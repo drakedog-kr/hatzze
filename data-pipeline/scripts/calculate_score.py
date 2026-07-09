@@ -60,6 +60,9 @@ INDICATOR_ORDER = [
     "vkospi",
     "news_sentiment",
     "kospi_gold_ratio",
+    "kosdaq_kospi_ratio",
+    "usdkrw_volatility",
+    "leverage_etf_volume",
 ]
 
 INDICATOR_CONFIGS = {
@@ -72,6 +75,9 @@ INDICATOR_CONFIGS = {
     "vkospi": {"kind": "percentile", "window_days": 365, "percentile": 5, "direction": "low"},
     "news_sentiment": {"kind": "percentile", "window_days": 30, "percentile": 95},
     "kospi_gold_ratio": {"kind": "percentile", "window_days": 365, "percentile": 95},
+    "kosdaq_kospi_ratio": {"kind": "percentile", "window_days": 365, "percentile": 95},
+    "usdkrw_volatility": {"kind": "percentile", "window_days": 365, "percentile": 5, "direction": "low"},
+    "leverage_etf_volume": {"kind": "percentile", "window_days": 365, "percentile": 95},
 }
 
 
