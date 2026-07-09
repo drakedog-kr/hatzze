@@ -1,14 +1,20 @@
-"""5개 지표의 현재값을 기준선과 비교해 과열도 스코어를 계산하고 daily_score/indicator_values에 저장.
+"""7개 지표의 현재값을 기준선과 비교해 과열도 스코어를 계산하고 daily_score/indicator_values에 저장.
 
 기준선(threshold) 종류:
 - 고정 기준선: buffett_index(100), kospi_high_gap(0)
 - 데이터 기반 기준선: us10y/naver_search_trend(과거 1년치의 상위 5% 지점),
-  dcinside_post_count(과거 30일치의 상위 5% 지점)
+  dcinside_post_count(과거 30일치의 상위 5% 지점), kospi_volume_surge(과거 1년치의
+  상위 5% 지점), vkospi(과거 1년치의 하위 5% 지점 — 아래 direction 설명 참고)
 
 kospi_high_gap은 0 이하 값만 가지는 지표라 (현재값/기준선)*100 공식을 그대로 쓸 수
 없다. KOSPI_HIGH_GAP_FLOOR(기준선까지의 거리를 재는 "0% 진행" 기준점, 지금까지
 관측된 실제 값과 비슷한 -20%로 설정한 가정값)을 두고 0%(기준선)를 "100% 진행"으로
 선형 보간한다.
+
+vkospi는 다른 지표와 반대 방향이다 — 값이 낮을수록(시장이 방심할수록) 과열 신호다.
+config에 "direction": "low"를 주면 기준선을 하위 5% 지점으로 잡고, 현재값이 그
+이하일 때 Hit, progress = threshold/current*100 (낮을수록 progress가 커짐)으로
+계산한다. 나머지 지표는 기본값인 "high" 방향(현재값이 기준선 이상일 때 Hit)을 쓴다.
 
 Progress는 두 가지 버전을 함께 다룬다:
 - 원본(raw) Progress: 100%를 넘거나 음수여도 그대로 둔 값. "기준선을 몇 % 초과했는지"
@@ -50,6 +56,9 @@ INDICATOR_ORDER = [
     "us10y",
     "naver_search_trend",
     "dcinside_post_count",
+    "kospi_volume_surge",
+    "vkospi",
+    "news_sentiment",
 ]
 
 INDICATOR_CONFIGS = {
@@ -58,6 +67,9 @@ INDICATOR_CONFIGS = {
     "us10y": {"kind": "percentile", "window_days": 365, "percentile": 95},
     "naver_search_trend": {"kind": "percentile", "window_days": 365, "percentile": 95},
     "dcinside_post_count": {"kind": "percentile", "window_days": 30, "percentile": 95},
+    "kospi_volume_surge": {"kind": "percentile", "window_days": 365, "percentile": 95},
+    "vkospi": {"kind": "percentile", "window_days": 365, "percentile": 5, "direction": "low"},
+    "news_sentiment": {"kind": "percentile", "window_days": 30, "percentile": 95},
 }
 
 
@@ -88,7 +100,7 @@ def get_latest_value(client, indicator_id: str) -> tuple[str, float]:
         .execute()
     )
     if not result.data:
-        raise RuntimeError(f"indicator_id={indicator_id}에 값이 없습니다")
+        raise InsufficientHistoryError(f"indicator_id={indicator_id}에 값이 아직 없습니다")
     row = result.data[0]
     return row["date"], float(row["raw_value"])
 
@@ -118,10 +130,20 @@ def compute_threshold(client, indicator_id: str, config: dict) -> float:
     return percentile(values, config["percentile"])
 
 
+def compute_hit(current: float, threshold: float, config: dict) -> bool:
+    if config.get("direction") == "low":
+        return current <= threshold
+    return current >= threshold
+
+
 def compute_progress(slug: str, current: float, threshold: float, config: dict) -> float:
     if slug == "kospi_high_gap":
         floor = config["floor"]
         return (current - floor) / (threshold - floor) * 100
+    if config.get("direction") == "low":
+        if current == 0:
+            return 0.0
+        return threshold / current * 100
     return current / threshold * 100
 
 
@@ -129,14 +151,15 @@ def cap_progress(progress: float) -> float:
     return min(max(progress, 0.0), 100.0)
 
 
-def stage_for_hit_count(hit_count: int) -> str:
-    if hit_count <= 1:
+def stage_for_hit_ratio(hit_count: int, total: int) -> str:
+    ratio = hit_count / total
+    if ratio <= 0.3:
         return "냉정"
-    if hit_count == 2:
+    if ratio <= 0.5:
         return "보통"
-    if hit_count == 3:
+    if ratio <= 0.7:
         return "과열"
-    return "광기"  # 4 or 5
+    return "광기"
 
 
 def main() -> None:
@@ -146,21 +169,32 @@ def main() -> None:
     for slug in INDICATOR_ORDER:
         config = INDICATOR_CONFIGS[slug]
         indicator_id, name = get_indicator(client, slug)
-        latest_date, current = get_latest_value(client, indicator_id)
 
         try:
-            threshold = compute_threshold(client, indicator_id, config)
-            hit = current >= threshold
-            progress = compute_progress(slug, current, threshold, config)
-            capped_progress = cap_progress(progress)
-            insufficient = False
+            latest_date, current = get_latest_value(client, indicator_id)
         except InsufficientHistoryError as e:
-            print(f"[WARNING] '{slug}' 히스토리 부족으로 중립 처리됨: {e}")
+            print(f"[WARNING] '{slug}' 데이터 부족으로 중립 처리됨: {e}")
+            latest_date = date.today().isoformat()
+            current = None
             threshold = None
             hit = False
             progress = NEUTRAL_PROGRESS
             capped_progress = NEUTRAL_PROGRESS
             insufficient = True
+        else:
+            try:
+                threshold = compute_threshold(client, indicator_id, config)
+                hit = compute_hit(current, threshold, config)
+                progress = compute_progress(slug, current, threshold, config)
+                capped_progress = cap_progress(progress)
+                insufficient = False
+            except InsufficientHistoryError as e:
+                print(f"[WARNING] '{slug}' 데이터 부족으로 중립 처리됨: {e}")
+                threshold = None
+                hit = False
+                progress = NEUTRAL_PROGRESS
+                capped_progress = NEUTRAL_PROGRESS
+                insufficient = True
 
         results.append(
             {
@@ -179,7 +213,7 @@ def main() -> None:
 
     hit_count = sum(1 for r in results if r["hit"])
     average_progress = sum(r["capped_progress"] for r in results) / len(results)
-    stage = stage_for_hit_count(hit_count)
+    stage = stage_for_hit_ratio(hit_count, len(results))
 
     print(
         f"{'slug':22} {'현재값':>14} {'기준선':>14} {'Hit':>5} "
@@ -187,22 +221,25 @@ def main() -> None:
     )
     for r in results:
         hit_mark = "O" if r["hit"] else "X"
+        current_str = (
+            f"{r['current']:>14.2f}" if r["current"] is not None else f"{'N/A':>14}"
+        )
         threshold_str = (
             f"{r['threshold']:>14.2f}" if r["threshold"] is not None else f"{'N/A':>14}"
         )
-        note = "  (히스토리 부족 - 중립 처리)" if r["insufficient"] else ""
+        note = "  (데이터 부족 - 중립 처리)" if r["insufficient"] else ""
         print(
-            f"{r['slug']:22} {r['current']:>14.2f} {threshold_str} "
+            f"{r['slug']:22} {current_str} {threshold_str} "
             f"{hit_mark:>5} {r['progress']:>13.1f}% {r['capped_progress']:>13.1f}%{note}"
         )
     print()
-    print(f"[종합] Hit: {hit_count}/5, average_progress(캡핑 기준): {average_progress:.2f}%, stage: {stage}")
+    print(f"[종합] Hit: {hit_count}/{len(results)}, average_progress(캡핑 기준): {average_progress:.2f}%, stage: {stage}")
 
     for r in results:
         client.table("indicator_values").update(
             {"normalized_score": round(r["progress"], 2)}
         ).eq("indicator_id", r["indicator_id"]).eq("date", r["date"]).execute()
-    print("[Supabase] indicator_values.normalized_score upsert 완료 (5건, 원본 Progress 저장)")
+    print(f"[Supabase] indicator_values.normalized_score upsert 완료 ({len(results)}건, 원본 Progress 저장)")
 
     today = date.today().isoformat()
     client.table("daily_score").upsert(
