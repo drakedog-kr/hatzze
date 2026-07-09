@@ -136,13 +136,10 @@ export default async function Home() {
       <section className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-8 sm:p-10 text-center">
         {dailyScore ? (
           <>
-            <p className="text-sm text-neutral-500">
-              {formatKstDateTime(dailyScore.updated_at)}
-            </p>
-            <p className="text-xs font-medium tracking-wide text-neutral-500 mt-2">
+            <p className="text-xl sm:text-2xl font-extrabold tracking-tight text-neutral-200">
               햇쩨 지수
             </p>
-            <p className="text-6xl sm:text-7xl font-bold mt-1 tracking-tight text-neutral-50">
+            <p className="text-6xl sm:text-7xl font-bold mt-3 tracking-tight text-neutral-50">
               {formatIndicatorValue(dailyScore.score, "%").display}%
             </p>
             <span
@@ -154,6 +151,9 @@ export default async function Home() {
               {dailyScore.stage}
             </span>
             <StageGauge stage={dailyScore.stage} />
+            <p className="text-xs text-neutral-500 text-right mt-6">
+              {formatKstDateTime(dailyScore.updated_at)}
+            </p>
           </>
         ) : (
           <p className="text-neutral-500">아직 계산된 스코어가 없습니다.</p>
