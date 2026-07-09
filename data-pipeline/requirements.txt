@@ -2,3 +2,4 @@ requests
 python-dotenv
 supabase
 pandas
+beautifulsoup4
