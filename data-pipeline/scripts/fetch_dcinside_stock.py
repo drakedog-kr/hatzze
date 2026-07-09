@@ -1,9 +1,23 @@
-"""디시인사이드 주식 갤러리(neostock)의 오늘자 게시글 수를 세어 Supabase에 upsert.
+"""디시인사이드 한국/미국 주식 마이너 갤러리의 오늘자 게시글 제목으로 커뮤니티 감성 지수를 계산해 Supabase에 upsert.
 
-robots.txt 확인 결과 gall.dcinside.com은 `User-agent: * / Allow: /`이고, 갤러리
-단위로 명시 차단된 id 목록(stock_new, stock_new2 등)은 모두 2013~2015년에
-운영되던 과거 아카이브 갤러리다. 현재 실제 운영 중인 주식 갤러리(2020년 개설, id=neostock)는
-차단 목록에 없어 스크래핑 대상으로 사용한다.
+애초에 사용하던 "주식 갤러리"(neostock, 정갤)는 실제로는 성별 갈등/연애 잡담이
+점령한 상태라(2026-07-09 기준 게시글 47건 중 주식 관련 1~2건) 감성 분석 대상으로
+부적절하다고 판단해, 실제로 주식 논의가 활발한 마이너 갤러리 2곳으로 교체했다:
+- 한국 주식 마이너 갤러리 (id=krstock)
+- 미국 주식 마이너 갤러리 (id=stockus)
+
+두 갤러리 모두 /mgallery/board/lists/ 경로를 쓰고, robots.txt(gall.dcinside.com)의
+`User-agent: * / Allow: /`에 해당하며 개별 차단 목록(stock_new, stock_new2, rezero
+등)에도 포함되어 있지 않아 스크래핑 가능하다.
+
+감성 스코어 = (긍정 게시글 수 - 부정 게시글 수) / 전체 게시글 수 * 100 (-100~100).
+두 갤러리의 게시글을 합산한 뒤 계산한다. 키워드 기반 단순 분류라 반어법 등은
+잡아내지 못한다 — PRD상 추후 LLM 기반으로 고도화할 예정이며, 지금은 1차 근사치로
+사용한다.
+
+--backfill(최근 30일)은 krstock만 대상으로 한다. stockus는 활동량이 너무 많아
+(오늘자 게시글만 1,500건을 넘겨도 전날로 못 넘어감) 30일 전체 백필이 비현실적이라,
+오늘부터의 값만 매일 누적한다.
 """
 
 from __future__ import annotations
@@ -19,9 +33,10 @@ from bs4 import BeautifulSoup
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client  # noqa: E402
+from config.sentiment_keywords import NEGATIVE_KEYWORDS, POSITIVE_KEYWORDS  # noqa: E402
 
-GALLERY_ID = "neostock"
-LIST_URL = "https://gall.dcinside.com/board/lists/"
+GALLERY_IDS = ["krstock", "stockus"]
+MGALLERY_LIST_URL = "https://gall.dcinside.com/mgallery/board/lists/"
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -29,19 +44,31 @@ HEADERS = {
     )
 }
 REQUEST_DELAY_SEC = 1.5
-MAX_PAGES = 30  # 무한 순회 방지용 안전장치
+MAX_PAGES = 30  # 무한 순회 방지용 안전장치 (갤러리별)
+
+# stockus(미국 주식 갤러리)는 활동량이 너무 많아(오늘자 1,500건을 넘겨도 전날로
+# 못 넘어감) 30일 전체 백필이 비현실적이다. krstock만 30일 백필하고, stockus는
+# 오늘부터의 값만 매일 누적해 나간다.
+BACKFILL_GALLERY_IDS = ["krstock"]
 
 BACKFILL_DAYS = 30
 DAY_BOUNDARY_DELAY_SEC = 4.0  # 하루치 수집이 끝나고 다음 날짜로 넘어갈 때 추가로 쉬는 시간
-MAX_BACKFILL_PAGES = 300  # 무한 순회 방지용 안전장치 (30일치라 페이지 수가 더 많이 필요)
+MAX_BACKFILL_PAGES = 300  # 무한 순회 방지용 안전장치 (갤러리별, 30일치라 페이지 수가 더 많이 필요)
+# 갤러리 목록에는 간혹 "개념글"처럼 원래 날짜의 오래된 글이 최신 글 사이에 끼어
+# 나오는 경우가 있다(정상적인 시간순 정렬을 깨뜨림). 이런 행 하나만 보고 바로
+# 종료하면 실제로는 더 있는 데이터를 놓칠 수 있으므로, 목표 범위보다 오래된 행이
+# 연속으로 여러 개 나올 때만 완전히 지난 것으로 판단한다.
+OLD_ROW_STREAK_THRESHOLD = 5
 
+# slug는 과거 neostock "게시글 수" 시절과 동일하게 유지해 기존 히스토리와 연결을
+# 끊지 않는다. name/description/unit만 감성 지수에 맞게 바꾼다.
 INDICATOR_SLUG = "dcinside_post_count"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
-    "name": "디시인사이드 주식 갤러리 게시글 수",
+    "name": "디시인사이드 한국/미국 주식 갤러리 커뮤니티 감성 지수",
     "category": "밈",
-    "description_beginner": "게시글이 갑자기 폭증하면 다들 주식 얘기만 하고 있다는 뜻 — 관심이 쏠린 정점일 수 있어요",
-    "unit": "건",
+    "description_beginner": "게시글에 긍정적인 말이 많은지 부정적인 말이 많은지 보여주는 지수예요. 다들 들떠서 낙관적인 얘기만 하고 있다면 과열 신호일 수 있어요",
+    "unit": "pt",
 }
 
 
@@ -50,16 +77,34 @@ def ensure_indicator(client) -> str:
         client.table("indicators").select("id").eq("slug", INDICATOR_SLUG).execute()
     )
     if existing.data:
-        return existing.data[0]["id"]
+        indicator_id = existing.data[0]["id"]
+        # 지표 정의가 바뀌었을 수 있으므로(게시글 수 -> 감성 지수, 갤러리 교체) 메타데이터를 최신화한다.
+        client.table("indicators").update(
+            {k: v for k, v in INDICATOR_META.items() if k != "slug"}
+        ).eq("id", indicator_id).execute()
+        return indicator_id
 
     inserted = client.table("indicators").insert(INDICATOR_META).execute()
     return inserted.data[0]["id"]
 
 
-def fetch_page(page: int) -> BeautifulSoup:
+def classify_sentiment(title: str) -> str:
+    positive_hits = sum(1 for kw in POSITIVE_KEYWORDS if kw in title)
+    negative_hits = sum(1 for kw in NEGATIVE_KEYWORDS if kw in title)
+
+    if positive_hits == 0 and negative_hits == 0:
+        return "neutral"
+    if positive_hits > negative_hits:
+        return "positive"
+    if negative_hits > positive_hits:
+        return "negative"
+    return "neutral"  # 동률
+
+
+def fetch_page(gallery_id: str, page: int) -> BeautifulSoup:
     resp = requests.get(
-        LIST_URL,
-        params={"id": GALLERY_ID, "page": page},
+        MGALLERY_LIST_URL,
+        params={"id": gallery_id, "page": page},
         headers=HEADERS,
         timeout=10,
     )
@@ -67,19 +112,26 @@ def fetch_page(page: int) -> BeautifulSoup:
     return BeautifulSoup(resp.text, "html.parser")
 
 
-def count_today_posts() -> int:
-    today_str = date.today().isoformat()
-    count = 0
-    page = 1
+def collect_today_titles_for_gallery(gallery_id: str) -> list[str]:
+    """오늘자 게시글 제목을 모은다.
 
-    while page <= MAX_PAGES:
-        soup = fetch_page(page)
+    갤러리 목록에는 간혹 "개념글"처럼 다른 날짜의 글이 최신 글 사이에 끼어
+    나온다(정상적인 시간순 정렬을 깨뜨림). 이런 행 하나만 보고 바로 종료하면
+    실제로는 오늘 글이 훨씬 많이 남아있어도 거기서 멈춰버리므로(krstock에서
+    45건 만에 조기 종료된 원인이었다), 오늘이 아닌 행이 연속으로 여러 개
+    나올 때만 오늘자 수집이 끝난 것으로 판단한다.
+    """
+    today_str = date.today().isoformat()
+    titles: list[str] = []
+    page = 1
+    done = False
+    consecutive_old_rows = 0
+
+    while page <= MAX_PAGES and not done:
+        soup = fetch_page(gallery_id, page)
         rows = soup.select("table.gall_list tbody tr")
         if not rows:
             break
-
-        page_has_today_post = False
-        reached_older_post = False
 
         for row in rows:
             if row.get("data-type") == "icon_notice":
@@ -91,25 +143,120 @@ def count_today_posts() -> int:
                 continue  # 설문/광고 등 실제 게시글이 아닌 행 (title 속성 없음)
 
             post_date = title_attr[:10]  # "YYYY-MM-DD HH:MM:SS" -> "YYYY-MM-DD"
-            if post_date == today_str:
-                count += 1
-                page_has_today_post = True
-            else:
-                reached_older_post = True
 
-        print(f"[DCInside] {page}페이지 조회 완료 (누적 {count}건)")
+            if post_date != today_str:
+                consecutive_old_rows += 1
+                if consecutive_old_rows >= OLD_ROW_STREAK_THRESHOLD:
+                    done = True
+                    break
+                continue
+            consecutive_old_rows = 0
 
-        if reached_older_post or not page_has_today_post:
-            break
+            title_link = row.select_one("td.gall_tit a:not(.reply_numbox)")
+            titles.append(title_link.get_text(strip=True) if title_link else "")
+
+        print(f"[DCInside:{gallery_id}] {page}페이지 조회 완료 (누적 {len(titles)}건)")
 
         page += 1
+        if not done:
+            time.sleep(REQUEST_DELAY_SEC)
+
+    return titles
+
+
+def collect_today_titles() -> list[str]:
+    all_titles: list[str] = []
+    for gallery_id in GALLERY_IDS:
+        all_titles.extend(collect_today_titles_for_gallery(gallery_id))
         time.sleep(REQUEST_DELAY_SEC)
+    return all_titles
 
-    return count
+
+def compute_sentiment(titles: list[str]) -> dict:
+    positive = negative = neutral = 0
+    for title in titles:
+        label = classify_sentiment(title)
+        if label == "positive":
+            positive += 1
+        elif label == "negative":
+            negative += 1
+        else:
+            neutral += 1
+
+    total = len(titles)
+    score = (positive - negative) / total * 100 if total else 0.0
+    return {
+        "positive": positive,
+        "negative": negative,
+        "neutral": neutral,
+        "total": total,
+        "score": score,
+    }
 
 
-def backfill_daily_counts(client, indicator_id: str) -> None:
-    """최근 BACKFILL_DAYS일치 게시글 수를 과거 페이지를 거슬러 올라가며 집계한다.
+def collect_daily_titles_for_gallery(
+    gallery_id: str, oldest_missing: str
+) -> dict[str, list[str]]:
+    day_titles: dict[str, list[str]] = {}
+    current_day: str | None = None
+    page = 1
+    done = False
+    consecutive_old_rows = 0
+
+    while page <= MAX_BACKFILL_PAGES and not done:
+        soup = fetch_page(gallery_id, page)
+        rows = soup.select("table.gall_list tbody tr")
+        if not rows:
+            break
+
+        for row in rows:
+            if row.get("data-type") == "icon_notice":
+                continue
+
+            date_td = row.select_one("td.gall_date")
+            title_attr = date_td.get("title") if date_td else None
+            if not title_attr:
+                continue
+
+            post_date = title_attr[:10]
+
+            if post_date < oldest_missing:
+                consecutive_old_rows += 1
+                if consecutive_old_rows >= OLD_ROW_STREAK_THRESHOLD:
+                    done = True
+                    break
+                continue
+            consecutive_old_rows = 0
+
+            if post_date != current_day:
+                if current_day is not None:
+                    print(
+                        f"[DCInside:{gallery_id}] {current_day} 수집 완료: "
+                        f"{len(day_titles.get(current_day, []))}건"
+                    )
+                    time.sleep(DAY_BOUNDARY_DELAY_SEC)
+                current_day = post_date
+
+            title_link = row.select_one("td.gall_tit a:not(.reply_numbox)")
+            title_text = title_link.get_text(strip=True) if title_link else ""
+            day_titles.setdefault(post_date, []).append(title_text)
+
+        print(f"[DCInside:{gallery_id}] {page}페이지 조회 완료")
+        page += 1
+        if not done:
+            time.sleep(REQUEST_DELAY_SEC)
+
+    if current_day is not None:
+        print(
+            f"[DCInside:{gallery_id}] {current_day} 수집 완료: "
+            f"{len(day_titles.get(current_day, []))}건"
+        )
+
+    return day_titles
+
+
+def backfill_daily_sentiment(client, indicator_id: str) -> None:
+    """최근 BACKFILL_DAYS일치 감성 스코어를 두 갤러리 합산 기준으로 백필한다.
 
     이미 저장된 날짜라도 그 날짜의 게시글이 흩어져 있는 페이지 자체는 순서상
     반드시 거쳐가야 하지만(페이지네이션에 날짜 점프 기능이 없음), 이미 저장된
@@ -137,64 +284,24 @@ def backfill_daily_counts(client, indicator_id: str) -> None:
     oldest_missing = min(missing_dates)
     print(f"[DCInside] 백필 대상 {len(missing_dates)}일 (가장 오래된 날짜: {oldest_missing})")
 
-    # 갤러리 목록에는 간혹 "개념글"처럼 원래 날짜의 오래된 글이 최신 글 사이에
-    # 끼어 나오는 경우가 있다(정상적인 시간순 정렬을 깨뜨림). 이런 행 하나만
-    # 보고 바로 종료하면 실제로는 더 있는 데이터를 놓칠 수 있으므로, 목표 범위보다
-    # 오래된 행이 연속으로 여러 개 나올 때만 완전히 지난 것으로 판단한다.
-    OLD_ROW_STREAK_THRESHOLD = 5
+    combined_titles: dict[str, list[str]] = {}
+    for gallery_id in BACKFILL_GALLERY_IDS:
+        gallery_titles = collect_daily_titles_for_gallery(gallery_id, oldest_missing)
+        for d, titles in gallery_titles.items():
+            combined_titles.setdefault(d, []).extend(titles)
 
-    day_counts: dict[str, int] = {}
-    current_day: str | None = None
-    page = 1
-    done = False
-    consecutive_old_rows = 0
+    rows_to_save = []
+    for d, titles in combined_titles.items():
+        if d not in missing_dates:
+            continue
+        result = compute_sentiment(titles)
+        score = round(result["score"], 2)
+        rows_to_save.append({"indicator_id": indicator_id, "date": d, "raw_value": score})
+        print(
+            f"[DCInside] {d}: 긍정 {result['positive']} / 부정 {result['negative']} / "
+            f"중립 {result['neutral']} (전체 {result['total']}) -> {score}pt"
+        )
 
-    while page <= MAX_BACKFILL_PAGES and not done:
-        soup = fetch_page(page)
-        rows = soup.select("table.gall_list tbody tr")
-        if not rows:
-            break
-
-        for row in rows:
-            if row.get("data-type") == "icon_notice":
-                continue
-
-            date_td = row.select_one("td.gall_date")
-            title_attr = date_td.get("title") if date_td else None
-            if not title_attr:
-                continue
-
-            post_date = title_attr[:10]
-
-            if post_date < oldest_missing:
-                consecutive_old_rows += 1
-                if consecutive_old_rows >= OLD_ROW_STREAK_THRESHOLD:
-                    done = True
-                    break
-                continue
-            consecutive_old_rows = 0
-
-            if post_date != current_day:
-                if current_day is not None:
-                    print(f"[DCInside] {current_day} 집계 완료: {day_counts.get(current_day, 0)}건")
-                    time.sleep(DAY_BOUNDARY_DELAY_SEC)
-                current_day = post_date
-
-            day_counts[post_date] = day_counts.get(post_date, 0) + 1
-
-        print(f"[DCInside] {page}페이지 조회 완료")
-        page += 1
-        if not done:
-            time.sleep(REQUEST_DELAY_SEC)
-
-    if current_day is not None:
-        print(f"[DCInside] {current_day} 집계 완료: {day_counts.get(current_day, 0)}건")
-
-    rows_to_save = [
-        {"indicator_id": indicator_id, "date": d, "raw_value": c}
-        for d, c in day_counts.items()
-        if d in missing_dates
-    ]
     if rows_to_save:
         client.table("indicator_values").upsert(
             rows_to_save, on_conflict="indicator_id,date"
@@ -208,18 +315,35 @@ def main() -> None:
     print(f"[Supabase] indicator '{INDICATOR_SLUG}' id: {indicator_id}")
 
     if "--backfill" in sys.argv:
-        backfill_daily_counts(client, indicator_id)
+        backfill_daily_sentiment(client, indicator_id)
         return
 
-    post_count = count_today_posts()
+    titles = collect_today_titles()
+    result = compute_sentiment(titles)
     today = date.today().isoformat()
-    print(f"[DCInside] 오늘({today}) 주식 갤러리 게시글 수: {post_count}건")
+
+    print(
+        f"[DCInside] 오늘({today}) 감성 분류 — 긍정 {result['positive']}건 / "
+        f"부정 {result['negative']}건 / 중립 {result['neutral']}건 "
+        f"(전체 {result['total']}건, 갤러리: {', '.join(GALLERY_IDS)})"
+    )
+
+    if result["total"]:
+        neutral_ratio = result["neutral"] / result["total"] * 100
+        if neutral_ratio >= 80:
+            print(
+                f"[WARNING] 중립 비율이 {neutral_ratio:.1f}%로 매우 높습니다. "
+                "config/sentiment_keywords.py의 키워드를 보강하는 걸 권장합니다."
+            )
+
+    score = round(result["score"], 2)
+    print(f"[DCInside] 감성 스코어: {score}pt")
 
     client.table("indicator_values").upsert(
-        {"indicator_id": indicator_id, "date": today, "raw_value": post_count},
+        {"indicator_id": indicator_id, "date": today, "raw_value": score},
         on_conflict="indicator_id,date",
     ).execute()
-    print(f"[Supabase] indicator_values upsert 완료: date={today}, raw_value={post_count}")
+    print(f"[Supabase] indicator_values upsert 완료: date={today}, raw_value={score}")
 
 
 if __name__ == "__main__":
