@@ -5,31 +5,42 @@ import type { IndicatorWithLatestValue } from "@/lib/data";
 // 굳어버리지 않도록 매 요청마다 서버에서 새로 조회한다.
 export const dynamic = "force-dynamic";
 
+const STAGE_BADGE_CLASS: Record<string, string> = {
+  냉정: "bg-sky-500/10 text-sky-300",
+  보통: "bg-neutral-500/15 text-neutral-300",
+  과열: "bg-amber-500/10 text-amber-300",
+  광기: "bg-red-500/10 text-red-300",
+};
+
 function IndicatorCard({ indicator }: { indicator: IndicatorWithLatestValue }) {
   const hasValue = indicator.latest !== null;
   const isHit = (indicator.latest?.normalized_score ?? 0) >= 100;
 
   return (
-    <div className="border rounded p-4">
+    <div className="rounded-lg border border-neutral-800 bg-neutral-900/30 p-4">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="font-semibold">{indicator.name}</h3>
+        <h3 className="font-medium text-neutral-100">{indicator.name}</h3>
         {hasValue && (
           <span
             className={
               isHit
-                ? "text-xs font-bold text-red-600"
-                : "text-xs text-gray-400"
+                ? "text-xs font-semibold text-red-400"
+                : "text-xs text-neutral-600"
             }
           >
             {isHit ? "● Hit" : "○"}
           </span>
         )}
       </div>
-      <p className="text-2xl mt-1">
+      <p className="text-2xl font-semibold mt-1 text-neutral-100">
         {hasValue ? indicator.latest!.raw_value : "-"}
-        <span className="text-sm text-gray-500 ml-1">{indicator.unit}</span>
+        <span className="text-sm font-normal text-neutral-500 ml-1">
+          {indicator.unit}
+        </span>
       </p>
-      <p className="text-sm text-gray-500 mt-2">{indicator.description_beginner}</p>
+      <p className="text-sm text-neutral-500 mt-2 leading-relaxed">
+        {indicator.description_beginner}
+      </p>
     </div>
   );
 }
@@ -44,23 +55,32 @@ export default async function Home() {
   const meme = indicators.filter((i) => i.category === "밈");
 
   return (
-    <main className="max-w-2xl mx-auto p-6 space-y-10">
-      <section className="border rounded p-6 text-center">
+    <main className="max-w-2xl mx-auto p-6 space-y-12">
+      <section className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-8 sm:p-10 text-center">
         {dailyScore ? (
           <>
-            <p className="text-sm text-gray-500">{dailyScore.date} 기준</p>
-            <p className="text-5xl font-bold mt-2">{dailyScore.score}%</p>
-            <span className="inline-block mt-3 px-3 py-1 rounded-full bg-gray-100 text-sm font-medium">
+            <p className="text-sm text-neutral-500">{dailyScore.date} 기준</p>
+            <p className="text-6xl sm:text-7xl font-bold mt-3 tracking-tight text-neutral-50">
+              {dailyScore.score}%
+            </p>
+            <span
+              className={`inline-block mt-4 px-4 py-1.5 rounded-full text-sm font-medium ${
+                STAGE_BADGE_CLASS[dailyScore.stage] ??
+                "bg-neutral-500/15 text-neutral-300"
+              }`}
+            >
               {dailyScore.stage}
             </span>
           </>
         ) : (
-          <p className="text-gray-500">아직 계산된 스코어가 없습니다.</p>
+          <p className="text-neutral-500">아직 계산된 스코어가 없습니다.</p>
         )}
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold mb-3">정통 지표</h2>
+        <h2 className="text-base font-semibold text-neutral-300 mb-3">
+          정통 지표
+        </h2>
         <div className="space-y-3">
           {traditional.map((indicator) => (
             <IndicatorCard key={indicator.id} indicator={indicator} />
@@ -69,7 +89,9 @@ export default async function Home() {
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold mb-3">밈 지표</h2>
+        <h2 className="text-base font-semibold text-neutral-300 mb-3">
+          밈 지표
+        </h2>
         <div className="space-y-3">
           {meme.map((indicator) => (
             <IndicatorCard key={indicator.id} indicator={indicator} />
@@ -77,7 +99,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <p className="text-xs text-gray-400 text-center pt-4">
+      <p className="text-xs text-neutral-600 text-center pt-4">
         이 서비스는 정보 제공 목적이며, 투자 조언이나 매수·매도 추천이 아닙니다.
       </p>
     </main>
