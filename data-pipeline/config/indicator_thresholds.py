@@ -1,4 +1,4 @@
-"""15개 지표의 Hit/progress 기준값(threshold) 설정.
+"""16개 지표의 Hit/progress 기준값(threshold) 설정.
 
 percentile 기반(과거 데이터의 상위/하위 N% 지점)은 데이터가 1년 가까이 쌓일
 때까지 기준선이 계속 흔들려서, 리서치·논리 기반으로 정한 고정 기준값으로
@@ -41,6 +41,12 @@ INDICATOR_THRESHOLDS = {
     # 못 넘기고, 반대로 건조한 가을/겨울엔 자주 넘길 수 있다. 계절별 기준선을
     # 따로 두려면 이 단일 threshold로는 안 되고 월별/계절별 분기가 필요하다.
     "weather_sunshine_index": {"kind": "fixed", "threshold": 8.0},
+    # kospi_asia_relative_strength: threshold=10(%p)은 "코스피 20거래일
+    # 수익률이 일본·홍콩·대만 평균보다 10%p 이상 앞선다"를 뚜렷한 쏠림으로
+    # 보는 논리적 추정치다 — 실측 분포(예: 최근 1~2년 이 지표의 실제
+    # 최댓값·분산)를 아직 확인 못 했으니, 데이터가 쌓이면 재조정이 필요할
+    # 수 있다.
+    "kospi_asia_relative_strength": {"kind": "fixed", "threshold": 10.0},
 }
 
 # 현재값이 음수로 나올 수 있는 지표(감성 점수류)는 음수를 "역방향 과열"로 해석하지

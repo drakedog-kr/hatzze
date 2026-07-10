@@ -53,13 +53,17 @@ function IndicatorCard({ indicator }: { indicator: IndicatorWithLatestValue }) {
   const hasValue = indicator.latest !== null;
   const normalizedScore = indicator.latest?.normalized_score ?? null;
   const isHit = (normalizedScore ?? 0) >= 100;
-  const barWidth =
-    normalizedScore !== null ? Math.min(Math.max(normalizedScore, 0), 100) : 0;
+  // normalized_score는 기준선 초과분(100%+)이나 음수를 그대로 담은 원본값이라,
+  // 화면에는 progress bar와 같은 0~100% 범위로 캡핑한 값을 보여준다 — 그래야
+  // "-88%" 텍스트 옆에 텅 빈 바가 뜨는 것처럼 텍스트와 바가 어긋나 보이지 않는다.
+  const cappedScore =
+    normalizedScore !== null ? Math.min(Math.max(normalizedScore, 0), 100) : null;
+  const barWidth = cappedScore ?? 0;
   const { display, displayUnit } = hasValue
     ? formatIndicatorValue(indicator.latest!.raw_value, indicator.unit)
     : { display: "-", displayUnit: indicator.unit };
   const normalizedScoreDisplay =
-    normalizedScore !== null ? formatIndicatorValue(normalizedScore, "%") : null;
+    cappedScore !== null ? formatIndicatorValue(cappedScore, "%") : null;
   const threshold = indicator.latest?.threshold ?? null;
   const thresholdDisplay =
     threshold !== null ? formatIndicatorValue(threshold, indicator.unit) : null;
