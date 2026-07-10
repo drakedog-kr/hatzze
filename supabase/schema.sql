@@ -13,6 +13,7 @@ create table if not exists public.indicators (
   unit text not null,
   is_public boolean not null default true,
   weight numeric not null default 1,
+  direction text not null default 'high' check (direction in ('high', 'low')),
   created_at timestamptz not null default now()
 );
 
@@ -21,6 +22,7 @@ comment on column public.indicators.slug is '코드에서 참조하는 안정적
 comment on column public.indicators.description_beginner is '초보자용 한줄 설명';
 comment on column public.indicators.is_public is '프론트엔드 노출 여부. false면 다른 지표 계산용 내부 캐시(예: kospi_close_raw)라 화면에 표시하지 않음';
 comment on column public.indicators.weight is '햇쩨 지수(daily_score.score) 가중 평균 계산용 가중치. 새 지표는 기본값 1(최저 가중치)로 시작한다';
+comment on column public.indicators.direction is 'Hit 판정 방향. high(기본값)=현재값이 기준값 이상이면 Hit, low=현재값이 기준값 이하면 Hit(vkospi, usdkrw_volatility)';
 
 alter table public.indicators enable row level security;
 
@@ -39,11 +41,13 @@ create table if not exists public.indicator_values (
   date date not null,
   raw_value numeric not null,
   normalized_score numeric,
+  threshold numeric,
   created_at timestamptz not null default now(),
   unique (indicator_id, date)
 );
 
 comment on table public.indicator_values is '지표별 일별 원시값 및 정규화 스코어(기준선 대비 진행률 %, 100 초과·음수 가능)';
+comment on column public.indicator_values.threshold is '그날 calculate_score.py가 계산한 Hit 기준값. kospi_high_gap/youtube_finance_search_views처럼 기준값이 매일 바뀌는 지표가 있어 indicators가 아니라 여기 저장한다';
 
 create index if not exists indicator_values_indicator_id_date_idx
   on public.indicator_values (indicator_id, date desc);

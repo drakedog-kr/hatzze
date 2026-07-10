@@ -60,6 +60,10 @@ function IndicatorCard({ indicator }: { indicator: IndicatorWithLatestValue }) {
     : { display: "-", displayUnit: indicator.unit };
   const normalizedScoreDisplay =
     normalizedScore !== null ? formatIndicatorValue(normalizedScore, "%") : null;
+  const threshold = indicator.latest?.threshold ?? null;
+  const thresholdDisplay =
+    threshold !== null ? formatIndicatorValue(threshold, indicator.unit) : null;
+  const directionLabel = indicator.direction === "low" ? "이하" : "이상";
 
   return (
     <div className="rounded-lg border border-neutral-800 bg-neutral-900/30 p-4">
@@ -106,6 +110,12 @@ function IndicatorCard({ indicator }: { indicator: IndicatorWithLatestValue }) {
               style={{ width: `${barWidth}%` }}
             />
           </div>
+          {thresholdDisplay && (
+            <p className="text-xs text-neutral-600 mt-1.5">
+              기준: {thresholdDisplay.display}
+              {thresholdDisplay.displayUnit} {directionLabel}
+            </p>
+          )}
         </div>
       )}
 

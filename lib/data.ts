@@ -16,10 +16,12 @@ export type IndicatorWithLatestValue = {
   category: "정통" | "밈";
   description_beginner: string;
   unit: string;
+  direction: "high" | "low";
   latest: {
     date: string;
     raw_value: number;
     normalized_score: number | null;
+    threshold: number | null;
   } | null;
 };
 
@@ -43,8 +45,8 @@ export async function getPublicIndicators(): Promise<IndicatorWithLatestValue[]>
     .from("indicators")
     .select(
       `
-      id, slug, name, category, description_beginner, unit, created_at,
-      indicator_values ( date, raw_value, normalized_score )
+      id, slug, name, category, description_beginner, unit, direction, created_at,
+      indicator_values ( date, raw_value, normalized_score, threshold )
     `,
     )
     .eq("is_public", true)
@@ -61,6 +63,7 @@ export async function getPublicIndicators(): Promise<IndicatorWithLatestValue[]>
     category: row.category,
     description_beginner: row.description_beginner,
     unit: row.unit,
+    direction: row.direction,
     latest: row.indicator_values[0] ?? null,
   }));
 }

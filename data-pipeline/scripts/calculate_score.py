@@ -289,7 +289,10 @@ def main() -> None:
 
     for r in results:
         client.table("indicator_values").update(
-            {"normalized_score": round(r["progress"], 2)}
+            {
+                "normalized_score": round(r["progress"], 2),
+                "threshold": round(r["threshold"], 2) if r["threshold"] is not None else None,
+            }
         ).eq("indicator_id", r["indicator_id"]).eq("date", r["date"]).execute()
     print(f"[Supabase] indicator_values.normalized_score upsert 완료 ({len(results)}건, 원본 Progress 저장)")
 
