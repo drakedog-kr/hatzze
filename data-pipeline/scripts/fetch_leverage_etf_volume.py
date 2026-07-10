@@ -4,10 +4,13 @@
 kospi_dd_trd(지수 시세)와는 별개로 개별 서비스 이용신청이 필요할 수 있다. 401이
 나면 KRX 정보데이터시스템에서 'ETF 시세정보' 서비스를 신청/승인받아야 한다.
 
-주의: 이 엔드포인트는 아직 승인받지 못해 실제 응답 필드를 검증하지 못했다.
-종목 단위 KRX API는 지수 API(CLSPRC_IDX 등)와 다르게 TDD_CLSPRC(종가),
-ACC_TRDVAL(거래대금), ISU_CD(종목코드) 필드명을 쓰는 것으로 알려져 있어
-그 관례를 따랐다 — 승인 후 실제 응답을 보고 다르면 필드명만 고치면 된다.
+승인 후 실제 응답으로 필드명을 검증 완료: ISU_CD(종목코드), TDD_CLSPRC(종가),
+ACC_TRDVAL(거래대금) 모두 추정했던 그대로였다.
+
+이 엔드포인트는 하루치 응답에 전체 ETF 종목(1000건 이상)이 다 담겨오다 보니 다른
+KRX 엔드포인트보다 응답이 느려 10초 타임아웃에 자주 걸린다. fetch_buffett_index.py의
+ECOS 재시도 패턴과 동일하게 재시도하되, 그래도 실패하면(네트워크 문제로 추정) 그
+하루만 건너뛰고 나머지 365일 백필은 계속 진행한다.
 
 최초 실행 시 1년치를 백필하고, 이후 실행부터는 아직 없는 날짜만 채운다.
 """
@@ -29,6 +32,9 @@ from common.supabase_client import get_client  # noqa: E402
 KRX_URL = "http://data-dbg.krx.co.kr/svc/apis/etp/etf_bydd_trd"
 BACKFILL_DAYS = 365
 REQUEST_DELAY_SEC = 0.05
+KRX_REQUEST_TIMEOUT_SEC = 15
+KRX_MAX_RETRIES = 3
+KRX_RETRY_DELAY_SEC = 3
 TRADING_VALUE_KEY = "ACC_TRDVAL"
 ISU_CODE_KEY = "ISU_CD"
 TARGET_ISU_CODE = "122630"  # KODEX 레버리지
@@ -56,12 +62,30 @@ def ensure_indicator(client) -> str:
 
 
 def fetch_leverage_etf_trading_value(bas_dd: str) -> float | None:
-    resp = requests.get(
-        KRX_URL,
-        params={"basDd": bas_dd},
-        headers={"AUTH_KEY": KRX_API_KEY},
-        timeout=10,
-    )
+    resp = None
+    last_error: Exception | None = None
+    for attempt in range(1, KRX_MAX_RETRIES + 1):
+        try:
+            resp = requests.get(
+                KRX_URL,
+                params={"basDd": bas_dd},
+                headers={"AUTH_KEY": KRX_API_KEY},
+                timeout=KRX_REQUEST_TIMEOUT_SEC,
+            )
+            break
+        except requests.exceptions.RequestException as e:
+            last_error = e
+            print(f"[KRX] {bas_dd} 요청 실패 ({attempt}/{KRX_MAX_RETRIES}): {e}")
+            if attempt < KRX_MAX_RETRIES:
+                time.sleep(KRX_RETRY_DELAY_SEC)
+
+    if resp is None:
+        print(
+            f"[WARNING] {bas_dd} 요청이 {KRX_MAX_RETRIES}번 모두 실패해 이 날짜는 "
+            f"건너뜁니다: {last_error}"
+        )
+        return None
+
     if resp.status_code == 401:
         raise PermissionError(
             "KRX API가 401을 반환했습니다. data.krx.co.kr(정보데이터시스템)에서 "
