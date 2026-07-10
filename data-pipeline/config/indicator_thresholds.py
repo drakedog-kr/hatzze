@@ -1,4 +1,4 @@
-"""14개 지표의 Hit/progress 기준값(threshold) 설정.
+"""15개 지표의 Hit/progress 기준값(threshold) 설정.
 
 percentile 기반(과거 데이터의 상위/하위 N% 지점)은 데이터가 1년 가까이 쌓일
 때까지 기준선이 계속 흔들려서, 리서치·논리 기반으로 정한 고정 기준값으로
@@ -35,6 +35,12 @@ INDICATOR_THRESHOLDS = {
     "leverage_etf_volume": {"kind": "fixed", "threshold": 40_000.0},  # 억원 (4조원)
     "bestseller_finance_ratio": {"kind": "fixed", "threshold": 16.0},
     "youtube_finance_search_views": {"kind": "cumulative_average"},
+    # weather_sunshine_index: threshold=8은 "전운량 2 이하(구름 거의 없음)"에
+    # 해당하는 맑음지수다. 다만 이건 계절과 무관하게 고정된 값이라는 한계가
+    # 있다 — 예를 들어 장마철(6~7월)엔 맑은 날 자체가 드물어 이 기준을 거의
+    # 못 넘기고, 반대로 건조한 가을/겨울엔 자주 넘길 수 있다. 계절별 기준선을
+    # 따로 두려면 이 단일 threshold로는 안 되고 월별/계절별 분기가 필요하다.
+    "weather_sunshine_index": {"kind": "fixed", "threshold": 8.0},
 }
 
 # 현재값이 음수로 나올 수 있는 지표(감성 점수류)는 음수를 "역방향 과열"로 해석하지
