@@ -13,6 +13,7 @@ export type IndicatorWithLatestValue = {
   id: string;
   slug: string;
   name: string;
+  headline: string | null;
   category: "정통" | "밈";
   description_beginner: string;
   unit: string;
@@ -45,7 +46,7 @@ export async function getPublicIndicators(): Promise<IndicatorWithLatestValue[]>
     .from("indicators")
     .select(
       `
-      id, slug, name, category, description_beginner, unit, direction, created_at,
+      id, slug, name, headline, category, description_beginner, unit, direction, created_at,
       indicator_values ( date, raw_value, normalized_score, threshold )
     `,
     )
@@ -60,6 +61,7 @@ export async function getPublicIndicators(): Promise<IndicatorWithLatestValue[]>
     id: row.id,
     slug: row.slug,
     name: row.name,
+    headline: row.headline,
     category: row.category,
     description_beginner: row.description_beginner,
     unit: row.unit,

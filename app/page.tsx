@@ -68,11 +68,19 @@ function IndicatorCard({ indicator }: { indicator: IndicatorWithLatestValue }) {
   const thresholdDisplay =
     threshold !== null ? formatIndicatorValue(threshold, indicator.unit) : null;
   const directionLabel = indicator.direction === "low" ? "이하" : "이상";
+  // headline이 아직 없는(새로 추가된) 지표는 name을 큰 제목 자리에 그대로
+  // 쓰고, 이 경우 부제목 줄은 name과 중복되므로 표시하지 않는다.
+  const title = indicator.headline ?? indicator.name;
 
   return (
     <div className="rounded-lg border border-neutral-800 bg-neutral-900/30 p-4">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="font-medium text-neutral-100">{indicator.name}</h3>
+        <div>
+          <h3 className="font-medium text-neutral-100">{title}</h3>
+          {indicator.headline && (
+            <p className="text-xs text-neutral-500 mt-0.5">{indicator.name}</p>
+          )}
+        </div>
         {hasValue && (
           <span
             className={

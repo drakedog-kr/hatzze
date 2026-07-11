@@ -8,6 +8,7 @@ create table if not exists public.indicators (
   id uuid primary key default gen_random_uuid(),
   slug text not null unique,
   name text not null,
+  headline text,
   category text not null check (category in ('정통', '밈')),
   description_beginner text not null,
   unit text not null,
@@ -23,6 +24,7 @@ comment on column public.indicators.description_beginner is '초보자용 한줄
 comment on column public.indicators.is_public is '프론트엔드 노출 여부. false면 다른 지표 계산용 내부 캐시(예: kospi_close_raw)라 화면에 표시하지 않음';
 comment on column public.indicators.weight is '햇쩨 지수(daily_score.score) 가중 평균 계산용 가중치. 새 지표는 기본값 1(최저 가중치)로 시작한다';
 comment on column public.indicators.direction is 'Hit 판정 방향. high(기본값)=현재값이 기준값 이상이면 Hit, low=현재값이 기준값 이하면 Hit(vkospi, usdkrw_volatility)';
+comment on column public.indicators.headline is '카드 상단에 표시되는 감성적인 한 줄 제목. 비어 있으면 name을 대신 큰 제목으로 표시한다';
 
 alter table public.indicators enable row level security;
 
