@@ -32,7 +32,7 @@ INDICATOR_SLUG = "kospi_volume_surge"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "코스피 거래대금 급증도",
-    "category": "정통",
+    "category": "시장",
     "description_beginner": "사람들이 오늘 얼마나 활발하게 사고팔았는지 보여줘요. 평소보다 거래가 훨씬 많으면 다들 흥분한 상태일 수 있어요",
     "unit": "억원",
 }

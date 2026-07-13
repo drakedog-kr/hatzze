@@ -84,7 +84,7 @@ ETF_RAW_SLUG = "leverage_etf_trade_value_raw"
 ETF_RAW_META = {
     "slug": ETF_RAW_SLUG,
     "name": "레버리지 ETF 거래대금 (내부용 원본)",
-    "category": "정통",
+    "category": "시장",
     "description_beginner": "레버리지 ETF·선물 미결제약정 종합 지수 계산을 위해 내부적으로 저장하는 KODEX 레버리지 ETF 거래대금 데이터예요.",
     "unit": "억원",
     "is_public": False,
@@ -94,7 +94,7 @@ OI_RAW_SLUG = "kospi200_futures_oi_raw"
 OI_RAW_META = {
     "slug": OI_RAW_SLUG,
     "name": "코스피200 선물 미결제약정 (내부용 원본)",
-    "category": "정통",
+    "category": "시장",
     "description_beginner": "레버리지 ETF·선물 미결제약정 종합 지수 계산을 위해 내부적으로 저장하는 코스피200 선물 미결제약정 데이터예요.",
     "unit": "계약",
     "is_public": False,
@@ -104,7 +104,7 @@ COMPOSITE_SLUG = "leverage_etf_volume"
 COMPOSITE_META = {
     "slug": COMPOSITE_SLUG,
     "name": "레버리지 ETF·선물 미결제약정 종합 지수",
-    "category": "정통",
+    "category": "시장",
     "description_beginner": "레버리지 상품 거래와 선물 미결제약정을 같이 보면, 개인들이 얼마나 공격적으로, 그리고 얼마나 오래 베팅을 이어가고 있는지 알 수 있어요",
     "unit": "pt",
 }

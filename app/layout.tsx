@@ -11,7 +11,7 @@ const pretendard = localFont({
 
 export const metadata: Metadata = {
   title: "Hatzze — 코스피 과열도 판독기",
-  description: "정통 지표와 밈 지표로 오늘의 코스피 과열도를 확인하세요.",
+  description: "시장 지표와 감성 지표로 오늘의 코스피 과열도를 확인하세요.",
 };
 
 export default function RootLayout({

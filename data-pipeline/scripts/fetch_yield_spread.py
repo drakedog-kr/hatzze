@@ -36,7 +36,7 @@ INDICATOR_SLUG = "yield_curve_spread"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "미국 장단기 금리차 (10년물-2년물)",
-    "category": "정통",
+    "category": "시장",
     "headline": "채권시장이 보내는 경고",
     "description_beginner": "장기 금리가 단기 금리보다 낮아지면(역전) 경기 침체 신호로 유명해요. 반대로 스프레드가 넓어지면 경기 확장 기대가 커지고 있다는 뜻일 수 있어요",
     "unit": "%p",

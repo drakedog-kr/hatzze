@@ -43,7 +43,7 @@ INDICATOR_SLUG = "vix_vkospi_spread"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "VIX 대비 VKOSPI 스프레드",
-    "category": "정통",
+    "category": "시장",
     "headline": "태평양 건너 공포와 비교하면",
     "description_beginner": "미국(VIX)과 한국(VKOSPI) 변동성을 각자 최근 1년 대비 백분위로 바꿔 비교해요. 미국은 불안한데 한국만 유독 잠잠할수록(백분위 격차가 클수록) 방심 신호로 봐요",
     "unit": "pt",

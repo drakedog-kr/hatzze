@@ -25,7 +25,7 @@ INDICATOR_SLUG = "naver_search_trend"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "주식 초보 검색량 지수",
-    "category": "밈",
+    "category": "감성",
     "description_beginner": "다들 이제서야 주식을 시작하려고 검색하고 있다면, 이미 많이 오른 뒤일 수 있어요",
     "unit": "pt",
 }

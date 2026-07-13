@@ -28,7 +28,7 @@ RAW_SLUG = "kospi_close_raw"
 RAW_META = {
     "slug": RAW_SLUG,
     "name": "코스피 지수 종가 (내부용 원본)",
-    "category": "정통",
+    "category": "시장",
     "description_beginner": "52주 신고가 대비 괴리율 계산을 위해 내부적으로 저장하는 코스피 지수 종가 데이터예요.",
     "unit": "pt",
     "is_public": False,
@@ -38,7 +38,7 @@ GAP_SLUG = "kospi_high_gap"
 GAP_META = {
     "slug": GAP_SLUG,
     "name": "코스피 신고가 대비 괴리율",
-    "category": "정통",
+    "category": "시장",
     "description_beginner": (
         '코스피가 역대 최고 기록에 얼마나 가까운지 보여줘요. '
         '가까울수록 "더 오를 데가 있나" 싶은 부담스러운 구간'

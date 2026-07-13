@@ -2,7 +2,7 @@
 전운량을 받아와 "맑음지수"(10 - 전운량)로 변환해 Supabase에 저장.
 
 행동경제학의 "Sunshine Effect"(화창한 날 위험자산 선호가 올라간다는 연구)에서
-착안한 실험적/재미 지표다 — 다른 12개 정통 지표와 달리 실제 시장 데이터가
+착안한 실험적/재미 지표다 — 다른 12개 시장 지표와 달리 실제 시장 데이터가
 아니라 날씨 데이터를 쓴다.
 
 엔드포인트는 apis.data.go.kr/1360000/AsosDalyInfoService/getWthrDataList이다
@@ -48,7 +48,7 @@ INDICATOR_SLUG = "weather_sunshine_index"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "서울 맑은 날씨 지수",
-    "category": "밈",
+    "category": "감성",
     "description_beginner": "화창한 날엔 사람들 기분이 좋아져서 위험한 투자에도 더 대범해진다는 연구가 실제로 있어요. 오늘 서울 하늘이 얼마나 맑은지를 보여드려요 (재미로 보는 지표예요!)",
     "unit": "pt",
 }

@@ -41,7 +41,7 @@ INDICATOR_SLUG = "news_sentiment"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "경제뉴스 헤드라인 감성 지수",
-    "category": "밈",
+    "category": "감성",
     "description_beginner": "경제 뉴스 제목에 낙관적인 말이 많은지 비관적인 말이 많은지 보여주는 지수예요. 다들 장밋빛 전망만 하고 있다면 과열 신호일 수 있어요",
     "unit": "pt",
 }

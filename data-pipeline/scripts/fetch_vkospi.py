@@ -33,7 +33,7 @@ INDICATOR_SLUG = "vkospi"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "VKOSPI (변동성지수)",
-    "category": "정통",
+    "category": "시장",
     "description_beginner": "시장이 얼마나 불안하게 출렁이는지 보여주는 지수예요. 너무 낮으면 다들 방심하고 있다는 신호일 수 있어요",
     "unit": "pt",
 }

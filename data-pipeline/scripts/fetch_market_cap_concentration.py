@@ -37,7 +37,7 @@ INDICATOR_SLUG = "top10_market_cap_concentration"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "코스피 시가총액 상위 10종목 쏠림도",
-    "category": "정통",
+    "category": "시장",
     "headline": "몇몇 대장주가 이끄는 지수",
     "description_beginner": "코스피 상승이 몇몇 대형주에만 의존하고 있는지 보여줘요. 쏠림이 심할수록 겉보기엔 지수가 좋아 보여도 시장이 실제로는 얇고 취약한 상태일 수 있어요",
     "unit": "%",

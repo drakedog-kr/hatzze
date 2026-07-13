@@ -61,7 +61,7 @@ INDICATOR_SLUG = "upbit_speculation_index"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "업비트 투기 과열 지수",
-    "category": "밈",
+    "category": "감성",
     "description_beginner": "개미들이 코스피만 하는 게 아니에요 — 여유자금이 있을 때 코인 시장으로도 같이 흘러가요. 김치프리미엄과 거래대금이 동시에 뛴다면, 그 뜨거운 돈이 코스피에도 이미 들어와 있을 가능성이 높아요",
     "unit": "pt",
     "weight": 2,
