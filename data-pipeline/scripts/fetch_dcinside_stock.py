@@ -33,6 +33,7 @@ from bs4 import BeautifulSoup
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client  # noqa: E402
+from common.timeutil import today_kst  # noqa: E402
 from config.sentiment_keywords import NEGATIVE_KEYWORDS, POSITIVE_KEYWORDS  # noqa: E402
 
 GALLERY_IDS = ["krstock", "stockus"]
@@ -121,7 +122,7 @@ def collect_today_titles_for_gallery(gallery_id: str) -> list[str]:
     45건 만에 조기 종료된 원인이었다), 오늘이 아닌 행이 연속으로 여러 개
     나올 때만 오늘자 수집이 끝난 것으로 판단한다.
     """
-    today_str = date.today().isoformat()
+    today_str = today_kst().isoformat()
     titles: list[str] = []
     page = 1
     done = False
@@ -262,7 +263,7 @@ def backfill_daily_sentiment(client, indicator_id: str) -> None:
     반드시 거쳐가야 하지만(페이지네이션에 날짜 점프 기능이 없음), 이미 저장된
     날짜는 최종 저장 단계에서 제외해 중복 upsert를 하지 않는다.
     """
-    today = date.today()
+    today = today_kst()
     target_dates = {
         (today - timedelta(days=offset)).isoformat() for offset in range(BACKFILL_DAYS)
     }
@@ -320,7 +321,7 @@ def main() -> None:
 
     titles = collect_today_titles()
     result = compute_sentiment(titles)
-    today = date.today().isoformat()
+    today = today_kst().isoformat()
 
     print(
         f"[DCInside] 오늘({today}) 감성 분류 — 긍정 {result['positive']}건 / "
