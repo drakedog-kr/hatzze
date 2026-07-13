@@ -18,11 +18,9 @@ import time
 from datetime import date, timedelta
 from pathlib import Path
 
-import requests
-
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.config import KRX_API_KEY  # noqa: E402
+from common.krx_client import krx_get  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 
 KRX_URL = "http://data-dbg.krx.co.kr/svc/apis/idx/drvprod_dd_trd"
@@ -53,12 +51,9 @@ def ensure_indicator(client) -> str:
 
 
 def fetch_vkospi_value(bas_dd: str) -> float | None:
-    resp = requests.get(
-        KRX_URL,
-        params={"basDd": bas_dd},
-        headers={"AUTH_KEY": KRX_API_KEY},
-        timeout=10,
-    )
+    resp = krx_get(KRX_URL, bas_dd)
+    if resp is None:
+        return None  # 네트워크 재시도 소진 — 이 날짜만 건너뜀
     if resp.status_code == 401:
         raise PermissionError(
             "KRX API가 401을 반환했습니다. data.krx.co.kr(정보데이터시스템)에서 "

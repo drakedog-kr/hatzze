@@ -35,12 +35,17 @@ weight는 그대로 유지한다 — 이 프로젝트는 percentile→고정 기
   KRX API를 다시 호출하지 않아 비용이 들지 않는다.
 
 선물 미결제약정 엔드포인트(drv/fut_bydd_trd, "선물 일별매매정보(주식선물外)")는
-이 코드를 작성하는 시점에 아직 승인 대기 중이다 — 401이 나면 그 사실을 로그로
-남기고 원본 캐시 백필만 건너뛴 채 나머지는 계속 진행한다(ETF 쪽은 정상 동작).
-승인 전까지는 두 원본 캐시의 공통 날짜가 없어 종합 지수(leverage_etf_volume)가
-갱신되지 않고 마지막으로 저장된 값이 화면에 그대로 남는다. 필드명(ISU_NM
-매칭 키워드 "코스피 200 선물", 미결제약정 필드명 OPNINT_QTY)은 실제 응답을
-아직 못 봐서 추정치다 — 승인 후 첫 실행에서 검증 필요.
+처음 작성할 때(승인 대기 중이던 시점) ISU_NM 매칭 키워드를 "코스피 200 선물",
+미결제약정 필드명을 OPNINT_QTY로 추정해뒀었는데, 승인 후 실제 응답을 확인해보니
+(2026-07-13) 둘 다 틀렸다 — 실제로는 종목명이 "코스피200 F 202609 (주간)"처럼
+공백 없이 "코스피200 F"로 시작하고(계약월별로 여러 건, 주/야간 구분도 있음),
+필드명은 ACC_OPNINT_QTY다. 이 불일치 때문에 API가 승인된 뒤에도 매 실행마다
+"코스피200 선물" 레코드를 하나도 못 찾아 kospi200_futures_oi_raw가 계속
+비어있었다(재시도 실패가 아니라 이름 불일치로 인한 매칭 실패였음 — 로그에는
+에러 없이 그냥 "0건 저장"으로만 나와서 발견이 늦었다). 지금은 고쳤으니 정상
+동작해야 하지만, 401이 다시 나면(승인이 풀리는 등) 여전히 그 사실을 로그로
+남기고 원본 캐시 백필만 건너뛴 채 나머지는 계속 진행한다(ETF 쪽은 별개로
+정상 동작).
 """
 
 from __future__ import annotations
@@ -50,29 +55,27 @@ import time
 from datetime import date, timedelta
 from pathlib import Path
 
-import requests
-
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.config import KRX_API_KEY  # noqa: E402
+from common.krx_client import krx_get  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 
 ETF_URL = "http://data-dbg.krx.co.kr/svc/apis/etp/etf_bydd_trd"
 FUTURES_URL = "http://data-dbg.krx.co.kr/svc/apis/drv/fut_bydd_trd"
 BACKFILL_DAYS = 365
 REQUEST_DELAY_SEC = 0.05
-KRX_REQUEST_TIMEOUT_SEC = 15
-KRX_MAX_RETRIES = 3
-KRX_RETRY_DELAY_SEC = 3
 WON_PER_EOK = 100_000_000  # 1억원 = 1e8원
 
 TRADING_VALUE_KEY = "ACC_TRDVAL"
 ISU_CODE_KEY = "ISU_CD"
 TARGET_ISU_CODE = "122630"  # KODEX 레버리지
 
-# 승인 전이라 미검증 — 승인 후 실제 응답 보고 다르면 고칠 것
-KOSPI200_FUTURES_NAME_KEYWORD = "코스피 200 선물"
-OPEN_INTEREST_KEY = "OPNINT_QTY"
+# 실제 응답으로 검증 완료(2026-07-13). "코스피200 F "(공백 없음, "F"=선물)로
+# 시작하는 종목만 매칭 — 뒤에 계약월/주야간 구분이 붙는다(예: "코스피200 F
+# 202609 (주간)"). 접두 공백 없이 매칭하면 "코스피200 SP ..."(캘린더 스프레드)나
+# "미니코스피 F ..."(미니선물, 별개 상품)까지 잘못 포함되므로 주의.
+KOSPI200_FUTURES_NAME_KEYWORD = "코스피200 F "
+OPEN_INTEREST_KEY = "ACC_OPNINT_QTY"
 
 ETF_THRESHOLD = 40_000.0  # 억원 (4조원) — 기존 leverage_etf_volume 기준값
 OI_SURGE_THRESHOLD = 150.0  # 최근 1년 평균 대비 %, "완전히 달아오름" 기준
@@ -151,35 +154,8 @@ def get_values(client, indicator_id: str, start: date) -> dict[str, float]:
     return {row["date"]: float(row["raw_value"]) for row in result.data}
 
 
-def _get_with_retry(url: str, bas_dd: str):
-    resp = None
-    last_error: Exception | None = None
-    for attempt in range(1, KRX_MAX_RETRIES + 1):
-        try:
-            resp = requests.get(
-                url,
-                params={"basDd": bas_dd},
-                headers={"AUTH_KEY": KRX_API_KEY},
-                timeout=KRX_REQUEST_TIMEOUT_SEC,
-            )
-            break
-        except requests.exceptions.RequestException as e:
-            last_error = e
-            print(f"[KRX] {bas_dd} 요청 실패 ({attempt}/{KRX_MAX_RETRIES}): {e}")
-            if attempt < KRX_MAX_RETRIES:
-                time.sleep(KRX_RETRY_DELAY_SEC)
-
-    if resp is None:
-        print(
-            f"[WARNING] {bas_dd} 요청이 {KRX_MAX_RETRIES}번 모두 실패해 이 날짜는 "
-            f"건너뜁니다: {last_error}"
-        )
-        return None
-    return resp
-
-
 def fetch_leverage_etf_trading_value(bas_dd: str) -> float | None:
-    resp = _get_with_retry(ETF_URL, bas_dd)
+    resp = krx_get(ETF_URL, bas_dd)
     if resp is None:
         return None
 
@@ -211,7 +187,7 @@ class FuturesApprovalPendingError(Exception):
 
 
 def fetch_kospi200_futures_oi(bas_dd: str) -> float | None:
-    resp = _get_with_retry(FUTURES_URL, bas_dd)
+    resp = krx_get(FUTURES_URL, bas_dd)
     if resp is None:
         return None
 

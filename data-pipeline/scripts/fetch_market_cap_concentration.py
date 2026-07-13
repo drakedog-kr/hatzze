@@ -5,11 +5,10 @@ percentile이 아니라 고정 기준값 체계라 히스토리 백필이 필요
 스냅샷 하나만 저장한다(fetch_buffett_index.py의 kospi_market_cap_raw와 동일한
 "오늘 값만 매일 갱신" 방식).
 
-sto/stk_bydd_trd(유가증권 일별매매정보) 서비스는 이 코드를 작성하는 시점에
-아직 승인 대기 중이다(401 확인됨, 2026-07-11) — leverage_etf_volume의 선물
-미결제약정 API와 동일한 패턴으로, 401이면 그 사실을 로그로 남기고 indicators
-메타데이터 등록만 마친 채 데이터 수집은 건너뛴다. 승인 후 재실행하면 자동으로
-채워진다.
+sto/stk_bydd_trd(유가증권 일별매매정보) 서비스는 처음 작성 시점(2026-07-11)엔
+401(승인 대기)이었으나 이후 승인되어 정상 동작한다. 혹시 다시 401이 나면
+leverage_etf_volume의 선물 미결제약정 API와 동일한 패턴으로, 그 사실을 로그로
+남기고 데이터 수집만 건너뛴다(indicators 메타데이터는 이미 등록되어 있음).
 
 전체 시가총액은 이미 fetch_buffett_index.py가 매일 kospi_market_cap_raw로
 저장하고 있으므로 여기서 다시 계산하지 않고 그 값을 그대로 나눠 쓴다(같은
@@ -22,11 +21,9 @@ import sys
 from datetime import date, timedelta
 from pathlib import Path
 
-import requests
-
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.config import KRX_API_KEY  # noqa: E402
+from common.krx_client import krx_get  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 
 KRX_URL = "http://data-dbg.krx.co.kr/svc/apis/sto/stk_bydd_trd"
@@ -65,12 +62,9 @@ def get_indicator_id(client, slug: str) -> str | None:
 
 
 def fetch_all_stocks(bas_dd: str) -> list[dict]:
-    resp = requests.get(
-        KRX_URL,
-        params={"basDd": bas_dd},
-        headers={"AUTH_KEY": KRX_API_KEY},
-        timeout=15,
-    )
+    resp = krx_get(KRX_URL, bas_dd)
+    if resp is None:
+        return []  # 네트워크 재시도 소진 — 이 날짜만 건너뜀(호출자가 이전 날짜로 재시도)
     if resp.status_code == 401:
         raise PermissionError(
             "KRX API가 401을 반환했습니다. data.krx.co.kr(정보데이터시스템)에서 "
