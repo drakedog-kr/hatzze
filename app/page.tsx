@@ -939,7 +939,7 @@ function CardVolume({ v }: { v: Pick }) {
         <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 6, height: "100%" }}>
           <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color: v.color }}>{v.disp}{v.unit}</span>
           <div style={{ width: "100%", height: `${todayH}%`, background: v.color, borderRadius: "6px 6px 0 0" }} />
-          <span style={{ fontSize: 9, fontWeight: 700, color: C.sub }}>오늘</span>
+          <span style={{ fontSize: 9, fontWeight: 700, color: C.sub }}>최근 거래일</span>
         </div>
       </div>
       <Foot text={v.desc} />

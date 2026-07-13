@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.config import NAVER_CLIENT_ID, NAVER_CLIENT_SECRET  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
+from common.timeutil import today_kst  # noqa: E402
 from config.news_sentiment_keywords import NEGATIVE_KEYWORDS, POSITIVE_KEYWORDS  # noqa: E402
 
 NAVER_NEWS_SEARCH_URL = "https://openapi.naver.com/v1/search/news.json"
@@ -129,7 +130,7 @@ def compute_sentiment(titles: list[str]) -> dict:
 
 
 def collect_today_titles_for_query(query: str) -> dict[str, str]:
-    today = date.today()
+    today = today_kst()
     headlines: dict[str, str] = {}
     start = 1
     consecutive_old = 0
@@ -218,7 +219,7 @@ def collect_daily_titles_for_query(
 
 
 def backfill_daily_sentiment(client, indicator_id: str) -> None:
-    today = date.today()
+    today = today_kst()
     target_dates = {
         (today - timedelta(days=offset)).isoformat() for offset in range(BACKFILL_DAYS)
     }
@@ -291,7 +292,7 @@ def main() -> None:
 
     titles = collect_today_titles()
     result = compute_sentiment(titles)
-    today = date.today().isoformat()
+    today = today_kst().isoformat()
 
     print(
         f"[Naver News] 오늘({today}) 감성 분류 — 긍정 {result['positive']}건 / "
