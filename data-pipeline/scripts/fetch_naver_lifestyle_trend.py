@@ -40,7 +40,7 @@ GROUP_CONFIGS = [
         "meta": {
             "slug": "fine_dining_search_index",
             "name": "오마카세·파인다이닝 웨이팅 검색 지수",
-            "category": "밈",
+            "category": "감성",
             "description_beginner": "오마카세, 파인다이닝 웨이팅 검색이 늘어나면, 사람들이 여윳돈으로 경험 소비에 돈을 쓰고 있다는 신호일 수 있어요",
             "unit": "지수",
         },
@@ -52,7 +52,7 @@ GROUP_CONFIGS = [
         "meta": {
             "slug": "small_business_crisis_index",
             "name": "자영업 폐업·권리금 검색 지수",
-            "category": "밈",
+            "category": "감성",
             "description_beginner": "자영업 폐업 관련 검색이 늘어나는데 증시는 뜨겁다면, 실물경제와 주식시장 사이에 괴리가 커지고 있다는 위험한 신호일 수 있어요",
             "unit": "지수",
         },

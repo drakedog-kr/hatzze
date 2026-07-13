@@ -14,12 +14,21 @@ export type DailyScore = {
 // 값이 아직 안 채워졌으면 null이고, 그 경우 카드는 단순화된 폴백으로 렌더된다.
 export type IndicatorDetails = Record<string, number>;
 
+export type IndicatorCategory = "시장" | "감성";
+
+// 레거시 category 값(정통/밈)을 현재 명칭(시장/감성)으로 정규화한다. DB 마이그레이션
+// 전/중에도 프론트가 항상 새 값을 보도록 하는 안전장치 — 마이그레이션 후엔 no-op.
+function normalizeCategory(raw: string): IndicatorCategory {
+  if (raw === "정통" || raw === "시장") return "시장";
+  return "감성"; // "밈" 또는 "감성"
+}
+
 export type IndicatorWithLatestValue = {
   id: string;
   slug: string;
   name: string;
   headline: string | null;
-  category: "정통" | "밈";
+  category: IndicatorCategory;
   description_beginner: string;
   unit: string;
   direction: "high" | "low";
@@ -79,7 +88,7 @@ export async function getPublicIndicators(): Promise<IndicatorWithLatestValue[]>
     slug: string;
     name: string;
     headline: string | null;
-    category: "정통" | "밈";
+    category: string;
     description_beginner: string;
     unit: string;
     direction: "high" | "low";
@@ -99,7 +108,7 @@ export async function getPublicIndicators(): Promise<IndicatorWithLatestValue[]>
       slug: row.slug,
       name: row.name,
       headline: row.headline,
-      category: row.category,
+      category: normalizeCategory(row.category),
       description_beginner: row.description_beginner,
       unit: row.unit,
       direction: row.direction,

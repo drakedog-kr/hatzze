@@ -66,7 +66,7 @@ INDICATOR_SLUG = "dcinside_post_count"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "디시인사이드 한국/미국 주식 갤러리 커뮤니티 감성 지수",
-    "category": "밈",
+    "category": "감성",
     "description_beginner": "게시글에 긍정적인 말이 많은지 부정적인 말이 많은지 보여주는 지수예요. 다들 들떠서 낙관적인 얘기만 하고 있다면 과열 신호일 수 있어요",
     "unit": "pt",
 }

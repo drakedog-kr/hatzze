@@ -54,7 +54,7 @@ RAW_MKTCAP_SLUG = "kospi_market_cap_raw"
 RAW_MKTCAP_META = {
     "slug": RAW_MKTCAP_SLUG,
     "name": "코스피 전체 시가총액 (내부용 원본)",
-    "category": "정통",
+    "category": "시장",
     "description_beginner": "버핏지수 계산을 위해 내부적으로 저장하는 코스피 전체 시가총액 데이터예요.",
     "unit": "원",
     "is_public": False,
@@ -64,7 +64,7 @@ BUFFETT_SLUG = "buffett_index"
 BUFFETT_META = {
     "slug": BUFFETT_SLUG,
     "name": "버핏지수",
-    "category": "정통",
+    "category": "시장",
     "description_beginner": "나라 경제 규모(GDP)에 비해 주식시장이 얼마나 커졌는지 보는 지표예요. 너무 크면 거품일 수 있다는 신호",
     "unit": "%",
 }

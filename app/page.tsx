@@ -1,5 +1,5 @@
 import { getLatestDailyScore, getPublicIndicators } from "@/lib/data";
-import type { DailyScore, IndicatorWithLatestValue } from "@/lib/data";
+import type { DailyScore, IndicatorCategory, IndicatorWithLatestValue } from "@/lib/data";
 import { formatIndicatorValue, formatKstDateTime } from "@/lib/format";
 
 // 지표는 하루 단위(GitHub Actions 배치)로 갱신되므로, 빌드 시점에 정적으로
@@ -385,7 +385,7 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
         <div style={{ marginTop: 20, background: C.bg, borderRadius: 16, padding: "22px 24px", display: "flex", gap: 14 }}>
           <Icon name="auto_awesome" style={{ color: C.blue, fontSize: 22 }} />
           <p style={{ margin: 0, fontSize: 15, lineHeight: 1.6, color: "#3a4453", fontWeight: 500 }}>
-            오늘은 정통 지표 <b style={{ color: C.ink }}>{tradHits}개</b>, 소셜 지표 <b style={{ color: C.ink }}>{socialHits}개</b>가 기준선을 넘었어요. 지표들이 가리키는 현재 시장 온도는 <b style={{ color: stage.color }}>{dailyScore.stage}</b> 구간이에요.
+            오늘은 시장 지표 <b style={{ color: C.ink }}>{tradHits}개</b>, 감성 지표 <b style={{ color: C.ink }}>{socialHits}개</b>가 기준선을 넘었어요. 지표들이 가리키는 현재 시장 온도는 <b style={{ color: stage.color }}>{dailyScore.stage}</b> 구간이에요.
           </p>
         </div>
       </div>
@@ -563,7 +563,7 @@ function VixPctRow({ flag, label, pct, color }: { flag: string; label: string; p
   );
 }
 
-// ── 정통 지표 카드들 (목업 순서대로) ──────────────────────────────
+// ── 시장 지표 카드들 (목업 순서대로) ──────────────────────────────
 
 // 1. 버핏지수 — 경제(GDP) vs 증시 시총 비교 (실제 값으로 복원 가능)
 function CardBuffett({ v }: { v: Pick }) {
@@ -1204,8 +1204,8 @@ const LAID_OUT = new Set([
 ]);
 
 const FALLBACK_ICONS: Record<string, string> = {
-  정통: "insights",
-  밈: "tag",
+  시장: "insights",
+  감성: "tag",
 };
 
 function GenericCard({ v, icon }: { v: Pick; icon: string }) {
@@ -1228,10 +1228,10 @@ export default async function Home() {
 
   const bySlug = new Map(indicators.map((i) => [i.slug, i]));
   const p = (slug: string) => pick(bySlug.get(slug));
-  const countHits = (cat: "정통" | "밈") =>
+  const countHits = (cat: IndicatorCategory) =>
     indicators.filter((i) => i.category === cat && (i.latest?.normalized_score ?? 0) >= 100).length;
 
-  const extra = (cat: "정통" | "밈") =>
+  const extra = (cat: IndicatorCategory) =>
     indicators.filter((i) => i.category === cat && !LAID_OUT.has(i.slug));
 
   return (
@@ -1252,16 +1252,16 @@ export default async function Home() {
         <main className="hz-scroll" style={{ flex: 1, overflowY: "auto", padding: 40 }}>
           <div style={{ maxWidth: 1180, margin: "0 auto", display: "flex", flexDirection: "column", gap: 56 }}>
             {dailyScore ? (
-              <Hero dailyScore={dailyScore} tradHits={countHits("정통")} socialHits={countHits("밈")} />
+              <Hero dailyScore={dailyScore} tradHits={countHits("시장")} socialHits={countHits("감성")} />
             ) : (
               <section style={{ background: C.card, borderRadius: 24, padding: 44, textAlign: "center", color: C.sub }}>
                 아직 계산된 스코어가 없습니다.
               </section>
             )}
 
-            {/* 정통 지표 */}
+            {/* 시장 지표 (category=시장) */}
             <section>
-              <SectionHeading title="정통 지표" />
+              <SectionHeading title="시장 지표" />
               <div className="hz-grid">
                 <CardBuffett v={p("buffett_index")} />
                 <CardLeverage v={p("leverage_etf_volume")} />
@@ -1278,15 +1278,15 @@ export default async function Home() {
                 <CardCopper v={p("copper_price_momentum")} />
                 <CardRangeRate v={p("yield_curve_spread")} icon="trending_down" warn />
                 <CardComingSoon />
-                {extra("정통").map((i) => (
-                  <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["정통"]} />
+                {extra("시장").map((i) => (
+                  <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["시장"]} />
                 ))}
               </div>
             </section>
 
-            {/* 소셜 지표 */}
+            {/* 감성 지표 (category=감성) */}
             <section>
-              <SectionHeading title="소셜 지표" />
+              <SectionHeading title="감성 지표" />
               <div className="hz-grid">
                 <CardTrend v={p("naver_search_trend")} icon="search" />
                 <CardSentiment v={p("dcinside_post_count")} icon="forum" span={2} />
@@ -1298,8 +1298,8 @@ export default async function Home() {
                 <CardWeather v={p("weather_sunshine_index")} />
                 <CardTrend v={p("github_trading_bot_repos")} icon="terminal" />
                 <CardTrend v={p("small_business_crisis_index")} icon="storefront" />
-                {extra("밈").map((i) => (
-                  <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["밈"]} />
+                {extra("감성").map((i) => (
+                  <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["감성"]} />
                 ))}
                 <a href="#" style={{ border: `2px dashed ${C.line}`, borderRadius: 20, padding: 24, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, minHeight: 210, color: C.sub, textAlign: "center" }}>
                   <Icon name="add_circle" style={{ fontSize: 34 }} />

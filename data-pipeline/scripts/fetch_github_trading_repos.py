@@ -37,7 +37,7 @@ INDICATOR_SLUG = "github_trading_bot_repos"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "GitHub 트레이딩봇 저장소 생성 수",
-    "category": "밈",
+    "category": "감성",
     "headline": "개발자들도 뛰어드는 순간",
     "description_beginner": "주식으로 돈 벌 궁리를 하는 게 투자자들만은 아니에요. 개발자들이 트레이딩 봇을 만들기 시작했다면, 그만큼 시장에 대한 관심이 개발자 커뮤니티까지 번졌다는 뜻이에요",
     "unit": "건",
