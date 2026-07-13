@@ -10,9 +10,11 @@ kospi_close_raw로 "아시아 3국 대비 코스피 상대강도"를 계산해 S
 제외된다(예: 한국은 개장, 일본은 공휴일인 날은 그날 값이 안 나옴) — 데이터
 품질을 위한 의도된 트레이드오프다.
 
-최초 실행 시 kospi_close_raw가 가진 1년치 범위 안에서 계산 가능한 구간
-(각 시계열의 최초 20거래일 이후부터)을 전부 백필하고, 이후 실행부터는
-아직 없는 날짜만 채운다.
+kospi_close_raw가 가진 1년치 범위 안에서 계산 가능한 구간(각 시계열의 최초
+20거래일 이후부터)을 매 실행마다 전부 다시 upsert한다 — raw_value는 동일하지만
+카드용 세부값(각국 20일 수익률)을 details(JSONB)에 채워 넣기 위해서다.
+normalized_score는 payload에 없어 보존되고, yfinance 조회는 어차피 매 실행마다
+하므로 추가 비용은 없다.
 """
 
 from __future__ import annotations
@@ -128,26 +130,38 @@ def main() -> None:
         print(f"[{INDICATOR_SLUG}] 4개 시계열의 공통 날짜가 없습니다")
         return
 
-    existing_dates = set(get_indicator_values(client, indicator_id, start).keys())
-    missing_dates = sorted(common_dates - existing_dates)
-
     def relative_strength(d: str) -> float:
         asia_avg = (
             asia_returns["^N225"][d] + asia_returns["^HSI"][d] + asia_returns["^TWII"][d]
         ) / 3
         return kospi_returns[d] - asia_avg
 
-    if not missing_dates:
-        print(f"[{INDICATOR_SLUG}] 백필할 신규 날짜 없음 (이미 최신 상태)")
-    else:
-        rows = [
-            {"indicator_id": indicator_id, "date": d, "raw_value": round(relative_strength(d), 2)}
-            for d in missing_dates
-        ]
-        client.table("indicator_values").upsert(
-            rows, on_conflict="indicator_id,date"
-        ).execute()
-        print(f"[Supabase] indicator_values upsert 완료: {len(rows)}건")
+    def details_for(d: str) -> dict:
+        # 카드가 목업 원본대로 4개국 상대 막대를 그릴 수 있도록 각국 20일 수익률을
+        # details(JSONB)에 함께 저장한다(코스피=100 기준 상대지수는 프론트에서 계산).
+        return {
+            "kospi": round(kospi_returns[d], 2),
+            "nikkei": round(asia_returns["^N225"][d], 2),
+            "hangseng": round(asia_returns["^HSI"][d], 2),
+            "taiex": round(asia_returns["^TWII"][d], 2),
+        }
+
+    # 공통 날짜 전체를 매 실행마다 다시 upsert한다 — raw_value는 동일하지만 카드용
+    # 세부값(각국 수익률)을 details에 채워 넣기 위해서다. normalized_score는 payload에
+    # 없어 보존되고, yfinance 조회는 어차피 매 실행마다 하므로 추가 비용은 없다.
+    rows = [
+        {
+            "indicator_id": indicator_id,
+            "date": d,
+            "raw_value": round(relative_strength(d), 2),
+            "details": details_for(d),
+        }
+        for d in sorted(common_dates)
+    ]
+    client.table("indicator_values").upsert(
+        rows, on_conflict="indicator_id,date"
+    ).execute()
+    print(f"[Supabase] indicator_values upsert 완료: {len(rows)}건 (details 포함)")
 
     latest_date = max(common_dates)
     latest_asia_avg = (

@@ -290,14 +290,21 @@ def main() -> None:
         composite = etf_progress * 0.5 + oi_progress * 0.5
         return etf_progress, oi_progress, composite
 
-    rows = [
-        {
+    def row_for(d: str) -> dict:
+        etf_progress, oi_progress, composite = composite_for(d)
+        return {
             "indicator_id": composite_id,
             "date": d,
-            "raw_value": round(composite_for(d)[2], 2),
+            "raw_value": round(composite, 2),
+            # 카드가 목업 원본대로 ETF 거래대금 / 선물 미결제약정 두 서브바를
+            # 그릴 수 있도록 각 진행률을 details(JSONB)에 함께 저장한다.
+            "details": {
+                "etf_progress": round(etf_progress, 1),
+                "futures_progress": round(oi_progress, 1),
+            },
         }
-        for d in common_dates
-    ]
+
+    rows = [row_for(d) for d in common_dates]
     client.table("indicator_values").upsert(
         rows, on_conflict="indicator_id,date"
     ).execute()
