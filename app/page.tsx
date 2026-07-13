@@ -57,6 +57,7 @@ type Pick = {
   unit: string;
   thDisp: string | null;
   dirLabel: string;
+  details: Record<string, number> | null;
 };
 
 function pick(ind: Ind | undefined): Pick {
@@ -85,6 +86,7 @@ function pick(ind: Ind | undefined): Pick {
     unit: f.displayUnit,
     thDisp: tf ? `${tf.display}${tf.displayUnit}` : null,
     dirLabel: ind?.direction === "low" ? "이하" : "이상",
+    details: ind?.latest?.details ?? null,
   };
 }
 
@@ -487,6 +489,51 @@ function TrendLine({ color, down = false }: { color: string; down?: boolean }) {
   );
 }
 
+// 레버리지 카드의 서브 진행률 바 (ETF 거래대금 / 선물 미결제약정)
+function LevSubBar({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 6 }}>
+        <span>{label}</span>
+        <span style={{ color }}>
+          {Math.round(value)}
+          <span style={{ color: "#a9b0bd" }}>/100</span>
+        </span>
+      </div>
+      <div style={{ height: 8, background: C.track, borderRadius: 999, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, value))}%`, background: color }} />
+      </div>
+    </div>
+  );
+}
+
+// 매수쏠림 카드의 다이버징 카운트 바 (매수 / 매도 / CB)
+function DivRow({ label, w, color }: { label: string; w: number; color: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <span style={{ width: 82, fontSize: 11, fontWeight: 800, color, textAlign: "right" }}>{label}</span>
+      <div style={{ flex: 1, height: 16, position: "relative", background: C.track, borderRadius: 999 }}>
+        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.max(0, Math.min(100, w))}%`, background: color, borderRadius: 999 }} />
+      </div>
+    </div>
+  );
+}
+
+// 아시아 카드의 4개국 상대 막대 (KOSPI=100 기준)
+function AsiaBar({ label, sub, index, maxIndex, color }: { label: string; sub: string; index: number; maxIndex: number; color: string }) {
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+      <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color }}>{Math.round(index)}</span>
+      <div style={{ width: "100%", height: Math.max(8, (index / maxIndex) * 108), background: color, borderRadius: "6px 6px 0 0" }} />
+      <span style={{ fontSize: 9, fontWeight: 800, color: C.sub, textAlign: "center", lineHeight: 1.25 }}>
+        {label}
+        <br />
+        {sub}
+      </span>
+    </div>
+  );
+}
+
 // ── 정통 지표 카드들 (목업 순서대로) ──────────────────────────────
 
 // 1. 버핏지수 — 경제(GDP) vs 증시 시총 비교 (실제 값으로 복원 가능)
@@ -527,47 +574,71 @@ function CardBuffett({ v }: { v: Pick }) {
   );
 }
 
-// 2. 레버리지 지수 — 역대 범위 내 위치 (세부 ETF/선물 분해는 DB 미보유 → 과열도로 표현)
+// 2. 레버리지 지수 — 역대 범위 바 + ETF/선물 서브 진행률 (details 있으면 목업 원본)
 function CardLeverage({ v }: { v: Pick }) {
+  const dt = v.details;
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
       {v.isHit && <HitBadge />}
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon="rocket_launch" iconSize={30} color={v.color} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="당일 기준" />
       <Big disp={v.disp} unit={v.unit} color={v.color} size={44} sub={v.capped !== null ? `과열도 ${Math.round(v.capped)}` : undefined} />
-      <div style={{ background: C.bg, borderRadius: 14, padding: 18 }}>
-        <div style={{ position: "relative", height: 12, background: C.line, borderRadius: 999, overflow: "hidden" }}>
-          <div style={{ position: "absolute", inset: 0, width: `${v.capped ?? 0}%`, background: `linear-gradient(90deg,${C.hot},${C.mania})`, borderRadius: 999 }} />
+      <div style={{ background: C.bg, borderRadius: 14, padding: 18, display: "flex", flexDirection: "column", gap: 16 }}>
+        <div>
+          <div style={{ position: "relative", height: 12, background: C.line, borderRadius: 999, overflow: "hidden" }}>
+            <div style={{ position: "absolute", inset: 0, width: `${v.capped ?? 0}%`, background: `linear-gradient(90deg,${C.hot},${C.mania})`, borderRadius: 999 }} />
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 700, color: C.sub, marginTop: 7 }}>
+            <span>역대 최저</span>
+            <span style={{ color: v.color }}>▲ 지금{v.isHit ? " · 역대 최고" : ""}</span>
+          </div>
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 700, color: C.sub, marginTop: 7 }}>
-          <span>역대 최저</span>
-          <span style={{ color: v.color }}>▲ 지금{v.isHit ? " · 역대 최고" : ""}</span>
-        </div>
+        {dt && (
+          <>
+            <div style={{ height: 1, background: "rgba(0,0,0,0.07)" }} />
+            <div style={{ display: "flex", gap: 22 }}>
+              <LevSubBar label="ETF 거래대금" value={dt.etf_progress ?? 0} color={C.hot} />
+              <LevSubBar label="선물 미결제약정" value={dt.futures_progress ?? 0} color={C.mania} />
+            </div>
+          </>
+        )}
       </div>
       <Foot text={v.desc} />
     </Shell>
   );
 }
 
-// 3. 매수 쏠림 지수 — 순 쏠림(중앙 기준 다이버징). 세부 건수는 DB 미보유.
+// 3. 매수 쏠림 지수 — 매수/매도/CB 다이버징 카운트 바 (details 있으면 목업 원본)
 function CardMarketActions({ v }: { v: Pick }) {
+  const dt = v.details;
   const buy = (v.raw ?? 0) > 0;
   const mag = v.threshold ? Math.min(100, (Math.abs(v.raw ?? 0) / Math.abs(v.threshold)) * 50) : 20;
+  const maxC = dt ? Math.max(1, dt.buy ?? 0, dt.sell ?? 0, dt.cb ?? 0) : 1;
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
       {v.isHit && <HitBadge />}
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon="speed" iconSize={30} color={v.color} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="최근 30일" />
       <Big disp={v.raw !== null && v.raw > 0 ? `+${v.disp}` : v.disp} color={v.color} size={44} sub="최근 30일 순 쏠림" />
-      <div style={{ background: C.bg, borderRadius: 14, padding: 18 }}>
-        <div style={{ position: "relative", height: 16, background: C.line, borderRadius: 999 }}>
-          <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 2, background: "rgba(32,38,50,0.4)" }} />
-          <div style={{ position: "absolute", top: 0, bottom: 0, borderRadius: 999, background: v.color, ...(buy ? { left: "50%", width: `${mag}%` } : { right: "50%", width: `${mag}%` }) }} />
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 700, color: C.sub, marginTop: 8 }}>
-          <span style={{ color: C.cold }}>매도 우세</span>
-          <span style={{ color: C.hot }}>매수 우세</span>
-        </div>
+      <div style={{ background: C.bg, borderRadius: 14, padding: 18, display: "flex", flexDirection: "column", gap: 14 }}>
+        {dt ? (
+          <>
+            <DivRow label={`매수 ${dt.buy ?? 0}건`} w={((dt.buy ?? 0) / maxC) * 100} color={C.hot} />
+            <DivRow label={`매도 ${dt.sell ?? 0}건`} w={((dt.sell ?? 0) / maxC) * 100} color={C.cold} />
+            <DivRow label={`CB ${dt.cb ?? 0}건`} w={((dt.cb ?? 0) / maxC) * 100} color={C.sub} />
+          </>
+        ) : (
+          <>
+            <div style={{ position: "relative", height: 16, background: C.line, borderRadius: 999 }}>
+              <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 2, background: "rgba(32,38,50,0.4)" }} />
+              <div style={{ position: "absolute", top: 0, bottom: 0, borderRadius: 999, background: v.color, ...(buy ? { left: "50%", width: `${mag}%` } : { right: "50%", width: `${mag}%` }) }} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 700, color: C.sub }}>
+              <span style={{ color: C.cold }}>매도 우세</span>
+              <span style={{ color: C.hot }}>매수 우세</span>
+            </div>
+          </>
+        )}
       </div>
       <Foot text={v.desc} />
     </Shell>
@@ -666,14 +737,42 @@ function CardVixSpread({ v }: { v: Pick }) {
   );
 }
 
-// 8. 코스피 vs 아시아 (상대 강도 실제 값 + 과열도). 4개국 개별값은 DB 미보유.
+// 8. 코스피 vs 아시아 — 4개국 상대 막대 (details 있으면 목업 원본, 없으면 과열도)
 function CardAsia({ v }: { v: Pick }) {
+  const dt = v.details;
+  if (!dt) {
+    return (
+      <Shell span={2} minH={230}>
+        <Tag text={v.headline} color={v.color} />
+        <TitleRow icon="public" name={v.name} color={v.color} />
+        <Big disp={v.raw !== null && v.raw > 0 ? `+${v.disp}` : v.disp} unit={v.unit} color={v.color} size={40} sub="아시아 3국 평균 대비" />
+        <HeatBar v={v} />
+        <Foot text={v.desc} />
+      </Shell>
+    );
+  }
+  const k = dt.kospi ?? 0;
+  const bars = [
+    { label: "KOSPI", sub: "한국", index: 100, color: C.blue },
+    { label: "Nikkei", sub: "일본", index: 100 + ((dt.nikkei ?? 0) - k), color: C.hot },
+    { label: "HangSeng", sub: "홍콩", index: 100 + ((dt.hangseng ?? 0) - k), color: C.cold },
+    { label: "Taiex", sub: "대만", index: 100 + ((dt.taiex ?? 0) - k), color: C.neutral },
+  ];
+  const maxIndex = Math.max(...bars.map((b) => b.index), 1);
   return (
     <Shell span={2} minH={230}>
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon="public" name={v.name} color={v.color} />
-      <Big disp={v.raw !== null && v.raw > 0 ? `+${v.disp}` : v.disp} unit={v.unit} color={v.color} size={40} sub="아시아 3국 평균 대비" />
-      <HeatBar v={v} />
+      <div style={{ fontSize: 9, color: "#8a919e", fontWeight: 700, marginBottom: 4 }}>
+        KOSPI를 100으로 둔 상대 지수 · 코스피 초과수익률 {v.raw !== null && v.raw > 0 ? "+" : ""}
+        {v.disp}
+        {v.unit}
+      </div>
+      <div style={{ flex: 1, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, paddingTop: 6 }}>
+        {bars.map((b) => (
+          <AsiaBar key={b.label} label={b.label} sub={b.sub} index={b.index} maxIndex={maxIndex} color={b.color} />
+        ))}
+      </div>
       <Foot text={v.desc} />
     </Shell>
   );

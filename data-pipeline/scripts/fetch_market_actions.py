@@ -180,7 +180,14 @@ def main() -> None:
         raw = (buy_count - sell_count) * SIDECAR_WEIGHT + cb_count * CB_WEIGHT
         raw = max(raw, 0.0)
         rows.append(
-            {"indicator_id": indicator_id, "date": d.isoformat(), "raw_value": round(raw, 2)}
+            {
+                "indicator_id": indicator_id,
+                "date": d.isoformat(),
+                "raw_value": round(raw, 2),
+                # 카드가 목업 원본대로 매수/매도/CB 다이버징 바를 그릴 수 있도록
+                # 최근 30일 세 건수를 details(JSONB)에 함께 저장한다.
+                "details": {"buy": buy_count, "sell": sell_count, "cb": cb_count},
+            }
         )
 
     client.table("indicator_values").upsert(rows, on_conflict="indicator_id,date").execute()
