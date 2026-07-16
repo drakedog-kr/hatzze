@@ -3,7 +3,7 @@
 percentile 기반(과거 데이터의 상위/하위 N% 지점)은 데이터가 1년 가까이 쌓일
 때까지 기준선이 계속 흔들려서, 리서치·논리 기반으로 정한 고정 기준값으로
 전환했다. 기준값을 조정하고 싶을 땐 이 파일만 고치면 되고
-calculate_score.py의 계산 로직(compute_hit/compute_progress 등)은 건드릴
+calculate_score.py의 계산 로직(compute_progress 등)은 건드릴
 필요가 없다.
 
 각 항목의 필드:
