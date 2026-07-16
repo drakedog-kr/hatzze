@@ -52,12 +52,6 @@ INDICATOR_THRESHOLDS = {
     # 급증(%)"을 과열도로 매핑한다 — 평균(급증 0%)=진행률 50(상온), +25%=75(초고온 진입/Hit),
     # +50%=100. 카드의 "평소 대비 X배"는 threshold(=평균) 그대로라 안 깨진다.
     "youtube_finance_search_views": {"kind": "cumulative_average", "surge_map": {"floor": -50.0, "ceil": 50.0}},
-    # weather_sunshine_index: threshold=8은 "전운량 2 이하(구름 거의 없음)"에
-    # 해당하는 맑음지수다. 다만 이건 계절과 무관하게 고정된 값이라는 한계가
-    # 있다 — 예를 들어 장마철(6~7월)엔 맑은 날 자체가 드물어 이 기준을 거의
-    # 못 넘기고, 반대로 건조한 가을/겨울엔 자주 넘길 수 있다. 계절별 기준선을
-    # 따로 두려면 이 단일 threshold로는 안 되고 월별/계절별 분기가 필요하다.
-    "weather_sunshine_index": {"kind": "fixed", "threshold": 8.0},
     # kospi_asia_relative_strength: threshold=10(%p)은 "코스피 20거래일
     # 수익률이 일본·홍콩·대만 평균보다 10%p 이상 앞선다"를 뚜렷한 쏠림으로
     # 보는 논리적 추정치다 — 실측 분포(예: 최근 1~2년 이 지표의 실제
@@ -90,6 +84,11 @@ INDICATOR_THRESHOLDS = {
     # 것이라, 표본이 하루뿐이라는 한계가 크다. 며칠~몇 주치 데이터가 쌓이면 실제
     # 분포(평균, 표준편차)를 보고 반드시 재조정해야 한다.
     "github_trading_bot_repos": {"kind": "fixed", "threshold": 150.0},
+    # brokerage_app_rank: 애플 금융 무료앱 차트 내 증권 앱들의 froth 점수(Σ(101-순위)).
+    # github처럼 사전 분포가 없어 첫 관측값(462점, 2026-07-17 — 증권 앱 7개 차트인, 최고 10위)을
+    # 기준점으로 삼았다. threshold=800은 "증권 앱들이 최상위로 도배(대부분 top20~1위)"되는
+    # 과열 수준의 잠정 추정치라, 며칠~몇 주 쌓이면 실제 분포로 반드시 재조정해야 한다.
+    "brokerage_app_rank": {"kind": "fixed", "threshold": 800.0},
     # market_actions_30d: raw_value = (매수 사이드카 - 매도 사이드카) - CB발동×4를
     # 실제 KIND 공시로 1년치(2025-07~2026-07) 백필해 매일의 롤링 30일 값을 계산해보니
     # 최댓값이 3.0에 그쳤다 — 사이드카는 연간 매수17건/매도18건으로 거의 균형이라
