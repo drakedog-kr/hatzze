@@ -158,6 +158,19 @@ def get_all_values(client, indicator_id: str) -> list[float]:
     return [float(r["raw_value"]) for r in result.data]
 
 
+def get_latest_details(client, indicator_id: str) -> dict | None:
+    """최신 행의 details(JSONB) — kospi_volume_surge의 surge_pct/avg_30d를 읽는 데 쓴다."""
+    result = (
+        client.table("indicator_values")
+        .select("details")
+        .eq("indicator_id", indicator_id)
+        .order("date", desc=True)
+        .limit(1)
+        .execute()
+    )
+    return result.data[0].get("details") if result.data else None
+
+
 def compute_threshold(client, indicator_id: str, config: dict) -> float:
     if config["kind"] == "fixed":
         return config["threshold"]
@@ -180,6 +193,15 @@ def compute_hit(current: float, threshold: float, config: dict) -> bool:
 
 def compute_progress(slug: str, current: float, threshold: float, config: dict) -> float:
     if slug == "kospi_high_gap":
+        # 피스와이즈: kink(−3%)~threshold(0%=ATH)를 75~100%(초고온을 근처로 좁게),
+        # floor(−30%)~kink를 0~75%로 균등 배분.
+        floor = config["floor"]
+        kink = config["kink"]
+        if current >= kink:
+            return 75.0 + (current - kink) / (threshold - kink) * 25.0
+        return (current - floor) / (kink - floor) * 75.0
+    if "floor" in config:
+        # 일반 floor-ceiling(버핏 등): floor=0%, threshold(ceiling)=100% 선형.
         floor = config["floor"]
         return (current - floor) / (threshold - floor) * 100
     if slug in NEGATIVE_CURRENT_CLAMP_SLUGS and current < 0:
@@ -211,11 +233,6 @@ def main() -> None:
     results = []
     for slug in INDICATOR_ORDER:
         config = INDICATOR_THRESHOLDS[slug]
-        if slug == "kospi_high_gap":
-            floor = compute_kospi_high_gap_floor(client)
-            config = {**config, "floor": floor}
-            print(f"[kospi_high_gap] floor(지난 1년 최대 낙폭) = {floor}%")
-
         indicator_id, name, weight = get_indicator(client, slug)
 
         try:
@@ -236,6 +253,19 @@ def main() -> None:
             progress = compute_progress(slug, current, threshold, config)
             capped_progress = cap_progress(progress)
 
+            rs = config.get("relative_surge")
+            if rs is not None:
+                # 절대 거래대금 대신 "30일 평균 대비 %"(fetch가 details.surge_pct에 저장)로.
+                details = get_latest_details(client, indicator_id)
+                surge = details.get("surge_pct") if details else None
+                if surge is not None:
+                    progress = (surge - rs["floor"]) / (rs["ceil"] - rs["floor"]) * 100
+                    capped_progress = cap_progress(progress)
+                    hit = surge >= rs["hit"]
+                    avg = details.get("avg_30d")
+                    if avg:
+                        threshold = round(avg * (1 + rs["hit"] / 100), 2)  # 표시용: 평균+20%
+
         results.append(
             {
                 "slug": slug,
@@ -251,6 +281,19 @@ def main() -> None:
                 "no_value": no_value,
             }
         )
+
+    # 실물–증시 괴리: 자영업 폐업 검색(실물 stress)과 신고가 근접(증시 강세)이 둘 다
+    # 높을 때만 = "실물 없는 랠리". small_business_crisis_index의 점수 기여를 이 괴리로
+    # 대체한다(자영업 단독은 과열 신호로 역방향이라 부적합). raw_value·threshold는 그대로
+    # 두고 progress만 곱으로 덮어써, GenericCard의 과열도 바가 괴리를 반영한다.
+    by_slug = {r["slug"]: r for r in results}
+    sb = by_slug.get("small_business_crisis_index")
+    hg = by_slug.get("kospi_high_gap")
+    if sb and hg and not sb["no_value"] and not hg["no_value"]:
+        divergence = sb["capped_progress"] * hg["capped_progress"] / 100.0
+        sb["progress"] = divergence
+        sb["capped_progress"] = cap_progress(divergence)
+        sb["hit"] = divergence >= 75.0  # 괴리 초고온(≥75)일 때 Hit
 
     hit_count = sum(1 for r in results if r["hit"])
     weighted_results = [r for r in results if not r["no_value"]]
