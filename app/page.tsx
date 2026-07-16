@@ -1341,35 +1341,6 @@ function CardUpbit({ v }: { v: Pick }) {
   );
 }
 
-// 서울 맑은 날씨 — 아이콘 + 게이지 바
-// 서울 맑은 날씨 — raw는 "맑음지수 = 10 - 전운량"(0~10, 클수록 맑음). "pt"는 뜻이
-// 안 통해서, 날씨 표현(쾌청/맑음/흐림)과 "맑음지수 N/10"으로 직관적으로 보여준다.
-function CardWeather({ v }: { v: Pick }) {
-  const raw = v.raw ?? 0;
-  const label = raw >= 8 ? "쾌청" : raw >= 6 ? "맑음" : raw >= 4 ? "구름 조금" : raw >= 2 ? "구름 많음" : "흐림";
-  // 아이콘 기준을 라벨과 맞춘다 — 맑음(≥6)부터 해 아이콘, 그 아래는 구름 아이콘.
-  const clear = raw >= 6;
-  return (
-    <Shell hit={v.isHit} minH={210}>
-      <Tag text={v.headline} color={v.color} />
-      <TitleRow icon="wb_sunny" iconSize={22} name={v.name} color={v.color} />
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}>
-        <Icon name={clear ? "clear_day" : "cloudy"} style={{ fontSize: 48, color: v.color }} />
-        <span style={{ fontSize: 20, fontWeight: 800, color: C.ink }}>{label}</span>
-        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: C.sub }}>맑음지수 {raw.toFixed(1)} / 10</span>
-        <div style={{ width: "100%", height: 8, background: C.bg, borderRadius: 999, overflow: "hidden" }}>
-          <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, raw * 10))}%`, background: `linear-gradient(90deg,${C.neutral},${C.hot})` }} />
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", width: "100%", fontSize: 9, fontWeight: 700, color: C.sub }}>
-          <span>흐림</span>
-          <span>쾌청</span>
-        </div>
-      </div>
-      <Foot text={v.desc} />
-    </Shell>
-  );
-}
-
 function SectionHeading({ title }: { title: string }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 28 }}>
@@ -1389,7 +1360,7 @@ const LAID_OUT = new Set([
   "us10y", "copper_price_momentum", "yield_curve_spread",
   "naver_search_trend", "dcinside_post_count", "news_sentiment", "bestseller_finance_ratio",
   "youtube_finance_search_views", "luxury_consumption_index", "fine_dining_search_index",
-  "upbit_speculation_index", "weather_sunshine_index", "github_trading_bot_repos",
+  "upbit_speculation_index", "github_trading_bot_repos",
   "small_business_crisis_index",
 ]);
 
@@ -1470,7 +1441,6 @@ export default async function Home() {
                 <CardYoutube v={p("youtube_finance_search_views")} />
                 <CardSpending luxury={p("luxury_consumption_index")} dining={p("fine_dining_search_index")} />
                 <CardUpbit v={p("upbit_speculation_index")} />
-                <CardWeather v={p("weather_sunshine_index")} />
                 <CardTrend v={p("github_trading_bot_repos")} icon="terminal" />
                 <CardTrend v={p("bestseller_finance_ratio")} icon="menu_book" />
                 {extra("감성").map((i) => (
