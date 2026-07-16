@@ -36,6 +36,7 @@ INDICATOR_WEIGHTS = {
     "bestseller_finance_ratio": 1.0,     # 선행이나 갱신 느림
     "youtube_finance_search_views": 1.0, # 소매(선행)
     "github_trading_bot_repos": 1.0,     # 표본 부족, 관찰
+    "brokerage_app_rank": 1.0,           # 증권 앱 유입(froth 직접), 부트스트랩·관찰
     # 참고용 (후행 소비 / 노이즈)
     "luxury_consumption_index": 0.5,     # 후행 소비
     "fine_dining_search_index": 0.5,     # 후행 소비
