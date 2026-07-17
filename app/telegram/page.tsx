@@ -44,7 +44,7 @@ export default function TelegramPage() {
             className="hz-span2"
             style={{
               background: C.card,
-              borderRadius: 20,
+              borderRadius: 14,
               padding: 28,
               minHeight: 150,
               display: "flex",

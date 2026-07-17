@@ -99,7 +99,7 @@ function Shell({
       className={span === 2 ? "hz-span2" : undefined}
       style={{
         background: C.card,
-        borderRadius: 20,
+        borderRadius: 14,
         // 모든 카드의 divider(Foot 등) 가로 위치가 동일하도록 span과 무관하게
         // 안쪽 여백을 통일한다.
         padding: 24,
@@ -273,7 +273,7 @@ function HeatBar({ v }: { v: Pick }) {
   if (v.capped === null) return null;
   const c = overheatColor(v.capped); // 과열도 게이지는 stage 구간(50=과열) 색을 쓴다
   return (
-    <div style={{ background: C.bg, borderRadius: 14, padding: "16px 18px" }}>
+    <div style={{ background: C.bg, borderRadius: 10, padding: "16px 18px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 800, marginBottom: 8 }}>
         <span style={{ color: C.sub }}>과열도</span>
         <span style={{ color: c, fontFamily: MONO }}>
@@ -391,7 +391,7 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
       className="hz-hero"
       style={{
         background: C.card,
-        borderRadius: 24,
+        borderRadius: 16,
         boxShadow: "0 4px 6px -1px var(--c-shadow), 0 2px 4px -2px var(--c-shadow)",
         display: "flex",
         flexWrap: "wrap",
@@ -426,7 +426,7 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
         {/* 데일리 스코어는 매일 아침(KST 09:00) 갱신되는 하루 스냅샷이라, updated_at의
             분 단위 변동 대신 "그 날짜 · 오전 9시" 라벨로 고정 표시한다. */}
         <p style={{ margin: "0 0 4px", fontSize: 11, color: C.sub, fontFamily: MONO }}>최종 업데이트 · {formatKstDate(dailyScore.date)} 오전 9:00 기준</p>
-        <div style={{ marginTop: 20, background: C.bg, borderRadius: 16, padding: "22px 24px", display: "flex", gap: 14 }}>
+        <div style={{ marginTop: 20, background: C.bg, borderRadius: 12, padding: "22px 24px", display: "flex", gap: 14 }}>
           <Icon name="auto_awesome" style={{ color: C.blue, fontSize: 22, flexShrink: 0 }} />
           <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 15, lineHeight: 1.6, color: "var(--c-ink-soft)", fontWeight: 500 }}>
             {/* 고정 오프너 — 두 문장을 한 문단으로. 이 아래 LLM 문장들이 각각 한 문단씩
@@ -661,7 +661,7 @@ function CardBuffett({ v }: { v: Pick }) {
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon="payments" iconSize={30} color={v.color} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="당일 기준" />
       <Big disp={v.disp} unit={v.unit} color={v.color} size={52} sub={ratio !== null ? `${ratio.toFixed(1)}배` : undefined} />
-      <div style={{ background: C.bg, borderRadius: 14, padding: "18px 18px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ background: C.bg, borderRadius: 10, padding: "18px 18px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 6 }}>
             <span>
@@ -725,7 +725,7 @@ function CardLeverage({ v }: { v: Pick }) {
         <span style={{ fontSize: 18, fontWeight: 800, color: "var(--c-faint)" }}>/ 100</span>
         <span style={{ fontSize: 13, fontWeight: 700, color: C.sub, paddingBottom: 4 }}>종합 과열도</span>
       </div>
-      <div style={{ background: C.bg, borderRadius: 14, padding: 18, display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ background: C.bg, borderRadius: 10, padding: 18, display: "flex", flexDirection: "column", gap: 16 }}>
         <div>
           <div style={{ position: "relative", height: 12, background: C.line, borderRadius: 999 }}>
             <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.min(100, heat)}%`, background: `linear-gradient(90deg,${C.hot},${C.mania})`, borderRadius: 999 }} />
@@ -778,7 +778,7 @@ function CardMarketActions({ v }: { v: Pick }) {
       ) : (
         <Big disp={v.raw !== null && v.raw > 0 ? `+${v.disp}` : v.disp} color={v.color} size={44} sub="최근 30일 순 쏠림" />
       )}
-      <div style={{ background: C.bg, borderRadius: 14, padding: 18, display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ background: C.bg, borderRadius: 10, padding: 18, display: "flex", flexDirection: "column", gap: 14 }}>
         {dt ? (
           <>
             <DivRow label={`매수 ${dt.buy ?? 0}건`} w={((dt.buy ?? 0) / maxC) * 100} color={C.hot} />
@@ -1171,7 +1171,7 @@ function CardDivergence({ v }: { v: Pick }) {
           </span>
         }
       />
-      <div style={{ background: C.bg, borderRadius: 14, padding: 16, marginTop: 6, display: "flex", gap: 22 }}>
+      <div style={{ background: C.bg, borderRadius: 10, padding: 16, marginTop: 6, display: "flex", gap: 22 }}>
         <DivergenceBar label="실물 스트레스" hint="자영업 폐업 검색" value={real} color={C.cold} />
         <DivergenceBar label="증시 강세" hint="신고가 근접도" value={market} color={C.hot} />
       </div>
@@ -1546,7 +1546,7 @@ export default async function Home() {
             {dailyScore ? (
               <Hero dailyScore={dailyScore} tradHits={countHits("시장")} socialHits={countHits("감성")} />
             ) : (
-              <section style={{ background: C.card, borderRadius: 24, padding: 44, textAlign: "center", color: C.sub }}>
+              <section style={{ background: C.card, borderRadius: 16, padding: 44, textAlign: "center", color: C.sub }}>
                 아직 계산된 스코어가 없습니다.
               </section>
             )}
@@ -1593,7 +1593,7 @@ export default async function Home() {
                 {extra("감성").map((i) => (
                   <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["감성"]} />
                 ))}
-                <a href="#" style={{ border: `2px dashed ${C.line}`, borderRadius: 20, padding: 24, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, minHeight: 210, color: C.sub, textAlign: "center" }}>
+                <a href="#" style={{ border: `2px dashed ${C.line}`, borderRadius: 14, padding: 24, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, minHeight: 210, color: C.sub, textAlign: "center" }}>
                   <Icon name="add_circle" style={{ fontSize: 34 }} />
                   <span style={{ fontSize: 14, fontWeight: 700 }}>새로운 지표 제보하기</span>
                   <span style={{ fontSize: 11, fontWeight: 500, color: "var(--c-muted)" }}>아이디어가 있다면 알려주세요</span>
