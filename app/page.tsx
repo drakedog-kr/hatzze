@@ -341,14 +341,6 @@ function renderRichSummary(text: string): React.ReactNode {
   });
 }
 
-// 문장 끝(. ! ?) 뒤에서 나눠, 요약을 문장별로 줄바꿈해 읽기 편하게 한다.
-function splitSentences(text: string): string[] {
-  return text
-    .split(/(?<=[.!?])\s+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
 function HeroGauge({ score }: { score: number }) {
   const s = Math.max(0, Math.min(100, score));
   const arcLen = 389.6;
@@ -435,9 +427,14 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
             {/* LLM(generate_daily_summary.py) 상세 요약을 문장별로 줄바꿈해 이어붙인다.
                 없으면(마이그레이션 전이거나 생성 실패) 오프너만 보여준다. */}
             {dailyScore.ai_summary
-              ? splitSentences(dailyScore.ai_summary).map((sentence, i) => (
-                  <p key={i} style={{ margin: 0 }}>{renderRichSummary(sentence)}</p>
-                ))
+              ? dailyScore.ai_summary
+                  .split("\n")
+                  .map((s) => s.trim())
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((para, i) => (
+                    <p key={i} style={{ margin: 0 }}>{renderRichSummary(para)}</p>
+                  ))
               : null}
           </div>
         </div>
@@ -1188,10 +1185,10 @@ function CardTrend({ v, icon }: { v: Pick; icon: string }) {
         <>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
             <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.disp}{v.unit}</span>
+            {v.thDisp && <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 800, color: C.hot }}>과열 기준 {v.thDisp}</span>}
           </div>
           <div style={{ flex: 1, position: "relative", minHeight: 52 }}>
             <Sparkline data={v.history} color={v.color} />
-            {v.thDisp && <span style={{ position: "absolute", top: 1, left: 2, fontSize: 8, fontWeight: 800, color: C.hot }}>과열 기준 {v.thDisp}</span>}
           </div>
         </>
       )}
