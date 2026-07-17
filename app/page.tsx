@@ -479,15 +479,6 @@ function HalfGauge({ score, color }: { score: number; color: string }) {
 }
 
 // 우상향/우하향 추세를 암시하는 장식용 라인 (실제 시계열이 아님).
-function TrendLine({ color, down = false }: { color: string; down?: boolean }) {
-  const d = down ? "M0 18 L25 22 L50 28 L75 34 L98 40" : "M0 42 L25 38 L50 30 L75 20 L98 14";
-  return (
-    <svg width="100%" height="100%" viewBox="0 0 100 52" preserveAspectRatio="none" style={{ position: "absolute", inset: 0 }}>
-      <path d={d} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 // 최근 값들의 실제 추세 스파크라인. data는 시간순(오래된→최신). 차트는 위 영역을
 // 꽉 채우고(선 두께는 non-scaling-stroke로 일정), 라벨은 차트에 겹치지 않게 아래
 // 오른쪽에 둔다.
@@ -844,8 +835,8 @@ function CardHighGap({ v }: { v: Pick }) {
       <TitleRow icon="vertical_align_top" name={v.name} color={v.color} />
       <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1 }}>
         <div style={{ display: "flex", flexDirection: "column" }}>
-          <span style={{ fontFamily: MONO, fontSize: 34, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.disp}{v.unit}</span>
-          <span style={{ fontSize: 10, fontWeight: 700, color: C.sub, marginTop: 4 }}>{gap < 0 ? "전고점까지 남음" : "전고점 돌파"}</span>
+          <span style={{ fontFamily: MONO, fontSize: 34, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{gap > 0 ? "+" : ""}{v.disp}{v.unit}</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: C.sub, marginTop: 4 }}>{gap > 0 ? "이전 전고점 돌파" : "전고점으로부터"}</span>
         </div>
         <div style={{ flex: 1, alignSelf: "stretch", display: "flex", justifyContent: "center", padding: "6px 0" }}>
           <div style={{ width: 74, position: "relative", background: C.bg, borderRadius: 10, overflow: "hidden" }}>
@@ -1199,7 +1190,7 @@ function CardTrend({ v, icon }: { v: Pick; icon: string }) {
             <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.disp}{v.unit}</span>
           </div>
           <div style={{ flex: 1, position: "relative", minHeight: 52 }}>
-            <TrendLine color={v.color} down={(v.score ?? 0) < 33} />
+            <Sparkline data={v.history} color={v.color} />
             {v.thDisp && <span style={{ position: "absolute", top: 1, left: 2, fontSize: 8, fontWeight: 800, color: C.hot }}>과열 기준 {v.thDisp}</span>}
           </div>
         </>
@@ -1433,7 +1424,7 @@ function CardPutCall({ v }: { v: Pick }) {
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "6px 0 14px" }}>
         <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 800, color: c, letterSpacing: "-0.03em" }}>{ratio.toFixed(2)}</span>
         <span style={{ fontSize: 11, fontWeight: 700, color: C.sub }}>풋/콜</span>
-        <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: c }}>{greedy ? "콜 우세 · 탐욕" : "풋 우세 · 공포"}</span>
+        <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: c }}>{greedy ? "콜 우세" : "풋 우세"}</span>
       </div>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 8 }}>
         <div style={{ display: "flex", height: 24, borderRadius: 8, overflow: "hidden" }}>
@@ -1445,8 +1436,8 @@ function CardPutCall({ v }: { v: Pick }) {
           </div>
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 800 }}>
-          <span style={{ color: C.hot }}>콜 = 상승 베팅(탐욕)</span>
-          <span style={{ color: C.cold }}>풋 = 하락 대비(공포)</span>
+          <span style={{ color: C.hot }}>콜 = 상승 베팅</span>
+          <span style={{ color: C.cold }}>풋 = 하락 대비</span>
         </div>
       </div>
       <Foot text={v.desc} />
@@ -1469,7 +1460,7 @@ function CardBrokerage({ v }: { v: Pick }) {
       <TitleRow icon="leaderboard" iconSize={22} name={v.name} color={c} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "6px 0 10px" }}>
         <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: c, letterSpacing: "-0.03em" }}>{count}</span>
-        <span style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>개 앱 차트인</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>개 앱 인기차트 진입</span>
         {topRank !== null && (
           <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 800, color: c }}>최고 {topRank}위</span>
         )}

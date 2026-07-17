@@ -92,10 +92,12 @@ INDICATOR_THRESHOLDS = {
     # youtube처럼 '최근 평균(cumulative_average) 대비 급증(surge_map)'으로 froth를 본다 —
     # 평균이면 상온(50), 평균 대비 +15%면 초고온(100). 예탁금 변동폭이 작아 ±15%로 잡았다.
     "investor_deposit": {"kind": "cumulative_average", "surge_map": {"floor": -15.0, "ceil": 15.0}},
-    # turnover_concentration: 상위10 종목 거래대금 비중(%). KOSPI는 구조적으로 삼성전자·
-    # SK하이닉스에 상시 쏠려(70%+) 절대 threshold가 낡으므로, '최근 평균 대비 쏠림 심화'를
-    # surge_map으로 본다 — 평균이면 상온, 평균 대비 +8% 심화면 초고온.
-    "turnover_concentration": {"kind": "cumulative_average", "surge_map": {"floor": -8.0, "ceil": 8.0}},
+    # turnover_concentration: 상위10 종목 거래대금 비중(%). '평균 대비 상대'로 보면 70%+라도
+    # 평균 근처면 시원하게 나와 직관과 어긋나(Hun 피드백), 절대값 floor-ceiling으로 전환한다.
+    # 60%(=폭넓은 참여, 저온) ~ 80%(=극단 쏠림, 초고온). 이러면 70%가 과열도 50%(고온 주황)
+    # 근처로, "70% 이상이면 충분히 높다"는 감각과 맞는다. 단 KOSPI는 구조적으로 70%대라
+    # 이 지표가 평소에도 고온으로 자주 뜬다(의도된 트레이드오프).
+    "turnover_concentration": {"kind": "fixed", "threshold": 80.0, "floor": 60.0},
     # market_actions_30d: raw_value = (매수 사이드카 - 매도 사이드카) - CB발동×4를
     # 실제 KIND 공시로 1년치(2025-07~2026-07) 백필해 매일의 롤링 30일 값을 계산해보니
     # 최댓값이 3.0에 그쳤다 — 사이드카는 연간 매수17건/매도18건으로 거의 균형이라
