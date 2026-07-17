@@ -119,7 +119,7 @@ body {
 }
 /* 히어로 패딩/gap은 여기서 관리 — 모바일에서 좁혀야 고정 300px 게이지와
    냉정/보통/과열/광기 라벨이 화면 안에 온전히 들어온다. */
-.hz-hero { padding: 44px 48px; gap: 56px; }
+.hz-hero { padding: 32px 48px; gap: 56px; }
 
 @media (max-width: 560px) {
   .hz-grid { grid-template-columns: 1fr; }

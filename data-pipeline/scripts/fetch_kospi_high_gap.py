@@ -140,9 +140,12 @@ def compute_gap(client, raw_indicator_id: str) -> tuple[str, float, float, float
 
     latest_date = rows[0]["date"]
     latest_close = float(rows[0]["raw_value"])
-    fifty_two_week_high = max(float(r["raw_value"]) for r in rows)
-    gap_pct = (latest_close - fifty_two_week_high) / fifty_two_week_high * 100
-    return latest_date, latest_close, fifty_two_week_high, gap_pct
+    # 오늘(rows[0])을 제외한 전고점. 오늘 종가가 이걸 넘으면 '신고가'라 gap이 양수(+X%)로
+    # 나와 화면에 "이전 전고점 대비 +X%"를 표시할 수 있다. 넘지 못하면 음수(-X%, 전고점
+    # 아래). 오늘을 포함해 max를 잡으면 신고가 날에도 gap이 0에 캡돼 초과분이 안 보인다.
+    prior_high = max((float(r["raw_value"]) for r in rows[1:]), default=latest_close)
+    gap_pct = (latest_close - prior_high) / prior_high * 100
+    return latest_date, latest_close, prior_high, gap_pct
 
 
 def main() -> None:
