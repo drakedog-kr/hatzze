@@ -67,6 +67,7 @@ def collect_channel(tg, handle: str, cutoff: datetime) -> list[dict]:
                 "posted_at": msg.date.astimezone(timezone.utc).isoformat(),
                 "views": msg.views,
                 "forwards": msg.forwards,
+                "replies": msg.replies.replies if msg.replies else None,
                 "text": msg.message or None,
                 "has_media": msg.media is not None,
                 "edited_at": (

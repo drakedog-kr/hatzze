@@ -40,6 +40,7 @@ from common.config import (  # noqa: E402
     TELEGRAM_SESSION,
 )
 from common.supabase_client import get_client  # noqa: E402
+from common.timeutil import today_kst  # noqa: E402
 
 REQUEST_TIMEOUT_SEC = 20
 # 시트 첫 탭을 CSV로 내보내는 공개 export 엔드포인트. 시트가 "링크 있는 사람 보기"로
@@ -142,6 +143,23 @@ def sync_to_supabase(channels: list[dict]) -> None:
             "handle", stale
         ).execute()
         print(f"[Supabase] 시트에서 빠진 채널 {len(stale)}건 비활성화: {stale}")
+
+    # 오늘(KST) 구독자 스냅샷 기록 — "뜨는 채널" 시계열용(백필 불가라 매일 남긴다).
+    today = today_kst().isoformat()
+    snapshots = [
+        {
+            "channel_handle": ch["handle"],
+            "date": today,
+            "subscriber_count": ch["subscriber_count"],
+        }
+        for ch in channels
+        if ch["subscriber_count"] is not None
+    ]
+    if snapshots:
+        client.table("telegram_channel_stats").upsert(
+            snapshots, on_conflict="channel_handle,date"
+        ).execute()
+        print(f"[Supabase] telegram_channel_stats 스냅샷 {len(snapshots)}건 ({today})")
 
 
 def main() -> None:
