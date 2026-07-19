@@ -155,3 +155,65 @@ body {
 .hz-ticker-wrap:hover .hz-ticker-track {
   animation-play-state: paused;
 }
+
+/* 마우스오버 툴팁 — data-tip 속성의 문구를 요소 위에 띄운다. 카더라 리포트의
+   언급 추이 막대(며칠 몇 회인지)와 영향력 점수 설명(?)에 쓴다. JS 없이 CSS만. */
+.hz-tip {
+  position: relative;
+}
+.hz-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-6px);
+  background: var(--c-ink);
+  color: var(--c-bg);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  padding: 6px 9px;
+  border-radius: 7px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  z-index: 30;
+}
+.hz-tip:hover::after {
+  opacity: 1;
+}
+/* 긴 설명용 — 줄바꿈 허용 + 너비 제한 */
+.hz-tip-wide::after {
+  white-space: normal;
+  width: 240px;
+  text-align: left;
+}
+
+/* 클릭 가능한 카드(트렌딩 메시지 등) — 마우스를 올리면 살짝 떠오르고 테두리가
+   강조돼 "누를 수 있다"는 걸 알린다. */
+.hz-lift {
+  cursor: pointer;
+  transition: transform 0.14s ease, border-color 0.14s ease;
+}
+.hz-lift:hover {
+  transform: translateY(-2px);
+  border-color: var(--c-blue);
+}
+
+/* 리스트 행 링크(채널 랭킹 등) — 호버 시 메시지 카드와 같은 배경으로 강조된다.
+   음수 마진으로 여백을 카드 안쪽까지 넓혀 행 전체가 눌리는 느낌을 준다. */
+.hz-row-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 9px;
+  margin: -7px -9px;
+  border-radius: 10px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.hz-row-link:hover {
+  background: var(--c-bg);
+}

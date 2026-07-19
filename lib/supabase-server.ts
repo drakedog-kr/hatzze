@@ -33,3 +33,32 @@ export function getSupabaseServer(): SupabaseClient {
 
   return client;
 }
+
+let adminClient: SupabaseClient | null = null;
+
+/**
+ * service_role(secret) 키로 만든 서버 전용 Supabase 클라이언트.
+ *
+ * 카더라 리포트의 telegram_* 테이블은 감시 목록·원본을 비공개로 두려고 공개 SELECT
+ * 정책을 두지 않았다(anon 키로는 못 읽음). 이 클라이언트는 RLS를 우회하므로 반드시
+ * 서버(server-only)에서만 쓰고, 브라우저로 새어나가지 않게 한다. getSupabaseServer와
+ * 같은 이유로 지연 초기화한다(빌드 시 env 부재로 실패하지 않도록).
+ */
+export function getSupabaseAdmin(): SupabaseClient {
+  if (adminClient) return adminClient;
+
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const secretKey = process.env.SUPABASE_SECRET_KEY;
+
+  if (!supabaseUrl || !secretKey) {
+    throw new Error(
+      "SUPABASE_URL / SUPABASE_SECRET_KEY 환경변수가 설정되어 있지 않습니다.",
+    );
+  }
+
+  adminClient = createClient(supabaseUrl, secretKey, {
+    auth: { persistSession: false },
+  });
+
+  return adminClient;
+}

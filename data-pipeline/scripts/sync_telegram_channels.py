@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import base64
 import csv
 import io
 import sys
@@ -80,8 +81,19 @@ def fetch_sheet_channels(sheet_id: str) -> list[dict]:
     return channels
 
 
+def download_photo_data_uri(client, entity) -> str | None:
+    """채널 프로필 사진(작은 썸네일)을 base64 data URI로. 사진이 없으면 None."""
+    try:
+        raw = client.download_profile_photo(entity, file=bytes, download_big=False)
+        if not raw:
+            return None
+        return "data:image/jpeg;base64," + base64.b64encode(raw).decode("ascii")
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def enrich_from_telegram(channels: list[dict]) -> list[dict]:
-    """각 핸들의 표시명·구독자수를 텔레그램에서 채운다. 실패하면 title/subs=None + error."""
+    """각 핸들의 표시명·구독자수·프로필사진을 텔레그램에서 채운다. 실패하면 None + error."""
     with TelegramClient(
         StringSession(TELEGRAM_SESSION), int(TELEGRAM_API_ID), TELEGRAM_API_HASH
     ) as client:
@@ -91,10 +103,12 @@ def enrich_from_telegram(channels: list[dict]) -> list[dict]:
                 full = client(GetFullChannelRequest(entity))
                 ch["title"] = getattr(entity, "title", None) or ch["handle"]
                 ch["subscriber_count"] = full.full_chat.participants_count
+                ch["photo"] = download_photo_data_uri(client, entity)
                 ch["error"] = None
             except Exception as exc:  # noqa: BLE001
                 ch["title"] = None
                 ch["subscriber_count"] = None
+                ch["photo"] = None
                 ch["error"] = f"{type(exc).__name__}: {exc}"
     return channels
 
@@ -123,6 +137,8 @@ def sync_to_supabase(channels: list[dict]) -> None:
             "subscriber_count": ch["subscriber_count"],
             "is_active": True,
             "synced_at": now,
+            # 사진 조회 실패 시 기존 값을 지우지 않도록 None이면 키 자체를 뺀다.
+            **({"photo": ch["photo"]} if ch.get("photo") else {}),
         }
         for ch in channels
     ]

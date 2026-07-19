@@ -30,6 +30,21 @@ KOSDAQ_URL = "http://data-dbg.krx.co.kr/svc/apis/sto/ksq_bydd_trd"
 MAX_LOOKBACK_DAYS = 10  # 최신 가용 거래일을 찾기 위해 과거로 훑는 최대 일수
 
 
+def _to_int(value) -> int | None:
+    """KRX 숫자 문자열('12,345')을 int로. 빈 값/파싱 실패는 None."""
+    try:
+        return int(str(value).replace(",", "").strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _to_float(value) -> float | None:
+    try:
+        return float(str(value).replace(",", "").strip())
+    except (TypeError, ValueError):
+        return None
+
+
 def fetch_rows(url: str, bas_dd: str) -> list[dict]:
     resp = krx_get(url, bas_dd)
     if resp is None:
@@ -70,6 +85,10 @@ def main() -> None:
                 "name": name,
                 "market": (d.get("MKT_NM") or "").strip() or None,
                 "sect_type": (d.get("SECT_TP_NM") or "").strip() or None,
+                # 종가·등락률도 같은 응답에 있어 추가 호출 없이 저장한다(급부상 카드 표시용).
+                "close_price": _to_int(d.get("TDD_CLSPRC")),
+                "change_rate": _to_float(d.get("FLUC_RT")),
+                "price_date": f"{bas_dd[:4]}-{bas_dd[4:6]}-{bas_dd[6:]}",
             }
 
     if not stocks:
