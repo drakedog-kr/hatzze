@@ -19,6 +19,7 @@ import { formatKstUpdate } from "@/lib/format";
 
 import { C, Icon, MONO } from "../ui";
 import { ExpandableList } from "./ExpandableList";
+import { SectionHead } from "./SectionHead";
 import { TrendingTabs } from "./TrendingTabs";
 
 export const metadata: Metadata = {
@@ -93,40 +94,6 @@ function Avatar({ photo, title, size = 30 }: { photo: string | null; title: stri
   );
 }
 
-function SectionHead({
-  icon,
-  title,
-  note,
-  desc,
-  noteHelp,
-}: {
-  icon: string;
-  title: string;
-  note?: string;
-  desc?: string;
-  noteHelp?: string;
-}) {
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <Icon name={icon} style={{ fontSize: 22, color: C.blue }} />
-        <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: C.ink }}>{title}</h3>
-        {note && (
-          <span style={{ fontSize: 11, fontWeight: 700, color: C.sub, marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 4 }}>
-            {note}
-            {noteHelp && (
-              <span className="hz-tip hz-tip-wide" data-tip={noteHelp} style={{ display: "inline-flex", cursor: "help" }}>
-                <Icon name="help" style={{ fontSize: 14, color: C.sub }} />
-              </span>
-            )}
-          </span>
-        )}
-      </div>
-      {desc && <p style={{ margin: "7px 0 0", fontSize: 12, lineHeight: 1.5, color: C.sub }}>{desc}</p>}
-    </div>
-  );
-}
-
 const cardStyle: React.CSSProperties = {
   background: C.card,
   borderRadius: 16,
@@ -168,20 +135,7 @@ const badge = (bg: string, color: string): React.CSSProperties => ({
  * 목록 마크업만 여기로 뽑아 재사용한다 — 조회는 서버에 그대로 남는다.
  */
 function TrendingList({ items }: { items: TrendingMessage[] }) {
-  return (
-      // 3열 그리드 — 한 줄에 3개씩. 카드가 좁아지는 대신 세로로 길어져
-      // 실제 텔레그램 메시지처럼 읽힌다.
-      <ol
-        style={{
-          listStyle: "none",
-          margin: 0,
-          padding: 0,
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))",
-          gap: 12,
-        }}
-      >
-        {items.map((m, i) => (
+  const nodes = items.map((m, i) => (
           <li key={`${m.channelHandle}-${m.messageId}`} style={{ display: "flex" }}>
             {/* 원문 메시지로 이동 — 텔레그램 공개 채널은 t.me/핸들/메시지ID 로 열린다 */}
             <a
@@ -260,8 +214,21 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
               </div>
             </a>
           </li>
-        ))}
-      </ol>
+        ));
+
+  // 3열 그리드 — 한 줄에 3개씩. 카드가 좁아지는 대신 세로로 길어져 실제 텔레그램
+  // 메시지처럼 읽힌다. 채널 파워 랭킹과 같은 더 보기(+10)를 붙인다.
+  return (
+    <ExpandableList
+      items={nodes}
+      initial={6}
+      step={10}
+      listStyle={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))",
+        gap: 12,
+      }}
+    />
   );
 }
 
@@ -285,9 +252,10 @@ export default async function KaderaPage() {
       getTelegramSummary(),
       getSurgingStocks(5),
       // 기간 탭이 즉시 전환되도록 세 창을 한 번에 받아둔다(병렬이라 지연은 한 번 분).
-      getTrendingMessages("today", 6),
-      getTrendingMessages(7, 6),
-      getTrendingMessages(30, 6),
+      // 6건만 보여주고 '더 보기'로 10건씩 늘리므로, 세 번 펼칠 만큼(36) 미리 받아둔다.
+      getTrendingMessages("today", 36),
+      getTrendingMessages(7, 36),
+      getTrendingMessages(30, 36),
       getChannelRanking(),
       getRisingChannels(10),
       getThemeRotation(10),
@@ -546,13 +514,12 @@ export default async function KaderaPage() {
 
         {/* ⑥ 트렌딩 메시지 (전체폭) — 종목/주제 태그 포함 */}
         <div className="hz-c4" style={cardStyle}>
-          <SectionHead
+          {/* 머리(SectionHead)는 TrendingTabs 안에서 그린다 — 기간 탭이 머리 우측에
+              들어가고 목록은 그 아래라, 둘을 한 컴포넌트가 감싸야 상태를 공유한다. */}
+          <TrendingTabs
             icon="campaign"
             title="트렌딩 메시지"
             desc="조회·공유로 가장 널리 퍼진 메시지"
-          />
-          {/* 기간은 아래 탭이 나타내므로 SectionHead 의 note 는 두지 않는다(중복·불일치 방지). */}
-          <TrendingTabs
             panels={[
               { key: "today", label: "오늘", count: trendingToday.length, node: <TrendingList items={trendingToday} /> },
               { key: "w1", label: "최근 7일", count: trending.length, node: <TrendingList items={trending} /> },

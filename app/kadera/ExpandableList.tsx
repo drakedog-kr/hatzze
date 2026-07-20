@@ -14,11 +14,14 @@ export function ExpandableList({
   initial = 8,
   step = 10,
   gap = 11,
+  listStyle,
 }: {
   items: React.ReactNode[];
   initial?: number;
   step?: number;
   gap?: number;
+  /** 기본 세로 목록 대신 다른 배치를 쓸 때(트렌딩 메시지는 3열 그리드). gap 은 여기서 덮어쓴다. */
+  listStyle?: React.CSSProperties;
 }) {
   const [shown, setShown] = useState(initial);
   const canExpand = shown < items.length;
@@ -38,7 +41,17 @@ export function ExpandableList({
 
   return (
     <>
-      <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap }}>
+      <ol
+        style={{
+          listStyle: "none",
+          margin: 0,
+          padding: 0,
+          display: "flex",
+          flexDirection: "column",
+          gap,
+          ...listStyle,
+        }}
+      >
         {items.slice(0, shown)}
       </ol>
       {(canExpand || isExpanded) && (
