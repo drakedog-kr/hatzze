@@ -47,7 +47,26 @@ type Pick = {
   dirLabel: string;
   details: Record<string, number> | null;
   history: number[];
+  /** 자료의 실제 기준일이 계산일보다 며칠 뒤처졌나(0이면 최신). details.source_date 가 있을 때만. */
+  staleDays: number;
 };
+
+/**
+ * KRX가 최근 영업일치를 아직 안 낸 날에도 파이프라인은 '오늘' 행을 쓴다(며칠 전
+ * 자료로 계산해서). 그래서 행 날짜만 보면 항상 최신처럼 보인다. 자료를 만든
+ * 스크립트가 details.source_date(YYYYMMDD)를 남기면 여기서 지연일을 구해
+ * 카드에 "기준 07-16"을 띄운다.
+ */
+function staleDaysOf(details: Record<string, number> | null): number {
+  const sd = details?.source_date;
+  if (!sd) return 0;
+  const s = String(sd);
+  const src = new Date(`${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}T00:00:00+09:00`);
+  const now = new Date();
+  const kstToday = new Date(now.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  const today = new Date(`${kstToday}T00:00:00+09:00`);
+  return Math.max(0, Math.round((today.getTime() - src.getTime()) / 86400000));
+}
 
 function pick(ind: Ind | undefined): Pick {
   const raw = ind?.latest?.raw_value ?? null;
@@ -79,7 +98,19 @@ function pick(ind: Ind | undefined): Pick {
     dirLabel: ind?.direction === "low" ? "이하" : "이상",
     details: ind?.latest?.details ?? null,
     history: ind?.history ?? [],
+    staleDays: staleDaysOf(ind?.latest?.details ?? null),
   };
+}
+
+/**
+ * 카드 배지 문구 — 자료가 뒤처졌으면 "당일 기준" 대신 실제 기준일을 밝힌다.
+ * 주말·공휴일엔 자료가 없는 게 정상이라 2일까지는 조용히 넘기고, 3일 이상
+ * 벌어졌을 때만(= 영업일을 건너뛰기 시작) 기준일로 바꿔 단다.
+ */
+function sourceBadge(v: Pick, fresh: string): string {
+  if (v.staleDays < 3 || !v.details?.source_date) return fresh;
+  const s = String(v.details.source_date);
+  return `${s.slice(4, 6)}-${s.slice(6, 8)} 기준`;
 }
 
 // ── 공용 카드 조각 ────────────────────────────────────────────────
@@ -645,7 +676,7 @@ function CardBuffett({ v }: { v: Pick }) {
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
       <Tag text={v.headline} color={v.color} />
-      <TitleRow icon="payments" iconSize={30} color={v.color} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="당일 기준" />
+      <TitleRow icon="payments" iconSize={30} color={v.color} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge={sourceBadge(v, "당일 기준")} />
       <Big disp={v.disp} unit={v.unit} color={v.color} size={52} sub={ratio !== null ? `${ratio.toFixed(1)}배` : undefined} />
       <div style={{ background: C.bg, borderRadius: 10, padding: "18px 18px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
         <div>
@@ -827,7 +858,7 @@ function CardHighGap({ v }: { v: Pick }) {
   return (
     <Shell hit={v.isHit} minH={230}>
       <Tag text={v.headline} color={v.color} />
-      <TitleRow icon="vertical_align_top" name={v.name} color={v.color} />
+      <TitleRow icon="vertical_align_top" name={v.name} color={v.color} badge={sourceBadge(v, "")} />
       <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1 }}>
         <div style={{ display: "flex", flexDirection: "column" }}>
           <span style={{ fontFamily: MONO, fontSize: 34, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{gap > 0 ? "+" : ""}{v.disp}{v.unit}</span>
