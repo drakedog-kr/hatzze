@@ -47,25 +47,42 @@ type Pick = {
   dirLabel: string;
   details: Record<string, number> | null;
   history: number[];
-  /** 자료의 실제 기준일이 계산일보다 며칠 뒤처졌나(0이면 최신). details.source_date 가 있을 때만. */
+  /** 자료의 실제 기준일이 몇 영업일 뒤처졌나(0~1이면 정상). details.source_date 가 있을 때만. */
   staleDays: number;
 };
 
 /**
  * KRX가 최근 영업일치를 아직 안 낸 날에도 파이프라인은 '오늘' 행을 쓴다(며칠 전
  * 자료로 계산해서). 그래서 행 날짜만 보면 항상 최신처럼 보인다. 자료를 만든
- * 스크립트가 details.source_date(YYYYMMDD)를 남기면 여기서 지연일을 구해
- * 카드에 "기준 07-16"을 띄운다.
+ * 스크립트가 details.source_date(YYYYMMDD)를 남기면 여기서 지연을 구해
+ * 카드에 "07-16 기준"을 띄운다.
+ *
+ * **달력 날짜가 아니라 영업일로 센다.** 주말엔 장이 안 열리니 금요일 자료를
+ * 월요일에 보는 건 정상인데, 달력으로 세면 3일이라 멀쩡한 값에 낡음 딱지가 붙는다.
+ * 반환값 = source_date 다음날부터 오늘까지의 평일 수:
+ *   금요일 자료를 월요일에 → 1 (정상)
+ *   목요일 자료를 월요일에 → 2 (금요일치를 건너뜀 = 지연)
+ * 공휴일은 달력을 따로 안 봐서 하루치 과경고가 날 수 있는데, 지연을 놓치는 쪽보다
+ * 낫다고 보고 감수한다.
  */
-function staleDaysOf(details: Record<string, number> | null): number {
+function staleBusinessDays(details: Record<string, number> | null): number {
   const sd = details?.source_date;
   if (!sd) return 0;
   const s = String(sd);
   const src = new Date(`${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}T00:00:00+09:00`);
-  const now = new Date();
-  const kstToday = new Date(now.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  const kstToday = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
   const today = new Date(`${kstToday}T00:00:00+09:00`);
-  return Math.max(0, Math.round((today.getTime() - src.getTime()) / 86400000));
+
+  let count = 0;
+  const cursor = new Date(src);
+  cursor.setUTCDate(cursor.getUTCDate() + 1); // 자료일 다음날부터 센다
+  while (cursor <= today) {
+    // KST 기준 요일 — src/today 모두 KST 자정이라 UTC 요일로 봐도 어긋나지 않는다.
+    const dow = new Date(cursor.getTime() + 9 * 3600 * 1000).getUTCDay();
+    if (dow !== 0 && dow !== 6) count += 1;
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return count;
 }
 
 function pick(ind: Ind | undefined): Pick {
@@ -98,17 +115,17 @@ function pick(ind: Ind | undefined): Pick {
     dirLabel: ind?.direction === "low" ? "이하" : "이상",
     details: ind?.latest?.details ?? null,
     history: ind?.history ?? [],
-    staleDays: staleDaysOf(ind?.latest?.details ?? null),
+    staleDays: staleBusinessDays(ind?.latest?.details ?? null),
   };
 }
 
 /**
  * 카드 배지 문구 — 자료가 뒤처졌으면 "당일 기준" 대신 실제 기준일을 밝힌다.
- * 주말·공휴일엔 자료가 없는 게 정상이라 2일까지는 조용히 넘기고, 3일 이상
- * 벌어졌을 때만(= 영업일을 건너뛰기 시작) 기준일로 바꿔 단다.
+ * 1영업일 지연(어제 자료로 오늘 계산)은 거래소 공표 주기상 정상이라 조용히 넘기고,
+ * 2영업일부터 = 나와야 할 영업일치를 건너뛰기 시작했을 때만 기준일로 바꿔 단다.
  */
 function sourceBadge(v: Pick, fresh: string): string {
-  if (v.staleDays < 3 || !v.details?.source_date) return fresh;
+  if (v.staleDays < 2 || !v.details?.source_date) return fresh;
   const s = String(v.details.source_date);
   return `${s.slice(4, 6)}-${s.slice(6, 8)} 기준`;
 }
