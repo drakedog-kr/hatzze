@@ -191,7 +191,7 @@ function HitBadge({ label = "🎯 HIT", small = false }: { label?: string; small
 
 
 /**
- * 카드 머리 — 카더라 리포트(app/telegram의 SectionHead)와 같은 구조를 쓴다:
+ * 카드 머리 — 카더라 리포트(app/kadera의 SectionHead)와 같은 구조를 쓴다:
  * [아이콘 + 제목] 을 먼저 두고 그 아래 한 줄 설명을 붙인다.
  *
  * 예전엔 따옴표 친 기울임 헤드라인("꼭대기까지 남은 발걸음")이 제목 위에 먼저 왔고

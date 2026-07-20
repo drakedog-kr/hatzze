@@ -7,6 +7,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
   return [
     { url: SITE_URL, lastModified: now, changeFrequency: "daily", priority: 1 },
-    { url: `${SITE_URL}/telegram`, lastModified: now, changeFrequency: "daily", priority: 0.8 },
+    { url: `${SITE_URL}/kadera`, lastModified: now, changeFrequency: "daily", priority: 0.8 },
   ];
 }

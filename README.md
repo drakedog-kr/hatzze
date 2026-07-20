@@ -44,7 +44,7 @@ flowchart LR
 
 `vercel.json`의 `regions: ["icn1"]`은 성능상 필수입니다 — 지우지 마세요.
 
-Vercel 함수는 기본값이 `iad1`(미국 버지니아)인데, Supabase는 `ap-northeast-2`(서울)에 있습니다. 기본값을 두면 렌더 중 쿼리 한 번마다 태평양을 왕복해 **쿼리당 ~200ms**가 붙습니다. `/telegram`은 쿼리가 24개라 이것만으로 몇 초가 됐습니다(수정 전 TTFB 2.9~5.4초).
+Vercel 함수는 기본값이 `iad1`(미국 버지니아)인데, Supabase는 `ap-northeast-2`(서울)에 있습니다. 기본값을 두면 렌더 중 쿼리 한 번마다 태평양을 왕복해 **쿼리당 ~200ms**가 붙습니다. `/kadera`(당시 `/telegram`)는 쿼리가 24개라 이것만으로 몇 초가 됐습니다(수정 전 TTFB 2.9~5.4초).
 
 `icn1`은 Supabase와 같은 리전이라 왕복이 한 자릿수 ms로 떨어집니다. Hobby 플랜도 **리전 개수만 1개 제한**이고 어느 리전을 고르는지는 자유입니다. 참고로 Yahoo Finance 등 미국 API 호출은 조금 느려지지만, `revalidate` 캐시가 걸려 있고 호출 수도 적어 영향이 작습니다.
 
