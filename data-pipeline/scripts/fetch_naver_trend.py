@@ -20,7 +20,23 @@ from common.indicator import ensure_indicator  # noqa: E402
 
 NAVER_DATALAB_URL = "https://openapi.naver.com/v1/datalab/search"
 KEYWORD_GROUP_NAME = "주식초보"
-KEYWORDS = ["주식 시작하는 법", "증권계좌 개설", "주식 초보"]
+# 주식을 '처음 시작하는 사람'의 검색 의도만 모은다 — 종목명·시황 검색어를 섞으면
+# 기존 투자자의 관심까지 잡혀 '초보 유입'이라는 지표의 뜻이 흐려진다.
+# 데이터랩은 그룹의 검색량을 합산해 0~100으로 정규화하므로, 키워드를 늘리면 저변이
+# 넓어져 신호가 안정된다. 매 실행 365일치를 다시 받아 upsert 하니 과거 시계열도
+# 같은 구성으로 재계산돼 단절이 생기지 않는다(그룹당 20개까지 허용).
+KEYWORDS = [
+    "주식 시작하는 법",
+    "증권계좌 개설",
+    "주식 초보",
+    "주린이",  # 초보 투자자를 가리키는 관용어 — 입문 검색의 대표어
+    "주식 공부",
+    "주식 입문",
+    "주식 하는법",
+    "주식 계좌 개설",
+    "증권사 추천",
+    "미국주식 시작",
+]
 LOOKBACK_DAYS = 365
 
 INDICATOR_SLUG = "naver_search_trend"

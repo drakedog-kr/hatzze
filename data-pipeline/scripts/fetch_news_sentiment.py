@@ -27,7 +27,7 @@ from common.details import store_abs_scale_details  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
-from config.news_sentiment_keywords import NEGATIVE_KEYWORDS, POSITIVE_KEYWORDS  # noqa: E402
+from common.llm_sentiment import LlmUnavailableError, classify_titles  # noqa: E402
 
 NAVER_NEWS_SEARCH_URL = "https://openapi.naver.com/v1/search/news.json"
 QUERIES = ["코스피", "증시"]
@@ -62,19 +62,6 @@ def parse_pub_date(pub_date: str) -> date:
     return datetime.strptime(pub_date, "%a, %d %b %Y %H:%M:%S %z").date()
 
 
-def classify_sentiment(title: str) -> str:
-    positive_hits = sum(1 for kw in POSITIVE_KEYWORDS if kw in title)
-    negative_hits = sum(1 for kw in NEGATIVE_KEYWORDS if kw in title)
-
-    if positive_hits == 0 and negative_hits == 0:
-        return "neutral"
-    if positive_hits > negative_hits:
-        return "positive"
-    if negative_hits > positive_hits:
-        return "negative"
-    return "neutral"  # 동률
-
-
 def fetch_page(query: str, start: int) -> list[dict]:
     resp = requests.get(
         NAVER_NEWS_SEARCH_URL,
@@ -100,15 +87,10 @@ def fetch_page(query: str, start: int) -> list[dict]:
 
 
 def compute_sentiment(titles: list[str]) -> dict:
-    positive = negative = neutral = 0
-    for title in titles:
-        label = classify_sentiment(title)
-        if label == "positive":
-            positive += 1
-        elif label == "negative":
-            negative += 1
-        else:
-            neutral += 1
+    labels = classify_titles(titles, source="경제 뉴스 헤드라인", slang=False)
+    positive = labels.count("positive")
+    negative = labels.count("negative")
+    neutral = labels.count("neutral")
 
     total = len(titles)
     score = (positive - negative) / total * 100 if total else 0.0
@@ -318,6 +300,7 @@ def main() -> None:
 if __name__ == "__main__":
     try:
         main()
-    except PermissionError as e:
-        print(f"[ERROR] {e}")
-        sys.exit(1)
+    except LlmUnavailableError as e:
+        # 분류가 안 되면 그날 값을 쓰지 않는다 — 옛 키워드 방식으로 몰래 되돌아가면
+        # 스케일이 다른 값이 시계열에 섞여 더 나쁘다. 워크플로우는 continue-on-error 다.
+        print(f"[WARNING] [Naver News] LLM 분류 불가로 오늘 계산을 건너뜁니다: {e}")
