@@ -22,6 +22,10 @@ import { ExpandableList } from "./ExpandableList";
 export const metadata: Metadata = {
   title: "카더라 리포트 | hatzze",
   description: "한국 주식 텔레그램 채널에서 가장 많이 언급되는 종목과 화제의 메시지를 분석합니다.",
+  // 루트 레이아웃이 canonical "/" 를 선언해 하위 페이지가 그대로 물려받는다. 그대로 두면
+  // 이 페이지가 홈의 중복이라고 선언하는 셈이라 검색엔진이 색인하지 않는다. 자기 주소로
+  // 덮어써야 sitemap 에 올린 것이 실제 색인으로 이어진다.
+  alternates: { canonical: "/kadera" },
 };
 
 export const dynamic = "force-dynamic";

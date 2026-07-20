@@ -57,7 +57,7 @@ export default function Footer() {
           <nav aria-label="바로가기">
             <GroupLabel>바로가기</GroupLabel>
             <FooterLink href="/">시장 브리핑</FooterLink>
-            <FooterLink href="/telegram">카더라 리포트</FooterLink>
+            <FooterLink href="/kadera">카더라 리포트</FooterLink>
           </nav>
           <div>
             <GroupLabel>데이터 출처</GroupLabel>
