@@ -1262,7 +1262,11 @@ function CardDivergence({ v }: { v: Pick }) {
           </span>
         }
       />
-      <div style={{ background: C.bg, borderRadius: 10, padding: 16, marginTop: 6, display: "flex", gap: 22 }}>
+      {/* 이 카드는 span=2 인데 내용이 짧아, 같은 행의 긴 카드(증권앱)에 맞춰 늘어난 만큼
+          남는 공간이 Foot 의 marginTop:auto 로 전부 아래에 몰렸다 — 박스와 divider 사이만
+          56px 로 벌어졌다. 박스에도 auto 를 줘 남는 공간을 위아래가 나눠 갖게 한다
+          (auto 마진 두 개면 균등 분배). 고정값이 아니라 행 높이가 달라져도 유지된다. */}
+      <div style={{ background: C.bg, borderRadius: 10, padding: 16, marginTop: "auto", display: "flex", gap: 22 }}>
         <DivergenceBar label="실물 스트레스" hint="자영업 폐업 검색" value={real} color={C.cold} />
         <DivergenceBar label="증시 강세" hint="신고가 근접도" value={market} color={C.hot} />
       </div>
