@@ -30,6 +30,14 @@ INDICATOR_THRESHOLDS = {
     # (−20%인데 약세장 느낌 안 남)을 반영해 크래시급에서만 저온으로 본다.
     "kospi_high_gap": {"kind": "fixed", "threshold": 0.0, "floor": -30.0, "kink": -3.0},
     "naver_search_trend": {"kind": "fixed", "threshold": 70.0},
+    # dcinside_post_count / news_sentiment: (긍정−부정)/전체×100 (−100~100).
+    # 2026-07-20 분류를 키워드 매칭 → LLM 으로 바꾸면서 **값의 스케일이 커졌다.**
+    # 키워드 시절 디시는 제목의 95%가 어느 단어에도 안 걸려 중립으로 빠졌고, 그 결과
+    # 관측 범위가 −4.6~0.1 에 그쳐 threshold 25 에 **한 번도 닿을 수 없었다**(진행률 ≤18%).
+    # LLM 전환 후 분류율이 6%→72% 로 올라 같은 날 −24.4 가 나온다 — 임계값을 바꾸지
+    # 않아도 이제야 의미 있게 켜질 수 있는 범위가 됐으므로 25/35 를 유지한다.
+    # (히스토리에는 두 방식이 섞이지만 게이지가 '최근 |최대|' 기준이라 계산은 안 깨지고,
+    #  30일 창이 굴러가며 자연히 LLM 값만 남는다.)
     "dcinside_post_count": {"kind": "fixed", "threshold": 25.0},
     # kospi_volume_surge: 절대 거래대금이 아니라 "30일 평균 대비 %"(details.surge_pct)로 판단.
     # 평소(0%)=상온, +20%↑=초고온. floor surge −20%=0%, ceiling surge +33.3%=100%
@@ -54,7 +62,10 @@ INDICATOR_THRESHOLDS = {
     # 진행률 값이라(upbit_speculation_index와 동일한 설계), threshold=100은
     # "두 서브 신호 모두 자기 기준선에 도달한 수준"을 의미한다.
     "leverage_etf_volume": {"kind": "fixed", "threshold": 100.0},
-    "bestseller_finance_ratio": {"kind": "fixed", "threshold": 16.0},
+    # bestseller_finance_ratio: 베스트셀러 100위 중 경제·재테크 도서 비중(%).
+    # 16%는 실측상 거의 닿지 않는 값이라(최근 30일 관측값이 2%·4% 두 종류뿐) 지표가
+    # 늘 바닥에 붙어 있었다. 10%로 낮춰 "서점가 열풍"이 실제로 켜질 수 있게 한다.
+    "bestseller_finance_ratio": {"kind": "fixed", "threshold": 10.0},
     # youtube: 기준선=누적 평균(compute_threshold). 예전엔 progress=현재/평균×100이라 "평균=100%
     # =정상"인데도 과열 100%로 잡혀(평균 이하도 hit) 점수를 부풀렸다. surge_map으로 "평균 대비
     # 급증(%)"을 과열도로 매핑한다 — 평균(급증 0%)=진행률 50(상온), +25%=75(초고온 진입/Hit),

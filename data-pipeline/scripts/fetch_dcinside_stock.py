@@ -11,9 +11,10 @@
 등)에도 포함되어 있지 않아 스크래핑 가능하다.
 
 감성 스코어 = (긍정 게시글 수 - 부정 게시글 수) / 전체 게시글 수 * 100 (-100~100).
-두 갤러리의 게시글을 합산한 뒤 계산한다. 키워드 기반 단순 분류라 반어법 등은
-잡아내지 못한다 — PRD상 추후 LLM 기반으로 고도화할 예정이며, 지금은 1차 근사치로
-사용한다.
+두 갤러리의 게시글을 합산한 뒤 계산한다. 분류는 LLM(common/llm_sentiment)이 맡는다 —
+예전 키워드 매칭은 제목 2,987건 중 95%가 어느 단어에도 안 걸려 중립 처리됐고("양닉 음전",
+"롱숭이 계좌 정밀타격" 같은 갤러리 은어가 사전에 없었다), 지표가 사실상 5% 표본으로
+계산되고 있었다. LLM 전환 후 분류율은 6% → 72%다.
 
 --backfill(최근 30일)은 krstock만 대상으로 한다. stockus는 활동량이 너무 많아
 (오늘자 게시글만 1,500건을 넘겨도 전날로 못 넘어감) 30일 전체 백필이 비현실적이라,
@@ -36,7 +37,7 @@ from common.details import store_abs_scale_details  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
-from config.sentiment_keywords import NEGATIVE_KEYWORDS, POSITIVE_KEYWORDS  # noqa: E402
+from common.llm_sentiment import LlmUnavailableError, classify_titles  # noqa: E402
 
 GALLERY_IDS = ["krstock", "stockus"]
 MGALLERY_LIST_URL = "https://gall.dcinside.com/mgallery/board/lists/"
@@ -74,19 +75,6 @@ INDICATOR_META = {
     "description_beginner": "낙관적인 얘기만 쏟아지면, 개인 투자 심리가 과열됐다는 신호예요",
     "unit": "pt",
 }
-
-
-def classify_sentiment(title: str) -> str:
-    positive_hits = sum(1 for kw in POSITIVE_KEYWORDS if kw in title)
-    negative_hits = sum(1 for kw in NEGATIVE_KEYWORDS if kw in title)
-
-    if positive_hits == 0 and negative_hits == 0:
-        return "neutral"
-    if positive_hits > negative_hits:
-        return "positive"
-    if negative_hits > positive_hits:
-        return "negative"
-    return "neutral"  # 동률
 
 
 def fetch_page(gallery_id: str, page: int) -> BeautifulSoup:
@@ -161,15 +149,10 @@ def collect_today_titles() -> list[str]:
 
 
 def compute_sentiment(titles: list[str]) -> dict:
-    positive = negative = neutral = 0
-    for title in titles:
-        label = classify_sentiment(title)
-        if label == "positive":
-            positive += 1
-        elif label == "negative":
-            negative += 1
-        else:
-            neutral += 1
+    labels = classify_titles(titles, source="커뮤니티 갤러리", slang=True)
+    positive = labels.count("positive")
+    negative = labels.count("negative")
+    neutral = labels.count("neutral")
 
     total = len(titles)
     score = (positive - negative) / total * 100 if total else 0.0
@@ -341,4 +324,9 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except LlmUnavailableError as e:
+        # 분류가 안 되면 그날 값을 쓰지 않는다 — 옛 키워드 방식으로 몰래 되돌아가면
+        # 스케일이 다른 값이 시계열에 섞여 더 나쁘다. 워크플로우는 continue-on-error 다.
+        print(f"[WARNING] [DCInside] LLM 분류 불가로 오늘 계산을 건너뜁니다: {e}")
