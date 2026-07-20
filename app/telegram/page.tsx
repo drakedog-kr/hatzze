@@ -531,8 +531,9 @@ export default async function TelegramPage() {
           <SectionHead
             icon="donut_small"
             title="테마 로테이션"
-            note="최근 7일 · 점유율/순위"
+            note="최근 3일 vs 이전"
             desc="관심이 어느 테마로 옮겨가는지"
+            noteHelp="최근 3일 평균 점유율을 5일 이상 이전 평균과 비교해요. 하루치끼리 비교하면 주말처럼 표본이 얇은 날에 점유율이 크게 요동쳐서, 며칠씩 묶어 안정적으로 봐요."
           />
           {themes.length === 0 ? (
             <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 집계된 테마가 없어요.</p>

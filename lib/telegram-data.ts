@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { changeRateOf, fetchYahooQuote } from "@/lib/yahoo-quote";
 
@@ -65,11 +67,17 @@ export async function getTelegramSummary(): Promise<TelegramSummary> {
     .from("telegram_message_stocks")
     .select("id", { count: "exact", head: true });
 
-  const { data: recent } = await db
-    .from("telegram_messages")
-    .select("channel_handle")
-    .gte("posted_at", daysAgoISO(7));
-  const activeChannels = new Set((recent ?? []).map((r) => r.channel_handle)).size;
+  // 서로 다른 채널 수를 세려면 행을 다 봐야 한다 — 페이징 없이 select 하면 1000행에서
+  // 잘려 활성 채널이 실제보다 적게 나온다(7일 메시지가 1,805건인데 1,000건만 보여
+  // 12개 채널이 8개로 표시되던 버그).
+  const recent = await fetchAllRows<{ channel_handle: string }>((from, to) =>
+    db
+      .from("telegram_messages")
+      .select("channel_handle")
+      .gte("posted_at", daysAgoISO(7))
+      .range(from, to),
+  );
+  const activeChannels = new Set(recent.map((r) => r.channel_handle)).size;
   // 행을 세면 PostgREST 기본 1000행 상한에 걸려 항상 1,000이 된다 — count 쿼리로 정확히.
   const { count: messages7dCount } = await db
     .from("telegram_messages")
@@ -409,12 +417,19 @@ export async function getTrendingMessages(windowDays: number, limit = 8): Promis
     .slice(0, limit);
 
   // 각 메시지에서 추출해둔 종목을 태그로 붙인다(사전 기반 추출 결과 재사용).
-  const { data: tags } = await db
-    .from("telegram_message_stocks")
-    .select("channel_handle,message_id,stock_code")
-    .in("message_id", top.map((m) => m.messageId));
+  // message_id 는 채널별로만 유일해서 채널을 안 걸면 다른 채널의 같은 번호 메시지까지
+  // 딸려온다(한 번호가 최대 60행). 아래에서 채널까지 포함한 키로 걸러내므로 결과는
+  // 맞지만, 행이 많아지면 1000행 상한에 잘려 태그가 조용히 사라질 수 있어 페이징한다.
+  const tags = await fetchAllRows<{ channel_handle: string; message_id: number; stock_code: string }>(
+    (from, to) =>
+      db
+        .from("telegram_message_stocks")
+        .select("channel_handle,message_id,stock_code")
+        .in("message_id", top.map((m) => m.messageId))
+        .range(from, to),
+  );
 
-  if (tags?.length) {
+  if (tags.length) {
     const nameOf = await nameMap([...new Set(tags.map((t) => t.stock_code))]);
     const byMsg = new Map<string, string[]>();
     for (const t of tags) {
@@ -440,14 +455,34 @@ export type StockReport = {
   name: string;
   totalMentions: number;
   series: { date: string; mentions: number }[];
-  topChannels: { title: string; count: number }[];
   channelCount: number; // 이 종목을 다룬 서로 다른 채널 수(관심의 폭)
   price: number | null; // 실시간 시세
   changeRate: number | null;
-  topMessage: { text: string; channelTitle: string; views: number; forwards: number } | null;
 };
 
-/** 종목 텔레그램 리포트 — 특정 종목의 일별 언급 추이 + 언급 상위 채널. */
+/** 종목 리포트 카드가 내세우는 구간. 카드 라벨("최근 7일")과 반드시 같아야 한다. */
+const REPORT_WINDOW_DAYS = 7;
+
+/**
+ * 최근 N일 안에 올라온 메시지의 키 집합.
+ *
+ * telegram_message_stocks 에는 날짜가 없어서(메시지 PK만 갖는다) 종목 언급을 기간으로
+ * 자르려면 메시지 쪽 posted_at 을 봐야 한다. 한 페이지에서 종목 리포트를 3개 만들며
+ * 같은 집합을 세 번 쓰므로 React cache 로 요청당 한 번만 조회한다.
+ */
+const recentMessageKeys = cache(async (days: number): Promise<Set<string>> => {
+  const db = getSupabaseAdmin();
+  const rows = await fetchAllRows<{ channel_handle: string; message_id: number }>((from, to) =>
+    db
+      .from("telegram_messages")
+      .select("channel_handle,message_id")
+      .gte("posted_at", daysAgoISO(days))
+      .range(from, to),
+  );
+  return new Set(rows.map((r) => `${r.channel_handle}|${r.message_id}`));
+});
+
+/** 종목 텔레그램 리포트 — 특정 종목의 최근 7일 언급 추이와 관심의 폭. */
 export async function getStockReport(code: string): Promise<StockReport | null> {
   const db = getSupabaseAdmin();
   const { data: stock } = await db.from("stocks").select("name,market").eq("code", code).maybeSingle();
@@ -457,50 +492,30 @@ export async function getStockReport(code: string): Promise<StockReport | null> 
     .from("telegram_stock_daily")
     .select("date,mention_count")
     .eq("stock_code", code)
-    .gte("date", daysAgoISO(10).slice(0, 10))
+    .gte("date", daysAgoISO(REPORT_WINDOW_DAYS).slice(0, 10))
     .order("date");
   const today = todayKstDate();
   const series = (daily ?? []).filter((d) => d.date < today).map((d) => ({ date: d.date, mentions: d.mention_count || 0 }));
   const totalMentions = series.reduce((s, d) => s + d.mentions, 0);
 
-  const { data: mentions } = await db
-    .from("telegram_message_stocks")
-    .select("channel_handle,message_id")
-    .eq("stock_code", code);
-  const counts = new Map<string, number>();
-  for (const m of mentions ?? []) counts.set(m.channel_handle, (counts.get(m.channel_handle) ?? 0) + 1);
-
-  const { data: channels } = await db.from("telegram_channels").select("handle,title");
-  const titleOf = new Map((channels ?? []).map((c) => [c.handle, (c.title as string) ?? c.handle]));
-  const topChannels = [...counts.entries()]
-    .map(([h, count]) => ({ title: titleOf.get(h) ?? h, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 3);
-
-  // 대표 메시지 — 이 종목을 언급한 메시지 중 가장 널리 퍼진 것. "왜 화제인지"를 보여준다.
-  let topMessage: StockReport["topMessage"] = null;
-  const ids = [...new Set((mentions ?? []).map((m) => m.message_id))].slice(0, 300);
-  if (ids.length) {
-    const { data: msgs } = await db
-      .from("telegram_messages")
-      .select("channel_handle,message_id,text,views,forwards,replies")
-      .in("message_id", ids)
-      .not("text", "is", null)
-      .order("views", { ascending: false, nullsFirst: false })
-      .limit(50);
-    const pairs = new Set((mentions ?? []).map((m) => `${m.channel_handle}|${m.message_id}`));
-    const best = (msgs ?? [])
-      .filter((m) => pairs.has(`${m.channel_handle}|${m.message_id}`))
-      .map((m) => ({
-        text: (m.text ?? "").replace(/\s+/g, " ").trim(),
-        channelTitle: titleOf.get(m.channel_handle) ?? m.channel_handle,
-        views: m.views ?? 0,
-        forwards: m.forwards ?? 0,
-        score: (m.views ?? 0) * TREND_W_VIEWS + (m.forwards ?? 0) * TREND_W_FWD + (m.replies ?? 0) * TREND_W_REPLIES,
-      }))
-      .sort((a, b) => b.score - a.score)[0];
-    if (best) topMessage = { text: best.text, channelTitle: best.channelTitle, views: best.views, forwards: best.forwards };
-  }
+  // 채널 수도 같은 창으로 자른다 — 전체 기간으로 세면 모니터링 채널이 12개뿐이라
+  // 금세 12로 포화돼 '관심의 폭'을 구분하지 못한다.
+  // 이 표에는 날짜가 없어 서버에서 기간을 못 자른다 — 종목 하나의 전체 기간 언급을
+  // 다 받아 와 아래에서 창으로 거른다. 인기 종목은 하루 30건꼴이라 한 달이면 1000행을
+  // 넘기므로 반드시 페이징한다(안 하면 채널 수가 조용히 적게 나온다).
+  const mentions = await fetchAllRows<{ channel_handle: string; message_id: number }>((from, to) =>
+    db
+      .from("telegram_message_stocks")
+      .select("channel_handle,message_id")
+      .eq("stock_code", code)
+      .range(from, to),
+  );
+  const keys = await recentMessageKeys(REPORT_WINDOW_DAYS);
+  const channelCount = new Set(
+    mentions
+      .filter((m) => keys.has(`${m.channel_handle}|${m.message_id}`))
+      .map((m) => m.channel_handle),
+  ).size;
 
   const quote = await stockQuote(`${code}.${stock.market === "KOSDAQ" ? "KQ" : "KS"}`);
 
@@ -509,11 +524,9 @@ export async function getStockReport(code: string): Promise<StockReport | null> 
     name: stock.name as string,
     totalMentions,
     series,
-    topChannels,
-    channelCount: counts.size,
+    channelCount,
     price: quote ? Math.round(quote.price) : null,
     changeRate: quote ? quote.changeRate : null,
-    topMessage,
   };
 }
 
@@ -619,12 +632,24 @@ export type ChannelRank = {
 /** 채널 파워 랭킹 — 가장 최근 날짜의 Influence Score. */
 export async function getChannelRanking(): Promise<ChannelRank[]> {
   const db = getSupabaseAdmin();
-  const { data: stats } = await db
-    .from("telegram_channel_stats")
-    .select("channel_handle,date,subscriber_count,influence_score,view_rate,is_growing")
-    .not("influence_score", "is", null)
-    .order("date", { ascending: false });
-  if (!stats?.length) return [];
+  // 채널 12개 × 하루 1행이라 석 달이면 1000행을 넘긴다 — 그때 잘리면 순위 변동 비교용
+  // 과거 스냅샷이 사라지므로 미리 페이징해 둔다.
+  const stats = await fetchAllRows<{
+    channel_handle: string;
+    date: string;
+    subscriber_count: number | null;
+    influence_score: number | null;
+    view_rate: number | null;
+    is_growing: boolean | null;
+  }>((from, to) =>
+    db
+      .from("telegram_channel_stats")
+      .select("channel_handle,date,subscriber_count,influence_score,view_rate,is_growing")
+      .not("influence_score", "is", null)
+      .order("date", { ascending: false })
+      .range(from, to),
+  );
+  if (!stats.length) return [];
 
   const latest = new Map<string, (typeof stats)[number]>();
   for (const r of stats) if (!latest.has(r.channel_handle)) latest.set(r.channel_handle, r);
