@@ -13,11 +13,13 @@ import {
   getTopStocksWithTrend,
   getTrendingMessages,
 } from "@/lib/telegram-data";
+import type { TrendingMessage } from "@/lib/telegram-data";
 
 import { formatKstUpdate } from "@/lib/format";
 
 import { C, Icon, MONO } from "../ui";
 import { ExpandableList } from "./ExpandableList";
+import { TrendingTabs } from "./TrendingTabs";
 
 export const metadata: Metadata = {
   title: "카더라 리포트 | hatzze",
@@ -160,13 +162,132 @@ const badge = (bg: string, color: string): React.CSSProperties => ({
   whiteSpace: "nowrap",
 });
 
-export default async function TelegramPage() {
+
+/**
+ * 트렌딩 메시지 목록(3열 그리드). 기간 탭이 세 벌을 미리 렌더해 넘기므로
+ * 목록 마크업만 여기로 뽑아 재사용한다 — 조회는 서버에 그대로 남는다.
+ */
+function TrendingList({ items }: { items: TrendingMessage[] }) {
+  return (
+      // 3열 그리드 — 한 줄에 3개씩. 카드가 좁아지는 대신 세로로 길어져
+      // 실제 텔레그램 메시지처럼 읽힌다.
+      <ol
+        style={{
+          listStyle: "none",
+          margin: 0,
+          padding: 0,
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))",
+          gap: 12,
+        }}
+      >
+        {items.map((m, i) => (
+          <li key={`${m.channelHandle}-${m.messageId}`} style={{ display: "flex" }}>
+            {/* 원문 메시지로 이동 — 텔레그램 공개 채널은 t.me/핸들/메시지ID 로 열린다 */}
+            <a
+              href={`https://t.me/${m.channelHandle}/${m.messageId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hz-lift"
+              style={{
+                ...subCard,
+                padding: "13px 15px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 9,
+                textDecoration: "none",
+                width: "100%",
+                minHeight: 168,
+              }}
+            >
+              {/* 보낸 채널 */}
+              <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+                <span style={{ ...rankNum, width: 14, fontSize: 12, color: i < 3 ? C.hot : C.sub }}>{i + 1}</span>
+                <Avatar photo={m.channelPhoto} title={m.channelTitle} size={22} />
+                <b
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: C.blue,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {m.channelTitle}
+                </b>
+                <span style={{ marginLeft: "auto", fontSize: 10, fontFamily: MONO, color: C.sub, whiteSpace: "nowrap" }}>
+                  {timeAgo(m.postedAt)}
+                </span>
+              </div>
+
+              {/* 본문 */}
+              <p
+                style={{
+                  margin: 0,
+                  flex: 1,
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                  color: C.ink,
+                  display: "-webkit-box",
+                  WebkitLineClamp: 5,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                }}
+              >
+                {m.text}
+              </p>
+
+              {/* 지표 + 종목/주제 태그(공유 수 오른쪽) */}
+              <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", fontSize: 11, fontFamily: MONO, color: C.sub }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                  <Icon name="visibility" style={{ fontSize: 13 }} /> {compact(m.views)}
+                </span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                  <Icon name="shortcut" style={{ fontSize: 13 }} /> {compact(m.forwards)}
+                </span>
+                {m.replies > 0 && (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                    <Icon name="chat_bubble" style={{ fontSize: 12 }} /> {m.replies}
+                  </span>
+                )}
+                {m.stocks.map((st) => (
+                  <span key={st} style={badge("var(--c-blue-tint)", C.blue)}>{st}</span>
+                ))}
+                {m.topics.map((t) => (
+                  <span key={t} style={badge(C.track, C.sub)}>#{t}</span>
+                ))}
+              </div>
+            </a>
+          </li>
+        ))}
+      </ol>
+  );
+}
+
+export default async function KaderaPage() {
   const topStocks = await getTopStocksWithTrend(3);
-  const [summary, surging, trending, channels, rising, themes, reports, sentiment, keywords, narratives] =
+  const [
+    summary,
+    surging,
+    trendingToday,
+    trending,
+    trendingMonth,
+    channels,
+    rising,
+    themes,
+    reports,
+    sentiment,
+    keywords,
+    narratives,
+  ] =
     await Promise.all([
       getTelegramSummary(),
       getSurgingStocks(5),
+      // 기간 탭이 즉시 전환되도록 세 창을 한 번에 받아둔다(병렬이라 지연은 한 번 분).
+      getTrendingMessages("today", 6),
       getTrendingMessages(7, 6),
+      getTrendingMessages(30, 6),
       getChannelRanking(),
       getRisingChannels(10),
       getThemeRotation(10),
@@ -428,106 +549,16 @@ export default async function TelegramPage() {
           <SectionHead
             icon="campaign"
             title="트렌딩 메시지"
-            note="최근 7일"
             desc="조회·공유로 가장 널리 퍼진 메시지"
           />
-          {trending.length === 0 ? (
-            <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 화제 메시지가 없어요.</p>
-          ) : (
-            // 3열 그리드 — 한 줄에 3개씩. 카드가 좁아지는 대신 세로로 길어져
-            // 실제 텔레그램 메시지처럼 읽힌다.
-            <ol
-              style={{
-                listStyle: "none",
-                margin: 0,
-                padding: 0,
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))",
-                gap: 12,
-              }}
-            >
-              {trending.map((m, i) => (
-                <li key={`${m.channelHandle}-${m.messageId}`} style={{ display: "flex" }}>
-                  {/* 원문 메시지로 이동 — 텔레그램 공개 채널은 t.me/핸들/메시지ID 로 열린다 */}
-                  <a
-                    href={`https://t.me/${m.channelHandle}/${m.messageId}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hz-lift"
-                    style={{
-                      ...subCard,
-                      padding: "13px 15px",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 9,
-                      textDecoration: "none",
-                      width: "100%",
-                      minHeight: 168,
-                    }}
-                  >
-                    {/* 보낸 채널 */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
-                      <span style={{ ...rankNum, width: 14, fontSize: 12, color: i < 3 ? C.hot : C.sub }}>{i + 1}</span>
-                      <Avatar photo={m.channelPhoto} title={m.channelTitle} size={22} />
-                      <b
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 700,
-                          color: C.blue,
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
-                        {m.channelTitle}
-                      </b>
-                      <span style={{ marginLeft: "auto", fontSize: 10, fontFamily: MONO, color: C.sub, whiteSpace: "nowrap" }}>
-                        {timeAgo(m.postedAt)}
-                      </span>
-                    </div>
-
-                    {/* 본문 */}
-                    <p
-                      style={{
-                        margin: 0,
-                        flex: 1,
-                        fontSize: 13,
-                        lineHeight: 1.6,
-                        color: C.ink,
-                        display: "-webkit-box",
-                        WebkitLineClamp: 5,
-                        WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {m.text}
-                    </p>
-
-                    {/* 지표 + 종목/주제 태그(공유 수 오른쪽) */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", fontSize: 11, fontFamily: MONO, color: C.sub }}>
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
-                        <Icon name="visibility" style={{ fontSize: 13 }} /> {compact(m.views)}
-                      </span>
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
-                        <Icon name="shortcut" style={{ fontSize: 13 }} /> {compact(m.forwards)}
-                      </span>
-                      {m.replies > 0 && (
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
-                          <Icon name="chat_bubble" style={{ fontSize: 12 }} /> {m.replies}
-                        </span>
-                      )}
-                      {m.stocks.map((st) => (
-                        <span key={st} style={badge("var(--c-blue-tint)", C.blue)}>{st}</span>
-                      ))}
-                      {m.topics.map((t) => (
-                        <span key={t} style={badge(C.track, C.sub)}>#{t}</span>
-                      ))}
-                    </div>
-                  </a>
-                </li>
-              ))}
-            </ol>
-          )}
+          {/* 기간은 아래 탭이 나타내므로 SectionHead 의 note 는 두지 않는다(중복·불일치 방지). */}
+          <TrendingTabs
+            panels={[
+              { key: "today", label: "오늘", count: trendingToday.length, node: <TrendingList items={trendingToday} /> },
+              { key: "w1", label: "최근 7일", count: trending.length, node: <TrendingList items={trending} /> },
+              { key: "m1", label: "최근 30일", count: trendingMonth.length, node: <TrendingList items={trendingMonth} /> },
+            ]}
+          />
         </div>
 
         {/* ④ 테마 로테이션 (½) */}

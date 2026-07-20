@@ -1727,7 +1727,7 @@ export default async function Home() {
                     가중치 0.5+0.5에 후행 지표라 뒤로, 베스트셀러는 30일간 값이 2종류뿐일
                     만큼 안 움직여 맨 뒤로 뺐다.
                     행 구성: [검색량·코인·디씨·뉴스] [증권앱·유튜브·실물괴리2]
-                             [명품2·베스트셀러·봇레포] — 3행이 정확히 채워진다. */}
+                             [명품2·봇레포·베스트셀러] — 3행이 정확히 채워진다. */}
                 <CardTrend v={p("naver_search_trend")} icon="search" />
                 <CardUpbit v={p("upbit_speculation_index")} />
                 <CardSentiment v={p("dcinside_post_count")} icon="forum" />
@@ -1736,8 +1736,8 @@ export default async function Home() {
                 <CardYoutube v={p("youtube_finance_search_views")} />
                 <CardDivergence v={p("small_business_crisis_index")} />
                 <CardSpending luxury={p("luxury_consumption_index")} dining={p("fine_dining_search_index")} />
-                <CardTrend v={p("bestseller_finance_ratio")} icon="menu_book" />
                 <CardTrend v={p("github_trading_bot_repos")} icon="terminal" />
+                <CardTrend v={p("bestseller_finance_ratio")} icon="menu_book" />
                 {extra("감성").map((i) => (
                   <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["감성"]} />
                 ))}
