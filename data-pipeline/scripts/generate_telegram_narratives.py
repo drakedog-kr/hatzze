@@ -12,6 +12,14 @@
 
 키가 없거나 호출이 실패해도 파이프라인 본체엔 영향이 없도록 조용히 건너뛴다.
 
+**규칙: 주요 종목 리포트에 뜨는 종목은 반드시 요약이 있어야 한다.**
+카드는 telegram_stock_narrative 를 그대로 읽으므로, 요약이 없는 종목은 화면에
+빈칸으로 나간다. 그래서 길이 규칙은 '맞으면 좋은 것'으로 낮추고(허용 범위를 벗어나도
+목표에 가장 가까운 후보를 저장한다), 마지막에 DB 를 되읽어 대상 종목이 전부 요약을
+갖고 있는지 검사한 뒤 하나라도 비면 예외로 실패시킨다. 예전엔 길이가 안 맞으면 그
+종목을 통째로 건너뛰어, 2026-07-20 삼성전자 요약이 조용히 사라졌다(후보 104·96·60·66자가
+전부 70~83 밖).
+
 실행:
     cd data-pipeline && source .venv/bin/activate
     python scripts/generate_telegram_narratives.py --dry-run  # digest만 출력(호출 없음)
@@ -353,13 +361,25 @@ def main() -> None:
             mid = (LEN_MIN + LEN_MAX) / 2
             in_goal = [t for t in candidates if LEN_MIN <= len(t) <= LEN_MAX]
             in_ok = [t for t in candidates if LEN_HARD_MIN <= len(t) <= LEN_HARD_MAX]
+            usable = [t for t in candidates if t.strip()]
             if in_goal:
                 text = in_goal[0]
             elif in_ok:
                 text = min(in_ok, key=lambda t: abs(len(t) - mid))
-            else:
+            elif usable:
+                # 길이는 '맞으면 좋은 것'이고, 요약이 아예 없는 건 허용하지 않는다.
+                # 예전엔 여기서 continue 해 그 종목만 요약이 비었는데, 주요 종목 리포트가
+                # 이 표를 그대로 읽어 카드에 뿌리므로 화면에 빈칸이 생겼다
+                # (2026-07-20 삼성전자: 후보 104·96·60·66자가 전부 70~83 밖이라 누락).
+                text = min(usable, key=lambda t: abs(len(t) - mid))
                 lens = ", ".join(str(len(t)) for t in candidates)
-                print(f"  [{name}] 길이({lens}자)가 허용 범위를 벗어나 저장하지 않습니다.")
+                print(
+                    f"  [{name}] 길이({lens}자)가 모두 허용 범위 밖 — "
+                    f"목표에 가장 가까운 {len(text)}자를 저장합니다."
+                )
+            else:
+                # 모델이 빈 문자열만 준 경우. 아래 커버리지 검사에서 걸린다.
+                print(f"  [{name}] 빈 응답만 받아 저장하지 못했습니다.")
                 continue
             db.table("telegram_stock_narrative").upsert(
                 {"date": latest, "stock_code": code, "narrative": text, "model": MODEL},
@@ -371,6 +391,32 @@ def main() -> None:
             print(f"  [{name}] 실패: {type(exc).__name__}: {exc}")
 
     print(f"[Supabase] telegram_stock_narrative {saved}/{len(stock_digests)}종목 저장")
+
+    # ── 커버리지 규칙 ───────────────────────────────────────────────────────
+    # 주요 종목 리포트는 이 표를 그대로 읽어 카드에 뿌린다 — 카드에 뜨는 종목에
+    # 요약이 없으면 화면이 빈칸으로 나간다. 그래서 "대상 종목은 전부 요약이 있다"를
+    # 여기서 불변식으로 확인한다.
+    #
+    # 루프의 saved 카운터가 아니라 **DB를 되읽어** 검사한다. 저장했다고 믿는 것과
+    # 실제로 저장된 것은 다를 수 있고(업서트 실패·부분 실패), 화면이 읽는 건 DB다.
+    #
+    # 이 스텝은 워크플로우에서 continue-on-error 라, 여기서 예외를 던져도 파이프라인
+    # 전체를 멈추지 않고 실패 알림에만 잡힌다 — 조용히 넘어가지 않게 하는 게 목적이다.
+    stored = (
+        db.table("telegram_stock_narrative")
+        .select("stock_code")
+        .eq("date", latest)
+        .execute()
+    )
+    have = {r["stock_code"] for r in (stored.data or [])}
+    missing = [(code, name) for code, name, _ in stock_digests if code not in have]
+    if missing:
+        detail = ", ".join(f"{name}({code})" for code, name in missing)
+        raise RuntimeError(
+            f"주요 종목 리포트 대상 {len(missing)}종목의 요약이 없습니다: {detail}. "
+            f"요약 없는 종목이 카드에 뜨면 안 되므로 실패로 처리합니다."
+        )
+    print(f"[검사] 대상 {len(stock_digests)}종목 모두 요약 보유 확인")
 
 
 if __name__ == "__main__":
