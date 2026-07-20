@@ -34,6 +34,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.krx_client import krx_get  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
+from common.indicator import ensure_indicator  # noqa: E402
+from common.timeutil import business_days  # noqa: E402
 
 KRX_URL = "http://data-dbg.krx.co.kr/svc/apis/drv/opt_bydd_trd"
 BACKFILL_DAYS = 365
@@ -54,25 +56,6 @@ INDICATOR_META = {
     ),
     "unit": "배",
 }
-
-
-def ensure_indicator(client) -> str:
-    """지표 행을 보장하고, 이미 있으면 메타데이터를 코드 기준으로 맞춘다.
-
-    이 지표는 옵션 API 승인 전 손으로 넣은 행이 먼저 있었다. 삽입만 하고 말면
-    그 옛 행이 남아 코드의 INDICATOR_META(unit="배" 등)가 영영 반영되지 않는다
-    — 실제로 unit 이 빈 값으로 남아 있었다. slug 를 뺀 나머지를 매번 덮어써
-    코드를 소스 오브 트루스로 둔다(is_public·weight 는 META 에 없어 안 건드린다).
-    """
-    existing = client.table("indicators").select("id").eq("slug", INDICATOR_SLUG).execute()
-    if existing.data:
-        indicator_id = existing.data[0]["id"]
-        client.table("indicators").update(
-            {k: v for k, v in INDICATOR_META.items() if k != "slug"}
-        ).eq("id", indicator_id).execute()
-        return indicator_id
-    inserted = client.table("indicators").insert(INDICATOR_META).execute()
-    return inserted.data[0]["id"]
 
 
 def to_int(value) -> int:
@@ -112,14 +95,6 @@ def fetch_volumes(bas_dd: str) -> tuple[int, int] | None:
     if call_vol == 0:
         return None
     return put_vol, call_vol
-
-
-def business_days(start: date, end: date):
-    current = start
-    while current <= end:
-        if current.weekday() < 5:  # 0=Mon ... 4=Fri
-            yield current
-        current += timedelta(days=1)
 
 
 def backfill(client, indicator_id: str) -> None:
@@ -173,7 +148,7 @@ def backfill(client, indicator_id: str) -> None:
 
 def main() -> None:
     client = get_client()
-    indicator_id = ensure_indicator(client)
+    indicator_id = ensure_indicator(client, INDICATOR_META)
     print(f"[Supabase] indicator '{INDICATOR_SLUG}' id: {indicator_id}")
     backfill(client, indicator_id)
 
