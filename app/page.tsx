@@ -721,8 +721,8 @@ function CardBuffett({ v }: { v: Pick }) {
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
       <TitleRow desc={v.headline} icon="payments" name={v.name} badge={sourceBadge(v, "당일 기준")} />
-      {/* 크기는 같은 2칸 카드인 레버리지 ETF 종합 지수(44)에 맞춘다. */}
-      <Big disp={v.disp} unit={v.unit} color={v.color} size={44} sub={ratio !== null ? `${ratio.toFixed(1)}배` : undefined} />
+      {/* 주요 수치 크기는 VKOSPI 카드(40)를 기준으로 맞춘다. */}
+      <Big disp={v.disp} unit={v.unit} color={v.color} size={40} sub={ratio !== null ? `${ratio.toFixed(1)}배` : undefined} />
       <div style={{ background: C.bg, borderRadius: 10, padding: "18px 18px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 6 }}>
@@ -783,7 +783,8 @@ function CardLeverage({ v }: { v: Pick }) {
     <Shell span={2} hit={v.isHit} minH={236}>
       <TitleRow desc={v.headline} icon="rocket_launch" name={v.name} badge="당일 기준" />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 12 }}>
-        <span style={{ fontFamily: MONO, fontSize: 44, fontWeight: 800, color: heatC, lineHeight: 1, letterSpacing: "-0.03em" }}>{heat}</span>
+        {/* 주요 수치 크기는 VKOSPI 카드(40)를 기준으로 맞춘다. */}
+        <span style={{ fontFamily: MONO, fontSize: 40, fontWeight: 800, color: heatC, lineHeight: 1, letterSpacing: "-0.03em" }}>{heat}</span>
         <span style={{ fontSize: 18, fontWeight: 800, color: "var(--c-faint)" }}>/ 100</span>
         <span style={{ fontSize: 13, fontWeight: 700, color: C.sub, paddingBottom: 4 }}>종합 과열도</span>
       </div>
@@ -834,8 +835,8 @@ function CardMarketActions({ v }: { v: Pick }) {
       <TitleRow desc={v.headline} icon="speed" name={v.name} badge="최근 한 달" />
       {verdict ? (
         <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginBottom: 12 }}>
-          {/* 크기는 같은 2칸 카드인 레버리지 ETF 종합 지수(44)에 맞춘다. */}
-          <span style={{ fontSize: 44, fontWeight: 800, color: verdict.c, lineHeight: 1 }}>{verdict.t}</span>
+          {/* 주요 수치 크기는 VKOSPI 카드(40)를 기준으로 맞춘다. */}
+          <span style={{ fontSize: 40, fontWeight: 800, color: verdict.c, lineHeight: 1 }}>{verdict.t}</span>
         </div>
       ) : (
         <Big disp={v.raw !== null && v.raw > 0 ? `+${v.disp}` : v.disp} color={v.color} size={44} sub="최근 30일 순 쏠림" />
