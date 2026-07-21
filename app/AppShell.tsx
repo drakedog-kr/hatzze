@@ -68,6 +68,27 @@ function Sidebar() {
             </Link>
           );
         })}
+        {/* 외부(텔레그램) 링크라 NAV 배열이 아니라 따로 둔다 — pathname 기반 active 판정
+            대상이 아니고, 새 탭으로 열려야 해서 next/link 가 아닌 <a> 를 쓴다. */}
+        <a
+          href="https://t.me/hatzze_kr"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hz-nav-external"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "16px 20px",
+            color: C.sub,
+            fontWeight: 600,
+            borderRadius: 14,
+            textDecoration: "none",
+          }}
+        >
+          <Icon name="send" />
+          <span style={{ fontSize: 15 }}>커뮤니티 합류</span>
+        </a>
       </nav>
     </aside>
   );
