@@ -75,15 +75,17 @@ from config.indicator_weights import INDICATOR_WEIGHTS  # noqa: E402
 
 KOSPI_HIGH_GAP_FALLBACK_FLOOR = -20.0  # kospi_close_raw 히스토리가 부족할 때의 대체값
 KOSPI_CLOSE_RAW_SLUG = "kospi_close_raw"
-# 실물–증시 괴리의 실물 축 = 소비자심리지수(CCSI). 내부용 원본이라 점수에 직접
-# 참여하지 않고(INDICATOR_THRESHOLDS에 없음) 여기서 stress progress로 뒤집어 쓴다.
+# 실물–증시 괴리 = "실물 경제와 증시 중 누가 더 강한가"(양방향 게이지). 두 축을 각자
+# '역대 백분위'(0~100, 자기 역사에서 어느 지점만큼 강한가)로 만들어 공정하게 비교한다.
+# 서로 다른 척도(심리지수 vs 낙폭%)를 그냥 빼면 불공정해서, 백분위로 통일했다.
+#
+# 백분위 매핑은 DB 히스토리가 짧아(코스피 종가 1년) 실시간 계산이 불가능하므로, 장기
+# 실측 분위수를 앵커 상수로 박아 구간 선형보간한다(다른 지표들의 fixed-threshold 철학과 동일).
 CCSI_SLUG = "consumer_sentiment_index"
-# CCSI를 실물경제 '강도'(0~100)로 매핑한다. 괴리 = 증시강세 − 실물강도(갭 모델)에 쓴다.
-# 평균 CCSI(100) = 강도 50(중간)이라, 실물이 평범한데 증시만 높으면 갭이 벌어진다.
-# 양끝점 80~120은 실측 근거: CCSI 표준편차 9.3의 약 ±2σ이고, 위기 저점(2008 67.7·
-# 2020 71.2)이 강도 0, 역대 최고 근처(120)가 강도 100에 놓인다.
-CCSI_STRENGTH_LOW = 80.0   # 이하 = 실물강도 0 (위기)
-CCSI_STRENGTH_HIGH = 120.0  # 이상 = 실물강도 100 (호황)
+# CCSI 역대 분위수(2008~2026 216개월 실측): p10~p90. 값→백분위 보간용.
+CCSI_PCTILE_ANCHORS = [(90.0, 10), (98.0, 25), (102.0, 50), (107.0, 75), (112.0, 90)]
+# 코스피 전고점 대비 낙폭(%) 역대 분위수(10년 실측). 낙폭이 얕을수록(0에 가까울수록) 증시 강함.
+KOSPI_DD_PCTILE_ANCHORS = [(-25.9, 10), (-21.6, 25), (-15.1, 50), (-3.4, 75), (-0.4, 90)]
 MIN_FLOOR_HISTORY_SAMPLES = 5  # kospi_high_gap floor 계산에 필요한 최소 과거 데이터 개수
 NEUTRAL_PROGRESS = 50.0  # 값이 아예 없는 지표(no_value)를 표에 표시할 때 쓰는 자리표시자
 HIT_ZONE = 75.0  # Hit 기준 = 초고온 진입선(진행률 ≥ 75). stage 밴드(25/50/75)의 초고온 경계와 동일.
@@ -149,11 +151,28 @@ def compute_kospi_high_gap_floor(client) -> float:
     return round((year_low - year_high) / year_high * 100, 2)
 
 
-def ccsi_real_strength(client) -> tuple[float, float] | None:
-    """CCSI 최신값을 (실물강도 0~100, CCSI 원값)으로 돌려준다. 강도는 심리가 좋을수록 높음.
+def percentile_from_anchors(value: float, anchors: list[tuple[float, int]]) -> float:
+    """값을 (값, 백분위) 앵커들로 구간 선형보간해 0~100 백분위로 만든다.
 
-    원값도 함께 주는 이유: 카드의 실물 강도 툴팁이 "CCSI 106.6 → 강도 67" 처럼 실제
-    지수와 변환 근거를 같이 보여주기 때문이다. CCSI 지표가 아직 없으면 None.
+    앵커는 값 오름차순이어야 한다. 앵커 밖은 양끝 백분위로 클램프한다. 예: CCSI 앵커에서
+    102(p50)와 107(p75) 사이의 105는 p50~p75를 선형보간해 ≈65가 된다.
+    """
+    if value <= anchors[0][0]:
+        return float(anchors[0][1])
+    if value >= anchors[-1][0]:
+        return float(anchors[-1][1])
+    for (v0, p0), (v1, p1) in zip(anchors, anchors[1:]):
+        if v0 <= value <= v1:
+            return p0 + (value - v0) / (v1 - v0) * (p1 - p0)
+    return float(anchors[-1][1])  # 도달 불가(방어)
+
+
+def ccsi_real_strength(client) -> tuple[float, float] | None:
+    """CCSI 최신값을 (실물강도 백분위 0~100, CCSI 원값)으로 돌려준다.
+
+    강도 = CCSI가 역대에서 몇 %ile인가(높을수록 실물 심리 강함). 원값도 함께 주는 이유:
+    카드 툴팁이 "CCSI 106.6 → 역대 68%ile" 처럼 실제 지수와 변환 근거를 같이 보여준다.
+    CCSI 지표가 아직 없으면 None.
     """
     ccsi_id = get_indicator_id_or_none(client, CCSI_SLUG)
     if ccsi_id is None:
@@ -162,9 +181,24 @@ def ccsi_real_strength(client) -> tuple[float, float] | None:
         _, current = get_latest_value(client, ccsi_id)
     except InsufficientHistoryError:
         return None
-    # 80→0, 120→100 선형(평균 100→50). cap_progress가 0~100으로 조인다.
-    strength = (current - CCSI_STRENGTH_LOW) / (CCSI_STRENGTH_HIGH - CCSI_STRENGTH_LOW) * 100
-    return cap_progress(strength), current
+    return percentile_from_anchors(current, CCSI_PCTILE_ANCHORS), current
+
+
+def kospi_market_strength(client) -> tuple[float, float] | None:
+    """코스피 전고점 대비 낙폭을 (증시강세 백분위 0~100, 낙폭 %)로 돌려준다.
+
+    강세 = 낙폭이 역대에서 몇 %ile로 얕은가(전고점에 가까울수록 강함). kospi_high_gap의
+    raw_value(전고점 대비 %)를 그대로 재사용한다 — 그 카드의 progress(피스와이즈)와는
+    목적이 달라(여긴 역대 백분위) 별도 계산이다. 값이 없으면 None.
+    """
+    hg_id = get_indicator_id_or_none(client, "kospi_high_gap")
+    if hg_id is None:
+        return None
+    try:
+        _, gap = get_latest_value(client, hg_id)  # 전고점 대비 % (음수)
+    except InsufficientHistoryError:
+        return None
+    return percentile_from_anchors(gap, KOSPI_DD_PCTILE_ANCHORS), gap
 
 
 def get_window_values(client, indicator_id: str, window_days: int) -> list[float]:
@@ -317,36 +351,33 @@ def main() -> None:
             }
         )
 
-    # 실물–증시 괴리: "증시가 실물경제를 얼마나 앞질렀나"(갭 모델). 실물은 CCSI 강도로,
-    # 증시는 신고가 근접도로 각각 0~100 강도를 매기고, 괴리 = max(0, 증시강세 − 실물강도).
-    # small_business_crisis_index의 점수 기여를 이 괴리로 대체한다(raw_value·threshold는
-    # 그대로, progress만 덮어써 GenericCard 과열도 바가 괴리를 반영).
+    # 실물–증시 괴리: "실물 경제와 증시 중 누가 더 강한가"(양방향 게이지). 두 축을 각자
+    # 역대 백분위(0~100)로 만들어 lead = 증시%ile − 실물%ile 을 낸다. lead>0 이면 증시가
+    # 실물을 앞지른 것(거품 신호), lead<0 이면 실물이 앞선 것(건강).
     #
-    # 예전엔 √(실물stress × 증시강세) 기하평균이라 실물이 평범(CCSI 평균)하면 stress가 0이
-    # 돼 괴리가 영원히 0이었다 — "실물은 그대론데 증시만 앞서가는" 거품 초입을 못 잡았다.
-    # 갭 모델은 실물 평균(강도 50) + 증시 높음(80)이면 괴리 30으로 그 국면을 잡고, 실물이
-    # 뜨거우면(강도 100) 증시가 높아도 0(정당한 상승)으로 둔다. '괴리(gap)'라는 이름값에
-    # 충실하다. 자영업 검색량은 이제 실물 축에서 완전히 빠진다(CCSI 없으면 괴리 계산 생략).
+    # 점수(과열도) 기여는 증시가 앞설 때만: capped_progress = max(0, lead). 실물이 앞서면
+    # 0(건강한 상태는 과열이 아니므로). 카드는 lead의 부호로 "실물 X% 강세"↔"증시 X% 강세"를
+    # 양방향으로 보여준다. small_business_crisis_index의 점수 기여를 이 lead로 대체한다.
     by_slug = {r["slug"]: r for r in results}
     sb = by_slug.get("small_business_crisis_index")
     hg = by_slug.get("kospi_high_gap")
     ccsi = ccsi_real_strength(client)
-    if sb and hg and not sb["no_value"] and not hg["no_value"] and ccsi is not None:
+    mkt = kospi_market_strength(client)
+    if sb and hg and not sb["no_value"] and ccsi is not None and mkt is not None:
         real_strength, ccsi_value = ccsi
-        market_strength = hg["capped_progress"]  # 신고가 근접 = 증시 강세
-        divergence = max(0.0, market_strength - real_strength)  # 증시가 실물을 앞지른 폭
-        sb["progress"] = divergence
-        sb["capped_progress"] = cap_progress(divergence)
-        sb["hit"] = sb["capped_progress"] >= HIT_ZONE  # 괴리 초고온(≥75)일 때 Hit
-        # 카드 인포그래픽용: 두 축(실물강도/증시강세) progress + CCSI 원값(툴팁용)을 남긴다.
-        # fetch 쪽(common/details.py)이 같은 컬럼에 vs_avg/avg_index를 쓰므로 병합한다 —
-        # 통째로 갈아끼우면 아래 update가 그 키들을 지운다(반대 방향의 같은 사고).
+        market_strength, gap_pct = mkt
+        lead = market_strength - real_strength  # +면 증시 앞섬, −면 실물 앞섬
+        sb["progress"] = max(0.0, lead)  # 과열도는 증시가 앞설 때만
+        sb["capped_progress"] = cap_progress(max(0.0, lead))
+        sb["hit"] = sb["capped_progress"] >= HIT_ZONE
+        # 카드용: 두 축 백분위 + 방향(lead) + 원값(툴팁). 병합해 남의 키 보존.
         sb["details"] = {
             **(get_latest_details(client, sb["indicator_id"]) or {}),
             "real_strength": round(real_strength, 1),
             "market_strength": round(market_strength, 1),
-            "divergence": round(cap_progress(divergence), 1),
+            "lead": round(lead, 1),  # 양수=증시 강세, 음수=실물 강세
             "ccsi_value": round(ccsi_value, 1),
+            "kospi_gap": round(gap_pct, 1),
         }
 
     hit_count = sum(1 for r in results if r["hit"])

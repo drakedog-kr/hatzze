@@ -1269,17 +1269,25 @@ function DivergenceBar({ label, hint, value, color, tip }: { label: string; hint
 
 function CardDivergence({ v }: { v: Pick }) {
   const dt = v.details;
-  // 갭 모델: 실물강도(높을수록 실물 튼튼)와 증시강세를 나란히 보여준다. 증시 바가 실물
-  // 바보다 길면 그 차이가 곧 괴리 — 눈으로도 "증시가 실물을 앞질렀나"가 읽힌다.
+  // 양방향 게이지: 실물·증시를 각자 역대 백분위(0~100)로 매기고, 어느 쪽이 앞서는지 보여준다.
   const real = dt?.real_strength ?? 0;
   const market = dt?.market_strength ?? 0;
-  const div = dt?.divergence ?? v.capped ?? 0;
-  const c = overheatColor(div);
-  // 실물 강도 툴팁 — 실제 CCSI 지수와 0~100 변환 근거를 밝힌다.
+  const lead = dt?.lead ?? market - real; // +면 증시 강세, −면 실물 강세
+  const marketLeads = lead >= 0;
+  const leadColor = marketLeads ? C.hot : C.blue;
+  // 헤드라인: "증시 63% 강세" / "실물 63% 강세". 부호로 방향, 크기로 격차.
+  const leadWho = marketLeads ? "증시" : "실물 경제";
+  // 실물 강도 툴팁 — 실제 CCSI 지수와 백분위 변환 근거.
   const ccsi = dt?.ccsi_value;
   const realTip =
     ccsi != null
-      ? `한국은행 소비자심리지수(CCSI) 최신값은 ${ccsi}예요. 100이 장기 평균이라, CCSI 80을 실물 강도 0, 120을 100으로 놓고 100(평균)을 50에 맞춰 환산했어요. 그래서 ${ccsi} → ${Math.round(real)}/100이 돼요.`
+      ? `한국은행 소비자심리지수(CCSI) 최신값은 ${ccsi}예요. 이게 역대(2008~) 분포에서 몇 번째로 높은지를 0~100으로 매긴 값이 실물 강도예요. 그래서 ${ccsi} → ${Math.round(real)}/100(역대 ${Math.round(real)}% 지점)이 돼요.`
+      : undefined;
+  // 증시 강세 툴팁 — 전고점 대비 낙폭과 백분위 변환 근거.
+  const gap = dt?.kospi_gap;
+  const marketTip =
+    gap != null
+      ? `코스피는 지금 전고점보다 ${Math.abs(gap)}% 아래예요. 이 낙폭이 역대(10년) 분포에서 얼마나 얕은지를 0~100으로 매긴 값이 증시 강세예요. 그래서 ${Math.round(market)}/100(역대 ${Math.round(market)}% 지점)이 돼요.`
       : undefined;
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
@@ -1288,19 +1296,17 @@ function CardDivergence({ v }: { v: Pick }) {
         name={v.name}
         right={
           <span style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
-            <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: c, letterSpacing: "-0.02em" }}>{Math.round(div)}</span>
-            <span style={{ fontSize: 12, fontWeight: 800, color: "var(--c-faint)" }}>/100</span>
-            <span style={{ fontSize: 11, fontWeight: 700, color: C.sub }}>괴리도</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: C.sub }}>{leadWho}</span>
+            <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: leadColor, letterSpacing: "-0.02em" }}>{Math.round(Math.abs(lead))}</span>
+            <span style={{ fontSize: 12, fontWeight: 800, color: "var(--c-faint)" }}>%</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: C.sub }}>강세</span>
           </span>
         }
       />
-      {/* 이 카드는 span=2 인데 내용이 짧아, 같은 행의 긴 카드(증권앱)에 맞춰 늘어난 만큼
-          남는 공간이 Foot 의 marginTop:auto 로 전부 아래에 몰렸다 — 박스와 divider 사이만
-          56px 로 벌어졌다. 박스에도 auto 를 줘 남는 공간을 위아래가 나눠 갖게 한다
-          (auto 마진 두 개면 균등 분배). 고정값이 아니라 행 높이가 달라져도 유지된다. */}
+      {/* span=2 인데 내용이 짧아 남는 공간을 박스·Foot 이 auto 마진으로 나눠 갖는다. */}
       <div style={{ background: C.bg, borderRadius: 10, padding: 16, marginTop: "auto", display: "flex", gap: 22 }}>
         <DivergenceBar label="실물 강도" hint="소비심리(CCSI)" value={real} color={C.blue} tip={realTip} />
-        <DivergenceBar label="증시 강세" hint="신고가 근접도" value={market} color={C.hot} />
+        <DivergenceBar label="증시 강세" hint="신고가 근접도" value={market} color={C.hot} tip={marketTip} />
       </div>
       <Foot text={v.desc} />
     </Shell>
