@@ -302,9 +302,12 @@ function Headline({ data }: { data: MddResult }) {
 function Underwater({ series, mdd }: { series: DrawdownPoint[]; mdd: number }) {
   const W = 720;
   const H = 176;
+  // 왼쪽 여백 — y축 라벨(0%·−23%·−45%)을 이 안에 두어 곡선과 겹치지 않게 한다.
+  // 예전엔 라벨을 플롯 안(x=3)에 그려 0% 가 곡선과 겹쳐 읽기 어려웠다.
+  const PAD_L = 48;
   const floor = Math.min(mdd, -1); // 0 나눗셈·완전 평평 방지
   const n = series.length;
-  const x = (i: number) => (n <= 1 ? 0 : (i / (n - 1)) * W);
+  const x = (i: number) => (n <= 1 ? PAD_L : PAD_L + (i / (n - 1)) * (W - PAD_L));
   const y = (dd: number) => (dd / floor) * H;
 
   const line = series.map((p, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(p.dd).toFixed(1)}`).join(" ");
@@ -324,15 +327,15 @@ function Underwater({ series, mdd }: { series: DrawdownPoint[]; mdd: number }) {
   return (
     <div style={{ position: "relative" }}>
       <svg viewBox={`0 -6 ${W} ${H + 26}`} width="100%" role="img" aria-label={`고점 대비 낙폭 곡선. 현재 ${fmtPct(series[n - 1].dd)}, 기간 최저 ${fmtPct(mdd)}`}>
-        <line x1="0" y1="0" x2={W} y2="0" stroke={C.line} strokeWidth="1" />
+        <line x1={PAD_L} y1="0" x2={W} y2="0" stroke={C.line} strokeWidth="1" />
         {rows.slice(1).map((dd, i) => (
-          <line key={i} x1="0" y1={y(dd)} x2={W} y2={y(dd)} stroke={C.line} strokeWidth="1" strokeDasharray="2 5" />
+          <line key={i} x1={PAD_L} y1={y(dd)} x2={W} y2={y(dd)} stroke={C.line} strokeWidth="1" strokeDasharray="2 5" />
         ))}
         <path d={area} fill={C.cold} fillOpacity="0.14" />
         <path d={line} fill="none" stroke={C.cold} strokeWidth="1.6" strokeLinejoin="round" />
         <circle cx={W} cy={y(series[n - 1].dd)} r="4.5" fill={C.cold} stroke={C.card} strokeWidth="2" />
         {rows.map((dd, i) => (
-          <text key={i} x="3" y={y(dd) + (i === 0 ? 12 : -4)} fontSize="11" fill={C.faint}>
+          <text key={i} x={PAD_L - 8} y={y(dd) + 4} fontSize="11" fill={C.faint} textAnchor="end">
             {Math.round(dd)}%
           </text>
         ))}
@@ -344,7 +347,7 @@ function Underwater({ series, mdd }: { series: DrawdownPoint[]; mdd: number }) {
       </svg>
       {/* 시장 브리핑 지표 카드와 같은 크로스헤어 — 보이지 않는 세로 띠가 hover 시 기준선(hz-vline)과
           툴팁(hz-tip)을 낸다. 연도 라벨 높이(≈26px)만큼 아래로 남는 띠는 무시할 수준이다. */}
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 26, display: "flex" }}>
+      <div style={{ position: "absolute", top: 0, left: `${(PAD_L / W) * 100}%`, right: 0, bottom: 26, display: "flex" }}>
         {series.map((p, i) => (
           <div key={i} className="hz-tip hz-vline" data-tip={`${p.date} · ${fmtWon(p.close)} · 고점 대비 ${fmtPct(p.dd)}`} style={{ flex: 1, position: "relative" }} />
         ))}
