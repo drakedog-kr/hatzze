@@ -85,7 +85,7 @@ export function MddExplorer({ stocks, initial }: { stocks: StockOption[]; initia
           MDD 정밀분석
         </h1>
         <p style={{ margin: "8px 0 0", color: C.sub, fontSize: 14, lineHeight: 1.6 }}>
-          종목이 고점에서 얼마나 빠졌는지, 이만큼 빠진 적이 얼마나 드문지, 과거엔 회복까지 얼마나 걸렸는지를 봅니다.
+          종목이 고점에서 <b style={{ color: C.ink }}>얼마나 빠졌는지</b>, 이만큼 빠진 적이 <b style={{ color: C.ink }}>얼마나 드문지</b>, 과거엔 회복까지 <b style={{ color: C.ink }}>얼마나 걸렸는지</b>를 봅니다.
         </p>
       </header>
 
@@ -155,7 +155,7 @@ function Controls({
               setOpen(true);
             }}
             onFocus={() => setOpen(true)}
-            placeholder={`${selected.name} — 다른 종목 검색`}
+            placeholder={`${selected.name} · 다른 종목 검색`}
             style={{ flex: 1, border: "none", outline: "none", background: "transparent", color: C.ink, fontSize: 15, minWidth: 0 }}
           />
         </div>
@@ -368,7 +368,7 @@ function Attribution({
       v: attr.theme,
       self: false,
       // "○○ 대표"가 어떤 종목인지 툴팁으로 밝힌다 — 이 종목은 뺀 나머지 대표 종목 평균이다.
-      help: themePeers.length ? `${themePeers.join(" · ")} — 이 테마 대표 종목의 평균입니다 (이 종목 제외).` : undefined,
+      help: themePeers.length ? `${themePeers.join(" · ")}. 이 테마 대표 종목의 평균입니다 (이 종목 제외).` : undefined,
     });
   const worst = Math.max(...rows.map((r) => Math.abs(r.v)), 1);
 
@@ -381,8 +381,8 @@ function Attribution({
       : gap >= 8
         ? "시장이 빠지는 와중에 상대적으로 버틴 편입니다."
         : gap <= -8
-          ? "시장·업종보다 더 깊게 빠졌습니다 — 종목 고유 요인이 있는지 볼 대목입니다."
-          : "거의 시장을 따라 움직였습니다 — 이 하락의 대부분은 시장 전체가 함께 빠진 것입니다.";
+          ? "시장·업종보다 더 깊게 빠졌습니다. 종목 고유 요인이 있는지 볼 대목입니다."
+          : "거의 시장을 따라 움직였습니다. 이 하락의 대부분은 시장 전체가 함께 빠진 것입니다.";
 
   return (
     <section style={card}>
@@ -430,7 +430,7 @@ function Recovery({ a }: { a: MddAnalysis }) {
       <section style={card}>
         <SectionTitle icon="history" title="회복까지 걸린 시간" />
         <p style={{ margin: "0 0 16px", color: C.sub, fontSize: 14, lineHeight: 1.7 }}>
-          이만큼(<b style={{ color: C.ink }}>{fmtPct(a.currentDd)}</b>) 깊게 빠진 뒤 <b style={{ color: C.ink }}>회복한 전례가 없습니다</b> — 지금이 이 종목의 역대 최대 낙폭입니다.
+          이만큼(<b style={{ color: C.ink }}>{fmtPct(a.currentDd)}</b>) 깊게 빠진 뒤 <b style={{ color: C.ink }}>회복한 전례가 없습니다</b>. 지금이 이 종목의 역대 최대 낙폭입니다.
         </p>
         <div style={{ background: C.bg, borderRadius: 12, padding: "14px 16px" }}>
           <div style={{ fontSize: 12, color: C.sub, marginBottom: 6 }}>고점({a.athDate}) 이후 지금까지</div>
@@ -486,7 +486,7 @@ function Character({ ch }: { ch: DrawdownCharacter }) {
     <section style={card}>
       <SectionTitle icon="bolt" title="이 하락의 성격" />
       <p style={{ margin: `0 0 ${hasBuckets ? 4 : 12}px`, color: C.sub, fontSize: 14, lineHeight: 1.7 }}>
-        지금은 <b style={{ color: C.ink }}>{curLabel}</b>입니다 — 고점 이후 <b style={{ color: C.ink }}>{ch.currentTroughDays.toLocaleString("ko-KR")}일</b> 만에 저점({fmtPct(ch.currentTroughDepth)})까지 빠졌습니다.
+        지금은 <b style={{ color: C.ink }}>{curLabel}</b>입니다. 고점 이후 <b style={{ color: C.ink }}>{ch.currentTroughDays.toLocaleString("ko-KR")}일</b> 만에 저점({fmtPct(ch.currentTroughDepth)})까지 빠졌습니다.
         {compare && ` ${compare}`}
       </p>
       {hasBuckets ? (
@@ -509,7 +509,7 @@ function Character({ ch }: { ch: DrawdownCharacter }) {
       ) : (
         <p style={{ margin: 0, color: C.faint, fontSize: 12, lineHeight: 1.6 }}>
           <Icon name="info" style={{ fontSize: 14, verticalAlign: -2, marginRight: 4 }} />
-          이 기간엔 비교할 과거 하락이 부족합니다 — 기간을 넓히면 급락형·완만형 회복을 비교할 수 있습니다.
+          이 기간엔 비교할 과거 하락이 부족합니다. 기간을 넓히면 급락형·완만형 회복을 비교할 수 있습니다.
         </p>
       )}
     </section>
@@ -534,7 +534,7 @@ function Theme({ theme }: { theme: ThemeCmp }) {
         <Badge>평균 {fmtPct(theme.avgDd)}</Badge>
       </div>
       <p style={{ margin: "6px 0 16px", color: C.sub, fontSize: 14, lineHeight: 1.7 }}>
-        <b style={{ color: C.ink }}>{self.name}</b> — {lead}
+        <b style={{ color: C.ink }}>{self.name}</b>. {lead}
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {theme.peers.map((p) => (
