@@ -401,22 +401,30 @@ def main() -> None:
     )
     stage = stage_for_score(weighted_score)
 
+    # 화면과 같은 말을 쓴다: '기준선'은 초고온 진입선(카드에 뜨는 값)이고, 진행률 100을
+    # 맞추는 매핑 상한은 '상한(100)'으로 따로 적는다. 로그만 옛 이름을 쓰면 나중에 이
+    # 표를 보고 임계값을 조정할 때 다시 같은 혼동이 생긴다.
     print(
-        f"{'slug':22} {'weight':>7} {'현재값':>14} {'기준선':>14} {'Hit':>5} "
-        f"{'Progress(원본)':>14} {'Progress(캡핑)':>14}"
+        f"{'slug':22} {'weight':>7} {'현재값':>14} {'기준선(초고온)':>15} {'상한(100)':>14} "
+        f"{'초고온':>6} {'Progress(원본)':>14} {'Progress(캡핑)':>14}"
     )
     for r in results:
-        hit_mark = "O" if r["hit"] else "X"
+        hot_mark = "O" if r["hit"] else "X"
         current_str = (
             f"{r['current']:>14.2f}" if r["current"] is not None else f"{'N/A':>14}"
         )
-        threshold_str = (
+        hot_str = (
+            f"{r['hot_threshold']:>15.2f}"
+            if r.get("hot_threshold") is not None
+            else f"{'N/A':>15}"
+        )
+        cap_str = (
             f"{r['threshold']:>14.2f}" if r["threshold"] is not None else f"{'N/A':>14}"
         )
         note = "  (값 없음 - 가중 평균에서 제외)" if r["no_value"] else ""
         print(
-            f"{r['slug']:22} {r['weight']:>7.1f} {current_str} {threshold_str} "
-            f"{hit_mark:>5} {r['progress']:>13.1f}% {r['capped_progress']:>13.1f}%{note}"
+            f"{r['slug']:22} {r['weight']:>7.1f} {current_str} {hot_str} {cap_str} "
+            f"{hot_mark:>6} {r['progress']:>13.1f}% {r['capped_progress']:>13.1f}%{note}"
         )
     print()
     excluded = [r["slug"] for r in results if r["no_value"]]
