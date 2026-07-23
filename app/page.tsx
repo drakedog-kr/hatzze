@@ -956,14 +956,16 @@ function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
             일치**한다. 예전엔 묶음이 카드 본문 전체 높이로 늘어나 막대만 위아래로
             삐져나왔다. */}
         <div style={{ display: "flex", alignSelf: "flex-start", gap: 16, flexShrink: 0 }}>
-          <div style={{ display: "flex", flexDirection: "column" }}>
+          {/* -25%·"전고점으로부터"를 막대 높이에 맞춰 세로 가운데로 — 종가 블록을 빼면서
+              위로 몰려 보이던 걸 막대와 눈높이가 맞게 중앙 정렬한다. */}
+          <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
             <span style={{ fontFamily: MONO, fontSize: 34, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{gap > 0 ? "+" : ""}{v.disp}{v.unit}</span>
             <span style={{ fontSize: 10, fontWeight: 700, color: C.sub, marginTop: 4 }}>{gap > 0 ? "이전 전고점 돌파" : "전고점으로부터"}</span>
           </div>
           <div style={{ display: "flex", justifyContent: "center" }}>
             {/* 막대 높이는 고정한다 — 예전엔 왼쪽 텍스트 칸(종가·전고점 블록)에 맞춰 늘어났는데
                 그 블록을 빼면서 기준 높이가 사라졌다. 전고점 값은 이제 막대 위 라벨에 붙인다. */}
-            <div style={{ width: 74, height: 143, position: "relative", background: C.bg, borderRadius: 10, overflow: "hidden" }}>
+            <div style={{ width: 96, height: 143, position: "relative", background: C.bg, borderRadius: 10, overflow: "hidden" }}>
               <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: `${fillH}%`, background: `linear-gradient(180deg,#7cbde6,${C.cold})` }} />
               <span style={{ position: "absolute", top: 6, right: 8, fontSize: 9, fontWeight: 800, color: C.ink }}>
                 전고점{typeof priorHigh === "number" ? ` ${num(priorHigh)}` : ""}
