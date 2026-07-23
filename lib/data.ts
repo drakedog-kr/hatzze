@@ -178,6 +178,35 @@ export async function getPublicIndicators(): Promise<IndicatorWithLatestValue[]>
   });
 }
 
+/** 코스피 지수의 실시간 52주 고점 대비 괴리율 (신고가 카드 왼쪽 칸). */
+export type KospiHighGapLive = { price: number; high52: number; gapPct: number };
+
+/**
+ * 코스피 괴리율을 야후 실시간 시세로 계산한다 — 카드 표시 전용.
+ *
+ * 왜 파이프라인 값을 안 쓰나: 파이프라인은 KRX 공식 종가로 하루 2회만 돈다. 그래서
+ * 카드가 어제 종가 기준 값을 보여주는데, **같은 카드 오른쪽의 상위 3종목은 이미 야후
+ * 실시간**이라 한 카드 안에서 기준이 갈렸다. 상단 티커의 코스피와도 어긋난다.
+ *
+ * 점수(daily_score)는 계속 KRX 종가를 쓴다 — 장중 값으로 과열도를 매기면 하루 종일
+ * 점수가 흔들리고, '오늘의 온도'라는 정의가 깨진다. 그래서 카드 숫자와 점수 근거가
+ * 조금 다를 수 있는데, 카드가 과열도를 표시하지 않아 사용자가 두 값을 나란히 볼 일은 없다.
+ *
+ * 야후의 52주 고점은 **장중 고가** 기준이라 KRX 종가 기준보다 높다(실측 9,385 vs 9,114).
+ * 상위 3종목도 같은 야후 기준이라, 카드 안에서는 같은 잣대로 비교된다.
+ *
+ * 10분 캐시(revalidate 600)는 티커·상위 종목과 동일하다.
+ */
+export async function getKospiHighGapLive(): Promise<KospiHighGapLive | null> {
+  const q = await fetchYahooQuote("^KS11", { next: { revalidate: 600 } });
+  if (!q || q.fiftyTwoWeekHigh === null || q.fiftyTwoWeekHigh <= 0) return null;
+  return {
+    price: q.price,
+    high52: q.fiftyTwoWeekHigh,
+    gapPct: (q.price / q.fiftyTwoWeekHigh - 1) * 100,
+  };
+}
+
 /** 거래대금 상위 종목의 52주 신고가 대비 괴리율 (코스피 신고가 카드의 오른쪽 칸). */
 export type StockHighGap = {
   name: string;

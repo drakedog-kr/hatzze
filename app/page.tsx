@@ -1,5 +1,5 @@
-import { getLatestDailyScore, getPublicIndicators, getTopStockHighGaps } from "@/lib/data";
-import type { DailyScore, IndicatorCategory, IndicatorWithLatestValue, StockHighGap } from "@/lib/data";
+import { getKospiHighGapLive, getLatestDailyScore, getPublicIndicators, getTopStockHighGaps } from "@/lib/data";
+import type { DailyScore, IndicatorCategory, IndicatorWithLatestValue, KospiHighGapLive, StockHighGap } from "@/lib/data";
 import { formatEokMixed, formatIndicatorValue, formatKstUpdate, sentimentTone, shortDate } from "@/lib/format";
 import { C, Icon, MONO, stageForScore } from "./ui";
 
@@ -7,17 +7,14 @@ import { C, Icon, MONO, stageForScore } from "./ui";
 // 굳어버리지 않도록 매 요청마다 서버에서 새로 조회한다.
 export const dynamic = "force-dynamic";
 
-function heatColor(score: number | null): string {
-  if (score === null) return C.sub;
-  if (score >= 100) return C.mania;
-  if (score >= 70) return C.hot;
-  if (score >= 33) return C.neutral;
-  return C.cold;
-}
-
-// 0~100 "과열도" 게이지용 색 — 히어로 지수의 stage 구간(저온<25·상온<50·고온<75·초고온)과
-// 동일한 경계를 쓴다. heatColor는 "기준선 대비 진행률(100=임계값 도달)" 의미라 70을 과열
-// 경계로 두지만, 이런 게이지는 50이 과열 시작이라 별도 매핑이 맞다.
+/**
+ * 과열도(0~100) → 색. **화면 전체가 이 함수 하나만 쓴다.**
+ *
+ * 경계(25·50·75)는 히어로의 저온·상온·고온·초고온과 같다. 예전엔 큰 수치용 heatColor
+ * (경계 33·70·100)가 따로 있어서 한 카드 안에서 색이 갈렸다 — 코스닥 과열도 79.7이
+ * 숫자는 '고온'(주황), 바로 밑 게이지는 '초고온'(빨강)으로 칠해지는 식이었다.
+ * 같은 값에 두 이름을 붙일 이유가 없어 하나로 합쳤다.
+ */
 function overheatColor(pct: number | null): string {
   if (pct === null) return C.sub;
   if (pct >= 75) return C.mania;
@@ -123,7 +120,9 @@ function pick(ind: Ind | undefined): Pick {
     // (youtube는 surge_map으로 평균 대비 급증을 매핑) 예외 없이 동일 기준이고,
     // 이 지점이 곧 카드에 적히는 기준선(hotDisp)이다.
     isHit: (capped ?? 0) >= 75,
-    color: heatColor(score),
+    // 캡핑 전 원본이 아니라 capped(0~100)를 쓴다 — 색 경계가 0~100 척도 위에 있고,
+    // 원본은 −226%나 118% 같은 값이 나와 구간 밖으로 벗어난다.
+    color: overheatColor(capped),
     disp: f.display,
     unit: f.displayUnit,
     thDisp: tf ? `${tf.display}${tf.displayUnit}` : null,
@@ -359,7 +358,7 @@ function Foot({ text, color = C.sub }: { text: string; color?: string }) {
 // 과열도 진행 바 (세부 데이터가 없는 카드의 공용 시각화).
 function HeatBar({ v }: { v: Pick }) {
   if (v.capped === null) return null;
-  const c = overheatColor(v.capped); // 과열도 게이지는 stage 구간(50=과열) 색을 쓴다
+  const c = overheatColor(v.capped);
   return (
     <div style={{ background: C.bg, borderRadius: 10, padding: "16px 18px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 800, marginBottom: 8 }}>
@@ -503,7 +502,7 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
             {/* 카더라 SectionHead 의 도움말과 같은 패턴(hz-tip-wide + help 아이콘). */}
             <span
               className="hz-tip hz-tip-wide hz-tip-below"
-              data-tip="시장·감성 지표 26개의 과열도를 가중 평균한 값입니다. 지표마다 신호의 무게가 달라 다른 가중치로 합산합니다. 25·50·75를 경계로 저온·상온·고온·초고온이 나뉩니다."
+              data-tip="시장·감성 지표 25개의 과열도를 가중 평균한 값입니다. 지표마다 신호의 무게가 달라 다른 가중치로 합산합니다. 25·50·75를 경계로 저온·상온·고온·초고온이 나뉩니다."
               style={{ display: "inline-flex", cursor: "help" }}
             >
               <Icon name="help" style={{ fontSize: 16, color: C.sub }} />
@@ -862,18 +861,22 @@ function CardLeverage({ v }: { v: Pick }) {
   );
 }
 
-// 3. 매수 쏠림 지수 — 매수/매도/CB 다이버징 카운트 바 (details 있으면 목업 원본)
+/**
+ * 최근 한 달 매매 안전장치 동향 — 매수/매도/CB 발동 건수.
+ *
+ * 세부 건수가 없을 때 쓰던 예비 화면을 걷어냈다. 그 화면은 raw 의 부호로 매수/매도를
+ * 가르고 "최근 30일 순 쏠림"이라 적었는데, 2026-07-20 공식 교체로 raw 가 0~1 비중이 돼
+ * 음수가 될 수 없다 — 즉 옛 공식을 전제한 죽은 코드였다. fetch 가 건수를 항상 함께
+ * 저장하므로 그 경로는 실제로 실행되지도 않았다.
+ */
 function CardMarketActions({ v }: { v: Pick }) {
   const dt = v.details;
-  const buy = (v.raw ?? 0) > 0;
-  const mag = v.threshold ? Math.min(100, (Math.abs(v.raw ?? 0) / Math.abs(v.threshold)) * 50) : 20;
   const buyN = dt?.buy ?? 0;
   const sellN = dt?.sell ?? 0;
   const maxC = Math.max(1, buyN, sellN, dt?.cb ?? 0);
-  // 매수/매도 안전장치 중 무엇이 우세했는지 판정 — 종합 점수가 0이어도 방향은 보여준다.
-  const verdict = !dt
-    ? null
-    : buyN > sellN
+  // 매수/매도 안전장치 중 무엇이 우세했는지 — 종합 점수가 0이어도 방향은 보여준다.
+  const verdict =
+    buyN > sellN
       ? { t: "매수 우세", c: C.hot }
       : sellN > buyN
         ? { t: "매도 우세", c: C.cold }
@@ -881,37 +884,17 @@ function CardMarketActions({ v }: { v: Pick }) {
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
       <TitleRow desc={v.headline} icon="speed" name={v.name} badge="최근 한 달" />
-      {verdict ? (
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginBottom: 12 }}>
-          {/* 다른 카드의 주요 수치(191%·48)와 '눈에 보이는 크기'를 맞춘 값이다. 한글은
-              같은 font-size 라도 글리프가 em box 를 더 꽉 채워 숫자보다 커 보인다 —
-              Pretendard 800 기준 실측으로 40px 일 때 숫자는 글자높이 29.1px, "매도 우세"는
-              35.9px 였다. 32px 면 28.7px 라 숫자와 거의 같아진다. font-size 를 40 으로
-              맞추면 수치는 같아도 화면에서는 이 카드만 커 보인다. */}
-          <span style={{ fontSize: 32, fontWeight: 800, color: verdict.c, lineHeight: 1 }}>{verdict.t}</span>
-        </div>
-      ) : (
-        <Big disp={v.raw !== null && v.raw > 0 ? `+${v.disp}` : v.disp} color={v.color} size={44} sub="최근 30일 순 쏠림" />
-      )}
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginBottom: 12 }}>
+        {/* 다른 카드의 주요 수치(191%·48)와 '눈에 보이는 크기'를 맞춘 값이다. 한글은
+            같은 font-size 라도 글리프가 em box 를 더 꽉 채워 숫자보다 커 보인다 —
+            Pretendard 800 기준 실측으로 40px 일 때 숫자는 글자높이 29.1px, "매도 우세"는
+            35.9px 였다. 32px 면 28.7px 라 숫자와 거의 같아진다. */}
+        <span style={{ fontSize: 32, fontWeight: 800, color: verdict.c, lineHeight: 1 }}>{verdict.t}</span>
+      </div>
       <div style={{ background: C.bg, borderRadius: 10, padding: 18, display: "flex", flexDirection: "column", gap: 14 }}>
-        {dt ? (
-          <>
-            <DivRow label={`매수 ${dt.buy ?? 0}건`} w={((dt.buy ?? 0) / maxC) * 100} color={C.hot} />
-            <DivRow label={`매도 ${dt.sell ?? 0}건`} w={((dt.sell ?? 0) / maxC) * 100} color={C.cold} />
-            <DivRow label={`CB ${dt.cb ?? 0}건`} w={((dt.cb ?? 0) / maxC) * 100} color={C.sub} />
-          </>
-        ) : (
-          <>
-            <div style={{ position: "relative", height: 16, background: C.line, borderRadius: 999 }}>
-              <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 2, background: "var(--c-marker)" }} />
-              <div style={{ position: "absolute", top: 0, bottom: 0, borderRadius: 999, background: v.color, ...(buy ? { left: "50%", width: `${mag}%` } : { right: "50%", width: `${mag}%` }) }} />
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 700, color: C.sub }}>
-              <span style={{ color: C.cold }}>매도 우세</span>
-              <span style={{ color: C.hot }}>매수 우세</span>
-            </div>
-          </>
-        )}
+        <DivRow label={`매수 ${buyN}건`} w={(buyN / maxC) * 100} color={C.hot} />
+        <DivRow label={`매도 ${sellN}건`} w={(sellN / maxC) * 100} color={C.cold} />
+        <DivRow label={`CB ${dt?.cb ?? 0}건`} w={((dt?.cb ?? 0) / maxC) * 100} color={C.sub} />
       </div>
       <Foot text={v.desc} />
     </Shell>
@@ -964,16 +947,25 @@ function CardTurnover({ v }: { v: Pick }) {
  * 보인다. 지금 돈이 몰리는 종목들이 각자 고점에서 얼마나 떨어져 있는지를 나란히 두면
  * 지수 숫자가 어디서 온 건지 읽힌다(종목 선정·산출은 lib/data.ts getTopStockHighGaps).
  */
-function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
-  const gap = v.raw ?? 0;
+function CardHighGap({ v, tops, live }: { v: Pick; tops: StockHighGap[]; live: KospiHighGapLive | null }) {
+  // 실시간 야후 값을 우선한다 — 오른쪽 상위 3종목이 이미 야후 실시간이라, 왼쪽만
+  // KRX 어제 종가면 한 카드 안에서 기준이 갈린다(lib/data.getKospiHighGapLive 참고).
+  // 야후가 실패하면 파이프라인 값(KRX 종가)으로 떨어지고, 그때만 자료일 배지를 단다.
+  const gap = live ? live.gapPct : (v.raw ?? 0);
+  const gapDisp = `${gap > 0 ? "+" : ""}${gap.toFixed(gap <= -10 ? 0 : 1)}%`;
   const fillH = Math.max(0, Math.min(100, 100 - Math.abs(gap)));
   return (
     <Shell span={2} hit={v.isHit} minH={230}>
-      <TitleRow desc={v.headline} icon="vertical_align_top" name={v.name} badge={sourceBadge(v, "")} />
+      <TitleRow
+        desc={v.headline}
+        icon="vertical_align_top"
+        name={v.name}
+        badge={live ? "실시간" : sourceBadge(v, "")}
+      />
       <div style={{ display: "flex", gap: 24, flex: 1 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
           <div style={{ display: "flex", flexDirection: "column" }}>
-            <span style={{ fontFamily: MONO, fontSize: 34, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{gap > 0 ? "+" : ""}{v.disp}{v.unit}</span>
+            <span style={{ fontFamily: MONO, fontSize: 34, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{gapDisp}</span>
             <span style={{ fontSize: 10, fontWeight: 700, color: C.sub, marginTop: 4 }}>{gap > 0 ? "이전 전고점 돌파" : "전고점으로부터"}</span>
           </div>
           <div style={{ alignSelf: "stretch", display: "flex", justifyContent: "center", padding: "6px 0" }}>
@@ -1359,7 +1351,10 @@ function CardDivergence({ v }: { v: Pick }) {
   const gap = dt?.kospi_gap;
   const marketTip =
     gap != null
-      ? `코스피는 지금 전고점보다 ${Math.abs(gap)}% 아래입니다. 이 낙폭이 역대(10년) 분포에서 얼마나 얕은지를 0~100으로 매긴 값이 증시 강세입니다. 그래서 ${Math.round(market)}/100(역대 ${Math.round(market)}% 지점)이 됩니다.`
+      ? // "지금"이라고 쓰면 신고가 카드의 실시간 값(-24%)과 어긋나 보인다. 이 숫자는 점수
+        // 계산에 쓰는 KRX **종가** 기준이라 근거를 밝힌다 — 장중 값으로 과열도를 매기면
+        // 하루 종일 점수가 흔들리므로 여기는 종가를 쓰는 게 맞다.
+        `코스피는 최근 종가 기준 전고점보다 ${Math.abs(gap)}% 아래입니다. 이 낙폭이 역대(10년) 분포에서 얼마나 얕은지를 0~100으로 매긴 값이 증시 강세입니다. 그래서 ${Math.round(market)}/100(역대 ${Math.round(market)}% 지점)이 됩니다.`
       : undefined;
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
@@ -1842,10 +1837,11 @@ function GenericCard({ v, icon }: { v: Pick; icon: string }) {
 }
 
 export default async function Home() {
-  const [dailyScore, indicators, topGaps] = await Promise.all([
+  const [dailyScore, indicators, topGaps, kospiLive] = await Promise.all([
     getLatestDailyScore(),
     getPublicIndicators(),
     getTopStockHighGaps(3),
+    getKospiHighGapLive(),
   ]);
 
   const bySlug = new Map(indicators.map((i) => [i.slug, i]));
@@ -1877,7 +1873,7 @@ export default async function Home() {
                     ③ 콘텐츠가 풍부한 2칸 카드들, ④ 해석이 한 단계 필요한 지표 순.
                     버핏지수는 예전에 맨 앞이었지만 분기 GDP 기반이라 30일 변동계수가
                     0.04로 거의 안 움직여(가중치 주석의 "느림·비타이밍"과 같은 이유) 뒤로 뺐다. */}
-                <CardHighGap v={p("kospi_high_gap")} tops={topGaps} />
+                <CardHighGap v={p("kospi_high_gap")} tops={topGaps} live={kospiLive} />
                 <CardVolume v={p("kospi_volume_surge")} />
                 <CardDeposit v={p("investor_deposit")} />
                 <CardVkospi v={p("vkospi")} />
