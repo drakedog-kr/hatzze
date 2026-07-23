@@ -1093,9 +1093,22 @@ function CardAsia({ v }: { v: Pick }) {
 }
 
 // 9. 위험자산 vs 안전자산 — 금/코스닥 두 지표 결합 (둘 다 실제 값)
-function SubRatio({ v, icon, label, signed = false }: { v: Pick; icon: string; label: string; signed?: boolean }) {
+function SubRatio({
+  v,
+  icon,
+  label,
+  signed = false,
+  note,
+}: {
+  v: Pick;
+  icon: string;
+  label: string;
+  signed?: boolean;
+  /** 큰 수치 밑 한 줄 — 그 숫자가 무엇과 무엇을 견준 건지 밝힌다. */
+  note?: string;
+}) {
   // 초과수익률처럼 0을 기준으로 위아래가 다 의미 있는 값은 부호를 밝힌다 —
-  // "1.39%p"만 적으면 앞선 건지 뒤처진 건지 안 읽힌다. 배수(금 대비)는 부호가 없다.
+  // "1.39%"만 적으면 앞선 건지 뒤처진 건지 안 읽힌다. 배수(금 대비)는 부호가 없다.
   const sign = signed && (v.raw ?? 0) > 0 ? "+" : "";
   return (
     <div style={{ flex: 1 }}>
@@ -1103,10 +1116,16 @@ function SubRatio({ v, icon, label, signed = false }: { v: Pick; icon: string; l
         <Icon name={icon} style={{ fontSize: 20, color: C.sub }} />
         <span style={{ fontSize: 13, fontWeight: 800, wordBreak: "keep-all" }}>{label}</span>
       </div>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 14 }}>
-        <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: v.color }}>{sign}{v.disp}{v.unit}</span>
-        {v.hotDisp && <span style={{ fontSize: 10, fontWeight: 700, color: C.sub }}>초고온 {v.hotDisp}</span>}
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: note ? 5 : 14 }}>
+        <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: v.color, whiteSpace: "nowrap" }}>{sign}{v.disp}{v.unit}</span>
+        {v.hotDisp && <span style={{ fontSize: 10, fontWeight: 700, color: C.sub, whiteSpace: "nowrap" }}>초고온 {v.hotDisp}</span>}
       </div>
+      {/* 두 칸의 높이를 맞춰야 아래 과열도 바가 같은 줄에 온다 — 한쪽만 있으면 어긋난다. */}
+      {note && (
+        <div style={{ fontSize: 10, fontWeight: 600, color: "var(--c-muted)", marginBottom: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {note}
+        </div>
+      )}
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, fontWeight: 800, marginBottom: 6 }}>
         <span style={{ color: C.sub }}>과열도</span>
         <span style={{ color: overheatColor(v.capped) }}>{v.capped !== null ? Math.round(v.capped) : "-"} / 100</span>
@@ -1127,14 +1146,22 @@ function SubNote({ text }: { text: string }) {
 }
 
 function CardRiskAssets({ gold, kosdaq }: { gold: Pick; kosdaq: Pick }) {
+  // 코스닥 칸은 '최근 한 달 초과수익률'이라(2026-07-23 측정 교체) 숫자만으론 안 읽힌다.
+  // 견준 두 수익률을 그대로 밑에 적어 "+1.39%"가 어디서 나온 값인지 스스로 드러나게 한다.
+  const kq = kosdaq.details?.kosdaq_return;
+  const kp = kosdaq.details?.kospi_return;
+  const pct = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(1)}%`;
+  const kosdaqNote =
+    typeof kq === "number" && typeof kp === "number"
+      ? `코스닥 ${pct(kq)} · 코스피 ${pct(kp)}`
+      : "최근 한 달 수익률 차이";
   return (
     <Shell span={2} hit={gold.isHit || kosdaq.isHit} minH={230}>
       <TitleRow icon="balance" name="위험자산 VS 안전자산" desc="금·코스피를 기준으로 본 위험 선호도" />
       <div style={{ display: "flex", gap: 32, flex: 1 }}>
-        <SubRatio v={gold} icon="balance" label="코스피 강도 (vs 금)" />
+        <SubRatio v={gold} icon="balance" label="코스피 강도 (vs 금)" note="코스피 지수 ÷ 금 시세" />
         <div style={{ width: 1, background: C.line }} />
-        {/* 코스닥은 '최근 한 달 초과수익률(%p)'이라 부호가 뜻을 가른다(2026-07-23 측정 교체). */}
-        <SubRatio v={kosdaq} icon="celebration" label="코스닥 강도 (vs 코스피)" signed />
+        <SubRatio v={kosdaq} icon="celebration" label="코스닥 강도 (vs 코스피)" signed note={kosdaqNote} />
       </div>
       {/* 지표가 둘인 카드의 설명 줄. Foot 과 박스 모델을 똑같이 맞춰야 같은 행에 놓인
           카드끼리 divider 가 같은 높이에 온다 — marginTop:auto 로 바닥에 붙이고,
