@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 
 import { sentimentTone } from "@/lib/format";
+import { THEMES } from "@/lib/stock-themes";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { changeRateOf, fetchYahooQuote } from "@/lib/yahoo-quote";
 
@@ -626,6 +627,14 @@ export async function getStockReport(code: string): Promise<StockReport | null> 
   };
 }
 
+/** 테마를 이룬 종목 한 건. 카드 툴팁이 이걸로 MDD 정밀분석 링크를 만든다. */
+export type ThemeStock = {
+  code: string;
+  name: string;
+  market: string | null; // MDD 링크의 심볼(.KS/.KQ)을 가르는 값
+  mentions: number;
+};
+
 export type ThemeRotation = {
   theme: string;
   rank: number;
@@ -633,9 +642,76 @@ export type ThemeRotation = {
   sharePct: number;
   shareDelta: number | null; // 점유율 증감(%p)
   mentions: number;
-  stockCount: number;
+  stockCount: number; // = stocks.length. 표시 숫자와 목록이 어긋나지 못하게 한 출처로 묶는다
+  stocks: ThemeStock[]; // 최근 창에 실제로 언급된 종목(주목도 내림차순)
   series: number[]; // 일별 점유율 추이(오래된→최신)
 };
+
+/**
+ * 최근 창에 실제로 언급된 테마별 종목 목록.
+ *
+ * 테마 집계표(telegram_theme_daily)에는 '몇 종목'만 있고 '어느 종목'이 없어서,
+ * 종목 일별 집계를 테마 사전으로 같은 창에서 다시 묶는다. 사전은 lib/stock-themes.ts
+ * 인데 이건 파이프라인 config/stock_themes.py 를 손으로 옮긴 사본이다 — 둘이 어긋나면
+ * 이 목록과 집계표의 점유율이 서로 다른 바스켓을 가리킨다(그 파일의 경고 참고).
+ *
+ * 사전에 있어도 창 안에서 언급이 없으면 목록에 없다. 카드가 "이 테마엔 이런 종목이
+ * 있습니다"가 아니라 "이 점유율을 만든 종목은 이들입니다"를 말해야 하기 때문이다.
+ */
+async function themeStocks(windowDates: string[]): Promise<Map<string, ThemeStock[]>> {
+  const out = new Map<string, ThemeStock[]>();
+  if (!windowDates.length) return out;
+  const db = getSupabaseAdmin();
+
+  // 사전은 종목명으로 적혀 있고 집계는 종목코드다 — stocks 로 한 번 옮긴다.
+  // 이름은 KRX 정식명이라야 매칭된다(사전 62종목 전부 매칭됨, 동명 종목 없음).
+  const names = [...new Set(Object.values(THEMES).flat())];
+  const { data: rows } = await db.from("stocks").select("code,name,market").in("name", names);
+  const stockOf = new Map((rows ?? []).map((s) => [s.code as string, s]));
+  const themesOf = new Map<string, string[]>(); // 종목코드 → 속한 테마(둘 이상일 수 있다)
+  const codeOfName = new Map((rows ?? []).map((s) => [s.name as string, s.code as string]));
+  for (const [theme, members] of Object.entries(THEMES)) {
+    for (const name of members) {
+      const code = codeOfName.get(name);
+      if (!code) continue; // stocks 에 없는 이름은 파이프라인 집계에서도 빠진다(스크립트가 경고한다)
+      themesOf.set(code, [...(themesOf.get(code) ?? []), theme]);
+    }
+  }
+
+  // 창이 3일이라 지금은 1000행에 못 미치지만, 추출 종목이 늘면 조용히 잘린다 — 페이징한다.
+  const daily = await fetchAllRows<{ stock_code: string; mention_count: number; weighted_score: number }>("id", () =>
+    db.from("telegram_stock_daily").select("stock_code,mention_count,weighted_score").in("date", windowDates),
+  );
+
+  const agg = new Map<string, Map<string, { m: number; w: number }>>();
+  for (const r of daily) {
+    for (const theme of themesOf.get(r.stock_code) ?? []) {
+      const per = agg.get(theme) ?? new Map<string, { m: number; w: number }>();
+      const a = per.get(r.stock_code) ?? { m: 0, w: 0 };
+      a.m += r.mention_count || 0;
+      a.w += Number(r.weighted_score) || 0;
+      per.set(r.stock_code, a);
+      agg.set(theme, per);
+    }
+  }
+
+  for (const [theme, per] of agg) {
+    out.set(
+      theme,
+      [...per.entries()]
+        // 언급수가 아니라 주목도(weighted) 순 — 테마 점유율을 매긴 잣대와 같아야
+        // "1등 테마를 끌어올린 게 누구인가"가 목록 맨 위에 온다. 동점은 코드로 못박는다.
+        .sort((x, y) => y[1].w - x[1].w || x[0].localeCompare(y[0]))
+        .map(([code, a]) => ({
+          code,
+          name: (stockOf.get(code)?.name as string) ?? code,
+          market: (stockOf.get(code)?.market as string) ?? null,
+          mentions: a.m,
+        })),
+    );
+  }
+  return out;
+}
 
 /**
  * 테마 로테이션 — 테마별 언급 점유율·순위와 그 변화.
@@ -681,15 +757,24 @@ export async function getThemeRotation(limit = 10): Promise<ThemeRotation[]> {
   const currRank = rankMap(recentShare);
   const prevRank = priorShare ? rankMap(priorShare) : null;
 
-  // 최근 창의 합계(언급수·종목수)는 표시용으로 최신일 값이 아니라 창 전체를 쓴다.
-  const agg = new Map<string, { mentions: number; stocks: number }>();
+  // 최근 창의 언급수는 표시용으로 최신일 값이 아니라 창 전체 합을 쓴다.
+  const agg = new Map<string, { mentions: number }>();
   for (const r of data) {
     if (!recentDates.includes(r.date)) continue;
-    const a = agg.get(r.theme) ?? { mentions: 0, stocks: 0 };
+    const a = agg.get(r.theme) ?? { mentions: 0 };
     a.mentions += r.mention_count ?? 0;
-    a.stocks = Math.max(a.stocks, r.stock_count ?? 0);
     agg.set(r.theme, a);
   }
+
+  // 종목은 수만 세지 않고 목록째 가져온다 — 툴팁이 어느 종목인지 보여줘야 하고,
+  // 그러면 "종목 N개"도 이 목록에서 나와야 둘이 어긋날 수 없다.
+  //
+  // 그래서 집계표의 stock_count 는 더 쓰지 않는다. 그 값은 '하루치' 종목 수라,
+  // 창 전체에 쓰려면 3일 중 최대값을 잡는 수밖에 없었다(합치면 같은 종목이 세 번
+  // 세어진다). 언급수는 창 전체 합인데 종목만 하루치 최대라 잣대가 어긋났고,
+  // 무엇보다 목록의 길이와 맞지 않는다 — 반도체는 최대 6이지만 3일 동안 언급된
+  // 종목은 7개다. 이제 창 전체의 서로 다른 종목 수로 통일한다.
+  const stocksOf = await themeStocks(recentDates);
 
   const seriesOf = (theme: string) =>
     dates.map((d) => Number(data.find((r) => r.date === d && r.theme === theme)?.share_pct ?? 0));
@@ -706,7 +791,8 @@ export async function getThemeRotation(limit = 10): Promise<ThemeRotation[]> {
         sharePct: share,
         shareDelta: before != null ? share - before : null,
         mentions: agg.get(theme)?.mentions ?? 0,
-        stockCount: agg.get(theme)?.stocks ?? 0,
+        stockCount: stocksOf.get(theme)?.length ?? 0,
+        stocks: stocksOf.get(theme) ?? [],
         series: seriesOf(theme),
       };
     })

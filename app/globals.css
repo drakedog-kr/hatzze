@@ -327,6 +327,129 @@ body {
   transform: translateX(-50%) translateY(6px);
 }
 
+/* ── 테마 로테이션 줄의 호버 카드 ──────────────────────────────────
+   줄 어디에든 마우스를 올리면 그 줄 전체가 하늘색으로 물들고, 그 테마의 점유율을
+   만든 종목이 목록으로 열린다. 목록의 종목마다 MDD 정밀분석으로 가는 링크가 붙는다.
+   그래서 위의 data-tip 툴팁을 못 쓴다 — 그건 attr() 로 뽑은 문자열이라 링크를 담지
+   못한다. 대신 실제 요소를 두고 :hover 로 여닫는다(카드는 서버 컴포넌트로 남는다).
+
+   목록이 줄에 붙어 있어서 마우스를 목록으로 옮겨도 :hover 가 유지된다 —
+   :hover 는 조상까지 함께 걸리고, 목록은 줄의 자식이다. */
+
+/* 배경만 카드 안쪽 여백까지 번지게 한다. 음수 마진을 패딩과 같은 값으로 둬 margin box
+   치수는 그대로 남긴다 — 이 목록은 space-between 으로 남는 높이를 줄들이 나눠 갖는
+   구조라, 줄의 외곽 치수가 바뀌면 그 배분이 흔들린다. 줄 사이 간격만 10px 좁아 보인다. */
+.hz-theme-row {
+  position: relative;
+  margin: -5px -12px;
+  padding: 5px 12px;
+  border-radius: 11px;
+  transition: background 0.13s ease;
+}
+.hz-theme-row:hover,
+.hz-theme-row:focus-within {
+  background: var(--c-blue-tint);
+}
+/* 마우스 없이도 열 수 있어야 한다(줄에 tabindex 를 준다). 터치에서도 이 경로로 열린다. */
+.hz-theme-row:focus-visible {
+  outline: 2px solid var(--c-blue);
+  outline-offset: -1px;
+}
+
+.hz-theme-pop {
+  position: absolute;
+  left: 12px; /* 줄의 가로 패딩만큼 물러나 순위 숫자와 왼쪽을 맞춘다 */
+  /* 하이라이트와 5px 겹쳐 둔다. 사이에 틈이 있으면 마우스가 그 틈을 건너는 동안
+     :hover 가 끊겨 목록이 닫혀 버린다(클릭할 틈을 안 준다). */
+  top: calc(100% - 5px);
+  z-index: 40;
+  width: min(268px, calc(100% - 24px));
+  padding: 9px;
+  background: var(--c-card);
+  border: 1px solid var(--c-line);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px var(--c-shadow-strong);
+  opacity: 0;
+  /* opacity 만 0 으로 두면 안 보이는 링크가 Tab 순서에 그대로 남는다. */
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 0.13s ease, transform 0.13s ease, visibility 0.13s;
+}
+.hz-theme-row:hover .hz-theme-pop,
+.hz-theme-row:focus-within .hz-theme-pop {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+/* 아래쪽 줄은 위로 펼친다 — 아래로 열면 카드 밖으로 나가 다음 카드를 덮는다. */
+.hz-theme-pop-up {
+  top: auto;
+  bottom: calc(100% - 5px);
+  transform: translateY(4px);
+}
+
+.hz-theme-pop-head {
+  padding: 1px 7px 7px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--c-faint);
+}
+.hz-theme-pop-item {
+  /* 화살표 칸을 늘 잡아 둬, 마우스를 올려 화살표가 나타나도 이름이 밀리지 않는다. */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 13px;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: background 0.12s ease;
+}
+.hz-theme-pop-item:hover {
+  background: var(--c-blue-tint);
+}
+.hz-theme-pop-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--c-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.12s ease;
+}
+.hz-theme-pop-item:hover .hz-theme-pop-name {
+  color: var(--c-blue);
+}
+.hz-theme-pop-cnt {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--c-faint);
+}
+.hz-theme-pop-go {
+  font-size: 13px;
+  color: var(--c-blue);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.hz-theme-pop-item:hover .hz-theme-pop-go {
+  opacity: 1;
+}
+.hz-theme-pop-foot {
+  margin-top: 5px;
+  padding: 7px 7px 1px;
+  border-top: 1px solid var(--c-divider);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--c-faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hz-theme-pop,
+  .hz-theme-pop-up {
+    transform: none;
+  }
+}
+
 /* 클릭 가능한 카드(트렌딩 메시지 등) — 마우스를 올리면 살짝 떠오르고 테두리가
    강조돼 "누를 수 있다"는 걸 알린다. */
 .hz-lift {
