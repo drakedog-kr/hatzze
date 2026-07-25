@@ -43,8 +43,12 @@ export function TrendingTabs({
   const [active, setActive] = useState(panels[0]?.key);
   const current = panels.find((p) => p.key === active) ?? panels[0];
 
+  // 낱개 알약 3개 대신 하나의 세그먼티드 컨트롤로 묶는다 — 셋이 한 축의 눈금이라는 게
+  // 테두리 하나로 드러나고, 고른 칸만 카드색으로 떠올라 상태가 분명하다(MDD 정밀분석의
+  // 기간 토글과 같은 문법). 예전엔 선택 배경을 `${C.blue}14` 로 줬는데 var() 에 알파를
+  // 이어붙인 꼴이라 CSS 가 버려서, 실제로는 배경 없이 테두리 색만 바뀌고 있었다.
   const tabs = (
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+    <div style={{ display: "flex", gap: 2, background: C.bg, border: `1px solid ${C.line}`, borderRadius: 999, padding: 3 }}>
       {panels.map((p) => {
         const on = p.key === current?.key;
         return (
@@ -54,15 +58,17 @@ export function TrendingTabs({
             onClick={() => setActive(p.key)}
             aria-pressed={on}
             style={{
-              padding: "6px 13px",
+              padding: "6px 14px",
               borderRadius: 999,
-              border: `1px solid ${on ? C.blue : C.line}`,
-              background: on ? `${C.blue}14` : "transparent",
+              border: "none",
+              background: on ? C.card : "transparent",
+              boxShadow: on ? `0 1px 3px ${C.shadow}` : "none",
               color: on ? C.blue : C.sub,
               fontSize: 12,
               fontWeight: 800,
               cursor: "pointer",
               whiteSpace: "nowrap",
+              transition: "background .15s, color .15s",
             }}
           >
             {p.label}
