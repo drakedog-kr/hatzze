@@ -219,12 +219,40 @@ function drawdownCharacter(eps: Episode[], currentDd: number): DrawdownCharacter
   };
 }
 
-/** 낙폭 시계열을 최대 maxPoints 개로 균등 다운샘플한다(마지막 점은 항상 포함). */
+/**
+ * 낙폭 시계열을 화면용으로 줄인다. 구간을 나눠 **각 구간의 최저·최고 낙폭을 남긴다**
+ * (시간순, 첫 점과 마지막 점은 항상 포함).
+ *
+ * 예전엔 step 개마다 하나씩 솎아냈는데, 그러면 극값이 통째로 사라진다. 10년치
+ * 삼성전자(2,470일)를 220점으로 줄이면 step 이 12라 12일 중 11일이 버려지고,
+ * 실제 최저일(2024-11-14 −45.2%)도 그 사이에 끼어 사라졌다. 그 결과 차트가 찍는
+ * '기간 최저점' 표시가 헤드라인과 3개월·3.3%p 어긋났고(2025-02-05 −41.9%),
+ * y축 맨 아래 눈금이 −45% 인데 곡선은 거기까지 내려가지도 않았다.
+ *
+ * 최저만 남기면 곡선이 실제보다 늘 깊어 보이므로 최고도 같이 남긴다 — 바닥과
+ * 회복 양쪽이 보존돼 모양이 안 뭉개진다. 구간당 최대 2점이라 결과는 maxPoints 안쪽이다.
+ */
 function downsample(series: DrawdownPoint[], maxPoints: number): DrawdownPoint[] {
   if (series.length <= maxPoints) return series;
-  const step = Math.ceil(series.length / maxPoints);
+  const buckets = Math.max(1, Math.floor(maxPoints / 2));
+  const width = series.length / buckets;
   const out: DrawdownPoint[] = [];
-  for (let i = 0; i < series.length; i += step) out.push(series[i]);
+  for (let b = 0; b < buckets; b++) {
+    const start = Math.floor(b * width);
+    const end = Math.min(series.length, Math.floor((b + 1) * width));
+    if (start >= end) continue;
+    let lo = start;
+    let hi = start;
+    for (let i = start + 1; i < end; i++) {
+      if (series[i].dd < series[lo].dd) lo = i;
+      if (series[i].dd > series[hi].dd) hi = i;
+    }
+    // 두 극값을 시간순으로 넣어야 선이 뒤로 꺾이지 않는다.
+    const [first, second] = lo <= hi ? [lo, hi] : [hi, lo];
+    out.push(series[first]);
+    if (second !== first) out.push(series[second]);
+  }
+  if (out[0] !== series[0]) out.unshift(series[0]);
   const last = series[series.length - 1];
   if (out[out.length - 1] !== last) out.push(last);
   return out;
