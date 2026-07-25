@@ -84,7 +84,7 @@ def main() -> None:
 
     # 급부상 미리보기: 최신일 vs 그 이전 일평균(baseline) 대비 weighted_score 급증
     code_to_name = {
-        s["code"]: s["name"] for s in load_all(db, "stocks", "code,name")
+        s["code"]: s["name"] for s in load_all(db, "stocks", "code,name", order_by="code")
     }
     dates = sorted({r["date"] for r in rows})
     if len(dates) >= 2:
