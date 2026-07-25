@@ -57,7 +57,7 @@ MASK_CHAR = "\x00"
 
 def load_dictionary(db) -> tuple[dict[str, str], dict[str, str], set[str]]:
     """매칭문자열→코드, 매칭문자열→method, 오탐위험 매칭문자열 집합을 만든다."""
-    stocks = load_all(db, "stocks", "code,name")
+    stocks = load_all(db, "stocks", "code,name", order_by="code")
     name_to_code = {}
     for s in stocks:
         name = s["name"].strip()
@@ -191,12 +191,19 @@ def extract(text: str, pattern, match_to_code, method, ambiguous, caseless) -> d
 
 
 def load_messages(db) -> list[dict]:
+    """본문이 있는 메시지 전량. 필터가 있어 load_all 을 못 쓰고 직접 페이징한다.
+
+    정렬 키는 유일해야 한다(id). 정렬이 없으면 페이지 사이 행 순서가 보장되지 않아
+    경계에서 행이 조용히 빠진다 — 빠진 메시지는 종목 추출 자체가 안 된다.
+    자세한 이유는 common/supabase_client.py:load_all 주석.
+    """
     msgs, start = [], 0
     while True:
         page = (
             db.table("telegram_messages")
             .select("channel_handle,message_id,text")
             .not_.is_("text", "null")
+            .order("id")
             .range(start, start + 999)
             .execute()
             .data
@@ -214,7 +221,7 @@ def main() -> None:
 
     match_to_code, method, ambiguous = load_dictionary(db)
     pattern, caseless = build_pattern(list(match_to_code))
-    code_to_name = {s["code"]: s["name"] for s in load_all(db, "stocks", "code,name")}
+    code_to_name = {s["code"]: s["name"] for s in load_all(db, "stocks", "code,name", order_by="code")}
     print(f"사전: {len(match_to_code)}개 매칭문자열(별칭 {sum(1 for v in method.values() if v=='alias')}, 오탐위험 {len(ambiguous)})")
 
     messages = load_messages(db)

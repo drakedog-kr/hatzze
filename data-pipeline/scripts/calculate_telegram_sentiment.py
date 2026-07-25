@@ -93,7 +93,7 @@ def main() -> None:
     }
 
     # 종목 → 테마 (테마 로테이션과 같은 사전). stocks 에 없는 이름은 조용히 건너뛴다.
-    stocks = load_all(db, "stocks", "code,name")
+    stocks = load_all(db, "stocks", "code,name", order_by="code")
     code_of = {s["name"]: s["code"] for s in stocks}
     themes_of_code: dict[str, list[str]] = defaultdict(list)
     for theme, names in THEMES.items():

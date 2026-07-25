@@ -36,7 +36,7 @@ def main() -> None:
     # 테마 사전의 종목명을 코드로 해석한다. stocks 에 없는 이름은 건너뛰되 무엇이
     # 빠졌는지 알린다. 코스닥 적재(2026-07-20) 이후 남는 미해결은 사전 오타이거나
     # KRX 정식명 불일치(예: 엔씨소프트 → "NC")이니 사전을 고쳐야 한다.
-    stocks = load_all(db, "stocks", "code,name")
+    stocks = load_all(db, "stocks", "code,name", order_by="code")
     code_of = {s["name"]: s["code"] for s in stocks}
     theme_of: dict[str, list[str]] = defaultdict(list)  # code -> [theme]
     missing: dict[str, list[str]] = {}

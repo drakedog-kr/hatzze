@@ -269,7 +269,7 @@ def build_stock_digests(db, latest: str) -> list[tuple[str, str, str]]:
         a["by_date"][r["date"]] = r["mention_count"] or 0
     top = sorted(agg.items(), key=lambda kv: kv[1]["w"], reverse=True)[:NARRATIVE_TOP_N]
 
-    stocks = load_all(db, "stocks", "code,name")
+    stocks = load_all(db, "stocks", "code,name", order_by="code")
     name_of = {s["code"]: s["name"] for s in stocks}
 
     mentions = load_all(db, "telegram_message_stocks", "channel_handle,message_id,stock_code")

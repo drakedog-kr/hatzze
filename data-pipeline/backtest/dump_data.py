@@ -20,7 +20,10 @@ while True:
     page = (
         c.table("indicator_values")
         .select("indicator_id,date,raw_value,normalized_score,details")
-        .order("date")
+        # 정렬 키는 유일해야 한다. date 로 정렬하면 같은 날짜에 지표 수만큼 행이 몰려
+        # 그 구간 순서가 요청마다 달라지고, 페이지 경계에서 행이 조용히 빠진다
+        # (자세한 이유는 common/supabase_client.py:load_all 주석).
+        .order("id")
         .range(start, start + 999)
         .execute()
         .data
