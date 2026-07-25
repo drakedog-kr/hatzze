@@ -159,6 +159,16 @@ body {
   .mdd-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
+/* 로딩 자리표시자 — 결과와 같은 골격으로 은은하게 깜빡인다(레이아웃이 튀지 않게). */
+@keyframes hz-shimmer {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.hz-shimmer { animation: hz-shimmer 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .hz-shimmer { animation: none; }
+}
+
 .hz-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
 .hz-scroll::-webkit-scrollbar-thumb {
   background: var(--c-scrollbar);
