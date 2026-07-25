@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { analyzeDrawdown, drawdownSeries, type Bar } from "@/lib/mdd";
+import { analyzeDrawdown, drawdownSeries, riskProfile, type Bar } from "@/lib/mdd";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { themesForName, THEMES } from "@/lib/stock-themes";
 import { fetchDailyHistory, yahooSymbol } from "@/lib/yahoo-history";
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
   const symbol = yahooSymbol(code, market);
   const bars = await fetchDailyHistory(symbol, years);
   const analysis = bars ? analyzeDrawdown(bars) : null;
-  if (!analysis) {
+  if (!bars || !analysis) {
     return NextResponse.json(
       { ok: false, error: "이 종목의 과거 시세를 불러오지 못했습니다." },
       { status: 502 },
@@ -46,10 +46,15 @@ export async function GET(request: Request) {
   const atHigh = analysis.currentDd > -1;
   const athDate = analysis.athDate;
 
+  // 코스피는 항상 받는다 — 원인 분해(고점 이후)뿐 아니라 리스크 프로필의 '시장 동반성'도
+  // 코스피 시계열이 필요하기 때문이다.
   const [marketBars, theme] = await Promise.all([
-    atHigh ? Promise.resolve(null) : fetchDailyHistory(KOSPI, years),
+    fetchDailyHistory(KOSPI, years),
     buildThemeComparison(name, market, years, analysis.currentDd, athDate),
   ]);
+
+  // 리스크 프로필(보상·큰 하락 빈도·시장 동반성) — 종목·코스피 종가로 요약.
+  const risk = riskProfile(bars, marketBars);
 
   // 원인 분해 — 이 종목의 고점 이후, 같은 기간 시장·테마는 얼마나 움직였나.
   // stock 은 곧 currentDd(고점 이후 수익률과 같다). 시장·테마와 나란히 놓아
@@ -66,7 +71,7 @@ export async function GET(request: Request) {
       : null;
 
   return NextResponse.json(
-    { ok: true, code, name, market, symbol, years: yearsKey, analysis, attribution, theme },
+    { ok: true, code, name, market, symbol, years: yearsKey, analysis, attribution, theme, risk },
     { headers: { "Cache-Control": "public, s-maxage=900, stale-while-revalidate=600" } },
   );
 }
