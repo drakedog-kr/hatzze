@@ -1,11 +1,27 @@
 /**
  * 지표 값의 크기에 따라 소수점 표시를 자동으로 결정한다.
  * - 절댓값 10 미만: 소수점 둘째자리까지 (작은 숫자는 소수점 변화가 의미 있음)
- * - 절댓값 10 이상: 정수로 표시 (0 방향으로 버림 — 예: 212.96 -> 212, -20.49 -> -20)
+ * - 절댓값 10 이상: 정수로 **반올림** (예: 199.93 -> 200, -26.59 -> -27)
  * - unit이 "억원"이고 절댓값 10000 이상(=1조 이상)이면 "조원" 단위로 전환
  *
  * 특정 지표를 하드코딩하지 않고 값의 크기만 보고 판단하므로, 새로 추가되는
  * 지표에도 코드 수정 없이 그대로 적용된다.
+ *
+ * ## 왜 버림이 아니라 반올림인가
+ *
+ * 예전엔 Math.trunc 로 0 방향 버림이었다. 버림은 (1) 값을 항상 실제보다 작게 말하고
+ * (2) 같은 화면의 다른 표기와 어긋난다. 버핏지수 카드가 대표 사례다. raw 199.93 이
+ * 큰 숫자로는 "199%"인데 바로 옆 서브텍스트는 toFixed(1) 로 "2.0배"라, 한 카드가
+ * 스스로 모순되는 두 값을 동시에 말했다. 상단 티커의 햇쩨 지수도 같은 병으로 히어로의
+ * 31℃ 와 1도 어긋나 그 자리에서만 Math.round 로 우회했었다(app/AppShell.tsx).
+ *
+ * 이 파일 안에서도 규칙이 갈렸다. 아래 "조원" 분기와 formatEokMixed 는 처음부터
+ * 반올림이었으므로, 반올림으로 맞추는 쪽이 파일 전체가 한 규칙을 쓰는 방향이다.
+ * 음수도 0 이 아니라 가까운 정수로 간다(Math.round(-26.59) === -27).
+ *
+ * 값과 기준선(threshold·hot_threshold)이 모두 이 함수를 지나므로 판정과 표시가
+ * 같은 규칙 위에 놓인다. 표시가 1 움직여 기준선을 넘어 보일 수 있지만, 초고온 배지는
+ * 표시값이 아니라 진행률(capped ≥ 75)로 판정하니 배지와 숫자가 뒤집히지는 않는다.
  */
 export function formatIndicatorValue(
   value: number,
@@ -24,7 +40,7 @@ export function formatIndicatorValue(
 
   if (unit === "억원") {
     return {
-      display: Math.trunc(value).toLocaleString("ko-KR"),
+      display: Math.round(value).toLocaleString("ko-KR"),
       displayUnit: unit,
     };
   }
@@ -35,7 +51,7 @@ export function formatIndicatorValue(
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         })
-      : Math.trunc(value).toLocaleString("ko-KR");
+      : Math.round(value).toLocaleString("ko-KR");
 
   return { display, displayUnit: unit };
 }
