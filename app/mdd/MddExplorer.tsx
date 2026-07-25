@@ -106,6 +106,105 @@ export function MddExplorer({ stocks, initial }: { stocks: StockOption[]; initia
   );
 }
 
+/* ── 검색 순위 ─────────────────────────────────────────────────────
+   부분일치만 하고 이름 가나다순으로 앞에서 여덟 개를 자르면 대표 종목이 밀려난다.
+   실측(2026-07-26): "삼성" 22종목 중 앞 여덟에 삼성전자가 없었고(삼성E&A·삼성FN리츠·
+   삼성SDI·삼성SDI우…가 먼저), "현대" 33종목 중 현대차는 24번째, "한화" 는 부분일치인
+   대한화섬이 1위였다. 시총 1위와 자동차 1위를 이름으로 찾을 수 없었다는 뜻이다.
+
+   그래서 자르기 전에 관련도로 세운다. 등급(낮을수록 먼저):
+     0 이름·코드 완전일치 — "현대차"·"005930" 을 정확히 쳤으면 무조건 1위
+     1 이름 접두일치      — "삼성" → 삼성전자·삼성물산…
+     2 코드 접두일치      — "0059" → 005930
+     3 이름 부분일치      — "한화" → 대한화섬. 접두일치를 이기지 못하게 뒤로 보낸다
+
+   같은 등급 안에서는 보통주 → 대표 종목 → 이름 짧은 순 → 가나다순으로 가른다. */
+
+/**
+ * 시가총액 상위 KOSPI 보통주를 큰 것부터 손으로 고정한 목록(2026-07 기준).
+ *
+ * 관련도를 데이터로 뽑을 수 없어 손으로 둔다 — stocks 테이블에는 코드·종목명·종가만
+ * 있고 시가총액도 상장주식수도 없다. 종가는 대용이 못 된다(삼성바이오로직스 한 주가
+ * 삼성전자보다 열 배 넘게 비싸다). 검색창에 대표성을 주는 다른 신호가 없다.
+ *
+ * 하는 일은 하나다: "삼성"·"현대"처럼 그룹명이 겹쳐 수십 종목이 걸리는 질의에서 어느
+ * 쪽을 먼저 보여줄지 가른다. 여기 없는 종목도 검색은 그대로 되고 이름 길이·가나다순으로
+ * 뒤에 붙을 뿐이다. 순위가 낡아도 화면에 나오는 수치는 틀리지 않는다 — 후보를 세우는
+ * 데만 쓰고 분석값에는 손대지 않기 때문이다. 그래서 시총이 바뀔 때마다 고칠 필요는 없고,
+ * 새 대표주가 검색으로 안 나온다는 말이 나올 때 맨 앞쪽만 손보면 된다.
+ *
+ * 이름은 stocks 테이블(KRX 정식 종목명)과 정확히 같아야 맞는다 — "엔씨소프트"가 아니라
+ * "NC", "네이버"가 아니라 "NAVER". lib/stock-themes.ts 의 테마 사전과 일부 겹치지만
+ * 일부러 따로 둔다: 그쪽은 테마별 바스켓이라 안에 순서가 없고, 순서를 뜻하게 만들면
+ * 테마 카드를 손볼 때 검색 순위가 조용히 따라 바뀐다.
+ */
+const MAJOR_NAMES = [
+  "삼성전자", "SK하이닉스", "삼성바이오로직스", "LG에너지솔루션", "현대차", "기아",
+  "두산에너빌리티", "한화에어로스페이스", "HD현대중공업", "셀트리온", "NAVER", "신한지주",
+  "KB금융", "삼성물산", "현대모비스", "한국전력", "카카오", "하나금융지주", "메리츠금융지주",
+  "HD한국조선해양", "삼성생명", "삼성화재", "POSCO홀딩스", "LG화학", "SK스퀘어", "한화오션",
+  "삼성SDI", "크래프톤", "HMM", "하이브", "KT&G", "우리금융지주", "SK이노베이션",
+  "삼성에스디에스", "한국항공우주", "한미반도체", "현대글로비스", "삼성중공업", "LG전자",
+  "SK텔레콤", "KT", "기업은행", "대한항공", "유한양행", "삼양식품", "아모레퍼시픽", "삼성전기",
+  "포스코퓨처엠", "현대건설", "HD현대", "HD현대일렉트릭", "한화시스템", "현대로템", "고려아연",
+  "SK", "LG", "한화", "GS", "CJ", "두산", "삼성증권", "미래에셋증권", "DB손해보험", "현대해상",
+  "LG유플러스", "롯데케미칼", "한진칼", "CJ제일제당", "이마트", "LS",
+];
+const MAJOR_RANK = new Map(MAJOR_NAMES.map((n, i) => [n, i]));
+
+/**
+ * 우선주 판별 — 뒤로 밀 대상. "삼성"을 친 사람이 찾는 건 삼성전자우가 아니고,
+ * 실측상 삼성물산우B·현대차2우B·현대차3우B·현대차우 같은 것들이 앞자리를 먹었다.
+ *
+ * 판정은 코드로 한다. KRX 단축코드는 보통주가 0 으로 끝나고 우선주는 5·7·K·L 등으로
+ * 끝난다. 코스피 944종목에 대보니 이 규칙이 우선주 110개를 하나도 놓치지 않았고,
+ * 보통주를 잘못 집은 경우도 없었다. 이름 규칙(우·우B·2우B…)은 107개까지만 잡는다 —
+ * CJ4우(전환)·DL이앤씨2우(전환)·아모레퍼시픽홀딩스3우C 를 놓친다.
+ * 그래도 이름 규칙을 함께 두는 건, 코드 규칙에서 벗어난 종목이 들어와도 이름만으로
+ * 걸러지게 하려는 이중 안전장치다.
+ */
+const isPreferredShare = (s: StockOption) => !s.code.endsWith("0") || /\d?우B?$/.test(s.name);
+
+/**
+ * 검색어에 맞는 종목을 관련도 순으로. 위 등급표를 그대로 옮긴 순수 함수다.
+ * 검색어가 비면 빈 배열(입력 전에는 목록을 열지 않는다).
+ */
+export function rankStockMatches(stocks: StockOption[], query: string, limit = 8): StockOption[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+
+  const scored: { s: StockOption; tier: number; pref: number; major: number; len: number }[] = [];
+  for (const s of stocks) {
+    const name = s.name.toLowerCase();
+    // 코드도 소문자로 — 우선주 코드에는 영문이 섞인다(예: 02826K).
+    const code = s.code.toLowerCase();
+    let tier: number;
+    if (name === q || code === q) tier = 0;
+    else if (name.startsWith(q)) tier = 1;
+    else if (code.startsWith(q)) tier = 2;
+    else if (name.includes(q)) tier = 3;
+    else continue;
+    scored.push({
+      s,
+      tier,
+      pref: isPreferredShare(s) ? 1 : 0,
+      major: MAJOR_RANK.get(s.name) ?? MAJOR_NAMES.length,
+      len: s.name.length,
+    });
+  }
+
+  // 마지막 가나다순까지 두어 같은 값이 남지 않게 한다 — 정렬이 흔들리지 않는다.
+  scored.sort(
+    (a, b) =>
+      a.tier - b.tier ||
+      a.pref - b.pref ||
+      a.major - b.major ||
+      a.len - b.len ||
+      a.s.name.localeCompare(b.s.name, "ko"),
+  );
+  return scored.slice(0, limit).map((r) => r.s);
+}
+
 /* ── 조회 바: 종목 검색 + 기간 토글 ─────────────────────────────── */
 function Controls({
   stocks,
@@ -133,13 +232,7 @@ function Controls({
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
-  const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return stocks
-      .filter((s) => s.name.toLowerCase().includes(q) || s.code.startsWith(q))
-      .slice(0, 8);
-  }, [query, stocks]);
+  const matches = useMemo(() => rankStockMatches(stocks, query), [query, stocks]);
 
   const pick = (s: StockOption) => {
     onSelect(s);
