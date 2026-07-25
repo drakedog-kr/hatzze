@@ -272,7 +272,9 @@ export default async function KaderaPage() {
           베타라 페이지마다 붙일 일이 아니다. */}
       <header>
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: C.ink, letterSpacing: "-0.01em" }}>카더라 리포트</h2>
+          {/* 이 페이지의 h1. 사이드바 로고는 홈에서만 h1이라 여기와 겹치지 않는다.
+              스타일은 h2 때와 동일해 보이는 건 그대로다(제목 크기는 인라인 지정). */}
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: C.ink, letterSpacing: "-0.01em" }}>카더라 리포트</h1>
           <div style={{ height: 1, flex: 1, background: C.line }} />
         </div>
         <p style={{ margin: "8px 0 0", fontSize: 14, lineHeight: 1.7, color: C.sub }}>

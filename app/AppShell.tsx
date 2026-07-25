@@ -38,6 +38,13 @@ type Quote = { label: string; value: string; change: number | null; color?: stri
 
 function Sidebar() {
   const pathname = usePathname();
+  // 로고를 감싸는 태그는 홈에서만 h1이다. 사이드바는 모든 페이지가 공유하는데,
+  // 검색엔진은 h1을 그 페이지의 주제로 읽는다. 늘 h1이면 카더라·MDD가 자기 제목이
+  // 아니라 "로고"를 주제로 선언하는 셈이고, 자기 h1이 있는 페이지는 h1이 둘이 된다.
+  // 홈은 페이지 대표 제목이 따로 없고 사이트 자체가 주제라 로고가 h1인 게 맞다.
+  // div로 바뀌어도 보이는 건 그대로다. globals.css에 h1~h6 규칙이 없고 Tailwind
+  // preflight가 font-size·font-weight를 inherit으로 되돌려서, 태그 기본값 중 남는 게 없다.
+  const LogoTag = pathname === "/" ? "h1" : "div";
   return (
     <aside
       className="hz-sidebar"
@@ -47,7 +54,7 @@ function Sidebar() {
         {/* 베타 배지는 로고 우측 상단에 붙인다 — 서비스 전체가 베타라는 표시라서,
             페이지마다(예전엔 카더라 제목 옆) 다는 것보다 여기 한 곳이 맞다.
             alignItems:flex-start 로 로고 윗선에 맞춰 위첨자처럼 올린다. */}
-        <h1 style={{ margin: 0, display: "flex", alignItems: "flex-start", gap: 5 }}>
+        <LogoTag style={{ margin: 0, display: "flex", alignItems: "flex-start", gap: 5 }}>
           {/* 로고는 메인(시장 브리핑)으로 가는 링크 — 어느 페이지에서든 홈으로 돌아올 수 있게. */}
           <Link href="/" aria-label="hatzze 홈" className="hz-logo-link" style={{ display: "inline-flex" }}>
             <LogoLockup symbolSize={29} wordmarkSize={30} gap={7} />
@@ -55,7 +62,7 @@ function Sidebar() {
           <span style={{ flexShrink: 0, fontSize: 8, fontWeight: 800, color: C.blue, background: "var(--c-blue-tint)", padding: "3px 8px", borderRadius: 999 }}>
             베타
           </span>
-        </h1>
+        </LogoTag>
         <p style={{ margin: "8px 0 0", fontSize: 11, fontWeight: 700, color: C.sub, letterSpacing: "0.02em", lineHeight: 1.5 }}>
           데이터와 감성으로 읽는 시장
         </p>
