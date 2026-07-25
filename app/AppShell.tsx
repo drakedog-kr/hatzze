@@ -263,8 +263,11 @@ function TopBar({ dailyScore, theme }: { dailyScore: DailyScore | null; theme: "
   const hatzze: Quote = dailyScore
     ? {
         label: "햇쩨 지수",
-        // 히어로와 같은 정수 반올림을 써야 한다 — formatIndicatorValue 는 30.86 을 "30"으로
-        // 잘라서 히어로의 31℃ 와 한 화면에서 1도 어긋났다.
+        // 히어로와 같은 정수 반올림을 쓴다. 예전엔 formatIndicatorValue 가 30.86 을 "30"으로
+        // 잘라서 히어로의 31℃ 와 한 화면에서 1도 어긋났고, 그 버림은 lib/format.ts 에서
+        // 뿌리를 고쳤다. 그래도 여기서 Math.round 를 직접 쓰는 이유는 따로다 —
+        // formatIndicatorValue 는 절댓값 10 미만을 소수점 둘째자리로 적어(저온장의 8.5점이
+        // "8.50℃") 티커 한 줄에 맞지 않는다. 온도는 언제나 정수여야 한다.
         value: `${Math.round(dailyScore.score)}℃ · ${stageLabel}`,
         change: null,
         color: STAGE_COLOR[stageLabel] ?? C.ink,
