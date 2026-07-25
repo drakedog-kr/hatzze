@@ -16,8 +16,13 @@
   --c-ink-soft: #3a4453;
   --c-logo-ink: oklch(0.24 0.02 260); /* 로고 워드마크 잉크(≈#25262F) — handoff 10a */
   --c-sub: #6b7684;
-  --c-muted: #8a919e;
-  --c-faint: #a9b0bd;
+  /* 라이트 팔레트는 배경이 밝은 회색(#d4daea)이라, 흔한 라이트 테마 기준으로 고른
+     연한 회색이 바탕에 그대로 묻힌다. 예전 faint(#a9b0bd)는 타일 배경 위 명암비가
+     1.56:1 이라 10px 종목 코드가 거의 안 읽혔다. 두 단계를 한 칸씩 내려 잡는다
+     (faint 1.56 → 2.60, muted 2.27 → 2.97). sub 는 그대로 둔다 — 여기까지 내리면
+     세 단계가 한 색으로 뭉개진다. */
+  --c-muted: #737d90;
+  --c-faint: #7e8798;
   --c-hint: #8a93a8;
 
   --c-card: #e8eefe;
@@ -31,6 +36,12 @@
   --c-shadow-strong: rgba(0, 0, 0, 0.2);
   --c-marker: rgba(32, 38, 50, 0.35);
   --c-blue-tint: rgba(0, 100, 255, 0.08);
+  /* 강조색 알약(배지)의 옅은 배경. 인라인에서 `${C.hot}22` 처럼 쓰면 var()에 알파를
+     이어붙인 꼴("var(--c-hot)22")이라 CSS가 통째로 버린다 — 실제로 급부상 종목의
+     "언급 ▲ 4.3배" 배지가 배경 없이 글자만 떠 있었다. 색마다 변수로 둔다. */
+  --c-hot-tint: rgba(255, 154, 77, 0.14);
+  --c-cold-tint: rgba(94, 168, 216, 0.14);
+  --c-mania-tint: rgba(255, 107, 129, 0.12);
   --c-scrollbar: #c2c6d8;
   --c-scrollbar-border: #d4daea;
 
@@ -45,8 +56,10 @@
   --c-ink-soft: #c3c9d4;
   --c-logo-ink: #ffffff; /* on-dark 워드마크 — handoff 10a */
   --c-sub: #9aa3b2;
-  --c-muted: #7e8798;
-  --c-faint: #5c6474;
+  /* 다크도 같은 이유로 한 칸씩 올린다(어두운 쪽은 밝게 해야 대비가 오른다).
+     카드 배경 위 faint 2.71 → 3.41. 라이트만큼 심하진 않았지만 10px 코드는 여기서도 얇았다. */
+  --c-muted: #8a94a6;
+  --c-faint: #6b7484;
   --c-hint: #6e7686;
 
   --c-card: #1a2130;
@@ -60,6 +73,9 @@
   --c-shadow-strong: rgba(0, 0, 0, 0.6);
   --c-marker: rgba(231, 234, 241, 0.4);
   --c-blue-tint: rgba(77, 141, 255, 0.16);
+  --c-hot-tint: rgba(255, 154, 77, 0.16);
+  --c-cold-tint: rgba(94, 168, 216, 0.16);
+  --c-mania-tint: rgba(255, 107, 129, 0.16);
   --c-scrollbar: #2b3344;
   --c-scrollbar-border: #0e131c;
 }
@@ -323,6 +339,44 @@ body {
 }
 .hz-mdd-link:hover {
   color: var(--c-blue);
+}
+
+/* 주요 종목 리포트의 언급 추이 막대. 평소엔 마지막 날만 진하고, 차트에 마우스를
+   올리면 가리키고 있는 날만 진해진다(나머지는 더 옅어져 어디를 보고 있는지 분명해진다).
+   서버 컴포넌트라 인라인 호버를 못 줘서 여기 클래스로 둔다.
+   규칙 순서가 곧 우선순위다 — :hover 규칙이 .hz-bar-last 뒤에 와야 마우스를 올렸을 때
+   마지막 날도 같이 옅어진다(안 그러면 진한 막대가 둘이 된다). */
+.hz-bars .hz-bar {
+  opacity: 0.45;
+  transition: opacity 0.12s ease;
+}
+.hz-bars .hz-bar-last { opacity: 0.95; }
+.hz-bars:hover .hz-bar { opacity: 0.3; }
+.hz-bars .hz-bar-col:hover .hz-bar { opacity: 1; }
+.hz-bars .hz-bar-date { transition: color 0.12s ease; }
+.hz-bars .hz-bar-col:hover .hz-bar-date { color: var(--c-sub); }
+
+/* 카드 바닥에 붙는 옅은 버튼형 링크(모니터링 현황의 "채널 등록 신청"). 파란 글자만
+   덩그러니 떠 있으면 눌리는 것인지 알기 어려워, 테두리를 줘 버튼으로 읽히게 한다.
+   서버 컴포넌트라 인라인 호버를 못 줘서 여기 클래스로 둔다. */
+.hz-btn-soft {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 38px;
+  border-radius: 11px;
+  border: 1px solid var(--c-line);
+  background: var(--c-bg);
+  color: var(--c-blue);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: border-color 0.14s ease, background 0.14s ease;
+}
+.hz-btn-soft:hover {
+  border-color: var(--c-blue);
+  background: var(--c-blue-tint);
 }
 
 /* 사이드바 로고 → 홈 링크. 워드마크 색을 건드리면 브랜드가 흐트러지므로
