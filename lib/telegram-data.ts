@@ -68,17 +68,25 @@ export async function getTelegramSummary(): Promise<TelegramSummary> {
     .from("telegram_message_stocks")
     .select("id", { count: "exact", head: true });
 
-  // 서로 다른 채널 수를 세려면 행을 다 봐야 한다 — 페이징 없이 select 하면 1000행에서
-  // 잘려 활성 채널이 실제보다 적게 나온다(7일 메시지가 1,805건인데 1,000건만 보여
-  // 12개 채널이 8개로 표시되던 버그).
-  const recent = await fetchAllRows<{ channel_handle: string }>((from, to) =>
-    db
-      .from("telegram_messages")
-      .select("channel_handle")
-      .gte("posted_at", daysAgoISO(7))
-      .range(from, to),
-  );
-  const activeChannels = new Set(recent.map((r) => r.channel_handle)).size;
+  // 활성 채널 = 최근 7일 안에 글을 올린 채널.
+  // 예전엔 7일치 메시지를 전부 훑어 distinct 를 셌다. 채널이 12개(2천 행)일 땐 됐지만
+  // 317개면 같은 창이 수만 행이라 렌더마다 1,000행씩 수십 번 왕복한다. 파이프라인이
+  // 이미 채널별로 같은 7일 창을 세어 두므로(channel_stats.weekly_posts) 그걸 읽는다.
+  // 한 채널당 날짜별 한 행이라, 최신 날짜로 좁히면 조회는 채널 수만큼이다.
+  const { data: lastStat } = await db
+    .from("telegram_channel_stats")
+    .select("date")
+    .not("weekly_posts", "is", null)
+    .order("date", { ascending: false })
+    .limit(1);
+  const statDate = lastStat?.[0]?.date as string | undefined;
+  const { data: weekly } = statDate
+    ? await db
+        .from("telegram_channel_stats")
+        .select("channel_handle,weekly_posts")
+        .eq("date", statDate)
+    : { data: [] as { channel_handle: string; weekly_posts: number | null }[] };
+  const activeChannels = (weekly ?? []).filter((r) => (r.weekly_posts ?? 0) > 0).length;
   // 행을 세면 PostgREST 기본 1000행 상한에 걸려 항상 1,000이 된다 — count 쿼리로 정확히.
   const { count: messages7dCount } = await db
     .from("telegram_messages")
@@ -134,16 +142,29 @@ async function loadStockDaily(days: number): Promise<{ rows: DailyRow[]; dates: 
   return { rows, dates };
 }
 
-/** 채널 핸들→(제목, 사진). photo 컬럼이 아직 없는 환경(마이그레이션 016 이전)에서도 안 깨지게 폴백. */
-async function channelMeta(): Promise<{ titleOf: Map<string, string>; photoOf: Map<string, string | null> }> {
+/**
+ * 채널 핸들→(제목, 사진). photo 컬럼이 아직 없는 환경(마이그레이션 016 이전)에서도 안 깨지게 폴백.
+ *
+ * photo 는 base64 data URI(건당 ~12KB)라 전 채널을 다 읽으면 채널이 317개인 지금
+ * 한 번에 3.6MB가 되고, 이 함수는 카드마다 불린다. 화면에 실제로 그리는 채널은
+ * 10~20개뿐이므로 필요한 핸들만 넘길 것(안 넘기면 종전대로 전체를 읽는다).
+ */
+async function channelMeta(
+  handles?: string[],
+): Promise<{ titleOf: Map<string, string>; photoOf: Map<string, string | null> }> {
   const db = getSupabaseAdmin();
+  const only = handles ? [...new Set(handles)] : null;
+  const pick = (cols: string) => {
+    const q = db.from("telegram_channels").select(cols);
+    return only ? q.in("handle", only) : q;
+  };
   let rows: { handle: string; title: string | null; photo?: string | null }[] = [];
-  const withPhoto = await db.from("telegram_channels").select("handle,title,photo");
+  const withPhoto = await pick("handle,title,photo");
   if (withPhoto.error) {
-    const basic = await db.from("telegram_channels").select("handle,title");
-    rows = (basic.data ?? []) as typeof rows;
+    const basic = await pick("handle,title");
+    rows = (basic.data ?? []) as unknown as typeof rows;
   } else {
-    rows = (withPhoto.data ?? []) as typeof rows;
+    rows = (withPhoto.data ?? []) as unknown as typeof rows;
   }
   return {
     titleOf: new Map(rows.map((c) => [c.handle, c.title ?? c.handle])),
@@ -433,7 +454,7 @@ export async function getTrendingMessages(
     .limit(200);
   if (!msgs?.length) return [];
 
-  const { titleOf, photoOf } = await channelMeta();
+  const { titleOf, photoOf } = await channelMeta(msgs.map((m) => m.channel_handle));
 
   const top = msgs
     .map((m) => ({
@@ -684,10 +705,14 @@ export type ChannelRank = {
 };
 
 /** 채널 파워 랭킹 — 가장 최근 날짜의 Influence Score. */
-export async function getChannelRanking(): Promise<ChannelRank[]> {
+export async function getChannelRanking(limit = 50): Promise<ChannelRank[]> {
   const db = getSupabaseAdmin();
   // 채널 12개 × 하루 1행이라 석 달이면 1000행을 넘긴다 — 그때 잘리면 순위 변동 비교용
   // 과거 스냅샷이 사라지므로 미리 페이징해 둔다.
+  // 창을 최근 14일로 자른 건 채널이 317개가 되면서다 — 전 기간을 읽으면 하루 317행씩
+  // 늘어난 표를 렌더마다 1,000행 단위로 수십 번 왕복한다. 필요한 건 최신 스냅샷과
+  // 5일 이상 이전 비교분 하나뿐이라 14일이면 넉넉하다(대신 파이프라인이 2주 넘게
+  // 멈추면 이 카드는 빈다 — 그 상황은 실패 알림으로 먼저 잡힌다).
   const stats = await fetchAllRows<{
     channel_handle: string;
     date: string;
@@ -700,6 +725,7 @@ export async function getChannelRanking(): Promise<ChannelRank[]> {
       .from("telegram_channel_stats")
       .select("channel_handle,date,subscriber_count,influence_score,view_rate,is_growing")
       .not("influence_score", "is", null)
+      .gte("date", daysAgoISO(14).slice(0, 10))
       .order("date", { ascending: false })
       .range(from, to),
   );
@@ -726,23 +752,27 @@ export async function getChannelRanking(): Promise<ChannelRank[]> {
   const prevRanks = baseDate ? rankOn(baseDate) : null;
   const currRanks = rankOn(latestDate);
 
-  const { titleOf, photoOf } = await channelMeta();
+  // 순위는 전 채널로 매기고(위 currRanks/prevRanks), 내려보내는 목록만 자른다.
+  // 카드는 10개씩 '더보기'로 펼치는데, 자르지 않으면 317개 행이 사진(건당 ~12KB)까지
+  // 달려 페이지 payload에 통째로 실린다.
+  const ranked = [...latest.values()]
+    .sort((a, b) => Number(b.influence_score) - Number(a.influence_score))
+    .slice(0, limit);
+  const { titleOf, photoOf } = await channelMeta(ranked.map((r) => r.channel_handle));
 
-  return [...latest.values()]
-    .map((r) => ({
-      handle: r.channel_handle,
-      title: titleOf.get(r.channel_handle) ?? r.channel_handle,
-      photo: photoOf.get(r.channel_handle) ?? null,
-      rankChange:
-        prevRanks && prevRanks.has(r.channel_handle) && currRanks.has(r.channel_handle)
-          ? (prevRanks.get(r.channel_handle) as number) - (currRanks.get(r.channel_handle) as number)
-          : null,
-      subscriberCount: r.subscriber_count,
-      influenceScore: Number(r.influence_score),
-      viewRate: r.view_rate != null ? Number(r.view_rate) : null,
-      isGrowing: !!r.is_growing,
-    }))
-    .sort((a, b) => b.influenceScore - a.influenceScore);
+  return ranked.map((r) => ({
+    handle: r.channel_handle,
+    title: titleOf.get(r.channel_handle) ?? r.channel_handle,
+    photo: photoOf.get(r.channel_handle) ?? null,
+    rankChange:
+      prevRanks && prevRanks.has(r.channel_handle) && currRanks.has(r.channel_handle)
+        ? (prevRanks.get(r.channel_handle) as number) - (currRanks.get(r.channel_handle) as number)
+        : null,
+    subscriberCount: r.subscriber_count,
+    influenceScore: Number(r.influence_score),
+    viewRate: r.view_rate != null ? Number(r.view_rate) : null,
+    isGrowing: !!r.is_growing,
+  }));
 }
 
 export type RisingChannel = {
@@ -761,10 +791,17 @@ export type RisingChannel = {
  */
 export async function getRisingChannels(limit = 10): Promise<RisingChannel[]> {
   const db = getSupabaseAdmin();
-  const { data } = await db
-    .from("telegram_channel_stats")
-    .select("channel_handle,date,subscriber_count")
-    .gte("date", daysAgoISO(8).slice(0, 10));
+  // 채널 하나당 하루 한 행이라 8일 창은 채널 수 × 8 이다 — 채널이 317개면 2,500행이
+  // 넘어 페이징 없이는 1,000행에서 조용히 잘린다. 잘리면 대부분 채널이 스냅샷 한 개만
+  // 잡혀 아래 `arr.length < 2` 에서 탈락하고, 증감 순위가 실제와 무관해진다.
+  const data = await fetchAllRows<{ channel_handle: string; date: string; subscriber_count: number | null }>(
+    (from, to) =>
+      db
+        .from("telegram_channel_stats")
+        .select("channel_handle,date,subscriber_count")
+        .gte("date", daysAgoISO(8).slice(0, 10))
+        .range(from, to),
+  );
 
   const byCh = new Map<string, { d: string; s: number }[]>();
   for (const r of data ?? []) {
@@ -773,8 +810,6 @@ export async function getRisingChannels(limit = 10): Promise<RisingChannel[]> {
     arr.push({ d: r.date, s: r.subscriber_count });
     byCh.set(r.channel_handle, arr);
   }
-  const { titleOf, photoOf } = await channelMeta();
-
   // 스냅샷은 백필이 안 돼 오늘부터 하루씩 쌓인다 — 지금 잰 구간이 며칠인지 그대로 알린다.
   const snapDates = [...new Set((data ?? []).map((r) => r.date))].sort();
   const spanDays = snapDates.length
@@ -783,30 +818,39 @@ export async function getRisingChannels(limit = 10): Promise<RisingChannel[]> {
       )
     : 0;
 
-  const real: RisingChannel[] = [];
-  const flat: RisingChannel[] = [];
+  type Delta = { handle: string; subscriberCount: number; delta: number };
+  const real: Delta[] = [];
+  const flat: Delta[] = [];
   for (const [h, arr] of byCh) {
     if (arr.length < 2) continue;
     arr.sort((a, b) => a.d.localeCompare(b.d));
     const delta = arr[arr.length - 1].s - arr[0].s;
     (delta > 0 ? real : flat).push({
       handle: h,
-      title: titleOf.get(h) ?? h,
-      photo: photoOf.get(h) ?? null,
       subscriberCount: arr[arr.length - 1].s,
-      delta7d: delta,
-      isPlaceholder: false,
-      spanDays,
+      delta,
     });
   }
-  real.sort((a, b) => b.delta7d - a.delta7d);
-  flat.sort((a, b) => b.delta7d - a.delta7d);
+  real.sort((a, b) => b.delta - a.delta);
+  flat.sort((a, b) => b.delta - a.delta);
 
   // 카드 정원은 항상 채운다. 실제로 늘어난 채널을 먼저 넣고, 모자라면 증감이 없거나
   // 줄어든 채널까지 순서대로 끌어온다(표시되는 증감은 실제값 그대로).
   // 지금은 모니터링 채널이 12개뿐이라 "늘어난 곳"만 세면 8개 안팎에서 멈춘다 —
   // 시트에 채널이 늘면 이 보충분은 자연히 밀려나 사라진다.
-  const filled = [...real, ...flat].slice(0, limit);
+  const top = [...real, ...flat].slice(0, limit);
+  // 제목·사진은 여기서 자른 뒤에 읽는다 — 스냅샷이 있는 전 채널(수백 개)의 base64
+  // 사진을 먼저 끌어오면 화면에 쓰는 건 이 10개뿐인데 수 MB를 낭비한다.
+  const { titleOf, photoOf } = await channelMeta(top.map((t) => t.handle));
+  const filled: RisingChannel[] = top.map((t) => ({
+    handle: t.handle,
+    title: titleOf.get(t.handle) ?? t.handle,
+    photo: photoOf.get(t.handle) ?? null,
+    subscriberCount: t.subscriberCount,
+    delta7d: t.delta,
+    isPlaceholder: false,
+    spanDays,
+  }));
   // 그래도 모자라면(채널 수 자체가 정원보다 적으면) '빈 행'으로 자리만 채운다.
   // 예전엔 마지막 행을 복제했는데, 그러면 같은 채널이 두 번 표시돼 없는 데이터를
   // 지어내는 꼴이었다 — 카드 높이를 지키자고 사용자에게 거짓을 보일 순 없다.
