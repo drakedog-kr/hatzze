@@ -148,8 +148,17 @@ SCHEMA = {
     "additionalProperties": False,
 }
 
+# 이 시간을 넘겨도 안 끝난 배치는 포기한다(결과 보관이 24시간이라 그 뒤엔 기다릴
+# 이유가 없다). 포기하지 않으면 그 메시지들이 영구히 '처리 중'으로 묶인다.
+STALE_HOURS = 26
+
 URL_RE = re.compile(r"https?://\S+")
 WS_RE = re.compile(r"\s+")
+
+
+def _hours_since(iso: str) -> float:
+    then = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    return (datetime.now(timezone.utc) - then).total_seconds() / 3600
 
 
 def body_key(text: str) -> str:
@@ -164,16 +173,22 @@ def body_key(text: str) -> str:
 
 
 def load_recent_messages(db) -> list[dict]:
-    """최근 SCAN_DAYS 일 메시지를 페이지를 이어 받아 읽는다(1,000행 상한 회피)."""
+    """최근 SCAN_DAYS 일 메시지를 페이지를 이어 받아 읽는다(1,000행 상한 회피).
+
+    **정렬 키는 반드시 유일해야 한다(id).** posted_at·analyzed_at 처럼 값이 겹치는
+    컬럼으로 정렬하면 동일값 구간의 순서가 요청마다 보장되지 않아, 페이지 경계에서
+    행이 조용히 빠지거나 겹친다. 실측으로 4,054행 표를 4,029행으로 읽었고, 그렇게
+    빠진 행은 '미분류'로 보여 이미 분류한 메시지를 다시 제출했다(=이중 과금).
+    """
     since = (datetime.now(timezone.utc) - timedelta(days=SCAN_DAYS)).isoformat()
     rows: list[dict] = []
     start = 0
     while True:
         page = (
             db.table("telegram_messages")
-            .select("channel_handle,message_id,posted_at,text")
+            .select("id,channel_handle,message_id,posted_at,text")
             .gte("posted_at", since)
-            .order("posted_at")
+            .order("id")
             .range(start, start + PAGE - 1)
             .execute()
             .data
@@ -199,9 +214,9 @@ def load_recent_analysis(db) -> dict[tuple[str, int], dict]:
     while True:
         page = (
             db.table("telegram_message_analysis")
-            .select("channel_handle,message_id,sentiment,keywords,analyzed_at")
+            .select("id,channel_handle,message_id,sentiment,keywords,analyzed_at")
             .gte("analyzed_at", since)
-            .order("analyzed_at")
+            .order("id")  # 유일 키로 정렬해야 페이지 경계에서 행이 빠지지 않는다
             .range(start, start + PAGE - 1)
             .execute()
             .data
@@ -309,8 +324,21 @@ def collect_batches(client: Anthropic, db) -> int:
             print(f"[수거] {bid} 상태 조회 실패: {type(exc).__name__}: {exc}")
             continue
         if status != "ended":
-            age = row["submitted_at"]
-            print(f"[수거] {bid} 아직 {status} (제출 {age}) — 다음 실행에서 다시 봅니다.")
+            # 끝나지 않는 배치를 그대로 두면 그 메시지들이 영구히 '처리 중'으로 묶여
+            # 다시는 분류되지 않는다. 결과 보관은 24시간이라 그 뒤로는 기다릴 이유도 없다.
+            if _hours_since(row["submitted_at"]) > STALE_HOURS:
+                db.table("telegram_analysis_batches").update(
+                    {
+                        "collected_at": datetime.now(timezone.utc).isoformat(),
+                        "note": f"{STALE_HOURS}시간 넘게 {status} — 포기(메시지는 재제출됨)",
+                    }
+                ).eq("batch_id", bid).execute()
+                print(f"[수거] {bid} {STALE_HOURS}시간 넘게 {status} — 포기합니다(재제출 대상).")
+                continue
+            print(
+                f"[수거] {bid} 아직 {status} (제출 {row['submitted_at']}) "
+                "— 다음 실행에서 다시 봅니다."
+            )
             continue
 
         payload = row["payload"] or {}
