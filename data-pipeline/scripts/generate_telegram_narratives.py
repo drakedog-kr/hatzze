@@ -134,9 +134,27 @@ def optimism(positive: int, negative: int) -> int | None:
     return round(positive / decided * 100)
 
 
-# 낙관+비관이 이만큼은 돼야 비율에 의미가 있다. 카드(getEcosystemSentiment)와 같은 값 —
-# 두 곳이 다르면 총평이 화면에 없는 테마를 인용하게 된다.
+# ── 총평이 볼 테마: 카드와 **글자 그대로 같은 집합**이어야 한다 ────────────────────
+#
+# 총평은 화면에서 테마 막대 바로 왼쪽에 붙는다. 총평이 인용한 숫자를 독자가 확인할
+# 곳은 그 막대뿐이므로, 두 곳이 고르는 테마 집합이 어긋나면 확인할 방법이 없는 숫자가
+# 화면에 나간다. 집합을 정하는 조건은 셋(정렬 키·표본 하한·개수)이고 셋 다 같아야 한다.
+#
+#   정렬 키   : total 내림차순      ← 양쪽 동일
+#   표본 하한 : MIN_DECIDED         ← lib/telegram-data.ts THEME_MIN_DECIDED 와 같은 값
+#   개수      : THEME_TOP_N         ← lib/telegram-data.ts THEME_TOP_N 과 같은 값
+#
+# ⚠️ **한쪽만 고치면 안 된다.** Python 과 TS 라 import 로 공유할 수 없어 손으로 맞춘
+# 사본이다(lib/stock-themes.ts ↔ config/stock_themes.py 와 같은 관례). 같은 병이 두 번
+# 났다: 2026-07-22 에는 하한만 어긋나 표본 서너 건짜리 테마의 "100% 긍정"이 총평에만
+# 나왔고("방산 93%, 조선 100%"), 그때 하한만 맞추고 개수를 안 맞춘 탓에 2026-07-26 에
+# 5·6위 테마가 총평에만 나왔다("인터넷·플랫폼 96%, 방산 90%" — 옆 막대엔 상위 4개뿐).
+#
+# 맞추는 방향은 **총평을 카드에 맞춘다**(4개). 카드가 4개인 건 반칸 카드에 막대 4줄이
+# 왼쪽 종합 막대와 높이가 맞는 한계라 늘리기 어렵고, 총평은 어차피 상위 몇 개만
+# 인용하기 때문이다. 프롬프트가 요구하는 "테마 최소 2개 언급"에도 4개면 충분하다.
 MIN_DECIDED = 8
+THEME_TOP_N = 4
 
 
 def tone_label(optimism_pct: int) -> str:
@@ -202,14 +220,16 @@ def build_brief_digest(db, latest: str) -> str | None:
         lines.append(f"[낙관도 추이] {' → '.join(trail)}")
 
     lines.append("")
-    lines.append(f"[테마별] 낙관도 (중립 제외 · 낙관+비관 {MIN_DECIDED}건 이상만)")
-    # 카드(lib/telegram-data.getEcosystemSentiment)와 **같은 하한**으로 거른다.
-    # 카드는 낙관+비관이 MIN_DECIDED 미만인 테마를 "한두 건에 100:0이 찍혀 실제보다
-    # 단정적으로 보인다"는 이유로 숨기는데, 총평에는 그 필터가 없어서 모델이 표본
-    # 서너 건짜리 테마의 "100% 긍정"을 그대로 인용했다 — 화면에 없는 숫자를 총평이
-    # 말하니 사용자가 확인할 방법이 없었다(2026-07-22 "방산 93%, 조선 100%").
-    # 프롬프트로 "표본 적은 테마는 빼라"고 시켜도 모델에게 표본 수를 안 줬으니
-    # 판단할 근거가 없었다. 아예 안 보여주는 게 확실하다.
+    # "화면에 뜨는 것과 같다"를 프롬프트에도 적어 둔다. 모델이 인용해도 되는 테마의
+    # 범위가 곧 화면의 범위라는 걸, digest 를 읽는 사람도 모델도 같이 보게 하려는 것이다.
+    lines.append(
+        f"[테마별] 낙관도 (중립 제외 · 낙관+비관 {MIN_DECIDED}건 이상 · "
+        f"화면 막대에 뜨는 상위 {THEME_TOP_N}개입니다)"
+    )
+    # 카드(lib/telegram-data.getEcosystemSentiment)와 **같은 정렬·하한·개수**로 고른다.
+    # 셋 다 맞아야 총평과 옆 막대가 같은 테마를 말한다(위 THEME_TOP_N 주석 참고).
+    # 프롬프트로 "표본 적은 테마는 빼라"고 시켜도 모델에게 표본 수를 안 줬으니 판단할
+    # 근거가 없었다. 화면에 없는 테마는 아예 digest 에 넣지 않는 게 확실하다.
     themes = sorted(
         (
             (s, c)
@@ -218,7 +238,7 @@ def build_brief_digest(db, latest: str) -> str | None:
         ),
         key=lambda kv: kv[1]["total"],
         reverse=True,
-    )[:6]
+    )[:THEME_TOP_N]
     for scope, c in themes:
         o = optimism(c["positive"], c["negative"])
         if o is None:
