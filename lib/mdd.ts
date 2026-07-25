@@ -219,15 +219,38 @@ function drawdownCharacter(eps: Episode[], currentDd: number): DrawdownCharacter
   };
 }
 
-/** 낙폭 시계열을 최대 maxPoints 개로 균등 다운샘플한다(마지막 점은 항상 포함). */
-function downsample(series: DrawdownPoint[], maxPoints: number): DrawdownPoint[] {
-  if (series.length <= maxPoints) return series;
-  const step = Math.ceil(series.length / maxPoints);
-  const out: DrawdownPoint[] = [];
-  for (let i = 0; i < series.length; i += step) out.push(series[i]);
-  const last = series[series.length - 1];
-  if (out[out.length - 1] !== last) out.push(last);
-  return out;
+/**
+ * 낙폭 시계열을 화면용으로 줄인다. 거래소 차트와 같은 방식 — **일정한 시간 간격으로
+ * 뽑는다**(10년은 2주에 한 점, 1년은 매일). 기간이 길수록 간격이 굵어져 선이 완만해지고,
+ * 짧으면 간격이 1일이라 오르내림이 그대로 보인다.
+ *
+ * 두 번 갈아엎고 여기로 왔다.
+ * 1) 처음엔 이 방식이었는데 극값 보장이 없어, 10년치 삼성전자의 실제 최저일
+ *    (2024-11-14 −45.2%)이 통째로 빠지고 차트의 '기간 최저점' 표시가 엉뚱한 날
+ *    (2025-02-05 −41.9%)을 가리켰다.
+ * 2) 구간마다 최저·최고를 둘 다 남겨 봤다가 톱니가 됐고, LTTB(구간에서 가장 튀는 점을
+ *    고르는 방식)로 바꿨더니 이번엔 굴곡이 과장돼 10년 차트가 지그재그로 뒤덮였다.
+ *    장기 차트는 원래 완만해야 읽힌다.
+ *
+ * 그래서 원래의 등간격 샘플링으로 돌아오되, **최저점 한 점만 따로 끼워 넣는다.**
+ * 그 점이 빠지는 게 애초의 버그였고, 하나 넣는 걸로 표시와 헤드라인이 다시 맞는다.
+ */
+function downsample(series: DrawdownPoint[], targetPoints: number): DrawdownPoint[] {
+  const n = series.length;
+  if (n <= targetPoints || targetPoints < 3) return series;
+
+  const step = Math.ceil(n / targetPoints);
+  const keep = new Set<number>();
+  for (let i = 0; i < n; i += step) keep.add(i);
+  keep.add(0);
+  keep.add(n - 1);
+
+  // 기간 최저점은 등간격 격자에 안 걸려도 반드시 남긴다.
+  let trough = 0;
+  for (let i = 1; i < n; i++) if (series[i].dd < series[trough].dd) trough = i;
+  keep.add(trough);
+
+  return [...keep].sort((x, y) => x - y).map((i) => series[i]);
 }
 
 /** 종가 시계열 하나를 받아 화면에 필요한 모든 수치를 낸다. */
@@ -266,7 +289,11 @@ export function analyzeDrawdown(bars: Bar[]): MddAnalysis | null {
     deeperThanNowPct: (deeperDays / ds.length) * 100,
     mdd,
     mddDate,
-    underwater: downsample(ds, 220),
+    // 목표 250점 = 샘플 간격이 기간에 따라 저절로 정해진다(거래소 차트와 같은 방식).
+    //   1년 250거래일  → 간격 1일  = 일봉처럼 오르내림이 다 보인다
+    //   5년 1,230일    → 간격 5일  ≈ 주봉
+    //   10년 2,470일   → 간격 10일 ≈ 2주봉, 선이 완만해진다
+    underwater: downsample(ds, 250),
     recovery: recoveryStats(eps, last.dd),
     character: drawdownCharacter(eps, last.dd),
     topDrawdowns: [...eps].sort((a, b) => a.depth - b.depth).slice(0, 5),
