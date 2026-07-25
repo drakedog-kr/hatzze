@@ -54,12 +54,16 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hr / 24)}일 전`;
 }
 
-/** 종목 카드 → 그 종목의 MDD 정밀분석으로 잇는 작은 링크. 이름은 MDD 페이지가 code 로
-   찾으므로 URL 엔 code·market 만 실어 깔끔하게 둔다(코스닥은 market 으로 .KQ 심볼이 된다). */
+/** 그 종목의 MDD 정밀분석 주소. 이름은 MDD 페이지가 code 로 찾으므로 URL 엔 code·market
+   만 실어 깔끔하게 둔다(코스닥은 market 으로 .KQ 심볼이 된다). */
+function mddHref(code: string, market: string | null): string {
+  return `/mdd?code=${code}${market ? `&market=${market}` : ""}`;
+}
+
+/** 종목 카드 → 그 종목의 MDD 정밀분석으로 잇는 작은 링크. */
 function MddLink({ code, market }: { code: string; market: string | null }) {
-  const href = `/mdd?code=${code}${market ? `&market=${market}` : ""}`;
   return (
-    <Link href={href} className="hz-mdd-link">
+    <Link href={mddHref(code, market)} className="hz-mdd-link">
       MDD 정밀분석
       <Icon name="arrow_outward" style={{ fontSize: 13 }} />
     </Link>
@@ -568,9 +572,14 @@ export default async function KaderaPage() {
                   이전 방식은 38.5%만 넘으면 여러 줄이 한꺼번에 100%로 꽉 차 1위가 늘
                   만땅으로 보였는데, 1위 기준이면 정의상 한 줄만 가득 찬다. 절대값은
                   아래 "점유율 15.4%" 로 그대로 적는다(이슈 키워드 카드와 같은 문법). */}
-              {themes.map((t) => (
+              {themes.map((t, i) => (
                 <div
                   key={t.theme}
+                  className="hz-theme-row"
+                  /* 마우스가 없어도(키보드·터치) 종목 목록을 열 수 있게 초점을 받는다.
+                     언급된 종목이 없는 테마는 열 것도 없으니 초점도 주지 않는다. */
+                  tabIndex={t.stocks.length ? 0 : undefined}
+                  aria-label={t.stocks.length ? `${t.theme} 테마를 이룬 종목 ${t.stockCount}개 보기` : undefined}
                   style={{ display: "grid", gridTemplateColumns: "17px minmax(0,1fr) 62px", alignItems: "start", gap: 12 }}
                 >
                   <span style={{ ...rankNum, paddingTop: 2 }}>{t.rank}</span>
@@ -641,6 +650,27 @@ export default async function KaderaPage() {
                   >
                     <Sparkline data={t.series} />
                   </span>
+
+                  {/* 이 테마의 점유율을 만든 종목 목록. 줄에 마우스를 올리거나 초점이
+                      가면 열린다(CSS 만, globals.css 의 .hz-theme-pop).
+                      아래쪽 줄은 위로 펼친다 — 아래로 열면 카드를 벗어나 다음 카드를 덮는다. */}
+                  {t.stocks.length > 0 && (
+                    <div className={`hz-theme-pop${i >= themes.length - 4 ? " hz-theme-pop-up" : ""}`}>
+                      <div className="hz-theme-pop-head">최근 3일 언급 {t.stockCount}종목 · 주목도순</div>
+                      {t.stocks.map((s) => (
+                        <Link key={s.code} href={mddHref(s.code, s.market)} className="hz-theme-pop-item">
+                          <span className="hz-theme-pop-name">{s.name}</span>
+                          <span className="hz-theme-pop-cnt">{s.mentions}회</span>
+                          {/* Icon 은 클래스를 받지 않으니 한 겹 싼다 — 화살표는 그 줄에
+                              마우스를 올렸을 때만 드러난다(칸은 늘 잡혀 있다). */}
+                          <span className="hz-theme-pop-go">
+                            <Icon name="arrow_outward" style={{ fontSize: 13 }} />
+                          </span>
+                        </Link>
+                      ))}
+                      <div className="hz-theme-pop-foot">종목을 누르면 MDD 정밀분석이 열립니다.</div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
