@@ -1,6 +1,16 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // 빌드 디렉터리를 환경변수로 가를 수 있게 한다. 기본값은 그대로 ".next" 라
+  // Vercel·CI·`npm run dev`·`npm run build` 의 동작은 하나도 바뀌지 않는다.
+  //
+  // 이게 필요한 이유: 같은 폴더에서 next 프로세스를 둘 이상 돌리면 서로의 빌드
+  // 디렉터리를 덮어써서 라우트 매니페스트가 날아간다. 그러면 API 는 200 으로
+  // 멀쩡히 답하는데 페이지만 404 나 무한 대기가 된다(서버 문제로 오진하기 딱 좋다).
+  // 포트를 달리 줘도 소용없다 — 충돌하는 건 포트가 아니라 이 디렉터리다.
+  // 로컬 프로덕션 미리보기(`npm run build:local`)가 dev 서버를 죽이던 게 그 경우다.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
+
   // OG 이미지(app/opengraph-image.tsx)가 런타임에 읽는 Pretendard OTF를 프로덕션
   // 번들에 확실히 포함시킨다 — 없으면 배포 환경에서 폰트 로딩이 실패할 수 있다.
   outputFileTracingIncludes: {

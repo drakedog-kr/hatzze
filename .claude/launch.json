@@ -9,9 +9,16 @@
       "autoPort": true
     },
     {
+      "name": "hatzze-dev-alt",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:alt"],
+      "port": 3001,
+      "autoPort": true
+    },
+    {
       "name": "hatzze-prod",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["start"],
+      "runtimeArgs": ["run", "start:local"],
       "port": 3100,
       "autoPort": true
     }
