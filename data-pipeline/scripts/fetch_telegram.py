@@ -19,6 +19,7 @@ DB엔 telegram_messages 테이블이 있어야 한다(migration_009).
 from __future__ import annotations
 
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -37,6 +38,15 @@ from common.timeutil import KST  # noqa: E402
 
 WINDOW_DAYS = 7  # 매 실행 재수집하는 창(= 첫 실행 백필 범위)
 MAX_SCAN_PER_CHANNEL = 2000  # 폭주 채널 안전 상한(보통 창 경계에서 먼저 멈춤)
+# 채널마다 get_entity(=ResolveUsername) 를 부르므로 목록이 300개대면 처음 보는
+# 유저네임을 몇 분 안에 300번 넘게 푼다 — FloodWait 이 가장 잘 나는 호출이다.
+# sync_telegram_channels.py 가 바로 앞 스텝에서 같은 목록을 이미 한 번 풀지만,
+# StringSession 은 저장하지 않으므로 그때 채워진 엔티티 캐시가 이 프로세스로
+# 넘어오지 않는다(= 같은 이름을 두 번 푼다). 그래서 그쪽과 같은 방어를 여기에도 건다.
+SLEEP_BETWEEN_CHANNELS_SEC = 0.5
+# Telethon 기본값(60초)보다 올려, 짧은 FloodWait 은 예외 대신 대기로 흡수한다.
+# 이보다 긴 대기는 그대로 예외 → 그 채널만 건너뛴다(다음 실행에서 다시 잡는다).
+FLOOD_SLEEP_THRESHOLD_SEC = 180
 
 
 def load_active_handles(client) -> list[str]:
@@ -102,14 +112,21 @@ def main() -> None:
     )
 
     total = 0
+    failed: list[str] = []
     with TelegramClient(
-        StringSession(TELEGRAM_SESSION), int(TELEGRAM_API_ID), TELEGRAM_API_HASH
+        StringSession(TELEGRAM_SESSION),
+        int(TELEGRAM_API_ID),
+        TELEGRAM_API_HASH,
+        flood_sleep_threshold=FLOOD_SLEEP_THRESHOLD_SEC,
     ) as tg:
-        for handle in handles:
+        for i, handle in enumerate(handles):
+            if i:
+                time.sleep(SLEEP_BETWEEN_CHANNELS_SEC)
             try:
                 rows = collect_channel(tg, handle, cutoff)
             except Exception as exc:  # noqa: BLE001
                 print(f"  {handle:<18} 실패: {type(exc).__name__}: {exc}")
+                failed.append(handle)
                 continue
 
             total += len(rows)
@@ -128,6 +145,16 @@ def main() -> None:
         print(f"\n--dry-run: 총 {total}건 수집(표시만, DB 안 씀).")
     else:
         print(f"\n[Supabase] telegram_messages upsert 완료: 총 {total}건")
+
+    # 실패는 채널마다 한 줄씩 이미 찍히지만, 300줄 로그에 섞이면 눈에 안 띈다.
+    # 워크플로의 실패 알림 집계에 텔레그램 스텝은 안 들어가 있어(의도적 분리) 이
+    # 줄이 사실상 유일한 신호다 — 건수가 계속 늘면 FloodWait 을 의심할 것.
+    if failed:
+        print(
+            f"[경고] 채널 {len(failed)}/{len(handles)}개 수집 실패: "
+            + ", ".join(failed[:20])
+            + (f" 외 {len(failed) - 20}개" if len(failed) > 20 else "")
+        )
 
 
 if __name__ == "__main__":
