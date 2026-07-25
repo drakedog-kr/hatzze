@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import { cookies } from "next/headers";
 import "./globals.css";
 import AppShell from "./AppShell";
+import { SITE_NAME, SITE_URL } from "./seo";
 import { getLatestDailyScore } from "@/lib/data";
 import type { DailyScore } from "@/lib/data";
 
@@ -13,8 +14,6 @@ const pretendard = localFont({
   weight: "45 920",
 });
 
-const SITE_URL = "https://hatzze.fun";
-
 // 서치콘솔·서치어드바이저 소유확인 토큰. 값이 없으면 메타 태그 자체를 만들지 않는다
 // (content가 빈 태그는 두 콘솔 모두 '소유확인 실패'로 처리한다).
 const GOOGLE_VERIFICATION = process.env.GOOGLE_SITE_VERIFICATION;
@@ -22,7 +21,7 @@ const NAVER_VERIFICATION = process.env.NAVER_SITE_VERIFICATION;
 
 const TITLE = "hatzze | 데이터와 감성으로 읽는 시장";
 const DESCRIPTION =
-  "시장 지표와 감성 지표로 오늘의 코스피 과열도를 보여줍니다. 버핏지수·VKOSPI·레버리지 등 25개 지표를 매일 0~100 점수로.";
+  "오늘 코스피는 얼마나 뜨겁습니까. 버핏지수·VKOSPI·레버리지 등 25개 지표를 매일 하나의 과열도 점수로 환산합니다.";
 
 // opengraph-image.tsx(파일 컨벤션)가 openGraph/twitter 이미지를 자동으로 채운다.
 export const metadata: Metadata = {
@@ -35,7 +34,7 @@ export const metadata: Metadata = {
     type: "website",
     locale: "ko_KR",
     url: SITE_URL,
-    siteName: "hatzze",
+    siteName: SITE_NAME,
     title: TITLE,
     description: DESCRIPTION,
   },
@@ -105,7 +104,7 @@ export default async function RootLayout({
                   "@type": "WebSite",
                   "@id": `${SITE_URL}/#website`,
                   url: SITE_URL,
-                  name: "hatzze",
+                  name: SITE_NAME,
                   alternateName: "햇쩨",
                   description: DESCRIPTION,
                   inLanguage: "ko-KR",
@@ -114,7 +113,7 @@ export default async function RootLayout({
                 {
                   "@type": "Organization",
                   "@id": `${SITE_URL}/#organization`,
-                  name: "hatzze",
+                  name: SITE_NAME,
                   url: SITE_URL,
                   logo: `${SITE_URL}/icon.svg`,
                 },
