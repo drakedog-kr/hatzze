@@ -9,6 +9,9 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    // NEXT_DIST_DIR 로 가른 빌드 디렉터리(build:local, dev:alt). 안 막으면 빌드
+    // 산출물 87개 파일에서 에러 293건이 쏟아져 진짜 경고가 묻힌다. next.config.ts 참고.
+    ".next-*/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

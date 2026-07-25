@@ -6,6 +6,8 @@ data-pipeline/**/__pycache__/
 
 # next.js
 .next/
+# NEXT_DIST_DIR 로 가른 빌드 디렉터리(build:local, dev:alt). next.config.ts 참고.
+.next-*/
 out/
 build/
 
