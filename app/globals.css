@@ -284,6 +284,15 @@ body {
 /* 좁은 화면에선 240px 가 카드보다 넓어, 안쪽으로 열어도(start/end) 화면을 넘는다.
    폭을 화면에 비례해 줄여야 어느 자리에 붙어도 안에 들어온다(줄 수만 늘어난다). */
 @media (max-width: 560px) {
+  /* wide 가 아닌 기본 툴팁도 마찬가지다 — MDD 낙폭 차트의 "날짜 · 가격 · 낙폭"은
+     nowrap 이라 130px 쯤 되는데, 카드 오른쪽에 붙은 지점에서 화면을 넘었다(실측 17px).
+     끝쪽 15%만 방향을 트는 규칙으론 가운데~오른쪽 구간이 안 걸린다. max-content 라
+     짧은 툴팁은 그대로 짧고, 긴 것만 max-width 에 걸려 줄바꿈된다. */
+  .hz-tip::after {
+    white-space: normal;
+    width: max-content;
+    max-width: 58vw;
+  }
   .hz-tip-wide::after {
     width: min(240px, 58vw);
   }

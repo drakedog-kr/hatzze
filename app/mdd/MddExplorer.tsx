@@ -489,11 +489,13 @@ function Underwater({ series, mdd }: { series: DrawdownPoint[]; mdd: number }) {
           툴팁(hz-tip)을 낸다. 연도 라벨 높이(≈26px)만큼 아래로 남는 띠는 무시할 수준이다. */}
       <div style={{ position: "absolute", top: 0, left: `${(PAD_L / W) * 100}%`, right: 0, bottom: 26, display: "flex" }}>
         {series.map((p, i) => {
-          // 툴팁이 넓어서(날짜·가격·낙폭, nowrap) 가운데 정렬이면 양 끝 지점에서 컨테이너를
-          // 벗어난다 — 오른쪽으로 벗어나면 페이지에 가로 스크롤까지 생긴다. 끝쪽 15%는
-          // 안쪽으로 열리게 방향을 튼다.
+          // 툴팁이 넓어서(날짜·가격·낙폭) 가운데 정렬이면 끝쪽 지점에서 컨테이너를
+          // 벗어난다 — 오른쪽으로 벗어나면 페이지에 가로 스크롤까지 생긴다.
+          // 경계를 15/85 에서 25/75 로 넓혔다. 모바일에선 카드가 285px 로 좁아져 툴팁이
+          // 폭의 3/4를 차지하는 탓에, 85% 를 안 넘는 지점(실측 0.78)도 화면 밖으로 나갔다.
+          // 안쪽으로 열리는 구간이 넓어져도 넓은 화면에선 툴팁이 살짝 옆으로 붙을 뿐이다.
           const at = n <= 1 ? 0 : i / (n - 1);
-          const edge = at < 0.15 ? " hz-tip-start" : at > 0.85 ? " hz-tip-end" : "";
+          const edge = at < 0.25 ? " hz-tip-start" : at > 0.75 ? " hz-tip-end" : "";
           return (
             <div
               key={i}
@@ -741,14 +743,18 @@ function Attribution({
           : "거의 시장을 따라 움직였습니다. 이 하락의 대부분은 시장 전체가 함께 빠진 것입니다.";
 
   return (
-    <section style={card}>
+    <section style={{ ...card, display: "flex", flexDirection: "column" }}>
       <CardHead
         icon="call_split"
         title="이 하락, 시장 탓일까 종목 탓일까"
         sub={`고점(${athDate}) 이후 ${attr.sincePeakDays.toLocaleString("ko-KR")}일, 같은 기간을 나란히 놓고 비교합니다.`}
       />
       <p style={{ margin: "0 0 16px", color: C.ink, fontSize: 15, fontWeight: 700, lineHeight: 1.6, wordBreak: "keep-all" }}>{verdict}</p>
-      <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+      {/* 옆 카드(이 하락의 성격)에 맞춰 늘어나는데 여긴 막대 셋뿐이라 바닥이 비었다.
+          줄 간격을 벌려 채우지는 않는다 — 이건 목록이 아니라 길이를 견주는 차트라,
+          막대가 서로 멀어지면 비교가 어려워진다. 묶음을 붙여 둔 채 세로 가운데로 둬
+          남는 공간이 위아래로 갈리게 한다. */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 9, justifyContent: "center" }}>
         {rows.map((r) => (
           // 고점 이후 수익률이라 시장·테마는 상승(+)일 수도 있다 — 부호로 색을 가른다
           // (하락=파랑, 상승=빨강, 티커와 같은 한국장 관례). 자기 종목만 진하게.
@@ -786,27 +792,75 @@ function Recovery({ a }: { a: MddAnalysis }) {
     );
   }
 
-  const tiles: { label: string; value: string; sub?: string; tone?: "ink" | "mania" }[] = [
-    { label: "최단 회복", value: fmtDur(r.minDays!), sub: fmtDayCount(r.minDays!) },
-    { label: "중앙값", value: fmtDur(r.medianDays!), sub: fmtDayCount(r.medianDays!) },
-    { label: "최장 회복", value: fmtDur(r.maxDays!), sub: fmtDayCount(r.maxDays!) },
-  ];
-  if (r.unrecoveredCount > 0) tiles.push({ label: "아직 회복 못 함", value: `${r.unrecoveredCount}건`, sub: "진행 중", tone: "mania" });
+  // 눈금 상한은 표본 중 가장 긴 기간. 미회복 건은 '지금까지 걸린 시간'이라 같은 축에 놓인다.
+  const longest = Math.max(1, ...r.samples.map((s) => s.days));
 
   return (
-    <section style={card}>
+    <section style={{ ...card, display: "flex", flexDirection: "column" }}>
       <CardHead
         icon="history"
         title="회복까지 걸린 시간"
         sub={`지금(${fmtPct(a.currentDd)}) 이상 빠졌던 ${r.similarCount}번 중 ${r.recoveredCount}번이 고점을 되찾았습니다.`}
       />
-      {/* 2열 고정 그리드 — flex-wrap 이면 한 줄에 3개가 들어가고 남은 하나('아직 회복 못 함')가
-          혼자 전체 폭으로 늘어나 어색했다. 4칸이면 2×2, 3칸이면 2+1 로 타일 크기가 일정하다. */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
-        {tiles.map((t, i) => (
-          <Stat key={i} label={t.label} value={t.value} sub={t.sub} tone={t.tone} />
+      {/* 예전엔 최단·중앙값·최장·미회복을 타일 네 개로만 뒀는데, 숫자 넷으로는 "4.7년"이
+          유난히 길었던 한 번인지 늘 그 정도인지 알 수 없었다(카드도 아래가 비었다).
+          회차별 막대로 분포를 그리고, 중앙값을 세로선으로 얹어 기준을 준다. */}
+      {/* 옆 카드(역대 낙폭 Top 5)가 5줄이라 이 카드가 그 높이로 늘어나는데 표본은 보통
+          3~4건이다. 원인 분해 카드와 같은 이유로 간격을 벌리지 않고 묶음을 가운데 둔다 —
+          회차별 길이를 견주는 차트라 막대끼리 붙어 있어야 읽힌다. 범례·중앙값 선도 이
+          안쪽 묶음에 넣어야 막대와 같이 움직인다(밖에 두면 선이 차트 위아래로 삐져나온다). */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+        <div style={{ display: "flex", gap: 14, marginBottom: 12, fontSize: 11, color: C.sub }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+            <span style={{ width: 9, height: 9, borderRadius: 2, background: C.cold }} />
+            고점 되찾음
+          </span>
+          {r.unrecoveredCount > 0 && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+              <span style={{ width: 9, height: 9, borderRadius: 2, background: C.mania }} />
+              아직 회복 못 함
+            </span>
+          )}
+        </div>
+        <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 9 }}>
+        {r.samples.map((s) => (
+          <div key={s.peakDate} style={{ display: "grid", gridTemplateColumns: "42px minmax(0,1fr) 62px", alignItems: "center", gap: 9 }}>
+            <span style={{ fontFamily: MONO, fontSize: 11, color: C.faint }}>{s.peakDate.slice(2, 7)}</span>
+            <span
+              className="hz-tip hz-tip-wide hz-tip-end"
+              data-tip={`${s.peakDate} 고점에서 ${fmtPct(s.depth)}까지 빠졌고, ${s.recovered ? `${fmtDayCount(s.days)} 만에 고점을 되찾았습니다` : `${fmtDayCount(s.days)}째 회복 중입니다`}.`}
+              style={{ height: 10, background: C.bg, borderRadius: 999, overflow: "hidden", cursor: "help" }}
+            >
+              {/* minWidth 18px — 36일 vs 4.7년처럼 차이가 크면 비율만으로는 폭이 몇 px 라
+                  둥근 모서리에 먹혀 점 하나처럼 보인다(렌더 오류로 오해하기 쉽다).
+                  높이(10)보다 넉넉히 넓어야 원이 아니라 짧은 막대로 읽힌다. */}
+              <span
+                style={{
+                  display: "block",
+                  height: "100%",
+                  width: `${(s.days / longest) * 100}%`,
+                  minWidth: 18,
+                  background: s.recovered ? C.cold : C.mania,
+                  borderRadius: 999,
+                }}
+              />
+            </span>
+            <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, textAlign: "right", color: s.recovered ? C.sub : C.mania }}>
+              {fmtDur(s.days)}
+            </span>
+          </div>
         ))}
+        {/* 중앙값 눈금 — 막대 칸(가운데 트랙)에만 걸치도록 좌우 여백을 맞춘다.
+            바깥 여백(51 = 날짜칸 42 + gap 9, 71 = 값칸 62 + gap 9). */}
+        <div style={{ position: "absolute", left: 51, right: 71, top: 0, bottom: 0, pointerEvents: "none" }}>
+          <div style={{ position: "absolute", left: `${(r.medianDays! / longest) * 100}%`, top: -4, bottom: -4, width: 1, background: C.faint }} />
+        </div>
+        </div>
       </div>
+      <p style={{ margin: "14px 0 0", fontSize: 12, color: C.muted, lineHeight: 1.6 }}>
+        회복한 {r.recoveredCount}번의 중앙값은 <b style={{ color: C.sub }}>{fmtDur(r.medianDays!)}</b>(세로선), 가장 빠른 때가{" "}
+        <b style={{ color: C.sub }}>{fmtDur(r.minDays!)}</b>, 가장 오래 걸린 때가 <b style={{ color: C.sub }}>{fmtDur(r.maxDays!)}</b>였습니다.
+      </p>
     </section>
   );
 }
