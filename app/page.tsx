@@ -200,7 +200,9 @@ function Shell({
 // 예전엔 "🎯 HIT"이었는데, 그 이름이 "기준선에 도달했다"로 읽히는 게 문제였다.
 // 실제 판정선은 초고온 진입이고, 서비스의 나머지 언어(저온·상온·고온·초고온)와도
 // 어긋나 있었다. 이름을 구간 이름으로 맞춰 배지와 히어로·요약이 한 말을 쓰게 한다.
-function HitBadge({ label = "🌋 초고온", small = false }: { label?: string; small?: boolean }) {
+// 앞에 붙어 있던 🌋 는 뺐다 — 배지가 이미 초고온 색(mania)으로 꽉 찬 알약이라 표식이
+// 겹치고, 컬러 이모지라 OS마다 글리프 높이가 달라 배지만 세로로 들쭉날쭉했다.
+function HitBadge({ label = "초고온", small = false }: { label?: string; small?: boolean }) {
   return (
     // 바깥 span은 '제목 행'과 똑같은 자리를 차지하는 빈 상자다 — top은 Shell의 안쪽 여백(24),
     // height는 제목 행의 높이(TitleRow의 아이콘 크기 22 = 그 행에서 가장 큰 요소)와 맞춘다.
@@ -405,11 +407,16 @@ function HeatBar({ v }: { v: Pick }) {
 }
 
 // ── 히어로 ────────────────────────────────────────────────────────
-const STAGE_META: Record<string, { emoji: string; color: string; zone: string }> = {
-  저온: { emoji: "❄️", color: C.cold, zone: "저온 구간" },
-  상온: { emoji: "🌡️", color: C.neutral, zone: "상온 구간" },
-  고온: { emoji: "🔥", color: C.hot, zone: "고온 구간" },
-  초고온: { emoji: "🌋", color: C.mania, zone: "초고온 구간" },
+// 온도 표식은 컬러 이모지(❄️🌡️🔥🌋) 대신 Material Symbols 글리프를 쓴다. 은유는 그대로인데
+// 이모지는 (1) OS 이모지 서체로 떨어져 사이트 서체와 갈리고, (2) 색을 못 물려받아 구간 색과
+// 따로 놀고, (3) 글리프 높이가 제각각이라 알약 높이가 저 혼자 달라졌다.
+// tint 는 반드시 변수로 둔다. `${stage.color}24` 처럼 알파를 이어붙이면 "var(--c-hot)24" 가
+// 되어 CSS 가 통째로 버린다 — 실제로 히어로의 구간 알약이 배경 없이 글자만 떠 있었다.
+const STAGE_META: Record<string, { icon: string; color: string; tint: string; zone: string }> = {
+  저온: { icon: "ac_unit", color: C.cold, tint: "var(--c-cold-tint)", zone: "저온 구간" },
+  상온: { icon: "thermostat", color: C.neutral, tint: "var(--c-neutral-tint)", zone: "상온 구간" },
+  고온: { icon: "local_fire_department", color: C.hot, tint: "var(--c-hot-tint)", zone: "고온 구간" },
+  초고온: { icon: "volcano", color: C.mania, tint: "var(--c-mania-tint)", zone: "초고온 구간" },
 };
 
 // LLM 요약 문장을 서식 있는 노드로 렌더한다.
@@ -441,6 +448,20 @@ function renderRichSummary(text: string): React.ReactNode {
   });
 }
 
+/** 점수(0~100)가 게이지 호 위에서 갖는 x 좌표. 호는 반지름 124, 중심 (150,150) 의 반원이다. */
+function gaugeX(score: number): number {
+  const theta = ((180 - (Math.max(0, Math.min(100, score)) / 100) * 180) * Math.PI) / 180;
+  return 150 + 124 * Math.cos(theta);
+}
+
+/** 구간 라벨과 그 구간의 한가운데 점수. 경계는 25·50·75(stageForScore 와 같은 값). */
+const STAGE_TICKS: { label: string; mid: number; color: string }[] = [
+  { label: "저온", mid: 12.5, color: C.cold },
+  { label: "상온", mid: 37.5, color: C.neutral },
+  { label: "고온", mid: 62.5, color: C.hot },
+  { label: "초고온", mid: 87.5, color: C.mania },
+];
+
 function HeroGauge({ score }: { score: number }) {
   const s = Math.max(0, Math.min(100, score));
   const arcLen = 389.6;
@@ -449,7 +470,7 @@ function HeroGauge({ score }: { score: number }) {
   const nx = 150 + 124 * Math.cos(theta);
   const ny = 150 - 124 * Math.sin(theta);
   return (
-    <svg viewBox="0 0 300 172" style={{ width: 300, height: 172, overflow: "visible" }}>
+    <svg viewBox="0 0 300 172" style={{ width: "100%", height: "100%", display: "block", overflow: "visible" }}>
       <defs>
         <linearGradient id="heroThermal" x1="0" y1="0" x2="1" y2="0">
           <stop offset="0%" stopColor={C.cold} />
@@ -476,7 +497,7 @@ function HeroGauge({ score }: { score: number }) {
 function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tradHits: number; socialHits: number }) {
   // 저장된 stage 문자열 대신 점수에서 직접 구간을 계산해, 라벨 변경/과거 데이터에도 견고.
   const stageLabel = stageForScore(dailyScore.score);
-  const stage = STAGE_META[stageLabel] ?? { emoji: "📊", color: C.neutral, zone: stageLabel };
+  const stage = STAGE_META[stageLabel] ?? { icon: "thermostat", color: C.neutral, tint: "var(--c-neutral-tint)", zone: stageLabel };
   // 도수는 정수로 — 소수점 둘째 자리(6.16℃)는 없는 정밀도를 있는 것처럼 보이게 한다.
   // 지수는 25개 지표의 가중평균을 다시 앵커로 매핑한 값이라 0.01 단위에 의미가 없다.
   const scoreDisplay = Math.round(dailyScore.score).toString();
@@ -492,10 +513,14 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
         alignItems: "center",
       }}
     >
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-        <div style={{ position: "relative", width: 300, height: 172 }}>
+      {/* 게이지는 300px 고정이었는데, 375px 화면에선 본문 폭(285px)보다 넓어 페이지에
+          가로 스크롤이 생겼다(실측 10px). 폭을 min(300px,100%) 로 두고 안쪽을 전부
+          비율(aspect-ratio·%)로 잡아 좁은 화면에서 같이 줄어들게 한다. */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flex: "0 1 300px", minWidth: 0, maxWidth: 300 }}>
+        <div style={{ position: "relative", width: "100%", aspectRatio: "300 / 172" }}>
           <HeroGauge score={dailyScore.score} />
-          <div style={{ position: "absolute", left: 0, right: 0, top: 78, textAlign: "center" }}>
+          {/* top 78 / 172 = 45.3% — 게이지가 줄어도 숫자가 호 안 같은 자리에 남는다. */}
+          <div style={{ position: "absolute", left: 0, right: 0, top: "45.3%", textAlign: "center" }}>
             <div style={{ fontFamily: MONO, fontSize: 58, fontWeight: 800, color: C.ink, letterSpacing: "-0.04em", lineHeight: 1 }}>
               {scoreDisplay}
               <span style={{ fontSize: 30 }}>℃</span>
@@ -503,14 +528,32 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
             <div style={{ fontSize: 11, fontWeight: 800, color: stage.color, marginTop: 6 }}>지금 · {stage.zone}</div>
           </div>
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", width: 300, padding: "0 6px", fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-          <span style={{ color: C.cold }}>저온</span>
-          <span style={{ color: C.neutral }}>상온</span>
-          <span style={{ color: C.hot }}>고온</span>
-          <span style={{ color: C.mania }}>초고온</span>
+        {/* 라벨을 각자 맡은 구간의 한가운데(호 위 x좌표)에 놓는다. 예전엔 space-between 이라
+            넷이 균등 간격으로 놓였는데, 구간 경계는 25·50·75 이고 호는 반원이라 라벨이
+            자기 구간 아래가 아니었다 — 상온(12.5~50 한가운데 x≈103)이 x≈80 에, 저온은
+            호가 시작하기도 전인 x≈17 에 있었다. HeroGauge 와 같은 식으로 x 를 구한다. */}
+        <div style={{ position: "relative", width: "100%", height: 14, fontSize: 10, fontWeight: 800, letterSpacing: "0.06em" }}>
+          {STAGE_TICKS.map((t) => (
+            <span
+              key={t.label}
+              style={{
+                position: "absolute",
+                // 게이지가 줄어도 라벨이 따라가도록 px 이 아니라 % 로 건다(뷰박스 폭 300 기준).
+                left: `${(gaugeX(t.mid) / 300) * 100}%`,
+                transform: "translateX(-50%)",
+                color: t.color,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {t.label}
+            </span>
+          ))}
         </div>
       </div>
-      <div style={{ flex: 1, minWidth: 280 }}>
+      {/* flex-basis 280 + minWidth 0. basis 로 "280 이 안 되면 아랫줄로" 를 유지하되,
+          일단 아랫줄로 내려간 뒤에는 남은 폭(모바일 245px)까지 줄어들 수 있게 한다 —
+          minWidth:280 이던 때는 줄바꿈 후에도 280 을 고집해 카드가 화면 밖으로 나갔다. */}
+      <div style={{ flex: "1 1 280px", minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 22, fontWeight: 800, color: C.blue }}>햇쩨 지수</span>
@@ -525,8 +568,10 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
           </span>
           {/* 상태 텍스트는 옆의 "햇쩨 지수"(22px)와 같은 크기로 둔다 — 둘이 한 쌍으로 읽히는 자리라
               크기가 다르면 상태 쪽이 부속처럼 보인다. */}
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: `${stage.color}24`, color: stage.color, fontWeight: 800, fontSize: 22, padding: "5px 14px", borderRadius: 999, whiteSpace: "nowrap" }}>
-            {stage.emoji} {stageLabel}
+          {/* 아이콘은 색을 물려받으므로 구간 색이 글자·아이콘·배경에 한 번에 걸린다. */}
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 7, background: stage.tint, color: stage.color, fontWeight: 800, fontSize: 22, padding: "5px 15px", borderRadius: 999, whiteSpace: "nowrap" }}>
+            <Icon name={stage.icon} style={{ fontSize: 22 }} />
+            {stageLabel}
           </span>
         </div>
         <p style={{ margin: "0 0 4px", fontSize: 11, color: C.sub, fontFamily: MONO }}>최종 업데이트 · {formatKstUpdate(dailyScore.updated_at)}</p>
@@ -622,9 +667,14 @@ function Sparkline({
             hover 영역이 거의 없어서(선 두께 2px) 띠로 받아야 실제로 잡힌다. */}
         {tips && tips.length === data.length && (
           <div style={{ position: "absolute", inset: 0, display: "flex" }}>
-            {tips.map((tip, i) => (
-              <div key={i} className="hz-tip hz-vline" data-tip={tip} style={{ flex: 1, position: "relative" }} />
-            ))}
+            {tips.map((tip, i) => {
+              // 띠 하나가 7~8px 인데 툴팁은 100px 남짓이라, 가운데 정렬(기본)이면 양 끝
+              // 지점에서 카드 밖으로 나간다 — 좁은 화면에선 페이지에 가로 스크롤까지 생겼다.
+              // MDD 차트와 같은 규칙으로 끝쪽 15%는 안쪽으로 열리게 방향을 튼다.
+              const at = tips.length <= 1 ? 0 : i / (tips.length - 1);
+              const edge = at < 0.15 ? " hz-tip-start" : at > 0.85 ? " hz-tip-end" : "";
+              return <div key={i} className={`hz-tip hz-vline${edge}`} data-tip={tip} style={{ flex: 1, position: "relative" }} />;
+            })}
           </div>
         )}
       </div>
@@ -683,13 +733,38 @@ function ratioBarHeights(baseline: number | null, current: number | null, baseH 
   return [baseH, Math.max(10, Math.min(100, (current / baseline) * baseH))];
 }
 
+/* 아시아 카드 막대의 세로 치수. 카드가 코스피 높이에 기준선을 그으려면 막대 최대 높이와
+   라벨 줄 높이를 알아야 해서, 값을 흩어 두지 않고 여기 모은다. */
+const ASIA_BAR_MAX = 108;
+const ASIA_LABEL_H = 26; // 나라 이름 두 줄. span 에 height 로 못 박아 두어 계산이 확정된다
+const ASIA_COL_GAP = 6; // 막대 ↔ 라벨 사이(칸 안 flex gap)
+/** 컨테이너 바닥에서 막대 밑변까지의 거리 — 기준선을 막대 끝에 정확히 걸기 위해 쓴다. */
+const ASIA_BAR_BASE = ASIA_LABEL_H + ASIA_COL_GAP;
+
 // 아시아 카드의 4개국 상대 막대 (KOSPI=100 기준). heightPct는 차이를 강조한 0~100.
-function AsiaBar({ label, sub, index, heightPct, color }: { label: string; sub: string; index: number; heightPct: number; color: string }) {
+// self(코스피)만 파랑으로 세우고 이웃 셋은 같은 중립색 — 색이 아니라 높이로 비교하게 한다.
+function AsiaBar({ label, sub, index, heightPct, self }: { label: string; sub: string; index: number; heightPct: number; self: boolean }) {
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-      <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color }}>{Math.round(index)}</span>
-      <div style={{ width: "100%", height: Math.max(10, (heightPct / 100) * 108), background: color, borderRadius: "6px 6px 0 0" }} />
-      <span style={{ fontSize: 9, fontWeight: 800, color: C.sub, textAlign: "center", lineHeight: 1.25 }}>
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: ASIA_COL_GAP }}>
+      <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: self ? C.blue : C.sub }}>{Math.round(index)}</span>
+      <div
+        style={{
+          width: "100%",
+          height: Math.max(10, (heightPct / 100) * ASIA_BAR_MAX),
+          background: self ? C.blue : C.track,
+          borderRadius: "6px 6px 0 0",
+        }}
+      />
+      <span
+        style={{
+          height: ASIA_LABEL_H,
+          fontSize: 9,
+          fontWeight: 800,
+          color: self ? C.ink : C.sub,
+          textAlign: "center",
+          lineHeight: 1.25,
+        }}
+      >
         {label}
         <br />
         {sub}
@@ -878,7 +953,10 @@ function CardMarketActions({ v }: { v: Pick }) {
             35.9px 였다. 32px 면 28.7px 라 숫자와 거의 같아진다. */}
         <span style={{ fontSize: 32, fontWeight: 800, color: verdict.c, lineHeight: 1 }}>{verdict.t}</span>
       </div>
-      <div style={{ background: C.bg, borderRadius: 10, padding: 18, display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* 2칸 카드라 같은 줄의 1칸 카드들에 맞춰 늘어나는데 내용은 세 줄뿐이라, 예전엔
+          막대 아래로 100px 넘게 비었다. 묶음에 flex:1 을 주고 세 줄을 그 안에서 고르게
+          펴 카드를 채운다(남는 높이가 없으면 gap 14 그대로다). */}
+      <div style={{ flex: 1, background: C.bg, borderRadius: 10, padding: 18, display: "flex", flexDirection: "column", gap: 14, justifyContent: "space-evenly" }}>
         <DivRow label={`매수 ${buyN}건`} w={(buyN / maxC) * 100} color={C.hot} />
         <DivRow label={`매도 ${sellN}건`} w={(sellN / maxC) * 100} color={C.cold} />
         <DivRow label={`CB ${dt?.cb ?? 0}건`} w={((dt?.cb ?? 0) / maxC) * 100} color={C.sub} />
@@ -950,7 +1028,10 @@ function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
         name={v.name}
         badge={sourceDateBadge(v) ?? "최근 거래일 기준"}
       />
-      <div style={{ display: "flex", gap: 24, flex: 1 }}>
+      {/* flexWrap — 모바일(1열)에서 이 2칸 카드가 285px 로 좁아지는데, 왼쪽 묶음이
+          flexShrink:0 이라 오른쪽 종목 목록에 13px 밖에 안 남아 이름·수치가 카드 밖으로
+          삐져나갔다(페이지 가로 스크롤의 원인이었다). 자리가 모자라면 목록을 아랫줄로. */}
+      <div style={{ display: "flex", gap: 24, flex: 1, flexWrap: "wrap" }}>
         {/* alignSelf:flex-start 로 이 묶음이 세로로 내용만큼만 차지하게 한다 — 그래야
             옆의 세로 막대가 (기본 stretch 로) 왼쪽 텍스트 칸과 **위아래 끝이 정확히
             일치**한다. 예전엔 묶음이 카드 본문 전체 높이로 늘어나 막대만 위아래로
@@ -962,24 +1043,33 @@ function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
             <span style={{ fontFamily: MONO, fontSize: 34, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{gap > 0 ? "+" : ""}{v.disp}{v.unit}</span>
             <span style={{ fontSize: 10, fontWeight: 700, color: C.sub, marginTop: 4 }}>{gap > 0 ? "이전 전고점 돌파" : "전고점으로부터"}</span>
           </div>
-          <div style={{ display: "flex", justifyContent: "center" }}>
-            {/* 막대 높이는 고정한다 — 예전엔 왼쪽 텍스트 칸(종가·전고점 블록)에 맞춰 늘어났는데
-                그 블록을 빼면서 기준 높이가 사라졌다. 전고점 값은 이제 막대 위 라벨에 붙인다. */}
-            <div style={{ width: 96, height: 143, position: "relative", background: C.bg, borderRadius: 10, overflow: "hidden" }}>
-              <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: `${fillH}%`, background: `linear-gradient(180deg,#7cbde6,${C.cold})` }} />
-              <span style={{ position: "absolute", top: 6, right: 8, fontSize: 9, fontWeight: 800, color: C.ink }}>
-                전고점{typeof priorHigh === "number" ? ` ${num(priorHigh)}` : ""}
-              </span>
+          {/* 전고점을 수위 눈금처럼 읽는 통. 세 가지를 고쳤다.
+              (1) 전고점 라벨을 통 안 우상단에서 통 바로 위로 뺐다 — 통의 윗변이 곧 전고점이라
+                  라벨이 그 선에 붙어 있어야 '눈금'으로 읽힌다(안에 있으면 그냥 캡션이었다).
+              (2) 수면에 실선을 그었다. 색 덩어리만 있으면 어디까지가 '지금'인지 눈이 못 짚는다.
+              (3) 그라데이션의 #7cbde6 은 팔레트 밖 하드코딩이라 테마를 안 따랐다 — 단색+투명도로.
+              막대 높이는 고정한다(예전엔 옆 텍스트 칸에 맞춰 늘어났는데 그 칸이 없어졌다). */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
+            <span style={{ fontSize: 9, fontWeight: 800, color: C.sub, whiteSpace: "nowrap" }}>
+              전고점{typeof priorHigh === "number" ? ` ${num(priorHigh)}` : ""}
+            </span>
+            <div style={{ width: 92, height: 134, position: "relative", background: C.bg, borderRadius: 10, overflow: "hidden" }}>
+              <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: `${fillH}%`, background: C.cold, opacity: 0.75 }} />
+              <div style={{ position: "absolute", left: 0, right: 0, bottom: `${fillH}%`, height: 2, background: C.cold }} />
             </div>
           </div>
         </div>
+        {/* flex-basis 240 — 이만큼도 안 남으면 아랫줄로 내려간다. 구분선은 그때 왼쪽에
+            있으면 안 되므로(아랫줄에선 위가 맞다) globals.css 의 .hz-peer-list 가 맡는다. */}
         {tops.length > 0 && (
-          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center", gap: 10, borderLeft: `1px solid ${C.line}`, paddingLeft: 24 }}>
+          <div className="hz-peer-list" style={{ flex: "1 1 240px", minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center", gap: 10 }}>
             {/* 현재가는 KRX 종가라 왼쪽 지수와 같은 거래일이다. 52주 고점만 야후를 쓰는데
                 (KRX엔 그 필드가 없다 — lib/data.getTopStockHighGaps 참고) 장중 고가 기준이라
                 종가 기준보다 3%쯤 높아, 괴리율이 그만큼 깊게 나온다. 그 사실을 툴팁에 밝힌다. */}
+            {/* hz-tip-end — 이 라벨은 2칸 카드의 오른쪽 절반에 있어, 좁은 화면에선 가운데
+                정렬 툴팁(240px)의 절반이 화면 밖으로 나가 가로 스크롤이 생겼다(실측 59px). */}
             <span
-              className="hz-tip hz-tip-wide"
+              className="hz-tip hz-tip-wide hz-tip-end"
               data-tip="현재가는 지수와 같은 KRX 종가입니다. 52주 고점은 야후 파이낸스의 장중 최고가라, 종가 기준인 지수 쪽보다 괴리율이 조금 더 깊게 나옵니다."
               style={{ fontSize: 10, fontWeight: 800, color: C.sub, cursor: "help" }}
             >
@@ -1112,15 +1202,20 @@ function CardAsia({ v }: { v: Pick }) {
     );
   }
   const k = dt.kospi ?? 0;
+  // 나라마다 다른 색(파랑·주황·하늘·베이지)을 주던 걸 걷었다. 그 색들은 아무 뜻도
+  // 없으면서 "일본은 뜨겁고 대만은 식었다"처럼 읽혔다. 이 카드의 질문은 하나다 —
+  // "코스피가 이웃보다 앞섰나". 그래서 코스피만 파랑, 나머지 셋은 같은 중립색으로
+  // 두고, 코스피 높이에 기준선을 그어 위아래를 한눈에 재게 한다.
   const bars = [
-    { label: "KOSPI", sub: "한국", index: 100, color: C.blue },
-    { label: "Nikkei", sub: "일본", index: 100 + ((dt.nikkei ?? 0) - k), color: C.hot },
-    { label: "HangSeng", sub: "홍콩", index: 100 + ((dt.hangseng ?? 0) - k), color: C.cold },
-    { label: "Taiex", sub: "대만", index: 100 + ((dt.taiex ?? 0) - k), color: C.neutral },
+    { label: "KOSPI", sub: "한국", index: 100, self: true },
+    { label: "Nikkei", sub: "일본", index: 100 + ((dt.nikkei ?? 0) - k), self: false },
+    { label: "HangSeng", sub: "홍콩", index: 100 + ((dt.hangseng ?? 0) - k), self: false },
+    { label: "Taiex", sub: "대만", index: 100 + ((dt.taiex ?? 0) - k), self: false },
   ];
   // floorPct를 55로 올려 강조는 유지하되 과하지 않게 — 최소 막대가 55%까지만
   // 내려가 100 vs 117 같은 차이가 지나치게 벌어지지 않는다.
   const heights = emphasizedHeights(bars.map((b) => b.index), 55);
+  const kospiHeight = heights[0];
   return (
     <Shell span={2} hit={v.isHit} minH={230}>
       <TitleRow desc={v.headline} icon="public" name={v.name} badge="최근 한 달" />
@@ -1129,9 +1224,21 @@ function CardAsia({ v }: { v: Pick }) {
         {v.disp}
         {v.unit}
       </div>
-      <div style={{ flex: 1, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, paddingTop: 6 }}>
+      {/* 코스피 높이에 파선을 그어, 이웃이 그 선 위로 나갔는지 아래인지가 바로 보이게 한다.
+          라벨 줄(약 26px)은 기준선 계산에서 빼야 선이 막대 끝에 정확히 걸린다. */}
+      <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, paddingTop: 6 }}>
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: ASIA_BAR_BASE + (kospiHeight / 100) * ASIA_BAR_MAX,
+            borderTop: `1px dashed ${C.blue}`,
+            opacity: 0.45,
+          }}
+        />
         {bars.map((b, i) => (
-          <AsiaBar key={b.label} label={b.label} sub={b.sub} index={b.index} heightPct={heights[i]} color={b.color} />
+          <AsiaBar key={b.label} label={b.label} sub={b.sub} index={b.index} heightPct={heights[i]} self={b.self} />
         ))}
       </div>
       <Foot text={v.desc} />
@@ -1296,14 +1403,36 @@ function VsAvg({ ratio, size = 26 }: { ratio: number; size?: number }) {
 // 실물–증시 괴리 — 두 축(실물 강도 / 증시 강세)을 각자 역대 백분위로 매겨 나란히 둔다.
 // 괴리는 둘의 '곱'이 아니라 '차이'(lead = 증시%ile − 실물%ile)다 — 2026-07-22 PR #69 에서
 // 양방향 게이지로 바꿨는데 이 주석만 옛 설계(곱·실물 스트레스)에 머물러 있었다.
-function DivergenceBar({ label, hint, value, color, tip }: { label: string; hint: string; value: number; color: string; tip?: string }) {
+function DivergenceBar({
+  label,
+  hint,
+  value,
+  color,
+  tip,
+  tipEdge = "start",
+}: {
+  label: string;
+  hint: string;
+  value: number;
+  color: string;
+  tip?: string;
+  /** 툴팁이 열리는 방향. 오른쪽 막대는 "end"(안쪽=왼쪽으로) 로 둔다. */
+  tipEdge?: "start" | "end";
+}) {
   const level = value >= 66 ? "높음" : value >= 33 ? "보통" : "낮음";
   return (
     <div style={{ flex: 1 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2 }}>
         <span style={{ fontSize: 12, fontWeight: 800, color: C.ink }}>{label}</span>
+        {/* 이 막대는 늘 둘씩 나란히 놓인다. 240px 툴팁을 가운데 정렬로 두면 오른쪽 막대
+            것이 카드 밖으로 나갔다(좁은 화면에선 페이지 가로 스크롤까지). 왼쪽 막대는
+            오른쪽으로, 오른쪽 막대는 왼쪽으로 열어 둘 다 카드 안에 머문다. */}
         {tip && (
-          <span className="hz-tip hz-tip-wide" data-tip={tip} style={{ display: "inline-flex", cursor: "help" }}>
+          <span
+            className={`hz-tip hz-tip-wide ${tipEdge === "end" ? "hz-tip-end" : "hz-tip-start"}`}
+            data-tip={tip}
+            style={{ display: "inline-flex", cursor: "help" }}
+          >
             <Icon name="help" style={{ fontSize: 13, color: C.sub }} />
           </span>
         )}
@@ -1363,7 +1492,7 @@ function CardDivergence({ v }: { v: Pick }) {
       {/* span=2 인데 내용이 짧아 남는 공간을 박스·Foot 이 auto 마진으로 나눠 갖는다. */}
       <div style={{ background: C.bg, borderRadius: 10, padding: 16, marginTop: "auto", display: "flex", gap: 22 }}>
         <DivergenceBar label="실물 강도" hint="소비심리(CCSI)" value={real} color={C.blue} tip={realTip} />
-        <DivergenceBar label="증시 강세" hint="신고가 근접도" value={market} color={C.hot} tip={marketTip} />
+        <DivergenceBar label="증시 강세" hint="신고가 근접도" value={market} color={C.hot} tip={marketTip} tipEdge="end" />
       </div>
       <Foot text={v.desc} />
     </Shell>
@@ -1523,20 +1652,28 @@ function CardYoutube({ v }: { v: Pick }) {
   return (
     <Shell hit={v.isHit} minH={210}>
       <TitleRow desc={v.headline} icon="play_circle" name={v.name} />
-      <div style={{ flex: 1, display: "flex", alignItems: "flex-end", gap: 14 }}>
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 88 }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 6, height: "100%" }}>
-            <div style={{ width: 26, height: `${baseH}%`, background: C.line, borderRadius: "5px 5px 0 0" }} />
-            <span style={{ fontSize: 8, fontWeight: 700, color: C.sub }}>평소</span>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 6, height: "100%" }}>
-            <div style={{ width: 26, height: `${todayH}%`, background: v.color, borderRadius: "5px 5px 0 0" }} />
-            <span style={{ fontSize: 8, fontWeight: 700, color: C.sub }}>오늘</span>
-          </div>
+      {/* 예전엔 26px 짜리 막대 둘이 왼쪽에 몰려 있고 조회수만 오른쪽에 크게 떠 있었다.
+          이 카드가 말하려는 건 절대 조회수가 아니라 '평소보다 몇 배'인데 그 문구가 9px 로
+          제일 작았다. 배수를 큰 수치로 올리고, 비교 막대는 거래대금 급증도 카드와 같은
+          짜임(전폭 두 칸 · 막대 위에 값)으로 맞춘다 — 같은 질문에는 같은 그림. */}
+      {ratio !== null && (
+        <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "2px 0 10px" }}>
+          <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 800, color: v.color, letterSpacing: "-0.03em", lineHeight: 1 }}>
+            {ratio.toFixed(1)}배
+          </span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: C.sub }}>평소 대비</span>
         </div>
-        <div style={{ marginLeft: "auto", textAlign: "right" }}>
-          <div style={{ fontFamily: MONO, fontSize: 24, fontWeight: 800, color: v.color, lineHeight: 1 }}>{v.disp}{v.unit && <span style={{ fontSize: 14 }}>{v.unit}</span>}</div>
-          {ratio !== null && <div style={{ fontSize: 9, fontWeight: 800, color: v.color, marginTop: 4 }}>평소 대비 {ratio.toFixed(1)}배</div>}
+      )}
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 12, flex: 1, minHeight: 88 }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 6, height: "100%" }}>
+          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color: C.sub }}>{v.thDisp ?? "-"}</span>
+          <div style={{ width: "100%", height: `${baseH}%`, background: C.line, borderRadius: "6px 6px 0 0" }} />
+          <span style={{ fontSize: 9, fontWeight: 700, color: C.sub }}>평소</span>
+        </div>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 6, height: "100%" }}>
+          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color: v.color }}>{v.disp}{v.unit}</span>
+          <div style={{ width: "100%", height: `${todayH}%`, background: v.color, borderRadius: "6px 6px 0 0" }} />
+          <span style={{ fontSize: 9, fontWeight: 700, color: C.sub }}>오늘</span>
         </div>
       </div>
       <Foot text={v.desc} />
@@ -1642,9 +1779,13 @@ function CardNetBuy({ v }: { v: Pick }) {
           <span style={{ fontSize: 12, fontWeight: 800, color: isBuy ? C.hot : C.cold }}>{isBuy ? "순매수" : "순매도"}</span>
         </div>
       </div>
-      <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, minHeight: 60 }}>
+      {/* 0선을 칸마다 하나씩 긋던 걸 차트 전체에 한 줄로 바꿨다. 예전엔 5개 조각으로
+          끊겨 있어 기준선으로 안 보이고, 막대가 허공에 뜬 사각형처럼 읽혔다.
+          막대 높이 한도도 24 → 30 으로 올려 하루치 차이가 실제로 보이게 한다. */}
+      <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "center", gap: 8, minHeight: 60 }}>
+        <div style={{ position: "absolute", left: 0, right: 0, top: "50%", height: 1, background: C.line }} />
         {daily.map((d, i) => {
-          const px = Math.round((Math.abs(d) / maxAbs) * 24);
+          const px = Math.round((Math.abs(d) / maxAbs) * 30);
           const buy = d >= 0;
           const ymd = dates[i];
           const label = ymd
@@ -1655,19 +1796,31 @@ function CardNetBuy({ v }: { v: Pick }) {
               key={i}
               className="hz-tip"
               data-tip={label}
-              style={{ flex: 1, position: "relative", height: 56 }}
+              style={{ flex: 1, position: "relative", height: 68, cursor: "help" }}
             >
-              <div style={{ position: "absolute", left: 0, right: 0, top: "50%", height: 1, background: C.line }} />
-              <div style={{ position: "absolute", left: "22%", right: "22%", height: px, background: buy ? C.hot : C.cold, borderRadius: 2, ...(buy ? { bottom: "50%" } : { top: "50%" }) }} />
+              <div style={{ position: "absolute", left: "18%", right: "18%", height: px, background: buy ? C.hot : C.cold, borderRadius: 2, ...(buy ? { bottom: "50%" } : { top: "50%" }) }} />
+              {/* 날짜를 막대마다 붙인다 — 다섯 개뿐이라 자리가 되고, 양 끝에만 적으면
+                  가운데 막대가 언제인지 툴팁을 열어봐야 했다. */}
+              {ymd && (
+                <span
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    textAlign: "center",
+                    fontSize: 9,
+                    fontWeight: 700,
+                    fontFamily: MONO,
+                    color: "var(--c-faint)",
+                  }}
+                >
+                  {ymdShort(ymd)}
+                </span>
+              )}
             </div>
           );
         })}
-      </div>
-      {/* 예전엔 "5일 전 / 어제" 였는데 마지막 막대는 보통 '오늘'이라 틀린 표기였다.
-          이제 dates5 가 있으니 실제 거래일을 적는다(거래일이라 달력상 5일 전이 아닐 수도 있다). */}
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, fontWeight: 700, color: "var(--c-faint)", marginTop: -4, marginBottom: 2 }}>
-        <span>{dates.length ? ymdShort(dates[0]) : "5일 전"}</span>
-        <span>{dates.length ? ymdShort(dates[dates.length - 1]) : "최근"}</span>
       </div>
       <Foot text={v.desc} />
     </Shell>

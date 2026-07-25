@@ -42,6 +42,7 @@
   --c-hot-tint: rgba(255, 154, 77, 0.14);
   --c-cold-tint: rgba(94, 168, 216, 0.14);
   --c-mania-tint: rgba(255, 107, 129, 0.12);
+  --c-neutral-tint: rgba(168, 159, 149, 0.16);
   --c-scrollbar: #c2c6d8;
   --c-scrollbar-border: #d4daea;
 
@@ -76,6 +77,7 @@
   --c-hot-tint: rgba(255, 154, 77, 0.16);
   --c-cold-tint: rgba(94, 168, 216, 0.16);
   --c-mania-tint: rgba(255, 107, 129, 0.16);
+  --c-neutral-tint: rgba(168, 159, 149, 0.2);
   --c-scrollbar: #2b3344;
   --c-scrollbar-border: #0e131c;
 }
@@ -279,6 +281,13 @@ body {
   width: 240px;
   text-align: left;
 }
+/* 좁은 화면에선 240px 가 카드보다 넓어, 안쪽으로 열어도(start/end) 화면을 넘는다.
+   폭을 화면에 비례해 줄여야 어느 자리에 붙어도 안에 들어온다(줄 수만 늘어난다). */
+@media (max-width: 560px) {
+  .hz-tip-wide::after {
+    width: min(240px, 58vw);
+  }
+}
 
 /* 아래로 펼치는 변형 — 스크롤 컨테이너(main, overflow:auto) 최상단에 있는 요소는
    기본값(위로 펼침)이면 툴팁이 컨테이너 경계에서 잘린다(햇쩨 지수 도움말이 그랬다).
@@ -339,6 +348,21 @@ body {
 }
 .hz-mdd-link:hover {
   color: var(--c-blue);
+}
+
+/* 신고가 괴리율 카드의 종목 목록. 넓을 땐 왼쪽 게이지와 세로 선으로 나뉘지만, 좁아져
+   아랫줄로 내려가면 그 선이 허공에 뜬다 — 그때는 가로 선으로 바꿔 위아래를 나눈다. */
+.hz-peer-list {
+  border-left: 1px solid var(--c-line);
+  padding-left: 24px;
+}
+@media (max-width: 560px) {
+  .hz-peer-list {
+    border-left: none;
+    padding-left: 0;
+    border-top: 1px solid var(--c-line);
+    padding-top: 16px;
+  }
 }
 
 /* 주요 종목 리포트의 언급 추이 막대. 평소엔 마지막 날만 진하고, 차트에 마우스를
