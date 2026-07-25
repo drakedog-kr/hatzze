@@ -24,19 +24,42 @@ function todayKstDate(): string {
 }
 
 /**
- * PostgREST는 한 번에 최대 1,000행만 준다 — 그 이상은 **에러 없이 잘린다**.
- * 일별 집계 테이블은 날짜가 쌓일수록 커져서(화제어는 하루 200행꼴) 이 상한을 넘기면
- * 최신 날짜가 통째로 빠지고, 그러면 "최근 3일 vs 이전" 같은 비교가 조용히 어긋난다.
- * 실제로 화제어 증감(▲▼)이 전부 사라지는 버그가 이 때문에 났다.
- * 행 수가 상한을 넘길 수 있는 조회는 전부 이 헬퍼로 페이지를 이어 받는다.
+ * 페이징 대상 쿼리 — 필터까지만 건 상태. `.order()`·`.range()` 는 fetchAllRows 가 건다.
+ * 정렬을 호출부에 맡기지 않으려고 일부러 이 모양으로 받는다(아래 주석 참고).
  */
-async function fetchAllRows<T>(
-  build: (from: number, to: number) => PromiseLike<{ data: T[] | null }>,
-): Promise<T[]> {
+type PagedQuery<T> = {
+  order(column: string): {
+    range(from: number, to: number): PromiseLike<{ data: T[] | null }>;
+  };
+};
+
+/**
+ * 표 전체를 페이지를 이어 받아 읽는다.
+ *
+ * 함정이 둘이고, 겪는 순서도 그렇다.
+ *
+ * **[1] 1,000행 캡** — PostgREST는 한 번에 최대 1,000행만 주고 그 이상은
+ * **에러 없이 잘린다**. 일별 집계 표는 날짜가 쌓일수록 커져서(화제어는 하루 200행꼴)
+ * 상한을 넘기면 최신 날짜가 통째로 빠지고, "최근 3일 vs 이전" 같은 비교가 조용히
+ * 어긋난다. 실제로 화제어 증감(▲▼)이 전부 사라지는 버그가 이 때문에 났다.
+ *
+ * **[2] 정렬 키의 유일성** — `.range()` 페이징은 요청마다 별개의 쿼리라, 정렬이
+ * 없거나 정렬 키가 유일하지 않으면 동점 행들의 순서를 DB가 보장하지 않는다. 그러면
+ * 페이지 경계에 걸친 행이 다음 요청에서 자리를 바꿔 **빠지거나 겹친다**. 1,000행
+ * 캡과 달리 총 건수는 맞아 보여서 훨씬 안 보인다 — 파이프라인 쪽에서 `indicator_values`
+ * 를 `.order("date")` 로 페이징했더니 5,828행을 5,828행으로 받는데 유일 키는 5,820개,
+ * 즉 8행이 빠지고 8행이 중복되는 걸 매 실행 재현했다(경계가 같은 날짜 구간 안쪽에
+ * 떨어져서다). 여기 telegram_* 표는 날짜 하나에 종목·채널 수백 행이 달리므로 조건이
+ * 똑같다. 그래서 정렬 키를 **필수 인자**로 받아 헬퍼 안에서 건다 — 호출부가 잊을
+ * 자리를 없앤다. 넘길 값은 유일 키여야 하고, telegram_* 표는 전부 `id`(uuid PK)다.
+ *
+ * 결과 순서는 이제 orderKey 순이다. 순서에 기대는 소비자는 직접 정렬할 것.
+ */
+async function fetchAllRows<T>(orderKey: string, build: () => PagedQuery<T>): Promise<T[]> {
   const PAGE = 1000;
   const out: T[] = [];
   for (let from = 0; ; from += PAGE) {
-    const { data } = await build(from, from + PAGE - 1);
+    const { data } = await build().order(orderKey).range(from, from + PAGE - 1);
     if (!data?.length) break;
     out.push(...data);
     if (data.length < PAGE) break;
@@ -127,13 +150,11 @@ type DailyRow = { stock_code: string; date: string; weighted_score: number; ment
 
 async function loadStockDaily(days: number): Promise<{ rows: DailyRow[]; dates: string[] }> {
   const db = getSupabaseAdmin();
-  const data = await fetchAllRows<DailyRow>((from, to) =>
+  const data = await fetchAllRows<DailyRow>("id", () =>
     db
       .from("telegram_stock_daily")
       .select("stock_code,date,weighted_score,mention_count,channel_count")
-      .gte("date", daysAgoISO(days).slice(0, 10))
-      .order("date")
-      .range(from, to),
+      .gte("date", daysAgoISO(days).slice(0, 10)),
   );
   // 오늘은 아직 하루가 덜 차서 일평균·추이를 왜곡한다 — 완료된 날만 쓴다.
   const today = todayKstDate();
@@ -325,7 +346,9 @@ export async function getSurgingStocks(limit = 5): Promise<SurgingStock[]> {
     // 예전엔 ratio=Infinity라 정렬을 독점해서 isNew를 3/2로 환산하는 보정이 필요했는데,
     // 그 보정은 "크게 등장한 신규"와 "1회 언급 신규"를 구분 못 했다. 이제 몫의 크기가
     // 그대로 반영돼 보정 없이 옳게 줄 선다.
-    .sort((x, y) => y.ratio - x.ratio || y.recentMentions - x.recentMentions);
+    // 마지막 종목코드 비교는 완전한 동점(신규 등장끼리 흔하다)에서 순서가 DB 행
+    // 순서에 딸리지 않게 못박는 것이다.
+    .sort((x, y) => y.ratio - x.ratio || y.recentMentions - x.recentMentions || x.code.localeCompare(y.code));
 
   // 카드 정원은 항상 채운다 — 기준을 만족한 종목만 넣으면 조용한 날에 4개·3개로 줄어
   // 레이아웃이 들쭉날쭉해진다. 다만 아무거나 끌어오면 안 되고 '덜 미더운 순서'로 메운다:
@@ -379,7 +402,7 @@ export async function getTopStocksWithTrend(limit = 6): Promise<StockTrend[]> {
 
   const nameOf = await nameMap([...agg.keys()]);
   return [...agg.entries()]
-    .sort((x, y) => y[1].w - x[1].w)
+    .sort((x, y) => y[1].w - x[1].w || x[0].localeCompare(y[0])) // 동점은 종목코드로 못박는다
     .slice(0, limit)
     .map(([code, a]) => ({
       code,
@@ -480,12 +503,12 @@ export async function getTrendingMessages(
   // 딸려온다(한 번호가 최대 60행). 아래에서 채널까지 포함한 키로 걸러내므로 결과는
   // 맞지만, 행이 많아지면 1000행 상한에 잘려 태그가 조용히 사라질 수 있어 페이징한다.
   const tags = await fetchAllRows<{ channel_handle: string; message_id: number; stock_code: string }>(
-    (from, to) =>
+    "id",
+    () =>
       db
         .from("telegram_message_stocks")
         .select("channel_handle,message_id,stock_code")
-        .in("message_id", top.map((m) => m.messageId))
-        .range(from, to),
+        .in("message_id", top.map((m) => m.messageId)),
   );
 
   if (tags.length) {
@@ -532,12 +555,11 @@ const REPORT_WINDOW_DAYS = 7;
  */
 const recentMessageKeys = cache(async (days: number): Promise<Set<string>> => {
   const db = getSupabaseAdmin();
-  const rows = await fetchAllRows<{ channel_handle: string; message_id: number }>((from, to) =>
+  const rows = await fetchAllRows<{ channel_handle: string; message_id: number }>("id", () =>
     db
       .from("telegram_messages")
       .select("channel_handle,message_id")
-      .gte("posted_at", daysAgoISO(days))
-      .range(from, to),
+      .gte("posted_at", daysAgoISO(days)),
   );
   return new Set(rows.map((r) => `${r.channel_handle}|${r.message_id}`));
 });
@@ -577,12 +599,11 @@ export async function getStockReport(code: string): Promise<StockReport | null> 
   // 이 표에는 날짜가 없어 서버에서 기간을 못 자른다 — 종목 하나의 전체 기간 언급을
   // 다 받아 와 아래에서 창으로 거른다. 인기 종목은 하루 30건꼴이라 한 달이면 1000행을
   // 넘기므로 반드시 페이징한다(안 하면 채널 수가 조용히 적게 나온다).
-  const mentions = await fetchAllRows<{ channel_handle: string; message_id: number }>((from, to) =>
+  const mentions = await fetchAllRows<{ channel_handle: string; message_id: number }>("id", () =>
     db
       .from("telegram_message_stocks")
       .select("channel_handle,message_id")
-      .eq("stock_code", code)
-      .range(from, to),
+      .eq("stock_code", code),
   );
   const keys = await recentMessageKeys(REPORT_WINDOW_DAYS);
   const channelCount = new Set(
@@ -720,19 +741,23 @@ export async function getChannelRanking(limit = 50): Promise<ChannelRank[]> {
     influence_score: number | null;
     view_rate: number | null;
     is_growing: boolean | null;
-  }>((from, to) =>
+  }>("id", () =>
     db
       .from("telegram_channel_stats")
       .select("channel_handle,date,subscriber_count,influence_score,view_rate,is_growing")
       .not("influence_score", "is", null)
-      .gte("date", daysAgoISO(14).slice(0, 10))
-      .order("date", { ascending: false })
-      .range(from, to),
+      .gte("date", daysAgoISO(14).slice(0, 10)),
   );
   if (!stats.length) return [];
 
+  // 채널별 최신 스냅샷. 예전엔 date 내림차순 정렬에 기대 "먼저 온 행이 최신"으로
+  // 골랐는데, 페이징 정렬 키가 id 로 바뀌었고 애초에 date 는 하루 317행이 동점이라
+  // 순서를 보장받을 수 없었다 — 날짜를 직접 비교한다.
   const latest = new Map<string, (typeof stats)[number]>();
-  for (const r of stats) if (!latest.has(r.channel_handle)) latest.set(r.channel_handle, r);
+  for (const r of stats) {
+    const cur = latest.get(r.channel_handle);
+    if (!cur || r.date > cur.date) latest.set(r.channel_handle, r);
+  }
 
   // 주간 순위 변동 — 최신일과 "5일 이상 이전" 스냅샷의 순위를 비교한다.
   // 그만큼 히스토리가 없으면(축적 초기) null로 두고 화면에서 배지를 숨긴다.
@@ -742,11 +767,17 @@ export async function getChannelRanking(limit = 50): Promise<ChannelRank[]> {
   const baseDate = dates.find(
     (d) => (new Date(latestDate).getTime() - new Date(d).getTime()) / DAY >= 5,
   );
+  // 점수가 같으면 handle 로 가른다. influence_score 는 소수 첫째 자리까지만 저장돼
+  // 동점이 흔한데(12채널 중 3쌍이 동점), 그때 JS sort 는 입력 순서를 그대로 두므로
+  // 순위가 DB가 돌려준 행 순서에 좌우된다 — 조회 방식만 바꿔도 7·8위가 뒤바뀌고
+  // '▲1계단' 배지가 사라졌다 확 나타났다 한다. 채널이 317개면 동점은 더 잦다.
+  const byScore = (a: { influence_score: number | null; channel_handle: string }, b: typeof a) =>
+    Number(b.influence_score) - Number(a.influence_score) || a.channel_handle.localeCompare(b.channel_handle);
   const rankOn = (date: string) =>
     new Map(
       stats
         .filter((r) => r.date === date)
-        .sort((a, b) => Number(b.influence_score) - Number(a.influence_score))
+        .sort(byScore)
         .map((r, i) => [r.channel_handle, i + 1]),
     );
   const prevRanks = baseDate ? rankOn(baseDate) : null;
@@ -755,9 +786,7 @@ export async function getChannelRanking(limit = 50): Promise<ChannelRank[]> {
   // 순위는 전 채널로 매기고(위 currRanks/prevRanks), 내려보내는 목록만 자른다.
   // 카드는 10개씩 '더보기'로 펼치는데, 자르지 않으면 317개 행이 사진(건당 ~12KB)까지
   // 달려 페이지 payload에 통째로 실린다.
-  const ranked = [...latest.values()]
-    .sort((a, b) => Number(b.influence_score) - Number(a.influence_score))
-    .slice(0, limit);
+  const ranked = [...latest.values()].sort(byScore).slice(0, limit);
   const { titleOf, photoOf } = await channelMeta(ranked.map((r) => r.channel_handle));
 
   return ranked.map((r) => ({
@@ -795,12 +824,12 @@ export async function getRisingChannels(limit = 10): Promise<RisingChannel[]> {
   // 넘어 페이징 없이는 1,000행에서 조용히 잘린다. 잘리면 대부분 채널이 스냅샷 한 개만
   // 잡혀 아래 `arr.length < 2` 에서 탈락하고, 증감 순위가 실제와 무관해진다.
   const data = await fetchAllRows<{ channel_handle: string; date: string; subscriber_count: number | null }>(
-    (from, to) =>
+    "id",
+    () =>
       db
         .from("telegram_channel_stats")
         .select("channel_handle,date,subscriber_count")
-        .gte("date", daysAgoISO(8).slice(0, 10))
-        .range(from, to),
+        .gte("date", daysAgoISO(8).slice(0, 10)),
   );
 
   const byCh = new Map<string, { d: string; s: number }[]>();
@@ -831,8 +860,11 @@ export async function getRisingChannels(limit = 10): Promise<RisingChannel[]> {
       delta,
     });
   }
-  real.sort((a, b) => b.delta - a.delta);
-  flat.sort((a, b) => b.delta - a.delta);
+  // 증감이 같으면 handle 로 가른다 — 정수라 동점이 흔하고(특히 0), 동점을 안 가르면
+  // 순서가 DB 행 순서에 딸려 흔들린다(채널 랭킹에서 실제로 겪었다).
+  const byDelta = (a: Delta, b: Delta) => b.delta - a.delta || a.handle.localeCompare(b.handle);
+  real.sort(byDelta);
+  flat.sort(byDelta);
 
   // 카드 정원은 항상 채운다. 실제로 늘어난 채널을 먼저 넣고, 모자라면 증감이 없거나
   // 줄어든 채널까지 순서대로 끌어온다(표시되는 증감은 실제값 그대로).
@@ -1022,13 +1054,12 @@ export async function getIssueKeywords(limit = 10): Promise<IssueKeyword[]> {
   const db = getSupabaseAdmin();
   // 화제어는 하루 200행꼴이라 2주면 1,000행 상한을 훌쩍 넘는다 — 반드시 페이징.
   const data = await fetchAllRows<{ date: string; keyword: string; mention_count: number }>(
-    (from, to) =>
+    "id",
+    () =>
       db
         .from("telegram_keyword_daily")
         .select("date,keyword,mention_count")
-        .gte("date", daysAgoISO(14).slice(0, 10))
-        .order("date")
-        .range(from, to),
+        .gte("date", daysAgoISO(14).slice(0, 10)),
   );
   if (!data.length) return [];
 
@@ -1065,7 +1096,9 @@ export async function getIssueKeywords(limit = 10): Promise<IssueKeyword[]> {
   const canCompare = priorDates.size > 0;
   return [...total.entries()]
     .filter(([, count]) => count >= MIN_KEYWORD_MENTIONS)
-    .sort((a, b) => b[1] - a[1])
+    // 언급 수가 같으면 화제어로 가른다 — 정수라 동점이 흔하고, 안 가르면 순위가
+    // DB 행 순서에 딸려 흔들린다(채널 랭킹에서 실제로 겪었다).
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .slice(0, limit)
     .map(([word, count]) => {
       // 창 길이가 다르므로 '하루 평균 점유율'로 맞춰 비교한다.
