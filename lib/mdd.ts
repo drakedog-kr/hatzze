@@ -289,11 +289,20 @@ export function analyzeDrawdown(bars: Bar[]): MddAnalysis | null {
     deeperThanNowPct: (deeperDays / ds.length) * 100,
     mdd,
     mddDate,
-    // 목표 250점 = 샘플 간격이 기간에 따라 저절로 정해진다(거래소 차트와 같은 방식).
-    //   1년 250거래일  → 간격 1일  = 일봉처럼 오르내림이 다 보인다
-    //   5년 1,230일    → 간격 5일  ≈ 주봉
-    //   10년 2,470일   → 간격 10일 ≈ 2주봉, 선이 완만해진다
-    underwater: downsample(ds, 250),
+    // 샘플 간격은 기간에 따라 저절로 정해진다(거래소 차트와 같은 방식).
+    //   1년 243거래일  → 간격 1일   = 일봉처럼 오르내림이 다 보인다
+    //   3년 728일      → 3일
+    //   5년 1,219일    → 5일   ≈ 주봉
+    //   10년 2,446일   → 14일  ≈ 3주봉
+    //   전체 6,639일   → 37일  ≈ 월봉 이상
+    //
+    // 긴 구간은 목표 점수를 180으로 낮춘다 — 10년·전체는 개별 사건보다 다년 추세를
+    // 보는 화면이라 선이 차분해야 읽힌다. 다만 여기서 더 낮추진 않는다: 실측한 하락
+    // 사건 중 가장 짧은 게 31일인데, 10년 기준 14일 간격이면 그 사건에도 점이 두 개는
+    // 남아 자국이 보인다(월봉이면 한 개라 곡선에서 사라진다 — 그러면 "역대 낙폭 Top 5"가
+    // 적어 둔 사건이 바로 위 곡선엔 없는 상태가 된다).
+    // 경계 1,500거래일 ≈ 6년으로, 5년(1,219)과 10년(2,446) 사이에 깔끔히 떨어진다.
+    underwater: downsample(ds, ds.length > 1500 ? 180 : 250),
     recovery: recoveryStats(eps, last.dd),
     character: drawdownCharacter(eps, last.dd),
     topDrawdowns: [...eps].sort((a, b) => a.depth - b.depth).slice(0, 5),
