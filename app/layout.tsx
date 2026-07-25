@@ -14,6 +14,12 @@ const pretendard = localFont({
 });
 
 const SITE_URL = "https://hatzze.fun";
+
+// 서치콘솔·서치어드바이저 소유확인 토큰. 값이 없으면 메타 태그 자체를 만들지 않는다
+// (content가 빈 태그는 두 콘솔 모두 '소유확인 실패'로 처리한다).
+const GOOGLE_VERIFICATION = process.env.GOOGLE_SITE_VERIFICATION;
+const NAVER_VERIFICATION = process.env.NAVER_SITE_VERIFICATION;
+
 const TITLE = "hatzze | 데이터와 감성으로 읽는 시장";
 const DESCRIPTION =
   "시장 지표와 감성 지표로 오늘의 코스피 과열도를 보여줍니다. 버핏지수·VKOSPI·레버리지 등 25개 지표를 매일 0~100 점수로.";
@@ -37,6 +43,12 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: TITLE,
     description: DESCRIPTION,
+  },
+  verification: {
+    ...(GOOGLE_VERIFICATION ? { google: GOOGLE_VERIFICATION } : {}),
+    ...(NAVER_VERIFICATION
+      ? { other: { "naver-site-verification": NAVER_VERIFICATION } }
+      : {}),
   },
 };
 
