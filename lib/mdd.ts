@@ -50,6 +50,12 @@ export type DrawdownCharacter = {
 const CHARACTER_SPLIT_DAYS = 75;
 /** 성격 분석에 넣을 '의미 있는' 하락의 최소 깊이(%). 잔물결은 뺀다. */
 const CHARACTER_MIN_DEPTH = -15;
+/**
+ * 성격(급락형/완만형)을 따지기 시작하는 최소 낙폭(%). 이보다 얕으면 판단하지 않는다.
+ * 화면이 "왜 안 보이는지"를 이 숫자로 설명하므로 export 한다 — 문턱을 옮기면
+ * 안내 문구도 같이 따라와야 한다.
+ */
+export const CHARACTER_MIN_DD = -8;
 
 export type RecoveryStats = {
   /** 지금과 같거나 더 깊었던 사건 수(진행 중 포함). */
@@ -194,7 +200,7 @@ function recoveryStats(eps: Episode[], currentDd: number): RecoveryStats | null 
  * currentDd 는 음수(%). 지금 하락이 뚜렷하지 않거나(−8% 초과) 표본이 얇으면 null.
  */
 function drawdownCharacter(eps: Episode[], currentDd: number): DrawdownCharacter | null {
-  if (currentDd > -8) return null;
+  if (currentDd > CHARACTER_MIN_DD) return null;
   // 진행 중(미회복) 마지막 사건이 곧 '현재 하락'이다.
   const current = eps.length && !eps[eps.length - 1].recovered ? eps[eps.length - 1] : null;
   if (!current) return null;
