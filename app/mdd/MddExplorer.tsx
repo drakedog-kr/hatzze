@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { CHARACTER_MIN_DD } from "@/lib/mdd";
 import type { DrawdownCharacter, DrawdownPoint, Episode, MddAnalysis, RiskProfile as RiskProfileData } from "@/lib/mdd";
 import { C, Icon, MONO } from "../ui";
 
@@ -37,6 +38,9 @@ const fmtWon = (n: number) => `${Math.round(n).toLocaleString("ko-KR")}원`;
 /** 기간을 사람 단위로 짧게. 카드 안 큰 숫자는 이 형식으로 통일한다(1,733일 → 4.7년). */
 const fmtDur = (d: number) => (d >= 365 ? `${(d / 365).toFixed(1)}년` : d >= 45 ? `${Math.round(d / 30)}개월` : `${Math.round(d)}일`);
 const fmtDayCount = (d: number) => `${Math.round(d).toLocaleString("ko-KR")}일`;
+/** 차트 축 라벨용 연·월. "2017-11-24" → "2017-11".
+ *  연도를 두 자리로 줄이면("17-11") 연-월인지 월-일인지 분간이 안 된다. */
+const fmtYm = (date: string) => date.slice(0, 7);
 
 export function MddExplorer({ stocks, initial }: { stocks: StockOption[]; initial?: StockOption | null }) {
   // initial 은 URL(?code=…)로 지정된 종목. 없으면 기본 종목(삼성전자)으로 연다.
@@ -335,27 +339,72 @@ function Results({ data }: { data: MddResult }) {
       <div className="mdd-full">
         <Headline data={data} />
       </div>
-      {data.risk && (
-        <div className="mdd-full">
+      {/* 카드는 데이터가 없어도 자리를 지킨다 — 이유는 AbsentCard 주석 참고.
+          full/half 칸 수도 그대로 유지해야 2열 짝이 안 어긋난다. */}
+      <div className="mdd-full">
+        {data.risk ? (
           <RiskProfile r={data.risk} />
-        </div>
-      )}
-      {data.attribution && (
+        ) : (
+          <AbsentCard
+            icon="insights"
+            title="리스크 프로필"
+            sub="이 종목을 들고 있으면 어떤 위험을 감수하게 되는지, 세 가지 각도로 봅니다."
+            body="상장한 지 얼마 되지 않아 연도별 성적과 큰 하락을 낼 만큼 이력이 쌓이지 않았습니다."
+          />
+        )}
+      </div>
+      {data.attribution ? (
         <Attribution
           attr={data.attribution}
           themeName={data.theme?.name ?? null}
           themePeers={data.theme?.peers.filter((p) => !p.isSelf).map((p) => p.name) ?? []}
           athDate={a.athDate}
         />
+      ) : (
+        <AbsentCard
+          icon="call_split"
+          title="이 하락, 시장 탓일까 종목 탓일까"
+          sub="고점 이후 같은 기간을 시장·테마와 나란히 놓고 비교합니다."
+          body={
+            a.currentDd > -1
+              ? "지금은 고점 부근이라 원인을 나눌 하락이 없습니다."
+              : `고점(${a.athDate}) 무렵의 코스피·테마 기록이 없어 같은 기간을 나란히 놓지 못했습니다.`
+          }
+        />
       )}
-      {a.character && <Character ch={a.character} />}
-      {a.recovery && <Recovery a={a} />}
-      {a.topDrawdowns.length > 0 && <TopDrawdowns eps={a.topDrawdowns} />}
-      {data.theme && (
-        <div className="mdd-full">
+      <Character ch={a.character} currentDd={a.currentDd} />
+      {a.recovery ? (
+        <Recovery a={a} />
+      ) : (
+        <AbsentCard
+          icon="history"
+          title="회복까지 걸린 시간"
+          sub="과거 이만큼 빠졌을 때 고점을 되찾기까지 걸린 기간입니다."
+          body="지금은 고점 부근이라 회복을 기다릴 하락이 없습니다."
+        />
+      )}
+      {a.topDrawdowns.length > 0 ? (
+        <TopDrawdowns eps={a.topDrawdowns} />
+      ) : (
+        <AbsentCard
+          icon="leaderboard"
+          title="역대 낙폭 Top 5"
+          sub="이 기간에 가장 깊었던 하락과, 고점을 되찾기까지 걸린 시간입니다."
+          body="이 기간엔 순위를 매길 만한 하락이 없었습니다. 기간을 넓히면 더 나올 수 있습니다."
+        />
+      )}
+      <div className="mdd-full">
+        {data.theme ? (
           <Theme theme={data.theme} />
-        </div>
-      )}
+        ) : (
+          <AbsentCard
+            icon="hub"
+            title="테마 비교"
+            sub="같은 테마 대표 종목들과 지금 낙폭을 나란히 놓습니다."
+            body="이 종목이 묶인 테마를 찾지 못했습니다. 테마 대표 종목 목록에 등록된 종목에서만 비교가 나옵니다."
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -379,6 +428,26 @@ function CardHead({ icon, title, sub, right }: { icon: string; title: string; su
       </div>
       {right && <div style={{ flexShrink: 0 }}>{right}</div>}
     </div>
+  );
+}
+
+/**
+ * 데이터가 없어 본문을 못 채우는 카드의 공통 껍데기.
+ *
+ * 카드를 통째로 숨기지 않는다. 종목을 바꿀 때마다 격자에서 카드가 빠지면 (1) 2열 짝이
+ * 어긋나 옆 카드 가운데가 텅 비고, (2) 문턱이 절벽이라 카드가 깜빡인다 — 성격 카드는
+ * −8% 문턱이라 KB금융(−7.9%)이 0.1%p 차이로 사라져, 하루 사이 생겼다 없어지면
+ * "어제 있던 게 왜 없지"가 된다. 자리를 지키고 왜 못 보여주는지를 적는다.
+ */
+function AbsentCard({ icon, title, sub, body }: { icon: string; title: string; sub: string; body: string }) {
+  return (
+    <section style={card}>
+      <CardHead icon={icon} title={title} sub={sub} />
+      <p style={{ margin: 0, color: C.muted, fontSize: 12.5, lineHeight: 1.7, wordBreak: "keep-all" }}>
+        <Icon name="info" style={{ fontSize: 14, verticalAlign: -2, marginRight: 4 }} />
+        {body}
+      </p>
+    </section>
   );
 }
 
@@ -643,8 +712,8 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
     a: { pct: number; color: string; opacity: number; value: string },
     b: { pct: number; color: string; opacity: number; value: string },
   ) => (
-    <div key={key} style={{ display: "grid", gridTemplateColumns: "24px minmax(0,1fr)", alignItems: "center", gap: 8 }}>
-      <span style={{ fontFamily: MONO, fontSize: 11, color: C.faint }}>{`'${String(year).slice(2)}`}</span>
+    <div key={key} style={{ display: "grid", gridTemplateColumns: "30px minmax(0,1fr)", alignItems: "center", gap: 8 }}>
+      <span style={{ fontFamily: MONO, fontSize: 11, color: C.faint }}>{year}</span>
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {[a, b].map((s, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 7 }}>
@@ -878,6 +947,18 @@ function Attribution({
 }
 
 /* ── 회복까지 걸린 시간 ─────────────────────────────────────────── */
+/* 줄 레이아웃 = [날짜칸] gap [막대 트랙] gap [값칸]. 중앙값 눈금이 트랙 위에 절대배치로
+   얹히면서 같은 폭을 다시 쓰기 때문에 상수로 묶는다. 예전엔 grid 문자열에 박아 두고
+   눈금 쪽에 51/71 을 손으로 적어 놨는데, 날짜칸을 넓히자(42→50) 눈금만 8px 어긋나
+   막대가 선을 넘어 보였다. */
+const REC_DATE_W = 50;
+const REC_VALUE_W = 62;
+const REC_GAP = 9;
+/* 막대의 최소 폭. 눈금도 같은 하한을 쓴다 — 중앙값이 이 폭 안쪽에 떨어지는 종목
+   (KB금융처럼 최장 표본이 중앙값의 30배가 넘는 경우)에서 눈금만 막대 뭉치 안에
+   박혀 모든 막대가 선을 넘어 보이던 것을 막는다. */
+const REC_BAR_MIN_W = 18;
+
 function Recovery({ a }: { a: MddAnalysis }) {
   const r = a.recovery!;
 
@@ -898,6 +979,13 @@ function Recovery({ a }: { a: MddAnalysis }) {
 
   // 눈금 상한은 표본 중 가장 긴 기간. 미회복 건은 '지금까지 걸린 시간'이라 같은 축에 놓인다.
   const longest = Math.max(1, ...r.samples.map((s) => s.days));
+
+  /* 제곱근 눈금. 선형으로 그리면 최장 표본 하나가 축을 다 먹는다 — KB금융은 6.1년 한 건
+     때문에 나머지 13건(11일~5개월)이 전부 최소 폭 18px 에 붙어 버려 서로 구분이 안 됐다.
+     제곱근은 짧은 쪽을 벌리면서 순서와 "길수록 오래"라는 직관을 지킨다(로그와 달리
+     0 근처가 발산하지 않는다). 대신 길이 비율은 실제 비율보다 눌리므로, 정확한 값은
+     오른쪽 숫자로 읽게 하고 카드 아래에 그렇게 적어 둔다. */
+  const barPct = (days: number) => Math.sqrt(days / longest) * 100;
 
   return (
     <section style={{ ...card, display: "flex", flexDirection: "column" }}>
@@ -928,26 +1016,32 @@ function Recovery({ a }: { a: MddAnalysis }) {
         </div>
         <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 9 }}>
         {r.samples.map((s) => (
-          <div key={s.peakDate} style={{ display: "grid", gridTemplateColumns: "42px minmax(0,1fr) 62px", alignItems: "center", gap: 9 }}>
-            <span style={{ fontFamily: MONO, fontSize: 11, color: C.faint }}>{s.peakDate.slice(2, 7)}</span>
+          <div key={s.peakDate} style={{ display: "grid", gridTemplateColumns: `${REC_DATE_W}px minmax(0,1fr) ${REC_VALUE_W}px`, alignItems: "center", gap: REC_GAP }}>
+            <span style={{ fontFamily: MONO, fontSize: 11, color: C.faint, whiteSpace: "nowrap" }}>{fmtYm(s.peakDate)}</span>
+            {/* 껍데기를 둘로 나눈다. 툴팁(.hz-tip::after)은 position:absolute; bottom:100% 로
+                요소 박스 '바깥 위쪽'에 그려지는데, 막대 둥근 모서리를 자르는 overflow:hidden 이
+                같은 요소에 있으면 툴팁이 통째로 잘려 영영 안 보인다(커서만 물음표로 바뀌어
+                있지도 않은 설명을 약속한다). 바깥은 툴팁 기준점, 안쪽은 클리핑 담당. */}
             <span
               className="hz-tip hz-tip-wide hz-tip-end"
               data-tip={`${s.peakDate} 고점에서 ${fmtPct(s.depth)}까지 빠졌고, ${s.recovered ? `${fmtDayCount(s.days)} 만에 고점을 되찾았습니다` : `${fmtDayCount(s.days)}째 회복 중입니다`}.`}
-              style={{ height: 10, background: C.bg, borderRadius: 999, overflow: "hidden", cursor: "help" }}
+              style={{ display: "block", cursor: "help" }}
             >
-              {/* minWidth 18px — 36일 vs 4.7년처럼 차이가 크면 비율만으로는 폭이 몇 px 라
-                  둥근 모서리에 먹혀 점 하나처럼 보인다(렌더 오류로 오해하기 쉽다).
-                  높이(10)보다 넉넉히 넓어야 원이 아니라 짧은 막대로 읽힌다. */}
-              <span
-                style={{
-                  display: "block",
-                  height: "100%",
-                  width: `${(s.days / longest) * 100}%`,
-                  minWidth: 18,
-                  background: s.recovered ? C.cold : C.mania,
-                  borderRadius: 999,
-                }}
-              />
+              <span style={{ display: "block", height: 10, background: C.bg, borderRadius: 999, overflow: "hidden" }}>
+                {/* minWidth 18px — 36일 vs 4.7년처럼 차이가 크면 비율만으로는 폭이 몇 px 라
+                    둥근 모서리에 먹혀 점 하나처럼 보인다(렌더 오류로 오해하기 쉽다).
+                    높이(10)보다 넉넉히 넓어야 원이 아니라 짧은 막대로 읽힌다. */}
+                <span
+                  style={{
+                    display: "block",
+                    height: "100%",
+                    width: `${barPct(s.days)}%`,
+                    minWidth: REC_BAR_MIN_W,
+                    background: s.recovered ? C.cold : C.mania,
+                    borderRadius: 999,
+                  }}
+                />
+              </span>
             </span>
             <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, textAlign: "right", color: s.recovered ? C.sub : C.mania }}>
               {fmtDur(s.days)}
@@ -955,22 +1049,37 @@ function Recovery({ a }: { a: MddAnalysis }) {
           </div>
         ))}
         {/* 중앙값 눈금 — 막대 칸(가운데 트랙)에만 걸치도록 좌우 여백을 맞춘다.
-            바깥 여백(51 = 날짜칸 42 + gap 9, 71 = 값칸 62 + gap 9). */}
-        <div style={{ position: "absolute", left: 51, right: 71, top: 0, bottom: 0, pointerEvents: "none" }}>
-          <div style={{ position: "absolute", left: `${(r.medianDays! / longest) * 100}%`, top: -4, bottom: -4, width: 1, background: C.faint }} />
+            트랙의 좌우 바깥은 [날짜칸 + gap] 과 [값칸 + gap] 이다. */}
+        <div style={{ position: "absolute", left: REC_DATE_W + REC_GAP, right: REC_VALUE_W + REC_GAP, top: 0, bottom: 0, pointerEvents: "none" }}>
+          <div
+            style={{
+              position: "absolute",
+              left: `max(${REC_BAR_MIN_W}px, ${barPct(r.medianDays!)}%)`,
+              top: -4,
+              bottom: -4,
+              width: 1,
+              background: C.faint,
+            }}
+          />
         </div>
         </div>
       </div>
       <p style={{ margin: "14px 0 0", fontSize: 12, color: C.muted, lineHeight: 1.6 }}>
         회복한 {r.recoveredCount}번의 중앙값은 <b style={{ color: C.sub }}>{fmtDur(r.medianDays!)}</b>(세로선), 가장 빠른 때가{" "}
         <b style={{ color: C.sub }}>{fmtDur(r.minDays!)}</b>, 가장 오래 걸린 때가 <b style={{ color: C.sub }}>{fmtDur(r.maxDays!)}</b>였습니다.
+        {" "}막대 길이는 짧은 기간도 구분되도록 눌러 그렸으니 정확한 값은 오른쪽 숫자로 보십시오.
       </p>
     </section>
   );
 }
 
 /* ── 이 하락의 성격 ─────────────────────────────────────────────── */
-function Character({ ch }: { ch: DrawdownCharacter }) {
+/* ch 가 null 이어도 카드를 지우지 않고 "왜 못 따지는지"를 남긴다.
+   예전엔 통째로 숨겼는데, 문턱(−8%)이 절벽이라 카드가 깜빡였다 — KB금융은 −7.9% 라
+   0.1%p 차이로 사라져서, 하루 사이 생겼다 없어졌다 하면 "어제 있던 게 왜 없지"가 된다.
+   2열 그리드에서 짝이 어긋나 옆 카드 가운데가 텅 비던 것도 같이 사라진다. */
+function Character({ ch, currentDd }: { ch: DrawdownCharacter | null; currentDd: number }) {
+  if (!ch) return <CharacterAbsent currentDd={currentDd} />;
   const isFast = ch.currentClass === "fast";
   const curLabel = isFast ? "급락형" : "완만형";
   const hasBuckets = Boolean(ch.fast || ch.slow);
@@ -1031,6 +1140,22 @@ function Character({ ch }: { ch: DrawdownCharacter }) {
         </p>
       )}
     </section>
+  );
+}
+
+/** 성격을 못 따지는 경우의 같은 자리 카드. 문턱을 넘겼는지에 따라 이유가 다르다. */
+function CharacterAbsent({ currentDd }: { currentDd: number }) {
+  return (
+    <AbsentCard
+      icon="bolt"
+      title="이 하락의 성격"
+      sub="같은 깊이라도 빨리 빠진 하락과 오래 흘러내린 하락은 회복 양상이 다릅니다."
+      body={
+        currentDd > -1
+          ? "지금은 고점 부근이라 성격을 따질 하락이 없습니다."
+          : `지금 하락은 ${fmtPct(currentDd)}입니다. 고점 대비 ${Math.abs(CHARACTER_MIN_DD)}% 이상 빠졌을 때부터 급락형과 완만형을 나눕니다. 이보다 얕은 눌림은 속도로 성격을 가리기 어렵습니다.`
+      }
+    />
   );
 }
 
