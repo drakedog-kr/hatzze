@@ -60,6 +60,14 @@ export type RecoveryStats = {
   minDays: number | null;
   medianDays: number | null;
   maxDays: number | null;
+  /**
+   * 통계를 낸 사건 하나하나(진행 중 포함, 고점 날짜순).
+   * 최단·중앙값·최장 세 숫자만으로는 "4.7년"이 예외적으로 길었던 한 번인지
+   * 늘 그 정도인지 알 수 없어서, 화면이 분포를 그릴 수 있게 표본을 함께 넘긴다.
+   * topDrawdowns 로 대신할 수 없다 — 그건 깊이 상위 5건이라 '지금보다 깊었던
+   * 사건'이 6건 이상이면 일부가 빠진다.
+   */
+  samples: { peakDate: string; days: number; depth: number; recovered: boolean }[];
 };
 
 export type MddAnalysis = {
@@ -164,7 +172,7 @@ function recoveryStats(eps: Episode[], currentDd: number): RecoveryStats | null 
   if (currentDd > -1) return null;
   const similar = eps.filter((e) => e.depth <= currentDd);
   if (similar.length === 0) {
-    return { similarCount: 0, recoveredCount: 0, unrecoveredCount: 0, minDays: null, medianDays: null, maxDays: null };
+    return { similarCount: 0, recoveredCount: 0, unrecoveredCount: 0, minDays: null, medianDays: null, maxDays: null, samples: [] };
   }
   const recovered = similar.filter((e) => e.recovered);
   const days = recovered.map((e) => e.days);
@@ -175,6 +183,9 @@ function recoveryStats(eps: Episode[], currentDd: number): RecoveryStats | null 
     minDays: days.length ? Math.min(...days) : null,
     medianDays: days.length ? median(days) : null,
     maxDays: days.length ? Math.max(...days) : null,
+    samples: [...similar]
+      .sort((a, b) => a.peakDate.localeCompare(b.peakDate))
+      .map((e) => ({ peakDate: e.peakDate, days: e.days, depth: e.depth, recovered: e.recovered })),
   };
 }
 
