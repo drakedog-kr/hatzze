@@ -464,9 +464,10 @@ function Underwater({ series, mdd }: { series: DrawdownPoint[]; mdd: number }) {
 
   return (
     <div style={{ position: "relative" }}>
-      {/* overflow:visible — 현재 점(cx=W)이 뷰박스 오른쪽 끝에 정확히 놓여, 기본값
-          (hidden)이면 반지름만큼이 잘려 반달로 보였다. 뷰박스를 넓히는 대신 넘침만
-          허용한다 — 넓히면 아래 크로스헤어 띠(퍼센트로 잡은 위치)가 곡선과 어긋난다. */}
+      {/* overflow:visible — 최저점 표시가 하필 마지막 지점일 때(지금이 역대 최저인
+          종목) 뷰박스 오른쪽 끝에 놓여 기본값(hidden)이면 반지름만큼 잘린다. 뷰박스를
+          넓히는 대신 넘침만 허용한다 — 넓히면 아래 크로스헤어 띠(퍼센트로 잡은 위치)가
+          곡선과 어긋난다. */}
       <svg
         viewBox={`0 -6 ${W} ${H + 26}`}
         width="100%"
@@ -480,9 +481,10 @@ function Underwater({ series, mdd }: { series: DrawdownPoint[]; mdd: number }) {
         ))}
         <path d={area} fill={C.cold} fillOpacity="0.14" />
         <path d={line} fill="none" stroke={C.cold} strokeWidth="1.6" strokeLinejoin="round" />
-        {/* 최저점 — 속 빈 점으로 현재 점(속 찬 점)과 구분한다. */}
+        {/* 기간 최저점 표시. 현재 지점에도 속 찬 점을 찍었었는데 뺐다 — 선이 끝나는
+            자리가 곧 현재이고, 그 값은 헤드라인(고점 대비 −31.2%)이 이미 크게 말한다.
+            오른쪽 끝에 점 하나가 더 있으면 눈만 끌 뿐이었다. */}
         <circle cx={x(ti)} cy={y(series[ti].dd)} r="3.5" fill={C.card} stroke={C.cold} strokeWidth="1.6" />
-        <circle cx={W} cy={y(series[n - 1].dd)} r="4.5" fill={C.cold} stroke={C.card} strokeWidth="2" />
         {rows.map((dd, i) => (
           <text key={i} x={PAD_L - LABEL_GAP} y={y(dd) + 4} fontSize="11" fill={C.faint} textAnchor="end">
             {Math.round(dd)}%
