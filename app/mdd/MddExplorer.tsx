@@ -464,7 +464,16 @@ function Underwater({ series, mdd }: { series: DrawdownPoint[]; mdd: number }) {
 
   return (
     <div style={{ position: "relative" }}>
-      <svg viewBox={`0 -6 ${W} ${H + 26}`} width="100%" role="img" aria-label={`고점 대비 낙폭 곡선. 현재 ${fmtPct(series[n - 1].dd)}, 기간 최저 ${fmtPct(mdd)}`}>
+      {/* overflow:visible — 현재 점(cx=W)이 뷰박스 오른쪽 끝에 정확히 놓여, 기본값
+          (hidden)이면 반지름만큼이 잘려 반달로 보였다. 뷰박스를 넓히는 대신 넘침만
+          허용한다 — 넓히면 아래 크로스헤어 띠(퍼센트로 잡은 위치)가 곡선과 어긋난다. */}
+      <svg
+        viewBox={`0 -6 ${W} ${H + 26}`}
+        width="100%"
+        style={{ overflow: "visible" }}
+        role="img"
+        aria-label={`고점 대비 낙폭 곡선. 현재 ${fmtPct(series[n - 1].dd)}, 기간 최저 ${fmtPct(mdd)}`}
+      >
         <line x1={PAD_L} y1="0" x2={W} y2="0" stroke={C.line} strokeWidth="1" />
         {rows.slice(1).map((dd, i) => (
           <line key={i} x1={PAD_L} y1={y(dd)} x2={W} y2={y(dd)} stroke={C.line} strokeWidth="1" strokeDasharray="2 5" />
