@@ -57,6 +57,7 @@ function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              className={`hz-nav-item${active ? " hz-nav-active" : ""}`}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -64,7 +65,10 @@ function Sidebar() {
                 padding: "16px 20px",
                 color: active ? C.blue : C.sub,
                 fontWeight: active ? 700 : 600,
-                background: active ? "var(--c-blue-tint)" : "transparent",
+                // 비활성일 때 background 를 인라인으로 두면(예전 "transparent") 인라인이
+                // 우선순위에서 이겨 .hz-nav-item:hover 회색 배경이 먹히지 않는다. 값을 아예
+                // 빼서 호버는 CSS 가 담당하게 한다.
+                background: active ? "var(--c-blue-tint)" : undefined,
                 borderRadius: 14,
                 textDecoration: "none",
               }}
@@ -80,7 +84,7 @@ function Sidebar() {
           href="https://t.me/hatzze_kr"
           target="_blank"
           rel="noopener noreferrer"
-          className="hz-nav-external"
+          className="hz-nav-item"
           style={{
             display: "flex",
             alignItems: "center",
