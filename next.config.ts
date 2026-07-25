@@ -11,10 +11,14 @@ const nextConfig: NextConfig = {
   // 로컬 프로덕션 미리보기(`npm run build:local`)가 dev 서버를 죽이던 게 그 경우다.
   distDir: process.env.NEXT_DIST_DIR || ".next",
 
-  // OG 이미지(app/opengraph-image.tsx)가 런타임에 읽는 Pretendard OTF를 프로덕션
-  // 번들에 확실히 포함시킨다 — 없으면 배포 환경에서 폰트 로딩이 실패할 수 있다.
+  // OG 이미지(app/opengraph-image.tsx)가 런타임에 읽는 폰트를 프로덕션 번들에
+  // 확실히 포함시킨다 — 없으면 배포 환경에서 폰트 로딩이 실패할 수 있다.
+  // 본문·설명은 Pretendard(한글), 워드마크는 브랜드 서체 Bricolage Grotesque.
   outputFileTracingIncludes: {
-    "/opengraph-image": ["./node_modules/pretendard/dist/public/static/Pretendard-*.otf"],
+    "/opengraph-image": [
+      "./node_modules/pretendard/dist/public/static/Pretendard-*.otf",
+      "./node_modules/@fontsource/bricolage-grotesque/files/bricolage-grotesque-latin-700-normal.woff",
+    ],
   },
 
   // 카더라 리포트가 /telegram 으로 먼저 배포됐다(2026-07-20). /kadera 로 옮기면서
