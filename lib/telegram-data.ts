@@ -955,6 +955,30 @@ function toPercents(pos: number, neu: number, neg: number): [number, number, num
 }
 
 /**
+ * 카드에 막대로 그릴 테마 수, 그리고 테마가 막대에 오르기 위한 최소 표본.
+ *
+ * ⚠️ **두 값 모두 data-pipeline/scripts/generate_telegram_narratives.py 의
+ * THEME_TOP_N · MIN_DECIDED 와 같은 값이어야 한다.** 그쪽은 같은 테이블을 같은 기준으로
+ * 다시 집계해 LLM 총평의 입력(digest)을 만드는데, 총평은 이 카드 **바로 왼쪽**에 붙는다.
+ * 한쪽만 고치면 총평이 옆 막대에 없는 테마의 숫자를 인용하고, 독자는 그 숫자를 확인할
+ * 방법이 없다. Python 과 TS 라 import 로 공유할 수 없어 손으로 맞춘 사본이다
+ * (lib/stock-themes.ts ↔ config/stock_themes.py 와 같은 관례).
+ *
+ * 실제로 두 번 났던 일이다. 2026-07-22 에는 하한이 어긋나 표본 서너 건짜리 테마의
+ * "100% 긍정"이 총평에만 나왔고(하한을 맞춰 고침), 2026-07-26 에는 개수가 어긋나
+ * 5·6위 테마(인터넷·플랫폼 96%, 방산 90%)가 총평에만 나왔다.
+ *
+ * 4개인 이유는 레이아웃이다. 이 카드는 반칸이라 막대 4줄이 왼쪽 종합 막대 블록과
+ * 높이가 맞는 한계다. 그래서 **총평 쪽을 이 값에 맞춘다**(카드를 늘리는 게 아니라).
+ */
+const THEME_TOP_N = 4;
+
+/** 낙관/비관이 합쳐 이만큼은 돼야 비율에 의미가 있다. 그 아래는 한두 건에 100:0이 되어
+ *  실제보다 단정적으로 보인다. 남은 극단값은 표본을 툴팁으로 같이 보여 해석을 돕는다.
+ *  위 THEME_TOP_N 주석의 동기화 규칙이 이 값에도 그대로 적용된다. */
+const THEME_MIN_DECIDED = 8;
+
+/**
  * 생태계 센티먼트 — 최근 7일 메시지 톤 구성 + 테마별 낙관 비중 + LLM 총평.
  * 테마는 파이프라인이 config/stock_themes.py(테마 로테이션과 같은 사전)로 묶어 둔 것이다.
  */
@@ -985,10 +1009,9 @@ export async function getEcosystemSentiment(): Promise<EcosystemSentiment | null
   const [positive, neutral, negative] = toPercents(overall.pos, overall.neu, overall.neg);
 
   // 테마 막대는 낙관↔비관 양분 구조라 중립을 뺀 대립 비율로 그린다.
-  // 낙관/비관이 합쳐 8건은 돼야 비율에 의미가 있다(그 아래는 한두 건에 100:0이 되어
-  // 실제보다 단정적으로 보인다). 남은 극단값은 표본을 툴팁으로 같이 보여 해석을 돕는다.
+  // 하한·개수는 총평 쪽과 같이 움직여야 한다(THEME_TOP_N 주석 참고).
   const byTheme = [...agg.entries()]
-    .filter(([scope, a]) => scope !== "overall" && a.pos + a.neg >= 8)
+    .filter(([scope, a]) => scope !== "overall" && a.pos + a.neg >= THEME_MIN_DECIDED)
     .map(([scope, a]) => ({
       name: scope,
       pos: Math.round((a.pos / (a.pos + a.neg)) * 100),
@@ -997,7 +1020,7 @@ export async function getEcosystemSentiment(): Promise<EcosystemSentiment | null
       total: a.total,
     }))
     .sort((x, y) => y.total - x.total)
-    .slice(0, 4);
+    .slice(0, THEME_TOP_N);
 
   const { data: brief } = await db
     .from("telegram_daily_brief")
