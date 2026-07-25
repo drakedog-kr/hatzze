@@ -15,6 +15,16 @@ const NAV = [
   { href: "/mdd", label: "MDD 정밀분석", icon: "trending_down" },
 ];
 
+// 외부(텔레그램) 링크라 NAV 배열이 아니라 따로 둔다 — pathname 기반 active 판정 대상이
+// 아니고, 새 탭으로 열려야 해서 next/link 가 아닌 <a> 를 쓴다. 사이드바와 모바일 탭바가
+// 같은 값을 참조해야 두 내비게이션의 항목이 어긋나지 않는다.
+const COMMUNITY = { href: "https://t.me/hatzze_kr", label: "커뮤니티 합류", icon: "send" };
+
+/** NAV 항목의 현재 페이지 판정. 사이드바와 모바일 탭바가 같은 규칙을 써야 한다. */
+function isActive(href: string, pathname: string) {
+  return href === "/" ? pathname === "/" : pathname.startsWith(href);
+}
+
 const STAGE_COLOR: Record<string, string> = {
   저온: C.cold,
   상온: C.neutral,
@@ -52,7 +62,7 @@ function Sidebar() {
       </div>
       <nav style={{ flex: 1, padding: "0 16px", display: "flex", flexDirection: "column", gap: 8 }}>
         {NAV.map((item) => {
-          const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          const active = isActive(item.href, pathname);
           return (
             <Link
               key={item.href}
@@ -78,10 +88,8 @@ function Sidebar() {
             </Link>
           );
         })}
-        {/* 외부(텔레그램) 링크라 NAV 배열이 아니라 따로 둔다 — pathname 기반 active 판정
-            대상이 아니고, 새 탭으로 열려야 해서 next/link 가 아닌 <a> 를 쓴다. */}
         <a
-          href="https://t.me/hatzze_kr"
+          href={COMMUNITY.href}
           target="_blank"
           rel="noopener noreferrer"
           className="hz-nav-item"
@@ -96,11 +104,73 @@ function Sidebar() {
             textDecoration: "none",
           }}
         >
-          <Icon name="send" />
-          <span style={{ fontSize: 15 }}>커뮤니티 합류</span>
+          <Icon name={COMMUNITY.icon} />
+          <span style={{ fontSize: 15 }}>{COMMUNITY.label}</span>
         </a>
       </nav>
     </aside>
+  );
+}
+
+// 모바일 하단 탭바 — 사이드바가 560px 아래에서 숨겨지는데(globals.css) 그 자리를 메우는
+// 내비게이션이 없었다. /kadera·/mdd 로 가는 유일한 링크가 푸터(문서 y≈10,774px)라
+// 사실상 닿을 수 없었다.
+//
+// 햄버거+드로어 대신 하단 탭바를 고른 이유:
+//  1. 항목이 4개뿐이라 한 줄에 다 들어간다 — 접어 숨길 이유가 없다.
+//  2. 이 화면의 문제는 "갈 곳이 있는 줄 모른다"였다. 드로어는 그걸 한 겹 더 감춘다.
+//  3. 현재 페이지 표시(사이드바와 같은 파란 배경)가 늘 떠 있다 — 드로어는 열어야 보인다.
+//
+// position:fixed 가 아니라 셸 flex 칼럼의 마지막 칸으로 둔다. 스크롤은 바깥이 아니라
+// main.hz-scroll 이 자체적으로 하므로, 흐름에 놓으면 마지막 콘텐츠를 덮을 일이 없다
+// (하단 패딩으로 가림을 보정할 필요도 없다).
+function MobileTabBar() {
+  const pathname = usePathname();
+
+  const tabStyle = (active: boolean): React.CSSProperties => ({
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+    padding: "7px 2px",
+    borderRadius: 12,
+    color: active ? C.blue : C.sub,
+    fontWeight: active ? 700 : 600,
+    // 사이드바와 같은 이유로 비활성 background 는 인라인에서 뺀다 — 값을 두면
+    // .hz-nav-item:hover 를 인라인이 이겨버린다.
+    background: active ? "var(--c-blue-tint)" : undefined,
+    textDecoration: "none",
+  });
+
+  return (
+    <nav className="hz-tabbar" aria-label="주요 메뉴" style={{ flexShrink: 0, background: C.card, borderTop: `1px solid ${C.line}`, padding: "6px 8px" }}>
+      {NAV.map((item) => {
+        const active = isActive(item.href, pathname);
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={`hz-tab hz-nav-item${active ? " hz-nav-active" : ""}`}
+            aria-current={active ? "page" : undefined}
+            style={tabStyle(active)}
+          >
+            <Icon name={item.icon} style={{ fontSize: 22 }} />
+            <span style={{ fontSize: 10, whiteSpace: "nowrap" }}>{item.label}</span>
+          </Link>
+        );
+      })}
+      <a
+        href={COMMUNITY.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="hz-tab hz-nav-item"
+        style={tabStyle(false)}
+      >
+        <Icon name={COMMUNITY.icon} style={{ fontSize: 22 }} />
+        <span style={{ fontSize: 10, whiteSpace: "nowrap" }}>{COMMUNITY.label}</span>
+      </a>
+    </nav>
   );
 }
 
@@ -243,8 +313,8 @@ export default function AppShell({
 }) {
   return (
     <div
+      className="hz-shell"
       style={{
-        height: "100vh",
         display: "flex",
         background: C.bg,
         color: C.ink,
@@ -263,6 +333,7 @@ export default function AppShell({
           {children}
           <Footer />
         </main>
+        <MobileTabBar />
       </div>
     </div>
   );

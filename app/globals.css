@@ -143,12 +143,31 @@ body {
   .hz-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hz-c2, .hz-c3, .hz-c4 { grid-column: span 2; }
 }
+/* 셸 전체 높이. 100dvh는 모바일 브라우저 주소창이 떠 있을 때의 실제 보이는 높이라,
+   100vh만 쓰면 셸 바닥(하단 탭바)이 주소창 뒤로 밀려 첫 화면에서 안 보인다. dvh를
+   모르는 브라우저는 앞줄 100vh로 되돌아간다. 데스크톱에서는 둘이 같은 값이다. */
+.hz-shell {
+  height: 100vh;
+  height: 100dvh;
+}
+
 /* 사이드바의 display는 여기서 관리한다 — 인라인 스타일로 두면 아래
    모바일 미디어쿼리의 display:none을 이겨버려 숨김이 안 먹는다. */
 .hz-sidebar {
   display: flex;
   flex-direction: column;
 }
+
+/* 모바일 하단 탭바 — 사이드바가 숨겨지는 폭에서만 나타난다(같은 브레이크포인트를 쓴다).
+   display를 인라인이 아니라 여기서 관리하는 이유는 사이드바와 같다. */
+.hz-tabbar {
+  display: none;
+}
+.hz-tab {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 /* 히어로 패딩/gap은 여기서 관리 — 모바일에서 좁혀야 고정 300px 게이지와
    냉정/보통/과열/광기 라벨이 화면 안에 온전히 들어온다. */
 .hz-hero { padding: 24px 48px; gap: 56px; }
@@ -158,6 +177,7 @@ body {
   .hz-span2 { grid-column: span 1; }
   .hz-c2, .hz-c3, .hz-c4 { grid-column: span 1; }
   .hz-sidebar { display: none; }
+  .hz-tabbar { display: flex; }
   .hz-hero { padding: 28px 20px; gap: 32px; }
   .hz-topbar-date { display: none; }
 }
@@ -335,7 +355,8 @@ body {
   background: var(--c-bg);
 }
 
-/* 사이드바 메뉴(내부 3개 + 텔레그램 커뮤니티). 호버 배경으로 "눌리는 요소"임을 알린다.
+/* 내비게이션 항목(사이드바·모바일 탭바 공통, 내부 3개 + 텔레그램 커뮤니티).
+   호버 배경으로 "눌리는 요소"임을 알린다.
    현재 페이지(hz-nav-active)는 파란 배경이 그대로 남아야 하므로 :not()으로 제외한다 —
    회색 호버가 덮으면 어느 페이지에 있는지 표시가 사라진다. */
 .hz-nav-item {
