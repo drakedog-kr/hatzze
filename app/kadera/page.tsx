@@ -754,11 +754,11 @@ export default async function KaderaPage() {
                         </span>
                       )}
                     </div>
-                    {/* 언급 추이 — 막대를 바닥선 위에 세운다. 평소엔 마지막 날만 진해
-                        "지금"이 어디인지 눈이 먼저 잡고, 마우스를 올리면 그 날로 강조가
+                    {/* 언급 추이 — 막대를 바닥선 위에 세운다. 진한 칸이 곧 카드 수치에 들어간
+                        최근 3일이고 앞쪽 옅은 칸은 배경 맥락이다. 마우스를 올리면 그 날로 강조가
                         옮겨간다(진하기·날짜색 규칙은 globals.css 의 .hz-bars). */}
                     <div className="hz-bars" style={{ display: "flex", alignItems: "flex-end", gap: 4, margin: "14px 0 12px", borderBottom: `1px solid ${C.line}` }}>
-                      {r.series.map((d, i) => (
+                      {r.series.map((d) => (
                         <div
                           key={d.date}
                           className="hz-tip hz-bar-col"
@@ -766,11 +766,11 @@ export default async function KaderaPage() {
                           // 커서는 기본 그대로 둔다 — 도움말(?)이 아니라 값을 짚어 보는 차트다.
                           style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 5, minWidth: 0 }}
                         >
-                          {/* 집계 창 밖(앞쪽 칸)은 배경 맥락이라 더 옅게 — 막대는 7일치인데
+                          {/* 집계 창 밖(앞쪽 칸)은 배경 맥락이라 옅게 — 막대는 7일치인데
                               아래 '언급 N회'는 최근 3일치라, 어디까지가 그 숫자인지 눈으로
                               짚을 수 있어야 한다(globals.css 의 .hz-bar-ctx). */}
                           <div
-                            className={`hz-bar${d.scored ? "" : " hz-bar-ctx"}${i === r.series.length - 1 ? " hz-bar-last" : ""}`}
+                            className={`hz-bar${d.scored ? "" : " hz-bar-ctx"}`}
                             style={{
                               width: "100%",
                               height: `${Math.max(3, (d.mentions / max) * 40)}px`,
