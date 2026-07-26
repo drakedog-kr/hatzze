@@ -146,10 +146,29 @@ body {
      비어 버린다. 내용만큼만 세운다(짧은 카드는 짧아도 된다). */
 .hz-selfstretch-lg { align-self: stretch; }
 
+/* 생태계 센티먼트 총평이 차지하는 자리. 줄 수·줄 높이는 app/kadera/page.tsx 가
+   --hz-summary-lines / --hz-summary-lh 로 넘긴다(숫자의 출처를 TS 한 곳에 둔다).
+   4열에서만 높이를 고정하는 이유는 hz-selfstretch-lg 와 같다 — 그 폭에서만 옆에
+   '모니터링 현황'이 나란히 서기 때문이다. 2열 이하에선 이 카드가 한 줄을 혼자 쓰므로
+   맞출 상대가 없고, 좁을수록 같은 글이 여러 줄로 늘어나 3줄 고정이 문장을 크게
+   잘라먹는다(모바일 폭이면 예닐곱 줄이 된다). 거기선 그냥 흐르게 둔다. */
+.hz-summary-clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--hz-summary-lines);
+  height: calc(var(--hz-summary-lines) * var(--hz-summary-lh) * 1em);
+  overflow: hidden;
+}
+
 @media (max-width: 1024px) {
   .hz-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hz-c2, .hz-c3, .hz-c4 { grid-column: span 2; }
   .hz-selfstretch-lg { align-self: start; }
+  .hz-summary-clamp {
+    display: block;
+    height: auto;
+    overflow: visible;
+  }
 }
 /* 셸 전체 높이. 100dvh는 모바일 브라우저 주소창이 떠 있을 때의 실제 보이는 높이라,
    100vh만 쓰면 셸 바닥(하단 탭바)이 주소창 뒤로 밀려 첫 화면에서 안 보인다. dvh를
