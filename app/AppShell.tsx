@@ -5,9 +5,11 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import type { DailyScore } from "@/lib/data";
+import { track } from "@/lib/ga";
 import { C, Icon, MONO, stageForScore } from "./ui";
 import { LogoLockup } from "./Logo";
 import Footer from "./Footer";
+import GaEvents from "./GaEvents";
 
 const NAV = [
   { href: "/", label: "시장 브리핑", icon: "monitoring" },
@@ -100,6 +102,9 @@ function Sidebar() {
           target="_blank"
           rel="noopener noreferrer"
           className="hz-nav-item"
+          data-ga="cta_click"
+          data-ga-cta="community"
+          data-ga-surface="sidebar"
           style={{
             display: "flex",
             alignItems: "center",
@@ -172,6 +177,9 @@ function MobileTabBar() {
         target="_blank"
         rel="noopener noreferrer"
         className="hz-tab hz-nav-item"
+        data-ga="cta_click"
+        data-ga-cta="community"
+        data-ga-surface="tabbar"
         style={tabStyle(false)}
       >
         <Icon name={COMMUNITY.icon} style={{ fontSize: 22 }} />
@@ -187,6 +195,9 @@ function ThemeToggle({ initial }: { initial: "light" | "dark" }) {
 
   const toggle = () => {
     const next = theme === "dark" ? "light" : "dark";
+    // 기본 테마를 라이트로 둘지 판단할 유일한 근거. 전환 방향(to)이 있어야
+    // "다크를 켠 사람"과 "다크에서 되돌아온 사람"이 구분된다.
+    track("theme_toggle", { to: next });
     setTheme(next);
     document.documentElement.setAttribute("data-theme", next);
     document.cookie = `hz-theme=${next}; path=/; max-age=31536000; SameSite=Lax`;
@@ -336,6 +347,9 @@ export default function AppShell({
         overflow: "hidden",
       }}
     >
+      {/* 위임 리스너(클릭·툴팁·스크롤). 렌더 결과가 없으므로 어디에 두어도 되지만,
+          셸 최상단에 두어 "모든 페이지에 걸린다"는 게 눈에 보이게 한다. */}
+      <GaEvents />
       <Sidebar />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <TopBar dailyScore={dailyScore} theme={theme} />

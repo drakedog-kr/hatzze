@@ -122,6 +122,8 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
           target="_blank"
           rel="noopener noreferrer"
           className="hz-lift"
+          data-ga="kadera_message_click"
+          data-ga-channel={m.channelHandle}
           style={{
             ...subCard,
             padding: "13px 15px",
@@ -198,6 +200,7 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
   return (
     <ExpandableList
       items={nodes}
+      name="trending_messages"
       initial={6}
       step={10}
       listStyle={{
@@ -255,7 +258,16 @@ export default async function KaderaPage() {
   // "주식 급등일보🚀…| Korean Stocks" 같은 긴 이름에서 배지가 말줄임에 먹혀 잘렸다.
   const channelItems = channels.map((c, i) => (
     <li key={c.handle}>
-      <a href={`https://t.me/${c.handle}`} target="_blank" rel="noopener noreferrer" className="hz-row-link">
+      <a
+        href={`https://t.me/${c.handle}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="hz-row-link"
+        data-ga="kadera_channel_click"
+        data-ga-channel={c.handle}
+        data-ga-surface="power_rank"
+        data-ga-rank={i + 1}
+      >
         <span style={{ ...rankNum, color: i < 3 ? C.blue : C.faint }}>{i + 1}</span>
         <Avatar photo={c.photo} title={c.title} />
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -344,7 +356,7 @@ export default async function KaderaPage() {
                 <span style={{ fontSize: 12, color: C.sub, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4, minWidth: 0, wordBreak: "keep-all" }}>
                   {s.label}
                   {s.help && (
-                    <span className="hz-tip hz-tip-wide" data-tip={s.help} style={{ display: "inline-flex", cursor: "help", flexShrink: 0 }}>
+                    <span className="hz-tip hz-tip-wide" data-tip={s.help} data-ga-tip={s.label} style={{ display: "inline-flex", cursor: "help", flexShrink: 0 }}>
                       <Icon name="help" style={{ fontSize: 13, color: C.muted }} />
                     </span>
                   )}
@@ -364,6 +376,9 @@ export default async function KaderaPage() {
               target="_blank"
               rel="noopener noreferrer"
               className="hz-btn-soft"
+              data-ga="cta_click"
+              data-ga-cta="register_channel"
+              data-ga-surface="channel_rank"
             >
               <Icon name="add_circle" style={{ fontSize: 16 }} />
               채널 등록 신청
@@ -448,6 +463,7 @@ export default async function KaderaPage() {
                       <span
                         className="hz-tip hz-tip-wide hz-tip-end"
                         data-tip="메시지를 비관/중립/낙관으로 나눈 뒤, 중립을 뺀 비관↔낙관 비율입니다. 시황·공시 같은 담담한 글이 절반이라, 같이 세면 늘 비관으로 기웁니다."
+                        data-ga-tip="sentiment_ratio"
                         style={{ display: "inline-flex", cursor: "help" }}
                       >
                         <Icon name="help" style={{ fontSize: 13, color: C.muted }} />
@@ -824,7 +840,7 @@ export default async function KaderaPage() {
             // 목록이 남는 높이를 먹고 열 줄이 그 안에서 고르게 벌어진다("더 보기" 버튼은
             // 아래 그대로 붙는다). 이 줄 세 카드는 그리드가 높이를 맞추는데, 카드마다
             // 줄 높이가 달라 짧은 카드는 바닥이 비었다.
-            <ExpandableList items={channelItems} initial={10} step={10} listStyle={{ flex: 1, justifyContent: "space-between" }} />
+            <ExpandableList items={channelItems} name="channel_rank" initial={10} step={10} listStyle={{ flex: 1, justifyContent: "space-between" }} />
           )}
         </div>
 
@@ -885,7 +901,16 @@ export default async function KaderaPage() {
               return (
                 <li key={`${r.handle ?? r.title}-${i}`}>
                   {r.handle ? (
-                    <a href={`https://t.me/${r.handle}`} target="_blank" rel="noopener noreferrer" className="hz-row-link" style={{ alignItems: "flex-start", gap: 8 }}>
+                    <a
+                      href={`https://t.me/${r.handle}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hz-row-link"
+                      data-ga="kadera_channel_click"
+                      data-ga-channel={r.handle}
+                      data-ga-surface="rising"
+                      style={{ alignItems: "flex-start", gap: 8 }}
+                    >
                       {body}
                     </a>
                   ) : (

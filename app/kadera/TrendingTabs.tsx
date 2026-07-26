@@ -2,6 +2,7 @@
 
 import { Fragment, useState } from "react";
 
+import { track } from "@/lib/ga";
 import { C } from "../ui";
 import { SectionHead } from "./SectionHead";
 
@@ -55,7 +56,12 @@ export function TrendingTabs({
           <button
             key={p.key}
             type="button"
-            onClick={() => setActive(p.key)}
+            onClick={() => {
+              // title 을 같이 보낸다 — 이 컴포넌트는 트렌딩 말고 다른 카드도 쓸 수 있어서,
+              // tab 값(today/7d/30d)만으로는 어느 카드의 탭인지 구분이 안 된다.
+              track("kadera_tab_select", { tab: p.key, card: title });
+              setActive(p.key);
+            }}
             aria-pressed={on}
             style={{
               padding: "6px 14px",

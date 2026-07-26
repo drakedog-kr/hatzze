@@ -102,7 +102,7 @@ export function SectionHead({
                 폭의 절반이 카드 밖으로 나가고, 좁은 화면에선 페이지에 가로 스크롤까지
                 생긴다. 안쪽으로 열리게 방향을 고정한다. */}
             {noteHelp && (
-              <span className="hz-tip hz-tip-wide hz-tip-end" data-tip={noteHelp} style={{ display: "inline-flex", cursor: "help" }}>
+              <span className="hz-tip hz-tip-wide hz-tip-end" data-tip={noteHelp} data-ga-tip={title} style={{ display: "inline-flex", cursor: "help" }}>
                 <Icon name="help" style={{ fontSize: 14, color: C.muted }} />
               </span>
             )}

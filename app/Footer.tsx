@@ -32,12 +32,15 @@ function FooterLink({ href, children }: { href: string; children: React.ReactNod
 }
 
 /** 외부 링크용. next/link 대신 <a> 를 써서 새 탭으로 연다(모양은 FooterLink 와 동일). */
-function FooterExternalLink({ href, children }: { href: string; children: React.ReactNode }) {
+function FooterExternalLink({ href, cta, children }: { href: string; cta: string; children: React.ReactNode }) {
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
+      data-ga="cta_click"
+      data-ga-cta={cta}
+      data-ga-surface="footer"
       style={{ display: "block", fontSize: 13, fontWeight: 600, color: C.sub, textDecoration: "none", padding: "4px 0" }}
     >
       {children}
@@ -98,7 +101,7 @@ export default function Footer() {
             <FooterLink href="/mdd">MDD 정밀분석</FooterLink>
             {/* 사이드바가 모바일에서 숨겨져 커뮤니티 링크가 사라진다 — 내부 내비게이션과
                 같은 방식으로 푸터에 두어 좁은 화면에서도 닿게 한다. */}
-            <FooterExternalLink href="https://t.me/hatzze_kr">커뮤니티 합류</FooterExternalLink>
+            <FooterExternalLink href="https://t.me/hatzze_kr" cta="community">커뮤니티 합류</FooterExternalLink>
           </nav>
           <div>
             <GroupLabel>데이터 출처</GroupLabel>
