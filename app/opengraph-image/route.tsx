@@ -1,14 +1,25 @@
 import { ImageResponse } from "next/og";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 
 import { getLatestDailyScore } from "@/lib/data";
 
+import {
+  BLUE,
+  CARD_BG,
+  CardShell,
+  INK,
+  OG_SIZE,
+  SUB,
+  TRACK,
+  Wordmark,
+  dataUri,
+  loadOgFonts,
+} from "../og-card";
 import { stageForScore } from "../ui";
 
 /**
- * 카톡·X·슬랙 등에서 hatzze.fun 링크를 공유할 때 뜨는 미리보기 이미지(1200×630).
+ * **홈**(hatzze.fun)을 카톡·X·슬랙에 공유할 때 뜨는 미리보기 이미지(1200×630).
  * 오늘의 과열도(정수 ℃)와 구간을 얹어, 링크만 봐도 오늘 숫자가 보이게 한다.
+ * (/kadera·/mdd 는 매일 바뀌는 숫자가 없어 각 폴더의 opengraph-image.tsx 로 따로 그린다.)
  *
  * ## 왜 파일 컨벤션(app/opengraph-image.tsx)이 아니라 라우트 핸들러인가
  * 컨벤션이 만들어 주는 URL 은 `/opengraph-image?<빌드시점 해시>` 라 내용이 매일
@@ -21,8 +32,7 @@ import { stageForScore } from "../ui";
  * `/opengraph-image` 로 유지한 덕에 이미 퍼진 옛 링크의 미리보기도 계속 뜬다.
  * URL 은 app/seo.ts 의 ogImage() 한 곳에서만 만든다.
  *
- * 폰트는 로컬 파일을 바이트로 넘긴다. Satori 는 woff2 만 못 읽고 otf·woff 는 읽으므로
- * 한글 본문은 Pretendard OTF, 워드마크는 Bricolage Grotesque woff 를 쓴다.
+ * 배경·글자색·워드마크·폰트는 app/og-card.tsx 에서 가져온다(세 카드가 한 세트로 보이게).
  */
 export const runtime = "nodejs";
 
@@ -30,26 +40,13 @@ export const runtime = "nodejs";
 // 크롤러가 몰려도 조회가 그만큼 늘지는 않게 한다.
 export const dynamic = "force-dynamic";
 
-const SIZE = { width: 1200, height: 630 };
-
-// Satori 는 CSS 변수를 못 읽어서 색을 직접 적는다. 구간 색·트랙 색은 화면과 같아야
-// 하므로 app/globals.css 의 라이트 테마 값을 그대로 옮겼다(그쪽을 바꾸면 여기도 바꿀 것).
-const INK = "#25262f";
-const SUB = "#5b6474";
-const CARD_BG = "#eef2ff";
-const TRACK = "#c2c6d8"; // --c-track
-const BLUE = "#0064ff"; // --c-blue
+// 구간 색은 화면과 같아야 한다. app/globals.css 의 라이트 테마 값 그대로다.
 const STAGE_COLOR: Record<string, { color: string; tint: string }> = {
   저온: { color: "#5ea8d8", tint: "rgba(94, 168, 216, 0.16)" },
   상온: { color: "#a89f95", tint: "rgba(168, 159, 149, 0.18)" },
   고온: { color: "#ff9a4d", tint: "rgba(255, 154, 77, 0.16)" },
   초고온: { color: "#ff6b81", tint: "rgba(255, 107, 129, 0.14)" },
 };
-
-const GHOST =
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 104">' +
-  '<path d="M12,84 C6,42 22,8 50,8 C78,8 94,42 88,84 C86,95 80,95 77,87 C74,80 67,80 64,88 C61,96 54,96 51,88 C48,80 41,80 38,88 C35,96 28,96 25,87 C22,80 15,93 12,84 Z" fill="#0064ff"/>' +
-  '<ellipse cx="39" cy="50" rx="9.5" ry="12" fill="#fff"/><circle cx="66" cy="52" r="7" fill="#fff"/><circle cx="42" cy="45" r="3" fill="#0064ff"/></svg>';
 
 /**
  * 히어로의 반원 게이지(app/page.tsx 의 HeroGauge)와 같은 그림.
@@ -74,42 +71,6 @@ function gaugeSvg(score: number): string {
     `<path ${arc} stroke="url(#thermal)" stroke-dasharray="${arcLen}" stroke-dashoffset="${dashoffset}"/>` +
     `<circle cx="${nx}" cy="${ny}" r="12" fill="${BLUE}" stroke="${CARD_BG}" stroke-width="4"/>` +
     "</svg>"
-  );
-}
-
-function dataUri(svg: string): string {
-  return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
-}
-
-const FONT_DIR = "node_modules/pretendard/dist/public/static";
-// 워드마크는 본문과 서체가 다르다. app/Logo.tsx 의 브랜드 규격이
-// Bricolage Grotesque 700 · letter-spacing -0.035em 라, 화면과 공유 이미지가
-// 같은 글자로 보이려면 이 파일도 같은 서체를 써야 한다. 화면 쪽은 Google Fonts
-// CDN 으로 받지만 Satori 는 폰트 바이트를 직접 받아야 해서 여기서만 로컬 파일을 읽는다.
-const WORDMARK_FONT =
-  "node_modules/@fontsource/bricolage-grotesque/files/bricolage-grotesque-latin-700-normal.woff";
-
-/** 워드마크 자간. 브랜드 규격(-0.035em)을 주어진 크기에 환산한 값이다. */
-function tracking(size: number): string {
-  return `${(size * -0.035).toFixed(2)}px`;
-}
-
-function Wordmark({ size }: { size: number }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: size * 0.23 }}>
-      <img src={dataUri(GHOST)} width={size * 1.03} height={size * 1.07} alt="" />
-      <div
-        style={{
-          fontFamily: "Bricolage Grotesque",
-          fontSize: size,
-          fontWeight: 700,
-          color: INK,
-          letterSpacing: tracking(size),
-        }}
-      >
-        hatzze
-      </div>
-    </div>
   );
 }
 
@@ -145,18 +106,7 @@ function ScoreCard({ score, date }: { score: number; date: string }) {
   const display = Math.round(score).toString();
 
   return (
-    <div
-      style={{
-        width: "100%",
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between",
-        padding: "62px 84px 58px",
-        background: CARD_BG,
-        fontFamily: "Pretendard",
-      }}
-    >
+    <CardShell>
       <Wordmark size={50} />
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", flexDirection: "column" }}>
@@ -192,16 +142,12 @@ function ScoreCard({ score, date }: { score: number; date: string }) {
       <div style={{ fontSize: 27, fontWeight: 500, color: SUB }}>
         {`${date} 기준 · 시장·감성 25개 지표를 하나의 과열도 점수로 환산합니다.`}
       </div>
-    </div>
+    </CardShell>
   );
 }
 
 export async function GET() {
-  const [extraBold, medium, bricolage] = await Promise.all([
-    readFile(join(process.cwd(), FONT_DIR, "Pretendard-ExtraBold.otf")),
-    readFile(join(process.cwd(), FONT_DIR, "Pretendard-Medium.otf")),
-    readFile(join(process.cwd(), WORDMARK_FONT)),
-  ]);
+  const fonts = await loadOgFonts();
 
   // 조회가 실패해도 이미지는 200 으로 떠야 한다 — 미리보기가 통째로 사라지는 것보다
   // 숫자 없는 브랜드 카드가 낫다. 쿼리의 v= 는 카톡 캐시를 깨기 위한 키일 뿐이라
@@ -215,12 +161,8 @@ export async function GET() {
   }
 
   return new ImageResponse(score ? <ScoreCard score={score.score} date={score.date} /> : <BrandCard />, {
-    ...SIZE,
-    fonts: [
-      { name: "Pretendard", data: extraBold, weight: 800, style: "normal" },
-      { name: "Pretendard", data: medium, weight: 500, style: "normal" },
-      { name: "Bricolage Grotesque", data: bricolage, weight: 700, style: "normal" },
-    ],
+    ...OG_SIZE,
+    fonts,
     headers: {
       // URL 에 날짜·도수가 실려 있어 내용이 바뀌면 URL 도 바뀐다. 그래도 무한 캐시는
       // 두지 않는다 — 버전 없는 폴백 URL(/opengraph-image)도 같은 핸들러라, 그쪽이

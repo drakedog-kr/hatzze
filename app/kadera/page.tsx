@@ -19,6 +19,7 @@ import type { TrendingMessage } from "@/lib/telegram-data";
 
 import { formatKstUpdate, shortDate } from "@/lib/format";
 
+import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { C, Icon, MONO } from "../ui";
 import { ExpandableList } from "./ExpandableList";
@@ -26,13 +27,13 @@ import { Avatar, Pill, RankDelta, Sparkline, card as cardStyle, rankNum, subCard
 import { SectionHead } from "./SectionHead";
 import { TrendingTabs } from "./TrendingTabs";
 
-// og:image URL 에 그날의 도수가 실려 있어 요청마다 다시 계산해야 한다(상수로 두면
-// 서버가 살아 있는 동안 어제 URL 을 계속 내보낸다). 자세한 건 app/seo.ts 주석 참고.
+// 미리보기 이미지는 옆의 opengraph-image.tsx 가 그린다(ownImage). 자세한 건 app/seo.ts 주석 참고.
 export async function generateMetadata(): Promise<Metadata> {
   return pageMetadata({
     title: "카더라 리포트 | hatzze",
     description: "주식 텔레그램 채널 수백 개를 대신 읽습니다. 오늘 가장 많이 언급된 종목과 가장 많이 퍼진 메시지를 매일 집계합니다.",
     path: "/kadera",
+    ownImage: KADERA_CARD.alt,
   });
 }
 

@@ -15,7 +15,17 @@ const nextConfig: NextConfig = {
   // 확실히 포함시킨다 — 없으면 배포 환경에서 폰트 로딩이 실패할 수 있다.
   // 본문·설명은 Pretendard(한글), 워드마크는 브랜드 서체 Bricolage Grotesque.
   outputFileTracingIncludes: {
+    // 홈은 매 요청 그리는 라우트라 런타임에 폰트를 읽는다. /kadera·/mdd 카드는 빌드
+    // 시점에 굳지만, Next 가 요청 시 렌더로 돌려도 죽지 않도록 같이 넣어 둔다.
     "/opengraph-image": [
+      "./node_modules/pretendard/dist/public/static/Pretendard-*.otf",
+      "./node_modules/@fontsource/bricolage-grotesque/files/bricolage-grotesque-latin-700-normal.woff",
+    ],
+    "/kadera/opengraph-image": [
+      "./node_modules/pretendard/dist/public/static/Pretendard-*.otf",
+      "./node_modules/@fontsource/bricolage-grotesque/files/bricolage-grotesque-latin-700-normal.woff",
+    ],
+    "/mdd/opengraph-image": [
       "./node_modules/pretendard/dist/public/static/Pretendard-*.otf",
       "./node_modules/@fontsource/bricolage-grotesque/files/bricolage-grotesque-latin-700-normal.woff",
     ],

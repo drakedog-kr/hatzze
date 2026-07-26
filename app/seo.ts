@@ -54,12 +54,21 @@ async function ogImage(): Promise<OgImage> {
  * 남아서, 카톡·X에 하위 페이지를 공유해도 홈 설명이 뜬다. 어느 쪽도 손으로 하면
  * 틀리기 쉬워서 공통 필드를 여기서 한 번에 채운다.
  *
- * og:image 도 여기서 같이 넣는다. 예전엔 app/opengraph-image.tsx(파일 컨벤션)가
- * 자동으로 채워 줬는데, 그건 그 세그먼트가 openGraph 를 직접 선언하지 않았을 때뿐이라
- * 아래에서 openGraph 를 선언하는 순간 이미지까지 통째로 날아갔다(실제로 하위 페이지
- * 미리보기가 이미지 없이 떴었다). 지금은 컨벤션 자체를 걷어내고(app/opengraph-image/route.tsx
- * 주석 참고) 홈·하위 페이지 모두 여기 ogImage() 한 곳에서 URL 을 받는다 —
- * **한쪽만 고치면 세 페이지의 미리보기가 서로 다른 이미지를 가리키게 된다.**
+ * ## og:image 를 넣는 자리
+ * 아래에서 openGraph 를 선언하는 순간 물려받은 이미지가 통째로 날아간다(실제로 하위
+ * 페이지 미리보기가 이미지 없이 떴었다). 그래서 이미지도 여기서 같이 정한다.
+ *
+ * 페이지마다 써야 할 카드가 다른데, 파일 컨벤션은 **여기에 전혀 끼어들지 못한다.**
+ * 하위 세그먼트에서 실측한 결과는 이렇다.
+ *  - images 를 선언하면 → 그게 이긴다(자기 폴더의 opengraph-image.tsx 는 무시된다).
+ *  - images 를 비우면 → 컨벤션이 채워 주지 **않는다**. og:image 가 통째로 사라진다.
+ * 즉 어느 쪽이든 URL 을 손으로 가리켜야 한다. 다행히 컨벤션 파일이 만든 경로는
+ * 해시 쿼리 없이도 같은 PNG 를 200 으로 주므로 그 경로를 그대로 쓴다.
+ * (루트는 규칙이 또 반대라, 컨벤션이 layout 의 images 를 도로 덮어썼다. 그래서 홈
+ *  카드만 컨벤션을 못 쓰고 라우트 핸들러로 뺐다 — app/opengraph-image/route.tsx 주석 참고.)
+ *
+ * 그래서 `ownImage` 를 주면 그 페이지의 `{path}/opengraph-image` 를, 안 주면
+ * 홈의 과열도 카드를(사이트 대표 카드라 /privacy 같은 페이지에 무난하다) 가리킨다.
  *
  * 데이터를 읽어야 해서 async 다. 호출부는 `export const metadata` 가 아니라
  * `generateMetadata` 여야 요청마다(=날짜가 바뀌면) 새 URL 이 나간다.
@@ -68,13 +77,21 @@ export async function pageMetadata({
   title,
   description,
   path,
+  ownImage,
 }: {
   title: string;
   description: string;
   /** 사이트 루트 기준 경로. 예: "/kadera" */
   path: string;
+  /**
+   * 이 폴더에 opengraph-image.tsx 가 있을 때, 그 카드의 alt(=og-copy.ts 의 alt).
+   * URL 은 path 에서 만들어지므로 따로 안 받는다.
+   */
+  ownImage?: string;
 }): Promise<Metadata> {
-  const images = [await ogImage()];
+  const images = [
+    ownImage ? { url: `${path}/opengraph-image`, ...OG_SIZE, alt: ownImage } : await ogImage(),
+  ];
   return {
     title,
     description,
