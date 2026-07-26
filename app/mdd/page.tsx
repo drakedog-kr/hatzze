@@ -1,15 +1,20 @@
 import type { Metadata } from "next";
 
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { MDD_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { MddExplorer, type StockOption } from "./MddExplorer";
 
-export const metadata: Metadata = pageMetadata({
-  title: "MDD 정밀분석 | hatzze",
-  description:
-    "내 종목은 고점에서 얼마나 내려왔습니까. 이만큼 빠졌던 적이 과거에 몇 번이었는지, 회복까지 얼마나 걸렸는지 함께 봅니다.",
-  path: "/mdd",
-});
+// 미리보기 이미지는 옆의 opengraph-image.tsx 가 그린다(ownImage). 자세한 건 app/seo.ts 주석 참고.
+export async function generateMetadata(): Promise<Metadata> {
+  return pageMetadata({
+    title: "MDD 정밀분석 | hatzze",
+    description:
+      "내 종목은 고점에서 얼마나 내려왔습니까. 이만큼 빠졌던 적이 과거에 몇 번이었는지, 회복까지 얼마나 걸렸는지 함께 봅니다.",
+    path: "/mdd",
+    ownImage: MDD_CARD.alt,
+  });
+}
 
 export const dynamic = "force-dynamic";
 
