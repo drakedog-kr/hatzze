@@ -58,6 +58,16 @@ function kstDateRange(n: number): string[] {
 export const KADERA_WINDOW_DAYS = 3;
 
 /**
+ * 종목 리포트 **막대 차트**가 그리는 일수. 세는 창(KADERA_WINDOW_DAYS)보다 길다.
+ *
+ * 3칸짜리 막대는 추이가 안 읽힌다 — "지금 얼마나 뜨거운가"는 최근 3일이 맞지만, 그게
+ * 평소보다 많은 건지 적은 건지는 앞선 날들이 있어야 보인다. 눈으로 읽는 축만 길게 둔다.
+ * 뒤쪽 KADERA_WINDOW_DAYS 칸이 곧 집계 구간이고, 화면은 그 칸만 진하게 그린다
+ * (StockTrendPoint.scored).
+ */
+export const STOCK_CHART_DAYS = 7;
+
+/**
  * 페이징 대상 쿼리 — 필터까지만 건 상태. `.order()`·`.range()` 는 fetchAllRows 가 건다.
  * 정렬을 호출부에 맡기지 않으려고 일부러 이 모양으로 받는다(아래 주석 참고).
  */
@@ -573,7 +583,8 @@ export type StockReport = {
   name: string;
   market: string | null; // KOSPI | KOSDAQ — MDD 링크가 야후 심볼(.KS/.KQ)을 만들 때 쓴다
   totalMentions: number;
-  series: { date: string; mentions: number }[];
+  /** 막대 차트용 일별 언급. scored=false 인 앞쪽 칸은 배경 맥락이라 합계에 안 들어간다. */
+  series: { date: string; mentions: number; scored: boolean }[];
   channelCount: number; // 이 종목을 다룬 서로 다른 채널 수(관심의 폭)
   price: number | null; // 실시간 시세
   changeRate: number | null;
@@ -620,10 +631,18 @@ export async function getStockReport(code: string): Promise<StockReport | null> 
   const { data: stock } = await db.from("stocks").select("name,market").eq("code", code).maybeSingle();
   if (!stock) return null;
 
-  // 창을 먼저 확정하고 세 조회가 **같은 날짜 구간**을 보게 한다. 오늘은 뺀다 — 아직 하루가
-  // 덜 차서 막대가 늘 짧게 나오고, 그 반쪽짜리 하루가 합계·채널 수에도 섞이기 때문이다.
-  const days = kstDateRange(KADERA_WINDOW_DAYS);
-  const [first, last] = [days[0], days[days.length - 1]];
+  // **차트와 수치의 창이 다르다.** 막대는 STOCK_CHART_DAYS 일치를 그리고, 언급 수·채널
+  // 수·LLM 문장은 그중 최근 KADERA_WINDOW_DAYS 일만 센다(Hun 요청).
+  //
+  // 왜 나누나: 3일치 막대 세 개는 추이가 안 읽힌다. "지금 얼마나 뜨거운가"는 최근 3일이
+  // 맞지만, 그게 평소보다 많은 건지 적은 건지는 앞선 날들이 있어야 보인다. 그래서 눈으로
+  // 읽는 축은 길게 두고 세는 창만 짧게 잡는다.
+  //
+  // 두 창 모두 오늘은 뺀다 — 아직 하루가 덜 차서 막대가 늘 짧게 나오고, 그 반쪽짜리
+  // 하루가 합계·채널 수에도 섞인다.
+  const chartDays = kstDateRange(STOCK_CHART_DAYS);
+  const scoreDays = chartDays.slice(-KADERA_WINDOW_DAYS); // 차트 꼬리 = 집계 창
+  const [first, last] = [scoreDays[0], scoreDays[scoreDays.length - 1]];
   const dayAfterLast = addDaysISO(last, 1); // posted_at 상한(미포함)
 
   // 남은 셋은 서로 의존하지 않는다 — 직렬로 두면 왕복이 그대로 더해진다.
@@ -633,7 +652,8 @@ export async function getStockReport(code: string): Promise<StockReport | null> 
       .from("telegram_stock_daily")
       .select("date,mention_count")
       .eq("stock_code", code)
-      .gte("date", first)
+      // 막대용이라 차트 창 전체를 받는다(합계는 아래에서 집계 창만 골라 낸다).
+      .gte("date", chartDays[0])
       .lte("date", last)
       .order("date"),
     // 채널 수도 같은 창으로 자른다 — 전체 기간으로 세면 모니터링 채널이 12개뿐이라
@@ -646,11 +666,20 @@ export async function getStockReport(code: string): Promise<StockReport | null> 
   // 현대차 7칸 — 07-18이 통째로 빠졌다). "최근 이틀 급증" 같은 문장도 눌린 축 위에서
   // 읽히고, 카드 라벨과도 안 맞는다.
   //
-  // 그래서 창 전체의 날짜(days)를 먼저 만들고 없는 날은 0으로 채운다 — 같은 파일의
+  // 그래서 창 전체의 날짜(chartDays)를 먼저 만들고 없는 날은 0으로 채운다 — 같은 파일의
   // getTopStocksWithTrend 가 이미 쓰는 방식이라 그쪽과도 축이 맞는다.
+  //
+  // scored 는 "이 막대가 집계 창 안인가" — 화면이 뒤쪽 3칸만 진하게 그려, 7칸을 보면서도
+  // 아래 '언급 N회'가 어느 구간을 센 값인지 눈으로 짚을 수 있게 한다.
   const byDate = new Map((daily ?? []).map((d) => [d.date, d.mention_count || 0]));
-  const series = days.map((date) => ({ date, mentions: byDate.get(date) ?? 0 }));
-  const totalMentions = series.reduce((s, d) => s + d.mentions, 0);
+  const scoredFrom = scoreDays[0];
+  const series = chartDays.map((date) => ({
+    date,
+    mentions: byDate.get(date) ?? 0,
+    scored: date >= scoredFrom,
+  }));
+  // 합계는 **집계 창만** 센다. 막대는 7칸이어도 카드에 적히는 수치는 최근 3일치다.
+  const totalMentions = series.reduce((s, d) => (d.scored ? s + d.mentions : s), 0);
 
   return {
     code,
@@ -1102,6 +1131,32 @@ const THEME_TOP_N = 4;
 const THEME_MIN_DECIDED = 8;
 
 /**
+ * 낙관도(%) — 중립을 뺀 '낙관 : 비관' 중 낙관 쪽 비중. **평활을 건다.**
+ *
+ * 날것의 pos/(pos+neg)는 표본이 적으면 0%·100% 같은 절대값을 뱉는다. 창을 3일로 줄이자
+ * 인터넷·플랫폼이 82:0 으로 잡혀 막대가 `0:100` 이 됐다(2026-07-26). 82건이 전부 낙관인
+ * 건 진짜 신호지만, 화면에 100%가 찍히면 "비관이 하나도 없다"는 단정이 되고 막대 한쪽이
+ * 통째로 빈다. 하루만 지나도 뒤집힐 수치라 그렇게 못 박아 보일 이유가 없다.
+ *
+ * 그래서 양쪽에 가상 표본 SENTIMENT_PRIOR 건씩을 더해 센다(가산 평활/베이즈 축소).
+ *   낙관도 = (낙관 + k) / (낙관 + 비관 + 2k)
+ *
+ * 성질이 딱 맞는다 — **표본이 크면 사실상 그대로, 작을수록 가운데로 당겨진다.**
+ * 실측(k=5): 반도체 122:103 54% → 54%(불변), 전체 64% → 64%(불변),
+ *            인터넷·플랫폼 82:0 100% → 95%, 하한(8:0) 100% → 72%.
+ *
+ * ⚠️ 파이프라인 optimism()(generate_telegram_narratives.py)과 **같은 식·같은 k** 여야 한다.
+ * 총평 문장이 인용하는 숫자와 그 옆 막대가 갈리면 확인할 방법이 없는 값이 화면에 나간다.
+ */
+const SENTIMENT_PRIOR = 5;
+
+function optimismPct(pos: number, neg: number): number | null {
+  if (pos + neg === 0) return null;
+  return Math.round(((pos + SENTIMENT_PRIOR) / (pos + neg + 2 * SENTIMENT_PRIOR)) * 100);
+}
+
+
+/**
  * 생태계 센티먼트 — 최근 7일 메시지 톤 구성 + 테마별 낙관 비중 + LLM 총평.
  * 테마는 파이프라인이 config/stock_themes.py(테마 로테이션과 같은 사전)로 묶어 둔 것이다.
  */
@@ -1138,7 +1193,7 @@ export async function getEcosystemSentiment(): Promise<EcosystemSentiment | null
     .filter(([scope, a]) => scope !== "overall" && a.pos + a.neg >= THEME_MIN_DECIDED)
     .map(([scope, a]) => ({
       name: scope,
-      pos: Math.round((a.pos / (a.pos + a.neg)) * 100),
+      pos: optimismPct(a.pos, a.neg) ?? 50,
       positive: a.pos,
       negative: a.neg,
       total: a.total,
@@ -1154,8 +1209,7 @@ export async function getEcosystemSentiment(): Promise<EcosystemSentiment | null
     .maybeSingle();
 
   // 헤드라인은 중립을 뺀 낙관도 — 테마별 막대와 같은 기준으로 맞춘다(위 타입 주석 참고).
-  const decided = overall.pos + overall.neg;
-  const optimism = decided ? Math.round((overall.pos / decided) * 100) : 50;
+  const optimism = optimismPct(overall.pos, overall.neg) ?? 50;
 
   const { label, tone } = sentimentTone(optimism);
 

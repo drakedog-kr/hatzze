@@ -552,7 +552,13 @@ body {
   transition: opacity 0.12s ease;
 }
 .hz-bars .hz-bar-last { opacity: 0.95; }
+/* 집계 창 밖의 앞쪽 칸 — 막대는 7일치를 그리는데 카드 수치는 최근 3일치라, 그 경계를
+   진하기로 살짝 보여 준다. 값을 숨기지는 않는다(툴팁·hover 는 그대로 동작).
+   0.16 까지 내려 봤더니 "3칸 + 유령 4칸"으로 보여서, 기본(0.45)에서 한 단계만 낮춘다 —
+   7칸이 다 제 막대로 읽히되 어디까지가 집계 구간인지는 짚인다. */
+.hz-bars .hz-bar-ctx { opacity: 0.3; }
 .hz-bars:hover .hz-bar { opacity: 0.3; }
+.hz-bars:hover .hz-bar-ctx { opacity: 0.2; }
 .hz-bars .hz-bar-col:hover .hz-bar { opacity: 1; }
 .hz-bars .hz-bar-date { transition: color 0.12s ease; }
 .hz-bars .hz-bar-col:hover .hz-bar-date { color: var(--c-sub); }

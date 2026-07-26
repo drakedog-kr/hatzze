@@ -766,8 +766,11 @@ export default async function KaderaPage() {
                           // 커서는 기본 그대로 둔다 — 도움말(?)이 아니라 값을 짚어 보는 차트다.
                           style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 5, minWidth: 0 }}
                         >
+                          {/* 집계 창 밖(앞쪽 칸)은 배경 맥락이라 더 옅게 — 막대는 7일치인데
+                              아래 '언급 N회'는 최근 3일치라, 어디까지가 그 숫자인지 눈으로
+                              짚을 수 있어야 한다(globals.css 의 .hz-bar-ctx). */}
                           <div
-                            className={`hz-bar${i === r.series.length - 1 ? " hz-bar-last" : ""}`}
+                            className={`hz-bar${d.scored ? "" : " hz-bar-ctx"}${i === r.series.length - 1 ? " hz-bar-last" : ""}`}
                             style={{
                               width: "100%",
                               height: `${Math.max(3, (d.mentions / max) * 40)}px`,
