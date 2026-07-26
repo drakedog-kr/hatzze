@@ -500,6 +500,7 @@ function BarRow({
   strong,
   help,
   labelWidth = 112,
+  dim = !strong,
 }: {
   label: string;
   pct: number;
@@ -508,6 +509,9 @@ function BarRow({
   strong?: boolean;
   help?: string;
   labelWidth?: number;
+  /** 강조색(cold/mania)을 옅게 깔아 자기 종목 줄만 튀게 하는 장치. 색 자체가 이미
+   *  중립색(C.bar)이면 여기서 또 반투명을 먹이면 트랙에 묻으니 끈다. */
+  dim?: boolean;
 }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: `${labelWidth}px minmax(0,1fr) 58px`, alignItems: "center", gap: 10 }}>
@@ -520,7 +524,7 @@ function BarRow({
         )}
       </span>
       <span style={{ height: 9, background: C.bg, borderRadius: 999, overflow: "hidden" }}>
-        <span style={{ display: "block", height: "100%", width: `${Math.max(2, Math.min(100, pct))}%`, background: color, opacity: strong ? 1 : 0.5, borderRadius: 999 }} />
+        <span style={{ display: "block", height: "100%", width: `${Math.max(2, Math.min(100, pct))}%`, background: color, opacity: dim ? 0.5 : 1, borderRadius: 999 }} />
       </span>
       <span style={{ fontFamily: MONO, fontSize: 13, textAlign: "right", color: strong ? C.ink : C.sub, fontWeight: strong ? 800 : 500 }}>{value}</span>
     </div>
@@ -832,7 +836,7 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
       <>
         {legend([
           { label: "이 종목", color: C.cold },
-          { label: "코스피", color: C.track },
+          { label: "코스피", color: C.bar },
         ])}
         {rows(
           (() => {
@@ -844,7 +848,7 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
                 { pct: (Math.abs(e.stock) / max) * 100, color: C.cold, opacity: 1, value: `${Math.round(e.stock)}%` },
                 {
                   pct: e.market === null ? 0 : (Math.abs(e.market) / max) * 100,
-                  color: C.track,
+                  color: C.bar,
                   opacity: 1,
                   value: e.market === null ? "—" : `${Math.round(e.market)}%`,
                 },
@@ -1213,8 +1217,9 @@ function Theme({ theme }: { theme: ThemeCmp }) {
             label={p.name}
             pct={(Math.abs(p.dd) / worst) * 100}
             value={`${Math.round(p.dd)}%`}
-            color={p.isSelf ? C.cold : C.track}
+            color={p.isSelf ? C.cold : C.bar}
             strong={p.isSelf}
+            dim={false}
             labelWidth={104}
           />
         ))}
