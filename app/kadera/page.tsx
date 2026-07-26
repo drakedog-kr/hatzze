@@ -13,6 +13,7 @@ import {
   getThemeRotation,
   getTopStocksWithTrend,
   getTrendingMessages,
+  KADERA_WINDOW_DAYS,
 } from "@/lib/telegram-data";
 import type { TrendingMessage } from "@/lib/telegram-data";
 
@@ -372,7 +373,7 @@ export default async function KaderaPage() {
           <SectionHead
             icon="psychology"
             title="텔레그램 생태계 센티먼트"
-            note="최근 7일"
+            note={`최근 ${KADERA_WINDOW_DAYS}일`}
             desc="메시지 톤으로 본 시장 분위기"
             meta={summary.lastUpdated ? `최종 업데이트 · ${formatKstUpdate(summary.lastUpdated)}` : undefined}
           />
@@ -725,7 +726,7 @@ export default async function KaderaPage() {
           <SectionHead
             icon="query_stats"
             title="주요 종목 리포트"
-            note="최근 7일 · 상위 3종목"
+            note={`최근 ${KADERA_WINDOW_DAYS}일 · 상위 3종목`}
             desc="가장 많이 회자된 종목의 추이와 흐름"
           />
           {stockReports.length === 0 ? (

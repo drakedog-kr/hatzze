@@ -66,9 +66,13 @@ LEN_MIN, LEN_MAX = 75, 80
 LEN_HARD_MIN, LEN_HARD_MAX = 70, 82
 MAX_RETRIES = 3
 
-# 집계 창. 프론트 카드가 "최근 7일"이라 **오늘 포함 7일**이어야 화면 수치와 맞는다
-# (days=7로 빼면 8일치가 잡혀 화제어 횟수가 화면보다 커진다).
-WINDOW_DAYS = 7
+# 집계 창. 2026-07-26 에 7 → 3 으로 내렸다(Hun 요청) — 일주일치는 이미 지나간 얘기가
+# 절반이라 "지금 무엇이 오가나"를 흐렸다.
+#
+# ⚠️ **프론트 KADERA_WINDOW_DAYS 와 같은 값이어야 한다**(lib/telegram-data.ts).
+# 화면 숫자는 프론트에서, 그 옆 LLM 문장은 여기서 나오므로 값이 갈리면 한 카드가 서로
+# 다른 기간을 말한다. Python 과 TS 라 import 로 공유할 수 없어 손으로 맞춘 사본이다.
+WINDOW_DAYS = 3
 WINDOW_OFFSET = WINDOW_DAYS - 1
 
 # 총평 한 대목의 길이. 두 대목을 공백으로 이어 총평 전체는 240~258자가 된다.
@@ -339,10 +343,19 @@ def load_messages_since(db, since_date: str) -> list[dict]:
 def build_brief_digest(db, latest: str) -> str | None:
     """센티먼트 총평용 digest.
 
-    창은 최근 7일 — 카드 헤더가 '최근 7일'이라 화면의 막대 비율과 총평이 같은 기간을
-    말해야 한다. 하루치만 쓰면 주말처럼 표본이 얇은 날에 총평이 튄다.
+    창은 **카드와 글자 그대로 같아야 한다** — 총평은 화면에서 낙관도 막대 바로 옆에 붙고,
+    독자가 그 문장의 숫자를 확인할 곳은 그 막대뿐이다.
+
+    카드(lib/telegram-data.getEcosystemSentiment → kstDateRange)는 **오늘을 뺀** 최근
+    WINDOW_DAYS 일을 본다. 오늘은 아직 하루가 덜 차서 반쪽 표본이 낙관도를 끌기 때문이다.
+    여기서 오늘을 포함하면 같은 '최근 N일'이 서로 다른 N일이 된다.
+
+    실제로 어긋났다(2026-07-26, 창을 3일로 줄이자마자 드러남): 카드가 낙관 64%(낙관 우세)
+    로 찍는데 digest 는 54%(중립)였다. 창이 7일일 땐 하루 차이가 1/7 이라 안 보였지만
+    3일이면 1/3 이다. 헤드라인 숫자도 구간 라벨도 갈렸다.
     """
-    since = (datetime.fromisoformat(latest).date() - timedelta(days=WINDOW_OFFSET)).isoformat()
+    end = (datetime.fromisoformat(latest).date() - timedelta(days=1)).isoformat()  # 어제
+    since = (date.fromisoformat(end) - timedelta(days=WINDOW_OFFSET)).isoformat()
     sent = [
         r
         for r in load_all(
@@ -350,7 +363,7 @@ def build_brief_digest(db, latest: str) -> str | None:
             "telegram_sentiment_daily",
             "date,scope,positive_count,neutral_count,negative_count,message_count",
         )
-        if r["date"] >= since
+        if since <= r["date"] <= end
     ]
 
     window: dict[str, Counter] = defaultdict(Counter)
@@ -422,7 +435,9 @@ def build_brief_digest(db, latest: str) -> str | None:
     kws = load_all(db, "telegram_keyword_daily", "date,keyword,mention_count")
     recent = Counter()
     for r in kws:
-        if r["date"] >= since:
+        # 위 낙관도와 같은 구간을 쓴다(오늘 제외). 여기만 오늘을 넣으면 화제어가 반쪽짜리
+        # 하루에 끌려, 문장이 인용하는 주제와 낙관도가 다른 기간을 말하게 된다.
+        if since <= r["date"] <= end:
             recent[r["keyword"]] += r["mention_count"]
     if recent:
         lines.append("")

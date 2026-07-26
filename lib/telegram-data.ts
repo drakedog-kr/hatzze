@@ -22,6 +22,41 @@ function todayKstDate(): string {
   return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
+/** "YYYY-MM-DD" 에 n일을 더한 날짜. 창의 경계를 만들 때 쓴다. */
+function addDaysISO(iso: string, n: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * **오늘을 뺀** 최근 n일의 KST 날짜 목록(오래된→최신).
+ *
+ * 오늘을 빼는 이유는 하나다 — 아직 하루가 덜 차서, 넣으면 막대가 늘 짧게 나오고
+ * 그 반쪽짜리 하루가 합계에도 섞인다. 창을 쓰는 곳마다 이 계산을 따로 하면
+ * "같은 최근 N일"이 서로 다른 N일이 되므로(실제로 카드 1,828 vs 요약문 1,727 로
+ * 어긋난 적이 있다) 여기 하나로 모은다.
+ */
+function kstDateRange(n: number): string[] {
+  const end = addDaysISO(todayKstDate(), -1); // 어제
+  return Array.from({ length: n }, (_, i) => addDaysISO(end, -(n - 1 - i)));
+}
+
+/**
+ * **생태계 센티먼트 · 주요 종목 리포트**가 함께 쓰는 창(일). 2026-07-26 에 7 → 3 으로
+ * 내렸다(Hun 요청) — 일주일치는 이미 지나간 얘기가 절반이라 "지금 무엇이 오가나"를
+ * 흐렸다.
+ *
+ * ⚠️ **파이프라인 WINDOW_DAYS 와 같은 값이어야 한다**
+ * (data-pipeline/scripts/generate_telegram_narratives.py). 화면 숫자는 여기서, 그 옆
+ * LLM 문장은 저기서 나오므로 값이 갈리면 한 카드가 서로 다른 기간을 말한다.
+ * Python 과 TS 라 import 로 공유할 수 없어 손으로 맞춘 사본이다.
+ *
+ * 이 창을 쓰지 **않는** 것들: 모니터링 현황(활성 채널·총 메시지 7일), 뜨는 채널,
+ * 이슈 키워드, 테마 로테이션, 트렌딩 메시지(자체 기간 탭). 각자 이유가 있어 그대로 둔다.
+ */
+export const KADERA_WINDOW_DAYS = 3;
+
 /**
  * 페이징 대상 쿼리 — 필터까지만 건 상태. `.order()`·`.range()` 는 fetchAllRows 가 건다.
  * 정렬을 호출부에 맡기지 않으려고 일부러 이 모양으로 받는다(아래 주석 참고).
@@ -386,7 +421,9 @@ export type StockTrend = {
 
 /** 최근 7일 주목도 상위 종목 + 일별 언급 추이(스파크라인용). 종목 리포트에 쓴다. */
 export async function getTopStocksWithTrend(limit = 6): Promise<StockTrend[]> {
-  const { rows, dates } = await loadStockDaily(7);
+  // 어느 종목이 리포트에 뜨는지도 같은 창으로 정한다 — 카드가 "최근 N일"이라 적어 놓고
+  // 다른 기간으로 고른 종목을 보여주면 안 된다.
+  const { rows, dates } = await loadStockDaily(KADERA_WINDOW_DAYS);
   if (!rows.length) return [];
 
   const agg = new Map<string, { w: number; m: number; ch: number; byDate: Map<string, number> }>();
@@ -542,9 +579,6 @@ export type StockReport = {
   changeRate: number | null;
 };
 
-/** 종목 리포트 카드가 내세우는 구간. 카드 라벨("최근 7일")과 반드시 같아야 한다. */
-const REPORT_WINDOW_DAYS = 7;
-
 /**
  * 이 종목을 최근 N일 안에 언급한 **서로 다른 채널 수**('관심의 폭').
  *
@@ -562,7 +596,7 @@ const REPORT_WINDOW_DAYS = 7;
  * 페이징은 여전히 필수다 — 인기 종목은 7일치만도 1,000행을 넘는다(삼성전자 2,242행).
  * 안 하면 채널 수가 조용히 적게 나온다.
  */
-async function recentChannelCount(code: string, days: number): Promise<number> {
+async function recentChannelCount(code: string, from: string, to: string): Promise<number> {
   const db = getSupabaseAdmin();
   const rows = await fetchAllRows<{ channel_handle: string }>("id", () =>
     db
@@ -571,16 +605,26 @@ async function recentChannelCount(code: string, days: number): Promise<number> {
       // posted_at 은 거르는 데만 쓰고 결과엔 필요 없어서, 행마다 딸려 오지 않게 한다.
       .select("channel_handle,telegram_messages!inner()")
       .eq("stock_code", code)
-      .gte("telegram_messages.posted_at", daysAgoISO(days)),
+      // 아래 위아래 경계를 둘 다 건다. 예전엔 하한만(rolling N일) 걸어서 **오늘이 섞였다** —
+      // 막대 차트와 언급 수는 오늘을 빼고 그리는데 채널 수만 오늘을 포함해, 한 줄에 적힌
+      // 두 값이 서로 다른 기간을 말했다. 창이 7일일 땐 1/7 차이라 안 보였지만 3일이면 1/3 이다.
+      .gte("telegram_messages.posted_at", `${from}T00:00:00+09:00`)
+      .lt("telegram_messages.posted_at", `${to}T00:00:00+09:00`),
   );
   return new Set(rows.map((r) => r.channel_handle)).size;
 }
 
-/** 종목 텔레그램 리포트 — 특정 종목의 최근 7일 언급 추이와 관심의 폭. */
+/** 종목 텔레그램 리포트 — 특정 종목의 최근 창 언급 추이와 관심의 폭. */
 export async function getStockReport(code: string): Promise<StockReport | null> {
   const db = getSupabaseAdmin();
   const { data: stock } = await db.from("stocks").select("name,market").eq("code", code).maybeSingle();
   if (!stock) return null;
+
+  // 창을 먼저 확정하고 세 조회가 **같은 날짜 구간**을 보게 한다. 오늘은 뺀다 — 아직 하루가
+  // 덜 차서 막대가 늘 짧게 나오고, 그 반쪽짜리 하루가 합계·채널 수에도 섞이기 때문이다.
+  const days = kstDateRange(KADERA_WINDOW_DAYS);
+  const [first, last] = [days[0], days[days.length - 1]];
+  const dayAfterLast = addDaysISO(last, 1); // posted_at 상한(미포함)
 
   // 남은 셋은 서로 의존하지 않는다 — 직렬로 두면 왕복이 그대로 더해진다.
   // (시세만 stock.market 에 걸려 있어 위 조회 뒤에 온다.)
@@ -589,30 +633,23 @@ export async function getStockReport(code: string): Promise<StockReport | null> 
       .from("telegram_stock_daily")
       .select("date,mention_count")
       .eq("stock_code", code)
-      .gte("date", daysAgoISO(REPORT_WINDOW_DAYS).slice(0, 10))
+      .gte("date", first)
+      .lte("date", last)
       .order("date"),
     // 채널 수도 같은 창으로 자른다 — 전체 기간으로 세면 모니터링 채널이 12개뿐이라
     // 금세 12로 포화돼 '관심의 폭'을 구분하지 못한다.
-    recentChannelCount(code, REPORT_WINDOW_DAYS),
+    recentChannelCount(code, first, dayAfterLast),
     stockQuote(`${code}.${stock.market === "KOSDAQ" ? "KQ" : "KS"}`),
   ]);
-
-  const today = todayKstDate();
   // 언급이 0인 날은 집계 표에 행 자체가 없다. 있는 행만 그리면 종목마다 막대 개수가
   // 달라져, 나란히 놓인 두 차트가 서로 다른 기간을 그리게 된다(실측: 삼성전자 8칸,
   // 현대차 7칸 — 07-18이 통째로 빠졌다). "최근 이틀 급증" 같은 문장도 눌린 축 위에서
-  // 읽히고, "최근 7일"이라는 라벨과도 안 맞는다.
+  // 읽히고, 카드 라벨과도 안 맞는다.
   //
-  // 그래서 창 전체의 날짜를 먼저 만들고 없는 날은 0으로 채운다 — 같은 파일의
+  // 그래서 창 전체의 날짜(days)를 먼저 만들고 없는 날은 0으로 채운다 — 같은 파일의
   // getTopStocksWithTrend 가 이미 쓰는 방식이라 그쪽과도 축이 맞는다.
   const byDate = new Map((daily ?? []).map((d) => [d.date, d.mention_count || 0]));
-  const series: { date: string; mentions: number }[] = [];
-  for (let i = REPORT_WINDOW_DAYS - 1; i >= 0; i -= 1) {
-    const d = new Date(`${today}T00:00:00Z`);
-    d.setUTCDate(d.getUTCDate() - i - 1); // 오늘은 아직 하루가 덜 차서 제외
-    const iso = d.toISOString().slice(0, 10);
-    series.push({ date: iso, mentions: byDate.get(iso) ?? 0 });
-  }
+  const series = days.map((date) => ({ date, mentions: byDate.get(date) ?? 0 }));
   const totalMentions = series.reduce((s, d) => s + d.mentions, 0);
 
   return {
@@ -1070,14 +1107,15 @@ const THEME_MIN_DECIDED = 8;
  */
 export async function getEcosystemSentiment(): Promise<EcosystemSentiment | null> {
   const db = getSupabaseAdmin();
-  // 날짜 컬럼에 gte라 경계일이 포함된다 — 7일치를 보려면 오늘 포함 6일 전부터다.
-  // daysAgoISO(7)이면 8일치가 잡혀 카드 헤더('최근 7일')와도, 같은 창을 latest-6으로
-  // 잡는 파이프라인 총평(generate_telegram_narratives.py)과도 어긋났다.
-  const since = daysAgoISO(6).slice(0, 10);
+  // 종목 리포트와 **같은 날짜 구간**을 본다(kstDateRange = 오늘 뺀 최근 N일).
+  // 예전엔 여기만 daysAgoISO 로 굴러 오늘이 섞였는데, 오늘은 하루가 덜 차서 낙관도가
+  // 반쪽 표본에 끌려다녔다. 두 카드가 같은 기간을 말해야 총평 문장도 옆 막대와 맞는다.
+  const window = kstDateRange(KADERA_WINDOW_DAYS);
   const { data } = await db
     .from("telegram_sentiment_daily")
     .select("date,scope,positive_count,neutral_count,negative_count,message_count")
-    .gte("date", since);
+    .gte("date", window[0])
+    .lte("date", window[window.length - 1]);
   if (!data?.length) return null;
 
   const agg = new Map<string, { pos: number; neu: number; neg: number; total: number }>();
