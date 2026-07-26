@@ -878,6 +878,26 @@ export type ChannelRank = {
 };
 
 /** 채널 파워 랭킹 — 가장 최근 날짜의 Influence Score. */
+/**
+ * 채널 파워 랭킹의 ▲▼ 순위 변동을 며칠 전과 견줄지.
+ *
+ * 7일 → 5일 → 2일로 내려왔다. 영향력 점수의 재료가 "최근 ~30개 글 / 7일 게시물 수"라
+ * 점수 자체가 느리게 움직이는데, 비교 기준까지 멀면 배지가 며칠째 같은 값으로 굳는다.
+ * 2일이면 "어제오늘 사이 올라왔나"가 읽히고, 모집단이 바뀌었을 때 정상으로 돌아오는
+ * 시간도 그만큼 짧다(아래 RANK_POOL_MIN_RATIO 참고).
+ */
+const RANK_COMPARE_DAYS = 2;
+
+/**
+ * 순위를 견주려면 두 스냅샷의 **모집단이 비슷해야 한다**. 기준일 채널 수가 최신일의
+ * 이 비율에 못 미치면 비교를 접는다(배지 없음).
+ *
+ * 감시 채널이 12개에서 317개로 늘던 날 이 장치가 없어서, 12개 중 8위이던 채널이
+ * 317개 중 170위가 되며 "▼162계단" 으로 찍혔다. 채널이 내려간 게 아니라 재는 자가
+ * 바뀐 것이다. 0.8 은 채널 몇 개가 빠지는 정상 변동은 통과시키되 이런 도약은 막는 선.
+ */
+const RANK_POOL_MIN_RATIO = 0.8;
+
 export async function getChannelRanking(limit = 50): Promise<ChannelRank[]> {
   const db = getSupabaseAdmin();
   // 채널 12개 × 하루 1행이라 석 달이면 1000행을 넘긴다 — 그때 잘리면 순위 변동 비교용
@@ -916,9 +936,12 @@ export async function getChannelRanking(limit = 50): Promise<ChannelRank[]> {
   const dates = [...new Set(stats.map((r) => r.date))].sort();
   const latestDate = dates[dates.length - 1];
   const DAY = 24 * 60 * 60 * 1000;
-  const baseDate = dates.find(
-    (d) => (new Date(latestDate).getTime() - new Date(d).getTime()) / DAY >= 5,
-  );
+  const daysBefore = (d: string) => (new Date(latestDate).getTime() - new Date(d).getTime()) / DAY;
+  // 기준일은 "RANK_COMPARE_DAYS 일 이상 이전" 중 **가장 최근**이다.
+  // 예전엔 dates.find(…) 였는데 dates 는 오름차순이라 조건을 만족하는 **가장 오래된** 날이
+  // 잡혔다 — "5일 이상"이라 적어 두고 실제로는 창 끝(7일 전)과 비교하고 있었다.
+  // 창 길이(14일)를 건드리면 비교 기준이 같이 흔들리는 구조였다.
+  const baseDate = [...dates].reverse().find((d) => daysBefore(d) >= RANK_COMPARE_DAYS);
   // 점수가 같으면 handle 로 가른다. influence_score 는 소수 첫째 자리까지만 저장돼
   // 동점이 흔한데(12채널 중 3쌍이 동점), 그때 JS sort 는 입력 순서를 그대로 두므로
   // 순위가 DB가 돌려준 행 순서에 좌우된다 — 조회 방식만 바꿔도 7·8위가 뒤바뀌고
@@ -932,8 +955,15 @@ export async function getChannelRanking(limit = 50): Promise<ChannelRank[]> {
         .sort(byScore)
         .map((r, i) => [r.channel_handle, i + 1]),
     );
-  const prevRanks = baseDate ? rankOn(baseDate) : null;
   const currRanks = rankOn(latestDate);
+  // 모집단이 크게 달라졌으면 비교하지 않는다. 감시 채널이 12개 → 317개로 늘면서
+  // 옛 스냅샷(12개) 순위와 지금(317개) 순위를 견주게 됐고, 채널이 내려간 게 아니라
+  // 모집단이 26배가 된 것뿐인데 "▼162계단" 이 찍혔다(2026-07-26 실측).
+  // 확장 이력이 RANK_COMPARE_DAYS 만큼 쌓일 때까지는 배지를 접어 둔다 — 틀린 숫자를
+  // 보여주느니 아무 말도 안 하는 게 낫다.
+  const prevAll = baseDate ? rankOn(baseDate) : null;
+  const comparable = prevAll != null && prevAll.size >= currRanks.size * RANK_POOL_MIN_RATIO;
+  const prevRanks = comparable ? prevAll : null;
 
   // 순위는 전 채널로 매기고(위 currRanks/prevRanks), 내려보내는 목록만 자른다.
   // 카드는 10개씩 '더보기'로 펼치는데, 자르지 않으면 317개 행이 사진(건당 ~12KB)까지
