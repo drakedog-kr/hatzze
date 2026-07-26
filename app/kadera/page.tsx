@@ -70,17 +70,21 @@ function MddLink({ code, market }: { code: string; market: string | null }) {
   );
 }
 
-/* 생태계 센티먼트 카드의 LLM 총평이 차지하는 자리. 이 두 값이 곧 카드 높이를 결정하므로
-   한 곳에 모아 둔다 — 줄 수와 줄 높이가 따로 놀면 height 계산이 조용히 어긋난다.
+/* 생태계 센티먼트 카드의 LLM 총평 줄 높이.
 
-   4 → 3 → 다시 4로 왔다. 3으로 내렸던 건 총평이 140~190자였을 때 4줄을 못 채워서다.
-   총평 길이를 240~258자로 올리면서(generate_telegram_narratives.py 의 BRIEF_TONE_LEN·
-   BRIEF_NEWS_LEN) 다시 4줄이 필요해졌다 — 그 길이가 1280px 에서 정확히 4줄이다.
+   **높이는 고정하지 않는다. 3줄이면 3줄, 4줄이면 4줄로 글에 맞춰 흐른다.**
+   한때 4줄로 못박아 뒀는데(줄 수는 화면 폭을 타서 같은 240자가 1280px 에선 4줄,
+   1920px 에선 3줄이다) 넓은 화면에서 늘 밑에 빈 줄이 하나 남았다. 그 자리는 어떤
+   글자수로도 못 채운다 — 넓은 쪽을 채우려면 좁은 쪽이 잘리기 때문이다.
 
-   **줄 수는 화면 폭을 탄다.** 같은 240자가 1280px 에선 4줄, 1920px 에선 3줄이다. 그래서 이
-   숫자는 "가장 좁은 데스크톱(1280px)에서 넘치지 않는 줄 수"로 잡는다. 넓은 화면에선 한 줄이
-   남는데, 그쪽을 채우려면 260자 이상이 필요하고 그러면 1280px 에서 잘린다. */
-const SUMMARY_LINES = 4;
+   **옆 카드와 높이를 맞추는 일은 이 상자가 아니라 그리드가 한다**(globals.css 의
+   hz-selfstretch-lg). 모니터링 현황이 이 카드 높이로 늘어나므로, 총평이 한 줄 줄면
+   두 카드가 나란히 한 줄만큼 줄어든다. 높이는 여전히 서로 같다.
+
+   길이 자체는 파이프라인이 잡는다(generate_telegram_narratives.py 의 BRIEF_TONE_LEN·
+   BRIEF_NEWS_LEN = 총 240~258자). 여기서 다시 자르지 않는 이유는, 잘라 두면 그쪽이
+   망가졌을 때 화면이 조용히 문장을 먹어 치우기 때문이다. 길어지면 길어진 대로 보이는
+   편이 눈에 띈다. */
 const SUMMARY_LINE_HEIGHT = 1.7;
 
 /** 한 줄 말줄임 — 채널명·종목명처럼 카드를 밀어낼 수 있는 이름에 붙인다. */
@@ -391,25 +395,16 @@ export default async function KaderaPage() {
                   }}
                 >
                   <Icon name="auto_awesome" style={{ fontSize: 15, color: C.blue, flexShrink: 0, marginTop: 4 }} />
-                  {/* 높이 고정은 hz-summary-clamp 가 맡는다(줄 수·줄 높이는 아래 변수로 넘긴다).
-                      LLM 총평은 길이가 날마다 달라서 자라게 두면 이 카드가 옆의 모니터링 현황
-                      카드보다 들쭉날쭉해진다. 다만 **고정이 필요한 건 4열일 때뿐**이다 — 2열
-                      이하에선 이 카드가 한 줄을 혼자 써서 맞출 상대가 없고, 좁을수록 같은 글이
-                      여러 줄로 늘어나 3줄 고정이 문장을 크게 잘라먹는다. 그 분기는 미디어쿼리라
-                      인라인 style 로는 못 쓴다(globals.css 참고). */}
+                  {/* 높이를 안 잡는다 — 글이 3줄이면 3줄, 4줄이면 4줄로 흐른다.
+                      옆 카드와 높이를 맞추는 건 그리드 몫이다(SUMMARY_LINE_HEIGHT 주석 참고). */}
                   <p
-                    className="hz-summary-clamp"
                     style={{
                       margin: 0,
                       fontSize: 13,
                       lineHeight: SUMMARY_LINE_HEIGHT,
                       color: "var(--c-ink-soft)",
                       wordBreak: "keep-all",
-                      // CSS 쪽이 이 값으로 height·line-clamp 를 계산한다. 숫자의 출처를
-                      // TS 한 곳에 두려는 것 — 양쪽에 3과 1.7 을 따로 적으면 갈라진다.
-                      ["--hz-summary-lines" as string]: SUMMARY_LINES,
-                      ["--hz-summary-lh" as string]: SUMMARY_LINE_HEIGHT,
-                    } as React.CSSProperties}
+                    }}
                   >
                     {sentiment.summary}
                   </p>

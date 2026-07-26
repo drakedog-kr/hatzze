@@ -29,7 +29,13 @@ export function getDevOverrides(): DevOverrides {
   try {
     const raw = readFileSync(join(process.cwd(), "dev-overrides.json"), "utf-8");
     const parsed = JSON.parse(raw) as DevOverrides;
-    return parsed && typeof parsed === "object" ? parsed : EMPTY;
+    if (!parsed || typeof parsed !== "object") return EMPTY;
+    // 빈 문자열은 "덮어쓰지 않는다"로 읽는다. 소비자가 `override ?? row.값` 으로 쓰는데
+    // ""는 ?? 를 통과해 버려서, 키를 비워 둔 게 곧 '빈 값으로 덮어쓰기'가 된다.
+    // 실제로 dev-overrides.json 의 summary:"" 하나가 로컬 히어로 요약을 통째로 지워,
+    // 프로덕션엔 멀쩡한 문장이 로컬에서만 안 보였다(파일 주석은 "지금은 비어 있습니다"
+    // 라고 적혀 있었으니 의도는 명백히 '오버라이드 없음'이다).
+    return { ...parsed, summary: parsed.summary?.trim() ? parsed.summary : undefined };
   } catch {
     return EMPTY;
   }
