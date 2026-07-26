@@ -321,15 +321,21 @@ export default async function KaderaPage() {
                   borderTop: i === 0 ? "none" : `1px solid var(--c-divider)`,
                 }}
               >
-                <span style={{ fontSize: 12, color: C.sub, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                {/* wordBreak:keep-all — 이 카드는 4열 그리드의 1칸이라 1025~1300px 구간에서
+                    폭이 185px 까지 좁아진다. 기본 규칙이면 "활성 채널 (7일)"이 "활성 채널 (7"
+                    / "일)" 처럼 토막나 읽히지 않는다. 어절 경계에서만 접히게 한다.
+                    minWidth:0 — 접힐 수 있어야 옆의 숫자가 밀려나지 않는다. */}
+                <span style={{ fontSize: 12, color: C.sub, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4, minWidth: 0, wordBreak: "keep-all" }}>
                   {s.label}
                   {s.help && (
-                    <span className="hz-tip hz-tip-wide" data-tip={s.help} style={{ display: "inline-flex", cursor: "help" }}>
+                    <span className="hz-tip hz-tip-wide" data-tip={s.help} style={{ display: "inline-flex", cursor: "help", flexShrink: 0 }}>
                       <Icon name="help" style={{ fontSize: 13, color: C.muted }} />
                     </span>
                   )}
                 </span>
-                <span style={{ fontFamily: MONO, fontSize: 18, fontWeight: 800, color: C.ink, letterSpacing: "-0.02em" }}>{s.value}</span>
+                {/* 숫자는 절대 안 쪼갠다 — "38,631" 과 "개" 가 두 줄로 갈리면 수치가 아니라
+                    오류처럼 보인다. 라벨이 접히더라도 이쪽은 통째로 유지한다. */}
+                <span style={{ fontFamily: MONO, fontSize: 18, fontWeight: 800, color: C.ink, letterSpacing: "-0.02em", whiteSpace: "nowrap", flexShrink: 0 }}>{s.value}</span>
               </div>
             ))}
           </div>
