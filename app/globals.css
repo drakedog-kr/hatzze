@@ -584,6 +584,48 @@ body {
   background: var(--c-blue-tint);
 }
 
+/* 히어로 온도 아래의 공유 버튼(app/ShareButtons.tsx). 위 .hz-btn-soft 와 같은 옅은
+   버튼 문법을 쓰되, 카드 폭을 채우는 대신 글자 폭에 맞춰 나란히 놓이게 padding 을 준다.
+   버튼과 링크(<button>·<a>)가 섞여 있어 font 는 반드시 물려받게 둔다 — 안 그러면
+   <button> 만 브라우저 기본 서체로 떨어져 둘의 글자가 달라 보인다.
+   색은 전부 CSS 변수라 라이트/다크가 같이 따라온다. */
+.hz-share-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 13px;
+  border-radius: 10px;
+  border: 1px solid var(--c-line);
+  background: var(--c-bg);
+  color: var(--c-blue);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.14s ease, background 0.14s ease, color 0.14s ease;
+}
+.hz-share-btn:hover {
+  border-color: var(--c-blue);
+  background: var(--c-blue-tint);
+}
+/* 복사 결과. 라벨·아이콘과 함께 색까지 바뀌어야 눌린 게 분명하다. */
+.hz-share-btn[data-state="done"],
+.hz-share-btn[data-state="done"]:hover {
+  color: var(--c-cold);
+  border-color: var(--c-cold);
+  background: var(--c-cold-tint);
+}
+.hz-share-btn[data-state="fail"],
+.hz-share-btn[data-state="fail"]:hover {
+  color: var(--c-mania);
+  border-color: var(--c-mania);
+  background: var(--c-mania-tint);
+}
+
 /* 사이드바 로고 → 홈 링크. 워드마크 색을 건드리면 브랜드가 흐트러지므로
    투명도만 살짝 줄여 눌리는 요소임을 알린다. */
 .hz-logo-link {

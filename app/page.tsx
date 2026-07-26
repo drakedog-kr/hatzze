@@ -1,6 +1,8 @@
 import { getLatestDailyScore, getPublicIndicators, getTopStockHighGaps } from "@/lib/data";
 import type { DailyScore, IndicatorCategory, IndicatorWithLatestValue, StockHighGap } from "@/lib/data";
 import { formatEokMixed, formatIndicatorValue, formatKstUpdate, sentimentTone, shortDate } from "@/lib/format";
+import { SITE_URL } from "./seo";
+import { ShareButtons } from "./ShareButtons";
 import { C, Icon, MONO, stageForScore } from "./ui";
 
 // 지표는 하루 단위(GitHub Actions 배치)로 갱신되므로, 빌드 시점에 정적으로
@@ -549,6 +551,11 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
             </span>
           ))}
         </div>
+        {/* 공유는 온도 바로 아래 — 숫자를 보고 바로 퍼가는 자리다. 게이지 열이 오른쪽
+            열보다 짧아 desktop 에선 남는 자리를 채우고, 좁은 화면에선 게이지 아래로
+            그대로 따라 내려간다. 링크는 항상 운영 주소로 굳힌다(로컬에서 눌러도
+            localhost 가 복사되지 않도록). */}
+        <ShareButtons deg={scoreDisplay} stage={stageLabel} url={SITE_URL} />
       </div>
       {/* flex-basis 280 + minWidth 0. basis 로 "280 이 안 되면 아랫줄로" 를 유지하되,
           일단 아랫줄로 내려간 뒤에는 남은 폭(모바일 245px)까지 줄어들 수 있게 한다 —

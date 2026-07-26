@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { getDevOverrides } from "@/lib/dev-overrides";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { fetchYahooQuote } from "@/lib/yahoo-quote";
@@ -58,7 +60,15 @@ export type IndicatorWithLatestValue = {
   historyPoints: { date: string; value: number }[];
 };
 
-export async function getLatestDailyScore(): Promise<DailyScore | null> {
+/**
+ * 최신 daily_score 한 줄.
+ *
+ * 한 요청 안에서 두 번 불린다 — 루트 레이아웃(탑바에 쓸 점수)과 generateMetadata
+ * (OG 이미지 URL 에 실을 날짜·도수). supabase-js 는 Next 의 fetch 메모이제이션 대상이
+ * 아니라 그냥 두면 조회가 두 번 나가므로, React cache 로 감싸 요청당 한 번만 돈다.
+ * (OG 이미지 라우트는 별도 요청이라 여기 캐시를 공유하지 않는다 — 의도된 것이다.)
+ */
+export const getLatestDailyScore = cache(async function getLatestDailyScore(): Promise<DailyScore | null> {
   const query = (cols: string) =>
     getSupabaseServer()
       .from("daily_score")
@@ -96,7 +106,7 @@ export async function getLatestDailyScore(): Promise<DailyScore | null> {
     updated_at: row.updated_at,
     ai_summary: summaryOverride ?? row.ai_summary ?? null,
   };
-}
+});
 
 export async function getPublicIndicators(): Promise<IndicatorWithLatestValue[]> {
   // is_public=false인 지표(예: kospi_close_raw)는 다른 지표를 계산하기 위한

@@ -3,12 +3,16 @@ import type { Metadata } from "next";
 import { C } from "../ui";
 import { pageMetadata } from "../seo";
 
-export const metadata: Metadata = pageMetadata({
-  title: "개인정보처리방침 | hatzze",
-  description:
-    "hatzze가 수집하는 정보와 이용 목적, 쿠키의 설치·운영 및 거부 방법을 안내합니다.",
-  path: "/privacy",
-});
+// og:image URL 에 그날의 도수가 실려 있어 요청마다 다시 계산해야 한다(상수로 두면
+// 서버가 살아 있는 동안 어제 URL 을 계속 내보낸다). 자세한 건 app/seo.ts 주석 참고.
+export async function generateMetadata(): Promise<Metadata> {
+  return pageMetadata({
+    title: "개인정보처리방침 | hatzze",
+    description:
+      "hatzze가 수집하는 정보와 이용 목적, 쿠키의 설치·운영 및 거부 방법을 안내합니다.",
+    path: "/privacy",
+  });
+}
 
 /** 방침 시행일. 베타 오픈일과 맞춘다. 내용을 고치면 이 날짜도 같이 올려야 한다. */
 const EFFECTIVE_DATE = "2026년 7월 31일";

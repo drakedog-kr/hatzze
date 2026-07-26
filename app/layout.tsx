@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
 import AppShell from "./AppShell";
-import { SITE_NAME, SITE_URL } from "./seo";
+import { SITE_NAME, SITE_URL, pageMetadata } from "./seo";
 import { getLatestDailyScore } from "@/lib/data";
 import type { DailyScore } from "@/lib/data";
 
@@ -29,33 +29,25 @@ const TITLE = "hatzze | 데이터와 감성으로 읽는 시장";
 const DESCRIPTION =
   "오늘 코스피는 얼마나 뜨겁습니까. 버핏지수·VKOSPI·레버리지 등 25개 지표를 매일 하나의 과열도 점수로 환산합니다.";
 
-// opengraph-image.tsx(파일 컨벤션)가 openGraph/twitter 이미지를 자동으로 채운다.
-export const metadata: Metadata = {
-  metadataBase: new URL(SITE_URL),
-  title: TITLE,
-  description: DESCRIPTION,
-  keywords: ["코스피 과열도", "시장 과열도", "버핏지수", "VKOSPI", "공포탐욕지수", "증시 심리", "코스피 지표", "hatzze", "햇쩨"],
-  alternates: { canonical: "/" },
-  openGraph: {
-    type: "website",
-    locale: "ko_KR",
-    url: SITE_URL,
-    siteName: SITE_NAME,
-    title: TITLE,
-    description: DESCRIPTION,
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: TITLE,
-    description: DESCRIPTION,
-  },
-  verification: {
-    ...(GOOGLE_VERIFICATION ? { google: GOOGLE_VERIFICATION } : {}),
-    ...(NAVER_VERIFICATION
-      ? { other: { "naver-site-verification": NAVER_VERIFICATION } }
-      : {}),
-  },
-};
+// 홈도 하위 페이지와 같은 pageMetadata()를 쓴다 — og:image URL 에 오늘 날짜·도수가
+// 실려 있어(카톡 캐시를 깨려고) 여기만 손으로 적어 두면 홈과 /kadera·/mdd 가 서로 다른
+// 이미지를 가리키게 된다. 여기서는 홈에만 있는 것(metadataBase·키워드·소유확인)만 얹는다.
+//
+// `export const metadata` 가 아니라 generateMetadata 인 이유: 상수는 모듈이 로드될 때
+// 한 번만 계산돼서 서버가 살아 있는 동안 어제 날짜의 URL 을 계속 내보낸다.
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    ...(await pageMetadata({ title: TITLE, description: DESCRIPTION, path: "/" })),
+    metadataBase: new URL(SITE_URL),
+    keywords: ["코스피 과열도", "시장 과열도", "버핏지수", "VKOSPI", "공포탐욕지수", "증시 심리", "코스피 지표", "hatzze", "햇쩨"],
+    verification: {
+      ...(GOOGLE_VERIFICATION ? { google: GOOGLE_VERIFICATION } : {}),
+      ...(NAVER_VERIFICATION
+        ? { other: { "naver-site-verification": NAVER_VERIFICATION } }
+        : {}),
+    },
+  };
+}
 
 // 사이드바/탑바는 모든 페이지가 공유하므로 레이아웃에서 점수를 받아 셸에 넘긴다.
 // env가 없는 빌드 환경에서도 죽지 않도록 실패 시 null로 둔다(탑바가 —로 표시).
