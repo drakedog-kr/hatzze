@@ -195,12 +195,17 @@ function ThemeToggle({ initial }: { initial: "light" | "dark" }) {
 
   const toggle = () => {
     const next = theme === "dark" ? "light" : "dark";
-    // 기본 테마를 라이트로 둘지 판단할 유일한 근거. 전환 방향(to)이 있어야
-    // "다크를 켠 사람"과 "다크에서 되돌아온 사람"이 구분된다.
+    // 기본 테마가 다크라, 이 이벤트는 이제 "라이트로 되돌린 사람"이 얼마나 되는지를
+    // 재는 쪽이 주된 쓸모다. 전환 방향(to)이 있어야 양쪽이 구분된다.
     track("theme_toggle", { to: next });
     setTheme(next);
     document.documentElement.setAttribute("data-theme", next);
     document.cookie = `hz-theme=${next}; path=/; max-age=31536000; SameSite=Lax`;
+    // 모바일 주소창 색도 같이 돌린다. 이 메타는 layout.tsx 가 쿠키를 보고 SSR 하므로,
+    // 여기서 안 고치면 다음 페이지 로드까지 주소창만 이전 테마로 남는다.
+    // 값을 또 적지 않고 방금 바뀐 data-theme 의 --c-bg 를 읽어 globals.css 를 따라간다.
+    const bg = getComputedStyle(document.documentElement).getPropertyValue("--c-bg").trim();
+    if (bg) document.querySelector('meta[name="theme-color"]')?.setAttribute("content", bg);
   };
 
   return (
