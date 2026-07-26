@@ -74,8 +74,8 @@ function MddLink({ code, market }: { code: string; market: string | null }) {
    한 곳에 모아 둔다 — 줄 수와 줄 높이가 따로 놀면 height 계산이 조용히 어긋난다.
 
    4 → 3 → 다시 4로 왔다. 3으로 내렸던 건 총평이 140~190자였을 때 4줄을 못 채워서다.
-   총평 길이를 231~255자로 올리면서(generate_telegram_narratives.py 의 BRIEF_LEN_MIN/MAX)
-   다시 4줄이 필요해졌다 — 그 길이가 1280px 에서 정확히 4줄이다.
+   총평 길이를 240~258자로 올리면서(generate_telegram_narratives.py 의 BRIEF_TONE_LEN·
+   BRIEF_NEWS_LEN) 다시 4줄이 필요해졌다 — 그 길이가 1280px 에서 정확히 4줄이다.
 
    **줄 수는 화면 폭을 탄다.** 같은 240자가 1280px 에선 4줄, 1920px 에선 3줄이다. 그래서 이
    숫자는 "가장 좁은 데스크톱(1280px)에서 넘치지 않는 줄 수"로 잡는다. 넓은 화면에선 한 줄이
