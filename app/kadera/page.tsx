@@ -13,6 +13,7 @@ import {
   getThemeRotation,
   getTopStocksWithTrend,
   getTrendingMessages,
+  KADERA_WINDOW_DAYS,
 } from "@/lib/telegram-data";
 import type { TrendingMessage } from "@/lib/telegram-data";
 
@@ -372,7 +373,7 @@ export default async function KaderaPage() {
           <SectionHead
             icon="psychology"
             title="텔레그램 생태계 센티먼트"
-            note="최근 7일"
+            note={`최근 ${KADERA_WINDOW_DAYS}일`}
             desc="메시지 톤으로 본 시장 분위기"
             meta={summary.lastUpdated ? `최종 업데이트 · ${formatKstUpdate(summary.lastUpdated)}` : undefined}
           />
@@ -725,7 +726,7 @@ export default async function KaderaPage() {
           <SectionHead
             icon="query_stats"
             title="주요 종목 리포트"
-            note="최근 7일 · 상위 3종목"
+            note={`최근 ${KADERA_WINDOW_DAYS}일 · 상위 3종목`}
             desc="가장 많이 회자된 종목의 추이와 흐름"
           />
           {stockReports.length === 0 ? (
@@ -753,11 +754,11 @@ export default async function KaderaPage() {
                         </span>
                       )}
                     </div>
-                    {/* 언급 추이 — 막대를 바닥선 위에 세운다. 평소엔 마지막 날만 진해
-                        "지금"이 어디인지 눈이 먼저 잡고, 마우스를 올리면 그 날로 강조가
+                    {/* 언급 추이 — 막대를 바닥선 위에 세운다. 진한 칸이 곧 카드 수치에 들어간
+                        최근 3일이고 앞쪽 옅은 칸은 배경 맥락이다. 마우스를 올리면 그 날로 강조가
                         옮겨간다(진하기·날짜색 규칙은 globals.css 의 .hz-bars). */}
                     <div className="hz-bars" style={{ display: "flex", alignItems: "flex-end", gap: 4, margin: "14px 0 12px", borderBottom: `1px solid ${C.line}` }}>
-                      {r.series.map((d, i) => (
+                      {r.series.map((d) => (
                         <div
                           key={d.date}
                           className="hz-tip hz-bar-col"
@@ -765,8 +766,11 @@ export default async function KaderaPage() {
                           // 커서는 기본 그대로 둔다 — 도움말(?)이 아니라 값을 짚어 보는 차트다.
                           style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 5, minWidth: 0 }}
                         >
+                          {/* 집계 창 밖(앞쪽 칸)은 배경 맥락이라 옅게 — 막대는 7일치인데
+                              아래 '언급 N회'는 최근 3일치라, 어디까지가 그 숫자인지 눈으로
+                              짚을 수 있어야 한다(globals.css 의 .hz-bar-ctx). */}
                           <div
-                            className={`hz-bar${i === r.series.length - 1 ? " hz-bar-last" : ""}`}
+                            className={`hz-bar${d.scored ? "" : " hz-bar-ctx"}`}
                             style={{
                               width: "100%",
                               height: `${Math.max(3, (d.mentions / max) * 40)}px`,

@@ -542,17 +542,21 @@ body {
   }
 }
 
-/* 주요 종목 리포트의 언급 추이 막대. 평소엔 마지막 날만 진하고, 차트에 마우스를
-   올리면 가리키고 있는 날만 진해진다(나머지는 더 옅어져 어디를 보고 있는지 분명해진다).
-   서버 컴포넌트라 인라인 호버를 못 줘서 여기 클래스로 둔다.
-   규칙 순서가 곧 우선순위다 — :hover 규칙이 .hz-bar-last 뒤에 와야 마우스를 올렸을 때
-   마지막 날도 같이 옅어진다(안 그러면 진한 막대가 둘이 된다). */
+/* 주요 종목 리포트의 언급 추이 막대. 차트에 마우스를 올리면 가리키고 있는 날만 진해진다
+   (나머지는 더 옅어져 어디를 보고 있는지 분명해진다). 서버 컴포넌트라 인라인 호버를 못 줘서
+   여기 클래스로 둔다. 규칙 순서가 곧 우선순위다 — :hover 규칙이 기본 규칙 뒤에 와야
+   마우스를 올렸을 때 다른 칸이 같이 옅어진다(안 그러면 진한 막대가 둘이 된다). */
+/* 종목 리포트 막대는 **두 단계뿐**이다 — 진한 칸 = 카드 수치에 들어간 최근 3일,
+   옅은 칸 = 그 앞 배경 맥락. 예전엔 마지막 하루만 진하고 나머지 집계일이 중간 톤이라
+   세 단계였는데, 그러면 "어디까지가 480회인가"가 색으로 안 읽혔다. 경계를 색이 직접
+   말하게 두 단계로 줄인다(값은 숨기지 않는다 — 툴팁·hover 는 7칸 전부 동작). */
 .hz-bars .hz-bar {
-  opacity: 0.45;
+  opacity: 0.95; /* 집계 창(최근 3일) */
   transition: opacity 0.12s ease;
 }
-.hz-bars .hz-bar-last { opacity: 0.95; }
-.hz-bars:hover .hz-bar { opacity: 0.3; }
+.hz-bars .hz-bar-ctx { opacity: 0.45; } /* 그 앞 배경 맥락 */
+.hz-bars:hover .hz-bar { opacity: 0.45; }
+.hz-bars:hover .hz-bar-ctx { opacity: 0.25; }
 .hz-bars .hz-bar-col:hover .hz-bar { opacity: 1; }
 .hz-bars .hz-bar-date { transition: color 0.12s ease; }
 .hz-bars .hz-bar-col:hover .hz-bar-date { color: var(--c-sub); }

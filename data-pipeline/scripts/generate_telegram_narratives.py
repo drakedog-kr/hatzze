@@ -66,9 +66,13 @@ LEN_MIN, LEN_MAX = 75, 80
 LEN_HARD_MIN, LEN_HARD_MAX = 70, 82
 MAX_RETRIES = 3
 
-# 집계 창. 프론트 카드가 "최근 7일"이라 **오늘 포함 7일**이어야 화면 수치와 맞는다
-# (days=7로 빼면 8일치가 잡혀 화제어 횟수가 화면보다 커진다).
-WINDOW_DAYS = 7
+# 집계 창. 2026-07-26 에 7 → 3 으로 내렸다(Hun 요청) — 일주일치는 이미 지나간 얘기가
+# 절반이라 "지금 무엇이 오가나"를 흐렸다.
+#
+# ⚠️ **프론트 KADERA_WINDOW_DAYS 와 같은 값이어야 한다**(lib/telegram-data.ts).
+# 화면 숫자는 프론트에서, 그 옆 LLM 문장은 여기서 나오므로 값이 갈리면 한 카드가 서로
+# 다른 기간을 말한다. Python 과 TS 라 import 로 공유할 수 없어 손으로 맞춘 사본이다.
+WINDOW_DAYS = 3
 WINDOW_OFFSET = WINDOW_DAYS - 1
 
 # 총평 한 대목의 길이. 두 대목을 공백으로 이어 총평 전체는 240~258자가 된다.
@@ -182,7 +186,10 @@ STOCK_SYSTEM = COMMON + f"""
   채널"이 찍히고 위에는 일별 막대 차트가 있습니다. 같은 걸 문장으로 또 적으면 자리만
   차지하고, 무엇보다 **두 숫자가 어긋나 보일 수 있습니다**(카드와 집계 시점이 다릅니다).
 - **날짜 숫자('21일', '24~25일')도 쓰지 마세요.** 차트에 날짜 축이 이미 있습니다. 추이는
-  모양으로 옮기세요 — "주 중반에 몰렸다가 잦아들었습니다", "최근 이틀 사이 부쩍 늘었습니다".
+  모양으로 옮기세요 — "최근 사흘 사이 부쩍 늘었습니다", "요 며칠은 잦아들었습니다".
+- ⚠️ **화면 차트는 이 digest 보다 긴 기간을 그립니다.** 그러니 추이를 말할 땐 반드시
+  "최근 사흘", "요 며칠"처럼 **가까운 며칠로 범위를 못박으세요.** "주 중반에 몰렸다"처럼
+  더 앞을 가리키는 말은 쓰면 안 됩니다 — 여기 준 숫자로는 확인할 수 없는 얘기입니다.
 - **그 종목의 이름으로 문장을 시작하지 마세요.** 카드 머리에 종목명과 코드가 이미 크게
   적혀 있어 되풀이입니다(75~80자에서 그 자리가 아깝습니다). 바로 본론으로 들어가세요.
   다른 회사 이름은 필요하면 씁니다 — 금지되는 건 이 카드 주인공의 이름뿐입니다.
@@ -196,20 +203,33 @@ STOCK_SYSTEM = COMMON + f"""
   맞춰져 있어 넘치면 레이아웃이 깨집니다. 한 문장 또는 두 문장으로 자연스럽게 맞추세요."""
 
 
-def optimism(positive: int, negative: int) -> int | None:
-    """낙관도 = 중립을 뺀 '낙관 : 비관' 중 낙관 쪽 비중(%).
+# 낙관도에 얹는 가상 표본(가산 평활). **프론트 SENTIMENT_PRIOR 와 같은 값이어야 한다**
+# (lib/telegram-data.ts). 총평이 인용하는 숫자와 그 옆 막대가 갈리면 확인할 방법이 없는
+# 값이 화면에 나간다. Python 과 TS 라 import 로 공유할 수 없어 손으로 맞춘 사본이다.
+SENTIMENT_PRIOR = 5
 
-    화면(카더라 리포트의 종합 막대·테마 막대, 시장 브리핑 감성 카드)이 전부 이 기준을
-    쓴다. 예전엔 여기서 전체 건수로 나눠(중립 포함) 총평만 다른 숫자를 말했다 — 같은
-    반도체를 두고 총평은 "낙관 51%", 막대는 "31:69"라 어느 쪽이 맞는지 알 수 없었다.
+
+def optimism(positive: int, negative: int) -> int | None:
+    """낙관도 = 중립을 뺀 '낙관 : 비관' 중 낙관 쪽 비중(%). **평활을 건다.**
+
+    화면(카더라 리포트의 종합 막대·테마 막대)이 전부 이 기준을 쓴다. 예전엔 여기서 전체
+    건수로 나눠(중립 포함) 총평만 다른 숫자를 말했다 — 같은 반도체를 두고 총평은
+    "낙관 51%", 막대는 "31:69"라 어느 쪽이 맞는지 알 수 없었다.
 
     중립을 빼는 이유: 시황·공시 전달처럼 담담한 글이 원래 절반쯤이라, 같이 세면 낙관이
     아무리 좋아도 50%를 넘기 어려워 늘 비관 쪽으로 기울어 보인다.
+
+    평활을 거는 이유: 날것의 비율은 표본이 적으면 0%·100% 를 뱉는다. 창을 3일로 줄이자
+    인터넷·플랫폼이 82:0 으로 잡혀 막대가 `0:100` 이 됐다(2026-07-26). 양쪽에 가상 표본을
+    k 건씩 얹으면 **표본이 크면 사실상 그대로, 작을수록 가운데로 당겨진다** —
+    실측(k=5): 반도체 122:103 54%→54%, 전체 64%→64%, 인터넷·플랫폼 82:0 100%→95%,
+    하한(8:0) 100%→72%.
     """
     decided = positive + negative
     if decided == 0:
         return None
-    return round(positive / decided * 100)
+    k = SENTIMENT_PRIOR
+    return round((positive + k) / (decided + 2 * k) * 100)
 
 
 # ── 총평이 볼 테마: 카드와 **글자 그대로 같은 집합**이어야 한다 ────────────────────
@@ -339,10 +359,19 @@ def load_messages_since(db, since_date: str) -> list[dict]:
 def build_brief_digest(db, latest: str) -> str | None:
     """센티먼트 총평용 digest.
 
-    창은 최근 7일 — 카드 헤더가 '최근 7일'이라 화면의 막대 비율과 총평이 같은 기간을
-    말해야 한다. 하루치만 쓰면 주말처럼 표본이 얇은 날에 총평이 튄다.
+    창은 **카드와 글자 그대로 같아야 한다** — 총평은 화면에서 낙관도 막대 바로 옆에 붙고,
+    독자가 그 문장의 숫자를 확인할 곳은 그 막대뿐이다.
+
+    카드(lib/telegram-data.getEcosystemSentiment → kstDateRange)는 **오늘을 뺀** 최근
+    WINDOW_DAYS 일을 본다. 오늘은 아직 하루가 덜 차서 반쪽 표본이 낙관도를 끌기 때문이다.
+    여기서 오늘을 포함하면 같은 '최근 N일'이 서로 다른 N일이 된다.
+
+    실제로 어긋났다(2026-07-26, 창을 3일로 줄이자마자 드러남): 카드가 낙관 64%(낙관 우세)
+    로 찍는데 digest 는 54%(중립)였다. 창이 7일일 땐 하루 차이가 1/7 이라 안 보였지만
+    3일이면 1/3 이다. 헤드라인 숫자도 구간 라벨도 갈렸다.
     """
-    since = (datetime.fromisoformat(latest).date() - timedelta(days=WINDOW_OFFSET)).isoformat()
+    end = (datetime.fromisoformat(latest).date() - timedelta(days=1)).isoformat()  # 어제
+    since = (date.fromisoformat(end) - timedelta(days=WINDOW_OFFSET)).isoformat()
     sent = [
         r
         for r in load_all(
@@ -350,7 +379,7 @@ def build_brief_digest(db, latest: str) -> str | None:
             "telegram_sentiment_daily",
             "date,scope,positive_count,neutral_count,negative_count,message_count",
         )
-        if r["date"] >= since
+        if since <= r["date"] <= end
     ]
 
     window: dict[str, Counter] = defaultdict(Counter)
@@ -422,7 +451,9 @@ def build_brief_digest(db, latest: str) -> str | None:
     kws = load_all(db, "telegram_keyword_daily", "date,keyword,mention_count")
     recent = Counter()
     for r in kws:
-        if r["date"] >= since:
+        # 위 낙관도와 같은 구간을 쓴다(오늘 제외). 여기만 오늘을 넣으면 화제어가 반쪽짜리
+        # 하루에 끌려, 문장이 인용하는 주제와 낙관도가 다른 기간을 말하게 된다.
+        if since <= r["date"] <= end:
             recent[r["keyword"]] += r["mention_count"]
     if recent:
         lines.append("")
