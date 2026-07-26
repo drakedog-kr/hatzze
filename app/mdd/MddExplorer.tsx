@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { CHARACTER_MIN_DD } from "@/lib/mdd";
 import type { DrawdownCharacter, DrawdownPoint, Episode, MddAnalysis, RiskProfile as RiskProfileData } from "@/lib/mdd";
+import { track } from "@/lib/ga";
 import { C, Icon, MONO } from "../ui";
 
 export type StockOption = { code: string; name: string; market: string | null };
@@ -238,7 +239,21 @@ function Controls({
 
   const matches = useMemo(() => rankStockMatches(stocks, query), [query, stocks]);
 
+  // 검색어는 타이핑이 멎은 뒤에만 한 번 보낸다. onChange 마다 쏘면 "삼성전자" 한 번
+  // 치는 데 이벤트가 다섯 개 나가고, 그중 넷("삼", "삼성", …)은 의미가 없다.
+  // matches=0 인 검색어가 이 데이터의 알맹이다 — 목록에 없는 종목을 찾고 있다는 뜻.
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) return;
+    const timer = setTimeout(() => track("mdd_search", { query: q, matches: matches.length }), 800);
+    return () => clearTimeout(timer);
+  }, [query, matches.length]);
+
   const pick = (s: StockOption) => {
+    // 파라미터 이름을 stock_* 으로 붙인다. GA4 의 맞춤 측정기준은 이벤트가 아니라
+    // 속성 전체에서 이름 하나를 공유하므로, code/name 처럼 흔한 이름을 쓰면 나중에
+    // 다른 이벤트가 같은 이름을 다른 뜻으로 보낼 때 한 측정기준에 섞인다.
+    track("mdd_stock_select", { stock_code: s.code, stock_name: s.name });
     onSelect(s);
     setQuery("");
     setOpen(false);
@@ -304,7 +319,10 @@ function Controls({
           return (
             <button
               key={p.key}
-              onClick={() => onYears(p.key)}
+              onClick={() => {
+                track("mdd_period_change", { years: p.key });
+                onYears(p.key);
+              }}
               aria-pressed={on}
               style={{
                 padding: "7px 15px",

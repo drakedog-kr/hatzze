@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { track } from "@/lib/ga";
 import { C } from "../ui";
 
 /**
@@ -15,6 +16,7 @@ export function ExpandableList({
   step = 10,
   gap = 11,
   listStyle,
+  name,
 }: {
   items: React.ReactNode[];
   initial?: number;
@@ -22,6 +24,8 @@ export function ExpandableList({
   gap?: number;
   /** 기본 세로 목록 대신 다른 배치를 쓸 때(트렌딩 메시지는 3열 그리드). gap 은 여기서 덮어쓴다. */
   listStyle?: React.CSSProperties;
+  /** GA 이벤트에서 어느 목록인지 구분할 이름. 없으면 펼침을 재지 않는다. */
+  name?: string;
 }) {
   const [shown, setShown] = useState(initial);
   const canExpand = shown < items.length;
@@ -57,12 +61,29 @@ export function ExpandableList({
       {(canExpand || isExpanded) && (
         <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
           {canExpand && (
-            <button type="button" style={buttonStyle} onClick={() => setShown(Math.min(shown + step, items.length))}>
+            <button
+              type="button"
+              style={buttonStyle}
+              onClick={() => {
+                const next = Math.min(shown + step, items.length);
+                // shown 을 같이 보내면 "한 번 더 보고 말았는가, 끝까지 내려갔는가"가
+                // 나뉜다 — 기본 노출 개수를 조정할 때 그게 판단 근거다.
+                if (name) track("list_expand", { list: name, action: "more", shown: next });
+                setShown(next);
+              }}
+            >
               더 보기 +{Math.min(step, items.length - shown)}
             </button>
           )}
           {isExpanded && (
-            <button type="button" style={buttonStyle} onClick={() => setShown(initial)}>
+            <button
+              type="button"
+              style={buttonStyle}
+              onClick={() => {
+                if (name) track("list_expand", { list: name, action: "fold", shown: initial });
+                setShown(initial);
+              }}
+            >
               접기
             </button>
           )}

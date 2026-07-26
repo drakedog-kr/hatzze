@@ -561,6 +561,7 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
             <span
               className="hz-tip hz-tip-wide hz-tip-below"
               data-tip="시장·감성 지표 25개의 과열도를 가중 평균한 값입니다. 지표마다 신호의 무게가 달라 다른 가중치로 합산합니다. 25·50·75를 경계로 저온·상온·고온·초고온이 나뉩니다."
+              data-ga-tip="hatzze_index"
               style={{ display: "inline-flex", cursor: "help" }}
             >
               <Icon name="help" style={{ fontSize: 16, color: C.sub }} />
@@ -1083,6 +1084,7 @@ function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
             <span
               className="hz-tip hz-tip-wide hz-tip-end"
               data-tip="현재가는 지수와 같은 KRX 종가입니다. 52주 고점은 야후 파이낸스의 장중 최고가라, 종가 기준인 지수 쪽보다 괴리율이 조금 더 깊게 나옵니다."
+              data-ga-tip="high_gap_source"
               style={{ fontSize: 10, fontWeight: 800, color: C.sub }}
             >
               거래대금 상위 종목의 52주 고점 대비
@@ -1443,6 +1445,7 @@ function DivergenceBar({
           <span
             className={`hz-tip hz-tip-wide ${tipEdge === "end" ? "hz-tip-end" : "hz-tip-start"}`}
             data-tip={tip}
+            data-ga-tip={label}
             style={{ display: "inline-flex", cursor: "help" }}
           >
             <Icon name="help" style={{ fontSize: 13, color: C.sub }} />
@@ -2086,7 +2089,7 @@ export default async function Home() {
                 {extra("감성").map((i) => (
                   <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["감성"]} />
                 ))}
-                <a href="https://forms.gle/P4wzp2DkP2wyTPWP9" target="_blank" rel="noopener noreferrer" style={{ border: `2px dashed ${C.line}`, borderRadius: 14, padding: 24, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, minHeight: 210, color: C.sub, textAlign: "center" }}>
+                <a href="https://forms.gle/P4wzp2DkP2wyTPWP9" target="_blank" rel="noopener noreferrer" data-ga="cta_click" data-ga-cta="report_indicator" data-ga-surface="sentiment_grid" style={{ border: `2px dashed ${C.line}`, borderRadius: 14, padding: 24, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, minHeight: 210, color: C.sub, textAlign: "center" }}>
                   <Icon name="add_circle" style={{ fontSize: 34 }} />
                   <span style={{ fontSize: 14, fontWeight: 700 }}>새로운 지표 제보하기</span>
                   <span style={{ fontSize: 11, fontWeight: 500, color: "var(--c-muted)" }}>아이디어가 있다면 알려주세요</span>
