@@ -90,6 +90,7 @@ SPOTLIGHT_SYSTEM = COMMON + """
 **카테고리가 '시장'인 지표 중에서만** 과열도가 가장 높은(가장 뜨거운) 지표 '하나'를 골라,
 이름과 함께 그 지표가 무엇을 재는지·왜 뜨거운 게 의미 있는지를 쉬운 말로 한 문장에 담으세요.
 '감성' 지표가 더 뜨겁더라도 고르지 마세요(시장 지표가 하나도 없을 때만 감성에서 고릅니다).
+**'← 주인공으로 고르지 마세요' 표시가 붙은 지표는 아무리 뜨거워도 고르지 마세요.**
 지표 밑 '뜻:' 설명을 근거로 삼되 그대로 베끼진 마세요. 지표는 하나만 씁니다. 여러 개를
 나열하지 마세요."""
 
@@ -109,6 +110,30 @@ DESC_TOP_N = 5
 # 전체 상위 5개에만 붙이면, 시장 지표가 전체 8위쯤에 있는 날엔 주인공으로 뽑힌 지표에
 # 근거가 하나도 안 딸려 가서 모델이 뜻을 지어내야 한다(프롬프트가 금지한 바로 그 일).
 SPOTLIGHT_CATEGORY = "시장"
+
+# 주인공에서 빼는 지표 — slug → 다시 후보가 되는 raw_value 하한.
+#
+# 버핏지수는 시장 지표 중 과열도가 늘 높은 편이라(2026-07-26 raw 196.75% · 과열도 71)
+# '시장 지표에서 고르라'고 바꾸자마자 주인공을 독차지했다. 그런데 이건 시가총액/GDP 라
+# 분기 GDP 를 따라 아주 천천히 움직인다 — 어제와 오늘이 사실상 같은 값이라, 매일 바뀌는
+# '오늘의 요약'의 주인공으로는 할 말이 없다(Hun: "너무 매크로한 지표").
+#
+# 다만 임계를 넘으면 그 자체가 사건이라 다시 후보로 올린다. 230% 는 Hun 이 정한 선이다.
+# 값은 표시 단위 그대로다(indicator_values.raw_value, 버핏지수는 % 단위).
+SPOTLIGHT_RAW_GATES: dict[str, float] = {"buffett_index": 230.0}
+
+
+def spotlight_eligible(row: dict) -> bool:
+    """이 지표를 주인공(2번째 문단)으로 세워도 되나.
+
+    문턱이 걸린 지표는 raw 가 그 값을 넘을 때만 통과. raw 가 없으면(아직 안 채워짐)
+    보수적으로 제외한다 — 문턱을 확인 못 한 채 올리는 것보다 낫다.
+    """
+    gate = SPOTLIGHT_RAW_GATES.get(row.get("slug") or "")
+    if gate is None:
+        return True
+    raw = row.get("raw")
+    return raw is not None and float(raw) >= gate
 
 
 def normalize_category(raw: str | None) -> str:
@@ -151,11 +176,15 @@ def build_digest(
         "",
         "[지표별] 과열도 높은 순 (0=저온 ~ 100=초고온, '초고온'=과열도 75 이상)",
     ]
-    spotlight_pool = [r for r in rows if r["category"] == SPOTLIGHT_CATEGORY] or rows
+    # 문턱에 걸린 지표(SPOTLIGHT_RAW_GATES)는 후보에서 빼고, 목록에는 남기되 표시를 단다 —
+    # 지워 버리면 모델이 보는 '가장 뜨거운 지표'가 실제와 달라져 다른 문장까지 어긋난다.
+    eligible = [r for r in rows if spotlight_eligible(r)]
+    spotlight_pool = [r for r in eligible if r["category"] == SPOTLIGHT_CATEGORY] or eligible or rows
     desc_names = {r["name"] for r in spotlight_pool[:DESC_TOP_N]}
     for r in rows:
         hot_mark = " · 초고온" if r["hot"] else ""
-        lines.append(f"- {r['name']} ({r['category']}): 과열도 {r['capped']:.0f}%{hot_mark}")
+        gate_mark = "" if spotlight_eligible(r) else "  ← 주인공으로 고르지 마세요"
+        lines.append(f"- {r['name']} ({r['category']}): 과열도 {r['capped']:.0f}%{hot_mark}{gate_mark}")
         if r["name"] in desc_names and r.get("desc"):
             lines.append(f"    뜻: {r['desc']}")
     return "\n".join(lines)
@@ -192,7 +221,7 @@ def main() -> None:
     # 1번째 문단(주인공 뜻풀이)의 근거로 상위 지표에 붙인다.
     indicators = (
         client.table("indicators")
-        .select("id, name, category, description_beginner")
+        .select("id, slug, name, category, description_beginner")
         .eq("is_public", True)
         .order("created_at", desc=False)
         .execute()
@@ -202,7 +231,7 @@ def main() -> None:
     for ind in indicators.data:
         iv = (
             client.table("indicator_values")
-            .select("normalized_score")
+            .select("normalized_score, raw_value")
             .eq("indicator_id", ind["id"])
             .order("date", desc=True)
             .limit(1)
@@ -221,6 +250,10 @@ def main() -> None:
                 "desc": ind.get("description_beginner"),
                 "capped": capped,
                 "hot": capped >= HOT_ZONE,
+                # 주인공 자격 심사에만 쓴다. digest 에는 넣지 않는다 — raw 를 보여주면
+                # 모델이 방향을 거꾸로 읽는다(build_digest 주석 참고).
+                "slug": ind.get("slug"),
+                "raw": iv.data[0].get("raw_value"),
             }
         )
 

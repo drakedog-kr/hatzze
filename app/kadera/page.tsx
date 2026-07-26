@@ -72,9 +72,12 @@ function MddLink({ code, market }: { code: string; market: string | null }) {
 
 /* 생태계 센티먼트 카드의 LLM 총평이 차지하는 자리. 이 두 값이 곧 카드 높이를 결정하므로
    한 곳에 모아 둔다 — 줄 수와 줄 높이가 따로 놀면 height 계산이 조용히 어긋난다.
-   4줄로 잡은 근거: 총평은 원래 2문장 설계(generate_telegram_narratives.py 의 '총평 2문장')
-   이고, 2문장이면 좁은 화면에서도 3~4줄에 들어간다. */
-const SUMMARY_LINES = 4;
+
+   4줄이었다가 3줄로 내렸다. 총평이 2문장(140~190자)으로 고정되고 나니 4줄은 **어떤 길이로도
+   못 채우는** 자리였다 — 실측(2026-07-26, 1280px)으로 190자도 3줄이다. 첫 실행이 73자로
+   나오자 상자 아래 두 줄이 통째로 비어 "한 줄이 다냐"가 됐다. 길이 쪽은 파이프라인에서
+   잡았고(BRIEF_LEN_MIN/MAX), 이쪽은 실제로 차는 높이로 맞춘다. */
+const SUMMARY_LINES = 3;
 const SUMMARY_LINE_HEIGHT = 1.7;
 
 /** 한 줄 말줄임 — 채널명·종목명처럼 카드를 밀어낼 수 있는 이름에 붙인다. */
@@ -385,24 +388,25 @@ export default async function KaderaPage() {
                   }}
                 >
                   <Icon name="auto_awesome" style={{ fontSize: 15, color: C.blue, flexShrink: 0, marginTop: 4 }} />
-                  {/* 높이를 SUMMARY_LINES 줄로 **고정**한다(min/max 가 아니라 height).
-                      LLM 총평은 길이가 날마다 달라서, 자라게 두면 이 카드가 옆의 모니터링
-                      현황 카드보다 들쭉날쭉 길어진다. 줄 수는 화면 폭에 따라서도 바뀌므로
-                      (같은 글이 1280px 에서 5줄, 넓은 모니터에선 4줄) '내용에 맞춘 높이'
-                      로는 애초에 안정될 수가 없다. 넘치면 line-clamp 가 말줄임으로 끊는다. */}
+                  {/* 높이 고정은 hz-summary-clamp 가 맡는다(줄 수·줄 높이는 아래 변수로 넘긴다).
+                      LLM 총평은 길이가 날마다 달라서 자라게 두면 이 카드가 옆의 모니터링 현황
+                      카드보다 들쭉날쭉해진다. 다만 **고정이 필요한 건 4열일 때뿐**이다 — 2열
+                      이하에선 이 카드가 한 줄을 혼자 써서 맞출 상대가 없고, 좁을수록 같은 글이
+                      여러 줄로 늘어나 3줄 고정이 문장을 크게 잘라먹는다. 그 분기는 미디어쿼리라
+                      인라인 style 로는 못 쓴다(globals.css 참고). */}
                   <p
+                    className="hz-summary-clamp"
                     style={{
                       margin: 0,
                       fontSize: 13,
                       lineHeight: SUMMARY_LINE_HEIGHT,
                       color: "var(--c-ink-soft)",
                       wordBreak: "keep-all",
-                      height: `${SUMMARY_LINES * SUMMARY_LINE_HEIGHT}em`,
-                      display: "-webkit-box",
-                      WebkitBoxOrient: "vertical",
-                      WebkitLineClamp: SUMMARY_LINES,
-                      overflow: "hidden",
-                    }}
+                      // CSS 쪽이 이 값으로 height·line-clamp 를 계산한다. 숫자의 출처를
+                      // TS 한 곳에 두려는 것 — 양쪽에 3과 1.7 을 따로 적으면 갈라진다.
+                      ["--hz-summary-lines" as string]: SUMMARY_LINES,
+                      ["--hz-summary-lh" as string]: SUMMARY_LINE_HEIGHT,
+                    } as React.CSSProperties}
                   >
                     {sentiment.summary}
                   </p>
