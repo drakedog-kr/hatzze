@@ -139,9 +139,17 @@ body {
 .hz-c2 { grid-column: span 2; }
 .hz-c3 { grid-column: span 3; }
 .hz-c4 { grid-column: span 4; }
+/* 카더라 '모니터링 현황' 카드의 세로 정렬. 짝이 브레이크포인트마다 바뀌어서 인라인
+   style 로는 표현이 안 된다(같은 이유로 hz-c* 도 여기 있다).
+   - 4열(데스크톱): 옆이 '생태계 센티먼트'라 높이가 비슷하다 → stretch 로 밑선을 맞춘다.
+   - 2열 이하: 옆이 10줄짜리 '뜨는 채널'이 된다 → stretch 하면 카드 한가운데가 200~300px
+     비어 버린다. 내용만큼만 세운다(짧은 카드는 짧아도 된다). */
+.hz-selfstretch-lg { align-self: stretch; }
+
 @media (max-width: 1024px) {
   .hz-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hz-c2, .hz-c3, .hz-c4 { grid-column: span 2; }
+  .hz-selfstretch-lg { align-self: start; }
 }
 /* 셸 전체 높이. 100dvh는 모바일 브라우저 주소창이 떠 있을 때의 실제 보이는 높이라,
    100vh만 쓰면 셸 바닥(하단 탭바)이 주소창 뒤로 밀려 첫 화면에서 안 보인다. dvh를
@@ -238,6 +246,13 @@ body {
    언급 추이 막대(며칠 몇 회인지)와 영향력 점수 설명(?)에 쓴다. JS 없이 CSS만. */
 .hz-tip {
   position: relative;
+  /* 커서 규칙을 여기 한 줄로 못박는다: 툴팁이 달렸다고 "?" 커서를 주지 않는다.
+     "?" 는 물음표 아이콘이 실제로 붙어 있는 자리에만 쓰고(그 자리들은 인라인
+     style 의 cursor:help 가 이 규칙을 이긴다), 그래프·막대·라벨처럼 요소 자체가
+     hover 영역인 곳은 기본 화살표로 둔다.
+     auto 에 맡기지 않는 이유: 안에 글자가 있는 hover 영역(막대 밑 날짜 라벨 등)에서
+     auto 는 I 빔(텍스트 커서)으로 풀린다 — 60곳 가까이가 그 상태였다. */
+  cursor: default;
 }
 .hz-tip::after {
   content: attr(data-tip);

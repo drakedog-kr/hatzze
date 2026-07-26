@@ -694,10 +694,12 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
   const yearly = r.yearly.slice(-RISK_ROWS);
   const events = r.events.slice(-RISK_ROWS);
 
+  // 범례는 막대 두 줄이 각각 뭔지 알려주는 유일한 단서다 — 이걸 못 읽으면 타일이
+  // 통째로 안 읽힌다. sub(11px)로는 타일 배경 위에서 흐려서 ink-soft 로 한 단계 올린다.
   const legend = (items: { label: string; color: string; opacity?: number }[]) => (
     <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
       {items.map((it) => (
-        <span key={it.label} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: C.sub }}>
+        <span key={it.label} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--c-ink-soft)" }}>
           <span style={{ width: 9, height: 9, borderRadius: 2, background: it.color, opacity: it.opacity ?? 1 }} />
           {it.label}
         </span>
@@ -713,7 +715,11 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
     b: { pct: number; color: string; opacity: number; value: string },
   ) => (
     <div key={key} style={{ display: "grid", gridTemplateColumns: "30px minmax(0,1fr)", alignItems: "center", gap: 8 }}>
-      <span style={{ fontFamily: MONO, fontSize: 11, color: C.faint }}>{year}</span>
+      {/* 연도는 이 줄이 언제 얘기인지를 말하는 축이라 faint 로는 흐리다. muted 로는 부족했다 —
+          라이트에서 명암비가 2.59 → 2.96 으로 거의 안 움직인다(두 토큰이 라이트에선 붙어
+          있다). sub 까지 올려야 3.30/7.32 로 실제로 한 단계 밝아진다. 범례(ink-soft)보다는
+          여전히 한 단계 아래라 위계는 그대로다. */}
+      <span style={{ fontFamily: MONO, fontSize: 11, color: C.sub }}>{year}</span>
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {[a, b].map((s, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 7 }}>
@@ -1002,7 +1008,9 @@ function Recovery({ a }: { a: MddAnalysis }) {
           회차별 길이를 견주는 차트라 막대끼리 붙어 있어야 읽힌다. 범례·중앙값 선도 이
           안쪽 묶음에 넣어야 막대와 같이 움직인다(밖에 두면 선이 차트 위아래로 삐져나온다). */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-        <div style={{ display: "flex", gap: 14, marginBottom: 12, fontSize: 11, color: C.sub }}>
+        {/* 리스크 프로필 범례와 같은 위계로 맞춘다(ink-soft) — 두 카드가 같은 성격의
+            범례를 다른 밝기로 쓰면 한쪽이 덜 중요한 것처럼 읽힌다. */}
+        <div style={{ display: "flex", gap: 14, marginBottom: 12, fontSize: 11, color: "var(--c-ink-soft)" }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
             <span style={{ width: 9, height: 9, borderRadius: 2, background: C.cold }} />
             고점 되찾음
@@ -1017,7 +1025,8 @@ function Recovery({ a }: { a: MddAnalysis }) {
         <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 9 }}>
         {r.samples.map((s) => (
           <div key={s.peakDate} style={{ display: "grid", gridTemplateColumns: `${REC_DATE_W}px minmax(0,1fr) ${REC_VALUE_W}px`, alignItems: "center", gap: REC_GAP }}>
-            <span style={{ fontFamily: MONO, fontSize: 11, color: C.faint, whiteSpace: "nowrap" }}>{fmtYm(s.peakDate)}</span>
+            {/* 리스크 프로필의 연도 축과 같은 밝기(sub)로 맞춘다. */}
+            <span style={{ fontFamily: MONO, fontSize: 11, color: C.sub, whiteSpace: "nowrap" }}>{fmtYm(s.peakDate)}</span>
             {/* 껍데기를 둘로 나눈다. 툴팁(.hz-tip::after)은 position:absolute; bottom:100% 로
                 요소 박스 '바깥 위쪽'에 그려지는데, 막대 둥근 모서리를 자르는 overflow:hidden 이
                 같은 요소에 있으면 툴팁이 통째로 잘려 영영 안 보인다(커서만 물음표로 바뀌어
@@ -1025,7 +1034,7 @@ function Recovery({ a }: { a: MddAnalysis }) {
             <span
               className="hz-tip hz-tip-wide hz-tip-end"
               data-tip={`${s.peakDate} 고점에서 ${fmtPct(s.depth)}까지 빠졌고, ${s.recovered ? `${fmtDayCount(s.days)} 만에 고점을 되찾았습니다` : `${fmtDayCount(s.days)}째 회복 중입니다`}.`}
-              style={{ display: "block", cursor: "help" }}
+              style={{ display: "block" }}
             >
               <span style={{ display: "block", height: 10, background: C.bg, borderRadius: 999, overflow: "hidden" }}>
                 {/* minWidth 18px — 36일 vs 4.7년처럼 차이가 크면 비율만으로는 폭이 몇 px 라
@@ -1120,7 +1129,7 @@ function Character({ ch, currentDd }: { ch: DrawdownCharacter | null; currentDd:
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
                     <span style={{ fontSize: 13, fontWeight: 700, color: t.on ? C.blue : C.ink }}>{t.label}</span>
-                    <span style={{ fontSize: 11.5, color: C.faint }}>· {t.b.count}번</span>
+                    <span style={{ fontSize: 11.5, color: C.faint }}>· {t.b.count}회</span>
                   </div>
                   <div style={{ fontSize: 11.5, color: C.sub, marginBottom: 8 }}>{t.sub}</div>
                   <div style={{ fontFamily: MONO, fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em", color: C.ink, lineHeight: 1.15 }}>

@@ -79,12 +79,19 @@ COMMON = """\
 [출력] 설명·머리말 없이, 지시된 딱 '한 문장'만 출력하세요."""
 
 # 문단 2: 주인공 지표 + 뜻풀이 (A)
+#
+# 주인공은 '시장' 카테고리에서만 고른다. 감성 지표(검색량·커뮤니티 말투·유튜브 조회수)는
+# 하루치 잡음이 크고 대체로 시장 지표보다 과열도가 높게 튄다 — 그냥 '가장 뜨거운 하나'를
+# 고르게 두면 요약 문단이 며칠씩 감성 지표만 물고 늘어졌다. 지수의 무게중심은 시장 쪽이니
+# 주인공도 거기서 고른다(감성은 3문단의 추세와 카드들이 계속 보여준다).
 SPOTLIGHT_SYSTEM = COMMON + """
 
 [이번 문장 — 주인공 지표 뜻풀이]
-오늘 과열도가 가장 높은(가장 뜨거운) 지표 '하나'를 골라, 이름과 함께 그 지표가 무엇을
-재는지·왜 뜨거운 게 의미 있는지를 쉬운 말로 한 문장에 담으세요. 지표 밑 '뜻:' 설명을
-근거로 삼되 그대로 베끼진 마세요. 지표는 하나만 씁니다. 여러 개를 나열하지 마세요."""
+**카테고리가 '시장'인 지표 중에서만** 과열도가 가장 높은(가장 뜨거운) 지표 '하나'를 골라,
+이름과 함께 그 지표가 무엇을 재는지·왜 뜨거운 게 의미 있는지를 쉬운 말로 한 문장에 담으세요.
+'감성' 지표가 더 뜨겁더라도 고르지 마세요(시장 지표가 하나도 없을 때만 감성에서 고릅니다).
+지표 밑 '뜻:' 설명을 근거로 삼되 그대로 베끼진 마세요. 지표는 하나만 씁니다. 여러 개를
+나열하지 마세요."""
 
 # 문단 3: 최근 추세 (②)
 TREND_SYSTEM = COMMON + """
@@ -97,6 +104,20 @@ TREND_SYSTEM = COMMON + """
 
 # 첫 문장(주인공 뜻풀이)에 근거를 주기 위해, 상위 몇 개 지표엔 설명문(뜻)을 함께 붙인다.
 DESC_TOP_N = 5
+
+# 주인공 문장이 고르는 카테고리. '뜻:' 설명도 이 카테고리 상위 N개에 붙여야 한다 —
+# 전체 상위 5개에만 붙이면, 시장 지표가 전체 8위쯤에 있는 날엔 주인공으로 뽑힌 지표에
+# 근거가 하나도 안 딸려 가서 모델이 뜻을 지어내야 한다(프롬프트가 금지한 바로 그 일).
+SPOTLIGHT_CATEGORY = "시장"
+
+
+def normalize_category(raw: str | None) -> str:
+    """레거시 category 값(정통/밈)을 현재 명칭(시장/감성)으로 정규화.
+
+    lib/data.ts 의 normalizeCategory 와 같은 규칙이다. 프론트는 이미 이 보정을 하고
+    있어서, 여기서 안 하면 프롬프트의 '시장'과 DB 의 '정통'이 안 맞을 수 있다.
+    """
+    return "시장" if raw in ("정통", "시장") else "감성"
 
 
 def build_digest(
@@ -117,8 +138,9 @@ def build_digest(
     표기해 화면 표기와 맞춘다.
 
     - [최근 추세]: 3번째 문단(추세)용. 최근 며칠 햇쩨 지수를 오래된→오늘 순으로 준다.
-    - [지표별]의 '뜻:' : 1번째 문단(주인공 뜻풀이)용. 상위 DESC_TOP_N개에만 설명문을 붙여,
-      모델이 지표 의미를 지어내지 않고 근거 있게 풀도록 한다."""
+    - [지표별]의 '뜻:' : 1번째 문단(주인공 뜻풀이)용. 주인공 카테고리(시장) 상위
+      DESC_TOP_N개에만 설명문을 붙여, 모델이 지표 의미를 지어내지 않고 근거 있게 풀도록
+      한다. 시장 지표가 아예 없는 날을 대비해, 그때는 순서대로 앞 N개에 붙인다."""
     lines = [
         f"[전체] 햇쩨 지수 {score:.0f}℃ · {stage} 구간 · 초고온 구간에 든 지표 {hot_count}개",
     ]
@@ -129,10 +151,12 @@ def build_digest(
         "",
         "[지표별] 과열도 높은 순 (0=저온 ~ 100=초고온, '초고온'=과열도 75 이상)",
     ]
-    for i, r in enumerate(rows):
+    spotlight_pool = [r for r in rows if r["category"] == SPOTLIGHT_CATEGORY] or rows
+    desc_names = {r["name"] for r in spotlight_pool[:DESC_TOP_N]}
+    for r in rows:
         hot_mark = " · 초고온" if r["hot"] else ""
         lines.append(f"- {r['name']} ({r['category']}): 과열도 {r['capped']:.0f}%{hot_mark}")
-        if i < DESC_TOP_N and r.get("desc"):
+        if r["name"] in desc_names and r.get("desc"):
             lines.append(f"    뜻: {r['desc']}")
     return "\n".join(lines)
 
@@ -193,7 +217,7 @@ def main() -> None:
         rows.append(
             {
                 "name": ind["name"],
-                "category": ind["category"],
+                "category": normalize_category(ind.get("category")),
                 "desc": ind.get("description_beginner"),
                 "capped": capped,
                 "hot": capped >= HOT_ZONE,
