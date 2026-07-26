@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { cookies } from "next/headers";
+import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
 import AppShell from "./AppShell";
 import { SITE_NAME, SITE_URL } from "./seo";
@@ -18,6 +19,11 @@ const pretendard = localFont({
 // (content가 빈 태그는 두 콘솔 모두 '소유확인 실패'로 처리한다).
 const GOOGLE_VERIFICATION = process.env.GOOGLE_SITE_VERIFICATION;
 const NAVER_VERIFICATION = process.env.NAVER_SITE_VERIFICATION;
+
+// GA4 측정 ID. 값이 없으면 스크립트 자체를 넣지 않는다 — 로컬·프리뷰에서 찍힌
+// 방문이 프로덕션 통계에 섞이는 걸 막는다(검증할 때만 .env.local 에서 켠다).
+// NEXT_PUBLIC_ 은 빌드 시점에 인라인되므로 Vercel 에 넣은 뒤 재배포해야 반영된다.
+const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 
 const TITLE = "hatzze | 데이터와 감성으로 읽는 시장";
 const DESCRIPTION =
@@ -130,6 +136,10 @@ export default async function RootLayout({
           {children}
         </AppShell>
       </body>
+      {/* gtag.js 는 hydration 이후에 실린다(LCP 를 밀지 않는다). 라우트 이동
+          페이지뷰는 GA4 의 '향상된 측정'이 history 이벤트로 알아서 잡으므로
+          여기서 따로 쏘지 않는다 — 직접 쏘면 이중 집계된다. */}
+      {GA_ID ? <GoogleAnalytics gaId={GA_ID} /> : null}
     </html>
   );
 }
