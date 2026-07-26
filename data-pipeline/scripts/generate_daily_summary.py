@@ -37,6 +37,16 @@ def cap_progress(progress: float) -> float:
     return min(max(progress, 0.0), 100.0)
 
 
+def is_clean(text: str) -> bool:
+    """대체문자(U+FFFD)가 섞이지 않았나.
+
+    Haiku 가 드물게 한글 음절 하나를 U+FFFD 로 뱉는다 — 실측(2026-07-26) "콜옵션"이
+    "콜�션"으로 나왔다. 응답 자체는 정상 UTF-8 이라 인코딩 오류로도 안 잡히고,
+    그대로 두면 깨진 글자가 화면에 나간다. 문장을 고를 때 이런 후보는 거른다.
+    """
+    return "�" not in text
+
+
 def stage_for_score(score: float) -> str:
     """종합 점수 → 구간. calculate_score.stage_for_score와 동일(밴드 25/50/75)."""
     if score < 25:
@@ -72,6 +82,8 @@ COMMON = """\
 - 온도 단어(저온/상온/고온/초고온)는 별표로 감싸지 마세요(색 자동). 그 외 마크다운·목록·제목 금지.
 
 [절대 하지 말 것]
+- **'← 이 지표는 문장에 쓰지 마세요' 표시가 붙은 지표를 언급하는 것.** 이름조차 꺼내지
+  마세요. 아무리 뜨거워도, 어떤 문장에서도 안 됩니다(그 지표는 화면 카드로 따로 보입니다).
 - 매수/매도/투자 권유·신호, 목표가, 상승/하락 예측('오를 것/내릴 것/앞으로').
 - 데이터에 없는 숫자, 카테고리(시장/감성) 평균 비교 같은 근거 없는 일반화, 특정 종목·인물·정치 언급.
 - 면책 문구(화면에 따로 있음).
@@ -90,7 +102,6 @@ SPOTLIGHT_SYSTEM = COMMON + """
 **카테고리가 '시장'인 지표 중에서만** 과열도가 가장 높은(가장 뜨거운) 지표 '하나'를 골라,
 이름과 함께 그 지표가 무엇을 재는지·왜 뜨거운 게 의미 있는지를 쉬운 말로 한 문장에 담으세요.
 '감성' 지표가 더 뜨겁더라도 고르지 마세요(시장 지표가 하나도 없을 때만 감성에서 고릅니다).
-**'← 주인공으로 고르지 마세요' 표시가 붙은 지표는 아무리 뜨거워도 고르지 마세요.**
 지표 밑 '뜻:' 설명을 근거로 삼되 그대로 베끼진 마세요. 지표는 하나만 씁니다. 여러 개를
 나열하지 마세요."""
 
@@ -111,25 +122,42 @@ DESC_TOP_N = 5
 # 근거가 하나도 안 딸려 가서 모델이 뜻을 지어내야 한다(프롬프트가 금지한 바로 그 일).
 SPOTLIGHT_CATEGORY = "시장"
 
-# 주인공에서 빼는 지표 — slug → 다시 후보가 되는 raw_value 하한.
+# 히어로 요약 한 문장의 길이. 길이 규칙이 아예 없어서 문장이 들쭉날쭉했다 —
+# 실측(2026-07-25~26): 111자 · 95자 · 108자 · 57자. 57자짜리는 앞뒤 문단과 나란히 놓였을 때
+# 혼자 말이 없어 보인다. 하한을 두는 게 핵심이고(짧은 쪽이 문제였다), 상한은 문단이
+# 지나치게 길어지지 않게 두는 안전장치다.
+#
+# **두 문장의 범위를 다르게 잡는다.** 주인공 문장은 지표가 무엇을 재는지 풀어야 해서 자리가
+# 필요하지만, 추세 문장은 햇쩨 지수 궤적 하나라 늘릴 내용이 없다. 같은 하한(75)을 걸었더니
+# 추세가 두 번 다시 써도 62자에 머물렀고, 억지로 늘린 것들은 "내려온 후 반등과 다시 하락을
+# 반복하는"처럼 말이 겉돌았다. 문장마다 할 말의 양이 다르니 자리도 다르게 준다.
+SPOTLIGHT_LEN = (75, 115)
+TREND_LEN = (55, 90)
+HERO_RETRIES = 2
+
+# 요약에서 **아예 언급하지 않을** 지표 — slug → 다시 풀리는 raw_value 하한.
 #
 # 버핏지수는 시장 지표 중 과열도가 늘 높은 편이라(2026-07-26 raw 196.75% · 과열도 71)
 # '시장 지표에서 고르라'고 바꾸자마자 주인공을 독차지했다. 그런데 이건 시가총액/GDP 라
 # 분기 GDP 를 따라 아주 천천히 움직인다 — 어제와 오늘이 사실상 같은 값이라, 매일 바뀌는
-# '오늘의 요약'의 주인공으로는 할 말이 없다(Hun: "너무 매크로한 지표").
+# '오늘의 요약'에서 할 말이 없다(Hun: "너무 매크로한 지표").
 #
-# 다만 임계를 넘으면 그 자체가 사건이라 다시 후보로 올린다. 230% 는 Hun 이 정한 선이다.
+# 다만 임계를 넘으면 그 자체가 사건이라 다시 풀어 준다. 230% 는 Hun 이 정한 선이다.
 # 값은 표시 단위 그대로다(indicator_values.raw_value, 버핏지수는 % 단위).
-SPOTLIGHT_RAW_GATES: dict[str, float] = {"buffett_index": 230.0}
+#
+# ⚠️ **여기는 요약 문장에만 걸린다. 지표 카드와는 무관하다** — 카드는 프론트가
+# indicators/indicator_values 를 직접 읽어 그린다(app/page.tsx CardBuffett). 버핏지수
+# 카드는 값과 상관없이 늘 그대로 뜬다.
+MENTION_RAW_GATES: dict[str, float] = {"buffett_index": 230.0}
 
 
-def spotlight_eligible(row: dict) -> bool:
-    """이 지표를 주인공(2번째 문단)으로 세워도 되나.
+def mentionable(row: dict) -> bool:
+    """이 지표를 요약 문장에 올려도 되나(주인공이든 곁다리든).
 
     문턱이 걸린 지표는 raw 가 그 값을 넘을 때만 통과. raw 가 없으면(아직 안 채워짐)
     보수적으로 제외한다 — 문턱을 확인 못 한 채 올리는 것보다 낫다.
     """
-    gate = SPOTLIGHT_RAW_GATES.get(row.get("slug") or "")
+    gate = MENTION_RAW_GATES.get(row.get("slug") or "")
     if gate is None:
         return True
     raw = row.get("raw")
@@ -176,14 +204,14 @@ def build_digest(
         "",
         "[지표별] 과열도 높은 순 (0=저온 ~ 100=초고온, '초고온'=과열도 75 이상)",
     ]
-    # 문턱에 걸린 지표(SPOTLIGHT_RAW_GATES)는 후보에서 빼고, 목록에는 남기되 표시를 단다 —
+    # 문턱에 걸린 지표(MENTION_RAW_GATES)는 후보에서 빼고, 목록에는 남기되 표시를 단다 —
     # 지워 버리면 모델이 보는 '가장 뜨거운 지표'가 실제와 달라져 다른 문장까지 어긋난다.
-    eligible = [r for r in rows if spotlight_eligible(r)]
+    eligible = [r for r in rows if mentionable(r)]
     spotlight_pool = [r for r in eligible if r["category"] == SPOTLIGHT_CATEGORY] or eligible or rows
     desc_names = {r["name"] for r in spotlight_pool[:DESC_TOP_N]}
     for r in rows:
         hot_mark = " · 초고온" if r["hot"] else ""
-        gate_mark = "" if spotlight_eligible(r) else "  ← 주인공으로 고르지 마세요"
+        gate_mark = "" if mentionable(r) else "  ← 이 지표는 문장에 쓰지 마세요"
         lines.append(f"- {r['name']} ({r['category']}): 과열도 {r['capped']:.0f}%{hot_mark}{gate_mark}")
         if r["name"] in desc_names and r.get("desc"):
             lines.append(f"    뜻: {r['desc']}")
@@ -281,9 +309,44 @@ def main() -> None:
         # 별표(**...**)는 굵게 표시용이라 유지한다 — 프론트가 파싱해 <b>로 렌더한다.
         return "".join(b.text for b in resp.content if b.type == "text").strip()
 
+    def sized_sentence(system: str, length: tuple[int, int]) -> str:
+        """한 문장 — 길이가 목표를 벗어나면 다시 쓰게 한다.
+
+        카더라 총평의 ask_brief_sentence 와 같은 방식이다. 후보를 모아 두고 목표 범위
+        안의 첫 번째를, 없으면 한가운데에 가장 가까운 걸 고른다. **빈 문장은 절대 안 낸다** —
+        요약이 통째로 저장되지 않는 것보다 길이가 몇 자 어긋나는 게 낫다.
+        """
+        lo, hi = length
+        candidates = [one_sentence(system)]
+        for _ in range(HERO_RETRIES):
+            cur = candidates[-1]
+            # 길이가 맞아도 글자가 깨졌으면 다시 쓴다(is_clean 주석 참고).
+            if lo <= len(cur) <= hi and is_clean(cur):
+                break
+            if not is_clean(cur):
+                print(f"[WARNING] 대체문자가 섞인 문장을 버리고 다시 씁니다: {cur[:40]}…")
+                retry = system + "\n\n[다시 쓰기] 방금 쓴 문장에 깨진 글자가 있습니다. 같은 뜻으로 다시 쓰세요."
+            else:
+                need = "늘려" if len(cur) < lo else "줄여"
+                retry = (
+                    system
+                    + f"\n\n[다시 쓰기] 방금 쓴 문장은 {len(cur)}자입니다. 뜻은 유지하면서 "
+                    f"{need} {lo}~{hi}자로 **한 문장**만 다시 쓰세요.\n"
+                    f"[방금 쓴 문장]\n{cur}"
+                )
+            candidates.append(one_sentence(retry))
+        # 깨진 후보는 길이가 맞아도 안 쓴다 — 길이는 어긋나도 읽히지만 깨진 글자는 못 읽는다.
+        usable = [t for t in candidates if t.strip() and is_clean(t)] or [t for t in candidates if t.strip()]
+        if not usable:
+            return ""
+        in_goal = [t for t in usable if lo <= len(t) <= hi]
+        if in_goal:
+            return in_goal[0]
+        return min(usable, key=lambda t: abs(len(t) - (lo + hi) / 2))
+
     # 주인공 문장과 추세 문장을 따로 생성해 문단 수를 항상 정확히 2로 고정한다.
-    spotlight = one_sentence(SPOTLIGHT_SYSTEM)
-    trend = one_sentence(TREND_SYSTEM)
+    spotlight = sized_sentence(SPOTLIGHT_SYSTEM, SPOTLIGHT_LEN)
+    trend = sized_sentence(TREND_SYSTEM, TREND_LEN)
     if not spotlight or not trend:
         print("[WARNING] LLM 응답이 비어 요약을 저장하지 않습니다.")
         return

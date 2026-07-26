@@ -191,6 +191,16 @@ MIN_DECIDED = 8
 THEME_TOP_N = 4
 
 
+def is_clean(text: str) -> bool:
+    """대체문자(U+FFFD)가 섞이지 않았나.
+
+    Haiku 가 드물게 한글 음절 하나를 U+FFFD 로 뱉는다 — 실측(2026-07-26) "콜옵션"이
+    "콜�션"으로 나왔다. 응답 자체는 정상 UTF-8 이라 인코딩 오류로도 안 잡히고, 그대로
+    두면 깨진 글자가 화면에 나간다. generate_daily_summary.is_clean 과 같은 규칙이다.
+    """
+    return "�" not in text
+
+
 def first_sentence(text: str) -> str:
     """여러 문장이 와도 첫 문장만 남긴다. "한 문장" 지시를 코드에서 못박는 장치다.
 
@@ -560,20 +570,22 @@ def main() -> None:
         candidates = [first_sentence(ask(system, digest))]
         for _ in range(BRIEF_RETRIES):
             cur = candidates[-1]
-            if BRIEF_LEN_MIN <= len(cur) <= BRIEF_LEN_MAX:
+            # 길이가 맞아도 글자가 깨졌으면 다시 쓴다(is_clean 주석 참고).
+            if BRIEF_LEN_MIN <= len(cur) <= BRIEF_LEN_MAX and is_clean(cur):
                 break
-            need = "늘려" if len(cur) < BRIEF_LEN_MIN else "줄여"
-            candidates.append(
-                first_sentence(
-                    ask(
-                        system,
-                        f"방금 쓴 문장은 {len(cur)}자입니다. 뜻은 유지하면서 {need} "
-                        f"{BRIEF_LEN_MIN}~{BRIEF_LEN_MAX}자로 **한 문장**으로 다시 써 주세요.\n\n"
-                        f"{digest}\n\n[방금 쓴 문장]\n{cur}",
-                    )
+            if not is_clean(cur):
+                print(f"[WARNING] 대체문자가 섞인 문장을 버리고 다시 씁니다: {cur[:40]}…")
+                fix = f"방금 쓴 문장에 깨진 글자가 있습니다. 같은 뜻으로 **한 문장**으로 다시 써 주세요.\n\n{digest}"
+            else:
+                need = "늘려" if len(cur) < BRIEF_LEN_MIN else "줄여"
+                fix = (
+                    f"방금 쓴 문장은 {len(cur)}자입니다. 뜻은 유지하면서 {need} "
+                    f"{BRIEF_LEN_MIN}~{BRIEF_LEN_MAX}자로 **한 문장**으로 다시 써 주세요.\n\n"
+                    f"{digest}\n\n[방금 쓴 문장]\n{cur}"
                 )
-            )
-        usable = [t for t in candidates if t.strip()]
+            candidates.append(first_sentence(ask(system, fix)))
+        # 깨진 후보는 길이가 맞아도 안 쓴다 — 길이는 어긋나도 읽히지만 깨진 글자는 못 읽는다.
+        usable = [t for t in candidates if t.strip() and is_clean(t)] or [t for t in candidates if t.strip()]
         if not usable:
             return ""
         in_goal = [t for t in usable if BRIEF_LEN_MIN <= len(t) <= BRIEF_LEN_MAX]
