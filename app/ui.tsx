@@ -15,7 +15,10 @@ export const C = {
   card: "var(--c-card)",
   bg: "var(--c-bg)",
   line: "var(--c-line)",
-  track: "var(--c-track)",
+  track: "var(--c-track)", // 막대의 빈 '트랙'(배경)
+  // 막대의 '채움' — 강조색을 안 쓰는 비교군용. track 을 채움에 돌려쓰면 안 된다
+  // (트랙과 같은 색이라 막대가 사라진다). 이유는 globals.css의 --c-bar 주석 참고.
+  bar: "var(--c-bar)",
   blue: "var(--c-blue)",
   shadow: "var(--c-shadow)",
 } as const;

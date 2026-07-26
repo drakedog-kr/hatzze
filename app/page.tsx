@@ -744,6 +744,8 @@ const ASIA_BAR_BASE = ASIA_LABEL_H + ASIA_COL_GAP;
 
 // 아시아 카드의 4개국 상대 막대 (KOSPI=100 기준). heightPct는 차이를 강조한 0~100.
 // self(코스피)만 파랑으로 세우고 이웃 셋은 같은 중립색 — 색이 아니라 높이로 비교하게 한다.
+// 그 중립색은 --c-track(막대 트랙 배경)이 아니라 --c-bar 다. track 은 카드 배경과
+// 명암비가 라이트 1.46:1·다크 1.27:1 뿐이라 기둥 셋이 카드에 묻었다.
 function AsiaBar({ label, sub, index, heightPct, self }: { label: string; sub: string; index: number; heightPct: number; self: boolean }) {
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: ASIA_COL_GAP }}>
@@ -752,7 +754,7 @@ function AsiaBar({ label, sub, index, heightPct, self }: { label: string; sub: s
         style={{
           width: "100%",
           height: Math.max(10, (heightPct / 100) * ASIA_BAR_MAX),
-          background: self ? C.blue : C.track,
+          background: self ? C.blue : C.bar,
           borderRadius: "6px 6px 0 0",
         }}
       />
