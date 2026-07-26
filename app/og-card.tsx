@@ -19,6 +19,7 @@ export const SUB = "#5b6474";
 export const CARD_BG = "#eef2ff";
 export const TRACK = "#c2c6d8"; // --c-track
 export const BLUE = "#0064ff"; // --c-blue
+export const COLD = "#5ea8d8"; // --c-cold
 
 const GHOST =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 104">' +

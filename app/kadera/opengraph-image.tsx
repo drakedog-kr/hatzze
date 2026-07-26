@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-import { BLUE, OG_CONTENT_TYPE, OG_SIZE, TitleCard, dataUri, loadOgFonts } from "../og-card";
+import { BLUE, OG_CONTENT_TYPE, OG_SIZE, TRACK, TitleCard, dataUri, loadOgFonts } from "../og-card";
 import { KADERA_CARD } from "../og-copy";
 
 /**
@@ -20,15 +20,39 @@ export const size = OG_SIZE;
 export const contentType = OG_CONTENT_TYPE;
 
 /**
- * 말풍선 세 개. 채널 메시지를 모아 읽는다는 뜻만 담은 장식이고 실제 데이터가 아니다
- * (카드에 숫자를 적으면 매일 틀린 값이 박제된다 — 그건 홈 카드가 할 일이다).
+ * 언급 순위 막대. 이 페이지가 하는 일("오늘 가장 많이 언급된 종목")이 곧 줄 세우기라,
+ * 화면의 순위 행에 붙는 가는 띠(app/kadera/page.tsx 의 영향력 점수 막대)와 같은 문법으로
+ * 그린다 — 파란색, 양 끝 둥근 알약, 위에서 아래로 옅어지는 순위.
+ * (홈 카드가 히어로 게이지를, MDD 카드가 낙폭 곡선을 옮긴 것과 같은 원칙이다.)
+ *
+ * 길이는 순위의 모양만 나타낸 것이고 실제 언급 수가 아니다. 그래서 숫자도 넣지 않는다.
  */
-const BUBBLES =
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 220">' +
-  `<rect x="8" y="10" width="196" height="56" rx="20" fill="${BLUE}" opacity="0.14"/>` +
-  `<rect x="96" y="82" width="196" height="56" rx="20" fill="${BLUE}" opacity="0.28"/>` +
-  `<rect x="30" y="154" width="196" height="56" rx="20" fill="${BLUE}"/>` +
-  "</svg>";
+const RANK_BARS = (() => {
+  const rows = [
+    { w: 288, o: 1 },
+    { w: 236, o: 0.76 },
+    { w: 186, o: 0.56 },
+    { w: 146, o: 0.4 },
+    { w: 108, o: 0.28 },
+  ];
+  const h = 26;
+  const gap = 15;
+  const axis = 10; // 축과 막대 사이 간격
+  const height = rows.length * (h + gap) - gap;
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${axis + 300} ${height}">` +
+    // 세로 축. 이게 없으면 둥근 막대가 스켈레톤 로딩 화면처럼 보인다 —
+    // 선 하나로 "줄 세운 그래프"라는 게 분명해진다.
+    `<line x1="1.5" y1="0" x2="1.5" y2="${height}" stroke="${TRACK}" stroke-width="3"/>` +
+    rows
+      .map(
+        (r, i) =>
+          `<rect x="${axis}" y="${i * (h + gap)}" width="${r.w}" height="${h}" rx="${h / 2}" fill="${BLUE}" opacity="${r.o}"/>`,
+      )
+      .join("") +
+    "</svg>"
+  );
+})();
 
 export default async function Image() {
   return new ImageResponse(
@@ -37,7 +61,7 @@ export default async function Image() {
         title={KADERA_CARD.title}
         lines={KADERA_CARD.lines}
         foot={KADERA_CARD.foot}
-        art={{ src: dataUri(BUBBLES), width: 300, height: 220 }}
+        art={{ src: dataUri(RANK_BARS), width: 330, height: 202 }}
       />
     ),
     { ...OG_SIZE, fonts: await loadOgFonts() },
