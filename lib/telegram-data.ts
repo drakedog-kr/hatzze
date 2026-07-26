@@ -1,7 +1,5 @@
 import "server-only";
 
-import { cache } from "react";
-
 import { sentimentTone } from "@/lib/format";
 import { THEMES } from "@/lib/stock-themes";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
@@ -548,22 +546,35 @@ export type StockReport = {
 const REPORT_WINDOW_DAYS = 7;
 
 /**
- * 최근 N일 안에 올라온 메시지의 키 집합.
+ * 이 종목을 최근 N일 안에 언급한 **서로 다른 채널 수**('관심의 폭').
  *
- * telegram_message_stocks 에는 날짜가 없어서(메시지 PK만 갖는다) 종목 언급을 기간으로
- * 자르려면 메시지 쪽 posted_at 을 봐야 한다. 한 페이지에서 종목 리포트를 3개 만들며
- * 같은 집합을 세 번 쓰므로 React cache 로 요청당 한 번만 조회한다.
+ * telegram_message_stocks 에는 날짜가 없다(메시지 PK만 갖는다). 그래서 기간으로 자르려면
+ * 메시지 쪽 posted_at 을 봐야 하는데, 예전엔 그 짝짓기를 **프론트에서** 했다:
+ * 최근 7일 메시지 키를 전부 받아 Set 을 만들고(38,737행 = 1,000행씩 39번 순차 왕복),
+ * 종목의 **전체 기간** 언급을 또 전부 받아(삼성전자 2,458행) 그 Set 으로 걸렀다.
+ * 숫자 하나 세자고 4만 행을 옮기는 셈이라, 이 한 줄이 /kadera 응답의 70%였다
+ * (2026-07-26 실측: 이 조회 ~2.0초 / 페이지 전체 2.85초).
+ *
+ * telegram_message_stocks → telegram_messages 에 복합 FK(channel_handle, message_id)가
+ * 있으므로 PostgREST 가 서버에서 조인해 준다(migration_013 참고). !inner + posted_at
+ * 필터로 창 안의 행만 받으면 왕복이 39번에서 종목당 2~3번으로 줄고, 세는 규칙은 그대로다.
+ *
+ * 페이징은 여전히 필수다 — 인기 종목은 7일치만도 1,000행을 넘는다(삼성전자 2,242행).
+ * 안 하면 채널 수가 조용히 적게 나온다.
  */
-const recentMessageKeys = cache(async (days: number): Promise<Set<string>> => {
+async function recentChannelCount(code: string, days: number): Promise<number> {
   const db = getSupabaseAdmin();
-  const rows = await fetchAllRows<{ channel_handle: string; message_id: number }>("id", () =>
+  const rows = await fetchAllRows<{ channel_handle: string }>("id", () =>
     db
-      .from("telegram_messages")
-      .select("channel_handle,message_id")
-      .gte("posted_at", daysAgoISO(days)),
+      .from("telegram_message_stocks")
+      // !inner() 의 빈 괄호 — 조인은 걸되 메시지 쪽 컬럼은 하나도 안 받는다.
+      // posted_at 은 거르는 데만 쓰고 결과엔 필요 없어서, 행마다 딸려 오지 않게 한다.
+      .select("channel_handle,telegram_messages!inner()")
+      .eq("stock_code", code)
+      .gte("telegram_messages.posted_at", daysAgoISO(days)),
   );
-  return new Set(rows.map((r) => `${r.channel_handle}|${r.message_id}`));
-});
+  return new Set(rows.map((r) => r.channel_handle)).size;
+}
 
 /** 종목 텔레그램 리포트 — 특정 종목의 최근 7일 언급 추이와 관심의 폭. */
 export async function getStockReport(code: string): Promise<StockReport | null> {
@@ -571,12 +582,21 @@ export async function getStockReport(code: string): Promise<StockReport | null> 
   const { data: stock } = await db.from("stocks").select("name,market").eq("code", code).maybeSingle();
   if (!stock) return null;
 
-  const { data: daily } = await db
-    .from("telegram_stock_daily")
-    .select("date,mention_count")
-    .eq("stock_code", code)
-    .gte("date", daysAgoISO(REPORT_WINDOW_DAYS).slice(0, 10))
-    .order("date");
+  // 남은 셋은 서로 의존하지 않는다 — 직렬로 두면 왕복이 그대로 더해진다.
+  // (시세만 stock.market 에 걸려 있어 위 조회 뒤에 온다.)
+  const [{ data: daily }, channelCount, quote] = await Promise.all([
+    db
+      .from("telegram_stock_daily")
+      .select("date,mention_count")
+      .eq("stock_code", code)
+      .gte("date", daysAgoISO(REPORT_WINDOW_DAYS).slice(0, 10))
+      .order("date"),
+    // 채널 수도 같은 창으로 자른다 — 전체 기간으로 세면 모니터링 채널이 12개뿐이라
+    // 금세 12로 포화돼 '관심의 폭'을 구분하지 못한다.
+    recentChannelCount(code, REPORT_WINDOW_DAYS),
+    stockQuote(`${code}.${stock.market === "KOSDAQ" ? "KQ" : "KS"}`),
+  ]);
+
   const today = todayKstDate();
   // 언급이 0인 날은 집계 표에 행 자체가 없다. 있는 행만 그리면 종목마다 막대 개수가
   // 달라져, 나란히 놓인 두 차트가 서로 다른 기간을 그리게 된다(실측: 삼성전자 8칸,
@@ -594,26 +614,6 @@ export async function getStockReport(code: string): Promise<StockReport | null> 
     series.push({ date: iso, mentions: byDate.get(iso) ?? 0 });
   }
   const totalMentions = series.reduce((s, d) => s + d.mentions, 0);
-
-  // 채널 수도 같은 창으로 자른다 — 전체 기간으로 세면 모니터링 채널이 12개뿐이라
-  // 금세 12로 포화돼 '관심의 폭'을 구분하지 못한다.
-  // 이 표에는 날짜가 없어 서버에서 기간을 못 자른다 — 종목 하나의 전체 기간 언급을
-  // 다 받아 와 아래에서 창으로 거른다. 인기 종목은 하루 30건꼴이라 한 달이면 1000행을
-  // 넘기므로 반드시 페이징한다(안 하면 채널 수가 조용히 적게 나온다).
-  const mentions = await fetchAllRows<{ channel_handle: string; message_id: number }>("id", () =>
-    db
-      .from("telegram_message_stocks")
-      .select("channel_handle,message_id")
-      .eq("stock_code", code),
-  );
-  const keys = await recentMessageKeys(REPORT_WINDOW_DAYS);
-  const channelCount = new Set(
-    mentions
-      .filter((m) => keys.has(`${m.channel_handle}|${m.message_id}`))
-      .map((m) => m.channel_handle),
-  ).size;
-
-  const quote = await stockQuote(`${code}.${stock.market === "KOSDAQ" ? "KQ" : "KS"}`);
 
   return {
     code,

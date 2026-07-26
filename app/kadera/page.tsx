@@ -195,7 +195,14 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
 }
 
 export default async function KaderaPage() {
-  const topStocks = await getTopStocksWithTrend(3);
+  // 종목 리포트는 "어느 종목인지"를 먼저 알아야 해서 getTopStocksWithTrend 에 매여 있다.
+  // 그렇다고 이걸 await 한 **뒤에** 나머지를 시작하면, 나머지와 아무 상관 없는 그 왕복이
+  // 페이지 앞에 통째로 붙는다(실측 240ms, 콜드 1,976ms). 독립적인 조회들은 지금 바로
+  // 띄우고, 종목 리포트만 이 프로미스에 이어 붙인다 — 둘이 나란히 간다.
+  const topStocksPromise = getTopStocksWithTrend(3);
+  const reportsPromise = topStocksPromise.then((tops) =>
+    Promise.all(tops.map((s) => getStockReport(s.code))),
+  );
   const [
     summary,
     surging,
@@ -221,7 +228,7 @@ export default async function KaderaPage() {
       getChannelRanking(),
       getRisingChannels(10),
       getThemeRotation(10),
-      Promise.all(topStocks.map((s) => getStockReport(s.code))),
+      reportsPromise,
       getEcosystemSentiment(),
       getIssueKeywords(10),
       getStockNarratives(),
