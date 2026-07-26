@@ -1,7 +1,12 @@
 import Link from "next/link";
 
 import { GhostSymbol, Wordmark } from "./Logo";
-import { C } from "./ui";
+import { C, MONO } from "./ui";
+
+/** 푸터 로고 옆에 찍히는 서비스 버전. 베타 오픈(2026-07-31) 기준 1.0.0 에서 시작한다. */
+const APP_VERSION = "1.0.0";
+/** 문의 창구. 여기 한 곳만 바꾸면 본문 문구와 mailto: 가 같이 따라온다. */
+const CONTACT_EMAIL = "hatzze@proton.me";
 
 // SEO를 위해 시맨틱 <footer> + 내부 링크(<nav>) + 키워드가 담긴 사이트 소개글을
 // 둔다. 색은 전부 CSS 변수(C.*)라 라이트/다크가 함께 전환된다.
@@ -57,12 +62,30 @@ export default function Footer() {
         <div style={{ maxWidth: 380 }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 9 }}>
             <GhostSymbol size={26} />
-            <Wordmark size={26} />
+            {/* 워드마크와 버전만 baseline 으로 묶는다 — 둘 다 글자라 밑선이 맞아야 한 줄로
+                읽힌다. 유령(svg)까지 같은 baseline 묶음에 넣으면 svg 의 baseline 은 제 아래
+                모서리라 심볼이 혼자 들려 lockup 이 깨진다. 그래서 바깥은 center 유지. */}
+            <span style={{ display: "inline-flex", alignItems: "baseline", gap: 9 }}>
+              <Wordmark size={26} />
+              {/* 로고(26px 잉크)와 나란히 두되 크기·색을 확 낮춘다 — 비슷하게 두면
+                  "hatzze v.1.0.0" 이 한 덩어리 워드마크처럼 읽힌다. */}
+              <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: "var(--c-muted)", letterSpacing: "0.02em" }}>
+                v.{APP_VERSION}
+              </span>
+            </span>
           </span>
           <p style={{ margin: "14px 0 0", fontSize: 13, lineHeight: 1.75, color: C.sub }}>
             <b style={{ color: C.ink }}>hatzze(햇쩨)</b>는 코스피 시장의 <b style={{ color: C.ink }}>과열도</b>를
             시장 지표와 감성 지표로 종합해 매일 0~100 점수로 보여주는 대시보드입니다.
             버핏지수, VKOSPI, 레버리지 ETF, 공포·탐욕 심리 등 25개 지표를 한눈에 볼 수 있습니다.
+          </p>
+          {/* 문의는 소개글과 한 줄 띄워 따로 앉힌다 — 소개 문장에 이어 붙이면 25개 지표
+              얘기의 꼬리처럼 읽혀서, 연락처라는 게 눈에 안 들어온다. */}
+          <p style={{ margin: "1em 0 0", fontSize: 13, lineHeight: 1.75, color: C.sub }}>
+            {/* "문의:" 와 주소가 줄바꿈으로 갈라지면 라벨만 앞줄 끝에 남아 떠 보인다 — 한 덩어리로 묶는다. */}
+            <span style={{ whiteSpace: "nowrap" }}>
+              <b style={{ color: C.ink }}>문의</b>: <a href={`mailto:${CONTACT_EMAIL}`} style={{ color: C.sub, textDecoration: "none" }}>{CONTACT_EMAIL}</a>
+            </span>
           </p>
         </div>
 

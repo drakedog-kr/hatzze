@@ -28,6 +28,7 @@
 
 from __future__ import annotations
 
+import re
 import sys
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
@@ -155,6 +156,18 @@ def optimism(positive: int, negative: int) -> int | None:
 # 인용하기 때문이다. 프롬프트가 요구하는 "테마 최소 2개 언급"에도 4개면 충분하다.
 MIN_DECIDED = 8
 THEME_TOP_N = 4
+
+
+def first_sentence(text: str) -> str:
+    """여러 문장이 와도 첫 문장만 남긴다. "한 문장" 지시를 코드에서 못박는 장치다.
+
+    프롬프트로만 부탁하면 모델이 곧잘 2~3문장을 붙여 보낸다. 총평은 카드에서 4줄
+    자리에 렌더되므로(app/kadera/page.tsx 의 SUMMARY_LINES) 길이가 곧 레이아웃이다.
+
+    소수점(94.5%)이나 날짜(07-26)에서 잘리지 않도록 '문장부호 + 공백'에서만 나눈다.
+    """
+    parts = re.split(r"(?<=[.!?])\s+", text.strip())
+    return parts[0].strip() if parts else text.strip()
 
 
 def tone_label(optimism_pct: int) -> str:
@@ -400,10 +413,14 @@ def main() -> None:
     # 한 번의 호출로 "정확히 2문장"을 강제하면 문장 수가 흔들린다(히어로 요약에서 겪음).
     # 문장별로 따로 생성해 개수를 결정적으로 고정하고, 카드가 한 문단으로 렌더하므로
     # 공백으로 이어 붙인다.
+    #
+    # 다만 '호출을 나누는 것'만으로는 문장 수가 안 고정된다 — 프롬프트가 "한 문장"이라
+    # 적어도 모델이 2~3문장을 뱉는다(2026-07-26 실측: 총평이 5문장 327자로 나와 카드
+    # 높이가 옆 카드를 밀어냈다). 그래서 코드에서 첫 문장만 잘라 결정적으로 못박는다.
     if brief_digest:
         try:
-            tone_sentence = ask(BRIEF_TONE_SYSTEM, brief_digest)
-            contrast_sentence = ask(BRIEF_CONTRAST_SYSTEM, brief_digest)
+            tone_sentence = first_sentence(ask(BRIEF_TONE_SYSTEM, brief_digest))
+            contrast_sentence = first_sentence(ask(BRIEF_CONTRAST_SYSTEM, brief_digest))
             summary = f"{tone_sentence} {contrast_sentence}".strip()
             if summary:
                 db.table("telegram_daily_brief").upsert(

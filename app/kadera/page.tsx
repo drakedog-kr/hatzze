@@ -70,6 +70,13 @@ function MddLink({ code, market }: { code: string; market: string | null }) {
   );
 }
 
+/* 생태계 센티먼트 카드의 LLM 총평이 차지하는 자리. 이 두 값이 곧 카드 높이를 결정하므로
+   한 곳에 모아 둔다 — 줄 수와 줄 높이가 따로 놀면 height 계산이 조용히 어긋난다.
+   4줄로 잡은 근거: 총평은 원래 2문장 설계(generate_telegram_narratives.py 의 '총평 2문장')
+   이고, 2문장이면 좁은 화면에서도 3~4줄에 들어간다. */
+const SUMMARY_LINES = 4;
+const SUMMARY_LINE_HEIGHT = 1.7;
+
 /** 한 줄 말줄임 — 채널명·종목명처럼 카드를 밀어낼 수 있는 이름에 붙인다. */
 const clip: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
 
@@ -288,11 +295,10 @@ export default async function KaderaPage() {
       </header>
 
       <div className="hz-grid">
-        {/* 모니터링 현황 (1칸). alignSelf:start — 그리드는 기본으로 칸을 같은 높이로
-            늘리는데, 이 카드는 네 줄이 전부라 옆의 센티먼트 카드(2열에선 뜨는 채널)에
-            끌려 200~300px 짜리 빈 바닥이 생겼다. 억지로 늘리는 대신 내용만큼만 서게
-            둔다 — 짧은 카드는 짧아도 된다. */}
-        <div style={{ ...cardStyle, display: "flex", flexDirection: "column", alignSelf: "start" }}>
+        {/* 모니터링 현황 (1칸). 세로 정렬은 hz-selfstretch-lg 가 맡는다 — 데스크톱에선 옆의
+            센티먼트 카드와 밑선을 맞추고(stretch), 2열 이하에선 훨씬 긴 '뜨는 채널'이 짝이
+            되므로 내용만큼만 선다. 브레이크포인트마다 달라서 인라인 style 로는 안 된다. */}
+        <div className="hz-selfstretch-lg" style={{ ...cardStyle, display: "flex", flexDirection: "column" }}>
           <SectionHead icon="monitoring" title="모니터링 현황" desc="추적 중인 텔레그램 채널 규모" />
           {/* 네 줄 사이를 가는 선으로 나눠 한 장의 표로 읽히게 한다. */}
           <div style={{ display: "flex", flexDirection: "column" }}>
@@ -320,16 +326,20 @@ export default async function KaderaPage() {
               </div>
             ))}
           </div>
-          <a
-            href="https://forms.gle/PRapNH9rz8YuF2zu9"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hz-btn-soft"
-            style={{ marginTop: 18 }}
-          >
-            <Icon name="add_circle" style={{ fontSize: 16 }} />
-            채널 등록 신청
-          </a>
+          {/* marginTop:auto 로 버튼을 바닥에 붙인다 — 카드가 옆 카드 높이만큼 늘어나도
+              남는 자리가 통계 줄 사이가 아니라 버튼 위 한 곳에만 생긴다. paddingTop 은
+              늘어나지 않았을 때의 최소 간격(예전 marginTop:18 과 같은 값). */}
+          <div style={{ marginTop: "auto", paddingTop: 18 }}>
+            <a
+              href="https://forms.gle/PRapNH9rz8YuF2zu9"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hz-btn-soft"
+            >
+              <Icon name="add_circle" style={{ fontSize: 16 }} />
+              채널 등록 신청
+            </a>
+          </div>
         </div>
 
         {/* 생태계 센티먼트 (3칸) — 메시지별 LLM 분류를 집계한 결과 */}
@@ -362,7 +372,25 @@ export default async function KaderaPage() {
                   }}
                 >
                   <Icon name="auto_awesome" style={{ fontSize: 15, color: C.blue, flexShrink: 0, marginTop: 4 }} />
-                  <p style={{ margin: 0, fontSize: 13, lineHeight: 1.7, color: "var(--c-ink-soft)", wordBreak: "keep-all" }}>
+                  {/* 높이를 SUMMARY_LINES 줄로 **고정**한다(min/max 가 아니라 height).
+                      LLM 총평은 길이가 날마다 달라서, 자라게 두면 이 카드가 옆의 모니터링
+                      현황 카드보다 들쭉날쭉 길어진다. 줄 수는 화면 폭에 따라서도 바뀌므로
+                      (같은 글이 1280px 에서 5줄, 넓은 모니터에선 4줄) '내용에 맞춘 높이'
+                      로는 애초에 안정될 수가 없다. 넘치면 line-clamp 가 말줄임으로 끊는다. */}
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 13,
+                      lineHeight: SUMMARY_LINE_HEIGHT,
+                      color: "var(--c-ink-soft)",
+                      wordBreak: "keep-all",
+                      height: `${SUMMARY_LINES * SUMMARY_LINE_HEIGHT}em`,
+                      display: "-webkit-box",
+                      WebkitBoxOrient: "vertical",
+                      WebkitLineClamp: SUMMARY_LINES,
+                      overflow: "hidden",
+                    }}
+                  >
                     {sentiment.summary}
                   </p>
                 </div>
@@ -646,7 +674,7 @@ export default async function KaderaPage() {
                   <span
                     className="hz-tip hz-tip-wide hz-tip-end"
                     data-tip={`최근 ${t.series.length}일 일별 점유율입니다.`}
-                    style={{ display: "block", marginTop: THEME_SPARK_TOP, cursor: "help" }}
+                    style={{ display: "block", marginTop: THEME_SPARK_TOP }}
                   >
                     <Sparkline data={t.series} />
                   </span>

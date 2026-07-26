@@ -774,6 +774,16 @@ function AsiaBar({ label, sub, index, heightPct, self }: { label: string; sub: s
 }
 
 // 업비트 카드의 서브 바 (김치 프리미엄 / 거래량 강도) — 값 라벨은 우측 표시
+//
+// 진행률이 0이면 막대가 통째로 비어, 옆의 "LOW" 글자만 떠 있고 바는 렌더가 덜 된 것처럼
+// 보인다. 바닥값을 둬 어떤 값이든 눈에 띄는 조각은 남긴다 — 0과 5%가 같아 보이는 대가는
+// 있지만, 이 바는 정확한 크기가 아니라 LOW/MID/HIGH 를 눈으로 거드는 자리다.
+//
+// %가 아니라 px로 잡는다. 카드 폭에 비례하는 %는 좁은 화면에서 다시 점만 해지고, 무엇보다
+// 높이(8)보다 넉넉히 넓어야 원이 아니라 '짧은 막대'로 읽힌다(MDD 회복 막대의 REC_BAR_MIN_W
+// 와 같은 이유 — 4%로 뒀더니 실제로 동그란 점 하나로 보였다).
+const SUB_BAR_MIN_W = 18;
+
 function UpbitSubBar({ label, value, pct, color }: { label: string; value: string; pct: number; color: string }) {
   return (
     <div>
@@ -782,7 +792,9 @@ function UpbitSubBar({ label, value, pct, color }: { label: string; value: strin
         <span style={{ color }}>{value}</span>
       </div>
       <div style={{ height: 8, background: C.bg, borderRadius: 999, overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, pct))}%`, background: color }} />
+        {/* 안쪽에도 borderRadius 를 준다 — 바닥값만큼 짧을 때 오른쪽 끝이 네모로 잘려
+            막대가 아니라 잘린 조각처럼 보인다. */}
+        <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, pct))}%`, minWidth: SUB_BAR_MIN_W, background: color, borderRadius: 999 }} />
       </div>
     </div>
   );
@@ -1071,7 +1083,7 @@ function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
             <span
               className="hz-tip hz-tip-wide hz-tip-end"
               data-tip="현재가는 지수와 같은 KRX 종가입니다. 52주 고점은 야후 파이낸스의 장중 최고가라, 종가 기준인 지수 쪽보다 괴리율이 조금 더 깊게 나옵니다."
-              style={{ fontSize: 10, fontWeight: 800, color: C.sub, cursor: "help" }}
+              style={{ fontSize: 10, fontWeight: 800, color: C.sub }}
             >
               거래대금 상위 종목의 52주 고점 대비
             </span>
@@ -1733,9 +1745,15 @@ function CardUpbit({ v }: { v: Pick }) {
       <TitleRow desc={v.headline} icon="currency_bitcoin" name={v.name} />
       {/* 이 지표의 raw_value는 두 서브지표의 '기준값 대비 진행률' 가중평균이라 0~100
           과열도 점수다 — 감성 지표의 pt(순감성)와는 축이 다르다. 같은 'pt'를 달면
-          둘이 같은 단위처럼 보여 오해를 키우므로 '/100'으로 척도를 드러낸다. */}
+          둘이 같은 단위처럼 보여 오해를 키우므로 '/100'으로 척도를 드러낸다.
+          v.disp 대신 직접 반올림한다 — formatIndicatorValue 는 절댓값 10 미만이면
+          소수점 둘째자리까지 쓰는데(작은 숫자는 소수가 의미 있다는 규칙), 100점 척도
+          위의 "1.47/100"에선 그 두 자리가 있으나 마나다. 그 규칙은 "0.5배" 같은 배수
+          지표를 위한 것이라 전역으로 못 바꾸고, 척도를 아는 이 카드에서만 눌러 준다. */}
       <div style={{ display: "flex", alignItems: "baseline", gap: 3, marginBottom: 6 }}>
-        <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.disp}</span>
+        <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>
+          {v.raw !== null ? Math.round(v.raw).toLocaleString("ko-KR") : v.disp}
+        </span>
         <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: C.sub }}>/100</span>
         <span style={{ fontSize: 10, fontWeight: 700, color: C.sub, marginLeft: 4 }}>과열도</span>
       </div>
@@ -1796,7 +1814,7 @@ function CardNetBuy({ v }: { v: Pick }) {
               key={i}
               className="hz-tip"
               data-tip={label}
-              style={{ flex: 1, position: "relative", height: 68, cursor: "help" }}
+              style={{ flex: 1, position: "relative", height: 68 }}
             >
               <div style={{ position: "absolute", left: "18%", right: "18%", height: px, background: buy ? C.hot : C.cold, borderRadius: 2, ...(buy ? { bottom: "50%" } : { top: "50%" }) }} />
               {/* 날짜를 막대마다 붙인다 — 다섯 개뿐이라 자리가 되고, 양 끝에만 적으면
