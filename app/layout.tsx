@@ -99,6 +99,19 @@ export default async function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=block"
           rel="stylesheet"
         />
+        {/* 기기별 수집 제외 스위치. ?ga=off 로 한 번 들어온 기기는 gtag 의 공식
+            무력화 플래그(ga-disable-<측정ID>)가 켜져 히트를 아예 보내지 않는다.
+            ?ga=on 이면 해제. 상태를 localStorage 에 남기므로 IP 가 매번 바뀌는
+            휴대폰 LTE 처럼 내부 트래픽 필터로 못 거르는 기기를 걸러낼 수 있다.
+            gtag.js 는 hydration 이후에 실리므로 head 의 동기 스크립트인 이쪽이
+            항상 먼저 실행된다 — 플래그를 놓쳐 히트가 새 나갈 일이 없다. */}
+        {GA_ID ? (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `(function(){try{var k=${JSON.stringify(`ga-disable-${GA_ID}`)};var v=new URLSearchParams(location.search).get("ga");if(v==="off")localStorage.setItem(k,"1");else if(v==="on")localStorage.removeItem(k);if(localStorage.getItem(k))window[k]=true;}catch(e){}})();`,
+            }}
+          />
+        ) : null}
         {/* 구조화 데이터(JSON-LD) — 검색엔진에 사이트/조직 정보를 명시적으로 제공. */}
         <script
           type="application/ld+json"
