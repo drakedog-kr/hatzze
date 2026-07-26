@@ -114,8 +114,12 @@ export function TitleCard({
   title: string;
   lines: string[];
   foot: string;
-  /** 오른쪽에 놓을 장식 그림(data URI)과 크기. 없으면 글자만 놓인다. */
-  art?: { src: string; width: number; height: number };
+  /**
+   * 오른쪽에 놓을 그림. 노드로 받는다 — SVG 한 장일 때도 있고(MDD 낙폭 곡선),
+   * 글자가 들어가야 해서 JSX 로 짜야 할 때도 있다(카더라 말풍선. SVG 안의 글자는
+   * Satori 가 폰트를 못 넘겨줘서 빈칸으로 나온다).
+   */
+  art?: React.ReactNode;
 }) {
   return (
     <CardShell>
@@ -133,8 +137,7 @@ export function TitleCard({
             ))}
           </div>
         </div>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        {art ? <img src={art.src} width={art.width} height={art.height} alt="" /> : null}
+        {art}
       </div>
       <div style={{ fontSize: 27, fontWeight: 500, color: SUB }}>{foot}</div>
     </CardShell>

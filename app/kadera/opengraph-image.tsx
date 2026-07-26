@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-import { BLUE, OG_CONTENT_TYPE, OG_SIZE, TRACK, TitleCard, dataUri, loadOgFonts } from "../og-card";
+import { BLUE, INK, OG_CONTENT_TYPE, OG_SIZE, TitleCard, loadOgFonts } from "../og-card";
 import { KADERA_CARD } from "../og-copy";
 
 /**
@@ -20,50 +20,52 @@ export const size = OG_SIZE;
 export const contentType = OG_CONTENT_TYPE;
 
 /**
- * 언급 순위 막대. 이 페이지가 하는 일("오늘 가장 많이 언급된 종목")이 곧 줄 세우기라,
- * 화면의 순위 행에 붙는 가는 띠(app/kadera/page.tsx 의 영향력 점수 막대)와 같은 문법으로
- * 그린다 — 파란색, 양 끝 둥근 알약, 위에서 아래로 옅어지는 순위.
- * (홈 카드가 히어로 게이지를, MDD 카드가 낙폭 곡선을 옮긴 것과 같은 원칙이다.)
+ * 오가는 말. 이 페이지의 재료가 채널에 도는 이야기라, 순위 막대 같은 집계 그림보다
+ * "사람들이 떠드는" 장면이 이름(카더라)에 맞는다.
  *
- * 길이는 순위의 모양만 나타낸 것이고 실제 언급 수가 아니다. 그래서 숫자도 넣지 않는다.
+ * SVG 가 아니라 JSX 로 짠다 — data URI 로 넘긴 SVG 안의 글자는 Satori 가 폰트를
+ * 실어 주지 않아 빈칸으로 나온다. 여기서는 카드 본문과 같은 Pretendard 로 그려진다.
+ *
+ * 문구는 **떠도는 말투 자체**만 흉내 낸다. 뭘 사라/팔라로 읽힐 말은 넣지 않는다 —
+ * 이 서비스는 그런 말을 옮기는 곳이 아니라 얼마나 도는지를 세는 곳이다.
  */
-const RANK_BARS = (() => {
-  const rows = [
-    { w: 288, o: 1 },
-    { w: 236, o: 0.76 },
-    { w: 186, o: 0.56 },
-    { w: 146, o: 0.4 },
-    { w: 108, o: 0.28 },
-  ];
-  const h = 26;
-  const gap = 15;
-  const axis = 10; // 축과 막대 사이 간격
-  const height = rows.length * (h + gap) - gap;
+const CHATTER: { text: string; mine: boolean }[] = [
+  { text: "그 얘기 들었어?", mine: false },
+  { text: "어디서 나온 건데", mine: true },
+  { text: "…라고 카더라", mine: false },
+];
+
+function Bubbles() {
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${axis + 300} ${height}">` +
-    // 세로 축. 이게 없으면 둥근 막대가 스켈레톤 로딩 화면처럼 보인다 —
-    // 선 하나로 "줄 세운 그래프"라는 게 분명해진다.
-    `<line x1="1.5" y1="0" x2="1.5" y2="${height}" stroke="${TRACK}" stroke-width="3"/>` +
-    rows
-      .map(
-        (r, i) =>
-          `<rect x="${axis}" y="${i * (h + gap)}" width="${r.w}" height="${h}" rx="${h / 2}" fill="${BLUE}" opacity="${r.o}"/>`,
-      )
-      .join("") +
-    "</svg>"
+    <div style={{ display: "flex", flexDirection: "column", gap: 14, width: 358 }}>
+      {CHATTER.map((c) => (
+        <div key={c.text} style={{ display: "flex", justifyContent: c.mine ? "flex-end" : "flex-start" }}>
+          <div
+            style={{
+              padding: "15px 26px",
+              fontSize: 27,
+              fontWeight: 500,
+              background: c.mine ? BLUE : "#ffffff",
+              color: c.mine ? "#ffffff" : INK,
+              // 말풍선의 꼬리 자리만 각지게 둔다. 삼각형 꼬리를 붙이는 것보다 단순하고
+              // 메신저에서 흔히 보는 모양이라 한눈에 대화로 읽힌다.
+              borderTopLeftRadius: 26,
+              borderTopRightRadius: 26,
+              borderBottomLeftRadius: c.mine ? 26 : 8,
+              borderBottomRightRadius: c.mine ? 8 : 26,
+            }}
+          >
+            {c.text}
+          </div>
+        </div>
+      ))}
+    </div>
   );
-})();
+}
 
 export default async function Image() {
   return new ImageResponse(
-    (
-      <TitleCard
-        title={KADERA_CARD.title}
-        lines={KADERA_CARD.lines}
-        foot={KADERA_CARD.foot}
-        art={{ src: dataUri(RANK_BARS), width: 330, height: 202 }}
-      />
-    ),
+    <TitleCard title={KADERA_CARD.title} lines={KADERA_CARD.lines} foot={KADERA_CARD.foot} art={<Bubbles />} />,
     { ...OG_SIZE, fonts: await loadOgFonts() },
   );
 }

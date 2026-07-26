@@ -64,7 +64,7 @@ export default async function Image() {
         title={MDD_CARD.title}
         lines={MDD_CARD.lines}
         foot={MDD_CARD.foot}
-        art={{ src: dataUri(drawdownSvg()), width: 384, height: 228 }}
+        art={<img src={dataUri(drawdownSvg())} width={384} height={228} alt="" />}
       />
     ),
     { ...OG_SIZE, fonts: await loadOgFonts() },
