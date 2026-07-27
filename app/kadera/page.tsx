@@ -24,6 +24,7 @@ import { pageMetadata } from "../seo";
 import { C, Icon, MONO } from "../ui";
 import { ExpandableList } from "./ExpandableList";
 import { Avatar, Pill, RankDelta, Sparkline, card as cardStyle, rankNum, subCard } from "./parts";
+import { StockLogo } from "../StockLogo";
 import { SectionHead } from "./SectionHead";
 import { TrendingTabs } from "./TrendingTabs";
 
@@ -553,7 +554,8 @@ export default async function KaderaPage() {
               {surging.map((s) => (
                 <div key={s.code} style={{ ...subCard, flex: "1 1 168px", padding: "14px 15px", display: "flex", flexDirection: "column" }}>
                   {/* 1) 종목 — 이름 + 코드 */}
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 5, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+                    <StockLogo code={s.code} name={s.name} market={s.market} size={22} />
                     <span style={{ ...clip, fontWeight: 700, fontSize: 15, color: C.ink }}>{s.name}</span>
                     {/* 종목 코드는 눈에서 흘려보내는 장식이 아니라 읽고 확인하는 값이라
                         faint 가 아니라 한 단계 진한 muted 를 쓴다(10px 이라 더 그렇다). */}
@@ -763,7 +765,8 @@ export default async function KaderaPage() {
                 const max = Math.max(1, ...r.series.map((s) => s.mentions));
                 return (
                   <div key={r.code} style={{ ...subCard, padding: 16 }}>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                      <StockLogo code={r.code} name={r.name} market={r.market} size={26} />
                       <span style={{ ...clip, fontSize: 18, fontWeight: 700, color: C.ink }}>{r.name}</span>
                       <span style={{ fontFamily: MONO, fontSize: 11, color: C.muted }}>{r.code}</span>
                       {r.price != null && (
