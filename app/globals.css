@@ -20,7 +20,7 @@
   --c-cold: #1b64da; /* blue700 */
   --c-neutral: #6b7684; /* grey600 */
   --c-hot: #ed6700; /* orange800 */
-  --c-mania: #f04452; /* red500 */
+  --c-mania: #d22030; /* red700 */
   --c-blue: #3182f6; /* blue500 */
 
   /* 텍스트 램프 = grey900→400. 흰 카드 위 명암비 16.6 / 11.0 / 7.1 / 4.6 / 3.0 / 2.0.
@@ -69,8 +69,9 @@
      "언급 ▲ 4.3배" 배지가 배경 없이 글자만 떠 있었다. 색마다 변수로 둔다. */
   --c-hot-tint: rgba(245, 120, 0, 0.12);
   --c-cold-tint: rgba(27, 100, 218, 0.1);
-  --c-mania-tint: rgba(240, 68, 82, 0.1);
+  --c-mania-tint: rgba(210, 32, 48, 0.1);
   --c-neutral-tint: rgba(107, 118, 132, 0.1);
+  --c-on-mania: #ffffff;
   --c-scrollbar: #d1d6db;
   --c-scrollbar-border: #f2f4f6;
 
@@ -131,6 +132,7 @@
   --c-cold-tint: rgba(97, 176, 255, 0.16);
   --c-mania-tint: rgba(250, 97, 109, 0.16);
   --c-neutral-tint: rgba(158, 158, 164, 0.16);
+  --c-on-mania: #16161a;
   --c-scrollbar: #3c3c47;
   --c-scrollbar-border: #101013;
 }
@@ -167,13 +169,6 @@ body {
   -webkit-font-feature-settings: "liga";
   -webkit-font-smoothing: antialiased;
 }
-
-@keyframes hz-pulse-red {
-  0% { box-shadow: 0 0 0 0 rgba(255, 107, 129, 0.5); }
-  70% { box-shadow: 0 0 0 10px rgba(255, 107, 129, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(255, 107, 129, 0); }
-}
-.hz-pulse-red { animation: hz-pulse-red 2s infinite; }
 
 /* 4열 → 3열 → 2열 → 1열. span-2 카드는 최소 폭 아래에서 1열로 접힌다. */
 /* minmax(0, 1fr) — 1fr은 minmax(auto, 1fr)이라 그리드 항목의 기본 min-width:auto가

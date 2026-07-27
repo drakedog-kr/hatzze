@@ -42,10 +42,10 @@ export const dynamic = "force-dynamic";
 
 // 구간 색은 화면과 같아야 한다. app/globals.css 의 라이트 테마 값 그대로다.
 const STAGE_COLOR: Record<string, { color: string; tint: string }> = {
-  저온: { color: "#5ea8d8", tint: "rgba(94, 168, 216, 0.16)" },
-  상온: { color: "#a89f95", tint: "rgba(168, 159, 149, 0.18)" },
-  고온: { color: "#ff9a4d", tint: "rgba(255, 154, 77, 0.16)" },
-  초고온: { color: "#ff6b81", tint: "rgba(255, 107, 129, 0.14)" },
+  저온: { color: "#1b64da", tint: "rgba(27, 100, 218, 0.10)" },
+  상온: { color: "#6b7684", tint: "rgba(107, 118, 132, 0.10)" },
+  고온: { color: "#ed6700", tint: "rgba(237, 103, 0, 0.12)" },
+  초고온: { color: "#d22030", tint: "rgba(210, 32, 48, 0.10)" },
 };
 
 /**
@@ -64,8 +64,8 @@ function gaugeSvg(score: number): string {
   return (
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 172">' +
     '<defs><linearGradient id="thermal" x1="0" y1="0" x2="1" y2="0">' +
-    '<stop offset="0%" stop-color="#5ea8d8"/><stop offset="33%" stop-color="#a89f95"/>' +
-    '<stop offset="66%" stop-color="#ff9a4d"/><stop offset="100%" stop-color="#ff6b81"/>' +
+    '<stop offset="0%" stop-color="#1b64da"/><stop offset="33%" stop-color="#6b7684"/>' +
+    '<stop offset="66%" stop-color="#ed6700"/><stop offset="100%" stop-color="#d22030"/>' +
     "</linearGradient></defs>" +
     `<path ${arc} stroke="${TRACK}"/>` +
     `<path ${arc} stroke="url(#thermal)" stroke-dasharray="${arcLen}" stroke-dashoffset="${dashoffset}"/>` +

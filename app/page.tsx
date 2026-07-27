@@ -228,7 +228,7 @@ function HitBadge({ label = "초고온", small = false }: { label?: string; smal
       <span
         style={{
           background: C.mania,
-          color: "#fff",
+          color: "var(--c-on-mania)",
           fontWeight: 700,
           fontSize: small ? 9 : 11,
           lineHeight: 1.2,
