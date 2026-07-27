@@ -341,7 +341,13 @@ def collect_batches(client: Anthropic, db) -> int:
             continue
         if status != "ended":
             # 끝나지 않는 배치를 그대로 두면 그 메시지들이 영구히 '처리 중'으로 묶여
-            # 다시는 분류되지 않는다. 결과 보관은 24시간이라 그 뒤로는 기다릴 이유도 없다.
+            # 다시는 분류되지 않는다. 배치 처리 마감이 24시간이라(그 안에 못 끝내면
+            # expired 로 닫힌다) 그 뒤로는 기다릴 이유가 없다.
+            #   ※ 예전 주석은 "결과 보관이 24시간"이라고 적었는데 틀리다. 24시간은
+            #     처리 마감(expires_at)이고 **결과는 생성 후 29일간** 받을 수 있다.
+            #     2026-07-28 에 만든 지 40시간 지난(=expires_at 이 지난) 배치의 결과
+            #     1,299건을 그대로 다 읽었다. 그래서 아래 분기는 '끝난' 배치엔 걸리지
+            #     않고, 끝난 배치는 나이와 무관하게 결과 경로로 간다.
             if _hours_since(row["submitted_at"]) > STALE_HOURS:
                 db.table("telegram_analysis_batches").update(
                     {
