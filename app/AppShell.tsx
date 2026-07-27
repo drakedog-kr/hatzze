@@ -358,7 +358,8 @@ export default function AppShell({
       <Sidebar />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <TopBar dailyScore={dailyScore} theme={theme} />
-        <main className="hz-scroll" style={{ flex: 1, overflowY: "auto", padding: 40 }}>
+        {/* 여백은 globals.css 의 --hz-main-pad 가 폭에 따라 정한다(40 → 24 → 16). */}
+        <main className="hz-scroll" style={{ flex: 1, overflowY: "auto", padding: "var(--hz-main-pad)" }}>
           {children}
           <Footer />
         </main>

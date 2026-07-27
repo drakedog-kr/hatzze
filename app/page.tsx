@@ -178,8 +178,8 @@ function Shell({
         background: C.card,
         borderRadius: 14,
         // 모든 카드의 divider(Foot 등) 가로 위치가 동일하도록 span과 무관하게
-        // 안쪽 여백을 통일한다.
-        padding: 24,
+        // 안쪽 여백을 통일한다. 값은 폭에 따라 24 → 18 (globals.css 의 --hz-card-pad).
+        padding: "var(--hz-card-pad)",
         display: "flex",
         flexDirection: "column",
         position: "relative",
@@ -204,7 +204,9 @@ function Shell({
 // 겹치고, 컬러 이모지라 OS마다 글리프 높이가 달라 배지만 세로로 들쭉날쭉했다.
 function HitBadge({ label = "초고온", small = false }: { label?: string; small?: boolean }) {
   return (
-    // 바깥 span은 '제목 행'과 똑같은 자리를 차지하는 빈 상자다 — top은 Shell의 안쪽 여백(24),
+    // 바깥 span은 '제목 행'과 똑같은 자리를 차지하는 빈 상자다 — top은 Shell의 안쪽 여백
+    // (--hz-card-pad. 폭에 따라 24 → 18 이라 배지도 같은 변수를 읽어야 따라 움직인다.
+    //  숫자로 박아 두면 좁은 화면에서 배지만 제목보다 6px 아래에 남는다),
     // height는 제목 행의 높이(TitleRow의 아이콘 크기 22 = 그 행에서 가장 큰 요소)와 맞춘다.
     // 그 안에서 배지를 세로 가운데 정렬하면 배지 글자 크기·여백을 바꿔도 제목과 계속 나란하다.
     // (예전엔 배지에 top을 직접 줬는데, 그 값은 테두리 기준이고 제목은 여백 기준이라 서로
@@ -212,8 +214,9 @@ function HitBadge({ label = "초고온", small = false }: { label?: string; smal
     <span
       style={{
         position: "absolute",
-        top: 24,
-        right: small ? 18 : 24,
+        top: "var(--hz-card-pad)",
+        // 1칸 카드는 제목이 짧아 배지를 6px 더 바깥으로 붙인다(그 차이만 유지한다).
+        right: small ? "calc(var(--hz-card-pad) - 6px)" : "var(--hz-card-pad)",
         height: 22,
         display: "flex",
         alignItems: "center",
@@ -325,7 +328,9 @@ function Big({
   sub?: React.ReactNode;
 }) {
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginBottom: 12 }}>
+    // flexWrap — 좁은 카드에서 sub("최근 -20.3조")를 숫자 옆에 억지로 끼우지 않고 아랫줄로
+    // 내린다. 예전엔 nowrap 이라 sub 가 자리를 차지한 채 숫자 쪽만 눌렸다.
+    <div style={{ display: "flex", alignItems: "flex-end", gap: 8, rowGap: 4, flexWrap: "wrap", marginBottom: 12 }}>
       <span
         style={{
           fontFamily: MONO,
@@ -334,12 +339,15 @@ function Big({
           color,
           lineHeight: 1,
           letterSpacing: "-0.03em",
+          // 수치와 단위는 한 덩어리다 — 끊기면 "104.3조/원" 처럼 단위가 두 줄로 쪼개진다.
+          // 768px(사이드바 + 2열)에서 카드 안이 176px 뿐이라 투자자예탁금이 실제로 그랬다.
+          whiteSpace: "nowrap",
         }}
       >
         {disp}
         {unit && <span style={{ fontSize: size * 0.5 }}>{unit}</span>}
       </span>
-      {sub && <span style={{ fontSize: 12, fontWeight: 800, color, paddingBottom: 6 }}>{sub}</span>}
+      {sub && <span style={{ fontSize: 12, fontWeight: 800, color, paddingBottom: 6, whiteSpace: "nowrap" }}>{sub}</span>}
     </div>
   );
 }
