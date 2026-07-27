@@ -101,7 +101,7 @@ export default function Footer() {
             <FooterLink href="/mdd">MDD 정밀분석</FooterLink>
             {/* 사이드바가 모바일에서 숨겨져 커뮤니티 링크가 사라진다 — 내부 내비게이션과
                 같은 방식으로 푸터에 두어 좁은 화면에서도 닿게 한다. */}
-            <FooterExternalLink href="https://t.me/hatzze_kr" cta="community">커뮤니티 합류</FooterExternalLink>
+            <FooterExternalLink href="https://t.me/hatzze69" cta="community">커뮤니티 합류</FooterExternalLink>
           </nav>
           <div>
             <GroupLabel>데이터 출처</GroupLabel>
