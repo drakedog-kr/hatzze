@@ -20,7 +20,7 @@ const NAV = [
 // 외부(텔레그램) 링크라 NAV 배열이 아니라 따로 둔다 — pathname 기반 active 판정 대상이
 // 아니고, 새 탭으로 열려야 해서 next/link 가 아닌 <a> 를 쓴다. 사이드바와 모바일 탭바가
 // 같은 값을 참조해야 두 내비게이션의 항목이 어긋나지 않는다.
-const COMMUNITY = { href: "https://t.me/hatzze_kr", label: "커뮤니티 합류", icon: "send" };
+const COMMUNITY = { href: "https://t.me/hatzze69", label: "커뮤니티 합류", icon: "send" };
 
 /** NAV 항목의 현재 페이지 판정. 사이드바와 모바일 탭바가 같은 규칙을 써야 한다. */
 function isActive(href: string, pathname: string) {
