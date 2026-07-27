@@ -222,7 +222,25 @@ export function rankStockMatches(stocks: StockOption[], query: string, limit = 8
 }
 
 /**
- * 추천 한 묶음. 행 구조는 [순위 · 이름 · 근거] 세 칸이고, 근거는 오른쪽 정렬로
+ * 종목 머리글자 배지. 진짜 로고가 생기기 전까지 그 자리를 채운다(globals.css 의
+ * .hz-stock-badge 주석 참고). 라틴 문자로 시작하는 이름은 두 글자를 쓴다 —
+ * "SK"·"LG" 처럼 두 글자가 곧 회사인 경우가 많아 한 글자만 두면 다 "S"·"L"이 된다.
+ */
+function StockBadge({ code, name }: { code: string; name: string }) {
+  // 코드에서 색상값을 뽑는다. 같은 종목이면 언제나 같은 색이라 목록이 다시 그려져도
+  // 안 흔들린다. 31 을 곱하는 흔한 문자열 해시이고, 값 자체에 의미는 없다.
+  let h = 0;
+  for (let i = 0; i < code.length; i++) h = (h * 31 + code.charCodeAt(i)) % 360;
+  const initials = /^[A-Za-z]/.test(name) ? name.slice(0, 2).toUpperCase() : name.slice(0, 1);
+  return (
+    <span className="hz-stock-badge" style={{ "--h": h } as React.CSSProperties} aria-hidden="true">
+      {initials}
+    </span>
+  );
+}
+
+/**
+ * 추천 한 묶음. 행 구조는 [순위 · 로고 · 이름 · 근거] 네 칸이고, 근거는 오른쪽 정렬로
  * 세로줄을 맞춘다 — 숫자가 왼쪽 정렬이면 훑을 때 눈이 매번 다시 자리를 찾는다.
  * 순위 숫자는 tabular(MONO)로 둬야 두 자리가 돼도 이름 시작점이 안 밀린다.
  */
@@ -239,7 +257,7 @@ function SuggestSection({
 }) {
   if (!items.length) return null;
   return (
-    <section style={{ marginBottom: 6 }}>
+    <section>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, padding: "0 10px 6px" }}>
         <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: C.ink }}>{title}</h3>
         <span style={{ fontSize: 11, fontWeight: 600, color: C.faint, whiteSpace: "nowrap" }}>{hint}</span>
@@ -266,6 +284,7 @@ function SuggestSection({
               }}
             >
               <span style={{ fontFamily: MONO, fontSize: 12, color: C.faint, width: 12, flexShrink: 0 }}>{i + 1}</span>
+              <StockBadge code={s.code} name={s.name} />
               <span style={{ fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {s.name}
               </span>
@@ -408,8 +427,12 @@ function Controls({
           >
             {showSuggest ? (
               <>
-                <SuggestSection title="급부상 종목" hint="평소 대비 언급 급증" items={suggest.surging} onPick={pick} />
-                <SuggestSection title="주요 종목 리포트" hint="최근 주목도 상위" items={suggest.report} onPick={pick} />
+                {/* 두 묶음 사이는 넉넉히 벌린다. 붙여 두면 아래 묶음의 제목이 위 묶음의
+                    마지막 줄처럼 읽혀서 어디까지가 '급부상'인지 헷갈린다. */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+                  <SuggestSection title="급부상 종목" hint="평소 대비 언급 급증" items={suggest.surging} onPick={pick} />
+                  <SuggestSection title="주요 종목" hint="최근 주목도 상위" items={suggest.report} onPick={pick} />
+                </div>
                 <p style={{ margin: "10px 10px 2px", fontSize: 11, color: C.faint, lineHeight: 1.5 }}>
                   텔레그램에서 많이 언급된 종목입니다. 매수·매도 신호가 아닙니다.
                 </p>
