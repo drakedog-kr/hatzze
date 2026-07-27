@@ -24,3 +24,8 @@ telethon>=1.41,<2
 # anthropic — 히어로 카드의 '오늘의 요약'을 Claude(Haiku)로 생성한다
 # (generate_daily_summary.py). 현재 확인 버전 0.117.
 anthropic>=0.117,<1
+# kiwipiepy — 한국어 형태소 분석기. LLM이 쓴 문장의 오타를 잡는 데만 쓴다
+# (common/text_check.py). API 호출 없이 로컬에서 돌고, 모델 포함 40MB 정도다.
+# 없으면 text_check 가 문자 검사만 하고 넘어가므로 파이프라인은 안 죽는다.
+# 현재 확인 버전 0.23.
+kiwipiepy>=0.20,<1

@@ -40,6 +40,7 @@ from anthropic import Anthropic  # noqa: E402
 
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.supabase_client import PAGE_SIZE, get_client  # noqa: E402
+from common.text_check import is_clean, problems  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 from common.supabase_client import load_all  # noqa: E402
 
@@ -255,14 +256,10 @@ MIN_DECIDED = 8
 THEME_TOP_N = 4
 
 
-def is_clean(text: str) -> bool:
-    """대체문자(U+FFFD)가 섞이지 않았나.
-
-    Haiku 가 드물게 한글 음절 하나를 U+FFFD 로 뱉는다 — 실측(2026-07-26) "콜옵션"이
-    "콜�션"으로 나왔다. 응답 자체는 정상 UTF-8 이라 인코딩 오류로도 안 잡히고, 그대로
-    두면 깨진 글자가 화면에 나간다. generate_daily_summary.is_clean 과 같은 규칙이다.
-    """
-    return "�" not in text
+# 문장 검수(깨진 글자·오타)는 common/text_check.py 가 맡는다. 예전엔 여기서 대체문자
+# (U+FFFD) 하나만 봤는데, 2026-07-26 에 "잦아들기"가 "낙아들기"로 나온 걸 그 그물이
+# 통과시켰다 — 네 음절 모두 정상 한글이라 문자 검사로는 못 잡는다. 자세한 규칙과 실측
+# 근거는 그 파일 주석 참고. **원문(digest)을 함께 넘겨야** 어절 검사까지 돈다.
 
 
 def first_sentences(text: str, limit: int) -> str:
@@ -668,12 +665,13 @@ def main() -> None:
         candidates = [first_sentences(ask(system, digest), BRIEF_SENTENCES)]
         for _ in range(BRIEF_RETRIES):
             cur = candidates[-1]
-            # 길이가 맞아도 글자가 깨졌으면 다시 쓴다(is_clean 주석 참고).
-            if lo <= len(cur) <= hi and is_clean(cur):
+            # 길이가 맞아도 글자가 깨졌거나 오타가 있으면 다시 쓴다(common/text_check.py).
+            found = problems(cur, digest)
+            if lo <= len(cur) <= hi and not found:
                 break
-            if not is_clean(cur):
-                print(f"[WARNING] 대체문자가 섞인 문장을 버리고 다시 씁니다: {cur[:40]}…")
-                fix = f"방금 쓴 문장에 깨진 글자가 있습니다. 같은 뜻으로 **한두 문장**으로 다시 써 주세요.\n\n{digest}"
+            if found:
+                print(f"[WARNING] 문장을 버리고 다시 씁니다({' · '.join(found)}): {cur[:40]}…")
+                fix = f"방금 쓴 문장에 깨진 글자나 오타가 있습니다. 같은 뜻으로 **한두 문장**으로 다시 써 주세요.\n\n{digest}"
             else:
                 need = "늘려" if len(cur) < lo else "줄여"
                 fix = (
@@ -683,7 +681,9 @@ def main() -> None:
                 )
             candidates.append(first_sentences(ask(system, fix), BRIEF_SENTENCES))
         # 깨진 후보는 길이가 맞아도 안 쓴다 — 길이는 어긋나도 읽히지만 깨진 글자는 못 읽는다.
-        usable = [t for t in candidates if t.strip() and is_clean(t)] or [t for t in candidates if t.strip()]
+        usable = [t for t in candidates if t.strip() and is_clean(t, digest)] or [
+            t for t in candidates if t.strip()
+        ]
         if not usable:
             return ""
         in_goal = [t for t in usable if lo <= len(t) <= hi]
@@ -731,12 +731,13 @@ def main() -> None:
             candidates = [ask(STOCK_SYSTEM, digest)]
             for attempt in range(MAX_RETRIES):
                 cur = candidates[-1]
-                # 길이가 맞아도 글자가 깨졌으면 다시 쓴다(is_clean 주석 참고).
-                if LEN_MIN <= len(cur) <= LEN_MAX and is_clean(cur):
+                # 길이가 맞아도 글자가 깨졌거나 오타가 있으면 다시 쓴다(common/text_check.py).
+                found = problems(cur, digest)
+                if LEN_MIN <= len(cur) <= LEN_MAX and not found:
                     break
-                if not is_clean(cur):
-                    print(f"  [{name}] 대체문자가 섞인 문장을 버리고 다시 씁니다: {cur[:40]}…")
-                    fix = f"방금 쓴 문장에 깨진 글자가 있습니다. 같은 뜻으로 다시 써 주세요.\n\n{digest}"
+                if found:
+                    print(f"  [{name}] 문장을 버리고 다시 씁니다({' · '.join(found)}): {cur[:40]}…")
+                    fix = f"방금 쓴 문장에 깨진 글자나 오타가 있습니다. 같은 뜻으로 다시 써 주세요.\n\n{digest}"
                 else:
                     need = "늘려" if len(cur) < LEN_MIN else "줄여"
                     fix = (
@@ -749,7 +750,7 @@ def main() -> None:
             # 목표 범위가 있으면 그중 첫 번째, 없으면 허용 범위 중 목표 한가운데에 가장 가까운 것.
             # 깨진 후보는 어느 단계에서도 안 고른다 — 길이는 어긋나도 읽히지만 깨진 글자는 못 읽는다.
             # (전부 깨졌으면 그때만 어쩔 수 없이 쓴다. 빈칸이 더 나쁘다.)
-            clean = [t for t in candidates if is_clean(t)] or candidates
+            clean = [t for t in candidates if is_clean(t, digest)] or candidates
             mid = (LEN_MIN + LEN_MAX) / 2
             in_goal = [t for t in clean if LEN_MIN <= len(t) <= LEN_MAX]
             in_ok = [t for t in clean if LEN_HARD_MIN <= len(t) <= LEN_HARD_MAX]
