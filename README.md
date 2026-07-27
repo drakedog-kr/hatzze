@@ -193,6 +193,7 @@ cp .env.example .env.local
 | `GITHUB_TOKEN` | 깃헙 검색 API (선택 — 없으면 비인증) |
 | `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` / `TELEGRAM_SESSION` | 카더라 리포트 메시지 수집 |
 | `TELEGRAM_CHANNELS_SHEET_ID` | 모니터링 채널 목록 시트 |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_BROADCAST_CHAT_ID` | 채널에 오늘의 지수 발송 (수집용 값과 별개인 봇 토큰) |
 
 ---
 

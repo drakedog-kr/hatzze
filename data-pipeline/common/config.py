@@ -33,3 +33,12 @@ TELEGRAM_SESSION = os.environ.get("TELEGRAM_SESSION")
 # 분석 대상 채널 목록을 담은 구글시트의 ID(=URL의 /d/<ID>/ 부분). 목록을 public
 # 레포에 커밋하지 않으려 URL이 아니라 ID만 env로 받아 sync가 CSV export를 조립한다.
 TELEGRAM_CHANNELS_SHEET_ID = os.environ.get("TELEGRAM_CHANNELS_SHEET_ID")
+
+# 매일 채널에 오늘의 지수를 올리는 봇(send_telegram_broadcast.py). **수집용 값과 별개다** —
+# 위 TELEGRAM_SESSION은 Hun 계정의 로그인 권한이고 읽기 전용으로 쓴다. 발송은 BotFather로
+# 만든 봇 토큰으로 Bot API를 부르므로, 새어 나가도 피해 범위가 '이 채널에 글쓰기'로 갇힌다.
+# 둘을 섞지 말 것.
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+# 발송 대상. 공개 채널은 핸들 그대로("@내채널핸들"), 비공개 채널은 -100으로 시작하는 숫자다.
+# 채널 ID도 커밋하지 않으려 env로 받는다.
+TELEGRAM_BROADCAST_CHAT_ID = os.environ.get("TELEGRAM_BROADCAST_CHAT_ID")
