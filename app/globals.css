@@ -806,9 +806,13 @@ main.hz-scroll { overflow-x: clip; }
    색이라 목록이 다시 그려져도 안 흔들리고, 채도·명도는 여기서 고정하니 어떤 색이
    걸려도 팔레트 밖으로 튀지 않는다. */
 .hz-stock-badge {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  /* 원이 아니라 스퀘어클(iOS 앱 아이콘 모양)이다. 로고 아이콘이 대개 '브랜드 색 타일'로
+     그려져 있어서 원으로 자르면 네 귀퉁이가 통째로 날아간다.
+     반지름 30% 는 corner-shape 를 모르는 브라우저용 폴백이다 — 여기에 50% 를 주면
+     그런 브라우저에서 그냥 원이 되어 버린다(아래 @supports 참고). */
+  border-radius: 30%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -827,12 +831,32 @@ main.hz-scroll { overflow-x: clip; }
    로고는 대개 흰 여백을 품고 있어서 배경을 깔지 않는다(깔면 로고 안의 흰색과 겹쳐
    테두리가 두 겹으로 보인다). object-fit:contain 으로 비율만 지킨다. */
 .hz-stock-logo {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  border-radius: 30%; /* 머리글자 배지와 같은 실루엣 — 폴백해도 모양이 안 바뀐다 */
   flex-shrink: 0;
-  object-fit: contain;
+  /* cover 로 타일을 꽉 채운다. contain 이면 정사각형이 아닌 원본에 여백이 생겨
+     타일 색이 가운데만 뜨고 가장자리에 흰 띠가 남는다. */
+  object-fit: cover;
   background: #fff; /* 투명 배경 로고가 다크에서 안 보이는 걸 막는다 */
+}
+
+/* ── 스퀘어클 마스크 ─────────────────────────────────────────────
+   네 변이 고르게 부푼 iOS 앱 아이콘 모양. 종목 아이콘이 '브랜드 색 타일'이라
+   모서리만 살짝 깎은 사각형보다 이 모양이 타일에 훨씬 잘 맞는다.
+
+   corner-shape:squircle 로 먼저 시도했다가 걷어냈다 — Lightning CSS(Tailwind v4)가
+   모르는 속성이라 선언을 버리고, 그러면 @supports 블록이 통째로 사라진다(컴파일된
+   CSS 에 corner-shape 가 0건이었다). mask-image 는 아는 속성이라 살아남고,
+   지원 범위도 훨씬 넓다.
+
+   경로는 100x100 기준 superellipse 근사다. mask-size 로 늘려 쓰므로 크기가 바뀌어도
+   모양이 유지된다. border-radius 는 마스크를 못 쓰는 아주 옛 브라우저용으로 남긴다. */
+.hz-stock-badge,
+.hz-stock-logo {
+  mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M0,50 C0,11.5 11.5,0 50,0 C88.5,0 100,11.5 100,50 C100,88.5 88.5,100 50,100 C11.5,100 0,88.5 0,50 Z" fill="black"/></svg>');
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
 }
 
 :root[data-theme="dark"] .hz-stock-badge {
