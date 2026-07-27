@@ -1,14 +1,16 @@
 """활성 텔레그램 채널의 최근 N일 메시지를 수집해 Supabase telegram_messages 에 upsert.
 
-- 대상: telegram_channels 에서 is_active=true 인 채널(먼저 sync_telegram_channels.py로
-  목록을 맞춰둔다).
+- 대상: telegram_channels 에서 is_active=true 이고 peer 캐시(channel_id·access_hash)가
+  채워진 채널(먼저 sync_telegram_channels.py로 목록과 캐시를 맞춰둔다). 캐시가 없는
+  채널은 건너뛴다 — 이 스크립트는 유저네임을 풀지 않는다(아래 상수 주석 참고).
 - 방식: 채널마다 최신순으로 훑다가 WINDOW_DAYS 보다 오래된 메시지를 만나면 멈춘다.
   이 "최근 N일 창"을 매 실행마다 통째로 다시 upsert하므로, 신규 메시지 수집과
   기존 메시지의 조회수/포워드수 갱신이 동시에 이뤄진다(첫 실행 = N일 백필).
 - upsert 키: (channel_handle, message_id). collected_at 은 payload에서 빼 최초
   수집 시각을 보존하고, updated_at 만 매번 현재 시각으로 갱신한다.
 
-DB엔 telegram_messages 테이블이 있어야 한다(migration_009).
+DB엔 telegram_messages 테이블(migration_009)과 telegram_channels 의 peer 캐시
+컬럼(migration_021)이 있어야 한다.
 
 실행:
     cd data-pipeline && source .venv/bin/activate
@@ -27,44 +29,47 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from telethon.sessions import StringSession  # noqa: E402
 from telethon.sync import TelegramClient  # noqa: E402
+from telethon.tl.types import InputPeerChannel  # noqa: E402
 
 from common.config import (  # noqa: E402
     TELEGRAM_API_HASH,
     TELEGRAM_API_ID,
     TELEGRAM_SESSION,
 )
-from common.supabase_client import get_client  # noqa: E402
+from common.supabase_client import get_client, load_all  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 
 WINDOW_DAYS = 7  # 매 실행 재수집하는 창(= 첫 실행 백필 범위)
 MAX_SCAN_PER_CHANNEL = 2000  # 폭주 채널 안전 상한(보통 창 경계에서 먼저 멈춤)
-# 채널마다 get_entity(=ResolveUsername) 를 부르므로 목록이 300개대면 처음 보는
-# 유저네임을 몇 분 안에 300번 넘게 푼다 — FloodWait 이 가장 잘 나는 호출이다.
-# sync_telegram_channels.py 가 바로 앞 스텝에서 같은 목록을 이미 한 번 풀지만,
-# StringSession 은 저장하지 않으므로 그때 채워진 엔티티 캐시가 이 프로세스로
-# 넘어오지 않는다(= 같은 이름을 두 번 푼다). 그래서 그쪽과 같은 방어를 여기에도 건다.
+# 여기선 유저네임을 풀지 않는다(ResolveUsername 호출 0건). DB에 저장된
+# (channel_id, access_hash) 로 InputPeerChannel 을 만들어 바로 연다.
+#
+# 예전엔 채널마다 get_entity 를 불렀다. sync_telegram_channels.py 가 바로 앞 스텝에서
+# 같은 목록을 이미 풀었지만 StringSession 은 엔티티 캐시를 저장하지 않아 이 프로세스로
+# 안 넘어왔고, 결국 같은 이름을 하루 두 번씩 풀었다. 채널이 317개가 되자 그게 계정
+# FloodWait(약 14시간)으로 돌아왔다 — 2026-07-27 저녁 수집은 0건이었다.
+# 이제 유저네임을 푸는 곳은 sync 한 곳뿐이고, 그쪽은 실행당 개수 상한이 걸려 있다.
 SLEEP_BETWEEN_CHANNELS_SEC = 0.5
 # Telethon 기본값(60초)보다 올려, 짧은 FloodWait 은 예외 대신 대기로 흡수한다.
 # 이보다 긴 대기는 그대로 예외 → 그 채널만 건너뛴다(다음 실행에서 다시 잡는다).
 FLOOD_SLEEP_THRESHOLD_SEC = 180
 
 
-def load_active_handles(client) -> list[str]:
-    resp = (
-        client.table("telegram_channels")
-        .select("handle")
-        .eq("is_active", True)
-        .execute()
+def load_active_channels(client) -> list[dict]:
+    """활성 채널 + peer 캐시. 잘리면 그 채널은 조용히 수집에서 빠지므로 페이징해 읽는다."""
+    rows = load_all(
+        client, "telegram_channels", "handle,channel_id,access_hash,is_active"
     )
-    return [r["handle"] for r in resp.data]
+    return [r for r in rows if r["is_active"]]
 
 
-def collect_channel(tg, handle: str, cutoff: datetime) -> list[dict]:
+def collect_channel(tg, ch: dict, cutoff: datetime) -> list[dict]:
     """한 채널에서 cutoff 이후 메시지를 [row dict] 로 모은다."""
-    entity = tg.get_entity(handle)
+    handle = ch["handle"]
+    peer = InputPeerChannel(ch["channel_id"], ch["access_hash"])
     rows: list[dict] = []
     scanned = 0
-    for msg in tg.iter_messages(entity, limit=MAX_SCAN_PER_CHANNEL):
+    for msg in tg.iter_messages(peer, limit=MAX_SCAN_PER_CHANNEL):
         scanned += 1
         if msg.date is None:
             continue
@@ -99,14 +104,30 @@ def main() -> None:
         sys.exit(1)
 
     db = get_client()
-    handles = load_active_handles(db)
-    if not handles:
+    channels = load_active_channels(db)
+    if not channels:
         print("[경고] 활성 채널이 없습니다. 먼저 sync_telegram_channels.py 를 실행하세요.")
+        return
+
+    # peer 캐시가 없는 채널은 건너뛴다. 여기서 유저네임을 풀어 버리면 sync 에 걸어 둔
+    # resolve 상한이 무의미해지기 때문이다. 다음 sync 가 캐시를 채우면 그때부터 잡히고,
+    # 창이 7일이라 하루 늦게 시작해도 그 사이 글은 백필로 함께 들어온다.
+    ready, waiting = [], []
+    for ch in channels:
+        target = ready if ch.get("channel_id") and ch.get("access_hash") else waiting
+        target.append(ch)
+    if waiting:
+        print(
+            f"[안내] peer 캐시가 아직 없는 채널 {len(waiting)}개는 건너뜁니다"
+            "(sync 가 채우면 다음 실행부터 수집)."
+        )
+    if not ready:
+        print("[경고] 수집 가능한 채널이 없습니다. sync_telegram_channels.py 를 먼저 돌리세요.")
         return
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=WINDOW_DAYS)
     print(
-        f"활성 채널 {len(handles)}개 · 최근 {WINDOW_DAYS}일"
+        f"활성 채널 {len(ready)}개 · 최근 {WINDOW_DAYS}일"
         f"(≥ {cutoff.astimezone(KST):%Y-%m-%d %H:%M} KST) 수집"
         + (" · [dry-run]" if dry_run else "")
     )
@@ -119,12 +140,16 @@ def main() -> None:
         TELEGRAM_API_HASH,
         flood_sleep_threshold=FLOOD_SLEEP_THRESHOLD_SEC,
     ) as tg:
-        for i, handle in enumerate(handles):
+        for i, ch in enumerate(ready):
+            handle = ch["handle"]
             if i:
                 time.sleep(SLEEP_BETWEEN_CHANNELS_SEC)
             try:
-                rows = collect_channel(tg, handle, cutoff)
+                rows = collect_channel(tg, ch, cutoff)
             except Exception as exc:  # noqa: BLE001
+                # 캐시가 낡아 실패하는 경우도 여기로 온다. 다음 sync 가 유저네임으로
+                # 다시 풀어 값을 고치므로 여기서 되돌리지 않는다(그게 resolve 창구를
+                # 한 곳으로 묶는 이유다).
                 print(f"  {handle:<18} 실패: {type(exc).__name__}: {exc}")
                 failed.append(handle)
                 continue
@@ -151,7 +176,7 @@ def main() -> None:
     # 줄이 사실상 유일한 신호다 — 건수가 계속 늘면 FloodWait 을 의심할 것.
     if failed:
         print(
-            f"[경고] 채널 {len(failed)}/{len(handles)}개 수집 실패: "
+            f"[경고] 채널 {len(failed)}/{len(ready)}개 수집 실패: "
             + ", ".join(failed[:20])
             + (f" 외 {len(failed) - 20}개" if len(failed) > 20 else "")
         )
