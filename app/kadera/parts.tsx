@@ -15,7 +15,8 @@ import { C, MONO } from "../ui";
 export const card: React.CSSProperties = {
   background: C.card,
   borderRadius: 16,
-  padding: 24,
+  // 폭에 따라 24 → 18 (globals.css 의 --hz-card-pad).
+  padding: "var(--hz-card-pad)",
   border: `1px solid ${C.line}`,
   // 그리드 칸 안에서 카드가 내용에 밀려 넓어지지 않도록(칸 비율 고정). 긴 채널명 등은
   // 카드 안에서 말줄임 처리되어야지, 카드를 늘려선 안 된다.

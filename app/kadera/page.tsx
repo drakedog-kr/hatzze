@@ -433,7 +433,12 @@ export default async function KaderaPage() {
               )}
               <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "center" }}>
                 {/* 메시지 톤 종합 — 점수와 그 근거 막대를 한 덩어리로 묶는다 */}
-                <div style={{ flex: "1 1 300px", minWidth: 280 }}>
+                {/* flex-basis 300 + minWidth 0. basis 로 "300 이 안 되면 아랫줄로" 는 유지하되,
+                    아랫줄로 내려간 뒤에는 남은 폭까지 줄어들 수 있게 한다 — minWidth:280 이던
+                    때는 줄바꿈 후에도 280 을 고집해, 375px 화면에서 비관↔낙관 막대와 '낙관'
+                    라벨이 카드 오른쪽 밖으로 44px 삐져나왔다(히어로 hz-hero 가 겪은 것과 같은
+                    문제라 같은 해법을 쓴다). */}
+                <div style={{ flex: "1 1 300px", minWidth: 0 }}>
                   {/* 이 카드가 답하는 건 "지금 분위기 좋아, 나빠?" 하나다. 그래서 숫자도 한 벌만
                       쓴다 — 예전엔 헤드라인이 낙관도(중립 제외, 59%)이고 아래 막대는 중립 포함
                       구성(낙관 32%)이라, 한 카드에서 '낙관'이 두 숫자로 나와 어느 쪽이 진짜인지

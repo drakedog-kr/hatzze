@@ -431,7 +431,8 @@ function Results({ data }: { data: MddResult }) {
    카드마다 제각각이던 머리·타일·막대를 셋으로 통일한다. 페이지 전체가 같은
    리듬(파란 아이콘 → 제목 → 한 줄 설명 → 데이터)으로 읽히게 하는 게 목적이다. */
 
-const card: React.CSSProperties = { background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: 24, minWidth: 0 };
+// padding 은 폭에 따라 24 → 18 (globals.css 의 --hz-card-pad).
+const card: React.CSSProperties = { background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: "var(--hz-card-pad)", minWidth: 0 };
 
 /** 카드 머리 — 시장 브리핑(TitleRow)·카더라(SectionHead)와 같은 구조. 아이콘은 파랑 고정. */
 function CardHead({ icon, title, sub, right }: { icon: string; title: string; sub?: string; right?: React.ReactNode }) {

@@ -61,7 +61,10 @@ function InfoBlock({ heading, rows }: { heading: string; rows: [string, React.Re
         {rows.map(([label, value]) => (
           <div key={label} style={{ display: "contents" }}>
             <dt style={{ fontSize: 12, fontWeight: 700, color: "var(--c-muted)", whiteSpace: "nowrap" }}>{label}</dt>
-            <dd style={{ margin: 0, fontSize: 13, lineHeight: 1.7, color: C.sub }}>{value}</dd>
+            {/* 값 칸에는 끊을 자리가 없는 긴 문자열이 들어온다(처리방침 URL
+                "policies.google.com/privacy"). 기본값이면 그 한 덩어리가 최소 폭을 밀어올려
+                375px 화면에서 표가 7px 넘쳤다. 이 칸만 중간에서 끊게 둔다. */}
+            <dd style={{ margin: 0, fontSize: 13, lineHeight: 1.7, color: C.sub, overflowWrap: "anywhere" }}>{value}</dd>
           </div>
         ))}
       </dl>
