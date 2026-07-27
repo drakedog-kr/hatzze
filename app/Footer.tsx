@@ -32,12 +32,13 @@ function FooterLink({ href, children }: { href: string; children: React.ReactNod
 }
 
 /** 외부 링크용. next/link 대신 <a> 를 써서 새 탭으로 연다(모양은 FooterLink 와 동일). */
-function FooterExternalLink({ href, cta, children }: { href: string; cta: string; children: React.ReactNode }) {
+function FooterExternalLink({ href, cta, aria, children }: { href: string; cta: string; aria?: string; children: React.ReactNode }) {
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
+      aria-label={aria}
       data-ga="cta_click"
       data-ga-cta={cta}
       data-ga-surface="footer"
@@ -99,9 +100,13 @@ export default function Footer() {
             <FooterLink href="/">시장 브리핑</FooterLink>
             <FooterLink href="/kadera">카더라 리포트</FooterLink>
             <FooterLink href="/mdd">MDD 정밀분석</FooterLink>
-            {/* 사이드바가 모바일에서 숨겨져 커뮤니티 링크가 사라진다 — 내부 내비게이션과
-                같은 방식으로 푸터에 두어 좁은 화면에서도 닿게 한다. */}
-            <FooterExternalLink href="https://t.me/hatzze69" cta="community">커뮤니티 합류</FooterExternalLink>
+            {/* 사이드바가 모바일에서 숨겨져 텔레그램 링크가 사라진다 — 내부 내비게이션과
+                같은 방식으로 푸터에 두어 좁은 화면에서도 닿게 한다. 라벨과 aria 는
+                AppShell 의 TELEGRAM 상수와 같은 문구로 맞춘다(두 내비게이션이 같은
+                항목이라 문구가 갈리면 다른 곳으로 가는 링크처럼 보인다). */}
+            <FooterExternalLink href="https://t.me/hatzze69" cta="community" aria="오늘 뭐래? 텔레그램 채널 열기(새 탭)">
+              오늘 뭐래?
+            </FooterExternalLink>
           </nav>
           <div>
             <GroupLabel>데이터 출처</GroupLabel>
