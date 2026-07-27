@@ -425,10 +425,14 @@ function HeatBar({ v }: { v: Pick }) {
 // 되어 CSS 가 통째로 버린다 — 실제로 히어로의 구간 알약이 배경 없이 글자만 떠 있었다.
 const STAGE_META: Record<string, { icon: string; color: string; tint: string; zone: string }> = {
   저온: { icon: "ac_unit", color: C.cold, tint: "var(--c-cold-tint)", zone: "저온 구간" },
-  상온: { icon: "thermostat", color: C.neutral, tint: "var(--c-neutral-tint)", zone: "상온 구간" },
+  상온: { icon: "sunny", color: C.neutral, tint: "var(--c-neutral-tint)", zone: "상온 구간" },
   고온: { icon: "local_fire_department", color: C.hot, tint: "var(--c-hot-tint)", zone: "고온 구간" },
   초고온: { icon: "volcano", color: C.mania, tint: "var(--c-mania-tint)", zone: "초고온 구간" },
 };
+
+// 히어로 배지의 4칸 막대에서 몇 칸을 켤지. 구간 순서를 숫자로 적어 둔 것뿐이라
+// STAGE_META 와 키가 어긋나면 안 된다(어긋나면 막대가 0칸이 된다).
+const STAGE_LEVEL: Record<string, number> = { 저온: 1, 상온: 2, 고온: 3, 초고온: 4 };
 
 // LLM 요약 문장을 서식 있는 노드로 렌더한다.
 //  - **...** → 굵게(중요 부분: 지표 이름·핵심 수치 등)
@@ -508,7 +512,7 @@ function HeroGauge({ score }: { score: number }) {
 function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tradHits: number; socialHits: number }) {
   // 저장된 stage 문자열 대신 점수에서 직접 구간을 계산해, 라벨 변경/과거 데이터에도 견고.
   const stageLabel = stageForScore(dailyScore.score);
-  const stage = STAGE_META[stageLabel] ?? { icon: "thermostat", color: C.neutral, tint: "var(--c-neutral-tint)", zone: stageLabel };
+  const stage = STAGE_META[stageLabel] ?? { icon: "sunny", color: C.neutral, tint: "var(--c-neutral-tint)", zone: stageLabel };
   // 도수는 정수로 — 소수점 둘째 자리(6.16℃)는 없는 정밀도를 있는 것처럼 보이게 한다.
   // 지수는 25개 지표의 가중평균을 다시 앵커로 매핑한 값이라 0.01 단위에 의미가 없다.
   const scoreDisplay = Math.round(dailyScore.score).toString();
@@ -581,8 +585,19 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
           {/* 상태 텍스트는 옆의 "햇쩨 지수"(22px)와 같은 크기로 둔다 — 둘이 한 쌍으로 읽히는 자리라
               크기가 다르면 상태 쪽이 부속처럼 보인다. */}
           {/* 아이콘은 색을 물려받으므로 구간 색이 글자·아이콘·배경에 한 번에 걸린다. */}
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 7, background: stage.tint, color: stage.color, fontWeight: 700, fontSize: 22, padding: "5px 15px", borderRadius: 999, whiteSpace: "nowrap" }}>
-            <Icon name={stage.icon} style={{ fontSize: 22 }} />
+          {/* 재질·치수는 globals.css 의 .hz-stage* 가 맡고, 여기서는 구간 색 두 개만
+              커스텀 속성으로 넘긴다 — 색을 CSS 에 박으면 구간마다 규칙을 네 벌 써야 한다.
+              막대는 장식이라 aria-hidden 으로 빼고, 구간은 옆의 글자가 이미 말한다. */}
+          <span
+            className="hz-stage"
+            style={{ "--stage": stage.color, "--stage-tint": stage.tint } as React.CSSProperties}
+          >
+            <span className="hz-stage-meter" aria-hidden="true">
+              {[1, 2, 3, 4].map((n) => (
+                <i key={n} className={n <= STAGE_LEVEL[stageLabel] ? "on" : undefined} />
+              ))}
+            </span>
+            <Icon name={stage.icon} style={{ fontSize: 22 }} className="ms-fill" />
             {stageLabel}
           </span>
         </div>

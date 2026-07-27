@@ -41,9 +41,19 @@ export function stageForScore(score: number): string {
 // 111/847/000이 모두 같은 폭으로 찍힌다. 실제 적용은 globals.css의 body 규칙이 맡는다.
 export const MONO = "var(--font-pretendard), sans-serif";
 
-export function Icon({ name, style }: { name: string; style?: React.CSSProperties }) {
+// className 은 .ms 에 덧붙는다(대체가 아니라). 지금 쓰임은 채운 글리프를 내는
+// .ms-fill 하나뿐인데, 아이콘 폰트 규칙(.ms)은 어느 경우에도 남아야 하므로 합쳐 준다.
+export function Icon({
+  name,
+  style,
+  className,
+}: {
+  name: string;
+  style?: React.CSSProperties;
+  className?: string;
+}) {
   return (
-    <span className="ms" style={style}>
+    <span className={className ? `ms ${className}` : "ms"} style={style}>
       {name}
     </span>
   );
