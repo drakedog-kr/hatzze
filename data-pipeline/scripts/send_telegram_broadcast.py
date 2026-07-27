@@ -389,9 +389,12 @@ def build_evening(score_row: dict, surging: list[dict]) -> str:
 
     # ai_summary 는 두 문장(주인공 지표·최근 추세)이 개행으로 이어져 저장된다.
     # 한 문단으로 붙여 글을 짧게 둔다 — 채널에서는 문단이 늘수록 스크롤이 는다.
+    # ai_summary 도 LLM 문장이라 같은 길이 규칙을 건다(공백 포함 120자 내외).
+    # 히어로는 두 문장을 한 문단으로 붙여 저장하는데, 그대로 실으면 150자짜리 한 덩어리가
+    # 되어 폰에서 눈이 미끄러진다(실측).
     sentences = [s.strip() for s in (score_row.get("ai_summary") or "").splitlines() if s.strip()]
     if sentences:
-        lines += ["", to_telegram_html(drop_emdash(" ".join(sentences[:SUMMARY_SENTENCES])))]
+        lines += paragraphs(" ".join(sentences[:SUMMARY_SENTENCES]))
 
     if surging:
         lines += ["", "📡 <b>카더라 급부상 종목</b> · 최근 3일"]
@@ -410,10 +413,15 @@ def build_evening(score_row: dict, surging: list[dict]) -> str:
 
 
 def paragraphs(text: str) -> list[str]:
-    """LLM 이 준 여러 문단을 텔레그램용으로 다듬는다(빈 줄 하나로 구분)."""
+    """LLM 이 준 문단들을 텔레그램용으로 다듬는다(빈 줄 하나로 구분).
+
+    길이는 여기서 강제한다 — 프롬프트에 120자를 적어도 모델이 자주 넘긴다. 문장 경계로
+    잘라 놓으면 어느 포맷에서나 문단 길이가 같아진다(common/broadcast_content.split_paragraph).
+    """
     out: list[str] = []
     for p in [p.strip() for p in text.split("\n") if p.strip()]:
-        out += ["", to_telegram_html(drop_emdash(p))]
+        for chunk in bc.split_paragraph(p):
+            out += ["", to_telegram_html(drop_emdash(chunk))]
     return out
 
 
@@ -428,8 +436,9 @@ def build_morning(db, llm) -> str:
         print("[skip] 어제 키워드가 없어 아침 글을 만들 수 없습니다.")
         return ""
 
-    night, total = bc.night_split(db, date.fromisoformat(kdate))
-    night_pct = round(night / total * 100) if total else 0
+    # 밤사이는 **키워드와 창이 다르다.** 키워드는 LLM 분류를 거쳐야 해서 이틀까지 밀릴 수
+    # 있지만, 밤사이는 수집만 된 원문이라 그날 아침 실행이 지난밤을 그대로 들고 있다.
+    night_count, excerpts, night_from, night_to = bc.load_night_messages(db)
     channels = (
         db.table("telegram_channels").select("handle", count="exact", head=True).eq("is_active", True).execute()
     ).count or 0
@@ -438,10 +447,13 @@ def build_morning(db, llm) -> str:
         [
             f"[날짜] {kdate}",
             f"[어제 키워드] {' · '.join(f'{k}({n}회)' for k, n in keywords)}",
-            f"[밤사이] 어제 메시지 {total}건 중 {night}건({night_pct}%)이 18시 이후~8시 이전에 올라왔습니다.",
+            "",
+            f"[밤사이] {night_from:%m월 %d일 %H시} ~ {night_to:%m월 %d일 %H시}(KST) 사이 {night_count}건이 올라왔습니다.",
+            "[밤사이 메시지 발췌] 널리 퍼진 순입니다. 여기서 '무슨 이야기가 돌았나'를 뽑으세요.",
         ]
+        + [f"- {t}" for t in excerpts]
     )
-    body = bc.compose(llm, MODEL, bc.MORNING_TASK, digest)
+    body = bc.compose(llm, MODEL, bc.MORNING_TASK, digest, max_tokens=800)
 
     # 집계가 하루 이상 밀렸으면 "어제"라고 못 쓴다. LLM 분류가 배치라 수거가 늦으면
     # 키워드 날짜가 이틀 전이 되는데(실측), 그때 "어제"라고 적으면 그냥 거짓말이 된다.
@@ -451,12 +463,37 @@ def build_morning(db, llm) -> str:
         f"🌅 <b>{head}</b>",
         f"{korean_date_label(kdate)} · {channels}개 채널",
     ]
-    parts = [p for p in body.split("\n") if p.strip()]
-    if parts:
-        lines += ["", to_telegram_html(drop_emdash(parts[0]))]
-    lines += ["", "🌙 <b>장 마감 뒤에 오간 말</b>", quote(f"어제 대화의 {night_pct}%가 저녁 6시 이후였습니다.")]
-    if len(parts) > 1:
-        lines += ["", to_telegram_html(drop_emdash(" ".join(parts[1:])))]
+    # 모델이 찍은 경계선으로만 자른다(bc.MORNING_SPLIT 주석 참고). 경계가 없으면
+    # 전부 갈래로 보고 위에 놓는다 — 밤사이 자리에 엉뚱한 문단이 가는 것보다 낫다.
+    # **줄 단위로 자른다.** 앞에 개행이 붙어 있다고 보고 partition 으로 잘랐더니, 갈래
+    # 문단이 금지어로 걸러진 날 경계선이 맨 앞줄이 되어 매칭에 실패했다 — 그러면 밤사이
+    # 내용이 통째로 🌙 위로 올라가고 본문에 "---" 가 그대로 찍힌다(실측).
+    chunks = re.split(rf"^\s*{re.escape(bc.MORNING_SPLIT)}\s*$", body or "", maxsplit=1, flags=re.M)
+    head_text = chunks[0]
+    night_text = chunks[1] if len(chunks) > 1 else ""
+
+    # 모델이 대괄호 제목이나 여분의 경계선을 붙이는 날을 대비해 그런 줄만 걷어낸다.
+    def clean(t: str) -> str:
+        drop = re.compile(rf"\s*(\[[^\]]*\]|{re.escape(bc.MORNING_SPLIT)})\s*")
+        return "\n".join(l for l in t.split("\n") if not drop.fullmatch(l))
+
+    head_text, night_text = clean(head_text).strip(), clean(night_text).strip()
+    if head_text:
+        lines += paragraphs(head_text)
+
+    if night_count:
+        # 창의 날짜를 그대로 적는다. 수집이 밀려 며칠 전 밤을 쓰게 돼도(load_night_messages
+        # 의 폴백) 읽는 사람이 어느 밤인지 바로 안다.
+        span = f"{night_from:%-m월 %-d일} {night_from.hour}시 ~ {night_to:%-m월 %-d일} {night_to.hour}시"
+        lines += [
+            "",
+            "🌙 <b>장 마감 뒤에 오간 말</b>",
+            quote(f"{span} · {night_count:,}건"),
+        ]
+        if night_text:
+            lines += paragraphs(night_text)
+    # 밤사이 자료가 아예 없으면 이 구획을 통째로 뺀다 — 제목만 있고 내용이 없는 게
+    # 가장 나쁘다(그 자리에 "정리하지 못했습니다"를 적어도 읽는 사람에겐 마찬가지다).
 
     lines += ["", brand_link("/kadera", "morning")]
     return "\n".join(lines)

@@ -35,6 +35,7 @@ A 와 C 의 해설 문단은 아직 어디에도 저장돼 있지 않다. 원래
 from __future__ import annotations
 
 import html
+import re
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 
@@ -143,6 +144,76 @@ def night_split(db, target: date) -> tuple[int, int]:
         if h >= NIGHT_FROM_HOUR or h < NIGHT_TO_HOUR:
             night += 1
     return night, len(out)
+
+
+NIGHT_EXCERPTS = 14      # 밤사이 요약에 근거로 주는 메시지 수
+NIGHT_EXCERPT_CHARS = 180  # 발췌 한 건의 길이 상한
+NIGHT_FALLBACK_DAYS = 3    # 지난밤이 비었을 때 뒤로 물러날 최대 일수
+
+
+def load_night_messages(db) -> tuple[int, list[str], datetime, datetime]:
+    """**지난밤**(어제 18시 ~ 오늘 8시, KST) 메시지 수와 널리 퍼진 순 발췌.
+
+    아침 글의 '장 마감 뒤에 오간 말' 이 여기서 나온다. 예전엔 비중(%)만 싣고 무슨
+    이야기였는지는 안 썼는데, 제목이 '오간 말'이라고 해 놓고 "말이 많았습니다"만
+    말하는 셈이라 읽는 사람에게 남는 게 없었다(Hun 지적).
+
+    **키워드와 창이 다르다.** 키워드는 LLM 분류를 거쳐야 해서 배치 수거가 늦으면
+    이틀까지 밀리는데, 이쪽은 수집만 되면 되는 원문이라 그날 아침 실행이 지난밤을
+    그대로 들고 있다. 같은 글 안에서 앞은 '어제 하루', 뒤는 '지난밤'인 이유다.
+
+    발췌는 조회+공유 순으로 고른다. 밤에는 메시지가 적어 아무거나 집으면 한 채널의
+    잡담이 대표가 되기 쉽다.
+    """
+    def window_of(days_back: int) -> tuple[datetime, datetime]:
+        base = datetime.combine(datetime.now(KST).date(), datetime.min.time(), tzinfo=KST)
+        end = base + timedelta(hours=NIGHT_TO_HOUR) - timedelta(days=days_back)
+        return end - timedelta(hours=24 - NIGHT_FROM_HOUR + NIGHT_TO_HOUR), end
+
+    def fetch(start: datetime, end: datetime) -> list[dict]:
+        rows: list[dict] = []
+        offset = 0
+        PAGE = 1000
+        while True:
+            page = (
+                db.table("telegram_messages")
+                .select("text,views,forwards,posted_at")
+                .gte("posted_at", start.isoformat())
+                .lt("posted_at", end.isoformat())
+                .order("id")
+                .range(offset, offset + PAGE - 1)
+                .execute()
+                .data
+            )
+            if not page:
+                break
+            rows += page
+            offset += PAGE
+            if len(page) < PAGE:
+                break
+        return rows
+
+    # 지난밤이 비어 있으면 자료가 있는 밤까지 하루씩 물러난다.
+    #
+    # 프로덕션에서는 같은 워크플로가 수집(fetch_telegram)을 먼저 돌리므로 지난밤이 차 있다.
+    # 다만 수집 스텝이 실패한 날이나 손으로 돌릴 때는 창이 통째로 빌 수 있는데, 그때
+    # "밤사이 이야기를 정리하지 못했습니다"만 내보내느니 **자료가 있는 가장 최근 밤**을
+    # 쓰는 게 낫다. 대신 화면에 창의 날짜를 그대로 적어 어느 밤인지 숨기지 않는다.
+    rows: list[dict] = []
+    start, end = window_of(0)
+    for back in range(0, NIGHT_FALLBACK_DAYS + 1):
+        start, end = window_of(back)
+        rows = fetch(start, end)
+        if rows:
+            break
+
+    usable = [r for r in rows if (r.get("text") or "").strip()]
+    usable.sort(key=lambda r: (r.get("views") or 0) + (r.get("forwards") or 0) * 3, reverse=True)
+    excerpts = []
+    for r in usable[:NIGHT_EXCERPTS]:
+        t = " ".join((r["text"] or "").split())
+        excerpts.append(t[:NIGHT_EXCERPT_CHARS])
+    return len(rows), excerpts, start, end
 
 
 def load_theme_rotation(db) -> list[dict]:
@@ -351,9 +422,32 @@ _LLM_RULES = """\
 - 올바른 표현: "언급이 늘었습니다", "회자량이 커졌습니다", "관심이 옮겨갔습니다",
   "화제의 중심이 됐습니다", "점유율이 올랐습니다".
 
+[⚠️ 증권사 의견을 옮기지 마세요]
+- 발췌에 "○○증권은 목표가 상향", "지금 주가는 과도한 조정", "저평가 국면" 같은 **특정
+  종목에 대한 평가**가 섞여 있어도 문장에 옮기지 마세요. 우리가 그 의견을 전하는 순간
+  매수·매도 권유로 읽힙니다.
+- 그런 이야기가 돌았다는 사실은 **산업·이슈 수준으로** 적습니다.
+  (X) "씨티는 삼성전자 주가 하락이 과도하다고 지적했습니다."
+  (O) "메모리 업황 전망을 두고 해외 투자은행들의 분석이 오갔습니다."
+
+[형식]
+- **번호를 매기지 마세요.** "첫째/둘째/셋째", "첫 번째는/두 번째는", "1)" 전부 안 됩니다.
+  갈래가 여럿이면 문단을 나누되 각 문단이 **혼자서도 말이 되게** 쓰세요. 번호를 매기면
+  중간 문단 하나가 빠졌을 때 "두 번째는…"으로 시작하는 글이 남습니다.
+- 대괄호 제목([갈래] 같은 것)을 출력에 쓰지 마세요. 본문만 씁니다.
+
+[문단 길이]
+- **한 문단은 공백 포함 120자 내외로 씁니다.** 길어지면 거기서 끊고 다음 문단으로 넘기세요.
+  폰에서 읽는 글이라 한 덩어리가 길면 눈이 미끄러집니다.
+
 [표현]
 - 이 데이터는 텔레그램에서 오간 '말'이지 확인된 사실이 아닙니다. "~를 체결했습니다"가 아니라
   "~ 소식이 화제였습니다", "~라는 이야기가 돌았습니다"처럼 화제·전언으로 적으세요."""
+
+# 한 문단의 목표 길이(공백 포함). 프롬프트로도 요구하지만 모델이 자주 넘겨서, 나온 뒤에
+# 문장 경계로 잘라 강제한다(split_paragraph). 폰 화면에서 한 덩어리가 이보다 길면
+# 눈이 미끄러진다는 게 Hun 의 판단이다.
+PARAGRAPH_CHARS = 120
 
 # 이 말이 하나라도 들어간 문단은 **버린다**(compose 참고).
 #
@@ -369,6 +463,11 @@ _LLM_RULES = """\
 BANNED_TERMS = (
     "매수", "매도", "매매", "수익률", "목표가", "투자의견", "비중확대", "비중축소",
     "저평가", "고평가", "유망", "급등주", "추천", "강세", "약세", "상승세", "하락세",
+    # 증권사 의견을 옮길 때 딸려 오는 말들. 특정 종목 평가는 전하는 순간 권유가 된다.
+    "과도한 조정", "과매도", "과매수", "저점", "목표주가", "상향", "하향",
+    # 증권사 코멘트를 그대로 옮길 때 나오는 말. "과도한 하락이 근거 없는 우려"처럼
+    # 조합이 바뀌어도 걸리도록 조각으로 둔다(실측에서 '조정' 대신 '하락'으로 빠져나갔다).
+    "과도한", "근거 없는", "촉매",
 )
 
 
@@ -396,15 +495,50 @@ def compose(client, model: str, task: str, digest: str, max_tokens: int = 600) -
         return ""
     if not text:
         return ""
-    hits = [w for w in BANNED_TERMS if w in text]
-    if hits:
-        print(f"[LLM] 금지어가 섞여 해설을 버립니다({' · '.join(hits)}): {text[:50]}…")
-        return ""
-    found = problems(text, digest)
-    if found:
-        print(f"[LLM] 해설에 문제가 있어 버립니다({' · '.join(found)}): {text[:40]}…")
-        return ""
-    return text
+
+    # **문단 단위로 거른다.** 통째로 버리면 한 구절 때문에 글의 절반이 사라진다
+    # (실측: 갈래 문단에 '과도한 조정'이 섞여 아침 글이 111자로 줄었다). 문단 하나만
+    # 빼면 나머지는 그대로 읽히고, 구획 경계선도 살아남는다.
+    kept: list[str] = []
+    for line in text.split("\n"):
+        if not line.strip() or line.strip() == MORNING_SPLIT:
+            kept.append(line)
+            continue
+        hits = [w for w in BANNED_TERMS if w in line]
+        if hits:
+            print(f"[LLM] 금지어가 섞여 문단을 뺍니다({' · '.join(hits)}): {line[:44]}…")
+            continue
+        found = problems(line, digest)
+        if found:
+            print(f"[LLM] 문제가 있어 문단을 뺍니다({' · '.join(found)}): {line[:40]}…")
+            continue
+        kept.append(line)
+
+    out = "\n".join(kept).strip()
+    return out if out.replace(MORNING_SPLIT, "").strip() else ""
+
+
+def split_paragraph(text: str, target: int = PARAGRAPH_CHARS) -> list[str]:
+    """긴 문단을 문장 경계에서 잘라 target 자 내외의 여러 문단으로 만든다.
+
+    프롬프트에 길이를 적어도 모델이 자주 넘긴다(실측 220자짜리 한 덩어리). 그래서
+    나온 뒤에 코드가 강제한다 — 이쪽이 결정적이라 매번 같은 결과가 나온다.
+
+    합쇼체라 문장이 '다.' 로 끝나는 걸 경계로 쓴다. 자를 자리가 없으면(한 문장이 이미
+    target 보다 길면) 그냥 둔다 — 문장 한가운데를 끊는 것보다 긴 게 낫다.
+    """
+    sentences = [s for s in re.split(r"(?<=다\.)\s+", text.strip()) if s]
+    out: list[str] = []
+    cur = ""
+    for s in sentences:
+        if cur and len(cur) + 1 + len(s) > target:
+            out.append(cur)
+            cur = s
+        else:
+            cur = f"{cur} {s}".strip()
+    if cur:
+        out.append(cur)
+    return out
 
 
 def josa(word: str, with_final: str, without_final: str) -> str:
@@ -420,16 +554,33 @@ def josa(word: str, with_final: str, without_final: str) -> str:
     return with_final if (ord(last) - 0xAC00) % 28 else without_final
 
 
-MORNING_TASK = """\
-[이번 글 — 어제 커뮤니티 정리]
-두 문단을 씁니다. 문단 사이는 빈 줄 하나로 나눕니다.
+# 아침 글은 화면에서 두 구획으로 나뉘어 놓인다(위=갈래, 🌙 아래=밤사이). 그런데 문단
+# 순서만으로 가르면 모델이 앞에 라벨 한 줄을 붙이거나 문단을 하나 더 쪼개는 순간 배치가
+# 통째로 밀린다(실측: 갈래 문단이 🌙 아래로 내려갔다). 그래서 **모델이 직접 경계를 찍게**
+# 하고 코드는 그 줄로만 자른다.
+MORNING_SPLIT = "---"
 
-1문단: [어제 키워드]를 보고, 어제 채널들이 붙잡고 있던 이야기를 **두세 갈래로 묶어** 한두
-문장으로 씁니다. 키워드를 그냥 나열하지 마세요. 갈래로 묶어야 읽힙니다.
+MORNING_TASK = f"""\
+[이번 글 — 어제 커뮤니티 정리]
+두 덩이를 쓰고, **그 사이에 {MORNING_SPLIT} 만 있는 줄**을 넣으세요. 이 줄은 딱 한 번만
+나와야 합니다. 대괄호 제목은 출력하지 마세요.
+
+[첫째 덩이 — 어제의 갈래] (한 문단)
+[어제 키워드]를 보고, 어제 채널들이 붙잡고 있던 이야기를 **두세 갈래로 묶어** 씁니다.
+키워드를 그냥 나열하지 마세요. 갈래로 묶어야 읽힙니다.
 (예: "어제는 두 갈래였습니다. 중동 정세 급변과, AI 데이터센터 투자 확대입니다.")
 
-2문단: [밤사이]를 보고, 장이 닫힌 뒤에 오간 이야기가 낮과 어떻게 달랐는지 한두 문장으로
-씁니다. 자료에 밤사이 화제가 따로 없으면 비중만 담백하게 언급하고 넘어가세요."""
+[둘째 덩이 — 밤사이] (한두 문단)
+⚠️ **가장 중요한 부분입니다.** [밤사이 메시지 발췌]를 읽고 **밤에 실제로 무슨 이야기가
+돌았는지 그 내용**을 쓰세요. 제목이 '장 마감 뒤에 오간 말'이라, 여기에 "대화가 많았다",
+"관심이 이어졌다" 같은 **양(量) 이야기만 쓰면 읽는 사람에게 아무것도 안 남습니다.**
+구체적으로 무엇이 화제였는지(어떤 소식·어떤 종목·어떤 지표) 담으세요.
+
+- 여러 발췌에 **공통으로 나오는 이야기**를 고르세요. 한 채널만 떠든 건 화제가 아닙니다.
+- 발췌를 그대로 베끼지 말고 무엇이 오갔는지로 옮기세요.
+- 발췌에 섞인 링크·홍보 문구·가격 알림은 무시하세요.
+- 밤에 미국 시장이 열리므로 해외 소식이 자주 섞입니다. 그건 그대로 적어도 됩니다.
+- 건수·비중(%)은 이미 화면에 찍히니 문장에서 되풀이하지 마세요."""
 
 THEME_TASK = """\
 [이번 글 — 관심이 어디로 옮겨갔나]
