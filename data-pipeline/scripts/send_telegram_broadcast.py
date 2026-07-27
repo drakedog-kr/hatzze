@@ -37,7 +37,7 @@ dry-run 은 게이트에 걸려도 메시지를 그려서 보여준다(경고만
   - 도수 = Math.round(daily_score.score) — app/page.tsx Hero. **정수다.**
   - 구간 = 점수에서 재계산(25/50/75) — app/ui.tsx stageForScore. 저장된 stage 문자열이
     아니라 점수에서 직접 낸다(프론트가 그렇게 한다).
-  - 급부상 종목 = lib/telegram-data.ts getSurgingStocks 와 같은 계산(아래 pick_surging).
+  - 급부상 종목 = lib/telegram-data.ts getSurgingStocks 와 같은 계산(common/surging.py).
 
 ## 말투·표현 규칙(어기면 서비스 성격이 달라진다)
 
@@ -46,7 +46,8 @@ dry-run 은 게이트에 걸려도 메시지를 그려서 보여준다(경고만
   - **매수·매도 프레이밍 금지.** 사이트는 "과열도"만 말하고 매수·매도 신호가 아니라는
     선을 지킨다. 급부상 종목은 "많이 언급되었다"는 사실만 전하고 가격·등락률은 넣지
     않는다(카드에는 시세가 있지만, 종목명 옆에 붙은 가격은 채널 글에서 추천으로 읽힌다).
-    면책 한 줄을 메시지 하단에 고정으로 넣는다.
+  - 하단 링크는 브랜드 한 줄뿐이다(BRAND_LINE). 면책 문구는 넣지 않기로 했다(Hun 결정,
+    2026-07-28) — 그 링크가 닿는 사이트에 면책이 있다. 되살릴 땐 이 줄 아래에 한 줄로.
 """
 
 from __future__ import annotations
@@ -67,6 +68,7 @@ import requests  # noqa: E402
 from common.config import TELEGRAM_BOT_TOKEN, TELEGRAM_BROADCAST_CHAT_ID  # noqa: E402
 from common.retry import backoff_delay  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
+from common.surging import load_stock_daily, top_surging  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 
 SITE_URL = "https://hatzze.fun"
@@ -91,13 +93,18 @@ SUMMARY_SENTENCES = 2
 # 갈린다) 텔레그램은 이모지가 기본 어휘라 여기서만 쓴다.
 STAGE_EMOJI = {"저온": "❄️", "상온": "🌡️", "고온": "🔥", "초고온": "🌋"}
 
-# 급부상 종목 계산 상수 — lib/telegram-data.ts 의 사본이다. Python 과 TS 라 import 로
-# 공유할 수 없어 손으로 맞춘다. **저쪽을 고치면 여기도 고쳐야 한다** — 안 그러면 채널이
-# 사이트 카드에 없는 종목을 소개한다.
-SURGING_LOOKBACK_DAYS = 14  # getSurgingStocks 의 loadStockDaily(14)
-SURGING_RECENT_MAX = 3      # recentN = min(3, …)
-SHARE_SMOOTHING = 0.002     # 점유율 평활 상수(언급 1회가 그날 대화에서 차지하는 몫)
-SURGING_LIMIT = 5           # 카드 정원. 그중 1위만 메시지에 싣는다
+# 급부상 종목 계산은 common/surging.py 가 맡는다. 내러티브 생성기와 **같은 목록**을
+# 써야 채널이 소개한 종목에 요약이 빠지지 않는다(그 파일 주석 참고).
+
+# 그중 메시지에 싣는 수. 하나만 실으면 "왜 저 종목이냐"가 안 보이고, 다섯이면 글이
+# 길어져 아래 링크까지 안 내려간다. 셋이 카드 정원(5) 안쪽이라 사이트와도 안 어긋난다.
+SURGING_SHOW = 3
+
+# 하단 브랜드 줄. **모든 포맷이 이 한 줄만 링크로 갖는다.** 예전엔 "지표 전체 보기 ·
+# 카더라 리포트" 두 개를 나란히 뒀는데, 링크가 둘이면 무엇을 눌러야 하는지 고민하게
+# 되고 글의 마무리도 어수선해진다. 하나로 줄이는 대신 목적지를 메시지 성격에 맞춘다
+# (카더라 이야기를 읽고 눌렀는데 지수 페이지가 뜨면 한 번 더 찾아가야 한다).
+BRAND_LINE = "hatzze | 데이터와 감성으로 읽는 시장"
 
 # 카더라 집계가 이만큼보다 오래됐으면 종목 블록을 통째로 뺀다(발송은 계속한다).
 # 창이 이미 '오늘'을 빼므로 정상값은 1일이다. 주말·수집 실패 한 번은 흡수하고,
@@ -187,119 +194,57 @@ def load_daily_score(db) -> dict | None:
     return res.data[0] if res.data else None
 
 
-def load_stock_daily(db) -> tuple[list[dict], list[str]]:
-    """급부상 계산용 원자료 — 최근 14일 telegram_stock_daily(오늘 제외).
+def surging_for_message(db) -> list[dict]:
+    """메시지에 실을 급부상 종목 — 이름과 '왜 회자되나' 요약까지 붙여서.
 
-    lib/telegram-data.ts loadStockDaily 의 사본이다. 오늘을 빼는 이유는 저쪽 주석대로
-    아직 하루가 덜 차서 일평균과 추이를 왜곡하기 때문이다.
-
-    창의 시작을 UTC 기준으로 잡는 것도 프론트를 그대로 따른 것이다(TS 는
-    `new Date(Date.now() - n일).toISOString()`). 파이프라인이 도는 시각(KST 10시대·19시대)
-    에는 UTC 날짜와 KST 날짜가 같아서 실질 차이는 없지만, 같은 목록을 두 규칙으로 만들
-    이유도 없다.
-    """
-    since = (datetime.now(timezone.utc) - timedelta(days=SURGING_LOOKBACK_DAYS)).date().isoformat()
-    # 종목 × 날짜라 14일치가 1,000행을 쉽게 넘는다. 페이징하지 않으면 PostgREST 가
-    # **에러 없이** 잘라서, 최신 날짜가 통째로 빠진 채 "평소 대비"가 계산된다.
-    # 정렬 키는 유일해야 한다(common/supabase_client.load_all 주석) — id 를 쓴다.
-    rows: list[dict] = []
-    start = 0
-    PAGE = 1000
-    while True:
-        page = (
-            db.table("telegram_stock_daily")
-            .select("stock_code,date,weighted_score,mention_count,channel_count")
-            .gte("date", since)
-            .order("id")
-            .range(start, start + PAGE - 1)
-            .execute()
-            .data
-        )
-        if not page:
-            break
-        rows += page
-        start += PAGE
-
-    today = today_kst().isoformat()
-    rows = [r for r in rows if r["date"] < today]
-    dates = sorted({r["date"] for r in rows})
-    return rows, dates
-
-
-def pick_surging(db) -> dict | None:
-    """급부상 종목 1위. lib/telegram-data.ts getSurgingStocks 와 같은 순서로 고른다.
-
-    **같은 계산을 두 벌 두는 게 목적이 아니라, 같은 종목이 나오는 게 목적이다.** 채널이
-    사이트 카드에 없는 종목을 "급부상"이라고 소개하면 링크를 눌러 확인한 사람이 못 찾는다.
-    그래서 정렬 동점 처리(종목코드 비교)와 tier 규칙까지 그대로 옮겼다.
-
-    저쪽 카드는 여기에 더해 야후 실시간 시세를 붙이는데, 이 메시지는 가격을 싣지 않으므로
-    (모듈 상단 '매수·매도 프레이밍 금지' 참고) 그 부분은 옮기지 않았다.
+    고르는 계산은 common/surging.py 가 한다(사이트 카드·내러티브 생성기와 같은 함수).
+    여기서는 표시에 필요한 살만 붙인다.
     """
     rows, dates = load_stock_daily(db)
-    if not rows or not dates:
-        return None
+    if not dates:
+        return []
 
     # 자료가 밀렸으면 종목 블록을 포기한다. 낡은 급부상은 틀린 급부상이다.
     lag = (today_kst() - date.fromisoformat(dates[-1])).days
     if lag > KADERA_MAX_LAG_DAYS:
         print(f"[경고] 카더라 집계가 {lag}일 밀려 있습니다(최신 {dates[-1]}). 종목 블록을 뺍니다.")
-        return None
+        return []
 
-    recent_n = min(SURGING_RECENT_MAX, max(1, len(dates) - 1))
-    recent_dates = set(dates[-recent_n:])
-    prior_count = max(len(dates) - recent_n, 1)
-
-    # 주말엔 전체 언급량이 평일의 1/10~1/20 로 떨어져, 절대량으로 비교하면 모든 종목이
-    # "감소"로 보인다. 그날 전체 대비 '비중'으로 비교해 볼륨 수준의 영향을 지운다.
-    day_total: dict[str, float] = {}
-    for r in rows:
-        day_total[r["date"]] = day_total.get(r["date"], 0.0) + (float(r["weighted_score"] or 0))
-
-    agg: dict[str, dict] = {}
-    for r in rows:
-        a = agg.setdefault(r["stock_code"], {"recent_share": 0.0, "recent_m": 0, "prior_share": 0.0, "channels": 0})
-        total = day_total.get(r["date"], 0.0)
-        share = (float(r["weighted_score"] or 0) / total) if total > 0 else 0.0
-        if r["date"] in recent_dates:
-            a["recent_share"] += share
-            a["recent_m"] += r["mention_count"] or 0
-            a["channels"] = max(a["channels"], r["channel_count"] or 0)
-        else:
-            a["prior_share"] += share
-
-    scored = []
-    for code, a in agg.items():
-        base = a["prior_share"] / prior_count
-        recent_per_day = a["recent_share"] / recent_n
-        scored.append(
-            {
-                "code": code,
-                "mentions": a["recent_m"],
-                "channels": a["channels"],
-                # 평활 후 나눈다. 그냥 나누면 분모가 거의 0인 종목이 "▲162.8배" 같은
-                # 터무니없는 배수를 받는데 실제론 표본이 사실상 없는 경우다.
-                "ratio": (recent_per_day + SHARE_SMOOTHING) / (base + SHARE_SMOOTHING),
-                "is_new": base == 0,
-            }
-        )
-
-    # 1차: 배수 → 언급수 → 종목코드(완전 동점에서 순서가 DB 행 순서에 딸리지 않게).
-    scored.sort(key=lambda s: (-s["ratio"], -s["mentions"], s["code"]))
-    # 2차: 신뢰도 tier 로 안정 정렬. ① 언급 2회↑ + 뚜렷한 상승 ② 언급 2회↑ 완만 ③ 언급 1회.
-    def tier(s: dict) -> int:
-        if s["mentions"] < 2:
-            return 3
-        return 1 if s["ratio"] >= 1.3 else 2
-
-    top = sorted(scored, key=tier)[:SURGING_LIMIT]
+    # 위에서 이미 읽은 걸 넘긴다 — 14일치를 한 실행에서 두 번 읽지 않는다.
+    top = top_surging(db, SURGING_SHOW, preloaded=(rows, dates))
     if not top:
-        return None
-    best = top[0]
+        return []
 
-    name = db.table("stocks").select("name").eq("code", best["code"]).limit(1).execute().data
-    best["name"] = name[0]["name"] if name else best["code"]
-    return best
+    codes = [s["code"] for s in top]
+    names = {
+        r["code"]: r["name"]
+        for r in db.table("stocks").select("code,name").in_("code", codes).execute().data
+    }
+    # 종목별 '왜 회자되나' 한두 문장. generate_telegram_narratives.py 가 이미 만들어 둔 걸
+    # 그대로 읽는다 — 방송이 문장을 새로 만들지 않으므로 추가 비용이 없고, 사이트 종목
+    # 리포트와 **같은 문장**이 나가 둘이 어긋날 수도 없다.
+    latest = (
+        db.table("telegram_stock_narrative").select("date").order("date", desc=True).limit(1).execute().data
+    )
+    narratives: dict[str, str] = {}
+    if latest:
+        narratives = {
+            r["stock_code"]: (r["narrative"] or "").strip()
+            for r in db.table("telegram_stock_narrative")
+            .select("stock_code,narrative")
+            .eq("date", latest[0]["date"])
+            .in_("stock_code", codes)
+            .execute()
+            .data
+        }
+
+    for s in top:
+        s["name"] = names.get(s["code"], s["code"])
+        s["narrative"] = narratives.get(s["code"], "")
+    missing = [s["name"] for s in top if not s["narrative"]]
+    if missing:
+        print(f"[안내] 요약이 아직 없는 종목: {' · '.join(missing)} (숫자만 싣습니다)")
+    return top
 
 
 # ─── 발송 게이트 ──────────────────────────────────────────────────────────────
@@ -401,16 +346,31 @@ def as_read(message: str) -> str:
     return html.unescape(text)
 
 
-def link(path: str, content: str, label: str) -> str:
+def brand_link(path: str, content: str) -> str:
+    """하단 브랜드 줄. 모든 포맷에서 **유일한 링크**다(BRAND_LINE 주석 참고).
+
+    path 는 그 메시지가 말한 것을 보여 주는 페이지다. content 는 utm_content 로,
+    링크가 하나로 줄어든 대신 이걸로 '어느 포맷이 사람을 데려왔나'를 GA 에서 가른다.
+    """
     sep = "&" if "?" in path else "?"
-    return f'<a href="{SITE_URL}{path}{sep}{UTM}&utm_content={content}">{label}</a>'
+    return f'<a href="{SITE_URL}{path}{sep}{UTM}&utm_content={content}">{BRAND_LINE}</a>'
 
 
-def build_message(score_row: dict, surging: dict | None) -> str:
-    """채널에 올라갈 글 전문(텔레그램 HTML).
+def quote(*lines: str) -> str:
+    """인용 박스. 텔레그램이 왼쪽에 세로선을 그려 준다.
 
-    길이를 짧게 잡는다. 폰 알림에 한눈에 들어와야 하고, 자세한 건 링크가 맡는다.
-    구조는 [온도 한 줄] → [요약] → [급부상 종목] → [링크] → [면책] 이다.
+    공백 들여쓰기를 쓰지 않는 이유가 있다 — 텔레그램은 가변폭 서체라 앞 공백이 줄마다
+    다른 폭으로 보여서, 종목 밑에 붙인 설명이 들쭉날쭉 어긋난다. 인용 박스는 서체와
+    무관하게 같은 모양이라 어느 기기에서나 같게 보인다(Bot API 7.0+).
+    """
+    return "<blockquote>" + "\n".join(lines) + "</blockquote>"
+
+
+def build_evening(score_row: dict, surging: list[dict]) -> str:
+    """B · 마감 리포트 — 평일 저녁. [온도] → [오늘의 요약] → [급부상 종목 3] → [브랜드].
+
+    온도는 머리에 한 줄로만 둔다. 이 글에서 **읽을 거리는 카더라 종목 쪽**이고, 온도는
+    "오늘 어느 언저리였나"를 짚어 주는 조연이다.
     """
     score = float(score_row["score"])
     degrees = js_round(score)
@@ -419,8 +379,8 @@ def build_message(score_row: dict, surging: dict | None) -> str:
     emoji = STAGE_EMOJI.get(stage, "🌡️")
 
     lines = [
-        f"{emoji} <b>햇쩨 지수 {degrees}℃ · {stage}</b>",
-        f"{korean_date_label(score_row['date'])} 기준",
+        f"{emoji} <b>오늘 {degrees}℃ · {stage}</b>",
+        f"{korean_date_label(score_row['date'])} 마감 기준",
     ]
 
     # ai_summary 는 두 문장(주인공 지표·최근 추세)이 개행으로 이어져 저장된다.
@@ -430,21 +390,18 @@ def build_message(score_row: dict, surging: dict | None) -> str:
         lines += ["", to_telegram_html(drop_emdash(" ".join(sentences[:SUMMARY_SENTENCES])))]
 
     if surging:
-        name = html.escape(surging["name"], quote=False)
-        # '얼마나 언급됐나'만 말한다. 오르내림·가격·전망은 넣지 않는다.
-        how = "이번에 새로 등장했습니다" if surging["is_new"] else f"평소의 {js_fixed1(surging['ratio'])}배로 늘었습니다"
-        lines += [
-            "",
-            "📡 <b>카더라 급부상 종목</b>",
-            f"<b>{name}</b> · 최근 3일 {surging['mentions']}회 언급 · {surging['channels']}개 채널입니다. {how}.",
-        ]
+        lines += ["", "📡 <b>카더라 급부상 종목</b> · 최근 3일"]
+        for i, s in enumerate(surging):
+            name = html.escape(s["name"], quote=False)
+            # '얼마나 언급됐나'만 말한다. 오르내림·가격·전망은 넣지 않는다.
+            how = "신규 등장" if s["is_new"] else f"▲{js_fixed1(s['ratio'])}배"
+            body = [f"{s['mentions']}회 언급 · {s['channels']}개 채널"]
+            if s["narrative"]:
+                body.append(to_telegram_html(drop_emdash(s["narrative"])))
+            lines += ["", f"<b>{'①②③④⑤'[i]} {name}</b> {how}", quote(*body)]
 
-    lines += [
-        "",
-        f"{link('/', 'index', '지표 전체 보기')} · {link('/kadera', 'kadera', '카더라 리포트')}",
-        "",
-        "<i>과열도는 시장 분위기를 재는 값이며 매수·매도 신호가 아닙니다.</i>",
-    ]
+    # 카더라가 본론이라 카더라 페이지로 보낸다.
+    lines += ["", brand_link("/kadera", "evening")]
     return "\n".join(lines)
 
 
@@ -512,8 +469,8 @@ def main() -> None:
         print("[skip] daily_score 행이 없어 보낼 내용이 없습니다.")
         return
 
-    surging = pick_surging(db)
-    message = build_message(score_row, surging)
+    surging = surging_for_message(db)
+    message = build_evening(score_row, surging)
 
     read = as_read(message)
     print("──── 채널에서 읽히는 모습 " + "─" * 34)

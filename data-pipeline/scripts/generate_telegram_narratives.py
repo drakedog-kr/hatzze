@@ -40,6 +40,7 @@ from anthropic import Anthropic  # noqa: E402
 
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.supabase_client import PAGE_SIZE, get_client  # noqa: E402
+from common.surging import top_surging  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 from common.supabase_client import load_all  # noqa: E402
@@ -50,6 +51,10 @@ MODEL = "claude-haiku-4-5"
 # 상위 종목을 다시 뽑는다 — 파이프라인 실행 이후 순위가 바뀌어도 문장이 비지 않도록
 # 여유를 둔다(추가 3건은 하루 2회 호출이라 비용상 무의미한 수준).
 NARRATIVE_TOP_N = 6
+# 급부상 종목 중 몇 개까지 요약을 더 만들어 둘지. 텔레그램 채널이 싣는 수와 맞춘다
+# (send_telegram_broadcast.SURGING_SHOW). 상위 N개와 겹치는 만큼 실제 추가 호출은
+# 보통 1~2건이라 비용은 무시할 수준이다.
+SURGING_NARRATIVE_N = 3
 
 # 종목 요약 길이. 카드가 세로로 쌓이는데 **줄 수가 갈리면 카드 높이가 어긋난다**.
 #
@@ -543,6 +548,22 @@ def build_stock_digests(db, latest: str) -> list[tuple[str, str, str]]:
         a["m"] += r["mention_count"] or 0
         a["by_date"][r["date"]] = r["mention_count"] or 0
     top = sorted(agg.items(), key=lambda kv: kv[1]["w"], reverse=True)[:NARRATIVE_TOP_N]
+
+    # 주목도 상위 N개에 더해 **급부상 종목**도 대상에 넣는다.
+    #
+    # 두 목록은 잣대가 달라 겹치지 않는 날이 있다 — 상위 N개는 '절대 주목도'(늘 대형주),
+    # 급부상은 '평소 대비 배수'(작은 종목이 자주 올라온다). 실측 2026-07-26 에 급부상
+    # 3개 중 NHN 하나가 상위 6개 밖이었고, 그러면 **텔레그램 채널이 소개한 종목에만
+    # 요약이 빠진다**(scripts/send_telegram_broadcast.py 가 이 표를 읽는다).
+    #
+    # 오히려 이쪽이 문장이 더 필요한 자리다. 대형주는 왜 회자되는지 대충 짐작이 되지만,
+    # 갑자기 튀어나온 중소형주는 이유를 모르면 이름과 숫자만 남는다.
+    have = {code for code, _ in top}
+    for s in top_surging(db, SURGING_NARRATIVE_N):
+        code = s["code"]
+        # 집계 창(3일)에 행이 없으면 digest 를 만들 재료가 없다 — 그런 종목은 건너뛴다.
+        if code not in have and code in agg:
+            top.append((code, agg[code]))
 
     stocks = load_all(db, "stocks", "code,name", order_by="code")
     name_of = {s["code"]: s["name"] for s in stocks}
