@@ -285,9 +285,25 @@ def analysis_row(handle: str, message_id: int, result: dict) -> dict:
 
 
 def save_rows(db, rows: list[dict]) -> None:
-    for i in range(0, len(rows), 500):
+    """(channel_handle, message_id) 중복을 걷어내고 upsert 한다.
+
+    한 요청 안에 같은 키가 두 번 들어가면 Postgres 가 그 요청을 통째로 거절한다
+    (21000 "ON CONFLICT DO UPDATE command cannot affect row a second time").
+    수백 건짜리 묶음이 한 건의 중복 때문에 전부 날아가고, 그 배치는 수거 완료로
+    표시되므로 **결과가 조용히 사라진다** — 2026-07-26~27 에 이걸로 네 번 연속
+    실패해 분류가 이틀 멈췄고, 화면의 센티먼트·총평이 07-26 자료에 묶였다.
+
+    중복이 나는 길은 두 갈래다. 배치 수거에선 모델이 같은 번호(n)를 두 번 매기면
+    같은 메시지 행이 두 번 만들어지고, 복사 경로(fan_out_duplicates)에선 같은
+    메시지가 두 대표에 붙으면 그렇게 된다. 어느 쪽이든 같은 메시지에 대한 라벨이라
+    뒤에 온 것을 남긴다.
+    """
+    unique = list({(r["channel_handle"], r["message_id"]): r for r in rows}.values())
+    if len(unique) != len(rows):
+        print(f"[저장] 같은 메시지에 두 번 매겨진 분류 {len(rows) - len(unique)}건 정리")
+    for i in range(0, len(unique), 500):
         db.table("telegram_message_analysis").upsert(
-            rows[i : i + 500], on_conflict="channel_handle,message_id"
+            unique[i : i + 500], on_conflict="channel_handle,message_id"
         ).execute()
 
 
@@ -325,7 +341,13 @@ def collect_batches(client: Anthropic, db) -> int:
             continue
         if status != "ended":
             # 끝나지 않는 배치를 그대로 두면 그 메시지들이 영구히 '처리 중'으로 묶여
-            # 다시는 분류되지 않는다. 결과 보관은 24시간이라 그 뒤로는 기다릴 이유도 없다.
+            # 다시는 분류되지 않는다. 배치 처리 마감이 24시간이라(그 안에 못 끝내면
+            # expired 로 닫힌다) 그 뒤로는 기다릴 이유가 없다.
+            #   ※ 예전 주석은 "결과 보관이 24시간"이라고 적었는데 틀리다. 24시간은
+            #     처리 마감(expires_at)이고 **결과는 생성 후 29일간** 받을 수 있다.
+            #     2026-07-28 에 만든 지 40시간 지난(=expires_at 이 지난) 배치의 결과
+            #     1,299건을 그대로 다 읽었다. 그래서 아래 분기는 '끝난' 배치엔 걸리지
+            #     않고, 끝난 배치는 나이와 무관하게 결과 경로로 간다.
             if _hours_since(row["submitted_at"]) > STALE_HOURS:
                 db.table("telegram_analysis_batches").update(
                     {
