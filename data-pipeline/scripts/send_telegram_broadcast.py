@@ -65,11 +65,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import requests  # noqa: E402
 
-from common.config import TELEGRAM_BOT_TOKEN, TELEGRAM_BROADCAST_CHAT_ID  # noqa: E402
+from common import broadcast_content as bc  # noqa: E402
+from common.config import ANTHROPIC_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_BROADCAST_CHAT_ID  # noqa: E402
 from common.retry import backoff_delay  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.surging import load_stock_daily, top_surging  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
+
+# 해설 문단을 쓰는 모델. 히어로 요약·카더라 총평과 같은 걸 쓴다(generate_daily_summary).
+MODEL = "claude-haiku-4-5"
 
 SITE_URL = "https://hatzze.fun"
 
@@ -405,6 +409,193 @@ def build_evening(score_row: dict, surging: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def paragraphs(text: str) -> list[str]:
+    """LLM 이 준 여러 문단을 텔레그램용으로 다듬는다(빈 줄 하나로 구분)."""
+    out: list[str] = []
+    for p in [p.strip() for p in text.split("\n") if p.strip()]:
+        out += ["", to_telegram_html(drop_emdash(p))]
+    return out
+
+
+def build_morning(db, llm) -> str:
+    """A · 어제 브리핑 — 평일 아침. [어제 키워드 갈래] → [밤사이 이야기] → [브랜드].
+
+    **종목을 말하지 않는다.** 저녁 글이 종목을 맡으므로 아침은 '주제·사건'만 다룬다.
+    같은 날 두 번 나가는 글이라 소재가 겹치면 두 번째부터 안 읽힌다.
+    """
+    kdate, keywords = bc.load_keywords(db)
+    if not kdate or not keywords:
+        print("[skip] 어제 키워드가 없어 아침 글을 만들 수 없습니다.")
+        return ""
+
+    night, total = bc.night_split(db, date.fromisoformat(kdate))
+    night_pct = round(night / total * 100) if total else 0
+    channels = (
+        db.table("telegram_channels").select("handle", count="exact", head=True).eq("is_active", True).execute()
+    ).count or 0
+
+    digest = "\n".join(
+        [
+            f"[날짜] {kdate}",
+            f"[어제 키워드] {' · '.join(f'{k}({n}회)' for k, n in keywords)}",
+            f"[밤사이] 어제 메시지 {total}건 중 {night}건({night_pct}%)이 18시 이후~8시 이전에 올라왔습니다.",
+        ]
+    )
+    body = bc.compose(llm, MODEL, bc.MORNING_TASK, digest)
+
+    # 집계가 하루 이상 밀렸으면 "어제"라고 못 쓴다. LLM 분류가 배치라 수거가 늦으면
+    # 키워드 날짜가 이틀 전이 되는데(실측), 그때 "어제"라고 적으면 그냥 거짓말이 된다.
+    is_yesterday = date.fromisoformat(kdate) == today_kst() - timedelta(days=1)
+    head = "어제 한국 주식 커뮤니티는 이랬습니다" if is_yesterday else "한국 주식 커뮤니티는 이랬습니다"
+    lines = [
+        f"🌅 <b>{head}</b>",
+        f"{korean_date_label(kdate)} · {channels}개 채널",
+    ]
+    parts = [p for p in body.split("\n") if p.strip()]
+    if parts:
+        lines += ["", to_telegram_html(drop_emdash(parts[0]))]
+    lines += ["", "🌙 <b>장 마감 뒤에 오간 말</b>", quote(f"어제 대화의 {night_pct}%가 저녁 6시 이후였습니다.")]
+    if len(parts) > 1:
+        lines += ["", to_telegram_html(drop_emdash(" ".join(parts[1:])))]
+
+    lines += ["", brand_link("/kadera", "morning")]
+    return "\n".join(lines)
+
+
+def build_theme(db, llm) -> str:
+    """C · 관심 이동 — 3일마다. [테마 순위·증감] → [무엇이 달라졌나] → [브랜드].
+
+    3일 간격에 근거가 있다. 카더라 집계 창이 3일이라(KADERA_WINDOW_DAYS) 3일마다 보내면
+    매번 완전히 새 구간을 말한다. 겹치지도 비지도 않는다.
+    """
+    themes = bc.load_theme_rotation(db)
+    if not themes:
+        print("[skip] 테마 집계가 없어 테마 글을 만들 수 없습니다.")
+        return ""
+
+    shown = themes[: bc.THEME_SHOW]
+    window = shown[0]["dates"]
+    members = bc.theme_members(db, [t["theme"] for t in shown], window)
+    # 밀려난 곳 = 순위가 가장 많이 내려간 테마. 없으면 이 줄을 뺀다.
+    dropped = min(
+        (t for t in themes if t["rank_change"] is not None and t["rank_change"] < 0),
+        key=lambda t: t["rank_change"],
+        default=None,
+    )
+
+    label = f"{korean_date_label(window[0])[:-3]}~{korean_date_label(window[-1])}" if window else ""
+    lines = ["🔄 <b>관심이 옮겨간 곳</b>", f"최근 {len(window)}일 · {label}"]
+
+    lines.append("")
+    for t in shown:
+        move = ""
+        if t["rank_change"]:
+            move = f" {'▲' if t['rank_change'] > 0 else '▼'}{abs(t['rank_change'])}계단"
+        delta = f" ({t['delta']:+.1f}%p)" if t["delta"] is not None else ""
+        name = html.escape(t["theme"], quote=False)
+        head = f"<b>{t['rank']}위 {name}</b> {t['share']:.1f}%{delta}{move}"
+        picks = members.get(t["theme"], [])
+        lines.append(head)
+        if picks:
+            lines.append(quote(" · ".join(html.escape(p, quote=False) for p in picks)))
+
+    if dropped:
+        d = html.escape(dropped["theme"], quote=False)
+        delta = f" ({dropped['delta']:+.1f}%p)" if dropped["delta"] is not None else ""
+        lines += ["", f"밀려난 곳: <b>{d}</b> {dropped['share']:.1f}%{delta} ▼{abs(dropped['rank_change'])}계단"]
+
+    # 3문단이 다룰 '밀려난 테마'를 digest 에 못박는다. 안 적어 주면 모델이 목록에서 아무
+    # 테마나 골라 설명하는데, 화면 위쪽 "밀려난 곳" 줄과 다른 이름이 나와 한 글이 서로
+    # 다른 말을 한다(실측: 화면은 바이오, 문단은 방산이었다).
+    dropped_line = (
+        [f"[밀려난 곳] {dropped['theme']} {dropped['share']:.1f}% "
+         f"({dropped['delta']:+.1f}%p, 순위 {dropped['rank_change']:+d}) "
+         f"← 3문단은 **반드시 이 테마**를 다루세요"]
+        if dropped
+        else []
+    )
+    digest = "\n".join(
+        dropped_line
+        + [f"[최근 {len(window)}일 테마] " + " / ".join(
+            f"{t['rank']}위 {t['theme']} {t['share']:.1f}%"
+            + (f" ({t['delta']:+.1f}%p)" if t["delta"] is not None else "")
+            + (f" 순위 {t['rank_change']:+d}" if t["rank_change"] else "")
+            + (f" · 종목: {', '.join(members.get(t['theme'], []))}" if members.get(t["theme"]) else "")
+            for t in themes[:6]
+        )]
+        + ([f"[어제 키워드] {' · '.join(k for k, _ in bc.load_keywords(db)[1])}"] or [])
+    )
+    body = bc.compose(llm, MODEL, bc.THEME_TASK, digest)
+    if body:
+        lines += ["", "📖 <b>무엇이 달라졌나</b>"] + paragraphs(body)
+
+    lines += ["", brand_link("/kadera", "theme")]
+    return "\n".join(lines)
+
+
+def build_weekly(db, llm) -> str:
+    """D · 주간 결산 — 주 1회. [주간 최다 종목 3] → [테마] → [마무리] → [브랜드].
+
+    **온도를 넣지 않는다**(Hun 결정). 온도는 어디서든 만들 수 있지만 316개 채널을 매일
+    읽어 쌓은 데이터는 우리만 있다. 주 1회 결산은 거기에 건다.
+
+    B(급부상)와 뽑히는 종목이 다르다 — 저쪽은 평소 대비 배수라 중소형주가, 이쪽은 절대
+    누적이라 대형주가 선다. 두 글이 같은 종목을 두 번 말하지 않는다.
+    """
+    stocks = bc.load_weekly_stocks(db)
+    if not stocks:
+        print("[skip] 주간 종목 집계가 없어 주간 글을 만들 수 없습니다.")
+        return ""
+
+    window = stocks[0]["window"]
+    lines = [
+        "📅 <b>이번 주 카더라 결산</b>",
+        f"{korean_date_label(window[0])[:-3]} ~ {korean_date_label(window[-1])}",
+        "",
+        "<b>가장 많이 회자된 종목</b>",
+    ]
+    for i, s in enumerate(stocks):
+        name = html.escape(s["name"], quote=False)
+        body = [f"{s['mentions']:,}회 언급 · {s['channels']}개 채널"]
+        if s["narrative"]:
+            body.append(to_telegram_html(drop_emdash(s["narrative"])))
+        lines += ["", f"<b>{'①②③④⑤'[i]} {name}</b>", quote(*body)]
+
+    themes = bc.load_theme_rotation(db)
+    if themes:
+        top2 = " · ".join(
+            f"{html.escape(t['theme'], quote=False)} {t['share']:.1f}%"
+            + (f" ({t['delta']:+.1f}%p)" if t["delta"] is not None else "")
+            for t in themes[:2]
+        )
+        lines += ["", "<b>관심이 옮겨간 곳</b>", top2]
+        dropped = min(
+            (t for t in themes if t["delta"] is not None and t["delta"] < 0),
+            key=lambda t: t["delta"],
+            default=None,
+        )
+        if dropped:
+            nm = html.escape(dropped["theme"], quote=False)
+            lines.append(f"{nm}{bc.josa(dropped['theme'], '은', '는')} {dropped['delta']:+.1f}%p로 밀렸습니다.")
+
+    digest = "\n".join(
+        [
+            "[이번 주 최다 언급] " + " / ".join(f"{s['name']} {s['mentions']}회" for s in stocks),
+            "[테마] " + " / ".join(
+                f"{t['theme']} {t['share']:.1f}%" + (f" ({t['delta']:+.1f}%p)" if t["delta"] is not None else "")
+                for t in themes[:5]
+            ),
+            f"[생태계 총평] {bc.load_daily_brief(db)}",
+        ]
+    )
+    body = bc.compose(llm, MODEL, bc.WEEKLY_TASK, digest, max_tokens=300)
+    if body:
+        lines += paragraphs(body)
+
+    lines += ["", brand_link("/kadera", "weekly")]
+    return "\n".join(lines)
+
+
 # ─── 발송 ─────────────────────────────────────────────────────────────────────
 
 
@@ -518,6 +709,17 @@ def main() -> None:
         action="store_true",
         help="봇이 볼 수 있는 채팅과 chat_id 를 찍는다(연동 설정용). 메시지는 안 만든다.",
     )
+    parser.add_argument(
+        "--ignore-staleness",
+        action="store_true",
+        help="신선도 게이트를 경고로만 낮춘다. **손으로 시험 발송할 때만** 쓴다.",
+    )
+    parser.add_argument(
+        "--format",
+        choices=["morning", "evening", "theme", "weekly"],
+        default="evening",
+        help="어떤 글을 만들지. morning=아침 브리핑 · evening=마감 리포트(기본) · theme=관심 이동 · weekly=주간 결산",
+    )
     args = parser.parse_args()
 
     # 설정 도우미라 DB 도 안 붙고 메시지도 안 만든다. 토큰만 있으면 된다.
@@ -529,13 +731,35 @@ def main() -> None:
         return
 
     db = get_client()
+
+    # 해설 문단용 클라이언트. 키가 없으면 None 이고, compose 가 빈 문자열을 돌려줘
+    # 해당 문단만 빠진다(common/broadcast_content.compose 주석 — fail-soft).
+    llm = None
+    if ANTHROPIC_API_KEY:
+        from anthropic import Anthropic
+
+        llm = Anthropic(api_key=ANTHROPIC_API_KEY)
+    elif args.format in ("morning", "theme", "weekly"):
+        print("[안내] ANTHROPIC_API_KEY 가 없어 해설 문단 없이 만듭니다.")
+
+    # 신선도 게이트는 daily_score 를 본다. 온도를 싣는 건 마감 리포트뿐이지만, 점수가
+    # 안 돌았다는 건 그날 파이프라인이 제대로 안 끝났다는 신호라 나머지 글도 같이 막는다.
     score_row = load_daily_score(db)
     if not score_row:
         print("[skip] daily_score 행이 없어 보낼 내용이 없습니다.")
         return
 
-    surging = surging_for_message(db)
-    message = build_evening(score_row, surging)
+    if args.format == "evening":
+        message = build_evening(score_row, surging_for_message(db))
+    elif args.format == "morning":
+        message = build_morning(db, llm)
+    elif args.format == "theme":
+        message = build_theme(db, llm)
+    else:
+        message = build_weekly(db, llm)
+
+    if not message:
+        return  # 재료가 없어 글을 못 만든 경우(각 builder 가 이유를 찍는다)
 
     read = as_read(message)
     print("──── 채널에서 읽히는 모습 " + "─" * 34)
@@ -555,6 +779,15 @@ def main() -> None:
         return
 
     # 여기부터는 실제 발송 경로다.
+    #
+    # --ignore-staleness 는 **사람이 손으로 시험 발송할 때만** 쓰라고 둔 문이다. 문구가
+    # 실제 채널에서 어떻게 보이는지는 한 번 보내 봐야 아는데, 그때마다 파이프라인이 방금
+    # 돌기를 기다릴 수는 없다. 이름을 길게 둔 건 손에 익어 습관처럼 붙이지 않게 하려는
+    # 것이고, **워크플로에는 절대 넣지 않는다** — 자동 발송에서 이걸 켜면 게이트가 통째로
+    # 없는 것과 같아져서, 낡은 값을 구독자 전원에게 쏘는 걸 막을 장치가 사라진다.
+    if problems and args.ignore_staleness:
+        print("[경고] --ignore-staleness 가 켜져 있어 낡은 자료인 채로 보냅니다. 시험 발송에만 쓸 것.")
+        problems = []
     if problems:
         print("[중단] 자료가 낡아 발송하지 않습니다. 구독자 전원에게 틀린 숫자를 쏘는 건 되돌리기 어렵습니다.")
         sys.exit(1)
