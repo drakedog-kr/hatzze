@@ -61,11 +61,11 @@ function Sidebar() {
           <Link href="/" aria-label="hatzze 홈" className="hz-logo-link" style={{ display: "inline-flex" }}>
             <LogoLockup symbolSize={29} wordmarkSize={30} gap={7} />
           </Link>
-          <span style={{ flexShrink: 0, fontSize: 8, fontWeight: 800, color: C.blue, background: "var(--c-blue-tint)", padding: "3px 8px", borderRadius: 999 }}>
+          <span style={{ flexShrink: 0, fontSize: 8, fontWeight: 700, color: C.blue, background: "var(--c-blue-tint)", padding: "3px 8px", borderRadius: 999 }}>
             베타
           </span>
         </LogoTag>
-        <p style={{ margin: "8px 0 0", fontSize: 11, fontWeight: 700, color: C.sub, letterSpacing: "0.02em", lineHeight: 1.5 }}>
+        <p style={{ margin: "8px 0 0", fontSize: 11, fontWeight: 600, color: C.sub, letterSpacing: "0.02em", lineHeight: 1.5 }}>
           데이터와 감성으로 읽는 시장
         </p>
       </div>
@@ -236,10 +236,10 @@ function TickerItem({ q }: { q: Quote }) {
   const arrow = q.change === null ? "" : q.change > 0 ? "▲" : q.change < 0 ? "▼" : "";
   return (
     <div style={{ display: "flex", alignItems: "baseline", gap: 6, whiteSpace: "nowrap" }}>
-      <span style={{ fontSize: 11, fontWeight: 700, color: C.sub }}>{q.label}</span>
-      <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: q.color ?? C.ink }}>{q.value}</span>
+      <span style={{ fontSize: 11, fontWeight: 600, color: C.sub }}>{q.label}</span>
+      <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: q.color ?? C.ink }}>{q.value}</span>
       {q.change !== null && (
-        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: changeColor }}>
+        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 600, color: changeColor }}>
           {arrow}
           {Math.abs(q.change).toFixed(1)}%
         </span>

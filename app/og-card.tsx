@@ -14,17 +14,17 @@ import { join } from "node:path";
 export const OG_SIZE = { width: 1200, height: 630 };
 export const OG_CONTENT_TYPE = "image/png";
 
-export const INK = "#25262f";
-export const SUB = "#5b6474";
-export const CARD_BG = "#eef2ff";
-export const TRACK = "#c2c6d8"; // --c-track
-export const BLUE = "#0064ff"; // --c-blue
-export const COLD = "#5ea8d8"; // --c-cold
+export const INK = "#191f28"; // --c-ink
+export const SUB = "#4e5968"; // --c-sub
+export const CARD_BG = "#ffffff"; // --c-card
+export const TRACK = "#e5e8eb"; // --c-track
+export const BLUE = "#3182f6"; // --c-blue
+export const COLD = "#1b64da"; // --c-cold
 
 const GHOST =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 104">' +
-  '<path d="M12,84 C6,42 22,8 50,8 C78,8 94,42 88,84 C86,95 80,95 77,87 C74,80 67,80 64,88 C61,96 54,96 51,88 C48,80 41,80 38,88 C35,96 28,96 25,87 C22,80 15,93 12,84 Z" fill="#0064ff"/>' +
-  '<ellipse cx="39" cy="50" rx="9.5" ry="12" fill="#fff"/><circle cx="66" cy="52" r="7" fill="#fff"/><circle cx="42" cy="45" r="3" fill="#0064ff"/></svg>';
+  '<path d="M12,84 C6,42 22,8 50,8 C78,8 94,42 88,84 C86,95 80,95 77,87 C74,80 67,80 64,88 C61,96 54,96 51,88 C48,80 41,80 38,88 C35,96 28,96 25,87 C22,80 15,93 12,84 Z" fill="#3182f6"/>' +
+  '<ellipse cx="39" cy="50" rx="9.5" ry="12" fill="#fff"/><circle cx="66" cy="52" r="7" fill="#fff"/><circle cx="42" cy="45" r="3" fill="#3182f6"/></svg>';
 
 /** Satori 에 SVG 를 넘기는 안전한 방법은 data URI 다(JSX 안의 <svg> 는 지원이 들쭉날쭉하다). */
 export function dataUri(svg: string): string {

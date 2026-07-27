@@ -184,10 +184,13 @@ function Shell({
         flexDirection: "column",
         position: "relative",
         minHeight: minH,
-        boxShadow: hit
-          ? "0 8px 24px -12px rgba(255,107,129,0.35)"
-          : "0 4px 6px -1px var(--c-shadow), 0 2px 4px -2px var(--c-shadow)",
-        border: hit ? "2px solid rgba(255,107,129,0.18)" : "2px solid transparent",
+        // 카드는 그림자로 띄우지 않는다 — 바탕(--c-bg)과 카드(--c-card)의 명도 차이가
+        // 이미 층을 만들고, 헤어라인 한 줄이 그 경계를 또렷하게 한다.
+        // 예전의 0 4px 6px 그림자는 카드가 20개 깔린 화면에서 전부 겹쳐 바탕을 탁하게
+        // 만들었다. 테두리 굵기는 두 상태가 같아야 한다 — 다르면 초고온 배지가 붙고
+        // 떨어질 때 카드가 1px 씩 움찔한다.
+        border: `1px solid ${hit ? C.mania : C.line}`,
+        boxShadow: hit ? "0 0 0 3px var(--c-mania-tint)" : undefined,
       }}
     >
       {hit && <HitBadge small={span === 1} />}
@@ -225,8 +228,8 @@ function HitBadge({ label = "초고온", small = false }: { label?: string; smal
       <span
         style={{
           background: C.mania,
-          color: "#fff",
-          fontWeight: 800,
+          color: "var(--c-on-mania)",
+          fontWeight: 700,
           fontSize: small ? 9 : 11,
           lineHeight: 1.2,
           padding: small ? "4px 9px" : "6px 12px",
@@ -277,14 +280,14 @@ function TitleRow({
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Icon name={icon} style={{ fontSize: iconSize, color: C.blue }} />
-          <span style={{ fontSize: 17, fontWeight: 800, color: C.ink, lineHeight: 1.2, wordBreak: "keep-all" }}>
+          <span style={{ fontSize: 17, fontWeight: 700, color: C.ink, lineHeight: 1.2, wordBreak: "keep-all" }}>
             {name}
           </span>
           {badge && (
             <span
               style={{
                 fontSize: 9,
-                fontWeight: 700,
+                fontWeight: 600,
                 color: C.sub,
                 background: C.bg,
                 padding: "3px 8px",
@@ -335,7 +338,7 @@ function Big({
         style={{
           fontFamily: MONO,
           fontSize: size,
-          fontWeight: 800,
+          fontWeight: 700,
           color,
           lineHeight: 1,
           letterSpacing: "-0.03em",
@@ -347,7 +350,7 @@ function Big({
         {disp}
         {unit && <span style={{ fontSize: size * 0.5 }}>{unit}</span>}
       </span>
-      {sub && <span style={{ fontSize: 12, fontWeight: 800, color, paddingBottom: 6, whiteSpace: "nowrap" }}>{sub}</span>}
+      {sub && <span style={{ fontSize: 12, fontWeight: 700, color, paddingBottom: 6, whiteSpace: "nowrap" }}>{sub}</span>}
     </div>
   );
 }
@@ -384,7 +387,7 @@ function HeatBar({ v }: { v: Pick }) {
   const c = overheatColor(v.capped);
   return (
     <div style={{ background: C.bg, borderRadius: 10, padding: "16px 18px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 800, marginBottom: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, marginBottom: 8 }}>
         <span style={{ color: C.sub }}>과열도</span>
         <span style={{ color: c, fontFamily: MONO }}>
           {Math.round(v.capped)}
@@ -401,12 +404,12 @@ function HeatBar({ v }: { v: Pick }) {
           }}
         />
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 700, color: C.sub, marginTop: 7 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 600, color: C.sub, marginTop: 7 }}>
         <span>안심</span>
         <span style={{ color: C.hot }}>과열 100</span>
       </div>
       {v.hotDisp && (
-        <p style={{ margin: "8px 0 0", textAlign: "center", fontSize: 10, fontWeight: 700, color: C.sub, fontFamily: MONO }}>
+        <p style={{ margin: "8px 0 0", textAlign: "center", fontSize: 10, fontWeight: 600, color: C.sub, fontFamily: MONO }}>
           초고온 기준선 {v.hotDisp} {v.dirLabel}
         </p>
       )}
@@ -439,7 +442,7 @@ function renderRichSummary(text: string): React.ReactNode {
       const tempColor = STAGE_META[seg]?.color;
       if (tempColor) {
         return (
-          <b key={`${pi}-${si}`} style={{ color: tempColor, fontWeight: 800 }}>
+          <b key={`${pi}-${si}`} style={{ color: tempColor, fontWeight: 700 }}>
             {seg}
           </b>
         );
@@ -487,7 +490,7 @@ function HeroGauge({ score }: { score: number }) {
           <stop offset="100%" stopColor={C.mania} />
         </linearGradient>
       </defs>
-      <path d="M 26 150 A 124 124 0 0 1 274 150" fill="none" stroke={C.bg} strokeWidth={22} strokeLinecap="round" />
+      <path d="M 26 150 A 124 124 0 0 1 274 150" fill="none" stroke={C.track} strokeWidth={22} strokeLinecap="round" />
       <path
         d="M 26 150 A 124 124 0 0 1 274 150"
         fill="none"
@@ -515,7 +518,7 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
       style={{
         background: C.card,
         borderRadius: 16,
-        boxShadow: "0 4px 6px -1px var(--c-shadow), 0 2px 4px -2px var(--c-shadow)",
+        border: `1px solid ${C.line}`, /* 그림자 대신 헤어라인 — Shell 주석 참고 */
         display: "flex",
         flexWrap: "wrap",
         alignItems: "center",
@@ -529,18 +532,18 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
           <HeroGauge score={dailyScore.score} />
           {/* top 78 / 172 = 45.3% — 게이지가 줄어도 숫자가 호 안 같은 자리에 남는다. */}
           <div style={{ position: "absolute", left: 0, right: 0, top: "45.3%", textAlign: "center" }}>
-            <div style={{ fontFamily: MONO, fontSize: 58, fontWeight: 800, color: C.ink, letterSpacing: "-0.04em", lineHeight: 1 }}>
+            <div style={{ fontFamily: MONO, fontSize: 58, fontWeight: 700, color: C.ink, letterSpacing: "-0.04em", lineHeight: 1 }}>
               {scoreDisplay}
               <span style={{ fontSize: 30 }}>℃</span>
             </div>
-            <div style={{ fontSize: 11, fontWeight: 800, color: stage.color, marginTop: 6 }}>지금 · {stage.zone}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: stage.color, marginTop: 6 }}>지금 · {stage.zone}</div>
           </div>
         </div>
         {/* 라벨을 각자 맡은 구간의 한가운데(호 위 x좌표)에 놓는다. 예전엔 space-between 이라
             넷이 균등 간격으로 놓였는데, 구간 경계는 25·50·75 이고 호는 반원이라 라벨이
             자기 구간 아래가 아니었다 — 상온(12.5~50 한가운데 x≈103)이 x≈80 에, 저온은
             호가 시작하기도 전인 x≈17 에 있었다. HeroGauge 와 같은 식으로 x 를 구한다. */}
-        <div style={{ position: "relative", width: "100%", height: 14, fontSize: 10, fontWeight: 800, letterSpacing: "0.06em" }}>
+        <div style={{ position: "relative", width: "100%", height: 14, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em" }}>
           {STAGE_TICKS.map((t) => (
             <span
               key={t.label}
@@ -564,7 +567,7 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
       <div style={{ flex: "1 1 280px", minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 22, fontWeight: 800, color: C.blue }}>햇쩨 지수</span>
+            <span style={{ fontSize: 22, fontWeight: 700, color: C.blue }}>햇쩨 지수</span>
             {/* 카더라 SectionHead 의 도움말과 같은 패턴(hz-tip-wide + help 아이콘). */}
             <span
               className="hz-tip hz-tip-wide hz-tip-below"
@@ -578,7 +581,7 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
           {/* 상태 텍스트는 옆의 "햇쩨 지수"(22px)와 같은 크기로 둔다 — 둘이 한 쌍으로 읽히는 자리라
               크기가 다르면 상태 쪽이 부속처럼 보인다. */}
           {/* 아이콘은 색을 물려받으므로 구간 색이 글자·아이콘·배경에 한 번에 걸린다. */}
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 7, background: stage.tint, color: stage.color, fontWeight: 800, fontSize: 22, padding: "5px 15px", borderRadius: 999, whiteSpace: "nowrap" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 7, background: stage.tint, color: stage.color, fontWeight: 700, fontSize: 22, padding: "5px 15px", borderRadius: 999, whiteSpace: "nowrap" }}>
             <Icon name={stage.icon} style={{ fontSize: 22 }} />
             {stageLabel}
           </span>
@@ -622,7 +625,7 @@ function Donut({ pct, color }: { pct: number; color: string }) {
   const fill = (Math.max(0, Math.min(100, pct)) / 100) * circ;
   return (
     <svg width="116" height="116" viewBox="0 0 36 36">
-      <circle cx="18" cy="18" r="15.5" fill="none" stroke={C.bg} strokeWidth="5" />
+      <circle cx="18" cy="18" r="15.5" fill="none" stroke={C.track} strokeWidth="5" />
       <circle cx="18" cy="18" r="15.5" fill="none" stroke={color} strokeWidth="5" strokeLinecap="round" strokeDasharray={`${fill} ${circ - fill}`} transform="rotate(-90 18 18)" />
     </svg>
   );
@@ -647,7 +650,7 @@ function Sparkline({
 }) {
   if (data.length < 2) {
     return (
-      <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: C.sub }}>
+      <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 600, color: C.sub }}>
         추세 데이터 쌓이는 중
       </div>
     );
@@ -687,7 +690,7 @@ function Sparkline({
           </div>
         )}
       </div>
-      <span style={{ alignSelf: "flex-end", fontSize: 9, fontWeight: 700, color: C.sub, marginTop: 4 }}>{label}</span>
+      <span style={{ alignSelf: "flex-end", fontSize: 9, fontWeight: 600, color: C.sub, marginTop: 4 }}>{label}</span>
     </div>
   );
 }
@@ -696,9 +699,9 @@ function Sparkline({
 function LevSubBar({ label, amount, value, color }: { label: string; amount: string | null; value: number; color: string }) {
   return (
     <div style={{ flex: 1 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 4 }}>{label}</div>
-      {amount && <div style={{ fontFamily: MONO, fontSize: 15, fontWeight: 800, color: C.ink, marginBottom: 7 }}>{amount}</div>}
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 700, color: C.sub, marginBottom: 5 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: C.sub, marginBottom: 4 }}>{label}</div>
+      {amount && <div style={{ fontFamily: MONO, fontSize: 15, fontWeight: 700, color: C.ink, marginBottom: 7 }}>{amount}</div>}
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 600, color: C.sub, marginBottom: 5 }}>
         <span>과열도</span>
         <span style={{ color }}>
           {Math.round(value)}
@@ -716,7 +719,7 @@ function LevSubBar({ label, amount, value, color }: { label: string; amount: str
 function DivRow({ label, w, color }: { label: string; w: number; color: string }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <span style={{ width: 82, fontSize: 11, fontWeight: 800, color, textAlign: "right" }}>{label}</span>
+      <span style={{ width: 82, fontSize: 11, fontWeight: 700, color, textAlign: "right" }}>{label}</span>
       <div style={{ flex: 1, height: 16, position: "relative", background: C.track, borderRadius: 999 }}>
         <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.max(0, Math.min(100, w))}%`, background: color, borderRadius: 999 }} />
       </div>
@@ -757,7 +760,7 @@ const ASIA_BAR_BASE = ASIA_LABEL_H + ASIA_COL_GAP;
 function AsiaBar({ label, sub, index, heightPct, self }: { label: string; sub: string; index: number; heightPct: number; self: boolean }) {
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: ASIA_COL_GAP }}>
-      <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: self ? C.blue : C.sub }}>{Math.round(index)}</span>
+      <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: self ? C.blue : C.sub }}>{Math.round(index)}</span>
       <div
         style={{
           width: "100%",
@@ -770,7 +773,7 @@ function AsiaBar({ label, sub, index, heightPct, self }: { label: string; sub: s
         style={{
           height: ASIA_LABEL_H,
           fontSize: 9,
-          fontWeight: 800,
+          fontWeight: 700,
           color: self ? C.ink : C.sub,
           textAlign: "center",
           lineHeight: 1.25,
@@ -798,11 +801,11 @@ const SUB_BAR_MIN_W = 18;
 function UpbitSubBar({ label, value, pct, color }: { label: string; value: string; pct: number; color: string }) {
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 6 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 600, color: C.sub, marginBottom: 6 }}>
         <span>{label}</span>
         <span style={{ color }}>{value}</span>
       </div>
-      <div style={{ height: 8, background: C.bg, borderRadius: 999, overflow: "hidden" }}>
+      <div style={{ height: 8, background: C.track, borderRadius: 999, overflow: "hidden" }}>
         {/* 안쪽에도 borderRadius 를 준다 — 바닥값만큼 짧을 때 오른쪽 끝이 네모로 잘려
             막대가 아니라 잘린 조각처럼 보인다. */}
         <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, pct))}%`, minWidth: SUB_BAR_MIN_W, background: color, borderRadius: 999 }} />
@@ -819,11 +822,11 @@ function UpbitKimchiBar({ premium }: { premium: number }) {
   const color = premium >= 0 ? C.hot : C.cold;
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 6 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 600, color: C.sub, marginBottom: 6 }}>
         <span>김치 프리미엄</span>
         <span style={{ color }}>{premium > 0 ? "+" : ""}{premium.toFixed(1)}%</span>
       </div>
-      <div style={{ position: "relative", height: 8, background: C.bg, borderRadius: 999 }}>
+      <div style={{ position: "relative", height: 8, background: C.track, borderRadius: 999 }}>
         <div style={{ position: "absolute", left: "50%", top: -2, bottom: -2, width: 2, background: "var(--c-marker)" }} />
         <div
           style={{
@@ -857,7 +860,7 @@ function CardBuffett({ v }: { v: Pick }) {
       <Big disp={v.disp} unit={v.unit} color={v.color} size={40} sub={ratio !== null ? `${ratio.toFixed(1)}배` : undefined} />
       <div style={{ background: C.bg, borderRadius: 10, padding: "18px 18px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
         <div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 6 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 600, color: C.sub, marginBottom: 6 }}>
             {/* 1칸 카드라 폭이 좁다 — 분기 표기는 "~26년 1분기"로 줄여 한 줄에 들어가게 한다. */}
             <span style={{ whiteSpace: "nowrap" }}>
               나라 경제 (GDP)
@@ -867,23 +870,23 @@ function CardBuffett({ v }: { v: Pick }) {
             </span>
             <span style={{ fontFamily: MONO, whiteSpace: "nowrap" }}>{dt && dt.gdp ? `약 ${jo(dt.gdp)}조원` : "기준 100"}</span>
           </div>
-          <div style={{ height: 18, background: "var(--c-line)", borderRadius: 6, overflow: "hidden" }}>
-            <div style={{ height: "100%", width: `${gdpWidth}%`, background: "var(--c-hint)", borderRadius: 6 }} />
+          <div style={{ height: 18, background: C.track, borderRadius: 6, overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${gdpWidth}%`, background: C.bar, borderRadius: 6 }} />
           </div>
         </div>
         <div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 800, color: v.color, marginBottom: 6 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, color: v.color, marginBottom: 6 }}>
             <span>증시 시가총액</span>
             <span style={{ fontFamily: MONO }}>
               {dt && dt.market_cap ? `약 ${jo(dt.market_cap)}조원 · ` : `${v.disp} · `}
               {ratio !== null ? `${ratio.toFixed(1)}배` : "-"}
             </span>
           </div>
-          <div style={{ height: 18, background: "var(--c-line)", borderRadius: 6, overflow: "hidden" }}>
+          <div style={{ height: 18, background: C.track, borderRadius: 6, overflow: "hidden" }}>
             <div style={{ height: "100%", width: "100%", background: `linear-gradient(90deg,${C.hot},${C.mania})`, borderRadius: 6 }} />
           </div>
         </div>
-        <p style={{ margin: "2px 0 0", fontSize: 11, fontWeight: 700, color: "var(--c-ink-soft)", textAlign: "center" }}>
+        <p style={{ margin: "2px 0 0", fontSize: 11, fontWeight: 600, color: "var(--c-ink-soft)", textAlign: "center" }}>
           증시가 실물 경제보다 <span style={{ color: v.color }}>{ratio !== null ? `${ratio.toFixed(1)}배 커진` : "커진"}</span> 상태입니다
         </p>
       </div>
@@ -916,17 +919,17 @@ function CardLeverage({ v }: { v: Pick }) {
       <TitleRow desc={v.headline} icon="rocket_launch" name={v.name} badge="당일 기준" />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 12 }}>
         {/* 주요 수치 크기는 VKOSPI 카드(40)를 기준으로 맞춘다. */}
-        <span style={{ fontFamily: MONO, fontSize: 40, fontWeight: 800, color: heatC, lineHeight: 1, letterSpacing: "-0.03em" }}>{heat}</span>
-        <span style={{ fontSize: 18, fontWeight: 800, color: "var(--c-faint)" }}>/ 100</span>
-        <span style={{ fontSize: 13, fontWeight: 700, color: C.sub, paddingBottom: 4 }}>종합 과열도</span>
+        <span style={{ fontFamily: MONO, fontSize: 40, fontWeight: 700, color: heatC, lineHeight: 1, letterSpacing: "-0.03em" }}>{heat}</span>
+        <span style={{ fontSize: 18, fontWeight: 700, color: "var(--c-faint)" }}>/ 100</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: C.sub, paddingBottom: 4 }}>종합 과열도</span>
       </div>
       <div style={{ background: C.bg, borderRadius: 10, padding: 18, display: "flex", flexDirection: "column", gap: 16 }}>
         <div>
-          <div style={{ position: "relative", height: 12, background: C.line, borderRadius: 999 }}>
+          <div style={{ position: "relative", height: 12, background: C.track, borderRadius: 999 }}>
             <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.min(100, heat)}%`, background: `linear-gradient(90deg,${C.hot},${C.mania})`, borderRadius: 999 }} />
-            <div style={{ position: "absolute", top: "50%", left: `${Math.min(100, heat)}%`, transform: "translate(-50%,-50%)", width: 14, height: 14, borderRadius: 999, background: heatC, border: `3px solid ${C.card}`, boxShadow: "0 1px 3px var(--c-shadow-strong)" }} />
+            <div style={{ position: "absolute", top: "50%", left: `${Math.min(100, heat)}%`, transform: "translate(-50%,-50%)", width: 14, height: 14, borderRadius: 999, background: heatC, border: `3px solid ${C.card}` }} />
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 700, color: C.sub, marginTop: 7 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 600, color: C.sub, marginTop: 7 }}>
             <span>안심</span>
             <span style={{ color: C.hot }}>과열</span>
           </div>
@@ -974,7 +977,7 @@ function CardMarketActions({ v }: { v: Pick }) {
             같은 font-size 라도 글리프가 em box 를 더 꽉 채워 숫자보다 커 보인다 —
             Pretendard 800 기준 실측으로 40px 일 때 숫자는 글자높이 29.1px, "매도 우세"는
             35.9px 였다. 32px 면 28.7px 라 숫자와 거의 같아진다. */}
-        <span style={{ fontSize: 32, fontWeight: 800, color: verdict.c, lineHeight: 1 }}>{verdict.t}</span>
+        <span style={{ fontSize: 32, fontWeight: 700, color: verdict.c, lineHeight: 1 }}>{verdict.t}</span>
       </div>
       {/* 2칸 카드라 같은 줄의 1칸 카드들에 맞춰 늘어나는데 내용은 세 줄뿐이라, 예전엔
           막대 아래로 100px 넘게 비었다. 묶음에 flex:1 을 주고 세 줄을 그 안에서 고르게
@@ -1010,15 +1013,15 @@ function CardTurnover({ v }: { v: Pick }) {
           {/* 툴팁은 도넛 바깥이 아니라 안쪽 라벨에 건다 — 116px 도넛 위에 걸면 툴팁이
               카드 제목·설명 자리까지 올라가 글자를 덮는다(실측 확인). */}
           <div className="hz-tip" data-tip={donutTip} style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 800, color: c, lineHeight: 1 }}>{Math.round(share)}%</span>
-            <span style={{ fontSize: 8, fontWeight: 700, color: C.sub, marginTop: 2 }}>상위10 거래</span>
+            <span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 700, color: c, lineHeight: 1 }}>{Math.round(share)}%</span>
+            <span style={{ fontSize: 8, fontWeight: 600, color: C.sub, marginTop: 2 }}>상위10 거래</span>
           </div>
         </div>
         <div style={{ width: "100%", display: "grid", gridTemplateColumns: "1fr 1fr", columnGap: 18, rowGap: 6 }}>
           {top5.slice(0, 4).map((s, i) => (
-            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, fontWeight: 700, gap: 6 }}>
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, fontWeight: 600, gap: 6 }}>
               <span style={{ color: C.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
-              <span style={{ fontFamily: MONO, fontWeight: 800, color: C.sub, flexShrink: 0 }}>{s.share}%</span>
+              <span style={{ fontFamily: MONO, fontWeight: 700, color: C.sub, flexShrink: 0 }}>{s.share}%</span>
             </div>
           ))}
         </div>
@@ -1063,8 +1066,8 @@ function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
           {/* -25%·"전고점으로부터"를 막대 높이에 맞춰 세로 가운데로 — 종가 블록을 빼면서
               위로 몰려 보이던 걸 막대와 눈높이가 맞게 중앙 정렬한다. */}
           <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
-            <span style={{ fontFamily: MONO, fontSize: 34, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{gap > 0 ? "+" : ""}{v.disp}{v.unit}</span>
-            <span style={{ fontSize: 10, fontWeight: 700, color: C.sub, marginTop: 4 }}>{gap > 0 ? "이전 전고점 돌파" : "전고점으로부터"}</span>
+            <span style={{ fontFamily: MONO, fontSize: 34, fontWeight: 700, color: v.color, letterSpacing: "-0.03em" }}>{gap > 0 ? "+" : ""}{v.disp}{v.unit}</span>
+            <span style={{ fontSize: 10, fontWeight: 600, color: C.sub, marginTop: 4 }}>{gap > 0 ? "이전 전고점 돌파" : "전고점으로부터"}</span>
           </div>
           {/* 전고점을 수위 눈금처럼 읽는 통. 세 가지를 고쳤다.
               (1) 전고점 라벨을 통 안 우상단에서 통 바로 위로 뺐다 — 통의 윗변이 곧 전고점이라
@@ -1073,7 +1076,7 @@ function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
               (3) 그라데이션의 #7cbde6 은 팔레트 밖 하드코딩이라 테마를 안 따랐다 — 단색+투명도로.
               막대 높이는 고정한다(예전엔 옆 텍스트 칸에 맞춰 늘어났는데 그 칸이 없어졌다). */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
-            <span style={{ fontSize: 9, fontWeight: 800, color: C.sub, whiteSpace: "nowrap" }}>
+            <span style={{ fontSize: 9, fontWeight: 700, color: C.sub, whiteSpace: "nowrap" }}>
               전고점{typeof priorHigh === "number" ? ` ${num(priorHigh)}` : ""}
             </span>
             <div style={{ width: 92, height: 134, position: "relative", background: C.bg, borderRadius: 10, overflow: "hidden" }}>
@@ -1095,7 +1098,7 @@ function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
               className="hz-tip hz-tip-wide hz-tip-end"
               data-tip="현재가는 지수와 같은 KRX 종가입니다. 52주 고점은 야후 파이낸스의 장중 최고가라, 종가 기준인 지수 쪽보다 괴리율이 조금 더 깊게 나옵니다."
               data-ga-tip="high_gap_source"
-              style={{ fontSize: 10, fontWeight: 800, color: C.sub }}
+              style={{ fontSize: 10, fontWeight: 700, color: C.sub }}
             >
               거래대금 상위 종목의 52주 고점 대비
             </span>
@@ -1104,11 +1107,11 @@ function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
               const pct = Math.max(0, Math.min(100, 100 + s.gapPct));
               return (
                 <div key={s.code} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: C.ink, width: 68, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</span>
-                  <div style={{ flex: 1, height: 6, borderRadius: 999, background: C.bg, overflow: "hidden", minWidth: 0 }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: C.ink, width: 68, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</span>
+                  <div style={{ flex: 1, height: 6, borderRadius: 999, background: C.track, overflow: "hidden", minWidth: 0 }}>
                     <div style={{ width: `${pct}%`, height: "100%", background: C.cold, borderRadius: 999 }} />
                   </div>
-                  <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 800, color: C.cold, width: 46, textAlign: "right" }}>
+                  <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: C.cold, width: 46, textAlign: "right" }}>
                     {s.gapPct >= 0 ? "+" : ""}{s.gapPct.toFixed(1)}%
                   </span>
                 </div>
@@ -1135,12 +1138,12 @@ function CardSpeed({ v }: { v: Pick }) {
     <Shell hit={v.isHit} minH={210}>
       <TitleRow desc={v.headline} icon="trending_up" name={v.name} badge={sourceDateBadge(v) ?? "최근 거래일 기준"} />
       <div>
-        <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>
+        <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 700, color: v.color, letterSpacing: "-0.03em" }}>
           {spd !== null && spd > 0 ? "+" : ""}{v.disp}{v.unit}
         </span>
         {typeof from === "number" && typeof to === "number" && (
           // 두 숫자만 적으면 무엇에서 무엇으로 간 건지 안 읽힌다 — 양끝에 이름을 붙인다.
-          <span style={{ display: "block", fontSize: 11, fontWeight: 700, color: C.sub, marginTop: 6 }}>
+          <span style={{ display: "block", fontSize: 11, fontWeight: 600, color: C.sub, marginTop: 6 }}>
             60거래일 전 {num(from)} → 지금 {num(to)}
           </span>
         )}
@@ -1179,9 +1182,9 @@ function CardVkospi({ v }: { v: Pick }) {
       <TitleRow desc={v.headline} icon="monitor_heart" name={v.name} />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 14 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
-          <span style={{ fontFamily: MONO, fontSize: 40, fontWeight: 800, color: c, letterSpacing: "-0.03em", lineHeight: 1 }}>{v.disp}</span>
-          <span style={{ fontSize: 12, fontWeight: 800, color: C.sub }}>변동성지수</span>
-          <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 800, color: c }}>{verdict}</span>
+          <span style={{ fontFamily: MONO, fontSize: 40, fontWeight: 700, color: c, letterSpacing: "-0.03em", lineHeight: 1 }}>{v.disp}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>변동성지수</span>
+          <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, color: c }}>{verdict}</span>
         </div>
         <div>
           <div style={{ position: "relative", height: 8, borderRadius: 999, background: `linear-gradient(90deg, ${C.hot}, var(--c-track), ${C.cold})` }}>
@@ -1199,7 +1202,7 @@ function CardVkospi({ v }: { v: Pick }) {
               }}
             />
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 7, fontSize: 9, fontWeight: 800 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 7, fontSize: 9, fontWeight: 700 }}>
             <span style={{ color: C.hot }}>방심 {lo !== null ? Math.round(lo) : "-"}</span>
             <span style={{ color: C.sub }}>최근 30일 범위</span>
             <span style={{ color: C.cold }}>불안 {hi !== null ? Math.round(hi) : "-"}</span>
@@ -1243,7 +1246,7 @@ function CardAsia({ v }: { v: Pick }) {
   return (
     <Shell span={2} hit={v.isHit} minH={230}>
       <TitleRow desc={v.headline} icon="public" name={v.name} badge="최근 한 달" />
-      <div style={{ fontSize: 9, color: "var(--c-muted)", fontWeight: 700, marginBottom: 4 }}>
+      <div style={{ fontSize: 9, color: "var(--c-muted)", fontWeight: 600, marginBottom: 4 }}>
         KOSPI를 100으로 둔 상대 지수 · 코스피 초과수익률 {v.raw !== null && v.raw > 0 ? "+" : ""}
         {v.disp}
         {v.unit}
@@ -1296,8 +1299,8 @@ function CardGoldRatio({ v }: { v: Pick }) {
     <Shell hit={v.isHit} minH={210}>
       <TitleRow icon="balance" name={v.name} desc={v.headline} />
       <div>
-        <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.disp}{v.unit}</span>
-        <span style={{ display: "block", fontSize: 11, fontWeight: 700, color: C.sub, marginTop: 6 }}>{note}</span>
+        <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 700, color: v.color, letterSpacing: "-0.03em" }}>{v.disp}{v.unit}</span>
+        <span style={{ display: "block", fontSize: 11, fontWeight: 600, color: C.sub, marginTop: 6 }}>{note}</span>
       </div>
       {/* paddingTop 으로 과열도 박스와의 최소 간격을 보장한다 — flex-end 만으로는 카드가
           짧을 때 근거 줄에 바로 붙어 두 덩어리가 한 블록처럼 보인다. */}
@@ -1325,25 +1328,25 @@ function CardVolume({ v }: { v: Pick }) {
           내려놓고 보니 이 숫자가 카드의 결론이라 다른 1칸 카드처럼 큰 수치로 두는 게 맞다. */}
       {surge !== null && (
         <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "2px 0 10px" }}>
-          <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 800, color: surge >= 0 ? C.hot : C.cold, letterSpacing: "-0.03em", lineHeight: 1 }}>
+          <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 700, color: surge >= 0 ? C.hot : C.cold, letterSpacing: "-0.03em", lineHeight: 1 }}>
             {surge >= 0 ? "+" : ""}
             {surge}%
           </span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: C.sub }}>평소 대비</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: C.sub }}>평소 대비</span>
         </div>
       )}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 12, flex: 1, minHeight: 88 }}>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 6, height: "100%" }}>
-          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color: C.neutral }}>
+          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: C.neutral }}>
             {avgFmt ? `${avgFmt.display}${avgFmt.displayUnit}` : v.thDisp ?? "-"}
           </span>
           <div style={{ width: "100%", height: `${avgH}%`, background: C.line, borderRadius: "6px 6px 0 0" }} />
-          <span style={{ fontSize: 9, fontWeight: 700, color: C.sub }}>{avg !== null ? "30일 평균" : "과열 기준"}</span>
+          <span style={{ fontSize: 9, fontWeight: 600, color: C.sub }}>{avg !== null ? "30일 평균" : "과열 기준"}</span>
         </div>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 6, height: "100%" }}>
-          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color: v.color }}>{v.disp}{v.unit}</span>
+          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: v.color }}>{v.disp}{v.unit}</span>
           <div style={{ width: "100%", height: `${todayH}%`, background: v.color, borderRadius: "6px 6px 0 0" }} />
-          <span style={{ fontSize: 9, fontWeight: 700, color: C.sub }}>최근 거래일</span>
+          <span style={{ fontSize: 9, fontWeight: 600, color: C.sub }}>최근 거래일</span>
         </div>
       </div>
       <Foot text={v.desc} />
@@ -1357,7 +1360,7 @@ function CardFx({ v }: { v: Pick }) {
     <Shell hit={v.isHit} minH={230}>
       <TitleRow desc={v.headline} icon="waves" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
-        <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>±{v.disp}{v.unit}</span>
+        <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 700, color: v.color, letterSpacing: "-0.03em" }}>±{v.disp}{v.unit}</span>
       </div>
       <div style={{ flex: 1, position: "relative", minHeight: 50 }}>
         <Sparkline
@@ -1381,7 +1384,7 @@ function CardComingSoon() {
           name={<span style={{ color: "var(--c-muted)" }}>신용융자 잔고</span>}
           desc="빚내서 주식을 산 금액"
           right={
-            <span style={{ background: "var(--c-blue-tint)", color: C.blue, fontWeight: 800, padding: "4px 9px", borderRadius: 6, fontSize: 9 }}>준비 중</span>
+            <span style={{ background: "var(--c-blue-tint)", color: C.blue, fontWeight: 700, padding: "4px 9px", borderRadius: 6, fontSize: 9 }}>준비 중</span>
           }
         />
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -1406,16 +1409,16 @@ function VsAvg({ ratio, size = 26 }: { ratio: number; size?: number }) {
   const fill = Math.max(4, Math.min(100, (ratio / 2) * 100)); // 2배 = 꽉 참, 1배 = 50%
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 2 }}>평소 대비</div>
+      <div style={{ fontSize: 11, fontWeight: 600, color: C.sub, marginBottom: 2 }}>평소 대비</div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 4, whiteSpace: "nowrap" }}>
-        <span style={{ fontFamily: MONO, fontSize: size, fontWeight: 800, color: c, letterSpacing: "-0.03em" }}>{ratio.toFixed(1)}배</span>
-        <span style={{ fontSize: 15, fontWeight: 800, color: c }}>{arrow}</span>
+        <span style={{ fontFamily: MONO, fontSize: size, fontWeight: 700, color: c, letterSpacing: "-0.03em" }}>{ratio.toFixed(1)}배</span>
+        <span style={{ fontSize: 15, fontWeight: 700, color: c }}>{arrow}</span>
       </div>
-      <div style={{ position: "relative", height: 8, background: C.bg, borderRadius: 999, marginTop: 8, overflow: "hidden" }}>
+      <div style={{ position: "relative", height: 8, background: C.track, borderRadius: 999, marginTop: 8, overflow: "hidden" }}>
         <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${fill}%`, background: c, borderRadius: 999 }} />
         <div style={{ position: "absolute", left: "50%", top: -2, bottom: -2, width: 2, background: "var(--c-marker)" }} />
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, fontWeight: 700, color: C.sub, marginTop: 5 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, fontWeight: 600, color: C.sub, marginTop: 5 }}>
         <span>적음</span>
         <span>평소(1배)</span>
         <span>많음</span>
@@ -1447,7 +1450,7 @@ function DivergenceBar({
   return (
     <div style={{ flex: 1 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2 }}>
-        <span style={{ fontSize: 12, fontWeight: 800, color: C.ink }}>{label}</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: C.ink }}>{label}</span>
         {/* 이 막대는 늘 둘씩 나란히 놓인다. 240px 툴팁을 가운데 정렬로 두면 오른쪽 막대
             것이 카드 밖으로 나갔다(좁은 화면에선 페이지 가로 스크롤까지). 왼쪽 막대는
             오른쪽으로, 오른쪽 막대는 왼쪽으로 열어 둘 다 카드 안에 머문다. */}
@@ -1463,7 +1466,7 @@ function DivergenceBar({
         )}
       </div>
       <div style={{ fontSize: 10, fontWeight: 600, color: C.sub, marginBottom: 6 }}>{hint}</div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, fontWeight: 800, marginBottom: 4 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, fontWeight: 700, marginBottom: 4 }}>
         <span style={{ color: C.sub }}>{level}</span>
         <span style={{ color, fontFamily: MONO }}>
           {Math.round(value)}
@@ -1509,10 +1512,10 @@ function CardDivergence({ v }: { v: Pick }) {
           이 카드가 초고온에 들면 둘이 겹친다. 카드 본문 맨 위로 내려 배지와 자리를 나눈다 —
           span=2 인데 내용이 짧아 남던 공간도 이 줄이 채운다. */}
       <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "2px 0 0" }}>
-        <span style={{ fontSize: 15, fontWeight: 700, color: C.sub }}>{leadWho}</span>
-        <span style={{ fontFamily: MONO, fontSize: 32, fontWeight: 800, color: leadColor, letterSpacing: "-0.02em", lineHeight: 1 }}>{Math.round(Math.abs(lead))}</span>
-        <span style={{ fontSize: 14, fontWeight: 800, color: "var(--c-faint)" }}>%</span>
-        <span style={{ fontSize: 13, fontWeight: 700, color: C.sub }}>강세</span>
+        <span style={{ fontSize: 15, fontWeight: 600, color: C.sub }}>{leadWho}</span>
+        <span style={{ fontFamily: MONO, fontSize: 32, fontWeight: 700, color: leadColor, letterSpacing: "-0.02em", lineHeight: 1 }}>{Math.round(Math.abs(lead))}</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: "var(--c-faint)" }}>%</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>강세</span>
       </div>
       {/* span=2 인데 내용이 짧아 남는 공간을 박스·Foot 이 auto 마진으로 나눠 갖는다. */}
       <div style={{ background: C.bg, borderRadius: 10, padding: 16, marginTop: "auto", display: "flex", gap: 22 }}>
@@ -1539,8 +1542,8 @@ function CardTrend({ v, icon, span }: { v: Pick; icon: string; span?: 1 | 2 }) {
       ) : (
         <>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
-            <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.disp}{v.unit}</span>
-            {v.hotDisp && <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 800, color: C.hot }}>초고온 기준 {v.hotDisp}</span>}
+            <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 700, color: v.color, letterSpacing: "-0.03em" }}>{v.disp}{v.unit}</span>
+            {v.hotDisp && <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 700, color: C.hot }}>초고온 기준 {v.hotDisp}</span>}
           </div>
           <div style={{ flex: 1, position: "relative", minHeight: 52 }}>
             <Sparkline data={v.history} color={v.color} />
@@ -1626,26 +1629,26 @@ function CardSentiment({
         <div style={{ margin: "8px 0 0" }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
             {/* 순서는 앱 전체에서 '비관 : 낙관'으로 통일한다(카더라 테마 막대도 동일). */}
-            <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, letterSpacing: "-0.03em" }}>
+            <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 700, letterSpacing: "-0.03em" }}>
               <span style={{ color: C.cold }}>{ratio.neg}</span>
               <span style={{ color: C.sub }}>:</span>
               <span style={{ color: C.hot }}>{ratio.pos}</span>
             </span>
-            <span style={{ fontSize: 12, fontWeight: 800, color: barColor }}>{sentimentTone(ratio.pos).label}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: barColor }}>{sentimentTone(ratio.pos).label}</span>
           </div>
           <div style={{ fontSize: 10, color: C.sub, marginTop: 4 }}>
             {countNoun} <span style={{ fontFamily: MONO }}>{ratio.total.toLocaleString("ko-KR")}</span>건 분석
           </div>
         </div>
       ) : (
-        <div style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: barColor, letterSpacing: "-0.03em", margin: "8px 0 0" }}>
+        <div style={{ fontFamily: MONO, fontSize: 30, fontWeight: 700, color: barColor, letterSpacing: "-0.03em", margin: "8px 0 0" }}>
           {raw > 0 ? "+" : ""}
           {v.disp}
           {v.unit}
         </div>
       )}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-        <div style={{ position: "relative", height: 16, background: C.bg, borderRadius: 999 }}>
+        <div style={{ position: "relative", height: 16, background: C.track, borderRadius: 999 }}>
           <div style={{ position: "absolute", left: "50%", top: -3, bottom: -3, width: 2, background: "var(--c-marker)" }} />
           <div
             style={{
@@ -1657,9 +1660,9 @@ function CardSentiment({
               ...(optimistic ? { left: "50%", width: `${pos - 50}%` } : { right: "50%", width: `${50 - pos}%` }),
             }}
           />
-          <div style={{ position: "absolute", top: "50%", left: `${pos}%`, transform: "translate(-50%,-50%)", width: 14, height: 14, borderRadius: 999, background: barColor, border: `3px solid ${C.card}`, boxShadow: "0 1px 3px var(--c-shadow-strong)" }} />
+          <div style={{ position: "absolute", top: "50%", left: `${pos}%`, transform: "translate(-50%,-50%)", width: 14, height: 14, borderRadius: 999, background: barColor, border: `3px solid ${C.card}` }} />
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 800, marginTop: 8 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 700, marginTop: 8 }}>
           <span style={{ color: C.cold }}>비관</span>
           <span style={{ color: C.sub }}>중립</span>
           <span style={{ color: C.hot }}>낙관</span>
@@ -1683,22 +1686,22 @@ function CardYoutube({ v }: { v: Pick }) {
           짜임(전폭 두 칸 · 막대 위에 값)으로 맞춘다 — 같은 질문에는 같은 그림. */}
       {ratio !== null && (
         <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "2px 0 10px" }}>
-          <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 800, color: v.color, letterSpacing: "-0.03em", lineHeight: 1 }}>
+          <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 700, color: v.color, letterSpacing: "-0.03em", lineHeight: 1 }}>
             {ratio.toFixed(1)}배
           </span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: C.sub }}>평소 대비</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: C.sub }}>평소 대비</span>
         </div>
       )}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 12, flex: 1, minHeight: 88 }}>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 6, height: "100%" }}>
-          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color: C.sub }}>{v.thDisp ?? "-"}</span>
+          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: C.sub }}>{v.thDisp ?? "-"}</span>
           <div style={{ width: "100%", height: `${baseH}%`, background: C.line, borderRadius: "6px 6px 0 0" }} />
-          <span style={{ fontSize: 9, fontWeight: 700, color: C.sub }}>평소</span>
+          <span style={{ fontSize: 9, fontWeight: 600, color: C.sub }}>평소</span>
         </div>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 6, height: "100%" }}>
-          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color: v.color }}>{v.disp}{v.unit}</span>
+          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: v.color }}>{v.disp}{v.unit}</span>
           <div style={{ width: "100%", height: `${todayH}%`, background: v.color, borderRadius: "6px 6px 0 0" }} />
-          <span style={{ fontSize: 9, fontWeight: 700, color: C.sub }}>오늘</span>
+          <span style={{ fontSize: 9, fontWeight: 600, color: C.sub }}>오늘</span>
         </div>
       </div>
       <Foot text={v.desc} />
@@ -1712,13 +1715,13 @@ function SubSpend({ v, icon }: { v: Pick; icon: string }) {
     <div style={{ flex: 1 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <Icon name={icon} style={{ fontSize: 18, color: C.sub }} />
-        <span style={{ fontSize: 12, fontWeight: 700, wordBreak: "keep-all" }}>{v.name}</span>
+        <span style={{ fontSize: 12, fontWeight: 600, wordBreak: "keep-all" }}>{v.name}</span>
       </div>
       {v.details?.vs_avg != null ? (
         <VsAvg ratio={v.details.vs_avg} />
       ) : (
         <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
-          <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 800, color: v.color }}>{v.disp}{v.unit}</span>
+          <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 700, color: v.color }}>{v.disp}{v.unit}</span>
         </div>
       )}
     </div>
@@ -1764,11 +1767,11 @@ function CardUpbit({ v }: { v: Pick }) {
           위의 "1.47/100"에선 그 두 자리가 있으나 마나다. 그 규칙은 "0.5배" 같은 배수
           지표를 위한 것이라 전역으로 못 바꾸고, 척도를 아는 이 카드에서만 눌러 준다. */}
       <div style={{ display: "flex", alignItems: "baseline", gap: 3, marginBottom: 6 }}>
-        <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>
+        <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 700, color: v.color, letterSpacing: "-0.03em" }}>
           {v.raw !== null ? Math.round(v.raw).toLocaleString("ko-KR") : v.disp}
         </span>
-        <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: C.sub }}>/100</span>
-        <span style={{ fontSize: 10, fontWeight: 700, color: C.sub, marginLeft: 4 }}>과열도</span>
+        <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 600, color: C.sub }}>/100</span>
+        <span style={{ fontSize: 10, fontWeight: 600, color: C.sub, marginLeft: 4 }}>과열도</span>
       </div>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
         {dt ? (
@@ -1801,13 +1804,13 @@ function CardNetBuy({ v }: { v: Pick }) {
     <Shell hit={v.isHit} minH={210}>
       <TitleRow desc={v.headline} icon="person" name={v.name} />
       <div style={{ margin: "6px 0 2px" }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: C.sub }}>최근 5거래일 누적</span>
+        <span style={{ fontSize: 10, fontWeight: 600, color: C.sub }}>최근 5거래일 누적</span>
         <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
           {/* "12,929억"은 한눈에 안 읽히고 "1.3조원"은 끝자리가 날아간다 — 둘을 함께 쓴다. */}
-          <span style={{ fontFamily: MONO, fontSize: 24, fontWeight: 800, color: isBuy ? C.hot : C.cold, letterSpacing: "-0.03em" }}>
+          <span style={{ fontFamily: MONO, fontSize: 24, fontWeight: 700, color: isBuy ? C.hot : C.cold, letterSpacing: "-0.03em" }}>
             {cum >= 0 ? "+" : ""}{formatEokMixed(cum)}
           </span>
-          <span style={{ fontSize: 12, fontWeight: 800, color: isBuy ? C.hot : C.cold }}>{isBuy ? "순매수" : "순매도"}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: isBuy ? C.hot : C.cold }}>{isBuy ? "순매수" : "순매도"}</span>
         </div>
       </div>
       {/* 0선을 칸마다 하나씩 긋던 걸 차트 전체에 한 줄로 바꿨다. 예전엔 5개 조각으로
@@ -1841,7 +1844,7 @@ function CardNetBuy({ v }: { v: Pick }) {
                     bottom: 0,
                     textAlign: "center",
                     fontSize: 9,
-                    fontWeight: 700,
+                    fontWeight: 600,
                     fontFamily: MONO,
                     color: "var(--c-faint)",
                   }}
@@ -1873,9 +1876,9 @@ function CardDeposit({ v }: { v: Pick }) {
     <Shell hit={v.isHit} minH={210}>
       <TitleRow desc={v.headline} icon="savings" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "6px 0 4px" }}>
-        <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: c, letterSpacing: "-0.03em" }}>{jo.toFixed(1)}</span>
-        <span style={{ fontSize: 13, fontWeight: 700, color: C.sub }}>조원</span>
-        <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 800, color: change >= 0 ? C.hot : C.cold }}>
+        <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 700, color: c, letterSpacing: "-0.03em" }}>{jo.toFixed(1)}</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>조원</span>
+        <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, color: change >= 0 ? C.hot : C.cold }}>
           최근 {change >= 0 ? "+" : ""}{change.toFixed(1)}조
         </span>
       </div>
@@ -1916,20 +1919,20 @@ function CardPutCall({ v }: { v: Pick }) {
     <Shell hit={v.isHit} minH={210}>
       <TitleRow desc={v.headline} icon="casino" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "6px 0 14px" }}>
-        <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 800, color: c, letterSpacing: "-0.03em" }}>{ratio.toFixed(2)}</span>
-        <span style={{ fontSize: 11, fontWeight: 700, color: C.sub }}>풋/콜</span>
-        <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: c }}>{greedy ? "콜 우세" : "풋 우세"}</span>
+        <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 700, color: c, letterSpacing: "-0.03em" }}>{ratio.toFixed(2)}</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: C.sub }}>풋/콜</span>
+        <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, color: c }}>{greedy ? "콜 우세" : "풋 우세"}</span>
       </div>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 8 }}>
         <div style={{ display: "flex", height: 24, borderRadius: 8, overflow: "hidden" }}>
           <div className="hz-tip" data-tip={tip("call")} style={{ width: `${callShare}%`, background: C.hot, display: "flex", alignItems: "center", paddingLeft: 8 }}>
-            <span style={{ fontSize: 10, fontWeight: 800, color: "#fff" }}>콜 {Math.round(callShare)}%</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: "#fff" }}>콜 {Math.round(callShare)}%</span>
           </div>
           <div className="hz-tip" data-tip={tip("put")} style={{ width: `${100 - callShare}%`, background: C.cold, display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: 8 }}>
-            <span style={{ fontSize: 10, fontWeight: 800, color: "#fff" }}>풋 {Math.round(100 - callShare)}%</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: "#fff" }}>풋 {Math.round(100 - callShare)}%</span>
           </div>
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 800 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 700 }}>
           <span style={{ color: C.hot }}>콜 = 상승 베팅</span>
           <span style={{ color: C.cold }}>풋 = 하락 대비</span>
         </div>
@@ -1952,17 +1955,17 @@ function CardBrokerage({ v }: { v: Pick }) {
     <Shell hit={v.isHit} minH={210}>
       <TitleRow desc={v.headline} icon="leaderboard" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "6px 0 10px" }}>
-        <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: c, letterSpacing: "-0.03em" }}>{count}</span>
-        <span style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>개 앱 인기차트 진입</span>
+        <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 700, color: c, letterSpacing: "-0.03em" }}>{count}</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: C.sub }}>개 앱 인기차트 진입</span>
         {topRank !== null && (
-          <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 800, color: c }}>최고 {topRank}위</span>
+          <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, color: c }}>최고 {topRank}위</span>
         )}
       </div>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5 }}>
         {charted.slice(0, 4).map((app, i) => (
-          <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, fontWeight: 700, gap: 8 }}>
+          <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, fontWeight: 600, gap: 8 }}>
             <span style={{ color: C.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{shortName(app.name)}</span>
-            <span style={{ fontFamily: MONO, fontWeight: 800, color: C.sub, flexShrink: 0 }}>{app.rank}위</span>
+            <span style={{ fontFamily: MONO, fontWeight: 700, color: C.sub, flexShrink: 0 }}>{app.rank}위</span>
           </div>
         ))}
       </div>
@@ -1974,7 +1977,7 @@ function CardBrokerage({ v }: { v: Pick }) {
 function SectionHeading({ title }: { title: string }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 28 }}>
-      <h2 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: C.ink }}>{title}</h2>
+      <h2 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: C.ink }}>{title}</h2>
       <div style={{ height: 1, flex: 1, background: C.line }} />
     </div>
   );
@@ -2101,7 +2104,7 @@ export default async function Home() {
                 ))}
                 <a href="https://forms.gle/P4wzp2DkP2wyTPWP9" target="_blank" rel="noopener noreferrer" data-ga="cta_click" data-ga-cta="report_indicator" data-ga-surface="sentiment_grid" style={{ border: `2px dashed ${C.line}`, borderRadius: 14, padding: 24, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, minHeight: 210, color: C.sub, textAlign: "center" }}>
                   <Icon name="add_circle" style={{ fontSize: 34 }} />
-                  <span style={{ fontSize: 14, fontWeight: 700 }}>새로운 지표 제보하기</span>
+                  <span style={{ fontSize: 14, fontWeight: 600 }}>새로운 지표 제보하기</span>
                   <span style={{ fontSize: 11, fontWeight: 500, color: "var(--c-muted)" }}>아이디어가 있다면 알려주세요</span>
                 </a>
               </div>
