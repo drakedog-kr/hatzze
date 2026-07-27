@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { getSurgingStocks, getTopStocksWithTrend } from "@/lib/telegram-data";
 import { MDD_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
-import { MddExplorer, type StockOption } from "./MddExplorer";
+import { MddExplorer, type StockOption, type SuggestGroups } from "./MddExplorer";
 
 // 미리보기 이미지는 옆의 opengraph-image.tsx 가 그린다(ownImage). 자세한 건 app/seo.ts 주석 참고.
 export async function generateMetadata(): Promise<Metadata> {
@@ -71,13 +72,61 @@ async function resolveInitial(sp: Record<string, string | string[] | undefined>)
   return { code, name, market };
 }
 
+/**
+ * 검색창을 눌렀을 때(아직 아무것도 안 쳤을 때) 띄울 추천 종목.
+ * 카더라 리포트의 '급부상 종목'·'주요 종목 리포트'를 그대로 가져온다 — 빈 검색창에
+ * 채울 거리로 인기 순위를 새로 만들 이유가 없다. 이미 매일 계산해 두는 두 목록이
+ * "지금 사람들이 무슨 종목을 말하고 있나"라는 같은 질문의 답이다.
+ *
+ * 이름·시장은 카더라 쪽 값을 쓰지 않고 stocks 테이블에서 다시 읽는다. 두 가지를 얻는다:
+ *  (1) 표기가 MDD 의 나머지(검색 목록·제목)와 어긋나지 않는다.
+ *  (2) stocks 에 없는 코드(상폐·외국주)가 자연히 걸러진다 — 어차피 낙폭을 못 그린다.
+ *
+ * 코스닥이 섞여 들어오는 건 의도한 것이다. 검색 '목록'은 코스피만 싣지만(위 주석),
+ * 낙폭 계산 자체는 /api/mdd 가 코스닥도 처리하고, 카더라 카드가 이미 같은 경로로
+ * 코스닥 종목을 열고 있다. 텔레그램 대화는 코스닥 비중이 커서, 코스피로 걸러 버리면
+ * 추천이 몇 개 남지 않는다.
+ */
+async function loadSuggestions(): Promise<SuggestGroups> {
+  const empty: SuggestGroups = { surging: [], report: [] };
+  try {
+    const [surging, report] = await Promise.all([getSurgingStocks(5), getTopStocksWithTrend(5)]);
+    const codes = [...new Set([...surging.map((s) => s.code), ...report.map((s) => s.code)])];
+    if (!codes.length) return empty;
+
+    // 코드가 최대 10개 남짓이라 .in() 목록 길이 걱정은 없다(PostgREST 캡은 훨씬 위).
+    const { data } = await getSupabaseServer().from("stocks").select("code, name, market").in("code", codes);
+    const known = new Map((data ?? []).map((r) => [r.code as string, r as StockOption]));
+
+    const pick = (code: string, note: string) => {
+      const s = known.get(code);
+      return s ? { ...s, note } : null;
+    };
+    return {
+      surging: surging
+        .map((s) => pick(s.code, s.isNew ? "신규 등장" : `평소 ${s.ratio.toFixed(1)}배`))
+        .filter((s): s is NonNullable<typeof s> => s !== null),
+      report: report
+        .map((s) => pick(s.code, `${s.mentions.toLocaleString()}회 언급`))
+        .filter((s): s is NonNullable<typeof s> => s !== null),
+    };
+  } catch {
+    // 추천은 곁다리다. 텔레그램 쪽이 비어도 검색 자체는 그대로 동작해야 한다.
+    return empty;
+  }
+}
+
 export default async function MddPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
-  const [stocks, initial] = await Promise.all([loadKospiStocks(), resolveInitial(sp)]);
+  const [stocks, initial, suggestions] = await Promise.all([
+    loadKospiStocks(),
+    resolveInitial(sp),
+    loadSuggestions(),
+  ]);
   // key 로 초기 종목이 바뀌면 리마운트 — /mdd?code=A → ?code=B 로 이동해도 반영된다.
-  return <MddExplorer key={initial?.code ?? "default"} stocks={stocks} initial={initial} />;
+  return <MddExplorer key={initial?.code ?? "default"} stocks={stocks} initial={initial} suggestions={suggestions} />;
 }
