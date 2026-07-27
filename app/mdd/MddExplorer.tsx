@@ -1377,8 +1377,10 @@ function TopDrawdowns({ eps }: { eps: Episode[] }) {
               gridTemplateColumns: "22px minmax(0,1fr) 54px",
               alignItems: "center",
               gap: 10,
-              padding: "9px 0",
-              borderTop: i === 0 ? "none" : `1px solid ${C.line}`,
+              // 행 사이에 선을 두지 않는다 — 순위 숫자와 오른쪽 정렬된 낙폭이 이미 행을
+              // 갈라 주고 있어서 선은 한 겹 더 얹은 잡음이다. 대신 선이 하던 분리 일을
+              // 여백이 받도록 위아래 패딩을 9 → 13 으로 키운다(선을 그냥 빼면 붙는다).
+              padding: "13px 0",
             }}
           >
             <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 13, color: i === 0 ? C.cold : C.faint }}>{i + 1}</span>
