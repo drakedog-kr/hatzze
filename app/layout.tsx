@@ -101,7 +101,7 @@ export default async function RootLayout({
           rel="stylesheet"
         />
         <link
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=block"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0..1,0&display=block"
           rel="stylesheet"
         />
         {/* 기기별 수집 제외 스위치. ?ga=off 로 한 번 들어온 기기는 gtag 의 공식
