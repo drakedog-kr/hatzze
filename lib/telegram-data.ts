@@ -111,6 +111,39 @@ async function fetchAllRows<T>(orderKey: string, build: () => PagedQuery<T>): Pr
   return out;
 }
 
+/**
+ * `.in(칼럼, 목록)` 을 조각내어 부른다.
+ *
+ * 위 fetchAllRows 가 막는 건 **표가 커서** 넘치는 경우고, 이건 **거르는 목록 자체가
+ * 길어서** 넘치는 경우다. 같은 1,000행 캡인데 증상이 달라 따로 물린다. 이쪽이 더 안
+ * 보이는 이유는 두 가지다 — (1) 응답이 잘려도 에러가 없고, (2) 못 받은 코드는 Map 에서
+ * 그냥 빠지는데 호출부가 `?? code` 로 폴백하고 있어 화면엔 종목명 자리에 6자리 숫자가
+ * 찍힐 뿐이다. "이름이 좀 이상하네" 로 넘어가기 쉽다.
+ *
+ * 실제로 급부상 종목 카드가 그랬다. 14일치 언급 종목이 1,710개인데 한 번에 물어서
+ * 1,000개만 돌아왔고, 빠진 710개 중 하나(451760 컨텍)가 카드에 떴다.
+ * **이름보다 나쁜 건 market 도 같이 비었다는 것이다** — 표시용 시세를
+ * `${code}.${market === "KOSDAQ" ? "KQ" : "KS"}` 로 조회하므로, 코스닥 종목에 코스피
+ * 접미사가 붙어 **엉뚱한 종목의 가격이 카드에 찍혔다**(컨텍 종가 7,660원 자리에
+ * 12,200원·＋70.15%). 종목명이 틀린 것과 시세가 틀린 것은 무게가 다르다.
+ *
+ * 조각을 500 으로 둔 건 응답 행수를 캡의 절반 아래로 눌러 두려는 것이다. code 는 유일
+ * 키라 조각 하나가 500행을 넘을 수 없고, 이름처럼 유일하지 않은 칼럼으로 걸어도 여유가
+ * 남는다. 조각은 병렬로 부른다 — 이 함수는 화면을 그리는 경로에 있어서 직렬로 돌리면
+ * 조각 수만큼 지연이 쌓인다.
+ */
+async function selectInChunks<T>(
+  values: string[],
+  run: (slice: string[]) => PromiseLike<{ data: T[] | null }>,
+): Promise<T[]> {
+  const CHUNK = 500;
+  if (values.length <= CHUNK) return (await run(values)).data ?? [];
+  const slices: string[][] = [];
+  for (let i = 0; i < values.length; i += CHUNK) slices.push(values.slice(i, i + CHUNK));
+  const pages = await Promise.all(slices.map((s) => run(s)));
+  return pages.flatMap((p) => p.data ?? []);
+}
+
 export type TelegramSummary = {
   channelCount: number;
   totalSubscribers: number;
@@ -240,11 +273,25 @@ async function channelMeta(
 async function nameMap(codes: string[]): Promise<Map<string, string>> {
   if (!codes.length) return new Map();
   const db = getSupabaseAdmin();
-  const { data } = await db.from("stocks").select("code,name").in("code", codes);
-  return new Map((data ?? []).map((s) => [s.code as string, s.name as string]));
+  // 조각내어 부른다(selectInChunks 주석 참고) — 코드 목록이 1,000개를 넘으면 응답이
+  // 조용히 잘려 이름이 빠진다.
+  const data = await selectInChunks<{ code: string; name: string }>(codes, (slice) =>
+    db.from("stocks").select("code,name").in("code", slice),
+  );
+  return new Map(data.map((s) => [s.code, s.name]));
 }
 
 type StockInfo = { name: string; market: string | null; closePrice: number | null; changeRate: number | null; priceDate: string | null };
+
+/** stocks 표에서 그대로 읽어 온 행(칼럼명 그대로). 위 StockInfo 는 화면용으로 옮긴 뒤의 모양. */
+type StockRow = {
+  code: string;
+  name: string;
+  market: string | null;
+  close_price: number | null;
+  change_rate: number | string | null;
+  price_date: string | null;
+};
 
 /**
  * 카드용 시세 — 야후 실시간(상단 티커와 같은 소스·같은 전일종가 규칙, lib/yahoo-quote).
@@ -263,11 +310,20 @@ async function stockQuote(symbol: string): Promise<{ price: number; changeRate: 
 async function stockInfoMap(codes: string[]): Promise<Map<string, StockInfo>> {
   if (!codes.length) return new Map();
   const db = getSupabaseAdmin();
-  const { data, error } = await db
-    .from("stocks")
-    .select("code,name,market,close_price,change_rate,price_date")
-    .in("code", codes);
-  if (error) {
+  // 조각내어 부른다(selectInChunks 주석 참고). 여기서 잘리면 이름뿐 아니라 market 까지
+  // 비어 시세를 엉뚱한 티커로 조회하게 되므로, 이 함수가 가장 아프게 물린 자리다.
+  let failed = false;
+  const data = await selectInChunks<StockRow>(codes, async (slice) => {
+    const res = await db
+      .from("stocks")
+      .select("code,name,market,close_price,change_rate,price_date")
+      .in("code", slice);
+    // 조각 하나라도 실패하면 통째로 폴백한다 — 일부만 가격이 붙은 결과는 "어떤 종목은
+    // 시세가 없다"로 보여서, 아예 없는 것보다 읽는 사람을 헷갈리게 한다.
+    if (res.error) failed = true;
+    return res;
+  });
+  if (failed) {
     // 가격 컬럼이 아직 없는 환경에서도 이름은 나오도록 폴백.
     const names = await nameMap(codes);
     return new Map(
@@ -275,11 +331,11 @@ async function stockInfoMap(codes: string[]): Promise<Map<string, StockInfo>> {
     );
   }
   return new Map(
-    (data ?? []).map((s) => [
-      s.code as string,
+    data.map((s) => [
+      s.code,
       {
-        name: s.name as string,
-        market: (s.market as string) ?? null,
+        name: s.name,
+        market: s.market ?? null,
         closePrice: s.close_price ?? null,
         changeRate: s.change_rate != null ? Number(s.change_rate) : null,
         priceDate: s.price_date ?? null,
