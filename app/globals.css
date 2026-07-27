@@ -822,6 +822,19 @@ main.hz-scroll { overflow-x: clip; }
      한다(전 색상 최저 4.59:1). */
   color: hsl(var(--h) 46% 30%);
 }
+/* 로고 이미지. 머리글자 배지와 **크기·모양이 정확히 같아야 한다** — 로고를 못 불러와
+   폴백될 때 줄이 밀리면 목록 전체가 한 번 움찔한다.
+   로고는 대개 흰 여백을 품고 있어서 배경을 깔지 않는다(깔면 로고 안의 흰색과 겹쳐
+   테두리가 두 겹으로 보인다). object-fit:contain 으로 비율만 지킨다. */
+.hz-stock-logo {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: contain;
+  background: #fff; /* 투명 배경 로고가 다크에서 안 보이는 걸 막는다 */
+}
+
 :root[data-theme="dark"] .hz-stock-badge {
   /* 다크에서 라이트와 같은 명도를 쓰면 배지만 허옇게 뜬다. 배경은 낮추고 글자는 올린다. */
   background: hsl(var(--h) 24% 26%);
