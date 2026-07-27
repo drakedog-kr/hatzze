@@ -68,23 +68,26 @@ export default async function RootLayout({
   // 테마는 쿠키로 관리한다 — 서버가 여기서 읽어 <html data-theme>를 SSR하면
   // 클라이언트와 값이 일치해 hydration 불일치도, 첫 페인트 깜빡임도 없다.
   //
-  // 기본값은 다크다(2026-07-27 전환). 쿠키가 없으면 다크로 열리고, 라이트는 이용자가
-  // 토글을 눌러 쿠키를 남긴 경우에만 나온다. 지표 수치와 인포그래픽이 어두운 바탕에서
-  // 더 또렷하게 읽힌다는 판단이다.
+  // 기본값은 라이트다(2026-07-27 원복). 쿠키가 없으면 라이트로 열리고, 다크는 이용자가
+  // 토글을 눌러 쿠키를 남긴 경우에만 나온다. 한동안 다크가 기본이었는데, 팔레트를
+  // 새로 잡으면서(흰 카드 + 옅은 회색 바탕) 라이트 쪽 가독성이 올라가 되돌렸다.
   //
   // 이 한 줄이 기본 테마의 유일한 정의다 — 셸의 토글도 여기서 내려준 값을 초기값으로
-  // 받으므로, 기본값을 되돌리려면 비교 대상을 "light" 에서 "dark" 로 뒤집으면 된다.
-  // 다만 globals.css 의 color-scheme 과 아래 theme-color 메타는 이 값을 따라가야 한다.
-  const theme = (await cookies()).get("hz-theme")?.value === "light" ? "light" : "dark";
+  // 받으므로, 기본값을 다시 뒤집으려면 비교 대상만 바꾸면 된다.
+  // 다만 아래 theme-color 메타는 이 값을 따라가야 한다(globals.css 의 color-scheme 은
+  // :root=light / [data-theme=dark]=dark 로 갈라 둬서 기본값과 무관하게 맞는다).
+  const theme = (await cookies()).get("hz-theme")?.value === "dark" ? "dark" : "light";
 
   return (
     <html lang="ko" data-theme={theme} className={`${pretendard.variable} h-full antialiased`}>
       <head>
-        {/* 모바일 브라우저의 주소창·상태바 색. 기본이 다크가 되면서 이걸 안 주면 어두운
-            화면 위에 흰 주소창이 얹혀 페이지가 잘린 것처럼 보인다. 쿠키로 정한 theme 을
-            그대로 따르므로 토글과 어긋나지 않는다.
-            값은 globals.css 의 --c-bg 와 같아야 한다(메타 태그에는 var() 를 못 쓴다). */}
-        <meta name="theme-color" content={theme === "dark" ? "#0e131c" : "#d4daea"} />
+        {/* 모바일 브라우저의 주소창·상태바 색. 안 주면 다크에서 어두운 화면 위에 흰
+            주소창이 얹혀 페이지가 잘린 것처럼 보인다. 쿠키로 정한 theme 을 그대로
+            따르므로 토글과 어긋나지 않는다.
+            값은 globals.css 의 --c-bg 와 **같아야 한다**(메타 태그에는 var() 를 못 쓴다).
+            팔레트를 갈면서 여기가 옛 값(#0e131c / #d4daea)으로 남아 주소창만 이전
+            팔레트를 띠고 있었다 — --c-bg 를 바꿀 땐 이 줄을 같이 볼 것. */}
+        <meta name="theme-color" content={theme === "dark" ? "#101013" : "#f2f4f6"} />
         {/* 본문·숫자는 전부 Pretendard(위에서 next/font/local로 자체 호스팅)라 CDN에서
             받아오는 건 두 가지뿐이다: 워드마크 전용 Bricolage Grotesque와 Material Symbols
             아이콘. 둘 다 빌드 시점 폰트 페치 실패를 피하려고 런타임 CDN 링크로 둔다.

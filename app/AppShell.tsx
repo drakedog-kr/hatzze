@@ -195,8 +195,8 @@ function ThemeToggle({ initial }: { initial: "light" | "dark" }) {
 
   const toggle = () => {
     const next = theme === "dark" ? "light" : "dark";
-    // 기본 테마가 다크라, 이 이벤트는 이제 "라이트로 되돌린 사람"이 얼마나 되는지를
-    // 재는 쪽이 주된 쓸모다. 전환 방향(to)이 있어야 양쪽이 구분된다.
+    // 기본이 라이트라, 이 이벤트는 "다크로 바꾼 사람"이 얼마나 되는지를 재는 쪽이
+    // 주된 쓸모다. 전환 방향(to)이 있어야 양쪽이 구분된다.
     track("theme_toggle", { to: next });
     setTheme(next);
     document.documentElement.setAttribute("data-theme", next);
