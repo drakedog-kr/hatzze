@@ -36,7 +36,7 @@ export const rankNum: React.CSSProperties = {
   width: 17,
   textAlign: "right",
   fontFamily: MONO,
-  fontWeight: 800,
+  fontWeight: 700,
   fontSize: 13,
   color: C.faint,
   flexShrink: 0,
@@ -71,7 +71,7 @@ export function Pill({
         alignItems: "center",
         gap: 3,
         fontSize: 11,
-        fontWeight: 700,
+        fontWeight: 600,
         lineHeight: 1.45,
         color: fg,
         background: bg,
@@ -89,7 +89,7 @@ export function Pill({
 export function RankDelta({ change, unit = "계단" }: { change: number | null; unit?: string }) {
   if (change === null || change === 0) return null;
   return (
-    <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 800, color: change > 0 ? C.hot : C.cold, whiteSpace: "nowrap" }}>
+    <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: change > 0 ? C.hot : C.cold, whiteSpace: "nowrap" }}>
       {change > 0 ? "▲" : "▼"}
       {Math.abs(change)}
       {unit}
@@ -118,7 +118,7 @@ export function Avatar({ photo, title, size = 30 }: { photo: string | null; titl
         background: C.track,
         color: C.sub,
         fontSize: size * 0.42,
-        fontWeight: 800,
+        fontWeight: 700,
       }}
     >
       {title.trim().charAt(0)}

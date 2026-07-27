@@ -64,7 +64,7 @@ export function SectionHead({
             style={{
               margin: 0,
               fontSize: 17,
-              fontWeight: 800,
+              fontWeight: 700,
               color: C.ink,
               display: "flex",
               alignItems: "center",
@@ -89,7 +89,7 @@ export function SectionHead({
               alignItems: "center",
               gap: 4,
               fontSize: 11.5,
-              fontWeight: 700,
+              fontWeight: 600,
               color: C.sub,
               background: C.bg,
               padding: "4px 10px",

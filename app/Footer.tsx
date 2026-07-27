@@ -50,7 +50,7 @@ function FooterExternalLink({ href, cta, children }: { href: string; cta: string
 
 function GroupLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ fontSize: 11, fontWeight: 800, color: C.ink, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 10 }}>
+    <div style={{ fontSize: 11, fontWeight: 700, color: C.ink, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 10 }}>
       {children}
     </div>
   );
@@ -72,7 +72,7 @@ export default function Footer() {
               <Wordmark size={26} />
               {/* 로고(26px 잉크)와 나란히 두되 크기·색을 확 낮춘다 — 비슷하게 두면
                   "hatzze v.1.0.0" 이 한 덩어리 워드마크처럼 읽힌다. */}
-              <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: "var(--c-muted)", letterSpacing: "0.02em" }}>
+              <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 600, color: "var(--c-muted)", letterSpacing: "0.02em" }}>
                 v.{APP_VERSION}
               </span>
             </span>
@@ -108,7 +108,7 @@ export default function Footer() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, auto)", gap: "12px 32px" }}>
               {SOURCE_GROUPS.map((g) => (
                 <div key={g.label} style={{ minWidth: 140 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: C.ink, marginBottom: 3 }}>{g.label}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: C.ink, marginBottom: 3 }}>{g.label}</div>
                   <div style={{ fontSize: 12, lineHeight: 1.55, color: C.sub }}>{g.items}</div>
                 </div>
               ))}
@@ -134,7 +134,7 @@ export default function Footer() {
         {/* 개인정보처리방침은 법정 고지라 '바로가기'(서비스 메뉴)가 아니라 저작권 옆에 둔다.
             좁은 화면에서 두 줄로 갈리더라도 링크와 저작권이 한 덩어리로 붙어 있게 감싼다. */}
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-          <Link href="/privacy" style={{ fontSize: 11, fontWeight: 700, color: C.sub, textDecoration: "none" }}>
+          <Link href="/privacy" style={{ fontSize: 11, fontWeight: 600, color: C.sub, textDecoration: "none" }}>
             개인정보처리방침
           </Link>
           <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: "var(--c-muted)" }}>Copyright © {year} hatzze. All rights reserved.</p>

@@ -87,7 +87,7 @@ export function MddExplorer({ stocks, initial }: { stocks: StockOption[]; initia
     <div style={{ maxWidth: 1180, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
       <header>
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: C.ink }}>MDD 정밀분석</h1>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: C.ink }}>MDD 정밀분석</h1>
           <div style={{ height: 1, flex: 1, background: C.line }} />
         </div>
         <p style={{ margin: "8px 0 0", color: C.sub, fontSize: 14, lineHeight: 1.6 }}>
@@ -294,7 +294,7 @@ function Controls({
           />
         </div>
         {open && matches.length > 0 && (
-          <ul style={{ position: "absolute", top: 50, left: 0, right: 0, zIndex: 20, listStyle: "none", margin: 0, padding: 6, background: C.card, border: `1px solid ${C.line}`, borderRadius: 12, boxShadow: `0 8px 24px ${C.shadow}` }}>
+          <ul style={{ position: "absolute", top: 50, left: 0, right: 0, zIndex: 20, listStyle: "none", margin: 0, padding: 6, background: "var(--c-float)", border: `1px solid ${C.line}`, borderRadius: 12, boxShadow: "0 4px 16px var(--c-shadow-strong)" }}>
             {matches.map((s) => (
               <li key={s.code}>
                 <button
@@ -329,10 +329,9 @@ function Controls({
                 borderRadius: 999,
                 border: "none",
                 background: on ? C.card : "transparent",
-                boxShadow: on ? `0 1px 3px ${C.shadow}` : "none",
                 color: on ? C.blue : C.sub,
                 fontSize: 13,
-                fontWeight: 800,
+                fontWeight: 700,
                 cursor: "pointer",
                 whiteSpace: "nowrap",
                 transition: "background .15s, color .15s",
@@ -439,7 +438,7 @@ function CardHead({ icon, title, sub, right }: { icon: string; title: string; su
   return (
     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
       <div style={{ minWidth: 0 }}>
-        <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: C.ink, display: "flex", alignItems: "center", gap: 10, lineHeight: 1.25 }}>
+        <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: C.ink, display: "flex", alignItems: "center", gap: 10, lineHeight: 1.25 }}>
           <Icon name={icon} style={{ fontSize: 22, color: C.blue, flexShrink: 0 }} />
           <span style={{ wordBreak: "keep-all" }}>{title}</span>
         </h2>
@@ -474,7 +473,7 @@ function Badge({ children, tone }: { children: React.ReactNode; tone?: "blue" | 
   const bg = tone === "blue" ? "var(--c-blue-tint)" : tone === "warn" ? "var(--c-mania-tint, rgba(220,80,80,.12))" : C.bg;
   const fg = tone === "blue" ? C.blue : tone === "warn" ? C.mania : C.sub;
   return (
-    <span style={{ fontSize: 11.5, fontWeight: 700, padding: "4px 10px", borderRadius: 999, background: bg, color: fg, whiteSpace: "nowrap" }}>
+    <span style={{ fontSize: 11.5, fontWeight: 600, padding: "4px 10px", borderRadius: 999, background: bg, color: fg, whiteSpace: "nowrap" }}>
       {children}
     </span>
   );
@@ -486,7 +485,7 @@ function Stat({ label, value, sub, tone }: { label: string; value: string; sub?:
   return (
     <div style={{ background: C.bg, borderRadius: 12, padding: "13px 15px", minWidth: 0 }}>
       <div style={{ fontSize: 11.5, color: C.sub, marginBottom: 5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
-      <div style={{ fontFamily: MONO, fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em", color, lineHeight: 1.15 }}>{value}</div>
+      <div style={{ fontFamily: MONO, fontSize: 19, fontWeight: 700, letterSpacing: "-0.02em", color, lineHeight: 1.15 }}>{value}</div>
       {sub && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 4 }}>{sub}</div>}
     </div>
   );
@@ -554,7 +553,7 @@ function Headline({ data }: { data: MddResult }) {
     <section style={card}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 22 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-          <span style={{ fontSize: 21, fontWeight: 800, color: C.ink }}>{data.name}</span>
+          <span style={{ fontSize: 21, fontWeight: 700, color: C.ink }}>{data.name}</span>
           <span style={{ fontFamily: MONO, fontSize: 13, color: C.faint }}>{data.code}</span>
           {data.market && <Badge>{data.market}</Badge>}
         </div>
@@ -568,7 +567,7 @@ function Headline({ data }: { data: MddResult }) {
       <div style={{ display: "flex", alignItems: "flex-end", gap: 22, flexWrap: "wrap", marginBottom: 18 }}>
         <div>
           <div style={{ fontSize: 12.5, color: C.sub, marginBottom: 7 }}>고점 대비</div>
-          <span style={{ fontFamily: MONO, fontSize: 54, fontWeight: 800, lineHeight: 0.95, letterSpacing: "-0.035em", color: atHigh ? C.ink : C.cold }}>
+          <span style={{ fontFamily: MONO, fontSize: 54, fontWeight: 700, lineHeight: 0.95, letterSpacing: "-0.035em", color: atHigh ? C.ink : C.cold }}>
             {atHigh ? "신고가 부근" : fmtPct(a.currentDd)}
           </span>
         </div>
@@ -587,7 +586,7 @@ function Headline({ data }: { data: MddResult }) {
       </div>
 
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
-        <span style={{ fontSize: 12.5, fontWeight: 700, color: C.sub }}>고점 대비 낙폭 추이</span>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: C.sub }}>고점 대비 낙폭 추이</span>
         <span style={{ fontSize: 11.5, color: C.muted }}>0%에 가까울수록 고점 부근</span>
       </div>
       <Underwater series={a.underwater} mdd={a.mdd} />
@@ -749,7 +748,7 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
             <span style={{ display: "block", flex: 1 }}>
               <span style={{ display: "block", height: 6, width: `${Math.max(2, Math.min(100, s.pct))}%`, background: s.color, opacity: s.opacity, borderRadius: 999 }} />
             </span>
-            <span style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: C.sub, width: 42, textAlign: "right" }}>{s.value}</span>
+            <span style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 600, color: C.sub, width: 42, textAlign: "right" }}>{s.value}</span>
           </div>
         ))}
       </div>
@@ -888,7 +887,7 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
                 <Icon name={t.icon} style={{ fontSize: 17, color: C.blue }} />
               </span>
               <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: C.ink, lineHeight: 1.3, wordBreak: "keep-all" }}>{t.label}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: C.ink, lineHeight: 1.3, wordBreak: "keep-all" }}>{t.label}</span>
                 <span style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.45, wordBreak: "keep-all" }}>{t.sub}</span>
               </div>
             </div>
@@ -951,7 +950,7 @@ function Attribution({
         title="이 하락, 시장 탓일까 종목 탓일까"
         sub={`고점(${athDate}) 이후 ${attr.sincePeakDays.toLocaleString("ko-KR")}일, 같은 기간을 나란히 놓고 비교합니다.`}
       />
-      <p style={{ margin: "0 0 16px", color: C.ink, fontSize: 15, fontWeight: 700, lineHeight: 1.6, wordBreak: "keep-all" }}>{verdict}</p>
+      <p style={{ margin: "0 0 16px", color: C.ink, fontSize: 15, fontWeight: 600, lineHeight: 1.6, wordBreak: "keep-all" }}>{verdict}</p>
       {/* 옆 카드(이 하락의 성격)에 맞춰 늘어나는데 여긴 막대 셋뿐이라 바닥이 비었다.
           줄 간격을 벌려 채우지는 않는다 — 이건 목록이 아니라 길이를 견주는 차트라,
           막대가 서로 멀어지면 비교가 어려워진다. 묶음을 붙여 둔 채 세로 가운데로 둬
@@ -1075,7 +1074,7 @@ function Recovery({ a }: { a: MddAnalysis }) {
                 />
               </span>
             </span>
-            <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, textAlign: "right", color: s.recovered ? C.sub : C.mania }}>
+            <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 600, textAlign: "right", color: s.recovered ? C.sub : C.mania }}>
               {fmtDur(s.days)}
             </span>
           </div>
@@ -1151,11 +1150,11 @@ function Character({ ch, currentDd }: { ch: DrawdownCharacter | null; currentDd:
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: t.on ? C.blue : C.ink }}>{t.label}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: t.on ? C.blue : C.ink }}>{t.label}</span>
                     <span style={{ fontSize: 11.5, color: C.faint }}>· {t.b.count}회</span>
                   </div>
                   <div style={{ fontSize: 11.5, color: C.sub, marginBottom: 8 }}>{t.sub}</div>
-                  <div style={{ fontFamily: MONO, fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em", color: C.ink, lineHeight: 1.15 }}>
+                  <div style={{ fontFamily: MONO, fontSize: 19, fontWeight: 700, letterSpacing: "-0.02em", color: C.ink, lineHeight: 1.15 }}>
                     {fmtDur(t.b.medianRecovery)}
                   </div>
                   <div style={{ fontSize: 11.5, color: C.muted, marginTop: 4 }}>회복 중앙값</div>
@@ -1248,7 +1247,7 @@ function TopDrawdowns({ eps }: { eps: Episode[] }) {
               borderTop: i === 0 ? "none" : `1px solid ${C.line}`,
             }}
           >
-            <span style={{ fontFamily: MONO, fontWeight: 800, fontSize: 13, color: i === 0 ? C.cold : C.faint }}>{i + 1}</span>
+            <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 13, color: i === 0 ? C.cold : C.faint }}>{i + 1}</span>
             <div style={{ minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 12.5, color: C.sub }}>{e.peakDate} 고점</span>
@@ -1260,7 +1259,7 @@ function TopDrawdowns({ eps }: { eps: Episode[] }) {
                 <span style={{ display: "block", height: "100%", width: `${(Math.abs(e.depth) / worst) * 100}%`, background: C.cold, opacity: e.recovered ? 0.55 : 1, borderRadius: 999 }} />
               </span>
             </div>
-            <span style={{ fontFamily: MONO, fontSize: 16, fontWeight: 800, letterSpacing: "-0.02em", color: C.cold, textAlign: "right" }}>
+            <span style={{ fontFamily: MONO, fontSize: 16, fontWeight: 700, letterSpacing: "-0.02em", color: C.cold, textAlign: "right" }}>
               {Math.round(e.depth)}%
             </span>
           </div>

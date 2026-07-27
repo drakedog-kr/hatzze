@@ -39,7 +39,7 @@ export function ExpandableList({
     background: "transparent",
     color: C.sub,
     fontSize: 12,
-    fontWeight: 700,
+    fontWeight: 600,
     cursor: "pointer",
   };
 

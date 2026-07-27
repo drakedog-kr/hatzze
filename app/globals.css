@@ -3,54 +3,76 @@
 /* ── 테마 팔레트 (라이트 기본 / 다크 오버라이드) ────────────────────
    카드가 인라인 스타일 위주라, 색은 전부 CSS 변수로 두고 app/ui.tsx의 C가
    var(--c-*)를 참조한다. data-theme="dark"를 <html>에 붙이면 전체가 전환된다.
-   강조색(cold/neutral/hot/mania)은 두 테마 공통, 구조색(배경/카드/텍스트/보더)만
-   다르게 둔다. */
+
+   회색 램프는 토스증권을 참고해 잡았다. 예전 팔레트는 라이트가 청보라
+   (bg #d4daea / card #e8eefe)라 카드와 바탕의 명도차가 1.10:1 밖에 안 됐고,
+   화면 전체가 한 덩어리로 뭉갰다. "흰 카드 + 옅은 회색 바탕"으로 바꾸면
+   그 경계가 저절로 생긴다.
+
+   **강조색도 이제 테마마다 다르다.** 예전에는 cold/neutral/hot/mania 를 두 테마가
+   공유하고 구조색만 갈랐는데, 한 값으로 양쪽 배경을 다 만족시키려니 라이트에선 뜨고
+   다크에선 탁했다. 배경이 반대인 두 테마는 강조색도 반대 방향으로 밀어야 한다. */
 :root {
-  --c-cold: #5ea8d8;
-  --c-neutral: #a89f95;
-  --c-hot: #ff9a4d;
-  --c-mania: #ff6b81;
-  --c-blue: #0064ff;
+  /* 온도 스케일 — 색조(파랑→회색→주황→빨강)는 그대로 두고 값만 램프에 맞춰 옮겼다.
+     저온은 CTA 파랑(--c-blue = blue500)보다 한 단계 진한 blue700 을 쓴다. 같은
+     값이면 게이지 호가 링크처럼 읽힌다. 상온은 채도를 뺀 회색(grey600)이다 —
+     예전 베이지(#a89f95)는 '중립'보다 '바랜 색'으로 보였다. */
+  --c-cold: #1b64da; /* blue700 */
+  --c-neutral: #6b7684; /* grey600 */
+  --c-hot: #ed6700; /* orange800 */
+  --c-mania: #f04452; /* red500 */
+  --c-blue: #3182f6; /* blue500 */
 
-  --c-ink: #202632;
-  --c-ink-soft: #3a4453;
+  /* 텍스트 램프 = grey900→400. 흰 카드 위 명암비 16.6 / 11.0 / 7.1 / 4.6 / 3.0 / 2.0.
+     hint(2.0)은 글자에 쓰면 안 된다 — 점선·아이콘 같은 장식 전용이다.
+     바탕이 흰색으로 올라가면서 예전에 라이트에서 겪던 "옅은 회색이 바탕에 묻힘"
+     문제(faint 1.56:1)가 근본적으로 사라진다 — 억지로 어둡게 당길 필요가 없다. */
+  --c-ink: #191f28; /* grey900 */
+  --c-ink-soft: #333d4b; /* grey800 */
   --c-logo-ink: oklch(0.24 0.02 260); /* 로고 워드마크 잉크(≈#25262F) — handoff 10a */
-  --c-sub: #6b7684;
-  /* 라이트 팔레트는 배경이 밝은 회색(#d4daea)이라, 흔한 라이트 테마 기준으로 고른
-     연한 회색이 바탕에 그대로 묻힌다. 예전 faint(#a9b0bd)는 타일 배경 위 명암비가
-     1.56:1 이라 10px 종목 코드가 거의 안 읽혔다. 두 단계를 한 칸씩 내려 잡는다
-     (faint 1.56 → 2.60, muted 2.27 → 2.97). sub 는 그대로 둔다 — 여기까지 내리면
-     세 단계가 한 색으로 뭉개진다. */
-  --c-muted: #737d90;
-  --c-faint: #7e8798;
-  --c-hint: #8a93a8;
+  --c-sub: #4e5968; /* grey700 */
+  --c-muted: #6b7684; /* grey600 */
+  --c-faint: #8b95a1; /* grey500 */
+  --c-hint: #b0b8c1; /* grey400 */
 
-  --c-card: #e8eefe;
-  --c-bg: #d4daea;
-  --c-line: #c2c6d8;
-  --c-track: #c2c6d8;
+  --c-card: #ffffff;
+  /* 떠 있는 층(테마 팝오버, 종목 자동완성). 다크에서는 카드보다 한 단계 밝은 층으로
+     오버레이를 띄운다 — 그림자 없이도 아래 카드와 갈라진다.
+     라이트에선 카드가 이미 흰색이라 그 수가 안 통하고, 테두리와 옅은 그림자가 그 몫을
+     대신한다. 그래서 이 값만 두 테마의 동작이 다르다. */
+  --c-float: #ffffff;
+  --c-bg: #f2f4f6; /* 화면 바탕 겸, 흰 카드 안에 파이는 '내려앉은' 패널 */
+  --c-line: #e5e8eb; /* hairlineBorder */
+  --c-track: #e5e8eb;
   /* 막대 '채움'은 트랙(--c-track)과 반드시 다른 값이어야 한다. 같은 값을 쓰면 막대가
-     자기 트랙 위에서 사라진다 — MDD 테마 비교의 비교군 막대가 그랬다. 트랙 배경이
-     --c-bg 인데 채움이 --c-track(거의 같은 색)에 opacity 0.5 까지 얹혀 명암비가
-     1.10:1(라이트)·1.18:1(다크)이었다. 강조 막대는 채도(--c-cold)로 구분되니 중립
-     막대는 채도 없이 명도만으로 읽히게 잡는다(트랙 대비 1.94:1 / 2.68:1). */
-  --c-bar: #949db2;
+     자기 트랙 위에서 사라진다 — MDD 테마 비교의 비교군 막대가 그랬다. 강조 막대는
+     채도로 구분되니 중립 막대는 채도 없이 명도만으로 읽히게 잡는다
+     (트랙 대비 2.47:1 라이트 / 3.18:1 다크 — PR #128 이 세운 1.94/2.68 기준을 넘긴다). */
+  --c-bar: #8b95a1;
 
-  --c-divider: rgba(0, 0, 0, 0.05);
-  --c-divider-strong: rgba(0, 0, 0, 0.07);
-  --c-shadow: rgba(0, 0, 0, 0.08);
-  --c-shadow-strong: rgba(0, 0, 0, 0.2);
-  --c-marker: rgba(32, 38, 50, 0.35);
-  --c-blue-tint: rgba(0, 100, 255, 0.08);
+  --c-divider: rgba(0, 27, 55, 0.06);
+  --c-divider-strong: rgba(0, 27, 55, 0.1);
+  /* 눌리는 요소의 호버/눌림. 불투명 회색이 아니라 '반투명 먹'이라, 흰 카드 위든
+     옅은 회색 바탕 위든 같은 규칙 하나로 맞는다. 예전엔 호버 배경에 --c-bg 를 썼는데, 그게 다크에서는
+     사이드바(#202027)보다 어두운 색이라 마우스를 올리면 항목이 파이는 것처럼 보였다. */
+  --c-hover: rgba(7, 25, 76, 0.04);
+  --c-pressed: rgba(3, 31, 63, 0.09);
+  /* 드롭섀도를 쓰지 않는다 — box-shadow 는 전부 0.5~0.75px 짜리 헤어라인 링
+     (번짐 0, 오프셋 0)이고, 깊이는 배경 명도 단계로만 낸다. 이 두 값은 이제
+     '그림자'가 아니라 그 링의 색이다. */
+  --c-shadow: rgba(2, 32, 71, 0.05);
+  --c-shadow-strong: rgba(0, 27, 55, 0.12);
+  --c-marker: rgba(25, 31, 40, 0.35);
+  --c-blue-tint: rgba(49, 130, 246, 0.1);
   /* 강조색 알약(배지)의 옅은 배경. 인라인에서 `${C.hot}22` 처럼 쓰면 var()에 알파를
      이어붙인 꼴("var(--c-hot)22")이라 CSS가 통째로 버린다 — 실제로 급부상 종목의
      "언급 ▲ 4.3배" 배지가 배경 없이 글자만 떠 있었다. 색마다 변수로 둔다. */
-  --c-hot-tint: rgba(255, 154, 77, 0.14);
-  --c-cold-tint: rgba(94, 168, 216, 0.14);
-  --c-mania-tint: rgba(255, 107, 129, 0.12);
-  --c-neutral-tint: rgba(168, 159, 149, 0.16);
-  --c-scrollbar: #c2c6d8;
-  --c-scrollbar-border: #d4daea;
+  --c-hot-tint: rgba(245, 120, 0, 0.12);
+  --c-cold-tint: rgba(27, 100, 218, 0.1);
+  --c-mania-tint: rgba(240, 68, 82, 0.1);
+  --c-neutral-tint: rgba(107, 118, 132, 0.1);
+  --c-scrollbar: #d1d6db;
+  --c-scrollbar-border: #f2f4f6;
 
   --background: var(--c-bg);
   --foreground: var(--c-ink);
@@ -65,36 +87,52 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --c-blue: #4d8dff;
+  /* 다크는 채도가 거의 없는 중성 먹색으로 간다. 예전 값은 남색기가 강해서
+     (bg #0e131c / card #1a2130) 화면이 파랗게 떴다.
+     저온은 라이트와 반대로 CTA 파랑보다 한 단계 '밝은' 쪽으로 벌린다 — 어두운 배경에선
+     밝을수록 대비가 오르므로, 두 파랑을 가르는 방향도 뒤집혀야 한다. */
+  --c-cold: #61b0ff;
+  --c-neutral: #9e9ea4;
+  --c-hot: #ffa927;
+  --c-mania: #fa616d;
+  --c-blue: #3485fa;
 
-  --c-ink: #e7eaf1;
-  --c-ink-soft: #c3c9d4;
+  /* 카드(#202027) 위 명암비 12.7 / 9.2 / 6.1 / 4.7 / 4.0 / 2.7 (hint 는 라이트와 같은 이유로 장식 전용).
+     ink 를 순백(#fff)으로 두지 않는 이유: 이 변수는 큰 숫자뿐 아니라 AI 요약 같은
+     긴 문단에도 걸린다. 어두운 바탕 위 순백 본문은 글자가 번져 보인다(halation).
+     본문에는 grey800 을 쓰고 순백은 큰 수치에만 남긴다. */
+  --c-ink: #e4e4e5; /* grey800 */
+  --c-ink-soft: #c3c3c6; /* grey700 */
   --c-logo-ink: #ffffff; /* on-dark 워드마크 — handoff 10a */
-  --c-sub: #9aa3b2;
-  /* 다크도 같은 이유로 한 칸씩 올린다(어두운 쪽은 밝게 해야 대비가 오른다).
-     카드 배경 위 faint 2.71 → 3.41. 라이트만큼 심하진 않았지만 10px 코드는 여기서도 얇았다. */
-  --c-muted: #8a94a6;
-  --c-faint: #6b7484;
-  --c-hint: #6e7686;
+  --c-sub: #9e9ea4; /* grey600 */
+  --c-muted: #8a8a92;
+  --c-faint: #7e7e87; /* grey500 */
+  --c-hint: #62626d; /* grey400 */
 
-  --c-card: #1a2130;
-  --c-bg: #0e131c;
-  --c-line: #2b3344;
-  --c-track: #2b3344;
-  --c-bar: #4d5a72;
+  --c-card: #202027; /* backgroundLevel01 */
+  --c-float: #2c2c35; /* backgroundLevel02 */
+  --c-bg: #101013; /* backgroundScreen */
+  --c-line: #2f2f39;
+  --c-track: #3c3c47;
+  --c-bar: #8a8a92;
 
-  --c-divider: rgba(255, 255, 255, 0.07);
-  --c-divider-strong: rgba(255, 255, 255, 0.1);
-  --c-shadow: rgba(0, 0, 0, 0.45);
-  --c-shadow-strong: rgba(0, 0, 0, 0.6);
-  --c-marker: rgba(231, 234, 241, 0.4);
-  --c-blue-tint: rgba(77, 141, 255, 0.16);
-  --c-hot-tint: rgba(255, 154, 77, 0.16);
-  --c-cold-tint: rgba(94, 168, 216, 0.16);
-  --c-mania-tint: rgba(255, 107, 129, 0.16);
-  --c-neutral-tint: rgba(168, 159, 149, 0.2);
-  --c-scrollbar: #2b3344;
-  --c-scrollbar-border: #0e131c;
+  --c-divider: rgba(214, 224, 239, 0.09);
+  --c-divider-strong: rgba(213, 223, 244, 0.14);
+  /* 다크에서는 같은 자리에 '옅은 빛'을 얹는다(라이트의 먹과 방향만 반대). */
+  --c-hover: rgba(214, 224, 239, 0.09);
+  --c-pressed: rgba(213, 223, 244, 0.14);
+  /* 라이트와 같다 — 이제 그림자가 아니라 헤어라인 링의 색이다. 다크에서는 링이
+     '어두운 테두리'가 아니라 '옅은 빛'이어야 카드 윤곽이 살아난다. */
+  --c-shadow: rgba(218, 223, 233, 0.05);
+  --c-shadow-strong: rgba(218, 223, 233, 0.11);
+  --c-marker: rgba(228, 228, 229, 0.4);
+  --c-blue-tint: rgba(52, 133, 250, 0.18);
+  --c-hot-tint: rgba(255, 169, 39, 0.16);
+  --c-cold-tint: rgba(97, 176, 255, 0.16);
+  --c-mania-tint: rgba(250, 97, 109, 0.16);
+  --c-neutral-tint: rgba(158, 158, 164, 0.16);
+  --c-scrollbar: #3c3c47;
+  --c-scrollbar-border: #101013;
 }
 
 @theme inline {
@@ -496,10 +534,13 @@ main.hz-scroll { overflow-x: clip; }
   z-index: 40;
   width: min(268px, calc(100% - 24px));
   padding: 9px;
-  background: var(--c-card);
+  background: var(--c-float);
   border: 1px solid var(--c-line);
   border-radius: 12px;
-  box-shadow: 0 12px 30px var(--c-shadow-strong);
+  /* 카드에는 그림자를 안 쓰지만(배경 단계로만 띄운다) 오버레이는 예외다 — 아래 내용을
+     실제로 가리고 떠 있어야 해서, 경계선만으로는 "위에 있다"가 안 읽힌다. 예전
+     0 12px 30px 보다 훨씬 얕게 줄여 카드와 층이 뒤바뀌지 않을 만큼만 남긴다. */
+  box-shadow: 0 4px 16px var(--c-shadow-strong);
   opacity: 0;
   /* opacity 만 0 으로 두면 안 보이는 링크가 Tab 순서에 그대로 남는다. */
   visibility: hidden;
@@ -522,7 +563,7 @@ main.hz-scroll { overflow-x: clip; }
 .hz-theme-pop-head {
   padding: 1px 7px 7px;
   font-size: 10.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--c-faint);
 }
 .hz-theme-pop-item {
@@ -541,7 +582,7 @@ main.hz-scroll { overflow-x: clip; }
 }
 .hz-theme-pop-name {
   font-size: 12.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--c-ink);
   white-space: nowrap;
   overflow: hidden;
@@ -553,7 +594,7 @@ main.hz-scroll { overflow-x: clip; }
 }
 .hz-theme-pop-cnt {
   font-size: 10.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--c-faint);
 }
 .hz-theme-pop-go {
@@ -606,7 +647,7 @@ main.hz-scroll { overflow-x: clip; }
   transition: background 0.12s ease;
 }
 .hz-row-link:hover {
-  background: var(--c-bg);
+  background: var(--c-hover);
 }
 
 /* 내비게이션 항목(사이드바·모바일 탭바 공통, 내부 3개 + 텔레그램 커뮤니티).
@@ -617,7 +658,7 @@ main.hz-scroll { overflow-x: clip; }
   cursor: pointer;
 }
 .hz-nav-item:not(.hz-nav-active):hover {
-  background: var(--c-bg);
+  background: var(--c-hover);
 }
 
 /* 카더라 종목 카드 → MDD 정밀분석 링크. 카드 하단에 은근히 붙는 작은 텍스트 링크다
@@ -628,7 +669,7 @@ main.hz-scroll { overflow-x: clip; }
   align-items: center;
   gap: 3px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--c-sub);
   text-decoration: none;
   white-space: nowrap;
@@ -686,7 +727,7 @@ main.hz-scroll { overflow-x: clip; }
   background: var(--c-bg);
   color: var(--c-blue);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   text-decoration: none;
   transition: border-color 0.14s ease, background 0.14s ease;
 }

@@ -139,7 +139,7 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
           <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
             <span style={{ ...rankNum, width: 13, fontSize: 11, color: i < 3 ? C.hot : C.faint }}>{i + 1}</span>
             <Avatar photo={m.channelPhoto} title={m.channelTitle} size={22} />
-            <b style={{ ...clip, fontSize: 12, fontWeight: 700, color: C.blue }}>{m.channelTitle}</b>
+            <b style={{ ...clip, fontSize: 12, fontWeight: 600, color: C.blue }}>{m.channelTitle}</b>
             <span style={{ marginLeft: "auto", fontSize: 10.5, fontFamily: MONO, color: C.faint, whiteSpace: "nowrap" }}>
               {timeAgo(m.postedAt)}
             </span>
@@ -271,7 +271,7 @@ export default async function KaderaPage() {
         <span style={{ ...rankNum, color: i < 3 ? C.blue : C.faint }}>{i + 1}</span>
         <Avatar photo={c.photo} title={c.title} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ ...clip, fontWeight: 700, fontSize: 14, color: C.ink }}>{c.title}</div>
+          <div style={{ ...clip, fontWeight: 600, fontSize: 14, color: C.ink }}>{c.title}</div>
           <div style={{ ...clip, marginTop: 2, fontSize: 11, fontFamily: MONO, color: C.muted }}>
             구독자 {c.subscriberCount ? compact(c.subscriberCount) : "-"}
             {c.viewRate != null && ` · 조회율 ${c.viewRate.toFixed(1)}%`}
@@ -283,7 +283,7 @@ export default async function KaderaPage() {
           {/* 점수는 52~100 이라 앞자리만 보고 줄 세우기 어렵다 — 숫자 아래 가는 띠로
               같은 정보를 한 번 더 그려 위아래 행의 차이가 눈에 먼저 들어오게 한다. */}
           <div style={{ width: 44, textAlign: "right" }}>
-            <div style={{ fontFamily: MONO, fontWeight: 800, fontSize: 18, color: C.blue, lineHeight: 1.1, letterSpacing: "-0.02em" }}>
+            <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 18, color: C.blue, lineHeight: 1.1, letterSpacing: "-0.02em" }}>
               {c.influenceScore.toFixed(0)}
             </div>
             <div style={{ marginTop: 4, height: 3, background: C.track, borderRadius: 999, overflow: "hidden" }}>
@@ -320,7 +320,7 @@ export default async function KaderaPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           {/* 이 페이지의 h1. 사이드바 로고는 홈에서만 h1이라 여기와 겹치지 않는다.
               스타일은 h2 때와 동일해 보이는 건 그대로다(제목 크기는 인라인 지정). */}
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: C.ink, letterSpacing: "-0.01em" }}>카더라 리포트</h1>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: C.ink, letterSpacing: "-0.01em" }}>카더라 리포트</h1>
           <div style={{ height: 1, flex: 1, background: C.line }} />
         </div>
         <p style={{ margin: "8px 0 0", fontSize: 14, lineHeight: 1.7, color: C.sub }}>
@@ -363,7 +363,7 @@ export default async function KaderaPage() {
                 </span>
                 {/* 숫자는 절대 안 쪼갠다 — "38,631" 과 "개" 가 두 줄로 갈리면 수치가 아니라
                     오류처럼 보인다. 라벨이 접히더라도 이쪽은 통째로 유지한다. */}
-                <span style={{ fontFamily: MONO, fontSize: 18, fontWeight: 800, color: C.ink, letterSpacing: "-0.02em", whiteSpace: "nowrap", flexShrink: 0 }}>{s.value}</span>
+                <span style={{ fontFamily: MONO, fontSize: 18, fontWeight: 700, color: C.ink, letterSpacing: "-0.02em", whiteSpace: "nowrap", flexShrink: 0 }}>{s.value}</span>
               </div>
             ))}
           </div>
@@ -445,7 +445,7 @@ export default async function KaderaPage() {
                       알 수 없었다. 이제 비관:낙관 한 기준으로만 말하고, 막대는 그 비율을 그림으로
                       반복한다(숫자와 그림이 어긋날 수가 없다). 중립은 얼마나 뺐는지만 각주로. */}
                   <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-                    <span style={{ fontFamily: MONO, fontSize: 44, fontWeight: 800, lineHeight: 1, letterSpacing: "-0.035em" }}>
+                    <span style={{ fontFamily: MONO, fontSize: 44, fontWeight: 700, lineHeight: 1, letterSpacing: "-0.035em" }}>
                       <span style={{ color: C.cold }}>{100 - sentiment.score}</span>
                       <span style={{ color: C.faint }}>:</span>
                       <span style={{ color: C.hot }}>{sentiment.score}</span>
@@ -457,7 +457,7 @@ export default async function KaderaPage() {
                         alignItems: "center",
                         gap: 4,
                         fontSize: 14,
-                        fontWeight: 800,
+                        fontWeight: 700,
                         color: sentiment.tone === "hot" ? C.hot : sentiment.tone === "cold" ? C.cold : C.sub,
                       }}
                     >
@@ -476,7 +476,7 @@ export default async function KaderaPage() {
                     </span>
                   </div>
                   {/* 두 라벨을 막대의 양 끝에 붙여 어느 쪽이 어느 색인지 위치로 바로 읽히게 한다. */}
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, margin: "10px 0 6px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 600, margin: "10px 0 6px" }}>
                     <span style={{ color: C.cold }}>비관</span>
                     <span style={{ color: C.hot }}>낙관</span>
                   </div>
@@ -495,7 +495,7 @@ export default async function KaderaPage() {
 
                 {sentiment.byTheme.length > 0 && (
                   <div style={{ flex: "1 1 250px", minWidth: 235, display: "flex", flexDirection: "column", gap: 9 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: C.muted }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: C.muted }}>
                       {/* 중립을 뺀 기준이라는 설명은 왼쪽 종합 막대 각주에 이미 있다 —
                           같은 카드 안에서 두 번 말할 필요는 없다. */}
                       인기 테마별 비관 ↔ 낙관
@@ -510,14 +510,14 @@ export default async function KaderaPage() {
                         // 실제 테마명은 '지주·밸류업'·'인터넷·플랫폼'처럼 길어 70px 는 있어야 한다.
                         style={{ display: "grid", gridTemplateColumns: "70px minmax(0,1fr) 54px", alignItems: "center", gap: 9 }}
                       >
-                        <span style={{ ...clip, fontSize: 11.5, fontWeight: 700, color: C.ink }}>{t.name}</span>
+                        <span style={{ ...clip, fontSize: 11.5, fontWeight: 600, color: C.ink }}>{t.name}</span>
                         {/* 비관(왼쪽)과 낙관(오른쪽)을 한 바에 나눠 담아 비율이 바로 보이게.
                             순서는 시장 브리핑 감성 카드와 맞춘 '비관 : 낙관'이다. */}
                         <span style={{ display: "flex", height: 7, borderRadius: 999, overflow: "hidden" }}>
                           <span style={{ width: `${100 - t.pos}%`, background: C.cold }} />
                           <span style={{ width: `${t.pos}%`, background: C.hot }} />
                         </span>
-                        <span style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, textAlign: "right", whiteSpace: "nowrap" }}>
+                        <span style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 600, textAlign: "right", whiteSpace: "nowrap" }}>
                           <span style={{ color: C.cold }}>{100 - t.pos}</span>
                           <span style={{ color: C.faint }}>:</span>
                           <span style={{ color: C.hot }}>{t.pos}</span>
@@ -554,7 +554,7 @@ export default async function KaderaPage() {
                 <div key={s.code} style={{ ...subCard, flex: "1 1 168px", padding: "14px 15px", display: "flex", flexDirection: "column" }}>
                   {/* 1) 종목 — 이름 + 코드 */}
                   <div style={{ display: "flex", alignItems: "baseline", gap: 5, minWidth: 0 }}>
-                    <span style={{ ...clip, fontWeight: 800, fontSize: 15, color: C.ink }}>{s.name}</span>
+                    <span style={{ ...clip, fontWeight: 700, fontSize: 15, color: C.ink }}>{s.name}</span>
                     {/* 종목 코드는 눈에서 흘려보내는 장식이 아니라 읽고 확인하는 값이라
                         faint 가 아니라 한 단계 진한 muted 를 쓴다(10px 이라 더 그렇다). */}
                     <span style={{ fontFamily: MONO, fontSize: 10.5, color: C.muted, flexShrink: 0 }}>{s.code}</span>
@@ -566,11 +566,11 @@ export default async function KaderaPage() {
                   <div style={{ marginTop: 8 }}>
                     {s.closePrice != null ? (
                       <>
-                        <div style={{ fontFamily: MONO, fontSize: 16, fontWeight: 800, color: C.ink, letterSpacing: "-0.02em" }}>
+                        <div style={{ fontFamily: MONO, fontSize: 16, fontWeight: 700, color: C.ink, letterSpacing: "-0.02em" }}>
                           {s.closePrice.toLocaleString("ko-KR")}원
                         </div>
                         {s.changeRate != null && (
-                          <div style={{ marginTop: 2, fontFamily: MONO, fontSize: 12, fontWeight: 700, color: s.changeRate >= 0 ? C.hot : C.cold }}>
+                          <div style={{ marginTop: 2, fontFamily: MONO, fontSize: 12, fontWeight: 600, color: s.changeRate >= 0 ? C.hot : C.cold }}>
                             {s.changeRate >= 0 ? "▲" : "▼"}
                             {Math.abs(s.changeRate).toFixed(2)}%
                           </div>
@@ -666,7 +666,7 @@ export default async function KaderaPage() {
                         lineHeight: `${THEME_NAME_H}px`,
                       }}
                     >
-                      <span style={{ ...clip, fontWeight: 800, fontSize: 14, color: C.ink }}>{t.theme}</span>
+                      <span style={{ ...clip, fontWeight: 700, fontSize: 14, color: C.ink }}>{t.theme}</span>
                       <RankDelta change={t.rankChange} />
                       {t.shareDelta !== null && Math.abs(t.shareDelta) >= 0.1 && (
                         <span
@@ -675,7 +675,7 @@ export default async function KaderaPage() {
                             flexShrink: 0,
                             fontFamily: MONO,
                             fontSize: 12,
-                            fontWeight: 700,
+                            fontWeight: 600,
                             color: t.shareDelta >= 0 ? C.hot : C.cold,
                           }}
                         >
@@ -764,15 +764,15 @@ export default async function KaderaPage() {
                 return (
                   <div key={r.code} style={{ ...subCard, padding: 16 }}>
                     <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                      <span style={{ ...clip, fontSize: 18, fontWeight: 800, color: C.ink }}>{r.name}</span>
+                      <span style={{ ...clip, fontSize: 18, fontWeight: 700, color: C.ink }}>{r.name}</span>
                       <span style={{ fontFamily: MONO, fontSize: 11, color: C.muted }}>{r.code}</span>
                       {r.price != null && (
                         <span style={{ marginLeft: "auto", display: "flex", alignItems: "baseline", gap: 5, whiteSpace: "nowrap" }}>
-                          <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 800, color: C.ink, letterSpacing: "-0.02em" }}>
+                          <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: C.ink, letterSpacing: "-0.02em" }}>
                             {r.price.toLocaleString("ko-KR")}원
                           </span>
                           {r.changeRate != null && (
-                            <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: r.changeRate >= 0 ? C.hot : C.cold }}>
+                            <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 600, color: r.changeRate >= 0 ? C.hot : C.cold }}>
                               {r.changeRate >= 0 ? "▲" : "▼"}
                               {Math.abs(r.changeRate).toFixed(2)}%
                             </span>
@@ -882,7 +882,7 @@ export default async function KaderaPage() {
                   <span style={{ ...rankNum, width: 14, fontSize: 11 }}>{i + 1}</span>
                   <Avatar photo={r.photo} title={r.title} size={26} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ ...clip, fontWeight: 700, fontSize: 13, color: C.ink }}>{r.title}</div>
+                    <div style={{ ...clip, fontWeight: 600, fontSize: 13, color: C.ink }}>{r.title}</div>
                     <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6, marginTop: 2 }}>
                       <span style={{ fontSize: 10.5, fontFamily: MONO, color: C.muted }}>구독자 {compact(r.subscriberCount)}</span>
                       {/* 정원을 채우느라 증감이 없거나 줄어든 채널까지 들어올 수 있어 부호를 그대로 쓴다 */}
@@ -890,7 +890,7 @@ export default async function KaderaPage() {
                         style={{
                           fontFamily: MONO,
                           fontSize: 11,
-                          fontWeight: 800,
+                          fontWeight: 700,
                           color: r.delta7d > 0 ? C.hot : r.delta7d < 0 ? C.cold : C.muted,
                           whiteSpace: "nowrap",
                         }}
@@ -942,7 +942,7 @@ export default async function KaderaPage() {
                     <span style={{ ...rankNum, width: 14, fontSize: 11, paddingTop: 1 }}>{i + 1}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6 }}>
-                        <span style={{ ...clip, fontWeight: 700, fontSize: 13, color: C.ink }}>{k.word}</span>
+                        <span style={{ ...clip, fontWeight: 600, fontSize: 13, color: C.ink }}>{k.word}</span>
                         {/* 비교할 과거가 아직 없으면 화살표를 숨긴다 — ▲▼ 아무거나 붙이면 거짓말이 된다 */}
                         {/* 화살표는 '관심 점유율이 움직였을 때'만 — 변화 없음(flat)과
                             비교할 과거가 없을 때(null)는 숫자만 둔다. 예전엔 boolean 이라
@@ -951,7 +951,7 @@ export default async function KaderaPage() {
                           style={{
                             fontFamily: MONO,
                             fontSize: 11,
-                            fontWeight: 700,
+                            fontWeight: 600,
                             color: k.trend === "up" ? C.hot : k.trend === "down" ? C.cold : C.muted,
                             flexShrink: 0,
                           }}
