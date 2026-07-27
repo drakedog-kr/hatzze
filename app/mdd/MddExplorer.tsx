@@ -8,6 +8,9 @@ import { track } from "@/lib/ga";
 import { C, Icon, MONO } from "../ui";
 
 export type StockOption = { code: string; name: string; market: string | null };
+/** 추천 종목 = 종목 + 오른쪽에 붙는 한 조각 근거(왜 지금 이게 떠 있나). */
+export type Suggestion = StockOption & { note: string };
+export type SuggestGroups = { surging: Suggestion[]; report: Suggestion[] };
 
 type Peer = { name: string; code: string; dd: number; isSelf: boolean };
 type ThemeCmp = { name: string; peers: Peer[]; avgDd: number; sincePeakAvg: number | null };
@@ -43,7 +46,15 @@ const fmtDayCount = (d: number) => `${Math.round(d).toLocaleString("ko-KR")}일`
  *  연도를 두 자리로 줄이면("17-11") 연-월인지 월-일인지 분간이 안 된다. */
 const fmtYm = (date: string) => date.slice(0, 7);
 
-export function MddExplorer({ stocks, initial }: { stocks: StockOption[]; initial?: StockOption | null }) {
+export function MddExplorer({
+  stocks,
+  initial,
+  suggestions,
+}: {
+  stocks: StockOption[];
+  initial?: StockOption | null;
+  suggestions?: SuggestGroups;
+}) {
   // initial 은 URL(?code=…)로 지정된 종목. 없으면 기본 종목(삼성전자)으로 연다.
   const [selected, setSelected] = useState<StockOption>(initial ?? DEFAULT);
   const [years, setYears] = useState("10");
@@ -95,7 +106,7 @@ export function MddExplorer({ stocks, initial }: { stocks: StockOption[]; initia
         </p>
       </header>
 
-      <Controls stocks={stocks} selected={selected} onSelect={setSelected} years={years} onYears={setYears} />
+      <Controls stocks={stocks} selected={selected} onSelect={setSelected} years={years} onYears={setYears} suggestions={suggestions} />
 
       {loading && <Skeleton />}
       {!loading && error && <ErrorCard message={error} />}
@@ -210,6 +221,69 @@ export function rankStockMatches(stocks: StockOption[], query: string, limit = 8
   return scored.slice(0, limit).map((r) => r.s);
 }
 
+/**
+ * 추천 한 묶음. 행 구조는 [순위 · 이름 · 근거] 세 칸이고, 근거는 오른쪽 정렬로
+ * 세로줄을 맞춘다 — 숫자가 왼쪽 정렬이면 훑을 때 눈이 매번 다시 자리를 찾는다.
+ * 순위 숫자는 tabular(MONO)로 둬야 두 자리가 돼도 이름 시작점이 안 밀린다.
+ */
+function SuggestSection({
+  title,
+  hint,
+  items,
+  onPick,
+}: {
+  title: string;
+  hint: string;
+  items: Suggestion[];
+  onPick: (s: StockOption) => void;
+}) {
+  if (!items.length) return null;
+  return (
+    <section style={{ marginBottom: 6 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, padding: "0 10px 6px" }}>
+        <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: C.ink }}>{title}</h3>
+        <span style={{ fontSize: 11, fontWeight: 600, color: C.faint, whiteSpace: "nowrap" }}>{hint}</span>
+      </div>
+      <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+        {items.map((s, i) => (
+          <li key={s.code}>
+            <button
+              onClick={() => onPick(s)}
+              className="hz-row-link"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                width: "100%",
+                padding: "8px 10px",
+                border: "none",
+                background: "transparent",
+                borderRadius: 8,
+                cursor: "pointer",
+                color: C.ink,
+                fontSize: 14,
+                textAlign: "left",
+              }}
+            >
+              <span style={{ fontFamily: MONO, fontSize: 12, color: C.faint, width: 12, flexShrink: 0 }}>{i + 1}</span>
+              <span style={{ fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {s.name}
+              </span>
+              {/* 코스닥은 표시해 준다 — 검색 목록에는 코스피만 있어서, 여기서만 만날 수 있는 종목이다. */}
+              {s.market === "KOSDAQ" && (
+                <span style={{ fontSize: 10, fontWeight: 600, color: C.faint, background: C.bg, padding: "2px 5px", borderRadius: 4, flexShrink: 0 }}>
+                  코스닥
+                </span>
+              )}
+              <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 600, color: C.sub, whiteSpace: "nowrap" }}>{s.note}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /* ── 조회 바: 종목 검색 + 기간 토글 ─────────────────────────────── */
 function Controls({
   stocks,
@@ -217,7 +291,9 @@ function Controls({
   onSelect,
   years,
   onYears,
+  suggestions,
 }: {
+  suggestions?: SuggestGroups;
   stocks: StockOption[];
   selected: StockOption;
   onSelect: (s: StockOption) => void;
@@ -238,6 +314,11 @@ function Controls({
   }, []);
 
   const matches = useMemo(() => rankStockMatches(stocks, query), [query, stocks]);
+
+  const suggest = suggestions ?? { surging: [], report: [] };
+  const hasSuggest = suggest.surging.length > 0 || suggest.report.length > 0;
+  // 검색어가 비었을 때만 추천을 보여준다. 한 글자라도 치면 그때부터는 매칭 결과다.
+  const showSuggest = query.trim() === "";
 
   // 검색어는 타이핑이 멎은 뒤에만 한 번 보낸다. onChange 마다 쏘면 "삼성전자" 한 번
   // 치는 데 이벤트가 다섯 개 나가고, 그중 넷("삼", "삼성", …)은 의미가 없다.
@@ -262,14 +343,22 @@ function Controls({
   return (
     <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
       <div ref={boxRef} style={{ position: "relative", flex: "1 1 260px", minWidth: 220 }}>
-        {/* 포커스 때 파란 테두리 + 옅은 링 — 입력 중임을 분명히 한다. */}
+        {/* 검색창은 흰 상자가 아니라 '파인 회색 면'으로 둔다 — 눌러야 할 자리가 눈에 먼저
+            들어온다.
+            다만 --c-bg 를 그대로 쓰면 안 된다. 이 조회 바는 카드 안이 아니라 페이지 바탕
+            위에 바로 얹혀 있어서, 바탕과 같은 값을 주면 입력창이 통째로 사라진다
+            (실제로 그렇게 만들었다가 화면에서 안 보여 되돌렸다 — 계산된 색만 보면
+            '#f2f4f6 맞음'이라 멀쩡해 보인다).
+            그래서 바탕에서 한 칸 더 간 --c-track 을 쓴다. 라이트에서는 바탕보다 어둡고,
+            다크에서는 바탕보다 밝다 — 두 테마 모두 '주변과 다른 면'이 된다.
+            포커스 때는 파란 테두리 + 옅은 링으로 입력 중임을 분명히 한다. */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
             gap: 8,
-            background: C.card,
-            border: `1px solid ${focused ? C.blue : C.line}`,
+            background: C.track,
+            border: `1px solid ${focused ? C.blue : "transparent"}`,
             boxShadow: focused ? `0 0 0 3px var(--c-blue-tint)` : "none",
             borderRadius: 12,
             padding: "0 14px",
@@ -293,22 +382,55 @@ function Controls({
             style={{ flex: 1, border: "none", outline: "none", background: "transparent", color: C.ink, fontSize: 15, minWidth: 0 }}
           />
         </div>
-        {open && matches.length > 0 && (
-          <ul style={{ position: "absolute", top: 50, left: 0, right: 0, zIndex: 20, listStyle: "none", margin: 0, padding: 6, background: "var(--c-float)", border: `1px solid ${C.line}`, borderRadius: 12, boxShadow: "0 4px 16px var(--c-shadow-strong)" }}>
-            {matches.map((s) => (
-              <li key={s.code}>
-                <button
-                  onClick={() => pick(s)}
-                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "9px 10px", border: "none", background: "transparent", borderRadius: 8, cursor: "pointer", color: C.ink, fontSize: 14, textAlign: "left" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = C.bg)}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                >
-                  <span style={{ fontWeight: 600 }}>{s.name}</span>
-                  <span style={{ fontFamily: MONO, fontSize: 12, color: C.faint }}>{s.code}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
+        {/* 드롭다운은 두 얼굴이다.
+              검색어가 있으면 → 매칭 결과
+              검색어가 비어 있으면 → 추천(카더라의 급부상·주요 종목)
+            빈 검색창에 아무것도 안 띄우면 "무슨 종목을 볼지" 부터 사용자가 떠올려야 한다.
+            추천이 아예 없을 때만(텔레그램 데이터가 비었을 때) 닫아 둔다. */}
+        {open && (showSuggest ? hasSuggest : matches.length > 0) && (
+          <div
+            style={{
+              position: "absolute",
+              top: 50,
+              left: 0,
+              right: 0,
+              zIndex: 20,
+              padding: showSuggest ? "14px 8px 8px" : 6,
+              background: "var(--c-float)",
+              border: `1px solid ${C.line}`,
+              borderRadius: 14,
+              // 카드에는 그림자를 안 쓰지만 오버레이는 예외다 — 아래 내용을 실제로 가리고
+              // 떠 있어서, 경계선만으로는 "위에 있다"가 안 읽힌다(globals.css 의 팝오버와 같은 규칙).
+              boxShadow: "0 4px 16px var(--c-shadow-strong)",
+              maxHeight: 420,
+              overflowY: "auto",
+            }}
+          >
+            {showSuggest ? (
+              <>
+                <SuggestSection title="급부상 종목" hint="평소 대비 언급 급증" items={suggest.surging} onPick={pick} />
+                <SuggestSection title="주요 종목 리포트" hint="최근 주목도 상위" items={suggest.report} onPick={pick} />
+                <p style={{ margin: "10px 10px 2px", fontSize: 11, color: C.faint, lineHeight: 1.5 }}>
+                  텔레그램에서 많이 언급된 종목입니다. 매수·매도 신호가 아닙니다.
+                </p>
+              </>
+            ) : (
+              <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+                {matches.map((s) => (
+                  <li key={s.code}>
+                    <button
+                      onClick={() => pick(s)}
+                      className="hz-row-link"
+                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "9px 10px", border: "none", background: "transparent", borderRadius: 8, cursor: "pointer", color: C.ink, fontSize: 14, textAlign: "left" }}
+                    >
+                      <span style={{ fontWeight: 600 }}>{s.name}</span>
+                      <span style={{ fontFamily: MONO, fontSize: 12, color: C.faint }}>{s.code}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
       </div>
 
