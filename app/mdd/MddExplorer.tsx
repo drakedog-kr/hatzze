@@ -6,6 +6,7 @@ import { CHARACTER_MIN_DD } from "@/lib/mdd";
 import type { DrawdownCharacter, DrawdownPoint, Episode, MddAnalysis, RiskProfile as RiskProfileData } from "@/lib/mdd";
 import { track } from "@/lib/ga";
 import { C, Icon, MONO } from "../ui";
+import { StockLogo } from "../StockLogo";
 
 export type StockOption = { code: string; name: string; market: string | null };
 /** 추천 종목 = 종목 + 오른쪽에 붙는 한 조각 근거(왜 지금 이게 떠 있나). */
@@ -222,24 +223,6 @@ export function rankStockMatches(stocks: StockOption[], query: string, limit = 8
 }
 
 /**
- * 종목 머리글자 배지. 진짜 로고가 생기기 전까지 그 자리를 채운다(globals.css 의
- * .hz-stock-badge 주석 참고). 라틴 문자로 시작하는 이름은 두 글자를 쓴다 —
- * "SK"·"LG" 처럼 두 글자가 곧 회사인 경우가 많아 한 글자만 두면 다 "S"·"L"이 된다.
- */
-function StockBadge({ code, name }: { code: string; name: string }) {
-  // 코드에서 색상값을 뽑는다. 같은 종목이면 언제나 같은 색이라 목록이 다시 그려져도
-  // 안 흔들린다. 31 을 곱하는 흔한 문자열 해시이고, 값 자체에 의미는 없다.
-  let h = 0;
-  for (let i = 0; i < code.length; i++) h = (h * 31 + code.charCodeAt(i)) % 360;
-  const initials = /^[A-Za-z]/.test(name) ? name.slice(0, 2).toUpperCase() : name.slice(0, 1);
-  return (
-    <span className="hz-stock-badge" style={{ "--h": h } as React.CSSProperties} aria-hidden="true">
-      {initials}
-    </span>
-  );
-}
-
-/**
  * 추천 한 묶음. 행 구조는 [순위 · 로고 · 이름 · 근거] 네 칸이고, 근거는 오른쪽 정렬로
  * 세로줄을 맞춘다 — 숫자가 왼쪽 정렬이면 훑을 때 눈이 매번 다시 자리를 찾는다.
  * 순위 숫자는 tabular(MONO)로 둬야 두 자리가 돼도 이름 시작점이 안 밀린다.
@@ -284,7 +267,7 @@ function SuggestSection({
               }}
             >
               <span style={{ fontFamily: MONO, fontSize: 12, color: C.faint, width: 12, flexShrink: 0 }}>{i + 1}</span>
-              <StockBadge code={s.code} name={s.name} />
+              <StockLogo code={s.code} name={s.name} market={s.market} />
               <span style={{ fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {s.name}
               </span>
@@ -421,7 +404,10 @@ function Controls({
               // 카드에는 그림자를 안 쓰지만 오버레이는 예외다 — 아래 내용을 실제로 가리고
               // 떠 있어서, 경계선만으로는 "위에 있다"가 안 읽힌다(globals.css 의 팝오버와 같은 규칙).
               boxShadow: "0 4px 16px var(--c-shadow-strong)",
-              maxHeight: 420,
+              // 내용이 436px 이라 420 에서 스크롤이 생겼다. 여유를 둬서 스크롤을 없앤다 —
+              // 좁은 폭에서 안내 문구가 두 줄로 접히는 경우까지 감안한 값이다.
+              // 상한 자체는 남겨 둔다(작은 화면에서 패널이 화면 밖으로 자라면 안 된다).
+              maxHeight: 480,
               overflowY: "auto",
             }}
           >
@@ -697,7 +683,10 @@ function Headline({ data }: { data: MddResult }) {
   return (
     <section style={card}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 22 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+        {/* 로고는 글자 기준선(baseline)이 아니라 가운데에 맞아야 해서 이 줄만 center 로
+            둔다. baseline 이면 정사각형 타일이 글자 밑선에 걸려 위로 떠 보인다. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <StockLogo code={data.code} name={data.name} market={data.market} size={30} />
           <span style={{ fontSize: 21, fontWeight: 700, color: C.ink }}>{data.name}</span>
           <span style={{ fontFamily: MONO, fontSize: 13, color: C.faint }}>{data.code}</span>
           {data.market && <Badge>{data.market}</Badge>}
