@@ -20,7 +20,19 @@ const NAV = [
 // 외부(텔레그램) 링크라 NAV 배열이 아니라 따로 둔다 — pathname 기반 active 판정 대상이
 // 아니고, 새 탭으로 열려야 해서 next/link 가 아닌 <a> 를 쓴다. 사이드바와 모바일 탭바가
 // 같은 값을 참조해야 두 내비게이션의 항목이 어긋나지 않는다.
-const COMMUNITY = { href: "https://t.me/hatzze69", label: "커뮤니티 합류", icon: "send" };
+//
+// 라벨이 "커뮤니티 합류"가 아닌 이유: 채널이 파는 건 공간이 아니라 "오늘 장에서 무슨
+// 말이 오갔나"라서, 들어가는 행위가 아니라 받는 내용을 이름으로 삼는다. 지수·브리핑
+// 계열 이름은 전부 피했다 — 사이트에 이미 있는 것들이라 같은 메뉴가 둘로 보인다.
+//
+// aria-label 은 라벨과 따로 둔다. "오늘 뭐래?"만 읽히면 스크린리더 사용자는 이게 외부
+// 텔레그램으로 나가는 링크라는 걸 알 수 없다.
+const TELEGRAM = {
+  href: "https://t.me/hatzze69",
+  label: "오늘 뭐래?",
+  aria: "오늘 뭐래? 텔레그램 채널 열기(새 탭)",
+  icon: "send",
+};
 
 /** NAV 항목의 현재 페이지 판정. 사이드바와 모바일 탭바가 같은 규칙을 써야 한다. */
 function isActive(href: string, pathname: string) {
@@ -97,10 +109,13 @@ function Sidebar() {
             </Link>
           );
         })}
+        {/* 라벨은 바뀌었어도 data-ga-cta 는 "community" 그대로 둔다 — 값을 같이 바꾸면
+            이름 변경 전후의 클릭수를 한 줄로 비교할 수 없다. 탭바·푸터도 같은 값이다. */}
         <a
-          href={COMMUNITY.href}
+          href={TELEGRAM.href}
           target="_blank"
           rel="noopener noreferrer"
+          aria-label={TELEGRAM.aria}
           className="hz-nav-item"
           data-ga="cta_click"
           data-ga-cta="community"
@@ -116,8 +131,8 @@ function Sidebar() {
             textDecoration: "none",
           }}
         >
-          <Icon name={COMMUNITY.icon} />
-          <span style={{ fontSize: 15 }}>{COMMUNITY.label}</span>
+          <Icon name={TELEGRAM.icon} />
+          <span style={{ fontSize: 15 }}>{TELEGRAM.label}</span>
         </a>
       </nav>
     </aside>
@@ -173,17 +188,18 @@ function MobileTabBar() {
         );
       })}
       <a
-        href={COMMUNITY.href}
+        href={TELEGRAM.href}
         target="_blank"
         rel="noopener noreferrer"
+        aria-label={TELEGRAM.aria}
         className="hz-tab hz-nav-item"
         data-ga="cta_click"
         data-ga-cta="community"
         data-ga-surface="tabbar"
         style={tabStyle(false)}
       >
-        <Icon name={COMMUNITY.icon} style={{ fontSize: 22 }} />
-        <span style={{ fontSize: 10, whiteSpace: "nowrap" }}>{COMMUNITY.label}</span>
+        <Icon name={TELEGRAM.icon} style={{ fontSize: 22 }} />
+        <span style={{ fontSize: 10, whiteSpace: "nowrap" }}>{TELEGRAM.label}</span>
       </a>
     </nav>
   );
