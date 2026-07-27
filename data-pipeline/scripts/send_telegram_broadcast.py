@@ -408,6 +408,58 @@ def build_evening(score_row: dict, surging: list[dict]) -> str:
 # ─── 발송 ─────────────────────────────────────────────────────────────────────
 
 
+def probe_chats(token: str) -> None:
+    """이 봇이 볼 수 있는 채팅과 그 chat_id 를 찍는다(`--probe-chats`).
+
+    **왜 스크립트로 두나.** 흔한 안내는 브라우저에서
+    `api.telegram.org/bot<토큰>/getUpdates` 를 열라고 하는데, 그러면 **봇 토큰이 주소창에
+    들어가 브라우저 기록에 남는다**(기기 간 동기화까지 되면 더 넓게 퍼진다). 토큰은 이
+    채널에 글을 쓸 수 있는 권한이므로 굳이 그런 자리에 흘릴 이유가 없다. 여기서는 토큰이
+    .env.local 에서 바로 요청 헤더로 가고 화면엔 한 번도 나오지 않는다.
+
+    비공개 채널은 핸들이 없어 숫자 chat_id 가 필요하다(공개 채널은 "@핸들"을 그대로 쓴다).
+    봇이 관리자로 들어가 있고 그 뒤에 채널에 글이 하나 올라와야 여기 잡힌다 — 텔레그램은
+    봇이 들어오기 전의 기록을 주지 않는다.
+    """
+    def call(method: str) -> dict:
+        res = requests.get(f"https://api.telegram.org/bot{token}/{method}", timeout=TELEGRAM_TIMEOUT_SEC)
+        return res.json()
+
+    me = call("getMe")
+    if not me.get("ok"):
+        # description 에는 토큰이 안 들어간다(텔레그램이 만든 사람 읽는 설명이다).
+        print(f"[실패] 토큰이 유효하지 않습니다: {me.get('description')}")
+        sys.exit(1)
+    bot = me["result"]
+    print(f"[봇] @{bot.get('username')} ({bot.get('first_name')})")
+
+    body = call("getUpdates")
+    if not body.get("ok"):
+        print(f"[실패] getUpdates: {body.get('description')}")
+        sys.exit(1)
+
+    seen: dict[str, str] = {}
+    for u in body.get("result", []):
+        for key in ("channel_post", "message", "edited_channel_post", "my_chat_member"):
+            chat = (u.get(key) or {}).get("chat")
+            if chat:
+                seen[str(chat["id"])] = f"{chat.get('title') or chat.get('username') or '이름 없음'} ({chat.get('type')})"
+
+    if not seen:
+        print(
+            "[결과] 보이는 채팅이 없습니다.\n"
+            "  1) 봇을 채널 관리자로 넣었는지\n"
+            "  2) **관리자로 넣은 뒤에** 채널에 글을 하나 올렸는지\n"
+            "  확인하고 다시 실행하세요. 텔레그램은 봇이 들어오기 전 기록을 주지 않습니다."
+        )
+        return
+    print("[결과] 이 봇이 볼 수 있는 채팅")
+    for cid, label in seen.items():
+        print(f"  chat_id = {cid}   {label}")
+    print("\n비공개 테스트 채널이면 위 숫자를 --chat-id 에 넣으세요.")
+    print("공개 채널이면 숫자 대신 \"@핸들\"을 그대로 써도 됩니다.")
+
+
 def send(token: str, chat_id: str, text: str) -> None:
     """Bot API sendMessage. 실패하면 예외를 올려 워크플로가 실패로 집계하게 한다.
 
@@ -459,9 +511,22 @@ def main() -> None:
     parser.add_argument(
         "--chat-id",
         default=None,
-        help="발송 대상 override. 비공개 테스트 채널로 보낼 때 쓴다(예: -1001234567890).",
+        help="발송 대상 override. 비공개 테스트 채널로 보낼 때 쓴다(예: -100 으로 시작하는 숫자).",
+    )
+    parser.add_argument(
+        "--probe-chats",
+        action="store_true",
+        help="봇이 볼 수 있는 채팅과 chat_id 를 찍는다(연동 설정용). 메시지는 안 만든다.",
     )
     args = parser.parse_args()
+
+    # 설정 도우미라 DB 도 안 붙고 메시지도 안 만든다. 토큰만 있으면 된다.
+    if args.probe_chats:
+        if not TELEGRAM_BOT_TOKEN:
+            print("[중단] TELEGRAM_BOT_TOKEN 이 없습니다. .env.local 에 넣고 다시 실행하세요.")
+            sys.exit(1)
+        probe_chats(TELEGRAM_BOT_TOKEN)
+        return
 
     db = get_client()
     score_row = load_daily_score(db)
