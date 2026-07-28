@@ -250,7 +250,7 @@ function SuggestSection({
           <li key={s.code}>
             <button
               onClick={() => onPick(s)}
-              className="hz-row-link"
+              className="hz-row-link hz-pick"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -258,7 +258,6 @@ function SuggestSection({
                 width: "100%",
                 padding: "8px 10px",
                 border: "none",
-                background: "transparent",
                 borderRadius: 8,
                 cursor: "pointer",
                 color: C.ink,
@@ -429,8 +428,8 @@ function Controls({
                   <li key={s.code}>
                     <button
                       onClick={() => pick(s)}
-                      className="hz-row-link"
-                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "9px 10px", border: "none", background: "transparent", borderRadius: 8, cursor: "pointer", color: C.ink, fontSize: 14, textAlign: "left" }}
+                      className="hz-row-link hz-pick"
+                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "9px 10px", border: "none", borderRadius: 8, cursor: "pointer", color: C.ink, fontSize: 14, textAlign: "left" }}
                     >
                       <span style={{ fontWeight: 600 }}>{s.name}</span>
                       <span style={{ fontFamily: MONO, fontSize: 12, color: C.faint }}>{s.code}</span>
