@@ -145,7 +145,7 @@ async function selectInChunks<T>(
 }
 
 export type TelegramSummary = {
-  channelCount: number;
+  channelCount: number; // 지금 실제로 수집 중인 채널 수(시트 목록 크기가 아니다 — 아래 주석)
   totalSubscribers: number;
   totalMentions: number;
   activeChannels: number;
@@ -153,16 +153,41 @@ export type TelegramSummary = {
   lastUpdated: string | null; // 파이프라인이 마지막으로 데이터를 갱신한 시각
 };
 
-/** 상단 요약 스탯 — 모니터링 채널 수·총 구독자·총 종목 언급·최근 7일 활성 채널. */
+/**
+ * 상단 요약 스탯 — 모니터링 채널 수·총 구독자·총 종목 언급·최근 7일 활성 채널.
+ *
+ * **채널을 세는 세 줄은 전부 '지금 수집 중인 채널'을 센다.** 목록(telegram_channels
+ * 의 is_active) 크기가 아니다. 수집기는 peer 캐시(channel_id·access_hash)가 찬 채널만
+ * 열고 나머지는 통째로 건너뛰므로, 캐시가 없는 채널은 모니터링하고 있는 것이 아니다.
+ *
+ * 2026-07-28 실측이 200/317 이었는데(계정 FloodWait 로 캐시가 200 에서 멈췄다) 카드는
+ * "모니터링 채널 317개 · 활성 채널 310개"라고 말했다. 310 은 캐시 없는 117개 중 111개가
+ * 아직 7일 창 안에 옛 글을 갖고 있어서 나온 수였다. 카드 아래 언급 수·채널 수·점유율이
+ * 전부 200개 채널만의 것인데 화면만 317개를 본다고 말한 셈이다.
+ *
+ * 세 줄을 함께 옮기는 것이 중요하다. '모니터링 채널'만 200으로 내리면 그 아래 '활성
+ * 채널 310'이 더 커져 앞뒤가 안 맞는다.
+ *
+ * 목록에는 있는데 수집이 안 되는 채널이 몇 개인지는 여기서 화면으로 내보내지 않는다.
+ * 그건 방문자가 알 일이 아니라 우리가 알 일이라, 파이프라인의 커버리지 검사가
+ * 맡는다(data-pipeline/scripts/check_telegram_coverage.py).
+ */
 export async function getTelegramSummary(): Promise<TelegramSummary> {
   const db = getSupabaseAdmin();
 
-  const { data: chans } = await db
-    .from("telegram_channels")
-    .select("handle,subscriber_count")
-    .eq("is_active", true);
-  const channelCount = chans?.length ?? 0;
-  const totalSubscribers = (chans ?? []).reduce((s, c) => s + (c.subscriber_count ?? 0), 0);
+  // 317행이라 아직 1,000행 캡에 안 닿지만, 여기서 잘리면 잘린 채널이 '수집 안 됨'으로
+  // 보여 이 카드의 세 줄이 함께 낮아진다 — 조용히 틀리는 쪽이라 페이징해 읽는다.
+  const chans = await fetchAllRows<{ handle: string; subscriber_count: number | null; channel_id: number | null; access_hash: number | null }>(
+    "id",
+    () => db.from("telegram_channels").select("id,handle,subscriber_count,channel_id,access_hash").eq("is_active", true),
+  );
+  // 수집 대상의 정의를 fetch_telegram.py 와 **한 글자도 다르지 않게** 맞춘다 —
+  // 그쪽은 channel_id·access_hash 가 둘 다 있는 채널만 열고 나머지는 건너뛴다.
+  // 둘 중 하나라도 비면 그 채널은 오늘 한 건도 안 걷힌다.
+  const collected = chans.filter((c) => c.channel_id != null && c.access_hash != null);
+  const collectedHandles = new Set(collected.map((c) => c.handle));
+  const channelCount = collected.length;
+  const totalSubscribers = collected.reduce((s, c) => s + (c.subscriber_count ?? 0), 0);
 
   const { count: totalMentions } = await db
     .from("telegram_message_stocks")
@@ -186,8 +211,17 @@ export async function getTelegramSummary(): Promise<TelegramSummary> {
         .select("channel_handle,weekly_posts")
         .eq("date", statDate)
     : { data: [] as { channel_handle: string; weekly_posts: number | null }[] };
-  const activeChannels = (weekly ?? []).filter((r) => (r.weekly_posts ?? 0) > 0).length;
+  // 수집 중인 채널로 좁힌다. 안 좁히면 수집이 끊긴 채널도 7일 창 안에 옛 글이 남아
+  // 있는 동안 계속 '활성'으로 세어져, 이 줄만 '모니터링 채널'보다 커진다.
+  const activeChannels = (weekly ?? []).filter(
+    (r) => (r.weekly_posts ?? 0) > 0 && collectedHandles.has(r.channel_handle),
+  ).length;
   // 행을 세면 PostgREST 기본 1000행 상한에 걸려 항상 1,000이 된다 — count 쿼리로 정확히.
+  //
+  // 이 줄만 채널로 안 좁힌다. 세는 단위가 채널이 아니라 **창 안의 메시지**이고, 카드
+  // 아래 집계(언급·테마·센티먼트)가 실제로 읽는 것도 창 안 전부이기 때문이다. 수집이
+  // 끊긴 채널이 남긴 옛 글도 그 집계에 들어가므로(2026-07-28 기준 37,706건 중 5,224건),
+  // 여기서 빼면 '재료가 얼마나 되나'를 되레 적게 말하게 된다.
   const { count: messages7dCount } = await db
     .from("telegram_messages")
     .select("id", { count: "exact", head: true })

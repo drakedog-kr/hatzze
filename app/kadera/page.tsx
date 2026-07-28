@@ -307,6 +307,9 @@ export default async function KaderaPage() {
     </li>
   ));
 
+  /* 채널을 세는 세 줄은 전부 **지금 수집 중인 채널**을 센다(getTelegramSummary 주석).
+     목록에 있어도 peer 캐시가 없어 한 건도 안 걷히는 채널은 모니터링하고 있는 것이
+     아니다. 화면에 덧붙이는 표시는 없다 — 숫자 자체가 사실이면 설명할 것이 없다. */
   const miniStats: { label: string; value: string; help?: string }[] = [
     { label: "모니터링 채널", value: `${summary.channelCount}개` },
     { label: "총 구독자", value: formatKR(summary.totalSubscribers) },
