@@ -258,6 +258,9 @@ export async function getTopStockHighGaps(limit = 3): Promise<StockHighGap[]> {
       const q = await fetchYahooQuote(`${info.code}.${info.market === "KOSDAQ" ? "KQ" : "KS"}`, {
         next: { revalidate: 600 },
       });
+      // 시세를 못 믿으면(낡은 값 포함, lib/yahoo-quote 참고) 52주 고점만 따로 건지지
+      // 않고 종목을 통째로 뺀다. 카드 왼쪽 게이지는 KRX 값이라 그대로 서고 오른쪽 목록만
+      // 줄어든다 — 드물고 잠깐이라 이 정도 손해는 받는다.
       if (!q || q.fiftyTwoWeekHigh === null || q.fiftyTwoWeekHigh <= 0) return null;
 
       // 현재가는 KRX 종가를 우선한다 — 지수 쪽 배지와 같은 거래일을 가리키게.

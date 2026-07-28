@@ -56,8 +56,14 @@ export async function GET() {
   // 원하는 티커 순서: 나스닥 선물 · 코스피 · 코스닥 · 삼성전자 · SK하이닉스 · 비트코인 · 원/달러
   const quotes: Quote[] = [nasdaq, kospi, kosdaq, samsung, skhynix, btc, usdkrw];
 
-  return NextResponse.json(
-    { quotes, updatedAt: new Date().toISOString() },
-    { headers: { "Cache-Control": "public, s-maxage=600, stale-while-revalidate=300" } },
-  );
+  // 하나라도 값을 못 구했으면 캐시를 짧게 간다. 소스가 정체됐다가 몇 분 만에 스스로
+  // 복구하는 일이 있는데(2026-07-28 야후 실측: 약 45분), 성한 응답과 같은 10분을
+  // 물리면 소스가 돌아온 뒤에도 "—" 가 그만큼 더 화면에 남는다. 60초면 원본 부하는
+  // 분당 1회로 묶이면서 복구는 눈에 띄게 빨라진다.
+  const degraded = quotes.some((q) => q.value === "—" || q.change === null);
+  const cache = degraded
+    ? "public, s-maxage=60, stale-while-revalidate=60"
+    : "public, s-maxage=600, stale-while-revalidate=300";
+
+  return NextResponse.json({ quotes, updatedAt: new Date().toISOString() }, { headers: { "Cache-Control": cache } });
 }
