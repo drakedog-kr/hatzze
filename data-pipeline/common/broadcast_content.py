@@ -365,13 +365,6 @@ def load_daily_brief(db) -> str:
     return (rows[0].get("sentiment_summary") or "").strip() if rows else ""
 
 
-def kadera_lag_days(dates: list[str]) -> int | None:
-    """카더라 집계가 며칠 밀렸나. 창이 이미 오늘을 빼므로 정상값은 1이다."""
-    if not dates:
-        return None
-    return (today_kst() - date.fromisoformat(dates[-1])).days
-
-
 # ─── LLM 해설 ─────────────────────────────────────────────────────────────────
 
 _LLM_RULES = """\
