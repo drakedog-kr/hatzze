@@ -225,6 +225,8 @@ jobs:
       # 각 스텝은 DB에서 읽어 이어가므로 하나가 실패해도 다음 스텝은 직전까지의
       # 저장분으로 동작한다(graceful degradation). 지표용 실패 알림/요약과는
       # 분리하려고 아래 Summarize results 집계 배열에는 넣지 않는다.
+      # 대신 이 파이프라인의 '재료' 두 스텝(sync·fetch)만 따로 재는 집계·알림이
+      # 잡 끝에 붙어 있다(Summarize 카더라 collection).
       - name: (텔레그램) KRX 상장종목 마스터 갱신
         id: telegram_krx_stocks
         continue-on-error: true
@@ -473,3 +475,76 @@ jobs:
             gh issue create --title "$title" --body "$note"
             echo "새 알림 이슈 생성"
           fi
+
+      # ── 카더라(텔레그램) 전용 집계·알림 ──────────────────────────────────
+      # 위 Summarize results 에 텔레그램 스텝을 넣지 않는 분리는 그대로 둔다. LLM 분류·
+      # 집계·문장 생성은 하나 실패해도 다음 실행이 만회하는 단계들이라, 지표 알림에
+      # 섞으면 알림이 자주 울려 결국 아무도 안 보게 된다.
+      #
+      # 그런데 그 분리 때문에 **고장이 조용했다.** 2026-07-28 01:28 UTC 실행(30320356222)은
+      # FloodWait 으로 sync 가 resolve 를 0건 성공했고, peer 캐시가 0개라 fetch 가 317개를
+      # 전부 건너뛰어 그날 메시지 수집이 0건이었는데, 잡은 success 로 끝나고 이슈도 안
+      # 열렸다. 복구는 사람이 알아채고 손으로 돌려서야 됐다.
+      #
+      # 그래서 '스텝이 실패했나'가 아니라 **재료가 들어왔나**를 잰다. fetch_telegram.py 가
+      # 수집 가능한 채널 0개 · 총 0건이면 exit 1 로 끝나므로(그 스크립트 main() 끝 주석),
+      # 여기서는 그 결과만 보면 된다.
+      #
+      # 대상을 sync·fetch 둘로 좁힌 이유: 이 둘만 "그날치가 영영 빈다"를 뜻한다.
+      # sync 가 죽으면 구독자 스냅샷이 그날 없이 지나가고(시계열이라 백필 불가),
+      # fetch 가 죽으면 그날 메시지가 통째로 빈다. 나머지 스텝은 다음 실행이 만회한다.
+      # 여기에 스텝을 더 넣고 싶어지면 그 기준을 먼저 통과시킬 것.
+      - name: Summarize 카더라 collection (텔레그램 수집 전용)
+        id: telegram_health
+        if: always()
+        run: |
+          names=("sync_telegram_channels.py" "fetch_telegram.py")
+          outcomes=("${{ steps.telegram_sync.outcome }}" "${{ steps.telegram_fetch.outcome }}")
+
+          {
+            echo "## 카더라 수집"
+            echo "| Script | Result |"
+            echo "|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          failed=0
+          failed_list=""
+          for i in "${!names[@]}"; do
+            script="${names[$i]}"
+            outcome="${outcomes[$i]}"
+            echo "$script: $outcome"
+            echo "| $script | $outcome |" >> "$GITHUB_STEP_SUMMARY"
+            # 여기 두 스텝은 조건이 없어 늘 돈다. 'skipped'는 앞 스텝이 잡을 멈춘
+            # 경우뿐인데, 그때도 그날 수집은 없었던 것이라 실패로 센다.
+            [ "$outcome" = "success" ] || { failed=1; failed_list="${failed_list:+$failed_list, }$script"; }
+          done
+
+          # 조건식(if:)에 쓸 참/거짓만 output 으로 넘기고, 목록은 위 Alert on failure 와
+          # 같게 env 로 넘긴다 — 표현식을 셸 안에 그대로 펼치지 않으려는 것.
+          echo "failed=$failed" >> "$GITHUB_OUTPUT"
+          echo "TELEGRAM_FAILED_SCRIPTS=$failed_list" >> "$GITHUB_ENV"
+
+      # 지표 알림과 제목이 달라 이슈가 섞이지 않는다(각자 자기 제목으로 열리고 코멘트가 쌓인다).
+      # 마지막에 exit 1 로 잡을 실패시킨다 — 수집이 멈춘 날이 초록으로 끝나면 이 감시는
+      # 있으나 마나이기 때문이다. 발송 스텝은 이 앞에서 이미 끝나므로 영향받지 않는다.
+      # !cancelled() 는 앞 스텝이 실패해도(=Summarize results 가 exit 1 한 날에도) 돌지만
+      # 사람이 실행을 취소한 날에는 안 돈다. always() 로 두면 취소할 때마다 이슈가 열린다.
+      - name: Alert on 카더라 failure (open/update GitHub issue)
+        if: ${{ !cancelled() && steps.telegram_health.outputs.failed == '1' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          failed="${TELEGRAM_FAILED_SCRIPTS:-요약 탭에서 확인}"
+          title="⚠️ 카더라(텔레그램) 수집 중단"
+          note=$(printf '카더라 수집 스텝이 실패했습니다. 그날 메시지·구독자 스냅샷이 비어 있을 수 있습니다.\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n먼저 볼 것: sync 로그의 "peer 캐시 보유 N/M개" 와 FloodWait 줄. FloodWait 이면 만료 뒤 다음 예약 실행이 캐시를 이어서 채웁니다(한 실행 최대 100개).' \
+            "$(date -u '+%Y-%m-%d %H:%M')" "$failed" "$run_url")
+          existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$note"
+            echo "기존 알림 이슈 #$existing 에 코멘트 추가"
+          else
+            gh issue create --title "$title" --body "$note"
+            echo "새 알림 이슈 생성"
+          fi
+          exit 1
