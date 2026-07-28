@@ -23,7 +23,7 @@ import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { C, Icon, MONO } from "../ui";
 import { ExpandableList } from "./ExpandableList";
-import { Avatar, ChangeRate, Pill, RankDelta, Sparkline, card as cardStyle, rankNum, subCard } from "./parts";
+import { Avatar, ChangeRate, Pill, QuoteDate, RankDelta, Sparkline, card as cardStyle, rankNum, subCard } from "./parts";
 import { StockLogo } from "../StockLogo";
 import { SectionHead } from "./SectionHead";
 import { TrendingTabs } from "./TrendingTabs";
@@ -60,6 +60,9 @@ function timeAgo(iso: string): string {
   if (hr < 24) return `${hr}시간 전`;
   return `${Math.floor(hr / 24)}일 전`;
 }
+
+/** 급부상 종목 타일에서 가격 바로 아랫줄(등락률 또는 시세 기준일)의 공통 치수. */
+const quoteSubLine: React.CSSProperties = { display: "block", marginTop: 2, fontSize: 12 };
 
 /** 그 종목의 MDD 정밀분석 주소. 이름은 MDD 페이지가 code 로 찾으므로 URL 엔 code·market
    만 실어 깔끔하게 둔다(코스닥은 market 으로 .KQ 심볼이 된다). */
@@ -565,14 +568,22 @@ export default async function KaderaPage() {
 
                   {/* 2) 시세 — 가격 + 등락률. 좁은 타일에서 일곱 자리 가격("1,759,000원")이
                       등락률과 한 줄에 안 들어가 줄이 갈리므로, 등락률은 아예 아랫줄에
-                      고정한다(타일마다 줄 수가 달라지지 않는다). */}
+                      고정한다(타일마다 줄 수가 달라지지 않는다).
+                      야후 실시간이 아니면(isLive=false, KRX 저장 종가 폴백) 그 아랫줄을
+                      등락률 대신 기준일로 바꿔 단다 — 치환이라 줄 수는 그대로다. 왜
+                      등락률을 버리는지는 QuoteDate 주석 참고. 두 줄이 같은 style 을 받는
+                      것도 일부러다(폴백 타일과 실시간 타일이 같은 높이로 서야 한다). */}
                   <div style={{ marginTop: 8 }}>
                     {s.closePrice != null ? (
                       <>
                         <div style={{ fontFamily: MONO, fontSize: 16, fontWeight: 700, color: C.ink, letterSpacing: "-0.02em" }}>
                           {s.closePrice.toLocaleString("ko-KR")}원
                         </div>
-                        <ChangeRate rate={s.changeRate} style={{ display: "block", marginTop: 2, fontSize: 12 }} />
+                        {s.isLive ? (
+                          <ChangeRate rate={s.changeRate} style={quoteSubLine} />
+                        ) : (
+                          <QuoteDate date={s.priceDate} style={quoteSubLine} />
+                        )}
                       </>
                     ) : (
                       <span style={{ fontSize: 12, color: C.muted }}>가격 정보 준비 중</span>
