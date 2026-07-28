@@ -343,7 +343,9 @@ def load_weekly_stocks(db) -> list[dict]:
             "name": names.get(c, c),
             "mentions": a["m"],
             "channels": a["ch"],
-            "narrative": narr.get(c, ""),
+            # 금지어가 든 문장은 여기서 버린다(safe_narrative). 종목 이름 밑에 붙는
+            # 문장이라 시세 표현이 섞이면 그 종목에 대한 의견으로 읽힌다.
+            "narrative": safe_narrative(names.get(c, c), narr.get(c, "")),
             "window": sorted(window),
         }
         for c, a in top
@@ -387,7 +389,7 @@ def surging_with_narrative(db, limit: int) -> list[dict]:
         }
     for s in top:
         s["name"] = names.get(s["code"], s["code"])
-        s["narrative"] = narr.get(s["code"], "")
+        s["narrative"] = safe_narrative(s["name"], narr.get(s["code"], ""))
     return top
 
 
@@ -452,7 +454,17 @@ _LLM_RULES = """\
 # 눈이 미끄러진다는 게 Hun 의 판단이다.
 PARAGRAPH_CHARS = 120
 
-# 이 말이 하나라도 들어간 문단은 **버린다**(compose 참고).
+# 이 말이 하나라도 들어간 문단은 **버린다**.
+#
+# ## 그물이 걸리는 자리 셋 — 버리는 단위가 다르다
+#
+#   compose()             A·C·D 의 해설 문단      문단 단위. 숫자·목록은 그대로 남는다
+#   safe_narrative()      B·D 의 종목 '왜 회자되나'  통째로. 카드에 숫자만 남는다
+#   safe_summary_lines()  B 의 '오늘의 요약'        줄 단위 + 지표명 면제
+#
+# 오래도록 첫째만 있었다. 나머지 둘은 표에 저장된 문장을 그대로 읽어 오는 자리라
+# compose() 를 안 지났고, 그래서 검사 없이 채널에 나갔다(2026-07-28 에 메웠다).
+# **새 LLM 문장을 채널에 싣게 되면 이 목록에 한 줄을 더 붙여야 한다.**
 #
 # 프롬프트로 금지해도 샌다 — 실측(2026-07-28) 테마 해설이 "테마 수익률 1위", "매수 심리를
 # 끌어당기는", "독립적인 매매 신호로 움직인" 을 한 번에 냈다. 언급 점유율을 주가로 읽은
@@ -551,13 +563,132 @@ BANNED_EXEMPT = (
 )
 _EXEMPT_RE = re.compile("|".join(re.escape(w) for w in BANNED_EXEMPT))
 
+# **지표 이름에서 온 말.** 위 BANNED_EXEMPT 와 달리 전역이 아니라 ai_summary 한 자리에서만
+# 봐준다(safe_summary_lines). 둘은 성격이 다르다 — 위는 "뜻이 전혀 다른 말"이라 어디서나
+# 면제고, 이쪽은 **뜻이 같은데도** 우리 지표 이름이라 안 쓸 도리가 없는 말이다.
+#
+# 공개 지표 33개 중 넷이 이름·헤드라인에 금지어를 품고 있다(2026-07-28 실측).
+#
+#   개인 순매수 강도                ⊃ 매수      individual_net_buy
+#   증권계좌에 대기 중인 매수 자금   ⊃ 매수      investor_deposit(헤드라인)
+#   코스피 신고가 대비 괴리율        ⊃ 신고가    kospi_high_gap
+#   최근 한 달 매매 안전장치 동향    ⊃ 매매      market_actions_30d
+#
+# 히어로 요약은 '가장 뜨거운 시장 지표'를 골라 그 이름을 굵게 쓰고 뜻을 풀어 준다
+# (generate_daily_summary.py). 그러니 저 넷이 주인공이 되는 날은 첫 문장이 반드시 걸린다.
+# 실제로 2026-07-28 요약이 "**개인 순매수 강도**는…"으로 시작해 걸렸다.
+#
+# ## 왜 전역(BANNED_EXEMPT)에 넣으면 안 되나
+#
+# '순매수'는 최근 3일 원문 12,035건 중 192건(1.60%)에 있고 용례가 전부 수급 이야기다
+# ("외국인 순매수 확대", "개인 순매수에 상승 전환"). PR #146 이 일부러 집어넣은 '매물'
+# (0.6%)·'출회'(0.4%)보다 흔하다. 전역으로 풀면 A·C·D 해설이 발췌에서 그 말을 그대로
+# 옮겨 와도 그물이 안 걸린다.
+#
+# ## 이 자리에서는 왜 안전한가
+#
+# **ai_summary 의 digest 에는 원문이 한 줄도 안 들어간다.** 지표 이름·카테고리·과열도·
+# 설명문과 점수 추이뿐이다(generate_daily_summary.indicator_digest). 채널 발췌를 읽고
+# 쓰는 A·C·D 와 달리 시장 잡담이 흘러들 통로 자체가 없어서, 여기서 '순매수'가 나왔다면
+# 출처는 저 지표 이름 하나뿐이다.
+#
+# ⚠️ **지표 이름을 바꾸면 이 목록이 낡는다.** 다시 뽑는 법(banned_hits 에 그대로 건다):
+#
+#     for i in db.table("indicators").select("slug,name,headline").eq("is_public", True)…:
+#         for f in ("name", "headline"):
+#             print(i["slug"], f, banned_hits(i[f] or ""))
+INDICATOR_EXEMPT = (
+    "순매수",         # 개인 순매수 강도
+    "매수 자금",      # 증권계좌에 대기 중인 매수 자금(예탁금)
+    "신고가",         # 코스피 신고가 대비 괴리율
+    "매매 안전장치",  # 최근 한 달 매매 안전장치 동향
+)
 
-def banned_hits(line: str) -> list[str]:
+
+def banned_hits(line: str, extra_exempt: tuple[str, ...] = ()) -> list[str]:
     """이 문단에 든 금지어. 비어 있으면 통과다.
 
     면제어를 **공백으로** 바꾸고 찾는다. 지워서 붙이면 없던 말이 생길 수 있다.
+
+    extra_exempt 는 BANNED_EXEMPT 에 **더해** 이 자리에서만 봐줄 말이다. 전역 목록을
+    넓히는 것과 다르다 — 넓히면 모든 글에서 그 말이 통과한다(INDICATOR_EXEMPT 주석 참고).
     """
-    return [w for w in BANNED_TERMS if w in _EXEMPT_RE.sub(" ", line)]
+    text = _EXEMPT_RE.sub(" ", line)
+    for w in extra_exempt:
+        text = text.replace(w, " ")
+    return [w for w in BANNED_TERMS if w in text]
+
+
+def safe_narrative(name: str, text: str) -> str:
+    """종목의 '왜 회자되나' 문장. 금지어가 있으면 **통째로 버린다**(빈 문자열).
+
+    ## 왜 여기가 compose() 보다 위험한가
+
+    이 문장은 종목 이름 **바로 아래**에 붙는다. 해설 문단은 시장 전체를 말하지만 이쪽은
+    한 종목을 가리키고 있어서, 시세 표현이 한 마디만 섞여도 그 종목에 대한 매수·매도
+    의견으로 읽힌다. 그물을 둔 이유 그 자체다(BANNED_TERMS 주석).
+
+    그런데 이 문장은 지금까지 그물을 안 지났다 — banned_hits 가 compose() 안에서만
+    걸려서, 표에 저장된 문장을 그대로 읽어 오는 B(마감)·D(주간)는 검사 없이 나갔다.
+
+    ## 왜 문장 단위가 아니라 통째인가
+
+    compose() 는 문단을 빼도 숫자·목록이 남지만, 내러티브는 그 자체가 한 문단이고
+    종목 카드에서 유일한 설명이다. 반쪽만 남기면 주어가 사라진 문장이 종목 이름 밑에
+    걸린다. 통째로 빼면 카드에 숫자만 남는데, 그건 요약이 아직 없는 종목에서 이미
+    쓰고 있는 모습이라 글이 어색해지지 않는다(surging_for_message 의 '숫자만 싣습니다').
+
+    ## 얼마나 빠지나(2026-07-28 실측)
+
+    저장된 66건 중 8건(12.1%)이 걸린다. 다만 **날짜가 07-19~21 에 전부 몰려 있다.**
+    종목 요약 프롬프트에 필수 규칙이 들어간 것이 07-21(ef365a8)이고, 그 다음 날부터
+    **45건 연속 0건**이다.
+
+    걸린 8건은 전부 증권사 의견을 옮긴 자리였다. 넷이 "반도체 실적 (전망) 하향"이라는
+    같은 표현이었고, 나머지는 목표가 상향·목표가 제시·실적 상향이다. 즉 지금 나가는
+    글에서 빠지는 문장은 없고, 이 그물은 프롬프트가 다시 느슨해질 때를 위한 보험이다.
+    """
+    text = (text or "").strip()
+    if not text:
+        return ""
+    hits = banned_hits(text)
+    if hits:
+        print(f"[금지어] {name} 요약을 뺍니다({' · '.join(hits)}). 숫자만 싣습니다: {text[:40]}…")
+        return ""
+    return text
+
+
+def safe_summary_lines(lines: list[str]) -> list[str]:
+    """히어로 '오늘의 요약'(daily_score.ai_summary)에서 금지어가 든 줄만 뺀다.
+
+    ## 왜 통째로 안 버리나
+
+    이 요약은 [주인공 지표 뜻풀이] + [최근 추세] 두 줄이 각각 한 문장으로 저장된다
+    (generate_daily_summary). 한 줄이 걸렸다고 둘 다 버리면 저녁 글의 요약 자리가 통째로
+    빈다. 내러티브와 달리 **남은 줄만으로도 말이 되므로** 줄 단위로 뺀다.
+
+    ## 네 가지 안을 재 보고 골랐다
+
+    2026-07-28 실측. 저장된 12일치 23줄(11일이 2줄, 하루가 1줄)이 분모다.
+
+        통째로 버림            4줄 탈락 · 요약이 빈 날 2일
+        줄 단위                2줄 탈락 · 요약이 빈 날 0일
+        지표명 면제 + 통째      2줄 탈락 · 요약이 빈 날 1일
+        지표명 면제 + 줄 단위    1줄 탈락 · 요약이 빈 날 0일   ← 이것
+
+    면제 없이 줄만 빼면 "**개인 순매수 강도**는…"이 지표 이름 때문에 날아가고, 그날 요약은
+    온도 추세 문장만 남아 무엇이 뜨거운지를 말하지 않는 글이 된다. 면제만 걸고 통째로
+    버리면 12일 중 하루가 요약을 통째로 잃는다. 둘을 같이 걸어야 남는 탈락 1건이 진짜다
+    ("투자자들이 **주가 상승**에 베팅하는 콜옵션을…" 2026-07-27 — 값의 방향을 말한 게 맞다).
+    """
+    kept: list[str] = []
+    for line in lines:
+        hits = banned_hits(line, extra_exempt=INDICATOR_EXEMPT)
+        if hits:
+            print(f"[금지어] 오늘의 요약에서 한 줄을 뺍니다({' · '.join(hits)}): {line[:40]}…")
+            continue
+        kept.append(line)
+    return kept
 
 
 def compose(client, model: str, task: str, digest: str, max_tokens: int = 600) -> str:

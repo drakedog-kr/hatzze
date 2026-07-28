@@ -244,7 +244,11 @@ def surging_for_message(db) -> list[dict]:
 
     for s in top:
         s["name"] = names.get(s["code"], s["code"])
-        s["narrative"] = narratives.get(s["code"], "")
+        # **금지어 그물을 여기서 건다.** 이 문장은 표에서 그대로 읽어 오는 것이라
+        # compose() 의 검사를 한 번도 안 지난다(bc.safe_narrative 주석). 걸리면 빈
+        # 문자열이 되어 아래 '요약이 아직 없는 종목' 경로로 합류한다 — 카드에 숫자만
+        # 남는 모습은 이미 쓰고 있던 것이라 글이 어색해지지 않는다.
+        s["narrative"] = bc.safe_narrative(s["name"], narratives.get(s["code"], ""))
     missing = [s["name"] for s in top if not s["narrative"]]
     if missing:
         print(f"[안내] 요약이 아직 없는 종목: {' · '.join(missing)} (숫자만 싣습니다)")
@@ -393,8 +397,15 @@ def build_evening(score_row: dict, surging: list[dict]) -> str:
     # 히어로는 두 문장을 한 문단으로 붙여 저장하는데, 그대로 실으면 150자짜리 한 덩어리가
     # 되어 폰에서 눈이 미끄러진다(실측).
     sentences = [s.strip() for s in (score_row.get("ai_summary") or "").splitlines() if s.strip()]
+    # 여기도 금지어 그물을 안 지나던 자리다. ai_summary 는 파이프라인이 만들어 표에 넣어
+    # 둔 LLM 문장이라 compose() 의 검사와 무관하다(bc.safe_summary_lines 주석).
+    #
+    # **자르고 나서 거른다.** 거르고 자르면 첫 줄이 빠진 날 세 번째 줄이 그 자리로 올라와,
+    # 원래 안 실릴 문장이 채널에 나간다. SUMMARY_SENTENCES 가 정한 건 '어디까지 싣나'이지
+    # '몇 줄을 채우나'가 아니다.
+    sentences = bc.safe_summary_lines(sentences[:SUMMARY_SENTENCES])
     if sentences:
-        lines += paragraphs(" ".join(sentences[:SUMMARY_SENTENCES]))
+        lines += paragraphs(" ".join(sentences))
 
     if surging:
         lines += ["", "📡 <b>카더라 급부상 종목</b> · 최근 3일"]
