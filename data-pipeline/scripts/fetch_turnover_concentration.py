@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from common.krx_client import krx_get  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
+from common.yahoo_client import fetch_last_session_quote  # noqa: E402
 
 KRX_URL = "http://data-dbg.krx.co.kr/svc/apis/sto/stk_bydd_trd"
 TOP_N = 10
@@ -78,6 +79,80 @@ def fetch_concentration(bas_dd: str):
     return share, details
 
 
+def _code_map(client, names: list[str]) -> dict[str, dict]:
+    """종목명 → {code, market}. stocks 표에서 한 번에 찾는다."""
+    if not names:
+        return {}
+    rows = client.table("stocks").select("code,name,market").in_("name", names).execute().data
+    return {r["name"]: r for r in rows}
+
+
+def attach_quotes(client, indicator_id: str, day: date, details: dict) -> dict:
+    """최신 행의 top5 에 종가·52주 고점을 얹는다(신고가 카드 오른쪽 칸이 쓴다).
+
+    **이 조회가 파이프라인에 있는 이유**: 예전엔 프론트가 화면을 그릴 때마다 야후를
+    실시간으로 불렀다. 그러면 카드가 장중에 움직이는데 같은 카드 왼쪽 지수 게이지와
+    햇쩨 지수는 하루 두 번만 바뀐다 — 한 화면에서 시점이 갈린다.
+
+    **장중에는 값을 못 받는다**(yahoo_client 의 16:00 게이트). 그때는 **이미 저장된
+    값을 그대로 살린다** — 아침 실행이 details 를 통째로 새로 쓰면서 전날 저녁이 넣어
+    둔 종가를 지워 버리는 걸 막는다. `details` 는 여러 스크립트가 나눠 쓰는 칸이라
+    통째 대입이 늘 이런 식으로 문다.
+
+    종가 기준일(`price_date`)은 KRX 거래대금 기준일(행의 date)과 **다를 수 있다.**
+    KRX 는 T+1 이라 행은 어제인데 종가는 오늘일 수 있어서다. 지수 게이지와 날짜를
+    맞추는 게 목적이므로 이쪽이 맞고, 프론트가 그 날짜를 라벨로 쓴다.
+    """
+    top5 = details.get("top5") or []
+    codes = _code_map(client, [s["name"] for s in top5])
+
+    quoted, price_date = 0, None
+    for stock in top5:
+        info = codes.get(stock["name"])
+        if not info:
+            continue
+        stock["code"] = info["code"]
+        symbol = f"{info['code']}.{'KQ' if info.get('market') == 'KOSDAQ' else 'KS'}"
+        quote = fetch_last_session_quote(symbol)
+        if quote is None:
+            continue
+        session_date, close, high52 = quote
+        if high52 is None or high52 <= 0:
+            continue  # 52주 고점이 없으면 카드가 못 그린다
+        stock["price"] = close
+        stock["high52"] = high52
+        stock["gap_pct"] = round((close / high52 - 1) * 100, 2)
+        price_date = session_date
+        quoted += 1
+
+    if quoted:
+        details["price_date"] = price_date
+        print(f"[야후] 상위 종목 {quoted}개 종가 부착 ({price_date} 기준)")
+        return details
+
+    # 장중이거나 조회 실패 — 저장돼 있던 값을 되살린다.
+    prev = (
+        client.table("indicator_values")
+        .select("details")
+        .eq("indicator_id", indicator_id)
+        .eq("date", day.isoformat())
+        .maybe_single()
+        .execute()
+    )
+    old = ((prev.data or {}).get("details") or {}) if prev else {}
+    old_by_name = {s["name"]: s for s in (old.get("top5") or []) if "price" in s}
+    kept = 0
+    for stock in top5:
+        prior = old_by_name.get(stock["name"])
+        if prior:
+            stock.update({k: prior[k] for k in ("price", "high52", "gap_pct") if k in prior})
+            kept += 1
+    if old.get("price_date"):
+        details["price_date"] = old["price_date"]
+    print(f"[야후] 종가를 새로 못 받아 기존 값 {kept}개를 유지합니다 (기준 {old.get('price_date')})")
+    return details
+
+
 def main() -> None:
     client = get_client()
     indicator_id = ensure_indicator(client, INDICATOR_META)
@@ -94,6 +169,10 @@ def main() -> None:
         if result is None:
             continue  # 휴장/데이터 없음
         share, details = result
+        # 종가는 화면에 뜨는 최신 행에만 붙인다 — 프론트가 그 행 하나만 읽고, 과거
+        # 날짜의 52주 고점은 야후가 소급해서 주지도 않는다.
+        if latest_line is None:
+            details = attach_quotes(client, indicator_id, d, details)
         client.table("indicator_values").upsert(
             {"indicator_id": indicator_id, "date": d.isoformat(), "raw_value": share, "details": details},
             on_conflict="indicator_id,date",
