@@ -650,6 +650,26 @@ main.hz-scroll { overflow-x: clip; }
   background: var(--c-hover);
 }
 
+/* 종목 검색 드롭다운의 항목 — 고르면 그 종목이 열리는 자리라, 회색 호버 대신 파란 틴트로
+   "이게 지금 걸려 있다"를 짚어 준다. 카더라의 목록 행들도 .hz-row-link 를 쓰므로 클래스를
+   통째로 바꾸지 않고 여기서만 덮는다.
+   배경을 CSS 로 두는 것이 핵심이다 — 인라인 style 로 transparent 를 주면 인라인이 :hover
+   규칙을 이겨서 하이라이트가 통째로 안 먹는다(고치기 전이 그 상태였다). */
+.hz-row-link.hz-pick {
+  background: transparent;
+  /* .hz-row-link 의 좌우 음수 마진(-9px)만 되돌린다. 그건 카드 안쪽까지 행을 넓히려고
+     쓰는 값인데, width:100% 인 이 버튼에 걸리면 왼쪽으로만 9px 밀려 나가고 오른쪽은
+     그만큼 짧아진다 — 하이라이트가 왼쪽엔 여백 없이 붙고 오른쪽만 떠 보였다.
+     0 으로 두면 패널의 좌우 패딩이 그대로 양쪽 여백이 된다.
+     세로(-7px)는 그대로 둔다. 같이 없애면 행 간격이 벌어져 패널이 maxHeight 를 넘고
+     맨 아래 안내 문구가 잘린다. */
+  margin: -7px 0;
+}
+.hz-row-link.hz-pick:hover,
+.hz-row-link.hz-pick:focus-visible {
+  background: var(--c-blue-tint);
+}
+
 /* 내비게이션 항목(사이드바·모바일 탭바 공통, 내부 3개 + 텔레그램 커뮤니티).
    호버 배경으로 "눌리는 요소"임을 알린다.
    현재 페이지(hz-nav-active)는 파란 배경이 그대로 남아야 하므로 :not()으로 제외한다 —
