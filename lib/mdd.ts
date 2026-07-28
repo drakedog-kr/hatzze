@@ -347,6 +347,8 @@ export type RiskProfile = {
  */
 export type RiskEvent = {
   year: number;
+  /** 고점이 난 달(1~12). 한 해에 두 건 이상이면 화면에서 이걸로 줄을 구분한다. */
+  month: number;
   stock: number;
   market: number | null;
   dropDays: number;
@@ -429,6 +431,7 @@ export function riskProfile(bars: Bar[], marketBars: Bar[] | null): RiskProfile 
     }
     return {
       year: Number(e.peakDate.slice(0, 4)),
+      month: Number(e.peakDate.slice(5, 7)),
       stock: e.depth,
       market,
       dropDays: e.troughDays,

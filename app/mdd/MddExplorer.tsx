@@ -850,6 +850,20 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
   const yearly = r.yearly.slice(-RISK_ROWS);
   const events = r.events.slice(-RISK_ROWS);
 
+  // 뒤 두 타일의 한 줄은 '연도'가 아니라 '큰 하락 한 건'이라, 같은 해에 두 번 났으면
+  // 연도만으로는 두 줄이 구분되지 않는다(삼성전자 2026 이 그렇다). 그런 해에만 고점 월을
+  // 붙인다 — 한 번뿐인 해까지 붙이면 축이 괜히 시끄러워진다.
+  const eventYearCount = new Map<number, number>();
+  for (const e of events) eventYearCount.set(e.year, (eventYearCount.get(e.year) ?? 0) + 1);
+  const eventLabels = events.map((e) =>
+    (eventYearCount.get(e.year) ?? 0) > 1 ? `${e.year}.${e.month}` : `${e.year}`,
+  );
+
+  // 연도 칸 폭 — 월이 붙는 종목에서만 넓혀 세 타일을 함께 민다(한 종목 안에서는 세 타일이
+  // 늘 같은 폭이라 가로 축은 그대로 맞는다). 폭은 계산하지 말고 실측할 것: 이 자리에서
+  // "2021.11"은 43.3px 이라 눈대중으로 잡은 42px 에서 1px 넘쳤다. 두 자리 월이 최대다.
+  const yearCol = eventLabels.some((l) => l.includes(".")) ? 46 : 30;
+
   // 범례는 막대 두 줄이 각각 뭔지 알려주는 유일한 단서다 — 이걸 못 읽으면 타일이
   // 통째로 안 읽힌다. sub(11px)로는 타일 배경 위에서 흐려서 ink-soft 로 한 단계 올린다.
   const legend = (items: { label: string; color: string; opacity?: number }[]) => (
@@ -866,16 +880,16 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
   /** 한 줄 = [연도] [막대+값] [막대+값]. 세 타일이 이 한 가지 줄만 쓴다. */
   const row = (
     key: string | number,
-    year: number,
+    label: string,
     a: { pct: number; color: string; opacity: number; value: string },
     b: { pct: number; color: string; opacity: number; value: string },
   ) => (
-    <div key={key} style={{ display: "grid", gridTemplateColumns: "30px minmax(0,1fr)", alignItems: "center", gap: 8 }}>
+    <div key={key} style={{ display: "grid", gridTemplateColumns: `${yearCol}px minmax(0,1fr)`, alignItems: "center", gap: 8 }}>
       {/* 연도는 이 줄이 언제 얘기인지를 말하는 축이라 faint 로는 흐리다. muted 로는 부족했다 —
           라이트에서 명암비가 2.59 → 2.96 으로 거의 안 움직인다(두 토큰이 라이트에선 붙어
           있다). sub 까지 올려야 3.30/7.32 로 실제로 한 단계 밝아진다. 범례(ink-soft)보다는
           여전히 한 단계 아래라 위계는 그대로다. */}
-      <span style={{ fontFamily: MONO, fontSize: 11, color: C.sub }}>{year}</span>
+      <span style={{ fontFamily: MONO, fontSize: 11, color: C.sub, whiteSpace: "nowrap" }}>{label}</span>
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {[a, b].map((s, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 7 }}>
@@ -913,7 +927,7 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
             return yearly.map((y) =>
               row(
                 y.year,
-                y.year,
+                `${y.year}`,
                 { pct: (Math.abs(y.ret) / max) * 100, color: y.ret >= 0 ? C.mania : C.cold, opacity: 1, value: `${y.ret >= 0 ? "+" : "−"}${Math.abs(Math.round(y.ret))}%` },
                 { pct: (Math.abs(y.mdd) / max) * 100, color: C.cold, opacity: 0.45, value: `${Math.round(y.mdd)}%` },
               ),
@@ -940,7 +954,7 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
             return events.map((e, i) =>
               row(
                 i,
-                e.year,
+                eventLabels[i],
                 { pct: (e.dropDays / max) * 100, color: C.cold, opacity: 1, value: fmtDur(e.dropDays) },
                 {
                   pct: e.recoverDays === null ? 0 : (e.recoverDays / max) * 100,
@@ -978,7 +992,7 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
             return events.map((e, i) =>
               row(
                 i,
-                e.year,
+                eventLabels[i],
                 { pct: (Math.abs(e.stock) / max) * 100, color: C.cold, opacity: 1, value: `${Math.round(e.stock)}%` },
                 {
                   pct: e.market === null ? 0 : (Math.abs(e.market) / max) * 100,
@@ -1035,7 +1049,7 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
       </div>
       <p style={{ margin: "16px 0 0", color: C.muted, fontSize: 12, lineHeight: 1.6 }}>
         <Icon name="info" style={{ fontSize: 14, verticalAlign: -2, marginRight: 4 }} />
-        보상은 조회 기간(최근 {yrs}년)에 따라 달라지니 절대 수치보다 성격으로 보십시오. 큰 하락·속도는 고점 대비 −20% 이상 하락 기준이고, 최근 {RISK_ROWS}건까지만 보여줍니다.
+        &lsquo;낙폭 대비 보상&rsquo;은 달력 연도 한 해가 한 줄이고, 조회 기간(최근 {yrs}년)에 따라 달라지니 절대 수치보다 성격으로 보십시오. 나머지 둘은 연도가 아니라 큰 하락(고점 대비 −20% 이상) 한 건이 한 줄입니다. 하락이 없던 해는 건너뛰고, 같은 해에 두 번이면 고점 월을 붙여 나눕니다(최근 {RISK_ROWS}건). 아직 회복하지 못한 하락은 다음 고점이 없어 그 뒤로 새 줄이 생기지 않습니다.
       </p>
     </section>
   );
