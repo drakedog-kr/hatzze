@@ -243,6 +243,16 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_telegram.py
 
+      # 위 수집기가 재는 것은 '총 몇 건'이고, 이 스텝이 재는 것은 '며칠째 몇 개 채널'이다.
+      # 문턱을 하나 더 얹지 않고 따로 둔 이유는 그 스크립트 main() 끝 주석에 있다 —
+      # 0건 문턱을 비율로 바꾸면 캐시가 차는 중인 정상적인 날에도 울린다. 연속 일수는
+      # 그 반례를 통과시키면서 '오래 낮은' 상태만 잡는다(판정 근거는 이 스크립트 주석).
+      # 수집기 바로 뒤여야 오늘 칸이 채워진 상태로 잰다.
+      - name: (텔레그램) 수집 커버리지 검사
+        id: telegram_coverage
+        continue-on-error: true
+        run: python data-pipeline/scripts/check_telegram_coverage.py
+
       # 분류는 Batch API(토큰 값 절반)로 보내므로 응답 시각을 우리가 정할 수 없다.
       # 그래서 수집 직후 제출해 두고, 아래 집계 스텝들이 도는 20~30분을 대기 시간으로
       # 쓴 뒤 집계 직전에 수거한다. 그 안에 안 끝난 배치는 다음 실행이 가져간다.
@@ -539,6 +549,35 @@ jobs:
           title="⚠️ 카더라(텔레그램) 수집 중단"
           note=$(printf '카더라 수집 스텝이 실패했습니다. 그날 메시지·구독자 스냅샷이 비어 있을 수 있습니다.\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n먼저 볼 것: sync 로그의 "peer 캐시 보유 N/M개" 와 FloodWait 줄. FloodWait 이면 만료 뒤 다음 예약 실행이 캐시를 이어서 채웁니다(한 실행 최대 100개).' \
             "$(date -u '+%Y-%m-%d %H:%M')" "$failed" "$run_url")
+          existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$note"
+            echo "기존 알림 이슈 #$existing 에 코멘트 추가"
+          else
+            gh issue create --title "$title" --body "$note"
+            echo "새 알림 이슈 생성"
+          fi
+          exit 1
+
+      # ── 부분 수집(커버리지) 전용 알림 ────────────────────────────────────
+      # 위 알림과 **합치지 않았다.** 제목이 곧 진단이라, "수집 중단" 하나로 묶으면
+      # 며칠째 200/317 만 걷히는 날에도 '멈췄다'고 말하게 된다. 둘은 대응도 다르다 —
+      # 저쪽은 그날 재료가 통째로 빈 것이고, 이쪽은 재료가 들어오긴 하는데 3분의 1이
+      # 계속 빠지는 것이다. 제목이 다르면 이슈도 따로 열리고 따로 닫힌다.
+      #
+      # 위 telegram_health 배열에 스텝을 더하는 쪽도 생각했지만, 그 배열은 "그날치가
+      # 영영 빈다"를 뜻하는 스텝만 담기로 기준이 서 있다(바로 위 주석). 커버리지는
+      # 그 기준을 통과하지 못한다 — 빠진 채널은 다음 실행이 캐시를 채우면 7일 창 안에서
+      # 백필로 따라온다.
+      - name: Alert on 카더라 커버리지 저하 (open/update GitHub issue)
+        if: ${{ !cancelled() && steps.telegram_coverage.outcome == 'failure' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          title="⚠️ 카더라(텔레그램) 수집 커버리지 저하"
+          note=$(printf '수집은 되는데 **며칠째 채널 일부만** 걷히고 있습니다. 화면의 언급 수·채널 수·점유율이 전부 그 일부만의 것입니다.\n\n- 시각(UTC): %s\n- 로그/요약: %s\n\n먼저 볼 것: 위 스텝 로그의 일별 커버리지 표와 "peer 캐시 N/M개" 줄, 그리고 telegram_flood_wait 표의 wait_until. 만료 뒤 실행이 캐시를 이어서 채우면(한 실행 최대 100개) 이 알림은 저절로 닫힙니다.\n\n⚠️ MAX_RESOLVES_PER_RUN 을 올리거나 --force-resolve 를 예약 실행에 넣지 마세요 — 그게 애초에 긴 FloodWait 을 만든 경위입니다(마이그레이션 021·022 주석).' \
+            "$(date -u '+%Y-%m-%d %H:%M')" "$run_url")
           existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
           if [ -n "$existing" ]; then
             gh issue comment "$existing" --body "$note"
