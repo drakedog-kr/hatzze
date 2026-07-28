@@ -39,7 +39,7 @@ import re
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 
-from .surging import load_stock_daily, top_surging
+from .surging import load_stock_daily
 from .text_check import problems
 from .timeutil import KST, today_kst
 
@@ -363,34 +363,6 @@ def load_daily_brief(db) -> str:
         .data
     )
     return (rows[0].get("sentiment_summary") or "").strip() if rows else ""
-
-
-def surging_with_narrative(db, limit: int) -> list[dict]:
-    """급부상 종목 + 이름 + '왜 회자되나' 문장. B 가 쓴다."""
-    rows, dates = load_stock_daily(db)
-    if not dates:
-        return []
-    top = top_surging(db, limit, preloaded=(rows, dates))
-    if not top:
-        return []
-    codes = [s["code"] for s in top]
-    names = {r["code"]: r["name"] for r in db.table("stocks").select("code,name").in_("code", codes).execute().data}
-    latest = db.table("telegram_stock_narrative").select("date").order("date", desc=True).limit(1).execute().data
-    narr: dict[str, str] = {}
-    if latest:
-        narr = {
-            r["stock_code"]: (r["narrative"] or "").strip()
-            for r in db.table("telegram_stock_narrative")
-            .select("stock_code,narrative")
-            .eq("date", latest[0]["date"])
-            .in_("stock_code", codes)
-            .execute()
-            .data
-        }
-    for s in top:
-        s["name"] = names.get(s["code"], s["code"])
-        s["narrative"] = safe_narrative(s["name"], narr.get(s["code"], ""))
-    return top
 
 
 def kadera_lag_days(dates: list[str]) -> int | None:
