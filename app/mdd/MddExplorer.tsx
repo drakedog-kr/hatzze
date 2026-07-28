@@ -1265,7 +1265,6 @@ function Recovery({ a }: { a: MddAnalysis }) {
       <p style={{ margin: "14px 0 0", fontSize: 12, color: C.muted, lineHeight: 1.6 }}>
         회복한 {r.recoveredCount}번의 중앙값은 <b style={{ color: C.sub }}>{fmtDur(r.medianDays!)}</b>(세로선), 가장 빠른 때가{" "}
         <b style={{ color: C.sub }}>{fmtDur(r.minDays!)}</b>, 가장 오래 걸린 때가 <b style={{ color: C.sub }}>{fmtDur(r.maxDays!)}</b>였습니다.
-        {" "}막대 길이는 짧은 기간도 구분되도록 눌러 그렸으니 정확한 값은 오른쪽 숫자로 보십시오.
       </p>
     </section>
   );
