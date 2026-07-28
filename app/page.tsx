@@ -1104,14 +1104,16 @@ function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
             있으면 안 되므로(아랫줄에선 위가 맞다) globals.css 의 .hz-peer-list 가 맡는다. */}
         {tops.length > 0 && (
           <div className="hz-peer-list" style={{ flex: "1 1 240px", minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center", gap: 10 }}>
-            {/* 현재가는 KRX 종가라 왼쪽 지수와 같은 거래일이다. 52주 고점만 야후를 쓰는데
-                (KRX엔 그 필드가 없다 — lib/data.getTopStockHighGaps 참고) 장중 고가 기준이라
-                종가 기준보다 3%쯤 높아, 괴리율이 그만큼 깊게 나온다. 그 사실을 툴팁에 밝힌다. */}
+            {/* 현재가·52주 고점 둘 다 야후다(2026-07-29 에 현재가가 KRX 종가에서 바뀌었다 —
+                지수 종가가 야후로 옮겨 가면서 KRX 쪽이 되레 하루 뒤처졌다).
+                밝힐 게 둘이다. ⑴ 고점이 장중 고가라 종가 기준보다 3%쯤 높아 괴리율이 그만큼
+                깊게 나온다. ⑵ 왼쪽 지수는 하루 한 번 쓰는 종가라 **장중에는 오른쪽만 오늘**
+                이다. 자세한 건 lib/data.getTopStockHighGaps 주석. */}
             {/* hz-tip-end — 이 라벨은 2칸 카드의 오른쪽 절반에 있어, 좁은 화면에선 가운데
                 정렬 툴팁(240px)의 절반이 화면 밖으로 나가 가로 스크롤이 생겼다(실측 59px). */}
             <span
               className="hz-tip hz-tip-wide hz-tip-end"
-              data-tip="현재가는 지수와 같은 KRX 종가입니다. 52주 고점은 야후 파이낸스의 장중 최고가라, 종가 기준인 지수 쪽보다 괴리율이 조금 더 깊게 나옵니다."
+              data-tip="현재가와 52주 고점 모두 야후 파이낸스 시세입니다. 고점이 장중 최고가라 종가 기준인 지수 쪽보다 괴리율이 조금 더 깊게 나옵니다. 왼쪽 지수는 하루 한 번 갱신되는 종가라, 장중에는 이 종목들만 오늘 값입니다."
               data-ga-tip="high_gap_source"
               style={{ fontSize: 10, fontWeight: 700, color: C.sub }}
             >
