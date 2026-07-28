@@ -97,6 +97,26 @@ export function RankDelta({ change, unit = "계단" }: { change: number | null; 
   );
 }
 
+/**
+ * 등락률(▲1.23%). 0 은 상승도 하락도 아니라 화살표를 떼고 중립색으로 그린다 —
+ * 탑바 티커(app/AppShell.tsx 의 TickerItem)와 같은 규칙이다. 예전엔 `>= 0` 으로 갈라서
+ * 시세가 잠깐 멈춘 동안 "▲0.00%" 가 상승색으로 떴는데, 바로 위 티커는 같은 0 을 화살표
+ * 없이 그리고 있었다(2026-07-28 실측). 티커가 상승에 C.mania 를 쓰는 것만 다르고 규칙은
+ * 하나다 — 한쪽을 고치면 다른 쪽도 같이 볼 것.
+ *
+ * null(전일 종가를 못 구해 등락률을 못 낸다)이면 아무것도 그리지 않는다.
+ */
+export function ChangeRate({ rate, style }: { rate: number | null; style?: React.CSSProperties }) {
+  if (rate === null) return null;
+  const [color, arrow] = rate > 0 ? [C.hot, "▲"] : rate < 0 ? [C.cold, "▼"] : [C.sub, ""];
+  return (
+    <span style={{ fontFamily: MONO, fontWeight: 600, color, ...style }}>
+      {arrow}
+      {Math.abs(rate).toFixed(2)}%
+    </span>
+  );
+}
+
 /** 채널 프로필 사진. 없으면 첫 글자 이니셜 아바타로 폴백. */
 export function Avatar({ photo, title, size = 30 }: { photo: string | null; title: string; size?: number }) {
   const common: React.CSSProperties = {

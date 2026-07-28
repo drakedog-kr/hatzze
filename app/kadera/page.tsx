@@ -23,7 +23,7 @@ import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { C, Icon, MONO } from "../ui";
 import { ExpandableList } from "./ExpandableList";
-import { Avatar, Pill, RankDelta, Sparkline, card as cardStyle, rankNum, subCard } from "./parts";
+import { Avatar, ChangeRate, Pill, RankDelta, Sparkline, card as cardStyle, rankNum, subCard } from "./parts";
 import { StockLogo } from "../StockLogo";
 import { SectionHead } from "./SectionHead";
 import { TrendingTabs } from "./TrendingTabs";
@@ -572,12 +572,7 @@ export default async function KaderaPage() {
                         <div style={{ fontFamily: MONO, fontSize: 16, fontWeight: 700, color: C.ink, letterSpacing: "-0.02em" }}>
                           {s.closePrice.toLocaleString("ko-KR")}원
                         </div>
-                        {s.changeRate != null && (
-                          <div style={{ marginTop: 2, fontFamily: MONO, fontSize: 12, fontWeight: 600, color: s.changeRate >= 0 ? C.hot : C.cold }}>
-                            {s.changeRate >= 0 ? "▲" : "▼"}
-                            {Math.abs(s.changeRate).toFixed(2)}%
-                          </div>
-                        )}
+                        <ChangeRate rate={s.changeRate} style={{ display: "block", marginTop: 2, fontSize: 12 }} />
                       </>
                     ) : (
                       <span style={{ fontSize: 12, color: C.muted }}>가격 정보 준비 중</span>
@@ -775,12 +770,7 @@ export default async function KaderaPage() {
                           <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: C.ink, letterSpacing: "-0.02em" }}>
                             {r.price.toLocaleString("ko-KR")}원
                           </span>
-                          {r.changeRate != null && (
-                            <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 600, color: r.changeRate >= 0 ? C.hot : C.cold }}>
-                              {r.changeRate >= 0 ? "▲" : "▼"}
-                              {Math.abs(r.changeRate).toFixed(2)}%
-                            </span>
-                          )}
+                          <ChangeRate rate={r.changeRate} style={{ fontSize: 11 }} />
                         </span>
                       )}
                     </div>
