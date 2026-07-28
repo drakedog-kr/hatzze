@@ -1,0 +1,196 @@
+name: Telegram Broadcast (오후 2시)
+
+# 오후 2시(KST)에 나가는 두 글 — C 관심 이동(화·금) · D 주간 결산(일).
+#
+# **왜 파이프라인과 분리했나.** daily-update.yml 은 아침(~11:00)과 저녁(~20:20)에 돈다.
+# A 어제 브리핑·B 마감 리포트는 그 데이터가 막 갱신된 직후에 나가는 게 맞아 거기 붙였지만,
+# C·D 는 오후 2시라 어느 실행에도 붙지 않는다. 파이프라인 크론을 하나 더 늘리면 지표 수집
+# 26개가 통째로 한 번 더 도는 셈이라, 발송만 하는 가벼운 워크플로를 따로 뒀다.
+#
+# 자료는 그날 아침 실행이 이미 채워 뒀다(오후 2시면 완료 후 세 시간쯤 지난 시점).
+
+on:
+  schedule:
+    # ⚠️ **발화 시각 ≠ 실제 실행 시각.** GitHub 예약 큐가 실측 90~150분 밀린다
+    # (daily-update.yml 의 cron 주석 참고). 그래서 발화를 한참 앞에 잡고, 아래
+    # '발송 시각까지 대기' 스텝에서 KST 14:00 까지 기다렸다가 보낸다.
+    #
+    # 지연을 역산해 발화 시각만으로 맞추지 않는 이유: 지연 폭이 슬롯마다 다르고 날마다
+    # 흔들려서, 발화만 옮기면 실제 발송이 12시 반에도 3시에도 떨어진다. 일찍 깨워 놓고
+    # 기다리면 큐가 얼마나 밀리든 **항상 2시에 나간다**. 이 저장소는 public 이라 Actions
+    # 분이 무료여서 러너가 좀 기다리는 비용은 없다.
+    #
+    # 요일은 UTC 기준이다. 02:20 UTC = 11:20 KST 로 같은 날이라 그대로 써도 어긋나지 않는다.
+    #   0=일 → D 주간 결산 · 2=화, 5=금 → C 관심 이동
+    - cron: "20 2 * * 0,2,5"
+  workflow_dispatch:
+    inputs:
+      format:
+        description: "보낼 글"
+        type: choice
+        options: [theme, weekly]
+        default: theme
+      send:
+        description: "실제로 발송한다 (끄면 미리보기만 찍고 안 보낸다)"
+        type: boolean
+        default: false
+
+jobs:
+  broadcast:
+    runs-on: ubuntu-latest
+    # 실패 시 알림 이슈를 열 수 있도록(daily-update.yml 과 같은 감지 레이어).
+    permissions:
+      contents: read
+      issues: write
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      # 해설 문단 생성용. 없으면 문단만 빠지고 숫자·목록은 그대로 나간다(fail-soft).
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      # 발송 전용 봇 토큰(수집용 TELEGRAM_SESSION 과 별개).
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_BROADCAST_CHAT_ID: ${{ secrets.TELEGRAM_BROADCAST_CHAT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r data-pipeline/requirements.txt
+
+      # 설치까지 끝내 놓고 기다린다 — 2시가 되면 바로 보내야 하므로, 대기 뒤에 몇 분짜리
+      # 설치가 남아 있으면 그만큼 늦게 나간다(kiwipiepy 모델이 88MB 라 설치가 짧지 않다).
+      - name: 발송 시각까지 대기 (KST 14:00)
+        if: github.event_name == 'schedule'
+        run: |
+          target=$(TZ=Asia/Seoul date -d 'today 14:00' +%s)
+          now=$(date +%s)
+          wait=$(( target - now ))
+          echo "지금 $(TZ=Asia/Seoul date '+%F(%a) %H:%M') KST · 목표 14:00"
+          if [ "$wait" -le 0 ]; then
+            # 큐가 예상보다 크게 밀린 경우. 기다릴 게 없으니 바로 보낸다.
+            echo "이미 14:00 을 지났습니다($(( -wait / 60 ))분). 대기 없이 진행합니다."
+          else
+            # 상한을 둔다. 큐 지연이 없다시피 한 날은 11:20 에 시작해 2시간 40분을
+            # 기다리게 되는데, 그보다 더 긴 대기는 발화 시각이 잘못됐다는 뜻이다.
+            [ "$wait" -gt 10800 ] && wait=10800
+            echo "$(( wait / 60 ))분 대기합니다."
+            sleep "$wait"
+          fi
+          echo "발송 시각 $(TZ=Asia/Seoul date '+%F(%a) %H:%M') KST"
+
+      - name: 발송 요일 판정
+        id: when
+        run: |
+          DOW=$(TZ=Asia/Seoul date +%u)   # 1=월 … 7=일
+          themeday=false; sunday=false
+          # 관심 이동(테마)은 3일 간격이다. 카더라 집계 창이 3일이라 그 주기로 보내면
+          # 매번 완전히 새 구간을 말한다. 화·금으로 고정한 건 (a) 평일 안에 들어오고
+          # (b) 화→금 3일 · 금→화 4일로 3일에 가장 가까우면서 (c) 요일이 고정돼 구독자가
+          # 리듬을 익히기 때문이다. 날짜 나머지(%3)로 돌리면 요일이 매주 바뀐다.
+          { [ "$DOW" -eq 2 ] || [ "$DOW" -eq 5 ]; } && themeday=true
+          [ "$DOW" -eq 7 ] && sunday=true
+          echo "themeday=$themeday" >> "$GITHUB_OUTPUT"
+          echo "sunday=$sunday" >> "$GITHUB_OUTPUT"
+          echo "DOW=$DOW · 테마일=$themeday 일요일=$sunday"
+
+      # 낡은 값 차단. 이 워크플로엔 수집·계산 스텝이 없어서 daily-update.yml 처럼
+      # 앞 스텝 결과를 볼 수가 없다. 대신 같은 검사를 직접 돌려 게이트로 쓴다 — DB 조회만
+      # 하는 가벼운 스크립트다. 발송 스크립트 안에도 게이트가 하나 더 있다(daily_score 나이).
+      - name: 자료 정체 감시 (발송 게이트)
+        id: check_freshness
+        continue-on-error: true
+        run: python data-pipeline/scripts/check_freshness.py
+
+      - name: (텔레그램) C 관심 이동 발송 (화·금 14:00)
+        id: telegram_theme
+        continue-on-error: true
+        if: >-
+          steps.check_freshness.outcome == 'success'
+          && github.run_attempt == '1'
+          && (
+            (github.event_name == 'schedule' && steps.when.outputs.themeday == 'true')
+            || (github.event.inputs.send == 'true' && github.event.inputs.format == 'theme')
+          )
+        run: python data-pipeline/scripts/send_telegram_broadcast.py --send --format theme
+
+      - name: (텔레그램) D 주간 결산 발송 (일요일 14:00)
+        id: telegram_weekly
+        continue-on-error: true
+        if: >-
+          steps.check_freshness.outcome == 'success'
+          && github.run_attempt == '1'
+          && (
+            (github.event_name == 'schedule' && steps.when.outputs.sunday == 'true')
+            || (github.event.inputs.send == 'true' && github.event.inputs.format == 'weekly')
+          )
+        run: python data-pipeline/scripts/send_telegram_broadcast.py --send --format weekly
+
+      # 수동 실행에서 send 를 껐을 때의 미리보기. 실제로는 안 보낸다.
+      - name: 미리보기 (수동 실행 · 발송 끔)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.send != 'true'
+        run: python data-pipeline/scripts/send_telegram_broadcast.py --format ${{ github.event.inputs.format }}
+
+      - name: Summarize results
+        if: always()
+        run: |
+          names=("check_freshness.py" "broadcast(C테마)" "broadcast(D주간)")
+          outcomes=("${{ steps.check_freshness.outcome }}" "${{ steps.telegram_theme.outcome }}" "${{ steps.telegram_weekly.outcome }}")
+
+          {
+            echo "## Telegram broadcast summary"
+            echo "| Step | Result |"
+            echo "|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          failed=0
+          failed_list=""
+          for i in "${!names[@]}"; do
+            name="${names[$i]}"
+            outcome="${outcomes[$i]}"
+            echo "$name: $outcome"
+            case "$outcome" in
+              success)
+                echo "| $name | success |" >> "$GITHUB_STEP_SUMMARY"
+                ;;
+              skipped|"")
+                # 'skipped'는 실패가 아니다. 화·금엔 D 가, 일요일엔 C 가 **일부러**
+                # 건너뛴다. 이걸 실패로 세면 발송이 있는 날마다 알림 이슈가 열린다.
+                echo "| $name | skipped (예정된 건너뜀) |" >> "$GITHUB_STEP_SUMMARY"
+                ;;
+              *)
+                echo "| $name | $outcome |" >> "$GITHUB_STEP_SUMMARY"
+                failed=1
+                failed_list="${failed_list:+$failed_list, }$name"
+                ;;
+            esac
+          done
+
+          if [ "$failed" = "1" ]; then
+            echo "FAILED_STEPS=$failed_list" >> "$GITHUB_ENV"
+            echo "One or more steps failed. Check the step logs above."
+            exit 1
+          fi
+
+      - name: Alert on failure (open/update GitHub issue)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          failed="${FAILED_STEPS:-요약 탭에서 확인}"
+          title="⚠️ 텔레그램 오후 발송 실패"
+          note=$(printf '오후 2시 채널 발송이 실패했습니다.\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n자료가 정체됐으면(check_freshness) 다음 파이프라인 실행이 회복시킵니다. 계속 실패하면 확인이 필요합니다.' \
+            "$(date -u '+%Y-%m-%d %H:%M')" "$failed" "$run_url")
+          existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$note"
+            echo "기존 알림 이슈 #$existing 에 코멘트 추가"
+          else
+            gh issue create --title "$title" --body "$note"
+            echo "새 알림 이슈 생성"
+          fi
