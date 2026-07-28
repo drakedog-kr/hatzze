@@ -738,6 +738,16 @@ def josa(word: str, with_final: str, without_final: str) -> str:
     return with_final if (ord(last) - 0xAC00) % 28 else without_final
 
 
+def day_label(kdate: str) -> str:
+    """"2026-07-28" → "7월 28일". digest 라벨에 집계일을 못박을 때 쓰는 짧은 표기.
+
+    요일을 뺀 이유는 자리 때문이다. 화면 머리줄은 korean_date_label 로 "7월 28일(화)"를
+    쓰지만, 이건 모델이 읽는 라벨이라 요일이 문장에 그대로 딸려 나오면 군더더기가 된다.
+    """
+    d = date.fromisoformat(kdate)
+    return f"{d.month}월 {d.day}일"
+
+
 def is_yesterday(kdate: str, today: date | None = None) -> bool:
     """키워드 집계일이 진짜 어제인가. **제목과 본문이 이 답 하나를 같이 쓴다.**
 
@@ -762,11 +772,16 @@ def morning_day_words(kdate: str, today: date | None = None) -> tuple[str, str]:
     앞 문장이 없다. 머리줄(7월 26일(일) · 317개 채널)과 날짜가 겹치기는 하는데, 겹쳐서
     나쁠 것은 없다 — 같은 값을 두 번 적는 것이고 틀릴 수가 없다. 오히려 밀린 날에는 본문이
     어느 날 이야기인지 문장 안에서 바로 읽힌다.
+
+    ## 아침 전용이다. 이름을 일반화하지 말 것
+
+    테마 글도 같은 키워드를 쓰지만 **이 함수를 부르지 않는다**(build_theme). 저쪽은 집계일이
+    진짜 어제여도 '어제'를 안 쓴다 — 이유는 그 주석에 있다. 이름을 day_words 처럼 일반화하면
+    '어제'가 틀린 말이 되는 자리에서 그대로 불려 나온다. 공통은 날짜 표기(day_label)뿐이다.
     """
     if is_yesterday(kdate, today):
         return "어제", "어제는"
-    d = date.fromisoformat(kdate)
-    label = f"{d.month}월 {d.day}일"
+    label = day_label(kdate)
     return label, f"{label}에는"
 
 
