@@ -12,6 +12,10 @@
 DB엔 telegram_messages 테이블(migration_009)과 telegram_channels 의 peer 캐시
 컬럼(migration_021)이 있어야 한다.
 
+종료 코드: 수집이 **통째로 빈** 실행은 exit 1 로 끝난다(활성 채널 0개 · peer 캐시가
+찬 채널 0개 · 총 0건). 워크플로가 이 실패를 카더라 전용 알림으로 잡는다. 왜 그렇게
+했는지는 main() 끝의 주석 참고.
+
 실행:
     cd data-pipeline && source .venv/bin/activate
     python scripts/fetch_telegram.py            # 실제 수집·저장
@@ -106,8 +110,8 @@ def main() -> None:
     db = get_client()
     channels = load_active_channels(db)
     if not channels:
-        print("[경고] 활성 채널이 없습니다. 먼저 sync_telegram_channels.py 를 실행하세요.")
-        return
+        print("[실패] 활성 채널이 없습니다. 먼저 sync_telegram_channels.py 를 실행하세요.")
+        sys.exit(1)
 
     # peer 캐시가 없는 채널은 건너뛴다. 여기서 유저네임을 풀어 버리면 sync 에 걸어 둔
     # resolve 상한이 무의미해지기 때문이다. 다음 sync 가 캐시를 채우면 그때부터 잡히고,
@@ -122,8 +126,8 @@ def main() -> None:
             "(sync 가 채우면 다음 실행부터 수집)."
         )
     if not ready:
-        print("[경고] 수집 가능한 채널이 없습니다. sync_telegram_channels.py 를 먼저 돌리세요.")
-        return
+        print("[실패] 수집 가능한 채널이 없습니다. sync_telegram_channels.py 를 먼저 돌리세요.")
+        sys.exit(1)
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=WINDOW_DAYS)
     print(
@@ -172,14 +176,31 @@ def main() -> None:
         print(f"\n[Supabase] telegram_messages upsert 완료: 총 {total}건")
 
     # 실패는 채널마다 한 줄씩 이미 찍히지만, 300줄 로그에 섞이면 눈에 안 띈다.
-    # 워크플로의 실패 알림 집계에 텔레그램 스텝은 안 들어가 있어(의도적 분리) 이
-    # 줄이 사실상 유일한 신호다 — 건수가 계속 늘면 FloodWait 을 의심할 것.
+    # 건수가 계속 늘면 FloodWait 을 의심할 것.
     if failed:
         print(
             f"[경고] 채널 {len(failed)}/{len(ready)}개 수집 실패: "
             + ", ".join(failed[:20])
             + (f" 외 {len(failed) - 20}개" if len(failed) > 20 else "")
         )
+
+    # ── 왜 여기서 죽는가 ────────────────────────────────────────────────────
+    # 2026-07-28 01:28 UTC 실행은 peer 캐시가 0개라 위 '수집 가능한 채널이 없습니다'
+    # 에서 조용히 return 했고, 워크플로는 success 로 끝났다. 그날 메시지 수집은 0건인데
+    # 알림은 없었고, 복구는 사람이 손으로 돌려서야 됐다. 스텝이 성공으로 끝나면 그 위의
+    # 어떤 감시도 붙일 수가 없다 — 그래서 '재료가 아예 안 들어온' 실행은 실패로 끝낸다.
+    #
+    # 문턱을 여기 하나만 둔 이유: 부분 실패(예: 절반이 실패)에도 비율 문턱을 걸까
+    # 고민했지만, 그 숫자를 정할 실측이 없다. 게다가 peer 캐시가 차는 중인 날은 원래
+    # 대상이 200/317 처럼 부분이라 정상인데, 그걸 실패로 세면 알림이 며칠 연속 울리고
+    # 그러면 아무도 안 보게 된다. 0건은 다르다 — 300개대 채널의 7일 창이 비는 건
+    # 정상적으로는 일어나지 않는다. 부분 실패는 위 [경고] 줄이 계속 맡는다.
+    if total == 0:
+        print(
+            "\n[실패] 수집된 메시지가 0건입니다. FloodWait·세션 만료·peer 캐시 소실을"
+            " 의심하고, sync_telegram_channels.py 로그를 먼저 보세요."
+        )
+        sys.exit(1)
 
 
 if __name__ == "__main__":

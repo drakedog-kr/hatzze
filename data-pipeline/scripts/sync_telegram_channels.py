@@ -5,7 +5,9 @@
   2. 각 핸들을 텔레그램에서 조회(GetFullChannelRequest)해 표시명·구독자수를 얻는다.
      이때 얻은 (channel_id, access_hash) 를 DB에 남겨, 다음 실행부터는 유저네임을
      푸는 호출(ResolveUsername) 없이 바로 연다 — **이 스크립트가 레포에서 유저네임을
-     푸는 유일한 곳**이고, 한 실행에 MAX_RESOLVES_PER_RUN 개까지만 푼다.
+     푸는 유일한 곳**이고, 한 실행에 MAX_RESOLVES_PER_RUN 개까지만 푼다. 이미
+     FloodWait 이 걸려 있는 동안에는 그 상한과 무관하게 아예 시도하지 않는다
+     (telegram_flood_wait 표 · 마이그레이션 022).
      프사는 아직 없는 채널만 내려받는다. 호출 사이엔 잠깐 쉰다(FloodWait 완화).
   3. telegram_channels 에 upsert(on_conflict=handle). added_at/notes 는 payload에서
      빼서 기존 값을 보존한다(insert 때만 default로 채워짐). 조회에 실패한 채널은
@@ -19,8 +21,9 @@
 
 실행:
     cd data-pipeline && source .venv/bin/activate
-    python scripts/sync_telegram_channels.py            # 실제 동기화
-    python scripts/sync_telegram_channels.py --dry-run  # 조회만, DB 안 씀
+    python scripts/sync_telegram_channels.py                  # 실제 동기화
+    python scripts/sync_telegram_channels.py --dry-run        # 조회만, DB 안 씀
+    python scripts/sync_telegram_channels.py --force-resolve  # FloodWait 기록 무시
 """
 
 from __future__ import annotations
@@ -30,7 +33,7 @@ import csv
 import io
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import requests
@@ -50,7 +53,7 @@ from common.config import (  # noqa: E402
     TELEGRAM_SESSION,
 )
 from common.supabase_client import get_client, load_all  # noqa: E402
-from common.timeutil import today_kst  # noqa: E402
+from common.timeutil import KST, today_kst  # noqa: E402
 
 REQUEST_TIMEOUT_SEC = 20
 # 채널마다 GetFullChannel 을 부르므로 목록이 300개대면 호출도 300건대다. 연속 호출은
@@ -70,6 +73,15 @@ MAX_RESOLVES_PER_RUN = 100
 # Telethon 기본값(60초)보다 올려, 짧은 FloodWait 은 예외 대신 대기로 흡수한다.
 # 이보다 긴 대기는 그대로 예외 → 그 채널만 건너뛴다(기존 값은 보존된다).
 FLOOD_SLEEP_THRESHOLD_SEC = 180
+# FloodWait 은 프로세스가 아니라 **계정**에 걸리는데, 실행마다 프로세스가 새로 뜨는
+# Actions 에서는 그 사실이 다음 실행으로 안 넘어간다. 그래서 매 실행이 "일단 한 번
+# 두드려 보고 FloodWait 을 받는" 것을 반복했다(2026-07-28 01:28 UTC 실행이 그랬고,
+# 그날 캐시가 0개인 채로 남아 수집이 통째로 0건이 됐다). 만료 시각을 DB에 남겨
+# 그 전에는 아예 시도하지 않는다 — 아낀 시도 한 번보다, 막힌 문을 계속 미는 것이
+# 제한을 늘린다는 쪽이 중요하다.
+FLOOD_WAIT_TABLE = "telegram_flood_wait"  # 한 행짜리 표(마이그레이션 022)
+# 만료 직후 곧바로 두드리면 몇 초 차이로 또 걸린다. 기록할 때 여유를 붙인다.
+FLOOD_WAIT_MARGIN_SEC = 60
 # base64 사진은 건당 ~12KB — 한 요청에 수백 개를 실으면 수 MB가 된다.
 PHOTO_BATCH = 20
 # 시트 첫 탭을 CSV로 내보내는 공개 export 엔드포인트. 시트가 "링크 있는 사람 보기"로
@@ -120,6 +132,59 @@ def download_photo_data_uri(client, entity) -> str | None:
         return None
 
 
+def load_flood_wait_until(client) -> datetime | None:
+    """이전 실행이 받아 둔 FloodWait 만료 시각(UTC). 기록이 없으면 None.
+
+    표가 아직 없어도(마이그레이션 022 미적용) None 을 돌려 예전처럼 동작한다.
+    기록을 못 읽는 것과 제한이 없는 것은 다르지만, 여기서 멈추면 이 스크립트가
+    유일하게 하는 일(캐시 채우기)이 DDL 적용 전까지 통째로 막힌다 — 고치려는 문제를
+    더 크게 만드는 쪽이라 진행을 택한다.
+    """
+    try:
+        rows = (
+            client.table(FLOOD_WAIT_TABLE).select("wait_until").limit(1).execute().data
+        )
+        if not rows or not rows[0].get("wait_until"):
+            return None
+        until = datetime.fromisoformat(rows[0]["wait_until"].replace("Z", "+00:00"))
+        # timestamptz 는 오프셋을 달고 오지만, 혹시 안 달고 오면 UTC 로 본다 — naive 가
+        # 여기서 새어 나가면 호출부의 비교가 TypeError 로 죽고, 그러면 이 기록이
+        # 막으려던 것보다 큰 고장이 된다.
+        return until if until.tzinfo else until.replace(tzinfo=timezone.utc)
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[안내] FloodWait 기록을 읽지 못했습니다({type(exc).__name__}) — "
+            "제한 없이 진행합니다(마이그레이션 022 적용 여부 확인)."
+        )
+        return None
+
+
+def record_flood_wait(client, seconds: int) -> None:
+    """이번 실행이 받은 FloodWait 의 만료 시각을 남긴다(다음 실행이 읽는다)."""
+    now = datetime.now(timezone.utc)
+    until = now + timedelta(seconds=seconds + FLOOD_WAIT_MARGIN_SEC)
+    try:
+        client.table(FLOOD_WAIT_TABLE).upsert(
+            {
+                "id": 1,
+                "wait_until": until.isoformat(),
+                "seconds": seconds,
+                "recorded_at": now.isoformat(),
+            },
+            on_conflict="id",
+        ).execute()
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[경고] FloodWait 기록에 실패했습니다({type(exc).__name__}: {exc}) — "
+            "다음 실행이 또 헛되이 두드립니다. 마이그레이션 022 를 적용하세요."
+        )
+        return
+    print(
+        f"[기록] FloodWait({seconds}초) — {until.astimezone(KST):%m-%d %H:%M} KST "
+        "까지는 유저네임을 풀지 않습니다."
+    )
+
+
 class ResolveBudget:
     """한 실행에서 유저네임을 풀 수 있는 횟수. **성공이 아니라 시도**를 센다.
 
@@ -162,25 +227,32 @@ def open_channel(client, handle: str, cached: tuple[int, int] | None, budget: Re
                 raise
             print(f"  {handle:<18} 캐시된 peer 실패({type(exc).__name__}) — 유저네임으로 다시 풉니다")
     if not budget.spend():
-        raise RuntimeError(
-            f"이번 실행의 resolve 상한({MAX_RESOLVES_PER_RUN})에 걸렸습니다"
-        )
+        # 상한을 다 썼거나(=이번 실행 몫 소진) FloodWait 중이라 처음부터 0이었거나.
+        raise RuntimeError("이번 실행에는 유저네임을 더 풀 수 없습니다")
     entity = client.get_entity(handle)  # ResolveUsername — 아껴 써야 하는 호출
     return entity, client(GetFullChannelRequest(entity))
 
 
 def enrich_from_telegram(
-    channels: list[dict], have_photo: set[str], peers: dict[str, tuple[int, int]]
-) -> list[dict]:
+    channels: list[dict],
+    have_photo: set[str],
+    peers: dict[str, tuple[int, int]],
+    resolve_limit: int = MAX_RESOLVES_PER_RUN,
+) -> int | None:
     """각 핸들의 표시명·구독자수·프로필사진·peer 를 텔레그램에서 채운다.
 
     실패하면 None + error. 캐시가 없는데 이번 실행의 resolve 상한을 다 썼으면 아예
     건드리지 않고 deferred 로 표시한다(호출 0건 → 기존 값 그대로 보존).
+    resolve_limit=0 이면 캐시 있는 채널만 갱신한다(FloodWait 대기 중일 때).
 
     사진은 이미 DB에 있는 채널이면 다시 내려받지 않는다 — 매 실행 전 채널의 프사를
     받으면 목록 크기만큼 다운로드가 늘고(300개대면 매일 300건) 얻는 게 거의 없다.
+
+    반환값은 이번 실행이 받은 FloodWait 의 초(없으면 None). 호출부가 DB에 남겨
+    다음 실행이 헛되이 두드리지 않게 한다.
     """
-    budget = ResolveBudget(MAX_RESOLVES_PER_RUN)
+    budget = ResolveBudget(resolve_limit)
+    flood_seconds: int | None = None
     calls = 0
     with TelegramClient(
         StringSession(TELEGRAM_SESSION),
@@ -226,6 +298,8 @@ def enrich_from_telegram(
                 if isinstance(exc, FloodWaitError):
                     # 지금 텔레그램이 조회를 막고 있다. 남은 채널을 계속 두드려 봐야
                     # 다 실패하고 제한만 길어진다 — 이번 실행은 여기서 손을 뗀다.
+                    # 가장 긴 대기를 남긴다(여러 번 받으면 그게 실제 해제 시각이다).
+                    flood_seconds = max(flood_seconds or 0, exc.seconds)
                     if budget.left:
                         print(
                             f"\n[중단] FloodWait({exc.seconds}초) — 이번 실행의 남은 "
@@ -233,10 +307,10 @@ def enrich_from_telegram(
                         )
                     budget.exhaust()
     print(
-        f"\n유저네임 조회(ResolveUsername) {budget.used}/{MAX_RESOLVES_PER_RUN}건 시도 · "
+        f"\n유저네임 조회(ResolveUsername) {budget.used}/{resolve_limit}건 시도 · "
         f"캐시로 연 채널 {max(calls - budget.used, 0)}개"
     )
-    return channels
+    return flood_seconds
 
 
 def load_peer_cache(client) -> dict[str, tuple[int, int]]:
@@ -392,6 +466,9 @@ def sync_to_supabase(channels: list[dict]) -> None:
 
 def main() -> None:
     dry_run = "--dry-run" in sys.argv[1:]
+    # 탈출구: 텔레그램이 예정보다 일찍 풀어 줬다고 판단할 때 손으로 무시한다.
+    # 예약 실행에는 절대 넣지 말 것 — 그러면 이 기록이 있으나 마나다.
+    force_resolve = "--force-resolve" in sys.argv[1:]
 
     if not TELEGRAM_CHANNELS_SHEET_ID:
         print("[오류] TELEGRAM_CHANNELS_SHEET_ID 가 .env.local 에 없습니다.")
@@ -410,11 +487,26 @@ def main() -> None:
     have_photo = handles_with_photo(db)
     print(f"프로필 사진 보유 {len(have_photo)}개 — 나머지만 내려받습니다")
     peers = load_peer_cache(db)
+
+    # 아직 FloodWait 이 안 풀렸으면 이번 실행은 resolve 를 아예 건너뛴다. 캐시가 있는
+    # 채널은 그대로 갱신되므로(호출 메서드가 다르다) 구독자 스냅샷은 계속 쌓인다.
+    resolve_limit = MAX_RESOLVES_PER_RUN
+    flood_until = load_flood_wait_until(db)
+    if flood_until and datetime.now(timezone.utc) < flood_until and not force_resolve:
+        resolve_limit = 0
+        print(
+            f"[대기] FloodWait 이 {flood_until.astimezone(KST):%m-%d %H:%M} KST 까지 "
+            "남아 있어 유저네임을 풀지 않습니다(--force-resolve 로 무시)."
+        )
     print(
-        f"peer 캐시 보유 {len(peers)}/{len(channels)}개 — 나머지만 유저네임을 풉니다"
-        f"(한 실행 최대 {MAX_RESOLVES_PER_RUN}개)"
+        f"peer 캐시 보유 {len(peers)}/{len(channels)}개"
+        + (
+            " — 캐시 있는 채널만 갱신합니다"
+            if resolve_limit == 0
+            else f" — 나머지만 유저네임을 풉니다(한 실행 최대 {resolve_limit}개)"
+        )
     )
-    enrich_from_telegram(channels, have_photo, peers)
+    flood_seconds = enrich_from_telegram(channels, have_photo, peers, resolve_limit)
     print_table(channels)
 
     failed = [ch["handle"] for ch in channels if ch.get("error")]
@@ -426,6 +518,17 @@ def main() -> None:
             f"\n[안내] resolve 상한으로 {len(deferred)}건은 다음 실행으로 미뤘습니다"
             "(기존 값 유지). 캐시가 다 차면 이 줄은 사라집니다."
         )
+
+    # 채널 동기화 결과보다 먼저 남긴다 — upsert 가 실패해도 "지금 계정이 막혀 있다"는
+    # 사실은 다음 실행에 넘겨야 하기 때문이다.
+    if flood_seconds:
+        if dry_run:
+            print(
+                f"\n--dry-run: FloodWait({flood_seconds}초)을 받았지만 기록하지 않습니다"
+                " — 다음 실행은 이걸 모른 채 다시 두드립니다."
+            )
+        else:
+            record_flood_wait(db, flood_seconds)
 
     if dry_run:
         print("\n--dry-run: DB에 아무것도 쓰지 않았습니다.")
