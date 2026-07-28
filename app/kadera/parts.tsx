@@ -1,3 +1,5 @@
+import { shortDate } from "@/lib/format";
+
 import { C, MONO } from "../ui";
 
 /**
@@ -113,6 +115,26 @@ export function ChangeRate({ rate, style }: { rate: number | null; style?: React
     <span style={{ fontFamily: MONO, fontWeight: 600, color, ...style }}>
       {arrow}
       {Math.abs(rate).toFixed(2)}%
+    </span>
+  );
+}
+
+/**
+ * 실시간이 아닌 시세의 기준일("7/27 종가"). 가격 아랫줄에서 위 ChangeRate 와 자리를
+ * 나눠 쓰므로 둘 다 반드시 한 줄을 채운다 — 한쪽이 비면 타일 높이가 갈린다.
+ *
+ * 등락률 대신 날짜를 그리는 이유: 저장 종가로 폴백하면 등락률도 그날 것이라, 화살표를
+ * 그대로 두면 가격뿐 아니라 방향까지 뒤집혀 보인다(2026-07-28 NAVER 가 실제
+ * ▼6.67% 인 날 07-27 의 ▲8.43% 로 떴다). '지금 뭐가 뜨나' 카드에서 지난 거래일의
+ * 등락률은 값어치가 낮아, 버리고 기준일로 갈음하는 편이 손해가 적다.
+ *
+ * 기준일을 모르면(마이그레이션 015 이전 폴백 등) 빈 배지가 뜨지 않게 날짜를 뺀
+ * "종가 기준"으로 떨어뜨린다.
+ */
+export function QuoteDate({ date, style }: { date: string | null; style?: React.CSSProperties }) {
+  return (
+    <span style={{ fontFamily: MONO, fontWeight: 600, color: C.sub, ...style }}>
+      {date ? `${shortDate(date)} 종가` : "종가 기준"}
     </span>
   );
 }
