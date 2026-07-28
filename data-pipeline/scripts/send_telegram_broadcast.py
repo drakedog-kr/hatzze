@@ -57,7 +57,7 @@ import html
 import re
 import sys
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
@@ -454,22 +454,31 @@ def build_morning(db, llm) -> str:
         db.table("telegram_channels").select("handle", count="exact", head=True).eq("is_active", True).execute()
     ).count or 0
 
+    # 집계일을 뭐라고 부를지는 **한 곳에서 정한다**(bc.morning_day_words). 지시문·digest
+    # 라벨·제목이 각자 판단하면 서로 다른 날을 가리키게 된다 — 실제로 그랬다.
+    day, day_topic = bc.morning_day_words(kdate)
+
     digest = "\n".join(
         [
             f"[날짜] {kdate}",
-            f"[어제 키워드] {' · '.join(f'{k}({n}회)' for k, n in keywords)}",
+            # 라벨에도 같은 말을 쓴다. 모델은 라벨을 문장에 그대로 옮겨 적는다 —
+            # 지시문만 고치고 여기를 "[어제 키워드]"로 두면 본문에 '어제'가 되살아난다.
+            f"[{day} 키워드] {' · '.join(f'{k}({n}회)' for k, n in keywords)}",
             "",
             f"[밤사이] {night_from:%m월 %d일 %H시} ~ {night_to:%m월 %d일 %H시}(KST) 사이 {night_count}건이 올라왔습니다.",
             "[밤사이 메시지 발췌] 널리 퍼진 순입니다. 여기서 '무슨 이야기가 돌았나'를 뽑으세요.",
         ]
         + [f"- {t}" for t in excerpts]
     )
-    body = bc.compose(llm, MODEL, bc.MORNING_TASK, digest, max_tokens=800)
+    body = bc.compose(llm, MODEL, bc.morning_task(day, day_topic), digest, max_tokens=800)
 
     # 집계가 하루 이상 밀렸으면 "어제"라고 못 쓴다. LLM 분류가 배치라 수거가 늦으면
-    # 키워드 날짜가 이틀 전이 되는데(실측), 그때 "어제"라고 적으면 그냥 거짓말이 된다.
-    is_yesterday = date.fromisoformat(kdate) == today_kst() - timedelta(days=1)
-    head = "어제 한국 주식 커뮤니티는 이랬습니다" if is_yesterday else "한국 주식 커뮤니티는 이랬습니다"
+    # 키워드 날짜가 이틀 전이 되고, 오늘치가 먼저 들어와 있는 날도 있다(둘 다 실측).
+    # 그때 "어제"라고 적으면 그냥 거짓말이 된다.
+    #
+    # **본문도 같은 판단을 지난다**(위 day). 예전엔 이 줄만 가드를 갖고 있어서 제목은
+    # '어제'를 빼는데 바로 아래 문단이 "어제는…"으로 시작하는 글이 나갔다(2026-07-28).
+    head = "어제 한국 주식 커뮤니티는 이랬습니다" if bc.is_yesterday(kdate) else "한국 주식 커뮤니티는 이랬습니다"
     lines = [
         f"🌅 <b>{head}</b>",
         f"{korean_date_label(kdate)} · {channels}개 채널",
