@@ -674,6 +674,10 @@ def build_weekly(db, llm) -> str:
                 f"{abs(dropped['rank_change'])}계단 내려 {dropped['rank']}위가 되었습니다."
             )
 
+    # 총평은 사이트 카드용 문장이라 시황 표현을 달고 있고, 모델이 그걸 그대로 옮겨 쓰다가
+    # 금지어 그물에 걸린다(bc.safe_brief 주석 — '약세'가 그 통로였다). 손질해서 넘긴다.
+    # 통째로 비면 라벨만 남은 빈 줄이 나가므로 줄째로 뺀다(build_theme 의 키워드 줄과 같다).
+    brief = bc.safe_brief(bc.load_daily_brief(db))
     digest = "\n".join(
         [
             "[이번 주 최다 언급] " + " / ".join(f"{s['name']} {s['mentions']}회" for s in stocks),
@@ -681,10 +685,15 @@ def build_weekly(db, llm) -> str:
                 f"{t['theme']} {t['share']:.1f}%" + (f" ({t['delta']:+.1f}%p)" if t["delta"] is not None else "")
                 for t in themes[:5]
             ),
-            f"[생태계 총평] {bc.load_daily_brief(db)}",
         ]
+        + ([f"[생태계 총평] {brief}"] if brief else [])
     )
-    body = bc.compose(llm, MODEL, bc.WEEKLY_TASK, digest, max_tokens=300)
+    # max_tokens 는 compose 의 기본값(600)을 쓴다. 예전 300 은 '한 문단' 시절 치수라 두세
+    # 문단이 자주 잘렸다(실측 40회 중 31회 잘림 · 26회는 잘린 문단이 그대로 남았다).
+    # **한 문단 시절에도 이미 새고 있었다** — 같은 300 으로 80회 중 20회가 잘렸고 7회는
+    # 잘린 채 나갔다. 끝이 잘린 어절은 text_check 가 잡아 주기도 하지만("주간이었습")
+    # "조선업은 언급"처럼 멀쩡한 낱말에서 끊기면 못 잡는다. 600 에서는 40회 중 0회다.
+    body = bc.compose(llm, MODEL, bc.WEEKLY_TASK, digest)
     if body:
         lines += paragraphs(body)
 
