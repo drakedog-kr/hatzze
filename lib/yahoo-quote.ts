@@ -44,7 +44,7 @@ const DAY_RANGE_SLACK = 0.005;
  * 두 필드가 없으면 통과시킨다 — 검사를 **못 하는** 것과 검사에 **떨어진** 것은 다르다.
  * 장 시작 전처럼 아직 체결이 없어 고가·저가가 0인 응답도 판정 대상이 아니다.
  */
-function priceContradictsDayRange(price: number, meta: Record<string, unknown> | undefined): boolean {
+export function priceContradictsDayRange(price: number, meta: Record<string, unknown> | undefined): boolean {
   const low = meta?.regularMarketDayLow;
   const high = meta?.regularMarketDayHigh;
   if (typeof low !== "number" || typeof high !== "number") return false;
