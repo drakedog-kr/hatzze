@@ -478,10 +478,28 @@ def build_morning(db, llm) -> str:
         return "\n".join(l for l in t.split("\n") if not drop.fullmatch(l))
 
     head_text, night_text = clean(head_text).strip(), clean(night_text).strip()
+
+    # 두 덩이가 다 사라졌으면 글을 아예 안 만든다. 남는 건 제목 두 줄과 링크뿐이라,
+    # 읽는 사람에게 아무것도 주지 않으면서 구독자 전원의 알림만 울린다.
+    if not head_text and not night_text:
+        print("[skip] 해설 문단이 하나도 남지 않아 아침 글을 만들지 않습니다.")
+        return ""
+
     if head_text:
         lines += paragraphs(head_text)
 
-    if night_count:
+    # **건수만으로는 이 구획을 세우지 않는다.** 수집은 됐는데(night_count > 0) 밤사이
+    # 문단이 거르개에 다 걸리는 일이 실제로 있다 — 2026-07-28 아침 미리보기에서 두 문단이
+    # 금지어('약세')로 빠져 제목과 인용 박스만 남았다. 밤사이 발췌는 미국장이 열려 있는
+    # 시간대의 원문이라 해설이 시세 이야기로 흐르기 쉽고, 그래서 이 구획이 유독 자주
+    # 걸린다(실측: 탈락한 문단 7개가 **전부** 이쪽이었다).
+    #
+    # 건수만이라도 남기는 쪽도 재 봤지만 그건 되돌리는 선택이다. 이 구획은 애초에 비중만
+    # 싣고 무슨 말이 오갔는지는 안 쓰던 걸 고치려고 만들었다(common/broadcast_content
+    # .load_night_messages 주석 — "말이 많았습니다"만 말하면 읽는 사람에게 남는 게 없다).
+    # 제목이 '오간 말'인데 오간 말이 없으면 제목이 거짓말이 된다. 그래서 밤사이 자료가 아예
+    # 없을 때든(night_count 0) 해설만 다 걸렸을 때든, **제목만 있고 내용이 없느니 구획째 뺀다.**
+    if night_count and night_text:
         # 창의 날짜를 그대로 적는다. 수집이 밀려 며칠 전 밤을 쓰게 돼도(load_night_messages
         # 의 폴백) 읽는 사람이 어느 밤인지 바로 안다.
         span = f"{night_from:%-m월 %-d일} {night_from.hour}시 ~ {night_to:%-m월 %-d일} {night_to.hour}시"
@@ -489,11 +507,7 @@ def build_morning(db, llm) -> str:
             "",
             "🌙 <b>장 마감 뒤에 오간 말</b>",
             quote(f"{span} · {night_count:,}건"),
-        ]
-        if night_text:
-            lines += paragraphs(night_text)
-    # 밤사이 자료가 아예 없으면 이 구획을 통째로 뺀다 — 제목만 있고 내용이 없는 게
-    # 가장 나쁘다(그 자리에 "정리하지 못했습니다"를 적어도 읽는 사람에겐 마찬가지다).
+        ] + paragraphs(night_text)
 
     lines += ["", brand_link("/kadera", "morning")]
     return "\n".join(lines)
