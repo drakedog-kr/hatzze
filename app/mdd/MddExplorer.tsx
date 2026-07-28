@@ -841,8 +841,13 @@ function Underwater({ series, mdd }: { series: DrawdownPoint[]; mdd: number }) {
 
 /* ── 리스크 프로필 ─────────────────────────────────────────────────
    세 타일이 완전히 같은 문법을 쓴다: [범례] → [연도 + 막대 2줄 + 값 2개] × 최대 4줄 →
-   [요약 한 줄]. 타일마다 구조가 다르면 종목을 바꿀 때마다 길이가 들쭉날쭉해진다. */
-const RISK_ROWS = 4; // 모든 타일이 쓰는 고정 줄 수
+   [요약 한 줄]. 타일마다 구조가 다르면 종목을 바꿀 때마다 길이가 들쭉날쭉해진다.
+   요약 한 줄은 줄 수가 모자라도 타일 맨 아래에 붙는다 — 표본이 얇은 종목(네이버 등)에서
+   요약이 막대를 따라 위로 딸려 올라가면 세 타일의 밑단이 어긋나 보인다. */
+const RISK_ROWS = 5; // 모든 타일이 쓰는 고정 줄 수(연도 5개 · 사건 5건)
+
+/** 타일 본문 — 막대 영역(viz)과 맨 아래에 고정되는 요약 한 줄(foot)을 따로 들고 있는다. */
+type TileBody = { viz: React.ReactNode; foot: React.ReactNode };
 
 function RiskProfile({ r }: { r: RiskProfileData }) {
   const yrs = Math.max(1, Math.round(r.years));
@@ -863,6 +868,12 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
   // 늘 같은 폭이라 가로 축은 그대로 맞는다). 폭은 계산하지 말고 실측할 것: 이 자리에서
   // "2021.11"은 43.3px 이라 눈대중으로 잡은 42px 에서 1px 넘쳤다. 두 자리 월이 최대다.
   const yearCol = eventLabels.some((l) => l.includes(".")) ? 46 : 30;
+
+  // 부제 옆 범위 표기 — 각주는 짧게 두고, "이 타일이 무엇을 몇 개 보여주는가"는 제목 옆에
+  // 붙인다. 상수(5)가 아니라 실제 줄 수를 쓴다: 조회 기간이 3년이면 연도가 4개뿐이고,
+  // 큰 하락이 두 번밖에 없던 종목도 있다. 0 이면 빈 상태 문구가 대신 설명한다.
+  const yearScope = yearly.length ? ` (최근 ${yearly.length}년)` : "";
+  const eventScope = events.length ? ` (최근 ${events.length}건)` : "";
 
   // 범례는 막대 두 줄이 각각 뭔지 알려주는 유일한 단서다 — 이걸 못 읽으면 타일이
   // 통째로 안 읽힌다. sub(11px)로는 타일 배경 위에서 흐려서 ink-soft 로 한 단계 올린다.
@@ -912,112 +923,118 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
   );
 
   /* 1 — 낙폭 대비 보상: 해마다 '그 해 수익'과 '그 해 최악 낙폭'. */
-  const tile1 =
-    yearly.length === 0 ? (
-      empty("연도별 표본이 부족합니다.")
-    ) : (
-      <>
-        {legend([
-          { label: "그 해 수익", color: C.mania },
-          { label: "그 해 최악 낙폭", color: C.cold, opacity: 0.45 },
-        ])}
-        {rows(
-          (() => {
-            const max = Math.max(...yearly.flatMap((y) => [Math.abs(y.ret), Math.abs(y.mdd)]), 1);
-            return yearly.map((y) =>
-              row(
-                y.year,
-                `${y.year}`,
-                { pct: (Math.abs(y.ret) / max) * 100, color: y.ret >= 0 ? C.mania : C.cold, opacity: 1, value: `${y.ret >= 0 ? "+" : "−"}${Math.abs(Math.round(y.ret))}%` },
-                { pct: (Math.abs(y.mdd) / max) * 100, color: C.cold, opacity: 0.45, value: `${Math.round(y.mdd)}%` },
-              ),
-            );
-          })(),
-        )}
-        {summary(`최근 ${yrs}년 연 ${fmtPct(r.annualReturn)} · 최악 ${fmtPct(r.mdd)}`)}
-      </>
-    );
+  const tile1: TileBody =
+    yearly.length === 0
+      ? { viz: empty("연도별 표본이 부족합니다."), foot: null }
+      : {
+          viz: (
+            <>
+              {legend([
+                { label: "그 해 수익", color: C.mania },
+                { label: "그 해 최악 낙폭", color: C.cold, opacity: 0.45 },
+              ])}
+              {rows(
+                (() => {
+                  const max = Math.max(...yearly.flatMap((y) => [Math.abs(y.ret), Math.abs(y.mdd)]), 1);
+                  return yearly.map((y) =>
+                    row(
+                      y.year,
+                      `${y.year}`,
+                      { pct: (Math.abs(y.ret) / max) * 100, color: y.ret >= 0 ? C.mania : C.cold, opacity: 1, value: `${y.ret >= 0 ? "+" : "−"}${Math.abs(Math.round(y.ret))}%` },
+                      { pct: (Math.abs(y.mdd) / max) * 100, color: C.cold, opacity: 0.45, value: `${Math.round(y.mdd)}%` },
+                    ),
+                  );
+                })(),
+              )}
+            </>
+          ),
+          foot: summary(`최근 ${yrs}년 연 ${fmtPct(r.annualReturn)} · 최악 ${fmtPct(r.mdd)}`),
+        };
 
   /* 2 — 하락 vs 회복 속도: 큰 하락마다 '빠지는 데'와 '되돌아오는 데'. */
-  const tile2 =
-    events.length === 0 ? (
-      empty("큰 하락 표본이 얇습니다.")
-    ) : (
-      <>
-        {legend([
-          { label: "빠지는 데", color: C.cold },
-          { label: "되돌아오는 데", color: C.cold, opacity: 0.4 },
-        ])}
-        {rows(
-          (() => {
-            const max = Math.max(...events.map((e) => Math.max(e.dropDays, e.recoverDays ?? 0)), 1);
-            return events.map((e, i) =>
-              row(
-                i,
-                eventLabels[i],
-                { pct: (e.dropDays / max) * 100, color: C.cold, opacity: 1, value: fmtDur(e.dropDays) },
-                {
-                  pct: e.recoverDays === null ? 0 : (e.recoverDays / max) * 100,
-                  color: C.cold,
-                  opacity: 0.4,
-                  value: e.recoverDays === null ? "미회복" : fmtDur(e.recoverDays),
-                },
-              ),
-            );
-          })(),
-        )}
-        {summary(
-          r.dropDaysMedian !== null && r.recoverDaysMedian !== null
-            ? `보통 ${fmtDur(r.dropDaysMedian)} 빠지고 ${fmtDur(r.recoverDaysMedian)} 만에 되돌아왔습니다`
-            : "되찾은 큰 하락 표본이 얇습니다",
-        )}
-      </>
-    );
+  const tile2: TileBody =
+    events.length === 0
+      ? { viz: empty("큰 하락 표본이 얇습니다."), foot: null }
+      : {
+          viz: (
+            <>
+              {legend([
+                { label: "빠지는 데", color: C.cold },
+                { label: "되돌아오는 데", color: C.cold, opacity: 0.4 },
+              ])}
+              {rows(
+                (() => {
+                  const max = Math.max(...events.map((e) => Math.max(e.dropDays, e.recoverDays ?? 0)), 1);
+                  return events.map((e, i) =>
+                    row(
+                      i,
+                      eventLabels[i],
+                      { pct: (e.dropDays / max) * 100, color: C.cold, opacity: 1, value: fmtDur(e.dropDays) },
+                      {
+                        pct: e.recoverDays === null ? 0 : (e.recoverDays / max) * 100,
+                        color: C.cold,
+                        opacity: 0.4,
+                        value: e.recoverDays === null ? "미회복" : fmtDur(e.recoverDays),
+                      },
+                    ),
+                  );
+                })(),
+              )}
+            </>
+          ),
+          foot: summary(
+            r.dropDaysMedian !== null && r.recoverDaysMedian !== null
+              ? `보통 ${fmtDur(r.dropDaysMedian)} 빠지고 ${fmtDur(r.recoverDaysMedian)} 만에 되돌아왔습니다`
+              : "되찾은 큰 하락 표본이 얇습니다",
+          ),
+        };
 
   /* 3 — 혼자 빠지나, 같이 빠지나: 큰 하락마다 이 종목과 코스피의 낙폭. */
-  const tile3 =
-    events.length === 0 ? (
-      empty("큰 하락이 없었습니다.")
-    ) : !events.some((e) => e.market !== null) ? (
-      empty("코스피 데이터가 없습니다.")
-    ) : (
-      <>
-        {legend([
-          { label: "이 종목", color: C.cold },
-          { label: "코스피", color: C.bar },
-        ])}
-        {rows(
-          (() => {
-            const max = Math.max(...events.flatMap((e) => [Math.abs(e.stock), e.market !== null ? Math.abs(e.market) : 0]), 1);
-            return events.map((e, i) =>
-              row(
-                i,
-                eventLabels[i],
-                { pct: (Math.abs(e.stock) / max) * 100, color: C.cold, opacity: 1, value: `${Math.round(e.stock)}%` },
-                {
-                  pct: e.market === null ? 0 : (Math.abs(e.market) / max) * 100,
-                  color: C.bar,
-                  opacity: 1,
-                  value: e.market === null ? "—" : `${Math.round(e.market)}%`,
-                },
-              ),
-            );
-          })(),
-        )}
-        {summary(
-          r.withMarket === null
-            ? "코스피 데이터가 없습니다"
-            : alone > 0
-              ? `${r.bigDropCount}번 중 ${alone}번은 이 종목만 빠졌습니다`
-              : "큰 하락 때마다 코스피도 함께 빠졌습니다",
-        )}
-      </>
-    );
+  const tile3: TileBody =
+    events.length === 0
+      ? { viz: empty("큰 하락이 없었습니다."), foot: null }
+      : !events.some((e) => e.market !== null)
+        ? { viz: empty("코스피 데이터가 없습니다."), foot: null }
+        : {
+            viz: (
+              <>
+                {legend([
+                  { label: "이 종목", color: C.cold },
+                  { label: "코스피", color: C.bar },
+                ])}
+                {rows(
+                  (() => {
+                    const max = Math.max(...events.flatMap((e) => [Math.abs(e.stock), e.market !== null ? Math.abs(e.market) : 0]), 1);
+                    return events.map((e, i) =>
+                      row(
+                        i,
+                        eventLabels[i],
+                        { pct: (Math.abs(e.stock) / max) * 100, color: C.cold, opacity: 1, value: `${Math.round(e.stock)}%` },
+                        {
+                          pct: e.market === null ? 0 : (Math.abs(e.market) / max) * 100,
+                          color: C.bar,
+                          opacity: 1,
+                          value: e.market === null ? "—" : `${Math.round(e.market)}%`,
+                        },
+                      ),
+                    );
+                  })(),
+                )}
+              </>
+            ),
+            foot: summary(
+              r.withMarket === null
+                ? "코스피 데이터가 없습니다"
+                : alone > 0
+                  ? `${r.bigDropCount}번 중 ${alone}번은 이 종목만 빠졌습니다`
+                  : "큰 하락 때마다 코스피도 함께 빠졌습니다",
+            ),
+          };
 
-  const tiles: { icon: string; label: string; sub: string; viz: React.ReactNode }[] = [
-    { icon: "trending_up", label: "낙폭 대비 보상", sub: "감수한 위험에 비해 얼마나 벌었나", viz: tile1 },
-    { icon: "speed", label: "하락 vs 회복 속도", sub: "빠질 때와 되돌아올 때, 어느 쪽이 오래 걸리나", viz: tile2 },
-    { icon: "sync", label: "혼자 빠지나, 같이 빠지나", sub: "큰 하락 때 코스피도 같이 빠졌나", viz: tile3 },
+  const tiles: { icon: string; label: string; sub: string; body: TileBody }[] = [
+    { icon: "trending_up", label: "낙폭 대비 보상", sub: `감수한 위험에 비해 얼마나 벌었나${yearScope}`, body: tile1 },
+    { icon: "speed", label: "하락 vs 회복 속도", sub: `빠질 때와 되돌아올 때, 어느 쪽이 오래 걸리나${eventScope}`, body: tile2 },
+    { icon: "sync", label: "혼자 빠지나, 같이 빠지나", sub: `큰 하락 때 코스피도 같이 빠졌나${eventScope}`, body: tile3 },
   ];
 
   return (
@@ -1027,9 +1044,13 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
         title="리스크 프로필"
         sub="이 종목을 들고 있으면 어떤 위험을 감수하게 되는지, 세 가지 각도로 봅니다."
       />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12, alignItems: "stretch" }}>
+      {/* 세 타일이 [머리말][막대][요약] 세 행을 공유한다(subgrid). 부제 길이가 타일마다
+          달라 어떤 폭에서는 두 줄, 어떤 폭에서는 한 줄이 되는데, 타일마다 제 높이를 쓰면
+          그만큼 막대 시작 줄이 어긋난다. 머리말에 최소 높이를 박아 두는 방법은 폭이 좁아
+          세 줄이 되는 구간에서 다시 깨지므로, 행을 공유해 구조로 맞춘다. */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gridTemplateRows: "auto 1fr auto", gap: 12, alignItems: "stretch" }}>
         {tiles.map((t) => (
-          <div key={t.label} style={{ background: C.bg, borderRadius: 14, padding: "16px 18px", display: "flex", flexDirection: "column" }}>
+          <div key={t.label} style={{ background: C.bg, borderRadius: 14, padding: "16px 18px", display: "grid", gridTemplateRows: "subgrid", gridRow: "span 3", rowGap: 0 }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 16 }}>
               <span style={{ width: 30, height: 30, borderRadius: 9, background: "var(--c-blue-tint)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <Icon name={t.icon} style={{ fontSize: 17, color: C.blue }} />
@@ -1039,17 +1060,16 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
                 <span style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.45, wordBreak: "keep-all" }}>{t.sub}</span>
               </div>
             </div>
-            {/* 줄 수가 적은 타일도 같은 높이를 유지하도록 최소 높이를 준다(4줄 기준).
-                요약 문장은 항상 타일 맨 아래에 붙는다. */}
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 138 }}>
-              <div style={{ flex: 1 }}>{t.viz}</div>
-            </div>
+            {/* 줄 수가 적은 타일도 같은 높이를 유지하도록 최소 높이를 준다(5줄 기준).
+                요약 문장(foot)은 별도 행이라 줄이 모자라도 늘 타일 맨 아래에 붙는다. */}
+            <div style={{ minHeight: 164 }}>{t.body.viz}</div>
+            <div>{t.body.foot}</div>
           </div>
         ))}
       </div>
       <p style={{ margin: "16px 0 0", color: C.muted, fontSize: 12, lineHeight: 1.6 }}>
         <Icon name="info" style={{ fontSize: 14, verticalAlign: -2, marginRight: 4 }} />
-        &lsquo;낙폭 대비 보상&rsquo;은 달력 연도 한 해가 한 줄이고, 조회 기간(최근 {yrs}년)에 따라 달라지니 절대 수치보다 성격으로 보십시오. 나머지 둘은 연도가 아니라 큰 하락(고점 대비 −20% 이상) 한 건이 한 줄입니다. 하락이 없던 해는 건너뛰고, 같은 해에 두 번이면 고점 월을 붙여 나눕니다(최근 {RISK_ROWS}건). 아직 회복하지 못한 하락은 다음 고점이 없어 그 뒤로 새 줄이 생기지 않습니다.
+        보상은 조회 기간(최근 {yrs}년)에 따라 달라지니 절대 수치보다 성격으로 보십시오. 큰 하락·속도는 고점 대비 −20% 이상 하락 기준이고, 최근 {RISK_ROWS}건까지만 보여줍니다.
       </p>
     </section>
   );
