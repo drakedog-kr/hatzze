@@ -1,30 +1,30 @@
-"""KRX Open API로 코스피 지수 종가를 받아와 52주 신고가 대비 괴리율을 계산해 Supabase에 upsert.
+"""야후 파이낸스로 코스피 지수 종가를 받아와 52주 신고가 대비 괴리율을 계산해 Supabase에 upsert.
 
 최초 실행 시 최근 1년치 일별 종가를 백필해서 raw price 캐시(kospi_close_raw indicator)에
 저장하고, 이후 실행부터는 아직 없는 날짜만 추가로 채운다. 매 실행마다 최신 종가 기준
 52주 신고가 대비 괴리율을 계산해 kospi_high_gap indicator의 오늘 값으로 upsert한다.
+
+**소스가 KRX → 야후로 바뀌었다(2026-07-29).** KRX Open API 는 T일 종가를 T+1 오전에야
+올려서 오후 실행(~19:50 KST)도 그날 종가를 못 받았다. 야후는 장 마감 직후에 준다.
+값은 같다 — 전환 시점에 겹치는 날짜를 대조해 소수점까지 일치함을 확인했다. 자세한
+배경과 이 소스가 가진 함정 셋은 common/yahoo_client.py 의 모듈 주석에 있다.
 """
 
 from __future__ import annotations
 
 import sys
-import time
 from datetime import date, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.krx_client import krx_get  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
-from common.timeutil import days_to_backfill  # noqa: E402
+from common.timeutil import days_to_backfill, today_kst  # noqa: E402
+from common.yahoo_client import fetch_index_close_series  # noqa: E402
 
-KRX_URL = "http://data-dbg.krx.co.kr/svc/apis/idx/kospi_dd_trd"
+YAHOO_SYMBOL = "^KS11"
 BACKFILL_DAYS = 365
-REQUEST_DELAY_SEC = 0.05
-CLOSE_PRICE_KEY = "CLSPRC_IDX"
-# OutBlock_1에는 코스피 외에도 코스피200/100/50 등 여러 계열 지수가 함께 내려온다.
-TARGET_INDEX_NAME = "코스피"
 
 RAW_SLUG = "kospi_close_raw"
 RAW_META = {
@@ -73,34 +73,10 @@ SPEED_META = {
 }
 
 
-def fetch_close_price(bas_dd: str) -> float | None:
-    resp = krx_get(KRX_URL, bas_dd)
-    if resp is None:
-        return None  # 네트워크 재시도 소진 — 이 날짜만 건너뜀
-    if resp.status_code == 401:
-        raise PermissionError(
-            "KRX API가 401을 반환했습니다. data.krx.co.kr(정보데이터시스템)에서 "
-            "'코스피 시리즈 일별시세정보' 개별 서비스 API 이용신청 및 승인이 됐는지 확인하세요."
-        )
-    resp.raise_for_status()
-
-    records = resp.json().get("OutBlock_1", [])
-    if not records:
-        return None
-
-    record = next((r for r in records if r.get("IDX_NM") == TARGET_INDEX_NAME), None)
-    if record is None:
-        found_names = [r.get("IDX_NM") for r in records]
-        raise KeyError(f"'{TARGET_INDEX_NAME}' 지수를 응답에서 찾지 못했습니다. 포함된 지수명: {found_names}")
-
-    value = record.get(CLOSE_PRICE_KEY)
-    if value in (None, ""):
-        return None  # 휴장일 등으로 값이 비어있는 경우
-    return float(str(value).replace(",", ""))
-
-
 def backfill_raw_prices(client, raw_indicator_id: str) -> None:
-    today = date.today()
+    # 야후 일봉은 KST 날짜로 떨어지므로 '오늘'도 KST 로 센다. 러너는 UTC 라 date.today()
+    # 를 쓰면 KST 이른 아침에 하루가 어긋난다(common/timeutil 참고).
+    today = today_kst()
     start = today - timedelta(days=BACKFILL_DAYS)
 
     existing = (
@@ -115,25 +91,26 @@ def backfill_raw_prices(client, raw_indicator_id: str) -> None:
     # 옛 공휴일을 매 실행 다시 물어보지 않도록 최근 창만 훑는다(common/timeutil 참고).
     missing_days = days_to_backfill(existing_dates, today, bootstrap_days=BACKFILL_DAYS)
     if not missing_days:
-        print("[KRX] 백필할 신규 날짜 없음 (이미 최신 상태)")
+        print("[야후] 백필할 신규 날짜 없음 (이미 최신 상태)")
         return
 
-    print(f"[KRX] 백필 대상 {len(missing_days)}일 조회 시작")
-    new_rows = []
-    for d in missing_days:
-        close = fetch_close_price(d.strftime("%Y%m%d"))
-        if close is not None:
-            new_rows.append(
-                {"indicator_id": raw_indicator_id, "date": d.isoformat(), "raw_value": close}
-            )
-        time.sleep(REQUEST_DELAY_SEC)
+    # KRX 때와 달리 날짜마다 부르지 않는다. 한 번에 기간 전체를 받아 놓고 필요한 날짜만
+    # 꺼내 쓴다(요청 N회 → 2회). 그래서 REQUEST_DELAY_SEC 도 없어졌다.
+    prices = fetch_index_close_series(YAHOO_SYMBOL, BACKFILL_DAYS, today)
+    print(f"[야후] 백필 대상 {len(missing_days)}일 · 응답 종가 {len(prices)}일치")
+
+    new_rows = [
+        {"indicator_id": raw_indicator_id, "date": d.isoformat(), "raw_value": prices[d.isoformat()]}
+        for d in missing_days
+        if d.isoformat() in prices
+    ]
 
     if new_rows:
         client.table("indicator_values").upsert(
             new_rows, on_conflict="indicator_id,date"
         ).execute()
     skipped = len(missing_days) - len(new_rows)
-    print(f"[KRX] 백필 완료: {len(new_rows)}건 저장 (휴장일 등 {skipped}건 제외)")
+    print(f"[야후] 백필 완료: {len(new_rows)}건 저장 (휴장일 등 {skipped}건 제외)")
 
 
 def compute_speed(client, raw_indicator_id: str) -> list[dict]:
@@ -168,7 +145,7 @@ def compute_gap(client, raw_indicator_id: str) -> tuple[str, float, float, float
     # 전고점을 잡았는데, 백필이 옛 행을 지우지 않아 표가 계속 자라므로 실제로는 '전체 기간
     # 최고가'였다(이미 365일 밖 행이 9개 있었다). 지금은 최고점이 1년 안이라 값이 우연히
     # 같지만, 고점이 1년보다 오래되는 순간 "52주 괴리율"이 조용히 틀려진다.
-    window_start = (date.today() - timedelta(days=BACKFILL_DAYS)).isoformat()
+    window_start = (today_kst() - timedelta(days=BACKFILL_DAYS)).isoformat()
     rows = (
         client.table("indicator_values")
         .select("date,raw_value")
@@ -263,8 +240,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except PermissionError as e:
-        print(f"[ERROR] {e}")
-        sys.exit(1)
+    # KRX 를 쓰던 시절엔 401(개별 서비스 미승인)을 PermissionError 로 올려 여기서 받았다.
+    # 야후는 승인 개념이 없어 그 경로가 통째로 사라졌다 — 조회 실패는 yahoo_client 가
+    # 빈 결과로 돌려주고, 그러면 그날만 비워 두고 다음 실행이 채운다.
+    main()
