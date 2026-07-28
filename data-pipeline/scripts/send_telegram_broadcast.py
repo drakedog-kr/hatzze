@@ -570,14 +570,19 @@ def build_theme(db, llm) -> str:
     if dropped:
         d = html.escape(dropped["theme"], quote=False)
         delta = f" ({dropped['delta']:+.1f}%p)" if dropped["delta"] is not None else ""
-        lines += ["", f"밀려난 곳: <b>{d}</b> {dropped['share']:.1f}%{delta} ▼{abs(dropped['rank_change'])}계단"]
+        # 도착 순위를 같이 적는다. 이 테마는 위 목록(상위 3개) 밖이라 이 줄이 화면에서
+        # 그 이름이 나오는 유일한 자리인데, digest 가 순위를 넘기게 된 뒤로는 문단이
+        # "7위"를 말한다. 표에 그 숫자가 없으면 읽는 사람이 확인할 곳이 없다
+        # (bc.rank_move_label 주석). 주간 글은 이미 "3계단 내려 7위가 되었습니다"로 적는다.
+        lines += ["", f"밀려난 곳: <b>{d}</b> {dropped['share']:.1f}%{delta} "
+                      f"▼{abs(dropped['rank_change'])}계단 · 지금 {dropped['rank']}위"]
 
     # 3문단이 다룰 '밀려난 테마'를 digest 에 못박는다. 안 적어 주면 모델이 목록에서 아무
     # 테마나 골라 설명하는데, 화면 위쪽 "밀려난 곳" 줄과 다른 이름이 나와 한 글이 서로
     # 다른 말을 한다(실측: 화면은 바이오, 문단은 방산이었다).
     dropped_line = (
         [f"[밀려난 곳] {dropped['theme']} {dropped['share']:.1f}% "
-         f"({dropped['delta']:+.1f}%p, 순위 {dropped['rank_change']:+d}) "
+         f"({dropped['delta']:+.1f}%p, {bc.rank_move_label(dropped)}) "
          f"← 3문단은 **반드시 이 테마**를 다루세요"]
         if dropped
         else []
@@ -606,7 +611,7 @@ def build_theme(db, llm) -> str:
         + [f"[최근 {len(window)}일 테마] " + " / ".join(
             f"{t['rank']}위 {t['theme']} {t['share']:.1f}%"
             + (f" ({t['delta']:+.1f}%p)" if t["delta"] is not None else "")
-            + (f" 순위 {t['rank_change']:+d}" if t["rank_change"] else "")
+            + (f" {bc.rank_move_label(t)}" if t["rank_change"] else "")
             + (f" · 종목: {', '.join(members.get(t['theme'], []))}" if members.get(t["theme"]) else "")
             for t in themes[:6]
         )]
