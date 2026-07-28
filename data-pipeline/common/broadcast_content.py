@@ -34,10 +34,9 @@ A 와 C 의 해설 문단은 아직 어디에도 저장돼 있지 않다. 원래
 
 from __future__ import annotations
 
-import html
 import re
 from collections import defaultdict
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 
 from .surging import load_stock_daily
 from .text_check import problems
