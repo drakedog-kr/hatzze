@@ -6,8 +6,8 @@
 표본 수가 쌓일 때까지 기준선 자체가 계속 흔들리는 문제가 있었다. 기준값을
 조정하고 싶으면 이 파일이 아니라 indicator_thresholds.py만 고치면 된다.
 
-kospi_high_gap은 0 이하 값만 가지는 지표라 (현재값/기준선)*100 공식을 그대로
-쓸 수 없어서, floor(-35%)와 kink(-3%)를 둔 피스와이즈로 매핑한다. floor·kink는
+kospi_high_gap은 주로 0 이하 값을 가지는 지표라 (현재값/기준선)*100 공식을 그대로
+쓸 수 없어서, floor 와 kink 를 둔 피스와이즈로 매핑한다. floor·kink는
 둘 다 indicator_thresholds.py의 고정값이다 — 예전엔 floor를 kospi_close_raw
 히스토리에서 매일 다시 계산했지만, 지금은 다른 지표들과 같은 고정 임계값 철학을
 따른다.
@@ -273,8 +273,9 @@ def compute_threshold(client, indicator_id: str, config: dict) -> float:
 
 def compute_progress(slug: str, current: float, threshold: float, config: dict) -> float:
     if slug == "kospi_high_gap":
-        # 피스와이즈: kink(−3%)~threshold(0%=ATH)를 75~100%(초고온을 근처로 좁게),
-        # floor(−30%)~kink를 0~75%로 균등 배분.
+        # 피스와이즈: kink~threshold(ceiling)를 75~100%(초고온 구간), floor~kink를 0~75%로
+        # 균등 배분. 세 값은 전부 indicator_thresholds.py 에 있다 — 여기 숫자를 적어 두면
+        # 눈금을 고칠 때마다 주석만 낡는다(실제로 −3/0/−30 인 채로 두 번 낡았다).
         floor = config["floor"]
         kink = config["kink"]
         if current >= kink:
