@@ -1373,8 +1373,54 @@ export type IssueKeyword = {
  *
  * 창은 테마 로테이션과 동일하게 최근 3일 평균 vs 5일 이상 이전 평균 — 하루치끼리
  * 비교하면 표본이 얇은 날에 요동친다.
+ *
+ * ⚠️ **이 규칙의 사본이 파이프라인에도 있다**(calculate_telegram_sentiment.py 의
+ * issue_keyword_rows). 평소엔 그쪽이 미리 계산한 값을 읽고, 그 표가 비었을 때만 아래
+ * computeIssueKeywords 가 돈다. 즉 규칙이 갈리면 **폴백이 열리는 날에만** 화면이
+ * 달라진다 — 가장 알아채기 어려운 종류의 어긋남이라, 한쪽을 고치면 반드시 다른 쪽도
+ * 고칠 것. 창(14일)·문턱(3회)·flat 판정도 같이 맞춰야 한다.
  */
 export async function getIssueKeywords(limit = 10): Promise<IssueKeyword[]> {
+  const stored = await loadIssueKeywords(limit);
+  return stored ?? computeIssueKeywords(limit);
+}
+
+/**
+ * 파이프라인이 미리 계산해 둔 카드(마이그레이션 023). 없으면 null 을 돌려
+ * 호출부가 즉석 계산으로 떨어진다.
+ *
+ * **캐시가 아니라 계산을 옮긴 것이다.** telegram_keyword_daily 는 파이프라인이 돌 때만
+ * 바뀌므로, 실행과 실행 사이에 아래 computeIssueKeywords 는 얼어붙은 입력에 대한 순수
+ * 함수다 — 매 렌더가 14일치 23,672행을 다시 읽어 매번 같은 10줄을 만들고 있었다
+ * (실측 2026-07-29: /kadera 서버 렌더 1,775ms 중 1,131ms). 미리 계산해 두어도 화면 값은
+ * 한 글자도 달라지지 않는다.
+ *
+ * 저장된 순서를 그대로 쓴다 — 여기서 다시 정렬하면 파이프라인과 규칙이 갈릴 자리가
+ * 하나 더 생긴다.
+ */
+async function loadIssueKeywords(limit: number): Promise<IssueKeyword[] | null> {
+  const db = getSupabaseAdmin();
+  try {
+    const { data, error } = await db
+      .from("telegram_issue_keyword")
+      .select("rank,keyword,mention_count,trend")
+      .order("rank")
+      .limit(limit);
+    if (error || !data?.length) return null;
+    return data.map((r) => ({
+      word: r.keyword as string,
+      count: r.mention_count as number,
+      trend: (r.trend ?? null) as IssueKeyword["trend"],
+    }));
+  } catch {
+    // 표가 아직 없는 환경(마이그레이션 023 미적용)도 여기로 온다. 화면을 세우지 않고
+    // 예전 경로로 간다 — 이 표는 속도만 담당하고 정확성은 담당하지 않는다.
+    return null;
+  }
+}
+
+/** 원자료에서 직접 세는 원래 경로. 위 표가 비었을 때만 쓰인다. */
+async function computeIssueKeywords(limit: number): Promise<IssueKeyword[]> {
   const db = getSupabaseAdmin();
   // 화제어는 하루 200행꼴이라 2주면 1,000행 상한을 훌쩍 넘는다 — 반드시 페이징.
   const data = await fetchAllRows<{ date: string; keyword: string; mention_count: number }>(

@@ -32,7 +32,7 @@ from __future__ import annotations
 import re
 import sys
 from collections import Counter, defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -50,6 +50,119 @@ from config.stock_extraction import ALIASES as STOCK_ALIASES  # noqa: E402
 from config.stock_themes import THEMES  # noqa: E402
 
 OVERALL = "overall"
+
+# ── 이슈 키워드 카드(/kadera)를 미리 계산해 두기 위한 상수 ──────────────────
+# 카드는 10줄인데 그 10줄을 **고르려면** 화제어 전체를 세어야 한다(상위가 무엇인지는
+# 다 세기 전엔 모르고, ▲▼ 는 "그날 전체 화제어" 를 분모로 쓰는 점유율 비교다).
+# 렌더할 때 하면 14일치 23,672행을 1,000행씩 24회 왕복해 읽게 돼서, 실측으로 /kadera
+# 서버 렌더 1,775ms 중 1,131ms 가 이 카드였다(그 조회만 빼면 644ms).
+#
+# 여기서 계산하면 DB 추가 조회가 0회다 — 이 스크립트가 (날짜, 화제어, 언급수)를 만드는
+# 당사자라 이미 전부 메모리에 있다.
+#
+# ⚠️ 아래 네 값은 lib/telegram-data.ts 의 getIssueKeywords 와 **같아야 한다.** 표가
+# 비었거나 아직 없으면 프론트가 그쪽 즉석 계산으로 떨어지므로, 값이 갈리면 폴백이
+# 열릴 때만 화면이 달라진다(가장 알아채기 어려운 종류의 어긋남이다). Python 과 TS 라
+# import 로 공유할 수 없어 손으로 맞춘 사본이다.
+ISSUE_KEYWORD_TABLE = "telegram_issue_keyword"  # 마이그레이션 023
+ISSUE_KEYWORD_LIMIT = 10  # page.tsx 의 getIssueKeywords(10)
+ISSUE_KEYWORD_WINDOW_DAYS = 14  # getIssueKeywords 의 daysAgoISO(14)
+ISSUE_KEYWORD_MIN_MENTIONS = 3  # getIssueKeywords 의 MIN_KEYWORD_MENTIONS
+# 점유율 차이가 이보다 작으면 '변화 없음'. TS 쪽 FLAT 과 같은 값.
+ISSUE_KEYWORD_FLAT = 1e-6
+
+
+def issue_keyword_rows(keyword_rows: list[dict]) -> list[dict]:
+    """이슈 키워드 카드에 그대로 그릴 상위 N줄. 계산 규칙은 getIssueKeywords 와 동일.
+
+    증감(▲▼)은 절대 언급 수가 아니라 **그날 전체 화제어 중 점유율**로 본다. 주말이면
+    전체 메시지가 평일의 1/10로 떨어져서, 절대량으로 비교하면 모든 화제어가 일제히
+    ▼가 된다(실제로 그렇게 났다). 창은 최근 3일 평균 vs 5일 이상 이전 평균이다.
+    """
+    since = (datetime.now(timezone.utc) - timedelta(days=ISSUE_KEYWORD_WINDOW_DAYS)).date().isoformat()
+    rows = [r for r in keyword_rows if r["date"] >= since]
+    if not rows:
+        return []
+
+    dates = sorted({r["date"] for r in rows})
+    latest = datetime.fromisoformat(dates[-1]).date()
+
+    def days_before(d: str) -> int:
+        return (latest - datetime.fromisoformat(d).date()).days
+
+    recent_dates = set(dates[-3:])
+    prior_dates = {d for d in dates if days_before(d) >= 5}
+    last7 = {d for d in dates if days_before(d) < 7}
+
+    day_total: Counter = Counter()
+    for r in rows:
+        day_total[r["date"]] += r["mention_count"] or 0
+
+    total: Counter = Counter()
+    recent_share: defaultdict = defaultdict(float)
+    prior_share: defaultdict = defaultdict(float)
+    for r in rows:
+        n = r["mention_count"] or 0
+        if r["date"] in last7:
+            total[r["keyword"]] += n
+        share = n / max(day_total[r["date"]], 1)
+        if r["date"] in recent_dates:
+            recent_share[r["keyword"]] += share
+        if r["date"] in prior_dates:
+            prior_share[r["keyword"]] += share
+
+    can_compare = bool(prior_dates)
+    # 언급 수가 같으면 화제어로 가른다 — 정수라 동점이 흔하고, 안 가르면 순위가
+    # 실행마다 흔들린다.
+    ranked = sorted(
+        ((w, c) for w, c in total.items() if c >= ISSUE_KEYWORD_MIN_MENTIONS),
+        key=lambda wc: (-wc[1], wc[0]),
+    )[:ISSUE_KEYWORD_LIMIT]
+
+    out = []
+    for i, (word, count) in enumerate(ranked, 1):
+        # 창 길이가 다르므로 '하루 평균 점유율'로 맞춘다. 그날 안 나온 화제어는
+        # 점유율 0으로 치므로 창 전체 일수로 나눈다.
+        recent_avg = recent_share.get(word, 0.0) / max(len(recent_dates), 1)
+        prior_avg = prior_share.get(word, 0.0) / max(len(prior_dates), 1)
+        if not can_compare:
+            trend = None
+        elif abs(recent_avg - prior_avg) < ISSUE_KEYWORD_FLAT:
+            trend = "flat"
+        else:
+            trend = "up" if recent_avg > prior_avg else "down"
+        out.append(
+            {
+                "rank": i,
+                "keyword": word,
+                "mention_count": count,
+                "trend": trend,
+                "computed_for": dates[-1],
+            }
+        )
+    return out
+
+
+def save_issue_keywords(db, rows: list[dict]) -> None:
+    """전량 교체. 표가 아직 없어도(마이그레이션 023 미적용) 파이프라인을 세우지 않는다.
+
+    이 표는 **속도만 담당하고 정확성은 담당하지 않는다** — 비어 있으면 프론트가
+    telegram_keyword_daily 에서 즉석 계산으로 떨어져 예전과 똑같이 그린다. 그래서
+    여기서 죽는 것은 얻는 것 없이 그날 센티먼트 집계까지 날리는 셈이다.
+    """
+    if not rows:
+        print(f"[안내] 이슈 키워드가 비어 저장을 건너뜁니다({ISSUE_KEYWORD_TABLE}).")
+        return
+    try:
+        db.table(ISSUE_KEYWORD_TABLE).delete().gte("rank", 0).execute()
+        db.table(ISSUE_KEYWORD_TABLE).insert(rows).execute()
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[안내] {ISSUE_KEYWORD_TABLE} 저장을 건너뜁니다({type(exc).__name__}) — "
+            "화면은 즉석 계산으로 그대로 동작합니다(마이그레이션 023 적용 여부 확인)."
+        )
+        return
+    print(f"[Supabase] {ISSUE_KEYWORD_TABLE} {len(rows)}행 저장 ({rows[0]['computed_for']} 기준)")
 
 # 정규화 시 지우는 것: 공백·가운뎃점·하이픈·언더스코어.
 # "금리 인하" / "금리·인하" / "금리-인하" 가 한 버킷에 모이게 한다.
@@ -185,11 +298,14 @@ def main() -> None:
         n = max(1, r["message_count"])
         print(f"    {r['scope']}: {n}건 · 긍정 {r['positive_count'] * 100 // n}%")
 
-    recent_kw = Counter()
-    for r in keyword_rows:
-        if r["date"] >= dates[max(0, len(dates) - 7)]:
-            recent_kw[r["keyword"]] += r["mention_count"]
-    print(f"  최근 화제어 상위: {', '.join(f'{w}({n})' for w, n in recent_kw.most_common(12))}")
+    # 화면의 이슈 키워드 카드와 **같은 규칙**으로 뽑아 그대로 저장한다. 예전엔 여기서
+    # 7일 합만 세어 로그에 찍었는데, 그건 카드와 창도 문턱도 달라 눈으로 대조할 수 없었다.
+    issue_rows = issue_keyword_rows(keyword_rows)
+    arrow = {"up": "▲", "down": "▼", "flat": "·", None: " "}
+    print(
+        "  이슈 키워드: "
+        + ", ".join(f"{r['keyword']}{arrow[r['trend']]}{r['mention_count']}" for r in issue_rows)
+    )
 
     if dry_run:
         print("[dry-run] 저장하지 않고 종료합니다.")
@@ -208,6 +324,10 @@ def main() -> None:
         for i in range(0, len(rows), 500):
             db.table(table).insert(rows[i : i + 500]).execute()
         print(f"[Supabase] {table} {len(rows)}행 저장")
+
+    # 화제어 원자료를 쓴 뒤에 저장한다 — 이 표는 그것의 파생이라 순서가 뒤집히면
+    # 잠깐이지만 카드가 원자료보다 앞선 값을 말한다.
+    save_issue_keywords(db, issue_rows)
 
 
 if __name__ == "__main__":
