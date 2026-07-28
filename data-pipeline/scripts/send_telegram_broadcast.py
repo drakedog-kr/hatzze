@@ -538,12 +538,9 @@ def build_theme(db, llm) -> str:
     shown = themes[: bc.THEME_SHOW]
     window = shown[0]["dates"]
     members = bc.theme_members(db, [t["theme"] for t in shown], window)
-    # 밀려난 곳 = 순위가 가장 많이 내려간 테마. 없으면 이 줄을 뺀다.
-    dropped = min(
-        (t for t in themes if t["rank_change"] is not None and t["rank_change"] < 0),
-        key=lambda t: t["rank_change"],
-        default=None,
-    )
+    # 밀려난 곳 = 순위가 가장 많이 내려간 테마(정의는 bc.pick_dropped 에 하나로 뒀다).
+    # 위에 세운 순위에서 고르면 같은 줄을 두 번 쓰게 되므로 shown 을 뺀다. 없으면 이 줄을 뺀다.
+    dropped = bc.pick_dropped(themes, exclude=[t["theme"] for t in shown])
 
     label = f"{korean_date_label(window[0])[:-3]}~{korean_date_label(window[-1])}" if window else ""
     lines = ["🔄 <b>관심이 옮겨간 곳</b>", f"최근 {len(window)}일 · {label}"]
@@ -625,20 +622,27 @@ def build_weekly(db, llm) -> str:
 
     themes = bc.load_theme_rotation(db)
     if themes:
+        shown = themes[:2]
         top2 = " · ".join(
             f"{html.escape(t['theme'], quote=False)} {t['share']:.1f}%"
             + (f" ({t['delta']:+.1f}%p)" if t["delta"] is not None else "")
-            for t in themes[:2]
+            for t in shown
         )
         lines += ["", "<b>관심이 옮겨간 곳</b>", top2]
-        dropped = min(
-            (t for t in themes if t["delta"] is not None and t["delta"] < 0),
-            key=lambda t: t["delta"],
-            default=None,
-        )
+        # 밀려난 곳 = 순위가 가장 많이 내려간 테마(정의는 C 와 공유한다. bc.pick_dropped).
+        # 방금 세운 top2 는 후보에서 뺀다 — 안 빼면 "관심이 옮겨간 곳" 1위로 적은 테마를
+        # 바로 아래에서 "밀렸다"고 해, 붙어 있는 두 줄이 반대말을 한다.
+        dropped = bc.pick_dropped(themes, exclude=[t["theme"] for t in shown])
         if dropped:
+            # 문장을 %p 가 아니라 계단으로 쓴다. 순위로 고른 테마는 점유율이 오히려 오른
+            # 채로 자리만 내준 경우가 있어(다른 테마가 더 크게 올라서) "+0.3%p로 밀렸습니다"
+            # 같은 문장이 나온다 — 지난 14일 재생 중 2일이 그랬다. 고른 근거와 적는 근거는
+            # 같아야 한다.
             nm = html.escape(dropped["theme"], quote=False)
-            lines.append(f"{nm}{bc.josa(dropped['theme'], '은', '는')} {dropped['delta']:+.1f}%p로 밀렸습니다.")
+            lines.append(
+                f"{nm}{bc.josa(dropped['theme'], '은', '는')} "
+                f"{abs(dropped['rank_change'])}계단 내려 {dropped['rank']}위가 되었습니다."
+            )
 
     digest = "\n".join(
         [

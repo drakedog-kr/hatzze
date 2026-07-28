@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
+from collections.abc import Iterable
 from datetime import date, datetime, timedelta
 
 from .surging import load_stock_daily
@@ -264,6 +265,46 @@ def load_theme_rotation(db) -> list[dict]:
             }
         )
     return out
+
+
+def pick_dropped(themes: list[dict], exclude: Iterable[str] = ()) -> dict | None:
+    """'밀려난 곳' = **순위가 가장 많이 내려간** 테마. 없으면 None(부르는 쪽이 줄을 뺀다).
+
+    C(테마)와 D(주간)가 같은 라벨을 쓰므로 정의도 하나여야 한다. 예전엔 C 가 순위,
+    D 가 점유율 변화(delta)로 골라 같은 날 C 는 자동차를, D 는 반도체를 "밀려났다"고
+    했다. 한 서비스가 같은 말을 두 뜻으로 쓴 것이다.
+
+    **순위로 통일한 이유.** delta 는 큰 테마에 기계적으로 쏠린다. 점유율 24% 짜리
+    테마는 하루만 식어도 -7%p 가 나오지만 점유율 2% 짜리는 아무리 식어도 -2%p 를
+    넘지 못한다. 그래서 delta 기준은 1위 테마를 거의 매번 집어 든다. 지난 14일을
+    되돌려 재생하니 **11/14 일이 그랬고**, D 는 그 테마를 방금 "관심이 옮겨간 곳"
+    1위로 세워 둔 참이라 붙어 있는 두 줄이 반대말을 했다(2026-07-28 실측:
+    "반도체 24.3% (-7.7%p)" 바로 아래 "반도체는 -7.7%p로 밀렸습니다").
+    순위는 다른 테마가 실제로 앞질렀을 때만 내려가므로 '관심이 옮겨갔다'는 이 글들의
+    주제와도 맞는다.
+
+    **테마가 적어 순위가 안 바뀌면 어쩌나**를 걱정했는데, 같은 재생에서 순위 하락
+    후보는 **14/14 일 있었다**(테마 11개면 매일 서넛이 자리를 바꾼다). 그래도 비는 날은
+    있을 수 있어 None 을 그대로 돌려준다.
+
+    `exclude` 는 그 글이 이미 화면에 세운 테마다. 안 빼면 위에서 "1위"로 적은 테마를
+    아래에서 "밀려났다"고 하거나(D), 같은 줄을 두 번 쓰게 된다(C. 2026-07-28 실측:
+    "3위 지주·밸류업 3.0% (-1.4%p) ▼1계단" 아래 "밀려난 곳: 지주·밸류업 3.0%
+    (-1.4%p) ▼1계단"). C 는 3개, D 는 2개를 세우므로 **정의는 같아도 답이 갈리는 날이
+    있다** — 3위 테마가 뽑히는 날이 그렇다(재생 14일 중 2일). 어긋난 게 아니라 각 글이
+    자기 화면에 없는 테마를 고른 결과다.
+
+    순위 하락 폭이 같으면 점유율이 더 빠진 쪽을 고른다. 하락 -1 은 흔해서(오늘만 넷)
+    무엇으로든 가려야 하는데, 목록 순서대로 두면 '가장 큰 테마'가 뽑혀 delta 기준의
+    쏠림이 뒷문으로 돌아온다. delta 와 rank_change 는 둘 다 이전 창(before)에서만
+    나오므로 한쪽이 있으면 다른 쪽도 있다 — 여기서 delta 가 None 일 일은 없다.
+    """
+    names = set(exclude)
+    return min(
+        (t for t in themes if t["theme"] not in names and t["rank_change"] is not None and t["rank_change"] < 0),
+        key=lambda t: (t["rank_change"], t["delta"]),
+        default=None,
+    )
 
 
 def theme_members(db, themes: list[str], window_dates: list[str], per: int = THEME_STOCKS_PER) -> dict[str, list[str]]:
