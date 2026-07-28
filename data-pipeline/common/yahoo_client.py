@@ -123,12 +123,20 @@ def _price_is_stale(meta: dict, price: float) -> bool:
     return price > high * (1 + DAY_RANGE_SLACK) or price < low * (1 - DAY_RANGE_SLACK)
 
 
-def fetch_index_closes(symbol: str, days: int) -> dict[str, float]:
-    """최근 `days` 일의 일별 종가를 {'YYYY-MM-DD': close} 로 돌려준다(KST 날짜 기준).
+def fetch_index_closes(symbol: str, days: int) -> tuple[dict[str, float], list[str]]:
+    """최근 `days` 일의 일별 종가와, **바가 존재한 날짜 전체**를 돌려준다(KST 기준).
+
+    돌려주는 것이 둘인 이유: 맨 끝 바는 `close` 가 비어 와도 **timestamp 는 늘 있다**.
+    그 날짜를 호출부가 알아야 `fetch_prev_session_close()` 가 값을 어느 날에 붙일지
+    정할 수 있다(아래 함수 주석 참고).
 
     한 번의 요청으로 기간 전체를 받는다 — KRX 헬퍼처럼 날짜마다 따로 부르지 않는다.
-    휴장일은 애초에 바가 없고, 진행 중인 오늘 바는 `close` 가 None 이라 자연히 빠진다.
-    오늘 종가는 `fetch_index_today()` 가 따로 붙인다.
+    휴장일은 애초에 바가 없다.
+
+    ⚠️ **이 경로로는 '가장 최근에 끝난 거래일'을 받을 수 없다.** 야후는 응답의 마지막
+    바만 `close=None` 으로 준다. 장중이라서가 아니다 — 2026-07-28 종가는 마감 10.6시간
+    뒤에도 비어 있었고, period2 를 그날 끝으로 끊어도 여전히 비었다(둘 다 실측). 야후의
+    과거 데이터 정리가 늦는 것이고, 그동안 값은 `range=1d` 응답에만 있다.
 
     ⚠️ `range` 파라미터를 쓰지 않고 period1/period2 를 못박는다. 야후는 `range=365d` 를
     '365 거래일'로 읽어 365개(≈17개월)를 주는데 `range=1y` 는 244개다 — 같은 뜻으로
@@ -145,18 +153,58 @@ def fetch_index_closes(symbol: str, days: int) -> dict[str, float]:
         },
     )
     if result is None:
-        return {}
+        return {}, []
 
     timestamps = result.get("timestamp") or []
     quote = ((result.get("indicators") or {}).get("quote") or [{}])[0]
     closes = quote.get("close") or []
 
     prices: dict[str, float] = {}
+    all_dates: list[str] = []
     for ts, close in zip(timestamps, closes):
+        d = _kst_date(ts)
+        all_dates.append(d)
         if close is None:
-            continue  # 진행 중인 오늘 바
-        prices[_kst_date(ts)] = _round(close)
-    return prices
+            continue  # 위 주석 — 맨 끝 바는 비어 온다
+        prices[d] = _round(close)
+    return prices, all_dates
+
+
+def fetch_session_close(symbol: str, day: date) -> float | None:
+    """특정 거래일 하루의 **시간봉**을 받아 마지막 봉의 종가를 돌려준다.
+
+    일봉의 맨 끝 바가 비어 오는 걸(위 주석) 메우는 용도다. 그 한 칸이 비면 아침
+    실행(~10:45 KST, 장중)이 전 거래일 종가를 못 집는 날이 생기고, 그날 저녁까지
+    화면이 이틀 전 값에 머문다. 워크플로는 초록불이라 아무도 모른다.
+
+    ⚠️ **`meta.chartPreviousClose` 를 쓰면 안 된다.** 처음에 그걸로 짰다가 틀렸다 —
+    코스피에선 맞는데(6755.75 = 07-27 종가) **코스닥에선 한 세션 밀린 값**을 준다
+    (748.22 = 07-24 종가, 실제 07-27 은 764.86). 심볼 하나로 확인하고 일반화하면
+    이렇게 조용히 틀린 값을 저장하게 된다. 시간봉은 두 지수에서 모두 맞았다
+    (07-28: 코스피 6023.66 · 코스닥 705.85, 둘 다 meta 와 일치).
+
+    하루를 KST 기준으로 잘라 부르므로 **어느 세션인지 모호하지 않다.** 마지막 시간봉은
+    15:00~16:00 구간이라 정규장 마감(15:30)을 포함한다.
+
+    ⚠️ 진행 중인 날에는 쓰지 말 것 — 그날의 마지막 시간봉은 종가가 아니라 장중값이다.
+    호출부가 `day < today` 로만 부른다.
+    """
+    start = int(datetime.combine(day, dtime(0, 0), KST).timestamp())
+    result = _get(
+        symbol,
+        {"interval": "1h", "period1": start, "period2": start + 24 * 60 * 60},
+    )
+    if result is None:
+        return None
+
+    timestamps = result.get("timestamp") or []
+    quote = ((result.get("indicators") or {}).get("quote") or [{}])[0]
+    closes = quote.get("close") or []
+
+    filled = [c for t, c in zip(timestamps, closes) if c is not None]
+    if not filled:
+        return None  # 휴장일 등
+    return _round(filled[-1])
 
 
 def fetch_last_session_close(symbol: str) -> tuple[str, float] | None:
@@ -203,17 +251,45 @@ def fetch_last_session_close(symbol: str) -> tuple[str, float] | None:
 
 
 def fetch_index_close_series(symbol: str, days: int, today: date) -> dict[str, float]:
-    """과거 일봉 + (가능하면) 최근 끝난 세션의 종가를 합친 {'YYYY-MM-DD': close}.
+    """세 소스를 합친 {'YYYY-MM-DD': close}. 하루 두 번 실행이 각자 제 몫을 채운다.
 
-    호출부는 이 맵에서 필요한 날짜만 꺼내 쓴다. `today` 는 미래 날짜를 막는 상한으로만
-    쓴다 — 야후가 시간대 경계에서 앞선 날짜를 줄 여지를 없앤다.
+    소스가 셋인 건 야후 하나로는 어느 실행에서도 최신이 안 되기 때문이다.
+
+      ① 히스토리(period1/period2) — 지난 1년. 단 **맨 끝 바는 늘 비어 온다.**
+      ② 시간봉 — ①이 비워 둔 지난 날짜를 그 하루만 따로 받아 메운다.
+      ③ meta.regularMarketPrice — 오늘 종가. 16:00 KST 이후에만(장중값 방지).
+
+    실행별로 이렇게 갈린다.
+
+      아침 ~10:45 (장중)   ①+② → **전 거래일 종가**가 확정된다. ③은 게이트에 걸려 빠진다.
+      오후 ~19:50 (마감후) ①+③ → **당일 종가**까지 들어온다.
+
+    ②가 없던 판(2026-07-29 최초 구현)에는 아침 실행이 전 거래일을 못 집는 날이 생겼다.
+    평소엔 전날 **저녁** 실행이 그날 종가를 이미 넣어 두므로 티가 안 나지만, 저녁 실행이
+    통째로 건너뛰는 날이 있다(07-24 실측). 그 다음 날 아침이 ②로 만회한다.
+
+    ②는 ①이 실제로 바를 만든 날짜에만 건다. 휴장일 달력을 따로 들 필요가 없고, 비는
+    칸이 맨 끝 하나뿐이라 추가 요청도 실행당 최대 1회다.
+
+    `today` 는 미래 날짜를 막는 상한으로만 쓴다 — 야후가 시간대 경계에서 앞선 날짜를 줄
+    여지를 없앤다.
     """
-    prices = fetch_index_closes(symbol, days)
+    prices, all_dates = fetch_index_closes(symbol, days)
 
+    # ② 지난 날짜인데 ①이 비워 둔 칸만 시간봉으로 메운다. 오늘은 건드리지 않는다 —
+    # 진행 중인 날의 마지막 시간봉은 종가가 아니라 장중값이고, 오늘은 ③ 담당이다.
+    for d in all_dates:
+        if d in prices or d >= today.isoformat():
+            continue
+        close = fetch_session_close(symbol, date.fromisoformat(d))
+        if close is not None:
+            prices[d] = close
+            print(f"[야후] {symbol}: 일봉이 비어 있던 {d} 를 시간봉으로 채웠습니다 ({close})")
+
+    # ③ 오늘 종가(장 마감 뒤에만).
     last = fetch_last_session_close(symbol)
     if last is not None:
         session_date, close = last
-        if session_date <= today.isoformat():
-            prices[session_date] = close
+        prices[session_date] = close
 
     return {d: v for d, v in prices.items() if d <= today.isoformat()}
