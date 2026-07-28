@@ -4,7 +4,6 @@ import { cache } from "react";
 
 import { getDevOverrides } from "@/lib/dev-overrides";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { fetchYahooQuote } from "@/lib/yahoo-quote";
 
 export type DailyScore = {
   date: string;
@@ -203,6 +202,8 @@ export type StockHighGap = {
   price: number;
   high52: number;
   gapPct: number; // 음수 = 고점 아래
+  /** 종가 기준일. 행의 날짜(KRX 거래대금 기준일)와 다를 수 있다 — 아래 주석 참고. */
+  priceDate: string | null;
 };
 
 /**
@@ -212,30 +213,28 @@ export type StockHighGap = {
  * 주도주들이 어떤 상태인지는 안 보인다. 거래대금 상위 종목(= 지금 돈이 몰리는 곳)의
  * 개별 괴리율을 같이 두면 지수 숫자가 어디서 온 건지 읽힌다.
  *
- * 종목 선정은 turnover_concentration 지표가 이미 저장해 둔 details.top5(거래대금 순)를
- * 재사용한다 — 같은 자료를 두 번 긁지 않기 위해서다. 다만 거기엔 종목명만 있어
- * stocks 에서 코드를 찾아 야후 심볼로 바꾼다.
+ * **여기는 조회를 하지 않는다. 저장된 값을 그대로 읽을 뿐이다.**
  *
- * **현재가·52주 고점 둘 다 야후.** 이 규칙은 두 번 뒤집혔으니 되돌리기 전에 읽을 것.
+ * 규칙이 세 번 뒤집혔으니 되돌리기 전에 읽을 것.
  *
- * 처음엔 현재가가 KRX 종가였다. 왼쪽 지수 괴리율이 KRX 기준이라, 오른쪽만 야후 실시간이면
- * 한 카드에서 날짜가 갈렸기 때문이다 — 배지에 "7/22 기준"이라 적어도 이 숫자는 그날 값이
- * 아니었다. 그런데 2026-07-29 에 **지수 종가가 야후로 옮겨 가면서 그 논리가 뒤집혔다**
- * (data-pipeline/common/yahoo_client.py). KRX 종가는 이제 지수보다 하루 뒤처진 값이라,
- * 날짜를 맞추려면 반대로 야후를 써야 한다.
+ *  1) 처음엔 현재가가 KRX 저장 종가였다. 왼쪽 지수가 KRX 기준이라 날짜가 맞았다.
+ *  2) 지수 종가가 야후로 옮겨 가자(2026-07-29) KRX 가 되레 하루 뒤처져, 현재가를
+ *     야후 **실시간**으로 바꿨다.
+ *  3) 그런데 실시간이면 이 카드가 장중에 움직인다. 같은 카드 왼쪽의 지수 게이지와
+ *     햇쩨 지수는 하루 두 번만 바뀌므로 **한 화면에서 시점이 갈린다.** 지표는 온도와
+ *     같은 시점이어야 한다는 원칙이 우선이라, 조회를 파이프라인으로 옮겼다
+ *     (data-pipeline/scripts/fetch_turnover_concentration.py 의 attach_quotes).
  *
- * ⚠️ **그래도 장중에는 여전히 갈린다.** 지수는 파이프라인이 16:00 KST 이후에만 쓰는
- * '일별 종가'고 여기는 실시간이다. 장중 = 종목만 오늘 · 지수는 어제, 저녁 실행 뒤 = 둘 다
- * 오늘. 카드 툴팁이 이걸 밝히므로 문구를 지울 때 같이 볼 것.
+ * 그래서 지금 이 함수는 순수한 읽기다. 화면을 아무리 새로고침해도 값이 안 변하고,
+ * 파이프라인이 도는 하루 두 번만 바뀐다 — 지수 카드·햇쩨 지수와 같은 리듬이다.
  *
- * 52주 고점이 야후인 이유(이건 안 바뀐다): KRX 일별매매정보에는 52주 고점 필드가 없어서,
- * 같은 값을 얻으려면 1년치를 훑어야 하고 실측 80분이 걸린다(응답 하나가 KOSPI 943행 +
- * KOSDAQ 1,821행). 야후는 fiftyTwoWeekHigh 를 한 번의 호출로 준다. 지수 쪽은 이미 일별
- * 종가를 쌓고 있어 최고 종가를 공짜로 구하지만(kospi_close_raw), 종목은 그 저장소가 없다.
+ * `priceDate` 가 행의 날짜와 다를 수 있다. KRX 거래대금은 T+1 이라 행은 어제인데
+ * 종가는 오늘일 수 있어서다. 지수 게이지와 날짜를 맞추는 게 목적이므로 이쪽이 맞다.
  *
- * 남는 차이: 야후 고점은 **장중 고가**라 종가 기준보다 3%쯤 높다. 그만큼 종목 괴리율이
- * 깊게 나온다(SK하이닉스 -35.8% → -38.7%). 세 종목에 똑같이 걸리는 편향이고 점수에는
- * 들어가지 않는다.
+ * 52주 고점이 야후인 이유: KRX 일별매매정보에 그 필드가 없어서, 같은 값을 얻으려면
+ * 1년치를 훑어야 하고 실측 80분이 걸린다. 야후는 fiftyTwoWeekHigh 를 한 번에 준다.
+ * 남는 차이는 야후 고점이 **장중 고가**라 종가 기준보다 3%쯤 높다는 것 — 세 종목에
+ * 똑같이 걸리는 편향이고 점수에는 들어가지 않는다.
  */
 export async function getTopStockHighGaps(limit = 3): Promise<StockHighGap[]> {
   const { data: rows } = await getSupabaseServer()
@@ -246,54 +245,28 @@ export async function getTopStockHighGaps(limit = 3): Promise<StockHighGap[]> {
     .limit(1, { referencedTable: "indicator_values" })
     .maybeSingle();
 
-  const details = rows?.indicator_values?.[0]?.details as { top5?: { name: string }[] } | null;
-  const names = (details?.top5 ?? []).map((s) => s.name).slice(0, limit);
-  if (!names.length) return [];
+  type StoredStock = { name: string; code?: string; price?: number; high52?: number; gap_pct?: number };
+  const details = rows?.indicator_values?.[0]?.details as
+    | { top5?: StoredStock[]; price_date?: string }
+    | null;
 
-  const { data: stocks } = await getSupabaseServer()
-    .from("stocks")
-    // close_price·price_date 는 더 안 읽는다 — 현재가가 야후로 바뀌면서 쓸 데가 없어졌다
-    // (그 컬럼 자체는 fetch_krx_stocks.py 가 계속 채우고 카더라 폴백이 쓴다).
-    .select("code,name,market")
-    .in("name", names);
-  const infoOf = new Map((stocks ?? []).map((s) => [s.name as string, s]));
-
-  const results = await Promise.all(
-    names.map(async (name) => {
-      const info = infoOf.get(name);
-      if (!info) return null;
-      const q = await fetchYahooQuote(`${info.code}.${info.market === "KOSDAQ" ? "KQ" : "KS"}`, {
-        next: { revalidate: 600 },
-      });
-      // 시세를 못 믿으면(낡은 값 포함, lib/yahoo-quote 참고) 52주 고점만 따로 건지지
-      // 않고 종목을 통째로 뺀다. 카드 왼쪽 게이지는 KRX 값이라 그대로 서고 오른쪽 목록만
-      // 줄어든다 — 드물고 잠깐이라 이 정도 손해는 받는다.
-      if (!q || q.fiftyTwoWeekHigh === null || q.fiftyTwoWeekHigh <= 0) return null;
-
-      // 현재가는 야후를 쓴다(2026-07-29 에 KRX 우선에서 뒤집었다).
-      //
-      // 예전엔 KRX 저장 종가를 우선했고 이유는 "지수 쪽 배지와 같은 거래일을 가리키게"
-      // 였다. 지수가 KRX 라 둘 다 전일 종가로 맞아떨어졌기 때문이다. 그런데 지수 종가가
-      // 야후로 옮겨 가면서(data-pipeline/common/yahoo_client.py) **같은 규칙이 정반대
-      // 결과를 낸다** — KRX 종가는 이제 지수보다 하루 뒤처진 값이다.
-      //
-      // ⚠️ 그렇다고 날짜가 늘 맞는 건 아니다. 지수는 파이프라인이 16:00 KST 이후에만
-      // 쓰는 '일별 종가'고 여기는 실시간이라, **장중에는 종목만 오늘이고 지수는 어제**다
-      // (저녁 실행 뒤에야 둘 다 오늘이 된다). 카드 툴팁이 그 사실을 밝힌다.
-      //
-      // KRX 저장 종가로 폴백하지는 않는다. 이 카드는 52주 고점이 있어야 성립하는데 그
-      // 필드는 야후에만 있어서, 야후를 못 믿는 순간 어차피 종목을 통째로 뺀다(위 가드).
-      const price = Math.round(q.price);
-      return {
-        name,
-        code: info.code as string,
-        price,
-        high52: Math.round(q.fiftyTwoWeekHigh),
-        // 현재가와 고점이 같은 응답에서 나온다 — 예전엔 KRX 종가 ÷ 야후 고점이라 한
-        // 숫자가 두 소스에 걸쳐 있었다.
-        gapPct: (price / q.fiftyTwoWeekHigh - 1) * 100,
-      };
-    }),
-  );
-  return results.filter((r): r is StockHighGap => r !== null);
+  // 종가가 아직 안 붙은 종목은 뺀다(파이프라인이 한 번도 안 돌았거나 야후 조회 실패).
+  // 카드 왼쪽 게이지는 지수 값이라 그대로 서고 오른쪽 목록만 줄어든다.
+  return (details?.top5 ?? [])
+    .filter(
+      (s): s is StoredStock & { code: string; price: number; high52: number } =>
+        typeof s.code === "string" &&
+        typeof s.price === "number" &&
+        typeof s.high52 === "number" &&
+        s.high52 > 0,
+    )
+    .slice(0, limit)
+    .map((s) => ({
+      name: s.name,
+      code: s.code,
+      price: s.price,
+      high52: s.high52,
+      gapPct: typeof s.gap_pct === "number" ? s.gap_pct : (s.price / s.high52 - 1) * 100,
+      priceDate: details?.price_date ?? null,
+    }));
 }

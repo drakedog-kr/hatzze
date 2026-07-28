@@ -293,3 +293,38 @@ def fetch_index_close_series(symbol: str, days: int, today: date) -> dict[str, f
         prices[session_date] = close
 
     return {d: v for d, v in prices.items() if d <= today.isoformat()}
+
+
+def fetch_last_session_quote(symbol: str) -> tuple[str, float, float | None] | None:
+    """개별 종목용 — 가장 최근에 **끝난** 거래일의 (날짜, 종가, 52주 고점).
+
+    지수용 `fetch_last_session_close()` 와 게이트가 같다(장중이면 None, 자기모순이면
+    None). 52주 고점만 더 얹는다 — 신고가 카드가 그 값을 쓰는데 KRX 일별매매정보에는
+    그 필드가 없기 때문이다.
+
+    **왜 파이프라인에서 부르나.** 예전엔 이걸 프론트(`lib/data.ts`)가 화면을 그릴 때마다
+    실시간으로 불렀다. 그러면 카드가 장중에 움직이는데, 같은 카드 왼쪽의 지수 게이지와
+    햇쩨 지수는 하루 두 번만 바뀐다 — 한 화면에서 시점이 갈린다. 지표는 온도와 같은
+    시점이어야 하므로 조회를 파이프라인으로 옮기고 프론트는 저장값만 읽는다.
+    """
+    result = _get(symbol, {"interval": "1d", "range": "5d"})
+    if result is None:
+        return None
+
+    meta = result.get("meta") or {}
+    price = meta.get("regularMarketPrice")
+    market_time = meta.get("regularMarketTime")
+    if not isinstance(price, (int, float)) or not isinstance(market_time, (int, float)):
+        return None
+
+    session_date = _kst_date(int(market_time))
+    now = datetime.now(KST)
+    if session_date == now.date().isoformat() and now.time() < MARKET_CLOSE_KST:
+        return None  # 장중 — 종가가 아니다
+
+    if _price_is_stale(meta, float(price)):
+        print(f"[야후] {symbol}: 종가 {price} 가 당일 밴드 밖이라 버립니다")
+        return None
+
+    high52 = meta.get("fiftyTwoWeekHigh")
+    return session_date, _round(price), _round(high52) if isinstance(high52, (int, float)) else None
