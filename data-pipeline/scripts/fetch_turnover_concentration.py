@@ -32,6 +32,8 @@ KRX_URL = "http://data-dbg.krx.co.kr/svc/apis/sto/stk_bydd_trd"
 TOP_N = 10
 BACKFILL_DAYS = 30  # 최근 30일(달력) 조회 — 휴장일은 빈 응답이라 건너뛴다
 REQUEST_DELAY_SEC = 0.05
+# 종가 폴백이 거슬러 볼 행 수. 한 주치면 연휴를 덮고, 그보다 오래 비었다면 살릴 값이 없다.
+FALLBACK_LOOKBACK_ROWS = 5
 WON_PER_JO = 1_000_000_000_000
 
 INDICATOR_SLUG = "turnover_concentration"
@@ -99,6 +101,13 @@ def attach_quotes(client, indicator_id: str, day: date, details: dict) -> dict:
     둔 종가를 지워 버리는 걸 막는다. `details` 는 여러 스크립트가 나눠 쓰는 칸이라
     통째 대입이 늘 이런 식으로 문다.
 
+    ⚠️ **그 폴백은 '같은 날짜 행'을 보면 안 된다.** 처음에 그렇게 짰다가 폴백이 한 번도
+    작동하지 못했다. KRX 거래대금이 T+1 이라 **아침 실행이 새 날짜 행을 그 자리에서
+    처음 만든다** — 되살릴 값은 늘 그 **전날** 행에 있는데 갓 만든 빈 행을 뒤지니
+    언제나 0개였다. 2026-07-29 아침에 카드 오른쪽 칸이 통째로 사라진 원인이 이것이고,
+    아침마다 재현되는 종류였다(오후 실행이 채울 때까지 장중 내내). 그래서 날짜로 찾지
+    않고 **종가가 실제로 붙어 있는 가장 최근 행**을 찾는다.
+
     종가 기준일(`price_date`)은 KRX 거래대금 기준일(행의 date)과 **다를 수 있다.**
     KRX 는 T+1 이라 행은 어제인데 종가는 오늘일 수 있어서다. 지수 게이지와 날짜를
     맞추는 게 목적이므로 이쪽이 맞고, 프론트가 그 날짜를 라벨로 쓴다.
@@ -130,16 +139,26 @@ def attach_quotes(client, indicator_id: str, day: date, details: dict) -> dict:
         print(f"[야후] 상위 종목 {quoted}개 종가 부착 ({price_date} 기준)")
         return details
 
-    # 장중이거나 조회 실패 — 저장돼 있던 값을 되살린다.
-    prev = (
+    # 장중이거나 조회 실패 — 저장돼 있던 값을 되살린다. 위 주석대로 날짜가 아니라
+    # '종가가 붙어 있는 최근 행'을 찾는다. 며칠치만 봐도 충분하다 — 그보다 오래
+    # 비어 있었다면 오후 실행이 계속 실패했다는 뜻이라 살릴 값 자체가 없다.
+    recent = (
         client.table("indicator_values")
-        .select("details")
+        .select("date,details")
         .eq("indicator_id", indicator_id)
-        .eq("date", day.isoformat())
-        .maybe_single()
+        .lte("date", day.isoformat())
+        .order("date", desc=True)
+        .limit(FALLBACK_LOOKBACK_ROWS)
         .execute()
+    ).data or []
+    old = next(
+        (
+            r["details"]
+            for r in recent
+            if any("price" in s for s in ((r.get("details") or {}).get("top5") or []))
+        ),
+        {},
     )
-    old = ((prev.data or {}).get("details") or {}) if prev else {}
     old_by_name = {s["name"]: s for s in (old.get("top5") or []) if "price" in s}
     kept = 0
     for stock in top5:
