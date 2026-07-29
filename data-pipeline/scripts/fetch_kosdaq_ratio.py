@@ -103,7 +103,9 @@ def backfill_kosdaq_closes(client, raw_indicator_id: str) -> None:
         print("[야후] 코스닥 종가 받을 날짜 없음")
         return
 
-    prices = fetch_index_close_series(YAHOO_SYMBOL, BACKFILL_DAYS, today)
+    # known 을 넘겨 시간봉 폴백이 이미 있는 날짜를 근사치로 덮어쓰지 못하게 한다
+    # (코스피 쪽과 같은 이유 · yahoo_client 의 ② 주석). 코스닥은 격차가 1.15%라 더 크다.
+    prices = fetch_index_close_series(YAHOO_SYMBOL, BACKFILL_DAYS, today, known=existing)
     print(f"[야후] 코스닥 종가 대상 {len(target_days)}일 · 응답 종가 {len(prices)}일치")
 
     rows = [

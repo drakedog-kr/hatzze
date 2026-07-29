@@ -258,7 +258,9 @@ def fetch_last_session_close(symbol: str) -> tuple[str, float] | None:
     return session_date, _round(price)
 
 
-def fetch_index_close_series(symbol: str, days: int, today: date) -> dict[str, float]:
+def fetch_index_close_series(
+    symbol: str, days: int, today: date, known: set[str] | None = None
+) -> dict[str, float]:
     """세 소스를 합친 {'YYYY-MM-DD': close}. 하루 두 번 실행이 각자 제 몫을 채운다.
 
     소스가 셋인 건 야후 하나로는 어느 실행에서도 최신이 안 되기 때문이다.
@@ -279,6 +281,13 @@ def fetch_index_close_series(symbol: str, days: int, today: date) -> dict[str, f
     ②는 ①이 실제로 바를 만든 날짜에만 건다. 휴장일 달력을 따로 들 필요가 없고, 비는
     칸이 맨 끝 하나뿐이라 추가 요청도 실행당 최대 1회다.
 
+    ⚠️ **②는 '그 날짜에 아무것도 없을 때'만 쓰는 것이다.** `known` 에 이미 저장된 날짜를
+    넘기면 그 날짜는 건너뛴다. 안 넘기면 이런 일이 난다 — 저녁 실행이 ③으로 받아 둔
+    **정확한 종가**를 다음 날 아침 실행이 ②의 **근사치로 덮어쓴다.** ②가 보는 건 야후
+    응답(`prices`)이지 DB가 아니라서, 일봉이 아직 안 익은 어제 날짜를 "비었다"고 읽기
+    때문이다. 호출부가 최근 며칠을 덮어쓰게 되면서(`days_to_sync`) 이 조합이 실제로
+    값을 되돌리는 경로가 됐다. 둘 중 하나만 보면 안 보이는 종류라 여기 적어 둔다.
+
     ⚠️ **②가 주는 값은 종가가 아니라 근사치다.** 마지막 시간봉이 동시호가(15:20~15:30)로
     확정되는 종가를 못 잡는다. 실측 격차: 코스피 07-27 6720.55 vs 6755.75(0.52%) ·
     07-28 6019.06 vs 6023.66(0.08%) · 코스닥 07-28 697.76 vs 705.85(**1.15%**). 시점
@@ -298,10 +307,12 @@ def fetch_index_close_series(symbol: str, days: int, today: date) -> dict[str, f
     if intraday is not None:
         print(f"[야후] {symbol}: 오늘({today}) 일봉의 {intraday} 는 장중값이라 버립니다")
 
-    # ② 지난 날짜인데 ①이 비워 둔 칸만 시간봉으로 메운다. 오늘은 건드리지 않는다 —
-    # 진행 중인 날의 마지막 시간봉은 종가가 아니라 장중값이고, 오늘은 ③ 담당이다.
+    # ② 지난 날짜인데 ①도 비워 두고 DB에도 없는 칸만 시간봉으로 메운다. 오늘은 건드리지
+    # 않는다 — 진행 중인 날의 마지막 시간봉은 종가가 아니라 장중값이고, 오늘은 ③ 담당이다.
+    # `known` 을 안 보면 어제 받아 둔 정확한 종가를 오늘 아침이 근사치로 되돌린다(위 주석).
+    stored = known or set()
     for d in all_dates:
-        if d in prices or d >= today.isoformat():
+        if d in prices or d in stored or d >= today.isoformat():
             continue
         close = fetch_session_close(symbol, date.fromisoformat(d))
         if close is not None:
