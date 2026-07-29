@@ -4,7 +4,9 @@
 마찬가지로 "낮을수록 과열(방심)" 방향이다 — calculate_score.py에서
 direction: "low"로 다뤄야 한다.
 
-최초 실행 시 1년치를 백필하고, 이후 실행부터는 아직 없는 날짜만 채운다.
+최초 실행 시 1년치를 백필하고, 이후에도 매 실행마다 계산 가능한 날짜 전체를 다시
+계산해 upsert 한다(형제 스크립트들과 같은 방식). **진행 중인 오늘 바는 쓰지 않는다** —
+자세한 이유는 fetch_volatility_series 주석에 있다.
 """
 
 from __future__ import annotations
@@ -37,12 +39,33 @@ INDICATOR_META = {
 
 
 def fetch_volatility_series(start: date, end: date) -> dict[str, float]:
+    """확정된 환율 종가만으로 20일 변동성을 낸다. **진행 중인 `end` 날짜는 버린다.**
+
+    yfinance 의 마지막 일봉은 그날이 안 끝났으면 `Close` 에 현재가가 앉는다. 원/달러는
+    24시간 돌아서 오전·오후 실행 **둘 다** 진행 중인 값을 받는다.
+
+    그대로 두면 "확정 종가 19개 + 장중 1개"로 표준편차를 낸다. 재는 대상(일간 등락
+    0.3~0.5%)과 그 오차(그 시각 값 vs 확정 종가, 13일 평균 0.39% · 최대 0.89%)가
+    같은 크기라 결과가 크게 흔들렸다 — 저장값을 정상 재계산과 대조하니 **최대 7.1%**
+    어긋나 있었다(07-27 0.4728 vs 0.5087).
+
+    게다가 아래 upsert 가 '없는 날짜만' 쓰던 탓에 그 값이 **영영 안 고쳐졌다.**
+    kospi_close_raw 가 당한 것과 같은 조합이다(common/timeutil.days_to_sync 참고).
+
+    버리면 오전 실행 시점에 이미 확정된 자료만 쓰게 되므로 **하루 한 번, 쓰는 순간
+    최종값**이다. 오후 실행이 다시 계산해도 같은 숫자라 카드가 안 흔들린다.
+    """
     # 20일 이동 표준편차를 구하려면 start보다 더 이전 데이터가 필요하다.
     fetch_start = start - timedelta(days=VOLATILITY_WINDOW * 3)  # 주말/휴일 감안 여유치
     history = yf.Ticker(FX_TICKER).history(
         start=fetch_start.isoformat(), end=(end + timedelta(days=1)).isoformat()
     )
-    pct_change = history["Close"].pct_change() * 100
+    closes = history["Close"]
+    in_progress = [ts for ts in closes.index if ts.date() >= end]
+    if in_progress:
+        print(f"[yfinance] {FX_TICKER}: {in_progress[-1].date()} 는 아직 진행 중이라 버립니다")
+        closes = closes[[ts.date() < end for ts in closes.index]]
+    pct_change = closes.pct_change() * 100
     rolling_std = pct_change.rolling(window=VOLATILITY_WINDOW).std()
 
     result = {}
@@ -70,27 +93,36 @@ def main() -> None:
         print("[usdkrw_volatility] 계산된 값이 없습니다")
         return
 
+    # '없는 날짜만' 쓰던 것을 **전량 재계산**으로 바꾼다. 형제 스크립트 셋
+    # (fetch_gold_ratio · fetch_asia_relative_strength · fetch_upbit_speculation)이
+    # 이미 그렇게 하고 있었고, 이것만 예외였다. 빈 칸만 채우면 한 번 잘못 들어간 값을
+    # 고칠 경로가 없어서, 장중 환율로 계산된 값이 그대로 굳어 있었다(최대 7.1% 왜곡).
+    # 이제 진행 중인 날을 안 쓰므로 재계산해도 같은 숫자가 나온다 — 즉 평소엔 무해하고,
+    # 과거에 잘못 든 값만 이 실행에서 한 번에 제자리를 찾는다.
     existing = (
         client.table("indicator_values")
-        .select("date")
+        .select("date,raw_value")
         .eq("indicator_id", indicator_id)
         .gte("date", start.isoformat())
         .execute()
     )
-    existing_dates = {row["date"] for row in existing.data}
+    stored = {row["date"]: float(row["raw_value"]) for row in existing.data}
 
-    missing = {d: v for d, v in volatility_series.items() if d not in existing_dates}
-    if not missing:
-        print("[usdkrw_volatility] 백필할 신규 날짜 없음 (이미 최신 상태)")
-    else:
-        rows = [
-            {"indicator_id": indicator_id, "date": d, "raw_value": v}
-            for d, v in missing.items()
-        ]
-        client.table("indicator_values").upsert(
-            rows, on_conflict="indicator_id,date"
-        ).execute()
-        print(f"[Supabase] indicator_values upsert 완료: {len(rows)}건")
+    rows = [
+        {"indicator_id": indicator_id, "date": d, "raw_value": v}
+        for d, v in volatility_series.items()
+    ]
+    client.table("indicator_values").upsert(rows, on_conflict="indicator_id,date").execute()
+    fresh = sum(1 for r in rows if r["date"] not in stored)
+    fixed = sum(
+        1
+        for r in rows
+        if r["date"] in stored and abs(stored[r["date"]] - r["raw_value"]) > 1e-9
+    )
+    print(
+        f"[Supabase] indicator_values upsert 완료: {len(rows)}건 (전량 재계산) "
+        f"— 신규 {fresh}건 · 값이 바뀐 것 {fixed}건"
+    )
 
     latest_date = max(volatility_series)
     print(
