@@ -38,7 +38,29 @@ function gate(req: NextRequest): boolean {
   return want.length === got.length && timingSafeEqual(want, got);
 }
 
-type Call = { host: string; ms: number };
+type Call = { host: string; label: string; ms: number };
+
+/**
+ * 쿼리를 식별하되 **값은 남기지 않는다.** `handle=in.(...)` 같은 필터에는 감시 채널
+ * 핸들이 통째로 들어 있어서(비공개 목록) 그대로 찍으면 응답에 목록이 실린다.
+ * 표 이름·select 컬럼·필터 키와 연산자까지만 남긴다.
+ */
+function label(raw: string): string {
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return "?";
+  }
+  const table = u.pathname.replace("/rest/v1/", "");
+  const parts: string[] = [];
+  for (const [k, v] of u.searchParams) {
+    if (k === "select") parts.push(`select=${v.slice(0, 60)}`);
+    else if (k === "order" || k === "limit") parts.push(`${k}=${v}`);
+    else parts.push(`${k}=${v.split(".")[0]}.…`); // 연산자만, 값은 버린다
+  }
+  return `${table}?${parts.join("&")}`.slice(0, 150);
+}
 
 export async function GET(req: NextRequest) {
   if (!gate(req)) return new Response(null, { status: 404 });
@@ -55,7 +77,7 @@ export async function GET(req: NextRequest) {
       try {
         host = new URL(raw).host;
       } catch {}
-      calls.push({ host, ms: performance.now() - t0 });
+      calls.push({ host, label: host.includes("supabase") ? label(raw) : host, ms: performance.now() - t0 });
     }
   }) as typeof fetch;
 
@@ -100,10 +122,24 @@ export async function GET(req: NextRequest) {
     b.max = Math.max(b.max, c.ms);
   }
 
+  // 같은 쿼리 모양끼리 묶는다 — 68회가 몇 종류인지, 어느 종류가 시간을 먹는지 본다.
+  const byQuery: Record<string, { n: number; total: number; max: number }> = {};
+  for (const c of calls) {
+    if (!c.host.includes("supabase")) continue;
+    const b = (byQuery[c.label] ??= { n: 0, total: 0, max: 0 });
+    b.n += 1;
+    b.total += c.ms;
+    b.max = Math.max(b.max, c.ms);
+  }
+
   return Response.json(
     {
       wallMs: Math.round(performance.now() - wall),
       slowestFirst: marks.sort((a, b) => b.ms - a.ms),
+      topQueries: Object.entries(byQuery)
+        .map(([q, b]) => ({ q, n: b.n, totalMs: Math.round(b.total), maxMs: Math.round(b.max) }))
+        .sort((a, b) => b.totalMs - a.totalMs)
+        .slice(0, 12),
       fetchByHost: Object.fromEntries(
         Object.entries(byHost)
           .map(([h, b]) => [h, { n: b.n, totalMs: Math.round(b.total), maxMs: Math.round(b.max) }])
