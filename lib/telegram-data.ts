@@ -76,9 +76,7 @@ export const STOCK_CHART_DAYS = 7;
  */
 type PagedQuery<T> = {
   order(column: string): {
-    // count 는 select(cols, { count: "exact" }) 를 켠 호출부에서만 온다. 안 켜면 undefined 고,
-    // fetchAllRows 는 그 경우 예전처럼 순차로 이어 받는다(느릴 뿐 결과는 같다).
-    range(from: number, to: number): PromiseLike<{ data: T[] | null; count?: number | null }>;
+    range(from: number, to: number): PromiseLike<{ data: T[] | null }>;
   };
 };
 
@@ -103,61 +101,17 @@ type PagedQuery<T> = {
  * 자리를 없앤다. 넘길 값은 유일 키여야 하고, telegram_* 표는 전부 `id`(uuid PK)다.
  *
  * 결과 순서는 이제 orderKey 순이다. 순서에 기대는 소비자는 직접 정렬할 것.
- *
- * **[3] 순차로 이어 받으면 그게 곧 페이지 지연이 된다** (2026-07-30)
- *
- * 예전엔 한 페이지를 받아야 다음을 요청하는 for 루프였다. 그 사이 `telegram_stock_daily`
- * 의 14일 창이 **7,411행**까지 자라서, `getSurgingStocks` 는 시작하자마자 왕복 8번을
- * 줄줄이 기다렸다. 프로덕션 계측에서 이 함수가 606~1,151ms 로 페이지 임계경로 1~2위였고,
- * 실 DB 대조 실측이 정확히 그 값이다 — **순차 8회 609~1,100ms vs 병렬 8회 138~181ms
- * (같은 7,411행, 4.4~6.1배)**.
- *
- * 그래서 첫 페이지만 혼자 받고 나머지는 병렬로 받는다. 1,000행 이하인 호출부는 첫 줄에서
- * 끝나 예전과 왕복 수가 같다(헛요청 없음). 범위 밖 페이지는 58~77ms 짜리 빈 응답이고
- * 병렬이라 지연을 늘리지 않는다.
- *
- * ⚠️ 병렬로 바꾸면 위 **[2] 가 더 중요해진다.** 순차일 땐 그나마 요청 사이에 표가 안
- * 변하길 기대할 수 있었지만, 이제는 페이지들이 정말 동시에 날아간다. 정렬 키가 유일해야
- * 범위가 겹치거나 빠지지 않는다는 전제는 그대로이고, 그래서 orderKey 는 여전히 필수 인자다.
- *
- * 돈으로 살 수 있는 문제가 아니었다는 점도 적어 둔다 — 위 4.4~6.1배는 **같은 Supabase
- * 인스턴스**에서 난 차이다. 상위 플랜은 왕복 한 번을 빠르게 할 뿐 8번을 1번으로 만들지 못한다.
  */
 async function fetchAllRows<T>(orderKey: string, build: () => PagedQuery<T>): Promise<T[]> {
   const PAGE = 1000;
-  const page = (n: number) => build().order(orderKey).range(n * PAGE, n * PAGE + PAGE - 1);
-
-  const first = await page(0);
-  const out = [...(first.data ?? [])];
-  if (out.length < PAGE) return out; // 1,000행 이하 — 예전과 똑같이 왕복 한 번으로 끝난다
-
-  // 첫 응답이 총 행 수를 같이 실어 온다(select 의 count:"exact"). 남은 페이지 수를 정확히
-  // 알기 때문에 **그만큼만** 병렬로 받는다 — 헛요청이 없고 왕복 총수는 순차 때와 같다.
-  // count 를 안 켠 호출부는 known 이 PAGE 라 이 블록을 건너뛰고 아래 순차 루프만 돈다:
-  // 느릴 뿐 결과는 같다(새 호출부가 count 를 잊어도 조용히 틀리지 않는다).
-  const known = first.count ?? PAGE;
-  let next = 1;
-  if (known > PAGE) {
-    const rest = await Promise.all(
-      Array.from({ length: Math.ceil(known / PAGE) - 1 }, (_, i) => page(i + 1).then((r) => r.data ?? [])),
-    );
-    for (const rows of rest) {
-      out.push(...rows);
-      if (rows.length < PAGE) return out; // 짧은 페이지 뒤는 반드시 비어 있다
-    }
-    next = Math.ceil(known / PAGE);
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data } = await build().order(orderKey).range(from, from + PAGE - 1);
+    if (!data?.length) break;
+    out.push(...data);
+    if (data.length < PAGE) break;
   }
-
-  // 첫 요청과 나머지 사이에 행이 늘었을 수 있다(파이프라인이 쓰는 중이면). 마지막 페이지가
-  // 꽉 찬 채로 여기 오면 더 있다는 뜻이라, 짧은 페이지가 나올 때까지 마저 받는다 —
-  // '짧은 페이지를 볼 때까지 멈추지 않는다'는 예전 보장을 그대로 유지한다.
-  for (;;) {
-    const { data } = await page(next);
-    const rows = data ?? [];
-    out.push(...rows);
-    if (rows.length < PAGE) return out;
-    next += 1;
-  }
+  return out;
 }
 
 /**
@@ -228,7 +182,7 @@ export async function getTelegramSummary(): Promise<TelegramSummary> {
   // 보여 이 카드의 세 줄이 함께 낮아진다 — 조용히 틀리는 쪽이라 페이징해 읽는다.
   const chans = await fetchAllRows<{ handle: string; subscriber_count: number | null; channel_id: number | null; access_hash: number | null }>(
     "id",
-    () => db.from("telegram_channels").select("id,handle,subscriber_count,channel_id,access_hash", { count: "exact" }).eq("is_active", true),
+    () => db.from("telegram_channels").select("id,handle,subscriber_count,channel_id,access_hash").eq("is_active", true),
   );
   // 수집 대상의 정의를 fetch_telegram.py 와 **한 글자도 다르지 않게** 맞춘다 —
   // 그쪽은 channel_id·access_hash 가 둘 다 있는 채널만 열고 나머지는 건너뛴다.
@@ -313,7 +267,7 @@ async function loadStockDaily(days: number): Promise<{ rows: DailyRow[]; dates: 
   const data = await fetchAllRows<DailyRow>("id", () =>
     db
       .from("telegram_stock_daily")
-      .select("stock_code,date,weighted_score,mention_count,channel_count", { count: "exact" })
+      .select("stock_code,date,weighted_score,mention_count,channel_count")
       .gte("date", daysAgoISO(days).slice(0, 10)),
   );
   // 오늘은 아직 하루가 덜 차서 일평균·추이를 왜곡한다 — 완료된 날만 쓴다.
@@ -347,10 +301,10 @@ const channelMeta = cache(
     // handle 은 unique 라 페이징 정렬 키로 안전하다(fetchAllRows 주석의 함정 [2]).
     const [rows, havePhoto] = await Promise.all([
       fetchAllRows<{ handle: string; title: string | null }>("handle", () =>
-        db.from("telegram_channels").select("handle,title", { count: "exact" }),
+        db.from("telegram_channels").select("handle,title"),
       ),
       fetchAllRows<{ handle: string }>("handle", () =>
-        db.from("telegram_channels").select("handle", { count: "exact" }).not("photo", "is", null),
+        db.from("telegram_channels").select("handle").not("photo", "is", null),
       ),
     ]);
     const withPhoto = new Set(havePhoto.map((c) => c.handle));
@@ -700,7 +654,7 @@ export async function getTrendingMessages(
     () =>
       db
         .from("telegram_message_stocks")
-        .select("channel_handle,message_id,stock_code", { count: "exact" })
+        .select("channel_handle,message_id,stock_code")
         .in("message_id", top.map((m) => m.messageId)),
   );
 
@@ -761,7 +715,7 @@ async function recentChannelCount(code: string, from: string, to: string): Promi
       .from("telegram_message_stocks")
       // !inner() 의 빈 괄호 — 조인은 걸되 메시지 쪽 컬럼은 하나도 안 받는다.
       // posted_at 은 거르는 데만 쓰고 결과엔 필요 없어서, 행마다 딸려 오지 않게 한다.
-      .select("channel_handle,telegram_messages!inner()", { count: "exact" })
+      .select("channel_handle,telegram_messages!inner()")
       .eq("stock_code", code)
       // 아래 위아래 경계를 둘 다 건다. 예전엔 하한만(rolling N일) 걸어서 **오늘이 섞였다** —
       // 막대 차트와 언급 수는 오늘을 빼고 그리는데 채널 수만 오늘을 포함해, 한 줄에 적힌
@@ -893,7 +847,7 @@ async function themeStocks(windowDates: string[]): Promise<Map<string, ThemeStoc
 
   // 창이 3일이라 지금은 1000행에 못 미치지만, 추출 종목이 늘면 조용히 잘린다 — 페이징한다.
   const daily = await fetchAllRows<{ stock_code: string; mention_count: number; weighted_score: number }>("id", () =>
-    db.from("telegram_stock_daily").select("stock_code,mention_count,weighted_score", { count: "exact" }).in("date", windowDates),
+    db.from("telegram_stock_daily").select("stock_code,mention_count,weighted_score").in("date", windowDates),
   );
 
   const agg = new Map<string, Map<string, { m: number; w: number }>>();
@@ -1066,7 +1020,7 @@ export async function getChannelRanking(limit = 50): Promise<ChannelRank[]> {
   }>("id", () =>
     db
       .from("telegram_channel_stats")
-      .select("channel_handle,date,subscriber_count,influence_score,view_rate,is_growing", { count: "exact" })
+      .select("channel_handle,date,subscriber_count,influence_score,view_rate,is_growing")
       .not("influence_score", "is", null)
       .gte("date", daysAgoISO(14).slice(0, 10)),
   );
@@ -1160,7 +1114,7 @@ export async function getRisingChannels(limit = 10): Promise<RisingChannel[]> {
     () =>
       db
         .from("telegram_channel_stats")
-        .select("channel_handle,date,subscriber_count", { count: "exact" })
+        .select("channel_handle,date,subscriber_count")
         .gte("date", daysAgoISO(8).slice(0, 10)),
   );
 
@@ -1483,7 +1437,7 @@ async function computeIssueKeywords(limit: number): Promise<IssueKeyword[]> {
     () =>
       db
         .from("telegram_keyword_daily")
-        .select("date,keyword,mention_count", { count: "exact" })
+        .select("date,keyword,mention_count")
         .gte("date", daysAgoISO(14).slice(0, 10)),
   );
   if (!data.length) return [];
