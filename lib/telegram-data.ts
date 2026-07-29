@@ -1,5 +1,8 @@
 import "server-only";
 
+import { cache } from "react";
+
+import { channelPhotoUrl } from "@/lib/channel-photo";
 import { sentimentTone } from "@/lib/format";
 import { THEMES } from "@/lib/stock-themes";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
@@ -275,34 +278,42 @@ async function loadStockDaily(days: number): Promise<{ rows: DailyRow[]; dates: 
 }
 
 /**
- * 채널 핸들→(제목, 사진). photo 컬럼이 아직 없는 환경(마이그레이션 016 이전)에서도 안 깨지게 폴백.
+ * 채널 핸들→(제목, 사진 주소).
  *
- * photo 는 base64 data URI(건당 ~12KB)라 전 채널을 다 읽으면 채널이 317개인 지금
- * 한 번에 3.6MB가 되고, 이 함수는 카드마다 불린다. 화면에 실제로 그리는 채널은
- * 10~20개뿐이므로 필요한 핸들만 넘길 것(안 넘기면 종전대로 전체를 읽는다).
+ * **photo 컬럼(base64 data URI)은 여기서 절대 읽지 않는다.** 건당 ~12KB 라 화면에 쓰는
+ * 60개만 읽어도 응답이 733KB 였고, 이 함수는 카드마다 불려서 그게 페이지 한 장에
+ * 예닐곱 번 반복됐다. 사진 바이트는 /api/channel-photo 가 따로 내주고(캐시가 먹는다)
+ * 여기서는 그 주소만 만든다 — 자세한 사정은 lib/channel-photo.ts 주석 참고.
+ *
+ * 사진이 없는 채널(현재 317개 중 19개)은 주소 대신 null 을 줘서 화면이 이니셜
+ * 아바타로 폴백하게 한다. 그 판별에 필요한 건 '있다/없다' 뿐이라 핸들만 받아 온다.
+ *
+ * 컬럼을 안 읽으니 전 채널을 통째로 받아도 10KB 남짓이다. 그래서 핸들로 거르는 대신
+ * 요청당 한 번만 읽고 React cache 로 돌려 쓴다 — 카드 5~7장이 각자 하던 왕복이
+ * 두 번으로 줄고, 호출부는 무엇을 그릴지 정하기 전에 불러도 손해가 없다.
+ *
+ * 마이그레이션 016 이전 환경(photo 컬럼 없음)에서는 사진 쿼리가 에러 → 빈 집합이 되어
+ * 전부 이니셜 아바타로 떨어진다. 제목은 그대로 나온다.
  */
-async function channelMeta(
-  handles?: string[],
-): Promise<{ titleOf: Map<string, string>; photoOf: Map<string, string | null> }> {
-  const db = getSupabaseAdmin();
-  const only = handles ? [...new Set(handles)] : null;
-  const pick = (cols: string) => {
-    const q = db.from("telegram_channels").select(cols);
-    return only ? q.in("handle", only) : q;
-  };
-  let rows: { handle: string; title: string | null; photo?: string | null }[] = [];
-  const withPhoto = await pick("handle,title,photo");
-  if (withPhoto.error) {
-    const basic = await pick("handle,title");
-    rows = (basic.data ?? []) as unknown as typeof rows;
-  } else {
-    rows = (withPhoto.data ?? []) as unknown as typeof rows;
-  }
-  return {
-    titleOf: new Map(rows.map((c) => [c.handle, c.title ?? c.handle])),
-    photoOf: new Map(rows.map((c) => [c.handle, c.photo ?? null])),
-  };
-}
+const channelMeta = cache(
+  async (): Promise<{ titleOf: Map<string, string>; photoUrlOf: Map<string, string | null> }> => {
+    const db = getSupabaseAdmin();
+    // handle 은 unique 라 페이징 정렬 키로 안전하다(fetchAllRows 주석의 함정 [2]).
+    const [rows, havePhoto] = await Promise.all([
+      fetchAllRows<{ handle: string; title: string | null }>("handle", () =>
+        db.from("telegram_channels").select("handle,title"),
+      ),
+      fetchAllRows<{ handle: string }>("handle", () =>
+        db.from("telegram_channels").select("handle").not("photo", "is", null),
+      ),
+    ]);
+    const withPhoto = new Set(havePhoto.map((c) => c.handle));
+    return {
+      titleOf: new Map(rows.map((c) => [c.handle, c.title ?? c.handle])),
+      photoUrlOf: new Map(rows.map((c) => [c.handle, withPhoto.has(c.handle) ? channelPhotoUrl(c.handle) : null])),
+    };
+  },
+);
 
 async function nameMap(codes: string[]): Promise<Map<string, string>> {
   if (!codes.length) return new Map();
@@ -553,7 +564,7 @@ export type TrendingMessage = {
   channelHandle: string;
   messageId: number;
   channelTitle: string;
-  channelPhoto: string | null;
+  channelPhotoUrl: string | null; // /api/channel-photo/... (사진이 없는 채널은 null)
   text: string;
   views: number;
   forwards: number;
@@ -613,14 +624,14 @@ export async function getTrendingMessages(
     .limit(200);
   if (!msgs?.length) return [];
 
-  const { titleOf, photoOf } = await channelMeta(msgs.map((m) => m.channel_handle));
+  const { titleOf, photoUrlOf } = await channelMeta();
 
   const top = msgs
     .map((m) => ({
       channelHandle: m.channel_handle,
       messageId: m.message_id as number,
       channelTitle: titleOf.get(m.channel_handle) ?? m.channel_handle,
-      channelPhoto: photoOf.get(m.channel_handle) ?? null,
+      channelPhotoUrl: photoUrlOf.get(m.channel_handle) ?? null,
       text: (m.text ?? "").replace(/\s+/g, " ").trim(),
       views: m.views ?? 0,
       forwards: m.forwards ?? 0,
@@ -959,7 +970,7 @@ export async function getThemeRotation(limit = 10): Promise<ThemeRotation[]> {
 export type ChannelRank = {
   handle: string;
   title: string;
-  photo: string | null;
+  photoUrl: string | null;
   rankChange: number | null; // 주간 순위 변동(+면 상승). 비교할 과거 스냅샷이 없으면 null
   subscriberCount: number | null;
   influenceScore: number;
@@ -1059,15 +1070,15 @@ export async function getChannelRanking(limit = 50): Promise<ChannelRank[]> {
   const prevRanks = comparable ? prevAll : null;
 
   // 순위는 전 채널로 매기고(위 currRanks/prevRanks), 내려보내는 목록만 자른다.
-  // 카드는 10개씩 '더보기'로 펼치는데, 자르지 않으면 317개 행이 사진(건당 ~12KB)까지
-  // 달려 페이지 payload에 통째로 실린다.
+  // 카드는 10개씩 '더보기'로 펼치는데, 자르지 않으면 317개 행이 통째로 페이지
+  // payload에 실린다(사진이 인라인이던 시절엔 그게 행마다 ~12KB씩이었다).
   const ranked = [...latest.values()].sort(byScore).slice(0, limit);
-  const { titleOf, photoOf } = await channelMeta(ranked.map((r) => r.channel_handle));
+  const { titleOf, photoUrlOf } = await channelMeta();
 
   return ranked.map((r) => ({
     handle: r.channel_handle,
     title: titleOf.get(r.channel_handle) ?? r.channel_handle,
-    photo: photoOf.get(r.channel_handle) ?? null,
+    photoUrl: photoUrlOf.get(r.channel_handle) ?? null,
     rankChange:
       prevRanks && prevRanks.has(r.channel_handle) && currRanks.has(r.channel_handle)
         ? (prevRanks.get(r.channel_handle) as number) - (currRanks.get(r.channel_handle) as number)
@@ -1082,7 +1093,7 @@ export async function getChannelRanking(limit = 50): Promise<ChannelRank[]> {
 export type RisingChannel = {
   handle: string | null;
   title: string;
-  photo: string | null;
+  photoUrl: string | null;
   subscriberCount: number;
   delta7d: number;
   isPlaceholder: boolean; // true=정원을 채우려 복제한 행
@@ -1146,13 +1157,11 @@ export async function getRisingChannels(limit = 10): Promise<RisingChannel[]> {
   // 지금은 모니터링 채널이 12개뿐이라 "늘어난 곳"만 세면 8개 안팎에서 멈춘다 —
   // 시트에 채널이 늘면 이 보충분은 자연히 밀려나 사라진다.
   const top = [...real, ...flat].slice(0, limit);
-  // 제목·사진은 여기서 자른 뒤에 읽는다 — 스냅샷이 있는 전 채널(수백 개)의 base64
-  // 사진을 먼저 끌어오면 화면에 쓰는 건 이 10개뿐인데 수 MB를 낭비한다.
-  const { titleOf, photoOf } = await channelMeta(top.map((t) => t.handle));
+  const { titleOf, photoUrlOf } = await channelMeta();
   const filled: RisingChannel[] = top.map((t) => ({
     handle: t.handle,
     title: titleOf.get(t.handle) ?? t.handle,
-    photo: photoOf.get(t.handle) ?? null,
+    photoUrl: photoUrlOf.get(t.handle) ?? null,
     subscriberCount: t.subscriberCount,
     delta7d: t.delta,
     isPlaceholder: false,
@@ -1165,7 +1174,7 @@ export async function getRisingChannels(limit = 10): Promise<RisingChannel[]> {
     filled.push({
       handle: null,
       title: "",
-      photo: null,
+      photoUrl: null,
       subscriberCount: 0,
       delta7d: 0,
       isPlaceholder: true,

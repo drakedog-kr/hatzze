@@ -139,8 +139,18 @@ export function QuoteDate({ date, style }: { date: string | null; style?: React.
   );
 }
 
-/** 채널 프로필 사진. 없으면 첫 글자 이니셜 아바타로 폴백. */
-export function Avatar({ photo, title, size = 30 }: { photo: string | null; title: string; size?: number }) {
+/**
+ * 채널 프로필 사진. 없으면 첫 글자 이니셜 아바타로 폴백.
+ *
+ * src 는 /api/channel-photo/... 주소다(lib/channel-photo.ts). base64 data URI 를 그대로
+ * 받던 시절엔 같은 사진이 페이지에 최대 세 번씩 박혀 HTML 의 74%가 아바타였다.
+ *
+ * loading="lazy" 가 중요하다 — 트렌딩 메시지는 탭 세 벌이 다 그려져 있고 채널 랭킹은
+ * '더보기'로 접혀 있어, 첫 화면에 실제로 보이는 아바타는 전체의 3분의 1도 안 된다.
+ * 나머지는 눈에 들어올 때 받는다. width/height 를 속성으로도 주는 건 사진이 도착하기
+ * 전에도 자리를 잡아 두라는 뜻이다(줄이 밀리지 않는다).
+ */
+export function Avatar({ photoUrl, title, size = 30 }: { photoUrl: string | null; title: string; size?: number }) {
   const common: React.CSSProperties = {
     width: size,
     height: size,
@@ -149,7 +159,22 @@ export function Avatar({ photo, title, size = 30 }: { photo: string | null; titl
     objectFit: "cover",
     border: `1px solid ${C.line}`,
   };
-  if (photo) return <img src={photo} alt="" style={common} />;
+  // 사진이 도착하기 전에는 이니셜 아바타와 같은 회색 원으로 자리를 지킨다. 배경이
+  // 없으면 그동안 테두리만 남아 빈 링으로 보인다 — 사진이 HTML 에 박혀 있던 시절엔
+  // 없던 순간이라, 빠르게 스크롤해 내려갈 때만 잠깐 스친다. 아래 폴백과 같은 C.track
+  // 을 깔아 두면 그 순간이 '아직 안 온 사진'이 아니라 '원래 그 자리'로 읽힌다.
+  if (photoUrl)
+    return (
+      <img
+        src={photoUrl}
+        alt=""
+        width={size}
+        height={size}
+        loading="lazy"
+        decoding="async"
+        style={{ ...common, background: C.track }}
+      />
+    );
   return (
     <span
       style={{
