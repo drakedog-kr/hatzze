@@ -350,6 +350,25 @@ body {
   .hz-shimmer { animation: none; }
 }
 
+/* 로딩 스피너 — 자리표시자와 **함께** 쓴다. 블록이 은은하게 깜빡이는 것만으로는
+   "멈춘 건지 오는 중인지"가 덜 분명해서, 도는 표시를 하나 얹는다.
+   GIF 가 아니라 CSS 인 이유: 테마 변수를 그대로 타서 라이트·다크가 자동으로 맞고
+   (회색 GIF 는 다크에서 뜬다), 로딩 화면에서 이미지 요청이 하나 더 나가지 않는다. */
+@keyframes hz-spin { to { transform: rotate(360deg); } }
+.hz-spinner {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid var(--c-line);
+  border-top-color: var(--c-blue);
+  animation: hz-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* shimmer 처럼 아예 멈추면 테두리 한쪽만 파란 원이 남아 고장으로 보인다 — 늦춘다. */
+  .hz-spinner { animation-duration: 2.4s; }
+}
+
 /* 본문은 세로로만 스크롤한다. overflow-y 만 auto 로 주면 overflow-x 는 visible 이
    auto 로 계산돼(한 축이 auto 면 다른 축의 visible 은 auto 가 된다) 가로 스크롤바가
    생길 수 있다. 실제로 그걸 만드는 건 **투명한 툴팁**이다 — .hz-tip::after 는
