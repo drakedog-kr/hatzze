@@ -840,12 +840,16 @@ export default async function KaderaPage() {
 
         {/* ③ 채널 파워 랭킹 (½) */}
         <div className="hz-c2" style={{ ...cardStyle, display: "flex", flexDirection: "column" }}>
+          {/* ▲▼ 배지가 며칠을 견주는지는 noteHelp 한 줄로만 밝힌다. 제목 옆에 "3일 기준"
+              알약을 하나 더 붙이면, 옆 카드인 "뜨는 채널"("최근 7일")과 나란히 놓여
+              카드마다 기간 딱지가 늘어선 줄로 보인다. 일수는 lib/telegram-data.ts 의
+              RANK_COMPARE_DAYS 와 맞춰야 한다. */}
           <SectionHead
             icon="military_tech"
             title="채널 파워 랭킹"
             note="영향력 점수"
             desc="조회율·확산력까지 반영한 채널 영향력"
-            noteHelp="조회율·포워드율·구독자 규모·게시 빈도를 합쳐 52~100으로 낸 점수입니다. 구독자만 많고 안 읽히는 채널은 낮게 나옵니다."
+            noteHelp="조회율·포워드율·구독자 규모·게시 빈도를 합쳐 52~100으로 낸 점수입니다. 구독자만 많고 안 읽히는 채널은 낮게 나옵니다. ▲▼ 는 3일 전 순위와 견준 것입니다."
           />
           {channels.length === 0 ? (
             <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 채널 점수가 없습니다.</p>
