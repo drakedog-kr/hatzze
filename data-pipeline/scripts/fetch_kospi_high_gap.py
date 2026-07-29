@@ -98,7 +98,10 @@ def backfill_raw_prices(client, raw_indicator_id: str) -> None:
 
     # KRX 때와 달리 날짜마다 부르지 않는다. 한 번에 기간 전체를 받아 놓고 필요한 날짜만
     # 꺼내 쓴다(요청 N회 → 2회). 그래서 REQUEST_DELAY_SEC 도 없어졌다.
-    prices = fetch_index_close_series(YAHOO_SYMBOL, BACKFILL_DAYS, today)
+    # existing_dates 를 넘기는 이유는 시간봉 폴백이 **이미 있는 날짜를 근사치로 덮어쓰지
+    # 못하게** 하기 위해서다(yahoo_client 의 ② 주석). 안 넘기면 저녁이 받아 둔 정확한
+    # 종가를 다음 날 아침이 되돌린다.
+    prices = fetch_index_close_series(YAHOO_SYMBOL, BACKFILL_DAYS, today, known=existing_dates)
     print(f"[야후] 대상 {len(target_days)}일 · 응답 종가 {len(prices)}일치")
 
     new_rows = [
