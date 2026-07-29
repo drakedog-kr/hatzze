@@ -142,7 +142,7 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
           {/* 보낸 채널 */}
           <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
             <span style={{ ...rankNum, width: 13, fontSize: 11, color: i < 3 ? C.hot : C.faint }}>{i + 1}</span>
-            <Avatar photo={m.channelPhoto} title={m.channelTitle} size={22} />
+            <Avatar photoUrl={m.channelPhotoUrl} title={m.channelTitle} size={22} />
             <b style={{ ...clip, fontSize: 12, fontWeight: 600, color: C.blue }}>{m.channelTitle}</b>
             <span style={{ marginLeft: "auto", fontSize: 10.5, fontFamily: MONO, color: C.faint, whiteSpace: "nowrap" }}>
               {timeAgo(m.postedAt)}
@@ -273,7 +273,7 @@ export default async function KaderaPage() {
         data-ga-rank={i + 1}
       >
         <span style={{ ...rankNum, color: i < 3 ? C.blue : C.faint }}>{i + 1}</span>
-        <Avatar photo={c.photo} title={c.title} />
+        <Avatar photoUrl={c.photoUrl} title={c.title} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ ...clip, fontWeight: 600, fontSize: 14, color: C.ink }}>{c.title}</div>
           <div style={{ ...clip, marginTop: 2, fontSize: 11, fontFamily: MONO, color: C.muted }}>
@@ -888,7 +888,7 @@ export default async function KaderaPage() {
               const body = (
                 <>
                   <span style={{ ...rankNum, width: 14, fontSize: 11 }}>{i + 1}</span>
-                  <Avatar photo={r.photo} title={r.title} size={26} />
+                  <Avatar photoUrl={r.photoUrl} title={r.title} size={26} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ ...clip, fontWeight: 600, fontSize: 13, color: C.ink }}>{r.title}</div>
                     <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6, marginTop: 2 }}>
