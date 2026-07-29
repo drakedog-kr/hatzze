@@ -79,8 +79,29 @@ INDICATOR_META = {
 }
 
 
-def fetch_upbit_candles(min_days: int) -> dict[str, dict]:
-    """날짜(YYYY-MM-DD) -> {"close": KRW 종가, "trade_value": 24h 거래대금(KRW)}."""
+def fetch_upbit_candles(min_days: int, today: date) -> dict[str, dict]:
+    """날짜(YYYY-MM-DD) -> {"close": KRW 종가, "trade_value": 24h 거래대금(KRW)}.
+
+    ⚠️ **업비트 일봉의 하루는 09:00 KST 에 시작한다.** 자정이 아니다. 응답을 보면
+    `candle_date_time_utc=2026-07-29T00:00:00` ↔ `candle_date_time_kst=2026-07-29T09:00:00`
+    이라, 우리가 붙이는 "2026-07-29" 라벨은 실제로 **09:00 KST 7/29 ~ 09:00 KST 7/30**
+    구간이다. (그래서 KST 문자열의 앞 10글자는 곧 UTC 날짜와 같고, 아래 `today` 비교도
+    UTC 날짜인 `date.today()` 로 맞아떨어진다.)
+
+    그 라벨의 캔들은 **오전 실행(10:45 KST) 시점에 겨우 1시간 45분치**다. 그런데
+    `compute_volume_surge` 는 그걸 하루치 30일 평균과 나눈다. 2026-07-29 실측:
+
+        아침 실행이 저장한 급증도  10.8   (1.75시간치)
+        같은 날 17:40 시점         68.0   (8.7시간치)
+        하루가 다 찬 뒤(어제)     118.1
+
+    10.8 → 거래대금 과열도 0 → 김프가 역프면 **종합 0.00pt**. 화면이 "0/100 · 거래량
+    강도 LOW" 를 띄웠는데 실제로는 어제와 비슷한 거래가 도는 날이었다. 전량 재계산이라
+    다음 날 아침에 고쳐지긴 하지만, 그날 하루는 지표가 통째로 바닥에 눕는다.
+
+    그래서 **진행 중인 라벨(오늘)은 아예 빼고** 완결된 24시간만 쓴다. 지표가 하루 뒤로
+    물러서는 대신 매일 같은 크기의 창을 잰다.
+    """
     candles: dict[str, dict] = {}
     to_param: str | None = None
 
@@ -97,6 +118,8 @@ def fetch_upbit_candles(min_days: int) -> dict[str, dict]:
 
         for candle in page:
             d = candle["candle_date_time_kst"][:10]
+            if d >= today.isoformat():
+                continue  # 진행 중인 라벨 — 위 주석
             candles[d] = {
                 "close": float(candle["trade_price"]),
                 "trade_value": float(candle["candle_acc_trade_price"]),
@@ -115,7 +138,34 @@ def fetch_yf_close(ticker: str, start: date, end: date) -> dict[str, float]:
     history = yf.Ticker(ticker).history(
         start=start.isoformat(), end=(end + timedelta(days=1)).isoformat()
     )
-    return {ts.date().isoformat(): float(close) for ts, close in history["Close"].items()}
+    prices = {}
+    for ts, close in history["Close"].items():
+        d = ts.date()
+        if d >= end:
+            continue  # 진행 중인 오늘 바 — fetch_upbit_candles 주석과 같은 이유
+        prices[d.isoformat()] = float(close)
+    return prices
+
+
+def forward_fill(prices: dict[str, float], dates: list[str]) -> dict[str, float]:
+    """빠진 날짜를 **직전 값으로** 메운다. 환율의 주말 구멍 때문에 필요하다.
+
+    `common_dates` 가 업비트 ∩ BTC-USD ∩ USD/KRW 인데 **환율에는 토·일 봉이 없다.**
+    그래서 주말이 교집합에서 통째로 빠졌고, 한 번 들어간 주말 행은 다시 계산되지
+    않아 **영구히 낡은 채로** 남았다. 실측(2026-07-29): 07-25(토) 저장 19.5 vs
+    정상 36.1 · 07-26(일) 저장 30.1 vs 정상 47.7. 평일은 전량 재계산이 돌아 전부
+    정확했는데 주말만 이 구멍에 빠져 있었다.
+
+    코인은 주말에도 거래되니 지표가 주말에 비는 것 자체가 어색하다. 환율은 금요일
+    종가가 월요일 개장까지 유효한 값이므로, 그걸 끌어다 쓰는 게 맞다.
+    """
+    out, last = {}, None
+    for d in dates:
+        if d in prices:
+            last = prices[d]
+        if last is not None:
+            out[d] = last
+    return out
 
 
 def compute_volume_surge(upbit_candles: dict[str, dict]) -> dict[str, float]:
@@ -140,12 +190,19 @@ def main() -> None:
     today = date.today()
     start = today - timedelta(days=BACKFILL_DAYS)
 
-    upbit_candles = fetch_upbit_candles(BACKFILL_DAYS + VOLUME_WINDOW + 5)
-    print(f"[Upbit] {UPBIT_MARKET} 일별 캔들 {len(upbit_candles)}건 조회")
+    upbit_candles = fetch_upbit_candles(BACKFILL_DAYS + VOLUME_WINDOW + 5, today)
+    print(f"[Upbit] {UPBIT_MARKET} 일별 캔들 {len(upbit_candles)}건 조회 (진행 중인 오늘 제외)")
 
     btc_usd = fetch_yf_close(BTC_USD_TICKER, start, today)
-    usd_krw = fetch_yf_close(USD_KRW_TICKER, start, today)
-    print(f"[yfinance] {BTC_USD_TICKER} {len(btc_usd)}건, {USD_KRW_TICKER} {len(usd_krw)}건 조회")
+    usd_krw_raw = fetch_yf_close(USD_KRW_TICKER, start, today)
+    # 코인은 주말에도 거래되는데 환율은 토·일 봉이 없다. 금요일 종가를 끌어와 메운다
+    # (forward_fill 주석 참고) — 안 하면 주말이 교집합에서 빠져 영구히 낡은 채 남는다.
+    usd_krw = forward_fill(usd_krw_raw, sorted(btc_usd))
+    weekend_filled = len(usd_krw) - len(usd_krw_raw)
+    print(
+        f"[yfinance] {BTC_USD_TICKER} {len(btc_usd)}건, "
+        f"{USD_KRW_TICKER} {len(usd_krw_raw)}건 (주말 등 {weekend_filled}일은 직전 종가로 메움)"
+    )
 
     volume_surge = compute_volume_surge(upbit_candles)
     print(f"[upbit_speculation_index] 거래대금 급증도 {len(volume_surge)}건 계산")
