@@ -49,6 +49,14 @@ export default function Loading() {
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: C.ink, letterSpacing: "-0.01em" }}>카더라 리포트</h1>
           <div style={{ height: 1, flex: 1, background: C.line }} />
+          {/* 스켈레톤만 두면 "멈춘 건지 오는 중인지"가 덜 분명하다. 내용이 오기까지
+              0.7~1.1초가 더 걸리므로(프로덕션 실측) 도는 표시를 같이 둔다. 자리는
+              제목 줄 오른쪽 끝 — 카드 영역을 가리지 않고, 눈이 제목을 읽은 뒤 자연히
+              닿는 곳이다. */}
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
+            <span className="hz-spinner" />
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: C.muted, whiteSpace: "nowrap" }}>불러오는 중</span>
+          </span>
         </div>
         <p style={{ margin: "8px 0 0", fontSize: 14, lineHeight: 1.7, color: C.sub }}>
           한국 주식 텔레그램 채널들이 <b style={{ color: C.ink }}>지금 무엇에 주목하는지</b>를 모아 보여줍니다.
