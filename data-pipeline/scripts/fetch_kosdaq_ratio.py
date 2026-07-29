@@ -44,7 +44,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
-from common.timeutil import days_to_backfill, today_kst  # noqa: E402
+from common.timeutil import days_to_sync, today_kst  # noqa: E402
 from common.yahoo_client import fetch_index_close_series  # noqa: E402
 
 YAHOO_SYMBOL = "^KQ11"
@@ -89,24 +89,26 @@ def get_indicator_values(client, indicator_id: str, start: date) -> dict[str, fl
 
 
 def backfill_kosdaq_closes(client, raw_indicator_id: str) -> None:
-    """아직 없는 영업일의 코스닥 종가만 받아 채운다(kospi_close_raw와 같은 패턴)."""
+    """코스닥 종가를 받아 채운다(kospi_close_raw와 같은 패턴 · 같은 헬퍼)."""
     # 야후 일봉은 KST 날짜로 떨어지므로 '오늘'도 KST 로 센다(fetch_kospi_high_gap 과 동일).
     today = today_kst()
     start = today - timedelta(days=BACKFILL_DAYS)
     existing = set(get_indicator_values(client, raw_indicator_id, start))
 
-    # 옛 공휴일을 매 실행 다시 물어보지 않도록 최근 창만 훑는다(common/timeutil 참고).
-    missing_days = days_to_backfill(existing, today, bootstrap_days=BACKFILL_DAYS)
-    if not missing_days:
-        print("[야후] 코스닥 종가 백필할 신규 날짜 없음 (이미 최신 상태)")
+    # 빈 칸 + 최근 5영업일 재확인. 코스피 쪽과 같은 이유다 — 07-28 코스닥 종가가 시간봉
+    # 근사치 697.76 으로 들어갔는데 일봉 확정값은 705.85(1.15% 차이)였고, '빈 칸만
+    # 채우기'로는 갈아치울 길이 없었다(common/timeutil.days_to_sync 참고).
+    target_days = days_to_sync(existing, today, bootstrap_days=BACKFILL_DAYS)
+    if not target_days:
+        print("[야후] 코스닥 종가 받을 날짜 없음")
         return
 
     prices = fetch_index_close_series(YAHOO_SYMBOL, BACKFILL_DAYS, today)
-    print(f"[야후] 코스닥 종가 백필 대상 {len(missing_days)}일 · 응답 종가 {len(prices)}일치")
+    print(f"[야후] 코스닥 종가 대상 {len(target_days)}일 · 응답 종가 {len(prices)}일치")
 
     rows = [
         {"indicator_id": raw_indicator_id, "date": d.isoformat(), "raw_value": prices[d.isoformat()]}
-        for d in missing_days
+        for d in target_days
         if d.isoformat() in prices
     ]
 
@@ -114,7 +116,11 @@ def backfill_kosdaq_closes(client, raw_indicator_id: str) -> None:
         client.table("indicator_values").upsert(
             rows, on_conflict="indicator_id,date"
         ).execute()
-    print(f"[야후] 백필 완료: {len(rows)}건 저장 (휴장일 등 {len(missing_days) - len(rows)}건 제외)")
+    fresh = sum(1 for r in rows if r["date"] not in existing)
+    print(
+        f"[야후] 저장 완료: 신규 {fresh}건 · 재확인 {len(rows) - fresh}건 "
+        f"(휴장일 등 {len(target_days) - len(rows)}건 제외)"
+    )
 
 
 def compute_high_gaps(prices: dict[str, float]) -> dict[str, tuple[float, float]]:

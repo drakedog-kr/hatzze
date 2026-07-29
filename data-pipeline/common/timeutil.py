@@ -68,3 +68,36 @@ def days_to_backfill(
     # 최근 recent_days 영업일 — 주말·연휴를 감안해 넉넉한 달력 구간에서 뒤에서 자른다.
     window = list(business_days(today - timedelta(days=recent_days * 3), today))[-recent_days:]
     return [d for d in window if d.isoformat() not in existing_dates]
+
+
+DEFAULT_REFRESH_BUSINESS_DAYS = 5  # 한 주 — 주말 하나와 연휴 하루를 덮는다
+
+
+def days_to_sync(
+    existing_dates: set[str],
+    today: date,
+    *,
+    bootstrap_days: int,
+    refresh_days: int = DEFAULT_REFRESH_BUSINESS_DAYS,
+) -> list[date]:
+    """`days_to_backfill` 의 '빈 칸'에 **최근 refresh_days 영업일**을 더한 목록.
+
+    빈 칸만 채우면 **한 번 잘못 들어간 값이 영영 안 고쳐진다.** 2026-07-29 에 이걸로
+    두 번 데었다.
+
+      · 오전 실행이 야후 일봉의 오늘 칸(=장중 호가)을 종가로 저장했는데, 오후 실행이
+        "이미 있는 날짜"라며 건너뛰어 10:29 의 6076.65 가 그날 종가로 굳었다.
+      · 시간봉으로 메운 07-28 코스닥 697.76 도 마찬가지였다. 일봉이 확정돼
+        705.85(1.15% 차이)가 됐는데도 갈아치울 경로가 없었다.
+
+    둘 다 '조회가 실패했다'가 아니라 '조회가 **덜 익은 값**을 줬다'는 사고다. 소스가
+    나중에 확정하는 값(야후 일봉이 하루쯤 뒤에 채워진다)을 쓰는 한 계속 생긴다. 그래서
+    최근 며칠은 **이미 있어도 다시 받아 덮어쓴다.** 야후 일봉은 한 번의 요청으로 기간
+    전체가 오므로 추가 요청은 0이다.
+
+    ⚠️ 이 창을 없애거나 줄이려면 `yahoo_client.fetch_index_close_series` 의 ②(시간봉)도
+    같이 봐야 한다. ②는 근사치를 주고 여기서 교정되는 것을 전제로 남아 있다.
+    """
+    days = set(days_to_backfill(existing_dates, today, bootstrap_days=bootstrap_days))
+    window = list(business_days(today - timedelta(days=refresh_days * 3), today))
+    return sorted(days | set(window[-refresh_days:]))
