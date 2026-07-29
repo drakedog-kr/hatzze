@@ -34,6 +34,36 @@ const TELEGRAM = {
   icon: "send",
 };
 
+/**
+ * 마우스가 닿은(또는 손가락이 닿은·포커스가 온) 링크만 **전체 프리페치**로 올린다.
+ *
+ * Next 의 기본값은 동적 라우트에서 "가장 가까운 loading 경계까지"만 미리 받는다.
+ * /kadera 는 데이터 가지가 12개라 클릭 시점에야 시작되는 서버 왕복이 0.7~1.5초다
+ * (프로덕션 실측). prefetch 를 켜면 그 왕복이 클릭 **전에** 끝나 있어 즉시 열린다.
+ *
+ * 그런데 `prefetch` 를 항상 켜면 **카더라를 누를 생각이 없는 방문자까지 전원이**
+ * 5분마다 /kadera 풀 렌더(왕복 60회)를 서버에 시킨다. Supabase 지연이 이미 불안정하고
+ * 부하에 민감한 걸 확인한 터라, 사이트 전체를 느리게 만들 수 있는 거래다.
+ * 그래서 **의도를 보인 사람만 비용을 낸다** — 커서가 링크에 닿는 순간 시작한다.
+ *
+ * 한번 켜면 끄지 않는다(목록에 쌓아 둔다). 마우스가 들락날락할 때마다 프리페치가
+ * 껐다 켜지면 그게 더 낭비다.
+ *
+ * prefetch 는 **프로덕션 빌드에서만 동작한다** — `npm run dev` 로는 확인할 수 없고
+ * `npm run build:local` + `start:local`(hatzze-prod) 로 봐야 한다.
+ */
+function useIntentPrefetch() {
+  const [armed, setArmed] = useState<string[]>([]);
+  const arm = (href: string) => setArmed((a) => (a.includes(href) ? a : [...a, href]));
+  return (href: string) => ({
+    // undefined = Next 기본값 유지(경계까지 부분 프리페치). true = 데이터까지 전부.
+    prefetch: armed.includes(href) ? true : undefined,
+    onMouseEnter: () => arm(href),
+    onFocus: () => arm(href),
+    onTouchStart: () => arm(href),
+  });
+}
+
 /** NAV 항목의 현재 페이지 판정. 사이드바와 모바일 탭바가 같은 규칙을 써야 한다. */
 function isActive(href: string, pathname: string) {
   return href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -51,6 +81,7 @@ const STAGE_COLOR: Record<string, string> = {
 type Quote = { label: string; value: string; change: number | null; color?: string };
 
 function Sidebar() {
+  const intentPrefetch = useIntentPrefetch();
   const pathname = usePathname();
   // 로고를 감싸는 태그는 홈에서만 h1이다. 사이드바는 모든 페이지가 공유하는데,
   // 검색엔진은 h1을 그 페이지의 주제로 읽는다. 늘 h1이면 카더라·MDD가 자기 제목이
@@ -88,6 +119,7 @@ function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              {...intentPrefetch(item.href)}
               className={`hz-nav-item${active ? " hz-nav-active" : ""}`}
               style={{
                 display: "flex",
@@ -152,6 +184,7 @@ function Sidebar() {
 // main.hz-scroll 이 자체적으로 하므로, 흐름에 놓으면 마지막 콘텐츠를 덮을 일이 없다
 // (하단 패딩으로 가림을 보정할 필요도 없다).
 function MobileTabBar() {
+  const intentPrefetch = useIntentPrefetch();
   const pathname = usePathname();
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
@@ -178,6 +211,7 @@ function MobileTabBar() {
           <Link
             key={item.href}
             href={item.href}
+            {...intentPrefetch(item.href)}
             className={`hz-tab hz-nav-item${active ? " hz-nav-active" : ""}`}
             aria-current={active ? "page" : undefined}
             style={tabStyle(active)}
