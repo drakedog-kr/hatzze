@@ -55,10 +55,35 @@ def get_indicator_id(client, slug: str) -> str:
 
 
 def fetch_gold_prices(start: date, end: date) -> dict[str, float]:
+    """확정된 금 종가만 돌려준다. **진행 중인 `end` 날짜 바는 버린다.**
+
+    yfinance 의 마지막 일봉은 그날 세션이 끝나기 전이면 `Close` 에 현재가가 앉는다.
+    코스피 일봉과 같은 함정인데(common/yahoo_client.py 참고) 금은 더 오래 열려 있어
+    **오후 실행(~10:50 UTC)에도 그날이 안 끝나 있다.** COMEX 금은 21:00 UTC 마감이다.
+
+    그대로 쓰면 코스피 확정 종가와 금 장중값을 한 비율에 섞는다. 실측으로 그 시각
+    값과 확정 종가의 격차가 11일 평균 0.57% · 최대 1.24% 였다(07-27 은 4,102 →
+    4,074). 전량 재계산이라 다음 날 아침에 저절로 고쳐지긴 했지만, 저녁부터 다음 날
+    오전까지 화면과 방송이 그 값을 들고 있었다.
+
+    버리면 이 지표는 **오전 실행에서 하루 한 번, 전날 확정 종가로** 갱신된다. 오전
+    실행 시각(01:45 UTC)에는 전날 금 세션이 이미 끝나 있으므로(21:00 UTC 마감)
+    받는 즉시 최종값이고, 그날 오후 실행이 다시 계산해도 같은 숫자다.
+
+    ⚠️ 대신 이 카드는 코스피 카드보다 **한 거래일 뒤**에 선다. 금이 없는 날의
+    코스피/금 비율은 계산할 수 없으니 물러서는 게 맞는 동작이다.
+    """
     history = yf.Ticker(GOLD_TICKER).history(
         start=start.isoformat(), end=(end + timedelta(days=1)).isoformat()
     )
-    return {ts.date().isoformat(): float(close) for ts, close in history["Close"].items()}
+    prices = {}
+    for ts, close in history["Close"].items():
+        d = ts.date()
+        if d >= end:
+            print(f"[yfinance] {GOLD_TICKER}: {d} 는 아직 세션 진행 중이라 버립니다 ({close:.2f})")
+            continue
+        prices[d.isoformat()] = float(close)
+    return prices
 
 
 def get_indicator_values(client, indicator_id: str, start: date) -> dict[str, float]:
