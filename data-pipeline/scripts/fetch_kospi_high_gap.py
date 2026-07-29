@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
-from common.timeutil import days_to_backfill, today_kst  # noqa: E402
+from common.timeutil import days_to_sync, today_kst  # noqa: E402
 from common.yahoo_client import fetch_index_close_series  # noqa: E402
 
 YAHOO_SYMBOL = "^KS11"
@@ -88,20 +88,22 @@ def backfill_raw_prices(client, raw_indicator_id: str) -> None:
     )
     existing_dates = {row["date"] for row in existing.data}
 
-    # 옛 공휴일을 매 실행 다시 물어보지 않도록 최근 창만 훑는다(common/timeutil 참고).
-    missing_days = days_to_backfill(existing_dates, today, bootstrap_days=BACKFILL_DAYS)
-    if not missing_days:
-        print("[야후] 백필할 신규 날짜 없음 (이미 최신 상태)")
+    # 옛 공휴일을 매 실행 다시 물어보지 않도록 최근 창만 훑되, 최근 5영업일은 이미 있어도
+    # 다시 받아 덮어쓴다 — 야후가 나중에 확정하는 값이라 '빈 칸만 채우기'로 두면 덜 익은
+    # 값이 영영 남는다(common/timeutil.days_to_sync 주석에 사고 둘이 적혀 있다).
+    target_days = days_to_sync(existing_dates, today, bootstrap_days=BACKFILL_DAYS)
+    if not target_days:
+        print("[야후] 받을 날짜 없음")
         return
 
     # KRX 때와 달리 날짜마다 부르지 않는다. 한 번에 기간 전체를 받아 놓고 필요한 날짜만
     # 꺼내 쓴다(요청 N회 → 2회). 그래서 REQUEST_DELAY_SEC 도 없어졌다.
     prices = fetch_index_close_series(YAHOO_SYMBOL, BACKFILL_DAYS, today)
-    print(f"[야후] 백필 대상 {len(missing_days)}일 · 응답 종가 {len(prices)}일치")
+    print(f"[야후] 대상 {len(target_days)}일 · 응답 종가 {len(prices)}일치")
 
     new_rows = [
         {"indicator_id": raw_indicator_id, "date": d.isoformat(), "raw_value": prices[d.isoformat()]}
-        for d in missing_days
+        for d in target_days
         if d.isoformat() in prices
     ]
 
@@ -109,8 +111,11 @@ def backfill_raw_prices(client, raw_indicator_id: str) -> None:
         client.table("indicator_values").upsert(
             new_rows, on_conflict="indicator_id,date"
         ).execute()
-    skipped = len(missing_days) - len(new_rows)
-    print(f"[야후] 백필 완료: {len(new_rows)}건 저장 (휴장일 등 {skipped}건 제외)")
+    fresh = sum(1 for r in new_rows if r["date"] not in existing_dates)
+    print(
+        f"[야후] 저장 완료: 신규 {fresh}건 · 재확인 {len(new_rows) - fresh}건 "
+        f"(휴장일 등 {len(target_days) - len(new_rows)}건 제외)"
+    )
 
 
 def compute_speed(client, raw_indicator_id: str) -> list[dict]:

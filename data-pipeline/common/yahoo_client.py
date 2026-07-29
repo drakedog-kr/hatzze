@@ -138,6 +138,14 @@ def fetch_index_closes(symbol: str, days: int) -> tuple[dict[str, float], list[s
     뒤에도 비어 있었고, period2 를 그날 끝으로 끊어도 여전히 비었다(둘 다 실측). 야후의
     과거 데이터 정리가 늦는 것이고, 그동안 값은 `range=1d` 응답에만 있다.
 
+    ⚠️⚠️ **그런데 '오늘' 바는 비어 오지 않는다. 장중 시세가 실려 온다.** 위 문장과
+    모순처럼 보이지만 둘 다 맞다 — 비어 오는 건 **끝난** 날이고, 진행 중인 날은 현재가가
+    `close` 자리에 앉는다. 2026-07-29 에 같은 필드가 10:29 KST 6076.65 · 14:24 KST
+    5517.41 로 왔다(실측). 이걸 종가로 저장하면 지표가 오전 실행 시각의 호가로 굳는다.
+    실제로 그 사고가 났다. 그래서 호출부가 오늘을 걸러낼 수 있도록 `all_dates` 를 같이
+    돌려주는 것이고, **`fetch_index_close_series` 는 오늘을 통째로 버린다.** 오늘 값은
+    16:00 게이트가 붙은 `fetch_last_session_close()` 만 만든다.
+
     ⚠️ `range` 파라미터를 쓰지 않고 period1/period2 를 못박는다. 야후는 `range=365d` 를
     '365 거래일'로 읽어 365개(≈17개월)를 주는데 `range=1y` 는 244개다 — 같은 뜻으로
     적은 두 표기가 다른 기간을 낸다. `lib/yahoo-history.ts` 가 `range=max` 에서
@@ -255,8 +263,8 @@ def fetch_index_close_series(symbol: str, days: int, today: date) -> dict[str, f
 
     소스가 셋인 건 야후 하나로는 어느 실행에서도 최신이 안 되기 때문이다.
 
-      ① 히스토리(period1/period2) — 지난 1년. 단 **맨 끝 바는 늘 비어 온다.**
-      ② 시간봉 — ①이 비워 둔 지난 날짜를 그 하루만 따로 받아 메운다.
+      ① 히스토리(period1/period2) — 지난 1년. **끝난 날은 확정 종가, 오늘은 장중값.**
+      ② 시간봉 — ①이 비워 둔 지난 날짜를 그 하루만 따로 받아 메운다. **근사치다.**
       ③ meta.regularMarketPrice — 오늘 종가. 16:00 KST 이후에만(장중값 방지).
 
     실행별로 이렇게 갈린다.
@@ -271,10 +279,24 @@ def fetch_index_close_series(symbol: str, days: int, today: date) -> dict[str, f
     ②는 ①이 실제로 바를 만든 날짜에만 건다. 휴장일 달력을 따로 들 필요가 없고, 비는
     칸이 맨 끝 하나뿐이라 추가 요청도 실행당 최대 1회다.
 
-    `today` 는 미래 날짜를 막는 상한으로만 쓴다 — 야후가 시간대 경계에서 앞선 날짜를 줄
-    여지를 없앤다.
+    ⚠️ **②가 주는 값은 종가가 아니라 근사치다.** 마지막 시간봉이 동시호가(15:20~15:30)로
+    확정되는 종가를 못 잡는다. 실측 격차: 코스피 07-27 6720.55 vs 6755.75(0.52%) ·
+    07-28 6019.06 vs 6023.66(0.08%) · 코스닥 07-28 697.76 vs 705.85(**1.15%**). 시점
+    문제가 아니라 계통 오차라 나중에 다시 불러도 같다. 그래도 남겨 둔 건 '하루 낡은 값'
+    보다는 낫기 때문이고, **호출부가 최근 며칠을 매 실행 덮어쓰는 것을 전제로 한다** —
+    일봉이 확정되면 그때 갈아치워진다. 덮어쓰기를 없앨 거면 ②도 같이 없앨 것.
+
+    `today` 는 상한이자 **오늘 배제선**이다. ①이 오늘 칸에 실어 보내는 장중값을 여기서
+    떨궈야 지표가 오전 실행 시각의 호가로 굳지 않는다(fetch_index_closes 주석 참고).
+    오늘 값은 오직 ③만 만든다.
     """
     prices, all_dates = fetch_index_closes(symbol, days)
+
+    # ①이 오늘 칸에 실어 보낸 장중값을 버린다. 여기가 유일하게 막는 자리다 —
+    # ②는 애초에 오늘을 안 건드리고 ③에는 16:00 게이트가 있는데, ①만 무방비였다.
+    intraday = prices.pop(today.isoformat(), None)
+    if intraday is not None:
+        print(f"[야후] {symbol}: 오늘({today}) 일봉의 {intraday} 는 장중값이라 버립니다")
 
     # ② 지난 날짜인데 ①이 비워 둔 칸만 시간봉으로 메운다. 오늘은 건드리지 않는다 —
     # 진행 중인 날의 마지막 시간봉은 종가가 아니라 장중값이고, 오늘은 ③ 담당이다.
@@ -284,7 +306,7 @@ def fetch_index_close_series(symbol: str, days: int, today: date) -> dict[str, f
         close = fetch_session_close(symbol, date.fromisoformat(d))
         if close is not None:
             prices[d] = close
-            print(f"[야후] {symbol}: 일봉이 비어 있던 {d} 를 시간봉으로 채웠습니다 ({close})")
+            print(f"[야후] {symbol}: 일봉이 비어 있던 {d} 를 시간봉으로 채웠습니다 ({close}, 근사치)")
 
     # ③ 오늘 종가(장 마감 뒤에만).
     last = fetch_last_session_close(symbol)
