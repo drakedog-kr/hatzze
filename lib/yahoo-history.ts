@@ -34,7 +34,19 @@ function kstDate(epochSec: number): string {
 }
 
 /**
- * 야후 일봉은 **응답의 맨 끝 바만 `close` 를 비워서 준다.** 장중이라서가 아니다 —
+ * 이 날짜가 **아직 끝나지 않은 세션**인가(오늘이면서 16:00 KST 전).
+ *
+ * 장중값이 들어올 수 있는 경로가 둘(일봉 배열·meta)이라 판정을 함수로 뺐다. 예전엔
+ * meta 쪽에만 인라인으로 있었는데, 그 사이 일봉 배열이 무방비였다(아래 주석).
+ */
+function sessionUnfinished(date: string): boolean {
+  const now = new Date(Date.now() + KST_OFFSET_MS);
+  if (date !== now.toISOString().slice(0, 10)) return false;
+  return now.getUTCHours() * 60 + now.getUTCMinutes() < MARKET_CLOSE_KST_MIN;
+}
+
+/**
+ * 야후 일봉은 **응답의 맨 끝 바 `close` 를 비워서 주는 날이 있다.** 장중이라서가 아니다 —
  * 2026-07-28 종가는 마감 10.6시간 뒤에도 비어 있었고, period2 를 그날 끝으로 끊어도
  * 여전히 비었다(둘 다 실측). 야후의 과거 데이터 정리가 늦는 것이다.
  *
@@ -57,11 +69,7 @@ function appendLastSession(bars: Bar[], meta: Record<string, unknown> | undefine
   if (priceContradictsDayRange(price, meta)) return;
 
   const sessionDate = kstDate(marketTime);
-  const now = new Date(Date.now() + KST_OFFSET_MS);
-  const todayKst = now.toISOString().slice(0, 10);
-  if (sessionDate === todayKst && now.getUTCHours() * 60 + now.getUTCMinutes() < MARKET_CLOSE_KST_MIN) {
-    return; // ⑴ 아직 장중
-  }
+  if (sessionUnfinished(sessionDate)) return; // ⑴ 아직 장중
 
   // 일봉이 이미 그 날짜를 채웠으면(야후가 뒤늦게 정리한 경우) 그대로 둔다.
   if (bars.length > 0 && bars[bars.length - 1].date >= sessionDate) return;
@@ -105,6 +113,23 @@ export async function fetchDailyHistory(
       if (typeof t !== "number" || typeof c !== "number") continue; // 휴장·결측 봉은 건너뛴다
       bars.push({ date: kstDate(t), close: c });
     }
+
+    /* 야후는 **장중에도 오늘 칸을 채워서 준다** — 값은 종가가 아니라 그 순간의 호가이고,
+       meta.regularMarketPrice 와 같은 숫자다(2026-07-30 15:38 KST 실측: 기아 오늘 바
+       close=120300 = meta 현재가). 아래 ⑴ 게이트는 meta 경로만 막고 있었고, 일봉 배열로
+       들어온 이 값은 완결된 종가인 척 그대로 통과했다("이미 그 날짜를 채웠으면 그대로
+       둔다"에서 되돌아가므로 ⑴ 은 아예 도달하지 못한다).
+
+       그러면 낙폭이 호가에 따라 초 단위로 움직이고, MDD 정밀분석의 "지금 이상 빠졌던 N번"은
+       문턱(depth ≤ currentDd)이 같이 움직여 **같은 날 안에서 표본 개수가 오간다** — 기아를
+       몇 분 간격으로 재니 3번(회복 2)에서 2번(회복 1)으로 바뀌었고, 그때마다 회복 카드의
+       중앙값 세로선이 생겼다 없어졌다 했다. "종가 기준"이라 적어 둔 화면 문구도 거짓이 된다.
+
+       파이프라인은 이걸 이미 막아 뒀다(data-pipeline/common/yahoo_client.py: "①이 오늘 칸에
+       실어 보내는 장중값을 여기서 떨궈야 지표가 오전 실행 시각의 호가로 굳지 않는다").
+       같은 규칙을 여기도 둔다 — 끝나지 않은 세션은 걷어내고, 오늘 종가는 16:00 게이트를
+       지나는 아래 경로만 만든다. */
+    if (bars.length > 0 && sessionUnfinished(bars[bars.length - 1].date)) bars.pop();
 
     appendLastSession(bars, result?.meta);
     return bars.length >= 2 ? bars : null;
