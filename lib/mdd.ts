@@ -502,6 +502,12 @@ export function riskProfile(bars: Bar[], marketBars: Bar[] | null): RiskProfile 
     dropDaysMedian: enoughSpeed ? median(bigRecovered.map((e) => e.troughDays)) : null,
     recoverDaysMedian: enoughSpeed ? median(bigRecovered.map((e) => e.days - e.troughDays)) : null,
     events: events.slice(-6),
-    yearly: yearlyStats(bars).slice(-6),
+    /**
+     * 해마다 한 줄이라 조회 기간 전체를 그대로 보낸다(10년이면 11개, 전체면 상장 이후 전부).
+     * 예전엔 여기서 6개로 잘랐는데, 화면이 최근 5줄만 막대로 그리므로 그걸로 충분했다.
+     * 지금은 타일에 '전체보기'가 붙어 조회 기간 전체를 펼쳐 보여주므로 자르면 안 된다
+     * (자르면 10년을 골라도 6년치만 열린다). 한 줄이 숫자 셋이라 늘려도 응답이 거의 안 는다.
+     */
+    yearly: yearlyStats(bars),
   };
 }
