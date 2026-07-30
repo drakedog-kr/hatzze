@@ -681,7 +681,7 @@ function Rarity({ a, periodLabel }: { a: MddAnalysis; periodLabel: string }) {
 
   /* 1% 미만을 "0%"로 적지 않는다 — 날수는 있는데 비율이 0이면 두 숫자가 서로 어긋나 보인다. */
   const pct = a.deeperThanNowPct < 0.5 ? "1% 미만" : `${Math.round(a.deeperThanNowPct)}%`;
-  /* 세는 단위는 거래일인데 화면엔 '일'로 적는다(2026-07-30 Hun 결정). '거래일'이 더 정확하지만
+  /* 세는 단위는 거래일인데 화면엔 '일'로 적는다(2026-07-30 결정). '거래일'이 더 정확하지만
      히어로 한 문장에서 걸리는 말이고, 낙폭·기간이 전부 종가 기준인 페이지라 여기서만 단위를
      따로 짚을 자리가 아니다. 정확한 단위는 lib/mdd.ts 의 deeperThanNowDays 주석에 있다. */
   const days = `${a.deeperThanNowDays.toLocaleString("ko-KR")}일`;

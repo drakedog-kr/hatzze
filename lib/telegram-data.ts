@@ -47,7 +47,7 @@ function kstDateRange(n: number): string[] {
 
 /**
  * **생태계 센티먼트 · 주요 종목 리포트**가 함께 쓰는 창(일). 2026-07-26 에 7 → 3 으로
- * 내렸다(Hun 요청) — 일주일치는 이미 지나간 얘기가 절반이라 "지금 무엇이 오가나"를
+ * 내렸다 — 일주일치는 이미 지나간 얘기가 절반이라 "지금 무엇이 오가나"를
  * 흐렸다.
  *
  * ⚠️ **파이프라인 WINDOW_DAYS 와 같은 값이어야 한다**
@@ -733,7 +733,7 @@ export async function getStockReport(code: string): Promise<StockReport | null> 
   if (!stock) return null;
 
   // **차트와 수치의 창이 다르다.** 막대는 STOCK_CHART_DAYS 일치를 그리고, 언급 수·채널
-  // 수·LLM 문장은 그중 최근 KADERA_WINDOW_DAYS 일만 센다(Hun 요청).
+  // 수·LLM 문장은 그중 최근 KADERA_WINDOW_DAYS 일만 센다(요청 사항).
   //
   // 왜 나누나: 3일치 막대 세 개는 추이가 안 읽힌다. "지금 얼마나 뜨거운가"는 최근 3일이
   // 맞지만, 그게 평소보다 많은 건지 적은 건지는 앞선 날들이 있어야 보인다. 그래서 눈으로

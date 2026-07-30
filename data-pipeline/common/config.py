@@ -25,7 +25,7 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_SECRET_KEY = os.environ.get("SUPABASE_SECRET_KEY")
 
 # 카더라 리포트 — 텔레그램 Client API(Telethon) 인증값.
-# api_id/api_hash는 my.telegram.org에서 발급. TELEGRAM_SESSION은 Hun 계정으로
+# api_id/api_hash는 my.telegram.org에서 발급. TELEGRAM_SESSION은 운영자 개인 계정으로
 # 1회 로그인해 만든 StringSession 문자열(= 계정 로그인 권한이라 절대 커밋 금지).
 TELEGRAM_API_ID = os.environ.get("TELEGRAM_API_ID")
 TELEGRAM_API_HASH = os.environ.get("TELEGRAM_API_HASH")
@@ -35,7 +35,7 @@ TELEGRAM_SESSION = os.environ.get("TELEGRAM_SESSION")
 TELEGRAM_CHANNELS_SHEET_ID = os.environ.get("TELEGRAM_CHANNELS_SHEET_ID")
 
 # 매일 채널에 오늘의 지수를 올리는 봇(send_telegram_broadcast.py). **수집용 값과 별개다** —
-# 위 TELEGRAM_SESSION은 Hun 계정의 로그인 권한이고 읽기 전용으로 쓴다. 발송은 BotFather로
+# 위 TELEGRAM_SESSION은 운영자 개인 계정의 로그인 권한이고 읽기 전용으로 쓴다. 발송은 BotFather로
 # 만든 봇 토큰으로 Bot API를 부르므로, 새어 나가도 피해 범위가 '이 채널에 글쓰기'로 갇힌다.
 # 둘을 섞지 말 것.
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")

@@ -87,7 +87,7 @@ function readBandColor(img: HTMLImageElement): string | null {
  * 되돌릴 수 있고, 덤으로 접미사를 잘못 준 경우까지 막아 준다.
  *
  * 어트리뷰션: logo.dev 무료 플랜은 **상업용** 프로젝트에만 링크백을 요구한다.
- * personal project 로 보고 넣지 않기로 했다(2026-07-27 Hun 판단). 광고·구독·유료
+ * personal project 로 보고 넣지 않기로 했다(2026-07-27 판단). 광고·구독·유료
  * 기능이 붙는 시점에는 다시 봐야 한다.
  */
 export function StockLogo({
