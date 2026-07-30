@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { CHARACTER_MIN_DD } from "@/lib/mdd";
-import type { DrawdownCharacter, DrawdownPoint, Episode, MddAnalysis, RiskProfile as RiskProfileData } from "@/lib/mdd";
+import type { DrawdownCharacter, DrawdownPoint, Episode, MddAnalysis, RiskProfile as RiskProfileData, YearStat } from "@/lib/mdd";
 import { track } from "@/lib/ga";
 import { C, Icon, MONO } from "../ui";
 import { StockLogo } from "../StockLogo";
@@ -883,7 +883,52 @@ function Underwater({ series, mdd }: { series: DrawdownPoint[]; mdd: number }) {
 const RISK_ROWS = 5; // 모든 타일이 쓰는 고정 줄 수(연도 5개 · 사건 5건)
 
 /** 타일 본문 — 막대 영역(viz)과 맨 아래에 고정되는 요약 한 줄(foot)을 따로 들고 있는다. */
-type TileBody = { viz: React.ReactNode; foot: React.ReactNode };
+type TileBody = { viz: React.ReactNode; foot: React.ReactNode; more?: React.ReactNode };
+
+/**
+ * '전체보기' — 막대에 안 깔린 해까지 조회 기간 전체를 펼친다.
+ *
+ * PC 는 마우스오버, 모바일은 탭으로 열린다. 여는 장치는 CSS 하나뿐이라(:hover 와
+ * :focus-within, globals.css 의 .hz-yrpop) 상태도 이벤트 핸들러도 없다 — 카더라
+ * 테마 로테이션의 .hz-theme-pop 과 같은 어법이다. 버튼이라 탭하면 포커스가 잡혀 열리고,
+ * 딴 데를 누르면 포커스가 빠져 닫힌다.
+ *
+ * ⚠️ .hz-tip 은 :hover 전용이라 여기 못 쓴다(모바일에서 안 열린다).
+ */
+function YearsPopover({ years, label }: { years: YearStat[]; label: string }) {
+  // 위로 편다 — 타일 맨 아래라 아래로 열면 카드 밖으로 나간다. 오른쪽 끝에 맞춰 세 번째
+  // 타일에서도 카드 오른쪽으로 안 넘친다(넘치면 페이지에 가로 스크롤이 생긴다).
+  const max = Math.max(...years.flatMap((y) => [Math.abs(y.ret), Math.abs(y.mdd)]), 1);
+  return (
+    <span className="hz-yrpop-host">
+      {/* 글자 없이 아이콘만. 제목 줄에 "전체보기" 넉 자를 얹으면 부제와 부딪혀 제목이
+          좁아진다. 뜻은 aria-label 이 지고, 커서·호버 색이 누를 수 있음을 알린다. */}
+      <button type="button" className="hz-yrpop-btn" aria-label={`${label} 연도별 성적 보기`}>
+        <Icon name="open_in_full" style={{ fontSize: 15 }} />
+      </button>
+      <span className="hz-yrpop" role="group">
+        <span className="hz-yrpop-head">
+          {label} 연도별 성적
+        </span>
+        {/* 오래된 해가 위, 올해가 맨 아래. 타일 막대와 같은 순서라 펼쳤을 때 눈이
+            같은 자리를 짚는다(막대도 2022→2026 으로 내려온다). */}
+        {years.map((y) => (
+          <span key={y.year} className="hz-yrpop-row">
+            <span className="hz-yrpop-year">{y.year}</span>
+            <span className="hz-yrpop-bars">
+              <span className="hz-yrpop-bar" style={{ width: `${Math.max(2, (Math.abs(y.ret) / max) * 100)}%`, background: y.ret >= 0 ? C.mania : C.cold }} />
+              <span className="hz-yrpop-bar" style={{ width: `${Math.max(2, (Math.abs(y.mdd) / max) * 100)}%`, background: C.cold, opacity: 0.45 }} />
+            </span>
+            <span className="hz-yrpop-val">
+              <span style={{ color: y.ret >= 0 ? C.mania : C.cold }}>{`${y.ret >= 0 ? "+" : "−"}${Math.abs(Math.round(y.ret))}%`}</span>
+              <span style={{ color: C.cold, opacity: 0.75 }}>{`${Math.round(y.mdd)}%`}</span>
+            </span>
+          </span>
+        ))}
+      </span>
+    </span>
+  );
+}
 
 function RiskProfile({ r }: { r: RiskProfileData }) {
   const yrs = Math.max(1, Math.round(r.years));
@@ -905,24 +950,22 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
   // "2021.11"은 43.3px 이라 눈대중으로 잡은 42px 에서 1px 넘쳤다. 두 자리 월이 최대다.
   const yearCol = eventLabels.some((l) => l.includes(".")) ? 46 : 30;
 
-  // 부제 옆 범위 표기 — 각주는 짧게 두고, "이 타일이 무엇을 몇 개 보여주는가"는 제목 옆에
-  // 붙인다. 상수(5)가 아니라 실제 줄 수를 쓴다: 조회 기간이 3년이면 연도가 4개뿐이고,
-  // 큰 하락이 두 번밖에 없던 종목도 있다. 0 이면 빈 상태 문구가 대신 설명한다.
-  /* 타일 제목 옆 괄호는 **그 타일의 요약 한 줄이 잰 범위**를 적는다. 줄 수가 아니다.
-     예전엔 화면에 깔린 줄 수(yearly.length·events.length, 둘 다 RISK_ROWS 로 자른 값)를
-     적었는데, 요약은 조회 기간 전체로 내므로 한 타일 안에서 숫자가 어긋났다.
+  /* 타일 제목 옆 괄호. 두 타일과 한 타일이 서로 다른 것을 적는데, 다르게 적을 이유가 있다.
+     기준은 하나다 — **괄호가 가리키는 것에 화면에서 닿을 수 있나.**
 
-       "감수한 위험에 비해 얼마나 벌었나 (최근 5년)"  ↔  "최근 10년 연 +3.3% · 최악 −65.9%"
-       "큰 하락 때 코스피도 같이 빠졌나 (최근 5건)"   ↔  "7번 중 2번은 이 종목만 빠졌습니다"
+     뒤 두 타일(속도·동반성)은 막대 RISK_ROWS 줄이 전부라, 닿을 수 있는 건 그 줄들뿐이다.
+     그래서 **실제 줄 수**를 적는다. 예전에 전체 건수(bigDropCount)를 적어 봤는데 SK하이닉스가
+     "(최근 7건)"인데 5줄만 깔려서, 읽는 사람이 "7건을 보여준다"로 읽고 두 줄을 찾게 됐다.
+     7 이라는 숫자는 그 타일 요약이 "7번 중 2번은…"으로 스스로 밝히니 잃지 않는다.
 
-     앞의 것은 10년 화면이면 **모든 종목에서** 났다(연도 줄은 늘 5로 잘리니까). NAVER 는
-     실제 5년이 −14.8%, 10년이 +3.3% 라 읽는 사람이 18%p 를 잘못 가져간다. 뒤의 것은 큰
-     하락이 5건을 넘는 종목에서만 났다(SK하이닉스 7건).
+     앞 타일(보상)은 전체보기가 붙어 **조회 기간 전체에 실제로 닿는다.** 그래서 조회 기간을
+     적는다. 막대는 최근 5줄이지만 나머지 해는 전체보기 안에 있고, 요약도 "최근 10년 연 …"
+     으로 같은 창을 말한다. 셋이 같은 기간을 가리킨다.
 
-     줄이 잘린다는 사실은 지우지 않는다 — 카드 밑단 각주가 "최근 N건까지만 보여줍니다"로
-     이미 말하고, 줄마다 연도·날짜가 붙어 있다. 여기서 또 적을 자리가 아니다. */
+     ⚠️ 이 타일에서 전체보기를 걷어내면 괄호도 같이 손봐야 한다. 그러면 10년이라 적고 5년만
+     보여주는 상태로 되돌아간다(2026-07-30 에 실제로 그래서 어색했다). */
   const yearScope = yearly.length ? ` (최근 ${yrs}년)` : "";
-  const eventScope = r.bigDropCount ? ` (최근 ${r.bigDropCount}건)` : "";
+  const eventScope = events.length ? ` (최근 ${events.length}건)` : "";
 
   // 범례는 막대 두 줄이 각각 뭔지 알려주는 유일한 단서다 — 이걸 못 읽으면 타일이
   // 통째로 안 읽힌다. sub(11px)로는 타일 배경 위에서 흐려서 ink-soft 로 한 단계 올린다.
@@ -998,6 +1041,19 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
             </>
           ),
           foot: summary(`최근 ${yrs}년 연 ${fmtPct(r.annualReturn)} · 최악 ${fmtPct(r.mdd)}`),
+          /* 막대는 자리 때문에 최근 RISK_ROWS 줄뿐인데 제목·요약은 조회 기간 전체를 말한다.
+             나머지 해를 여기서 펼쳐, 적어 둔 기간에 실제로 닿게 한다.
+
+             ⚠️ **yearly 를 그대로 주면 안 된다.** yearlyStats 는 거래일이 20일 넘는 해를 다
+             세므로 10년 조회에 11개(2016~2026)가 나온다 — 시작 해의 토막을 한 해로 세기
+             때문이다. 그러면 "(최근 10년)"이라 적어 놓고 11년을 편다. 조회 기간만큼 잘라
+             2017~2026 을 준다.
+
+             막대가 이미 전부면(조회 기간이 짧아 잘릴 게 없으면) 버튼을 안 만든다. */
+          more: (() => {
+            const full = r.yearly.slice(-yrs);
+            return full.length > yearly.length ? <YearsPopover years={full} label={`최근 ${yrs}년`} /> : null;
+          })(),
         };
 
   /* 2 — 하락 vs 회복 속도: 큰 하락마다 '빠지는 데'와 '되돌아오는 데'. */
@@ -1112,13 +1168,19 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
             {/* 줄 수가 적은 타일도 같은 높이를 유지하도록 최소 높이를 준다(5줄 기준).
                 요약 문장(foot)은 별도 행이라 줄이 모자라도 늘 타일 맨 아래에 붙는다. */}
             <div style={{ minHeight: 164 }}>{t.body.viz}</div>
-            <div>{t.body.foot}</div>
+            {/* 요약과 전체보기가 한 줄을 나눠 쓴다. 팝오버가 이 칸 기준으로 위로 펴지므로
+                relative 가 여기 있어야 한다(타일에 주면 요약 줄 위로 안 붙는다). */}
+            <div style={{ position: "relative", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 10 }}>
+              {/* foot 은 <p> 라 <span> 으로 감싸면 안 된다(span 은 phrasing content 만 받는다). */}
+              <div style={{ minWidth: 0 }}>{t.body.foot}</div>
+              {t.body.more}
+            </div>
           </div>
         ))}
       </div>
       <p style={{ margin: "16px 0 0", color: C.muted, fontSize: 12, lineHeight: 1.6 }}>
         <Icon name="info" style={{ fontSize: 14, verticalAlign: -2, marginRight: 4 }} />
-        보상은 조회 기간(최근 {yrs}년)에 따라 달라지니 절대 수치보다 성격으로 보십시오. 큰 하락·속도는 고점 대비 −20% 이상 하락 기준이고, 최근 {RISK_ROWS}건까지만 보여줍니다.
+        보상은 조회 기간(최근 {yrs}년)에 따라 달라지니 절대 수치보다 성격으로 보십시오. 큰 하락·속도는 고점 대비 −20% 이상 하락 기준입니다. 막대는 최근 {RISK_ROWS}개까지만 그리고, 연도는 전체보기로 조회 기간 전부를 볼 수 있습니다.
       </p>
     </section>
   );

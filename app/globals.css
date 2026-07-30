@@ -1053,3 +1053,128 @@ main.hz-scroll { overflow-x: clip; }
   background: hsl(var(--h) 24% 26%);
   color: hsl(var(--h) 55% 76%);
 }
+
+/* ── MDD 리스크 프로필 '전체보기' 팝오버 ──────────────────────────────────
+   '낙폭 대비 보상' 타일의 막대는 자리 때문에 최근 몇 줄뿐인데 제목·요약은 조회 기간
+   전체를 말한다. 나머지 해를 여기서 펼쳐 그 기간에 실제로 닿게 한다.
+
+   여는 장치는 CSS 뿐이다 — PC 는 :hover, 모바일은 버튼을 탭했을 때 잡히는 :focus-within.
+   카더라 테마 로테이션(.hz-theme-pop)과 같은 어법이라 새 언어를 만들지 않는다.
+   ⚠️ .hz-tip 은 :hover 전용이라 여기 못 쓴다(모바일에서 안 열린다). */
+.hz-yrpop-host {
+  position: relative;
+  flex-shrink: 0;
+  /* 버튼을 이 칸 **밑선**에 붙인다. span 이라 글자 줄상자가 생기는데, 그러면 버튼이
+     베이스라인에 앉아 아래로 디센더만큼 빈틈이 남아 옆 요약 문장보다 떠 보인다. */
+  display: inline-flex;
+  align-items: flex-end;
+}
+.hz-yrpop-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  /* 오른쪽 패딩만큼 밖으로 뺀다 — 그래야 **아이콘의 오른쪽 끝**이 위 막대들의 값 칸
+     (`+95%`·`−55%`)과 같은 세로선에 선다. 그 값 칸은 오른쪽 끝이 타일 콘텐츠 경계에
+     딱 붙어 있어(실측 차이 0px), 패딩을 그대로 두면 아이콘만 4px 안쪽으로 들어간다.
+     패딩 자체는 남긴다 — 호버 알약이 글자에 붙지 않게 하는 건 그쪽 몫이다. */
+  margin-right: -4px;
+  /* 사방 4px — 아이콘만 남아 23×23 이 된다. 오른쪽 4px 는 위 margin-right 가 상쇄한다. */
+  padding: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--c-sub);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.hz-yrpop-btn:hover,
+.hz-yrpop-host:focus-within .hz-yrpop-btn {
+  background: var(--c-blue-tint);
+  color: var(--c-blue);
+}
+.hz-yrpop-btn:focus-visible {
+  outline: 2px solid var(--c-blue);
+  outline-offset: 1px;
+}
+
+.hz-yrpop {
+  position: absolute;
+  /* 위로 편다 — 타일 맨 아래라 아래로 열면 카드 밖으로 나가 다음 카드를 덮는다.
+     버튼과 4px 겹쳐 둔다. 틈이 있으면 마우스가 건너는 동안 :hover 가 끊긴다. */
+  bottom: calc(100% - 4px);
+  /* 오른쪽 끝에 맞춘다. 세 번째 타일에서 왼쪽 정렬로 두면 카드 밖으로 넘쳐
+     페이지에 가로 스크롤이 생긴다(예전에 툴팁으로 같은 사고가 있었다). */
+  right: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: min(280px, 78vw);
+  /* 조회 기간이 10년이면 10줄인데, 그걸 스크롤로 나눠 보면 '전체보기'라는 이름값을 못 한다.
+     내용만큼 자라게 두고 뷰포트에 걸릴 때만 스크롤한다 — '전체' 조회(상장 이후 20년 넘는
+     종목)에서만 걸린다. 화면 밖으로 자라 위가 잘리는 걸 72vh 가 막는다. */
+  max-height: min(600px, 72vh);
+  overflow-y: auto;
+  padding: 10px;
+  background: var(--c-float);
+  border: 1px solid var(--c-line);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px var(--c-shadow-strong);
+  opacity: 0;
+  /* opacity 만 0 이면 안 보이는 내용이 스크롤 영역과 Tab 순서에 그대로 남는다. */
+  visibility: hidden;
+  transform: translateY(4px);
+  transition: opacity 0.13s ease, transform 0.13s ease, visibility 0.13s;
+}
+.hz-yrpop-host:hover .hz-yrpop,
+.hz-yrpop-host:focus-within .hz-yrpop {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.hz-yrpop-head {
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--c-line);
+  color: var(--c-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.hz-yrpop-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 62px;
+  align-items: center;
+  gap: 7px;
+}
+.hz-yrpop-year {
+  /* app/ui.tsx 의 MONO 와 같은 값. 이 레포는 모노 서체를 쓰지 않고 Pretendard 에
+     body 의 tabular-nums 로 자릿수만 고정한다(한글 글리프가 갈리지 않게). */
+  font-family: var(--font-pretendard), sans-serif;
+  font-size: 10.5px;
+  color: var(--c-sub);
+}
+/* 한 해가 두 줄(수익 / 그 해 최악 낙폭)인 건 타일 막대와 같은 문법이다. */
+.hz-yrpop-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.hz-yrpop-bar {
+  display: block;
+  height: 5px;
+  border-radius: 999px;
+}
+.hz-yrpop-val {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  /* app/ui.tsx 의 MONO 와 같은 값. 이 레포는 모노 서체를 쓰지 않고 Pretendard 에
+     body 의 tabular-nums 로 자릿수만 고정한다(한글 글리프가 갈리지 않게). */
+  font-family: var(--font-pretendard), sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  text-align: right;
+}
