@@ -121,6 +121,19 @@ export default async function MddPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  // 로딩 화면을 조금 더 보여주려고 **일부러** 0.2초 늦춘다.
+  //
+  // 이 페이지는 서버 시간이 0.4~0.5초라 스켈레톤이 딱 그만큼만 보인다(실측). 카더라는
+  // 0.6~0.9초라, 둘을 오가면 MDD 쪽만 스치듯 지나가 "눌렀는데 반응이 없었다"에 가깝게
+  // 읽힌다. 0.2초를 더해 두 페이지의 인상을 같은 대역에 둔다.
+  //
+  // 병렬이 아니라 순차인 것이 의도다. 아래 조회와 나란히 돌리면 조회(0.4초)가 이미 더
+  // 길어서 아무 효과가 없다 — '최소 노출 시간'이 아니라 '더 보여주기'가 목적이다.
+  //
+  // ⚠️ 모든 방문자가 매번 더 기다리는 값이다. 서버가 느려지면 그만큼 위에 얹히므로,
+  //    /mdd 응답이 길어지면 이 줄부터 다시 볼 것.
+  await new Promise((r) => setTimeout(r, 200));
+
   const sp = await searchParams;
   const [stocks, initial, suggestions] = await Promise.all([
     loadKospiStocks(),

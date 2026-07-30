@@ -77,7 +77,7 @@ export default function Loading() {
       <div className="hz-loading-float" aria-hidden>
         <div className="hz-loading-inner">
           <span
-            className="hz-loading-badge"
+            className="hz-loading-badge hz-loading-badge--sentiment"
             style={{
               display: "inline-flex",
               alignItems: "center",
