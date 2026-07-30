@@ -48,8 +48,6 @@ type Pick = {
   details: Record<string, number> | null;
   history: number[];
   historyPoints: { date: string; value: number }[];
-  /** 자료의 실제 기준일이 몇 영업일 뒤처졌나(0~1이면 정상). details.source_date 가 있을 때만. */
-  staleDays: number;
   /**
    * 카드에 "7/28 기준"으로 적을 자료일(YYYYMMDD). details.source_date 가 있으면 그 값,
    * 없으면 **행 날짜**로 물러선다.
@@ -59,47 +57,13 @@ type Pick = {
    * 날 파이프라인이 며칠 전 자료로 '오늘' 행을 쓰는 지표에서는 행 날짜가 자료일보다
    * 새것이라, 이 폴백은 낡음을 **덜** 말한다(더 말하지는 않는다).
    *
-   * 그래서 이 값을 **아무 카드에나 붙이면 안 된다.** 지금은 투자자예탁금 한 장만 쓰는데,
-   * 그 지표는 upsert 가 출처 시계열의 날짜를 그대로 행 날짜로 삼아(`"date": d`,
-   * fetch_investor_deposit.py) 둘이 정확히 같다. 다른 카드에 달려면 그 스크립트가
-   * 행 날짜를 어떻게 정하는지 먼저 볼 것.
+   * 그래서 이 값을 **아무 카드에나 붙이면 안 된다.** 지금 배지를 다는 건 코스피 신고가
+   * 괴리율(source_date 를 쓴다)과 투자자예탁금 둘뿐이고, 예탁금은 upsert 가 출처 시계열의
+   * 날짜를 그대로 행 날짜로 삼아(`"date": d`, fetch_investor_deposit.py) 둘이 정확히 같다.
+   * 다른 카드에 달려면 그 스크립트가 행 날짜를 어떻게 정하는지 먼저 볼 것.
    */
   sourceDate: string | null;
 };
-
-/**
- * KRX가 최근 영업일치를 아직 안 낸 날에도 파이프라인은 '오늘' 행을 쓴다(며칠 전
- * 자료로 계산해서). 그래서 행 날짜만 보면 항상 최신처럼 보인다. 자료를 만든
- * 스크립트가 details.source_date(YYYYMMDD)를 남기면 여기서 지연을 구해
- * 카드에 "07-16 기준"을 띄운다.
- *
- * **달력 날짜가 아니라 영업일로 센다.** 주말엔 장이 안 열리니 금요일 자료를
- * 월요일에 보는 건 정상인데, 달력으로 세면 3일이라 멀쩡한 값에 낡음 딱지가 붙는다.
- * 반환값 = source_date 다음날부터 오늘까지의 평일 수:
- *   금요일 자료를 월요일에 → 1 (정상)
- *   목요일 자료를 월요일에 → 2 (금요일치를 건너뜀 = 지연)
- * 공휴일은 달력을 따로 안 봐서 하루치 과경고가 날 수 있는데, 지연을 놓치는 쪽보다
- * 낫다고 보고 감수한다.
- */
-function staleBusinessDays(details: Record<string, number> | null): number {
-  const sd = details?.source_date;
-  if (!sd) return 0;
-  const s = String(sd);
-  const src = new Date(`${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}T00:00:00+09:00`);
-  const kstToday = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
-  const today = new Date(`${kstToday}T00:00:00+09:00`);
-
-  let count = 0;
-  const cursor = new Date(src);
-  cursor.setUTCDate(cursor.getUTCDate() + 1); // 자료일 다음날부터 센다
-  while (cursor <= today) {
-    // KST 기준 요일 — src/today 모두 KST 자정이라 UTC 요일로 봐도 어긋나지 않는다.
-    const dow = new Date(cursor.getTime() + 9 * 3600 * 1000).getUTCDay();
-    if (dow !== 0 && dow !== 6) count += 1;
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-  }
-  return count;
-}
 
 function pick(ind: Ind | undefined): Pick {
   const raw = ind?.latest?.raw_value ?? null;
@@ -146,7 +110,6 @@ function pick(ind: Ind | undefined): Pick {
     details: ind?.latest?.details ?? null,
     history: ind?.history ?? [],
     historyPoints: ind?.historyPoints ?? [],
-    staleDays: staleBusinessDays(ind?.latest?.details ?? null),
     sourceDate: (ind?.latest?.details?.source_date != null
       ? String(ind.latest.details.source_date)
       : ind?.latest?.date) ?? null,
@@ -154,21 +117,16 @@ function pick(ind: Ind | undefined): Pick {
 }
 
 /**
- * 카드 배지 문구 — 자료가 뒤처졌으면 "당일 기준" 대신 실제 기준일을 밝힌다.
- * 1영업일 지연(어제 자료로 오늘 계산)은 거래소 공표 주기상 정상이라 조용히 넘기고,
- * 2영업일부터 = 나와야 할 영업일치를 건너뛰기 시작했을 때만 기준일로 바꿔 단다.
- */
-function sourceBadge(v: Pick, fresh: string): string {
-  if (v.staleDays < 2 || !v.details?.source_date) return fresh;
-  return sourceDateBadge(v) ?? fresh;
-}
-
-/**
  * 자료 기준일을 **항상** 밝히는 배지 — "7/22 기준".
  *
- * sourceBadge 는 2영업일 이상 밀렸을 때만 날짜로 바꾸는데, 그러면 평소엔 날짜가 안 보여
- * "이 숫자가 언제 것인지"를 매번 알 수 없다. KRX 종가처럼 늘 하루 늦는 게 정상인
- * 지표는 그 사실을 숨기지 말고 계속 적는 편이 정직하다.
+ * 한때 '2영업일 이상 밀렸을 때만 날짜로 바꾸는' 짝(sourceBadge)이 있었는데 걷어냈다.
+ * 평소엔 날짜가 안 보여 "이 숫자가 언제 것인지"를 매번 알 수 없었고, 늦지 않은 날엔
+ * "당일 기준"이라는 아무 말도 아닌 문구가 남았다. 배지를 다는 카드는 늘 날짜를 적는다.
+ *
+ * ⚠️ **배지는 아무 카드에나 달지 않는다.** 지표 대부분은 하루 늦게 공표되는 게 정상이라
+ * 20장 넘는 카드에 날짜가 깔리면 그게 배경이 돼 아무도 안 본다. 지금 다는 둘은 이유가
+ * 있다 — 코스피 신고가 괴리율은 **다른 카드도 적는 코스피 지수**를 적고, 투자자예탁금은
+ * 공표가 이틀까지 밀린다. 그 둘 중 하나에 해당할 때만 붙일 것.
  */
 function sourceDateBadge(v: Pick): string | null {
   // source_date 는 20260728(숫자), 행 날짜는 "2026-07-28"(문자열)로 꼴이 달라 둘 다 받는다.
@@ -888,7 +846,7 @@ function CardBuffett({ v }: { v: Pick }) {
   const jo = (won: number) => Math.round(won / 1e12).toLocaleString("ko-KR"); // 원 → 조원
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
-      <TitleRow desc={v.headline} icon="payments" name={v.name} badge={sourceBadge(v, "당일 기준")} />
+      <TitleRow desc={v.headline} icon="payments" name={v.name} />
       {/* 주요 수치 크기는 VKOSPI 카드(40)를 기준으로 맞춘다. */}
       <Big disp={v.disp} unit={v.unit} color={v.color} size={40} sub={ratio !== null ? `${ratio.toFixed(1)}배` : undefined} />
       <div style={{ background: C.bg, borderRadius: 10, padding: "18px 18px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
@@ -949,7 +907,7 @@ function CardLeverage({ v }: { v: Pick }) {
     dt?.futures_oi != null ? `${Math.round(dt.futures_oi).toLocaleString("ko-KR")}계약` : null;
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
-      <TitleRow desc={v.headline} icon="rocket_launch" name={v.name} badge="당일 기준" />
+      <TitleRow desc={v.headline} icon="rocket_launch" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 12 }}>
         {/* 주요 수치 크기는 VKOSPI 카드(40)를 기준으로 맞춘다. */}
         <span style={{ fontFamily: MONO, fontSize: 40, fontWeight: 700, color: heatC, lineHeight: 1, letterSpacing: "-0.03em" }}>{heat}</span>
@@ -1177,7 +1135,7 @@ function CardSpeed({ v }: { v: Pick }) {
   const num = (n: number) => n.toLocaleString("ko-KR", { maximumFractionDigits: 0 });
   return (
     <Shell hit={v.isHit} minH={210}>
-      <TitleRow desc={v.headline} icon="trending_up" name={v.name} badge={sourceDateBadge(v) ?? "최근 거래일 기준"} />
+      <TitleRow desc={v.headline} icon="trending_up" name={v.name} />
       <div>
         <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 700, color: v.color, letterSpacing: "-0.03em" }}>
           {spd !== null && spd > 0 ? "+" : ""}{v.disp}{v.unit}
