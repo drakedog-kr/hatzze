@@ -662,6 +662,46 @@ function BarRow({
 }
 
 /* ── 헤드라인 ─────────────────────────────────────────────────── */
+/* 히어로의 '얼마나 드문지' 한 문장. 비율만 적으면 "0%뿐입니다"가 된다 — 삼성전자는 실제로
+   나흘이 더 깊었는데 반올림이 0% 으로 만들고, 정말 0일인 신저점 종목과 화면이 똑같아진다.
+   비율은 얼마나 드문지를 말하지만 그 자체로는 손에 잡히지 않으니 날수를 앞에 세운다. */
+function Rarity({ a, periodLabel }: { a: MddAnalysis; periodLabel: string }) {
+  /* keep-all — 날수가 붙어 문장이 두 줄이 되면서 "뿐입니 / 다"로 갈라졌다(이 파일의 다른
+     설명문들과 같은 처리다). 예전엔 한 줄에 들어가 이 속성이 없어도 티가 안 났다. */
+  const style = { margin: "0 0 6px", fontSize: 14.5, color: C.sub, lineHeight: 1.6, maxWidth: 340, wordBreak: "keep-all" as const };
+
+  // 0일이면 지금이 이 구간에서 가장 깊다. "0거래일뿐입니다"로 얼버무리지 않고 문장을 갈아탄다.
+  if (a.deeperThanNowDays === 0) {
+    return (
+      <p style={style}>
+        {periodLabel} 중 <b style={{ color: C.ink }}>가장 깊은</b> 낙폭입니다
+      </p>
+    );
+  }
+
+  /* 1% 미만을 "0%"로 적지 않는다 — 날수는 있는데 비율이 0이면 두 숫자가 서로 어긋나 보인다.
+     '일'이 아니라 '거래일'인 건 낙폭이 종가 기준이라서다. 1,560일과 1,560거래일은 달력으로
+     2년 가까이 차이 난다(≈4.3년 vs ≈6.2년). */
+  const pct = a.deeperThanNowPct < 0.5 ? "1% 미만" : `${Math.round(a.deeperThanNowPct)}%`;
+  const days = `${a.deeperThanNowDays.toLocaleString("ko-KR")}거래일`;
+  /* 64%에 "뿐"을 붙이면 드물다는 뜻이 사라진다. 흔한 쪽은 담담하게 적는다. */
+  const tail = a.deeperThanNowPct < 10 ? "뿐입니다" : "입니다";
+
+  return (
+    <p style={style}>
+      {periodLabel} 중 이보다 깊었던 날은{" "}
+      {/* 숫자와 어미를 한 덩이로 — 떼어 놓으면 "뿐입니다"만 다음 줄에 혼자 남는다.
+          가장 긴 조합("1,559거래일(64%)입니다")도 maxWidth 340 안에 들어간다. */}
+      <span style={{ whiteSpace: "nowrap" }}>
+        <b style={{ color: C.ink }}>
+          {days}({pct})
+        </b>
+        {tail}
+      </span>
+    </p>
+  );
+}
+
 function Headline({ data }: { data: MddResult }) {
   const a = data.analysis;
   const atHigh = a.currentDd > -1;
@@ -704,11 +744,7 @@ function Headline({ data }: { data: MddResult }) {
             {atHigh ? "신고가 부근" : fmtPct(a.currentDd)}
           </span>
         </div>
-        {!atHigh && (
-          <p style={{ margin: "0 0 6px", fontSize: 14.5, color: C.sub, lineHeight: 1.6, maxWidth: 340 }}>
-            {periodLabel} 중 이보다 깊었던 날은 <b style={{ color: C.ink }}>{Math.round(a.deeperThanNowPct)}%</b>뿐입니다
-          </p>
-        )}
+        {!atHigh && <Rarity a={a} periodLabel={periodLabel} />}
       </div>
 
       {/* 현재가·최고가를 라벨 붙은 두 칸으로 — 예전 회색 한 줄보다 기준이 분명하다. */}

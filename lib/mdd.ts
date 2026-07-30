@@ -86,6 +86,11 @@ export type MddAnalysis = {
   currentDd: number;
   /** 조회 구간에서 지금보다 더 깊게 빠져 있던 날의 비율(%). */
   deeperThanNowPct: number;
+  /**
+   * 같은 것의 날수(거래일). 비율만으로는 화면이 "0%뿐입니다"가 된다 — 4일이든 0일이든
+   * 반올림하면 똑같이 0% 라, 실제로 있었던 날을 없었던 것처럼 읽힌다.
+   */
+  deeperThanNowDays: number;
   mdd: number;
   mddDate: string;
   underwater: DrawdownPoint[];
@@ -281,7 +286,11 @@ export function analyzeDrawdown(bars: Bar[]): MddAnalysis | null {
     }
   }
 
-  const deeperDays = ds.filter((p) => p.dd <= last.dd).length;
+  /* '지금보다 더 깊었던' 이므로 오늘 자신은 뺀다(`<` 이지 `<=` 가 아니다). 예전엔 `<=` 라
+     늘 최소 1일이 세어졌는데, 비율로만 쓸 때는 0.04%p 차이라 안 보였다. 날수를 화면에
+     내면 바로 드러난다 — 신저점 종목(SK하이닉스)이 "더 깊었던 날은 1일"이 되고, 그 1일이
+     오늘이다. 0일은 '지금이 이 구간에서 가장 깊다'는 뜻이라 화면이 문장을 갈아탄다. */
+  const deeperDays = ds.filter((p) => p.dd < last.dd).length;
   const eps = episodes(bars);
 
   return {
@@ -293,6 +302,7 @@ export function analyzeDrawdown(bars: Bar[]): MddAnalysis | null {
     athDate,
     currentDd: last.dd,
     deeperThanNowPct: (deeperDays / ds.length) * 100,
+    deeperThanNowDays: deeperDays,
     mdd,
     mddDate,
     // 목표 250점 = 샘플 간격이 기간에 따라 저절로 정해진다(거래소 차트와 같은 방식).
