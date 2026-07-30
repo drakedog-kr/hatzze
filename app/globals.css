@@ -1104,7 +1104,10 @@ main.hz-scroll { overflow-x: clip; }
   flex-direction: column;
   gap: 5px;
   width: min(280px, 78vw);
-  max-height: 320px;
+  /* 조회 기간이 10년이면 10줄인데, 그걸 스크롤로 나눠 보면 '전체보기'라는 이름값을 못 한다.
+     내용만큼 자라게 두고 뷰포트에 걸릴 때만 스크롤한다 — '전체' 조회(상장 이후 20년 넘는
+     종목)에서만 걸린다. 화면 밖으로 자라 위가 잘리는 걸 72vh 가 막는다. */
+  max-height: min(600px, 72vh);
   overflow-y: auto;
   padding: 10px;
   background: var(--c-float);

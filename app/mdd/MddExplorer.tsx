@@ -895,19 +895,19 @@ type TileBody = { viz: React.ReactNode; foot: React.ReactNode; more?: React.Reac
  *
  * ⚠️ .hz-tip 은 :hover 전용이라 여기 못 쓴다(모바일에서 안 열린다).
  */
-function YearsPopover({ years, shown }: { years: YearStat[]; shown: number }) {
+function YearsPopover({ years, label }: { years: YearStat[]; label: string }) {
   // 위로 편다 — 타일 맨 아래라 아래로 열면 카드 밖으로 나간다. 오른쪽 끝에 맞춰 세 번째
   // 타일에서도 카드 오른쪽으로 안 넘친다(넘치면 페이지에 가로 스크롤이 생긴다).
   const max = Math.max(...years.flatMap((y) => [Math.abs(y.ret), Math.abs(y.mdd)]), 1);
   return (
     <span className="hz-yrpop-host">
-      <button type="button" className="hz-yrpop-btn" aria-label={`연도별 성적 ${years.length}년 전체 보기`}>
+      <button type="button" className="hz-yrpop-btn" aria-label={`연도별 성적 ${label} 보기`}>
         전체보기
         <Icon name="unfold_more" style={{ fontSize: 13 }} />
       </button>
       <span className="hz-yrpop" role="group">
         <span className="hz-yrpop-head">
-          연도별 성적 {years.length}년 전체 · 막대는 최근 {shown}년
+          연도별 성적 {label}
         </span>
         {[...years].reverse().map((y) => (
           <span key={y.year} className="hz-yrpop-row">
@@ -1039,9 +1039,18 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
           ),
           foot: summary(`최근 ${yrs}년 연 ${fmtPct(r.annualReturn)} · 최악 ${fmtPct(r.mdd)}`),
           /* 막대는 자리 때문에 최근 RISK_ROWS 줄뿐인데 제목·요약은 조회 기간 전체를 말한다.
-             나머지 해를 여기서 펼쳐, 적어 둔 기간에 실제로 닿게 한다. 조회 기간이 짧아
-             막대가 이미 전부면 더 보여줄 게 없으니 버튼을 안 만든다. */
-          more: r.yearly.length > yearly.length ? <YearsPopover years={r.yearly} shown={yearly.length} /> : null,
+             나머지 해를 여기서 펼쳐, 적어 둔 기간에 실제로 닿게 한다.
+
+             ⚠️ **yearly 를 그대로 주면 안 된다.** yearlyStats 는 거래일이 20일 넘는 해를 다
+             세므로 10년 조회에 11개(2016~2026)가 나온다 — 시작 해의 토막을 한 해로 세기
+             때문이다. 그러면 "(최근 10년)"이라 적어 놓고 11년을 편다. 조회 기간만큼 잘라
+             2017~2026 을 준다.
+
+             막대가 이미 전부면(조회 기간이 짧아 잘릴 게 없으면) 버튼을 안 만든다. */
+          more: (() => {
+            const full = r.yearly.slice(-yrs);
+            return full.length > yearly.length ? <YearsPopover years={full} label={`최근 ${yrs}년`} /> : null;
+          })(),
         };
 
   /* 2 — 하락 vs 회복 속도: 큰 하락마다 '빠지는 데'와 '되돌아오는 데'. */
