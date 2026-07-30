@@ -34,6 +34,71 @@ const TELEGRAM = {
   icon: "send",
 };
 
+// 아직 페이지가 없는 예고 항목. NAV 에 넣지 않는 이유가 둘이다.
+//  1. NAV 항목은 전부 <Link> 로 렌더되고 pathname 기반 active 판정을 받는다 — 갈 곳이
+//     없는 항목이 그 배열에 섞이면 "링크인데 href 가 가짜"인 상태를 만들어야 한다.
+//  2. NAV 는 모바일 하단 탭바와 공유한다. 탭바는 한 줄에 항목을 나눠 갖는 구조라
+//     (지금 4개) 5번째가 들어가면 나머지 라벨이 눌린다. 게다가 탭바가 나오는 폭은
+//     터치 화면이라 hover 가 없어 툴팁이 뜨지 않는다 — 눌러도 아무 일도 일어나지 않는
+//     칸만 남는다. 그래서 사이드바에만 둔다. 페이지가 생기면 NAV 로 옮긴다.
+const COMING_SOON = {
+  label: "서학개미 해부도",
+  badge: "준비 중",
+  tip: "현재 오픈 준비 중입니다",
+};
+
+/**
+ * 서학개미 아이콘. Material Symbols 에 개미가 없어서 직접 그렸다.
+ *
+ * 폰트를 먼저 뒤졌다: ant · insects · termite · bug 는 글리프 자체가 없어서 리거처가
+ * 안 잡히고 "ANT" 같은 대문자 텍스트로 찍힌다. 실제로 있는 벌레는 pest_control 과
+ * bug_report 둘뿐인데, 둘 다 몸통이 한 덩어리인 딱정벌레라 개미로 안 읽힌다.
+ *
+ * 어법은 브랜드 유령(Logo.tsx 의 GhostSymbol)을 따랐다 — 외곽선이 아니라 통으로 채운
+ * 덩어리에 눈을 파낸다. 해부학적으로 정확한 개미(머리·가슴·배 3마디 + 다리 6개)를
+ * 외곽선으로 그려도 봤는데, 이 아이콘이 실제로 쓰이는 16px 에서는 다리가 뭉개져
+ * 그냥 얼룩이 된다. 덩어리는 작아져도 형태가 남는다.
+ *
+ * 눈은 흰 원이 아니라 fillRule="evenodd" 로 뚫은 구멍이다. 흰색으로 칠하면 다크모드
+ * 카드(어두운 배경) 위에서 흰 점이 떠 버린다. 구멍이라야 배경을 안 가린다.
+ *
+ * 좌표는 Hun 이 준 시안을 1200px 기준으로 재서 24 박스로 옮긴 값이다(배율 0.0505).
+ * 그래서 눈 지름 대 몸통 높이(32%), 더듬이 굵기(1.52) 같은 비율이 시안 그대로다.
+ * 별도 transform 없이 그림이 이미 박스에 맞다 — bbox 는 x 3.8~20.0, y 1.6~22.5 다.
+ *
+ * 더듬이 두 가닥은 몸통 '안'(y 12.5·12.2)에서 끝난다. 몸통 테두리에 딱 맞춰 끝내면
+ * 둥근 캡이 실루엣 위로 튀어나와 이음매에 혹 두 개가 생긴다. 채움 안쪽으로 밀어 넣으면
+ * 캡이 덮여서 시안처럼 한 덩어리로 이어진다. 몸통 오른쪽 위 모서리(19.73)는 더듬이
+ * 바깥선(18.97 + 굵기 절반 0.76)과 같은 값이라 둘이 단차 없이 만난다.
+ */
+function AntIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.52}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      style={{ display: "block", flexShrink: 0 }}
+    >
+      {/* 몸통 + 눈구멍(한 path 에 evenodd) */}
+      <path
+        fill="currentColor"
+        stroke="none"
+        fillRule="evenodd"
+        d="M19.73 10.4 C19.9 12 19.98 13.5 19.98 15 C19.98 19.2 16.3 22.46 11.9 22.46 C7.5 22.46 3.82 19.2 3.82 15.6 C3.82 12.2 7 9.84 11.2 9.84 C14.6 9.84 18.2 9.9 19.73 10.4 Z M10.03 13.52 a2.02 2.02 0 1 0 4.04 0 a2.02 2.02 0 1 0 -4.04 0 Z"
+      />
+      {/* 뒤로 쓸리는 더듬이 두 가닥 */}
+      <path d="M5.64 2.41 C9.8 1.55 14.8 2 17.2 4.3 C18.5 5.55 18.97 7.4 18.97 12.5" />
+      <path d="M6.09 5.14 C9.8 4.4 14 4.8 16 6.6 C16.9 7.4 17.15 8.6 17.15 12.2" />
+    </svg>
+  );
+}
+
 /**
  * 마우스가 닿은(또는 손가락이 닿은·포커스가 온) 링크만 **전체 프리페치**로 올린다.
  *
@@ -141,6 +206,59 @@ function Sidebar() {
             </Link>
           );
         })}
+        {/* 예고 항목. <a href> 가 아니라 <div> 인 게 "못 누른다"의 유일한 보장이다 —
+            href 만 뺀 <a> 는 클릭은 안 먹어도 브라우저·확장 프로그램에 따라 링크로
+            취급되는 변형이 남는다. div 는 포커스 순서에도 안 들어간다.
+
+            hz-nav-item 을 안 붙인다. 그 클래스가 주는 cursor:pointer 와 회색 호버 배경은
+            둘 다 "눌리는 요소"라는 신호라, 못 누르는 항목에 붙이면 거짓말이 된다.
+            hz-tip 의 cursor:default 를 그대로 받아 평범한 화살표로 둔다.
+
+            색은 C.sub(다른 항목) 보다 한 단 흐린 C.faint 로. 호버해 보기 전에도
+            "지금은 아닌 것"이 보여야 한다. */}
+        <div
+          className="hz-tip"
+          data-tip={COMING_SOON.tip}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "16px 20px",
+            color: C.faint,
+            fontWeight: 600,
+            borderRadius: 14,
+          }}
+        >
+          <AntIcon />
+          {/* 배지는 라벨 '우측 상단'에 위첨자로 띄운다. 로고 옆 베타 배지처럼 flex 로
+              나란히 두면 이 사이드바에서는 안 된다 — 210px 폭에서 아이콘(20)+간격(12)+
+              라벨(92.9)까지 쓰고 남는 자리가 12px 인데 배지가 34.6px 라, 실측에서 배지가
+              항목 밖으로 21px 삐져나와 사이드바 오른쪽 테두리에 붙었다(scrollWidth 178 >
+              clientWidth 177). absolute 로 띄우면 배지가 행 폭 계산에서 빠져 라벨이
+              눌리지도, 항목이 넘치지도 않는다. 라벨 길이가 바뀌어도 따라 붙는다. */}
+          <span style={{ position: "relative", display: "inline-flex" }}>
+            <span style={{ fontSize: 15, whiteSpace: "nowrap" }}>{COMING_SOON.label}</span>
+            <span
+              style={{
+                position: "absolute",
+                left: "100%",
+                top: -4,
+                marginLeft: 2,
+                fontSize: 8,
+                fontWeight: 700,
+                lineHeight: 1.4,
+                whiteSpace: "nowrap",
+                color: C.faint,
+                background: "var(--c-hover)",
+                border: `1px solid ${C.line}`,
+                padding: "1px 4px",
+                borderRadius: 999,
+              }}
+            >
+              {COMING_SOON.badge}
+            </span>
+          </span>
+        </div>
         {/* 라벨은 바뀌었어도 data-ga-cta 는 "community" 그대로 둔다 — 값을 같이 바꾸면
             이름 변경 전후의 클릭수를 한 줄로 비교할 수 없다. 탭바·푸터도 같은 값이다. */}
         <a
