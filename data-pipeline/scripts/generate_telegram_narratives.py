@@ -200,6 +200,10 @@ STOCK_SYSTEM = COMMON + f"""
   적혀 있어 되풀이입니다(75~80자에서 그 자리가 아깝습니다). 바로 본론으로 들어가세요.
   다른 회사 이름은 필요하면 씁니다 — 금지되는 건 이 카드 주인공의 이름뿐입니다.
 - 대표 메시지 발췌는 '무엇이 화제였는지'의 근거로만 쓰고, 그대로 베끼지 마세요.
+- ⚠️ 발췌 가운데 있는 `[…]` 는 **중간을 줄인 표시**입니다(앞부분과 이 종목이 언급된 대목을
+  이어 붙인 것입니다). 그 앞과 뒤는 이어진 문장이 아니니, 둘을 붙여 읽어 없는 인과를
+  만들지 마세요. 발췌는 여러 소재를 한 메시지에 몰아 담은 글일 수 있으므로 **이 종목과
+  상관있는 대목만** 근거로 쓰고, 그런 대목이 안 보이면 무엇이 화제였는지 단정하지 마세요.
 - **'무슨 일이 있었나'가 아니라 '무엇이 화제였나'를 씁니다.** 이 데이터는 텔레그램에서 오간
   말이지 확인된 사실이 아닙니다. "~를 체결했습니다"가 아니라 "~ 소식이 화제였습니다",
   "~라는 이야기가 돌았습니다"처럼 화제·전언으로 적으세요.
@@ -313,6 +317,52 @@ def tone_label(optimism_pct: int) -> str:
 NEWS_MIN_MSGS = 1000
 NEWS_EXCERPTS = 6  # 발췌 건수. 3건이면 한 사건에 쏠려 '공통 화제'가 안 보인다
 NEWS_TOP_STOCKS = 6
+
+
+# ── 종목별 [대표 메시지 발췌] 자르는 자리 ─────────────────────────────────────
+#
+# 예전엔 메시지 앞 EXCERPT_CHARS 자를 그대로 잘랐다. 그런데 이 채널들의 글은 뉴스
+# 브리핑처럼 여러 소재를 한 메시지에 몰아 담는 것이 많아서, **종목명이 발췌 안에 아예
+# 없는 일이 흔했다.** 실측(2026-07-30, 저장된 언급 52,128건):
+#
+#     발췌 안 28,705(55.1%) · 발췌 밖 23,423(44.9%)
+#     매칭 위치  중앙 118자 · 75% 506자 · 90% 1,143자 · 최대 6,631자
+#     메시지 길이 중앙 657자 (180자 이하는 24.9%뿐)
+#
+# 그러면 모델은 그 종목과 무관한 소재를 근거로 문장을 쓴다. 카스(016920)의 07-29 요약이
+# "스페인 대형 산불 확산과 중동 지역 정세 불안정"을 말한 것이 이 경로다 — 발췌 3건이
+# 전부 '카스피해·카스테욘주'가 든 뉴스 브리핑이었고, 잘린 앞 180자에는 산불과 이란
+# 공습만 있었다. (그 언급 자체가 추출 오탐이기도 하다. 그건 config/stock_extraction.py
+# 쪽 일이고, 여기서 막는 건 '오탐이 남아도 문장이 그 종목 얘기를 하게' 두는 것이다.)
+#
+# **머리는 버리지 않는다.** 뉴스 글은 제목·리드가 맨 앞에 있어 앞부분 자체가 값진
+# 재료다. 그래서 앞 EXCERPT_HEAD 자를 항상 남기고, 매칭이 그 밖일 때만 뒤에 창을
+# 덧붙인다. 매칭이 이미 앞쪽이면(55.1%) 발췌는 예전과 한 글자도 다르지 않다.
+EXCERPT_CHARS = 180
+EXCERPT_HEAD = 90
+# 줄인 자리 표시. **STOCK_SYSTEM 이 이 기호를 글자 그대로 설명한다**(그쪽이 위에 있어
+# 여기를 참조할 수 없다). 바꿀 땐 프롬프트의 `[…]` 도 같이 고칠 것.
+EXCERPT_ELLIPSIS = " […] "
+
+
+def excerpt(text: str, needle: str | None) -> str:
+    """[대표 메시지 발췌] 한 건 — 머리 + (필요할 때) 매칭 자리 주변.
+
+    needle 은 그 종목이 본문에 실제로 어떻게 적혀 있었나다
+    (telegram_message_stocks.match_text — "삼전"·"하이닉스" 같은 별칭일 수 있어
+    종목명으로 찾으면 못 만난다). 없거나 본문에서 못 찾으면 예전처럼 앞부분만 자른다 —
+    자리를 모르면 창을 잡을 수 없고, 그때 머리는 최선의 추측이다.
+    """
+    flat = " ".join((text or "").split())
+    if len(flat) <= EXCERPT_CHARS:
+        return flat
+    at = flat.find(needle) if needle else -1
+    if at < 0 or at + len(needle) <= EXCERPT_CHARS:
+        return flat[:EXCERPT_CHARS]  # 매칭이 이미 머리 안 → 예전과 동일
+    window = EXCERPT_CHARS - EXCERPT_HEAD
+    # 매칭 앞을 조금 남겨 문맥을 준다. 머리와 겹치지 않게 EXCERPT_HEAD 아래로는 안 간다.
+    start = max(EXCERPT_HEAD, at - window // 3)
+    return flat[:EXCERPT_HEAD] + EXCERPT_ELLIPSIS + flat[start : start + window]
 
 
 def kst_date(posted_at: str) -> str:
@@ -568,7 +618,9 @@ def build_stock_digests(db, latest: str) -> list[tuple[str, str, str]]:
     stocks = load_all(db, "stocks", "code,name", order_by="code")
     name_of = {s["code"]: s["name"] for s in stocks}
 
-    mentions = load_all(db, "telegram_message_stocks", "channel_handle,message_id,stock_code")
+    mentions = load_all(
+        db, "telegram_message_stocks", "channel_handle,message_id,stock_code,match_text"
+    )
     msgs = {
         (m["channel_handle"], m["message_id"]): m
         for m in load_all(
@@ -581,8 +633,13 @@ def build_stock_digests(db, latest: str) -> list[tuple[str, str, str]]:
     }
 
     by_code: dict[str, list[tuple]] = defaultdict(list)
+    # 발췌를 자를 때 쓸 '본문에 적힌 표기'. 메시지 키에 종목까지 묶어야 한다 — 한 메시지가
+    # 여러 종목을 언급하면 종목마다 자리가 다르다.
+    needle_of: dict[tuple, str] = {}
     for m in mentions:
-        by_code[m["stock_code"]].append((m["channel_handle"], m["message_id"]))
+        key = (m["channel_handle"], m["message_id"])
+        by_code[m["stock_code"]].append(key)
+        needle_of[key + (m["stock_code"],)] = m.get("match_text") or ""
 
     out = []
     for code, a in top:
@@ -620,8 +677,9 @@ def build_stock_digests(db, latest: str) -> list[tuple[str, str, str]]:
             lines.append("")
             lines.append("[대표 메시지 발췌]")
             for k in keys[:3]:
-                text = " ".join((msgs[k].get("text") or "").split())[:180]
-                lines.append(f"- {text}")
+                # 앞부분만 자르지 않는다 — 이 종목이 실제로 언급된 자리를 함께 담는다
+                # (EXCERPT_CHARS 주석의 실측 참고).
+                lines.append(f"- {excerpt(msgs[k].get('text'), needle_of.get(k + (code,)))}")
         out.append((code, name, "\n".join(lines)))
     return out
 
