@@ -775,12 +775,17 @@ export default async function KaderaPage() {
                 const max = Math.max(1, ...r.series.map((s) => s.mentions));
                 return (
                   <div key={r.code} style={{ ...subCard, padding: 16 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                    {/* 폰에서는 시세가 다음 줄로 내려간다(globals.css 의 .hz-stock-head).
+                        한 줄에 다 넣으면 시세 묶음이 nowrap 이라 안 줄고, 줄어들 수 있는 건
+                        종목명뿐이라 이름이 먼저 0 으로 눌려 사라졌다. marginLeft:auto 를
+                        인라인이 아니라 클래스로 옮긴 이유는, 인라인이면 미디어쿼리에서
+                        그걸 풀 수 없어서다. */}
+                    <div className="hz-stock-head" style={{ display: "flex", alignItems: "center", gap: 9 }}>
                       <StockLogo code={r.code} name={r.name} market={r.market} size={26} />
                       <span style={{ ...clip, fontSize: 18, fontWeight: 700, color: C.ink }}>{r.name}</span>
                       <span style={{ fontFamily: MONO, fontSize: 11, color: C.muted }}>{r.code}</span>
                       {r.price != null && (
-                        <span style={{ marginLeft: "auto", display: "flex", alignItems: "baseline", gap: 5, whiteSpace: "nowrap" }}>
+                        <span className="hz-stock-price" style={{ display: "flex", alignItems: "baseline", gap: 5, whiteSpace: "nowrap" }}>
                           <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: C.ink, letterSpacing: "-0.02em" }}>
                             {r.price.toLocaleString("ko-KR")}원
                           </span>
