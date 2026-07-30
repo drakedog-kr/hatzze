@@ -901,15 +901,17 @@ function YearsPopover({ years, label }: { years: YearStat[]; label: string }) {
   const max = Math.max(...years.flatMap((y) => [Math.abs(y.ret), Math.abs(y.mdd)]), 1);
   return (
     <span className="hz-yrpop-host">
-      <button type="button" className="hz-yrpop-btn" aria-label={`연도별 성적 ${label} 보기`}>
+      <button type="button" className="hz-yrpop-btn" aria-label={`${label} 연도별 성적 보기`}>
         전체보기
-        <Icon name="unfold_more" style={{ fontSize: 13 }} />
+        <Icon name="open_in_full" style={{ fontSize: 13 }} />
       </button>
       <span className="hz-yrpop" role="group">
         <span className="hz-yrpop-head">
-          연도별 성적 {label}
+          {label} 연도별 성적
         </span>
-        {[...years].reverse().map((y) => (
+        {/* 오래된 해가 위, 올해가 맨 아래. 타일 막대와 같은 순서라 펼쳤을 때 눈이
+            같은 자리를 짚는다(막대도 2022→2026 으로 내려온다). */}
+        {years.map((y) => (
           <span key={y.year} className="hz-yrpop-row">
             <span className="hz-yrpop-year">{y.year}</span>
             <span className="hz-yrpop-bars">
