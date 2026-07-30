@@ -901,9 +901,10 @@ function YearsPopover({ years, label }: { years: YearStat[]; label: string }) {
   const max = Math.max(...years.flatMap((y) => [Math.abs(y.ret), Math.abs(y.mdd)]), 1);
   return (
     <span className="hz-yrpop-host">
+      {/* 글자 없이 아이콘만. 제목 줄에 "전체보기" 넉 자를 얹으면 부제와 부딪혀 제목이
+          좁아진다. 뜻은 aria-label 이 지고, 커서·호버 색이 누를 수 있음을 알린다. */}
       <button type="button" className="hz-yrpop-btn" aria-label={`${label} 연도별 성적 보기`}>
-        전체보기
-        <Icon name="open_in_full" style={{ fontSize: 13 }} />
+        <Icon name="open_in_full" style={{ fontSize: 15 }} />
       </button>
       <span className="hz-yrpop" role="group">
         <span className="hz-yrpop-head">
@@ -1167,7 +1168,7 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
             {/* 줄 수가 적은 타일도 같은 높이를 유지하도록 최소 높이를 준다(5줄 기준).
                 요약 문장(foot)은 별도 행이라 줄이 모자라도 늘 타일 맨 아래에 붙는다. */}
             <div style={{ minHeight: 164 }}>{t.body.viz}</div>
-            {/* 요약과 '전체보기'가 한 줄을 나눠 쓴다. 팝오버가 이 칸 기준으로 위로 펴지므로
+            {/* 요약과 전체보기가 한 줄을 나눠 쓴다. 팝오버가 이 칸 기준으로 위로 펴지므로
                 relative 가 여기 있어야 한다(타일에 주면 요약 줄 위로 안 붙는다). */}
             <div style={{ position: "relative", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 10 }}>
               {/* foot 은 <p> 라 <span> 으로 감싸면 안 된다(span 은 phrasing content 만 받는다). */}
