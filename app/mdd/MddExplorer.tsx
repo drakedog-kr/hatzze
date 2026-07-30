@@ -1182,6 +1182,13 @@ function Recovery({ a }: { a: MddAnalysis }) {
      오른쪽 숫자로 읽게 하고 카드 아래에 그렇게 적어 둔다. */
   const barPct = (days: number) => Math.sqrt(days / longest) * 100;
 
+  /* 회복 표본이 하나면 중앙값 = 최단 = 최장이라 눈금이 그 막대 끝에 정확히 겹친다.
+     최장 표본이 그 한 건이면 트랙 맨 오른쪽 끝에 붙어 축 테두리처럼 보이고, 어느
+     쪽이든 "가운데"라는 뜻을 잃는다(막대 하나에 그 막대를 기준선으로 얹는 셈).
+     표본이 둘 이상일 때만 눈금과 중앙값 설명을 둔다. 표본 하나는 곧 진행 중인
+     지금 하락 말고 회복한 전례가 한 번뿐인 종목이다. */
+  const hasMedian = r.recoveredCount >= 2;
+
   return (
     <section style={{ ...card, display: "flex", flexDirection: "column" }}>
       <CardHead
@@ -1248,23 +1255,36 @@ function Recovery({ a }: { a: MddAnalysis }) {
         ))}
         {/* 중앙값 눈금 — 막대 칸(가운데 트랙)에만 걸치도록 좌우 여백을 맞춘다.
             트랙의 좌우 바깥은 [날짜칸 + gap] 과 [값칸 + gap] 이다. */}
-        <div style={{ position: "absolute", left: REC_DATE_W + REC_GAP, right: REC_VALUE_W + REC_GAP, top: 0, bottom: 0, pointerEvents: "none" }}>
-          <div
-            style={{
-              position: "absolute",
-              left: `max(${REC_BAR_MIN_W}px, ${barPct(r.medianDays!)}%)`,
-              top: -4,
-              bottom: -4,
-              width: 1,
-              background: C.faint,
-            }}
-          />
-        </div>
+        {hasMedian && (
+          <div style={{ position: "absolute", left: REC_DATE_W + REC_GAP, right: REC_VALUE_W + REC_GAP, top: 0, bottom: 0, pointerEvents: "none" }}>
+            <div
+              style={{
+                position: "absolute",
+                left: `max(${REC_BAR_MIN_W}px, ${barPct(r.medianDays!)}%)`,
+                top: -4,
+                bottom: -4,
+                width: 1,
+                background: C.faint,
+              }}
+            />
+          </div>
+        )}
         </div>
       </div>
+      {/* 표본이 하나면 중앙값·최단·최장이 다 같은 숫자라, 원래 문장은 "중앙값은 4.7년,
+          가장 빠른 때가 4.7년, 가장 오래 걸린 때가 4.7년"처럼 한 값을 세 번 읽는다.
+          숫자 셋이 나란히 있으면 분포가 있는 것처럼 읽히니 한 번만 말하고 만다. */}
       <p style={{ margin: "14px 0 0", fontSize: 12, color: C.muted, lineHeight: 1.6 }}>
-        회복한 {r.recoveredCount}번의 중앙값은 <b style={{ color: C.sub }}>{fmtDur(r.medianDays!)}</b>(세로선), 가장 빠른 때가{" "}
-        <b style={{ color: C.sub }}>{fmtDur(r.minDays!)}</b>, 가장 오래 걸린 때가 <b style={{ color: C.sub }}>{fmtDur(r.maxDays!)}</b>였습니다.
+        {hasMedian ? (
+          <>
+            회복한 {r.recoveredCount}번의 중앙값은 <b style={{ color: C.sub }}>{fmtDur(r.medianDays!)}</b>(세로선), 가장 빠른 때가{" "}
+            <b style={{ color: C.sub }}>{fmtDur(r.minDays!)}</b>, 가장 오래 걸린 때가 <b style={{ color: C.sub }}>{fmtDur(r.maxDays!)}</b>였습니다.
+          </>
+        ) : (
+          <>
+            고점을 되찾은 전례는 <b style={{ color: C.sub }}>{fmtDur(r.medianDays!)}</b> 걸린 한 번뿐입니다. 표본이 하나라 중앙값은 내지 않았습니다.
+          </>
+        )}
       </p>
     </section>
   );
