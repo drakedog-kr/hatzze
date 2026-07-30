@@ -50,6 +50,21 @@ type Pick = {
   historyPoints: { date: string; value: number }[];
   /** 자료의 실제 기준일이 몇 영업일 뒤처졌나(0~1이면 정상). details.source_date 가 있을 때만. */
   staleDays: number;
+  /**
+   * 카드에 "7/28 기준"으로 적을 자료일(YYYYMMDD). details.source_date 가 있으면 그 값,
+   * 없으면 **행 날짜**로 물러선다.
+   *
+   * ⚠️ 둘은 같은 뜻이 아니다. source_date 는 스크립트가 "이 값은 며칟날 자료다"라고
+   * 밝힌 것이고, 행 날짜는 그 행이 놓인 날일 뿐이다. KRX 가 최근 영업일치를 아직 안 낸
+   * 날 파이프라인이 며칠 전 자료로 '오늘' 행을 쓰는 지표에서는 행 날짜가 자료일보다
+   * 새것이라, 이 폴백은 낡음을 **덜** 말한다(더 말하지는 않는다).
+   *
+   * 그래서 이 값을 **아무 카드에나 붙이면 안 된다.** 지금은 투자자예탁금 한 장만 쓰는데,
+   * 그 지표는 upsert 가 출처 시계열의 날짜를 그대로 행 날짜로 삼아(`"date": d`,
+   * fetch_investor_deposit.py) 둘이 정확히 같다. 다른 카드에 달려면 그 스크립트가
+   * 행 날짜를 어떻게 정하는지 먼저 볼 것.
+   */
+  sourceDate: string | null;
 };
 
 /**
@@ -132,6 +147,9 @@ function pick(ind: Ind | undefined): Pick {
     history: ind?.history ?? [],
     historyPoints: ind?.historyPoints ?? [],
     staleDays: staleBusinessDays(ind?.latest?.details ?? null),
+    sourceDate: (ind?.latest?.details?.source_date != null
+      ? String(ind.latest.details.source_date)
+      : ind?.latest?.date) ?? null,
   };
 }
 
@@ -153,9 +171,9 @@ function sourceBadge(v: Pick, fresh: string): string {
  * 지표는 그 사실을 숨기지 말고 계속 적는 편이 정직하다.
  */
 function sourceDateBadge(v: Pick): string | null {
-  const sd = v.details?.source_date;
-  if (!sd) return null;
-  const s = String(sd);
+  // source_date 는 20260728(숫자), 행 날짜는 "2026-07-28"(문자열)로 꼴이 달라 둘 다 받는다.
+  const s = v.sourceDate?.replace(/-/g, "");
+  if (!s || s.length !== 8) return null;
   return `${shortDate(`${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`)} 기준`;
 }
 
@@ -1897,7 +1915,10 @@ function CardDeposit({ v }: { v: Pick }) {
   const change = recent.length >= 2 ? recent[recent.length - 1] - recent[0] : 0;
   return (
     <Shell hit={v.isHit} minH={210}>
-      <TitleRow desc={v.headline} icon="savings" name={v.name} />
+      {/* 예탁금은 늘 하루이틀 늦게 공표된다(2026-07-30 화면에 07-28 자료가 떠 있었다).
+          정상이지만 히어로는 페이지 전체를 "오늘 기준"으로 액자에 넣으므로, 이 카드만은
+          자기 자료일을 계속 밝힌다 — 신고가 괴리율·상승 속도 카드와 같은 처리다. */}
+      <TitleRow desc={v.headline} icon="savings" name={v.name} badge={sourceDateBadge(v) ?? "최근 거래일 기준"} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "6px 0 4px" }}>
         <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 700, color: c, letterSpacing: "-0.03em" }}>{jo.toFixed(1)}</span>
         <span style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>조원</span>
