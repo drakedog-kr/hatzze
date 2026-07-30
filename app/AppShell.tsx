@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import type { DailyScore } from "@/lib/data";
 import { track } from "@/lib/ga";
@@ -573,6 +573,86 @@ function TopBar({
 }
 
 /**
+ * 첫 방문자에게 한 번 뜨는 PC 권유 토스트(모바일 전용).
+ *
+ * 문구는 "최적화되지 않았습니다" 류를 피했다. 모바일은 고장난 게 아니라 카드가 한 줄로
+ * 늘어서서 한눈에 못 견줄 뿐인데, 첫 화면에서 사과부터 읽으면 남은 화면까지 의심하게
+ * 된다. 지표 개수 같은 숫자도 일부러 안 넣었다 — 개수가 바뀌면 문구가 조용히 거짓이
+ * 되는데, 이 배너는 아무도 다시 안 보는 자리라 틀린 채로 남는다.
+ *
+ * useEffect + setState 가 아니라 useSyncExternalStore 를 쓴다. localStorage 는 React
+ * 바깥의 저장소라 이게 정석이고, 서버 스냅샷을 false 로 두면 SSR 은 아무것도 안 그려
+ * 하이드레이션이 어긋나지 않는다. effect 로 하면 eslint(set-state-in-effect)에도 걸린다.
+ *
+ * 표시 여부는 CSS(.hz-pc-hint)가 최종 결정한다. 데스크톱에서는 DOM 에 있어도 안 보이고,
+ * 그래서 데스크톱 방문자는 '봤음' 표시를 남기지 않는다 — 나중에 폰으로 들어오면 그때
+ * 제대로 한 번 뜬다.
+ */
+const PC_HINT_KEY = "hz-pc-hint-seen";
+const PC_HINT_EVENT = "hz-pc-hint-change";
+
+const pcHintStore = {
+  subscribe(cb: () => void) {
+    window.addEventListener(PC_HINT_EVENT, cb);
+    return () => window.removeEventListener(PC_HINT_EVENT, cb);
+  },
+  // 사파리 사생활 보호 모드 등에서 localStorage 접근이 던진다. 그때는 안 띄운다 —
+  // 껐다는 걸 기억할 수 없으니, 띄우면 갈 때마다 다시 뜬다.
+  getSnapshot() {
+    try {
+      return localStorage.getItem(PC_HINT_KEY) === null;
+    } catch {
+      return false;
+    }
+  },
+};
+
+function PcHint() {
+  const show = useSyncExternalStore(
+    pcHintStore.subscribe,
+    pcHintStore.getSnapshot,
+    () => false,
+  );
+
+  if (!show) return null;
+
+  const dismiss = () => {
+    try {
+      localStorage.setItem(PC_HINT_KEY, "1");
+    } catch {}
+    window.dispatchEvent(new Event(PC_HINT_EVENT));
+  };
+
+  return (
+    <div className="hz-pc-hint" role="status">
+      <Icon name="desktop_windows" style={{ fontSize: 18, flexShrink: 0 }} />
+      <span style={{ flex: 1, wordBreak: "keep-all" }}>지표를 한눈에 보시려면 PC를 권해 드립니다.</span>
+      <button
+        type="button"
+        onClick={dismiss}
+        aria-label="닫기"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+          width: 26,
+          height: 26,
+          borderRadius: 8,
+          border: "none",
+          background: "transparent",
+          color: "inherit",
+          opacity: 0.7,
+          cursor: "pointer",
+        }}
+      >
+        <Icon name="close" style={{ fontSize: 17 }} />
+      </button>
+    </div>
+  );
+}
+
+/**
  * 스크롤을 내리면 true, 올리면 false. 모바일 탑바를 감췄다 꺼내는 데 쓴다.
  *
  * window 가 아니라 인자로 받은 요소를 듣는다. 이 셸은 바깥(document)이 스크롤되지
@@ -679,6 +759,7 @@ export default function AppShell({
           {children}
           <Footer />
         </main>
+        <PcHint />
       </div>
     </div>
   );
