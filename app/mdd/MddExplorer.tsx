@@ -679,11 +679,12 @@ function Rarity({ a, periodLabel }: { a: MddAnalysis; periodLabel: string }) {
     );
   }
 
-  /* 1% 미만을 "0%"로 적지 않는다 — 날수는 있는데 비율이 0이면 두 숫자가 서로 어긋나 보인다.
-     '일'이 아니라 '거래일'인 건 낙폭이 종가 기준이라서다. 1,560일과 1,560거래일은 달력으로
-     2년 가까이 차이 난다(≈4.3년 vs ≈6.2년). */
+  /* 1% 미만을 "0%"로 적지 않는다 — 날수는 있는데 비율이 0이면 두 숫자가 서로 어긋나 보인다. */
   const pct = a.deeperThanNowPct < 0.5 ? "1% 미만" : `${Math.round(a.deeperThanNowPct)}%`;
-  const days = `${a.deeperThanNowDays.toLocaleString("ko-KR")}거래일`;
+  /* 세는 단위는 거래일인데 화면엔 '일'로 적는다(2026-07-30 Hun 결정). '거래일'이 더 정확하지만
+     히어로 한 문장에서 걸리는 말이고, 낙폭·기간이 전부 종가 기준인 페이지라 여기서만 단위를
+     따로 짚을 자리가 아니다. 정확한 단위는 lib/mdd.ts 의 deeperThanNowDays 주석에 있다. */
+  const days = `${a.deeperThanNowDays.toLocaleString("ko-KR")}일`;
   /* 64%에 "뿐"을 붙이면 드물다는 뜻이 사라진다. 흔한 쪽은 담담하게 적는다. */
   const tail = a.deeperThanNowPct < 10 ? "뿐입니다" : "입니다";
 
@@ -691,7 +692,7 @@ function Rarity({ a, periodLabel }: { a: MddAnalysis; periodLabel: string }) {
     <p style={style}>
       {periodLabel} 중 이보다 깊었던 날은{" "}
       {/* 숫자와 어미를 한 덩이로 — 떼어 놓으면 "뿐입니다"만 다음 줄에 혼자 남는다.
-          가장 긴 조합("1,559거래일(64%)입니다")도 maxWidth 340 안에 들어간다. */}
+          가장 긴 조합("1,559일(64%)입니다")도 maxWidth 340 안에 들어간다. */}
       <span style={{ whiteSpace: "nowrap" }}>
         <b style={{ color: C.ink }}>
           {days}({pct})
