@@ -283,14 +283,26 @@ body {
   flex-direction: column;
 }
 
-/* 모바일 하단 탭바 — 사이드바가 숨겨지는 폭에서만 나타난다(같은 브레이크포인트를 쓴다).
-   display를 인라인이 아니라 여기서 관리하는 이유는 사이드바와 같다. */
-.hz-tabbar {
-  display: none;
+/* 본문 여백. 인라인이 아니라 여기서 관리한다 — 모바일에서 탑바가 fixed 로 흐름에서
+   빠지고 그만큼을 padding-top 으로 되메우는데, 인라인 padding 축약형은 미디어쿼리의
+   padding-top 을 이겨서 그게 안 먹는다. */
+.hz-main {
+  padding: var(--hz-main-pad);
 }
-.hz-tab {
-  flex: 1 1 0;
-  min-width: 0;
+
+/* 탑바 좌우 여백. 인라인이 아니라 여기 두는 이유는 아래 모바일 미디어쿼리가 이겨야
+   하기 때문이다 — 인라인이면 폰에서 탑바 양끝이 본문 카드(16)와 안 맞고 24 로 남는다. */
+.hz-topbar {
+  padding: 0 24px;
+}
+
+/* 모바일 전용 조각들 — 기본은 숨기고 아래 560px 미디어쿼리에서만 켠다.
+   display 를 인라인이 아니라 여기서 관리하는 이유는 사이드바와 같다. */
+.hz-topbar-logo,
+.hz-menu-btn,
+.hz-menu-backdrop,
+.hz-menu-panel {
+  display: none;
 }
 
 /* 히어로 패딩/gap은 여기서 관리 — 모바일에서 좁혀야 고정 300px 게이지와
@@ -316,13 +328,63 @@ body {
 
 @media (max-width: 560px) {
   .hz-sidebar { display: none; }
-  .hz-tabbar { display: flex; }
   .hz-hero { padding: 28px 20px; gap: 32px; }
   .hz-topbar-date { display: none; }
   /* 1열이 되면서 사이드바가 빠져 폭이 도로 넉넉해지므로 카드 여백(18)은 그대로 두고
      본문 여백만 더 깎는다. 폰에서 카드는 화면 끝까지 가도 되지만(가장자리 16px),
      카드 '안쪽'까지 좁으면 숫자·막대가 눌린다. */
   :root { --hz-main-pad: 16px; }
+
+  /* ── 모바일 탑바 ────────────────────────────────────────────────
+     시세 티커를 걷어내고 로고 + (햄버거 · 테마) 만 남긴다. 좁은 화면에서 흐르는
+     마퀴는 읽히지도 않으면서 탑바를 다 차지했고, 사이드바가 숨는 폭이라 브랜드가
+     화면 어디에도 없었다. */
+  .hz-ticker-wrap { display: none; }
+  .hz-topbar-logo { display: inline-flex; align-items: center; }
+  .hz-menu-btn { display: inline-flex; }
+  .hz-topbar { padding: 0 16px; }
+
+  /* 스크롤을 내리면 접히고 올리면 다시 나온다. 흐름에서 빼야(fixed) 접힌 자리에
+     빈 칸이 안 남는다. 빠진 높이(54)는 본문 위쪽 여백으로 되메운다. */
+  .hz-topbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 40;
+    transition: transform 0.24s ease;
+  }
+  .hz-topbar-hidden {
+    transform: translateY(-100%);
+  }
+  .hz-main {
+    padding-top: calc(54px + var(--hz-main-pad));
+  }
+
+  /* 햄버거 메뉴. 백드롭·패널 모두 탑바(40)보다 아래에 둬서, 열려 있는 동안에도
+     탑바가 덮이지 않고 닫기(X) 버튼을 계속 누를 수 있다. */
+  .hz-menu-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    background: rgba(0, 0, 0, 0.35);
+  }
+  .hz-menu-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    position: fixed;
+    top: 54px;
+    left: 8px;
+    right: 8px;
+    z-index: 38;
+    padding: 8px;
+    background: var(--c-card);
+    border: 1px solid var(--c-line);
+    border-radius: 16px;
+    box-shadow: 0 12px 32px var(--c-shadow);
+  }
 }
 
 /* MDD 정밀분석 — 카드 2열 배치. 컴팩트한 카드는 가로로 둘씩 묶고, 넓어야 하는
@@ -752,6 +814,24 @@ main.hz-scroll { overflow-x: clip; }
 }
 .hz-mdd-link:hover {
   color: var(--c-blue);
+}
+
+/* 주요 종목 리포트의 머리줄 — 로고 · 종목명 · 종목코드 · 시세.
+   시세 묶음은 nowrap 이고 종목코드도 안 줄어서, 좁아지면 줄어들 수 있는 게 종목명(clip)
+   하나뿐이다. 폰에서 그 이름이 0 까지 눌려 아예 안 보였다. 폭이 모자라면 시세를 통째로
+   다음 줄로 내려 이름에 한 줄을 다 준다. */
+.hz-stock-price {
+  margin-left: auto;
+}
+@media (max-width: 560px) {
+  .hz-stock-head {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  .hz-stock-price {
+    margin-left: 0;
+    flex-basis: 100%;
+  }
 }
 
 /* 신고가 괴리율 카드의 종목 목록. 넓을 땐 왼쪽 게이지와 세로 선으로 나뉘지만, 좁아져

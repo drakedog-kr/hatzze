@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { DailyScore } from "@/lib/data";
 import { track } from "@/lib/ga";
@@ -289,29 +289,25 @@ function Sidebar() {
   );
 }
 
-// 모바일 하단 탭바 — 사이드바가 560px 아래에서 숨겨지는데(globals.css) 그 자리를 메우는
-// 내비게이션이 없었다. /kadera·/mdd 로 가는 유일한 링크가 푸터(문서 y≈10,774px)라
-// 사실상 닿을 수 없었다.
+// 모바일 메뉴(햄버거). 예전엔 하단 탭바였는데 탑바 오른쪽으로 올렸다.
 //
-// 햄버거+드로어 대신 하단 탭바를 고른 이유:
-//  1. 항목이 4개뿐이라 한 줄에 다 들어간다 — 접어 숨길 이유가 없다.
-//  2. 이 화면의 문제는 "갈 곳이 있는 줄 모른다"였다. 드로어는 그걸 한 겹 더 감춘다.
-//  3. 현재 페이지 표시(사이드바와 같은 파란 배경)가 늘 떠 있다 — 드로어는 열어야 보인다.
+// 탭바를 접은 이유는 그때 적어 둔 근거가 뒤집혔기 때문이다. "항목이 4개뿐이라 한 줄에
+// 다 들어간다"가 전제였는데, 서학개미 해부도가 붙어 5개가 되면서 칸마다 라벨이 눌린다.
+// 게다가 예고 항목은 탭 칸에 두면 눌러도 아무 일이 없어 고장으로 보인다 — 탭바가 뜨는
+// 폭은 터치라 hover 가 없어서 "준비 중" 툴팁이 안 뜬다. 세로 목록은 배지를 그 자리에
+// 늘 띄워 두므로 눌러 보기 전에 이유가 보인다.
 //
-// position:fixed 가 아니라 셸 flex 칼럼의 마지막 칸으로 둔다. 스크롤은 바깥이 아니라
-// main.hz-scroll 이 자체적으로 하므로, 흐름에 놓으면 마지막 콘텐츠를 덮을 일이 없다
-// (하단 패딩으로 가림을 보정할 필요도 없다).
-function MobileTabBar() {
+// 열려 있는 동안에만 DOM 에 올린다. 데스크톱에서는 여는 버튼 자체가 없지만, 열어 둔
+// 채로 창을 넓히는 경우가 있어 패널·백드롭의 display 는 미디어쿼리가 최종적으로 막는다.
+function MobileMenu({ onClose }: { onClose: () => void }) {
   const intentPrefetch = useIntentPrefetch();
   const pathname = usePathname();
 
-  const tabStyle = (active: boolean): React.CSSProperties => ({
+  const rowStyle = (active: boolean): React.CSSProperties => ({
     display: "flex",
-    flexDirection: "column",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 3,
-    padding: "7px 2px",
+    gap: 12,
+    padding: "13px 14px",
     borderRadius: 12,
     color: active ? C.blue : C.sub,
     fontWeight: active ? 700 : 600,
@@ -322,38 +318,68 @@ function MobileTabBar() {
   });
 
   return (
-    <nav className="hz-tabbar" aria-label="주요 메뉴" style={{ flexShrink: 0, background: C.card, borderTop: `1px solid ${C.line}`, padding: "6px 8px" }}>
-      {NAV.map((item) => {
-        const active = isActive(item.href, pathname);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            {...intentPrefetch(item.href)}
-            className={`hz-tab hz-nav-item${active ? " hz-nav-active" : ""}`}
-            aria-current={active ? "page" : undefined}
-            style={tabStyle(active)}
+    <>
+      <div className="hz-menu-backdrop" onClick={onClose} />
+      <nav className="hz-menu-panel" id="hz-mobile-menu" aria-label="주요 메뉴">
+        {NAV.map((item) => {
+          const active = isActive(item.href, pathname);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              {...intentPrefetch(item.href)}
+              className={`hz-nav-item${active ? " hz-nav-active" : ""}`}
+              aria-current={active ? "page" : undefined}
+              style={rowStyle(active)}
+            >
+              <Icon name={item.icon} style={{ fontSize: 20 }} />
+              <span style={{ fontSize: 15 }}>{item.label}</span>
+            </Link>
+          );
+        })}
+        {/* 예고 항목 — 사이드바와 같은 이유로 <div> 다(링크가 아니고 포커스도 안 받는다).
+            다만 배지는 위첨자가 아니라 라벨 옆에 나란히 둔다. 여기는 폭이 사이드바처럼
+            210px 로 묶여 있지 않아 자리가 남고, 툴팁이 안 뜨는 화면이라 배지가 유일한
+            설명이므로 겹쳐 두지 않고 또렷하게 보여야 한다. */}
+        <div className="hz-tip" data-tip={COMING_SOON.tip} style={{ ...rowStyle(false), color: C.faint }}>
+          <AntIcon size={20} />
+          <span style={{ fontSize: 15 }}>{COMING_SOON.label}</span>
+          <span
+            style={{
+              fontSize: 9,
+              fontWeight: 700,
+              lineHeight: 1.4,
+              whiteSpace: "nowrap",
+              color: C.faint,
+              background: "var(--c-hover)",
+              border: `1px solid ${C.line}`,
+              padding: "2px 6px",
+              borderRadius: 999,
+            }}
           >
-            <Icon name={item.icon} style={{ fontSize: 22 }} />
-            <span style={{ fontSize: 10, whiteSpace: "nowrap" }}>{item.label}</span>
-          </Link>
-        );
-      })}
-      <a
-        href={TELEGRAM.href}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label={TELEGRAM.aria}
-        className="hz-tab hz-nav-item"
-        data-ga="cta_click"
-        data-ga-cta="community"
-        data-ga-surface="tabbar"
-        style={tabStyle(false)}
-      >
-        <Icon name={TELEGRAM.icon} style={{ fontSize: 22 }} />
-        <span style={{ fontSize: 10, whiteSpace: "nowrap" }}>{TELEGRAM.label}</span>
-      </a>
-    </nav>
+            {COMING_SOON.badge}
+          </span>
+        </div>
+        <span style={{ height: 1, background: C.line, margin: "4px 8px" }} />
+        {/* 라벨은 바뀌었어도 data-ga-cta 는 "community" 그대로 둔다 — 값을 같이 바꾸면
+            이름 변경 전후의 클릭수를 한 줄로 비교할 수 없다. surface 만 tabbar → menu 로
+            바꾼다. 그 자리는 실제로 없어졌으니 계속 tabbar 로 적으면 거짓이 된다. */}
+        <a
+          href={TELEGRAM.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={TELEGRAM.aria}
+          className="hz-nav-item"
+          data-ga="cta_click"
+          data-ga-cta="community"
+          data-ga-surface="menu"
+          style={rowStyle(false)}
+        >
+          <Icon name={TELEGRAM.icon} style={{ fontSize: 20 }} />
+          <span style={{ fontSize: 15 }}>{TELEGRAM.label}</span>
+        </a>
+      </nav>
+    </>
   );
 }
 
@@ -427,7 +453,19 @@ const PLACEHOLDER: Quote[] = [
   { label: "원/달러", value: "—", change: null },
 ];
 
-function TopBar({ dailyScore, theme }: { dailyScore: DailyScore | null; theme: "light" | "dark" }) {
+function TopBar({
+  dailyScore,
+  theme,
+  scrolledDown,
+  menuOpen,
+  onMenuToggle,
+}: {
+  dailyScore: DailyScore | null;
+  theme: "light" | "dark";
+  scrolledDown: boolean;
+  menuOpen: boolean;
+  onMenuToggle: () => void;
+}) {
   // 햇쩨 지수는 일간 값이라 서버 prop을 쓰고, 나머지 시세는 10분마다 폴링한다.
   const [live, setLive] = useState<Quote[]>(PLACEHOLDER);
 
@@ -467,8 +505,13 @@ function TopBar({ dailyScore, theme }: { dailyScore: DailyScore | null; theme: "
 
   const quotes: Quote[] = [hatzze, ...live];
 
+  // 메뉴가 열려 있으면 감추지 않는다 — 패널이 탑바 바로 아래에 붙어 있어서, 탑바만
+  // 올라가면 패널이 허공에 뜬다.
+  const hidden = scrolledDown && !menuOpen;
+
   return (
     <header
+      className={`hz-topbar${hidden ? " hz-topbar-hidden" : ""}`}
       style={{
         height: 54,
         flexShrink: 0,
@@ -478,9 +521,15 @@ function TopBar({ dailyScore, theme }: { dailyScore: DailyScore | null; theme: "
         alignItems: "center",
         justifyContent: "space-between",
         gap: 16,
-        padding: "0 24px",
+        // 좌우 여백은 .hz-topbar 가 정한다(데스크톱 24 · 모바일 16). 인라인에 두면
+        // 미디어쿼리가 못 이겨서, 폰에서 탑바 양끝이 카드(16)와 안 맞고 24 로 남는다.
       }}
     >
+      {/* 모바일 전용 로고. 사이드바가 숨는 폭에서는 브랜드가 화면 어디에도 없었다.
+          display 를 인라인으로 안 주는 이유는 아래 미디어쿼리가 이겨야 하기 때문이다. */}
+      <Link href="/" aria-label="hatzze 홈" className="hz-topbar-logo hz-logo-link">
+        <LogoLockup symbolSize={22} wordmarkSize={23} gap={6} />
+      </Link>
       <div className="hz-ticker-wrap">
         <div className="hz-ticker-track">
           {[...quotes, ...quotes].map((q, i) => (
@@ -491,9 +540,70 @@ function TopBar({ dailyScore, theme }: { dailyScore: DailyScore | null; theme: "
           ))}
         </div>
       </div>
-      <ThemeToggle initial={theme} />
+      {/* 오른쪽 묶음: 테마 토글 + 햄버거(모바일 전용). 햄버거가 화면 맨 오른쪽 끝이다.
+          데스크톱에서는 햄버거가 display:none 이라 flex 에서 아예 빠지고, 남는 건
+          예전과 같은 토글 하나다 — 순서를 바꿔도 데스크톱은 그대로다. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+        <ThemeToggle initial={theme} />
+        <button
+          type="button"
+          className="hz-menu-btn"
+          onClick={onMenuToggle}
+          aria-label={menuOpen ? "메뉴 닫기" : "메뉴 열기"}
+          aria-expanded={menuOpen}
+          aria-controls="hz-mobile-menu"
+          style={{
+            alignItems: "center",
+            justifyContent: "center",
+            width: 38,
+            height: 38,
+            borderRadius: 12,
+            border: `1px solid ${C.line}`,
+            background: C.bg,
+            color: C.sub,
+            cursor: "pointer",
+            flexShrink: 0,
+          }}
+        >
+          <Icon name={menuOpen ? "close" : "menu"} style={{ fontSize: 20 }} />
+        </button>
+      </div>
     </header>
   );
+}
+
+/**
+ * 스크롤을 내리면 true, 올리면 false. 모바일 탑바를 감췄다 꺼내는 데 쓴다.
+ *
+ * window 가 아니라 인자로 받은 요소를 듣는다. 이 셸은 바깥(document)이 스크롤되지
+ * 않는다 — 루트가 overflow:hidden 이고 main.hz-scroll 이 자기 안에서 굴린다.
+ * window 에 붙이면 이벤트가 한 번도 안 온다.
+ *
+ * 6px 문턱을 둔 이유는 관성 스크롤이 끝날 때 1~2px 씩 방향이 튀어서, 문턱이 없으면
+ * 탑바가 깜빡이기 때문이다. 최상단(10px 이내)에서는 방향과 무관하게 늘 보여 준다.
+ *
+ * 데스크톱에서도 이 훅은 돌지만 보이는 변화는 없다 — 감추는 건 transform 이고,
+ * 그 규칙은 560px 미디어쿼리 안에만 있다.
+ */
+function useScrolledDown(ref: React.RefObject<HTMLElement | null>) {
+  const [scrolledDown, setScrolledDown] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let last = el.scrollTop;
+    const onScroll = () => {
+      const y = el.scrollTop;
+      const dy = y - last;
+      if (Math.abs(dy) < 6) return;
+      last = y;
+      setScrolledDown(y > 10 && dy > 0);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [ref]);
+
+  return scrolledDown;
 }
 
 export default function AppShell({
@@ -505,6 +615,32 @@ export default function AppShell({
   theme: "light" | "dark";
   children: React.ReactNode;
 }) {
+  const mainRef = useRef<HTMLElement>(null);
+  const scrolledDown = useScrolledDown(mainRef);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const pathname = usePathname();
+
+  // 페이지를 옮기면 닫는다. 패널은 셸에 얹혀 있어 라우팅만으로는 사라지지 않는다.
+  //
+  // useEffect 가 아니라 렌더 중에 맞춘다. effect 로 하면 이미 그린 뒤에 다시 그리는
+  // 셈이라 메뉴가 한 프레임 남고(cascading render), eslint 도 막는다. 링크마다
+  // onClick 으로 닫는 방법도 있지만 그러면 뒤로가기·앞으로가기가 빠진다 — pathname 을
+  // 보면 어떤 경로로 바뀌든 다 걸린다.
+  const [menuPath, setMenuPath] = useState(pathname);
+  if (menuPath !== pathname) {
+    setMenuPath(pathname);
+    setMenuOpen(false);
+  }
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
+
   return (
     <div
       className="hz-shell"
@@ -525,13 +661,24 @@ export default function AppShell({
       <GaEvents />
       <Sidebar />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <TopBar dailyScore={dailyScore} theme={theme} />
-        {/* 여백은 globals.css 의 --hz-main-pad 가 폭에 따라 정한다(40 → 24 → 16). */}
-        <main className="hz-scroll" style={{ flex: 1, overflowY: "auto", padding: "var(--hz-main-pad)" }}>
+        <TopBar
+          dailyScore={dailyScore}
+          theme={theme}
+          scrolledDown={scrolledDown}
+          menuOpen={menuOpen}
+          onMenuToggle={() => setMenuOpen((v) => !v)}
+        />
+        {/* 메뉴는 탑바 '안'이 아니라 형제로 둔다. 안에 두면 백드롭이 탑바의 자식이 되어
+            로고·햄버거까지 덮어 버려서, 정작 닫기 버튼을 누를 수 없다. */}
+        {menuOpen && <MobileMenu onClose={() => setMenuOpen(false)} />}
+        {/* 여백은 globals.css 의 --hz-main-pad 가 폭에 따라 정한다(40 → 24 → 16).
+            인라인이 아니라 .hz-main 클래스로 준다 — 모바일에서 탑바가 fixed 로 떠서
+            흐름에서 빠지는데, 그만큼을 padding-top 으로 되메워야 첫 카드가 안 가린다.
+            인라인 padding 은 미디어쿼리의 padding-top 을 이겨서 그게 안 먹는다. */}
+        <main ref={mainRef} className="hz-scroll hz-main" style={{ flex: 1, overflowY: "auto" }}>
           {children}
           <Footer />
         </main>
-        <MobileTabBar />
       </div>
     </div>
   );
