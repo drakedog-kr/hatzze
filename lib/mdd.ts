@@ -243,10 +243,29 @@ function drawdownCharacter(eps: Episode[], currentDd: number): DrawdownCharacter
  *    고르는 방식)로 바꿨더니 이번엔 굴곡이 과장돼 10년 차트가 지그재그로 뒤덮였다.
  *    장기 차트는 원래 완만해야 읽힌다.
  *
- * 그래서 원래의 등간격 샘플링으로 돌아오되, **최저점 한 점만 따로 끼워 넣는다.**
- * 그 점이 빠지는 게 애초의 버그였고, 하나 넣는 걸로 표시와 헤드라인이 다시 맞는다.
+ * 그래서 원래의 등간격 샘플링으로 돌아오되, **화면이 숫자로 적는 날은 따로 끼워 넣는다.**
+ * 처음엔 기간 최저점 하나였는데, 그것만으로는 모자랐다 — 같은 페이지의 '역대 낙폭 Top 5'는
+ * 전량으로 계산하는데 차트는 등간격 격자만 보므로, 격자 사이에 낀 저점은 표에만 남고 곡선에선
+ * 사라진다. 그러면 한 화면에서 같은 날의 숫자가 둘이 된다(실측 2026-07-30, 10년 화면):
+ *
+ *   삼성전자     2026-03-31  표 −23.30%  ↔ 곡선 −13.47%
+ *   에코프로비엠  2020-03-19  표 −40.72%  ↔ 곡선 −25.79%
+ *   SK하이닉스   2024-09-19  표 −36.60%  ↔ 곡선 −29.02%
+ *
+ * 고점 쪽도 같다. 표가 "{peakDate} 고점"이라 적는 날이 격자에 없으면 곡선은 그날 0%로
+ * 안 올라오고, 실측 최대 10.7%p 어긋났다(SK하이닉스 2026-06-22).
+ *
+ * 그래서 keepDates 로 **표에 적히는 날짜만** 받아 격자에 더한다. 위 2)의 톱니·과장과는
+ * 다른 처방이다 — 그건 구간마다 극값을 뽑아 250점 전체를 흔든 것이고, 이건 종목당 10점
+ * 안팎(실측 247→254)이라 곡선의 결은 그대로 두고 어긋난 날만 제자리에 놓는다.
+ *
+ * 1년 화면은 간격이 1일이라 애초에 어긋나지 않는다. 이 손질은 기간을 넓혔을 때만 일한다.
  */
-function downsample(series: DrawdownPoint[], targetPoints: number): DrawdownPoint[] {
+function downsample(
+  series: DrawdownPoint[],
+  targetPoints: number,
+  keepDates: readonly string[] = [],
+): DrawdownPoint[] {
   const n = series.length;
   if (n <= targetPoints || targetPoints < 3) return series;
 
@@ -260,6 +279,15 @@ function downsample(series: DrawdownPoint[], targetPoints: number): DrawdownPoin
   let trough = 0;
   for (let i = 1; i < n; i++) if (series[i].dd < series[trough].dd) trough = i;
   keep.add(trough);
+
+  // 화면이 날짜와 값을 함께 적는 지점들. 없는 날짜(휴장·구간 밖)는 조용히 건너뛴다.
+  if (keepDates.length > 0) {
+    const indexOfDate = new Map(series.map((p, i) => [p.date, i]));
+    for (const d of keepDates) {
+      const i = indexOfDate.get(d);
+      if (i !== undefined) keep.add(i);
+    }
+  }
 
   return [...keep].sort((x, y) => x - y).map((i) => series[i]);
 }
@@ -292,6 +320,12 @@ export function analyzeDrawdown(bars: Bar[]): MddAnalysis | null {
      오늘이다. 0일은 '지금이 이 구간에서 가장 깊다'는 뜻이라 화면이 문장을 갈아탄다. */
   const deeperDays = ds.filter((p) => p.dd < last.dd).length;
   const eps = episodes(bars);
+  const topDrawdowns = [...eps].sort((a, b) => a.depth - b.depth).slice(0, 5);
+
+  /* 차트가 반드시 지나야 하는 날 = 화면이 날짜와 값을 함께 적는 곳.
+     헤드라인의 최고가(athDate)·기간 최저점(mddDate)과 '역대 낙폭 Top 5'의 고점·저점이다.
+     여기 없는 날은 곡선이 격자 사이를 직선으로 건너뛰어도 화면과 어긋나지 않는다. */
+  const anchorDates = [athDate, mddDate, ...topDrawdowns.flatMap((e) => [e.peakDate, e.troughDate])];
 
   return {
     firstDate: bars[0].date,
@@ -309,10 +343,10 @@ export function analyzeDrawdown(bars: Bar[]): MddAnalysis | null {
     //   1년 250거래일  → 간격 1일  = 일봉처럼 오르내림이 다 보인다
     //   5년 1,230일    → 간격 5일  ≈ 주봉
     //   10년 2,470일   → 간격 10일 ≈ 2주봉, 선이 완만해진다
-    underwater: downsample(ds, 250),
+    underwater: downsample(ds, 250, anchorDates),
     recovery: recoveryStats(eps, last.dd),
     character: drawdownCharacter(eps, last.dd),
-    topDrawdowns: [...eps].sort((a, b) => a.depth - b.depth).slice(0, 5),
+    topDrawdowns,
   };
 }
 
