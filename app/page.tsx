@@ -358,7 +358,13 @@ function Foot({ text, color = C.sub }: { text: string; color?: string }) {
 }
 
 // 과열도 진행 바 (세부 데이터가 없는 카드의 공용 시각화).
-function HeatBar({ v }: { v: Pick }) {
+/**
+ * 과열도 진행 바. hideThreshold 를 주면 맨 아래 "초고온 기준선 …" 줄을 뺀다.
+ *
+ * 상승 속도 카드가 그렇다 — 그 카드는 이미 "60거래일 전 X → 지금 Y"로 값의 뜻을
+ * 다 말해 놓고, 그 아래 다시 기준선 퍼센트를 적으면 같은 축의 숫자가 셋이 된다.
+ */
+function HeatBar({ v, hideThreshold = false }: { v: Pick; hideThreshold?: boolean }) {
   if (v.capped === null) return null;
   const c = overheatColor(v.capped);
   return (
@@ -384,7 +390,7 @@ function HeatBar({ v }: { v: Pick }) {
         <span>안심</span>
         <span style={{ color: C.hot }}>과열 100</span>
       </div>
-      {v.hotDisp && (
+      {v.hotDisp && !hideThreshold && (
         <p style={{ margin: "8px 0 0", textAlign: "center", fontSize: 10, fontWeight: 600, color: C.sub, fontFamily: MONO }}>
           초고온 기준선 {v.hotDisp} {v.dirLabel}
         </p>
@@ -1150,7 +1156,7 @@ function CardSpeed({ v }: { v: Pick }) {
       {/* paddingTop 으로 과열도 박스와의 최소 간격을 보장한다 — flex-end 만으로는 카드가
           짧을 때 근거 줄에 바로 붙어 두 덩어리가 한 블록처럼 보인다. */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", paddingTop: 18 }}>
-        <HeatBar v={v} />
+        <HeatBar v={v} hideThreshold />
       </div>
       <Foot text={v.desc} />
     </Shell>
@@ -1820,7 +1826,7 @@ function CardNetBuy({ v }: { v: Pick }) {
     <Shell hit={v.isHit} minH={210}>
       <TitleRow desc={v.headline} icon="public" name={v.name} />
       <div style={{ margin: "6px 0 2px" }}>
-        <span style={{ fontSize: 10, fontWeight: 600, color: C.sub }}>외국인 · 최근 5거래일 누적</span>
+        <span style={{ fontSize: 10, fontWeight: 600, color: C.sub }}>최근 5거래일 누적</span>
         <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
           {/* "12,929억"은 한눈에 안 읽히고 "1.3조원"은 끝자리가 날아간다 — 둘을 함께 쓴다. */}
           <span style={{ fontFamily: MONO, fontSize: 24, fontWeight: 700, color: tone, letterSpacing: "-0.03em" }}>
@@ -1952,7 +1958,9 @@ function CardLimitUp({ v }: { v: Pick }) {
       <div style={{ display: "flex", alignItems: "baseline", gap: 5, margin: "6px 0 12px" }}>
         <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 700, color: c, letterSpacing: "-0.03em" }}>{surged}</span>
         <span style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>종목</span>
-        <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 12, fontWeight: 700, color: c }}>
+        {/* 퍼센트만 있으면 "무엇의 6.15%"인지 모른다. 분모를 붙여 둔다. */}
+        <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: c, whiteSpace: "nowrap" }}>
+          {listed ? `${listed.toLocaleString("ko-KR")}종목 중 ` : ""}
           {(v.raw ?? 0).toFixed(2)}%
         </span>
       </div>
@@ -1977,8 +1985,13 @@ function CardLimitUp({ v }: { v: Pick }) {
           <span
             // 강도별 개수는 여기 한 곳에 모은다. 줄마다 붙이면 랭킹이 라벨로 시끄러워진다.
             // 커서는 건드리지 않는다(globals.css 의 .hz-tip 주석).
-            className="hz-tip hz-tip-wide hz-tip-start"
-            data-tip={buckets.map((b) => `${b.label} ${b.n}종목`).join(" · ") + (listed ? ` / 전체 ${listed}종목` : "")}
+            // hz-tip-lines: data-tip 의 줄바꿈을 살린다. 한 줄로 이으면 세 단계가
+            // 눈에 안 들어온다.
+            className="hz-tip hz-tip-wide hz-tip-lines hz-tip-start"
+            data-tip={
+              buckets.map((b) => `${b.label}  ${b.n}종목`).join("\n") +
+              (listed ? `\n전체  ${listed.toLocaleString("ko-KR")}종목` : "")
+            }
             style={{ fontSize: 11, fontWeight: 600, color: "var(--c-muted)", marginTop: 1 }}
           >
             외 {rest}개
@@ -2149,8 +2162,8 @@ export default async function Home() {
                     0.04로 거의 안 움직여(가중치 주석의 "느림·비타이밍"과 같은 이유) 뒤로 뺐다. */}
                 <CardHighGap v={p("kospi_high_gap")} tops={topGaps} />
                 <CardVolume v={p("kospi_volume_surge")} />
-                <CardLimitUp v={p("limit_up_breadth")} />
                 <CardSpeed v={p("kospi_speed_60d")} />
+                <CardLimitUp v={p("limit_up_breadth")} />
                 <CardNetBuy v={p("foreign_sell_at_high")} />
                 <CardPutCall v={p("put_call_ratio")} />
                 <CardTurnover v={p("turnover_concentration")} />

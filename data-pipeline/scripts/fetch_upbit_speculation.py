@@ -68,7 +68,7 @@ VOLUME_SURGE_CEILING = 175.0  # 평균의 1.75배 = 거래 폭발
 INDICATOR_SLUG = "upbit_speculation_index"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
-    "name": "업비트 투기 과열 지수",
+    "name": "코인 투자 과열 지수",
     "headline": "김치 프리미엄과 코인 거래량",
     "category": "감성",
     # 코인 자금이 코스피로 옮겨왔다는 '자금 이동'으로 읽지 않는다 — 이 지표는 그걸

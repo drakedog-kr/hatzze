@@ -629,6 +629,15 @@ main.hz-scroll { overflow-x: clip; }
   }
 }
 
+/* data-tip 안의 줄바꿈(\n)을 그대로 살린다. 여러 항목을 나열하는 툴팁에 쓴다 —
+   한 줄로 이으면 항목의 개수와 경계가 눈에 안 들어온다. hz-tip-wide 와 같이 쓴다.
+   ⚠️ 위치가 중요하다. .hz-tip-wide 와 좁은 화면 미디어쿼리가 둘 다 white-space 를
+   normal 로 되돌리므로, 특이도가 같은 이 규칙은 **그 둘보다 뒤에** 있어야 이긴다. */
+.hz-tip-lines::after {
+  white-space: pre-line;
+  text-align: left;
+}
+
 /* 아래로 펼치는 변형 — 스크롤 컨테이너(main, overflow:auto) 최상단에 있는 요소는
    기본값(위로 펼침)이면 툴팁이 컨테이너 경계에서 잘린다(햇쩨 지수 도움말이 그랬다).
    위 공간이 없고 아래가 넉넉한 자리에서 쓴다. */
