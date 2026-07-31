@@ -1,9 +1,11 @@
-"""코스피 전종목의 장중 급등 종목 수를 가중 합산해 froth 지표로 저장.
+"""코스피에서 장중 10% 넘게 오른 종목의 비율을 froth 지표로 저장.
 
-원값 = 3×상한가 터치 + 2×(+20~29%) + 1×(+10~20%)
+원값 = (장중 고가가 +10% 이상인 종목 수) ÷ 전체 종목 수 × 100  (단위 %)
 
-**세 칸은 겹치지 않는다.** 상한가 ⊂ +20 ⊂ +10 이라 그냥 세면 상한가 종목이 세 번
-세어져 가중치가 의도대로 안 먹는다.
+**비율인 게 핵심이다.** 개수로 재면 상장 종목이 늘기만 해도 값이 오른다(2021년
+2,300개대 → 2,700개대). 분모가 전체 종목 수라 그 증가가 상쇄되고, 고정 눈금을
+써도 낡지 않는다. 앞서 쓰던 가중 합산(3×상한가 + 2×(+20~29%) + 1×(+10~20%))은
+개수 기반이라 롤링 평균을 기준선으로 삼아야 했는데, 그 장치가 통째로 필요 없어졌다.
 
 **종가가 아니라 장중 고가로 잰다.** KRX 가 주는 등락률(FLUC_RT)은 종가 기준이라,
 상한가를 찍었다가 풀려서 +26% 로 마감한 종목을 통째로 놓친다(2026-07-30 실측:
@@ -52,8 +54,8 @@ from common.supabase_client import get_client  # noqa: E402
 # 지표가 사실상 코스닥 지표가 된다. 이 사이트의 과열도는 코스피 시장을 말하므로 시장을
 # 맞춘다. 코스닥 쏠림은 kosdaq_kospi_ratio 가 따로 본다.
 KRX_URLS = ("http://data-dbg.krx.co.kr/svc/apis/sto/stk_bydd_trd",)
-# 원값 가중치. 처음엔 손으로 정한다 — 데이터로 고르려 했지만 어떤 조합도 국면을 못 갈랐다.
-W_LIMIT, W_20, W_10 = 3, 2, 1
+# 급등 판정선(장중 고가 기준, %). 이 위가 전부 원값의 분자다.
+SURGE_LO = 10.0
 LIMIT_LO, LIMIT_HI = 29.0, 30.5  # 상한가 판정 구간(호가 절사로 29.x~30.0 에 찍힌다)
 BACKFILL_DAYS = 2000  # 달력일. 2021년 초까지 닿는다
 RECENT_DAYS = 10  # 평소 실행에서 다시 계산하는 최근 구간(KRX 지연을 덮는다)
@@ -63,13 +65,13 @@ REQUEST_DELAY_SEC = 0.05
 INDICATOR_SLUG = "limit_up_breadth"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
-    "name": "급등 종목 강도",
+    "name": "급등 종목 비율",
     "category": "시장",
-    "headline": "장중 급등 종목이 얼마나 쏟아졌나",
+    "headline": "10% 넘게 오른 종목이 얼마나 되나",
     # 카드에서 headline 은 한 줄, 이 설명은 두 줄에 들어가야 한다. 시장(코스피)은 안 적는다 —
     # 사이트 전체가 코스피 과열도라 카드마다 되풀이할 필요가 없다(다른 카드도 안 적는다).
-    "description_beginner": "상한가 근처까지 오른 종목이 쏟아지면, 개별 종목에 돈이 몰리는 장입니다",
-    "unit": "점",
+    "description_beginner": "장중 10% 넘게 오른 종목이 많을수록, 개별 종목에 돈이 몰리는 장입니다",
+    "unit": "%",
 }
 
 
@@ -116,7 +118,10 @@ def collect_day(d: date) -> dict | None:
             buckets["up10"].append(item)
 
     counts = {k: len(v) for k, v in buckets.items()}
-    raw = W_LIMIT * counts["limit"] + W_20 * counts["up20"] + W_10 * counts["up10"]
+    # 분자는 세 칸의 합 = 장중 +10% 이상 오른 모든 종목. 칸을 나눠 세는 건 카드 툴팁이
+    # 강도별로 보여 주기 위한 것이지, 원값에는 가중치가 없다.
+    surged = counts["limit"] + counts["up20"] + counts["up10"]
+    raw = round(surged / len(rows) * 100, 3) if rows else 0.0
 
     details: dict = {
         "limit_n": counts["limit"],
@@ -172,8 +177,8 @@ def main() -> None:
     iso, got = last
     dt = got["details"]
     print(
-        f"[Supabase] {saved}거래일 upsert. 최신 {iso} → 원값 {got['raw']:.0f}점 "
-        f"(상한가 {dt['limit_n']} · +20~29% {dt['up20_n']} · +10~20% {dt['up10_n']})"
+        f"[Supabase] {saved}거래일 upsert. 최신 {iso} → {got['raw']:.2f}% "
+        f"(상한가 {dt['limit_n']} · +20~29% {dt['up20_n']} · +10~20% {dt['up10_n']} / 전체 {dt['listed_n']})"
     )
 
 

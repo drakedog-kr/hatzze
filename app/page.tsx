@@ -1900,15 +1900,15 @@ function CardNetBuy({ v }: { v: Pick }) {
 }
 
 /**
- * 급등 종목 강도 — 장중 급등 종목 수를 가중 합산한 점수(3·상한가 + 2·(+20~29%) + 1·(+10~20%)).
+ * 급등 종목 비율 — 코스피에서 장중 10% 넘게 오른 종목의 비율(%).
  *
- * 막대는 **점수 기여도**를 쌓는다(개수가 아니다). 이 카드의 큰 숫자가 어디서 왔는지는
- * 개수만 봐서는 안 나온다 — 상한가 5개가 15점이고 +10~20% 49개가 49점이라, 개수로는
- * 뒤쪽이 열 배지만 점수로는 세 배다. 쌓아 놓으면 그 몫이 그대로 보인다.
+ * 큰 숫자는 비율이고, 그 아래에 "943종목 중 58개"를 붙여 분모·분자를 그대로 밝힌다.
+ * 퍼센트만 있으면 6.15% 가 몇 종목인지 감이 안 오고, 개수만 있으면 상장 종목이 늘 때
+ * 같은 개수가 다른 뜻이 된다. 둘을 같이 둬야 읽힌다.
  *
- * 막대 위의 세로선은 **1년 평균**(threshold)이다. 이 지표의 눈금은 절대값이 아니라
- * 평균 대비 급증이라, 평균이 어디인지 안 보이면 72점이 뜨거운지 아닌지 알 수 없다.
- * 막대가 그 선을 넘었으면 평소보다 뜨거운 날이다.
+ * 막대는 **강도별 구성**이다(원값에는 가중치가 없다 — 세 칸의 단순 합이 분자다).
+ * 같은 6% 라도 상한가가 몇인지에 따라 장의 성격이 다르므로, 그 몫을 색으로 나눈다.
+ * 세로선은 초고온 진입선(5%)이다.
  *
  * 세 칸에 각각 툴팁을 달아 어떤 종목이 그 칸에 들었는지 보여 준다. 파이프라인이
  * 거래대금 상위 10종목만 details 에 넣으므로, 그보다 많으면 "외 N개"로 센다.
@@ -1916,22 +1916,24 @@ function CardNetBuy({ v }: { v: Pick }) {
 function CardLimitUp({ v }: { v: Pick }) {
   const c = overheatColor(v.capped);
   const dt = v.details as unknown as {
-    limit_n?: number; up20_n?: number; up10_n?: number;
+    limit_n?: number; up20_n?: number; up10_n?: number; listed_n?: number;
     limit_names?: string[]; up20_names?: string[]; up10_names?: string[];
   } | null;
 
-  // 가중치는 파이프라인(fetch_limit_up_breadth.py)과 같아야 한다. 갈리면 막대 합이
-  // 큰 숫자와 안 맞는다.
   const buckets = [
-    { label: "상한가", short: "상한가", n: dt?.limit_n ?? 0, w: 3, names: dt?.limit_names ?? [], tone: C.mania },
-    { label: "+20~29%", short: "+20%", n: dt?.up20_n ?? 0, w: 2, names: dt?.up20_names ?? [], tone: C.hot },
-    { label: "+10~20%", short: "+10%", n: dt?.up10_n ?? 0, w: 1, names: dt?.up10_names ?? [], tone: C.neutral },
+    { label: "상한가", short: "상한가", n: dt?.limit_n ?? 0, names: dt?.limit_names ?? [], tone: C.mania },
+    { label: "+20~29%", short: "+20%", n: dt?.up20_n ?? 0, names: dt?.up20_names ?? [], tone: C.hot },
+    { label: "+10~20%", short: "+10%", n: dt?.up10_n ?? 0, names: dt?.up10_names ?? [], tone: C.neutral },
   ];
-  const raw = v.raw ?? 0;
-  const avg = v.threshold; // rolling_average 의 기준선 = 최근 1년 평균
-  // 막대 눈금은 오늘 값과 평균 중 큰 쪽에 맞춘다 — 평균이 오늘보다 크면(조용한 날)
-  // 그 세로선이 막대 밖으로 나가 버린다.
-  const scale = Math.max(raw, avg ?? 0) || 1;
+  const surged = buckets.reduce((a, b) => a + b.n, 0);
+  const listed = dt?.listed_n ?? 0;
+  const pct = v.raw ?? 0;
+  // 막대 눈금은 오늘 값과 진입선 중 큰 쪽. 조용한 날엔 진입선이 오늘보다 커서, 안 그러면
+  // 세로선이 막대 밖으로 나간다.
+  // 초고온 진입선(진행률 75 지점). Pick 은 서식 문자열(hotDisp)만 내보내서 위치 계산에
+  // 못 쓰므로 details 의 원값을 직접 읽는다. 파이프라인이 새 설정으로 돌기 전엔 없다.
+  const hot = v.details?.hot_threshold ?? null;
+  const scale = Math.max(pct, hot ?? 0) || 1;
 
   return (
     <Shell hit={v.isHit} minH={210}>
@@ -1939,66 +1941,48 @@ function CardLimitUp({ v }: { v: Pick }) {
           액자에 넣으므로 이 카드만은 자기 자료일을 계속 밝힌다(예탁금 카드에서 물려받은 처리). */}
       <TitleRow desc={v.headline} icon="bolt" name={v.name} badge={sourceDateBadge(v) ?? "최근 거래일 기준"} />
 
-      <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "6px 0 12px" }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "6px 0 3px" }}>
         <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 700, color: c, letterSpacing: "-0.03em" }}>
-          {raw.toLocaleString("ko-KR")}
+          {pct.toFixed(2)}
         </span>
-        <span style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>점</span>
-        {/* 평균 대비 몇 %인지. 이 지표의 과열도는 이 값 하나로 정해지므로 큰 숫자 옆에 붙인다.
-            파이프라인이 아직 안 돈 날(threshold 없음)에는 통째로 뺀다 — 0% 로 적으면 거짓이 된다. */}
-        {avg ? (
-          <span
-            style={{
-              marginLeft: "auto",
-              fontFamily: MONO,
-              fontSize: 11,
-              fontWeight: 700,
-              color: raw >= avg ? C.hot : C.cold,
-            }}
-          >
-            평균 대비 {raw >= avg ? "+" : ""}{Math.round((raw / avg - 1) * 100)}%
+        <span style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>%</span>
+        {listed > 0 && (
+          <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 11, color: "var(--c-muted)" }}>
+            {listed.toLocaleString("ko-KR")}종목 중 {surged}개
           </span>
-        ) : null}
+        )}
       </div>
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10, justifyContent: "center" }}>
-        {/* 점수 기여도 누적 막대 + 1년 평균 세로선 */}
+        {/* 강도별 구성 + 초고온 진입선 */}
         <div style={{ position: "relative" }}>
           <div style={{ display: "flex", height: 14, background: C.track, borderRadius: 5, overflow: "hidden" }}>
             {buckets.map((b) => (
-              <span key={b.label} style={{ width: `${(b.n * b.w) / scale * 100}%`, background: b.tone }} />
+              <span
+                key={b.label}
+                style={{ width: `${(surged ? (b.n / surged) * pct : 0) / scale * 100}%`, background: b.tone }}
+              />
             ))}
           </div>
-          {avg ? (
+          {hot ? (
             <>
               {/* 세로선은 막대보다 위아래로 3px 씩 삐져나오게 둔다 — 막대 안에만 있으면
                   세그먼트 경계선과 구분이 안 된다. */}
-              <span
-                style={{
-                  position: "absolute", left: `${(avg / scale) * 100}%`, top: -3, bottom: -3,
-                  width: 2, marginLeft: -1, background: C.ink, borderRadius: 1,
-                }}
-              />
-              <span
-                style={{
-                  position: "absolute", left: `${(avg / scale) * 100}%`, top: 18,
-                  transform: "translateX(-50%)", whiteSpace: "nowrap",
-                  fontFamily: MONO, fontSize: 9.5, fontWeight: 700, color: "var(--c-muted)",
-                }}
-              >
-                1년 평균 {Math.round(avg)}
+              <span style={{ position: "absolute", left: `${(hot / scale) * 100}%`, top: -3, bottom: -3, width: 2, marginLeft: -1, background: C.ink, borderRadius: 1 }} />
+              <span style={{ position: "absolute", left: `${(hot / scale) * 100}%`, top: 18, transform: "translateX(-50%)", whiteSpace: "nowrap", fontFamily: MONO, fontSize: 9.5, fontWeight: 700, color: "var(--c-muted)" }}>
+                기준선 {hot.toFixed(2)}%
               </span>
             </>
           ) : null}
         </div>
 
-        {/* 범례 — 색·라벨·개수. 각 칸에 마우스를 올리면 그 칸에 든 종목이 뜬다. */}
-        <div style={{ display: "flex", gap: 6, marginTop: avg ? 14 : 0 }}>
+        {/* 강도별 개수. 마우스를 올리면 그 칸에 든 종목이 뜬다. */}
+        <div style={{ display: "flex", gap: 6, marginTop: hot ? 14 : 0 }}>
           {buckets.map((b) => {
             const shown = b.names.slice(0, 10);
             const rest = b.n - shown.length;
             const tip = shown.length
-              ? `${b.label} ${b.n}종목 · ${b.n * b.w}점 — ${shown.join(" · ")}${rest > 0 ? ` 외 ${rest}개` : ""}`
+              ? `${b.label} ${b.n}종목 — ${shown.join(" · ")}${rest > 0 ? ` 외 ${rest}개` : ""}`
               : `${b.label}에 든 종목이 없습니다`;
             return (
               <div
@@ -2009,16 +1993,11 @@ function CardLimitUp({ v }: { v: Pick }) {
                 // 쓴다(globals.css 의 .hz-tip 주석).
                 className="hz-tip hz-tip-wide hz-tip-start"
                 data-tip={tip}
-                style={{
-                  flex: 1, minWidth: 0, padding: "5px 7px", borderRadius: 8,
-                  background: C.bg, display: "flex", flexDirection: "column", gap: 3,
-                }}
+                style={{ flex: 1, minWidth: 0, padding: "5px 7px", borderRadius: 8, background: C.bg, display: "flex", flexDirection: "column", gap: 3 }}
               >
                 <span style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 0 }}>
                   <span style={{ width: 6, height: 6, borderRadius: 999, background: b.tone, flexShrink: 0 }} />
-                  <span style={{ fontSize: 10, fontWeight: 700, color: C.sub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {b.short}
-                  </span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: C.sub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.short}</span>
                 </span>
                 <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: C.ink, lineHeight: 1 }}>{b.n}</span>
               </div>
