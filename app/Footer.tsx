@@ -142,9 +142,14 @@ export default function Footer() {
         <p style={{ margin: 0, fontSize: 11, color: "var(--c-muted)" }}>
           이 서비스는 재미와 참고를 위한 정보 제공 목적이며, 투자 조언이나 매수·매도 추천이 아닙니다. 모든 투자 판단과 책임은 이용자 본인에게 있습니다.
         </p>
-        {/* 개인정보처리방침은 법정 고지라 '바로가기'(서비스 메뉴)가 아니라 저작권 옆에 둔다.
-            좁은 화면에서 두 줄로 갈리더라도 링크와 저작권이 한 덩어리로 붙어 있게 감싼다. */}
+        {/* 이용약관·개인정보처리방침은 법정 고지라 '바로가기'(서비스 메뉴)가 아니라 저작권
+            옆에 둔다. 좁은 화면에서 두 줄로 갈리더라도 한 덩어리로 붙어 있게 감싼다.
+            순서는 이용약관이 먼저다 — 서비스 전반을 정하는 쪽이 앞이고, 처리방침은 그중
+            개인정보 한 갈래를 따로 떼어 놓은 문서다(약관 10항이 그쪽을 가리킨다). */}
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+          <Link href="/terms" style={{ fontSize: 11, fontWeight: 600, color: C.sub, textDecoration: "none" }}>
+            이용약관
+          </Link>
           <Link href="/privacy" style={{ fontSize: 11, fontWeight: 600, color: C.sub, textDecoration: "none" }}>
             개인정보처리방침
           </Link>
