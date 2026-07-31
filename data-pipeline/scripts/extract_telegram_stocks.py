@@ -16,6 +16,9 @@
       "SK 그룹"      → 그룹 전체 지칭(config.GROUP_SUFFIXES) → 거부
 우선주(…우) 등 파생 종목은 사전에서 제외해 잡음을 줄인다.
 
+상장 증권사 이름은 종목보다 **리포트 발행처 표기**로 훨씬 자주 나와 따로 본다
+(publisher_context 참고).
+
 LLM 보강은 여기 붙일 자리만 두고(사전이 0개 잡은 메시지 대상), 실측 후 정한다.
 
 실행:
@@ -156,6 +159,57 @@ def compound_key(text: str, end: int, key: str, match_to_code: dict[str, str]) -
     return key
 
 
+def is_publisher_name(key: str) -> bool:
+    """리포트 발행처로 더 자주 등장하는 이름인가(= 상장 증권사).
+
+    목록이 아니라 stocks 에서 나오는 조건이라 새 증권사가 상장하거나 사명이 바뀌어도
+    따라온다. '…제11호스팩'처럼 증권사가 세운 SPAC 은 '스팩'으로 끝나 여기 안 걸린다.
+    """
+    return key.endswith("증권")
+
+
+def publisher_context(text: str, start: int, end: int) -> bool:
+    """이 자리의 증권사 이름이 '종목'이 아니라 리포트 **발행처** 표기인가.
+
+    이 코퍼스는 증권사 리서치 배포가 큰 몫이라, 증권사 이름은 종목보다 리포트를 낸
+    곳을 밝히는 자리에 훨씬 자주 나온다. 실측 표본 100건에서 82건이 발행처였다.
+    아래 다섯 꼴이 그 자리이고, 이걸 걸러 낸 뒤 남는 것이 진짜 종목 언급이다
+    (공시 "(유가)삼성증권 - 투자설명서", 실적 "[잠정실적]현대차증권, 2Q 매출 …",
+    나열 "현대차, NH투자증권, KB금융 개별 실적 이벤트").
+
+    ⚠️ **증권사를 통째로 EXCLUDE_NAMES 에 넣는 건 답이 아니다.** 같은 표본에서 진짜
+    종목 언급이 18%였고 그중 13건이 DART 공시였다. 증권사도 실적을 내고 공시를 하는
+    상장사라, 이름을 죽이면 그 회사에 대한 진짜 뉴스가 통째로 사라진다.
+    """
+    prev = text[start - 1] if start > 0 else ""
+    nxt = text[end] if end < len(text) else ""
+    after = text[end:]
+    line_before = text[:start].rsplit("\n", 1)[-1]
+
+    # ① "[SK증권 반도체 한동희, 손 건]" — 대괄호 머리에 적는 발신 데스크.
+    if prev and prev in "[［":
+        return True
+    # ② "작성자: 박제민 (SK증권)" — 괄호에 이름만 들어간 귀속.
+    if prev and nxt and prev in "(（" and nxt in ")）":
+        return True
+    # ③ "[리포트 브리핑]한세실업, '…' 목표가 11,000원 - SK증권" — 줄 끝에 구분자를
+    #    두고 붙는 귀속. 방향이 중요하다. 이름이 구분자 **뒤**면 발행처지만, 앞이면
+    #    ("키움증권 - 높아진 배당 매력도") 그 종목이 리포트의 주인공이라 살려야 한다.
+    if not after.split("\n", 1)[0].strip() and re.search(r"[-–—|/∥]\s*$", line_before):
+        return True
+    # ④ "미래에셋증권  [링크]" — 리포트 목록에서 발행처 칸(중간에 "(2026. 07. 24.)"
+    #    같은 날짜가 끼기도 해서 같은 줄에 [링크]가 있는지로 본다).
+    if re.match(r"[^\n]*\[링크\]", after):
+        return True
+    # ⑤ "삼성증권 리서치센터", "키움증권 신민수", "SK증권 Global Carbon Market Daily"
+    #    — 뒤에 부서·애널리스트·리포트 제목이 이어진다. AMBIGUOUS_NAMES 의 뒤 경계
+    #    규칙("조사 아닌 한글이 붙으면 거부")과 같은 잣대인데, 발행처 표기는 한 칸
+    #    띄우고 오므로 띄어쓴 뒤 낱말까지 본다. 진짜 언급은 뒤가 조사이거나 구두점
+    #    (쉼표 나열·괄호 종목코드·공시의 " - ")이라 이 규칙에 걸리지 않는다.
+    nxt_word = re.match(r"[ \t]+(\S)", after)
+    return bool(nxt_word and HANGUL_OR_ALNUM.match(nxt_word.group(1)))
+
+
 def extract(text: str, pattern, match_to_code, method, ambiguous, caseless) -> dict[str, tuple[str, str]]:
     """text에서 {code: (match_text, method)} (메시지 내 중복 제거)."""
     # URL 안의 문자열은 본문 언급이 아니다. 길이를 유지해 경계 판정을 흐트러뜨리지 않는다.
@@ -177,6 +231,10 @@ def extract(text: str, pattern, match_to_code, method, ambiguous, caseless) -> d
             continue
         is_ambiguous = key in ambiguous
         if not boundary_ok(text, m.start(), m.end(), is_ambiguous):
+            continue
+        # 증권사 이름은 한 메시지에 여러 번 나오는 일이 흔하다(머리글의 발행처 표기 +
+        # 본문의 진짜 언급). 자리마다 따로 보고, 발행처 자리면 이 자리만 건너뛴다.
+        if is_publisher_name(key) and publisher_context(text, m.start(), m.end()):
             continue
         if is_ambiguous:
             key = compound_key(text, m.end(), key, match_to_code)
