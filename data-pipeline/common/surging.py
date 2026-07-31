@@ -17,12 +17,15 @@ scripts/generate_telegram_narratives.py 가 그 종목의 요약을 미리 만�
     배수를 받지 않도록 분자·분모에 SHARE_SMOOTHING 을 함께 더한다.
   - 정렬은 배수 → 언급수 → 종목코드(완전 동점에서 DB 행 순서에 딸리지 않게), 그 뒤
     신뢰도 tier 로 안정 정렬한다.
+  - 채널 수는 창 안의 **서로 다른 채널 수**다(common/channel_breadth.py). 정원을
+    확정한 뒤 그 몇 건만 센다.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+from .channel_breadth import channel_breadth_map
 from .timeutil import today_kst
 
 LOOKBACK_DAYS = 14   # getSurgingStocks 의 loadStockDaily(14)
@@ -50,7 +53,9 @@ def load_stock_daily(db) -> tuple[list[dict], list[str]]:
     while True:
         page = (
             db.table("telegram_stock_daily")
-            .select("stock_code,date,weighted_score,mention_count,channel_count")
+            # channel_count 는 안 받는다 — 여러 날을 묶은 '서로 다른 채널 수'는 일별
+            # 개수로 복원할 수 없어서(common/channel_breadth.py) 쓸 데가 없다.
+            .select("stock_code,date,weighted_score,mention_count")
             .gte("date", since)
             .order("id")
             .range(start, start + PAGE - 1)
@@ -96,14 +101,13 @@ def top_surging(db, limit: int = CARD_LIMIT, preloaded: tuple[list[dict], list[s
     agg: dict[str, dict] = {}
     for r in rows:
         a = agg.setdefault(
-            r["stock_code"], {"recent_share": 0.0, "recent_m": 0, "prior_share": 0.0, "channels": 0}
+            r["stock_code"], {"recent_share": 0.0, "recent_m": 0, "prior_share": 0.0}
         )
         total = day_total.get(r["date"], 0.0)
         share = (float(r["weighted_score"] or 0) / total) if total > 0 else 0.0
         if r["date"] in recent_dates:
             a["recent_share"] += share
             a["recent_m"] += r["mention_count"] or 0
-            a["channels"] = max(a["channels"], r["channel_count"] or 0)
         else:
             a["prior_share"] += share
 
@@ -115,7 +119,6 @@ def top_surging(db, limit: int = CARD_LIMIT, preloaded: tuple[list[dict], list[s
             {
                 "code": code,
                 "mentions": a["recent_m"],
-                "channels": a["channels"],
                 "ratio": (recent_per_day + SHARE_SMOOTHING) / (base + SHARE_SMOOTHING),
                 "is_new": base == 0,
             }
@@ -129,7 +132,16 @@ def top_surging(db, limit: int = CARD_LIMIT, preloaded: tuple[list[dict], list[s
             return 3
         return 1 if s["ratio"] >= 1.3 else 2
 
-    return sorted(scored, key=tier)[:CARD_LIMIT][:limit]
+    top = sorted(scored, key=tier)[:CARD_LIMIT][:limit]
+
+    # 채널 수는 정원을 자른 **뒤에** 센다 — 순위에 쓰이지 않는 표시용이라, 카드에
+    # 오르지도 못할 종목(14일치면 1,700여 개)까지 물을 이유가 없다. 창은 언급 수와
+    # 같은 recent_dates 여야 한 줄에 적힌 두 값이 같은 기간을 말한다.
+    recent_sorted = sorted(recent_dates)
+    breadth = channel_breadth_map(db, [s["code"] for s in top], recent_sorted[0], recent_sorted[-1])
+    for s in top:
+        s["channels"] = breadth.get(s["code"], 0)
+    return top
 
 
 def latest_date(dates: list[str]) -> str | None:
