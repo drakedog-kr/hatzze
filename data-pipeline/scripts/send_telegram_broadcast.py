@@ -46,7 +46,7 @@ dry-run 은 게이트에 걸려도 메시지를 그려서 보여준다(경고만
   - **매수·매도 프레이밍 금지.** 사이트는 "과열도"만 말하고 매수·매도 신호가 아니라는
     선을 지킨다. 급부상 종목은 "많이 언급되었다"는 사실만 전하고 가격·등락률은 넣지
     않는다(카드에는 시세가 있지만, 종목명 옆에 붙은 가격은 채널 글에서 추천으로 읽힌다).
-  - 하단 링크는 브랜드 한 줄뿐이다(BRAND_LINE). 면책 문구는 넣지 않기로 했다(2026-07-28
+  - 하단 링크는 행동 유도 한 줄뿐이다(CTA_LINE). 면책 문구는 넣지 않기로 했다(2026-07-28
     결정) — 그 링크가 닿는 사이트에 면책이 있다. 되살릴 땐 이 줄 아래에 한 줄로.
 """
 
@@ -104,11 +104,27 @@ STAGE_EMOJI = {"저온": "❄️", "상온": "🌡️", "고온": "🔥", "초�
 # 길어져 아래 링크까지 안 내려간다. 셋이 카드 정원(5) 안쪽이라 사이트와도 안 어긋난다.
 SURGING_SHOW = 3
 
-# 하단 브랜드 줄. **모든 포맷이 이 한 줄만 링크로 갖는다.** 예전엔 "지표 전체 보기 ·
+# 하단 행동 유도 줄. **모든 포맷이 이 한 줄만 링크로 갖는다.** 예전엔 "지표 전체 보기 ·
 # 카더라 리포트" 두 개를 나란히 뒀는데, 링크가 둘이면 무엇을 눌러야 하는지 고민하게
 # 되고 글의 마무리도 어수선해진다. 하나로 줄이는 대신 목적지를 메시지 성격에 맞춘다
 # (카더라 이야기를 읽고 눌렀는데 지수 페이지가 뜨면 한 번 더 찾아가야 한다).
-BRAND_LINE = "hatzze | 데이터와 감성으로 읽는 시장"
+#
+# 2026-08-01 까지는 브랜드 태그라인이었다("hatzze | 데이터와 감성으로 읽는 시장").
+# 그건 서명이지 문이 아니다. 누를 이유를 한 글자도 안 주면서 글에서 눈이 가장 오래
+# 머무는 마지막 줄을 차지했고, 링크 미리보기까지 꺼 둔 터라(send 주석) 어디로 가는지도
+# 안 보였다. 이 채널은 재방문 루프 하나로 굴러가는데(파일 첫머리) 그 루프의 손잡이가
+# 손잡이처럼 안 생겼던 셈이다.
+#
+# 문구를 고칠 때 두 가지를 지킨다.
+#
+#   1. **네 포맷이 이 한 줄을 공유한다.** "급부상 종목 5개" 같은 포맷별 약속은 못 쓴다.
+#      저녁 글에는 맞아도 아침·테마·주간 글에서는 그냥 거짓말이 된다. 포맷마다 다르게
+#      쓰고 싶으면 상수가 아니라 cta_link() 의 인자로 올려야 한다.
+#   2. **'실제'·'진짜' 류의 말은 안 쓴다.** 바로 윗줄이 이미 "147회 언급 · 56개 채널"
+#      이라 무엇을 가리키는지 흐려지고, 무엇보다 이 서비스는 소문이 사실인지를 안 본다
+#      ("많이 언급되었다"는 사실만 전한다). '실제 데이터'는 우리가 진위를 가려 준다는
+#      뜻으로 읽힐 수 있어서 안 하는 일을 광고하는 문구가 된다.
+CTA_LINE = "👉 데이터 전부 보러 가기 | hatzze"
 
 # 카더라 집계가 이만큼보다 오래됐으면 종목 블록을 통째로 뺀다(발송은 계속한다).
 # 창이 이미 '오늘'을 빼므로 정상값은 1일이다. 주말·수집 실패 한 번은 흡수하고,
@@ -354,14 +370,14 @@ def as_read(message: str) -> str:
     return html.unescape(text)
 
 
-def brand_link(path: str, content: str) -> str:
-    """하단 브랜드 줄. 모든 포맷에서 **유일한 링크**다(BRAND_LINE 주석 참고).
+def cta_link(path: str, content: str) -> str:
+    """하단 행동 유도 줄. 모든 포맷에서 **유일한 링크**다(CTA_LINE 주석 참고).
 
     path 는 그 메시지가 말한 것을 보여 주는 페이지다. content 는 utm_content 로,
     링크가 하나로 줄어든 대신 이걸로 '어느 포맷이 사람을 데려왔나'를 GA 에서 가른다.
     """
     sep = "&" if "?" in path else "?"
-    return f'<a href="{SITE_URL}{path}{sep}{UTM}&utm_content={content}">{BRAND_LINE}</a>'
+    return f'<a href="{SITE_URL}{path}{sep}{UTM}&utm_content={content}">{CTA_LINE}</a>'
 
 
 def quote(*lines: str) -> str:
@@ -419,7 +435,7 @@ def build_evening(score_row: dict, surging: list[dict]) -> str:
             lines += ["", f"<b>{'①②③④⑤'[i]} {name}</b> {how}", quote(*body)]
 
     # 카더라가 본론이라 카더라 페이지로 보낸다.
-    lines += ["", brand_link("/kadera", "evening")]
+    lines += ["", cta_link("/kadera", "evening")]
     return "\n".join(lines)
 
 
@@ -546,7 +562,7 @@ def build_morning(db, llm) -> str:
             quote(f"{span} · {night_count:,}건"),
         ] + paragraphs(night_text)
 
-    lines += ["", brand_link("/kadera", "morning")]
+    lines += ["", cta_link("/kadera", "morning")]
     return "\n".join(lines)
 
 
@@ -640,7 +656,7 @@ def build_theme(db, llm) -> str:
     if body:
         lines += ["", "📖 <b>무엇이 달라졌나</b>"] + paragraphs(body)
 
-    lines += ["", brand_link("/kadera", "theme")]
+    lines += ["", cta_link("/kadera", "theme")]
     return "\n".join(lines)
 
 
@@ -719,7 +735,7 @@ def build_weekly(db, llm) -> str:
     if body:
         lines += paragraphs(body)
 
-    lines += ["", brand_link("/kadera", "weekly")]
+    lines += ["", cta_link("/kadera", "weekly")]
     return "\n".join(lines)
 
 
