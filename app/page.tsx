@@ -1944,46 +1944,57 @@ function CardNetBuy({ v }: { v: Pick }) {
       </div>
       {/* 0선을 칸마다 하나씩 긋던 걸 차트 전체에 한 줄로 바꿨다. 예전엔 5개 조각으로
           끊겨 있어 기준선으로 안 보이고, 막대가 허공에 뜬 사각형처럼 읽혔다.
-          막대 높이 한도도 24 → 30 으로 올려 하루치 차이가 실제로 보이게 한다. */}
-      <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "center", gap: 8, minHeight: 60 }}>
-        <div style={{ position: "absolute", left: 0, right: 0, top: "50%", height: 1, background: C.line }} />
-        {daily.map((d, i) => {
-          const px = Math.round((Math.abs(d) / maxAbs) * 30);
-          const buy = d >= 0;
-          const ymd = dates[i];
-          const label = ymd
-            ? `${ymdShort(ymd)} · ${d >= 0 ? "+" : ""}${formatEokMixed(d)} ${d >= 0 ? "순매수" : "순매도"}`
-            : `${d >= 0 ? "+" : ""}${formatEokMixed(d)}`;
-          return (
-            <div
-              key={i}
-              className="hz-tip"
-              data-tip={label}
-              style={{ flex: 1, position: "relative", height: 68 }}
-            >
-              <div style={{ position: "absolute", left: "18%", right: "18%", height: px, background: buy ? C.cold : C.hot, borderRadius: 2, ...(buy ? { bottom: "50%" } : { top: "50%" }) }} />
-              {/* 날짜를 막대마다 붙인다 — 다섯 개뿐이라 자리가 되고, 양 끝에만 적으면
-                  가운데 막대가 언제인지 툴팁을 열어봐야 했다. */}
-              {ymd && (
-                <span
-                  style={{
-                    position: "absolute",
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    textAlign: "center",
-                    fontSize: 9,
-                    fontWeight: 600,
-                    fontFamily: MONO,
-                    color: "var(--c-faint)",
-                  }}
-                >
-                  {ymdShort(ymd)}
-                </span>
-              )}
-            </div>
-          );
-        })}
+          막대 높이 한도도 24 → 30 으로 올려 하루치 차이가 실제로 보이게 한다.
+
+          ⚠️ 날짜는 **막대 칸 안이 아니라 아래 줄**에 둔다. 예전엔 칸 안에 bottom:0 으로
+          붙였는데, 0선이 칸의 한가운데(34px)라 순매도 막대는 거기서 아래로 자라고,
+          한도까지(30px) 자란 날은 64px 까지 내려와 라벨 상자(54.5~68px)를 9.5px 파고들었다
+          — 가장 크게 판 날, 즉 가장 봐야 할 날에서만 겹치는 종류의 버그다.
+          막대 구역과 날짜 줄을 형제로 나누면 막대가 얼마나 자라든 겹칠 수가 없고,
+          다섯 날짜의 밑선도 저절로 나란해진다(같은 gap·flex:1 이라 칸 폭도 그대로 맞는다). */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", minHeight: 60 }}>
+        <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ position: "absolute", left: 0, right: 0, top: "50%", height: 1, background: C.line }} />
+          {daily.map((d, i) => {
+            const px = Math.round((Math.abs(d) / maxAbs) * 30);
+            const buy = d >= 0;
+            const ymd = dates[i];
+            const label = ymd
+              ? `${ymdShort(ymd)} · ${d >= 0 ? "+" : ""}${formatEokMixed(d)} ${d >= 0 ? "순매수" : "순매도"}`
+              : `${d >= 0 ? "+" : ""}${formatEokMixed(d)}`;
+            return (
+              <div
+                key={i}
+                className="hz-tip"
+                data-tip={label}
+                style={{ flex: 1, position: "relative", height: 68 }}
+              >
+                <div style={{ position: "absolute", left: "18%", right: "18%", height: px, background: buy ? C.cold : C.hot, borderRadius: 2, ...(buy ? { bottom: "50%" } : { top: "50%" }) }} />
+              </div>
+            );
+          })}
+        </div>
+        {/* 날짜를 막대마다 붙인다 — 다섯 개뿐이라 자리가 되고, 양 끝에만 적으면
+            가운데 막대가 언제인지 툴팁을 열어봐야 했다. 금액 툴팁은 막대 칸에 그대로 남는다. */}
+        {dates.length > 0 && (
+          <div style={{ display: "flex", gap: 8, marginTop: 5 }}>
+            {daily.map((_, i) => (
+              <span
+                key={i}
+                style={{
+                  flex: 1,
+                  textAlign: "center",
+                  fontSize: 9,
+                  fontWeight: 600,
+                  fontFamily: MONO,
+                  color: "var(--c-faint)",
+                }}
+              >
+                {dates[i] ? ymdShort(dates[i]) : ""}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
       <Foot text={v.desc} />
     </Shell>
@@ -2001,8 +2012,8 @@ function CardNetBuy({ v }: { v: Pick }) {
  * 넣으므로, 여기 서는 건 "크게 오른 것들 중 거래가 두꺼운 종목"이다. 잡주 하나가
  * 30% 올랐다고 목록을 차지하지 않는다.
  *
- * 색 막대는 강도(상한가 / +20~29% / +10~20%)다. 맨 아래 '외 N개'에 마우스를 올리면
- * 강도별 개수가 뜬다.
+ * 색 막대는 그 줄에 적힌 등락률을 30/20/10 에서 끊은 것이다(toneForPct). 맨 아래
+ * '외 N개'에 마우스를 올리면 강도별 개수가 뜬다.
  */
 function CardLimitUp({ v }: { v: Pick }) {
   const c = overheatColor(v.capped);
@@ -2026,10 +2037,19 @@ function CardLimitUp({ v }: { v: Pick }) {
   const surged = buckets.reduce((a, b) => a + b.n, 0);
   const listed = dt?.listed_n ?? 0;
 
+  // 줄 색은 **그 줄에 적히는 등락률 그대로** 30/20/10 에서 끊는다. 버킷 색을 그대로
+  // 쓰면 +29.9% 가 +30.0% 와 똑같은 초고온색으로 찍힌다 — 파이프라인의 상한가 판정이
+  // 29.0~30.5% 구간이라(호가 절사로 진짜 상한가가 29.x 에 찍힌다) 버킷 경계와 화면에
+  // 적히는 숫자가 어긋나기 때문이다. 개수 집계(원값·툴팁)는 건드리지 않는다 — 거기선
+  // '진짜 상한가'를 세는 게 맞다. 색만 숫자를 따르게 해서 눈과 글자를 맞춘다.
+  // 등락률이 없는 옛 행(이름만 있던 시절)은 버킷 색으로 물러선다.
+  const toneForPct = (p: number | null, fallback: string) =>
+    p === null ? fallback : p >= 30 ? C.mania : p >= 20 ? C.hot : C.neutral;
+
   // 등락률 순으로 세운다. 등락률이 없는 옛 행은 강도 순(버킷 순서)이 그대로 남는다.
   const ROWS = 5;
   const rank = buckets
-    .flatMap((b) => b.items.map((it) => ({ ...it, tone: b.tone, label: b.label })))
+    .flatMap((b) => b.items.map((it) => ({ ...it, tone: toneForPct(it.p, b.tone), label: b.label })))
     .sort((a, b) => (b.p ?? 0) - (a.p ?? 0))
     .slice(0, ROWS);
   const rest = Math.max(0, surged - rank.length);
