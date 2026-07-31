@@ -253,6 +253,32 @@ export type StockHighGap = {
  * 남는 차이는 야후 고점이 **장중 고가**라 종가 기준보다 3%쯤 높다는 것 — 세 종목에
  * 똑같이 걸리는 편향이고 점수에는 들어가지 않는다.
  */
+/**
+ * 코스피 지수 종가 최근 n거래일(오래된→최신). 상승 속도 카드가 60일 궤적을 그리는 데 쓴다.
+ *
+ * kospi_close_raw 는 is_public=false 인 내부용 캐시라 getPublicIndicators 에 안 잡힌다.
+ * 화면에 직접 쓰는 건 이 카드 하나뿐이라 여기서 따로 읽는다. 날짜를 같이 돌려주는 건
+ * 차트 호버 툴팁이 "며칟날 몇 %"를 적어야 해서다.
+ */
+export type ClosePoint = { date: string; close: number };
+
+export async function getKospiCloseSeries(days = 61): Promise<ClosePoint[]> {
+  const { data } = await getSupabaseServer()
+    .from("indicators")
+    .select("id,indicator_values(date,raw_value)")
+    .eq("slug", "kospi_close_raw")
+    .order("date", { referencedTable: "indicator_values", ascending: false })
+    .limit(days, { referencedTable: "indicator_values" })
+    .maybeSingle();
+  const rows = (data?.indicator_values ?? []) as { date: string; raw_value: number }[];
+  // 위 쿼리는 최신순이라 뒤집어 시간 순으로 돌려준다.
+  return rows
+    .slice()
+    .reverse()
+    .map((r) => ({ date: r.date, close: Number(r.raw_value) }))
+    .filter((p) => Number.isFinite(p.close) && p.close > 0);
+}
+
 export async function getTopStockHighGaps(limit = 3): Promise<StockHighGap[]> {
   const { data: rows } = await getSupabaseServer()
     .from("indicators")

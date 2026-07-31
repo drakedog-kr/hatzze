@@ -1,5 +1,5 @@
-import { getLatestDailyScore, getPublicIndicators, getTopStockHighGaps } from "@/lib/data";
-import type { DailyScore, IndicatorCategory, IndicatorWithLatestValue, StockHighGap } from "@/lib/data";
+import { getKospiCloseSeries, getLatestDailyScore, getPublicIndicators, getTopStockHighGaps } from "@/lib/data";
+import type { ClosePoint, DailyScore, IndicatorCategory, IndicatorWithLatestValue, StockHighGap } from "@/lib/data";
 import { formatEokMixed, formatIndicatorValue, formatKstUpdate, sentimentTone, shortDate } from "@/lib/format";
 import { AiMark, C, Icon, MONO, stageForScore } from "./ui";
 
@@ -358,7 +358,13 @@ function Foot({ text, color = C.sub }: { text: string; color?: string }) {
 }
 
 // 과열도 진행 바 (세부 데이터가 없는 카드의 공용 시각화).
-function HeatBar({ v }: { v: Pick }) {
+/**
+ * 과열도 진행 바. hideThreshold 를 주면 맨 아래 "초고온 기준선 …" 줄을 뺀다.
+ *
+ * 상승 속도 카드가 그렇다 — 그 카드는 이미 "60거래일 전 X → 지금 Y"로 값의 뜻을
+ * 다 말해 놓고, 그 아래 다시 기준선 퍼센트를 적으면 같은 축의 숫자가 셋이 된다.
+ */
+function HeatBar({ v, hideThreshold = false }: { v: Pick; hideThreshold?: boolean }) {
   if (v.capped === null) return null;
   const c = overheatColor(v.capped);
   return (
@@ -384,7 +390,7 @@ function HeatBar({ v }: { v: Pick }) {
         <span>안심</span>
         <span style={{ color: C.hot }}>과열 100</span>
       </div>
-      {v.hotDisp && (
+      {v.hotDisp && !hideThreshold && (
         <p style={{ margin: "8px 0 0", textAlign: "center", fontSize: 10, fontWeight: 600, color: C.sub, fontFamily: MONO }}>
           초고온 기준선 {v.hotDisp} {v.dirLabel}
         </p>
@@ -1128,30 +1134,115 @@ function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
 // 둘은 같은 종가에서 나오지만 실측 상관이 +0.13으로 거의 직교한다: 같은 전고점 근처라도
 // 두 달 만에 온 것과 1년에 걸쳐 온 것은 다르다. details 에 기간 양끝 종가가 들어 있어
 // "6,418 → 6,798" 처럼 근거를 그대로 보여준다.
-function CardSpeed({ v }: { v: Pick }) {
+/**
+ * 코스피 상승 속도 — 60거래일 수익률(%).
+ *
+ * 차트는 지수 값이 아니라 **시작점 대비 %**를 그린다. 지수 값을 그리면 y축이 그 60일의
+ * 최소~최대로 늘어나서 ±1% 든 ±30% 든 그림이 똑같아진다 — "얼마나" 움직였는지가 통째로
+ * 사라진다. 시작점을 0%로 두면 y축이 곧 퍼센트라 높이가 그대로 크기다.
+ *
+ * 0선 위는 hot, 아래는 cold 로 나눠 칠한다. 같은 −5% 라도 곧게 빠진 것과 크게 올랐다
+ * 무너진 것이 면적으로 갈린다.
+ *
+ * 호버 크로스헤어는 MDD 낙폭 차트와 같은 어법이다 — SVG 위에 투명한 세로 띠를 깔고
+ * 각 띠가 hz-vline(기준선)과 hz-tip(툴팁)을 낸다.
+ *
+ * ⚠️ preserveAspectRatio="none" 이라 획이 가로로 늘어난다. 모든 stroke 에
+ * vectorEffect="non-scaling-stroke" 를 걸어야 지정한 두께로 그려진다.
+ */
+function CardSpeed({ v, path = [] }: { v: Pick; path?: ClosePoint[] }) {
   const from = v.details?.from_close;
   const to = v.details?.to_close;
-  const spd = v.raw;
+  const spd = v.raw ?? 0;
+  const up = spd >= 0;
   const num = (n: number) => n.toLocaleString("ko-KR", { maximumFractionDigits: 0 });
+
+  const base = path[0]?.close ?? 0;
+  const pts = base > 0 ? path.map((p) => ({ date: p.date, pct: (p.close / base - 1) * 100 })) : [];
+  const hi = pts.length ? Math.max(...pts.map((p) => p.pct), 0) : 0;
+  const lo = pts.length ? Math.min(...pts.map((p) => p.pct), 0) : 0;
+  // 0선이 가운데 오도록 위아래를 같은 폭으로 잡는다 — 눈금을 읽기 쉬워진다.
+  const span = Math.max(Math.abs(hi), Math.abs(lo), 5) * 1.12;
+  const H = 72;
+  const y = (t: number) => H / 2 - (t / span) * (H / 2);
+  const line = pts.map((p, i) => `${(i / Math.max(1, pts.length - 1)) * 100},${y(p.pct)}`).join(" ");
+  const step = span > 25 ? 20 : span > 12 ? 10 : 5;
+  const ticks: number[] = [];
+  for (let t = -Math.floor(span / step) * step; t <= span; t += step) ticks.push(t);
+
   return (
     <Shell hit={v.isHit} minH={210}>
       <TitleRow desc={v.headline} icon="trending_up" name={v.name} />
-      <div>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 10 }}>
         <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 700, color: v.color, letterSpacing: "-0.03em" }}>
-          {spd !== null && spd > 0 ? "+" : ""}{v.disp}{v.unit}
+          {up ? "+" : ""}{v.disp}{v.unit}
         </span>
         {typeof from === "number" && typeof to === "number" && (
-          // 두 숫자만 적으면 무엇에서 무엇으로 간 건지 안 읽힌다 — 양끝에 이름을 붙인다.
-          <span style={{ display: "block", fontSize: 11, fontWeight: 600, color: C.sub, marginTop: 6 }}>
-            60거래일 전 {num(from)} → 지금 {num(to)}
+          <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 11, color: "var(--c-muted)" }}>
+            {num(from)} → {num(to)}
           </span>
         )}
       </div>
-      {/* paddingTop 으로 과열도 박스와의 최소 간격을 보장한다 — flex-end 만으로는 카드가
-          짧을 때 근거 줄에 바로 붙어 두 덩어리가 한 블록처럼 보인다. */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", paddingTop: 18 }}>
-        <HeatBar v={v} />
-      </div>
+
+      {pts.length < 2 ? (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", paddingTop: 18 }}>
+          <HeatBar v={v} hideThreshold />
+        </div>
+      ) : (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ flex: 1, position: "relative", height: H, minWidth: 0 }}>
+              <svg viewBox={`0 0 100 ${H}`} style={{ width: "100%", height: H, display: "block" }} preserveAspectRatio="none">
+                <defs>
+                  {/* 0선 위/아래를 따로 칠하려면 반씩 잘라야 한다. 이 카드는 한 장뿐이라 id 를 고정으로 둔다. */}
+                  <clipPath id="spd-up"><rect x="0" y="0" width="100" height={H / 2} /></clipPath>
+                  <clipPath id="spd-dn"><rect x="0" y={H / 2} width="100" height={H / 2} /></clipPath>
+                </defs>
+                {ticks.map((t) => (
+                  <line
+                    key={t} x1="0" y1={y(t)} x2="100" y2={y(t)}
+                    stroke={t === 0 ? C.ink : C.line} strokeWidth={t === 0 ? 1 : 0.6}
+                    opacity={t === 0 ? 0.5 : 0.75} vectorEffect="non-scaling-stroke"
+                  />
+                ))}
+                <polygon points={`0,${H / 2} ${line} 100,${H / 2}`} fill={C.hot} opacity={0.26} clipPath="url(#spd-up)" />
+                <polygon points={`0,${H / 2} ${line} 100,${H / 2}`} fill={C.cold} opacity={0.26} clipPath="url(#spd-dn)" />
+                <polyline points={line} fill="none" stroke={v.color} strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
+              </svg>
+              {/* 크로스헤어 — MDD 낙폭 차트와 같은 어법. 끝쪽 지점은 툴팁이 카드 밖으로
+                  넘치지 않게 여는 방향을 튼다(안 그러면 가로 스크롤이 생긴다). */}
+              <div style={{ position: "absolute", inset: 0, display: "flex" }}>
+                {pts.map((p, i) => {
+                  const at = pts.length <= 1 ? 0 : i / (pts.length - 1);
+                  const edge = at < 0.25 ? " hz-tip-start" : at > 0.75 ? " hz-tip-end" : "";
+                  return (
+                    <div
+                      key={p.date}
+                      className={`hz-tip hz-vline${edge}`}
+                      data-tip={`${shortDate(p.date)} · ${p.pct >= 0 ? "+" : ""}${p.pct.toFixed(1)}%`}
+                      style={{ flex: 1, position: "relative" }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+            <div style={{ position: "relative", width: 26, height: H, flexShrink: 0 }}>
+              {ticks.map((t) => (
+                <span key={t} style={{ position: "absolute", top: y(t) - 6, right: 0, fontFamily: MONO, fontSize: 8.5, fontWeight: 600, color: t === 0 ? C.sub : "var(--c-muted)" }}>
+                  {t > 0 ? "+" : ""}{t}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9.5, fontFamily: MONO, color: "var(--c-muted)" }}>
+            <span>60일 전 = 0%</span>
+            <span>
+              최고 <span style={{ color: C.hot, fontWeight: 700 }}>{hi >= 0 ? "+" : ""}{hi.toFixed(1)}%</span>
+              {" · "}최저 <span style={{ color: C.cold, fontWeight: 700 }}>{lo.toFixed(1)}%</span>
+            </span>
+          </div>
+        </div>
+      )}
       <Foot text={v.desc} />
     </Shell>
   );
@@ -1820,7 +1911,7 @@ function CardNetBuy({ v }: { v: Pick }) {
     <Shell hit={v.isHit} minH={210}>
       <TitleRow desc={v.headline} icon="public" name={v.name} />
       <div style={{ margin: "6px 0 2px" }}>
-        <span style={{ fontSize: 10, fontWeight: 600, color: C.sub }}>외국인 · 최근 5거래일 누적</span>
+        <span style={{ fontSize: 10, fontWeight: 600, color: C.sub }}>최근 5거래일 누적</span>
         <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
           {/* "12,929억"은 한눈에 안 읽히고 "1.3조원"은 끝자리가 날아간다 — 둘을 함께 쓴다. */}
           <span style={{ fontFamily: MONO, fontSize: 24, fontWeight: 700, color: tone, letterSpacing: "-0.03em" }}>
@@ -1952,7 +2043,9 @@ function CardLimitUp({ v }: { v: Pick }) {
       <div style={{ display: "flex", alignItems: "baseline", gap: 5, margin: "6px 0 12px" }}>
         <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 700, color: c, letterSpacing: "-0.03em" }}>{surged}</span>
         <span style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>종목</span>
-        <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 12, fontWeight: 700, color: c }}>
+        {/* 퍼센트만 있으면 "무엇의 6.15%"인지 모른다. 분모를 붙여 둔다. */}
+        <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: c, whiteSpace: "nowrap" }}>
+          {listed ? `${listed.toLocaleString("ko-KR")}종목 중 ` : ""}
           {(v.raw ?? 0).toFixed(2)}%
         </span>
       </div>
@@ -1977,8 +2070,13 @@ function CardLimitUp({ v }: { v: Pick }) {
           <span
             // 강도별 개수는 여기 한 곳에 모은다. 줄마다 붙이면 랭킹이 라벨로 시끄러워진다.
             // 커서는 건드리지 않는다(globals.css 의 .hz-tip 주석).
-            className="hz-tip hz-tip-wide hz-tip-start"
-            data-tip={buckets.map((b) => `${b.label} ${b.n}종목`).join(" · ") + (listed ? ` / 전체 ${listed}종목` : "")}
+            // hz-tip-lines: data-tip 의 줄바꿈을 살린다. 한 줄로 이으면 세 단계가
+            // 눈에 안 들어온다.
+            className="hz-tip hz-tip-wide hz-tip-lines hz-tip-start"
+            data-tip={
+              buckets.map((b) => `${b.label}  ${b.n}종목`).join("\n") +
+              (listed ? `\n전체  ${listed.toLocaleString("ko-KR")}종목` : "")
+            }
             style={{ fontSize: 11, fontWeight: 600, color: "var(--c-muted)", marginTop: 1 }}
           >
             외 {rest}개
@@ -2112,10 +2210,12 @@ function GenericCard({ v, icon }: { v: Pick; icon: string }) {
 }
 
 export default async function Home() {
-  const [dailyScore, indicators, topGaps] = await Promise.all([
+  const [dailyScore, indicators, topGaps, kospiPath] = await Promise.all([
     getLatestDailyScore(),
     getPublicIndicators(),
     getTopStockHighGaps(3),
+    // 상승 속도 카드의 60일 궤적. 내부용 지표라 getPublicIndicators 에 안 잡힌다.
+    getKospiCloseSeries(61),
   ]);
 
   const bySlug = new Map(indicators.map((i) => [i.slug, i]));
@@ -2149,8 +2249,8 @@ export default async function Home() {
                     0.04로 거의 안 움직여(가중치 주석의 "느림·비타이밍"과 같은 이유) 뒤로 뺐다. */}
                 <CardHighGap v={p("kospi_high_gap")} tops={topGaps} />
                 <CardVolume v={p("kospi_volume_surge")} />
+                <CardSpeed v={p("kospi_speed_60d")} path={kospiPath} />
                 <CardLimitUp v={p("limit_up_breadth")} />
-                <CardSpeed v={p("kospi_speed_60d")} />
                 <CardNetBuy v={p("foreign_sell_at_high")} />
                 <CardPutCall v={p("put_call_ratio")} />
                 <CardTurnover v={p("turnover_concentration")} />
