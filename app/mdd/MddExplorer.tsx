@@ -114,9 +114,11 @@ export function MddExplorer({
       {!loading && !error && data && <Results data={data} />}
 
       {/* 면책("재미·참고용이며 매수·매도 신호가 아닙니다")은 푸터가 전역으로 이미 말하므로 빼고,
-          여기선 이 페이지에만 해당하는 데이터 기준만 밝힌다. */}
+          여기선 이 페이지에만 해당하는 데이터 기준만 밝힌다.
+          출처 이름은 여기 안 적는다 — 데이터 출처는 푸터가 한곳에서 모아 밝히고, 이 줄은
+          "이 숫자를 어떻게 읽어야 하나"(종가·수정주가·표본 크기)만 맡는다. */}
       <p style={{ margin: 0, color: C.muted, fontSize: 12, lineHeight: 1.7 }}>
-        모든 수치는 <b style={{ color: C.sub }}>종가</b> 기준이며 액면분할·감자를 반영한 수정주가입니다. 시세 출처는 Yahoo Finance이고,
+        모든 수치는 <b style={{ color: C.sub }}>종가</b> 기준이며 액면분할·감자를 반영한 수정주가입니다.
         표본이 한 사이클 남짓이라 회복 기간은 <b style={{ color: C.sub }}>범위</b>로만 참고하십시오.
       </p>
     </div>
