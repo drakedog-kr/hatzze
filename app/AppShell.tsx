@@ -44,7 +44,7 @@ const TELEGRAM = {
 const COMING_SOON = {
   label: "서학개미 해부도",
   badge: "준비 중",
-  tip: "현재 오픈 준비 중입니다",
+  tip: "현재 열심히 개발 중입니다!",
 };
 
 /**
