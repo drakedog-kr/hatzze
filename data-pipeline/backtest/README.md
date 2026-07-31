@@ -79,3 +79,31 @@ cd data-pipeline && .venv/bin/python backtest/dump_data.py && .venv/bin/python b
 ```
 
 결과는 `docs/indicator-changes-2026-07-23.md` §5 에 정리돼 있다.
+
+## 전수 검사 3 (2026-08-01) — 25개 가중치 재보정
+
+검사 2 이후 지표가 셋 바뀌어 가중치의 34.8%가 미검증이던 것을 다시 쟀다. 근거와
+결론은 `config/indicator_weights.py` docstring 에 있다.
+
+아래 스크립트는 `PYTHONPATH=backtest` 를 붙여 돌린다(서로를 import 한다):
+
+```bash
+cd data-pipeline && PYTHONPATH=backtest .venv/bin/python backtest/final3.py
+```
+
+| 스크립트 | 내용 |
+|---|---|
+| `recal2.py` | 지표별 성적표 — 이벤트 스프레드 + 블록 부트스트랩 p. **정답지 저점을 07-20 → 07-30 으로 고친 곳** |
+| `table2.py` | 성적표에 **초고온 진입선**(progress 75 의 원값)과 최근값을 붙인다 |
+| `compose2.py` | 후보 가중치를 종합점수 단위로 비교(값 없는 지표는 분모에서 제외 — calculate_score 규칙) |
+| `lever2.py` | 가중치별 '지렛대' 진단 — 0~5 를 훑어 종합 스프레드가 움직이는 폭 |
+| `robust2.py` | leave-one-out · 반기 분할 · 개별 지표 sweep · 앵커 정합성 |
+| `final3.py` | **확정안 R 전면 검증** — 이벤트/단조성/국면분포/과적합/월별 서사 |
+| `works3.py` | "이 지수가 실제로 작동하는가" — 십분위 모양, 폭락 구간 제외 시 잔존 효과 |
+
+> ⚠️ `lever2.py` 의 "최적 0.0" 을 그대로 따르지 말 것. 25개 중 13개가 그렇게 나오는데,
+> A등급 4개가 신호를 다 들고 있어 나머지를 빼면 스프레드가 기계적으로 오르기 때문이다.
+> 그대로 최적화하면 초고온 58.8% 짜리 퇴화안이 나온다.
+
+> ⚠️ 검사 2 문서(`docs/indicator-audit-2026-07-23.md`)의 스프레드 숫자와 다르다.
+> 정답지 저점이 바뀌었고 표본도 9영업일 늘었다. 비교할 땐 이쪽을 기준으로 볼 것.
