@@ -1,4 +1,4 @@
-"""장중 급등 종목 수를 가중 합산해 froth 지표로 저장(코스피+코스닥 전종목).
+"""코스피 전종목의 장중 급등 종목 수를 가중 합산해 froth 지표로 저장.
 
 원값 = 3×상한가 터치 + 2×(+20~29%) + 1×(+10~20%)
 
@@ -48,10 +48,10 @@ from common.indicator import ensure_indicator  # noqa: E402
 from common.krx_client import krx_get  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 
-KRX_URLS = (
-    "http://data-dbg.krx.co.kr/svc/apis/sto/stk_bydd_trd",
-    "http://data-dbg.krx.co.kr/svc/apis/sto/ksq_bydd_trd",
-)
+# 코스피만 본다. 상한가는 코스닥에서 훨씬 많이 나와서(같은 날 기준 3배쯤) 둘을 합치면
+# 지표가 사실상 코스닥 지표가 된다. 이 사이트의 과열도는 코스피 시장을 말하므로 시장을
+# 맞춘다. 코스닥 쏠림은 kosdaq_kospi_ratio 가 따로 본다.
+KRX_URLS = ("http://data-dbg.krx.co.kr/svc/apis/sto/stk_bydd_trd",)
 # 원값 가중치. 처음엔 손으로 정한다 — 데이터로 고르려 했지만 어떤 조합도 국면을 못 갈랐다.
 W_LIMIT, W_20, W_10 = 3, 2, 1
 LIMIT_LO, LIMIT_HI = 29.0, 30.5  # 상한가 판정 구간(호가 절사로 29.x~30.0 에 찍힌다)
@@ -65,9 +65,9 @@ INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "급등 종목 강도",
     "category": "시장",
-    "headline": "장중 크게 오른 종목이 얼마나 쏟아졌나",
+    "headline": "코스피에서 장중 크게 오른 종목이 얼마나 쏟아졌나",
     "description_beginner": (
-        "상한가에 가까이 간 종목이 많을수록, 개별 종목에 돈이 몰려 들끓는 장이라는 신호입니다"
+        "코스피에서 상한가에 가까이 간 종목이 많을수록, 개별 종목에 돈이 몰려 들끓는 장이라는 신호입니다"
     ),
     "unit": "점",
 }
