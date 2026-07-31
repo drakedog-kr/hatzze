@@ -39,6 +39,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from datetime import date, datetime, timedelta
 
+from .channel_breadth import channel_breadth_map
 from .surging import load_stock_daily
 from .text_check import problems
 from .timeutil import KST, today_kst
@@ -405,17 +406,21 @@ def load_weekly_stocks(db) -> list[dict]:
     if not dates:
         return []
     window = set(dates[-WEEKLY_DAYS:])
-    agg: dict[str, dict] = defaultdict(lambda: {"m": 0, "ch": 0})
+    mentions: dict[str, int] = defaultdict(int)
     for r in rows:
         if r["date"] in window:
-            a = agg[r["stock_code"]]
-            a["m"] += r["mention_count"] or 0
-            a["ch"] = max(a["ch"], r["channel_count"] or 0)
+            mentions[r["stock_code"]] += r["mention_count"] or 0
 
-    top = sorted(agg.items(), key=lambda kv: (-kv[1]["m"], kv[0]))[:WEEKLY_STOCK_SHOW]
+    top = sorted(mentions.items(), key=lambda kv: (-kv[1], kv[0]))[:WEEKLY_STOCK_SHOW]
     codes = [c for c, _ in top]
     if not codes:
         return []
+
+    # 채널 수는 창 전체의 **서로 다른 채널 수**다(common/channel_breadth.py).
+    # 이 글이 특히 max 규칙에 취약했다 — 7일 창인데 일별 최대치를 적으면 3일 창인
+    # 사이트보다 작은 수가 나와, 언급은 늘었는데 채널은 줄어든 것처럼 읽혔다.
+    win_sorted = sorted(window)
+    breadth = channel_breadth_map(db, codes, win_sorted[0], win_sorted[-1])
     names = {r["code"]: r["name"] for r in db.table("stocks").select("code,name").in_("code", codes).execute().data}
 
     latest = db.table("telegram_stock_narrative").select("date").order("date", desc=True).limit(1).execute().data
@@ -434,14 +439,14 @@ def load_weekly_stocks(db) -> list[dict]:
         {
             "code": c,
             "name": names.get(c, c),
-            "mentions": a["m"],
-            "channels": a["ch"],
+            "mentions": m,
+            "channels": breadth.get(c, 0),
             # 금지어가 든 문장은 여기서 버린다(safe_narrative). 종목 이름 밑에 붙는
             # 문장이라 시세 표현이 섞이면 그 종목에 대한 의견으로 읽힌다.
             "narrative": safe_narrative(names.get(c, c), narr.get(c, "")),
             "window": sorted(window),
         }
-        for c, a in top
+        for c, m in top
     ]
 
 

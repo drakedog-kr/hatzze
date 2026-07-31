@@ -275,14 +275,17 @@ export async function getTelegramSummary(): Promise<TelegramSummary> {
  */
 const SHARE_SMOOTHING = 0.002;
 
-type DailyRow = { stock_code: string; date: string; weighted_score: number; mention_count: number; channel_count: number };
+// channel_count 는 일부러 뺐다. 창 전체의 '서로 다른 채널 수'는 일별 개수로 복원할 수
+// 없어서(recentChannelCount 주석) 프론트가 쓸 데가 없고, 14일 × 수천 행에 실려 오는
+// 열이라 안 받는 편이 낫다. 파이프라인 집계에는 그대로 남아 있다.
+type DailyRow = { stock_code: string; date: string; weighted_score: number; mention_count: number };
 
 async function loadStockDaily(days: number): Promise<{ rows: DailyRow[]; dates: string[] }> {
   const db = getSupabaseAdmin();
   const data = await fetchAllRows<DailyRow>("id", () =>
     db
       .from("telegram_stock_daily")
-      .select("stock_code,date,weighted_score,mention_count,channel_count")
+      .select("stock_code,date,weighted_score,mention_count")
       .gte("date", daysAgoISO(days).slice(0, 10)),
   );
   // 오늘은 아직 하루가 덜 차서 일평균·추이를 왜곡한다 — 완료된 날만 쓴다.
@@ -425,7 +428,7 @@ export type SurgingStock = {
   code: string;
   name: string;
   recentMentions: number;
-  channelCount: number;
+  channelCount: number; // 이 종목을 다룬 서로 다른 채널 수(관심의 폭). 규칙은 recentChannelCount.
   ratio: number; // 최근 vs 평소 주목도 배수 (Infinity=신규 등장)
   isNew: boolean;
   series: number[]; // 일별 언급수(오래된→최신)
@@ -458,17 +461,16 @@ export async function getSurgingStocks(limit = 5): Promise<SurgingStock[]> {
 
   const byStock = new Map<
     string,
-    { recentShare: number; recentM: number; priorShare: number; channels: number; byDate: Map<string, number> }
+    { recentShare: number; recentM: number; priorShare: number; byDate: Map<string, number> }
   >();
   for (const r of rows) {
-    const a = byStock.get(r.stock_code) ?? { recentShare: 0, recentM: 0, priorShare: 0, channels: 0, byDate: new Map() };
+    const a = byStock.get(r.stock_code) ?? { recentShare: 0, recentM: 0, priorShare: 0, byDate: new Map() };
     a.byDate.set(r.date, r.mention_count || 0);
     const total = dayTotal.get(r.date) || 0;
     const share = total > 0 ? (Number(r.weighted_score) || 0) / total : 0;
     if (recentDates.has(r.date)) {
       a.recentShare += share;
       a.recentM += r.mention_count || 0;
-      a.channels = Math.max(a.channels, r.channel_count || 0);
     } else {
       a.priorShare += share;
     }
@@ -486,7 +488,10 @@ export async function getSurgingStocks(limit = 5): Promise<SurgingStock[]> {
         code,
         name: info?.name ?? code,
         recentMentions: a.recentM,
-        channelCount: a.channels,
+        // 여기서는 못 센다 — '서로 다른 채널 수'는 일별 집계의 합집합이라 원자료를
+        // 봐야 하고(recentChannelCount 주석), 카드에 오르지도 못할 1,700여 종목까지
+        // 물을 이유가 없다. 정원을 확정한 뒤 그 몇 건만 아래에서 채운다.
+        channelCount: 0,
         // 평활(+SHARE_SMOOTHING)한 뒤 나눈다. 그냥 나누면 분모가 거의 0인 종목이
         // "▲162.8배"처럼 터무니없는 배수를 받는데, 실제론 3일간 2회 언급·1개 채널이라
         // 표본이 사실상 없는 경우다. 상수는 '언급 1회가 만드는 몫'(실측 중앙값 0.0018)
@@ -522,9 +527,18 @@ export async function getSurgingStocks(limit = 5): Promise<SurgingStock[]> {
 
   // 표시용 가격은 실시간(야후) 우선 — KRX 저장 종가는 며칠 지연돼 상단 티커와 어긋난다.
   // 조회 실패 시 KRX 종가(priceDate 라벨과 함께)를 그대로 쓴다.
-  const quotes = await Promise.all(
-    list.map((s) => stockQuote(`${s.code}.${s.market === "KOSDAQ" ? "KQ" : "KS"}`)),
-  );
+  //
+  // 채널 수도 여기서 함께 받는다. 시세와 서로 상관이 없으니 나란히 두면 둘 중 느린
+  // 쪽만큼만 걸린다(실측 0.09초, 야후 시세가 늘 더 오래 걸린다).
+  const [quotes, breadth] = await Promise.all([
+    Promise.all(list.map((s) => stockQuote(`${s.code}.${s.market === "KOSDAQ" ? "KQ" : "KS"}`))),
+    // 언급 수(recentM)와 **같은 창**이어야 한 줄에 적힌 두 값이 같은 기간을 말한다.
+    channelBreadth(
+      list.map((s) => s.code),
+      recentDateList[0],
+      addDaysISO(recentDateList[recentDateList.length - 1], 1),
+    ),
+  ]);
   list.forEach((s, i) => {
     const q = quotes[i];
     if (q) {
@@ -532,6 +546,7 @@ export async function getSurgingStocks(limit = 5): Promise<SurgingStock[]> {
       s.changeRate = q.changeRate;
       s.isLive = true;
     }
+    s.channelCount = breadth.get(s.code) ?? 0;
   });
 
   return list;
@@ -541,7 +556,6 @@ export type StockTrend = {
   code: string;
   name: string;
   mentions: number;
-  channels: number;
   series: number[];
 };
 
@@ -552,12 +566,15 @@ export async function getTopStocksWithTrend(limit = 6): Promise<StockTrend[]> {
   const { rows, dates } = await loadStockDaily(KADERA_WINDOW_DAYS);
   if (!rows.length) return [];
 
-  const agg = new Map<string, { w: number; m: number; ch: number; byDate: Map<string, number> }>();
+  // 채널 수는 여기서 내주지 않는다. 예전엔 일별 channel_count 의 최대치를 `channels` 로
+  // 실어 보냈는데 **아무도 읽지 않았고**(호출부는 /kadera·/mdd 둘뿐이고 둘 다 코드와
+  // 언급 수만 쓴다), 남겨 두면 언젠가 화면에 붙어 max 규칙이 되살아난다.
+  // 이 목록에 채널 수가 필요해지면 channelBreadth 로 받을 것.
+  const agg = new Map<string, { w: number; m: number; byDate: Map<string, number> }>();
   for (const r of rows) {
-    const a = agg.get(r.stock_code) ?? { w: 0, m: 0, ch: 0, byDate: new Map() };
+    const a = agg.get(r.stock_code) ?? { w: 0, m: 0, byDate: new Map() };
     a.w += Number(r.weighted_score) || 0;
     a.m += r.mention_count || 0;
-    a.ch = Math.max(a.ch, r.channel_count || 0);
     a.byDate.set(r.date, r.mention_count || 0);
     agg.set(r.stock_code, a);
   }
@@ -570,7 +587,6 @@ export async function getTopStocksWithTrend(limit = 6): Promise<StockTrend[]> {
       code,
       name: nameOf.get(code) ?? code,
       mentions: a.m,
-      channels: a.ch,
       series: dates.map((d) => a.byDate.get(d) ?? 0),
     }));
 }
@@ -709,6 +725,15 @@ export type StockReport = {
 /**
  * 이 종목을 최근 N일 안에 언급한 **서로 다른 채널 수**('관심의 폭').
  *
+ * ⚠️ **'N개 채널'은 어디서든 이 규칙으로 센다.** 화면·방송을 통틀어 네 자리가 같은
+ * 라벨을 쓰는데, 예전엔 두 규칙이 섞여 있었다 — 여기만 창 전체의 distinct 였고
+ * 나머지 셋은 telegram_stock_daily.channel_count 의 **하루 최대치**(max)였다.
+ * 일별 집계는 '그날 그 종목을 다룬 채널 수'라, 날이 달라지면 채널 명단도 달라진다.
+ * 그래서 max 는 창을 늘려도 커지지 않고, 언급 수만 늘어 **창이 길수록 채널이 적은**
+ * 겉보기에 불가능한 조합이 나왔다(2026-07-31 SK하이닉스 실측: 3일 1,882회·201채널 vs
+ * 7일 2,822회·174채널). 라벨이 말하는 '서로 다른 채널 수'는 합집합이고, 합집합은
+ * 일별 개수만으로는 복원할 수 없다 — 원자료를 봐야 한다. 그래서 max 를 버렸다.
+ *
  * telegram_message_stocks 에는 날짜가 없다(메시지 PK만 갖는다). 그래서 기간으로 자르려면
  * 메시지 쪽 posted_at 을 봐야 하는데, 예전엔 그 짝짓기를 **프론트에서** 했다:
  * 최근 7일 메시지 키를 전부 받아 Set 을 만들고(38,737행 = 1,000행씩 39번 순차 왕복),
@@ -739,6 +764,22 @@ async function recentChannelCount(code: string, from: string, to: string): Promi
       .lt("telegram_messages.posted_at", `${to}T00:00:00+09:00`),
   );
   return new Set(rows.map((r) => r.channel_handle)).size;
+}
+
+/**
+ * 여러 종목의 '관심의 폭'을 한꺼번에. 종목별로 따로 묻고 **병렬로** 기다린다.
+ *
+ * `.in(stock_code, 코드들)` 로 한 방에 묻는 쪽이 왕복이 적어 보이지만 실제로는 느리다.
+ * 페이징이 순차라서, 종목을 합치면 행이 합쳐진 만큼 페이지가 늘고 그게 전부 직렬로
+ * 쌓인다. 종목별로 나누면 각자 1~2 페이지에서 끝나고 그 왕복들이 겹친다
+ * (2026-07-31 실측, 급부상 5종목 3일 창: 순차 합 0.49초 → 병렬 0.09초).
+ *
+ * 목록은 화면에 실제로 그릴 몇 건(카드 정원 5~6)뿐이라 `.in()` 목록 길이 함정과도
+ * 무관하다. 순위를 정할 땐 이 값을 쓰지 않으므로 전 종목을 셀 이유가 없다.
+ */
+async function channelBreadth(codes: string[], from: string, to: string): Promise<Map<string, number>> {
+  const counts = await Promise.all(codes.map((c) => recentChannelCount(c, from, to)));
+  return new Map(codes.map((c, i) => [c, counts[i]]));
 }
 
 /** 종목 텔레그램 리포트 — 특정 종목의 최근 창 언급 추이와 관심의 폭. */
