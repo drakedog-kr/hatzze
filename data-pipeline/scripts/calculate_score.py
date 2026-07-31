@@ -257,9 +257,39 @@ def get_all_values(client, indicator_id: str) -> list[float]:
     return [float(r["raw_value"]) for r in result.data]
 
 
+def get_recent_values(client, indicator_id: str, limit: int) -> list[float]:
+    """최근 `limit` 행의 raw_value(최신순).
+
+    get_all_values 와 달리 정렬·상한을 명시한다. 전체를 읽는 쪽은 히스토리가 1,000행을
+    넘는 순간 PostgREST 기본 상한에 **조용히** 잘려서, 평균이 옛 구간만 반영하게 된다.
+    롤링 창은 애초에 상한보다 작으므로 그 함정을 아예 안 밟는다.
+    """
+    result = (
+        client.table("indicator_values")
+        .select("raw_value")
+        .eq("indicator_id", indicator_id)
+        .order("date", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return [float(r["raw_value"]) for r in result.data]
+
+
 def compute_threshold(client, indicator_id: str, config: dict) -> float:
     if config["kind"] == "fixed":
         return config["threshold"]
+
+    # rolling_average (limit_up_breadth): 최근 window 거래일 평균을 그날의 기준선으로
+    # 삼는다. cumulative_average 와 다른 점은 둘이다 — (1) 창이 유한해서 오래된 구간이
+    # 계속 끌고 가지 않고, (2) **오늘 값을 평균에서 뺀다**. 오늘을 넣으면 급등한 날이
+    # 제 기준선을 스스로 올려 급등을 덜 급등해 보이게 만든다.
+    if config["kind"] == "rolling_average":
+        window = config["window"]
+        values = get_recent_values(client, indicator_id, window + 1)
+        prior = values[1:]  # 최신순이라 첫 행이 오늘
+        # 히스토리가 없으면 비교할 기준이 없다. 오늘 값을 기준선으로 두면 급증 0%,
+        # 즉 상온(50)에서 시작한다 — 판단을 보류하는 셈이라 의도된 동작이다.
+        return statistics.mean(prior) if prior else values[0]
 
     # cumulative_average (youtube_finance_search_views 전용): 오늘 값을 포함해
     # 지금까지 쌓인 전체 값의 평균을 매일 다시 계산해 그날의 기준선으로 삼는다.

@@ -42,7 +42,6 @@ INDICATOR_WEIGHTS = {
     "kospi_volume_surge": 4.5,      # 거래량: 스프레드 +26.5. 절대 수준 축을 더해 국면까지 본다
     "kospi_high_gap": 4.0,          # 가격 위치: 스프레드 최고(+44.9)지만 60%가 초고온이라 소폭 감량
     "naver_search_trend": 3.5,      # 초보 유입: 스프레드 +27.6(3위)
-    "investor_deposit": 3.0,        # 예탁금: 대기 매수 실탄(표본 24일, 잠정)
     "foreign_sell_at_high": 2.5,    # 고점권 외국인 매도(individual_net_buy 자리·가중치를 물려받음)
     "kospi_speed_60d": 2.5,         # 가격 속도: 위치와 직교하는 새 축
     # froth 심리·투기
@@ -53,6 +52,7 @@ INDICATOR_WEIGHTS = {
     "turnover_concentration": 2.0,  # 거래대금 쏠림(표본 24일, 잠정)
     "dcinside_post_count": 2.0,     # 커뮤니티 여론(표본 15일, 잠정)
     "buffett_index": 2.0,           # 밸류(느리지만 향후 낙폭 −0.585)
+    "limit_up_breadth": 1.0,        # 급등 종목 강도(예탁금 자리. 판별력 확인 전이라 낮게)
     "vkospi": 1.5,                  # 공포/방심 → 레짐 이동으로 무력화, 감량
     "small_business_crisis_index": 1.5,  # 실물–증시 괴리(동행성 +0.533)
     "brokerage_app_rank": 1.5,      # 증권 앱 유입(표본 7일, 잠정)

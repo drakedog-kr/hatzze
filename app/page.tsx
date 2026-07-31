@@ -58,8 +58,8 @@ type Pick = {
    * 새것이라, 이 폴백은 낡음을 **덜** 말한다(더 말하지는 않는다).
    *
    * 그래서 이 값을 **아무 카드에나 붙이면 안 된다.** 지금 배지를 다는 건 코스피 신고가
-   * 괴리율(source_date 를 쓴다)과 투자자예탁금 둘뿐이고, 예탁금은 upsert 가 출처 시계열의
-   * 날짜를 그대로 행 날짜로 삼아(`"date": d`, fetch_investor_deposit.py) 둘이 정확히 같다.
+   * 괴리율(source_date 를 쓴다)과 급등 종목 강도 둘뿐이고, 후자는 upsert 가 KRX 거래일을
+   * 그대로 행 날짜로 삼아(`"date": iso`, fetch_limit_up_breadth.py) 둘이 정확히 같다.
    * 다른 카드에 달려면 그 스크립트가 행 날짜를 어떻게 정하는지 먼저 볼 것.
    */
   sourceDate: string | null;
@@ -1899,36 +1899,66 @@ function CardNetBuy({ v }: { v: Pick }) {
   );
 }
 
-// 투자자예탁금 — 대기 매수 자금(조원) + 최근 추이
-function CardDeposit({ v }: { v: Pick }) {
+/**
+ * 급등 종목 강도 — 장중 급등 종목 수를 가중 합산한 점수(3·상한가 + 2·(+20~29%) + 1·(+10~20%)).
+ *
+ * 세 칸에 각각 툴팁을 달아 어떤 종목이 그 칸에 들었는지 보여 준다. 파이프라인이
+ * 거래대금 상위 10종목만 details 에 넣으므로, 그보다 많으면 "외 N개"로 센다
+ * (상한가는 하루 10~20개지만 +10~20% 칸은 100개를 넘는 날이 있다).
+ */
+function CardLimitUp({ v }: { v: Pick }) {
   const c = overheatColor(v.capped);
-  const jo = (v.details as unknown as { jo?: number })?.jo ?? (v.raw ?? 0) / 10000;
-  // 예전엔 details.recent_jo(조원 배열)를 썼지만 날짜가 없어 툴팁을 못 만들었다.
-  // historyPoints 는 날짜를 갖고 있고 값은 억원이라 1e4 로 나눠 조원으로 맞춘다.
-  const points = v.historyPoints.map((pt) => ({ date: pt.date, jo: pt.value / 10000 }));
-  const recent = points.length
-    ? points.map((pt) => pt.jo)
-    : ((v.details as unknown as { recent_jo?: number[] })?.recent_jo ?? []);
-  const change = recent.length >= 2 ? recent[recent.length - 1] - recent[0] : 0;
+  const dt = v.details as unknown as {
+    limit_n?: number; up20_n?: number; up10_n?: number;
+    limit_names?: string[]; up20_names?: string[]; up10_names?: string[];
+  } | null;
+
+  const buckets: { label: string; n: number; names: string[]; tone: string }[] = [
+    { label: "상한가", n: dt?.limit_n ?? 0, names: dt?.limit_names ?? [], tone: C.mania },
+    { label: "+20%", n: dt?.up20_n ?? 0, names: dt?.up20_names ?? [], tone: C.hot },
+    { label: "+10%", n: dt?.up10_n ?? 0, names: dt?.up10_names ?? [], tone: C.sub },
+  ];
+  // 막대 길이는 칸끼리만 비교하면 된다(절대 개수는 옆에 숫자로 적혀 있다).
+  const maxN = Math.max(1, ...buckets.map((b) => b.n));
+
   return (
     <Shell hit={v.isHit} minH={210}>
-      {/* 예탁금은 늘 하루이틀 늦게 공표된다(2026-07-30 화면에 07-28 자료가 떠 있었다).
-          정상이지만 히어로는 페이지 전체를 "오늘 기준"으로 액자에 넣으므로, 이 카드만은
-          자기 자료일을 계속 밝힌다 — 신고가 괴리율·상승 속도 카드와 같은 처리다. */}
-      <TitleRow desc={v.headline} icon="savings" name={v.name} badge={sourceDateBadge(v) ?? "최근 거래일 기준"} />
-      <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "6px 0 4px" }}>
-        <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 700, color: c, letterSpacing: "-0.03em" }}>{jo.toFixed(1)}</span>
-        <span style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>조원</span>
-        <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, color: change >= 0 ? C.hot : C.cold }}>
-          최근 {change >= 0 ? "+" : ""}{change.toFixed(1)}조
+      {/* KRX 일별매매정보는 하루이틀 늦게 열린다. 히어로가 페이지 전체를 "오늘 기준"으로
+          액자에 넣으므로 이 카드만은 자기 자료일을 계속 밝힌다(예탁금 카드에서 물려받은 처리). */}
+      <TitleRow desc={v.headline} icon="bolt" name={v.name} badge={sourceDateBadge(v) ?? "최근 거래일 기준"} />
+      <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "6px 0 10px" }}>
+        <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 700, color: c, letterSpacing: "-0.03em" }}>
+          {(v.raw ?? 0).toLocaleString("ko-KR")}
         </span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>점</span>
       </div>
-      <div style={{ flex: 1, position: "relative", minHeight: 52 }}>
-        <Sparkline
-          data={recent}
-          color={c}
-          tips={points.length === recent.length ? points.map((pt) => `${shortDate(pt.date)} · ${pt.jo.toFixed(1)}조원`) : undefined}
-        />
+
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 7, justifyContent: "center" }}>
+        {buckets.map((b) => {
+          const shown = b.names.slice(0, 10);
+          const rest = b.n - shown.length;
+          const tip = shown.length
+            ? `${shown.join(" · ")}${rest > 0 ? ` 외 ${rest}개` : ""}`
+            : "해당 종목이 없습니다";
+          return (
+            <div
+              key={b.label}
+              // 툴팁이 길어 hz-tip-wide 로 줄바꿈을 허용한다. 카드 왼쪽 끝에 붙는 줄이라
+              // 가운데 정렬로 두면 좁은 화면에서 왼쪽으로 넘쳐 가로 스크롤이 생긴다.
+              className="hz-tip hz-tip-wide hz-tip-start"
+              data-tip={tip}
+              style={{ display: "flex", alignItems: "center", gap: 8, cursor: "help" }}
+            >
+              <span style={{ width: 40, fontSize: 11, fontWeight: 700, color: C.sub, flexShrink: 0 }}>{b.label}</span>
+              <span style={{ flex: 1, height: 7, background: C.track, borderRadius: 4, overflow: "hidden" }}>
+                <span style={{ display: "block", width: `${(b.n / maxN) * 100}%`, height: "100%", background: b.tone, borderRadius: 4 }} />
+              </span>
+              <span style={{ width: 32, textAlign: "right", fontFamily: MONO, fontSize: 12, fontWeight: 700, color: C.ink, flexShrink: 0 }}>
+                {b.n}
+              </span>
+            </div>
+          );
+        })}
       </div>
       <Foot text={v.desc} />
     </Shell>
@@ -2031,7 +2061,7 @@ const LAID_OUT = new Set([
   "buffett_index", "leverage_etf_volume", "market_actions_30d", "turnover_concentration",
   "kospi_high_gap", "kospi_speed_60d", "vkospi", "kospi_asia_relative_strength",
   "kospi_gold_ratio", "kospi_volume_surge", "usdkrw_volatility",
-  "foreign_sell_at_high", "put_call_ratio", "investor_deposit",
+  "foreign_sell_at_high", "put_call_ratio", "limit_up_breadth",
   "naver_search_trend", "dcinside_post_count", "news_sentiment", "bestseller_finance_ratio",
   "youtube_finance_search_views", "luxury_consumption_index", "fine_dining_search_index",
   "upbit_speculation_index", "github_trading_bot_repos", "brokerage_app_rank",
@@ -2094,7 +2124,7 @@ export default async function Home() {
                     0.04로 거의 안 움직여(가중치 주석의 "느림·비타이밍"과 같은 이유) 뒤로 뺐다. */}
                 <CardHighGap v={p("kospi_high_gap")} tops={topGaps} />
                 <CardVolume v={p("kospi_volume_surge")} />
-                <CardDeposit v={p("investor_deposit")} />
+                <CardLimitUp v={p("limit_up_breadth")} />
                 <CardSpeed v={p("kospi_speed_60d")} />
                 <CardNetBuy v={p("foreign_sell_at_high")} />
                 <CardPutCall v={p("put_call_ratio")} />
