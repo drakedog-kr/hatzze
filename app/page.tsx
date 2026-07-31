@@ -2103,10 +2103,16 @@ function CardLimitUp({ v }: { v: Pick }) {
             // 커서는 건드리지 않는다(globals.css 의 .hz-tip 주석).
             // hz-tip-lines: data-tip 의 줄바꿈을 살린다. 한 줄로 이으면 세 단계가
             // 눈에 안 들어온다.
+            //
+            // 라벨과 수를 콜론으로 잇는다. 예전엔 공백 두 칸으로 열을 맞추려 했는데,
+            // .hz-tip-lines 가 white-space:pre-line 이라 **연속 공백이 합쳐진다** —
+            // 두 칸은 화면에서 한 칸으로 나왔고 열 맞춤은 처음부터 없었다("상한가 4종목").
+            // 공백으로 벌리려면 pre-wrap 이 필요한데, 그러면 이 파일의 다른 툴팁까지
+            // 줄바꿈 규칙이 바뀐다. 콜론은 폭에 기대지 않고 "이름: 값"을 못박는다.
             className="hz-tip hz-tip-wide hz-tip-lines hz-tip-start"
             data-tip={
-              buckets.map((b) => `${b.label}  ${b.n}종목`).join("\n") +
-              (listed ? `\n전체  ${listed.toLocaleString("ko-KR")}종목` : "")
+              buckets.map((b) => `${b.label}: ${b.n}종목`).join("\n") +
+              (listed ? `\n전체: ${listed.toLocaleString("ko-KR")}종목` : "")
             }
             style={{ fontSize: 11, fontWeight: 600, color: "var(--c-muted)", marginTop: 1 }}
           >
