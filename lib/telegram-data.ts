@@ -444,7 +444,12 @@ export type SurgingStock = {
  * 최근 3일(완료된 날 기준) 일평균 weighted 를 그 이전 일평균과 비교한다.
  * 이전 기록이 없으면 신규 등장(🆕).
  */
-export async function getSurgingStocks(limit = 5): Promise<SurgingStock[]> {
+export async function getSurgingStocks(
+  limit = 5,
+  // 시세를 안 쓰는 호출부(탑바 티커는 종목명과 배수만 쓴다)가 야후 왕복을 건너뛰게 한다.
+  // 기본값은 켜 둔 채라 기존 호출부는 그대로다.
+  opts: { withQuotes?: boolean } = {},
+): Promise<SurgingStock[]> {
   const { rows, dates } = await loadStockDaily(14);
   if (!rows.length) return [];
 
@@ -525,13 +530,18 @@ export async function getSurgingStocks(limit = 5): Promise<SurgingStock[]> {
   const tier = (s: SurgingStock) => (s.recentMentions < 2 ? 3 : s.ratio >= 1.3 ? 1 : 2);
   const list = [...scored].sort((x, y) => tier(x) - tier(y)).slice(0, limit);
 
-  // 표시용 가격은 실시간(야후) 우선 — KRX 저장 종가는 며칠 지연돼 상단 티커와 어긋난다.
-  // 조회 실패 시 KRX 종가(priceDate 라벨과 함께)를 그대로 쓴다.
+  // 표시용 가격은 실시간(야후) 우선 — KRX 저장 종가는 며칠 지연돼, 같은 종목이 이 카드와
+  // 종목 리포트에서 다른 값으로 보인다. 조회 실패 시 KRX 종가(priceDate 라벨과 함께)를 쓴다.
+  // 가격 칸이 없는 호출부(탑바 티커)는 이 왕복만 건너뛴다 — closePrice 는 KRX 값으로 남는다.
   //
-  // 채널 수도 여기서 함께 받는다. 시세와 서로 상관이 없으니 나란히 두면 둘 중 느린
-  // 쪽만큼만 걸린다(실측 0.09초, 야후 시세가 늘 더 오래 걸린다).
+  // 채널 수는 **건너뛰지 않는다.** 시세와 서로 상관이 없어 나란히 두면 둘 중 느린 쪽만큼만
+  // 걸리고(실측 0.09초, 야후 시세가 늘 더 오래 걸린다), 이걸 빼면 channelCount 가 distinct
+  // 규칙을 안 거친 값으로 남아 화면마다 '몇 개 채널'이 달라진다.
+  const wantQuotes = opts.withQuotes !== false;
   const [quotes, breadth] = await Promise.all([
-    Promise.all(list.map((s) => stockQuote(`${s.code}.${s.market === "KOSDAQ" ? "KQ" : "KS"}`))),
+    wantQuotes
+      ? Promise.all(list.map((s) => stockQuote(`${s.code}.${s.market === "KOSDAQ" ? "KQ" : "KS"}`)))
+      : Promise.resolve<Awaited<ReturnType<typeof stockQuote>>[]>([]),
     // 언급 수(recentM)와 **같은 창**이어야 한 줄에 적힌 두 값이 같은 기간을 말한다.
     channelBreadth(
       list.map((s) => s.code),

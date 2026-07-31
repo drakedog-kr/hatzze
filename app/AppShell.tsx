@@ -141,9 +141,13 @@ const STAGE_COLOR: Record<string, string> = {
   초고온: C.mania,
 };
 
-// 탑바 시세 티커. 햇쩨 지수는 서버에서 받은 일간 점수를 쓰고, 나머지 종목/지수/
-// 환율은 5분 시세 소스를 붙이기 전까지 자리표시(—)로 둔다.
-type Quote = { label: string; value: string; change: number | null; color?: string };
+// 탑바 티커의 한 칸. 햇쩨 지수는 서버에서 받은 일간 점수를 그대로 쓰고, 나머지 카더라
+// 집계는 /api/ticker 응답이 오면 자리표시(—)를 밀어낸다.
+//
+// changeText 는 change 옆에 붙는 단위를 갈아끼우는 자리다. 기본은 퍼센트인데, 온도의
+// 하루 변화는 "3%" 가 아니라 "3" 이라 그걸 그대로 쓰면 거짓말이 된다. 부호와 색은
+// 그대로 change 가 정한다(그래야 ▲/▼ 판정이 한 곳에만 있다).
+type Quote = { label: string; value: string; change: number | null; changeText?: string; color?: string };
 
 function Sidebar() {
   const intentPrefetch = useIntentPrefetch();
@@ -435,23 +439,38 @@ function TickerItem({ q }: { q: Quote }) {
       {q.change !== null && (
         <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 600, color: changeColor }}>
           {arrow}
-          {Math.abs(q.change).toFixed(1)}%
+          {q.changeText ?? `${Math.abs(q.change).toFixed(1)}%`}
         </span>
       )}
     </div>
   );
 }
 
-// 시세 로드 전 자리표시. /api/ticker 응답이 오면 실데이터로 교체된다.
+// 로드 전 자리표시. /api/ticker 응답이 오면 실데이터로 교체된다. 라벨을 그쪽과 맞춰 두면
+// 값만 "—" 에서 바뀌어, 흐르던 띠가 글자째 갈아엎히지 않는다.
+//
+// '주목도 1위' 만 라벨이 짧다(응답은 "주목도 1위 3일"). 창 길이는 KADERA_WINDOW_DAYS 인데
+// 그게 server-only 모듈에 있어 클라이언트인 이 파일이 못 읽는다. 숫자를 여기 손으로
+// 적으면 창을 바꾼 날 이 줄만 옛 값으로 남으므로, 아예 안 적고 응답이 채우게 둔다.
 const PLACEHOLDER: Quote[] = [
-  { label: "나스닥 선물", value: "—", change: null },
-  { label: "코스피", value: "—", change: null },
-  { label: "코스닥", value: "—", change: null },
-  { label: "삼성전자", value: "—", change: null },
-  { label: "SK하이닉스", value: "—", change: null },
-  { label: "비트코인", value: "—", change: null },
-  { label: "원/달러", value: "—", change: null },
+  { label: "급부상", value: "—", change: null },
+  { label: "주목도 1위", value: "—", change: null },
+  { label: "생태계 센티먼트", value: "—", change: null },
+  { label: "이슈 키워드", value: "—", change: null },
 ];
+
+/**
+ * 온도의 하루 변화를 Quote 의 change/changeText 로 만든다. 직전 기록이 없으면
+ * 둘 다 비워 화살표 자체가 안 붙는다.
+ *
+ * 단위를 안 붙인다 — 기본 서식이 퍼센트인데 온도 차이는 퍼센트가 아니고, 바로 왼쪽
+ * 값이 이미 "68℃" 라 도 단위는 한 번 더 말할 필요가 없다.
+ */
+function scoreDelta(s: DailyScore): Pick<Quote, "change" | "changeText"> {
+  if (s.prevScore === null) return { change: null };
+  const d = Math.round(s.score) - Math.round(s.prevScore);
+  return { change: d, changeText: `${Math.abs(d)}` };
+}
 
 function TopBar({
   dailyScore,
@@ -466,7 +485,9 @@ function TopBar({
   menuOpen: boolean;
   onMenuToggle: () => void;
 }) {
-  // 햇쩨 지수는 일간 값이라 서버 prop을 쓰고, 나머지 시세는 10분마다 폴링한다.
+  // 햇쩨 지수는 레이아웃이 이미 들고 있어 서버 prop 을 그대로 쓴다(첫 화면부터 값이
+  // 박혀 있다). 나머지 카더라 집계는 /api/ticker 를 10분마다 폴링한다 — 값 자체는 하루
+  // 두 번 파이프라인이 돌 때만 바뀌지만, 그 시각을 클라이언트가 모르니 주기로 따라간다.
   const [live, setLive] = useState<Quote[]>(PLACEHOLDER);
 
   useEffect(() => {
@@ -498,7 +519,9 @@ function TopBar({
         // formatIndicatorValue 는 절댓값 10 미만을 소수점 둘째자리로 적어(저온장의 8.5점이
         // "8.50℃") 티커 한 줄에 맞지 않는다. 온도는 언제나 정수여야 한다.
         value: `${Math.round(dailyScore.score)}℃ · ${stageLabel}`,
-        change: null,
+        // 하루 변화. 반올림한 값끼리 뺀다 — 원값으로 빼면 67.6 과 65.4 가 "2" 로 나오는데
+        // 화면에는 68 과 65 가 떠 있었으므로, 눈에 보이는 두 숫자의 차이와 어긋난다.
+        ...scoreDelta(dailyScore),
         color: STAGE_COLOR[stageLabel] ?? C.ink,
       }
     : { label: "햇쩨 지수", value: "—", change: null };
