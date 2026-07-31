@@ -101,15 +101,15 @@ def collect_day(d: date) -> dict | None:
     if not rows:
         return None
 
-    # (거래대금, 종목명) — 툴팁에 적을 대표 종목을 거래대금 순으로 고른다.
-    buckets: dict[str, list[tuple[float, str]]] = {"limit": [], "up20": [], "up10": []}
+    # (거래대금, 종목명, 장중 최고 등락률) — 카드에 적을 대표 종목을 거래대금 순으로 고른다.
+    buckets: dict[str, list[tuple[float, str, float]]] = {"limit": [], "up20": [], "up10": []}
     for x in rows:
         close = _to_f(x.get("TDD_CLSPRC"))
         prev = close - _to_f(x.get("CMPPREVDD_PRC"))
         if prev <= 0:
             continue
         hi = (_to_f(x.get("TDD_HGPRC")) / prev - 1) * 100
-        item = (_to_f(x.get("ACC_TRDVAL")), (x.get("ISU_NM") or "").strip())
+        item = (_to_f(x.get("ACC_TRDVAL")), (x.get("ISU_NM") or "").strip(), hi)
         if LIMIT_LO <= hi <= LIMIT_HI:
             buckets["limit"].append(item)
         elif 20.0 <= hi < LIMIT_LO:
@@ -129,9 +129,15 @@ def collect_day(d: date) -> dict | None:
         "up10_n": counts["up10"],
         "listed_n": len(rows),
     }
+    # 카드가 "종목명 +23.4%" 로 적으려면 등락률이 있어야 한다. 이름만 저장하던 때는
+    # 버킷 이름(+20% 등)밖에 못 붙여서 랭킹이 밋밋했다.
+    # {"n": 종목명, "p": 장중 최고 등락률} 로 넣는다 — 옛 행은 문자열 배열이라 화면 쪽에
+    # 두 모양을 다 받는 정규화가 있다(app/page.tsx 의 CardLimitUp).
     for key, items in buckets.items():
         items.sort(key=lambda t: -t[0])
-        details[f"{key}_names"] = [nm for _, nm in items[:NAMES_PER_BUCKET] if nm]
+        details[f"{key}_names"] = [
+            {"n": nm, "p": round(hi, 1)} for _, nm, hi in items[:NAMES_PER_BUCKET] if nm
+        ]
     return {"raw": float(raw), "details": details}
 
 

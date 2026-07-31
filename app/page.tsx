@@ -1902,38 +1902,46 @@ function CardNetBuy({ v }: { v: Pick }) {
 /**
  * 급등 종목 비율 — 코스피에서 장중 10% 넘게 오른 종목의 비율(%).
  *
- * 큰 숫자는 비율이고, 그 아래에 "943종목 중 58개"를 붙여 분모·분자를 그대로 밝힌다.
- * 퍼센트만 있으면 6.15% 가 몇 종목인지 감이 안 오고, 개수만 있으면 상장 종목이 늘 때
- * 같은 개수가 다른 뜻이 된다. 둘을 같이 둬야 읽힌다.
+ * 카드는 **랭킹**이다. 큰 숫자를 퍼센트가 아니라 종목 수로 둔 이유는, 이 지표에서
+ * 사람이 실제로 궁금해하는 게 "6%"가 아니라 "뭐가 뛰었나"라서다. 퍼센트는 옆에
+ * 작게 붙여 두 값을 다 준다.
  *
- * 막대는 **강도별 구성**이다(원값에는 가중치가 없다 — 세 칸의 단순 합이 분자다).
- * 같은 6% 라도 상한가가 몇인지에 따라 장의 성격이 다르므로, 그 몫을 색으로 나눈다.
- * 세로선은 초고온 진입선(5%)이다.
+ * 줄은 등락률 순이다. 파이프라인이 버킷별로 거래대금 상위 10종목만 details 에
+ * 넣으므로, 여기 서는 건 "크게 오른 것들 중 거래가 두꺼운 종목"이다. 잡주 하나가
+ * 30% 올랐다고 목록을 차지하지 않는다.
  *
- * 세 칸에 각각 툴팁을 달아 어떤 종목이 그 칸에 들었는지 보여 준다. 파이프라인이
- * 거래대금 상위 10종목만 details 에 넣으므로, 그보다 많으면 "외 N개"로 센다.
+ * 색 막대는 강도(상한가 / +20~29% / +10~20%)다. 맨 아래 '외 N개'에 마우스를 올리면
+ * 강도별 개수가 뜬다.
  */
 function CardLimitUp({ v }: { v: Pick }) {
   const c = overheatColor(v.capped);
   const dt = v.details as unknown as {
     limit_n?: number; up20_n?: number; up10_n?: number; listed_n?: number;
-    limit_names?: string[]; up20_names?: string[]; up10_names?: string[];
+    limit_names?: unknown[]; up20_names?: unknown[]; up10_names?: unknown[];
   } | null;
 
+  // 옛 행은 종목명 문자열 배열이고 새 행은 {n, p} 객체 배열이다. 둘 다 받는다 —
+  // 등락률이 없던 시절 행에서도 카드가 이름만으로 서야 한다.
+  const norm = (arr: unknown[] | undefined) =>
+    (arr ?? []).map((x) =>
+      typeof x === "string" ? { n: x, p: null as number | null } : (x as { n: string; p: number }),
+    );
+
   const buckets = [
-    { label: "상한가", short: "상한가", n: dt?.limit_n ?? 0, names: dt?.limit_names ?? [], tone: C.mania },
-    { label: "+20~29%", short: "+20%", n: dt?.up20_n ?? 0, names: dt?.up20_names ?? [], tone: C.hot },
-    { label: "+10~20%", short: "+10%", n: dt?.up10_n ?? 0, names: dt?.up10_names ?? [], tone: C.neutral },
+    { label: "상한가", n: dt?.limit_n ?? 0, items: norm(dt?.limit_names), tone: C.mania },
+    { label: "+20~29%", n: dt?.up20_n ?? 0, items: norm(dt?.up20_names), tone: C.hot },
+    { label: "+10~20%", n: dt?.up10_n ?? 0, items: norm(dt?.up10_names), tone: C.neutral },
   ];
   const surged = buckets.reduce((a, b) => a + b.n, 0);
   const listed = dt?.listed_n ?? 0;
-  const pct = v.raw ?? 0;
-  // 막대 눈금은 오늘 값과 진입선 중 큰 쪽. 조용한 날엔 진입선이 오늘보다 커서, 안 그러면
-  // 세로선이 막대 밖으로 나간다.
-  // 초고온 진입선(진행률 75 지점). Pick 은 서식 문자열(hotDisp)만 내보내서 위치 계산에
-  // 못 쓰므로 details 의 원값을 직접 읽는다. 파이프라인이 새 설정으로 돌기 전엔 없다.
-  const hot = v.details?.hot_threshold ?? null;
-  const scale = Math.max(pct, hot ?? 0) || 1;
+
+  // 등락률 순으로 세운다. 등락률이 없는 옛 행은 강도 순(버킷 순서)이 그대로 남는다.
+  const ROWS = 5;
+  const rank = buckets
+    .flatMap((b) => b.items.map((it) => ({ ...it, tone: b.tone, label: b.label })))
+    .sort((a, b) => (b.p ?? 0) - (a.p ?? 0))
+    .slice(0, ROWS);
+  const rest = Math.max(0, surged - rank.length);
 
   return (
     <Shell hit={v.isHit} minH={210}>
@@ -1941,69 +1949,41 @@ function CardLimitUp({ v }: { v: Pick }) {
           액자에 넣으므로 이 카드만은 자기 자료일을 계속 밝힌다(예탁금 카드에서 물려받은 처리). */}
       <TitleRow desc={v.headline} icon="bolt" name={v.name} badge={sourceDateBadge(v) ?? "최근 거래일 기준"} />
 
-      <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "6px 0 3px" }}>
-        <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 700, color: c, letterSpacing: "-0.03em" }}>
-          {pct.toFixed(2)}
+      <div style={{ display: "flex", alignItems: "baseline", gap: 5, margin: "6px 0 12px" }}>
+        <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 700, color: c, letterSpacing: "-0.03em" }}>{surged}</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>종목</span>
+        <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 12, fontWeight: 700, color: c }}>
+          {(v.raw ?? 0).toFixed(2)}%
         </span>
-        <span style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>%</span>
-        {listed > 0 && (
-          <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 11, color: "var(--c-muted)" }}>
-            {listed.toLocaleString("ko-KR")}종목 중 {surged}개
-          </span>
-        )}
       </div>
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10, justifyContent: "center" }}>
-        {/* 강도별 구성 + 초고온 진입선 */}
-        <div style={{ position: "relative" }}>
-          <div style={{ display: "flex", height: 14, background: C.track, borderRadius: 5, overflow: "hidden" }}>
-            {buckets.map((b) => (
-              <span
-                key={b.label}
-                style={{ width: `${(surged ? (b.n / surged) * pct : 0) / scale * 100}%`, background: b.tone }}
-              />
-            ))}
-          </div>
-          {hot ? (
-            <>
-              {/* 세로선은 막대보다 위아래로 3px 씩 삐져나오게 둔다 — 막대 안에만 있으면
-                  세그먼트 경계선과 구분이 안 된다. */}
-              <span style={{ position: "absolute", left: `${(hot / scale) * 100}%`, top: -3, bottom: -3, width: 2, marginLeft: -1, background: C.ink, borderRadius: 1 }} />
-              <span style={{ position: "absolute", left: `${(hot / scale) * 100}%`, top: 18, transform: "translateX(-50%)", whiteSpace: "nowrap", fontFamily: MONO, fontSize: 9.5, fontWeight: 700, color: "var(--c-muted)" }}>
-                기준선 {hot.toFixed(2)}%
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6, justifyContent: "center" }}>
+        {rank.length === 0 ? (
+          <span style={{ fontSize: 12, color: "var(--c-muted)" }}>10% 넘게 오른 종목이 없습니다</span>
+        ) : (
+          rank.map((r, i) => (
+            <div key={`${r.n}-${i}`} style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+              <span style={{ width: 3, height: 14, borderRadius: 2, background: r.tone, flexShrink: 0 }} />
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: C.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {r.n}
               </span>
-            </>
-          ) : null}
-        </div>
-
-        {/* 강도별 개수. 마우스를 올리면 그 칸에 든 종목이 뜬다. */}
-        <div style={{ display: "flex", gap: 6, marginTop: hot ? 14 : 0 }}>
-          {buckets.map((b) => {
-            const shown = b.names.slice(0, 10);
-            const rest = b.n - shown.length;
-            const tip = shown.length
-              ? `${b.label} ${b.n}종목 — ${shown.join(" · ")}${rest > 0 ? ` 외 ${rest}개` : ""}`
-              : `${b.label}에 든 종목이 없습니다`;
-            return (
-              <div
-                key={b.label}
-                // 툴팁이 길어 hz-tip-wide 로 줄바꿈을 허용한다. 카드 왼쪽에 붙는 칸이라
-                // 가운데 정렬로 두면 좁은 화면에서 왼쪽으로 넘쳐 가로 스크롤이 생긴다.
-                // 커서는 건드리지 않는다 — 물음표는 물음표 아이콘이 실제로 있는 자리에만
-                // 쓴다(globals.css 의 .hz-tip 주석).
-                className="hz-tip hz-tip-wide hz-tip-start"
-                data-tip={tip}
-                style={{ flex: 1, minWidth: 0, padding: "5px 7px", borderRadius: 8, background: C.bg, display: "flex", flexDirection: "column", gap: 3 }}
-              >
-                <span style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 0 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: 999, background: b.tone, flexShrink: 0 }} />
-                  <span style={{ fontSize: 10, fontWeight: 700, color: C.sub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.short}</span>
-                </span>
-                <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: C.ink, lineHeight: 1 }}>{b.n}</span>
-              </div>
-            );
-          })}
-        </div>
+              <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: r.tone, whiteSpace: "nowrap", flexShrink: 0 }}>
+                {r.p === null ? r.label : `+${r.p.toFixed(1)}%`}
+              </span>
+            </div>
+          ))
+        )}
+        {rest > 0 && (
+          <span
+            // 강도별 개수는 여기 한 곳에 모은다. 줄마다 붙이면 랭킹이 라벨로 시끄러워진다.
+            // 커서는 건드리지 않는다(globals.css 의 .hz-tip 주석).
+            className="hz-tip hz-tip-wide hz-tip-start"
+            data-tip={buckets.map((b) => `${b.label} ${b.n}종목`).join(" · ") + (listed ? ` / 전체 ${listed}종목` : "")}
+            style={{ fontSize: 11, fontWeight: 600, color: "var(--c-muted)", marginTop: 1 }}
+          >
+            외 {rest}개
+          </span>
+        )}
       </div>
       <Foot text={v.desc} />
     </Shell>
