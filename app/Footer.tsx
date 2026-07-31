@@ -3,7 +3,7 @@ import Link from "next/link";
 import { GhostSymbol, Wordmark } from "./Logo";
 import { C, MONO } from "./ui";
 
-/** 푸터 로고 옆에 찍히는 서비스 버전. 베타 오픈(2026-07-31) 기준 1.0.0 에서 시작한다. */
+/** 푸터 로고 옆에 찍히는 서비스 버전. 베타 오픈(2026-08-03) 기준 1.0.0 에서 시작한다. */
 const APP_VERSION = "1.0.0";
 /** 문의 창구. 여기 한 곳만 바꾸면 본문 문구와 mailto: 가 같이 따라온다. */
 const CONTACT_EMAIL = "hatzze@proton.me";
