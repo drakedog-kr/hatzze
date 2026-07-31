@@ -733,7 +733,7 @@ function Headline({ data }: { data: MddResult }) {
         </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           <Badge tone="blue">{periodLabel}</Badge>
-          <Badge>{a.asOf} 종가</Badge>
+          <Badge>{a.asOf}</Badge>
         </div>
       </div>
 
@@ -750,7 +750,7 @@ function Headline({ data }: { data: MddResult }) {
 
       {/* 현재가·최고가를 라벨 붙은 두 칸으로 — 예전 회색 한 줄보다 기준이 분명하다. */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 20 }}>
-        <Stat label="현재가" value={fmtWon(a.price)} sub={`${a.asOf} 종가`} />
+        <Stat label="현재가" value={fmtWon(a.price)} sub={a.asOf} />
         <Stat label={`${periodLabel} 최고가`} value={fmtWon(a.ath)} sub={a.athDate} />
         <Stat label="기간 최저점" value={fmtPct(a.mdd)} sub={a.mddDate} tone="cold" />
       </div>
