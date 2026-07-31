@@ -14,15 +14,21 @@ export type DailyScore = {
   // 생성 전이면 null이고, 이땐 히어로가 기존 템플릿 문장으로 폴백한다.
   ai_summary: string | null;
   /**
-   * 바로 앞 기록의 점수. 탑바 티커가 "▲3" 을 그리는 데 쓴다. 기록이 하나뿐이면 null.
+   * **직전 파이프라인 실행**이 남긴 점수. 탑바 티커가 "▲3" 을 그리는 데 쓴다. 비교할
+   * 앞 실행이 없으면 null.
    *
-   * '전일'이 아니라 '직전 행'이다. 파이프라인이 하루 못 돌면 그날 행이 없어 이틀 전과
-   * 비교하게 되는데, 그걸 "어제보다"라고 못박지 않으려고 화면에도 날짜말을 안 쓴다
-   * (숫자와 화살표만 띄운다).
+   * '전일'도 '직전 행'도 아니다. 파이프라인은 하루 두 번(오전·오후) 도는데 둘 다 같은
+   * 날짜 행을 덮어쓰므로, 앞 행과 비교하면 오후 실행이 새 점수를 써도 화살표는 여전히
+   * 어제와의 차이를 가리킨다 — 방금 바뀐 온도가 화면에 안 나타난다. 그래서
+   * calculate_score.py 가 덮어쓰기 직전의 점수를 daily_score.prev_score 에 적어 두고,
+   * 여기서는 그 값을 그대로 읽는다(마이그레이션 024).
+   *
+   * 컬럼이 없거나 아직 안 채워진 행에서는 앞 행 점수로 폴백한다 — 예전 동작이라 화살표가
+   * 사라지지는 않는다.
    *
    * ⚠️ 눈금(SCORE_DISPLAY_ANCHORS)을 바꾼 날은 이 차이가 시장이 아니라 눈금 변경을
-   * 반영한다. 저장된 score 가 이미 매핑을 거친 표시값이라 과거 행은 옛 눈금으로 남기
-   * 때문이다. 하루면 지나가는 문제라 보정하지 않는다.
+   * 반영한다. 저장된 score 가 이미 매핑을 거친 표시값이라 앞 실행 값은 옛 눈금으로 남기
+   * 때문이다. 한 실행이면 지나가는 문제라 보정하지 않는다.
    */
   prevScore: number | null;
 };
@@ -80,9 +86,9 @@ export type IndicatorWithLatestValue = {
  * (OG 이미지 라우트는 별도 요청이라 여기 캐시를 공유하지 않는다 — 의도된 것이다.)
  */
 export const getLatestDailyScore = cache(async function getLatestDailyScore(): Promise<DailyScore | null> {
-  // 두 줄을 읽는다 — 최신 한 줄은 화면 전체가 쓰고, 그 앞 줄은 탑바가 변화량을
-  // 그리는 데만 쓴다(prevScore). 한 줄 더 읽는 비용은 없다시피 하고, 변화량 때문에
-  // 조회를 한 번 더 내보내면 요청당 왕복이 늘어난다.
+  // 두 줄을 읽는다 — 최신 한 줄은 화면 전체가 쓰고, 그 앞 줄은 prev_score 가 비어 있을
+  // 때의 폴백이다. 한 줄 더 읽는 비용은 없다시피 하고, 폴백 때문에 조회를 한 번 더
+  // 내보내면 요청당 왕복이 늘어난다.
   const query = (cols: string) =>
     getSupabaseServer()
       .from("daily_score")
@@ -90,9 +96,14 @@ export const getLatestDailyScore = cache(async function getLatestDailyScore(): P
       .order("date", { ascending: false })
       .limit(2);
 
-  // ai_summary 컬럼이 아직 없는 환경(마이그레이션 007 전)에서도 페이지가 죽지
-  // 않도록, 포함 조회가 실패하면 그 컬럼 없이 한 번 더 조회한다.
-  let { data, error } = await query("date,score,stage,updated_at,ai_summary");
+  // 컬럼이 아직 없는 환경(마이그레이션 007·024 전)에서도 페이지가 죽지 않도록 한 칸씩
+  // 떼며 다시 조회한다. 둘을 한 번에 떼지 않는 이유는, 마이그레이션이 손으로 하나씩
+  // 적용되는 사이 prev_score 하나 없다고 ai_summary 까지 버리면 히어로 요약이 그동안
+  // 통째로 사라지기 때문이다.
+  let { data, error } = await query("date,score,stage,updated_at,ai_summary,prev_score");
+  if (error) {
+    ({ data, error } = await query("date,score,stage,updated_at,ai_summary"));
+  }
   if (error) {
     ({ data, error } = await query("date,score,stage,updated_at"));
   }
@@ -105,6 +116,7 @@ export const getLatestDailyScore = cache(async function getLatestDailyScore(): P
     stage: string;
     updated_at: string;
     ai_summary?: string | null;
+    prev_score?: number | null;
   }[];
   if (!rows.length) return null;
   const row = rows[0];
@@ -120,7 +132,9 @@ export const getLatestDailyScore = cache(async function getLatestDailyScore(): P
     stage: row.stage,
     updated_at: row.updated_at,
     ai_summary: summaryOverride ?? row.ai_summary ?? null,
-    prevScore: prev ? prev.score : null,
+    // 파이프라인이 적어 둔 '덮어쓰기 직전 점수'가 있으면 그것, 없으면 앞 행(옛 동작).
+    // ?? 여야 한다 — 0℃ 는 유효한 점수인데 || 로 쓰면 그날만 앞 행으로 넘어간다.
+    prevScore: row.prev_score ?? (prev ? prev.score : null),
   };
 });
 

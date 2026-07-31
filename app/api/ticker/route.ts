@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 
 import { C } from "@/app/ui";
 import {
-  KADERA_WINDOW_DAYS,
   getEcosystemSentiment,
   getIssueKeywords,
   getSurgingStocks,
@@ -47,13 +46,16 @@ export async function GET() {
 
   const quotes: Quote[] = [];
 
-  // 급부상 — 배수(▲3.1배)로 적는다. 카더라 카드가 쓰는 단위와 같아야 한다(그쪽은
+  // 언급 급부상 — 배수(▲3.1배)로 적는다. 카더라 카드가 쓰는 단위와 같아야 한다(그쪽은
   // "언급 ▲ 3.1배"). 퍼센트로 바꿔 적으면 같은 숫자가 두 화면에서 다른 말이 된다.
   // 신규 등장은 비교할 과거가 없어 배수 자리에 "신규" 를 넣는다(카드와 같은 어법).
+  //
+  // 라벨 앞에 '언급'을 붙인다. 여기는 시세 티커가 흐르던 자리라 종목명 옆의 "급부상 ▲3.1배"
+  // 가 주가가 튀었다는 말로 읽힌다 — 튄 건 언급 횟수다.
   if (surging.length) {
     quotes.push({
       key: "surging",
-      label: "급부상",
+      label: "언급 급부상",
       value: surging
         .map((s) => (s.isNew ? `${s.name} 신규` : `${s.name} ▲${s.ratio.toFixed(1)}배`))
         .join(" · "),
@@ -66,10 +68,13 @@ export async function GET() {
   // "최다 언급"이라 안 적는 이유: 이 순위는 언급 수가 아니라 채널 영향력을 반영한
   // weighted_score 기준이라, 언급만 많고 얇은 채널에서만 돈 종목은 위로 안 온다.
   // 옆에 붙는 회수는 그 종목의 실제 언급 수라 라벨과 어긋나지 않는다.
+  //
+  // 창 길이(KADERA_WINDOW_DAYS)는 라벨에서 뺀다. 라벨 자리에 숫자가 둘("1위"·"3일") 붙어
+  // 순위와 헷갈리고, 창을 밝히는 일은 카더라 카드('최근 3일')가 이미 한다.
   if (top.length) {
     quotes.push({
       key: "top-stock",
-      label: `주목도 1위 ${KADERA_WINDOW_DAYS}일`,
+      label: "주목도 1위",
       value: `${top[0].name} ${top[0].mentions.toLocaleString("ko-KR")}회`,
       change: null,
     });
