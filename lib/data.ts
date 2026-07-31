@@ -13,6 +13,18 @@ export type DailyScore = {
   // LLM(Claude Haiku)이 생성한 오늘의 요약. 컬럼이 없거나(마이그레이션 전) 아직
   // 생성 전이면 null이고, 이땐 히어로가 기존 템플릿 문장으로 폴백한다.
   ai_summary: string | null;
+  /**
+   * 바로 앞 기록의 점수. 탑바 티커가 "▲3" 을 그리는 데 쓴다. 기록이 하나뿐이면 null.
+   *
+   * '전일'이 아니라 '직전 행'이다. 파이프라인이 하루 못 돌면 그날 행이 없어 이틀 전과
+   * 비교하게 되는데, 그걸 "어제보다"라고 못박지 않으려고 화면에도 날짜말을 안 쓴다
+   * (숫자와 화살표만 띄운다).
+   *
+   * ⚠️ 눈금(SCORE_DISPLAY_ANCHORS)을 바꾼 날은 이 차이가 시장이 아니라 눈금 변경을
+   * 반영한다. 저장된 score 가 이미 매핑을 거친 표시값이라 과거 행은 옛 눈금으로 남기
+   * 때문이다. 하루면 지나가는 문제라 보정하지 않는다.
+   */
+  prevScore: number | null;
 };
 
 /**
@@ -68,13 +80,15 @@ export type IndicatorWithLatestValue = {
  * (OG 이미지 라우트는 별도 요청이라 여기 캐시를 공유하지 않는다 — 의도된 것이다.)
  */
 export const getLatestDailyScore = cache(async function getLatestDailyScore(): Promise<DailyScore | null> {
+  // 두 줄을 읽는다 — 최신 한 줄은 화면 전체가 쓰고, 그 앞 줄은 탑바가 변화량을
+  // 그리는 데만 쓴다(prevScore). 한 줄 더 읽는 비용은 없다시피 하고, 변화량 때문에
+  // 조회를 한 번 더 내보내면 요청당 왕복이 늘어난다.
   const query = (cols: string) =>
     getSupabaseServer()
       .from("daily_score")
       .select(cols)
       .order("date", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(2);
 
   // ai_summary 컬럼이 아직 없는 환경(마이그레이션 007 전)에서도 페이지가 죽지
   // 않도록, 포함 조회가 실패하면 그 컬럼 없이 한 번 더 조회한다.
@@ -83,16 +97,18 @@ export const getLatestDailyScore = cache(async function getLatestDailyScore(): P
     ({ data, error } = await query("date,score,stage,updated_at"));
   }
   if (error) throw error;
-  if (!data) return null;
 
   // 동적 select라 supabase-js가 타입을 추론하지 못해 명시적으로 캐스팅한다.
-  const row = data as unknown as {
+  const rows = (data ?? []) as unknown as {
     date: string;
     score: number;
     stage: string;
     updated_at: string;
     ai_summary?: string | null;
-  };
+  }[];
+  if (!rows.length) return null;
+  const row = rows[0];
+  const prev = rows[1] ?? null;
 
   // 로컬 dev 전용 오버레이(운영 빌드에선 no-op). 운영 DB에 요약을 쓰기 전에
   // 로컬에서만 미리 문장을 얹어 보기 위한 장치.
@@ -104,6 +120,7 @@ export const getLatestDailyScore = cache(async function getLatestDailyScore(): P
     stage: row.stage,
     updated_at: row.updated_at,
     ai_summary: summaryOverride ?? row.ai_summary ?? null,
+    prevScore: prev ? prev.score : null,
   };
 });
 
