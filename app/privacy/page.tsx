@@ -15,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /** 방침 시행일. 베타 오픈일과 맞춘다. 내용을 고치면 이 날짜도 같이 올려야 한다. */
-const EFFECTIVE_DATE = "2026년 7월 31일";
+const EFFECTIVE_DATE = "2026년 8월 3일";
 /** 문의 창구. Footer 와 같은 주소를 쓴다(두 곳이 갈리면 이용자가 어디로 보낼지 헷갈린다). */
 const CONTACT_EMAIL = "hatzze@proton.me";
 
