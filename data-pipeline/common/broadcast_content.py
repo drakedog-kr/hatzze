@@ -51,10 +51,16 @@ THEME_STOCKS_PER = 3    # 테마마다 붙이는 대표 종목 수
 WEEKLY_STOCK_SHOW = 3   # 주간 결산의 최다 언급 종목 수
 WEEKLY_DAYS = 7
 
-# 테마 비교 창 — 최근 3일 평균 vs 그 이전 평균. lib/telegram-data.ts getThemeRotation 과
-# 같은 방식이다. 하루치끼리 비교하면 주말·수집 첫날처럼 표본이 얇은 날에 점유율이 요동친다.
+# 테마 비교 창 — 최근 3일 평균 vs **5일 이상 이전** 평균. 하루치끼리 비교하면 주말·수집
+# 첫날처럼 표본이 얇은 날에 점유율이 요동친다.
+#
+# ⚠️ **lib/telegram-data.ts 의 같은 이름 상수와 값이 같아야 한다.** 사이트의 테마 로테이션
+# 카드와 이 글이 같은 날 같은 테마의 변동폭을 말하고, 이 글은 본문에 그 사이트 링크를
+# 달고 나간다. 공백 이틀(THEME_PRIOR_GAP_DAYS)을 왜 두는지는 그쪽 주석에 실측과 함께
+# 적어 뒀다. 규칙을 바꿀 땐 양쪽을 같이 고칠 것.
 THEME_RECENT_DAYS = 3
 THEME_LOOKBACK_DAYS = 14
+THEME_PRIOR_GAP_DAYS = 5
 
 # '밤사이'의 경계(KST). 장 마감(15:30) 한참 뒤부터 이튿날 장 준비 전까지를 잡는다.
 # 실측(2026-07-27) 이 구간이 어제 메시지의 31% 였다 — 아침 글에만 있을 수 있는 각도다.
@@ -217,18 +223,32 @@ def load_night_messages(db) -> tuple[int, list[str], datetime, datetime]:
 
 
 def load_theme_rotation(db) -> list[dict]:
-    """테마 순위 — 최근 3일 평균 점유율과 그 이전 대비 변화.
+    """테마 순위 — 최근 3일 평균 점유율과 '5일 이상 이전' 평균 대비 변화.
 
-    lib/telegram-data.ts getThemeRotation 의 규칙을 따른다. 절대 언급량은 주말에 급감해
-    비교가 안 되므로 '그날 전체 대비 점유율'로 본다.
+    lib/telegram-data.ts getThemeRotation 과 **같은 창**을 쓴다. 절대 언급량은 주말에
+    급감해 비교가 안 되므로 '그날 전체 대비 점유율'로 본다.
+
+    예전엔 이 줄이 `prior = [d for d in dates if d not in recent]` 라 사이 이틀을 기준
+    창에 넣었다. 같은 규칙을 따른다고 적어 두고 따르지 않은 것이라, 두 화면이 같은 날
+    같은 테마를 다르게 말했다(2026-07-31 실측: 반도체를 사이트는 ▲3.7%p, 이 글은
+    +5.6%p 로 적었다. 점유율은 36.5%로 같았다 — 최근 창은 같고 기준 창만 달랐다).
+    이 글은 본문에 사이트 링크를 달고 나가므로 클릭 한 번이면 보이는 어긋남이었다.
     """
     since = (today_kst() - timedelta(days=THEME_LOOKBACK_DAYS)).isoformat()
     rows = db.table("telegram_theme_daily").select("date,theme,share_pct,mention_count").gte("date", since).limit(1000).execute().data
     if not rows:
         return []
     dates = sorted({r["date"] for r in rows})
+    latest = date.fromisoformat(dates[-1])
     recent = set(dates[-THEME_RECENT_DAYS:])
-    prior = [d for d in dates if d not in recent]
+    # recent 는 개수로, prior 는 날짜 간격으로 잡는다 — 수집이 끊긴 구간에서는 recent 가
+    # 5일보다 더 뒤까지 뻗어 같은 날이 양쪽에 들어갈 수 있어 recent 를 명시적으로 뺀다
+    # (근거는 TS 쪽 주석). 두 조건 다 TS 와 같은 순서·같은 부등호로 둔다.
+    prior = [
+        d
+        for d in dates
+        if (latest - date.fromisoformat(d)).days >= THEME_PRIOR_GAP_DAYS and d not in recent
+    ]
     themes = {r["theme"] for r in rows}
 
     def avg(window: set[str] | list[str]) -> dict[str, float]:

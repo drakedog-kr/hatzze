@@ -25,6 +25,21 @@ function todayKstDate(): string {
   return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
+/**
+ * 오늘(KST)에서 days 일 전 날짜. `date` 컬럼을 조회하는 하한에 쓴다.
+ *
+ * daysAgoISO 와 하루 어긋날 때가 있다. `date` 는 KST 달력 날짜인데
+ * (calculate_stock_daily.py 가 posted_at 을 KST 로 옮겨 적는다) daysAgoISO 는 UTC 로
+ * 재므로, 00~09시 KST 사이에는 하루 이른 날짜를 준다. 그 시간대에만 창이 하루 길어져
+ * 파이프라인(today_kst() 기준)과 조용히 어긋나므로, 파이프라인과 같은 창을 써야 하는
+ * 조회는 이쪽을 쓴다.
+ */
+function daysAgoKstDate(days: number): string {
+  return new Date(Date.now() + 9 * 60 * 60 * 1000 - days * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+}
+
 /** "YYYY-MM-DD" 에 n일을 더한 날짜. 창의 경계를 만들 때 쓴다. */
 function addDaysISO(iso: string, n: number): string {
   const d = new Date(`${iso}T00:00:00Z`);
@@ -881,6 +896,20 @@ async function themeStocks(windowDates: string[]): Promise<Map<string, ThemeStoc
 }
 
 /**
+ * 테마 로테이션 비교 창.
+ *
+ * ⚠️ **data-pipeline/common/broadcast_content.py 의 같은 이름 상수와 값이 같아야 한다.**
+ * 이 카드의 숫자와 방송 C(테마) 글의 숫자가 같은 날 같은 테마를 말하는데, 그 글은 본문에
+ * 이 사이트 링크를 달고 나간다 — 창이 갈리면 클릭 한 번에 어긋남이 보인다. 2026-07-31 에
+ * 실제로 그랬다(반도체를 카드는 ▲3.7%p, 방송은 +5.6%p 로 적었다. 파이프라인 쪽이 공백
+ * 이틀을 기준 창에 넣고 있었다). Python 과 TS 라 import 로 공유할 수 없어 손으로 맞춘
+ * 사본이고, 그래서 규칙을 바꿀 땐 **양쪽을 같이** 고쳐야 한다.
+ */
+const THEME_LOOKBACK_DAYS = 14;
+const THEME_RECENT_DAYS = 3;
+const THEME_PRIOR_GAP_DAYS = 5;
+
+/**
  * 테마 로테이션 — 테마별 언급 점유율·순위와 그 변화.
  * 절대 언급량은 주말에 급감해 비교가 안 되므로 '그날 전체 대비 점유율'로 본다.
  * 순위 변동·점유율 증감은 5일 이상 이전 데이터가 있을 때만 계산한다(축적 초기 왜곡 방지).
@@ -890,7 +919,7 @@ export async function getThemeRotation(limit = 10): Promise<ThemeRotation[]> {
   const { data } = await db
     .from("telegram_theme_daily")
     .select("date,theme,share_pct,mention_count,stock_count")
-    .gte("date", daysAgoISO(14).slice(0, 10));
+    .gte("date", daysAgoKstDate(THEME_LOOKBACK_DAYS));
   if (!data?.length) return [];
 
   const dates = [...new Set(data.map((r) => r.date))].sort();
@@ -900,8 +929,29 @@ export async function getThemeRotation(limit = 10): Promise<ThemeRotation[]> {
 
   // 하루치끼리 비교하면 주말·수집 첫날처럼 표본이 얇은 날에 점유율이 요동친다.
   // 그래서 '최근 3일 평균' vs '5일 이상 이전 평균'으로 창을 잡아 비교한다.
-  const recentDates = dates.slice(-3);
-  const priorDates = dates.filter((d) => daysBefore(d) >= 5);
+  //
+  // **사이에 이틀(3·4일 전)을 비워 두는 이유.** 겹침을 막으려는 게 아니다 — 두 창은
+  // 공백이 없어도 겹치지 않는다. 막는 건 경계를 갓 넘어온 날이다. 공백을 없애면 기준
+  // 창의 가장 최근 날이 '어제까지 최근 창에 있던 날'이 되어, 최근 3일을 하루 밀린 자기
+  // 자신과 견주는 꼴이 된다.
+  //
+  // 다만 **그게 숫자로 낫다는 근거는 없다.** 2026-07-31 에 지난 재생분으로 '하루가
+  // 지날 때 변동폭이 흔들린 폭'을 두 방식으로 재 봤는데, 창이 꽉 찬 날만 추리면
+  // (6일·55쌍) 평균은 공백 쪽이 0.99 vs 1.09%p 로 조금 낫고 중앙값(0.45 vs 0.44%p)과
+  // 최대(7.4 vs 6.7%p)는 오히려 반대였다. 표본이 그만한 차이를 가릴 만큼 작다.
+  // 그래서 이 값은 '더 정확해서'가 아니라 **한쪽으로 정해 두려고** 고른 것이다.
+  // 고른 쪽이 이 값인 이유는 이슈 키워드(computeIssueKeywords ↔
+  // calculate_telegram_sentiment.py)가 이미 양쪽 다 5일로 맞춰져 있어서다.
+  // 바꾸고 싶으면 취향이 아니라 표본을 들고 올 것. 그때도 양쪽을 같이 바꿔야 한다.
+  const recentDates = dates.slice(-THEME_RECENT_DAYS);
+  // recent 는 **개수**로, prior 는 **날짜 간격**으로 잡는다. 그래서 수집이 며칠 끊기면
+  // recent 가 THEME_PRIOR_GAP_DAYS 보다 더 뒤까지 손을 뻗어 같은 날이 양쪽에 들어간다
+  // (07-20·07-25·07-30·07-31 만 남은 경우 07-25 가 recent 이면서 5일 이상 이전이다).
+  // 그 날은 이중으로 세어져 변동폭을 조용히 깎으므로 명시적으로 뺀다. 카더라 수집은
+  // 2026-07-26~28 에 실제로 이틀 멈춘 적이 있다.
+  const priorDates = dates.filter(
+    (d) => daysBefore(d) >= THEME_PRIOR_GAP_DAYS && !recentDates.includes(d),
+  );
 
   // 최근 창에 한 번도 안 뜬 테마도 카드에는 0%로 남겨야 정원(10개)이 채워진다.
   // 그래서 집계 대상 테마는 '최근 창에 등장한 것'이 아니라 조회 구간 전체의 테마다.
