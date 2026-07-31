@@ -1235,7 +1235,7 @@ function CardSpeed({ v, path = [] }: { v: Pick; path?: ClosePoint[] }) {
             </div>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9.5, fontFamily: MONO, color: "var(--c-muted)" }}>
-            <span>60일 전 = 0%</span>
+            <span>90일 전 = 0%</span>
             <span>
               최고 <span style={{ color: C.hot, fontWeight: 700 }}>{hi >= 0 ? "+" : ""}{hi.toFixed(1)}%</span>
               {" · "}최저 <span style={{ color: C.cold, fontWeight: 700 }}>{lo.toFixed(1)}%</span>
