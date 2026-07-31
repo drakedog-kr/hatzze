@@ -1902,9 +1902,16 @@ function CardNetBuy({ v }: { v: Pick }) {
 /**
  * 급등 종목 강도 — 장중 급등 종목 수를 가중 합산한 점수(3·상한가 + 2·(+20~29%) + 1·(+10~20%)).
  *
+ * 막대는 **점수 기여도**를 쌓는다(개수가 아니다). 이 카드의 큰 숫자가 어디서 왔는지는
+ * 개수만 봐서는 안 나온다 — 상한가 5개가 15점이고 +10~20% 49개가 49점이라, 개수로는
+ * 뒤쪽이 열 배지만 점수로는 세 배다. 쌓아 놓으면 그 몫이 그대로 보인다.
+ *
+ * 막대 위의 세로선은 **1년 평균**(threshold)이다. 이 지표의 눈금은 절대값이 아니라
+ * 평균 대비 급증이라, 평균이 어디인지 안 보이면 72점이 뜨거운지 아닌지 알 수 없다.
+ * 막대가 그 선을 넘었으면 평소보다 뜨거운 날이다.
+ *
  * 세 칸에 각각 툴팁을 달아 어떤 종목이 그 칸에 들었는지 보여 준다. 파이프라인이
- * 거래대금 상위 10종목만 details 에 넣으므로, 그보다 많으면 "외 N개"로 센다
- * (상한가는 하루 10~20개지만 +10~20% 칸은 100개를 넘는 날이 있다).
+ * 거래대금 상위 10종목만 details 에 넣으므로, 그보다 많으면 "외 N개"로 센다.
  */
 function CardLimitUp({ v }: { v: Pick }) {
   const c = overheatColor(v.capped);
@@ -1913,52 +1920,111 @@ function CardLimitUp({ v }: { v: Pick }) {
     limit_names?: string[]; up20_names?: string[]; up10_names?: string[];
   } | null;
 
-  const buckets: { label: string; n: number; names: string[]; tone: string }[] = [
-    { label: "상한가", n: dt?.limit_n ?? 0, names: dt?.limit_names ?? [], tone: C.mania },
-    { label: "+20%", n: dt?.up20_n ?? 0, names: dt?.up20_names ?? [], tone: C.hot },
-    { label: "+10%", n: dt?.up10_n ?? 0, names: dt?.up10_names ?? [], tone: C.sub },
+  // 가중치는 파이프라인(fetch_limit_up_breadth.py)과 같아야 한다. 갈리면 막대 합이
+  // 큰 숫자와 안 맞는다.
+  const buckets = [
+    { label: "상한가", short: "상한가", n: dt?.limit_n ?? 0, w: 3, names: dt?.limit_names ?? [], tone: C.mania },
+    { label: "+20~29%", short: "+20%", n: dt?.up20_n ?? 0, w: 2, names: dt?.up20_names ?? [], tone: C.hot },
+    { label: "+10~20%", short: "+10%", n: dt?.up10_n ?? 0, w: 1, names: dt?.up10_names ?? [], tone: C.neutral },
   ];
-  // 막대 길이는 칸끼리만 비교하면 된다(절대 개수는 옆에 숫자로 적혀 있다).
-  const maxN = Math.max(1, ...buckets.map((b) => b.n));
+  const raw = v.raw ?? 0;
+  const avg = v.threshold; // rolling_average 의 기준선 = 최근 1년 평균
+  // 막대 눈금은 오늘 값과 평균 중 큰 쪽에 맞춘다 — 평균이 오늘보다 크면(조용한 날)
+  // 그 세로선이 막대 밖으로 나가 버린다.
+  const scale = Math.max(raw, avg ?? 0) || 1;
 
   return (
     <Shell hit={v.isHit} minH={210}>
       {/* KRX 일별매매정보는 하루이틀 늦게 열린다. 히어로가 페이지 전체를 "오늘 기준"으로
           액자에 넣으므로 이 카드만은 자기 자료일을 계속 밝힌다(예탁금 카드에서 물려받은 처리). */}
       <TitleRow desc={v.headline} icon="bolt" name={v.name} badge={sourceDateBadge(v) ?? "최근 거래일 기준"} />
-      <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "6px 0 10px" }}>
+
+      <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "6px 0 12px" }}>
         <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 700, color: c, letterSpacing: "-0.03em" }}>
-          {(v.raw ?? 0).toLocaleString("ko-KR")}
+          {raw.toLocaleString("ko-KR")}
         </span>
         <span style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>점</span>
+        {/* 평균 대비 몇 %인지. 이 지표의 과열도는 이 값 하나로 정해지므로 큰 숫자 옆에 붙인다.
+            파이프라인이 아직 안 돈 날(threshold 없음)에는 통째로 뺀다 — 0% 로 적으면 거짓이 된다. */}
+        {avg ? (
+          <span
+            style={{
+              marginLeft: "auto",
+              fontFamily: MONO,
+              fontSize: 11,
+              fontWeight: 700,
+              color: raw >= avg ? C.hot : C.cold,
+            }}
+          >
+            평균 대비 {raw >= avg ? "+" : ""}{Math.round((raw / avg - 1) * 100)}%
+          </span>
+        ) : null}
       </div>
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 7, justifyContent: "center" }}>
-        {buckets.map((b) => {
-          const shown = b.names.slice(0, 10);
-          const rest = b.n - shown.length;
-          const tip = shown.length
-            ? `${shown.join(" · ")}${rest > 0 ? ` 외 ${rest}개` : ""}`
-            : "해당 종목이 없습니다";
-          return (
-            <div
-              key={b.label}
-              // 툴팁이 길어 hz-tip-wide 로 줄바꿈을 허용한다. 카드 왼쪽 끝에 붙는 줄이라
-              // 가운데 정렬로 두면 좁은 화면에서 왼쪽으로 넘쳐 가로 스크롤이 생긴다.
-              className="hz-tip hz-tip-wide hz-tip-start"
-              data-tip={tip}
-              style={{ display: "flex", alignItems: "center", gap: 8, cursor: "help" }}
-            >
-              <span style={{ width: 40, fontSize: 11, fontWeight: 700, color: C.sub, flexShrink: 0 }}>{b.label}</span>
-              <span style={{ flex: 1, height: 7, background: C.track, borderRadius: 4, overflow: "hidden" }}>
-                <span style={{ display: "block", width: `${(b.n / maxN) * 100}%`, height: "100%", background: b.tone, borderRadius: 4 }} />
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10, justifyContent: "center" }}>
+        {/* 점수 기여도 누적 막대 + 1년 평균 세로선 */}
+        <div style={{ position: "relative" }}>
+          <div style={{ display: "flex", height: 14, background: C.track, borderRadius: 5, overflow: "hidden" }}>
+            {buckets.map((b) => (
+              <span key={b.label} style={{ width: `${(b.n * b.w) / scale * 100}%`, background: b.tone }} />
+            ))}
+          </div>
+          {avg ? (
+            <>
+              {/* 세로선은 막대보다 위아래로 3px 씩 삐져나오게 둔다 — 막대 안에만 있으면
+                  세그먼트 경계선과 구분이 안 된다. */}
+              <span
+                style={{
+                  position: "absolute", left: `${(avg / scale) * 100}%`, top: -3, bottom: -3,
+                  width: 2, marginLeft: -1, background: C.ink, borderRadius: 1,
+                }}
+              />
+              <span
+                style={{
+                  position: "absolute", left: `${(avg / scale) * 100}%`, top: 18,
+                  transform: "translateX(-50%)", whiteSpace: "nowrap",
+                  fontFamily: MONO, fontSize: 9.5, fontWeight: 700, color: "var(--c-muted)",
+                }}
+              >
+                1년 평균 {Math.round(avg)}
               </span>
-              <span style={{ width: 32, textAlign: "right", fontFamily: MONO, fontSize: 12, fontWeight: 700, color: C.ink, flexShrink: 0 }}>
-                {b.n}
-              </span>
-            </div>
-          );
-        })}
+            </>
+          ) : null}
+        </div>
+
+        {/* 범례 — 색·라벨·개수. 각 칸에 마우스를 올리면 그 칸에 든 종목이 뜬다. */}
+        <div style={{ display: "flex", gap: 6, marginTop: avg ? 14 : 0 }}>
+          {buckets.map((b) => {
+            const shown = b.names.slice(0, 10);
+            const rest = b.n - shown.length;
+            const tip = shown.length
+              ? `${b.label} ${b.n}종목 · ${b.n * b.w}점 — ${shown.join(" · ")}${rest > 0 ? ` 외 ${rest}개` : ""}`
+              : `${b.label}에 든 종목이 없습니다`;
+            return (
+              <div
+                key={b.label}
+                // 툴팁이 길어 hz-tip-wide 로 줄바꿈을 허용한다. 카드 왼쪽에 붙는 칸이라
+                // 가운데 정렬로 두면 좁은 화면에서 왼쪽으로 넘쳐 가로 스크롤이 생긴다.
+                // 커서는 건드리지 않는다 — 물음표는 물음표 아이콘이 실제로 있는 자리에만
+                // 쓴다(globals.css 의 .hz-tip 주석).
+                className="hz-tip hz-tip-wide hz-tip-start"
+                data-tip={tip}
+                style={{
+                  flex: 1, minWidth: 0, padding: "5px 7px", borderRadius: 8,
+                  background: C.bg, display: "flex", flexDirection: "column", gap: 3,
+                }}
+              >
+                <span style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 0 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: 999, background: b.tone, flexShrink: 0 }} />
+                  <span style={{ fontSize: 10, fontWeight: 700, color: C.sub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {b.short}
+                  </span>
+                </span>
+                <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: C.ink, lineHeight: 1 }}>{b.n}</span>
+              </div>
+            );
+          })}
+        </div>
       </div>
       <Foot text={v.desc} />
     </Shell>
