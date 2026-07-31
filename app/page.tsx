@@ -1,7 +1,7 @@
 import { getLatestDailyScore, getPublicIndicators, getTopStockHighGaps } from "@/lib/data";
 import type { DailyScore, IndicatorCategory, IndicatorWithLatestValue, StockHighGap } from "@/lib/data";
 import { formatEokMixed, formatIndicatorValue, formatKstUpdate, sentimentTone, shortDate } from "@/lib/format";
-import { C, Icon, MONO, stageForScore } from "./ui";
+import { AiMark, C, Icon, MONO, stageForScore } from "./ui";
 
 // 지표는 하루 단위(GitHub Actions 배치)로 갱신되므로, 빌드 시점에 정적으로
 // 굳어버리지 않도록 매 요청마다 서버에서 새로 조회한다.
@@ -579,7 +579,7 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
         </div>
         <p style={{ margin: "0 0 4px", fontSize: 11, color: C.sub, fontFamily: MONO }}>최종 업데이트 · {formatKstUpdate(dailyScore.updated_at)}</p>
         <div style={{ marginTop: 20, background: C.bg, borderRadius: 12, padding: "22px 24px", display: "flex", gap: 14 }}>
-          <Icon name="auto_awesome" style={{ color: C.blue, fontSize: 22, flexShrink: 0 }} />
+          <AiMark size={22} style={{ flexShrink: 0 }} />
           <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 15, lineHeight: 1.6, color: "var(--c-ink-soft)", fontWeight: 500 }}>
             {/* 고정 오프너 — 두 문장을 한 문단으로. 이 아래 LLM 문장들이 각각 한 문단씩
                 붙어 전체가 3문단 정도가 된다. */}

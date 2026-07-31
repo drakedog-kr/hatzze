@@ -58,3 +58,48 @@ export function Icon({
     </span>
   );
 }
+
+/**
+ * 생성형 AI 가 쓴 글 옆에 붙는 고지 문구. 세 곳(히어로 요약 · 카더라 생태계 총평 ·
+ * 종목 리포트)이 반드시 같은 문장을 써야 한다 — 문구가 갈리면 "어떤 글이 AI 인가"가
+ * 화면마다 다르게 읽힌다.
+ */
+export const AI_NOTICE = "이 요약은 생성형 AI가 작성했습니다.";
+
+/**
+ * 생성형 AI 가 쓴 문단 앞에 세우는 ✨ 표시. 누르거나 마우스를 올리면 AI_NOTICE 가 뜬다.
+ *
+ * 왜 아이콘만으로 안 되나. 「인공지능 발전과 신뢰 기반 조성 등에 관한 기본법」 제31조가
+ * 생성형 AI 결과물에 "생성형 인공지능에 의하여 생성되었다는 사실"을 표시하도록 요구한다
+ * (2026-01-22 시행). ✨ 는 그 사실을 말해 주지 않는다. 그렇다고 문장마다 고지를 한 줄씩
+ * 깔면 정작 읽어야 할 요약보다 고지가 길어져서, 이미 서 있던 아이콘을 눌리게 만들고
+ * 문구를 그 안에 담는다.
+ *
+ * 여는 방식은 hz-tip-tap(= :hover + :focus-within)이다. 모바일에서 :hover 가 없는 걸
+ * 툴팁 하나 못 여는 문제로 두면 고지가 아예 닿지 않으므로, 아이콘을 <button> 으로 만들어
+ * 탭에 포커스가 잡히게 한다. 같은 문구가 aria-label 에도 들어가 화면을 못 보는
+ * 이용자에게도 전달된다.
+ *
+ * hz-tip-start 를 고정으로 붙인다. 세 자리 모두 ✨ 가 글 묶음의 **왼쪽 끝**에 서는데,
+ * 기본값(가운데 정렬)이면 폭 200px 남짓한 툴팁이 화면 왼쪽으로 넘쳐 가로 스크롤을
+ * 만든다(globals.css 의 hz-tip-start 주석에 같은 사고가 적혀 있다).
+ *
+ * size 는 원래 아이콘 크기를 그대로 넘긴다. 자리마다 글자 크기가 달라 ✨ 도 22/15/13 으로
+ * 다르고, 그 비례가 깨지면 아이콘만 튄다.
+ */
+export function AiMark({ size, style }: { size: number; style?: React.CSSProperties }) {
+  return (
+    <span
+      className="hz-tip hz-tip-tap hz-tip-start"
+      data-tip={AI_NOTICE}
+      // alignSelf 로 제 높이만 차지하게 못박는다. flex 기본값(stretch)이면 이 칸이 옆
+      // 문단 높이만큼 늘어나, 위로 펴지는 툴팁이 아이콘이 아니라 문단 꼭대기에서 열린다.
+      // 글리프 위치는 그대로다(.ms 는 line-height:1 이라 어느 쪽이든 칸 맨 위에 그려진다).
+      style={{ display: "inline-flex", alignSelf: "flex-start", ...style }}
+    >
+      <button type="button" className="hz-ai-mark" aria-label={AI_NOTICE}>
+        <Icon name="auto_awesome" style={{ fontSize: size, color: C.blue, display: "block" }} />
+      </button>
+    </span>
+  );
+}

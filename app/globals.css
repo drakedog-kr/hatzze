@@ -638,6 +638,37 @@ main.hz-scroll { overflow-x: clip; }
   transform: translateX(-50%) translateY(6px);
 }
 
+/* 탭으로도 여는 변형 — PC 는 :hover, 모바일은 눌렀을 때 잡히는 :focus-within.
+   기본 .hz-tip 은 :hover 전용이라 모바일에서 아예 안 열린다. 도움말이라면 그래도
+   되지만(옆의 숫자가 이미 다 말하고 있다) 법정 고지 문구는 닿지 못하면 표시를 안 한
+   것과 같아서, 그런 자리에만 이걸 덧붙인다.
+   여닫는 어법은 MDD '전체보기' 팝오버(.hz-yrpop)와 같다.
+   ⚠️ 안에 포커스를 받는 요소(<button>)가 실제로 있어야 동작한다. 그냥 <span> 에
+   붙이면 탭해도 포커스가 안 잡혀 PC 전용 툴팁 그대로다. */
+.hz-tip-tap:focus-within::after {
+  opacity: 1;
+}
+
+/* 생성형 AI 표시(✨)의 눌리는 자리.
+   아이콘이 13~22px 뿐이라 그대로 두면 손가락으로 못 누른다. padding 으로 누를 곳을
+   키우고 같은 크기의 음수 margin 으로 되돌려, 주변 배치는 아이콘 크기 그대로 두면서
+   hit 영역만 넓힌다(.hz-yrpop-btn 과 같은 수법). */
+.hz-ai-mark {
+  display: block;
+  padding: 9px;
+  margin: -9px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: help;
+}
+.hz-ai-mark:focus-visible {
+  outline: 2px solid var(--c-blue);
+  outline-offset: -6px;
+  border-radius: 999px;
+}
+
 /* ── 테마 로테이션 줄의 호버 카드 ──────────────────────────────────
    줄 어디에든 마우스를 올리면 그 줄 전체가 하늘색으로 물들고, 그 테마의 점유율을
    만든 종목이 목록으로 열린다. 목록의 종목마다 MDD 정밀분석으로 가는 링크가 붙는다.
