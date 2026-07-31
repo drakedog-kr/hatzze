@@ -21,7 +21,7 @@ import { formatKstUpdate, shortDate } from "@/lib/format";
 
 import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
-import { C, Icon, MONO } from "../ui";
+import { AiMark, C, Icon, MONO } from "../ui";
 import { ExpandableList } from "./ExpandableList";
 import { Avatar, ChangeRate, Pill, QuoteDate, RankDelta, Sparkline, card as cardStyle, rankNum, subCard } from "./parts";
 import { StockLogo } from "../StockLogo";
@@ -422,7 +422,7 @@ export default async function KaderaPage() {
                     padding: "13px 15px",
                   }}
                 >
-                  <Icon name="auto_awesome" style={{ fontSize: 15, color: C.blue, flexShrink: 0, marginTop: 4 }} />
+                  <AiMark size={15} style={{ flexShrink: 0, marginTop: 4 }} />
                   {/* 높이를 안 잡는다 — 글이 3줄이면 3줄, 4줄이면 4줄로 흐른다.
                       옆 카드와 높이를 맞추는 건 그리드 몫이다(SUMMARY_LINE_HEIGHT 주석 참고). */}
                   <p
@@ -825,7 +825,7 @@ export default async function KaderaPage() {
                     </div>
                     {narratives[r.code] && (
                       <div style={{ display: "flex", gap: 8, margin: "0 0 12px", background: C.track, borderRadius: 11, padding: "10px 12px" }}>
-                        <Icon name="auto_awesome" style={{ fontSize: 13, color: C.blue, flexShrink: 0, marginTop: 3 }} />
+                        <AiMark size={13} style={{ flexShrink: 0, marginTop: 3 }} />
                         <p style={{ margin: 0, fontSize: 12, lineHeight: 1.6, color: "var(--c-ink-soft)", wordBreak: "keep-all" }}>
                           {narratives[r.code]}
                         </p>
