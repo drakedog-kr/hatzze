@@ -596,7 +596,9 @@ _EXEMPT_RE = re.compile("|".join(re.escape(w) for w in BANNED_EXEMPT))
 #
 # 공개 지표 33개 중 넷이 이름·헤드라인에 금지어를 품고 있다(2026-07-28 실측).
 #
-#   개인 순매수 강도                ⊃ 매수      individual_net_buy
+#   (없어짐) 개인 순매수 강도       ⊃ 매수      individual_net_buy → foreign_sell_at_high
+#            2026-07-31 에 '고점권 외국인 매도'로 갈렸다. 새 이름에는 금지 조합이
+#            없어서('매도 의견'·'매도 추천'이 금지지 '매도'가 아니다) 면제가 필요 없다.
 #   증권계좌에 대기 중인 매수 자금   ⊃ 매수      investor_deposit(헤드라인)
 #   코스피 신고가 대비 괴리율        ⊃ 신고가    kospi_high_gap
 #   최근 한 달 매매 안전장치 동향    ⊃ 매매      market_actions_30d
@@ -625,7 +627,6 @@ _EXEMPT_RE = re.compile("|".join(re.escape(w) for w in BANNED_EXEMPT))
 #         for f in ("name", "headline"):
 #             print(i["slug"], f, banned_hits(i[f] or ""))
 INDICATOR_EXEMPT = (
-    "순매수",         # 개인 순매수 강도
     "매수 자금",      # 증권계좌에 대기 중인 매수 자금(예탁금)
     "신고가",         # 코스피 신고가 대비 괴리율
     "매매 안전장치",  # 최근 한 달 매매 안전장치 동향

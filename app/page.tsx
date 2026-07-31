@@ -1787,10 +1787,24 @@ function CardUpbit({ v }: { v: Pick }) {
   );
 }
 
-// 개인 순매수 강도 — 최근 5거래일 누적 + 일별 순매수/순매도 다이버징 바
+// 고점권 외국인 매도 — 최근 5거래일 누적 + 일별 순매수/순매도 다이버징 바
+//
+// 헤드라인은 raw 가 아니라 details.cum5(게이트 전 5일 누적)다. raw 는 고점권이 아니거나
+// 외국인이 사는 중이면 0 인데, 최근 5년 기준 그런 날이 86% 라 raw 를 그대로 크게 띄우면
+// 카드가 대부분의 날에 "0" 한 글자만 말하게 된다. 대신 실제 수급을 보여주고, 그게 점수에
+// 반영되는 조건(고점권)인지 아닌지를 배지로 따로 알린다.
 function CardNetBuy({ v }: { v: Pick }) {
-  const cum = v.raw ?? 0;
-  const dt = v.details as unknown as { daily5?: number[]; dates5?: number[] } | null;
+  const dt = v.details as unknown as {
+    daily5?: number[];
+    dates5?: number[];
+    cum5?: number;
+    high_gap?: number;
+    at_high?: number;
+  } | null;
+  // cum5 가 없는 옛 행(개인 순매수 시절)에서는 raw 로 떨어진다.
+  const cum = dt?.cum5 ?? v.raw ?? 0;
+  const atHigh = dt?.at_high === 1;
+  const gap = dt?.high_gap;
   const daily = dt?.daily5 ?? [];
   // 거래일은 주말·휴장을 건너뛰어 화면에서 역산할 수 없다 — 파이프라인이 넣어준
   // YYYYMMDD 정수를 그대로 쓴다. 옛 행에는 없을 수 있어 빈 배열로 폴백한다.
@@ -1799,18 +1813,43 @@ function CardNetBuy({ v }: { v: Pick }) {
   const ymdShort = (ymd: number) => shortDate(`${String(ymd).slice(0, 4)}-${String(ymd).slice(4, 6)}-${String(ymd).slice(6, 8)}`);
   const maxAbs = Math.max(1, ...daily.map((d) => Math.abs(d)));
   const isBuy = cum >= 0;
+  // ⚠️ 색이 개인 순매수 때와 **반대**다. 여기서 froth 는 외국인이 파는 쪽이라
+  // 순매도가 hot, 순매수가 cold 다. 옛 카드 색을 그대로 옮기면 뜻이 뒤집힌다.
+  const tone = isBuy ? C.cold : C.hot;
   return (
     <Shell hit={v.isHit} minH={210}>
-      <TitleRow desc={v.headline} icon="person" name={v.name} />
+      <TitleRow desc={v.headline} icon="public" name={v.name} />
       <div style={{ margin: "6px 0 2px" }}>
-        <span style={{ fontSize: 10, fontWeight: 600, color: C.sub }}>최근 5거래일 누적</span>
+        <span style={{ fontSize: 10, fontWeight: 600, color: C.sub }}>외국인 · 최근 5거래일 누적</span>
         <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
           {/* "12,929억"은 한눈에 안 읽히고 "1.3조원"은 끝자리가 날아간다 — 둘을 함께 쓴다. */}
-          <span style={{ fontFamily: MONO, fontSize: 24, fontWeight: 700, color: isBuy ? C.hot : C.cold, letterSpacing: "-0.03em" }}>
+          <span style={{ fontFamily: MONO, fontSize: 24, fontWeight: 700, color: tone, letterSpacing: "-0.03em" }}>
             {cum >= 0 ? "+" : ""}{formatEokMixed(cum)}
           </span>
-          <span style={{ fontSize: 12, fontWeight: 700, color: isBuy ? C.hot : C.cold }}>{isBuy ? "순매수" : "순매도"}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: tone }}>{isBuy ? "순매수" : "순매도"}</span>
         </div>
+        {/* 게이트 상태. 이 카드에서 가장 자주 받는 질문이 "왜 과열도가 0인가" 일 텐데,
+            답이 여기 있다 — 고점권이 아니면 아무리 크게 팔아도 점수에 안 들어간다.
+            gap 이 없는 옛 행에서는 이 줄을 통째로 뺀다(빈 괄호가 남지 않게). */}
+        {gap != null && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5 }}>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                padding: "2px 7px",
+                borderRadius: 999,
+                color: atHigh ? C.hot : C.sub,
+                background: atHigh ? "var(--c-blue-tint)" : C.track,
+              }}
+            >
+              {atHigh ? "고점권" : "고점권 아님"}
+            </span>
+            <span style={{ fontFamily: MONO, fontSize: 10.5, color: "var(--c-muted)" }}>
+              52주 고점 대비 {gap.toFixed(1)}%
+            </span>
+          </div>
+        )}
       </div>
       {/* 0선을 칸마다 하나씩 긋던 걸 차트 전체에 한 줄로 바꿨다. 예전엔 5개 조각으로
           끊겨 있어 기준선으로 안 보이고, 막대가 허공에 뜬 사각형처럼 읽혔다.
@@ -1831,7 +1870,7 @@ function CardNetBuy({ v }: { v: Pick }) {
               data-tip={label}
               style={{ flex: 1, position: "relative", height: 68 }}
             >
-              <div style={{ position: "absolute", left: "18%", right: "18%", height: px, background: buy ? C.hot : C.cold, borderRadius: 2, ...(buy ? { bottom: "50%" } : { top: "50%" }) }} />
+              <div style={{ position: "absolute", left: "18%", right: "18%", height: px, background: buy ? C.cold : C.hot, borderRadius: 2, ...(buy ? { bottom: "50%" } : { top: "50%" }) }} />
               {/* 날짜를 막대마다 붙인다 — 다섯 개뿐이라 자리가 되고, 양 끝에만 적으면
                   가운데 막대가 언제인지 툴팁을 열어봐야 했다. */}
               {ymd && (
@@ -1992,7 +2031,7 @@ const LAID_OUT = new Set([
   "buffett_index", "leverage_etf_volume", "market_actions_30d", "turnover_concentration",
   "kospi_high_gap", "kospi_speed_60d", "vkospi", "kospi_asia_relative_strength",
   "kospi_gold_ratio", "kospi_volume_surge", "usdkrw_volatility",
-  "individual_net_buy", "put_call_ratio", "investor_deposit",
+  "foreign_sell_at_high", "put_call_ratio", "investor_deposit",
   "naver_search_trend", "dcinside_post_count", "news_sentiment", "bestseller_finance_ratio",
   "youtube_finance_search_views", "luxury_consumption_index", "fine_dining_search_index",
   "upbit_speculation_index", "github_trading_bot_repos", "brokerage_app_rank",
@@ -2057,7 +2096,7 @@ export default async function Home() {
                 <CardVolume v={p("kospi_volume_surge")} />
                 <CardDeposit v={p("investor_deposit")} />
                 <CardSpeed v={p("kospi_speed_60d")} />
-                <CardNetBuy v={p("individual_net_buy")} />
+                <CardNetBuy v={p("foreign_sell_at_high")} />
                 <CardPutCall v={p("put_call_ratio")} />
                 <CardTurnover v={p("turnover_concentration")} />
                 <CardMarketActions v={p("market_actions_30d")} />

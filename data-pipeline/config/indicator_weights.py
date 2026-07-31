@@ -43,7 +43,7 @@ INDICATOR_WEIGHTS = {
     "kospi_high_gap": 4.0,          # 가격 위치: 스프레드 최고(+44.9)지만 60%가 초고온이라 소폭 감량
     "naver_search_trend": 3.5,      # 초보 유입: 스프레드 +27.6(3위)
     "investor_deposit": 3.0,        # 예탁금: 대기 매수 실탄(표본 24일, 잠정)
-    "individual_net_buy": 2.5,      # 개미 매매(표본 10일, 잠정)
+    "foreign_sell_at_high": 2.5,    # 고점권 외국인 매도(individual_net_buy 자리·가중치를 물려받음)
     "kospi_speed_60d": 2.5,         # 가격 속도: 위치와 직교하는 새 축
     # froth 심리·투기
     "upbit_speculation_index": 2.0, # 코인 투기(스프레드 −5.5 — 이번 사이클엔 증시와 따로 놀았다)
