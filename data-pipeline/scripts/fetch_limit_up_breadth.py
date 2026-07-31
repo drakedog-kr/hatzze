@@ -1,16 +1,16 @@
 """코스피에서 장중 10% 넘게 오른 종목의 비율을 froth 지표로 저장.
 
-원값 = (장중 고가가 +10% 이상인 종목 수) ÷ 전체 종목 수 × 100  (단위 %)
+원값 = (종가가 +10% 이상 오른 종목 수) ÷ 전체 종목 수 × 100  (단위 %)
 
 **비율인 게 핵심이다.** 개수로 재면 상장 종목이 늘기만 해도 값이 오른다(2021년
 2,300개대 → 2,700개대). 분모가 전체 종목 수라 그 증가가 상쇄되고, 고정 눈금을
 써도 낡지 않는다. 앞서 쓰던 가중 합산(3×상한가 + 2×(+20~29%) + 1×(+10~20%))은
 개수 기반이라 롤링 평균을 기준선으로 삼아야 했는데, 그 장치가 통째로 필요 없어졌다.
 
-**종가가 아니라 장중 고가로 잰다.** KRX 가 주는 등락률(FLUC_RT)은 종가 기준이라,
-상한가를 찍었다가 풀려서 +26% 로 마감한 종목을 통째로 놓친다(2026-07-30 실측:
-장중 터치 18 중 9가 풀렸고, 그중엔 −22.75% 로 마감한 것도 있었다). 전일 종가를
-`TDD_CLSPRC − CMPPREVDD_PRC` 로 복원해 `TDD_HGPRC` 로 다시 잰다.
+**종가 기준이다**(KRX 의 FLUC_RT). 장중 고가로 재던 때도 있었는데, 그러면 상한가를
+찍었다가 −22.75% 로 마감한 종목까지 '급등'으로 세게 된다(2026-07-30 실측: 장중 터치
+18 중 9가 풀렸다). 끝까지 버틴 것만 세는 쪽이 "돈이 몰렸다"에 가깝다.
+대신 장중에 크게 올랐다 밀린 종목은 안 잡힌다 — 같은 날 장중 6.15% vs 종가 4.24%.
 
 **상한가 판정은 위도 막는다**(29.0~30.5%). 30.5 를 넘는 건 가격제한폭이 없는
 종목(정리매매·신규상장 첫날)이라 상한가가 아니다.
@@ -54,7 +54,7 @@ from common.supabase_client import get_client  # noqa: E402
 # 지표가 사실상 코스닥 지표가 된다. 이 사이트의 과열도는 코스피 시장을 말하므로 시장을
 # 맞춘다. 코스닥 쏠림은 kosdaq_kospi_ratio 가 따로 본다.
 KRX_URLS = ("http://data-dbg.krx.co.kr/svc/apis/sto/stk_bydd_trd",)
-# 급등 판정선(장중 고가 기준, %). 이 위가 전부 원값의 분자다.
+# 급등 판정선(종가 등락률, %). 이 위가 전부 원값의 분자다.
 SURGE_LO = 10.0
 LIMIT_LO, LIMIT_HI = 29.0, 30.5  # 상한가 판정 구간(호가 절사로 29.x~30.0 에 찍힌다)
 BACKFILL_DAYS = 2000  # 달력일. 2021년 초까지 닿는다
@@ -70,7 +70,7 @@ INDICATOR_META = {
     "headline": "10% 넘게 오른 종목이 얼마나 되나",
     # 카드에서 headline 은 한 줄, 이 설명은 두 줄에 들어가야 한다. 시장(코스피)은 안 적는다 —
     # 사이트 전체가 코스피 과열도라 카드마다 되풀이할 필요가 없다(다른 카드도 안 적는다).
-    "description_beginner": "크게 뛴 종목이 쏟아질수록 단기 매매가 몰린다는 신호입니다. 평소에는 2% 안팎입니다",
+    "description_beginner": "크게 뛴 종목이 쏟아질수록 단기 매매가 몰린다는 신호입니다. 평소에는 1% 안팎입니다",
     "unit": "%",
 }
 
@@ -101,20 +101,16 @@ def collect_day(d: date) -> dict | None:
     if not rows:
         return None
 
-    # (거래대금, 종목명, 장중 최고 등락률) — 카드에 적을 대표 종목을 거래대금 순으로 고른다.
+    # (거래대금, 종목명, 종가 등락률) — 카드에 적을 대표 종목을 거래대금 순으로 고른다.
     buckets: dict[str, list[tuple[float, str, float]]] = {"limit": [], "up20": [], "up10": []}
     for x in rows:
-        close = _to_f(x.get("TDD_CLSPRC"))
-        prev = close - _to_f(x.get("CMPPREVDD_PRC"))
-        if prev <= 0:
-            continue
-        hi = (_to_f(x.get("TDD_HGPRC")) / prev - 1) * 100
-        item = (_to_f(x.get("ACC_TRDVAL")), (x.get("ISU_NM") or "").strip(), hi)
-        if LIMIT_LO <= hi <= LIMIT_HI:
+        fr = _to_f(x.get("FLUC_RT"))
+        item = (_to_f(x.get("ACC_TRDVAL")), (x.get("ISU_NM") or "").strip(), fr)
+        if LIMIT_LO <= fr <= LIMIT_HI:
             buckets["limit"].append(item)
-        elif 20.0 <= hi < LIMIT_LO:
+        elif 20.0 <= fr < LIMIT_LO:
             buckets["up20"].append(item)
-        elif 10.0 <= hi < 20.0:
+        elif 10.0 <= fr < 20.0:
             buckets["up10"].append(item)
 
     counts = {k: len(v) for k, v in buckets.items()}
