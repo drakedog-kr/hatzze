@@ -1636,7 +1636,18 @@ function CardTrend({ v, icon, span }: { v: Pick; icon: string; span?: 1 | 2 }) {
             {v.hotDisp && <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 700, color: C.hot }}>초고온 기준 {v.hotDisp}</span>}
           </div>
           <div style={{ flex: 1, position: "relative", minHeight: 52 }}>
-            <Sparkline data={v.history} color={v.color} />
+            {/* 툴팁은 카드 큰 숫자와 **같은 포매터**를 지난다 — 그래야 78건 위에 뜬
+                툴팁이 "78건"이지 "78.0건"이 아니다. 넘기는 단위가 v.unit 이 아니라
+                원단위(ind.unit)인 이유도 같다: v.unit 은 이미 변환된 표시 단위라
+                (억원 → 조원) 그걸 다시 넘기면 큰 값에서 변환이 두 번 걸린다. */}
+            <Sparkline
+              data={v.history}
+              color={v.color}
+              tips={v.historyPoints.map((pt) => {
+                const g = formatIndicatorValue(pt.value, v.ind?.unit ?? "");
+                return `${shortDate(pt.date)} · ${g.display}${g.displayUnit}`;
+              })}
+            />
           </div>
         </>
       )}
