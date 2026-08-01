@@ -670,7 +670,11 @@ main.hz-scroll { overflow-x: clip; }
   background: none;
   color: inherit;
   font: inherit;
-  cursor: help;
+  /* 기본 화살표로 둔다. 위 .hz-tip 규칙이 정한 대로 "?" 커서는 물음표 아이콘이 실제로
+     붙어 있는 자리에만 쓰는데, 여기 서 있는 건 ✨ 라 그 자리가 아니다(cursor:help 인
+     채로 남아 있던 예외였다). 버튼이라 브라우저 기본값에 맡기면 화살표가 나오지만,
+     cursor 는 상속되는 속성이라 부모가 바뀌면 딸려 움직이므로 못박아 둔다. */
+  cursor: default;
 }
 .hz-ai-mark:focus-visible {
   outline: 2px solid var(--c-blue);
