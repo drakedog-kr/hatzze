@@ -42,7 +42,8 @@ function CardSkeleton({ className, h }: { className?: string; h: number }) {
 
 export default function Loading() {
   return (
-    <div style={{ maxWidth: 1180, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
+    // position:relative 는 아래 hz-loading-float 의 기준 상자가 되기 위한 것이다.
+    <div style={{ position: "relative", maxWidth: 1180, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
       {/* 제목은 자리표시자로 두지 않고 진짜 글자를 쓴다 — 어느 페이지로 왔는지는 데이터를
           기다릴 이유가 없고, 회색 막대보다 제목이 있는 편이 '열렸다'는 느낌을 준다. */}
       <header>
@@ -71,33 +72,14 @@ export default function Loading() {
 
       {/* 스켈레톤만 두면 "멈춘 건지 오는 중인지"가 덜 분명하다. 자리표시자가 뜬 뒤에도
           내용이 오기까지 0.7~1.1초가 더 걸리므로(프로덕션 실측) 도는 표시를 같이 둔다.
-          자리는 보이는 화면 한가운데 — 처음엔 제목 옆에 뒀는데 눈에 잘 안 띄었다.
-          가로는 '생태계 센티먼트' 카드 중앙에 맞춘다(계산 근거는 globals.css 주석).
+          자리는 '보이는 자리표시자의 한가운데' — 처음엔 제목 옆에 뒀는데 눈에 잘 안 띄었다.
+          기준을 창이 아니라 이 상자로 잡는 이유는 globals.css 의 hz-loading-float 주석에.
           알맹이가 아니라 진행 표시라 pointer-events 는 CSS 에서 꺼 둔다. */}
       <div className="hz-loading-float" aria-hidden>
-        <div className="hz-loading-inner">
-          <span
-            className="hz-loading-badge hz-loading-badge--sentiment"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 9,
-              // 카드 위에 뜨므로 카드와 같은 배경·테두리를 줘야 글자가 묻히지 않는다.
-              background: C.card,
-              border: `1px solid ${C.line}`,
-              borderRadius: 999,
-              padding: "11px 18px",
-              boxShadow: "0 6px 20px rgba(0, 0, 0, 0.07)",
-              fontSize: 13.5,
-              fontWeight: 600,
-              color: C.sub,
-              whiteSpace: "nowrap",
-            }}
-          >
-            <span className="hz-spinner" />
-            다들 뭐에 꽂혔는지 보는 중
-          </span>
-        </div>
+        <span className="hz-loading-badge">
+          <span className="hz-spinner" />
+          다들 뭐에 꽂혔는지 보는 중
+        </span>
       </div>
 
       {/* 화면에는 안 보이고 스크린리더에만 읽힌다(전용 유틸 클래스가 레포에 없어 인라인). */}
