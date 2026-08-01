@@ -8,15 +8,15 @@ USD/KRW로 김치프리미엄을, 업비트 자체 거래대금으로 거래대�
   하루 정도의 오차는 감수한다.
 - 거래대금 급증도(%) = 오늘 24시간 거래대금 / 최근 VOLUME_WINDOW(30)일
   평균 거래대금 × 100. 업비트 자체 데이터만 쓰므로 날짜 매칭 문제가 없다.
-- 종합 raw_value = 김프_progress × 0.5 + 거래대금_progress × 0.5, 여기서
-  김프_progress = 김프/10*100, 거래대금_progress는 급증도(평균=100)를
-  25~175 구간에 놓아 **평균이면 정확히 50점**이 되게 한다(아래 상수 주석).
+- 종합 raw_value = 김프_progress × 0.5 + 거래대금_progress × 0.5. 두 축 모두
+  floor-ceiling 으로 0~100 에 놓는다 — 김프는 −2~+7%, 거래대금 급증도는
+  25~175(평균 100이 **정확히 50점**). 근거는 각 상수 주석에 있다.
   원래는 기하평균(sqrt(a×b))을 썼는데,
   두 서브지표 중 하나라도 0에 가까우면(예: 역프로 김프_progress=0) 전체가
   통째로 0이 되어버려 다른 쪽 신호가 아무리 커도 묻히는 문제가 있었다 —
   가중 산술평균으로 바꿔 한쪽이 0이어도 나머지 절반은 반영되게 했다.
-  김치프리미엄이 음수(역프)면 "투기 과열"과 반대 신호라 김프_progress는
-  여전히 0으로 바닥 처리한다(NEGATIVE_CURRENT_CLAMP_SLUGS와 같은 원칙).
+  김프 floor 가 0 이 아니라 −2 인 건 얕은 역프(−2~0)까지 0 으로 뭉개면
+  34.8% 의 날이 0 점이 되기 때문이다(2026-08-01 재보정, 상수 주석 참고).
   이 raw_value는 이미 0~100대의 "진행률"에 가까운 값이라, calculate_score.py
   에서 threshold=100로 나누는 건 사실상 그대로 통과시키는 것에 가깝다.
 
@@ -56,7 +56,19 @@ USD_KRW_TICKER = "KRW=X"
 BACKFILL_DAYS = 365
 VOLUME_WINDOW = 30  # 거래대금 급증도 계산에 쓰는 이동평균 기간
 
-KIMCHI_PREMIUM_THRESHOLD = 10.0
+# 김프 축은 floor-ceiling 이다(거래대금 축과 같은 모양).
+# 2026-08-01 재보정: 예전엔 `김프/10*100` 이라 천장 10% 에 **한 번도 못 닿았다** —
+# 실측 379일 최대가 8.57%, p95 가 4.29% 다. 게다가 음수를 전부 0 으로 뭉개서
+# **34.8% 의 날이 0 점**이었고(역프가 34.0%), 그 탓에 가중치를 절반(0.5) 갖고도
+# 종합에 실제로 넣은 몫은 20.3% 였다. 나머지 절반을 거래대금 축이 떠받치고 있었다.
+# −2~+7 로 잡으면 0 점이 4.5% 로 줄고 기여율이 40.6% 로 올라 가중치와 얼추 맞는다.
+# floor 를 0 이 아니라 −2 로 두는 건 "얕은 역프(−2~0)는 과열이 아닐 뿐 바닥은 아니다"로
+# 보겠다는 뜻이다. 진짜 바닥은 −2 미만(실측 4.2%)이다.
+# ceiling 7 은 실측 p95(4.29) 위이면서 최대(8.57)보다 아래라 만점이 1.6% 만 나온다.
+# ⚠️ 이 숫자를 바꾸면 app/page.tsx 의 UpbitKimchiBar 도 같이 고칠 것 — 카드 바가
+#    같은 천장으로 정규화한다(바가 꽉 차는 지점과 점수가 만점인 지점이 어긋나면 안 된다).
+KIMCHI_PREMIUM_FLOOR = -2.0
+KIMCHI_PREMIUM_CEILING = 7.0
 # 거래대금 축은 "30일 평균 대비 %"(평균 = 100)를 0~100 과열도로 옮긴다.
 # 2026-07-23 재보정: 예전엔 surge/150*100 이라 **평균과 똑같은 평범한 날이 66.7점**이었다.
 # 저온에서 시작해 올라가는 다른 지표들과 축이 어긋나, 아무 일 없는 날에도 이 지표만
@@ -217,18 +229,23 @@ def main() -> None:
         pct = (surge - VOLUME_SURGE_FLOOR) / (VOLUME_SURGE_CEILING - VOLUME_SURGE_FLOOR) * 100
         return min(max(pct, 0.0), 100.0)
 
+    def kimchi_progress_of(premium: float) -> float:
+        """김치프리미엄(%) → 0~100 과열도. floor 이하면 0, ceiling 이상이면 100."""
+        pct = (premium - KIMCHI_PREMIUM_FLOOR) / (KIMCHI_PREMIUM_CEILING - KIMCHI_PREMIUM_FLOOR) * 100
+        return min(max(pct, 0.0), 100.0)
+
     def composite_for(d: str) -> tuple[float, float, float]:
         krw_price = upbit_candles[d]["close"]
         global_price_krw = btc_usd[d] * usd_krw[d]
         premium = (krw_price / global_price_krw - 1) * 100
-        kimchi_progress = max(premium / KIMCHI_PREMIUM_THRESHOLD * 100, 0.0)
+        kimchi_progress = kimchi_progress_of(premium)
         volume_progress = volume_progress_of(volume_surge[d])
         composite = kimchi_progress * 0.5 + volume_progress * 0.5
         return premium, volume_surge[d], composite
 
     def row_for(d: str) -> dict:
         premium, surge, composite = composite_for(d)
-        kimchi_progress = max(premium / KIMCHI_PREMIUM_THRESHOLD * 100, 0.0)
+        kimchi_progress = kimchi_progress_of(premium)
         volume_progress = volume_progress_of(surge)
         return {
             "indicator_id": indicator_id,
