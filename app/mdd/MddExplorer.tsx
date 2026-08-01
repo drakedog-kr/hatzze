@@ -62,6 +62,9 @@ export function MddExplorer({
   const [data, setData] = useState<MddResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // 자리표시자 배지 문구를 가르는 값 — 기간만 바꿨나(true), 아니면 첫 진입·종목 변경인가.
+  // 이유는 Skeleton 주석에. 조회를 거는 두 입구에서 세워 두고 Skeleton 이 읽는다.
+  const [periodOnly, setPeriodOnly] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -107,9 +110,22 @@ export function MddExplorer({
         </p>
       </header>
 
-      <Controls stocks={stocks} selected={selected} onSelect={setSelected} years={years} onYears={setYears} suggestions={suggestions} />
+      <Controls
+        stocks={stocks}
+        selected={selected}
+        onSelect={(s) => {
+          setPeriodOnly(false);
+          setSelected(s);
+        }}
+        years={years}
+        onYears={(y) => {
+          setPeriodOnly(true);
+          setYears(y);
+        }}
+        suggestions={suggestions}
+      />
 
-      {loading && <Skeleton />}
+      {loading && <Skeleton periodOnly={periodOnly} />}
       {!loading && error && <ErrorCard message={error} />}
       {!loading && !error && data && <Results data={data} />}
 
@@ -1587,25 +1603,64 @@ function TopDrawdowns({ eps }: { eps: Episode[] }) {
 }
 
 /* ── 보조 ─────────────────────────────────────────────────────── */
-function Skeleton() {
+/**
+ * 이 페이지의 **두 번째** 로딩이다. 첫 번째는 app/mdd/loading.tsx(라우트가 열릴 때까지),
+ * 여기는 그 뒤 /api/mdd 로 낙폭을 받아올 때까지 — 그리고 종목·기간을 바꿀 때마다 다시 뜬다.
+ *
+ * 배지를 여기도 두는 이유: 둘은 회색 골격이 거의 똑같이 생겼는데 배지만 도중에 사라지면
+ * **아직 오는 중인데 다 온 것처럼 보이는 구간**이 생긴다. 배지를 넣은 목적이 "멈춘 건지
+ * 오는 중인지"를 가르는 것이었으니, 기다림이 더 긴 이쪽에 없으면 앞뒤가 안 맞는다.
+ *
+ * 문구는 **무엇이 바뀌어서 다시 뜨느냐로 갈린다**(Hun 결정, 2026-08-02).
+ *  - 첫 진입 · 종목 변경 — "10년치 들춰보는 중". 종목이 바뀌면 그 종목의 시세를 처음부터
+ *    들춰 오는 것이라 1단계와 같은 일이다. 특히 첫 진입은 1단계 배지 바로 뒤에 이어
+ *    붙으므로 **글자 그대로 같아야 한다** — 다르면 1.5초 안에 글자가 갈아끼워져 진행이
+ *    아니라 깜빡임으로 읽힌다.
+ *  - 기간 변경 — "고점부터 되짚는 중". 종목은 그대로고 창만 달라져 고점을 다시 잡는
+ *    일이라 말이 다르다. 1년·3년을 골라 놓고 "10년치"라고 하면 거짓말이 되기도 한다.
+ *
+ * 가르는 값은 `data` 유무가 아니라 **조작 자체**다(아래 onSelect/onYears). 종목과 기간을
+ * 구분해야 하는데 결과 유무로는 둘이 같아 보인다.
+ */
+function Skeleton({ periodOnly }: { periodOnly: boolean }) {
   // 실제 결과와 같은 골격(헤드라인 + 2열 카드)으로 깜빡여, 로딩 뒤 레이아웃이 튀지 않는다.
   const block = (h: number) => <div className="hz-shimmer" style={{ height: h, borderRadius: 10, background: C.bg }} />;
   return (
-    <div className="mdd-grid">
-      <div className="mdd-full">
-        <section style={{ ...card, display: "flex", flexDirection: "column", gap: 14 }}>
-          {block(22)}
-          {block(54)}
-          {block(176)}
-        </section>
+    // position:relative 는 아래 hz-loading-float 의 기준 상자가 되기 위한 것이다.
+    <div style={{ position: "relative" }}>
+      <div className="mdd-grid" aria-hidden>
+        <div className="mdd-full">
+          <section style={{ ...card, display: "flex", flexDirection: "column", gap: 14 }}>
+            {block(22)}
+            {block(54)}
+            {block(176)}
+          </section>
+        </div>
+        {[0, 1].map((i) => (
+          <section key={i} style={{ ...card, display: "flex", flexDirection: "column", gap: 12 }}>
+            {block(20)}
+            {block(14)}
+            {block(96)}
+          </section>
+        ))}
       </div>
-      {[0, 1].map((i) => (
-        <section key={i} style={{ ...card, display: "flex", flexDirection: "column", gap: 12 }}>
-          {block(20)}
-          {block(14)}
-          {block(96)}
-        </section>
-      ))}
+
+      <div className="hz-loading-float" aria-hidden>
+        <span className="hz-loading-badge">
+          <span className="hz-spinner" />
+          {periodOnly ? "고점부터 되짚는 중" : "10년치 들춰보는 중"}
+        </span>
+      </div>
+
+      {/* 화면에는 안 보이고 스크린리더에만 읽힌다(전용 유틸 클래스가 레포에 없어 인라인).
+          종목·기간을 바꿀 때마다 다시 마운트되므로 바뀐 것도 그때그때 읽힌다. */}
+      <span
+        role="status"
+        aria-live="polite"
+        style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap" }}
+      >
+        낙폭을 계산하는 중입니다.
+      </span>
     </div>
   );
 }
