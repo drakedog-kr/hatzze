@@ -814,7 +814,9 @@ function UpbitSubBar({ label, value, pct, color }: { label: string; value: strin
 // 김치 프리미엄 전용 양극 바 — 0을 중앙에 두고 음수(역프)면 왼쪽(파랑), 양수면
 // 오른쪽(빨강)으로 채운다. ±10%를 최대로 스케일한다(업비트 기준값과 동일).
 function UpbitKimchiBar({ premium }: { premium: number }) {
-  const norm = Math.max(-1, Math.min(1, premium / 10));
+  // 정규화 기준은 파이프라인의 김프 천장과 같아야 한다(fetch_upbit_speculation.py 의
+  // KIMCHI_PREMIUM_CEILING). 어긋나면 바가 70%만 찬 채로 점수는 만점인 화면이 나온다.
+  const norm = Math.max(-1, Math.min(1, premium / 7));
   const pos = 50 + norm * 50;
   const color = premium >= 0 ? C.hot : C.cold;
   return (
