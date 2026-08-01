@@ -455,41 +455,52 @@ body {
   .hz-spinner { animation-duration: 2.4s; }
 }
 
-/* 로딩 표시를 **보이는 화면 한가운데**에 띄운다.
-   제목 옆에 두니 눈에 잘 안 띄어서 옮겼다. 자리표시자는 화면보다 훨씬 길어(수천 px)
-   '콘텐츠 전체의 세로 중간'을 그대로 잡으면 스크롤해야 보이는 곳에 박힌다. 그래서
-   fixed 로 두어 스크롤과 무관하게 늘 보이는 영역 가운데에 있게 한다. */
+/* 로딩 표시를 **보이는 자리표시자의 한가운데**에 띄운다.
+   제목 옆에 두니 눈에 잘 안 띄어서 옮겼다.
+
+   기준이 창(viewport)이 아니라 **자리표시자 자신**인 게 핵심이다. 예전엔 fixed + top:50%
+   라 배지가 늘 '창의 한가운데'였고, 그러면 창 높이에 따라 자리표시자의 어디쯤에 얹힐지가
+   매번 달라진다. 큰 모니터(2560×1400 실측)에서 두 가지로 어긋났다.
+     - 카더라: 창이 높으면 배지가 1행(생태계 센티먼트)이 아니라 그 아래 **전폭** 카드 위로
+       내려앉는데, 가로 보정은 1행 카드 중앙(62.5%)에 맞춘 값이라 전폭 카드 위에서 혼자
+       오른쪽으로 155px 밀려 보였다.
+     - MDD: 자리표시자가 창보다 짧아(≈810px) 창 한가운데가 자리표시자 아래쪽 끝, 푸터
+       코앞이었다.
+
+   그래서 자리표시자를 감싸는 상자(loading.tsx 의 바깥 div — 그래서 position:relative 다)
+   를 덮고 그 안에서 가운데 정렬한다. 덮개 높이 min() 의 두 항이 위 두 경우다.
+     - 100%       — 자리표시자가 창보다 짧을 때(MDD). 자리표시자의 한가운데가 된다.
+     - 보이는 높이 — 자리표시자가 창보다 길 때(카더라). 첫 화면의 한가운데가 된다. 스크롤해야
+                    보이는 수천 px 아래에 배지가 박히는 것을 막는 항이다.
+   '보이는 높이' = 창 − 탑바(54, AppShell 인라인) − 본문 위아래 여백. 사이드바 폭(210)과
+   560px 분기를 이제 안 세도 되는 건 기준이 창에서 콘텐츠 상자로 바뀌었기 때문이다. */
 .hz-loading-float {
-  position: fixed;
-  top: 50%;
-  left: 210px; /* 사이드바 폭 — 콘텐츠 영역 기준으로 맞추려면 빼고 시작해야 한다 */
+  position: absolute;
+  top: 0;
+  left: 0;
   right: 0;
-  transform: translateY(-50%);
+  height: min(100%, calc(100dvh - 54px - var(--hz-main-pad) * 2));
   display: flex;
+  align-items: center;
   justify-content: center;
   pointer-events: none;
   z-index: 5;
 }
-@media (max-width: 560px) {
-  .hz-loading-float { left: 0; } /* 이 폭부터 사이드바가 없다(.hz-sidebar) */
-}
-.hz-loading-inner {
-  position: relative;
-  width: 100%;
-  max-width: 1180px;
-}
-/* 기본은 콘텐츠 중앙이다. MDD 정밀분석처럼 카드가 폭을 꽉 채우는 화면은 이대로 맞는다. */
+/* 카드 위에 뜨므로 카드와 같은 배경·테두리를 줘야 글자가 묻히지 않는다.
+   두 페이지가 같은 모양이라 인라인이 아니라 여기 한 벌만 둔다. */
 .hz-loading-badge {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-}
-/* 카더라 전용 보정 — 가로 기준을 '텔레그램 생태계 센티먼트' 카드 중앙에 맞춘다.
-   그 카드는 4열(≥1440px)에서만 2~4번째 칸에 앉는다. 칸폭 = (1180-3×20)/4 = 280 이고
-   세 칸의 중앙은 왼쪽에서 2.5×280+40 = 740 = 62.5% + 2.5px 다.
-   3열 이하에서는 그 카드가 폭 전체를 먹으므로 위 기본값(50%)이 곧 카드 중앙이다. */
-@media (min-width: 1440px) {
-  .hz-loading-badge--sentiment { left: calc(62.5% + 2.5px); }
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 18px;
+  border: 1px solid var(--c-line);
+  border-radius: 999px;
+  background: var(--c-card);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.07);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--c-sub);
+  white-space: nowrap;
 }
 
 /* 본문은 세로로만 스크롤한다. overflow-y 만 auto 로 주면 overflow-x 는 visible 이

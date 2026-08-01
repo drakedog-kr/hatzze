@@ -27,7 +27,8 @@ const card: React.CSSProperties = {
 
 export default function Loading() {
   return (
-    <div style={{ maxWidth: 1180, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
+    // position:relative 는 아래 hz-loading-float 의 기준 상자가 되기 위한 것이다.
+    <div style={{ position: "relative", maxWidth: 1180, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
       {/* 제목·설명은 자리표시자로 두지 않고 진짜 글자를 쓴다 — 어느 페이지로 왔는지는
           데이터를 기다릴 이유가 없다(카더라와 같은 원칙). */}
       <header>
@@ -65,31 +66,13 @@ export default function Loading() {
         ))}
       </div>
 
-      {/* 보이는 화면 한가운데. 이 페이지는 카드가 폭을 꽉 채우므로 콘텐츠 중앙이 곧 카드
-          중앙이라, 카더라가 쓰는 --sentiment 보정 없이 기본값(50%)을 그대로 쓴다. */}
+      {/* 보이는 자리표시자의 한가운데(globals.css 의 hz-loading-float 주석). 이 페이지는
+          자리표시자가 창보다 짧아서, 예전의 '창 한가운데'는 푸터 코앞에 찍혔다. */}
       <div className="hz-loading-float" aria-hidden>
-        <div className="hz-loading-inner">
-          <span
-            className="hz-loading-badge"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 9,
-              background: C.card,
-              border: `1px solid ${C.line}`,
-              borderRadius: 999,
-              padding: "11px 18px",
-              boxShadow: "0 6px 20px rgba(0, 0, 0, 0.07)",
-              fontSize: 13.5,
-              fontWeight: 600,
-              color: C.sub,
-              whiteSpace: "nowrap",
-            }}
-          >
-            <span className="hz-spinner" />
-            10년치 들춰보는 중
-          </span>
-        </div>
+        <span className="hz-loading-badge">
+          <span className="hz-spinner" />
+          10년치 들춰보는 중
+        </span>
       </div>
 
       {/* 화면에는 안 보이고 스크린리더에만 읽힌다(전용 유틸 클래스가 레포에 없어 인라인). */}
