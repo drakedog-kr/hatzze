@@ -14,6 +14,7 @@ LLM 호출이 실패하거나 키가 없어도 파이프라인 본체(점수 계
 from __future__ import annotations
 
 import sys
+from datetime import date, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -23,6 +24,7 @@ from anthropic import Anthropic  # noqa: E402
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
+from common.timeutil import today_kst  # noqa: E402
 
 # Haiku 4.5 — 2~3문장 짧은 요약엔 충분히 빠르고 저렴하다. 하루 2회 실행이라 비용은
 # 사실상 무시 가능. (thinking/effort 파라미터는 Haiku 4.5에서 불필요/미지원이라 안 쓴다.)
@@ -170,12 +172,73 @@ def normalize_category(raw: str | None) -> str:
     return "시장" if raw in ("정통", "시장") else "감성"
 
 
+_DOW = "월화수목금토일"  # date.weekday() 0=월 … 6=일
+
+
+def day_tag(d: date, today: date) -> str:
+    """이 날짜에 붙일 꼬리표. **달력상 진짜 오늘/어제일 때만** 붙는다.
+
+    목록의 마지막·마지막에서 두 번째 줄에 무조건 '오늘'·'어제'를 다는 게 아니다. 파이프라인이
+    하루 걸러 돌거나 daily_score 행이 비면 그 자리는 어제가 아니고, 그때 라벨을 달면 날짜를
+    못박으려고 넣은 장치가 그 자체로 새 거짓말이 된다. 그러면 날짜만 적고 만다 — 모델이
+    '어제'라는 말을 못 쓰게 되는 게 아니라, 며칠 전인지 세어 볼 근거를 그대로 갖는다.
+
+    common/broadcast_content.morning_day_words 가 같은 판단을 한다(PR #153·#157). 저쪽은
+    '어제가 아니면 날짜를 못박는다'를 문장 쓰는 쪽에서 했고, 여기는 자료 쪽에서 한다.
+    """
+    if d == today:
+        return "  ← 오늘"
+    if d == today - timedelta(days=1):
+        return "  ← 어제"
+    return ""
+
+
+def trend_lines(recent: list[tuple[str, float]], today: date | None = None) -> list[str]:
+    """[최근 추세] 블록 — 날짜 하나에 한 줄. 오래된→최신 순으로 받는다.
+
+    **화살표 사슬(`25 → 26 → … → 39`)로 주면 안 된다.** 그러면 '어제'가 위치 세기가 되어
+    모델이 한 칸씩 밀린다. 2026-08-02 프로덕션 문장이 그렇게 나왔다: 실제로는 08-01 41℃ ·
+    08-02 39℃ 인데 "어제 28℃로 급락한 후 오늘 39℃로 다시 올라온"이라 적어, 어제 값도 마지막
+    두 날의 순서도 방향도 틀렸다. 방향이 뒤집힌 탓에 **같은 화면 탑바가 ▼2 를 그리는데 문장은
+    올랐다고 하는** 정면 모순이 났다.
+
+    같은 지표 자료로 두 시계열 × 40회씩, **sized_sentence 재시도까지 태워** 재현했다
+    (2026-08-02, 저장되는 문장 기준 80건):
+
+        화살표          없는 숫자 14/80 · 날짜값 오류 6/80 · 방향 뒤집힘 1/80
+        날짜 라벨        없는 숫자  0/80 · 날짜값 오류 0/80 · 방향 뒤집힘 0/80
+
+    화살표 쪽 80건에 이번 프로덕션 사고가 그대로 다시 나왔다("어제 28℃로 내려갔다가 오늘
+    39℃로 다시 올라온"). 재현되는 결함이지 하루치 운이 아니다.
+
+    **대가는 길이다.** 날짜를 짚게 되니 문장이 길어진다 — 중앙 66→70자(A) · 70→82자(B),
+    90자 초과는 재시도 뒤에도 0/80 → 5/80(최대 97자), 평균 호출 1.3→1.45회. 삼키기로 한
+    값이다. 늘어난 자리는 군더더기가 아니라 날짜 자체고, 벗어나는 5건도 상한을 몇 자 넘길
+    뿐이다. TREND_LEN 을 같이 넓히지 않은 건 눈금을 하나 건드리면 짝이 딸려 움직여서다.
+
+    ⚠️ **TREND_SYSTEM 을 같이 고치지 말 것.** 채택 전 4개 변형 비교(첫 시도 기준 40회씩)에서
+    날짜 라벨에 '적힌 값만 쓰라'는 프롬프트를 겹쳤더니 모델이 날짜를 전부 나열해 33/40 이
+    90자를 넘고 중앙값이 100자대가 됐다. "날짜를 전부 나열하지 마세요"를 넣어도 안 들었다 —
+    자료가 날짜 목록이면 따라 나열한다. 라벨만 넣은 쪽이 길이 대비 효과가 가장 좋았다.
+
+    ⏳ 잠복: 프롬프트 예시의 "50℃대"를 모델이 그대로 베껴 쓴다(화살표 쪽 '없는 숫자'
+    14/80 이 거의 전부 이것). 날짜 라벨만으로 0/80 이 돼 이번엔 안 건드렸다. 예시를 손볼
+    거면 그것만 따로 40회 재고 판단할 것.
+    """
+    ref = today or today_kst()
+    lines = ["[최근 추세] 햇쩨 지수(℃) 날짜별"]
+    for iso, s in recent:
+        d = date.fromisoformat(iso)
+        lines.append(f"- {d.month}월 {d.day}일({_DOW[d.weekday()]}): {s:.0f}℃{day_tag(d, ref)}")
+    return lines
+
+
 def build_digest(
     score: float,
     stage: str,
     hot_count: int,
     rows: list[dict],
-    recent_scores: list[float],
+    recent: list[tuple[str, float]],
 ) -> str:
     """LLM에 넘길 지표 요약(사람이 읽는 한글 텍스트). 과열도 높은 순으로 정렬해
     모델이 '눈여겨볼 지표'를 고르기 쉽게 한다.
@@ -187,16 +250,16 @@ def build_digest(
     헤드라인 '햇쩨 지수'는 온도(℃)로, 개별 지표는 기준선까지의 진행률(과열도 %)로
     표기해 화면 표기와 맞춘다.
 
-    - [최근 추세]: 3번째 문단(추세)용. 최근 며칠 햇쩨 지수를 오래된→오늘 순으로 준다.
+    - [최근 추세]: 3번째 문단(추세)용. 최근 며칠 햇쩨 지수를 (날짜, 점수) 쌍으로,
+      오래된→최신 순으로 받아 날짜별 목록으로 적는다(trend_lines 주석 참고).
     - [지표별]의 '뜻:' : 1번째 문단(주인공 뜻풀이)용. 주인공 카테고리(시장) 상위
       DESC_TOP_N개에만 설명문을 붙여, 모델이 지표 의미를 지어내지 않고 근거 있게 풀도록
       한다. 시장 지표가 아예 없는 날을 대비해, 그때는 순서대로 앞 N개에 붙인다."""
     lines = [
         f"[전체] 햇쩨 지수 {score:.0f}℃ · {stage} 구간 · 초고온 구간에 든 지표 {hot_count}개",
     ]
-    if recent_scores:
-        trend = " → ".join(f"{s:.0f}" for s in recent_scores)
-        lines.append(f"[최근 추세] 최근 {len(recent_scores)}일 햇쩨 지수(℃, 오래된→오늘): {trend}")
+    if recent:
+        lines += trend_lines(recent)
     lines += [
         "",
         "[지표별] 과열도 높은 순 (0=저온 ~ 100=초고온, '초고온'=과열도 75 이상)",
@@ -237,8 +300,9 @@ def main() -> None:
         return
     target_date = ds.data[0]["date"]
     score = float(ds.data[0]["score"])
-    # 최신순으로 받았으니 뒤집어 오래된→오늘 순으로. 추세 서술용.
-    recent_scores = [float(r["score"]) for r in reversed(ds.data)]
+    # 최신순으로 받았으니 뒤집어 오래된→최신 순으로. 추세 서술용.
+    # **날짜를 같이 넘긴다** — 점수만 주면 모델이 '어제'를 위치로 세다 한 칸씩 민다(trend_lines).
+    recent = [(r["date"], float(r["score"])) for r in reversed(ds.data)]
     stage = stage_for_score(score)  # 저장된 라벨 대신 점수에서 재계산(프론트와 동일 규칙)
 
     # 공개 지표 + 각 지표의 최신 값. normalized_score는 calculate_score가 저장한 원본
@@ -288,7 +352,7 @@ def main() -> None:
 
     rows.sort(key=lambda r: r["capped"], reverse=True)
     hot_count = sum(1 for r in rows if r["hot"])
-    digest = build_digest(score, stage, hot_count, rows, recent_scores)
+    digest = build_digest(score, stage, hot_count, rows, recent)
 
     print("─" * 60)
     print(digest)
