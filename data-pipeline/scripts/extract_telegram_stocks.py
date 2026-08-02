@@ -14,6 +14,8 @@
       "SK 하이닉스"  → 붙이면 사전에 있는 더 긴 종목명 → 그 종목(SK하이닉스)으로 인정
       "SK hynix"    → 뒤가 로마자(영문 병기·해외 자회사명: SK On) → 거부
       "SK 그룹"      → 그룹 전체 지칭(config.GROUP_SUFFIXES) → 거부
+합성어의 꼬리로 쓰이는 이름은 **앞**에 띄어쓴 낱말까지 본다("뷰티 디바이스" → 거부).
+위 경계 규칙이 앞은 붙어 있는 한 글자만 보므로 이 자리가 비어 있었다(modifier_context 참고).
 우선주(…우) 등 파생 종목은 사전에서 제외해 잡음을 줄인다.
 
 상장 증권사 이름은 종목보다 **리포트 발행처 표기**로 훨씬 자주 나와 따로 본다
@@ -43,6 +45,7 @@ from config.stock_extraction import (  # noqa: E402
     AMBIGUOUS_NAMES,
     EXCLUDE_NAMES,
     GROUP_SUFFIXES,
+    HEAD_NOUN_NAMES,
     JOSA,
 )
 
@@ -54,6 +57,15 @@ HAN = re.compile(r"[一-鿿]")  # SK海力士(=SK하이닉스) 같은 중국어 
 LATIN = re.compile(r"[A-Za-z]")
 LATIN_ACRONYM = re.compile(r"^[A-Za-z][A-Za-z0-9&]*$")  # SK, LG, E1 … (한글 종목명 제외)
 URL_RE = re.compile(r"(?:https?://|www\.)\S+")
+# 이름을 합성어 안에 붙들어 매는 이음표("구독·플랫폼·디바이스", "X-레이", "다이렉트-투-
+# 디바이스"). 띄어쓴 수식어와 같은 자리인데, 앞 글자가 한글도 영숫자도 아니라 경계 검사도
+# 앞 낱말 검사도 그냥 통과한다(modifier_context 참고). 실측된 건 '·' 와 '-' 이고, 나머지는
+# 같은 부호의 다른 표기라 함께 둔다. 쉼표·콜론·괄호는 **여기 넣으면 안 된다** — 진짜
+# 언급이 쓰는 구분자다("노바렉스, 디바이스", "기업명: 서한", "(코스닥)진영").
+JOIN_MARKS = "·‧・･-–—"
+# HTML 로 이스케이프된 가운뎃점("윈도우 OEM&middot;디바이스"). 앞 글자가 ';' 라 위 검사에
+# 안 걸린다.
+HTML_MIDDOT_RE = re.compile(r"&(?:middot|#183|#[xX][Bb]7);?$")
 # 마스킹 채움 문자 — 한글/영숫자/한자 어디에도 안 걸려 경계 판정이 공백과 같아진다.
 MASK_CHAR = "\x00"
 
@@ -159,6 +171,54 @@ def compound_key(text: str, end: int, key: str, match_to_code: dict[str, str]) -
     return key
 
 
+def modifier_context(text: str, start: int) -> bool:
+    """이 자리의 이름이 앞 낱말의 수식을 받는 **머리 명사**인가(= 종목이 아니다).
+
+    compound_key 의 거울상이다. 그쪽은 이름 뒤에 띄어쓴 낱말을 붙여 더 긴 고유명사인지
+    보는데("SK 하이닉스"), 앞쪽엔 같은 장치가 없었다. boundary_ok 의 앞 검사는 **붙어
+    있는 한 글자**만 보므로 `온디바이스`는 걸러도 `뷰티 디바이스`는 앞 글자가 공백이라
+    그대로 통과한다. 이 함수가 그 구멍을 막는다.
+
+    판정은 publisher_context ⑤ 와 같은 잣대다 — 띄어쓴 앞 낱말이 한글/영숫자로 끝나면
+    수식어 자리로 본다. 이 이름들의 진짜 언급은 예외 없이 구두점이나 줄머리로 열려서
+    (`(코스닥)디바이스` `기업명: 서한` `농심(+3.1%), 동서(+2.1%)` `9) 알트 (29.91%)`)
+    이 규칙에 걸리지 않는다. 시세·공시·특징주 표기가 전부 구분자를 쓰기 때문이다.
+
+    줄바꿈은 건너뛰지 않는다(compound_key 와 같은 이유 — 앞 줄 끝 낱말은 한 고유명사가
+    아니다). 앞 낱말이 없으면(줄머리) False, 붙어 있으면 boundary_ok 가 이미 봤다.
+
+    이음표(JOIN_MARKS)는 한 가지 예외다. `구독·플랫폼·디바이스` `CPU·스토리지·DB` `X-레이`
+    `다이렉트-투-디바이스` 는 띄어쓴 수식어와 똑같이 이름을 합성어 안에 넣는데, 앞 글자가
+    한글도 영숫자도 아니라 경계 검사도 이 함수의 앞 낱말 검사도 그냥 통과한다. 이 자리를
+    저장된 언급 전량에서 세니 **표본이 아니라 전수로 20건이고 전부 오탐**이라 함께 거른다.
+
+        가운뎃점 12  디바이스 6 · DB 4 · 신흥 1 · 미래산업 1
+        붙임표    7  DB 4(`목표가↑"-DB` 발행처 표기) · X-레이 2 · 다이렉트-투-디바이스 1
+        &middot;  1  윈도우 OEM&middot;디바이스
+
+    ⚠️ **띄어쓴 붙임표는 여기 안 든다.** 목록 글머리(`- 신흥 중남미…`)가 그 꼴이라 13건이
+    걸리는데 진짜가 섞인다. 붙어 있을 때만 합성어다.
+
+    ⚠️ 쉼표·콜론·괄호는 **넣으면 안 된다.** 진짜 언급이 쓰는 구분자다(`노바렉스, 디바이스`
+    `기업명: 서한` `(코스닥)진영`). 남은 오탐이 제일 많은 자리가 여기인데(쉼표 62·줄머리
+    54·마침표 44), 같은 자리에 진짜가 더 많아 규칙으로는 못 가른다.
+
+    ⚠️ **HEAD_NOUN_NAMES 에만 건다.** AMBIGUOUS_NAMES 전체에 걸면 994건이 죽는데
+    `최태원 SK`·`수주 따낸 한화`처럼 앞 낱말이 수식어가 아닌 진짜가 섞인다. 어느
+    이름에 걸어도 되는지는 config 쪽 목록 주석에 근거를 적어 뒀다.
+    """
+    if start > 0 and text[start - 1] in JOIN_MARKS:
+        return True
+    line_before = text[:start].rsplit("\n", 1)[-1]
+    if HTML_MIDDOT_RE.search(line_before):
+        return True
+    m = re.search(r"(\S)[ \t]+$", line_before)
+    if not m:
+        return False
+    prev = m.group(1)
+    return bool(HANGUL_OR_ALNUM.match(prev) or HAN.match(prev))
+
+
 def is_publisher_name(key: str) -> bool:
     """리포트 발행처로 더 자주 등장하는 이름인가(= 상장 증권사).
 
@@ -235,6 +295,10 @@ def extract(text: str, pattern, match_to_code, method, ambiguous, caseless) -> d
         # 증권사 이름은 한 메시지에 여러 번 나오는 일이 흔하다(머리글의 발행처 표기 +
         # 본문의 진짜 언급). 자리마다 따로 보고, 발행처 자리면 이 자리만 건너뛴다.
         if is_publisher_name(key) and publisher_context(text, m.start(), m.end()):
+            continue
+        # 합성어의 꼬리로 쓰이는 이름은 앞 자리도 본다("뷰티 디바이스"). 승격(compound_key)
+        # 전에 판정해야 한다 — 걸러야 할 건 사전 키가 놓인 자리이지 승격된 이름이 아니다.
+        if key in HEAD_NOUN_NAMES and modifier_context(text, m.start()):
             continue
         if is_ambiguous:
             key = compound_key(text, m.end(), key, match_to_code)
