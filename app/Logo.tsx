@@ -65,26 +65,58 @@ export function GhostSymbol({
  * 베타 배지 — 로고 우측 상단에 위첨자처럼 붙는다.
  *
  * 서비스 **전체**가 베타라는 표시라서, 페이지마다 다는 게 아니라 브랜드가 나오는
- * 자리마다 같은 모양으로 붙인다(사이드바 · 모바일 탑바 · 푸터 셋).
+ * 자리마다 붙인다(사이드바 · 모바일 탑바 · 푸터 셋).
  *
- * 크기는 로고 크기를 안 따라간다 — 셋의 워드마크가 30/23/26 으로 제각각이라 배지까지
- * 같이 움직이면 "같은 배지"가 아니라 "비슷한 배지 셋"이 된다. 이건 상태 표시지 로고의
- * 일부가 아니므로 고정값이 맞다.
+ * **알약 크기는 셋이 완전히 같고, 자리만 로고에 맞춘다**(Hun 결정, 2026-08-02).
+ *
+ * 맞추는 기준은 상자가 아니라 **글자**다 — 배지 '베' 의 ㅔ 가로선을 워드마크 'e' 의 위
+ * 끝자락과 같은 높이에 둔다. 상자 윗선끼리 붙이면 로고가 작을수록 같은 배지가 로고를 더
+ * 많이 덮어(30/26/23 에 배지 18 이면 60%/69%/78%) 위첨자가 아니라 로고에 걸터앉은 것처럼
+ * 보인다. 눈이 읽는 건 상자가 아니라 글자의 높이다.
+ *
+ * lift 는 그 조건을 푼 것이다. 네 값 다 실측이고, 로고 크기에 비례하는 항은 워드마크 쪽
+ * 둘뿐이라 식이 한 줄로 떨어진다.
+ *   - 배지 상자 위 → 글자 베이스라인 = 11.5px (높이 18 · line-height 8 에서 나오는 고정값)
+ *   - ㅔ 가로선    = 베이스라인 위 3.5px (8px pretendard 700, 글자 크기가 고정이라 상수)
+ *   - 워드마크 상자 위 → 베이스라인 = 0.833em (Bricolage, line-height 1)
+ *   - 'e' 잉크 꼭대기 = 베이스라인 위 0.539em (둥근 글자라 x-height 보다 살짝 넘친다)
+ * 실측값은 30/26/23 에서 lift −0.8 / 0.4 / 1.2 다. 사이드바가 음수인 건 지금 그 자리가
+ * 0.8px 만큼 위로 떠 있다는 뜻이라, 이 값이 들어가면 오히려 제자리로 내려온다.
+ *
+ * 높이를 글꼴에 맡기지 않고 못 박은 이유: 위아래 여백으로 만들면 line-height 가 섞여
+ * 들어와 같은 값을 줘도 자리마다 몇 px 씩 달라지고, 그러면 위 11.5 가 흔들린다.
  *
  * 윗선 맞춤은 쓰는 쪽이 정한다 — 부모를 alignItems:flex-start 로 두거나(사이드바·탑바),
  * baseline 묶음 안에서는 alignSelf 로 빠져나온다(푸터). 그래서 여기서 정렬을 못 박지 않고
  * style 로 열어 둔다.
  */
-export function BetaBadge({ style }: { style?: React.CSSProperties }) {
+const BETA_BADGE_HEIGHT = 18;
+/** 배지 상자 위에서 글자 베이스라인까지(px). 위 높이·line-height 에서 나오는 고정값이다. */
+const BADGE_BASELINE = 11.5;
+/** ㅔ 가로선 중심이 베이스라인 위로 뜬 거리(px). 배지 글자가 8px 고정이라 상수다. */
+const BAR_ABOVE_BASELINE = 3.5;
+/** 워드마크 상자 위에서 베이스라인까지(em). Bricolage + line-height 1 기준. */
+const WORDMARK_BASELINE = 0.833;
+/** 워드마크 'e' 잉크 꼭대기가 베이스라인 위로 뜬 거리(em). */
+const WORDMARK_E_TOP = 0.539;
+
+export function BetaBadge({ logoSize = 30, style }: { logoSize?: number; style?: React.CSSProperties }) {
+  // ㅔ 가로선 = e 위 끝자락 이 되는 지점. 30/26/23 → -0.8 / 0.4 / 1.2
+  const lift = BADGE_BASELINE - BAR_ABOVE_BASELINE - (WORDMARK_BASELINE - WORDMARK_E_TOP) * logoSize;
   return (
     <span
       style={{
         flexShrink: 0,
+        display: "inline-flex",
+        alignItems: "center",
+        height: BETA_BADGE_HEIGHT,
+        marginTop: -lift,
+        padding: "0 8px",
         fontSize: 8,
         fontWeight: 700,
+        lineHeight: 1,
         color: "var(--c-blue)",
         background: "var(--c-blue-tint)",
-        padding: "3px 8px",
         borderRadius: 999,
         ...style,
       }}

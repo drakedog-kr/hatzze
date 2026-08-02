@@ -98,7 +98,7 @@ export default function Footer() {
                   워드마크 밑선에 맞는다(배지는 alignSelf 로 baseline 정렬에서 빠진다). */}
               <span style={{ display: "inline-flex", alignItems: "flex-start", gap: 5 }}>
                 <Wordmark size={26} />
-                <BetaBadge />
+                <BetaBadge logoSize={26} />
               </span>
               {/* 로고(26px 잉크)와 나란히 두되 크기·색을 확 낮춘다 — 비슷하게 두면
                   "hatzze v.1.0.0" 이 한 덩어리 워드마크처럼 읽힌다. */}
