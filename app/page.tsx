@@ -693,25 +693,37 @@ function Hero({
         )}
         {/* 두 묶음 중 어디가 더 뜨거운가. 바로 아래 화면이 '시장 지표'·'감성 지표' 두
             덩어리로 갈리는데, 왜 나뉘어 있는지를 말해 주는 문장이 어디에도 없었다.
-            LLM 이 아니라 **계산**이다 — 두 가중평균의 차이라 문장이 흔들릴 자리가 없다. */}
+            LLM 이 아니라 **계산**이다 — 두 가중평균의 차이라 문장이 흔들릴 자리가 없다.
+
+            ⚠️ **이 두 수는 히어로의 ℃ 와 눈금이 다르다.** 여기 값은 카테고리별 가중평균
+            (원 과열도 0~100)이고, 히어로 ℃ 는 그 원점수를 calculate_score.py 의
+            SCORE_DISPLAY_ANCHORS 로 한 번 더 매핑한 값이다. 오늘 값으로 원 42.3 은
+            ℃ 로 치면 47 이고, 원 50 쯤에서는 차이가 13 까지 벌어진다.
+            **두 수를 히어로 온도에서 빼면 안 된다.** 서로(시장↔감성) 견주는 건 같은
+            눈금이라 정확하다 — 이 문장이 하는 비교가 그것이다.
+            정확한 ℃ 로 적으려면 앵커 매핑을 프론트에 복제하지 말고, 파이프라인이
+            카테고리별 ℃ 를 계산해 daily_score.details 에 실어 보내게 하는 쪽이 맞다. */}
         {marketHeat !== null && socialHeat !== null && (
           <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.75, color: C.inkSoft, textWrap: "pretty" }}>
             {Math.abs(marketHeat - socialHeat) < 5 ? (
               <>
-                시장 지표(<b style={{ fontWeight: 800, color: C.ink }}>{Math.round(marketHeat)}</b>)와 감성
-                지표(<b style={{ fontWeight: 800, color: C.ink }}>{Math.round(socialHeat)}</b>)의 온도가 비슷합니다.
-                가격·거래와 사람들의 관심이 같은 속도로 움직이고 있습니다.
+                시장 지표와 감성 지표의 온도가
+                <b style={{ fontWeight: 800, color: C.ink }}> {Math.round(marketHeat)}도</b> ·
+                <b style={{ fontWeight: 800, color: C.ink }}> {Math.round(socialHeat)}도</b>로 비슷합니다. 가격·거래와
+                사람들의 관심이 같은 속도로 움직이고 있습니다.
               </>
             ) : marketHeat > socialHeat ? (
               <>
-                지금은 <b style={{ fontWeight: 800, color: C.ink }}>시장 지표({Math.round(marketHeat)})</b>가 감성
-                지표({Math.round(socialHeat)})보다 뜨겁습니다. 가격·거래는 움직이는데 사람들의 관심은 아직 따라붙지
-                않았습니다.
+                지금은 <b style={{ fontWeight: 800, color: C.ink }}>시장 지표</b>의 온도가{" "}
+                <b style={{ fontWeight: 800, color: C.ink }}>{Math.round(marketHeat)}도</b>로 감성
+                지표({Math.round(socialHeat)}도)보다 높습니다. 가격·거래는 움직이는데 사람들의 관심은 아직
+                따라붙지 않았습니다.
               </>
             ) : (
               <>
-                지금은 <b style={{ fontWeight: 800, color: C.ink }}>감성 지표({Math.round(socialHeat)})</b>가 시장
-                지표({Math.round(marketHeat)})보다 뜨겁습니다. 사람들의 관심이 가격·거래보다 앞서 있습니다.
+                지금은 <b style={{ fontWeight: 800, color: C.ink }}>감성 지표</b>의 온도가{" "}
+                <b style={{ fontWeight: 800, color: C.ink }}>{Math.round(socialHeat)}도</b>로 시장
+                지표({Math.round(marketHeat)}도)보다 높습니다. 사람들의 관심이 가격·거래보다 앞서 있습니다.
               </>
             )}
           </p>
@@ -876,6 +888,19 @@ function CardLeverage({ v }: { v: Pick }) {
         })()
       : null;
   const oiAmount = dt?.futures_oi != null ? `${Math.round(dt.futures_oi).toLocaleString("ko-KR")}` : null;
+  // "기준 대비 N%" 는 두 타일이 **서로 다른 기준**을 같은 말로 부르던 라벨이었다.
+  // ETF 는 4조원(고정), 선물은 "1년 평균의 1.5배" 라, 선물의 53% 는 두 단계 건너뛴 말이라
+  // 카드만 보고는 풀 수 없었다. 이제 파이프라인이 기준 자체를 details 로 보낸다.
+  //
+  // 옛 행에는 그 두 필드가 없어서 상수로 물러선다. 값은 fetch_leverage_etf_volume.py 의
+  // ETF_THRESHOLD(40,000억) · OI_SURGE_THRESHOLD(150) 와 같아야 한다 —
+  // **다음 파이프라인 실행 뒤에는 이 폴백이 안 쓰인다.**
+  const etfBaseEok = dt?.etf_base_eok ?? 40_000;
+  const etfBaseLabel = (() => {
+    const f = formatIndicatorValue(etfBaseEok, "억원");
+    return `${f.display}${f.displayUnit}`;
+  })();
+  const oiVsAvg = dt?.oi_vs_avg ?? (dt?.futures_progress != null ? dt.futures_progress * 1.5 : null);
   return (
     <Shell hit={v.isHit} minH={230}>
       <TitleRow desc={v.headline} icon="rocket_launch" name={v.name} />
@@ -900,12 +925,12 @@ function CardLeverage({ v }: { v: Pick }) {
           <div style={{ background: C.soft, borderRadius: R.tile, padding: 13, display: "flex", flexDirection: "column", gap: 5 }}>
             <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub2 }}>ETF 거래대금</span>
             <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: C.ink }}>{etfAmount ?? "-"}</strong>
-            <span style={{ fontSize: 11, color: C.muted }}>기준 대비 {Math.round(dt.etf_progress ?? 0)}%</span>
+            <span style={{ fontSize: 11, color: C.muted }}>{etfBaseLabel} 대비 {Math.round(dt.etf_progress ?? 0)}%</span>
           </div>
           <div style={{ background: C.soft, borderRadius: R.tile, padding: 13, display: "flex", flexDirection: "column", gap: 5 }}>
             <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub2 }}>선물 미결제약정</span>
             <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: C.ink }}>{oiAmount ?? "-"}</strong>
-            <span style={{ fontSize: 11, color: C.muted }}>계약 · 기준 대비 {Math.round(dt.futures_progress ?? 0)}%</span>
+            <span style={{ fontSize: 11, color: C.muted }}>계약 · 1년 평균 대비 {oiVsAvg !== null ? Math.round(oiVsAvg) : "-"}%</span>
           </div>
         </div>
       )}
@@ -981,7 +1006,7 @@ function CardTurnover({ v }: { v: Pick }) {
             자리까지 올라가 글자를 덮는다(실측 확인). */}
         <div style={{ width: 104, height: 104, borderRadius: "50%", flexShrink: 0, background: `conic-gradient(${stops.join(",")})`, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div className="hz-tip" data-tip={donutTip} style={{ width: 68, height: 68, borderRadius: "50%", background: C.card, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-            <strong style={{ fontFamily: MONO, fontSize: 19, fontWeight: 800, color: C.ink }}>{Math.round(share)}%</strong>
+            <strong style={{ fontFamily: MONO, fontSize: 19, fontWeight: 800, color: v.color }}>{Math.round(share)}%</strong>
             <span style={{ fontSize: 10, color: C.muted }}>상위10</span>
           </div>
         </div>
@@ -1396,8 +1421,8 @@ function CardDivergence({ v }: { v: Pick }) {
     <Shell hit={v.isHit} minH={230}>
       <TitleRow desc={v.headline} icon="compare_arrows" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-        <strong style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-.03em", color: C.ink, lineHeight: 1 }}>
-          {leadWho} <span style={{ fontFamily: MONO, color: v.color }}>{Math.round(Math.abs(lead))}%</span>
+        <strong style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
+          {leadWho} <span style={{ fontFamily: MONO }}>{Math.round(Math.abs(lead))}%</span>
         </strong>
         <span style={{ fontSize: 12.5, fontWeight: 600, color: C.sub2 }}>강세</span>
       </div>
@@ -1692,7 +1717,7 @@ function CardUpbit({ v }: { v: Pick }) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10 }}>
           <div style={{ background: C.soft, borderRadius: R.tile, padding: 13, display: "flex", flexDirection: "column", gap: 4 }}>
             <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub2 }}>김치 프리미엄</span>
-            <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: C.ink }}>
+            <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: v.color }}>
               {premium !== null ? `${premium > 0 ? "+" : ""}${premium.toFixed(1)}%` : "-"}
             </strong>
           </div>
