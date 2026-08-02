@@ -693,16 +693,22 @@ function Sparkline({
 }
 
 // 레버리지 카드의 서브 진행률 바 (ETF 거래대금 / 선물 미결제약정)
+//
+// ⚠️ 이 수치를 '과열도'라 부르지 않는다. 화면에서 과열도는 초고온 배지·히어로 카운트·
+// 종합점수가 함께 쓰는 0~100 눈금 하나를 가리키는데, 여기 값은 각 서브신호가 자기
+// 기준값(ETF 4조원 · 미결제약정 1년 평균의 1.5배)에 얼마나 다가갔는지일 뿐이다. 둘을
+// 같은 이름으로 부르면 카드의 큰 숫자가 이 둘의 평균이라는 오해를 부른다 — 실제로는
+// 그 평균을 floor 38 / ceiling 74 로 다시 눈금 매긴 값이라 서로 맞아떨어지지 않는다.
 function LevSubBar({ label, amount, value, color }: { label: string; amount: string | null; value: number; color: string }) {
   return (
     <div style={{ flex: 1 }}>
       <div style={{ fontSize: 11, fontWeight: 600, color: C.sub, marginBottom: 4 }}>{label}</div>
       {amount && <div style={{ fontFamily: MONO, fontSize: 15, fontWeight: 700, color: C.ink, marginBottom: 7 }}>{amount}</div>}
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 600, color: C.sub, marginBottom: 5 }}>
-        <span>과열도</span>
+        <span>기준 대비</span>
         <span style={{ color }}>
           {Math.round(value)}
-          <span style={{ color: "var(--c-faint)" }}>/100</span>
+          <span style={{ color: "var(--c-faint)" }}>%</span>
         </span>
       </div>
       <div style={{ height: 8, background: C.track, borderRadius: 999, overflow: "hidden" }}>
@@ -897,13 +903,20 @@ function CardBuffett({ v }: { v: Pick }) {
 // 2. 레버리지 지수 — 역대 범위 바 + ETF/선물 서브 진행률 (details 있으면 목업 원본)
 function CardLeverage({ v }: { v: Pick }) {
   const dt = v.details;
-  // 종합 과열도 = ETF 거래대금·선물 미결제약정 과열도의 평균(아래 두 서브바의 평균).
-  const heat = dt
-    ? Math.round(((dt.etf_progress ?? 0) + (dt.futures_progress ?? 0)) / 2)
-    : Math.round(v.capped ?? 0);
-  // 종합 과열도(0~100) 자체의 구간 색을 쓴다 — v.color(기준선 진행률 기준)와 달리
-  // 이 게이지는 50이 과열 시작이라 heat값을 그대로 stage 색에 매핑한다.
-  const heatC = overheatColor(heat);
+  // 큰 숫자는 다른 카드와 **똑같은 과열도**(v.capped)다.
+  //
+  // 예전엔 두 서브바의 산술평균을 적었다. 그 평균은 fetch 스크립트가 raw_value 로 저장하는
+  // 종합 지수일 뿐 화면이 말하는 과열도가 아니다 — indicator_thresholds 가 이 지표를
+  // floor 38 / ceiling 74 로 다시 눈금 매기기 때문이다(관측 대역이 38~74 에 갇혀 있어
+  // 2026-07-23 에 그렇게 바꿨다). 그래서 배지와 큰 숫자가 서로 다른 눈금을 가리켰고,
+  // 2026-08-02 에 실제로 어긋났다 — 과열도 75.06 이라 빨간 초고온 배지가 켜졌는데 큰
+  // 숫자는 평균 65 였다. 배지·히어로 카운트·종합점수가 모두 과열도를 쓰므로 큰 숫자도
+  // 과열도로 맞춘다. "배지가 켜졌다 = 이 카드가 보여주는 수가 75 를 넘었다"가 성립한다.
+  //
+  // 두 서브바는 각자 자기 기준 대비 달성률이라 그대로 둔다(라벨만 '기준 대비'로 갈랐다).
+  // 큰 숫자가 그 둘의 평균이 아니게 됐으니 같은 이름으로 부르면 안 된다.
+  const heat = v.capped === null ? null : Math.round(v.capped);
+  const heatC = v.color;
   const etfAmount =
     dt?.etf_value != null
       ? (() => {
@@ -918,15 +931,15 @@ function CardLeverage({ v }: { v: Pick }) {
       <TitleRow desc={v.headline} icon="rocket_launch" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 12 }}>
         {/* 주요 수치 크기는 VKOSPI 카드(40)를 기준으로 맞춘다. */}
-        <span style={{ fontFamily: MONO, fontSize: 40, fontWeight: 700, color: heatC, lineHeight: 1, letterSpacing: "-0.03em" }}>{heat}</span>
+        <span style={{ fontFamily: MONO, fontSize: 40, fontWeight: 700, color: heatC, lineHeight: 1, letterSpacing: "-0.03em" }}>{heat ?? "-"}</span>
         <span style={{ fontSize: 18, fontWeight: 700, color: "var(--c-faint)" }}>/ 100</span>
         <span style={{ fontSize: 13, fontWeight: 600, color: C.sub, paddingBottom: 4 }}>종합 과열도</span>
       </div>
       <div style={{ background: C.bg, borderRadius: 10, padding: 18, display: "flex", flexDirection: "column", gap: 16 }}>
         <div>
           <div style={{ position: "relative", height: 12, background: C.track, borderRadius: 999 }}>
-            <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.min(100, heat)}%`, background: `linear-gradient(90deg,${C.hot},${C.mania})`, borderRadius: 999 }} />
-            <div style={{ position: "absolute", top: "50%", left: `${Math.min(100, heat)}%`, transform: "translate(-50%,-50%)", width: 14, height: 14, borderRadius: 999, background: heatC, border: `3px solid ${C.card}` }} />
+            <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${heat ?? 0}%`, background: `linear-gradient(90deg,${C.hot},${C.mania})`, borderRadius: 999 }} />
+            <div style={{ position: "absolute", top: "50%", left: `${heat ?? 0}%`, transform: "translate(-50%,-50%)", width: 14, height: 14, borderRadius: 999, background: heatC, border: `3px solid ${C.card}` }} />
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 600, color: C.sub, marginTop: 7 }}>
             <span>안심</span>
@@ -1862,16 +1875,23 @@ function CardUpbit({ v }: { v: Pick }) {
   return (
     <Shell hit={v.isHit} minH={210}>
       <TitleRow desc={v.headline} icon="currency_bitcoin" name={v.name} />
-      {/* 이 지표의 raw_value는 두 서브지표의 '기준값 대비 진행률' 가중평균이라 0~100
-          과열도 점수다 — 감성 지표의 pt(순감성)와는 축이 다르다. 같은 'pt'를 달면
-          둘이 같은 단위처럼 보여 오해를 키우므로 '/100'으로 척도를 드러낸다.
-          v.disp 대신 직접 반올림한다 — formatIndicatorValue 는 절댓값 10 미만이면
-          소수점 둘째자리까지 쓰는데(작은 숫자는 소수가 의미 있다는 규칙), 100점 척도
-          위의 "1.47/100"에선 그 두 자리가 있으나 마나다. 그 규칙은 "0.5배" 같은 배수
-          지표를 위한 것이라 전역으로 못 바꾸고, 척도를 아는 이 카드에서만 눌러 준다. */}
+      {/* 이 카드도 큰 숫자는 다른 카드와 같은 과열도(v.capped)를 적는다 — 감성 지표의
+          pt(순감성)와는 축이 다르니 '/100'으로 척도를 드러낸다.
+          예전엔 raw_value 를 그대로 적었다. fetch 스크립트가 raw_value 를 두 서브지표의
+          '기준값 대비 진행률' 가중평균으로 만들어 두니 그게 곧 과열도라고 봤던 것인데,
+          2026-08-01 재보정이 이 지표에 ceiling 85 를 얹으면서 둘이 갈렸다(과열도 =
+          raw/85×100). 그래서 초고온 배지가 켜지는 자리가 raw 63.75 인데 카드에는 그
+          숫자가 "64 / 100 과열도"로 적혀, 배지가 켜지는 날이면 언제나 75 에 못 미치는
+          수 옆에 초고온 배지가 붙게 돼 있었다. 레버리지 카드가 같은 이유로 실제 어긋난
+          날(2026-08-02)에 함께 맞춘다.
+          v.disp 대신 직접 반올림하는 이유는 그대로다 — formatIndicatorValue 는 절댓값
+          10 미만이면 소수점 둘째자리까지 쓰는데(작은 숫자는 소수가 의미 있다는 규칙),
+          100점 척도 위의 "1.47/100"에선 그 두 자리가 있으나 마나다. 그 규칙은 "0.5배"
+          같은 배수 지표를 위한 것이라 전역으로 못 바꾸고, 척도를 아는 이 카드에서만
+          눌러 준다. */}
       <div style={{ display: "flex", alignItems: "baseline", gap: 3, marginBottom: 6 }}>
         <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 700, color: v.color, letterSpacing: "-0.03em" }}>
-          {v.raw !== null ? Math.round(v.raw).toLocaleString("ko-KR") : v.disp}
+          {v.capped !== null ? Math.round(v.capped) : "-"}
         </span>
         <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 600, color: C.sub }}>/100</span>
         <span style={{ fontSize: 10, fontWeight: 600, color: C.sub, marginLeft: 4 }}>과열도</span>
