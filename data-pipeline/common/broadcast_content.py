@@ -396,22 +396,51 @@ def theme_members(db, themes: list[str], window_dates: list[str], per: int = THE
     return out
 
 
+def weekly_top_stocks(
+    db, preloaded: tuple[list[dict], list[str]] | None = None
+) -> tuple[list[tuple[str, int]], list[str]]:
+    """주간 결산에 오르는 종목 — [(종목코드, 창 안 누적 언급수)] 와 그 창의 날짜(오름차순).
+
+    **목록을 정하는 규칙은 여기 하나뿐이다.** 쓰는 곳이 둘이라서 그렇다 — 아래
+    load_weekly_stocks 가 글에 실을 때, scripts/generate_telegram_narratives.py 가 그
+    종목의 요약을 미리 만들어 둘 때. 각자 계산하면 사본이 둘이 되고, 그러면 **주간
+    결산에 오른 종목에 요약이 없는** 일이 조용히 생긴다.
+
+    실제로 그랬다(2026-08-02 발송): ③ NAVER 가 언급 수·채널 수만 달고 설명 없이 나갔다.
+    요약을 만드는 쪽은 3일 창 weighted_score 상위 6개를 대상으로 삼는데 NAVER 는 7일
+    누적으로만 3위라 그 안에 못 들었다. 창도 잣대도 달라 두 집합이 어긋난 것이고,
+    주간 글은 요약이 없으면 그 줄을 조용히 빼므로 고장이 아니라 '한 칸이 비어 보이는'
+    형태로 나간다. 되짚어 보니 요약이 있는 15일 중 7일이 같은 모양이었다.
+
+    common/surging.py·common/channel_breadth.py 를 모아 둔 것과 같은 취지다 — 사본을
+    없애면 그 어긋남 자체가 불가능해진다.
+
+    preloaded 는 호출부가 이미 load_stock_daily 를 부른 경우에 넘긴다(top_surging 과 같은
+    규약). 안 넘기면 여기서 읽는다.
+    """
+    rows, dates = preloaded if preloaded is not None else load_stock_daily(db)
+    if not dates:
+        return [], []
+    window = sorted(dates[-WEEKLY_DAYS:])
+    win = set(window)
+    mentions: dict[str, int] = defaultdict(int)
+    for r in rows:
+        if r["date"] in win:
+            mentions[r["stock_code"]] += r["mention_count"] or 0
+
+    return sorted(mentions.items(), key=lambda kv: (-kv[1], kv[0]))[:WEEKLY_STOCK_SHOW], window
+
+
 def load_weekly_stocks(db) -> list[dict]:
     """최근 WEEKLY_DAYS 일 누적 언급 상위 종목 + 그 종목의 '왜 회자되나' 문장.
 
     B(급부상)와 **뽑히는 종목이 다르다.** 저쪽은 평소 대비 배수라 중소형주가 자주 오르고,
     이쪽은 절대 누적이라 대형주가 선다. 그래서 두 글이 같은 종목을 두 번 말하지 않는다.
-    """
-    rows, dates = load_stock_daily(db)
-    if not dates:
-        return []
-    window = set(dates[-WEEKLY_DAYS:])
-    mentions: dict[str, int] = defaultdict(int)
-    for r in rows:
-        if r["date"] in window:
-            mentions[r["stock_code"]] += r["mention_count"] or 0
 
-    top = sorted(mentions.items(), key=lambda kv: (-kv[1], kv[0]))[:WEEKLY_STOCK_SHOW]
+    종목을 고르는 일은 weekly_top_stocks 가 한다(그쪽 주석 참고). 여기서는 그 목록에
+    표시할 값을 붙이기만 한다.
+    """
+    top, window = weekly_top_stocks(db)
     codes = [c for c, _ in top]
     if not codes:
         return []
@@ -419,8 +448,7 @@ def load_weekly_stocks(db) -> list[dict]:
     # 채널 수는 창 전체의 **서로 다른 채널 수**다(common/channel_breadth.py).
     # 이 글이 특히 max 규칙에 취약했다 — 7일 창인데 일별 최대치를 적으면 3일 창인
     # 사이트보다 작은 수가 나와, 언급은 늘었는데 채널은 줄어든 것처럼 읽혔다.
-    win_sorted = sorted(window)
-    breadth = channel_breadth_map(db, codes, win_sorted[0], win_sorted[-1])
+    breadth = channel_breadth_map(db, codes, window[0], window[-1])
     names = {r["code"]: r["name"] for r in db.table("stocks").select("code,name").in_("code", codes).execute().data}
 
     latest = db.table("telegram_stock_narrative").select("date").order("date", desc=True).limit(1).execute().data
@@ -444,7 +472,7 @@ def load_weekly_stocks(db) -> list[dict]:
             # 금지어가 든 문장은 여기서 버린다(safe_narrative). 종목 이름 밑에 붙는
             # 문장이라 시세 표현이 섞이면 그 종목에 대한 의견으로 읽힌다.
             "narrative": safe_narrative(names.get(c, c), narr.get(c, "")),
-            "window": sorted(window),
+            "window": window,
         }
         for c, m in top
     ]
