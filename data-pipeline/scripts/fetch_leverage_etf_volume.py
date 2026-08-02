@@ -263,12 +263,12 @@ def main() -> None:
         print("[종합 지수] ETF·선물 공통 날짜가 없어 종합 지수를 계산할 수 없습니다")
         return
 
-    def composite_for(d: str) -> tuple[float, float, float]:
+    def composite_for(d: str) -> tuple[float, float, float, float]:
         etf_progress = etf_values[d] / ETF_THRESHOLD * 100
         oi_surge_pct = oi_values[d] / oi_avg * 100
         oi_progress = oi_surge_pct / OI_SURGE_THRESHOLD * 100
         composite = etf_progress * 0.5 + oi_progress * 0.5
-        return etf_progress, oi_progress, composite
+        return etf_progress, oi_progress, composite, oi_surge_pct
 
     # 카드의 범위 바가 "역대 최저 ↔ 역대 최고" 사이에서 '지금' 위치를 정확히
     # 찍을 수 있도록, 보유 구간의 종합 지수 최소/최대를 미리 구해 details에 함께 넣는다.
@@ -278,7 +278,7 @@ def main() -> None:
     hist_max = round(max(all_composites), 2)
 
     def row_for(d: str) -> dict:
-        etf_progress, oi_progress, composite = comp_by_date[d]
+        etf_progress, oi_progress, composite, oi_surge_pct = comp_by_date[d]
         return {
             "indicator_id": composite_id,
             "date": d,
@@ -290,6 +290,13 @@ def main() -> None:
             "details": {
                 "etf_progress": round(etf_progress, 1),
                 "futures_progress": round(oi_progress, 1),
+                # 카드가 "무엇 대비 몇 %"인지 스스로 적을 수 있게 **기준 자체**를 같이 보낸다.
+                # 예전엔 progress 두 개만 보내서 카드가 "기준 대비 53%"라고밖에 못 썼는데,
+                # 그 53% 는 "1년 평균의 1.5배를 100으로 본 값"이라 두 단계 건너뛴 말이었다.
+                # 이 둘을 실어 보내면 카드가 "4조원 대비 77%" · "1년 평균 대비 80%"로 적는다.
+                # ⚠️ 프론트가 ETF_THRESHOLD·OI_SURGE_THRESHOLD 를 복제하지 않게 하려는 것이다.
+                "etf_base_eok": ETF_THRESHOLD,
+                "oi_vs_avg": round(oi_surge_pct, 1),
                 "etf_value": round(etf_values[d], 0),
                 "futures_oi": round(oi_values[d], 0),
                 "hist_min": hist_min,
@@ -304,7 +311,7 @@ def main() -> None:
     print(f"[Supabase] indicator_values upsert 완료: {len(rows)}건")
 
     latest_date = common_dates[-1]
-    etf_progress, oi_progress, composite = composite_for(latest_date)
+    etf_progress, oi_progress, composite, _ = composite_for(latest_date)
     print(
         f"[종합 지수] 최신값 ({latest_date} 기준): "
         f"ETF 거래대금 {etf_values[latest_date]:.1f}억원(진행률 {etf_progress:.1f}%), "

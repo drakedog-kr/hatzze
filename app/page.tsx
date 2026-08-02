@@ -888,6 +888,19 @@ function CardLeverage({ v }: { v: Pick }) {
         })()
       : null;
   const oiAmount = dt?.futures_oi != null ? `${Math.round(dt.futures_oi).toLocaleString("ko-KR")}` : null;
+  // "기준 대비 N%" 는 두 타일이 **서로 다른 기준**을 같은 말로 부르던 라벨이었다.
+  // ETF 는 4조원(고정), 선물은 "1년 평균의 1.5배" 라, 선물의 53% 는 두 단계 건너뛴 말이라
+  // 카드만 보고는 풀 수 없었다. 이제 파이프라인이 기준 자체를 details 로 보낸다.
+  //
+  // 옛 행에는 그 두 필드가 없어서 상수로 물러선다. 값은 fetch_leverage_etf_volume.py 의
+  // ETF_THRESHOLD(40,000억) · OI_SURGE_THRESHOLD(150) 와 같아야 한다 —
+  // **다음 파이프라인 실행 뒤에는 이 폴백이 안 쓰인다.**
+  const etfBaseEok = dt?.etf_base_eok ?? 40_000;
+  const etfBaseLabel = (() => {
+    const f = formatIndicatorValue(etfBaseEok, "억원");
+    return `${f.display}${f.displayUnit}`;
+  })();
+  const oiVsAvg = dt?.oi_vs_avg ?? (dt?.futures_progress != null ? dt.futures_progress * 1.5 : null);
   return (
     <Shell hit={v.isHit} minH={230}>
       <TitleRow desc={v.headline} icon="rocket_launch" name={v.name} />
@@ -912,12 +925,12 @@ function CardLeverage({ v }: { v: Pick }) {
           <div style={{ background: C.soft, borderRadius: R.tile, padding: 13, display: "flex", flexDirection: "column", gap: 5 }}>
             <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub2 }}>ETF 거래대금</span>
             <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: C.ink }}>{etfAmount ?? "-"}</strong>
-            <span style={{ fontSize: 11, color: C.muted }}>기준 대비 {Math.round(dt.etf_progress ?? 0)}%</span>
+            <span style={{ fontSize: 11, color: C.muted }}>{etfBaseLabel} 대비 {Math.round(dt.etf_progress ?? 0)}%</span>
           </div>
           <div style={{ background: C.soft, borderRadius: R.tile, padding: 13, display: "flex", flexDirection: "column", gap: 5 }}>
             <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub2 }}>선물 미결제약정</span>
             <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: C.ink }}>{oiAmount ?? "-"}</strong>
-            <span style={{ fontSize: 11, color: C.muted }}>계약 · 기준 대비 {Math.round(dt.futures_progress ?? 0)}%</span>
+            <span style={{ fontSize: 11, color: C.muted }}>계약 · 1년 평균 대비 {oiVsAvg !== null ? Math.round(oiVsAvg) : "-"}%</span>
           </div>
         </div>
       )}
@@ -993,7 +1006,7 @@ function CardTurnover({ v }: { v: Pick }) {
             자리까지 올라가 글자를 덮는다(실측 확인). */}
         <div style={{ width: 104, height: 104, borderRadius: "50%", flexShrink: 0, background: `conic-gradient(${stops.join(",")})`, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div className="hz-tip" data-tip={donutTip} style={{ width: 68, height: 68, borderRadius: "50%", background: C.card, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-            <strong style={{ fontFamily: MONO, fontSize: 19, fontWeight: 800, color: C.ink }}>{Math.round(share)}%</strong>
+            <strong style={{ fontFamily: MONO, fontSize: 19, fontWeight: 800, color: v.color }}>{Math.round(share)}%</strong>
             <span style={{ fontSize: 10, color: C.muted }}>상위10</span>
           </div>
         </div>
@@ -1408,8 +1421,8 @@ function CardDivergence({ v }: { v: Pick }) {
     <Shell hit={v.isHit} minH={230}>
       <TitleRow desc={v.headline} icon="compare_arrows" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-        <strong style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-.03em", color: C.ink, lineHeight: 1 }}>
-          {leadWho} <span style={{ fontFamily: MONO, color: v.color }}>{Math.round(Math.abs(lead))}%</span>
+        <strong style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
+          {leadWho} <span style={{ fontFamily: MONO }}>{Math.round(Math.abs(lead))}%</span>
         </strong>
         <span style={{ fontSize: 12.5, fontWeight: 600, color: C.sub2 }}>강세</span>
       </div>
