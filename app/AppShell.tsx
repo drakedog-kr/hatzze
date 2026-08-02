@@ -173,7 +173,7 @@ function Sidebar() {
           <Link href="/" aria-label="hatzze 홈" className="hz-logo-link" style={{ display: "inline-flex" }}>
             <LogoLockup symbolSize={29} wordmarkSize={30} gap={7} />
           </Link>
-          <BetaBadge />
+          <BetaBadge logoSize={30} />
         </LogoTag>
         <p style={{ margin: "8px 0 0", fontSize: 11, fontWeight: 600, color: C.sub, letterSpacing: "0.02em", lineHeight: 1.5 }}>
           데이터와 감성으로 읽는 시장
@@ -555,7 +555,7 @@ function TopBar({
         <Link href="/" aria-label="hatzze 홈" className="hz-logo-link" style={{ display: "inline-flex" }}>
           <LogoLockup symbolSize={22} wordmarkSize={23} gap={6} />
         </Link>
-        <BetaBadge />
+        <BetaBadge logoSize={23} />
       </span>
       <div className="hz-ticker-wrap">
         <div className="hz-ticker-track">
