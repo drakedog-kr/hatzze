@@ -113,7 +113,7 @@ export default function Footer() {
               </span>
             </span>
           </span>
-          <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.75, color: C.sub2, textWrap: "pretty" }}>
+          <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.75, color: C.sub2, textWrap: "pretty", wordBreak: "keep-all" }}>
             <b style={{ fontWeight: 700, color: C.label }}>hatzze(햇쩨)</b>는 코스피 시장의{" "}
             <b style={{ fontWeight: 700, color: C.label }}>과열도</b>를 시장 지표와 감성 지표로 종합해 매일 0~100
             점수로 보여주는 대시보드입니다. 버핏지수, VKOSPI, 레버리지 ETF, 공포·탐욕 심리 등 25개 지표를 한눈에 볼 수
@@ -173,7 +173,7 @@ export default function Footer() {
       >
         {/* 한 줄에 들어가게 줄였다. 법적으로 지켜야 할 두 가지(투자 조언이 아니다 ·
             판단과 책임은 이용자에게 있다)는 그대로 남긴다. */}
-        <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.5, color: C.faint }}>
+        <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.5, color: C.faint, wordBreak: "keep-all" }}>
           재미·참고용이며 투자 조언이나 매수·매도 추천이 아닙니다. 투자 판단과 책임은 이용자 본인에게 있습니다.
         </p>
         {/* 이용약관·개인정보처리방침은 법정 고지라 '바로가기'(서비스 메뉴)가 아니라 저작권

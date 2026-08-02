@@ -693,25 +693,37 @@ function Hero({
         )}
         {/* 두 묶음 중 어디가 더 뜨거운가. 바로 아래 화면이 '시장 지표'·'감성 지표' 두
             덩어리로 갈리는데, 왜 나뉘어 있는지를 말해 주는 문장이 어디에도 없었다.
-            LLM 이 아니라 **계산**이다 — 두 가중평균의 차이라 문장이 흔들릴 자리가 없다. */}
+            LLM 이 아니라 **계산**이다 — 두 가중평균의 차이라 문장이 흔들릴 자리가 없다.
+
+            ⚠️ **이 두 수는 히어로의 ℃ 와 눈금이 다르다.** 여기 값은 카테고리별 가중평균
+            (원 과열도 0~100)이고, 히어로 ℃ 는 그 원점수를 calculate_score.py 의
+            SCORE_DISPLAY_ANCHORS 로 한 번 더 매핑한 값이다. 오늘 값으로 원 42.3 은
+            ℃ 로 치면 47 이고, 원 50 쯤에서는 차이가 13 까지 벌어진다.
+            **두 수를 히어로 온도에서 빼면 안 된다.** 서로(시장↔감성) 견주는 건 같은
+            눈금이라 정확하다 — 이 문장이 하는 비교가 그것이다.
+            정확한 ℃ 로 적으려면 앵커 매핑을 프론트에 복제하지 말고, 파이프라인이
+            카테고리별 ℃ 를 계산해 daily_score.details 에 실어 보내게 하는 쪽이 맞다. */}
         {marketHeat !== null && socialHeat !== null && (
           <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.75, color: C.inkSoft, textWrap: "pretty" }}>
             {Math.abs(marketHeat - socialHeat) < 5 ? (
               <>
-                시장 지표(<b style={{ fontWeight: 800, color: C.ink }}>{Math.round(marketHeat)}</b>)와 감성
-                지표(<b style={{ fontWeight: 800, color: C.ink }}>{Math.round(socialHeat)}</b>)의 온도가 비슷합니다.
-                가격·거래와 사람들의 관심이 같은 속도로 움직이고 있습니다.
+                시장 지표와 감성 지표의 온도가
+                <b style={{ fontWeight: 800, color: C.ink }}> {Math.round(marketHeat)}도</b> ·
+                <b style={{ fontWeight: 800, color: C.ink }}> {Math.round(socialHeat)}도</b>로 비슷합니다. 가격·거래와
+                사람들의 관심이 같은 속도로 움직이고 있습니다.
               </>
             ) : marketHeat > socialHeat ? (
               <>
-                지금은 <b style={{ fontWeight: 800, color: C.ink }}>시장 지표({Math.round(marketHeat)})</b>가 감성
-                지표({Math.round(socialHeat)})보다 뜨겁습니다. 가격·거래는 움직이는데 사람들의 관심은 아직 따라붙지
-                않았습니다.
+                지금은 <b style={{ fontWeight: 800, color: C.ink }}>시장 지표</b>의 온도가{" "}
+                <b style={{ fontWeight: 800, color: C.ink }}>{Math.round(marketHeat)}도</b>로 감성
+                지표({Math.round(socialHeat)}도)보다 높습니다. 가격·거래는 움직이는데 사람들의 관심은 아직
+                따라붙지 않았습니다.
               </>
             ) : (
               <>
-                지금은 <b style={{ fontWeight: 800, color: C.ink }}>감성 지표({Math.round(socialHeat)})</b>가 시장
-                지표({Math.round(marketHeat)})보다 뜨겁습니다. 사람들의 관심이 가격·거래보다 앞서 있습니다.
+                지금은 <b style={{ fontWeight: 800, color: C.ink }}>감성 지표</b>의 온도가{" "}
+                <b style={{ fontWeight: 800, color: C.ink }}>{Math.round(socialHeat)}도</b>로 시장
+                지표({Math.round(marketHeat)}도)보다 높습니다. 사람들의 관심이 가격·거래보다 앞서 있습니다.
               </>
             )}
           </p>
@@ -1692,7 +1704,7 @@ function CardUpbit({ v }: { v: Pick }) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10 }}>
           <div style={{ background: C.soft, borderRadius: R.tile, padding: 13, display: "flex", flexDirection: "column", gap: 4 }}>
             <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub2 }}>김치 프리미엄</span>
-            <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: C.ink }}>
+            <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: v.color }}>
               {premium !== null ? `${premium > 0 ? "+" : ""}${premium.toFixed(1)}%` : "-"}
             </strong>
           </div>
