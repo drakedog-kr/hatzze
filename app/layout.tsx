@@ -5,8 +5,6 @@ import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
 import AppShell from "./AppShell";
 import { SITE_NAME, SITE_URL, pageMetadata } from "./seo";
-import { getLatestDailyScore } from "@/lib/data";
-import type { DailyScore } from "@/lib/data";
 
 const pretendard = localFont({
   src: "../node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2",
@@ -50,7 +48,6 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 // 사이드바/탑바는 모든 페이지가 공유하므로 레이아웃에서 점수를 받아 셸에 넘긴다.
-// env가 없는 빌드 환경에서도 죽지 않도록 실패 시 null로 둔다(탑바가 —로 표시).
 export const dynamic = "force-dynamic";
 
 export default async function RootLayout({
@@ -58,13 +55,6 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  let dailyScore: DailyScore | null = null;
-  try {
-    dailyScore = await getLatestDailyScore();
-  } catch {
-    dailyScore = null;
-  }
-
   // 테마는 쿠키로 관리한다 — 서버가 여기서 읽어 <html data-theme>를 SSR하면
   // 클라이언트와 값이 일치해 hydration 불일치도, 첫 페인트 깜빡임도 없다.
   //
@@ -87,7 +77,7 @@ export default async function RootLayout({
             값은 globals.css 의 --c-bg 와 **같아야 한다**(메타 태그에는 var() 를 못 쓴다).
             팔레트를 갈면서 여기가 옛 값(#0e131c / #d4daea)으로 남아 주소창만 이전
             팔레트를 띠고 있었다 — --c-bg 를 바꿀 땐 이 줄을 같이 볼 것. */}
-        <meta name="theme-color" content={theme === "dark" ? "#101013" : "#f2f4f6"} />
+        <meta name="theme-color" content={theme === "dark" ? "#101013" : "#e8f0fa"} />
         {/* 본문·숫자는 전부 Pretendard(위에서 next/font/local로 자체 호스팅)라 CDN에서
             받아오는 건 두 가지뿐이다: 워드마크 전용 Bricolage Grotesque와 Material Symbols
             아이콘. 둘 다 빌드 시점 폰트 페치 실패를 피하려고 런타임 CDN 링크로 둔다.
@@ -104,7 +94,7 @@ export default async function RootLayout({
           rel="stylesheet"
         />
         <link
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0..1,0&display=block"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0..1,0&display=block"
           rel="stylesheet"
         />
         {/* 기기별 수집 제외 스위치. ?ga=off 로 한 번 들어온 기기는 gtag 의 공식
@@ -153,7 +143,7 @@ export default async function RootLayout({
           <body>에 속성을 주입해 불일치 경고를 낸다. body 자신의 속성 불일치만
           무시한다 — 내부 컴포넌트 hydration 검사에는 영향 없다. */}
       <body className="font-sans" suppressHydrationWarning>
-        <AppShell dailyScore={dailyScore} theme={theme}>
+        <AppShell theme={theme}>
           {children}
         </AppShell>
       </body>

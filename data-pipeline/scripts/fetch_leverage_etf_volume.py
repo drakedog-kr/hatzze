@@ -108,7 +108,7 @@ COMPOSITE_META = {
     "name": "레버리지 ETF·선물 미결제약정 종합 지수",
     "headline": "레버리지 ETF와 선물 미결제약정",
     "category": "시장",
-    "description_beginner": "레버리지 ETF 거래대금과 코스피200 선물 미결제약정을 함께 봅니다. 개인들이 빚내서 두 배로, 그리고 얼마나 오래 공격적으로 베팅을 이어가고 있는지 가늠할 수 있습니다",
+    "description_beginner": "빚내서 두 배로 거는 돈이 얼마나 되는지 봅니다",
     "unit": "pt",
 }
 

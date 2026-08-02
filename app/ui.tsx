@@ -7,20 +7,59 @@ export const C = {
   hot: "var(--c-hot)", // 고온
   mania: "var(--c-mania)", // 초고온
   ink: "var(--c-ink)",
-  sub: "var(--c-sub)",
+  inkSoft: "var(--c-ink-soft)", // 브리핑 본문
+  label: "var(--c-label)", // 목록 항목 이름
+  sub: "var(--c-sub)", // 내비·부제
+  sub2: "var(--c-sub2)", // 카드 부제
   // faint 와 sub 사이. faint 로는 흐려서 안 읽히는 보조 문구에 쓴다
   // (라이트에선 faint 보다 어둡고, 다크에선 더 밝아 양쪽 다 대비가 오른다).
   muted: "var(--c-muted)",
   faint: "var(--c-faint)",
+  hint: "var(--c-hint)", // 점선·비활성 아이콘. 글자에 쓰지 말 것
+  disabled: "var(--c-disabled)",
   card: "var(--c-card)",
-  bg: "var(--c-bg)",
+  page: "var(--c-page)", // 흰 셸 바깥
+  bg: "var(--c-bg)", // main 안쪽 바탕
+  soft: "var(--c-soft)", // 카드 안 타일·회색 박스
+  chip: "var(--c-chip)", // 회색 칩 배경
   line: "var(--c-line)",
+  divider: "var(--c-divider)",
   track: "var(--c-track)", // 막대의 빈 '트랙'(배경)
   // 막대의 '채움' — 강조색을 안 쓰는 비교군용. track 을 채움에 돌려쓰면 안 된다
   // (트랙과 같은 색이라 막대가 사라진다). 이유는 globals.css의 --c-bar 주석 참고.
   bar: "var(--c-bar)",
   blue: "var(--c-blue)",
+  blueTint: "var(--c-blue-tint)",
   shadow: "var(--c-shadow)",
+} as const;
+
+/**
+ * 같은 종류의 항목 여럿(도넛 조각, 서열 막대)을 순서대로 칠하는 파랑 스케일.
+ * 색조를 바꾸면 '순서'가 아니라 '종류'로 읽히므로 명도만 움직인다.
+ */
+export const BLUE_SCALE = [
+  "var(--c-blue-1)",
+  "var(--c-blue-2)",
+  "var(--c-blue-3)",
+  "var(--c-blue-4)",
+  "var(--c-blue-5)",
+] as const;
+
+/** 카드·셸의 그림자. 목업은 헤어라인이 아니라 진짜 그림자를 쓴다. */
+export const SH = {
+  shell: "var(--sh-shell)",
+  card: "var(--sh-card)",
+  blue: "var(--sh-blue)",
+  blueStrong: "var(--sh-blue-strong)",
+} as const;
+
+/** 반지름. 셸 28 / 카드 22 / 타일 14 / 아이콘 타일 13 / 알약 99. */
+export const R = {
+  shell: "var(--r-shell)",
+  card: "var(--r-card)",
+  tile: "var(--r-tile)",
+  icon: "var(--r-icon)",
+  pill: "var(--r-pill)",
 } as const;
 
 // 햇쩨 지수(0~100)를 4구간 라벨로 매핑 — 파이프라인 calculate_score.py의

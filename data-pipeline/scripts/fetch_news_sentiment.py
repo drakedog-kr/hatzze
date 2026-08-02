@@ -51,7 +51,7 @@ INDICATOR_META = {
     "name": "경제뉴스 감성 지수",
     "headline": "경제뉴스 제목에 드러난 낙관·비관",
     "category": "감성",
-    "description_beginner": "뉴스 제목마다 장밋빛 전망만 넘치면, 여론이 한쪽으로 쏠린 신호입니다",
+    "description_beginner": "장밋빛 전망만 넘치면 여론이 쏠렸다는 신호입니다",
     "unit": "pt",
 }
 
