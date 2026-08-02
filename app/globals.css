@@ -341,7 +341,9 @@ body {
      마퀴는 읽히지도 않으면서 탑바를 다 차지했고, 사이드바가 숨는 폭이라 브랜드가
      화면 어디에도 없었다. */
   .hz-ticker-wrap { display: none; }
-  .hz-topbar-logo { display: inline-flex; align-items: center; }
+  /* 로고 + 베타 배지 묶음. 배지를 위첨자처럼 올려야 해서 flex-start 이고, 사이 간격은
+     사이드바의 같은 묶음(AppShell 의 LogoTag)과 같은 5 로 맞춘다. */
+  .hz-topbar-logo { display: inline-flex; align-items: flex-start; gap: 5px; }
   .hz-menu-btn { display: inline-flex; }
   .hz-topbar { padding: 0 16px; }
 

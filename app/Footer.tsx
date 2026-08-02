@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { GhostSymbol, Wordmark } from "./Logo";
+import { BetaBadge, GhostSymbol, Wordmark } from "./Logo";
 import { C, MONO } from "./ui";
 
 /** 푸터 로고 옆에 찍히는 서비스 버전. 베타 오픈(2026-08-03) 기준 1.0.0 에서 시작한다. */
@@ -91,7 +91,15 @@ export default function Footer() {
                 읽힌다. 유령(svg)까지 같은 baseline 묶음에 넣으면 svg 의 baseline 은 제 아래
                 모서리라 심볼이 혼자 들려 lockup 이 깨진다. 그래서 바깥은 center 유지. */}
             <span style={{ display: "inline-flex", alignItems: "baseline", gap: 9 }}>
-              <Wordmark size={26} />
+              {/* 워드마크 + 베타 배지를 한 묶음으로 둔다(사이드바·탑바와 같은 gap 5, 윗선 맞춤).
+                  배지를 버전과 같은 줄에 그냥 늘어놓으면 "hatzze v.1.0.0 베타" 가 되어 배지가
+                  로고가 아니라 버전에 붙은 것처럼 읽힌다 — 배지는 로고 우측 상단이어야 한다.
+                  이 묶음의 baseline 은 첫 항목인 워드마크의 것이라, 아래 버전은 그대로
+                  워드마크 밑선에 맞는다(배지는 alignSelf 로 baseline 정렬에서 빠진다). */}
+              <span style={{ display: "inline-flex", alignItems: "flex-start", gap: 5 }}>
+                <Wordmark size={26} />
+                <BetaBadge />
+              </span>
               {/* 로고(26px 잉크)와 나란히 두되 크기·색을 확 낮춘다 — 비슷하게 두면
                   "hatzze v.1.0.0" 이 한 덩어리 워드마크처럼 읽힌다. */}
               <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 600, color: "var(--c-muted)", letterSpacing: "0.02em" }}>

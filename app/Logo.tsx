@@ -61,6 +61,39 @@ export function GhostSymbol({
   );
 }
 
+/**
+ * 베타 배지 — 로고 우측 상단에 위첨자처럼 붙는다.
+ *
+ * 서비스 **전체**가 베타라는 표시라서, 페이지마다 다는 게 아니라 브랜드가 나오는
+ * 자리마다 같은 모양으로 붙인다(사이드바 · 모바일 탑바 · 푸터 셋).
+ *
+ * 크기는 로고 크기를 안 따라간다 — 셋의 워드마크가 30/23/26 으로 제각각이라 배지까지
+ * 같이 움직이면 "같은 배지"가 아니라 "비슷한 배지 셋"이 된다. 이건 상태 표시지 로고의
+ * 일부가 아니므로 고정값이 맞다.
+ *
+ * 윗선 맞춤은 쓰는 쪽이 정한다 — 부모를 alignItems:flex-start 로 두거나(사이드바·탑바),
+ * baseline 묶음 안에서는 alignSelf 로 빠져나온다(푸터). 그래서 여기서 정렬을 못 박지 않고
+ * style 로 열어 둔다.
+ */
+export function BetaBadge({ style }: { style?: React.CSSProperties }) {
+  return (
+    <span
+      style={{
+        flexShrink: 0,
+        fontSize: 8,
+        fontWeight: 700,
+        color: "var(--c-blue)",
+        background: "var(--c-blue-tint)",
+        padding: "3px 8px",
+        borderRadius: 999,
+        ...style,
+      }}
+    >
+      베타
+    </span>
+  );
+}
+
 // 가로 lockup(심볼 + 워드마크) — 사이드바/헤더용.
 export function LogoLockup({
   symbolSize = 30,

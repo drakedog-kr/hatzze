@@ -7,7 +7,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { DailyScore } from "@/lib/data";
 import { track } from "@/lib/ga";
 import { C, Icon, MONO, stageForScore } from "./ui";
-import { LogoLockup } from "./Logo";
+import { BetaBadge, LogoLockup } from "./Logo";
 import Footer from "./Footer";
 import GaEvents from "./GaEvents";
 
@@ -173,9 +173,7 @@ function Sidebar() {
           <Link href="/" aria-label="hatzze 홈" className="hz-logo-link" style={{ display: "inline-flex" }}>
             <LogoLockup symbolSize={29} wordmarkSize={30} gap={7} />
           </Link>
-          <span style={{ flexShrink: 0, fontSize: 8, fontWeight: 700, color: C.blue, background: "var(--c-blue-tint)", padding: "3px 8px", borderRadius: 999 }}>
-            베타
-          </span>
+          <BetaBadge />
         </LogoTag>
         <p style={{ margin: "8px 0 0", fontSize: 11, fontWeight: 600, color: C.sub, letterSpacing: "0.02em", lineHeight: 1.5 }}>
           데이터와 감성으로 읽는 시장
@@ -549,10 +547,16 @@ function TopBar({
       }}
     >
       {/* 모바일 전용 로고. 사이드바가 숨는 폭에서는 브랜드가 화면 어디에도 없었다.
-          display 를 인라인으로 안 주는 이유는 아래 미디어쿼리가 이겨야 하기 때문이다. */}
-      <Link href="/" aria-label="hatzze 홈" className="hz-topbar-logo hz-logo-link">
-        <LogoLockup symbolSize={22} wordmarkSize={23} gap={6} />
-      </Link>
+          display 를 인라인으로 안 주는 이유는 아래 미디어쿼리가 이겨야 하기 때문이다.
+
+          배지를 링크 **밖**에 두는 건 사이드바와 같은 이유다 — 링크에 aria-label 이
+          걸려 있어서, 안에 넣으면 라벨이 내용을 덮어 스크린리더가 '베타'를 못 읽는다. */}
+      <span className="hz-topbar-logo">
+        <Link href="/" aria-label="hatzze 홈" className="hz-logo-link" style={{ display: "inline-flex" }}>
+          <LogoLockup symbolSize={22} wordmarkSize={23} gap={6} />
+        </Link>
+        <BetaBadge />
+      </span>
       <div className="hz-ticker-wrap">
         <div className="hz-ticker-track">
           {[...quotes, ...quotes].map((q, i) => (
