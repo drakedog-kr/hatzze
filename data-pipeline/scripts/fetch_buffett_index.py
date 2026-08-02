@@ -60,10 +60,7 @@ BUFFETT_META = {
     "category": "시장",
     # "100%가 정상"은 미국 옛 기준이라 코스피엔 안 맞는다 — 임계값 백테스트에서 나온
     # 실제 구간(floor 105% / ceiling 235%, config/indicator_thresholds.py)을 쓴다.
-    "description_beginner": (
-        "나라 경제 규모(GDP)에 비해 주식시장 몸집이 얼마나 커졌는지 봅니다. "
-        "코스피는 100%대 초반이 평범하고, 230%를 넘으면 실물이 감당 못 할 거품을 의심하는 과열 구간입니다"
-    ),
+    "description_beginner": "실물 경제보다 증시가 너무 크면 거품을 의심합니다",
     "unit": "%",
 }
 

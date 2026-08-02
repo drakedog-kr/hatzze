@@ -13,73 +13,113 @@
    공유하고 구조색만 갈랐는데, 한 값으로 양쪽 배경을 다 만족시키려니 라이트에선 뜨고
    다크에선 탁했다. 배경이 반대인 두 테마는 강조색도 반대 방향으로 밀어야 한다. */
 :root {
-  /* 온도 스케일 — 색조(파랑→회색→주황→빨강)는 그대로 두고 값만 램프에 맞춰 옮겼다.
-     저온은 CTA 파랑(--c-blue = blue500)보다 한 단계 진한 blue700 을 쓴다. 같은
-     값이면 게이지 호가 링크처럼 읽힌다.
-     상온은 초록이다. 한동안 무채색 회색을 썼는데, 회색 배지는 '중립'이 아니라
-     '꺼진 상태'로 읽혔다 — 상온이 1년 중 가장 흔한 구간이라 그 인상이 기본값이 된다.
-     파랑→초록→주황→빨강이면 네 단계가 전부 살아 있고, 초록이 '정상 구간'이라는
-     뜻도 같이 낸다. 초록↔주황은 적록색각이상에서 가장 위험한 인접이라 따로 쟀는데
-     deltaE 38(적)/64(녹) 로 안전하다. */
-  --c-cold: #1b64da; /* blue700 */
-  --c-neutral: #028450; /* green800 — 흰 카드 위 4.75:1 */
-  --c-hot: #ed6700; /* orange800 */
-  --c-mania: #d22030; /* red700 */
-  --c-blue: #3182f6; /* blue500 */
+  /* ── 2026-08 리디자인 팔레트 ────────────────────────────────────
+     Claude Design 목업(`Hatzze Dashboard.dc.html`)에서 가져왔다. 목업은 색을 전부
+     hex 로 박아 뒀지만 여기 변수로 옮긴다 — 그래야 다크 모드를 넣을 때 아래
+     [data-theme="dark"] 블록의 값만 채우면 되고 카드 25장을 다시 안 뒤진다.
 
-  /* 텍스트 램프 = grey900→400. 흰 카드 위 명암비 16.6 / 11.0 / 7.1 / 4.6 / 3.0 / 2.0.
-     hint(2.0)은 글자에 쓰면 안 된다 — 점선·아이콘 같은 장식 전용이다.
-     바탕이 흰색으로 올라가면서 예전에 라이트에서 겪던 "옅은 회색이 바탕에 묻힘"
-     문제(faint 1.56:1)가 근본적으로 사라진다 — 억지로 어둡게 당길 필요가 없다. */
-  --c-ink: #191f28; /* grey900 */
-  --c-ink-soft: #333d4b; /* grey800 */
-  --c-logo-ink: oklch(0.24 0.02 260); /* 로고 워드마크 잉크(≈#25262F) — handoff 10a */
-  --c-sub: #4e5968; /* grey700 */
-  --c-muted: #6b7684; /* grey600 */
-  --c-faint: #8b95a1; /* grey500 */
-  --c-hint: #b0b8c1; /* grey400 */
+     ⚠️ 다크 값은 아직 옛 팔레트다. 다크는 나중에 한 번에 잡기로 했다(2026-08-03).
+     이 블록에만 있고 dark 블록에 없는 변수는 다크에서도 라이트 값이 그대로 쓰인다 —
+     보기엔 틀리지만 정의되지 않은 var 로 깨지지는 않는다.
+
+     온도 스케일(2026-08-03 에 한 칸씩 밀었다). 목업은 저온·상온을 둘 다 파랑
+     계열로 뒀는데, 그러면 네 구간이 파랑·파랑·주황·빨강이라 앞 둘이 안 갈린다.
+     **파랑을 저온에 주고 상온을 초록으로** 되돌린다 — 초록이 '정상 구간'이라는 뜻을
+     같이 내고, 파랑→초록→주황→빨강 네 단계가 전부 살아난다.
+     초록↔주황은 적록색각이상에서 가장 위험한 인접이라 명도를 벌려 뒀다.
+     넷은 oklch 로 **명도·채도를 맞추고 색상만 돌린 한 벌**이다(L 0.65~0.70 / C 0.13~0.17).
+     고온이 처음엔 누런 #e8952a 였는데 혼자 명도가 낮고 노랑 쪽이라 나머지 셋과 안 붙었다. */
+  --c-cold: #3d9cf5;
+  --c-neutral: #22b07d;
+  --c-hot: #f0883c;
+  --c-mania: #ef5a6a;
+  --c-blue: #3d9cf5;
+  --c-blue-hover: #2b8ae4;
+
+  /* 히어로 온도 막대 4칸 — 위 강조색보다 연한 '트랙'용이다. 강조색을 그대로 쓰면
+     막대 네 칸이 전부 원색이라 그 위의 마커가 안 보인다. */
+  --c-band-cold: #cfe6fc;
+  --c-band-neutral: #8fdcbb;
+  --c-band-hot: #f8c39a;
+  --c-band-mania: #f6a7b0;
+
+  /* 파랑 스케일 — 도넛·서열 막대처럼 '같은 종류의 항목 여럿'을 순서대로 칠할 때.
+     색조를 바꾸면 순서가 아니라 종류로 읽히므로 명도만 움직인다. */
+  --c-blue-1: #1b7fd4;
+  --c-blue-2: #3d9cf5;
+  --c-blue-3: #7dbcf8;
+  --c-blue-4: #bcdefb;
+  --c-blue-5: #cfe6fc;
+
+  /* 텍스트 램프. 흰 카드 위 명암비 15.4 / 8.9 / 7.1 / 5.0 / 3.5 / 2.7 / 2.2.
+     faint 아래(hint·disabled)는 글자에 쓰면 안 된다 — 점선·아이콘 장식 전용이다. */
+  --c-ink: #0e2136;
+  --c-ink-soft: #3c5064; /* 브리핑 본문 */
+  --c-label: #42586e; /* 목록 항목 이름 */
+  --c-logo-ink: #0e2136; /* 로고 워드마크 잉크 */
+  --c-sub: #6a8098; /* 내비·부제 */
+  --c-sub2: #8ba0b6; /* 카드 부제 */
+  --c-muted: #93a6bb; /* 캡션·초보 설명 */
+  --c-faint: #a8b9cb;
+  --c-disabled: #b3c2d1; /* '준비 중' 항목 */
+  --c-hint: #c7d5e3; /* 점선·비활성 아이콘 */
 
   --c-card: #ffffff;
-  /* 떠 있는 층(테마 팝오버, 종목 자동완성). 다크에서는 카드보다 한 단계 밝은 층으로
-     오버레이를 띄운다 — 그림자 없이도 아래 카드와 갈라진다.
-     라이트에선 카드가 이미 흰색이라 그 수가 안 통하고, 테두리와 옅은 그림자가 그 몫을
-     대신한다. 그래서 이 값만 두 테마의 동작이 다르다. */
   --c-float: #ffffff;
-  --c-bg: #f2f4f6; /* 화면 바탕 겸, 흰 카드 안에 파이는 '내려앉은' 패널 */
-  --c-line: #e5e8eb; /* hairlineBorder */
-  --c-track: #e5e8eb;
+  /* 층이 셋이다. page(셸 바깥) < bg(main 안쪽) < card(흰 카드).
+     예전 팔레트는 page 가 없어 화면 전체가 한 판이었는데, 목업은 흰 셸이 옅은
+     파랑 위에 떠 있는 구조라 바깥 한 겹이 더 필요하다. */
+  --c-page: #e8f0fa;
+  --c-bg: #f7fafd;
+  --c-soft: #f6f9fd; /* 카드 안에 파이는 타일·회색 박스 */
+  --c-chip: #f2f6fb; /* 회색 칩 배경 */
+  --c-line: #eaf0f7; /* 컨트롤 테두리 */
+  --c-track: #eef3f9; /* 막대의 빈 트랙 */
   /* 막대 '채움'은 트랙(--c-track)과 반드시 다른 값이어야 한다. 같은 값을 쓰면 막대가
-     자기 트랙 위에서 사라진다 — MDD 테마 비교의 비교군 막대가 그랬다. 강조 막대는
-     채도로 구분되니 중립 막대는 채도 없이 명도만으로 읽히게 잡는다
-     (트랙 대비 2.47:1 라이트 / 3.18:1 다크 — PR #128 이 세운 1.94/2.68 기준을 넘긴다). */
-  --c-bar: #8b95a1;
+     자기 트랙 위에서 사라진다 — MDD 테마 비교의 비교군 막대가 그랬다. */
+  --c-bar: #cfe6fc;
 
-  --c-divider: rgba(0, 27, 55, 0.06);
-  --c-divider-strong: rgba(0, 27, 55, 0.1);
-  /* 눌리는 요소의 호버/눌림. 불투명 회색이 아니라 '반투명 먹'이라, 흰 카드 위든
-     옅은 회색 바탕 위든 같은 규칙 하나로 맞는다. 예전엔 호버 배경에 --c-bg 를 썼는데, 그게 다크에서는
-     사이드바(#202027)보다 어두운 색이라 마우스를 올리면 항목이 파이는 것처럼 보였다. */
-  --c-hover: rgba(7, 25, 76, 0.04);
-  --c-pressed: rgba(3, 31, 63, 0.09);
-  /* 드롭섀도를 쓰지 않는다 — box-shadow 는 전부 0.5~0.75px 짜리 헤어라인 링
-     (번짐 0, 오프셋 0)이고, 깊이는 배경 명도 단계로만 낸다. 이 두 값은 이제
-     '그림자'가 아니라 그 링의 색이다. */
-  --c-shadow: rgba(2, 32, 71, 0.05);
-  --c-shadow-strong: rgba(0, 27, 55, 0.12);
-  --c-marker: rgba(25, 31, 40, 0.35);
-  --c-blue-tint: rgba(49, 130, 246, 0.1);
+  --c-divider: #f0f4f9;
+  --c-divider-strong: #eaf0f7;
+  /* 눌리는 요소의 호버/눌림. 목업이 불투명 값을 쓴다(반투명 먹이 아니다) —
+     흰 카드 위에서만 쓰이므로 한 값으로 맞는다. */
+  --c-hover: #f2f7fc;
+  --c-pressed: #e9f0f8;
+
+  /* 목업은 헤어라인이 아니라 **진짜 그림자**를 쓴다. 예전 팔레트가 그림자를 걷어낸
+     이유(카드 20장이 겹쳐 바탕이 탁해짐)는 카드가 꽉 찬 격자였기 때문이고, 목업은
+     흰 셸 안에서 카드끼리 gap 18 로 떨어져 있어 같은 문제가 안 난다. */
+  --sh-shell: 0 24px 70px rgba(19, 66, 122, 0.09);
+  --sh-card: 0 4px 18px rgba(20, 70, 130, 0.05);
+  --sh-blue: 0 10px 20px rgba(61, 156, 245, 0.3);
+  --sh-blue-strong: 0 12px 24px rgba(61, 156, 245, 0.28);
+  --c-shadow: rgba(20, 70, 130, 0.05);
+  --c-shadow-strong: rgba(19, 66, 122, 0.09);
+  --c-marker: #c7d5e3;
+
   /* 강조색 알약(배지)의 옅은 배경. 인라인에서 `${C.hot}22` 처럼 쓰면 var()에 알파를
      이어붙인 꼴("var(--c-hot)22")이라 CSS가 통째로 버린다 — 실제로 급부상 종목의
      "언급 ▲ 4.3배" 배지가 배경 없이 글자만 떠 있었다. 색마다 변수로 둔다. */
-  --c-hot-tint: rgba(245, 120, 0, 0.12);
-  --c-cold-tint: rgba(27, 100, 218, 0.1);
-  --c-mania-tint: rgba(210, 32, 48, 0.1);
-  --c-neutral-tint: rgba(2, 132, 80, 0.1);
+  --c-blue-tint: #e8f3fe;
+  --c-blue-tint2: #e9f3fe; /* 티커 칩·제보 CTA */
+  --c-cold-tint: #e8f3fe;
+  --c-neutral-tint: #e3f6ee;
+  --c-hot-tint: #fdf0e6;
+  --c-mania-tint: #fdecee;
+  --c-mania-border: #fbdde1; /* 초고온 카드 테두리 */
   --c-on-mania: #ffffff;
-  --c-scrollbar: #d1d6db;
-  --c-scrollbar-border: #f2f4f6;
+  --c-scrollbar: #cfe6fc;
+  --c-scrollbar-border: #f7fafd;
 
-  --background: var(--c-bg);
+  /* 반지름 — 목업은 셸 28 / 카드 22 / 타일·컨트롤 13~16 / 알약 99 다. */
+  --r-shell: 28px;
+  --r-card: 22px;
+  --r-tile: 14px;
+  --r-icon: 13px;
+  --r-pill: 99px;
+
+  /* 셸 바깥이 곧 body 다 — 흰 셸이 그 위에 뜬다. */
+  --background: var(--c-page);
   --foreground: var(--c-ink);
 
   /* 브라우저가 직접 그리는 것들(오버스크롤 여백, 기본 스크롤바, MDD 검색창의 캐럿·
@@ -162,7 +202,9 @@ body {
    Material Symbols 아이콘 폰트, (2) 키프레임 애니메이션, (3) 스크롤바,
    (4) 미디어쿼리가 필요한 반응형 그리드/사이드바만 둔다. */
 .ms {
-  font-family: "Material Symbols Outlined";
+  /* Rounded 로 바꿨다(2026-08 리디자인). layout.tsx 의 CDN 링크와 반드시 같은 이름이어야
+     한다 — 다르면 글리프 대신 "vertical_align_top" 같은 리거처 원문이 그대로 찍힌다. */
+  font-family: "Material Symbols Rounded";
   font-weight: normal;
   font-style: normal;
   line-height: 1;
@@ -180,6 +222,31 @@ body {
    살아 있고, 줄바꿈 안 되는 긴 내용(예: 채널명 "주식 급등일보🚀…| Korean Stocks")이
    트랙을 밀어 4등분이 깨진다. 실제로 122/0/466/166px까지 벌어졌다.
    최소값을 0으로 눌러야 칸 비율이 내용과 무관하게 고정된다. */
+/* 시장 브리핑 지표 카드 격자 (2026-08 리디자인).
+   **모든 카드가 한 칸이다.** 예전엔 4열 고정 + 2칸 카드 8장 + dense 배치였는데,
+   목업이 auto-fill 로 바꿨다 — 칸 수가 화면 폭에서 저절로 나오고 2칸 카드가 없어져서
+   "칸 합이 20이라 5행이 딱 맞는다" 같은 계산이 통째로 사라진다.
+   최소 칸 340px 은 카드 안쪽 220px 하한(--hz-card-pad 22×2 = 44 을 뺀 296)을 넉넉히 넘는다.
+   ⚠️ 아래 .hz-grid 는 카더라가 쓴다 — 그쪽은 hz-c2/c3/c4 로 칸을 직접 지정하는 구조라
+   같이 바꾸면 안 된다. */
+.hz-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 18px;
+}
+/* 히어로 두 장. auto-fit 이라 자리가 모자라면 한 열로 접힌다. */
+.hz-hero-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+  gap: 18px;
+}
+/* 상단 카더라 집계 칩 4개. */
+.hz-ticker-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
 .hz-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -225,8 +292,10 @@ body {
    **이 값을 바꾸면 page.tsx 의 HitBadge 위치도 같이 움직여야 한다** — 배지는 카드
    안쪽 여백에 맞춰 놓는 자리라 같은 변수를 읽는다. */
 :root {
-  --hz-main-pad: 40px;
-  --hz-card-pad: 24px;
+  /* 목업 값: 셸 바깥 26 / main 안쪽 28 / 카드 22. 예전 40·24 는 셸이 화면을 꽉 채우던
+     시절의 값이라, 흰 판이 안으로 들어온 지금은 좌우가 두 겹으로 들어가 과하다. */
+  --hz-main-pad: 28px;
+  --hz-card-pad: 22px;
 }
 
 /* ── 열 수 사다리 ──────────────────────────────────────────────────
@@ -266,7 +335,7 @@ body {
   .hz-c2, .hz-c3, .hz-c4 { grid-column: span 2; }
   /* 2열 이하부터 여백을 깎는다(위 '반응형 여백' 주석 참고).
      커스텀 속성은 반드시 셀렉터 안에 둔다 — @media 바로 밑에 쓰면 선언이 통째로 버려진다. */
-  :root { --hz-main-pad: 24px; --hz-card-pad: 18px; }
+  :root { --hz-main-pad: 22px; --hz-card-pad: 18px; }
 }
 /* 셸 전체 높이. 100dvh는 모바일 브라우저 주소창이 떠 있을 때의 실제 보이는 높이라,
    100vh만 쓰면 셸 바닥(하단 탭바)이 주소창 뒤로 밀려 첫 화면에서 안 보인다. dvh를
@@ -292,8 +361,36 @@ body {
 
 /* 탑바 좌우 여백. 인라인이 아니라 여기 두는 이유는 아래 모바일 미디어쿼리가 이겨야
    하기 때문이다 — 인라인이면 폰에서 탑바 양끝이 본문 카드(16)와 안 맞고 24 로 남는다. */
+/* 2026-08 리디자인: 탑바는 **모바일 전용**이 됐다. 데스크톱에서는 사이드바가 로고를,
+   본문 헤더(.hz-page-head)가 제목·도구를, 집계 카드가 옛 티커를 나눠 가져간다.
+   ≤560 에서만 아래 미디어쿼리가 다시 켠다. */
 .hz-topbar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   padding: 0 24px;
+}
+
+/* 본문 헤더 — 제목/부제 + 오른쪽 도구(검색·알림·프로필). */
+/* 도구 묶음은 제목(h1)과 **윗변을 맞춘다**. 부제까지 포함한 두 줄 묶음의 세로 가운데에
+   두면 토글이 제목보다 아래로 내려앉는다(2026-08-03). */
+.hz-page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.hz-page-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+/* 좁아지면 도구 묶음부터 접는다. 제목이 먼저 눌리면 "여기가 어느 화면인지"를 잃는다.
+   검색·알림은 아직 기능이 없어 없어도 잃는 게 없다. */
+@media (max-width: 900px) {
+  .hz-page-tools { display: none; }
 }
 
 /* 모바일 전용 조각들 — 기본은 숨기고 아래 560px 미디어쿼리에서만 켠다.
@@ -340,12 +437,11 @@ body {
      시세 티커를 걷어내고 로고 + (햄버거 · 테마) 만 남긴다. 좁은 화면에서 흐르는
      마퀴는 읽히지도 않으면서 탑바를 다 차지했고, 사이드바가 숨는 폭이라 브랜드가
      화면 어디에도 없었다. */
-  .hz-ticker-wrap { display: none; }
   /* 로고 + 베타 배지 묶음. 배지를 위첨자처럼 올려야 해서 flex-start 이고, 사이 간격은
      사이드바의 같은 묶음(AppShell 의 LogoTag)과 같은 5 로 맞춘다. */
   .hz-topbar-logo { display: inline-flex; align-items: flex-start; gap: 5px; }
   .hz-menu-btn { display: inline-flex; }
-  .hz-topbar { padding: 0 16px; }
+  .hz-topbar { display: flex; padding: 0 16px; }
 
   /* 스크롤을 내리면 접히고 올리면 다시 나온다. 흐름에서 빼야(fixed) 접힌 자리에
      빈 칸이 안 남는다. 빠진 높이(54)는 본문 위쪽 여백으로 되메운다. */
@@ -876,8 +972,15 @@ main.hz-scroll { overflow-x: clip; }
 .hz-nav-item {
   cursor: pointer;
 }
+/* 사이드바 항목의 호버 배경은 **한 값으로 통일**한다(--c-hover). 예전엔 '준비 중' 항목만
+   이 클래스가 없어 아무 반응이 없었고, 그래서 항목마다 호버가 달라 보였다. */
 .hz-nav-item:not(.hz-nav-active):hover {
   background: var(--c-hover);
+}
+/* 못 누르는 예고 항목은 배경만 같이 주고 커서는 화살표로 둔다 — cursor:pointer 는
+   "눌린다"는 신호라 거짓말이 된다. */
+.hz-nav-item.hz-tip {
+  cursor: default;
 }
 
 /* 카더라 종목 카드 → MDD 정밀분석 링크. 카드 하단에 은근히 붙는 작은 텍스트 링크다
@@ -1235,3 +1338,7 @@ main.hz-scroll { overflow-x: clip; }
   font-weight: 600;
   text-align: right;
 }
+
+/* 푸터 링크 호버 — 목업이 파랑으로 밝힌다. 인라인 color 를 이겨야 하므로 여기서 !important
+   없이 쓰려면 :hover 가 더 구체적이어야 한다(클래스 + 의사클래스). */
+.hz-foot-link:hover { color: var(--c-blue) !important; }

@@ -4,17 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
-import type { DailyScore } from "@/lib/data";
 import { track } from "@/lib/ga";
-import { C, Icon, MONO, stageForScore } from "./ui";
+import { C, Icon, R } from "./ui";
 import { BetaBadge, LogoLockup } from "./Logo";
 import Footer from "./Footer";
 import GaEvents from "./GaEvents";
 
+// sub 는 본문 헤더의 페이지 부제다(목업이 사이드바 로고 밑에 있던 문장을 여기로 옮겼다).
+// 사이드바 항목에는 안 쓰이고 PageHeader 만 읽는다.
 const NAV = [
-  { href: "/", label: "시장 브리핑", icon: "monitoring" },
-  { href: "/kadera", label: "카더라 리포트", icon: "forum" },
-  { href: "/mdd", label: "MDD 정밀분석", icon: "trending_down" },
+  { href: "/", label: "시장 브리핑", icon: "monitoring", sub: "지표 25개로 잰 오늘의 시장 온도" },
+  { href: "/kadera", label: "카더라 리포트", icon: "forum", sub: "주식 텔레그램에서 무엇이 회자되는지" },
+  { href: "/mdd", label: "MDD 정밀분석", icon: "trending_down", sub: "고점에서 얼마나 내려왔고 언제 돌아왔는지" },
 ];
 
 // 외부(텔레그램) 링크라 NAV 배열이 아니라 따로 둔다 — pathname 기반 active 판정 대상이
@@ -134,21 +135,6 @@ function isActive(href: string, pathname: string) {
   return href === "/" ? pathname === "/" : pathname.startsWith(href);
 }
 
-const STAGE_COLOR: Record<string, string> = {
-  저온: C.cold,
-  상온: C.neutral,
-  고온: C.hot,
-  초고온: C.mania,
-};
-
-// 탑바 티커의 한 칸. 햇쩨 지수는 서버에서 받은 일간 점수를 그대로 쓰고, 나머지 카더라
-// 집계는 /api/ticker 응답이 오면 자리표시(—)를 밀어낸다.
-//
-// changeText 는 change 옆에 붙는 단위를 갈아끼우는 자리다. 기본은 퍼센트인데, 온도의
-// 하루 변화는 "3%" 가 아니라 "3" 이라 그걸 그대로 쓰면 거짓말이 된다. 부호와 색은
-// 그대로 change 가 정한다(그래야 ▲/▼ 판정이 한 곳에만 있다).
-type Quote = { label: string; value: string; change: number | null; changeText?: string; color?: string };
-
 function Sidebar() {
   const intentPrefetch = useIntentPrefetch();
   const pathname = usePathname();
@@ -162,9 +148,16 @@ function Sidebar() {
   return (
     <aside
       className="hz-sidebar"
-      style={{ width: 210, flexShrink: 0, background: C.card, borderRight: `1px solid ${C.line}`, padding: "32px 0" }}
+      style={{
+        width: 210,
+        flexShrink: 0,
+        background: C.card,
+        borderRight: `1px solid var(--c-divider)`,
+        padding: "26px 14px 22px",
+        gap: 40,
+      }}
     >
-      <div style={{ padding: "0 32px", marginBottom: 48 }}>
+      <div style={{ padding: "0 6px" }}>
         {/* 베타 배지는 로고 우측 상단에 붙인다 — 서비스 전체가 베타라는 표시라서,
             페이지마다(예전엔 카더라 제목 옆) 다는 것보다 여기 한 곳이 맞다.
             alignItems:flex-start 로 로고 윗선에 맞춰 위첨자처럼 올린다. */}
@@ -173,13 +166,15 @@ function Sidebar() {
           <Link href="/" aria-label="hatzze 홈" className="hz-logo-link" style={{ display: "inline-flex" }}>
             <LogoLockup symbolSize={29} wordmarkSize={30} gap={7} />
           </Link>
-          <BetaBadge logoSize={30} />
+          {/* 배지 크기는 '준비 중' 배지와 맞춘다(10px / padding 3-7). 서로 다른 크기면
+              같은 사이드바 안에서 배지가 두 종류로 보인다. */}
+          <BetaBadge logoSize={30} style={{ height: "auto", fontSize: 10, padding: "3px 7px", lineHeight: 1.4 }} />
         </LogoTag>
         <p style={{ margin: "8px 0 0", fontSize: 11, fontWeight: 600, color: C.sub, letterSpacing: "0.02em", lineHeight: 1.5 }}>
           데이터와 감성으로 읽는 시장
         </p>
       </div>
-      <nav style={{ flex: 1, padding: "0 16px", display: "flex", flexDirection: "column", gap: 8 }}>
+      <nav style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {NAV.map((item) => {
           const active = isActive(item.href, pathname);
           return (
@@ -192,19 +187,24 @@ function Sidebar() {
                 display: "flex",
                 alignItems: "center",
                 gap: 12,
-                padding: "16px 20px",
-                color: active ? C.blue : C.sub,
+                padding: "12px 14px",
+                // 활성 항목이 옅은 tint 배경 + 파란 글자였는데, 목업은 **파란 알약에 흰 글자**다.
+                color: active ? "#ffffff" : C.sub,
                 fontWeight: active ? 700 : 600,
                 // 비활성일 때 background 를 인라인으로 두면(예전 "transparent") 인라인이
                 // 우선순위에서 이겨 .hz-nav-item:hover 회색 배경이 먹히지 않는다. 값을 아예
                 // 빼서 호버는 CSS 가 담당하게 한다.
-                background: active ? "var(--c-blue-tint)" : undefined,
-                borderRadius: 14,
+                background: active ? C.blue : undefined,
+                // ⚠️ 활성 항목에 파란 그림자를 주지 않는다. 0 10px 20px 이라 **바로 아래
+                // 항목 위로 번져서**, 그 항목만 호버 배경이 푸르스름하게 도드라졌다
+                // (카더라는 볼록하고 MDD 는 평평해 보이던 원인, 2026-08-03).
+                // 활성 표시는 꽉 찬 파랑 알약만으로 충분하다.
+                borderRadius: R.tile,
                 textDecoration: "none",
               }}
             >
-              <Icon name={item.icon} />
-              <span style={{ fontSize: 15 }}>{item.label}</span>
+              <Icon name={item.icon} style={{ fontSize: 20 }} />
+              <span style={{ fontSize: 14 }}>{item.label}</span>
             </Link>
           );
         })}
@@ -218,49 +218,53 @@ function Sidebar() {
 
             색은 C.sub(다른 항목) 보다 한 단 흐린 C.faint 로. 호버해 보기 전에도
             "지금은 아닌 것"이 보여야 한다. */}
+        {/* 사이드바가 250px 로 넓어져서 배지를 라벨 우측 상단에 띄우던 처리를 걷었다.
+            210px 시절엔 아이콘(20)+간격(12)+라벨(92.9) 뒤에 12px 밖에 안 남아 34.6px 짜리
+            배지가 밖으로 삐져나왔는데(scrollWidth 178 > clientWidth 177), 지금은 라벨에
+            flex:1 을 주고 배지를 행 끝에 두면 된다 — 목업의 배치가 그것이다. */}
         <div
-          className="hz-tip"
+          className="hz-tip hz-nav-item"
           data-tip={COMING_SOON.tip}
           style={{
             display: "flex",
             alignItems: "center",
             gap: 12,
-            padding: "16px 20px",
-            color: C.faint,
+            padding: "12px 14px",
+            color: C.disabled,
             fontWeight: 600,
-            borderRadius: 14,
+            borderRadius: R.tile,
           }}
         >
-          <AntIcon />
-          {/* 배지는 라벨 '우측 상단'에 위첨자로 띄운다. 로고 옆 베타 배지처럼 flex 로
-              나란히 두면 이 사이드바에서는 안 된다 — 210px 폭에서 아이콘(20)+간격(12)+
-              라벨(92.9)까지 쓰고 남는 자리가 12px 인데 배지가 34.6px 라, 실측에서 배지가
-              항목 밖으로 21px 삐져나와 사이드바 오른쪽 테두리에 붙었다(scrollWidth 178 >
-              clientWidth 177). absolute 로 띄우면 배지가 행 폭 계산에서 빠져 라벨이
-              눌리지도, 항목이 넘치지도 않는다. 라벨 길이가 바뀌어도 따라 붙는다. */}
+          <AntIcon size={20} />
+          {/* 배지를 라벨 '우측 상단'에 위첨자로 띄운다(로고 옆 베타 배지와 같은 어법).
+              absolute 라 배지가 행 폭 계산에서 빠져 라벨이 눌리지도, 항목이 넘치지도 않는다. */}
           <span style={{ position: "relative", display: "inline-flex" }}>
-            <span style={{ fontSize: 15, whiteSpace: "nowrap" }}>{COMING_SOON.label}</span>
+            <span style={{ fontSize: 14, whiteSpace: "nowrap" }}>{COMING_SOON.label}</span>
             <span
               style={{
                 position: "absolute",
                 left: "100%",
-                top: -4,
-                marginLeft: 2,
-                fontSize: 8,
+                top: -6,
+                marginLeft: 3,
+                fontSize: 10,
                 fontWeight: 700,
                 lineHeight: 1.4,
                 whiteSpace: "nowrap",
-                color: C.faint,
-                background: "var(--c-hover)",
-                border: `1px solid ${C.line}`,
-                padding: "1px 4px",
-                borderRadius: 999,
+                color: C.muted,
+                background: C.chip,
+                padding: "3px 7px",
+                borderRadius: R.pill,
               }}
             >
               {COMING_SOON.badge}
             </span>
           </span>
         </div>
+      </nav>
+
+      <div style={{ flex: 1 }} />
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {/* 라벨은 바뀌었어도 data-ga-cta 는 "community" 그대로 둔다 — 값을 같이 바꾸면
             이름 변경 전후의 클릭수를 한 줄로 비교할 수 없다. 탭바·푸터도 같은 값이다. */}
         <a
@@ -268,25 +272,29 @@ function Sidebar() {
           target="_blank"
           rel="noopener noreferrer"
           aria-label={TELEGRAM.aria}
-          className="hz-nav-item"
           data-ga="cta_click"
           data-ga-cta="community"
           data-ga-surface="sidebar"
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 12,
-            padding: "16px 20px",
-            color: C.sub,
-            fontWeight: 600,
-            borderRadius: 14,
+            justifyContent: "center",
+            gap: 8,
+            padding: 14,
+            borderRadius: 16,
+            // 카드 아이콘 타일과 같은 옅은 하늘색. 꽉 찬 파랑은 사이드바에서 혼자 튀어
+            // 내비게이션이 아니라 광고 배너처럼 읽혔다(2026-08-03).
+            background: "var(--c-blue-tint)",
+            color: C.blue,
+            fontSize: 14,
+            fontWeight: 700,
             textDecoration: "none",
           }}
         >
-          <Icon name={TELEGRAM.icon} />
-          <span style={{ fontSize: 15 }}>{TELEGRAM.label}</span>
+          <Icon name={TELEGRAM.icon} style={{ fontSize: 19 }} />
+          {TELEGRAM.label}
         </a>
-      </nav>
+      </div>
     </aside>
   );
 }
@@ -385,7 +393,7 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
   );
 }
 
-function ThemeToggle({ initial }: { initial: "light" | "dark" }) {
+function ThemeToggle({ initial, variant = "icon" }: { initial: "light" | "dark"; variant?: "icon" | "row" }) {
   // 초기값은 서버가 쿠키로 SSR한 값(prop)이라 아이콘도 첫 렌더부터 정확하다.
   const [theme, setTheme] = useState<"light" | "dark">(initial);
 
@@ -403,6 +411,53 @@ function ThemeToggle({ initial }: { initial: "light" | "dark" }) {
     const bg = getComputedStyle(document.documentElement).getPropertyValue("--c-bg").trim();
     if (bg) document.querySelector('meta[name="theme-color"]')?.setAttribute("content", bg);
   };
+
+  // 모양이 둘이다. 사이드바(row)는 목업의 **라벨 + 스위치 행**이고, 모바일 탑바(icon)는
+  // 자리가 없어 아이콘 버튼 하나로 둔다. 동작은 같은 toggle 을 쓴다.
+  if (variant === "row") {
+    return (
+      <button
+        onClick={toggle}
+        aria-label="다크 모드 전환"
+        aria-pressed={theme === "dark"}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+          padding: "10px 14px",
+          borderRadius: R.tile,
+          border: 0,
+          background: C.soft,
+          color: C.sub,
+          cursor: "pointer",
+          font: "inherit",
+        }}
+      >
+        <span style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13, fontWeight: 600 }}>
+          <Icon name={theme === "dark" ? "light_mode" : "dark_mode"} style={{ fontSize: 19 }} />
+          다크 모드
+        </span>
+        {/* 스위치는 장식이다(aria-pressed 가 상태를 말한다). 켜지면 손잡이가 오른쪽으로. */}
+        <span
+          aria-hidden="true"
+          style={{
+            width: 34,
+            height: 19,
+            borderRadius: R.pill,
+            background: theme === "dark" ? C.blue : C.line,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: theme === "dark" ? "flex-end" : "flex-start",
+            padding: 2,
+            flexShrink: 0,
+          }}
+        >
+          <span style={{ width: 15, height: 15, borderRadius: "50%", background: C.card, boxShadow: "0 1px 3px rgba(20,70,130,.25)" }} />
+        </span>
+      </button>
+    );
+  }
 
   return (
     <button
@@ -427,104 +482,49 @@ function ThemeToggle({ initial }: { initial: "light" | "dark" }) {
   );
 }
 
-function TickerItem({ q }: { q: Quote }) {
-  const changeColor = q.change === null ? C.sub : q.change > 0 ? C.mania : q.change < 0 ? C.cold : C.sub;
-  const arrow = q.change === null ? "" : q.change > 0 ? "▲" : q.change < 0 ? "▼" : "";
+
+/**
+ * 본문 헤더 — 페이지 제목·부제 + 테마 토글.
+ *
+ * 부제는 사이드바 로고 밑에 있던 문장을 옮겨 온 것이다(NAV.sub). 페이지마다 달라지므로
+ * 세 화면이 공유하는 사이드바보다 여기가 맞는 자리다.
+ */
+function PageHeader({ theme }: { theme: "light" | "dark" }) {
+  const pathname = usePathname();
+  const page = NAV.find((n) => isActive(n.href, pathname)) ?? NAV[0];
   return (
-    <div style={{ display: "flex", alignItems: "baseline", gap: 6, whiteSpace: "nowrap" }}>
-      <span style={{ fontSize: 11, fontWeight: 600, color: C.sub }}>{q.label}</span>
-      <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: q.color ?? C.ink }}>{q.value}</span>
-      {q.change !== null && (
-        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 600, color: changeColor }}>
-          {arrow}
-          {q.changeText ?? `${Math.abs(q.change).toFixed(1)}%`}
-        </span>
-      )}
-    </div>
+    <header className="hz-page-head">
+      <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
+        <h1 style={{ margin: 0, fontSize: 23, fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>
+          {page.label}
+        </h1>
+        <p style={{ margin: 0, fontSize: 13, color: C.sub2 }}>{page.sub}</p>
+      </div>
+      {/* 오른쪽 도구는 테마 토글 하나다. 검색창·알림 벨·프로필 칩은 걷었다 —
+          셋 다 기능이 없어 모양만 있는 자리였고(2026-08-03), 로그인이 없는
+          서비스라 프로필 칩은 앞으로도 가리킬 대상이 없다. */}
+      <div className="hz-page-tools">
+        <ThemeToggle initial={theme} />
+      </div>
+    </header>
   );
 }
 
-// 로드 전 자리표시. /api/ticker 응답이 오면 실데이터로 교체된다. 라벨을 그쪽과 맞춰 두면
-// 값만 "—" 에서 바뀌어, 흐르던 띠가 글자째 갈아엎히지 않는다. 네 라벨 모두 응답과 글자까지
-// 같아야 하므로 저쪽을 고치면 여기도 같이 고친다.
-const PLACEHOLDER: Quote[] = [
-  { label: "언급 급부상", value: "—", change: null },
-  { label: "주목도 1위", value: "—", change: null },
-  { label: "생태계 센티먼트", value: "—", change: null },
-  { label: "이슈 키워드", value: "—", change: null },
-];
-
-/**
- * 직전 파이프라인 실행 대비 온도 변화를 Quote 의 change/changeText 로 만든다. 비교할
- * 앞 실행이 없으면 둘 다 비워 화살표 자체가 안 붙는다.
- *
- * '하루 변화'가 아니다 — 파이프라인이 오전·오후 두 번 도니 화살표도 하루에 두 번 바뀐다
- * (어느 실행과 견줬는지는 lib/data.ts 의 prevScore 참고).
- *
- * 단위를 안 붙인다 — 기본 서식이 퍼센트인데 온도 차이는 퍼센트가 아니고, 바로 왼쪽
- * 값이 이미 "68℃" 라 도 단위는 한 번 더 말할 필요가 없다.
- */
-function scoreDelta(s: DailyScore): Pick<Quote, "change" | "changeText"> {
-  if (s.prevScore === null) return { change: null };
-  const d = Math.round(s.score) - Math.round(s.prevScore);
-  return { change: d, changeText: `${Math.abs(d)}` };
-}
-
 function TopBar({
-  dailyScore,
   theme,
   scrolledDown,
   menuOpen,
   onMenuToggle,
 }: {
-  dailyScore: DailyScore | null;
   theme: "light" | "dark";
   scrolledDown: boolean;
   menuOpen: boolean;
   onMenuToggle: () => void;
 }) {
-  // 햇쩨 지수는 레이아웃이 이미 들고 있어 서버 prop 을 그대로 쓴다(첫 화면부터 값이
-  // 박혀 있다). 나머지 카더라 집계는 /api/ticker 를 10분마다 폴링한다 — 값 자체는 하루
-  // 두 번 파이프라인이 돌 때만 바뀌지만, 그 시각을 클라이언트가 모르니 주기로 따라간다.
-  const [live, setLive] = useState<Quote[]>(PLACEHOLDER);
-
-  useEffect(() => {
-    let active = true;
-    const load = async () => {
-      try {
-        const res = await fetch("/api/ticker");
-        if (!res.ok) return;
-        const data = await res.json();
-        if (active && Array.isArray(data.quotes)) setLive(data.quotes as Quote[]);
-      } catch {}
-    };
-    load();
-    const id = setInterval(load, 600_000); // 10분
-    return () => {
-      active = false;
-      clearInterval(id);
-    };
-  }, []);
-
-  // 저장된 stage 대신 점수에서 직접 구간을 계산 — 히어로와 항상 일치하고 라벨 변경에 견고.
-  const stageLabel = dailyScore ? stageForScore(dailyScore.score) : "";
-  const hatzze: Quote = dailyScore
-    ? {
-        label: "햇쩨 지수",
-        // 히어로와 같은 정수 반올림을 쓴다. 예전엔 formatIndicatorValue 가 30.86 을 "30"으로
-        // 잘라서 히어로의 31℃ 와 한 화면에서 1도 어긋났고, 그 버림은 lib/format.ts 에서
-        // 뿌리를 고쳤다. 그래도 여기서 Math.round 를 직접 쓰는 이유는 따로다 —
-        // formatIndicatorValue 는 절댓값 10 미만을 소수점 둘째자리로 적어(저온장의 8.5점이
-        // "8.50℃") 티커 한 줄에 맞지 않는다. 온도는 언제나 정수여야 한다.
-        value: `${Math.round(dailyScore.score)}℃ · ${stageLabel}`,
-        // 직전 실행 대비 변화. 반올림한 값끼리 뺀다 — 원값으로 빼면 67.6 과 65.4 가 "2" 로
-        // 나오는데 화면에는 68 과 65 가 떠 있었으므로, 눈에 보이는 두 숫자의 차이와 어긋난다.
-        ...scoreDelta(dailyScore),
-        color: STAGE_COLOR[stageLabel] ?? C.ink,
-      }
-    : { label: "햇쩨 지수", value: "—", change: null };
-
-  const quotes: Quote[] = [hatzze, ...live];
+  // 2026-08 리디자인: 흐르는 티커가 여기서 빠졌다. 카더라 집계는 본문 맨 위 카드 4장
+  // (TickerCards)으로, 햇쩨 지수는 히어로로 갔다. 그래서 이 탑바에 남은 건 **모바일에서
+  // 사이드바가 숨을 때 필요한 것들뿐**이다 — 로고·테마 토글·햄버거.
+  // 데스크톱에서는 globals.css 가 통째로 display:none 한다.
 
   // 메뉴가 열려 있으면 감추지 않는다 — 패널이 탑바 바로 아래에 붙어 있어서, 탑바만
   // 올라가면 패널이 허공에 뜬다.
@@ -538,10 +538,9 @@ function TopBar({
         flexShrink: 0,
         background: C.card,
         borderBottom: `1px solid ${C.line}`,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 16,
+        // ⚠️ display·정렬을 인라인에 두지 않는다. 이 탑바는 데스크톱에서 통째로 숨는데,
+        // 인라인 display 는 미디어쿼리를 이겨서 .hz-topbar{display:none} 이 안 먹는다
+        // (여백에서 같은 함정을 이미 네 번 밟았다). 전부 globals.css 의 .hz-topbar 로.
         // 좌우 여백은 .hz-topbar 가 정한다(데스크톱 24 · 모바일 16). 인라인에 두면
         // 미디어쿼리가 못 이겨서, 폰에서 탑바 양끝이 카드(16)와 안 맞고 24 로 남는다.
       }}
@@ -557,16 +556,7 @@ function TopBar({
         </Link>
         <BetaBadge logoSize={23} />
       </span>
-      <div className="hz-ticker-wrap">
-        <div className="hz-ticker-track">
-          {[...quotes, ...quotes].map((q, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 22, paddingRight: 22 }}>
-              <span style={{ width: 1, height: 18, background: C.line, flexShrink: 0 }} />
-              <TickerItem q={q} />
-            </div>
-          ))}
-        </div>
-      </div>
+      <div style={{ flex: 1 }} />
       {/* 오른쪽 묶음: 테마 토글 + 햄버거(모바일 전용). 햄버거가 화면 맨 오른쪽 끝이다.
           데스크톱에서는 햄버거가 display:none 이라 flex 에서 아예 빠지고, 남는 건
           예전과 같은 토글 하나다 — 순서를 바꿔도 데스크톱은 그대로다. */}
@@ -714,11 +704,9 @@ function useScrolledDown(ref: React.RefObject<HTMLElement | null>) {
 }
 
 export default function AppShell({
-  dailyScore,
   theme,
   children,
 }: {
-  dailyScore: DailyScore | null;
   theme: "light" | "dark";
   children: React.ReactNode;
 }) {
@@ -752,8 +740,16 @@ export default function AppShell({
     <div
       className="hz-shell"
       style={{
+        // 목업은 흰 셸이 옅은 파랑(--c-page) 위에 떠 있는 구조다. 바깥 한 겹이 페이지
+        // 바탕이고, 안쪽 둥근 흰 판이 사이트 전체를 담는다.
+        //
+        // ⚠️ **스크롤은 여전히 main 안쪽이다.** 목업의 바깥 div 는 min-height:100vh 라
+        // 페이지가 통째로 스크롤되는 모양인데, 그러면 사이드바가 같이 밀려 올라간다 —
+        // 사이드바 아래쪽(오늘 뭐래? · 다크모드 · 버전)을 spacer 로 바닥에 붙여 둔 설계와
+        // 어긋난다. 셸을 화면 높이에 못 박고 main 만 굴리면 목업과 첫 화면이 같으면서
+        // 사이드바가 고정된다. 탑바 접힘(useScrolledDown)·PcHint 도 이 전제 위에 있다.
         display: "flex",
-        background: C.bg,
+        background: C.page,
         color: C.ink,
         // 사이트 전체를 Pretendard 하나로 통일한다. 예전엔 Plus Jakarta Sans가 앞에 있어서
         // 라틴·숫자만 그 서체로 렌더되고 한글만 Pretendard로 떨어졌다 — 한 줄 안에서 서체가
@@ -766,10 +762,22 @@ export default function AppShell({
       {/* 위임 리스너(클릭·툴팁·스크롤). 렌더 결과가 없으므로 어디에 두어도 되지만,
           셸 최상단에 두어 "모든 페이지에 걸린다"는 게 눈에 보이게 한다. */}
       <GaEvents />
+      <div
+        className="hz-frame"
+        style={{
+          // 화면을 꽉 채운다. 목업이 흰 판을 여백 위에 띄운 건 **캔버스 안에서 화면을
+          // 보여 주려던 액자**이지 서비스의 모양이 아니다(2026-08-03).
+          // 실제 사이트에서는 그 액자가 없어야 브라우저 창 전체가 서비스가 된다.
+          flex: 1,
+          display: "flex",
+          minWidth: 0,
+          background: C.card,
+          overflow: "hidden",
+        }}
+      >
       <Sidebar />
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, background: C.bg }}>
         <TopBar
-          dailyScore={dailyScore}
           theme={theme}
           scrolledDown={scrolledDown}
           menuOpen={menuOpen}
@@ -782,11 +790,17 @@ export default function AppShell({
             인라인이 아니라 .hz-main 클래스로 준다 — 모바일에서 탑바가 fixed 로 떠서
             흐름에서 빠지는데, 그만큼을 padding-top 으로 되메워야 첫 카드가 안 가린다.
             인라인 padding 은 미디어쿼리의 padding-top 을 이겨서 그게 안 먹는다. */}
-        <main ref={mainRef} className="hz-scroll hz-main" style={{ flex: 1, overflowY: "auto" }}>
+        {/* 헤더·집계 카드는 main **안**에 둔다. 목업이 그 둘을 본문 흐름의 일부로
+            그렸고(스크롤하면 같이 올라간다), 그래야 좌우 여백이 카드와 한 선에 맞는다. */}
+        {/* 목업 main 은 세로 flex 에 gap 20 이다 — 헤더·집계 카드·섹션·푸터이 같은 간격으로
+            떨어진다. 블록 흐름으로 두면 집계 카드와 히어로가 맞붙는다. */}
+        <main ref={mainRef} className="hz-scroll hz-main" style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 20 }}>
+          <PageHeader theme={theme} />
           {children}
           <Footer />
         </main>
         <PcHint />
+      </div>
       </div>
     </div>
   );

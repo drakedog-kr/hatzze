@@ -64,6 +64,13 @@ export type IndicatorWithLatestValue = {
   description_beginner: string;
   unit: string;
   direction: "high" | "low";
+  /**
+   * 종합점수에서 이 지표가 차지하는 무게. **파이프라인의
+   * `config/indicator_weights.py` 가 소스 오브 트루스**이고 DB 는 그 값을 받아 둔 사본이다
+   * (전수 검사에서 둘이 완전히 일치하는지 매번 대조한다).
+   * 프론트가 TS 로 표를 또 갖지 않으려고 DB 쪽을 읽는다 — 표를 둘로 두면 갈린다.
+   */
+  weight: number;
   latest: {
     date: string;
     raw_value: number;
@@ -143,7 +150,7 @@ export async function getPublicIndicators(): Promise<IndicatorWithLatestValue[]>
   // 내부용 캐시라 화면에 노출하지 않는다. 그 외에는 새로 추가되는 지표도
   // 코드 수정 없이 자동으로 표시된다.
   const baseCols =
-    "id, slug, name, headline, category, description_beginner, unit, direction, created_at";
+    "id, slug, name, headline, category, description_beginner, unit, direction, weight, created_at";
 
   const query = (valueCols: string) =>
     getSupabaseServer()
@@ -177,6 +184,7 @@ export async function getPublicIndicators(): Promise<IndicatorWithLatestValue[]>
     description_beginner: string;
     unit: string;
     direction: "high" | "low";
+    weight: number | null;
     indicator_values: {
       date: string;
       raw_value: number;
@@ -206,6 +214,8 @@ export async function getPublicIndicators(): Promise<IndicatorWithLatestValue[]>
       description_beginner: descOverride ?? row.description_beginner,
       unit: row.unit,
       direction: row.direction,
+      // 검증 전 새 지표는 DB 기본값이 1 이라 null 이 오는 일은 없지만, 스키마상 널 허용이라 받아 둔다.
+      weight: row.weight ?? 1,
       latest: iv
         ? {
             date: iv.date,
