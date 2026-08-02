@@ -12,13 +12,22 @@
 
 키가 없거나 호출이 실패해도 파이프라인 본체엔 영향이 없도록 조용히 건너뛴다.
 
-**규칙: 주요 종목 리포트에 뜨는 종목은 반드시 요약이 있어야 한다.**
-카드는 telegram_stock_narrative 를 그대로 읽으므로, 요약이 없는 종목은 화면에
-빈칸으로 나간다. 그래서 길이 규칙은 '맞으면 좋은 것'으로 낮추고(허용 범위를 벗어나도
-목표에 가장 가까운 후보를 저장한다), 마지막에 DB 를 되읽어 대상 종목이 전부 요약을
-갖고 있는지 검사한 뒤 하나라도 비면 예외로 실패시킨다. 예전엔 길이가 안 맞으면 그
-종목을 통째로 건너뛰어, 2026-07-20 삼성전자 요약이 조용히 사라졌다(후보 104·96·60·66자가
+**규칙: 이 표를 읽어 뿌리는 화면에 뜨는 종목은 반드시 요약이 있어야 한다.**
+읽는 곳이 둘이다 — 사이트의 주요 종목 리포트 카드(3일 창)와 텔레그램 주간 결산
+(7일 누적, common/broadcast_content.weekly_top_stocks). 둘 다 telegram_stock_narrative 를
+그대로 읽으므로, 요약이 없는 종목은 카드에선 빈칸으로, 주간 글에선 이름과 숫자만
+남은 칸으로 나간다.
+
+그래서 길이 규칙은 '맞으면 좋은 것'으로 낮추고(허용 범위를 벗어나도 목표에 가장
+가까운 후보를 저장한다), 마지막에 DB 를 되읽어 **뜨는 종목이** 전부 요약을 갖고
+있는지 검사한 뒤 하나라도 비면 예외로 실패시킨다. 예전엔 길이가 안 맞으면 그 종목을
+통째로 건너뛰어, 2026-07-20 삼성전자 요약이 조용히 사라졌다(후보 104·96·60·66자가
 전부 70~83 밖).
+
+**검사의 범위가 곧 그물의 크기다.** 그 검사는 오래 '자기 대상 집합'만 봤고, 그래서
+대상에 안 든 종목이 화면에 뜨는 경우를 원리적으로 못 잡았다 — 2026-08-02 주간 결산의
+③ NAVER 가 그 구멍으로 나갔다. 대상을 정하는 규칙을 새로 만들 때는 검사 범위도 같이
+넓힐 것.
 
 실행:
     cd data-pipeline && source .venv/bin/activate
@@ -38,9 +47,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from anthropic import Anthropic  # noqa: E402
 
+from common.broadcast_content import weekly_top_stocks  # noqa: E402
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.supabase_client import PAGE_SIZE, get_client  # noqa: E402
-from common.surging import top_surging  # noqa: E402
+from common.surging import load_stock_daily, top_surging  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 from common.supabase_client import load_all  # noqa: E402
@@ -566,8 +576,11 @@ def build_news_block(db, latest: str, window_since: str) -> list[str]:
     return out
 
 
-def build_stock_digests(db, latest: str) -> list[tuple[str, str, str]]:
-    """(종목코드, 종목명, digest) 목록. 최근 창의 주목도 상위 종목만.
+def build_stock_digests(db, latest: str) -> tuple[list[tuple[str, str, str]], list[tuple[str, str]]]:
+    """([(종목코드, 종목명, digest)], [(종목코드, 종목명)]).
+
+    첫째는 요약을 만들 대상, 둘째는 **요약이 반드시 있어야 하는 종목**이다. 둘은 대개
+    같지만 갈리는 자리가 있어 따로 돌려준다 — 아래 required 주석 참고.
 
     창을 **카드와 글자 그대로 같게** 잡는다. 카드(lib/telegram-data.getStockReport)는
     오늘을 빼고 어제까지 7일을 그린다 — "오늘은 아직 하루가 덜 차서" 막대가 늘 짧게
@@ -589,7 +602,8 @@ def build_stock_digests(db, latest: str) -> list[tuple[str, str, str]]:
         if since <= r["date"] <= until
     ]
     if not daily:
-        return []
+        # 창에 집계가 아예 없으면 어떤 종목도 digest 를 못 만든다. 검사할 대상도 없다.
+        return [], []
 
     agg: dict[str, dict] = defaultdict(lambda: {"w": 0.0, "m": 0, "by_date": {}})
     for r in daily:
@@ -599,24 +613,48 @@ def build_stock_digests(db, latest: str) -> list[tuple[str, str, str]]:
         a["by_date"][r["date"]] = r["mention_count"] or 0
     top = sorted(agg.items(), key=lambda kv: kv[1]["w"], reverse=True)[:NARRATIVE_TOP_N]
 
-    # 주목도 상위 N개에 더해 **급부상 종목**도 대상에 넣는다.
+    # 주목도 상위 N개에 더해 **급부상 종목**과 **주간 결산이 세우는 종목**도 대상에 넣는다.
     #
-    # 두 목록은 잣대가 달라 겹치지 않는 날이 있다 — 상위 N개는 '절대 주목도'(늘 대형주),
-    # 급부상은 '평소 대비 배수'(작은 종목이 자주 올라온다). 실측 2026-07-26 에 급부상
-    # 3개 중 NHN 하나가 상위 6개 밖이었고, 그러면 **텔레그램 채널이 소개한 종목에만
-    # 요약이 빠진다**(scripts/send_telegram_broadcast.py 가 이 표를 읽는다).
+    # 세 목록은 창도 잣대도 달라 겹치지 않는 날이 있다.
+    #
+    #   상위 N개   3일 창 weighted_score  '절대 주목도'. 늘 대형주가 선다
+    #   급부상     14일 창 점유율 배수    '평소 대비'. 작은 종목이 자주 올라온다
+    #   주간 결산  7일 창 mention_count   '누적 언급'. 대형주지만 순위가 다르다
+    #
+    # 그러면 **텔레그램 채널이 소개한 종목에만 요약이 빠진다**
+    # (scripts/send_telegram_broadcast.py 가 이 표를 읽는다). 실측으로 둘 다 났다 —
+    # 2026-07-26 급부상 3개 중 NHN 하나가 상위 6개 밖이었고, 2026-08-02 주간 결산은
+    # ③ NAVER 가 설명 없이 나갔다(7일 누적 3위인데 3일 가중치 상위 6에는 못 든다).
+    #
+    # 되짚어 보니 요약이 있는 15일 중 7일이 같은 모양이었다(주간 top3 를 그날 저장된
+    # 요약 목록과 대조). 여섯 번은 NAVER, 한 번은 알테오젠이다. **더해지는 종목은 늘
+    # 한 종목이었다** — 상위 2개는 언제나 삼성전자·SK하이닉스라 이미 대상 안에 있다.
     #
     # 오히려 이쪽이 문장이 더 필요한 자리다. 대형주는 왜 회자되는지 대충 짐작이 되지만,
     # 갑자기 튀어나온 중소형주는 이유를 모르면 이름과 숫자만 남는다.
+    #
+    # 두 목록이 같은 표(14일치 telegram_stock_daily)를 보므로 한 번 읽어 같이 넘긴다.
+    stock_daily = load_stock_daily(db)
+    weekly, _ = weekly_top_stocks(db, preloaded=stock_daily)
+    extra = [s["code"] for s in top_surging(db, SURGING_NARRATIVE_N, preloaded=stock_daily)]
+    extra += [code for code, _m in weekly]
+
     have = {code for code, _ in top}
-    for s in top_surging(db, SURGING_NARRATIVE_N):
-        code = s["code"]
+    for code in extra:
         # 집계 창(3일)에 행이 없으면 digest 를 만들 재료가 없다 — 그런 종목은 건너뛴다.
+        # 건너뛴 주간 종목은 아래 required 에 그대로 남아 커버리지 검사에 걸린다.
         if code not in have and code in agg:
             top.append((code, agg[code]))
+            have.add(code)
 
     stocks = load_all(db, "stocks", "code,name", order_by="code")
     name_of = {s["code"]: s["name"] for s in stocks}
+
+    # 요약이 반드시 있어야 하는 종목. **digest 를 못 만든 주간 종목까지 담는다** —
+    # 그 종목은 요약 없이 주간 결산에 오르므로, 여기서 빠지면 검사가 그 구멍을 못 본다
+    # (검사가 자기 대상 집합만 보던 것이 2026-08-02 건을 놓친 이유다).
+    required = [(code, name_of.get(code, code)) for code, _ in top]
+    required += [(c, name_of.get(c, c)) for c, _m in weekly if c not in have]
 
     mentions = load_all(
         db, "telegram_message_stocks", "channel_handle,message_id,stock_code,match_text"
@@ -681,7 +719,7 @@ def build_stock_digests(db, latest: str) -> list[tuple[str, str, str]]:
                 # (EXCERPT_CHARS 주석의 실측 참고).
                 lines.append(f"- {excerpt(msgs[k].get('text'), needle_of.get(k + (code,)))}")
         out.append((code, name, "\n".join(lines)))
-    return out
+    return out, required
 
 
 def main() -> None:
@@ -710,7 +748,7 @@ def main() -> None:
     print(f"[기준일] {latest}")
 
     brief_digest = build_brief_digest(db, latest)
-    stock_digests = build_stock_digests(db, latest)
+    stock_digests, required = build_stock_digests(db, latest)
 
     if dry_run:
         print("─" * 60)
@@ -719,6 +757,13 @@ def main() -> None:
             print("─" * 60)
             print(d)
         print("─" * 60)
+        # 요약을 만들 대상과 '있어야 하는' 대상을 같이 찍는다 — 둘이 갈리면 그 종목이
+        # 아래 커버리지 검사에 걸릴 종목이라, dry-run 에서 미리 보이는 편이 낫다.
+        print("[대상] " + " · ".join(f"{name}({code})" for code, name, _ in stock_digests))
+        skipped = [(c, n) for c, n in required if c not in {x for x, _, _ in stock_digests}]
+        if skipped:
+            print("[⚠️ 창 밖] " + " · ".join(f"{n}({c})" for c, n in skipped)
+                  + " — 집계 창에 행이 없어 digest 를 못 만듭니다")
         print("[dry-run] LLM 호출·저장 없이 종료합니다.")
         return
 
@@ -865,9 +910,16 @@ def main() -> None:
     print(f"[Supabase] telegram_stock_narrative {saved}/{len(stock_digests)}종목 저장")
 
     # ── 커버리지 규칙 ───────────────────────────────────────────────────────
-    # 주요 종목 리포트는 이 표를 그대로 읽어 카드에 뿌린다 — 카드에 뜨는 종목에
-    # 요약이 없으면 화면이 빈칸으로 나간다. 그래서 "대상 종목은 전부 요약이 있다"를
-    # 여기서 불변식으로 확인한다.
+    # 이 표를 그대로 읽어 화면·채널에 뿌리는 곳이 둘이다 — 사이트의 주요 종목 리포트
+    # 카드와, 텔레그램 주간 결산(scripts/send_telegram_broadcast.build_weekly). 요약이
+    # 없으면 카드는 빈칸으로, 주간 글은 종목 이름과 숫자만 남은 칸으로 나간다. 그래서
+    # "뜨는 종목은 전부 요약이 있다"를 여기서 불변식으로 확인한다.
+    #
+    # **검사 범위는 required 다(build_stock_digests).** 예전엔 stock_digests, 곧 자기
+    # 대상 집합만 봤다. 그러면 대상에 안 든 종목이 화면에 뜨는 경우를 원리적으로 못
+    # 잡는다 — 2026-08-02 주간 결산의 ③ NAVER 가 그 구멍으로 나갔다. 이제 주간 결산이
+    # 세우는 종목까지 required 에 들어가고, 집계 창 밖이라 digest 조차 못 만든 종목도
+    # 거기 남는다(그런 날은 여기서 걸리는 게 맞다. 그 종목은 그대로 주간 글에 오른다).
     #
     # 루프의 saved 카운터가 아니라 **DB를 되읽어** 검사한다. 저장했다고 믿는 것과
     # 실제로 저장된 것은 다를 수 있고(업서트 실패·부분 실패), 화면이 읽는 건 DB다.
@@ -881,14 +933,14 @@ def main() -> None:
         .execute()
     )
     have = {r["stock_code"] for r in (stored.data or [])}
-    missing = [(code, name) for code, name, _ in stock_digests if code not in have]
+    missing = [(code, name) for code, name in required if code not in have]
     if missing:
         detail = ", ".join(f"{name}({code})" for code, name in missing)
         raise RuntimeError(
-            f"주요 종목 리포트 대상 {len(missing)}종목의 요약이 없습니다: {detail}. "
-            f"요약 없는 종목이 카드에 뜨면 안 되므로 실패로 처리합니다."
+            f"화면·채널에 뜨는 {len(missing)}종목의 요약이 없습니다: {detail}. "
+            f"요약 없는 종목이 카드나 주간 결산에 뜨면 안 되므로 실패로 처리합니다."
         )
-    print(f"[검사] 대상 {len(stock_digests)}종목 모두 요약 보유 확인")
+    print(f"[검사] 대상 {len(required)}종목 모두 요약 보유 확인")
 
 
 if __name__ == "__main__":
