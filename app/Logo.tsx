@@ -65,26 +65,45 @@ export function GhostSymbol({
  * 베타 배지 — 로고 우측 상단에 위첨자처럼 붙는다.
  *
  * 서비스 **전체**가 베타라는 표시라서, 페이지마다 다는 게 아니라 브랜드가 나오는
- * 자리마다 같은 모양으로 붙인다(사이드바 · 모바일 탑바 · 푸터 셋).
+ * 자리마다 붙인다(사이드바 · 모바일 탑바 · 푸터 셋).
  *
- * 크기는 로고 크기를 안 따라간다 — 셋의 워드마크가 30/23/26 으로 제각각이라 배지까지
- * 같이 움직이면 "같은 배지"가 아니라 "비슷한 배지 셋"이 된다. 이건 상태 표시지 로고의
- * 일부가 아니므로 고정값이 맞다.
+ * **알약 크기는 셋이 완전히 같고, 자리만 로고에 맞춰 올린다**(Hun 결정, 2026-08-02).
+ *
+ * 그냥 윗선에 붙이면 로고가 작을수록 같은 배지가 로고를 더 많이 덮는다 — 로고 30/26/23
+ * 에 배지 18 이면 60%/69%/**78%** 다. 78% 는 로고 밑선까지 5px 밖에 안 남아 위첨자가
+ * 아니라 로고에 걸터앉은 것처럼 보인다(모바일에서 "내려앉았다"는 지적이 실제로 나왔다).
+ * 눈이 보는 건 배지의 절대 크기가 아니라 **로고와의 관계**다.
+ *
+ * 그래서 로고 아래로 남는 여백이 로고 높이의 40% 가 되도록 끌어올린다. 기준이 사이드바
+ * (18/30 = 60%)라 거기서는 lift 가 0 이고, 작은 로고일수록 배지가 로고 윗선 밖으로 솟는다.
+ * 크기를 줄여 맞추는 길도 있었지만 그러면 알약이 자리마다 달라진다 — 그건 "같은 배지"가
+ * 아니다.
+ *
+ * 높이를 글꼴에 맡기지 않고 못 박은 이유: 위아래 여백으로 만들면 line-height 가 섞여
+ * 들어와 같은 값을 줘도 자리마다 몇 px 씩 달라지고, 그러면 lift 계산의 기준이 흔들린다.
  *
  * 윗선 맞춤은 쓰는 쪽이 정한다 — 부모를 alignItems:flex-start 로 두거나(사이드바·탑바),
  * baseline 묶음 안에서는 alignSelf 로 빠져나온다(푸터). 그래서 여기서 정렬을 못 박지 않고
  * style 로 열어 둔다.
  */
-export function BetaBadge({ style }: { style?: React.CSSProperties }) {
+const BETA_BADGE_HEIGHT = 18;
+
+export function BetaBadge({ logoSize = 30, style }: { logoSize?: number; style?: React.CSSProperties }) {
+  const lift = Math.round(BETA_BADGE_HEIGHT - logoSize * 0.6); // 30→0 · 26→2 · 23→4
   return (
     <span
       style={{
         flexShrink: 0,
+        display: "inline-flex",
+        alignItems: "center",
+        height: BETA_BADGE_HEIGHT,
+        marginTop: -lift,
+        padding: "0 8px",
         fontSize: 8,
         fontWeight: 700,
+        lineHeight: 1,
         color: "var(--c-blue)",
         background: "var(--c-blue-tint)",
-        padding: "3px 8px",
         borderRadius: 999,
         ...style,
       }}
