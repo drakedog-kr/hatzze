@@ -12,11 +12,13 @@ import GaEvents from "./GaEvents";
 
 // sub 는 본문 헤더의 페이지 부제다(목업이 사이드바 로고 밑에 있던 문장을 여기로 옮겼다).
 // 사이드바 항목에는 안 쓰이고 PageHeader 만 읽는다.
+// badge 는 제목 옆 회색 알약이다(콘솔 리디자인). "이 화면이 몇 개를 다루나"를 제목 줄에서
+// 바로 말해 준다 — 부제 문장으로 적으면 읽어야 알 수 있다. 없는 화면엔 안 그린다.
 const NAV = [
-  { href: "/", label: "시장 브리핑", icon: "monitoring", sub: "지표 25개로 잰 오늘의 시장 온도" },
+  { href: "/", label: "시장 브리핑", icon: "monitoring", sub: "지표 25개로 잰 오늘의 시장 온도", badge: "25개 지표" },
   { href: "/kadera", label: "카더라 리포트", icon: "forum", sub: "주식 텔레그램에서 무엇이 회자되는지" },
   { href: "/mdd", label: "MDD 정밀분석", icon: "trending_down", sub: "고점에서 얼마나 내려왔고 언제 돌아왔는지" },
-];
+] as { href: string; label: string; icon: string; sub: string; badge?: string }[];
 
 // 외부(텔레그램) 링크라 NAV 배열이 아니라 따로 둔다 — pathname 기반 active 판정 대상이
 // 아니고, 새 탭으로 열려야 해서 next/link 가 아닌 <a> 를 쓴다. 사이드바와 모바일 탭바가
@@ -495,9 +497,28 @@ function PageHeader({ theme }: { theme: "light" | "dark" }) {
   return (
     <header className="hz-page-head">
       <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-        <h1 style={{ margin: 0, fontSize: 23, fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>
-          {page.label}
-        </h1>
+        {/* 배지는 제목과 같은 줄, baseline 정렬. center 로 두면 23px 제목 옆에서 알약이
+            가운데에 떠 제목 아랫선과 안 맞는다. */}
+        <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap", minWidth: 0 }}>
+          <h1 style={{ margin: 0, fontSize: 23, fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>
+            {page.label}
+          </h1>
+          {page.badge && (
+            <span
+              style={{
+                fontSize: 10.5,
+                fontWeight: 700,
+                color: C.sub,
+                background: C.track,
+                borderRadius: R.pill,
+                padding: "3px 8px",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {page.badge}
+            </span>
+          )}
+        </div>
         <p style={{ margin: 0, fontSize: 13, color: C.sub2 }}>{page.sub}</p>
       </div>
       {/* 오른쪽 도구는 테마 토글 하나다. 검색창·알림 벨·프로필 칩은 걷었다 —

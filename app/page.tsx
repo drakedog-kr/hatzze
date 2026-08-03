@@ -459,13 +459,13 @@ function HeatBar({ v, hideThreshold = false }: { v: Pick; hideThreshold?: boolea
         <span style={{ fontSize: 11.5, fontWeight: 700, color: C.muted }}>과열도</span>
         <span style={{ fontFamily: MONO, fontSize: 12.5, fontWeight: 800, color: v.color }}>
           {Math.round(v.capped)}
-          <span style={{ color: C.faint, fontWeight: 600 }}>/100</span>
+          <span style={{ color: C.sub, fontWeight: 600 }}>/100</span>
         </span>
       </div>
       <HeatFill pct={v.capped} />
       <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 11, color: C.faint }}>안심</span>
-        <span style={{ fontSize: 11, color: C.faint }}>과열 100</span>
+        <span style={{ fontSize: 11, color: C.sub }}>안심</span>
+        <span style={{ fontSize: 11, color: C.sub }}>과열 100</span>
       </div>
       {v.hotDisp && !hideThreshold && (
         <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub2, background: C.soft, borderRadius: 10, padding: "8px 10px" }}>
@@ -1034,15 +1034,15 @@ function CardLeverage({ v }: { v: Pick }) {
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
         <strong style={{ fontFamily: MONO, fontSize: 32, fontWeight: 800, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
           {heat ?? "-"}
-          <span style={{ fontSize: 17, fontWeight: 700, color: C.faint }}>/100</span>
+          <span style={{ fontSize: 17, fontWeight: 700, color: C.sub }}>/100</span>
         </strong>
         <span style={{ fontSize: 12.5, fontWeight: 600, color: C.sub2 }}>종합 과열도</span>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <HeatFill pct={heat ?? 0} />
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ fontSize: 11, color: C.faint }}>안심</span>
-          <span style={{ fontSize: 11, color: C.faint }}>과열</span>
+          <span style={{ fontSize: 11, color: C.sub }}>안심</span>
+          <span style={{ fontSize: 11, color: C.sub }}>과열</span>
         </div>
       </div>
       {dt && (
@@ -1273,9 +1273,9 @@ function CardSpeed({ v, path = [] }: { v: Pick; path?: ClosePoint[] }) {
             tip={(x) => `${shortDate(x.key)} · ${x.value >= 0 ? "+" : ""}${x.value.toFixed(1)}%`}
           />
           <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 11, color: C.faint }}>3개월 전 = 0%</span>
+            <span style={{ fontSize: 11, color: C.sub }}>3개월 전 = 0%</span>
             {hi !== null && lo !== null && (
-              <span style={{ fontSize: 11, color: C.faint }}>
+              <span style={{ fontSize: 11, color: C.sub }}>
                 최고 {hi >= 0 ? "+" : ""}{hi.toFixed(1)}% · 최저 {lo.toFixed(1)}%
               </span>
             )}
@@ -1324,7 +1324,7 @@ function CardVkospi({ v }: { v: Pick }) {
         </div>
         <div style={{ display: "flex", justifyContent: "space-between" }}>
           <span style={{ fontSize: 11.5, fontWeight: 600, color: C.muted }}>방심 {lo !== null ? Math.round(lo) : "-"}</span>
-          <span style={{ fontSize: 11, color: C.faint }}>최근 30일 범위</span>
+          <span style={{ fontSize: 11, color: C.sub }}>최근 30일 범위</span>
           <span style={{ fontSize: 11.5, fontWeight: 600, color: C.muted }}>불안 {hi !== null ? Math.round(hi) : "-"}</span>
         </div>
       </div>
@@ -1551,7 +1551,7 @@ function CardComingSoon() {
         }}
       >
         <Icon name="hourglass_empty" style={{ fontSize: 24, color: C.hint }} />
-        <span style={{ fontSize: 12.5, fontWeight: 700, color: C.faint }}>데이터 준비 중</span>
+        <span style={{ fontSize: 12.5, fontWeight: 700, color: C.sub }}>데이터 준비 중</span>
       </div>
       <Foot text="빚내서 주식 사는 돈이 불어나면 과열 신호입니다" />
     </Shell>
@@ -1688,7 +1688,7 @@ function CardDivergence({ v }: { v: Pick }) {
             <span style={{ fontSize: 11.5, color: C.muted }}>{t.hint}</span>
             <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: t.accent ? C.blue : C.ink }}>
               {level(t.value)} {Math.round(t.value)}
-              <span style={{ fontSize: 12, color: C.faint }}>/100</span>
+              <span style={{ fontSize: 12, color: C.sub }}>/100</span>
             </strong>
           </div>
         ))}
@@ -1748,7 +1748,7 @@ function CardTrend({ v, icon }: { v: Pick; icon: string }) {
                 }}
               />
               {/* 기간은 차트의 캡션이지 큰 수치의 곁말이 아니다 — 차트 밑 오른쪽에 둔다. */}
-              <span style={{ alignSelf: "flex-end", fontSize: 11, color: C.faint }}>최근 30일</span>
+              <span style={{ alignSelf: "flex-end", fontSize: 11, color: C.sub }}>최근 30일</span>
             </div>
           ) : (
             pct !== null && <HeatFill pct={pct} />
@@ -1986,7 +1986,7 @@ function CardUpbit({ v }: { v: Pick }) {
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
         <strong style={{ fontFamily: MONO, fontSize: 32, fontWeight: 800, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
           {heat ?? "-"}
-          <span style={{ fontSize: 17, fontWeight: 700, color: C.faint }}>/100</span>
+          <span style={{ fontSize: 17, fontWeight: 700, color: C.sub }}>/100</span>
         </strong>
         <span style={{ fontSize: 12.5, fontWeight: 600, color: C.sub2 }}>과열도</span>
       </div>
@@ -2097,7 +2097,7 @@ function CardNetBuy({ v }: { v: Pick }) {
           {dates.length > 0 && (
             <div style={{ display: "flex", gap: 8 }}>
               {daily.map((_, i) => (
-                <span key={i} style={{ flex: 1, textAlign: "center", fontFamily: MONO, fontSize: 10.5, color: C.faint }}>
+                <span key={i} style={{ flex: 1, textAlign: "center", fontFamily: MONO, fontSize: 10.5, color: C.sub }}>
                   {dates[i] ? ymdShort(dates[i]) : ""}
                 </span>
               ))}
@@ -2161,7 +2161,7 @@ function CardLimitUp({ v }: { v: Pick }) {
       />
       <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
         {rank.length === 0 ? (
-          <span style={{ fontSize: 12.5, color: C.faint }}>10% 넘게 오른 종목이 없습니다</span>
+          <span style={{ fontSize: 12.5, color: C.sub }}>10% 넘게 오른 종목이 없습니다</span>
         ) : (
           rank.map((r, i) => (
             <div key={`${r.n}-${i}`} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, minWidth: 0 }}>
@@ -2192,7 +2192,7 @@ function CardLimitUp({ v }: { v: Pick }) {
               buckets.map((b) => `${b.label}: ${b.n}종목`).join("\n") +
               (listed ? `\n전체: ${listed.toLocaleString("ko-KR")}종목` : "")
             }
-            style={{ fontSize: 11.5, color: C.faint }}
+            style={{ fontSize: 11.5, color: C.sub }}
           >
             외 {rest}개
           </span>
@@ -2244,8 +2244,8 @@ function CardPutCall({ v }: { v: Pick }) {
           <span style={{ fontSize: 12, fontWeight: 700, color: C.cold }}>풋 {Math.round(100 - callShare)}%</span>
         </div>
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ fontSize: 11, color: C.faint }}>콜 = 상승 베팅</span>
-          <span style={{ fontSize: 11, color: C.faint }}>풋 = 하락 대비</span>
+          <span style={{ fontSize: 11, color: C.sub }}>콜 = 상승 베팅</span>
+          <span style={{ fontSize: 11, color: C.sub }}>풋 = 하락 대비</span>
         </div>
       </div>
       <Foot text={v.desc} />
