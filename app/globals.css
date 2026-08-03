@@ -984,19 +984,52 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
   }
 }
 
-/* MDD 정밀분석 — 카드 2열 배치. 컴팩트한 카드는 가로로 둘씩 묶고, 넓어야 하는
-   카드(헤드라인 차트·테마 막대)는 mdd-full 로 두 칸을 다 쓴다. align-items:stretch(기본)
-   로 같은 줄의 두 카드 높이를 맞춘다 — 짧은 카드는 아래 여백이 생기더라도 세로 길이를
-   맞추는 게 낫다. 카드가 좁아 답답해지는 폭에서는 1열로 접는다. */
-.mdd-grid {
+/* MDD 정밀분석 — 시트 두 장이 나란히 서는 줄(역대 낙폭 ↔ 회복 · 시장탓 ↔ 성격).
+   align-items:stretch(기본)로 같은 줄 두 시트의 높이를 맞춘다 — 짧은 쪽에 아래 여백이
+   생기더라도 세로 길이를 맞추는 게 낫다. 안쪽이 답답해지는 폭에서는 1열로 접는다.
+
+   ⚠️ flex-basis 를 calc(50% - 8px) 로 두면 gap 과 합이 어긋나 좁은 폭에서 넘친다.
+   grid 로 두면 minmax(0,1fr) 이 그 계산을 대신 해 준다. */
+.mdd-pair {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
+  gap: 16px;
   align-items: stretch;
 }
-.mdd-grid .mdd-full { grid-column: 1 / -1; }
 @media (max-width: 1024px) {
-  .mdd-grid { grid-template-columns: minmax(0, 1fr); }
+  .mdd-pair { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* 기간 토글 — 배경·글자색은 선택 여부에 따라 인라인으로 정하고, 호버만 여기서 맡는다.
+   ⚠️ 호버 배경을 인라인에 두면 :hover 를 이겨서 아예 안 먹는다(카더라 '더 보기'가
+   그래서 한 번도 호버가 안 보였다). */
+.mdd-period-btn { transition: background 0.13s ease, color 0.13s ease; }
+.mdd-period-btn[aria-pressed="false"]:hover {
+  background: var(--c-blue-tint);
+  color: var(--c-cold-ink);
+}
+
+/* 역대 낙폭 Top 5 의 열 —— **인라인이 아니라 여기 둔다**. 인라인 grid-template-columns 는
+   아래 미디어쿼리를 이겨서 좁은 폭에서 열이 안 줄어든다.
+   375px 실측: 구간 열이 73px 로 눌려 "2021-02 ~ 2024-02"(118px)가 넘쳤다. */
+.mdd-top-row {
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.3fr) 56px 62px;
+  gap: 11px;
+}
+@media (max-width: 640px) {
+  /* 상태 열('회복'/'진행 중')을 접는다 — 회복 열이 '—' 면 진행 중이라 같은 말이고,
+     진행 중 행은 배경·파란 잉크로 이미 갈린다. 그 62px 을 구간 열이 가져간다. */
+  .mdd-top-row { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.1fr) 52px; }
+  .mdd-top-status { display: none; }
+}
+
+/* 언더워터 차트의 크로스헤어(호버 기준선 + 툴팁) 띠.
+   ⚠️ 좁은 폭에서는 끈다. 툴팁(.hz-tip::after)은 opacity:0 이어도 absolute 라 **스크롤
+   영역을 넓히고**(375px 실측: 시트 scrollWidth 349 → 끄면 331), 시트의 overflow:hidden 에
+   잘려 어차피 안 읽힌다. 터치 기기엔 호버 자체가 없어 잃는 것도 없다. */
+.mdd-crosshair { display: flex; }
+@media (max-width: 640px) {
+  .mdd-crosshair { display: none; }
 }
 
 /* 로딩 자리표시자 — 결과와 같은 골격으로 은은하게 깜빡인다(레이아웃이 튀지 않게). */
