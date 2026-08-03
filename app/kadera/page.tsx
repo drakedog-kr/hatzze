@@ -596,10 +596,22 @@ export default async function KaderaPage() {
             {/* 높이를 안 잡는다 — 글이 3줄이면 3줄, 4줄이면 4줄로 흐른다. 길이 자체는
                 파이프라인이 잡는다(generate_telegram_narratives.py 의 BRIEF_*_LEN).
                 여기서 다시 자르지 않는 이유는, 잘라 두면 그쪽이 망가졌을 때 화면이
-                조용히 문장을 먹어 치우기 때문이다. */}
-            <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.75, color: "var(--c-ink-soft)", textWrap: "pretty", wordBreak: "keep-all" }}>
-              {sentiment?.summary ?? "오늘의 요약을 준비하고 있습니다."}
-            </p>
+                조용히 문장을 먹어 치우기 때문이다.
+
+                파이프라인이 세 대목을 빈 줄로 이어 보낸다. 여기서 쪼개 문단을 만든다 —
+                500자에 가까운 글을 한 덩어리로 두면 눈이 미끄러진다. 문단 사이는 10px 로,
+                칸의 gap(16) 보다 좁게 잡았다. 같은 글 안의 문단 사이가 제목과 본문 사이보다
+                벌어지면 세 문단이 별개의 블록으로 읽힌다.
+                구분자가 없는 옛 데이터(한 덩어리)는 그대로 한 문단이 된다. */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {(sentiment?.summary ?? "오늘의 요약을 준비하고 있습니다.")
+                .split(/\n{2,}/)
+                .map((para, i) => (
+                  <p key={i} style={{ margin: 0, fontSize: 12.5, lineHeight: 1.75, color: "var(--c-ink-soft)", textWrap: "pretty", wordBreak: "keep-all" }}>
+                    {para}
+                  </p>
+                ))}
+            </div>
             {/* 기준 시각은 **언제나 이 칸 맨 아래 왼쪽**이다 — 요약 글이 날마다 3줄·4줄로
                 달라져도 자리가 안 흔들려야 "이 화면의 기준 시각"으로 읽힌다(시장 브리핑
                 히어로가 쓰는 것과 같은 조판·같은 schedule 아이콘).
