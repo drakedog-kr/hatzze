@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { CHARACTER_MIN_DD } from "@/lib/mdd";
-import type { DrawdownCharacter, DrawdownPoint, Episode, MddAnalysis, RiskProfile as RiskProfileData, YearStat } from "@/lib/mdd";
+import { CHARACTER_MIN_DD, CHARACTER_SPLIT_DAYS } from "@/lib/mdd";
+import type { DepthBucket, DrawdownCharacter, Episode, MddAnalysis, RiskProfile as RiskProfileData, YearStat } from "@/lib/mdd";
 import { track } from "@/lib/ga";
-import { C, Icon, MONO } from "../ui";
+import { C, Icon, MONO, R } from "../ui";
+import { SectionHead } from "../kadera/SectionHead";
 import { StockLogo } from "../StockLogo";
 
 export type StockOption = { code: string; name: string; market: string | null };
@@ -46,6 +47,27 @@ const fmtDayCount = (d: number) => `${Math.round(d).toLocaleString("ko-KR")}일`
 /** 차트 축 라벨용 연·월. "2017-11-24" → "2017-11".
  *  연도를 두 자리로 줄이면("17-11") 연-월인지 월-일인지 분간이 안 된다. */
 const fmtYm = (date: string) => date.slice(0, 7);
+
+/* ── 색 축 ─────────────────────────────────────────────────────────
+   이 페이지만 온도축을 **낙폭축**으로 다시 매핑한다.
+     파랑 = 하락 · 낙폭 · 초과낙폭      빨강 = 회복 · 수익 · 상승
+   시장 브리핑의 파랑(저온)·빨강(고온)과 방향은 같다 — 내려간 것이 파랑, 올라간 것이
+   빨강이다. 그래서 전역 2색 체계와 어긋나지 않는다.
+
+   ⚠️ 예전엔 '미회복'이 빨강이었다(경고 뜻). 여기서 빨강은 회복을 뜻하므로 그대로 두면
+   못 돌아온 것이 돌아온 것과 같은 색이 된다. 미회복은 **채우지 않은 분홍 점선**으로
+   "아직 오지 않았다"를 말한다. */
+const DOWN = "var(--c-cold-ink)";
+const UP = "var(--c-hot-ink)";
+/** 하락 막대 서열(진한 → 옅은). 다크에선 1이 가장 밝다 — 순서가 뒤집힌다. */
+const DOWN_BAR = ["var(--c-blue-1)", "var(--c-blue-2)", "var(--c-blue-3)", "var(--c-blue-4)", "var(--c-blue-5)"];
+const UP_BAR = "var(--c-warm-1)";
+const UP_BAR_SOFT = "var(--c-warm-3)";
+/** 미회복 — 채우지 않은 분홍 점선. 위 색 축 주석 참고. */
+const UNRECOVERED = `repeating-linear-gradient(90deg, ${UP_BAR_SOFT} 0 3px, transparent 3px 6px)`;
+
+/** 시트 안쪽 본문 padding. 머리(.hz-sheet-head)의 22 와 좌우를 맞춘다. */
+const PAD = "18px 22px";
 
 export function MddExplorer({
   stocks,
@@ -97,9 +119,18 @@ export function MddExplorer({
     };
   }, [selected, years]);
 
-  // 폭·헤더 모양을 시장 브리핑·카더라와 맞춘다(둘 다 maxWidth 1180 + 제목 옆 가로줄).
+  /* 폭 상한을 여기서 걸지 않는다 — **셸(AppShell)이 이미 1340 으로 잡는다.**
+     세 페이지가 같은 상자를 쓰므로 여기에 또 두면 MDD 만 좁아진다.
+
+     ⚠️ 예전의 `maxWidth:1180, margin:"0 auto"` 는 두 가지로 틀렸다.
+       ① 1180 은 낡은 값이다. 셸이 1340 으로 넓어질 때(본문 폭을 목업 값으로 되돌린
+          커밋) 이 사본이 안 따라와서 `/mdd` 만 160px 좁았다.
+       ② 그보다 나쁜 건 `margin:0 auto` 다. 셸의 본문 상자가 **세로 flex** 라
+          가로 margin:auto 가 `align-items:stretch` 를 꺼 버린다 — 상자가 늘어나지
+          않고 **fit-content** 로 줄어든다(1920 실측 600px). 1440 에서는 남는 폭이
+          없어 티가 안 나고 넓은 화면에서만 드러난다. */
   return (
-    <div style={{ maxWidth: 1180, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       {/* 제목은 여기서 안 그린다 — 셸의 본문 헤더(AppShell 의 PageHeader)가 그리는 h1
           하나뿐이다. 예전엔 여기에 h1 을 또 둬서 "MDD 정밀분석"이 화면에 두 번 떴다.
           설명 문단은 남긴다(헤더의 한 줄 부제보다 훨씬 구체적이라 대신 못 한다). */}
@@ -457,8 +488,10 @@ function Controls({
         )}
       </div>
 
-      {/* 기간 토글 — 낱개 알약 5개 대신 하나의 세그먼티드 컨트롤로 묶는다(한 덩어리로 읽힘). */}
-      <div style={{ display: "flex", gap: 2, background: C.bg, border: `1px solid ${C.line}`, borderRadius: 999, padding: 3 }}>
+      {/* 기간 토글 — 낱개 알약 5개 대신 하나의 세그먼티드 컨트롤로 묶는다(한 덩어리로 읽힘).
+          선택된 칸만 파란 면 + 흰 글자다. 예전엔 흰 면 + 파란 글자였는데, 검색창과 이
+          컨트롤이 둘 다 회색 면이라 '지금 고른 것'이 면이 아니라 글자색으로만 갈렸다. */}
+      <div style={{ display: "flex", gap: 2, background: C.track, borderRadius: 9, padding: 3 }}>
         {PERIODS.map((p) => {
           const on = p.key === years;
           return (
@@ -469,17 +502,18 @@ function Controls({
                 onYears(p.key);
               }}
               aria-pressed={on}
+              className="mdd-period-btn"
               style={{
-                padding: "7px 15px",
-                borderRadius: 999,
+                padding: "7px 13px",
+                borderRadius: 6,
                 border: "none",
-                background: on ? C.card : "transparent",
-                color: on ? C.blue : C.sub,
-                fontSize: 13,
+                background: on ? C.blue : "transparent",
+                color: on ? "#ffffff" : C.sub,
+                fontSize: 11.5,
                 fontWeight: 700,
                 cursor: "pointer",
                 whiteSpace: "nowrap",
-                transition: "background .15s, color .15s",
+                fontFamily: "inherit",
               }}
             >
               {p.label}
@@ -492,160 +526,213 @@ function Controls({
 }
 
 /* ── 결과 ─────────────────────────────────────────────────────── */
-function Results({ data }: { data: MddResult }) {
-  const a = data.analysis;
-  // 2열 배치: 헤드라인·리스크 프로필·테마는 full(넓어야 함), 나머지 컴팩트 카드는 둘씩.
-  // 진단 페어[원인|성격] → 이력 페어[회복|Top5] 순으로 자연히 채워진다.
+/** 시트 묶음 앞의 구간 이름 — 마이크로 캡스 + 시트 수. */
+function GroupLabel({ title, count }: { title: string; count: number }) {
   return (
-    <div className="mdd-grid">
-      <div className="mdd-full">
-        <Headline data={data} />
-      </div>
-      {/* 카드는 데이터가 없어도 자리를 지킨다 — 이유는 AbsentCard 주석 참고.
-          full/half 칸 수도 그대로 유지해야 2열 짝이 안 어긋난다. */}
-      <div className="mdd-full">
-        {data.risk ? (
-          <RiskProfile r={data.risk} />
-        ) : (
-          <AbsentCard
-            icon="insights"
-            title="리스크 프로필"
-            sub="이 종목을 들고 있으면 어떤 위험을 감수하게 되는지, 세 가지 각도로 봅니다."
-            body="상장한 지 얼마 되지 않아 연도별 성적과 큰 하락을 낼 만큼 이력이 쌓이지 않았습니다."
-          />
-        )}
-      </div>
-      {data.attribution ? (
-        <Attribution
-          attr={data.attribution}
-          themeName={data.theme?.name ?? null}
-          themePeers={data.theme?.peers.filter((p) => !p.isSelf).map((p) => p.name) ?? []}
-          athDate={a.athDate}
-        />
-      ) : (
-        <AbsentCard
-          icon="call_split"
-          title="이 하락, 시장 탓일까 종목 탓일까"
-          sub="고점 이후 같은 기간을 시장·테마와 나란히 놓고 비교합니다."
-          body={
-            a.currentDd > -1
-              ? "지금은 고점 부근이라 원인을 나눌 하락이 없습니다."
-              : `고점(${a.athDate}) 무렵의 코스피·테마 기록이 없어 같은 기간을 나란히 놓지 못했습니다.`
-          }
-        />
-      )}
-      <Character ch={a.character} currentDd={a.currentDd} />
-      {a.recovery ? (
-        <Recovery a={a} />
-      ) : (
-        <AbsentCard
-          icon="history"
-          title="회복까지 걸린 시간"
-          sub="과거 이만큼 빠졌을 때 고점을 되찾기까지 걸린 기간입니다."
-          body="지금은 고점 부근이라 회복을 기다릴 하락이 없습니다."
-        />
-      )}
-      {a.topDrawdowns.length > 0 ? (
-        <TopDrawdowns eps={a.topDrawdowns} />
-      ) : (
-        <AbsentCard
-          icon="leaderboard"
-          title="역대 낙폭 Top 5"
-          sub="이 기간에 가장 깊었던 하락과, 고점을 되찾기까지 걸린 시간입니다."
-          body="이 기간엔 순위를 매길 만한 하락이 없었습니다. 기간을 넓히면 더 나올 수 있습니다."
-        />
-      )}
-      <div className="mdd-full">
-        {data.theme ? (
-          <Theme theme={data.theme} />
-        ) : (
-          <AbsentCard
-            icon="hub"
-            title="테마 비교"
-            sub="같은 테마 대표 종목들과 지금 낙폭을 나란히 놓습니다."
-            body="이 종목이 묶인 테마를 찾지 못했습니다. 테마 대표 종목 목록에 등록된 종목에서만 비교가 나옵니다."
-          />
-        )}
-      </div>
+    <div style={{ display: "flex", alignItems: "baseline", gap: 9, marginTop: 4 }}>
+      <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".1em", color: C.label }}>{title}</span>
+      <span style={{ fontSize: 10.5, fontWeight: 700, color: C.label }}>{count}</span>
     </div>
   );
+}
+
+/** 50:50 두 시트가 나란히 서는 줄. 좁아지면 한 장씩 접힌다. */
+function Pair({ children }: { children: React.ReactNode }) {
+  return <div className="mdd-pair">{children}</div>;
+}
+
+function Results({ data }: { data: MddResult }) {
+  const a = data.analysis;
+  const periodLabel = periodLabelOf(data);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <HeroStrip data={data} periodLabel={periodLabel} />
+      <Underwater a={a} periodLabel={periodLabel} />
+
+      {data.risk ? (
+        <RiskProfile r={data.risk} periodLabel={periodLabel} />
+      ) : (
+        <AbsentSheet
+          icon="monitoring"
+          title="리스크 프로필"
+          sub="이 종목을 들고 있으면 어떤 위험을 감수하게 되는지, 세 가지 각도로 봅니다"
+          body="상장한 지 얼마 되지 않아 연도별 성적과 큰 하락을 낼 만큼 이력이 쌓이지 않았습니다."
+        />
+      )}
+
+      <GroupLabel title="과거 낙폭 사례" count={2} />
+      {/* 시트는 데이터가 없어도 자리를 지킨다 — 이유는 AbsentSheet 주석 참고.
+          짝의 칸 수도 그대로 유지해야 50:50 이 안 어긋난다. */}
+      <Pair>
+        {a.topDrawdowns.length > 0 ? (
+          <TopDrawdowns eps={a.topDrawdowns} />
+        ) : (
+          <AbsentSheet
+            icon="history"
+            title="역대 낙폭 Top 5"
+            sub="이만큼 빠졌던 구간과 회복까지 걸린 기간"
+            body="이 기간엔 순위를 매길 만한 하락이 없었습니다. 기간을 넓히면 더 나올 수 있습니다."
+          />
+        )}
+        {a.recovery ? (
+          <Recovery a={a} periodLabel={periodLabel} />
+        ) : (
+          <AbsentSheet
+            icon="schedule"
+            title="회복까지 걸린 기간"
+            sub="과거 사례로 본 회복 소요 기간"
+            body="지금은 고점 부근이라 회복을 기다릴 하락이 없습니다."
+          />
+        )}
+      </Pair>
+
+      <GroupLabel title="이 하락의 정체" count={3} />
+      <Pair>
+        {data.attribution ? (
+          <Attribution
+            attr={data.attribution}
+            stockName={data.name}
+            themeName={data.theme?.name ?? null}
+            themePeers={data.theme?.peers.filter((p) => !p.isSelf).map((p) => p.name) ?? []}
+          />
+        ) : (
+          <AbsentSheet
+            icon="call_split"
+            title="시장 탓일까, 종목 탓일까"
+            sub="지수·업종과 견줘 이 종목만의 낙폭이 얼마인지"
+            body={
+              a.currentDd > -1
+                ? "지금은 고점 부근이라 원인을 나눌 하락이 없습니다."
+                : `고점(${a.athDate}) 무렵의 코스피·테마 기록이 없어 같은 기간을 나란히 놓지 못했습니다.`
+            }
+          />
+        )}
+        <Character ch={a.character} currentDd={a.currentDd} />
+      </Pair>
+      {data.theme ? (
+        <Theme theme={data.theme} />
+      ) : (
+        <AbsentSheet
+          icon="hub"
+          title="테마 비교"
+          sub="같은 테마 대표 종목들과 지금 낙폭을 나란히 놓습니다"
+          body="이 종목이 묶인 테마를 찾지 못했습니다. 테마 대표 종목 목록에 등록된 종목에서만 비교가 나옵니다."
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * "최근 10년" / "상장 이후·약 6년" — 화면 곳곳이 같은 말을 써야 해서 한곳에서 만든다.
+ * 요청한 기간보다 상장 이력이 짧으면 "최근 10년"은 거짓이 되므로 실제 구간으로 바꾼다.
+ */
+function periodLabelOf(data: MddResult): string {
+  const a = data.analysis;
+  const approxYears = (Date.parse(a.asOf) - Date.parse(a.firstDate)) / (365 * 86_400_000);
+  const requested = data.years === "all" ? Infinity : Number(data.years);
+  const truncated = data.years !== "all" && approxYears < requested - 0.5;
+  return data.years === "all" || truncated ? `상장 이후·약 ${Math.max(1, Math.round(approxYears))}년` : `최근 ${data.years}년`;
 }
 
 /* ── 공통 프리미티브 ───────────────────────────────────────────────
    카드마다 제각각이던 머리·타일·막대를 셋으로 통일한다. 페이지 전체가 같은
    리듬(파란 아이콘 → 제목 → 한 줄 설명 → 데이터)으로 읽히게 하는 게 목적이다. */
 
-// padding 은 폭에 따라 24 → 18 (globals.css 의 --hz-card-pad).
-const card: React.CSSProperties = { background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: "var(--hz-card-pad)", minWidth: 0 };
-
-/** 카드 머리 — 시장 브리핑(TitleRow)·카더라(SectionHead)와 같은 구조. 아이콘은 파랑 고정. */
-function CardHead({ icon, title, sub, right }: { icon: string; title: string; sub?: string; right?: React.ReactNode }) {
+/**
+ * 시트 — 흰 판 + 헤어라인 + radius 14, **그림자 없음**. 시장 브리핑·카더라와 같은 판이다.
+ * 세로 flex 라 각주 띠(Foot)가 늘 바닥에 붙고, 나란히 놓인 두 시트의 밑단이 맞는다.
+ */
+function Sheet({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
-      <div style={{ minWidth: 0 }}>
-        <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: C.ink, display: "flex", alignItems: "center", gap: 10, lineHeight: 1.25 }}>
-          <Icon name={icon} style={{ fontSize: 22, color: C.blue, flexShrink: 0 }} />
-          <span style={{ wordBreak: "keep-all" }}>{title}</span>
-        </h2>
-        {sub && <p style={{ margin: "7px 0 0", fontSize: 12.5, color: C.sub, lineHeight: 1.55, wordBreak: "keep-all" }}>{sub}</p>}
-      </div>
-      {right && <div style={{ flexShrink: 0 }}>{right}</div>}
+    <section className="hz-sheet" style={{ display: "flex", flexDirection: "column", ...style }}>
+      {children}
+    </section>
+  );
+}
+
+/**
+ * 시트 바닥 각주 띠. 높이는 클래스가 39 로 못박는다 — 나란한 시트끼리 바닥 두께가
+ * 다르면 같은 줄이 층진 것처럼 보인다(globals.css 의 .hz-sheet-foot 주석 참고).
+ */
+function Foot({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="hz-sheet-foot" style={{ marginTop: "auto" }}>
+      <span style={{ fontSize: 10.5, lineHeight: 1.55, color: C.sub2, padding: "9px 0", wordBreak: "keep-all" }}>{children}</span>
     </div>
   );
 }
 
 /**
- * 데이터가 없어 본문을 못 채우는 카드의 공통 껍데기.
+ * 데이터가 없어 본문을 못 채우는 시트의 공통 껍데기.
  *
- * 카드를 통째로 숨기지 않는다. 종목을 바꿀 때마다 격자에서 카드가 빠지면 (1) 2열 짝이
- * 어긋나 옆 카드 가운데가 텅 비고, (2) 문턱이 절벽이라 카드가 깜빡인다 — 성격 카드는
- * −8% 문턱이라 KB금융(−7.9%)이 0.1%p 차이로 사라져, 하루 사이 생겼다 없어지면
- * "어제 있던 게 왜 없지"가 된다. 자리를 지키고 왜 못 보여주는지를 적는다.
+ * 시트를 통째로 숨기지 않는다. 종목을 바꿀 때마다 격자에서 빠지면 (1) 2열 짝이 어긋나
+ * 옆 시트 가운데가 텅 비고, (2) 문턱이 절벽이라 시트가 깜빡인다 — 성격 시트는 −8% 문턱이라
+ * KB금융(−7.9%)이 0.1%p 차이로 사라져, 하루 사이 생겼다 없어지면 "어제 있던 게 왜 없지"가
+ * 된다. 자리를 지키고 왜 못 보여주는지를 적는다.
  */
-function AbsentCard({ icon, title, sub, body }: { icon: string; title: string; sub: string; body: string }) {
+function AbsentSheet({ icon, title, sub, body }: { icon: string; title: string; sub: string; body: string }) {
   return (
-    <section style={card}>
-      <CardHead icon={icon} title={title} sub={sub} />
-      <p style={{ margin: 0, color: C.muted, fontSize: 12.5, lineHeight: 1.7, wordBreak: "keep-all" }}>
-        <Icon name="info" style={{ fontSize: 14, verticalAlign: -2, marginRight: 4 }} />
-        {body}
-      </p>
-    </section>
+    <Sheet>
+      <SectionHead icon={icon} title={title} desc={sub} />
+      <div style={{ padding: PAD }}>
+        <p style={{ margin: 0, color: C.muted, fontSize: 12, lineHeight: 1.7, wordBreak: "keep-all" }}>
+          <Icon name="info" style={{ fontSize: 14, verticalAlign: -2, marginRight: 4 }} />
+          {body}
+        </p>
+      </div>
+    </Sheet>
   );
 }
 
-function Badge({ children, tone }: { children: React.ReactNode; tone?: "blue" | "warn" }) {
-  const bg = tone === "blue" ? "var(--c-blue-tint)" : tone === "warn" ? "var(--c-mania-tint, rgba(220,80,80,.12))" : C.bg;
-  const fg = tone === "blue" ? C.blue : tone === "warn" ? C.mania : C.sub;
+/** 히어로 셀·성격 시트 바닥의 3분할 통계 한 칸 — 라벨 / 값 / 보조. */
+function StatCell({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
   return (
-    <span style={{ fontSize: 11.5, fontWeight: 600, padding: "4px 10px", borderRadius: 999, background: bg, color: fg, whiteSpace: "nowrap" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
+      <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: ".06em", color: C.faint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        {label}
+      </span>
+      <strong style={{ fontSize: 15, fontWeight: 800, color: tone ?? C.ink, letterSpacing: "-.02em" }}>{value}</strong>
+      {sub && <span style={{ fontSize: 10, color: C.faint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</span>}
+    </div>
+  );
+}
+
+/** 시트 머리 오른쪽 알약. 띠 위에 얹히므로 카드색 + 헤어라인이다(SectionHead 주석 참고). */
+function Pill({ children, tone }: { children: React.ReactNode; tone?: string }) {
+  return (
+    <span
+      style={{
+        fontSize: 10,
+        fontWeight: 700,
+        padding: "2px 8px",
+        borderRadius: R.pill,
+        background: C.card,
+        border: `1px solid ${C.line}`,
+        color: tone ?? C.sub,
+        whiteSpace: "nowrap",
+      }}
+    >
       {children}
     </span>
   );
 }
 
-/** 값 타일 — 라벨 / 큰 숫자 / 보조. 회복·성격 카드가 공유한다. */
-function Stat({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "ink" | "cold" | "mania" | "blue" }) {
-  const color = tone === "cold" ? C.cold : tone === "mania" ? C.mania : tone === "blue" ? C.blue : C.ink;
-  return (
-    <div style={{ background: C.bg, borderRadius: 12, padding: "13px 15px", minWidth: 0 }}>
-      <div style={{ fontSize: 11.5, color: C.sub, marginBottom: 5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
-      <div style={{ fontFamily: MONO, fontSize: 19, fontWeight: 700, letterSpacing: "-0.02em", color, lineHeight: 1.15 }}>{value}</div>
-      {sub && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 4 }}>{sub}</div>}
-    </div>
-  );
-}
-
-/** 이름 | 막대 | 값 한 줄. 원인 분해·테마 비교가 공유한다. */
-function BarRow({
+/**
+ * 이름 | 트랙 막대 | 값 한 줄. 원인 분해·테마 비교·낙폭 구간 분포가 공유한다.
+ *
+ * ⚠️ 라벨·값 칸은 고정폭이고 막대만 flex:1 이다. 라벨에 minWidth:0 이 없으면 긴 종목명이
+ * 말줄임 대신 칸을 밀어 막대를 좁힌다 — 1440 에서는 안 보이고 좁은 폭에서만 드러난다.
+ */
+function MeterRow({
   label,
   pct,
   value,
   color,
   strong,
   help,
-  labelWidth = 112,
-  dim = !strong,
+  labelWidth = 104,
+  valueWidth = 48,
 }: {
   label: string;
   pct: number;
@@ -654,140 +741,432 @@ function BarRow({
   strong?: boolean;
   help?: string;
   labelWidth?: number;
-  /** 강조색(cold/mania)을 옅게 깔아 자기 종목 줄만 튀게 하는 장치. 색 자체가 이미
-   *  중립색(C.bar)이면 여기서 또 반투명을 먹이면 트랙에 묻으니 끈다. */
-  dim?: boolean;
+  valueWidth?: number;
 }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: `${labelWidth}px minmax(0,1fr) 58px`, alignItems: "center", gap: 10 }}>
-      <span style={{ display: "flex", alignItems: "center", gap: 3, minWidth: 0 }}>
-        <span style={{ fontSize: 13, color: strong ? C.ink : C.sub, fontWeight: strong ? 700 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <span style={{ width: labelWidth, flex: "none", display: "flex", alignItems: "center", gap: 3, minWidth: 0 }}>
+        <span
+          style={{
+            fontSize: 11.5,
+            fontWeight: strong ? 800 : 600,
+            color: strong ? C.ink : C.sub,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            minWidth: 0,
+          }}
+        >
+          {label}
+        </span>
         {help && (
-          <span className="hz-tip hz-tip-wide" data-tip={help} style={{ flexShrink: 0, display: "inline-flex", cursor: "help", color: C.faint }}>
-            <Icon name="help" style={{ fontSize: 14 }} />
+          <span className="hz-tip hz-tip-wide" data-tip={help} style={{ flexShrink: 0, display: "inline-flex", cursor: "help", color: C.hint }}>
+            <Icon name="help" style={{ fontSize: 13 }} />
           </span>
         )}
       </span>
-      <span style={{ height: 9, background: C.bg, borderRadius: 999, overflow: "hidden" }}>
-        <span style={{ display: "block", height: "100%", width: `${Math.max(2, Math.min(100, pct))}%`, background: color, opacity: dim ? 0.5 : 1, borderRadius: 999 }} />
+      <span style={{ flex: 1, minWidth: 0, height: 11, background: C.track, borderRadius: 4, overflow: "hidden" }}>
+        <span style={{ display: "block", height: "100%", width: `${Math.max(2, Math.min(100, pct))}%`, background: color, borderRadius: 4 }} />
       </span>
-      <span style={{ fontFamily: MONO, fontSize: 13, textAlign: "right", color: strong ? C.ink : C.sub, fontWeight: strong ? 800 : 500 }}>{value}</span>
+      <span
+        style={{
+          width: valueWidth,
+          flex: "none",
+          textAlign: "right",
+          fontFamily: MONO,
+          fontSize: 11.5,
+          fontWeight: strong ? 800 : 700,
+          color: strong ? color : C.sub,
+        }}
+      >
+        {value}
+      </span>
     </div>
   );
 }
 
-/* ── 헤드라인 ─────────────────────────────────────────────────── */
-/* 히어로의 '얼마나 드문지' 한 문장. 비율만 적으면 "0%뿐입니다"가 된다 — 삼성전자는 실제로
-   나흘이 더 깊었는데 반올림이 0% 으로 만들고, 정말 0일인 신저점 종목과 화면이 똑같아진다.
-   비율은 얼마나 드문지를 말하지만 그 자체로는 손에 잡히지 않으니 날수를 앞에 세운다. */
-function Rarity({ a, periodLabel }: { a: MddAnalysis; periodLabel: string }) {
-  /* keep-all — 날수가 붙어 문장이 두 줄이 되면서 "뿐입니 / 다"로 갈라졌다(이 파일의 다른
-     설명문들과 같은 처리다). 예전엔 한 줄에 들어가 이 속성이 없어도 티가 안 났다. */
-  const style = { margin: "0 0 6px", fontSize: 14.5, color: C.sub, lineHeight: 1.6, maxWidth: 340, wordBreak: "keep-all" as const };
+/* ── 거울 막대 ─────────────────────────────────────────────────────
+   리스크 프로필 세 패널이 공유하는 한 줄. 0선을 가운데 두고 왼쪽(파랑=하락)과
+   오른쪽(빨강=회복·수익)으로 갈라 "어느 쪽이 긴가"만 보면 읽히게 한다.
 
-  // 0일이면 지금이 이 구간에서 가장 깊다. "0거래일뿐입니다"로 얼버무리지 않고 문장을 갈아탄다.
-  if (a.deeperThanNowDays === 0) {
-    return (
-      <p style={style}>
-        {periodLabel} 중 <b style={{ color: C.ink }}>가장 깊은</b> 낙폭입니다
-      </p>
-    );
-  }
+   막대 폭은 **반폭 기준**이다 — |값| / 최댓값 × 50%. 한쪽이 최댓값이면 그 반쪽을 꽉 채운다.
 
-  /* 1% 미만을 "0%"로 적지 않는다 — 날수는 있는데 비율이 0이면 두 숫자가 서로 어긋나 보인다. */
-  const pct = a.deeperThanNowPct < 0.5 ? "1% 미만" : `${Math.round(a.deeperThanNowPct)}%`;
-  /* 세는 단위는 거래일인데 화면엔 '일'로 적는다(2026-07-30 결정). '거래일'이 더 정확하지만
-     히어로 한 문장에서 걸리는 말이고, 낙폭·기간이 전부 종가 기준인 페이지라 여기서만 단위를
-     따로 짚을 자리가 아니다. 정확한 단위는 lib/mdd.ts 의 deeperThanNowDays 주석에 있다. */
-  const days = `${a.deeperThanNowDays.toLocaleString("ko-KR")}일`;
-  /* 64%에 "뿐"을 붙이면 드물다는 뜻이 사라진다. 흔한 쪽은 담담하게 적는다. */
-  const tail = a.deeperThanNowPct < 10 ? "뿐입니다" : "입니다";
+   ⚠️ 기간처럼 자릿수 차가 큰 값(33일 ~ 1,387일)은 선형 눈금이면 짧은 막대가 1%로
+   사라진다. 제곱근 눈금과 min-width 5px 을 함께 쓴다(각주에 제곱근임을 밝힌다). */
+const MIRROR_LABEL_W = 34;
+const MIRROR_LEFT_W = 40;
+const MIRROR_RIGHT_W = 44;
 
+function MirrorRow({
+  label,
+  left,
+  right,
+}: {
+  label: string;
+  left: { pct: number; value: string; color: string; ink: string };
+  right: { pct: number; value: string; color: string; ink: string; dashed?: boolean };
+}) {
+  const bar: React.CSSProperties = { position: "absolute", top: 3, height: 8, minWidth: 5 };
   return (
-    <p style={style}>
-      {periodLabel} 중 이보다 깊었던 날은{" "}
-      {/* 숫자와 어미를 한 덩이로 — 떼어 놓으면 "뿐입니다"만 다음 줄에 혼자 남는다.
-          가장 긴 조합("1,559일(64%)입니다")도 maxWidth 340 안에 들어간다. */}
-      <span style={{ whiteSpace: "nowrap" }}>
-        <b style={{ color: C.ink }}>
-          {days}({pct})
-        </b>
-        {tail}
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <span style={{ width: MIRROR_LABEL_W, flex: "none", fontFamily: MONO, fontSize: 10, fontWeight: 700, color: C.sub2, whiteSpace: "nowrap" }}>
+        {label}
       </span>
-    </p>
+      <span style={{ width: MIRROR_LEFT_W, flex: "none", textAlign: "right", fontFamily: MONO, fontSize: 10.5, fontWeight: 800, color: left.ink }}>
+        {left.value}
+      </span>
+      <div style={{ position: "relative", flex: 1, minWidth: 0, height: 14 }}>
+        <span style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1.5, background: C.line }} />
+        <span style={{ ...bar, right: "50%", width: `${left.pct}%`, borderRadius: "3px 0 0 3px", background: left.color }} />
+        <span style={{ ...bar, left: "50%", width: `${right.pct}%`, borderRadius: "0 3px 3px 0", background: right.dashed ? UNRECOVERED : right.color }} />
+      </div>
+      <span style={{ width: MIRROR_RIGHT_W, flex: "none", fontFamily: MONO, fontSize: 10.5, fontWeight: 800, color: right.ink }}>{right.value}</span>
+    </div>
   );
 }
 
-function Headline({ data }: { data: MddResult }) {
+/** 거울 막대 위의 축 라벨. **값 열에 맞춘다** — 막대 위가 아니라 숫자 위에 서야 읽힌다. */
+function MirrorAxis({ left, right }: { left: string; right: string }) {
+  const s: React.CSSProperties = { flex: "none", fontSize: 9.5, fontWeight: 800, letterSpacing: ".04em", color: C.faint };
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <span style={{ width: MIRROR_LABEL_W, flex: "none" }} />
+      <span style={{ ...s, width: MIRROR_LEFT_W, textAlign: "right" }}>{left}</span>
+      <div style={{ flex: 1, minWidth: 0 }} />
+      <span style={{ ...s, width: MIRROR_RIGHT_W }}>{right}</span>
+    </div>
+  );
+}
+
+/** 범례 한 줄 — 색 조각 + 이름. */
+function Legend({ items }: { items: { label: string; background: string }[] }) {
+  return (
+    <div style={{ display: "flex", gap: 11, flexWrap: "wrap" }}>
+      {items.map((it) => (
+        <span key={it.label} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 9.5, fontWeight: 700, color: C.sub2 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 2, background: it.background, flex: "none" }} />
+          {it.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/* ── 이 하락, 어떻게 읽나 ───────────────────────────────────────────
+   히어로 셋째 셀의 해설 문단. **LLM 을 쓰지 않는다** — 전부 이 페이지가 이미 가진 수치를
+   문장으로 옮긴 것이라, 반짝 아이콘도 AI 고지도 붙이지 않는다.
+
+   ⚠️ 문단마다 재료가 없을 수 있다(테마 미등록·회복 전례 없음·상장 직후). 없으면 그 문단만
+   빠지고 나머지는 남는다 — 셋을 한 덩이로 묶으면 하나가 비어도 셋이 다 사라진다. */
+function Reading({ data, periodLabel }: { data: MddResult; periodLabel: string }) {
   const a = data.analysis;
-  const atHigh = a.currentDd > -1;
-  const approxYears = (Date.parse(a.asOf) - Date.parse(a.firstDate)) / (365 * 86_400_000);
-  const requested = data.years === "all" ? Infinity : Number(data.years);
-  // 요청한 기간보다 상장 이력이 짧으면 "최근 10년"은 거짓이 된다 — 실제 구간으로 바꾼다.
-  const truncated = data.years !== "all" && approxYears < requested - 0.5;
-  const periodLabel =
-    data.years === "all" || truncated ? `상장 이후·약 ${Math.max(1, Math.round(approxYears))}년` : `최근 ${data.years}년`;
+  const p: React.CSSProperties = { margin: 0, fontSize: 12.5, lineHeight: 1.75, color: C.inkSoft, wordBreak: "keep-all" };
+  const b = (color?: string) => ({ fontWeight: 800, color: color ?? C.ink });
+  const paras: React.ReactNode[] = [];
+
+  // 1 — 얼마나 드문 깊이인가.
+  const bigDrops = a.depthBuckets.reduce((s, d) => s + d.count, 0);
+  if (bigDrops > 0) {
+    paras.push(
+      <p key="depth" style={p}>
+        {periodLabel} 동안 <b style={b()}>−20%보다 깊이</b> 잠긴 구간은 {bigDrops}번이었고, 가장 깊었던 때는{" "}
+        <b style={b()}>{fmtPct(a.mdd)}</b>였습니다.
+        {a.recovery && a.recovery.similarCount > 0 && (
+          <> 지금만큼 깊었던 적은 그중 {a.recovery.similarCount}번입니다.</>
+        )}
+      </p>,
+    );
+  }
+
+  // 2 — 시장·업종으로 설명되는 몫과 안 되는 몫.
+  const attr = data.attribution;
+  if (attr) {
+    const bench = attr.theme ?? attr.market;
+    const themeName = data.theme?.name;
+    const gap = bench !== null ? attr.stock - bench : null;
+    paras.push(
+      <p key="attr" style={p}>
+        같은 기간 코스피는 {attr.market !== null ? fmtPct(attr.market) : "기록이 없고"}
+        {attr.theme !== null && <>, {themeName ?? "테마"} 업종은 {fmtPct(attr.theme)}</>} 빠졌습니다.
+        {gap !== null &&
+          (gap < 0 ? (
+            <>
+              {" "}
+              시장·업종으로 설명되지 않는 <b style={b(DOWN)}>{fmtPct(gap)}p</b>가 이 종목 고유의 낙폭입니다.
+            </>
+          ) : (
+            <>
+              {" "}
+              이 종목은 오히려 <b style={b(UP)}>{fmtPct(gap)}p</b> 덜 빠졌습니다.
+            </>
+          ))}
+      </p>,
+    );
+  }
+
+  // 3 — 과거엔 회복까지 얼마나 걸렸나.
+  const r = a.recovery;
+  if (r) {
+    paras.push(
+      <p key="rec" style={p}>
+        {r.recoveredCount >= 2 ? (
+          <>
+            과거 {r.recoveredCount}번의 회복은 <b style={b()}>중앙값 {fmtDur(r.medianDays!)}</b>({fmtDur(r.minDays!)}~
+            {fmtDur(r.maxDays!)})이 걸렸습니다.
+          </>
+        ) : r.recoveredCount === 1 ? (
+          <>
+            고점을 되찾은 전례는 <b style={b()}>{fmtDur(r.medianDays!)}</b> 걸린 한 번뿐이라, 기간은 범위로만 참고하십시오.
+          </>
+        ) : (
+          <>
+            이만큼 깊게 빠진 뒤 <b style={b()}>회복한 전례가 없습니다</b>. 지금이 이 종목의 역대 최대 낙폭입니다.
+          </>
+        )}
+      </p>,
+    );
+  }
 
   // 정직성 경고 — 겹쳐 쌓지 않고 필요한 것만.
-  const cautions: string[] = [];
-  if (data.years === "all")
-    cautions.push("전체 구간에는 합병·감자·액면병합이 섞여 있어, 아주 오래된 낙폭은 지금의 회사와 다를 수 있습니다.");
-  else if (truncated) cautions.push(`상장한 지 약 ${Math.round(approxYears)}년이라 요청한 기간보다 데이터가 짧습니다.`);
-  if (approxYears < 2) cautions.push("표본이 짧아 더 오래된 종목과 같은 무게로 보지 마십시오.");
+  const approxYears = (Date.parse(a.asOf) - Date.parse(a.firstDate)) / (365 * 86_400_000);
+  const caution =
+    data.years === "all"
+      ? "전체 구간에는 합병·감자·액면병합이 섞여 있어, 아주 오래된 낙폭은 지금의 회사와 다를 수 있습니다."
+      : approxYears < 2
+        ? "표본이 짧아 더 오래된 종목과 같은 무게로 보지 마십시오."
+        : null;
 
   return (
-    <section style={card}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 22 }}>
-        {/* 로고는 글자 기준선(baseline)이 아니라 가운데에 맞아야 해서 이 줄만 center 로
-            둔다. baseline 이면 정사각형 타일이 글자 밑선에 걸려 위로 떠 보인다. */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <StockLogo code={data.code} name={data.name} market={data.market} size={30} />
-          <span style={{ fontSize: 21, fontWeight: 700, color: C.ink }}>{data.name}</span>
-          <span style={{ fontFamily: MONO, fontSize: 13, color: C.faint }}>{data.code}</span>
-          {data.market && <Badge>{data.market}</Badge>}
-        </div>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          <Badge tone="blue">{periodLabel}</Badge>
-          <Badge>{a.asOf}</Badge>
-        </div>
-      </div>
-
-      {/* 히어로 — 지금 낙폭을 가장 크게, 그 옆에 '얼마나 드문지'를 한 문장으로. */}
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 22, flexWrap: "wrap", marginBottom: 18 }}>
-        <div>
-          <div style={{ fontSize: 12.5, color: C.sub, marginBottom: 7 }}>고점 대비</div>
-          <span style={{ fontFamily: MONO, fontSize: 54, fontWeight: 700, lineHeight: 0.95, letterSpacing: "-0.035em", color: atHigh ? C.ink : C.cold }}>
-            {atHigh ? "신고가 부근" : fmtPct(a.currentDd)}
-          </span>
-        </div>
-        {!atHigh && <Rarity a={a} periodLabel={periodLabel} />}
-      </div>
-
-      {/* 현재가·최고가를 라벨 붙은 두 칸으로 — 예전 회색 한 줄보다 기준이 분명하다. */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 20 }}>
-        <Stat label="현재가" value={fmtWon(a.price)} sub={a.asOf} />
-        <Stat label={`${periodLabel} 최고가`} value={fmtWon(a.ath)} sub={a.athDate} />
-        <Stat label="기간 최저점" value={fmtPct(a.mdd)} sub={a.mddDate} tone="cold" />
-      </div>
-
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: C.sub }}>고점 대비 낙폭 추이</span>
-        <span style={{ fontSize: 11.5, color: C.muted }}>0%에 가까울수록 고점 부근</span>
-      </div>
-      <Underwater series={a.underwater} mdd={a.mdd} />
-
-      {cautions.map((c, i) => (
-        <p key={i} style={{ margin: `${i === 0 ? 16 : 6}px 0 0`, fontSize: 12, color: C.sub, lineHeight: 1.6 }}>
-          <Icon name="info" style={{ fontSize: 14, verticalAlign: -2, marginRight: 4 }} />
-          {c}
+    <>
+      {paras}
+      {caution && (
+        <p style={{ ...p, fontSize: 11, color: C.muted, marginTop: "auto" }}>
+          <Icon name="info" style={{ fontSize: 13, verticalAlign: -2, marginRight: 4 }} />
+          {caution}
         </p>
-      ))}
+      )}
+    </>
+  );
+}
+
+/* ── 히어로 스트립 ─────────────────────────────────────────────────
+   시트 하나를 flex-wrap 으로 3분할한다. **고정 3열 그리드를 쓰면 안 된다** — 좁은 폭에서
+   세 칸이 합쳐 컨테이너를 넘긴다. 셀마다 flex-basis 를 주고 알아서 접히게 둔다. */
+function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel: string }) {
+  const a = data.analysis;
+  const atHigh = a.currentDd > -1;
+  const sincePeak = Math.round((Date.parse(a.asOf) - Date.parse(a.athDate)) / 86_400_000);
+  const fromLow = a.low > 0 ? (a.price / a.low - 1) * 100 : 0;
+
+  /* 셀 경계는 셀이 자기 **오른쪽·아래** 두 곳에 inset 으로 긋는다(globals.css 의
+     .hz-cellgrid 와 같은 방식). 오른쪽만 그으면 좁은 폭에서 세 셀이 세로로 쌓일 때
+     경계가 통째로 사라지고(실측 820px: 셀 셋이 각각 554px 전폭), 그 선은 시트
+     오른쪽 테두리와 겹쳐 버린다.
+
+     아래 감싸는 div 의 margin-bottom:-1px 이 짝이다 — 모든 셀이 아랫선을 그으면
+     마지막 줄의 선이 시트 바닥 테두리와 겹쳐 2px 로 두꺼워지는데, 1px 짧게 잡아
+     시트 밖으로 밀면 overflow:hidden 이 잘라 준다. 셀 개수를 안 세도 된다. */
+  const cell: React.CSSProperties = {
+    minWidth: 0,
+    padding: "20px 22px",
+    display: "flex",
+    flexDirection: "column",
+    gap: 14,
+    boxShadow: `inset -1px 0 0 ${C.line}, inset 0 -1px 0 ${C.line}`,
+  };
+
+  return (
+    <section className="hz-sheet">
+      <div style={{ display: "flex", flexWrap: "wrap", marginBottom: -1 }}>
+      {/* 1 — 분석 종목 */}
+      <div style={{ ...cell, flex: "1 1 290px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>분석 종목</span>
+          {data.market && <Pill>{data.market}</Pill>}
+        </div>
+        {/* 로고는 글자 기준선이 아니라 가운데에 맞아야 한다 — baseline 이면 정사각형
+            타일이 글자 밑선에 걸려 위로 떠 보인다. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", minWidth: 0 }}>
+          <StockLogo code={data.code} name={data.name} market={data.market} size={30} />
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", minWidth: 0 }}>
+            <strong style={{ fontSize: 21, fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>{data.name}</strong>
+            <span style={{ fontFamily: MONO, fontSize: 11, color: C.faint }}>{data.code}</span>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
+          <strong style={{ fontFamily: MONO, fontSize: 20, fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>{fmtWon(a.price)}</strong>
+          {a.changePct !== null && (
+            <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color: a.changePct >= 0 ? UP : DOWN }}>{fmtPct(a.changePct)}</span>
+          )}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", marginTop: "auto" }}>
+          <PriceRow label="전고점" date={a.athDate} value={fmtWon(a.ath)} />
+          <PriceRow label="저점" date={a.lowDate} value={fmtWon(a.low)} />
+        </div>
+      </div>
+
+      {/* 2 — 지금 낙폭 */}
+      <div style={{ ...cell, flex: "1.05 1 300px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+            <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>지금 낙폭</span>
+            <span
+              className="hz-tip hz-tip-wide hz-tip-start"
+              data-tip={`전고점(${fmtWon(a.ath)}) 대비 현재가가 얼마나 내려와 있는지입니다`}
+              style={{ display: "inline-flex", cursor: "help" }}
+            >
+              <Icon name="help" style={{ fontSize: 14, color: C.hint }} />
+            </span>
+          </span>
+          {!atHigh && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: C.sub }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: DOWN_BAR[1], flex: "none" }} />
+              {rarityChip(a)}
+            </span>
+          )}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <strong
+            style={{ fontFamily: MONO, fontSize: 40, fontWeight: 800, lineHeight: 0.78, letterSpacing: "-.04em", color: atHigh ? C.ink : DOWN }}
+          >
+            {atHigh ? "신고가 부근" : fmtPct(a.currentDd)}
+          </strong>
+          {!atHigh && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub }}>전고점 대비</span>
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: C.sub }}>
+                저점 대비 <b style={{ color: fromLow >= 0 ? UP : DOWN, fontWeight: 800 }}>{fmtPct(fromLow)}</b>
+              </span>
+            </div>
+          )}
+        </div>
+        {!atHigh && <DrawdownGauge current={a.currentDd} mdd={a.mdd} periodLabel={periodLabel} />}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 10, marginTop: "auto", paddingTop: 14, borderTop: `1px solid ${C.divider}` }}>
+          <StatCell label="이 정도 낙폭" value={rarityChip(a)} sub={`${periodLabel} 거래일 중`} />
+          <StatCell label="기간 최저점" value={fmtPct(a.mdd)} sub={a.mddDate} tone={DOWN} />
+          <StatCell label="고점 이후" value={fmtDayCount(sincePeak)} sub={`${a.athDate}부터`} />
+        </div>
+      </div>
+
+      {/* 3 — 이 하락, 어떻게 읽나. LLM 을 쓰지 않는다(반짝 아이콘·AI 고지 없음). */}
+      <div style={{ ...cell, flex: "1.3 1 300px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+          <span
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: 6,
+              background: C.blueTint,
+              color: DOWN,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flex: "none",
+            }}
+          >
+            <Icon name="insights" style={{ fontSize: 14 }} />
+          </span>
+          <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>이 하락, 어떻게 읽나</span>
+        </div>
+        <Reading data={data} periodLabel={periodLabel} />
+      </div>
+      </div>
     </section>
   );
 }
 
+/** 히어로 1번 셀의 전고점·저점 두 줄. 위 칸부터 선을 그어 값이 표처럼 읽히게 한다. */
+function PriceRow({ label, date, value }: { label: string; date: string; value: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, padding: "10px 0", borderTop: `1px solid ${C.divider}` }}>
+      <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub, minWidth: 0 }}>
+        {label} <span style={{ fontFamily: MONO, fontSize: 10, color: C.faint }}>{date}</span>
+      </span>
+      <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: C.ink, flex: "none" }}>{value}</span>
+    </div>
+  );
+}
+
+/** "상위 8%" — 지금 낙폭이 이 기간에서 얼마나 드문 깊이인가. */
+function rarityChip(a: MddAnalysis): string {
+  if (a.deeperThanNowDays === 0) return "가장 깊음";
+  // 1% 미만을 "0%"로 적지 않는다 — 날수는 있는데 비율이 0이면 두 숫자가 어긋나 보인다.
+  return a.deeperThanNowPct < 0.5 ? "상위 1%" : `상위 ${Math.round(a.deeperThanNowPct)}%`;
+}
+
+/**
+ * 0 ~ −100% 게이지. 현재 위치에 마커를, 기간 최대 낙폭에 기준선을 세운다.
+ * 두 눈금이 겹칠 만큼 가까우면(지금이 곧 역대 최저) 기준선을 접는다 — 같은 자리에
+ * 선 두 개가 겹쳐 마커가 두꺼워 보일 뿐이다.
+ */
+function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: number; periodLabel: string }) {
+  const at = Math.min(100, Math.abs(current));
+  const worst = Math.min(100, Math.abs(mdd));
+  const showWorst = Math.abs(worst - at) > 3;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ position: "relative", paddingTop: 16 }}>
+        <span
+          style={{
+            position: "absolute",
+            top: 0,
+            left: `${at}%`,
+            transform: "translateX(-50%)",
+            fontFamily: MONO,
+            fontSize: 10.5,
+            fontWeight: 800,
+            color: DOWN,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {fmtPct(current)}
+        </span>
+        <div style={{ height: 9, borderRadius: 3, background: `linear-gradient(90deg, ${C.track}, ${DOWN_BAR[2]} 60%, ${DOWN_BAR[0]})` }} />
+        <span
+          style={{
+            position: "absolute",
+            left: `${at}%`,
+            top: 12,
+            transform: "translateX(-50%)",
+            width: 2,
+            height: 17,
+            borderRadius: 1,
+            background: C.ink,
+            boxShadow: `0 0 0 2px ${C.card}`,
+          }}
+        />
+        {showWorst && (
+          <span style={{ position: "absolute", left: `${worst}%`, top: 12, transform: "translateX(-50%)", width: 1, height: 13, background: C.faint }} />
+        )}
+      </div>
+      <div style={{ position: "relative", height: 13 }}>
+        <span style={{ position: "absolute", left: 0, top: 0, fontSize: 9.5, fontWeight: 600, color: C.sub }}>0%</span>
+        {showWorst && (
+          <span
+            style={{
+              position: "absolute",
+              left: `${worst}%`,
+              top: 0,
+              transform: "translateX(-50%)",
+              fontSize: 9.5,
+              fontWeight: 600,
+              color: C.sub,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {periodLabel} 최대 {fmtPct(mdd)}
+          </span>
+        )}
+        <span style={{ position: "absolute", right: 0, top: 0, fontSize: 9.5, fontWeight: 600, color: C.sub }}>−100%</span>
+      </div>
+    </div>
+  );
+}
+
 /* 고점 대비 낙폭 곡선(언더워터). dd 는 0 이하이고 아래로 갈수록 깊다. */
-function Underwater({ series, mdd }: { series: DrawdownPoint[]; mdd: number }) {
+function Underwater({ a, periodLabel }: { a: MddAnalysis; periodLabel: string }) {
+  const series = a.underwater;
+  const mdd = a.mdd;
   const W = 720;
   const H = 176;
   // 왼쪽 여백 — y축 라벨(0%·−23%·−45%)을 이 안에 두어 곡선과 겹치지 않게 한다.
@@ -832,7 +1211,14 @@ function Underwater({ series, mdd }: { series: DrawdownPoint[]; mdd: number }) {
   for (let i = 1; i < n; i++) if (series[i].dd < series[ti].dd) ti = i;
 
   return (
-    <div style={{ position: "relative" }}>
+    <Sheet>
+      <SectionHead
+        icon="show_chart"
+        title="언더워터 차트"
+        desc="전고점을 0으로 두고 그 아래로 얼마나 잠겼는지"
+        note={periodLabel}
+      />
+      <div style={{ padding: "20px 22px 16px", position: "relative" }}>
       {/* overflow:visible — 최저점 표시가 하필 마지막 지점일 때(지금이 역대 최저인
           종목) 뷰박스 오른쪽 끝에 놓여 기본값(hidden)이면 반지름만큼 잘린다. 뷰박스를
           넓히는 대신 넘침만 허용한다 — 넓히면 아래 크로스헤어 띠(퍼센트로 잡은 위치)가
@@ -848,12 +1234,11 @@ function Underwater({ series, mdd }: { series: DrawdownPoint[]; mdd: number }) {
         {rows.slice(1).map((dd, i) => (
           <line key={i} x1={PAD_L} y1={y(dd)} x2={W} y2={y(dd)} stroke={C.line} strokeWidth="1" strokeDasharray="2 5" />
         ))}
-        <path d={area} fill={C.cold} fillOpacity="0.14" />
-        <path d={line} fill="none" stroke={C.cold} strokeWidth="1.6" strokeLinejoin="round" />
-        {/* 기간 최저점 표시. 현재 지점에도 속 찬 점을 찍었었는데 뺐다 — 선이 끝나는
-            자리가 곧 현재이고, 그 값은 헤드라인(고점 대비 −31.2%)이 이미 크게 말한다.
-            오른쪽 끝에 점 하나가 더 있으면 눈만 끌 뿐이었다. */}
-        <circle cx={x(ti)} cy={y(series[ti].dd)} r="3.5" fill={C.card} stroke={C.cold} strokeWidth="1.6" />
+        <path d={area} fill={DOWN_BAR[1]} fillOpacity="0.14" />
+        <path d={line} fill="none" stroke={DOWN_BAR[1]} strokeWidth="1.6" strokeLinejoin="round" />
+        {/* 기간 최저점 표시 — **빈 동그라미만**. 현재 지점에도 속 찬 점을 찍었었는데 뺐다:
+            선이 끝나는 자리가 곧 현재이고, 그 값은 히어로가 이미 크게 말한다. */}
+        <circle cx={x(ti)} cy={y(series[ti].dd)} r="3.5" fill={C.card} stroke={DOWN} strokeWidth="1.6" />
         {rows.map((dd, i) => (
           <text key={i} x={PAD_L - LABEL_GAP} y={y(dd) + 4} fontSize="11" fill={C.faint} textAnchor="end">
             {Math.round(dd)}%
@@ -866,8 +1251,20 @@ function Underwater({ series, mdd }: { series: DrawdownPoint[]; mdd: number }) {
         ))}
       </svg>
       {/* 시장 브리핑 지표 카드와 같은 크로스헤어 — 보이지 않는 세로 띠가 hover 시 기준선(hz-vline)과
-          툴팁(hz-tip)을 낸다. 연도 라벨 높이(≈26px)만큼 아래로 남는 띠는 무시할 수준이다. */}
-      <div style={{ position: "absolute", top: 0, left: `${(PAD_L / W) * 100}%`, right: 0, bottom: 26, display: "flex" }}>
+          툴팁(hz-tip)을 낸다. 연도 라벨 높이(≈26px)만큼 아래로 남는 띠는 무시할 수준이다.
+          ⚠️ 시트 padding 안쪽에 맞춰야 한다 — 바깥(시트) 기준으로 잡으면 곡선과 어긋난다. */}
+      {/* ⚠️ display 는 인라인에 두지 않는다 — 좁은 폭에서 이 띠를 끄는 미디어쿼리를
+          인라인 style 이 이겨서 안 먹는다(.mdd-crosshair 가 display 를 맡는다). */}
+      <div
+        className="mdd-crosshair"
+        style={{
+          position: "absolute",
+          top: 20,
+          left: `calc(22px + ${(PAD_L / W) * 100}% - ${(PAD_L / W) * 44}px)`,
+          right: 22,
+          bottom: 42,
+        }}
+      >
         {series.map((p, i) => {
           // 툴팁이 넓어서(날짜·가격·낙폭) 가운데 정렬이면 끝쪽 지점에서 컨테이너를
           // 벗어난다 — 오른쪽으로 벗어나면 페이지에 가로 스크롤까지 생긴다.
@@ -886,7 +1283,9 @@ function Underwater({ series, mdd }: { series: DrawdownPoint[]; mdd: number }) {
           );
         })}
       </div>
-    </div>
+      </div>
+      <Foot>0%가 전고점입니다. 아래로 갈수록 그 고점에서 멀어져 있다는 뜻이며, 선이 0에 닿은 날이 고점을 되찾은 날입니다.</Foot>
+    </Sheet>
   );
 }
 
@@ -898,7 +1297,23 @@ function Underwater({ series, mdd }: { series: DrawdownPoint[]; mdd: number }) {
 const RISK_ROWS = 5; // 모든 타일이 쓰는 고정 줄 수(연도 5개 · 사건 5건)
 
 /** 타일 본문 — 막대 영역(viz)과 맨 아래에 고정되는 요약 한 줄(foot)을 따로 들고 있는다. */
-type TileBody = { viz: React.ReactNode; foot: React.ReactNode; more?: React.ReactNode };
+type TileBody = { head: React.ReactNode; viz: React.ReactNode; foot: React.ReactNode; more?: React.ReactNode };
+
+/** 패널 머리의 큰 수치 둘 — 19px/800 + 작은 라벨. 세 패널이 같은 자리에 쓴다. */
+function TileHead({ items }: { items: { value: string; label: string; tone: string }[] }) {
+  return (
+    <div style={{ display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
+      {items.map((it) => (
+        <div key={it.label} style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+          <strong style={{ fontFamily: MONO, fontSize: 19, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1, color: it.tone }}>
+            {it.value}
+          </strong>
+          <span style={{ fontSize: 9.5, color: C.faint, whiteSpace: "nowrap" }}>{it.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /**
  * '전체보기' — 막대에 안 깔린 해까지 조회 기간 전체를 펼친다.
@@ -945,7 +1360,7 @@ function YearsPopover({ years, label }: { years: YearStat[]; label: string }) {
   );
 }
 
-function RiskProfile({ r }: { r: RiskProfileData }) {
+function RiskProfile({ r, periodLabel }: { r: RiskProfileData; periodLabel: string }) {
   const yrs = Math.max(1, Math.round(r.years));
   const alone = r.withMarket === null ? 0 : r.bigDropCount - r.withMarket;
   const yearly = r.yearly.slice(-RISK_ROWS);
@@ -956,14 +1371,12 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
   // 붙인다 — 한 번뿐인 해까지 붙이면 축이 괜히 시끄러워진다.
   const eventYearCount = new Map<number, number>();
   for (const e of events) eventYearCount.set(e.year, (eventYearCount.get(e.year) ?? 0) + 1);
+  /* 월이 붙는 줄은 연도를 두 자리로 줄인다("2026.2" → "26.2"). 거울 막대의 라벨 칸은
+     세 패널이 공유하는 고정폭(MIRROR_LABEL_W)이라 여기서 넓힐 수가 없는데, 네 자리 연도에
+     월을 붙이면 그 칸을 넘긴다. 두 자리로 줄이면 "2020"(4글자)과 폭이 같아진다. */
   const eventLabels = events.map((e) =>
-    (eventYearCount.get(e.year) ?? 0) > 1 ? `${e.year}.${e.month}` : `${e.year}`,
+    (eventYearCount.get(e.year) ?? 0) > 1 ? `${String(e.year).slice(2)}.${e.month}` : `${e.year}`,
   );
-
-  // 연도 칸 폭 — 월이 붙는 종목에서만 넓혀 세 타일을 함께 민다(한 종목 안에서는 세 타일이
-  // 늘 같은 폭이라 가로 축은 그대로 맞는다). 폭은 계산하지 말고 실측할 것: 이 자리에서
-  // "2021.11"은 43.3px 이라 눈대중으로 잡은 42px 에서 1px 넘쳤다. 두 자리 월이 최대다.
-  const yearCol = eventLabels.some((l) => l.includes(".")) ? 46 : 30;
 
   /* 타일 제목 옆 괄호. 두 타일과 한 타일이 서로 다른 것을 적는데, 다르게 적을 이유가 있다.
      기준은 하나다 — **괄호가 가리키는 것에 화면에서 닿을 수 있나.**
@@ -982,75 +1395,64 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
   const yearScope = yearly.length ? ` (최근 ${yrs}년)` : "";
   const eventScope = events.length ? ` (최근 ${events.length}건)` : "";
 
-  // 범례는 막대 두 줄이 각각 뭔지 알려주는 유일한 단서다 — 이걸 못 읽으면 타일이
-  // 통째로 안 읽힌다. sub(11px)로는 타일 배경 위에서 흐려서 ink-soft 로 한 단계 올린다.
-  const legend = (items: { label: string; color: string; opacity?: number }[]) => (
-    <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
-      {items.map((it) => (
-        <span key={it.label} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--c-ink-soft)" }}>
-          <span style={{ width: 9, height: 9, borderRadius: 2, background: it.color, opacity: it.opacity ?? 1 }} />
-          {it.label}
-        </span>
-      ))}
-    </div>
-  );
+  const empty = (text: string) => <p style={{ margin: 0, fontSize: 11.5, color: C.muted, lineHeight: 1.6 }}>{text}</p>;
+  const rows = (children: React.ReactNode) => <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{children}</div>;
+  const summary = (text: string) => <p style={{ margin: 0, fontSize: 10.5, color: C.sub2, lineHeight: 1.55, wordBreak: "keep-all" }}>{text}</p>;
+  /** 거울 막대의 반쪽 폭 — 최댓값이 반폭(50%)을 꽉 채운다. */
+  const half = (v: number, max: number) => (Math.abs(v) / max) * 50;
+  /**
+   * 제곱근 눈금(반폭 기준). 한 값이 나머지를 압도할 때 쓴다.
+   *
+   * 실측(SK하이닉스 10년): 2025년 수익 +280%가 축을 다 먹어 낙폭 막대가 6~20px 로
+   * 뭉갰다(2023년 −17%는 6px). 제곱근은 짧은 쪽을 벌리면서 **순서와 좌우 비교를 지킨다**
+   * — 단조 증가라 sqrt(a) > sqrt(b) 와 a > b 가 같은 뜻이고, 이 패널이 묻는 "어느 쪽이
+   * 긴가"가 그대로 남는다. 대신 길이 '비율'은 실제보다 눌리므로 각주에 밝힌다.
+   */
+  const halfSqrt = (v: number, max: number) => Math.sqrt(Math.abs(v) / max) * 50;
 
-  /** 한 줄 = [연도] [막대+값] [막대+값]. 세 타일이 이 한 가지 줄만 쓴다. */
-  const row = (
-    key: string | number,
-    label: string,
-    a: { pct: number; color: string; opacity: number; value: string },
-    b: { pct: number; color: string; opacity: number; value: string },
-  ) => (
-    <div key={key} style={{ display: "grid", gridTemplateColumns: `${yearCol}px minmax(0,1fr)`, alignItems: "center", gap: 8 }}>
-      {/* 연도는 이 줄이 언제 얘기인지를 말하는 축이라 faint 로는 흐리다. muted 로는 부족했다 —
-          라이트에서 명암비가 2.59 → 2.96 으로 거의 안 움직인다(두 토큰이 라이트에선 붙어
-          있다). sub 까지 올려야 3.30/7.32 로 실제로 한 단계 밝아진다. 범례(ink-soft)보다는
-          여전히 한 단계 아래라 위계는 그대로다. */}
-      <span style={{ fontFamily: MONO, fontSize: 11, color: C.sub, whiteSpace: "nowrap" }}>{label}</span>
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        {[a, b].map((s, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 7 }}>
-            <span style={{ display: "block", flex: 1 }}>
-              <span style={{ display: "block", height: 6, width: `${Math.max(2, Math.min(100, s.pct))}%`, background: s.color, opacity: s.opacity, borderRadius: 999 }} />
-            </span>
-            <span style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 600, color: C.sub, width: 42, textAlign: "right" }}>{s.value}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  const empty = (text: string) => <p style={{ margin: 0, fontSize: 12, color: C.muted, lineHeight: 1.6 }}>{text}</p>;
-  const rows = (children: React.ReactNode) => (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{children}</div>
-  );
-  const summary = (text: string) => (
-    <p style={{ margin: "12px 0 0", fontSize: 12, color: C.muted, lineHeight: 1.5 }}>{text}</p>
-  );
-
-  /* 1 — 낙폭 대비 보상: 해마다 '그 해 수익'과 '그 해 최악 낙폭'. */
+  /* 1 — 낙폭 대비 보상: 해마다 '그 해 최악 낙폭'(왼쪽·파랑)과 '그 해 수익'(오른쪽·빨강).
+         손실인 해는 수익도 하락이므로 오른쪽이지만 파랑으로 칠한다. */
+  const avgYearMdd = yearly.length ? yearly.reduce((s, y) => s + y.mdd, 0) / yearly.length : 0;
+  const beatCount = yearly.filter((y) => y.ret > Math.abs(y.mdd)).length;
   const tile1: TileBody =
     yearly.length === 0
-      ? { viz: empty("연도별 표본이 부족합니다."), foot: null }
+      ? { head: null, viz: empty("연도별 표본이 부족합니다."), foot: null }
       : {
+          head: (
+            <TileHead
+              items={[
+                { value: `${Math.abs(r.annualReturn).toFixed(1)}%`, label: `연평균(복리) ${r.annualReturn >= 0 ? "수익" : "손실"}`, tone: r.annualReturn >= 0 ? UP : DOWN },
+                { value: `${Math.round(avgYearMdd)}%`, label: "해마다 겪은 평균 낙폭", tone: DOWN },
+              ]}
+            />
+          ),
           viz: (
             <>
-              {legend([
-                { label: "그 해 수익", color: C.mania },
-                { label: "그 해 최악 낙폭", color: C.cold, opacity: 0.45 },
-              ])}
+              <Legend
+                items={[
+                  { label: "그 해 최악 낙폭", background: DOWN_BAR[2] },
+                  { label: "그 해 수익", background: UP_BAR_SOFT },
+                ]}
+              />
+              <div style={{ margin: "11px 0 8px" }}>
+                <MirrorAxis left="낙폭" right="수익" />
+              </div>
               {rows(
                 (() => {
                   const max = Math.max(...yearly.flatMap((y) => [Math.abs(y.ret), Math.abs(y.mdd)]), 1);
-                  return yearly.map((y) =>
-                    row(
-                      y.year,
-                      `${y.year}`,
-                      { pct: (Math.abs(y.ret) / max) * 100, color: y.ret >= 0 ? C.mania : C.cold, opacity: 1, value: `${y.ret >= 0 ? "+" : "−"}${Math.abs(Math.round(y.ret))}%` },
-                      { pct: (Math.abs(y.mdd) / max) * 100, color: C.cold, opacity: 0.45, value: `${Math.round(y.mdd)}%` },
-                    ),
-                  );
+                  return yearly.map((y) => (
+                    <MirrorRow
+                      key={y.year}
+                      label={`${y.year}`}
+                      left={{ pct: halfSqrt(y.mdd, max), value: `${Math.round(y.mdd)}%`, color: DOWN_BAR[2], ink: DOWN }}
+                      right={{
+                        pct: halfSqrt(y.ret, max),
+                        value: `${y.ret >= 0 ? "+" : "−"}${Math.abs(Math.round(y.ret))}%`,
+                        color: y.ret >= 0 ? UP_BAR_SOFT : DOWN_BAR[2],
+                        ink: y.ret >= 0 ? UP : DOWN,
+                      }}
+                    />
+                  ));
                 })(),
               )}
             </>
@@ -1069,7 +1471,9 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
              사람은 "손실이 마이너스면 이득인가" 하고 한 번 멈춘다. 낱말이 부호보다 빨리
              읽히니 낱말을 남기고 부호를 뺀다. */
           foot: summary(
-            `최근 ${yrs}년 연평균(복리) ${Math.abs(r.annualReturn).toFixed(1)}% ${r.annualReturn >= 0 ? "수익" : "손실"}`,
+            r.annualReturn >= 0 && avgYearMdd < 0
+              ? `위험 1을 견딜 때 보상 ${(r.annualReturn / Math.abs(avgYearMdd)).toFixed(2)}배 · ${yearly.length}년 중 ${beatCount}년은 보상이 낙폭보다 컸습니다`
+              : `최근 ${yrs}년은 연평균(복리) ${Math.abs(r.annualReturn).toFixed(1)}% 손실이라 견딘 위험을 보상하지 못했습니다`,
           ),
           /* 막대는 자리 때문에 최근 RISK_ROWS 줄뿐인데 제목·요약은 조회 기간 전체를 말한다.
              나머지 해를 여기서 펼쳐, 적어 둔 기간에 실제로 닿게 한다.
@@ -1086,33 +1490,51 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
           })(),
         };
 
-  /* 2 — 하락 vs 회복 속도: 큰 하락마다 '빠지는 데'와 '되돌아오는 데'. */
+  /* 2 — 하락 vs 회복 속도: 큰 하락마다 '빠지는 데'(왼쪽)와 '되돌아오는 데'(오른쪽).
+         ⚠️ 기간은 33일 ~ 1,387일처럼 자릿수 차가 커서 선형 눈금이면 짧은 막대가 사라진다.
+         제곱근 눈금을 쓰고 각주에 밝힌다(MirrorRow 주석 참고). */
   const tile2: TileBody =
     events.length === 0
-      ? { viz: empty("큰 하락 표본이 얇습니다."), foot: null }
+      ? { head: null, viz: empty("큰 하락 표본이 얇습니다."), foot: null }
       : {
+          head: (
+            <TileHead
+              items={[
+                { value: r.dropDaysMedian !== null ? fmtDur(r.dropDaysMedian) : "—", label: "하락 기간 중앙값", tone: DOWN },
+                { value: r.recoverDaysMedian !== null ? fmtDur(r.recoverDaysMedian) : "—", label: "회복 기간 중앙값", tone: UP },
+              ]}
+            />
+          ),
           viz: (
             <>
-              {legend([
-                { label: "빠지는 데", color: C.cold },
-                { label: "되돌아오는 데", color: C.cold, opacity: 0.4 },
-              ])}
+              <Legend
+                items={[
+                  { label: "빠지는 데", background: DOWN_BAR[2] },
+                  { label: "되돌아오는 데", background: UP_BAR_SOFT },
+                  { label: "미회복", background: UNRECOVERED },
+                ]}
+              />
+              <div style={{ margin: "11px 0 8px" }}>
+                <MirrorAxis left="하락" right="회복" />
+              </div>
               {rows(
                 (() => {
                   const max = Math.max(...events.map((e) => Math.max(e.dropDays, e.recoverDays ?? 0)), 1);
-                  return events.map((e, i) =>
-                    row(
-                      i,
-                      eventLabels[i],
-                      { pct: (e.dropDays / max) * 100, color: C.cold, opacity: 1, value: fmtDur(e.dropDays) },
-                      {
-                        pct: e.recoverDays === null ? 0 : (e.recoverDays / max) * 100,
-                        color: C.cold,
-                        opacity: 0.4,
+                  return events.map((e, i) => (
+                    <MirrorRow
+                      key={i}
+                      label={eventLabels[i]}
+                      left={{ pct: halfSqrt(e.dropDays, max), value: fmtDur(e.dropDays), color: DOWN_BAR[2], ink: DOWN }}
+                      right={{
+                        // 미회복은 '지금까지 걸린 시간'이 아직 안 끝났다는 뜻이라 짧은 점선만 둔다.
+                        pct: e.recoverDays === null ? 4 : halfSqrt(e.recoverDays, max),
                         value: e.recoverDays === null ? "미회복" : fmtDur(e.recoverDays),
-                      },
-                    ),
-                  );
+                        color: UP_BAR_SOFT,
+                        ink: e.recoverDays === null ? C.sub2 : UP,
+                        dashed: e.recoverDays === null,
+                      }}
+                    />
+                  ));
                 })(),
               )}
             </>
@@ -1127,32 +1549,47 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
   /* 3 — 혼자 빠지나, 같이 빠지나: 큰 하락마다 이 종목과 코스피의 낙폭. */
   const tile3: TileBody =
     events.length === 0
-      ? { viz: empty("큰 하락이 없었습니다."), foot: null }
+      ? { head: null, viz: empty("큰 하락이 없었습니다."), foot: null }
       : !events.some((e) => e.market !== null)
-        ? { viz: empty("코스피 데이터가 없습니다."), foot: null }
+        ? { head: null, viz: empty("코스피 데이터가 없습니다."), foot: null }
         : {
+            /* 양쪽 다 낙폭이라 **둘 다 파랑**이다 — 여기서 빨강을 쓰면 코스피 하락이
+               회복으로 읽힌다. 어느 쪽인지는 명도로 가른다. */
+            head: (
+              <TileHead
+                items={[
+                  { value: `${r.bigDropCount}번`, label: "큰 하락", tone: DOWN },
+                  { value: `${alone}번`, label: "이 종목만 빠짐", tone: C.ink },
+                ]}
+              />
+            ),
             viz: (
               <>
-                {legend([
-                  { label: "이 종목", color: C.cold },
-                  { label: "코스피", color: C.bar },
-                ])}
+                <Legend
+                  items={[
+                    { label: "이 종목", background: DOWN_BAR[0] },
+                    { label: "코스피", background: DOWN_BAR[3] },
+                  ]}
+                />
+                <div style={{ margin: "11px 0 8px" }}>
+                  <MirrorAxis left="이 종목" right="코스피" />
+                </div>
                 {rows(
                   (() => {
                     const max = Math.max(...events.flatMap((e) => [Math.abs(e.stock), e.market !== null ? Math.abs(e.market) : 0]), 1);
-                    return events.map((e, i) =>
-                      row(
-                        i,
-                        eventLabels[i],
-                        { pct: (Math.abs(e.stock) / max) * 100, color: C.cold, opacity: 1, value: `${Math.round(e.stock)}%` },
-                        {
-                          pct: e.market === null ? 0 : (Math.abs(e.market) / max) * 100,
-                          color: C.bar,
-                          opacity: 1,
+                    return events.map((e, i) => (
+                      <MirrorRow
+                        key={i}
+                        label={eventLabels[i]}
+                        left={{ pct: half(e.stock, max), value: `${Math.round(e.stock)}%`, color: DOWN_BAR[0], ink: DOWN }}
+                        right={{
+                          pct: e.market === null ? 0 : half(e.market, max),
                           value: e.market === null ? "—" : `${Math.round(e.market)}%`,
-                        },
-                      ),
-                    );
+                          color: DOWN_BAR[3],
+                          ink: C.sub,
+                        }}
+                      />
+                    ));
                   })(),
                 )}
               </>
@@ -1167,40 +1604,61 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
           };
 
   const tiles: { icon: string; label: string; sub: string; body: TileBody }[] = [
-    { icon: "trending_up", label: "낙폭 대비 보상", sub: `감수한 위험에 비해 얼마나 벌었나${yearScope}`, body: tile1 },
-    { icon: "speed", label: "하락 vs 회복 속도", sub: `빠질 때와 되돌아올 때, 어느 쪽이 오래 걸리나${eventScope}`, body: tile2 },
+    { icon: "balance", label: "낙폭 대비 보상", sub: `감수한 위험만큼 돌려받았나${yearScope}`, body: tile1 },
+    { icon: "speed", label: "하락 vs 회복 속도", sub: `빠지는 데 vs 되돌아오는 데${eventScope}`, body: tile2 },
     { icon: "sync", label: "혼자 빠지나, 같이 빠지나", sub: `큰 하락 때 코스피도 같이 빠졌나${eventScope}`, body: tile3 },
   ];
 
   return (
-    <section style={card}>
-      <CardHead
-        icon="insights"
+    <Sheet>
+      <SectionHead
+        icon="monitoring"
         title="리스크 프로필"
-        sub="이 종목을 들고 있으면 어떤 위험을 감수하게 되는지, 세 가지 각도로 봅니다."
+        desc="이 종목을 들고 있으면 어떤 위험을 감수하게 되는지, 세 가지 각도로 봅니다"
+        note={periodLabel}
       />
-      {/* 세 타일이 [머리말][막대][요약] 세 행을 공유한다(subgrid). 부제 길이가 타일마다
-          달라 어떤 폭에서는 두 줄, 어떤 폭에서는 한 줄이 되는데, 타일마다 제 높이를 쓰면
-          그만큼 막대 시작 줄이 어긋난다. 머리말에 최소 높이를 박아 두는 방법은 폭이 좁아
-          세 줄이 되는 구간에서 다시 깨지므로, 행을 공유해 구조로 맞춘다. */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gridTemplateRows: "auto 1fr auto", gap: 12, alignItems: "stretch" }}>
+      {/* 세 패널이 [머리말][큰 수치][막대][요약] 네 행을 공유한다(subgrid). 부제 길이가
+          패널마다 달라 어떤 폭에서는 두 줄, 어떤 폭에서는 한 줄이 되는데, 패널마다 제
+          높이를 쓰면 그만큼 막대 시작 줄이 어긋난다. 행을 공유해 구조로 맞춘다.
+          ⚠️ minmax(min(280px,100%), 1fr) — 280px 를 그냥 두면 좁은 폭에서 트랙이
+          컨테이너보다 넓어진다. */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))",
+          gridTemplateRows: "auto auto 1fr auto",
+          alignItems: "stretch",
+          // 아래 셀들이 긋는 마지막 줄 아랫선을 시트 밖으로 밀어 잘라낸다(위 히어로와 같은 짝).
+          marginBottom: -1,
+        }}
+      >
         {tiles.map((t) => (
-          <div key={t.label} style={{ background: C.bg, borderRadius: 14, padding: "16px 18px", display: "grid", gridTemplateRows: "subgrid", gridRow: "span 3", rowGap: 0 }}>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 16 }}>
-              <span style={{ width: 30, height: 30, borderRadius: 9, background: "var(--c-blue-tint)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Icon name={t.icon} style={{ fontSize: 17, color: C.blue }} />
-              </span>
-              <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: C.ink, lineHeight: 1.3, wordBreak: "keep-all" }}>{t.label}</span>
-                <span style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.45, wordBreak: "keep-all" }}>{t.sub}</span>
+          <div
+            key={t.label}
+            style={{
+              display: "grid",
+              gridTemplateRows: "subgrid",
+              gridRow: "span 4",
+              rowGap: 0,
+              padding: "18px 22px",
+              minWidth: 0,
+              // 오른쪽·아래 두 곳에 긋는다 — 좁은 폭에서 1열로 접히면 세로선은 시트
+              // 테두리와 겹치고 패널 사이를 가르는 건 아랫선이다(히어로 cell 주석 참고).
+              boxShadow: `inset -1px 0 0 ${C.line}, inset 0 -1px 0 ${C.line}`,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 9, marginBottom: 13 }}>
+              <Icon name={t.icon} style={{ fontSize: 17, color: C.muted, marginTop: 1, flexShrink: 0 }} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: "-.01em", color: C.ink, wordBreak: "keep-all" }}>{t.label}</span>
+                <span style={{ fontSize: 10.5, lineHeight: 1.5, color: C.faint, wordBreak: "keep-all" }}>{t.sub}</span>
               </div>
             </div>
-            {/* 줄 수가 적은 타일도 같은 높이를 유지하도록 최소 높이를 준다(5줄 기준).
-                요약 문장(foot)은 별도 행이라 줄이 모자라도 늘 타일 맨 아래에 붙는다. */}
-            <div style={{ minHeight: 164 }}>{t.body.viz}</div>
+            <div style={{ marginBottom: 13 }}>{t.body.head}</div>
+            <div>{t.body.viz}</div>
             {/* 요약과 전체보기가 한 줄을 나눠 쓴다. 팝오버가 이 칸 기준으로 위로 펴지므로
-                relative 가 여기 있어야 한다(타일에 주면 요약 줄 위로 안 붙는다). */}
-            <div style={{ position: "relative", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 10 }}>
+                relative 가 여기 있어야 한다(패널에 주면 요약 줄 위로 안 붙는다). */}
+            <div style={{ position: "relative", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 10, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.divider}` }}>
               {/* foot 은 <p> 라 <span> 으로 감싸면 안 된다(span 은 phrasing content 만 받는다). */}
               <div style={{ minWidth: 0 }}>{t.body.foot}</div>
               {t.body.more}
@@ -1208,227 +1666,230 @@ function RiskProfile({ r }: { r: RiskProfileData }) {
           </div>
         ))}
       </div>
-      <p style={{ margin: "16px 0 0", color: C.muted, fontSize: 12, lineHeight: 1.6 }}>
-        <Icon name="info" style={{ fontSize: 14, verticalAlign: -2, marginRight: 4 }} />
-        보상은 조회 기간(최근 {yrs}년)에 따라 달라지니 절대 수치보다 성격으로 보십시오. 큰 하락·속도는 고점 대비 −20% 이상 하락 기준입니다. 막대는 최근 {RISK_ROWS}개까지만 그리고, 연도는 전체보기로 조회 기간 전부를 볼 수 있습니다.
-      </p>
-    </section>
+      {/* 한 줄에 들어가야 바닥 띠가 39 로 선다. 보상이 조회 기간에 딸린다는 말은 패널
+          제목 옆 괄호가 이미 하고 있어 여기서 뺐다. */}
+      <Foot>
+        파랑은 하락, 빨강은 회복·수익입니다. 큰 하락은 고점 대비 −20% 이상 기준이고 막대는 최근 {RISK_ROWS}건까지, 앞 두 패널은 제곱근 눈금입니다.
+      </Foot>
+    </Sheet>
   );
 }
 
 /* ── 원인 분해 ─────────────────────────────────────────────────── */
 function Attribution({
   attr,
+  stockName,
   themeName,
   themePeers,
-  athDate,
 }: {
   attr: Attribution;
+  stockName: string;
   themeName: string | null;
   themePeers: string[];
-  athDate: string;
 }) {
-  const rows: { label: string; v: number; self: boolean; help?: string }[] = [{ label: "이 종목", v: attr.stock, self: true }];
-  if (attr.market !== null) rows.push({ label: "코스피", v: attr.market, self: false });
+  const rows: { label: string; v: number; self: boolean; color: string; help?: string }[] = [];
+  if (attr.market !== null) rows.push({ label: "코스피", v: attr.market, self: false, color: DOWN_BAR[4] });
   if (attr.theme !== null)
     rows.push({
-      label: `${themeName ?? "테마"} 대표`,
+      label: `${themeName ?? "테마"} 업종`,
       v: attr.theme,
       self: false,
-      // "○○ 대표"가 어떤 종목인지 툴팁으로 밝힌다 — 이 종목은 뺀 나머지 대표 종목 평균이다.
+      color: DOWN_BAR[2],
+      // "○○ 업종"이 어떤 종목인지 툴팁으로 밝힌다 — 이 종목은 뺀 나머지 대표 종목 평균이다.
       help: themePeers.length ? `${themePeers.join(" · ")}. 이 테마 대표 종목의 평균입니다 (이 종목 제외).` : undefined,
     });
+  rows.push({ label: stockName, v: attr.stock, self: true, color: DOWN_BAR[0] });
   const worst = Math.max(...rows.map((r) => Math.abs(r.v)), 1);
 
-  // 판단 기준은 시장(없으면 테마). 종목이 기준보다 얼마나 더/덜 빠졌나.
-  const bench = attr.market ?? attr.theme;
-  const gap = bench !== null ? attr.stock - bench : 0;
-  const verdict =
-    bench === null
-      ? "같은 기간 종목의 낙폭입니다."
-      : gap >= 8
-        ? "시장이 빠지는 와중에 상대적으로 버틴 편입니다."
-        : gap <= -8
-          ? "시장·업종보다 더 깊게 빠졌습니다. 종목 고유 요인이 있는지 볼 대목입니다."
-          : "거의 시장을 따라 움직였습니다. 이 하락의 대부분은 시장 전체가 함께 빠진 것입니다.";
+  /* 기준은 업종(없으면 시장). 종목이 기준보다 얼마나 더/덜 빠졌나.
+     gap 이 음수면 종목이 더 빠진 것 = 설명되지 않는 초과낙폭.
+
+     ⚠️ **gap 이 양수인 경우가 드물지 않다.** 업종보다 덜 빠진 종목이 절반쯤 되고
+     (2026-08 실측: 삼성전자 −33.9% vs 반도체 −40.6%), 그때 '종목 탓 %'를 그대로 내면
+     음수가 된다("종목 탓 −20%"). 비율 자체를 뒤집지 않고 **문장과 막대의 주인공을
+     바꾼다** — 초과낙폭이 아니라 '덜 빠진 몫'을 말한다. */
+  const bench = attr.theme ?? attr.market;
+  const gap = bench !== null && attr.stock !== 0 ? attr.stock - bench : null;
+  const excess = gap !== null && gap < 0;
+  const share = gap !== null ? Math.round((Math.abs(gap) / Math.abs(attr.stock)) * 100) : null;
 
   return (
-    <section style={{ ...card, display: "flex", flexDirection: "column" }}>
-      <CardHead
-        icon="call_split"
-        title="이 하락, 시장 탓일까 종목 탓일까"
-        sub={`고점(${athDate}) 이후 ${attr.sincePeakDays.toLocaleString("ko-KR")}일, 같은 기간을 나란히 놓고 비교합니다.`}
-      />
-      <p style={{ margin: "0 0 16px", color: C.ink, fontSize: 15, fontWeight: 600, lineHeight: 1.6, wordBreak: "keep-all" }}>{verdict}</p>
-      {/* 옆 카드(이 하락의 성격)에 맞춰 늘어나는데 여긴 막대 셋뿐이라 바닥이 비었다.
-          줄 간격을 벌려 채우지는 않는다 — 이건 목록이 아니라 길이를 견주는 차트라,
-          막대가 서로 멀어지면 비교가 어려워진다. 묶음을 붙여 둔 채 세로 가운데로 둬
-          남는 공간이 위아래로 갈리게 한다. */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 9, justifyContent: "center" }}>
-        {rows.map((r) => (
-          // 고점 이후 수익률이라 시장·테마는 상승(+)일 수도 있다 — 부호로 색을 가른다
-          // (하락=파랑, 상승=빨강, 티커와 같은 한국장 관례). 자기 종목만 진하게.
-          <BarRow
-            key={r.label}
-            label={r.label}
-            pct={(Math.abs(r.v) / worst) * 100}
-            value={fmtPct(r.v)}
-            color={r.v >= 0 ? C.mania : C.cold}
-            strong={r.self}
-            help={r.help}
-          />
-        ))}
+    <Sheet>
+      <SectionHead icon="call_split" title="시장 탓일까, 종목 탓일까" desc="지수·업종과 견줘 이 종목만의 낙폭이 얼마인지" note="같은 기간" />
+      <div style={{ flex: 1, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 18 }}>
+        {share !== null && (
+          <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
+            <strong style={{ fontFamily: MONO, fontSize: 34, fontWeight: 800, letterSpacing: "-.035em", lineHeight: 1, color: excess ? DOWN : UP }}>
+              <span style={{ fontSize: 17, fontWeight: 700 }}>{excess ? "종목 탓 " : "덜 빠진 몫 "}</span>
+              {share}
+              <span style={{ fontSize: 17, fontWeight: 700 }}>%</span>
+            </strong>
+            <span style={{ fontSize: 11.5, color: C.sub2 }}>{excess ? `시장·업종 ${100 - share}%` : "업종 평균보다 얕은 하락"}</span>
+          </div>
+        )}
+        {/* 옆 시트(이 하락의 성격)에 맞춰 늘어나는데 여긴 막대 셋뿐이라 가운데가 빈다.
+            줄 간격을 벌려 채우지는 않는다 — 길이를 견주는 차트라 막대끼리 멀어지면
+            비교가 어려워진다. 묶음을 붙여 둔 채 남는 공간을 위아래로 가른다.
+            (아래 결론 노트는 margin-top:auto 라 그대로 바닥에 붙는다.) */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 11, justifyContent: "center" }}>
+          {rows.map((r) => (
+            // 고점 이후 수익률이라 시장·업종은 상승(+)일 수도 있다 — 그때만 빨강으로 가른다.
+            <MeterRow
+              key={r.label}
+              label={r.label}
+              pct={(Math.abs(r.v) / worst) * 100}
+              value={fmtPct(r.v)}
+              color={r.v >= 0 ? UP_BAR : r.color}
+              strong={r.self}
+              help={r.help}
+              labelWidth={82}
+            />
+          ))}
+        </div>
+        {/* 결론 노트는 **항상 시트 바닥**에 붙는다. 위 컨테이너에 flex:1 이 있어야
+            margin-top:auto 가 먹는다(옆 시트에 맞춰 늘어난 만큼 아래가 비기 때문). */}
+        {gap !== null && (
+          <div style={{ marginTop: "auto", display: "flex", gap: 9, background: C.soft, borderRadius: 10, padding: "12px 13px" }}>
+            <Icon name="bolt" style={{ fontSize: 15, color: C.hint, flex: "none", marginTop: 1 }} />
+            <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.7, color: C.inkSoft, wordBreak: "keep-all" }}>
+              {excess ? (
+                <>
+                  시장·업종으로 설명되지 않는 <b style={{ fontWeight: 800, color: DOWN }}>{fmtPct(gap)}p</b>가 이 종목 고유의 낙폭입니다.
+                </>
+              ) : (
+                <>
+                  이 종목은 업종 평균보다 <b style={{ fontWeight: 800, color: UP }}>{fmtPct(gap)}p</b> 덜 빠졌습니다. 하락은 대체로 업종 전체가 함께 겪은 것입니다.
+                </>
+              )}
+            </p>
+          </div>
+        )}
       </div>
-    </section>
+    </Sheet>
   );
 }
 
-/* ── 회복까지 걸린 시간 ─────────────────────────────────────────── */
-/* 줄 레이아웃 = [날짜칸] gap [막대 트랙] gap [값칸]. 중앙값 눈금이 트랙 위에 절대배치로
-   얹히면서 같은 폭을 다시 쓰기 때문에 상수로 묶는다. 예전엔 grid 문자열에 박아 두고
-   눈금 쪽에 51/71 을 손으로 적어 놨는데, 날짜칸을 넓히자(42→50) 눈금만 8px 어긋나
-   막대가 선을 넘어 보였다. */
-const REC_DATE_W = 50;
-const REC_VALUE_W = 62;
-const REC_GAP = 9;
-/* 막대의 최소 폭. 눈금도 같은 하한을 쓴다 — 중앙값이 이 폭 안쪽에 떨어지는 종목
-   (KB금융처럼 최장 표본이 중앙값의 30배가 넘는 경우)에서 눈금만 막대 뭉치 안에
-   박혀 모든 막대가 선을 넘어 보이던 것을 막는다. */
-const REC_BAR_MIN_W = 18;
-
-function Recovery({ a }: { a: MddAnalysis }) {
+/* ── 회복까지 걸린 기간 ─────────────────────────────────────────── */
+/**
+ * 위: 회복 기간의 중앙값과 범위. 아래: 낙폭 구간별로 몇 번 있었나.
+ *
+ * ⚠️ 두 그래픽은 **서로 다른 표본**을 센다. 위는 `recovery.samples`(지금보다 깊었던
+ * 사건만)이고 아래는 `analysis.depthBuckets`(−20% 이상 전부)다. 낙폭이 깊은 종목일수록
+ * 위쪽 표본이 급격히 줄어드는데(SK하이닉스 −46%면 13건 중 2건), 아래쪽 분포까지 같이
+ * 줄면 "이 정도 하락이 얼마나 흔한가"를 아예 못 그린다. 그래서 아래는 서버가 따로
+ * 세어 보낸다(lib/mdd.ts 의 depthHistogram 주석 참고). 창이 다르니 화면에도 밝힌다.
+ */
+function Recovery({ a, periodLabel }: { a: MddAnalysis; periodLabel: string }) {
   const r = a.recovery!;
+  /* 회복 표본이 하나면 중앙값 = 최단 = 최장이라 범위 선이 한 점으로 뭉갠다. 둘 이상일
+     때만 선과 중앙값 마커를 둔다. 표본 하나는 곧 '회복한 전례가 한 번뿐'인 종목이다. */
+  const hasRange = r.recoveredCount >= 2 && r.minDays !== null && r.maxDays !== null && r.maxDays > r.minDays;
+  const sincePeak = Math.round((Date.parse(a.asOf) - Date.parse(a.athDate)) / 86_400_000);
 
-  // 지금 깊이에서 회복한 전례가 없으면(대개 역대 최대 낙폭) 회복 통계를 낼 표본이 없다.
-  // "아직 회복 못 함 1건" 타일 하나만 덩그러니 두는 대신, 얼마나 오래 미회복 중인지를 보여준다.
-  if (r.recoveredCount === 0) {
-    const days = Math.round((Date.parse(a.asOf) - Date.parse(a.athDate)) / 86_400_000);
-    return (
-      <section style={card}>
-        <CardHead icon="history" title="회복까지 걸린 시간" sub="과거 이만큼 빠졌을 때 고점을 되찾기까지 걸린 기간입니다." />
-        <p style={{ margin: "0 0 16px", color: C.sub, fontSize: 14, lineHeight: 1.7 }}>
-          이만큼(<b style={{ color: C.ink }}>{fmtPct(a.currentDd)}</b>) 깊게 빠진 뒤 <b style={{ color: C.ink }}>회복한 전례가 없습니다</b>. 지금이 이 종목의 역대 최대 낙폭입니다.
-        </p>
-        <Stat label={`고점(${a.athDate}) 이후 지금까지`} value={fmtDur(days)} sub={`${fmtDayCount(days)}째 회복 못 함`} tone="mania" />
-      </section>
-    );
-  }
-
-  // 눈금 상한은 표본 중 가장 긴 기간. 미회복 건은 '지금까지 걸린 시간'이라 같은 축에 놓인다.
-  const longest = Math.max(1, ...r.samples.map((s) => s.days));
-
-  /* 제곱근 눈금. 선형으로 그리면 최장 표본 하나가 축을 다 먹는다 — KB금융은 6.1년 한 건
-     때문에 나머지 13건(11일~5개월)이 전부 최소 폭 18px 에 붙어 버려 서로 구분이 안 됐다.
-     제곱근은 짧은 쪽을 벌리면서 순서와 "길수록 오래"라는 직관을 지킨다(로그와 달리
-     0 근처가 발산하지 않는다). 대신 길이 비율은 실제 비율보다 눌리므로, 정확한 값은
-     오른쪽 숫자로 읽게 하고 카드 아래에 그렇게 적어 둔다. */
-  const barPct = (days: number) => Math.sqrt(days / longest) * 100;
-
-  /* 회복 표본이 하나면 중앙값 = 최단 = 최장이라 눈금이 그 막대 끝에 정확히 겹친다.
-     최장 표본이 그 한 건이면 트랙 맨 오른쪽 끝에 붙어 축 테두리처럼 보이고, 어느
-     쪽이든 "가운데"라는 뜻을 잃는다(막대 하나에 그 막대를 기준선으로 얹는 셈).
-     표본이 둘 이상일 때만 눈금과 중앙값 설명을 둔다. 표본 하나는 곧 진행 중인
-     지금 하락 말고 회복한 전례가 한 번뿐인 종목이다. */
-  const hasMedian = r.recoveredCount >= 2;
+  const buckets = a.depthBuckets;
+  const maxCount = Math.max(...buckets.map((b) => b.count), 1);
+  const inBucket = (b: DepthBucket) => a.currentDd <= b.from && (b.to === null || a.currentDd > b.to);
+  const bucketLabel = (b: DepthBucket) => (b.to === null ? `${b.from}% 이하` : `${b.from} ~ ${b.to}%`);
+  const here = buckets.find(inBucket);
 
   return (
-    <section style={{ ...card, display: "flex", flexDirection: "column" }}>
-      <CardHead
-        icon="history"
-        title="회복까지 걸린 시간"
-        sub={`지금(${fmtPct(a.currentDd)}) 이상 빠졌던 ${r.similarCount}번 중 ${r.recoveredCount}번이 고점을 되찾았습니다.`}
+    <Sheet>
+      <SectionHead
+        icon="schedule"
+        title="회복까지 걸린 기간"
+        desc="과거 사례로 본 회복 소요 기간"
+        note={r.recoveredCount > 0 ? `표본 ${r.recoveredCount}회` : "전례 없음"}
       />
-      {/* 예전엔 최단·중앙값·최장·미회복을 타일 네 개로만 뒀는데, 숫자 넷으로는 "4.7년"이
-          유난히 길었던 한 번인지 늘 그 정도인지 알 수 없었다(카드도 아래가 비었다).
-          회차별 막대로 분포를 그리고, 중앙값을 세로선으로 얹어 기준을 준다. */}
-      {/* 옆 카드(역대 낙폭 Top 5)가 5줄이라 이 카드가 그 높이로 늘어나는데 표본은 보통
-          3~4건이다. 원인 분해 카드와 같은 이유로 간격을 벌리지 않고 묶음을 가운데 둔다 —
-          회차별 길이를 견주는 차트라 막대끼리 붙어 있어야 읽힌다. 범례·중앙값 선도 이
-          안쪽 묶음에 넣어야 막대와 같이 움직인다(밖에 두면 선이 차트 위아래로 삐져나온다). */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-        {/* 리스크 프로필 범례와 같은 위계로 맞춘다(ink-soft) — 두 카드가 같은 성격의
-            범례를 다른 밝기로 쓰면 한쪽이 덜 중요한 것처럼 읽힌다. */}
-        <div style={{ display: "flex", gap: 14, marginBottom: 12, fontSize: 11, color: "var(--c-ink-soft)" }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-            <span style={{ width: 9, height: 9, borderRadius: 2, background: C.cold }} />
-            고점 되찾음
+
+      <div style={{ padding: "20px 22px", display: "flex", flexDirection: "column", gap: 16, borderBottom: `1px solid ${C.line}` }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
+          <strong style={{ fontFamily: MONO, fontSize: 34, fontWeight: 800, letterSpacing: "-.035em", lineHeight: 1, color: r.recoveredCount > 0 ? C.ink : DOWN }}>
+            {r.recoveredCount > 0 ? fmtDur(r.medianDays!) : fmtDayCount(sincePeak)}
+          </strong>
+          <span style={{ fontSize: 11.5, color: C.sub2, wordBreak: "keep-all" }}>
+            {r.recoveredCount === 0
+              ? "째 회복 못 함 · 이만큼 깊게 빠진 뒤 되찾은 전례가 없습니다"
+              : hasRange
+                ? `중앙값 · 범위 ${fmtDur(r.minDays!)}~${fmtDur(r.maxDays!)}`
+                : "고점을 되찾은 전례는 이 한 번뿐입니다"}
           </span>
-          {r.unrecoveredCount > 0 && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-              <span style={{ width: 9, height: 9, borderRadius: 2, background: C.mania }} />
-              아직 회복 못 함
-            </span>
-          )}
         </div>
-        <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 9 }}>
-        {r.samples.map((s) => (
-          <div key={s.peakDate} style={{ display: "grid", gridTemplateColumns: `${REC_DATE_W}px minmax(0,1fr) ${REC_VALUE_W}px`, alignItems: "center", gap: REC_GAP }}>
-            {/* 리스크 프로필의 연도 축과 같은 밝기(sub)로 맞춘다. */}
-            <span style={{ fontFamily: MONO, fontSize: 11, color: C.sub, whiteSpace: "nowrap" }}>{fmtYm(s.peakDate)}</span>
-            {/* 껍데기를 둘로 나눈다. 툴팁(.hz-tip::after)은 position:absolute; bottom:100% 로
-                요소 박스 '바깥 위쪽'에 그려지는데, 막대 둥근 모서리를 자르는 overflow:hidden 이
-                같은 요소에 있으면 툴팁이 통째로 잘려 영영 안 보인다(커서만 물음표로 바뀌어
-                있지도 않은 설명을 약속한다). 바깥은 툴팁 기준점, 안쪽은 클리핑 담당. */}
-            <span
-              className="hz-tip hz-tip-wide hz-tip-end"
-              data-tip={`${s.peakDate} 고점에서 ${fmtPct(s.depth)}까지 빠졌고, ${s.recovered ? `${fmtDayCount(s.days)} 만에 고점을 되찾았습니다` : `${fmtDayCount(s.days)}째 회복 중입니다`}.`}
-              style={{ display: "block" }}
-            >
-              <span style={{ display: "block", height: 10, background: C.bg, borderRadius: 999, overflow: "hidden" }}>
-                {/* minWidth 18px — 36일 vs 4.7년처럼 차이가 크면 비율만으로는 폭이 몇 px 라
-                    둥근 모서리에 먹혀 점 하나처럼 보인다(렌더 오류로 오해하기 쉽다).
-                    높이(10)보다 넉넉히 넓어야 원이 아니라 짧은 막대로 읽힌다. */}
-                <span
-                  style={{
-                    display: "block",
-                    height: "100%",
-                    width: `${barPct(s.days)}%`,
-                    minWidth: REC_BAR_MIN_W,
-                    background: s.recovered ? C.cold : C.mania,
-                    borderRadius: 999,
-                  }}
-                />
-              </span>
-            </span>
-            <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 600, textAlign: "right", color: s.recovered ? C.sub : C.mania }}>
-              {fmtDur(s.days)}
-            </span>
-          </div>
-        ))}
-        {/* 중앙값 눈금 — 막대 칸(가운데 트랙)에만 걸치도록 좌우 여백을 맞춘다.
-            트랙의 좌우 바깥은 [날짜칸 + gap] 과 [값칸 + gap] 이다. */}
-        {hasMedian && (
-          <div style={{ position: "absolute", left: REC_DATE_W + REC_GAP, right: REC_VALUE_W + REC_GAP, top: 0, bottom: 0, pointerEvents: "none" }}>
-            <div
-              style={{
-                position: "absolute",
-                left: `max(${REC_BAR_MIN_W}px, ${barPct(r.medianDays!)}%)`,
-                top: -4,
-                bottom: -4,
-                width: 1,
-                background: C.faint,
-              }}
-            />
-          </div>
-        )}
-        </div>
+        {hasRange && <RecoveryRange min={r.minDays!} median={r.medianDays!} max={r.maxDays!} />}
       </div>
-      {/* 표본이 하나면 중앙값·최단·최장이 다 같은 숫자라, 원래 문장은 "중앙값은 4.7년,
-          가장 빠른 때가 4.7년, 가장 오래 걸린 때가 4.7년"처럼 한 값을 세 번 읽는다.
-          숫자 셋이 나란히 있으면 분포가 있는 것처럼 읽히니 한 번만 말하고 만다. */}
-      <p style={{ margin: "14px 0 0", fontSize: 12, color: C.muted, lineHeight: 1.6 }}>
-        {hasMedian ? (
-          <>
-            회복한 {r.recoveredCount}번의 중앙값은 <b style={{ color: C.sub }}>{fmtDur(r.medianDays!)}</b>(세로선), 가장 빠른 때가{" "}
-            <b style={{ color: C.sub }}>{fmtDur(r.minDays!)}</b>, 가장 오래 걸린 때가 <b style={{ color: C.sub }}>{fmtDur(r.maxDays!)}</b>였습니다.
-          </>
-        ) : (
-          <>
-            고점을 되찾은 전례는 <b style={{ color: C.sub }}>{fmtDur(r.medianDays!)}</b> 걸린 한 번뿐입니다. 표본이 하나라 중앙값은 내지 않았습니다.
-          </>
-        )}
-      </p>
-    </section>
+
+      {/* flex:1 + 가운데 정렬 — 옆 시트(역대 낙폭 Top 5)가 다섯 줄이라 이 시트가 그 높이로
+          늘어나는데 여긴 네 줄뿐이다. 줄 간격을 벌려 채우지는 않는다(길이를 견주는 막대라
+          서로 멀어지면 비교가 어려워진다). 묶음을 붙여 둔 채 남는 공간을 위아래로 가른다. */}
+      <div style={{ flex: 1, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 12, justifyContent: "center" }}>
+        <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: ".08em", color: C.sub2 }}>낙폭 구간별 발생 횟수 · {periodLabel}</span>
+        {buckets.map((b) => {
+          const on = inBucket(b);
+          return (
+            <MeterRow
+              key={b.from}
+              label={bucketLabel(b)}
+              pct={(b.count / maxCount) * 100}
+              value={`${b.count}회`}
+              color={on ? DOWN_BAR[0] : DOWN_BAR[3]}
+              strong={on}
+              labelWidth={74}
+              valueWidth={26}
+            />
+          );
+        })}
+      </div>
+      <Foot>
+        {here && here.count > 0
+          ? `지금 낙폭(${fmtPct(a.currentDd)})은 ${periodLabel} ${here.count}번이던 구간에 들어 있습니다`
+          : `구간별 횟수는 −20% 이상 하락 ${buckets.reduce((s, b) => s + b.count, 0)}건 전부를 세지만, 위 중앙값은 지금보다 깊었던 ${r.similarCount}건만 씁니다`}
+      </Foot>
+    </Sheet>
+  );
+}
+
+/** 최단~최장 범위 선 위에 중앙값 마커. 색은 회복이므로 빨강이다. */
+function RecoveryRange({ min, median, max }: { min: number; median: number; max: number }) {
+  const at = ((median - min) / (max - min)) * 100;
+  const dot: React.CSSProperties = {
+    position: "absolute",
+    top: 2,
+    width: 8,
+    height: 8,
+    borderRadius: "50%",
+    background: C.card,
+    border: `2px solid ${UP_BAR_SOFT}`,
+    boxSizing: "border-box",
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+      <div style={{ position: "relative", height: 12 }}>
+        <span style={{ position: "absolute", left: 0, right: 0, top: 5, height: 2, borderRadius: 99, background: UP_BAR_SOFT }} />
+        <span style={{ ...dot, left: 0 }} />
+        <span style={{ ...dot, right: 0 }} />
+        <span style={{ position: "absolute", left: `${at}%`, top: 0, width: 12, height: 12, marginLeft: -6, borderRadius: "50%", background: UP }} />
+      </div>
+      {/* 라벨은 양 끝을 안쪽으로 붙인다 — 중앙값이 끝에 가까우면 겹치지만, 셋 다 값이
+          숫자로 적혀 있어 읽는 데 지장이 없다. */}
+      <div style={{ position: "relative", height: 14 }}>
+        <span style={{ position: "absolute", left: 0, top: 0, fontFamily: MONO, fontSize: 9.5, fontWeight: 700, color: C.faint }}>{fmtDur(min)}</span>
+        <span
+          style={{
+            position: "absolute",
+            left: `${at}%`,
+            top: 0,
+            transform: "translateX(-50%)",
+            fontFamily: MONO,
+            fontSize: 9.5,
+            fontWeight: 800,
+            color: UP,
+            whiteSpace: "nowrap",
+          }}
+        >
+          중앙값 {fmtDur(median)}
+        </span>
+        <span style={{ position: "absolute", right: 0, top: 0, fontFamily: MONO, fontSize: 9.5, fontWeight: 700, color: C.faint }}>{fmtDur(max)}</span>
+      </div>
+    </div>
   );
 }
 
@@ -1450,65 +1911,85 @@ function Character({ ch, currentDd }: { ch: DrawdownCharacter | null; currentDd:
     { label: "급락형", sub: "빠르게 빠진 하락", b: ch.fast, on: isFast },
     { label: "완만형", sub: "오래 흘러내린 하락", b: ch.slow, on: !isFast },
   ];
+  // 하루 평균 낙폭 — "201일에 걸쳐 −42.5%"가 하루치로는 얼마인지.
+  const perDay = ch.currentTroughDays > 0 ? ch.currentTroughDepth / ch.currentTroughDays : null;
+
   return (
-    <section style={card}>
-      <CardHead
+    <Sheet>
+      <SectionHead
         icon="bolt"
         title="이 하락의 성격"
-        sub="같은 깊이라도 빨리 빠진 하락과 오래 흘러내린 하락은 회복 양상이 다릅니다."
-        right={<Badge tone="blue">{curLabel}</Badge>}
+        desc="같은 깊이라도 빨리 빠진 하락과 오래 흘러내린 하락은 회복 양상이 다릅니다"
+        note={curLabel}
       />
-      <p style={{ margin: "0 0 16px", color: C.sub, fontSize: 14, lineHeight: 1.7, wordBreak: "keep-all" }}>
-        지금은 <b style={{ color: C.ink }}>{curLabel}</b>입니다. 고점 이후 <b style={{ color: C.ink }}>{fmtDayCount(ch.currentTroughDays)}</b> 만에 저점({fmtPct(ch.currentTroughDepth)})까지 빠졌습니다.
-        {compare && ` ${compare}`}
-      </p>
-      {hasBuckets ? (
-        <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
+      <div style={{ flex: 1, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
+        {hasBuckets ? (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(150px, 100%), 1fr))", gap: 10 }}>
             {tiles.map((t) =>
               t.b ? (
+                /* 선택된 유형만 파란 틴트 + inset 링. 테두리 대신 inset box-shadow 를 쓰는
+                   이유는 1.5px 링이 칸 크기를 바꾸지 않아 두 칸의 밑선이 어긋나지 않기
+                   때문이다(테두리면 선택된 칸만 3px 커진다). */
                 <div
                   key={t.label}
                   style={{
-                    background: t.on ? "var(--c-blue-tint)" : C.bg,
-                    border: `1px solid ${t.on ? C.blue : "transparent"}`,
-                    borderRadius: 12,
-                    padding: "13px 15px",
+                    background: t.on ? C.blueTint : C.soft,
+                    boxShadow: t.on ? `inset 0 0 0 1.5px ${DOWN_BAR[1]}` : "none",
+                    borderRadius: 10,
+                    padding: "13px 14px",
                     minWidth: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: t.on ? C.blue : C.ink }}>{t.label}</span>
-                    <span style={{ fontSize: 11.5, color: C.faint }}>· {t.b.count}회</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                    {/* 틴트 위에는 강조색(--c-blue)을 쓰지 않는다 — 명암비 2.2 라 안 읽힌다. */}
+                    <span style={{ fontSize: 12.5, fontWeight: 800, color: t.on ? DOWN : C.ink }}>{t.label}</span>
+                    <span style={{ fontSize: 11, color: C.faint }}>· {t.b.count}회</span>
                   </div>
-                  <div style={{ fontSize: 11.5, color: C.sub, marginBottom: 8 }}>{t.sub}</div>
-                  <div style={{ fontFamily: MONO, fontSize: 19, fontWeight: 700, letterSpacing: "-0.02em", color: C.ink, lineHeight: 1.15 }}>
+                  <span style={{ fontSize: 11, color: t.on ? C.sub : C.sub2 }}>{t.sub}</span>
+                  <strong style={{ fontFamily: MONO, fontSize: 21, fontWeight: 800, letterSpacing: "-.03em", color: C.ink, marginTop: 2 }}>
                     {fmtDur(t.b.medianRecovery)}
-                  </div>
-                  <div style={{ fontSize: 11.5, color: C.muted, marginTop: 4 }}>회복 중앙값</div>
+                  </strong>
+                  <span style={{ fontSize: 10.5, color: t.on ? C.sub : C.sub2 }}>회복 중앙값</span>
                 </div>
               ) : null,
             )}
           </div>
-          <p style={{ margin: "12px 0 0", color: C.muted, fontSize: 12, lineHeight: 1.5 }}>과거 −15% 이상 하락을 속도로 나눈 회복 기간입니다.</p>
-        </>
-      ) : (
-        <p style={{ margin: 0, color: C.muted, fontSize: 12, lineHeight: 1.6 }}>
-          <Icon name="info" style={{ fontSize: 14, verticalAlign: -2, marginRight: 4 }} />
-          이 기간엔 비교할 과거 하락이 부족합니다. 기간을 넓히면 급락형·완만형 회복을 비교할 수 있습니다.
-        </p>
-      )}
-    </section>
+        ) : (
+          <p style={{ margin: 0, color: C.muted, fontSize: 11.5, lineHeight: 1.6, wordBreak: "keep-all" }}>
+            <Icon name="info" style={{ fontSize: 14, verticalAlign: -2, marginRight: 4 }} />
+            이 기간엔 비교할 과거 하락이 부족합니다. 기간을 넓히면 급락형·완만형 회복을 비교할 수 있습니다.
+          </p>
+        )}
+        <span style={{ fontSize: 11.5, color: C.inkSoft, lineHeight: 1.7, wordBreak: "keep-all" }}>
+          지금은 <b style={{ fontWeight: 800, color: DOWN }}>{curLabel}</b>입니다. {fmtDayCount(ch.currentTroughDays)}에 걸쳐 {fmtPct(ch.currentTroughDepth)}
+          {perDay !== null && <>, 하루 평균 {fmtPct(perDay)}</>}입니다.
+          {compare && ` ${compare}`}
+        </span>
+        <div style={{ marginTop: "auto", display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 10, paddingTop: 14, borderTop: `1px solid ${C.divider}` }}>
+          <StatCell label="하락 기간" value={fmtDayCount(ch.currentTroughDays)} sub="고점에서 저점까지" />
+          <StatCell
+            label="하락일 비중"
+            value={ch.currentDownDayRatio !== null ? `${Math.round(ch.currentDownDayRatio)}%` : "—"}
+            sub={ch.currentDownDayRatio !== null ? `10일 중 ${(ch.currentDownDayRatio / 10).toFixed(1)}일` : "표본 부족"}
+          />
+          <StatCell label="저점 깊이" value={fmtPct(ch.currentTroughDepth)} sub="고점 대비" tone={DOWN} />
+        </div>
+      </div>
+      <Foot>고점→저점이 {CHARACTER_SPLIT_DAYS}일 이하면 급락형, 넘으면 완만형입니다. 비교 막대는 과거 −15% 이상 하락만 셉니다.</Foot>
+    </Sheet>
   );
 }
 
-/** 성격을 못 따지는 경우의 같은 자리 카드. 문턱을 넘겼는지에 따라 이유가 다르다. */
+/** 성격을 못 따지는 경우의 같은 자리 시트. 문턱을 넘겼는지에 따라 이유가 다르다. */
 function CharacterAbsent({ currentDd }: { currentDd: number }) {
   return (
-    <AbsentCard
+    <AbsentSheet
       icon="bolt"
       title="이 하락의 성격"
-      sub="같은 깊이라도 빨리 빠진 하락과 오래 흘러내린 하락은 회복 양상이 다릅니다."
+      sub="같은 깊이라도 빨리 빠진 하락과 오래 흘러내린 하락은 회복 양상이 다릅니다"
       body={
         currentDd > -1
           ? "지금은 고점 부근이라 성격을 따질 하락이 없습니다."
@@ -1531,71 +2012,92 @@ function Theme({ theme }: { theme: ThemeCmp }) {
         ? "테마에서 가장 덜 빠졌습니다."
         : `테마 ${theme.peers.length}종목 중 낙폭 ${rank}위입니다.`;
   return (
-    <section style={card}>
-      <CardHead
+    <Sheet>
+      <SectionHead
         icon="hub"
         title={`${theme.name} 대표 ${theme.peers.length}종목 안에서`}
-        sub={`${self.name}. ${lead}`}
-        right={<Badge>평균 {fmtPct(theme.avgDd)}</Badge>}
+        desc={`${self.name}, ${lead}`}
+        note={`평균 ${fmtPct(theme.avgDd)}`}
       />
-      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+      <div style={{ padding: "18px 22px 20px", display: "flex", flexDirection: "column", gap: 9 }}>
         {theme.peers.map((p) => (
-          <BarRow
+          // 이 종목만 진한 파랑, 나머지는 옅은 파랑 — 전부 낙폭이라 빨강은 쓰지 않는다.
+          <MeterRow
             key={p.code || p.name}
             label={p.name}
             pct={(Math.abs(p.dd) / worst) * 100}
             value={`${Math.round(p.dd)}%`}
-            color={p.isSelf ? C.cold : C.bar}
+            color={p.isSelf ? DOWN_BAR[0] : DOWN_BAR[4]}
             strong={p.isSelf}
-            dim={false}
-            labelWidth={104}
+            valueWidth={46}
           />
         ))}
       </div>
-    </section>
+    </Sheet>
   );
 }
 
-/* ── 역대 낙폭 Top 5 ───────────────────────────────────────────── */
+/* ── 역대 낙폭 Top 5 ─────────────────────────────────────────────
+   표다. **낙폭 깊은 순**으로 세우고(이미 그렇게 정렬돼 온다), 진행 중인 구간은 순서상
+   제자리에 두되 파랑으로 강조한다 — 맨 위로 끌어올리면 '가장 깊은 하락'이라는 순위의
+   뜻이 깨진다. */
 function TopDrawdowns({ eps }: { eps: Episode[] }) {
   const worst = Math.max(...eps.map((e) => Math.abs(e.depth)), 1);
+  /* 열 폭은 .mdd-top-row(globals.css)가 잡는다. 인라인으로 두면 좁은 폭의 미디어쿼리를
+     이겨서 열이 안 줄어든다. */
   return (
-    <section style={card}>
-      <CardHead icon="leaderboard" title="역대 낙폭 Top 5" sub="이 기간에 가장 깊었던 하락과, 고점을 되찾기까지 걸린 시간입니다." />
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        {eps.map((e, i) => (
-          <div
-            key={i}
-            style={{
-              display: "grid",
-              gridTemplateColumns: "22px minmax(0,1fr) 54px",
-              alignItems: "center",
-              gap: 10,
-              // 행 사이에 선을 두지 않는다 — 순위 숫자와 오른쪽 정렬된 낙폭이 이미 행을
-              // 갈라 주고 있어서 선은 한 겹 더 얹은 잡음이다. 대신 선이 하던 분리 일을
-              // 여백이 받도록 위아래 패딩을 9 → 13 으로 키운다(선을 그냥 빼면 붙는다).
-              padding: "13px 0",
-            }}
-          >
-            <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 13, color: i === 0 ? C.cold : C.faint }}>{i + 1}</span>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 12.5, color: C.sub }}>{e.peakDate} 고점</span>
-                <span style={{ fontSize: 11.5, color: e.recovered ? C.faint : C.mania, fontWeight: e.recovered ? 400 : 700 }}>
-                  {e.recovered ? `${fmtDur(e.days)} 만에 회복` : `${fmtDur(e.days)}째 미회복`}
-                </span>
-              </div>
-              <span style={{ display: "block", height: 6, background: C.bg, borderRadius: 999, overflow: "hidden" }}>
-                <span style={{ display: "block", height: "100%", width: `${(Math.abs(e.depth) / worst) * 100}%`, background: C.cold, opacity: e.recovered ? 0.55 : 1, borderRadius: 999 }} />
-              </span>
-            </div>
-            <span style={{ fontFamily: MONO, fontSize: 16, fontWeight: 700, letterSpacing: "-0.02em", color: C.cold, textAlign: "right" }}>
-              {Math.round(e.depth)}%
-            </span>
-          </div>
-        ))}
+    <Sheet>
+      <SectionHead icon="history" title="역대 낙폭 Top 5" desc="이만큼 빠졌던 구간과 회복까지 걸린 기간" note="−20% 이상" />
+      <div className="hz-thead mdd-top-row">
+        <span>구간</span>
+        <span>낙폭</span>
+        <span style={{ textAlign: "right" }}>회복</span>
+        <span className="mdd-top-status" style={{ textAlign: "right" }}>
+          상태
+        </span>
       </div>
-    </section>
+      {eps.map((e, i) => (
+        <div key={i} className="hz-trow mdd-top-row" style={{ padding: "11px 22px", background: e.recovered ? undefined : C.soft }}>
+          <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
+            <span style={{ fontSize: 12, fontWeight: e.recovered ? 700 : 800, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {fmtYm(e.peakDate)} ~ {e.recovered ? fmtYm(e.recoveryDate!) : "진행 중"}
+            </span>
+            {/* 이 줄도 말줄임을 걸어야 한다 — 안 걸면 "저점 2026-07-30"이 열보다 넓어
+                부모를 밀어낸다(위 형제만 자르면 소용없다). */}
+            <span style={{ fontFamily: MONO, fontSize: 10, color: C.faint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              저점 {e.troughDate}
+            </span>
+          </span>
+          <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+            <span style={{ flex: 1, minWidth: 20, height: 8, borderRadius: 99, background: C.track, overflow: "hidden" }}>
+              <span
+                style={{
+                  display: "block",
+                  width: `${(Math.abs(e.depth) / worst) * 100}%`,
+                  height: "100%",
+                  borderRadius: 99,
+                  background: e.recovered ? DOWN_BAR[2] : DOWN_BAR[0],
+                }}
+              />
+            </span>
+            <span style={{ width: 44, flex: "none", fontFamily: MONO, fontSize: 11.5, fontWeight: 800, color: e.recovered ? C.ink : DOWN }}>
+              {fmtPct(e.depth)}
+            </span>
+          </span>
+          <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: e.recovered ? C.sub : C.faint, textAlign: "right" }}>
+            {e.recovered ? fmtDayCount(e.days) : "—"}
+          </span>
+          <span className="mdd-top-status" style={{ fontSize: 10, fontWeight: e.recovered ? 700 : 800, color: e.recovered ? C.sub : DOWN, textAlign: "right" }}>
+            {e.recovered ? "회복" : "진행 중"}
+          </span>
+        </div>
+      ))}
+      {/* 각주는 **한 줄 안에** 둔다 — 두 줄이 되면 이 시트의 바닥 띠만 두꺼워져 옆
+          시트(회복까지 걸린 기간)와 밑단이 어긋난다. 지금 낙폭은 히어로가 이미 크게 적는다. */}
+      <Foot>
+        막대는 {eps.length}개 구간 공통 눈금(최대 {fmtPct(-worst)}) · 회복은 고점에서 되찾기까지 걸린 날수입니다
+      </Foot>
+    </Sheet>
   );
 }
 
@@ -1620,26 +2122,38 @@ function TopDrawdowns({ eps }: { eps: Episode[] }) {
  * 구분해야 하는데 결과 유무로는 둘이 같아 보인다.
  */
 function Skeleton({ periodOnly }: { periodOnly: boolean }) {
-  // 실제 결과와 같은 골격(헤드라인 + 2열 카드)으로 깜빡여, 로딩 뒤 레이아웃이 튀지 않는다.
-  const block = (h: number) => <div className="hz-shimmer" style={{ height: h, borderRadius: 10, background: C.bg }} />;
+  // 실제 결과와 같은 골격(히어로 스트립 + 전폭 차트 + 50:50 짝)으로 깜빡여, 로딩 뒤
+  // 레이아웃이 튀지 않는다.
+  const block = (h: number) => <div className="hz-shimmer" style={{ height: h, borderRadius: 8, background: C.bg }} />;
+  const body = (children: React.ReactNode) => (
+    <div style={{ padding: PAD, display: "flex", flexDirection: "column", gap: 12 }}>{children}</div>
+  );
   return (
     // position:relative 는 아래 hz-loading-float 의 기준 상자가 되기 위한 것이다.
     <div style={{ position: "relative" }}>
-      <div className="mdd-grid" aria-hidden>
-        <div className="mdd-full">
-          <section style={{ ...card, display: "flex", flexDirection: "column", gap: 14 }}>
-            {block(22)}
-            {block(54)}
-            {block(176)}
-          </section>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }} aria-hidden>
+        <section className="hz-sheet" style={{ display: "flex", flexWrap: "wrap" }}>
+          {[290, 300, 300].map((basis, i) => (
+            <div key={i} style={{ flex: `1 1 ${basis}px`, minWidth: 0, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 12 }}>
+              {block(14)}
+              {block(38)}
+              {block(48)}
+            </div>
+          ))}
+        </section>
+        <section className="hz-sheet">{body(block(201))}</section>
+        <div className="mdd-pair">
+          {[0, 1].map((i) => (
+            <section key={i} className="hz-sheet">
+              {body(
+                <>
+                  {block(16)}
+                  {block(112)}
+                </>,
+              )}
+            </section>
+          ))}
         </div>
-        {[0, 1].map((i) => (
-          <section key={i} style={{ ...card, display: "flex", flexDirection: "column", gap: 12 }}>
-            {block(20)}
-            {block(14)}
-            {block(96)}
-          </section>
-        ))}
       </div>
 
       <div className="hz-loading-float" aria-hidden>
@@ -1664,9 +2178,11 @@ function Skeleton({ periodOnly }: { periodOnly: boolean }) {
 
 function ErrorCard({ message }: { message: string }) {
   return (
-    <div style={{ ...card, display: "flex", alignItems: "center", gap: 10, color: C.sub, fontSize: 14 }}>
-      <Icon name="error_outline" style={{ fontSize: 20, color: C.mania }} />
-      {message}
-    </div>
+    <Sheet>
+      <div style={{ padding: PAD, display: "flex", alignItems: "center", gap: 10, color: C.sub, fontSize: 13 }}>
+        <Icon name="error_outline" style={{ fontSize: 20, color: C.mania }} />
+        {message}
+      </div>
+    </Sheet>
   );
 }

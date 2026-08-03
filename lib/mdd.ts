@@ -41,13 +41,26 @@ export type DrawdownCharacter = {
   currentTroughDays: number;
   currentTroughDepth: number;
   currentClass: "fast" | "slow";
+  /**
+   * 고점→저점 구간에서 전일 대비 내린 날의 비중(%). '같은 −40% 라도 매일 조금씩
+   * 흘렀나, 몇 번 크게 꺾였나'를 가른다 — 일수(currentTroughDays)만으로는 안 보인다.
+   *
+   * ⚠️ 서버에서만 낼 수 있다. 화면이 받는 underwater 는 250점으로 솎아 낸 것이라
+   * (10년이면 2주에 한 점) 거기서 세면 하루 단위 등락이 통째로 사라진다.
+   * 구간에 거래일이 2일 미만이면 null.
+   */
+  currentDownDayRatio: number | null;
   /** 과거 급락형(빠른 하락)의 사례 수와 회복 일수 중앙값. 사례 없으면 null. */
   fast: { count: number; medianRecovery: number } | null;
   slow: { count: number; medianRecovery: number } | null;
 };
 
-/** 고점→저점이 이 일수 이하면 급락형, 넘으면 완만형. */
-const CHARACTER_SPLIT_DAYS = 75;
+/**
+ * 고점→저점이 이 일수 이하면 급락형, 넘으면 완만형.
+ * 화면이 각주로 이 숫자를 그대로 적으므로 export 한다 — 문턱을 옮기면 각주도 따라온다
+ * (아래 CHARACTER_MIN_DD 와 같은 이유).
+ */
+export const CHARACTER_SPLIT_DAYS = 75;
 /** 성격 분석에 넣을 '의미 있는' 하락의 최소 깊이(%). 잔물결은 뺀다. */
 const CHARACTER_MIN_DEPTH = -15;
 /**
@@ -81,6 +94,17 @@ export type MddAnalysis = {
   asOf: string;
   tradingDays: number;
   price: number;
+  /** 전일 대비 등락률(%). 거래일이 하루뿐이면 null. */
+  changePct: number | null;
+  /**
+   * **지금 하락의 저점** — 전고점(athDate) 이후의 최저 종가와 그 날. 화면이 전고점과
+   * 나란히 적고 '저점 대비 +N%' 를 여기서 낸다.
+   *
+   * ⚠️ 조회 기간 전체의 최저 종가가 아니다. 그건 10년 전 값이라(SK하이닉스 33,550원)
+   * 전고점 2,919,000원 옆에 놓으면 아무 뜻이 없다.
+   */
+  low: number;
+  lowDate: string;
   ath: number;
   athDate: string;
   currentDd: number;
@@ -97,6 +121,8 @@ export type MddAnalysis = {
   recovery: RecoveryStats | null;
   character: DrawdownCharacter | null;
   topDrawdowns: Episode[];
+  /** 낙폭 구간별 발생 횟수(−20% 이상 하락만). 위 depthHistogram 주석 참고. */
+  depthBuckets: DepthBucket[];
 };
 
 /** 종가 배열 → 시점별 고점 대비 낙폭. */
@@ -204,7 +230,7 @@ function recoveryStats(eps: Episode[], currentDd: number): RecoveryStats | null 
  * 하락의 성격(급락형/완만형)과 성격별 회복 통계.
  * currentDd 는 음수(%). 지금 하락이 뚜렷하지 않거나(−8% 초과) 표본이 얇으면 null.
  */
-function drawdownCharacter(eps: Episode[], currentDd: number): DrawdownCharacter | null {
+function drawdownCharacter(eps: Episode[], currentDd: number, bars: Bar[]): DrawdownCharacter | null {
   if (currentDd > CHARACTER_MIN_DD) return null;
   // 진행 중(미회복) 마지막 사건이 곧 '현재 하락'이다.
   const current = eps.length && !eps[eps.length - 1].recovered ? eps[eps.length - 1] : null;
@@ -225,9 +251,46 @@ function drawdownCharacter(eps: Episode[], currentDd: number): DrawdownCharacter
     currentTroughDays: current.troughDays,
     currentTroughDepth: current.depth,
     currentClass: current.troughDays <= CHARACTER_SPLIT_DAYS ? "fast" : "slow",
+    currentDownDayRatio: downDayRatio(bars, current.peakDate, current.troughDate),
     fast: bucket(true),
     slow: bucket(false),
   };
+}
+
+/**
+ * from~to(포함) 구간에서 전일 대비 내린 거래일의 비중(%).
+ * 첫날은 비교할 전일이 구간 안에 없으므로 분모에서 빠진다(그래서 2일 미만이면 null).
+ */
+function downDayRatio(bars: Bar[], from: string, to: string): number | null {
+  const win = bars.filter((b) => b.date >= from && b.date <= to);
+  if (win.length < 2) return null;
+  let down = 0;
+  for (let i = 1; i < win.length; i++) if (win[i].close < win[i - 1].close) down++;
+  return (down / (win.length - 1)) * 100;
+}
+
+/**
+ * 낙폭 구간별 발생 횟수 — 화면의 '회복까지 걸린 기간'이 분포를 그린다.
+ *
+ * ⚠️ recovery.samples 로는 못 낸다. 그건 **지금보다 깊었던** 사건만 담아서, 낙폭이
+ * 깊을수록 표본이 줄어든다(−46% 인 종목은 13건 중 2건만 남는다). topDrawdowns 도
+ * 깊이 상위 5건 캡이라 6건째부터 못 센다. 그래서 전체 에피소드를 여기서 따로 센다.
+ */
+export type DepthBucket = { from: number; to: number | null; count: number };
+
+const DEPTH_BUCKET_EDGES: { from: number; to: number | null }[] = [
+  { from: -20, to: -30 },
+  { from: -30, to: -40 },
+  { from: -40, to: -50 },
+  { from: -50, to: null },
+];
+
+function depthHistogram(eps: Episode[]): DepthBucket[] {
+  return DEPTH_BUCKET_EDGES.map(({ from, to }) => ({
+    from,
+    to,
+    count: eps.filter((e) => e.depth <= from && (to === null || e.depth > to)).length,
+  }));
 }
 
 /**
@@ -314,6 +377,17 @@ export function analyzeDrawdown(bars: Bar[]): MddAnalysis | null {
     }
   }
 
+  /* 지금 하락의 저점 — 전고점 **이후**만 본다(위 low 주석 참고). 전고점이 마지막 날이면
+     (신고가) 그날 하나만 남아 low = 종가, 저점 대비 0% 가 된다. */
+  let low = Infinity;
+  let lowDate = athDate;
+  for (const p of ds) {
+    if (p.date >= athDate && p.close < low) {
+      low = p.close;
+      lowDate = p.date;
+    }
+  }
+
   /* '지금보다 더 깊었던' 이므로 오늘 자신은 뺀다(`<` 이지 `<=` 가 아니다). 예전엔 `<=` 라
      늘 최소 1일이 세어졌는데, 비율로만 쓸 때는 0.04%p 차이라 안 보였다. 날수를 화면에
      내면 바로 드러난다 — 신저점 종목(SK하이닉스)이 "더 깊었던 날은 1일"이 되고, 그 1일이
@@ -332,6 +406,9 @@ export function analyzeDrawdown(bars: Bar[]): MddAnalysis | null {
     asOf: last.date,
     tradingDays: bars.length,
     price: last.close,
+    changePct: bars.length >= 2 ? (last.close / bars[bars.length - 2].close - 1) * 100 : null,
+    low,
+    lowDate,
     ath,
     athDate,
     currentDd: last.dd,
@@ -345,8 +422,9 @@ export function analyzeDrawdown(bars: Bar[]): MddAnalysis | null {
     //   10년 2,470일   → 간격 10일 ≈ 2주봉, 선이 완만해진다
     underwater: downsample(ds, 250, anchorDates),
     recovery: recoveryStats(eps, last.dd),
-    character: drawdownCharacter(eps, last.dd),
+    character: drawdownCharacter(eps, last.dd, bars),
     topDrawdowns,
+    depthBuckets: depthHistogram(eps),
   };
 }
 
