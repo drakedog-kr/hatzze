@@ -16,6 +16,8 @@ export function ExpandableList({
   step = 10,
   gap = 11,
   listStyle,
+  listClassName,
+  footerStyle,
   name,
 }: {
   items: React.ReactNode[];
@@ -24,6 +26,13 @@ export function ExpandableList({
   gap?: number;
   /** 기본 세로 목록 대신 다른 배치를 쓸 때(트렌딩 메시지는 3열 그리드). gap 은 여기서 덮어쓴다. */
   listStyle?: React.CSSProperties;
+  /**
+   * 배치를 클래스로 줄 때(시트의 셀 격자). listStyle 로는 안 되는 경우가 있다 —
+   * 셀 격자선(.hz-cellgrid > * 의 inset)과 열 수 미디어쿼리는 인라인으로 표현이 안 된다.
+   */
+  listClassName?: string;
+  /** '더 보기' 줄의 바깥 여백. 시트 안에서는 셀 격자에 딱 붙어야 해서 덮어쓴다. */
+  footerStyle?: React.CSSProperties;
   /** GA 이벤트에서 어느 목록인지 구분할 이름. 없으면 펼침을 재지 않는다. */
   name?: string;
 }) {
@@ -45,21 +54,22 @@ export function ExpandableList({
 
   return (
     <>
+      {/* 배치를 클래스로 받으면 기본 세로 flex 를 아예 안 깐다. 인라인 display:flex 는
+          클래스의 display:grid 를 이기므로, 같이 두면 격자가 통째로 무시된다. */}
       <ol
+        className={listClassName}
         style={{
           listStyle: "none",
           margin: 0,
           padding: 0,
-          display: "flex",
-          flexDirection: "column",
-          gap,
+          ...(listClassName ? null : { display: "flex", flexDirection: "column", gap }),
           ...listStyle,
         }}
       >
         {items.slice(0, shown)}
       </ol>
       {(canExpand || isExpanded) && (
-        <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+        <div style={{ display: "flex", gap: 8, marginTop: 14, ...footerStyle }}>
           {canExpand && (
             <button
               type="button"

@@ -48,8 +48,11 @@ export function TrendingTabs({
   // 테두리 하나로 드러나고, 고른 칸만 카드색으로 떠올라 상태가 분명하다(MDD 정밀분석의
   // 기간 토글과 같은 문법). 예전엔 선택 배경을 `${C.blue}14` 로 줬는데 var() 에 알파를
   // 이어붙인 꼴이라 CSS 가 버려서, 실제로는 배경 없이 테두리 색만 바뀌고 있었다.
+  // 2026-08 콘솔 리디자인: 알약(999)에서 **둥근 사각 세그먼트**(8/6)로 바꿨다. 시트
+  // 머리에 앉는 조작부라, 시트 자체가 radius 14 인 판이면 그 안의 컨트롤도 같은 계열의
+  // 모서리를 써야 한 벌로 읽힌다. 고른 칸은 카드색으로 떠오르고 미세 그림자가 받친다.
   const tabs = (
-    <div style={{ display: "flex", gap: 2, background: C.bg, border: `1px solid ${C.line}`, borderRadius: 999, padding: 3 }}>
+    <div style={{ display: "flex", gap: 2, background: C.chip, borderRadius: 8, padding: 2 }}>
       {panels.map((p) => {
         const on = p.key === current?.key;
         return (
@@ -64,12 +67,13 @@ export function TrendingTabs({
             }}
             aria-pressed={on}
             style={{
-              padding: "6px 14px",
-              borderRadius: 999,
+              padding: "5px 11px",
+              borderRadius: 6,
               border: "none",
               background: on ? C.card : "transparent",
-              color: on ? C.blue : C.sub,
-              fontSize: 12,
+              color: on ? C.ink : C.sub,
+              boxShadow: on ? "0 1px 2px rgba(14,33,54,.08)" : "none",
+              fontSize: 11,
               fontWeight: 700,
               cursor: "pointer",
               whiteSpace: "nowrap",
@@ -87,7 +91,9 @@ export function TrendingTabs({
     <>
       <SectionHead icon={icon} title={title} desc={desc} right={tabs} />
       {current?.count === 0 ? (
-        <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>
+        // 시트 안이라 여백은 셀과 같은 자리에서 낸다(머리가 자기 padding 을 갖고 있어
+        // 문단이 시트 왼쪽 끝에 붙어 버린다).
+        <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 12.5 }}>
           {current.label} 기준으로는 아직 화제 메시지가 없습니다.
         </p>
       ) : (
