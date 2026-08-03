@@ -658,9 +658,16 @@ function Hero({
         </div>
 
         {trendLine && (
-          <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.7, color: C.inkSoft, textWrap: "pretty" }}>
-            {renderRichSummary(trendLine)}
-          </p>
+          // 남는 높이를 **위아래로 나눠 갖게** 한다. 아래 '최종 업데이트' 가
+          // marginTop:auto 로 바닥에 붙어 있어서, 그냥 두면 남는 높이가 전부 이 문단
+          // 밑으로 몰려 위는 20px · 아래는 100px 처럼 갈렸다.
+          // flex:1 + 세로 가운데면 문단 위아래 공백이 같아지고, 업데이트 줄은 그대로
+          // 바닥에 남는다.
+          <div style={{ flex: 1, display: "flex", alignItems: "center", minHeight: 0 }}>
+            <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.7, color: C.inkSoft, textWrap: "pretty" }}>
+              {renderRichSummary(trendLine)}
+            </p>
+          </div>
         )}
 
         {/* 최종 업데이트는 **언제나 카드 맨 아래**다 — 위 내용 길이가 날마다 달라도
