@@ -432,6 +432,15 @@ export type SurgingStock = {
   ratio: number; // 최근 vs 평소 주목도 배수 (Infinity=신규 등장)
   isNew: boolean;
   series: number[]; // 일별 언급수(오래된→최신)
+  /** series 와 자리마다 짝이 맞는 날짜(YYYY-MM-DD). 막대 밑에 축 라벨을 달려면 필요하다 —
+   *  series 만으로는 "뒤에서 몇 번째 칸이 며칠인지"를 화면이 알 수 없고, 오늘 날짜에서
+   *  거꾸로 세면 파이프라인이 하루 밀린 날에 축이 통째로 어긋난다(loadStockDaily 는
+   *  완료된 날만 남기므로 마지막 칸이 어제가 아닐 수 있다). */
+  seriesDates: string[];
+  /** ratio 가 '최근'으로 친 **마지막 며칠**. 보통 3 이지만 집계가 얕은 초기엔 1~2 다.
+   *  막대에서 최근 창을 다른 색으로 칠하려면 이 값이 필요하다 — 3 으로 가정해 칠하면
+   *  배수는 2일치로 냈는데 그림은 3일을 가리키는 날이 생긴다. */
+  recentDays: number;
   market: string | null;
   closePrice: number | null;
   changeRate: number | null;
@@ -505,6 +514,8 @@ export async function getSurgingStocks(
         ratio: (recentPerDay + SHARE_SMOOTHING) / (base + SHARE_SMOOTHING),
         isNew: base === 0,
         series: dates.map((d) => a.byDate.get(d) ?? 0),
+        seriesDates: dates,
+        recentDays: recentDateList.length,
         market: info?.market ?? null,
         closePrice: info?.closePrice ?? null,
         changeRate: info?.changeRate ?? null,

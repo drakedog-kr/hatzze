@@ -48,8 +48,17 @@ export function TrendingTabs({
   // 테두리 하나로 드러나고, 고른 칸만 카드색으로 떠올라 상태가 분명하다(MDD 정밀분석의
   // 기간 토글과 같은 문법). 예전엔 선택 배경을 `${C.blue}14` 로 줬는데 var() 에 알파를
   // 이어붙인 꼴이라 CSS 가 버려서, 실제로는 배경 없이 테두리 색만 바뀌고 있었다.
+  // 2026-08 콘솔 리디자인: 알약(999)에서 **둥근 사각 세그먼트**(8/6)로 바꿨다. 시트
+  // 머리에 앉는 조작부라, 시트 자체가 radius 14 인 판이면 그 안의 컨트롤도 같은 계열의
+  // 모서리를 써야 한 벌로 읽힌다.
+  //
+  // ⚠️ 판은 **카드색 + 헤어라인**이다. 회색 칩(--c-chip)이었을 땐 타이틀 칸
+  // (--c-title-band #eef3f9)과 네 단위 차이라 컨트롤 자체가 띠에 녹아 보였다.
+  // 카드색이면 라이트에선 더 밝고 다크에선 더 어두워 양쪽에서 저절로 갈린다.
+  // 판이 카드색이 된 만큼 **고른 칸은 흰색으로 못 띄운다** — 그 자리는 하늘색 틴트가
+  // 맡는다(레포가 '지금 이것'을 가리킬 때 쓰는 그 색).
   const tabs = (
-    <div style={{ display: "flex", gap: 2, background: C.bg, border: `1px solid ${C.line}`, borderRadius: 999, padding: 3 }}>
+    <div style={{ display: "flex", gap: 2, background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, padding: 2 }}>
       {panels.map((p) => {
         const on = p.key === current?.key;
         return (
@@ -64,12 +73,12 @@ export function TrendingTabs({
             }}
             aria-pressed={on}
             style={{
-              padding: "6px 14px",
-              borderRadius: 999,
+              padding: "5px 11px",
+              borderRadius: 6,
               border: "none",
-              background: on ? C.card : "transparent",
-              color: on ? C.blue : C.sub,
-              fontSize: 12,
+              background: on ? "var(--c-blue-tint)" : "transparent",
+              color: on ? "var(--c-cold-ink)" : C.sub,
+              fontSize: 11,
               fontWeight: 700,
               cursor: "pointer",
               whiteSpace: "nowrap",
@@ -87,7 +96,9 @@ export function TrendingTabs({
     <>
       <SectionHead icon={icon} title={title} desc={desc} right={tabs} />
       {current?.count === 0 ? (
-        <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>
+        // 시트 안이라 여백은 셀과 같은 자리에서 낸다(머리가 자기 padding 을 갖고 있어
+        // 문단이 시트 왼쪽 끝에 붙어 버린다).
+        <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 12.5 }}>
           {current.label} 기준으로는 아직 화제 메시지가 없습니다.
         </p>
       ) : (
