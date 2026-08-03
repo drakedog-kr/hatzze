@@ -30,6 +30,8 @@ export const C = {
   bar: "var(--c-bar)",
   blue: "var(--c-blue)",
   blueTint: "var(--c-blue-tint)",
+  // 축의 기준 눈금(1배 자리 등). 데이터가 아니라 '자'라서 트랙보다 진하고 잉크보다 옅다.
+  marker: "var(--c-marker)",
   shadow: "var(--c-shadow)",
 } as const;
 

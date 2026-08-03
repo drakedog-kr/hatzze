@@ -940,12 +940,11 @@ function AreaChart({
   );
 }
 
-function emphasizedHeights(values: number[], floorPct = 30): number[] {
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  if (max <= min) return values.map(() => 100);
-  return values.map((v) => floorPct + ((v - min) / (max - min)) * (100 - floorPct));
-}
+/* emphasizedHeights(값들을 floorPct~100 으로 다시 편 높이) 는 여기 있었다.
+   붙어 있는 값들(100 대 107)의 차이를 세로 막대 높이로 보이게 하려고 축을 늘리는
+   함수였는데, 아시아 상대강도가 **가로 막대 + 기준선**으로 바뀌면서 쓸 곳이 없어졌다.
+   가로축은 세로보다 3배 길어서 축을 왜곡하지 않아도 차이가 보인다 — 왜곡을 안 하는
+   편이 낫다(늘린 축은 "일본이 한국의 1.5배"처럼 읽힌다). */
 
 function CardBuffett({ v }: { v: Pick }) {
   const dt = v.details;
@@ -1081,22 +1080,36 @@ function CardMarketActions({ v }: { v: Pick }) {
   const cbN = dt?.cb ?? 0;
   // 매수/매도 안전장치 중 무엇이 우세했는지 — 종합 점수가 0이어도 방향은 보여준다.
   const verdict = buyN > sellN ? "매수 우세" : sellN > buyN ? "매도 우세" : "균형";
-  const tiles = [
-    { label: "매수", n: buyN, accent: true },
-    { label: "매도", n: sellN, accent: false },
-    { label: "CB", n: cbN, accent: false },
+  // 세 값을 **같은 눈금**에 올린다. 숫자 타일 셋으로 흩어 두면 5·8·6 을 눈이 직접 빼야
+  // 하는데, 같은 축의 막대로 두면 "매도가 더 잦았다"가 길이로 바로 증명된다.
+  // 색이 방향을 진다 — 매수 안전장치(상승 제동)는 달아오른 쪽이라 고온, 매도 쪽은 식는
+  // 쪽이라 상온 파랑, CB 는 둘 다 걸릴 수 있어 중립인 연파랑.
+  const rows = [
+    { label: "매수", n: buyN, fill: C.hot, ink: C.hot },
+    { label: "매도", n: sellN, fill: C.neutral, ink: C.ink },
+    { label: "CB", n: cbN, fill: "var(--c-blue-4)", ink: C.label },
   ];
+  const maxN = Math.max(1, buyN, sellN, cbN);
+  const verdictHint = buyN > sellN ? "달아오른 쪽이 잦았습니다" : sellN > buyN ? "식는 쪽이 잦았습니다" : "양쪽이 비슷했습니다";
   return (
     <Shell hit={v.isHit} minH={230}>
       <TitleRow desc={v.headline} icon="speed" name={v.name} badge="최근 한 달" />
-      {/* 한글은 같은 font-size 라도 숫자보다 글리프가 커 보인다 — 다른 카드의 32px 숫자와
-          '눈에 보이는 크기'를 맞춘 값이 30 이다. */}
-      <strong style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>{verdict}</strong>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
-        {tiles.map((t) => (
-          <div key={t.label} style={{ background: C.soft, borderRadius: R.tile, padding: 12, display: "flex", flexDirection: "column", gap: 4, alignItems: "center" }}>
-            <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub2 }}>{t.label}</span>
-            <strong style={{ fontFamily: MONO, fontSize: 19, fontWeight: 800, color: t.accent ? C.blue : C.ink }}>{t.n}건</strong>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+        {/* 한글은 같은 font-size 라도 숫자보다 글리프가 커 보인다 — 다른 카드의 32px 숫자와
+            '눈에 보이는 크기'를 맞춘 값이 30 이다. */}
+        <strong style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>{verdict}</strong>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>{verdictHint}</span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {rows.map((r) => (
+          <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ width: 34, flexShrink: 0, fontSize: 11.5, fontWeight: 600, color: C.sub2 }}>{r.label}</span>
+            <div style={{ flex: 1, minWidth: 0, height: 14, borderRadius: 4, background: C.track, overflow: "hidden" }}>
+              <div style={{ width: `${(r.n / maxN) * 100}%`, height: "100%", borderRadius: 4, background: r.fill }} />
+            </div>
+            <span style={{ width: 30, flexShrink: 0, textAlign: "right", fontFamily: MONO, fontSize: 12.5, fontWeight: 800, color: r.ink }}>
+              {r.n}건
+            </span>
           </div>
         ))}
       </div>
@@ -1105,47 +1118,52 @@ function CardMarketActions({ v }: { v: Pick }) {
   );
 }
 
-// 거래대금 쏠림도 — 상위10 비중 도넛 + 상위 종목 목록.
-// 목업의 도넛은 SVG 가 아니라 conic-gradient 다. 조각 색은 파랑 스케일(진→연)이라
-// 종목 순위가 색 진하기로 읽히고, 남는 조각은 트랙색으로 깐다.
+// 거래대금 쏠림도 — 상위10 비중을 **100% 스택 바**로.
+//
+// 도넛이었다. 도넛은 상위 넷만 조각으로 그리고 나머지는 트랙색 한 덩어리로 남겨서,
+// "그럼 저 회색은 뭔데"에 답을 못 했다. 스택 바로 펴면 상위 4 + 나머지 상위 10종목 +
+// 그 외 전 종목까지 100% 가 전부 드러난다. 각도보다 길이가 견주기도 쉽다.
 function CardTurnover({ v }: { v: Pick }) {
   const share = v.raw ?? 0; // 상위10 거래대금 비중 %
   const dt = v.details as unknown as { top5?: { name: string; share: number }[]; total_jo?: number } | null;
   const top = (dt?.top5 ?? []).slice(0, 4);
   // 비중만으론 "얼마"인지 안 보인다 — 전체 거래대금에 비중을 곱해 금액으로 준다.
   const totalJo = dt?.total_jo ?? null;
-  const donutTip =
+  const barTip =
     totalJo != null
       ? `전체 ${totalJo.toLocaleString("ko-KR")}조원 중 상위 10종목이 ${((totalJo * share) / 100).toFixed(1)}조원`
       : `상위 10종목이 전체 거래대금의 ${share.toFixed(1)}%`;
-  // 누적 각도로 conic 스톱을 만든다. 목록에 없는 나머지는 트랙색 한 조각으로 남는다.
-  // 누적은 reduce 로 미리 만든다 — 렌더 중에 지역 변수를 재대입하면
-  // react-hooks/immutability 가 막는다(재렌더마다 값이 달라질 수 있는 모양이라서).
-  const edges = top.reduce<number[]>((a, t) => [...a, (a[a.length - 1] ?? 0) + t.share], [0]);
-  const stops = [
-    ...top.map((t, i) => `${BLUE_SCALE[i] ?? "var(--c-blue-5)"} ${edges[i]}% ${edges[i + 1]}%`),
-    `var(--c-track) ${edges[edges.length - 1]}% 100%`,
+  // 100% 를 채우는 조각들. 앞 넷은 종목별, 다섯째는 상위10 중 남은 몫, 마지막은 그 외 전부.
+  // ⚠️ 뺄셈이 음수가 되지 않게 막는다 — top5 가 상위10 비중보다 커지는 날이 있으면
+  // (자료가 어긋난 날) 막대가 통째로 뒤집힌다.
+  const namedSum = top.reduce((a, t) => a + t.share, 0);
+  const restOfTop = Math.max(0, share - namedSum);
+  const others = Math.max(0, 100 - share);
+  const segs = [
+    ...top.map((t, i) => ({ key: t.name, label: t.name, pct: t.share, fill: BLUE_SCALE[i] ?? "var(--c-blue-5)", ink: C.ink })),
+    { key: "__rest", label: "나머지 상위 10종목", pct: restOfTop, fill: "var(--c-blue-5)", ink: C.ink },
+    { key: "__others", label: "그 외 전 종목", pct: others, fill: C.track, ink: C.sub2 },
   ];
   return (
     <Shell hit={v.isHit} minH={230}>
       <TitleRow desc={v.headline} icon="pie_chart" name={v.name} />
-      <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-        {/* 툴팁은 도넛 바깥이 아니라 안쪽 라벨에 건다 — 도넛 위에 걸면 툴팁이 카드 제목
-            자리까지 올라가 글자를 덮는다(실측 확인). */}
-        <div style={{ width: 104, height: 104, borderRadius: "50%", flexShrink: 0, background: `conic-gradient(${stops.join(",")})`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div className="hz-tip" data-tip={donutTip} style={{ width: 68, height: 68, borderRadius: "50%", background: C.card, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-            <strong style={{ fontFamily: MONO, fontSize: 19, fontWeight: 800, color: v.color }}>{Math.round(share)}%</strong>
-            <span style={{ fontSize: 10, color: C.muted }}>상위10</span>
-          </div>
+      <Big disp={`${Math.round(share)}`} unit="%" color={v.color} size={32} sub="상위 10종목이 가져간 몫" />
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div className="hz-tip" data-tip={barTip} style={{ display: "flex", height: 14, borderRadius: 4, overflow: "hidden" }}>
+          {segs.map((s2) => (s2.pct <= 0 ? null : <div key={s2.key} style={{ width: `${s2.pct}%`, background: s2.fill }} />))}
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 9, flex: 1, minWidth: 0 }}>
-          {top.map((t, i) => (
-            <div key={t.name} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ width: 8, height: 8, borderRadius: 3, background: BLUE_SCALE[i] ?? "var(--c-blue-5)", flexShrink: 0 }} />
-              <span style={{ flex: 1, fontSize: 12.5, fontWeight: 600, color: C.label, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.name}</span>
-              <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color: C.ink }}>{t.share}%</span>
-            </div>
-          ))}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {segs.map((s2) =>
+            s2.pct <= 0 ? null : (
+              <div key={s2.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 3, background: s2.fill, flexShrink: 0 }} />
+                <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 600, color: C.label, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {s2.label}
+                </span>
+                <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color: s2.ink }}>{s2.pct.toFixed(1)}%</span>
+              </div>
+            ),
+          )}
         </div>
       </div>
       <Foot text={v.desc} />
@@ -1326,49 +1344,109 @@ function CardAsia({ v }: { v: Pick }) {
         { label: "Taiex", sub: "대만", index: 100 + ((dt.taiex ?? 0) - k), self: false },
       ]
     : [];
-  // floorPct 55 — 강조는 유지하되 100 vs 117 같은 차이가 지나치게 벌어지지 않게 한다.
-  const heights = bars.length ? emphasizedHeights(bars.map((b) => b.index), 55) : [];
-  // 카드가 꽉 차 보여 막대를 낮췄다(76 → 62). 라벨 두 줄(24) + 값 한 줄(18) + gap 을
-  // 더한 값이 칸 높이라, 막대만 줄여도 위아래 숨이 같이 생긴다.
-  const BAR_MAX = 62;
-  const kospiH = heights.length ? Math.round((heights[0] / 100) * BAR_MAX) : 0;
+  // 눈금 상한. 가장 큰 나라도 막대 끝에 딱 붙지 않게 4% 만큼 여유를 둔다 — 붙으면
+  // "여기가 최대치"로 읽혀서, 실제로는 열려 있는 축이 닫힌 것처럼 보인다.
+  const scaleMax = bars.length ? Math.max(...bars.map((b) => b.index)) * 1.04 : 1;
+  const pct = (n: number) => `${Math.max(0, Math.min(100, (n / scaleMax) * 100))}%`;
+  // 기준선(KOSPI)이 축 위에서 갖는 자리. 파선과 아래 캡션이 같은 값을 읽어야 어긋나지 않는다.
+  const kospiPct = bars.length ? pct(bars[0].index) : "0%";
+  // 라벨·값 칸 폭. 파선을 덮어씌우는 상자가 이 값을 그대로 되읽어야 막대 칸에 정확히
+  // 겹친다(숫자를 두 곳에 적으면 반드시 어긋난다).
+  const LABEL_W = 62;
+  const VALUE_W = 34;
+  const ROW_GAP = 9;
   return (
     <Shell hit={v.isHit} minH={230}>
       <TitleRow desc={v.headline} icon="public" name={v.name} badge="최근 한 달" />
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <span style={{ fontSize: 11.5, color: C.muted }}>KOSPI를 100으로 둔 상대 지수</span>
-        <Big
-          disp={`${v.raw !== null && v.raw > 0 ? "+" : ""}${v.disp}`}
-          unit={v.unit}
-          color={v.color}
-          size={26}
-          sub="코스피 초과수익률"
-        />
-      </div>
+      <Big
+        disp={`${v.raw !== null && v.raw > 0 ? "+" : ""}${v.disp}`}
+        unit={v.unit}
+        color={v.color}
+        size={32}
+        sub="코스피 초과수익률"
+      />
       {bars.length > 0 ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {/* 막대 줄과 라벨 줄을 **형제로 가른다**. 한 칸 안에 라벨까지 넣으면 파선의
-              bottom 을 라벨 높이만큼 눈으로 보정해야 하는데, 그 값이 글자 크기에 딸려
-              움직여 어긋난다(2026-08-03). 갈라 두면 파선이 막대 줄 안에서
-              bottom:{코스피 높이} 로 정확히 KOSPI 막대 끝에 걸린다. */}
-          <div style={{ position: "relative", display: "flex", alignItems: "flex-end", gap: 10, height: BAR_MAX + 20 }}>
-            <div style={{ position: "absolute", left: 0, right: 0, bottom: kospiH, borderTop: `1px dashed ${C.blue}`, opacity: 0.5 }} />
-            {bars.map((b, i) => (
-              <div key={b.label} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minWidth: 0 }}>
-                <strong style={{ fontFamily: MONO, fontSize: 12.5, fontWeight: 800, color: b.self ? C.ink : C.label }}>
-                  {Math.round(b.index)}
-                </strong>
-                <div style={{ width: "100%", height: Math.round((heights[i] / 100) * BAR_MAX), borderRadius: "10px 10px 6px 6px", background: b.self ? C.blue : "var(--c-blue-5)" }} />
+        // 세로 막대 넷을 **가로 막대 넷**으로 바꿨다. 세로로 세우면 네 나라의 차이가
+        // 높이차로만 남는데, 100 대 107 처럼 붙은 값들은 그 차이가 몇 px 이라 안 보인다.
+        // 가로로 눕히면 같은 차이가 훨씬 긴 축 위에 놓이고, 무엇보다 **기준선(KOSPI)을
+        // 세로 파선 하나로 그을 수 있어** "우리보다 앞선 나라"가 선 오른쪽으로 갈린다.
+        <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 10 }}>
+          {/* 파선은 막대 칸에만 걸쳐야 한다 — 라벨·값 칸까지 가로지르면 표를 관통하는
+              줄이 돼서 기준선으로 안 읽힌다. 좌우를 그 두 칸 폭만큼 물린 상자를 깔고
+              그 안에서 %로 세운다. 아래 캡션 줄(12+gap 10)만큼 bottom 도 물린다. */}
+          <span
+            aria-hidden
+            style={{
+              position: "absolute",
+              top: 0,
+              bottom: 22,
+              left: LABEL_W + ROW_GAP,
+              right: VALUE_W + ROW_GAP,
+              pointerEvents: "none",
+            }}
+          >
+            <span style={{ position: "absolute", left: kospiPct, top: -2, bottom: 0, borderLeft: `1px dashed var(--c-blue-3)` }} />
+          </span>
+          {bars.map((b) => (
+            <div key={b.label} style={{ display: "flex", alignItems: "center", gap: ROW_GAP }}>
+              <span style={{ width: LABEL_W, flexShrink: 0, display: "flex", flexDirection: "column", gap: 1 }}>
+                <span style={{ fontSize: 11, fontWeight: b.self ? 800 : 700, color: b.self ? C.ink : C.label, whiteSpace: "nowrap" }}>
+                  {b.label}
+                </span>
+                <span style={{ fontSize: 9.5, fontWeight: 600, color: C.sub }}>{b.sub}</span>
+              </span>
+              <div style={{ position: "relative", flex: 1, minWidth: 0, height: 16 }}>
+                <div style={{ position: "absolute", inset: 0, borderRadius: 4, background: C.track }} />
+                {/* 기준국만 진한 파랑. 넷을 다 같은 색으로 두면 "누가 기준인지"를 라벨
+                    굵기로만 말하게 되는데, 그건 막대를 훑는 눈에 안 걸린다. */}
+                <div
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: pct(b.index),
+                    borderRadius: 4,
+                    background: b.self ? "var(--c-blue-1)" : "var(--c-blue-4)",
+                  }}
+                />
               </div>
-            ))}
-          </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            {bars.map((b) => (
-              <div key={b.label} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, minWidth: 0 }}>
-                <span style={{ fontSize: 10.5, fontWeight: 700, color: C.label, whiteSpace: "nowrap" }}>{b.label}</span>
-                <span style={{ fontSize: 10, color: C.faint }}>{b.sub}</span>
-              </div>
-            ))}
+              <span
+                style={{
+                  width: VALUE_W,
+                  flexShrink: 0,
+                  textAlign: "right",
+                  fontFamily: MONO,
+                  fontSize: 12,
+                  fontWeight: 800,
+                  color: b.self ? C.ink : C.label,
+                }}
+              >
+                {Math.round(b.index)}
+              </span>
+            </div>
+          ))}
+          {/* 파선이 무슨 선인지 적는 줄. 파선과 같은 kospiPct 를 쓰되 오른쪽 기준으로
+              뒤집어 잡는다 — left 로 두면 캡션이 길어질 때 왼쪽으로 자라 선에서 밀린다. */}
+          <div style={{ display: "flex", alignItems: "center", gap: ROW_GAP }}>
+            <span style={{ width: LABEL_W, flexShrink: 0 }} />
+            <div style={{ position: "relative", flex: 1, minWidth: 0, height: 12 }}>
+              <span
+                style={{
+                  position: "absolute",
+                  right: `calc(100% - ${kospiPct})`,
+                  top: 0,
+                  transform: "translateX(50%)",
+                  fontSize: 9.5,
+                  fontWeight: 700,
+                  color: "var(--c-blue-2)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                KOSPI 100 기준
+              </span>
+            </div>
+            <span style={{ width: VALUE_W, flexShrink: 0 }} />
           </div>
         </div>
       ) : (
@@ -1486,23 +1564,65 @@ function CardComingSoon() {
 // 보여준다. ratio = 현재 / 최근 30일 평균. 가운데 눈금(1배=평소)을 기준으로
 // 오른쪽으로 넘으면 평소보다 활발(과열 방향).
 function VsAvg({ ratio, knob, showScale = true }: { ratio: number; knob: string; showScale?: boolean }) {
-  // 2배 = 오른쪽 끝, 1배 = 한가운데.
-  const pos = Math.max(0, Math.min(100, (ratio / 2) * 100));
+  // **1배를 축 한가운데에 못박는다.** 예전엔 0~2배를 0~100%로 폈는데(1배가 가운데인 건
+  // 같지만) 축이 넓어 1.0배와 1.3배가 15%p 차이로 붙어 보였다. ±0.5배를 양 끝으로 두면
+  // 같은 차이가 30%p 로 벌어진다. 검색 지수는 1배 근처에서 노는 값이라 이쪽이 맞다.
+  const pos = Math.max(0, Math.min(100, 50 + (ratio - 1) * 100));
+  // 채움을 **가운데에서 뻗어 나가게** 한다. 왼쪽 끝에서부터 채우면 1.0배(평소)도 절반이
+  // 차 있어 "꽤 많다"로 읽힌다. 가운데 기준이면 평소는 채움이 없고, 채운 길이가 곧
+  // '평소에서 얼마나 벗어났나'다 — 두 줄을 위아래로 놓았을 때 방향이 바로 갈린다.
+  const fillLeft = Math.min(50, pos);
+  const fillWidth = Math.abs(pos - 50);
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {/* 트랙만 두고 노브를 얹으면 "어디쯤인가"만 보이고 "얼마나 왔나"가 안 보인다.
-          채움을 과열도 색으로 깔아 두 가지를 한 막대에서 읽게 한다(2026-08-03). */}
-      <div style={{ position: "relative", height: 10 }}>
-        <div style={{ height: "100%", borderRadius: R.pill, background: C.track, overflow: "hidden" }}>
-          <div style={{ width: `${pos}%`, height: "100%", borderRadius: R.pill, background: knob }} />
-        </div>
-        <HeatKnob left={pos} color={knob} />
+    <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+      <div style={{ position: "relative", height: 12 }}>
+        <div style={{ height: "100%", borderRadius: R.pill, background: C.track }} />
+        <span
+          style={{
+            position: "absolute",
+            left: `${fillLeft}%`,
+            top: 0,
+            height: 12,
+            width: `${fillWidth}%`,
+            background: knob,
+            borderRadius: R.pill,
+          }}
+        />
+        {/* 1배 눈금. 채움이 없는 줄(평소 수준)에서도 축의 기준이 어디인지 보여야 한다. */}
+        <span
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: -3,
+            height: 18,
+            width: 1.5,
+            background: C.marker,
+            transform: "translateX(-50%)",
+          }}
+        />
+        {/* 노브는 흰 속을 둔 테두리 알약이다. 꽉 찬 점으로 두면 채움과 같은 색이라
+            채움 끝에서 사라진다. clamp 로 양 끝에서도 트랙 밖으로 안 나간다. */}
+        <span
+          style={{
+            position: "absolute",
+            left: `clamp(7px, ${pos}%, 100% - 7px)`,
+            top: -4,
+            transform: "translateX(-50%)",
+            width: 14,
+            height: 18,
+            borderRadius: 6,
+            background: C.card,
+            border: `3px solid ${knob}`,
+            boxSizing: "border-box",
+          }}
+        />
       </div>
       {showScale && (
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ fontSize: 11, color: C.faint }}>적음</span>
+          {/* 눈금 라벨은 --c-sub 이상으로. faint 는 장식용 선에만 쓴다(대비 규칙). */}
+          <span style={{ fontSize: 11, fontWeight: 600, color: C.sub }}>적음</span>
           <span style={{ fontSize: 11, fontWeight: 700, color: C.sub2 }}>평소(1배)</span>
-          <span style={{ fontSize: 11, color: C.faint }}>많음</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: C.sub }}>많음</span>
         </div>
       )}
     </div>
@@ -1806,9 +1926,39 @@ function SubSpend({ v, icon, showScale }: { v: Pick; icon: string; showScale: bo
 }
 
 function CardSpending({ luxury, dining }: { luxury: Pick; dining: Pick }) {
+  // 카드에 큰 수치가 없어 시트에서 이 셀만 리드아웃 자리가 비어 있었다(25칸이 같은
+  // 높이에서 같은 종류를 만나야 표로 읽힌다). 지표가 둘인데 하나만 뽑아야 하므로
+  // **평소에서 더 많이 벗어난 쪽**을 세운다 — 그게 이 카드가 하려는 말이다.
+  const lr = luxury.details?.vs_avg ?? null;
+  const dr = dining.details?.vs_avg ?? null;
+  const lead =
+    lr === null && dr === null
+      ? null
+      : lr === null
+        ? { v: dining, r: dr as number, other: "명품" }
+        : dr === null
+          ? { v: luxury, r: lr, other: "외식" }
+          : Math.abs(dr - 1) >= Math.abs(lr - 1)
+            ? { v: dining, r: dr, other: "명품" }
+            : { v: luxury, r: lr, other: "외식" };
+  // 나머지 한쪽이 평소 수준이면 그렇다고 적는다 — 큰 숫자 하나만 두면 "둘 중 무엇이냐"가
+  // 안 보인다. 0.05 는 소수 첫째 자리로 적었을 때 1.0 으로 보이는 폭이다.
+  const otherR = lead && lead.other === "명품" ? lr : dr;
+  const otherWord =
+    otherR === null ? "" : Math.abs(otherR - 1) < 0.05 ? `${lead?.other}은 평소 수준` : `${lead?.other} ${otherR.toFixed(1)}배`;
   return (
     <Shell hit={luxury.isHit || dining.isHit} minH={230}>
       <TitleRow icon="local_mall" name="여윳돈이 향하는 곳" desc="명품·외식 검색량으로 본 소비 심리" />
+      {lead && (
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+          <strong style={{ fontFamily: MONO, fontSize: 32, fontWeight: 800, letterSpacing: "-.03em", color: lead.v.color, lineHeight: 1, whiteSpace: "nowrap" }}>
+            {lead.r.toFixed(1)}배
+          </strong>
+          <span style={{ fontSize: 12.5, fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>
+            {lead.other === "명품" ? "외식" : "명품"} 검색{otherWord && ` · ${otherWord}`}
+          </span>
+        </div>
+      )}
       <SubSpend v={luxury} icon="shopping_bag" showScale={false} />
       <SubSpend v={dining} icon="restaurant" showScale />
       {/* 지표가 둘이지만 설명은 하나로 합쳐 적는다. 두 문장을 이어 붙이면 이 카드만
