@@ -1042,7 +1042,7 @@ function CardLeverage({ v }: { v: Pick }) {
           <div style={{ background: C.soft, borderRadius: R.tile, padding: 13, display: "flex", flexDirection: "column", gap: 5 }}>
             <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub2 }}>선물 미결제약정</span>
             <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: C.ink }}>{oiAmount ?? "-"}</strong>
-            <span style={{ fontSize: 11, color: C.muted }}>계약 · 1년 평균 대비 {oiVsAvg !== null ? Math.round(oiVsAvg) : "-"}%</span>
+            <span style={{ fontSize: 11, color: C.muted }}>1년 평균 대비 {oiVsAvg !== null ? Math.round(oiVsAvg) : "-"}%</span>
           </div>
         </div>
       )}
@@ -1642,11 +1642,17 @@ function CardDivergence({ v }: { v: Pick }) {
   const ccsi = dt?.ccsi_value;
   const gap = dt?.kospi_gap;
   const level = (x: number) => (x >= 66 ? "높음" : x >= 33 ? "보통" : "낮음");
+  // ⚠️ 두 값의 **과열 방향이 반대**다. 이 지표의 과열도는 lead = 증시%ile − 실물%ile 이라
+  // (calculate_score.py), 증시가 높을수록 과열이고 **실물이 높을수록 차갑다**("실물이 크게
+  // 앞서면 차갑다로 읽히게 한다" — 그 주석). 그래서 색을 낼 때 실물만 100−값으로 뒤집는다.
+  // 한때 둘 다 overheatColor(값) 으로 칠했는데, 그러면 실물 74(=건강)가 빨강으로 떠서
+  // 카드가 "과열"이라고 말하는 꼴이었다(2026-08-03).
   const tiles = [
     {
       label: "실물 강도",
       hint: "소비심리(CCSI)",
       value: real,
+      heat: 100 - real,
       tip:
         ccsi != null
           ? `한국은행 소비자심리지수(CCSI) 최신값은 ${ccsi}입니다. 이게 역대(2008~) 분포에서 몇 번째로 높은지를 0~100으로 매긴 값이 실물 강도입니다.`
@@ -1656,6 +1662,7 @@ function CardDivergence({ v }: { v: Pick }) {
       label: "증시 강세",
       hint: "신고가 근접도",
       value: market,
+      heat: market,
       tip:
         gap != null
           ? `코스피는 최근 종가 기준 전고점보다 ${Math.abs(gap)}% 아래입니다. 이 낙폭이 역대(10년) 분포에서 얼마나 얕은지를 0~100으로 매긴 값이 증시 강세입니다.`
@@ -1683,11 +1690,10 @@ function CardDivergence({ v }: { v: Pick }) {
               {t.tip && <Icon name="help" style={{ fontSize: 13, color: C.hint }} />}
             </span>
             <span style={{ fontSize: 11.5, color: C.muted }}>{t.hint}</span>
-            {/* 두 값 모두 0~100 이라 **다른 지표와 같은 밴드 규칙**으로 칠한다(저온·상온 파랑 /
-                고온·초고온 빨강). 예전엔 '앞서는 쪽'만 파랑이고 나머지는 먹색이었는데, 그러면
-                같은 눈금의 두 수(74·10)가 서로 다른 규칙으로 칠해져 비교가 안 됐다.
-                어느 쪽이 앞서는지는 위 큰 수치가 이미 말한다. */}
-            <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: overheatColor(t.value) }}>
+            {/* 색은 값이 아니라 **그 값이 뜻하는 과열도**(heat)로 낸다 — 위 주석 참고.
+                예전엔 '앞서는 쪽'만 파랑이고 나머지는 먹색이라, 같은 눈금의 두 수가 서로 다른
+                규칙으로 칠해져 비교가 안 됐다. 어느 쪽이 앞서는지는 위 큰 수치가 이미 말한다. */}
+            <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: overheatColor(t.heat) }}>
               {level(t.value)} {Math.round(t.value)}
               <span style={{ fontSize: 12, color: C.sub }}>/100</span>
             </strong>
