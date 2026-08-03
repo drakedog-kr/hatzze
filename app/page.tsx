@@ -3,7 +3,7 @@ import React from "react";
 import { getKospiCloseSeries, getLatestDailyScore, getPublicIndicators, getTopStockHighGaps } from "@/lib/data";
 import type { ClosePoint, DailyScore, IndicatorCategory, IndicatorWithLatestValue, StockHighGap } from "@/lib/data";
 import { formatEokMixed, formatIndicatorValue, formatKstUpdate, sentimentTone, shortDate } from "@/lib/format";
-import { AiMark, BLUE_SCALE, C, Icon, MONO, R, SH, stageForScore } from "./ui";
+import { AiMark, BLUE_SCALE, C, Icon, MONO, R, stageForScore } from "./ui";
 
 // 지표는 하루 단위(GitHub Actions 배치)로 갱신되므로, 빌드 시점에 정적으로
 // 굳어버리지 않도록 매 요청마다 서버에서 새로 조회한다.
@@ -519,13 +519,16 @@ function renderRichSummary(text: string): React.ReactNode {
 }
 
 /** 점수(0~100)가 게이지 호 위에서 갖는 x 좌표. 호는 반지름 124, 중심 (150,150) 의 반원이다. */
-/** 온도 막대 4칸. 강조색이 아니라 연한 트랙색이다 — 위에 마커가 서기 때문이다. */
-const BAND_SEGMENTS = [
-  "var(--c-band-cold)",
-  "var(--c-band-neutral)",
-  "var(--c-band-hot)",
-  "var(--c-band-mania)",
-];
+/**
+ * 히어로 게이지의 4칸 띠. 강조색이 아니라 연한 트랙색이다 — 위에 마커가 서기 때문이다.
+ *
+ * ⚠️ 아래 DIST_FILL(지표 분포 스택 바)과 **다른 한 벌**이다. 헷갈리기 쉬운데 하는 일이
+ * 다르다: 이쪽은 '구간 자체'를 그리는 배경이라 연해야 마커와 값 라벨이 뜨고, 저쪽은
+ * 개수를 견주는 데이터 면이라 진해야 12 대 3 이 눈에 들어온다.
+ */
+const HERO_STRIP = ["#dbe9f7", "#3d9cf5", "#f7bcc2", "#ef8f9a"];
+/** 지표 분포 스택 바·범례 점의 4색. 위 HERO_STRIP 보다 한 단계씩 진하다. */
+const DIST_FILL = ["#dbe9f7", "#3d9cf5", "#ef8a94", "#dc4b56"];
 const BAND_LABELS = ["저온", "상온", "고온", "초고온"];
 
 /**
@@ -562,12 +565,18 @@ function Hero({
   socialHits,
   marketHeat,
   socialHeat,
+  bandCounts,
+  bandTotal,
 }: {
   dailyScore: DailyScore;
   tradHits: number;
   socialHits: number;
   marketHeat: number | null;
   socialHeat: number | null;
+  /** 저온·상온·고온·초고온 순서 고정. 색까지 같이 넘겨 셀 안에서 인덱스로 안 찾게 한다. */
+  bandCounts: { label: string; count: number; fill: string }[];
+  /** 위 넷의 합. 25가 아니라 **오늘 값이 들어온 지표 수**다(자료가 늦는 날 24가 된다). */
+  bandTotal: number;
 }) {
   const stageLabel = stageForScore(dailyScore.score);
   const stage = STAGE_META[stageLabel] ?? STAGE_META["상온"];
@@ -577,14 +586,13 @@ function Hero({
   // 직전 실행 대비 변화. **반올림한 값끼리** 뺀다 — 원값으로 빼면 67.6과 65.4가 "2"로
   // 나오는데 화면에는 68과 65가 떠 있으므로 눈에 보이는 두 숫자의 차이와 어긋난다.
   const delta = dailyScore.prevScore === null ? null : temp - Math.round(dailyScore.prevScore);
+  // 전일 대비는 알약이 아니라 글자 색으로만 말한다(콘솔 리디자인) — 그래서 tint 가 없다.
   const deltaColor = delta === null || delta === 0 ? C.sub2 : delta > 0 ? C.mania : C.blue;
-  const deltaTint =
-    delta === null || delta === 0 ? C.chip : delta > 0 ? "var(--c-mania-tint)" : "var(--c-blue-tint)";
   const deltaText = delta === null ? "—" : delta === 0 ? "—" : `${delta > 0 ? "▲" : "▼"}${Math.abs(delta)}`;
 
   // LLM 요약은 두 문단이다. 앞은 "오늘 가장 뜨거운 지표", 뒤는 "최근 며칠 온도 추세".
-  // 뒤 문단은 **온도 이야기**라 브리핑이 아니라 햇쩨 지수 카드가 제 자리다
-  // (2026-08-03). 앞 문단만 브리핑에 남는다.
+  // 둘 다 브리핑 셀에 들어간다 — '오늘 → 왜 → 흐름' 순으로 읽힌다. 한때 뒤 문단을
+  // 햇쩨 지수 카드에 뒀는데, 그 셀이 게이지·눈금까지 넣으면서 문단을 받을 자리가 없다.
   const summaryLines = (dailyScore.ai_summary ?? "")
     .split("\n")
     .map((x) => x.trim())
@@ -593,119 +601,206 @@ function Hero({
   const trendLine = summaryLines[1] ?? null;
 
   return (
-    <section className="hz-hero-pair">
-      {/* ── 왼쪽: 햇쩨 지수 ─────────────────────────────────────── */}
-      <div style={{ background: C.card, borderRadius: R.card, padding: 24, boxShadow: SH.card, display: "flex", flexDirection: "column", gap: 20 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: C.ink }}>햇쩨 지수</h2>
+    // 히어로도 아래 지표 시트와 같은 어법이다 — 흰 판 하나를 헤어라인으로 갈라 셀을
+    // 앉힌다. 예전엔 그림자 진 카드 두 장(햇쩨 지수 · 오늘의 브리핑)이었는데, 바로 밑에
+    // 평평한 시트가 오면서 위만 떠 있어 두 화면이 붙어 보이지 않았다.
+    <section className="hz-hero-panel">
+      {/* ── ① 햇쩨 지수 ─────────────────────────────────────────── */}
+      <div className="hz-hero-cell">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+            <h2 style={{ margin: 0, fontSize: 12.5, fontWeight: 800, letterSpacing: "-0.01em", color: C.ink }}>햇쩨 지수</h2>
             <span
               className="hz-tip hz-tip-wide hz-tip-below"
               data-tip="시장·감성 지표 25개의 과열도를 가중 평균한 값입니다. 지표마다 신호의 무게가 달라 다른 가중치로 합산합니다. 25·50·75를 경계로 저온·상온·고온·초고온이 나뉩니다."
               data-ga-tip="hatzze_index"
               style={{ display: "inline-flex", cursor: "help" }}
             >
-              <Icon name="help" style={{ fontSize: 17, color: C.hint }} />
+              <Icon name="help" style={{ fontSize: 15, color: C.muted }} />
             </span>
-          </div>
-          <span
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: 12,
-              fontWeight: 700,
-              borderRadius: R.pill,
-              padding: "6px 12px",
-              background: stage.tint,
-              color: stage.color,
-            }}
-          >
-            <Icon name={stage.icon} style={{ fontSize: 16 }} className="ms-fill" />
+          </span>
+          {/* 구간 표시가 알약에서 **점 + 글자**로 내려앉았다. 큰 숫자가 이미 같은 색으로
+              구간을 말하고 있어서, 알약까지 칠하면 셀 하나에 색 덩어리가 둘이 된다. */}
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: C.label }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: stage.color }} />
             {stageLabel}
           </span>
         </div>
 
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 14, flexWrap: "wrap" }}>
-          <strong style={{ fontFamily: MONO, fontSize: 68, fontWeight: 800, lineHeight: 0.9, letterSpacing: "-.045em", color: stage.color }}>
-            {temp}℃
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          {/* lineHeight 0.78 — 숫자만 남기고 서체의 위아래 여백을 걷어내야 옆의 두 줄
+              설명과 광학적으로 가운데가 맞는다. */}
+          <strong style={{ fontFamily: MONO, fontSize: 40, fontWeight: 800, lineHeight: 0.78, letterSpacing: "-0.04em", color: stage.color }}>
+            {temp}
+            <span style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.02em" }}>℃</span>
           </strong>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingBottom: 6 }}>
-            <span style={{ fontSize: 13.5, fontWeight: 600, color: C.sub }}>지금 · {stage.zone}</span>
-            <span style={{ fontSize: 12, fontWeight: 700, borderRadius: R.pill, padding: "4px 10px", alignSelf: "flex-start", background: deltaTint, color: deltaColor }}>
-              {deltaText}
+          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub }}>0~100 과열도 환산</span>
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: C.sub }}>
+              전일 대비 <span style={{ color: deltaColor, fontWeight: 800 }}>{deltaText}</span>
             </span>
           </div>
         </div>
 
-        {/* 4칸 막대 + 그 위에 선 마커. 마커의 left 는 점수를 그대로 % 로 쓴다 —
-            막대 네 칸이 0·25·50·75 경계와 정확히 같은 폭이라 계산이 필요 없다. */}
-        <div style={{ position: "relative", paddingTop: 26 }}>
-          <div style={{ position: "absolute", top: 0, left: `${score}%`, transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-            <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 800, whiteSpace: "nowrap", borderRadius: R.pill, padding: "3px 9px", background: stage.tint, color: stage.color }}>
+        {/* 4칸 띠 + 그 위에 선 마커. 마커의 left 는 점수를 그대로 % 로 쓴다 —
+            띠 네 칸이 0·25·50·75 경계와 정확히 같은 폭이라 계산이 필요 없다.
+            값 라벨을 SVG <text> 가 아니라 HTML 로 얹는 건 서체 로딩·자간 문제를 피하려는
+            것이다(핸드오프 지침). */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ position: "relative", paddingTop: 18 }}>
+            <span
+              style={{
+                position: "absolute",
+                top: 0,
+                left: `${score}%`,
+                transform: "translateX(-50%)",
+                fontFamily: MONO,
+                fontSize: 11,
+                fontWeight: 800,
+                letterSpacing: "-0.02em",
+                whiteSpace: "nowrap",
+                color: stage.color,
+              }}
+            >
               {temp}℃
             </span>
-            <span style={{ width: 2, height: 7, borderRadius: R.pill, background: stage.color }} />
+            <div style={{ display: "flex", height: 9, borderRadius: 3, overflow: "hidden" }}>
+              {HERO_STRIP.map((bg, i) => (
+                <span key={i} style={{ width: "25%", background: bg }} />
+              ))}
+            </div>
+            {/* 흰 링(box-shadow) 을 둘러야 마커가 어느 칸 위에 서든 띠와 안 섞인다. */}
+            <span
+              style={{
+                position: "absolute",
+                left: `${score}%`,
+                top: 14,
+                transform: "translateX(-50%)",
+                width: 2,
+                height: 17,
+                background: C.ink,
+                borderRadius: 1,
+                boxShadow: "0 0 0 2px var(--c-card)",
+              }}
+            />
           </div>
-          <div style={{ display: "flex", gap: 4, height: 10 }}>
-            {BAND_SEGMENTS.map((bg, i) => (
-              <div
-                key={i}
+          {/* 눈금 숫자는 --c-sub 이상으로. faint/hint 는 장식용 구분선 전용이다(대비 규칙). */}
+          <div style={{ position: "relative", height: 13 }}>
+            {[0, 25, 50, 75, 100].map((n) => (
+              <span
+                key={n}
                 style={{
-                  flex: 1,
-                  background: bg,
-                  borderRadius: i === 0 ? "99px 0 0 99px" : i === BAND_SEGMENTS.length - 1 ? "0 99px 99px 0" : undefined,
+                  position: "absolute",
+                  top: 0,
+                  ...(n === 0 ? { left: 0 } : n === 100 ? { right: 0 } : { left: `${n}%`, transform: "translateX(-50%)" }),
+                  fontFamily: MONO,
+                  fontSize: 9.5,
+                  fontWeight: 600,
+                  color: C.sub,
                 }}
-              />
+              >
+                {n}
+              </span>
             ))}
           </div>
-          <div style={{ display: "flex", marginTop: 9 }}>
-            {BAND_LABELS.map((l, i) => (
-              <span key={l} style={{ flex: 1, fontSize: 11.5, fontWeight: 600, color: C.muted, textAlign: i === BAND_LABELS.length - 1 ? "right" : undefined }}>
+          {/* 지금 구간만 진하게. 나머지는 --c-label — 비활성이라고 faint 로 떨구면
+              네 글자 중 셋이 안 읽힌다(대비 규칙). */}
+          <div style={{ display: "flex" }}>
+            {BAND_LABELS.map((l) => (
+              <span
+                key={l}
+                style={{
+                  flex: 1,
+                  textAlign: "center",
+                  fontSize: 10.5,
+                  fontWeight: l === stageLabel ? 800 : 600,
+                  color: l === stageLabel ? stage.color : C.label,
+                }}
+              >
                 {l}
               </span>
             ))}
           </div>
         </div>
 
-        {trendLine && (
-          // 남는 높이를 **위아래로 나눠 갖게** 한다. 아래 '최종 업데이트' 가
-          // marginTop:auto 로 바닥에 붙어 있어서, 그냥 두면 남는 높이가 전부 이 문단
-          // 밑으로 몰려 위는 20px · 아래는 100px 처럼 갈렸다.
-          // flex:1 + 세로 가운데면 문단 위아래 공백이 같아지고, 업데이트 줄은 그대로
-          // 바닥에 남는다.
-          <div style={{ flex: 1, display: "flex", alignItems: "center", minHeight: 0 }}>
-            <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.7, color: C.inkSoft, textWrap: "pretty" }}>
-              {renderRichSummary(trendLine)}
-            </p>
-          </div>
-        )}
-
-        {/* 최종 업데이트는 **언제나 카드 맨 아래**다 — 위 내용 길이가 날마다 달라도
-            자리가 안 흔들려야 "이 카드의 기준 시각" 으로 읽힌다. */}
-        <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 8, paddingTop: 16, borderTop: `1px solid ${C.divider}` }}>
-          <Icon name="schedule" style={{ fontSize: 17, color: C.faint }} />
-          <span style={{ fontSize: 12, color: C.sub2 }}>최종 업데이트 · {formatKstUpdate(dailyScore.updated_at)}</span>
+        {/* 최종 업데이트는 언제나 셀 맨 아래다 — 위 내용 길이가 날마다 달라도 자리가
+            안 흔들려야 "이 화면의 기준 시각" 으로 읽힌다.
+            목업은 이 줄을 본문 헤더 부제로 올렸는데, 헤더(AppShell)는 세 화면이 공유하는
+            클라이언트 셸이라 브리핑 전용 데이터인 이 시각을 집을 수가 없다. 여기 남긴다. */}
+        <div
+          style={{
+            marginTop: "auto",
+            display: "flex",
+            alignItems: "center",
+            gap: 7,
+            paddingTop: 10,
+            borderTop: `1px solid ${C.divider}`,
+          }}
+        >
+          <Icon name="schedule" style={{ fontSize: 14, color: C.muted }} />
+          <span style={{ fontSize: 10.5, color: C.sub }}>최종 업데이트 · {formatKstUpdate(dailyScore.updated_at)}</span>
         </div>
       </div>
 
-      {/* ── 오른쪽: 오늘의 브리핑 ────────────────────────────────── */}
-      <div style={{ background: C.card, borderRadius: R.card, padding: 24, boxShadow: SH.card, display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {/* ✨ 는 장식이 아니라 생성형 AI 고지(AI 기본법 §31)라 누를 수 있어야 한다.
-              목업의 아이콘 타일 안에 AiMark 버튼을 그대로 넣어 모양과 의무를 같이 지킨다. */}
-          <div style={{ width: 38, height: 38, borderRadius: 12, background: "var(--c-blue-tint)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <AiMark size={20} style={{ alignSelf: "center" }} />
-          </div>
-          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: C.ink }}>오늘의 브리핑</h2>
+      {/* ── ② 지표 분포 ─────────────────────────────────────────── */}
+      {/* 히어로가 답을 하나(38℃)만 주면 "그 하나가 어떻게 나온 값인지"가 안 보인다.
+          25개가 네 구간에 어떻게 흩어져 있는지를 같이 두면, 같은 38℃라도 '전부 상온'인
+          날과 '저온 12 + 초고온 3'인 날이 다른 화면이 된다. */}
+      <div className="hz-hero-cell hz-hero-divide">
+        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.08em", color: C.label }}>지표 분포</span>
+        {/* 100% 스택 바. 칸 색은 게이지 띠와 다른 한 벌이다 — 게이지는 '구간 자체'를
+            그리는 배경이라 연하고, 이쪽은 개수를 견주는 데이터 면이라 진하다. */}
+        <div style={{ display: "flex", height: 9, borderRadius: 3, overflow: "hidden" }}>
+          {bandCounts.map((b) =>
+            b.count === 0 ? null : (
+              <span key={b.label} style={{ width: `${(b.count / bandTotal) * 100}%`, background: b.fill }} />
+            ),
+          )}
         </div>
-        <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.75, color: C.inkSoft, textWrap: "pretty" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+          {bandCounts.map((b) => (
+            <div key={b.label} style={{ display: "flex", alignItems: "center", gap: 9 }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: b.fill, flexShrink: 0 }} />
+              <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: C.label }}>{b.label}</span>
+              <strong style={{ fontFamily: MONO, fontSize: 12.5, fontWeight: 800, color: C.ink }}>{b.count}</strong>
+            </div>
+          ))}
+        </div>
+        {/* 분모를 적어 둔다 — 25개 전부가 아니라 **오늘 값이 들어온 것**만 센다.
+            자료가 늦는 지표가 있는 날 합이 24가 되는데, 적어 두지 않으면 숫자가 틀린
+            것처럼 보인다. */}
+        <span
+          style={{
+            marginTop: "auto",
+            fontSize: 10.5,
+            lineHeight: 1.6,
+            color: C.sub,
+            paddingTop: 10,
+            borderTop: `1px solid ${C.divider}`,
+            textWrap: "pretty",
+          }}
+        >
+          오늘 {bandTotal}개 지표 집계
+          {bandCounts[3].count > 0 && ` · 초고온 ${bandCounts[3].count}개가 온도를 끌어올렸습니다`}
+        </span>
+      </div>
+
+      {/* ── ③ 오늘의 브리핑 ─────────────────────────────────────── */}
+      <div className="hz-hero-cell hz-hero-divide hz-hero-wide">
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <h2 style={{ margin: 0, fontSize: 12.5, fontWeight: 800, letterSpacing: "-0.01em", color: C.ink }}>오늘의 브리핑</h2>
+          {/* ✨ 는 장식이 아니라 생성형 AI 고지(AI 기본법 §31)라 누를 수 있어야 한다.
+              타일을 걷고 표식만 남겼다 — 셀 머리가 10.5~12.5px 짜리 줄인데 38px 타일이
+              붙으면 그 줄만 혼자 두 배로 두꺼워진다. */}
+          <AiMark size={15} />
+        </div>
+        <p style={{ margin: 0, fontSize: 13, lineHeight: 1.75, color: C.inkSoft, textWrap: "pretty" }}>
           오늘은 시장 지표 <b style={{ fontWeight: 800, color: C.ink }}>{tradHits}개</b>, 감성 지표{" "}
           <b style={{ fontWeight: 800, color: C.ink }}>{socialHits}개</b>가 초고온 구간에 들었습니다. 지표들이 가리키는
           현재 시장 온도는 <b style={{ fontWeight: 800, color: stage.color }}>{stageLabel}</b> 구간입니다.
         </p>
         {meaningLine && (
-          <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.75, color: C.inkSoft, textWrap: "pretty" }}>
+          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.75, color: C.inkSoft, textWrap: "pretty" }}>
             {renderRichSummary(meaningLine)}
           </p>
         )}
@@ -718,11 +813,9 @@ function Hero({
             SCORE_DISPLAY_ANCHORS 로 한 번 더 매핑한 값이다. 오늘 값으로 원 42.3 은
             ℃ 로 치면 47 이고, 원 50 쯤에서는 차이가 13 까지 벌어진다.
             **두 수를 히어로 온도에서 빼면 안 된다.** 서로(시장↔감성) 견주는 건 같은
-            눈금이라 정확하다 — 이 문장이 하는 비교가 그것이다.
-            정확한 ℃ 로 적으려면 앵커 매핑을 프론트에 복제하지 말고, 파이프라인이
-            카테고리별 ℃ 를 계산해 daily_score.details 에 실어 보내게 하는 쪽이 맞다. */}
+            눈금이라 정확하다 — 이 문장이 하는 비교가 그것이다. */}
         {marketHeat !== null && socialHeat !== null && (
-          <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.75, color: C.inkSoft, textWrap: "pretty" }}>
+          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.75, color: C.inkSoft, textWrap: "pretty" }}>
             {Math.abs(marketHeat - socialHeat) < 5 ? (
               <>
                 시장 지표와 감성 지표의 온도가
@@ -746,12 +839,29 @@ function Hero({
             )}
           </p>
         )}
-        <div style={{ marginTop: "auto", display: "flex", gap: 10, background: C.soft, borderRadius: 16, padding: "14px 16px" }}>
-          <Icon name="info" style={{ fontSize: 18, lineHeight: 1.4, color: C.faint, flexShrink: 0 }} />
-          <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.65, color: C.sub2 }}>
-            저온·상온·고온·초고온은 시장의 과열 정도를 나타낸 표현일 뿐, 재미·참고용이며 매수·매도 신호가 아닙니다.
+        {/* 온도 추세 문단. 예전엔 햇쩨 지수 카드에 뒀는데(온도 이야기라서), 그 셀이
+            게이지까지 넣기엔 좁아졌다. 브리핑 세 문단이 '오늘 → 왜 → 흐름' 순으로
+            읽히는 편이 낫기도 하다. */}
+        {trendLine && (
+          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.75, color: C.inkSoft, textWrap: "pretty" }}>
+            {renderRichSummary(trendLine)}
           </p>
-        </div>
+        )}
+        {/* 면책은 회색 상자에서 헤어라인 한 줄로 내려앉았다. 상자로 두면 이 셀에서
+            가장 큰 덩어리가 돼서, 정작 읽어야 할 브리핑 문단보다 눈에 먼저 들었다. */}
+        <p
+          style={{
+            margin: "auto 0 0",
+            paddingTop: 10,
+            borderTop: `1px solid ${C.divider}`,
+            fontSize: 10.5,
+            lineHeight: 1.6,
+            color: C.sub,
+            textWrap: "pretty",
+          }}
+        >
+          저온·상온·고온·초고온은 시장의 과열 정도를 나타낸 표현일 뿐, 재미·참고용이며 매수·매도 신호가 아닙니다.
+        </p>
       </div>
     </section>
   );
@@ -2122,6 +2232,21 @@ export default async function Home() {
   const extra = (cat: IndicatorCategory) =>
     indicators.filter((i) => i.category === cat && !LAID_OUT.has(i.slug));
 
+  // 히어로 '지표 분포' — 25개를 네 구간으로 센다.
+  // 카드의 구간 판정(overheatColor)·초고온 배지(isHit)와 **같은 값**을 쓴다: capped(0~100)
+  // 를 stageForScore 에 넣는다. 다른 기준으로 세면 "초고온 3개"라고 적어 놓고 시트에는
+  // 빨간 셀이 둘만 보이는 일이 난다.
+  // capped 가 null 인 지표(자료가 아직 안 온 것)는 **빼고** 센다 — isHit 은 null 을 0 으로
+  // 떨어뜨리지만, 그건 '초고온이 아니다'를 판정하려는 것이지 '저온이다'라는 뜻이 아니다.
+  const bandTally = [0, 0, 0, 0];
+  for (const i of indicators) {
+    const v = pick(i).capped;
+    if (v === null) continue;
+    bandTally[BAND_LABELS.indexOf(stageForScore(v))] += 1;
+  }
+  const bandCounts = BAND_LABELS.map((label, i) => ({ label, count: bandTally[i], fill: DIST_FILL[i] }));
+  const bandTotal = bandTally.reduce((a, b) => a + b, 0);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             {dailyScore ? (
@@ -2131,6 +2256,8 @@ export default async function Home() {
                 socialHits={countHits("감성")}
                 marketHeat={categoryHeat(indicators, "시장")}
                 socialHeat={categoryHeat(indicators, "감성")}
+                bandCounts={bandCounts}
+                bandTotal={bandTotal}
               />
             ) : (
               <section style={{ background: C.card, borderRadius: 16, padding: 44, textAlign: "center", color: C.sub }}>

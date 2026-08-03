@@ -292,11 +292,53 @@ body {
 .hz-cell-graphic > :last-child {
   margin-block: auto;
 }
-/* 히어로 두 장. auto-fit 이라 자리가 모자라면 한 열로 접힌다. */
-.hz-hero-pair {
+/* 히어로 — 아래 지표 시트와 같은 어법(흰 판 하나 + 헤어라인)이다. 셀 셋을 1:1:2 로
+   나눠 한 줄에 세운다.
+
+   auto-fill 로 두지 않은 이유: 3열이 되는 폭에서 [지수][분포]가 한 줄, [브리핑 span 2]가
+   다음 줄로 가면서 **두 줄 모두 오른쪽 한 칸이 빈다.** 칸 수를 폭 구간마다 못박으면
+   어느 폭에서도 줄이 꽉 찬다(4단위 → 2+2 → 1). 아래 지표 시트의 칸과 세로선이 맞지
+   않는 건 감수한다 — 빈 칸이 생기는 쪽이 훨씬 눈에 띈다.
+
+   경계 1100·700 은 화면 폭이 아니라 이 판이 실제로 좁아지는 자리에서 잡았다:
+   1100 아래에서 2fr 짜리 브리핑 셀 안쪽이 300px 밑으로 내려가 문단이 세로로 흐른다. */
+.hz-hero-panel {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
-  gap: 18px;
+  grid-template-columns: 1fr 1fr 2fr;
+  background: var(--c-card);
+  border: 1px solid var(--c-sheet-line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.hz-hero-cell {
+  min-width: 0;
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+/* 셀 사이 세로 헤어라인. 시트와 달리 셀이 셋뿐이고 자리가 고정이라, inset 그림자 대신
+   왼쪽 테두리로 둔다(첫 셀만 빼면 되니 규칙이 더 짧다). */
+.hz-hero-divide {
+  border-left: 1px solid var(--c-divider);
+}
+/* ⚠️ 넓은 화면에서는 span 을 주지 않는다. 세 칸짜리 격자의 **셋째 칸이 이미 2fr** 이라
+   브리핑은 그 한 칸에 그대로 앉으면 된다. span 2 를 얹으면 1+1+2 = 네 칸을 요구하는
+   셈이라 세 칸 격자에 못 들어가서 다음 줄로 내려가고, 두 줄 모두 오른쪽 칸이 빈다. */
+.hz-hero-wide {
+  gap: 12px;
+}
+@media (max-width: 1100px) {
+  /* 두 칸이 되면 브리핑만 아랫줄에서 폭을 다 쓴다 — 이때야 span 이 필요하다. */
+  .hz-hero-panel { grid-template-columns: 1fr 1fr; }
+  .hz-hero-wide { grid-column: span 2; }
+  /* 아랫줄 첫 셀이라 왼쪽 선이 허공에 뜬다 — 대신 윗선. */
+  .hz-hero-wide { border-left: 0; border-top: 1px solid var(--c-divider); }
+}
+@media (max-width: 700px) {
+  .hz-hero-panel { grid-template-columns: 1fr; }
+  .hz-hero-wide { grid-column: span 1; }
+  .hz-hero-divide { border-left: 0; border-top: 1px solid var(--c-divider); }
 }
 /* 상단 카더라 집계 칩 4개. */
 .hz-ticker-cards {
