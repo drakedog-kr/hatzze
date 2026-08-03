@@ -790,14 +790,32 @@ export default function AppShell({
             인라인이 아니라 .hz-main 클래스로 준다 — 모바일에서 탑바가 fixed 로 떠서
             흐름에서 빠지는데, 그만큼을 padding-top 으로 되메워야 첫 카드가 안 가린다.
             인라인 padding 은 미디어쿼리의 padding-top 을 이겨서 그게 안 먹는다. */}
-        {/* 헤더·집계 카드는 main **안**에 둔다. 목업이 그 둘을 본문 흐름의 일부로
-            그렸고(스크롤하면 같이 올라간다), 그래야 좌우 여백이 카드와 한 선에 맞는다. */}
-        {/* 목업 main 은 세로 flex 에 gap 20 이다 — 헤더·집계 카드·섹션·푸터이 같은 간격으로
-            떨어진다. 블록 흐름으로 두면 집계 카드와 히어로가 맞붙는다. */}
-        <main ref={mainRef} className="hz-scroll hz-main" style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 20 }}>
-          <PageHeader theme={theme} />
-          {children}
-          <Footer />
+        {/* 헤더·푸터는 main **안**에 둔다. 목업이 그 둘을 본문 흐름의 일부로 그렸고
+            (스크롤하면 같이 올라간다), 그래야 좌우 여백이 카드와 한 선에 맞는다.
+
+            폭 제한은 **안쪽 상자**가 건다. main 자체에 걸면 스크롤바가 콘텐츠를 따라
+            안쪽으로 들어와 창 오른쪽 끝에서 떨어진다. 그리고 헤더·카드·푸터가 같은
+            상자 안에 있어야 셋의 왼쪽 선이 어긋나지 않는다 — 카드에만 걸면 헤더와
+            푸터가 화면 끝까지 늘어나 격자와 안 맞는다.
+
+            세로 flex + gap 20 도 여기 둔다(목업 main 의 값). */}
+        <main ref={mainRef} className="hz-scroll hz-main" style={{ flex: 1, overflowY: "auto" }}>
+          <div
+            style={{
+              width: "100%",
+              // 리디자인 전과 같은 값. 3열 격자에서 칸이 381px 이라 카드 안쪽 하한(220)에
+              // 여유가 크고, 브리핑 문단 한 줄이 지나치게 길어지지 않는다.
+              maxWidth: 1180,
+              margin: "0 auto",
+              display: "flex",
+              flexDirection: "column",
+              gap: 20,
+            }}
+          >
+            <PageHeader theme={theme} />
+            {children}
+            <Footer />
+          </div>
         </main>
         <PcHint />
       </div>
