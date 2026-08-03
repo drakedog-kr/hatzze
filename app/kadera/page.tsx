@@ -228,7 +228,7 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
       initial={6}
       step={10}
       listClassName="hz-panelgrid hz-panelgrid-auto"
-      footerStyle={{ margin: 0, gap: 0, borderTop: "1px solid var(--c-sheet-line)" }}
+      footerClassName="hz-sheet-foot-row"
     />
   );
 }
@@ -978,7 +978,7 @@ export default async function KaderaPage() {
                 initial={10}
                 step={10}
                 listStyle={{ display: "block" }}
-                footerStyle={{ margin: 0, gap: 0, borderTop: "1px solid var(--c-sheet-line)" }}
+                footerClassName="hz-sheet-foot-row"
               />
               <div style={{ marginTop: "auto" }} />
             </>

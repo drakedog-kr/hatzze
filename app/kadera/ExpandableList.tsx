@@ -18,6 +18,7 @@ export function ExpandableList({
   listStyle,
   listClassName,
   footerStyle,
+  footerClassName,
   name,
 }: {
   items: React.ReactNode[];
@@ -33,6 +34,8 @@ export function ExpandableList({
   listClassName?: string;
   /** '더 보기' 줄의 바깥 여백. 시트 안에서는 셀 격자에 딱 붙어야 해서 덮어쓴다. */
   footerStyle?: React.CSSProperties;
+  /** '더 보기' 줄에 붙일 클래스. 시트 바닥 띠는 높이를 CSS 에서 못박으므로 클래스로 준다. */
+  footerClassName?: string;
   /** GA 이벤트에서 어느 목록인지 구분할 이름. 없으면 펼침을 재지 않는다. */
   name?: string;
 }) {
@@ -45,7 +48,10 @@ export function ExpandableList({
   // 떠 보인다. 줄 자체가 눌리는 자리가 되게 두고 높이도 데이터 행보다 낮게 잡는다.
   const buttonStyle: React.CSSProperties = {
     flex: 1,
-    padding: "7px 12px",
+    // 세로 여백은 주지 않는다 — 시트 안에서는 바닥 띠(.hz-sheet-foot-row)가 높이를
+    // 정하고 버튼이 그 높이를 늘여 받는다. 밖에서 쓰면 아래 minHeight 가 대신 잡는다.
+    padding: "0 12px",
+    minHeight: 32,
     borderRadius: 0,
     border: 0,
     background: "transparent",
@@ -57,22 +63,26 @@ export function ExpandableList({
 
   return (
     <>
-      {/* 배치를 클래스로 받으면 기본 세로 flex 를 아예 안 깐다. 인라인 display:flex 는
-          클래스의 display:grid 를 이기므로, 같이 두면 격자가 통째로 무시된다. */}
+      {/* 배치를 클래스로 받으면 기본값을 아예 안 깐다. 인라인은 클래스를 이기므로 같이
+          두면 클래스의 배치가 통째로 무시된다 — display:flex 가 grid 를 덮었고, **padding:0
+          이 패널 격자의 안쪽 여백(14)까지 지워** 말풍선이 시트 테두리와 '더 보기' 줄에
+          그대로 붙었다. 목록 초기화(list-style·margin)만 남긴다. */}
       <ol
         className={listClassName}
         style={{
           listStyle: "none",
           margin: 0,
-          padding: 0,
-          ...(listClassName ? null : { display: "flex", flexDirection: "column", gap }),
+          ...(listClassName ? null : { padding: 0, display: "flex", flexDirection: "column", gap }),
           ...listStyle,
         }}
       >
         {items.slice(0, shown)}
       </ol>
       {(canExpand || isExpanded) && (
-        <div style={{ display: "flex", gap: 8, marginTop: 14, ...footerStyle }}>
+        <div
+          className={footerClassName}
+          style={footerClassName ? footerStyle : { display: "flex", gap: 8, marginTop: 14, ...footerStyle }}
+        >
           {canExpand && (
             <button
               type="button"
@@ -93,7 +103,9 @@ export function ExpandableList({
             <button
               type="button"
               className="hz-more-btn"
-              style={buttonStyle}
+              /* 둘이 나란히 설 때만 사이에 세로 선을 세운다. 테두리 없는 줄 둘이 맞붙어
+                 있으면 어디까지가 '더 보기'인지 눌러 보기 전엔 알 수 없다. */
+              style={canExpand ? { ...buttonStyle, borderLeft: `1px solid ${C.line}` } : buttonStyle}
               onClick={() => {
                 if (name) track("list_expand", { list: name, action: "fold", shown: initial });
                 setShown(initial);
