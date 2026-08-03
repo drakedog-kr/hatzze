@@ -8,57 +8,69 @@ import { C } from "../ui";
  *  1) 여기(route 단계) — 서버가 코스피 종목 목록(944행)을 실어 내려줄 때까지. 실측 ~0.5초.
  *  2) MddExplorer 안의 `Skeleton` — 그 다음 클라이언트가 /api/mdd 로 낙폭을 받아올 때까지.
  * 두 번째는 이미 있던 것이고 종목·기간을 바꿀 때마다 다시 뜬다. 여기서는 첫 번째만 맡는다.
- * 그래서 골격을 그쪽 `Skeleton` 과 같은 모양(mdd-grid + full 하나 + 2열)으로 맞춘다 —
- * 두 단계가 이어질 때 화면이 다른 모양으로 갈아타는 것처럼 보이면 안 된다.
+ *
+ * ⭐ **골격은 그쪽 `Skeleton` 과 글자 그대로 같아야 한다.** 두 단계가 이어 붙는데 모양이
+ * 다르면 화면이 갈아타는 것처럼 보인다. 그래서 시트 배치(히어로 3분할 → 전폭 차트 →
+ * 50:50 짝)를 여기서도 그대로 그린다.
+ *
+ * ⚠️ **폭 상한을 여기서 걸지 말 것.** 셸(AppShell)이 본문 상자를 이미 1340 으로 잡는다.
+ * 예전엔 `maxWidth:1180, margin:"0 auto"` 가 있었는데, 세로 flex 안에서 가로 margin:auto 가
+ * `align-items:stretch` 를 꺼 버려 자리표시자만 좁게(fit-content) 떴다 — MddExplorer 와 같은
+ * 함정이라 두 파일을 같이 고쳤다.
  */
 
-/** 결과와 같은 골격으로 은은하게 깜빡이는 블록. MddExplorer 의 Skeleton 과 같은 표현이다. */
-function Block({ h, w = "100%", r = 10 }: { h: number; w?: number | string; r?: number }) {
-  return <div className="hz-shimmer" style={{ height: h, width: w, borderRadius: r, background: C.bg }} />;
+/**
+ * 결과와 같은 골격으로 은은하게 깜빡이는 블록. MddExplorer 의 Skeleton 과 같은 표현이다.
+ *
+ * ⚠️ 바탕색을 자리에 맞춰 골라야 한다. 기본값 `--c-bg` 는 **시트(흰 판) 안**에서만 보인다 —
+ * 조회 바처럼 시트 밖(페이지 바탕 위)에 놓이는 블록에 그대로 쓰면 바탕과 같은 색이라
+ * 아예 안 보인다. 그 자리는 실제 검색창과 같은 `--c-track` 을 쓴다.
+ */
+function Block({ h, w = "100%", r = 8, bg = C.bg }: { h: number; w?: number | string; r?: number; bg?: string }) {
+  return <div className="hz-shimmer" style={{ height: h, width: w, borderRadius: r, background: bg }} />;
 }
 
-const card: React.CSSProperties = {
-  background: C.card,
-  border: `1px solid ${C.line}`,
-  borderRadius: 16,
-  padding: "var(--hz-card-pad)",
-  minWidth: 0,
-};
+/** 시트 안쪽 본문 — MddExplorer 의 PAD 와 같은 값. */
+const body: React.CSSProperties = { padding: "18px 22px", display: "flex", flexDirection: "column", gap: 12 };
 
 export default function Loading() {
   return (
     // position:relative 는 아래 hz-loading-float 의 기준 상자가 되기 위한 것이다.
-    <div style={{ position: "relative", maxWidth: 1180, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* 설명은 자리표시자로 두지 않고 진짜 글자를 쓴다 — 이 문단은 데이터를 기다릴
-          이유가 없다(카더라와 같은 원칙). 제목은 여기서 안 그린다(셸의 본문 헤더가
-          이미 그린다 — MddExplorer 와 같은 이유). */}
-      <p style={{ margin: 0, color: C.sub, fontSize: 14, lineHeight: 1.6 }}>
-        종목이 고점에서 <b style={{ color: C.ink }}>얼마나 빠졌는지</b>, 이만큼 빠진 적이{" "}
-        <b style={{ color: C.ink }}>얼마나 드문지</b>, 과거엔 회복까지 <b style={{ color: C.ink }}>얼마나 걸렸는지</b>를 봅니다.
-      </p>
-
+    <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 20 }}>
       {/* 조회 바(종목 검색 + 기간 탭). 실제 Controls 가 앉을 자리를 그대로 비워 둔다. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }} aria-hidden>
-        <Block h={44} w={260} r={12} />
-        <Block h={44} w={218} r={999} />
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }} aria-hidden>
+        <div style={{ flex: "1 1 260px", minWidth: 220 }}>
+          <Block h={44} r={12} bg={C.track} />
+        </div>
+        <Block h={44} w={218} r={9} bg={C.track} />
       </div>
 
-      {/* MddExplorer 의 Skeleton 과 같은 골격 — 넓은 카드 하나 + 2열 카드 둘. */}
-      <div className="mdd-grid" aria-hidden>
-        <div className="mdd-full">
-          <section style={{ ...card, display: "flex", flexDirection: "column", gap: 14 }}>
-            <Block h={22} />
-            <Block h={54} />
-            <Block h={176} />
-          </section>
+      {/* MddExplorer 의 Skeleton 과 같은 골격 — 히어로 3분할 + 전폭 차트 + 50:50 짝. */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }} aria-hidden>
+        <section className="hz-sheet" style={{ display: "flex", flexWrap: "wrap" }}>
+          {[290, 300, 300].map((basis, i) => (
+            <div key={i} style={{ flex: `1 1 ${basis}px`, minWidth: 0, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 12 }}>
+              <Block h={14} />
+              <Block h={38} />
+              <Block h={48} />
+            </div>
+          ))}
+        </section>
+        <section className="hz-sheet">
+          <div style={body}>
+            <Block h={201} />
+          </div>
+        </section>
+        <div className="mdd-pair">
+          {[0, 1].map((i) => (
+            <section key={i} className="hz-sheet">
+              <div style={body}>
+                <Block h={16} />
+                <Block h={112} />
+              </div>
+            </section>
+          ))}
         </div>
-        {[0, 1].map((i) => (
-          <section key={i} style={{ ...card, display: "flex", flexDirection: "column", gap: 12 }}>
-            <Block h={20} />
-            <Block h={14} />
-            <Block h={96} />
-          </section>
-        ))}
       </div>
 
       {/* 보이는 자리표시자의 한가운데(globals.css 의 hz-loading-float 주석). 이 페이지는

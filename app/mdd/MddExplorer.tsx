@@ -131,13 +131,10 @@ export function MddExplorer({
           없어 티가 안 나고 넓은 화면에서만 드러난다. */
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* 제목은 여기서 안 그린다 — 셸의 본문 헤더(AppShell 의 PageHeader)가 그리는 h1
-          하나뿐이다. 예전엔 여기에 h1 을 또 둬서 "MDD 정밀분석"이 화면에 두 번 떴다.
-          설명 문단은 남긴다(헤더의 한 줄 부제보다 훨씬 구체적이라 대신 못 한다). */}
-      <p style={{ margin: 0, color: C.sub, fontSize: 14, lineHeight: 1.6 }}>
-        종목이 고점에서 <b style={{ color: C.ink }}>얼마나 빠졌는지</b>, 이만큼 빠진 적이 <b style={{ color: C.ink }}>얼마나 드문지</b>, 과거엔 회복까지 <b style={{ color: C.ink }}>얼마나 걸렸는지</b>를 봅니다.
-      </p>
-
+      {/* 제목도 설명 문단도 여기서 안 그린다 — 셸의 본문 헤더(AppShell 의 PageHeader)가
+          제목과 한 줄 부제를 이미 그린다. 예전엔 그 아래에 세 갈래 설명("얼마나 빠졌는지 ·
+          얼마나 드문지 · 얼마나 걸렸는지")을 한 문단 더 뒀는데, 바로 아래 시트들이 같은
+          말을 제목으로 다시 하고 있어 걷어냈다(2026-08-04). */}
       <Controls
         stocks={stocks}
         selected={selected}
