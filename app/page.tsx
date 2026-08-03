@@ -286,7 +286,7 @@ function TitleRow({
     // 우상단 절대배치 배지(HitBadge)와 제목이 겹치지 않게 오른쪽을 62 비우는데, 그건
     // 초고온 셀에서만 필요하다. TitleRow 는 hit 를 안 받으므로(받게 하면 카드 25장에
     // 프롭을 하나씩 더 넘겨야 한다) 셀 클래스로 건다 — globals.css 의 .hz-cell-hot .hz-cell-head.
-    <div className="hz-cell-head" style={{ display: "flex", alignItems: "flex-start", gap: 12, minHeight: 61 }}>
+    <div className="hz-cell-head" style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
       <Icon
         name={icon}
         style={{
@@ -309,7 +309,7 @@ function TitleRow({
             justifyContent: right ? "space-between" : undefined,
           }}
         >
-          <span style={{ fontSize: 13.5, fontWeight: 800, color: C.ink, lineHeight: 1.3, letterSpacing: "-.01em", wordBreak: "keep-all" }}>
+          <span className="hz-clamp2" style={{ fontSize: 13.5, fontWeight: 800, color: C.ink, lineHeight: 1.3, letterSpacing: "-.01em", wordBreak: "keep-all" }}>
             {name}
           </span>
           {badge && (
@@ -330,7 +330,7 @@ function TitleRow({
           {right && <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>{right}</div>}
         </div>
         {desc && (
-          <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.45, color: C.sub2, wordBreak: "keep-all" }}>{desc}</p>
+          <p className="hz-clamp2" style={{ margin: 0, fontSize: 12.5, lineHeight: 1.45, color: C.sub2, wordBreak: "keep-all" }}>{desc}</p>
         )}
       </div>
     </div>
