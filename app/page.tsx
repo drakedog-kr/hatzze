@@ -255,7 +255,7 @@ function TitleRow({
   icon,
   name,
   desc,
-  iconSize = 22,
+  iconSize = 20,
   badge,
   right,
 }: {
@@ -268,9 +268,16 @@ function TitleRow({
   right?: React.ReactNode;
 }) {
   return (
-    // ① 머리 슬롯 — 왼쪽에 **아이콘 타일**(40×40 둥근 사각), 오른쪽에 제목/부제.
-    // 예전엔 아이콘이 제목과 같은 줄에 그냥 얹혀 있었다. 타일이 생기면서 카드마다
-    // 시작점이 같아져 25장이 한 격자로 읽힌다.
+    // ① 머리 슬롯 — 왼쪽에 아이콘, 오른쪽에 제목/부제.
+    //
+    // **아이콘 타일(40×40 색 사각)을 걷었다.** 카드가 저마다 떠 있던 시절엔 타일이
+    // 카드마다 같은 시작점을 만들어 줬는데, 시트가 되면서 그 일은 격자선이 한다.
+    // 셀 25칸에 색 타일이 25개 뜨면 정작 데이터(큰 숫자·막대)보다 타일이 먼저 눈에 든다.
+    // 아이콘은 제목을 거드는 표식으로 내려앉는다 — 20px 맨 아이콘, --c-muted.
+    //
+    // line-height/height 18 + align-items:center 는 **제목 첫 줄 중앙에 광학 정렬**하는
+    // 장치다(18 = 제목 13.5 × line-height 1.3). 제목이 두 줄이 되어도 아이콘은 첫 줄
+    // 가운데에 그대로 있는다 — flex-start 로만 두면 글리프 상단 여백만큼 위로 뜬다.
     //
     // minHeight 61 이 4슬롯 규칙의 첫 칸이다. 제목이 한 줄인 카드와 두 줄인 카드
     // ("레버리지 ETF·선물 미결제약정 종합 지수")가 섞여 있어서, 이 칸을 안 잡으면
@@ -280,21 +287,18 @@ function TitleRow({
     // 초고온 셀에서만 필요하다. TitleRow 는 hit 를 안 받으므로(받게 하면 카드 25장에
     // 프롭을 하나씩 더 넘겨야 한다) 셀 클래스로 건다 — globals.css 의 .hz-cell-hot .hz-cell-head.
     <div className="hz-cell-head" style={{ display: "flex", alignItems: "flex-start", gap: 12, minHeight: 61 }}>
-      <div
+      <Icon
+        name={icon}
         style={{
-          width: 40,
-          height: 40,
-          borderRadius: R.icon,
-          // Shell 이 카드 상태에 따라 정해 준다(평소 파랑 / 초고온 빨강).
-          background: "var(--card-accent-tint, var(--c-blue-tint))",
+          fontSize: iconSize,
+          lineHeight: "18px",
+          height: 18,
           display: "flex",
           alignItems: "center",
-          justifyContent: "center",
+          color: C.muted,
           flexShrink: 0,
         }}
-      >
-        <Icon name={icon} style={{ fontSize: iconSize, color: "var(--card-accent, var(--c-blue))" }} />
-      </div>
+      />
       <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0, flex: 1 }}>
         <div
           style={{
@@ -305,7 +309,7 @@ function TitleRow({
             justifyContent: right ? "space-between" : undefined,
           }}
         >
-          <span style={{ fontSize: 14.5, fontWeight: 800, color: C.ink, lineHeight: 1.25, letterSpacing: "-.01em", wordBreak: "keep-all" }}>
+          <span style={{ fontSize: 13.5, fontWeight: 800, color: C.ink, lineHeight: 1.3, letterSpacing: "-.01em", wordBreak: "keep-all" }}>
             {name}
           </span>
           {badge && (
@@ -2302,32 +2306,21 @@ function CardBrokerage({ v }: { v: Pick }) {
  * ⚠️ count 는 **카드 수**지 지표 수가 아니다(감성은 명품·오마카세가 한 장이고, 시장엔
  * '준비 중' 카드가 한 장 더 있다). 사이드바의 SECTION_NAV 와 같은 값이라 함께 볼 것.
  */
-function SectionHeading({ title, count, hits, id }: { title: string; count: number; hits: number; id: string }) {
-  const on = hits > 0;
+function SectionHeading({ title, count, id }: { title: string; count: number; id: string }) {
   return (
-    <div id={id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginTop: 19 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <h2 style={{ margin: 0, fontSize: 19, fontWeight: 800, letterSpacing: "-.02em", color: C.ink }}>{title}</h2>
-        <span style={{ fontSize: 11.5, fontWeight: 700, color: C.blue, background: "var(--c-blue-tint)", borderRadius: R.pill, padding: "4px 10px" }}>
-          {count}개
-        </span>
-      </div>
-      <span
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          fontSize: 12,
-          fontWeight: 700,
-          borderRadius: R.pill,
-          padding: "6px 12px",
-          color: on ? C.mania : C.sub,
-          background: on ? "var(--c-mania-tint)" : C.track,
-        }}
-      >
-        <Icon name="whatshot" style={{ fontSize: 15 }} />
-        초고온 {hits}
-      </span>
+    // 시트 위에 얹는 **미세 라벨**이다. 예전엔 19px 굵은 제목 + 개수 알약 + 초고온 배지가
+    // 한 줄을 다 썼는데, 그러면 묶음 제목이 히어로만큼 무거워져 시트가 '두 번째 화면'처럼
+    // 갈라 보였다. 시트는 하나의 표이고 이 줄은 그 표의 머리말일 뿐이다.
+    //
+    // 초고온 개수 배지는 걷었다. 사라진 정보는 아니다 — 히어로가 '지표 분포'로 전체
+    // 개수를, 브리핑 첫 문단이 "시장 지표 N개, 감성 지표 M개"로 묶음별 개수를 이미
+    // 말한다. 같은 수를 화면에서 세 번 적고 있었다.
+    //
+    // h2 와 id 는 유지한다 — 사이드바·목차가 걸 앵커이고, 문서 구조상 이 줄이 묶음의
+    // 제목인 것도 그대로다(작아진 건 크기지 역할이 아니다).
+    <div id={id} style={{ display: "flex", alignItems: "baseline", gap: 9, marginTop: 10 }}>
+      <h2 style={{ margin: 0, fontSize: 10.5, fontWeight: 800, letterSpacing: "0.1em", color: C.label }}>{title}</h2>
+      <span style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: C.label }}>{count}</span>
     </div>
   );
 }
@@ -2416,8 +2409,8 @@ export default async function Home() {
             )}
 
             {/* 시장 지표 (category=시장) */}
-            <section style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-              <SectionHeading id="market" title="시장 지표" count={15} hits={countHits("시장")} />
+            <section style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <SectionHeading id="market" title="시장 지표" count={15} />
               <div className="hz-cards">
                 {/* 순서 = 가중치(config/indicator_weights.py) × 직관성 × 변동성.
                     ① 가중치 1·2위(4.5/4.0)를 2칸으로 맨 앞에 — 둘 다 설명이 필요 없는 지표다.
@@ -2454,8 +2447,8 @@ export default async function Home() {
             </section>
 
             {/* 감성 지표 (category=감성) */}
-            <section style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-              <SectionHeading id="sentiment" title="감성 지표" count={10} hits={countHits("감성")} />
+            <section style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <SectionHeading id="sentiment" title="감성 지표" count={10} />
               <div className="hz-cards">
                 {/* 시장 지표와 같은 원칙으로 순서만 바꿨다 — 칸 수는 기존과 동일(12칸).
                     검색량(가중치 3.0)과 코인 투기를 앞세우고, 명품·오마카세는 재미는 크지만
