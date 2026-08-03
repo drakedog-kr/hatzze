@@ -1548,6 +1548,20 @@ function CardComingSoon() {
 // '평소 대비 N배' — 절대 건수가 없는 네이버 검색지수(0~100 상대지수)를 직관적으로
 // 보여준다. ratio = 현재 / 최근 30일 평균. 가운데 눈금(1배=평소)을 기준으로
 // 오른쪽으로 넘으면 평소보다 활발(과열 방향).
+/**
+ * 1배(평소) 축 위에서 값이 갖는 색.
+ *
+ * 이 축은 양극이다 — 가운데가 평소이고 오른쪽이 '많다', 왼쪽이 '적다'. 그래서 색을
+ * 카드의 과열도(v.color)에서 가져오면 안 된다. 외식 검색 1.3배는 평소보다 **많은데**
+ * 그 지표의 과열도가 아직 상온이라 파랑으로 떴다 — 막대는 오른쪽으로 뻗는데 색은
+ * 차갑다고 말하는 꼴이었다(2026-08-03).
+ * 축이 스스로 말하게 둔다: 1배 위는 빨강, 아래는 파랑, 정확히 1배면 중립.
+ */
+function vsAvgTone(ratio: number): string {
+  if (Math.abs(ratio - 1) < 0.05) return C.sub2; // 소수 첫째 자리로 1.0 으로 보이는 폭
+  return ratio > 1 ? C.hot : C.cold;
+}
+
 function VsAvg({ ratio, knob, showScale = true }: { ratio: number; knob: string; showScale?: boolean }) {
   // **1배를 축 한가운데에 못박는다.** 예전엔 0~2배를 0~100%로 폈는데(1배가 가운데인 건
   // 같지만) 축이 넓어 1.0배와 1.3배가 15%p 차이로 붙어 보였다. ±0.5배를 양 끝으로 두면
@@ -1633,7 +1647,6 @@ function CardDivergence({ v }: { v: Pick }) {
       label: "실물 강도",
       hint: "소비심리(CCSI)",
       value: real,
-      accent: !marketLeads,
       tip:
         ccsi != null
           ? `한국은행 소비자심리지수(CCSI) 최신값은 ${ccsi}입니다. 이게 역대(2008~) 분포에서 몇 번째로 높은지를 0~100으로 매긴 값이 실물 강도입니다.`
@@ -1643,7 +1656,6 @@ function CardDivergence({ v }: { v: Pick }) {
       label: "증시 강세",
       hint: "신고가 근접도",
       value: market,
-      accent: marketLeads,
       tip:
         gap != null
           ? `코스피는 최근 종가 기준 전고점보다 ${Math.abs(gap)}% 아래입니다. 이 낙폭이 역대(10년) 분포에서 얼마나 얕은지를 0~100으로 매긴 값이 증시 강세입니다.`
@@ -1671,7 +1683,11 @@ function CardDivergence({ v }: { v: Pick }) {
               {t.tip && <Icon name="help" style={{ fontSize: 13, color: C.hint }} />}
             </span>
             <span style={{ fontSize: 11.5, color: C.muted }}>{t.hint}</span>
-            <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: t.accent ? C.blue : C.ink }}>
+            {/* 두 값 모두 0~100 이라 **다른 지표와 같은 밴드 규칙**으로 칠한다(저온·상온 파랑 /
+                고온·초고온 빨강). 예전엔 '앞서는 쪽'만 파랑이고 나머지는 먹색이었는데, 그러면
+                같은 눈금의 두 수(74·10)가 서로 다른 규칙으로 칠해져 비교가 안 됐다.
+                어느 쪽이 앞서는지는 위 큰 수치가 이미 말한다. */}
+            <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: overheatColor(t.value) }}>
               {level(t.value)} {Math.round(t.value)}
               <span style={{ fontSize: 12, color: C.sub }}>/100</span>
             </strong>
@@ -1707,7 +1723,7 @@ function CardTrend({ v, icon }: { v: Pick; icon: string }) {
             {arrow && <span style={{ fontSize: 12.5, fontWeight: 700, color: vsAvg < 1 ? C.cold : C.hot }}>{arrow}</span>}
             <span style={{ fontSize: 12.5, fontWeight: 600, color: C.sub2 }}>평소 대비</span>
           </div>
-          <VsAvg ratio={vsAvg} knob={v.color} />
+          <VsAvg ratio={vsAvg} knob={vsAvgTone(vsAvg)} />
         </>
       ) : (
         <>
@@ -1889,10 +1905,12 @@ function CardYoutube({ v }: { v: Pick }) {
 // 눈금 라벨(적음·평소·많음)은 아래쪽 한 번만 적는다.
 function SubSpend({ v, icon, showScale }: { v: Pick; icon: string; showScale: boolean }) {
   const ratio = v.details?.vs_avg ?? null;
-  // 화살표는 **1배(평소) 기준**이다. 0.9배면 아래, 1.4배면 위 — 예전엔 ±5% 죽은 구간을
-  // 뒀는데 0.9 가 그 안에 안 들어가면서도 화살표가 없어 보여 헷갈렸다(2026-08-03).
-  const arrow = ratio === null || ratio === 1 ? "" : ratio > 1 ? "↑" : "↓";
-  const arrowColor = ratio !== null && ratio < 1 ? C.cold : C.hot;
+  // 화살표와 색이 **같은 경계**를 써야 한다. 예전엔 화살표가 `ratio === 1` 로만 갈려서,
+  // 0.98배(화면엔 "1.0배")가 색은 중립인데 화살표만 ↓ 로 떴다 — 한 줄이 두 말을 했다.
+  // vsAvgTone 과 같은 죽은 구간(±0.05 = 소수 첫째 자리로 1.0 으로 보이는 폭)을 쓴다.
+  const flat = ratio === null || Math.abs(ratio - 1) < 0.05;
+  const arrow = flat ? "" : (ratio as number) > 1 ? "↑" : "↓";
+  const arrowColor = ratio !== null ? vsAvgTone(ratio) : C.sub2;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1900,12 +1918,21 @@ function SubSpend({ v, icon, showScale }: { v: Pick; icon: string; showScale: bo
         <span style={{ flex: 1, fontSize: 12.5, fontWeight: 700, color: C.label, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {v.name}
         </span>
-        <strong style={{ fontFamily: MONO, fontSize: 16, fontWeight: 800, color: v.color, whiteSpace: "nowrap" }}>
+        <strong
+          style={{
+            fontFamily: MONO,
+            fontSize: 16,
+            fontWeight: 800,
+            // 막대와 같은 색이어야 한다 — 숫자가 파랑인데 막대가 빨강이면 한 줄이 두 말을 한다.
+            color: ratio !== null ? vsAvgTone(ratio) : v.color,
+            whiteSpace: "nowrap",
+          }}
+        >
           {ratio !== null ? `${ratio.toFixed(1)}배` : `${v.disp}${v.unit}`}
           {arrow && <span style={{ fontSize: 12, color: arrowColor }}> {arrow}</span>}
         </strong>
       </div>
-      {ratio !== null && <VsAvg ratio={ratio} knob={v.color} showScale={showScale} />}
+      {ratio !== null && <VsAvg ratio={ratio} knob={vsAvgTone(ratio)} showScale={showScale} />}
     </div>
   );
 }
@@ -1936,7 +1963,7 @@ function CardSpending({ luxury, dining }: { luxury: Pick; dining: Pick }) {
       <TitleRow icon="local_mall" name="여윳돈이 향하는 곳" desc="명품·외식 검색량으로 본 소비 심리" />
       {lead && (
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-          <strong style={{ fontFamily: MONO, fontSize: 32, fontWeight: 800, letterSpacing: "-.03em", color: lead.v.color, lineHeight: 1, whiteSpace: "nowrap" }}>
+          <strong style={{ fontFamily: MONO, fontSize: 32, fontWeight: 800, letterSpacing: "-.03em", color: vsAvgTone(lead.r), lineHeight: 1, whiteSpace: "nowrap" }}>
             {lead.r.toFixed(1)}배
           </strong>
           <span style={{ fontSize: 12.5, fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>
@@ -1986,7 +2013,11 @@ function CardUpbit({ v }: { v: Pick }) {
           </div>
           <div style={{ background: C.soft, borderRadius: R.tile, padding: 13, display: "flex", flexDirection: "column", gap: 4 }}>
             <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub2 }}>거래량 강도</span>
-            <strong style={{ fontSize: 17, fontWeight: 800, color: C.blue }}>{volLabel(dt.volume_progress ?? 0)}</strong>
+            {/* HIGH/MID/LOW 도 0~100 진행률에서 나온 말이라 같은 밴드 규칙으로 칠한다.
+                파랑으로 못박아 두면 HIGH 일 때도 차분한 색이라 값과 색이 반대말을 한다. */}
+            <strong style={{ fontSize: 17, fontWeight: 800, color: overheatColor(dt.volume_progress ?? 0) }}>
+              {volLabel(dt.volume_progress ?? 0)}
+            </strong>
           </div>
         </div>
       )}
