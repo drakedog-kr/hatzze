@@ -100,15 +100,12 @@ export function MddExplorer({
   // 폭·헤더 모양을 시장 브리핑·카더라와 맞춘다(둘 다 maxWidth 1180 + 제목 옆 가로줄).
   return (
     <div style={{ maxWidth: 1180, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
-      <header>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: C.ink }}>MDD 정밀분석</h1>
-          <div style={{ height: 1, flex: 1, background: C.line }} />
-        </div>
-        <p style={{ margin: "8px 0 0", color: C.sub, fontSize: 14, lineHeight: 1.6 }}>
-          종목이 고점에서 <b style={{ color: C.ink }}>얼마나 빠졌는지</b>, 이만큼 빠진 적이 <b style={{ color: C.ink }}>얼마나 드문지</b>, 과거엔 회복까지 <b style={{ color: C.ink }}>얼마나 걸렸는지</b>를 봅니다.
-        </p>
-      </header>
+      {/* 제목은 여기서 안 그린다 — 셸의 본문 헤더(AppShell 의 PageHeader)가 그리는 h1
+          하나뿐이다. 예전엔 여기에 h1 을 또 둬서 "MDD 정밀분석"이 화면에 두 번 떴다.
+          설명 문단은 남긴다(헤더의 한 줄 부제보다 훨씬 구체적이라 대신 못 한다). */}
+      <p style={{ margin: 0, color: C.sub, fontSize: 14, lineHeight: 1.6 }}>
+        종목이 고점에서 <b style={{ color: C.ink }}>얼마나 빠졌는지</b>, 이만큼 빠진 적이 <b style={{ color: C.ink }}>얼마나 드문지</b>, 과거엔 회복까지 <b style={{ color: C.ink }}>얼마나 걸렸는지</b>를 봅니다.
+      </p>
 
       <Controls
         stocks={stocks}

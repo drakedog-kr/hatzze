@@ -319,22 +319,33 @@ export default async function KaderaPage() {
 
   return (
     <div style={{ maxWidth: 1180, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* 헤더 — 제목과 소개를 한 덩어리로 묶는다(MDD 정밀분석과 같은 골격).
-          예전엔 소개 문단이 그리드 gap 20 만큼 떨어져 있어 제목이 아니라 첫 카드에
-          붙어 보였다. 베타 배지는 사이드바 로고 옆으로 옮겼다 — 서비스 전체가
-          베타라 페이지마다 붙일 일이 아니다. */}
-      <header>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-          {/* 이 페이지의 h1. 사이드바 로고는 홈에서만 h1이라 여기와 겹치지 않는다.
-              스타일은 h2 때와 동일해 보이는 건 그대로다(제목 크기는 인라인 지정). */}
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: C.ink, letterSpacing: "-0.01em" }}>카더라 리포트</h1>
-          <div style={{ height: 1, flex: 1, background: C.line }} />
+      {/* 소개 — 제목은 여기서 안 그린다. 페이지 제목은 셸의 본문 헤더(AppShell 의
+          PageHeader)가 그리는 h1 하나뿐이다. 예전엔 여기에 h1 을 또 둬서 "카더라 리포트"가
+          화면에 두 번 떴고 문서에 h1 이 둘이었다.
+          남은 문단은 그대로 둔다 — "화제성 지표이며 매수·매도 신호가 아닙니다"는 빼면 안 되는
+          문장이고, 헤더의 한 줄 부제("주식 텔레그램에서 무엇이 회자되는지")로는 대신 못 한다.
+          맨 문단으로 두면 카드 격자 위에 뜬 부스러기처럼 보여서, 다른 섹션과 같은 카드에
+          담고 아이콘 타일로 시작점을 맞춘다(제목 칸은 비운다 — 넣으면 다시 중복이다). */}
+      <section style={{ ...cardStyle, display: "flex", alignItems: "flex-start", gap: 12 }}>
+        <div
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: "var(--r-icon)",
+            background: "var(--c-blue-tint)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <Icon name="forum" style={{ fontSize: 21, color: C.blue }} />
         </div>
-        <p style={{ margin: "8px 0 0", fontSize: 14, lineHeight: 1.7, color: C.sub }}>
-          한국 주식 텔레그램 채널들이 <b style={{ color: C.ink }}>지금 무엇에 주목하는지</b>를 모아 보여줍니다.
-          조회·확산·언급량을 종합한 <b style={{ color: C.ink }}>화제성</b> 지표이며, 매수·매도 신호가 아닙니다.
+        <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.75, color: C.inkSoft, textWrap: "pretty" }}>
+          한국 주식 텔레그램 채널들이 <b style={{ fontWeight: 800, color: C.ink }}>지금 무엇에 주목하는지</b>를 모아 보여줍니다.
+          조회·확산·언급량을 종합한 <b style={{ fontWeight: 800, color: C.ink }}>화제성</b> 지표이며, 매수·매도 신호가 아닙니다.
         </p>
-      </header>
+      </section>
 
       <div className="hz-grid">
         {/* 모니터링 현황 (1칸). 세로 정렬은 hz-selfstretch-lg 가 맡는다 — 데스크톱에선 옆의

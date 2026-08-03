@@ -138,13 +138,15 @@ function isActive(href: string, pathname: string) {
 function Sidebar() {
   const intentPrefetch = useIntentPrefetch();
   const pathname = usePathname();
-  // 로고를 감싸는 태그는 홈에서만 h1이다. 사이드바는 모든 페이지가 공유하는데,
-  // 검색엔진은 h1을 그 페이지의 주제로 읽는다. 늘 h1이면 카더라·MDD가 자기 제목이
-  // 아니라 "로고"를 주제로 선언하는 셈이고, 자기 h1이 있는 페이지는 h1이 둘이 된다.
-  // 홈은 페이지 대표 제목이 따로 없고 사이트 자체가 주제라 로고가 h1인 게 맞다.
+  // 로고를 감싸는 태그는 어느 페이지에서도 h1이 아니다. 사이드바는 모든 페이지가
+  // 공유하는데, 검색엔진은 h1을 그 페이지의 주제로 읽는다 — 늘 h1이면 카더라·MDD가
+  // 자기 제목이 아니라 "로고"를 주제로 선언하는 셈이다.
+  // 예전엔 홈에서만 h1이었다("홈은 페이지 대표 제목이 따로 없다"는 이유였다). 그 전제는
+  // 본문 헤더(PageHeader)가 생기면서 깨졌다 — 홈도 이제 "시장 브리핑"이라는 자기 제목을
+  // 갖고, 로고까지 h1이면 홈만 h1이 둘이 된다.
   // div로 바뀌어도 보이는 건 그대로다. globals.css에 h1~h6 규칙이 없고 Tailwind
   // preflight가 font-size·font-weight를 inherit으로 되돌려서, 태그 기본값 중 남는 게 없다.
-  const LogoTag = pathname === "/" ? "h1" : "div";
+  const LogoTag = "div";
   return (
     <aside
       className="hz-sidebar"
@@ -488,18 +490,32 @@ function ThemeToggle({ initial, variant = "icon" }: { initial: "light" | "dark";
  *
  * 부제는 사이드바 로고 밑에 있던 문장을 옮겨 온 것이다(NAV.sub). 페이지마다 달라지므로
  * 세 화면이 공유하는 사이드바보다 여기가 맞는 자리다.
+ *
+ * ⚠️ 여기가 그리는 h1 이 그 페이지의 **유일한** h1 이다. 화면 쪽에 제목을 또 두면
+ * 같은 글자가 두 번 뜨고 SEO 상으로도 h1 이 둘이 된다.
+ *
+ * NAV 에 없는 경로(개인정보처리방침·이용약관)에서는 제목 칸을 통째로 비운다. 예전엔
+ * `?? NAV[0]` 로 떨어져서 법률 문서 위에 "시장 브리핑"이라는 **틀린 제목**이 붙어
+ * 있었다(중복보다 나쁘다 — 문서 제목과 나란히 서서 둘 다 h1 이었다). 그 문서들은
+ * 자기 제목(legal.tsx 의 DocTitle)을 갖고 있으니 여기서 보탤 것이 없다. 도구 묶음은
+ * 남긴다 — 테마 토글은 어느 화면에서나 같은 자리에 있어야 한다.
  */
 function PageHeader({ theme }: { theme: "light" | "dark" }) {
   const pathname = usePathname();
-  const page = NAV.find((n) => isActive(n.href, pathname)) ?? NAV[0];
+  const page = NAV.find((n) => isActive(n.href, pathname));
   return (
     <header className="hz-page-head">
-      <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-        <h1 style={{ margin: 0, fontSize: 23, fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>
-          {page.label}
-        </h1>
-        <p style={{ margin: 0, fontSize: 13, color: C.sub2 }}>{page.sub}</p>
-      </div>
+      {page && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
+          <h1 style={{ margin: 0, fontSize: 23, fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>
+            {page.label}
+          </h1>
+          <p style={{ margin: 0, fontSize: 13, color: C.sub2 }}>{page.sub}</p>
+        </div>
+      )}
+      {/* 제목이 없을 때 도구가 왼쪽으로 붙지 않도록. justify-content:space-between 은
+          자식이 하나면 그 하나를 왼쪽 끝에 둔다. */}
+      {!page && <div style={{ flex: 1 }} />}
       {/* 오른쪽 도구는 테마 토글 하나다. 검색창·알림 벨·프로필 칩은 걷었다 —
           셋 다 기능이 없어 모양만 있는 자리였고(2026-08-03), 로그인이 없는
           서비스라 프로필 칩은 앞으로도 가리킬 대상이 없다. */}
