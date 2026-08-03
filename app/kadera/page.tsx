@@ -23,7 +23,8 @@ import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { AiMark, C, Icon, MONO } from "../ui";
 import { ExpandableList } from "./ExpandableList";
-import { Avatar, ChangeRate, DayBars, Pill, QuoteDate, RankBadge, RankDelta, SectionCaps } from "./parts";
+import { Avatar, ChangeRate, DayBars, Pill, QuoteDate, RankBadge, RankDelta, SectionCaps, Sparkline, rankNum } from "./parts";
+import { StockLogo } from "../StockLogo";
 import { SectionHead } from "./SectionHead";
 import { TrendingTabs } from "./TrendingTabs";
 
@@ -82,10 +83,17 @@ const clip: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", te
 /** 시트 안 열 머리·데이터 행이 공유하는 격자. 한 곳에서 내야 두 줄의 칸이 어긋나지 않는다. */
 const CHANNEL_COLS = "24px minmax(0,1fr) 54px 56px 54px";
 const RISING_COLS = "24px minmax(0,1fr) minmax(60px,1.3fr) 62px";
-// 테마·키워드 두 시트는 같은 격자를 쓴다 — 나란히 놓이는 50:50 짝이라 열이 어긋나면
-// 두 표가 서로 다른 물건처럼 보인다.
-const THEME_COLS = "26px minmax(80px,1fr) minmax(70px,1.5fr) 58px";
 const KEYWORD_COLS = "26px minmax(80px,1fr) minmax(70px,1.5fr) 58px";
+
+/* 테마 로테이션 한 줄의 세로 치수. 오른쪽 스파크라인의 밑선을 왼쪽 점유율 막대의
+   밑선에 맞추려면 그 위에 무엇이 얼마나 쌓여 있는지 알아야 해서, 값을 흩어 두지 않고
+   여기 모은다(한 곳만 고치면 정렬이 따라온다). */
+const THEME_NAME_H = 20; // 테마명 줄(lineHeight 로 고정)
+const THEME_BAR_TOP = 7; // 이름 줄 ↔ 막대 사이 여백
+const THEME_BAR_H = 7; // 막대 두께
+const SPARK_H = 26; // Sparkline 기본 높이와 같아야 한다
+/** 스파크라인을 이만큼 내리면 밑선이 막대 밑선과 같아진다. */
+const THEME_SPARK_TOP = THEME_NAME_H + THEME_BAR_TOP + THEME_BAR_H - SPARK_H;
 
 /** 시트 안 '2분할 하이라이트'(테마 로테이션·이슈 키워드의 머리 아래 두 칸). */
 function Highlight({ cap, name, value, valueColor, sub, divide }: {
@@ -128,7 +136,7 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
   const nodes = items.map((m, i) => {
     const tags = [...m.stocks, ...m.topics.map((t) => `#${t}`)];
     return (
-      <li key={`${m.channelHandle}-${m.messageId}`} style={{ display: "flex", padding: "18px 22px", gap: 12, minWidth: 0 }}>
+      <li key={`${m.channelHandle}-${m.messageId}`} style={{ display: "flex", padding: "16px 18px", gap: 12, minWidth: 0 }}>
         {/* 원문 메시지로 이동 — 텔레그램 공개 채널은 t.me/핸들/메시지ID 로 열린다 */}
         <a
           href={`https://t.me/${m.channelHandle}/${m.messageId}`}
@@ -219,7 +227,7 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
       name="trending_messages"
       initial={6}
       step={10}
-      listClassName="hz-cellgrid hz-cellgrid-auto"
+      listClassName="hz-panelgrid hz-panelgrid-auto"
       footerStyle={{ margin: 0, gap: 0, borderTop: "1px solid var(--c-sheet-line)" }}
     />
   );
@@ -297,34 +305,57 @@ export default async function KaderaPage() {
     return (
       <div
         key={t.theme}
-        className="hz-trow hz-theme-row-sheet"
-        style={{ gridTemplateColumns: THEME_COLS, flex: 1 }}
+        className="hz-theme-row-sheet"
+        /* 표가 아니라 **쌓인 줄**이다(옛 디자인). 한 줄이 [이름 + 변화폭] / [점유율 막대] /
+           [점유율·종목·횟수] 세 층이라, 열로 쪼갤 때보다 테마 하나가 한 덩어리로 읽힌다.
+           오른쪽 스파크라인은 14일 추이라 여기서만 볼 수 있는 값이다. */
+        style={{ display: "grid", gridTemplateColumns: "17px minmax(0,1fr) 62px", alignItems: "start", gap: 12, padding: "11px 22px" }}
         /* 마우스가 없어도(키보드·터치) 종목 목록을 열 수 있게 초점을 받는다.
            언급된 종목이 없는 테마는 열 것도 없으니 초점도 주지 않는다. */
         tabIndex={t.stocks.length ? 0 : undefined}
         aria-label={t.stocks.length ? `${t.theme} 테마를 이룬 종목 ${t.stockCount}개 보기` : undefined}
       >
-        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 800, color: C.faint }}>{t.rank}</span>
-        {/* 이름 옆 순위 변동(▲1계단)은 값이 있을 때만 붙는다 — 열을 하나 더 세우면 좁은
-            시트에서 막대가 눌린다. RankDelta 가 0·null 이면 아무것도 안 그린다. */}
-        <span style={{ display: "flex", alignItems: "baseline", gap: 5, minWidth: 0 }}>
-          <span style={{ ...clip, fontSize: 12, fontWeight: 700, color: C.ink }}>{t.theme}</span>
-          <RankDelta change={t.rankChange} />
-        </span>
-        {/* 막대는 1위 대비 점유율. 절대 점유율을 폭으로 쓰면 1위 28%·10위 0.9% 라 아홉 줄이
-            빈 트랙만 남는다(이슈 키워드가 1위 횟수를 기준 삼는 것과 같은 규칙). */}
-        <span style={{ height: 7, borderRadius: 999, background: C.track, overflow: "hidden" }}>
-          <span
-            style={{
-              display: "block",
-              width: `${Math.max(2, (t.sharePct / Math.max(0.1, themes[0].sharePct)) * 100)}%`,
-              height: "100%",
-              background: d > 0 ? "var(--c-warm-2)" : d < 0 ? "var(--c-blue-3)" : C.hint,
-            }}
-          />
-        </span>
-        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 800, textAlign: "right", color: ink }}>
-          {t.shareDelta === null ? `${t.sharePct.toFixed(1)}%` : `${d > 0 ? "▲" : d < 0 ? "▼" : ""}${Math.abs(d).toFixed(1)}%p`}
+        <span style={{ ...rankNum, paddingTop: 2 }}>{t.rank}</span>
+        <div style={{ minWidth: 0 }}>
+          {/* 줄 높이를 못 박는다 — 오른쪽 스파크라인을 막대 밑선에 맞추려면(THEME_SPARK_TOP)
+              이 줄이 몇 px 인지 확정돼야 한다. lineHeight 만으론 모자란다: 14·12·10px
+              글자의 베이스라인을 맞추느라 줄이 1px 더 커진다. */}
+          <div style={{ display: "flex", alignItems: "baseline", gap: 7, height: THEME_NAME_H, lineHeight: `${THEME_NAME_H}px` }}>
+            <span style={{ ...clip, fontWeight: 700, fontSize: 14, color: C.ink }}>{t.theme}</span>
+            <RankDelta change={t.rankChange} />
+            {t.shareDelta !== null && Math.abs(d) >= 0.1 && (
+              <span style={{ marginLeft: "auto", flexShrink: 0, fontFamily: MONO, fontSize: 12, fontWeight: 700, color: ink }}>
+                {d >= 0 ? "▲" : "▼"}
+                {Math.abs(d).toFixed(1)}%p
+              </span>
+            )}
+          </div>
+          {/* 막대는 1위 대비 점유율. 절대 점유율을 폭으로 쓰면 1위 28%·10위 0.9% 라 아홉
+              줄이 빈 트랙만 남아 순위가 눈에 안 들어온다. */}
+          <div style={{ margin: `${THEME_BAR_TOP}px 0 5px`, height: THEME_BAR_H, background: C.track, borderRadius: 999, overflow: "hidden" }}>
+            <div
+              style={{
+                width: `${Math.max(2, Math.min(100, (t.sharePct / Math.max(0.1, themes[0].sharePct)) * 100))}%`,
+                height: "100%",
+                borderRadius: 999,
+                background: d > 0 ? "var(--c-warm-2)" : d < 0 ? "var(--c-blue-3)" : C.hint,
+              }}
+            />
+          </div>
+          <div style={{ ...clip, fontSize: 11, color: C.muted }}>
+            점유율 <b style={{ color: C.sub, fontFamily: MONO }}>{t.sharePct.toFixed(1)}%</b> · 종목 {t.stockCount}개 ·{" "}
+            <span style={{ fontFamily: MONO }}>{t.mentions}회</span>
+          </div>
+        </div>
+        {/* 스파크라인은 위에서부터 그려지므로, 밑선을 왼쪽 막대의 밑선에 맞추려면 그만큼
+            내려 앉혀야 한다. 기간은 툴팁으로만 밝힌다 — 이 줄의 다른 숫자(점유율·종목·회)는
+            최근 3일 기준인데 이 그래프만 14일이라, 적어 두지 않으면 알 길이 없다. */}
+        <span
+          className="hz-tip hz-tip-wide hz-tip-end"
+          data-tip={`최근 ${t.series.length}일 일별 점유율입니다.`}
+          style={{ display: "block", marginTop: THEME_SPARK_TOP }}
+        >
+          <Sparkline data={t.series} />
         </span>
 
         {/* 이 테마의 점유율을 만든 종목 목록. 줄에 마우스를 올리거나 초점이 가면 열린다
@@ -393,7 +424,9 @@ export default async function KaderaPage() {
         <div className="hz-kd-hero">
           {/* ① 모니터링 현황 */}
           <div className="hz-kd-hero-q">
-            <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>모니터링 현황</span>
+            <div className="hz-kd-hero-title">
+              <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>모니터링 현황</span>
+            </div>
             <div style={{ display: "flex", flexDirection: "column" }}>
               {miniStats.map((s, i) => (
                 <div
@@ -403,7 +436,9 @@ export default async function KaderaPage() {
                     alignItems: "baseline",
                     justifyContent: "space-between",
                     gap: 8,
-                    padding: "11px 0",
+                    // 첫 줄만 위 여백을 뺀다 — 제목 슬롯 아래 gap 16 이 이미 그 자리를 잡고
+                    // 있어서, 여기에 11 을 또 주면 317 만 옆 칸 66% 보다 내려앉는다.
+                    padding: i === 0 ? "0 0 11px" : "11px 0",
                     borderBottom: i === miniStats.length - 1 ? "none" : "1px solid var(--c-sheet-row)",
                   }}
                 >
@@ -448,7 +483,7 @@ export default async function KaderaPage() {
 
           {/* ② 생태계 센티먼트 */}
           <div className="hz-kd-hero-q">
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+            <div className="hz-kd-hero-title" style={{ justifyContent: "space-between", gap: 10 }}>
               <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>생태계 센티먼트</span>
               {sentiment && (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: C.label, whiteSpace: "nowrap" }}>
@@ -471,13 +506,22 @@ export default async function KaderaPage() {
                 {/* 이 칸이 답하는 건 "지금 분위기 좋아, 나빠?" 하나다. 그래서 숫자도 한 벌만
                     쓴다 — 낙관도(중립 제외) 하나로 말하고, 아래 막대는 그 비율을 그림으로
                     반복한다(숫자와 그림이 어긋날 수가 없다). 중립을 얼마나 뺐는지만 옆에. */}
-                <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                {/* alignItems:flex-start — 66% 의 **글자 윗선**을 옆 칸 317 의 윗선에 맞추려면
+                    이 줄이 세로 가운데 정렬이면 안 된다(오른쪽 두 줄 캡션 높이에 따라 숫자가
+                    위아래로 떠다닌다). */}
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
                   <strong
                     style={{
                       fontFamily: MONO,
                       fontSize: 40,
                       fontWeight: 800,
-                      lineHeight: 0.78,
+                      /* 옆 칸 '317' 의 **숫자 윗선**에 맞춘 값이다. 줄 상자 위끝끼리 맞추면
+                         안 된다 — 40px 과 19px 은 줄 상자 안에서 글자가 앉는 깊이가 달라서,
+                         상자를 맞추면 정작 눈에 보이는 숫자 윗선이 7px 어긋난다.
+                         브라우저에서 두 캡 윗선을 재서 남은 차이를 이 값으로 걷었다
+                         (globals.css 의 .hz-kd-hero-title 주석과 한 세트). */
+                      lineHeight: 1,
+                      marginTop: 4,
                       letterSpacing: "-.04em",
                       color: sentiment.tone === "cold" ? C.cold : sentiment.tone === "hot" ? C.hot : C.ink,
                     }}
@@ -485,7 +529,8 @@ export default async function KaderaPage() {
                     {sentiment.score}
                     <span style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-.02em" }}>%</span>
                   </strong>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
+                  {/* 두 줄 캡션은 숫자 윗선이 아니라 숫자 덩어리 가운데에 오게 살짝 내린다. */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0, marginTop: 2 }}>
                     <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub }}>
                       최근 {KADERA_WINDOW_DAYS}일 · {sentiment.messageCount.toLocaleString("ko-KR")}건 분석
                     </span>
@@ -541,14 +586,9 @@ export default async function KaderaPage() {
 
           {/* ③ 오늘의 요약 */}
           <div className="hz-kd-hero-h">
-            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+            <div className="hz-kd-hero-title">
               <AiMark size={14} />
               <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>오늘의 요약</span>
-              <span style={{ flex: 1 }} />
-              {/* formatKstUpdate 가 이미 "… 기준"으로 끝난다 — 여기서 또 붙이면 "기준 기준". */}
-              {summary.lastUpdated && (
-                <span style={{ fontSize: 10.5, color: C.faint, whiteSpace: "nowrap" }}>{formatKstUpdate(summary.lastUpdated)}</span>
-              )}
             </div>
             {/* 높이를 안 잡는다 — 글이 3줄이면 3줄, 4줄이면 4줄로 흐른다. 길이 자체는
                 파이프라인이 잡는다(generate_telegram_narratives.py 의 BRIEF_*_LEN).
@@ -557,6 +597,16 @@ export default async function KaderaPage() {
             <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.75, color: "var(--c-ink-soft)", textWrap: "pretty", wordBreak: "keep-all" }}>
               {sentiment?.summary ?? "오늘의 요약을 준비하고 있습니다."}
             </p>
+            {/* 기준 시각은 **언제나 이 칸 맨 아래 왼쪽**이다 — 요약 글이 날마다 3줄·4줄로
+                달라져도 자리가 안 흔들려야 "이 화면의 기준 시각"으로 읽힌다(시장 브리핑
+                히어로가 쓰는 것과 같은 조판·같은 schedule 아이콘).
+                formatKstUpdate 가 이미 "… 기준"으로 끝난다 — 또 붙이면 "기준 기준". */}
+            {summary.lastUpdated && (
+              <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 7, paddingTop: 10 }}>
+                <Icon name="schedule" style={{ fontSize: 14, color: C.muted }} />
+                <span style={{ fontSize: 10.5, color: C.sub }}>최종 업데이트 · {formatKstUpdate(summary.lastUpdated)}</span>
+              </div>
+            )}
           </div>
         </div>
         {/* 이 문장은 빼면 안 된다(공개 저장소·법률). 히어로 시트의 각주 띠에 두면 첫
@@ -590,7 +640,7 @@ export default async function KaderaPage() {
                 const dates = s.seriesDates.slice(-7);
                 return (
                   <div key={s.code} className="hz-panel-pad">
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 8, minWidth: 0 }}>
                       <RankBadge n={i + 1} />
                       {/* minWidth:0 — flex 항목의 기본 min-width:auto 가 살아 있으면 이름이
                           줄지 않아 말줄임이 안 걸리고 셀 밖으로 넘친다(820px 에서 실측 3px).
@@ -598,7 +648,17 @@ export default async function KaderaPage() {
                       <strong style={{ ...clip, minWidth: 0, fontSize: 14, fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>{s.name}</strong>
                       <span style={{ fontFamily: MONO, fontSize: 10, color: C.faint, flexShrink: 0 }}>{s.code}</span>
                       <span style={{ flex: 1 }} />
-                      <span style={{ fontSize: 10.5, color: C.sub2, whiteSpace: "nowrap", flexShrink: 0 }}>{s.channelCount}개 채널</span>
+                      {/* '몇 개 채널'과 '며칠에 몇 회'는 둘 다 이 배수의 표본 크기를 말한다 —
+                          한 덩어리로 오른쪽 위에 모아 두면 아래 그래픽이 배수와 막대만 남는다.
+                          ⚠️ '평소 N회'는 여기 없다. 배수는 언급 **횟수**가 아니라 그날 전체
+                          대화에서 차지한 **몫(share)** 을 평활해 낸 값이라(getSurgingStocks),
+                          횟수 둘을 나란히 두면 그 비가 배수와 안 맞아 눈금이 둘 생긴다. */}
+                      <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
+                        <span style={{ fontSize: 10.5, color: C.sub2, whiteSpace: "nowrap" }}>{s.channelCount}개 채널</span>
+                        <span style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: C.label, whiteSpace: "nowrap" }}>
+                          최근 {s.recentDays}일 기준 {s.recentMentions}회
+                        </span>
+                      </span>
                     </div>
 
                     {/* 이 셀이 말하려는 건 시세가 아니라 이 배수다 — 30px 로 올려 주인공을 못박는다. */}
@@ -611,17 +671,7 @@ export default async function KaderaPage() {
                       {s.isNew && <Pill tone="blue">신규 등장</Pill>}
                     </div>
 
-                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                      <DayBars values={values} dates={dates} tone="warm" hot={Math.min(s.recentDays, values.length)} />
-                      {/* ⚠️ '평소 N회'는 여기 적지 않는다. 위 배수는 언급 **횟수**가 아니라
-                          그날 전체 대화에서 차지한 **몫(share)** 을 평활해 낸 값이라
-                          (getSurgingStocks), 횟수 둘을 나란히 두면 그 비가 배수와 안 맞아
-                          한 셀에 눈금이 둘 생긴다. 데이터에 '평소 N회'라는 값 자체가 없다. */}
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: C.faint }}>최근 {s.recentDays}일</span>
-                        <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 800, color: C.ink }}>{s.recentMentions}회</span>
-                      </div>
-                    </div>
+                    <DayBars values={values} dates={dates} tone="warm" hot={Math.min(s.recentDays, values.length)} />
 
                     <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 8, paddingTop: 2, flexWrap: "wrap" }}>
                       {s.closePrice != null ? (
@@ -695,19 +745,11 @@ export default async function KaderaPage() {
                 />
               </div>
 
-              <div className="hz-thead" style={{ gridTemplateColumns: THEME_COLS }}>
-                <span>#</span>
-                <span>테마</span>
-                <span>점유율</span>
-                <span style={{ textAlign: "right" }}>변화폭</span>
-              </div>
-
-              {/* 행을 상자로 감싸고 flex:1 을 준다. 예전엔 뒤에 marginTop:auto 스페이서를
-                  뒀는데, 그러면 마지막 행이 시트의 막내가 아니라 밑선이 안 지워졌고 그 선이
-                  시트 바닥 테두리와 1px 떨어져 **바닥이 두 줄**로 보였다. 상자로 묶으면
-                  마지막 행이 상자의 막내라 규칙이 걸리고, flex:1 이 남는 높이를 행들이
-                  나눠 가져 짝(이슈 키워드)과 바닥이 맞는다. */}
-              <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+              {/* 열 머리를 두지 않는다 — 줄이 표가 아니라 세 층으로 쌓인 덩어리라
+                  가리킬 열이 없다(옆 이슈 키워드는 표라서 머리가 있다).
+                  행을 상자로 감싸 남는 높이를 행들이 나눠 갖게 한다(justify-content 로
+                  벌리면 줄 사이만 멀어져 덩어리가 흩어져 보인다). */}
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", paddingBottom: 6 }}>
                 {themes.map((t, i) => themeRow(t, i, themes.length))}
               </div>
             </>
@@ -835,28 +877,24 @@ export default async function KaderaPage() {
                  추이는 아래 7일 막대와 AI 문장이 이미 말한다. */
               return (
                 <div key={r.code} className="hz-panel-pad">
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                    <RankBadge n={i + 1} />
-                    {/* minWidth:0 — 급부상 셀과 같은 이유(그쪽 주석). 여기는 오른쪽에
-                        일곱 자리 시세("1,567,000원")까지 붙어서 더 빨리 넘쳤다. */}
-                    <strong style={{ ...clip, minWidth: 0, fontSize: 14, fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>{r.name}</strong>
-                    <span style={{ fontFamily: MONO, fontSize: 10, color: C.faint, flexShrink: 0 }}>{r.code}</span>
-                    <span style={{ flex: 1 }} />
+                  {/* 순위 배지가 아니라 **로고 + 종목명**이다. 이 시트는 순위표가 아니라
+                      종목별 리포트라, 몇 등인지보다 어느 회사인지가 먼저 읽혀야 한다
+                      (급부상 셀은 반대라 그쪽엔 배지가 남는다).
+                      폰에서는 시세가 다음 줄로 내려간다(globals.css 의 .hz-stock-head) —
+                      한 줄에 다 넣으면 시세 묶음이 nowrap 이라 안 줄고, 줄어들 수 있는 건
+                      종목명뿐이라 이름이 먼저 0 으로 눌려 사라진다. */}
+                  <div className="hz-stock-head" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                    <StockLogo code={r.code} name={r.name} market={r.market} size={30} />
+                    <strong style={{ ...clip, minWidth: 0, fontSize: 17, fontWeight: 800, letterSpacing: "-.02em", color: C.ink }}>{r.name}</strong>
+                    <span style={{ fontFamily: MONO, fontSize: 11, color: C.faint, flexShrink: 0 }}>{r.code}</span>
                     {r.price != null && (
-                      <span style={{ display: "flex", alignItems: "baseline", gap: 6, whiteSpace: "nowrap", flexShrink: 0 }}>
-                        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: C.label }}>{r.price.toLocaleString("ko-KR")}원</span>
-                        <ChangeRate rate={r.changeRate} style={{ fontSize: 10.5, fontWeight: 800 }} />
+                      <span className="hz-stock-price" style={{ display: "flex", alignItems: "baseline", gap: 7, whiteSpace: "nowrap", flexShrink: 0 }}>
+                        <span style={{ fontFamily: MONO, fontSize: 15, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
+                          {r.price.toLocaleString("ko-KR")}원
+                        </span>
+                        <ChangeRate rate={r.changeRate} style={{ fontSize: 12.5, fontWeight: 800 }} />
                       </span>
                     )}
-                  </div>
-
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
-                    <strong style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, letterSpacing: "-.035em", lineHeight: 1, color: C.ink }}>
-                      {r.totalMentions.toLocaleString("ko-KR")}
-                    </strong>
-                    <span style={{ fontSize: 11.5, color: C.sub2 }}>회 언급</span>
-                    <span style={{ flex: 1 }} />
-                    <span style={{ fontSize: 10.5, color: C.sub2, whiteSpace: "nowrap", flexShrink: 0 }}>{r.channelCount}개 채널</span>
                   </div>
 
                   {/* hot = 큰 숫자(totalMentions)가 실제로 센 날 수. StockReport.series 의
@@ -877,8 +915,13 @@ export default async function KaderaPage() {
                       </p>
                     </div>
                   )}
-                  <div style={{ marginTop: "auto", display: "flex", justifyContent: "flex-end", paddingTop: 2 }}>
-                    <MddLink code={r.code} market={r.market} label={`${r.name} MDD 정밀분석`} />
+                  {/* 표본 크기는 왼쪽 아래, MDD 링크는 오른쪽 아래. 한 줄에 마주 보게 두면
+                      "이 리포트가 몇 건을 봤나"와 "더 파고들기"가 같은 높이에서 끝난다. */}
+                  <div style={{ marginTop: "auto", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, paddingTop: 2 }}>
+                    <span style={{ fontFamily: MONO, fontSize: 11, color: C.sub2, whiteSpace: "nowrap" }}>
+                      언급 {r.totalMentions.toLocaleString("ko-KR")}회 · {r.channelCount}개 채널
+                    </span>
+                    <MddLink code={r.code} market={r.market} label="MDD 정밀분석" />
                   </div>
                 </div>
               );
