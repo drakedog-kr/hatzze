@@ -213,19 +213,41 @@ export function Avatar({ photoUrl, title, size = 30 }: { photoUrl: string | null
  * 미니 막대 그래프(테마 언급 추이). 폭을 고정해 데이터 개수가 달라도 행마다 같은
  * 자리에서 끝난다 — 예전엔 막대 폭이 고정이라 7일치와 14일치 행의 오른쪽 끝이 어긋났다.
  * 마지막 막대만 진하게 둬 "지금"이 어디인지 눈이 먼저 잡는다.
+ *
+ * fluid 를 켜면 폭을 칸에 맡기고 막대가 남는 자리를 나눠 가진다(급부상 종목 타일처럼
+ * 폭이 화면마다 달라지는 자리용). 이때는 고정 폭 계산을 안 쓰므로 width 를 무시한다.
  */
-export function Sparkline({ data, width = 62, height = 26 }: { data: number[]; width?: number; height?: number }) {
+export function Sparkline({
+  data,
+  width = 62,
+  height = 26,
+  fluid = false,
+}: {
+  data: number[];
+  width?: number;
+  height?: number;
+  fluid?: boolean;
+}) {
   const max = Math.max(1, ...data);
   const n = Math.max(1, data.length);
   const gap = 2;
   const barW = Math.max(2, (width - gap * (n - 1)) / n);
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap, height, width, flexShrink: 0 }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "flex-end",
+        gap,
+        height,
+        ...(fluid ? { width: "100%" } : { width, flexShrink: 0 }),
+      }}
+    >
       {data.map((v, i) => (
         <div
           key={i}
           style={{
-            width: barW,
+            // fluid 에선 minWidth:0 이 있어야 막대가 칸보다 넓어져 넘치지 않는다.
+            ...(fluid ? { flex: 1, minWidth: 0 } : { width: barW }),
             height: `${Math.max(2, (v / max) * height)}px`,
             background: C.blue,
             opacity: i === data.length - 1 ? 0.9 : 0.4,

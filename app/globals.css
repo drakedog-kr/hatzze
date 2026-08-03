@@ -103,6 +103,11 @@
   --c-blue-tint: #e8f3fe;
   --c-blue-tint2: #e9f3fe; /* 티커 칩·제보 CTA */
   --c-cold-tint: #e8f3fe;
+  /* tint 배경 **위에 얹는 글자**. 강조색(--c-hot #f0883c)을 그대로 쓰면 자기 tint
+     위에서 명암비가 2.2 라 10~11px 글자가 안 읽힌다. 한 단계 눌러 7.0 / 5.4 로 올린다.
+     막대·아이콘 같은 면에는 쓰지 말 것 — 그쪽은 강조색이 맞다. */
+  --c-hot-ink: #8a5a00;
+  --c-cold-ink: #1b6fb8;
   --c-neutral-tint: #e3f6ee;
   --c-hot-tint: #fdf0e6;
   --c-mania-tint: #fdecee;
@@ -186,6 +191,10 @@
   --c-blue-tint: rgba(52, 133, 250, 0.18);
   --c-hot-tint: rgba(255, 169, 39, 0.16);
   --c-cold-tint: rgba(97, 176, 255, 0.16);
+  /* 라이트에선 강조색을 **어둡게** 눌러 tint 위에 얹는데, 다크에선 tint 가 어두우니
+     반대로 **밝게** 올린다(라이트 값 #8a5a00 을 그대로 쓰면 어두운 tint 위에서 사라진다). */
+  --c-hot-ink: #ffbe5c;
+  --c-cold-ink: #8cc6ff;
   --c-mania-tint: rgba(250, 97, 109, 0.16);
   --c-neutral-tint: rgba(21, 196, 126, 0.16);
   --c-on-mania: #16161a;
