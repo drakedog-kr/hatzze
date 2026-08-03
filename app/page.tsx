@@ -542,41 +542,22 @@ const BAND_LABELS = ["저온", "상온", "고온", "초고온"];
  * 읽으려면 각도를 가늠해야 했는데, 곧은 4칸 막대는 구간 경계(25·50·75)가 칸 경계와
  * 그대로 일치한다. 마커가 그 위에 서서 온도를 한 번 더 적는다.
  */
-/**
- * 두 묶음(시장·감성)의 가중평균 과열도. 종합점수와 같은 방식으로 재되 카테고리별로 끊는다.
- *
- * 무게는 DB 의 indicators.weight 를 그대로 쓴다 — 파이프라인의 indicator_weights.py 가
- * 소스 오브 트루스이고 DB 는 그 사본이라, 프론트에 표를 또 두면 갈릴 자리가 하나 는다.
- * 값이 없는 지표(latest 가 null)는 분모에서도 빠진다.
- */
-function categoryHeat(indicators: IndicatorWithLatestValue[], cat: IndicatorCategory): number | null {
-  let num = 0;
-  let den = 0;
-  for (const i of indicators) {
-    if (i.category !== cat) continue;
-    const sc = i.latest?.normalized_score;
-    if (sc === null || sc === undefined) continue;
-    const w = i.weight || 1;
-    num += w * Math.max(0, Math.min(100, sc));
-    den += w;
-  }
-  return den > 0 ? num / den : null;
-}
+/* 두 묶음(시장·감성)의 가중평균 과열도를 내던 categoryHeat 는 여기 있었다.
+   히어로의 시장↔감성 비교 문단이 빠지면서 유일한 호출부가 없어졌다.
+   ⚠️ 되살릴 일이 있으면 눈금을 먼저 볼 것 — 이 값은 원 과열도(0~100)이고 히어로의 ℃ 는
+   그걸 SCORE_DISPLAY_ANCHORS 로 한 번 더 매핑한 값이라, 둘을 같은 문장에 섞으면 안 된다. */
+
 
 function Hero({
   dailyScore,
   tradHits,
   socialHits,
-  marketHeat,
-  socialHeat,
   bandCounts,
   bandTotal,
 }: {
   dailyScore: DailyScore;
   tradHits: number;
   socialHits: number;
-  marketHeat: number | null;
-  socialHeat: number | null;
   /** 저온·상온·고온·초고온 순서 고정. 색까지 같이 넘겨 셀 안에서 인덱스로 안 찾게 한다. */
   bandCounts: { label: string; count: number; fill: string }[];
   /** 위 넷의 합. 25가 아니라 **오늘 값이 들어온 지표 수**다(자료가 늦는 날 24가 된다). */
@@ -808,41 +789,12 @@ function Hero({
             {renderRichSummary(meaningLine)}
           </p>
         )}
-        {/* 두 묶음 중 어디가 더 뜨거운가. 바로 아래 화면이 '시장 지표'·'감성 지표' 두
-            덩어리로 갈리는데, 왜 나뉘어 있는지를 말해 주는 문장이 어디에도 없었다.
-            LLM 이 아니라 **계산**이다 — 두 가중평균의 차이라 문장이 흔들릴 자리가 없다.
-
-            ⚠️ **이 두 수는 히어로의 ℃ 와 눈금이 다르다.** 여기 값은 카테고리별 가중평균
-            (원 과열도 0~100)이고, 히어로 ℃ 는 그 원점수를 calculate_score.py 의
-            SCORE_DISPLAY_ANCHORS 로 한 번 더 매핑한 값이다. 오늘 값으로 원 42.3 은
-            ℃ 로 치면 47 이고, 원 50 쯤에서는 차이가 13 까지 벌어진다.
-            **두 수를 히어로 온도에서 빼면 안 된다.** 서로(시장↔감성) 견주는 건 같은
-            눈금이라 정확하다 — 이 문장이 하는 비교가 그것이다. */}
-        {marketHeat !== null && socialHeat !== null && (
-          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.75, color: C.inkSoft, textWrap: "pretty" }}>
-            {Math.abs(marketHeat - socialHeat) < 5 ? (
-              <>
-                시장 지표와 감성 지표의 온도가
-                <b style={{ fontWeight: 800, color: C.ink }}> {Math.round(marketHeat)}도</b> ·
-                <b style={{ fontWeight: 800, color: C.ink }}> {Math.round(socialHeat)}도</b>로 비슷합니다. 가격·거래와
-                사람들의 관심이 같은 속도로 움직이고 있습니다.
-              </>
-            ) : marketHeat > socialHeat ? (
-              <>
-                지금은 <b style={{ fontWeight: 800, color: C.ink }}>시장 지표</b>의 온도가{" "}
-                <b style={{ fontWeight: 800, color: C.ink }}>{Math.round(marketHeat)}도</b>로 감성
-                지표({Math.round(socialHeat)}도)보다 높습니다. 가격·거래는 움직이는데 사람들의 관심은 아직
-                따라붙지 않았습니다.
-              </>
-            ) : (
-              <>
-                지금은 <b style={{ fontWeight: 800, color: C.ink }}>감성 지표</b>의 온도가{" "}
-                <b style={{ fontWeight: 800, color: C.ink }}>{Math.round(socialHeat)}도</b>로 시장
-                지표({Math.round(marketHeat)}도)보다 높습니다. 사람들의 관심이 가격·거래보다 앞서 있습니다.
-              </>
-            )}
-          </p>
-        )}
+        {/* 시장↔감성 온도 비교 문단이 여기 있었다("지금은 시장 지표의 온도가 39도로
+            감성 지표(21도)보다 높습니다…"). 히어로가 카드 둘에서 셀 하나로 합쳐지면서
+            요약이 한자리에 모였고, 그 안에서 이 문단만 LLM 이 아니라 우리가 만들어 낸
+            문장이라 결이 달랐다. 두 카테고리의 온도 차이는 바로 옆 '지표 분포'가
+            개수로 이미 보여 준다. 만들어 낸 문장은 넣지 않는다(2026-08-03 결정).
+            계산에 쓰던 marketHeat·socialHeat 프롭도 같이 걷었다. */}
         {/* 온도 추세 문단. 예전엔 햇쩨 지수 카드에 뒀는데(온도 이야기라서), 그 셀이
             게이지까지 넣기엔 좁아졌다. 브리핑 세 문단이 '오늘 → 왜 → 흐름' 순으로
             읽히는 편이 낫기도 하다. */}
@@ -2040,12 +1992,15 @@ function CardNetBuy({ v }: { v: Pick }) {
     <Shell hit={v.isHit} minH={230}>
       <TitleRow desc={v.headline} icon="public" name={v.name} />
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        <span style={{ fontSize: 11.5, fontWeight: 700, color: C.muted }}>최근 5거래일 누적</span>
+        {/* ⚠️ 기간("최근 5거래일")을 큰 수치 **위**에 한 줄로 두면 안 된다. 그 한 줄만큼
+            이 셀의 큰 수치가 아래로 밀려, 같은 줄에 놓인 다른 카드들의 큰 수치와 가로선이
+            어긋난다 — 시트의 제1규칙이 "같은 줄의 메인 지수는 같은 높이"다.
+            기간은 다른 카드들과 똑같이 수치 옆 sub 로 붙인다. */}
         <Big
           disp={`${cum >= 0 ? "+" : ""}${formatEokMixed(cum)}`}
           color={isBuy ? C.cold : C.hot}
-          size={28}
-          sub={isBuy ? "순매수" : "순매도"}
+          size={32}
+          sub={`최근 5거래일 ${isBuy ? "순매수" : "순매도"}`}
         />
         {/* 게이트 상태. 이 카드에서 가장 자주 받을 질문이 "왜 과열도가 0인가" 인데,
             답이 여기 있다 — 고점권이 아니면 아무리 크게 팔아도 점수에 안 들어간다.
@@ -2397,8 +2352,6 @@ export default async function Home() {
                 dailyScore={dailyScore}
                 tradHits={countHits("시장")}
                 socialHits={countHits("감성")}
-                marketHeat={categoryHeat(indicators, "시장")}
-                socialHeat={categoryHeat(indicators, "감성")}
                 bandCounts={bandCounts}
                 bandTotal={bandTotal}
               />
@@ -2476,10 +2429,12 @@ export default async function Home() {
                   data-ga="cta_click"
                   data-ga-cta="report_indicator"
                   data-ga-surface="sentiment_grid"
+                  // 시트의 한 칸이라 **라운드를 주지 않는다.** 라운드를 두면 격자 안에서
+                  // 이 칸만 안쪽으로 물러난 카드처럼 보인다. 점선 테두리가 이미 "이건
+                  // 지표가 아니라 빈자리"를 말한다.
                   style={{
                     background: "var(--c-blue-tint2)",
                     border: "1.5px dashed var(--c-blue-4)",
-                    borderRadius: "var(--r-card)",
                     padding: 22,
                     display: "flex",
                     flexDirection: "column",
