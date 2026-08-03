@@ -1487,8 +1487,13 @@ main.hz-scroll { overflow-x: clip; }
   white-space: nowrap;
   transition: color 0.12s ease;
 }
+/* 호버는 파랑 램프의 **맨 앞**(--c-blue-1)이다. --c-blue 로 두면 종목 리포트의 최근
+   3일 막대와 똑같은 색인데, 막대는 면적이 크고 이쪽은 11px 글자라 같은 색이 훨씬
+   흐리게 보인다 — 한 단계 깊은 값이라야 "링크를 짚었다"가 읽힌다.
+   다크에선 램프가 뒤집혀 --c-blue-1 이 가장 밝은 값이라, 어두운 바탕에서도 같은
+   '가장 또렷한 파랑' 자리를 그대로 가리킨다. */
 .hz-mdd-link:hover {
-  color: var(--c-blue);
+  color: var(--c-blue-1);
 }
 
 /* 주요 종목 리포트의 머리줄 — 로고 · 종목명 · 종목코드 · 시세.
