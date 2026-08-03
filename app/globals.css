@@ -142,6 +142,10 @@
      '칸을 가르는 선'과 '행을 가르는 선'이 구분된다. */
   --c-sheet-head: #fafcfe;
   --c-sheet-row: #eef2f7;
+  /* 패널 테두리 — 시트 격자선(--c-sheet-line)보다 한 톤 진하다. 종목 패널처럼 **항목
+     경계가 그 안의 요소 경계보다 세야 하는** 자리에 쓴다(핸드오프: 헤어라인 격자만으로는
+     종목 구분이 약하다). 같은 값을 쓰면 패널이 자기 안의 구분선에 묻힌다. */
+  --c-panel-line: #dfe6ef;
   /* 순위 배지·이니셜 아바타가 앉는 판. 파랑 tint 계열이지만 글자(--c-cold-ink)를
      얹는 자리라 --c-blue-tint 보다 살짝 차분하다. */
   --c-plate: #eef4fb;
@@ -240,6 +244,7 @@
      다크에서는 card(#202027) 보다 한 단계 밝은 쪽으로 얹는다(--c-soft 와 같은 규칙). */
   --c-sheet-head: #26262e;
   --c-sheet-row: #2a2a33;
+  --c-panel-line: #3a3a45; /* 패널 테두리 — 격자선(#2f2f39)보다 밝아야 경계가 더 세다 */
   --c-plate: #2c3a4a; /* 순위 배지 판 — 위에 --c-cold-ink(#6bb6f8)를 얹어 4.5:1 을 넘긴다 */
   --c-line: #2f2f39;
   --c-track: #3c3c47;
@@ -494,22 +499,40 @@ body {
     inset -1px 0 0 var(--c-sheet-line),
     inset 0 -1px 0 var(--c-sheet-line);
 }
-.hz-cellgrid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.hz-cellgrid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* ── 패널 격자 (급부상 종목 · 주요 종목 리포트) ────────────────────
+   헤어라인 격자에서 **간격을 둔 독립 패널**로 바꿨다. 종목 하나가 한 덩어리라는 것이
+   먼저 읽혀야 하는데, 셀이 선 하나로만 갈리면 그 안의 구분선(수치 줄·AI 블록)과 세기가
+   비슷해서 어디까지가 한 종목인지 눈이 매번 다시 찾았다.
+   경계를 셋으로 겹친다: 옅은 바탕(tray) + 간격 12 + 패널 테두리(--c-panel-line).
+   위 .hz-cellgrid 와 달리 margin-bottom:-1px 이 필요 없다 — 패널이 자기 테두리를
+   닫으므로 마지막 줄에 남는 선이 없다. */
+.hz-panelgrid {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  background: var(--c-sheet-head);
+}
+.hz-panelgrid > * {
+  min-width: 0;
+  background: var(--c-card);
+  border: 1px solid var(--c-panel-line);
+  border-radius: 12px;
+}
+.hz-panelgrid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.hz-panelgrid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* 패널 안쪽. 시트 셀(.hz-cell-pad)보다 좌우가 2px 좁다 — 테두리가 생긴 만큼 안쪽 여백을
+   줄여 글의 시작점이 이전과 같은 자리에 남는다. */
+.hz-panel-pad {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
 /* 트렌딩 메시지만 칸 수를 폭에 맡긴다 — 말풍선은 개수가 6·16·26 으로 늘어나(더 보기)
    고정 열이면 넓은 화면에서 한 장이 지나치게 넓어진다.
    ⚠️ min(340px, 100%) 이어야 한다. 그냥 340px 로 두면 **칸보다 넓은 트랙**이 되어
    컨테이너가 좁을 때 그대로 넘친다(375px 화면에서 시트가 9px 삐져나왔다). */
 .hz-cellgrid-auto { grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); }
-
-/* 셀 안쪽. 급부상·종목 리포트가 공유한다. flex-column + gap 14 라 자식 순서가 곧
-   세로 리듬이고, 바닥에 붙일 것은 margin-top:auto 로 민다. */
-.hz-cell-pad {
-  padding: 20px 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
 
 /* ── 히어로 3분할 ──────────────────────────────────────────────────
    ⚠️ **고정 3열 그리드를 쓰지 않는다.** 25:25:50 을 grid 로 잡으면 좁은 폭에서 셋째
@@ -604,17 +627,18 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
   .hz-sheet-foot,
   .hz-thead,
   .hz-trow { padding-left: 16px; padding-right: 16px; }
-  .hz-cell-pad { padding: 16px; }
+  .hz-panelgrid { padding: 10px; gap: 10px; }
+  .hz-panel-pad { padding: 16px; }
   .hz-kd-hero > * { padding: 18px 16px; }
 }
-/* 급부상 3열 → 2열 → 1열. 경계는 화면 폭이 아니라 셀 안쪽에서 나왔다: 셀 하나에
+/* 급부상 3열 → 2열 → 1열. 경계는 화면 폭이 아니라 패널 안쪽에서 나왔다: 패널 하나에
    7일 막대(7칸)와 '평소 대비' 배수가 같은 줄에 서려면 안쪽 210px 이 필요하다. */
 @media (max-width: 1080px) {
-  .hz-cellgrid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hz-panelgrid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 700px) {
-  .hz-cellgrid-3,
-  .hz-cellgrid-2 { grid-template-columns: minmax(0, 1fr); }
+  .hz-panelgrid-3,
+  .hz-panelgrid-2 { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* 상단 카더라 집계 칩 4개. */
@@ -764,41 +788,10 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
   align-items: center;
   gap: 12px;
 }
-/* 화면 전용 버튼(NAV.action) — 테마 토글과 같은 높이·같은 헤어라인의 한 벌이다.
-   글자가 붙어 폭이 있으니 모서리는 토글(12)과 같게 두고 좌우 padding 만 준다. */
-.hz-head-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 38px;
-  padding: 0 13px;
-  border-radius: 12px;
-  border: 1px solid var(--c-line);
-  background: var(--c-bg);
-  color: var(--c-sub);
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-  text-decoration: none;
-  flex-shrink: 0;
-  transition: border-color 0.14s ease, background 0.14s ease, color 0.14s ease;
-}
-.hz-head-action:hover {
-  border-color: var(--c-blue);
-  background: var(--c-blue-tint);
-  color: var(--c-blue);
-}
 /* 좁아지면 도구 묶음부터 접는다. 제목이 먼저 눌리면 "여기가 어느 화면인지"를 잃는다.
    검색·알림은 아직 기능이 없어 없어도 잃는 게 없다. */
 @media (max-width: 900px) {
   .hz-page-tools { display: none; }
-  /* 다만 화면 전용 버튼은 살린다 — 이 자리로 올라오기 전에는 카드 안에 있어서 모바일에서도
-     보이던 것이라, 통째로 접으면 폰에서만 CTA 가 사라진다. 대신 같은 묶음의 테마 토글은
-     접는다(모바일 탑바에 토글이 따로 있어 두 개가 뜬다). */
-  .hz-page-tools:has(.hz-head-action) { display: flex; }
-  /* !important 는 인라인 style 을 이기려는 것이다 — ThemeToggle 이 display 를 인라인으로
-     들고 있어서 클래스 규칙으로는 못 끈다(실측: 375px 에서 토글이 그대로 떠 있었다). */
-  .hz-page-tools:has(.hz-head-action) > button { display: none !important; }
 }
 
 /* 모바일 전용 조각들 — 기본은 숨기고 아래 560px 미디어쿼리에서만 켠다.

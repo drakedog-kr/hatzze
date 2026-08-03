@@ -23,7 +23,7 @@ import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { AiMark, C, Icon, MONO } from "../ui";
 import { ExpandableList } from "./ExpandableList";
-import { Avatar, ChangeRate, DayBars, Pill, QuoteDate, RankBadge, SectionCaps } from "./parts";
+import { Avatar, ChangeRate, DayBars, Pill, QuoteDate, RankBadge, RankDelta, SectionCaps } from "./parts";
 import { SectionHead } from "./SectionHead";
 import { TrendingTabs } from "./TrendingTabs";
 
@@ -82,7 +82,9 @@ const clip: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", te
 /** 시트 안 열 머리·데이터 행이 공유하는 격자. 한 곳에서 내야 두 줄의 칸이 어긋나지 않는다. */
 const CHANNEL_COLS = "24px minmax(0,1fr) 54px 56px 54px";
 const RISING_COLS = "24px minmax(0,1fr) minmax(60px,1.3fr) 62px";
-const THEME_COLS = "minmax(80px,1fr) 52px minmax(70px,1.3fr) 50px";
+// 테마·키워드 두 시트는 같은 격자를 쓴다 — 나란히 놓이는 50:50 짝이라 열이 어긋나면
+// 두 표가 서로 다른 물건처럼 보인다.
+const THEME_COLS = "26px minmax(80px,1fr) minmax(70px,1.5fr) 58px";
 const KEYWORD_COLS = "26px minmax(80px,1fr) minmax(70px,1.5fr) 58px";
 
 /** 시트 안 '2분할 하이라이트'(테마 로테이션·이슈 키워드의 머리 아래 두 칸). */
@@ -277,17 +279,14 @@ export default async function KaderaPage() {
     { label: "총 메시지", note: "7일", value: summary.messages7d.toLocaleString("ko-KR"), unit: "개" },
   ];
 
-  // ── 테마 로테이션: 유입/이탈 그룹 ───────────────────────────────────
-  // 0선 다이버징 막대를 그룹 분리로 바꿨다. 막대가 모두 왼쪽 기준이라 길이 비교가
-  // 직접 되고, **두 그룹이 같은 눈금(|변화폭| 최대)을 쓴다.**
-  // 변화폭이 없는(비교할 과거가 없거나 반올림해 0.0%p) 테마는 어느 쪽도 아니라
-  // 셋째 묶음으로 뺀다 — 0을 이탈에 섞으면 "관심이 빠졌다"는 거짓이 된다.
+  // ── 테마 로테이션 ──────────────────────────────────────────────────
+  // 표는 **점유율 순위 그대로**(themes 가 이미 그 순서다) 순위 번호를 달아 나열한다 —
+  // 옆 이슈 키워드와 같은 골격이라 두 시트를 나란히 훑을 수 있다.
+  // 막대는 **점유율**이다(변화폭이 아니다). 변화폭으로 그리면 1위 반도체(28%)가 +1.1%p
+  // 라는 이유로 작은 막대가 되어, 순위표인데 순위가 그림에서 사라진다. 변화폭은 오른쪽
+  // 값 칸이 부호·색으로 말한다(이슈 키워드의 ▲/▼ 횟수와 같은 자리).
   const delta = (t: ThemeRotation) => (t.shareDelta === null ? 0 : t.shareDelta);
-  // 표는 **점유율 순위 그대로** 나열한다(themes 가 이미 그 순서다). 유입/이탈로 묶어 봤는데,
-  // 묶음 알약이 두 줄을 먹고 같은 테마를 찾으려면 어느 묶음인지부터 알아야 해서 훑기가
-  // 더 나빠졌다. 방향은 막대 색과 부호가 이미 말한다.
-  // 위 하이라이트 두 칸에 쓸 최대·최소만 따로 뽑는다(표 순서와는 무관하다).
-  const maxDelta = Math.max(0.1, ...themes.map((t) => Math.abs(delta(t))));
+  // 위 하이라이트 두 칸에 쓸 최대·최소. 표 순서와는 무관하므로 따로 고른다.
   const moved = themes.filter((t) => t.shareDelta !== null);
   const topIn = moved.length ? moved.reduce((a, b) => (delta(b) > delta(a) ? b : a)) : null;
   const topOut = moved.length ? moved.reduce((a, b) => (delta(b) < delta(a) ? b : a)) : null;
@@ -299,31 +298,33 @@ export default async function KaderaPage() {
       <div
         key={t.theme}
         className="hz-trow hz-theme-row-sheet"
-        style={{ gridTemplateColumns: THEME_COLS }}
+        style={{ gridTemplateColumns: THEME_COLS, flex: 1 }}
         /* 마우스가 없어도(키보드·터치) 종목 목록을 열 수 있게 초점을 받는다.
            언급된 종목이 없는 테마는 열 것도 없으니 초점도 주지 않는다. */
         tabIndex={t.stocks.length ? 0 : undefined}
         aria-label={t.stocks.length ? `${t.theme} 테마를 이룬 종목 ${t.stockCount}개 보기` : undefined}
       >
-        <span style={{ ...clip, fontSize: 12, fontWeight: 700, color: C.ink }}>{t.theme}</span>
-        <span style={{ fontFamily: MONO, fontSize: 11, color: C.sub2, textAlign: "right" }}>{t.sharePct.toFixed(1)}%</span>
-        <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-          <span style={{ flex: 1, minWidth: 20, height: 7, borderRadius: 999, background: C.track, overflow: "hidden" }}>
-            <span
-              style={{
-                display: "block",
-                width: `${Math.max(2, (Math.abs(d) / maxDelta) * 100)}%`,
-                height: "100%",
-                background: d >= 0 ? "var(--c-warm-2)" : "var(--c-blue-3)",
-              }}
-            />
-          </span>
-          <span style={{ width: 44, flexShrink: 0, fontFamily: MONO, fontSize: 11, fontWeight: 800, color: ink }}>
-            {t.shareDelta === null ? "—" : `${d > 0 ? "+" : d < 0 ? "−" : ""}${Math.abs(d).toFixed(1)}%p`}
-          </span>
+        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 800, color: C.faint }}>{t.rank}</span>
+        {/* 이름 옆 순위 변동(▲1계단)은 값이 있을 때만 붙는다 — 열을 하나 더 세우면 좁은
+            시트에서 막대가 눌린다. RankDelta 가 0·null 이면 아무것도 안 그린다. */}
+        <span style={{ display: "flex", alignItems: "baseline", gap: 5, minWidth: 0 }}>
+          <span style={{ ...clip, fontSize: 12, fontWeight: 700, color: C.ink }}>{t.theme}</span>
+          <RankDelta change={t.rankChange} />
         </span>
-        <span style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, textAlign: "right", color: t.rankChange ? (t.rankChange > 0 ? "var(--c-hot-ink)" : "var(--c-cold-ink)") : C.hint }}>
-          {t.rankChange ? `${t.rankChange > 0 ? "▲" : "▼"}${Math.abs(t.rankChange)}` : "—"}
+        {/* 막대는 1위 대비 점유율. 절대 점유율을 폭으로 쓰면 1위 28%·10위 0.9% 라 아홉 줄이
+            빈 트랙만 남는다(이슈 키워드가 1위 횟수를 기준 삼는 것과 같은 규칙). */}
+        <span style={{ height: 7, borderRadius: 999, background: C.track, overflow: "hidden" }}>
+          <span
+            style={{
+              display: "block",
+              width: `${Math.max(2, (t.sharePct / Math.max(0.1, themes[0].sharePct)) * 100)}%`,
+              height: "100%",
+              background: d > 0 ? "var(--c-warm-2)" : d < 0 ? "var(--c-blue-3)" : C.hint,
+            }}
+          />
+        </span>
+        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 800, textAlign: "right", color: ink }}>
+          {t.shareDelta === null ? `${t.sharePct.toFixed(1)}%` : `${d > 0 ? "▲" : d < 0 ? "▼" : ""}${Math.abs(d).toFixed(1)}%p`}
         </span>
 
         {/* 이 테마의 점유율을 만든 종목 목록. 줄에 마우스를 올리거나 초점이 가면 열린다
@@ -425,6 +426,23 @@ export default async function KaderaPage() {
                   </strong>
                 </div>
               ))}
+            </div>
+            {/* 통계 넷 바로 아래. marginTop:auto 로 칸 바닥에 붙인다 — 옆 '오늘의 요약'
+                칸이 문단 길이만큼 늘어나면 이 칸도 같이 늘어나는데, 그때 남는 자리가
+                통계 줄 사이가 아니라 버튼 위 한 곳에만 생긴다. */}
+            <div style={{ marginTop: "auto", paddingTop: 14 }}>
+              <a
+                href="https://forms.gle/PRapNH9rz8YuF2zu9"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hz-btn-soft"
+                data-ga="cta_click"
+                data-ga-cta="register_channel"
+                data-ga-surface="channel_rank"
+              >
+                <Icon name="add_circle" style={{ fontSize: 15 }} />
+                채널 등록 신청
+              </a>
             </div>
           </div>
 
@@ -566,12 +584,12 @@ export default async function KaderaPage() {
           </p>
         ) : (
           <>
-            <div className="hz-cellgrid hz-cellgrid-3">
+            <div className="hz-panelgrid hz-panelgrid-3">
               {surging.map((s, i) => {
                 const values = s.series.slice(-7);
                 const dates = s.seriesDates.slice(-7);
                 return (
-                  <div key={s.code} className="hz-cell-pad">
+                  <div key={s.code} className="hz-panel-pad">
                     <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                       <RankBadge n={i + 1} />
                       {/* minWidth:0 — flex 항목의 기본 min-width:auto 가 살아 있으면 이름이
@@ -678,16 +696,20 @@ export default async function KaderaPage() {
               </div>
 
               <div className="hz-thead" style={{ gridTemplateColumns: THEME_COLS }}>
+                <span>#</span>
                 <span>테마</span>
-                <span style={{ textAlign: "right" }}>점유율</span>
-                <span>변화폭</span>
-                <span style={{ textAlign: "right" }}>순위</span>
+                <span>점유율</span>
+                <span style={{ textAlign: "right" }}>변화폭</span>
               </div>
 
-              {/* 점유율 순위 그대로. 막대는 |변화폭| 을 한 눈금(maxDelta)으로 재고 방향은
-                  색이 말한다 — 0선 다이버징이 아니라 전부 왼쪽 기준이라 길이 비교가 직접 된다. */}
-              {themes.map((t, i) => themeRow(t, i, themes.length))}
-              <div style={{ marginTop: "auto" }} />
+              {/* 행을 상자로 감싸고 flex:1 을 준다. 예전엔 뒤에 marginTop:auto 스페이서를
+                  뒀는데, 그러면 마지막 행이 시트의 막내가 아니라 밑선이 안 지워졌고 그 선이
+                  시트 바닥 테두리와 1px 떨어져 **바닥이 두 줄**로 보였다. 상자로 묶으면
+                  마지막 행이 상자의 막내라 규칙이 걸리고, flex:1 이 남는 높이를 행들이
+                  나눠 가져 짝(이슈 키워드)과 바닥이 맞는다. */}
+              <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+                {themes.map((t, i) => themeRow(t, i, themes.length))}
+              </div>
             </>
           )}
         </section>
@@ -800,7 +822,7 @@ export default async function KaderaPage() {
         {stockReports.length === 0 ? (
           <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 12.5 }}>아직 리포트를 만들 종목이 없습니다.</p>
         ) : (
-          <div className="hz-cellgrid hz-cellgrid-2">
+          <div className="hz-panelgrid hz-panelgrid-2">
             {stockReports.map((r, i) => {
               const peak = Math.max(0, ...r.series.map((d) => d.mentions));
               /* ⚠️ 목업의 "▼30% 이전 3일" 배지는 넣지 않는다.
@@ -812,7 +834,7 @@ export default async function KaderaPage() {
                  여기서 같은 보정을 하려면 그날 전체 대화량이 필요한데 StockReport 엔 없다.
                  추이는 아래 7일 막대와 AI 문장이 이미 말한다. */
               return (
-                <div key={r.code} className="hz-cell-pad">
+                <div key={r.code} className="hz-panel-pad">
                   <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                     <RankBadge n={i + 1} />
                     {/* minWidth:0 — 급부상 셀과 같은 이유(그쪽 주석). 여기는 오른쪽에
