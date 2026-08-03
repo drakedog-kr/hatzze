@@ -290,17 +290,21 @@ export function DayBars({
   const max = Math.max(1, ...values);
   const peak = values.indexOf(max);
   const n = values.length;
-  // 2등은 최고 칸을 뺀 나머지의 최대. 같은 값이 둘이면 앞쪽이 최고가 되고 뒤쪽이 2등이다.
-  const second = Math.max(0, ...values.filter((_, i) => i !== peak));
+  /** 이 칸이 셀의 큰 숫자에 들어갔나(뒤에서 hot 칸). hot=0 이면 전부 창 안으로 친다. */
+  const inWindow = (i: number) => hot <= 0 || i >= n - hot;
 
   const fill = (v: number, i: number): string => {
     if (tone === "warm") {
-      if (i < n - hot) return "var(--c-bar-mute)";
+      if (!inWindow(i)) return "var(--c-bar-mute)";
       return v === max ? "var(--c-warm-1)" : "var(--c-warm-3)";
     }
-    if (i === peak) return "var(--c-blue-2)";
-    return v === second && v > 0 ? "var(--c-blue-3)" : "var(--c-blue-5)";
+    // cold 는 **한 색**이다(옛 디자인 그대로). 진하기만 두 단계로 갈라 "어디까지가 이
+    // 숫자인가"를 색이 직접 말한다 — 최고일까지 따로 칠하면 단계가 셋이 되어 그 경계가
+    // 안 읽힌다(globals.css 의 .hz-bars 주석에 같은 이유가 적혀 있다).
+    return "var(--c-blue)";
   };
+  /** 창 밖은 배경 맥락이라 옅게. 옛 .hz-bar / .hz-bar-ctx 와 같은 값(0.95 / 0.45). */
+  const dim = (i: number): number => (tone === "cold" && !inWindow(i) ? 0.45 : tone === "cold" ? 0.95 : 1);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -341,8 +345,7 @@ export function DayBars({
                 height: `${Math.max(2, (v / max) * height)}px`,
                 borderRadius: "2px 2px 0 0",
                 background: fill(v, i),
-                // 창 밖(배경 맥락)은 눌러 둔다. warm 은 색으로 이미 갈라서 손대지 않는다.
-                opacity: tone === "cold" && hot > 0 && i < n - hot ? 0.45 : 1,
+                opacity: dim(i),
               }}
             />
           ))}

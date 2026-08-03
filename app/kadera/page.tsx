@@ -555,12 +555,12 @@ export default async function KaderaPage() {
                     <span style={{ color: "var(--c-hot-ink)" }}>낙관 {sentiment.score}</span>
                   </div>
                 </div>
-                {/* marginTop:auto 를 주지 않는다. 옆 '오늘의 요약' 칸이 문단 길이만큼
-                    늘어나면 이 칸도 같이 늘어나는데, auto 를 걸면 남는 높이가 통째로
-                    이 블록 **위**에 몰려 칸 한가운데가 구멍처럼 빈다. 위에서부터
-                    쌓아 두면 그 여백이 맨 아래로 간다. */}
+                {/* marginTop:auto — 이 블록의 **밑선**을 옆 칸 '채널 등록 신청' 버튼의
+                    밑선에 맞춘다. 두 칸은 같은 높이로 늘어나므로(flex), 둘 다 바닥에
+                    붙이면 밑선이 정확히 같아진다. 남는 높이는 위 스플릿 막대와 이 블록
+                    사이로 간다. */}
                 {sentiment.byTheme.length > 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 9, paddingTop: 14, borderTop: "1px solid var(--c-sheet-row)" }}>
+                  <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 9, paddingTop: 14, borderTop: "1px solid var(--c-sheet-row)" }}>
                     <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: ".08em", color: C.sub2 }}>인기 테마별 비관 ↔ 낙관</span>
                     {sentiment.byTheme.map((t) => (
                       <div
