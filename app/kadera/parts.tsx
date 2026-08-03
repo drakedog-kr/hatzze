@@ -329,7 +329,11 @@ export function DayBars({
           {values.map((v, i) => (
             <span
               key={dates[i] ?? i}
-              className="hz-tip"
+              /* 양 끝 칸은 툴팁을 안쪽으로 연다. 기본은 가운데 정렬이라 막대가 30px 남짓인
+                 이 차트에서는 툴팁("7/29 · 944회")이 칸보다 훨씬 넓어 좌우로 삐져나가는데,
+                 시트가 overflow:hidden 이라 **잘려서 안 읽힌다**. 두 칸씩 잡는 이유는
+                 툴팁 폭이 한 칸 반을 넘기 때문이다. */
+              className={`hz-tip${i <= 1 ? " hz-tip-start" : i >= n - 2 ? " hz-tip-end" : ""}`}
               data-tip={`${shortDate(dates[i] ?? "")} · ${v}회`}
               style={{
                 flex: 1,

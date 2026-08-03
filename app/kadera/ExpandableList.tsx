@@ -40,15 +40,18 @@ export function ExpandableList({
   const canExpand = shown < items.length;
   const isExpanded = shown > initial;
 
+  // 알약형 버튼이 아니라 **목록의 마지막 줄**이다. 시트 안에서는 위 헤어라인이 이미
+  // 경계를 그어 주므로 테두리를 또 두르면 선이 두 겹이 되고, 그 상자가 표에서 저 혼자
+  // 떠 보인다. 줄 자체가 눌리는 자리가 되게 두고 높이도 데이터 행보다 낮게 잡는다.
   const buttonStyle: React.CSSProperties = {
     flex: 1,
-    padding: "9px 12px",
-    borderRadius: 10,
-    border: `1px solid ${C.line}`,
+    padding: "7px 12px",
+    borderRadius: 0,
+    border: 0,
     background: "transparent",
     color: C.sub,
-    fontSize: 12,
-    fontWeight: 600,
+    fontSize: 11.5,
+    fontWeight: 700,
     cursor: "pointer",
   };
 
@@ -73,6 +76,7 @@ export function ExpandableList({
           {canExpand && (
             <button
               type="button"
+              className="hz-more-btn"
               style={buttonStyle}
               onClick={() => {
                 const next = Math.min(shown + step, items.length);
@@ -88,6 +92,7 @@ export function ExpandableList({
           {isExpanded && (
             <button
               type="button"
+              className="hz-more-btn"
               style={buttonStyle}
               onClick={() => {
                 if (name) track("list_expand", { list: name, action: "fold", shown: initial });

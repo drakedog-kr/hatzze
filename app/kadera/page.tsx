@@ -115,32 +115,6 @@ function Highlight({ cap, name, value, valueColor, sub, divide }: {
   );
 }
 
-/** 유입/이탈 그룹을 가르는 알약. 두 그룹이 같은 눈금을 쓰므로 색만 방향을 말한다. */
-function GroupTag({ dir }: { dir: "in" | "out" }) {
-  const inflow = dir === "in";
-  return (
-    <div style={{ padding: "10px 22px 7px" }}>
-      <span
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 4,
-          fontSize: 10,
-          fontWeight: 800,
-          letterSpacing: ".04em",
-          color: inflow ? "var(--c-hot-ink)" : "var(--c-cold-ink)",
-          background: inflow ? "var(--c-hot-tint)" : "var(--c-cold-tint)",
-          borderRadius: 999,
-          padding: "3px 9px",
-        }}
-      >
-        <Icon name={inflow ? "north_east" : "south_west"} style={{ fontSize: 12 }} />
-        {inflow ? "유입" : "이탈"}
-      </span>
-    </div>
-  );
-}
-
 /**
  * 트렌딩 메시지 목록(말풍선 카드). 기간 탭이 세 벌을 미리 렌더해 넘기므로 목록
  * 마크업만 여기로 뽑아 재사용한다 — 조회는 서버에 그대로 남는다.
@@ -244,7 +218,7 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
       initial={6}
       step={10}
       listClassName="hz-cellgrid hz-cellgrid-auto"
-      footerStyle={{ margin: 0, padding: "12px 22px", borderTop: "1px solid var(--c-sheet-line)" }}
+      footerStyle={{ margin: 0, gap: 0, borderTop: "1px solid var(--c-sheet-line)" }}
     />
   );
 }
@@ -293,8 +267,6 @@ export default async function KaderaPage() {
     ]);
   const stockReports = reports.filter((r): r is NonNullable<typeof r> => r !== null);
 
-  const activeRate = summary.channelCount > 0 ? (summary.activeChannels / summary.channelCount) * 100 : 0;
-
   /* 채널을 세는 세 줄은 전부 **지금 수집 중인 채널**을 센다(getTelegramSummary 주석).
      목록에 있어도 peer 캐시가 없어 한 건도 안 걷히는 채널은 모니터링하고 있는 것이
      아니다. 화면에 덧붙이는 표시는 없다 — 숫자 자체가 사실이면 설명할 것이 없다. */
@@ -311,15 +283,14 @@ export default async function KaderaPage() {
   // 변화폭이 없는(비교할 과거가 없거나 반올림해 0.0%p) 테마는 어느 쪽도 아니라
   // 셋째 묶음으로 뺀다 — 0을 이탈에 섞으면 "관심이 빠졌다"는 거짓이 된다.
   const delta = (t: ThemeRotation) => (t.shareDelta === null ? 0 : t.shareDelta);
-  // 그룹 안에서는 **변화폭 크기순**으로 세운다. themes 는 점유율 순위대로 오는데, 그 순서
-  // 그대로 두면 막대가 +1.1 / +0.2 / +0.7 / +0.8 처럼 들쭉날쭉해 계단으로 안 읽힌다.
-  // 아래 topIn·topOut 도 이 정렬에 기대므로 여기서 한 번에 맞춘다.
-  const inflow = themes.filter((t) => delta(t) >= 0.05).sort((a, b) => delta(b) - delta(a));
-  const outflow = themes.filter((t) => delta(t) <= -0.05).sort((a, b) => delta(a) - delta(b));
-  const steady = themes.filter((t) => Math.abs(delta(t)) < 0.05);
+  // 표는 **점유율 순위 그대로** 나열한다(themes 가 이미 그 순서다). 유입/이탈로 묶어 봤는데,
+  // 묶음 알약이 두 줄을 먹고 같은 테마를 찾으려면 어느 묶음인지부터 알아야 해서 훑기가
+  // 더 나빠졌다. 방향은 막대 색과 부호가 이미 말한다.
+  // 위 하이라이트 두 칸에 쓸 최대·최소만 따로 뽑는다(표 순서와는 무관하다).
   const maxDelta = Math.max(0.1, ...themes.map((t) => Math.abs(delta(t))));
-  const topIn = inflow[0] ?? null;
-  const topOut = outflow[0] ?? null;
+  const moved = themes.filter((t) => t.shareDelta !== null);
+  const topIn = moved.length ? moved.reduce((a, b) => (delta(b) > delta(a) ? b : a)) : null;
+  const topOut = moved.length ? moved.reduce((a, b) => (delta(b) < delta(a) ? b : a)) : null;
 
   const themeRow = (t: ThemeRotation, i: number, total: number) => {
     const d = delta(t);
@@ -454,33 +425,6 @@ export default async function KaderaPage() {
                   </strong>
                 </div>
               ))}
-            </div>
-            {/* marginTop:auto 로 바닥에 붙인다 — 칸이 옆 칸 높이만큼 늘어나도 남는 자리가
-                통계 줄 사이가 아니라 여기 한 곳에만 생긴다. */}
-            <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 12, paddingTop: 12, borderTop: "1px solid var(--c-sheet-row)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ flex: 1, height: 6, borderRadius: 999, background: C.track, overflow: "hidden" }}>
-                  <span style={{ display: "block", width: `${activeRate}%`, height: "100%", borderRadius: 999, background: "var(--c-blue-2)" }} />
-                </span>
-                <span style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: C.label, whiteSpace: "nowrap" }}>
-                  활성률 {activeRate.toFixed(1)}%
-                </span>
-              </div>
-              {/* 목업은 이 버튼을 페이지 헤더로 올렸지만, 헤더(AppShell 의 PageHeader)는
-                  세 페이지가 공유하는 셸이라 카더라 전용 버튼을 끼우면 나머지 둘까지
-                  흔든다. 원래 자리인 이 칸 바닥에 그대로 둔다. */}
-              <a
-                href="https://forms.gle/PRapNH9rz8YuF2zu9"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hz-btn-soft"
-                data-ga="cta_click"
-                data-ga-cta="register_channel"
-                data-ga-surface="channel_rank"
-              >
-                <Icon name="add_circle" style={{ fontSize: 15 }} />
-                채널 등록 신청
-              </a>
             </div>
           </div>
 
@@ -636,7 +580,7 @@ export default async function KaderaPage() {
                       <strong style={{ ...clip, minWidth: 0, fontSize: 14, fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>{s.name}</strong>
                       <span style={{ fontFamily: MONO, fontSize: 10, color: C.faint, flexShrink: 0 }}>{s.code}</span>
                       <span style={{ flex: 1 }} />
-                      <span style={{ fontSize: 10.5, color: C.sub2, whiteSpace: "nowrap" }}>{s.channelCount}개 채널</span>
+                      <span style={{ fontSize: 10.5, color: C.sub2, whiteSpace: "nowrap", flexShrink: 0 }}>{s.channelCount}개 채널</span>
                     </div>
 
                     {/* 이 셀이 말하려는 건 시세가 아니라 이 배수다 — 30px 로 올려 주인공을 못박는다. */}
@@ -664,7 +608,7 @@ export default async function KaderaPage() {
                     <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 8, paddingTop: 2, flexWrap: "wrap" }}>
                       {s.closePrice != null ? (
                         <>
-                          <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: C.label, whiteSpace: "nowrap" }}>
+                          <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: C.label, whiteSpace: "nowrap", flexShrink: 0 }}>
                             {s.closePrice.toLocaleString("ko-KR")}원
                           </span>
                           {/* 야후 실시간이 아니면(KRX 저장 종가 폴백) 등락률 대신 기준일을 단다.
@@ -740,23 +684,9 @@ export default async function KaderaPage() {
                 <span style={{ textAlign: "right" }}>순위</span>
               </div>
 
-              {/* 유입/이탈을 그룹으로 나눠 막대가 모두 왼쪽 기준이 되게 한다. 0선 다이버징
-                  이었을 땐 좌우 길이를 눈으로 견줘야 했는데, 이러면 같은 눈금 위에서
-                  길이만 비교하면 된다(두 그룹의 분모가 같다 — maxDelta). */}
-              {inflow.length > 0 && <GroupTag dir="in" />}
-              {inflow.map((t, i) => themeRow(t, i, themes.length))}
-              {outflow.length > 0 && <GroupTag dir="out" />}
-              {outflow.map((t, i) => themeRow(t, inflow.length + i, themes.length))}
-              {steady.length > 0 && (
-                <>
-                  <div style={{ padding: "10px 22px 7px" }}>
-                    <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".04em", color: C.sub2, background: C.chip, borderRadius: 999, padding: "3px 9px" }}>
-                      변화 없음
-                    </span>
-                  </div>
-                  {steady.map((t, i) => themeRow(t, inflow.length + outflow.length + i, themes.length))}
-                </>
-              )}
+              {/* 점유율 순위 그대로. 막대는 |변화폭| 을 한 눈금(maxDelta)으로 재고 방향은
+                  색이 말한다 — 0선 다이버징이 아니라 전부 왼쪽 기준이라 길이 비교가 직접 된다. */}
+              {themes.map((t, i) => themeRow(t, i, themes.length))}
               <div style={{ marginTop: "auto" }} />
             </>
           )}
@@ -904,7 +834,7 @@ export default async function KaderaPage() {
                     </strong>
                     <span style={{ fontSize: 11.5, color: C.sub2 }}>회 언급</span>
                     <span style={{ flex: 1 }} />
-                    <span style={{ fontSize: 10.5, color: C.sub2, whiteSpace: "nowrap" }}>{r.channelCount}개 채널</span>
+                    <span style={{ fontSize: 10.5, color: C.sub2, whiteSpace: "nowrap", flexShrink: 0 }}>{r.channelCount}개 채널</span>
                   </div>
 
                   {/* hot = 큰 숫자(totalMentions)가 실제로 센 날 수. StockReport.series 의
@@ -983,7 +913,7 @@ export default async function KaderaPage() {
                 initial={10}
                 step={10}
                 listStyle={{ display: "block" }}
-                footerStyle={{ margin: 0, padding: "12px 22px", borderTop: "1px solid var(--c-sheet-line)" }}
+                footerStyle={{ margin: 0, gap: 0, borderTop: "1px solid var(--c-sheet-line)" }}
               />
               <div style={{ marginTop: "auto" }} />
             </>

@@ -14,11 +14,28 @@ import GaEvents from "./GaEvents";
 // 사이드바 항목에는 안 쓰이고 PageHeader 만 읽는다.
 // badge 는 제목 옆 회색 알약이다(콘솔 리디자인). "이 화면이 몇 개를 다루나"를 제목 줄에서
 // 바로 말해 준다 — 부제 문장으로 적으면 읽어야 알 수 있다. 없는 화면엔 안 그린다.
+// action 은 제목 줄 오른쪽, 테마 토글 **왼쪽**에 붙는 그 화면 전용 버튼이다. 카더라의
+// '채널 등록 신청'처럼 화면 안 어디에 둬도 곁다리로 보이는 것을 도구 자리로 올린다.
+// 여기 두는 이유: 화면 쪽에서 헤더에 끼우려면 셸을 뚫어야 하는데, NAV 항목의 속성으로
+// 두면 어느 경로에 무엇이 붙는지가 한 줄로 읽힌다(정적 링크라 서버 데이터가 필요 없다).
 const NAV = [
   { href: "/", label: "시장 브리핑", icon: "monitoring", sub: "지표 25개로 잰 오늘의 시장 온도", badge: "25개 지표" },
-  { href: "/kadera", label: "카더라 리포트", icon: "forum", sub: "주식 텔레그램에서 무엇이 회자되는지" },
+  {
+    href: "/kadera",
+    label: "카더라 리포트",
+    icon: "forum",
+    sub: "주식 텔레그램에서 무엇이 회자되는지",
+    action: { href: "https://forms.gle/PRapNH9rz8YuF2zu9", icon: "add_circle", label: "채널 등록 신청", ga: "register_channel" },
+  },
   { href: "/mdd", label: "MDD 정밀분석", icon: "trending_down", sub: "고점에서 얼마나 내려왔고 언제 돌아왔는지" },
-] as { href: string; label: string; icon: string; sub: string; badge?: string }[];
+] as {
+  href: string;
+  label: string;
+  icon: string;
+  sub: string;
+  badge?: string;
+  action?: { href: string; icon: string; label: string; ga: string };
+}[];
 
 // 외부(텔레그램) 링크라 NAV 배열이 아니라 따로 둔다 — pathname 기반 active 판정 대상이
 // 아니고, 새 탭으로 열려야 해서 next/link 가 아닌 <a> 를 쓴다. 사이드바와 모바일 탭바가
@@ -543,6 +560,22 @@ function PageHeader({ theme }: { theme: "light" | "dark" }) {
           셋 다 기능이 없어 모양만 있는 자리였고(2026-08-03), 로그인이 없는
           서비스라 프로필 칩은 앞으로도 가리킬 대상이 없다. */}
       <div className="hz-page-tools">
+        {/* 화면 전용 버튼(NAV.action)은 테마 토글 **왼쪽**에. 토글이 늘 오른쪽 끝이라
+            페이지를 옮겨 다녀도 그 자리가 안 흔들린다. 높이 38 은 토글과 같은 값이다. */}
+        {page?.action && (
+          <a
+            href={page.action.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hz-head-action"
+            data-ga="cta_click"
+            data-ga-cta={page.action.ga}
+            data-ga-surface="page_header"
+          >
+            <Icon name={page.action.icon} style={{ fontSize: 16 }} />
+            {page.action.label}
+          </a>
+        )}
         <ThemeToggle initial={theme} />
       </div>
     </header>

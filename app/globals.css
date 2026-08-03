@@ -497,8 +497,10 @@ body {
 .hz-cellgrid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .hz-cellgrid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 /* 트렌딩 메시지만 칸 수를 폭에 맡긴다 — 말풍선은 개수가 6·16·26 으로 늘어나(더 보기)
-   고정 열이면 넓은 화면에서 한 장이 지나치게 넓어진다. */
-.hz-cellgrid-auto { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+   고정 열이면 넓은 화면에서 한 장이 지나치게 넓어진다.
+   ⚠️ min(340px, 100%) 이어야 한다. 그냥 340px 로 두면 **칸보다 넓은 트랙**이 되어
+   컨테이너가 좁을 때 그대로 넘친다(375px 화면에서 시트가 9px 삐져나왔다). */
+.hz-cellgrid-auto { grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); }
 
 /* 셀 안쪽. 급부상·종목 리포트가 공유한다. flex-column + gap 14 라 자식 순서가 곧
    세로 리듬이고, 바닥에 붙일 것은 margin-top:auto 로 민다. */
@@ -561,8 +563,28 @@ body {
   border-bottom: 1px solid var(--c-sheet-row);
 }
 .hz-trow:hover { background: var(--c-sheet-head); }
-/* 마지막 행의 밑선은 지운다 — 그 아래가 각주 띠(자기 윗선을 가짐)거나 시트 바닥이다. */
-.hz-trow:last-child { border-bottom: 0; }
+/* 마지막 행의 밑선은 지운다 — 그 아래가 각주 띠(자기 윗선을 가짐)거나 시트 바닥이라
+   그대로 두면 선이 두 겹으로 겹쳐 보인다(뜨는 채널 10위 밑에 줄이 하나 더 있었다).
+   :last-child 만으로는 못 잡는다 — 각주 띠가 있으면 마지막 행은 막내가 아니고,
+   반대로 목록이 <li> 로 싸여 있으면(파워 랭킹) 모든 행이 저마다 막내라 전부 지워진다.
+   그래서 **형제 관계**로 판정한다: 뒤에 아무 것도 없거나 각주 띠가 오는 행만. */
+.hz-trow:has(+ .hz-sheet-foot), /* 뒤가 각주 띠 — 뜨는 채널 */
+.hz-sheet > .hz-trow:last-child, /* 시트가 행으로 끝난다 */
+div > .hz-trow:last-child, /* 상자로 감싼 목록 — 이슈 키워드 */
+li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워 랭킹 */
+  border-bottom: 0;
+}
+
+/* 목록 맨 아랫줄의 '더 보기 / 접기'. 테두리 없는 줄이라 눌리는 자리라는 걸 호버가 말한다
+   (표 행의 호버와 같은 배경이라 목록의 연장으로 읽힌다). */
+.hz-more-btn {
+  font-family: inherit;
+  transition: background 0.13s ease, color 0.13s ease;
+}
+.hz-more-btn:hover {
+  background: var(--c-sheet-head);
+  color: var(--c-cold-ink);
+}
 
 /* ── 말풍선 (트렌딩 메시지) ────────────────────────────────────────
    좌상단만 각지게 둬서 아바타 쪽을 가리킨다 — 텔레그램 원본 매체의 형태다. */
@@ -742,10 +764,41 @@ body {
   align-items: center;
   gap: 12px;
 }
+/* 화면 전용 버튼(NAV.action) — 테마 토글과 같은 높이·같은 헤어라인의 한 벌이다.
+   글자가 붙어 폭이 있으니 모서리는 토글(12)과 같게 두고 좌우 padding 만 준다. */
+.hz-head-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 13px;
+  border-radius: 12px;
+  border: 1px solid var(--c-line);
+  background: var(--c-bg);
+  color: var(--c-sub);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-decoration: none;
+  flex-shrink: 0;
+  transition: border-color 0.14s ease, background 0.14s ease, color 0.14s ease;
+}
+.hz-head-action:hover {
+  border-color: var(--c-blue);
+  background: var(--c-blue-tint);
+  color: var(--c-blue);
+}
 /* 좁아지면 도구 묶음부터 접는다. 제목이 먼저 눌리면 "여기가 어느 화면인지"를 잃는다.
    검색·알림은 아직 기능이 없어 없어도 잃는 게 없다. */
 @media (max-width: 900px) {
   .hz-page-tools { display: none; }
+  /* 다만 화면 전용 버튼은 살린다 — 이 자리로 올라오기 전에는 카드 안에 있어서 모바일에서도
+     보이던 것이라, 통째로 접으면 폰에서만 CTA 가 사라진다. 대신 같은 묶음의 테마 토글은
+     접는다(모바일 탑바에 토글이 따로 있어 두 개가 뜬다). */
+  .hz-page-tools:has(.hz-head-action) { display: flex; }
+  /* !important 는 인라인 style 을 이기려는 것이다 — ThemeToggle 이 display 를 인라인으로
+     들고 있어서 클래스 규칙으로는 못 끈다(실측: 375px 에서 토글이 그대로 떠 있었다). */
+  .hz-page-tools:has(.hz-head-action) > button { display: none !important; }
 }
 
 /* 모바일 전용 조각들 — 기본은 숨기고 아래 560px 미디어쿼리에서만 켠다.
