@@ -60,8 +60,13 @@ export function SectionHead({
             fontSize: 10,
             fontWeight: 700,
             color: C.sub,
-            background: C.chip,
-            padding: "3px 8px",
+            /* 타이틀 칸(--c-title-band) 위에 얹히는 알약이라 **카드색**이다.
+               회색 칩(--c-chip #f2f6fb)은 띠(#eef3f9)와 네 단위 차이라 배지가 띠에
+               녹아 안 보였다. 카드색이면 라이트에선 더 밝게, 다크에선 더 어둡게 —
+               양쪽에서 저절로 갈린다. 헤어라인은 그 경계를 한 번 더 굳힌다. */
+            background: C.card,
+            border: `1px solid ${C.line}`,
+            padding: "2px 8px",
             borderRadius: R.pill,
             whiteSpace: "nowrap",
           }}
