@@ -147,36 +147,35 @@ function Shell({
   minH?: number;
   children: React.ReactNode;
 }) {
-  // 카드는 [제목 행] [본문] [설명] 세 덩어리다. 격자가 행 높이를 맞추느라 카드가
-  // 늘어나면 남는 높이가 전부 설명 위로 몰려서, 인포그래픽이 위로 쏠려 보였다
-  // (2026-08-03 — 풋/콜 카드가 그랬다).
-  // 가운데 덩어리에 flex:1 + justifyContent:center 를 주면 남는 높이를 위아래로
-  // 나눠 가지므로 본문이 카드 한가운데에 선다. 카드마다 손대지 않고 여기 한 곳에서
-  // 처리하려고 children 을 셋으로 가른다.
+  // 카드는 [제목 행] [본문] [설명] 세 덩어리다. 셀 높이가 274 로 고정돼 있어(시트가
+  // 표로 읽히려면 그래야 한다) 내용이 짧은 카드는 늘 남는 높이가 생긴다.
+  //
+  // 그 남는 높이를 **어디에 줄지가 4슬롯 규칙**이다:
+  //   ① 머리   min-height 61 — 제목이 두 줄이어도 아래 슬롯 시작점이 안 밀린다
+  //   ② 본문   min-height 140, 위에서부터 쌓되(flex-start) 마지막 자식만 margin-block:auto
+  //   ③ 각주   margin-top:auto — 늘 셀 바닥
+  // 예전엔 본문을 justifyContent:center 로 가운데 세웠는데, 그러면 카드마다 그래픽이
+  // 저마다 다른 높이에서 시작해 25칸이 표로 안 읽혔다. 위에서부터 쌓아야 눈이 가로로
+  // 훑을 때 같은 자리에서 같은 종류를 만난다.
   const kids = React.Children.toArray(children);
   const head = kids[0];
   const foot = kids.length > 1 ? kids[kids.length - 1] : null;
   const body = kids.slice(1, kids.length - 1);
   return (
     <div
-      // 2026-08 리디자인: 2칸 카드가 없어졌다(.hz-cards 가 auto-fill).
+      // 2026-08 콘솔 리디자인: 카드가 아니라 **시트 안의 셀**이다. 배경·격자선·최소
+      // 높이는 globals.css 의 .hz-cards > * 가 준다 — 여기서 인라인으로 주면 초고온
+      // 셀의 상단 라인(.hz-cell-hot)을 덮어써 버린다.
+      className={hit ? "hz-cell-hot" : undefined}
       style={{
-        background: C.card,
-        borderRadius: R.card,
-        // 모든 카드의 divider(Foot 등) 가로 위치가 동일하도록 span과 무관하게
-        // 안쪽 여백을 통일한다. 값은 폭에 따라 22 → 18 (globals.css 의 --hz-card-pad).
+        // 모든 카드의 divider(Foot 등) 가로 위치가 동일하도록 안쪽 여백을 통일한다.
+        // 값은 폭에 따라 22 → 18 (globals.css 의 --hz-card-pad).
         padding: "var(--hz-card-pad)",
         display: "flex",
         flexDirection: "column",
         gap: 16,
         position: "relative",
         minHeight: minH,
-        // 흰 셸 안에서 카드끼리 gap 18 로 떨어져 있어 그림자가 겹쳐 바탕을 탁하게 만들던
-        // 예전 문제가 안 난다(그래서 헤어라인만 쓰던 규칙을 되돌렸다).
-        // 초고온 카드만 테두리가 붙는데, 평소에도 같은 굵기의 투명 테두리를 둬야
-        // 배지가 붙고 떨어질 때 카드가 1px 씩 움찔하지 않는다.
-        border: `1px solid ${hit ? "var(--c-mania-border)" : "transparent"}`,
-        boxShadow: SH.card,
         // 카드 머리의 아이콘 타일·초고온 칩이 이 두 값을 읽는다. 여기서 한 번만 정하면
         // TitleRow 에 hit 를 따로 넘기지 않아도 카드 25장이 같이 따라온다.
         ["--card-accent" as string]: hit ? "var(--c-mania)" : "var(--c-blue)",
@@ -185,7 +184,10 @@ function Shell({
     >
       {hit && <HitBadge />}
       {head}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 16, justifyContent: "center", minHeight: 0 }}>
+      {/* ② 그래픽 존. flex:1 로 남는 높이를 받되 내용은 위에서부터 쌓는다.
+          마지막 자식에만 margin-block:auto 를 줘, 그래픽이 하나뿐인 카드는 그 하나가
+          존 한가운데 서고 여럿인 카드는 위에서부터 줄줄이 선다. */}
+      <div className="hz-cell-graphic" style={{ flex: 1, display: "flex", flexDirection: "column", gap: 16, minHeight: 140 }}>
         {body}
       </div>
       {foot}
@@ -266,10 +268,18 @@ function TitleRow({
   right?: React.ReactNode;
 }) {
   return (
-    // 목업의 카드 머리 — 왼쪽에 **아이콘 타일**(40×40 둥근 사각), 오른쪽에 제목/부제.
+    // ① 머리 슬롯 — 왼쪽에 **아이콘 타일**(40×40 둥근 사각), 오른쪽에 제목/부제.
     // 예전엔 아이콘이 제목과 같은 줄에 그냥 얹혀 있었다. 타일이 생기면서 카드마다
     // 시작점이 같아져 25장이 한 격자로 읽힌다.
-    <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+    //
+    // minHeight 61 이 4슬롯 규칙의 첫 칸이다. 제목이 한 줄인 카드와 두 줄인 카드
+    // ("레버리지 ETF·선물 미결제약정 종합 지수")가 섞여 있어서, 이 칸을 안 잡으면
+    // 아래 리드아웃(큰 숫자)이 카드마다 다른 높이에서 시작한다 — 시트로 묶어 놓고
+    // 정작 가로로 훑을 수가 없다.
+    // 우상단 절대배치 배지(HitBadge)와 제목이 겹치지 않게 오른쪽을 62 비우는데, 그건
+    // 초고온 셀에서만 필요하다. TitleRow 는 hit 를 안 받으므로(받게 하면 카드 25장에
+    // 프롭을 하나씩 더 넘겨야 한다) 셀 클래스로 건다 — globals.css 의 .hz-cell-hot .hz-cell-head.
+    <div className="hz-cell-head" style={{ display: "flex", alignItems: "flex-start", gap: 12, minHeight: 61 }}>
       <div
         style={{
           width: 40,
@@ -365,9 +375,10 @@ function Big({
 
 function Foot({ text, color = C.muted }: { text: string; color?: string }) {
   return (
-    // Shell 이 본문 덩어리에 flex:1 을 주므로 여기서 marginTop:auto 로 밀 필요가 없다.
-    // (auto 마진을 남겨 두면 그게 남는 높이를 먼저 먹어서 본문 가운데 정렬이 안 된다.)
-    <div>
+    // ④ 각주 슬롯 — 늘 셀 바닥이다. 위 그래픽 존이 flex:1 이라 대개 여기까지 밀려
+    // 내려오지만, 그래픽이 140 을 넘겨 존이 늘어난 셀에서는 marginTop:auto 가 있어야
+    // 각주가 바닥에 붙는다. 25칸의 각주 밑선이 한 줄로 맞아야 시트가 표로 읽힌다.
+    <div style={{ marginTop: "auto" }}>
       <p
         style={{
           margin: 0,
