@@ -464,12 +464,16 @@ body {
   overflow: hidden;
   min-width: 0;
 }
-/* 시트 머리 — 맨 아이콘(타일 아님) + 제목 + 설명 + 우측 알약. */
+/* 시트 머리(**타이틀 칸**) — 맨 아이콘(타일 아님) + 제목 + 설명 + 우측 알약.
+   바탕은 호버 하이라이트와 같은 --c-blue-tint 다. 화면에 시트가 일곱이라 머리가 흰
+   판이면 어디서 새 구간이 시작하는지 선 하나로만 갈리는데, 옅은 색을 깔면 스크롤하며
+   훑을 때 구간 경계가 먼저 잡힌다. */
 .hz-sheet-head {
   padding: 16px 22px 14px;
   display: flex;
   align-items: flex-start;
   gap: 10px;
+  background: var(--c-blue-tint);
   border-bottom: 1px solid var(--c-sheet-line);
 }
 /* 시트 바닥 각주 띠. 각주는 시트 밖(회색 바탕)이 아니라 안에 둔다 — 밖에 두면
@@ -621,7 +625,11 @@ body {
   padding: 9px 22px;
   border-bottom: 1px solid var(--c-sheet-row);
 }
-.hz-trow:hover { background: var(--c-sheet-head); }
+/* 호버 하이라이트는 화면 전체가 **한 색**이다 — --c-blue-tint. 예전엔 표 행만
+   --c-sheet-head(#fafcfe)라 옆 테마 로테이션 줄(--c-blue-tint)보다 눈에 띄게 옅었고,
+   나란히 놓인 두 시트에서 같은 동작이 다른 색으로 보였다. */
+.hz-trow { transition: background 0.13s ease; }
+.hz-trow:hover { background: var(--c-blue-tint); }
 /* 마지막 행의 밑선은 지운다 — 그 아래가 각주 띠(자기 윗선을 가짐)거나 시트 바닥이라
    그대로 두면 선이 두 겹으로 겹쳐 보인다(뜨는 채널 10위 밑에 줄이 하나 더 있었다).
    :last-child 만으로는 못 잡는다 — 각주 띠가 있으면 마지막 행은 막내가 아니고,
