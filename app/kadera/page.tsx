@@ -61,8 +61,9 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hr / 24)}일 전`;
 }
 
-/** 급부상 종목 타일에서 가격 바로 아랫줄(등락률 또는 시세 기준일)의 공통 치수. */
-const quoteSubLine: React.CSSProperties = { display: "block", marginTop: 2, fontSize: 12 };
+/** 급부상 종목 타일에서 가격 바로 아랫줄(등락률 또는 시세 기준일)의 공통 치수.
+    가격이 카드의 주어에서 밑줄로 내려가면서 13/11 로 한 단계씩 줄었다. */
+const quoteSubLine: React.CSSProperties = { display: "block", marginTop: 2, fontSize: 11 };
 
 /** 그 종목의 MDD 정밀분석 주소. 이름은 MDD 페이지가 code 로 찾으므로 URL 엔 code·market
    만 실어 깔끔하게 둔다(코스닥은 market 으로 .KQ 심볼이 된다). */
@@ -100,16 +101,12 @@ const SUMMARY_LINE_HEIGHT = 1.7;
 /** 한 줄 말줄임 — 채널명·종목명처럼 카드를 밀어낼 수 있는 이름에 붙인다. */
 const clip: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
 
-/* 테마 로테이션 한 줄의 세로 치수. 오른쪽 스파크라인의 밑선을 왼쪽 점유율 막대의
-   밑선에 맞추려면 그 위에 무엇이 얼마나 쌓여 있는지 알아야 해서, 값을 흩어 두지 않고
-   여기 모은다(한 곳만 고치면 정렬이 따라온다). */
-const THEME_NAME_H = 20; // 테마명 줄(lineHeight 로 고정)
-const THEME_BAR_TOP = 7; // 이름 줄 ↔ 막대 사이 여백
-const THEME_BAR_H = 7; // 막대 두께
-const SPARK_H = 26; // Sparkline 기본 높이와 같아야 한다
-/** 스파크라인을 이만큼 내리면 밑선이 막대 밑선과 같아진다. */
-const THEME_SPARK_TOP = THEME_NAME_H + THEME_BAR_TOP + THEME_BAR_H - SPARK_H;
-
+/* 테마 로테이션 줄의 스파크라인 정렬 상수 넷(THEME_NAME_H·THEME_BAR_TOP·THEME_BAR_H·
+   SPARK_H)이 여기 있었다. 그 줄이 두 층(이름 줄 + 막대 줄)이던 시절, 오른쪽 스파크라인의
+   밑선을 왼쪽 막대의 밑선에 맞추려고 쌓인 높이를 손으로 더하던 값들이다.
+   줄이 한 층 다섯 칸(테마·점유율·변화폭·증감·순위)이 되면서 스파크라인 자리가 없어져
+   같이 나갔다. 14일 추이는 카드에서 빠졌다 — 다섯 칸에 여섯째를 끼우면 절반 폭 카드에서
+   막대가 30px 로 눌린다. */
 
 /**
  * 트렌딩 메시지 목록(3열 그리드). 기간 탭이 세 벌을 미리 렌더해 넘기므로
@@ -419,36 +416,6 @@ export default async function KaderaPage() {
             <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 분석된 메시지가 없습니다.</p>
           ) : (
             <>
-              {/* AI 요약 — 아이콘을 글 흐름에 끼우지 않고 제 칸에 세운다. 인라인이면
-                  둘째 줄부터 아이콘 아래로 파고들어 첫 줄만 들여쓴 것처럼 보였다. */}
-              {sentiment.summary && (
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 9,
-                    margin: "0 0 18px",
-                    background: C.bg,
-                    border: `1px solid ${C.line}`,
-                    borderRadius: 12,
-                    padding: "13px 15px",
-                  }}
-                >
-                  <AiMark size={15} style={{ flexShrink: 0, marginTop: 4 }} />
-                  {/* 높이를 안 잡는다 — 글이 3줄이면 3줄, 4줄이면 4줄로 흐른다.
-                      옆 카드와 높이를 맞추는 건 그리드 몫이다(SUMMARY_LINE_HEIGHT 주석 참고). */}
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 13,
-                      lineHeight: SUMMARY_LINE_HEIGHT,
-                      color: "var(--c-ink-soft)",
-                      wordBreak: "keep-all",
-                    }}
-                  >
-                    {sentiment.summary}
-                  </p>
-                </div>
-              )}
               <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "center" }}>
                 {/* 메시지 톤 종합 — 점수와 그 근거 막대를 한 덩어리로 묶는다 */}
                 {/* flex-basis 300 + minWidth 0. basis 로 "300 이 안 되면 아랫줄로" 는 유지하되,
@@ -462,11 +429,14 @@ export default async function KaderaPage() {
                       구성(낙관 32%)이라, 한 카드에서 '낙관'이 두 숫자로 나와 어느 쪽이 진짜인지
                       알 수 없었다. 이제 비관:낙관 한 기준으로만 말하고, 막대는 그 비율을 그림으로
                       반복한다(숫자와 그림이 어긋날 수가 없다). 중립은 얼마나 뺐는지만 각주로. */}
+                  {/* 큰 숫자는 낙관 쪽 한 값이다(예전엔 35:65 두 값이었다). 비관은 바로
+                      아래 막대가 자기 라벨로 말하므로, 여기서 한 번 더 말하면 "어느 쪽이
+                      이 카드의 답인가"가 흐려진다. 100−score 는 지금도 막대와 라벨이 쓴다 —
+                      한 값에서 나오니 둘이 어긋날 수가 없는 건 그대로다. */}
                   <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-                    <span style={{ fontFamily: MONO, fontSize: 44, fontWeight: 700, lineHeight: 1, letterSpacing: "-0.035em" }}>
-                      <span style={{ color: C.cold }}>{100 - sentiment.score}</span>
-                      <span style={{ color: C.faint }}>:</span>
-                      <span style={{ color: C.hot }}>{sentiment.score}</span>
+                    <span style={{ fontFamily: MONO, fontSize: 44, fontWeight: 700, lineHeight: 1, letterSpacing: "-0.035em", color: C.hot }}>
+                      {sentiment.score}
+                      <span style={{ fontSize: 22 }}>%</span>
                     </span>
                     {/* 유저가 실제로 가져가는 답은 이 라벨이다 — 색도 여기가 tone을 쓴다. */}
                     <span
@@ -493,21 +463,46 @@ export default async function KaderaPage() {
                       </span>
                     </span>
                   </div>
-                  {/* 두 라벨을 막대의 양 끝에 붙여 어느 쪽이 어느 색인지 위치로 바로 읽히게 한다. */}
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 600, margin: "10px 0 6px" }}>
-                    <span style={{ color: C.cold }}>비관</span>
-                    <span style={{ color: C.hot }}>낙관</span>
+                  {/* 두 라벨을 막대의 양 끝에 붙여 어느 쪽이 어느 색인지 위치로 바로 읽히게 한다.
+                      숫자도 여기 붙는다 — 큰 숫자가 낙관 한 값만 말하게 되면서 비관 값이
+                      갈 곳이 이 라벨뿐이다.
+                      ⚠️ 목업은 이 숫자를 **막대 안**에 흰 글씨로 넣는다. 그러려면 채움색을
+                      바꿔야 한다 — 목업의 막대는 진한 파랑(#1b6fb8)과 연한 주황(#f5b451)이라
+                      글자가 읽히지만, 우리 강조색 위에 얹으면 명암비가 2.9(흰 글씨/저온)·
+                      2.2(어두운 글씨/고온)로 둘 다 못 읽는다. 채움색을 바꾸면 이 막대만
+                      페이지의 다른 온도 막대와 색이 갈리므로, 숫자를 밖으로 뺐다. */}
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, fontWeight: 700, margin: "12px 0 7px" }}>
+                    <span style={{ color: C.cold }}>
+                      비관 <span style={{ fontFamily: MONO }}>{100 - sentiment.score}</span>
+                    </span>
+                    <span style={{ color: C.hot }}>
+                      낙관 <span style={{ fontFamily: MONO }}>{sentiment.score}</span>
+                    </span>
                   </div>
                   {/* 반반(50%) 자리에 기준선을 세워 봤다가 걷어냈다. 색이 갈리는 자리(35%)와
                       눈금 자리(50%)가 한 막대에 나란히 생기니, 어느 쪽이 데이터의 경계인지
-                      알 수 없는 흰 줄로만 보였다. 기울기는 숫자(35:65)와 색 면적이 이미 말한다. */}
-                  <div style={{ display: "flex", height: 13, borderRadius: 999, overflow: "hidden" }}>
+                      알 수 없는 흰 줄로만 보였다. 기울기는 라벨의 숫자와 색 면적이 이미 말한다. */}
+                  <div style={{ display: "flex", height: 18, borderRadius: 999, overflow: "hidden" }}>
                     <div style={{ width: `${100 - sentiment.score}%`, background: C.cold }} />
                     <div style={{ width: `${sentiment.score}%`, background: C.hot }} />
                   </div>
-                  <div style={{ marginTop: 9, fontSize: 11.5, color: C.muted, lineHeight: 1.5 }}>
-                    총 <span style={{ fontFamily: MONO }}>{sentiment.messageCount.toLocaleString("ko-KR")}</span>건 중{" "}
-                    <span style={{ fontFamily: MONO }}>{sentiment.neutral}</span>%는 중립이라 빼고 계산했습니다
+                  {/* 각주 두 개를 칩으로. 한 문장으로 흘려 두면 "총 9,101건 중 46%는 중립이라
+                      빼고 계산했습니다"가 막대 밑에서 세 번째 문단처럼 읽혀, 정작 위의 숫자보다
+                      길었다. 값 둘을 따로 세워 두면 눈이 필요할 때만 집는다. */}
+                  {/* ⚠️ Pill 안은 **한 덩어리**로 넘긴다. Pill 은 inline-flex + gap:3 이라
+                      "분석 " / 숫자 / "건" 을 따로 넣으면 낱말 사이마다 3px 이 끼어
+                      "분석 9,101 건" 처럼 단위가 떨어져 나온다. */}
+                  <div style={{ marginTop: 11, display: "flex", flexWrap: "wrap", gap: 7 }}>
+                    <Pill>
+                      <span>
+                        분석 <b style={{ fontFamily: MONO, fontWeight: 700 }}>{sentiment.messageCount.toLocaleString("ko-KR")}</b>건
+                      </span>
+                    </Pill>
+                    <Pill>
+                      <span>
+                        중립 <b style={{ fontFamily: MONO, fontWeight: 700 }}>{sentiment.neutral}</b>% 제외
+                      </span>
+                    </Pill>
                   </div>
                 </div>
 
@@ -545,6 +540,41 @@ export default async function KaderaPage() {
                   </div>
                 )}
               </div>
+
+              {/* AI 총평 — 카드 **맨 아래**다. 예전엔 맨 위에 있어서, 이 카드에 들어온
+                  눈이 숫자(65%)보다 네 줄짜리 산문을 먼저 만났다. 지표 카드의 답은 숫자고
+                  총평은 그 뒤에 붙는 해설이라 순서를 뒤집었다.
+                  테두리를 떼고 --c-soft 로 판다 — 위의 막대·칩과 한 카드 안에서 층이
+                  갈려야 "여기부터는 글"이 눈에 잡힌다.
+                  아이콘을 글 흐름에 끼우지 않고 제 칸에 세우는 건 그대로다. 인라인이면
+                  둘째 줄부터 아이콘 아래로 파고들어 첫 줄만 들여쓴 것처럼 보였다. */}
+              {sentiment.summary && (
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 11,
+                    marginTop: 18,
+                    background: C.soft,
+                    borderRadius: "var(--r-tile)",
+                    padding: "14px 16px",
+                  }}
+                >
+                  <AiMark size={15} style={{ flexShrink: 0, marginTop: 4 }} />
+                  {/* 높이를 안 잡는다 — 글이 3줄이면 3줄, 4줄이면 4줄로 흐른다.
+                      옆 카드와 높이를 맞추는 건 그리드 몫이다(SUMMARY_LINE_HEIGHT 주석 참고). */}
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 12.5,
+                      lineHeight: SUMMARY_LINE_HEIGHT,
+                      color: "var(--c-ink-soft)",
+                      wordBreak: "keep-all",
+                    }}
+                  >
+                    {sentiment.summary}
+                  </p>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -568,29 +598,113 @@ export default async function KaderaPage() {
             // 줄이 꽉 찬다(줄마다 타일 폭이 달라지는 건 감수한다).
             // 기준폭 168px 은 "좁은 화면에서도 다섯이 한 줄"에서 거꾸로 나온 값이다.
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-              {surging.map((s) => (
-                <div key={s.code} style={{ ...subCard, flex: "1 1 168px", padding: "14px 15px", display: "flex", flexDirection: "column" }}>
-                  {/* 1) 종목 — 이름 + 코드 */}
+              {surging.map((s, i) => (
+                <div key={s.code} style={{ ...subCard, flex: "1 1 168px", padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                  {/* 1) 순위 + 종목 — 이름 + 코드 */}
                   {/* 급부상 종목에는 로고를 넣지 않는다 — 타일이 다섯 개 나란히 서면
-                      정작 봐야 할 '평소 대비 몇 배'보다 로고가 먼저 눈에 든다. */}
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 5, minWidth: 0 }}>
-                    <span style={{ ...clip, fontWeight: 700, fontSize: 15, color: C.ink }}>{s.name}</span>
+                      정작 봐야 할 '평소 대비 몇 배'보다 로고가 먼저 눈에 든다.
+                      순위 배지를 앞에 세운 건 타일이 줄바꿈으로 흩어지기 때문이다. flex-wrap
+                      이라 폭에 따라 3+2·2+3 으로 접히는데, 배지가 없으면 둘째 줄 첫 타일이
+                      1위처럼 보인다(그리드처럼 자리가 순위를 말해 주지 않는다). */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+                    <span
+                      style={{
+                        flexShrink: 0,
+                        fontFamily: MONO,
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: C.blue,
+                        background: "var(--c-blue-tint)",
+                        borderRadius: 6,
+                        padding: "2px 6px",
+                      }}
+                    >
+                      {i + 1}
+                    </span>
+                    <span style={{ ...clip, flex: 1, fontWeight: 700, fontSize: 13, color: C.ink }}>{s.name}</span>
                     {/* 종목 코드는 눈에서 흘려보내는 장식이 아니라 읽고 확인하는 값이라
                         faint 가 아니라 한 단계 진한 muted 를 쓴다(10px 이라 더 그렇다). */}
-                    <span style={{ fontFamily: MONO, fontSize: 10.5, color: C.muted, flexShrink: 0 }}>{s.code}</span>
+                    <span style={{ fontFamily: MONO, fontSize: 10, color: C.muted, flexShrink: 0 }}>{s.code}</span>
                   </div>
 
-                  {/* 2) 시세 — 가격 + 등락률. 좁은 타일에서 일곱 자리 가격("1,759,000원")이
-                      등락률과 한 줄에 안 들어가 줄이 갈리므로, 등락률은 아예 아랫줄에
-                      고정한다(타일마다 줄 수가 달라지지 않는다).
-                      야후 실시간이 아니면(isLive=false, KRX 저장 종가 폴백) 그 아랫줄을
-                      등락률 대신 기준일로 바꿔 단다 — 치환이라 줄 수는 그대로다. 왜
-                      등락률을 버리는지는 QuoteDate 주석 참고. 두 줄이 같은 style 을 받는
-                      것도 일부러다(폴백 타일과 실시간 타일이 같은 높이로 서야 한다). */}
-                  <div style={{ marginTop: 8 }}>
+                  {/* 2) 이 카드의 주인공 — 배수. 예전엔 가격이 16px 로 맨 위에 서고 배수는
+                      그 아래 작은 알약이었는데, 카드 제목이 "평소보다 언급이 갑자기 뛴 종목"
+                      이라 주어와 화면이 어긋나 있었다. 이제 배수가 히어로다.
+                      색은 고온(hot) 이다 — 목업은 파랑을 쓰지만, 이 페이지의 다른 '증가'
+                      표시(이슈 키워드 ▲, 테마 유입)가 전부 고온색이라 혼자 파랑이면
+                      "늘었다"가 아니라 "다른 종류"로 읽힌다. */}
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 5, minWidth: 0 }}>
+                    {s.isNew ? (
+                      <strong style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.1, color: C.blue }}>
+                        신규 등장
+                      </strong>
+                    ) : (
+                      <>
+                        <strong
+                          style={{
+                            fontFamily: MONO,
+                            fontSize: 30,
+                            fontWeight: 700,
+                            letterSpacing: "-0.04em",
+                            lineHeight: 1,
+                            color: C.hot,
+                          }}
+                        >
+                          ×{s.ratio.toFixed(1)}
+                        </strong>
+                        <span style={{ fontSize: 11, color: C.sub2 }}>평소 대비</span>
+                      </>
+                    )}
+                  </div>
+
+                  {/* 3) 언급 추이 — 목업은 여기에 '평소 9.8회 / 지금 50회' 두 막대를 뒀다.
+                      그 두 값은 우리 데이터로 못 만든다: 위 배수는 언급 **횟수**가 아니라
+                      그날 전체 대비 **몫(share)** 을 평활해 낸 값이다(getSurgingStocks 주석 —
+                      주말엔 전체 언급량이 평일의 1/10 이라 횟수로 재면 모두 '감소'가 된다).
+                      횟수로 두 막대를 그리면 그 비가 위 배수와 안 맞아, 한 타일에서 눈금이
+                      둘로 갈린다. 대신 실제 일별 언급수를 그대로 그린다 — "평소 납작하다가
+                      최근에 솟았다"는 이 카드가 하려던 말을 거짓 없이 한다. */}
+                  <div>
+                    <span
+                      className="hz-tip hz-tip-wide"
+                      data-tip={`최근 ${s.series.length}일 일별 언급수입니다. 위 배수는 횟수가 아니라 그날 전체 대비 몫으로 잰 값이라, 이 막대의 비와는 다릅니다.`}
+                      style={{ display: "block" }}
+                    >
+                      <Sparkline data={s.series} fluid height={22} />
+                    </span>
+                    <div style={{ marginTop: 7, fontSize: 10.5, fontFamily: MONO, color: C.faint }}>
+                      {s.recentMentions}회 언급 · {s.channelCount}개 채널
+                    </div>
+                  </div>
+
+                  {/* 4) 시세 — 카드의 주어가 아니므로 구분선 아래 밑줄로 내린다.
+                      좁은 타일에서 일곱 자리 가격("1,759,000원")이 등락률과 한 줄에 안 들어가
+                      줄이 갈리므로, 등락률은 아예 아랫줄에 고정한다(타일마다 줄 수가 달라지지
+                      않는다). 야후 실시간이 아니면(isLive=false, KRX 저장 종가 폴백) 그 아랫줄을
+                      등락률 대신 기준일로 바꿔 단다 — 치환이라 줄 수는 그대로다. 왜 등락률을
+                      버리는지는 QuoteDate 주석 참고.
+                      MDD 링크는 그 아래 오른쪽 — 가격을 누르러 온 눈이 그대로 이어진다.
+
+                      ⚠️ 가격과 MDD 링크를 **한 줄에 나란히 두지 않는다.** 목업은 그렇게
+                      그렸지만 목업의 링크는 "MDD ↗" 두 글자다. 우리 라벨("MDD 정밀분석 ↗",
+                      ~90px)과 일곱 자리 가격("1,181,000원", ~85px)은 타일 안쪽 폭(좁을 때
+                      136px)에 절대 같이 못 들어간다 — 실제로 "145,600" / "원" 으로 갈라져
+                      수치가 아니라 오류처럼 보였다. 줄바꿈에 맡기면 그 타일만 밑줄이
+                      높아져 다섯 개의 구분선이 어긋난다. 줄 수를 못박아 다섯이 같은 높이로
+                      서게 한다. */}
+                  <div style={{ marginTop: "auto", paddingTop: 11, borderTop: `1px solid var(--c-divider-strong)` }}>
                     {s.closePrice != null ? (
                       <>
-                        <div style={{ fontFamily: MONO, fontSize: 16, fontWeight: 700, color: C.ink, letterSpacing: "-0.02em" }}>
+                        <div
+                          style={{
+                            fontFamily: MONO,
+                            fontSize: 13,
+                            fontWeight: 700,
+                            color: C.label,
+                            letterSpacing: "-0.02em",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
                           {s.closePrice.toLocaleString("ko-KR")}원
                         </div>
                         {s.isLive ? (
@@ -600,23 +714,9 @@ export default async function KaderaPage() {
                         )}
                       </>
                     ) : (
-                      <span style={{ fontSize: 12, color: C.muted }}>가격 정보 준비 중</span>
+                      <span style={{ display: "block", fontSize: 11.5, color: C.muted }}>가격 정보 준비 중</span>
                     )}
-                  </div>
-
-                  {/* 3) 텔레그램 화제도 — 이 카드가 말하려는 건 시세가 아니라 이 배수다.
-                      배지는 마이너스 마진으로 왼쪽에 걸쳐 두던 걸 걷고 제자리에 놓는다.
-                      '신규 등장' 앞에 붙어 있던 🆕 도 뺐다 — 페이지에서 유일한 컬러
-                      이모지라 서체가 갈리고 배지 높이도 저 혼자 달라졌다. */}
-                  <div style={{ marginTop: "auto", paddingTop: 12 }}>
-                    <div style={{ paddingTop: 11, borderTop: `1px solid ${C.line}` }}>
-                      <Pill tone={s.isNew ? "blue" : "hot"}>{s.isNew ? "신규 등장" : `언급 ▲ ${s.ratio.toFixed(1)}배`}</Pill>
-                    </div>
-                    <div style={{ marginTop: 8, fontSize: 11, fontFamily: MONO, color: C.muted }}>
-                      {s.recentMentions}회 언급 · {s.channelCount}개 채널
-                    </div>
-                    {/* MDD 링크는 통계 아래 우측에 은근히 — 타일이 좁아 한 줄에 같이 두면 넘친다. */}
-                    <div style={{ marginTop: 8, textAlign: "right" }}>
+                    <div style={{ marginTop: 7, textAlign: "right" }}>
                       <MddLink code={s.code} market={s.market} />
                     </div>
                   </div>
@@ -652,121 +752,259 @@ export default async function KaderaPage() {
             icon="donut_small"
             title="테마 로테이션"
             note="최근 3일 vs 이전"
-            desc="관심이 어느 테마로 옮겨가는지"
+            desc="관심이 어느 테마로 옮겨가는지 · 점유율 변화 기준"
             noteHelp="최근 3일 평균 점유율을 그 이전과 비교합니다. 하루치끼리 재면 표본 얇은 날에 크게 요동쳐서, 며칠씩 묶어서 봅니다."
           />
           {themes.length === 0 ? (
             <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 집계된 테마가 없습니다.</p>
           ) : (
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 15, justifyContent: "space-between" }}>
-              {/* 막대 길이는 1위 테마를 가득 찬 것으로 두고 그에 견준 비율이다.
-                  점유율을 그대로 폭으로 쓰면(예전 방식) 1위 15%·10위 0.7%라 열 줄 중
-                  아홉 줄이 빈 트랙만 남아 순위가 눈에 안 들어왔다. 2.6배를 곱하던 그
-                  이전 방식은 38.5%만 넘으면 여러 줄이 한꺼번에 100%로 꽉 차 1위가 늘
-                  만땅으로 보였는데, 1위 기준이면 정의상 한 줄만 가득 찬다. 절대값은
-                  아래 "점유율 15.4%" 로 그대로 적는다(이슈 키워드 카드와 같은 문법). */}
-              {themes.map((t, i) => (
-                <div
-                  key={t.theme}
-                  className="hz-theme-row"
-                  /* 마우스가 없어도(키보드·터치) 종목 목록을 열 수 있게 초점을 받는다.
-                     언급된 종목이 없는 테마는 열 것도 없으니 초점도 주지 않는다. */
-                  tabIndex={t.stocks.length ? 0 : undefined}
-                  aria-label={t.stocks.length ? `${t.theme} 테마를 이룬 종목 ${t.stockCount}개 보기` : undefined}
-                  style={{ display: "grid", gridTemplateColumns: "17px minmax(0,1fr) 62px", alignItems: "start", gap: 12 }}
-                >
-                  <span style={{ ...rankNum, paddingTop: 2 }}>{t.rank}</span>
-                  <div style={{ minWidth: 0 }}>
-                    {/* 줄 높이를 못 박는다 — 오른쪽 스파크라인을 막대 밑선에 맞추려면
-                        (THEME_SPARK_TOP) 이 줄이 몇 px 인지 확정돼야 한다. lineHeight 만으론
-                        모자란다: 14·12·10px 글자의 베이스라인을 맞추느라 줄이 1px 더 커진다. */}
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "baseline",
-                        gap: 7,
-                        height: THEME_NAME_H,
-                        lineHeight: `${THEME_NAME_H}px`,
-                      }}
-                    >
-                      <span style={{ ...clip, fontWeight: 700, fontSize: 14, color: C.ink }}>{t.theme}</span>
-                      <RankDelta change={t.rankChange} />
-                      {t.shareDelta !== null && Math.abs(t.shareDelta) >= 0.1 && (
-                        <span
-                          style={{
-                            marginLeft: "auto",
-                            flexShrink: 0,
-                            fontFamily: MONO,
-                            fontSize: 12,
-                            fontWeight: 600,
-                            color: t.shareDelta >= 0 ? C.hot : C.cold,
-                          }}
-                        >
-                          {t.shareDelta >= 0 ? "▲" : "▼"}
-                          {Math.abs(t.shareDelta).toFixed(1)}%p
-                        </span>
-                      )}
-                    </div>
-                    <div
-                      style={{
-                        margin: `${THEME_BAR_TOP}px 0 5px`,
-                        height: THEME_BAR_H,
-                        background: C.track,
-                        borderRadius: 999,
-                        overflow: "hidden",
-                      }}
-                    >
-                      <div
+            (() => {
+              /* 이 카드의 질문은 "어느 테마가 큰가"가 아니라 "관심이 어디로 옮겨갔나"다.
+                 예전엔 점유율 순으로 한 줄씩 열 개를 세워 두고 변화폭은 줄 끝에 작게 적었는데,
+                 그건 앞의 질문에 답하는 배치였다. 이제 **변화폭으로 갈라 두 묶음**으로 세운다.
+
+                 문턱 0.1%p 아래는 방향을 짓지 않는다. 소수 첫째 자리까지만 보여 주므로
+                 그보다 작은 움직임은 화면에서 "0.0%p" 로 보이는데, 그걸 유입/이탈로 갈라
+                 놓으면 같은 0.0 이 양쪽에 나뉘어 앉는다. 비교할 과거가 없는 것(null)도 같다.
+                 ⚠️ 이 문턱은 예전 줄 끝 표시가 쓰던 값과 같아야 한다 — 한쪽만 고치면
+                 "▲가 안 붙었는데 유입 묶음에 있는 줄"이 생긴다. */
+              const DEAD_ZONE = 0.1;
+              const dirOf = (t: (typeof themes)[number]) =>
+                t.shareDelta === null || Math.abs(t.shareDelta) < DEAD_ZONE ? 0 : t.shareDelta > 0 ? 1 : -1;
+
+              const inflow = themes.filter((t) => dirOf(t) > 0).sort((a, b) => (b.shareDelta ?? 0) - (a.shareDelta ?? 0));
+              const outflow = themes.filter((t) => dirOf(t) < 0).sort((a, b) => (a.shareDelta ?? 0) - (b.shareDelta ?? 0));
+              /* 목업엔 없는 셋째 묶음이다. 없으면 문턱에 걸린 테마가 카드에서 통째로
+                 사라진다 — 열 개를 세어 보여 주겠다고 해 놓고 여덟 개만 보여주는 꼴이다. */
+              const flat = themes.filter((t) => dirOf(t) === 0);
+
+              /* 막대 길이는 **변화폭**이다(예전엔 점유율이었다). 가장 크게 움직인 테마를
+                 가득 찬 것으로 두고 그에 견준다 — 유입·이탈 양쪽을 한 자에 재야 "반도체가
+                 들어온 만큼 자동차가 빠졌나"를 길이로 견줄 수 있다. 점유율 절대값은
+                 옆 칸에 숫자로 그대로 적는다. */
+              const maxAbs = Math.max(DEAD_ZONE, ...themes.map((t) => Math.abs(t.shareDelta ?? 0)));
+
+              /* 펼침 목록의 방향은 **카드 안에서 몇 번째 줄인지**로 정한다. 묶음마다 새로
+                 세면 이탈 묶음 첫 줄이 "위쪽 줄"로 잡혀 아래로 열리고, 그게 카드 밖으로
+                 나가 다음 카드를 덮는다. 그래서 화면에 그려지는 순서로 번호를 매겨 둔다. */
+              const drawOrder = [...inflow, ...outflow, ...flat];
+              const rowIndexOf = (t: (typeof themes)[number]) => drawOrder.indexOf(t);
+
+              /* 다섯 칸을 머리줄과 각 줄이 똑같이 나눠 써야 세로로 훑힌다. 값이 아니라
+                 이름으로 한 번만 정해 둔다 — 두 곳에 따로 적으면 반드시 어긋난다.
+
+                 이름과 막대를 **둘 다 fr** 로 두고 비율(1 : 1.3)로 나눈다. 처음엔 이름을
+                 minmax(0,104px) 로 못박고 막대에 1fr 을 줬는데, 그러면 남는 폭을 이름이
+                 먼저 다 가져가서 폰(375px)에서 막대가 하한 30px 까지 눌렸다 — 길이를
+                 견주라고 그린 막대가 점이 됐다. 비율로 나누면 좁아질 때 둘이 같이 줄어든다.
+                 숫자 칸 셋은 고정이다(자릿수가 정해져 있어 줄일 여지가 없다). */
+              const GRID = "minmax(0,1fr) 42px minmax(0,1.3fr) 46px 38px";
+
+              const Row = ({ t }: { t: (typeof themes)[number] }) => {
+                const dir = dirOf(t);
+                const delta = t.shareDelta ?? 0;
+                // 흰 바탕 위 글자·면이라 강조색을 그대로 쓴다(tint 위가 아니다 —
+                // --c-hot-ink 계열은 tint 배경 전용이다. globals.css 의 그 주석 참고).
+                const fill = dir > 0 ? C.hot : dir < 0 ? "var(--c-blue-3)" : C.bar;
+                const tone = dir > 0 ? C.hot : dir < 0 ? C.cold : C.muted;
+                const i = rowIndexOf(t);
+                return (
+                  <div
+                    className="hz-theme-row"
+                    /* 마우스가 없어도(키보드·터치) 종목 목록을 열 수 있게 초점을 받는다.
+                       언급된 종목이 없는 테마는 열 것도 없으니 초점도 주지 않는다. */
+                    tabIndex={t.stocks.length ? 0 : undefined}
+                    aria-label={t.stocks.length ? `${t.theme} 테마를 이룬 종목 ${t.stockCount}개 보기` : undefined}
+                    style={{ display: "grid", gridTemplateColumns: GRID, alignItems: "center", gap: 10 }}
+                  >
+                    {/* 좁은 화면에선 이 칸이 60px 까지 줄어 이름이 잘린다. title 을 달아
+                        마우스로는 전체가 보이게 한다(펼침 목록은 테마명을 안 적는다). */}
+                    <span style={{ ...clip, fontSize: 12.5, fontWeight: 700, color: C.ink }} title={t.theme}>
+                      {t.theme}
+                    </span>
+                    <span style={{ fontFamily: MONO, fontSize: 10.5, color: C.faint, textAlign: "right" }}>
+                      {t.sharePct.toFixed(1)}%
+                    </span>
+                    <span style={{ height: 9, background: C.track, borderRadius: 999, overflow: "hidden", display: "block" }}>
+                      {/* 최소 2% — 문턱에 걸린 줄도 트랙만 남지 않게 흔적은 남긴다. */}
+                      <span
                         style={{
-                          width: `${Math.max(2, Math.min(100, (t.sharePct / Math.max(0.1, themes[0].sharePct)) * 100))}%`,
+                          display: "block",
+                          width: `${Math.max(2, Math.min(100, (Math.abs(delta) / maxAbs) * 100))}%`,
                           height: "100%",
-                          background: C.blue,
-                          opacity: 0.85,
+                          background: fill,
                           borderRadius: 999,
                         }}
                       />
-                    </div>
-                    <div style={{ ...clip, fontSize: 11, color: C.muted }}>
-                      점유율 <b style={{ color: C.sub, fontFamily: MONO }}>{t.sharePct.toFixed(1)}%</b> · 종목 {t.stockCount}개 ·{" "}
-                      <span style={{ fontFamily: MONO }}>{t.mentions}회</span>
-                    </div>
-                  </div>
-                  {/* 스파크라인은 위에서부터 그려지므로, 밑선을 왼쪽 막대의 밑선에 맞추려면
-                      그만큼 내려 앉혀야 한다. 예전엔 이름 줄 높이에 맞춰 떠 있어서 두 그래프가
-                      서로 다른 선 위에 놓인 것처럼 보였다.
-                      기간은 툴팁으로만 밝힌다 — 카드의 다른 숫자(점유율·종목·회)는 최근 3일
-                      평균인데 이 그래프만 14일이라, 적어 두지 않으면 알 길이 없다. */}
-                  <span
-                    className="hz-tip hz-tip-wide hz-tip-end"
-                    data-tip={`최근 ${t.series.length}일 일별 점유율입니다.`}
-                    style={{ display: "block", marginTop: THEME_SPARK_TOP }}
-                  >
-                    <Sparkline data={t.series} />
-                  </span>
+                    </span>
+                    <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: tone, textAlign: "right", whiteSpace: "nowrap" }}>
+                      {dir === 0 ? "—" : `${dir > 0 ? "+" : "−"}${Math.abs(delta).toFixed(1)}%p`}
+                    </span>
+                    {/* 순위 변동은 있을 때만. RankDelta 가 0·null 이면 아무것도 안 그리므로
+                        칸이 비는데, 그 자리에 —를 놓아 다섯 칸의 오른쪽 끝을 고정한다. */}
+                    <span style={{ textAlign: "right", fontSize: 9.5 }}>
+                      {t.rankChange ? <RankDelta change={t.rankChange} /> : <span style={{ color: C.hint }}>—</span>}
+                    </span>
 
-                  {/* 이 테마의 점유율을 만든 종목 목록. 줄에 마우스를 올리거나 초점이
-                      가면 열린다(CSS 만, globals.css 의 .hz-theme-pop).
-                      아래쪽 줄은 위로 펼친다 — 아래로 열면 카드를 벗어나 다음 카드를 덮는다. */}
-                  {t.stocks.length > 0 && (
-                    <div className={`hz-theme-pop${i >= themes.length - 4 ? " hz-theme-pop-up" : ""}`}>
-                      <div className="hz-theme-pop-head">최근 3일 언급 {t.stockCount}종목 · 주목도순</div>
-                      {t.stocks.map((s) => (
-                        <Link key={s.code} href={mddHref(s.code, s.market)} className="hz-theme-pop-item">
-                          <span className="hz-theme-pop-name">{s.name}</span>
-                          <span className="hz-theme-pop-cnt">{s.mentions}회</span>
-                          {/* Icon 은 클래스를 받지 않으니 한 겹 싼다 — 화살표는 그 줄에
-                              마우스를 올렸을 때만 드러난다(칸은 늘 잡혀 있다). */}
-                          <span className="hz-theme-pop-go">
-                            <Icon name="arrow_outward" style={{ fontSize: 13 }} />
+                    {/* 이 테마의 점유율을 만든 종목 목록. 줄에 마우스를 올리거나 초점이
+                        가면 열린다(CSS 만, globals.css 의 .hz-theme-pop).
+                        아래쪽 줄은 위로 펼친다 — 아래로 열면 카드를 벗어나 다음 카드를 덮는다.
+                        언급 횟수는 이 머리줄로 옮겨 왔다 — 줄이 다섯 칸이 되면서 본문에
+                        "종목 6개 · 134회"를 놓을 자리가 없어졌는데, 버리지는 않는다. */}
+                    {t.stocks.length > 0 && (
+                      <div className={`hz-theme-pop${i >= drawOrder.length - 4 ? " hz-theme-pop-up" : ""}`}>
+                        <div className="hz-theme-pop-head">
+                          최근 3일 {t.mentions}회 · {t.stockCount}종목 · 주목도순
+                        </div>
+                        {t.stocks.map((s) => (
+                          <Link key={s.code} href={mddHref(s.code, s.market)} className="hz-theme-pop-item">
+                            <span className="hz-theme-pop-name">{s.name}</span>
+                            <span className="hz-theme-pop-cnt">{s.mentions}회</span>
+                            {/* Icon 은 클래스를 받지 않으니 한 겹 싼다 — 화살표는 그 줄에
+                                마우스를 올렸을 때만 드러난다(칸은 늘 잡혀 있다). */}
+                            <span className="hz-theme-pop-go">
+                              <Icon name="arrow_outward" style={{ fontSize: 13 }} />
+                            </span>
+                          </Link>
+                        ))}
+                        <div className="hz-theme-pop-foot">종목을 누르면 MDD 정밀분석이 열립니다.</div>
+                      </div>
+                    )}
+                  </div>
+                );
+              };
+
+              const Group = ({
+                rows,
+                label,
+                hint,
+                tint,
+                ink,
+              }: {
+                rows: typeof themes;
+                label: string;
+                hint: string;
+                tint: string;
+                ink: string;
+              }) =>
+                rows.length === 0 ? null : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: ink,
+                          background: tint,
+                          borderRadius: "var(--r-pill)",
+                          padding: "4px 10px",
+                        }}
+                      >
+                        {label}
+                      </span>
+                      <span style={{ fontSize: 10.5, color: C.faint }}>{hint}</span>
+                    </div>
+                    {rows.map((t) => (
+                      <Row key={t.theme} t={t} />
+                    ))}
+                  </div>
+                );
+
+              /* 요약 한 쌍 — 카드를 다 읽지 않아도 답이 나오게. 한쪽이 비면(그날 전부
+                 유입이거나 전부 이탈이면) 그 자리는 그리지 않는다. */
+              const lead = inflow[0];
+              const lag = outflow[0];
+
+              return (
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 18 }}>
+                  {(lead || lag) && (
+                    <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                      {lead && (
+                        <div
+                          style={{
+                            flex: "1 1 150px",
+                            minWidth: 140,
+                            background: "var(--c-hot-tint)",
+                            borderRadius: "var(--r-tile)",
+                            padding: "14px 16px",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 4,
+                          }}
+                        >
+                          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--c-hot-ink)" }}>가장 많이 유입</span>
+                          <div style={{ display: "flex", alignItems: "baseline", gap: 7, minWidth: 0 }}>
+                            <strong style={{ ...clip, fontSize: 16, fontWeight: 800, color: C.ink }}>{lead.theme}</strong>
+                            <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: "var(--c-hot-ink)", whiteSpace: "nowrap" }}>
+                              ▲{(lead.shareDelta ?? 0).toFixed(1)}%p
+                            </span>
+                          </div>
+                          <span style={{ fontSize: 10.5, color: "var(--c-hot-ink)" }}>
+                            점유율 {lead.sharePct.toFixed(1)}% · 전체 {lead.rank}위
                           </span>
-                        </Link>
-                      ))}
-                      <div className="hz-theme-pop-foot">종목을 누르면 MDD 정밀분석이 열립니다.</div>
+                        </div>
+                      )}
+                      {lag && (
+                        <div
+                          style={{
+                            flex: "1 1 150px",
+                            minWidth: 140,
+                            background: "var(--c-cold-tint)",
+                            borderRadius: "var(--r-tile)",
+                            padding: "14px 16px",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 4,
+                          }}
+                        >
+                          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--c-cold-ink)" }}>가장 많이 이탈</span>
+                          <div style={{ display: "flex", alignItems: "baseline", gap: 7, minWidth: 0 }}>
+                            <strong style={{ ...clip, fontSize: 16, fontWeight: 800, color: C.ink }}>{lag.theme}</strong>
+                            <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: "var(--c-cold-ink)", whiteSpace: "nowrap" }}>
+                              ▼{Math.abs(lag.shareDelta ?? 0).toFixed(1)}%p
+                            </span>
+                          </div>
+                          {/* 순위까지 밀렸으면 그게 더 센 사실이라 먼저 말한다. 안 밀렸으면
+                              점유율로 갈음한다 — 없는 변동을 지어내지 않는다. */}
+                          <span style={{ fontSize: 10.5, color: "var(--c-cold-ink)" }}>
+                            {lag.rankChange && lag.rankChange < 0
+                              ? `순위도 ${Math.abs(lag.rankChange)}계단 하락`
+                              : `점유율 ${lag.sharePct.toFixed(1)}% · 전체 ${lag.rank}위`}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
+
+                  {/* 머리줄. 다섯 칸이 무슨 값인지 한 번만 적어 두면 아래 열 줄에서
+                      숫자마다 단위를 반복하지 않아도 된다. */}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: GRID,
+                      gap: 10,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: C.hint,
+                    }}
+                  >
+                    <span>테마</span>
+                    <span style={{ textAlign: "right" }}>점유율</span>
+                    <span>변화폭</span>
+                    <span style={{ textAlign: "right" }}>증감</span>
+                    <span style={{ textAlign: "right" }}>순위</span>
+                  </div>
+
+                  {/* 남는 자리는 묶음 사이에 나눠 준다 — 옆 카드(주요 종목 리포트)가 요약문
+                      길이에 따라 키를 정해서, 이 카드는 바닥이 남는 날이 생긴다. */}
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 18, justifyContent: "space-between" }}>
+                    <Group rows={inflow} label="유입" hint="관심이 들어온 테마" tint="var(--c-hot-tint)" ink="var(--c-hot-ink)" />
+                    <Group rows={outflow} label="이탈" hint="관심이 빠져나간 테마" tint="var(--c-cold-tint)" ink="var(--c-cold-ink)" />
+                    <Group rows={flat} label="그대로" hint="0.1%p 미만이라 방향을 안 지음" tint="var(--c-chip)" ink="var(--c-sub)" />
+                  </div>
                 </div>
-              ))}
-            </div>
+              );
+            })()
           )}
         </div>
 
@@ -958,47 +1196,131 @@ export default async function KaderaPage() {
         {/* 이슈 키워드 (¼) — 종목이 아닌 화제어. analyze_telegram_messages.py 가 메시지별로
             뽑고 calculate_telegram_sentiment.py 가 telegram_keyword_daily 로 집계한 실데이터. */}
         <div style={{ ...cardStyle, display: "flex", flexDirection: "column" }}>
-          <SectionHead icon="tag" title="이슈 키워드" note="최근 7일" desc="종목명이 아닌 화제어" />
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 19, justifyContent: "space-between" }}>
-            {keywords.length === 0 ? (
-              <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 뽑을 화제어가 없습니다.</p>
-            ) : (
-              keywords.map((k, i) => {
-                const max = keywords[0].count;
+          <SectionHead icon="tag" title="이슈 키워드" note="최근 7일" desc="종목명이 아닌 화제어 · 언급 횟수 기준" />
+          {keywords.length === 0 ? (
+            <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 뽑을 화제어가 없습니다.</p>
+          ) : (
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* 1위는 목록에서 빼내 제 상자를 준다. 열 줄이 같은 굵기로 서 있으면 "이번 주에
+                  뭐가 제일 회자됐나"라는 첫 질문에 눈이 한 번 더 훑어야 답한다.
+                  상자 색은 고온 tint — 화제어 1위는 정의상 '가장 뜨거운 말'이다. 글자는
+                  --c-hot-ink 로 눌러 얹는다(강조색 그대로면 자기 tint 위에서 안 읽힌다). */}
+              {(() => {
+                const top = keywords[0];
+                const total = keywords.reduce((sum, k) => sum + k.count, 0);
+                // "상위 N개 중 비중" — 화제어 전체가 아니라 이 카드에 실린 것들 안에서의
+                // 몫이다. 라벨에 개수를 박아 둬야 분모를 오해하지 않는다.
+                const sharePct = total > 0 ? Math.round((top.count / total) * 100) : 0;
                 return (
-                  <div key={k.word} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                    <span style={{ ...rankNum, width: 14, fontSize: 11, paddingTop: 1 }}>{i + 1}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6 }}>
-                        <span style={{ ...clip, fontWeight: 600, fontSize: 13, color: C.ink }}>{k.word}</span>
-                        {/* 비교할 과거가 아직 없으면 화살표를 숨긴다 — ▲▼ 아무거나 붙이면 거짓말이 된다 */}
-                        {/* 화살표는 '관심 점유율이 움직였을 때'만 — 변화 없음(flat)과
-                            비교할 과거가 없을 때(null)는 숫자만 둔다. 예전엔 boolean 이라
-                            동률과 '최근 창에 안 나온 말'까지 ▲가 붙었다. */}
-                        <span
-                          style={{
-                            fontFamily: MONO,
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: k.trend === "up" ? C.hot : k.trend === "down" ? C.cold : C.muted,
-                            flexShrink: 0,
-                          }}
-                        >
-                          {k.trend === "up" ? "▲ " : k.trend === "down" ? "▼ " : ""}
-                          {k.count}회
-                        </span>
-                      </div>
-                      {/* 막대는 1위 대비. 화제어는 순위를 훑는 목록이라 굵기를 4px 로 줄이고
-                          투명도를 낮춰, 눈이 막대가 아니라 단어를 먼저 잡게 한다. */}
-                      <div style={{ marginTop: 6, height: 4, background: C.track, borderRadius: 999, overflow: "hidden" }}>
-                        <div style={{ width: `${(k.count / max) * 100}%`, height: "100%", background: C.blue, borderRadius: 999, opacity: 0.7 }} />
-                      </div>
+                  <div
+                    style={{
+                      background: "var(--c-hot-tint)",
+                      borderRadius: "var(--r-tile)",
+                      padding: "14px 16px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 4,
+                    }}
+                  >
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "var(--c-hot-ink)" }}>이번 주 화제어 1위</span>
+                    {/* 세로로 쌓는다 — 목업은 낱말과 비중을 좌우로 놨지만 그건 이 카드가
+                        절반 폭일 때 이야기다. 우리 격자에서 이 카드는 ¼ 칸이라 큰 숫자
+                        둘이 한 줄에 못 선다. */}
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+                      <strong style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.03em", color: C.ink, wordBreak: "keep-all" }}>
+                        {top.word}
+                      </strong>
+                      <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: "var(--c-hot-ink)", whiteSpace: "nowrap" }}>
+                        {top.trend === "up" ? "▲" : top.trend === "down" ? "▼" : ""}
+                        {top.count.toLocaleString("ko-KR")}회
+                      </span>
                     </div>
+                    <span style={{ fontSize: 10.5, color: "var(--c-hot-ink)" }}>
+                      상위 {keywords.length}개 중 비중 <b style={{ fontFamily: MONO, fontWeight: 700 }}>{sharePct}%</b>
+                    </span>
                   </div>
                 );
-              })
-            )}
-          </div>
+              })()}
+
+              {/* 2위부터. 줄은 두 층이다 — 낱말·횟수가 윗줄, 막대가 아랫줄.
+                  목업은 [순위 낱말 막대 횟수]를 한 줄에 뒀는데, 그건 절반 폭 카드라 가능한
+                  것이다. ¼ 칸(안쪽 ~230px)에서 그렇게 하면 막대 몫이 35px 밖에 안 남아
+                  길이 차이가 안 보인다. 폭을 다 쓰는 아랫줄이 순위를 훨씬 잘 그린다. */}
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 15, justifyContent: "space-between" }}>
+                {keywords.slice(1).map((k, i) => {
+                  const max = keywords[0].count;
+                  // 막대 색이 방향을 진다(아래 범례가 이 색을 설명한다). 비교할 과거가
+                  // 없거나(null) 변화가 없으면(flat) 중립색 — 방향을 지어내지 않는다.
+                  const barColor = k.trend === "up" ? C.hot : k.trend === "down" ? "var(--c-blue-3)" : C.bar;
+                  return (
+                    <div key={k.word} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                      <span style={{ ...rankNum, width: 14, fontSize: 11, paddingTop: 1 }}>{i + 2}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6 }}>
+                          <span style={{ ...clip, fontWeight: 600, fontSize: 13, color: C.ink }}>{k.word}</span>
+                          {/* 비교할 과거가 아직 없으면 화살표를 숨긴다 — ▲▼ 아무거나 붙이면 거짓말이 된다 */}
+                          {/* 화살표는 '관심 점유율이 움직였을 때'만 — 변화 없음(flat)과
+                              비교할 과거가 없을 때(null)는 숫자만 둔다. 예전엔 boolean 이라
+                              동률과 '최근 창에 안 나온 말'까지 ▲가 붙었다. */}
+                          <span
+                            style={{
+                              fontFamily: MONO,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: k.trend === "up" ? C.hot : k.trend === "down" ? C.cold : C.muted,
+                              flexShrink: 0,
+                            }}
+                          >
+                            {k.trend === "up" ? "▲ " : k.trend === "down" ? "▼ " : ""}
+                            {k.count}회
+                          </span>
+                        </div>
+                        {/* 막대는 1위 대비. 화제어는 순위를 훑는 목록이라 굵기를 4px 로 줄이고
+                            투명도를 낮춰, 눈이 막대가 아니라 단어를 먼저 잡게 한다. */}
+                        <div style={{ marginTop: 6, height: 4, background: C.track, borderRadius: 999, overflow: "hidden" }}>
+                          <div style={{ width: `${(k.count / max) * 100}%`, height: "100%", background: barColor, borderRadius: 999, opacity: 0.8 }} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* 막대에 색을 입혔으면 그 색이 무슨 뜻인지 적어야 한다. 예전엔 전부 파랑
+                  한 색이라 설명할 것이 없었다.
+
+                  ⚠️ 이 줄의 문구는 목업("지난주보다 증가")을 그대로 못 쓴다. 우리 trend 는
+                  **지난주 대비가 아니고, 횟수 대비도 아니다** — 최근 3일 평균 *점유율* 을 그
+                  이전과 견준 값이다(getIssueKeywords 주석: 주말엔 전체 메시지가 1/10 이라
+                  횟수로 재면 모든 말이 일제히 ▼가 된다).
+                  그래서 한 줄에 눈금이 둘이다 — **길이는 7일 언급 수, 색은 최근 3일 관심의
+                  방향**. 둘을 다 적어 두지 않으면 긴 주황 막대가 "많이 언급됐고 그만큼
+                  늘었다"로 읽힌다. */}
+              <div
+                style={{
+                  paddingTop: 12,
+                  borderTop: `1px solid var(--c-divider)`,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
+                  fontSize: 10.5,
+                  color: C.muted,
+                }}
+              >
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: 3, background: C.hot }} />
+                    최근 관심 늘어남
+                  </span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: 3, background: "var(--c-blue-3)" }} />
+                    줄어듦
+                  </span>
+                </div>
+                <span style={{ color: C.faint }}>막대 길이는 7일 언급 수입니다</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
