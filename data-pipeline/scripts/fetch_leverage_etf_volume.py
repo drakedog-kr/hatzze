@@ -105,7 +105,7 @@ OI_RAW_META = {
 COMPOSITE_SLUG = "leverage_etf_volume"
 COMPOSITE_META = {
     "slug": COMPOSITE_SLUG,
-    "name": "레버리지 ETF·선물 미결제약정 종합 지수",
+    "name": "레버리지·선물 약정 종합 지수",
     "headline": "레버리지 ETF와 선물 미결제약정",
     "category": "시장",
     "description_beginner": "빚내서 두 배로 거는 돈이 얼마나 되는지 봅니다",

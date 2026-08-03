@@ -86,7 +86,7 @@ INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "고점권 외국인 매도",
     "category": "시장",
-    "headline": "지수가 고점 부근일 때 외국인이 파는 정도",
+    "headline": "고점 부근일 때 외국인이 파는 정도",
     "description_beginner": (
         "고점권에서 외국인이 팔면 개인이 받는다는 뜻입니다"
     ),

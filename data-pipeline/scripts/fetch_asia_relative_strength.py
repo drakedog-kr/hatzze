@@ -43,7 +43,11 @@ KOSPI_RAW_SLUG = "kospi_close_raw"
 INDICATOR_SLUG = "kospi_asia_relative_strength"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
-    "name": "아시아 3국 대비 코스피 상대강도",
+    # "…상대강도" 를 뗐다. 카드 부제("일본·홍콩·대만 증시와 견준 코스피")가 이미 무엇과
+    # 견주는지 말하고, 카드 안의 큰 수치도 "코스피 초과수익률"이라 적혀 있어서 제목의
+    # '상대강도'는 같은 말을 세 번째로 하는 자리였다. 시트에서 제목이 두 줄로 접히던 것도
+    # 이 카드뿐이었다.
+    "name": "아시아 3국 대비 코스피",
     "headline": "일본·홍콩·대만 증시와 견준 코스피",
     "category": "시장",
     "description_beginner": "한국만 유독 앞서가면 쏠림이 심하다는 뜻입니다",
