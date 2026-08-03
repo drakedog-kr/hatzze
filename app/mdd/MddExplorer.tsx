@@ -119,9 +119,18 @@ export function MddExplorer({
     };
   }, [selected, years]);
 
-  // 폭·헤더 모양을 시장 브리핑·카더라와 맞춘다(둘 다 maxWidth 1180 + 제목 옆 가로줄).
+  /* 폭 상한을 여기서 걸지 않는다 — **셸(AppShell)이 이미 1340 으로 잡는다.**
+     세 페이지가 같은 상자를 쓰므로 여기에 또 두면 MDD 만 좁아진다.
+
+     ⚠️ 예전의 `maxWidth:1180, margin:"0 auto"` 는 두 가지로 틀렸다.
+       ① 1180 은 낡은 값이다. 셸이 1340 으로 넓어질 때(본문 폭을 목업 값으로 되돌린
+          커밋) 이 사본이 안 따라와서 `/mdd` 만 160px 좁았다.
+       ② 그보다 나쁜 건 `margin:0 auto` 다. 셸의 본문 상자가 **세로 flex** 라
+          가로 margin:auto 가 `align-items:stretch` 를 꺼 버린다 — 상자가 늘어나지
+          않고 **fit-content** 로 줄어든다(1920 실측 600px). 1440 에서는 남는 폭이
+          없어 티가 안 나고 넓은 화면에서만 드러난다. */
   return (
-    <div style={{ maxWidth: 1180, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       {/* 제목은 여기서 안 그린다 — 셸의 본문 헤더(AppShell 의 PageHeader)가 그리는 h1
           하나뿐이다. 예전엔 여기에 h1 을 또 둬서 "MDD 정밀분석"이 화면에 두 번 떴다.
           설명 문단은 남긴다(헤더의 한 줄 부제보다 훨씬 구체적이라 대신 못 한다). */}
