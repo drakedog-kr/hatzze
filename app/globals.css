@@ -638,10 +638,15 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
    (표 행의 호버와 같은 배경이라 목록의 연장으로 읽힌다). */
 .hz-more-btn {
   font-family: inherit;
+  /* 바탕·글자색이 **여기** 있어야 한다. 인라인 style 로 두면 아래 :hover 를 이겨서
+     호버가 아예 안 먹는다(버튼이 :hover 인데 배경이 transparent 로 남았다). */
+  background: transparent;
+  color: var(--c-sub);
   transition: background 0.13s ease, color 0.13s ease;
 }
 .hz-more-btn:hover {
-  background: var(--c-sheet-head);
+  /* 레포가 쓰는 호버 하늘색 그대로 — 표 행·테마 줄·목록 링크가 다 이 색이다. */
+  background: var(--c-blue-tint);
   color: var(--c-cold-ink);
 }
 
@@ -1262,6 +1267,13 @@ main.hz-scroll { overflow-x: clip; }
    호버 배경도 .hz-trow 가 이미 준다 — 여기서는 팝오버가 기댈 기준점만 세운다. */
 .hz-theme-row-sheet {
   position: relative;
+  transition: background 0.13s ease;
+}
+/* 줄 전체가 눌리는 자리(종목 목록이 열린다)라 호버·초점에 하늘색을 깐다. 표가 아니라
+   쌓인 줄이라 .hz-trow 의 호버가 안 걸려서 여기서 따로 준다. */
+.hz-theme-row-sheet:hover,
+.hz-theme-row-sheet:focus-within {
+  background: var(--c-blue-tint);
 }
 .hz-theme-row-sheet:focus-visible {
   outline: 2px solid var(--c-blue);

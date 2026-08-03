@@ -54,11 +54,12 @@ export function ExpandableList({
     minHeight: 32,
     borderRadius: 0,
     border: 0,
-    background: "transparent",
-    color: C.sub,
     fontSize: 11.5,
     fontWeight: 700,
     cursor: "pointer",
+    // ⚠️ background·color 는 여기 두지 않는다 — 인라인은 :hover 규칙을 이겨서
+    // 호버 색이 통째로 죽는다(실측: 버튼이 :hover 인데 배경이 transparent 그대로).
+    // 둘 다 globals.css 의 .hz-more-btn 이 갖고 있다.
   };
 
   return (

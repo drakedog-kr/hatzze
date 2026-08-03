@@ -136,7 +136,10 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
   const nodes = items.map((m, i) => {
     const tags = [...m.stocks, ...m.topics.map((t) => `#${t}`)];
     return (
-      <li key={`${m.channelHandle}-${m.messageId}`} style={{ display: "flex", padding: "16px 18px", gap: 12, minWidth: 0 }}>
+      // hz-lift — 호버에 살짝 떠오르고(translateY −2) 테두리가 파랗게 든다. 패널이라
+      // 이미 테두리가 있어 색만 바뀌면 되고, 트레이 여백 14 안에서 움직여 시트를 안 넘는다.
+      // 레포가 이미 쓰던 클래스라 다른 카드와 감이 같다.
+      <li key={`${m.channelHandle}-${m.messageId}`} className="hz-lift" style={{ display: "flex", padding: "16px 18px", gap: 12, minWidth: 0 }}>
         {/* 원문 메시지로 이동 — 텔레그램 공개 채널은 t.me/핸들/메시지ID 로 열린다 */}
         <a
           href={`https://t.me/${m.channelHandle}/${m.messageId}`}
