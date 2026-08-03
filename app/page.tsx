@@ -39,6 +39,8 @@ type Pick = {
   capped: number | null;
   threshold: number | null;
   isHit: boolean;
+  /** 고온 이상(진행률 ≥ 50). 카드 보조 배지의 색을 가른다. */
+  warm: boolean;
   color: string;
   disp: string;
   unit: string;
@@ -101,6 +103,11 @@ function pick(ind: Ind | undefined): Pick {
     // (youtube는 surge_map으로 평균 대비 급증을 매핑) 예외 없이 동일 기준이고,
     // 이 지점이 곧 카드에 적히는 기준선(hotDisp)이다.
     isHit: (capped ?? 0) >= 75,
+    // 고온 이상(진행률 ≥ 50). 카드에 붙는 보조 배지의 색을 가르는 값이다 — 배지가 늘
+    // 파랑이면 "콜 우세"(= 지금 뜨겁다)가 차분한 색으로 떠서 큰 수치와 반대말을 한다.
+    // isHit(≥75)과 따로 두는 이유: 초고온 배지와 셀 상단 라인은 75 가 맞고 색만 50 에서
+    // 갈려야 한다. 하나로 묶으면 고온 카드가 파란 배지를 달거나 초고온 표시가 헐거워진다.
+    warm: (capped ?? 0) >= 50,
     // 캡핑 전 원본이 아니라 capped(0~100)를 쓴다 — 색 경계가 0~100 척도 위에 있고,
     // 원본은 −226%나 118% 같은 값이 나와 구간 밖으로 벗어난다.
     color: overheatColor(capped),
@@ -140,10 +147,13 @@ function sourceDateBadge(v: Pick): string | null {
 // ── 공용 카드 조각 ────────────────────────────────────────────────
 function Shell({
   hit = false,
+  warm = false,
   minH = 230,
   children,
 }: {
   hit?: boolean;
+  /** 고온 이상(진행률 ≥ 50). 카드에 붙는 보조 배지의 색을 가른다(pick 의 warm 주석). */
+  warm?: boolean;
   minH?: number;
   children: React.ReactNode;
 }) {
@@ -178,8 +188,10 @@ function Shell({
         minHeight: minH,
         // 카드 머리의 아이콘 타일·초고온 칩이 이 두 값을 읽는다. 여기서 한 번만 정하면
         // TitleRow 에 hit 를 따로 넘기지 않아도 카드 25장이 같이 따라온다.
-        ["--card-accent" as string]: hit ? "var(--c-mania)" : "var(--c-blue)",
-        ["--card-accent-tint" as string]: hit ? "var(--c-mania-tint)" : "var(--c-blue-tint)",
+        // 강조색은 **hit(≥75) 이 아니라 warm(≥50)** 에서 갈린다. 카드에 붙는 보조 배지가
+        // 이 두 값을 읽으므로 고온 카드의 배지도 빨강이 된다(pick 의 warm 주석 참고).
+        ["--card-accent" as string]: warm ? "var(--c-mania)" : "var(--c-blue)",
+        ["--card-accent-tint" as string]: warm ? "var(--c-mania-tint)" : "var(--c-blue-tint)",
       }}
     >
       {hit && <HitBadge />}
@@ -772,12 +784,29 @@ function Hero({
 
       {/* ── ③ 오늘의 브리핑 ─────────────────────────────────────── */}
       <div className="hz-hero-cell hz-hero-divide hz-hero-wide">
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {/* ✨ 는 장식이 아니라 생성형 AI 고지(AI 기본법 §31)라 누를 수 있어야 한다.
+            **제목 앞**에 둔다 — 뒤에 달면 "오늘의 브리핑✨" 처럼 제목의 꾸밈으로 읽혀서,
+            정작 고지의 대상(아래 문단들)을 가리키지 않는다. 앞에 서면 이 묶음 전체에
+            붙는 표식이 된다.
+            옅은 하늘색 타일에 앉힌다 — 맨 아이콘으로 두면 누를 수 있는 것으로 안 보인다.
+            26px 은 제목 줄(12.5 × 1.3 ≈ 16)보다 크지만, 이 줄은 셀의 머리가 아니라
+            브리핑 묶음의 제목이라 조금 더 서도 된다. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+          <span
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: 9,
+              background: "var(--c-blue-tint)",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <AiMark size={15} style={{ alignSelf: "center" }} />
+          </span>
           <h2 style={{ margin: 0, fontSize: 12.5, fontWeight: 800, letterSpacing: "-0.01em", color: C.ink }}>오늘의 브리핑</h2>
-          {/* ✨ 는 장식이 아니라 생성형 AI 고지(AI 기본법 §31)라 누를 수 있어야 한다.
-              타일을 걷고 표식만 남겼다 — 셀 머리가 10.5~12.5px 짜리 줄인데 38px 타일이
-              붙으면 그 줄만 혼자 두 배로 두꺼워진다. */}
-          <AiMark size={15} />
         </div>
         <p style={{ margin: 0, fontSize: 13, lineHeight: 1.75, color: C.inkSoft, textWrap: "pretty" }}>
           오늘은 시장 지표 <b style={{ fontWeight: 800, color: C.ink }}>{tradHits}개</b>, 감성 지표{" "}
@@ -909,12 +938,12 @@ function CardBuffett({ v }: { v: Pick }) {
   const gdpWidth = v.raw && v.raw > 0 ? Math.min(100, (100 / v.raw) * 100) : 50;
   const jo = (won: number) => Math.round(won / 1e12).toLocaleString("ko-KR"); // 원 → 조원
   return (
-    <Shell hit={v.isHit} minH={230}>
+    <Shell hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="payments" name={v.name} />
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={v.disp} unit={v.unit} color={v.color} size={32} />
         {ratio !== null && (
-          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: C.blue, background: "var(--c-blue-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: "var(--card-accent)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
             {ratio.toFixed(1)}배
           </span>
         )}
@@ -985,7 +1014,7 @@ function CardLeverage({ v }: { v: Pick }) {
   })();
   const oiVsAvg = dt?.oi_vs_avg ?? (dt?.futures_progress != null ? dt.futures_progress * 1.5 : null);
   return (
-    <Shell hit={v.isHit} minH={230}>
+    <Shell hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="rocket_launch" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
         <strong style={{ fontFamily: MONO, fontSize: 32, fontWeight: 800, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
@@ -1048,7 +1077,7 @@ function CardMarketActions({ v }: { v: Pick }) {
   const maxN = Math.max(1, buyN, sellN, cbN);
   const verdictHint = buyN > sellN ? "달아오른 쪽이 잦았습니다" : sellN > buyN ? "식는 쪽이 잦았습니다" : "양쪽이 비슷했습니다";
   return (
-    <Shell hit={v.isHit} minH={230}>
+    <Shell hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="speed" name={v.name} badge="최근 한 달" />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
         {/* 한글은 같은 font-size 라도 숫자보다 글리프가 커 보인다 — 다른 카드의 32px 숫자와
@@ -1101,7 +1130,7 @@ function CardTurnover({ v }: { v: Pick }) {
     { key: "__others", label: "그 외 전 종목", pct: others, fill: C.track, ink: C.sub2 },
   ];
   return (
-    <Shell hit={v.isHit} minH={230}>
+    <Shell hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="pie_chart" name={v.name} />
       <Big disp={`${Math.round(share)}`} unit="%" color={v.color} size={32} sub="상위 10종목이 가져간 몫" />
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -1144,7 +1173,7 @@ function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
   // 순위대로 진한 파랑 → 옅은 파랑. 색조가 아니라 명도만 움직여 '서열'로 읽히게 한다.
   const rankColor = ["var(--c-blue-2)", "var(--c-blue-3)", "var(--c-blue-4)"];
   return (
-    <Shell hit={v.isHit} minH={230}>
+    <Shell hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow
         desc={v.headline}
         icon="vertical_align_top"
@@ -1154,7 +1183,7 @@ function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={`${gap > 0 ? "+" : ""}${v.disp}`} unit={v.unit} color={v.color} size={32} sub={gap > 0 ? "이전 전고점 돌파" : "전고점으로부터"} />
         {typeof priorHigh === "number" && (
-          <span style={{ fontSize: 12, fontWeight: 700, color: C.blue, background: "var(--c-blue-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: "var(--card-accent)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
             전고점 {num(priorHigh)}
           </span>
         )}
@@ -1212,7 +1241,7 @@ function CardSpeed({ v, path = [] }: { v: Pick; path?: ClosePoint[] }) {
   const hi = pts.length ? Math.max(...pts.map((x) => x.value), 0) : null;
   const lo = pts.length ? Math.min(...pts.map((x) => x.value), 0) : null;
   return (
-    <Shell hit={v.isHit} minH={230}>
+    <Shell hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="trending_up" name={v.name} />
       <Big
         disp={`${spd >= 0 ? "+" : ""}${v.disp}`}
@@ -1263,11 +1292,11 @@ function CardVkospi({ v }: { v: Pick }) {
   const verdict = pos >= 0.66 ? "최근 30일 중 높은 편" : pos <= 0.33 ? "최근 30일 중 낮은 편" : "최근 30일 평균 수준";
   const knob = v.color;
   return (
-    <Shell hit={v.isHit} minH={230}>
+    <Shell hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="monitor_heart" name={v.name} />
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={v.disp} color={v.color} size={32} sub="변동성지수" />
-        <span style={{ fontSize: 11.5, fontWeight: 700, color: C.blue, background: "var(--c-blue-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--card-accent)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
           {verdict}
         </span>
       </div>
@@ -1312,7 +1341,7 @@ function CardAsia({ v }: { v: Pick }) {
   const VALUE_W = 34;
   const ROW_GAP = 9;
   return (
-    <Shell hit={v.isHit} minH={230}>
+    <Shell hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="public" name={v.name} badge="최근 한 달" />
       <Big
         disp={`${v.raw !== null && v.raw > 0 ? "+" : ""}${v.disp}`}
@@ -1419,7 +1448,7 @@ function CardGoldRatio({ v }: { v: Pick }) {
   const num = (n: number) => n.toLocaleString("ko-KR", { maximumFractionDigits: 0 });
   const note = typeof k === "number" && typeof g === "number" ? `코스피 ${num(k)} ÷ 금 ${num(g)}` : "코스피 지수 ÷ 금 시세";
   return (
-    <Shell hit={v.isHit} minH={230}>
+    <Shell hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow icon="balance" name={v.name} desc={v.headline} />
       <Big disp={v.disp} unit={v.unit} color={v.color} size={32} sub={note} />
       <HeatBar v={v} />
@@ -1447,7 +1476,7 @@ function CardVolume({ v }: { v: Pick }) {
     { label: "최근 거래일", value: today, fill: C.blue, strong: true },
   ];
   return (
-    <Shell hit={v.isHit} minH={230}>
+    <Shell hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="groups" name={v.name} />
       {surge !== null && (
         <Big disp={`${surge >= 0 ? "+" : ""}${surge}`} unit="%" color={v.color} size={32} sub="평소 대비" />
@@ -1476,7 +1505,7 @@ function CardVolume({ v }: { v: Pick }) {
 function CardFx({ v }: { v: Pick }) {
   const pts = v.historyPoints.map((b) => ({ key: b.date, value: b.value }));
   return (
-    <Shell hit={v.isHit} minH={230}>
+    <Shell hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="waves" name={v.name} />
       <Big disp={`±${v.disp}`} unit={v.unit} color={v.color} size={32} sub="최근 30일" />
       <AreaChart points={pts} color={v.color} tip={(x) => `${shortDate(x.key)} · ±${x.value.toFixed(2)}%`} />
@@ -1622,7 +1651,7 @@ function CardDivergence({ v }: { v: Pick }) {
     },
   ];
   return (
-    <Shell hit={v.isHit} minH={230}>
+    <Shell hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="compare_arrows" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
         <strong style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
@@ -1667,7 +1696,7 @@ function CardTrend({ v, icon }: { v: Pick; icon: string }) {
   const pct = hot && v.raw !== null ? Math.max(0, Math.min(100, (v.raw / hot) * 100)) : null;
   const chart = v.historyPoints.map((x) => ({ key: x.date, value: x.value }));
   return (
-    <Shell hit={v.isHit} minH={230}>
+    <Shell hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon={icon} name={v.name} />
       {vsAvg !== null ? (
         <>
@@ -1769,7 +1798,7 @@ function CardSentiment({
   const negW = ratio ? 100 - ratio.pos : 50;
   const posW = ratio ? ratio.pos : 50;
   return (
-    <Shell hit={v.isHit} minH={230}>
+    <Shell hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon={icon} name={v.name} />
       {ratio ? (
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
@@ -1823,7 +1852,7 @@ function CardYoutube({ v }: { v: Pick }) {
     { label: "오늘", value: v.raw, fill: C.blue, strong: true },
   ];
   return (
-    <Shell hit={v.isHit} minH={230}>
+    <Shell hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="play_circle" name={v.name} />
       {ratio !== null && (
         <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
@@ -1903,7 +1932,7 @@ function CardSpending({ luxury, dining }: { luxury: Pick; dining: Pick }) {
   const otherWord =
     otherR === null ? "" : Math.abs(otherR - 1) < 0.05 ? `${lead?.other}은 평소 수준` : `${lead?.other} ${otherR.toFixed(1)}배`;
   return (
-    <Shell hit={luxury.isHit || dining.isHit} minH={230}>
+    <Shell hit={luxury.isHit || dining.isHit} warm={luxury.warm || dining.warm} minH={230}>
       <TitleRow icon="local_mall" name="여윳돈이 향하는 곳" desc="명품·외식 검색량으로 본 소비 심리" />
       {lead && (
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
@@ -1937,7 +1966,7 @@ function CardUpbit({ v }: { v: Pick }) {
   const volLabel = (x: number) => (x >= 100 ? "HIGH" : x >= 60 ? "MID" : "LOW");
   const premium = dt?.kimchi_premium ?? null;
   return (
-    <Shell hit={v.isHit} minH={230}>
+    <Shell hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="currency_bitcoin" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
         <strong style={{ fontFamily: MONO, fontSize: 32, fontWeight: 800, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
@@ -1989,7 +2018,7 @@ function CardNetBuy({ v }: { v: Pick }) {
   const maxAbs = Math.max(1, ...daily.map((d) => Math.abs(d)));
   const isBuy = cum >= 0;
   return (
-    <Shell hit={v.isHit} minH={230}>
+    <Shell hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="public" name={v.name} />
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {/* ⚠️ 기간("최근 5거래일")을 큰 수치 **위**에 한 줄로 두면 안 된다. 그 한 줄만큼
@@ -2108,7 +2137,7 @@ function CardLimitUp({ v }: { v: Pick }) {
   const rest = Math.max(0, surged - rank.length);
 
   return (
-    <Shell hit={v.isHit} minH={230}>
+    <Shell hit={v.isHit} warm={v.warm} minH={230}>
       {/* KRX 일별매매정보는 하루이틀 늦게 열린다. 히어로가 페이지 전체를 "오늘 기준"으로
           액자에 넣으므로 이 카드만은 자기 자료일을 계속 밝힌다. */}
       <TitleRow desc={v.headline} icon="bolt" name={v.name} badge={sourceDateBadge(v) ?? "최근 거래일 기준"} />
@@ -2184,11 +2213,11 @@ function CardPutCall({ v }: { v: Pick }) {
   const ratio = call > 0 ? put / call : 0;
   const greedy = callShare >= 50;
   return (
-    <Shell hit={v.isHit} minH={230}>
+    <Shell hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="casino" name={v.name} />
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={ratio.toFixed(2)} color={v.color} size={32} sub="풋/콜" />
-        <span style={{ fontSize: 12, fontWeight: 700, color: C.blue, background: "var(--c-blue-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--card-accent)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
           {greedy ? "콜 우세" : "풋 우세"}
         </span>
       </div>
@@ -2222,12 +2251,12 @@ function CardBrokerage({ v }: { v: Pick }) {
   // 긴 앱 이름을 짧게: 첫 구분자(-, (, ,) 앞부분만, 18자 제한
   const shortName = (n: string) => (n.split(/[-(,]/)[0].trim().slice(0, 18) || n);
   return (
-    <Shell hit={v.isHit} minH={230}>
+    <Shell hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="leaderboard" name={v.name} />
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={`${count}개`} color={v.color} size={32} sub="인기차트 진입" />
         {topRank !== null && (
-          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: C.blue, background: "var(--c-blue-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: "var(--card-accent)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
             최고 {topRank}위
           </span>
         )}
@@ -2301,7 +2330,7 @@ const FALLBACK_ICONS: Record<string, string> = {
 
 function GenericCard({ v, icon }: { v: Pick; icon: string }) {
   return (
-    <Shell hit={v.isHit} minH={210}>
+    <Shell hit={v.isHit} warm={v.warm} minH={210}>
       <TitleRow desc={v.headline} icon={icon} name={v.name} />
       <Big disp={v.disp} unit={v.unit} color={v.color} size={30} />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
