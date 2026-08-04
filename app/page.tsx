@@ -2424,11 +2424,15 @@ function SectionHeading({ title, count, id }: { title: string; count: number; id
     // 말한다. 같은 수를 화면에서 세 번 적고 있었다.
     //
     // 생김새는 .hz-section-badge(globals.css)가 진다 — 카더라·MDD 의 같은 줄도 이 클래스를
-    // 쓸 자리라, 인라인으로 두면 페이지마다 값이 갈린다.
+    // 쓰므로, 인라인으로 두면 페이지마다 값이 갈린다.
+    //
+    // marginTop 만 10 으로 누른다. 기준은 세 페이지 공통 "위 30 / 아래 16"인데, 이 배지를
+    // 감싼 <section> 은 바깥 격자에서 gap 20 으로 떨어져 있어(카더라·MDD 는 16) 클래스
+    // 기본값 14 를 그대로 쓰면 혼자 34 가 된다. 30 − 20 = 10.
     //
     // h2 와 id 는 유지한다 — 문서 구조상 이 줄이 묶음의 제목인 것도, 딥링크가 걸릴 자리인
     // 것도 그대로다(바뀐 건 생김새지 역할이 아니다).
-    <div id={id} className="hz-section-badge">
+    <div id={id} className="hz-section-badge" style={{ marginTop: 10 }}>
       <h2>{title}</h2>
       <span className="hz-section-badge-n">{count}</span>
     </div>

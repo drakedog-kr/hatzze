@@ -348,14 +348,17 @@ body {
    ⚠️ align-self 를 안 주면 배지가 한 줄을 통째로 먹는다. 부모가 세로 flex 라
    기본 stretch 가 걸리고, 그러면 inline-flex 도 블록화돼 폭이 100% 가 된다.
 
-   ⚠️ margin-top 은 세 call site 중 둘(브리핑·카더라)의 값이다. MDD 의 GroupLabel 만
-   4px 이라, 그쪽에 이 클래스를 붙일 때는 인라인으로 눌러야 간격이 안 벌어진다. */
+   ⚠️ 간격의 기준은 **위 30 / 아래 16**(시장 브리핑의 값)이고, margin-top 은 그 차액이다.
+   아래 16 은 부모 flex 의 gap 이 알아서 내주지만 위는 그 gap 만으로는 모자라서,
+   `30 − 부모 gap` 만큼을 여기서 보탠다. 카더라·MDD 는 부모 gap 이 16 이라 14 이고,
+   시장 브리핑만 바깥 격자가 gap 20 이라 10 으로 눌러야 같은 30 이 된다(page.tsx).
+   세 페이지가 자기 값을 따로 들고 있다가 20·26·30 으로 갈렸던 자리다. */
 .hz-section-badge {
   display: inline-flex;
   align-self: flex-start;
   align-items: baseline;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 14px;
   padding: 6px 10px;
   border-radius: 5px;
   background: var(--c-title-band);
