@@ -524,7 +524,12 @@ function PageHeader({ theme }: { theme: "light" | "dark" }) {
                   fontSize: 11,
                   fontWeight: 700,
                   color: C.sub,
-                  background: C.track,
+                  /* 회색 알약이니 --c-chip 이다. --c-track(막대의 빈 트랙)을 쓰고 있었는데,
+                     라이트에서는 둘이 네 단위 차이라 티가 안 났지만 다크에서는 track 이
+                     chip 보다 한 칸 밝아서(#3c3c47 vs #35353f) 같은 글자(--c-sub)가
+                     4.08 로 떨어졌다 — 라이트의 4.98 보다 눈에 띄게 낮다. chip 위에서는
+                     4.55 다. 칩 배경을 뜻하는 값이 따로 있으면 그걸 쓰는 게 맞다. */
+                  background: C.chip,
                   borderRadius: R.pill,
                   padding: "3px 8px",
                   whiteSpace: "nowrap",
