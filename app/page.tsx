@@ -200,6 +200,10 @@ function Shell({
         // 이 두 값을 읽으므로 고온 카드의 배지도 빨강이 된다(pick 의 warm 주석 참고).
         ["--card-accent" as string]: warm ? "var(--c-mania)" : "var(--c-blue)",
         ["--card-accent-tint" as string]: warm ? "var(--c-mania-tint)" : "var(--c-blue-tint)",
+        /* 알약 **글자**용 변형. --card-accent 를 그대로 얹으면 tint 위 명암비가 저온에서
+           2.57(--c-blue #3d9cf5)이라 배지 안 글자가 안 읽힌다. 강조선·테두리는 원래
+           채도를 써야 하므로 색을 하나 더 둔다(팔레트의 --c-*-ink 주석과 같은 규칙). */
+        ["--card-accent-ink" as string]: warm ? "var(--c-hot-ink)" : "var(--c-cold-ink)",
       }}
     >
       {hit && <HitBadge />}
@@ -247,9 +251,10 @@ function HitBadge({ label = "초고온" }: { label?: string }) {
       <span
         style={{
           background: "var(--c-mania-tint)",
-          color: C.mania,
+          /* tint 위에 C.mania 를 그대로 얹으면 명암비 4.21 이라 배지 글자가 안 읽힌다. */
+          color: "var(--c-hot-ink)",
           fontWeight: 800,
-          fontSize: 10.5,
+          fontSize: 11,
           lineHeight: 1.2,
           padding: "5px 10px",
           borderRadius: R.pill,
@@ -335,9 +340,9 @@ function TitleRow({
           {badge && (
             <span
               style={{
-                fontSize: 10.5,
+                fontSize: 11,
                 fontWeight: 700,
-                color: C.muted,
+                color: C.sub,
                 background: C.chip,
                 padding: "3px 8px",
                 borderRadius: R.pill,
@@ -397,7 +402,7 @@ function Big({
   );
 }
 
-function Foot({ text, color = C.muted }: { text: string; color?: string }) {
+function Foot({ text, color = C.sub }: { text: string; color?: string }) {
   return (
     // ④ 각주 슬롯 — 늘 셀 바닥이다. 위 그래픽 존이 flex:1 이라 대개 여기까지 밀려
     // 내려오지만, 그래픽이 140 을 넘겨 존이 늘어난 셀에서는 marginTop:auto 가 있어야
@@ -407,9 +412,11 @@ function Foot({ text, color = C.muted }: { text: string; color?: string }) {
         style={{
           margin: 0,
           paddingTop: 14,
-          fontSize: 11.5,
+          fontSize: 12,
           color,
-          fontWeight: 500,
+          /* 500 → 400. 카더라·MDD 의 같은 자리(시트 각주)가 400 이다. 세 페이지에서
+             한 문장만 굵기가 달라 보이면 그 자리가 더 중요한 말처럼 읽힌다. */
+          fontWeight: 400,
           borderTop: `1px solid ${C.divider}`,
           lineHeight: 1.65,
           textWrap: "pretty",
@@ -628,7 +635,7 @@ function Hero({
       <div className="hz-hero-cell">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-            <h2 style={{ margin: 0, fontSize: 12.5, fontWeight: 800, letterSpacing: "-0.01em", color: C.ink }}>햇쩨 지수</h2>
+            <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, letterSpacing: "-0.01em", color: C.ink }}>햇쩨 지수</h2>
             <span
               className="hz-tip hz-tip-wide hz-tip-below"
               data-tip="시장·감성 지표 25개의 과열도를 가중 평균한 값입니다. 지표마다 신호의 무게가 달라 다른 가중치로 합산합니다. 25·50·75를 경계로 저온·상온·고온·초고온이 나뉩니다."
@@ -719,7 +726,7 @@ function Hero({
                   top: 0,
                   ...(n === 0 ? { left: 0 } : n === 100 ? { right: 0 } : { left: `${n}%`, transform: "translateX(-50%)" }),
                   fontFamily: MONO,
-                  fontSize: 9.5,
+                  fontSize: 10.5,
                   fontWeight: 600,
                   color: C.sub,
                 }}
@@ -763,7 +770,7 @@ function Hero({
           }}
         >
           <Icon name="schedule" style={{ fontSize: 14, color: C.muted }} />
-          <span style={{ fontSize: 10.5, color: C.sub }}>최종 업데이트 · {formatKstUpdate(dailyScore.updated_at)}</span>
+          <span style={{ fontSize: 11.5, color: C.sub }}>최종 업데이트 · {formatKstUpdate(dailyScore.updated_at)}</span>
         </div>
       </div>
 
@@ -780,7 +787,7 @@ function Hero({
           대신 진짜 요소를 두고 :hover / :focus-within 으로 여닫는다. JS 가 없으므로 이
           셀은 서버 컴포넌트로 남는다. */}
       <div className="hz-hero-cell hz-hero-divide hz-dist">
-        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.08em", color: C.label }}>지표 분포</span>
+        <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-0.01em", color: C.ink }}>지표 분포</span>
         {/* 100% 스택 바. 칸 색은 게이지 띠와 다른 한 벌이다 — 게이지는 '구간 자체'를
             그리는 배경이라 연하고, 이쪽은 개수를 견주는 데이터 면이라 진하다.
             data-band 는 아래 줄과 짝을 맞추는 열쇠다 — globals.css 가 :has() 로 그 짝을
@@ -839,7 +846,7 @@ function Hero({
         <span
           style={{
             marginTop: "auto",
-            fontSize: 10.5,
+            fontSize: 12,
             lineHeight: 1.6,
             color: C.sub,
             paddingTop: 10,
@@ -847,7 +854,7 @@ function Hero({
             textWrap: "pretty",
           }}
         >
-          오늘 {bandTotal}개 지표 집계
+          {bandTotal}개 지표 집계
           {bandCounts[3].count > 0 && ` · 초고온 ${bandCounts[3].count}개가 온도를 끌어올렸습니다`}
         </span>
       </div>
@@ -876,15 +883,15 @@ function Hero({
           >
             <AiMark size={15} style={{ alignSelf: "center" }} />
           </span>
-          <h2 style={{ margin: 0, fontSize: 12.5, fontWeight: 800, letterSpacing: "-0.01em", color: C.ink }}>오늘의 브리핑</h2>
+          <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, letterSpacing: "-0.01em", color: C.ink }}>오늘의 브리핑</h2>
         </div>
-        <p style={{ margin: 0, fontSize: 13, lineHeight: 1.75, color: C.inkSoft, textWrap: "pretty" }}>
+        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.7, color: C.inkSoft, textWrap: "pretty" }}>
           오늘은 시장 지표 <b style={{ fontWeight: 800, color: C.ink }}>{tradHits}개</b>, 감성 지표{" "}
           <b style={{ fontWeight: 800, color: C.ink }}>{socialHits}개</b>가 초고온 구간에 들었습니다. 지표들이 가리키는
           현재 시장 온도는 <b style={{ fontWeight: 800, color: stage.color }}>{stageLabel}</b> 구간입니다.
         </p>
         {meaningLine && (
-          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.75, color: C.inkSoft, textWrap: "pretty" }}>
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.7, color: C.inkSoft, textWrap: "pretty" }}>
             {renderRichSummary(meaningLine)}
           </p>
         )}
@@ -898,7 +905,7 @@ function Hero({
             게이지까지 넣기엔 좁아졌다. 브리핑 세 문단이 '오늘 → 왜 → 흐름' 순으로
             읽히는 편이 낫기도 하다. */}
         {trendLine && (
-          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.75, color: C.inkSoft, textWrap: "pretty" }}>
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.7, color: C.inkSoft, textWrap: "pretty" }}>
             {renderRichSummary(trendLine)}
           </p>
         )}
@@ -909,7 +916,7 @@ function Hero({
             margin: "auto 0 0",
             paddingTop: 10,
             borderTop: `1px solid ${C.divider}`,
-            fontSize: 10.5,
+            fontSize: 12,
             lineHeight: 1.6,
             color: C.sub,
             textWrap: "pretty",
@@ -1013,7 +1020,7 @@ function CardBuffett({ v }: { v: Pick }) {
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={v.disp} unit={v.unit} color={v.color} size={32} />
         {ratio !== null && (
-          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: "var(--card-accent)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
             {ratio.toFixed(1)}배
           </span>
         )}
@@ -1253,7 +1260,7 @@ function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={`${gap > 0 ? "+" : ""}${v.disp}`} unit={v.unit} color={v.color} size={32} sub={gap > 0 ? "이전 전고점 돌파" : "전고점으로부터"} />
         {typeof priorHigh === "number" && (
-          <span style={{ fontSize: 12, fontWeight: 700, color: "var(--card-accent)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
             전고점 {num(priorHigh)}
           </span>
         )}
@@ -1378,7 +1385,7 @@ function CardVkospi({ v }: { v: Pick }) {
       <TitleRow desc={v.headline} icon="monitor_heart" name={v.name} />
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={v.disp} color={v.color} size={32} sub="변동성지수" />
-        <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--card-accent)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
           {verdict}
         </span>
       </div>
@@ -1468,7 +1475,7 @@ function CardAsia({ v }: { v: Pick }) {
                 <span style={{ fontSize: 11, fontWeight: b.self ? 800 : 700, color: b.self ? C.ink : C.label, whiteSpace: "nowrap" }}>
                   {b.label}
                 </span>
-                <span style={{ fontSize: 9.5, fontWeight: 600, color: C.sub }}>{b.sub}</span>
+                <span style={{ fontSize: 10.5, fontWeight: 600, color: C.sub }}>{b.sub}</span>
               </span>
               <div style={{ position: "relative", flex: 1, minWidth: 0, height: 16 }}>
                 <div style={{ position: "absolute", inset: 0, borderRadius: 4, background: C.track }} />
@@ -1512,9 +1519,9 @@ function CardAsia({ v }: { v: Pick }) {
                   right: `calc(100% - ${kospiPct})`,
                   top: 0,
                   transform: "translateX(50%)",
-                  fontSize: 9.5,
+                  fontSize: 11,
                   fontWeight: 700,
-                  color: "var(--c-blue-2)",
+                  color: "var(--c-cold-ink)",
                   whiteSpace: "nowrap",
                 }}
               >
@@ -1647,11 +1654,6 @@ function CardComingSoon() {
  * 차갑다고 말하는 꼴이었다(2026-08-03).
  * 축이 스스로 말하게 둔다: 1배 위는 빨강, 아래는 파랑, 정확히 1배면 중립.
  */
-function vsAvgTone(ratio: number): string {
-  if (Math.abs(ratio - 1) < 0.05) return C.sub2; // 소수 첫째 자리로 1.0 으로 보이는 폭
-  return ratio > 1 ? C.hot : C.cold;
-}
-
 function VsAvg({ ratio, knob, showScale = true }: { ratio: number; knob: string; showScale?: boolean }) {
   // **1배를 축 한가운데에 못박는다.** 예전엔 0~2배를 0~100%로 폈는데(1배가 가운데인 건
   // 같지만) 축이 넓어 1.0배와 1.3배가 15%p 차이로 붙어 보였다. ±0.5배를 양 끝으로 두면
@@ -1816,17 +1818,21 @@ function CardTrend({ v, icon }: { v: Pick; icon: string }) {
             <strong style={{ fontFamily: MONO, fontSize: 32, fontWeight: 800, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
               {vsAvg.toFixed(1)}배
             </strong>
-            {arrow && <span style={{ fontSize: 12.5, fontWeight: 700, color: vsAvg < 1 ? C.cold : C.hot }}>{arrow}</span>}
+            {/* 화살표·막대·숫자가 **한 색**이어야 한다. 예전엔 숫자만 온도색이고
+                화살표·막대는 평균 대비 방향(>1 이면 빨강)이라, 1.1배(과열도 저온) 카드가
+                파란 숫자 옆에 빨간 화살표를 달고 있었다 — 한 줄이 두 말을 했다.
+                방향은 이미 화살표 모양과 막대가 뻗는 쪽이 말한다. 색은 온도만 맡는다. */}
+            {arrow && <span style={{ fontSize: 12.5, fontWeight: 700, color: v.color }}>{arrow}</span>}
             <span style={{ fontSize: 12.5, fontWeight: 600, color: C.sub2 }}>평소 대비</span>
           </div>
-          <VsAvg ratio={vsAvg} knob={vsAvgTone(vsAvg)} />
+          <VsAvg ratio={vsAvg} knob={v.color} />
         </>
       ) : (
         <>
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
             <Big disp={v.disp} unit={v.unit} color={v.color} size={32} />
             {v.hotDisp && (
-              <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: C.muted, background: C.chip, borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+              <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: C.sub, background: C.chip, borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
                 초고온 {v.hotDisp}
               </span>
             )}
@@ -1920,12 +1926,12 @@ function CardSentiment({
                 한 색으로 적으면 "63:37" 중 어느 쪽이 어느 편인지 다시 라벨을 봐야 한다. */}
             <strong style={{ fontFamily: MONO, fontSize: 32, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1 }}>
               <span style={{ color: C.cold }}>{ratio.neg}</span>
-              <span style={{ color: C.faint }}>:</span>
+              <span style={{ color: C.sub2 }}>:</span>
               <span style={{ color: C.mania }}>{ratio.pos}</span>
             </strong>
             <span style={{ fontSize: 12.5, fontWeight: 600, color: C.sub2 }}>{sentimentTone(ratio.pos).label}</span>
           </div>
-          <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: C.muted, background: C.chip, borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+          <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: C.sub, background: C.chip, borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
             {countNoun} {ratio.total.toLocaleString("ko-KR")}건 분석
           </span>
         </div>
@@ -2003,10 +2009,10 @@ function SubSpend({ v, icon, showScale }: { v: Pick; icon: string; showScale: bo
   const ratio = v.details?.vs_avg ?? null;
   // 화살표와 색이 **같은 경계**를 써야 한다. 예전엔 화살표가 `ratio === 1` 로만 갈려서,
   // 0.98배(화면엔 "1.0배")가 색은 중립인데 화살표만 ↓ 로 떴다 — 한 줄이 두 말을 했다.
-  // vsAvgTone 과 같은 죽은 구간(±0.05 = 소수 첫째 자리로 1.0 으로 보이는 폭)을 쓴다.
+  // ±0.05 = 소수 첫째 자리로 1.0 으로 보이는 폭. 이 안에서는 화살표를 안 그린다.
   const flat = ratio === null || Math.abs(ratio - 1) < 0.05;
   const arrow = flat ? "" : (ratio as number) > 1 ? "↑" : "↓";
-  const arrowColor = ratio !== null ? vsAvgTone(ratio) : C.sub2;
+  const arrowColor = v.color;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -2020,7 +2026,9 @@ function SubSpend({ v, icon, showScale }: { v: Pick; icon: string; showScale: bo
             fontSize: 16,
             fontWeight: 800,
             // 막대와 같은 색이어야 한다 — 숫자가 파랑인데 막대가 빨강이면 한 줄이 두 말을 한다.
-            color: ratio !== null ? vsAvgTone(ratio) : v.color,
+            // 그 "같은 색"은 **온도**다(2026-08-04). 방향으로 맞췄더니 이번엔 이 줄만
+            // 다른 카드와 규칙이 갈렸다.
+            color: v.color,
             whiteSpace: "nowrap",
           }}
         >
@@ -2028,7 +2036,7 @@ function SubSpend({ v, icon, showScale }: { v: Pick; icon: string; showScale: bo
           {arrow && <span style={{ fontSize: 12, color: arrowColor }}> {arrow}</span>}
         </strong>
       </div>
-      {ratio !== null && <VsAvg ratio={ratio} knob={vsAvgTone(ratio)} showScale={showScale} />}
+      {ratio !== null && <VsAvg ratio={ratio} knob={v.color} showScale={showScale} />}
     </div>
   );
 }
@@ -2061,7 +2069,7 @@ function CardSpending({ luxury, dining }: { luxury: Pick; dining: Pick }) {
       <TitleRow icon="local_mall" name="여윳돈이 향하는 곳" desc="명품·외식 검색량으로 본 소비 심리" />
       {lead && (
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-          <strong style={{ fontFamily: MONO, fontSize: 32, fontWeight: 800, letterSpacing: "-.03em", color: vsAvgTone(lead.r), lineHeight: 1, whiteSpace: "nowrap" }}>
+          <strong style={{ fontFamily: MONO, fontSize: 32, fontWeight: 800, letterSpacing: "-.03em", color: lead.v.color, lineHeight: 1, whiteSpace: "nowrap" }}>
             {lead.r.toFixed(1)}배
           </strong>
           <span style={{ fontSize: 12.5, fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>
@@ -2154,9 +2162,13 @@ function CardNetBuy({ v }: { v: Pick }) {
             이 셀의 큰 수치가 아래로 밀려, 같은 줄에 놓인 다른 카드들의 큰 수치와 가로선이
             어긋난다 — 시트의 제1규칙이 "같은 줄의 메인 지수는 같은 높이"다.
             기간은 다른 카드들과 똑같이 수치 옆 sub 로 붙인다. */}
+        {/* 색은 **온도**다. 매수/매도 방향으로 칠하면 이 카드만 규칙이 갈린다 — 게이트
+            (52주 고점 −5%)를 못 넘은 날은 아무리 크게 팔아도 과열도가 0(저온)인데,
+            숫자만 빨갛게 떠서 셀이 뜨거운 것처럼 읽혔다. 방향은 부호(+/−)와 아래 곁말
+            ("순매도")이 이미 말한다. */}
         <Big
           disp={`${cum >= 0 ? "+" : ""}${formatEokMixed(cum)}`}
-          color={isBuy ? C.cold : C.hot}
+          color={v.color}
           size={32}
           sub={`최근 5거래일 ${isBuy ? "순매수" : "순매도"}`}
         />
@@ -2171,7 +2183,7 @@ function CardNetBuy({ v }: { v: Pick }) {
               fontWeight: 700,
               padding: "4px 10px",
               borderRadius: R.pill,
-              color: atHigh ? C.mania : C.blue,
+              color: atHigh ? "var(--c-hot-ink)" : "var(--c-cold-ink)",
               background: atHigh ? "var(--c-mania-tint)" : "var(--c-blue-tint)",
             }}
           >
@@ -2291,7 +2303,7 @@ function CardLimitUp({ v }: { v: Pick }) {
                   fontFamily: MONO,
                   fontSize: 12,
                   fontWeight: 800,
-                  color: "var(--card-accent, var(--c-blue))",
+                  color: "var(--card-accent-ink, var(--c-cold-ink))",
                   background: "var(--card-accent-tint, var(--c-blue-tint))",
                   borderRadius: R.pill,
                   padding: "3px 9px",
@@ -2346,7 +2358,7 @@ function CardPutCall({ v }: { v: Pick }) {
       <TitleRow desc={v.headline} icon="casino" name={v.name} />
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={ratio.toFixed(2)} color={v.color} size={32} sub="풋/콜" />
-        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--card-accent)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
           {greedy ? "콜 우세" : "풋 우세"}
         </span>
       </div>
@@ -2385,7 +2397,7 @@ function CardBrokerage({ v }: { v: Pick }) {
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={`${count}개`} color={v.color} size={32} sub="인기차트 진입" />
         {topRank !== null && (
-          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: "var(--card-accent)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
             최고 {topRank}위
           </span>
         )}
@@ -2393,7 +2405,7 @@ function CardBrokerage({ v }: { v: Pick }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {charted.slice(0, 4).map((app, i) => (
           <div key={`${app.name}-${i}`} style={{ display: "flex", alignItems: "center", gap: 10, background: C.soft, borderRadius: 12, padding: "9px 12px", minWidth: 0 }}>
-            <span style={{ flexShrink: 0, fontFamily: MONO, fontSize: 11.5, fontWeight: 800, color: i === 0 ? C.blue : C.sub, background: C.card, borderRadius: 8, padding: "3px 8px" }}>
+            <span style={{ flexShrink: 0, fontFamily: MONO, fontSize: 11.5, fontWeight: 800, color: i === 0 ? "var(--c-cold-ink)" : C.sub, background: C.card, borderRadius: 8, padding: "3px 8px" }}>
               {app.rank}위
             </span>
             <span style={{ flex: 1, fontSize: 12.5, fontWeight: 600, color: C.label, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
