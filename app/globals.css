@@ -160,6 +160,9 @@
      inset 그림자로 그린다(빈 슬롯이 회색으로 남지 않는다). 셀 사이 선이라 --c-line
      보다 한 톤 진하다. */
   --c-sheet-line: #e7edf4;
+  /* 가로 구분선. 기본은 --c-sheet-line 과 같은 값이고, 폰에서만 반 칸 진해진다
+     (아래 @media). 세로선과 토큰을 나눈 이유는 그 미디어쿼리 주석에 적어 뒀다. */
+  --c-sep-h: #e7edf4;
   /* 시트 안 표의 두 겹. head 는 열 머리 행과 바닥 각주 띠가 쓰는 옅은 바탕이고,
      row 는 데이터 행 사이 구분선이다 — 격자선(--c-sheet-line)보다 한 톤 옅어야
      '칸을 가르는 선'과 '행을 가르는 선'이 구분된다. */
@@ -283,6 +286,7 @@
                         오버스크롤(고무줄)에서 드러난다 — 라이트 값이면 그때 하늘색이 번쩍한다 */
   /* 아래는 콘솔 리디자인이 새로 만든 것들(시트 격자선·초고온 셀). */
   --c-sheet-line: #2f2f39; /* 시트 격자선 — 다크에선 --c-line 과 같은 값이면 충분하다 */
+  --c-sep-h: #2f2f39;
   --c-sheet-hot: #fa616d;
   --c-sheet-hot-bg: #261b1e; /* 카드(#202027)에 빨강을 아주 조금 섞은 값 */
   /* 파랑 램프도 다크에 없어서 라이트의 연한 값(#cfe6fc 등)이 흘러나왔다. 이 램프는
@@ -502,7 +506,7 @@ body {
   border-radius: 0;
   box-shadow:
     inset -1px 0 0 var(--c-sheet-line),
-    inset 0 -1px 0 var(--c-sheet-line);
+    inset 0 -1px 0 var(--c-sep-h);
 }
 /* 초고온 셀 — 상단 2px 레드 라인 + 아주 옅은 바탕. 테두리를 두르지 않는 건 시트 안에서
    셀끼리 붙어 있어 테두리가 격자선과 겹쳐 두 겹이 되기 때문이다. 라인이 격자선보다
@@ -512,7 +516,7 @@ body {
   box-shadow:
     inset 0 2px 0 var(--c-sheet-hot),
     inset -1px 0 0 var(--c-sheet-line),
-    inset 0 -1px 0 var(--c-sheet-line);
+    inset 0 -1px 0 var(--c-sep-h);
 }
 /* ① 머리 슬롯의 **높이를 고정한다.** min-height 로는 부족했다 — 칸이 좁아지면 제목이나
    설명이 한 줄 더 접히면서 그 카드만 머리가 자라고, 아래 큰 수치가 같은 줄의 다른
@@ -934,7 +938,7 @@ body {
   min-width: 0;
   box-shadow:
     inset -1px 0 0 var(--c-sheet-line),
-    inset 0 -1px 0 var(--c-sheet-line);
+    inset 0 -1px 0 var(--c-sep-h);
 }
 /* ── 패널 격자 (급부상 종목 · 주요 종목 리포트) ────────────────────
    헤어라인 격자에서 **간격을 둔 독립 패널**로 바꿨다. 종목 하나가 한 덩어리라는 것이
@@ -1014,7 +1018,7 @@ body {
   .hz-kd-hero-q {
     box-shadow:
       inset -1px 0 0 var(--c-sheet-line),
-      inset 0 -1px 0 var(--c-sheet-line);
+      inset 0 -1px 0 var(--c-sep-h);
   }
 }
 .hz-kd-hero-h {
@@ -1490,29 +1494,19 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
     padding: 8px 7px;
   }
 
-  /* ── 폰에서는 구분선을 한 단계 진하게 ──────────────────────────────
-     흰 카드 위 명암비가 sheet-line 1.18 · line 1.15 · panel-line 1.26 이다. 큰 화면에서
-     카드가 격자로 흩어져 있을 땐 **위치**가 이미 구분을 맡아서 선은 거들기만 하면 되는데,
-     폰에서는 카드가 세로로 한 줄에 이어 붙어 이 선 하나가 유일한 경계가 된다. 같은
-     1.18 이 데스크톱에선 은은하고 폰에선 없는 것처럼 보이는 이유다(히어로 세 칸도,
-     지표 카드 스물여섯도 같은 증상 — 실기기 피드백 2026-08-05).
+  /* ── 폰에서는 **가로 구분선만** 아주 살짝 진하게 ─────────────────
+     폰에서 카드가 세로로 이어 붙으면 카드를 가르는 건 **가로선 하나**뿐이라, 흰 카드 위
+     명암비 1.18 로는 경계가 안 보인다(실기기 피드백 2026-08-05).
 
-     값은 램프에서 한 칸씩 내렸다. 테두리처럼 무겁지 않으면서 경계가 눈에 걸리는 선이다.
-     ⚠️ 여기서 바꾸는 건 **선 색뿐**이다. 배경·잉크는 그대로라 화면 인상은 안 바뀐다. */
+     ⚠️ 처음엔 --c-sheet-line 을 통째로 내렸는데 그러면 **세로선까지 같이 진해진다** —
+     같은 토큰이 셀의 오른쪽(세로)과 아래(가로) 양쪽을 그리기 때문이다. 카드 우측 라인이
+     굵어 보인다는 지적이 그것이었다. 가로 전용 토큰을 따로 두고 그것만 내린다.
+     세로선·컨트롤 테두리·패널 경계는 기본값 그대로다. */
   :root {
-    --c-sheet-line: #d7e1ed; /* 1.18 → 1.36 */
-    --c-line: #dbe4ef; /* 컨트롤 테두리 */
-    --c-panel-line: #ccd8e8; /* 패널 경계는 격자선보다 한 톤 더 */
-    --c-divider: #e4ebf3;
-    --c-divider-strong: #d7e1ed;
+    --c-sep-h: #dde5ef; /* 1.18 → 1.28. 한 칸이 아니라 반 칸만 */
   }
   :root[data-theme="dark"] {
-    /* 다크는 방향이 반대다 — 밝은 쪽으로 한 칸. */
-    --c-sheet-line: #3a3a45;
-    --c-line: #3a3a45;
-    --c-panel-line: #474753;
-    --c-divider: rgba(214, 224, 239, 0.14);
-    --c-divider-strong: rgba(213, 223, 244, 0.2);
+    --c-sep-h: #35353f;
   }
 }
 
@@ -1563,6 +1557,10 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
 @media (max-width: 640px) {
   .mdd-crosshair { display: none; }
 }
+/* 확대 보기 안에서는 좁은 폭이어도 켠다. 끄기로 한 이유가 "폰에선 툴팁이 시트에 잘려
+   어차피 안 읽힌다"였는데, 확대 보기는 시트 밖 전체 화면이라 그 전제가 사라진다.
+   여는 것은 탭이 맡는다(app/TipTap.tsx — 터치엔 호버가 없다). */
+.mdd-crosshair-zoom { display: flex !important; }
 
 /* 로딩 자리표시자 — 결과와 같은 골격으로 은은하게 깜빡인다(레이아웃이 튀지 않게). */
 @keyframes hz-shimmer {
@@ -2636,6 +2634,6 @@ main.hz-scroll { overflow-x: clip; }
   }
   /* 세로로 서면 칸 사이를 가르던 세로선이 할 일이 없어진다 — 가로선으로 바꾼다. */
   .hz-kd-duo > *:first-child {
-    box-shadow: inset 0 -1px 0 var(--c-sheet-line) !important;
+    box-shadow: inset 0 -1px 0 var(--c-sep-h) !important;
   }
 }

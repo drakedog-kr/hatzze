@@ -1250,7 +1250,37 @@ function Underwater({ a, periodLabel }: { a: MddAnalysis; periodLabel: string })
     return () => document.removeEventListener("keydown", onKey);
   }, [zoom]);
 
-  const chart = (
+  /* 크로스헤어 띠 — 보이지 않는 세로 띠가 눌리면 기준선(hz-vline)과 툴팁(hz-tip)을 낸다.
+     위치를 **뷰박스 비율(%)**로 잡는다. 예전엔 카드 padding(22/20/42 px)을 기준으로 잡아
+     그 카드 안에서만 맞았는데, 확대 보기는 padding 이 달라서 그대로 두면 곡선과 어긋난다.
+     뷰박스는 `0 -6 720 202` 이고 플롯은 y 0~176 · x 36~720 이므로 비율은 이렇게 떨어진다. */
+  const crosshair = (extraClass: string) => (
+    <div
+      className={`mdd-crosshair${extraClass}`}
+      style={{
+        position: "absolute",
+        top: `${(6 / (H + 26)) * 100}%`,
+        left: `${(PAD_L / W) * 100}%`,
+        right: 0,
+        bottom: `${(20 / (H + 26)) * 100}%`,
+      }}
+    >
+      {series.map((p, i) => {
+        const at = n <= 1 ? 0 : i / (n - 1);
+        const edge = at < 0.25 ? " hz-tip-start" : at > 0.75 ? " hz-tip-end" : "";
+        return (
+          <div
+            key={i}
+            className={`hz-tip hz-vline${edge}`}
+            data-tip={`${p.date} · ${fmtWon(p.close)} · 고점 대비 ${fmtPct(p.dd)}`}
+            style={{ flex: 1, position: "relative" }}
+          />
+        );
+      })}
+    </div>
+  );
+
+  const chartOnly = (
       <svg
       viewBox={`0 -6 ${W} ${H + 26}`}
       width="100%"
@@ -1280,6 +1310,14 @@ function Underwater({ a, periodLabel }: { a: MddAnalysis; periodLabel: string })
     </svg>
   );
 
+  /* svg 와 띠를 한 상자에 묶는다 — 띠가 svg 박스 기준으로 앉아야 어디에 놓든 안 어긋난다. */
+  const chartWith = (extraClass: string) => (
+    <div style={{ position: "relative" }}>
+      {chartOnly}
+      {crosshair(extraClass)}
+    </div>
+  );
+
   return (
     <Sheet>
       <SectionHead
@@ -1293,40 +1331,7 @@ function Underwater({ a, periodLabel }: { a: MddAnalysis; periodLabel: string })
           종목) 뷰박스 오른쪽 끝에 놓여 기본값(hidden)이면 반지름만큼 잘린다. 뷰박스를
           넓히는 대신 넘침만 허용한다 — 넓히면 아래 크로스헤어 띠(퍼센트로 잡은 위치)가
           곡선과 어긋난다. */}
-      {chart}
-      {/* 시장 브리핑 지표 카드와 같은 크로스헤어 — 보이지 않는 세로 띠가 hover 시 기준선(hz-vline)과
-          툴팁(hz-tip)을 낸다. 연도 라벨 높이(≈26px)만큼 아래로 남는 띠는 무시할 수준이다.
-          ⚠️ 시트 padding 안쪽에 맞춰야 한다 — 바깥(시트) 기준으로 잡으면 곡선과 어긋난다. */}
-      {/* ⚠️ display 는 인라인에 두지 않는다 — 좁은 폭에서 이 띠를 끄는 미디어쿼리를
-          인라인 style 이 이겨서 안 먹는다(.mdd-crosshair 가 display 를 맡는다). */}
-      <div
-        className="mdd-crosshair"
-        style={{
-          position: "absolute",
-          top: 20,
-          left: `calc(22px + ${(PAD_L / W) * 100}% - ${(PAD_L / W) * 44}px)`,
-          right: 22,
-          bottom: 42,
-        }}
-      >
-        {series.map((p, i) => {
-          // 툴팁이 넓어서(날짜·가격·낙폭) 가운데 정렬이면 끝쪽 지점에서 컨테이너를
-          // 벗어난다 — 오른쪽으로 벗어나면 페이지에 가로 스크롤까지 생긴다.
-          // 경계를 15/85 에서 25/75 로 넓혔다. 모바일에선 카드가 285px 로 좁아져 툴팁이
-          // 폭의 3/4를 차지하는 탓에, 85% 를 안 넘는 지점(실측 0.78)도 화면 밖으로 나갔다.
-          // 안쪽으로 열리는 구간이 넓어져도 넓은 화면에선 툴팁이 살짝 옆으로 붙을 뿐이다.
-          const at = n <= 1 ? 0 : i / (n - 1);
-          const edge = at < 0.25 ? " hz-tip-start" : at > 0.75 ? " hz-tip-end" : "";
-          return (
-            <div
-              key={i}
-              className={`hz-tip hz-vline${edge}`}
-              data-tip={`${p.date} · ${fmtWon(p.close)} · 고점 대비 ${fmtPct(p.dd)}`}
-              style={{ flex: 1, position: "relative" }}
-            />
-          );
-        })}
-      </div>
+      {chartWith("")}
       {/* 확대 버튼 — 차트 오른쪽 아래. 리스크 프로필의 '전체보기'(.hz-yrpop-btn)와 같은
           아이콘·같은 자리 어법이라 새 언어를 안 만든다. 폰에서만 뜬다(CSS). */}
       <button
@@ -1341,13 +1346,15 @@ function Underwater({ a, periodLabel }: { a: MddAnalysis; periodLabel: string })
       <Foot>0%가 전고점입니다. 아래로 갈수록 그 고점에서 멀어져 있다는 뜻이며, 선이 0에 닿은 날이 고점을 되찾은 날입니다.</Foot>
       {zoom && (
         /* 스크림을 눌러도 닫힌다. 무대는 90도 돌려 화면의 긴 변을 쓴다. */
-        <div className="mdd-zoom-scrim" role="dialog" aria-modal="true" aria-label="언더워터 차트 확대" onClick={() => setZoom(false)}>
+        /* ⚠️ 닫기 판정은 target 으로 한다. 무대에 stopPropagation 을 걸면 편하지만, 그러면
+           document 에 걸린 툴팁 탭 리스너(app/TipTap.tsx)까지 막혀서 곡선을 짚어도
+           설명이 안 뜬다 — 확대해 놓고 정작 값을 못 보는 꼴이 된다. */
+        <div className="mdd-zoom-scrim" role="dialog" aria-modal="true" aria-label="언더워터 차트 확대" onClick={(e) => { if (e.target === e.currentTarget) setZoom(false); }}>
           <button type="button" className="mdd-zoom-close" aria-label="닫기" onClick={() => setZoom(false)}>
             <Icon name="close" style={{ fontSize: 20 }} />
           </button>
-          {/* 무대 안을 눌렀을 때는 안 닫는다 — 곡선을 짚어 보는 중일 수 있다. */}
-          <div className="mdd-zoom-stage" onClick={(e) => e.stopPropagation()}>
-            {chart}
+          <div className="mdd-zoom-stage">
+            {chartWith(" mdd-crosshair-zoom")}
           </div>
         </div>
       )}
