@@ -321,7 +321,13 @@ export default async function KaderaPage() {
         tabIndex={t.stocks.length ? 0 : undefined}
         aria-label={t.stocks.length ? `${t.theme} 테마를 이룬 종목 ${t.stockCount}개 보기` : undefined}
       >
-        <span style={{ ...rankNum, paddingTop: 2 }}>{t.rank}</span>
+        {/* 순위 숫자(13px)와 테마명(14px)의 **밑선**을 맞춘 값이다. 둘은 그리드 형제라
+            (alignItems:start) 윗변만 같고, 줄 상자 안에서 글자가 앉는 깊이는 크기마다
+            다르다 — 실측으로 반각 여백이 3.25 : 3, ascent 가 12.0 : 13.0 이라 그냥 두면
+            숫자가 1.25px 내려앉는다. 그 차를 걷어 낸 것이 0.75 다(예전 2 는 눈대중이라
+            숫자가 1.25px 처져 있었다). 밑선을 맞추면 글자 한가운데끼리도 0.35px 안에
+            든다. 두 글자 크기 중 하나라도 바꾸면 이 값을 다시 재야 한다. */}
+        <span style={{ ...rankNum, paddingTop: 0.75 }}>{t.rank}</span>
         <div style={{ minWidth: 0 }}>
           {/* 줄 높이를 못 박는다 — 오른쪽 스파크라인을 막대 밑선에 맞추려면(THEME_SPARK_TOP)
               이 줄이 몇 px 인지 확정돼야 한다. lineHeight 만으론 모자란다: 14·12·10px
