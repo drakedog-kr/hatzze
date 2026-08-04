@@ -402,7 +402,7 @@ function Big({
   );
 }
 
-function Foot({ text, color = C.muted }: { text: string; color?: string }) {
+function Foot({ text, color = C.sub }: { text: string; color?: string }) {
   return (
     // ④ 각주 슬롯 — 늘 셀 바닥이다. 위 그래픽 존이 flex:1 이라 대개 여기까지 밀려
     // 내려오지만, 그래픽이 140 을 넘겨 존이 늘어난 셀에서는 marginTop:auto 가 있어야
@@ -414,7 +414,9 @@ function Foot({ text, color = C.muted }: { text: string; color?: string }) {
           paddingTop: 14,
           fontSize: 12,
           color,
-          fontWeight: 500,
+          /* 500 → 400. 카더라·MDD 의 같은 자리(시트 각주)가 400 이다. 세 페이지에서
+             한 문장만 굵기가 달라 보이면 그 자리가 더 중요한 말처럼 읽힌다. */
+          fontWeight: 400,
           borderTop: `1px solid ${C.divider}`,
           lineHeight: 1.65,
           textWrap: "pretty",
@@ -633,7 +635,7 @@ function Hero({
       <div className="hz-hero-cell">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-            <h2 style={{ margin: 0, fontSize: 12.5, fontWeight: 800, letterSpacing: "-0.01em", color: C.ink }}>햇쩨 지수</h2>
+            <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, letterSpacing: "-0.01em", color: C.ink }}>햇쩨 지수</h2>
             <span
               className="hz-tip hz-tip-wide hz-tip-below"
               data-tip="시장·감성 지표 25개의 과열도를 가중 평균한 값입니다. 지표마다 신호의 무게가 달라 다른 가중치로 합산합니다. 25·50·75를 경계로 저온·상온·고온·초고온이 나뉩니다."
@@ -785,7 +787,7 @@ function Hero({
           대신 진짜 요소를 두고 :hover / :focus-within 으로 여닫는다. JS 가 없으므로 이
           셀은 서버 컴포넌트로 남는다. */}
       <div className="hz-hero-cell hz-hero-divide hz-dist">
-        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.08em", color: C.label }}>지표 분포</span>
+        <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-0.01em", color: C.ink }}>지표 분포</span>
         {/* 100% 스택 바. 칸 색은 게이지 띠와 다른 한 벌이다 — 게이지는 '구간 자체'를
             그리는 배경이라 연하고, 이쪽은 개수를 견주는 데이터 면이라 진하다.
             data-band 는 아래 줄과 짝을 맞추는 열쇠다 — globals.css 가 :has() 로 그 짝을
@@ -844,7 +846,7 @@ function Hero({
         <span
           style={{
             marginTop: "auto",
-            fontSize: 10.5,
+            fontSize: 12,
             lineHeight: 1.6,
             color: C.sub,
             paddingTop: 10,
@@ -881,15 +883,15 @@ function Hero({
           >
             <AiMark size={15} style={{ alignSelf: "center" }} />
           </span>
-          <h2 style={{ margin: 0, fontSize: 12.5, fontWeight: 800, letterSpacing: "-0.01em", color: C.ink }}>오늘의 브리핑</h2>
+          <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, letterSpacing: "-0.01em", color: C.ink }}>오늘의 브리핑</h2>
         </div>
-        <p style={{ margin: 0, fontSize: 13, lineHeight: 1.75, color: C.inkSoft, textWrap: "pretty" }}>
+        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.7, color: C.inkSoft, textWrap: "pretty" }}>
           오늘은 시장 지표 <b style={{ fontWeight: 800, color: C.ink }}>{tradHits}개</b>, 감성 지표{" "}
           <b style={{ fontWeight: 800, color: C.ink }}>{socialHits}개</b>가 초고온 구간에 들었습니다. 지표들이 가리키는
           현재 시장 온도는 <b style={{ fontWeight: 800, color: stage.color }}>{stageLabel}</b> 구간입니다.
         </p>
         {meaningLine && (
-          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.75, color: C.inkSoft, textWrap: "pretty" }}>
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.7, color: C.inkSoft, textWrap: "pretty" }}>
             {renderRichSummary(meaningLine)}
           </p>
         )}
@@ -903,7 +905,7 @@ function Hero({
             게이지까지 넣기엔 좁아졌다. 브리핑 세 문단이 '오늘 → 왜 → 흐름' 순으로
             읽히는 편이 낫기도 하다. */}
         {trendLine && (
-          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.75, color: C.inkSoft, textWrap: "pretty" }}>
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.7, color: C.inkSoft, textWrap: "pretty" }}>
             {renderRichSummary(trendLine)}
           </p>
         )}
@@ -914,7 +916,7 @@ function Hero({
             margin: "auto 0 0",
             paddingTop: 10,
             borderTop: `1px solid ${C.divider}`,
-            fontSize: 10.5,
+            fontSize: 12,
             lineHeight: 1.6,
             color: C.sub,
             textWrap: "pretty",

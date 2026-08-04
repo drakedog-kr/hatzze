@@ -662,7 +662,7 @@ function Sheet({ children, style }: { children: React.ReactNode; style?: React.C
 function Foot({ children }: { children: React.ReactNode }) {
   return (
     <div className="hz-sheet-foot" style={{ marginTop: "auto" }}>
-      <span style={{ fontSize: 10.5, lineHeight: 1.55, color: C.sub2, padding: "9px 0", wordBreak: "keep-all" }}>{children}</span>
+      <span style={{ fontSize: 12, lineHeight: 1.6, color: C.sub, padding: "9px 0", wordBreak: "keep-all" }}>{children}</span>
     </div>
   );
 }
@@ -693,7 +693,7 @@ function AbsentSheet({ icon, title, sub, body }: { icon: string; title: string; 
 function StatCell({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-      <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".06em", color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+      <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: C.sub, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
         {label}
       </span>
       <strong style={{ fontSize: 15, fontWeight: 800, color: tone ?? C.ink, letterSpacing: "-.02em" }}>{value}</strong>
@@ -842,7 +842,7 @@ function MirrorRow({
 
 /** 거울 막대 위의 축 라벨. **값 열에 맞춘다** — 막대 위가 아니라 숫자 위에 서야 읽힌다. */
 function MirrorAxis({ left, right }: { left: string; right: string }) {
-  const s: React.CSSProperties = { flex: "none", fontSize: 10.5, fontWeight: 800, letterSpacing: ".04em", color: C.muted };
+  const s: React.CSSProperties = { flex: "none", fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: C.sub };
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <span style={{ width: MIRROR_LABEL_W, flex: "none" }} />
@@ -875,7 +875,7 @@ function Legend({ items }: { items: { label: string; background: string }[] }) {
    빠지고 나머지는 남는다 — 셋을 한 덩이로 묶으면 하나가 비어도 셋이 다 사라진다. */
 function Reading({ data, periodLabel }: { data: MddResult; periodLabel: string }) {
   const a = data.analysis;
-  const p: React.CSSProperties = { margin: 0, fontSize: 12.5, lineHeight: 1.75, color: C.inkSoft, wordBreak: "keep-all" };
+  const p: React.CSSProperties = { margin: 0, fontSize: 14, lineHeight: 1.7, color: C.inkSoft, wordBreak: "keep-all" };
   const b = (color?: string) => ({ fontWeight: 800, color: color ?? C.ink });
   const paras: React.ReactNode[] = [];
 
@@ -996,7 +996,7 @@ function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel: string
       {/* 1 — 분석 종목 */}
       <div style={{ ...cell, flex: "1 1 290px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-          <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>분석 종목</span>
+          <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>분석 종목</span>
           {data.market && <Pill>{data.market}</Pill>}
         </div>
         {/* 로고는 글자 기준선이 아니라 가운데에 맞아야 한다 — baseline 이면 정사각형
@@ -1024,7 +1024,7 @@ function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel: string
       <div style={{ ...cell, flex: "1.05 1 300px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-            <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>지금 낙폭</span>
+            <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>지금 낙폭</span>
             <span
               className="hz-tip hz-tip-wide hz-tip-start"
               data-tip={`전고점(${fmtWon(a.ath)}) 대비 현재가가 얼마나 내려와 있는지입니다`}
@@ -1080,7 +1080,7 @@ function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel: string
           >
             <Icon name="insights" style={{ fontSize: 14 }} />
           </span>
-          <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>이 하락, 어떻게 읽나</span>
+          <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>이 하락, 어떻게 읽나</span>
         </div>
         <Reading data={data} periodLabel={periodLabel} />
       </div>
@@ -1870,7 +1870,7 @@ function Recovery({ a, periodLabel }: { a: MddAnalysis; periodLabel: string }) {
           늘어나는데 여긴 네 줄뿐이다. 줄 간격을 벌려 채우지는 않는다(길이를 견주는 막대라
           서로 멀어지면 비교가 어려워진다). 묶음을 붙여 둔 채 남는 공간을 위아래로 가른다. */}
       <div style={{ flex: 1, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 12, justifyContent: "center" }}>
-        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".08em", color: C.sub2 }}>낙폭 구간별 발생 횟수 · {periodLabel}</span>
+        <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>낙폭 구간별 발생 횟수 · {periodLabel}</span>
         {buckets.map((b) => {
           const on = inBucket(b);
           return (

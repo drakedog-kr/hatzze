@@ -46,6 +46,49 @@ function compact(n: number): string {
   return `${n}`;
 }
 
+/**
+ * 요약 글에서 **수치를 굵게** 집는다.
+ *
+ * 시장 브리핑의 '오늘의 브리핑'과 MDD 의 '이 하락, 어떻게 읽나'는 문단을 JSX 로
+ * 조립해서 지표명·수치에 <b> 를 직접 붙인다. 여기는 LLM 이 보낸 **통글**이라 같은
+ * 방법을 못 쓴다 — 대신 화면에서 집는다.
+ *
+ * 집는 것은 **수치뿐**이다. 지표명·테마명까지 굵게 하려면 낱말 목록을 들고 있어야
+ * 하는데, 그 목록은 카더라가 매일 새 테마·새 종목을 뱉는 자리라 반드시 낡는다.
+ * 숫자만으로도 눈이 걸리는 자리는 같아진다.
+ *
+ * ⚠️ 거르는 것 둘. (1) 날짜·시각(2026-08-04, 7:00)은 앞뒤의 -, /, : 로 알아채고
+ * 건너뛴다. (2) **낱말에 박힌 숫자**는 단위 없이 곧바로 한글이 붙는다 — 2차전지·3세대가
+ * 그렇다. 이걸 안 거르면 "2차전지"의 2 만 굵어져 낱말이 갈라진다(실제로 그랬다).
+ */
+const NUM_RE = /[+-]?\d[\d,]*(?:\.\d+)?\s*(?:%p|%|배|회|건|명|개월|개|일간|일|주|년|조원|억원|원|조|억|만)?/g;
+const HANGUL = /[\uAC00-\uD7A3]/;
+
+function highlightNumbers(text: string): React.ReactNode[] {
+  const out: React.ReactNode[] = [];
+  let last = 0;
+  for (const m of text.matchAll(NUM_RE)) {
+    const start = m.index;
+    const end = start + m[0].length;
+    const before = text[start - 1];
+    const after = text[end];
+    const bare = /\d$/.test(m[0]); // 단위를 못 물고 숫자로 끝났다
+    if (before && "-/:.".includes(before)) continue;
+    if (after && "-/:".includes(after)) continue;
+    if (bare && after && HANGUL.test(after)) continue;
+    if (before && HANGUL.test(before)) continue;
+    if (start > last) out.push(text.slice(last, start));
+    out.push(
+      <b key={start} style={{ fontWeight: 800, color: C.ink }}>
+        {m[0]}
+      </b>,
+    );
+    last = end;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
+
 function formatKR(n: number): string {
   if (n >= 1e8) return `${(n / 1e8).toFixed(1).replace(/\.0$/, "")}억`;
   if (n >= 1e4) return `${(n / 1e4).toFixed(1).replace(/\.0$/, "")}만`;
@@ -667,7 +710,7 @@ export default async function KaderaPage() {
                 .split(/\n{2,}/)
                 .map((para, i) => (
                   <p key={i} style={{ margin: 0, fontSize: 14, lineHeight: 1.7, color: "var(--c-ink-soft)", textWrap: "pretty", wordBreak: "keep-all" }}>
-                    {para}
+                    {highlightNumbers(para)}
                   </p>
                 ))}
             </div>
