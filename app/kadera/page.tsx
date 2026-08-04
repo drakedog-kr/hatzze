@@ -916,7 +916,7 @@ export default async function KaderaPage() {
             <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>아직 집계된 테마가 없습니다.</p>
           ) : (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "1px solid var(--c-sheet-line)" }}>
+              <div className="hz-kd-duo" style={{ borderBottom: "1px solid var(--c-sheet-line)" }}>
                 <Highlight
                   cap="가장 많이 유입"
                   name={topIn?.theme ?? "—"}
@@ -963,7 +963,7 @@ export default async function KaderaPage() {
                 const sharePct = Math.round((top.count / Math.max(1, totalTop)) * 100);
                 const second = keywords[1];
                 return (
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "1px solid var(--c-sheet-line)" }}>
+                  <div className="hz-kd-duo" style={{ borderBottom: "1px solid var(--c-sheet-line)" }}>
                     <Highlight
                       cap="이번 주 화제어 1위"
                       name={top.word}

@@ -2620,3 +2620,22 @@ main.hz-scroll { overflow-x: clip; }
 @media (max-width: 560px) {
   .mdd-zoom-btn { display: flex; }
 }
+
+/* 시트 머리의 2단 요약(테마 로테이션의 유입↔이탈 · 이슈 키워드의 1위↔비중).
+   격자를 인라인에 두면 미디어쿼리가 못 이겨서 클래스로 뺀다(이 저장소의 반복된 함정). */
+.hz-kd-duo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 560px) {
+  /* 폰에서는 한 칸씩 세로로. 393px 화면에서 두 칸이면 한 칸이 175px 밖에 안 돼,
+     "한 키워드에 관심이 쏠린 상태"(185px) 같은 부제가 잘렸다 — 두 값을 나란히
+     견주자고 만든 자리인데 정작 설명이 안 읽히면 견줄 것이 없다. */
+  .hz-kd-duo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* 세로로 서면 칸 사이를 가르던 세로선이 할 일이 없어진다 — 가로선으로 바꾼다. */
+  .hz-kd-duo > *:first-child {
+    box-shadow: inset 0 -1px 0 var(--c-sheet-line) !important;
+  }
+}
