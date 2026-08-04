@@ -794,19 +794,20 @@ function Hero({
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
           {bandCounts.map((b, i) => (
-            // 지표가 0개인 구간은 열 목록이 없으니 평범한 줄로 둔다 — 눌러도 아무 일이
-            // 없는 자리를 눌리는 것처럼 꾸미지 않는다.
+            // 지표가 0개인 구간도 **열린다.** 예전엔 아예 호버 대상에서 뺐는데, 네 줄 중
+            // 하나만 아무 반응이 없으면 비어 있다는 뜻이 아니라 고장으로 읽힌다. 목록
+            // 대신 "없습니다" 한 줄을 띄운다(2026-08-04).
             <div
               key={b.label}
-              className={b.count > 0 ? "hz-dist-row" : undefined}
+              className={`hz-dist-row${b.count === 0 ? " hz-dist-row-none" : ""}`}
               data-band={i}
-              tabIndex={b.count > 0 ? 0 : undefined}
+              tabIndex={0}
               style={{ display: "flex", alignItems: "center", gap: 9 }}
             >
               <span style={{ width: 7, height: 7, borderRadius: "50%", background: b.fill, flexShrink: 0 }} />
               <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: C.label }}>{b.label}</span>
               <strong style={{ fontFamily: MONO, fontSize: 12.5, fontWeight: 800, color: C.ink }}>{b.count}</strong>
-              {b.count > 0 && (
+              {b.count > 0 ? (
                 // 스크롤바 모양은 본문과 같은 것을 쓴다(.hz-scroll).
                 <div className="hz-dist-pop hz-scroll">
                   {/* 머리는 **붙박이**다(sticky). 가장 긴 구간이 열두 줄인데 팝오버는 여덟
@@ -821,6 +822,12 @@ function Hero({
                       <span className="hz-dist-pop-heat">{Math.round(it.heat)}</span>
                     </a>
                   ))}
+                </div>
+              ) : (
+                // 빈 구간은 상자를 내용 높이만큼만 잡는다(hz-dist-pop-slim) — 위아래를
+                // 못박은 채로 두면 한 줄짜리가 258px 짜리 빈 판이 된다.
+                <div className="hz-dist-pop hz-dist-pop-slim">
+                  <p className="hz-dist-pop-none">오늘은 {b.label} 구간에 든 지표가 없습니다</p>
                 </div>
               )}
             </div>
