@@ -203,7 +203,7 @@ function Sidebar() {
                 // 항목 위로 번져서**, 그 항목만 호버 배경이 푸르스름하게 도드라졌다
                 // (카더라는 볼록하고 MDD 는 평평해 보이던 원인, 2026-08-03).
                 // 활성 표시는 꽉 찬 파랑 알약만으로 충분하다.
-                borderRadius: R.tile,
+                borderRadius: R.nav,
                 textDecoration: "none",
               }}
             >
@@ -236,7 +236,7 @@ function Sidebar() {
             padding: "12px 14px",
             color: C.disabled,
             fontWeight: 600,
-            borderRadius: R.tile,
+            borderRadius: R.nav,
           }}
         >
           <AntIcon size={20} />
@@ -285,7 +285,7 @@ function Sidebar() {
             justifyContent: "center",
             gap: 8,
             padding: 14,
-            borderRadius: 16,
+            borderRadius: R.control,
             // 카드 아이콘 타일과 같은 옅은 하늘색. 꽉 찬 파랑은 사이드바에서 혼자 튀어
             // 내비게이션이 아니라 광고 배너처럼 읽혔다(2026-08-03).
             background: "var(--c-blue-tint)",
@@ -322,7 +322,7 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
     alignItems: "center",
     gap: 12,
     padding: "13px 14px",
-    borderRadius: 12,
+    borderRadius: R.nav,
     color: active ? C.blue : C.sub,
     fontWeight: active ? 700 : 600,
     // 사이드바와 같은 이유로 비활성 background 는 인라인에서 뺀다 — 값을 두면
@@ -430,7 +430,7 @@ function ThemeToggle({ initial, variant = "icon" }: { initial: "light" | "dark";
           justifyContent: "space-between",
           gap: 8,
           padding: "10px 14px",
-          borderRadius: R.tile,
+          borderRadius: R.control,
           border: 0,
           background: C.soft,
           color: C.sub,
@@ -473,7 +473,7 @@ function ThemeToggle({ initial, variant = "icon" }: { initial: "light" | "dark";
         justifyContent: "center",
         width: 38,
         height: 38,
-        borderRadius: 12,
+        borderRadius: R.control,
         border: `1px solid ${C.line}`,
         background: C.bg,
         color: C.sub,
@@ -619,7 +619,7 @@ function TopBar({
             justifyContent: "center",
             width: 38,
             height: 38,
-            borderRadius: 12,
+            borderRadius: R.control,
             border: `1px solid ${C.line}`,
             background: C.bg,
             color: C.sub,
@@ -700,7 +700,7 @@ function PcHint() {
           flexShrink: 0,
           width: 26,
           height: 26,
-          borderRadius: 8,
+          borderRadius: R.control,
           border: "none",
           background: "transparent",
           color: "inherit",

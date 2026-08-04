@@ -1985,7 +1985,7 @@ function Character({ ch, currentDd }: { ch: DrawdownCharacter | null; currentDd:
                   style={{
                     background: t.on ? C.blueTint : C.soft,
                     boxShadow: t.on ? `inset 0 0 0 1.5px ${DOWN_BAR[1]}` : "none",
-                    borderRadius: 10,
+                    borderRadius: R.control,
                     padding: "13px 14px",
                     minWidth: 0,
                     display: "flex",

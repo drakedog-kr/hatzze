@@ -1,4 +1,4 @@
-import { C } from "./ui";
+import { C, R } from "./ui";
 
 // 법정 고지 문서(개인정보처리방침·이용약관)가 공유하는 조판.
 //
@@ -63,7 +63,7 @@ export function Ul({ children }: { children: React.ReactNode }) {
  */
 export function InfoBlock({ heading, rows }: { heading: string; rows: [string, React.ReactNode][] }) {
   return (
-    <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 12, padding: "16px 18px", marginBottom: 12 }}>
+    <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: R.card, padding: "16px 18px", marginBottom: 12 }}>
       <div style={{ fontSize: 14, fontWeight: 700, color: C.ink, marginBottom: 10 }}>{heading}</div>
       <dl style={{ margin: 0, display: "grid", gridTemplateColumns: "auto 1fr", gap: "7px 16px" }}>
         {rows.map(([label, value]) => (

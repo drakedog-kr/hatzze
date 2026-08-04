@@ -499,7 +499,7 @@ function HeatBar({ v, hideThreshold = false }: { v: Pick; hideThreshold?: boolea
         <span style={{ fontSize: 11, color: C.sub }}>과열 100</span>
       </div>
       {v.hotDisp && !hideThreshold && (
-        <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub2, background: C.soft, borderRadius: 10, padding: "8px 10px" }}>
+        <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub2, background: C.soft, borderRadius: R.control, padding: "8px 10px" }}>
           초고온 기준선 {v.hotDisp} {v.dirLabel}
         </span>
       )}
@@ -1064,7 +1064,7 @@ function CardBuffett({ v }: { v: Pick }) {
             <div style={{ width: "100%", height: "100%", borderRadius: R.pill, background: C.blue }} />
           </div>
         </div>
-        <span style={{ fontSize: 12, fontWeight: 600, color: C.label, background: C.soft, borderRadius: 10, padding: "9px 11px" }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: C.label, background: C.soft, borderRadius: R.control, padding: "9px 11px" }}>
           증시가 실물 경제보다 {ratio !== null ? `${ratio.toFixed(1)}배 커진` : "커진"} 상태입니다
         </span>
       </div>
@@ -1125,12 +1125,12 @@ function CardLeverage({ v }: { v: Pick }) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10 }}>
           {/* 서브바 두 개는 각자 '자기 기준 대비 달성률'이라 큰 숫자와 다른 눈금이다.
               라벨을 '기준 대비'로 갈라 둔 것이 그 표시다(같은 이름으로 부르면 안 된다). */}
-          <div style={{ background: C.soft, borderRadius: R.tile, padding: 13, display: "flex", flexDirection: "column", gap: 5 }}>
+          <div style={{ background: C.soft, borderRadius: R.control, padding: 13, display: "flex", flexDirection: "column", gap: 5 }}>
             <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub2 }}>ETF 거래대금</span>
             <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: C.ink }}>{etfAmount ?? "-"}</strong>
             <span style={{ fontSize: 11, color: C.muted }}>{etfBaseLabel} 대비 {Math.round(dt.etf_progress ?? 0)}%</span>
           </div>
-          <div style={{ background: C.soft, borderRadius: R.tile, padding: 13, display: "flex", flexDirection: "column", gap: 5 }}>
+          <div style={{ background: C.soft, borderRadius: R.control, padding: 13, display: "flex", flexDirection: "column", gap: 5 }}>
             <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub2 }}>선물 미결제약정</span>
             <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: C.ink }}>{oiAmount ?? "-"}</strong>
             <span style={{ fontSize: 11, color: C.muted }}>1년 평균 대비 {oiVsAvg !== null ? Math.round(oiVsAvg) : "-"}%</span>
@@ -1636,7 +1636,7 @@ function CardComingSoon() {
         style={{
           flex: 1,
           minHeight: 96,
-          borderRadius: 16,
+          borderRadius: R.control,
           border: `1.5px dashed ${C.line}`,
           background: C.soft,
           display: "flex",
@@ -1786,7 +1786,7 @@ function CardDivergence({ v }: { v: Pick }) {
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10 }}>
         {tiles.map((t) => (
-          <div key={t.label} style={{ background: C.soft, borderRadius: R.tile, padding: 13, display: "flex", flexDirection: "column", gap: 6 }}>
+          <div key={t.label} style={{ background: C.soft, borderRadius: R.control, padding: 13, display: "flex", flexDirection: "column", gap: 6 }}>
             <span
               className={t.tip ? "hz-tip hz-tip-wide hz-tip-start" : undefined}
               data-tip={t.tip}
@@ -2125,13 +2125,13 @@ function CardUpbit({ v }: { v: Pick }) {
       <HeatFill pct={heat ?? 0} />
       {dt && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10 }}>
-          <div style={{ background: C.soft, borderRadius: R.tile, padding: 13, display: "flex", flexDirection: "column", gap: 4 }}>
+          <div style={{ background: C.soft, borderRadius: R.control, padding: 13, display: "flex", flexDirection: "column", gap: 4 }}>
             <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub2 }}>김치 프리미엄</span>
             <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: v.color }}>
               {premium !== null ? `${premium > 0 ? "+" : ""}${premium.toFixed(1)}%` : "-"}
             </strong>
           </div>
-          <div style={{ background: C.soft, borderRadius: R.tile, padding: 13, display: "flex", flexDirection: "column", gap: 4 }}>
+          <div style={{ background: C.soft, borderRadius: R.control, padding: 13, display: "flex", flexDirection: "column", gap: 4 }}>
             <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub2 }}>거래량 강도</span>
             {/* HIGH/MID/LOW 도 0~100 진행률에서 나온 말이라 같은 밴드 규칙으로 칠한다.
                 파랑으로 못박아 두면 HIGH 일 때도 차분한 색이라 값과 색이 반대말을 한다. */}
@@ -2649,7 +2649,7 @@ export default async function Home() {
                     textDecoration: "none",
                   }}
                 >
-                  <div style={{ width: 44, height: 44, borderRadius: 14, background: "var(--c-card)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <div style={{ width: 44, height: 44, borderRadius: R.control, background: "var(--c-card)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <Icon name="add_circle" style={{ fontSize: 23, color: "var(--c-blue)" }} />
                   </div>
                   <strong style={{ fontSize: 15, fontWeight: 800, color: "var(--c-ink)" }}>새로운 지표 제보하기</strong>

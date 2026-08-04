@@ -192,11 +192,22 @@
   --c-scrollbar: #cfe6fc;
   --c-scrollbar-border: #f7fafd;
 
-  /* 반지름 — 목업은 셸 28 / 카드 22 / 타일·컨트롤 13~16 / 알약 99 다. */
-  --r-shell: 28px;
-  --r-card: 22px;
-  --r-tile: 14px;
-  --r-icon: 13px;
+  /* 반지름 — 토스증권 웹(1280)에서 실측한 눈금을 그대로 쓴다(2026-08-05).
+     그쪽 계산 스타일을 훑어 알약(반지름 ≥ 높이/2)을 뺀 분포를 세면 이렇게 나온다.
+       카드·패널  12  — 888×623 메인 패널 · 288×402 · 248×176 카드가 전부 12
+       내비 항목   9  — 홈 · 피드 · 주식 골라보기
+       버튼·타일   8  — 288×44 버튼 · 288×120 타일 · 검색창(가장 많이 쓰인 값)
+     예전 값(셸 28 / 카드 22 / 타일 14)은 목업에서 온 건데, 셸 28 과 카드 22 는
+     콘솔 리디자인 뒤로 쓰는 곳이 없어졌고 실제로는 14 한 값이 카드·타일·내비를
+     겸하고 있었다. 세 역할을 세 값으로 가른다.
+
+     ⚠️ 알약(--r-pill)과 인포그래픽(막대·점·노브·로고)은 이 눈금 밖이다. 저것들은
+     '모서리를 얼마나 깎나'가 아니라 제 모양 자체라, 카드 눈금에 맞추면 뜻이 바뀐다.
+     26px 이하 아이콘 사각형도 그대로 뒀다 — 같은 8 이라도 20px 짜리에 얹으면 40% 라
+     사각형이 아니라 덩어리로 읽힌다(토스도 저 크기엔 4~7 을 쓴다). */
+  --r-card: 12px;
+  --r-nav: 9px;
+  --r-control: 8px;
   --r-pill: 99px;
 
   /* 셸 바깥이 곧 body 다 — 흰 셸이 그 위에 뜬다. */
@@ -479,7 +490,7 @@ body {
   gap: 0;
   background: var(--c-card);
   border: 1px solid var(--c-sheet-line);
-  border-radius: 14px;
+  border-radius: var(--r-card);
   overflow: hidden;
 }
 /* 셀 = 예전의 카드 한 장. 그림자·라운드·테두리를 걷고 격자선만 남긴다.
@@ -550,7 +561,7 @@ body {
   grid-template-columns: 1fr 1fr 2fr;
   background: var(--c-card);
   border: 1px solid var(--c-sheet-line);
-  border-radius: 14px;
+  border-radius: var(--r-card);
   overflow: hidden;
 }
 .hz-hero-cell {
@@ -623,7 +634,7 @@ body {
      relative 를 주면 그 순간 기준이 줄로 바뀌어 팝오버가 줄 높이(24px)로 눌린다. */
   margin: -4px -10px;
   padding: 4px 10px;
-  border-radius: 9px;
+  border-radius: var(--r-control);
   cursor: pointer;
   transition: background 0.13s ease;
 }
@@ -655,7 +666,7 @@ body {
   overscroll-behavior: contain;
   background: var(--c-float);
   border: 1px solid var(--c-line);
-  border-radius: 12px;
+  border-radius: var(--r-card);
   /* 시트엔 그림자를 안 쓰지만 오버레이는 예외다 — 옆 셀의 글을 실제로 가리고 떠 있어야
      해서, 경계선만으로는 "위에 있다"가 안 읽힌다(.hz-theme-pop 과 같은 값). */
   box-shadow: 0 4px 16px var(--c-shadow-strong);
@@ -690,7 +701,7 @@ body {
   align-items: center;
   gap: 8px;
   padding: 5px 7px;
-  border-radius: 8px;
+  border-radius: var(--r-control);
   text-decoration: none;
   transition: background 0.12s ease;
 }
@@ -843,7 +854,7 @@ body {
 .hz-sheet {
   background: var(--c-card);
   border: 1px solid var(--c-sheet-line);
-  border-radius: 14px;
+  border-radius: var(--r-card);
   overflow: hidden;
   min-width: 0;
 }
@@ -938,7 +949,7 @@ body {
   min-width: 0;
   background: var(--c-card);
   border: 1px solid var(--c-panel-line);
-  border-radius: 12px;
+  border-radius: var(--r-card);
 }
 .hz-panelgrid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .hz-panelgrid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1066,7 +1077,7 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
    좌상단만 각지게 둬서 아바타 쪽을 가리킨다 — 텔레그램 원본 매체의 형태다. */
 .hz-bubble {
   background: var(--c-soft);
-  border-radius: 3px 12px 12px 12px;
+  border-radius: 3px var(--r-card) var(--r-card) var(--r-card);
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
@@ -1335,7 +1346,7 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
     padding: 8px;
     background: var(--c-card);
     border: 1px solid var(--c-line);
-    border-radius: 16px;
+    border-radius: var(--r-card);
     box-shadow: 0 12px 32px var(--c-shadow);
   }
 
@@ -1355,7 +1366,7 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
     padding: 11px 10px 11px 14px;
     background: var(--c-ink);
     color: var(--c-bg);
-    border-radius: 14px;
+    border-radius: var(--r-card);
     box-shadow: 0 10px 28px var(--c-shadow);
     font-size: 13px;
     font-weight: 600;
@@ -1566,7 +1577,7 @@ main.hz-scroll { overflow-x: clip; }
   font-weight: 600;
   line-height: 1.5;
   padding: 6px 9px;
-  border-radius: 7px;
+  border-radius: var(--r-control);
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
@@ -1776,7 +1787,7 @@ main.hz-scroll { overflow-x: clip; }
   position: relative;
   margin: -5px -12px;
   padding: 5px 12px;
-  border-radius: 11px;
+  border-radius: var(--r-control);
   transition: background 0.13s ease;
 }
 .hz-theme-row:hover,
@@ -1830,7 +1841,7 @@ main.hz-scroll { overflow-x: clip; }
   padding: 9px;
   background: var(--c-float);
   border: 1px solid var(--c-line);
-  border-radius: 12px;
+  border-radius: var(--r-card);
   /* 카드에는 그림자를 안 쓰지만(배경 단계로만 띄운다) 오버레이는 예외다 — 아래 내용을
      실제로 가리고 떠 있어야 해서, 경계선만으로는 "위에 있다"가 안 읽힌다. 예전
      0 12px 30px 보다 훨씬 얕게 줄여 카드와 층이 뒤바뀌지 않을 만큼만 남긴다. */
@@ -1867,7 +1878,7 @@ main.hz-scroll { overflow-x: clip; }
   align-items: center;
   gap: 8px;
   padding: 5px 7px;
-  border-radius: 8px;
+  border-radius: var(--r-control);
   text-decoration: none;
   transition: background 0.12s ease;
 }
@@ -1935,7 +1946,7 @@ main.hz-scroll { overflow-x: clip; }
   gap: 12px;
   padding: 7px 9px;
   margin: -7px -9px;
-  border-radius: 10px;
+  border-radius: var(--r-control);
   text-decoration: none;
   cursor: pointer;
   transition: background 0.12s ease;
@@ -2073,7 +2084,7 @@ main.hz-scroll { overflow-x: clip; }
   justify-content: center;
   gap: 6px;
   height: 38px;
-  border-radius: 11px;
+  border-radius: var(--r-control);
   border: 1px solid var(--c-line);
   background: var(--c-bg);
   /* --c-blue(#3182f6)는 밝은 바탕 위 명암비 3.55 라 버튼 글자로 못 쓴다. tint 위
@@ -2254,7 +2265,7 @@ main.hz-scroll { overflow-x: clip; }
   /* 사방 4px — 아이콘만 남아 23×23 이 된다. 오른쪽 4px 는 위 margin-right 가 상쇄한다. */
   padding: 4px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--r-control);
   background: none;
   color: var(--c-sub);
   font: inherit;
@@ -2294,7 +2305,7 @@ main.hz-scroll { overflow-x: clip; }
   padding: 10px;
   background: var(--c-float);
   border: 1px solid var(--c-line);
-  border-radius: 12px;
+  border-radius: var(--r-card);
   box-shadow: 0 4px 16px var(--c-shadow-strong);
   opacity: 0;
   /* opacity 만 0 이면 안 보이는 내용이 스크롤 영역과 Tab 순서에 그대로 남는다. */
