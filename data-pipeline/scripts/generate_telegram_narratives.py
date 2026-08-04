@@ -504,13 +504,22 @@ def build_brief_digest(db, latest: str) -> str | None:
     창은 **카드와 글자 그대로 같아야 한다** — 총평은 화면에서 낙관도 막대 바로 옆에 붙고,
     독자가 그 문장의 숫자를 확인할 곳은 그 막대뿐이다.
 
-    카드(lib/telegram-data.getEcosystemSentiment → kstDateRange)는 **오늘을 뺀** 최근
-    WINDOW_DAYS 일을 본다. 오늘은 아직 하루가 덜 차서 반쪽 표본이 낙관도를 끌기 때문이다.
-    여기서 오늘을 포함하면 같은 '최근 N일'이 서로 다른 N일이 된다.
+    카드(lib/telegram-data.getEcosystemSentiment → windowBefore)는 **기준일을 뺀** 그 앞
+    WINDOW_DAYS 일을 본다. 기준일은 아직 하루가 덜 차서 반쪽 표본이 낙관도를 끌기 때문이다.
+    여기서 기준일을 포함하면 같은 '최근 N일'이 서로 다른 N일이 된다.
+
+    ⚠️ **카드도 이 `latest` 를 기준일로 읽는다**(telegram_sentiment_daily 의 최신 날짜 =
+    lib/telegram-data.kaderaBaseDate). 그래야 이 문장과 그 옆 숫자가 같은 사흘을 말한다.
+    저장할 때 이 문장에 붙이는 날짜(`date: latest`)가 곧 카드가 문장을 찾는 열쇠이므로,
+    이 함수의 창을 옮기려면 저쪽 windowBefore 도 같이 옮겨야 한다.
 
     실제로 어긋났다(2026-07-26, 창을 3일로 줄이자마자 드러남): 카드가 낙관 64%(낙관 우세)
     로 찍는데 digest 는 54%(중립)였다. 창이 7일일 땐 하루 차이가 1/7 이라 안 보였지만
     3일이면 1/3 이다. 헤드라인 숫자도 구간 라벨도 갈렸다.
+
+    두 번째로 어긋난 건 길이가 아니라 **끝점**이었다(2026-08-05 00:30 KST): 카드가 창의
+    끝을 벽시계로 잡고 있어, 새 데이터 없이 자정에만 하루 굴러 71%(08-02~08-04)를 찍는데
+    문장은 66%(08-01~08-03)였다. 그래서 끝점을 이 `latest` 하나로 묶었다.
     """
     end = (datetime.fromisoformat(latest).date() - timedelta(days=1)).isoformat()  # 어제
     since = (date.fromisoformat(end) - timedelta(days=WINDOW_OFFSET)).isoformat()
