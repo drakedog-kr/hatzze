@@ -2414,19 +2414,23 @@ function CardBrokerage({ v }: { v: Pick }) {
  */
 function SectionHeading({ title, count, id }: { title: string; count: number; id: string }) {
   return (
-    // 시트 위에 얹는 **미세 라벨**이다. 예전엔 19px 굵은 제목 + 개수 알약 + 초고온 배지가
-    // 한 줄을 다 썼는데, 그러면 묶음 제목이 히어로만큼 무거워져 시트가 '두 번째 화면'처럼
-    // 갈라 보였다. 시트는 하나의 표이고 이 줄은 그 표의 머리말일 뿐이다.
+    // 시트 위에 얹는 **배지**다. 예전엔 19px 굵은 제목 + 개수 알약 + 초고온 배지가 한 줄을
+    // 다 썼고(시트가 '두 번째 화면'처럼 갈라 보였다), 그걸 걷어 10.5px 마이크로 캡스만
+    // 남겼더니 이번엔 반대로 회색 바탕에 글자만 떠서 묶음의 시작이 안 짚였다.
+    // 판을 깔되 크기는 미세 라벨 쪽에 두는 것이 그 사이다.
     //
-    // 초고온 개수 배지는 걷었다. 사라진 정보는 아니다 — 히어로가 '지표 분포'로 전체
-    // 개수를, 브리핑 첫 문단이 "시장 지표 N개, 감성 지표 M개"로 묶음별 개수를 이미
+    // 초고온 개수 배지는 걷은 그대로 둔다. 사라진 정보는 아니다 — 히어로가 '지표 분포'로
+    // 전체 개수를, 브리핑 첫 문단이 "시장 지표 N개, 감성 지표 M개"로 묶음별 개수를 이미
     // 말한다. 같은 수를 화면에서 세 번 적고 있었다.
     //
-    // h2 와 id 는 유지한다 — 사이드바·목차가 걸 앵커이고, 문서 구조상 이 줄이 묶음의
-    // 제목인 것도 그대로다(작아진 건 크기지 역할이 아니다).
-    <div id={id} style={{ display: "flex", alignItems: "baseline", gap: 9, marginTop: 10 }}>
-      <h2 style={{ margin: 0, fontSize: 10.5, fontWeight: 800, letterSpacing: "0.1em", color: C.label }}>{title}</h2>
-      <span style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: C.label }}>{count}</span>
+    // 생김새는 .hz-section-badge(globals.css)가 진다 — 카더라·MDD 의 같은 줄도 이 클래스를
+    // 쓸 자리라, 인라인으로 두면 페이지마다 값이 갈린다.
+    //
+    // h2 와 id 는 유지한다 — 문서 구조상 이 줄이 묶음의 제목인 것도, 딥링크가 걸릴 자리인
+    // 것도 그대로다(바뀐 건 생김새지 역할이 아니다).
+    <div id={id} className="hz-section-badge">
+      <h2>{title}</h2>
+      <span className="hz-section-badge-n">{count}</span>
     </div>
   );
 }

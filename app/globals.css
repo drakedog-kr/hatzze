@@ -332,6 +332,57 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ── 세미 타이틀 배지 (전 페이지 공통) ─────────────────────────────
+   시트 위에 얹혀 "여기부터 다른 묶음"을 말하는 줄이다("시장 지표 15",
+   "최근 뜨는 것 3"). 지금까지는 배경 없는 10.5px 마이크로 캡스라 회색 바탕에
+   글자만 떠 있었는데, 시트가 커지면서 묶음의 시작을 못 짚었다. 판을 깔아
+   **하나의 물체**로 만들면 시트와 시트 사이에서 눈에 걸린다.
+
+   알약(--r-pill)이 아니라 모서리만 깎은 사각형이다. 알약은 이 화면에서 이미
+   '값이 실린 배지'(초고온·언급 4.3배)의 형태라, 같은 꼴을 쓰면 묶음 머리가
+   수치 배지처럼 읽힌다. 여기는 구조를 말하는 자리다.
+
+   바탕은 --c-title-band — 카더라 시트 머리가 쓰는 그 무채색 띠다. 파랑 tint 를
+   깔면 띠가 제 색을 주장해 아래 그래픽의 파랑·빨강과 자리다툼을 한다.
+
+   ⚠️ align-self 를 안 주면 배지가 한 줄을 통째로 먹는다. 부모가 세로 flex 라
+   기본 stretch 가 걸리고, 그러면 inline-flex 도 블록화돼 폭이 100% 가 된다.
+
+   ⚠️ margin-top 은 세 call site 중 둘(브리핑·카더라)의 값이다. MDD 의 GroupLabel 만
+   4px 이라, 그쪽에 이 클래스를 붙일 때는 인라인으로 눌러야 간격이 안 벌어진다. */
+.hz-section-badge {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 6px 10px;
+  border-radius: 5px;
+  background: var(--c-title-band);
+  color: var(--c-label);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  line-height: 1;
+}
+/* h2 의 기본 여백·크기를 지운다. 이 줄이 묶음의 제목인 것은 그대로라 태그는
+   h2 를 유지하고(문서 구조·딥링크), 생김새만 배지가 가져간다. */
+.hz-section-badge > h2 {
+  margin: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+}
+/* 개수는 제목과 같은 크기지만 한 톤 흐리다. 같은 색이면 "시장지표15" 가 한 낱말로
+   붙어 읽히고, 크게 줄이면 배지 안에서 각주처럼 가라앉는다.
+   램프에서 sub2 가 아니라 sub 인 이유: 이 글자는 흰 판이 아니라 --c-title-band 위에
+   앉는다. sub2(#8ba0b6)는 그 위에서 명암비 2.4 라 12px 숫자가 안 읽힌다. */
+.hz-section-badge > .hz-section-badge-n {
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--c-sub);
+}
+
 /* 4열 → 3열 → 2열 → 1열. span-2 카드는 최소 폭 아래에서 1열로 접힌다. */
 /* minmax(0, 1fr) — 1fr은 minmax(auto, 1fr)이라 그리드 항목의 기본 min-width:auto가
    살아 있고, 줄바꿈 안 되는 긴 내용(예: 채널명 "주식 급등일보🚀…| Korean Stocks")이

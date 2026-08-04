@@ -238,12 +238,13 @@ export function RankBadge({ n }: { n: number }) {
   );
 }
 
-/** 마이크로 캡스 구간 머리("최근 뜨는 것 3"). 시트 사이를 갈라 페이지를 장으로 묶는다. */
+/** 구간 머리 배지("최근 뜨는 것 3"). 시트 사이를 갈라 페이지를 장으로 묶는다.
+    생김새는 .hz-section-badge(globals.css) — 시장 브리핑·MDD 의 같은 줄과 한 벌이다. */
 export function SectionCaps({ label, count }: { label: string; count: number }) {
   return (
-    <div style={{ display: "flex", alignItems: "baseline", gap: 9, marginTop: 10 }}>
-      <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".1em", color: C.label }}>{label}</span>
-      <span style={{ fontSize: 10.5, fontWeight: 700, color: C.label }}>{count}</span>
+    <div className="hz-section-badge">
+      <span>{label}</span>
+      <span className="hz-section-badge-n">{count}</span>
     </div>
   );
 }
