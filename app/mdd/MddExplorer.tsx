@@ -129,8 +129,10 @@ export function MddExplorer({
           가로 margin:auto 가 `align-items:stretch` 를 꺼 버린다 — 상자가 늘어나지
           않고 **fit-content** 로 줄어든다(1920 실측 600px). 1440 에서는 남는 폭이
           없어 티가 안 나고 넓은 화면에서만 드러난다. */
+  /* 세로 간격은 시트끼리의 간격(Results 의 gap 16)과 같은 값 하나로 둔다. 예전엔 여기만
+     20 이라 조회 바 밑의 틈이 시트 사이보다 넓어, 조회 바가 결과에서 떨어져 보였다. */
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* 제목도 설명 문단도 여기서 안 그린다 — 셸의 본문 헤더(AppShell 의 PageHeader)가
           제목과 한 줄 부제를 이미 그린다. 예전엔 그 아래에 세 갈래 설명("얼마나 빠졌는지 ·
           얼마나 드문지 · 얼마나 걸렸는지")을 한 문단 더 뒀는데, 바로 아래 시트들이 같은
@@ -1015,12 +1017,8 @@ function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel: string
               <Icon name="help" style={{ fontSize: 14, color: C.hint }} />
             </span>
           </span>
-          {!atHigh && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: C.sub }}>
-              <span style={{ width: 7, height: 7, borderRadius: "50%", background: DOWN_BAR[1], flex: "none" }} />
-              {rarityChip(a)}
-            </span>
-          )}
+          {/* 오른쪽 위에 있던 '상위 11%' 배지는 걷었다(2026-08-04). 바로 아래 타일이 같은
+              것을 이미 말하는데다, '상위 N%' 자체가 무엇의 상위인지 한 번 더 생각하게 했다. */}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <strong
@@ -1039,7 +1037,10 @@ function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel: string
         </div>
         {!atHigh && <DrawdownGauge current={a.currentDd} mdd={a.mdd} periodLabel={periodLabel} />}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 10, marginTop: "auto", paddingTop: 14, borderTop: `1px solid ${C.divider}` }}>
-          <StatCell label="이 정도 낙폭" value={rarityChip(a)} sub={`${periodLabel} 거래일 중`} />
+          {/* 보조 줄에 조회 기간 이름("최근 10년")은 안 붙인다 — '전체' 조회에서
+              "상장 이후·약 27년 6,646일 중"이 되어 칸을 넘겼다(실측 121 > 115px).
+              옆 칸 '기간 최저점'도 기간을 안 적고, 기간은 바로 위 토글이 말한다. */}
+          <StatCell label="이보다 깊었던 날" value={deeperLabel(a)} sub={`${fmtDayCount(a.tradingDays)} 중`} />
           <StatCell label="기간 최저점" value={fmtPct(a.mdd)} sub={a.mddDate} tone={DOWN} />
           <StatCell label="고점 이후" value={fmtDayCount(sincePeak)} sub={`${a.athDate}부터`} />
         </div>
@@ -1084,11 +1085,16 @@ function PriceRow({ label, date, value }: { label: string; date: string; value: 
   );
 }
 
-/** "상위 8%" — 지금 낙폭이 이 기간에서 얼마나 드문 깊이인가. */
-function rarityChip(a: MddAnalysis): string {
-  if (a.deeperThanNowDays === 0) return "가장 깊음";
-  // 1% 미만을 "0%"로 적지 않는다 — 날수는 있는데 비율이 0이면 두 숫자가 어긋나 보인다.
-  return a.deeperThanNowPct < 0.5 ? "상위 1%" : `상위 ${Math.round(a.deeperThanNowPct)}%`;
+/**
+ * 지금 낙폭이 이 기간에서 얼마나 드문 깊이인가 — **날수로** 적는다.
+ *
+ * 예전엔 "상위 11%" 였는데(2026-08-04 교체), 무엇의 상위인지 한 번 더 생각해야 했다.
+ * 백분위는 아래 보조 줄(`2,445일 중`)이 분모를 대면서 저절로 나온다. 날수는 곧바로
+ * 손에 잡히고("280일이면 1년 남짓"), 같은 창을 쓰는 다른 시트와 단위도 맞는다.
+ */
+function deeperLabel(a: MddAnalysis): string {
+  if (a.deeperThanNowDays === 0) return "없음";
+  return fmtDayCount(a.deeperThanNowDays);
 }
 
 /**
@@ -1102,28 +1108,19 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
   const showWorst = Math.abs(worst - at) > 3;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ position: "relative", paddingTop: 16 }}>
-        <span
-          style={{
-            position: "absolute",
-            top: 0,
-            left: `${at}%`,
-            transform: "translateX(-50%)",
-            fontFamily: MONO,
-            fontSize: 10.5,
-            fontWeight: 800,
-            color: DOWN,
-            whiteSpace: "nowrap",
-          }}
-        >
-          {fmtPct(current)}
-        </span>
+      {/* 마커 위에 있던 값 라벨("−33.8%")은 걷었다(2026-08-04). 바로 위에 같은 값이 40px 로
+          서 있어서 한 셀에서 같은 숫자를 두 번 읽게 했다. 대신 짝대기 머리에 **빈 동그라미**를
+          얹어 핀 모양으로 만든다 — 시장 브리핑 히어로 게이지와 같은 장치이고, 라벨 없이도
+          "여기를 가리킨다"가 남는다. paddingTop 도 라벨 자리(16)에서 동그라미 자리(12)로 줄인다. */}
+      <div style={{ position: "relative", paddingTop: 12 }}>
         <div style={{ height: 9, borderRadius: 3, background: `linear-gradient(90deg, ${C.track}, ${DOWN_BAR[2]} 60%, ${DOWN_BAR[0]})` }} />
+        {/* 짝대기 — 띠 위아래로 4px 씩 삐져나온다. 흰 링(box-shadow) 이 있어야 어느 색 위에
+            서든 띠와 안 섞인다. */}
         <span
           style={{
             position: "absolute",
             left: `${at}%`,
-            top: 12,
+            top: 8,
             transform: "translateX(-50%)",
             width: 2,
             height: 17,
@@ -1132,8 +1129,25 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
             boxShadow: `0 0 0 2px ${C.card}`,
           }}
         />
+        {/* 핀 머리. 속을 카드색으로 채워 **비어 보이게** 한다 — 꽉 찬 점은 띠 위의 데이터
+            점처럼 읽히는데, 이건 값이 아니라 '가리키는 자리'다. 짝대기(top 8)의 첫 1px 을
+            이 원이 덮어 이음매가 안 보인다. */}
+        <span
+          style={{
+            position: "absolute",
+            left: `${at}%`,
+            top: 0,
+            transform: "translateX(-50%)",
+            width: 9,
+            height: 9,
+            borderRadius: "50%",
+            border: `2px solid ${C.ink}`,
+            background: C.card,
+            boxSizing: "border-box",
+          }}
+        />
         {showWorst && (
-          <span style={{ position: "absolute", left: `${worst}%`, top: 12, transform: "translateX(-50%)", width: 1, height: 13, background: C.faint }} />
+          <span style={{ position: "absolute", left: `${worst}%`, top: 8, transform: "translateX(-50%)", width: 1, height: 13, background: C.faint }} />
         )}
       </div>
       <div style={{ position: "relative", height: 13 }}>
@@ -1708,20 +1722,31 @@ function Attribution({
   const bench = attr.theme ?? attr.market;
   const gap = bench !== null && attr.stock !== 0 ? attr.stock - bench : null;
   const excess = gap !== null && gap < 0;
-  const share = gap !== null ? Math.round((Math.abs(gap) / Math.abs(attr.stock)) * 100) : null;
+  const benchLabel = attr.theme !== null ? "업종" : "코스피";
 
   return (
     <Sheet>
       <SectionHead icon="call_split" title="시장 탓일까, 종목 탓일까" desc="지수·업종과 견줘 이 종목만의 낙폭이 얼마인지" note="같은 기간" />
       <div style={{ flex: 1, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 18 }}>
-        {share !== null && (
+        {/* 큰 수치는 **아래 각주·히어로 해설과 같은 값·같은 단위**여야 한다(2026-08-04).
+            예전엔 여기만 '몫'(|gap| ÷ 자기 낙폭 = 14%)이라, 한 시트 안에서 14% 와 4.9%p 가
+            같은 것을 말하는 듯 다르게 적혔다. 게다가 그 14% 는 아래 막대 어디에도 안 보이는
+            숫자였다 — 지금 값(gap)은 업종 막대와 종목 막대의 차이로 눈에 그대로 잡힌다.
+
+            단위는 %p 로 둔다. 두 낙폭률의 **차이**라 % 로 적으면 틀린 말이 된다
+            (−38.7% 대비 −33.8% 는 '4.9% 덜'이 아니라 '12.7% 덜'이다).
+
+            색은 온도색을 안 쓴다. 이 값은 오르내림이 아니라 '견줘서 얼마나 벌어졌나'인데
+            34px 짜리 빨강이 경보처럼 읽혔다. 방향은 낱말('종목 탓'/'덜 빠진 폭')이 지고,
+            온도색은 아래 막대와 각주가 맡는다. */}
+        {gap !== null && (
           <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
-            <strong style={{ fontFamily: MONO, fontSize: 34, fontWeight: 800, letterSpacing: "-.035em", lineHeight: 1, color: excess ? DOWN : UP }}>
-              <span style={{ fontSize: 17, fontWeight: 700 }}>{excess ? "종목 탓 " : "덜 빠진 몫 "}</span>
-              {share}
-              <span style={{ fontSize: 17, fontWeight: 700 }}>%</span>
+            <strong style={{ fontFamily: MONO, fontSize: 34, fontWeight: 800, letterSpacing: "-.035em", lineHeight: 1, color: C.ink }}>
+              <span style={{ fontSize: 17, fontWeight: 700 }}>{excess ? "종목 탓 " : "덜 빠진 폭 "}</span>
+              {Math.abs(gap).toFixed(1)}
+              <span style={{ fontSize: 17, fontWeight: 700 }}>%p</span>
             </strong>
-            <span style={{ fontSize: 11.5, color: C.sub2 }}>{excess ? `시장·업종 ${100 - share}%` : "업종 평균보다 얕은 하락"}</span>
+            <span style={{ fontSize: 11.5, color: C.sub2 }}>{benchLabel} 평균보다 {excess ? "깊은" : "얕은"} 하락</span>
           </div>
         )}
         {/* 옆 시트(이 하락의 성격)에 맞춰 늘어나는데 여긴 막대 셋뿐이라 가운데가 빈다.
@@ -1755,7 +1780,7 @@ function Attribution({
                 </>
               ) : (
                 <>
-                  이 종목은 업종 평균보다 <b style={{ fontWeight: 800, color: UP }}>{fmtPct(gap)}p</b> 덜 빠졌습니다. 하락은 대체로 업종 전체가 함께 겪은 것입니다.
+                  이 종목은 {benchLabel} 평균보다 <b style={{ fontWeight: 800, color: UP }}>{fmtPct(gap)}p</b> 덜 빠졌습니다. 하락은 대체로 {benchLabel} 전체가 함께 겪은 것입니다.
                 </>
               )}
             </p>
