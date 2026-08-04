@@ -597,25 +597,32 @@ body {
 }
 
 /* ── 스크롤 목적지 ────────────────────────────────────────────────
-   위 목록에서 건너온 셀. 본문 맨 위에 딱 붙지 않게 숨을 두고, 도착한 칸을 한 번
-   짚어 준다 — 25칸이 똑같이 생겨서 표시가 없으면 어디로 왔는지 모른다.
-   :target 은 해시가 바뀔 때까지 남는데, 그게 맞다(다시 훑다 돌아와도 표시가 있다). */
+   위 목록에서 건너온 셀. 본문 맨 위에 딱 붙지 않게 숨을 두고, 도착한 칸을 1초 동안
+   테두리로 짚었다가 서서히 지운다 — 25칸이 똑같이 생겨서 표시가 없으면 어디로 왔는지
+   모르고, 계속 남아 있으면 그 칸만 특별한 것처럼 읽힌다.
+
+   ⚠️ 셀 자체의 box-shadow 가 아니라 **덧대는 ::after** 로 그린다. 셀의 그림자는
+   격자선(오른쪽·아래 1px)과 초고온 윗줄 2px 을 이미 지고 있어서, 거기에 테두리를
+   섞으면 사라질 때 그 선들까지 같이 흐려진다. 별개 레이어면 테두리만 혼자 사라진다.
+   색을 transparent 로 보내지 않고 opacity 를 쓰는 이유도 같다 — 색 보간은 중간에
+   탁한 회색을 지난다. */
 .hz-cards > *[id] {
   scroll-margin: 14px;
 }
-.hz-cards > *:target {
-  box-shadow:
-    inset 0 0 0 2px var(--c-blue),
-    inset -1px 0 0 var(--c-sheet-line),
-    inset 0 -1px 0 var(--c-sheet-line);
+.hz-cards > *:target::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* 셀이 자기 온도로 이미 정해 둔 강조색을 그대로 쓴다(Shell 의 --card-accent):
+     저온·상온은 파랑, 고온·초고온은 빨강. 경계가 warm(과열도 ≥ 50)이라 구간 이름과
+     정확히 같이 간다 — 여기서 색을 다시 고르면 카드 머리의 아이콘·배지와 갈린다. */
+  border: 2px solid var(--card-accent);
+  animation: hz-target-fade 1s ease-out forwards;
 }
-/* 초고온 셀은 위쪽 2px 이 이미 빨간 줄이라, 그 줄을 지우지 않도록 따로 얹는다. */
-.hz-cards > .hz-cell-hot:target {
-  box-shadow:
-    inset 0 0 0 2px var(--c-blue),
-    inset 0 2px 0 var(--c-sheet-hot),
-    inset -1px 0 0 var(--c-sheet-line),
-    inset 0 -1px 0 var(--c-sheet-line);
+@keyframes hz-target-fade {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }
 
 /* ── 접히는 자리 ───────────────────────────────────────────────────
