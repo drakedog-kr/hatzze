@@ -618,7 +618,11 @@ body {
      저온·상온은 파랑, 고온·초고온은 빨강. 경계가 warm(과열도 ≥ 50)이라 구간 이름과
      정확히 같이 간다 — 여기서 색을 다시 고르면 카드 머리의 아이콘·배지와 갈린다. */
   border: 2px solid var(--card-accent);
-  animation: hz-target-fade 1s ease-out forwards;
+  /* 2.5초. 1초로 뒀더니 스크롤이 멎기도 전에 표시가 사라져, 눈이 도착한 칸을 찾기 전에
+     단서가 없어졌다. 여기서 중요한 건 '깜빡임'이 아니라 **눈이 따라올 시간**이다.
+     ease-out 이라 앞 절반에서 대부분 옅어지고 끝자락이 길게 남는다 — 갑자기 끊기지
+     않으면서도 오래 붙어 있다는 인상은 안 준다. */
+  animation: hz-target-fade 2.5s ease-out forwards;
 }
 @keyframes hz-target-fade {
   from { opacity: 1; }
