@@ -460,7 +460,12 @@ export default async function KaderaPage() {
                       아니라 오류처럼 보인다. */}
                   <strong style={{ fontFamily: MONO, fontSize: 19, fontWeight: 800, color: C.ink, letterSpacing: "-.03em", whiteSpace: "nowrap", flexShrink: 0 }}>
                     {s.value}
-                    <span style={{ fontSize: 12, fontWeight: 700, color: C.sub2 }}>{s.unit}</span>
+                    {/* 단위는 숫자에서 떼어 놓는다. 부모의 letterSpacing −.03em 은 마지막
+                        숫자와 이 글자 **사이**에도 걸려서, 아무것도 안 주면 "317개" 가
+                        한 낱말처럼 붙어 버린다. 음수분을 되돌리는 값(≈0.6px)에 여백을
+                        더해 3px. letterSpacing 을 normal 로 되돌리면 글자 **뒤**에도
+                        붙어 오른끝 정렬이 어긋나므로 마진으로만 벌린다. */}
+                    <span style={{ fontSize: 12, fontWeight: 700, color: C.sub2, marginLeft: 3 }}>{s.unit}</span>
                   </strong>
                 </div>
               ))}
@@ -590,7 +595,26 @@ export default async function KaderaPage() {
           {/* ③ 오늘의 요약 */}
           <div className="hz-kd-hero-h">
             <div className="hz-kd-hero-title">
-              <AiMark size={14} />
+              {/* 시장 브리핑의 '오늘의 브리핑'과 같은 표식이다 — 옅은 하늘색 타일에 앉힌
+                  ✨. 맨 아이콘으로 두면 누를 수 있는 것(= 생성형 AI 고지)으로 안 보인다.
+                  타일이 22px 인 건 이 제목 슬롯이 22px 로 못박혀 있어서다(globals.css 의
+                  .hz-kd-hero-title). 브리핑 쪽 26px 을 그대로 가져오면 슬롯을 넘겨,
+                  세 칸의 주인공 숫자(317 · 66% · 문단)가 서로 다른 높이에 선다.
+                  모서리도 26:9 비례를 지켜 7px. */}
+              <span
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 7,
+                  background: "var(--c-blue-tint)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <AiMark size={13} style={{ alignSelf: "center" }} />
+              </span>
               <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>오늘의 요약</span>
             </div>
             {/* 높이를 안 잡는다 — 글이 3줄이면 3줄, 4줄이면 4줄로 흐른다. 길이 자체는
@@ -841,6 +865,9 @@ export default async function KaderaPage() {
                   >
                     {k.trend === "up" ? "▲" : k.trend === "down" ? "▼" : ""}
                     {k.count.toLocaleString("ko-KR")}
+                    {/* 단위를 붙여 위 하이라이트("1,204회")와 같은 문법으로 읽히게 한다.
+                        머리글이 '횟수'라 해도 이 숫자만 떼어 보면 무엇의 400 인지 모른다. */}
+                    <span style={{ fontWeight: 700, color: C.sub2, marginLeft: 1 }}>회</span>
                   </span>
                 </div>
               ))}
@@ -1056,6 +1083,9 @@ export default async function KaderaPage() {
                       >
                         {r.delta7d > 0 ? "▲" : r.delta7d < 0 ? "▼" : ""}
                         {Math.abs(r.delta7d).toLocaleString("ko-KR")}
+                        {/* 단위를 붙인다 — 이 칸의 1,866 은 구독자 **수**이고, 바로 옆
+                            채널명 아랫줄엔 총 구독자가 또 있어 둘이 헷갈리기 쉽다. */}
+                        <span style={{ fontWeight: 700, color: C.sub2, marginLeft: 1 }}>명</span>
                       </span>
                     </>
                   );
