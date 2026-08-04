@@ -453,6 +453,171 @@ body {
   gap: 12px;
 }
 
+/* ── 지표 분포 셀의 구간별 목록 ─────────────────────────────────────
+   구간 줄에 마우스를 올리면 그 구간에 든 지표가 목록으로 열리고, 이름을 누르면 아래
+   시트의 그 셀(`#ind-<slug>`)로 내려간다. 카더라 테마 줄(.hz-theme-pop)과 같은 어법이라
+   새 언어를 안 만든다 — 목록에 **링크**가 들어가야 해서 data-tip 툴팁을 못 쓰고(그건
+   attr() 로 뽑은 문자열이다), 진짜 요소를 두고 :hover / :focus-within 으로 여닫는다.
+   JS 가 없으므로 히어로는 서버 컴포넌트로 남는다.
+
+   ⭐ 팝오버는 **셀에 걸어 위아래를 못박는다**(top/bottom 12). 줄마다 다른 높이에서 열면
+   네 줄이 30px 씩 어긋나 목록이 위아래로 튀는데, 자리를 고정하면 내용만 바뀐다. 덤으로
+   높이가 셀 안에 갇혀 히어로 판(.hz-hero-panel 은 overflow:hidden) 밖으로 안 나간다 —
+   가장 긴 구간이 12줄까지 가므로 그대로 두면 판을 뚫는다. 넘치면 안에서 스크롤한다. */
+.hz-dist {
+  position: relative;
+}
+.hz-dist-bar {
+  display: flex;
+  height: 9px;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.hz-dist-seg {
+  transition: opacity 0.13s ease;
+}
+/* 호버한 구간만 남기고 띠를 흐린다. 줄과 띠 칸은 형제가 아니라 짝을 못 짓는데,
+   :has() 로 "이 구간 줄이 호버된 분포 셀"을 집으면 그 안에서 같은 data-band 를 고를 수
+   있다. 미지원 브라우저는 띠가 안 흐려질 뿐, 목록은 그대로 열린다. */
+.hz-dist:has(.hz-dist-row:hover) .hz-dist-seg,
+.hz-dist:has(.hz-dist-row:focus-within) .hz-dist-seg {
+  opacity: 0.22;
+}
+.hz-dist:has(.hz-dist-row[data-band="0"]:hover) .hz-dist-seg[data-band="0"],
+.hz-dist:has(.hz-dist-row[data-band="0"]:focus-within) .hz-dist-seg[data-band="0"],
+.hz-dist:has(.hz-dist-row[data-band="1"]:hover) .hz-dist-seg[data-band="1"],
+.hz-dist:has(.hz-dist-row[data-band="1"]:focus-within) .hz-dist-seg[data-band="1"],
+.hz-dist:has(.hz-dist-row[data-band="2"]:hover) .hz-dist-seg[data-band="2"],
+.hz-dist:has(.hz-dist-row[data-band="2"]:focus-within) .hz-dist-seg[data-band="2"],
+.hz-dist:has(.hz-dist-row[data-band="3"]:hover) .hz-dist-seg[data-band="3"],
+.hz-dist:has(.hz-dist-row[data-band="3"]:focus-within) .hz-dist-seg[data-band="3"] {
+  opacity: 1;
+}
+
+/* 배경만 셀 안쪽 여백까지 번지게 한다. 음수 마진을 패딩과 같은 값으로 둬 줄의 바깥
+   치수는 그대로 남긴다(.hz-theme-row 와 같은 수법) — 네 줄의 간격이 안 흔들린다. */
+.hz-dist-row {
+  /* ⚠️ position 을 주지 않는다. 카더라 테마 줄(.hz-theme-row)은 팝오버가 **줄에** 붙어서
+     relative 가 필요했지만, 여기 팝오버는 셀(.hz-dist)에 붙어 자리를 못박는다 — 줄에
+     relative 를 주면 그 순간 기준이 줄로 바뀌어 팝오버가 줄 높이(24px)로 눌린다. */
+  margin: -4px -10px;
+  padding: 4px 10px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.13s ease;
+}
+.hz-dist-row:hover,
+.hz-dist-row:focus-within {
+  background: var(--c-blue-tint);
+}
+/* 마우스 없이도 열려야 한다(줄에 tabindex 를 준다). 터치에서도 이 경로로 열린다. */
+.hz-dist-row:focus-visible {
+  outline: 2px solid var(--c-blue);
+  outline-offset: -2px;
+}
+
+.hz-dist-pop {
+  position: absolute;
+  /* 기준은 줄이 아니라 셀(.hz-dist)이다 — 위 ⭐ 참고.
+     ⚠️ 100% 에서 **18px 을 뺀다.** 줄은 좌우 10px 씩 넓힌 상자라 오른쪽 끝이 셀 안쪽
+     경계보다 14px 바깥에 있는데, 팝오버를 셀 바깥(100% + n)에 두면 그 사이가 빈다.
+     마우스가 그 틈을 건너는 동안 :hover 가 끊겨 목록이 닫혀서 **링크를 누를 수가 없다**
+     (카더라 .hz-theme-pop 이 top 을 5px 겹쳐 두는 것과 같은 이유). 4px 겹쳐 둔다.
+     겹치는 14~18px 은 셀 여백이라 줄의 글자·숫자는 안 가린다. */
+  left: calc(100% - 18px);
+  top: 12px;
+  bottom: 12px;
+  width: 252px;
+  z-index: 40;
+  padding: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--c-float);
+  border: 1px solid var(--c-line);
+  border-radius: 12px;
+  /* 시트엔 그림자를 안 쓰지만 오버레이는 예외다 — 옆 셀의 글을 실제로 가리고 떠 있어야
+     해서, 경계선만으로는 "위에 있다"가 안 읽힌다(.hz-theme-pop 과 같은 값). */
+  box-shadow: 0 4px 16px var(--c-shadow-strong);
+  opacity: 0;
+  /* opacity 만 0 으로 두면 안 보이는 링크가 Tab 순서에 그대로 남는다. */
+  visibility: hidden;
+  transform: translateX(-4px);
+  transition: opacity 0.13s ease, transform 0.13s ease, visibility 0.13s;
+}
+.hz-dist-row:hover .hz-dist-pop,
+.hz-dist-row:focus-within .hz-dist-pop {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0);
+}
+/* 붙박이 머리 — 목록이 여덟 줄쯤에서 잘려 스크롤되므로, 안내가 따라 올라가면 안 된다.
+   top 은 팝오버 padding(8) 만큼 음수로 당겨 위 여백에 흰 틈이 안 생기게 한다. */
+.hz-dist-pop-head {
+  position: sticky;
+  top: -8px;
+  margin: -8px -8px 0;
+  padding: 10px 15px 7px;
+  background: var(--c-float);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--c-sub);
+  white-space: nowrap;
+}
+.hz-dist-pop-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: background 0.12s ease;
+}
+.hz-dist-pop-item:hover {
+  background: var(--c-blue-tint);
+}
+.hz-dist-pop-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.12s ease;
+}
+.hz-dist-pop-item:hover .hz-dist-pop-name {
+  color: var(--c-blue);
+}
+/* 과열도. 자릿수는 body 의 tabular-nums 가 이미 고정해 줘서, 열두 줄이 오른쪽에서
+   한 줄로 선다(page.tsx 의 MONO 도 별도 서체가 아니라 같은 Pretendard 다). */
+.hz-dist-pop-heat {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--c-sub);
+}
+
+/* ── 스크롤 목적지 ────────────────────────────────────────────────
+   위 목록에서 건너온 셀. 본문 맨 위에 딱 붙지 않게 숨을 두고, 도착한 칸을 한 번
+   짚어 준다 — 25칸이 똑같이 생겨서 표시가 없으면 어디로 왔는지 모른다.
+   :target 은 해시가 바뀔 때까지 남는데, 그게 맞다(다시 훑다 돌아와도 표시가 있다). */
+.hz-cards > *[id] {
+  scroll-margin: 14px;
+}
+.hz-cards > *:target {
+  box-shadow:
+    inset 0 0 0 2px var(--c-blue),
+    inset -1px 0 0 var(--c-sheet-line),
+    inset 0 -1px 0 var(--c-sheet-line);
+}
+/* 초고온 셀은 위쪽 2px 이 이미 빨간 줄이라, 그 줄을 지우지 않도록 따로 얹는다. */
+.hz-cards > .hz-cell-hot:target {
+  box-shadow:
+    inset 0 0 0 2px var(--c-blue),
+    inset 0 2px 0 var(--c-sheet-hot),
+    inset -1px 0 0 var(--c-sheet-line),
+    inset 0 -1px 0 var(--c-sheet-line);
+}
+
 /* ── 접히는 자리 ───────────────────────────────────────────────────
    히어로 3 / 시트 4 는 **데스크톱에서 절대 안 바뀐다.** 아래 두 경계는 그 배치가
    물리적으로 불가능해지는 폭에서만 켠다.
@@ -470,12 +635,31 @@ body {
      아랫줄 첫 셀이라 왼쪽 선이 허공에 뜨므로 윗선으로 바꾼다. */
   .hz-hero-panel { grid-template-columns: 1fr 1fr; }
   .hz-hero-wide { grid-column: span 2; border-left: 0; border-top: 1px solid var(--c-divider); }
+  /* 2칸이 되면 분포 셀이 **판의 오른쪽 끝**이라 오른쪽으로 열 자리가 없다. 왼쪽(햇쩨
+     지수 셀 위)으로 튼다 — 판 안이라 잘리지 않는다. 줄과 겹치는 18px 은 위와 같다. */
+  .hz-dist-pop {
+    left: auto;
+    right: calc(100% - 18px);
+    transform: translateX(4px);
+  }
+  .hz-dist-row:hover .hz-dist-pop,
+  .hz-dist-row:focus-within .hz-dist-pop { transform: translateX(0); }
 }
 @media (max-width: 620px) {
   .hz-cards { grid-template-columns: minmax(0, 1fr); }
   .hz-hero-panel { grid-template-columns: 1fr; }
   .hz-hero-wide { grid-column: span 1; }
   .hz-hero-divide { border-left: 0; border-top: 1px solid var(--c-divider); }
+  /* 1칸이면 좌우 어느 쪽에도 자리가 없다. 셀 위에 그대로 덮는다 — 목록을 보는 동안
+     가려지는 건 방금 누른 그 넉 줄뿐이라 잃는 게 없다. */
+  .hz-dist-pop {
+    left: 10px;
+    right: 10px;
+    width: auto;
+    transform: translateY(-4px);
+  }
+  .hz-dist-row:hover .hz-dist-pop,
+  .hz-dist-row:focus-within .hz-dist-pop { transform: translateY(0); }
 }
 /* ════ 카더라 콘솔 (2026-08 리디자인) ═══════════════════════════════
    시장 브리핑과 **같은 어법**이다 — 흰 판(시트) 하나 + 1px 헤어라인 + radius 14,
@@ -1127,6 +1311,13 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
    가로로 스크롤해서 봐야 하는 내용이 생기면 그건 이 규칙이 아니라 그 요소 안에서
    (자체 overflow-x:auto 로) 해결한다. */
 main.hz-scroll { overflow-x: clip; }
+
+/* 히어로 '지표 분포'의 목록에서 지표 이름을 누르면 이 컨테이너가 스크롤된다(#ind-<slug>).
+   그냥 두면 순간이동이라 스물다섯 칸 중 어디로 왔는지 눈이 못 따라간다 — 흘러가야
+   '내려갔다'가 읽힌다. 동작을 줄여 달라는 설정에서는 켜지 않는다. */
+@media (prefers-reduced-motion: no-preference) {
+  main.hz-scroll { scroll-behavior: smooth; }
+}
 
 .hz-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
 .hz-scroll::-webkit-scrollbar-thumb {
