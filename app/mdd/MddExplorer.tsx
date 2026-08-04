@@ -129,8 +129,10 @@ export function MddExplorer({
           가로 margin:auto 가 `align-items:stretch` 를 꺼 버린다 — 상자가 늘어나지
           않고 **fit-content** 로 줄어든다(1920 실측 600px). 1440 에서는 남는 폭이
           없어 티가 안 나고 넓은 화면에서만 드러난다. */
+  /* 세로 간격은 시트끼리의 간격(Results 의 gap 16)과 같은 값 하나로 둔다. 예전엔 여기만
+     20 이라 조회 바 밑의 틈이 시트 사이보다 넓어, 조회 바가 결과에서 떨어져 보였다. */
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* 제목도 설명 문단도 여기서 안 그린다 — 셸의 본문 헤더(AppShell 의 PageHeader)가
           제목과 한 줄 부제를 이미 그린다. 예전엔 그 아래에 세 갈래 설명("얼마나 빠졌는지 ·
           얼마나 드문지 · 얼마나 걸렸는지")을 한 문단 더 뒀는데, 바로 아래 시트들이 같은
@@ -790,7 +792,12 @@ function MeterRow({
 
    ⚠️ 기간처럼 자릿수 차가 큰 값(33일 ~ 1,387일)은 선형 눈금이면 짧은 막대가 1%로
    사라진다. 제곱근 눈금과 min-width 5px 을 함께 쓴다(각주에 제곱근임을 밝힌다). */
-const MIRROR_LABEL_W = 34;
+/* 라벨 칸 폭. 가장 긴 라벨이 `2026.12`(10px/700 실측 42.1px)라 44 로 잡는다.
+   예전 34 는 네 자리 연도에 월을 붙이면 넘쳐서, 월이 붙는 줄만 `26.2` 로 줄여 쓰게 했다 —
+   한 화면에서 연도 표기가 두 벌이 되는 값이라 칸을 넓히는 쪽으로 되돌렸다(2026-08-04).
+   늘어난 10px 은 가운데 막대 칸(flex:1)에서 나온다. 3열이 가장 좁아지는 1000px 에서도
+   막대 칸이 181 → 171 이라 반쪽 막대가 85px 씩 남는다. */
+const MIRROR_LABEL_W = 44;
 const MIRROR_LEFT_W = 40;
 const MIRROR_RIGHT_W = 44;
 
@@ -1015,12 +1022,8 @@ function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel: string
               <Icon name="help" style={{ fontSize: 14, color: C.hint }} />
             </span>
           </span>
-          {!atHigh && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: C.sub }}>
-              <span style={{ width: 7, height: 7, borderRadius: "50%", background: DOWN_BAR[1], flex: "none" }} />
-              {rarityChip(a)}
-            </span>
-          )}
+          {/* 오른쪽 위에 있던 '상위 11%' 배지는 걷었다(2026-08-04). 바로 아래 타일이 같은
+              것을 이미 말하는데다, '상위 N%' 자체가 무엇의 상위인지 한 번 더 생각하게 했다. */}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <strong
@@ -1039,7 +1042,10 @@ function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel: string
         </div>
         {!atHigh && <DrawdownGauge current={a.currentDd} mdd={a.mdd} periodLabel={periodLabel} />}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 10, marginTop: "auto", paddingTop: 14, borderTop: `1px solid ${C.divider}` }}>
-          <StatCell label="이 정도 낙폭" value={rarityChip(a)} sub={`${periodLabel} 거래일 중`} />
+          {/* 보조 줄에 조회 기간 이름("최근 10년")은 안 붙인다 — '전체' 조회에서
+              "상장 이후·약 27년 6,646일 중"이 되어 칸을 넘겼다(실측 121 > 115px).
+              옆 칸 '기간 최저점'도 기간을 안 적고, 기간은 바로 위 토글이 말한다. */}
+          <StatCell label="이보다 깊었던 날" value={deeperLabel(a)} sub={`${fmtDayCount(a.tradingDays)} 중`} />
           <StatCell label="기간 최저점" value={fmtPct(a.mdd)} sub={a.mddDate} tone={DOWN} />
           <StatCell label="고점 이후" value={fmtDayCount(sincePeak)} sub={`${a.athDate}부터`} />
         </div>
@@ -1084,11 +1090,16 @@ function PriceRow({ label, date, value }: { label: string; date: string; value: 
   );
 }
 
-/** "상위 8%" — 지금 낙폭이 이 기간에서 얼마나 드문 깊이인가. */
-function rarityChip(a: MddAnalysis): string {
-  if (a.deeperThanNowDays === 0) return "가장 깊음";
-  // 1% 미만을 "0%"로 적지 않는다 — 날수는 있는데 비율이 0이면 두 숫자가 어긋나 보인다.
-  return a.deeperThanNowPct < 0.5 ? "상위 1%" : `상위 ${Math.round(a.deeperThanNowPct)}%`;
+/**
+ * 지금 낙폭이 이 기간에서 얼마나 드문 깊이인가 — **날수로** 적는다.
+ *
+ * 예전엔 "상위 11%" 였는데(2026-08-04 교체), 무엇의 상위인지 한 번 더 생각해야 했다.
+ * 백분위는 아래 보조 줄(`2,445일 중`)이 분모를 대면서 저절로 나온다. 날수는 곧바로
+ * 손에 잡히고("280일이면 1년 남짓"), 같은 창을 쓰는 다른 시트와 단위도 맞는다.
+ */
+function deeperLabel(a: MddAnalysis): string {
+  if (a.deeperThanNowDays === 0) return "없음";
+  return fmtDayCount(a.deeperThanNowDays);
 }
 
 /**
@@ -1102,28 +1113,19 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
   const showWorst = Math.abs(worst - at) > 3;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ position: "relative", paddingTop: 16 }}>
-        <span
-          style={{
-            position: "absolute",
-            top: 0,
-            left: `${at}%`,
-            transform: "translateX(-50%)",
-            fontFamily: MONO,
-            fontSize: 10.5,
-            fontWeight: 800,
-            color: DOWN,
-            whiteSpace: "nowrap",
-          }}
-        >
-          {fmtPct(current)}
-        </span>
+      {/* 마커 위에 있던 값 라벨("−33.8%")은 걷었다(2026-08-04). 바로 위에 같은 값이 40px 로
+          서 있어서 한 셀에서 같은 숫자를 두 번 읽게 했다. 대신 짝대기 머리에 **빈 동그라미**를
+          얹어 핀 모양으로 만든다 — 시장 브리핑 히어로 게이지와 같은 장치이고, 라벨 없이도
+          "여기를 가리킨다"가 남는다. paddingTop 도 라벨 자리(16)에서 동그라미 자리(12)로 줄인다. */}
+      <div style={{ position: "relative", paddingTop: 12 }}>
         <div style={{ height: 9, borderRadius: 3, background: `linear-gradient(90deg, ${C.track}, ${DOWN_BAR[2]} 60%, ${DOWN_BAR[0]})` }} />
+        {/* 짝대기 — 띠 위아래로 4px 씩 삐져나온다. 흰 링(box-shadow) 이 있어야 어느 색 위에
+            서든 띠와 안 섞인다. */}
         <span
           style={{
             position: "absolute",
             left: `${at}%`,
-            top: 12,
+            top: 8,
             transform: "translateX(-50%)",
             width: 2,
             height: 17,
@@ -1132,8 +1134,25 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
             boxShadow: `0 0 0 2px ${C.card}`,
           }}
         />
+        {/* 핀 머리. 속을 카드색으로 채워 **비어 보이게** 한다 — 꽉 찬 점은 띠 위의 데이터
+            점처럼 읽히는데, 이건 값이 아니라 '가리키는 자리'다. 짝대기(top 8)의 첫 1px 을
+            이 원이 덮어 이음매가 안 보인다. */}
+        <span
+          style={{
+            position: "absolute",
+            left: `${at}%`,
+            top: 0,
+            transform: "translateX(-50%)",
+            width: 9,
+            height: 9,
+            borderRadius: "50%",
+            border: `2px solid ${C.ink}`,
+            background: C.card,
+            boxSizing: "border-box",
+          }}
+        />
         {showWorst && (
-          <span style={{ position: "absolute", left: `${worst}%`, top: 12, transform: "translateX(-50%)", width: 1, height: 13, background: C.faint }} />
+          <span style={{ position: "absolute", left: `${worst}%`, top: 8, transform: "translateX(-50%)", width: 1, height: 13, background: C.faint }} />
         )}
       </div>
       <div style={{ position: "relative", height: 13 }}>
@@ -1338,17 +1357,22 @@ function YearsPopover({ years, label }: { years: YearStat[]; label: string }) {
           {label} 연도별 성적
         </span>
         {/* 오래된 해가 위, 올해가 맨 아래. 타일 막대와 같은 순서라 펼쳤을 때 눈이
-            같은 자리를 짚는다(막대도 2022→2026 으로 내려온다). */}
+            같은 자리를 짚는다(막대도 2022→2026 으로 내려온다).
+
+            한 해의 두 줄도 타일과 같은 순서로 **낙폭이 먼저, 수익이 두 번째**다.
+            타일의 범례("그 해 최악 낙폭 · 그 해 수익")도, 거울 막대의 좌우(왼쪽 낙폭 ·
+            오른쪽 수익)도 그 순서라, 여기만 뒤집혀 있으면 펼칠 때마다 읽는 순서가
+            바뀐다(2026-08-04 에 바로잡음). */}
         {years.map((y) => (
           <span key={y.year} className="hz-yrpop-row">
             <span className="hz-yrpop-year">{y.year}</span>
             <span className="hz-yrpop-bars">
-              <span className="hz-yrpop-bar" style={{ width: `${Math.max(2, (Math.abs(y.ret) / max) * 100)}%`, background: y.ret >= 0 ? C.mania : C.cold }} />
               <span className="hz-yrpop-bar" style={{ width: `${Math.max(2, (Math.abs(y.mdd) / max) * 100)}%`, background: C.cold, opacity: 0.45 }} />
+              <span className="hz-yrpop-bar" style={{ width: `${Math.max(2, (Math.abs(y.ret) / max) * 100)}%`, background: y.ret >= 0 ? C.mania : C.cold }} />
             </span>
             <span className="hz-yrpop-val">
-              <span style={{ color: y.ret >= 0 ? C.mania : C.cold }}>{`${y.ret >= 0 ? "+" : "−"}${Math.abs(Math.round(y.ret))}%`}</span>
               <span style={{ color: C.cold, opacity: 0.75 }}>{`${Math.round(y.mdd)}%`}</span>
+              <span style={{ color: y.ret >= 0 ? C.mania : C.cold }}>{`${y.ret >= 0 ? "+" : "−"}${Math.abs(Math.round(y.ret))}%`}</span>
             </span>
           </span>
         ))}
@@ -1360,7 +1384,16 @@ function YearsPopover({ years, label }: { years: YearStat[]; label: string }) {
 function RiskProfile({ r, periodLabel }: { r: RiskProfileData; periodLabel: string }) {
   const yrs = Math.max(1, Math.round(r.years));
   const alone = r.withMarket === null ? 0 : r.bigDropCount - r.withMarket;
-  const yearly = r.yearly.slice(-RISK_ROWS);
+  /* 두 벌을 구분해서 든다.
+       scoped — **조회 기간 전체**의 해들. 요약 문장과 큰 수치가 세는 창이고,
+                '전체보기' 팝오버가 펴는 것도 이것이다.
+       yearly — 그중 막대로 깔 최근 RISK_ROWS 줄. 자리 때문에 자른 것뿐이다.
+
+     ⚠️ `r.yearly` 를 그대로 쓰면 안 된다. yearlyStats 는 거래일이 20일 넘는 해를 다 세므로
+     10년 조회에 11개(2016~2026)가 나온다 — 시작 해의 토막을 한 해로 세기 때문이다. 조회
+     기간만큼(`-yrs`) 잘라야 "최근 10년"이라 적어 놓고 11년을 세는 일이 없다. */
+  const scoped = r.yearly.slice(-yrs);
+  const yearly = scoped.slice(-RISK_ROWS);
   const events = r.events.slice(-RISK_ROWS);
 
   // 뒤 두 타일의 한 줄은 '연도'가 아니라 '큰 하락 한 건'이라, 같은 해에 두 번 났으면
@@ -1368,12 +1401,10 @@ function RiskProfile({ r, periodLabel }: { r: RiskProfileData; periodLabel: stri
   // 붙인다 — 한 번뿐인 해까지 붙이면 축이 괜히 시끄러워진다.
   const eventYearCount = new Map<number, number>();
   for (const e of events) eventYearCount.set(e.year, (eventYearCount.get(e.year) ?? 0) + 1);
-  /* 월이 붙는 줄은 연도를 두 자리로 줄인다("2026.2" → "26.2"). 거울 막대의 라벨 칸은
-     세 패널이 공유하는 고정폭(MIRROR_LABEL_W)이라 여기서 넓힐 수가 없는데, 네 자리 연도에
-     월을 붙이면 그 칸을 넘긴다. 두 자리로 줄이면 "2020"(4글자)과 폭이 같아진다. */
-  const eventLabels = events.map((e) =>
-    (eventYearCount.get(e.year) ?? 0) > 1 ? `${String(e.year).slice(2)}.${e.month}` : `${e.year}`,
-  );
+  /* 연도는 네 자리 그대로 적는다. 예전엔 월이 붙는 줄만 두 자리로 줄였는데("2026.2" →
+     "26.2"), 같은 축에서 `2024` 와 `26.2` 가 나란히 서니 무슨 해인지 한 번 더 세어야 했다.
+     라벨 칸(MIRROR_LABEL_W)을 넓혀 두 자리로 줄이는 이유를 없앴다(2026-08-04). */
+  const eventLabels = events.map((e) => ((eventYearCount.get(e.year) ?? 0) > 1 ? `${e.year}.${e.month}` : `${e.year}`));
 
   /* 타일 제목 옆 괄호. 두 타일과 한 타일이 서로 다른 것을 적는데, 다르게 적을 이유가 있다.
      기준은 하나다 — **괄호가 가리키는 것에 화면에서 닿을 수 있나.**
@@ -1409,8 +1440,13 @@ function RiskProfile({ r, periodLabel }: { r: RiskProfileData; periodLabel: stri
 
   /* 1 — 낙폭 대비 보상: 해마다 '그 해 최악 낙폭'(왼쪽·파랑)과 '그 해 수익'(오른쪽·빨강).
          손실인 해는 수익도 하락이므로 오른쪽이지만 파랑으로 칠한다. */
-  const avgYearMdd = yearly.length ? yearly.reduce((s, y) => s + y.mdd, 0) / yearly.length : 0;
-  const beatCount = yearly.filter((y) => y.ret > Math.abs(y.mdd)).length;
+  /* 큰 수치와 요약은 **조회 기간 전체**(scoped)로 센다. 막대에 깔린 최근 다섯 해가 아니다.
+     예전엔 이 둘만 5년이라, 옆에 선 연평균(복리)은 10년인데 평균 낙폭은 5년이었고 그 둘을
+     나눈 '보상 배수'는 창이 섞인 값이었다. 제목의 "(최근 10년)"·전체보기와도 어긋났다.
+     (삼성전자 10년 실측: 평균 낙폭 −29% → −26%, 보상 0.78배 → 0.88배, 5년 중 3년 →
+     10년 중 6년.) 2026-08-04. */
+  const avgYearMdd = scoped.length ? scoped.reduce((s, y) => s + y.mdd, 0) / scoped.length : 0;
+  const beatCount = scoped.filter((y) => y.ret > Math.abs(y.mdd)).length;
   const tile1: TileBody =
     yearly.length === 0
       ? { head: null, viz: empty("연도별 표본이 부족합니다."), foot: null }
@@ -1469,22 +1505,15 @@ function RiskProfile({ r, periodLabel }: { r: RiskProfileData; periodLabel: stri
              읽히니 낱말을 남기고 부호를 뺀다. */
           foot: summary(
             r.annualReturn >= 0 && avgYearMdd < 0
-              ? `위험 1을 견딜 때 보상 ${(r.annualReturn / Math.abs(avgYearMdd)).toFixed(2)}배 · ${yearly.length}년 중 ${beatCount}년은 보상이 낙폭보다 컸습니다`
+              ? `위험 1을 견딜 때 보상 ${(r.annualReturn / Math.abs(avgYearMdd)).toFixed(2)}배 · ${scoped.length}년 중 ${beatCount}년은 보상이 낙폭보다 컸습니다`
               : `최근 ${yrs}년은 연평균(복리) ${Math.abs(r.annualReturn).toFixed(1)}% 손실이라 견딘 위험을 보상하지 못했습니다`,
           ),
           /* 막대는 자리 때문에 최근 RISK_ROWS 줄뿐인데 제목·요약은 조회 기간 전체를 말한다.
-             나머지 해를 여기서 펼쳐, 적어 둔 기간에 실제로 닿게 한다.
-
-             ⚠️ **yearly 를 그대로 주면 안 된다.** yearlyStats 는 거래일이 20일 넘는 해를 다
-             세므로 10년 조회에 11개(2016~2026)가 나온다 — 시작 해의 토막을 한 해로 세기
-             때문이다. 그러면 "(최근 10년)"이라 적어 놓고 11년을 편다. 조회 기간만큼 잘라
-             2017~2026 을 준다.
+             나머지 해를 여기서 펼쳐, 적어 둔 기간에 실제로 닿게 한다. 펴는 것은 요약이 세는
+             것과 **같은 목록**(scoped)이라, 손으로 세어 봐도 문장과 맞는다.
 
              막대가 이미 전부면(조회 기간이 짧아 잘릴 게 없으면) 버튼을 안 만든다. */
-          more: (() => {
-            const full = r.yearly.slice(-yrs);
-            return full.length > yearly.length ? <YearsPopover years={full} label={`최근 ${yrs}년`} /> : null;
-          })(),
+          more: scoped.length > yearly.length ? <YearsPopover years={scoped} label={`최근 ${yrs}년`} /> : null,
         };
 
   /* 2 — 하락 vs 회복 속도: 큰 하락마다 '빠지는 데'(왼쪽)와 '되돌아오는 데'(오른쪽).
@@ -1708,20 +1737,31 @@ function Attribution({
   const bench = attr.theme ?? attr.market;
   const gap = bench !== null && attr.stock !== 0 ? attr.stock - bench : null;
   const excess = gap !== null && gap < 0;
-  const share = gap !== null ? Math.round((Math.abs(gap) / Math.abs(attr.stock)) * 100) : null;
+  const benchLabel = attr.theme !== null ? "업종" : "코스피";
 
   return (
     <Sheet>
       <SectionHead icon="call_split" title="시장 탓일까, 종목 탓일까" desc="지수·업종과 견줘 이 종목만의 낙폭이 얼마인지" note="같은 기간" />
       <div style={{ flex: 1, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 18 }}>
-        {share !== null && (
+        {/* 큰 수치는 **아래 각주·히어로 해설과 같은 값·같은 단위**여야 한다(2026-08-04).
+            예전엔 여기만 '몫'(|gap| ÷ 자기 낙폭 = 14%)이라, 한 시트 안에서 14% 와 4.9%p 가
+            같은 것을 말하는 듯 다르게 적혔다. 게다가 그 14% 는 아래 막대 어디에도 안 보이는
+            숫자였다 — 지금 값(gap)은 업종 막대와 종목 막대의 차이로 눈에 그대로 잡힌다.
+
+            단위는 %p 로 둔다. 두 낙폭률의 **차이**라 % 로 적으면 틀린 말이 된다
+            (−38.7% 대비 −33.8% 는 '4.9% 덜'이 아니라 '12.7% 덜'이다).
+
+            색은 온도색을 안 쓴다. 이 값은 오르내림이 아니라 '견줘서 얼마나 벌어졌나'인데
+            34px 짜리 빨강이 경보처럼 읽혔다. 방향은 낱말('종목 탓'/'덜 빠진 폭')이 지고,
+            온도색은 아래 막대와 각주가 맡는다. */}
+        {gap !== null && (
           <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
-            <strong style={{ fontFamily: MONO, fontSize: 34, fontWeight: 800, letterSpacing: "-.035em", lineHeight: 1, color: excess ? DOWN : UP }}>
-              <span style={{ fontSize: 17, fontWeight: 700 }}>{excess ? "종목 탓 " : "덜 빠진 몫 "}</span>
-              {share}
-              <span style={{ fontSize: 17, fontWeight: 700 }}>%</span>
+            <strong style={{ fontFamily: MONO, fontSize: 34, fontWeight: 800, letterSpacing: "-.035em", lineHeight: 1, color: C.ink }}>
+              <span style={{ fontSize: 17, fontWeight: 700 }}>{excess ? "종목 탓 " : "덜 빠진 폭 "}</span>
+              {Math.abs(gap).toFixed(1)}
+              <span style={{ fontSize: 17, fontWeight: 700 }}>%p</span>
             </strong>
-            <span style={{ fontSize: 11.5, color: C.sub2 }}>{excess ? `시장·업종 ${100 - share}%` : "업종 평균보다 얕은 하락"}</span>
+            <span style={{ fontSize: 11.5, color: C.sub2 }}>{benchLabel} 평균보다 {excess ? "깊은" : "얕은"} 하락</span>
           </div>
         )}
         {/* 옆 시트(이 하락의 성격)에 맞춰 늘어나는데 여긴 막대 셋뿐이라 가운데가 빈다.
@@ -1755,7 +1795,7 @@ function Attribution({
                 </>
               ) : (
                 <>
-                  이 종목은 업종 평균보다 <b style={{ fontWeight: 800, color: UP }}>{fmtPct(gap)}p</b> 덜 빠졌습니다. 하락은 대체로 업종 전체가 함께 겪은 것입니다.
+                  이 종목은 {benchLabel} 평균보다 <b style={{ fontWeight: 800, color: UP }}>{fmtPct(gap)}p</b> 덜 빠졌습니다. 하락은 대체로 {benchLabel} 전체가 함께 겪은 것입니다.
                 </>
               )}
             </p>
