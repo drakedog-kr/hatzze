@@ -525,9 +525,11 @@ body {
 }
 /* 호버한 구간만 남기고 띠를 흐린다. 줄과 띠 칸은 형제가 아니라 짝을 못 짓는데,
    :has() 로 "이 구간 줄이 호버된 분포 셀"을 집으면 그 안에서 같은 data-band 를 고를 수
-   있다. 미지원 브라우저는 띠가 안 흐려질 뿐, 목록은 그대로 열린다. */
-.hz-dist:has(.hz-dist-row:hover) .hz-dist-seg,
-.hz-dist:has(.hz-dist-row:focus-within) .hz-dist-seg {
+   있다. 미지원 브라우저는 띠가 안 흐려질 뿐, 목록은 그대로 열린다.
+   ⚠️ 0개인 구간(.hz-dist-row-none)은 뺀다. 그 구간은 띠에 칸이 아예 없어서, 흐리는
+   규칙만 걸리고 되살릴 칸이 없어 **띠 전체가 흐려진다** — 고장으로 보인다. */
+.hz-dist:has(.hz-dist-row:not(.hz-dist-row-none):hover) .hz-dist-seg,
+.hz-dist:has(.hz-dist-row:not(.hz-dist-row-none):focus-within) .hz-dist-seg {
   opacity: 0.22;
 }
 .hz-dist:has(.hz-dist-row[data-band="0"]:hover) .hz-dist-seg[data-band="0"],
@@ -641,6 +643,26 @@ body {
   font-size: 11px;
   font-weight: 800;
   color: var(--c-sub);
+}
+
+/* ── 지표가 0개인 구간 ────────────────────────────────────────────
+   줄은 그대로 열리되(반응이 없으면 고장으로 읽힌다) 목록 대신 한 줄만 띄운다.
+   상자는 내용 높이만큼만 — 위아래를 못박은 기본값이면 한 줄짜리가 258px 빈 판이 된다. */
+.hz-dist-pop-slim {
+  bottom: auto;
+  padding: 10px 12px;
+}
+.hz-dist-pop-none {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--c-sub);
+  text-wrap: pretty;
+}
+/* 누를 것이 없는 줄이라 손가락 커서를 주지 않는다. 하이라이트는 그대로 걸린다 —
+   "이 줄을 보고 있다"는 표시는 내용이 없어도 필요하다. */
+.hz-dist-row-none {
+  cursor: default;
 }
 
 /* ── 스크롤 목적지 ────────────────────────────────────────────────
