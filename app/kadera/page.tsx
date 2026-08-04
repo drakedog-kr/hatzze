@@ -60,8 +60,9 @@ function compact(n: number): string {
  * 아닌 날은 그날의 것이 굵어진다.
  *
  * ⚠️ 한 문단에 **최대 둘**이다. 굵은 데가 셋을 넘으면 강조가 아니라 얼룩이 된다.
- * 같은 낱말은 두 번 굵히지 않는다 — 반도체가 세 번 나오는 날 두 자리를 그 하나가
- * 다 먹으면, 정작 다른 주인공이 묻힌다.
+ * 그리고 같은 낱말은 **글 전체에서 한 번만** 굵어진다 — used 를 문단마다 새로 만들면
+ * 반도체가 2·3문단에서 각각 한 번씩, 화면에서는 두 번 굵어진다(실측). 세 문단이
+ * 한 글이므로 셈도 글 단위로 한다. 그래서 호출자가 Set 을 들고 넘긴다.
  *
  * ⚠️ 긴 낱말을 먼저 대본다. "삼성전자"를 "삼성"보다 뒤에 대면 "삼성"만 굵어지고
  * "전자"가 떨어져 나온다.
@@ -74,15 +75,15 @@ const HANGUL = /[\uAC00-\uD7A3]/;
 
 const MAX_BOLD_PER_PARAGRAPH = 2;
 
-function highlightTerms(text: string, terms: string[]): React.ReactNode[] {
+function highlightTerms(text: string, terms: string[], used: Set<string>): React.ReactNode[] {
   if (terms.length === 0) return [text];
   const out: React.ReactNode[] = [];
-  const used = new Set<string>();
+  let inThisParagraph = 0;
   let i = 0;
   let key = 0;
   let buf = "";
   outer: while (i < text.length) {
-    if (used.size >= MAX_BOLD_PER_PARAGRAPH) break;
+    if (inThisParagraph >= MAX_BOLD_PER_PARAGRAPH) break;
     for (const term of terms) {
       if (used.has(term)) continue;
       if (!text.startsWith(term, i)) continue;
@@ -100,6 +101,7 @@ function highlightTerms(text: string, terms: string[]): React.ReactNode[] {
         </b>,
       );
       used.add(term);
+      inThisParagraph += 1;
       i += term.length;
       continue outer;
     }
@@ -744,13 +746,18 @@ export default async function KaderaPage() {
                 벌어지면 세 문단이 별개의 블록으로 읽힌다.
                 구분자가 없는 옛 데이터(한 덩어리)는 그대로 한 문단이 된다. */}
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {(sentiment?.summary ?? "오늘의 요약을 준비하고 있습니다.")
-                .split(/\n{2,}/)
-                .map((para, i) => (
-                  <p key={i} style={{ margin: 0, fontSize: 14, lineHeight: 1.7, color: "var(--c-ink-soft)", textWrap: "pretty", wordBreak: "keep-all" }}>
-                    {highlightTerms(para, summaryTerms)}
-                  </p>
-                ))}
+              {(() => {
+                /* 굵힌 낱말을 **세 문단에 걸쳐** 기억한다. 문단마다 새로 세면 반도체가
+                   2문단·3문단에서 각각 한 번씩 굵어져 화면에는 두 번으로 보인다. */
+                const used = new Set<string>();
+                return (sentiment?.summary ?? "오늘의 요약을 준비하고 있습니다.")
+                  .split(/\n{2,}/)
+                  .map((para, i) => (
+                    <p key={i} style={{ margin: 0, fontSize: 14, lineHeight: 1.7, color: "var(--c-ink-soft)", textWrap: "pretty", wordBreak: "keep-all" }}>
+                      {highlightTerms(para, summaryTerms, used)}
+                    </p>
+                  ));
+              })()}
             </div>
             {/* 기준 시각은 **언제나 이 칸 맨 아래 왼쪽**이다 — 요약 글이 날마다 3줄·4줄로
                 달라져도 자리가 안 흔들려야 "이 화면의 기준 시각"으로 읽힌다(시장 브리핑
