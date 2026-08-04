@@ -47,13 +47,10 @@ export const BLUE_SCALE = [
   "var(--c-blue-5)",
 ] as const;
 
-/** 카드·셸의 그림자. 목업은 헤어라인이 아니라 진짜 그림자를 쓴다. */
-export const SH = {
-  shell: "var(--sh-shell)",
-  card: "var(--sh-card)",
-  blue: "var(--sh-blue)",
-  blueStrong: "var(--sh-blue-strong)",
-} as const;
+/* 그림자 묶음 SH(shell/card/blue/blueStrong)는 여기 있었다. 콘솔 리디자인이 카드를
+   시트로 바꾸면서 경계가 그림자에서 헤어라인으로 돌아갔고, 마지막 소비자였던
+   kadera/parts.tsx 의 `card` 와 함께 참조가 0이 됐다. 살아 있는 그림자는 --c-shadow ·
+   --c-shadow-strong 둘이고, 그건 C.shadow 로 따로 나간다. */
 
 /** 반지름. 셸 28 / 카드 22 / 타일 14 / 아이콘 타일 13 / 알약 99. */
 export const R = {
