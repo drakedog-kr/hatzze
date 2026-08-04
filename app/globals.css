@@ -1264,6 +1264,80 @@ main.hz-scroll { overflow-x: clip; }
   transform: translateX(-50%) translateY(6px);
 }
 
+/* ── 툴팁을 판 밖으로 꺼낸다 ────────────────────────────────────────
+   위 규칙들은 전부 position:absolute 라 **조상의 overflow:hidden 에 잘린다.** 그 조상은
+   우연이 아니라 구조다: 히어로 판(.hz-hero-panel)·지표 시트(.hz-cards)·카더라/MDD
+   시트(.hz-sheet)가 셋 다 overflow:hidden 으로 격자선의 남는 끝과 둥근 모서리를 자른다.
+   그래서 셀 맨 윗줄에 붙은 툴팁은 세 화면 어디서나 판 경계에서 잘려 나갔다
+   (2026-08-04, ✨ 고지 툴팁이 히어로 판 위쪽에서 잘린 게 신고된 자리).
+
+   position:fixed 는 그 clip 을 안 받는다 — fixed 가 잘리려면 그 조상이 fixed 의
+   컨테이닝 블록이어야 하는데, transform·filter·contain 이 없으면 컨테이닝 블록은
+   뷰포트다(위 세 판 모두 없는 것을 실측으로 확인).
+
+   자리는 CSS 앵커 위치지정이 잡는다. 앵커는 아래 규칙이 클래스 하나로 걸어 주므로,
+   data-tip 이 붙은 60여 곳의 마크업은 하나도 안 건드린다.
+
+   덤이 둘이다.
+   ① 가장자리에서 여는 방향을 브라우저가 알아서 튼다(position-try-fallbacks). 지금까지
+      손으로 붙이던 hz-tip-start/end 는 지원 브라우저에서 하는 일이 없어진다 — 클래스는
+      미지원 브라우저를 위해 그대로 둔다.
+   ② 기준이 '조상 판'이 아니라 **뷰포트**로 바뀐다. 카드 안에서 넘치는지를 재던 것이
+      화면 안에서 넘치는지가 되므로, 좁은 칸에 든 툴팁도 옆 칸을 덮으며 온전히 열린다.
+
+   @supports 로 감싸는 이유: 미지원 브라우저는 위 absolute 규칙 그대로다. 지금보다
+   나빠지는 자리가 없다.
+   ⚠️ 이 블록은 hz-tip-start/end/below 보다 **뒤에** 있어야 한다. 특이도가 같아서
+   (@supports 는 특이도를 안 올린다) 순서로만 이긴다.
+
+   ⚠️ anchor-scope 를 조건에 같이 건다. anchor-name 만 되고 anchor-scope 가 안 되는
+   브라우저가 있으면 **한 페이지의 툴팁 158개가 전부 같은 이름을 갖게 돼**, 각자 자기
+   요소가 아니라 문서의 마지막 .hz-tip 에 달라붙는다. 지금보다 훨씬 나쁜 그림이라
+   둘 다 되는 곳에서만 켠다. */
+@supports (anchor-scope: --a) and (position-area: top center) {
+  /* ::after 의 '암묵 앵커'(자기를 만든 요소)에 기대면 안 된다 — 실측하니 position-anchor
+     가 none 으로 풀려 position-area 가 통째로 무시되고, 툴팁이 자기 정적 위치에 그냥
+     떠 있었다(잘리지만 않을 뿐 자리가 안 맞는다). 이름을 명시적으로 붙인다.
+
+     이름은 하나뿐인데 페이지엔 .hz-tip 이 158개다. anchor-scope 가 그 이름을 **자기
+     서브트리 안에서만** 보이게 막아 주므로, 각 ::after 는 자기를 만든 요소만 앵커로
+     찾는다(이게 없으면 전부 마지막 .hz-tip 을 가리킨다). */
+  .hz-tip {
+    anchor-name: --hz-tip;
+    anchor-scope: --hz-tip;
+  }
+  .hz-tip::after {
+    position: fixed;
+    position-anchor: --hz-tip;
+    /* 위 규칙들이 깔아 둔 bottom/left/right 와 transform 을 걷어낸다. 남겨 두면
+       position-area 가 잡아 준 자리를 그 값들이 다시 밀어낸다. */
+    inset: auto;
+    transform: none;
+    position-area: top center;
+    /* 순서대로 시도해 처음 들어맞는 것을 쓴다. 좌우로 넘칠 때가 위로 넘칠 때보다
+       흔해서(칸이 폭 240 남짓) 좌우 보정을 먼저 둔다. */
+    position-try-fallbacks:
+      top span-right,
+      top span-left,
+      bottom center,
+      bottom span-right,
+      bottom span-left;
+    /* 앵커와의 간격. translateY(-6px) 를 대신한다 — transform 으로 두면 아래로 뒤집힌
+       fallback 에서 6px 이 앵커 쪽으로 붙어 버린다. margin 은 어느 방향이든 바깥이다. */
+    margin: 6px;
+  }
+  /* 아래로 여는 자리는 그대로 아래가 기본이다. 뒤집기는 '위에 자리가 없을 때' 켜지는데
+     그 판정 기준이 이제 뷰포트라, 이 자리들(본문 맨 윗줄)은 위가 비어 있는 것으로
+     계산돼 헤더를 덮으며 위로 열린다. */
+  .hz-tip-below::after {
+    position-area: bottom center;
+    position-try-fallbacks:
+      bottom span-right,
+      bottom span-left,
+      top center;
+  }
+}
+
 /* 탭으로도 여는 변형 — PC 는 :hover, 모바일은 눌렀을 때 잡히는 :focus-within.
    기본 .hz-tip 은 :hover 전용이라 모바일에서 아예 안 열린다. 도움말이라면 그래도
    되지만(옆의 숫자가 이미 다 말하고 있다) 법정 고지 문구는 닿지 못하면 표시를 안 한
