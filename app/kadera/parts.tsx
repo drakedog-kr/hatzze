@@ -107,7 +107,7 @@ export function Pill({
 export function RankDelta({ change, unit = "계단" }: { change: number | null; unit?: string }) {
   if (change === null || change === 0) return null;
   return (
-    <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: change > 0 ? C.hot : C.cold, whiteSpace: "nowrap" }}>
+    <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: change > 0 ? "var(--c-hot-ink)" : "var(--c-cold-ink)", whiteSpace: "nowrap" }}>
       {change > 0 ? "▲" : "▼"}
       {Math.abs(change)}
       {unit}
@@ -364,10 +364,10 @@ export function DayBars({
                 flex: 1,
                 minWidth: 0,
                 textAlign: "center",
-                fontSize: 10,
+                fontSize: 10.5,
                 fontFamily: MONO,
                 fontWeight: mark ? 700 : 500,
-                color: mark ? (tone === "warm" ? "var(--c-hot-ink)" : "var(--c-cold-ink)") : C.muted,
+                color: mark ? (tone === "warm" ? "var(--c-hot-ink)" : "var(--c-cold-ink)") : C.sub2,
               }}
             >
               {shortDate(d)}

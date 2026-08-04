@@ -187,7 +187,7 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
                     <span
                       key={t}
                       style={{
-                        fontSize: 9.5,
+                        fontSize: 10.5,
                         fontWeight: 700,
                         color: C.label,
                         background: C.card,
@@ -421,7 +421,7 @@ export default async function KaderaPage() {
         <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: C.label, textAlign: "right" }}>
           {c.viewRate != null ? `${c.viewRate.toFixed(1)}%` : "—"}
         </span>
-        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, textAlign: "right", color: c.rankChange ? (c.rankChange > 0 ? "var(--c-hot-ink)" : "var(--c-cold-ink)") : C.hint }}>
+        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, textAlign: "right", color: c.rankChange ? (c.rankChange > 0 ? "var(--c-hot-ink)" : "var(--c-cold-ink)") : C.sub2 }}>
           {c.rankChange ? `${c.rankChange > 0 ? "▲" : "▼"}${Math.abs(c.rankChange)}` : "—"}
         </span>
         <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: C.ink, textAlign: "right" }}>
@@ -959,7 +959,7 @@ export default async function KaderaPage() {
                   <div className="hz-stock-head" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                     <StockLogo code={r.code} name={r.name} market={r.market} size={30} />
                     <strong style={{ ...clip, minWidth: 0, fontSize: 17, fontWeight: 800, letterSpacing: "-.02em", color: C.ink }}>{r.name}</strong>
-                    <span style={{ fontFamily: MONO, fontSize: 11, color: C.faint, flexShrink: 0 }}>{r.code}</span>
+                    <span style={{ fontFamily: MONO, fontSize: 11, color: C.sub2, flexShrink: 0 }}>{r.code}</span>
                     {r.price != null && (
                       <span className="hz-stock-price" style={{ display: "flex", alignItems: "baseline", gap: 7, whiteSpace: "nowrap", flexShrink: 0 }}>
                         <span style={{ fontFamily: MONO, fontSize: 15, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
@@ -1141,7 +1141,7 @@ export default async function KaderaPage() {
                   );
                 })}
                 <div className="hz-sheet-foot" style={{ marginTop: "auto" }}>
-                  <span style={{ fontSize: 10.5, color: C.sub2 }}>
+                  <span style={{ fontSize: 12, color: C.sub }}>
                     막대는 1위({real[0] ? Math.abs(real[0].delta7d).toLocaleString("ko-KR") : "-"}명) 기준 상대 증가폭입니다
                   </span>
                 </div>
