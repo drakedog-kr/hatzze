@@ -1237,6 +1237,49 @@ function Underwater({ a, periodLabel }: { a: MddAnalysis; periodLabel: string })
   let ti = 0;
   for (let i = 1; i < n; i++) if (series[i].dd < series[ti].dd) ti = i;
 
+  /* 확대 보기. 폰에서 이 차트는 뷰박스 720 units 가 화면 폭(≈350)으로 눌려 **절반 축척**이
+     된다 — 연도·퍼센트 라벨이 11 units 라 실제 5~6px 로 찍혀 안 읽힌다.
+     오버레이에서 무대 폭을 100vh 로 잡고 90도 돌리면 화면의 긴 변을 쓰게 되어 폰에서
+     2배 남짓 커진다(393×830 기준 350 → 830). 같은 SVG 를 그대로 다시 그리므로
+     곡선·눈금·라벨이 갈릴 일이 없다. */
+  const [zoom, setZoom] = useState(false);
+  useEffect(() => {
+    if (!zoom) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setZoom(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [zoom]);
+
+  const chart = (
+      <svg
+      viewBox={`0 -6 ${W} ${H + 26}`}
+      width="100%"
+      style={{ overflow: "visible" }}
+      role="img"
+      aria-label={`고점 대비 낙폭 곡선. 현재 ${fmtPct(series[n - 1].dd)}, 기간 최저 ${fmtPct(mdd)}`}
+    >
+      <line x1={PAD_L} y1="0" x2={W} y2="0" stroke={C.line} strokeWidth="1" />
+      {rows.slice(1).map((dd, i) => (
+        <line key={i} x1={PAD_L} y1={y(dd)} x2={W} y2={y(dd)} stroke={C.line} strokeWidth="1" strokeDasharray="2 5" />
+      ))}
+      <path d={area} fill={DOWN_BAR[1]} fillOpacity="0.14" />
+      <path d={line} fill="none" stroke={DOWN_BAR[1]} strokeWidth="1.6" strokeLinejoin="round" />
+      {/* 기간 최저점 표시 — **빈 동그라미만**. 현재 지점에도 속 찬 점을 찍었었는데 뺐다:
+          선이 끝나는 자리가 곧 현재이고, 그 값은 히어로가 이미 크게 말한다. */}
+      <circle cx={x(ti)} cy={y(series[ti].dd)} r="3.5" fill={C.card} stroke={DOWN} strokeWidth="1.6" />
+      {rows.map((dd, i) => (
+        <text key={i} x={PAD_L - LABEL_GAP} y={y(dd) + 4} fontSize="11" fill={C.muted} textAnchor="end">
+          {Math.round(dd)}%
+        </text>
+      ))}
+      {ticks.map((t, i) => (
+        <text key={i} x={t.x} y={H + 16} fontSize="11" fill={C.muted} textAnchor="middle">
+          {t.year}
+        </text>
+      ))}
+    </svg>
+  );
+
   return (
     <Sheet>
       <SectionHead
@@ -1250,33 +1293,7 @@ function Underwater({ a, periodLabel }: { a: MddAnalysis; periodLabel: string })
           종목) 뷰박스 오른쪽 끝에 놓여 기본값(hidden)이면 반지름만큼 잘린다. 뷰박스를
           넓히는 대신 넘침만 허용한다 — 넓히면 아래 크로스헤어 띠(퍼센트로 잡은 위치)가
           곡선과 어긋난다. */}
-      <svg
-        viewBox={`0 -6 ${W} ${H + 26}`}
-        width="100%"
-        style={{ overflow: "visible" }}
-        role="img"
-        aria-label={`고점 대비 낙폭 곡선. 현재 ${fmtPct(series[n - 1].dd)}, 기간 최저 ${fmtPct(mdd)}`}
-      >
-        <line x1={PAD_L} y1="0" x2={W} y2="0" stroke={C.line} strokeWidth="1" />
-        {rows.slice(1).map((dd, i) => (
-          <line key={i} x1={PAD_L} y1={y(dd)} x2={W} y2={y(dd)} stroke={C.line} strokeWidth="1" strokeDasharray="2 5" />
-        ))}
-        <path d={area} fill={DOWN_BAR[1]} fillOpacity="0.14" />
-        <path d={line} fill="none" stroke={DOWN_BAR[1]} strokeWidth="1.6" strokeLinejoin="round" />
-        {/* 기간 최저점 표시 — **빈 동그라미만**. 현재 지점에도 속 찬 점을 찍었었는데 뺐다:
-            선이 끝나는 자리가 곧 현재이고, 그 값은 히어로가 이미 크게 말한다. */}
-        <circle cx={x(ti)} cy={y(series[ti].dd)} r="3.5" fill={C.card} stroke={DOWN} strokeWidth="1.6" />
-        {rows.map((dd, i) => (
-          <text key={i} x={PAD_L - LABEL_GAP} y={y(dd) + 4} fontSize="11" fill={C.muted} textAnchor="end">
-            {Math.round(dd)}%
-          </text>
-        ))}
-        {ticks.map((t, i) => (
-          <text key={i} x={t.x} y={H + 16} fontSize="11" fill={C.muted} textAnchor="middle">
-            {t.year}
-          </text>
-        ))}
-      </svg>
+      {chart}
       {/* 시장 브리핑 지표 카드와 같은 크로스헤어 — 보이지 않는 세로 띠가 hover 시 기준선(hz-vline)과
           툴팁(hz-tip)을 낸다. 연도 라벨 높이(≈26px)만큼 아래로 남는 띠는 무시할 수준이다.
           ⚠️ 시트 padding 안쪽에 맞춰야 한다 — 바깥(시트) 기준으로 잡으면 곡선과 어긋난다. */}
@@ -1310,8 +1327,30 @@ function Underwater({ a, periodLabel }: { a: MddAnalysis; periodLabel: string })
           );
         })}
       </div>
+      {/* 확대 버튼 — 차트 오른쪽 아래. 리스크 프로필의 '전체보기'(.hz-yrpop-btn)와 같은
+          아이콘·같은 자리 어법이라 새 언어를 안 만든다. 폰에서만 뜬다(CSS). */}
+      <button
+        type="button"
+        className="mdd-zoom-btn"
+        aria-label="언더워터 차트 확대해서 보기"
+        onClick={() => setZoom(true)}
+      >
+        <Icon name="open_in_full" style={{ fontSize: 15 }} />
+      </button>
       </div>
       <Foot>0%가 전고점입니다. 아래로 갈수록 그 고점에서 멀어져 있다는 뜻이며, 선이 0에 닿은 날이 고점을 되찾은 날입니다.</Foot>
+      {zoom && (
+        /* 스크림을 눌러도 닫힌다. 무대는 90도 돌려 화면의 긴 변을 쓴다. */
+        <div className="mdd-zoom-scrim" role="dialog" aria-modal="true" aria-label="언더워터 차트 확대" onClick={() => setZoom(false)}>
+          <button type="button" className="mdd-zoom-close" aria-label="닫기" onClick={() => setZoom(false)}>
+            <Icon name="close" style={{ fontSize: 20 }} />
+          </button>
+          {/* 무대 안을 눌렀을 때는 안 닫는다 — 곡선을 짚어 보는 중일 수 있다. */}
+          <div className="mdd-zoom-stage" onClick={(e) => e.stopPropagation()}>
+            {chart}
+          </div>
+        </div>
+      )}
     </Sheet>
   );
 }
@@ -1695,9 +1734,14 @@ function RiskProfile({ r, periodLabel }: { r: RiskProfileData; periodLabel: stri
             <div>{t.body.viz}</div>
             {/* 요약과 전체보기가 한 줄을 나눠 쓴다. 팝오버가 이 칸 기준으로 위로 펴지므로
                 relative 가 여기 있어야 한다(패널에 주면 요약 줄 위로 안 붙는다). */}
-            <div style={{ position: "relative", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 10, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.divider}` }}>
+            {/* justifyContent 가 '전체보기'가 있느냐에 딸린다. space-between 은 자식이
+                둘일 때 양끝으로 미는 규칙인데, 전체보기가 없는 패널은 자식이 요약 하나뿐이라
+                그 규칙이 요약을 왼쪽 끝에 붙여 놓는다 — 폰에서 패널이 화면 폭을 다 쓰면
+                오른쪽에 107px 빈자리가 남아 줄이 어긋난 것처럼 보였다(실기기 피드백).
+                혼자면 가운데, 전체보기와 나눠 쓰면 양끝. */}
+            <div style={{ position: "relative", display: "flex", alignItems: "flex-end", justifyContent: t.body.more ? "space-between" : "center", gap: 10, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.divider}` }}>
               {/* foot 은 <p> 라 <span> 으로 감싸면 안 된다(span 은 phrasing content 만 받는다). */}
-              <div style={{ minWidth: 0 }}>{t.body.foot}</div>
+              <div style={{ minWidth: 0, textAlign: t.body.more ? "left" : "center" }}>{t.body.foot}</div>
               {t.body.more}
             </div>
           </div>

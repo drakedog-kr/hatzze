@@ -897,7 +897,11 @@ body {
 .hz-sheet-foot,
 .hz-sheet-foot-row {
   min-height: 39px;
-  padding: 0 22px;
+  /* 위아래 11 은 **줄바꿈될 때를 위한 것**이다. 한 줄일 때는 min-height 39 가 여백을
+     만들어 줘서(11 + 글줄 17 + 11 = 39) 있으나 마나지만, 폰에서 이 각주는 두세 줄이
+     되고 그 순간 min-height 가 놀아 버려 padding 0 이 그대로 드러났다 — 글이 띠의
+     위아래 선에 딱 붙었다(실측: 3줄 각주의 위여백 1px · 아래여백 0px). */
+  padding: 11px 22px;
   display: flex;
   align-items: center;
   background: var(--c-card);
@@ -1484,6 +1488,31 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
   .hz-dist-pop-item {
     min-height: 40px;
     padding: 8px 7px;
+  }
+
+  /* ── 폰에서는 구분선을 한 단계 진하게 ──────────────────────────────
+     흰 카드 위 명암비가 sheet-line 1.18 · line 1.15 · panel-line 1.26 이다. 큰 화면에서
+     카드가 격자로 흩어져 있을 땐 **위치**가 이미 구분을 맡아서 선은 거들기만 하면 되는데,
+     폰에서는 카드가 세로로 한 줄에 이어 붙어 이 선 하나가 유일한 경계가 된다. 같은
+     1.18 이 데스크톱에선 은은하고 폰에선 없는 것처럼 보이는 이유다(히어로 세 칸도,
+     지표 카드 스물여섯도 같은 증상 — 실기기 피드백 2026-08-05).
+
+     값은 램프에서 한 칸씩 내렸다. 테두리처럼 무겁지 않으면서 경계가 눈에 걸리는 선이다.
+     ⚠️ 여기서 바꾸는 건 **선 색뿐**이다. 배경·잉크는 그대로라 화면 인상은 안 바뀐다. */
+  :root {
+    --c-sheet-line: #d7e1ed; /* 1.18 → 1.36 */
+    --c-line: #dbe4ef; /* 컨트롤 테두리 */
+    --c-panel-line: #ccd8e8; /* 패널 경계는 격자선보다 한 톤 더 */
+    --c-divider: #e4ebf3;
+    --c-divider-strong: #d7e1ed;
+  }
+  :root[data-theme="dark"] {
+    /* 다크는 방향이 반대다 — 밝은 쪽으로 한 칸. */
+    --c-sheet-line: #3a3a45;
+    --c-line: #3a3a45;
+    --c-panel-line: #474753;
+    --c-divider: rgba(214, 224, 239, 0.14);
+    --c-divider-strong: rgba(213, 223, 244, 0.2);
   }
 }
 
@@ -2522,3 +2551,72 @@ main.hz-scroll { overflow-x: clip; }
 /* 푸터 링크 호버 — 목업이 파랑으로 밝힌다. 인라인 color 를 이겨야 하므로 여기서 !important
    없이 쓰려면 :hover 가 더 구체적이어야 한다(클래스 + 의사클래스). */
 .hz-foot-link:hover { color: var(--c-blue) !important; }
+
+/* ── 언더워터 차트 확대 보기 ────────────────────────────────────────
+   폰에서 이 차트는 뷰박스 720 units 가 화면 폭(≈350)으로 눌려 절반 축척이 된다. 연도·
+   퍼센트 라벨이 11 units 라 실제 5~6px 로 찍혀 안 읽힌다(실기기 피드백 2026-08-05).
+   무대를 90도 돌려 화면의 **긴 변**을 쓰면 393×830 폰에서 350 → 830 으로 2배 남짓 커진다. */
+.mdd-zoom-btn {
+  position: absolute;
+  right: 22px;
+  bottom: 12px;
+  display: none; /* 폰에서만 (아래 미디어쿼리) — 넓은 화면은 이미 크다 */
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  background: var(--c-card);
+  color: var(--c-sub);
+  cursor: pointer;
+}
+.mdd-zoom-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 불투명이어야 한다. 반투명으로 뒀더니 뒤 카드의 글자가 곡선 사이로 비쳐 확대한
+     보람이 없었다 — 확대 보기는 '겹쳐 띄운 창'이 아니라 '이 차트만 보는 화면'이다. */
+  background: var(--c-page);
+}
+.mdd-zoom-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  background: var(--c-card);
+  color: var(--c-ink);
+  cursor: pointer;
+}
+/* ⚠️ **세로일 때만 돌린다.** 무조건 돌려 두면, 이용자가 크게 보려고 폰을 가로로
+   눕히는 순간 OS 가 뷰포트를 돌리고 그 위에 이 rotate 가 또 얹혀서 차트가 도로 세로로
+   선다 — 크게 보려는 행동이 오히려 화면을 망친다.
+   세로: 폭을 100vh 로 두고 90도 돌리면 그 폭이 화면의 긴 변을 타고 눕는다(393×830 폰에서
+   350 → 830, 2배 남짓). 가로: 이미 긴 변이 가로라 돌릴 것 없이 폭만 채운다. */
+.mdd-zoom-stage {
+  width: 100%;
+  padding: 0 24px;
+  /* ⚠️ flex 자식은 기본이 flex-shrink:1 이다. 아래 세로 규칙에서 폭을 100vh(=830) 로
+     줘도 스크림(393 폭)이 그대로 830 → 393 으로 눌러 버려서, 돌려 놓고 보면 확대가
+     아니라 오히려 작았다. 눌리지 않게 못박는다. */
+  flex: none;
+}
+@media (orientation: portrait) {
+  .mdd-zoom-stage {
+    width: 100vh;
+    transform: rotate(90deg);
+    transform-origin: center;
+  }
+}
+@media (max-width: 560px) {
+  .mdd-zoom-btn { display: flex; }
+}
