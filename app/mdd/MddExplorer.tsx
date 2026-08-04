@@ -525,12 +525,14 @@ function Controls({
 }
 
 /* ── 결과 ─────────────────────────────────────────────────────── */
-/** 시트 묶음 앞의 구간 이름 — 마이크로 캡스 + 시트 수. */
+/** 시트 묶음 앞의 구간 이름 — 배지 + 시트 수.
+    생김새도 간격도 .hz-section-badge(globals.css) — 시장 브리핑·카더라의 같은 줄과
+    한 벌이다. 이 컨테이너의 gap 이 16 이라 클래스 기본값을 그대로 쓰면 위 30 이 된다. */
 function GroupLabel({ title, count }: { title: string; count: number }) {
   return (
-    <div style={{ display: "flex", alignItems: "baseline", gap: 9, marginTop: 4 }}>
-      <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".1em", color: C.label }}>{title}</span>
-      <span style={{ fontSize: 10.5, fontWeight: 700, color: C.label }}>{count}</span>
+    <div className="hz-section-badge">
+      <span>{title}</span>
+      <span className="hz-section-badge-n">{count}</span>
     </div>
   );
 }
