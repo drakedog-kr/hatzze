@@ -52,12 +52,19 @@ export const BLUE_SCALE = [
    kadera/parts.tsx 의 `card` 와 함께 참조가 0이 됐다. 살아 있는 그림자는 --c-shadow ·
    --c-shadow-strong 둘이고, 그건 C.shadow 로 따로 나간다. */
 
-/** 반지름. 셸 28 / 카드 22 / 타일 14 / 아이콘 타일 13 / 알약 99. */
+/**
+ * 반지름 — 토스증권 웹 실측 눈금(globals.css 의 --r-* 주석에 근거를 적어 뒀다).
+ * 카드·패널 12 / 내비 항목 9 / 버튼·타일 8 / 알약은 그대로.
+ *
+ * 역할로 고른다. 같은 값을 쓰더라도 "이건 카드다 / 버튼이다"를 이름이 말해야,
+ * 다음에 눈금을 옮길 때 무엇이 같이 움직여야 하는지가 드러난다.
+ * (예전엔 shell·card·icon 셋이 쓰는 곳 없이 남아 있었고, 살아 있던 tile 하나가
+ *  카드·타일·내비를 다 겸했다.)
+ */
 export const R = {
-  shell: "var(--r-shell)",
   card: "var(--r-card)",
-  tile: "var(--r-tile)",
-  icon: "var(--r-icon)",
+  nav: "var(--r-nav)",
+  control: "var(--r-control)",
   pill: "var(--r-pill)",
 } as const;
 

@@ -28,7 +28,7 @@ import { C, MONO, R } from "../ui";
  */
 export const subCard: React.CSSProperties = {
   background: C.soft,
-  borderRadius: R.tile,
+  borderRadius: R.control,
   minWidth: 0,
 };
 

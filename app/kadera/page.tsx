@@ -21,7 +21,7 @@ import { formatKstUpdate } from "@/lib/format";
 
 import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
-import { AiMark, C, Icon, MONO } from "../ui";
+import { AiMark, C, Icon, MONO, R } from "../ui";
 import { ExpandableList } from "./ExpandableList";
 import { Avatar, ChangeRate, DayBars, Pill, QuoteDate, RankBadge, RankDelta, SectionCaps, Sparkline, rankNum } from "./parts";
 import { StockLogo } from "../StockLogo";
@@ -1077,7 +1077,7 @@ export default async function KaderaPage() {
                   />
 
                   {narratives[r.code] && (
-                    <div style={{ display: "flex", gap: 9, background: C.soft, borderRadius: 10, padding: "12px 13px" }}>
+                    <div style={{ display: "flex", gap: 9, background: C.soft, borderRadius: R.control, padding: "12px 13px" }}>
                       <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
                       <p style={{ margin: 0, fontSize: 13, lineHeight: 1.7, color: "var(--c-ink-soft)", textWrap: "pretty", wordBreak: "keep-all" }}>
                         {narratives[r.code]}
