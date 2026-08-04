@@ -150,6 +150,18 @@ const clip: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", te
 
 /** 시트 안 열 머리·데이터 행이 공유하는 격자. 한 곳에서 내야 두 줄의 칸이 어긋나지 않는다. */
 const KEYWORD_COLS = "26px minmax(80px,1fr) minmax(70px,1.5fr) 58px";
+
+/**
+ * 시트 두 장이 한 줄에 나란히 설 최소 폭.
+ *
+ * 320 이었는데, 그 값이면 창 1100(컨테이너 834)에서도 둘이 나란히 서서 시트 하나가
+ * 409px 밖에 안 된다. 그 안에 5열을 넣으면 채널명 칸이 70~93px 로 눌려 최악 67% 가
+ * 잘렸다(실측). 460 이면 둘이 서려면 컨테이너 936(창 ~1214) 이 필요해서, 그 아래에서는
+ * 한 장씩 세로로 서고 시트가 컨테이너 폭을 통째로 쓴다.
+ *
+ * 데스크톱은 그대로다 — 창 1440 은 컨테이너 1164 라 936 을 넉넉히 넘긴다.
+ */
+const SHEET_PAIR_MIN = 460;
 /* 채널 표 두 벌(파워 랭킹·뜨는 채널)의 격자는 여기 없다 — globals.css 의 .hz-cols-ch /
    .hz-cols-rise 다. 폰에서 열을 접어야 하는데 인라인 style 은 미디어쿼리를 이겨서,
    여기 두면 @media 가 아무 일도 못 한다. 이유는 그 클래스 주석에 적어 뒀다. */
@@ -888,7 +900,7 @@ export default async function KaderaPage() {
 
       {/* ── 테마 로테이션 · 이슈 키워드 (50:50) ──────────────────────── */}
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-        <section className="hz-sheet" style={{ flex: "1 1 calc(50% - 8px)", minWidth: 320, display: "flex", flexDirection: "column" }}>
+        <section className="hz-sheet" style={{ flex: "1 1 calc(50% - 8px)", minWidth: SHEET_PAIR_MIN, display: "flex", flexDirection: "column" }}>
           <SectionHead
             icon="donut_small"
             title="테마 로테이션"
@@ -935,7 +947,7 @@ export default async function KaderaPage() {
           )}
         </section>
 
-        <section className="hz-sheet" style={{ flex: "1 1 calc(50% - 8px)", minWidth: 320, display: "flex", flexDirection: "column" }}>
+        <section className="hz-sheet" style={{ flex: "1 1 calc(50% - 8px)", minWidth: SHEET_PAIR_MIN, display: "flex", flexDirection: "column" }}>
           <SectionHead icon="tag" title="이슈 키워드" note="최근 7일" desc="종목명이 아닌 화제어 · 언급 횟수 기준" />
           {keywords.length === 0 ? (
             <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>아직 뽑을 화제어가 없습니다.</p>
@@ -1132,7 +1144,7 @@ export default async function KaderaPage() {
 
       {/* ── 채널 파워 랭킹 · 뜨는 채널 (50:50) ───────────────────────── */}
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-        <section className="hz-sheet" style={{ flex: "1 1 calc(50% - 8px)", minWidth: 320, display: "flex", flexDirection: "column" }}>
+        <section className="hz-sheet" style={{ flex: "1 1 calc(50% - 8px)", minWidth: SHEET_PAIR_MIN, display: "flex", flexDirection: "column" }}>
           <SectionHead icon="military_tech" title="채널 파워 랭킹" desc="조회율·확산력까지 반영한 채널 영향력" />
           {channels.length === 0 ? (
             <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>아직 채널 점수가 없습니다.</p>
@@ -1167,7 +1179,7 @@ export default async function KaderaPage() {
           )}
         </section>
 
-        <section className="hz-sheet" style={{ flex: "1 1 calc(50% - 8px)", minWidth: 320, display: "flex", flexDirection: "column" }}>
+        <section className="hz-sheet" style={{ flex: "1 1 calc(50% - 8px)", minWidth: SHEET_PAIR_MIN, display: "flex", flexDirection: "column" }}>
           {/* 기간 표기는 옆 시트와 "최근 7일"로 맞춘다. 구독자 스냅샷은 백필이 안 돼
               하루씩 쌓이므로 실제로 잰 구간이 그보다 짧은 날이 있다(getRisingChannels 의
               spanDays). 시트에 그 사정까지 적진 않는다. */}
