@@ -521,7 +521,7 @@ function PageHeader({ theme }: { theme: "light" | "dark" }) {
             {page.badge && (
               <span
                 style={{
-                  fontSize: 10.5,
+                  fontSize: 11,
                   fontWeight: 700,
                   color: C.sub,
                   background: C.track,

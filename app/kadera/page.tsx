@@ -183,7 +183,7 @@ function Highlight({ cap, name, value, valueColor, sub, divide }: {
         boxShadow: divide ? "inset -1px 0 0 var(--c-sheet-row)" : undefined,
       }}
     >
-      <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>{cap}</span>
+      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>{cap}</span>
       <div style={{ display: "flex", alignItems: "baseline", gap: 7, minWidth: 0 }}>
         <strong style={{ ...clip, fontSize: 16, fontWeight: 800, letterSpacing: "-.02em", color: C.ink }}>{name}</strong>
         {value && <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: valueColor, flexShrink: 0 }}>{value}</span>}
@@ -225,7 +225,7 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
               </span>
               <span style={{ fontSize: 11, fontFamily: MONO, color: C.sub2 }}>{timeAgo(m.postedAt)}</span>
               <span style={{ flex: 1 }} />
-              <span style={{ fontSize: 10.5, fontFamily: MONO, fontWeight: 800, color: C.sub }}>#{i + 1}</span>
+              <span style={{ fontSize: 11, fontFamily: MONO, fontWeight: 800, color: C.sub }}>#{i + 1}</span>
             </div>
 
             <div className="hz-bubble">
@@ -255,7 +255,7 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
                     <span
                       key={t}
                       style={{
-                        fontSize: 10.5,
+                        fontSize: 11,
                         fontWeight: 700,
                         color: C.label,
                         background: C.card,
@@ -687,7 +687,7 @@ export default async function KaderaPage() {
                     사이로 간다. */}
                 {sentiment.byTheme.length > 0 && (
                   <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 9, paddingTop: 14, borderTop: "1px solid var(--c-sheet-row)" }}>
-                    <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>인기 테마별 비관 ↔ 낙관</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>인기 테마별 비관 ↔ 낙관</span>
                     {sentiment.byTheme.map((t) => (
                       <div
                         key={t.name}
@@ -802,7 +802,11 @@ export default async function KaderaPage() {
                 const dates = s.seriesDates.slice(-7);
                 return (
                   <div key={s.code} className="hz-panel-pad">
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: 8, minWidth: 0 }}>
+                    {/* baseline 정렬이어야 한다. flex-start 는 **상자 윗변**을 맞추는데,
+                        이 줄엔 14px 종목명과 11px 코드·11.5px 표본이 섞여 있어 상자를 맞추면
+                        정작 눈에 보이는 글자 밑선이 어긋난다(실측 3.8px). 순위 배지는 판이라
+                        글자 밑선이 아니라 판의 광학 중심으로 읽히므로 같이 내려가도 된다. */}
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
                       <RankBadge n={i + 1} />
                       {/* minWidth:0 — flex 항목의 기본 min-width:auto 가 살아 있으면 이름이
                           줄지 않아 말줄임이 안 걸리고 셀 밖으로 넘친다(820px 에서 실측 3px).
@@ -1048,7 +1052,7 @@ export default async function KaderaPage() {
                       폰에서는 시세가 다음 줄로 내려간다(globals.css 의 .hz-stock-head) —
                       한 줄에 다 넣으면 시세 묶음이 nowrap 이라 안 줄고, 줄어들 수 있는 건
                       종목명뿐이라 이름이 먼저 0 으로 눌려 사라진다. */}
-                  <div className="hz-stock-head" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                  <div className="hz-stock-head" style={{ display: "flex", alignItems: "baseline", gap: 10, minWidth: 0 }}>
                     <StockLogo code={r.code} name={r.name} market={r.market} size={30} />
                     <strong style={{ ...clip, minWidth: 0, fontSize: 17, fontWeight: 800, letterSpacing: "-.02em", color: C.ink }}>{r.name}</strong>
                     <span style={{ fontFamily: MONO, fontSize: 11, color: C.sub2, flexShrink: 0 }}>{r.code}</span>

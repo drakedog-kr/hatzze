@@ -91,10 +91,17 @@ export function GhostSymbol({
  * style 로 열어 둔다.
  */
 const BETA_BADGE_HEIGHT = 18;
-/** 배지 상자 위에서 글자 베이스라인까지(px). 위 높이·line-height 에서 나오는 고정값이다. */
-const BADGE_BASELINE = 11.5;
-/** ㅔ 가로선 중심이 베이스라인 위로 뜬 거리(px). 배지 글자가 8px 고정이라 상수다. */
-const BAR_ABOVE_BASELINE = 3.5;
+/** 배지 글자 크기. 서비스 전체의 글자 바닥은 11 이지만 **이 배지만 8 로 남긴다** —
+    워드마크에 얹히는 상표 부속이지 읽는 글이 아니라, 키우면 로고가 배지에 눌린다.
+    아래 두 값이 이 크기에 매여 있으니 셋을 따로 움직이지 말 것. */
+const BETA_FONT = 8;
+/** 배지 상자 위에서 글자 베이스라인까지(px).
+    align-items:center + line-height 1 이면 글자 상자가 배지 가운데에 앉으므로
+    (높이 − 글자크기)/2 만큼 내려간 자리에서 ascent 만큼 더 내려간 곳이 베이스라인이다.
+    ascent 비율 0.8125 는 옛 값(높이 18 · 글자 8 · 베이스라인 11.5)에서 역산했다. */
+const BADGE_BASELINE = (BETA_BADGE_HEIGHT - BETA_FONT) / 2 + 0.8125 * BETA_FONT;
+/** ㅔ 가로선 중심이 베이스라인 위로 뜬 거리(px). 글자 크기에 비례한다(8px 일 때 3.5). */
+const BAR_ABOVE_BASELINE = 3.5 * (BETA_FONT / 8);
 /** 워드마크 상자 위에서 베이스라인까지(em). Bricolage + line-height 1 기준. */
 const WORDMARK_BASELINE = 0.833;
 /** 워드마크 'e' 잉크 꼭대기가 베이스라인 위로 뜬 거리(em). */
@@ -112,7 +119,7 @@ export function BetaBadge({ logoSize = 30, style }: { logoSize?: number; style?:
         height: BETA_BADGE_HEIGHT,
         marginTop: -lift,
         padding: "0 8px",
-        fontSize: 8,
+        fontSize: BETA_FONT,
         fontWeight: 700,
         lineHeight: 1,
         color: "var(--c-blue)",
