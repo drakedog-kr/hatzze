@@ -1384,7 +1384,16 @@ function YearsPopover({ years, label }: { years: YearStat[]; label: string }) {
 function RiskProfile({ r, periodLabel }: { r: RiskProfileData; periodLabel: string }) {
   const yrs = Math.max(1, Math.round(r.years));
   const alone = r.withMarket === null ? 0 : r.bigDropCount - r.withMarket;
-  const yearly = r.yearly.slice(-RISK_ROWS);
+  /* 두 벌을 구분해서 든다.
+       scoped — **조회 기간 전체**의 해들. 요약 문장과 큰 수치가 세는 창이고,
+                '전체보기' 팝오버가 펴는 것도 이것이다.
+       yearly — 그중 막대로 깔 최근 RISK_ROWS 줄. 자리 때문에 자른 것뿐이다.
+
+     ⚠️ `r.yearly` 를 그대로 쓰면 안 된다. yearlyStats 는 거래일이 20일 넘는 해를 다 세므로
+     10년 조회에 11개(2016~2026)가 나온다 — 시작 해의 토막을 한 해로 세기 때문이다. 조회
+     기간만큼(`-yrs`) 잘라야 "최근 10년"이라 적어 놓고 11년을 세는 일이 없다. */
+  const scoped = r.yearly.slice(-yrs);
+  const yearly = scoped.slice(-RISK_ROWS);
   const events = r.events.slice(-RISK_ROWS);
 
   // 뒤 두 타일의 한 줄은 '연도'가 아니라 '큰 하락 한 건'이라, 같은 해에 두 번 났으면
@@ -1431,8 +1440,13 @@ function RiskProfile({ r, periodLabel }: { r: RiskProfileData; periodLabel: stri
 
   /* 1 — 낙폭 대비 보상: 해마다 '그 해 최악 낙폭'(왼쪽·파랑)과 '그 해 수익'(오른쪽·빨강).
          손실인 해는 수익도 하락이므로 오른쪽이지만 파랑으로 칠한다. */
-  const avgYearMdd = yearly.length ? yearly.reduce((s, y) => s + y.mdd, 0) / yearly.length : 0;
-  const beatCount = yearly.filter((y) => y.ret > Math.abs(y.mdd)).length;
+  /* 큰 수치와 요약은 **조회 기간 전체**(scoped)로 센다. 막대에 깔린 최근 다섯 해가 아니다.
+     예전엔 이 둘만 5년이라, 옆에 선 연평균(복리)은 10년인데 평균 낙폭은 5년이었고 그 둘을
+     나눈 '보상 배수'는 창이 섞인 값이었다. 제목의 "(최근 10년)"·전체보기와도 어긋났다.
+     (삼성전자 10년 실측: 평균 낙폭 −29% → −26%, 보상 0.78배 → 0.88배, 5년 중 3년 →
+     10년 중 6년.) 2026-08-04. */
+  const avgYearMdd = scoped.length ? scoped.reduce((s, y) => s + y.mdd, 0) / scoped.length : 0;
+  const beatCount = scoped.filter((y) => y.ret > Math.abs(y.mdd)).length;
   const tile1: TileBody =
     yearly.length === 0
       ? { head: null, viz: empty("연도별 표본이 부족합니다."), foot: null }
@@ -1491,22 +1505,15 @@ function RiskProfile({ r, periodLabel }: { r: RiskProfileData; periodLabel: stri
              읽히니 낱말을 남기고 부호를 뺀다. */
           foot: summary(
             r.annualReturn >= 0 && avgYearMdd < 0
-              ? `위험 1을 견딜 때 보상 ${(r.annualReturn / Math.abs(avgYearMdd)).toFixed(2)}배 · ${yearly.length}년 중 ${beatCount}년은 보상이 낙폭보다 컸습니다`
+              ? `위험 1을 견딜 때 보상 ${(r.annualReturn / Math.abs(avgYearMdd)).toFixed(2)}배 · ${scoped.length}년 중 ${beatCount}년은 보상이 낙폭보다 컸습니다`
               : `최근 ${yrs}년은 연평균(복리) ${Math.abs(r.annualReturn).toFixed(1)}% 손실이라 견딘 위험을 보상하지 못했습니다`,
           ),
           /* 막대는 자리 때문에 최근 RISK_ROWS 줄뿐인데 제목·요약은 조회 기간 전체를 말한다.
-             나머지 해를 여기서 펼쳐, 적어 둔 기간에 실제로 닿게 한다.
-
-             ⚠️ **yearly 를 그대로 주면 안 된다.** yearlyStats 는 거래일이 20일 넘는 해를 다
-             세므로 10년 조회에 11개(2016~2026)가 나온다 — 시작 해의 토막을 한 해로 세기
-             때문이다. 그러면 "(최근 10년)"이라 적어 놓고 11년을 편다. 조회 기간만큼 잘라
-             2017~2026 을 준다.
+             나머지 해를 여기서 펼쳐, 적어 둔 기간에 실제로 닿게 한다. 펴는 것은 요약이 세는
+             것과 **같은 목록**(scoped)이라, 손으로 세어 봐도 문장과 맞는다.
 
              막대가 이미 전부면(조회 기간이 짧아 잘릴 게 없으면) 버튼을 안 만든다. */
-          more: (() => {
-            const full = r.yearly.slice(-yrs);
-            return full.length > yearly.length ? <YearsPopover years={full} label={`최근 ${yrs}년`} /> : null;
-          })(),
+          more: scoped.length > yearly.length ? <YearsPopover years={scoped} label={`최근 ${yrs}년`} /> : null,
         };
 
   /* 2 — 하락 vs 회복 속도: 큰 하락마다 '빠지는 데'(왼쪽)와 '되돌아오는 데'(오른쪽).
