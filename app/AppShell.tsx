@@ -511,9 +511,10 @@ function PageHeader({ theme }: { theme: "light" | "dark" }) {
           그 안에 콘솔 리디자인의 배지를 넣는다 — 둘은 서로 독립이다. */}
       {page && (
         <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-          {/* 배지는 제목과 같은 줄, baseline 정렬. center 로 두면 23px 제목 옆에서 알약이
-              가운데에 떠 제목 아랫선과 안 맞는다. */}
-          <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap", minWidth: 0 }}>
+          {/* 배지는 제목과 같은 줄, 세로 가운데 정렬. baseline 으로 두면 알약의 **글자**
+              밑선이 제목 밑선에 맞아, 알약 자체는 그만큼(패딩+테두리) 아래로 내려앉는다 —
+              옆에 붙은 라벨이 아니라 매달린 것처럼 보였다. */}
+          <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", minWidth: 0 }}>
             <h1 style={{ margin: 0, fontSize: 23, fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>
               {page.label}
             </h1>

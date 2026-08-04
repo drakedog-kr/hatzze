@@ -146,11 +146,18 @@ function sourceDateBadge(v: Pick): string | null {
 
 // ── 공용 카드 조각 ────────────────────────────────────────────────
 function Shell({
+  slug,
   hit = false,
   warm = false,
   minH = 230,
   children,
 }: {
+  /**
+   * 지표 slug. 셀에 `ind-<slug>` 라는 id 를 달아 **스크롤 목적지**로 만든다.
+   * 히어로의 '지표 분포'가 구간별 지표 이름을 목록으로 열고, 그 이름이 여기로 건너온다.
+   * 값이 없는 셀('준비 중')은 목적지가 될 일이 없으므로 id 도 안 붙는다.
+   */
+  slug?: string;
   hit?: boolean;
   /** 고온 이상(진행률 ≥ 50). 카드에 붙는 보조 배지의 색을 가른다(pick 의 warm 주석). */
   warm?: boolean;
@@ -173,6 +180,7 @@ function Shell({
   const body = kids.slice(1, kids.length - 1);
   return (
     <div
+      id={slug ? `ind-${slug}` : undefined}
       // 2026-08 콘솔 리디자인: 카드가 아니라 **시트 안의 셀**이다. 배경·격자선·최소
       // 높이는 globals.css 의 .hz-cards > * 가 준다 — 여기서 인라인으로 주면 초고온
       // 셀의 상단 라인(.hz-cell-hot)을 덮어써 버린다.
@@ -547,6 +555,20 @@ const HERO_STRIP = ["#dbe9f7", "#3d9cf5", "#f7bcc2", "#ef8f9a"];
 const DIST_FILL = ["#dbe9f7", "#3d9cf5", "#ef8a94", "#dc4b56"];
 const BAND_LABELS = ["저온", "상온", "고온", "초고온"];
 
+/** 지표 분포 팝오버의 한 줄. heat 는 카드가 쓰는 것과 같은 과열도(capped 0~100)다. */
+type BandItem = { slug: string; name: string; heat: number };
+
+/**
+ * '지표 분포' 목록의 이름을 눌렀을 때 실제로 갈 셀.
+ *
+ * 보통은 지표 slug 가 그대로 셀 id(`ind-<slug>`)지만, **한 셀에 지표가 둘인 카드**가
+ * 하나 있다(여윳돈이 향하는 곳 = 명품 + 오마카세). 그 셀엔 명품 id 만 달려 있으므로
+ * 오마카세는 여기서 돌려보낸다. 이 표에 없는 slug 는 자기 id 를 그대로 쓴다.
+ */
+const ANCHOR_ALIAS: Record<string, string> = {
+  fine_dining_search_index: "luxury_consumption_index",
+};
+
 /**
  * 히어로 — 목업은 **두 장**이다(왼쪽 햇쩨 지수 · 오른쪽 오늘의 브리핑).
  *
@@ -571,7 +593,7 @@ function Hero({
   tradHits: number;
   socialHits: number;
   /** 저온·상온·고온·초고온 순서 고정. 색까지 같이 넘겨 셀 안에서 인덱스로 안 찾게 한다. */
-  bandCounts: { label: string; count: number; fill: string }[];
+  bandCounts: { label: string; count: number; fill: string; items: BandItem[] }[];
   /** 위 넷의 합. 25가 아니라 **오늘 값이 들어온 지표 수**다(자료가 늦는 날 24가 된다). */
   bandTotal: number;
 }) {
@@ -641,43 +663,49 @@ function Hero({
 
         {/* 4칸 띠 + 그 위에 선 마커. 마커의 left 는 점수를 그대로 % 로 쓴다 —
             띠 네 칸이 0·25·50·75 경계와 정확히 같은 폭이라 계산이 필요 없다.
-            값 라벨을 SVG <text> 가 아니라 HTML 로 얹는 건 서체 로딩·자간 문제를 피하려는
-            것이다(핸드오프 지침). */}
+
+            마커 위에 있던 값 라벨("21℃")은 걷었다(2026-08-04). 바로 위에 같은 값이
+            40px 로 서 있어서, 한 셀에서 같은 숫자를 두 번 읽게 했다. 대신 짝대기 머리에
+            **빈 동그라미**를 얹어 핀 모양으로 만든다 — 라벨 없이도 "여기를 가리킨다"가
+            남고, 눈금(0·25·50·75·100)과 구간 이름이 그 자리의 뜻을 말해 준다.
+            paddingTop 은 라벨 자리(18)에서 동그라미 자리(12)로 줄였다. */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ position: "relative", paddingTop: 18 }}>
-            <span
-              style={{
-                position: "absolute",
-                top: 0,
-                left: `${score}%`,
-                transform: "translateX(-50%)",
-                fontFamily: MONO,
-                fontSize: 11,
-                fontWeight: 800,
-                letterSpacing: "-0.02em",
-                whiteSpace: "nowrap",
-                color: stage.color,
-              }}
-            >
-              {temp}℃
-            </span>
+          <div style={{ position: "relative", paddingTop: 12 }}>
             <div style={{ display: "flex", height: 9, borderRadius: 3, overflow: "hidden" }}>
               {HERO_STRIP.map((bg, i) => (
                 <span key={i} style={{ width: "25%", background: bg }} />
               ))}
             </div>
-            {/* 흰 링(box-shadow) 을 둘러야 마커가 어느 칸 위에 서든 띠와 안 섞인다. */}
+            {/* 짝대기 — 띠 위아래로 4px 씩 삐져나와 어느 칸을 가리키는지 눈에 걸린다.
+                흰 링(box-shadow) 을 둘러야 어느 칸 위에 서든 띠 색과 안 섞인다. */}
             <span
               style={{
                 position: "absolute",
                 left: `${score}%`,
-                top: 14,
+                top: 8,
                 transform: "translateX(-50%)",
                 width: 2,
                 height: 17,
                 background: C.ink,
                 borderRadius: 1,
                 boxShadow: "0 0 0 2px var(--c-card)",
+              }}
+            />
+            {/* 핀 머리. 속을 카드색으로 채워 **비어 보이게** 한다 — 꽉 찬 점은 띠 위의
+                데이터 점처럼 읽히는데, 이건 값이 아니라 '가리키는 자리'다.
+                짝대기(top 8)의 첫 1px 을 이 원이 덮어 이음매가 안 보인다. */}
+            <span
+              style={{
+                position: "absolute",
+                left: `${score}%`,
+                top: 0,
+                transform: "translateX(-50%)",
+                width: 9,
+                height: 9,
+                borderRadius: "50%",
+                border: `2px solid ${C.ink}`,
+                background: C.card,
+                boxSizing: "border-box",
               }}
             />
           </div>
@@ -743,23 +771,58 @@ function Hero({
       {/* 히어로가 답을 하나(38℃)만 주면 "그 하나가 어떻게 나온 값인지"가 안 보인다.
           25개가 네 구간에 어떻게 흩어져 있는지를 같이 두면, 같은 38℃라도 '전부 상온'인
           날과 '저온 12 + 초고온 3'인 날이 다른 화면이 된다. */}
-      <div className="hz-hero-cell hz-hero-divide">
+      {/* 줄에 마우스를 올리면 그 구간에 든 지표가 목록으로 열리고, 이름을 누르면 아래
+          시트의 그 셀로 내려간다. "상온 12개"가 **어느 12개인지** 볼 수 있어야 이 셀이
+          숫자 넉 줄에서 끝나지 않는다.
+
+          카더라의 테마 호버 카드(.hz-theme-pop)와 같은 어법이다 — 목록에 링크가 들어가야
+          해서 data-tip 툴팁을 못 쓰고(그건 attr() 로 뽑은 **문자열**이라 링크를 못 담는다),
+          대신 진짜 요소를 두고 :hover / :focus-within 으로 여닫는다. JS 가 없으므로 이
+          셀은 서버 컴포넌트로 남는다. */}
+      <div className="hz-hero-cell hz-hero-divide hz-dist">
         <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.08em", color: C.label }}>지표 분포</span>
         {/* 100% 스택 바. 칸 색은 게이지 띠와 다른 한 벌이다 — 게이지는 '구간 자체'를
-            그리는 배경이라 연하고, 이쪽은 개수를 견주는 데이터 면이라 진하다. */}
-        <div style={{ display: "flex", height: 9, borderRadius: 3, overflow: "hidden" }}>
-          {bandCounts.map((b) =>
+            그리는 배경이라 연하고, 이쪽은 개수를 견주는 데이터 면이라 진하다.
+            data-band 는 아래 줄과 짝을 맞추는 열쇠다 — globals.css 가 :has() 로 그 짝을
+            찾아 호버한 구간만 남기고 나머지를 흐린다. */}
+        <div className="hz-dist-bar">
+          {bandCounts.map((b, i) =>
             b.count === 0 ? null : (
-              <span key={b.label} style={{ width: `${(b.count / bandTotal) * 100}%`, background: b.fill }} />
+              <span key={b.label} className="hz-dist-seg" data-band={i} style={{ width: `${(b.count / bandTotal) * 100}%`, background: b.fill }} />
             ),
           )}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-          {bandCounts.map((b) => (
-            <div key={b.label} style={{ display: "flex", alignItems: "center", gap: 9 }}>
+          {bandCounts.map((b, i) => (
+            // 지표가 0개인 구간은 열 목록이 없으니 평범한 줄로 둔다 — 눌러도 아무 일이
+            // 없는 자리를 눌리는 것처럼 꾸미지 않는다.
+            <div
+              key={b.label}
+              className={b.count > 0 ? "hz-dist-row" : undefined}
+              data-band={i}
+              tabIndex={b.count > 0 ? 0 : undefined}
+              style={{ display: "flex", alignItems: "center", gap: 9 }}
+            >
               <span style={{ width: 7, height: 7, borderRadius: "50%", background: b.fill, flexShrink: 0 }} />
               <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: C.label }}>{b.label}</span>
               <strong style={{ fontFamily: MONO, fontSize: 12.5, fontWeight: 800, color: C.ink }}>{b.count}</strong>
+              {b.count > 0 && (
+                // 스크롤바 모양은 본문과 같은 것을 쓴다(.hz-scroll).
+                <div className="hz-dist-pop hz-scroll">
+                  {/* 머리는 **붙박이**다(sticky). 가장 긴 구간이 열두 줄인데 팝오버는 여덟
+                      줄쯤에서 잘려 스크롤되므로, 안내를 맨 아래 두면 처음엔 안 보인다.
+                      오른쪽 숫자가 무엇인지(과열도)와 눌러도 된다는 것 둘 다 여기 적는다. */}
+                  <div className="hz-dist-pop-head">
+                    {b.label} {b.count}개 · 과열도순 · 눌러서 이동
+                  </div>
+                  {b.items.map((it) => (
+                    <a key={it.slug} href={`#ind-${ANCHOR_ALIAS[it.slug] ?? it.slug}`} className="hz-dist-pop-item">
+                      <span className="hz-dist-pop-name">{it.name}</span>
+                      <span className="hz-dist-pop-heat">{Math.round(it.heat)}</span>
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -938,7 +1001,7 @@ function CardBuffett({ v }: { v: Pick }) {
   const gdpWidth = v.raw && v.raw > 0 ? Math.min(100, (100 / v.raw) * 100) : 50;
   const jo = (won: number) => Math.round(won / 1e12).toLocaleString("ko-KR"); // 원 → 조원
   return (
-    <Shell hit={v.isHit} warm={v.warm} minH={230}>
+    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="payments" name={v.name} />
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={v.disp} unit={v.unit} color={v.color} size={32} />
@@ -952,7 +1015,7 @@ function CardBuffett({ v }: { v: Pick }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: C.sub2 }}>
-              나라 경제 (GDP){dt && dt.gdp_year ? ` · ~${String(dt.gdp_year).slice(2)}년 ${dt.gdp_q}분기` : ""}
+              나라 경제 (GDP){dt && dt.gdp_year ? ` · ${String(dt.gdp_year).slice(2)}년 ${dt.gdp_q}분기` : ""}
             </span>
             <span style={{ fontFamily: MONO, fontSize: 12.5, fontWeight: 700, color: C.label, whiteSpace: "nowrap" }}>
               {dt && dt.gdp ? `약 ${jo(dt.gdp)}조원` : "기준 100"}
@@ -1014,7 +1077,7 @@ function CardLeverage({ v }: { v: Pick }) {
   })();
   const oiVsAvg = dt?.oi_vs_avg ?? (dt?.futures_progress != null ? dt.futures_progress * 1.5 : null);
   return (
-    <Shell hit={v.isHit} warm={v.warm} minH={230}>
+    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="rocket_launch" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
         <strong style={{ fontFamily: MONO, fontSize: 32, fontWeight: 800, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
@@ -1077,7 +1140,7 @@ function CardMarketActions({ v }: { v: Pick }) {
   const maxN = Math.max(1, buyN, sellN, cbN);
   const verdictHint = buyN > sellN ? "달아오른 쪽이 잦았습니다" : sellN > buyN ? "식는 쪽이 잦았습니다" : "양쪽이 비슷했습니다";
   return (
-    <Shell hit={v.isHit} warm={v.warm} minH={230}>
+    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="speed" name={v.name} badge="최근 한 달" />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
         {/* 한글은 같은 font-size 라도 숫자보다 글리프가 커 보인다 — 다른 카드의 32px 숫자와
@@ -1130,7 +1193,7 @@ function CardTurnover({ v }: { v: Pick }) {
     { key: "__others", label: "그 외 전 종목", pct: others, fill: C.track, ink: C.sub2 },
   ];
   return (
-    <Shell hit={v.isHit} warm={v.warm} minH={230}>
+    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="pie_chart" name={v.name} />
       <Big disp={`${Math.round(share)}`} unit="%" color={v.color} size={32} sub="상위 10종목이 가져간 몫" />
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -1173,7 +1236,7 @@ function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
   // 순위대로 진한 파랑 → 옅은 파랑. 색조가 아니라 명도만 움직여 '서열'로 읽히게 한다.
   const rankColor = ["var(--c-blue-2)", "var(--c-blue-3)", "var(--c-blue-4)"];
   return (
-    <Shell hit={v.isHit} warm={v.warm} minH={230}>
+    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow
         desc={v.headline}
         icon="vertical_align_top"
@@ -1195,11 +1258,11 @@ function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
               시점이 갈리기 때문이다. */}
           <span
             className="hz-tip hz-tip-wide hz-tip-start"
-            data-tip={`현재가와 52주 고점 모두 야후 파이낸스 종가 기준입니다${tops[0]?.priceDate ? ` (${tops[0].priceDate} 종가)` : ""}.`}
+            data-tip={`현재가와 52주 고점 모두 야후 파이낸스 종가 기준입니다${tops[0]?.priceDate ? ` (${tops[0].priceDate} 종가)` : ""}. 막대가 꽉 찰수록 고점에 가깝습니다.`}
             data-ga-tip="high_gap_source"
             style={{ fontSize: 11.5, fontWeight: 700, color: C.muted }}
           >
-            거래대금 상위 종목의 52주 고점 대비
+            거래대금 상위 종목의 52주 고점 근접도
           </span>
           {tops.map((st, i) => (
             <div key={st.code} style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1207,7 +1270,19 @@ function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
                 {st.name}
               </span>
               <div style={{ flex: 1, height: 7, borderRadius: R.pill, background: C.track, overflow: "hidden", minWidth: 0 }}>
-                <div style={{ width: `${Math.max(0, Math.min(100, (Math.abs(st.gapPct) / 50) * 100))}%`, height: "100%", borderRadius: R.pill, background: rankColor[i] ?? "var(--c-blue-4)" }} />
+                {/* 막대 = **고점 근접도**(52주 고점 = 꽉 찬 막대). 오른쪽 숫자는 그대로
+                    괴리율이라, 둘을 더하면 늘 100 이다.
+
+                    ⚠️ 2026-08-04 에 방향을 되돌렸다. 목업을 따라 '얼마나 빠졌나'(깊을수록
+                    긴 막대, 축은 −50%)로 그렸는데 두 가지가 어긋났다.
+                    ① **이 화면에서 꽉 찬 막대는 늘 뜨겁다는 뜻**인데, 이 카드만 꽉 찬
+                       막대가 가장 차가운 종목(고점에서 가장 많이 빠진 종목)이었다.
+                    ② 축 −50% 가 실제 값을 못 담았다. 실측(2026-08-04) −47.5 / −36.0 /
+                       −51.1 은 95% · 72% · **100%(잘림)** 으로 그려져, 셋 다 거의 꽉 찬
+                       데다 −51 과 −80 이 같은 그림이 된다.
+                    근접도로 두면 축이 '고점 = 100' 이라 임의로 정한 수가 없고, 잘릴 일도
+                    없다(같은 값이 52.5 · 64.0 · 48.9 로 갈린다). */}
+                <div style={{ width: `${Math.max(0, Math.min(100, 100 + st.gapPct))}%`, height: "100%", borderRadius: R.pill, background: rankColor[i] ?? "var(--c-blue-4)" }} />
               </div>
               <span style={{ width: 50, textAlign: "right", fontFamily: MONO, fontSize: 12, fontWeight: 700, color: C.ink }}>
                 {st.gapPct >= 0 ? "+" : ""}{st.gapPct.toFixed(1)}%
@@ -1241,7 +1316,7 @@ function CardSpeed({ v, path = [] }: { v: Pick; path?: ClosePoint[] }) {
   const hi = pts.length ? Math.max(...pts.map((x) => x.value), 0) : null;
   const lo = pts.length ? Math.min(...pts.map((x) => x.value), 0) : null;
   return (
-    <Shell hit={v.isHit} warm={v.warm} minH={230}>
+    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="trending_up" name={v.name} />
       <Big
         disp={`${spd >= 0 ? "+" : ""}${v.disp}`}
@@ -1292,7 +1367,7 @@ function CardVkospi({ v }: { v: Pick }) {
   const verdict = pos >= 0.66 ? "최근 30일 중 높은 편" : pos <= 0.33 ? "최근 30일 중 낮은 편" : "최근 30일 평균 수준";
   const knob = v.color;
   return (
-    <Shell hit={v.isHit} warm={v.warm} minH={230}>
+    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="monitor_heart" name={v.name} />
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={v.disp} color={v.color} size={32} sub="변동성지수" />
@@ -1307,10 +1382,14 @@ function CardVkospi({ v }: { v: Pick }) {
           </div>
           <HeatKnob left={pos * 100} color={knob} />
         </div>
+        {/* 양 끝 라벨은 **변동성 자체**를 말한다(잔잔 ↔ 출렁). 예전엔 '방심 ↔ 불안'
+            이었는데, 방심은 시장의 상태가 아니라 그 상태에 대한 평가라서 눈금 끝에
+            적히면 무엇을 잰 값인지가 흐려졌다(2026-08-04). 낮은 쪽이 왜 과열 신호인지는
+            셀 맨 아래 설명 한 줄이 맡는다. */}
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ fontSize: 11.5, fontWeight: 600, color: C.muted }}>방심 {lo !== null ? Math.round(lo) : "-"}</span>
+          <span style={{ fontSize: 11.5, fontWeight: 600, color: C.muted }}>잔잔 {lo !== null ? Math.round(lo) : "-"}</span>
           <span style={{ fontSize: 11, color: C.sub }}>최근 30일 범위</span>
-          <span style={{ fontSize: 11.5, fontWeight: 600, color: C.muted }}>불안 {hi !== null ? Math.round(hi) : "-"}</span>
+          <span style={{ fontSize: 11.5, fontWeight: 600, color: C.muted }}>출렁 {hi !== null ? Math.round(hi) : "-"}</span>
         </div>
       </div>
       <Foot text={v.desc} />
@@ -1341,7 +1420,7 @@ function CardAsia({ v }: { v: Pick }) {
   const VALUE_W = 34;
   const ROW_GAP = 9;
   return (
-    <Shell hit={v.isHit} warm={v.warm} minH={230}>
+    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="public" name={v.name} badge="최근 한 달" />
       <Big
         disp={`${v.raw !== null && v.raw > 0 ? "+" : ""}${v.disp}`}
@@ -1358,7 +1437,10 @@ function CardAsia({ v }: { v: Pick }) {
         <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 10 }}>
           {/* 파선은 막대 칸에만 걸쳐야 한다 — 라벨·값 칸까지 가로지르면 표를 관통하는
               줄이 돼서 기준선으로 안 읽힌다. 좌우를 그 두 칸 폭만큼 물린 상자를 깔고
-              그 안에서 %로 세운다. 아래 캡션 줄(12+gap 10)만큼 bottom 도 물린다. */}
+              그 안에서 %로 세운다. 아래 캡션 줄(12+gap 10)만큼 bottom 도 물린다.
+              ⚠️ zIndex 1 — 이 상자는 DOM 에서 막대보다 **앞**이라, 그냥 두면 뒤에 깔려
+              KOSPI 를 넘어선 나라의 막대가 파선을 덮는다. 기준선은 자기가 가르는 막대
+              위에 보여야 "여기까지가 우리"로 읽히므로 맨 앞 레이어로 올린다. */}
           <span
             aria-hidden
             style={{
@@ -1368,6 +1450,7 @@ function CardAsia({ v }: { v: Pick }) {
               left: LABEL_W + ROW_GAP,
               right: VALUE_W + ROW_GAP,
               pointerEvents: "none",
+              zIndex: 1,
             }}
           >
             <span style={{ position: "absolute", left: kospiPct, top: -2, bottom: 0, borderLeft: `1px dashed var(--c-blue-3)` }} />
@@ -1448,7 +1531,7 @@ function CardGoldRatio({ v }: { v: Pick }) {
   const num = (n: number) => n.toLocaleString("ko-KR", { maximumFractionDigits: 0 });
   const note = typeof k === "number" && typeof g === "number" ? `코스피 ${num(k)} ÷ 금 ${num(g)}` : "코스피 지수 ÷ 금 시세";
   return (
-    <Shell hit={v.isHit} warm={v.warm} minH={230}>
+    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow icon="balance" name={v.name} desc={v.headline} />
       <Big disp={v.disp} unit={v.unit} color={v.color} size={32} sub={note} />
       <HeatBar v={v} />
@@ -1476,7 +1559,7 @@ function CardVolume({ v }: { v: Pick }) {
     { label: "최근 거래일", value: today, fill: C.blue, strong: true },
   ];
   return (
-    <Shell hit={v.isHit} warm={v.warm} minH={230}>
+    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="groups" name={v.name} />
       {surge !== null && (
         <Big disp={`${surge >= 0 ? "+" : ""}${surge}`} unit="%" color={v.color} size={32} sub="평소 대비" />
@@ -1505,7 +1588,7 @@ function CardVolume({ v }: { v: Pick }) {
 function CardFx({ v }: { v: Pick }) {
   const pts = v.historyPoints.map((b) => ({ key: b.date, value: b.value }));
   return (
-    <Shell hit={v.isHit} warm={v.warm} minH={230}>
+    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="waves" name={v.name} />
       <Big disp={`±${v.disp}`} unit={v.unit} color={v.color} size={32} sub="최근 30일" />
       <AreaChart points={pts} color={v.color} tip={(x) => `${shortDate(x.key)} · ±${x.value.toFixed(2)}%`} />
@@ -1670,7 +1753,7 @@ function CardDivergence({ v }: { v: Pick }) {
     },
   ];
   return (
-    <Shell hit={v.isHit} warm={v.warm} minH={230}>
+    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="compare_arrows" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
         <strong style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
@@ -1718,7 +1801,7 @@ function CardTrend({ v, icon }: { v: Pick; icon: string }) {
   const pct = hot && v.raw !== null ? Math.max(0, Math.min(100, (v.raw / hot) * 100)) : null;
   const chart = v.historyPoints.map((x) => ({ key: x.date, value: x.value }));
   return (
-    <Shell hit={v.isHit} warm={v.warm} minH={230}>
+    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon={icon} name={v.name} />
       {vsAvg !== null ? (
         <>
@@ -1820,7 +1903,7 @@ function CardSentiment({
   const negW = ratio ? 100 - ratio.pos : 50;
   const posW = ratio ? ratio.pos : 50;
   return (
-    <Shell hit={v.isHit} warm={v.warm} minH={230}>
+    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon={icon} name={v.name} />
       {ratio ? (
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
@@ -1874,7 +1957,7 @@ function CardYoutube({ v }: { v: Pick }) {
     { label: "오늘", value: v.raw, fill: C.blue, strong: true },
   ];
   return (
-    <Shell hit={v.isHit} warm={v.warm} minH={230}>
+    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="play_circle" name={v.name} />
       {ratio !== null && (
         <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
@@ -1964,8 +2047,10 @@ function CardSpending({ luxury, dining }: { luxury: Pick; dining: Pick }) {
   const otherR = lead && lead.other === "명품" ? lr : dr;
   const otherWord =
     otherR === null ? "" : Math.abs(otherR - 1) < 0.05 ? `${lead?.other}은 평소 수준` : `${lead?.other} ${otherR.toFixed(1)}배`;
+  // 지표 둘이 한 셀이라 스크롤 목적지 id 는 하나만 붙는다(명품). 오마카세로 오는
+  // 스크롤은 ANCHOR_ALIAS 가 이 id 로 돌려보낸다.
   return (
-    <Shell hit={luxury.isHit || dining.isHit} warm={luxury.warm || dining.warm} minH={230}>
+    <Shell slug={luxury.ind?.slug} hit={luxury.isHit || dining.isHit} warm={luxury.warm || dining.warm} minH={230}>
       <TitleRow icon="local_mall" name="여윳돈이 향하는 곳" desc="명품·외식 검색량으로 본 소비 심리" />
       {lead && (
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
@@ -1999,7 +2084,7 @@ function CardUpbit({ v }: { v: Pick }) {
   const volLabel = (x: number) => (x >= 100 ? "HIGH" : x >= 60 ? "MID" : "LOW");
   const premium = dt?.kimchi_premium ?? null;
   return (
-    <Shell hit={v.isHit} warm={v.warm} minH={230}>
+    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="currency_bitcoin" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
         <strong style={{ fontFamily: MONO, fontSize: 32, fontWeight: 800, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
@@ -2055,7 +2140,7 @@ function CardNetBuy({ v }: { v: Pick }) {
   const maxAbs = Math.max(1, ...daily.map((d) => Math.abs(d)));
   const isBuy = cum >= 0;
   return (
-    <Shell hit={v.isHit} warm={v.warm} minH={230}>
+    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="public" name={v.name} />
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {/* ⚠️ 기간("최근 5거래일")을 큰 수치 **위**에 한 줄로 두면 안 된다. 그 한 줄만큼
@@ -2174,7 +2259,7 @@ function CardLimitUp({ v }: { v: Pick }) {
   const rest = Math.max(0, surged - rank.length);
 
   return (
-    <Shell hit={v.isHit} warm={v.warm} minH={230}>
+    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       {/* KRX 일별매매정보는 하루이틀 늦게 열린다. 히어로가 페이지 전체를 "오늘 기준"으로
           액자에 넣으므로 이 카드만은 자기 자료일을 계속 밝힌다. */}
       <TitleRow desc={v.headline} icon="bolt" name={v.name} badge={sourceDateBadge(v) ?? "최근 거래일 기준"} />
@@ -2250,7 +2335,7 @@ function CardPutCall({ v }: { v: Pick }) {
   const ratio = call > 0 ? put / call : 0;
   const greedy = callShare >= 50;
   return (
-    <Shell hit={v.isHit} warm={v.warm} minH={230}>
+    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="casino" name={v.name} />
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={ratio.toFixed(2)} color={v.color} size={32} sub="풋/콜" />
@@ -2288,7 +2373,7 @@ function CardBrokerage({ v }: { v: Pick }) {
   // 긴 앱 이름을 짧게: 첫 구분자(-, (, ,) 앞부분만, 18자 제한
   const shortName = (n: string) => (n.split(/[-(,]/)[0].trim().slice(0, 18) || n);
   return (
-    <Shell hit={v.isHit} warm={v.warm} minH={230}>
+    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="leaderboard" name={v.name} />
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={`${count}개`} color={v.color} size={32} sub="인기차트 진입" />
@@ -2367,7 +2452,7 @@ const FALLBACK_ICONS: Record<string, string> = {
 
 function GenericCard({ v, icon }: { v: Pick; icon: string }) {
   return (
-    <Shell hit={v.isHit} warm={v.warm} minH={210}>
+    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={210}>
       <TitleRow desc={v.headline} icon={icon} name={v.name} />
       <Big disp={v.disp} unit={v.unit} color={v.color} size={30} />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
@@ -2402,14 +2487,25 @@ export default async function Home() {
   // 빨간 셀이 둘만 보이는 일이 난다.
   // capped 가 null 인 지표(자료가 아직 안 온 것)는 **빼고** 센다 — isHit 은 null 을 0 으로
   // 떨어뜨리지만, 그건 '초고온이 아니다'를 판정하려는 것이지 '저온이다'라는 뜻이 아니다.
-  const bandTally = [0, 0, 0, 0];
+  //
+  // 세는 김에 **이름도 같이 담는다** — 줄에 마우스를 올리면 그 구간의 지표가 목록으로
+  // 열린다. 개수와 목록이 같은 순회에서 나오므로 둘이 갈릴 자리가 없다.
+  const bandItems: BandItem[][] = [[], [], [], []];
   for (const i of indicators) {
     const v = pick(i).capped;
     if (v === null) continue;
-    bandTally[BAND_LABELS.indexOf(stageForScore(v))] += 1;
+    bandItems[BAND_LABELS.indexOf(stageForScore(v))].push({ slug: i.slug, name: i.name, heat: v });
   }
-  const bandCounts = BAND_LABELS.map((label, i) => ({ label, count: bandTally[i], fill: DIST_FILL[i] }));
-  const bandTotal = bandTally.reduce((a, b) => a + b, 0);
+  // 구간 안에서는 뜨거운 것부터. 목록이 열두 줄까지 가는 구간이 있어서, 순서가 없으면
+  // 그 구간에서 무엇이 경계에 가까운지가 안 읽힌다.
+  for (const list of bandItems) list.sort((a, b) => b.heat - a.heat);
+  const bandCounts = BAND_LABELS.map((label, i) => ({
+    label,
+    count: bandItems[i].length,
+    fill: DIST_FILL[i],
+    items: bandItems[i],
+  }));
+  const bandTotal = bandCounts.reduce((a, b) => a + b.count, 0);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
