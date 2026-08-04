@@ -315,19 +315,21 @@ export default async function KaderaPage() {
         /* 세로 패딩 9.35px — 줄 사이 간격은 위 줄의 아래 패딩과 아래 줄의 위 패딩을 더한
            값(11+11=22)이라, 그 22 를 15% 줄인 18.7 을 두 줄이 반씩 나눠 가진 것이다.
            가로 22 는 시트의 다른 표(.hz-trow)와 같은 값이라 건드리지 않는다. */
-        style={{ display: "grid", gridTemplateColumns: "17px minmax(0,1fr) 62px", alignItems: "start", gap: 12, padding: "9.35px 22px" }}
+        /* 첫 칸 19px — 순위 숫자가 14px 이 되면서 두 자리("10")가 18.34px 을 먹는다
+           (이 글꼴의 숫자는 폭이 고정이라 9.17 × 2). 17px 이던 예전 폭에 두면 10위만
+           오른끝이 1.34px 삐져나와 아홉 줄과 안 맞는다. */
+        style={{ display: "grid", gridTemplateColumns: "19px minmax(0,1fr) 62px", alignItems: "start", gap: 12, padding: "9.35px 22px" }}
         /* 마우스가 없어도(키보드·터치) 종목 목록을 열 수 있게 초점을 받는다.
            언급된 종목이 없는 테마는 열 것도 없으니 초점도 주지 않는다. */
         tabIndex={t.stocks.length ? 0 : undefined}
         aria-label={t.stocks.length ? `${t.theme} 테마를 이룬 종목 ${t.stockCount}개 보기` : undefined}
       >
-        {/* 순위 숫자(13px)와 테마명(14px)의 **밑선**을 맞춘 값이다. 둘은 그리드 형제라
-            (alignItems:start) 윗변만 같고, 줄 상자 안에서 글자가 앉는 깊이는 크기마다
-            다르다 — 실측으로 반각 여백이 3.25 : 3, ascent 가 12.0 : 13.0 이라 그냥 두면
-            숫자가 1.25px 내려앉는다. 그 차를 걷어 낸 것이 0.75 다(예전 2 는 눈대중이라
-            숫자가 1.25px 처져 있었다). 밑선을 맞추면 글자 한가운데끼리도 0.35px 안에
-            든다. 두 글자 크기 중 하나라도 바꾸면 이 값을 다시 재야 한다. */}
-        <span style={{ ...rankNum, paddingTop: 0.75 }}>{t.rank}</span>
+        {/* 순위 숫자를 테마명과 같은 14px 로 세우고, 줄 상자도 테마명 줄과 같은
+            THEME_NAME_H 로 준다. 글자 크기와 줄 높이가 둘 다 같으면 두 상자의 윗변이
+            같은 자리에서 시작하는 것만으로 밑선이 저절로 맞는다(그리드가 alignItems:start
+            라 윗변은 이미 같다) — 보정값이 필요 없다. 크기가 달랐을 땐 줄 상자 안에서
+            글자가 앉는 깊이가 달라 paddingTop 으로 그 차를 걷어 내야 했다. */}
+        <span style={{ ...rankNum, width: 19, fontSize: 14, lineHeight: `${THEME_NAME_H}px` }}>{t.rank}</span>
         <div style={{ minWidth: 0 }}>
           {/* 줄 높이를 못 박는다 — 오른쪽 스파크라인을 막대 밑선에 맞추려면(THEME_SPARK_TOP)
               이 줄이 몇 px 인지 확정돼야 한다. lineHeight 만으론 모자란다: 14·12·10px
@@ -466,8 +468,13 @@ export default async function KaderaPage() {
                   <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub, display: "inline-flex", alignItems: "baseline", gap: 4, minWidth: 0, wordBreak: "keep-all" }}>
                     {s.label}
                     {s.note && <span style={{ fontSize: 10, color: C.faint }}>{s.note}</span>}
+                    {/* alignSelf:center — 이 줄은 라벨과 '7일'의 밑선을 맞추느라 baseline
+                        정렬인데, 물음표까지 거기 딸려 가면 안 된다. 아이콘 글꼴은 글리프
+                        밑변이 곧 밑선이라, 밑선에 맞추면 12px 상자가 글자보다 통째로
+                        3.1px 떠오른다(실측). 글자와 눈높이를 맞추려면 상자를 줄 한가운데
+                        세워야 한다 — 옆 칸 '제외 후 환산 ?' 이 쓰는 것과 같은 기준이다. */}
                     {s.help && (
-                      <span className="hz-tip hz-tip-wide" data-tip={s.help} data-ga-tip={s.label} style={{ display: "inline-flex", cursor: "help", flexShrink: 0 }}>
+                      <span className="hz-tip hz-tip-wide" data-tip={s.help} data-ga-tip={s.label} style={{ display: "inline-flex", alignSelf: "center", cursor: "help", flexShrink: 0 }}>
                         <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
                       </span>
                     )}
