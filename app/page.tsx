@@ -1906,8 +1906,13 @@ function sentimentRatio(
 function CardSentiment({
   v,
   icon,
-  // 무엇을 센 건수인지는 지표마다 다르다(디시=게시글, 뉴스=뉴스). "낙관:비관 · N건"처럼
+  // 무엇을 센 건수인지는 지표마다 다르다(디시=글, 뉴스=뉴스). "낙관:비관 · N건"처럼
   // 비율 설명을 반복하는 것보다, 표본이 뭔지 알려주는 쪽이 정보량이 크다.
+  //
+  // ⚠️ **짧게 유지할 것.** 이 낱말은 아래 알약에 들어가고, 알약은 헤드라인 숫자와 한 줄을
+  // 나눠 쓴다(flexWrap). 넘치면 알약이 다음 줄로 내려가면서 그 아래 막대까지 통째로
+  // 밀려서, 옆 카드와 막대 높이가 어긋난다. 4열(카드 247px) 기준 실측 예산은 아래
+  // 알약 주석에 적어 뒀다.
   countNoun,
 }: {
   v: Pick;
@@ -1945,8 +1950,20 @@ function CardSentiment({
             </strong>
             <span style={{ fontSize: 12.5, fontWeight: 600, color: C.sub2 }}>{sentimentTone(ratio.pos).label}</span>
           </div>
+          {/* 표본 크기 알약. "분석"을 뺀 건 말맛이 아니라 **폭** 때문이다 — 이 알약은 왼쪽
+              헤드라인(숫자 + 톤 라벨)과 한 줄을 나눠 쓰는데, 넘치면 다음 줄로 내려가면서
+              아래 막대까지 밀어 옆 카드와 높이가 어긋난다.
+
+              4열(카드 247px) 기준 실측. 왼쪽 묶음은 톤 라벨이 "중립"이냐 "낙관 우세"냐로
+              120 ↔ 144 를 오가므로, **넉 자 라벨(144)을 최악으로 잡고 예산 91px**로 본다.
+                게시글 8,961건 분석  118  ✗ (27 초과 — 실제로 이것 때문에 줄이 밀렸다)
+                글 8,961건 분석       98  ✗ (7 초과. 낱말만 줄여선 모자란다)
+                글 8,961건            76  ✓ 여유 15
+                뉴스 3,717건          86  ✓ 여유 5
+              ⚠️ 뉴스 건수가 다섯 자리가 되면 93 이라 이 카드만 다시 내려앉는다
+              (디시는 여섯 자리까지 버틴다). 그때는 낱말이 아니라 이 줄의 구조를 고쳐야 한다. */}
           <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: C.sub, background: C.chip, borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
-            {countNoun} {ratio.total.toLocaleString("ko-KR")}건 분석
+            {countNoun} {ratio.total.toLocaleString("ko-KR")}건
           </span>
         </div>
       ) : (
@@ -2614,7 +2631,7 @@ export default async function Home() {
                              [명품2·봇레포·베스트셀러] — 3행이 정확히 채워진다. */}
                 <CardTrend v={p("naver_search_trend")} icon="search" />
                 <CardSentiment v={p("news_sentiment")} icon="newspaper" countNoun="뉴스" />
-                <CardSentiment v={p("dcinside_post_count")} icon="forum" countNoun="게시글" />
+                <CardSentiment v={p("dcinside_post_count")} icon="forum" countNoun="글" />
                 <CardUpbit v={p("upbit_speculation_index")} />
                 <CardSpending luxury={p("luxury_consumption_index")} dining={p("fine_dining_search_index")} />
                 <CardDivergence v={p("small_business_crisis_index")} />
