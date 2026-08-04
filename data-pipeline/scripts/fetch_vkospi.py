@@ -37,7 +37,10 @@ INDICATOR_META = {
     "name": "VKOSPI (변동성지수)",
     "headline": "옵션 가격에서 뽑아낸 시장의 불안",
     "category": "시장",
-    "description_beginner": "너무 낮으면 위험을 잊고 방심했다는 신호입니다",
+    # '방심'을 뺐다(2026-08-04). 시장이 방심했다는 건 잰 값이 아니라 그 값에 대한
+    # 평가여서, 무엇을 재는 지표인지가 흐려진다. 카드 눈금 라벨도 같이 잔잔↔출렁으로
+    # 바꿨다(app/page.tsx CardVkospi) — 둘은 한 카드의 같은 축이라 함께 봐야 한다.
+    "description_beginner": "너무 잔잔하면 위험을 작게 보고 있다는 뜻입니다",
     "unit": "pt",
 }
 

@@ -33,7 +33,9 @@ INDICATOR_META = {
     "name": "원/달러 환율 변동성",
     "headline": "최근 30일 원/달러 환율 출렁임",
     "category": "시장",
-    "description_beginner": "환율이 너무 잔잔하면 방심했다는 신호입니다",
+    # VKOSPI 와 같은 이유로 '방심'을 뺐다(2026-08-04). 두 카드가 같은 방향(낮을수록
+    # 과열)의 같은 어법을 쓰므로 문구도 짝을 맞춘다.
+    "description_beginner": "환율이 잔잔할수록 위험을 작게 본다는 뜻입니다",
     "unit": "%",
 }
 
