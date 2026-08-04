@@ -1741,14 +1741,12 @@ function RiskProfile({ r, periodLabel }: { r: RiskProfileData; periodLabel: stri
             <div>{t.body.viz}</div>
             {/* 요약과 전체보기가 한 줄을 나눠 쓴다. 팝오버가 이 칸 기준으로 위로 펴지므로
                 relative 가 여기 있어야 한다(패널에 주면 요약 줄 위로 안 붙는다). */}
-            {/* justifyContent 가 '전체보기'가 있느냐에 딸린다. space-between 은 자식이
-                둘일 때 양끝으로 미는 규칙인데, 전체보기가 없는 패널은 자식이 요약 하나뿐이라
-                그 규칙이 요약을 왼쪽 끝에 붙여 놓는다 — 폰에서 패널이 화면 폭을 다 쓰면
-                오른쪽에 107px 빈자리가 남아 줄이 어긋난 것처럼 보였다(실기기 피드백).
-                혼자면 가운데, 전체보기와 나눠 쓰면 양끝. */}
-            <div style={{ position: "relative", display: "flex", alignItems: "flex-end", justifyContent: t.body.more ? "space-between" : "center", gap: 10, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.divider}` }}>
+            {/* 정렬 규칙은 CSS(.mdd-tile-foot)가 진다 — **인라인은 미디어쿼리를 이겨서**
+                여기 두면 폭에 따라 못 가른다. 기본(PC)은 왼쪽, 폰에서 요약이 혼자일 때만
+                가운데다. 왜 그렇게 갈리는지는 그 클래스 주석에 적어 뒀다. */}
+            <div className={`mdd-tile-foot${t.body.more ? "" : " mdd-tile-foot-solo"}`} style={{ position: "relative", marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.divider}` }}>
               {/* foot 은 <p> 라 <span> 으로 감싸면 안 된다(span 은 phrasing content 만 받는다). */}
-              <div style={{ minWidth: 0, textAlign: t.body.more ? "left" : "center" }}>{t.body.foot}</div>
+              <div style={{ minWidth: 0 }}>{t.body.foot}</div>
               {t.body.more}
             </div>
           </div>

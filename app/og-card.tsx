@@ -14,12 +14,17 @@ import { join } from "node:path";
 export const OG_SIZE = { width: 1200, height: 630 };
 export const OG_CONTENT_TYPE = "image/png";
 
-export const INK = "#191f28"; // --c-ink
-export const SUB = "#4e5968"; // --c-sub
+/* ⚠️ 여기 hex 는 globals.css 의 토큰을 **손으로 베낀 것**이다. Satori 는 CSS 변수를
+   못 읽어서 값을 박을 수밖에 없는데, 그러면 팔레트를 바꿀 때 여기가 조용히 뒤처진다.
+   실제로 2026-08 콘솔 리디자인 뒤로 넉 달치가 옛 값(#191f28 · #4e5968 · #e5e8eb ·
+   #1b64da)으로 남아 있었다. **팔레트를 건드리면 이 줄들을 같이 볼 것.**
+   (같은 이유로 layout.tsx 의 theme-color 메타도 함께 봐야 한다.) */
+export const INK = "#0e2136"; // --c-ink
+export const SUB = "#556a84"; // --c-sub
 export const CARD_BG = "#ffffff"; // --c-card
-export const TRACK = "#e5e8eb"; // --c-track
+export const TRACK = "#eef3f9"; // --c-track
 export const BLUE = "#3182f6"; // --c-blue
-export const COLD = "#1b64da"; // --c-cold
+export const COLD = "#2371b2"; // --c-cold
 
 const GHOST =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 104">' +
