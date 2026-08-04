@@ -2115,6 +2115,42 @@ main.hz-scroll { overflow-x: clip; }
   transform: translateY(0);
 }
 
+/* 잘림 해결 — 툴팁(.hz-tip)과 같은 앵커 위치지정.
+   위 규칙은 position:absolute 라 조상 판의 overflow 에 갇힌다. '낙폭 대비 보상' 타일은
+   시트 맨 아래에 붙어 있고 그 시트(.hz-sheet)가 overflow:hidden 이라, 위로 펼친 팝오버의
+   윗부분이 잘려 나갔다(실측 2026-08-04, 10년 조회에서 425px 중 50px). 조회 기간이 길수록
+   더 잘린다.
+
+   position:fixed 로 바꾸면 기준이 조상 판이 아니라 **뷰포트**가 되어 시트 밖으로 온전히
+   열린다. 자리는 앵커가 잡아 준다.
+
+   ⚠️ 앵커 이름은 host 에 붙인다 — ::after 가 아니라 진짜 형제 요소라 '암묵 앵커'가 없다.
+   anchor-scope 도 같이 건다(.hz-tip 주석 참고): 이름은 하나뿐이라 범위를 안 막으면
+   문서의 마지막 host 에 달라붙는다. 지금은 페이지에 하나뿐이지만 타일이 늘면 바로 는다. */
+@supports (anchor-scope: --a) and (position-area: top center) {
+  .hz-yrpop-host {
+    anchor-name: --hz-yrpop;
+    anchor-scope: --hz-yrpop;
+  }
+  .hz-yrpop {
+    position: fixed;
+    position-anchor: --hz-yrpop;
+    /* 위 규칙의 bottom/right 를 걷어낸다. 남겨 두면 position-area 가 잡은 자리를 다시 민다. */
+    inset: auto;
+    /* 위로, 오른쪽 끝을 앵커에 맞춰 — absolute 판(bottom/right:0)과 같은 그림이다. */
+    position-area: top span-left;
+    position-try-fallbacks:
+      top span-right,
+      bottom span-left,
+      bottom span-right;
+    /* 버튼과 4px 겹친다. 틈이 있으면 마우스가 건너는 동안 :hover 가 끊긴다.
+       transform 은 여닫는 애니메이션이 쓰므로 margin 으로 준다. */
+    margin-bottom: -4px;
+    /* 뷰포트가 기준이 되었으니 화면 높이에 맞춰 스스로 줄어들게 둔다. */
+    max-height: min(600px, calc(100vh - 24px));
+  }
+}
+
 .hz-yrpop-head {
   padding-bottom: 6px;
   border-bottom: 1px solid var(--c-line);
