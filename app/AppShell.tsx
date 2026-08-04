@@ -17,7 +17,7 @@ import GaEvents from "./GaEvents";
 const NAV = [
   { href: "/", label: "시장 브리핑", icon: "monitoring", sub: "지표 25개로 잰 오늘의 시장 온도", badge: "25개 지표" },
   { href: "/kadera", label: "카더라 리포트", icon: "forum", sub: "주식 텔레그램에서 무엇이 회자되는지" },
-  { href: "/mdd", label: "MDD 정밀분석", icon: "trending_down", sub: "고점에서 얼마나 내려왔고 언제 돌아왔는지" },
+  { href: "/mdd", label: "MDD 정밀분석", icon: "trending_down", sub: "고점에서 얼마나 내려왔고 언제 회복했을까" },
 ] as { href: string; label: string; icon: string; sub: string; badge?: string }[];
 
 // 외부(텔레그램) 링크라 NAV 배열이 아니라 따로 둔다 — pathname 기반 active 판정 대상이
