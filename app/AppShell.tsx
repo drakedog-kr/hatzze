@@ -9,6 +9,7 @@ import { C, Icon, R } from "./ui";
 import { BetaBadge, LogoLockup } from "./Logo";
 import Footer from "./Footer";
 import GaEvents from "./GaEvents";
+import { TipTap } from "./TipTap";
 
 // sub 는 본문 헤더의 페이지 부제다(목업이 사이드바 로고 밑에 있던 문장을 여기로 옮겼다).
 // 사이드바 항목에는 안 쓰이고 PageHeader 만 읽는다.
@@ -807,6 +808,8 @@ export default function AppShell({
       {/* 위임 리스너(클릭·툴팁·스크롤). 렌더 결과가 없으므로 어디에 두어도 되지만,
           셸 최상단에 두어 "모든 페이지에 걸린다"는 게 눈에 보이게 한다. */}
       <GaEvents />
+      {/* 터치 기기에서 툴팁을 탭으로 여는 리스너. 호버가 되는 기기에서는 아무것도 안 건다. */}
+      <TipTap />
       <div
         className="hz-frame"
         style={{
