@@ -792,7 +792,12 @@ function MeterRow({
 
    ⚠️ 기간처럼 자릿수 차가 큰 값(33일 ~ 1,387일)은 선형 눈금이면 짧은 막대가 1%로
    사라진다. 제곱근 눈금과 min-width 5px 을 함께 쓴다(각주에 제곱근임을 밝힌다). */
-const MIRROR_LABEL_W = 34;
+/* 라벨 칸 폭. 가장 긴 라벨이 `2026.12`(10px/700 실측 42.1px)라 44 로 잡는다.
+   예전 34 는 네 자리 연도에 월을 붙이면 넘쳐서, 월이 붙는 줄만 `26.2` 로 줄여 쓰게 했다 —
+   한 화면에서 연도 표기가 두 벌이 되는 값이라 칸을 넓히는 쪽으로 되돌렸다(2026-08-04).
+   늘어난 10px 은 가운데 막대 칸(flex:1)에서 나온다. 3열이 가장 좁아지는 1000px 에서도
+   막대 칸이 181 → 171 이라 반쪽 막대가 85px 씩 남는다. */
+const MIRROR_LABEL_W = 44;
 const MIRROR_LEFT_W = 40;
 const MIRROR_RIGHT_W = 44;
 
@@ -1382,12 +1387,10 @@ function RiskProfile({ r, periodLabel }: { r: RiskProfileData; periodLabel: stri
   // 붙인다 — 한 번뿐인 해까지 붙이면 축이 괜히 시끄러워진다.
   const eventYearCount = new Map<number, number>();
   for (const e of events) eventYearCount.set(e.year, (eventYearCount.get(e.year) ?? 0) + 1);
-  /* 월이 붙는 줄은 연도를 두 자리로 줄인다("2026.2" → "26.2"). 거울 막대의 라벨 칸은
-     세 패널이 공유하는 고정폭(MIRROR_LABEL_W)이라 여기서 넓힐 수가 없는데, 네 자리 연도에
-     월을 붙이면 그 칸을 넘긴다. 두 자리로 줄이면 "2020"(4글자)과 폭이 같아진다. */
-  const eventLabels = events.map((e) =>
-    (eventYearCount.get(e.year) ?? 0) > 1 ? `${String(e.year).slice(2)}.${e.month}` : `${e.year}`,
-  );
+  /* 연도는 네 자리 그대로 적는다. 예전엔 월이 붙는 줄만 두 자리로 줄였는데("2026.2" →
+     "26.2"), 같은 축에서 `2024` 와 `26.2` 가 나란히 서니 무슨 해인지 한 번 더 세어야 했다.
+     라벨 칸(MIRROR_LABEL_W)을 넓혀 두 자리로 줄이는 이유를 없앴다(2026-08-04). */
+  const eventLabels = events.map((e) => ((eventYearCount.get(e.year) ?? 0) > 1 ? `${e.year}.${e.month}` : `${e.year}`));
 
   /* 타일 제목 옆 괄호. 두 타일과 한 타일이 서로 다른 것을 적는데, 다르게 적을 이유가 있다.
      기준은 하나다 — **괄호가 가리키는 것에 화면에서 닿을 수 있나.**
