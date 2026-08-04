@@ -867,7 +867,7 @@ function Legend({ items }: { items: { label: string; background: string }[] }) {
   );
 }
 
-/* ── 이 하락, 어떻게 읽나 ───────────────────────────────────────────
+/* ── 이 하락의 맥락 ────────────────────────────────────────────────
    히어로 셋째 셀의 해설 문단. **LLM 을 쓰지 않는다** — 전부 이 페이지가 이미 가진 수치를
    문장으로 옮긴 것이라, 반짝 아이콘도 AI 고지도 붙이지 않는다.
 
@@ -1062,7 +1062,7 @@ function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel: string
         </div>
       </div>
 
-      {/* 3 — 이 하락, 어떻게 읽나. LLM 을 쓰지 않는다(반짝 아이콘·AI 고지 없음). */}
+      {/* 3 — 이 하락의 맥락. LLM 을 쓰지 않는다(반짝 아이콘·AI 고지 없음). */}
       <div style={{ ...cell, flex: "1.3 1 300px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
           <span
@@ -1080,7 +1080,7 @@ function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel: string
           >
             <Icon name="insights" style={{ fontSize: 14 }} />
           </span>
-          <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>이 하락, 어떻게 읽나</span>
+          <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>이 하락의 맥락</span>
         </div>
         <Reading data={data} periodLabel={periodLabel} />
       </div>

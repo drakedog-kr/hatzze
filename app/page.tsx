@@ -854,7 +854,7 @@ function Hero({
             textWrap: "pretty",
           }}
         >
-          오늘 {bandTotal}개 지표 집계
+          {bandTotal}개 지표 집계
           {bandCounts[3].count > 0 && ` · 초고온 ${bandCounts[3].count}개가 온도를 끌어올렸습니다`}
         </span>
       </div>
@@ -1654,11 +1654,6 @@ function CardComingSoon() {
  * 차갑다고 말하는 꼴이었다(2026-08-03).
  * 축이 스스로 말하게 둔다: 1배 위는 빨강, 아래는 파랑, 정확히 1배면 중립.
  */
-function vsAvgTone(ratio: number): string {
-  if (Math.abs(ratio - 1) < 0.05) return C.sub2; // 소수 첫째 자리로 1.0 으로 보이는 폭
-  return ratio > 1 ? C.hot : C.cold;
-}
-
 function VsAvg({ ratio, knob, showScale = true }: { ratio: number; knob: string; showScale?: boolean }) {
   // **1배를 축 한가운데에 못박는다.** 예전엔 0~2배를 0~100%로 폈는데(1배가 가운데인 건
   // 같지만) 축이 넓어 1.0배와 1.3배가 15%p 차이로 붙어 보였다. ±0.5배를 양 끝으로 두면
@@ -1823,10 +1818,14 @@ function CardTrend({ v, icon }: { v: Pick; icon: string }) {
             <strong style={{ fontFamily: MONO, fontSize: 32, fontWeight: 800, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
               {vsAvg.toFixed(1)}배
             </strong>
-            {arrow && <span style={{ fontSize: 12.5, fontWeight: 700, color: vsAvg < 1 ? C.cold : C.hot }}>{arrow}</span>}
+            {/* 화살표·막대·숫자가 **한 색**이어야 한다. 예전엔 숫자만 온도색이고
+                화살표·막대는 평균 대비 방향(>1 이면 빨강)이라, 1.1배(과열도 저온) 카드가
+                파란 숫자 옆에 빨간 화살표를 달고 있었다 — 한 줄이 두 말을 했다.
+                방향은 이미 화살표 모양과 막대가 뻗는 쪽이 말한다. 색은 온도만 맡는다. */}
+            {arrow && <span style={{ fontSize: 12.5, fontWeight: 700, color: v.color }}>{arrow}</span>}
             <span style={{ fontSize: 12.5, fontWeight: 600, color: C.sub2 }}>평소 대비</span>
           </div>
-          <VsAvg ratio={vsAvg} knob={vsAvgTone(vsAvg)} />
+          <VsAvg ratio={vsAvg} knob={v.color} />
         </>
       ) : (
         <>
@@ -2010,10 +2009,10 @@ function SubSpend({ v, icon, showScale }: { v: Pick; icon: string; showScale: bo
   const ratio = v.details?.vs_avg ?? null;
   // 화살표와 색이 **같은 경계**를 써야 한다. 예전엔 화살표가 `ratio === 1` 로만 갈려서,
   // 0.98배(화면엔 "1.0배")가 색은 중립인데 화살표만 ↓ 로 떴다 — 한 줄이 두 말을 했다.
-  // vsAvgTone 과 같은 죽은 구간(±0.05 = 소수 첫째 자리로 1.0 으로 보이는 폭)을 쓴다.
+  // ±0.05 = 소수 첫째 자리로 1.0 으로 보이는 폭. 이 안에서는 화살표를 안 그린다.
   const flat = ratio === null || Math.abs(ratio - 1) < 0.05;
   const arrow = flat ? "" : (ratio as number) > 1 ? "↑" : "↓";
-  const arrowColor = ratio !== null ? vsAvgTone(ratio) : C.sub2;
+  const arrowColor = v.color;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -2027,7 +2026,9 @@ function SubSpend({ v, icon, showScale }: { v: Pick; icon: string; showScale: bo
             fontSize: 16,
             fontWeight: 800,
             // 막대와 같은 색이어야 한다 — 숫자가 파랑인데 막대가 빨강이면 한 줄이 두 말을 한다.
-            color: ratio !== null ? vsAvgTone(ratio) : v.color,
+            // 그 "같은 색"은 **온도**다(2026-08-04). 방향으로 맞췄더니 이번엔 이 줄만
+            // 다른 카드와 규칙이 갈렸다.
+            color: v.color,
             whiteSpace: "nowrap",
           }}
         >
@@ -2035,7 +2036,7 @@ function SubSpend({ v, icon, showScale }: { v: Pick; icon: string; showScale: bo
           {arrow && <span style={{ fontSize: 12, color: arrowColor }}> {arrow}</span>}
         </strong>
       </div>
-      {ratio !== null && <VsAvg ratio={ratio} knob={vsAvgTone(ratio)} showScale={showScale} />}
+      {ratio !== null && <VsAvg ratio={ratio} knob={v.color} showScale={showScale} />}
     </div>
   );
 }
@@ -2068,7 +2069,7 @@ function CardSpending({ luxury, dining }: { luxury: Pick; dining: Pick }) {
       <TitleRow icon="local_mall" name="여윳돈이 향하는 곳" desc="명품·외식 검색량으로 본 소비 심리" />
       {lead && (
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-          <strong style={{ fontFamily: MONO, fontSize: 32, fontWeight: 800, letterSpacing: "-.03em", color: vsAvgTone(lead.r), lineHeight: 1, whiteSpace: "nowrap" }}>
+          <strong style={{ fontFamily: MONO, fontSize: 32, fontWeight: 800, letterSpacing: "-.03em", color: lead.v.color, lineHeight: 1, whiteSpace: "nowrap" }}>
             {lead.r.toFixed(1)}배
           </strong>
           <span style={{ fontSize: 12.5, fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>
@@ -2161,9 +2162,13 @@ function CardNetBuy({ v }: { v: Pick }) {
             이 셀의 큰 수치가 아래로 밀려, 같은 줄에 놓인 다른 카드들의 큰 수치와 가로선이
             어긋난다 — 시트의 제1규칙이 "같은 줄의 메인 지수는 같은 높이"다.
             기간은 다른 카드들과 똑같이 수치 옆 sub 로 붙인다. */}
+        {/* 색은 **온도**다. 매수/매도 방향으로 칠하면 이 카드만 규칙이 갈린다 — 게이트
+            (52주 고점 −5%)를 못 넘은 날은 아무리 크게 팔아도 과열도가 0(저온)인데,
+            숫자만 빨갛게 떠서 셀이 뜨거운 것처럼 읽혔다. 방향은 부호(+/−)와 아래 곁말
+            ("순매도")이 이미 말한다. */}
         <Big
           disp={`${cum >= 0 ? "+" : ""}${formatEokMixed(cum)}`}
-          color={isBuy ? C.cold : C.hot}
+          color={v.color}
           size={32}
           sub={`최근 5거래일 ${isBuy ? "순매수" : "순매도"}`}
         />
