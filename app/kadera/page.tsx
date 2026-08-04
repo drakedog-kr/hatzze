@@ -802,7 +802,11 @@ export default async function KaderaPage() {
                 const dates = s.seriesDates.slice(-7);
                 return (
                   <div key={s.code} className="hz-panel-pad">
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: 8, minWidth: 0 }}>
+                    {/* baseline 정렬이어야 한다. flex-start 는 **상자 윗변**을 맞추는데,
+                        이 줄엔 14px 종목명과 11px 코드·11.5px 표본이 섞여 있어 상자를 맞추면
+                        정작 눈에 보이는 글자 밑선이 어긋난다(실측 3.8px). 순위 배지는 판이라
+                        글자 밑선이 아니라 판의 광학 중심으로 읽히므로 같이 내려가도 된다. */}
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
                       <RankBadge n={i + 1} />
                       {/* minWidth:0 — flex 항목의 기본 min-width:auto 가 살아 있으면 이름이
                           줄지 않아 말줄임이 안 걸리고 셀 밖으로 넘친다(820px 에서 실측 3px).
@@ -1048,7 +1052,7 @@ export default async function KaderaPage() {
                       폰에서는 시세가 다음 줄로 내려간다(globals.css 의 .hz-stock-head) —
                       한 줄에 다 넣으면 시세 묶음이 nowrap 이라 안 줄고, 줄어들 수 있는 건
                       종목명뿐이라 이름이 먼저 0 으로 눌려 사라진다. */}
-                  <div className="hz-stock-head" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                  <div className="hz-stock-head" style={{ display: "flex", alignItems: "baseline", gap: 10, minWidth: 0 }}>
                     <StockLogo code={r.code} name={r.name} market={r.market} size={30} />
                     <strong style={{ ...clip, minWidth: 0, fontSize: 17, fontWeight: 800, letterSpacing: "-.02em", color: C.ink }}>{r.name}</strong>
                     <span style={{ fontFamily: MONO, fontSize: 11, color: C.sub2, flexShrink: 0 }}>{r.code}</span>

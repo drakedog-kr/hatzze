@@ -1923,6 +1923,13 @@ main.hz-scroll { overflow-x: clip; }
 .hz-stock-price {
   margin-left: auto;
 }
+/* 이 줄은 baseline 으로 맞춘다(page.tsx). 17px 종목명·11px 코드·15px 시세가 한 줄에
+   섞여 있어 center 로 두면 눈에 보이는 밑선이 2.5px 어긋난다.
+   로고만 빼 준다 — 그림에는 baseline 이 없어 상자 밑변이 baseline 에 걸리고, 그러면
+   로고가 글자 위로 떠오른다. 이 하나는 광학 중심이 맞다. */
+.hz-stock-head > :first-child {
+  align-self: center;
+}
 @media (max-width: 560px) {
   .hz-stock-head {
     flex-wrap: wrap;
