@@ -726,7 +726,7 @@ function Hero({
                   top: 0,
                   ...(n === 0 ? { left: 0 } : n === 100 ? { right: 0 } : { left: `${n}%`, transform: "translateX(-50%)" }),
                   fontFamily: MONO,
-                  fontSize: 10.5,
+                  fontSize: 11,
                   fontWeight: 600,
                   color: C.sub,
                 }}
@@ -744,7 +744,7 @@ function Hero({
                 style={{
                   flex: 1,
                   textAlign: "center",
-                  fontSize: 10.5,
+                  fontSize: 11,
                   fontWeight: l === stageLabel ? 800 : 600,
                   color: l === stageLabel ? stage.color : C.label,
                 }}
@@ -1475,7 +1475,7 @@ function CardAsia({ v }: { v: Pick }) {
                 <span style={{ fontSize: 11, fontWeight: b.self ? 800 : 700, color: b.self ? C.ink : C.label, whiteSpace: "nowrap" }}>
                   {b.label}
                 </span>
-                <span style={{ fontSize: 10.5, fontWeight: 600, color: C.sub }}>{b.sub}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: C.sub }}>{b.sub}</span>
               </span>
               <div style={{ position: "relative", flex: 1, minWidth: 0, height: 16 }}>
                 <div style={{ position: "absolute", inset: 0, borderRadius: 4, background: C.track }} />
@@ -2226,7 +2226,7 @@ function CardNetBuy({ v }: { v: Pick }) {
           {dates.length > 0 && (
             <div style={{ display: "flex", gap: 8 }}>
               {daily.map((_, i) => (
-                <span key={i} style={{ flex: 1, textAlign: "center", fontFamily: MONO, fontSize: 10.5, color: C.sub }}>
+                <span key={i} style={{ flex: 1, textAlign: "center", fontFamily: MONO, fontSize: 11, color: C.sub }}>
                   {dates[i] ? ymdShort(dates[i]) : ""}
                 </span>
               ))}

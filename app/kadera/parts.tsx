@@ -322,7 +322,7 @@ export function DayBars({
               left: `${((peak + 0.5) / n) * 100}%`,
               transform: "translateX(-50%)",
               whiteSpace: "nowrap",
-              fontSize: 10.5,
+              fontSize: 11,
               fontWeight: 700,
               color: tone === "warm" ? "var(--c-hot-ink)" : "var(--c-cold-ink)",
             }}
@@ -364,7 +364,7 @@ export function DayBars({
                 flex: 1,
                 minWidth: 0,
                 textAlign: "center",
-                fontSize: 10.5,
+                fontSize: 11,
                 fontFamily: MONO,
                 fontWeight: mark ? 700 : 500,
                 color: mark ? (tone === "warm" ? "var(--c-hot-ink)" : "var(--c-cold-ink)") : C.sub2,

@@ -183,7 +183,7 @@ function Highlight({ cap, name, value, valueColor, sub, divide }: {
         boxShadow: divide ? "inset -1px 0 0 var(--c-sheet-row)" : undefined,
       }}
     >
-      <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>{cap}</span>
+      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>{cap}</span>
       <div style={{ display: "flex", alignItems: "baseline", gap: 7, minWidth: 0 }}>
         <strong style={{ ...clip, fontSize: 16, fontWeight: 800, letterSpacing: "-.02em", color: C.ink }}>{name}</strong>
         {value && <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: valueColor, flexShrink: 0 }}>{value}</span>}
@@ -225,7 +225,7 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
               </span>
               <span style={{ fontSize: 11, fontFamily: MONO, color: C.sub2 }}>{timeAgo(m.postedAt)}</span>
               <span style={{ flex: 1 }} />
-              <span style={{ fontSize: 10.5, fontFamily: MONO, fontWeight: 800, color: C.sub }}>#{i + 1}</span>
+              <span style={{ fontSize: 11, fontFamily: MONO, fontWeight: 800, color: C.sub }}>#{i + 1}</span>
             </div>
 
             <div className="hz-bubble">
@@ -255,7 +255,7 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
                     <span
                       key={t}
                       style={{
-                        fontSize: 10.5,
+                        fontSize: 11,
                         fontWeight: 700,
                         color: C.label,
                         background: C.card,
@@ -687,7 +687,7 @@ export default async function KaderaPage() {
                     사이로 간다. */}
                 {sentiment.byTheme.length > 0 && (
                   <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 9, paddingTop: 14, borderTop: "1px solid var(--c-sheet-row)" }}>
-                    <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>인기 테마별 비관 ↔ 낙관</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>인기 테마별 비관 ↔ 낙관</span>
                     {sentiment.byTheme.map((t) => (
                       <div
                         key={t.name}

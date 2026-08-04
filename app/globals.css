@@ -607,7 +607,7 @@ body {
   margin: -8px -8px 0;
   padding: 10px 15px 7px;
   background: var(--c-float);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--c-sub);
   white-space: nowrap;
@@ -2253,7 +2253,7 @@ main.hz-scroll { overflow-x: clip; }
   padding-bottom: 6px;
   border-bottom: 1px solid var(--c-line);
   color: var(--c-muted);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
 }
 .hz-yrpop-row {
@@ -2266,7 +2266,7 @@ main.hz-scroll { overflow-x: clip; }
   /* app/ui.tsx 의 MONO 와 같은 값. 이 레포는 모노 서체를 쓰지 않고 Pretendard 에
      body 의 tabular-nums 로 자릿수만 고정한다(한글 글리프가 갈리지 않게). */
   font-family: var(--font-pretendard), sans-serif;
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--c-sub);
 }
 /* 한 해가 두 줄(수익 / 그 해 최악 낙폭)인 건 타일 막대와 같은 문법이다. */
