@@ -57,6 +57,15 @@ SLEEP_BETWEEN_CHANNELS_SEC = 0.5
 # Telethon 기본값(60초)보다 올려, 짧은 FloodWait 은 예외 대신 대기로 흡수한다.
 # 이보다 긴 대기는 그대로 예외 → 그 채널만 건너뛴다(다음 실행에서 다시 잡는다).
 FLOOD_SLEEP_THRESHOLD_SEC = 180
+# 한 번에 쓰는 행 수. 이 파이프라인의 다른 쓰기(extract_telegram_stocks·
+# calculate_stock_daily 등)가 전부 쓰는 값과 같다.
+#
+# 2026-08-04 저녁 실행이 여기서 죽었다. 채널 하나치를 한 방에 upsert 했는데,
+# MAX_SCAN_PER_CHANNEL 을 채운 채널(kwtok·dartAll·DOC_POOL)은 그게 본문 300만 자짜리
+# 단일 statement 라 Postgres statement timeout(57014)에 걸렸다. 실측으로 2,000행 한 방은
+# 6~11초인데 천장이 15~20초 사이라 여유가 두 배도 안 됐고, 500행이면 4~5초로 내려간다.
+# 총 소요는 왕복이 늘어 오히려 조금 길지만, 천장은 총 소요가 아니라 statement 하나에 걸린다.
+UPSERT_BATCH = 500
 
 
 def load_active_channels(client) -> list[dict]:
@@ -98,6 +107,14 @@ def collect_channel(tg, ch: dict, cutoff: datetime) -> list[dict]:
             }
         )
     return rows
+
+
+def save_channel(db, rows: list[dict]) -> None:
+    """한 채널치를 UPSERT_BATCH 행씩 나눠 쓴다(왜 나누는지는 그 상수 주석)."""
+    for i in range(0, len(rows), UPSERT_BATCH):
+        db.table("telegram_messages").upsert(
+            rows[i : i + UPSERT_BATCH], on_conflict="channel_handle,message_id"
+        ).execute()
 
 
 def main() -> None:
@@ -150,6 +167,12 @@ def main() -> None:
                 time.sleep(SLEEP_BETWEEN_CHANNELS_SEC)
             try:
                 rows = collect_channel(tg, ch, cutoff)
+                # 저장까지 이 try 안에 둔다. 밖에 두면 DB 가 한 번 튕겼을 때 남은 채널이
+                # 통째로 날아간다 — 2026-08-04 저녁 실행이 204/317 번째 채널의 upsert 에서
+                # 죽어 뒤의 113개를 못 봤다. 수집 실패는 채널 단위로 흡수하면서 저장 실패만
+                # 전체를 멈출 이유가 없다. 창이 7일이라 다음 실행이 이 채널을 백필한다.
+                if not dry_run and rows:
+                    save_channel(db, rows)
             except Exception as exc:  # noqa: BLE001
                 # 캐시가 낡아 실패하는 경우도 여기로 온다. 다음 sync 가 유저네임으로
                 # 다시 풀어 값을 고치므로 여기서 되돌리지 않는다(그게 resolve 창구를
@@ -165,18 +188,13 @@ def main() -> None:
                 f"  {handle:<18} {len(rows):>3}건 · 최대조회 {view_max:>7,} · 최대포워드 {fwd_max:>4}"
             )
 
-            if not dry_run and rows:
-                db.table("telegram_messages").upsert(
-                    rows, on_conflict="channel_handle,message_id"
-                ).execute()
-
     if dry_run:
         print(f"\n--dry-run: 총 {total}건 수집(표시만, DB 안 씀).")
     else:
         print(f"\n[Supabase] telegram_messages upsert 완료: 총 {total}건")
 
     # 실패는 채널마다 한 줄씩 이미 찍히지만, 300줄 로그에 섞이면 눈에 안 띈다.
-    # 건수가 계속 늘면 FloodWait 을 의심할 것.
+    # 건수가 계속 늘면 FloodWait 을, 실패 줄에 APIError 가 보이면 DB 쪽을 의심할 것.
     if failed:
         print(
             f"[경고] 채널 {len(failed)}/{len(ready)}개 수집 실패: "
