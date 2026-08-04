@@ -14,6 +14,9 @@ import { C, Icon, R } from "../ui";
  *      파란 세로줄이 시장 브리핑에서 먼저 걷혔다.
  *   ② 제목 14.5 → 13, 설명 12.5 → 11.5. 시트 머리는 카드 제목이 아니라 **구간 이름**
  *      이라, 안쪽 셀 제목(14)보다 작아야 위계가 맞는다.
+ *      ↳ 2026-08-04 되돌렸다(제목 14/700, 설명 12.5). 위계를 크기로만 만들려다 큰
+ *        화면에서 안 읽히는 지경까지 내려갔다. 위계는 굵기·색이 지고, 크기는
+ *        읽히는 바닥 위에 둔다(globals.css 의 '읽히는 잉크 램프' 주석 참고).
  *   ③ 머리 자체가 아래와 헤어라인으로 갈린다(.hz-sheet-head). marginBottom 은 없다 —
  *      간격은 그 선 아래 내용이 자기 padding 으로 잡는다.
  */
@@ -40,12 +43,16 @@ export function SectionHead({
     <div className="hz-sheet-head" style={{ flexWrap: right ? "wrap" : "nowrap" }}>
       {/* marginTop:1 — 18px 아이콘의 광학 중심을 13px 제목 첫 줄에 맞춘다. */}
       <Icon name={icon} style={{ fontSize: 18, color: C.muted, marginTop: 1, flexShrink: 0 }} />
-      <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: right ? "1 1 200px" : 1, minWidth: 0 }}>
-        <h3 style={{ margin: 0, fontSize: 13, fontWeight: 800, color: C.ink, letterSpacing: "-.01em", wordBreak: "keep-all" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 3, flex: right ? "1 1 200px" : 1, minWidth: 0 }}>
+        {/* 800 → 700. 13px 에 800 은 획이 붙어 도리어 흐릿해 보였다. 크기를 올리고
+            굵기를 한 단 내린다 — 커진 만큼 무게는 이미 붙는다. */}
+        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: C.ink, letterSpacing: "-.01em", wordBreak: "keep-all" }}>
           {title}
         </h3>
-        {desc && <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.45, color: C.sub2, wordBreak: "keep-all" }}>{desc}</p>}
-        {meta && <p style={{ margin: 0, fontSize: 11, lineHeight: 1.5, color: C.muted }}>{meta}</p>}
+        {/* 설명은 이 페이지에서 가장 자주 읽히는 작은 글씨다(시트마다 한 줄).
+            11.5/sub2(명암비 2.7)로는 큰 화면에서 안 읽혔다. */}
+        {desc && <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.5, color: C.sub, wordBreak: "keep-all" }}>{desc}</p>}
+        {meta && <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.5, color: C.sub2 }}>{meta}</p>}
       </div>
       {right && <div style={{ flexShrink: 0, marginLeft: "auto" }}>{right}</div>}
       {/* 기간 표기는 알약으로. 회색 맨글씨로 두면 제목 오른쪽에 떠 있는 부스러기처럼
@@ -57,7 +64,7 @@ export function SectionHead({
             display: "inline-flex",
             alignItems: "center",
             gap: 4,
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: 700,
             color: C.sub,
             /* 타이틀 칸(--c-title-band) 위에 얹히는 알약이라 **카드색**이다.

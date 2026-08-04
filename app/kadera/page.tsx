@@ -115,12 +115,12 @@ function Highlight({ cap, name, value, valueColor, sub, divide }: {
         boxShadow: divide ? "inset -1px 0 0 var(--c-sheet-row)" : undefined,
       }}
     >
-      <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: ".08em", color: C.sub2 }}>{cap}</span>
+      <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>{cap}</span>
       <div style={{ display: "flex", alignItems: "baseline", gap: 7, minWidth: 0 }}>
         <strong style={{ ...clip, fontSize: 16, fontWeight: 800, letterSpacing: "-.02em", color: C.ink }}>{name}</strong>
         {value && <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: valueColor, flexShrink: 0 }}>{value}</span>}
       </div>
-      <span style={{ ...clip, fontSize: 10.5, color: C.sub2 }}>{sub}</span>
+      <span style={{ ...clip, fontSize: 11.5, color: C.sub }}>{sub}</span>
     </div>
   );
 }
@@ -155,9 +155,9 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
               <span style={{ ...clip, fontSize: 12.5, fontWeight: 800, letterSpacing: "-.01em", color: "var(--c-cold-ink)", maxWidth: 220 }}>
                 {m.channelTitle}
               </span>
-              <span style={{ fontSize: 10.5, fontFamily: MONO, color: C.faint }}>{timeAgo(m.postedAt)}</span>
+              <span style={{ fontSize: 11, fontFamily: MONO, color: C.sub2 }}>{timeAgo(m.postedAt)}</span>
               <span style={{ flex: 1 }} />
-              <span style={{ fontSize: 9.5, fontFamily: MONO, fontWeight: 800, color: C.sub2 }}>#{i + 1}</span>
+              <span style={{ fontSize: 10.5, fontFamily: MONO, fontWeight: 800, color: C.sub }}>#{i + 1}</span>
             </div>
 
             <div className="hz-bubble">
@@ -356,7 +356,7 @@ export default async function KaderaPage() {
               }}
             />
           </div>
-          <div style={{ ...clip, fontSize: 11, color: C.muted }}>
+          <div style={{ ...clip, fontSize: 11.5, color: C.sub2 }}>
             점유율 <b style={{ color: C.sub, fontFamily: MONO }}>{t.sharePct.toFixed(1)}%</b> · 종목 {t.stockCount}개 ·{" "}
             <span style={{ fontFamily: MONO }}>{t.mentions}회</span>
           </div>
@@ -408,12 +408,12 @@ export default async function KaderaPage() {
         data-ga-surface="power_rank"
         data-ga-rank={i + 1}
       >
-        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 800, color: C.faint }}>{i + 1}</span>
+        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 800, color: C.sub2 }}>{i + 1}</span>
         <span style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
           <Avatar photoUrl={c.photoUrl} title={c.title} size={26} />
           <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
             <span style={{ ...clip, fontSize: 12, fontWeight: 700, color: C.ink }}>{c.title}</span>
-            <span style={{ ...clip, fontSize: 10, fontFamily: MONO, color: C.faint }}>
+            <span style={{ ...clip, fontSize: 11, fontFamily: MONO, color: C.sub2 }}>
               구독자 {c.subscriberCount ? compact(c.subscriberCount) : "-"}
             </span>
           </span>
@@ -421,7 +421,7 @@ export default async function KaderaPage() {
         <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: C.label, textAlign: "right" }}>
           {c.viewRate != null ? `${c.viewRate.toFixed(1)}%` : "—"}
         </span>
-        <span style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, textAlign: "right", color: c.rankChange ? (c.rankChange > 0 ? "var(--c-hot-ink)" : "var(--c-cold-ink)") : C.hint }}>
+        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, textAlign: "right", color: c.rankChange ? (c.rankChange > 0 ? "var(--c-hot-ink)" : "var(--c-cold-ink)") : C.hint }}>
           {c.rankChange ? `${c.rankChange > 0 ? "▲" : "▼"}${Math.abs(c.rankChange)}` : "—"}
         </span>
         <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: C.ink, textAlign: "right" }}>
@@ -432,14 +432,15 @@ export default async function KaderaPage() {
   ));
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    // hz-type2 — 이 페이지 안에서만 잉크 램프의 아랫단을 끌어올린다(globals.css).
+    <div className="hz-type2" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* ── 히어로: 모니터링 25 · 센티먼트 25 · 오늘의 요약 50 ───────────── */}
       <section className="hz-sheet">
         <div className="hz-kd-hero">
           {/* ① 모니터링 현황 */}
           <div className="hz-kd-hero-q">
             <div className="hz-kd-hero-title">
-              <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>모니터링 현황</span>
+              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>모니터링 현황</span>
             </div>
             <div style={{ display: "flex", flexDirection: "column" }}>
               {miniStats.map((s, i) => (
@@ -467,7 +468,7 @@ export default async function KaderaPage() {
                       내려간다. 기본 규칙이면 "활성 채널"이 토막나 읽히지 않는다. */}
                   <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub, display: "inline-flex", alignItems: "baseline", gap: 4, minWidth: 0, wordBreak: "keep-all" }}>
                     {s.label}
-                    {s.note && <span style={{ fontSize: 10, color: C.faint }}>{s.note}</span>}
+                    {s.note && <span style={{ fontSize: 11, color: C.sub2 }}>{s.note}</span>}
                     {/* alignSelf:center — 이 줄은 라벨과 '7일'의 밑선을 맞추느라 baseline
                         정렬인데, 물음표까지 거기 딸려 가면 안 된다. 아이콘 글꼴은 글리프
                         밑변이 곧 밑선이라, 밑선에 맞추면 12px 상자가 글자보다 통째로
@@ -515,7 +516,7 @@ export default async function KaderaPage() {
           {/* ② 생태계 센티먼트 */}
           <div className="hz-kd-hero-q">
             <div className="hz-kd-hero-title" style={{ justifyContent: "space-between", gap: 10 }}>
-              <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>생태계 센티먼트</span>
+              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>생태계 센티먼트</span>
               {sentiment && (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: C.label, whiteSpace: "nowrap" }}>
                   <span
@@ -588,7 +589,7 @@ export default async function KaderaPage() {
                     <span style={{ width: `${sentiment.score}%`, background: "var(--c-warm-2)" }} />
                   </div>
                   {/* 두 라벨을 막대의 양 끝에 붙여 어느 쪽이 어느 색인지 위치로 읽히게 한다. */}
-                  <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 10.5, fontWeight: 700 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 11.5, fontWeight: 700 }}>
                     <span style={{ color: "var(--c-cold-ink)" }}>비관 {100 - sentiment.score}</span>
                     <span style={{ color: "var(--c-hot-ink)" }}>낙관 {sentiment.score}</span>
                   </div>
@@ -599,7 +600,7 @@ export default async function KaderaPage() {
                     사이로 간다. */}
                 {sentiment.byTheme.length > 0 && (
                   <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 9, paddingTop: 14, borderTop: "1px solid var(--c-sheet-row)" }}>
-                    <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: ".08em", color: C.sub2 }}>인기 테마별 비관 ↔ 낙관</span>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>인기 테마별 비관 ↔ 낙관</span>
                     {sentiment.byTheme.map((t) => (
                       <div
                         key={t.name}
@@ -645,7 +646,7 @@ export default async function KaderaPage() {
               >
                 <AiMark size={13} style={{ alignSelf: "center" }} />
               </span>
-              <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>오늘의 요약</span>
+              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>오늘의 요약</span>
             </div>
             {/* 높이를 안 잡는다 — 글이 3줄이면 3줄, 4줄이면 4줄로 흐른다. 길이 자체는
                 파이프라인이 잡는다(generate_telegram_narratives.py 의 BRIEF_*_LEN).
@@ -673,7 +674,7 @@ export default async function KaderaPage() {
             {summary.lastUpdated && (
               <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 7, paddingTop: 10 }}>
                 <Icon name="schedule" style={{ fontSize: 14, color: C.muted }} />
-                <span style={{ fontSize: 10.5, color: C.sub }}>최종 업데이트 · {formatKstUpdate(summary.lastUpdated)}</span>
+                <span style={{ fontSize: 11.5, color: C.sub }}>최종 업데이트 · {formatKstUpdate(summary.lastUpdated)}</span>
               </div>
             )}
           </div>
@@ -681,7 +682,7 @@ export default async function KaderaPage() {
         {/* 이 문장은 빼면 안 된다(공개 저장소·법률). 히어로 시트의 각주 띠에 두면 첫
             화면 안에 들면서도 그래픽을 밀어내지 않는다. */}
         <div className="hz-sheet-foot">
-          <span style={{ fontSize: 10.5, lineHeight: 1.6, color: C.sub2 }}>
+          <span style={{ fontSize: 12, lineHeight: 1.6, color: C.sub }}>
             한국 주식 텔레그램 채널들이 지금 무엇에 주목하는지를 모아 보여줍니다 · 조회·확산·언급량을 종합한 화제성 지표이며, 매수·매도 신호가 아닙니다
           </span>
         </div>
@@ -715,7 +716,7 @@ export default async function KaderaPage() {
                           줄지 않아 말줄임이 안 걸리고 셀 밖으로 넘친다(820px 에서 실측 3px).
                           줄어도 되는 건 이름뿐이라 여기만 풀어 준다. */}
                       <strong style={{ ...clip, minWidth: 0, fontSize: 14, fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>{s.name}</strong>
-                      <span style={{ fontFamily: MONO, fontSize: 10, color: C.faint, flexShrink: 0 }}>{s.code}</span>
+                      <span style={{ fontFamily: MONO, fontSize: 11, color: C.sub2, flexShrink: 0 }}>{s.code}</span>
                       <span style={{ flex: 1 }} />
                       {/* '몇 개 채널'과 '며칠에 몇 회'는 둘 다 이 배수의 표본 크기를 말한다 —
                           한 덩어리로 오른쪽 위에 모아 두면 아래 그래픽이 배수와 막대만 남는다.
@@ -723,8 +724,8 @@ export default async function KaderaPage() {
                           대화에서 차지한 **몫(share)** 을 평활해 낸 값이라(getSurgingStocks),
                           횟수 둘을 나란히 두면 그 비가 배수와 안 맞아 눈금이 둘 생긴다. */}
                       <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
-                        <span style={{ fontSize: 10.5, color: C.sub2, whiteSpace: "nowrap" }}>{s.channelCount}개 채널</span>
-                        <span style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: C.label, whiteSpace: "nowrap" }}>
+                        <span style={{ fontSize: 11.5, color: C.sub2, whiteSpace: "nowrap" }}>{s.channelCount}개 채널</span>
+                        <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: C.label, whiteSpace: "nowrap" }}>
                           최근 {s.recentDays}일 기준 {s.recentMentions}회
                         </span>
                       </span>
@@ -752,13 +753,13 @@ export default async function KaderaPage() {
                               폴백이면 등락률도 그날 것이라, 화살표를 그대로 두면 가격뿐 아니라
                               방향까지 뒤집혀 보인다(QuoteDate 주석). */}
                           {s.isLive ? (
-                            <ChangeRate rate={s.changeRate} style={{ fontSize: 10.5, fontWeight: 800 }} />
+                            <ChangeRate rate={s.changeRate} style={{ fontSize: 11.5, fontWeight: 800 }} />
                           ) : (
-                            <QuoteDate date={s.priceDate} style={{ fontSize: 10.5 }} />
+                            <QuoteDate date={s.priceDate} style={{ fontSize: 11.5 }} />
                           )}
                         </>
                       ) : (
-                        <span style={{ fontSize: 11, color: C.muted }}>가격 정보 준비 중</span>
+                        <span style={{ fontSize: 11.5, color: C.sub2 }}>가격 정보 준비 중</span>
                       )}
                       <span style={{ flex: 1 }} />
                       <MddLink code={s.code} market={s.market} label="MDD" />
@@ -768,7 +769,7 @@ export default async function KaderaPage() {
               })}
             </div>
             <div className="hz-sheet-foot">
-              <span style={{ fontSize: 10.5, lineHeight: 1.6, color: C.sub2 }}>
+              <span style={{ fontSize: 12, lineHeight: 1.6, color: C.sub }}>
                 막대는 최근 7일 일별 언급량이고, 붉은 칸이 배수를 낸 최근 창입니다 · 배수는 언급 횟수가 아니라 그날 전체 대화에서 차지한 몫을 견준 값입니다
               </span>
             </div>
@@ -871,7 +872,7 @@ export default async function KaderaPage() {
               <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
               {keywords.slice(1).map((k, i) => (
                 <div key={k.word} className="hz-trow" style={{ gridTemplateColumns: KEYWORD_COLS, flex: 1 }}>
-                  <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 800, color: C.faint }}>{i + 2}</span>
+                  <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 800, color: C.sub2 }}>{i + 2}</span>
                   <span style={{ ...clip, fontSize: 12, fontWeight: 700, color: C.ink }}>{k.word}</span>
                   <span style={{ height: 7, borderRadius: 999, background: C.track, overflow: "hidden" }}>
                     <span
@@ -907,16 +908,16 @@ export default async function KaderaPage() {
                   색이 서로 다른 눈금이라는 것도 여기서 밝힌다. */}
               <div className="hz-sheet-foot" style={{ marginTop: "auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10.5, color: C.sub }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: C.sub }}>
                     <span style={{ width: 8, height: 8, borderRadius: 3, background: "var(--c-warm-2)" }} />
                     최근 3일 관심 점유율 증가
                   </span>
-                  <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10.5, color: C.sub }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: C.sub }}>
                     <span style={{ width: 8, height: 8, borderRadius: 3, background: "var(--c-blue-3)" }} />
                     감소
                   </span>
                 </div>
-                <span style={{ fontSize: 10.5, color: C.sub2 }}>막대 길이는 7일 언급 횟수 · 종목명·티커는 제외</span>
+                <span style={{ fontSize: 12, color: C.sub }}>막대 길이는 7일 언급 횟수 · 종목명·티커는 제외</span>
               </div>
             </>
           )}
@@ -1082,12 +1083,12 @@ export default async function KaderaPage() {
                 {real.map((r, i) => {
                   const row = (
                     <>
-                      <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 800, color: C.faint }}>{i + 1}</span>
+                      <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 800, color: C.sub2 }}>{i + 1}</span>
                       <span style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
                         <Avatar photoUrl={r.photoUrl} title={r.title} size={26} />
                         <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
                           <span style={{ ...clip, fontSize: 12, fontWeight: 700, color: C.ink }}>{r.title}</span>
-                          <span style={{ ...clip, fontSize: 10, fontFamily: MONO, color: C.faint }}>구독자 {compact(r.subscriberCount)}</span>
+                          <span style={{ ...clip, fontSize: 11, fontFamily: MONO, color: C.sub2 }}>구독자 {compact(r.subscriberCount)}</span>
                         </span>
                       </span>
                       <span style={{ height: 7, borderRadius: 999, background: C.track, overflow: "hidden" }}>

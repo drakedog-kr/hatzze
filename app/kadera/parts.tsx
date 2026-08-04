@@ -56,7 +56,7 @@ export const rankNum: React.CSSProperties = {
   fontFamily: MONO,
   fontWeight: 700,
   fontSize: 13,
-  color: C.faint,
+  color: C.sub2,
   flexShrink: 0,
 };
 
@@ -107,7 +107,7 @@ export function Pill({
 export function RankDelta({ change, unit = "계단" }: { change: number | null; unit?: string }) {
   if (change === null || change === 0) return null;
   return (
-    <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: change > 0 ? C.hot : C.cold, whiteSpace: "nowrap" }}>
+    <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: change > 0 ? C.hot : C.cold, whiteSpace: "nowrap" }}>
       {change > 0 ? "▲" : "▼"}
       {Math.abs(change)}
       {unit}
@@ -220,12 +220,12 @@ export function RankBadge({ n }: { n: number }) {
   return (
     <span
       style={{
-        width: 19,
-        height: 19,
+        width: 20,
+        height: 20,
         borderRadius: 6,
         background: "var(--c-plate)",
         color: "var(--c-cold-ink)",
-        fontSize: 10.5,
+        fontSize: 11,
         fontWeight: 800,
         display: "flex",
         alignItems: "center",
@@ -322,8 +322,8 @@ export function DayBars({
               left: `${((peak + 0.5) / n) * 100}%`,
               transform: "translateX(-50%)",
               whiteSpace: "nowrap",
-              fontSize: 9.5,
-              fontWeight: 800,
+              fontSize: 10.5,
+              fontWeight: 700,
               color: tone === "warm" ? "var(--c-hot-ink)" : "var(--c-cold-ink)",
             }}
           >
@@ -364,10 +364,10 @@ export function DayBars({
                 flex: 1,
                 minWidth: 0,
                 textAlign: "center",
-                fontSize: 9,
+                fontSize: 10,
                 fontFamily: MONO,
-                fontWeight: mark ? 800 : 400,
-                color: mark ? (tone === "warm" ? "var(--c-hot-ink)" : "var(--c-cold-ink)") : C.hint,
+                fontWeight: mark ? 700 : 500,
+                color: mark ? (tone === "warm" ? "var(--c-hot-ink)" : "var(--c-cold-ink)") : C.muted,
               }}
             >
               {shortDate(d)}
