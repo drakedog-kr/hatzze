@@ -1357,17 +1357,22 @@ function YearsPopover({ years, label }: { years: YearStat[]; label: string }) {
           {label} 연도별 성적
         </span>
         {/* 오래된 해가 위, 올해가 맨 아래. 타일 막대와 같은 순서라 펼쳤을 때 눈이
-            같은 자리를 짚는다(막대도 2022→2026 으로 내려온다). */}
+            같은 자리를 짚는다(막대도 2022→2026 으로 내려온다).
+
+            한 해의 두 줄도 타일과 같은 순서로 **낙폭이 먼저, 수익이 두 번째**다.
+            타일의 범례("그 해 최악 낙폭 · 그 해 수익")도, 거울 막대의 좌우(왼쪽 낙폭 ·
+            오른쪽 수익)도 그 순서라, 여기만 뒤집혀 있으면 펼칠 때마다 읽는 순서가
+            바뀐다(2026-08-04 에 바로잡음). */}
         {years.map((y) => (
           <span key={y.year} className="hz-yrpop-row">
             <span className="hz-yrpop-year">{y.year}</span>
             <span className="hz-yrpop-bars">
-              <span className="hz-yrpop-bar" style={{ width: `${Math.max(2, (Math.abs(y.ret) / max) * 100)}%`, background: y.ret >= 0 ? C.mania : C.cold }} />
               <span className="hz-yrpop-bar" style={{ width: `${Math.max(2, (Math.abs(y.mdd) / max) * 100)}%`, background: C.cold, opacity: 0.45 }} />
+              <span className="hz-yrpop-bar" style={{ width: `${Math.max(2, (Math.abs(y.ret) / max) * 100)}%`, background: y.ret >= 0 ? C.mania : C.cold }} />
             </span>
             <span className="hz-yrpop-val">
-              <span style={{ color: y.ret >= 0 ? C.mania : C.cold }}>{`${y.ret >= 0 ? "+" : "−"}${Math.abs(Math.round(y.ret))}%`}</span>
               <span style={{ color: C.cold, opacity: 0.75 }}>{`${Math.round(y.mdd)}%`}</span>
+              <span style={{ color: y.ret >= 0 ? C.mania : C.cold }}>{`${y.ret >= 0 ? "+" : "−"}${Math.abs(Math.round(y.ret))}%`}</span>
             </span>
           </span>
         ))}
