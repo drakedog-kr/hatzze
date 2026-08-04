@@ -200,6 +200,10 @@ function Shell({
         // 이 두 값을 읽으므로 고온 카드의 배지도 빨강이 된다(pick 의 warm 주석 참고).
         ["--card-accent" as string]: warm ? "var(--c-mania)" : "var(--c-blue)",
         ["--card-accent-tint" as string]: warm ? "var(--c-mania-tint)" : "var(--c-blue-tint)",
+        /* 알약 **글자**용 변형. --card-accent 를 그대로 얹으면 tint 위 명암비가 저온에서
+           2.57(--c-blue #3d9cf5)이라 배지 안 글자가 안 읽힌다. 강조선·테두리는 원래
+           채도를 써야 하므로 색을 하나 더 둔다(팔레트의 --c-*-ink 주석과 같은 규칙). */
+        ["--card-accent-ink" as string]: warm ? "var(--c-hot-ink)" : "var(--c-cold-ink)",
       }}
     >
       {hit && <HitBadge />}
@@ -247,9 +251,10 @@ function HitBadge({ label = "초고온" }: { label?: string }) {
       <span
         style={{
           background: "var(--c-mania-tint)",
-          color: C.mania,
+          /* tint 위에 C.mania 를 그대로 얹으면 명암비 4.21 이라 배지 글자가 안 읽힌다. */
+          color: "var(--c-hot-ink)",
           fontWeight: 800,
-          fontSize: 10.5,
+          fontSize: 11,
           lineHeight: 1.2,
           padding: "5px 10px",
           borderRadius: R.pill,
@@ -335,9 +340,9 @@ function TitleRow({
           {badge && (
             <span
               style={{
-                fontSize: 10.5,
+                fontSize: 11,
                 fontWeight: 700,
-                color: C.muted,
+                color: C.sub,
                 background: C.chip,
                 padding: "3px 8px",
                 borderRadius: R.pill,
@@ -407,7 +412,7 @@ function Foot({ text, color = C.muted }: { text: string; color?: string }) {
         style={{
           margin: 0,
           paddingTop: 14,
-          fontSize: 11.5,
+          fontSize: 12,
           color,
           fontWeight: 500,
           borderTop: `1px solid ${C.divider}`,
@@ -719,7 +724,7 @@ function Hero({
                   top: 0,
                   ...(n === 0 ? { left: 0 } : n === 100 ? { right: 0 } : { left: `${n}%`, transform: "translateX(-50%)" }),
                   fontFamily: MONO,
-                  fontSize: 9.5,
+                  fontSize: 10.5,
                   fontWeight: 600,
                   color: C.sub,
                 }}
@@ -763,7 +768,7 @@ function Hero({
           }}
         >
           <Icon name="schedule" style={{ fontSize: 14, color: C.muted }} />
-          <span style={{ fontSize: 10.5, color: C.sub }}>최종 업데이트 · {formatKstUpdate(dailyScore.updated_at)}</span>
+          <span style={{ fontSize: 11.5, color: C.sub }}>최종 업데이트 · {formatKstUpdate(dailyScore.updated_at)}</span>
         </div>
       </div>
 
@@ -1013,7 +1018,7 @@ function CardBuffett({ v }: { v: Pick }) {
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={v.disp} unit={v.unit} color={v.color} size={32} />
         {ratio !== null && (
-          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: "var(--card-accent)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
             {ratio.toFixed(1)}배
           </span>
         )}
@@ -1253,7 +1258,7 @@ function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={`${gap > 0 ? "+" : ""}${v.disp}`} unit={v.unit} color={v.color} size={32} sub={gap > 0 ? "이전 전고점 돌파" : "전고점으로부터"} />
         {typeof priorHigh === "number" && (
-          <span style={{ fontSize: 12, fontWeight: 700, color: "var(--card-accent)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
             전고점 {num(priorHigh)}
           </span>
         )}
@@ -1378,7 +1383,7 @@ function CardVkospi({ v }: { v: Pick }) {
       <TitleRow desc={v.headline} icon="monitor_heart" name={v.name} />
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={v.disp} color={v.color} size={32} sub="변동성지수" />
-        <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--card-accent)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
           {verdict}
         </span>
       </div>
@@ -1468,7 +1473,7 @@ function CardAsia({ v }: { v: Pick }) {
                 <span style={{ fontSize: 11, fontWeight: b.self ? 800 : 700, color: b.self ? C.ink : C.label, whiteSpace: "nowrap" }}>
                   {b.label}
                 </span>
-                <span style={{ fontSize: 9.5, fontWeight: 600, color: C.sub }}>{b.sub}</span>
+                <span style={{ fontSize: 10.5, fontWeight: 600, color: C.sub }}>{b.sub}</span>
               </span>
               <div style={{ position: "relative", flex: 1, minWidth: 0, height: 16 }}>
                 <div style={{ position: "absolute", inset: 0, borderRadius: 4, background: C.track }} />
@@ -1512,9 +1517,9 @@ function CardAsia({ v }: { v: Pick }) {
                   right: `calc(100% - ${kospiPct})`,
                   top: 0,
                   transform: "translateX(50%)",
-                  fontSize: 9.5,
+                  fontSize: 11,
                   fontWeight: 700,
-                  color: "var(--c-blue-2)",
+                  color: "var(--c-cold-ink)",
                   whiteSpace: "nowrap",
                 }}
               >
@@ -1826,7 +1831,7 @@ function CardTrend({ v, icon }: { v: Pick; icon: string }) {
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
             <Big disp={v.disp} unit={v.unit} color={v.color} size={32} />
             {v.hotDisp && (
-              <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: C.muted, background: C.chip, borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+              <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: C.sub, background: C.chip, borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
                 초고온 {v.hotDisp}
               </span>
             )}
@@ -1920,12 +1925,12 @@ function CardSentiment({
                 한 색으로 적으면 "63:37" 중 어느 쪽이 어느 편인지 다시 라벨을 봐야 한다. */}
             <strong style={{ fontFamily: MONO, fontSize: 32, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1 }}>
               <span style={{ color: C.cold }}>{ratio.neg}</span>
-              <span style={{ color: C.faint }}>:</span>
+              <span style={{ color: C.sub2 }}>:</span>
               <span style={{ color: C.mania }}>{ratio.pos}</span>
             </strong>
             <span style={{ fontSize: 12.5, fontWeight: 600, color: C.sub2 }}>{sentimentTone(ratio.pos).label}</span>
           </div>
-          <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: C.muted, background: C.chip, borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+          <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: C.sub, background: C.chip, borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
             {countNoun} {ratio.total.toLocaleString("ko-KR")}건 분석
           </span>
         </div>
@@ -2171,7 +2176,7 @@ function CardNetBuy({ v }: { v: Pick }) {
               fontWeight: 700,
               padding: "4px 10px",
               borderRadius: R.pill,
-              color: atHigh ? C.mania : C.blue,
+              color: atHigh ? "var(--c-hot-ink)" : "var(--c-cold-ink)",
               background: atHigh ? "var(--c-mania-tint)" : "var(--c-blue-tint)",
             }}
           >
@@ -2291,7 +2296,7 @@ function CardLimitUp({ v }: { v: Pick }) {
                   fontFamily: MONO,
                   fontSize: 12,
                   fontWeight: 800,
-                  color: "var(--card-accent, var(--c-blue))",
+                  color: "var(--card-accent-ink, var(--c-cold-ink))",
                   background: "var(--card-accent-tint, var(--c-blue-tint))",
                   borderRadius: R.pill,
                   padding: "3px 9px",
@@ -2346,7 +2351,7 @@ function CardPutCall({ v }: { v: Pick }) {
       <TitleRow desc={v.headline} icon="casino" name={v.name} />
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={ratio.toFixed(2)} color={v.color} size={32} sub="풋/콜" />
-        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--card-accent)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
           {greedy ? "콜 우세" : "풋 우세"}
         </span>
       </div>
@@ -2385,7 +2390,7 @@ function CardBrokerage({ v }: { v: Pick }) {
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={`${count}개`} color={v.color} size={32} sub="인기차트 진입" />
         {topRank !== null && (
-          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: "var(--card-accent)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
             최고 {topRank}위
           </span>
         )}
@@ -2393,7 +2398,7 @@ function CardBrokerage({ v }: { v: Pick }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {charted.slice(0, 4).map((app, i) => (
           <div key={`${app.name}-${i}`} style={{ display: "flex", alignItems: "center", gap: 10, background: C.soft, borderRadius: 12, padding: "9px 12px", minWidth: 0 }}>
-            <span style={{ flexShrink: 0, fontFamily: MONO, fontSize: 11.5, fontWeight: 800, color: i === 0 ? C.blue : C.sub, background: C.card, borderRadius: 8, padding: "3px 8px" }}>
+            <span style={{ flexShrink: 0, fontFamily: MONO, fontSize: 11.5, fontWeight: 800, color: i === 0 ? "var(--c-cold-ink)" : C.sub, background: C.card, borderRadius: 8, padding: "3px 8px" }}>
               {app.rank}위
             </span>
             <span style={{ flex: 1, fontSize: 12.5, fontWeight: 600, color: C.label, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>

@@ -432,8 +432,7 @@ export default async function KaderaPage() {
   ));
 
   return (
-    // hz-type2 — 이 페이지 안에서만 잉크 램프의 아랫단을 끌어올린다(globals.css).
-    <div className="hz-type2" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* ── 히어로: 모니터링 25 · 센티먼트 25 · 오늘의 요약 50 ───────────── */}
       <section className="hz-sheet">
         <div className="hz-kd-hero">
@@ -551,9 +550,14 @@ export default async function KaderaPage() {
                          안 된다 — 40px 과 19px 은 줄 상자 안에서 글자가 앉는 깊이가 달라서,
                          상자를 맞추면 정작 눈에 보이는 숫자 윗선이 7px 어긋난다.
                          브라우저에서 두 캡 윗선을 재서 남은 차이를 이 값으로 걷었다
-                         (globals.css 의 .hz-kd-hero-title 주석과 한 세트). */
+                         (globals.css 의 .hz-kd-hero-title 주석과 한 세트).
+                         ↳ 4 → 1. 이 숫자의 **밑선**이 오른쪽 캡션 끝줄('중립 N% 제외 후
+                         환산')보다 3.1px 아래에 있었다. 줄 상자가 아니라 baseline 을 재서
+                         걷은 값이다 — 40px 과 11.5px 은 상자 안에서 글자가 앉는 깊이가
+                         달라 상자 밑끝을 맞추면 눈에 보이는 밑선이 어긋난다.
+                         덤으로 317 과의 윗선 차이도 2.1 → 0.9 로 줄었다. */
                       lineHeight: 1,
-                      marginTop: 4,
+                      marginTop: 1,
                       letterSpacing: "-.04em",
                       color: sentiment.tone === "cold" ? C.cold : sentiment.tone === "hot" ? C.hot : C.ink,
                     }}

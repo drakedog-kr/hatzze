@@ -35,8 +35,8 @@
      잉크(--c-cold ~ --c-mania)는 넷 다 흰 배경에서 4.5:1 이상이다. 고온과 초고온이
      같은 값(#d03a46)인 건 실수가 아니다 — 둘은 같은 '뜨거움'이고, 구분은 아래 밴드
      색과 초고온 셀의 상단 레드 라인이 맡는다. */
-  --c-cold: #2b7fc4;
-  --c-neutral: #1b7fd4;
+  --c-cold: #2371b2;
+  --c-neutral: #1a72bd;
   --c-hot: #d03a46;
   --c-mania: #d03a46;
   --c-blue: #3d9cf5;
@@ -66,10 +66,10 @@
   --c-ink-soft: #3c5064; /* 브리핑 본문 */
   --c-label: #42586e; /* 목록 항목 이름 */
   --c-logo-ink: #0e2136; /* 로고 워드마크 잉크 */
-  --c-sub: #6a8098; /* 내비·부제 */
-  --c-sub2: #8ba0b6; /* 카드 부제 */
-  --c-muted: #93a6bb; /* 캡션·초보 설명 */
-  --c-faint: #a8b9cb;
+  --c-sub: #556a84; /* 부제·각주 — 흰 카드 위 5.55 */
+  --c-sub2: #5a7089; /* 보조 수치·열 머리 — 5.10 */
+  --c-muted: #5f748f; /* 캡션·아이콘 — 4.79. 글자로 쓰는 마지막 단이다(회색 타일 위 4.54) */
+  --c-faint: #8ba0b6; /* 눈금·구분 — 2.69 */
   --c-disabled: #b3c2d1; /* '준비 중' 항목 */
   --c-hint: #c7d5e3; /* 점선·비활성 아이콘 */
 
@@ -118,7 +118,7 @@
   /* tint 배경 **위에 얹는 글자색**. 강조색을 그대로 쓰면 안 된다 — --c-hot(#d03a46)은
      hot-tint 위 명암비 2.2, --c-blue(#3d9cf5)는 2.9 라 알약 안 글자가 안 읽힌다.
      라이트에서는 강조색을 눌러 어둡게 잡고, 다크에서는 반대로 밝게 잡는다. */
-  --c-hot-ink: #c73f4d;
+  --c-hot-ink: #bd3a47;
   --c-cold-ink: #1b6fb8;
   /* 지표 시트 — 카드 25장을 한 판에 담는 격자. 격자선은 gap 배경이 아니라 셀이 직접
      inset 그림자로 그린다(빈 슬롯이 회색으로 남지 않는다). 셀 사이 선이라 --c-line
@@ -207,7 +207,7 @@
                           도드라졌다(램프 한복판에 끼어 있었다).
      라이트에서의 이웃 관계를 그대로 옮긴다: sub > sub2 > muted, faint > disabled > hint. */
   --c-sub2: #949499;
-  --c-muted: #8a8a92;
+  --c-muted: #9898a0; /* 카드 안 회색 타일(--c-soft) 위 4.83. 8a8a92 는 그 위에서 4.04 였다 */
   --c-faint: #7e7e87; /* grey500 */
   --c-disabled: #70707a; /* '준비 중' — 비활성이니 faint 보다 흐리고 hint 보다는 진하다 */
   --c-hint: #62626d; /* grey400 */
@@ -247,7 +247,7 @@
   --c-warm-3: #8f3d47;
   --c-bar-mute: #3c3c47;
   /* tint 위 잉크는 다크에서 **밝은 쪽**이다(라이트와 방향 반대). */
-  --c-hot-ink: #fa616d;
+  --c-hot-ink: #fb7480; /* hot-tint 를 카드 위에 합성한 바탕에서 4.90. fa616d 는 4.33 이었다 */
   --c-cold-ink: #6bb6f8;
   /* 표 머리·각주 띠와 행 구분선. 라이트에서 card 보다 어둡게 파이는 자리라,
      다크에서는 card(#202027) 보다 한 단계 밝은 쪽으로 얹는다(--c-soft 와 같은 규칙). */
@@ -742,8 +742,7 @@ body {
   .hz-dist-row:focus-within .hz-dist-pop { transform: translateY(0); }
 }
 /* ── 읽히는 잉크 램프 (라이트) ─────────────────────────────────────
-   ⚠️ 지금은 **카더라에만** 걸려 있다. 다른 두 페이지에서 나란히 놓고 판단하려고
-   범위를 좁혀 둔 것이라, 채택되면 이 블록을 통째로 :root 로 올리고 클래스를 지운다.
+   ⬆ 실제 값은 위 :root 에 있다. 여기 남긴 것은 **왜 그 값인가**에 대한 기록이다.
 
    문제는 크기보다 색이었다. 라이트 램프의 아랫단을 실측하면 흰 카드 위 명암비가
    sub 4.07 · sub2 2.69 · muted 2.50 · faint 2.01 이다. WCAG AA 가 4.5 인데 **본문성
@@ -764,19 +763,6 @@ body {
      faint  #8ba0b6  2.69  ← 2.01   눈금·구분(옛 sub2 값이 여기로 내려왔다)
    다크는 안 건드린다. 재 보니 카드(#202027) 위에서 label 7.85 · sub 6.07 · sub2 5.36
    으로 이미 넉넉하고, --c-sub(#9e9ea4)는 토스 다크의 '흐림'과 hex 까지 같다. */
-.hz-type2 {
-  --c-sub: #5a7089;
-  --c-sub2: #617792;
-  --c-muted: #70869e;
-  --c-faint: #8ba0b6;
-}
-:root[data-theme="dark"] .hz-type2 {
-  --c-sub: #9e9ea4;
-  --c-sub2: #949499;
-  --c-muted: #8a8a92;
-  --c-faint: #7e7e87;
-}
-
 /* ════ 카더라 콘솔 (2026-08 리디자인) ═══════════════════════════════
    시장 브리핑과 **같은 어법**이다 — 흰 판(시트) 하나 + 1px 헤어라인 + radius 14,
    그림자 없음. 카드가 저마다 떠 있던 것을 시트 안의 셀로 바꾼다.
@@ -938,17 +924,10 @@ body {
   background: var(--c-sheet-head);
   border-bottom: 1px solid var(--c-sheet-line);
 }
+/* 열 머리. 9.5px 에 800 을 얹고 자간까지 벌리면 획이 서로 붙어 글자가 뭉개진다 —
+   작은 글씨에서 굵기는 또렷함이 아니라 **뭉갬**으로 나온다. 크기를 올리고 굵기를 한 단
+   내리는 편이 같은 자리에서 훨씬 잘 읽힌다(기준으로 삼은 화면은 12px/500 에 자간 없음). */
 .hz-thead > * {
-  font-size: 9.5px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  color: var(--c-sub2);
-}
-/* 열 머리를 읽을 수 있게. 9.5px 에 800 을 얹고 자간까지 벌리면 획이 서로 붙어
-   글자가 뭉개진다 — 작은 글씨에서 굵기는 또렷함이 아니라 **뭉갬**으로 나온다.
-   크기를 올리고 굵기를 한 단 내리는 편이 같은 자리에서 훨씬 잘 읽힌다.
-   (토스의 열 머리는 12px/500 이고 자간을 안 벌린다.) */
-.hz-type2 .hz-thead > * {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -1493,7 +1472,8 @@ main.hz-scroll { overflow-x: clip; }
   transform: translateX(-50%) translateY(-6px);
   background: var(--c-ink);
   color: var(--c-bg);
-  font-size: 11px;
+  /* 툴팁도 읽는 글이다. 11 은 이 서비스가 정한 바닥(정보성 텍스트 12) 아래였다. */
+  font-size: 12px;
   font-weight: 600;
   line-height: 1.5;
   padding: 6px 9px;
@@ -1503,11 +1483,6 @@ main.hz-scroll { overflow-x: clip; }
   pointer-events: none;
   transition: opacity 0.12s ease;
   z-index: 30;
-}
-/* 툴팁도 읽는 글이다. 11px 은 이 페이지가 정한 바닥(정보성 텍스트 12px) 아래다.
-   색은 안 건드린다 — 먹판 위 밝은 글자라 명암비는 이미 넉넉하다. */
-.hz-type2 .hz-tip::after {
-  font-size: 12px;
 }
 .hz-tip:hover::after {
   opacity: 1;
@@ -2005,8 +1980,10 @@ main.hz-scroll { overflow-x: clip; }
   border-radius: 11px;
   border: 1px solid var(--c-line);
   background: var(--c-bg);
-  color: var(--c-blue);
-  font-size: 12px;
+  /* --c-blue(#3d9cf5)는 밝은 바탕 위 명암비 2.76 이라 버튼 글자로 못 쓴다. tint 위
+     알약이 --c-cold-ink 를 쓰는 것과 같은 이유이고 같은 해법이다(팔레트 주석 참고). */
+  color: var(--c-cold-ink);
+  font-size: 13px;
   font-weight: 600;
   text-decoration: none;
   transition: border-color 0.14s ease, background 0.14s ease;
@@ -2014,13 +1991,6 @@ main.hz-scroll { overflow-x: clip; }
 .hz-btn-soft:hover {
   border-color: var(--c-blue);
   background: var(--c-blue-tint);
-}
-/* --c-blue(#3d9cf5)는 밝은 바탕 위 명암비 2.76 이라 버튼 글자로 못 쓴다. tint 위
-   알약이 --c-cold-ink 를 쓰는 것과 같은 이유이고 같은 해법이다(팔레트 주석 참고).
-   크기도 12 → 13 — 이 버튼은 히어로 칸에서 유일하게 누를 수 있는 자리다. */
-.hz-type2 .hz-btn-soft {
-  font-size: 13px;
-  color: var(--c-cold-ink);
 }
 
 /* 사이드바 로고 → 홈 링크. 워드마크 색을 건드리면 브랜드가 흐트러지므로
@@ -2317,7 +2287,7 @@ main.hz-scroll { overflow-x: clip; }
   /* app/ui.tsx 의 MONO 와 같은 값. 이 레포는 모노 서체를 쓰지 않고 Pretendard 에
      body 의 tabular-nums 로 자릿수만 고정한다(한글 글리프가 갈리지 않게). */
   font-family: var(--font-pretendard), sans-serif;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   text-align: right;
 }

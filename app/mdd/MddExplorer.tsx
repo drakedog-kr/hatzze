@@ -288,7 +288,7 @@ function SuggestSection({
     <section>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, padding: "0 10px 6px" }}>
         <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: C.ink }}>{title}</h3>
-        <span style={{ fontSize: 11, fontWeight: 600, color: C.faint, whiteSpace: "nowrap" }}>{hint}</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: C.muted, whiteSpace: "nowrap" }}>{hint}</span>
       </div>
       <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
         {items.map((s, i) => (
@@ -310,14 +310,14 @@ function SuggestSection({
                 textAlign: "left",
               }}
             >
-              <span style={{ fontFamily: MONO, fontSize: 12, color: C.faint, width: 12, flexShrink: 0 }}>{i + 1}</span>
+              <span style={{ fontFamily: MONO, fontSize: 12, color: C.muted, width: 12, flexShrink: 0 }}>{i + 1}</span>
               <StockLogo code={s.code} name={s.name} market={s.market} />
               <span style={{ fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {s.name}
               </span>
               {/* 코스닥은 표시해 준다 — 검색 목록에는 코스피만 있어서, 여기서만 만날 수 있는 종목이다. */}
               {s.market === "KOSDAQ" && (
-                <span style={{ fontSize: 10, fontWeight: 600, color: C.faint, background: C.bg, padding: "2px 5px", borderRadius: 4, flexShrink: 0 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: C.muted, background: C.bg, padding: "2px 5px", borderRadius: 4, flexShrink: 0 }}>
                   코스닥
                 </span>
               )}
@@ -463,7 +463,7 @@ function Controls({
                   <SuggestSection title="급부상 종목" hint="평소 대비 언급 급증" items={suggest.surging} onPick={pick} />
                   <SuggestSection title="주요 종목" hint="최근 주목도 상위" items={suggest.report} onPick={pick} />
                 </div>
-                <p style={{ margin: "10px 10px 2px", fontSize: 11, color: C.faint, lineHeight: 1.5 }}>
+                <p style={{ margin: "10px 10px 2px", fontSize: 11, color: C.muted, lineHeight: 1.5 }}>
                   텔레그램에서 많이 언급된 종목입니다. 매수·매도 신호가 아닙니다.
                 </p>
               </>
@@ -477,7 +477,7 @@ function Controls({
                       style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "9px 10px", border: "none", borderRadius: 8, cursor: "pointer", color: C.ink, fontSize: 14, textAlign: "left" }}
                     >
                       <span style={{ fontWeight: 600 }}>{s.name}</span>
-                      <span style={{ fontFamily: MONO, fontSize: 12, color: C.faint }}>{s.code}</span>
+                      <span style={{ fontFamily: MONO, fontSize: 12, color: C.muted }}>{s.code}</span>
                     </button>
                   </li>
                 ))}
@@ -506,8 +506,11 @@ function Controls({
                 padding: "7px 13px",
                 borderRadius: 6,
                 border: "none",
-                background: on ? C.blue : "transparent",
-                color: on ? "#ffffff" : C.sub,
+                background: on ? "var(--c-cold-ink)" : "transparent",
+                /* 글자를 #ffffff 로 박으면 안 된다. --c-cold-ink 는 라이트에서 진한 파랑
+                   (#1b6fb8)이지만 다크에서는 **밝은** 파랑(#6bb6f8)이라, 흰 글자가 그 위에서
+                   명암비 2.17 이 된다. 카드색을 쓰면 두 테마가 저절로 반대로 간다. */
+                color: on ? C.card : C.label,
                 fontSize: 11.5,
                 fontWeight: 700,
                 cursor: "pointer",
@@ -690,11 +693,11 @@ function AbsentSheet({ icon, title, sub, body }: { icon: string; title: string; 
 function StatCell({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-      <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: ".06em", color: C.faint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+      <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".06em", color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
         {label}
       </span>
       <strong style={{ fontSize: 15, fontWeight: 800, color: tone ?? C.ink, letterSpacing: "-.02em" }}>{value}</strong>
-      {sub && <span style={{ fontSize: 10, color: C.faint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</span>}
+      {sub && <span style={{ fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</span>}
     </div>
   );
 }
@@ -704,7 +707,7 @@ function Pill({ children, tone }: { children: React.ReactNode; tone?: string }) 
   return (
     <span
       style={{
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: 700,
         padding: "2px 8px",
         borderRadius: R.pill,
@@ -732,6 +735,7 @@ function MeterRow({
   color,
   strong,
   help,
+  ink,
   labelWidth = 104,
   valueWidth = 48,
 }: {
@@ -739,6 +743,8 @@ function MeterRow({
   pct: number;
   value: string;
   color: string;
+  /** 강조 줄의 **글자**색. 없으면 막대색을 쓴다(둘이 같아도 되는 자리를 위해). */
+  ink?: string;
   strong?: boolean;
   help?: string;
   labelWidth?: number;
@@ -777,7 +783,10 @@ function MeterRow({
           fontFamily: MONO,
           fontSize: 11.5,
           fontWeight: strong ? 800 : 700,
-          color: strong ? color : C.sub,
+          /* 막대색을 글자에 그대로 쓰면 안 된다. 램프의 --c-blue-1(#1b7fd4)은 흰 위
+             명암비 4.17 이라 11.5px 값이 안 읽힌다 — 채우는 색과 읽는 색은 다른 물건이다
+             (시장 브리핑의 --card-accent-ink 와 같은 규칙). */
+          color: strong ? (ink ?? color) : C.sub,
         }}
       >
         {value}
@@ -815,7 +824,7 @@ function MirrorRow({
   const bar: React.CSSProperties = { position: "absolute", top: 3, height: 8, minWidth: 5 };
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <span style={{ width: MIRROR_LABEL_W, flex: "none", fontFamily: MONO, fontSize: 10, fontWeight: 700, color: C.sub2, whiteSpace: "nowrap" }}>
+      <span style={{ width: MIRROR_LABEL_W, flex: "none", fontFamily: MONO, fontSize: 11, fontWeight: 700, color: C.sub2, whiteSpace: "nowrap" }}>
         {label}
       </span>
       <span style={{ width: MIRROR_LEFT_W, flex: "none", textAlign: "right", fontFamily: MONO, fontSize: 10.5, fontWeight: 800, color: left.ink }}>
@@ -833,7 +842,7 @@ function MirrorRow({
 
 /** 거울 막대 위의 축 라벨. **값 열에 맞춘다** — 막대 위가 아니라 숫자 위에 서야 읽힌다. */
 function MirrorAxis({ left, right }: { left: string; right: string }) {
-  const s: React.CSSProperties = { flex: "none", fontSize: 9.5, fontWeight: 800, letterSpacing: ".04em", color: C.faint };
+  const s: React.CSSProperties = { flex: "none", fontSize: 10.5, fontWeight: 800, letterSpacing: ".04em", color: C.muted };
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <span style={{ width: MIRROR_LABEL_W, flex: "none" }} />
@@ -849,7 +858,7 @@ function Legend({ items }: { items: { label: string; background: string }[] }) {
   return (
     <div style={{ display: "flex", gap: 11, flexWrap: "wrap" }}>
       {items.map((it) => (
-        <span key={it.label} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 9.5, fontWeight: 700, color: C.sub2 }}>
+        <span key={it.label} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10.5, fontWeight: 700, color: C.sub2 }}>
           <span style={{ width: 8, height: 8, borderRadius: 2, background: it.background, flex: "none" }} />
           {it.label}
         </span>
@@ -996,7 +1005,7 @@ function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel: string
           <StockLogo code={data.code} name={data.name} market={data.market} size={30} />
           <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", minWidth: 0 }}>
             <strong style={{ fontSize: 21, fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>{data.name}</strong>
-            <span style={{ fontFamily: MONO, fontSize: 11, color: C.faint }}>{data.code}</span>
+            <span style={{ fontFamily: MONO, fontSize: 11, color: C.muted }}>{data.code}</span>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
@@ -1085,7 +1094,7 @@ function PriceRow({ label, date, value }: { label: string; date: string; value: 
   return (
     <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, padding: "10px 0", borderTop: `1px solid ${C.divider}` }}>
       <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub, minWidth: 0 }}>
-        {label} <span style={{ fontFamily: MONO, fontSize: 10, color: C.faint }}>{date}</span>
+        {label} <span style={{ fontFamily: MONO, fontSize: 11, color: C.muted }}>{date}</span>
       </span>
       <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: C.ink, flex: "none" }}>{value}</span>
     </div>
@@ -1154,11 +1163,11 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
           }}
         />
         {showWorst && (
-          <span style={{ position: "absolute", left: `${worst}%`, top: 8, transform: "translateX(-50%)", width: 1, height: 13, background: C.faint }} />
+          <span style={{ position: "absolute", left: `${worst}%`, top: 8, transform: "translateX(-50%)", width: 1, height: 13, background: C.muted }} />
         )}
       </div>
       <div style={{ position: "relative", height: 13 }}>
-        <span style={{ position: "absolute", left: 0, top: 0, fontSize: 9.5, fontWeight: 600, color: C.sub }}>0%</span>
+        <span style={{ position: "absolute", left: 0, top: 0, fontSize: 10.5, fontWeight: 600, color: C.sub }}>0%</span>
         {showWorst && (
           <span
             style={{
@@ -1166,7 +1175,7 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
               left: `${worst}%`,
               top: 0,
               transform: "translateX(-50%)",
-              fontSize: 9.5,
+              fontSize: 10.5,
               fontWeight: 600,
               color: C.sub,
               whiteSpace: "nowrap",
@@ -1175,7 +1184,7 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
             {periodLabel} 최대 {fmtPct(mdd)}
           </span>
         )}
-        <span style={{ position: "absolute", right: 0, top: 0, fontSize: 9.5, fontWeight: 600, color: C.sub }}>−100%</span>
+        <span style={{ position: "absolute", right: 0, top: 0, fontSize: 10.5, fontWeight: 600, color: C.sub }}>−100%</span>
       </div>
     </div>
   );
@@ -1258,12 +1267,12 @@ function Underwater({ a, periodLabel }: { a: MddAnalysis; periodLabel: string })
             선이 끝나는 자리가 곧 현재이고, 그 값은 히어로가 이미 크게 말한다. */}
         <circle cx={x(ti)} cy={y(series[ti].dd)} r="3.5" fill={C.card} stroke={DOWN} strokeWidth="1.6" />
         {rows.map((dd, i) => (
-          <text key={i} x={PAD_L - LABEL_GAP} y={y(dd) + 4} fontSize="11" fill={C.faint} textAnchor="end">
+          <text key={i} x={PAD_L - LABEL_GAP} y={y(dd) + 4} fontSize="11" fill={C.muted} textAnchor="end">
             {Math.round(dd)}%
           </text>
         ))}
         {ticks.map((t, i) => (
-          <text key={i} x={t.x} y={H + 16} fontSize="11" fill={C.faint} textAnchor="middle">
+          <text key={i} x={t.x} y={H + 16} fontSize="11" fill={C.muted} textAnchor="middle">
             {t.year}
           </text>
         ))}
@@ -1326,7 +1335,7 @@ function TileHead({ items }: { items: { value: string; label: string; tone: stri
           <strong style={{ fontFamily: MONO, fontSize: 19, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1, color: it.tone }}>
             {it.value}
           </strong>
-          <span style={{ fontSize: 9.5, color: C.faint, whiteSpace: "nowrap" }}>{it.label}</span>
+          <span style={{ fontSize: 10.5, color: C.muted, whiteSpace: "nowrap" }}>{it.label}</span>
         </div>
       ))}
     </div>
@@ -1679,7 +1688,7 @@ function RiskProfile({ r, periodLabel }: { r: RiskProfileData; periodLabel: stri
               <Icon name={t.icon} style={{ fontSize: 17, color: C.muted, marginTop: 1, flexShrink: 0 }} />
               <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                 <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: "-.01em", color: C.ink, wordBreak: "keep-all" }}>{t.label}</span>
-                <span style={{ fontSize: 10.5, lineHeight: 1.5, color: C.faint, wordBreak: "keep-all" }}>{t.sub}</span>
+                <span style={{ fontSize: 10.5, lineHeight: 1.5, color: C.muted, wordBreak: "keep-all" }}>{t.sub}</span>
               </div>
             </div>
             <div style={{ marginBottom: 13 }}>{t.body.head}</div>
@@ -1779,6 +1788,7 @@ function Attribution({
               pct={(Math.abs(r.v) / worst) * 100}
               value={fmtPct(r.v)}
               color={r.v >= 0 ? UP_BAR : r.color}
+              ink={r.v >= 0 ? UP : DOWN}
               strong={r.self}
               help={r.help}
               labelWidth={82}
@@ -1860,7 +1870,7 @@ function Recovery({ a, periodLabel }: { a: MddAnalysis; periodLabel: string }) {
           늘어나는데 여긴 네 줄뿐이다. 줄 간격을 벌려 채우지는 않는다(길이를 견주는 막대라
           서로 멀어지면 비교가 어려워진다). 묶음을 붙여 둔 채 남는 공간을 위아래로 가른다. */}
       <div style={{ flex: 1, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 12, justifyContent: "center" }}>
-        <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: ".08em", color: C.sub2 }}>낙폭 구간별 발생 횟수 · {periodLabel}</span>
+        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".08em", color: C.sub2 }}>낙폭 구간별 발생 횟수 · {periodLabel}</span>
         {buckets.map((b) => {
           const on = inBucket(b);
           return (
@@ -1870,6 +1880,7 @@ function Recovery({ a, periodLabel }: { a: MddAnalysis; periodLabel: string }) {
               pct={(b.count / maxCount) * 100}
               value={`${b.count}회`}
               color={on ? DOWN_BAR[0] : DOWN_BAR[3]}
+              ink={DOWN}
               strong={on}
               labelWidth={74}
               valueWidth={26}
@@ -1910,7 +1921,7 @@ function RecoveryRange({ min, median, max }: { min: number; median: number; max:
       {/* 라벨은 양 끝을 안쪽으로 붙인다 — 중앙값이 끝에 가까우면 겹치지만, 셋 다 값이
           숫자로 적혀 있어 읽는 데 지장이 없다. */}
       <div style={{ position: "relative", height: 14 }}>
-        <span style={{ position: "absolute", left: 0, top: 0, fontFamily: MONO, fontSize: 9.5, fontWeight: 700, color: C.faint }}>{fmtDur(min)}</span>
+        <span style={{ position: "absolute", left: 0, top: 0, fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: C.muted }}>{fmtDur(min)}</span>
         <span
           style={{
             position: "absolute",
@@ -1918,7 +1929,7 @@ function RecoveryRange({ min, median, max }: { min: number; median: number; max:
             top: 0,
             transform: "translateX(-50%)",
             fontFamily: MONO,
-            fontSize: 9.5,
+            fontSize: 10.5,
             fontWeight: 800,
             color: UP,
             whiteSpace: "nowrap",
@@ -1926,7 +1937,7 @@ function RecoveryRange({ min, median, max }: { min: number; median: number; max:
         >
           중앙값 {fmtDur(median)}
         </span>
-        <span style={{ position: "absolute", right: 0, top: 0, fontFamily: MONO, fontSize: 9.5, fontWeight: 700, color: C.faint }}>{fmtDur(max)}</span>
+        <span style={{ position: "absolute", right: 0, top: 0, fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: C.muted }}>{fmtDur(max)}</span>
       </div>
     </div>
   );
@@ -1985,7 +1996,7 @@ function Character({ ch, currentDd }: { ch: DrawdownCharacter | null; currentDd:
                   <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                     {/* 틴트 위에는 강조색(--c-blue)을 쓰지 않는다 — 명암비 2.2 라 안 읽힌다. */}
                     <span style={{ fontSize: 12.5, fontWeight: 800, color: t.on ? DOWN : C.ink }}>{t.label}</span>
-                    <span style={{ fontSize: 11, color: C.faint }}>· {t.b.count}회</span>
+                    <span style={{ fontSize: 11, color: t.on ? C.sub : C.muted }}>· {t.b.count}회</span>
                   </div>
                   <span style={{ fontSize: 11, color: t.on ? C.sub : C.sub2 }}>{t.sub}</span>
                   <strong style={{ fontFamily: MONO, fontSize: 21, fontWeight: 800, letterSpacing: "-.03em", color: C.ink, marginTop: 2 }}>
@@ -2067,6 +2078,7 @@ function Theme({ theme }: { theme: ThemeCmp }) {
             pct={(Math.abs(p.dd) / worst) * 100}
             value={`${Math.round(p.dd)}%`}
             color={p.isSelf ? DOWN_BAR[0] : DOWN_BAR[4]}
+            ink={DOWN}
             strong={p.isSelf}
             valueWidth={46}
           />
@@ -2103,7 +2115,7 @@ function TopDrawdowns({ eps }: { eps: Episode[] }) {
             </span>
             {/* 이 줄도 말줄임을 걸어야 한다 — 안 걸면 "저점 2026-07-30"이 열보다 넓어
                 부모를 밀어낸다(위 형제만 자르면 소용없다). */}
-            <span style={{ fontFamily: MONO, fontSize: 10, color: C.faint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            <span style={{ fontFamily: MONO, fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               저점 {e.troughDate}
             </span>
           </span>
@@ -2123,10 +2135,10 @@ function TopDrawdowns({ eps }: { eps: Episode[] }) {
               {fmtPct(e.depth)}
             </span>
           </span>
-          <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: e.recovered ? C.sub : C.faint, textAlign: "right" }}>
+          <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: e.recovered ? C.sub : C.muted, textAlign: "right" }}>
             {e.recovered ? fmtDayCount(e.days) : "—"}
           </span>
-          <span className="mdd-top-status" style={{ fontSize: 10, fontWeight: e.recovered ? 700 : 800, color: e.recovered ? C.sub : DOWN, textAlign: "right" }}>
+          <span className="mdd-top-status" style={{ fontSize: 11, fontWeight: e.recovered ? 700 : 800, color: e.recovered ? C.sub : DOWN, textAlign: "right" }}>
             {e.recovered ? "회복" : "진행 중"}
           </span>
         </div>
