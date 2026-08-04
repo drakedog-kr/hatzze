@@ -312,7 +312,10 @@ export default async function KaderaPage() {
         /* 표가 아니라 **쌓인 줄**이다(옛 디자인). 한 줄이 [이름 + 변화폭] / [점유율 막대] /
            [점유율·종목·횟수] 세 층이라, 열로 쪼갤 때보다 테마 하나가 한 덩어리로 읽힌다.
            오른쪽 스파크라인은 14일 추이라 여기서만 볼 수 있는 값이다. */
-        style={{ display: "grid", gridTemplateColumns: "17px minmax(0,1fr) 62px", alignItems: "start", gap: 12, padding: "11px 22px" }}
+        /* 세로 패딩 9.35px — 줄 사이 간격은 위 줄의 아래 패딩과 아래 줄의 위 패딩을 더한
+           값(11+11=22)이라, 그 22 를 15% 줄인 18.7 을 두 줄이 반씩 나눠 가진 것이다.
+           가로 22 는 시트의 다른 표(.hz-trow)와 같은 값이라 건드리지 않는다. */
+        style={{ display: "grid", gridTemplateColumns: "17px minmax(0,1fr) 62px", alignItems: "start", gap: 12, padding: "9.35px 22px" }}
         /* 마우스가 없어도(키보드·터치) 종목 목록을 열 수 있게 초점을 받는다.
            언급된 종목이 없는 테마는 열 것도 없으니 초점도 주지 않는다. */
         tabIndex={t.stocks.length ? 0 : undefined}
@@ -436,7 +439,14 @@ export default async function KaderaPage() {
                   key={s.label}
                   style={{
                     display: "flex",
-                    alignItems: "baseline",
+                    // baseline 이 아니라 center 다. 라벨(11.5px)과 값(19px)은 줄 상자
+                    // 높이가 17.25 : 28.5 로 달라서, 밑선을 맞추면 짧은 라벨이 줄 가운데보다
+                    // 아래로 처진다(실측 1.2~2.4px). 게다가 그 처짐이 값에 무슨 글자가
+                    // 들었느냐에 따라 흔들려서("42,552개"는 쉼표가 밑선 아래로 내려가 1.2px,
+                    // 나머지는 2.3px) 네 줄의 라벨 높이가 서로 어긋나 보였다.
+                    // 값이 늘 가장 높은 요소라 center 로 바꿔도 값의 자리는 그대로다
+                    // (줄 안쪽 높이 28.5 도 그대로) — 라벨만 제자리를 찾는다.
+                    alignItems: "center",
                     justifyContent: "space-between",
                     gap: 8,
                     // 첫 줄만 위 여백을 뺀다 — 제목 슬롯 아래 gap 16 이 이미 그 자리를 잡고
@@ -542,13 +552,20 @@ export default async function KaderaPage() {
                     <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub }}>
                       최근 {KADERA_WINDOW_DAYS}일 · {sentiment.messageCount.toLocaleString("ko-KR")}건 분석
                     </span>
-                    <span
-                      className="hz-tip hz-tip-wide"
-                      data-tip="메시지를 비관/중립/낙관으로 나눈 뒤, 중립을 뺀 비관↔낙관 비율입니다. 시황·공시 같은 담담한 글이 절반이라, 같이 세면 늘 비관으로 기웁니다."
-                      data-ga-tip="sentiment_ratio"
-                      style={{ fontSize: 11.5, fontWeight: 700, color: C.sub, cursor: "help", width: "fit-content" }}
-                    >
+                    {/* 툴팁은 문장이 아니라 물음표에 건다. 글 전체가 hz-tip 이면 마우스를
+                        올리기 전엔 설명이 있다는 것 자체가 안 보이고(cursor 가 바뀌어야만
+                        안다), 옆 '활성 채널 ?' 과도 규칙이 달라진다. 이 칸의 다른 설명들과
+                        같이 물음표를 세워 두고 그 위에서만 연다. */}
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: C.sub, display: "inline-flex", alignItems: "center", gap: 4, width: "fit-content" }}>
                       중립 {sentiment.neutral}% 제외 후 환산
+                      <span
+                        className="hz-tip hz-tip-wide"
+                        data-tip="메시지를 비관/중립/낙관으로 나눈 뒤, 중립을 뺀 비관↔낙관 비율입니다. 시황·공시 같은 담담한 글이 절반이라, 같이 세면 늘 비관으로 기웁니다."
+                        data-ga-tip="sentiment_ratio"
+                        style={{ display: "inline-flex", cursor: "help", flexShrink: 0 }}
+                      >
+                        <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
+                      </span>
                     </span>
                   </div>
                 </div>
