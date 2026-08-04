@@ -693,7 +693,7 @@ function AbsentSheet({ icon, title, sub, body }: { icon: string; title: string; 
 function StatCell({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-      <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: C.sub, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", color: C.sub, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
         {label}
       </span>
       <strong style={{ fontSize: 15, fontWeight: 800, color: tone ?? C.ink, letterSpacing: "-.02em" }}>{value}</strong>
@@ -827,7 +827,7 @@ function MirrorRow({
       <span style={{ width: MIRROR_LABEL_W, flex: "none", fontFamily: MONO, fontSize: 11, fontWeight: 700, color: C.sub2, whiteSpace: "nowrap" }}>
         {label}
       </span>
-      <span style={{ width: MIRROR_LEFT_W, flex: "none", textAlign: "right", fontFamily: MONO, fontSize: 10.5, fontWeight: 800, color: left.ink }}>
+      <span style={{ width: MIRROR_LEFT_W, flex: "none", textAlign: "right", fontFamily: MONO, fontSize: 11, fontWeight: 800, color: left.ink }}>
         {left.value}
       </span>
       <div style={{ position: "relative", flex: 1, minWidth: 0, height: 14 }}>
@@ -835,14 +835,14 @@ function MirrorRow({
         <span style={{ ...bar, right: "50%", width: `${left.pct}%`, borderRadius: "3px 0 0 3px", background: left.color }} />
         <span style={{ ...bar, left: "50%", width: `${right.pct}%`, borderRadius: "0 3px 3px 0", background: right.dashed ? UNRECOVERED : right.color }} />
       </div>
-      <span style={{ width: MIRROR_RIGHT_W, flex: "none", fontFamily: MONO, fontSize: 10.5, fontWeight: 800, color: right.ink }}>{right.value}</span>
+      <span style={{ width: MIRROR_RIGHT_W, flex: "none", fontFamily: MONO, fontSize: 11, fontWeight: 800, color: right.ink }}>{right.value}</span>
     </div>
   );
 }
 
 /** 거울 막대 위의 축 라벨. **값 열에 맞춘다** — 막대 위가 아니라 숫자 위에 서야 읽힌다. */
 function MirrorAxis({ left, right }: { left: string; right: string }) {
-  const s: React.CSSProperties = { flex: "none", fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: C.sub };
+  const s: React.CSSProperties = { flex: "none", fontSize: 11, fontWeight: 700, letterSpacing: ".06em", color: C.sub };
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <span style={{ width: MIRROR_LABEL_W, flex: "none" }} />
@@ -858,7 +858,7 @@ function Legend({ items }: { items: { label: string; background: string }[] }) {
   return (
     <div style={{ display: "flex", gap: 11, flexWrap: "wrap" }}>
       {items.map((it) => (
-        <span key={it.label} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10.5, fontWeight: 700, color: C.sub2 }}>
+        <span key={it.label} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, color: C.sub2 }}>
           <span style={{ width: 8, height: 8, borderRadius: 2, background: it.background, flex: "none" }} />
           {it.label}
         </span>
@@ -1167,7 +1167,7 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
         )}
       </div>
       <div style={{ position: "relative", height: 13 }}>
-        <span style={{ position: "absolute", left: 0, top: 0, fontSize: 10.5, fontWeight: 600, color: C.sub }}>0%</span>
+        <span style={{ position: "absolute", left: 0, top: 0, fontSize: 11, fontWeight: 600, color: C.sub }}>0%</span>
         {showWorst && (
           <span
             style={{
@@ -1175,7 +1175,7 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
               left: `${worst}%`,
               top: 0,
               transform: "translateX(-50%)",
-              fontSize: 10.5,
+              fontSize: 11,
               fontWeight: 600,
               color: C.sub,
               whiteSpace: "nowrap",
@@ -1184,7 +1184,7 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
             {periodLabel} 최대 {fmtPct(mdd)}
           </span>
         )}
-        <span style={{ position: "absolute", right: 0, top: 0, fontSize: 10.5, fontWeight: 600, color: C.sub }}>−100%</span>
+        <span style={{ position: "absolute", right: 0, top: 0, fontSize: 11, fontWeight: 600, color: C.sub }}>−100%</span>
       </div>
     </div>
   );
@@ -1335,7 +1335,7 @@ function TileHead({ items }: { items: { value: string; label: string; tone: stri
           <strong style={{ fontFamily: MONO, fontSize: 19, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1, color: it.tone }}>
             {it.value}
           </strong>
-          <span style={{ fontSize: 10.5, color: C.muted, whiteSpace: "nowrap" }}>{it.label}</span>
+          <span style={{ fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{it.label}</span>
         </div>
       ))}
     </div>
@@ -1436,7 +1436,7 @@ function RiskProfile({ r, periodLabel }: { r: RiskProfileData; periodLabel: stri
 
   const empty = (text: string) => <p style={{ margin: 0, fontSize: 11.5, color: C.muted, lineHeight: 1.6 }}>{text}</p>;
   const rows = (children: React.ReactNode) => <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{children}</div>;
-  const summary = (text: string) => <p style={{ margin: 0, fontSize: 10.5, color: C.sub2, lineHeight: 1.55, wordBreak: "keep-all" }}>{text}</p>;
+  const summary = (text: string) => <p style={{ margin: 0, fontSize: 11, color: C.sub2, lineHeight: 1.55, wordBreak: "keep-all" }}>{text}</p>;
   /** 거울 막대의 반쪽 폭 — 최댓값이 반폭(50%)을 꽉 채운다. */
   const half = (v: number, max: number) => (Math.abs(v) / max) * 50;
   /**
@@ -1688,7 +1688,7 @@ function RiskProfile({ r, periodLabel }: { r: RiskProfileData; periodLabel: stri
               <Icon name={t.icon} style={{ fontSize: 17, color: C.muted, marginTop: 1, flexShrink: 0 }} />
               <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                 <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: "-.01em", color: C.ink, wordBreak: "keep-all" }}>{t.label}</span>
-                <span style={{ fontSize: 10.5, lineHeight: 1.5, color: C.muted, wordBreak: "keep-all" }}>{t.sub}</span>
+                <span style={{ fontSize: 11, lineHeight: 1.5, color: C.muted, wordBreak: "keep-all" }}>{t.sub}</span>
               </div>
             </div>
             <div style={{ marginBottom: 13 }}>{t.body.head}</div>
@@ -1870,7 +1870,7 @@ function Recovery({ a, periodLabel }: { a: MddAnalysis; periodLabel: string }) {
           늘어나는데 여긴 네 줄뿐이다. 줄 간격을 벌려 채우지는 않는다(길이를 견주는 막대라
           서로 멀어지면 비교가 어려워진다). 묶음을 붙여 둔 채 남는 공간을 위아래로 가른다. */}
       <div style={{ flex: 1, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 12, justifyContent: "center" }}>
-        <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>낙폭 구간별 발생 횟수 · {periodLabel}</span>
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>낙폭 구간별 발생 횟수 · {periodLabel}</span>
         {buckets.map((b) => {
           const on = inBucket(b);
           return (
@@ -1921,7 +1921,7 @@ function RecoveryRange({ min, median, max }: { min: number; median: number; max:
       {/* 라벨은 양 끝을 안쪽으로 붙인다 — 중앙값이 끝에 가까우면 겹치지만, 셋 다 값이
           숫자로 적혀 있어 읽는 데 지장이 없다. */}
       <div style={{ position: "relative", height: 14 }}>
-        <span style={{ position: "absolute", left: 0, top: 0, fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: C.muted }}>{fmtDur(min)}</span>
+        <span style={{ position: "absolute", left: 0, top: 0, fontFamily: MONO, fontSize: 11, fontWeight: 700, color: C.muted }}>{fmtDur(min)}</span>
         <span
           style={{
             position: "absolute",
@@ -1929,7 +1929,7 @@ function RecoveryRange({ min, median, max }: { min: number; median: number; max:
             top: 0,
             transform: "translateX(-50%)",
             fontFamily: MONO,
-            fontSize: 10.5,
+            fontSize: 11,
             fontWeight: 800,
             color: UP,
             whiteSpace: "nowrap",
@@ -1937,7 +1937,7 @@ function RecoveryRange({ min, median, max }: { min: number; median: number; max:
         >
           중앙값 {fmtDur(median)}
         </span>
-        <span style={{ position: "absolute", right: 0, top: 0, fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: C.muted }}>{fmtDur(max)}</span>
+        <span style={{ position: "absolute", right: 0, top: 0, fontFamily: MONO, fontSize: 11, fontWeight: 700, color: C.muted }}>{fmtDur(max)}</span>
       </div>
     </div>
   );
@@ -2002,7 +2002,7 @@ function Character({ ch, currentDd }: { ch: DrawdownCharacter | null; currentDd:
                   <strong style={{ fontFamily: MONO, fontSize: 21, fontWeight: 800, letterSpacing: "-.03em", color: C.ink, marginTop: 2 }}>
                     {fmtDur(t.b.medianRecovery)}
                   </strong>
-                  <span style={{ fontSize: 10.5, color: t.on ? C.sub : C.sub2 }}>회복 중앙값</span>
+                  <span style={{ fontSize: 11, color: t.on ? C.sub : C.sub2 }}>회복 중앙값</span>
                 </div>
               ) : null,
             )}
