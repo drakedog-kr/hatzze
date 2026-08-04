@@ -201,7 +201,7 @@ function Shell({
         ["--card-accent" as string]: warm ? "var(--c-mania)" : "var(--c-blue)",
         ["--card-accent-tint" as string]: warm ? "var(--c-mania-tint)" : "var(--c-blue-tint)",
         /* 알약 **글자**용 변형. --card-accent 를 그대로 얹으면 tint 위 명암비가 저온에서
-           2.57(--c-blue #3d9cf5)이라 배지 안 글자가 안 읽힌다. 강조선·테두리는 원래
+           3.3(--c-blue #3182f6)이라 배지 안 글자가 안 읽힌다. 강조선·테두리는 원래
            채도를 써야 하므로 색을 하나 더 둔다(팔레트의 --c-*-ink 주석과 같은 규칙). */
         ["--card-accent-ink" as string]: warm ? "var(--c-hot-ink)" : "var(--c-cold-ink)",
       }}
