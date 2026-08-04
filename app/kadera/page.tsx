@@ -312,13 +312,24 @@ export default async function KaderaPage() {
         /* 표가 아니라 **쌓인 줄**이다(옛 디자인). 한 줄이 [이름 + 변화폭] / [점유율 막대] /
            [점유율·종목·횟수] 세 층이라, 열로 쪼갤 때보다 테마 하나가 한 덩어리로 읽힌다.
            오른쪽 스파크라인은 14일 추이라 여기서만 볼 수 있는 값이다. */
-        style={{ display: "grid", gridTemplateColumns: "17px minmax(0,1fr) 62px", alignItems: "start", gap: 12, padding: "11px 22px" }}
+        /* 세로 패딩 9.35px — 줄 사이 간격은 위 줄의 아래 패딩과 아래 줄의 위 패딩을 더한
+           값(11+11=22)이라, 그 22 를 15% 줄인 18.7 을 두 줄이 반씩 나눠 가진 것이다.
+           가로 22 는 시트의 다른 표(.hz-trow)와 같은 값이라 건드리지 않는다. */
+        /* 첫 칸 19px — 순위 숫자가 14px 이 되면서 두 자리("10")가 18.34px 을 먹는다
+           (이 글꼴의 숫자는 폭이 고정이라 9.17 × 2). 17px 이던 예전 폭에 두면 10위만
+           오른끝이 1.34px 삐져나와 아홉 줄과 안 맞는다. */
+        style={{ display: "grid", gridTemplateColumns: "19px minmax(0,1fr) 62px", alignItems: "start", gap: 12, padding: "9.35px 22px" }}
         /* 마우스가 없어도(키보드·터치) 종목 목록을 열 수 있게 초점을 받는다.
            언급된 종목이 없는 테마는 열 것도 없으니 초점도 주지 않는다. */
         tabIndex={t.stocks.length ? 0 : undefined}
         aria-label={t.stocks.length ? `${t.theme} 테마를 이룬 종목 ${t.stockCount}개 보기` : undefined}
       >
-        <span style={{ ...rankNum, paddingTop: 2 }}>{t.rank}</span>
+        {/* 순위 숫자를 테마명과 같은 14px 로 세우고, 줄 상자도 테마명 줄과 같은
+            THEME_NAME_H 로 준다. 글자 크기와 줄 높이가 둘 다 같으면 두 상자의 윗변이
+            같은 자리에서 시작하는 것만으로 밑선이 저절로 맞는다(그리드가 alignItems:start
+            라 윗변은 이미 같다) — 보정값이 필요 없다. 크기가 달랐을 땐 줄 상자 안에서
+            글자가 앉는 깊이가 달라 paddingTop 으로 그 차를 걷어 내야 했다. */}
+        <span style={{ ...rankNum, width: 19, fontSize: 14, lineHeight: `${THEME_NAME_H}px` }}>{t.rank}</span>
         <div style={{ minWidth: 0 }}>
           {/* 줄 높이를 못 박는다 — 오른쪽 스파크라인을 막대 밑선에 맞추려면(THEME_SPARK_TOP)
               이 줄이 몇 px 인지 확정돼야 한다. lineHeight 만으론 모자란다: 14·12·10px
@@ -436,7 +447,14 @@ export default async function KaderaPage() {
                   key={s.label}
                   style={{
                     display: "flex",
-                    alignItems: "baseline",
+                    // baseline 이 아니라 center 다. 라벨(11.5px)과 값(19px)은 줄 상자
+                    // 높이가 17.25 : 28.5 로 달라서, 밑선을 맞추면 짧은 라벨이 줄 가운데보다
+                    // 아래로 처진다(실측 1.2~2.4px). 게다가 그 처짐이 값에 무슨 글자가
+                    // 들었느냐에 따라 흔들려서("42,552개"는 쉼표가 밑선 아래로 내려가 1.2px,
+                    // 나머지는 2.3px) 네 줄의 라벨 높이가 서로 어긋나 보였다.
+                    // 값이 늘 가장 높은 요소라 center 로 바꿔도 값의 자리는 그대로다
+                    // (줄 안쪽 높이 28.5 도 그대로) — 라벨만 제자리를 찾는다.
+                    alignItems: "center",
                     justifyContent: "space-between",
                     gap: 8,
                     // 첫 줄만 위 여백을 뺀다 — 제목 슬롯 아래 gap 16 이 이미 그 자리를 잡고
@@ -450,8 +468,13 @@ export default async function KaderaPage() {
                   <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub, display: "inline-flex", alignItems: "baseline", gap: 4, minWidth: 0, wordBreak: "keep-all" }}>
                     {s.label}
                     {s.note && <span style={{ fontSize: 10, color: C.faint }}>{s.note}</span>}
+                    {/* alignSelf:center — 이 줄은 라벨과 '7일'의 밑선을 맞추느라 baseline
+                        정렬인데, 물음표까지 거기 딸려 가면 안 된다. 아이콘 글꼴은 글리프
+                        밑변이 곧 밑선이라, 밑선에 맞추면 12px 상자가 글자보다 통째로
+                        3.1px 떠오른다(실측). 글자와 눈높이를 맞추려면 상자를 줄 한가운데
+                        세워야 한다 — 옆 칸 '제외 후 환산 ?' 이 쓰는 것과 같은 기준이다. */}
                     {s.help && (
-                      <span className="hz-tip hz-tip-wide" data-tip={s.help} data-ga-tip={s.label} style={{ display: "inline-flex", cursor: "help", flexShrink: 0 }}>
+                      <span className="hz-tip hz-tip-wide" data-tip={s.help} data-ga-tip={s.label} style={{ display: "inline-flex", alignSelf: "center", cursor: "help", flexShrink: 0 }}>
                         <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
                       </span>
                     )}
@@ -460,7 +483,12 @@ export default async function KaderaPage() {
                       아니라 오류처럼 보인다. */}
                   <strong style={{ fontFamily: MONO, fontSize: 19, fontWeight: 800, color: C.ink, letterSpacing: "-.03em", whiteSpace: "nowrap", flexShrink: 0 }}>
                     {s.value}
-                    <span style={{ fontSize: 12, fontWeight: 700, color: C.sub2 }}>{s.unit}</span>
+                    {/* 단위는 숫자에서 떼어 놓는다. 부모의 letterSpacing −.03em 은 마지막
+                        숫자와 이 글자 **사이**에도 걸려서, 아무것도 안 주면 "317개" 가
+                        한 낱말처럼 붙어 버린다. 음수분을 되돌리는 값(≈0.6px)에 여백을
+                        더해 3px. letterSpacing 을 normal 로 되돌리면 글자 **뒤**에도
+                        붙어 오른끝 정렬이 어긋나므로 마진으로만 벌린다. */}
+                    <span style={{ fontSize: 12, fontWeight: 700, color: C.sub2, marginLeft: 3 }}>{s.unit}</span>
                   </strong>
                 </div>
               ))}
@@ -537,13 +565,20 @@ export default async function KaderaPage() {
                     <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub }}>
                       최근 {KADERA_WINDOW_DAYS}일 · {sentiment.messageCount.toLocaleString("ko-KR")}건 분석
                     </span>
-                    <span
-                      className="hz-tip hz-tip-wide"
-                      data-tip="메시지를 비관/중립/낙관으로 나눈 뒤, 중립을 뺀 비관↔낙관 비율입니다. 시황·공시 같은 담담한 글이 절반이라, 같이 세면 늘 비관으로 기웁니다."
-                      data-ga-tip="sentiment_ratio"
-                      style={{ fontSize: 11.5, fontWeight: 700, color: C.sub, cursor: "help", width: "fit-content" }}
-                    >
+                    {/* 툴팁은 문장이 아니라 물음표에 건다. 글 전체가 hz-tip 이면 마우스를
+                        올리기 전엔 설명이 있다는 것 자체가 안 보이고(cursor 가 바뀌어야만
+                        안다), 옆 '활성 채널 ?' 과도 규칙이 달라진다. 이 칸의 다른 설명들과
+                        같이 물음표를 세워 두고 그 위에서만 연다. */}
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: C.sub, display: "inline-flex", alignItems: "center", gap: 4, width: "fit-content" }}>
                       중립 {sentiment.neutral}% 제외 후 환산
+                      <span
+                        className="hz-tip hz-tip-wide"
+                        data-tip="메시지를 비관/중립/낙관으로 나눈 뒤, 중립을 뺀 비관↔낙관 비율입니다. 시황·공시 같은 담담한 글이 절반이라, 같이 세면 늘 비관으로 기웁니다."
+                        data-ga-tip="sentiment_ratio"
+                        style={{ display: "inline-flex", cursor: "help", flexShrink: 0 }}
+                      >
+                        <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
+                      </span>
                     </span>
                   </div>
                 </div>
@@ -590,7 +625,26 @@ export default async function KaderaPage() {
           {/* ③ 오늘의 요약 */}
           <div className="hz-kd-hero-h">
             <div className="hz-kd-hero-title">
-              <AiMark size={14} />
+              {/* 시장 브리핑의 '오늘의 브리핑'과 같은 표식이다 — 옅은 하늘색 타일에 앉힌
+                  ✨. 맨 아이콘으로 두면 누를 수 있는 것(= 생성형 AI 고지)으로 안 보인다.
+                  타일이 22px 인 건 이 제목 슬롯이 22px 로 못박혀 있어서다(globals.css 의
+                  .hz-kd-hero-title). 브리핑 쪽 26px 을 그대로 가져오면 슬롯을 넘겨,
+                  세 칸의 주인공 숫자(317 · 66% · 문단)가 서로 다른 높이에 선다.
+                  모서리도 26:9 비례를 지켜 7px. */}
+              <span
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 7,
+                  background: "var(--c-blue-tint)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <AiMark size={13} style={{ alignSelf: "center" }} />
+              </span>
               <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>오늘의 요약</span>
             </div>
             {/* 높이를 안 잡는다 — 글이 3줄이면 3줄, 4줄이면 4줄로 흐른다. 길이 자체는
@@ -841,6 +895,9 @@ export default async function KaderaPage() {
                   >
                     {k.trend === "up" ? "▲" : k.trend === "down" ? "▼" : ""}
                     {k.count.toLocaleString("ko-KR")}
+                    {/* 단위를 붙여 위 하이라이트("1,204회")와 같은 문법으로 읽히게 한다.
+                        머리글이 '횟수'라 해도 이 숫자만 떼어 보면 무엇의 400 인지 모른다. */}
+                    <span style={{ fontWeight: 700, color: C.sub2, marginLeft: 1 }}>회</span>
                   </span>
                 </div>
               ))}
@@ -1056,6 +1113,9 @@ export default async function KaderaPage() {
                       >
                         {r.delta7d > 0 ? "▲" : r.delta7d < 0 ? "▼" : ""}
                         {Math.abs(r.delta7d).toLocaleString("ko-KR")}
+                        {/* 단위를 붙인다 — 이 칸의 1,866 은 구독자 **수**이고, 바로 옆
+                            채널명 아랫줄엔 총 구독자가 또 있어 둘이 헷갈리기 쉽다. */}
+                        <span style={{ fontWeight: 700, color: C.sub2, marginLeft: 1 }}>명</span>
                       </span>
                     </>
                   );
