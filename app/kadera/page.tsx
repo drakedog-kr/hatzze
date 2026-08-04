@@ -149,9 +149,10 @@ function MddLink({ code, market, label = "MDD 정밀분석" }: { code: string; m
 const clip: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
 
 /** 시트 안 열 머리·데이터 행이 공유하는 격자. 한 곳에서 내야 두 줄의 칸이 어긋나지 않는다. */
-const CHANNEL_COLS = "24px minmax(0,1fr) 54px 56px 54px";
-const RISING_COLS = "24px minmax(0,1fr) minmax(60px,1.3fr) 62px";
 const KEYWORD_COLS = "26px minmax(80px,1fr) minmax(70px,1.5fr) 58px";
+/* 채널 표 두 벌(파워 랭킹·뜨는 채널)의 격자는 여기 없다 — globals.css 의 .hz-cols-ch /
+   .hz-cols-rise 다. 폰에서 열을 접어야 하는데 인라인 style 은 미디어쿼리를 이겨서,
+   여기 두면 @media 가 아무 일도 못 한다. 이유는 그 클래스 주석에 적어 뒀다. */
 
 /* 테마 로테이션 한 줄의 세로 치수. 오른쪽 스파크라인의 밑선을 왼쪽 점유율 막대의
    밑선에 맞추려면 그 위에 무엇이 얼마나 쌓여 있는지 알아야 해서, 값을 흩어 두지 않고
@@ -484,8 +485,8 @@ export default async function KaderaPage() {
         href={`https://t.me/${c.handle}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="hz-trow"
-        style={{ gridTemplateColumns: CHANNEL_COLS, textDecoration: "none" }}
+        className="hz-trow hz-cols-ch"
+        style={{ textDecoration: "none" }}
         data-ga="kadera_channel_click"
         data-ga-channel={c.handle}
         data-ga-surface="power_rank"
@@ -498,6 +499,18 @@ export default async function KaderaPage() {
             <span style={{ ...clip, fontSize: 12, fontWeight: 700, color: C.ink }}>{c.title}</span>
             <span style={{ ...clip, fontSize: 11, fontFamily: MONO, color: C.sub2 }}>
               구독자 {c.subscriberCount ? compact(c.subscriberCount) : "-"}
+              {/* 폰에서 접히는 조회율·순위 변동을 여기로 되살린다(.hz-ch-meta 는 기본 숨김).
+                  값을 버리지 않으려는 것이다 — 폰에서 열을 접는 건 자리가 없어서지
+                  그 숫자가 덜 중요해서가 아니다. 순위 변동은 색을 유지한다: 오르내림을
+                  ▲▼ 모양 하나로만 두면 잿빛 캡션 안에서 눈에 안 걸린다. */}
+              <span className="hz-ch-meta">
+                {c.viewRate != null ? ` · 조회 ${c.viewRate.toFixed(1)}%` : ""}
+                {c.rankChange ? (
+                  <span style={{ color: c.rankChange > 0 ? "var(--c-hot-ink)" : "var(--c-cold-ink)", fontWeight: 700 }}>
+                    {` · ${c.rankChange > 0 ? "▲" : "▼"}${Math.abs(c.rankChange)}`}
+                  </span>
+                ) : null}
+              </span>
             </span>
           </span>
         </span>
@@ -1125,7 +1138,7 @@ export default async function KaderaPage() {
             <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>아직 채널 점수가 없습니다.</p>
           ) : (
             <>
-              <div className="hz-thead" style={{ gridTemplateColumns: CHANNEL_COLS }}>
+              <div className="hz-thead hz-cols-ch">
                 <span>#</span>
                 <span>채널</span>
                 <span style={{ textAlign: "right" }}>조회율</span>
@@ -1167,7 +1180,7 @@ export default async function KaderaPage() {
             }
             return (
               <>
-                <div className="hz-thead" style={{ gridTemplateColumns: RISING_COLS }}>
+                <div className="hz-thead hz-cols-rise">
                   <span>#</span>
                   <span>채널</span>
                   {/* 셋째 칸은 막대(1위 대비 상대 길이), 넷째 칸은 그 증감의 실수치다.
@@ -1222,8 +1235,8 @@ export default async function KaderaPage() {
                       href={`https://t.me/${r.handle}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="hz-trow"
-                      style={{ gridTemplateColumns: RISING_COLS, textDecoration: "none" }}
+                      className="hz-trow hz-cols-rise"
+                      style={{ textDecoration: "none" }}
                       data-ga="kadera_channel_click"
                       data-ga-channel={r.handle}
                       data-ga-surface="rising"
@@ -1231,12 +1244,14 @@ export default async function KaderaPage() {
                       {row}
                     </a>
                   ) : (
-                    <div key={`${r.title}-${i}`} className="hz-trow" style={{ gridTemplateColumns: RISING_COLS }}>
+                    <div key={`${r.title}-${i}`} className="hz-trow hz-cols-rise">
                       {row}
                     </div>
                   );
                 })}
-                <div className="hz-sheet-foot" style={{ marginTop: "auto" }}>
+                {/* 폰에서는 막대 열을 접으므로(.hz-cols-rise) 이 각주도 같이 접는다 —
+                    화면에 없는 것을 설명하는 문장만 남으면 안 된다. */}
+                <div className="hz-sheet-foot hz-rise-barnote" style={{ marginTop: "auto" }}>
                   <span style={{ fontSize: 12, color: C.sub }}>
                     막대는 1위({real[0] ? Math.abs(real[0].delta7d).toLocaleString("ko-KR") : "-"}명) 기준 상대 증가폭입니다
                   </span>
