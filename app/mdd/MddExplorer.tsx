@@ -1741,10 +1741,9 @@ function RiskProfile({ r, periodLabel }: { r: RiskProfileData; periodLabel: stri
             <div>{t.body.viz}</div>
             {/* 요약과 전체보기가 한 줄을 나눠 쓴다. 팝오버가 이 칸 기준으로 위로 펴지므로
                 relative 가 여기 있어야 한다(패널에 주면 요약 줄 위로 안 붙는다). */}
-            {/* 정렬 규칙은 CSS(.mdd-tile-foot)가 진다 — **인라인은 미디어쿼리를 이겨서**
-                여기 두면 폭에 따라 못 가른다. 기본(PC)은 왼쪽, 폰에서 요약이 혼자일 때만
-                가운데다. 왜 그렇게 갈리는지는 그 클래스 주석에 적어 뒀다. */}
-            <div className={`mdd-tile-foot${t.body.more ? "" : " mdd-tile-foot-solo"}`} style={{ position: "relative", marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.divider}` }}>
+            {/* 요약은 폭을 가리지 않고 왼쪽이다(.mdd-tile-foot). '전체보기'가 있으면
+                그것만 오른쪽 끝으로 밀린다. */}
+            <div className="mdd-tile-foot" style={{ position: "relative", marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.divider}` }}>
               {/* foot 은 <p> 라 <span> 으로 감싸면 안 된다(span 은 phrasing content 만 받는다). */}
               <div style={{ minWidth: 0 }}>{t.body.foot}</div>
               {t.body.more}
