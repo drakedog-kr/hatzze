@@ -48,15 +48,47 @@ function addDaysISO(iso: string, n: number): string {
 }
 
 /**
- * **오늘을 뺀** 최근 n일의 KST 날짜 목록(오래된→최신).
+ * 카더라 리포트의 **기준일** — telegram_sentiment_daily 의 최신 날짜.
  *
- * 오늘을 빼는 이유는 하나다 — 아직 하루가 덜 차서, 넣으면 막대가 늘 짧게 나오고
- * 그 반쪽짜리 하루가 합계에도 섞인다. 창을 쓰는 곳마다 이 계산을 따로 하면
- * "같은 최근 N일"이 서로 다른 N일이 되므로(실제로 카드 1,828 vs 요약문 1,727 로
- * 어긋난 적이 있다) 여기 하나로 모은다.
+ * 파이프라인 generate_telegram_narratives.py 의 `latest` 와 **같은 표의 같은 값**이다.
+ * 화면의 창을 여기에 매다는 이유는 하나다 — 이 페이지의 숫자와 그 옆 LLM 문장이 같은
+ * 사흘을 말해야 하는데, 문장은 파이프라인이 돌 때 굳고 숫자는 요청마다 다시 계산되기
+ * 때문이다. 창의 끝을 벽시계('지금의 KST 오늘')로 잡으면 **새 데이터 없이 자정에만
+ * 창이 하루 굴러**, 오전 실행이 끝날 때까지 둘이 서로 다른 기간을 말한다.
+ *
+ * 실제로 어긋났다(2026-08-05 00:30 KST): 카드가 낙관 71%(08-02~08-04)인데 그 옆 문장은
+ * "66%"(08-01~08-03)였다. 그사이 들어온 새 데이터는 없었고, 빠진 날이 토요일이라
+ * 5%p 가 벌어졌다. "최근 3일 · N건 분석" 캡션도 7,329 대신 9,515 로 떠 있었다.
+ *
+ * 기준일에 매달면 화면이 움직이는 계기가 파이프라인 실행 둘(오전·오후)뿐이 된다.
+ * 오후 실행도 값을 바꾼다 — 분류가 Batch API 라 제출과 수거가 다른 실행에서 일어나
+ * (analyze_telegram_messages.py), 어젯밤 글이 오후 실행에서야 수거돼 어제 행에 얹힌다.
+ *
+ * 표가 비어 있으면(초기 환경) 벽시계로 떨어진다. 그때는 맞출 문장도 없다.
  */
-function kstDateRange(n: number): string[] {
-  const end = addDaysISO(todayKstDate(), -1); // 어제
+const kaderaBaseDate = cache(async (): Promise<string> => {
+  const db = getSupabaseAdmin();
+  const { data } = await db
+    .from("telegram_sentiment_daily")
+    .select("date")
+    .order("date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data?.date as string | undefined) ?? todayKstDate();
+});
+
+/**
+ * **기준일을 뺀** 그 앞 n일의 날짜 목록(오래된→최신).
+ *
+ * 기준일을 빼는 이유는 하나다 — 아직 하루가 덜 차서, 넣으면 막대가 늘 짧게 나오고
+ * 그 반쪽짜리 하루가 합계에도 섞인다. 파이프라인도 같은 자리에서 하루를 뺀다
+ * (generate_telegram_narratives.build_brief_digest 의 `end = latest - 1일`).
+ *
+ * 창을 쓰는 곳마다 이 계산을 따로 하면 "같은 최근 N일"이 서로 다른 N일이 되므로
+ * (실제로 카드 1,828 vs 요약문 1,727 로 어긋난 적이 있다) 여기 하나로 모은다.
+ */
+function windowBefore(base: string, n: number): string[] {
+  const end = addDaysISO(base, -1);
   return Array.from({ length: n }, (_, i) => addDaysISO(end, -(n - 1 - i)));
 }
 
@@ -69,6 +101,9 @@ function kstDateRange(n: number): string[] {
  * (data-pipeline/scripts/generate_telegram_narratives.py). 화면 숫자는 여기서, 그 옆
  * LLM 문장은 저기서 나오므로 값이 갈리면 한 카드가 서로 다른 기간을 말한다.
  * Python 과 TS 라 import 로 공유할 수 없어 손으로 맞춘 사본이다.
+ *
+ * 창은 **길이와 끝점 둘 다** 맞아야 한다. 길이만 맞춰 두고 끝점을 각자 잡았다가
+ * 자정에 하루 어긋난 적이 있다(kaderaBaseDate 주석). 끝점은 이제 기준일 하나로 묶여 있다.
  *
  * 이 창을 쓰지 **않는** 것들: 모니터링 현황(활성 채널·총 메시지 7일), 뜨는 채널,
  * 이슈 키워드, 테마 로테이션, 트렌딩 메시지(자체 기간 탭). 각자 이유가 있어 그대로 둔다.
@@ -282,15 +317,16 @@ type DailyRow = { stock_code: string; date: string; weighted_score: number; ment
 
 async function loadStockDaily(days: number): Promise<{ rows: DailyRow[]; dates: string[] }> {
   const db = getSupabaseAdmin();
-  const data = await fetchAllRows<DailyRow>("id", () =>
+  // 기준일 앞 days 일. 위아래 경계를 둘 다 쿼리에 건다 — 예전엔 하한만 걸고 오늘을
+  // 코드에서 걸러 냈는데, 그 '오늘'이 벽시계라 자정마다 창이 굴렀다(windowBefore 주석).
+  const window = windowBefore(await kaderaBaseDate(), days);
+  const rows = await fetchAllRows<DailyRow>("id", () =>
     db
       .from("telegram_stock_daily")
       .select("stock_code,date,weighted_score,mention_count")
-      .gte("date", daysAgoISO(days).slice(0, 10)),
+      .gte("date", window[0])
+      .lte("date", window[window.length - 1]),
   );
-  // 오늘은 아직 하루가 덜 차서 일평균·추이를 왜곡한다 — 완료된 날만 쓴다.
-  const today = todayKstDate();
-  const rows = data.filter((r) => r.date < today);
   const dates = [...new Set(rows.map((r) => r.date))].sort();
   return { rows, dates };
 }
@@ -816,9 +852,9 @@ export async function getStockReport(code: string): Promise<StockReport | null> 
   // 맞지만, 그게 평소보다 많은 건지 적은 건지는 앞선 날들이 있어야 보인다. 그래서 눈으로
   // 읽는 축은 길게 두고 세는 창만 짧게 잡는다.
   //
-  // 두 창 모두 오늘은 뺀다 — 아직 하루가 덜 차서 막대가 늘 짧게 나오고, 그 반쪽짜리
+  // 두 창 모두 기준일은 뺀다 — 아직 하루가 덜 차서 막대가 늘 짧게 나오고, 그 반쪽짜리
   // 하루가 합계·채널 수에도 섞인다.
-  const chartDays = kstDateRange(STOCK_CHART_DAYS);
+  const chartDays = windowBefore(await kaderaBaseDate(), STOCK_CHART_DAYS);
   const scoreDays = chartDays.slice(-KADERA_WINDOW_DAYS); // 차트 꼬리 = 집계 창
   const [first, last] = [scoreDays[0], scoreDays[scoreDays.length - 1]];
   const dayAfterLast = addDaysISO(last, 1); // posted_at 상한(미포함)
@@ -1416,10 +1452,11 @@ function optimismPct(pos: number, neg: number): number | null {
  */
 export async function getEcosystemSentiment(): Promise<EcosystemSentiment | null> {
   const db = getSupabaseAdmin();
-  // 종목 리포트와 **같은 날짜 구간**을 본다(kstDateRange = 오늘 뺀 최근 N일).
+  // 종목 리포트와 **같은 날짜 구간**을 본다(windowBefore = 기준일 뺀 그 앞 N일).
   // 예전엔 여기만 daysAgoISO 로 굴러 오늘이 섞였는데, 오늘은 하루가 덜 차서 낙관도가
   // 반쪽 표본에 끌려다녔다. 두 카드가 같은 기간을 말해야 총평 문장도 옆 막대와 맞는다.
-  const window = kstDateRange(KADERA_WINDOW_DAYS);
+  const base = await kaderaBaseDate();
+  const window = windowBefore(base, KADERA_WINDOW_DAYS);
   const { data } = await db
     .from("telegram_sentiment_daily")
     .select("date,scope,positive_count,neutral_count,negative_count,message_count")
@@ -1455,11 +1492,17 @@ export async function getEcosystemSentiment(): Promise<EcosystemSentiment | null
     .sort((x, y) => y.total - x.total)
     .slice(0, THEME_TOP_N);
 
+  // 총평은 **기준일분만** 집는다. 파이프라인이 이 문장을 저장할 때 쓴 날짜가 곧 기준일이라
+  // (generate_telegram_narratives 가 `date: latest` 로 upsert), 날짜로 맞추면 문장이 말하는
+  // 사흘과 위 window 가 같은 값이 되는 게 구조로 보장된다.
+  //
+  // 예전엔 날짜를 안 보고 최신 한 행을 집었다. 그래서 그날 실행이 실패하면 이틀·사흘 전
+  // 문장이 오늘 숫자 옆에 그대로 붙었다(2026-08-04 수집 타임아웃 같은 날). 못 찾으면
+  // 문장 없이 숫자만 낸다 — 틀린 기간을 말하는 문장을 붙이는 것보다 없는 편이 낫다.
   const { data: brief } = await db
     .from("telegram_daily_brief")
     .select("sentiment_summary")
-    .order("date", { ascending: false })
-    .limit(1)
+    .eq("date", base)
     .maybeSingle();
 
   // 헤드라인은 중립을 뺀 낙관도 — 테마별 막대와 같은 기준으로 맞춘다(위 타입 주석 참고).
@@ -1621,22 +1664,18 @@ async function computeIssueKeywords(limit: number): Promise<IssueKeyword[]> {
 }
 
 /**
- * 종목별 흐름 요약(LLM) — 가장 최근에 생성된 날짜분을 종목코드로 찾아 쓴다.
+ * 종목별 흐름 요약(LLM) — **기준일분만** 종목코드로 찾아 쓴다.
  * 파이프라인이 상위 몇 종목만 만들므로, 없는 종목은 카드에서 문단이 빠진다.
+ *
+ * 센티먼트 총평과 같은 이유로 날짜를 맞춘다 — 이 문장이 세는 창도 기준일 앞 3일이라
+ * (build_stock_digests 도 `latest - 1일`에서 끝난다), 날짜를 안 보고 최신 행을 집으면
+ * 막대는 기준일까지 그리는데 글은 그 하루 전까지를 말하게 된다.
  */
 export async function getStockNarratives(): Promise<Record<string, string>> {
   const db = getSupabaseAdmin();
-  const { data: latest } = await db
-    .from("telegram_stock_narrative")
-    .select("date")
-    .order("date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (!latest?.date) return {};
-
   const { data } = await db
     .from("telegram_stock_narrative")
     .select("stock_code,narrative")
-    .eq("date", latest.date);
+    .eq("date", await kaderaBaseDate());
   return Object.fromEntries((data ?? []).map((r) => [r.stock_code as string, r.narrative as string]));
 }
