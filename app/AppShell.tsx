@@ -172,7 +172,7 @@ function Sidebar() {
           </Link>
           {/* 배지 크기는 '준비 중' 배지와 맞춘다(10px / padding 3-7). 서로 다른 크기면
               같은 사이드바 안에서 배지가 두 종류로 보인다. */}
-          <BetaBadge logoSize={30} style={{ height: "auto", fontSize: 11, padding: "3px 7px", lineHeight: 1.4 }} />
+          <BetaBadge logoSize={30} style={{ height: "auto", fontSize: 10, padding: "3px 7px", lineHeight: 1.4 }} />
         </LogoTag>
         <p style={{ margin: "8px 0 0", fontSize: 11, fontWeight: 600, color: C.sub, letterSpacing: "0.02em", lineHeight: 1.5 }}>
           데이터와 감성으로 읽는 시장
@@ -250,7 +250,7 @@ function Sidebar() {
                 left: "100%",
                 top: -6,
                 marginLeft: 3,
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: 700,
                 lineHeight: 1.4,
                 whiteSpace: "nowrap",
@@ -360,7 +360,7 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
           <span style={{ fontSize: 15 }}>{COMING_SOON.label}</span>
           <span
             style={{
-              fontSize: 11,
+              fontSize: 9,
               fontWeight: 700,
               lineHeight: 1.4,
               whiteSpace: "nowrap",
