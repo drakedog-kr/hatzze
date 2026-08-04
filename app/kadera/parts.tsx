@@ -1,6 +1,6 @@
 import { shortDate } from "@/lib/format";
 
-import { C, MONO, R, SH } from "../ui";
+import { C, MONO, R } from "../ui";
 
 /**
  * 카더라 리포트가 공유하는 표시 프리미티브.
@@ -13,27 +13,10 @@ import { C, MONO, R, SH } from "../ui";
  * 같은 원칙 — 색·서체 프리미티브 외에는 의존이 없다).
  */
 
-/**
- * 카드(1단계) — 페이지의 모든 섹션이 이 껍데기를 쓴다.
- *
- * 시장 브리핑의 카드(app/page.tsx 의 Shell)와 같은 값이어야 한다. 두 화면은 같은
- * 사이드바 밑에서 한 번의 클릭으로 오가는 자리라, 반지름이나 테두리가 갈리면 둘 중
- * 하나가 다른 서비스에서 옮겨온 것처럼 보인다.
- *
- * 헤어라인(1px 테두리)이 아니라 그림자를 쓴다. 예전에 그림자를 걷어낸 이유는 카드가
- * 빈틈없는 격자로 붙어 있어 그림자끼리 겹쳐 바탕이 탁해졌기 때문인데, 지금은 흰 셸
- * 안에서 카드끼리 18 씩 떨어져 있어 그 문제가 안 난다(globals.css 의 --sh-card 주석).
- */
-export const card: React.CSSProperties = {
-  background: C.card,
-  borderRadius: R.card,
-  // 폭에 따라 22 → 18 (globals.css 의 --hz-card-pad).
-  padding: "var(--hz-card-pad)",
-  boxShadow: SH.card,
-  // 그리드 칸 안에서 카드가 내용에 밀려 넓어지지 않도록(칸 비율 고정). 긴 채널명 등은
-  // 카드 안에서 말줄임 처리되어야지, 카드를 늘려선 안 된다.
-  minWidth: 0,
-};
+/* 카드 껍데기(1단계)는 여기 인라인 스타일 `card` 로 있었다. 2026-08 콘솔 리디자인이
+   카드를 **시트**로 바꾸면서 두 페이지 모두 `.hz-sheet`(globals.css)로 옮겨 갔고,
+   그때부터 이 상수를 import 하는 곳이 없었다. 시트는 그림자가 아니라 헤어라인
+   (--c-sheet-line)으로 경계를 긋는다. */
 
 /**
  * 카드 안의 타일(2단계) — 종목 타일·메시지 카드·종목 리포트가 공유한다.
