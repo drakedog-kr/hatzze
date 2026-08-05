@@ -362,27 +362,6 @@ def stage_for_score(score: float) -> str:
     return "초고온"
 
 
-def load_last_score(client) -> float | None:
-    """지금 덮어쓰기 **직전**에 저장돼 있던 점수. 기록이 하나도 없으면 None.
-
-    탑바 티커의 "▲3" 이 이 값을 기준으로 그려진다. 앞 '날짜' 행이 아니라 앞 '실행' 값을
-    적어 두는 이유는, 파이프라인이 하루 두 번 도는데 두 실행이 같은 날짜 행을 덮어쓰기
-    때문이다 — 앞 행과 비교하면 오후 실행이 점수를 새로 써도 화살표는 계속 어제와의
-    차이를 가리켜서, 방금 바뀐 온도가 화면에 안 나타난다.
-
-    그래서 오늘 행이 이미 있으면(=오후 실행) 그 행의 점수가, 없으면(=오전 첫 실행)
-    가장 최근 행의 점수가 곧 '직전 실행 값'이다. 둘 다 "가장 최근 행 한 줄"로 얻어진다.
-    """
-    res = (
-        client.table("daily_score")
-        .select("date,score")
-        .order("date", desc=True)
-        .limit(1)
-        .execute()
-    )
-    return res.data[0]["score"] if res.data else None
-
-
 def main() -> None:
     client = get_client()
 
@@ -563,26 +542,19 @@ def main() -> None:
 
     today = date.today().isoformat()
     now_utc = datetime.now(timezone.utc).isoformat()
-    prev_score = load_last_score(client)
+    # prev_score(=덮어쓰기 직전 실행의 점수)를 여기서 함께 적던 것을 걷었다. 화면에서
+    # 그 값을 읽던 자리가 없어졌고, 남겨 두면 아무도 안 읽는 칸을 매 실행 채우게 된다.
+    # 히어로 배지는 앞 '날짜' 행과 견준다(lib/data.ts 의 prevDay 주석에 근거를 적어 뒀다).
     payload = {
         "date": today,
         "score": round(weighted_score, 2),
         "stage": stage,
         "updated_at": now_utc,
-        "prev_score": prev_score,
     }
-    try:
-        client.table("daily_score").upsert(payload, on_conflict="date").execute()
-    except Exception as e:
-        # prev_score 컬럼이 아직 없는 환경(마이그레이션 024 전)에서 점수 저장까지 같이
-        # 죽으면 안 된다. 그 칸만 빼고 다시 쓴다 — 프론트는 없으면 앞 행으로 폴백한다.
-        print(f"[WARNING] prev_score 포함 저장 실패({e}) — 그 컬럼 없이 다시 시도합니다")
-        payload.pop("prev_score")
-        prev_score = None
-        client.table("daily_score").upsert(payload, on_conflict="date").execute()
+    client.table("daily_score").upsert(payload, on_conflict="date").execute()
     print(
         f"[Supabase] daily_score upsert 완료: date={today}, score={round(weighted_score, 2)}, "
-        f"stage={stage}, updated_at={now_utc}, prev_score={prev_score}"
+        f"stage={stage}, updated_at={now_utc}"
     )
 
 
