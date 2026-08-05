@@ -703,13 +703,29 @@ export async function getTrendingMessages(
 ): Promise<TrendingMessage[]> {
   const db = getSupabaseAdmin();
   const since = windowDays === "today" ? trendingTodayStartISO() : daysAgoISO(windowDays);
-  const { data: msgs } = await db
+  /* error 를 **받아서 남긴다.** 안 받으면 조회 실패와 "그 창에 글이 없음"이 똑같이
+     data=null 로 나가고, 화면은 둘 다 "…기준으로는 아직 화제 메시지가 없습니다"를 띄운다.
+     둘은 전혀 다른 사건인데 화면에서도 로그에서도 구별할 방법이 없어진다.
+
+     이게 가설이 아닌 이유: 2026-08-06 새벽 프로덕션에서 7일 창이 36건인데 30일 창이
+     0건인 응답이 관측됐다. 7일은 30일에 포함되므로 데이터로는 불가능한 조합이고,
+     조회 하나가 실패해 조용히 빈 배열이 된 것으로밖에 설명되지 않는다.
+
+     ⚠️ **동작은 한 글자도 안 바꾼다** — 실패해도 여전히 [] 를 돌려주고 페이지는 그대로
+     뜬다. 실패를 '보이게' 만드는 것이 전부다. 실패했을 때 무엇을 보여줄지는 별건이다.
+
+     같은 패턴(에러를 안 받는 조회)이 이 파일에 11곳 더 있다. 실제로 실패가 관측된 건
+     여기뿐이라 여기만 고친다. 나머지는 오픈 후 같은 방식으로 훑을 것. */
+  const { data: msgs, error } = await db
     .from("telegram_messages")
     .select("channel_handle,message_id,text,views,forwards,replies,posted_at")
     .gte("posted_at", since)
     .not("text", "is", null)
     .order("views", { ascending: false, nullsFirst: false })
     .limit(200);
+  if (error) {
+    console.error(`[getTrendingMessages] 창=${windowDays} 조회 실패:`, error.message);
+  }
   if (!msgs?.length) return [];
 
   const { titleOf, photoUrlOf } = await channelMeta();
