@@ -26,9 +26,11 @@ from improve4 import W_kq  # noqa: E402
 pd.set_option("display.width", 330)
 PEAKS = ["2025-11-03", "2026-02-26", "2026-06-22"]
 TROUGHS = ["2025-11-24", "2026-03-31", "2026-07-20"]
-SHORT = ["investor_deposit", "individual_net_buy", "dcinside_post_count", "turnover_concentration",
-         "news_sentiment", "brokerage_app_rank", "youtube_finance_search_views",
-         "bestseller_finance_ratio", "github_trading_bot_repos"]
+# 장기 축(P_g)이 시계열을 못 만드는 지표들 = INDICATOR_WEIGHTS − P_g. 2026-08-06 현재 7개다.
+# investor_deposit·individual_net_buy 는 지표 자체가 없어졌는데 이 목록에만 남아 있어서
+# T[s] 가 KeyError 로 죽었다(=absolute.py 가 통째로 못 돌았다). 목록을 손으로 적어 두면
+# 지표가 드나들 때마다 낡으므로, 가중치 표에서 장기 축을 빼는 식으로 구한다.
+SHORT = [s for s in W if s not in P_g]
 
 raw = json.load(open("values.json"))
 by = defaultdict(dict)
