@@ -18,7 +18,10 @@ P = dict(P_g)
 P["kospi_speed_60d"] = lin(mom, MOM_F, MOM_C)
 
 W = W_kq.copy()
-W["kospi_speed_60d"] = 2.5
+# 검사 2(2026-07-23) 때 이 지표는 저장된 값이 없어 W_kq 에 안 들어와서 여기서 손으로
+# 붙였고, 그 2.5 는 그 시절 INDICATOR_WEIGHTS 를 그대로 베낀 수였다. 검사 3 이 3.0 으로
+# 올린 뒤로 이 줄만 옛 수를 들고 있었으므로 설정에서 읽는다.
+W["kospi_speed_60d"] = INDICATOR_WEIGHTS["kospi_speed_60d"]
 # (발목 지표 추가 감량은 11월 고점을 오히려 깎아 채택하지 않음)
 
 
