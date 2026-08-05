@@ -47,16 +47,29 @@ def run(name, pmap, wl, target=TARGET, outer=(22.0, 78.0)):
 
 
 rows = []
+# kospi_speed_60d 는 검사 2(2026-07-23) 때 **갓 만든 지표**라 저장된 값이 없었다. 장기 축 W_kq 는
+# 값이 150일 이상 쌓인 지표만 담으므로(plan4.py:8) 이 지표가 아예 빠져 있었고, 그래서 여기서
+# concat 으로 한 칸을 덧붙였다. 그 뒤 파이프라인이 값을 쌓아(2026-08-06 현재 203일) 이제는 W_kq 에
+# 이미 들어 있다. 덧붙이면 라벨이 겹쳐 wavg 의 reindex 가 ValueError 로 죽는다.
+# concat 이 아니라 **대입**으로 바꾼다 — 있으면 덮고 없으면 붙으므로 어느 쪽이든 안전하다.
+# 빼 버리면 안 되는 이유: 이 지표가 다시 W_kq 밖으로 나가면 P 에는 있는데 WL 에 없어 wavg 가
+# 조용히 지표 하나를 빠뜨린다. absolute.py 가 같은 고장을 같은 방식으로 이미 고쳤다.
+# W_kq 는 improve4 가 들고 있는 공유 객체라 반드시 copy() 한 뒤 대입한다.
+#
+# 값은 손으로 적어 둔 2.5 대신 설정값을 읽는다. 2.5 는 검사 2 시절 INDICATOR_WEIGHTS 를 그대로
+# 베낀 수였지 일부러 다르게 잡은 값이 아니고, 검사 3(2026-08-01)이 3.0 으로 올렸다.
+W1 = W_kq.copy()
+W1["kospi_speed_60d"] = W["kospi_speed_60d"]
+
 # ① 현재 배포 상태
 P0 = dict(P_g)
 P0["kospi_speed_60d"] = lin(mom, 20.6, 51.3)
-r, _, _ = run("① 지금 (속도 floor 20.6)", P0, W_kq.copy().pipe(lambda w: w.set_axis(w.index)) .append(pd.Series({"kospi_speed_60d": 2.5})) if False else pd.concat([W_kq, pd.Series({"kospi_speed_60d": 2.5})]))
+r, _, _ = run("① 지금 (속도 floor 20.6)", P0, W1)
 rows.append(r)
 
 # ② 속도 floor 를 절대 기준(0%)으로
 P1 = dict(P_g)
 P1["kospi_speed_60d"] = lin(mom, 0.0, 50.0)
-W1 = pd.concat([W_kq, pd.Series({"kospi_speed_60d": 2.5})])
 r, _, _ = run("② 속도 floor 0 / ceil 50", P1, W1)
 rows.append(r)
 
