@@ -14,23 +14,37 @@ export type DailyScore = {
   // 생성 전이면 null이고, 이땐 히어로가 기존 템플릿 문장으로 폴백한다.
   ai_summary: string | null;
   /**
-   * **직전 파이프라인 실행**이 남긴 점수. 탑바 티커가 "▲3" 을 그리는 데 쓴다. 비교할
-   * 앞 실행이 없으면 null.
+   * **앞 날짜 행**(=하루 전 마지막으로 저장된 점수)과 그 날짜. 히어로의 "전일 대비 ▲6"
+   * 이 이 값과의 차이를 그린다. 앞 행이 없으면(기록이 하루뿐) null.
    *
-   * '전일'도 '직전 행'도 아니다. 파이프라인은 하루 두 번(오전·오후) 도는데 둘 다 같은
-   * 날짜 행을 덮어쓰므로, 앞 행과 비교하면 오후 실행이 새 점수를 써도 화살표는 여전히
-   * 어제와의 차이를 가리킨다 — 방금 바뀐 온도가 화면에 안 나타난다. 그래서
-   * calculate_score.py 가 덮어쓰기 직전의 점수를 daily_score.prev_score 에 적어 두고,
-   * 여기서는 그 값을 그대로 읽는다(마이그레이션 024).
+   * 한때 여기 담긴 건 앞 '날짜'가 아니라 앞 '실행'의 점수였다(daily_score.prev_score,
+   * 마이그레이션 024). 파이프라인이 하루 두 번(오전·오후) 돌면서 같은 날짜 행을
+   * 덮어쓰므로, 그 편이 "방금 바뀐 온도"를 화살표에 바로 비친다는 이유였다. 그 이유는
+   * 티커에서만 성립했다. 티커의 화살표엔 라벨이 없어서 "지난 갱신 뒤로 움직였다"까지만
+   * 말했고, 실제로 스스로 '하루 변화가 아니다'라고 못박아 뒀다.
    *
-   * 컬럼이 없거나 아직 안 채워진 행에서는 앞 행 점수로 폴백한다 — 예전 동작이라 화살표가
-   * 사라지지는 않는다.
+   * 2026-08-03 리디자인이 이 값을 히어로로 옮기면서 **"전일 대비"라는 라벨을 새로
+   * 붙였다.** 그래서 두 가지가 깨졌다.
+   *
+   *   1. 라벨이 거짓이 됐다. 저녁 실행부터 다음 날 오전까지, 즉 하루의 대부분 이 차이는
+   *      전일이 아니라 그날 오전과의 차이다(2026-08-05: 29.7 vs 29.19 → ▲1, 진짜 전일
+   *      08-04 는 24.49 라 ▲6).
+   *   2. 기준선이 같이 움직여서 화살표가 큰 숫자와 어긋난다. 앞 날짜 점수는 하루 동안
+   *      고정이라 차이는 화면의 ℃ 가 바뀔 때만 바뀌지만, 앞 실행 점수는 두 항이 같이
+   *      움직여 **방향까지 뒤집힌다.** prev_score 가 채워진 5일 중 2일이 그랬다
+   *      (08-01 ▼2 인데 하루 변화는 +13 · 08-04 ▲3 인데 −9).
+   *
+   * 히어로 브리핑 문장은 daily_score 를 날짜별로 읽어 "어제 24℃ … 오늘 30℃"라고 적는다.
+   * 그 문장과 이 배지가 같은 화면에서 다른 수를 말한 것이 이 값을 바꾼 이유다. 같은 모순이
+   * 문장 쪽에서 났을 때도 날짜 기준으로 맞춰 해결했다(generate_daily_summary.trend_lines).
    *
    * ⚠️ 눈금(SCORE_DISPLAY_ANCHORS)을 바꾼 날은 이 차이가 시장이 아니라 눈금 변경을
-   * 반영한다. 저장된 score 가 이미 매핑을 거친 표시값이라 앞 실행 값은 옛 눈금으로 남기
-   * 때문이다. 한 실행이면 지나가는 문제라 보정하지 않는다.
+   * 반영한다. 저장된 score 가 이미 매핑을 거친 표시값이라 앞 날짜 값은 옛 눈금으로 남기
+   * 때문이다(08-01 의 +13 이 대부분 이것이다 — 07-31 저장 27.88 을 지금 코드로 다시 재면
+   * 41.41 이다). 하루면 지나가고, 무엇보다 **브리핑 문장이 같은 시계열을 읽어 같은 오염을
+   * 함께 받으므로** 배지와 문장이 갈리지는 않는다. 그래서 여기서 보정하지 않는다.
    */
-  prevScore: number | null;
+  prevDay: { date: string; score: number } | null;
 };
 
 /**
@@ -93,8 +107,8 @@ export type IndicatorWithLatestValue = {
  * (OG 이미지 라우트는 별도 요청이라 여기 캐시를 공유하지 않는다 — 의도된 것이다.)
  */
 export const getLatestDailyScore = cache(async function getLatestDailyScore(): Promise<DailyScore | null> {
-  // 두 줄을 읽는다 — 최신 한 줄은 화면 전체가 쓰고, 그 앞 줄은 prev_score 가 비어 있을
-  // 때의 폴백이다. 한 줄 더 읽는 비용은 없다시피 하고, 폴백 때문에 조회를 한 번 더
+  // 두 줄을 읽는다 — 최신 한 줄은 화면 전체가 쓰고, 그 앞 줄이 히어로 배지의 비교 기준
+  // (prevDay)이다. 한 줄 더 읽는 비용은 없다시피 하고, 앞 줄 때문에 조회를 한 번 더
   // 내보내면 요청당 왕복이 늘어난다.
   const query = (cols: string) =>
     getSupabaseServer()
@@ -103,14 +117,9 @@ export const getLatestDailyScore = cache(async function getLatestDailyScore(): P
       .order("date", { ascending: false })
       .limit(2);
 
-  // 컬럼이 아직 없는 환경(마이그레이션 007·024 전)에서도 페이지가 죽지 않도록 한 칸씩
-  // 떼며 다시 조회한다. 둘을 한 번에 떼지 않는 이유는, 마이그레이션이 손으로 하나씩
-  // 적용되는 사이 prev_score 하나 없다고 ai_summary 까지 버리면 히어로 요약이 그동안
-  // 통째로 사라지기 때문이다.
-  let { data, error } = await query("date,score,stage,updated_at,ai_summary,prev_score");
-  if (error) {
-    ({ data, error } = await query("date,score,stage,updated_at,ai_summary"));
-  }
+  // ai_summary 컬럼이 아직 없는 환경(마이그레이션 007 전)에서도 페이지가 죽지 않도록
+  // 그 칸을 떼고 다시 조회한다.
+  let { data, error } = await query("date,score,stage,updated_at,ai_summary");
   if (error) {
     ({ data, error } = await query("date,score,stage,updated_at"));
   }
@@ -123,7 +132,6 @@ export const getLatestDailyScore = cache(async function getLatestDailyScore(): P
     stage: string;
     updated_at: string;
     ai_summary?: string | null;
-    prev_score?: number | null;
   }[];
   if (!rows.length) return null;
   const row = rows[0];
@@ -139,9 +147,9 @@ export const getLatestDailyScore = cache(async function getLatestDailyScore(): P
     stage: row.stage,
     updated_at: row.updated_at,
     ai_summary: summaryOverride ?? row.ai_summary ?? null,
-    // 파이프라인이 적어 둔 '덮어쓰기 직전 점수'가 있으면 그것, 없으면 앞 행(옛 동작).
-    // ?? 여야 한다 — 0℃ 는 유효한 점수인데 || 로 쓰면 그날만 앞 행으로 넘어간다.
-    prevScore: row.prev_score ?? (prev ? prev.score : null),
+    // 날짜를 같이 넘긴다. 이 행이 정말 하루 전인지는 화면이 라벨을 고를 때 따져야 한다
+    // (자료가 하루 빠진 날엔 "전일"이 아니다).
+    prevDay: prev ? { date: prev.date, score: prev.score } : null,
   };
 });
 

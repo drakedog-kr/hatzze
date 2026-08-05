@@ -2,7 +2,7 @@ import React from "react";
 
 import { getKospiCloseSeries, getLatestDailyScore, getPublicIndicators, getTopStockHighGaps } from "@/lib/data";
 import type { ClosePoint, DailyScore, IndicatorCategory, IndicatorWithLatestValue, StockHighGap } from "@/lib/data";
-import { formatEokMixed, formatIndicatorValue, formatKstUpdate, sentimentTone, shortDate } from "@/lib/format";
+import { compareLabel, formatEokMixed, formatIndicatorValue, formatKstUpdate, sentimentTone, shortDate } from "@/lib/format";
 import { AiMark, BLUE_SCALE, C, Icon, MONO, R, stageForScore } from "./ui";
 
 // 지표는 하루 단위(GitHub Actions 배치)로 갱신되므로, 빌드 시점에 정적으로
@@ -623,12 +623,13 @@ function Hero({
   // 도수는 정수로 — 소수점 둘째 자리(6.16℃)는 없는 정밀도를 있는 것처럼 보이게 한다.
   const score = Math.max(0, Math.min(100, dailyScore.score));
   const temp = Math.round(score);
-  // 직전 실행 대비 변화. **반올림한 값끼리** 뺀다 — 원값으로 빼면 67.6과 65.4가 "2"로
+  // 앞 날짜 행 대비 변화. **반올림한 값끼리** 뺀다 — 원값으로 빼면 67.6과 65.4가 "2"로
   // 나오는데 화면에는 68과 65가 떠 있으므로 눈에 보이는 두 숫자의 차이와 어긋난다.
-  const delta = dailyScore.prevScore === null ? null : temp - Math.round(dailyScore.prevScore);
+  const delta = dailyScore.prevDay === null ? null : temp - Math.round(dailyScore.prevDay.score);
   // 전일 대비는 알약이 아니라 글자 색으로만 말한다(콘솔 리디자인) — 그래서 tint 가 없다.
   const deltaColor = delta === null || delta === 0 ? C.sub2 : delta > 0 ? C.mania : C.blue;
   const deltaText = delta === null ? "—" : delta === 0 ? "—" : `${delta > 0 ? "▲" : "▼"}${Math.abs(delta)}`;
+  const deltaLabel = compareLabel(dailyScore.date, dailyScore.prevDay?.date ?? null);
 
   // LLM 요약은 두 문단이다. 앞은 "오늘 가장 뜨거운 지표", 뒤는 "최근 며칠 온도 추세".
   // 둘 다 브리핑 셀에 들어간다 — '오늘 → 왜 → 흐름' 순으로 읽힌다. 한때 뒤 문단을
@@ -677,7 +678,7 @@ function Hero({
           <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
             <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub }}>0~100 과열도 환산</span>
             <span style={{ fontSize: 11.5, fontWeight: 700, color: C.sub }}>
-              전일 대비 <span style={{ color: deltaColor, fontWeight: 800 }}>{deltaText}</span>
+              {deltaLabel} <span style={{ color: deltaColor, fontWeight: 800 }}>{deltaText}</span>
             </span>
           </div>
         </div>

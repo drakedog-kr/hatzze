@@ -112,6 +112,32 @@ export function shortDate(iso: string): string {
 }
 
 /**
+ * "무엇과 견줬는지"를 말하는 라벨. 견준 날짜가 화면에 뜬 자료의 **하루 전일 때만**
+ * "전일 대비"라고 적고, 아니면 그 날짜를 못박는다("8월 3일 대비").
+ *
+ * 마지막에서 두 번째 행이라고 무조건 '전일'을 다는 게 아니다. 파이프라인이 하루 걸러
+ * 돌거나 daily_score 행이 비면 그 행은 어제가 아니고, 그때 라벨을 달면 배지가 스스로
+ * 거짓말을 한다. 히어로 배지가 "전일 대비 ▲1"로 그날 오전과의 차이를 전일이라 우겼던 것이
+ * 정확히 그 모양이었다(2026-08-05).
+ *
+ * ⚠️ 판정 기준은 달력의 오늘이 아니라 **`latestIso` 자신**이다. 배지는 그 옆에 뜬 온도를
+ * 설명하는 말이라, 자료가 하루 낡은 날에도 "그 자료의 전일"과 견주는 것이 맞다. 자료가
+ * 낡았다는 사실은 같은 셀의 '최종 업데이트' 줄이 따로 말한다.
+ *
+ * data-pipeline/scripts/generate_daily_summary.day_tag 가 LLM 자료 쪽에서 같은 판단을
+ * 한다. 둘이 갈리면 한 화면에서 배지와 브리핑 문장이 서로 다른 날을 '어제'라 부른다.
+ */
+export function compareLabel(latestIso: string, prevIso: string | null): string {
+  if (!prevIso) return "전일 대비";
+  const dayMs = 86_400_000;
+  // 로컬 타임존이 개입하면 서버(UTC)와 브라우저에서 판정이 갈릴 수 있어 UTC 자정으로 읽는다.
+  const gap = Date.parse(`${latestIso}T00:00:00Z`) - Date.parse(`${prevIso}T00:00:00Z`);
+  if (gap === dayMs) return "전일 대비";
+  const [, mm, dd] = prevIso.split("-");
+  return `${Number(mm)}월 ${Number(dd)}일 대비`;
+}
+
+/**
  * 억 단위 금액을 "1조 2,929억"처럼 조와 억을 함께 읽는 형태로 만든다.
  *
  * formatIndicatorValue 는 1조를 넘으면 "1.3조원"으로 반올림하는데, 순매수처럼
