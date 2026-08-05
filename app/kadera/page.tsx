@@ -217,6 +217,18 @@ function Highlight({ cap, name, value, valueColor, sub, divide }: {
  * 표가 아니라 말풍선인 이유: 원본이 텔레그램 메시지라 그 매체의 형태를 유지하면
  * "이건 우리가 센 수치가 아니라 누가 한 말"이라는 것이 형태만으로 읽힌다.
  */
+/** 트렌딩 목록의 초기 노출 건수와 '더 보기' 증가폭. 아래 TRENDING_PREFETCH 와 짝이다. */
+const TRENDING_INITIAL = 6;
+const TRENDING_STEP = 10;
+/**
+ * 기간 창 하나당 서버가 미리 실어 보내는 건수.
+ *
+ * **INITIAL + STEP 과 같게 둔다** — 한 번 펼치면 끝까지 열리고 그 다음은 '접기'가 된다.
+ * 여기만 키우면 '더 보기'가 여러 번 눌리는 대신 페이로드가 그만큼 무거워진다(세 창이라 ×3,
+ * 게다가 클라이언트 경계를 넘느라 전량이 직렬화된다 — KaderaPage 쪽 주석에 실측을 적어 뒀다).
+ */
+const TRENDING_PREFETCH = TRENDING_INITIAL + TRENDING_STEP;
+
 function TrendingList({ items }: { items: TrendingMessage[] }) {
   const nodes = items.map((m, i) => {
     const tags = [...m.stocks, ...m.topics.map((t) => `#${t}`)];
@@ -313,8 +325,8 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
     <ExpandableList
       items={nodes}
       name="trending_messages"
-      initial={6}
-      step={10}
+      initial={TRENDING_INITIAL}
+      step={TRENDING_STEP}
       listClassName="hz-panelgrid hz-panelgrid-auto"
       footerClassName="hz-sheet-foot-row"
     />
@@ -351,10 +363,25 @@ export default async function KaderaPage() {
       // 3×2 셀 격자라 여섯이어야 줄이 찬다(예전 카드 배치에선 다섯이었다).
       getSurgingStocks(6),
       // 기간 탭이 즉시 전환되도록 세 창을 한 번에 받아둔다(병렬이라 지연은 한 번 분).
-      // 6건만 보여주고 '더 보기'로 10건씩 늘리므로, 세 번 펼칠 만큼(36) 미리 받아둔다.
-      getTrendingMessages("today", 36),
-      getTrendingMessages(7, 36),
-      getTrendingMessages(30, 36),
+      //
+      // 창당 건수를 36 → **16** 으로 줄였다. 목록은 6건으로 시작해 '더 보기'가 10건씩
+      // 늘리므로 16이면 한 번에 끝까지 펼쳐지고, 그 다음은 '접기'가 뜬다(초기 6 + step 10).
+      //
+      // 왜 줄였나. TrendingTabs·ExpandableList 가 둘 다 "use client" 라, 세 창의 항목이
+      // **전부 RSC 페이로드로 직렬화돼 클라이언트 경계를 넘는다**. 화면에 그려지는 건
+      // 활성 탭의 6건뿐인데도 그렇다. 실측(2026-08-06 프로덕션): 렌더된 t.me 링크는 28개인데
+      // 페이로드 안 t.me 문자열은 125개였다. 36×3=108건을 실어 6건을 보여주고 있었다.
+      //
+      // 16으로 내리면 문서가 1,017KB → 767KB, 실제 전송량(gzip)이 **107KB → 74KB(−31%)** 다.
+      // 탭 전환은 여전히 왕복이 없다(그게 이 프리페치의 목적이고, 그건 그대로 둔다).
+      // 잃는 것은 '더 보기'를 세 번 눌러 36건까지 내려가던 것뿐이다.
+      //
+      // ⚠️ DB 왕복은 안 준다 — getTrendingMessages 는 창마다 200행을 받아 정렬한 뒤
+      // slice(0, limit) 한다(lib/telegram-data.ts). 여기서 줄어드는 건 페이로드와,
+      // 그 뒤에 딸린 telegram_message_stocks 태그 조회의 크기다.
+      getTrendingMessages("today", TRENDING_PREFETCH),
+      getTrendingMessages(7, TRENDING_PREFETCH),
+      getTrendingMessages(30, TRENDING_PREFETCH),
       getChannelRanking(),
       getRisingChannels(10),
       getThemeRotation(10),
