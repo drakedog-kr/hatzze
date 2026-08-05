@@ -1178,7 +1178,10 @@ export default async function KaderaPage() {
                 listStyle={{ display: "block" }}
                 footerClassName="hz-sheet-foot-row"
               />
-              <div style={{ marginTop: "auto" }} />
+              {/* 남는 높이를 먹던 빈 칸은 뺐다. 이 시트가 옆 시트 키에 맞춰 늘어나면
+                  그 여백이 '더 보기' 띠 아래에 깔려 호버 배경이 시트 바닥에 못 닿았다
+                  — 이제 띠 자신이 margin-top:auto 로 바닥에 붙는다(.hz-sheet-foot-row).
+                  둘을 같이 두면 auto 마진이 둘이라 여백을 반씩 나눠 갖는다. */}
             </>
           )}
         </section>
