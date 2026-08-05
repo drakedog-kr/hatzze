@@ -9,7 +9,8 @@
 
 오탐 위험 종목(일반 단어/영문 약자)은 경계 규칙을 통과할 때만 인정한다:
   - 매칭 앞 글자: 한글/영숫자/한자가 아니어야 함(다른 단어의 꼬리 방지)
-  - 붙어 있는 뒤 글자: 조사이거나 구두점/공백/문자열끝이어야 함
+  - 붙어 있는 뒤 한글: **덩어리 전체**가 조사 연쇄여야 함(JOSA_TAIL_RE 참고).
+    한 글자만 보면 조사꼴 음절로 시작하는 합성어가 샌다("하이브|로자임"의 '로').
   - 띄어쓴 뒤 단어까지 봤을 때 '더 긴 고유명사의 앞부분'이면 SK 단독으로 안 센다:
       "SK 하이닉스"  → 붙이면 사전에 있는 더 긴 종목명 → 그 종목(SK하이닉스)으로 인정
       "SK hynix"    → 뒤가 로마자(영문 병기·해외 자회사명: SK On) → 거부
@@ -47,6 +48,7 @@ from config.stock_extraction import (  # noqa: E402
     GROUP_SUFFIXES,
     HEAD_NOUN_NAMES,
     JOSA,
+    JOSA_HEAD,
 )
 
 # 우선주/파생 종목 제외 패턴(…우, …우B, …N우, …우(전환) 등).
@@ -68,6 +70,13 @@ JOIN_MARKS = "·‧・･-–—"
 HTML_MIDDOT_RE = re.compile(r"&(?:middot|#183|#[xX][Bb]7);?$")
 # 마스킹 채움 문자 — 한글/영숫자/한자 어디에도 안 걸려 경계 판정이 공백과 같아진다.
 MASK_CHAR = "\x00"
+# 이름 뒤에 이어지는 한글 덩어리가 조사 연쇄인가. 조사를 이어 붙여 **끝까지** 먹어야
+# 한다(뒤에 한글이 남으면 조사가 아니라 더 긴 낱말의 앞부분이다). 긴 조사부터 시도해
+# "로부터"가 "로"에서 잘리지 않게 한다. 앞의 lookahead 가 첫 글자를 옛 한 글자 목록으로
+# 묶어, 이 규칙이 조이기만 하도록 만든다(config 쪽 JOSA_HEAD 주석 참고).
+JOSA_TAIL_RE = re.compile(
+    rf"(?=[{JOSA_HEAD}])(?:{'|'.join(sorted(JOSA, key=len, reverse=True))})+(?![가-힣])"
+)
 
 
 def load_dictionary(db) -> tuple[dict[str, str], dict[str, str], set[str]]:
@@ -130,12 +139,15 @@ def boundary_ok(text: str, start: int, end: int, is_ambiguous: bool) -> bool:
         return False
     if not is_ambiguous:
         return True
-    # 오탐 위험군은 뒤 경계도 검사: 영숫자/한자 거부, 한글은 조사만 허용.
+    # 오탐 위험군은 뒤 경계도 검사: 영숫자/한자 거부, 한글은 조사 연쇄만 허용.
     if end < len(text):
         nxt = text[end]
         if re.match(r"[0-9A-Za-z]", nxt) or HAN.match(nxt):
             return False
-        if re.match(r"[가-힣]", nxt) and nxt not in JOSA:
+        # 붙어 있는 **한 글자**가 아니라 이어지는 한글 덩어리 전체를 본다. 한 글자만
+        # 보면 그 글자가 조사이기만 하면 통과해서, 조사꼴 음절로 시작하는 합성어가
+        # 그대로 샌다("하이브|로자임" "레이|도스" "카스|나비" "나노|가공").
+        if re.match(r"[가-힣]", nxt) and not JOSA_TAIL_RE.match(text, end):
             return False
         # 스킴 없는 URL("a.co/x?db=1&SK=") 대비 — 쿼리스트링 파라미터명 꼴은 거부.
         if nxt in "=&" or (start > 0 and text[start - 1] in "&?"):
