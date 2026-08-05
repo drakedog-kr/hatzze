@@ -16,6 +16,9 @@ import pandas as pd
 from engine import kospi
 from recal2 import PEAKS, TROUGHS, WIN, event_mean
 from compose2 import A, B, C, CURRENT, composite, displayed
+# engine 이 sys.path 를 잡아 준 뒤라 그대로 읽힌다. 앵커를 손으로 적어 두면 값이 바뀔 때
+# 여기만 낡아 거짓말을 하므로(2026-08-06 에 실제로 그럴 뻔했다) 상수를 그대로 가져온다.
+from scripts.calculate_score import SCORE_DISPLAY_ANCHORS  # noqa: E402
 
 IDX = kospi.index
 
@@ -115,7 +118,7 @@ def anchor_check() -> None:
     """가중치를 바꾸면 원점수 분포가 옮겨간다. 앵커가 절대 수준에 걸려 있으니
     분포가 통째로 밀리면 표시점수가 의도와 다르게 움직인다."""
     print("=== 5) 앵커 정합성 — 원점수 분포가 얼마나 옮겨갔나 ===")
-    print("SCORE_DISPLAY_ANCHORS = (14,0) (32,31) (44,50) (54,72) (61,86) (68,96) (78,100)")
+    print("SCORE_DISPLAY_ANCHORS = " + " ".join(f"({x:g},{y})" for x, y in SCORE_DISPLAY_ANCHORS))
     print()
     print(f"{'안':16} {'p10':>7} {'중앙':>7} {'p90':>7} {'최대':>7} {'고점평균':>9} {'저점평균':>9}")
     for n, w in (("현행", CURRENT), ("A", A), ("B", B), ("C", C)):
