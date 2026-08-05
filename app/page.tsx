@@ -2,7 +2,7 @@ import React from "react";
 
 import { getKospiCloseSeries, getLatestDailyScore, getPublicIndicators, getTopStockHighGaps } from "@/lib/data";
 import type { ClosePoint, DailyScore, IndicatorCategory, IndicatorWithLatestValue, StockHighGap } from "@/lib/data";
-import { compareLabel, formatEokMixed, formatIndicatorValue, formatKstUpdate, sentimentTone, shortDate } from "@/lib/format";
+import { compareLabel, formatEokMixed, formatIndicatorValue, formatKstUpdate, formatSampleCount, sentimentTone, shortDate } from "@/lib/format";
 import { AiMark, BLUE_SCALE, C, Icon, MONO, R, stageForScore } from "./ui";
 
 // 지표는 하루 단위(GitHub Actions 배치)로 갱신되므로, 빌드 시점에 정적으로
@@ -1992,11 +1992,12 @@ function CardSentiment({
                 3일 글 8,961건        253  ✗ (낱말과 창을 둘 다 넣으면 넘친다)
                 글 8,961건 · 3일      259  ✗
                 최근 3일 8,961건      263  ✗
-              ⚠️ 뉴스는 원래도 아슬아슬했다(뉴스 4,576건 = 243, 여유 4). 창 표기로 240 이 돼
-              3px 벌었지만, **다섯 자리가 되면 248 로 여전히 넘친다**(옛 표기는 250). 그때는
-              낱말이 아니라 이 줄의 구조를 고쳐야 한다. */}
+
+              자릿수가 늘면 이 여유 7px 이 바로 사라지므로(다섯 자리 248 ✗ · 여섯 자리 255 ✗)
+              건수는 formatSampleCount 가 만 단위로 묶는다 — 폭이 자릿수에 안 딸리게 하는 게
+              핵심이고, 그 함수 주석에 이 예산의 근거를 적어 뒀다. */}
           <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: C.sub, background: C.chip, borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
-            {ratio.days > 1 ? `${ratio.days}일` : countNoun} {ratio.total.toLocaleString("ko-KR")}건
+            {ratio.days > 1 ? `${ratio.days}일` : countNoun} {formatSampleCount(ratio.total)}건
           </span>
         </div>
       ) : (
