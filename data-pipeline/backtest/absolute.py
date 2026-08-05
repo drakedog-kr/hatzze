@@ -9,7 +9,6 @@ import pandas as pd
 
 from engine import kdf, kospi, series, spearman
 from plan4 import apply_anchors, full, lin, wavg
-from improve4 import W_kq
 from improve4b import P_g
 from prodanchor import means as SHORT_MEANS
 
@@ -33,20 +32,21 @@ P["kospi_speed_60d"] = lin(mom, 0.0, 50.0)
 P["kospi_asia_relative_strength"] = lin(series["kospi_asia_relative_strength"]["raw"], -20.0, 20.0)
 P["luxury_consumption_index"] = lin(series["luxury_consumption_index"]["raw"], 42.0, 78.0)
 P.pop("kosdaq_kospi_ratio")
-# kospi_speed_60d 는 검사 2(2026-07-23) 때 **막 만든 지표**라 저장된 값이 없었다. 장기 축
-# W_kq 는 값이 150일 이상 쌓인 지표만 담으므로 이 지표가 아예 빠져 있었고, 그래서 여기서
-# concat 으로 한 칸을 덧붙였다. 그 뒤 파이프라인이 값을 쌓아(2026-08-06 현재 203일) 이제는
-# W_kq 에 이미 들어 있다. 덧붙이면 라벨이 겹쳐 wavg 가 ValueError 로 죽는다.
-# concat 이 아니라 **대입**으로 바꾼다 — 있으면 덮고 없으면 붙으므로 어느 쪽이든 안전하다
-# (prodanchor.py 가 쓰던 방식과 같다). 빼 버리면 안 되는 이유: 이 지표가 다시 W_kq 밖으로
-# 나가면 P 에는 있는데 WL 에 없어 wavg 가 조용히 지표 하나를 빠뜨린다.
+# 장기 축 가중치는 **설정에서 그대로 읽는다.** 예전엔 검사 2 의 ④안 가중치표(W_kq)를 쓰고
+# kospi_speed_60d 만 손으로 2.5 를 덧붙였는데, 그 표는 검사 2 시절 INDICATOR_WEIGHTS 를
+# 베껴 굳힌 것이라 설정이 움직여도 여기는 안 움직였다. 실제로 검사 3(2026-08-01)이 여섯을
+# 옮겼는데(naver 3.5→4.0 · asia 2.0→2.5 · speed 2.5→3.0 · vkospi 1.5→1.0 ·
+# put_call 1.0→0.5 · upbit 2.0→1.0) 이 스크립트만 옛 수로 앵커를 뽑고 있었다.
+# calculate_score.py 가 "가중치를 크게 바꾸면 여기로 다시 확인할 것" 이라고 가리키는 도구라,
+# 운영이 안 쓰는 수를 쓰면 용도 자체가 어긋난다.
 #
-# 값은 손으로 적어 둔 2.5 대신 설정값을 읽는다. 2.5 는 검사 2 시절 INDICATOR_WEIGHTS 를
-# 그대로 베낀 수였지 일부러 다르게 잡은 값이 아니고, 검사 3(2026-08-01)이 3.0 으로 올렸다.
-# 이 스크립트는 calculate_score.py 가 "가중치를 크게 바꾸면 다시 확인할 것" 이라고 가리키는
-# 앵커 점검 도구라, 운영이 안 쓰는 수로 앵커를 뽑으면 목적 자체가 어긋난다.
-WL = W_kq.drop("kosdaq_kospi_ratio")
-WL["kospi_speed_60d"] = W["kospi_speed_60d"]
+# ⚠️ 그래서 이 스크립트의 출력은 더 이상 §9-8 문서(2026-07-23)의 수치와 같지 않다. 그게 맞다 —
+# 그때 이후로 가중치가 실제로 바뀌었다. 검사 2 시절 재현이 필요하면 그 시점 커밋을 볼 것.
+#
+# P 의 키로 만들므로 P 와 WL 이 **항상 같은 집합**이다. wavg 는 w.index 만 도니까, 예전처럼
+# 손으로 한 칸을 붙이는 방식이면 지표가 W_kq 안팎을 드나들 때 라벨이 겹쳐 죽거나(2026-08-06
+# kospi_speed_60d 가 그랬다) 반대로 P 에만 있는 지표를 조용히 빠뜨린다. 이제 둘 다 못 생긴다.
+WL = pd.Series({k: W[k] for k in P})
 
 long_raw = wavg(P, WL)
 prod = (long_raw * WL.sum() + short_contrib) / (WL.sum() + short_w)
