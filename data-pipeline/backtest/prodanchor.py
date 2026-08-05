@@ -9,11 +9,12 @@
 import json
 import sys
 from collections import defaultdict
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, "/Users/hun/hatzze/data-pipeline")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from config.indicator_thresholds import INDICATOR_THRESHOLDS as T  # noqa: E402
 from config.indicator_weights import INDICATOR_WEIGHTS as W  # noqa: E402
 from scripts.calculate_score import compute_progress  # noqa: E402

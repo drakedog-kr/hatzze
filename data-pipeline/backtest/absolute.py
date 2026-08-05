@@ -14,7 +14,9 @@ from improve4b import P_g
 from prodanchor import means as SHORT_MEANS
 
 import sys
-sys.path.insert(0, "/Users/hun/hatzze/data-pipeline")
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from config.indicator_weights import INDICATOR_WEIGHTS as W  # noqa: E402
 
 pd.set_option("display.width", 330)
