@@ -1155,7 +1155,25 @@ function CardMarketActions({ v }: { v: Pick }) {
   const sellN = dt?.sell ?? 0;
   const cbN = dt?.cb ?? 0;
   // 매수/매도 안전장치 중 무엇이 우세했는지 — 종합 점수가 0이어도 방향은 보여준다.
-  const verdict = buyN > sellN ? "매수 우세" : sellN > buyN ? "매도 우세" : "균형";
+  //
+  // 큰 글자의 색은 **이 판정을 따르고, 과열도(v.color)를 쓰지 않는다.** 과열도를 칠하면
+  // "매도 우세"가 빨강으로 떴다 — 한 카드가 두 질문(누가 우세했나 / 얼마나 뜨겁나)에
+  // 답하면서 서로 반대말을 한 것이다. 눈금의 50점 지점이 raw 0.25(= 매수가 매도+CB+2 의
+  // 3분의 1)라, 매수 6·매도 8·CB 6 같은 패닉 국면도 54.5점이라 고온으로 넘어간다.
+  // 저장된 391일을 현 눈금으로 재계산하면 고온 이상 134일 중 68일(51%)이 매수 우세가
+  // 아닌 날이었다.
+  //
+  // 과열도는 셀 상단 라인(진행률 ≥75)이 계속 진다 — 그쪽은 391일 중 57일이 전부 매수
+  // 우세라 판정과 어긋난 적이 없다. 어긋나던 건 ≥50 경계뿐이었다.
+  // ⚠️ 눈금 자체는 그대로다. 히어로 '지표 분포'에서 이 지표는 여전히 고온 칸에 앉으므로,
+  //    카드와 갈리는 게 거슬리면 indicator_thresholds 에 floor 0.25 를 얹는 재보정이
+  //    따로 필요하다(그러면 오늘 값이 54.5 → 9.1 로 내려간다).
+  const dir =
+    buyN > sellN
+      ? { label: "매수 우세", color: C.hot, hint: "달아오른 쪽이 잦았습니다" }
+      : sellN > buyN
+        ? { label: "매도 우세", color: C.neutral, hint: "식는 쪽이 잦았습니다" }
+        : { label: "균형", color: C.ink, hint: "양쪽이 비슷했습니다" };
   // 세 값을 **같은 눈금**에 올린다. 숫자 타일 셋으로 흩어 두면 5·8·6 을 눈이 직접 빼야
   // 하는데, 같은 축의 막대로 두면 "매도가 더 잦았다"가 길이로 바로 증명된다.
   // 색이 방향을 진다 — 매수 안전장치(상승 제동)는 달아오른 쪽이라 고온, 매도 쪽은 식는
@@ -1166,15 +1184,14 @@ function CardMarketActions({ v }: { v: Pick }) {
     { label: "CB", n: cbN, fill: "var(--c-blue-4)", ink: C.label },
   ];
   const maxN = Math.max(1, buyN, sellN, cbN);
-  const verdictHint = buyN > sellN ? "달아오른 쪽이 잦았습니다" : sellN > buyN ? "식는 쪽이 잦았습니다" : "양쪽이 비슷했습니다";
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="speed" name={v.name} badge="최근 한 달" />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
         {/* 한글은 같은 font-size 라도 숫자보다 글리프가 커 보인다 — 다른 카드의 32px 숫자와
             '눈에 보이는 크기'를 맞춘 값이 30 이다. */}
-        <strong style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>{verdict}</strong>
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>{verdictHint}</span>
+        <strong style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-.03em", color: dir.color, lineHeight: 1 }}>{dir.label}</strong>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>{dir.hint}</span>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {rows.map((r) => (
