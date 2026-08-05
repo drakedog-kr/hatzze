@@ -64,7 +64,10 @@ mom = ((kospi / kospi.shift(60) - 1) * 100).dropna()
 P = dict(P_g)
 P["kospi_speed_60d"] = lin(mom, 20.6, 51.3)
 WL = W_kq.copy()
-WL["kospi_speed_60d"] = 2.5
+# 손으로 적어 둔 2.5 는 검사 2 시절 INDICATOR_WEIGHTS 를 베낀 수였다(검사 3 이 3.0 으로
+# 올렸다). 이 WL 은 prod_raw 로 흘러 outer.py 가 그대로 쓰므로 기록용이 아니다 — 설정에서
+# 읽는다. 위의 means 는 이 줄보다 앞에서 끝나므로 absolute.py·refix.py 는 영향받지 않는다.
+WL["kospi_speed_60d"] = W["kospi_speed_60d"]
 long_raw = wavg(P, WL)
 long_w = WL.sum()
 print(f"\n장기 축 가중치 {long_w:.1f} + 단기 {short_w:.1f} = {long_w + short_w:.1f}")
