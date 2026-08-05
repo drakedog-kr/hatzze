@@ -1906,7 +1906,7 @@ function CardTrend({ v, icon }: { v: Pick; icon: string }) {
 // 파이프라인이 한 번 더 돌면 자연히 새 표기로 바뀐다.
 function sentimentRatio(
   details: Record<string, number> | null,
-): { pos: number; neg: number; decided: number; total: number } | null {
+): { pos: number; neg: number; decided: number; total: number; days: number } | null {
   const p = details?.pos_count;
   const n = details?.neg_count;
   if (typeof p !== "number" || typeof n !== "number") return null;
@@ -1918,19 +1918,25 @@ function sentimentRatio(
   // 전체 건수(중립 포함)는 '몇 건을 보고 낸 비율인지' 캡션에 쓴다. 옛 행에 없을 수 있어
   // 없으면 낙관+비관만으로 대신한다.
   const total = typeof details?.total_count === "number" ? details.total_count : decided;
-  return { pos, neg: 100 - pos, decided, total };
+  // 이 건수는 하루치가 아니라 **여러 날 합**이다(파이프라인이 감성 원자를 3일 풀링한다).
+  // 며칠을 합쳤는지는 파이프라인이 pool_days 로 남기므로 3을 박지 말고 그걸 읽는다 —
+  // 풀링 이전 행이나 시계열이 짧아 2일만 합쳐진 날에 "3일"은 거짓이 된다.
+  const days = typeof details?.pool_days === "number" ? details.pool_days : 1;
+  return { pos, neg: 100 - pos, decided, total, days };
 }
 
 function CardSentiment({
   v,
   icon,
-  // 무엇을 센 건수인지는 지표마다 다르다(디시=글, 뉴스=뉴스). "낙관:비관 · N건"처럼
-  // 비율 설명을 반복하는 것보다, 표본이 뭔지 알려주는 쪽이 정보량이 크다.
+  // 무엇을 센 건수인지는 지표마다 다르다(디시=글, 뉴스=뉴스).
+  //
+  // 지금은 **풀링이 없는 행에서만** 쓰인다. 건수가 여러 날 합이면 알약이 낱말 대신 창("3일")을
+  // 적기 때문이다 — 둘 다 넣을 폭이 없다(아래 알약 주석의 실측표). 파이프라인이 감성 원자를
+  // 3일 풀링하므로 실제 화면은 대부분 창 쪽으로 간다.
   //
   // ⚠️ **짧게 유지할 것.** 이 낱말은 아래 알약에 들어가고, 알약은 헤드라인 숫자와 한 줄을
   // 나눠 쓴다(flexWrap). 넘치면 알약이 다음 줄로 내려가면서 그 아래 막대까지 통째로
-  // 밀려서, 옆 카드와 막대 높이가 어긋난다. 4열(카드 247px) 기준 실측 예산은 아래
-  // 알약 주석에 적어 뒀다.
+  // 밀려서, 옆 카드와 막대 높이가 어긋난다.
   countNoun,
 }: {
   v: Pick;
@@ -1968,20 +1974,29 @@ function CardSentiment({
             </strong>
             <span style={{ fontSize: 12.5, fontWeight: 600, color: C.sub2 }}>{sentimentTone(ratio.pos).label}</span>
           </div>
-          {/* 표본 크기 알약. "분석"을 뺀 건 말맛이 아니라 **폭** 때문이다 — 이 알약은 왼쪽
+          {/* 표본 크기 알약. 낱말을 줄인 건 말맛이 아니라 **폭** 때문이다 — 이 알약은 왼쪽
               헤드라인(숫자 + 톤 라벨)과 한 줄을 나눠 쓰는데, 넘치면 다음 줄로 내려가면서
               아래 막대까지 밀어 옆 카드와 높이가 어긋난다.
 
-              4열(카드 247px) 기준 실측. 왼쪽 묶음은 톤 라벨이 "중립"이냐 "낙관 우세"냐로
-              120 ↔ 144 를 오가므로, **넉 자 라벨(144)을 최악으로 잡고 예산 91px**로 본다.
-                게시글 8,961건 분석  118  ✗ (27 초과 — 실제로 이것 때문에 줄이 밀렸다)
-                글 8,961건 분석       98  ✗ (7 초과. 낱말만 줄여선 모자란다)
-                글 8,961건            76  ✓ 여유 15
-                뉴스 3,717건          86  ✓ 여유 5
-              ⚠️ 뉴스 건수가 다섯 자리가 되면 93 이라 이 카드만 다시 내려앉는다
-              (디시는 여섯 자리까지 버틴다). 그때는 낱말이 아니라 이 줄의 구조를 고쳐야 한다. */}
+              여기 건수는 하루치가 아니라 **N일 합**이라 창을 밝힌다(카더라 테마 막대와 같은
+              규칙 — 창이 다른 수치를 라벨 없이 나란히 두지 않는다). 창을 적을 자리는 세는
+              낱말(글·뉴스) 자리를 뺏어서 냈다. 아래 실측대로 **둘 다 넣을 폭이 없고**, 무엇을
+              센 건지는 카드 이름과 아이콘에 남지만 창은 어디에도 안 남기 때문이다.
+
+              4열(카드 247px, 사다리 전 구간의 최솟값)에서 잰 '줄바꿈 없이 버티는 최소 행 폭'.
+              왼쪽 묶음은 톤 라벨이 "중립"이냐 "비관 우세"냐로 120 ↔ 144 를 오가므로 **넉 자
+              라벨을 최악**으로 잡는다.
+                글 8,961건            233  ✓ 여유 14  (옛 표기)
+                3일 8,961건           240  ✓ 여유 7   ← 지금
+                3일간 8,961건         250  ✗
+                3일 글 8,961건        253  ✗ (낱말과 창을 둘 다 넣으면 넘친다)
+                글 8,961건 · 3일      259  ✗
+                최근 3일 8,961건      263  ✗
+              ⚠️ 뉴스는 원래도 아슬아슬했다(뉴스 4,576건 = 243, 여유 4). 창 표기로 240 이 돼
+              3px 벌었지만, **다섯 자리가 되면 248 로 여전히 넘친다**(옛 표기는 250). 그때는
+              낱말이 아니라 이 줄의 구조를 고쳐야 한다. */}
           <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: C.sub, background: C.chip, borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
-            {countNoun} {ratio.total.toLocaleString("ko-KR")}건
+            {ratio.days > 1 ? `${ratio.days}일` : countNoun} {ratio.total.toLocaleString("ko-KR")}건
           </span>
         </div>
       ) : (
