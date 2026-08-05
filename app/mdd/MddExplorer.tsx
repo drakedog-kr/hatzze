@@ -1579,11 +1579,17 @@ function RiskProfile({ r, periodLabel }: { r: RiskProfileData; periodLabel: stri
              수익은 머리 수치와 같은 소수 한 자리로 적는다. 반올림해 "23%"로 적으면 두 줄
              위 "22.9%"와 어긋나 같은 상자에서 숫자가 둘이 된다.
 
+             부호(−/+)를 붙인다. 바로 위 머리 수치는 낱말('수익'·'평균 낙폭')이 방향을
+             말하니 부호를 뺐지만, 여기는 두 수치가 한 문장에 붙어 흐르므로 눈이 훑을 때
+             방향을 잡아 줄 표시가 따로 필요하다. '낙폭'·'벌었습니다'와 뜻이 겹치는 건
+             알고 넣은 것이다. 마이너스는 house 글리프인 U+2212(−)를 쓴다 — fmtPct 와
+             막대 라벨이 그것이고, ASCII 하이픈을 섞으면 폭·높이가 갈린다.
+
              ⚠️ 해마다의 승패는 이제 문장이 아니라 **막대와 전체보기**에만 있다. 이 각주를
              다시 손댈 때 그 둘을 같이 지우면 연도별 대비가 화면에서 통째로 사라진다. */
           foot: summary(
             r.annualReturn >= 0 && avgYearMdd < 0
-              ? `최근 ${yrs}년 해마다 ${Math.abs(Math.round(avgYearMdd))}% 낙폭을 견디고 연 ${r.annualReturn.toFixed(1)}%를 벌었습니다`
+              ? `최근 ${yrs}년 해마다 −${Math.abs(Math.round(avgYearMdd))}% 낙폭을 견디고 연 +${r.annualReturn.toFixed(1)}%를 벌었습니다`
               : `최근 ${yrs}년은 연평균(복리) ${Math.abs(r.annualReturn).toFixed(1)}% 손실이라 견딘 위험을 보상하지 못했습니다`,
           ),
           /* 막대는 자리 때문에 최근 RISK_ROWS 줄뿐인데 제목·요약은 조회 기간 전체를 말한다.
