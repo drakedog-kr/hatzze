@@ -417,7 +417,9 @@ function Foot({ text, color = C.sub }: { text: string; color?: string }) {
           /* 500 → 400. 카더라·MDD 의 같은 자리(시트 각주)가 400 이다. 세 페이지에서
              한 문장만 굵기가 달라 보이면 그 자리가 더 중요한 말처럼 읽힌다. */
           fontWeight: 400,
-          borderTop: `1px solid ${C.divider}`,
+          /* 윗선도 같은 이유로 카더라를 따른다 — 거긴 처음부터 --c-sheet-row 였는데
+             이쪽만 한 톤 옅은 --c-divider 라 같은 각주선이 화면마다 다르게 보였다. */
+          borderTop: `1px solid ${C.sheetRow}`,
           lineHeight: 1.65,
           textWrap: "pretty",
         }}
@@ -781,7 +783,7 @@ function Hero({
             alignItems: "center",
             gap: 7,
             paddingTop: 10,
-            borderTop: `1px solid ${C.divider}`,
+            borderTop: `1px solid ${C.sheetRow}`,
           }}
         >
           <Icon name="schedule" style={{ fontSize: 14, color: C.muted }} />
@@ -865,7 +867,7 @@ function Hero({
             lineHeight: 1.6,
             color: C.sub,
             paddingTop: 10,
-            borderTop: `1px solid ${C.divider}`,
+            borderTop: `1px solid ${C.sheetRow}`,
             textWrap: "pretty",
           }}
         >
@@ -930,7 +932,7 @@ function Hero({
           style={{
             margin: "auto 0 0",
             paddingTop: 10,
-            borderTop: `1px solid ${C.divider}`,
+            borderTop: `1px solid ${C.sheetRow}`,
             fontSize: 12,
             lineHeight: 1.6,
             color: C.sub,

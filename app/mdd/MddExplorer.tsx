@@ -1052,7 +1052,7 @@ function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel: string
           )}
         </div>
         {!atHigh && <DrawdownGauge current={a.currentDd} mdd={a.mdd} periodLabel={periodLabel} />}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 10, marginTop: "auto", paddingTop: 14, borderTop: `1px solid ${C.divider}` }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 10, marginTop: "auto", paddingTop: 14, borderTop: `1px solid ${C.sheetRow}` }}>
           {/* 보조 줄에 조회 기간 이름("최근 10년")은 안 붙인다 — '전체' 조회에서
               "상장 이후·약 27년 6,646일 중"이 되어 칸을 넘겼다(실측 121 > 115px).
               옆 칸 '기간 최저점'도 기간을 안 적고, 기간은 바로 위 토글이 말한다. */}
@@ -1092,7 +1092,7 @@ function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel: string
 /** 히어로 1번 셀의 전고점·저점 두 줄. 위 칸부터 선을 그어 값이 표처럼 읽히게 한다. */
 function PriceRow({ label, date, value }: { label: string; date: string; value: string }) {
   return (
-    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, padding: "10px 0", borderTop: `1px solid ${C.divider}` }}>
+    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, padding: "10px 0", borderTop: `1px solid ${C.sheetRow}` }}>
       <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub, minWidth: 0 }}>
         {label} <span style={{ fontFamily: MONO, fontSize: 11, color: C.muted }}>{date}</span>
       </span>
@@ -1770,7 +1770,7 @@ function RiskProfile({ r, periodLabel }: { r: RiskProfileData; periodLabel: stri
                 relative 가 여기 있어야 한다(패널에 주면 요약 줄 위로 안 붙는다). */}
             {/* 요약은 폭을 가리지 않고 왼쪽이다(.mdd-tile-foot). '전체보기'가 있으면
                 그것만 오른쪽 끝으로 밀린다. */}
-            <div className="mdd-tile-foot" style={{ position: "relative", marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.divider}` }}>
+            <div className="mdd-tile-foot" style={{ position: "relative", marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.sheetRow}` }}>
               {/* foot 은 <p> 라 <span> 으로 감싸면 안 된다(span 은 phrasing content 만 받는다). */}
               <div style={{ minWidth: 0 }}>{t.body.foot}</div>
               {t.body.more}
@@ -2093,7 +2093,7 @@ function Character({ ch, currentDd }: { ch: DrawdownCharacter | null; currentDd:
           {perDay !== null && <>, 하루 평균 {fmtPct(perDay)}</>}입니다.
           {compare && ` ${compare}`}
         </span>
-        <div style={{ marginTop: "auto", display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 10, paddingTop: 14, borderTop: `1px solid ${C.divider}` }}>
+        <div style={{ marginTop: "auto", display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 10, paddingTop: 14, borderTop: `1px solid ${C.sheetRow}` }}>
           <StatCell label="하락 기간" value={fmtDayCount(ch.currentTroughDays)} sub="고점에서 저점까지" />
           <StatCell
             label="하락일 비중"
