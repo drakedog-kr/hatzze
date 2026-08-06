@@ -833,11 +833,15 @@ function trendingWindowKey(windowDays: TrendingWindow): string | null {
  * ⭐ **"11시간 전"은 여기서 안 만든다.** postedAt(절대 시각)을 그대로 넘기고 화면이
  * 렌더할 때 계산한다. 그래서 저장 목록이 그대로여도 나이는 계속 흘러간다.
  */
-async function storedTrending(key: string, limit: number): Promise<TrendingMessage[] | null> {
+async function storedTrending(
+  key: string,
+  limit: number,
+  expectStart: string | null,
+): Promise<TrendingMessage[] | null> {
   const db = getSupabaseAdmin();
   const { data, error } = await db
     .from("telegram_trending_message")
-    .select("rank,channel_handle,message_id,text,views,forwards,replies,posted_at,stocks")
+    .select("rank,channel_handle,message_id,text,views,forwards,replies,posted_at,stocks,window_start")
     .eq("window_key", key)
     .order("rank")
     .limit(limit);
@@ -846,6 +850,22 @@ async function storedTrending(key: string, limit: number): Promise<TrendingMessa
       `[트렌딩] 저장 목록이 없어 직접 뽑습니다(느린 길) 창=${key}: ${error?.message ?? "행 없음"}`,
     );
     return null;
+  }
+  /* ⚠️ **'오늘' 창만 시작점을 대조한다.** 파이프라인이 하루 거른 날, 저장된 '오늘'은
+     어제 목록인데 탭에는 '오늘'이라고 적힌다. 즉석 경로였다면 그날은 빈 카드가 됐을
+     자리다 — 빈 것보다 **어제 것을 오늘이라고 하는 쪽이 나쁘다.** 그래서 시작점이
+     다르면 저장값을 버리고 직접 뽑는다(2026-07-26~28 에 실제로 이틀 멈춘 적이 있다).
+
+     7일·30일 창은 대조하지 않는다. 그쪽 시작점은 굴러가는 시각이라 정확히 같을 수가
+     없고, 며칠 어긋나도 7일·30일 눈금에서는 같은 목록이 나온다(재료가 그대로다). */
+  if (expectStart != null) {
+    const got = new Date(data[0].window_start as string).getTime();
+    if (got !== new Date(expectStart).getTime()) {
+      console.warn(
+        `[트렌딩] 저장된 '오늘' 창이 어긋나 직접 뽑습니다(느린 길): 저장 ${data[0].window_start} vs 기대 ${expectStart}`,
+      );
+      return null;
+    }
   }
   const { titleOf, photoUrlOf } = await channelMeta();
   return data.map((r) => {
@@ -878,7 +898,7 @@ export async function getTrendingMessages(
 ): Promise<TrendingMessage[]> {
   const key = trendingWindowKey(windowDays);
   if (key) {
-    const stored = await storedTrending(key, limit);
+    const stored = await storedTrending(key, limit, key === "today" ? trendingTodayStartISO() : null);
     if (stored) return stored;
   }
 
