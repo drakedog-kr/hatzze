@@ -23,7 +23,13 @@ export const C = {
   soft: "var(--c-soft)", // 카드 안 타일·회색 박스
   chip: "var(--c-chip)", // 회색 칩 배경
   line: "var(--c-line)",
-  divider: "var(--c-divider)",
+  /* 카드 **안에서** 내용과 각주(또는 행과 행)를 가르는 줄. 칸을 가르는 격자선
+     (--c-sheet-line)보다 한 톤 옅어야 둘이 구분된다 — 근거는 globals.css 주석.
+     세 화면이 같은 자리에 같은 값을 쓴다(카더라가 먼저 이 토큰이었다).
+     (여기 있던 divider 는 소비자가 0이 됐다. --c-divider 자체는 살아 있다 —
+      알파라서 카드가 아닌 면 위에서도 사는 값이라, 셸 사이드바와 테마 팝오버
+      각주가 raw var 로 쓴다. 카드 위 자리에는 쓰지 말 것.) */
+  sheetRow: "var(--c-sheet-row)",
   track: "var(--c-track)", // 막대의 빈 '트랙'(배경)
   // 막대의 '채움' — 강조색을 안 쓰는 비교군용. track 을 채움에 돌려쓰면 안 된다
   // (트랙과 같은 색이라 막대가 사라진다). 이유는 globals.css의 --c-bar 주석 참고.

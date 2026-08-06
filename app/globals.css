@@ -594,9 +594,13 @@ body {
   gap: 16px;
 }
 /* 셀 사이 세로 헤어라인. 시트와 달리 셀이 셋뿐이고 자리가 고정이라, inset 그림자 대신
-   왼쪽 테두리로 둔다(첫 셀만 빼면 되니 규칙이 더 짧다). */
+   왼쪽 테두리로 둔다(첫 셀만 빼면 되니 규칙이 더 짧다).
+
+   색은 카더라 히어로(.hz-kd-hero-q 의 inset)와 같은 --c-sheet-line 이다. 예전엔 한 톤
+   옅은 --c-divider 였는데, 그러면 같은 자리의 같은 선이 두 화면에서 다른 세기로 보였다
+   (흰 카드 위 명암비 1.10 대 1.18 — 브리핑 쪽은 셀이 갈린다는 게 거의 안 읽혔다). */
 .hz-hero-divide {
-  border-left: 1px solid var(--c-divider);
+  border-left: 1px solid var(--c-sheet-line);
 }
 /* ⚠️ span 을 주지 않는다. 세 칸짜리 격자의 **셋째 칸이 이미 2fr** 이라 브리핑은 그 한 칸에
    그대로 앉으면 된다. span 2 를 얹으면 1+1+2 = 네 칸을 요구하는 셈이라 세 칸 격자에 못
@@ -817,9 +821,11 @@ body {
 @media (max-width: 1399px) {
   .hz-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* 히어로도 같이 2칸으로. 브리핑만 아랫줄에서 폭을 다 쓴다 — 이때야 span 이 필요하다.
-     아랫줄 첫 셀이라 왼쪽 선이 허공에 뜨므로 윗선으로 바꾼다. */
+     아랫줄 첫 셀이라 왼쪽 선이 허공에 뜨므로 윗선으로 바꾼다.
+     세로선과 달리 **가로 전용 토큰**을 쓴다 — 폰에서 반 칸 진해져야 하는 선이라서다
+     (카더라의 접힘선 .hz-kd-hero-q @1200 과 같다. 이유는 --c-sep-h 주석). */
   .hz-hero-panel { grid-template-columns: 1fr 1fr; }
-  .hz-hero-wide { grid-column: span 2; border-left: 0; border-top: 1px solid var(--c-divider); }
+  .hz-hero-wide { grid-column: span 2; border-left: 0; border-top: 1px solid var(--c-sep-h); }
   /* 2칸이 되면 분포 셀이 **판의 오른쪽 끝**이라 오른쪽으로 열 자리가 없다. 왼쪽(햇쩨
      지수 셀 위)으로 튼다 — 판 안이라 잘리지 않는다. 줄과 겹치는 18px 은 위와 같다. */
   .hz-dist-pop {
@@ -834,7 +840,7 @@ body {
   .hz-cards { grid-template-columns: minmax(0, 1fr); }
   .hz-hero-panel { grid-template-columns: 1fr; }
   .hz-hero-wide { grid-column: span 1; }
-  .hz-hero-divide { border-left: 0; border-top: 1px solid var(--c-divider); }
+  .hz-hero-divide { border-left: 0; border-top: 1px solid var(--c-sep-h); }
   /* 1칸이면 좌우 어느 쪽에도 자리가 없다. 셀 위에 그대로 덮는다 — 목록을 보는 동안
      가려지는 건 방금 누른 그 넉 줄뿐이라 잃는 게 없다. */
   .hz-dist-pop {
