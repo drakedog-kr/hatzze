@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 
 import {
   getChannelRanking,
@@ -321,6 +322,82 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
   );
 }
 
+/**
+ * 트렌딩 메시지 — **이 시트 한 장만 나머지와 떼어 놓는다.**
+ *
+ * 페이지의 열두 갈래는 원래 `Promise.all` 하나로 묶여 있어서, 제일 늦는 갈래 하나가
+ * 판 전체를 붙잡았다. 그 제일 늦는 갈래가 여기다 — 세 창(오늘·7일·30일)이 각각
+ * `telegram_messages` 를 `views` 순으로 정렬해 상위 200건을 받는데, **그 열엔 인덱스가
+ * 없어서**(migration_026 이 붙이는 것이 그것이다) 창이 넓을수록 표를 통째로 훑는다.
+ * 2026-08-06 실측으로 이 한 쿼리가 같은 창·같은 200행인데 정렬 키만 인덱스 있는 것으로
+ * 바꾸면 중앙값 244ms → 112ms 였고, 무엇보다 **최대치가 6,750ms → 129ms** 였다.
+ * 꼬리가 길어서 평균이 아니라 최악이 화면을 정한다.
+ *
+ * 인덱스가 붙으면 이 갈래도 빨라지지만, 떼어 놓는 것은 그것과 별개로 남길 값이 있다 —
+ * 갈래 하나가 느려질 때 **그 시트 한 장만 늦게 차고 나머지는 제때 뜬다.** 열두 갈래를
+ * 한 덩어리로 묶어 두면 앞으로 어느 하나가 느려져도 매번 판 전체가 멈춘다.
+ *
+ * 왜 하필 여기만인가: 히어로의 굵은 낱말(summaryTerms)이 급부상·종목 리포트·테마·이슈
+ * 키워드 넷을 한꺼번에 봐야 정해진다. 그 넷을 떼면 **맨 위가 제일 늦게 차는** 이상한
+ * 순서가 된다. 트렌딩만 그 얽힘이 없다.
+ */
+async function TrendingSection() {
+  // 기간 탭이 즉시 전환되도록 세 창을 한 번에 받아둔다(병렬이라 지연은 한 번 분).
+  // 6건만 보여주고 '더 보기'로 10건씩 늘리므로, 세 번 펼칠 만큼(36) 미리 받아둔다.
+  const [trendingToday, trending, trendingMonth] = await Promise.all([
+    getTrendingMessages("today", 36),
+    getTrendingMessages(7, 36),
+    getTrendingMessages(30, 36),
+  ]);
+  return (
+    <section className="hz-sheet">
+      {/* 머리(SectionHead)는 TrendingTabs 안에서 그린다 — 기간 탭이 머리 우측에
+          들어가고 목록은 그 아래라, 둘을 한 컴포넌트가 감싸야 상태를 공유한다. */}
+      <TrendingTabs
+        icon="campaign"
+        title="트렌딩 메시지"
+        desc="조회·공유로 가장 널리 퍼진 메시지"
+        panels={[
+          { key: "today", label: "오늘", count: trendingToday.length, node: <TrendingList items={trendingToday} /> },
+          { key: "w1", label: "최근 7일", count: trending.length, node: <TrendingList items={trending} /> },
+          { key: "m1", label: "최근 30일", count: trendingMonth.length, node: <TrendingList items={trendingMonth} /> },
+        ]}
+      />
+    </section>
+  );
+}
+
+/**
+ * 위 시트가 차기 전의 자리표시자. 골격은 loading.tsx 의 시트와 같게 두되 **높이는
+ * 실제 시트에 맞춘다**(머리 74 + 본문 745 + 바닥 39 = 858, 2026-08-06 실측).
+ *
+ * loading.tsx 는 이 칸을 300 으로 그려도 됐다 — 그 화면은 결과가 오면 통째로 교체되지
+ * 시트별로 하나씩 차지 않기 때문이다. 여기는 반대로 **이 한 장만 나중에 찬다.**
+ * 낮게 잡으면 트렌딩이 도착하는 순간 아래 채널 시트가 446px 밀린다.
+ */
+/* 실측으로 맞춘 값이다. 계산으로 745−40=705 를 넣었더니 시트가 846 이라 14px 짧았다 —
+   자리표시자 머리(60)가 진짜 머리(74)보다 낮아서다. 그 차이를 본문에 얹었다. */
+const TRENDING_SKELETON_BODY = 719;
+
+function TrendingSkeleton() {
+  const block = (h: number, w: number | string = "100%", r = 8) => (
+    <div className="hz-shimmer" style={{ height: h, width: w, borderRadius: r, background: C.bg }} />
+  );
+  return (
+    <section className="hz-sheet" aria-hidden>
+      <div className="hz-sheet-head">
+        {block(18, 18, 5)}
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 5 }}>
+          {block(13, 116, 5)}
+          {block(11, 196, 5)}
+        </div>
+      </div>
+      <div style={{ padding: "20px 22px" }}>{block(TRENDING_SKELETON_BODY)}</div>
+      <div style={{ height: 39 }} />
+    </section>
+  );
+}
+
 export default async function KaderaPage() {
   // 종목 리포트는 "어느 종목인지"를 먼저 알아야 해서 getTopStocksWithTrend 에 매여 있다.
   // 그렇다고 이걸 await 한 **뒤에** 나머지를 시작하면, 나머지와 아무 상관 없는 그 왕복이
@@ -335,9 +412,6 @@ export default async function KaderaPage() {
   const [
     summary,
     surging,
-    trendingToday,
-    trending,
-    trendingMonth,
     channels,
     rising,
     themes,
@@ -350,11 +424,6 @@ export default async function KaderaPage() {
       getTelegramSummary(),
       // 3×2 셀 격자라 여섯이어야 줄이 찬다(예전 카드 배치에선 다섯이었다).
       getSurgingStocks(6),
-      // 기간 탭이 즉시 전환되도록 세 창을 한 번에 받아둔다(병렬이라 지연은 한 번 분).
-      // 6건만 보여주고 '더 보기'로 10건씩 늘리므로, 세 번 펼칠 만큼(36) 미리 받아둔다.
-      getTrendingMessages("today", 36),
-      getTrendingMessages(7, 36),
-      getTrendingMessages(30, 36),
       getChannelRanking(),
       getRisingChannels(10),
       getThemeRotation(10),
@@ -1129,20 +1198,10 @@ export default async function KaderaPage() {
       </section>
 
       {/* ── 트렌딩 메시지 ────────────────────────────────────────────── */}
-      <section className="hz-sheet">
-        {/* 머리(SectionHead)는 TrendingTabs 안에서 그린다 — 기간 탭이 머리 우측에
-            들어가고 목록은 그 아래라, 둘을 한 컴포넌트가 감싸야 상태를 공유한다. */}
-        <TrendingTabs
-          icon="campaign"
-          title="트렌딩 메시지"
-          desc="조회·공유로 가장 널리 퍼진 메시지"
-          panels={[
-            { key: "today", label: "오늘", count: trendingToday.length, node: <TrendingList items={trendingToday} /> },
-            { key: "w1", label: "최근 7일", count: trending.length, node: <TrendingList items={trending} /> },
-            { key: "m1", label: "최근 30일", count: trendingMonth.length, node: <TrendingList items={trendingMonth} /> },
-          ]}
-        />
-      </section>
+      {/* 이 한 장만 Suspense 로 떼어 놨다. 이유는 TrendingSection 주석에. */}
+      <Suspense fallback={<TrendingSkeleton />}>
+        <TrendingSection />
+      </Suspense>
 
       <SectionCaps label="채널" count={2} />
 
