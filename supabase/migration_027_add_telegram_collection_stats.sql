@@ -35,9 +35,18 @@
 --
 -- Supabase SQL Editor에서 실행하세요.
 
+-- 히어로 '모니터링 현황' 카드의 **네 줄이 전부** 여기 들어간다. 넷을 한 행에 두는 이유는
+-- 한 카드가 한 번에 읽히게 하려는 것도 있지만, 더 중요한 건 **넷이 같은 순간을 말하게
+-- 하려는 것**이다. 지금은 셋은 파이프라인 시각 기준이고 messages_7d 만 요청 시각
+-- 기준이라, 나란히 붙은 두 '7일'(활성 채널 7일 · 총 메시지 7일)이 서로 다른 시점을
+-- 말하고 있었다.
 create table if not exists public.telegram_collection_stats (
   id smallint primary key default 1 check (id = 1),
+  channel_count integer not null,
+  total_subscribers bigint not null,
+  active_channels_7d integer not null,
   messages_7d integer not null,
+  total_mentions integer not null,
   window_start timestamptz not null,
   computed_for date not null,
   updated_at timestamptz not null default now()
@@ -45,8 +54,14 @@ create table if not exists public.telegram_collection_stats (
 
 comment on table public.telegram_collection_stats is
   '수집량 집계 한 벌. 렌더마다 세지 않도록 파이프라인이 미리 계산해 둔다(실행마다 덮어씀)';
+comment on column public.telegram_collection_stats.channel_count is
+  '실제로 수집 중인 채널 수. is_active 이면서 channel_id·access_hash 가 둘 다 있는 것만 — 목록 크기가 아니다(fetch_telegram.py 가 여는 기준과 같다)';
+comment on column public.telegram_collection_stats.active_channels_7d is
+  '그중 최근 7일에 글을 올린 채널 수(weekly_posts > 0)';
 comment on column public.telegram_collection_stats.messages_7d is
   'window_start 이후 telegram_messages 행 수. 채널로 안 좁힌다(끊긴 채널의 옛 글 포함)';
+comment on column public.telegram_collection_stats.total_mentions is
+  'telegram_message_stocks 전체 행 수(누적 종목 언급)';
 comment on column public.telegram_collection_stats.window_start is
   '센 창의 시작 시각(= 실행 시각 − 7일). 화면이 이 값을 근거로 창을 설명할 수 있게 남긴다';
 

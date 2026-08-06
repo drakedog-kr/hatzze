@@ -253,49 +253,27 @@ export type TelegramSummary = {
  * 맡는다(data-pipeline/scripts/check_telegram_coverage.py).
  */
 /**
- * 최근 7일 메시지 수 — **파이프라인이 세어 둔 값을 읽는다**(마이그레이션 027).
+ * 최근 7일 메시지 수를 **직접 센다.** 저장값이 없을 때만 불린다(storedCollectionStats 참고).
  *
- * 예전엔 렌더마다 `count(*) … where posted_at >= now() - 7일` 을 돌렸다. 창 안이
- * 4.9만 행이라 표를 훑는데, 버퍼가 식어 있으면 **6,946ms**였다(2026-08-07 콜드 트레이스
- * 실측. 같은 질의가 웜에서는 236ms라 20~30배로 벌어진다).
+ * 창 안이 4.9만 행이라 표를 훑는다. 버퍼가 식어 있으면 이 한 줄이 **6,946ms** 였다
+ * (2026-08-07 콜드 트레이스 실측. 같은 질의가 웜에서는 236ms라 20~30배로 벌어진다).
+ * 이 경로가 도는 것 자체가 비정상이고, 그래서 호출자가 경고를 남긴다.
  *
- * telegram_messages 는 파이프라인이 돌 때만 바뀐다. 그래서 실행과 실행 사이에 이 수는
- * 얼어붙은 입력에 대한 상수고, 매 방문이 같은 답을 다시 세고 있었다. 계산을 옮긴
- * 것이지 캐싱이 아니다 — '얼마나 낡아도 되나'를 거래하지 않는다.
+ * **층이 둘이고 둘 다 PR #327 이 깔아 둔 것이다.** 순서를 바꾸지 말 것.
  *
- * ⭐ 오히려 옆줄과 맞아진다. 바로 옆 '활성 채널 7일'은 파이프라인이 실행 시각 기준으로
- * 세어 둔 값(weekly_posts)인데 이 줄만 요청 시각 기준이라, 실행 사이에 창이 미끄러지며
- * 두 숫자가 다른 시점을 말하고 있었다. 이제 같은 실행·같은 창에서 나온다.
- *
- * **층이 셋이고, 앞의 두 층은 PR #327 이 깔아 둔 것이다.** 순서를 바꾸지 말 것.
- *
- *   1. 저장값(이 PR) — 왕복 1회, 콜드 86ms 급. 정상 경로.
- *   2. 직접 세기 + 재시도 — 저장값이 없을 때. 마이그레이션 전이거나 파이프라인이 아직
- *      한 번도 안 돈 상태다. **되돌아갔다는 사실을 로그에 남긴다** — 안 남기면
- *      파이프라인이 조용히 이 표를 안 채우게 됐을 때 느린 길로 영원히 돌아가 있어도
- *      아무도 모른다.
- *   3. weekly_posts 합 — 세기까지 실패했을 때. 2026-08-06 오픈일에 이 count 가 실패해
+ *   1. 직접 세기 + 재시도.
+ *   2. weekly_posts 합 — 세기까지 실패했을 때. 2026-08-06 오픈일에 이 count 가 실패해
  *      `?? 0` 이 그대로 "총 메시지 0개"를 찍은 적이 있다(그때 DB 에는 42,468건이 있었다).
  *      호출자가 이미 받아 둔 행이라 추가 왕복이 없고, 수집 채널만 세는 정의 차이가
  *      있지만 실측 오차가 1.2% 였다(2026-08-06: 합 42,991 vs 라이브 42,468).
  *
- * 3층을 2층 앞으로 올리지 않는 이유: 1.2%라도 틀린 값을 정상 경로로 삼을 이유가 없다.
+ * 2층을 1층 앞으로 올리지 않는 이유: 1.2%라도 틀린 값을 정상 경로로 삼을 이유가 없다.
  * 어디까지나 "0을 찍느니"의 자리다.
  */
 async function messages7dCount(
   db: ReturnType<typeof getSupabaseAdmin>,
   weekly: { weekly_posts: number | null }[],
 ): Promise<number> {
-  const { data, error } = await db
-    .from("telegram_collection_stats")
-    .select("messages_7d")
-    .limit(1)
-    .maybeSingle();
-  if (!error && data?.messages_7d != null) return data.messages_7d as number;
-
-  console.warn(
-    `[getTelegramSummary] 저장된 수집량이 없어 직접 셉니다(느린 길): ${error?.message ?? "행 없음"}`,
-  );
   // 행을 세면 PostgREST 기본 1000행 상한에 걸려 항상 1,000이 된다 — count 쿼리로 정확히.
   //
   // 이 줄만 채널로 안 좁힌다. 세는 단위가 채널이 아니라 **창 안의 메시지**이고, 카드
@@ -311,9 +289,72 @@ async function messages7dCount(
   return 0;
 }
 
+/** 히어로 '모니터링 현황' 네 줄 — 파이프라인이 세어 둔 한 행(마이그레이션 027). */
+type StoredCollectionStats = Pick<
+  TelegramSummary,
+  "channelCount" | "totalSubscribers" | "activeChannels" | "messages7d" | "totalMentions"
+>;
+
+/**
+ * 저장된 수집량 한 행을 읽는다. 없으면 null → 호출자가 옛 방식으로 센다.
+ *
+ * 넷을 **한 행에** 둔 이유가 속도만은 아니다. 예전엔 셋(모니터링 채널·총 구독자·활성
+ * 채널)이 파이프라인 시각 기준이고 '총 메시지 7일'만 요청 시각 기준이라, 나란히 붙은
+ * 두 '7일'이 서로 다른 시점을 말했다. 한 행에서 오면 그 어긋남이 구조적으로 사라진다.
+ */
+async function storedCollectionStats(
+  db: ReturnType<typeof getSupabaseAdmin>,
+): Promise<StoredCollectionStats | null> {
+  const { data, error } = await db
+    .from("telegram_collection_stats")
+    .select("channel_count,total_subscribers,active_channels_7d,messages_7d,total_mentions")
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) {
+    console.warn(
+      `[getTelegramSummary] 저장된 수집량이 없어 직접 셉니다(느린 길): ${error?.message ?? "행 없음"}`,
+    );
+    return null;
+  }
+  return {
+    channelCount: data.channel_count as number,
+    totalSubscribers: data.total_subscribers as number,
+    activeChannels: data.active_channels_7d as number,
+    messages7d: data.messages_7d as number,
+    totalMentions: data.total_mentions as number,
+  };
+}
+
+/** 마지막 갱신 시각 — sync가 채널을 동기화한 시점이 파이프라인 실행 시각과 같다.
+    이 한 줄만은 저장할 수 없다(저장 시각 자체를 묻는 값이라 늘 원본을 봐야 한다). */
+async function lastSyncedAt(db: ReturnType<typeof getSupabaseAdmin>): Promise<string | null> {
+  const { data } = await db
+    .from("telegram_channels")
+    .select("synced_at")
+    .not("synced_at", "is", null)
+    .order("synced_at", { ascending: false })
+    .limit(1);
+  return (data?.[0]?.synced_at as string | undefined) ?? null;
+}
+
+/**
+ * 상단 요약 스탯.
+ *
+ * **빠른 길은 왕복 2회다** — 저장된 한 행 + 마지막 갱신 시각. 저장값이 없을 때만 아래
+ * 옛 경로로 내려간다(왕복 6회, 콜드 8,795ms 중 이 사슬이 벽시계를 정하고 있었다).
+ * 두 조회는 서로 의존하지 않으므로 나란히 띄운다.
+ */
 export async function getTelegramSummary(): Promise<TelegramSummary> {
   const db = getSupabaseAdmin();
+  const [stored, lastUpdated] = await Promise.all([storedCollectionStats(db), lastSyncedAt(db)]);
+  if (stored) return { ...stored, lastUpdated };
+  return { ...(await computeSummaryLive(db)), lastUpdated };
+}
 
+/** 옛 경로 — 저장값이 없을 때만 돈다. 아래 주석은 그 시절 판단을 그대로 둔 것이다. */
+async function computeSummaryLive(
+  db: ReturnType<typeof getSupabaseAdmin>,
+): Promise<StoredCollectionStats> {
   // 317행이라 아직 1,000행 캡에 안 닿지만, 여기서 잘리면 잘린 채널이 '수집 안 됨'으로
   // 보여 이 카드의 세 줄이 함께 낮아진다 — 조용히 틀리는 쪽이라 페이징해 읽는다.
   const chans = await fetchAllRows<{ handle: string; subscriber_count: number | null; channel_id: number | null; access_hash: number | null }>(
@@ -361,22 +402,12 @@ export async function getTelegramSummary(): Promise<TelegramSummary> {
   ).length;
   const messages7d = await messages7dCount(db, weekly ?? []);
 
-  // 마지막 갱신 시각 — sync가 채널을 동기화한 시점이 파이프라인 실행 시각과 같다.
-  const { data: synced } = await db
-    .from("telegram_channels")
-    .select("synced_at")
-    .not("synced_at", "is", null)
-    .order("synced_at", { ascending: false })
-    .limit(1);
-  const lastUpdated = synced?.[0]?.synced_at ?? null;
-
   return {
     channelCount,
     totalSubscribers,
     totalMentions: totalMentions ?? 0,
     activeChannels,
     messages7d,
-    lastUpdated,
   };
 }
 
@@ -907,7 +938,43 @@ export type StockReport = {
  * 페이징은 여전히 필수다 — 인기 종목은 7일치만도 1,000행을 넘는다(삼성전자 2,242행).
  * 안 하면 채널 수가 조용히 적게 나온다.
  */
+/**
+ * 파이프라인이 세어 둔 '관심의 폭' 한 벌(마이그레이션 028). 창이 맞는 것만 돌려준다.
+ *
+ * **한 렌더에 한 번만 돈다** — React `cache()` 로 감쌌고, 이 값을 쓰는 열 자리(급부상 6 +
+ * 종목 리포트 4)가 전부 같은 (from, to) 로 부르기 때문이다. 표가 60행이라 통째로 받아도
+ * 작다. 종목마다 따로 물으면 왕복이 열 번이 되어 옮긴 보람이 없다.
+ *
+ * ⚠️ **창을 대조해서 쓴다.** 파이프라인이 하루 밀리면 저장된 창이 화면이 원하는 창과
+ * 어긋나는데, 그때 낡은 숫자를 그냥 내보내면 느린 것보다 나쁘다. 어긋나면 빈 Map 을
+ * 돌려주고 호출부가 예전처럼 직접 센다.
+ *
+ * `to` 는 **미포함** 상한이고(아래 recentChannelCount 의 `.lt`) 저장된 window_end 는
+ * 포함 끝이라, 하루 차이를 여기서 맞춘다.
+ */
+const storedBreadth = cache(
+  async (from: string, to: string): Promise<Map<string, number>> => {
+    const db = getSupabaseAdmin();
+    const endInclusive = addDaysISO(to, -1);
+    const { data, error } = await db
+      .from("telegram_stock_breadth")
+      .select("stock_code,channel_count")
+      .eq("window_start", from)
+      .eq("window_end", endInclusive);
+    if (error || !data?.length) {
+      console.warn(
+        `[관심의 폭] 저장값을 못 써서 직접 셉니다(느린 길) 창=${from}~${endInclusive}: ${error?.message ?? "행 없음"}`,
+      );
+      return new Map();
+    }
+    return new Map(data.map((r) => [r.stock_code as string, r.channel_count as number]));
+  },
+);
+
 async function recentChannelCount(code: string, from: string, to: string): Promise<number | null> {
+  const stored = (await storedBreadth(from, to)).get(code);
+  if (stored != null) return stored;
+
   const db = getSupabaseAdmin();
   // 실패를 null 로 돌린다 — 0 과 구분해야 호출부가 폴백할지 말지 정할 수 있다.
   // 예전엔 실패도 빈 목록이 돼서 그대로 0 이 화면에 찍혔다(fetchAllRows 주석 [3]).

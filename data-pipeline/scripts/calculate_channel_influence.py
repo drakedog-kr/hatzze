@@ -26,7 +26,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.supabase_client import get_client  # noqa: E402
+from common.supabase_client import get_client, load_all  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 
 RECENT_POSTS = 30  # 평균 조회수/포워드율 계산에 쓰는 최근 게시물 수
@@ -48,28 +48,43 @@ def tier_score(value: float, tiers: list[tuple[float, int]]) -> int:
     return tiers[-1][1]
 
 
-def save_collection_stats(db, today: str, week_ago: str) -> None:
-    """'최근 7일 메시지 수'를 세어 한 벌짜리 표에 덮어쓴다(마이그레이션 027).
+def save_collection_stats(
+    db, today: str, week_ago: str, collected: list[dict], active_7d: int
+) -> None:
+    """히어로 '모니터링 현황' 네 줄을 세어 한 벌짜리 표에 덮어쓴다(마이그레이션 027).
 
-    화면(/kadera 히어로 "총 메시지 7일")이 렌더마다 세던 것을 여기로 옮긴 것이다.
-    창 안이 4.9만 행이라 버퍼가 식어 있으면 그 한 줄이 6.9초였다(2026-08-07 실측).
-    telegram_messages 는 파이프라인이 돌 때만 바뀌므로 실행 사이에는 상수다.
+    화면이 렌더마다 세던 것을 여기로 옮긴 것이다. 그중 '총 메시지 7일'은 창 안이
+    4.9만 행이라, 버퍼가 식어 있으면 그 한 줄이 **6,946ms** 였다(2026-08-07 콜드 트레이스
+    실측. 같은 질의가 웜에서는 236ms). telegram_messages·telegram_message_stocks·
+    telegram_channels 는 전부 파이프라인이 돌 때만 바뀌므로 실행 사이에는 상수다.
 
-    ⚠️ **채널로 좁히지 않는다.** 바로 위 weekly_posts 는 채널마다 세지만 이건 창 안의
-    모든 메시지를 센다 — 수집이 끊긴 채널이 남긴 옛 글도 포함하는 것이 화면 쪽의
-    의도다(lib/telegram-data.ts 의 messages7d 주석). weekly_posts 합으로 갈음하면
-    그만큼 조용히 적게 나온다.
+    ⚠️ **messages_7d 는 채널로 좁히지 않는다.** 바로 위 weekly_posts 는 채널마다 세지만
+    이건 창 안의 모든 메시지를 센다 — 수집이 끊긴 채널이 남긴 옛 글도 포함하는 것이
+    화면 쪽의 의도다(lib/telegram-data.ts 의 messages7d 주석). weekly_posts 합으로
+    갈음하면 그만큼 조용히 적게 나온다.
+
+    ⚠️ **collected 는 '목록에 있는 채널'이 아니라 '실제로 열리는 채널'이다.** 호출자가
+    channel_id·access_hash 가 둘 다 있는 것만 걸러서 넘긴다 — fetch_telegram.py 가 여는
+    기준과 한 글자도 다르지 않아야 화면의 '모니터링 채널' 숫자가 사실이 된다.
 
     창(week_ago)은 호출자에서 그대로 받는다. weekly_posts 와 **같은 순간, 같은 창**으로
-    세야 화면의 두 '7일' 숫자가 같은 시점을 말한다.
+    세야 화면의 두 '7일'(활성 채널 7일 · 총 메시지 7일)이 같은 시점을 말한다.
 
     표가 없으면(마이그레이션 미적용) 조용히 넘어간다 — 이 스크립트의 본래 일은
     영향력 점수 저장이고 그건 이미 위에서 끝났다. 화면은 옛 방식으로 되돌아간다.
     """
-    count = (
+    messages_7d = (
         db.table("telegram_messages")
         .select("id", count="exact")
         .gte("posted_at", week_ago)
+        .limit(1)
+        .execute()
+        .count
+    ) or 0
+    # 누적 종목 언급. 이것도 화면이 렌더마다 세던 count 다.
+    total_mentions = (
+        db.table("telegram_message_stocks")
+        .select("id", count="exact")
         .limit(1)
         .execute()
         .count
@@ -78,27 +93,38 @@ def save_collection_stats(db, today: str, week_ago: str) -> None:
         db.table("telegram_collection_stats").upsert(
             {
                 "id": 1,
-                "messages_7d": count,
+                "channel_count": len(collected),
+                "total_subscribers": sum(c.get("subscriber_count") or 0 for c in collected),
+                "active_channels_7d": active_7d,
+                "messages_7d": messages_7d,
+                "total_mentions": total_mentions,
                 "window_start": week_ago,
                 "computed_for": today,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             },
             on_conflict="id",
         ).execute()
-        print(f"[수집량] 최근 7일 메시지 {count:,}건 저장(창 시작 {week_ago})")
+        print(
+            f"[수집량] 채널 {len(collected)} · 활성7일 {active_7d} · "
+            f"메시지7일 {messages_7d:,} · 누적언급 {total_mentions:,} 저장(창 시작 {week_ago})"
+        )
     except Exception as e:  # noqa: BLE001 — 표가 없을 때 스크립트를 죽이지 않는다
         print(f"[수집량] 저장 실패(무시하고 계속): {e}")
 
 
 def main() -> None:
     db = get_client()
-    channels = (
-        db.table("telegram_channels")
-        .select("handle,subscriber_count")
-        .eq("is_active", True)
-        .execute()
-        .data
+    # channel_id·access_hash 를 함께 받는다 — 아래 save_collection_stats 가 '실제로
+    # 수집되는 채널'을 이 둘로 가른다(fetch_telegram.py 와 같은 기준). 영향력 점수는
+    # 예전처럼 활성 채널 전부를 대상으로 하므로 이 select 확장이 점수를 바꾸지 않는다.
+    #
+    # load_all 로 바꾼 이유: 지금 317행이라 안 걸리지만, 1,000행을 넘으면 PostgREST 가
+    # **에러 없이** 자른다. 그러면 점수가 빠질 뿐 아니라 여기서 센 '모니터링 채널' 수가
+    # 조용히 작아져 화면에 그대로 나간다(레포에 같은 사고가 여러 번 있었다).
+    all_channels = load_all(
+        db, "telegram_channels", "id,handle,subscriber_count,channel_id,access_hash,is_active"
     )
+    channels = [c for c in all_channels if c["is_active"]]
     if not channels:
         print("[경고] 활성 채널이 없습니다.")
         return
@@ -165,7 +191,21 @@ def main() -> None:
         rows, on_conflict="channel_handle,date"
     ).execute()
 
-    save_collection_stats(db, today, week_ago)
+    # 화면의 '모니터링 채널'은 목록 크기가 아니라 **실제로 열리는 채널** 수다.
+    # fetch_telegram.py 는 peer 캐시(channel_id·access_hash)가 둘 다 있는 채널만 열고
+    # 나머지는 통째로 건너뛴다 — 그 기준을 그대로 쓴다.
+    collected = [
+        c for c in channels if c.get("channel_id") is not None and c.get("access_hash") is not None
+    ]
+    collected_handles = {c["handle"] for c in collected}
+    # '활성 채널 7일' = 그중 방금 계산한 weekly_posts 가 0보다 큰 것. rows 는 이 실행에서
+    # 만든 것이라 저장 전에 그대로 셀 수 있다(화면이 읽던 값과 같은 출처다).
+    active_7d = sum(
+        1
+        for r in rows
+        if (r["weekly_posts"] or 0) > 0 and r["channel_handle"] in collected_handles
+    )
+    save_collection_stats(db, today, week_ago, collected, active_7d)
 
     rows.sort(key=lambda r: r["influence_score"], reverse=True)
     print(f"=== Influence Score {today} (저장 완료, {len(rows)}건) ===")
