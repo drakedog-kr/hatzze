@@ -126,9 +126,21 @@ export const STOCK_CHART_DAYS = 7;
  */
 type PagedQuery<T> = {
   order(column: string): {
-    range(from: number, to: number): PromiseLike<{ data: T[] | null }>;
+    // error 까지 받는다. 예전엔 data 만 적어 뒀는데, 그러면 실패가 `data: null` 로만
+    // 보여서 "행이 없다"와 구분이 안 된다 — 아래 fetchAllRows 가 그걸로 물렸다.
+    range(from: number, to: number): PromiseLike<{ data: T[] | null; error: unknown }>;
   };
 };
+
+/** 조회 한 번을 재시도까지 포함해 돌린다. 지연은 150ms·300ms 로 짧게 둔다. */
+async function withRetry<R extends { error: unknown }>(run: () => PromiseLike<R>, tries = 3): Promise<R> {
+  let res = await run();
+  for (let i = 1; i < tries && res.error; i++) {
+    await new Promise((r) => setTimeout(r, 150 * i));
+    res = await run();
+  }
+  return res;
+}
 
 /**
  * 표 전체를 페이지를 이어 받아 읽는다.
@@ -150,13 +162,28 @@ type PagedQuery<T> = {
  * 똑같다. 그래서 정렬 키를 **필수 인자**로 받아 헬퍼 안에서 건다 — 호출부가 잊을
  * 자리를 없앤다. 넘길 값은 유일 키여야 하고, telegram_* 표는 전부 `id`(uuid PK)다.
  *
+ * **[3] 실패가 빈 목록이 된다** — 예전엔 `data` 만 받아서, 조회가 실패해도 `data: null`
+ * → `break` → 빈 배열이 돌아갔다. 호출부는 "행이 없다"로 읽고 화면엔 그럴듯한 **0** 이
+ * 찍힌다. 2026-08-06 오픈일에 카더라 종목 카드가 "언급 1,002회 · **0개 채널**"로 떴다 —
+ * 1,002번 언급됐는데 채널이 0일 수는 없다. 그래서 (1) 일시적 실패는 재시도하고,
+ * (2) 그래도 실패하면 `onError` 로 호출부에 알린다. 알림을 안 받는 호출부는 종전대로
+ * 부분 결과를 쓰지만, 적어도 재시도의 덕은 본다.
+ *
  * 결과 순서는 이제 orderKey 순이다. 순서에 기대는 소비자는 직접 정렬할 것.
  */
-async function fetchAllRows<T>(orderKey: string, build: () => PagedQuery<T>): Promise<T[]> {
+async function fetchAllRows<T>(
+  orderKey: string,
+  build: () => PagedQuery<T>,
+  opts: { onError?: (e: unknown) => void } = {},
+): Promise<T[]> {
   const PAGE = 1000;
   const out: T[] = [];
   for (let from = 0; ; from += PAGE) {
-    const { data } = await build().order(orderKey).range(from, from + PAGE - 1);
+    const { data, error } = await withRetry(() => build().order(orderKey).range(from, from + PAGE - 1));
+    if (error) {
+      opts.onError?.(error);
+      break;
+    }
     if (!data?.length) break;
     out.push(...data);
     if (data.length < PAGE) break;
@@ -251,18 +278,22 @@ export async function getTelegramSummary(): Promise<TelegramSummary> {
   // 317개면 같은 창이 수만 행이라 렌더마다 1,000행씩 수십 번 왕복한다. 파이프라인이
   // 이미 채널별로 같은 7일 창을 세어 두므로(channel_stats.weekly_posts) 그걸 읽는다.
   // 한 채널당 날짜별 한 행이라, 최신 날짜로 좁히면 조회는 채널 수만큼이다.
-  const { data: lastStat } = await db
-    .from("telegram_channel_stats")
-    .select("date")
-    .not("weekly_posts", "is", null)
-    .order("date", { ascending: false })
-    .limit(1);
+  //
+  // 이 둘도 재시도를 태운다 — 실패하면 '활성 채널'이 0 이 되고, 아래 '총 메시지'가
+  // 기댈 폴백까지 같이 빈다.
+  const { data: lastStat } = await withRetry(() =>
+    db
+      .from("telegram_channel_stats")
+      .select("date")
+      .not("weekly_posts", "is", null)
+      .order("date", { ascending: false })
+      .limit(1),
+  );
   const statDate = lastStat?.[0]?.date as string | undefined;
   const { data: weekly } = statDate
-    ? await db
-        .from("telegram_channel_stats")
-        .select("channel_handle,weekly_posts")
-        .eq("date", statDate)
+    ? await withRetry(() =>
+        db.from("telegram_channel_stats").select("channel_handle,weekly_posts").eq("date", statDate),
+      )
     : { data: [] as { channel_handle: string; weekly_posts: number | null }[] };
   // 수집 중인 채널로 좁힌다. 안 좁히면 수집이 끊긴 채널도 7일 창 안에 옛 글이 남아
   // 있는 동안 계속 '활성'으로 세어져, 이 줄만 '모니터링 채널'보다 커진다.
@@ -275,11 +306,19 @@ export async function getTelegramSummary(): Promise<TelegramSummary> {
   // 아래 집계(언급·테마·센티먼트)가 실제로 읽는 것도 창 안 전부이기 때문이다. 수집이
   // 끊긴 채널이 남긴 옛 글도 그 집계에 들어가므로(2026-07-28 기준 37,706건 중 5,224건),
   // 여기서 빼면 '재료가 얼마나 되나'를 되레 적게 말하게 된다.
-  const { count: messages7dCount } = await db
-    .from("telegram_messages")
-    .select("id", { count: "exact", head: true })
-    .gte("posted_at", daysAgoISO(7));
-  const messages7d = messages7dCount ?? 0;
+  //
+  // ⚠️ **실패를 0 으로 두면 안 된다.** 예전엔 error 를 안 받아서, 이 count 가 실패하면
+  // `?? 0` 이 그대로 "총 메시지 0개"를 찍었다(2026-08-06 오픈일 실측 — 그때 DB 에는
+  // 42,468건이 있었다). 그래서 재시도하고, 그래도 안 되면 파이프라인이 저장해 둔 값으로
+  // 대신한다: 위에서 이미 받아 둔 weekly_posts("최근 7일 게시물 수")의 합이다. 추가
+  // 왕복이 없고, 수집 채널만 세는 정의 차이가 있지만 실측 오차가 1.2% 였다
+  // (2026-08-06: 저장값 합 42,991 vs 라이브 count 42,468).
+  const { count: messages7dCount, error: messages7dError } = await withRetry(() =>
+    db.from("telegram_messages").select("id", { count: "exact", head: true }).gte("posted_at", daysAgoISO(7)),
+  );
+  const messages7d =
+    messages7dCount ??
+    (messages7dError ? (weekly ?? []).reduce((s, r) => s + (r.weekly_posts ?? 0), 0) : 0);
 
   // 마지막 갱신 시각 — sync가 채널을 동기화한 시점이 파이프라인 실행 시각과 같다.
   const { data: synced } = await db
@@ -464,7 +503,9 @@ export type SurgingStock = {
   code: string;
   name: string;
   recentMentions: number;
-  channelCount: number; // 이 종목을 다룬 서로 다른 채널 수(관심의 폭). 규칙은 recentChannelCount.
+  // null = 못 셌다(조회 실패). 화면은 이때 'N개 채널' 문구를 통째로 뺀다 — 0 은 거짓이고,
+  // 일별 channel_count 로 때우면 버린 max 규칙이 되살아난다(recentChannelCount 주석).
+  channelCount: number | null; // 이 종목을 다룬 서로 다른 채널 수(관심의 폭). 규칙은 recentChannelCount.
   ratio: number; // 최근 vs 평소 주목도 배수 (Infinity=신규 등장)
   isNew: boolean;
   series: number[]; // 일별 언급수(오래된→최신)
@@ -541,7 +582,8 @@ export async function getSurgingStocks(
         // 여기서는 못 센다 — '서로 다른 채널 수'는 일별 집계의 합집합이라 원자료를
         // 봐야 하고(recentChannelCount 주석), 카드에 오르지도 못할 1,700여 종목까지
         // 물을 이유가 없다. 정원을 확정한 뒤 그 몇 건만 아래에서 채운다.
-        channelCount: 0,
+        // null 로 둔다 — 아래에서 못 채우면 그대로 '못 셌다'가 되고, 화면이 문구를 뺀다.
+        channelCount: null as number | null,
         // 평활(+SHARE_SMOOTHING)한 뒤 나눈다. 그냥 나누면 분모가 거의 0인 종목이
         // "▲162.8배"처럼 터무니없는 배수를 받는데, 실제론 3일간 2회 언급·1개 채널이라
         // 표본이 사실상 없는 경우다. 상수는 '언급 1회가 만드는 몫'(실측 중앙값 0.0018)
@@ -603,7 +645,10 @@ export async function getSurgingStocks(
       s.changeRate = q.changeRate;
       s.isLive = true;
     }
-    s.channelCount = breadth.get(s.code) ?? 0;
+    // null 을 그대로 넘긴다 — 화면이 '개 채널' 문구를 통째로 뺀다. 0 으로 두면
+    // "이 종목을 다룬 채널이 없다"는 거짓말이 되고(언급 수는 옆에 멀쩡히 적혀 있다),
+    // 저장된 일별 channel_count 로 때우면 버린 max 규칙이 되살아난다(recentChannelCount 주석).
+    s.channelCount = breadth.get(s.code) ?? null;
   });
 
   return list;
@@ -790,7 +835,7 @@ export type StockReport = {
   totalMentions: number;
   /** 막대 차트용 일별 언급. scored=false 인 앞쪽 칸은 배경 맥락이라 합계에 안 들어간다. */
   series: { date: string; mentions: number; scored: boolean }[];
-  channelCount: number; // 이 종목을 다룬 서로 다른 채널 수(관심의 폭)
+  channelCount: number | null; // 이 종목을 다룬 서로 다른 채널 수(관심의 폭). null = 못 셌다
   price: number | null; // 실시간 시세
   changeRate: number | null;
 };
@@ -821,8 +866,11 @@ export type StockReport = {
  * 페이징은 여전히 필수다 — 인기 종목은 7일치만도 1,000행을 넘는다(삼성전자 2,242행).
  * 안 하면 채널 수가 조용히 적게 나온다.
  */
-async function recentChannelCount(code: string, from: string, to: string): Promise<number> {
+async function recentChannelCount(code: string, from: string, to: string): Promise<number | null> {
   const db = getSupabaseAdmin();
+  // 실패를 null 로 돌린다 — 0 과 구분해야 호출부가 폴백할지 말지 정할 수 있다.
+  // 예전엔 실패도 빈 목록이 돼서 그대로 0 이 화면에 찍혔다(fetchAllRows 주석 [3]).
+  let failed = false;
   const rows = await fetchAllRows<{ channel_handle: string }>("id", () =>
     db
       .from("telegram_message_stocks")
@@ -835,8 +883,9 @@ async function recentChannelCount(code: string, from: string, to: string): Promi
       // 두 값이 서로 다른 기간을 말했다. 창이 7일일 땐 1/7 차이라 안 보였지만 3일이면 1/3 이다.
       .gte("telegram_messages.posted_at", `${from}T00:00:00+09:00`)
       .lt("telegram_messages.posted_at", `${to}T00:00:00+09:00`),
+    { onError: () => (failed = true) },
   );
-  return new Set(rows.map((r) => r.channel_handle)).size;
+  return failed ? null : new Set(rows.map((r) => r.channel_handle)).size;
 }
 
 /**
@@ -850,7 +899,7 @@ async function recentChannelCount(code: string, from: string, to: string): Promi
  * 목록은 화면에 실제로 그릴 몇 건(카드 정원 5~6)뿐이라 `.in()` 목록 길이 함정과도
  * 무관하다. 순위를 정할 땐 이 값을 쓰지 않으므로 전 종목을 셀 이유가 없다.
  */
-async function channelBreadth(codes: string[], from: string, to: string): Promise<Map<string, number>> {
+async function channelBreadth(codes: string[], from: string, to: string): Promise<Map<string, number | null>> {
   const counts = await Promise.all(codes.map((c) => recentChannelCount(c, from, to)));
   return new Map(codes.map((c, i) => [c, counts[i]]));
 }

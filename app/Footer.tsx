@@ -3,8 +3,18 @@ import Link from "next/link";
 import { BetaBadge, GhostSymbol, Wordmark } from "./Logo";
 import { C, MONO } from "./ui";
 
-/** 푸터 로고 옆에 찍히는 서비스 버전. 베타 오픈(2026-08-06) 기준 1.0.0 에서 시작한다. */
-const APP_VERSION = "1.0.0";
+/**
+ * 푸터 로고 옆에 찍히는 서비스 버전. 베타 오픈(2026-08-06) 기준 1.0.0 에서 시작한다.
+ *
+ * **SemVer 로 올린다.** 어느 자리를 올릴지는 이렇게 가른다.
+ *   Major  하위 호환이 깨질 때. 대대적인 변화. 이전 버전 방식으로는 접속조차 안 될 때
+ *   Minor  하위 호환을 지키면서 기능이 추가될 때. 기존 기능의 사용 방법이 바뀌었을 때
+ *   Patch  버그 수정. 이용자가 알아차리지 못할 작은 변화. 내부 소스만 고쳤을 때
+ *
+ * 화면에 찍히는 버전은 여기 한 곳뿐이라, 올릴 땐 이 상수만 고치면 된다.
+ * README 의 표기는 일부러 함께 올리지 않는다 — 주기적으로 한 번에 갱신한다.
+ */
+const APP_VERSION = "1.0.1";
 /** 문의 창구. 여기 한 곳만 바꾸면 본문 문구와 mailto: 가 같이 따라온다. */
 const CONTACT_EMAIL = "hatzze@proton.me";
 

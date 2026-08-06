@@ -849,7 +849,12 @@ export default async function KaderaPage() {
                           대화에서 차지한 **몫(share)** 을 평활해 낸 값이라(getSurgingStocks),
                           횟수 둘을 나란히 두면 그 비가 배수와 안 맞아 눈금이 둘 생긴다. */}
                       <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
-                        <span style={{ fontSize: 11.5, color: C.sub2, whiteSpace: "nowrap" }}>{s.channelCount}개 채널</span>
+                        {/* channelCount 가 null 이면 못 센 것이다(조회 실패). 그 줄만 뺀다 —
+                            0 을 찍으면 "이 종목을 다룬 채널이 없다"는 거짓이 되는데, 바로
+                            아래 '최근 N일 기준 M회'가 그 말과 대놓고 어긋난다. */}
+                        {s.channelCount !== null && (
+                          <span style={{ fontSize: 11.5, color: C.sub2, whiteSpace: "nowrap" }}>{s.channelCount}개 채널</span>
+                        )}
                         <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: C.label, whiteSpace: "nowrap" }}>
                           최근 {s.recentDays}일 기준 {s.recentMentions}회
                         </span>
@@ -1117,7 +1122,9 @@ export default async function KaderaPage() {
                       "이 리포트가 몇 건을 봤나"와 "더 파고들기"가 같은 높이에서 끝난다. */}
                   <div style={{ marginTop: "auto", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, paddingTop: 2 }}>
                     <span style={{ fontFamily: MONO, fontSize: 11, color: C.sub2, whiteSpace: "nowrap" }}>
-                      언급 {r.totalMentions.toLocaleString("ko-KR")}회 · {r.channelCount}개 채널
+                      {/* 채널 수를 못 셌으면(null) 가운뎃점부터 통째로 뺀다. 위 카드와 같은 규칙이다. */}
+                      언급 {r.totalMentions.toLocaleString("ko-KR")}회
+                      {r.channelCount !== null && ` · ${r.channelCount}개 채널`}
                     </span>
                     <MddLink code={r.code} market={r.market} label="MDD 정밀분석" />
                   </div>
