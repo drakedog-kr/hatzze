@@ -111,13 +111,27 @@ export function StockLogo({
   // 캐시에서 온 이미지는 핸들러가 붙기 전에 로드가 끝나 onLoad 가 아예 안 뜬다.
   // 붙고 나서 한 번 직접 확인한다.
   //
+  // ⚠️ **성공만 그런 게 아니라 실패도 그렇다.** 이 img 는 서버에서 그려져 오므로,
+  // 404 가 캐시에서 즉시 오면 error 이벤트가 하이드레이션보다 **먼저** 난다. 그러면
+  // React 합성 onError 가 그 이벤트를 통째로 놓쳐서 폴백 전이가 시작조차 안 하고,
+  // 브라우저 기본 '깨진 이미지' 아이콘이 그대로 남는다. 로고가 아예 없는 종목
+  // (지엔씨에너지 119850.KQ 는 logo.dev 에 없다)에서 재방문 때만 나는 레이스였고,
+  // 첫 방문은 네트워크가 느려 error 가 하이드레이션 뒤에 떠서 멀쩡했다. 그래서
+  // 하드 리프레시로 보면 늘 정상으로 보인다 — 재방문으로 재현할 것.
+  // 여기서 complete 로 두 경우를 같이 받아 onError 와 같은 전이를 태운다.
+  //
   // 이 확인을 인라인 ref 콜백으로 했다가 되돌렸다 — 콜백 신원이 매 렌더마다 바뀌어
   // React 가 detach/attach 를 반복했고, 그때마다 loading="lazy" 의 관찰이 리셋돼서
   // 드롭다운 로고가 **영영 로드되지 않았다**(complete 가 계속 false, onError 도 안 뜸).
   // 안정적인 ref + effect 로 두면 그 churn 이 없다.
   useEffect(() => {
     const node = imgRef.current;
-    if (node?.complete && node.naturalWidth) setTile(readBandColor(node));
+    // complete 는 '로드가 끝났다'만 뜻한다. 성패는 naturalWidth 로 가른다
+    // (0 이면 받다 실패한 것이다. 아직 안 끝났으면 complete 가 false 다).
+    if (!node?.complete) return;
+    if (node.naturalWidth) setTile(readBandColor(node));
+    else if (noCors) setFailed(true);
+    else setNoCors(true);
   }, [noCors]);
 
   if (!LOGO_KEY || !suffix || failed) return <InitialBadge code={code} name={name} size={size} />;
