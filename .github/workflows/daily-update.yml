@@ -286,6 +286,11 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/calculate_stock_daily.py
 
+      - name: (텔레그램) 트렌딩 메시지 선별
+        id: telegram_trending
+        continue-on-error: true
+        run: python data-pipeline/scripts/calculate_telegram_trending.py
+
       - name: (텔레그램) 테마 일별 집계
         id: telegram_theme_daily
         continue-on-error: true

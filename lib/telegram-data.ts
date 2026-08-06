@@ -814,10 +814,74 @@ function trendingTodayStartISO(): string {
 }
 
 /** 트렌딩 메시지 TOP N (창: windowDays). 점수는 view가 지배적이라 view순으로 후보를 좁힌 뒤 정확 점수로 정렬. */
+/** 화면 탭 ↔ 저장 키. 파이프라인(calculate_telegram_trending.py)의 WINDOWS 와 같아야 한다. */
+function trendingWindowKey(windowDays: TrendingWindow): string | null {
+  if (windowDays === "today") return "today";
+  if (windowDays === 7) return "w7";
+  if (windowDays === 30) return "w30";
+  return null; // 저장해 두지 않은 창은 예전처럼 즉석에서 뽑는다
+}
+
+/**
+ * 파이프라인이 골라 둔 트렌딩 목록(마이그레이션 029). 없으면 null → 호출자가 직접 뽑는다.
+ *
+ * 저장 안 된 것 둘을 여기서 붙인다.
+ *   · 채널 제목·프로필 사진 — channelMeta 가 telegram_channels 에서 읽는다(콜드 39~48ms).
+ *     채널이 이름을 바꾸면 저장된 목록까지 같이 따라가는 이점도 있다.
+ *   · 주제 태그 — 본문에서 뽑는 순수 함수라 저장할 이유가 없다.
+ *
+ * ⭐ **"11시간 전"은 여기서 안 만든다.** postedAt(절대 시각)을 그대로 넘기고 화면이
+ * 렌더할 때 계산한다. 그래서 저장 목록이 그대로여도 나이는 계속 흘러간다.
+ */
+async function storedTrending(key: string, limit: number): Promise<TrendingMessage[] | null> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db
+    .from("telegram_trending_message")
+    .select("rank,channel_handle,message_id,text,views,forwards,replies,posted_at,stocks")
+    .eq("window_key", key)
+    .order("rank")
+    .limit(limit);
+  if (error || !data?.length) {
+    console.warn(
+      `[트렌딩] 저장 목록이 없어 직접 뽑습니다(느린 길) 창=${key}: ${error?.message ?? "행 없음"}`,
+    );
+    return null;
+  }
+  const { titleOf, photoUrlOf } = await channelMeta();
+  return data.map((r) => {
+    const stocks = (Array.isArray(r.stocks) ? (r.stocks as string[]) : []).slice(0, 3);
+    const text = r.text as string;
+    return {
+      channelHandle: r.channel_handle as string,
+      messageId: r.message_id as number,
+      channelTitle: titleOf.get(r.channel_handle as string) ?? (r.channel_handle as string),
+      channelPhotoUrl: photoUrlOf.get(r.channel_handle as string) ?? null,
+      text,
+      views: (r.views as number) ?? 0,
+      forwards: (r.forwards as number) ?? 0,
+      replies: (r.replies as number) ?? 0,
+      score:
+        ((r.views as number) ?? 0) * TREND_W_VIEWS +
+        ((r.forwards as number) ?? 0) * TREND_W_FWD +
+        ((r.replies as number) ?? 0) * TREND_W_REPLIES,
+      postedAt: r.posted_at as string,
+      stocks,
+      // 종목이 붙은 메시지엔 주제를 안 단다 — 아래 즉석 경로와 같은 규칙이다.
+      topics: stocks.length === 0 ? extractTopics(text) : [],
+    };
+  });
+}
+
 export async function getTrendingMessages(
   windowDays: TrendingWindow,
   limit = 8,
 ): Promise<TrendingMessage[]> {
+  const key = trendingWindowKey(windowDays);
+  if (key) {
+    const stored = await storedTrending(key, limit);
+    if (stored) return stored;
+  }
+
   const db = getSupabaseAdmin();
   const since = windowDays === "today" ? trendingTodayStartISO() : daysAgoISO(windowDays);
   /* error 를 **받아서 남긴다.** 안 받으면 조회 실패와 "그 창에 글이 없음"이 똑같이
