@@ -748,12 +748,17 @@ def build_stock_digests(db, latest: str) -> tuple[list[tuple[str, str, str]], li
     mentions = load_all(
         db, "telegram_message_stocks", "channel_handle,message_id,stock_code,match_text"
     )
-    msgs = {
-        (m["channel_handle"], m["message_id"]): m
-        for m in load_all(
-            db, "telegram_messages", "channel_handle,message_id,posted_at,text,views,forwards"
-        )
-    }
+    # 발췌에 쓸 본문. **창 안만 받는다** — 아래에서 어차피 posted_at >= since 로 거르는데,
+    # load_all 로 받으면 그 창 밖 10만여 건의 본문까지 받아 놓고 버리게 된다.
+    #
+    # 실측(2026-08-06): 표 전체 114,427행 × 2,343B = **197.5MB**, 3일 창은 17,049행 29.4MB다.
+    # 한 번 실행에 168MB, 하루 2회면 336MB, 한 달이면 **9.85GB** 를 그냥 버리고 있었다.
+    # Supabase 무료 플랜 Egress 한도(5GB/월)의 두 배를 이 한 줄이 혼자 썼다.
+    #
+    # load_messages_since 가 컬럼 목록까지 이 자리와 똑같고(그 docstring 이 바로 이 문제를
+    # 적어 뒀다) since-1일부터 받아 오므로, 창 안 메시지는 하나도 빠지지 않는다.
+    # msgs 를 쓰는 네 곳 전부 창 밖 데이터가 필요 없어 결과는 정확히 같다.
+    msgs = {(m["channel_handle"], m["message_id"]): m for m in load_messages_since(db, since)}
     analysis = {
         (a["channel_handle"], a["message_id"]): a["sentiment"]
         for a in load_all(db, "telegram_message_analysis", "channel_handle,message_id,sentiment")
