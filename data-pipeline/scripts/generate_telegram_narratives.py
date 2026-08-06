@@ -55,7 +55,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from anthropic import Anthropic  # noqa: E402
 
 from common.broadcast_content import weekly_top_stocks  # noqa: E402
-from common.channel_breadth import channel_breadth_map  # noqa: E402
+from common.channel_breadth import channel_breadth  # noqa: E402
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.supabase_client import PAGE_SIZE, get_client  # noqa: E402
 from common.surging import load_stock_daily, top_surging  # noqa: E402
@@ -688,7 +688,7 @@ def save_stock_breadth(db, latest: str) -> None:
     ⚠️ **telegram_stock_daily.channel_count 로 갈음하면 안 된다.** 그 열은 '그날 하루'의
     채널 수라 여러 날을 묶으면 합집합이 아니다. 창을 늘려도 값이 안 커져서 '창이 길수록
     채널이 적은' 불가능한 조합이 나온다(common/channel_breadth.py 의 SK하이닉스 실측
-    참고). 그래서 원자료를 조인하는 channel_breadth_map 을 쓴다 — 화면이 쓰는 것과
+    참고). 그래서 원자료를 조인하는 channel_breadth 를 쓴다 — 화면이 쓰는 것과
     같은 규칙의 사본이다.
 
     표가 없으면(마이그레이션 미적용) 조용히 넘어간다. 화면은 예전처럼 직접 센다.
@@ -715,19 +715,32 @@ def save_stock_breadth(db, latest: str) -> None:
         print("[관심의 폭] 창에 언급이 없어 건너뜁니다.")
         return
 
-    breadth = channel_breadth_map(db, codes, first, last)
+    # ⚠️ **종목마다 따로 감싼다.** 이 조인은 statement timeout 에 걸릴 수 있다 — 실제로
+    # 2026-08-07 시험 실행에서 한 번 걸렸다(같은 종목이 다음 시도엔 2.7초로 끝났으니
+    # 버퍼가 식었을 때 나는 꼬리다). 하나가 터져 나머지 59종목과 **그 뒤의 총평·종목
+    # 요약 생성까지** 같이 잃으면 안 된다. 빠진 종목은 화면이 예전처럼 즉석에서 센다.
     now = datetime.now(timezone.utc).isoformat()
-    payload = [
-        {
-            "stock_code": c,
-            "channel_count": breadth.get(c, 0),
-            "window_start": first,
-            "window_end": last,
-            "computed_for": latest,
-            "updated_at": now,
-        }
-        for c in codes
-    ]
+    payload = []
+    failed = []
+    for c in codes:
+        try:
+            payload.append(
+                {
+                    "stock_code": c,
+                    "channel_count": channel_breadth(db, c, first, last),
+                    "window_start": first,
+                    "window_end": last,
+                    "computed_for": latest,
+                    "updated_at": now,
+                }
+            )
+        except Exception as e:  # noqa: BLE001 — 한 종목 실패가 전체를 데려가지 않게
+            failed.append((c, str(e)[:60]))
+    if failed:
+        print(f"[관심의 폭] {len(failed)}종목 실패(그 종목만 화면이 직접 센다): {failed[:3]}")
+    if not payload:
+        print("[관심의 폭] 한 종목도 못 세어 저장을 건너뜁니다.")
+        return
     try:
         # 이전 실행의 행은 창이 달라 프론트가 어차피 안 쓴다(창을 대조해서 쓴다).
         # 그래도 지워 두는 편이 낫다 — 안 지우면 옛 종목이 영원히 남아 표가 자란다.
