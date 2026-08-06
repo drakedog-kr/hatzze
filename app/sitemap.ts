@@ -13,5 +13,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // 매일 헛걸음하므로 yearly·낮은 우선순위로 둔다.
     { url: `${SITE_URL}/terms`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
     { url: `${SITE_URL}/privacy`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
+    // 버전을 올릴 때만 바뀐다. 법정 고지보다는 자주, 지표 화면보다는 훨씬 드물다.
+    { url: `${SITE_URL}/changelog`, lastModified: now, changeFrequency: "monthly", priority: 0.3 },
   ];
 }
