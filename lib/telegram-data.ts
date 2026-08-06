@@ -225,6 +225,50 @@ export type TelegramSummary = {
  * 그건 방문자가 알 일이 아니라 우리가 알 일이라, 파이프라인의 커버리지 검사가
  * 맡는다(data-pipeline/scripts/check_telegram_coverage.py).
  */
+/**
+ * 최근 7일 메시지 수 — **파이프라인이 세어 둔 값을 읽는다**(마이그레이션 027).
+ *
+ * 예전엔 렌더마다 `count(*) … where posted_at >= now() - 7일` 을 돌렸다. 창 안이
+ * 4.9만 행이라 표를 훑는데, 버퍼가 식어 있으면 **6,946ms**였다(2026-08-07 콜드 트레이스
+ * 실측. 같은 질의가 웜에서는 236ms라 20~30배로 벌어진다).
+ *
+ * telegram_messages 는 파이프라인이 돌 때만 바뀐다. 그래서 실행과 실행 사이에 이 수는
+ * 얼어붙은 입력에 대한 상수고, 매 방문이 같은 답을 다시 세고 있었다. 계산을 옮긴
+ * 것이지 캐싱이 아니다 — '얼마나 낡아도 되나'를 거래하지 않는다.
+ *
+ * ⭐ 오히려 옆줄과 맞아진다. 바로 옆 '활성 채널 7일'은 파이프라인이 실행 시각 기준으로
+ * 세어 둔 값(weekly_posts)인데 이 줄만 요청 시각 기준이라, 실행 사이에 창이 미끄러지며
+ * 두 숫자가 다른 시점을 말하고 있었다. 이제 같은 실행·같은 창에서 나온다.
+ *
+ * 저장값이 없으면(마이그레이션 전, 또는 파이프라인이 아직 한 번도 안 돈 상태) 옛 방식
+ * 으로 되돌아간다. **되돌아갔다는 사실을 로그에 남긴다** — 안 남기면 파이프라인이
+ * 조용히 이 표를 안 채우게 됐을 때 느린 길로 영원히 돌아가 있어도 아무도 모른다.
+ */
+async function messages7dCount(db: ReturnType<typeof getSupabaseAdmin>): Promise<number> {
+  const { data, error } = await db
+    .from("telegram_collection_stats")
+    .select("messages_7d")
+    .limit(1)
+    .maybeSingle();
+  if (!error && data?.messages_7d != null) return data.messages_7d as number;
+
+  console.warn(
+    `[getTelegramSummary] 저장된 수집량이 없어 직접 셉니다(느린 길): ${error?.message ?? "행 없음"}`,
+  );
+  // 행을 세면 PostgREST 기본 1000행 상한에 걸려 항상 1,000이 된다 — count 쿼리로 정확히.
+  //
+  // 이 줄만 채널로 안 좁힌다. 세는 단위가 채널이 아니라 **창 안의 메시지**이고, 카드
+  // 아래 집계(언급·테마·센티먼트)가 실제로 읽는 것도 창 안 전부이기 때문이다. 수집이
+  // 끊긴 채널이 남긴 옛 글도 그 집계에 들어가므로(2026-07-28 기준 37,706건 중 5,224건),
+  // 여기서 빼면 '재료가 얼마나 되나'를 되레 적게 말하게 된다.
+  // (파이프라인 쪽 save_collection_stats 도 같은 이유로 채널을 안 건다.)
+  const { count } = await db
+    .from("telegram_messages")
+    .select("id", { count: "exact", head: true })
+    .gte("posted_at", daysAgoISO(7));
+  return count ?? 0;
+}
+
 export async function getTelegramSummary(): Promise<TelegramSummary> {
   const db = getSupabaseAdmin();
 
@@ -269,17 +313,7 @@ export async function getTelegramSummary(): Promise<TelegramSummary> {
   const activeChannels = (weekly ?? []).filter(
     (r) => (r.weekly_posts ?? 0) > 0 && collectedHandles.has(r.channel_handle),
   ).length;
-  // 행을 세면 PostgREST 기본 1000행 상한에 걸려 항상 1,000이 된다 — count 쿼리로 정확히.
-  //
-  // 이 줄만 채널로 안 좁힌다. 세는 단위가 채널이 아니라 **창 안의 메시지**이고, 카드
-  // 아래 집계(언급·테마·센티먼트)가 실제로 읽는 것도 창 안 전부이기 때문이다. 수집이
-  // 끊긴 채널이 남긴 옛 글도 그 집계에 들어가므로(2026-07-28 기준 37,706건 중 5,224건),
-  // 여기서 빼면 '재료가 얼마나 되나'를 되레 적게 말하게 된다.
-  const { count: messages7dCount } = await db
-    .from("telegram_messages")
-    .select("id", { count: "exact", head: true })
-    .gte("posted_at", daysAgoISO(7));
-  const messages7d = messages7dCount ?? 0;
+  const messages7d = await messages7dCount(db);
 
   // 마지막 갱신 시각 — sync가 채널을 동기화한 시점이 파이프라인 실행 시각과 같다.
   const { data: synced } = await db
