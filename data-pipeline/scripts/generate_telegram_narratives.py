@@ -47,7 +47,7 @@ from __future__ import annotations
 import re
 import sys
 from collections import Counter, defaultdict
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -55,6 +55,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from anthropic import Anthropic  # noqa: E402
 
 from common.broadcast_content import weekly_top_stocks  # noqa: E402
+from common.channel_breadth import channel_breadth  # noqa: E402
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.supabase_client import PAGE_SIZE, get_client  # noqa: E402
 from common.surging import load_stock_daily, top_surging  # noqa: E402
@@ -665,6 +666,91 @@ def build_news_block(db, latest: str, window_since: str) -> list[str]:
     return out
 
 
+BREADTH_TOP_N = 60  # 화면이 쓰는 건 10개. 순위가 흔들려도 폴백이 안 걸리게 넉넉히 둔다.
+
+
+def save_stock_breadth(db, latest: str) -> None:
+    """'관심의 폭'(종목별 서로 다른 채널 수)을 미리 세어 둔다(마이그레이션 028).
+
+    화면 두 자리가 이 값을 쓴다 — 주요 종목 리포트의 "163개 채널", 급부상 종목의
+    "45개 채널". 둘 다 뜻이 같고 **창도 같다**: 기준일(latest) 하루 전에서 끝나는
+    WINDOW_DAYS 일.
+
+    왜 옮기나: telegram_message_stocks 에 날짜가 없어 telegram_messages 에 조인해야
+    하고, 그걸 종목마다 따로 한다(한 페이지에 10번). 2026-08-07 콜드 트레이스 실측으로
+    그 9왕복의 소요 합이 **22,386ms** 로 페이지 단일 최대 항목이었다. 웜에서는 931ms 라
+    30배 차이가 난다 — 버퍼가 식으면 조인이 그만큼 비싸다.
+
+    ⭐ **창이 이미 얼어 있어서 옮길 수 있다.** 프론트가 벽시계가 아니라 kaderaBaseDate
+    (= 이 `latest` 와 같은 질의)로 창을 잡으므로, 실행과 실행 사이에 답이 상수다.
+    미리 계산해도 표시 값이 한 글자도 안 달라진다.
+
+    ⚠️ **telegram_stock_daily.channel_count 로 갈음하면 안 된다.** 그 열은 '그날 하루'의
+    채널 수라 여러 날을 묶으면 합집합이 아니다. 창을 늘려도 값이 안 커져서 '창이 길수록
+    채널이 적은' 불가능한 조합이 나온다(common/channel_breadth.py 의 SK하이닉스 실측
+    참고). 그래서 원자료를 조인하는 channel_breadth 를 쓴다 — 화면이 쓰는 것과
+    같은 규칙의 사본이다.
+
+    표가 없으면(마이그레이션 미적용) 조용히 넘어간다. 화면은 예전처럼 직접 센다.
+    """
+    end = date.fromisoformat(latest) - timedelta(days=1)
+    first = (end - timedelta(days=WINDOW_OFFSET)).isoformat()
+    last = end.isoformat()
+
+    # 창 안 언급 상위 N 종목만 센다. 창이 3일이라 이 조회는 ~2천 행뿐이다(전량 로드 아님).
+    rows = (
+        db.table("telegram_stock_daily")
+        .select("stock_code,mention_count")
+        .gte("date", first)
+        .lte("date", last)
+        .limit(PAGE_SIZE)
+        .execute()
+        .data
+    ) or []
+    mentions: dict[str, int] = defaultdict(int)
+    for r in rows:
+        mentions[r["stock_code"]] += r["mention_count"] or 0
+    codes = [c for c, _ in sorted(mentions.items(), key=lambda kv: (-kv[1], kv[0]))[:BREADTH_TOP_N]]
+    if not codes:
+        print("[관심의 폭] 창에 언급이 없어 건너뜁니다.")
+        return
+
+    # ⚠️ **종목마다 따로 감싼다.** 이 조인은 statement timeout 에 걸릴 수 있다 — 실제로
+    # 2026-08-07 시험 실행에서 한 번 걸렸다(같은 종목이 다음 시도엔 2.7초로 끝났으니
+    # 버퍼가 식었을 때 나는 꼬리다). 하나가 터져 나머지 59종목과 **그 뒤의 총평·종목
+    # 요약 생성까지** 같이 잃으면 안 된다. 빠진 종목은 화면이 예전처럼 즉석에서 센다.
+    now = datetime.now(timezone.utc).isoformat()
+    payload = []
+    failed = []
+    for c in codes:
+        try:
+            payload.append(
+                {
+                    "stock_code": c,
+                    "channel_count": channel_breadth(db, c, first, last),
+                    "window_start": first,
+                    "window_end": last,
+                    "computed_for": latest,
+                    "updated_at": now,
+                }
+            )
+        except Exception as e:  # noqa: BLE001 — 한 종목 실패가 전체를 데려가지 않게
+            failed.append((c, str(e)[:60]))
+    if failed:
+        print(f"[관심의 폭] {len(failed)}종목 실패(그 종목만 화면이 직접 센다): {failed[:3]}")
+    if not payload:
+        print("[관심의 폭] 한 종목도 못 세어 저장을 건너뜁니다.")
+        return
+    try:
+        # 이전 실행의 행은 창이 달라 프론트가 어차피 안 쓴다(창을 대조해서 쓴다).
+        # 그래도 지워 두는 편이 낫다 — 안 지우면 옛 종목이 영원히 남아 표가 자란다.
+        db.table("telegram_stock_breadth").delete().neq("window_end", last).execute()
+        db.table("telegram_stock_breadth").upsert(payload, on_conflict="stock_code").execute()
+        print(f"[관심의 폭] {len(payload)}종목 저장(창 {first}~{last})")
+    except Exception as e:  # noqa: BLE001 — 표가 없어도 문장 생성은 계속돼야 한다
+        print(f"[관심의 폭] 저장 실패(무시하고 계속): {e}")
+
+
 def build_stock_digests(db, latest: str) -> tuple[list[tuple[str, str, str]], list[tuple[str, str]]]:
     """([(종목코드, 종목명, digest)], [(종목코드, 종목명)]).
 
@@ -840,6 +926,11 @@ def main() -> None:
         return
     latest = rows[0]["date"]
     print(f"[기준일] {latest}")
+
+    # 화면이 렌더마다 조인해 세던 '관심의 폭'을 여기서 미리 세어 둔다.
+    # 문장 생성보다 먼저 둔 이유: 아래는 LLM 호출이라 실패·지연이 잦은데,
+    # 이 값은 그것과 무관하게 저장돼야 화면이 느린 길로 안 떨어진다.
+    save_stock_breadth(db, latest)
 
     brief_digest = build_brief_digest(db, latest)
     stock_digests, required = build_stock_digests(db, latest)

@@ -24,6 +24,11 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    version: "1.0.2",
+    date: "2026-08-07",
+    changes: ["카더라 리포트가 열리는 속도를 크게 높였습니다."],
+  },
+  {
     version: "1.0.1",
     date: "2026-08-07",
     changes: [
