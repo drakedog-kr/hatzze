@@ -137,9 +137,45 @@
      있었다. 목업이 헤어라인 대신 진짜 그림자를 쓰던 시절의 값인데, 콘솔 리디자인이
      카드를 시트로 바꾸면서 경계가 다시 헤어라인(.hz-sheet 의 --c-sheet-line)으로
      돌아가 참조가 0이 됐다. 다크 값을 채우려다 소비자가 없다는 걸 알고 걷어냈다.
-     아래 둘은 살아 있다 — 열 곳 남짓이 box-shadow 의 **색**으로 쓴다. */
+     아래 셋은 살아 있다 — 열 곳 남짓이 box-shadow 의 **색**으로 쓴다. */
   --c-shadow: rgba(20, 70, 130, 0.05);
   --c-shadow-strong: rgba(19, 66, 122, 0.09);
+
+  /* 카드 층 바닥 그림자의 **색**. 판 하나가 캔버스에서 떠 보이게 하는 두 겹
+       0 1px 3px 0 · 0 1px 2px -1px
+     을 이 색으로 깐다. 쓰는 곳은 카드 층 넷이다 — 히어로 판(.hz-hero-panel)·지표
+     시트(.hz-cards)·카더라/MDD 시트(.hz-sheet)·종목 패널(.hz-panelgrid > *).
+
+     shadcn/ui 의 카드에서 **기하만** 옮겼다(2026-08-06 실측). 저쪽은 테두리를 아예
+     두르지 않고 box-shadow 세 겹으로 카드를 세운다:
+       0 0 0 1px  검정 5%(다크는 흰색 10%)   ← 링. 테두리 자리를 그림자로 대신한다
+       0 1px 3px  검정 10%
+       0 1px 2px -1px 검정 10%
+
+     ⭐ **바꿀 것은 테두리 두께가 아니라 그림자였다.** 저 링과 우리 헤어라인은 같은 일을
+     하고 세기도 같다 — 링은 흰 판 위 rgb(242,242,242) 로 캔버스와 명암비 1.119, 우리
+     --c-sheet-line(#e7edf4)은 캔버스(--c-bg #f7fafd)와 1.125 다. 둘 다 1px 이고 우리
+     쪽이 오히려 한 톤 진하다. 없던 것은 바닥 두 겹뿐이고, 카드가 떠 보이는 일은 그
+     두 겹이 한다. 그래서 테두리·radius 는 그대로 두고 이 색만 깐다.
+
+     라이트는 우리 팔레트를 쓴다 — 알파 0.09 는 --c-shadow-strong 과 같은 값이고
+     검정 10% 와 거의 같은 세기다.
+     다크는 **shadcn 의 다크 값을 그대로** 쓴다(검정 10%). 저쪽도 다크에서 그림자를
+     안 바꾸고 링만 흰색 10% 로 뒤집는다. 우리 다크 테두리(#2f2f39 on 카드 #202027)가
+     이미 그 링 자리라, 다크에서 이 그림자가 거의 안 보이는 게 맞다 — 카드 윤곽은
+     테두리와 카드/캔버스 단차(#202027 vs #101013)가 낸다.
+     ⚠️ 다크에 --c-shadow-strong 을 쓰면 안 된다. 그 토큰은 다크에서 '옅은 빛'으로
+     뒤집혀 있어(팝오버가 그렇게 쓴다) 카드 밑에 깔면 그림자가 아니라 광륜이 된다.
+
+     ⚠️⚠️ **그림자 두 겹을 통째로 담은 토큰(--sh-card: 0 1px 3px …)으로 두면 안 된다.**
+     Lightning CSS(Tailwind v4 의 미니파이어)가 `box-shadow: inset …, inset …, var(--sh-card)`
+     처럼 **리터럴 층과 var() 층을 섞은 목록에서 var() 층을 조용히 지운다.** 실제로
+     .hz-cards 의 안쪽 링 네 겹만 남고 바닥 두 겹이 서빙 CSS 에서 사라졌다(소스 5층 →
+     서빙 4층, 경고도 에러도 없다). box-shadow 값 전체가 var() 하나면 살아남아서, 시트·
+     패널에서는 되고 지표 시트에서만 안 되는 꼴이 됐다. 색으로 두면 이 자리는 이 파일이
+     이미 열 곳 넘게 쓰는 꼴(`inset -1px 0 0 var(--c-sheet-line)`)이라 안전하다. */
+  --c-sh-card: rgba(19, 66, 122, 0.09);
+
   --c-marker: #c7d5e3;
 
   /* 강조색 알약(배지)의 옅은 배경. 인라인에서 `${C.hot}22` 처럼 쓰면 var()에 알파를
@@ -351,6 +387,9 @@
      '어두운 테두리'가 아니라 '옅은 빛'이어야 카드 윤곽이 살아난다. */
   --c-shadow: rgba(218, 223, 233, 0.05);
   --c-shadow-strong: rgba(218, 223, 233, 0.11);
+  /* 카드 바닥 그림자는 반대로 **검정 그대로**다 — shadcn 다크가 쓰는 값(검정 10%)이고,
+     위 두 토큰처럼 빛으로 뒤집으면 그림자가 광륜이 된다(:root 의 --c-sh-card 주석 참고). */
+  --c-sh-card: rgba(0, 0, 0, 0.1);
   --c-marker: rgba(228, 228, 229, 0.4);
   --c-blue-tint: rgba(52, 133, 250, 0.18);
   /* 라이트에서 tint2(#e9f3fe)가 tint(#e8f3fe)보다 한 톤 차분하듯, 다크에서도 알파를
@@ -508,12 +547,19 @@ body {
      (.hz-cellgrid 가 margin-bottom:-1px 을 쓰는 것과 같은 동기다 — 저긴 격자가 시트
      안에 들어 있어 음수 여백이 통하지만, 여긴 격자 자신이 테두리를 진 상자라 안 통한다).
 
-     네 변을 따로 그어야 가로·세로가 각자 제 토큰을 쓴다(폰에서 가로만 반 칸 진하다). */
+     네 변을 따로 그어야 가로·세로가 각자 제 토큰을 쓴다(폰에서 가로만 반 칸 진하다).
+
+     ⚠️ 맨 끝 바닥 그림자 두 겹은 **안쪽 링과 한 선언에 같이 있어야 한다.** 다른 규칙으로
+     떼어 내면 나중에 오는 쪽이 box-shadow 를 통째로 이겨서 링 네 겹이 사라진다
+     (box-shadow 는 층을 합치지 않고 목록을 대체한다). 그래서 여기만 두 겹을 손으로
+     적는다 — 통째 토큰(var(--sh-card))으로 두면 미니파이어가 지운다(--c-sh-card 주석). */
   box-shadow:
     inset 0 1px 0 var(--c-sep-h),
     inset 0 -1px 0 var(--c-sep-h),
     inset 1px 0 0 var(--c-sheet-line),
-    inset -1px 0 0 var(--c-sheet-line);
+    inset -1px 0 0 var(--c-sheet-line),
+    0 1px 3px 0 var(--c-sh-card),
+    0 1px 2px -1px var(--c-sh-card);
 }
 /* 셀 = 예전의 카드 한 장. 그림자·라운드·테두리를 걷고 격자선만 남긴다.
    min-height 로 모든 셀의 키를 맞춰야 격자가 표로 읽힌다(안 맞으면 줄마다 높이가
@@ -585,6 +631,9 @@ body {
   border: 1px solid var(--c-sheet-line);
   border-radius: var(--r-card);
   overflow: hidden;
+  box-shadow:
+    0 1px 3px 0 var(--c-sh-card),
+    0 1px 2px -1px var(--c-sh-card);
 }
 .hz-hero-cell {
   min-width: 0;
@@ -885,6 +934,11 @@ body {
   border-radius: var(--r-card);
   overflow: hidden;
   min-width: 0;
+  /* 헤어라인 밑에 깔리는 낮은 그림자(:root 의 --c-sh-card). 위 주석의 "그림자 없음"은
+     2026-08-06 부터 아니다 — 테두리·radius 는 그대로고 바닥 두 겹만 얹었다. */
+  box-shadow:
+    0 1px 3px 0 var(--c-sh-card),
+    0 1px 2px -1px var(--c-sh-card);
 }
 /* 시트 머리(**타이틀 칸**) — 맨 아이콘(타일 아님) + 제목 + 설명 + 우측 알약.
    화면에 시트가 일곱이라 머리가 흰 판이면 어디서 새 구간이 시작하는지 선 하나로만
@@ -993,6 +1047,10 @@ body {
   background: var(--c-card);
   border: 1px solid var(--c-panel-line);
   border-radius: var(--r-card);
+  /* 경계를 넷으로 겹친다 — 위 셋(트레이 + 간격 + 테두리)에 바닥 그림자를 더한다. */
+  box-shadow:
+    0 1px 3px 0 var(--c-sh-card),
+    0 1px 2px -1px var(--c-sh-card);
 }
 .hz-panelgrid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .hz-panelgrid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
