@@ -352,18 +352,7 @@ const SHARE_SMOOTHING = 0.002;
 // channel_count 는 일부러 뺐다. 창 전체의 '서로 다른 채널 수'는 일별 개수로 복원할 수
 // 없어서(recentChannelCount 주석) 프론트가 쓸 데가 없고, 14일 × 수천 행에 실려 오는
 // 열이라 안 받는 편이 낫다. 파이프라인 집계에는 그대로 남아 있다.
-// channel_count 는 화면에 그대로 쓰는 값이 아니라 **폴백용**이다. 파이프라인이 날짜별로
-// 저장해 둔 '그날 이 종목을 언급한 서로 다른 채널 수'인데, 창 전체의 distinct 는 날짜별
-// 값의 합도 최댓값도 아니다(같은 채널이 이틀 나오면 합은 겹쳐 세고 최댓값은 놓친다).
-// 그래서 평소엔 원자료로 세고(recentChannelCount), 그게 실패했을 때만 이 값의 최댓값을
-// 하한으로 쓴다. 과대평가가 없다는 게 하한을 고른 이유다.
-type DailyRow = {
-  stock_code: string;
-  date: string;
-  weighted_score: number;
-  mention_count: number;
-  channel_count: number;
-};
+type DailyRow = { stock_code: string; date: string; weighted_score: number; mention_count: number };
 
 async function loadStockDaily(days: number): Promise<{ rows: DailyRow[]; dates: string[] }> {
   const db = getSupabaseAdmin();
@@ -373,7 +362,7 @@ async function loadStockDaily(days: number): Promise<{ rows: DailyRow[]; dates: 
   const rows = await fetchAllRows<DailyRow>("id", () =>
     db
       .from("telegram_stock_daily")
-      .select("stock_code,date,weighted_score,mention_count,channel_count")
+      .select("stock_code,date,weighted_score,mention_count")
       .gte("date", window[0])
       .lte("date", window[window.length - 1]),
   );
@@ -514,7 +503,9 @@ export type SurgingStock = {
   code: string;
   name: string;
   recentMentions: number;
-  channelCount: number; // 이 종목을 다룬 서로 다른 채널 수(관심의 폭). 규칙은 recentChannelCount.
+  // null = 못 셌다(조회 실패). 화면은 이때 'N개 채널' 문구를 통째로 뺀다 — 0 은 거짓이고,
+  // 일별 channel_count 로 때우면 버린 max 규칙이 되살아난다(recentChannelCount 주석).
+  channelCount: number | null; // 이 종목을 다룬 서로 다른 채널 수(관심의 폭). 규칙은 recentChannelCount.
   ratio: number; // 최근 vs 평소 주목도 배수 (Infinity=신규 등장)
   isNew: boolean;
   series: number[]; // 일별 언급수(오래된→최신)
@@ -559,13 +550,6 @@ export async function getSurgingStocks(
   const dayTotal = new Map<string, number>();
   for (const r of rows) dayTotal.set(r.date, (dayTotal.get(r.date) ?? 0) + (Number(r.weighted_score) || 0));
 
-  // 채널 수 폴백(하한). 창 안 하루치 최댓값이라 실제 distinct 이하다(DailyRow 주석).
-  const chanFloorOf = new Map<string, number>();
-  for (const r of rows) {
-    if (!recentDates.has(r.date)) continue;
-    chanFloorOf.set(r.stock_code, Math.max(chanFloorOf.get(r.stock_code) ?? 0, r.channel_count || 0));
-  }
-
   const byStock = new Map<
     string,
     { recentShare: number; recentM: number; priorShare: number; byDate: Map<string, number> }
@@ -598,7 +582,8 @@ export async function getSurgingStocks(
         // 여기서는 못 센다 — '서로 다른 채널 수'는 일별 집계의 합집합이라 원자료를
         // 봐야 하고(recentChannelCount 주석), 카드에 오르지도 못할 1,700여 종목까지
         // 물을 이유가 없다. 정원을 확정한 뒤 그 몇 건만 아래에서 채운다.
-        channelCount: 0,
+        // null 로 둔다 — 아래에서 못 채우면 그대로 '못 셌다'가 되고, 화면이 문구를 뺀다.
+        channelCount: null as number | null,
         // 평활(+SHARE_SMOOTHING)한 뒤 나눈다. 그냥 나누면 분모가 거의 0인 종목이
         // "▲162.8배"처럼 터무니없는 배수를 받는데, 실제론 3일간 2회 언급·1개 채널이라
         // 표본이 사실상 없는 경우다. 상수는 '언급 1회가 만드는 몫'(실측 중앙값 0.0018)
@@ -660,9 +645,10 @@ export async function getSurgingStocks(
       s.changeRate = q.changeRate;
       s.isLive = true;
     }
-    // null = 못 셌다. 그때만 저장된 일별 집계의 하한으로 대신한다 — 0 을 그대로 두면
-    // "이 종목을 다룬 채널이 없다"는 거짓말이 된다(언급 수는 옆에 멀쩡히 적혀 있다).
-    s.channelCount = breadth.get(s.code) ?? chanFloorOf.get(s.code) ?? 0;
+    // null 을 그대로 넘긴다 — 화면이 '개 채널' 문구를 통째로 뺀다. 0 으로 두면
+    // "이 종목을 다룬 채널이 없다"는 거짓말이 되고(언급 수는 옆에 멀쩡히 적혀 있다),
+    // 저장된 일별 channel_count 로 때우면 버린 max 규칙이 되살아난다(recentChannelCount 주석).
+    s.channelCount = breadth.get(s.code) ?? null;
   });
 
   return list;
@@ -849,7 +835,7 @@ export type StockReport = {
   totalMentions: number;
   /** 막대 차트용 일별 언급. scored=false 인 앞쪽 칸은 배경 맥락이라 합계에 안 들어간다. */
   series: { date: string; mentions: number; scored: boolean }[];
-  channelCount: number; // 이 종목을 다룬 서로 다른 채널 수(관심의 폭)
+  channelCount: number | null; // 이 종목을 다룬 서로 다른 채널 수(관심의 폭). null = 못 셌다
   price: number | null; // 실시간 시세
   changeRate: number | null;
 };
@@ -943,8 +929,7 @@ export async function getStockReport(code: string): Promise<StockReport | null> 
   const [{ data: daily }, channelCount, quote] = await Promise.all([
     db
       .from("telegram_stock_daily")
-      // channel_count 는 막대엔 안 쓴다. 아래 채널 수 폴백용이다(DailyRow 주석).
-      .select("date,mention_count,channel_count")
+      .select("date,mention_count")
       .eq("stock_code", code)
       // 막대용이라 차트 창 전체를 받는다(합계는 아래에서 집계 창만 골라 낸다).
       .gte("date", chartDays[0])
@@ -974,10 +959,6 @@ export async function getStockReport(code: string): Promise<StockReport | null> 
   }));
   // 합계는 **집계 창만** 센다. 막대는 7칸이어도 카드에 적히는 수치는 최근 3일치다.
   const totalMentions = series.reduce((s, d) => (d.scored ? s + d.mentions : s), 0);
-  // 채널 수를 못 셌으면(null) 저장된 일별 값의 하한으로 대신한다. 창은 집계 창과 맞춘다.
-  const channelFloor = (daily ?? [])
-    .filter((d) => d.date >= scoredFrom)
-    .reduce((m, d) => Math.max(m, d.channel_count || 0), 0);
 
   return {
     code,
@@ -985,7 +966,7 @@ export async function getStockReport(code: string): Promise<StockReport | null> 
     market: (stock.market as string) ?? null,
     totalMentions,
     series,
-    channelCount: channelCount ?? channelFloor,
+    channelCount,
     price: quote ? Math.round(quote.price) : null,
     changeRate: quote ? quote.changeRate : null,
   };
