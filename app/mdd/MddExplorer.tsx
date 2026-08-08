@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { CHARACTER_MIN_DD, CHARACTER_SPLIT_DAYS } from "@/lib/mdd";
 import type { DepthBucket, DrawdownCharacter, Episode, MddAnalysis, RiskProfile as RiskProfileData, YearStat } from "@/lib/mdd";
-import { track } from "@/lib/ga";
+import { gaStockCode, track } from "@/lib/ga";
 import { C, Icon, MONO, R } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
 import { StockLogo } from "../StockLogo";
@@ -376,11 +376,15 @@ function Controls({
     return () => clearTimeout(timer);
   }, [query, matches.length]);
 
-  const pick = (s: StockOption) => {
-    // 파라미터 이름을 stock_* 으로 붙인다. GA4 의 맞춤 측정기준은 이벤트가 아니라
-    // 속성 전체에서 이름 하나를 공유하므로, code/name 처럼 흔한 이름을 쓰면 나중에
-    // 다른 이벤트가 같은 이름을 다른 뜻으로 보낼 때 한 측정기준에 섞인다.
-    track("mdd_stock_select", { stock_code: s.code, stock_name: s.name });
+  // source 를 받는 이유: 이 드롭다운은 두 얼굴이라(아래 주석) 추천 목록 클릭과 검색
+  // 결과 클릭이 같은 pick 을 지난다. 값을 안 실으면 리포트에서 두 가지가 한 줄로 합쳐져
+  // "무슨 종목을 검색해서 찾아봤나"를 답할 수 없다 — 추천에 올린 종목이 검색어 없이도
+  // 상위를 채우기 때문에, 합쳐 놓으면 사실상 추천 목록을 되읽는 표가 된다.
+  const pick = (s: StockOption, source: "search" | "suggest") => {
+    // 파라미터 이름을 stock_*·select_* 으로 붙인다. GA4 의 맞춤 측정기준은 이벤트가
+    // 아니라 속성 전체에서 이름 하나를 공유하므로, code/name/source 처럼 흔한 이름을
+    // 쓰면 나중에 다른 이벤트가 같은 이름을 다른 뜻으로 보낼 때 한 측정기준에 섞인다.
+    track("mdd_stock_select", { stock_code: gaStockCode(s.code), stock_name: s.name, select_source: source });
     onSelect(s);
     setQuery("");
     setOpen(false);
@@ -460,8 +464,8 @@ function Controls({
                 {/* 두 묶음 사이는 넉넉히 벌린다. 붙여 두면 아래 묶음의 제목이 위 묶음의
                     마지막 줄처럼 읽혀서 어디까지가 '급부상'인지 헷갈린다. */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-                  <SuggestSection title="급부상 종목" hint="평소 대비 언급 급증" items={suggest.surging} onPick={pick} />
-                  <SuggestSection title="주요 종목" hint="최근 주목도 상위" items={suggest.report} onPick={pick} />
+                  <SuggestSection title="급부상 종목" hint="평소 대비 언급 급증" items={suggest.surging} onPick={(s) => pick(s, "suggest")} />
+                  <SuggestSection title="주요 종목" hint="최근 주목도 상위" items={suggest.report} onPick={(s) => pick(s, "suggest")} />
                 </div>
                 <p style={{ margin: "10px 10px 2px", fontSize: 11, color: C.muted, lineHeight: 1.5 }}>
                   텔레그램에서 많이 언급된 종목입니다. 매수·매도 신호가 아닙니다.
@@ -472,7 +476,7 @@ function Controls({
                 {matches.map((s) => (
                   <li key={s.code}>
                     <button
-                      onClick={() => pick(s)}
+                      onClick={() => pick(s, "search")}
                       className="hz-row-link hz-pick"
                       style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "9px 10px", border: "none", borderRadius: 8, cursor: "pointer", color: C.ink, fontSize: 14, textAlign: "left" }}
                     >

@@ -20,3 +20,19 @@ export function track(name: string, params: GaParams = {}) {
   if (!ON) return;
   sendGAEvent("event", name, params);
 }
+
+/**
+ * 종목 코드를 GA4 로 보낼 표기로 바꾼다. "005930" → "A005930".
+ *
+ * 앞자리 0 을 지키려고 붙이는 접두어다. 숫자로만 이뤄진 값은 GA4 리포트에서 수로
+ * 읽혀서, 코드를 그대로 보내면 005930 이 5930 으로, 000660 이 660 으로 찍힌다
+ * (2026-08-08 탐색 표에서 확인). 보내는 쪽 값은 문제가 없다 — stocks.code 는 text
+ * 컬럼이고 REST 응답도 "005930" 이다.
+ *
+ * A 는 KRX 단축코드 표기(A005930)를 그대로 쓴 것이다. 리포트를 읽는 사람이 자릿수
+ * 되돌리는 규칙을 기억하는 것보다 값 자체가 온전한 편이 낫고, 아무 글자나 붙이는
+ * 것보다는 이미 쓰이는 표기가 낫다.
+ */
+export function gaStockCode(code: string) {
+  return `A${code}`;
+}
