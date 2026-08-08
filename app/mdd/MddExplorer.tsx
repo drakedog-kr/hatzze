@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { CHARACTER_MIN_DD, CHARACTER_SPLIT_DAYS } from "@/lib/mdd";
 import type { DepthBucket, DrawdownCharacter, Episode, MddAnalysis, RiskProfile as RiskProfileData, YearStat } from "@/lib/mdd";
-import { gaStockCode, track } from "@/lib/ga";
+import { gaSearchTerm, gaStockCode, track } from "@/lib/ga";
 import { C, Icon, MONO, R } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
 import { StockLogo } from "../StockLogo";
@@ -369,10 +369,12 @@ function Controls({
   // 검색어는 타이핑이 멎은 뒤에만 한 번 보낸다. onChange 마다 쏘면 "삼성전자" 한 번
   // 치는 데 이벤트가 다섯 개 나가고, 그중 넷("삼", "삼성", …)은 의미가 없다.
   // matches=0 인 검색어가 이 데이터의 알맹이다 — 목록에 없는 종목을 찾고 있다는 뜻.
+  // 그 알맹이가 정확히 깨지는 자리라 검색어도 gaSearchTerm 을 지난다: 검색 목록에는
+  // 코스피만 실려 있어서, 코스닥 코드를 친 사람이 바로 matches=0 행이다.
   useEffect(() => {
     const q = query.trim();
     if (q.length < 2) return;
-    const timer = setTimeout(() => track("mdd_search", { query: q, matches: matches.length }), 800);
+    const timer = setTimeout(() => track("mdd_search", { query: gaSearchTerm(q), matches: matches.length }), 800);
     return () => clearTimeout(timer);
   }, [query, matches.length]);
 
