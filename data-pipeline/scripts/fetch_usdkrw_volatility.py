@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
+from common.details import upsert_details  # noqa: E402
 
 FX_TICKER = "KRW=X"
 BACKFILL_DAYS = 365
@@ -54,8 +55,11 @@ INDICATOR_META = {
 }
 
 
-def fetch_volatility_series(start: date, end: date) -> dict[str, float]:
+def fetch_volatility_series(start: date, end: date) -> dict[str, tuple[float, float]]:
     """확정된 환율 종가만으로 20일 변동성을 낸다. **진행 중인 `end` 날짜는 버린다.**
+
+    반환: {날짜: (20일 변동성, 그날 환율 종가)}. 종가를 같이 돌려주는 이유는 main 의
+    details 주석에 있다 — 카드가 "±0.61%" 옆에 "1,385원"을 적는 데 쓴다.
 
     yfinance 의 마지막 일봉은 그날이 안 끝났으면 `Close` 에 현재가가 앉는다. 원/달러는
     24시간 돌아서 오전·오후 실행 **둘 다** 진행 중인 값을 받는다.
@@ -90,7 +94,7 @@ def fetch_volatility_series(start: date, end: date) -> dict[str, float]:
             continue
         d = ts.date()
         if start <= d <= end:
-            result[d.isoformat()] = float(value)
+            result[d.isoformat()] = (float(value), float(closes[ts]))
     return result
 
 
@@ -125,10 +129,21 @@ def main() -> None:
     stored = {row["date"]: float(row["raw_value"]) for row in existing.data}
 
     rows = [
-        {"indicator_id": indicator_id, "date": d, "raw_value": v}
-        for d, v in volatility_series.items()
+        {
+            "date": d,
+            "raw_value": vol,
+            # 변동성 숫자만으로는 "그래서 환율이 지금 얼마인지"를 알 길이 없다. 그 값을
+            # 계산한 **바로 그 종가**를 같이 남겨 카드가 "±0.61%" 옆에 "1,385원"을 적게
+            # 한다. 변동성과 같은 종가에서 나오므로 카드의 두 숫자가 같은 시점을 가리킨다
+            # (= 실시간 환율이 아니라 파이프라인이 받은 확정 종가다).
+            "details": {"usdkrw_close": round(close, 2)},
+        }
+        for d, (vol, close) in volatility_series.items()
     ]
-    client.table("indicator_values").upsert(rows, on_conflict="indicator_id,date").execute()
+    # 통째 대입 대신 upsert_details 를 쓴다 — details 는 calculate_score 도 같은 행에
+    # hot_threshold 를 쓰는 공유 칸이라, 새로 만든 dict 를 그대로 넣으면 남의 키가 날아간다
+    # (common/details.py 모듈 docstring).
+    upsert_details(client, indicator_id, rows)
     fresh = sum(1 for r in rows if r["date"] not in stored)
     fixed = sum(
         1
@@ -141,9 +156,10 @@ def main() -> None:
     )
 
     latest_date = max(volatility_series)
+    latest_vol, latest_close = volatility_series[latest_date]
     print(
         f"[usdkrw_volatility] 최신값 ({latest_date} 기준): "
-        f"{volatility_series[latest_date]:.4f}%"
+        f"{latest_vol:.4f}% (환율 종가 {latest_close:,.2f}원)"
     )
 
 

@@ -1635,11 +1635,30 @@ function CardVolume({ v }: { v: Pick }) {
 // 값 하나하나보다 **선이 얼마나 평평한가**가 답이고, 막대는 그 평평함을 못 보여 준다.
 function CardFx({ v }: { v: Pick }) {
   const pts = v.historyPoints.map((b) => ({ key: b.date, value: b.value }));
+  // 이 카드는 '얼마나 출렁였나'만 말해서, 정작 환율이 지금 얼마인지는 알 수가 없었다.
+  // 파이프라인이 변동성을 계산한 **바로 그 종가**를 details 로 보내 준다 — 실시간이
+  // 아니라 파이프라인이 받은 확정 종가라 왼쪽 ±%와 같은 시점을 가리킨다.
+  const close = v.details?.usdkrw_close;
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="waves" name={v.name} />
-      <Big disp={`±${v.disp}`} unit={v.unit} color={v.color} size={32} sub="최근 30일" />
-      <AreaChart points={pts} color={v.color} tip={(x) => `${shortDate(x.key)} · ±${x.value.toFixed(2)}%`} />
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <Big disp={`±${v.disp}`} unit={v.unit} color={v.color} size={32} />
+        {typeof close === "number" && (
+          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+            {close.toLocaleString("ko-KR", { maximumFractionDigits: 0 })}원
+          </span>
+        )}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <AreaChart points={pts} color={v.color} tip={(x) => `${shortDate(x.key)} · ±${x.value.toFixed(2)}%`} />
+        {/* 기간은 차트의 캡션이지 큰 수치의 곁말이 아니다 — 차트 밑 오른쪽에 둔다
+            (경제 베스트셀러 비중이 쓰는 CardTrend 와 같은 자리·같은 활자).
+            큰 수치 옆을 비워 주는 덤도 있다: 곁말이 있으면 4열 하한(칸 안쪽 237px)에서
+            164+12+65=241 이라 배지가 아랫줄로 내려갔는데, 빼면 99+12+65=176 으로
+            한 줄에 붙어 배지가 오른쪽 끝에 선다. */}
+        <span style={{ alignSelf: "flex-end", fontSize: 11, color: C.sub }}>최근 30일</span>
+      </div>
       <Foot text={v.desc} />
     </Shell>
   );
