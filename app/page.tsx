@@ -1635,10 +1635,21 @@ function CardVolume({ v }: { v: Pick }) {
 // 값 하나하나보다 **선이 얼마나 평평한가**가 답이고, 막대는 그 평평함을 못 보여 준다.
 function CardFx({ v }: { v: Pick }) {
   const pts = v.historyPoints.map((b) => ({ key: b.date, value: b.value }));
+  // 이 카드는 '얼마나 출렁였나'만 말해서, 정작 환율이 지금 얼마인지는 알 수가 없었다.
+  // 파이프라인이 변동성을 계산한 **바로 그 종가**를 details 로 보내 준다 — 실시간이
+  // 아니라 파이프라인이 받은 확정 종가라 왼쪽 ±%와 같은 시점을 가리킨다.
+  const close = v.details?.usdkrw_close;
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="waves" name={v.name} />
-      <Big disp={`±${v.disp}`} unit={v.unit} color={v.color} size={32} sub="최근 30일" />
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <Big disp={`±${v.disp}`} unit={v.unit} color={v.color} size={32} sub="최근 30일" />
+        {typeof close === "number" && (
+          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+            {close.toLocaleString("ko-KR", { maximumFractionDigits: 0 })}원
+          </span>
+        )}
+      </div>
       <AreaChart points={pts} color={v.color} tip={(x) => `${shortDate(x.key)} · ±${x.value.toFixed(2)}%`} />
       <Foot text={v.desc} />
     </Shell>
