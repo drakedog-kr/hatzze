@@ -1643,14 +1643,22 @@ function CardFx({ v }: { v: Pick }) {
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="waves" name={v.name} />
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-        <Big disp={`±${v.disp}`} unit={v.unit} color={v.color} size={32} sub="최근 30일" />
+        <Big disp={`±${v.disp}`} unit={v.unit} color={v.color} size={32} />
         {typeof close === "number" && (
           <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
             {close.toLocaleString("ko-KR", { maximumFractionDigits: 0 })}원
           </span>
         )}
       </div>
-      <AreaChart points={pts} color={v.color} tip={(x) => `${shortDate(x.key)} · ±${x.value.toFixed(2)}%`} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <AreaChart points={pts} color={v.color} tip={(x) => `${shortDate(x.key)} · ±${x.value.toFixed(2)}%`} />
+        {/* 기간은 차트의 캡션이지 큰 수치의 곁말이 아니다 — 차트 밑 오른쪽에 둔다
+            (경제 베스트셀러 비중이 쓰는 CardTrend 와 같은 자리·같은 활자).
+            큰 수치 옆을 비워 주는 덤도 있다: 곁말이 있으면 4열 하한(칸 안쪽 237px)에서
+            164+12+65=241 이라 배지가 아랫줄로 내려갔는데, 빼면 99+12+65=176 으로
+            한 줄에 붙어 배지가 오른쪽 끝에 선다. */}
+        <span style={{ alignSelf: "flex-end", fontSize: 11, color: C.sub }}>최근 30일</span>
+      </div>
       <Foot text={v.desc} />
     </Shell>
   );
