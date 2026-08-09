@@ -749,6 +749,69 @@ function useScrolledDown(ref: React.RefObject<HTMLElement | null>) {
   return scrolledDown;
 }
 
+/**
+ * 한 화면 넘게 내려왔는지. '맨 위로' 버튼을 띄우는 데 쓴다.
+ *
+ * useScrolledDown 과 같은 이유로 window 가 아니라 인자로 받은 요소를 듣는다.
+ *
+ * 문턱을 px 상수가 아니라 **clientHeight(한 화면)** 로 둔다. "한 화면 넘게 내려왔으면
+ * 되돌아가기가 번거롭다"가 이 버튼을 띄우는 이유인데, 그 번거로움은 절대 픽셀이 아니라
+ * 화면 몇 개분인지로 정해진다 — 상수로 박으면 작은 폰에서는 늦고 태블릿에서는 이르다.
+ *
+ * 끄는 문턱만 80px 낮춰 둔다(히스테리시스). 같은 값으로 켜고 끄면 경계에 멈춰 선 채
+ * 손가락이 떨릴 때 버튼이 깜빡인다. 켤 때는 한 화면, 끌 때는 한 화면 −80.
+ *
+ * 스크롤마다 setState 를 부르지만 값이 그대로면 React 가 되돌려 보내므로(bail out)
+ * 실제 렌더는 경계를 넘는 순간에만 일어난다.
+ */
+function useScrolledPastFold(ref: React.RefObject<HTMLElement | null>) {
+  const [past, setPast] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const onScroll = () => {
+      const fold = el.clientHeight;
+      setPast((prev) => (prev ? el.scrollTop > fold - 80 : el.scrollTop > fold));
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [ref]);
+
+  return past;
+}
+
+/**
+ * '맨 위로' 버튼. 모바일에서 한 화면 넘게 내려가면 오른쪽 아래에 나타난다.
+ *
+ * **자리는 고정이다.** 같은 구석을 쓰는 PC 권유 띠(PcHint)에 맞춰 버튼을 밀어 올리지
+ * 않는다 — 띠는 대개 금방 닫히는 것이라, 그것 때문에 버튼이 오르내리면 늘 있는 쪽이
+ * 늘 없는 쪽에 맞춰 흔들린다. 대신 띠보다 한 층 아래에 눕혀서 겹치는 동안만 가려지게
+ * 한다(자세한 근거와 실측은 globals.css 의 .hz-totop 주석).
+ *
+ * 표시 여부는 PcHint 와 같은 방식으로 **CSS 가 최종 결정한다**(.hz-totop 은 560px
+ * 미디어쿼리 안에서만 display 가 켜진다). 여기서는 .is-on 만 붙였다 뗀다 — 마운트를
+ * 껐다 켜면 나타나고 사라지는 전환을 걸 수 없다.
+ */
+function ToTop({
+  scroller,
+  show,
+}: {
+  scroller: React.RefObject<HTMLElement | null>;
+  show: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className={show ? "hz-totop is-on" : "hz-totop"}
+      aria-label="맨 위로"
+      onClick={() => scroller.current?.scrollTo({ top: 0 })}
+    >
+      <Icon name="arrow_upward" style={{ fontSize: 20 }} />
+    </button>
+  );
+}
+
 export default function AppShell({
   theme,
   children,
@@ -758,6 +821,7 @@ export default function AppShell({
 }) {
   const mainRef = useRef<HTMLElement>(null);
   const scrolledDown = useScrolledDown(mainRef);
+  const pastFold = useScrolledPastFold(mainRef);
   const [menuOpen, setMenuOpen] = useState(false);
   const pathname = usePathname();
 
@@ -868,6 +932,9 @@ export default function AppShell({
             <Footer />
           </div>
         </main>
+        {/* 둘 다 오른쪽 아래 구석을 쓴다. 층은 DOM 순서가 아니라 z-index 로 못박아
+            두었으므로(버튼 33 · 띠 34) 여기 순서는 읽기 좋은 대로 둔다. */}
+        <ToTop scroller={mainRef} show={pastFold} />
         <PcHint />
       </div>
       </div>
