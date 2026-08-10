@@ -67,19 +67,21 @@ HOME = "43001"  # 한국. 실패했을 때 "이건 없으면 안 된다"를 가�
 #   FORLTEQTYNET    그 달 순매수 (음수면 순매도)
 #   FORLTEQTYVALCHG 그 달 평가액 변동
 #   USLTEQTYPOS     역방향 — 미국 거주자가 든 그 나라 주식(잔액)
+#   USLTEQTYNET     역방향 순매수 — 미국인이 그 나라 주식을 그 달에 산 금액
 SERIES_PREFIX = {
     "holdings_usd_mn": "FORLTEQTYPOS",
     "net_purchase_usd_mn": "FORLTEQTYNET",
     "valuation_change_usd_mn": "FORLTEQTYVALCHG",
     "us_holdings_usd_mn": "USLTEQTYPOS",
+    "us_net_purchase_usd_mn": "USLTEQTYNET",
 }
 
 
 def fetch_country(code: str) -> dict[str, dict[str, int]]:
-    """한 나라의 네 계열을 {월: {칸: 값}} 으로 합친다.
+    """한 나라의 다섯 계열을 {월: {칸: 값}} 으로 합친다.
 
-    계열마다 시작 연도가 다르다(역방향이 더 짧은 나라가 있다). 월 하나에 네 칸이 다
-    차 있을 거라고 가정하지 않는다 — 없는 칸은 None 으로 남고, 화면은 그걸 '자료 없음'
+    계열마다 시작 연도가 다르다(역방향이 더 짧은 나라가 있다). 월 하나에 칸이 다 차
+    있을 거라고 가정하지 않는다 — 없는 칸은 None 으로 남고, 화면은 그걸 '자료 없음'
     으로 그린다.
     """
     merged: dict[str, dict[str, int]] = {}

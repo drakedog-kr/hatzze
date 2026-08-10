@@ -67,6 +67,8 @@ jobs:
       NAVER_HUB_KEY: ${{ secrets.NAVER_HUB_KEY }}
       KRX_API_KEY: ${{ secrets.KRX_API_KEY }}
       ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
+      # 공공데이터포털 인증키(예탁결제원 외화증권 결제). **Decoding 키**를 넣어야 한다.
+      KSD_API_KEY: ${{ secrets.KSD_API_KEY }}
       ALADIN_TTB_KEY: ${{ secrets.ALADIN_TTB_KEY }}
       YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
       KMA_API_KEY: ${{ secrets.KMA_API_KEY }}
@@ -441,6 +443,14 @@ jobs:
         id: seohak_13f
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_seohak_13f.py
+
+      # 위 둘과 달리 이건 **매일 새 값이 있다**(거래일 대비 T+1). 기본은 최근 40일만
+      # 훑어 빠진 영업일을 메우므로, 파이프라인이 며칠 멈췄다 돌아도 저절로 따라붙는다.
+      # 32년 소급 적재는 --from 을 붙여 사람이 따로 돌린다(개발계정 일 10,000회).
+      - name: (서학개미) 일별 외화증권 결제 (예탁결제원)
+        id: seohak_settlement
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_seohak_settlement.py
 
       # ── 채널 발송 ────────────────────────────────────────────────────────
       # 유일하게 밖으로 나가는 스텝이다. 구독자 전원에게 한 번 나간 숫자는 되돌릴 수
