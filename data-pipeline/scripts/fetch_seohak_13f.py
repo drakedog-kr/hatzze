@@ -46,10 +46,10 @@ EDGAR 전문검색은 `locationCodes` 로 제출자의 소재 국가를 걸 수 
 
 from __future__ import annotations
 
+import html
 import re
 import sys
 import time
-from collections import defaultdict
 from pathlib import Path
 
 import requests
@@ -200,7 +200,11 @@ def parse_holdings(xml: str) -> dict[str, dict]:
 
         def field(tag: str) -> str | None:
             match = re.search(rf"<(?:\w+:)?{tag}>(.*?)</(?:\w+:)?{tag}>", block, re.S)
-            return match.group(1).strip() if match else None
+            if not match:
+                return None
+            # XML 이라 & 가 &amp; 로 escape 돼 온다. 안 풀면 발행사명이 화면에
+            # "MARSH &amp; MCLENNAN" 으로 그대로 찍힌다(실측 이름 중 여럿이 & 를 쓴다).
+            return html.unescape(match.group(1).strip())
 
         cusip = (field("cusip") or "").upper()
         issuer = field("nameOfIssuer")
