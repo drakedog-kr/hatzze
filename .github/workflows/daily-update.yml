@@ -421,6 +421,27 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/generate_daily_summary.py
 
+      # ── 서학개미 해부도 파이프라인 ──────────────────────────────────────
+      # 지표·카더라와 완전히 독립적이고, 둘 사이에도 순서 의존이 없다.
+      #
+      # 매일 돌리지만 **원천은 매일 안 바뀐다.** TIC 은 월 1회(약 2개월 지연),
+      # 13F 는 분기 1회(최대 45일 지연)다. 그런데도 일별 파이프라인에 얹는 이유는,
+      # 갱신일을 코드가 알 필요 없이 "새 게 있으면 가져오고 없으면 아무것도 안 쓴다"로
+      # 두는 편이 예약을 하나 더 만드는 것보다 고장 날 자리가 적어서다. 두 스크립트 다
+      # 이미 저장된 구간은 다시 쓰지 않는다.
+      #
+      # 실패 집계(Summarize results)에는 넣지 않는다 — 그 배열은 '그날 지수가 틀어지는'
+      # 스텝만 담기로 기준이 서 있는데, 이 둘이 하루 빠져도 화면은 어제 값 그대로다.
+      - name: (서학개미) 국가별 미국 주식 보유·순매수 (미 재무부 TIC)
+        id: seohak_flows
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_seohak_flows.py
+
+      - name: (서학개미) 한국 기관의 미국 주식 보유 (SEC 13F)
+        id: seohak_13f
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_seohak_13f.py
+
       # ── 채널 발송 ────────────────────────────────────────────────────────
       # 유일하게 밖으로 나가는 스텝이다. 구독자 전원에게 한 번 나간 숫자는 되돌릴 수
       # 없으므로 조건이 셋이고, 셋 다 이유가 다르다.
