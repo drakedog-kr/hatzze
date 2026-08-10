@@ -24,6 +24,11 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    version: "1.0.6",
+    date: "2026-08-11",
+    changes: ["카더라 리포트가 국장·미장으로 나뉩니다. 미장 카더라는 준비 중입니다."],
+  },
+  {
     version: "1.0.5",
     date: "2026-08-10",
     changes: ["휴대폰에서 아래로 내려가면 맨 위로 돌아가는 버튼이 나타납니다."],
