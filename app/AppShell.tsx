@@ -15,11 +15,113 @@ import { TipTap } from "./TipTap";
 // 사이드바 항목에는 안 쓰이고 PageHeader 만 읽는다.
 // badge 는 제목 옆 회색 알약이다(콘솔 리디자인). "이 화면이 몇 개를 다루나"를 제목 줄에서
 // 바로 말해 준다 — 부제 문장으로 적으면 읽어야 알 수 있다. 없는 화면엔 안 그린다.
-const NAV = [
+type Glyph = (props: { size?: number; dimmed?: boolean }) => React.ReactElement;
+
+/**
+ * 아래 세 아이콘은 **이모지(👅 🇰🇷 🗽)를 본으로 삼아 다시 그린 것**이다.
+ *
+ * 처음엔 맨손으로 그렸는데 여섯 번 다 딴것으로 읽혔다(혀는 세 번 방패, 여신상은
+ * "뭔지 모르겠다"). 이모지를 그대로 써 보니 바로 읽혔고, 그래서 **이모지의 구성을
+ * 베껴** 다시 그렸다. 혼자 상상해서 그리면 머릿속 그림과 어긋나는데, 이미 통하는
+ * 그림이 앞에 있으면 무엇을 남기고 무엇을 버릴지가 정해진다.
+ *
+ * 이모지를 그대로 안 쓰는 이유: currentColor 를 안 따라 활성 알약(파랑) 위에서
+ * 아이콘 열이 깨지고, 플랫폼마다 그림이 달라진다(🇰🇷 는 윈도우에서 글자 "KR").
+ */
+
+/** 태극 — 🇰🇷 에서 태극만 남겼다(건곤감리는 이 크기에서 회색 얼룩이 된다). */
+function KrTaegukIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      style={{ display: "block", flexShrink: 0 }}
+    >
+      {/* −33° 기울기가 태극기의 태극을 일반적인 음양 문양과 가른다 */}
+      <g transform="rotate(-33 12 12)">
+        <path
+          d="M3.6 12 A4.2 4.2 0 0 1 12 12 A4.2 4.2 0 0 0 20.4 12 A8.4 8.4 0 0 0 3.6 12 Z"
+          fill="currentColor"
+        />
+      </g>
+      <circle cx="12" cy="12" r="8.4" stroke="currentColor" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
+/**
+ * 독수리. **Hun 이 준 시안(~/Downloads/eagle.jpg)을 벡터로 뜬 것**이다.
+ *
+ * ⭐⭐ 손으로 좌표를 찍어 열 번 넘게 고쳤는데 매번 근사치였다("삐죽삐죽 이상하다").
+ * potrace 로 원본 윤곽을 그대로 뜨니 한 번에 끝났다.
+ * **시안이 있으면 눈대중으로 옮기지 말고 벡터로 뜰 것.**
+ *
+ * 재현 방법(스크래치패드에 도구가 있다):
+ *   node vectorize/trace.mjs <이미지> [--flip] [--threshold 128]
+ *   → traced.jsx(붙여넣을 JSX) · preview.png(18/20/32/96px 를 라이트·다크로)
+ *
+ * transform 은 원본 좌표를 24 박스로 옮기는 것이다(여백을 잘라 가운데 맞춤).
+ * 경로 좌표를 직접 고치지 말고 **시안을 고쳐 다시 뜰 것** — 손으로 만지면 원본과 갈린다.
+ *
+ * ⚠️ 시안 출처가 확인되지 않았다. 저장소가 public 이라 라이선스를 확인하거나,
+ *    비율만 참고하고 세부를 다르게 다듬어야 할 수 있다.
+ */
+function EagleIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      style={{ display: "block", flexShrink: 0 }}
+    >
+      <g transform="translate(3.702 1.200) scale(0.05179) translate(-329.519 -280.902)">
+        <path fillRule="evenodd" d="M 330.446 282.610 C 330.869 283.650, 334.044 292.150, 337.504 301.500 C 348.762 331.929, 374.872 402.589, 389.975 443.500 C 414.288 509.354, 417.303 517.488, 417.517 517.777 C 417.629 517.929, 432.832 508.770, 451.302 497.422 L 484.882 476.790 485.643 471.145 C 486.061 468.040, 486.408 456.950, 486.412 446.500 C 486.422 424.362, 485.089 417.736, 477.544 402.406 C 468.715 384.468, 471.006 386.510, 398.513 332 C 362.306 304.775, 332.006 282.100, 331.180 281.610 C 329.984 280.902, 329.835 281.105, 330.446 282.610 M 621.464 401.659 C 606.634 411.372, 565.700 438.206, 530.500 461.290 C 495.300 484.375, 457.154 509.391, 445.732 516.881 C 434.310 524.371, 416.751 535.900, 406.713 542.500 C 396.675 549.100, 377.564 561.632, 364.244 570.348 C 329.519 593.072, 329.974 592.288, 330.049 629.285 L 330.098 653.500 332.482 647.307 C 342.390 621.566, 364.769 607.483, 385.673 613.832 C 404.152 619.445, 415.380 632.628, 415.277 648.592 C 415.226 656.504, 412.753 665.226, 408.226 673.457 C 405.577 678.274, 405.325 678.446, 399.324 679.523 C 391.997 680.839, 390 682.252, 390 686.120 C 390 688.859, 396.028 697, 398.056 697 C 398.509 697, 399.019 695.323, 399.190 693.273 C 399.586 688.511, 402.313 687.035, 410.750 687.015 C 418.267 686.997, 421 688.993, 421 694.500 C 421 696.425, 421.380 698, 421.845 698 C 423.221 698, 425.818 694.679, 427.397 690.900 C 429.261 686.439, 427.904 683.218, 423.157 680.838 C 421.334 679.923, 419.660 678.993, 419.437 678.770 C 419.215 678.548, 421.499 675.820, 424.513 672.708 C 430.460 666.568, 435.934 658.543, 437.957 653 C 438.659 651.075, 439.519 646.578, 439.867 643.006 L 440.500 636.512 447.824 645.215 C 451.988 650.165, 457.308 655.249, 460.157 657.002 C 469.230 662.584, 471.378 662.774, 533.750 663.483 C 565.237 663.841, 590.974 663.766, 590.942 663.317 C 590.910 662.868, 573.343 651.025, 551.903 637 C 487.875 595.115, 484.511 592.885, 484.236 592.134 C 483.964 591.393, 490.074 589.566, 536.500 576.502 C 566.649 568.019, 576.724 563.793, 589.586 554.232 C 607.083 541.225, 620.526 522.226, 626.953 501.416 C 628.659 495.892, 632.850 474.687, 646.105 404.500 C 647.767 395.700, 649.372 387.488, 649.672 386.250 C 649.972 385.012, 649.814 384, 649.322 384 C 648.830 384, 636.294 391.947, 621.464 401.659" />
+      </g>
+    </svg>
+  );
+}
+
+// 서브 항목. href 가 없으면 아직 페이지가 없는 예고 항목이라 링크가 아니라 <div> 로 그린다.
+type NavChild = { label: string; href?: string; Glyph: Glyph; badge?: string; tip?: string };
+
+// icon 은 Material Symbols 이름, Glyph 는 직접 그린 SVG 다(폰트에 없는 것 — 태극·성조·개미).
+// 둘 중 하나만 있으면 된다. NavGlyph 가 Glyph 를 우선한다.
+type NavItem = {
+  href: string;
+  label: string;
+  icon?: string;
+  Glyph?: Glyph;
+  sub: string;
+  badge?: string;
+  children?: NavChild[];
+};
+
+const NAV: NavItem[] = [
   { href: "/", label: "시장 브리핑", icon: "monitoring", sub: "지표 25개로 잰 오늘의 시장 온도", badge: "25개 지표" },
-  { href: "/kadera", label: "카더라 리포트", icon: "forum", sub: "주식 텔레그램에서 무엇이 회자되는지" },
+  // 카더라가 국장·미장 둘로 갈린다. **부모는 그대로 두고 밑에 서브 항목을 단다** —
+  // 부모를 국장으로 바꿔 버리면 카더라라는 이름이 사이드바에서 사라지고, 나중에 시장을
+  // 하나 더 붙일 자리도 없어진다.
+  //
+  // 서브의 국장이 부모와 같은 /kadera 를 가리키는 건 의도다. 부모는 구역의 대문이고
+  // 그 대문을 열면 나오는 게 국장이다(카테고리는 라우트가 아니다). 주소를 안 옮기는 이유는
+  // 구글 색인이 이미 그 주소로 끝나 있어서다.
+  {
+    href: "/kadera",
+    label: "카더라 리포트",
+    icon: "forum",
+    sub: "주식 텔레그램에서 무엇이 회자되는지",
+    children: [
+      { label: "국장 카더라", href: "/kadera", Glyph: KrTaegukIcon },
+      { label: "미장 카더라", Glyph: EagleIcon, badge: "준비 중", tip: "이번 주 오픈 예정!" },
+    ],
+  },
   { href: "/mdd", label: "MDD 정밀분석", icon: "trending_down", sub: "고점에서 얼마나 내려왔고 언제 회복했을까" },
-] as { href: string; label: string; icon: string; sub: string; badge?: string }[];
+];
 
 // 외부(텔레그램) 링크라 NAV 배열이 아니라 따로 둔다 — pathname 기반 active 판정 대상이
 // 아니고, 새 탭으로 열려야 해서 next/link 가 아닌 <a> 를 쓴다. 사이드바와 모바일 탭바가
@@ -45,11 +147,56 @@ const TELEGRAM = {
 //     (지금 4개) 5번째가 들어가면 나머지 라벨이 눌린다. 게다가 탭바가 나오는 폭은
 //     터치 화면이라 hover 가 없어 툴팁이 뜨지 않는다 — 눌러도 아무 일도 일어나지 않는
 //     칸만 남는다. 그래서 사이드바에만 둔다. 페이지가 생기면 NAV 로 옮긴다.
-const COMING_SOON = {
-  label: "서학개미 해부도",
-  badge: "준비 중",
-  tip: "현재 열심히 개발 중입니다!",
-};
+// `after` 는 이 항목이 사이드바에서 **어느 NAV 항목 뒤에** 붙는지다. 배열 순서가 아니라
+// 자리를 데이터로 적는 이유는, 미장 카더라가 국장 카더라 바로 밑에 있어야 하기 때문이다 —
+// 예고 항목을 전부 목록 끝에 몰면 짝인 둘이 MDD 를 사이에 두고 떨어진다.
+const COMING_SOON: { label: string; badge: string; tip: string; after: string; Glyph: Glyph }[] = [
+  {
+    label: "서학개미 해부도",
+    badge: "준비 중",
+    tip: "현재 열심히 개발 중입니다!",
+    after: "/mdd",
+    Glyph: AntIcon,
+  },
+];
+
+/**
+ * 사이드바·모바일 메뉴가 그리는 순서. NAV 항목 사이사이에 예고 항목을 끼운다.
+ *
+ * NAV 에 예고 항목을 넣지 않는 이유는 COMING_SOON 위 주석 참고(모바일 하단 탭바가
+ * NAV 를 공유하는데 한 줄에 4개가 한계다). 그래서 목록을 하나 더 만들지 않고
+ * 그릴 때 합친다 — 두 배열을 손으로 맞춰 두면 한쪽만 고쳤을 때 조용히 어긋난다.
+ *
+ * `after` 가 어느 NAV 항목과도 안 맞으면 조용히 사라지지 않도록 끝에 붙인다.
+ */
+function sidebarItems() {
+  const placed = new Set<string>();
+  const rows: (
+    | { kind: "nav"; item: NavItem }
+    | { kind: "child"; item: NavChild }
+    | { kind: "soon"; item: (typeof COMING_SOON)[number] }
+  )[] = [];
+  for (const item of NAV) {
+    rows.push({ kind: "nav", item });
+    for (const child of item.children ?? []) rows.push({ kind: "child", item: child });
+    for (const soon of COMING_SOON) {
+      if (soon.after === item.href) {
+        rows.push({ kind: "soon", item: soon });
+        placed.add(soon.label);
+      }
+    }
+  }
+  for (const soon of COMING_SOON) {
+    if (!placed.has(soon.label)) rows.push({ kind: "soon", item: soon });
+  }
+  return rows;
+}
+
+/** NAV 아이콘. 직접 그린 SVG(Glyph)가 있으면 그걸, 없으면 Material Symbols 이름을 쓴다. */
+function NavGlyph({ item, size }: { item: { icon?: string; Glyph?: (p: { size?: number }) => React.ReactElement }; size: number }) {
+  if (item.Glyph) return <item.Glyph size={size} />;
+  return <Icon name={item.icon ?? ""} style={{ fontSize: size }} />;
+}
 
 /**
  * 서학개미 아이콘. Material Symbols 에 개미가 없어서 직접 그렸다.
@@ -180,7 +327,116 @@ function Sidebar() {
         </p>
       </div>
       <nav style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {NAV.map((item) => {
+        {sidebarItems().map((row) => {
+          if (row.kind === "soon") {
+            const soon = row.item;
+            return (
+              <div
+                key={soon.label}
+                className="hz-tip hz-nav-item"
+                data-tip={soon.tip}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "12px 14px",
+                  color: C.disabled,
+                  fontWeight: 600,
+                  borderRadius: R.nav,
+                }}
+              >
+                <soon.Glyph size={20} dimmed />
+                {/* 배지를 라벨 '우측 상단'에 위첨자로 띄운다(로고 옆 베타 배지와 같은 어법).
+                    absolute 라 배지가 행 폭 계산에서 빠져 라벨이 눌리지도, 항목이 넘치지도 않는다. */}
+                <span style={{ position: "relative", display: "inline-flex" }}>
+                  <span style={{ fontSize: 14, whiteSpace: "nowrap" }}>{soon.label}</span>
+                  <span
+                    style={{
+                      position: "absolute",
+                      left: "100%",
+                      top: -6,
+                      marginLeft: 3,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      lineHeight: 1.4,
+                      whiteSpace: "nowrap",
+                      color: C.muted,
+                      background: C.chip,
+                      padding: "3px 7px",
+                      borderRadius: R.pill,
+                    }}
+                  >
+                    {soon.badge}
+                  </span>
+                </span>
+              </div>
+            );
+          }
+          if (row.kind === "child") {
+            const child = row.item;
+            // 서브 행은 알약을 주지 않는다. 부모가 이미 알약을 쓰고 있어서 둘 다 칠하면
+            // 한 구역에 강조가 둘이 된다 — 부모는 "여기 구역", 서브는 "이 페이지"다.
+            const on = !!child.href && pathname === child.href;
+            const rowStyle = {
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              // 아이콘(20) + 간격(12) + 좌패딩(14) = 46 → 서브 아이콘이 부모 라벨 자리에 선다
+              padding: "8px 14px 8px 34px",
+              borderRadius: R.nav,
+            } as const;
+            if (!child.href) {
+              return (
+                <div
+                  key={child.label}
+                  className="hz-tip hz-nav-item"
+                  data-tip={child.tip}
+                  style={{ ...rowStyle, color: C.disabled, fontWeight: 600 }}
+                >
+                  <child.Glyph size={18} dimmed />
+                  <span style={{ position: "relative", display: "inline-flex" }}>
+                    <span style={{ fontSize: 13, whiteSpace: "nowrap" }}>{child.label}</span>
+                    <span
+                      style={{
+                        position: "absolute",
+                        left: "100%",
+                        top: -6,
+                        marginLeft: 3,
+                        fontSize: 10,
+                        fontWeight: 700,
+                        lineHeight: 1.4,
+                        whiteSpace: "nowrap",
+                        color: C.muted,
+                        background: C.chip,
+                        padding: "3px 7px",
+                        borderRadius: R.pill,
+                      }}
+                    >
+                      {child.badge}
+                    </span>
+                  </span>
+                </div>
+              );
+            }
+            return (
+              <Link
+                key={child.label}
+                href={child.href}
+                {...intentPrefetch(child.href)}
+                className="hz-nav-item"
+                style={{
+                  ...rowStyle,
+                  color: on ? C.blue : C.sub,
+                  fontWeight: on ? 700 : 600,
+                  textDecoration: "none",
+                }}
+              >
+                <child.Glyph size={18} />
+                <span style={{ fontSize: 13 }}>{child.label}</span>
+              </Link>
+            );
+          }
+          const item = row.item;
           const active = isActive(item.href, pathname);
           return (
             <Link
@@ -208,64 +464,19 @@ function Sidebar() {
                 textDecoration: "none",
               }}
             >
-              <Icon name={item.icon} style={{ fontSize: 20 }} />
+              <NavGlyph item={item} size={20} />
               <span style={{ fontSize: 14 }}>{item.label}</span>
             </Link>
           );
         })}
-        {/* 예고 항목. <a href> 가 아니라 <div> 인 게 "못 누른다"의 유일한 보장이다 —
-            href 만 뺀 <a> 는 클릭은 안 먹어도 브라우저·확장 프로그램에 따라 링크로
-            취급되는 변형이 남는다. div 는 포커스 순서에도 안 들어간다.
-
-            hz-nav-item 을 안 붙인다. 그 클래스가 주는 cursor:pointer 와 회색 호버 배경은
-            둘 다 "눌리는 요소"라는 신호라, 못 누르는 항목에 붙이면 거짓말이 된다.
-            hz-tip 의 cursor:default 를 그대로 받아 평범한 화살표로 둔다.
-
-            색은 C.sub(다른 항목) 보다 한 단 흐린 C.faint 로. 호버해 보기 전에도
-            "지금은 아닌 것"이 보여야 한다. */}
-        {/* 사이드바가 250px 로 넓어져서 배지를 라벨 우측 상단에 띄우던 처리를 걷었다.
-            210px 시절엔 아이콘(20)+간격(12)+라벨(92.9) 뒤에 12px 밖에 안 남아 34.6px 짜리
-            배지가 밖으로 삐져나왔는데(scrollWidth 178 > clientWidth 177), 지금은 라벨에
-            flex:1 을 주고 배지를 행 끝에 두면 된다 — 목업의 배치가 그것이다. */}
-        <div
-          className="hz-tip hz-nav-item"
-          data-tip={COMING_SOON.tip}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "12px 14px",
-            color: C.disabled,
-            fontWeight: 600,
-            borderRadius: R.nav,
-          }}
-        >
-          <AntIcon size={20} />
-          {/* 배지를 라벨 '우측 상단'에 위첨자로 띄운다(로고 옆 베타 배지와 같은 어법).
-              absolute 라 배지가 행 폭 계산에서 빠져 라벨이 눌리지도, 항목이 넘치지도 않는다. */}
-          <span style={{ position: "relative", display: "inline-flex" }}>
-            <span style={{ fontSize: 14, whiteSpace: "nowrap" }}>{COMING_SOON.label}</span>
-            <span
-              style={{
-                position: "absolute",
-                left: "100%",
-                top: -6,
-                marginLeft: 3,
-                fontSize: 10,
-                fontWeight: 700,
-                lineHeight: 1.4,
-                whiteSpace: "nowrap",
-                color: C.muted,
-                background: C.chip,
-                padding: "3px 7px",
-                borderRadius: R.pill,
-              }}
-            >
-              {COMING_SOON.badge}
-            </span>
-          </span>
-        </div>
       </nav>
+      {/* 예고 항목에 대하여(위 map 의 kind === "soon" 가지).
+          <a href> 가 아니라 <div> 인 게 "못 누른다"의 유일한 보장이다 — href 만 뺀 <a> 는
+          클릭은 안 먹어도 브라우저·확장 프로그램에 따라 링크로 취급되는 변형이 남는다.
+          div 는 포커스 순서에도 안 들어간다.
+
+          색은 C.sub(다른 항목) 보다 한 단 흐린 C.disabled 로. 호버해 보기 전에도
+          "지금은 아닌 것"이 보여야 한다. */}
 
       <div style={{ flex: 1 }} />
 
@@ -336,7 +547,88 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
     <>
       <div className="hz-menu-backdrop" onClick={onClose} />
       <nav className="hz-menu-panel" id="hz-mobile-menu" aria-label="주요 메뉴">
-        {NAV.map((item) => {
+        {/* 예고 항목은 사이드바와 같은 이유로 <div> 다(링크가 아니고 포커스도 안 받는다).
+            다만 배지는 위첨자가 아니라 라벨 옆에 나란히 둔다. 여기는 폭이 사이드바처럼
+            210px 로 묶여 있지 않아 자리가 남고, 툴팁이 안 뜨는 화면이라 배지가 유일한
+            설명이므로 겹쳐 두지 않고 또렷하게 보여야 한다. */}
+        {sidebarItems().map((row) => {
+          if (row.kind === "soon") {
+            const soon = row.item;
+            return (
+              <div
+                key={soon.label}
+                className="hz-tip"
+                data-tip={soon.tip}
+                style={{ ...rowStyle(false), color: C.faint }}
+              >
+                <soon.Glyph size={20} dimmed />
+                <span style={{ fontSize: 15 }}>{soon.label}</span>
+                <span
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 700,
+                    lineHeight: 1.4,
+                    whiteSpace: "nowrap",
+                    color: C.faint,
+                    background: "var(--c-hover)",
+                    border: `1px solid ${C.line}`,
+                    padding: "2px 6px",
+                    borderRadius: 999,
+                  }}
+                >
+                  {soon.badge}
+                </span>
+              </div>
+            );
+          }
+          if (row.kind === "child") {
+            const child = row.item;
+            const on = !!child.href && pathname === child.href;
+            // 들여쓰기는 사이드바와 같은 뜻(부모 라벨 자리에 서브 아이콘이 선다)이지만
+            // 여기는 행 높이·글자 크기가 달라서 값을 그대로 못 쓴다. rowStyle 위에 얹는다.
+            const indented = { ...rowStyle(false), paddingLeft: 40, gap: 10 };
+            if (!child.href) {
+              return (
+                <div
+                  key={child.label}
+                  className="hz-tip"
+                  data-tip={child.tip}
+                  style={{ ...indented, color: C.faint }}
+                >
+                  <child.Glyph size={18} dimmed />
+                  <span style={{ fontSize: 14 }}>{child.label}</span>
+                  <span
+                    style={{
+                      fontSize: 9,
+                      fontWeight: 700,
+                      lineHeight: 1.4,
+                      whiteSpace: "nowrap",
+                      color: C.faint,
+                      background: "var(--c-hover)",
+                      border: `1px solid ${C.line}`,
+                      padding: "2px 6px",
+                      borderRadius: 999,
+                    }}
+                  >
+                    {child.badge}
+                  </span>
+                </div>
+              );
+            }
+            return (
+              <Link
+                key={child.label}
+                href={child.href}
+                {...intentPrefetch(child.href)}
+                className="hz-nav-item"
+                style={{ ...indented, color: on ? C.blue : C.sub, fontWeight: on ? 700 : 600 }}
+              >
+                <child.Glyph size={18} />
+                <span style={{ fontSize: 14 }}>{child.label}</span>
+              </Link>
+            );
+          }
+          const item = row.item;
           const active = isActive(item.href, pathname);
           return (
             <Link
@@ -347,34 +639,11 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
               aria-current={active ? "page" : undefined}
               style={rowStyle(active)}
             >
-              <Icon name={item.icon} style={{ fontSize: 20 }} />
+              <NavGlyph item={item} size={20} />
               <span style={{ fontSize: 15 }}>{item.label}</span>
             </Link>
           );
         })}
-        {/* 예고 항목 — 사이드바와 같은 이유로 <div> 다(링크가 아니고 포커스도 안 받는다).
-            다만 배지는 위첨자가 아니라 라벨 옆에 나란히 둔다. 여기는 폭이 사이드바처럼
-            210px 로 묶여 있지 않아 자리가 남고, 툴팁이 안 뜨는 화면이라 배지가 유일한
-            설명이므로 겹쳐 두지 않고 또렷하게 보여야 한다. */}
-        <div className="hz-tip" data-tip={COMING_SOON.tip} style={{ ...rowStyle(false), color: C.faint }}>
-          <AntIcon size={20} />
-          <span style={{ fontSize: 15 }}>{COMING_SOON.label}</span>
-          <span
-            style={{
-              fontSize: 9,
-              fontWeight: 700,
-              lineHeight: 1.4,
-              whiteSpace: "nowrap",
-              color: C.faint,
-              background: "var(--c-hover)",
-              border: `1px solid ${C.line}`,
-              padding: "2px 6px",
-              borderRadius: 999,
-            }}
-          >
-            {COMING_SOON.badge}
-          </span>
-        </div>
         <span style={{ height: 1, background: C.line, margin: "4px 8px" }} />
         {/* 라벨은 바뀌었어도 data-ga-cta 는 "community" 그대로 둔다 — 값을 같이 바꾸면
             이름 변경 전후의 클릭수를 한 줄로 비교할 수 없다. surface 만 tabbar → menu 로
