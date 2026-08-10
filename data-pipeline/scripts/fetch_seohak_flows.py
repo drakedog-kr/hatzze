@@ -156,7 +156,10 @@ def main() -> None:
             )
             continue
 
-        known = existing_months(db, code)
+        # --all 은 이미 저장된 달까지 통째로 다시 쓴다. **칸을 새로 열었을 때 필요하다** —
+        # 평소 경로는 "저장 안 된 달"만 쓰므로, 컬럼을 추가해도 과거 행의 새 칸이 영원히
+        # 비어 있게 된다(마이그레이션 031 의 us_net_purchase_usd_mn 에서 실제로 걸렸다).
+        known = set() if "--all" in sys.argv else existing_months(db, code)
         fresh = [r for r in rows if r["month"] not in known]
         # 마지막 달은 원천이 나중에 수정하는 일이 있어(속보치 → 확정치) 늘 다시 쓴다.
         if rows and rows[-1] not in fresh:

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import {
+  getLatestSettlement,
   getNpsPortfolio,
   getPeers,
   getSeohakOverview,
@@ -309,7 +310,11 @@ function NpsSheet({ nps }: { nps: NpsPortfolio }) {
 export default async function SeohakPage() {
   const ov = await getSeohakOverview();
   // 아래 셋은 서로 의존이 없다. 순서대로 await 하면 왕복이 앞뒤로 붙으므로 함께 띄운다.
-  const [peers, nps] = await Promise.all([getPeers(ov.asOf), getNpsPortfolio()]);
+  const [peers, nps, today] = await Promise.all([
+    getPeers(ov.asOf),
+    getNpsPortfolio(),
+    getLatestSettlement(),
+  ]);
   const maxInflow = Math.max(...ov.cohorts.map((c) => c.inflow));
   const recent = ov.cohorts.filter((c) => c.year >= 2025).reduce((s, c) => s + c.inflow, 0);
   const recentShare = (recent / ov.principal) * 100;
@@ -400,6 +405,54 @@ export default async function SeohakPage() {
         </div>
       </section>
 
+      {/* ── 오늘의 서학개미 (매일 갱신) ─────────────────────────────── */}
+      {today && (
+        <section className="hz-sheet">
+          <SectionHead
+            icon="today"
+            title="직전 거래일, 실제로 사고판 것"
+            desc="예탁결제원 결제 기준입니다. 이 화면에서 유일하게 매일 바뀌는 칸입니다."
+            note={`${today.date} 결제`}
+          />
+          <div style={{ display: "flex", gap: 22, padding: "16px 18px 6px", flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontSize: 11.5, color: C.sub2, marginBottom: 3 }}>매수</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
+                {usdB(today.usBuy / 1_000_000)}
+              </div>
+              <div style={{ fontSize: 11.5, color: C.sub2, marginTop: 2 }}>
+                {today.usBuyCount.toLocaleString("ko-KR")}건
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11.5, color: C.sub2, marginBottom: 3 }}>매도</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
+                {usdB(today.usSell / 1_000_000)}
+              </div>
+              <div style={{ fontSize: 11.5, color: C.sub2, marginTop: 2 }}>
+                {today.usSellCount.toLocaleString("ko-KR")}건
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11.5, color: C.sub2, marginBottom: 3 }}>1건당 매수</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
+                ${Math.round(today.usBuy / Math.max(1, today.usBuyCount)).toLocaleString("ko-KR")}
+              </div>
+            </div>
+            <div style={{ marginLeft: "auto", textAlign: "right" }}>
+              <div style={{ fontSize: 11.5, color: C.sub2, marginBottom: 3 }}>해외주식 매수 중 미국</div>
+              <div style={{ fontSize: 30, fontWeight: 800, color: C.blue, letterSpacing: "-.02em" }}>
+                {((today.usBuy / Math.max(1, today.allStockBuy)) * 100).toFixed(1)}%
+              </div>
+            </div>
+          </div>
+          <div className="hz-sheet-foot">
+            결제일은 거래일보다 1영업일 늦습니다. 한국예탁결제원 국제거래 외화증권 예탁결제 통계이고, 예탁원을
+            거치지 않는 기관 거래는 잡히지 않습니다.
+          </div>
+        </section>
+      )}
+
       {/* ── 잔고가 늘어난 이유 ──────────────────────────────────────── */}
       <section className="hz-sheet">
         <SectionHead
@@ -468,8 +521,18 @@ export default async function SeohakPage() {
           </div>
           <div className="hz-sheet-foot">
             {ov.reversal.peakMonth}에 {ov.reversal.peakRatio.toFixed(2)}배였던 것이 지금{" "}
-            {ov.reversal.ratioNow.toFixed(2)}배입니다. 우리가 덜 사서가 아니라, 그 사이 한국 증시가 크게 올라
-            그들이 든 몫의 평가액이 커졌기 때문입니다.
+            {ov.reversal.ratioNow.toFixed(2)}배입니다.{" "}
+            {ov.reversal.usNetSincePeak < 0 ? (
+              <>
+                그 사이 미국 투자자는 한국 주식을 오히려{" "}
+                <b style={{ color: C.ink }}>{usdB(Math.abs(ov.reversal.usNetSincePeak))} 순매도</b>했습니다.
+                {ov.reversal.theirsGrowth &&
+                  ` 그런데도 그들이 든 몫은 ${ov.reversal.theirsGrowth.toFixed(1)}배가 됐습니다.`}{" "}
+                격차가 좁혀진 건 그들이 사서가 아니라 한국 증시가 크게 올랐기 때문입니다.
+              </>
+            ) : (
+              <>같은 기간 미국 투자자의 한국 주식 순매수는 {usdB(ov.reversal.usNetSincePeak)}였습니다.</>
+            )}
           </div>
         </section>
       )}

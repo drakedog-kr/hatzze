@@ -36,6 +36,17 @@ export type FlowRow = {
   netPurchase: number; // 그 달 순매수
   valuationChange: number; // 그 달 평가변동
   usHoldings: number | null; // 역방향 — 미국인이 든 한국 주식
+  usNetPurchase: number | null; // 역방향 순매수. 음수면 미국인이 판 것
+};
+
+export type SettlementDay = {
+  date: string;
+  usBuy: number;
+  usSell: number;
+  usBuyCount: number;
+  usSellCount: number;
+  /** 그날 전 시장 주식 매수 합. 미국 비중의 분모다. */
+  allStockBuy: number;
 };
 
 export type Cohort = {
@@ -65,6 +76,10 @@ export type SeohakOverview = {
   };
   /** 우리가 든 미국 주식 ÷ 그들이 든 한국 주식. */
   reversal: {
+    /** 꼭대기 이후 미국인의 한국 주식 순매수 합. 음수면 그동안 오히려 팔았다는 뜻이다. */
+    usNetSincePeak: number;
+    /** 같은 기간 그들이 든 몫이 몇 배가 됐나. 순매수가 음수인데 이게 크면 전부 주가다. */
+    theirsGrowth: number | null;
     ratioNow: number | null;
     ours: number;
     theirs: number;
@@ -83,7 +98,9 @@ async function loadKoreaFlows(): Promise<FlowRow[]> {
   for (let start = 0; ; start += 1000) {
     const { data, error } = await getSupabaseServer()
       .from("seohak_country_flows")
-      .select("month, holdings_usd_mn, net_purchase_usd_mn, valuation_change_usd_mn, us_holdings_usd_mn")
+      .select(
+        "month, holdings_usd_mn, net_purchase_usd_mn, valuation_change_usd_mn, us_holdings_usd_mn, us_net_purchase_usd_mn",
+      )
       .eq("country_code", KOREA)
       .order("month", { ascending: true })
       .range(start, start + 999);
@@ -98,6 +115,8 @@ async function loadKoreaFlows(): Promise<FlowRow[]> {
         netPurchase: Number(r.net_purchase_usd_mn ?? 0),
         valuationChange: Number(r.valuation_change_usd_mn ?? 0),
         usHoldings: r.us_holdings_usd_mn == null ? null : Number(r.us_holdings_usd_mn),
+        usNetPurchase:
+          r.us_net_purchase_usd_mn == null ? null : Number(r.us_net_purchase_usd_mn),
       });
     }
     if (page.length < 1000) break;
@@ -211,7 +230,17 @@ export async function getSeohakOverview(): Promise<SeohakOverview> {
   let peak = reverseSeries[0] ?? { month: last.month, ratio: 1 };
   for (const p of reverseSeries) if (p.ratio > peak.ratio) peak = p;
   const lastReverse = withReverse[withReverse.length - 1];
+  // 꼭대기 이후 미국인이 한국 주식을 실제로 얼마나 사고팔았나. 배수가 무너진 게
+  // "그들이 샀기 때문"인지 "한국 주가가 올랐기 때문"인지를 이 합이 가른다.
+  const sincePeak = rows.filter((r) => r.month > `${peak.month.slice(0, 7)}-01`);
+  const usNetSincePeak = sincePeak.reduce((s, r) => s + (r.usNetPurchase ?? 0), 0);
+  const theirsAtPeak = rows.find((r) => r.month === peak.month)?.usHoldings ?? null;
   const reversal = {
+    usNetSincePeak,
+    theirsGrowth:
+      theirsAtPeak && lastReverse?.usHoldings
+        ? (lastReverse.usHoldings as number) / theirsAtPeak
+        : null,
     ratioNow: lastReverse ? lastReverse.holdings / (lastReverse.usHoldings as number) : null,
     ours: lastReverse?.holdings ?? 0,
     theirs: lastReverse?.usHoldings ?? 0,
@@ -231,6 +260,46 @@ export async function getSeohakOverview(): Promise<SeohakOverview> {
     series,
     breakdown,
     reversal,
+  };
+}
+
+/**
+ * 가장 최근 결제일 하루치.
+ *
+ * **하루만 읽는다.** 이 표는 32년 × 하루 25행이라 다 받으면 25만 행이고, 매 렌더가
+ * 그걸 읽으면 예전에 Egress 를 태운 그 패턴이 된다(전량조회). 카드가 말하는 건
+ * "오늘 얼마"라서 하루면 충분하다.
+ *
+ * 결제일은 거래일 대비 T+1 영업일이라, 최신 행이 곧 **직전 거래일**의 매매다.
+ */
+export async function getLatestSettlement(): Promise<SettlementDay | null> {
+  const { data: head, error: headErr } = await getSupabaseServer()
+    .from("seohak_settlement_daily")
+    .select("settle_date")
+    .order("settle_date", { ascending: false })
+    .limit(1);
+  if (headErr) throw new Error(`결제 통계 조회 실패: ${headErr.message}`);
+  const day = head?.[0]?.settle_date as string | undefined;
+  if (!day) return null;
+
+  const { data, error } = await getSupabaseServer()
+    .from("seohak_settlement_daily")
+    .select("market_code, security_type, buy_count, buy_amount, sell_count, sell_amount")
+    .eq("settle_date", day);
+  if (error) throw new Error(`결제 통계 조회 실패: ${error.message}`);
+
+  const rows = data ?? [];
+  const us = rows.find((r) => r.market_code === "US" && r.security_type === "주식");
+  if (!us) return null;
+  return {
+    date: day,
+    usBuy: Number(us.buy_amount ?? 0),
+    usSell: Number(us.sell_amount ?? 0),
+    usBuyCount: Number(us.buy_count ?? 0),
+    usSellCount: Number(us.sell_count ?? 0),
+    allStockBuy: rows
+      .filter((r) => r.security_type === "주식")
+      .reduce((s, r) => s + Number(r.buy_amount ?? 0), 0),
   };
 }
 
