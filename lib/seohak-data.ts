@@ -16,6 +16,20 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 /** 한국. TIC 국가 코드이자 FRED 시리즈 ID 의 접미사다. */
 const KOREA = "43001";
 
+/** 비교국. fetch_seohak_flows.py 의 COUNTRIES 와 같은 목록이고 이름도 거기서 옮겨 왔다. */
+const COUNTRY_NAME: Record<string, string> = {
+  "43001": "대한민국",
+  "42609": "일본",
+  "41408": "중국",
+  "46302": "대만",
+  "42005": "홍콩",
+  "46019": "싱가포르",
+  "13005": "영국",
+};
+
+/** 국민연금. 13F 제출자 중 유일하게 '전 국민의 돈'이라 따로 이름을 둔다. */
+const NPS_CIK = "0001608046";
+
 export type FlowRow = {
   month: string;
   holdings: number; // 잔고(백만 달러)
@@ -42,6 +56,22 @@ export type SeohakOverview = {
   closureErrorPct: number;
   cohorts: Cohort[];
   series: { month: string; principal: number; value: number }[];
+  /** 최근 12개월 잔고 증가를 순매수 몫과 평가 몫으로 가른 것. */
+  breakdown: {
+    months: number;
+    netPurchase: number;
+    valuation: number;
+    rows: { month: string; netPurchase: number; valuation: number }[];
+  };
+  /** 우리가 든 미국 주식 ÷ 그들이 든 한국 주식. */
+  reversal: {
+    ratioNow: number | null;
+    ours: number;
+    theirs: number;
+    peakMonth: string;
+    peakRatio: number;
+    series: { month: string; ratio: number }[];
+  };
 };
 
 /**
@@ -154,6 +184,42 @@ export async function getSeohakOverview(): Promise<SeohakOverview> {
     if (r.month >= "1994-01-01") series.push({ month: r.month, principal: cum, value: r.holdings });
   }
 
+  // ── 아래 카드들은 같은 rows 를 재활용한다 ────────────────────────────
+  // 카드마다 표를 다시 읽지 않는다. 498행이 한 번 오면 나머지는 전부 그 위의 산수라,
+  // 왕복을 늘리면 화면만 느려지고 값은 한 글자도 안 달라진다.
+
+  // 잔고가 늘어난 이유 — 최근 12개월.
+  const tail = rows.slice(-12);
+  const breakdown = {
+    months: tail.length,
+    netPurchase: tail.reduce((s, r) => s + r.netPurchase, 0),
+    valuation: tail.reduce((s, r) => s + r.valuationChange, 0),
+    rows: tail.map((r) => ({
+      month: r.month.slice(0, 7),
+      netPurchase: r.netPurchase,
+      valuation: r.valuationChange,
+    })),
+  };
+
+  // 역전 — 우리가 든 미국 주식 vs 그들이 든 한국 주식.
+  // 배수의 **꼭대기부터** 보여 준다. "역전됐다"는 상태만 말하면 지금이 어느 방향으로
+  // 가는 중인지가 빠지는데, 실제로는 2024-12 3.09배에서 무너지는 중이다.
+  const withReverse = rows.filter((r) => r.usHoldings && r.usHoldings > 0);
+  const reverseSeries = withReverse
+    .filter((r) => r.month >= "2015-01-01")
+    .map((r) => ({ month: r.month, ratio: r.holdings / (r.usHoldings as number) }));
+  let peak = reverseSeries[0] ?? { month: last.month, ratio: 1 };
+  for (const p of reverseSeries) if (p.ratio > peak.ratio) peak = p;
+  const lastReverse = withReverse[withReverse.length - 1];
+  const reversal = {
+    ratioNow: lastReverse ? lastReverse.holdings / (lastReverse.usHoldings as number) : null,
+    ours: lastReverse?.holdings ?? 0,
+    theirs: lastReverse?.usHoldings ?? 0,
+    peakMonth: peak.month.slice(0, 7),
+    peakRatio: peak.ratio,
+    series: reverseSeries,
+  };
+
   return {
     asOf: last.month.slice(0, 7),
     principal,
@@ -163,5 +229,106 @@ export async function getSeohakOverview(): Promise<SeohakOverview> {
     closureErrorPct: (synthetic / marketValue - 1) * 100,
     cohorts,
     series,
+    breakdown,
+    reversal,
+  };
+}
+
+export type Peer = { code: string; name: string; holdings: number; isHome: boolean };
+
+/** 같은 달, 나라별 잔고. 한국이 어디쯤인지 보여 주는 데만 쓴다. */
+export async function getPeers(month: string): Promise<Peer[]> {
+  const { data, error } = await getSupabaseServer()
+    .from("seohak_country_flows")
+    .select("country_code, holdings_usd_mn")
+    .eq("month", `${month}-01`);
+  if (error) throw new Error(`비교국 조회 실패: ${error.message}`);
+  return (data ?? [])
+    .map((r) => ({
+      code: r.country_code as string,
+      name: COUNTRY_NAME[r.country_code as string] ?? (r.country_code as string),
+      holdings: Number(r.holdings_usd_mn ?? 0),
+      isHome: r.country_code === KOREA,
+    }))
+    .sort((a, b) => b.holdings - a.holdings);
+}
+
+export type NpsHolding = { issuer: string; value: number; sharePct: number };
+export type NpsPortfolio = {
+  reportDate: string;
+  positions: number;
+  total: number;
+  top: NpsHolding[];
+  added: number;
+  removed: number;
+  prevDate: string | null;
+};
+
+/** 한 제출자·한 분기의 보유 전부. 562종목이라 1,000행 캡 아래지만 페이지를 이어 받는다. */
+async function loadFiling(cik: string, reportDate: string) {
+  const rows: { cusip: string; issuer: string; value: number }[] = [];
+  for (let start = 0; ; start += 1000) {
+    const { data, error } = await getSupabaseServer()
+      .from("seohak_institution_13f")
+      .select("cusip, issuer, value_usd")
+      .eq("filer_cik", cik)
+      .eq("report_date", reportDate)
+      // 원문 오류 의심 제출은 통째로 뺀다(migration_030 의 suspect 주석).
+      .eq("suspect", false)
+      .order("cusip", { ascending: true })
+      .range(start, start + 999);
+    if (error) throw new Error(`13F 조회 실패: ${error.message}`);
+    const page = data ?? [];
+    for (const r of page)
+      rows.push({ cusip: r.cusip as string, issuer: r.issuer as string, value: Number(r.value_usd ?? 0) });
+    if (page.length < 1000) break;
+  }
+  return rows;
+}
+
+export async function getNpsPortfolio(): Promise<NpsPortfolio | null> {
+  // 최근 두 분기의 날짜만 먼저 집는다. 분기말이 언제인지는 제출자마다 다르고
+  // (한 곳은 이미 6/30 을 냈고 국민연금은 3/31 이 최신이다) 코드에 박으면 낡는다.
+  const { data: dates, error } = await getSupabaseServer()
+    .from("seohak_institution_13f")
+    .select("report_date")
+    .eq("filer_cik", NPS_CIK)
+    .order("report_date", { ascending: false })
+    .limit(1200);
+  if (error) throw new Error(`13F 분기 조회 실패: ${error.message}`);
+  const uniq = [...new Set((dates ?? []).map((d) => d.report_date as string))].sort().reverse();
+  if (!uniq.length) return null;
+
+  const [cur, prev] = uniq;
+  const rows = await loadFiling(NPS_CIK, cur);
+  if (!rows.length) return null;
+  const total = rows.reduce((s, r) => s + r.value, 0);
+
+  // 알파벳처럼 한 회사가 두 클래스로 나뉘어 CUSIP 이 둘인 경우가 있다. 표에는
+  // **회사 이름으로 합쳐** 보여 준다 — 순위표에 같은 이름이 두 줄로 서면 오류로 읽힌다.
+  const byIssuer = new Map<string, number>();
+  for (const r of rows) byIssuer.set(r.issuer, (byIssuer.get(r.issuer) ?? 0) + r.value);
+  const top = [...byIssuer.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([issuer, value]) => ({ issuer, value, sharePct: (value / total) * 100 }));
+
+  let added = 0;
+  let removed = 0;
+  if (prev) {
+    const before = new Set((await loadFiling(NPS_CIK, prev)).map((r) => r.cusip));
+    const after = new Set(rows.map((r) => r.cusip));
+    for (const c of after) if (!before.has(c)) added++;
+    for (const c of before) if (!after.has(c)) removed++;
+  }
+
+  return {
+    reportDate: cur,
+    positions: rows.length,
+    total,
+    top,
+    added,
+    removed,
+    prevDate: prev ?? null,
   };
 }
