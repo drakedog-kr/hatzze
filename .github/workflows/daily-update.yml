@@ -286,6 +286,28 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/calculate_stock_daily.py
 
+      # ── 미장 카더라 ────────────────────────────────────────────────────
+      # 같은 메시지를 미국 종목 사전으로 한 번 더 읽는다. 수집을 새로 하지 않는다 —
+      # 317개 채널 중 284개가 이미 미국 종목을 말하고 있고, 그중 79%는 제목에
+      # '미국'이 안 붙은 평범한 국내 채널이다.
+      #
+      # ⚠️ 국내 추출(telegram_extract) **뒤에** 와야 한다. 동시 언급 집계가
+      #    telegram_message_stocks 를 읽는데, 국내 추출이 그걸 매 실행 전량 재생성한다.
+      - name: (텔레그램) 미국 종목 추출
+        id: telegram_us_extract
+        continue-on-error: true
+        run: python data-pipeline/scripts/extract_telegram_us_stocks.py
+
+      - name: (텔레그램) 미국 종목·채널 일별 집계
+        id: telegram_us_daily
+        continue-on-error: true
+        run: python data-pipeline/scripts/calculate_us_stock_daily.py
+
+      - name: (텔레그램) 미국×국내 동시 언급
+        id: telegram_us_comention
+        continue-on-error: true
+        run: python data-pipeline/scripts/calculate_us_comention.py
+
       - name: (텔레그램) 트렌딩 메시지 선별
         id: telegram_trending
         continue-on-error: true
