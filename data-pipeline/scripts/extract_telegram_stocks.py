@@ -49,6 +49,7 @@ from config.stock_extraction import (  # noqa: E402
     HEAD_NOUN_NAMES,
     JOSA,
     JOSA_HEAD,
+    US_TICKER_COLLISION,
 )
 
 # 우선주/파생 종목 제외 패턴(…우, …우B, …N우, …우(전환) 등).
@@ -287,6 +288,14 @@ def extract(text: str, pattern, match_to_code, method, ambiguous, caseless) -> d
     # URL 안의 문자열은 본문 언급이 아니다. 길이를 유지해 경계 판정을 흐트러뜨리지 않는다.
     text = URL_RE.sub(lambda m: MASK_CHAR * len(m.group(0)), text)
 
+    # 미국 티커와 글자가 같은 이름(STX·GS)은 **메시지 전체**를 보고 가른다.
+    # 자리로는 못 가른다 — 이 코퍼스는 국내 종목에도 달러를 붙이고($NAVER),
+    # 괄호 앞 낱말을 부분문자열로 보면 "모델(HMM)"이 델(Dell)에 걸린다.
+    # 자세한 근거와 실측은 config.US_TICKER_COLLISION 주석.
+    us_collision = {
+        name for name, cues in US_TICKER_COLLISION.items() if any(c in text for c in cues)
+    }
+
     found: dict[str, tuple[str, str]] = {}
     for m in pattern.finditer(text):
         matched = m.group(0)
@@ -318,6 +327,10 @@ def extract(text: str, pattern, match_to_code, method, ambiguous, caseless) -> d
                 continue
             # "SK 하이닉스"처럼 더 긴 종목명으로 승격됐으면 그 이름을 기록한다.
             matched = key
+        # ⚠️ **승격 뒤에** 본다. 승격 전에 보면 "GS 건설"(→GS건설)까지 같이 죽는다 —
+        #    골드만삭스가 나온 글에서도 GS건설은 국내 종목 그대로다.
+        if key in us_collision:
+            continue
         code = match_to_code[key]
         if code not in found:
             found[code] = (matched, method[key])
