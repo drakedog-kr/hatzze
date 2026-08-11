@@ -83,6 +83,24 @@ ISSUE_KEYWORD_MIN_MENTIONS = 20  # 미국 메시지에서의 최소 언급 수
 ISSUE_KEYWORD_MIN_CHANNELS = 5   # 서로 다른 채널 수. 한 채널 복붙을 막는다
 ISSUE_KEYWORD_MIN_DAYS = 2       # 서로 다른 날짜 수. 하루짜리 이벤트를 막는다
 
+# ⭐ **쏠림은 줄 세우는 값이 아니라 자격이다**(2026-08-12에 바꿨다).
+#
+# 처음엔 쏠림 순으로 세웠다. 이유는 지금도 유효하다 — 빈도로 세우면 국장 카드를 베낀다.
+# 그런데 그렇게 세운 표는 **막대를 그릴 수가 없다.** 순위를 정한 값(쏠림)과 줄의 크기
+# (언급 수)가 따로 놀아서, 1위 22회 옆에 5위 59회가 서는 표가 된다. 국장 카드처럼
+# 언급량 막대를 깔면 막대가 위아래로 튄다.
+#
+# 그래서 쏠림을 문턱으로 내리고 언급 수로 세운다. 카드의 독창성은 그대로다 — 실측:
+#
+#   빈도만 (문턱 없음)          국장과 4/7 겹침  (AI · AI인프라 · HBM · 데이터센터)
+#   쏠림 1.5배 + 언급 수 순     국장과 4/11 겹침
+#   쏠림 2.0배 + 언급 수 순     국장과 1/11 겹침  ← 이 값
+#   쏠림 순 (옛 방식)           국장과 0/11 겹침
+#
+# 2.0 인 이유는 뜻이 또렷해서다 — "전체 대화보다 **두 배 이상** 미국 쪽에 몰린 말".
+# 2.5 로 올려도 겹침은 1/11 그대로인데 꼬리가 31회까지 얇아진다(2.0 은 38회).
+ISSUE_KEYWORD_MIN_SKEW = 2.0
+
 
 def issue_keyword_rows(
     keyword_rows: list[dict],
@@ -160,8 +178,11 @@ def issue_keyword_rows(
             continue
         total = max(count, all7.get(word, count))
         skew = (count / total) / max(baseline, 1e-9)
-        # 동점은 화제어로 가른다 — 안 가르면 순위가 실행마다 흔들린다.
-        scored.append((-skew, word, count, total, skew))
+        if skew < ISSUE_KEYWORD_MIN_SKEW:
+            continue
+        # 언급 수로 세운다(위 ISSUE_KEYWORD_MIN_SKEW 주석). 동점은 화제어로 가른다 —
+        # 안 가르면 순위가 실행마다 흔들린다.
+        scored.append((-count, word, count, total, skew))
     ranked = sorted(scored, key=lambda s: (s[0], s[1]))[:ISSUE_KEYWORD_LIMIT]
 
     out = []
@@ -351,7 +372,7 @@ def main() -> None:
 
     issue_rows = issue_keyword_rows(keyword_rows, all_total_by_date, channels_by_day)
     arrow = {"up": "▲", "down": "▼", "flat": "·", None: " "}
-    print("  이슈 키워드(쏠림순):")
+    print("  이슈 키워드(쏠림 %.1f배 이상 · 언급 수 순):" % ISSUE_KEYWORD_MIN_SKEW)
     for r in issue_rows:
         d = r["share_delta"]
         print(f"    {r['rank']:2} {r['keyword']:<14} 쏠림 {r['skew']:>5.1f}배 · "

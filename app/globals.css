@@ -1163,9 +1163,12 @@ body {
 .hz-cols-usch {
   grid-template-columns: 20px minmax(0, 1fr) minmax(40px, 0.55fr) 46px 76px;
 }
-/* # · 화제어 · 쏠림 · 표본. 표본 칸(126px)은 "22/22회 · 20채널"이 한 줄에 드는 폭이다. */
+/* # · 화제어 · 언급량 막대 · 횟수. 국장 이슈 키워드(KEYWORD_COLS)와 같은 얼개다 —
+   두 화면의 같은 카드가 같은 자리에서 같은 것을 말한다.
+   ⚠️ 쏠림·표본 칸이 있던 자리다. 그 둘은 이제 줄 세우는 값이 아니라 자격이라
+      (ISSUE_KEYWORD_MIN_SKEW) 행 툴팁으로 내려갔다. */
 .hz-cols-uskw {
-  grid-template-columns: 24px minmax(0, 1fr) 58px 126px;
+  grid-template-columns: 24px minmax(0, 1fr) minmax(70px, 1.5fr) 62px;
 }
 /* # · 종목 · 막대 · 채널 수 · 언급 수. 채널 카드(.hz-cols-usch)와 같은 얼개다 —
    두 시트가 나란히 서므로 열 자리가 어긋나면 한 판으로 안 읽힌다. */
@@ -1689,16 +1692,15 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
     display: none;
   }
 
-  /* 미장 화제어: 표본(4)을 접는다. 여기서는 접어도 거짓이 안 된다 — 쏠림 옆에 남는
-     배수가 이미 "얼마나 몰렸나"를 말하고, 표본은 그 배수를 만든 재료라 부차적이다
-     (함께 언급 표는 반대라 표본을 아랫줄로 살려 뒀다). */
+  /* 이슈 키워드: 막대(3)를 접는다. 막대는 옆 칸 횟수를 그림으로 되풀이한 것이라
+     접어도 잃는 정보가 없다(반대로 횟수를 접으면 줄이 아무 수치도 안 말한다). */
   .hz-cols-uskw {
-    grid-template-columns: 20px minmax(0, 1fr) 58px;
+    grid-template-columns: 20px minmax(0, 1fr) 62px;
     gap: 10px;
     padding-left: 16px;
     padding-right: 16px;
   }
-  .hz-cols-uskw > :nth-child(4) {
+  .hz-cols-uskw > :nth-child(3) {
     display: none;
   }
 

@@ -27,7 +27,6 @@ import {
   ChangeRate,
   DayBars,
   Highlight,
-  Pill,
   RankBadge,
   RankDelta,
   SectionCaps,
@@ -301,7 +300,10 @@ export default async function UsKaderaPage() {
   ] = await Promise.all([
     getUsKaderaSummary(),
     getUsSurgingStocks(6),
-    getUsChannelShare(10),
+    // 30 인 건 '더 보기'가 두 번 눌리는 깊이다(자격 채널 83곳 중 상위 30).
+    // 전부 받아도 되지만, 아래로 갈수록 30일 100건 문턱을 겨우 넘긴 채널이라
+    // 비중이 크게 흔들린다 — 목록의 신뢰도가 낮아지는 지점에서 끊는다.
+    getUsChannelShare(30),
     getUsSentiment(),
     getUsIssueKeywords(),
     getUsThemeRotation(10),
@@ -1262,7 +1264,7 @@ export default async function UsKaderaPage() {
             icon="tag"
             title="이슈 키워드"
             note="최근 7일"
-            desc="종목명이 아닌 화제어 · 전체 대화보다 미국 얘기에 몰린 정도로 줄 세웁니다"
+            desc="종목명이 아닌 화제어 · 미국 얘기에 몰린 말만 골라 언급 횟수로 줄 세웁니다"
             meta={keywords[0] ? `${keywords[0].computedFor} 기준` : undefined}
           />
           {keywords.length === 0 ? (
@@ -1288,22 +1290,22 @@ export default async function UsKaderaPage() {
                   name={keywords[0].keyword}
                   value={`${keywords[0].mentionCount.toLocaleString("ko-KR")}회`}
                   valueColor="var(--c-hot-ink)"
-                  sub={`쏠림 ${keywords[0].skew.toFixed(1)}배 · ${keywords[0].channelCount}개 채널`}
+                  sub={
+                    keywords[1]
+                      ? `2위 ${keywords[1].keyword}의 ${(keywords[0].mentionCount / Math.max(1, keywords[1].mentionCount)).toFixed(1)}배`
+                      : "비교할 2위가 없습니다"
+                  }
                   divide
                 />
-                {/* ⚠️ 국장은 이 자리에 "2위의 N배"를 적는다. 미장에선 그러면 안 된다 —
-                    국장 카드는 **언급 수** 순이라 1위와 2위의 배수가 곧 순위의 근거지만,
-                    이 카드는 **쏠림** 순이다. 실제로 1위 22회 · 2위 22회가 나와 "2위의
-                    1.0배"라는 아무 말도 안 하는 줄이 떴다. 순위를 정한 값(쏠림)을 적는다.
-                    ⭐ 아래 값의 소수 둘째 자리는 눈속임이 아니다 — 화제어 하나의 점유율이
-                    0.0~0.5% 대라 한 자리로 자르면 실측 변동(0.03~0.25%p)이 전부 0.0 이
-                    된다. 옆 테마 칸이 한 자리인 것과 다른 이유가 이것뿐이다. */}
+                {/* 한때 이 자리를 "쏠림 N배"로 뒀다. 줄 세우는 값이 쏠림이던 시절엔 1위
+                    22회 · 2위 22회가 나와 "2위의 1.0배"가 아무 말도 안 했기 때문이다.
+                    이제 언급 수 순이라 국장과 같은 문장이 뜻을 갖는다. */}
                 <Highlight
                   cap="가장 큰 변동"
                   name={kwMoved?.keyword ?? "—"}
                   value={
                     kwMoved
-                      ? `${kwMoved.shareDelta! > 0 ? "▲" : "▼"}${Math.abs(kwMoved.shareDelta! * 100).toFixed(2)}%p`
+                      ? `${kwMoved.shareDelta! > 0 ? "▲" : "▼"}${Math.abs(kwMoved.shareDelta! * 100).toFixed(1)}%p`
                       : undefined
                   }
                   valueColor={
@@ -1322,76 +1324,67 @@ export default async function UsKaderaPage() {
               <div className="hz-thead hz-cols-uskw">
                 <span>#</span>
                 <span>화제어</span>
-                <span
-                  className="hz-tip hz-tip-wide hz-tip-end"
-                  data-tip="전체 대화에서 이 말이 나온 횟수 중 미국 얘기가 차지한 몫을, 미국 얘기의 평소 몫으로 나눈 값입니다. 1이면 전체와 같은 정도로 나온 말이고, 클수록 미국 얘기에서만 나오는 말입니다."
-                  data-ga-tip="us_keyword_skew"
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "flex-end",
-                    gap: 3,
-                    cursor: "help",
-                  }}
-                >
-                  쏠림
-                  <Icon name="help" style={{ fontSize: 12, color: C.hint }} />
-                </span>
-                <span style={{ textAlign: "right" }}>표본</span>
+                <span>언급량</span>
+                <span style={{ textAlign: "right" }}>횟수</span>
               </div>
-              {keywords.map((k) => (
-                <div key={k.keyword} className="hz-trow hz-cols-uskw">
+              {/* 1위는 위 하이라이트가 맡았으므로 목록은 2위부터. 막대는 1위 대비라
+                  정의상 한 줄도 100% 가 되지 않는다(1위가 목록에 없다). 국장 카드와
+                  같은 규칙이다. */}
+              {keywords.slice(1).map((k) => (
+                <div
+                  key={k.keyword}
+                  className="hz-trow hz-cols-uskw hz-tip hz-tip-wide hz-tip-end"
+                  data-tip={`전체 대화 ${k.totalCount}회 중 미국 얘기가 ${k.mentionCount}회 · 쏠림 ${k.skew.toFixed(1)}배 · ${k.channelCount}개 채널 · ${k.dayCount}일`}
+                >
                   <RankBadge n={k.rank} />
                   <span
                     style={{
-                      display: "flex",
-                      alignItems: "baseline",
-                      gap: 6,
-                      minWidth: 0,
+                      ...clip,
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: C.ink,
                     }}
                   >
+                    {k.keyword}
+                  </span>
+                  {/* 막대 길이는 7일 언급 횟수, 색은 최근 사흘 관심의 **방향**이다 —
+                      눈금이 둘이라 각주에 둘 다 적는다(국장 카드와 같은 규칙). */}
+                  <span className="hz-usbar">
                     <span
                       style={{
-                        ...clip,
-                        minWidth: 0,
-                        fontSize: 13.5,
-                        fontWeight: 700,
-                        color: C.ink,
+                        width: `${(k.mentionCount / Math.max(1, keywords[0].mentionCount)) * 100}%`,
+                        background:
+                          k.trend === "up"
+                            ? "var(--c-warm-2)"
+                            : k.trend === "down"
+                              ? "var(--c-blue-3)"
+                              : C.hint,
                       }}
-                    >
-                      {k.keyword}
-                    </span>
-                    {/* 화살표는 쏠림이 아니라 **관심의 방향**이다(최근 3일 vs 그 이전 점유율).
-                        둘을 한 칸에 두면 같은 줄에서 두 가지를 말하게 되므로 이름 옆에 붙인다. */}
-                    {k.trend && k.trend !== "flat" && (
-                      <span
-                        style={{
-                          fontSize: 10.5,
-                          fontWeight: 800,
-                          color:
-                            k.trend === "up"
-                              ? "var(--c-hot-ink)"
-                              : "var(--c-cold-ink)",
-                          flexShrink: 0,
-                        }}
-                      >
-                        {k.trend === "up" ? "▲" : "▼"}
-                      </span>
-                    )}
-                  </span>
-                  <span style={{ textAlign: "right" }}>
-                    <Pill tone="hot">{k.skew.toFixed(1)}배</Pill>
+                    />
                   </span>
                   <span
                     style={{
                       fontFamily: MONO,
-                      fontSize: 11,
-                      color: C.sub2,
+                      fontSize: 12,
+                      fontWeight: 800,
                       textAlign: "right",
                       whiteSpace: "nowrap",
+                      color:
+                        k.trend === "up"
+                          ? "var(--c-hot-ink)"
+                          : k.trend === "down"
+                            ? "var(--c-cold-ink)"
+                            : C.sub,
                     }}
                   >
-                    {k.mentionCount}/{k.totalCount}회 · {k.channelCount}채널
+                    {k.trend === "up" ? "▲" : k.trend === "down" ? "▼" : ""}
+                    {k.mentionCount.toLocaleString("ko-KR")}
+                    {/* 단위를 붙여 위 하이라이트("155회")와 같은 문법으로 읽히게 한다. */}
+                    <span
+                      style={{ fontWeight: 700, color: C.sub2, marginLeft: 1 }}
+                    >
+                      회
+                    </span>
                   </span>
                 </div>
               ))}
@@ -1399,9 +1392,9 @@ export default async function UsKaderaPage() {
           )}
           <div className="hz-sheet-foot" style={{ marginTop: "auto" }}>
             <span style={{ fontSize: 11.5, lineHeight: 1.6, color: C.sub }}>
-              종목명은 뺐습니다. 그건 위 두 카드가 말합니다 · 빈도로 줄 세우면
-              국장 화제어와 절반 넘게 겹쳐, 쏠림으로 봅니다 · ▲▼는 쏠림이 아니라
-              최근 사흘 관심의 방향입니다
+              종목명은 뺐습니다. 그건 위 두 카드가 말합니다 · 전체 대화보다 두 배
+              이상 미국 쪽에 몰린 말만 남기고 7일 언급 횟수로 줄 세웁니다 ·
+              막대 색과 ▲▼는 횟수가 아니라 최근 사흘 관심의 방향입니다
             </span>
           </div>
         </section>
@@ -1641,6 +1634,7 @@ export default async function UsKaderaPage() {
             icon="podcasts"
             title="미국을 많이 다루는 채널"
             note="최근 30일"
+            noteHelp="30일에 100건 넘게 쓴 채널만 셉니다. 글이 몇 건뿐인 채널은 비중이 크게 흔들립니다."
             desc="그 채널이 쓴 글 중 미국 종목을 말한 글의 비중"
           />
           {channels.length === 0 ? (
@@ -1655,73 +1649,79 @@ export default async function UsKaderaPage() {
               아직 채널별 집계가 없습니다.
             </p>
           ) : (
-            channels.map((c, i) => (
-              <div key={c.handle} className="hz-trow hz-cols-usch">
-                <span
-                  style={{
-                    fontFamily: MONO,
-                    fontSize: 12,
-                    color: C.sub2,
-                    textAlign: "right",
-                  }}
-                >
-                  {i + 1}
-                </span>
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 8,
-                    minWidth: 0,
-                  }}
-                >
-                  <Avatar photoUrl={c.photoUrl} title={c.title} size={26} />
+            /* 국장 채널 파워 랭킹과 같은 얼개 — 열 줄만 세우고 나머지는 '더 보기'로
+               연다. 시트 바닥의 각주 띠가 있던 자리를 이 띠가 대신 쓴다(문턱 설명은
+               시트 머리의 기간 알약 툴팁으로 옮겼다).
+               listStyle={{display:"block"}} — 기본은 gap 을 준 세로 flex 라 행 사이가
+               벌어지는데, 이 표는 행끼리 붙어 헤어라인으로만 갈려야 한다. */
+            <ExpandableList
+              items={channels.map((c, i) => (
+                <div key={c.handle} className="hz-trow hz-cols-usch">
                   <span
                     style={{
-                      ...clip,
-                      fontSize: 12.5,
-                      fontWeight: 700,
-                      color: C.ink,
+                      fontFamily: MONO,
+                      fontSize: 12,
+                      color: C.sub2,
+                      textAlign: "right",
                     }}
                   >
-                    {c.title}
+                    {i + 1}
                   </span>
-                </span>
-                {/* 막대가 비중을 그대로 말한다. 숫자만 두면 60%와 40%의 차이가 안 잡힌다. */}
-                <span className="hz-usbar">
-                  <span style={{ width: pct(c.share) }} />
-                </span>
-                <span
-                  style={{
-                    fontFamily: MONO,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: C.label,
-                    textAlign: "right",
-                  }}
-                >
-                  {pct(c.share)}
-                </span>
-                <span
-                  style={{
-                    fontFamily: MONO,
-                    fontSize: 11,
-                    color: C.sub2,
-                    textAlign: "right",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {c.usMsgs.toLocaleString()}/{c.totalMsgs.toLocaleString()}
-                </span>
-              </div>
-            ))
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      minWidth: 0,
+                    }}
+                  >
+                    <Avatar photoUrl={c.photoUrl} title={c.title} size={26} />
+                    <span
+                      style={{
+                        ...clip,
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: C.ink,
+                      }}
+                    >
+                      {c.title}
+                    </span>
+                  </span>
+                  {/* 막대가 비중을 그대로 말한다. 숫자만 두면 60%와 40%의 차이가 안 잡힌다. */}
+                  <span className="hz-usbar">
+                    <span style={{ width: pct(c.share) }} />
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: MONO,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: C.label,
+                      textAlign: "right",
+                    }}
+                  >
+                    {pct(c.share)}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: MONO,
+                      fontSize: 11,
+                      color: C.sub2,
+                      textAlign: "right",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {c.usMsgs.toLocaleString()}/{c.totalMsgs.toLocaleString()}
+                  </span>
+                </div>
+              ))}
+              name="us_channel_share"
+              initial={10}
+              step={10}
+              listStyle={{ display: "block" }}
+              footerClassName="hz-sheet-foot-row"
+            />
           )}
-          <div className="hz-sheet-foot" style={{ marginTop: "auto" }}>
-            <span style={{ fontSize: 11.5, lineHeight: 1.6, color: C.sub }}>
-              30일에 100건 넘게 쓴 채널만 셉니다 · 글이 몇 건뿐인 채널은 비중이
-              크게 흔들립니다
-            </span>
-          </div>
         </section>
 
         <section
@@ -1739,7 +1739,7 @@ export default async function UsKaderaPage() {
             note={
               breadth.windowDays ? `최근 ${breadth.windowDays}일` : undefined
             }
-            desc="그 종목을 언급한 서로 다른 채널 수 · 많을수록 한두 곳이 아니라 여러 곳에서 오르내린 이야기입니다"
+            desc="그 종목을 언급한 서로 다른 채널 수"
           />
           {breadth.rows.length === 0 ? (
             <p
@@ -1773,11 +1773,14 @@ export default async function UsKaderaPage() {
                     minWidth: 0,
                   }}
                 >
+                  {/* 26 은 옆 시트의 채널 아바타와 **같은 값**이다. 22 였을 때 두 카드의
+                      행 높이가 45 vs 41 로 갈려(실측), 열 줄을 내려오면 40px 이 어긋났다.
+                      한쪽을 고치면 반드시 다른 쪽을 같이 볼 것. */}
                   <StockLogo
                     code={b.ticker}
                     name={b.name}
                     market="US"
-                    size={22}
+                    size={26}
                   />
                   <span
                     style={{
