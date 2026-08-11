@@ -398,8 +398,11 @@ export default async function KaderaPage() {
             {/* 이름은 반드시 minWidth:0 + 말줄임이다. flex 로 두면 긴 테마명이 배지를 칸 밖으로 민다. */}
             <span style={{ ...clip, minWidth: 0, fontSize: 13.5, fontWeight: 700, color: C.ink }}>{t.theme}</span>
             <span style={{ flex: 1 }} />
-            {/* 0.1%p 미만은 안 적는다 — 반올림하면 0.0%p 가 되어 "움직였다"는 표시만 남는다. */}
-            {t.shareDelta !== null && Math.abs(d) >= 0.1 && (
+            {/* 0.05%p 미만만 뺀다. 문턱이 0.1 이던 때는 7~10위가 통째로 빈칸이었다 —
+                꼬리 테마는 점유율이 1% 안팎이라 변동도 0.06~0.08%p 로 작다(실측). 0.05 는
+                "소수 한 자리로 적을 때 0.0%p 가 안 나오는 선"이고, 옆 이슈 키워드가 쓰는
+                값과 같다. */}
+            {t.shareDelta !== null && Math.abs(d) >= 0.05 && (
               <span
                 style={{
                   fontFamily: MONO,

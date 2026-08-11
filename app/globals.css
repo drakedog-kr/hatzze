@@ -2276,6 +2276,52 @@ main.hz-scroll { overflow-x: clip; }
   transform: translateY(4px);
 }
 
+/* ⚠️⚠️ **시트가 팝오버를 자른다.** .hz-sheet 는 overflow:hidden 이고(모서리 때문에)
+   테마 팝오버는 그 안에서 absolute 다 — 줄이 아래쪽일수록, 종목이 많을수록 아래가
+   잘려 나갔다(실측: 반도체 54종목 = 1,668px, 시트는 708px).
+
+   두 가지를 같이 고친다.
+   ① 키를 제한하고 안에서 굴린다. 54줄짜리 목록은 어차피 한 화면에 안 들어간다.
+   ② 앵커 위치지정으로 **시트 밖으로** 연다. 이 저장소가 툴팁(.hz-tip)과 연도 팝오버
+      (.hz-yrpop)에서 이미 쓴 방법이다 — position:fixed 면 기준이 조상 판이 아니라
+      뷰포트라 overflow 에 안 잘린다. 자리는 앵커가 잡는다.
+   ①은 앵커를 못 쓰는 브라우저에서도 최소한의 방어가 된다(잘리더라도 화면 밖까지는 안 간다). */
+.hz-theme-pop {
+  max-height: 340px;
+  overflow-y: auto;
+  /* 굴릴 때 손가락/휠이 아래 시트로 새지 않게. */
+  overscroll-behavior: contain;
+}
+
+@supports (anchor-scope: --a) and (position-area: top center) {
+  /* 앵커 이름은 줄(host)에 붙인다. anchor-scope 를 같이 걸어야 이름이 **자기 줄 안에서만**
+     통한다 — 안 막으면 페이지의 마지막 줄에 전부 달라붙는다(.hz-tip 주석의 그 함정). */
+  .hz-theme-host {
+    anchor-name: --hz-theme-pop;
+    anchor-scope: --hz-theme-pop;
+  }
+  .hz-theme-pop {
+    position: fixed;
+    position-anchor: --hz-theme-pop;
+    /* 위 absolute 시절의 left/top 을 걷어낸다. 남기면 position-area 가 잡은 자리를 민다. */
+    inset: auto;
+    position-area: bottom span-right;
+    /* 아래에 자리가 없으면 위로. JS 의 .hz-theme-pop-up 이 하던 일을 브라우저가 한다. */
+    position-try-fallbacks: top span-right, bottom span-left, top span-left;
+    width: 268px;
+    /* 줄과 5px 겹친다. 틈이 있으면 마우스가 건너는 동안 :hover 가 끊겨 목록이 닫힌다. */
+    margin-top: -5px;
+    margin-bottom: -5px;
+    /* 뷰포트가 기준이 되었으니 화면 높이에 맞춰 스스로 줄어들게 둔다. */
+    max-height: min(340px, calc(100vh - 24px));
+  }
+  /* 위로 여는 일은 이제 position-try-fallbacks 가 맡는다 — 옛 좌표는 무력화한다. */
+  .hz-theme-pop-up {
+    top: auto;
+    bottom: auto;
+  }
+}
+
 .hz-theme-pop-head {
   padding: 1px 7px 7px;
   font-size: 11.5px;

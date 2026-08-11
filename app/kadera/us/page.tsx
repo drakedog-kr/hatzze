@@ -1213,9 +1213,10 @@ export default async function UsKaderaPage() {
                         {t.theme}
                       </span>
                       <span style={{ flex: 1 }} />
-                      {/* 0.1%p 미만은 안 적는다(국장과 같은 문턱). 반올림하면 0.0%p 가 되어
-                          "움직였다"는 표시만 남고 값은 아무 말도 안 한다. */}
-                      {t.shareDelta !== null && Math.abs(t.shareDelta) >= 0.1 && (
+                      {/* 0.05%p 미만만 뺀다(국장과 같은 문턱). "소수 한 자리로 적을 때
+                          0.0%p 가 안 나오는 선"이다 — 0.1 로 두면 꼬리 테마가 통째로 빈칸이
+                          된다(국장 7~10위가 실제로 그랬다). */}
+                      {t.shareDelta !== null && Math.abs(t.shareDelta) >= 0.05 && (
                         <span
                           style={{
                             fontFamily: MONO,
