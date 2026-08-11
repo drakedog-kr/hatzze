@@ -879,7 +879,7 @@ export default async function KaderaPage() {
             title="테마 로테이션"
             note="3일 vs 이전"
             desc="관심이 어느 테마로 옮겨가는지 · 점유율 변화 기준"
-            noteHelp="최근 3일 평균 점유율을 그 이전과 비교합니다. 하루치끼리 재면 표본 얇은 날에 크게 요동쳐서, 며칠씩 묶어서 봅니다."
+            noteHelp="최근 3일 평균 점유율을 그 이전과 비교합니다. 하루치끼리 재면 표본 얇은 날에 크게 요동쳐서, 며칠씩 묶어서 봅니다. 점유율의 분모는 테마 사전에 든 종목의 언급이라 열 줄 밖까지 다 더하면 100%가 됩니다."
           />
           {themes.length === 0 ? (
             <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>아직 집계된 테마가 없습니다.</p>
