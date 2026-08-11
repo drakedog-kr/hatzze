@@ -42,6 +42,35 @@ async function loadKospiStocks(): Promise<StockOption[]> {
 }
 
 /**
+ * 미국 종목도 검색된다. 카더라 카드에서 링크로는 이미 열 수 있었는데(code+market=US)
+ * **검색창으로는 찾을 수가 없었다** — 목록에 코스피만 실려 있어서다.
+ *
+ * code 자리에 티커가 들어간다. 국내 코드는 여섯 자리 숫자라 티커와 겹치지 않고,
+ * /api/mdd 는 market 으로 갈라 야후 심볼·기준 지수·통화를 정한다.
+ *
+ * ⚠️ 검색 등급표(rankStockMatches)가 **코드 접두일치**를 3등급 중 2등급으로 본다 —
+ *    "NVDA" 를 치면 이름(엔비디아)이 아니라 티커로 걸린다. 미국 종목을 티커로 찾는 것이
+ *    자연스러우므로 그대로 둔다. 한글 표기("엔비디아")로도 이름 접두일치로 걸린다.
+ *
+ * 178행이라 1,000행 캡과 무관하다.
+ */
+async function loadUsStocks(): Promise<StockOption[]> {
+  try {
+    const { data } = await getSupabaseServer()
+      .from("us_stocks")
+      .select("ticker, name_ko")
+      .order("ticker", { ascending: true });
+    return (data ?? []).map((r) => ({
+      code: r.ticker as string,
+      name: (r.name_ko as string) || (r.ticker as string),
+      market: "US",
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/**
  * URL 파라미터로 특정 종목을 지정할 수 있다 — 카더라 리포트의 '급부상 종목'·'주요 종목
  * 리포트' 카드가 이 링크로 해당 종목 MDD 를 연다. URL 은 code·market 만 실어 깔끔하게
  * 두고(예: /mdd?code=058610&market=KOSDAQ), 이름은 여기서 code 로 stocks 에서 찾는다.
@@ -157,11 +186,15 @@ export default async function MddPage({
   await new Promise((r) => setTimeout(r, 200));
 
   const sp = await searchParams;
-  const [stocks, initial, suggestions] = await Promise.all([
+  const [kospi, us, initial, suggestions] = await Promise.all([
     loadKospiStocks(),
+    loadUsStocks(),
     resolveInitial(sp),
     loadSuggestions(),
   ]);
+  // 국내를 앞에 둔다. 등급이 같을 때의 마지막 정렬은 rankStockMatches 가 맡으므로
+  // 이 순서가 결과를 흔들지는 않는다 — 두 목록을 잇는 자리일 뿐이다.
+  const stocks = [...kospi, ...us];
   // key 로 초기 종목이 바뀌면 리마운트 — /mdd?code=A → ?code=B 로 이동해도 반영된다.
   return <MddExplorer key={initial?.code ?? "default"} stocks={stocks} initial={initial} suggestions={suggestions} />;
 }

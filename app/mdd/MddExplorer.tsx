@@ -39,6 +39,17 @@ const PERIODS: { key: string; label: string }[] = [
 
 const DEFAULT: StockOption = { code: "005930", name: "삼성전자", market: "KOSPI" };
 
+/**
+ * 검색 결과 줄에 붙는 시장 배지. **코스피는 안 붙인다** — 목록의 대부분이라 붙이면
+ * 배지가 배경이 된다. 나머지 둘은 붙여야 한다: 코스닥은 검색 목록에 없어 링크로만
+ * 만나고, 미국은 이름만으로 국내 종목과 구별이 안 된다("애플"·"메타"·"GS").
+ */
+function marketBadge(market: string | null): string | null {
+  if (market === "KOSDAQ") return "코스닥";
+  if (market === "US") return "미국";
+  return null;
+}
+
 const fmtPct = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n).toFixed(1)}%`;
 /**
  * 가격 표기. 시장에 따라 통화가 갈린다.
@@ -346,10 +357,11 @@ function SuggestSection({
               <span style={{ fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {s.name}
               </span>
-              {/* 코스닥은 표시해 준다 — 검색 목록에는 코스피만 있어서, 여기서만 만날 수 있는 종목이다. */}
-              {s.market === "KOSDAQ" && (
+              {/* 코스피가 아닌 것만 표시한다. 코스닥은 검색 목록에 없어 여기서만 만나고,
+                  미국은 이름만으로는 국내 종목과 구별이 안 된다("애플"·"메타"). */}
+              {marketBadge(s.market) && (
                 <span style={{ fontSize: 11, fontWeight: 600, color: C.muted, background: C.bg, padding: "2px 5px", borderRadius: 4, flexShrink: 0 }}>
-                  코스닥
+                  {marketBadge(s.market)}
                 </span>
               )}
               <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 600, color: C.sub, whiteSpace: "nowrap" }}>{s.note}</span>
@@ -513,8 +525,17 @@ function Controls({
                       className="hz-row-link hz-pick"
                       style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "9px 10px", border: "none", borderRadius: 8, cursor: "pointer", color: C.ink, fontSize: 14, textAlign: "left" }}
                     >
-                      <span style={{ fontWeight: 600 }}>{s.name}</span>
-                      <span style={{ fontFamily: MONO, fontSize: 12, color: C.muted }}>{s.code}</span>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+                        <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {s.name}
+                        </span>
+                        {marketBadge(s.market) && (
+                          <span style={{ fontSize: 11, fontWeight: 600, color: C.muted, background: C.bg, padding: "2px 5px", borderRadius: 4, flexShrink: 0 }}>
+                            {marketBadge(s.market)}
+                          </span>
+                        )}
+                      </span>
+                      <span style={{ fontFamily: MONO, fontSize: 12, color: C.muted, flexShrink: 0 }}>{s.code}</span>
                     </button>
                   </li>
                 ))}
