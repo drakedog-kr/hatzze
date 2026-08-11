@@ -5,7 +5,6 @@ import {
   getUsChannelShare,
   getUsIssueKeywords,
   getUsKaderaSummary,
-  getUsComentionGroups,
   getUsSentiment,
   getUsDailyBrief,
   getUsStockBreadth,
@@ -351,7 +350,6 @@ function UsTrendingList({ items }: { items: UsTrendingMessage[] }) {
 export default async function UsKaderaPage() {
   const [
     summary,
-    comention,
     surging,
     channels,
     sentiment,
@@ -365,7 +363,6 @@ export default async function UsKaderaPage() {
     breadth,
   ] = await Promise.all([
     getUsKaderaSummary(),
-    getUsComentionGroups(10),
     getUsSurgingStocks(6),
     getUsChannelShare(10),
     getUsSentiment(),
@@ -934,189 +931,6 @@ export default async function UsKaderaPage() {
               </div>
             )}
           </div>
-        </div>
-      </section>
-
-      <SectionCaps label="미국 소식이 국내로" count={1} />
-
-      <section className="hz-sheet">
-        <SectionHead
-          icon="alt_route"
-          title="함께 언급된 국내 종목"
-          note={
-            comention.windowDays ? `최근 ${comention.windowDays}일` : undefined
-          }
-          desc="미국 종목 얘기가 나올 때 어느 국내 종목이 같이 불리는지"
-          meta={comention.asOf ? `${comention.asOf} 기준` : undefined}
-        />
-        {comention.groups.length === 0 ? (
-          <p
-            style={{
-              margin: 0,
-              padding: "20px 22px",
-              color: C.sub,
-              fontSize: 13,
-            }}
-          >
-            아직 뚜렷하게 함께 불린 짝이 없습니다. 같은 글에 두 종목이 여러
-            채널·여러 날에 걸쳐 나와야 잡힙니다.
-          </p>
-        ) : (
-          <div className="hz-panelgrid hz-panelgrid-2">
-            {comention.groups.map((g) => (
-              <div key={g.ticker} className="hz-panel-pad">
-                {/* 분모를 그룹 머리에 한 번만 적는다. 줄마다 "9건 중"을 되풀이하면
-                    같은 숫자가 두세 번 찍혀 정작 다른 숫자(분자)가 안 읽힌다. */}
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "baseline",
-                    gap: 9,
-                    minWidth: 0,
-                  }}
-                >
-                  <StockLogo
-                    code={g.ticker}
-                    name={g.usName}
-                    market="US"
-                    size={26}
-                  />
-                  <strong
-                    style={{
-                      ...clip,
-                      minWidth: 0,
-                      fontSize: 15,
-                      fontWeight: 800,
-                      letterSpacing: "-.01em",
-                      color: C.ink,
-                    }}
-                  >
-                    {g.usName}
-                  </strong>
-                  <span style={{ flex: 1 }} />
-                  <span
-                    style={{
-                      fontFamily: MONO,
-                      fontSize: 11.5,
-                      color: C.sub2,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    이 종목 얘기 {g.usCount}건 중
-                  </span>
-                </div>
-
-                <div
-                  style={{ display: "flex", flexDirection: "column", gap: 10 }}
-                >
-                  {g.partners.map((pt) => {
-                    const rate = Math.min(
-                      100,
-                      Math.round((pt.pairCount / Math.max(1, g.usCount)) * 100),
-                    );
-                    return (
-                      <div
-                        key={pt.stockCode}
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 5,
-                          minWidth: 0,
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "baseline",
-                            gap: 8,
-                            minWidth: 0,
-                          }}
-                        >
-                          {/* 화살표가 방향을 만들면 안 된다 — 함께 불렸다는 것이지
-                              한쪽이 다른 쪽을 끌었다는 뜻이 아니다. 가운뎃점으로 잇는다. */}
-                          <span
-                            style={{
-                              fontSize: 12,
-                              color: C.hint,
-                              flexShrink: 0,
-                            }}
-                          >
-                            ·
-                          </span>
-                          <span
-                            style={{
-                              ...clip,
-                              minWidth: 0,
-                              fontSize: 13.5,
-                              fontWeight: 700,
-                              color: C.ink,
-                            }}
-                          >
-                            {pt.krName}
-                          </span>
-                          <span style={{ flex: 1 }} />
-                          {/* ⭐ 이 카드의 핵심 숫자. 배수(260배)를 걷어내고 분모·분자를 그대로
-                              보인다 — 눈으로 확인되고 표본 크기가 저절로 드러난다. */}
-                          <span
-                            style={{
-                              fontFamily: MONO,
-                              fontSize: 13,
-                              fontWeight: 800,
-                              color: C.ink,
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {pt.pairCount}건
-                            <span
-                              style={{
-                                fontSize: 11,
-                                fontWeight: 700,
-                                color: C.sub2,
-                              }}
-                            >
-                              {" "}
-                              · {rate}%
-                            </span>
-                          </span>
-                        </div>
-                        <span className="hz-usbar">
-                          <span
-                            style={{
-                              width: `${rate}%`,
-                              background: "var(--c-hot)",
-                            }}
-                          />
-                        </span>
-                        <span
-                          style={{
-                            fontFamily: MONO,
-                            fontSize: 10.5,
-                            color: C.sub2,
-                          }}
-                        >
-                          {pt.channelCount}개 채널 · {pt.dayCount}일에 걸쳐
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="hz-sheet-foot">
-          <span style={{ fontSize: 11.5, lineHeight: 1.6, color: C.sub }}>
-            순서는 비율이 아니라{" "}
-            <b style={{ color: C.label }}>
-              우연히 겹칠 확률보다 얼마나 자주 붙었는지
-            </b>
-            로 정합니다. 국내에서 흔한 종목은 아무 얘기에나 끼기 때문입니다 ·
-            같은 기사가 여러 채널에 퍼지는 일이 잦아, 한 채널·하루에만 나온 짝은
-            빼고 셉니다 ·{" "}
-            <b style={{ color: C.label }}>
-              함께 불렸다는 것이지 두 회사가 실제로 엮여 있다는 뜻은 아닙니다
-            </b>
-          </span>
         </div>
       </section>
 

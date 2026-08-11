@@ -14,7 +14,9 @@
  *   telegram_message_us_stocks 메시지 × 미국 종목
  *   telegram_us_stock_daily    날짜 × 티커 집계
  *   telegram_us_channel_daily  날짜 × 채널 (total/us/kr 메시지 수)
- *   telegram_us_comention      미국 × 국내 동시 언급(창 스냅샷)
+ *   telegram_us_comention      미국 × 국내 동시 언급 — **화면은 안 읽는다.**
+                             카드를 걷어냈고(2026-08-11), 지금은 '오늘의 요약' 셋째 대목의
+                             재료로만 쓴다(generate_us_telegram_narratives.py 가 직접 읽는다).
  */
 import { cache } from "react";
 
@@ -89,28 +91,6 @@ async function usQuotes(tickers: string[]): Promise<Map<string, { price: number;
   for (const [t, q] of got) if (q) out.set(t, { price: q.price, changeRate: changeRateOf(q) });
   return out;
 }
-
-export type UsKrComention = {
-  ticker: string;
-  usName: string;
-  stockCode: string;
-  krName: string;
-  pairCount: number;
-  channelCount: number;
-  dayCount: number;
-  /** 창 안에서 이 미국 종목이 나온 글 수. 화면이 "N건 중 M건"의 N 으로 쓴다 */
-  usCount: number;
-  lift: number;
-};
-
-/** 한 미국 종목과 그에 붙은 국내 종목들. 화면이 이 단위로 그린다. */
-export type UsComentionGroup = {
-  ticker: string;
-  usName: string;
-  /** 창 안 이 미국 종목의 총 언급 글 수(그룹의 분모) */
-  usCount: number;
-  partners: { stockCode: string; krName: string; pairCount: number; channelCount: number; dayCount: number; lift: number }[];
-};
 
 export type UsChannelShare = {
   handle: string;
@@ -237,131 +217,6 @@ export async function getUsSurgingStocks(limit = 6): Promise<UsSurgingStock[]> {
     price: quotes.get(s.ticker)?.price ?? null,
     changeRate: quotes.get(s.ticker)?.changeRate ?? null,
   }));
-}
-
-/**
- * 함께 언급된 국내 종목. **이 페이지의 존재 이유다.**
- *
- * 미국 언급 메시지의 36.4%가 국내 종목을 같이 말한다(실측). 영어권 서비스가 못 만드는
- * 화면인데, 미국 기업 소식이 **어느 국내 종목으로 옮겨붙는지**는 한국 채널만 말하기 때문이다.
- *
- * ⚠️ **빈도로 줄 세우면 안 된다.** 유명한 것끼리 붙어 시시해진다 —
- * 엔비디아×SK하이닉스가 427회지만 lift 1.2 로 사실상 우연이다. 그래서 lift 로 정렬한다.
- *
- * 창은 **파이프라인이 정해 행에 박아 둔 것**(as_of_date·window_days)을 그대로 쓴다.
- * 읽기 시점에 창을 다시 잡으면 파이프라인이 쓴 lift 와 끝점이 어긋나 숫자가 갈린다.
- */
-export async function getUsKrComentions(limit = 12): Promise<{ asOf: string | null; windowDays: number; rows: UsKrComention[] }> {
-  const db = getSupabaseAdmin();
-  const latest = await db
-    .from("telegram_us_comention")
-    .select("as_of_date,window_days")
-    .order("as_of_date", { ascending: false })
-    .limit(1);
-  const head = latest.data?.[0];
-  if (latest.error || !head) {
-    if (latest.error) console.error("[getUsKrComentions] 최신 창을 못 읽었습니다", latest.error);
-    return { asOf: null, windowDays: 0, rows: [] };
-  }
-
-  const raw = await fetchAllRows<{
-    ticker: string;
-    stock_code: string;
-    pair_count: number;
-    channel_count: number;
-    day_count: number;
-    us_count: number;
-    lift: number;
-  }>("id", () =>
-    db
-      .from("telegram_us_comention")
-      .select("ticker,stock_code,pair_count,channel_count,day_count,us_count,lift")
-      .eq("as_of_date", head.as_of_date)
-      .eq("window_days", head.window_days),
-  );
-
-  const [usName, krName] = await Promise.all([usNameMap(), krNameMap(raw.map((r) => r.stock_code))]);
-
-  return {
-    asOf: head.as_of_date,
-    windowDays: head.window_days,
-    rows: raw
-      .map((r) => ({
-        ticker: r.ticker,
-        usName: usName.get(r.ticker) ?? r.ticker,
-        stockCode: r.stock_code,
-        krName: krName.get(r.stock_code) ?? r.stock_code,
-        pairCount: r.pair_count,
-        channelCount: r.channel_count,
-        dayCount: r.day_count,
-        usCount: r.us_count,
-        lift: Number(r.lift) || 0,
-      }))
-      .sort((a, b) => b.lift - a.lift)
-      .slice(0, limit),
-  };
-}
-
-/**
- * 함께 언급된 국내 종목을 **미국 종목 단위로 묶어** 준다.
- *
- * ## 왜 묶나
- * lift 순으로 줄을 세우면 같은 미국 종목이 여러 줄에 흩어진다(퍼스트솔라가 1위와 3위).
- * 읽는 사람에게는 "퍼스트솔라 얘기엔 OCI홀딩스와 한화솔루션이 붙는다"가 한 덩어리다.
- *
- * ## 왜 lift 를 화면에서 걷어냈나
- * "260배"는 계산이 필요한 숫자다. 툴팁으로 설명해도 읽는 사람이 그 배수로 무엇을 해야
- * 할지 모른다. 대신 **"이 종목 얘기 9건 중 5건"** 을 보여 준다 — 분모와 분자가 다 있어
- * 눈으로 확인되고, 표본 크기가 저절로 드러난다(5회짜리가 279배로 보이던 문제도 같이 풀린다).
- *
- * ⚠️ **정렬은 여전히 lift 다.** 비율로 세우면 국내에서 흔한 종목이 위로 올라온다 —
- * 아무 미국 종목 얘기에나 끼는 이름이 "특별히 붙어 다니는 짝"으로 뒤바뀐다.
- * 화면에 안 보일 뿐 순서는 그대로다(각주가 그 사실을 적는다).
- */
-export async function getUsComentionGroups(
-  limitPairs = 10,
-): Promise<{ asOf: string | null; windowDays: number; groups: UsComentionGroup[] }> {
-  const { asOf, windowDays, rows } = await getUsKrComentions(limitPairs);
-  const byTicker = new Map<string, UsComentionGroup>();
-  for (const r of rows) {
-    const g = byTicker.get(r.ticker) ?? {
-      ticker: r.ticker,
-      usName: r.usName,
-      usCount: r.usCount,
-      partners: [],
-    };
-    g.partners.push({
-      stockCode: r.stockCode,
-      krName: r.krName,
-      pairCount: r.pairCount,
-      channelCount: r.channelCount,
-      dayCount: r.dayCount,
-      lift: r.lift,
-    });
-    byTicker.set(r.ticker, g);
-  }
-  // 그룹 순서는 그 안의 **가장 강한 짝**이 정한다. 그래야 lift 순서가 묶은 뒤에도 남는다.
-  const groups = [...byTicker.values()]
-    .map((g) => ({ ...g, partners: g.partners.sort((a, b) => b.lift - a.lift) }))
-    .sort((a, b) => (b.partners[0]?.lift ?? 0) - (a.partners[0]?.lift ?? 0));
-  return { asOf, windowDays, groups };
-}
-
-/** 국내 종목코드 → 이름. `.in()` 목록도 1,000개 캡에 걸리므로 조각내어 부른다. */
-async function krNameMap(codes: string[]): Promise<Map<string, string>> {
-  const uniq = [...new Set(codes)];
-  if (!uniq.length) return new Map();
-  const db = getSupabaseAdmin();
-  const out = new Map<string, string>();
-  for (let i = 0; i < uniq.length; i += 300) {
-    const { data, error } = await db.from("stocks").select("code,name").in("code", uniq.slice(i, i + 300));
-    if (error) {
-      console.error("[krNameMap] 종목명을 못 읽었습니다", error);
-      continue;
-    }
-    for (const r of data ?? []) out.set(r.code as string, r.name as string);
-  }
-  return out;
 }
 
 /** 채널별 미장 비중과 국장 vs 미장 배분이 **같은 표 하나**를 본다. */
