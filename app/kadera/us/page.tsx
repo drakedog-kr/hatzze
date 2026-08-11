@@ -7,7 +7,6 @@ import {
   getUsKaderaSummary,
   getUsSentiment,
   getUsDailyBrief,
-  getUsNegativeStocks,
   getUsStockBreadth,
   getUsStockReports,
   getUsSurgingStocks,
@@ -298,7 +297,6 @@ export default async function UsKaderaPage() {
     trendWeek,
     trendMonth,
     breadth,
-    negatives,
   ] = await Promise.all([
     getUsKaderaSummary(),
     getUsSurgingStocks(6),
@@ -316,7 +314,6 @@ export default async function UsKaderaPage() {
     getUsTrendingMessages("w7", 36),
     getUsTrendingMessages("w30", 36),
     getUsStockBreadth(10),
-    getUsNegativeStocks(),
   ]);
 
   /* 카드 위 하이라이트 두 칸에 쓸 최대·최소. 표 순서와는 무관하므로 따로 고른다.
@@ -1439,7 +1436,7 @@ export default async function UsKaderaPage() {
         </section>
       </div>
 
-      <SectionCaps label="무슨 얘기가 오갔나" count={3} />
+      <SectionCaps label="무슨 얘기가 오갔나" count={2} />
 
       <section className="hz-sheet">
         {/* 머리를 TrendingTabs 가 그린다 — 기간 탭이 머리 우측에 앉고 목록은 그 아래라
@@ -1655,260 +1652,6 @@ export default async function UsKaderaPage() {
             화제였는지를 옮긴 것이지 사실 확인을 거친 내용이 아닙니다
           </span>
         </div>
-      </section>
-
-      {/* ── 비관이 앞선 종목 ─────────────────────────────────────────────
-          이 페이지의 나머지 카드는 전부 '많이 회자된 것'을 센다. 코퍼스가 낙관 쪽으로
-          기운 만큼(판정 대비 비관 21%) 화면도 같이 기울어 있었다 — 이 카드가 반대편이다.
-          실측으로 **언급량 상위 10종목과 0/10 겹친다.** */}
-      <section className="hz-sheet">
-        <SectionHead
-          icon="trending_down"
-          title="비관이 앞선 종목"
-          note={negatives.windowDays ? `최근 ${negatives.windowDays}일` : undefined}
-          noteHelp="드문 것을 찾는 카드라 이 시트만 창이 깁니다. 사흘로 좁히면 비율을 믿을 만큼 표본이 쌓인 종목이 몇 개 안 됩니다."
-          desc="낙관보다 비관이 많이 나온 미국 종목 · 중립 제외 비율"
-        />
-        {negatives.rows.length === 0 ? (
-          <p
-            style={{
-              margin: 0,
-              padding: "20px 22px",
-              color: C.sub,
-              fontSize: 13,
-            }}
-          >
-            최근 {negatives.windowDays || 30}일 동안 비관이 낙관을 앞선 종목이
-            없습니다. 판정이 {40}건 넘게 쌓인 종목만 셉니다.
-          </p>
-        ) : (
-          <>
-            <div className="hz-panelgrid hz-panelgrid-auto">
-              {negatives.rows.map((n) => (
-                <div
-                  key={n.ticker}
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 10,
-                    minWidth: 0,
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 9,
-                      minWidth: 0,
-                    }}
-                  >
-                    <StockLogo
-                      code={n.ticker}
-                      name={n.name}
-                      market="US"
-                      size={26}
-                    />
-                    <span
-                      style={{
-                        ...clip,
-                        fontSize: 14,
-                        fontWeight: 800,
-                        color: C.ink,
-                      }}
-                    >
-                      {n.name}
-                    </span>
-                    <span
-                      style={{
-                        fontFamily: MONO,
-                        fontSize: 11.5,
-                        color: C.sub2,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {n.ticker}
-                    </span>
-                    <span style={{ flex: 1 }} />
-                    <strong
-                      style={{
-                        fontFamily: MONO,
-                        fontSize: 19,
-                        fontWeight: 800,
-                        letterSpacing: "-.03em",
-                        color: "var(--c-cold-ink)",
-                        flexShrink: 0,
-                      }}
-                    >
-                      {n.negativePct}
-                      <span style={{ fontSize: 12, fontWeight: 700 }}>%</span>
-                    </strong>
-                  </div>
-
-                  {/* ⚠️ 이 막대만 **파랑이 오른쪽**이다. 나머지 화면은 왼쪽이 비관인데,
-                      여기서는 비관이 주인공이라 큰 숫자(오른쪽 위)와 같은 쪽에 둔다.
-                      그래서 아래 라벨을 반드시 양 끝에 붙여 색을 위치로 읽게 한다. */}
-                  <div
-                    style={{ display: "flex", flexDirection: "column", gap: 6 }}
-                  >
-                    <span
-                      style={{
-                        display: "flex",
-                        height: 9,
-                        borderRadius: 3,
-                        overflow: "hidden",
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: `${100 - n.negativePct}%`,
-                          background: "var(--c-warm-3)",
-                        }}
-                      />
-                      <span
-                        style={{
-                          width: `${n.negativePct}%`,
-                          background: "var(--c-blue-2)",
-                        }}
-                      />
-                    </span>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontFamily: MONO,
-                        fontSize: 11,
-                        fontWeight: 700,
-                      }}
-                    >
-                      <span style={{ color: "var(--c-hot-ink)" }}>
-                        낙관 {n.positive}
-                      </span>
-                      <span style={{ color: "var(--c-cold-ink)" }}>
-                        비관 {n.negative}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* 숫자만 두면 "그래서 뭘 걱정하는데?"에 답이 없다. 그 종목**만** 말한
-                      글 중 가장 널리 퍼진 비관글을 그대로 옮긴다 — 세 종목까지 열어
-                      두면 '마감 시황' 같은 시장 코멘트가 뽑힌다(실측 5건 중 2건). */}
-                  {n.quote ? (
-                    <a
-                      href={`https://t.me/${n.quote.handle}/${n.quote.messageId}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hz-bubble hz-lift"
-                      data-ga="kadera_us_negative_click"
-                      data-ga-ticker={n.ticker}
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 7,
-                        minWidth: 0,
-                        textDecoration: "none",
-                        marginTop: "auto",
-                      }}
-                    >
-                      <p
-                        style={{
-                          margin: 0,
-                          fontSize: 12.5,
-                          lineHeight: 1.65,
-                          color: "var(--c-ink-soft)",
-                          overflowWrap: "anywhere",
-                          textWrap: "pretty",
-                          display: "-webkit-box",
-                          WebkitLineClamp: 3,
-                          WebkitBoxOrient: "vertical",
-                          overflow: "hidden",
-                        }}
-                      >
-                        {n.quote.text}
-                      </p>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 7,
-                          minWidth: 0,
-                        }}
-                      >
-                        <Avatar
-                          photoUrl={n.quote.channelPhotoUrl}
-                          title={n.quote.channelTitle}
-                          size={20}
-                        />
-                        <span
-                          style={{
-                            ...clip,
-                            fontSize: 11.5,
-                            fontWeight: 700,
-                            color: "var(--c-cold-ink)",
-                          }}
-                        >
-                          {n.quote.channelTitle}
-                        </span>
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 4,
-                            marginLeft: "auto",
-                            flexShrink: 0,
-                            fontFamily: MONO,
-                            fontSize: 11,
-                            fontWeight: 700,
-                            color: C.sub,
-                          }}
-                        >
-                          <Icon
-                            name="visibility"
-                            style={{ fontSize: 14, color: C.faint }}
-                          />
-                          {compact(n.quote.views)}
-                        </span>
-                      </div>
-                    </a>
-                  ) : (
-                    <p
-                      style={{
-                        margin: "auto 0 0",
-                        fontSize: 11.5,
-                        color: C.sub2,
-                      }}
-                    >
-                      그 종목만 말한 비관글이 아직 없습니다.
-                    </p>
-                  )}
-
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      fontFamily: MONO,
-                      fontSize: 11,
-                      color: C.sub2,
-                    }}
-                  >
-                    <span>
-                      판정 {n.decided}건 · 언급 {n.mentionCount}회
-                    </span>
-                    <span style={{ flex: 1 }} />
-                    <UsMddLink ticker={n.ticker} label="MDD" />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="hz-sheet-foot">
-              <span style={{ fontSize: 11.5, lineHeight: 1.6, color: C.sub }}>
-                여러 종목을 한꺼번에 나열한 시황 글은 빼고 셉니다 · 그런 글은
-                하나가 수십 종목에 같은 톤을 나눠 줘서, 상승으로 적힌 종목까지
-                비관으로 잡힙니다
-              </span>
-            </div>
-          </>
-        )}
       </section>
 
       <SectionCaps label="채널" count={2} />
