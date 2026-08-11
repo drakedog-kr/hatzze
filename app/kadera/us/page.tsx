@@ -1151,7 +1151,7 @@ export default async function UsKaderaPage() {
                 <span>테마</span>
                 <span style={{ textAlign: "right" }}>점유율</span>
                 <span>최근 14일</span>
-                <span style={{ textAlign: "right" }}>언급</span>
+                <span style={{ textAlign: "right" }}>순위 변화</span>
               </div>
               <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
               {themes.rows.map((t) => (
@@ -1197,35 +1197,6 @@ export default async function UsKaderaPage() {
                       >
                         {t.theme}
                       </span>
-                      {/* RankDelta 는 0 과 null 을 똑같이 '아무것도 안 그림'으로 낸다. 이 표는
-                        모든 줄이 같은 두 창을 견주므로 빈칸이면 "자료가 없나?"로 읽힌다 —
-                        변동 없음은 글자로 적고, 비교할 과거가 없을 때만 —로 둔다. */}
-                      {t.rankChange === null ? (
-                        <span
-                          style={{
-                            fontFamily: MONO,
-                            fontSize: 11,
-                            color: C.sub2,
-                            flexShrink: 0,
-                          }}
-                        >
-                          —
-                        </span>
-                      ) : t.rankChange === 0 ? (
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 700,
-                            color: C.sub2,
-                            whiteSpace: "nowrap",
-                            flexShrink: 0,
-                          }}
-                        >
-                          그대로
-                        </span>
-                      ) : (
-                        <RankDelta change={t.rankChange} />
-                      )}
                       <span style={{ flex: 1 }} />
                       {/* 0.1%p 미만은 안 적는다(국장과 같은 문턱). 반올림하면 0.0%p 가 되어
                           "움직였다"는 표시만 남고 값은 아무 말도 안 한다. */}
@@ -1282,26 +1253,36 @@ export default async function UsKaderaPage() {
                     접는 미디어쿼리를 인라인이 이긴다(막대 트랙에서 이미 한 번 당했다).
                     display 가 없는 span 으로 한 겹 싸면 접는 쪽이 이긴다. */}
                   <span>
-                    <Sparkline data={t.series} width={66} height={24} />
+                    <Sparkline data={t.series} width={78} height={24} />
                   </span>
-                  {/* 창(3일) 안 언급 수. 점유율이 창 평균이라 이 값도 같은 창의 합이다 —
-                    한쪽만 하루치면 "28.0% 인데 12회"처럼 두 숫자가 다른 기간을 말한다. */}
-                  <span
-                    style={{
-                      fontFamily: MONO,
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: C.label,
-                      textAlign: "right",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {t.mentionCount.toLocaleString("ko-KR")}
-                    <span
-                      style={{ fontSize: 11, fontWeight: 700, color: C.sub2 }}
-                    >
-                      회
-                    </span>
+                  {/* RankDelta 는 0 과 null 을 똑같이 '아무것도 안 그림'으로 낸다. 이 표는
+                      모든 줄이 같은 두 창을 견주므로 빈칸이면 "자료가 없나?"로 읽힌다 —
+                      변동 없음은 글자로 적고, 비교할 과거가 없을 때만 —로 둔다. */}
+                  <span style={{ textAlign: "right" }}>
+                    {t.rankChange === null ? (
+                      <span
+                        style={{
+                          fontFamily: MONO,
+                          fontSize: 11,
+                          color: C.sub2,
+                        }}
+                      >
+                        —
+                      </span>
+                    ) : t.rankChange === 0 ? (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: C.sub2,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        그대로
+                      </span>
+                    ) : (
+                      <RankDelta change={t.rankChange} />
+                    )}
                   </span>
                 </div>
               ))}
