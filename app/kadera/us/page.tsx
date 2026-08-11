@@ -1401,15 +1401,50 @@ export default async function UsKaderaPage() {
                   data-tip={`전체 대화 ${k.totalCount}회 중 미국 얘기가 ${k.mentionCount}회 · 쏠림 ${k.skew.toFixed(1)}배 · ${k.channelCount}개 채널 · ${k.dayCount}일`}
                 >
                   <RankBadge n={k.rank} />
+                  {/* 옆 테마 표는 %p 를 이름 줄 오른끝(막대 바로 위)에 둔다. 이 표는
+                      이름과 막대가 다른 칸이라 그 자리가 없다 — 대신 **이름 칸의 오른끝**에
+                      붙인다. 두 표의 이름 칸은 같은 x 에서 끝나므로(실측 326) 두 %p 가
+                      화면에서 한 세로선 위에 선다. */}
                   <span
                     style={{
-                      ...clip,
-                      fontSize: 13,
-                      fontWeight: 700,
-                      color: C.ink,
+                      display: "flex",
+                      alignItems: "baseline",
+                      gap: 8,
+                      minWidth: 0,
                     }}
                   >
-                    {k.keyword}
+                    <span
+                      style={{
+                        ...clip,
+                        minWidth: 0,
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: C.ink,
+                      }}
+                    >
+                      {k.keyword}
+                    </span>
+                    <span style={{ flex: 1 }} />
+                    {/* 0.05%p 미만은 안 적는다 — 소수 한 자리로 적으면 0.0%p 가 되어
+                        "움직였다"는 표시만 남고 값은 아무 말도 안 한다(테마 표와 같은 규칙,
+                        문턱만 이 표의 눈금에 맞춰 낮췄다. 화제어 하나의 점유율은 0.5% 대다). */}
+                    {k.shareDelta !== null && Math.abs(k.shareDelta * 100) >= 0.05 && (
+                      <span
+                        style={{
+                          fontFamily: MONO,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          flexShrink: 0,
+                          color:
+                            k.shareDelta > 0
+                              ? "var(--c-hot-ink)"
+                              : "var(--c-cold-ink)",
+                        }}
+                      >
+                        {k.shareDelta > 0 ? "▲" : "▼"}
+                        {Math.abs(k.shareDelta * 100).toFixed(1)}%p
+                      </span>
+                    )}
                   </span>
                   {/* 막대 길이는 7일 언급 횟수, 색은 최근 사흘 관심의 **방향**이다 —
                       눈금이 둘이라 각주에 둘 다 적는다(국장 카드와 같은 규칙). */}
@@ -1426,6 +1461,9 @@ export default async function UsKaderaPage() {
                       }}
                     />
                   </span>
+                  {/* 화살표를 뗐다. 방향은 왼쪽 %p 와 막대 색이 이미 두 번 말하고 있어,
+                      여기까지 붙이면 한 줄에 같은 뜻이 셋이라 얼룩이 된다. 이 칸은
+                      **얼마나 많이**만 말한다(국장 카드는 %p 가 없어 화살표를 단다). */}
                   <span
                     style={{
                       fontFamily: MONO,
@@ -1433,15 +1471,9 @@ export default async function UsKaderaPage() {
                       fontWeight: 800,
                       textAlign: "right",
                       whiteSpace: "nowrap",
-                      color:
-                        k.trend === "up"
-                          ? "var(--c-hot-ink)"
-                          : k.trend === "down"
-                            ? "var(--c-cold-ink)"
-                            : C.sub,
+                      color: C.ink,
                     }}
                   >
-                    {k.trend === "up" ? "▲" : k.trend === "down" ? "▼" : ""}
                     {k.mentionCount.toLocaleString("ko-KR")}
                     {/* 단위를 붙여 위 하이라이트("155회")와 같은 문법으로 읽히게 한다. */}
                     <span
