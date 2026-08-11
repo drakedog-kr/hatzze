@@ -41,7 +41,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.supabase_client import get_client, load_all  # noqa: E402
+from common.supabase_client import get_client, load_all, load_all_keyset  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 from config.issue_keywords import EXCLUDE, MAX_KEYWORD_LEN, MIN_KEYWORD_LEN  # noqa: E402
 from config.stock_extraction import ALIASES as STOCK_ALIASES  # noqa: E402
@@ -194,7 +194,7 @@ def main() -> None:
     db = get_client()
 
     # ── 어떤 메시지가 '미국 얘기'인가 ───────────────────────────────────────
-    us_mentions = load_all(db, "telegram_message_us_stocks", "channel_handle,message_id")
+    us_mentions = load_all_keyset(db, "telegram_message_us_stocks", "id,channel_handle,message_id")
     us_keys = {(m["channel_handle"], m["message_id"]) for m in us_mentions}
     if not us_keys:
         print("[경고] telegram_message_us_stocks 가 비어 있습니다. "
@@ -202,15 +202,15 @@ def main() -> None:
         return
     print(f"[재료] 미국 언급 메시지 {len(us_keys):,}건 (언급 {len(us_mentions):,}건)")
 
-    analysis = load_all(
-        db, "telegram_message_analysis", "channel_handle,message_id,sentiment,keywords"
+    analysis = load_all_keyset(
+        db, "telegram_message_analysis", "id,channel_handle,message_id,sentiment,keywords"
     )
     if not analysis:
         print("[경고] telegram_message_analysis 가 비어 있습니다. "
               "먼저 analyze_telegram_messages.py 를 실행하세요.")
         return
 
-    messages = load_all(db, "telegram_messages", "channel_handle,message_id,posted_at")
+    messages = load_all_keyset(db, "telegram_messages", "id,channel_handle,message_id,posted_at")
     date_of = {
         (m["channel_handle"], m["message_id"]): datetime.fromisoformat(m["posted_at"])
         .astimezone(KST)

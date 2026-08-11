@@ -28,9 +28,19 @@ const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
  */
 const MARKET_CLOSE_KST_MIN = 16 * 60;
 
-/** epoch(초) → KST 기준 YYYY-MM-DD. */
-function kstDate(epochSec: number): string {
-  return new Date(epochSec * 1000 + KST_OFFSET_MS).toISOString().slice(0, 10);
+/**
+ * epoch(초) → **거래소 현지** YYYY-MM-DD.
+ *
+ * 예전엔 KST 고정(+9h)이었다. 국장만 볼 때는 그게 곧 거래소 시간이라 맞았지만,
+ * 미국 종목이 들어오면서 틀린 값이 된다 — 미국장 마감(16:00 ET)은 KST 로 **다음 날
+ * 새벽**이라, 8/10 세션이 8/11 로 붙는다(실측: NVDA regularMarketTime 이 거래소 기준
+ * 08-10 16:00 인데 KST 로 옮기면 08-11).
+ *
+ * 시간대는 응답의 `meta.gmtoffset` 이 알려 준다(KRX 32400 · 미국 EDT −14400).
+ * 국장은 offset 이 +9h 라 **예전과 한 글자도 다르지 않다.**
+ */
+function exchangeDate(epochSec: number, gmtOffsetSec: number): string {
+  return new Date((epochSec + gmtOffsetSec) * 1000).toISOString().slice(0, 10);
 }
 
 /**
@@ -56,11 +66,30 @@ function appendLastSession(bars: Bar[], meta: Record<string, unknown> | undefine
   if (typeof price !== "number" || typeof marketTime !== "number") return;
   if (priceContradictsDayRange(price, meta)) return;
 
-  const sessionDate = kstDate(marketTime);
-  const now = new Date(Date.now() + KST_OFFSET_MS);
-  const todayKst = now.toISOString().slice(0, 10);
-  if (sessionDate === todayKst && now.getUTCHours() * 60 + now.getUTCMinutes() < MARKET_CLOSE_KST_MIN) {
-    return; // ⑴ 아직 장중
+  const offset = typeof meta?.gmtoffset === "number" ? (meta.gmtoffset as number) : KST_OFFSET_MS / 1000;
+  const sessionDate = exchangeDate(marketTime, offset);
+
+  // ⑴ 그 세션이 끝났는가. 판정 기준이 시장마다 다르다.
+  //
+  //   국장(+9h)  16:00 KST 고정. **야후가 마감(15:30) 직후 몇 분 동안 낡은 값을 주는 걸
+  //              실측해서** 30분 여유를 붙인 값이다. 이 규칙은 손대지 않는다.
+  //   그 외      `currentTradingPeriod.regular.end` + 30분. 미국장은 서머타임으로 UTC
+  //              기준 마감이 한 시간씩 움직여서 고정 시각을 못 쓴다.
+  //
+  // ⚠️ 국장에도 regular.end 를 쓰고 싶어지지만 쓰면 안 된다 — 야후가 KRX 마감을
+  //    15:00 으로 준다(실측). 실제 마감은 15:30 이라 30분 이른 값을 종가로 붙이게 된다.
+  const isKrx = offset === 32_400;
+  if (isKrx) {
+    const nowKst = new Date(Date.now() + KST_OFFSET_MS);
+    const todayKst = nowKst.toISOString().slice(0, 10);
+    if (sessionDate === todayKst && nowKst.getUTCHours() * 60 + nowKst.getUTCMinutes() < MARKET_CLOSE_KST_MIN) {
+      return;
+    }
+  } else {
+    const period = meta?.currentTradingPeriod as { regular?: { end?: unknown } } | undefined;
+    const end = period?.regular?.end;
+    if (typeof end !== "number") return; // 마감 시각을 모르면 붙이지 않는다
+    if (Date.now() / 1000 < end + 30 * 60) return;
   }
 
   // 일봉이 이미 그 날짜를 채웠으면(야후가 뒤늦게 정리한 경우) 그대로 둔다.
@@ -98,12 +127,15 @@ export async function fetchDailyHistory(
     const closes: unknown = result?.indicators?.quote?.[0]?.close;
     if (!Array.isArray(timestamps) || !Array.isArray(closes)) return null;
 
+    // 봉의 날짜는 **거래소 현지 기준**이다(exchangeDate 주석). 국장은 +9h 라 예전과 같다.
+    const gmtOffset = typeof result?.meta?.gmtoffset === "number" ? result.meta.gmtoffset : KST_OFFSET_MS / 1000;
+
     const bars: Bar[] = [];
     for (let i = 0; i < timestamps.length; i++) {
       const t = timestamps[i];
       const c = closes[i];
       if (typeof t !== "number" || typeof c !== "number") continue; // 휴장·결측 봉은 건너뛴다
-      bars.push({ date: kstDate(t), close: c });
+      bars.push({ date: exchangeDate(t, gmtOffset), close: c });
     }
 
     appendLastSession(bars, result?.meta);
@@ -115,6 +147,8 @@ export async function fetchDailyHistory(
 
 /** KRX 시장 구분 → 야후 심볼 접미사. */
 export function yahooSymbol(code: string, market: string | null | undefined): string {
+  // 미국 상장은 접미사가 없다(NVDA · AAPL). 국내만 .KS/.KQ 를 붙인다.
+  if (market === "US") return code;
   const suffix = market === "KOSDAQ" ? ".KQ" : ".KS";
   return `${code}${suffix}`;
 }

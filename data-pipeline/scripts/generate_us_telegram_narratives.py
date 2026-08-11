@@ -43,7 +43,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from anthropic import Anthropic  # noqa: E402
 
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
-from common.supabase_client import get_client, load_all  # noqa: E402
+from common.supabase_client import get_client, load_all, load_all_keyset  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 
@@ -221,15 +221,15 @@ def load_us_messages(db, since_date: str) -> list[dict]:
     ⚠️ 필터를 걸고 OFFSET 페이징을 하지 않는다(13만 행에서 statement timeout 이 났다).
     통째로 받아 파이썬에서 자른다 — calculate_us_trending.py 와 같은 방침이다.
     """
-    mentions = load_all(
-        db, "telegram_message_us_stocks", "channel_handle,message_id,ticker,match_text"
+    mentions = load_all_keyset(
+        db, "telegram_message_us_stocks", "id,channel_handle,message_id,ticker,match_text"
     )
     by_msg: dict[tuple[str, int], list[dict]] = defaultdict(list)
     for m in mentions:
         by_msg[(m["channel_handle"], m["message_id"])].append(m)
 
     out = []
-    for m in load_all(db, "telegram_messages", "channel_handle,message_id,text,posted_at,views"):
+    for m in load_all_keyset(db, "telegram_messages", "id,channel_handle,message_id,text,posted_at,views"):
         key = (m["channel_handle"], m["message_id"])
         if key not in by_msg or not m.get("posted_at") or not (m.get("text") or "").strip():
             continue

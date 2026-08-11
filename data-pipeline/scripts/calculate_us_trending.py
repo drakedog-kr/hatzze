@@ -36,7 +36,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.supabase_client import PAGE_SIZE, get_client, load_all  # noqa: E402
+from common.supabase_client import PAGE_SIZE, get_client, load_all, load_all_keyset  # noqa: E402
 from common.timeutil import KST, today_kst  # noqa: E402
 
 # ⚠️ 국내(calculate_telegram_trending.py)·lib/telegram-data.ts 와 같은 값이어야 한다.
@@ -147,7 +147,7 @@ def main() -> None:
 
     us_keys = {
         (m["channel_handle"], m["message_id"])
-        for m in load_all(db, "telegram_message_us_stocks", "channel_handle,message_id")
+        for m in load_all_keyset(db, "telegram_message_us_stocks", "id,channel_handle,message_id")
     }
     if not us_keys:
         print("[경고] telegram_message_us_stocks 가 비어 있습니다. "
@@ -155,8 +155,8 @@ def main() -> None:
         return
 
     # 본문 없이 점수 컬럼만. 창은 파이썬에서 자른다(위 머리 주석의 두 함정).
-    meta = load_all(
-        db, "telegram_messages", "channel_handle,message_id,views,forwards,replies,posted_at"
+    meta = load_all_keyset(
+        db, "telegram_messages", "id,channel_handle,message_id,views,forwards,replies,posted_at"
     )
     us_meta = [m for m in meta if (m["channel_handle"], m["message_id"]) in us_keys and m.get("posted_at")]
     print(f"[재료] 전체 메시지 {len(meta):,}건 · 그중 미국 언급 {len(us_meta):,}건")

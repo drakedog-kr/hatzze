@@ -49,7 +49,29 @@ async function loadKospiStocks(): Promise<StockOption[]> {
  */
 async function resolveInitial(sp: Record<string, string | string[] | undefined>): Promise<StockOption | null> {
   const code = typeof sp.code === "string" ? sp.code.trim() : "";
-  if (!/^[0-9A-Z]{6}$/.test(code)) return null;
+  const isUs = sp.market === "US";
+
+  // 미국은 티커 1~5자, 국내는 6자리다. api/mdd 의 검증과 같은 규칙이어야 한다 —
+  // 여기만 통과시키면 화면은 열리는데 조회가 400 으로 죽는다.
+  const codeOk = isUs ? /^[A-Z][A-Z.\-]{0,6}$/.test(code) : /^[0-9A-Z]{6}$/.test(code);
+  if (!codeOk) return null;
+
+  if (isUs) {
+    // 미국 종목의 한글 표기는 us_stocks 가 갖고 있다(원본은 config/us_stock_extraction.py).
+    let name = code;
+    try {
+      const { data } = await getSupabaseServer()
+        .from("us_stocks")
+        .select("name_ko")
+        .eq("ticker", code)
+        .maybeSingle();
+      if (data?.name_ko) name = data.name_ko as string;
+    } catch {
+      // 조회 실패 시 티커를 이름 자리에 쓴다 — 심볼만 맞으면 낙폭은 계산된다.
+    }
+    return { code, name, market: "US" };
+  }
+
   const marketParam = sp.market === "KOSDAQ" ? "KOSDAQ" : sp.market === "KOSPI" ? "KOSPI" : null;
 
   // 이름을 code 로 조회한다. stocks 에 없으면(상폐·외국주 등) 이름 자리에 code 를 쓰고

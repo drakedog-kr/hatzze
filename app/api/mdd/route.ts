@@ -16,6 +16,14 @@ export const maxDuration = 20;
 const YEARS: Record<string, number> = { "1": 1, "3": 3, "5": 5, "10": 10, all: 100 };
 /** 코스피 지수 심볼 — 시장 대비 비교의 기준. 상단 티커와 같은 심볼을 쓴다. */
 const KOSPI = "^KS11";
+/**
+ * 미국 상장의 시장 기준. S&P500 이다.
+ *
+ * 나스닥(^IXIC)이 아닌 이유: 이 사전(us_stocks 178종목)에는 나스닥·NYSE 가 섞여 있어
+ * 한쪽 거래소 지수를 기준으로 삼으면 다른 쪽 종목이 엉뚱한 것과 견줘진다.
+ * S&P500 은 두 거래소를 아우르는 시장 전체의 대용이다.
+ */
+const SP500 = "^GSPC";
 
 type Peer = { name: string; code: string; dd: number; isSelf: boolean };
 type Theme = { name: string; peers: Peer[]; avgDd: number; sincePeakAvg: number | null };
@@ -28,7 +36,11 @@ export async function GET(request: Request) {
   const yearsKey = searchParams.get("years") ?? "10";
   const years = YEARS[yearsKey] ?? 10;
 
-  if (!/^[0-9A-Z]{6}$/.test(code)) {
+  // 국내는 6자리(숫자·영문), 미국은 티커 1~5자다. 예전엔 `{6}` 고정이라 미국 티커가
+  // 통째로 400 이었다 — 미장 카드에서 링크를 걸 수 없던 이유가 이것이다.
+  const isUs = market === "US";
+  const codeOk = isUs ? /^[A-Z][A-Z.\-]{0,6}$/.test(code) : /^[0-9A-Z]{6}$/.test(code);
+  if (!codeOk) {
     return NextResponse.json({ ok: false, error: "종목 코드가 올바르지 않습니다." }, { status: 400 });
   }
 
@@ -48,9 +60,14 @@ export async function GET(request: Request) {
 
   // 코스피는 항상 받는다 — 원인 분해(고점 이후)뿐 아니라 리스크 프로필의 '시장 동반성'도
   // 코스피 시계열이 필요하기 때문이다.
+  // 시장 기준은 상장 시장을 따른다. 엔비디아 낙폭을 코스피와 견주는 건 뜻이 없다.
+  //
+  // ⏸ 테마 비교는 미국 종목에 아직 안 붙인다 — 미국 테마 사전(config/us_stock_themes.py,
+  //    16테마)을 TS 로 옮기는 일이 남아 있다(lib/stock-themes.ts ↔ config/stock_themes.py
+  //    와 같은 관례). 그때까지 미국은 시장 비교까지만 낸다.
   const [marketBars, theme] = await Promise.all([
-    fetchDailyHistory(KOSPI, years),
-    buildThemeComparison(name, market, years, analysis.currentDd, athDate),
+    fetchDailyHistory(isUs ? SP500 : KOSPI, years),
+    isUs ? Promise.resolve(null) : buildThemeComparison(name, market, years, analysis.currentDd, athDate),
   ]);
 
   // 리스크 프로필(보상·큰 하락 빈도·시장 동반성) — 종목·코스피 종가로 요약.

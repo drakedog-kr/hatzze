@@ -124,6 +124,22 @@ function SplitBar({
   );
 }
 
+/**
+ * 그 종목의 MDD 정밀분석으로 잇는 링크. 국장 카드와 같은 자리·같은 어법이다.
+ *
+ * URL 에 `market=US` 를 실어야 한다 — 그 값이 야후 심볼(접미사 없음)·시장 기준
+ * 지수(^GSPC)·통화 표기(USD)를 한꺼번에 가른다.
+ * ⏸ 테마 비교는 아직 미국에 안 붙는다(미국 테마 사전을 TS 로 옮기는 일이 남았다).
+ */
+function UsMddLink({ ticker }: { ticker: string }) {
+  return (
+    <Link href={`/mdd?code=${ticker}&market=US`} className="hz-mdd-link">
+      MDD 정밀분석
+      <Icon name="arrow_outward" style={{ fontSize: 13 }} />
+    </Link>
+  );
+}
+
 /** 조회수 표기. 국장 카드와 같은 규칙이라 두 화면의 같은 숫자가 같은 꼴로 보인다. */
 function compact(n: number): string {
   if (n >= 10000) return `${Math.round(n / 1000)}K`;
@@ -1159,6 +1175,11 @@ export default async function UsKaderaPage() {
                   tone="warm"
                   hot={US_WINDOW_DAYS}
                 />
+                {/* marginTop:auto — 셀마다 막대 높이가 같아 실제로 밀리지는 않지만,
+                    앞으로 줄이 하나 늘어도 링크는 늘 셀 바닥에 남는다. */}
+                <div style={{ marginTop: "auto", paddingTop: 2 }}>
+                  <UsMddLink ticker={s.ticker} />
+                </div>
               </div>
             ))}
           </div>
@@ -1558,13 +1579,22 @@ export default async function UsKaderaPage() {
                     이 종목의 흐름 요약은 아직 만들어지지 않았습니다.
                   </p>
                 )}
-                <div style={{ marginTop: "auto", paddingTop: 2 }}>
+                <div
+                  style={{
+                    marginTop: "auto",
+                    paddingTop: 2,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                  }}
+                >
                   <DayBars
                     values={r.series}
                     dates={r.seriesDates}
                     tone="warm"
                     hot={US_WINDOW_DAYS}
                   />
+                  <UsMddLink ticker={r.ticker} />
                 </div>
               </div>
             ))}

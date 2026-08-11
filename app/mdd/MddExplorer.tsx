@@ -40,7 +40,38 @@ const PERIODS: { key: string; label: string }[] = [
 const DEFAULT: StockOption = { code: "005930", name: "삼성전자", market: "KOSPI" };
 
 const fmtPct = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n).toFixed(1)}%`;
-const fmtWon = (n: number) => `${Math.round(n).toLocaleString("ko-KR")}원`;
+/**
+ * 가격 표기. 시장에 따라 통화가 갈린다.
+ *
+ * 미국은 소수 둘째 자리까지 쓴다 — 달러는 원과 달리 1달러 미만의 움직임이 뜻을 갖고,
+ * 반올림해 정수로 두면 저가주가 전부 같은 값으로 보인다.
+ */
+const fmtPrice = (n: number, market: string | null | undefined) =>
+  market === "US"
+    ? `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    : `${Math.round(n).toLocaleString("ko-KR")}원`;
+/**
+ * '시장'의 이름. 낙폭을 무엇과 견주고 있는지는 화면 곳곳에 글자로 나온다 —
+ * 엔비디아 낙폭 옆에 "코스피"라고 적혀 있으면 그 문장은 통째로 거짓이 된다.
+ * ⚠️ api/mdd 가 고르는 지수(^KS11 / ^GSPC)와 짝이다. 한쪽만 고치지 말 것.
+ */
+const benchName = (market: string | null | undefined) => (market === "US" ? "S&P500" : "코스피");
+/** 시장 이름에 붙는 주격 조사. "코스피는" · "S&P500은"(오백 → ㄱ받침). */
+const benchParticle = (market: string | null | undefined) => (market === "US" ? "은" : "는");
+/**
+ * "같은 기간 코스피는 −30.0%, 반도체 업종은 −35.3% ___" 의 마지막 동사.
+ *
+ * 예전엔 "빠졌습니다" 고정이었다. 국장은 이 문장이 뜨는 날 대부분 코스피도 같이
+ * 빠져 있어 맞았지만, 미장을 들이자 바로 드러났다 — **"S&P500은 +3.4% 빠졌습니다"**.
+ * 부호가 섞이는 경우까지 있어 세 갈래로 가른다(둘 다 하락 / 둘 다 상승 / 엇갈림).
+ */
+function benchVerb(market: number | null, theme: number | null): string {
+  const vals = [market, theme].filter((v): v is number => v !== null);
+  if (!vals.length) return "움직였습니다";
+  if (vals.every((v) => v <= 0)) return "빠졌습니다";
+  if (vals.every((v) => v >= 0)) return "올랐습니다";
+  return "엇갈렸습니다";
+}
 /** 기간을 사람 단위로 짧게. 카드 안 큰 숫자는 이 형식으로 통일한다(1,733일 → 4.7년). */
 const fmtDur = (d: number) => (d >= 365 ? `${(d / 365).toFixed(1)}년` : d >= 45 ? `${Math.round(d / 30)}개월` : `${Math.round(d)}일`);
 const fmtDayCount = (d: number) => `${Math.round(d).toLocaleString("ko-KR")}일`;
@@ -557,10 +588,10 @@ function Results({ data }: { data: MddResult }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <HeroStrip data={data} periodLabel={periodLabel} />
-      <Underwater a={a} periodLabel={periodLabel} />
+      <Underwater a={a} periodLabel={periodLabel} market={data.market} />
 
       {data.risk ? (
-        <RiskProfile r={data.risk} periodLabel={periodLabel} />
+        <RiskProfile r={data.risk} periodLabel={periodLabel} market={data.market} />
       ) : (
         <AbsentSheet
           icon="monitoring"
@@ -604,6 +635,7 @@ function Results({ data }: { data: MddResult }) {
             stockName={data.name}
             themeName={data.theme?.name ?? null}
             themePeers={data.theme?.peers.filter((p) => !p.isSelf).map((p) => p.name) ?? []}
+            market={data.market}
           />
         ) : (
           <AbsentSheet
@@ -613,7 +645,7 @@ function Results({ data }: { data: MddResult }) {
             body={
               a.currentDd > -1
                 ? "지금은 고점 부근이라 원인을 나눌 하락이 없습니다."
-                : `고점(${a.athDate}) 무렵의 코스피·테마 기록이 없어 같은 기간을 나란히 놓지 못했습니다.`
+                : `고점(${a.athDate}) 무렵의 ${benchName(data.market)} 기록이 없어 같은 기간을 나란히 놓지 못했습니다.`
             }
           />
         )}
@@ -907,8 +939,14 @@ function Reading({ data, periodLabel }: { data: MddResult; periodLabel: string }
     const gap = bench !== null ? attr.stock - bench : null;
     paras.push(
       <p key="attr" style={p}>
-        같은 기간 코스피는 {attr.market !== null ? fmtPct(attr.market) : "기록이 없고"}
-        {attr.theme !== null && <>, {themeName ?? "테마"} 업종은 {fmtPct(attr.theme)}</>} 빠졌습니다.
+        {/* ⚠️ 기준 지수가 **올랐을 때**를 빼먹으면 안 된다. 국장은 이 문장이 쓰이는
+            대부분의 날에 코스피도 같이 빠져 있어 "빠졌습니다"가 맞았는데, 미장을 들이자
+            바로 드러났다 — "S&P500은 +3.4% 빠졌습니다"(실측). 부호로 동사를 가른다. */}
+        같은 기간 {benchName(data.market)}
+        {benchParticle(data.market)}{" "}
+        {attr.market !== null ? fmtPct(attr.market) : "기록이 없고"}
+        {attr.theme !== null && <>, {themeName ?? "테마"} 업종은 {fmtPct(attr.theme)}</>}{" "}
+        {benchVerb(attr.market, attr.theme)}.
         {gap !== null &&
           (gap < 0 ? (
             <>
@@ -1015,14 +1053,14 @@ function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel: string
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
-          <strong style={{ fontFamily: MONO, fontSize: 20, fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>{fmtWon(a.price)}</strong>
+          <strong style={{ fontFamily: MONO, fontSize: 20, fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>{fmtPrice(a.price, data.market)}</strong>
           {a.changePct !== null && (
             <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color: a.changePct >= 0 ? UP : DOWN }}>{fmtPct(a.changePct)}</span>
           )}
         </div>
         <div style={{ display: "flex", flexDirection: "column", marginTop: "auto" }}>
-          <PriceRow label="전고점" date={a.athDate} value={fmtWon(a.ath)} />
-          <PriceRow label="저점" date={a.lowDate} value={fmtWon(a.low)} />
+          <PriceRow label="전고점" date={a.athDate} value={fmtPrice(a.ath, data.market)} />
+          <PriceRow label="저점" date={a.lowDate} value={fmtPrice(a.low, data.market)} />
         </div>
       </div>
 
@@ -1033,7 +1071,7 @@ function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel: string
             <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>지금 낙폭</span>
             <span
               className="hz-tip hz-tip-wide hz-tip-start"
-              data-tip={`전고점(${fmtWon(a.ath)}) 대비 현재가가 얼마나 내려와 있는지입니다`}
+              data-tip={`전고점(${fmtPrice(a.ath, data.market)}) 대비 현재가가 얼마나 내려와 있는지입니다`}
               style={{ display: "inline-flex", cursor: "help" }}
             >
               <Icon name="help" style={{ fontSize: 14, color: C.hint }} />
@@ -1197,7 +1235,7 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
 }
 
 /* 고점 대비 낙폭 곡선(언더워터). dd 는 0 이하이고 아래로 갈수록 깊다. */
-function Underwater({ a, periodLabel }: { a: MddAnalysis; periodLabel: string }) {
+function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodLabel: string; market: string | null }) {
   const series = a.underwater;
   const mdd = a.mdd;
   const W = 720;
@@ -1278,7 +1316,7 @@ function Underwater({ a, periodLabel }: { a: MddAnalysis; periodLabel: string })
           <div
             key={i}
             className={`hz-tip hz-vline${edge}`}
-            data-tip={`${p.date} · ${fmtWon(p.close)} · 고점 대비 ${fmtPct(p.dd)}`}
+            data-tip={`${p.date} · ${fmtPrice(p.close, market)} · 고점 대비 ${fmtPct(p.dd)}`}
             style={{ flex: 1, position: "relative" }}
           />
         );
@@ -1444,7 +1482,7 @@ function YearsPopover({ years, label }: { years: YearStat[]; label: string }) {
   );
 }
 
-function RiskProfile({ r, periodLabel }: { r: RiskProfileData; periodLabel: string }) {
+function RiskProfile({ r, periodLabel, market }: { r: RiskProfileData; periodLabel: string; market: string | null }) {
   const yrs = Math.max(1, Math.round(r.years));
   const alone = r.withMarket === null ? 0 : r.bigDropCount - r.withMarket;
   /* 두 벌을 구분해서 든다.
@@ -1667,7 +1705,7 @@ function RiskProfile({ r, periodLabel }: { r: RiskProfileData; periodLabel: stri
     events.length === 0
       ? { head: null, viz: empty("큰 하락이 없었습니다."), foot: null }
       : !events.some((e) => e.market !== null)
-        ? { head: null, viz: empty("코스피 데이터가 없습니다."), foot: null }
+        ? { head: null, viz: empty(`${benchName(market)} 데이터가 없습니다.`), foot: null }
         : {
             /* 양쪽 다 낙폭이라 **둘 다 파랑**이다 — 여기서 빨강을 쓰면 코스피 하락이
                회복으로 읽힌다. 어느 쪽인지는 명도로 가른다. */
@@ -1684,11 +1722,11 @@ function RiskProfile({ r, periodLabel }: { r: RiskProfileData; periodLabel: stri
                 <Legend
                   items={[
                     { label: "이 종목", background: DOWN_BAR[0] },
-                    { label: "코스피", background: DOWN_BAR[3] },
+                    { label: benchName(market), background: DOWN_BAR[3] },
                   ]}
                 />
                 <div style={{ margin: "11px 0 8px" }}>
-                  <MirrorAxis left="이 종목" right="코스피" />
+                  <MirrorAxis left="이 종목" right={benchName(market)} />
                 </div>
                 {rows(
                   (() => {
@@ -1712,17 +1750,17 @@ function RiskProfile({ r, periodLabel }: { r: RiskProfileData; periodLabel: stri
             ),
             foot: summary(
               r.withMarket === null
-                ? "코스피 데이터가 없습니다"
+                ? `${benchName(market)} 데이터가 없습니다`
                 : alone > 0
                   ? `${r.bigDropCount}번 중 ${alone}번은 이 종목만 빠졌습니다`
-                  : "큰 하락 때마다 코스피도 함께 빠졌습니다",
+                  : `큰 하락 때마다 ${benchName(market)}도 함께 빠졌습니다`,
             ),
           };
 
   const tiles: { icon: string; label: string; sub: string; body: TileBody }[] = [
     { icon: "balance", label: "낙폭 대비 보상", sub: `감수한 위험만큼 돌려받았나${yearScope}`, body: tile1 },
     { icon: "speed", label: "하락 vs 회복 속도", sub: `빠지는 데 vs 되돌아오는 데${eventScope}`, body: tile2 },
-    { icon: "sync", label: "혼자 빠지나, 같이 빠지나", sub: `큰 하락 때 코스피도 같이 빠졌나${eventScope}`, body: tile3 },
+    { icon: "sync", label: "혼자 빠지나, 같이 빠지나", sub: `큰 하락 때 ${benchName(market)}도 같이 빠졌나${eventScope}`, body: tile3 },
   ];
 
   return (
@@ -1799,14 +1837,16 @@ function Attribution({
   stockName,
   themeName,
   themePeers,
+  market,
 }: {
   attr: Attribution;
   stockName: string;
   themeName: string | null;
   themePeers: string[];
+  market: string | null;
 }) {
   const rows: { label: string; v: number; self: boolean; color: string; help?: string }[] = [];
-  if (attr.market !== null) rows.push({ label: "코스피", v: attr.market, self: false, color: DOWN_BAR[4] });
+  if (attr.market !== null) rows.push({ label: benchName(market), v: attr.market, self: false, color: DOWN_BAR[4] });
   if (attr.theme !== null)
     rows.push({
       label: `${themeName ?? "테마"} 업종`,
@@ -1829,7 +1869,7 @@ function Attribution({
   const bench = attr.theme ?? attr.market;
   const gap = bench !== null && attr.stock !== 0 ? attr.stock - bench : null;
   const excess = gap !== null && gap < 0;
-  const benchLabel = attr.theme !== null ? "업종" : "코스피";
+  const benchLabel = attr.theme !== null ? "업종" : benchName(market);
 
   return (
     <Sheet>
