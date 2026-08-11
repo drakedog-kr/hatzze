@@ -1437,37 +1437,6 @@ export default async function UsKaderaPage() {
       </div>
 
       <SectionCaps label="무슨 얘기가 오갔나" count={2} />
-
-      <section className="hz-sheet">
-        {/* 머리를 TrendingTabs 가 그린다 — 기간 탭이 머리 우측에 앉고 목록은 그 아래라
-            둘이 상태를 공유해야 한다. 국장과 같은 컴포넌트를 그대로 쓴다. */}
-        <TrendingTabs
-          icon="campaign"
-          title="트렌딩 메시지"
-          desc="미국 종목을 말한 글 중 조회·공유로 가장 널리 퍼진 것"
-          panels={[
-            {
-              key: "today",
-              label: "오늘",
-              count: trendToday.length,
-              node: <UsTrendingList items={trendToday} />,
-            },
-            {
-              key: "w7",
-              label: "최근 7일",
-              count: trendWeek.length,
-              node: <UsTrendingList items={trendWeek} />,
-            },
-            {
-              key: "w30",
-              label: "최근 30일",
-              count: trendMonth.length,
-              node: <UsTrendingList items={trendMonth} />,
-            },
-          ]}
-        />
-      </section>
-
       <section className="hz-sheet">
         <SectionHead
           icon="query_stats"
@@ -1646,14 +1615,38 @@ export default async function UsKaderaPage() {
             })}
           </div>
         )}
-        <div className="hz-sheet-foot">
-          <span style={{ fontSize: 11.5, lineHeight: 1.6, color: C.sub }}>
-            흐름 요약은 집계와 원문 발췌를 읽어 자동으로 쓴 글입니다 · 무엇이
-            화제였는지를 옮긴 것이지 사실 확인을 거친 내용이 아닙니다
-          </span>
-        </div>
       </section>
 
+
+      <section className="hz-sheet">
+        {/* 머리를 TrendingTabs 가 그린다 — 기간 탭이 머리 우측에 앉고 목록은 그 아래라
+            둘이 상태를 공유해야 한다. 국장과 같은 컴포넌트를 그대로 쓴다. */}
+        <TrendingTabs
+          icon="campaign"
+          title="트렌딩 메시지"
+          desc="미국 종목을 말한 글 중 조회·공유로 가장 널리 퍼진 것"
+          panels={[
+            {
+              key: "today",
+              label: "오늘",
+              count: trendToday.length,
+              node: <UsTrendingList items={trendToday} />,
+            },
+            {
+              key: "w7",
+              label: "최근 7일",
+              count: trendWeek.length,
+              node: <UsTrendingList items={trendWeek} />,
+            },
+            {
+              key: "w30",
+              label: "최근 30일",
+              count: trendMonth.length,
+              node: <UsTrendingList items={trendMonth} />,
+            },
+          ]}
+        />
+      </section>
       <SectionCaps label="채널" count={2} />
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
