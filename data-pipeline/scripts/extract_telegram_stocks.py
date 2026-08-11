@@ -343,22 +343,40 @@ def load_messages(db) -> list[dict]:
     정렬 키는 유일해야 한다(id). 정렬이 없으면 페이지 사이 행 순서가 보장되지 않아
     경계에서 행이 조용히 빠진다 — 빠진 메시지는 종목 추출 자체가 안 된다.
     자세한 이유는 common/supabase_client.py:load_all 주석.
+
+    ## OFFSET 이 아니라 **키셋**으로 넘긴다 (2026-08-11)
+
+    `.range(start, start+999)` 는 뒤 페이지로 갈수록 앞의 행을 전부 걸러 낸 뒤
+    건너뛰어야 한다. 여기엔 `text IS NOT NULL` 필터가 붙어 있어 인덱스만으로
+    건너뛸 수도 없다. 표가 139,849행이 되자 **뒤 페이지가 statement timeout(8초)에
+    걸려 죽었다** — 미장 쪽 같은 함수가 먼저 터졌고(run 31447589332), 이쪽은
+    같은 실행에서 먼저 돌아 우연히 살았을 뿐이다.
+
+    ⭐ 같은 실행에서 **필터 없는** `load_all` 은 같은 139,849행을 무사히 읽었다.
+    필터의 유무가 갈랐다. 그래서 load_all 은 그대로 두고 이 함수만 바꾼다.
+
+    키셋은 `id > 마지막id` 라 매 페이지가 인덱스 탐색 한 번이다(O(log n)).
+    id 가 uuid PK 라 유일해서 정렬 안정성도 그대로다.
     """
-    msgs, start = [], 0
+    msgs: list[dict] = []
+    last_id = ""
     while True:
-        page = (
+        q = (
             db.table("telegram_messages")
-            .select("channel_handle,message_id,text")
+            .select("id,channel_handle,message_id,text")
             .not_.is_("text", "null")
             .order("id")
-            .range(start, start + 999)
-            .execute()
-            .data
+            .limit(1000)
         )
+        if last_id:
+            q = q.gt("id", last_id)
+        page = q.execute().data
         if not page:
             break
         msgs += page
-        start += 1000
+        last_id = page[-1]["id"]
+        if len(page) < 1000:
+            break
     return msgs
 
 
