@@ -3,6 +3,7 @@
   telegram_us_sentiment_daily : 날짜 × scope('overall' | 미국 테마명) 별 톤 카운트
   telegram_us_keyword_daily   : 날짜 × 화제어 언급 수
   telegram_us_issue_keyword   : 이슈 키워드 카드 상위 N줄(선계산)
+  telegram_us_stock_tone      : 종목 × 톤(‘비관이 앞선 종목’ 카드)
 
 국내 짝은 `calculate_telegram_sentiment.py`. **LLM을 호출하지 않는다** — 그쪽과 같은
 철학이고, 미장은 특히 그렇다. 메시지별 톤·화제어(`telegram_message_analysis`)는 **시장
@@ -61,6 +62,7 @@ from calculate_telegram_sentiment import (  # noqa: E402
 SENTIMENT_TABLE = "telegram_us_sentiment_daily"
 KEYWORD_TABLE = "telegram_us_keyword_daily"
 ISSUE_KEYWORD_TABLE = "telegram_us_issue_keyword"
+STOCK_TONE_TABLE = "telegram_us_stock_tone"
 
 # ── 이슈 키워드 카드의 문턱 세 개 ──────────────────────────────────────────
 # 국내는 `언급 3회 이상`만 걸고 빈도로 줄 세운다. 미장은 **쏠림**으로 세우므로
@@ -107,6 +109,81 @@ ISSUE_KEYWORD_MIN_DAYS = 2       # 서로 다른 날짜 수. 하루짜리 이벤
 # 2.0 인 이유는 뜻이 또렷해서다 — "전체 대화보다 **두 배 이상** 미국 쪽에 몰린 말".
 # 2.5 로 올려도 겹침은 1/11 그대로인데 꼬리가 31회까지 얇아진다(2.0 은 38회).
 ISSUE_KEYWORD_MIN_SKEW = 2.0
+
+
+# ── 종목별 톤 ──────────────────────────────────────────────────────────────
+# 창이 30일인 건 이 카드가 **드문 것**을 찾기 때문이다. 다른 카드는 3일인데, 3일 창에서
+# 판정 40건을 넘는 종목이 몇 개 안 된다(비관 우세는 3종목뿐). 화면에 "최근 30일"을
+# 또렷이 적어 다른 카드와 창이 다르다는 것을 밝힌다.
+STOCK_TONE_WINDOW_DAYS = 30
+
+# ⚠️⚠️ **이 값이 이 표의 존재 이유다.** 시황 나열글("A·B 상승 Vs. C·D 하락")은 메시지
+#      전체가 negative 로 분류되는데, 그 글에 실린 종목이 전부 이어져 있어 **상승으로
+#      적힌 종목까지 비관 한 표를 받는다.** 실측으로 그런 글 한 건이 최대 40종목에
+#      표를 뿌렸다. 거르지 않으면 순위가 뒤집힌다:
+#        서비스나우 56% → 16% · 포드 52% → 27%
+#      30일 창에서 미국 언급 메시지의 86%가 3종목 이하라 표본은 넉넉하다.
+STOCK_TONE_MAX_TICKERS = 3
+
+# 인용은 **더 좁게** 고른다. 3종목까지 열어 두고 뽑았더니 다섯 중 둘이 '마감 시황' 같은
+# 시장 코멘트였다. 그 종목만 말한 글로 좁히면 5/5 가 제 얘기를 한다.
+STOCK_TONE_QUOTE_MAX_TICKERS = 1
+
+# ⚠️ 이 값은 **미리보기 출력에만** 쓴다. 표에는 언급이 있는 종목을 전부 저장하고,
+#    무엇을 화면에 세울지는 lib/us-telegram-data.ts 가 혼자 정한다 — 문턱이 양쪽에
+#    있으면 반드시 갈린다(이 저장소의 파이썬↔TS 쌍둥이 부채).
+STOCK_TONE_PREVIEW_MIN_DECIDED = 40
+
+
+def stock_tone_rows(
+    tickers_of_msg: dict,
+    tone_of: dict,
+    date_of: dict,
+    views_of: dict,
+    dates: list[str],
+) -> list[dict]:
+    """종목 × 톤. 창은 30일이고, **그 종목 얘기인 글만** 센다(위 상수 주석)."""
+    if not dates:
+        return []
+    base = dates[-1]
+    window = set(dates[-STOCK_TONE_WINDOW_DAYS:])
+
+    agg: dict[str, Counter] = defaultdict(Counter)
+    quote: dict[str, tuple[int, tuple[str, int] | None]] = defaultdict(lambda: (-1, None))
+    for key, tickers in tickers_of_msg.items():
+        if date_of.get(key) not in window:
+            continue
+        if len(tickers) > STOCK_TONE_MAX_TICKERS:
+            continue
+        sentiment = tone_of.get(key)
+        for ticker in tickers:
+            agg[ticker]["mention"] += 1
+            if sentiment:
+                agg[ticker][sentiment] += 1
+        if sentiment != "negative" or len(tickers) > STOCK_TONE_QUOTE_MAX_TICKERS:
+            continue
+        views = views_of.get(key, 0)
+        for ticker in tickers:
+            if views > quote[ticker][0]:
+                quote[ticker] = (views, key)
+
+    rows = []
+    for ticker, c in sorted(agg.items()):
+        _, key = quote.get(ticker, (-1, None))
+        rows.append(
+            {
+                "as_of_date": base,
+                "window_days": STOCK_TONE_WINDOW_DAYS,
+                "ticker": ticker,
+                "positive_count": c["positive"],
+                "neutral_count": c["neutral"],
+                "negative_count": c["negative"],
+                "mention_count": c["mention"],
+                "top_negative_handle": key[0] if key else None,
+                "top_negative_message_id": key[1] if key else None,
+            }
+        )
+    return rows
 
 
 def issue_keyword_rows(
@@ -257,15 +334,15 @@ def main() -> None:
               "먼저 analyze_telegram_messages.py 를 실행하세요.")
         return
 
-    messages = load_all_keyset(db, "telegram_messages", "id,channel_handle,message_id,posted_at")
-    date_of = {
-        (m["channel_handle"], m["message_id"]): datetime.fromisoformat(m["posted_at"])
-        .astimezone(KST)
-        .date()
-        .isoformat()
-        for m in messages
-        if m.get("posted_at")
-    }
+    # views 는 종목별 톤 카드의 인용글을 고르는 데 쓴다(가장 널리 퍼진 비관글).
+    messages = load_all_keyset(db, "telegram_messages", "id,channel_handle,message_id,posted_at,views")
+    date_of, views_of = {}, {}
+    for m in messages:
+        if not m.get("posted_at"):
+            continue
+        key = (m["channel_handle"], m["message_id"])
+        date_of[key] = datetime.fromisoformat(m["posted_at"]).astimezone(KST).date().isoformat()
+        views_of[key] = m.get("views") or 0
 
     # ── 화제어에서 뺄 종목명 ────────────────────────────────────────────────
     # 국내 이름(stocks + 별칭) **과** 미국 표기(사전의 키 전부 — 한글 표기·티커·영문).
@@ -286,6 +363,8 @@ def main() -> None:
     kw_channels: defaultdict = defaultdict(set)
     skipped_no_date = 0
     analyzed_us = 0
+
+    tone_of = {(a["channel_handle"], a["message_id"]): a["sentiment"] for a in analysis}
 
     for a in analysis:
         key = (a["channel_handle"], a["message_id"])
@@ -387,11 +466,38 @@ def main() -> None:
               f"{r['channel_count']}채널 · {r['day_count']}일 {arrow[r['trend']]}"
               f"{'' if d is None else f' {d * 100:+.2f}%p'}")
 
+    tone_rows = stock_tone_rows(tickers_of_msg, tone_of, date_of, views_of, dates)
+    decided = [
+        r for r in tone_rows
+        if r["positive_count"] + r["negative_count"] >= STOCK_TONE_PREVIEW_MIN_DECIDED
+    ]
+    hot = sorted(
+        (r for r in decided if r["negative_count"] > r["positive_count"]),
+        key=lambda r: -r["negative_count"] / max(1, r["positive_count"] + r["negative_count"]),
+    )
+    print(f"  종목별 톤({STOCK_TONE_WINDOW_DAYS}일 · {STOCK_TONE_MAX_TICKERS}종목 이하 글만): "
+          f"{len(tone_rows)}종목 저장 · 판정 {STOCK_TONE_PREVIEW_MIN_DECIDED}건 이상 {len(decided)}종목 · "
+          f"비관 우세 {len(hot)}종목")
+    for r in hot[:8]:
+        dec = r["positive_count"] + r["negative_count"]
+        print(f"    {r['ticker']:<6} 비관 {r['negative_count'] * 100 // dec:>3}% "
+              f"(판정 {dec} · 언급 {r['mention_count']})"
+              f"{'' if r['top_negative_handle'] else '  ⚠️ 인용할 단독글 없음'}")
+
     if dry_run:
         print("[dry-run] 저장하지 않고 종료합니다.")
         return
 
     # ── 저장 (전량 재계산: 삭제 후 삽입) ────────────────────────────────────
+    # 종목별 톤은 기준일 × 창 단위로 통째 갈아 끼운다(id 열이 없어 다른 삭제 조건).
+    if tone_rows:
+        db.table(STOCK_TONE_TABLE).delete().eq("as_of_date", tone_rows[0]["as_of_date"]).eq(
+            "window_days", STOCK_TONE_WINDOW_DAYS
+        ).execute()
+        for i in range(0, len(tone_rows), 500):
+            db.table(STOCK_TONE_TABLE).insert(tone_rows[i:i + 500]).execute()
+        print(f"[Supabase] {STOCK_TONE_TABLE} {len(tone_rows)}행 저장")
+
     for table, rows in ((SENTIMENT_TABLE, sentiment_rows), (KEYWORD_TABLE, keyword_rows)):
         # PostgREST 는 조건 없는 delete 를 막으므로 항상 참인 조건을 준다.
         db.table(table).delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()

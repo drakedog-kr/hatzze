@@ -704,6 +704,148 @@ export async function getUsTrendingMessages(window: UsTrendingWindow, limit = 36
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
+ * 비관이 앞선 종목 (migration_039)
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+export type UsNegativeStock = {
+  ticker: string;
+  name: string;
+  /** 중립을 뺀 낙관:비관 중 **비관** 쪽. 나머지 카드의 score 와 반대 방향이다 */
+  negativePct: number;
+  positive: number;
+  negative: number;
+  /** 판정(낙관+비관) 수. 화면이 이 값을 함께 보여야 비율을 제대로 읽는다 */
+  decided: number;
+  mentionCount: number;
+  windowDays: number;
+  /** 가장 널리 퍼진 비관글. 그 종목만 말한 글에서 고른다(파이프라인). 없으면 null */
+  quote: {
+    handle: string;
+    messageId: number;
+    channelTitle: string;
+    channelPhotoUrl: string | null;
+    text: string;
+    views: number;
+    postedAt: string;
+  } | null;
+};
+
+/**
+ * 문턱과 정원. **여기 한 곳에만 둔다.**
+ *
+ * 파이프라인은 언급이 있는 종목을 전부 저장하고(175행), 무엇을 세울지는 화면이 정한다.
+ * 양쪽에 문턱을 두면 반드시 갈린다 — 이 저장소가 파이썬↔TS 쌍둥이로 겪은 부채다.
+ *
+ * ⚠️ 40 인 이유: LLM 분류는 같은 입력을 다시 돌리면 낙관도가 흔들린다(실측 36%↔48%).
+ *    표본이 얇은 종목의 비율은 그대로 믿으면 안 된다. 40 에서 자격 49종목 ·
+ *    비관 우세 5종목이다. 30 으로 내리면 7종목이 되는데, 판정 31건짜리가 65% 로
+ *    2위에 서는 것은 이 카드가 감당할 수 있는 확신이 아니다.
+ */
+const NEGATIVE_MIN_DECIDED = 40;
+const NEGATIVE_LIMIT = 6;
+
+/**
+ * 비관이 낙관을 앞선 미국 종목.
+ *
+ * 이 화면의 다른 카드는 전부 '많이 회자된 것'을 센다. 코퍼스가 낙관 쪽으로 기운
+ * 만큼(판정 대비 비관 21%) 화면도 같이 기울어 있었다 — 이 카드가 그 반대편이다.
+ * 실측으로 **언급량 상위 10종목과 0/10 겹친다.**
+ *
+ * ⚠️ 창이 30일이다(다른 카드는 3일). 드문 것을 찾는 카드라 3일에서는 자격 종목이
+ *    몇 개 안 된다. 화면에 "최근 30일"을 또렷이 적어 창이 다르다는 것을 밝힌다.
+ */
+export async function getUsNegativeStocks(): Promise<{ windowDays: number; rows: UsNegativeStock[] }> {
+  const db = getSupabaseAdmin();
+  const latest = await db
+    .from("telegram_us_stock_tone")
+    .select("as_of_date")
+    .order("as_of_date", { ascending: false })
+    .limit(1);
+  const base = latest.data?.[0]?.as_of_date as string | undefined;
+  if (latest.error || !base) {
+    if (latest.error) console.error("[getUsNegativeStocks] 기준일을 못 읽었습니다", latest.error);
+    return { windowDays: 0, rows: [] };
+  }
+
+  const { data, error } = await db
+    .from("telegram_us_stock_tone")
+    .select("ticker,positive_count,negative_count,mention_count,window_days,top_negative_handle,top_negative_message_id")
+    .eq("as_of_date", base);
+  if (error || !data?.length) {
+    if (error) console.error("[getUsNegativeStocks] 집계를 못 읽었습니다", error);
+    return { windowDays: 0, rows: [] };
+  }
+
+  const picked = data
+    .map((r) => {
+      const positive = (r.positive_count as number) ?? 0;
+      const negative = (r.negative_count as number) ?? 0;
+      return { r, positive, negative, decided: positive + negative };
+    })
+    .filter((x) => x.decided >= NEGATIVE_MIN_DECIDED && x.negative > x.positive)
+    .sort((a, b) => b.negative / b.decided - a.negative / a.decided)
+    .slice(0, NEGATIVE_LIMIT);
+  if (!picked.length) return { windowDays: (data[0].window_days as number) ?? 0, rows: [] };
+
+  // 인용글 본문은 여기서 한 번에 받는다. 여섯 건뿐이라 `.in()` 목록 길이 함정과 무관하다.
+  const keys = picked
+    .map((x) => x.r.top_negative_message_id as number | null)
+    .filter((v): v is number => v !== null);
+  // ⚠️ 핸들로도 좁힌다. message_id 는 채널 안에서만 유일해서 id 만으로 걸면 같은 번호를
+  //    가진 남의 채널 글이 통째로 딸려 온다 — 흔한 번호(100 같은)면 1,000행 캡에 닿는다.
+  const handles = [
+    ...new Set(picked.map((x) => x.r.top_negative_handle as string | null).filter((v): v is string => !!v)),
+  ];
+  const [nameOf, { titleOf, photoUrlOf }, quoted] = await Promise.all([
+    usNameMap(),
+    channelMeta(),
+    keys.length
+      ? db
+          .from("telegram_messages")
+          .select("channel_handle,message_id,text,views,posted_at")
+          .in("message_id", keys)
+          .in("channel_handle", handles)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (quoted.error) console.error("[getUsNegativeStocks] 인용글을 못 읽었습니다", quoted.error);
+  // ⚠️ message_id 는 채널 안에서만 유일하다 — 핸들까지 맞춰야 남의 채널 글이 안 섞인다.
+  const textOf = new Map(
+    (quoted.data ?? []).map((m) => [`${m.channel_handle}/${m.message_id}`, m]),
+  );
+
+  return {
+    windowDays: (picked[0].r.window_days as number) ?? 0,
+    rows: picked.map(({ r, positive, negative, decided }) => {
+      const handle = r.top_negative_handle as string | null;
+      const messageId = r.top_negative_message_id as number | null;
+      const m = handle && messageId ? textOf.get(`${handle}/${messageId}`) : undefined;
+      return {
+        ticker: r.ticker as string,
+        name: nameOf.get(r.ticker as string) ?? (r.ticker as string),
+        negativePct: Math.round((negative / decided) * 100),
+        positive,
+        negative,
+        decided,
+        mentionCount: (r.mention_count as number) ?? 0,
+        windowDays: (r.window_days as number) ?? 0,
+        quote:
+          m && handle && messageId
+            ? {
+                handle,
+                messageId,
+                channelTitle: titleOf.get(handle) ?? handle,
+                channelPhotoUrl: photoUrlOf.get(handle) ?? null,
+                text: (m.text as string) ?? "",
+                views: (m.views as number) ?? 0,
+                postedAt: m.posted_at as string,
+              }
+            : null,
+      };
+    }),
+  };
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
  * LLM 문장 두 자리 — 오늘의 요약 · 주요 종목 리포트 (migration_036)
  *
  * 문장은 파이프라인(generate_us_telegram_narratives.py)이 만들어 표에 넣는다.
