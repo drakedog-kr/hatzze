@@ -75,7 +75,7 @@ function fmtPrice(n: number, _market: "US"): string {
  *
  * URL 에 `market=US` 를 실어야 한다 — 그 값이 야후 심볼(접미사 없음)·시장 기준
  * 지수(^GSPC)·통화 표기(USD)를 한꺼번에 가른다.
- * ⏸ 테마 비교는 아직 미국에 안 붙는다(미국 테마 사전을 TS 로 옮기는 일이 남았다).
+ * 테마 비교도 붙는다(2026-08-12) — lib/us-stock-themes.ts 를 만들면서 풀렸다.
  */
 function UsMddLink({
   ticker,

@@ -13,6 +13,22 @@
  * ⚠️ 한 종목이 여러 테마에 속해도 된다. 그래서 테마 점유율의 합은 100%를 넘는다.
  */
 
+/**
+ * MDD 테마 비교가 한 테마에서 데려오는 대표 종목 수(자기 자신 포함 전 기준).
+ * 국내(MDD_PEER_MAX)와 같은 값이다 — 두 화면의 카드가 같은 크기여야 한다.
+ *
+ * 앞에서부터 자른다. 이 카드는 "○○ 대표 N종목"이지 업종 통계가 아니다. 미국 사전은
+ * 언급량 순으로 배정돼 있어(us_stock_themes.py 머리 주석) 앞쪽이 곧 대표성 순서다.
+ */
+export const US_MDD_PEER_MAX = 10;
+
+/** 이 티커가 속한 테마들. 사전 순서 = 대표성 순서라 첫 번째가 대표 테마다. */
+export function themesForTicker(ticker: string): string[] {
+  return Object.entries(US_THEMES)
+    .filter(([, members]) => members.includes(ticker))
+    .map(([theme]) => theme);
+}
+
 export const US_THEMES: Record<string, string[]> = {
   "AI반도체": ["NVDA", "AMD", "AVGO", "TSM", "ARM", "MRVL", "QCOM", "INTC", "ALAB", "MPWR", "ON", "NXPI", "TXN", "SWKS", "QRVO", "NVTS", "WOLF", "TSEM", "CBRS"],
   "메모리": ["MU", "SNDK", "WDC", "STX"],
