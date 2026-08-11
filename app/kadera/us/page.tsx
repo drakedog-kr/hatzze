@@ -549,7 +549,7 @@ export default async function UsKaderaPage() {
               )}
             </div>
             {!sentiment ? (
-              <p style={{ margin: 0, fontSize: 12.5, color: C.sub }}>
+              <p style={{ margin: 0, fontSize: 13, color: C.sub }}>
                 아직 미국 종목 얘기의 톤 집계가 없습니다.
               </p>
             ) : (
@@ -557,7 +557,10 @@ export default async function UsKaderaPage() {
                 style={{
                   display: "flex",
                   flexDirection: "column",
-                  gap: 14,
+                  /* 16 은 .hz-kd-hero > * 의 gap 이다. 국장은 이 칸을 조각(<>)으로 두어
+                     형제들이 그 값을 그대로 받는데, 여기서는 marginTop:auto 를 쓰려고 한 겹
+                     감쌌다 — 그러면 간격을 손으로 같게 맞춰 줘야 두 화면이 같은 리듬이 된다. */
+                  gap: 16,
                   flex: 1,
                 }}
               >
@@ -565,16 +568,21 @@ export default async function UsKaderaPage() {
                   style={{
                     display: "flex",
                     alignItems: "flex-start",
-                    gap: 10,
+                    gap: 12,
                     flexWrap: "wrap",
                   }}
                 >
                   <strong
                     style={{
                       fontFamily: MONO,
-                      fontSize: 34,
+                      /* 국장 히어로와 같은 값이다(40/20). 34 로 두었더니 나란히 놓고 볼 때
+                         미장 쪽이 한 급 작아 보였다 — 같은 자리의 같은 수치는 같은 크기여야
+                         한다. marginTop:1 은 옆 칸 큰 숫자의 **숫자 윗선**에 맞추는 값으로,
+                         줄 상자 위끝끼리 맞추면 7px 어긋난다(국장 주석 참고). */
+                      fontSize: 40,
                       fontWeight: 800,
                       lineHeight: 1,
+                      marginTop: 1,
                       letterSpacing: "-.04em",
                       color:
                         sentiment.tone === "cold"
@@ -587,7 +595,7 @@ export default async function UsKaderaPage() {
                     {sentiment.score}
                     <span
                       style={{
-                        fontSize: 18,
+                        fontSize: 20,
                         fontWeight: 700,
                         letterSpacing: "-.02em",
                       }}
@@ -601,7 +609,7 @@ export default async function UsKaderaPage() {
                       flexDirection: "column",
                       gap: 3,
                       minWidth: 0,
-                      marginTop: 1,
+                      marginTop: 2,
                     }}
                   >
                     <span
@@ -806,7 +814,7 @@ export default async function UsKaderaPage() {
             {/* 높이를 안 잡는다 — 길이는 파이프라인이 잡는다(BRIEF_*_LEN). 여기서 또 자르면
                 그쪽이 망가졌을 때 화면이 조용히 문장을 먹는다. */}
             {brief.paragraphs.length === 0 ? (
-              <p style={{ margin: 0, fontSize: 12.5, color: C.sub }}>
+              <p style={{ margin: 0, fontSize: 13, color: C.sub }}>
                 오늘의 요약을 준비하고 있습니다. 집계가 끝난 뒤 만들어집니다.
               </p>
             ) : (
@@ -814,7 +822,7 @@ export default async function UsKaderaPage() {
                 style={{
                   display: "flex",
                   flexDirection: "column",
-                  gap: 11,
+                  gap: 10,
                   flex: 1,
                 }}
               >
@@ -828,8 +836,8 @@ export default async function UsKaderaPage() {
                       key={i}
                       style={{
                         margin: 0,
-                        fontSize: 13.5,
-                        lineHeight: 1.85,
+                        fontSize: 14,
+                        lineHeight: 1.7,
                         color: "var(--c-ink-soft)",
                         wordBreak: "keep-all",
                         textWrap: "pretty",
@@ -1419,10 +1427,11 @@ export default async function UsKaderaPage() {
                   key={k.keyword}
                   className="hz-trow hz-cols-uskw hz-tip hz-tip-wide hz-tip-end"
                   style={{ flex: 1 }}
-                  /* 줄에 안 적은 것만 담는다. 창(3일)·언급 수·변화폭은 이미 줄에 있고,
-                     여기서 답하는 건 "왜 이 말이 이 표에 올랐나"다 — 쏠림이 그 답이고,
-                     채널·날짜 수는 그 쏠림이 복붙 한 건에서 나온 게 아님을 보인다. */
-                  data-tip={`최근 ${US_WINDOW_DAYS}일 전체 대화에서 ${k.totalCount}회 나왔고 그중 ${k.mentionCount}회가 미국 얘기입니다 · 미국 쪽 평소 몫의 ${k.skew.toFixed(1)}배로 몰렸습니다 · ${k.channelCount}개 채널이 ${k.dayCount}일에 걸쳐 말했습니다`}
+                  /* 줄에 안 적은 것만 담는다. 창(3일)·언급 수·변화폭은 이미 줄에 있다.
+                     남는 것은 **표본의 모양** 하나 — 전체 대화에서 몇 번 중 몇 번이
+                     미국 얘기였고, 그게 몇 채널·며칠에 걸쳐 있었나. 복붙 한 건이
+                     아니라는 것이 여기서 읽힌다. */
+                  data-tip={`최근 ${US_WINDOW_DAYS}일 전체 대화에서 ${k.totalCount}회 나왔고 그중 ${k.mentionCount}회가 미국 얘기입니다 · ${k.channelCount}개 채널이 ${k.dayCount}일에 걸쳐 말했습니다`}
                 >
                   <RankBadge n={k.rank} />
                   {/* 옆 테마 표는 %p 를 이름 줄 오른끝(막대 바로 위)에 둔다. 이 표는
