@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import {
-  getMarketAttentionSplit,
   getUsChannelShare,
   getUsIssueKeywords,
   getUsKaderaSummary,
   getUsComentionGroups,
   getUsSentiment,
   getUsDailyBrief,
+  getUsStockBreadth,
   getUsStockReports,
   getUsSurgingStocks,
   getUsThemeRotation,
@@ -362,7 +362,7 @@ export default async function UsKaderaPage() {
     trendToday,
     trendWeek,
     trendMonth,
-    split,
+    breadth,
   ] = await Promise.all([
     getUsKaderaSummary(),
     getUsComentionGroups(10),
@@ -377,9 +377,7 @@ export default async function UsKaderaPage() {
     getUsTrendingMessages("today", 36),
     getUsTrendingMessages("w7", 36),
     getUsTrendingMessages("w30", 36),
-    // 18일. 옆에 선 채널 시트(10줄·566px)와 높이를 맞추는 값이다 — 자연 높이를 재서
-    // 정했다(21일이면 640px 이라 채널 쪽에 74px 구멍이 난다).
-    getMarketAttentionSplit(18),
+    getUsStockBreadth(10),
   ]);
 
   // 히어로 ① 의 네 줄. 국장의 miniStats 와 같은 얼개다 — 라벨·값·단위로 나눠 두면
@@ -1908,12 +1906,14 @@ export default async function UsKaderaPage() {
           }}
         >
           <SectionHead
-            icon="balance"
-            title="국장 vs 미장 관심 배분"
-            note="최근 18일"
-            desc="그날 오간 글 중 국내 종목을 말한 비중과 미국 종목을 말한 비중"
+            icon="hub"
+            title="몇 곳이 말하나"
+            note={
+              breadth.windowDays ? `최근 ${breadth.windowDays}일` : undefined
+            }
+            desc="그 종목을 언급한 서로 다른 채널 수 · 많을수록 한두 곳이 아니라 여러 곳에서 오르내린 이야기입니다"
           />
-          {split.length === 0 ? (
+          {breadth.rows.length === 0 ? (
             <p
               style={{
                 margin: 0,
@@ -1922,78 +1922,92 @@ export default async function UsKaderaPage() {
                 fontSize: 13,
               }}
             >
-              아직 일별 집계가 없습니다.
+              아직 채널 집계가 없습니다.
             </p>
           ) : (
-            <div
-              style={{
-                padding: "14px 22px 4px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 7,
-              }}
-            >
-              {split.map((p) => (
-                <div
-                  key={p.date}
+            breadth.rows.map((b, i) => (
+              <div key={b.ticker} className="hz-trow hz-cols-usbreadth">
+                <span
                   style={{
-                    display: "grid",
-                    gridTemplateColumns: "44px 1fr 96px",
-                    alignItems: "center",
-                    gap: 10,
+                    fontFamily: MONO,
+                    fontSize: 12,
+                    color: C.sub2,
+                    textAlign: "right",
                   }}
                 >
-                  <span
-                    style={{ fontFamily: MONO, fontSize: 11, color: C.sub2 }}
-                  >
-                    {p.date.slice(5)}
-                  </span>
-                  {/* ⚠️ 누적 막대를 쓰면 안 된다 — 한 글이 국내·미국을 다 말할 수 있어 합이 100%가 아니다.
-                      두 줄을 위아래로 겹치지 않게 그려 각자의 비중만 말하게 한다. */}
-                  <span
-                    style={{ display: "flex", flexDirection: "column", gap: 2 }}
-                  >
-                    <span className="hz-usbar">
-                      <span
-                        style={{ width: pct(p.kr / Math.max(1, p.total)) }}
-                      />
-                    </span>
-                    <span className="hz-usbar">
-                      <span
-                        style={{
-                          width: pct(p.us / Math.max(1, p.total)),
-                          background: "var(--c-hot)",
-                        }}
-                      />
-                    </span>
-                  </span>
+                  {i + 1}
+                </span>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    minWidth: 0,
+                  }}
+                >
+                  <StockLogo
+                    code={b.ticker}
+                    name={b.name}
+                    market="US"
+                    size={22}
+                  />
                   <span
                     style={{
-                      fontFamily: MONO,
-                      fontSize: 11,
-                      textAlign: "right",
-                      whiteSpace: "nowrap",
+                      ...clip,
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: C.ink,
                     }}
                   >
-                    <span style={{ color: C.blue, fontWeight: 700 }}>
-                      {Math.round((p.kr / Math.max(1, p.total)) * 100)}%
-                    </span>
-                    <span style={{ color: C.sub2 }}> · </span>
-                    <span style={{ color: C.hot, fontWeight: 700 }}>
-                      {Math.round((p.us / Math.max(1, p.total)) * 100)}%
-                    </span>
+                    {b.name}
                   </span>
-                </div>
-              ))}
-            </div>
+                </span>
+                {/* 막대의 분모는 **모니터링 채널 전체**다. 상위 종목 대비로 그리면
+                    1위가 늘 꽉 차서 "전체의 몇 곳인가"라는 뜻이 사라진다. */}
+                <span className="hz-usbar">
+                  <span
+                    style={{
+                      width: pct(
+                        b.channelCount / Math.max(1, breadth.totalChannels),
+                      ),
+                    }}
+                  />
+                </span>
+                <span
+                  style={{
+                    fontFamily: MONO,
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: C.ink,
+                    textAlign: "right",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {b.channelCount}
+                  <span
+                    style={{ fontSize: 11, fontWeight: 700, color: C.sub2 }}
+                  >
+                    곳
+                  </span>
+                </span>
+                <span
+                  style={{
+                    fontFamily: MONO,
+                    fontSize: 11,
+                    color: C.sub2,
+                    textAlign: "right",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {b.mentionCount.toLocaleString()}회
+                </span>
+              </div>
+            ))
           )}
           <div className="hz-sheet-foot" style={{ marginTop: "auto" }}>
             <span style={{ fontSize: 11.5, lineHeight: 1.6, color: C.sub }}>
-              {/* 색 이름을 글로 적을 땐 실제 값과 맞는지 본다 — --c-hot 은 붉은 계열이다. */}
-              <span style={{ color: C.blue, fontWeight: 700 }}>파랑</span>이
-              국내, <span style={{ color: C.hot, fontWeight: 700 }}>빨강</span>
-              이 미국입니다 · 한 글이 양쪽을 다 말하기도 해서 둘을 더해도 100%가
-              되지 않습니다 · 주말은 전체 글이 크게 줄어 비중이 흔들립니다
+              막대는 모니터링 채널 {breadth.totalChannels}곳 중 몇 곳이
+              말했는지입니다 · 같은 채널이 며칠에 걸쳐 말해도 한 곳으로 셉니다
             </span>
           </div>
         </section>

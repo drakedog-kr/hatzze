@@ -1174,6 +1174,12 @@ body {
 .hz-cols-uskw {
   grid-template-columns: 24px minmax(0, 1fr) 58px 126px;
 }
+/* # · 종목 · 막대 · 채널 수 · 언급 수. 채널 카드(.hz-cols-usch)와 같은 얼개다 —
+   두 시트가 나란히 서므로 열 자리가 어긋나면 한 판으로 안 읽힌다. */
+.hz-cols-usbreadth {
+  grid-template-columns: 20px minmax(0, 1fr) minmax(40px, 0.55fr) 52px 54px;
+}
+
 /* # · 테마(+막대) · 점유율 · 14일 추이 · 종목 · 주간 순위.
    ⚠️ 점유율 막대는 별도 칸이 아니라 **테마 이름 아래**에 깐다. 옆 칸으로 빼면 이름 칸이
       좁아져 '반도체 장비·소재'가 잘리는데, 이 표에서 가장 먼저 읽히는 건 이름이다. */
@@ -1695,6 +1701,18 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
   }
   .hz-cols-usch > :nth-child(3),
   .hz-cols-usch > :nth-child(5) {
+    display: none;
+  }
+
+  /* 몇 곳이 말하나: 막대(3)와 언급 수(5)를 접는다 — 채널 카드와 같은 규칙이다. */
+  .hz-cols-usbreadth {
+    grid-template-columns: 20px minmax(0, 1fr) 52px;
+    gap: 10px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .hz-cols-usbreadth > :nth-child(3),
+  .hz-cols-usbreadth > :nth-child(5) {
     display: none;
   }
 

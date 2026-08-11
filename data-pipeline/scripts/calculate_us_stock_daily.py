@@ -30,13 +30,13 @@ from __future__ import annotations
 
 import sys
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.supabase_client import get_client, load_all  # noqa: E402
-from common.timeutil import KST  # noqa: E402
+from common.supabase_client import get_client, load_all, load_all_keyset  # noqa: E402
+from common.timeutil import KST, today_kst  # noqa: E402
 
 # 트렌딩 점수 가중치. 국내(calculate_stock_daily)와 같은 값이어야 한다.
 W_VIEWS, W_FWD, W_REPLIES = 0.5, 3.0, 1.5
@@ -60,18 +60,18 @@ def main() -> None:
 
     messages = {
         (m["channel_handle"], m["message_id"]): m
-        for m in load_all(
+        for m in load_all_keyset(
             db,
             "telegram_messages",
-            "channel_handle,message_id,posted_at,views,forwards,replies",
+            "id,channel_handle,message_id,posted_at,views,forwards,replies",
         )
     }
-    us_mentions = load_all(
-        db, "telegram_message_us_stocks", "channel_handle,message_id,ticker"
+    us_mentions = load_all_keyset(
+        db, "telegram_message_us_stocks", "id,channel_handle,message_id,ticker"
     )
     # 국내 언급은 채널 집계의 kr_msgs 에만 쓴다(국장 vs 미장 배분 카드).
-    kr_mentions = load_all(
-        db, "telegram_message_stocks", "channel_handle,message_id,stock_code"
+    kr_mentions = load_all_keyset(
+        db, "telegram_message_stocks", "id,channel_handle,message_id,stock_code"
     )
     print(f"메시지 {len(messages):,} · 미국 언급 {len(us_mentions):,} · 국내 언급 {len(kr_mentions):,}")
 
@@ -187,8 +187,71 @@ def main() -> None:
         db.table("telegram_us_channel_daily").upsert(
             channel_rows[i : i + 500], on_conflict="date,channel_handle"
         ).execute()
+    save_breadth(db, messages, us_mentions)
     print(f"\n[Supabase] telegram_us_stock_daily {len(stock_rows):,}행 · "
           f"telegram_us_channel_daily {len(channel_rows):,}행 저장 완료")
+
+
+BREADTH_WINDOW_DAYS = 14
+
+
+def save_breadth(db, messages: dict, us_mentions: list[dict]) -> None:
+    """'관심의 폭' — 창 안에서 그 종목을 언급한 **서로 다른** 채널 수 (마이그레이션 037).
+
+    ⚠️ **위에서 만든 일별 channel_count 로 갈음하면 안 된다.** 그 열은 그날 하루의 채널
+    수라 여러 날을 묶어도 합집합이 아니다. 화면은 그동안 일별 최댓값을 쓰고 있었는데
+    (합치면 같은 채널을 며칠치 겹쳐 세니까) 실제보다 크게 작다 — 실측으로 엔비디아가
+    화면엔 100채널인데 창 전체로는 228채널이다. 국내 쪽이 같은 함정을 이미 겪었다
+    (common/channel_breadth.py 주석).
+
+    여기서 세는 이유는 하나뿐이다 — **원자료가 이미 메모리에 있다.** 화면이 렌더마다
+    38,319행을 다시 읽으면 2.37초로 페이지 전체 렌더보다 오래 걸린다.
+
+    표가 없으면(마이그레이션 미적용) 조용히 넘어간다. 이 스텝의 본 일은 위 두 표다.
+    """
+    end = today_kst()
+    first = (end - timedelta(days=BREADTH_WINDOW_DAYS - 1)).isoformat()
+    last = end.isoformat()
+
+    chans: dict[str, set[str]] = defaultdict(set)
+    counts: dict[str, int] = defaultdict(int)
+    for m in us_mentions:
+        msg = messages.get((m["channel_handle"], m["message_id"]))
+        if not msg or not msg.get("posted_at"):
+            continue
+        d = kst_date(msg["posted_at"])
+        if not (first <= d <= last):
+            continue
+        chans[m["ticker"]].add(m["channel_handle"])
+        counts[m["ticker"]] += 1
+
+    rows = [
+        {
+            "as_of_date": last,
+            "window_days": BREADTH_WINDOW_DAYS,
+            "ticker": t,
+            "channel_count": len(ch),
+            "mention_count": counts[t],
+        }
+        for t, ch in sorted(chans.items())
+    ]
+    if not rows:
+        print("[안내] 창 안 미국 언급이 없어 관심의 폭을 건너뜁니다.")
+        return
+    try:
+        # 창 스냅샷이라 옛 as_of_date 는 안 남긴다(안 지우면 표가 매일 177행씩 자란다).
+        db.table("telegram_us_stock_breadth").delete().neq("as_of_date", last).execute()
+        for i in range(0, len(rows), 500):
+            db.table("telegram_us_stock_breadth").upsert(
+                rows[i : i + 500], on_conflict="as_of_date,window_days,ticker"
+            ).execute()
+    except Exception as exc:  # noqa: BLE001
+        print(f"[안내] telegram_us_stock_breadth 저장을 건너뜁니다({type(exc).__name__}) — "
+              "마이그레이션 037 적용 여부를 확인하세요.")
+        return
+    top = sorted(rows, key=lambda r: -r["channel_count"])[:3]
+    print(f"[Supabase] telegram_us_stock_breadth {len(rows)}행 저장 (최근 {BREADTH_WINDOW_DAYS}일 · {last} 기준)")
+    print("  가장 널리: " + " · ".join(f"{r['ticker']} {r['channel_count']}채널" for r in top))
 
 
 if __name__ == "__main__":

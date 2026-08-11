@@ -193,8 +193,10 @@ export async function getUsSurgingStocks(limit = 6): Promise<UsSurgingStock[]> {
     if (recentDates.has(r.date)) {
       a.recentShare += share;
       a.recentM += r.mention_count || 0;
-      // 일별 채널 수의 **최댓값**을 쓴다. 합치면 같은 채널을 며칠치 겹쳐 세고,
-      // 서로 다른 채널 수를 제대로 세려면 원자료를 봐야 한다(카드에 못 오를 종목까지 물 이유가 없다).
+      // ⚠️ 여기서 센 값은 **쓰지 않는다.** 일별 채널 수는 여러 날을 묶어도 합집합이
+      // 아니라, 합치면 겹쳐 세고 최댓값을 쓰면 실제보다 작다(엔비디아 100 vs 204).
+      // 아래에서 telegram_us_stock_breadth 로 덮어쓴다. 이 줄은 그 표가 비었을 때의
+      // 폴백으로만 남긴다.
       a.channels = Math.max(a.channels, r.channel_count || 0);
     } else {
       a.priorShare += share;
@@ -226,9 +228,12 @@ export async function getUsSurgingStocks(limit = 6): Promise<UsSurgingStock[]> {
     .slice(0, limit);
 
   // 시세는 **고른 것만** 받는다. 후보 전부를 물으면 카드에 못 오를 종목까지 왕복한다.
-  const quotes = await usQuotes(ranked.map((s) => s.ticker));
+  const [quotes, breadth] = await Promise.all([usQuotes(ranked.map((s) => s.ticker)), usStockBreadth()]);
+  const chOf = new Map(breadth.rows.map((r) => [r.ticker, r.channelCount]));
   return ranked.map((s) => ({
     ...s,
+    // 창 전체의 **합집합**으로 덮어쓴다. 못 찾으면 위 폴백(일별 최댓값)이 남는다.
+    channelCount: chOf.get(s.ticker) ?? s.channelCount,
     price: quotes.get(s.ticker)?.price ?? null,
     changeRate: quotes.get(s.ticker)?.changeRate ?? null,
   }));
@@ -860,16 +865,86 @@ export async function getUsStockReports(limit = 4): Promise<UsStockReport[]> {
   const narrativeOf = new Map((data ?? []).map((r) => [r.ticker as string, r.narrative as string]));
 
   const chartDates = dates.slice(-US_CHART_DAYS);
-  const quotes = await usQuotes(top.map(([t]) => t));
+  const [quotes, breadth] = await Promise.all([usQuotes(top.map(([t]) => t)), usStockBreadth()]);
+  const chOf = new Map(breadth.rows.map((r) => [r.ticker, r.channelCount]));
   return top.map(([ticker, a]) => ({
     ticker,
     name: nameOf.get(ticker) ?? ticker,
     recentMentions: a.mentions,
-    channelCount: a.channels || null,
+    // 창 전체 합집합. 없으면 일별 최댓값 폴백(getUsSurgingStocks 주석과 같은 이유).
+    channelCount: chOf.get(ticker) ?? a.channels ?? null,
     series: chartDates.map((d) => a.byDate.get(d) ?? 0),
     seriesDates: chartDates,
     price: quotes.get(ticker)?.price ?? null,
     changeRate: quotes.get(ticker)?.changeRate ?? null,
     narrative: narrativeOf.get(ticker) ?? null,
   }));
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * 관심의 폭 — 몇 곳이 말하나 (migration_037)
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+export type UsStockBreadth = {
+  ticker: string;
+  name: string;
+  channelCount: number;
+  mentionCount: number;
+};
+
+/**
+ * 종목별 **서로 다른** 채널 수. 파이프라인이 창을 정해 세어 둔 것을 그대로 읽는다.
+ *
+ * ⚠️ `telegram_us_stock_daily.channel_count` 로 갈음하면 안 된다. 그 열은 **그날 하루**의
+ * 채널 수라 여러 날을 묶어도 합집합이 아니다. 합치면 같은 채널을 며칠치 겹쳐 세고,
+ * 최댓값을 쓰면 실제보다 크게 작아진다(실측: 엔비디아 최댓값 100 vs 창 전체 204).
+ * 국내가 같은 함정을 겪고 telegram_stock_breadth 를 판 이유가 이것이다.
+ *
+ * 렌더에서 직접 세지 않는 이유: 원자료 38,319행을 통째로 읽어야 하고 실측 2.37초다
+ * (페이지 전체 렌더보다 오래 걸린다).
+ */
+export const usStockBreadth = cache(async (): Promise<{ asOf: string | null; windowDays: number; rows: UsStockBreadth[] }> => {
+  const db = getSupabaseAdmin();
+  const latest = await db
+    .from("telegram_us_stock_breadth")
+    .select("as_of_date,window_days")
+    .order("as_of_date", { ascending: false })
+    .limit(1);
+  const head = latest.data?.[0];
+  if (latest.error || !head) {
+    if (latest.error) console.error("[usStockBreadth] 기준일을 못 읽었습니다", latest.error);
+    return { asOf: null, windowDays: 0, rows: [] };
+  }
+  const { data, error } = await db
+    .from("telegram_us_stock_breadth")
+    .select("ticker,channel_count,mention_count")
+    .eq("as_of_date", head.as_of_date)
+    .eq("window_days", head.window_days)
+    .order("channel_count", { ascending: false });
+  if (error) {
+    console.error("[usStockBreadth] 관심의 폭을 못 읽었습니다", error);
+    return { asOf: head.as_of_date as string, windowDays: head.window_days as number, rows: [] };
+  }
+  const nameOf = await usNameMap();
+  return {
+    asOf: head.as_of_date as string,
+    windowDays: head.window_days as number,
+    rows: (data ?? []).map((r) => ({
+      ticker: r.ticker as string,
+      name: nameOf.get(r.ticker as string) ?? (r.ticker as string),
+      channelCount: r.channel_count as number,
+      mentionCount: r.mention_count as number,
+    })),
+  };
+});
+
+/** '몇 곳이 말하나' 카드가 그리는 상위 N개 + 전체 채널 수(막대의 분모). */
+export async function getUsStockBreadth(limit = 10): Promise<{
+  asOf: string | null;
+  windowDays: number;
+  totalChannels: number;
+  rows: UsStockBreadth[];
+}> {
+  const [{ asOf, windowDays, rows }, { titleOf }] = await Promise.all([usStockBreadth(), channelMeta()]);
+  return { asOf, windowDays, totalChannels: titleOf.size, rows: rows.slice(0, limit) };
 }
