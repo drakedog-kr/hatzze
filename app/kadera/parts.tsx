@@ -389,3 +389,84 @@ export function Sparkline({ data, width = 62, height = 26 }: { data: number[]; w
     </div>
   );
 }
+
+/**
+ * 요약 글에서 **그날의 주인공**을 굵게 집는다. 국장·미장 두 히어로가 함께 쓴다.
+ *
+ * 시장 브리핑의 '오늘의 브리핑'과 MDD 의 '이 하락의 맥락'은 문단을 JSX 로 조립해서
+ * 지표명·핵심 수치에 <b> 를 직접 붙인다. 여기는 LLM 이 보낸 **통글**이라 같은 방법을
+ * 못 쓴다 — 대신 화면에서 집는다.
+ *
+ * 처음엔 수치를 집었다가 걷었다("3일간·328억"). 카더라에서 눈이 찾는 것은 숫자가
+ * 아니라 **무엇이 회자되나**다. 그래서 낱말은 그날 화면이 이미 뽑아 둔 것에서만
+ * 가져온다 — 급부상 종목·주요 종목 리포트·테마 로테이션·이슈 키워드. 손으로 적어 둔
+ * 목록이 아니라 **오늘 자 집계**라 낡지 않는다. 2차전지가 화제인 날은 2차전지가,
+ * 아닌 날은 그날의 것이 굵어진다.
+ *
+ * ⚠️ 한 문단에 **최대 둘**이다. 굵은 데가 셋을 넘으면 강조가 아니라 얼룩이 된다.
+ * 그리고 같은 낱말은 **글 전체에서 한 번만** 굵어진다 — used 를 문단마다 새로 만들면
+ * 반도체가 2·3문단에서 각각 한 번씩, 화면에서는 두 번 굵어진다(실측). 세 문단이
+ * 한 글이므로 셈도 글 단위로 한다. 그래서 호출자가 Set 을 들고 넘긴다.
+ *
+ * ⚠️ 긴 낱말을 먼저 대본다. "삼성전자"를 "삼성"보다 뒤에 대면 "삼성"만 굵어지고
+ * "전자"가 떨어져 나온다. 그 정렬은 호출자가 한다(termsFor 참고).
+ * ⚠️ 낱말 경계를 한글로는 못 가른다(\b 가 한글에 안 걸린다). 그렇다고 **뒤가 한글이면
+ * 건너뛰기**로 막으면 안 된다 — 한국어는 조사가 명사에 바로 붙어서 "2차전지가",
+ * "지주·밸류업과" 가 전부 걸러진다(실제로 반도체 하나만 굵어졌다). 뒤는 열어 두고,
+ * 영문·숫자 낱말일 때만 뒤를 막는다("AI"가 "AI수요" 속에서 따로 굵어지는 것 방지).
+ *
+ * ⚠️ 이 함수는 **한 벌만 있어야 한다.** 국장·미장이 각자 복사해 두면 한쪽만 고쳐진
+ * 채로 두 화면의 강조 규칙이 갈린다(이 저장소가 파이썬↔TS 쌍둥이로 이미 겪은 일이다).
+ */
+const HANGUL = /[\uAC00-\uD7A3]/;
+
+const MAX_BOLD_PER_PARAGRAPH = 2;
+
+export function highlightTerms(text: string, terms: string[], used: Set<string>): React.ReactNode[] {
+  if (terms.length === 0) return [text];
+  const out: React.ReactNode[] = [];
+  let inThisParagraph = 0;
+  let i = 0;
+  let key = 0;
+  let buf = "";
+  outer: while (i < text.length) {
+    if (inThisParagraph >= MAX_BOLD_PER_PARAGRAPH) break;
+    for (const term of terms) {
+      if (used.has(term)) continue;
+      if (!text.startsWith(term, i)) continue;
+      const before = text[i - 1];
+      const after = text[i + term.length];
+      if (before && HANGUL.test(before)) continue;
+      if (after && HANGUL.test(after) && /^[A-Za-z0-9]+$/.test(term)) continue;
+      if (buf) {
+        out.push(buf);
+        buf = "";
+      }
+      out.push(
+        <b key={key++} style={{ fontWeight: 800, color: C.ink }}>
+          {term}
+        </b>,
+      );
+      used.add(term);
+      inThisParagraph += 1;
+      i += term.length;
+      continue outer;
+    }
+    buf += text[i];
+    i += 1;
+  }
+  // 상한에 걸려 중간에 멈췄으면 남은 글을 그대로 붙인다.
+  if (i < text.length) buf += text.slice(i);
+  if (buf) out.push(buf);
+  return out;
+}
+
+/**
+ * highlightTerms 에 넘길 낱말 목록을 다듬는다. **긴 것부터** 대야 "삼성전자"가
+ * "삼성"에 먼저 걸리지 않는다. 한 글자는 뺀다 — 아무 데나 걸린다.
+ */
+export function termsFor(...groups: (string | null | undefined)[][]): string[] {
+  return Array.from(new Set(groups.flat()))
+    .filter((t): t is string => !!t && t.length >= 2)
+    .sort((a, b) => b.length - a.length);
+}

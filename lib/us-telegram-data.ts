@@ -22,7 +22,7 @@ import { cache } from "react";
 
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { sentimentTone } from "@/lib/format";
-import { channelMeta, fetchAllRows, optimismPct, toPercents } from "@/lib/telegram-data";
+import { channelMeta, fetchAllRows, lastSyncedAt, optimismPct, toPercents } from "@/lib/telegram-data";
 import { changeRateOf, fetchYahooQuote } from "@/lib/yahoo-quote";
 import { yahooSymbol } from "@/lib/yahoo-history";
 
@@ -110,8 +110,11 @@ export type UsKaderaSummary = {
   /** 창 안의 미국 종목 언급 수와 등장 종목 수 */
   mentions: number;
   tickers: number;
-  /** 집계가 닿아 있는 마지막 날(KST). 화면의 '최종 업데이트'가 이걸 쓴다. */
+  /** 집계가 닿아 있는 마지막 날(KST). */
   lastDate: string | null;
+  /** 파이프라인이 마지막으로 수집한 시각. 히어로 '최종 업데이트'가 이걸 쓴다 —
+      국장 히어로와 **같은 원천**이라 두 화면이 같은 시각을 말한다. */
+  lastUpdated: string | null;
 };
 
 type DailyRow = { date: string; ticker: string; mention_count: number; channel_count: number; weighted_score: number };
@@ -288,7 +291,12 @@ export async function getMarketAttentionSplit(days = 14): Promise<MarketSplitPoi
 
 /** 모니터링 현황. 카드 머리의 '무엇을 얼마나 보고 있나'를 채운다. */
 export async function getUsKaderaSummary(): Promise<UsKaderaSummary> {
-  const [channelRows, { rows, dates }] = await Promise.all([loadChannelDaily(), loadUsStockDaily(US_WINDOW_DAYS)]);
+  // 셋은 서로 안 기댄다 — 나란히 띄운다.
+  const [channelRows, { rows, dates }, lastUpdated] = await Promise.all([
+    loadChannelDaily(),
+    loadUsStockDaily(US_WINDOW_DAYS),
+    lastSyncedAt(getSupabaseAdmin()),
+  ]);
   const handles = new Set(channelRows.map((r) => r.channel_handle));
   const usHandles = new Set(channelRows.filter((r) => (r.us_msgs || 0) > 0).map((r) => r.channel_handle));
   return {
@@ -297,6 +305,7 @@ export async function getUsKaderaSummary(): Promise<UsKaderaSummary> {
     mentions: rows.reduce((s, r) => s + (r.mention_count || 0), 0),
     tickers: new Set(rows.map((r) => r.ticker)).size,
     lastDate: dates.at(-1) ?? null,
+    lastUpdated,
   };
 }
 

@@ -16,6 +16,8 @@ import {
 } from "@/lib/us-telegram-data";
 import type { UsTrendingMessage } from "@/lib/us-telegram-data";
 
+import { formatKstUpdate } from "@/lib/format";
+
 import { pageMetadata } from "../../seo";
 import { AiMark, C, Icon, MONO, R } from "../../ui";
 import { StockLogo } from "../../StockLogo";
@@ -29,6 +31,8 @@ import {
   RankDelta,
   SectionCaps,
   Sparkline,
+  highlightTerms,
+  termsFor,
 } from "../parts";
 import { TrendingTabs } from "../TrendingTabs";
 import { SectionHead } from "../SectionHead";
@@ -377,6 +381,17 @@ export default async function UsKaderaPage() {
     getUsStockBreadth(10),
   ]);
 
+  /* 요약 글에서 굵게 집을 낱말. **오늘 이 화면이 이미 뽑아 둔 것**만 쓴다(국장과 같은
+     규칙 — parts.tsx 의 highlightTerms 주석 참고). 여기 없는 종목은 요약에 나와도
+     굵어지지 않는다. 회자되는 것과 지나가는 이름을 가르는 것이 이 목록의 일이다.
+     ⚠️ 한글 표기를 쓴다 — 요약 글이 티커가 아니라 이름으로 쓰여 있다. */
+  const summaryTerms = termsFor(
+    surging.map((x) => x.name),
+    reports.map((x) => x.name),
+    themes.rows.slice(0, 4).map((x) => x.theme),
+    keywords.slice(0, 5).map((x) => x.keyword),
+  );
+
   // 히어로 ① 의 네 줄. 국장의 miniStats 와 같은 얼개다 — 라벨·값·단위로 나눠 두면
   // 값의 오른끝이 네 줄 모두 같은 자리에 선다.
   const miniStats: {
@@ -671,38 +686,36 @@ export default async function UsKaderaPage() {
                   </div>
                 </div>
 
-                {/* 톤 구성. 순서는 반드시 비관 → 중립 → 낙관이다 — 아래 두 막대도 왼쪽이
-                    비관이라, 이 막대만 뒤집으면 같은 색이 칸 안에서 반대로 자란다. */}
+                {/* 큰 숫자와 **같은 값**을 그림으로 되풀이한다(국장 히어로와 같은 규칙).
+                    ⚠️ 중립은 안 그린다. 예전엔 비관·중립·낙관 세 칸이었는데, 그러면 이
+                    막대만 원자료를 말하고 바로 위 큰 숫자(중립 뺀 환산값)와 어긋난다 —
+                    한 칸 안에서 76% 와 '낙관 49' 가 나란히 서서 어느 쪽이 참인지 읽는
+                    사람이 판단해야 했다. 중립을 얼마나 뺐는지는 위 캡션 한 줄로 족하다. */}
                 <div
                   style={{ display: "flex", flexDirection: "column", gap: 7 }}
                 >
                   <span
                     style={{
                       display: "flex",
-                      height: 9,
+                      height: 11,
                       borderRadius: 3,
                       overflow: "hidden",
                     }}
                   >
                     <span
                       style={{
-                        width: `${sentiment.negative}%`,
+                        width: `${100 - sentiment.score}%`,
                         background: "var(--c-blue-2)",
                       }}
                     />
                     <span
                       style={{
-                        width: `${sentiment.neutral}%`,
-                        background: "var(--c-chip)",
-                      }}
-                    />
-                    <span
-                      style={{
-                        width: `${sentiment.positive}%`,
+                        width: `${sentiment.score}%`,
                         background: "var(--c-warm-2)",
                       }}
                     />
                   </span>
+                  {/* 두 라벨을 막대의 양 끝에 붙여 어느 쪽이 어느 색인지 위치로 읽히게 한다. */}
                   <div
                     style={{
                       display: "flex",
@@ -713,94 +726,13 @@ export default async function UsKaderaPage() {
                     }}
                   >
                     <span style={{ color: "var(--c-cold-ink)" }}>
-                      비관 {sentiment.negative}
-                    </span>
-                    <span style={{ color: C.sub2 }}>
-                      중립 {sentiment.neutral}
+                      비관 {100 - sentiment.score}
                     </span>
                     <span style={{ color: "var(--c-hot-ink)" }}>
-                      낙관 {sentiment.positive}
+                      낙관 {sentiment.score}
                     </span>
                   </div>
                 </div>
-
-                {/* 톤 구성과 아래 비교 사이가 통째로 비어 있었다. 일별 낙관도를 여기
-                    되살린다 — 사흘 창의 78%가 어디서 왔는지 눈으로 따라갈 수 있어야 한다.
-                    히어로 칸은 좁아 14일이 아니라 7일만 그린다. */}
-                {sentiment.series.length >= 3 && (
-                  <div
-                    style={{ display: "flex", flexDirection: "column", gap: 5 }}
-                  >
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        letterSpacing: ".06em",
-                        color: C.sub,
-                      }}
-                    >
-                      일별 낙관도
-                    </span>
-                    {sentiment.series.slice(-7).map((p, i, arr) => {
-                      const isWindow = i >= arr.length - sentiment.windowDays;
-                      return (
-                        <div
-                          key={p.date}
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "34px 1fr 30px",
-                            alignItems: "center",
-                            gap: 8,
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontFamily: MONO,
-                              fontSize: 10,
-                              color: isWindow ? C.label : C.sub2,
-                            }}
-                          >
-                            {p.date.slice(5)}
-                          </span>
-                          {/* 창 밖은 옅게 — 위 큰 숫자가 센 사흘이 어디인지 색으로 말한다. */}
-                          <span
-                            style={{
-                              display: "flex",
-                              height: 5,
-                              borderRadius: 999,
-                              overflow: "hidden",
-                              opacity: isWindow ? 1 : 0.45,
-                            }}
-                          >
-                            <span
-                              style={{
-                                width: `${100 - p.score}%`,
-                                background: "var(--c-blue-3)",
-                              }}
-                            />
-                            <span
-                              style={{
-                                width: `${p.score}%`,
-                                background: "var(--c-warm-3)",
-                              }}
-                            />
-                          </span>
-                          <span
-                            style={{
-                              fontFamily: MONO,
-                              fontSize: 10,
-                              fontWeight: 700,
-                              textAlign: "right",
-                              color: isWindow ? "var(--c-hot-ink)" : C.sub2,
-                            }}
-                          >
-                            {p.score}%
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
 
                 {/* ⭐ 이 칸의 값어치는 큰 숫자가 아니라 이 비교다. 같은 채널·같은 사흘인데
                     미국 얘기의 톤과 전체 대화의 톤이 다르다는 건 우리만 낼 수 있는 숫자다.
@@ -871,19 +803,6 @@ export default async function UsKaderaPage() {
               >
                 오늘의 요약
               </span>
-              <span style={{ flex: 1 }} />
-              {brief.date && (
-                <span
-                  style={{
-                    fontFamily: MONO,
-                    fontSize: 11,
-                    color: C.sub2,
-                    flexShrink: 0,
-                  }}
-                >
-                  {brief.date.slice(5).replace("-", ".")} 기준
-                </span>
-              )}
             </div>
             {/* 높이를 안 잡는다 — 길이는 파이프라인이 잡는다(BRIEF_*_LEN). 여기서 또 자르면
                 그쪽이 망가졌을 때 화면이 조용히 문장을 먹는다. */}
@@ -900,37 +819,57 @@ export default async function UsKaderaPage() {
                   flex: 1,
                 }}
               >
-                {brief.paragraphs.map((para, i) => (
-                  <p
-                    key={i}
-                    style={{
-                      margin: 0,
-                      fontSize: 13.5,
-                      lineHeight: 1.85,
-                      color: "var(--c-ink-soft)",
-                      wordBreak: "keep-all",
-                      textWrap: "pretty",
-                    }}
-                  >
-                    {para}
-                  </p>
-                ))}
-                <span
-                  style={{
-                    marginTop: "auto",
-                    paddingTop: 4,
-                    fontSize: 11,
-                    lineHeight: 1.6,
-                    color: C.sub2,
-                  }}
-                >
-                  집계된 숫자를 읽어 자동으로 쓴 글이라 새 사실을 더하지
-                  않습니다 · 텔레그램에서 오간 말이지 확인된 사실이 아니며,
-                  매수·매도 신호가 아닙니다
+                {(() => {
+                  /* 굵힌 낱말을 **세 대목에 걸쳐** 기억한다. 대목마다 새로 세면 엔비디아가
+                     2·3대목에서 각각 한 번씩 굵어져 화면에는 두 번으로 보인다(국장과 같은
+                     규칙 — 함정은 parts.tsx 의 highlightTerms 주석에). */
+                  const used = new Set<string>();
+                  return brief.paragraphs.map((para, i) => (
+                    <p
+                      key={i}
+                      style={{
+                        margin: 0,
+                        fontSize: 13.5,
+                        lineHeight: 1.85,
+                        color: "var(--c-ink-soft)",
+                        wordBreak: "keep-all",
+                        textWrap: "pretty",
+                      }}
+                    >
+                      {highlightTerms(para, summaryTerms, used)}
+                    </p>
+                  ));
+                })()}
+              </div>
+            )}
+            {/* 기준 시각은 **언제나 이 칸 맨 아래 왼쪽**이다 — 요약 글이 날마다 3줄·4줄로
+                달라져도 자리가 안 흔들려야 "이 화면의 기준 시각"으로 읽힌다(국장 카더라·
+                시장 브리핑 히어로가 쓰는 것과 같은 조판·같은 schedule 아이콘).
+                formatKstUpdate 가 이미 "… 기준"으로 끝난다 — 또 붙이면 "기준 기준". */}
+            {summary.lastUpdated && (
+              <div
+                style={{
+                  marginTop: "auto",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 7,
+                  paddingTop: 10,
+                }}
+              >
+                <Icon name="schedule" style={{ fontSize: 14, color: C.muted }} />
+                <span style={{ fontSize: 11.5, color: C.sub }}>
+                  최종 업데이트 · {formatKstUpdate(summary.lastUpdated)}
                 </span>
               </div>
             )}
           </div>
+        </div>
+        {/* 이 문장은 빼면 안 된다(공개 저장소·법률). 히어로 시트의 각주 띠에 두면 첫
+            화면 안에 들면서도 그래픽을 밀어내지 않는다 — 국장 히어로와 같은 자리다. */}
+        <div className="hz-sheet-foot">
+          <span style={{ fontSize: 12, lineHeight: 1.6, color: C.sub }}>
+            미장 주식 텔레그램 채널들이 지금 무엇에 주목하는지를 모아 보여줍니다 · 조회·확산·언급량을 종합한 화제성 지표이며, 매수·매도 신호가 아닙니다
+          </span>
         </div>
       </section>
 

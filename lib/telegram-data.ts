@@ -326,8 +326,12 @@ async function storedCollectionStats(
 }
 
 /** 마지막 갱신 시각 — sync가 채널을 동기화한 시점이 파이프라인 실행 시각과 같다.
-    이 한 줄만은 저장할 수 없다(저장 시각 자체를 묻는 값이라 늘 원본을 봐야 한다). */
-async function lastSyncedAt(db: ReturnType<typeof getSupabaseAdmin>): Promise<string | null> {
+    이 한 줄만은 저장할 수 없다(저장 시각 자체를 묻는 값이라 늘 원본을 봐야 한다).
+
+    미장 카더라도 같은 값을 쓴다(getUsKaderaSummary). 수집이 한 벌이라 두 화면의
+    '최종 업데이트'는 같은 시각이어야 맞다 — 미국 집계는 같은 실행 안에서 이 수집
+    바로 뒤에 돈다. 그래서 export 한다. */
+export async function lastSyncedAt(db: ReturnType<typeof getSupabaseAdmin>): Promise<string | null> {
   const { data } = await db
     .from("telegram_channels")
     .select("synced_at")

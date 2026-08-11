@@ -24,7 +24,7 @@ import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { AiMark, C, Icon, MONO, R } from "../ui";
 import { ExpandableList } from "./ExpandableList";
-import { Avatar, ChangeRate, DayBars, Pill, QuoteDate, RankBadge, RankDelta, SectionCaps, Sparkline, rankNum } from "./parts";
+import { Avatar, ChangeRate, DayBars, Pill, QuoteDate, RankBadge, RankDelta, SectionCaps, Sparkline, highlightTerms, rankNum, termsFor } from "./parts";
 import { StockLogo } from "../StockLogo";
 import { SectionHead } from "./SectionHead";
 import { TrendingTabs } from "./TrendingTabs";
@@ -47,73 +47,8 @@ function compact(n: number): string {
   return `${n}`;
 }
 
-/**
- * 요약 글에서 **그날의 주인공**을 굵게 집는다.
- *
- * 시장 브리핑의 '오늘의 브리핑'과 MDD 의 '이 하락의 맥락'은 문단을 JSX 로
- * 조립해서 지표명·핵심 수치에 <b> 를 직접 붙인다. 여기는 LLM 이 보낸 **통글**이라
- * 같은 방법을 못 쓴다 — 대신 화면에서 집는다.
- *
- * 처음엔 수치를 집었다가 걷었다("3일간·328억"). 카더라에서 눈이 찾는 것은 숫자가
- * 아니라 **무엇이 회자되나**다. 그래서 낱말은 그날 화면이 이미 뽑아 둔 것에서만
- * 가져온다 — 급부상 종목·주요 종목 리포트·테마 로테이션·이슈 키워드. 손으로 적어 둔
- * 목록이 아니라 **오늘 자 집계**라 낡지 않는다. 2차전지가 화제인 날은 2차전지가,
- * 아닌 날은 그날의 것이 굵어진다.
- *
- * ⚠️ 한 문단에 **최대 둘**이다. 굵은 데가 셋을 넘으면 강조가 아니라 얼룩이 된다.
- * 그리고 같은 낱말은 **글 전체에서 한 번만** 굵어진다 — used 를 문단마다 새로 만들면
- * 반도체가 2·3문단에서 각각 한 번씩, 화면에서는 두 번 굵어진다(실측). 세 문단이
- * 한 글이므로 셈도 글 단위로 한다. 그래서 호출자가 Set 을 들고 넘긴다.
- *
- * ⚠️ 긴 낱말을 먼저 대본다. "삼성전자"를 "삼성"보다 뒤에 대면 "삼성"만 굵어지고
- * "전자"가 떨어져 나온다.
- * ⚠️ 낱말 경계를 한글로는 못 가른다(\b 가 한글에 안 걸린다). 그렇다고 **뒤가 한글이면
- * 건너뛰기**로 막으면 안 된다 — 한국어는 조사가 명사에 바로 붙어서 "2차전지가",
- * "지주·밸류업과" 가 전부 걸러진다(실제로 반도체 하나만 굵어졌다). 뒤는 열어 두고,
- * 영문·숫자 낱말일 때만 뒤를 막는다("AI"가 "AI수요" 속에서 따로 굵어지는 것 방지).
- */
-const HANGUL = /[\uAC00-\uD7A3]/;
-
-const MAX_BOLD_PER_PARAGRAPH = 2;
-
-function highlightTerms(text: string, terms: string[], used: Set<string>): React.ReactNode[] {
-  if (terms.length === 0) return [text];
-  const out: React.ReactNode[] = [];
-  let inThisParagraph = 0;
-  let i = 0;
-  let key = 0;
-  let buf = "";
-  outer: while (i < text.length) {
-    if (inThisParagraph >= MAX_BOLD_PER_PARAGRAPH) break;
-    for (const term of terms) {
-      if (used.has(term)) continue;
-      if (!text.startsWith(term, i)) continue;
-      const before = text[i - 1];
-      const after = text[i + term.length];
-      if (before && HANGUL.test(before)) continue;
-      if (after && HANGUL.test(after) && /^[A-Za-z0-9]+$/.test(term)) continue;
-      if (buf) {
-        out.push(buf);
-        buf = "";
-      }
-      out.push(
-        <b key={key++} style={{ fontWeight: 800, color: C.ink }}>
-          {term}
-        </b>,
-      );
-      used.add(term);
-      inThisParagraph += 1;
-      i += term.length;
-      continue outer;
-    }
-    buf += text[i];
-    i += 1;
-  }
-  // 상한에 걸려 중간에 멈췄으면 남은 글을 그대로 붙인다.
-  if (i < text.length) buf += text.slice(i);
-  if (buf) out.push(buf);
-  return out;
-}
+/* 요약 글의 굵힘(highlightTerms)은 미장 히어로도 똑같이 쓴다. 한쪽만 고쳐져 두 화면의
+   강조 규칙이 갈리지 않도록 ./parts 로 옮겼다 — 규칙과 함정은 그쪽 주석에. */
 
 function formatKR(n: number): string {
   if (n >= 1e8) return `${(n / 1e8).toFixed(1).replace(/\.0$/, "")}억`;
@@ -438,16 +373,12 @@ export default async function KaderaPage() {
      주석 참고). 여기 없는 종목은 요약에 나와도 굵어지지 않는다 — 회자되는 것과
      지나가는 이름을 가르는 것이 이 목록의 일이다.
      긴 것부터 대야 "삼성전자"가 "삼성"에 먼저 걸리지 않는다. */
-  const summaryTerms = Array.from(
-    new Set([
-      ...surging.map((x) => x.name),
-      ...stockReports.map((x) => x.name),
-      ...themes.slice(0, 4).map((x) => x.theme),
-      ...keywords.slice(0, 5).map((x) => x.word),
-    ]),
-  )
-    .filter((t) => t && t.length >= 2)
-    .sort((a, b) => b.length - a.length);
+  const summaryTerms = termsFor(
+    surging.map((x) => x.name),
+    stockReports.map((x) => x.name),
+    themes.slice(0, 4).map((x) => x.theme),
+    keywords.slice(0, 5).map((x) => x.word),
+  );
 
   /* 채널을 세는 세 줄은 전부 **지금 수집 중인 채널**을 센다(getTelegramSummary 주석).
      목록에 있어도 peer 캐시가 없어 한 건도 안 걷히는 채널은 모니터링하고 있는 것이
