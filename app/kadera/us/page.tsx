@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import {
   getMarketAttentionSplit,
@@ -17,7 +18,7 @@ import {
 import type { UsTrendingMessage } from "@/lib/us-telegram-data";
 
 import { pageMetadata } from "../../seo";
-import { C, Icon, MONO } from "../../ui";
+import { AiMark, C, Icon, MONO } from "../../ui";
 import { ExpandableList } from "../ExpandableList";
 import {
   Avatar,
@@ -336,7 +337,7 @@ export default async function UsKaderaPage() {
     getUsChannelShare(10),
     getUsSentiment(),
     getUsIssueKeywords(),
-    getUsThemeRotation(8),
+    getUsThemeRotation(10),
     getUsDailyBrief(),
     getUsStockReports(4),
     // 기간 탭이 즉시 전환되도록 세 창을 한 번에 받아 둔다(국장과 같은 이유).
@@ -348,148 +349,565 @@ export default async function UsKaderaPage() {
     getMarketAttentionSplit(18),
   ]);
 
+  // 히어로 ① 의 네 줄. 국장의 miniStats 와 같은 얼개다 — 라벨·값·단위로 나눠 두면
+  // 값의 오른끝이 네 줄 모두 같은 자리에 선다.
+  const miniStats: {
+    label: string;
+    note?: string;
+    value: string;
+    unit: string;
+    help?: string;
+  }[] = [
+    { label: "모니터링 채널", value: `${summary.totalChannels}`, unit: "개" },
+    {
+      label: "미국 얘기 채널",
+      note: "30일",
+      value: `${summary.usChannels}`,
+      unit: "개",
+      help: "최근 30일 안에 미국 종목을 한 번이라도 언급한 채널입니다. 제목에 '미국'이 없는 평범한 국내 채널이 대부분입니다.",
+    },
+    {
+      label: "미국 종목 언급",
+      note: `${US_WINDOW_DAYS}일`,
+      value: summary.mentions.toLocaleString("ko-KR"),
+      unit: "회",
+    },
+    {
+      label: "오르내린 종목",
+      note: `${US_WINDOW_DAYS}일`,
+      value: `${summary.tickers}`,
+      unit: "개",
+    },
+  ];
+
   return (
     <>
-      {/* ── 오늘의 요약: 이 페이지에서 가장 먼저 읽히는 자리 ─────────────── */}
+      {/* ── 히어로: 모니터링 25 · 센티먼트 25 · 오늘의 요약 50 ─────────────
+          국장 카더라와 같은 판이다. 셋을 시트 세 장으로 흩어 놓았다가 한 판으로 모았다 —
+          셋 다 "지금 어떤 상태인가"를 말하는데 따로 서면 무엇이 머리인지가 안 보였다. */}
       <section className="hz-sheet">
-        <SectionHead
-          icon="auto_awesome"
-          title="오늘의 요약"
-          note={
-            brief.date
-              ? `${brief.date.slice(5).replace("-", ".")} 기준`
-              : undefined
-          }
-          desc="아래 카드들의 집계를 읽어 세 대목으로 옮긴 글입니다"
-        />
-        {brief.paragraphs.length === 0 ? (
-          <p
-            style={{
-              margin: 0,
-              padding: "20px 22px",
-              color: C.sub,
-              fontSize: 13,
-            }}
-          >
-            오늘의 요약을 준비하고 있습니다. 집계가 끝난 뒤 만들어집니다.
-          </p>
-        ) : (
-          <div
-            style={{
-              padding: "18px 22px",
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-            }}
-          >
-            {brief.paragraphs.map((para, i) => (
-              <p
-                key={i}
+        <div className="hz-kd-hero">
+          {/* ① 모니터링 현황 */}
+          <div className="hz-kd-hero-q">
+            <div className="hz-kd-hero-title">
+              <span
                 style={{
-                  margin: 0,
-                  fontSize: 13.5,
-                  lineHeight: 1.85,
-                  color: "var(--c-ink-soft)",
-                  wordBreak: "keep-all",
-                  textWrap: "pretty",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  letterSpacing: "-.01em",
+                  color: C.ink,
                 }}
               >
-                {para}
-              </p>
-            ))}
+                모니터링 현황
+              </span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              {miniStats.map((s, i) => (
+                <div
+                  key={s.label}
+                  style={{
+                    display: "flex",
+                    // baseline 이 아니라 center 다 — 라벨(11.5)과 값(19)은 줄 상자 높이가
+                    // 달라 밑선을 맞추면 라벨이 줄 가운데보다 아래로 처진다(국장에서 실측).
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                    padding: i === 0 ? "0 0 11px" : "11px 0",
+                    borderBottom:
+                      i === miniStats.length - 1
+                        ? "none"
+                        : "1px solid var(--c-sheet-row)",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      color: C.sub,
+                      display: "inline-flex",
+                      alignItems: "baseline",
+                      gap: 4,
+                      minWidth: 0,
+                      // 이 칸은 25% 폭이라 좁은 구간에서 230px 까지 내려간다.
+                      // 기본 규칙이면 "미국 얘기 채널"이 토막나 읽히지 않는다.
+                      wordBreak: "keep-all",
+                    }}
+                  >
+                    {s.label}
+                    {s.note && (
+                      <span style={{ fontSize: 11, color: C.sub2 }}>
+                        {s.note}
+                      </span>
+                    )}
+                    {s.help && (
+                      <span
+                        className="hz-tip hz-tip-wide"
+                        data-tip={s.help}
+                        data-ga-tip={s.label}
+                        style={{
+                          display: "inline-flex",
+                          alignSelf: "center",
+                          cursor: "help",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <Icon
+                          name="help"
+                          style={{ fontSize: 12, color: C.muted }}
+                        />
+                      </span>
+                    )}
+                  </span>
+                  <strong
+                    style={{
+                      fontFamily: MONO,
+                      fontSize: 19,
+                      fontWeight: 800,
+                      color: C.ink,
+                      letterSpacing: "-.03em",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {s.value}
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: C.sub2,
+                        marginLeft: 3,
+                      }}
+                    >
+                      {s.unit}
+                    </span>
+                  </strong>
+                </div>
+              ))}
+            </div>
+            {/* 통계 넷 바로 아래. marginTop:auto 로 칸 바닥에 붙인다 — 옆 '오늘의 요약'
+                칸이 문단 길이만큼 늘어나면 이 칸도 같이 늘어나는데, 그때 남는 자리가
+                통계 줄 사이가 아니라 이 줄 위 한 곳에만 생긴다(국장과 같은 수법).
+                국장으로 가는 통로를 여기 두는 이유: 두 화면은 같은 채널을 사전만 바꿔
+                읽은 형제라, 한쪽을 보다 다른 쪽이 궁금해지는 게 자연스럽다. */}
+            <div style={{ marginTop: "auto", paddingTop: 14 }}>
+              <Link
+                href="/kadera"
+                className="hz-btn-soft"
+                data-ga="cta_click"
+                data-ga-cta="to_kr_kadera"
+                data-ga-surface="us_hero"
+              >
+                <Icon name="swap_horiz" style={{ fontSize: 15 }} />
+                국장 카더라 보기
+              </Link>
+            </div>
           </div>
-        )}
-        <div className="hz-sheet-foot">
-          <span style={{ fontSize: 11.5, lineHeight: 1.6, color: C.sub }}>
-            {/* AiMark 를 안 쓰고 글로 적는다 — 이 시트는 문장이 전부라 아이콘 하나로는
-                "무엇이 자동 생성인가"가 안 드러난다. */}
-            집계된 숫자를 읽어 자동으로 쓴 글이라 새 사실을 더하지 않습니다 ·
-            텔레그램에서 오간 말이지 확인된 사실이 아니며, 매수·매도 신호가
-            아닙니다
-          </span>
-        </div>
-      </section>
 
-      {/* ── 머리: 무엇을 보고 있나 ─────────────────────────────────────── */}
-      <section className="hz-sheet">
-        <SectionHead
-          icon="travel_explore"
-          title="무엇을 보고 있나"
-          desc="국장 카더라와 같은 채널을 봅니다. 사전만 미국 종목으로 바꿔 한 번 더 읽습니다"
-        />
-        <div className="hz-panelgrid hz-panelgrid-3">
-          <div className="hz-panel-pad">
-            <div style={{ fontSize: 11.5, color: C.sub2 }}>
-              미국 종목을 말하는 채널
-            </div>
+          {/* ② 생태계 센티먼트 */}
+          <div className="hz-kd-hero-q">
+            {/* 제목 우측의 구간 라벨(낙관 우세 등). 큰 숫자만 두면 78% 가 높은 건지
+                낮은 건지 읽는 사람이 판단해야 한다 — 국장과 같은 경계·같은 말을 붙인다. */}
             <div
-              style={{
-                fontFamily: MONO,
-                fontSize: 22,
-                fontWeight: 800,
-                color: C.ink,
-                letterSpacing: "-.02em",
-              }}
+              className="hz-kd-hero-title"
+              style={{ justifyContent: "space-between", gap: 10 }}
             >
-              {summary.usChannels}
-              <span style={{ fontSize: 13, fontWeight: 600, color: C.sub2 }}>
-                {" "}
-                / {summary.totalChannels}
+              <span
+                style={{
+                  fontSize: 14,
+                  fontWeight: 700,
+                  letterSpacing: "-.01em",
+                  color: C.ink,
+                }}
+              >
+                생태계 센티먼트
               </span>
+              {sentiment && (
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: C.label,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: "50%",
+                      background:
+                        sentiment.tone === "hot"
+                          ? "var(--c-warm-2)"
+                          : sentiment.tone === "cold"
+                            ? "var(--c-blue-2)"
+                            : C.hint,
+                    }}
+                  />
+                  {sentiment.label}
+                </span>
+              )}
             </div>
-            {/* ⭐ 제목은 신호가 아니다 — 실측으로 제목에 '미국'이 든 채널이 만든 언급은 21%뿐이다. */}
-            <div style={{ fontSize: 11.5, color: C.sub, marginTop: 2 }}>
-              제목에 표시가 없는 채널이 대부분입니다
-            </div>
+            {!sentiment ? (
+              <p style={{ margin: 0, fontSize: 12.5, color: C.sub }}>
+                아직 미국 종목 얘기의 톤 집계가 없습니다.
+              </p>
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 14,
+                  flex: 1,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 10,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <strong
+                    style={{
+                      fontFamily: MONO,
+                      fontSize: 34,
+                      fontWeight: 800,
+                      lineHeight: 1,
+                      letterSpacing: "-.04em",
+                      color:
+                        sentiment.tone === "cold"
+                          ? C.cold
+                          : sentiment.tone === "hot"
+                            ? C.hot
+                            : C.ink,
+                    }}
+                  >
+                    {sentiment.score}
+                    <span
+                      style={{
+                        fontSize: 18,
+                        fontWeight: 700,
+                        letterSpacing: "-.02em",
+                      }}
+                    >
+                      %
+                    </span>
+                  </strong>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 3,
+                      minWidth: 0,
+                      marginTop: 1,
+                    }}
+                  >
+                    <span
+                      style={{ fontSize: 11.5, fontWeight: 600, color: C.sub }}
+                    >
+                      최근 {sentiment.windowDays}일 ·{" "}
+                      {sentiment.messageCount.toLocaleString("ko-KR")}건 분석
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 11.5,
+                        fontWeight: 700,
+                        color: C.sub,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        width: "fit-content",
+                      }}
+                    >
+                      중립 {sentiment.neutral}% 제외 후 환산
+                      <span
+                        className="hz-tip hz-tip-wide"
+                        data-tip="메시지를 비관/중립/낙관으로 나눈 뒤, 중립을 뺀 비관↔낙관 비율입니다. 시황·공시 같은 담담한 글이 절반이라, 같이 세면 늘 비관으로 기웁니다."
+                        data-ga-tip="us_sentiment_ratio"
+                        style={{
+                          display: "inline-flex",
+                          cursor: "help",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <Icon
+                          name="help"
+                          style={{ fontSize: 12, color: C.muted }}
+                        />
+                      </span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* 톤 구성. 순서는 반드시 비관 → 중립 → 낙관이다 — 아래 두 막대도 왼쪽이
+                    비관이라, 이 막대만 뒤집으면 같은 색이 칸 안에서 반대로 자란다. */}
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 7 }}
+                >
+                  <span
+                    style={{
+                      display: "flex",
+                      height: 9,
+                      borderRadius: 3,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: `${sentiment.negative}%`,
+                        background: "var(--c-blue-2)",
+                      }}
+                    />
+                    <span
+                      style={{
+                        width: `${sentiment.neutral}%`,
+                        background: "var(--c-chip)",
+                      }}
+                    />
+                    <span
+                      style={{
+                        width: `${sentiment.positive}%`,
+                        background: "var(--c-warm-2)",
+                      }}
+                    />
+                  </span>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontFamily: MONO,
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                    }}
+                  >
+                    <span style={{ color: "var(--c-cold-ink)" }}>
+                      비관 {sentiment.negative}
+                    </span>
+                    <span style={{ color: C.sub2 }}>
+                      중립 {sentiment.neutral}
+                    </span>
+                    <span style={{ color: "var(--c-hot-ink)" }}>
+                      낙관 {sentiment.positive}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 톤 구성과 아래 비교 사이가 통째로 비어 있었다. 일별 낙관도를 여기
+                    되살린다 — 사흘 창의 78%가 어디서 왔는지 눈으로 따라갈 수 있어야 한다.
+                    히어로 칸은 좁아 14일이 아니라 7일만 그린다. */}
+                {sentiment.series.length >= 3 && (
+                  <div
+                    style={{ display: "flex", flexDirection: "column", gap: 5 }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        letterSpacing: ".06em",
+                        color: C.sub,
+                      }}
+                    >
+                      일별 낙관도
+                    </span>
+                    {sentiment.series.slice(-7).map((p, i, arr) => {
+                      const isWindow = i >= arr.length - sentiment.windowDays;
+                      return (
+                        <div
+                          key={p.date}
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "34px 1fr 30px",
+                            alignItems: "center",
+                            gap: 8,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontFamily: MONO,
+                              fontSize: 10,
+                              color: isWindow ? C.label : C.sub2,
+                            }}
+                          >
+                            {p.date.slice(5)}
+                          </span>
+                          {/* 창 밖은 옅게 — 위 큰 숫자가 센 사흘이 어디인지 색으로 말한다. */}
+                          <span
+                            style={{
+                              display: "flex",
+                              height: 5,
+                              borderRadius: 999,
+                              overflow: "hidden",
+                              opacity: isWindow ? 1 : 0.45,
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: `${100 - p.score}%`,
+                                background: "var(--c-blue-3)",
+                              }}
+                            />
+                            <span
+                              style={{
+                                width: `${p.score}%`,
+                                background: "var(--c-warm-3)",
+                              }}
+                            />
+                          </span>
+                          <span
+                            style={{
+                              fontFamily: MONO,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              textAlign: "right",
+                              color: isWindow ? "var(--c-hot-ink)" : C.sub2,
+                            }}
+                          >
+                            {p.score}%
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* ⭐ 이 칸의 값어치는 큰 숫자가 아니라 이 비교다. 같은 채널·같은 사흘인데
+                    미국 얘기의 톤과 전체 대화의 톤이 다르다는 건 우리만 낼 수 있는 숫자다.
+                    ⚠️ 아랫줄은 '국장'이 아니라 '전체 대화'다 — 그 집계엔 미국 얘기도 들어 있다.
+                    marginTop:auto — 옆 칸 문단의 밑선에 맞춰 바닥에 붙인다(국장과 같은 수법). */}
+                {sentiment.overallScore !== null && (
+                  <div
+                    style={{
+                      marginTop: "auto",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 9,
+                      paddingTop: 12,
+                      borderTop: "1px solid var(--c-sheet-row)",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        letterSpacing: ".06em",
+                        color: C.sub,
+                      }}
+                    >
+                      전체 대화와 견주면
+                    </span>
+                    <SplitBar
+                      label="미국 얘기"
+                      score={sentiment.score}
+                      strong
+                    />
+                    <SplitBar
+                      label="전체 대화"
+                      score={sentiment.overallScore}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          <div className="hz-panel-pad">
-            <div style={{ fontSize: 11.5, color: C.sub2 }}>
-              최근 {US_WINDOW_DAYS}일 언급
-            </div>
-            <div
-              style={{
-                fontFamily: MONO,
-                fontSize: 22,
-                fontWeight: 800,
-                color: C.ink,
-                letterSpacing: "-.02em",
-              }}
-            >
-              {summary.mentions.toLocaleString()}
-              <span style={{ fontSize: 13, fontWeight: 600, color: C.sub2 }}>
-                회
+
+          {/* ③ 오늘의 요약 */}
+          <div className="hz-kd-hero-h">
+            <div className="hz-kd-hero-title">
+              {/* 시장 브리핑·국장 카더라와 같은 표식 — 옅은 하늘색 타일에 ✨.
+                  22px 인 건 이 제목 슬롯이 22px 로 못박혀 있어서다(globals.css). */}
+              <span
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 7,
+                  background: "var(--c-blue-tint)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <AiMark size={13} style={{ alignSelf: "center" }} />
               </span>
+              <span
+                style={{
+                  fontSize: 14,
+                  fontWeight: 700,
+                  letterSpacing: "-.01em",
+                  color: C.ink,
+                }}
+              >
+                오늘의 요약
+              </span>
+              <span style={{ flex: 1 }} />
+              {brief.date && (
+                <span
+                  style={{
+                    fontFamily: MONO,
+                    fontSize: 11,
+                    color: C.sub2,
+                    flexShrink: 0,
+                  }}
+                >
+                  {brief.date.slice(5).replace("-", ".")} 기준
+                </span>
+              )}
             </div>
-            <div style={{ fontSize: 11.5, color: C.sub, marginTop: 2 }}>
-              {summary.tickers}개 종목이 오르내렸습니다
-            </div>
-          </div>
-          <div className="hz-panel-pad">
-            <div style={{ fontSize: 11.5, color: C.sub2 }}>가장 최근 집계</div>
-            {/* 카드마다 기준일이 다를 수 있어(함께 언급은 창 스냅샷) 머리에 한 번 못박아 둔다. */}
-            <div
-              style={{
-                fontFamily: MONO,
-                fontSize: 22,
-                fontWeight: 800,
-                color: C.ink,
-                letterSpacing: "-.02em",
-              }}
-            >
-              {summary.lastDate
-                ? summary.lastDate.slice(5).replace("-", ".")
-                : "집계 없음"}
-            </div>
-            <div style={{ fontSize: 11.5, color: C.sub, marginTop: 2 }}>
-              평일 아침·저녁 두 번 갱신합니다
-            </div>
+            {/* 높이를 안 잡는다 — 길이는 파이프라인이 잡는다(BRIEF_*_LEN). 여기서 또 자르면
+                그쪽이 망가졌을 때 화면이 조용히 문장을 먹는다. */}
+            {brief.paragraphs.length === 0 ? (
+              <p style={{ margin: 0, fontSize: 12.5, color: C.sub }}>
+                오늘의 요약을 준비하고 있습니다. 집계가 끝난 뒤 만들어집니다.
+              </p>
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 11,
+                  flex: 1,
+                }}
+              >
+                {brief.paragraphs.map((para, i) => (
+                  <p
+                    key={i}
+                    style={{
+                      margin: 0,
+                      fontSize: 13.5,
+                      lineHeight: 1.85,
+                      color: "var(--c-ink-soft)",
+                      wordBreak: "keep-all",
+                      textWrap: "pretty",
+                    }}
+                  >
+                    {para}
+                  </p>
+                ))}
+                <span
+                  style={{
+                    marginTop: "auto",
+                    paddingTop: 4,
+                    fontSize: 11,
+                    lineHeight: 1.6,
+                    color: C.sub2,
+                  }}
+                >
+                  집계된 숫자를 읽어 자동으로 쓴 글이라 새 사실을 더하지
+                  않습니다 · 텔레그램에서 오간 말이지 확인된 사실이 아니며,
+                  매수·매도 신호가 아닙니다
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </section>
 
       <SectionCaps label="미국 소식이 국내로" count={1} />
 
-      {/* ── 함께 언급된 국내 종목: 이 페이지의 존재 이유 ─────────────────── */}
       <section className="hz-sheet">
         <SectionHead
           icon="alt_route"
@@ -602,9 +1020,8 @@ export default async function UsKaderaPage() {
         </div>
       </section>
 
-      <SectionCaps label="지금 뜨는 미국 종목" count={2} />
+      <SectionCaps label="최근 뜨는 것" count={3} />
 
-      {/* ── 급부상 종목 ────────────────────────────────────────────────── */}
       <section className="hz-sheet">
         <SectionHead
           icon="local_fire_department"
@@ -755,168 +1172,7 @@ export default async function UsKaderaPage() {
         </div>
       </section>
 
-      {/* ── 테마 로테이션 ─────────────────────────────────────────────── */}
-      <section className="hz-sheet">
-        <SectionHead
-          icon="donut_small"
-          title="테마 로테이션"
-          note={
-            themes.date
-              ? `${themes.date.slice(5).replace("-", ".")} 기준`
-              : undefined
-          }
-          desc="미국 종목 얘기가 어느 테마에 몰려 있나 · 막대는 그날 미국 언급 전체에서 차지한 몫"
-        />
-        {themes.rows.length === 0 ? (
-          <p
-            style={{
-              margin: 0,
-              padding: "20px 22px",
-              color: C.sub,
-              fontSize: 13,
-            }}
-          >
-            아직 집계된 테마가 없습니다.
-          </p>
-        ) : (
-          <>
-            <div className="hz-thead hz-cols-ustheme">
-              <span>#</span>
-              <span>테마</span>
-              <span style={{ textAlign: "right" }}>점유율</span>
-              <span>최근 14일</span>
-              <span style={{ textAlign: "right" }}>종목</span>
-              <span style={{ textAlign: "right" }}>주간 순위</span>
-            </div>
-            {themes.rows.map((t) => (
-              <div key={t.theme} className="hz-trow hz-cols-ustheme">
-                <RankBadge n={t.rank} />
-                <span
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 5,
-                    minWidth: 0,
-                  }}
-                >
-                  <span
-                    style={{
-                      ...clip,
-                      fontSize: 13.5,
-                      fontWeight: 700,
-                      color: C.ink,
-                    }}
-                  >
-                    {t.theme}
-                  </span>
-                  {/* 막대는 이름 아래에 깐다. 옆 칸으로 빼면 이름 칸이 좁아져 '반도체 장비·소재'가
-                      잘리는데, 이 카드에서 가장 먼저 읽히는 건 테마 이름이다. */}
-                  <span className="hz-usbar">
-                    <span style={{ width: `${Math.min(100, t.sharePct)}%` }} />
-                  </span>
-                </span>
-                <span
-                  style={{
-                    fontFamily: MONO,
-                    fontSize: 13,
-                    fontWeight: 800,
-                    color: C.ink,
-                    textAlign: "right",
-                  }}
-                >
-                  {t.sharePct.toFixed(1)}%
-                </span>
-                {/* ⚠️ Sparkline 을 그리드 자식으로 **직접** 넣지 말 것. 그 컴포넌트는
-                    자기 뿌리에 인라인 `display:flex` 를 달고 있어서, 좁은 화면에서 이 칸을
-                    접는 미디어쿼리를 인라인이 이긴다(막대 트랙에서 이미 한 번 당했다).
-                    display 가 없는 span 으로 한 겹 싸면 접는 쪽이 이긴다. */}
-                <span>
-                  <Sparkline data={t.series} width={78} height={24} />
-                </span>
-                <span
-                  style={{
-                    fontFamily: MONO,
-                    fontSize: 11.5,
-                    color: C.sub2,
-                    textAlign: "right",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {t.stockCount}개
-                </span>
-                {/* RankDelta 는 0 과 null 을 똑같이 '아무것도 안 그림'으로 낸다. 이 표는
-                    모든 줄이 같은 기준일과 견주므로 빈칸이면 "자료가 없나?"로 읽힌다 —
-                    변동 없음은 글자로 적고, 비교할 과거가 없을 때만 —로 둔다. */}
-                <span style={{ textAlign: "right" }}>
-                  {t.rankChange === null ? (
-                    <span
-                      style={{ fontFamily: MONO, fontSize: 11, color: C.sub2 }}
-                    >
-                      —
-                    </span>
-                  ) : t.rankChange === 0 ? (
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: C.sub2,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      그대로
-                    </span>
-                  ) : (
-                    <RankDelta change={t.rankChange} />
-                  )}
-                </span>
-              </div>
-            ))}
-          </>
-        )}
-        <div className="hz-sheet-foot">
-          <span style={{ fontSize: 11.5, lineHeight: 1.6, color: C.sub }}>
-            한 종목이 여러 테마에 들 수 있어 점유율을 다 더하면 100%를 넘습니다
-            · 국장 테마 점유율과는 분모가 달라 (이쪽은 미국 언급 전체) 두 숫자를
-            견주면 안 됩니다
-          </span>
-        </div>
-      </section>
-
-      <SectionCaps label="무슨 얘기가 오갔나" count={4} />
-
-      {/* ── 트렌딩 메시지 ─────────────────────────────────────────────── */}
-      <section className="hz-sheet">
-        {/* 머리를 TrendingTabs 가 그린다 — 기간 탭이 머리 우측에 앉고 목록은 그 아래라
-            둘이 상태를 공유해야 한다. 국장과 같은 컴포넌트를 그대로 쓴다. */}
-        <TrendingTabs
-          icon="campaign"
-          title="트렌딩 메시지"
-          desc="미국 종목을 말한 글 중 조회·공유로 가장 널리 퍼진 것"
-          panels={[
-            {
-              key: "today",
-              label: "오늘",
-              count: trendToday.length,
-              node: <UsTrendingList items={trendToday} />,
-            },
-            {
-              key: "w7",
-              label: "최근 7일",
-              count: trendWeek.length,
-              node: <UsTrendingList items={trendWeek} />,
-            },
-            {
-              key: "w30",
-              label: "최근 30일",
-              count: trendMonth.length,
-              node: <UsTrendingList items={trendMonth} />,
-            },
-          ]}
-        />
-      </section>
-
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
-        {/* ── 생태계 센티먼트 ───────────────────────────────────────────── */}
         <section
           className="hz-sheet"
           style={{
@@ -927,12 +1183,16 @@ export default async function UsKaderaPage() {
           }}
         >
           <SectionHead
-            icon="mood"
-            title="생태계 센티먼트"
-            note={sentiment ? `최근 ${sentiment.windowDays}일` : undefined}
-            desc="미국 종목을 말한 글의 톤 · 중립을 뺀 낙관↔비관 비율입니다"
+            icon="donut_small"
+            title="테마 로테이션"
+            note={
+              themes.date
+                ? `${themes.date.slice(5).replace("-", ".")} 기준`
+                : undefined
+            }
+            desc="미국 종목 얘기가 어느 테마에 몰려 있나 · 막대는 그날 미국 언급 전체에서 차지한 몫"
           />
-          {!sentiment ? (
+          {themes.rows.length === 0 ? (
             <p
               style={{
                 margin: 0,
@@ -941,279 +1201,117 @@ export default async function UsKaderaPage() {
                 fontSize: 13,
               }}
             >
-              아직 미국 종목 얘기의 톤 집계가 없습니다.
+              아직 집계된 테마가 없습니다.
             </p>
           ) : (
-            <div
-              style={{
-                padding: "18px 22px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 16,
-                flex: 1,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: 12,
-                  flexWrap: "wrap",
-                }}
-              >
-                <strong
-                  style={{
-                    fontFamily: MONO,
-                    fontSize: 40,
-                    fontWeight: 800,
-                    lineHeight: 1,
-                    letterSpacing: "-.04em",
-                    color:
-                      sentiment.tone === "cold"
-                        ? C.cold
-                        : sentiment.tone === "hot"
-                          ? C.hot
-                          : C.ink,
-                  }}
-                >
-                  {sentiment.score}
+            <>
+              <div className="hz-thead hz-cols-ustheme">
+                <span>#</span>
+                <span>테마</span>
+                <span style={{ textAlign: "right" }}>점유율</span>
+                <span>최근 14일</span>
+                <span style={{ textAlign: "right" }}>종목</span>
+                <span style={{ textAlign: "right" }}>주간 순위</span>
+              </div>
+              {themes.rows.map((t) => (
+                <div key={t.theme} className="hz-trow hz-cols-ustheme">
+                  <RankBadge n={t.rank} />
                   <span
                     style={{
-                      fontSize: 20,
-                      fontWeight: 700,
-                      letterSpacing: "-.02em",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 5,
+                      minWidth: 0,
                     }}
                   >
-                    %
-                  </span>
-                </strong>
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 3,
-                    minWidth: 0,
-                    marginTop: 2,
-                  }}
-                >
-                  <span
-                    style={{ fontSize: 11.5, fontWeight: 600, color: C.sub }}
-                  >
-                    최근 {sentiment.windowDays}일 ·{" "}
-                    {sentiment.messageCount.toLocaleString("ko-KR")}건 분석
-                  </span>
-                  <span
-                    style={{
-                      fontSize: 11.5,
-                      fontWeight: 700,
-                      color: C.sub,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 4,
-                      width: "fit-content",
-                    }}
-                  >
-                    중립 {sentiment.neutral}% 제외 후 환산
                     <span
-                      className="hz-tip hz-tip-wide"
-                      data-tip="메시지를 비관/중립/낙관으로 나눈 뒤, 중립을 뺀 비관↔낙관 비율입니다. 시황·공시 같은 담담한 글이 절반이라, 같이 세면 늘 비관으로 기웁니다."
-                      data-ga-tip="us_sentiment_ratio"
                       style={{
-                        display: "inline-flex",
-                        cursor: "help",
-                        flexShrink: 0,
+                        ...clip,
+                        fontSize: 13.5,
+                        fontWeight: 700,
+                        color: C.ink,
                       }}
                     >
-                      <Icon
-                        name="help"
-                        style={{ fontSize: 12, color: C.muted }}
+                      {t.theme}
+                    </span>
+                    {/* 막대는 이름 아래에 깐다. 옆 칸으로 빼면 이름 칸이 좁아져 '반도체 장비·소재'가
+                      잘리는데, 이 카드에서 가장 먼저 읽히는 건 테마 이름이다. */}
+                    <span className="hz-usbar">
+                      <span
+                        style={{ width: `${Math.min(100, t.sharePct)}%` }}
                       />
                     </span>
                   </span>
-                </div>
-              </div>
-
-              {/* 톤 구성 세 갈래. 위 큰 숫자는 중립을 **뺀** 값이라, 뺀 게 얼마나 되는지
-                  보여 주지 않으면 78% 가 "글의 78%가 낙관"으로 읽힌다.
-                  ⚠️ 순서는 반드시 비관 → 중립 → 낙관이다. 이 카드의 막대가 셋인데 아래 둘은
-                     왼쪽이 비관이라, 이 막대만 낙관을 왼쪽에 두면 같은 색이 카드 안에서
-                     서로 반대 방향으로 자란다(실제로 그렇게 그렸다가 되돌렸다). */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    letterSpacing: ".04em",
-                    color: C.sub,
-                  }}
-                >
-                  톤 구성
-                </span>
-                <span
-                  style={{
-                    display: "flex",
-                    height: 9,
-                    borderRadius: 3,
-                    overflow: "hidden",
-                  }}
-                >
                   <span
                     style={{
-                      width: `${sentiment.negative}%`,
-                      background: "var(--c-blue-2)",
-                    }}
-                  />
-                  <span
-                    style={{
-                      width: `${sentiment.neutral}%`,
-                      background: "var(--c-chip)",
-                    }}
-                  />
-                  <span
-                    style={{
-                      width: `${sentiment.positive}%`,
-                      background: "var(--c-warm-2)",
-                    }}
-                  />
-                </span>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    fontFamily: MONO,
-                    fontSize: 11.5,
-                    fontWeight: 700,
-                  }}
-                >
-                  <span style={{ color: "var(--c-cold-ink)" }}>
-                    비관 {sentiment.negative}
-                  </span>
-                  <span style={{ color: C.sub2 }}>
-                    중립 {sentiment.neutral}
-                  </span>
-                  <span style={{ color: "var(--c-hot-ink)" }}>
-                    낙관 {sentiment.positive}
-                  </span>
-                </div>
-              </div>
-
-              {/* ⭐ 이 카드의 값어치는 큰 숫자가 아니라 **이 비교**다. 같은 채널·같은 사흘인데
-                  미국 얘기의 톤과 전체 대화의 톤이 다르다는 건 우리만 낼 수 있는 숫자다.
-                  ⚠️ 아랫줄은 '국장'이 아니라 '전체 대화'다 — 그 집계에는 미국 얘기도 들어 있다.
-                  위 큰 숫자와 첫 줄이 같은 값인 건 중복이 아니라 **기준점**이다. 견줄 대상
-                  하나만 그리면 78 과 74 중 어느 쪽이 미국인지 알 수 없다. */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    letterSpacing: ".04em",
-                    color: C.sub,
-                  }}
-                >
-                  전체 대화와 견주면
-                </span>
-                <SplitBar label="미국 얘기" score={sentiment.score} strong />
-                {sentiment.overallScore !== null && (
-                  <SplitBar label="전체 대화" score={sentiment.overallScore} />
-                )}
-              </div>
-
-              {/* 일별 톤. 스파크라인 한 줄로는 "어느 날이 왜 튀었나"를 못 짚는다 —
-                  날짜를 붙여야 사흘 창의 78% 가 어디서 왔는지 눈으로 따라갈 수 있다. */}
-              {sentiment.series.length >= 3 && (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 6,
-                    marginTop: "auto",
-                    paddingTop: 6,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      letterSpacing: ".04em",
-                      color: C.sub,
+                      fontFamily: MONO,
+                      fontSize: 13,
+                      fontWeight: 800,
+                      color: C.ink,
+                      textAlign: "right",
                     }}
                   >
-                    일별 낙관도 · 최근 {sentiment.series.length}일
+                    {t.sharePct.toFixed(1)}%
                   </span>
-                  {sentiment.series.map((p, i) => {
-                    const isWindow =
-                      i >= sentiment.series.length - sentiment.windowDays;
-                    return (
-                      <div
-                        key={p.date}
+                  {/* ⚠️ Sparkline 을 그리드 자식으로 **직접** 넣지 말 것. 그 컴포넌트는
+                    자기 뿌리에 인라인 `display:flex` 를 달고 있어서, 좁은 화면에서 이 칸을
+                    접는 미디어쿼리를 인라인이 이긴다(막대 트랙에서 이미 한 번 당했다).
+                    display 가 없는 span 으로 한 겹 싸면 접는 쪽이 이긴다. */}
+                  <span>
+                    <Sparkline data={t.series} width={78} height={24} />
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: MONO,
+                      fontSize: 11.5,
+                      color: C.sub2,
+                      textAlign: "right",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {t.stockCount}개
+                  </span>
+                  {/* RankDelta 는 0 과 null 을 똑같이 '아무것도 안 그림'으로 낸다. 이 표는
+                    모든 줄이 같은 기준일과 견주므로 빈칸이면 "자료가 없나?"로 읽힌다 —
+                    변동 없음은 글자로 적고, 비교할 과거가 없을 때만 —로 둔다. */}
+                  <span style={{ textAlign: "right" }}>
+                    {t.rankChange === null ? (
+                      <span
                         style={{
-                          display: "grid",
-                          gridTemplateColumns: "38px 1fr 34px",
-                          alignItems: "center",
-                          gap: 9,
+                          fontFamily: MONO,
+                          fontSize: 11,
+                          color: C.sub2,
                         }}
                       >
-                        <span
-                          style={{
-                            fontFamily: MONO,
-                            fontSize: 10.5,
-                            color: isWindow ? C.label : C.sub2,
-                          }}
-                        >
-                          {p.date.slice(5)}
-                        </span>
-                        {/* 창 밖의 날은 옅게 — 위 큰 숫자가 센 사흘이 어디인지 색으로 말한다. */}
-                        <span
-                          style={{
-                            display: "flex",
-                            height: 6,
-                            borderRadius: 999,
-                            overflow: "hidden",
-                            opacity: isWindow ? 1 : 0.45,
-                          }}
-                        >
-                          <span
-                            style={{
-                              width: `${100 - p.score}%`,
-                              background: "var(--c-blue-3)",
-                            }}
-                          />
-                          <span
-                            style={{
-                              width: `${p.score}%`,
-                              background: "var(--c-warm-3)",
-                            }}
-                          />
-                        </span>
-                        <span
-                          style={{
-                            fontFamily: MONO,
-                            fontSize: 10.5,
-                            fontWeight: 700,
-                            textAlign: "right",
-                            color: isWindow ? "var(--c-hot-ink)" : C.sub2,
-                          }}
-                        >
-                          {p.score}%
-                        </span>
-                      </div>
-                    );
-                  })}
+                        —
+                      </span>
+                    ) : t.rankChange === 0 ? (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: C.sub2,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        그대로
+                      </span>
+                    ) : (
+                      <RankDelta change={t.rankChange} />
+                    )}
+                  </span>
                 </div>
-              )}
-            </div>
+              ))}
+            </>
           )}
-          <div className="hz-sheet-foot" style={{ marginTop: "auto" }}>
+          <div className="hz-sheet-foot">
             <span style={{ fontSize: 11.5, lineHeight: 1.6, color: C.sub }}>
-              메시지별로 매긴 톤을 센 것이고 새로 분류하지 않습니다 · 아랫줄
-              &ldquo;전체 대화&rdquo;에는 미국 얘기도 들어 있어 국내만 따로 잰
-              값이 아닙니다
+              한 종목이 여러 테마에 들 수 있어 점유율을 다 더하면 100%를
+              넘습니다 · 국장 테마 점유율과는 분모가 달라 (이쪽은 미국 언급
+              전체) 두 숫자를 견주면 안 됩니다
             </span>
           </div>
         </section>
-
-        {/* ── 미장 화제어 ──────────────────────────────────────────────── */}
         <section
           className="hz-sheet"
           style={{
@@ -1332,7 +1430,38 @@ export default async function UsKaderaPage() {
         </section>
       </div>
 
-      {/* ── 주요 종목 리포트 ──────────────────────────────────────────── */}
+      <SectionCaps label="무슨 얘기가 오갔나" count={2} />
+
+      <section className="hz-sheet">
+        {/* 머리를 TrendingTabs 가 그린다 — 기간 탭이 머리 우측에 앉고 목록은 그 아래라
+            둘이 상태를 공유해야 한다. 국장과 같은 컴포넌트를 그대로 쓴다. */}
+        <TrendingTabs
+          icon="campaign"
+          title="트렌딩 메시지"
+          desc="미국 종목을 말한 글 중 조회·공유로 가장 널리 퍼진 것"
+          panels={[
+            {
+              key: "today",
+              label: "오늘",
+              count: trendToday.length,
+              node: <UsTrendingList items={trendToday} />,
+            },
+            {
+              key: "w7",
+              label: "최근 7일",
+              count: trendWeek.length,
+              node: <UsTrendingList items={trendWeek} />,
+            },
+            {
+              key: "w30",
+              label: "최근 30일",
+              count: trendMonth.length,
+              node: <UsTrendingList items={trendMonth} />,
+            },
+          ]}
+        />
+      </section>
+
       <section className="hz-sheet">
         <SectionHead
           icon="query_stats"
@@ -1449,10 +1578,9 @@ export default async function UsKaderaPage() {
         </div>
       </section>
 
-      <SectionCaps label="어디를 보고 있나" count={2} />
+      <SectionCaps label="채널" count={2} />
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
-        {/* ── 채널의 미장 비중 ──────────────────────────────────────────── */}
         <section
           className="hz-sheet"
           style={{
@@ -1549,7 +1677,6 @@ export default async function UsKaderaPage() {
           </div>
         </section>
 
-        {/* ── 국장 vs 미장 관심 배분 ────────────────────────────────────── */}
         <section
           className="hz-sheet"
           style={{
