@@ -114,22 +114,39 @@ def load_messages(db) -> list[dict]:
 
     국내 쪽과 같은 이유다 — 정렬이 없거나 유일하지 않으면 페이지 경계에서 행이
     조용히 빠지고, 빠진 메시지는 추출 자체가 안 된다.
+
+    ## OFFSET 이 아니라 **키셋**으로 넘긴다 (2026-08-11)
+
+    **이 함수가 실제로 죽었다.** 첫 정기 실행(run 31447589332)에서
+    `canceling statement due to statement timeout (57014)` 로 터졌고, 그 바람에
+    미장 데이터가 하루 통째로 비었다(08-11 미국 언급 0건).
+
+    `.range(start, start+999)` 는 뒤 페이지로 갈수록 앞의 행을 전부 걸러 낸 뒤
+    건너뛴다. `text IS NOT NULL` 필터 때문에 인덱스만으로 건너뛸 수도 없다.
+    표가 139,849행이 되자 뒤 페이지가 8초를 넘겼다.
+
+    ⭐ 같은 실행에서 **필터 없는** `load_all` 은 같은 139,849행을 무사히 읽었다
+    (calculate_us_stock_daily 는 살았다). 필터의 유무가 갈랐다.
+
+    키셋은 `id > 마지막id` 라 매 페이지가 인덱스 탐색 한 번이다(O(log n)).
     """
-    msgs, start = [], 0
+    msgs: list[dict] = []
+    last_id = ""
     while True:
-        page = (
+        q = (
             db.table("telegram_messages")
-            .select("channel_handle,message_id,text")
+            .select("id,channel_handle,message_id,text")
             .not_.is_("text", "null")
             .order("id")
-            .range(start, start + 999)
-            .execute()
-            .data
+            .limit(1000)
         )
+        if last_id:
+            q = q.gt("id", last_id)
+        page = q.execute().data
         if not page:
             break
         msgs += page
-        start += 1000
+        last_id = page[-1]["id"]
         if len(page) < 1000:
             break
     return msgs
@@ -191,6 +208,14 @@ def main() -> None:
     if dry_run:
         print("\n--dry-run: DB에 저장하지 않았습니다.")
         return
+
+    # 예외 없이 0건으로 끝나는 고장을 막는다(사전이 깨지거나 조회가 빈 경우).
+    # 아래 delete 가 먼저 도므로, 이 가드가 없으면 **표를 비우고 아무것도 안 넣는다.**
+    # 문턱을 비율이 아니라 0 으로 둔 이유는 fetch_telegram 과 같다 — 12만 건에서
+    # 미국 언급이 0이면 그건 시장 상황이 아니라 고장이다.
+    if not rows:
+        print("[오류] 미국 종목 언급이 0건입니다. 기존 데이터를 지우지 않고 멈춥니다.")
+        sys.exit(1)
 
     # 재실행 = 전량 삭제 후 삽입. 사전을 고치면 과거분까지 소급 반영된다(국내와 같다).
     db.table("telegram_message_us_stocks").delete().neq(
