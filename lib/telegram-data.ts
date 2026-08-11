@@ -1205,12 +1205,34 @@ async function themeStocks(windowDates: string[]): Promise<Map<string, ThemeStoc
   const db = getSupabaseAdmin();
 
   // 사전은 종목명으로 적혀 있고 집계는 종목코드다 — stocks 로 한 번 옮긴다.
-  // 이름은 KRX 정식명이라야 매칭된다(사전 62종목 전부 매칭됨, 동명 종목 없음).
+  // 이름은 KRX 정식명이라야 매칭된다(동명 종목 없음).
+  //
+  // ⚠️⚠️ **한 번에 다 묻지 않는다.** 사전이 62 → 366종목으로 넓어지면 `.in("name", …)` 의
+  //      URL 이 14,859자가 되는데, Supabase 클라이언트가 자체 한도(헤더 16KB)에 걸려
+  //      **요청을 보내기도 전에 거부**한다("HTTP headers exceeded server limits").
+  //      그 에러를 아무도 안 받고 있어서 화면에는 "테마에 속한 종목이 없다"로만 보였다 —
+  //      테마 줄의 종목 팝오버가 통째로 안 열렸다(2026-08-12 실측).
+  //      이 저장소는 `.in()` 목록 길이에 이미 여러 번 당했다. 사전이 더 커져도 안 깨지게
+  //      쪼개서 묻는다. 80개면 URL 이 3.5KB 언저리라 여유가 넉넉하다.
   const names = [...new Set(Object.values(THEMES).flat())];
-  const { data: rows } = await db.from("stocks").select("code,name,market").in("name", names);
-  const stockOf = new Map((rows ?? []).map((s) => [s.code as string, s]));
+  const NAME_CHUNK = 80;
+  const rows: { code: string; name: string; market: string | null }[] = [];
+  for (let i = 0; i < names.length; i += NAME_CHUNK) {
+    const { data, error } = await db
+      .from("stocks")
+      .select("code,name,market")
+      .in("name", names.slice(i, i + NAME_CHUNK));
+    // ⚠️ error 를 반드시 받는다. 안 받으면 실패가 '데이터 없음'으로 위장한다 —
+    //    이 함수가 정확히 그렇게 조용히 죽어 있었다.
+    if (error) {
+      console.error("[themeStocks] 종목 코드를 못 읽었습니다", error);
+      return out;
+    }
+    rows.push(...((data ?? []) as typeof rows));
+  }
+  const stockOf = new Map(rows.map((s) => [s.code, s]));
   const themesOf = new Map<string, string[]>(); // 종목코드 → 속한 테마(둘 이상일 수 있다)
-  const codeOfName = new Map((rows ?? []).map((s) => [s.name as string, s.code as string]));
+  const codeOfName = new Map(rows.map((s) => [s.name, s.code]));
   for (const [theme, members] of Object.entries(THEMES)) {
     for (const name of members) {
       const code = codeOfName.get(name);
