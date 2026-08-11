@@ -1151,14 +1151,15 @@ export default async function UsKaderaPage() {
                 <span>테마</span>
                 <span style={{ textAlign: "right" }}>점유율</span>
                 <span>최근 14일</span>
-                <span style={{ textAlign: "right" }}>종목</span>
+                <span style={{ textAlign: "right" }}>변화량</span>
                 <span style={{ textAlign: "right" }}>언급</span>
               </div>
               <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
               {themes.rows.map((t) => (
                 <div
                   key={t.theme}
-                  className="hz-trow hz-cols-ustheme"
+                  className="hz-trow hz-cols-ustheme hz-tip hz-tip-wide"
+                  data-tip={`${t.theme} · 창 안에서 언급된 종목 ${t.stockCount}개 · 언급 ${t.mentionCount}회`}
                   style={{ flex: 1 }}
                 >
                   <RankBadge n={t.rank} />
@@ -1229,7 +1230,18 @@ export default async function UsKaderaPage() {
                       잘리는데, 이 카드에서 가장 먼저 읽히는 건 테마 이름이다. */}
                     <span className="hz-usbar">
                       <span
-                        style={{ width: `${Math.min(100, t.sharePct)}%` }}
+                        style={{
+                          width: `${Math.min(100, t.sharePct)}%`,
+                          // 길이는 점유율, 색은 **변화 방향**이다(옆 이슈 키워드와 같은
+                          // 규칙). 눈금이 둘이라 헷갈릴 자리인데, 바로 옆 칸이 그 방향을
+                          // 부호 붙은 숫자로 적고 있어 색은 그 되풀이일 뿐이다.
+                          background:
+                            t.shareDelta === null || t.shareDelta === 0
+                              ? C.hint
+                              : t.shareDelta > 0
+                                ? "var(--c-warm-2)"
+                                : "var(--c-blue-2)",
+                        }}
                       />
                     </span>
                   </span>
@@ -1249,18 +1261,28 @@ export default async function UsKaderaPage() {
                     접는 미디어쿼리를 인라인이 이긴다(막대 트랙에서 이미 한 번 당했다).
                     display 가 없는 span 으로 한 겹 싸면 접는 쪽이 이긴다. */}
                   <span>
-                    <Sparkline data={t.series} width={78} height={24} />
+                    <Sparkline data={t.series} width={66} height={24} />
                   </span>
+                  {/* 점유율이 얼마나 움직였나. 위 막대의 색과 같은 값이라 색이 무슨 뜻인지
+                      여기서 읽힌다. 비교할 과거 창이 없으면 —. */}
                   <span
                     style={{
                       fontFamily: MONO,
                       fontSize: 11.5,
-                      color: C.sub2,
+                      fontWeight: 700,
                       textAlign: "right",
                       whiteSpace: "nowrap",
+                      color:
+                        t.shareDelta === null || t.shareDelta === 0
+                          ? C.sub2
+                          : t.shareDelta > 0
+                            ? "var(--c-hot-ink)"
+                            : "var(--c-cold-ink)",
                     }}
                   >
-                    {t.stockCount}개
+                    {t.shareDelta === null
+                      ? "—"
+                      : `${t.shareDelta > 0 ? "+" : t.shareDelta < 0 ? "−" : ""}${Math.abs(t.shareDelta).toFixed(1)}%p`}
                   </span>
                   {/* 창(3일) 안 언급 수. 점유율이 창 평균이라 이 값도 같은 창의 합이다 —
                     한쪽만 하루치면 "28.0% 인데 12회"처럼 두 숫자가 다른 기간을 말한다. */}
@@ -1360,6 +1382,7 @@ export default async function UsKaderaPage() {
                 <span>#</span>
                 <span>화제어</span>
                 <span>언급량</span>
+                <span style={{ textAlign: "right" }}>변화량</span>
                 <span style={{ textAlign: "right" }}>횟수</span>
               </div>
               {/* ⚠️ **1위부터** 센다(국장은 2위부터다). 옆 테마 로테이션과 줄을 맞추려면
@@ -1403,6 +1426,27 @@ export default async function UsKaderaPage() {
                               : C.hint,
                       }}
                     />
+                  </span>
+                  {/* 옆 테마 로테이션의 변화량 칸과 **같은 자리·같은 단위**다(%p).
+                      화제어 하나의 점유율이 작아 값도 작다 — 소수 한 자리로 적는다. */}
+                  <span
+                    style={{
+                      fontFamily: MONO,
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                      textAlign: "right",
+                      whiteSpace: "nowrap",
+                      color:
+                        k.shareDelta === null || k.shareDelta === 0
+                          ? C.sub2
+                          : k.shareDelta > 0
+                            ? "var(--c-hot-ink)"
+                            : "var(--c-cold-ink)",
+                    }}
+                  >
+                    {k.shareDelta === null
+                      ? "—"
+                      : `${k.shareDelta > 0 ? "+" : k.shareDelta < 0 ? "−" : ""}${Math.abs(k.shareDelta * 100).toFixed(1)}%p`}
                   </span>
                   <span
                     style={{
