@@ -556,17 +556,23 @@ async function usThemeStocks(windowDates: string[]): Promise<Map<string, UsTheme
 
   // 창이 3일이라 지금은 1,000행에 못 미치지만, 추출 종목이 늘면 조용히 잘린다 — 페이징한다.
   const [daily, nameOf] = await Promise.all([
-    fetchAllRows<{ ticker: string; mention_count: number }>("id", () =>
-      db.from("telegram_us_stock_daily").select("ticker,mention_count").in("date", windowDates),
+    fetchAllRows<{ ticker: string; mention_count: number; weighted_score: number }>("id", () =>
+      db
+        .from("telegram_us_stock_daily")
+        .select("ticker,mention_count,weighted_score")
+        .in("date", windowDates),
     ),
     usNameMap(),
   ]);
 
-  const agg = new Map<string, Map<string, number>>();
+  const agg = new Map<string, Map<string, { m: number; w: number }>>();
   for (const r of daily) {
     for (const theme of themesOf.get(r.ticker) ?? []) {
-      const per = agg.get(theme) ?? new Map<string, number>();
-      per.set(r.ticker, (per.get(r.ticker) ?? 0) + (r.mention_count || 0));
+      const per = agg.get(theme) ?? new Map<string, { m: number; w: number }>();
+      const a = per.get(r.ticker) ?? { m: 0, w: 0 };
+      a.m += r.mention_count || 0;
+      a.w += Number(r.weighted_score) || 0;
+      per.set(r.ticker, a);
       agg.set(theme, per);
     }
   }
@@ -575,9 +581,12 @@ async function usThemeStocks(windowDates: string[]): Promise<Map<string, UsTheme
     out.set(
       theme,
       [...per.entries()]
-        // 언급 수 순. 동점은 티커로 못박는다 — 안 그러면 렌더마다 순서가 흔들린다.
-        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-        .map(([ticker, mentions]) => ({ ticker, name: nameOf.get(ticker) ?? ticker, mentions })),
+        // ⚠️ 언급 수가 아니라 **주목도(weighted)** 순이다 — 테마 점유율을 매긴 잣대와 같아야
+        // "1등 테마를 끌어올린 게 누구인가"가 목록 맨 위에 온다(국장과 같은 규칙).
+        // 그래서 옆에 적히는 회수는 순서와 안 맞을 수 있고, 머리에 '주목도순'이라 밝힌다.
+        // 동점은 티커로 못박는다 — 안 그러면 렌더마다 순서가 흔들린다.
+        .sort((a, b) => b[1].w - a[1].w || a[0].localeCompare(b[0]))
+        .map(([ticker, a]) => ({ ticker, name: nameOf.get(ticker) ?? ticker, mentions: a.m })),
     );
   }
   return out;

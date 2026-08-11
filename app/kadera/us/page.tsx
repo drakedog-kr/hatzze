@@ -26,6 +26,7 @@ import {
   Avatar,
   ChangeRate,
   DayBars,
+  DeltaPp,
   Highlight,
   RankBadge,
   RankDelta,
@@ -315,6 +316,9 @@ export default async function UsKaderaPage() {
     getUsTrendingMessages("w30", 36),
     getUsStockBreadth(10),
   ]);
+
+  /* 이슈 키워드 막대의 분모 — 화면에 세운 낱말들의 합(국장과 같은 규칙). */
+  const keywordTotal = keywords.reduce((a, k) => a + k.mentionCount, 0);
 
   /* 카드 위 하이라이트 두 칸에 쓸 최대·최소. 표 순서와는 무관하므로 따로 고른다.
      ⚠️ shareDelta 가 null 인 줄(비교할 7일 전 집계가 없는 테마)은 후보에서 뺀다 —
@@ -1213,26 +1217,7 @@ export default async function UsKaderaPage() {
                         {t.theme}
                       </span>
                       <span style={{ flex: 1 }} />
-                      {/* 0.05%p 미만만 뺀다(국장과 같은 문턱). "소수 한 자리로 적을 때
-                          0.0%p 가 안 나오는 선"이다 — 0.1 로 두면 꼬리 테마가 통째로 빈칸이
-                          된다(국장 7~10위가 실제로 그랬다). */}
-                      {t.shareDelta !== null && Math.abs(t.shareDelta) >= 0.05 && (
-                        <span
-                          style={{
-                            fontFamily: MONO,
-                            fontSize: 12,
-                            fontWeight: 700,
-                            flexShrink: 0,
-                            color:
-                              t.shareDelta > 0
-                                ? "var(--c-hot-ink)"
-                                : "var(--c-cold-ink)",
-                          }}
-                        >
-                          {t.shareDelta > 0 ? "▲" : "▼"}
-                          {Math.abs(t.shareDelta).toFixed(1)}%p
-                        </span>
-                      )}
+                      <DeltaPp value={t.shareDelta} style={{ fontSize: 12 }} />
                     </span>
                     {/* 막대는 이름 아래에 깐다. 옆 칸으로 빼면 이름 칸이 좁아져 '반도체 장비·소재'가
                       잘리는데, 이 카드에서 가장 먼저 읽히는 건 테마 이름이다. */}
@@ -1310,7 +1295,8 @@ export default async function UsKaderaPage() {
                       className={`hz-theme-pop${i >= themes.rows.length - 4 ? " hz-theme-pop-up" : ""}`}
                     >
                       <div className="hz-theme-pop-head">
-                        최근 {US_WINDOW_DAYS}일 언급 {t.stockCount}종목 · 언급순
+                        최근 {US_WINDOW_DAYS}일 언급 {t.stockCount}종목 · 총{" "}
+                        {t.mentionCount.toLocaleString("ko-KR")}회 · 주목도순
                       </div>
                       {t.stocks.map((st) => (
                         <Link
@@ -1412,6 +1398,7 @@ export default async function UsKaderaPage() {
                 <span>#</span>
                 <span>화제어</span>
                 <span>언급량</span>
+                <span style={{ textAlign: "right" }}>점유율</span>
                 <span style={{ textAlign: "right" }}>횟수</span>
               </div>
               {/* ⚠️ **1위부터** 센다(국장은 2위부터다). 옆 테마 로테이션과 줄을 맞추려면
@@ -1459,33 +1446,19 @@ export default async function UsKaderaPage() {
                       {k.keyword}
                     </span>
                     <span style={{ flex: 1 }} />
-                    {/* 0.05%p 미만은 안 적는다 — 소수 한 자리로 적으면 0.0%p 가 되어
-                        "움직였다"는 표시만 남고 값은 아무 말도 안 한다(테마 표와 같은 규칙,
-                        문턱만 이 표의 눈금에 맞춰 낮췄다. 화제어 하나의 점유율은 0.5% 대다). */}
-                    {k.shareDelta !== null && Math.abs(k.shareDelta * 100) >= 0.05 && (
-                      <span
-                        style={{
-                          fontFamily: MONO,
-                          fontSize: 12,
-                          fontWeight: 700,
-                          flexShrink: 0,
-                          color:
-                            k.shareDelta > 0
-                              ? "var(--c-hot-ink)"
-                              : "var(--c-cold-ink)",
-                        }}
-                      >
-                        {k.shareDelta > 0 ? "▲" : "▼"}
-                        {Math.abs(k.shareDelta * 100).toFixed(1)}%p
-                      </span>
-                    )}
+                    {/* shareDelta 는 몫이라 ×100 해서 넘긴다(DeltaPp 는 %p 를 받는다). */}
+                    <DeltaPp
+                      value={k.shareDelta === null ? null : k.shareDelta * 100}
+                      style={{ fontSize: 12 }}
+                    />
                   </span>
-                  {/* 막대 길이는 7일 언급 횟수, 색은 최근 사흘 관심의 **방향**이다 —
-                      눈금이 둘이라 각주에 둘 다 적는다(국장 카드와 같은 규칙). */}
+                  {/* 막대는 **이 열 낱말 안에서 차지하는 몫**이다(국장과 같은 규칙).
+                      1위 대비로 그리면 1위가 늘 꽉 차고, 전체 화제어 대비로 그리면 1위도
+                      2.1%라 막대가 안 보인다(실측). 색은 최근 사흘 관심의 방향. */}
                   <span className="hz-bar">
                     <span
                       style={{
-                        width: `${(k.mentionCount / Math.max(1, keywords[0].mentionCount)) * 100}%`,
+                        width: `${(k.mentionCount / Math.max(1, keywordTotal)) * 100}%`,
                         background:
                           k.trend === "up"
                             ? "var(--c-warm-2)"
@@ -1494,6 +1467,19 @@ export default async function UsKaderaPage() {
                               : C.hint,
                       }}
                     />
+                  </span>
+                  {/* 막대가 그린 값을 숫자로 한 번 더. 옆 테마 표가 점유율 칸을 두는 것과
+                      같은 자리다 — 두 표를 나란히 훑을 때 같은 칸이 같은 뜻이어야 한다. */}
+                  <span
+                    style={{
+                      fontFamily: MONO,
+                      fontSize: 12,
+                      fontWeight: 800,
+                      color: C.ink,
+                      textAlign: "right",
+                    }}
+                  >
+                    {((k.mentionCount / Math.max(1, keywordTotal)) * 100).toFixed(1)}%
                   </span>
                   {/* 화살표를 뗐다. 방향은 왼쪽 %p 와 막대 색이 이미 두 번 말하고 있어,
                       여기까지 붙이면 한 줄에 같은 뜻이 셋이라 얼룩이 된다. 이 칸은

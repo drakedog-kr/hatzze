@@ -561,3 +561,30 @@ export function Highlight({ cap, name, value, valueColor, sub, divide }: {
     </div>
   );
 }
+
+/**
+ * 점유율 변동폭 배지(%p). 테마 로테이션·이슈 키워드가 국장·미장 네 자리에서 함께 쓴다.
+ *
+ * ⚠️ **문턱 아래를 빈칸으로 두지 않는다.** 0.05%p 미만은 소수 한 자리로 적으면 0.0%p 가
+ * 되는데, 그렇다고 안 그리면 줄에 아무 표시도 없어 "왜 이 줄만 없지?"가 된다 — 국장
+ * 테마 7~10위와 화제어 7·10위가 실제로 그렇게 보였다. 값이 작다는 것도 정보다.
+ * 그래서 세 갈래로 적는다:
+ *
+ *   비교할 과거가 없다 →  —        (자료가 없다)
+ *   0.05%p 미만        →  0.0%p    (화살표 없이 흐리게 — 움직이지 않았다)
+ *   그 이상            →  ▲/▼N.N%p
+ *
+ * value 는 **이미 %p 로 환산된 값**이다. 화제어의 shareDelta 는 몫이라 호출부가 ×100 해서
+ * 넘긴다 — 여기서 배율을 받으면 어느 쪽이 환산했는지가 흐려진다.
+ */
+export function DeltaPp({ value, style }: { value: number | null; style?: React.CSSProperties }) {
+  const base: React.CSSProperties = { fontFamily: MONO, fontWeight: 700, flexShrink: 0, ...style };
+  if (value === null) return <span style={{ ...base, color: C.sub2 }}>—</span>;
+  if (Math.abs(value) < 0.05) return <span style={{ ...base, color: C.sub2 }}>0.0%p</span>;
+  return (
+    <span style={{ ...base, color: value > 0 ? "var(--c-hot-ink)" : "var(--c-cold-ink)" }}>
+      {value > 0 ? "▲" : "▼"}
+      {Math.abs(value).toFixed(1)}%p
+    </span>
+  );
+}

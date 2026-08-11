@@ -24,7 +24,7 @@ import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { AiMark, C, Icon, MONO, R } from "../ui";
 import { ExpandableList } from "./ExpandableList";
-import { Avatar, ChangeRate, DayBars, Highlight, Pill, QuoteDate, RankBadge, RankDelta, SectionCaps, Sparkline, highlightTerms, termsFor } from "./parts";
+import { Avatar, ChangeRate, DayBars, DeltaPp, Highlight, Pill, QuoteDate, RankBadge, RankDelta, SectionCaps, Sparkline, highlightTerms, termsFor } from "./parts";
 import { StockLogo } from "../StockLogo";
 import { SectionHead } from "./SectionHead";
 import { TrendingTabs } from "./TrendingTabs";
@@ -339,6 +339,10 @@ export default async function KaderaPage() {
      주석 참고). 여기 없는 종목은 요약에 나와도 굵어지지 않는다 — 회자되는 것과
      지나가는 이름을 가르는 것이 이 목록의 일이다.
      긴 것부터 대야 "삼성전자"가 "삼성"에 먼저 걸리지 않는다. */
+  /* 이슈 키워드 막대의 분모 — 화면에 세운 낱말들의 합. 표에 있는 값만으로 내므로
+     새 조회가 없고, 막대와 숫자가 같은 재료에서 나와 어긋날 수 없다. */
+  const keywordTotal = keywords.reduce((a, k) => a + k.count, 0);
+
   const summaryTerms = termsFor(
     surging.map((x) => x.name),
     stockReports.map((x) => x.name),
@@ -398,24 +402,7 @@ export default async function KaderaPage() {
             {/* 이름은 반드시 minWidth:0 + 말줄임이다. flex 로 두면 긴 테마명이 배지를 칸 밖으로 민다. */}
             <span style={{ ...clip, minWidth: 0, fontSize: 13.5, fontWeight: 700, color: C.ink }}>{t.theme}</span>
             <span style={{ flex: 1 }} />
-            {/* 0.05%p 미만만 뺀다. 문턱이 0.1 이던 때는 7~10위가 통째로 빈칸이었다 —
-                꼬리 테마는 점유율이 1% 안팎이라 변동도 0.06~0.08%p 로 작다(실측). 0.05 는
-                "소수 한 자리로 적을 때 0.0%p 가 안 나오는 선"이고, 옆 이슈 키워드가 쓰는
-                값과 같다. */}
-            {t.shareDelta !== null && Math.abs(d) >= 0.05 && (
-              <span
-                style={{
-                  fontFamily: MONO,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  flexShrink: 0,
-                  color: d > 0 ? "var(--c-hot-ink)" : "var(--c-cold-ink)",
-                }}
-              >
-                {d > 0 ? "▲" : "▼"}
-                {Math.abs(d).toFixed(1)}%p
-              </span>
-            )}
+            <DeltaPp value={t.shareDelta} style={{ fontSize: 12 }} />
           </span>
           {/* 막대는 **절대 점유율**이다. 길이가 점유율, 색이 변화 방향 — 눈금이 둘이지만
               바로 위 칸이 그 방향을 부호 붙은 숫자로 적고 있어 색은 되풀이일 뿐이다. */}
@@ -984,6 +971,7 @@ export default async function KaderaPage() {
                 <span>#</span>
                 <span>키워드</span>
                 <span>언급량</span>
+                <span style={{ textAlign: "right" }}>점유율</span>
                 <span style={{ textAlign: "right" }}>횟수</span>
               </div>
               {/* ⚠️ **1위부터** 센다(예전엔 2위부터였다). 옆 테마 로테이션과 줄을 맞추려면
@@ -1010,31 +998,38 @@ export default async function KaderaPage() {
                       {/* 옆 테마 표는 %p 를 이름 줄 오른끝(막대 바로 위)에 둔다. 이 표는
                           이름과 막대가 다른 칸이라 그 자리가 없어 **이름 칸의 오른끝**에
                           붙인다 — 두 표의 이름 칸이 같은 x 에서 끝나므로 두 %p 가 한
-                          세로선 위에 선다. 0.05%p 미만은 안 적는다(0.0%p 가 안 나오는 선). */}
-                      {k.shareDelta !== null && Math.abs(k.shareDelta * 100) >= 0.05 && (
-                        <span
-                          style={{
-                            fontFamily: MONO,
-                            fontSize: 12,
-                            fontWeight: 700,
-                            flexShrink: 0,
-                            color: k.shareDelta > 0 ? "var(--c-hot-ink)" : "var(--c-cold-ink)",
-                          }}
-                        >
-                          {k.shareDelta > 0 ? "▲" : "▼"}
-                          {Math.abs(k.shareDelta * 100).toFixed(1)}%p
-                        </span>
-                      )}
+                          세로선 위에 선다. shareDelta 는 몫이라 ×100 해서 넘긴다. */}
+                      <DeltaPp
+                        value={k.shareDelta === null ? null : k.shareDelta * 100}
+                        style={{ fontSize: 12 }}
+                      />
                     </span>
-                    {/* 막대 길이는 창(3일) 언급 횟수, 색은 관심 점유율의 **방향**이다. */}
+                    {/* 막대는 **이 열 낱말 안에서 차지하는 몫**이다. 색은 관심 점유율의 방향.
+                        ⚠️ 1위 대비로 그리면 1위가 늘 꽉 차서 "얼마나 앞서나"가 사라진다.
+                        그렇다고 전체 화제어 대비로 그리면 화제어가 수백 개라 1위도 7.7%,
+                        5위는 1.7%밖에 안 돼 막대가 통째로 안 보인다(실측). 테마는 열한 개뿐이라
+                        전체 대비가 통하지만 여기는 눈금이 다르다 — 옆 표를 그대로 못 베낀다. */}
                     <span className="hz-bar">
                       <span
                         style={{
-                          width: `${(k.count / Math.max(1, keywords[0].count)) * 100}%`,
+                          width: `${(k.count / Math.max(1, keywordTotal)) * 100}%`,
                           background:
                             k.trend === "up" ? "var(--c-warm-2)" : k.trend === "down" ? "var(--c-blue-3)" : C.hint,
                         }}
                       />
+                    </span>
+                    {/* 막대가 그린 값을 숫자로 한 번 더. 옆 테마 표가 점유율 칸을 두는 것과
+                        같은 자리다 — 두 표를 나란히 훑을 때 같은 칸이 같은 뜻이어야 한다. */}
+                    <span
+                      style={{
+                        fontFamily: MONO,
+                        fontSize: 12,
+                        fontWeight: 800,
+                        color: C.ink,
+                        textAlign: "right",
+                      }}
+                    >
+                      {((k.count / Math.max(1, keywordTotal)) * 100).toFixed(1)}%
                     </span>
                     {/* 화살표는 안 붙인다 — 방향은 왼쪽 %p 와 막대 색이 이미 두 번 말한다.
                         이 칸은 **얼마나 많이**만 말한다. */}
