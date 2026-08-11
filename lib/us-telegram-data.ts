@@ -98,7 +98,18 @@ export type UsKrComention = {
   pairCount: number;
   channelCount: number;
   dayCount: number;
+  /** 창 안에서 이 미국 종목이 나온 글 수. 화면이 "N건 중 M건"의 N 으로 쓴다 */
+  usCount: number;
   lift: number;
+};
+
+/** 한 미국 종목과 그에 붙은 국내 종목들. 화면이 이 단위로 그린다. */
+export type UsComentionGroup = {
+  ticker: string;
+  usName: string;
+  /** 창 안 이 미국 종목의 총 언급 글 수(그룹의 분모) */
+  usCount: number;
+  partners: { stockCode: string; krName: string; pairCount: number; channelCount: number; dayCount: number; lift: number }[];
 };
 
 export type UsChannelShare = {
@@ -254,11 +265,12 @@ export async function getUsKrComentions(limit = 12): Promise<{ asOf: string | nu
     pair_count: number;
     channel_count: number;
     day_count: number;
+    us_count: number;
     lift: number;
   }>("id", () =>
     db
       .from("telegram_us_comention")
-      .select("ticker,stock_code,pair_count,channel_count,day_count,lift")
+      .select("ticker,stock_code,pair_count,channel_count,day_count,us_count,lift")
       .eq("as_of_date", head.as_of_date)
       .eq("window_days", head.window_days),
   );
@@ -277,11 +289,57 @@ export async function getUsKrComentions(limit = 12): Promise<{ asOf: string | nu
         pairCount: r.pair_count,
         channelCount: r.channel_count,
         dayCount: r.day_count,
+        usCount: r.us_count,
         lift: Number(r.lift) || 0,
       }))
       .sort((a, b) => b.lift - a.lift)
       .slice(0, limit),
   };
+}
+
+/**
+ * 함께 언급된 국내 종목을 **미국 종목 단위로 묶어** 준다.
+ *
+ * ## 왜 묶나
+ * lift 순으로 줄을 세우면 같은 미국 종목이 여러 줄에 흩어진다(퍼스트솔라가 1위와 3위).
+ * 읽는 사람에게는 "퍼스트솔라 얘기엔 OCI홀딩스와 한화솔루션이 붙는다"가 한 덩어리다.
+ *
+ * ## 왜 lift 를 화면에서 걷어냈나
+ * "260배"는 계산이 필요한 숫자다. 툴팁으로 설명해도 읽는 사람이 그 배수로 무엇을 해야
+ * 할지 모른다. 대신 **"이 종목 얘기 9건 중 5건"** 을 보여 준다 — 분모와 분자가 다 있어
+ * 눈으로 확인되고, 표본 크기가 저절로 드러난다(5회짜리가 279배로 보이던 문제도 같이 풀린다).
+ *
+ * ⚠️ **정렬은 여전히 lift 다.** 비율로 세우면 국내에서 흔한 종목이 위로 올라온다 —
+ * 아무 미국 종목 얘기에나 끼는 이름이 "특별히 붙어 다니는 짝"으로 뒤바뀐다.
+ * 화면에 안 보일 뿐 순서는 그대로다(각주가 그 사실을 적는다).
+ */
+export async function getUsComentionGroups(
+  limitPairs = 10,
+): Promise<{ asOf: string | null; windowDays: number; groups: UsComentionGroup[] }> {
+  const { asOf, windowDays, rows } = await getUsKrComentions(limitPairs);
+  const byTicker = new Map<string, UsComentionGroup>();
+  for (const r of rows) {
+    const g = byTicker.get(r.ticker) ?? {
+      ticker: r.ticker,
+      usName: r.usName,
+      usCount: r.usCount,
+      partners: [],
+    };
+    g.partners.push({
+      stockCode: r.stockCode,
+      krName: r.krName,
+      pairCount: r.pairCount,
+      channelCount: r.channelCount,
+      dayCount: r.dayCount,
+      lift: r.lift,
+    });
+    byTicker.set(r.ticker, g);
+  }
+  // 그룹 순서는 그 안의 **가장 강한 짝**이 정한다. 그래야 lift 순서가 묶은 뒤에도 남는다.
+  const groups = [...byTicker.values()]
+    .map((g) => ({ ...g, partners: g.partners.sort((a, b) => b.lift - a.lift) }))
+    .sort((a, b) => (b.partners[0]?.lift ?? 0) - (a.partners[0]?.lift ?? 0));
+  return { asOf, windowDays, groups };
 }
 
 /** 국내 종목코드 → 이름. `.in()` 목록도 1,000개 캡에 걸리므로 조각내어 부른다. */
