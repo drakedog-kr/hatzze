@@ -24,7 +24,7 @@ import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { AiMark, C, Icon, MONO, R } from "../ui";
 import { ExpandableList } from "./ExpandableList";
-import { Avatar, ChangeRate, DayBars, Pill, QuoteDate, RankBadge, RankDelta, SectionCaps, Sparkline, highlightTerms, rankNum, termsFor } from "./parts";
+import { Avatar, ChangeRate, DayBars, Highlight, Pill, QuoteDate, RankBadge, RankDelta, SectionCaps, Sparkline, highlightTerms, rankNum, termsFor } from "./parts";
 import { StockLogo } from "../StockLogo";
 import { SectionHead } from "./SectionHead";
 import { TrendingTabs } from "./TrendingTabs";
@@ -117,34 +117,7 @@ const SPARK_H = 26; // Sparkline 기본 높이와 같아야 한다
 const THEME_SPARK_TOP = THEME_NAME_H + THEME_BAR_TOP + THEME_BAR_H - SPARK_H;
 
 /** 시트 안 '2분할 하이라이트'(테마 로테이션·이슈 키워드의 머리 아래 두 칸). */
-function Highlight({ cap, name, value, valueColor, sub, divide }: {
-  cap: string;
-  name: string;
-  value?: string;
-  valueColor?: string;
-  sub: string;
-  divide?: boolean;
-}) {
-  return (
-    <div
-      style={{
-        padding: "14px 22px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 4,
-        minWidth: 0,
-        boxShadow: divide ? "inset -1px 0 0 var(--c-sheet-row)" : undefined,
-      }}
-    >
-      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>{cap}</span>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 7, minWidth: 0 }}>
-        <strong style={{ ...clip, fontSize: 16, fontWeight: 800, letterSpacing: "-.02em", color: C.ink }}>{name}</strong>
-        {value && <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: valueColor, flexShrink: 0 }}>{value}</span>}
-      </div>
-      <span style={{ ...clip, fontSize: 11.5, color: C.sub }}>{sub}</span>
-    </div>
-  );
-}
+/* 하이라이트 칸(카드 위 요약 두 칸)은 미장 카드도 쓴다 → ./parts */
 
 /**
  * 트렌딩 메시지 목록(말풍선 카드). 기간 탭이 세 벌을 미리 렌더해 넘기므로 목록

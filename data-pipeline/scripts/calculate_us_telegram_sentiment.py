@@ -1,6 +1,6 @@
 """미국 종목을 언급한 메시지만 골라 날짜별 톤·화제어로 집계한다.
 
-  telegram_us_sentiment_daily : 날짜 × scope('overall') 별 톤 카운트
+  telegram_us_sentiment_daily : 날짜 × scope('overall' | 미국 테마명) 별 톤 카운트
   telegram_us_keyword_daily   : 날짜 × 화제어 언급 수
   telegram_us_issue_keyword   : 이슈 키워드 카드 상위 N줄(선계산)
 
@@ -46,6 +46,7 @@ from common.timeutil import KST  # noqa: E402
 from config.issue_keywords import EXCLUDE, MAX_KEYWORD_LEN, MIN_KEYWORD_LEN  # noqa: E402
 from config.stock_extraction import ALIASES as STOCK_ALIASES  # noqa: E402
 from config.us_stock_extraction import US_NAMES  # noqa: E402
+from config.us_stock_themes import US_THEMES  # noqa: E402
 
 # 정규화·버킷 규칙은 국내 집계가 이미 정한 것을 그대로 가져다 쓴다. 여기서 다시 짜면
 # 두 화면의 화제어가 같은 말을 다르게 묶는다(예: "금리 인하" vs "금리인하").
@@ -167,12 +168,15 @@ def issue_keyword_rows(
     for i, (_, word, count, total, skew) in enumerate(ranked, 1):
         recent_avg = recent_share.get(word, 0.0) / max(len(recent_dates), 1)
         prior_avg = prior_share.get(word, 0.0) / max(len(prior_dates), 1)
-        if not can_compare:
+        # 두 값(방향·크기)은 **같은 뺄셈 하나**에서 나온다. trend 는 여기에 flat 문턱만
+        # 더한 것이다 — 한쪽만 고치면 화살표와 하이라이트 칸이 서로 다른 말을 한다.
+        delta = None if not can_compare else recent_avg - prior_avg
+        if delta is None:
             trend = None
-        elif abs(recent_avg - prior_avg) < ISSUE_KEYWORD_FLAT:
+        elif abs(delta) < ISSUE_KEYWORD_FLAT:
             trend = "flat"
         else:
-            trend = "up" if recent_avg > prior_avg else "down"
+            trend = "up" if delta > 0 else "down"
         out.append(
             {
                 "rank": i,
@@ -183,6 +187,7 @@ def issue_keyword_rows(
                 "channel_count": len(chan7.get(word, ())),
                 "day_count": len(day7.get(word, ())),
                 "trend": trend,
+                "share_delta": None if delta is None else round(delta, 6),
                 "computed_for": dates[-1],
             }
         )
@@ -194,13 +199,27 @@ def main() -> None:
     db = get_client()
 
     # ── 어떤 메시지가 '미국 얘기'인가 ───────────────────────────────────────
-    us_mentions = load_all_keyset(db, "telegram_message_us_stocks", "id,channel_handle,message_id")
+    # ⚠️ ticker 까지 받는다. 테마별 톤(scope=테마명)을 세려면 어느 종목 얘기였는지가
+    #    있어야 한다 — 국내 쪽이 telegram_message_stocks 에서 stock_code 를 받는 것과
+    #    같은 자리다. 열 하나가 늘 뿐 조회 수는 그대로다.
+    us_mentions = load_all_keyset(
+        db, "telegram_message_us_stocks", "id,channel_handle,message_id,ticker"
+    )
     us_keys = {(m["channel_handle"], m["message_id"]) for m in us_mentions}
     if not us_keys:
         print("[경고] telegram_message_us_stocks 가 비어 있습니다. "
               "먼저 extract_telegram_us_stocks.py 를 실행하세요.")
         return
     print(f"[재료] 미국 언급 메시지 {len(us_keys):,}건 (언급 {len(us_mentions):,}건)")
+
+    # 티커 → 테마. 한 종목이 여러 테마에 속할 수 있다(us_stock_themes 머리 주석).
+    themes_of_ticker: dict[str, list[str]] = defaultdict(list)
+    for theme, tickers in US_THEMES.items():
+        for t in tickers:
+            themes_of_ticker[t].append(theme)
+    tickers_of_msg: dict[tuple[str, int], set[str]] = defaultdict(set)
+    for m in us_mentions:
+        tickers_of_msg[(m["channel_handle"], m["message_id"])].add(m["ticker"])
 
     analysis = load_all_keyset(
         db, "telegram_message_analysis", "id,channel_handle,message_id,sentiment,keywords"
@@ -251,6 +270,15 @@ def main() -> None:
         if is_us:
             analyzed_us += 1
             tone[(date, OVERALL)][a["sentiment"]] += 1
+            # 이 메시지가 말한 종목들이 속한 테마 **전부**에 같은 톤을 반영(중복 제거).
+            # 국내 calculate_telegram_sentiment 와 같은 규칙이다 — 한 글이 엔비디아와
+            # 마이크론을 같이 말하면 AI반도체와 메모리 둘 다 그 톤을 겪은 것이 맞다.
+            for theme in {
+                th
+                for tk in tickers_of_msg.get(key, ())
+                for th in themes_of_ticker.get(tk, ())
+            }:
+                tone[(date, theme)][a["sentiment"]] += 1
 
         for word in a.get("keywords") or []:
             b, canonical = bucket_of(word)
@@ -325,9 +353,11 @@ def main() -> None:
     arrow = {"up": "▲", "down": "▼", "flat": "·", None: " "}
     print("  이슈 키워드(쏠림순):")
     for r in issue_rows:
+        d = r["share_delta"]
         print(f"    {r['rank']:2} {r['keyword']:<14} 쏠림 {r['skew']:>5.1f}배 · "
               f"미국 {r['mention_count']}/{r['total_count']}회 · "
-              f"{r['channel_count']}채널 · {r['day_count']}일 {arrow[r['trend']]}")
+              f"{r['channel_count']}채널 · {r['day_count']}일 {arrow[r['trend']]}"
+              f"{'' if d is None else f' {d * 100:+.2f}%p'}")
 
     if dry_run:
         print("[dry-run] 저장하지 않고 종료합니다.")

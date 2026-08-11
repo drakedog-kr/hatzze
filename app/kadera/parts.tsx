@@ -43,6 +43,10 @@ export const rankNum: React.CSSProperties = {
   flexShrink: 0,
 };
 
+/** 한 줄 말줄임 — 이름 칸처럼 셀을 밀어낼 수 있는 글에 붙인다. 두 page.tsx 가
+    각자 같은 상수를 들고 있는데, parts 안에서 쓰는 것은 여기 것을 쓴다. */
+const clip: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
+
 export type Tone = "plain" | "blue" | "hot" | "cold";
 
 /**
@@ -516,4 +520,44 @@ export function termsFor(...groups: (string | null | undefined)[][]): string[] {
   return Array.from(new Set(groups.flat()))
     .filter((t): t is string => !!t && t.length >= 2)
     .sort((a, b) => b.length - a.length);
+}
+
+/**
+ * 시트 머리 아래 **하이라이트 두 칸** — 표를 읽기 전에 "그래서 뭐가 제일 컸나"를
+ * 먼저 답한다. 테마 로테이션·이슈 키워드가 국장·미장 양쪽에서 같은 얼개로 쓴다.
+ *
+ * name 과 value 를 나누는 이유: name 은 길이가 제각각이라 말줄임이 걸려야 하고
+ * (`반도체 장비·소재`), value 는 절대 안 줄어야 한다(`▲13.5%p`). 한 문자열로 두면
+ * 좁은 폭에서 수치부터 잘린다.
+ *
+ * divide 는 왼쪽 칸에만 준다 — 칸 사이 세로선이다. 폰(≤560)에서는 두 칸이 세로로
+ * 서면서 globals.css 의 .hz-kd-duo 규칙이 이 선을 가로선으로 바꾼다.
+ */
+export function Highlight({ cap, name, value, valueColor, sub, divide }: {
+  cap: string;
+  name: string;
+  value?: string;
+  valueColor?: string;
+  sub: string;
+  divide?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        padding: "14px 22px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
+        minWidth: 0,
+        boxShadow: divide ? "inset -1px 0 0 var(--c-sheet-row)" : undefined,
+      }}
+    >
+      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>{cap}</span>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 7, minWidth: 0 }}>
+        <strong style={{ ...clip, fontSize: 16, fontWeight: 800, letterSpacing: "-.02em", color: C.ink }}>{name}</strong>
+        {value && <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: valueColor, flexShrink: 0 }}>{value}</span>}
+      </div>
+      <span style={{ ...clip, fontSize: 11.5, color: C.sub }}>{sub}</span>
+    </div>
+  );
 }

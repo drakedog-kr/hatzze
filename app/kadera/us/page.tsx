@@ -26,6 +26,7 @@ import {
   Avatar,
   ChangeRate,
   DayBars,
+  Highlight,
   Pill,
   RankBadge,
   RankDelta,
@@ -68,74 +69,6 @@ function pct(x: number): string {
  */
 function fmtPrice(n: number, _market: "US"): string {
   return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-/**
- * 비관↔낙관 양분 막대 한 줄. 색은 국장 히어로의 같은 막대와 맞춘다 —
- * 파랑이 비관, 따뜻한 색이 낙관이다. 두 화면을 오갈 때 색이 뒤집히면 안 된다.
- */
-function SplitBar({
-  label,
-  score,
-  strong,
-}: {
-  label: string;
-  score: number;
-  strong?: boolean;
-}) {
-  return (
-    <div
-      style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}
-    >
-      <span
-        style={{
-          width: 52,
-          flexShrink: 0,
-          fontSize: 11,
-          fontWeight: 700,
-          color: strong ? C.label : C.sub2,
-        }}
-      >
-        {label}
-      </span>
-      <span
-        style={{
-          flex: 1,
-          minWidth: 0,
-          display: "flex",
-          height: strong ? 11 : 8,
-          borderRadius: 3,
-          overflow: "hidden",
-        }}
-      >
-        <span
-          style={{
-            width: `${100 - score}%`,
-            background: strong ? "var(--c-blue-2)" : "var(--c-blue-3)",
-          }}
-        />
-        <span
-          style={{
-            width: `${score}%`,
-            background: strong ? "var(--c-warm-2)" : "var(--c-warm-3)",
-          }}
-        />
-      </span>
-      <span
-        style={{
-          fontFamily: MONO,
-          fontSize: 11.5,
-          fontWeight: 700,
-          color: "var(--c-hot-ink)",
-          width: 34,
-          textAlign: "right",
-          flexShrink: 0,
-        }}
-      >
-        {score}%
-      </span>
-    </div>
-  );
 }
 
 /**
@@ -380,6 +313,26 @@ export default async function UsKaderaPage() {
     getUsTrendingMessages("w30", 36),
     getUsStockBreadth(10),
   ]);
+
+  /* 카드 위 하이라이트 두 칸에 쓸 최대·최소. 표 순서와는 무관하므로 따로 고른다.
+     ⚠️ shareDelta 가 null 인 줄(비교할 7일 전 집계가 없는 테마)은 후보에서 뺀다 —
+     0 으로 치면 "변동 없음"이 "가장 많이 유입"으로 올라온다. */
+  const movedThemes = themes.rows.filter((t) => t.shareDelta !== null);
+  const themeIn = movedThemes.length
+    ? movedThemes.reduce((a, b) => (b.shareDelta! > a.shareDelta! ? b : a))
+    : null;
+  const themeOut = movedThemes.length
+    ? movedThemes.reduce((a, b) => (b.shareDelta! < a.shareDelta! ? b : a))
+    : null;
+  /* 화제어의 '가장 큰 변동'은 **위아래를 가리지 않는다**(절댓값 최대). 늘어난 말만
+     세우면 관심이 빠진 자리가 화면에서 통째로 안 보인다. 동점은 순위로 가른다 —
+     안 가르면 실행마다 다른 말이 뜬다. */
+  const kwMoved =
+    keywords
+      .filter((k) => k.shareDelta !== null)
+      .sort(
+        (a, b) => Math.abs(b.shareDelta!) - Math.abs(a.shareDelta!) || a.rank - b.rank,
+      )[0] ?? null;
 
   /* 요약 글에서 굵게 집을 낱말. **오늘 이 화면이 이미 뽑아 둔 것**만 쓴다(국장과 같은
      규칙 — parts.tsx 의 highlightTerms 주석 참고). 여기 없는 종목은 요약에 나와도
@@ -734,18 +687,18 @@ export default async function UsKaderaPage() {
                   </div>
                 </div>
 
-                {/* ⭐ 이 칸의 값어치는 큰 숫자가 아니라 이 비교다. 같은 채널·같은 사흘인데
-                    미국 얘기의 톤과 전체 대화의 톤이 다르다는 건 우리만 낼 수 있는 숫자다.
-                    ⚠️ 아랫줄은 '국장'이 아니라 '전체 대화'다 — 그 집계엔 미국 얘기도 들어 있다.
-                    marginTop:auto — 옆 칸 문단의 밑선에 맞춰 바닥에 붙인다(국장과 같은 수법). */}
-                {sentiment.overallScore !== null && (
+                {/* 테마별 낙관↔비관. 위 큰 숫자와 **같은 사흘**을 쪼갠 것이라, 76% 가
+                    어느 테마에서 온 값인지 눈으로 따라갈 수 있다(국장 히어로와 같은 자리·
+                    같은 얼개). marginTop:auto — 옆 칸 문단의 밑선에 맞춰 바닥에 붙인다.
+                    두 칸은 같은 높이로 늘어나므로, 둘 다 바닥에 붙이면 밑선이 정확히 같다. */}
+                {sentiment.byTheme.length > 0 && (
                   <div
                     style={{
                       marginTop: "auto",
                       display: "flex",
                       flexDirection: "column",
                       gap: 9,
-                      paddingTop: 12,
+                      paddingTop: 14,
                       borderTop: "1px solid var(--c-sheet-row)",
                     }}
                   >
@@ -757,17 +710,61 @@ export default async function UsKaderaPage() {
                         color: C.sub,
                       }}
                     >
-                      전체 대화와 견주면
+                      인기 테마별 비관 ↔ 낙관
                     </span>
-                    <SplitBar
-                      label="미국 얘기"
-                      score={sentiment.score}
-                      strong
-                    />
-                    <SplitBar
-                      label="전체 대화"
-                      score={sentiment.overallScore}
-                    />
+                    {sentiment.byTheme.map((t) => (
+                      <div
+                        key={t.name}
+                        className="hz-tip hz-tip-wide"
+                        data-tip={`${t.name} 언급 ${t.total}건 중 비관 ${t.negative}건 · 낙관 ${t.positive}건 (중립 제외 비율)`}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          minWidth: 0,
+                        }}
+                      >
+                        {/* 이름 칸 폭을 고정한다 — flex 로 두면 테마명 길이에 따라 막대
+                            시작점이 행마다 어긋나 눈이 세로로 훑질 못한다.
+                            ⚠️ 국장(62px)보다 넓다. 미장 테마명이 더 길어서다
+                            ('반도체 장비·소재' · 'AI 인프라·클라우드'). */}
+                        <span
+                          style={{
+                            ...clip,
+                            width: 86,
+                            flexShrink: 0,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: C.label,
+                          }}
+                        >
+                          {t.name}
+                        </span>
+                        <span
+                          style={{
+                            flex: 1,
+                            minWidth: 0,
+                            display: "flex",
+                            height: 7,
+                            borderRadius: 999,
+                            overflow: "hidden",
+                          }}
+                        >
+                          <span
+                            style={{
+                              width: `${100 - t.pos}%`,
+                              background: "var(--c-blue-3)",
+                            }}
+                          />
+                          <span
+                            style={{
+                              width: `${t.pos}%`,
+                              background: "var(--c-warm-3)",
+                            }}
+                          />
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -1092,12 +1089,10 @@ export default async function UsKaderaPage() {
           <SectionHead
             icon="donut_small"
             title="테마 로테이션"
-            note={
-              themes.date
-                ? `${themes.date.slice(5).replace("-", ".")} 기준`
-                : undefined
-            }
+            note="7일 전 대비"
+            noteHelp="점유율과 순위는 기준일 하루치입니다. 유입·이탈과 주간 순위는 그 하루를 7일 전 같은 날과 견줍니다."
             desc="미국 종목 얘기가 어느 테마에 몰려 있나 · 막대는 그날 미국 언급 전체에서 차지한 몫"
+            meta={themes.date ? `${themes.date} 기준` : undefined}
           />
           {themes.rows.length === 0 ? (
             <p
@@ -1112,6 +1107,41 @@ export default async function UsKaderaPage() {
             </p>
           ) : (
             <>
+              <div
+                className="hz-kd-duo"
+                style={{ borderBottom: "1px solid var(--c-sheet-line)" }}
+              >
+                <Highlight
+                  cap="가장 많이 유입"
+                  name={themeIn?.theme ?? "—"}
+                  value={themeIn ? `▲${themeIn.shareDelta!.toFixed(1)}%p` : undefined}
+                  valueColor="var(--c-hot-ink)"
+                  sub={
+                    themeIn
+                      ? `점유율 ${themeIn.sharePct.toFixed(1)}% · ${themeIn.rank}위`
+                      : "비교할 7일 전 집계가 없습니다"
+                  }
+                  divide
+                />
+                <Highlight
+                  cap="가장 많이 이탈"
+                  name={themeOut?.theme ?? "—"}
+                  value={
+                    themeOut
+                      ? `▼${Math.abs(themeOut.shareDelta!).toFixed(1)}%p`
+                      : undefined
+                  }
+                  valueColor="var(--c-cold-ink)"
+                  sub={
+                    themeOut
+                      ? themeOut.rankChange
+                        ? `순위도 ${Math.abs(themeOut.rankChange)}계단 ${themeOut.rankChange > 0 ? "상승" : "하락"}`
+                        : `점유율 ${themeOut.sharePct.toFixed(1)}% · ${themeOut.rank}위`
+                      : "비교할 7일 전 집계가 없습니다"
+                  }
+                />
+              </div>
+
               <div className="hz-thead hz-cols-ustheme">
                 <span>#</span>
                 <span>테마</span>
@@ -1230,7 +1260,7 @@ export default async function UsKaderaPage() {
         >
           <SectionHead
             icon="tag"
-            title="미장에서만 나오는 말"
+            title="이슈 키워드"
             note="최근 7일"
             desc="종목명이 아닌 화제어 · 전체 대화보다 미국 얘기에 몰린 정도로 줄 세웁니다"
             meta={keywords[0] ? `${keywords[0].computedFor} 기준` : undefined}
@@ -1249,6 +1279,46 @@ export default async function UsKaderaPage() {
             </p>
           ) : (
             <>
+              <div
+                className="hz-kd-duo"
+                style={{ borderBottom: "1px solid var(--c-sheet-line)" }}
+              >
+                <Highlight
+                  cap="이번 주 화제어 1위"
+                  name={keywords[0].keyword}
+                  value={`${keywords[0].mentionCount.toLocaleString("ko-KR")}회`}
+                  valueColor="var(--c-hot-ink)"
+                  sub={`쏠림 ${keywords[0].skew.toFixed(1)}배 · ${keywords[0].channelCount}개 채널`}
+                  divide
+                />
+                {/* ⚠️ 국장은 이 자리에 "2위의 N배"를 적는다. 미장에선 그러면 안 된다 —
+                    국장 카드는 **언급 수** 순이라 1위와 2위의 배수가 곧 순위의 근거지만,
+                    이 카드는 **쏠림** 순이다. 실제로 1위 22회 · 2위 22회가 나와 "2위의
+                    1.0배"라는 아무 말도 안 하는 줄이 떴다. 순위를 정한 값(쏠림)을 적는다.
+                    ⭐ 아래 값의 소수 둘째 자리는 눈속임이 아니다 — 화제어 하나의 점유율이
+                    0.0~0.5% 대라 한 자리로 자르면 실측 변동(0.03~0.25%p)이 전부 0.0 이
+                    된다. 옆 테마 칸이 한 자리인 것과 다른 이유가 이것뿐이다. */}
+                <Highlight
+                  cap="가장 큰 변동"
+                  name={kwMoved?.keyword ?? "—"}
+                  value={
+                    kwMoved
+                      ? `${kwMoved.shareDelta! > 0 ? "▲" : "▼"}${Math.abs(kwMoved.shareDelta! * 100).toFixed(2)}%p`
+                      : undefined
+                  }
+                  valueColor={
+                    kwMoved && kwMoved.shareDelta! > 0
+                      ? "var(--c-hot-ink)"
+                      : "var(--c-cold-ink)"
+                  }
+                  sub={
+                    kwMoved
+                      ? "최근 3일 vs 그 이전 점유율"
+                      : "비교할 과거 집계가 없습니다"
+                  }
+                />
+              </div>
+
               <div className="hz-thead hz-cols-uskw">
                 <span>#</span>
                 <span>화제어</span>

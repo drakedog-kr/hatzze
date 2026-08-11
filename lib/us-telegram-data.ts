@@ -327,8 +327,9 @@ export type UsSentiment = {
   negative: number; // 셋의 합은 항상 100(반올림 보정)
   messageCount: number;
   windowDays: number;
-  /** 같은 창의 **전체 대화** 낙관도. 없으면 null — 비교 줄을 안 그린다 */
-  overallScore: number | null;
+  /** 테마별 낙관↔비관(중립 제외). 표본을 같이 넘긴다 — 얇은 테마는 100:0 같은 극단값이
+   *  나오는데, 몇 건 기준인지 보여줘야 그 숫자를 제대로 읽을 수 있다(국장과 같은 규칙). */
+  byTheme: { name: string; pos: number; positive: number; negative: number; total: number }[];
   /** 최근 14일 낙관도 추이(오름차순). 그날 표본이 없으면 그 날은 빠진다 */
   series: { date: string; score: number }[];
 };
@@ -345,8 +346,26 @@ export type UsIssueKeyword = {
   channelCount: number;
   dayCount: number;
   trend: "up" | "flat" | "down" | null;
+  /** 최근 3일 평균 점유율 − 그 이전 평균(%p). trend 와 **같은 뺄셈**에서 나온다 —
+      trend 는 여기에 flat 문턱만 더한 것이다(migration_038). 비교할 과거가 없으면 null */
+  shareDelta: number | null;
   computedFor: string;
 };
+
+/**
+ * 히어로 센티먼트 칸에 막대로 그릴 테마 수와, 막대에 오를 최소 표본.
+ *
+ * 국장(lib/telegram-data.ts 의 THEME_TOP_N · THEME_MIN_DECIDED)과 **같은 값**이다.
+ * 두 화면이 같은 자리에서 다른 개수를 그리면 오갈 때 어느 쪽이 규칙인지 알 수 없다.
+ * 4개인 것은 조판이 정한 값이다 — 이 칸은 히어로의 25% 폭이라 왼쪽 큰 숫자 블록과
+ * 높이가 맞는 한계가 4줄이다.
+ *
+ * ⚠️ 국장은 이 두 값을 총평 생성기(generate_telegram_narratives.py)와도 맞춰야 했다.
+ *    미장 총평(generate_us_telegram_narratives.py)은 **테마별 톤을 재료로 안 쓴다** —
+ *    그래서 여기서는 짝이 없다. 미장 총평에 테마 톤을 넣게 되면 그때 같이 맞출 것.
+ */
+const US_THEME_TOP_N = 4;
+const US_THEME_MIN_DECIDED = 8;
 
 type UsSentimentRow = {
   date: string;
@@ -379,18 +398,22 @@ export async function getUsSentiment(): Promise<UsSentiment | null> {
   }
 
   // 추이 막대(14일)까지 한 번에 받는다. 창(3일)은 그 부분집합이라 조회가 하나면 된다.
+  //
+  // ⚠️ scope 를 안 거른다 — 테마별 막대까지 같은 조회에서 나온다. 14일 × 17스코프라
+  //    1,000행 캡에 못 미친다(전체 표가 484행). 캡 근처가 되면 fetchAllRows 로 옮길 것.
   const from = addDays(base, -(US_SENTIMENT_SERIES_DAYS - 1));
   const { data, error } = await db
     .from("telegram_us_sentiment_daily")
     .select("date,scope,positive_count,neutral_count,negative_count,message_count")
-    .eq("scope", "overall")
     .gte("date", from)
     .lte("date", base);
   if (error || !data?.length) {
     if (error) console.error("[getUsSentiment] 집계를 못 읽었습니다", error);
     return null;
   }
-  const rows = data as UsSentimentRow[];
+  const all = data as UsSentimentRow[];
+  const rows = all.filter((r) => r.scope === "overall");
+  if (!rows.length) return null;
 
   // 창은 **기준일 포함 최근 N일**이다. 국장의 windowBefore 는 기준일을 빼는데,
   // 그건 그쪽 기준일이 '오늘'이라 하루가 덜 찼기 때문이다. 미장 기준일은 이미
@@ -412,6 +435,30 @@ export async function getUsSentiment(): Promise<UsSentiment | null> {
   const score = optimismPct(sum.pos, sum.neg) ?? 50;
   const { label, tone } = sentimentTone(score);
 
+  // 테마별 막대는 **큰 숫자와 같은 창**(창 안 합계)을 쓴다. 하루치로 그리면 옆의
+  // 76% 와 다른 사흘을 말하게 되어, 같은 칸 안에서 두 값이 어긋난다.
+  const themeAgg = new Map<string, { pos: number; neg: number; total: number }>();
+  for (const r of all) {
+    if (r.scope === "overall" || r.date < windowFrom) continue;
+    const a = themeAgg.get(r.scope) ?? { pos: 0, neg: 0, total: 0 };
+    a.pos += r.positive_count ?? 0;
+    a.neg += r.negative_count ?? 0;
+    a.total += r.message_count ?? 0;
+    themeAgg.set(r.scope, a);
+  }
+  // 언급이 많은 테마부터 넷. '가장 밝은 테마'로 세우면 표본 얇은 테마가 늘 위에 선다.
+  const byTheme = [...themeAgg.entries()]
+    .filter(([, a]) => a.pos + a.neg >= US_THEME_MIN_DECIDED)
+    .map(([name, a]) => ({
+      name,
+      pos: optimismPct(a.pos, a.neg) ?? 50,
+      positive: a.pos,
+      negative: a.neg,
+      total: a.total,
+    }))
+    .sort((x, y) => y.total - x.total)
+    .slice(0, US_THEME_TOP_N);
+
   return {
     score,
     label,
@@ -421,38 +468,13 @@ export async function getUsSentiment(): Promise<UsSentiment | null> {
     negative,
     messageCount: sum.total,
     windowDays: win.length || US_WINDOW_DAYS,
-    overallScore: await overallOptimism(windowFrom, base),
+    byTheme,
     series: rows
       .slice()
       .sort((a, b) => a.date.localeCompare(b.date))
       .map((r) => ({ date: r.date, score: optimismPct(r.positive_count ?? 0, r.negative_count ?? 0) }))
       .filter((p): p is { date: string; score: number } => p.score !== null),
   };
-}
-
-/**
- * 같은 창의 **전체 대화** 낙관도 — "미국 얘기가 전체보다 밝은가"를 한 줄로 말하는 재료.
- *
- * ⚠️ 이건 '국장 낙관도'가 **아니다.** telegram_sentiment_daily 의 `overall` 은 미국
- *    언급 메시지까지 포함한 코퍼스 전체다. 화면에서 "국장"이라고 쓰면 거짓이 되므로
- *    "전체 대화"로 적는다. 국장만 따로 세려면 국내 언급 메시지로 한 번 더 집계해야
- *    하는데, 두 집합이 36.4% 겹쳐서 '국장 낙관도'라는 말 자체가 애매해진다.
- */
-async function overallOptimism(from: string, to: string): Promise<number | null> {
-  const db = getSupabaseAdmin();
-  const { data, error } = await db
-    .from("telegram_sentiment_daily")
-    .select("positive_count,negative_count")
-    .eq("scope", "overall")
-    .gte("date", from)
-    .lte("date", to);
-  if (error || !data?.length) {
-    if (error) console.error("[overallOptimism] 전체 센티먼트를 못 읽었습니다", error);
-    return null;
-  }
-  const pos = data.reduce((s, r) => s + ((r.positive_count as number) ?? 0), 0);
-  const neg = data.reduce((s, r) => s + ((r.negative_count as number) ?? 0), 0);
-  return optimismPct(pos, neg);
 }
 
 /**
@@ -468,7 +490,7 @@ export async function getUsIssueKeywords(): Promise<UsIssueKeyword[]> {
   const db = getSupabaseAdmin();
   const { data, error } = await db
     .from("telegram_us_issue_keyword")
-    .select("rank,keyword,mention_count,total_count,skew,channel_count,day_count,trend,computed_for")
+    .select("rank,keyword,mention_count,total_count,skew,channel_count,day_count,trend,share_delta,computed_for")
     .order("rank");
   if (error) {
     console.error("[getUsIssueKeywords] 화제어를 못 읽었습니다", error);
@@ -483,6 +505,8 @@ export async function getUsIssueKeywords(): Promise<UsIssueKeyword[]> {
     channelCount: r.channel_count as number,
     dayCount: r.day_count as number,
     trend: (r.trend as UsIssueKeyword["trend"]) ?? null,
+    // 0 도 뜻이 있는 값이라(움직이지 않았다) `?? null` 이 아니라 null 검사를 한다.
+    shareDelta: r.share_delta === null || r.share_delta === undefined ? null : Number(r.share_delta),
     computedFor: r.computed_for as string,
   }));
 }
@@ -499,6 +523,9 @@ export type UsThemeRow = {
   rank: number;
   /** 일주일 전 순위 대비 변동. 올라갔으면 양수. 비교할 과거가 없으면 null */
   rankChange: number | null;
+  /** 같은 7일 전과 견준 점유율 변동(%p). 순위와 **같은 비교일**을 쓴다 —
+      두 값이 다른 날을 가리키면 "점유율은 늘었는데 순위는 그대로"가 설명이 안 된다 */
+  shareDelta: number | null;
   /** 최근 N일 점유율 추이(오름차순). 막대 스파크라인이 그린다 */
   series: number[];
 };
@@ -587,6 +614,7 @@ export async function getUsThemeRotation(limit = 8): Promise<{ date: string | nu
           rank: today.rank ?? 0,
           // 순위는 작을수록 위다 — 올라간 것을 양수로 만들려면 (과거 − 현재)다.
           rankChange: prev ? (prev.rank ?? 0) - (today.rank ?? 0) : null,
+          shareDelta: prev ? (Number(today.share_pct) || 0) - (Number(prev.share_pct) || 0) : null,
           series: dates.map((d) => Number(m.get(d)?.share_pct ?? 0)),
         };
       })
