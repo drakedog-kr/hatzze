@@ -146,9 +146,21 @@ export async function fetchDailyHistory(
 }
 
 /** KRX 시장 구분 → 야후 심볼 접미사. */
+/**
+ * 우리 티커 → 야후 심볼 예외표.
+ *
+ * 야후는 **클래스가 나뉜 종목을 클래스까지 붙여야** 준다(BRK 는 없고 BRK-B 가 있다).
+ * 사전의 티커는 사람들이 글에서 실제로 쓰는 표기라 그대로 두고, 야후에 물을 때만 바꾼다 —
+ * `us_stocks.ticker` 를 바꾸면 그걸 참조하는 표들까지 손대야 한다.
+ *
+ * 사전 178종목을 야후에 전수로 물어 **실제로 안 되는 건 이 하나뿐이었다**(2026-08-11).
+ * 사전에 새 종목을 넣을 때 시세가 빈칸이면 여기를 먼저 볼 것.
+ */
+const YAHOO_ALIAS: Record<string, string> = { BRK: "BRK-B" };
+
 export function yahooSymbol(code: string, market: string | null | undefined): string {
   // 미국 상장은 접미사가 없다(NVDA · AAPL). 국내만 .KS/.KQ 를 붙인다.
-  if (market === "US") return code;
+  if (market === "US") return YAHOO_ALIAS[code] ?? code;
   const suffix = market === "KOSDAQ" ? ".KQ" : ".KS";
   return `${code}${suffix}`;
 }

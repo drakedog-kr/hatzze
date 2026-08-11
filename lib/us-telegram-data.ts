@@ -21,6 +21,8 @@ import { cache } from "react";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { sentimentTone } from "@/lib/format";
 import { channelMeta, fetchAllRows, optimismPct, toPercents } from "@/lib/telegram-data";
+import { changeRateOf, fetchYahooQuote } from "@/lib/yahoo-quote";
+import { yahooSymbol } from "@/lib/yahoo-history";
 
 /** 급부상 판정에서 '최근'으로 볼 일수. 국내(KADERA_WINDOW_DAYS)와 같게 둔다. */
 export const US_WINDOW_DAYS = 3;
@@ -61,7 +63,32 @@ export type UsSurgingStock = {
   multiple: number;
   series: number[];
   seriesDates: string[];
+  /** 야후 실시간 시세(USD). 못 받으면 null — 카드가 "시세를 못 받았습니다"로 적는다 */
+  price: number | null;
+  changeRate: number | null;
 };
+
+/**
+ * 티커 여럿의 현재가를 한 번에. 국내는 KRX 저장 종가라는 폴백이 있지만 미국은 없어서,
+ * 못 받으면 그냥 null 이다 — **틀린 숫자를 확신에 차서 그리는 것보다 빈칸이 낫다**
+ * (fetchYahooQuote 주석의 같은 판단).
+ *
+ * ⚠️ 티커를 그대로 던지지 말고 **yahooSymbol 을 거친다.** 야후가 클래스까지 요구하는
+ * 종목이 있어서다(버크셔 BRK → BRK-B). MDD 와 같은 함수를 쓰면 두 화면이 같은 종목에
+ * 같은 심볼을 쓴다 — 한쪽만 예외를 알면 카드에는 시세가 뜨는데 MDD 는 못 여는 식이 된다.
+ * 15분 재검증을 걸어 같은 티커 반복 조회의 야후 왕복을 줄인다.
+ */
+async function usQuotes(tickers: string[]): Promise<Map<string, { price: number; changeRate: number | null }>> {
+  const out = new Map<string, { price: number; changeRate: number | null }>();
+  const got = await Promise.all(
+    tickers.map(async (t) => {
+      const q = await fetchYahooQuote(yahooSymbol(t, "US"), { next: { revalidate: 900 } });
+      return [t, q] as const;
+    }),
+  );
+  for (const [t, q] of got) if (q) out.set(t, { price: q.price, changeRate: changeRateOf(q) });
+  return out;
+}
 
 export type UsKrComention = {
   ticker: string;
@@ -167,7 +194,7 @@ export async function getUsSurgingStocks(limit = 6): Promise<UsSurgingStock[]> {
   const nameOf = await usNameMap();
   const chartDates = dates.slice(-US_CHART_DAYS);
 
-  return [...byTicker.entries()]
+  const ranked = [...byTicker.entries()]
     .map(([ticker, a]) => {
       const recentPerDay = a.recentShare / recentN;
       const base = a.priorShare / priorCount;
@@ -186,6 +213,14 @@ export async function getUsSurgingStocks(limit = 6): Promise<UsSurgingStock[]> {
     .filter((s) => s.recentMentions >= 3 && s.multiple > 1)
     .sort((a, b) => b.multiple - a.multiple)
     .slice(0, limit);
+
+  // 시세는 **고른 것만** 받는다. 후보 전부를 물으면 카드에 못 오를 종목까지 왕복한다.
+  const quotes = await usQuotes(ranked.map((s) => s.ticker));
+  return ranked.map((s) => ({
+    ...s,
+    price: quotes.get(s.ticker)?.price ?? null,
+    changeRate: quotes.get(s.ticker)?.changeRate ?? null,
+  }));
 }
 
 /**
@@ -686,6 +721,8 @@ export type UsStockReport = {
   channelCount: number | null;
   series: number[];
   seriesDates: string[];
+  price: number | null;
+  changeRate: number | null;
   /** LLM 흐름 요약. 아직 생성 전이면 null — 카드가 그 자리에 이유를 적는다 */
   narrative: string | null;
 };
@@ -765,6 +802,7 @@ export async function getUsStockReports(limit = 4): Promise<UsStockReport[]> {
   const narrativeOf = new Map((data ?? []).map((r) => [r.ticker as string, r.narrative as string]));
 
   const chartDates = dates.slice(-US_CHART_DAYS);
+  const quotes = await usQuotes(top.map(([t]) => t));
   return top.map(([ticker, a]) => ({
     ticker,
     name: nameOf.get(ticker) ?? ticker,
@@ -772,6 +810,8 @@ export async function getUsStockReports(limit = 4): Promise<UsStockReport[]> {
     channelCount: a.channels || null,
     series: chartDates.map((d) => a.byDate.get(d) ?? 0),
     seriesDates: chartDates,
+    price: quotes.get(ticker)?.price ?? null,
+    changeRate: quotes.get(ticker)?.changeRate ?? null,
     narrative: narrativeOf.get(ticker) ?? null,
   }));
 }

@@ -18,10 +18,12 @@ import {
 import type { UsTrendingMessage } from "@/lib/us-telegram-data";
 
 import { pageMetadata } from "../../seo";
-import { AiMark, C, Icon, MONO } from "../../ui";
+import { AiMark, C, Icon, MONO, R } from "../../ui";
+import { StockLogo } from "../../StockLogo";
 import { ExpandableList } from "../ExpandableList";
 import {
   Avatar,
+  ChangeRate,
   DayBars,
   Pill,
   RankBadge,
@@ -54,6 +56,15 @@ const clip: React.CSSProperties = {
 
 function pct(x: number): string {
   return `${(x * 100).toFixed(1)}%`;
+}
+
+/**
+ * 달러 표기. **MDD 화면의 fmtPrice(market="US")와 같은 규칙이어야 한다** — 같은 종목을
+ * 두 화면에서 볼 때 소수 자리가 다르면 다른 값처럼 보인다.
+ * 소수 둘째 자리까지 쓰는 이유: 달러는 원과 달리 1달러 미만의 움직임이 뜻을 갖는다.
+ */
+function fmtPrice(n: number, _market: "US"): string {
+  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 /**
@@ -131,10 +142,16 @@ function SplitBar({
  * 지수(^GSPC)·통화 표기(USD)를 한꺼번에 가른다.
  * ⏸ 테마 비교는 아직 미국에 안 붙는다(미국 테마 사전을 TS 로 옮기는 일이 남았다).
  */
-function UsMddLink({ ticker }: { ticker: string }) {
+function UsMddLink({
+  ticker,
+  label = "MDD 정밀분석",
+}: {
+  ticker: string;
+  label?: string;
+}) {
   return (
     <Link href={`/mdd?code=${ticker}&market=US`} className="hz-mdd-link">
-      MDD 정밀분석
+      {label}
       <Icon name="arrow_outward" style={{ fontSize: 13 }} />
     </Link>
   );
@@ -1059,136 +1076,180 @@ export default async function UsKaderaPage() {
           </p>
         ) : (
           <div className="hz-panelgrid hz-panelgrid-3">
-            {surging.map((s, i) => (
-              <div key={s.ticker} className="hz-panel-pad">
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "baseline",
-                    gap: 8,
-                    minWidth: 0,
-                  }}
-                >
-                  <RankBadge n={i + 1} />
-                  {/* minWidth:0 이 없으면 flex 기본값(min-width:auto) 때문에 이름이 안 줄어 셀 밖으로 넘친다. */}
-                  <strong
+            {surging.map((s, i) => {
+              return (
+                <div key={s.ticker} className="hz-panel-pad">
+                  {/* baseline 정렬이어야 한다. flex-start 는 상자 윗변을 맞추는데, 이 줄엔
+                      14px 종목명과 11px 티커·11.5px 표본이 섞여 있어 상자를 맞추면 정작
+                      눈에 보이는 글자 밑선이 어긋난다(국장에서 실측 3.8px). */}
+                  <div
                     style={{
-                      ...clip,
+                      display: "flex",
+                      alignItems: "baseline",
+                      gap: 8,
                       minWidth: 0,
-                      fontSize: 14,
-                      fontWeight: 800,
-                      letterSpacing: "-.01em",
-                      color: C.ink,
                     }}
                   >
-                    {s.name}
-                  </strong>
-                  {/* 한글 표기가 없어 티커를 그대로 이름으로 쓰는 종목이 있다(RTX·TEAM).
-                      그때 티커를 또 붙이면 "RTX RTX" 가 된다. */}
-                  {s.name !== s.ticker && (
+                    <RankBadge n={i + 1} />
+                    {/* minWidth:0 — flex 항목의 기본 min-width:auto 가 살아 있으면 이름이
+                        안 줄어 말줄임이 안 걸리고 셀 밖으로 넘친다. */}
+                    <strong
+                      style={{
+                        ...clip,
+                        minWidth: 0,
+                        fontSize: 14,
+                        fontWeight: 800,
+                        letterSpacing: "-.01em",
+                        color: C.ink,
+                      }}
+                    >
+                      {s.name}
+                    </strong>
+                    {/* 한글 표기가 없어 티커를 이름으로 쓰는 종목이 있다(RTX·TEAM).
+                        그때 티커를 또 붙이면 "RTX RTX" 가 된다. */}
+                    {s.name !== s.ticker && (
+                      <span
+                        style={{
+                          fontFamily: MONO,
+                          fontSize: 11,
+                          color: C.sub2,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {s.ticker}
+                      </span>
+                    )}
+                    <span style={{ flex: 1 }} />
+                    {/* '몇 개 채널'과 '며칠에 몇 회'는 둘 다 이 배수의 표본 크기를 말한다 —
+                        한 덩어리로 오른쪽 위에 모아 두면 아래 그래픽이 배수와 막대만 남는다. */}
                     <span
                       style={{
-                        fontFamily: MONO,
-                        fontSize: 11,
-                        color: C.sub2,
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "flex-end",
+                        gap: 2,
                         flexShrink: 0,
                       }}
                     >
-                      {s.ticker}
-                    </span>
-                  )}
-                  <span style={{ flex: 1 }} />
-                  <span
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "flex-end",
-                      gap: 2,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {s.channelCount !== null && (
+                      {s.channelCount !== null && (
+                        <span
+                          style={{
+                            fontSize: 11.5,
+                            color: C.sub2,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {s.channelCount}개 채널
+                        </span>
+                      )}
                       <span
                         style={{
+                          fontFamily: MONO,
                           fontSize: 11.5,
-                          color: C.sub2,
+                          fontWeight: 700,
+                          color: C.label,
                           whiteSpace: "nowrap",
                         }}
                       >
-                        {s.channelCount}개 채널
+                        최근 {US_WINDOW_DAYS}일 기준 {s.recentMentions}회
                       </span>
-                    )}
-                    <span
-                      style={{
-                        fontFamily: MONO,
-                        fontSize: 11.5,
-                        fontWeight: 700,
-                        color: C.label,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {US_WINDOW_DAYS}일 {s.recentMentions}회
                     </span>
-                  </span>
-                </div>
-                {/* 국장 급부상 셀과 같은 세로 구성이다(머리 → 큰 배수 → 막대). 두 페이지의
-                    같은 카드가 다른 얼개면 옮겨 다닐 때마다 눈이 다시 자리를 찾아야 한다.
-                    다른 건 마지막 줄뿐 — 미국 종목은 시세를 실을 출처가 없어 가격 줄이 없다. */}
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "baseline",
-                    gap: 9,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <strong
+                  </div>
+
+                  {/* 이 셀이 말하려는 건 시세가 아니라 이 배수다 — 30px 로 올려 주인공을 못박는다. */}
+                  <div
                     style={{
-                      fontFamily: MONO,
-                      fontSize: 30,
-                      fontWeight: 800,
-                      letterSpacing: "-.035em",
-                      lineHeight: 1,
-                      color: C.hot,
+                      display: "flex",
+                      alignItems: "baseline",
+                      gap: 9,
+                      flexWrap: "wrap",
                     }}
                   >
-                    {s.multiple >= 10
-                      ? Math.round(s.multiple)
-                      : s.multiple.toFixed(1)}
-                    <span
+                    <strong
                       style={{
-                        fontSize: 18,
-                        fontWeight: 700,
-                        letterSpacing: "-.02em",
+                        fontFamily: MONO,
+                        fontSize: 30,
+                        fontWeight: 800,
+                        letterSpacing: "-.035em",
+                        lineHeight: 1,
+                        color: C.hot,
                       }}
                     >
-                      배
+                      {s.multiple >= 10
+                        ? Math.round(s.multiple)
+                        : s.multiple.toFixed(1)}
+                      <span
+                        style={{
+                          fontSize: 18,
+                          fontWeight: 700,
+                          letterSpacing: "-.02em",
+                        }}
+                      >
+                        배
+                      </span>
+                    </strong>
+                    <span style={{ fontSize: 11.5, color: C.sub2 }}>
+                      평소 대비
                     </span>
-                  </strong>
-                  <span style={{ fontSize: 11.5, color: C.sub2 }}>
-                    평소 대비
-                  </span>
+                  </div>
+
+                  <DayBars
+                    values={s.series}
+                    dates={s.seriesDates}
+                    tone="warm"
+                    hot={US_WINDOW_DAYS}
+                  />
+
+                  {/* 국장 셀과 같은 마지막 줄이다. 다른 건 폴백뿐 — 국내는 야후가 안 되면
+                      KRX 저장 종가로 떨어지는데(그때 등락률 대신 기준일을 단다) 미국은
+                      그 저장분이 없어 그냥 빈칸이다. 틀린 숫자를 그리는 것보다 낫다. */}
+                  <div
+                    style={{
+                      marginTop: "auto",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      paddingTop: 2,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    {s.price != null ? (
+                      <>
+                        <span
+                          style={{
+                            fontFamily: MONO,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: C.label,
+                            whiteSpace: "nowrap",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {fmtPrice(s.price, "US")}
+                        </span>
+                        <ChangeRate
+                          rate={s.changeRate}
+                          style={{ fontSize: 11.5, fontWeight: 800 }}
+                        />
+                      </>
+                    ) : (
+                      <span style={{ fontSize: 11.5, color: C.sub2 }}>
+                        시세를 못 받았습니다
+                      </span>
+                    )}
+                    <span style={{ flex: 1 }} />
+                    <UsMddLink ticker={s.ticker} label="MDD" />
+                  </div>
                 </div>
-                <DayBars
-                  values={s.series}
-                  dates={s.seriesDates}
-                  tone="warm"
-                  hot={US_WINDOW_DAYS}
-                />
-                {/* marginTop:auto — 셀마다 막대 높이가 같아 실제로 밀리지는 않지만,
-                    앞으로 줄이 하나 늘어도 링크는 늘 셀 바닥에 남는다. */}
-                <div style={{ marginTop: "auto", paddingTop: 2 }}>
-                  <UsMddLink ticker={s.ticker} />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
         <div className="hz-sheet-foot">
           <span style={{ fontSize: 11.5, lineHeight: 1.6, color: C.sub }}>
-            주말이면 전체 대화량이 평일의 10분의 1로 줄어, 횟수가 아니라 그날
-            대화에서 차지한 몫으로 견줍니다 · 화제성일 뿐 매수·매도 신호가
-            아닙니다
+            막대는 최근 7일 일별 언급량이고, 붉은 칸이 배수를 낸 최근 창입니다 ·
+            배수는 언급 횟수가 아니라 그날 전체 대화에서 차지한 몫을 견준
+            값입니다
           </span>
         </div>
       </section>
@@ -1503,101 +1564,162 @@ export default async function UsKaderaPage() {
           </p>
         ) : (
           <div className="hz-panelgrid hz-panelgrid-2">
-            {reports.map((r, i) => (
-              <div key={r.ticker} className="hz-panel-pad">
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "baseline",
-                    gap: 8,
-                    minWidth: 0,
-                  }}
-                >
-                  <RankBadge n={i + 1} />
-                  <strong
+            {reports.map((r) => {
+              const peak = Math.max(0, ...r.series);
+              return (
+                <div key={r.ticker} className="hz-panel-pad">
+                  {/* 순위 배지가 아니라 **로고 + 종목명**이다. 이 시트는 순위표가 아니라
+                      종목별 리포트라, 몇 등인지보다 어느 회사인지가 먼저 읽혀야 한다
+                      (급부상 셀은 반대라 그쪽엔 배지가 남는다).
+                      폰에서는 시세가 다음 줄로 내려간다(globals.css 의 .hz-stock-head). */}
+                  <div
+                    className="hz-stock-head"
                     style={{
-                      ...clip,
+                      display: "flex",
+                      alignItems: "baseline",
+                      gap: 10,
                       minWidth: 0,
-                      fontSize: 14,
-                      fontWeight: 800,
-                      letterSpacing: "-.01em",
-                      color: C.ink,
                     }}
                   >
-                    {r.name}
-                  </strong>
-                  {r.name !== r.ticker && (
+                    <StockLogo
+                      code={r.ticker}
+                      name={r.name}
+                      market="US"
+                      size={30}
+                    />
+                    <strong
+                      style={{
+                        ...clip,
+                        minWidth: 0,
+                        fontSize: 17,
+                        fontWeight: 800,
+                        letterSpacing: "-.02em",
+                        color: C.ink,
+                      }}
+                    >
+                      {r.name}
+                    </strong>
+                    {r.name !== r.ticker && (
+                      <span
+                        style={{
+                          fontFamily: MONO,
+                          fontSize: 11,
+                          color: C.sub2,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {r.ticker}
+                      </span>
+                    )}
+                    {r.price != null && (
+                      <span
+                        className="hz-stock-price"
+                        style={{
+                          display: "flex",
+                          alignItems: "baseline",
+                          gap: 7,
+                          whiteSpace: "nowrap",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontFamily: MONO,
+                            fontSize: 15,
+                            fontWeight: 800,
+                            color: C.ink,
+                            letterSpacing: "-.02em",
+                          }}
+                        >
+                          {fmtPrice(r.price, "US")}
+                        </span>
+                        <ChangeRate
+                          rate={r.changeRate}
+                          style={{ fontSize: 12.5, fontWeight: 800 }}
+                        />
+                      </span>
+                    )}
+                  </div>
+
+                  {/* hot = 큰 숫자가 실제로 센 날 수. 창 밖 칸은 막대가 옅어진다.
+                      tone="cold" 인 것도 국장과 같다 — 급부상 셀이 warm 이라, 같은 파랑으로
+                      두면 두 카드가 "뜨거운 것"과 "많이 오간 것"으로 구분된다. */}
+                  <DayBars
+                    values={r.series}
+                    dates={r.seriesDates}
+                    tone="cold"
+                    hot={US_WINDOW_DAYS}
+                    peakLabel={peak > 0 ? `최다 ${peak}회` : undefined}
+                  />
+
+                  {r.narrative ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 9,
+                        background: C.soft,
+                        borderRadius: R.control,
+                        padding: "12px 13px",
+                      }}
+                    >
+                      <AiMark
+                        size={15}
+                        style={{ flexShrink: 0, marginTop: 1 }}
+                      />
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 13,
+                          lineHeight: 1.7,
+                          color: "var(--c-ink-soft)",
+                          textWrap: "pretty",
+                          wordBreak: "keep-all",
+                        }}
+                      >
+                        {r.narrative}
+                      </p>
+                    </div>
+                  ) : (
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 12.5,
+                        lineHeight: 1.7,
+                        color: C.sub2,
+                      }}
+                    >
+                      이 종목의 흐름 요약은 아직 만들어지지 않았습니다.
+                    </p>
+                  )}
+
+                  {/* 표본 크기는 왼쪽 아래, MDD 링크는 오른쪽 아래. 한 줄에 마주 보게 두면
+                      "이 리포트가 몇 건을 봤나"와 "더 파고들기"가 같은 높이에서 끝난다. */}
+                  <div
+                    style={{
+                      marginTop: "auto",
+                      display: "flex",
+                      alignItems: "baseline",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      paddingTop: 2,
+                    }}
+                  >
                     <span
                       style={{
                         fontFamily: MONO,
                         fontSize: 11,
                         color: C.sub2,
-                        flexShrink: 0,
+                        whiteSpace: "nowrap",
                       }}
                     >
-                      {r.ticker}
+                      언급 {r.recentMentions.toLocaleString("ko-KR")}회
+                      {r.channelCount !== null && ` · ${r.channelCount}개 채널`}
                     </span>
-                  )}
-                  <span style={{ flex: 1 }} />
-                  <span
-                    style={{
-                      fontFamily: MONO,
-                      fontSize: 11.5,
-                      fontWeight: 700,
-                      color: C.label,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    언급 {r.recentMentions.toLocaleString()}회
-                    {r.channelCount !== null && ` · ${r.channelCount}개 채널`}
-                  </span>
+                    <UsMddLink ticker={r.ticker} />
+                  </div>
                 </div>
-                {/* 문장이 이 셀의 본론이다. 막대는 그 아래 보조로 둔다 — 반대로 두면
-                    카드가 '숫자 카드'가 되고 급부상 종목과 구분이 사라진다. */}
-                {r.narrative ? (
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 13,
-                      lineHeight: 1.75,
-                      color: "var(--c-ink-soft)",
-                      wordBreak: "keep-all",
-                      textWrap: "pretty",
-                    }}
-                  >
-                    {r.narrative}
-                  </p>
-                ) : (
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 12.5,
-                      lineHeight: 1.7,
-                      color: C.sub2,
-                    }}
-                  >
-                    이 종목의 흐름 요약은 아직 만들어지지 않았습니다.
-                  </p>
-                )}
-                <div
-                  style={{
-                    marginTop: "auto",
-                    paddingTop: 2,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 10,
-                  }}
-                >
-                  <DayBars
-                    values={r.series}
-                    dates={r.seriesDates}
-                    tone="warm"
-                    hot={US_WINDOW_DAYS}
-                  />
-                  <UsMddLink ticker={r.ticker} />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
         <div className="hz-sheet-foot">
@@ -1807,16 +1929,6 @@ export default async function UsKaderaPage() {
           </div>
         </section>
       </div>
-
-      <section className="hz-sheet">
-        <div style={{ padding: "16px 22px" }}>
-          <span style={{ fontSize: 12, lineHeight: 1.6, color: C.sub }}>
-            한국 주식 텔레그램 채널들이 미국 종목을 두고 무엇을 말하는지 모아
-            보여줍니다 · 언급량과 함께 불린 정도를 잰 것이며, 매수·매도 신호가
-            아닙니다
-          </span>
-        </div>
-      </section>
     </>
   );
 }
