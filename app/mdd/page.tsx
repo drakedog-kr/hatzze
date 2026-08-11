@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { getSurgingStocks, getTopStocksWithTrend } from "@/lib/telegram-data";
+import { getUsStockReports, getUsSurgingStocks } from "@/lib/us-telegram-data";
 import { MDD_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { MddExplorer, type StockOption, type SuggestGroups } from "./MddExplorer";
@@ -141,12 +142,41 @@ async function resolveInitial(sp: Record<string, string | string[] | undefined>)
  * 코스닥 종목을 열고 있다. 텔레그램 대화는 코스닥 비중이 커서, 코스피로 걸러 버리면
  * 추천이 몇 개 남지 않는다.
  */
+/** 한 묶음의 줄 수와, 그중 미국 종목에 내주는 자리. */
+const SUGGEST_ROWS = 5;
+const SUGGEST_US_ROWS = 2;
+
+/**
+ * 검색어를 치기 전에 보여 주는 추천 두 묶음.
+ *
+ * ## 미국 종목은 **자리를 나눠** 넣는다 (섞지 않는다)
+ *
+ * 값으로 합쳐 상위 다섯을 고르면 급부상 묶음을 미장이 먹는다 — 실측(2026-08-12)으로
+ * 상위 5줄 중 4줄이 미국이었다(버크셔 17배 vs 국내 최고 4.2배). 미국 사전이 178종목뿐이라
+ * 분모가 작고, 그래서 '평소 대비 배수'가 구조적으로 크게 나온다. 두 시장의 배수는
+ * 같은 잣대가 아니다.
+ *
+ * 주요 종목(언급 수)은 합쳐도 2:3 으로 갈려 괜찮지만, 한쪽만 섞으면 두 묶음이 서로 다른
+ * 규칙으로 뽑히게 된다. 둘 다 자리를 나눈다.
+ *
+ * ⚠️ 줄 수는 그대로 5 다. 드롭다운은 지금 436px 이고 상한이 480px 이라 **한 줄만 더**
+ *    들어간다(실측). 묶음을 늘리거나 줄을 늘리면 스크롤이 생기는데, 그 상한 자체가
+ *    스크롤을 없애려고 420 → 480 으로 올린 값이다.
+ *
+ * 국내를 다섯 개 다 받아 두고 미국이 채운 만큼만 잘라 낸다 — 미국 집계가 비는 날에도
+ * 묶음이 다섯 줄로 차 있다(추천이 조용히 세 줄로 줄지 않는다).
+ */
 async function loadSuggestions(): Promise<SuggestGroups> {
   const empty: SuggestGroups = { surging: [], report: [] };
   try {
-    const [surging, report] = await Promise.all([getSurgingStocks(5), getTopStocksWithTrend(5)]);
+    const [surging, report, usSurging, usReport] = await Promise.all([
+      getSurgingStocks(SUGGEST_ROWS),
+      getTopStocksWithTrend(SUGGEST_ROWS),
+      getUsSurgingStocks(SUGGEST_US_ROWS).catch(() => []),
+      getUsStockReports(SUGGEST_US_ROWS).catch(() => []),
+    ]);
     const codes = [...new Set([...surging.map((s) => s.code), ...report.map((s) => s.code)])];
-    if (!codes.length) return empty;
+    if (!codes.length && !usSurging.length && !usReport.length) return empty;
 
     // 코드가 최대 10개 남짓이라 .in() 목록 길이 걱정은 없다(PostgREST 캡은 훨씬 위).
     const { data } = await getSupabaseServer().from("stocks").select("code, name, market").in("code", codes);
@@ -156,13 +186,28 @@ async function loadSuggestions(): Promise<SuggestGroups> {
       const s = known.get(code);
       return s ? { ...s, note } : null;
     };
+    // 미국은 이름·티커를 이미 들고 있어 stocks 조회를 한 번 더 돌 필요가 없다.
+    const usPick = (ticker: string, name: string, note: string) => ({
+      code: ticker,
+      name,
+      market: "US",
+      note,
+    });
+    const join = <T,>(kr: T[], us: T[]) => [...kr.slice(0, SUGGEST_ROWS - us.length), ...us];
+
     return {
-      surging: surging
-        .map((s) => pick(s.code, s.isNew ? "신규 등장" : `평소 ${s.ratio.toFixed(1)}배`))
-        .filter((s): s is NonNullable<typeof s> => s !== null),
-      report: report
-        .map((s) => pick(s.code, `${s.mentions.toLocaleString()}회 언급`))
-        .filter((s): s is NonNullable<typeof s> => s !== null),
+      surging: join(
+        surging
+          .map((s) => pick(s.code, s.isNew ? "신규 등장" : `평소 ${s.ratio.toFixed(1)}배`))
+          .filter((s): s is NonNullable<typeof s> => s !== null),
+        usSurging.map((s) => usPick(s.ticker, s.name, `평소 ${s.multiple.toFixed(1)}배`)),
+      ),
+      report: join(
+        report
+          .map((s) => pick(s.code, `${s.mentions.toLocaleString()}회 언급`))
+          .filter((s): s is NonNullable<typeof s> => s !== null),
+        usReport.map((s) => usPick(s.ticker, s.name, `${s.recentMentions.toLocaleString()}회 언급`)),
+      ),
     };
   } catch {
     // 추천은 곁다리다. 텔레그램 쪽이 비어도 검색 자체는 그대로 동작해야 한다.
