@@ -1152,7 +1152,7 @@ export default async function UsKaderaPage() {
                 <span style={{ textAlign: "right" }}>점유율</span>
                 <span>최근 14일</span>
                 <span style={{ textAlign: "right" }}>종목</span>
-                <span style={{ textAlign: "right" }}>순위 변동</span>
+                <span style={{ textAlign: "right" }}>언급</span>
               </div>
               <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
               {themes.rows.map((t) => (
@@ -1170,15 +1170,60 @@ export default async function UsKaderaPage() {
                       minWidth: 0,
                     }}
                   >
+                    {/* 순위 변동을 **막대 바로 위 오른끝**에 둔다. 막대가 칸 폭을 꽉 채우므로
+                      이 줄의 오른끝이 곧 막대의 오른끝이다 — 점유율이 얼마나 찼는지와 그게
+                      어느 쪽으로 움직였는지가 한 덩어리로 읽힌다.
+                      ⚠️ 이름은 반드시 minWidth:0 + 말줄임이다. flex 로 두면 '반도체 장비·소재'
+                      같은 긴 이름이 배지를 칸 밖으로 밀어낸다. */}
                     <span
                       style={{
-                        ...clip,
-                        fontSize: 13.5,
-                        fontWeight: 700,
-                        color: C.ink,
+                        display: "flex",
+                        alignItems: "baseline",
+                        gap: 8,
+                        minWidth: 0,
                       }}
                     >
-                      {t.theme}
+                      <span
+                        style={{
+                          ...clip,
+                          minWidth: 0,
+                          fontSize: 13.5,
+                          fontWeight: 700,
+                          color: C.ink,
+                        }}
+                      >
+                        {t.theme}
+                      </span>
+                      <span style={{ flex: 1 }} />
+                      {/* RankDelta 는 0 과 null 을 똑같이 '아무것도 안 그림'으로 낸다. 이 표는
+                        모든 줄이 같은 두 창을 견주므로 빈칸이면 "자료가 없나?"로 읽힌다 —
+                        변동 없음은 글자로 적고, 비교할 과거가 없을 때만 —로 둔다. */}
+                      {t.rankChange === null ? (
+                        <span
+                          style={{
+                            fontFamily: MONO,
+                            fontSize: 11,
+                            color: C.sub2,
+                            flexShrink: 0,
+                          }}
+                        >
+                          —
+                        </span>
+                      ) : t.rankChange === 0 ? (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: C.sub2,
+                            whiteSpace: "nowrap",
+                            flexShrink: 0,
+                          }}
+                        >
+                          그대로
+                        </span>
+                      ) : (
+                        <RankDelta change={t.rankChange} />
+                      )}
                     </span>
                     {/* 막대는 이름 아래에 깐다. 옆 칸으로 빼면 이름 칸이 좁아져 '반도체 장비·소재'가
                       잘리는데, 이 카드에서 가장 먼저 읽히는 건 테마 이름이다. */}
@@ -1217,34 +1262,24 @@ export default async function UsKaderaPage() {
                   >
                     {t.stockCount}개
                   </span>
-                  {/* RankDelta 는 0 과 null 을 똑같이 '아무것도 안 그림'으로 낸다. 이 표는
-                    모든 줄이 같은 기준일과 견주므로 빈칸이면 "자료가 없나?"로 읽힌다 —
-                    변동 없음은 글자로 적고, 비교할 과거가 없을 때만 —로 둔다. */}
-                  <span style={{ textAlign: "right" }}>
-                    {t.rankChange === null ? (
-                      <span
-                        style={{
-                          fontFamily: MONO,
-                          fontSize: 11,
-                          color: C.sub2,
-                        }}
-                      >
-                        —
-                      </span>
-                    ) : t.rankChange === 0 ? (
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          color: C.sub2,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        그대로
-                      </span>
-                    ) : (
-                      <RankDelta change={t.rankChange} />
-                    )}
+                  {/* 창(3일) 안 언급 수. 점유율이 창 평균이라 이 값도 같은 창의 합이다 —
+                    한쪽만 하루치면 "28.0% 인데 12회"처럼 두 숫자가 다른 기간을 말한다. */}
+                  <span
+                    style={{
+                      fontFamily: MONO,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: C.label,
+                      textAlign: "right",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {t.mentionCount.toLocaleString("ko-KR")}
+                    <span
+                      style={{ fontSize: 11, fontWeight: 700, color: C.sub2 }}
+                    >
+                      회
+                    </span>
                   </span>
                 </div>
               ))}
