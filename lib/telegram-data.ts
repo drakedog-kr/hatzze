@@ -1613,6 +1613,11 @@ export async function getRisingChannels(limit = 10): Promise<RisingChannel[]> {
  *  끼면 "지금 무엇이 화제인가"라는 카드의 목적이 흐려진다. 집계 테이블에는 전부
  *  남아 있어서, 이 기준만 바꾸면 재계산 없이 반영된다. */
 const MIN_KEYWORD_MENTIONS = 3;
+/** 화제어를 세는 창(일). **3일이다** — 이 페이지의 다른 카드가 전부 3일이라 한 화면에
+ *  창이 둘이면 같은 낱말의 숫자가 서로 안 맞는 것처럼 읽힌다.
+ *  ⚠️ calculate_telegram_sentiment.py 의 ISSUE_KEYWORD_COUNT_DAYS 와 **같아야 한다**
+ *     (파이썬↔TS 라 import 로 공유할 수 없다. 갈리면 폴백이 열릴 때만 화면이 달라진다). */
+const KEYWORD_COUNT_DAYS = 3;
 
 export type EcosystemSentiment = {
   /** 낙관도 = 낙관 / (낙관 + 비관), 중립 제외. 카드 헤드라인 숫자.
@@ -1893,7 +1898,7 @@ async function computeIssueKeywords(limit: number): Promise<IssueKeyword[]> {
 
   const recentDates = new Set(dates.slice(-3));
   const priorDates = new Set(dates.filter((d) => daysBefore(d) >= 5));
-  const last7 = new Set(dates.filter((d) => daysBefore(d) < 7));
+  const window = new Set(dates.filter((d) => daysBefore(d) < KEYWORD_COUNT_DAYS));
 
   // 그날 전체 화제어 언급 합 — 점유율의 분모.
   const dayTotal = new Map<string, number>();
@@ -1906,7 +1911,7 @@ async function computeIssueKeywords(limit: number): Promise<IssueKeyword[]> {
   const priorShare = new Map<string, number>();
   for (const r of data) {
     const n = r.mention_count ?? 0;
-    if (last7.has(r.date)) total.set(r.keyword, (total.get(r.keyword) ?? 0) + n);
+    if (window.has(r.date)) total.set(r.keyword, (total.get(r.keyword) ?? 0) + n);
     const share = n / Math.max(dayTotal.get(r.date) ?? 1, 1);
     if (recentDates.has(r.date)) {
       recentShare.set(r.keyword, (recentShare.get(r.keyword) ?? 0) + share);

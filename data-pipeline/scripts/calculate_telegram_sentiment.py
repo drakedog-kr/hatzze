@@ -68,6 +68,11 @@ ISSUE_KEYWORD_TABLE = "telegram_issue_keyword"  # 마이그레이션 023
 ISSUE_KEYWORD_LIMIT = 10  # page.tsx 의 getIssueKeywords(10)
 ISSUE_KEYWORD_WINDOW_DAYS = 14  # getIssueKeywords 의 daysAgoISO(14)
 ISSUE_KEYWORD_MIN_MENTIONS = 3  # getIssueKeywords 의 MIN_KEYWORD_MENTIONS
+# 세는 창. **3일이다**(2026-08-12에 7 → 3). 이 페이지의 다른 카드가 전부 3일이라
+# (급부상·센티먼트·주요 종목·테마 로테이션) 한 화면에서 창이 둘이면 같은 낱말의 숫자가
+# 서로 안 맞는 것처럼 읽힌다. 미장 카드가 먼저 3일로 갔고 여기서 맞춘다.
+# 증감 판정(최근 3일 vs 5일 이상 이전)은 그대로다 — 그건 처음부터 3일 창이었다.
+ISSUE_KEYWORD_COUNT_DAYS = 3  # getIssueKeywords 의 KEYWORD_COUNT_DAYS
 # 점유율 차이가 이보다 작으면 '변화 없음'. TS 쪽 FLAT 과 같은 값.
 ISSUE_KEYWORD_FLAT = 1e-6
 
@@ -92,7 +97,7 @@ def issue_keyword_rows(keyword_rows: list[dict]) -> list[dict]:
 
     recent_dates = set(dates[-3:])
     prior_dates = {d for d in dates if days_before(d) >= 5}
-    last7 = {d for d in dates if days_before(d) < 7}
+    window = {d for d in dates if days_before(d) < ISSUE_KEYWORD_COUNT_DAYS}
 
     day_total: Counter = Counter()
     for r in rows:
@@ -103,7 +108,7 @@ def issue_keyword_rows(keyword_rows: list[dict]) -> list[dict]:
     prior_share: defaultdict = defaultdict(float)
     for r in rows:
         n = r["mention_count"] or 0
-        if r["date"] in last7:
+        if r["date"] in window:
             total[r["keyword"]] += n
         share = n / max(day_total[r["date"]], 1)
         if r["date"] in recent_dates:

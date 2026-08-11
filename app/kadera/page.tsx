@@ -937,7 +937,7 @@ export default async function KaderaPage() {
         </section>
 
         <section className="hz-sheet" style={{ flex: "1 1 calc(50% - 8px)", minWidth: SHEET_PAIR_MIN, display: "flex", flexDirection: "column" }}>
-          <SectionHead icon="tag" title="이슈 키워드" note="최근 7일" desc="종목명이 아닌 화제어 · 언급 횟수 기준" />
+          <SectionHead icon="tag" title="이슈 키워드" note="최근 3일" desc="종목명이 아닌 화제어 · 언급 횟수 기준" />
           {keywords.length === 0 ? (
             <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>아직 뽑을 화제어가 없습니다.</p>
           ) : (
@@ -993,7 +993,7 @@ export default async function KaderaPage() {
                   <div
                     key={k.word}
                     className="hz-trow hz-cols-kw hz-tip hz-tip-wide hz-tip-end"
-                    data-tip={`최근 7일 ${k.count.toLocaleString("ko-KR")}회 언급${
+                    data-tip={`최근 3일 ${k.count.toLocaleString("ko-KR")}회 언급${
                       k.shareDelta === null
                         ? ""
                         : ` · 최근 3일 관심 점유율이 그 이전보다 ${Math.abs(k.shareDelta * 100).toFixed(1)}%p ${k.shareDelta > 0 ? "늘었습니다" : "줄었습니다"}`
@@ -1023,7 +1023,7 @@ export default async function KaderaPage() {
                         </span>
                       )}
                     </span>
-                    {/* 막대 길이는 7일 언급 횟수, 색은 최근 사흘 관심의 **방향**이다. */}
+                    {/* 막대 길이는 창(3일) 언급 횟수, 색은 관심 점유율의 **방향**이다. */}
                     <span className="hz-bar">
                       <span
                         style={{
