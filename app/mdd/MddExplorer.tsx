@@ -9,7 +9,14 @@ import { C, Icon, MONO, R } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
 import { StockLogo } from "../StockLogo";
 
-export type StockOption = { code: string; name: string; market: string | null };
+export type StockOption = {
+  code: string;
+  name: string;
+  market: string | null;
+  /** 검색에만 쓰는 별칭. 미국 종목의 정식 영문명이다("Tesla, Inc.") — 화면에는 안 쓴다.
+      원래 이름이 영어인 회사를 한글 표기로만 찾게 두면 "tesla" 가 아무것도 못 찾는다. */
+  alias?: string | null;
+};
 /** 추천 종목 = 종목 + 오른쪽에 붙는 한 조각 근거(왜 지금 이게 떠 있나). */
 export type Suggestion = StockOption & { note: string };
 export type SuggestGroups = { surging: Suggestion[]; report: Suggestion[] };
@@ -282,11 +289,19 @@ export function rankStockMatches(stocks: StockOption[], query: string, limit = 8
     const name = s.name.toLowerCase();
     // 코드도 소문자로 — 우선주 코드에는 영문이 섞인다(예: 02826K).
     const code = s.code.toLowerCase();
+    // 별칭(미국 정식 영문명)은 국내 종목엔 없다 — 아래 판정이 통째로 건너뛴다.
+    // ⚠️ SEC 표기는 회사 형태가 꼬리에 붙는다("Tesla, Inc." · "NVIDIA CORP").
+    //    그래서 **접두일치**가 실제로 걸리는 경로다("tesla" → "tesla, inc.").
+    const alias = (s.alias ?? "").toLowerCase();
     let tier: number;
-    if (name === q || code === q) tier = 0;
+    if (name === q || code === q || alias === q) tier = 0;
     else if (name.startsWith(q)) tier = 1;
     else if (code.startsWith(q)) tier = 2;
+    // 별칭 접두일치는 코드 접두일치 **다음**이다. "TS" 를 치면 티커 TSLA·TSM 이
+    // "Taiwan Semiconductor…" 보다 먼저 와야 한다 — 티커가 더 짧고 정확한 신호다.
+    else if (alias.startsWith(q)) tier = 2.5;
     else if (name.includes(q)) tier = 3;
+    else if (alias.includes(q)) tier = 3.5;
     else continue;
     scored.push({
       s,

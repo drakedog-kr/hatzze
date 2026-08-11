@@ -48,7 +48,7 @@ async function loadKospiStocks(): Promise<StockOption[]> {
  * code 자리에 티커가 들어간다. 국내 코드는 여섯 자리 숫자라 티커와 겹치지 않고,
  * /api/mdd 는 market 으로 갈라 야후 심볼·기준 지수·통화를 정한다.
  *
- * ⚠️ 검색 등급표(rankStockMatches)가 **코드 접두일치**를 3등급 중 2등급으로 본다 —
+ * ⚠️ 검색 등급표(rankStockMatches)가 **코드 접두일치**를 이름 접두일치 다음으로 본다 —
  *    "NVDA" 를 치면 이름(엔비디아)이 아니라 티커로 걸린다. 미국 종목을 티커로 찾는 것이
  *    자연스러우므로 그대로 둔다. 한글 표기("엔비디아")로도 이름 접두일치로 걸린다.
  *
@@ -58,12 +58,15 @@ async function loadUsStocks(): Promise<StockOption[]> {
   try {
     const { data } = await getSupabaseServer()
       .from("us_stocks")
-      .select("ticker, name_ko")
+      .select("ticker, name_ko, name_en")
       .order("ticker", { ascending: true });
     return (data ?? []).map((r) => ({
       code: r.ticker as string,
       name: (r.name_ko as string) || (r.ticker as string),
       market: "US",
+      // 정식 영문명은 **검색에만** 쓴다(화면 이름은 한글 표기 그대로). 원래 이름이
+      // 영어인 회사를 한글로만 찾게 두면 "tesla" 가 아무것도 못 찾는다.
+      alias: (r.name_en as string | null) ?? null,
     }));
   } catch {
     return [];
