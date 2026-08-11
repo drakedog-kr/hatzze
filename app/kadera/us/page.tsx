@@ -1094,7 +1094,6 @@ export default async function UsKaderaPage() {
             note="7일 전 대비"
             noteHelp="점유율과 순위는 기준일 하루치입니다. 유입·이탈과 주간 순위는 그 하루를 7일 전 같은 날과 견줍니다."
             desc="미국 종목 얘기가 어느 테마에 몰려 있나 · 막대는 그날 미국 언급 전체에서 차지한 몫"
-            meta={themes.date ? `${themes.date} 기준` : undefined}
           />
           {themes.rows.length === 0 ? (
             <p
@@ -1152,8 +1151,13 @@ export default async function UsKaderaPage() {
                 <span style={{ textAlign: "right" }}>종목</span>
                 <span style={{ textAlign: "right" }}>주간 순위</span>
               </div>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
               {themes.rows.map((t) => (
-                <div key={t.theme} className="hz-trow hz-cols-ustheme">
+                <div
+                  key={t.theme}
+                  className="hz-trow hz-cols-ustheme"
+                  style={{ flex: 1 }}
+                >
                   <RankBadge n={t.rank} />
                   <span
                     style={{
@@ -1241,15 +1245,9 @@ export default async function UsKaderaPage() {
                   </span>
                 </div>
               ))}
+              </div>
             </>
           )}
-          <div className="hz-sheet-foot">
-            <span style={{ fontSize: 11.5, lineHeight: 1.6, color: C.sub }}>
-              한 종목이 여러 테마에 들 수 있어 점유율을 다 더하면 100%를
-              넘습니다 · 국장 테마 점유율과는 분모가 달라 (이쪽은 미국 언급
-              전체) 두 숫자를 견주면 안 됩니다
-            </span>
-          </div>
         </section>
         <section
           className="hz-sheet"
@@ -1264,8 +1262,7 @@ export default async function UsKaderaPage() {
             icon="tag"
             title="이슈 키워드"
             note="최근 7일"
-            desc="종목명이 아닌 화제어 · 미국 얘기에 몰린 말만 골라 언급 횟수로 줄 세웁니다"
-            meta={keywords[0] ? `${keywords[0].computedFor} 기준` : undefined}
+            desc="종목명이 아닌 화제어 · 언급 횟수 기준"
           />
           {keywords.length === 0 ? (
             <p
@@ -1327,13 +1324,20 @@ export default async function UsKaderaPage() {
                 <span>언급량</span>
                 <span style={{ textAlign: "right" }}>횟수</span>
               </div>
-              {/* 1위는 위 하이라이트가 맡았으므로 목록은 2위부터. 막대는 1위 대비라
-                  정의상 한 줄도 100% 가 되지 않는다(1위가 목록에 없다). 국장 카드와
-                  같은 규칙이다. */}
-              {keywords.slice(1).map((k) => (
+              {/* ⚠️ **1위부터** 센다(국장은 2위부터다). 옆 테마 로테이션과 줄을 맞추려면
+                  두 표의 **행 수가 같아야** 하는데, 테마는 하이라이트가 행을 안 먹고
+                  화제어는 1위를 먹기 때문이다. 테마 카드도 1위를 하이라이트에 다시
+                  보여주고 있으니(가장 많이 유입 = 1위 테마) 되풀이 자체는 이미 이 페이지의
+                  규칙이다.
+                  행을 상자로 감싸 남는 높이를 **행들이 나눠 갖게** 한다 — 두 시트는 flex
+                  행이라 키가 같아지고, 머리·하이라이트·열머리 높이가 같으므로 행 높이도
+                  자동으로 같아진다(손으로 px 을 맞추면 한쪽 글이 바뀔 때마다 어긋난다). */}
+              <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+              {keywords.map((k) => (
                 <div
                   key={k.keyword}
                   className="hz-trow hz-cols-uskw hz-tip hz-tip-wide hz-tip-end"
+                  style={{ flex: 1 }}
                   data-tip={`전체 대화 ${k.totalCount}회 중 미국 얘기가 ${k.mentionCount}회 · 쏠림 ${k.skew.toFixed(1)}배 · ${k.channelCount}개 채널 · ${k.dayCount}일`}
                 >
                   <RankBadge n={k.rank} />
@@ -1388,15 +1392,9 @@ export default async function UsKaderaPage() {
                   </span>
                 </div>
               ))}
+              </div>
             </>
           )}
-          <div className="hz-sheet-foot" style={{ marginTop: "auto" }}>
-            <span style={{ fontSize: 11.5, lineHeight: 1.6, color: C.sub }}>
-              종목명은 뺐습니다. 그건 위 두 카드가 말합니다 · 전체 대화보다 두 배
-              이상 미국 쪽에 몰린 말만 남기고 7일 언급 횟수로 줄 세웁니다 ·
-              막대 색과 ▲▼는 횟수가 아니라 최근 사흘 관심의 방향입니다
-            </span>
-          </div>
         </section>
       </div>
 
@@ -1632,7 +1630,7 @@ export default async function UsKaderaPage() {
         >
           <SectionHead
             icon="podcasts"
-            title="미국을 많이 다루는 채널"
+            title="미장을 많이 다루는 채널"
             note="최근 30일"
             noteHelp="30일에 100건 넘게 쓴 채널만 셉니다. 글이 몇 건뿐인 채널은 비중이 크게 흔들립니다."
             desc="그 채널이 쓴 글 중 미국 종목을 말한 글의 비중"
@@ -1656,7 +1654,13 @@ export default async function UsKaderaPage() {
                벌어지는데, 이 표는 행끼리 붙어 헤어라인으로만 갈려야 한다. */
             <ExpandableList
               items={channels.map((c, i) => (
-                <div key={c.handle} className="hz-trow hz-cols-usch">
+                /* ⚠️ <li> 로 싸야 한다. 이 목록의 컨테이너는 <ol> 이라(ExpandableList),
+                   행을 맨 <div> 로 두면 globals.css 의 마지막 줄 밑선 지우기가 하나도
+                   안 걸린다(`div > .hz-trow:last-child` 도 `li:last-child > .hz-trow` 도
+                   부모가 안 맞는다). 그래서 마지막 행의 밑선과 '더 보기' 띠의 윗선이
+                   겹쳐 선이 두 겹으로 보였다. 국장 채널 파워 랭킹이 <li> 를 쓰는 이유다. */
+                <li key={c.handle}>
+                <div className="hz-trow hz-cols-usch">
                   <span
                     style={{
                       fontFamily: MONO,
@@ -1714,6 +1718,7 @@ export default async function UsKaderaPage() {
                     {c.usMsgs.toLocaleString()}/{c.totalMsgs.toLocaleString()}
                   </span>
                 </div>
+                </li>
               ))}
               name="us_channel_share"
               initial={10}
