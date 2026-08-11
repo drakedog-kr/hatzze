@@ -1154,12 +1154,19 @@ export default async function UsKaderaPage() {
                 <span style={{ textAlign: "right" }}>순위 변화</span>
               </div>
               <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-              {themes.rows.map((t) => (
+              {themes.rows.map((t, i) => (
                 <div
                   key={t.theme}
-                  className="hz-trow hz-cols-ustheme hz-tip hz-tip-wide"
-                  data-tip={`${t.theme} · 창 안에서 언급된 종목 ${t.stockCount}개 · 언급 ${t.mentionCount}회`}
+                  className="hz-trow hz-cols-ustheme hz-theme-host"
                   style={{ flex: 1 }}
+                  /* 마우스가 없어도(키보드·터치) 종목 목록을 열 수 있게 초점을 받는다.
+                     언급된 종목이 없는 테마는 열 것도 없으니 초점도 주지 않는다. */
+                  tabIndex={t.stocks.length ? 0 : undefined}
+                  aria-label={
+                    t.stocks.length
+                      ? `${t.theme} 테마를 이룬 종목 ${t.stockCount}개 보기`
+                      : undefined
+                  }
                 >
                   <RankBadge n={t.rank} />
                   <span
@@ -1284,6 +1291,39 @@ export default async function UsKaderaPage() {
                       <RankDelta change={t.rankChange} />
                     )}
                   </span>
+
+                  {/* 이 테마의 점유율을 만든 종목 목록. 마우스를 올리거나 초점이 가면
+                      열린다(CSS 만 — globals.css 의 .hz-theme-pop). 국장 테마 줄과 **같은
+                      클래스·같은 어법**이라 두 화면의 같은 자리가 같게 움직인다.
+                      아래쪽 줄은 위로 펼친다 — 아래로 열면 시트를 벗어나 다음 구간을 덮는다. */}
+                  {t.stocks.length > 0 && (
+                    <div
+                      className={`hz-theme-pop${i >= themes.rows.length - 4 ? " hz-theme-pop-up" : ""}`}
+                    >
+                      <div className="hz-theme-pop-head">
+                        최근 {US_WINDOW_DAYS}일 언급 {t.stockCount}종목 · 언급순
+                      </div>
+                      {t.stocks.map((st) => (
+                        <Link
+                          key={st.ticker}
+                          href={`/mdd?code=${st.ticker}&market=US`}
+                          className="hz-theme-pop-item"
+                        >
+                          <span className="hz-theme-pop-name">{st.name}</span>
+                          <span className="hz-theme-pop-cnt">{st.mentions}회</span>
+                          <span className="hz-theme-pop-go">
+                            <Icon
+                              name="arrow_outward"
+                              style={{ fontSize: 13 }}
+                            />
+                          </span>
+                        </Link>
+                      ))}
+                      <div className="hz-theme-pop-foot">
+                        종목을 누르면 MDD 정밀분석이 열립니다.
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
               </div>
@@ -1379,7 +1419,10 @@ export default async function UsKaderaPage() {
                   key={k.keyword}
                   className="hz-trow hz-cols-uskw hz-tip hz-tip-wide hz-tip-end"
                   style={{ flex: 1 }}
-                  data-tip={`전체 대화 ${k.totalCount}회 중 미국 얘기가 ${k.mentionCount}회 · 쏠림 ${k.skew.toFixed(1)}배 · ${k.channelCount}개 채널 · ${k.dayCount}일`}
+                  /* 줄에 안 적은 것만 담는다. 창(3일)·언급 수·변화폭은 이미 줄에 있고,
+                     여기서 답하는 건 "왜 이 말이 이 표에 올랐나"다 — 쏠림이 그 답이고,
+                     채널·날짜 수는 그 쏠림이 복붙 한 건에서 나온 게 아님을 보인다. */
+                  data-tip={`최근 ${US_WINDOW_DAYS}일 전체 대화에서 ${k.totalCount}회 나왔고 그중 ${k.mentionCount}회가 미국 얘기입니다 · 미국 쪽 평소 몫의 ${k.skew.toFixed(1)}배로 몰렸습니다 · ${k.channelCount}개 채널이 ${k.dayCount}일에 걸쳐 말했습니다`}
                 >
                   <RankBadge n={k.rank} />
                   {/* 옆 테마 표는 %p 를 이름 줄 오른끝(막대 바로 위)에 둔다. 이 표는

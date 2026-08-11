@@ -2233,6 +2233,29 @@ main.hz-scroll { overflow-x: clip; }
 .hz-theme-row-sheet .hz-theme-pop {
   left: 22px;
 }
+/* 미장 테마 줄은 표(.hz-trow)라 위 '쌓인 줄'과 클래스가 다르다. 팝오버는 같은 것을
+   쓰되, 기준 상자와 호버만 여기서 다시 걸어 준다(.hz-trow 의 호버 배경은 이미 있다). */
+.hz-theme-host {
+  position: relative;
+}
+.hz-theme-host .hz-theme-pop {
+  left: 22px;
+}
+.hz-theme-host:hover .hz-theme-pop,
+.hz-theme-host:focus-within .hz-theme-pop {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+.hz-theme-host:focus-visible {
+  outline: 2px solid var(--c-blue);
+  outline-offset: -2px;
+}
+@media (max-width: 900px) {
+  .hz-theme-host .hz-theme-pop {
+    left: 16px;
+  }
+}
 .hz-theme-row-sheet:hover .hz-theme-pop,
 .hz-theme-row-sheet:focus-within .hz-theme-pop {
   opacity: 1;

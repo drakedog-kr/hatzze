@@ -25,6 +25,7 @@ import { sentimentTone } from "@/lib/format";
 import { channelMeta, fetchAllRows, lastSyncedAt, optimismPct, toPercents } from "@/lib/telegram-data";
 import { changeRateOf, fetchYahooQuote } from "@/lib/yahoo-quote";
 import { yahooSymbol } from "@/lib/yahoo-history";
+import { US_THEMES } from "@/lib/us-stock-themes";
 
 /** 급부상 판정에서 '최근'으로 볼 일수. 국내(KADERA_WINDOW_DAYS)와 같게 둔다. */
 export const US_WINDOW_DAYS = 3;
@@ -515,6 +516,9 @@ export async function getUsIssueKeywords(): Promise<UsIssueKeyword[]> {
  * 테마 로테이션 · 트렌딩 메시지 (migration_035)
  * ──────────────────────────────────────────────────────────────────────────── */
 
+/** 테마 호버 목록의 한 줄. 누르면 그 종목의 MDD 정밀분석이 열린다(국장과 같은 어법). */
+export type UsThemeStock = { ticker: string; name: string; mentions: number };
+
 export type UsThemeRow = {
   theme: string;
   sharePct: number;
@@ -528,7 +532,56 @@ export type UsThemeRow = {
   shareDelta: number | null;
   /** 최근 N일 점유율 추이(오름차순). 막대 스파크라인이 그린다 */
   series: number[];
+  /** 이 테마를 이룬 종목 — 창 안 언급 순. 줄에 마우스를 올리면 열린다 */
+  stocks: UsThemeStock[];
 };
+
+/**
+ * 테마 → 창 안에서 실제로 언급된 종목 목록.
+ *
+ * ⚠️ **종목 수를 여기서 낸다**(집계표의 stock_count 를 안 쓴다). 그 값은 하루치라
+ * 창 전체에 쓰려면 최댓값을 잡는 수밖에 없는데, 그러면 목록의 길이와 안 맞는다 —
+ * 국장이 같은 자리에서 겪은 일이다("반도체는 최대 6이지만 사흘 동안 언급된 종목은 7개").
+ * 언급 수는 창 전체 합인데 종목만 하루치 최대면 잣대가 어긋난다.
+ */
+async function usThemeStocks(windowDates: string[]): Promise<Map<string, UsThemeStock[]>> {
+  const out = new Map<string, UsThemeStock[]>();
+  if (!windowDates.length) return out;
+  const db = getSupabaseAdmin();
+
+  const themesOf = new Map<string, string[]>();
+  for (const [theme, tickers] of Object.entries(US_THEMES)) {
+    for (const t of tickers) themesOf.set(t, [...(themesOf.get(t) ?? []), theme]);
+  }
+
+  // 창이 3일이라 지금은 1,000행에 못 미치지만, 추출 종목이 늘면 조용히 잘린다 — 페이징한다.
+  const [daily, nameOf] = await Promise.all([
+    fetchAllRows<{ ticker: string; mention_count: number }>("id", () =>
+      db.from("telegram_us_stock_daily").select("ticker,mention_count").in("date", windowDates),
+    ),
+    usNameMap(),
+  ]);
+
+  const agg = new Map<string, Map<string, number>>();
+  for (const r of daily) {
+    for (const theme of themesOf.get(r.ticker) ?? []) {
+      const per = agg.get(theme) ?? new Map<string, number>();
+      per.set(r.ticker, (per.get(r.ticker) ?? 0) + (r.mention_count || 0));
+      agg.set(theme, per);
+    }
+  }
+
+  for (const [theme, per] of agg) {
+    out.set(
+      theme,
+      [...per.entries()]
+        // 언급 수 순. 동점은 티커로 못박는다 — 안 그러면 렌더마다 순서가 흔들린다.
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .map(([ticker, mentions]) => ({ ticker, name: nameOf.get(ticker) ?? ticker, mentions })),
+    );
+  }
+  return out;
+}
 
 export type UsTrendingMessage = {
   channelHandle: string;
@@ -631,6 +684,7 @@ export async function getUsThemeRotation(limit = 8): Promise<{ date: string | nu
   const rankMap = (shares: Map<string, number>) =>
     new Map([...shares].sort((a, b) => b[1] - a[1]).map(([t], i) => [t, i + 1]));
 
+  const stocksOf = await usThemeStocks(recentDates);
   const recentShare = avgShare(recentDates);
   const priorShare = priorDates.length ? avgShare(priorDates) : null;
   const currRank = rankMap(recentShare);
@@ -649,10 +703,10 @@ export async function getUsThemeRotation(limit = 8): Promise<{ date: string | nu
           // 언급 수는 창 전체 합. 점유율이 창 평균이므로 여기만 하루치면 두 숫자가
           // 다른 기간을 말하게 된다.
           mentionCount: recentDates.reduce((a, d) => a + (m.get(d)?.mention_count ?? 0), 0),
-          // ⚠️ 종목 수는 **합이 아니라 최댓값**이다. 집계표의 stock_count 는 하루치라
-          // 사흘을 더하면 같은 종목을 세 번 센다. 최댓값은 실제보다 작을 수 있지만
-          // 거짓말은 아니다(국장은 종목 목록을 따로 들고 있어 이 문제가 없다).
-          stockCount: Math.max(0, ...recentDates.map((d) => m.get(d)?.stock_count ?? 0)),
+          // 종목 수는 **목록의 길이**다. 집계표의 stock_count(하루치)를 쓰면 호버로 열리는
+          // 목록과 숫자가 어긋난다(usThemeStocks 주석).
+          stockCount: stocksOf.get(theme)?.length ?? 0,
+          stocks: stocksOf.get(theme) ?? [],
           rank: currRank.get(theme) ?? 0,
           // 순위는 작을수록 위다 — 올라간 것을 양수로 만들려면 (과거 − 현재)다.
           rankChange: prevRank ? (prevRank.get(theme) ?? 0) - (currRank.get(theme) ?? 0) : null,
