@@ -544,9 +544,20 @@ export type UsTrendingMessage = {
   stocks: string[];
 };
 
-/** 테마 카드가 보는 일수. 순위 변동은 이 창 안에서 7일 전과 견준다. */
+/**
+ * 테마 카드의 창. **국장(lib/telegram-data.ts)과 같은 값·같은 규칙이다.**
+ *
+ * 예전엔 기준일 **하루치**를 7일 전 하루와 견줬다. 그러면 주말·수집이 얇은 날에
+ * 점유율이 통째로 요동친다 — 국장 쪽 주석이 그래서 창을 며칠씩 묶어 쓴다고 적어 두었다.
+ *
+ * 최근 3일 평균 vs **5일 이상 이전** 평균. 사이 이틀(3·4일 전)을 비워 두는 이유는
+ * 겹침을 막으려는 게 아니라(공백 없이도 안 겹친다) 경계를 갓 넘어온 날을 막으려는
+ * 것이다 — 공백이 없으면 기준 창의 가장 최근 날이 '어제까지 최근 창에 있던 날'이라,
+ * 최근 3일을 하루 밀린 자기 자신과 견주는 꼴이 된다.
+ */
 const THEME_SERIES_DAYS = 14;
-const THEME_RANK_LOOKBACK = 7;
+const THEME_RECENT_DAYS = 3;
+const THEME_PRIOR_GAP_DAYS = 5;
 
 /**
  * 미장 테마 로테이션.
@@ -595,30 +606,60 @@ export async function getUsThemeRotation(limit = 8): Promise<{ date: string | nu
     byTheme.set(r.theme, m);
   }
 
-  // 7일 전 순위. 그날 집계가 없으면(주말 결측 등) 비교하지 않는다 — 없는 날을 0으로
-  // 치면 모든 테마가 크게 올라간 것처럼 보인다.
-  const prevDate = dates.filter((d) => d <= addDays(base, -THEME_RANK_LOOKBACK)).at(-1) ?? null;
+  const dayMs = 86_400_000;
+  const daysBefore = (d: string) =>
+    (new Date(`${base}T00:00:00Z`).getTime() - new Date(`${d}T00:00:00Z`).getTime()) / dayMs;
+
+  const recentDates = dates.slice(-THEME_RECENT_DAYS);
+  // recent 는 **개수**로, prior 는 **날짜 간격**으로 잡는다. 수집이 며칠 끊기면 recent 가
+  // 5일 전보다 더 뒤까지 손을 뻗어 같은 날이 양쪽에 들어가므로 명시적으로 뺀다(국장이
+  // 실제로 겪은 함정 — 카더라 수집은 2026-07-26~28 에 이틀 멈춘 적이 있다).
+  const priorDates = dates.filter(
+    (d) => daysBefore(d) >= THEME_PRIOR_GAP_DAYS && !recentDates.includes(d),
+  );
+
+  const themeNames = [...byTheme.keys()];
+  // 그날 안 뜬 테마는 0 으로 치므로 **창 전체 일수**로 나눈다(등장한 날 수가 아니다).
+  const avgShare = (win: string[]) =>
+    new Map(
+      themeNames.map((t) => {
+        const m = byTheme.get(t)!;
+        const sum = win.reduce((a, d) => a + (Number(m.get(d)?.share_pct) || 0), 0);
+        return [t, sum / Math.max(1, win.length)];
+      }),
+    );
+  const rankMap = (shares: Map<string, number>) =>
+    new Map([...shares].sort((a, b) => b[1] - a[1]).map(([t], i) => [t, i + 1]));
+
+  const recentShare = avgShare(recentDates);
+  const priorShare = priorDates.length ? avgShare(priorDates) : null;
+  const currRank = rankMap(recentShare);
+  const prevRank = priorShare ? rankMap(priorShare) : null;
 
   return {
     date: base,
-    rows: [...byTheme.entries()]
-      .map(([theme, m]) => {
-        const today = m.get(base);
-        if (!today) return null;
-        const prev = prevDate ? m.get(prevDate) : undefined;
+    rows: themeNames
+      .map((theme) => {
+        const m = byTheme.get(theme)!;
+        const share = recentShare.get(theme) ?? 0;
+        const prior = priorShare?.get(theme) ?? null;
         return {
           theme,
-          sharePct: Number(today.share_pct) || 0,
-          mentionCount: today.mention_count ?? 0,
-          stockCount: today.stock_count ?? 0,
-          rank: today.rank ?? 0,
+          sharePct: share,
+          // 언급 수는 창 전체 합. 점유율이 창 평균이므로 여기만 하루치면 두 숫자가
+          // 다른 기간을 말하게 된다.
+          mentionCount: recentDates.reduce((a, d) => a + (m.get(d)?.mention_count ?? 0), 0),
+          // ⚠️ 종목 수는 **합이 아니라 최댓값**이다. 집계표의 stock_count 는 하루치라
+          // 사흘을 더하면 같은 종목을 세 번 센다. 최댓값은 실제보다 작을 수 있지만
+          // 거짓말은 아니다(국장은 종목 목록을 따로 들고 있어 이 문제가 없다).
+          stockCount: Math.max(0, ...recentDates.map((d) => m.get(d)?.stock_count ?? 0)),
+          rank: currRank.get(theme) ?? 0,
           // 순위는 작을수록 위다 — 올라간 것을 양수로 만들려면 (과거 − 현재)다.
-          rankChange: prev ? (prev.rank ?? 0) - (today.rank ?? 0) : null,
-          shareDelta: prev ? (Number(today.share_pct) || 0) - (Number(prev.share_pct) || 0) : null,
+          rankChange: prevRank ? (prevRank.get(theme) ?? 0) - (currRank.get(theme) ?? 0) : null,
+          shareDelta: prior === null ? null : share - prior,
           series: dates.map((d) => Number(m.get(d)?.share_pct ?? 0)),
         };
       })
-      .filter((r): r is UsThemeRow => r !== null)
       .sort((a, b) => a.rank - b.rank)
       .slice(0, limit),
   };

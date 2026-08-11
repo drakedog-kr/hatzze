@@ -1091,12 +1091,12 @@ export default async function UsKaderaPage() {
           <SectionHead
             icon="donut_small"
             title="테마 로테이션"
-            note="7일 전 대비"
-            noteHelp="점유율과 순위는 기준일 하루치이고, 막대는 그날 미국 언급 전체에서 차지한 몫입니다. 유입·이탈과 주간 순위는 그 하루를 7일 전 같은 날과 견줍니다. 한 종목이 여러 테마에 들 수 있어 점유율 합은 100%를 넘습니다."
+            note="3일 vs 이전"
+            noteHelp="최근 3일 평균 점유율을 그 이전과 비교합니다. 하루치끼리 재면 표본 얇은 날에 크게 요동쳐서, 며칠씩 묶어서 봅니다."
             /* ⚠️ 짧게 둔다. 옆 이슈 키워드의 설명(20자)보다 길면 좁은 폭에서 이쪽만
                두 줄이 되고, 그 순간 머리가 18.8px 커져 **아래 열 줄이 통째로 밀린다**
                (실측 1280·1366). 자세한 설명은 위 noteHelp 툴팁이 맡는다. */
-            desc="미국 종목 얘기가 어느 테마에 몰려 있나"
+            desc="관심이 어느 미국 테마로 옮겨가는지 · 점유율 변화 기준"
           />
           {themes.rows.length === 0 ? (
             <p
@@ -1152,7 +1152,7 @@ export default async function UsKaderaPage() {
                 <span style={{ textAlign: "right" }}>점유율</span>
                 <span>최근 14일</span>
                 <span style={{ textAlign: "right" }}>종목</span>
-                <span style={{ textAlign: "right" }}>주간 순위</span>
+                <span style={{ textAlign: "right" }}>순위 변동</span>
               </div>
               <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
               {themes.rows.map((t) => (
@@ -1264,7 +1264,7 @@ export default async function UsKaderaPage() {
           <SectionHead
             icon="tag"
             title="이슈 키워드"
-            note="최근 7일"
+            note="최근 3일"
             desc="종목명이 아닌 화제어 · 언급 횟수 기준"
           />
           {keywords.length === 0 ? (
@@ -1286,7 +1286,7 @@ export default async function UsKaderaPage() {
                 style={{ borderBottom: "1px solid var(--c-sheet-line)" }}
               >
                 <Highlight
-                  cap="이번 주 화제어 1위"
+                  cap="화제어 1위"
                   name={keywords[0].keyword}
                   value={`${keywords[0].mentionCount.toLocaleString("ko-KR")}회`}
                   valueColor="var(--c-hot-ink)"

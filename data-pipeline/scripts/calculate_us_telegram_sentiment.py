@@ -77,7 +77,16 @@ ISSUE_KEYWORD_TABLE = "telegram_us_issue_keyword"
 # 1위부터라 그냥 10 이고, 남는 높이는 행들이 flex 로 나눠 갖는다(page.tsx 주석).
 # ⚠️ 짝은 화면의 getUsThemeRotation(10) 이다. 한쪽만 고치면 줄이 어긋난다.
 ISSUE_KEYWORD_LIMIT = 10
-ISSUE_KEYWORD_MIN_MENTIONS = 20  # 미국 메시지에서의 최소 언급 수
+# 세는 창. 국장은 7일인데 미장은 **3일**이다 — 이 페이지의 다른 카드가 전부 3일이라
+# (급부상·센티먼트·주요 종목) 한 화면에서 창이 둘이면 같은 종목의 숫자가 서로 안 맞는
+# 것처럼 읽힌다. 증감 판정(최근 3일 vs 5일 이전)은 그대로다.
+ISSUE_KEYWORD_COUNT_DAYS = 3
+# 창을 7 → 3 으로 줄이면서 20 → 12. **낮춘 게 아니라 하루당으로는 올렸다**
+# (20/7일 = 2.9회/일 → 12/3일 = 4.0회/일). 20 을 그대로 두면 자격을 통과하는 말이
+# 7개뿐이라 옆 테마 로테이션(10줄)과 줄이 어긋난다.
+# 복붙 한 건이 1위로 올라오는 것을 막는 일은 아래 두 문턱이 계속 맡는다 —
+# 3일 창에서도 실측 15~44채널 · 2~3일이라 아무도 안 잘린다.
+ISSUE_KEYWORD_MIN_MENTIONS = 12  # 미국 메시지에서의 최소 언급 수
 ISSUE_KEYWORD_MIN_CHANNELS = 5   # 서로 다른 채널 수. 한 채널 복붙을 막는다
 ISSUE_KEYWORD_MIN_DAYS = 2       # 서로 다른 날짜 수. 하루짜리 이벤트를 막는다
 
@@ -128,27 +137,27 @@ def issue_keyword_rows(
 
     recent_dates = set(dates[-3:])
     prior_dates = {d for d in dates if days_before(d) >= 5}
-    last7 = {d for d in dates if days_before(d) < 7}
+    window = {d for d in dates if days_before(d) < ISSUE_KEYWORD_COUNT_DAYS}
 
     day_total: Counter = Counter()
     for r in rows:
         day_total[r["date"]] += r["mention_count"] or 0
 
-    us7: Counter = Counter()
-    all7: Counter = Counter()
-    chan7: defaultdict = defaultdict(set)
-    day7: defaultdict = defaultdict(set)
+    us_win: Counter = Counter()
+    all_win: Counter = Counter()
+    chan_win: defaultdict = defaultdict(set)
+    day_win: defaultdict = defaultdict(set)
     recent_share: defaultdict = defaultdict(float)
     prior_share: defaultdict = defaultdict(float)
     for r in rows:
         n = r["mention_count"] or 0
-        if r["date"] in last7:
-            us7[r["keyword"]] += n
-            all7[r["keyword"]] += r["total_count"] or 0
-            # 분산도 **같은 창**으로 센다. 전 기간으로 세면 "7일에 22회"인데 "21일에
+        if r["date"] in window:
+            us_win[r["keyword"]] += n
+            all_win[r["keyword"]] += r["total_count"] or 0
+            # 분산도 **같은 창**으로 센다. 전 기간으로 세면 "3일에 22회"인데 "21일에
             # 걸쳐 있다"는 어긋난 짝이 화면에 뜬다.
-            chan7[r["keyword"]] |= channels_of.get((r["date"], r["keyword"]), set())
-            day7[r["keyword"]].add(r["date"])
+            chan_win[r["keyword"]] |= channels_of.get((r["date"], r["keyword"]), set())
+            day_win[r["keyword"]].add(r["date"])
         share = n / max(day_total[r["date"]], 1)
         if r["date"] in recent_dates:
             recent_share[r["keyword"]] += share
@@ -157,24 +166,24 @@ def issue_keyword_rows(
 
     # 쏠림의 기준선 — 창 안 **전체 화제어 언급 중 미국 몫**. 이 값이 1배다.
     #
-    # ⚠️ 분모를 `sum(all7.values())` 로 두면 안 된다(한 번 그렇게 썼다가 100% 미국인
-    #    말이 2.2배로 나왔다). all7 은 **미국분이 하나라도 있는 말만** 담고 있어서,
+    # ⚠️ 분모를 `sum(all_win.values())` 로 두면 안 된다(한 번 그렇게 썼다가 100% 미국인
+    #    말이 2.2배로 나왔다). all_win 은 **미국분이 하나라도 있는 말만** 담고 있어서,
     #    미국이 전혀 안 쓴 말이 통째로 빠진 채 기준선이 부풀려진다(16% → 45%).
     #    분모는 창 안 모든 화제어의 합이어야 한다.
-    us_total = sum(us7.values())
-    all_total = sum(all_total_by_date.get(d, 0) for d in last7)
+    us_total = sum(us_win.values())
+    all_total = sum(all_total_by_date.get(d, 0) for d in window)
     baseline = us_total / max(1, all_total)
 
     can_compare = bool(prior_dates)
     scored = []
-    for word, count in us7.items():
+    for word, count in us_win.items():
         if count < ISSUE_KEYWORD_MIN_MENTIONS:
             continue
-        if len(chan7.get(word, ())) < ISSUE_KEYWORD_MIN_CHANNELS:
+        if len(chan_win.get(word, ())) < ISSUE_KEYWORD_MIN_CHANNELS:
             continue
-        if len(day7.get(word, ())) < ISSUE_KEYWORD_MIN_DAYS:
+        if len(day_win.get(word, ())) < ISSUE_KEYWORD_MIN_DAYS:
             continue
-        total = max(count, all7.get(word, count))
+        total = max(count, all_win.get(word, count))
         skew = (count / total) / max(baseline, 1e-9)
         if skew < ISSUE_KEYWORD_MIN_SKEW:
             continue
@@ -203,8 +212,8 @@ def issue_keyword_rows(
                 "mention_count": count,
                 "total_count": total,
                 "skew": round(skew, 3),
-                "channel_count": len(chan7.get(word, ())),
-                "day_count": len(day7.get(word, ())),
+                "channel_count": len(chan_win.get(word, ())),
+                "day_count": len(day_win.get(word, ())),
                 "trend": trend,
                 "share_delta": None if delta is None else round(delta, 6),
                 "computed_for": dates[-1],
