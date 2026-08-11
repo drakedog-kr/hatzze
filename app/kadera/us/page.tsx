@@ -836,7 +836,12 @@ export default async function UsKaderaPage() {
                         textWrap: "pretty",
                       }}
                     >
-                      {highlightTerms(para, summaryTerms, used)}
+                      {/* particleAfterLatin — "TSMC의 7월 매출"의 TSMC 를 굵힌다.
+                          국장에선 안 켠다(이름이 한글이라 필요가 없고, 켜 봐야 판정만
+                          늘어난다). 규칙과 실측은 parts.tsx 의 목록 주석에. */}
+                      {highlightTerms(para, summaryTerms, used, {
+                        particleAfterLatin: true,
+                      })}
                     </p>
                   ));
                 })()}

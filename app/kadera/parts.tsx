@@ -414,6 +414,7 @@ export function Sparkline({ data, width = 62, height = 26 }: { data: number[]; w
  * 건너뛰기**로 막으면 안 된다 — 한국어는 조사가 명사에 바로 붙어서 "2차전지가",
  * "지주·밸류업과" 가 전부 걸러진다(실제로 반도체 하나만 굵어졌다). 뒤는 열어 두고,
  * 영문·숫자 낱말일 때만 뒤를 막는다("AI"가 "AI수요" 속에서 따로 굵어지는 것 방지).
+ * 그 예외의 예외가 particleAfterLatin 이다(아래).
  *
  * ⚠️ 이 함수는 **한 벌만 있어야 한다.** 국장·미장이 각자 복사해 두면 한쪽만 고쳐진
  * 채로 두 화면의 강조 규칙이 갈린다(이 저장소가 파이썬↔TS 쌍둥이로 이미 겪은 일이다).
@@ -422,7 +423,47 @@ const HANGUL = /[\uAC00-\uD7A3]/;
 
 const MAX_BOLD_PER_PARAGRAPH = 2;
 
-export function highlightTerms(text: string, terms: string[], used: Set<string>): React.ReactNode[] {
+/**
+ * 영문 이름 뒤에 **조사만** 붙었으면 그건 합성어가 아니라 낱말 경계다.
+ *
+ * 국장은 이름이 거의 한글이라 이 자리가 안 드러났다. 미장은 "TSMC의 7월 매출",
+ * "AMD와" 처럼 라틴 이름 + 조사가 흔해서, 뒤가 한글이면 무조건 막는 규칙이 그대로
+ * 걸리면 영문 종목은 하나도 안 굵어진다.
+ *
+ * 판정은 **뒤에 붙은 한글 덩어리 전체가 이 목록과 정확히 같은가**로 한다. 조사로
+ * 시작하는지만 보면 "AI에이전트"의 '에'가 조사로 통과한다 — 덩어리째 대면 "에이전트"
+ * 는 목록에 없어 그냥 막힌다. 못 맞히면 안 굵어질 뿐이라 실패가 안전한 쪽이다.
+ *
+ * ⚠️ 조사 목록을 문법책대로 넓히지 말 것. 넓힐수록 합성어가 새 들어온다 — 이 저장소가
+ * 유령 종목 그물에서 이미 겪었다. 여기 있는 것은 국장 LLM 글 210편(21,539자)에서 실제로
+ * 나온 '영문토큰 + 한글덩어리' 135건을 전수로 갈라 본 결과다. 이 목록으로 25건이 열리고
+ * 110건이 막히는데, **열린 25건은 전부 조사였고 막힌 110건은 전부 합성어였다**
+ * (SK+하이닉스는 · 20+일부터 · 000+억달러 …). 넓히려거든 그 대조를 다시 돌려
+ * 오분류가 0인지부터 확인할 것.
+ */
+const LATIN_TRAILING_PARTICLES = new Set(
+  (
+    "의 가 이 은 는 을 를 와 과 도 만 로 에 랑 야 " +
+    "에서 에게 으로 한테 처럼 보다 부터 까지 마저 조차 밖에 만큼 라고 로서 로써 " +
+    "와의 과의 로의 에의 에도 에는 에선 으론 으로도 으로는 에게도 에게는 에서도 에서는 " +
+    "로부터 으로서 으로써"
+  ).split(" "),
+);
+
+const HANGUL_RUN = /^[\uAC00-\uD7A3]+/;
+
+function trailingIsParticle(text: string, at: number): boolean {
+  const run = HANGUL_RUN.exec(text.slice(at));
+  return !!run && LATIN_TRAILING_PARTICLES.has(run[0]);
+}
+
+export function highlightTerms(
+  text: string,
+  terms: string[],
+  used: Set<string>,
+  /** particleAfterLatin: 영문 낱말 뒤가 조사면 굵힘을 허용한다(미장 히어로만 켠다). */
+  opts?: { particleAfterLatin?: boolean },
+): React.ReactNode[] {
   if (terms.length === 0) return [text];
   const out: React.ReactNode[] = [];
   let inThisParagraph = 0;
@@ -437,7 +478,13 @@ export function highlightTerms(text: string, terms: string[], used: Set<string>)
       const before = text[i - 1];
       const after = text[i + term.length];
       if (before && HANGUL.test(before)) continue;
-      if (after && HANGUL.test(after) && /^[A-Za-z0-9]+$/.test(term)) continue;
+      if (
+        after &&
+        HANGUL.test(after) &&
+        /^[A-Za-z0-9]+$/.test(term) &&
+        !(opts?.particleAfterLatin && trailingIsParticle(text, i + term.length))
+      )
+        continue;
       if (buf) {
         out.push(buf);
         buf = "";
