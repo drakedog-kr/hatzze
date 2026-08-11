@@ -1151,7 +1151,6 @@ export default async function UsKaderaPage() {
                 <span>테마</span>
                 <span style={{ textAlign: "right" }}>점유율</span>
                 <span>최근 14일</span>
-                <span style={{ textAlign: "right" }}>변화량</span>
                 <span style={{ textAlign: "right" }}>언급</span>
               </div>
               <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
@@ -1171,11 +1170,14 @@ export default async function UsKaderaPage() {
                       minWidth: 0,
                     }}
                   >
-                    {/* 순위 변동을 **막대 바로 위 오른끝**에 둔다. 막대가 칸 폭을 꽉 채우므로
-                      이 줄의 오른끝이 곧 막대의 오른끝이다 — 점유율이 얼마나 찼는지와 그게
-                      어느 쪽으로 움직였는지가 한 덩어리로 읽힌다.
-                      ⚠️ 이름은 반드시 minWidth:0 + 말줄임이다. flex 로 두면 '반도체 장비·소재'
-                      같은 긴 이름이 배지를 칸 밖으로 밀어낸다. */}
+                    {/* 국장 테마 줄과 같은 조판이다.
+                        [이름 · ▲n계단] ……………… [▲7.7%p]
+                        막대가 칸 폭을 꽉 채우므로 이 줄의 오른끝이 곧 **막대의 오른쪽 위**다
+                        — 점유율이 얼마나 찼는지와 그게 얼마나 움직였는지가 한 덩어리로 읽힌다.
+                        순위 변동은 이름 바로 옆이다. 그 값은 이름에 붙은 꼬리표지 막대와는
+                        다른 눈금이라, 떨어뜨려 두면 어느 쪽을 가리키는지 헷갈린다.
+                        ⚠️ 이름은 반드시 minWidth:0 + 말줄임이다. flex 로 두면 '반도체 장비·소재'
+                        같은 긴 이름이 배지를 칸 밖으로 밀어낸다. */}
                     <span
                       style={{
                         display: "flex",
@@ -1195,7 +1197,6 @@ export default async function UsKaderaPage() {
                       >
                         {t.theme}
                       </span>
-                      <span style={{ flex: 1 }} />
                       {/* RankDelta 는 0 과 null 을 똑같이 '아무것도 안 그림'으로 낸다. 이 표는
                         모든 줄이 같은 두 창을 견주므로 빈칸이면 "자료가 없나?"로 읽힌다 —
                         변동 없음은 글자로 적고, 비교할 과거가 없을 때만 —로 둔다. */}
@@ -1224,6 +1225,26 @@ export default async function UsKaderaPage() {
                         </span>
                       ) : (
                         <RankDelta change={t.rankChange} />
+                      )}
+                      <span style={{ flex: 1 }} />
+                      {/* 0.1%p 미만은 안 적는다(국장과 같은 문턱). 반올림하면 0.0%p 가 되어
+                          "움직였다"는 표시만 남고 값은 아무 말도 안 한다. */}
+                      {t.shareDelta !== null && Math.abs(t.shareDelta) >= 0.1 && (
+                        <span
+                          style={{
+                            fontFamily: MONO,
+                            fontSize: 12,
+                            fontWeight: 700,
+                            flexShrink: 0,
+                            color:
+                              t.shareDelta > 0
+                                ? "var(--c-hot-ink)"
+                                : "var(--c-cold-ink)",
+                          }}
+                        >
+                          {t.shareDelta > 0 ? "▲" : "▼"}
+                          {Math.abs(t.shareDelta).toFixed(1)}%p
+                        </span>
                       )}
                     </span>
                     {/* 막대는 이름 아래에 깐다. 옆 칸으로 빼면 이름 칸이 좁아져 '반도체 장비·소재'가
@@ -1262,27 +1283,6 @@ export default async function UsKaderaPage() {
                     display 가 없는 span 으로 한 겹 싸면 접는 쪽이 이긴다. */}
                   <span>
                     <Sparkline data={t.series} width={66} height={24} />
-                  </span>
-                  {/* 점유율이 얼마나 움직였나. 위 막대의 색과 같은 값이라 색이 무슨 뜻인지
-                      여기서 읽힌다. 비교할 과거 창이 없으면 —. */}
-                  <span
-                    style={{
-                      fontFamily: MONO,
-                      fontSize: 11.5,
-                      fontWeight: 700,
-                      textAlign: "right",
-                      whiteSpace: "nowrap",
-                      color:
-                        t.shareDelta === null || t.shareDelta === 0
-                          ? C.sub2
-                          : t.shareDelta > 0
-                            ? "var(--c-hot-ink)"
-                            : "var(--c-cold-ink)",
-                    }}
-                  >
-                    {t.shareDelta === null
-                      ? "—"
-                      : `${t.shareDelta > 0 ? "+" : t.shareDelta < 0 ? "−" : ""}${Math.abs(t.shareDelta).toFixed(1)}%p`}
                   </span>
                   {/* 창(3일) 안 언급 수. 점유율이 창 평균이라 이 값도 같은 창의 합이다 —
                     한쪽만 하루치면 "28.0% 인데 12회"처럼 두 숫자가 다른 기간을 말한다. */}
@@ -1382,7 +1382,6 @@ export default async function UsKaderaPage() {
                 <span>#</span>
                 <span>화제어</span>
                 <span>언급량</span>
-                <span style={{ textAlign: "right" }}>변화량</span>
                 <span style={{ textAlign: "right" }}>횟수</span>
               </div>
               {/* ⚠️ **1위부터** 센다(국장은 2위부터다). 옆 테마 로테이션과 줄을 맞추려면
@@ -1426,27 +1425,6 @@ export default async function UsKaderaPage() {
                               : C.hint,
                       }}
                     />
-                  </span>
-                  {/* 옆 테마 로테이션의 변화량 칸과 **같은 자리·같은 단위**다(%p).
-                      화제어 하나의 점유율이 작아 값도 작다 — 소수 한 자리로 적는다. */}
-                  <span
-                    style={{
-                      fontFamily: MONO,
-                      fontSize: 11.5,
-                      fontWeight: 700,
-                      textAlign: "right",
-                      whiteSpace: "nowrap",
-                      color:
-                        k.shareDelta === null || k.shareDelta === 0
-                          ? C.sub2
-                          : k.shareDelta > 0
-                            ? "var(--c-hot-ink)"
-                            : "var(--c-cold-ink)",
-                    }}
-                  >
-                    {k.shareDelta === null
-                      ? "—"
-                      : `${k.shareDelta > 0 ? "+" : k.shareDelta < 0 ? "−" : ""}${Math.abs(k.shareDelta * 100).toFixed(1)}%p`}
                   </span>
                   <span
                     style={{
