@@ -125,18 +125,23 @@ def issue_keyword_rows(keyword_rows: list[dict]) -> list[dict]:
         # 점유율 0으로 치므로 창 전체 일수로 나눈다.
         recent_avg = recent_share.get(word, 0.0) / max(len(recent_dates), 1)
         prior_avg = prior_share.get(word, 0.0) / max(len(prior_dates), 1)
-        if not can_compare:
+        # 두 값(방향·크기)은 **같은 뺄셈 하나**에서 나온다. trend 는 여기에 flat 문턱만
+        # 더한 것이다 — 한쪽만 고치면 화살표와 카드의 %p 가 서로 다른 말을 한다.
+        # (미장 쪽 calculate_us_telegram_sentiment.py 가 같은 모양이다.)
+        delta = None if not can_compare else recent_avg - prior_avg
+        if delta is None:
             trend = None
-        elif abs(recent_avg - prior_avg) < ISSUE_KEYWORD_FLAT:
+        elif abs(delta) < ISSUE_KEYWORD_FLAT:
             trend = "flat"
         else:
-            trend = "up" if recent_avg > prior_avg else "down"
+            trend = "up" if delta > 0 else "down"
         out.append(
             {
                 "rank": i,
                 "keyword": word,
                 "mention_count": count,
                 "trend": trend,
+                "share_delta": None if delta is None else round(delta, 6),
                 "computed_for": dates[-1],
             }
         )

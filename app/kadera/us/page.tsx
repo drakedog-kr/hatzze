@@ -1154,7 +1154,7 @@ export default async function UsKaderaPage() {
                 />
               </div>
 
-              <div className="hz-thead hz-cols-ustheme">
+              <div className="hz-thead hz-cols-theme">
                 <span>#</span>
                 <span>테마</span>
                 <span style={{ textAlign: "right" }}>점유율</span>
@@ -1165,7 +1165,7 @@ export default async function UsKaderaPage() {
               {themes.rows.map((t, i) => (
                 <div
                   key={t.theme}
-                  className="hz-trow hz-cols-ustheme hz-theme-host"
+                  className="hz-trow hz-cols-theme hz-theme-host"
                   style={{ flex: 1 }}
                   /* 마우스가 없어도(키보드·터치) 종목 목록을 열 수 있게 초점을 받는다.
                      언급된 종목이 없는 테마는 열 것도 없으니 초점도 주지 않는다. */
@@ -1235,7 +1235,7 @@ export default async function UsKaderaPage() {
                     </span>
                     {/* 막대는 이름 아래에 깐다. 옆 칸으로 빼면 이름 칸이 좁아져 '반도체 장비·소재'가
                       잘리는데, 이 카드에서 가장 먼저 읽히는 건 테마 이름이다. */}
-                    <span className="hz-usbar">
+                    <span className="hz-bar">
                       <span
                         style={{
                           width: `${Math.min(100, t.sharePct)}%`,
@@ -1407,7 +1407,7 @@ export default async function UsKaderaPage() {
                 />
               </div>
 
-              <div className="hz-thead hz-cols-uskw">
+              <div className="hz-thead hz-cols-kw">
                 <span>#</span>
                 <span>화제어</span>
                 <span>언급량</span>
@@ -1425,7 +1425,7 @@ export default async function UsKaderaPage() {
               {keywords.map((k) => (
                 <div
                   key={k.keyword}
-                  className="hz-trow hz-cols-uskw hz-tip hz-tip-wide hz-tip-end"
+                  className="hz-trow hz-cols-kw hz-tip hz-tip-wide hz-tip-end"
                   style={{ flex: 1 }}
                   /* 줄에 안 적은 것만 담는다. 창(3일)·언급 수·변화폭은 이미 줄에 있다.
                      남는 것은 **표본의 모양** 하나 — 전체 대화에서 몇 번 중 몇 번이
@@ -1481,7 +1481,7 @@ export default async function UsKaderaPage() {
                   </span>
                   {/* 막대 길이는 7일 언급 횟수, 색은 최근 사흘 관심의 **방향**이다 —
                       눈금이 둘이라 각주에 둘 다 적는다(국장 카드와 같은 규칙). */}
-                  <span className="hz-usbar">
+                  <span className="hz-bar">
                     <span
                       style={{
                         width: `${(k.mentionCount / Math.max(1, keywords[0].mentionCount)) * 100}%`,
@@ -1810,7 +1810,7 @@ export default async function UsKaderaPage() {
                     </span>
                   </span>
                   {/* 막대가 비중을 그대로 말한다. 숫자만 두면 60%와 40%의 차이가 안 잡힌다. */}
-                  <span className="hz-usbar">
+                  <span className="hz-bar">
                     <span style={{ width: pct(c.share) }} />
                   </span>
                   <span
@@ -1918,7 +1918,7 @@ export default async function UsKaderaPage() {
                 </span>
                 {/* 막대의 분모는 **모니터링 채널 전체**다. 상위 종목 대비로 그리면
                     1위가 늘 꽉 차서 "전체의 몇 곳인가"라는 뜻이 사라진다. */}
-                <span className="hz-usbar">
+                <span className="hz-bar">
                   <span
                     style={{
                       width: pct(

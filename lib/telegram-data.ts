@@ -1785,8 +1785,14 @@ export async function getEcosystemSentiment(): Promise<EcosystemSentiment | null
 }
 
 export type IssueKeyword = {
+  rank: number; // 1부터. 표가 이 값을 그대로 배지에 쓴다
   word: string;
   count: number; // 최근 7일 언급 수(화면에 그대로 표시)
+  /** 최근 3일 평균 점유율 − 그 이전 평균(%p 는 ×100). trend 와 **같은 뺄셈**에서 나온다 —
+   *  trend 는 여기에 flat 문턱만 더한 것이다. 비교할 과거가 없으면 null.
+   *  ⚠️ 저장 표(telegram_issue_keyword)에 share_delta 열이 없으면 null 로 온다.
+   *     화면은 null 이면 %p 를 그냥 안 그린다 — 마이그레이션 전후로 안 깨진다. */
+  shareDelta: number | null;
   /**
    * 관심 점유율의 방향. 비교할 과거가 없으면 null.
    *
@@ -1817,7 +1823,9 @@ export type IssueKeyword = {
  */
 export async function getIssueKeywords(limit = 10): Promise<IssueKeyword[]> {
   const stored = await loadIssueKeywords(limit);
-  return stored ?? computeIssueKeywords(limit);
+  if (stored) return stored;
+  // 즉석 계산 경로는 순위를 안 매긴다 — 정렬은 이미 끝났으므로 여기서 번호만 붙인다.
+  return (await computeIssueKeywords(limit)).map((k, i) => ({ ...k, rank: i + 1 }));
 }
 
 /**
@@ -1836,16 +1844,26 @@ export async function getIssueKeywords(limit = 10): Promise<IssueKeyword[]> {
 async function loadIssueKeywords(limit: number): Promise<IssueKeyword[] | null> {
   const db = getSupabaseAdmin();
   try {
-    const { data, error } = await db
-      .from("telegram_issue_keyword")
-      .select("rank,keyword,mention_count,trend")
-      .order("rank")
-      .limit(limit);
+    // ⚠️ share_delta 는 나중에 더한 열이다(마이그레이션 040). 그 열이 없는 환경에서
+    //    통째로 실패시키면 **화면이 조용히 즉석 계산 경로로 떨어진다** — 그 경로는
+    //    14일치 원자료를 다시 세느라 렌더가 1초 넘게 길어진다(이 표를 만든 이유가 그것이다).
+    //    그래서 한 번 더 시도한다: 있으면 쓰고, 없으면 %p 없이 간다.
+    type Row = { rank: number; keyword: string; mention_count: number; trend: string | null; share_delta?: number | null };
+    const read = (cols: string) =>
+      db.from("telegram_issue_keyword").select(cols).order("rank").limit(limit) as unknown as Promise<{
+        data: Row[] | null;
+        error: unknown;
+      }>;
+    let { data, error } = await read("rank,keyword,mention_count,trend,share_delta");
+    if (error) ({ data, error } = await read("rank,keyword,mention_count,trend"));
     if (error || !data?.length) return null;
     return data.map((r) => ({
+      rank: r.rank as number,
       word: r.keyword as string,
       count: r.mention_count as number,
       trend: (r.trend ?? null) as IssueKeyword["trend"],
+      // 0 도 뜻이 있는 값이라(움직이지 않았다) `?? null` 이 아니라 null 검사를 한다.
+      shareDelta: r.share_delta === null || r.share_delta === undefined ? null : Number(r.share_delta),
     }));
   } catch {
     // 표가 아직 없는 환경(마이그레이션 023 미적용)도 여기로 온다. 화면을 세우지 않고
@@ -1920,7 +1938,7 @@ async function computeIssueKeywords(limit: number): Promise<IssueKeyword[]> {
           : recentAvg > priorAvg
             ? "up"
             : "down";
-      return { word, count, trend };
+      return { rank: 0, word, count, trend, shareDelta: canCompare ? recentAvg - priorAvg : null };
     });
 }
 
