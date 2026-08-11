@@ -87,7 +87,9 @@ function EagleIcon({ size = 20 }: { size?: number }) {
 }
 
 // 서브 항목. href 가 없으면 아직 페이지가 없는 예고 항목이라 링크가 아니라 <div> 로 그린다.
-type NavChild = { label: string; href?: string; Glyph: Glyph; badge?: string; tip?: string };
+// sub 는 그 서브 페이지의 본문 머리(PageHeader)가 쓸 한 줄이다. 부모와 주소가 같은
+// 서브(국장 → /kadera)에는 두지 않는다 — 부모가 이미 자기 문장을 갖고 있다.
+type NavChild = { label: string; href?: string; Glyph: Glyph; badge?: string; tip?: string; sub?: string };
 
 // icon 은 Material Symbols 이름, Glyph 는 직접 그린 SVG 다(폰트에 없는 것 — 태극·성조·개미).
 // 둘 중 하나만 있으면 된다. NavGlyph 가 Glyph 를 우선한다.
@@ -117,7 +119,12 @@ const NAV: NavItem[] = [
     sub: "주식 텔레그램에서 무엇이 회자되는지",
     children: [
       { label: "국장 카더라", href: "/kadera", Glyph: KrTaegukIcon },
-      { label: "미장 카더라", Glyph: EagleIcon, badge: "준비 중", tip: "이번 주 오픈 예정!" },
+      {
+        label: "미장 카더라",
+        href: "/kadera/us",
+        Glyph: EagleIcon,
+        sub: "같은 채널이 미국 종목은 뭐라고 하는지",
+      },
     ],
   },
   { href: "/mdd", label: "MDD 정밀분석", icon: "trending_down", sub: "고점에서 얼마나 내려왔고 언제 회복했을까" },
@@ -775,6 +782,15 @@ function ThemeToggle({ initial, variant = "icon" }: { initial: "light" | "dark";
 function PageHeader({ theme }: { theme: "light" | "dark" }) {
   const pathname = usePathname();
   const page = NAV.find((n) => isActive(n.href, pathname));
+  // 서브 페이지에서는 서브의 이름을 h1 으로 쓴다. 부모(구역)의 이름을 그대로 두면
+  // /kadera 와 /kadera/us 두 페이지가 **같은 h1** 을 갖는다.
+  // ⚠️ 부모와 주소가 같은 서브(국장 → /kadera)는 일부러 비껴간다 — 이미 색인이 끝난
+  //    /kadera 의 제목을 여기서 바꿔 버릴 이유가 없다.
+  const child = page?.href === pathname ? undefined : page?.children?.find((c) => c.href === pathname);
+  const title = child?.label ?? page?.label;
+  const sub = child?.sub ?? page?.sub;
+  // 배지는 부모 것이다. 서브가 물려받으면 "25개 지표" 같은 남의 표찰이 따라 붙는다.
+  const badge = child ? undefined : page?.badge;
   return (
     <header className="hz-page-head">
 {/* #267 의 가드: NAV 에 없는 경로(법률 문서)에서는 제목 칸을 통째로 비운다.
@@ -786,9 +802,9 @@ function PageHeader({ theme }: { theme: "light" | "dark" }) {
               옆에 붙은 라벨이 아니라 매달린 것처럼 보였다. */}
           <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", minWidth: 0 }}>
             <h1 style={{ margin: 0, fontSize: 23, fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>
-              {page.label}
+              {title}
             </h1>
-            {page.badge && (
+            {badge && (
               <span
                 style={{
                   fontSize: 11,
@@ -805,11 +821,11 @@ function PageHeader({ theme }: { theme: "light" | "dark" }) {
                   whiteSpace: "nowrap",
                 }}
               >
-                {page.badge}
+                {badge}
               </span>
             )}
           </div>
-          <p style={{ margin: 0, fontSize: 13, color: C.sub2 }}>{page.sub}</p>
+          <p style={{ margin: 0, fontSize: 13, color: C.sub2 }}>{sub}</p>
         </div>
       )}
       {/* 제목이 없을 때 도구가 왼쪽으로 붙지 않도록. justify-content:space-between 은

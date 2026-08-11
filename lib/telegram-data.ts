@@ -87,7 +87,7 @@ const kaderaBaseDate = cache(async (): Promise<string> => {
  * 창을 쓰는 곳마다 이 계산을 따로 하면 "같은 최근 N일"이 서로 다른 N일이 되므로
  * (실제로 카드 1,828 vs 요약문 1,727 로 어긋난 적이 있다) 여기 하나로 모은다.
  */
-function windowBefore(base: string, n: number): string[] {
+export function windowBefore(base: string, n: number): string[] {
   const end = addDaysISO(base, -1);
   return Array.from({ length: n }, (_, i) => addDaysISO(end, -(n - 1 - i)));
 }
@@ -124,7 +124,7 @@ export const STOCK_CHART_DAYS = 7;
  * 페이징 대상 쿼리 — 필터까지만 건 상태. `.order()`·`.range()` 는 fetchAllRows 가 건다.
  * 정렬을 호출부에 맡기지 않으려고 일부러 이 모양으로 받는다(아래 주석 참고).
  */
-type PagedQuery<T> = {
+export type PagedQuery<T> = {
   order(column: string): {
     // error 까지 받는다. 예전엔 data 만 적어 뒀는데, 그러면 실패가 `data: null` 로만
     // 보여서 "행이 없다"와 구분이 안 된다 — 아래 fetchAllRows 가 그걸로 물렸다.
@@ -171,7 +171,7 @@ async function withRetry<R extends { error: unknown }>(run: () => PromiseLike<R>
  *
  * 결과 순서는 이제 orderKey 순이다. 순서에 기대는 소비자는 직접 정렬할 것.
  */
-async function fetchAllRows<T>(
+export async function fetchAllRows<T>(
   orderKey: string,
   build: () => PagedQuery<T>,
   opts: { onError?: (e: unknown) => void } = {},
@@ -460,7 +460,7 @@ async function loadStockDaily(days: number): Promise<{ rows: DailyRow[]; dates: 
  * 마이그레이션 016 이전 환경(photo 컬럼 없음)에서는 사진 쿼리가 에러 → 빈 집합이 되어
  * 전부 이니셜 아바타로 떨어진다. 제목은 그대로 나온다.
  */
-const channelMeta = cache(
+export const channelMeta = cache(
   async (): Promise<{ titleOf: Map<string, string>; photoUrlOf: Map<string, string | null> }> => {
     const db = getSupabaseAdmin();
     // handle 은 unique 라 페이징 정렬 키로 안전하다(fetchAllRows 주석의 함정 [2]).
@@ -1634,7 +1634,7 @@ export type EcosystemSentiment = {
 // LLM에 맡기지 않고 결정적으로 정해서, 같은 수치면 두 화면이 항상 같은 말을 쓴다.
 
 /** 합이 100이 되도록 반올림을 보정한다(단순 반올림은 99·101이 나와 막대가 어긋난다). */
-function toPercents(pos: number, neu: number, neg: number): [number, number, number] {
+export function toPercents(pos: number, neu: number, neg: number): [number, number, number] {
   const total = pos + neu + neg;
   if (!total) return [0, 0, 0];
   const raw = [(pos / total) * 100, (neu / total) * 100, (neg / total) * 100];
@@ -1697,7 +1697,7 @@ const THEME_MIN_DECIDED = 8;
  */
 const SENTIMENT_PRIOR = 5;
 
-function optimismPct(pos: number, neg: number): number | null {
+export function optimismPct(pos: number, neg: number): number | null {
   if (pos + neg === 0) return null;
   return Math.round(((pos + SENTIMENT_PRIOR) / (pos + neg + 2 * SENTIMENT_PRIOR)) * 100);
 }

@@ -1154,6 +1154,52 @@ body {
   display: none;
 }
 
+/* ── 미장 카더라의 표 두 벌 ───────────────────────────────────────
+   # · 미국 · 국내 · 함께 정도 · 표본. 이름 두 칸을 같은 1fr 로 두는 이유는 이 표가
+   **짝**을 보여 주는 표라서다 — 둘 사이가 멀면 짝이 아니라 남남으로 읽힌다.
+   1fr : 1fr 로 두면 이름이 대개 서너 글자라 남는 폭이 통째로 두 이름 사이 공백이 되어,
+   미국과 국내가 화면 양끝으로 밀려났다. 그래서 미국 칸을 0.62fr 로 좁힌다.
+   ⚠️ max-content 는 답이 아니다 — .hz-trow 는 **행마다 독립된 그리드**라
+      칸 폭이 행마다 달라지고, 국내 이름이 계단처럼 어긋난다(실제로 그렇게 나왔다).
+   표본 칸(150px)은 "5회 · 3채널 · 2일"이 한 줄에 들어가는 최소 폭이다. */
+.hz-cols-comention {
+  grid-template-columns: 24px minmax(0, 0.62fr) minmax(0, 1fr) 62px 150px;
+}
+/* # · 채널 · 막대 · 비중 · 원자료. 막대는 .hz-cols-ch 와 같은 이유로 유연 칸이고,
+   좁아지면 이름보다 먼저 양보한다. */
+.hz-cols-usch {
+  grid-template-columns: 20px minmax(0, 1fr) minmax(40px, 0.55fr) 46px 76px;
+}
+/* # · 화제어 · 쏠림 · 표본. 표본 칸(126px)은 "22/22회 · 20채널"이 한 줄에 드는 폭이다. */
+.hz-cols-uskw {
+  grid-template-columns: 24px minmax(0, 1fr) 58px 126px;
+}
+/* # · 테마(+막대) · 점유율 · 14일 추이 · 종목 · 주간 순위.
+   ⚠️ 점유율 막대는 별도 칸이 아니라 **테마 이름 아래**에 깐다. 옆 칸으로 빼면 이름 칸이
+      좁아져 '반도체 장비·소재'가 잘리는데, 이 표에서 가장 먼저 읽히는 건 이름이다. */
+.hz-cols-ustheme {
+  grid-template-columns: 24px minmax(0, 1fr) 58px 86px 46px 66px;
+}
+/* 폰에서 접힌 표본 열을 국내 종목명 아랫줄에 되살리는 조각(.hz-ch-meta 와 같은 수법). */
+.hz-us-meta {
+  display: none;
+}
+/* 채널 비중 막대. **인라인 style 로 두면 안 된다** — 좁은 화면에서 이 칸을 접는
+   미디어쿼리를 인라인이 이겨서, 막대만 살아남아 줄이 두 줄로 터졌다(실측 560px).
+   채움 폭만 값에 따라 달라지므로 그것만 인라인으로 남긴다. */
+.hz-usbar {
+  display: block;
+  height: 6px;
+  background: var(--c-track);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.hz-usbar > span {
+  display: block;
+  height: 100%;
+  background: var(--c-blue);
+}
+
 /* ── 시트 안의 표 ──────────────────────────────────────────────────
    유연 컬럼은 반드시 minmax(0, …fr) 이다. minmax(120px, …) 로 두면 좁은 폭에서
    합이 칸 폭을 넘겨 오버플로가 난다(핸드오프가 짚은 함정). */
@@ -1620,6 +1666,62 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
   /* 막대를 접었으니 막대를 설명하던 각주도 같이 접는다. 안 그러면 화면에 없는 것을
      가리키는 문장만 남는다. */
   .hz-rise-barnote {
+    display: none;
+  }
+
+  /* 미장: 표본(5)을 접는다. **버리지 않고** 국내 종목명 아랫줄로 옮긴다 —
+     "279배"는 표본을 모르면 읽을 수 없는 숫자라, 여기서만은 접는 것이 곧 거짓이 된다. */
+  .hz-cols-comention {
+    /* 68px 은 데이터("260배")가 아니라 **열 머리**가 정한 값이다 — "함께 정도"(50px)에
+       도움말 아이콘(12)과 사이 간격(3)이 붙는다. 56 으로 뒀더니 "함께 정 / 도"로 쪼개졌다. */
+    grid-template-columns: 20px minmax(0, 1fr) minmax(0, 1fr) 68px;
+    gap: 8px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .hz-cols-comention > :nth-child(5) {
+    display: none;
+  }
+  .hz-us-meta {
+    display: block;
+  }
+
+  /* 미장 채널: 막대(3)와 원자료(5)를 접는다. 바로 옆 칸의 비중이 같은 값을 이미 말한다. */
+  .hz-cols-usch {
+    grid-template-columns: 20px minmax(0, 1fr) 46px;
+    gap: 10px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .hz-cols-usch > :nth-child(3),
+  .hz-cols-usch > :nth-child(5) {
+    display: none;
+  }
+
+  /* 미장 화제어: 표본(4)을 접는다. 여기서는 접어도 거짓이 안 된다 — 쏠림 옆에 남는
+     배수가 이미 "얼마나 몰렸나"를 말하고, 표본은 그 배수를 만든 재료라 부차적이다
+     (함께 언급 표는 반대라 표본을 아랫줄로 살려 뒀다). */
+  .hz-cols-uskw {
+    grid-template-columns: 20px minmax(0, 1fr) 58px;
+    gap: 10px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .hz-cols-uskw > :nth-child(4) {
+    display: none;
+  }
+
+  /* 미장 테마: 추이(4)와 종목 수(5)를 접는다. 남는 넷(#·테마·점유율·순위)이
+     "무엇이 몇 %이고 오르내렸나"를 그대로 말한다. */
+  .hz-cols-ustheme {
+    /* 62px 은 "▲6계단"·"그대로"가 한 줄에 드는 폭이다(58 로 뒀더니 '그대 / 로'로 쪼개졌다). */
+    grid-template-columns: 20px minmax(0, 1fr) 54px 62px;
+    gap: 8px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .hz-cols-ustheme > :nth-child(4),
+  .hz-cols-ustheme > :nth-child(5) {
     display: none;
   }
 
