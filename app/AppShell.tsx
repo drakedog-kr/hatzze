@@ -260,7 +260,7 @@ function NavGlyph({ item, size }: { item: { icon?: string; Glyph?: (p: { size?: 
  * 개미는 통으로 채운 덩어리라 같은 크기로 그리면 옆의 선 아이콘들보다 무겁게 보인다.
  * 넘거나 모자란 만큼은 마진으로 되메워 **줄에서 차지하는 자리는 size 그대로**다.
  */
-const ANT_SHRINK = 0.8;
+const ANT_SHRINK = 0.85;
 
 function AntIcon({ size = 16 }: { size?: number }) {
   const draw = Math.round(size * ANT_SHRINK);
