@@ -65,9 +65,23 @@ export function Pill({
   tone?: Tone;
   title?: string;
 }) {
+  /**
+   * ⚠️ 글자는 **원색이 아니라 잉크 토큰**을 쓴다. 원색(--c-blue·--c-hot)은 흰 카드
+   * 위에서 쓰라고 고른 값이라, 같은 계열의 옅은 tint 위에 얹으면 대비가 무너진다.
+   * 실측(라이트/다크): 파랑 3.30/3.59 · 빨강 4.21/4.32 — 넷 중 둘이 AA 미달이었다.
+   * --c-hot-ink·--c-cold-ink 가 바로 그 tint 위에서 4.5 를 넘도록 맞춰 둔 값이다
+   * (globals.css 의 토큰 주석에 실측치가 적혀 있다). 잉크로 바꾸면 4.66~5.90 이 된다.
+   *
+   * 파랑에는 --c-blue-ink 가 없다. 이 저장소는 **파란 tint 위 글자에 --c-cold-ink 를
+   * 쓴다** — .hz-more-btn:hover · .mdd-period-btn · .hz-btn-soft 가 이미 그렇다.
+   *
+   * plain 의 바탕도 --c-track 에서 --c-chip 으로 옮긴다. track 은 '막대의 빈 트랙'이라
+   * 알약 바탕이 아니고, 다크에서 그 위 --c-sub 가 4.08 이었다(chip 위에서는 4.55).
+   */
   const bg =
-    tone === "blue" ? "var(--c-blue-tint)" : tone === "hot" ? "var(--c-hot-tint)" : tone === "cold" ? "var(--c-cold-tint)" : C.track;
-  const fg = tone === "blue" ? C.blue : tone === "hot" ? C.hot : tone === "cold" ? C.cold : C.sub;
+    tone === "blue" ? "var(--c-blue-tint)" : tone === "hot" ? "var(--c-hot-tint)" : tone === "cold" ? "var(--c-cold-tint)" : C.chip;
+  const fg =
+    tone === "blue" || tone === "cold" ? "var(--c-cold-ink)" : tone === "hot" ? "var(--c-hot-ink)" : C.sub;
   return (
     <span
       title={title}

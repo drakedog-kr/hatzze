@@ -2739,7 +2739,9 @@ main.hz-scroll { overflow-x: clip; }
 .hz-yrpop-btn:hover,
 .hz-yrpop-host:focus-within .hz-yrpop-btn {
   background: var(--c-blue-tint);
-  color: var(--c-blue);
+  /* 원색이 아니라 잉크다 — 파란 tint 위에서 --c-blue 는 3.30/3.59 로 떨어진다.
+     옆의 .hz-more-btn:hover · .mdd-period-btn 과 같은 값이다. */
+  color: var(--c-cold-ink);
 }
 .hz-yrpop-btn:focus-visible {
   outline: 2px solid var(--c-blue);
