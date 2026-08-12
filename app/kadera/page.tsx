@@ -32,7 +32,7 @@ import { TrendingTabs } from "./TrendingTabs";
 // 미리보기 이미지는 옆의 opengraph-image.tsx 가 그린다(ownImage). 자세한 건 app/seo.ts 주석 참고.
 export async function generateMetadata(): Promise<Metadata> {
   return pageMetadata({
-    title: "카더라 리포트 | hatzze",
+    title: "국장 카더라 | hatzze",
     description: "주식 텔레그램 채널 수백 개를 대신 읽습니다. 오늘 가장 많이 언급된 종목과 가장 많이 퍼진 메시지를 매일 집계합니다.",
     path: "/kadera",
     ownImage: KADERA_CARD.alt,

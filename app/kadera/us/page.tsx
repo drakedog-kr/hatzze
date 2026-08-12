@@ -375,7 +375,7 @@ export default async function UsKaderaPage() {
       unit: "회",
     },
     {
-      label: "오르내린 종목",
+      label: "언급된 종목",
       note: `${US_WINDOW_DAYS}일`,
       value: `${summary.tickers}`,
       unit: "개",

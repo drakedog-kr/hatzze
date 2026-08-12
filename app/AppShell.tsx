@@ -120,7 +120,7 @@ const NAV: NavItem[] = [
         label: "미장 카더라",
         href: "/kadera/us",
         Glyph: EagleIcon,
-        sub: "같은 채널이 미국 종목은 뭐라고 하는지",
+        sub: "미국 시장에선 무엇이 화제인지",
       },
     ],
   },
@@ -781,9 +781,12 @@ function PageHeader({ theme }: { theme: "light" | "dark" }) {
   const page = NAV.find((n) => isActive(n.href, pathname));
   // 서브 페이지에서는 서브의 이름을 h1 으로 쓴다. 부모(구역)의 이름을 그대로 두면
   // /kadera 와 /kadera/us 두 페이지가 **같은 h1** 을 갖는다.
-  // ⚠️ 부모와 주소가 같은 서브(국장 → /kadera)는 일부러 비껴간다 — 이미 색인이 끝난
-  //    /kadera 의 제목을 여기서 바꿔 버릴 이유가 없다.
-  const child = page?.href === pathname ? undefined : page?.children?.find((c) => c.href === pathname);
+  //
+  // 부모와 주소가 같은 서브(국장 → /kadera)도 서브의 이름을 쓴다. 한동안 여기만
+  // 비껴가 있었는데(이미 색인이 끝난 제목을 바꿀 이유가 없다는 판단), 그러면 화면에는
+  // "카더라 리포트", 사이드바에는 "국장 카더라"로 같은 페이지가 두 이름을 갖는다.
+  // 주소는 그대로라 색인이 끊기지 않고 제목만 갱신된다.
+  const child = page?.children?.find((c) => c.href === pathname);
   const title = child?.label ?? page?.label;
   const sub = child?.sub ?? page?.sub;
   // 배지는 부모 것이다. 서브가 물려받으면 "25개 지표" 같은 남의 표찰이 따라 붙는다.
