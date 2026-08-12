@@ -373,9 +373,16 @@ function SuggestSection({
                 {s.name}
               </span>
               {/* 코스피가 아닌 것만 표시한다. 코스닥은 검색 목록에 없어 여기서만 만나고,
-                  미국은 이름만으로는 국내 종목과 구별이 안 된다("애플"·"메타"). */}
+                  미국은 이름만으로는 국내 종목과 구별이 안 된다("애플"·"메타").
+
+                  ⚠️ 배경이 --c-bg(화면 바닥)였다. 라이트에서는 흰 카드와 1.05 라 칩이
+                  아예 안 보였고, **다크에서는 뜨는 판(--c-float #2c2c35)보다 어두워서
+                  (#101013) 알약이 아니라 판에 뚫린 구멍처럼 보였다.** 라이트에서 두 값이
+                  거의 같아 여태 안 드러났던 것이다. 회색 알약은 --c-chip 이 제 값이다
+                  (다크에서 판보다 한 단 밝다). 글자도 같이 --c-sub 로 올린다 — chip 위
+                  4.55/4.98 로 AA 를 넘고, muted 였으면 3.8 로 떨어졌다. */}
               {marketBadge(s.market) && (
-                <span style={{ fontSize: 11, fontWeight: 600, color: C.muted, background: C.bg, padding: "2px 5px", borderRadius: 4, flexShrink: 0 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: C.sub, background: C.chip, padding: "2px 5px", borderRadius: 4, flexShrink: 0 }}>
                   {marketBadge(s.market)}
                 </span>
               )}
@@ -545,7 +552,7 @@ function Controls({
                           {s.name}
                         </span>
                         {marketBadge(s.market) && (
-                          <span style={{ fontSize: 11, fontWeight: 600, color: C.muted, background: C.bg, padding: "2px 5px", borderRadius: 4, flexShrink: 0 }}>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: C.sub, background: C.chip, padding: "2px 5px", borderRadius: 4, flexShrink: 0 }}>
                             {marketBadge(s.market)}
                           </span>
                         )}
