@@ -931,6 +931,77 @@ function TopBar({
 }
 
 /**
+ * 새 화면을 알리는 띠. 본문 맨 위(제목 위)에 한 줄로 눕고, X 를 누르면 사라진다.
+ *
+ * 자리를 **탑바가 아니라 본문 흐름**으로 잡았다. 탑바(.hz-topbar)는 좁은 화면에서만
+ * 그려져서 거기 넣으면 데스크톱 방문자가 이 소식을 영영 못 본다. 본문 맨 위에 두면
+ * 두 폭 모두에서 보이고, 카드·헤더와 같은 상자 안이라 왼쪽 선도 저절로 맞는다.
+ * 스크롤하면 같이 올라가 사라지는 것도 의도다 — 소식은 도착했을 때 한 번 보이면 된다.
+ *
+ * ⭐ **이미 그 화면에 있으면 안 그린다.** 보고 있는 페이지를 보러 가라고 권하는 띠는
+ * 알림이 아니라 잡음이다.
+ *
+ * ⚠️ **문구에 숫자를 넣지 말 것.** 종목 수·채널 수는 매일 바뀌는데 이 띠는 한 번 닫으면
+ * 다시 안 보여서, 틀린 값이 조용히 남는다(아래 PcHint 가 같은 이유로 숫자를 뺐다).
+ *
+ * 여닫이 기계는 PcHint 와 같다(useSyncExternalStore + localStorage). 이유는 그쪽 주석에.
+ * ⭐ 키에 **버전을 박아 둔다** — 다음에 다른 소식으로 이 띠를 되쓸 때 키만 바꾸면
+ * 예전에 닫은 사람에게도 새로 뜬다. 키를 재사용하면 그 사람들은 새 소식을 못 본다.
+ */
+const NEWS_KEY = "hz-news-us-kadera";
+const NEWS_EVENT = "hz-news-change";
+const NEWS_HREF = "/kadera/us";
+const NEWS_TEXT = "미장 카더라를 열었습니다. 미국 시장에선 무엇이 화제인지 봅니다.";
+
+const newsStore = {
+  subscribe(cb: () => void) {
+    window.addEventListener(NEWS_EVENT, cb);
+    return () => window.removeEventListener(NEWS_EVENT, cb);
+  },
+  getSnapshot() {
+    try {
+      return localStorage.getItem(NEWS_KEY) === null;
+    } catch {
+      // 사생활 보호 모드 등에서 접근이 던진다. 닫은 걸 기억 못 하면 갈 때마다 다시
+      // 뜨므로, 그때는 아예 안 띄운다(PcHint 와 같은 판단).
+      return false;
+    }
+  },
+};
+
+function NewsStrip() {
+  const pathname = usePathname();
+  const show = useSyncExternalStore(newsStore.subscribe, newsStore.getSnapshot, () => false);
+
+  if (!show || pathname.startsWith(NEWS_HREF)) return null;
+
+  const dismiss = () => {
+    try {
+      localStorage.setItem(NEWS_KEY, "1");
+    } catch {}
+    window.dispatchEvent(new Event(NEWS_EVENT));
+  };
+
+  return (
+    <div className="hz-news" role="status">
+      {/* 링크와 닫기 버튼은 **형제**로 둔다. 버튼을 링크 안에 넣으면 유효하지 않은
+          마크업이고, 닫으려다 페이지가 넘어간다. */}
+      <Link href={NEWS_HREF} className="hz-news-link" data-ga-cta="news-us-kadera">
+        <LibertyIcon size={17} />
+        <span className="hz-news-text">{NEWS_TEXT}</span>
+        <span className="hz-news-go">
+          <span className="hz-news-go-label">보러 가기</span>
+          <Icon name="arrow_forward" style={{ fontSize: 15 }} />
+        </span>
+      </Link>
+      <button type="button" onClick={dismiss} aria-label="알림 닫기" className="hz-news-x">
+        <Icon name="close" style={{ fontSize: 17 }} />
+      </button>
+    </div>
+  );
+}
+
+/**
  * 첫 방문자에게 한 번 뜨는 PC 권유 토스트(모바일 전용).
  *
  * 문구는 "최적화되지 않았습니다" 류를 피했다. 모바일은 고장난 게 아니라 카드가 한 줄로
@@ -1222,6 +1293,7 @@ export default function AppShell({
               gap: 20,
             }}
           >
+            <NewsStrip />
             <PageHeader theme={theme} />
             {children}
             <Footer />

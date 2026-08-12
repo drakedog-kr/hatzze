@@ -2227,6 +2227,69 @@ main.hz-scroll { overflow-x: clip; }
   outline-offset: -1px;
 }
 
+/* ── 새 화면 알림 띠 (AppShell 의 NewsStrip) ─────────────────────────────
+   본문 맨 위에 눕는 한 줄. 눌러서 가는 링크와 닫는 X 가 형제로 앉는다.
+
+   ⚠️ 글자는 --c-blue 가 아니라 --c-cold-ink 다. 원색은 자기 tint 위에서 3.30 까지
+   떨어진다(이 저장소의 파란 글자 규칙 — app/ui.tsx 의 C.blueInk 주석 참고). */
+.hz-news {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px 0 14px;
+  background: var(--c-blue-tint);
+  border-radius: var(--r-card);
+  color: var(--c-cold-ink);
+}
+.hz-news-link {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1;
+  min-width: 0;
+  padding: 11px 0;
+  color: inherit;
+  text-decoration: none;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+/* 낱말 가운데서 끊기지 않게 — 좁은 화면에서 두 줄이 되어도 읽히는 단위로 접힌다. */
+.hz-news-text { min-width: 0; word-break: keep-all; }
+.hz-news-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  margin-left: auto;
+  opacity: 0.85;
+}
+.hz-news-link:hover .hz-news-go { opacity: 1; }
+.hz-news-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: inherit;
+  opacity: 0.65;
+  cursor: pointer;
+}
+.hz-news-x:hover { opacity: 1; background: var(--c-blue-tint2); }
+
+/* 좁은 화면에서는 '보러 가기' 글자를 접는다. 띠 전체가 링크라 화살표만으로 충분하고,
+   그 글자까지 두면 문장이 세 줄이 된다. */
+@media (max-width: 560px) {
+  .hz-news { padding-left: 12px; }
+  .hz-news-link { font-size: 13px; gap: 8px; }
+  .hz-news-go-label { display: none; }
+}
+
+
 /* .hz-theme-row-sheet(국장 테마의 '쌓인 줄')가 여기 있었다. 2026-08-12 에 국장 테마
    카드를 미장과 같은 **표**로 통일하면서 쓰는 곳이 없어졌다 — 팝오버를 여는 일은 아래
    .hz-theme-host 가 그대로 이어받는다. 지울 때 grep 으로 참조를 셌다(tsx 0곳).
