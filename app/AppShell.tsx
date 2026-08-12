@@ -255,11 +255,20 @@ function NavGlyph({ item, size }: { item: { icon?: string; Glyph?: (p: { size?: 
  * 캡이 덮여서 시안처럼 한 덩어리로 이어진다. 몸통 오른쪽 위 모서리(19.73)는 더듬이
  * 바깥선(18.97 + 굵기 절반 0.76)과 같은 값이라 둘이 단차 없이 만난다.
  */
+/**
+ * 자리보다 몇 배 크게/작게 그릴지. 여신상(LIBERTY_BLEED)과 같은 장치인데 **방향이 반대**다 —
+ * 개미는 통으로 채운 덩어리라 같은 크기로 그리면 옆의 선 아이콘들보다 무겁게 보인다.
+ * 넘거나 모자란 만큼은 마진으로 되메워 **줄에서 차지하는 자리는 size 그대로**다.
+ */
+const ANT_SHRINK = 0.8;
+
 function AntIcon({ size = 16 }: { size?: number }) {
+  const draw = Math.round(size * ANT_SHRINK);
+  const pull = (draw - size) / 2;
   return (
     <svg
-      width={size}
-      height={size}
+      width={draw}
+      height={draw}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -267,7 +276,7 @@ function AntIcon({ size = 16 }: { size?: number }) {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
-      style={{ display: "block", flexShrink: 0 }}
+      style={{ display: "block", flexShrink: 0, margin: -pull }}
     >
       {/* 몸통 + 눈구멍(한 path 에 evenodd) */}
       <path
