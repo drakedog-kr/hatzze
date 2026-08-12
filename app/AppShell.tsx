@@ -988,8 +988,15 @@ function NewsStrip() {
   return (
     <div className="hz-news" role="status">
       {/* 링크와 닫기 버튼은 **형제**로 둔다. 버튼을 링크 안에 넣으면 유효하지 않은
-          마크업이고, 닫으려다 페이지가 넘어간다. */}
-      <Link href={NEWS_HREF} className="hz-news-link" data-ga-cta="news-us-kadera">
+          마크업이고, 닫으려다 페이지가 넘어간다.
+
+          ⭐ 눌러서 들어가도 닫은 것으로 친다. 소식을 확인한 사람에게 그 소식을 다시
+          보여 줄 이유가 없다 — X 를 눌러야만 사라지면, 링크로 들어갔다 돌아온 사람은
+          이미 본 띠를 또 만난다.
+          ⚠️ dismiss 안의 dispatchEvent 는 동기지만 React 는 이벤트 핸들러에서 나온
+          상태 변경을 핸들러가 끝난 뒤로 미룬다. 그래서 이 줄이 링크를 먼저 언마운트해
+          이동을 막지 않는다(브라우저에서 눌러 확인했다). */}
+      <Link href={NEWS_HREF} className="hz-news-link" data-ga-cta="news-us-kadera" onClick={dismiss}>
         <LibertyIcon size={17} />
         <span className="hz-news-text">
           {/* ⚠️ <a> 안에 <a> 를 넣을 수 없다. 바깥 링크가 이미 같은 곳으로 가므로
