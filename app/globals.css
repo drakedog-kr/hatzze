@@ -2256,6 +2256,14 @@ main.hz-scroll { overflow-x: clip; }
 }
 /* 낱말 가운데서 끊기지 않게 — 좁은 화면에서 두 줄이 되어도 읽히는 단위로 접힌다. */
 .hz-news-text { min-width: 0; word-break: keep-all; }
+/* 화면 이름에만 밑줄. 띠 전체가 링크라 이건 '어디로 가는지'의 표시다.
+   글자 밑선에 붙이지 않고 3px 띄운다 — 받침(ㅇ·ㄹ)이 선에 닿아 뭉개진다. */
+.hz-news-em {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+.hz-news-link:hover .hz-news-em { text-decoration-thickness: 2px; }
 .hz-news-go {
   display: inline-flex;
   align-items: center;

@@ -54,7 +54,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.supabase_client import get_client, load_all  # noqa: E402
+from common.supabase_client import get_client, load_all, load_all_keyset  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 
 # 창 길이. 짧으면 표본이 얇아 lift 가 튀고, 길면 새로 생긴 연결이 늦게 뜬다.
@@ -72,12 +72,16 @@ def main() -> None:
     dry_run = "--dry-run" in sys.argv[1:]
     db = get_client()
 
+    # ⚠️ 이 셋은 **키셋**으로 읽는다. OFFSET 페이징은 건너뛴 행을 매번 다시 훑어
+    # 마지막 페이지가 표 전체를 스캔하고, 표가 자라면 statement_timeout(8초)을 넘긴다.
+    # 2026-08-12 정기 실행에서 telegram_messages(15.2만행)가 실제로 57014 로 죽었다 —
+    # 미장 스크립트를 키셋으로 옮길 때 이 파일만 빠져 있었다.
     messages = {
         (m["channel_handle"], m["message_id"]): m["posted_at"]
-        for m in load_all(db, "telegram_messages", "channel_handle,message_id,posted_at")
+        for m in load_all_keyset(db, "telegram_messages", "id,channel_handle,message_id,posted_at")
     }
-    us_rows = load_all(db, "telegram_message_us_stocks", "channel_handle,message_id,ticker")
-    kr_rows = load_all(db, "telegram_message_stocks", "channel_handle,message_id,stock_code")
+    us_rows = load_all_keyset(db, "telegram_message_us_stocks", "id,channel_handle,message_id,ticker")
+    kr_rows = load_all_keyset(db, "telegram_message_stocks", "id,channel_handle,message_id,stock_code")
 
     dates = [
         datetime.fromisoformat(p).astimezone(KST).date()

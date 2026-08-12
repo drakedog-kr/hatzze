@@ -951,7 +951,10 @@ function TopBar({
 const NEWS_KEY = "hz-news-us-kadera";
 const NEWS_EVENT = "hz-news-change";
 const NEWS_HREF = "/kadera/us";
-const NEWS_TEXT = "미장 카더라를 열었습니다. 미국 시장에선 무엇이 화제인지 봅니다.";
+/* 문구를 셋으로 나눈 건 가운데 화면 이름에만 밑줄을 긋기 위해서다 —
+   띠 전체가 이미 링크지만, 눌러서 가는 곳이 **어디인지**는 이름이 말해야 한다. */
+const NEWS_NAME = "미장 카더라";
+const NEWS_TAIL = "를 열었습니다. 미국 시장에선 무엇이 화제인지 봅니다.";
 
 const newsStore = {
   subscribe(cb: () => void) {
@@ -988,7 +991,12 @@ function NewsStrip() {
           마크업이고, 닫으려다 페이지가 넘어간다. */}
       <Link href={NEWS_HREF} className="hz-news-link" data-ga-cta="news-us-kadera">
         <LibertyIcon size={17} />
-        <span className="hz-news-text">{NEWS_TEXT}</span>
+        <span className="hz-news-text">
+          {/* ⚠️ <a> 안에 <a> 를 넣을 수 없다. 바깥 링크가 이미 같은 곳으로 가므로
+              여기서는 **밑줄만** 긋는다 — 눌리는 건 띠 전체다. */}
+          <span className="hz-news-em">{NEWS_NAME}</span>
+          {NEWS_TAIL}
+        </span>
         <span className="hz-news-go">
           <span className="hz-news-go-label">보러 가기</span>
           <Icon name="arrow_forward" style={{ fontSize: 15 }} />
