@@ -34,8 +34,15 @@ export const C = {
   // 막대의 '채움' — 강조색을 안 쓰는 비교군용. track 을 채움에 돌려쓰면 안 된다
   // (트랙과 같은 색이라 막대가 사라진다). 이유는 globals.css의 --c-bar 주석 참고.
   bar: "var(--c-bar)",
+  // ⚠️ 면(막대·아이콘 타일·활성 알약 바탕)에 쓰는 원색이다. **글자에 쓰지 말 것** —
+  // 흰 카드 위에서 3.71, 자기 tint 위에서는 3.30 까지 떨어진다. 파란 글자는 아래 blueInk.
   blue: "var(--c-blue)",
   blueTint: "var(--c-blue-tint)",
+  /* 파란 **글자**. 이 저장소는 원색과 별개로 '읽히는 값'을 따로 둔다(--c-hot-ink 와 같은
+     어법). 파랑에는 전용 토큰이 없고 --c-cold-ink 가 그 자리를 맡아 왔다 —
+     .hz-more-btn:hover · .mdd-period-btn · .hz-btn-soft 가 이미 이 값이다.
+     흰 카드 위 5.23 · 파란 tint 위 4.66 · 다크 카드 위 7.46. */
+  blueInk: "var(--c-cold-ink)",
   // 축의 기준 눈금(1배 자리 등). 데이터가 아니라 '자'라서 트랙보다 진하고 잉크보다 옅다.
   marker: "var(--c-marker)",
   shadow: "var(--c-shadow)",

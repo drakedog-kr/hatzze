@@ -87,7 +87,7 @@ const kaderaBaseDate = cache(async (): Promise<string> => {
  * 창을 쓰는 곳마다 이 계산을 따로 하면 "같은 최근 N일"이 서로 다른 N일이 되므로
  * (실제로 카드 1,828 vs 요약문 1,727 로 어긋난 적이 있다) 여기 하나로 모은다.
  */
-function windowBefore(base: string, n: number): string[] {
+export function windowBefore(base: string, n: number): string[] {
   const end = addDaysISO(base, -1);
   return Array.from({ length: n }, (_, i) => addDaysISO(end, -(n - 1 - i)));
 }
@@ -124,7 +124,7 @@ export const STOCK_CHART_DAYS = 7;
  * 페이징 대상 쿼리 — 필터까지만 건 상태. `.order()`·`.range()` 는 fetchAllRows 가 건다.
  * 정렬을 호출부에 맡기지 않으려고 일부러 이 모양으로 받는다(아래 주석 참고).
  */
-type PagedQuery<T> = {
+export type PagedQuery<T> = {
   order(column: string): {
     // error 까지 받는다. 예전엔 data 만 적어 뒀는데, 그러면 실패가 `data: null` 로만
     // 보여서 "행이 없다"와 구분이 안 된다 — 아래 fetchAllRows 가 그걸로 물렸다.
@@ -171,7 +171,7 @@ async function withRetry<R extends { error: unknown }>(run: () => PromiseLike<R>
  *
  * 결과 순서는 이제 orderKey 순이다. 순서에 기대는 소비자는 직접 정렬할 것.
  */
-async function fetchAllRows<T>(
+export async function fetchAllRows<T>(
   orderKey: string,
   build: () => PagedQuery<T>,
   opts: { onError?: (e: unknown) => void } = {},
@@ -326,8 +326,12 @@ async function storedCollectionStats(
 }
 
 /** 마지막 갱신 시각 — sync가 채널을 동기화한 시점이 파이프라인 실행 시각과 같다.
-    이 한 줄만은 저장할 수 없다(저장 시각 자체를 묻는 값이라 늘 원본을 봐야 한다). */
-async function lastSyncedAt(db: ReturnType<typeof getSupabaseAdmin>): Promise<string | null> {
+    이 한 줄만은 저장할 수 없다(저장 시각 자체를 묻는 값이라 늘 원본을 봐야 한다).
+
+    미장 카더라도 같은 값을 쓴다(getUsKaderaSummary). 수집이 한 벌이라 두 화면의
+    '최종 업데이트'는 같은 시각이어야 맞다 — 미국 집계는 같은 실행 안에서 이 수집
+    바로 뒤에 돈다. 그래서 export 한다. */
+export async function lastSyncedAt(db: ReturnType<typeof getSupabaseAdmin>): Promise<string | null> {
   const { data } = await db
     .from("telegram_channels")
     .select("synced_at")
@@ -460,7 +464,7 @@ async function loadStockDaily(days: number): Promise<{ rows: DailyRow[]; dates: 
  * 마이그레이션 016 이전 환경(photo 컬럼 없음)에서는 사진 쿼리가 에러 → 빈 집합이 되어
  * 전부 이니셜 아바타로 떨어진다. 제목은 그대로 나온다.
  */
-const channelMeta = cache(
+export const channelMeta = cache(
   async (): Promise<{ titleOf: Map<string, string>; photoUrlOf: Map<string, string | null> }> => {
     const db = getSupabaseAdmin();
     // handle 은 unique 라 페이징 정렬 키로 안전하다(fetchAllRows 주석의 함정 [2]).
@@ -1201,12 +1205,34 @@ async function themeStocks(windowDates: string[]): Promise<Map<string, ThemeStoc
   const db = getSupabaseAdmin();
 
   // 사전은 종목명으로 적혀 있고 집계는 종목코드다 — stocks 로 한 번 옮긴다.
-  // 이름은 KRX 정식명이라야 매칭된다(사전 62종목 전부 매칭됨, 동명 종목 없음).
+  // 이름은 KRX 정식명이라야 매칭된다(동명 종목 없음).
+  //
+  // ⚠️⚠️ **한 번에 다 묻지 않는다.** 사전이 62 → 366종목으로 넓어지면 `.in("name", …)` 의
+  //      URL 이 14,859자가 되는데, Supabase 클라이언트가 자체 한도(헤더 16KB)에 걸려
+  //      **요청을 보내기도 전에 거부**한다("HTTP headers exceeded server limits").
+  //      그 에러를 아무도 안 받고 있어서 화면에는 "테마에 속한 종목이 없다"로만 보였다 —
+  //      테마 줄의 종목 팝오버가 통째로 안 열렸다(2026-08-12 실측).
+  //      이 저장소는 `.in()` 목록 길이에 이미 여러 번 당했다. 사전이 더 커져도 안 깨지게
+  //      쪼개서 묻는다. 80개면 URL 이 3.5KB 언저리라 여유가 넉넉하다.
   const names = [...new Set(Object.values(THEMES).flat())];
-  const { data: rows } = await db.from("stocks").select("code,name,market").in("name", names);
-  const stockOf = new Map((rows ?? []).map((s) => [s.code as string, s]));
+  const NAME_CHUNK = 80;
+  const rows: { code: string; name: string; market: string | null }[] = [];
+  for (let i = 0; i < names.length; i += NAME_CHUNK) {
+    const { data, error } = await db
+      .from("stocks")
+      .select("code,name,market")
+      .in("name", names.slice(i, i + NAME_CHUNK));
+    // ⚠️ error 를 반드시 받는다. 안 받으면 실패가 '데이터 없음'으로 위장한다 —
+    //    이 함수가 정확히 그렇게 조용히 죽어 있었다.
+    if (error) {
+      console.error("[themeStocks] 종목 코드를 못 읽었습니다", error);
+      return out;
+    }
+    rows.push(...((data ?? []) as typeof rows));
+  }
+  const stockOf = new Map(rows.map((s) => [s.code, s]));
   const themesOf = new Map<string, string[]>(); // 종목코드 → 속한 테마(둘 이상일 수 있다)
-  const codeOfName = new Map((rows ?? []).map((s) => [s.name as string, s.code as string]));
+  const codeOfName = new Map(rows.map((s) => [s.name, s.code]));
   for (const [theme, members] of Object.entries(THEMES)) {
     for (const name of members) {
       const code = codeOfName.get(name);
@@ -1609,6 +1635,11 @@ export async function getRisingChannels(limit = 10): Promise<RisingChannel[]> {
  *  끼면 "지금 무엇이 화제인가"라는 카드의 목적이 흐려진다. 집계 테이블에는 전부
  *  남아 있어서, 이 기준만 바꾸면 재계산 없이 반영된다. */
 const MIN_KEYWORD_MENTIONS = 3;
+/** 화제어를 세는 창(일). **3일이다** — 이 페이지의 다른 카드가 전부 3일이라 한 화면에
+ *  창이 둘이면 같은 낱말의 숫자가 서로 안 맞는 것처럼 읽힌다.
+ *  ⚠️ calculate_telegram_sentiment.py 의 ISSUE_KEYWORD_COUNT_DAYS 와 **같아야 한다**
+ *     (파이썬↔TS 라 import 로 공유할 수 없다. 갈리면 폴백이 열릴 때만 화면이 달라진다). */
+const KEYWORD_COUNT_DAYS = 3;
 
 export type EcosystemSentiment = {
   /** 낙관도 = 낙관 / (낙관 + 비관), 중립 제외. 카드 헤드라인 숫자.
@@ -1634,7 +1665,7 @@ export type EcosystemSentiment = {
 // LLM에 맡기지 않고 결정적으로 정해서, 같은 수치면 두 화면이 항상 같은 말을 쓴다.
 
 /** 합이 100이 되도록 반올림을 보정한다(단순 반올림은 99·101이 나와 막대가 어긋난다). */
-function toPercents(pos: number, neu: number, neg: number): [number, number, number] {
+export function toPercents(pos: number, neu: number, neg: number): [number, number, number] {
   const total = pos + neu + neg;
   if (!total) return [0, 0, 0];
   const raw = [(pos / total) * 100, (neu / total) * 100, (neg / total) * 100];
@@ -1697,7 +1728,7 @@ const THEME_MIN_DECIDED = 8;
  */
 const SENTIMENT_PRIOR = 5;
 
-function optimismPct(pos: number, neg: number): number | null {
+export function optimismPct(pos: number, neg: number): number | null {
   if (pos + neg === 0) return null;
   return Math.round(((pos + SENTIMENT_PRIOR) / (pos + neg + 2 * SENTIMENT_PRIOR)) * 100);
 }
@@ -1781,8 +1812,14 @@ export async function getEcosystemSentiment(): Promise<EcosystemSentiment | null
 }
 
 export type IssueKeyword = {
+  rank: number; // 1부터. 표가 이 값을 그대로 배지에 쓴다
   word: string;
   count: number; // 최근 7일 언급 수(화면에 그대로 표시)
+  /** 최근 3일 평균 점유율 − 그 이전 평균(%p 는 ×100). trend 와 **같은 뺄셈**에서 나온다 —
+   *  trend 는 여기에 flat 문턱만 더한 것이다. 비교할 과거가 없으면 null.
+   *  ⚠️ 저장 표(telegram_issue_keyword)에 share_delta 열이 없으면 null 로 온다.
+   *     화면은 null 이면 %p 를 그냥 안 그린다 — 마이그레이션 전후로 안 깨진다. */
+  shareDelta: number | null;
   /**
    * 관심 점유율의 방향. 비교할 과거가 없으면 null.
    *
@@ -1813,7 +1850,9 @@ export type IssueKeyword = {
  */
 export async function getIssueKeywords(limit = 10): Promise<IssueKeyword[]> {
   const stored = await loadIssueKeywords(limit);
-  return stored ?? computeIssueKeywords(limit);
+  if (stored) return stored;
+  // 즉석 계산 경로는 순위를 안 매긴다 — 정렬은 이미 끝났으므로 여기서 번호만 붙인다.
+  return (await computeIssueKeywords(limit)).map((k, i) => ({ ...k, rank: i + 1 }));
 }
 
 /**
@@ -1832,16 +1871,26 @@ export async function getIssueKeywords(limit = 10): Promise<IssueKeyword[]> {
 async function loadIssueKeywords(limit: number): Promise<IssueKeyword[] | null> {
   const db = getSupabaseAdmin();
   try {
-    const { data, error } = await db
-      .from("telegram_issue_keyword")
-      .select("rank,keyword,mention_count,trend")
-      .order("rank")
-      .limit(limit);
+    // ⚠️ share_delta 는 나중에 더한 열이다(마이그레이션 040). 그 열이 없는 환경에서
+    //    통째로 실패시키면 **화면이 조용히 즉석 계산 경로로 떨어진다** — 그 경로는
+    //    14일치 원자료를 다시 세느라 렌더가 1초 넘게 길어진다(이 표를 만든 이유가 그것이다).
+    //    그래서 한 번 더 시도한다: 있으면 쓰고, 없으면 %p 없이 간다.
+    type Row = { rank: number; keyword: string; mention_count: number; trend: string | null; share_delta?: number | null };
+    const read = (cols: string) =>
+      db.from("telegram_issue_keyword").select(cols).order("rank").limit(limit) as unknown as Promise<{
+        data: Row[] | null;
+        error: unknown;
+      }>;
+    let { data, error } = await read("rank,keyword,mention_count,trend,share_delta");
+    if (error) ({ data, error } = await read("rank,keyword,mention_count,trend"));
     if (error || !data?.length) return null;
     return data.map((r) => ({
+      rank: r.rank as number,
       word: r.keyword as string,
       count: r.mention_count as number,
       trend: (r.trend ?? null) as IssueKeyword["trend"],
+      // 0 도 뜻이 있는 값이라(움직이지 않았다) `?? null` 이 아니라 null 검사를 한다.
+      shareDelta: r.share_delta === null || r.share_delta === undefined ? null : Number(r.share_delta),
     }));
   } catch {
     // 표가 아직 없는 환경(마이그레이션 023 미적용)도 여기로 온다. 화면을 세우지 않고
@@ -1871,7 +1920,7 @@ async function computeIssueKeywords(limit: number): Promise<IssueKeyword[]> {
 
   const recentDates = new Set(dates.slice(-3));
   const priorDates = new Set(dates.filter((d) => daysBefore(d) >= 5));
-  const last7 = new Set(dates.filter((d) => daysBefore(d) < 7));
+  const window = new Set(dates.filter((d) => daysBefore(d) < KEYWORD_COUNT_DAYS));
 
   // 그날 전체 화제어 언급 합 — 점유율의 분모.
   const dayTotal = new Map<string, number>();
@@ -1884,7 +1933,7 @@ async function computeIssueKeywords(limit: number): Promise<IssueKeyword[]> {
   const priorShare = new Map<string, number>();
   for (const r of data) {
     const n = r.mention_count ?? 0;
-    if (last7.has(r.date)) total.set(r.keyword, (total.get(r.keyword) ?? 0) + n);
+    if (window.has(r.date)) total.set(r.keyword, (total.get(r.keyword) ?? 0) + n);
     const share = n / Math.max(dayTotal.get(r.date) ?? 1, 1);
     if (recentDates.has(r.date)) {
       recentShare.set(r.keyword, (recentShare.get(r.keyword) ?? 0) + share);
@@ -1916,7 +1965,7 @@ async function computeIssueKeywords(limit: number): Promise<IssueKeyword[]> {
           : recentAvg > priorAvg
             ? "up"
             : "down";
-      return { word, count, trend };
+      return { rank: 0, word, count, trend, shareDelta: canCompare ? recentAvg - priorAvg : null };
     });
 }
 

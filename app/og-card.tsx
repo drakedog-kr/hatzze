@@ -4,9 +4,9 @@ import { join } from "node:path";
 /**
  * 공유 미리보기(OG) 카드가 공유하는 재료.
  *
- * 카드는 셋이다 — 홈은 오늘 도수를 그리는 동적 카드(app/opengraph-image/route.tsx),
- * /kadera·/mdd 는 각자의 정적 카드(각 폴더의 opengraph-image.tsx 파일 컨벤션).
- * 셋이 한 세트로 보이려면 배경·글자색·워드마크·폰트가 같아야 해서 여기에 모았다.
+ * 카드는 넷이다 — 홈은 오늘 도수를 그리는 동적 카드(app/opengraph-image/route.tsx),
+ * /kadera·/kadera/us·/mdd 는 각자의 정적 카드(각 폴더의 opengraph-image.tsx 파일 컨벤션).
+ * 넷이 한 세트로 보이려면 배경·글자색·워드마크·폰트가 같아야 해서 여기에 모았다.
  *
  * Satori 는 CSS 변수를 못 읽어서 색을 직접 적는다. app/globals.css 의 라이트 테마
  * 값을 그대로 옮긴 것이니 그쪽을 바꾸면 여기도 바꿀 것.
@@ -83,7 +83,52 @@ export function Wordmark({ size }: { size: number }) {
   );
 }
 
-/** 카드 바깥 틀. 배경·여백·기본 서체를 한 곳에서 정해 세 카드가 같은 판형이 되게 한다. */
+/**
+ * 카더라 두 카드(국장·미장)가 쓰는 오른쪽 그림 — 오가는 말.
+ *
+ * 이 구역의 재료가 채널에 도는 이야기라, 순위 막대 같은 집계 그림보다 "사람들이
+ * 떠드는" 장면이 이름(카더라)에 맞는다. **두 시장이 같은 그림을 쓰고 대사만 다르다** —
+ * 한 구역의 두 페이지라 서로 남처럼 보이면 안 된다.
+ *
+ * SVG 가 아니라 JSX 로 짠다 — data URI 로 넘긴 SVG 안의 글자는 Satori 가 폰트를
+ * 실어 주지 않아 빈칸으로 나온다. 여기서는 카드 본문과 같은 Pretendard 로 그려진다.
+ *
+ * ⚠️ 대사는 **떠도는 말투 자체**만 흉내 낸다. 뭘 사라/팔라로 읽힐 말은 넣지 않는다 —
+ * 이 서비스는 그런 말을 옮기는 곳이 아니라 얼마나 도는지를 세는 곳이다.
+ * 종목 이름도 넣지 않는다(그 종목을 추천하는 그림이 된다).
+ */
+export function ChatterArt({ chatter }: { chatter: { text: string; mine: boolean }[] }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14, width: 358 }}>
+      {chatter.map((c) => (
+        <div key={c.text} style={{ display: "flex", justifyContent: c.mine ? "flex-end" : "flex-start" }}>
+          <div
+            style={{
+              padding: "15px 26px",
+              fontSize: 27,
+              fontWeight: 500,
+              // ⚠️ 받은 말풍선이 **흰색이라 흰 카드 위에서 안 보였다** — 파란 말풍선
+              // 하나만 말풍선이고 나머지 둘은 허공에 뜬 글자였다. 카드 배경(CARD_BG)과
+              // 같은 색을 적어 둔 탓이다. 화면에서 옅은 면에 쓰는 토큰(TRACK)으로 바꾼다.
+              background: c.mine ? BLUE : TRACK,
+              color: c.mine ? "#ffffff" : INK,
+              // 말풍선의 꼬리 자리만 각지게 둔다. 삼각형 꼬리를 붙이는 것보다 단순하고
+              // 메신저에서 흔히 보는 모양이라 한눈에 대화로 읽힌다.
+              borderTopLeftRadius: 26,
+              borderTopRightRadius: 26,
+              borderBottomLeftRadius: c.mine ? 26 : 8,
+              borderBottomRightRadius: c.mine ? 8 : 26,
+            }}
+          >
+            {c.text}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** 카드 바깥 틀. 배경·여백·기본 서체를 한 곳에서 정해 네 카드가 같은 판형이 되게 한다. */
 export function CardShell({ children }: { children: React.ReactNode }) {
   return (
     <div

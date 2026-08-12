@@ -43,6 +43,10 @@ export const rankNum: React.CSSProperties = {
   flexShrink: 0,
 };
 
+/** 한 줄 말줄임 — 이름 칸처럼 셀을 밀어낼 수 있는 글에 붙인다. 두 page.tsx 가
+    각자 같은 상수를 들고 있는데, parts 안에서 쓰는 것은 여기 것을 쓴다. */
+const clip: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
+
 export type Tone = "plain" | "blue" | "hot" | "cold";
 
 /**
@@ -61,9 +65,23 @@ export function Pill({
   tone?: Tone;
   title?: string;
 }) {
+  /**
+   * ⚠️ 글자는 **원색이 아니라 잉크 토큰**을 쓴다. 원색(--c-blue·--c-hot)은 흰 카드
+   * 위에서 쓰라고 고른 값이라, 같은 계열의 옅은 tint 위에 얹으면 대비가 무너진다.
+   * 실측(라이트/다크): 파랑 3.30/3.59 · 빨강 4.21/4.32 — 넷 중 둘이 AA 미달이었다.
+   * --c-hot-ink·--c-cold-ink 가 바로 그 tint 위에서 4.5 를 넘도록 맞춰 둔 값이다
+   * (globals.css 의 토큰 주석에 실측치가 적혀 있다). 잉크로 바꾸면 4.66~5.90 이 된다.
+   *
+   * 파랑에는 --c-blue-ink 가 없다. 이 저장소는 **파란 tint 위 글자에 --c-cold-ink 를
+   * 쓴다** — .hz-more-btn:hover · .mdd-period-btn · .hz-btn-soft 가 이미 그렇다.
+   *
+   * plain 의 바탕도 --c-track 에서 --c-chip 으로 옮긴다. track 은 '막대의 빈 트랙'이라
+   * 알약 바탕이 아니고, 다크에서 그 위 --c-sub 가 4.08 이었다(chip 위에서는 4.55).
+   */
   const bg =
-    tone === "blue" ? "var(--c-blue-tint)" : tone === "hot" ? "var(--c-hot-tint)" : tone === "cold" ? "var(--c-cold-tint)" : C.track;
-  const fg = tone === "blue" ? C.blue : tone === "hot" ? C.hot : tone === "cold" ? C.cold : C.sub;
+    tone === "blue" ? "var(--c-blue-tint)" : tone === "hot" ? "var(--c-hot-tint)" : tone === "cold" ? "var(--c-cold-tint)" : C.chip;
+  const fg =
+    tone === "blue" || tone === "cold" ? "var(--c-cold-ink)" : tone === "hot" ? "var(--c-hot-ink)" : C.sub;
   return (
     <span
       title={title}
@@ -387,5 +405,200 @@ export function Sparkline({ data, width = 62, height = 26 }: { data: number[]; w
         />
       ))}
     </div>
+  );
+}
+
+/**
+ * 요약 글에서 **그날의 주인공**을 굵게 집는다. 국장·미장 두 히어로가 함께 쓴다.
+ *
+ * 시장 브리핑의 '오늘의 브리핑'과 MDD 의 '이 하락의 맥락'은 문단을 JSX 로 조립해서
+ * 지표명·핵심 수치에 <b> 를 직접 붙인다. 여기는 LLM 이 보낸 **통글**이라 같은 방법을
+ * 못 쓴다 — 대신 화면에서 집는다.
+ *
+ * 처음엔 수치를 집었다가 걷었다("3일간·328억"). 카더라에서 눈이 찾는 것은 숫자가
+ * 아니라 **무엇이 회자되나**다. 그래서 낱말은 그날 화면이 이미 뽑아 둔 것에서만
+ * 가져온다 — 급부상 종목·주요 종목 리포트·테마 로테이션·이슈 키워드. 손으로 적어 둔
+ * 목록이 아니라 **오늘 자 집계**라 낡지 않는다. 2차전지가 화제인 날은 2차전지가,
+ * 아닌 날은 그날의 것이 굵어진다.
+ *
+ * ⚠️ 한 문단에 **최대 둘**이다. 굵은 데가 셋을 넘으면 강조가 아니라 얼룩이 된다.
+ * 그리고 같은 낱말은 **글 전체에서 한 번만** 굵어진다 — used 를 문단마다 새로 만들면
+ * 반도체가 2·3문단에서 각각 한 번씩, 화면에서는 두 번 굵어진다(실측). 세 문단이
+ * 한 글이므로 셈도 글 단위로 한다. 그래서 호출자가 Set 을 들고 넘긴다.
+ *
+ * ⚠️ 긴 낱말을 먼저 대본다. "삼성전자"를 "삼성"보다 뒤에 대면 "삼성"만 굵어지고
+ * "전자"가 떨어져 나온다. 그 정렬은 호출자가 한다(termsFor 참고).
+ * ⚠️ 낱말 경계를 한글로는 못 가른다(\b 가 한글에 안 걸린다). 그렇다고 **뒤가 한글이면
+ * 건너뛰기**로 막으면 안 된다 — 한국어는 조사가 명사에 바로 붙어서 "2차전지가",
+ * "지주·밸류업과" 가 전부 걸러진다(실제로 반도체 하나만 굵어졌다). 뒤는 열어 두고,
+ * 영문·숫자 낱말일 때만 뒤를 막는다("AI"가 "AI수요" 속에서 따로 굵어지는 것 방지).
+ * 그 예외의 예외가 particleAfterLatin 이다(아래).
+ *
+ * ⚠️ 이 함수는 **한 벌만 있어야 한다.** 국장·미장이 각자 복사해 두면 한쪽만 고쳐진
+ * 채로 두 화면의 강조 규칙이 갈린다(이 저장소가 파이썬↔TS 쌍둥이로 이미 겪은 일이다).
+ */
+const HANGUL = /[\uAC00-\uD7A3]/;
+
+const MAX_BOLD_PER_PARAGRAPH = 2;
+
+/**
+ * 영문 이름 뒤에 **조사만** 붙었으면 그건 합성어가 아니라 낱말 경계다.
+ *
+ * 국장은 이름이 거의 한글이라 이 자리가 안 드러났다. 미장은 "TSMC의 7월 매출",
+ * "AMD와" 처럼 라틴 이름 + 조사가 흔해서, 뒤가 한글이면 무조건 막는 규칙이 그대로
+ * 걸리면 영문 종목은 하나도 안 굵어진다.
+ *
+ * 판정은 **뒤에 붙은 한글 덩어리 전체가 이 목록과 정확히 같은가**로 한다. 조사로
+ * 시작하는지만 보면 "AI에이전트"의 '에'가 조사로 통과한다 — 덩어리째 대면 "에이전트"
+ * 는 목록에 없어 그냥 막힌다. 못 맞히면 안 굵어질 뿐이라 실패가 안전한 쪽이다.
+ *
+ * ⚠️ 조사 목록을 문법책대로 넓히지 말 것. 넓힐수록 합성어가 새 들어온다 — 이 저장소가
+ * 유령 종목 그물에서 이미 겪었다. 여기 있는 것은 국장 LLM 글 210편(21,539자)에서 실제로
+ * 나온 '영문토큰 + 한글덩어리' 135건을 전수로 갈라 본 결과다. 이 목록으로 25건이 열리고
+ * 110건이 막히는데, **열린 25건은 전부 조사였고 막힌 110건은 전부 합성어였다**
+ * (SK+하이닉스는 · 20+일부터 · 000+억달러 …). 넓히려거든 그 대조를 다시 돌려
+ * 오분류가 0인지부터 확인할 것.
+ */
+const LATIN_TRAILING_PARTICLES = new Set(
+  (
+    "의 가 이 은 는 을 를 와 과 도 만 로 에 랑 야 " +
+    "에서 에게 으로 한테 처럼 보다 부터 까지 마저 조차 밖에 만큼 라고 로서 로써 " +
+    "와의 과의 로의 에의 에도 에는 에선 으론 으로도 으로는 에게도 에게는 에서도 에서는 " +
+    "로부터 으로서 으로써"
+  ).split(" "),
+);
+
+const HANGUL_RUN = /^[\uAC00-\uD7A3]+/;
+
+function trailingIsParticle(text: string, at: number): boolean {
+  const run = HANGUL_RUN.exec(text.slice(at));
+  return !!run && LATIN_TRAILING_PARTICLES.has(run[0]);
+}
+
+export function highlightTerms(
+  text: string,
+  terms: string[],
+  used: Set<string>,
+  /** particleAfterLatin: 영문 낱말 뒤가 조사면 굵힘을 허용한다(미장 히어로만 켠다). */
+  opts?: { particleAfterLatin?: boolean },
+): React.ReactNode[] {
+  if (terms.length === 0) return [text];
+  const out: React.ReactNode[] = [];
+  let inThisParagraph = 0;
+  let i = 0;
+  let key = 0;
+  let buf = "";
+  outer: while (i < text.length) {
+    if (inThisParagraph >= MAX_BOLD_PER_PARAGRAPH) break;
+    for (const term of terms) {
+      if (used.has(term)) continue;
+      if (!text.startsWith(term, i)) continue;
+      const before = text[i - 1];
+      const after = text[i + term.length];
+      if (before && HANGUL.test(before)) continue;
+      if (
+        after &&
+        HANGUL.test(after) &&
+        /^[A-Za-z0-9]+$/.test(term) &&
+        !(opts?.particleAfterLatin && trailingIsParticle(text, i + term.length))
+      )
+        continue;
+      if (buf) {
+        out.push(buf);
+        buf = "";
+      }
+      out.push(
+        <b key={key++} style={{ fontWeight: 800, color: C.ink }}>
+          {term}
+        </b>,
+      );
+      used.add(term);
+      inThisParagraph += 1;
+      i += term.length;
+      continue outer;
+    }
+    buf += text[i];
+    i += 1;
+  }
+  // 상한에 걸려 중간에 멈췄으면 남은 글을 그대로 붙인다.
+  if (i < text.length) buf += text.slice(i);
+  if (buf) out.push(buf);
+  return out;
+}
+
+/**
+ * highlightTerms 에 넘길 낱말 목록을 다듬는다. **긴 것부터** 대야 "삼성전자"가
+ * "삼성"에 먼저 걸리지 않는다. 한 글자는 뺀다 — 아무 데나 걸린다.
+ */
+export function termsFor(...groups: (string | null | undefined)[][]): string[] {
+  return Array.from(new Set(groups.flat()))
+    .filter((t): t is string => !!t && t.length >= 2)
+    .sort((a, b) => b.length - a.length);
+}
+
+/**
+ * 시트 머리 아래 **하이라이트 두 칸** — 표를 읽기 전에 "그래서 뭐가 제일 컸나"를
+ * 먼저 답한다. 테마 로테이션·이슈 키워드가 국장·미장 양쪽에서 같은 얼개로 쓴다.
+ *
+ * name 과 value 를 나누는 이유: name 은 길이가 제각각이라 말줄임이 걸려야 하고
+ * (`반도체 장비·소재`), value 는 절대 안 줄어야 한다(`▲13.5%p`). 한 문자열로 두면
+ * 좁은 폭에서 수치부터 잘린다.
+ *
+ * divide 는 왼쪽 칸에만 준다 — 칸 사이 세로선이다. 폰(≤560)에서는 두 칸이 세로로
+ * 서면서 globals.css 의 .hz-kd-duo 규칙이 이 선을 가로선으로 바꾼다.
+ */
+export function Highlight({ cap, name, value, valueColor, sub, divide }: {
+  cap: string;
+  name: string;
+  value?: string;
+  valueColor?: string;
+  sub: string;
+  divide?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        padding: "14px 22px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
+        minWidth: 0,
+        boxShadow: divide ? "inset -1px 0 0 var(--c-sheet-row)" : undefined,
+      }}
+    >
+      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>{cap}</span>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 7, minWidth: 0 }}>
+        <strong style={{ ...clip, fontSize: 16, fontWeight: 800, letterSpacing: "-.02em", color: C.ink }}>{name}</strong>
+        {value && <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: valueColor, flexShrink: 0 }}>{value}</span>}
+      </div>
+      <span style={{ ...clip, fontSize: 11.5, color: C.sub }}>{sub}</span>
+    </div>
+  );
+}
+
+/**
+ * 점유율 변동폭 배지(%p). 테마 로테이션·이슈 키워드가 국장·미장 네 자리에서 함께 쓴다.
+ *
+ * ⚠️ **문턱 아래를 빈칸으로 두지 않는다.** 0.05%p 미만은 소수 한 자리로 적으면 0.0%p 가
+ * 되는데, 그렇다고 안 그리면 줄에 아무 표시도 없어 "왜 이 줄만 없지?"가 된다 — 국장
+ * 테마 7~10위와 화제어 7·10위가 실제로 그렇게 보였다. 값이 작다는 것도 정보다.
+ * 그래서 세 갈래로 적는다:
+ *
+ *   비교할 과거가 없다 →  —        (자료가 없다)
+ *   0.05%p 미만        →  0.0%p    (화살표 없이 흐리게 — 움직이지 않았다)
+ *   그 이상            →  ▲/▼N.N%p
+ *
+ * value 는 **이미 %p 로 환산된 값**이다. 화제어의 shareDelta 는 몫이라 호출부가 ×100 해서
+ * 넘긴다 — 여기서 배율을 받으면 어느 쪽이 환산했는지가 흐려진다.
+ */
+export function DeltaPp({ value, style }: { value: number | null; style?: React.CSSProperties }) {
+  const base: React.CSSProperties = { fontFamily: MONO, fontWeight: 700, flexShrink: 0, ...style };
+  if (value === null) return <span style={{ ...base, color: C.sub2 }}>—</span>;
+  if (Math.abs(value) < 0.05) return <span style={{ ...base, color: C.sub2 }}>0.0%p</span>;
+  return (
+    <span style={{ ...base, color: value > 0 ? "var(--c-hot-ink)" : "var(--c-cold-ink)" }}>
+      {value > 0 ? "▲" : "▼"}
+      {Math.abs(value).toFixed(1)}%p
+    </span>
   );
 }

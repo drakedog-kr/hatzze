@@ -101,7 +101,10 @@ export function StockLogo({
   market: string | null;
   size?: number;
 }) {
-  const suffix = market === "KOSPI" ? "KS" : market === "KOSDAQ" ? "KQ" : null;
+  // 미국 상장은 접미사 없이 티커만 준다(logo.dev 가 NVDA·AAPL·TSM 을 그대로 받는 걸 실측).
+  // ⚠️ null 과 빈 문자열을 구분해야 한다 — null 은 "시장을 몰라 요청하지 않는다"는 뜻이고,
+  //    빈 문자열은 "접미사가 없는 게 정답"이라는 뜻이다. 아래 요청 조건이 이걸 가른다.
+  const suffix = market === "KOSPI" ? "KS" : market === "KOSDAQ" ? "KQ" : market === "US" ? "" : null;
   const [failed, setFailed] = useState(false);
   // CORS 로 못 받으면 픽셀은 포기하고 그림만 띄운다(아래 onError 참고).
   const [noCors, setNoCors] = useState(false);
@@ -134,14 +137,16 @@ export function StockLogo({
     else setNoCors(true);
   }, [noCors]);
 
-  if (!LOGO_KEY || !suffix || failed) return <InitialBadge code={code} name={name} size={size} />;
+  // ⚠️ `!suffix` 로 두면 안 된다 — 미국은 접미사가 **빈 문자열**이라 falsy 로 걸려
+  //    로고를 아예 요청하지 않는다. "모른다(null)"만 걸러야 한다.
+  if (!LOGO_KEY || suffix === null || failed) return <InitialBadge code={code} name={name} size={size} />;
 
   // 레티나에서 안 뭉개도록 표시 크기의 2배로 받는다.
   const px = (size ?? 24) * 2;
   return (
     // eslint-disable-next-line @next/next/no-img-element -- 외부 CDN 이라 next/image 최적화 대상이 아니다
     <img
-      src={`https://img.logo.dev/ticker/${code}.${suffix}?token=${LOGO_KEY}&size=${px}&format=webp&fallback=404`}
+      src={`https://img.logo.dev/ticker/${code}${suffix ? `.${suffix}` : ""}?token=${LOGO_KEY}&size=${px}&format=webp&fallback=404`}
       alt=""
       aria-hidden="true"
       // loading="lazy" 를 뺐다. crossOrigin 과 같이 쓰면 드롭다운 안의 이미지가 아예

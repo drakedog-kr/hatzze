@@ -34,10 +34,12 @@
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from collections import Counter
 from pathlib import Path
+from urllib.request import Request, urlopen
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -94,13 +96,82 @@ def extract(text: str, pattern, match_to_ticker: dict[str, str], caseless: dict[
     return found
 
 
+# SEC 가 공개하는 티커↔정식 영문명 목록. 키·토큰이 필요 없고 하루 한 번도 안 바뀐다.
+# ⚠️ User-Agent 에 연락처가 없으면 403 이다(SEC 접근 정책).
+SEC_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
+SEC_UA = "hatzze market research hatzze@proton.me"
+
+# SEC 목록은 클래스까지 적는다(BRK-A/BRK-B). 우리 사전은 클래스 없는 티커를 쓰므로
+# 그대로는 안 잡힌다 — 야후도 같은 사정이라 lib/yahoo-history.ts 에 이미 별칭이 있다.
+# ⚠️ 이 칸이 비면 **매일 SEC 를 한 번씩 헛되이 부른다**(채울 게 남았다고 보므로).
+SEC_TICKER_ALIAS = {"BRK": "BRK-B"}
+
+
+def fetch_sec_names(tickers: set[str]) -> dict[str, str]:
+    """티커 → 정식 영문명. 실패하면 빈 사전 — **이 스크립트의 본업을 막지 않는다.**
+
+    실측으로 우리 사전 178종목이 전부 잡힌다(BRK 는 SEC_TICKER_ALIAS 를 거친다).
+    """
+    try:
+        req = Request(SEC_TICKERS_URL, headers={"User-Agent": SEC_UA})
+        with urlopen(req, timeout=30) as resp:
+            raw = json.load(resp)
+    except Exception as exc:  # 네트워크·형식 무엇이든
+        print(f"[경고] SEC 영문명을 못 받았습니다({exc}). 이번 실행은 건너뜁니다.")
+        return {}
+    # SEC 표기 → 우리 티커. 별칭을 뒤집어 둬야 BRK-B 를 받아 BRK 자리에 넣는다.
+    want = {SEC_TICKER_ALIAS.get(t, t): t for t in tickers}
+    out: dict[str, str] = {}
+    for row in raw.values():
+        tk = str(row.get("ticker", "")).upper()
+        ours = want.get(tk)
+        if ours and ours not in out:
+            out[ours] = str(row.get("title", "")).strip()
+    return out
+
+
 def sync_master(db, dry_run: bool) -> None:
     """config 의 사전을 us_stocks 표로 밀어 넣는다.
 
     프론트가 파이썬 사전을 못 읽어서 필요하다. 파이썬·TS 로 같은 목록을 두 벌 두면
     반드시 어긋나므로 표를 하나 두고 양쪽이 그걸 본다.
+
+    ## 영문명(name_en)은 **비어 있는 것만** 받아 오되, 저장은 늘 병합해서 한다
+
+    MDD 검색이 이 값을 쓴다 — "tesla" 를 쳐도 테슬라가 나와야 한다(원래 이름이 영어인데
+    한글 표기만 들고 있었다). 회사 이름은 거의 안 바뀌므로 매일 SEC 를 부를 이유가 없다.
+    빈 칸이 하나라도 있을 때만 한 번 받는다 — 사전에 종목을 더하면 그날 저절로 메워지고,
+    평소에는 왕복이 0 이다.
+
+    ⚠️⚠️ **upsert 는 안 실은 열을 null 로 덮는다.** 처음엔 "준 열만 갱신한다"고 여기고
+    새로 받은 것만 실었는데, 그러면 나머지 177종목의 이름이 그 자리에서 지워진다
+    (실측: 채운 다음 실행에서 다시 177개를 채우고 있었다). 이 저장소가 details 열에서
+    이미 배운 것과 같다 — **통째로 대입하지 말고 병합할 것.**
+    그래서 저장 직전에 기존 값을 읽어 합친다. SEC 가 죽은 날에도 이름이 안 사라진다.
     """
-    rows = [{"ticker": tk, "name_ko": name} for tk, name in primary_names().items()]
+    names = primary_names()
+    rows = [{"ticker": tk, "name_ko": name} for tk, name in names.items()]
+
+    stored_en: dict[str, str] = {}
+    try:
+        for r in db.table("us_stocks").select("ticker,name_en").execute().data or []:
+            if r.get("name_en"):
+                stored_en[r["ticker"]] = r["name_en"]
+    except Exception as exc:
+        print(f"[경고] us_stocks 를 못 읽었습니다({exc}). 영문명은 이번에 건드리지 않습니다.")
+        stored_en = {}
+
+    need = {tk for tk in names if tk not in stored_en}
+    fetched = fetch_sec_names(need) if need else {}
+    if need:
+        missing = need - set(fetched)
+        print(f"[SEC] 영문명 {len(fetched)}/{len(need)}종목 받음"
+              f"{'' if not missing else ' · 못 찾은 것: ' + ', '.join(sorted(missing))}")
+
+    # 받은 것 + 이미 있던 것. 둘 다 없으면 null 을 그대로 실어 열을 비워 둔다.
+    for r in rows:
+        r["name_en"] = fetched.get(r["ticker"]) or stored_en.get(r["ticker"])
+
     if dry_run:
         print(f"[dry-run] us_stocks {len(rows)}종목 (upsert 안 함)")
         return

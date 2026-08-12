@@ -122,7 +122,11 @@ export function BetaBadge({ logoSize = 30, style }: { logoSize?: number; style?:
         fontSize: BETA_FONT,
         fontWeight: 700,
         lineHeight: 1,
-        color: "var(--c-blue)",
+        /* ⚠️ 원색(--c-blue)이 아니라 잉크다. 원색은 흰 카드 위에서 고른 값이라 같은
+           계열의 옅은 tint 위에서는 3.30(라이트)·3.59(다크)까지 떨어진다 — 8px 글자라
+           더 아프다. 파란 tint 위 글자는 이 저장소가 --c-cold-ink 로 통일해 두었다
+           (알약 Pill·.hz-more-btn·.mdd-period-btn 과 같은 값). 4.66/5.90 이 된다. */
+        color: "var(--c-cold-ink)",
         background: "var(--c-blue-tint)",
         borderRadius: 999,
         ...style,

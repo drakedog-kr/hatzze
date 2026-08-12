@@ -24,7 +24,7 @@ import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { AiMark, C, Icon, MONO, R } from "../ui";
 import { ExpandableList } from "./ExpandableList";
-import { Avatar, ChangeRate, DayBars, Pill, QuoteDate, RankBadge, RankDelta, SectionCaps, Sparkline, rankNum } from "./parts";
+import { Avatar, ChangeRate, DayBars, DeltaPp, Highlight, Pill, QuoteDate, RankBadge, RankDelta, SectionCaps, Sparkline, highlightTerms, termsFor } from "./parts";
 import { StockLogo } from "../StockLogo";
 import { SectionHead } from "./SectionHead";
 import { TrendingTabs } from "./TrendingTabs";
@@ -32,7 +32,7 @@ import { TrendingTabs } from "./TrendingTabs";
 // 미리보기 이미지는 옆의 opengraph-image.tsx 가 그린다(ownImage). 자세한 건 app/seo.ts 주석 참고.
 export async function generateMetadata(): Promise<Metadata> {
   return pageMetadata({
-    title: "카더라 리포트 | hatzze",
+    title: "국장 카더라 | hatzze",
     description: "주식 텔레그램 채널 수백 개를 대신 읽습니다. 오늘 가장 많이 언급된 종목과 가장 많이 퍼진 메시지를 매일 집계합니다.",
     path: "/kadera",
     ownImage: KADERA_CARD.alt,
@@ -47,73 +47,8 @@ function compact(n: number): string {
   return `${n}`;
 }
 
-/**
- * 요약 글에서 **그날의 주인공**을 굵게 집는다.
- *
- * 시장 브리핑의 '오늘의 브리핑'과 MDD 의 '이 하락의 맥락'은 문단을 JSX 로
- * 조립해서 지표명·핵심 수치에 <b> 를 직접 붙인다. 여기는 LLM 이 보낸 **통글**이라
- * 같은 방법을 못 쓴다 — 대신 화면에서 집는다.
- *
- * 처음엔 수치를 집었다가 걷었다("3일간·328억"). 카더라에서 눈이 찾는 것은 숫자가
- * 아니라 **무엇이 회자되나**다. 그래서 낱말은 그날 화면이 이미 뽑아 둔 것에서만
- * 가져온다 — 급부상 종목·주요 종목 리포트·테마 로테이션·이슈 키워드. 손으로 적어 둔
- * 목록이 아니라 **오늘 자 집계**라 낡지 않는다. 2차전지가 화제인 날은 2차전지가,
- * 아닌 날은 그날의 것이 굵어진다.
- *
- * ⚠️ 한 문단에 **최대 둘**이다. 굵은 데가 셋을 넘으면 강조가 아니라 얼룩이 된다.
- * 그리고 같은 낱말은 **글 전체에서 한 번만** 굵어진다 — used 를 문단마다 새로 만들면
- * 반도체가 2·3문단에서 각각 한 번씩, 화면에서는 두 번 굵어진다(실측). 세 문단이
- * 한 글이므로 셈도 글 단위로 한다. 그래서 호출자가 Set 을 들고 넘긴다.
- *
- * ⚠️ 긴 낱말을 먼저 대본다. "삼성전자"를 "삼성"보다 뒤에 대면 "삼성"만 굵어지고
- * "전자"가 떨어져 나온다.
- * ⚠️ 낱말 경계를 한글로는 못 가른다(\b 가 한글에 안 걸린다). 그렇다고 **뒤가 한글이면
- * 건너뛰기**로 막으면 안 된다 — 한국어는 조사가 명사에 바로 붙어서 "2차전지가",
- * "지주·밸류업과" 가 전부 걸러진다(실제로 반도체 하나만 굵어졌다). 뒤는 열어 두고,
- * 영문·숫자 낱말일 때만 뒤를 막는다("AI"가 "AI수요" 속에서 따로 굵어지는 것 방지).
- */
-const HANGUL = /[\uAC00-\uD7A3]/;
-
-const MAX_BOLD_PER_PARAGRAPH = 2;
-
-function highlightTerms(text: string, terms: string[], used: Set<string>): React.ReactNode[] {
-  if (terms.length === 0) return [text];
-  const out: React.ReactNode[] = [];
-  let inThisParagraph = 0;
-  let i = 0;
-  let key = 0;
-  let buf = "";
-  outer: while (i < text.length) {
-    if (inThisParagraph >= MAX_BOLD_PER_PARAGRAPH) break;
-    for (const term of terms) {
-      if (used.has(term)) continue;
-      if (!text.startsWith(term, i)) continue;
-      const before = text[i - 1];
-      const after = text[i + term.length];
-      if (before && HANGUL.test(before)) continue;
-      if (after && HANGUL.test(after) && /^[A-Za-z0-9]+$/.test(term)) continue;
-      if (buf) {
-        out.push(buf);
-        buf = "";
-      }
-      out.push(
-        <b key={key++} style={{ fontWeight: 800, color: C.ink }}>
-          {term}
-        </b>,
-      );
-      used.add(term);
-      inThisParagraph += 1;
-      i += term.length;
-      continue outer;
-    }
-    buf += text[i];
-    i += 1;
-  }
-  // 상한에 걸려 중간에 멈췄으면 남은 글을 그대로 붙인다.
-  if (i < text.length) buf += text.slice(i);
-  if (buf) out.push(buf);
-  return out;
-}
+/* 요약 글의 굵힘(highlightTerms)은 미장 히어로도 똑같이 쓴다. 한쪽만 고쳐져 두 화면의
+   강조 규칙이 갈리지 않도록 ./parts 로 옮겼다 — 규칙과 함정은 그쪽 주석에. */
 
 function formatKR(n: number): string {
   if (n >= 1e8) return `${(n / 1e8).toFixed(1).replace(/\.0$/, "")}억`;
@@ -149,9 +84,6 @@ function MddLink({ code, market, label = "MDD 정밀분석" }: { code: string; m
 /** 한 줄 말줄임 — 채널명·종목명처럼 셀을 밀어낼 수 있는 이름에 붙인다. */
 const clip: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
 
-/** 시트 안 열 머리·데이터 행이 공유하는 격자. 한 곳에서 내야 두 줄의 칸이 어긋나지 않는다. */
-const KEYWORD_COLS = "26px minmax(80px,1fr) minmax(70px,1.5fr) 58px";
-
 /**
  * 시트 두 장이 한 줄에 나란히 설 최소 폭.
  *
@@ -171,45 +103,14 @@ const SHEET_PAIR_MIN = "min(460px, 100%)";
    .hz-cols-rise 다. 폰에서 열을 접어야 하는데 인라인 style 은 미디어쿼리를 이겨서,
    여기 두면 @media 가 아무 일도 못 한다. 이유는 그 클래스 주석에 적어 뒀다. */
 
-/* 테마 로테이션 한 줄의 세로 치수. 오른쪽 스파크라인의 밑선을 왼쪽 점유율 막대의
-   밑선에 맞추려면 그 위에 무엇이 얼마나 쌓여 있는지 알아야 해서, 값을 흩어 두지 않고
-   여기 모은다(한 곳만 고치면 정렬이 따라온다). */
-const THEME_NAME_H = 20; // 테마명 줄(lineHeight 로 고정)
-const THEME_BAR_TOP = 7; // 이름 줄 ↔ 막대 사이 여백
-const THEME_BAR_H = 7; // 막대 두께
-const SPARK_H = 26; // Sparkline 기본 높이와 같아야 한다
-/** 스파크라인을 이만큼 내리면 밑선이 막대 밑선과 같아진다. */
-const THEME_SPARK_TOP = THEME_NAME_H + THEME_BAR_TOP + THEME_BAR_H - SPARK_H;
+/* 테마 로테이션 줄의 세로 치수(THEME_NAME_H·THEME_BAR_TOP·THEME_SPARK_TOP …)가 여기
+   있었다. '쌓인 줄'이던 시절 스파크라인 밑선을 막대 밑선에 맞추려고 손으로 계산하던
+   값인데, 미장과 같은 **표**로 바꾸면서 격자(globals.css 의 .hz-cols-theme)가 그 일을
+   맡았다 — 두 표의 줄은 이제 px 이 아니라 구조로 맞는다. 화제어 격자(KEYWORD_COLS)도
+   같은 이유로 .hz-cols-kw 로 옮겨 갔다. */
 
 /** 시트 안 '2분할 하이라이트'(테마 로테이션·이슈 키워드의 머리 아래 두 칸). */
-function Highlight({ cap, name, value, valueColor, sub, divide }: {
-  cap: string;
-  name: string;
-  value?: string;
-  valueColor?: string;
-  sub: string;
-  divide?: boolean;
-}) {
-  return (
-    <div
-      style={{
-        padding: "14px 22px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 4,
-        minWidth: 0,
-        boxShadow: divide ? "inset -1px 0 0 var(--c-sheet-row)" : undefined,
-      }}
-    >
-      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>{cap}</span>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 7, minWidth: 0 }}>
-        <strong style={{ ...clip, fontSize: 16, fontWeight: 800, letterSpacing: "-.02em", color: C.ink }}>{name}</strong>
-        {value && <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: valueColor, flexShrink: 0 }}>{value}</span>}
-      </div>
-      <span style={{ ...clip, fontSize: 11.5, color: C.sub }}>{sub}</span>
-    </div>
-  );
-}
+/* 하이라이트 칸(카드 위 요약 두 칸)은 미장 카드도 쓴다 → ./parts */
 
 /**
  * 트렌딩 메시지 목록(말풍선 카드). 기간 탭이 세 벌을 미리 렌더해 넘기므로 목록
@@ -438,16 +339,16 @@ export default async function KaderaPage() {
      주석 참고). 여기 없는 종목은 요약에 나와도 굵어지지 않는다 — 회자되는 것과
      지나가는 이름을 가르는 것이 이 목록의 일이다.
      긴 것부터 대야 "삼성전자"가 "삼성"에 먼저 걸리지 않는다. */
-  const summaryTerms = Array.from(
-    new Set([
-      ...surging.map((x) => x.name),
-      ...stockReports.map((x) => x.name),
-      ...themes.slice(0, 4).map((x) => x.theme),
-      ...keywords.slice(0, 5).map((x) => x.word),
-    ]),
-  )
-    .filter((t) => t && t.length >= 2)
-    .sort((a, b) => b.length - a.length);
+  /* 이슈 키워드 막대의 분모 — 화면에 세운 낱말들의 합. 표에 있는 값만으로 내므로
+     새 조회가 없고, 막대와 숫자가 같은 재료에서 나와 어긋날 수 없다. */
+  const keywordTotal = keywords.reduce((a, k) => a + k.count, 0);
+
+  const summaryTerms = termsFor(
+    surging.map((x) => x.name),
+    stockReports.map((x) => x.name),
+    themes.slice(0, 4).map((x) => x.theme),
+    keywords.slice(0, 5).map((x) => x.word),
+  );
 
   /* 채널을 세는 세 줄은 전부 **지금 수집 중인 채널**을 센다(getTelegramSummary 주석).
      목록에 있어도 peer 캐시가 없어 한 건도 안 걷히는 채널은 모니터링하고 있는 것이
@@ -471,82 +372,76 @@ export default async function KaderaPage() {
   const topIn = moved.length ? moved.reduce((a, b) => (delta(b) > delta(a) ? b : a)) : null;
   const topOut = moved.length ? moved.reduce((a, b) => (delta(b) < delta(a) ? b : a)) : null;
 
+  /**
+   * 테마 한 줄. **미장 카더라와 같은 표 조판이다**(2026-08-12에 통일했다).
+   *
+   * 예전엔 세 층으로 쌓인 줄이었다(이름+변화폭 / 막대 / 점유율·종목·횟수 + 오른쪽
+   * 스파크라인). 두 화면의 같은 카드가 서로 다른 얼개면 오갈 때 같은 것을 다시 읽어야
+   * 한다 — 표 쪽이 옆 이슈 키워드와도 골격이 같아 시선이 한 번에 훑린다.
+   *
+   * 줄의 구성:  [이름 ……… ▲7.7%p]        점유율 · 14일 추이 · 순위 변화
+   *             [██████░░░░░░░░░░]
+   * 막대가 칸 폭을 꽉 채우므로 이름 줄의 오른끝이 곧 **막대의 오른쪽 위**다 —
+   * 얼마나 찼는지와 얼마나 움직였는지가 한 덩어리로 읽힌다.
+   */
   const themeRow = (t: ThemeRotation, i: number, total: number) => {
     const d = delta(t);
-    const ink = d > 0 ? "var(--c-hot-ink)" : d < 0 ? "var(--c-cold-ink)" : C.hint;
     return (
       <div
         key={t.theme}
-        className="hz-theme-row-sheet"
-        /* 표가 아니라 **쌓인 줄**이다(옛 디자인). 한 줄이 [이름 + 변화폭] / [점유율 막대] /
-           [점유율·종목·횟수] 세 층이라, 열로 쪼갤 때보다 테마 하나가 한 덩어리로 읽힌다.
-           오른쪽 스파크라인은 14일 추이라 여기서만 볼 수 있는 값이다. */
-        /* 세로 패딩 9.35px — 줄 사이 간격은 위 줄의 아래 패딩과 아래 줄의 위 패딩을 더한
-           값(11+11=22)이라, 그 22 를 15% 줄인 18.7 을 두 줄이 반씩 나눠 가진 것이다.
-           가로 22 는 시트의 다른 표(.hz-trow)와 같은 값이라 건드리지 않는다. */
-        /* 첫 칸 19px — 순위 숫자가 14px 이 되면서 두 자리("10")가 18.34px 을 먹는다
-           (이 글꼴의 숫자는 폭이 고정이라 9.17 × 2). 17px 이던 예전 폭에 두면 10위만
-           오른끝이 1.34px 삐져나와 아홉 줄과 안 맞는다. */
-        style={{ display: "grid", gridTemplateColumns: "19px minmax(0,1fr) 62px", alignItems: "start", gap: 12, padding: "9.35px 22px" }}
+        className="hz-trow hz-cols-theme hz-theme-host"
+        style={{ flex: 1 }}
         /* 마우스가 없어도(키보드·터치) 종목 목록을 열 수 있게 초점을 받는다.
            언급된 종목이 없는 테마는 열 것도 없으니 초점도 주지 않는다. */
         tabIndex={t.stocks.length ? 0 : undefined}
         aria-label={t.stocks.length ? `${t.theme} 테마를 이룬 종목 ${t.stockCount}개 보기` : undefined}
       >
-        {/* 순위 숫자를 테마명과 같은 14px 로 세우고, 줄 상자도 테마명 줄과 같은
-            THEME_NAME_H 로 준다. 글자 크기와 줄 높이가 둘 다 같으면 두 상자의 윗변이
-            같은 자리에서 시작하는 것만으로 밑선이 저절로 맞는다(그리드가 alignItems:start
-            라 윗변은 이미 같다) — 보정값이 필요 없다. 크기가 달랐을 땐 줄 상자 안에서
-            글자가 앉는 깊이가 달라 paddingTop 으로 그 차를 걷어 내야 했다. */}
-        <span style={{ ...rankNum, width: 19, fontSize: 14, lineHeight: `${THEME_NAME_H}px` }}>{t.rank}</span>
-        <div style={{ minWidth: 0 }}>
-          {/* 줄 높이를 못 박는다 — 오른쪽 스파크라인을 막대 밑선에 맞추려면(THEME_SPARK_TOP)
-              이 줄이 몇 px 인지 확정돼야 한다. lineHeight 만으론 모자란다: 14·12·10px
-              글자의 베이스라인을 맞추느라 줄이 1px 더 커진다. */}
-          <div style={{ display: "flex", alignItems: "baseline", gap: 7, height: THEME_NAME_H, lineHeight: `${THEME_NAME_H}px` }}>
-            <span style={{ ...clip, fontWeight: 700, fontSize: 14, color: C.ink }}>{t.theme}</span>
-            <RankDelta change={t.rankChange} />
-            {t.shareDelta !== null && Math.abs(d) >= 0.1 && (
-              <span style={{ marginLeft: "auto", flexShrink: 0, fontFamily: MONO, fontSize: 12, fontWeight: 700, color: ink }}>
-                {d >= 0 ? "▲" : "▼"}
-                {Math.abs(d).toFixed(1)}%p
-              </span>
-            )}
-          </div>
-          {/* 막대는 1위 대비 점유율. 절대 점유율을 폭으로 쓰면 1위 28%·10위 0.9% 라 아홉
-              줄이 빈 트랙만 남아 순위가 눈에 안 들어온다. */}
-          <div style={{ margin: `${THEME_BAR_TOP}px 0 5px`, height: THEME_BAR_H, background: C.track, borderRadius: 999, overflow: "hidden" }}>
-            <div
+        <RankBadge n={t.rank} />
+        <span style={{ display: "flex", flexDirection: "column", gap: 5, minWidth: 0 }}>
+          <span style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+            {/* 이름은 반드시 minWidth:0 + 말줄임이다. flex 로 두면 긴 테마명이 배지를 칸 밖으로 민다. */}
+            <span style={{ ...clip, minWidth: 0, fontSize: 13.5, fontWeight: 700, color: C.ink }}>{t.theme}</span>
+            <span style={{ flex: 1 }} />
+            <DeltaPp value={t.shareDelta} style={{ fontSize: 12 }} />
+          </span>
+          {/* 막대는 **절대 점유율**이다. 길이가 점유율, 색이 변화 방향 — 눈금이 둘이지만
+              바로 위 칸이 그 방향을 부호 붙은 숫자로 적고 있어 색은 되풀이일 뿐이다. */}
+          <span className="hz-bar">
+            <span
               style={{
-                width: `${Math.max(2, Math.min(100, (t.sharePct / Math.max(0.1, themes[0].sharePct)) * 100))}%`,
-                height: "100%",
-                borderRadius: 999,
-                background: d > 0 ? "var(--c-warm-2)" : d < 0 ? "var(--c-blue-3)" : C.hint,
+                width: `${Math.min(100, t.sharePct)}%`,
+                background: d > 0 ? "var(--c-warm-2)" : d < 0 ? "var(--c-blue-2)" : C.hint,
               }}
             />
-          </div>
-          <div style={{ ...clip, fontSize: 11.5, color: C.sub2 }}>
-            점유율 <b style={{ color: C.sub, fontFamily: MONO }}>{t.sharePct.toFixed(1)}%</b> · 종목 {t.stockCount}개 ·{" "}
-            <span style={{ fontFamily: MONO }}>{t.mentions}회</span>
-          </div>
-        </div>
-        {/* 스파크라인은 위에서부터 그려지므로, 밑선을 왼쪽 막대의 밑선에 맞추려면 그만큼
-            내려 앉혀야 한다. 기간은 툴팁으로만 밝힌다 — 이 줄의 다른 숫자(점유율·종목·회)는
-            최근 3일 기준인데 이 그래프만 14일이라, 적어 두지 않으면 알 길이 없다. */}
-        <span
-          className="hz-tip hz-tip-wide hz-tip-end"
-          data-tip={`최근 ${t.series.length}일 일별 점유율입니다.`}
-          style={{ display: "block", marginTop: THEME_SPARK_TOP }}
-        >
-          <Sparkline data={t.series} />
+          </span>
+        </span>
+        <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: C.ink, textAlign: "right" }}>
+          {t.sharePct.toFixed(1)}%
+        </span>
+        {/* ⚠️ Sparkline 을 그리드 자식으로 직접 넣지 말 것 — 뿌리에 인라인 display:flex 가
+            있어 좁은 화면에서 이 칸을 접는 미디어쿼리를 이긴다. display 없는 span 으로 싼다. */}
+        <span>
+          <Sparkline data={t.series} width={78} height={24} />
+        </span>
+        {/* RankDelta 는 0 과 null 을 똑같이 '아무것도 안 그림'으로 낸다. 모든 줄이 같은 두
+            창을 견주므로 빈칸이면 "자료가 없나?"로 읽힌다 — 변동 없음은 글자로 적는다. */}
+        <span style={{ textAlign: "right" }}>
+          {t.rankChange === null ? (
+            <span style={{ fontFamily: MONO, fontSize: 11, color: C.sub2 }}>—</span>
+          ) : t.rankChange === 0 ? (
+            <span style={{ fontSize: 11, fontWeight: 700, color: C.sub2, whiteSpace: "nowrap" }}>그대로</span>
+          ) : (
+            <RankDelta change={t.rankChange} />
+          )}
         </span>
 
-        {/* 이 테마의 점유율을 만든 종목 목록. 줄에 마우스를 올리거나 초점이 가면 열린다
-            (CSS 만, globals.css 의 .hz-theme-pop). 아래쪽 줄은 위로 펼친다 — 아래로 열면
-            시트를 벗어나 다음 섹션을 덮는다. */}
+        {/* 이 테마의 점유율을 만든 종목 목록. 마우스를 올리거나 초점이 가면 열린다(CSS 만).
+            아래쪽 줄은 위로 펼친다 — 아래로 열면 시트를 벗어나 다음 구간을 덮는다. */}
         {t.stocks.length > 0 && (
           <div className={`hz-theme-pop${i >= total - 4 ? " hz-theme-pop-up" : ""}`}>
-            <div className="hz-theme-pop-head">최근 3일 언급 {t.stockCount}종목 · 주목도순</div>
+            <div className="hz-theme-pop-head">
+              최근 {KADERA_WINDOW_DAYS}일 언급 {t.stockCount}종목 · 총 {t.mentions.toLocaleString("ko-KR")}회 · 주목도순
+            </div>
             {t.stocks.map((s) => (
               <Link key={s.code} href={mddHref(s.code, s.market)} className="hz-theme-pop-item">
                 <span className="hz-theme-pop-name">{s.name}</span>
@@ -984,7 +879,7 @@ export default async function KaderaPage() {
             title="테마 로테이션"
             note="3일 vs 이전"
             desc="관심이 어느 테마로 옮겨가는지 · 점유율 변화 기준"
-            noteHelp="최근 3일 평균 점유율을 그 이전과 비교합니다. 하루치끼리 재면 표본 얇은 날에 크게 요동쳐서, 며칠씩 묶어서 봅니다."
+            noteHelp="최근 3일 평균 점유율을 그 이전과 비교합니다. 하루치끼리 재면 표본 얇은 날에 크게 요동쳐서, 며칠씩 묶어서 봅니다. 점유율의 분모는 테마 사전에 든 종목의 언급이라 열 줄 밖까지 다 더하면 100%가 됩니다."
           />
           {themes.length === 0 ? (
             <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>아직 집계된 테마가 없습니다.</p>
@@ -1014,11 +909,17 @@ export default async function KaderaPage() {
                 />
               </div>
 
-              {/* 열 머리를 두지 않는다 — 줄이 표가 아니라 세 층으로 쌓인 덩어리라
-                  가리킬 열이 없다(옆 이슈 키워드는 표라서 머리가 있다).
-                  행을 상자로 감싸 남는 높이를 행들이 나눠 갖게 한다(justify-content 로
-                  벌리면 줄 사이만 멀어져 덩어리가 흩어져 보인다). */}
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", paddingBottom: 6 }}>
+              <div className="hz-thead hz-cols-theme">
+                <span>#</span>
+                <span>테마</span>
+                <span style={{ textAlign: "right" }}>점유율</span>
+                <span>최근 14일</span>
+                <span style={{ textAlign: "right" }}>순위 변화</span>
+              </div>
+              {/* 행을 상자로 감싸 남는 높이를 **행들이 나눠 갖게** 한다. 옆 이슈 키워드와
+                  머리·하이라이트·열머리 높이가 같으므로 행 높이도 자동으로 같아진다 —
+                  손으로 px 을 맞추면 한쪽 글이 바뀔 때마다 어긋난다. */}
+              <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
                 {themes.map((t, i) => themeRow(t, i, themes.length))}
               </div>
             </>
@@ -1026,20 +927,25 @@ export default async function KaderaPage() {
         </section>
 
         <section className="hz-sheet" style={{ flex: "1 1 calc(50% - 8px)", minWidth: SHEET_PAIR_MIN, display: "flex", flexDirection: "column" }}>
-          <SectionHead icon="tag" title="이슈 키워드" note="최근 7일" desc="종목명이 아닌 화제어 · 언급 횟수 기준" />
+          <SectionHead icon="tag" title="이슈 키워드" note="최근 3일" desc="종목명이 아닌 화제어 · 언급 횟수 기준" />
           {keywords.length === 0 ? (
             <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>아직 뽑을 화제어가 없습니다.</p>
           ) : (
             <>
               {(() => {
                 const top = keywords[0];
-                const totalTop = keywords.reduce((a, k) => a + k.count, 0);
-                const sharePct = Math.round((top.count / Math.max(1, totalTop)) * 100);
                 const second = keywords[1];
+                /* '가장 큰 변동'은 **위아래를 안 가린다**(절댓값 최대). 늘어난 말만 세우면
+                   관심이 빠진 자리가 화면에서 통째로 안 보인다. 동점은 순위로 가른다 —
+                   안 가르면 실행마다 다른 말이 뜬다. 미장 카드와 같은 규칙이다. */
+                const moved =
+                  keywords
+                    .filter((k) => k.shareDelta !== null)
+                    .sort((a, b) => Math.abs(b.shareDelta!) - Math.abs(a.shareDelta!) || a.rank - b.rank)[0] ?? null;
                 return (
                   <div className="hz-kd-duo" style={{ borderBottom: "1px solid var(--c-sheet-line)" }}>
                     <Highlight
-                      cap="이번 주 화제어 1위"
+                      cap="화제어 1위"
                       name={top.word}
                       value={`${top.count.toLocaleString("ko-KR")}회`}
                       valueColor="var(--c-hot-ink)"
@@ -1047,76 +953,101 @@ export default async function KaderaPage() {
                       divide
                     />
                     <Highlight
-                      cap={`상위 ${keywords.length}개 중 비중`}
-                      name={`${sharePct}%`}
-                      sub={sharePct >= 30 ? "한 키워드에 관심이 쏠린 상태" : "관심이 여러 화제어에 흩어진 상태"}
+                      cap="가장 큰 변동"
+                      name={moved?.word ?? "—"}
+                      value={
+                        moved
+                          ? `${moved.shareDelta! > 0 ? "▲" : "▼"}${Math.abs(moved.shareDelta! * 100).toFixed(1)}%p`
+                          : undefined
+                      }
+                      valueColor={moved && moved.shareDelta! > 0 ? "var(--c-hot-ink)" : "var(--c-cold-ink)"}
+                      sub={moved ? "최근 3일 vs 그 이전 점유율" : "비교할 과거 집계가 없습니다"}
                     />
                   </div>
                 );
               })()}
 
-              <div className="hz-thead" style={{ gridTemplateColumns: KEYWORD_COLS }}>
+              <div className="hz-thead hz-cols-kw">
                 <span>#</span>
                 <span>키워드</span>
                 <span>언급량</span>
+                <span style={{ textAlign: "right" }}>점유율</span>
                 <span style={{ textAlign: "right" }}>횟수</span>
               </div>
-              {/* 1위는 위 하이라이트가 맡았으므로 목록은 2위부터. 막대는 1위 대비라
-                  정의상 한 줄도 100% 가 되지 않는다(1위가 목록에 없다).
-
-                  행마다 flex:1 을 줘 남는 높이를 **행이 나눠 갖게** 한다. 이 시트는 9줄이고
-                  짝인 테마 로테이션은 그룹 알약까지 12줄이라 늘 이쪽이 짧은데, 그냥 두면
-                  마지막 줄과 각주 사이가 통째로 빈다. space-between 으로 벌리면 구분선이
-                  서로 떨어져 표가 끊겨 보이므로, 줄 자체를 고르게 키운다(선은 붙어 있다). */}
+              {/* ⚠️ **1위부터** 센다(예전엔 2위부터였다). 옆 테마 로테이션과 줄을 맞추려면
+                  두 표의 **행 수가 같아야** 하는데, 테마는 하이라이트가 행을 안 먹고
+                  화제어는 1위를 먹기 때문이다. 테마 카드도 1위를 하이라이트에 다시 보여주고
+                  있으니 되풀이 자체는 이미 이 페이지의 규칙이다.
+                  행마다 flex:1 — 남는 높이를 행이 나눠 가지면 두 표의 줄이 저절로 맞는다. */}
               <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-              {keywords.slice(1).map((k, i) => (
-                <div key={k.word} className="hz-trow" style={{ gridTemplateColumns: KEYWORD_COLS, flex: 1 }}>
-                  <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 800, color: C.sub2 }}>{i + 2}</span>
-                  <span style={{ ...clip, fontSize: 12, fontWeight: 700, color: C.ink }}>{k.word}</span>
-                  <span style={{ height: 7, borderRadius: 999, background: C.track, overflow: "hidden" }}>
+                {keywords.map((k) => (
+                  <div
+                    key={k.word}
+                    className="hz-trow hz-cols-kw hz-tip hz-tip-wide hz-tip-end"
+                    data-tip={`최근 3일 ${k.count.toLocaleString("ko-KR")}회 언급${
+                      k.shareDelta === null
+                        ? ""
+                        : ` · 최근 3일 관심 점유율이 그 이전보다 ${Math.abs(k.shareDelta * 100).toFixed(1)}%p ${k.shareDelta > 0 ? "늘었습니다" : "줄었습니다"}`
+                    }`}
+                    style={{ flex: 1 }}
+                  >
+                    <RankBadge n={k.rank} />
+                    <span style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+                      <span style={{ ...clip, minWidth: 0, fontSize: 13, fontWeight: 700, color: C.ink }}>{k.word}</span>
+                      <span style={{ flex: 1 }} />
+                      {/* 옆 테마 표는 %p 를 이름 줄 오른끝(막대 바로 위)에 둔다. 이 표는
+                          이름과 막대가 다른 칸이라 그 자리가 없어 **이름 칸의 오른끝**에
+                          붙인다 — 두 표의 이름 칸이 같은 x 에서 끝나므로 두 %p 가 한
+                          세로선 위에 선다. shareDelta 는 몫이라 ×100 해서 넘긴다. */}
+                      <DeltaPp
+                        value={k.shareDelta === null ? null : k.shareDelta * 100}
+                        style={{ fontSize: 12 }}
+                      />
+                    </span>
+                    {/* 막대는 **이 열 낱말 안에서 차지하는 몫**이다. 색은 관심 점유율의 방향.
+                        ⚠️ 1위 대비로 그리면 1위가 늘 꽉 차서 "얼마나 앞서나"가 사라진다.
+                        그렇다고 전체 화제어 대비로 그리면 화제어가 수백 개라 1위도 7.7%,
+                        5위는 1.7%밖에 안 돼 막대가 통째로 안 보인다(실측). 테마는 열한 개뿐이라
+                        전체 대비가 통하지만 여기는 눈금이 다르다 — 옆 표를 그대로 못 베낀다. */}
+                    <span className="hz-bar">
+                      <span
+                        style={{
+                          width: `${(k.count / Math.max(1, keywordTotal)) * 100}%`,
+                          background:
+                            k.trend === "up" ? "var(--c-warm-2)" : k.trend === "down" ? "var(--c-blue-3)" : C.hint,
+                        }}
+                      />
+                    </span>
+                    {/* 막대가 그린 값을 숫자로 한 번 더. 옆 테마 표가 점유율 칸을 두는 것과
+                        같은 자리다 — 두 표를 나란히 훑을 때 같은 칸이 같은 뜻이어야 한다. */}
                     <span
                       style={{
-                        display: "block",
-                        width: `${(k.count / Math.max(1, keywords[0].count)) * 100}%`,
-                        height: "100%",
-                        // 길이는 7일 횟수, 색은 3일 점유율 방향 — 눈금이 둘이라 각주에 둘 다 적는다.
-                        background: k.trend === "up" ? "var(--c-warm-2)" : k.trend === "down" ? "var(--c-blue-3)" : C.hint,
+                        fontFamily: MONO,
+                        fontSize: 12,
+                        fontWeight: 800,
+                        color: C.ink,
+                        textAlign: "right",
                       }}
-                    />
-                  </span>
-                  <span
-                    style={{
-                      fontFamily: MONO,
-                      fontSize: 11,
-                      fontWeight: 800,
-                      textAlign: "right",
-                      color: k.trend === "up" ? "var(--c-hot-ink)" : k.trend === "down" ? "var(--c-cold-ink)" : C.sub,
-                    }}
-                  >
-                    {k.trend === "up" ? "▲" : k.trend === "down" ? "▼" : ""}
-                    {k.count.toLocaleString("ko-KR")}
-                    {/* 단위를 붙여 위 하이라이트("1,204회")와 같은 문법으로 읽히게 한다.
-                        머리글이 '횟수'라 해도 이 숫자만 떼어 보면 무엇의 400 인지 모른다. */}
-                    <span style={{ fontWeight: 700, color: C.sub2, marginLeft: 1 }}>회</span>
-                  </span>
-                </div>
-              ))}
-              </div>
-              {/* ⚠️ "지난주보다 증가"라고 쓰면 거짓이다 — trend 는 주 대비도, 횟수 대비도
-                  아니고 **최근 3일 점유율** 방향이다(getIssueKeywords 주석). 막대 길이와
-                  색이 서로 다른 눈금이라는 것도 여기서 밝힌다. */}
-              <div className="hz-sheet-foot" style={{ marginTop: "auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: C.sub }}>
-                    <span style={{ width: 8, height: 8, borderRadius: 3, background: "var(--c-warm-2)" }} />
-                    최근 3일 관심 점유율 증가
-                  </span>
-                  <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: C.sub }}>
-                    <span style={{ width: 8, height: 8, borderRadius: 3, background: "var(--c-blue-3)" }} />
-                    감소
-                  </span>
-                </div>
-                <span style={{ fontSize: 12, color: C.sub }}>막대 길이는 7일 언급 횟수 · 종목명·티커는 제외</span>
+                    >
+                      {((k.count / Math.max(1, keywordTotal)) * 100).toFixed(1)}%
+                    </span>
+                    {/* 화살표는 안 붙인다 — 방향은 왼쪽 %p 와 막대 색이 이미 두 번 말한다.
+                        이 칸은 **얼마나 많이**만 말한다. */}
+                    <span
+                      style={{
+                        fontFamily: MONO,
+                        fontSize: 12,
+                        fontWeight: 800,
+                        textAlign: "right",
+                        whiteSpace: "nowrap",
+                        color: C.ink,
+                      }}
+                    >
+                      {k.count.toLocaleString("ko-KR")}
+                      <span style={{ fontSize: 11, fontWeight: 700, color: C.sub2, marginLeft: 1 }}>회</span>
+                    </span>
+                  </div>
+                ))}
               </div>
             </>
           )}

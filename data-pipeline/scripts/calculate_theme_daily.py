@@ -3,10 +3,17 @@
 config/stock_themes.py 의 테마 사전으로 telegram_stock_daily 를 그룹핑한다.
 한 종목이 여러 테마에 속하면 각 테마에 모두 반영된다(예: POSCO홀딩스는 2차전지).
 
-share_pct 는 그날 '전체 종목' 주목도 합 대비 비중이다 — 주말엔 절대 언급량이
+share_pct 는 그날 '사전에 든 종목' 주목도 합 대비 비중이다(그래서 테마 점유율을 다
+더하면 100%가 된다 — 사전 밖 종목은 분자에도 분모에도 안 들어간다) — 주말엔 절대 언급량이
 평일의 1/10로 떨어져 절대량으로는 테마 간 비교도, 날짜 간 비교도 안 되기 때문
 (급부상 종목 계산과 같은 이유). rank 는 그날 share_pct 순위로, 주간 순위 변동은
 프론트에서 날짜 간 rank 를 비교해 구한다.
+
+**분모가 전 종목이므로 테마 합은 100%가 아니다.** 사전이 못 덮은 종목이 그만큼
+빠져 있다. 그래서 **분모에서도 뺀다** — 그러면 테마 점유율을 다 더해 100%가 된다.
+2026-08-11 이전에는 분모가 전체라 테마 합이 날마다 26~57% 를 오갔고, 카드엔 그 사실이
+어디에도 없었다. 사전이 얼마나 덮는지는 실행할 때 로그로 찍는다(표에는 안 넣는다 —
+미장에는 잔여분이 0 이라 그 줄이 아예 없고, 두 화면의 표는 같은 얼개여야 한다).
 
 extract/stock_daily 가 전량 재계산하므로 여기도 매 실행 전량 재계산해 맞춘다.
 
@@ -61,9 +68,22 @@ def main() -> None:
         print("[경고] telegram_stock_daily 가 비어 있습니다. 먼저 calculate_stock_daily.py 를 실행하세요.")
         return
 
-    # 그날 전체 주목도(테마 무관) — share_pct 의 분모.
+    # share_pct 의 분모 — 그날 **사전에 든 종목**의 주목도 합이다.
+    #
+    # ⚠️ 예전엔 '그날 전체 종목'이었다. 그러면 테마 점유율을 다 더해도 100%가 안 된다 —
+    #    사전이 못 덮은 종목의 몫이 분모에만 남기 때문이다. 국내는 그 구멍이 컸다:
+    #    일별 집계엔 856종목이 있는데 사전은 그 일부라, **합이 26%였다**(2026-08-12 실측).
+    #    "점유율"이라 적어 놓고 다 더하면 4분의 1이라는 것은 말이 안 된다.
+    #    미장은 우연히 티가 안 났다 — 집계에 담기는 종목이 곧 사전의 178개라 사전 = 우주였다
+    #    (그래서 합이 100.03% 였다). 규칙을 양쪽에 똑같이 두어, 미장에서 사전 밖 종목이
+    #    생기는 날에도 같은 뜻이 유지되게 한다.
+    #
+    #    분모가 바뀌면 점유율의 **뜻도 바뀐다**: '전체 대화 중 몫'이 아니라
+    #    '테마에 잡힌 것 중 몫'이다. 화면 문구도 그렇게 적혀 있어야 한다.
     day_total: dict[str, float] = defaultdict(float)
     for r in daily:
+        if not theme_of.get(r["stock_code"]):
+            continue
         day_total[r["date"]] += float(r["weighted_score"] or 0)
 
     agg: dict[tuple[str, str], dict] = defaultdict(
@@ -99,12 +119,36 @@ def main() -> None:
         for i, r in enumerate(date_rows, 1):
             r["rank"] = i
 
-    print(f"\n집계 {len(rows)}행 ((날짜×테마), 테마 {len(THEMES)}개 · 날짜 {len(by_date)}일)")
+    # '기타' — 사전이 못 덮은 종목의 몫. 테마 합 + 기타 = 100% 가 되게 한다.
+    # 사전 밖 종목이 얼마나 되는지는 **화면에 줄로 세우지 않고 여기서 찍는다.**
+    # 한때 '기타' 한 줄을 표에 넣어 합을 100% 로 맞추는 안이 있었는데, 분모에서 사전 밖을
+    # 빼는 지금 방식과는 양립하지 않는다(둘 다 하면 합이 139% 가 된다). 그리고 미장에는
+    # 그 줄이 아예 있을 수 없다 — 사전이 집계 대상을 전부 덮어 잔여분이 0 이다.
+    # 두 화면의 표를 같은 얼개로 두려면 잔여분은 표 밖에 있어야 한다.
+    covered = {d: 0.0 for d in day_total}
+    grand: dict[str, float] = defaultdict(float)
+    for r in daily:
+        grand[r["date"]] += float(r["weighted_score"] or 0)
+    latest_cov = max(grand) if grand else None
+    if latest_cov:
+        c, g = day_total.get(latest_cov, 0.0), grand[latest_cov]
+        print(f"\n[사전 커버리지] {latest_cov} · 전체 주목도의 {c / g * 100:.1f}% 를 사전이 덮는다"
+              f" (나머지 {100 - c / g * 100:.1f}% 는 어느 테마에도 안 잡혀 분자·분모 둘 다에서 빠진다)")
+
+    print(
+        f"\n집계 {len(rows)}행 ((날짜×테마), 테마 {len(THEMES)}개 · 날짜 {len(by_date)}일)"
+    )
     latest = max(by_date)
     print(f"\n=== 최신일({latest}) 테마 순위 ===")
     print(f"{'#':>2} {'테마':<14}{'점유율':>8}{'언급':>7}{'종목':>6}")
-    for r in sorted(by_date[latest], key=lambda r: r["rank"])[:10]:
+    ranked = sorted((r for r in by_date[latest] if r["rank"]), key=lambda r: r["rank"])
+    for r in ranked[:10]:
         print(f"{r['rank']:>2} {r['theme']:<14}{r['share_pct']:>7.1f}%{r['mention_count']:>7}{r['stock_count']:>6}")
+    if len(ranked) > 10:
+        rest = sum(r["share_pct"] for r in ranked[10:])
+        print(f"{'':>2} {f'(11~{len(ranked)}위)':<14}{rest:>7.1f}%")
+    # 합이 100 인지 여기서 눈으로 확인된다. 어긋나면 사전에 겹친 종목이 생긴 것이다.
+    print(f"{'':>2} {'합계':<14}{sum(r['share_pct'] for r in by_date[latest]):>7.1f}%")
 
     if dry_run:
         print("\n--dry-run: DB에 저장하지 않았습니다.")

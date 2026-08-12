@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { analyzeDrawdown, drawdownSeries, riskProfile, type Bar } from "@/lib/mdd";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { themesForName, THEMES } from "@/lib/stock-themes";
+import { US_MDD_PEER_MAX, US_THEMES, themesForTicker } from "@/lib/us-stock-themes";
 import { fetchDailyHistory, yahooSymbol } from "@/lib/yahoo-history";
 
 // MDD(최대낙폭) 분석. 야후 일봉을 호출 시점에 직접 받아 계산하고, 상단 티커
@@ -16,6 +17,14 @@ export const maxDuration = 20;
 const YEARS: Record<string, number> = { "1": 1, "3": 3, "5": 5, "10": 10, all: 100 };
 /** 코스피 지수 심볼 — 시장 대비 비교의 기준. 상단 티커와 같은 심볼을 쓴다. */
 const KOSPI = "^KS11";
+/**
+ * 미국 상장의 시장 기준. S&P500 이다.
+ *
+ * 나스닥(^IXIC)이 아닌 이유: 이 사전(us_stocks 178종목)에는 나스닥·NYSE 가 섞여 있어
+ * 한쪽 거래소 지수를 기준으로 삼으면 다른 쪽 종목이 엉뚱한 것과 견줘진다.
+ * S&P500 은 두 거래소를 아우르는 시장 전체의 대용이다.
+ */
+const SP500 = "^GSPC";
 
 type Peer = { name: string; code: string; dd: number; isSelf: boolean };
 type Theme = { name: string; peers: Peer[]; avgDd: number; sincePeakAvg: number | null };
@@ -28,7 +37,11 @@ export async function GET(request: Request) {
   const yearsKey = searchParams.get("years") ?? "10";
   const years = YEARS[yearsKey] ?? 10;
 
-  if (!/^[0-9A-Z]{6}$/.test(code)) {
+  // 국내는 6자리(숫자·영문), 미국은 티커 1~5자다. 예전엔 `{6}` 고정이라 미국 티커가
+  // 통째로 400 이었다 — 미장 카드에서 링크를 걸 수 없던 이유가 이것이다.
+  const isUs = market === "US";
+  const codeOk = isUs ? /^[A-Z][A-Z.\-]{0,6}$/.test(code) : /^[0-9A-Z]{6}$/.test(code);
+  if (!codeOk) {
     return NextResponse.json({ ok: false, error: "종목 코드가 올바르지 않습니다." }, { status: 400 });
   }
 
@@ -48,9 +61,14 @@ export async function GET(request: Request) {
 
   // 코스피는 항상 받는다 — 원인 분해(고점 이후)뿐 아니라 리스크 프로필의 '시장 동반성'도
   // 코스피 시계열이 필요하기 때문이다.
+  // 시장 기준은 상장 시장을 따른다. 엔비디아 낙폭을 코스피와 견주는 건 뜻이 없다.
+  //
+  // 테마 비교도 시장에 따라 갈린다. 사전만 다르고 결과 모양은 같아 화면은 하나다.
   const [marketBars, theme] = await Promise.all([
-    fetchDailyHistory(KOSPI, years),
-    buildThemeComparison(name, market, years, analysis.currentDd, athDate),
+    fetchDailyHistory(isUs ? SP500 : KOSPI, years),
+    isUs
+      ? buildUsThemeComparison(code, years, analysis.currentDd, athDate)
+      : buildThemeComparison(name, market, years, analysis.currentDd, athDate),
   ]);
 
   // 리스크 프로필(보상·큰 하락 빈도·시장 동반성) — 종목·코스피 종가로 요약.
@@ -74,6 +92,68 @@ export async function GET(request: Request) {
     { ok: true, code, name, market, symbol, years: yearsKey, analysis, attribution, theme, risk },
     { headers: { "Cache-Control": "public, s-maxage=900, stale-while-revalidate=600" } },
   );
+}
+
+/**
+ * 미국판 테마 비교. 국내(buildThemeComparison)와 **같은 결과 모양**이라 화면은 하나다.
+ * 갈리는 것은 사전 하나뿐이다 — 이 저장소가 미장 카더라 전체에서 지킨 원칙과 같다.
+ *
+ * 국내와 다른 점 둘.
+ *  ① 사전의 키가 이름이 아니라 **티커**다. 그래서 stocks 표를 거쳐 코드로 옮기는
+ *     단계가 없다 — 미국 종목의 한글 표기는 흔들리지만 티커는 안 흔들린다.
+ *  ② 이름은 화면에 쓸 한글 표기라 us_stocks 에서 받는다. 못 받으면 티커를 그대로 쓴다
+ *     (사전에 있는데 표에 없는 종목은 없지만, 조회가 실패해도 카드는 살아야 한다).
+ */
+async function buildUsThemeComparison(
+  ticker: string,
+  years: number,
+  selfDd: number,
+  athDate: string,
+): Promise<Theme | null> {
+  if (!ticker) return null;
+  const matched = themesForTicker(ticker);
+  if (matched.length === 0) return null;
+  const themeName = matched[0];
+  const peerTickers = US_THEMES[themeName].filter((t) => t !== ticker).slice(0, US_MDD_PEER_MAX);
+  if (!peerTickers.length) return null;
+
+  // 최대 10개라 1,000행 캡과 무관하다.
+  let nameOf = new Map<string, string>();
+  try {
+    const { data } = await getSupabaseServer()
+      .from("us_stocks")
+      .select("ticker, name_ko")
+      .in("ticker", [...peerTickers, ticker]);
+    nameOf = new Map((data ?? []).map((r) => [r.ticker as string, r.name_ko as string]));
+  } catch {
+    nameOf = new Map();
+  }
+
+  const fetched = await Promise.all(
+    peerTickers.map(async (t) => {
+      const bars = await fetchDailyHistory(yahooSymbol(t, "US"), years);
+      if (!bars) return null;
+      const ds = drawdownSeries(bars);
+      return {
+        name: nameOf.get(t) ?? t,
+        code: t,
+        dd: ds[ds.length - 1].dd,
+        sincePeak: returnSince(bars, athDate),
+      };
+    }),
+  );
+
+  const ok = fetched.filter((p): p is NonNullable<typeof p> => p !== null);
+  const peers: Peer[] = ok.map((p) => ({ name: p.name, code: p.code, dd: p.dd, isSelf: false }));
+  peers.push({ name: nameOf.get(ticker) ?? ticker, code: "", dd: selfDd, isSelf: true });
+  peers.sort((a, b) => a.dd - b.dd); // 깊게 빠진 순
+  if (peers.length < 2) return null;
+
+  const avgDd = peers.reduce((s, p) => s + p.dd, 0) / peers.length;
+  const sinceVals = ok.map((p) => p.sincePeak).filter((v): v is number => v !== null);
+  const sincePeakAvg = sinceVals.length ? sinceVals.reduce((s, v) => s + v, 0) / sinceVals.length : null;
+
+  return { name: themeName, peers, avgDd, sincePeakAvg };
 }
 
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
