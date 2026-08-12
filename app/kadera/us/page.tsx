@@ -19,6 +19,7 @@ import type { UsTrendingMessage } from "@/lib/us-telegram-data";
 import { formatKstUpdate } from "@/lib/format";
 
 import { pageMetadata } from "../../seo";
+import { US_KADERA_CARD } from "../../og-copy";
 import { AiMark, C, Icon, MONO, R } from "../../ui";
 import { StockLogo } from "../../StockLogo";
 import { ExpandableList } from "../ExpandableList";
@@ -42,8 +43,9 @@ export async function generateMetadata(): Promise<Metadata> {
   return pageMetadata({
     title: "미장 카더라 | hatzze",
     description:
-      "같은 주식 텔레그램 채널들이 미국 종목은 뭐라고 하는지 모읍니다. 미국 기업 소식이 어느 국내 종목과 함께 오르내리는지도 함께 봅니다.",
+      "같은 주식 텔레그램 채널들이 미국 종목은 뭐라고 하는지 봅니다. 오늘 가장 많이 언급된 미국 종목과 관심이 어느 테마로 옮겨가는지 매일 집계합니다.",
     path: "/kadera/us",
+    ownImage: US_KADERA_CARD.alt,
   });
 }
 

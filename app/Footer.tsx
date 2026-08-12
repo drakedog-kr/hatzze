@@ -138,7 +138,12 @@ export default function Footer() {
           <nav aria-label="바로가기">
             <GroupLabel>바로가기</GroupLabel>
             <FooterLink href="/">시장 브리핑</FooterLink>
-            <FooterLink href="/kadera">카더라 리포트</FooterLink>
+            {/* 카더라는 국장·미장 둘로 갈린다. 여기서는 구역 이름("카더라 리포트")이
+                아니라 **갈 수 있는 페이지**를 적는다 — 푸터는 목적지 목록이라, 구역
+                이름 하나만 두면 미장으로 가는 길이 푸터에서만 사라진다. 순서는
+                사이드바(AppShell 의 NAV)와 같게 둔다. */}
+            <FooterLink href="/kadera">국장 카더라</FooterLink>
+            <FooterLink href="/kadera/us">미장 카더라</FooterLink>
             <FooterLink href="/mdd">MDD 정밀분석</FooterLink>
             {/* 사이드바가 모바일에서 숨겨져 텔레그램 링크가 사라진다 — 내부 내비게이션과
                 같은 방식으로 푸터에 두어 좁은 화면에서도 닿게 한다. 라벨과 aria 는

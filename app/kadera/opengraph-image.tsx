@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-import { BLUE, INK, OG_CONTENT_TYPE, OG_SIZE, TitleCard, loadOgFonts } from "../og-card";
+import { ChatterArt, OG_CONTENT_TYPE, OG_SIZE, TitleCard, loadOgFonts } from "../og-card";
 import { KADERA_CARD } from "../og-copy";
 
 /**
@@ -20,52 +20,25 @@ export const size = OG_SIZE;
 export const contentType = OG_CONTENT_TYPE;
 
 /**
- * 오가는 말. 이 페이지의 재료가 채널에 도는 이야기라, 순위 막대 같은 집계 그림보다
- * "사람들이 떠드는" 장면이 이름(카더라)에 맞는다.
+ * 오가는 말. 그림 자체는 미장 카드와 같은 것을 쓴다(og-card.tsx 의 ChatterArt) —
+ * 왜 말풍선인지, 대사에 뭘 넣으면 안 되는지는 그쪽 주석에.
  *
- * SVG 가 아니라 JSX 로 짠다 — data URI 로 넘긴 SVG 안의 글자는 Satori 가 폰트를
- * 실어 주지 않아 빈칸으로 나온다. 여기서는 카드 본문과 같은 Pretendard 로 그려진다.
- *
- * 문구는 **떠도는 말투 자체**만 흉내 낸다. 뭘 사라/팔라로 읽힐 말은 넣지 않는다 —
- * 이 서비스는 그런 말을 옮기는 곳이 아니라 얼마나 도는지를 세는 곳이다.
+ * 대사만 두 시장이 다르다. 국장은 낮에 실시간으로 도는 말이라 "들었어?"로 연다.
  */
-const CHATTER: { text: string; mine: boolean }[] = [
+const CHATTER = [
   { text: "그 얘기 들었어?", mine: false },
   { text: "어디서 나온 건데", mine: true },
   { text: "…라고 카더라", mine: false },
 ];
 
-function Bubbles() {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14, width: 358 }}>
-      {CHATTER.map((c) => (
-        <div key={c.text} style={{ display: "flex", justifyContent: c.mine ? "flex-end" : "flex-start" }}>
-          <div
-            style={{
-              padding: "15px 26px",
-              fontSize: 27,
-              fontWeight: 500,
-              background: c.mine ? BLUE : "#ffffff",
-              color: c.mine ? "#ffffff" : INK,
-              // 말풍선의 꼬리 자리만 각지게 둔다. 삼각형 꼬리를 붙이는 것보다 단순하고
-              // 메신저에서 흔히 보는 모양이라 한눈에 대화로 읽힌다.
-              borderTopLeftRadius: 26,
-              borderTopRightRadius: 26,
-              borderBottomLeftRadius: c.mine ? 26 : 8,
-              borderBottomRightRadius: c.mine ? 8 : 26,
-            }}
-          >
-            {c.text}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export default async function Image() {
   return new ImageResponse(
-    <TitleCard title={KADERA_CARD.title} lines={KADERA_CARD.lines} foot={KADERA_CARD.foot} art={<Bubbles />} />,
+    <TitleCard
+      title={KADERA_CARD.title}
+      lines={KADERA_CARD.lines}
+      foot={KADERA_CARD.foot}
+      art={<ChatterArt chatter={CHATTER} />}
+    />,
     { ...OG_SIZE, fonts: await loadOgFonts() },
   );
 }
