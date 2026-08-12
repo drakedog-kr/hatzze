@@ -430,7 +430,7 @@ function Sidebar() {
                 className="hz-nav-item"
                 style={{
                   ...rowStyle,
-                  color: on ? C.blue : C.sub,
+                  color: on ? C.blueInk : C.sub,
                   fontWeight: on ? 700 : 600,
                   textDecoration: "none",
                 }}
@@ -505,7 +505,7 @@ function Sidebar() {
             // 카드 아이콘 타일과 같은 옅은 하늘색. 꽉 찬 파랑은 사이드바에서 혼자 튀어
             // 내비게이션이 아니라 광고 배너처럼 읽혔다(2026-08-03).
             background: "var(--c-blue-tint)",
-            color: C.blue,
+            color: C.blueInk,
             fontSize: 14,
             fontWeight: 700,
             textDecoration: "none",
@@ -539,7 +539,7 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
     gap: 12,
     padding: "13px 14px",
     borderRadius: R.nav,
-    color: active ? C.blue : C.sub,
+    color: active ? C.blueInk : C.sub,
     fontWeight: active ? 700 : 600,
     // 사이드바와 같은 이유로 비활성 background 는 인라인에서 뺀다 — 값을 두면
     // .hz-nav-item:hover 를 인라인이 이겨버린다.
@@ -625,7 +625,7 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
                 href={child.href}
                 {...intentPrefetch(child.href)}
                 className="hz-nav-item"
-                style={{ ...indented, color: on ? C.blue : C.sub, fontWeight: on ? 700 : 600 }}
+                style={{ ...indented, color: on ? C.blueInk : C.sub, fontWeight: on ? 700 : 600 }}
               >
                 <child.Glyph size={18} />
                 <span style={{ fontSize: 14 }}>{child.label}</span>
