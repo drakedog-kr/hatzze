@@ -58,6 +58,13 @@ def save_collection_stats(
     실측. 같은 질의가 웜에서는 236ms). telegram_messages·telegram_message_stocks·
     telegram_channels 는 전부 파이프라인이 돌 때만 바뀌므로 실행 사이에는 상수다.
 
+    ⭐ 2026-08-13 에 이 세 count 를 다시 쟀다(표가 156,180행으로 자란 뒤): messages_7d
+    39,481건 **0.34초(첫 회)·0.06초**, total_mentions 107,944건 0.38·0.08초, 채널별
+    weekly_posts 0.03~0.07초. 위 6,946ms 는 창이 커서가 아니라 **인스턴스가 식어 첫
+    질의가 문 값**이었다(같은 날 다른 조회의 첫 회도 7.5초였다). 그래서 이 셋은 8초
+    천장의 후보가 아니라고 보고 키셋으로 안 옮겼다 — 옮기면 정확한 count 한 번이
+    40여 번의 왕복이 된다. 다시 느려지면 그때 판단을 뒤집을 것.
+
     ⚠️ **messages_7d 는 채널로 좁히지 않는다.** 바로 위 weekly_posts 는 채널마다 세지만
     이건 창 안의 모든 메시지를 센다 — 수집이 끊긴 채널이 남긴 옛 글도 포함하는 것이
     화면 쪽의 의도다(lib/telegram-data.ts 의 messages7d 주석). weekly_posts 합으로

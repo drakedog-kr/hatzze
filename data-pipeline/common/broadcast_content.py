@@ -40,6 +40,7 @@ from collections.abc import Iterable
 from datetime import date, datetime, timedelta
 
 from .channel_breadth import channel_breadth_map
+from .supabase_client import load_keyset
 from .surging import load_stock_daily
 from .text_check import problems
 from .timeutil import KST, today_kst
@@ -122,28 +123,19 @@ def night_split(db, target: date) -> tuple[int, int]:
     lo = datetime.combine(target, datetime.min.time(), tzinfo=KST)
     hi = lo + timedelta(days=1)
 
-    # 위아래 경계를 둘 다 걸어야 해서 _page 를 안 쓰고 여기서 직접 페이징한다.
-    # 하루치가 4,000건을 넘으므로 페이징이 없으면 1,000건에서 조용히 잘린다.
-    out: list[str] = []
-    start = 0
-    PAGE = 1000
-    while True:
-        page = (
-            db.table("telegram_messages")
-            .select("posted_at")
-            .gte("posted_at", lo.isoformat())
-            .lt("posted_at", hi.isoformat())
-            .order("id")
-            .range(start, start + PAGE - 1)
-            .execute()
-            .data
-        )
-        if not page:
-            break
-        out += [r["posted_at"] for r in page]
-        start += PAGE
-        if len(page) < PAGE:
-            break
+    # 위아래 경계를 둘 다 걸어야 해서 _page 를 안 쓰고 load_keyset 의 narrow 로 건다.
+    # 하루치가 8,000건을 넘으므로 페이징이 없으면 1,000건에서 조용히 잘린다.
+    #
+    # ⚠️ OFFSET 이 아니라 키셋이다. 필터를 건 OFFSET 은 페이지마다 건너뛴 행을 다시 훑어
+    #    표가 자라면 `statement_timeout`(8초)에 걸린다 — 2026-08-13 오전에 같은 조합인
+    #    두 스텝이 그렇게 죽었다. select 의 id 는 다음 페이지의 시작점이라 필요하다.
+    rows = load_keyset(
+        db,
+        "telegram_messages",
+        "id,posted_at",
+        narrow=lambda q: q.gte("posted_at", lo.isoformat()).lt("posted_at", hi.isoformat()),
+    )
+    out = [r["posted_at"] for r in rows]
 
     night = 0
     for ts in out:
@@ -178,27 +170,15 @@ def load_night_messages(db) -> tuple[int, list[str], datetime, datetime]:
         return end - timedelta(hours=24 - NIGHT_FROM_HOUR + NIGHT_TO_HOUR), end
 
     def fetch(start: datetime, end: datetime) -> list[dict]:
-        rows: list[dict] = []
-        offset = 0
-        PAGE = 1000
-        while True:
-            page = (
-                db.table("telegram_messages")
-                .select("text,views,forwards,posted_at")
-                .gte("posted_at", start.isoformat())
-                .lt("posted_at", end.isoformat())
-                .order("id")
-                .range(offset, offset + PAGE - 1)
-                .execute()
-                .data
-            )
-            if not page:
-                break
-            rows += page
-            offset += PAGE
-            if len(page) < PAGE:
-                break
-        return rows
+        # 위 night_split 과 같은 이유로 키셋이다(필터 + OFFSET 조합이 천장에 걸린다).
+        return load_keyset(
+            db,
+            "telegram_messages",
+            "id,text,views,forwards,posted_at",
+            narrow=lambda q: q.gte("posted_at", start.isoformat()).lt(
+                "posted_at", end.isoformat()
+            ),
+        )
 
     # 지난밤이 비어 있으면 자료가 있는 밤까지 하루씩 물러난다.
     #

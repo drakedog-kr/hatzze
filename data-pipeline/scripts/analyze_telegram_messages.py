@@ -54,7 +54,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from anthropic import Anthropic  # noqa: E402
 
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
-from common.supabase_client import get_client  # noqa: E402
+from common.supabase_client import get_client, load_keyset  # noqa: E402
 
 # Haiku 4.5 — 분류는 대량 호출이라 속도/비용이 중요하고, 3지선다 + 명사 추출 난이도엔
 # 충분하다. (히어로 요약도 같은 모델을 쓴다.)
@@ -95,7 +95,6 @@ SCAN_DAYS = 14
 # 분류 기록은 창보다 조금 넓게 읽는다. analyzed_at ≥ posted_at 이므로 이 창은 위 창
 # 안의 모든 메시지의 분류 기록을 반드시 덮는다(놓치면 재분류 = 이중 과금).
 ANALYSIS_LOOKBACK_DAYS = SCAN_DAYS + 2
-PAGE = 1000
 
 SYSTEM = """\
 당신은 한국 주식 텔레그램 채널·채팅방의 메시지를 분류하는 분석기입니다.
@@ -179,25 +178,20 @@ def load_recent_messages(db) -> list[dict]:
     컬럼으로 정렬하면 동일값 구간의 순서가 요청마다 보장되지 않아, 페이지 경계에서
     행이 조용히 빠지거나 겹친다. 실측으로 4,054행 표를 4,029행으로 읽었고, 그렇게
     빠진 행은 '미분류'로 보여 이미 분류한 메시지를 다시 제출했다(=이중 과금).
+
+    ⚠️ **OFFSET 이 아니라 키셋으로 넘긴다.** 2026-08-13 오전에 이 조회가 `57014`
+    (statement timeout)로 죽어 그날 분류 제출이 통째로 0건이 됐다. 창이 14일이라
+    좁아 보여도 telegram_messages 가 156,180행(하루 7~8천씩 증가)이라 창 안이 이미
+    83,373행 = 84페이지고, 필터를 건 OFFSET 은 페이지마다 건너뛴 행을 다시 훑는다.
+    실측으로 한 페이지 최악이 6.91초인데 천장이 8초다(키셋은 0.65초).
     """
     since = (datetime.now(timezone.utc) - timedelta(days=SCAN_DAYS)).isoformat()
-    rows: list[dict] = []
-    start = 0
-    while True:
-        page = (
-            db.table("telegram_messages")
-            .select("id,channel_handle,message_id,posted_at,text")
-            .gte("posted_at", since)
-            .order("id")
-            .range(start, start + PAGE - 1)
-            .execute()
-            .data
-        )
-        if not page:
-            break
-        rows += page
-        start += PAGE
-    return rows
+    return load_keyset(
+        db,
+        "telegram_messages",
+        "id,channel_handle,message_id,posted_at,text",
+        narrow=lambda q: q.gte("posted_at", since),
+    )
 
 
 def load_recent_analysis(db) -> dict[tuple[str, int], dict]:
@@ -205,30 +199,25 @@ def load_recent_analysis(db) -> dict[tuple[str, int], dict]:
 
     재호출 방지와 중복 라벨 복사에 쓴다. 화제어까지 읽는 이유는 복사 때 같이 넣어야
     집계 의미가 지금과 같기 때문이다(아래 fan_out_duplicates 참조).
+
+    위 load_recent_messages 와 같은 이유로 키셋이다. 이쪽은 112,806행 표에 창이 16일이라
+    아직 안 죽었을 뿐, 조합(필터 + OFFSET)이 같아서 다음 차례였다.
     """
     since = (
         datetime.now(timezone.utc) - timedelta(days=ANALYSIS_LOOKBACK_DAYS)
     ).isoformat()
+    rows = load_keyset(
+        db,
+        "telegram_message_analysis",
+        "id,channel_handle,message_id,sentiment,keywords,analyzed_at",
+        narrow=lambda q: q.gte("analyzed_at", since),
+    )
     out: dict[tuple[str, int], dict] = {}
-    start = 0
-    while True:
-        page = (
-            db.table("telegram_message_analysis")
-            .select("id,channel_handle,message_id,sentiment,keywords,analyzed_at")
-            .gte("analyzed_at", since)
-            .order("id")  # 유일 키로 정렬해야 페이지 경계에서 행이 빠지지 않는다
-            .range(start, start + PAGE - 1)
-            .execute()
-            .data
-        )
-        if not page:
-            break
-        for r in page:
-            out[(r["channel_handle"], r["message_id"])] = {
-                "sentiment": r["sentiment"],
-                "keywords": r.get("keywords") or [],
-            }
-        start += PAGE
+    for r in rows:
+        out[(r["channel_handle"], r["message_id"])] = {
+            "sentiment": r["sentiment"],
+            "keywords": r.get("keywords") or [],
+        }
     return out
 
 
