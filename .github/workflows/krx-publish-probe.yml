@@ -1,0 +1,44 @@
+name: KRX 공표 시각 실측 (일회성)
+
+# 아침 파이프라인을 얼마나 당길 수 있는지 정하려면 **KRX 가 전 영업일 자료를 몇 시에
+# 올리는지** 알아야 한다. 지금 근거는 관측 두 점뿐이다 — 07:40 엔 없고 10:44 엔 있다.
+#
+# ⚠️ **크론을 여러 개 걸어 08:00·08:30·… 에 재는 방법은 안 통한다.** 깃헙 예약 큐가
+#    60분 넘게 밀어서(2026-08-13 실측 61~68분) 원하는 시각에 안 뜬다. 그래서 일찍 한 번
+#    켜 두고 **러너 안에서 5분 간격으로 도는** 폴링 루프로 만들었다.
+#
+# 이 저장소는 public 이라 Actions 분이 무료다. 자료가 올라오는 즉시 루프가 끝나므로
+# 실제 점유는 한두 시간이다.
+#
+# 🗑️ **일회성이다.** 한 번 재서 값을 얻으면 이 파일과 스크립트를 지우고, 얻은 시각을
+#    daily-update.yml 의 cron 주석에 적어 둘 것. 남겨 두면 매일 아침 러너를 켠다.
+
+on:
+  schedule:
+    # 발화 20:00 UTC(다음날 05:00 KST) → 큐 지연 ~60분 → 실제 시작 ~06:00 KST.
+    # 공표 하한이 07:40 이니 한참 앞에서 시작해 놓치지 않는다.
+    # UTC 일~목 = KST 월~금 아침. 주말 아침엔 잴 것이 없다.
+    - cron: "0 20 * * 0-4"
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    # 자료가 올라오면 즉시 끝난다. 공휴일 다음 날처럼 영영 안 올라오는 날을 대비한 상한.
+    timeout-minutes: 360
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests python-dotenv
+
+      - name: KRX 공표 시각 폴링
+        env:
+          KRX_API_KEY: ${{ secrets.KRX_API_KEY }}
+        run: python data-pipeline/scripts/probe_krx_publish_time.py
