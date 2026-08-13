@@ -7,6 +7,10 @@ telegram_messages 를 **조회수 순 상위 200건** 받아 점수로 다시 �
 
 실측(2026-08-07 콜드 트레이스): 세 창 3왕복의 소요 합이 11,011ms, 웜에서는 596ms.
 
+⚠️ 그 3왕복이 2026-08-12 저녁 실행에서 `57014`(statement timeout)로 죽었다. 조회수 순
+정렬에 **본문까지 실어 나른 것**이 원인이라, 지금은 줄 세우기와 본문 받기를 나눴다
+(pick_top 주석의 실측 참고).
+
 **캐싱이 아니라 계산을 옮기는 것이다.** telegram_messages 는 파이프라인이 돌 때만
 바뀐다 — 조회수·공유수도 그때 갱신된다. 실행 사이에 이 36줄은 상수다.
 
@@ -46,6 +50,8 @@ CANDIDATES = 200
 STORE_N = 36
 # 종목 태그는 메시지당 최대 3개까지 화면에 붙는다.
 STOCK_TAGS_PER_MESSAGE = 3
+# 본문을 뒤늦게 받을 때 한 번에 묶는 id 수(위 fetch_texts 주석 참고).
+TEXT_CHUNK = 50
 
 # ⚠️ lib/telegram-data.ts 의 FIRST_COLLECTION_HOUR_KST 와 같은 값이어야 한다.
 FIRST_COLLECTION_HOUR_KST = 9
@@ -84,11 +90,52 @@ def score(m: dict) -> float:
     )
 
 
+def fetch_texts(db, ids: list[str]) -> dict[str, str]:
+    """id → 본문. 줄 세우기가 끝난 뒤 **이긴 후보의 본문만** 따로 받는다.
+
+    한 번에 다 받지 않고 쪼개는 이유: `.in_()` 목록이 길면 URL 이 커져 **요청 자체가
+    안 나간다**(테마 팝오버가 그렇게 조용히 죽었다 — PR #336). 200건이면 네 번이고
+    한 번이 0.02초대라 왕복이 늘어도 체감이 없다.
+    """
+    out: dict[str, str] = {}
+    for i in range(0, len(ids), TEXT_CHUNK):
+        page = (
+            db.table("telegram_messages")
+            .select("id,text")
+            .in_("id", ids[i : i + TEXT_CHUNK])
+            .execute()
+            .data
+        ) or []
+        for r in page:
+            out[r["id"]] = r["text"]
+    return out
+
+
 def pick_top(db, start: datetime) -> list[dict]:
-    """창 안에서 점수 상위 STORE_N 건. 후보는 조회수 순 CANDIDATES 건에서 고른다."""
+    """창 안에서 점수 상위 STORE_N 건. 후보는 조회수 순 CANDIDATES 건에서 고른다.
+
+    ⚠️ **줄 세울 때는 본문을 받지 않는다.** 점수(score)가 조회·공유·댓글만 쓰므로 본문은
+    정렬에 아무 쓸모가 없는데, 같이 실으면 DB 가 **본문을 품은 넓은 행 수만 건을 정렬**
+    하게 된다. 2026-08-12 저녁 실행에서 이 질의가 `57014`(statement timeout)로 죽어
+    그날 트렌딩 카드가 갱신되지 않았다.
+
+    실측(2026-08-13, 창 3일 · 표 156,180행):
+        본문 포함  콜드 1.99초 · 웜 0.08초
+        본문 제외  콜드 0.05초 · 웜 0.04초   ← 40배
+
+    ⭐ **'오늘' 창이 제일 위험하다.** 창이 좁을수록 안전할 것 같지만 반대다 — `views desc`
+    로 훑다가 창 안에 드는 200건을 만날 때까지 더 멀리 걸어야 한다. 옛 판을 오늘 다시
+    돌려 보니 '오늘' 창에서 **또 57014 로 죽었고**(같은 자리 재현), 다음 회차가 3.37초,
+    그다음이 0.20초였다. 새 판은 같은 자리에서 1.01초 → 0.28초다.
+    ⚠️ 그래서 **웜 값만 보면 새 판이 더 느려 보인다**(본문을 따로 받는 왕복이 붙는다).
+    천장은 statement 하나에 걸리지 총 소요에 걸리지 않는다 — 볼 값은 콜드 최악값이다.
+
+    본문은 아래에서 후보 id 로 따로 받는다. 받는 대상이 같으니 결과는 같다 —
+    필터(`text is not null`)·정렬(`views desc`)·후보 수가 그대로이기 때문이다.
+    """
     rows = (
         db.table("telegram_messages")
-        .select("channel_handle,message_id,text,views,forwards,replies,posted_at")
+        .select("id,channel_handle,message_id,views,forwards,replies,posted_at")
         .gte("posted_at", start.isoformat())
         .not_.is_("text", "null")
         .order("views", desc=True, nullsfirst=False)
@@ -96,9 +143,10 @@ def pick_top(db, start: datetime) -> list[dict]:
         .execute()
         .data
     ) or []
+    texts = fetch_texts(db, [m["id"] for m in rows])
     cleaned = []
     for m in rows:
-        t = clean_text(m.get("text"))
+        t = clean_text(texts.get(m["id"]))
         if not t:  # 공백뿐인 본문은 화면에서도 걸러진다
             continue
         cleaned.append({**m, "text": t, "_score": score(m)})
