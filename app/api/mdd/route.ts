@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { analyzeDrawdown, drawdownSeries, riskProfile, type Bar } from "@/lib/mdd";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { themesForName, THEMES } from "@/lib/stock-themes";
+import { MDD_PEER_MAX, themesForName, THEMES } from "@/lib/stock-themes";
 import { US_MDD_PEER_MAX, US_THEMES, themesForTicker } from "@/lib/us-stock-themes";
 import { fetchDailyHistory, yahooSymbol } from "@/lib/yahoo-history";
 
@@ -189,7 +189,10 @@ async function buildThemeComparison(
   const matched = themesForName(name);
   if (matched.length === 0) return null;
   const themeName = matched[0]; // 여러 테마에 걸치면 첫 번째(사전 순서 = 대표성 순서)
-  const memberNames = THEMES[themeName].filter((n) => n !== name);
+  // **앞에서부터 잘라 쓴다**(미국 쪽과 같다). 이 화면은 "○○ 대표 N종목"이지 업종
+  // 통계가 아니다. 사전이 카더라 쪽 필요로 366종목까지 넓어져 반도체만 55종목이라,
+  // 전부 데려오면 카드의 성격이 바뀐다. 앞쪽은 넓히기 전 대형주 순서 그대로다.
+  const memberNames = THEMES[themeName].filter((n) => n !== name).slice(0, MDD_PEER_MAX);
 
   // 대표 종목의 코드·시장을 stocks(공개 read)에서 한 번에 받는다. 이름은 KRX 정식명과
   // 정확히 일치한다(사전이 그 전제로 큐레이션돼 있다). 최대 10개라 1000행 캡과 무관.
