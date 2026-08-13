@@ -36,7 +36,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.supabase_client import get_client, load_all  # noqa: E402
+from common.supabase_client import get_client, load_all, load_all_keyset  # noqa: E402
 from common.timeutil import KST, today_kst  # noqa: E402
 
 # 이 아래로 내려가면 '낮다'고 본다.
@@ -76,11 +76,14 @@ def coverage_by_day(db) -> dict[str, set[str]]:
     """KST 날짜 → 그날 수집기가 손댄 채널 핸들 집합.
 
     표 전체를 읽는다. 같은 표를 통째로 읽는 스텝이 이미 셋 있고(집계·센티먼트 등),
-    1,000행 캡과 정렬 키 함정을 load_all 이 한 곳에서 막아 준다 — 여기서만 조건을
+    1,000행 캡과 정렬 키 함정을 헬퍼가 한 곳에서 막아 준다 — 여기서만 조건을
     붙이려고 페이징을 새로 쓰면 그 함정이 하나 더 생긴다.
+
+    load_all 이 아니라 키셋인 이유: 표가 156,180행이라 OFFSET 은 깊은 페이지가 앞부분을
+    다시 훑어 statement_timeout(8초)에 걸린다. select 의 id 는 다음 페이지의 시작점이다.
     """
     by_day: dict[str, set[str]] = defaultdict(set)
-    for row in load_all(db, "telegram_messages", "channel_handle,updated_at"):
+    for row in load_all_keyset(db, "telegram_messages", "id,channel_handle,updated_at"):
         stamp = row.get("updated_at")
         if not stamp:
             continue

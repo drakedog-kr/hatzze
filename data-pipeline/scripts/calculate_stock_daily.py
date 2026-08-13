@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client  # noqa: E402
 from common.timeutil import KST  # noqa: E402
-from common.supabase_client import load_all  # noqa: E402
+from common.supabase_client import load_all, load_all_keyset  # noqa: E402
 
 # 트렌딩 점수 가중치(트렌딩 메시지 공식과 동일).
 W_VIEWS, W_FWD, W_REPLIES = 0.5, 3.0, 1.5
@@ -42,14 +42,18 @@ def main() -> None:
     dry_run = "--dry-run" in sys.argv[1:]
     db = get_client()
 
+    # 둘 다 10만 행대라 키셋으로 읽는다(OFFSET 은 페이지가 깊어질수록 앞부분을 다시
+    # 훑어 statement_timeout 8초에 걸린다). select 의 id 는 다음 페이지의 시작점이다.
     messages = {
         (m["channel_handle"], m["message_id"]): m
-        for m in load_all(
-            db, "telegram_messages", "channel_handle,message_id,posted_at,views,forwards,replies"
+        for m in load_all_keyset(
+            db,
+            "telegram_messages",
+            "id,channel_handle,message_id,posted_at,views,forwards,replies",
         )
     }
-    mentions = load_all(
-        db, "telegram_message_stocks", "channel_handle,message_id,stock_code"
+    mentions = load_all_keyset(
+        db, "telegram_message_stocks", "id,channel_handle,message_id,stock_code"
     )
 
     # (date, code) -> 집계 누적

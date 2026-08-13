@@ -57,7 +57,12 @@ from anthropic import Anthropic  # noqa: E402
 from common.broadcast_content import weekly_top_stocks  # noqa: E402
 from common.channel_breadth import channel_breadth  # noqa: E402
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
-from common.supabase_client import PAGE_SIZE, get_client, load_keyset  # noqa: E402
+from common.supabase_client import (  # noqa: E402
+    PAGE_SIZE,
+    get_client,
+    load_all_keyset,
+    load_keyset,
+)
 from common.surging import load_stock_daily, top_surging  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
 from common.timeutil import KST  # noqa: E402
@@ -824,8 +829,8 @@ def build_stock_digests(db, latest: str) -> tuple[list[tuple[str, str, str]], li
     required = [(code, name_of.get(code, code)) for code, _ in top]
     required += [(c, name_of.get(c, c)) for c, _m in weekly if c not in have]
 
-    mentions = load_all(
-        db, "telegram_message_stocks", "channel_handle,message_id,stock_code,match_text"
+    mentions = load_all_keyset(
+        db, "telegram_message_stocks", "id,channel_handle,message_id,stock_code,match_text"
     )
     # 발췌에 쓸 본문. **창 안만 받는다** — 아래에서 어차피 posted_at >= since 로 거르는데,
     # load_all 로 받으면 그 창 밖 10만여 건의 본문까지 받아 놓고 버리게 된다.
@@ -841,7 +846,9 @@ def build_stock_digests(db, latest: str) -> tuple[list[tuple[str, str, str]], li
     msgs = {(m["channel_handle"], m["message_id"]): m for m in load_messages_since(db, since)}
     analysis = {
         (a["channel_handle"], a["message_id"]): a["sentiment"]
-        for a in load_all(db, "telegram_message_analysis", "channel_handle,message_id,sentiment")
+        for a in load_all_keyset(
+            db, "telegram_message_analysis", "id,channel_handle,message_id,sentiment"
+        )
     }
 
     by_code: dict[str, list[tuple]] = defaultdict(list)

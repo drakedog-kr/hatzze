@@ -658,8 +658,9 @@ jobs:
       #    창 조회가 statement timeout(8초)에 걸렸다. 증가 속도도 적어 둔 것의 두 배였다
       #    (3,800행/일 → 실측 7,000~8,400행/일).
       #    갈림선은 표 크기가 아니라 **필터 + OFFSET** 조합이었다 — 같은 실행에서 필터 없는
-      #    load_all 세 곳은 멀쩡했다. 그 조합인 곳은 전부 키셋으로 옮겼다. 그러니 이 알림이
-      #    다시 57014 로 열리면 **남은 OFFSET 호출부가 아니라 다른 원인**부터 볼 것.
+      #    load_all 세 곳은 멀쩡했다. 그 조합 다섯 자리를 옮기면서, 덜 급하지만 같은 방향인
+      #    전량 조회 여덟 자리(10만 행대 표 셋)도 같이 옮겼다. 그러니 이 알림이 다시
+      #    57014 로 열리면 **남은 OFFSET 호출부가 아니라 다른 원인**부터 볼 것.
       - name: Summarize 국장 집계 (카더라 화면을 채우는 스텝)
         id: telegram_calc_health
         if: always()
@@ -697,7 +698,7 @@ jobs:
           # ⚠️ 본문은 **한 줄**로 둔다. 여러 줄로 적으면 이어지는 줄이 1열에 놓여
           #    블록 스칼라가 거기서 끊기고, 워크플로 파일 전체가 파싱에 실패한다
           #    (그러면 이 잡만이 아니라 그날 파이프라인이 통째로 안 돈다).
-          note=$(printf '카더라 화면을 채우는 집계 스텝이 실패했습니다. 그 시점의 값이 화면에 그대로 남아 있습니다(수집 자체는 별개이며, 그쪽이 멀쩡하면 원문은 계속 쌓입니다).\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n먼저 볼 것: job 로그의 해당 스텝 traceback.\n\n`statement timeout(57014)` 이라면 **전에 겪은 그것과는 다른 원인입니다.** 필터 + OFFSET 조합은 2026-08-13 에 전부 키셋으로 옮겼습니다(`common/supabase_client.load_keyset`). 남은 후보는 필터 없는 `load_all` 세 곳(`calculate_stock_daily`·`calculate_telegram_sentiment`·`check_telegram_coverage`)과 `calculate_channel_influence` 의 `count=exact` 세 곳입니다. 표가 하루 7~8천 행씩 자라므로 그쪽이 천장에 닿을 차례입니다.\n\n일곱 스텝 모두 전량 재계산이라 **다음 실행이 성공하면 과거분까지 저절로 복구**됩니다. 며칠 연속 열리면 그때는 미루지 말 것.' \
+          note=$(printf '카더라 화면을 채우는 집계 스텝이 실패했습니다. 그 시점의 값이 화면에 그대로 남아 있습니다(수집 자체는 별개이며, 그쪽이 멀쩡하면 원문은 계속 쌓입니다).\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n먼저 볼 것: job 로그의 해당 스텝 traceback.\n\n`statement timeout(57014)` 이라면 **전에 겪은 그것과는 다른 원인입니다.** 10만 행대 표 셋(`telegram_messages`·`telegram_message_analysis`·`telegram_message_stocks`)을 읽는 자리는 2026-08-13 에 전부 키셋으로 옮겼습니다(`common/supabase_client.load_keyset`). 남은 OFFSET 은 `stocks`·`telegram_channels` 같은 작은 표뿐이고, `calculate_channel_influence` 의 `count=exact` 도 같은 날 실측으로 콜드 0.34초·웜 0.06초라 후보가 아닙니다.\n\n일곱 스텝 모두 전량 재계산이라 **다음 실행이 성공하면 과거분까지 저절로 복구**됩니다. 며칠 연속 열리면 그때는 미루지 말 것.' \
             "$(date -u '+%Y-%m-%d %H:%M')" "$failed" "$run_url")
           existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
           if [ -n "$existing" ]; then

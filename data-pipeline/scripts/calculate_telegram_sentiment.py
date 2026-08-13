@@ -39,7 +39,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client  # noqa: E402
 from common.timeutil import KST  # noqa: E402
-from common.supabase_client import load_all  # noqa: E402
+from common.supabase_client import load_all, load_all_keyset  # noqa: E402
 from config.issue_keywords import (  # noqa: E402
     ALIASES,
     EXCLUDE,
@@ -197,15 +197,17 @@ def main() -> None:
     dry_run = "--dry-run" in sys.argv[1:]
     db = get_client()
 
-    analysis = load_all(
-        db, "telegram_message_analysis", "channel_handle,message_id,sentiment,keywords"
+    # 아래 셋은 전부 10만 행대다. OFFSET 페이징은 깊은 페이지가 앞부분을 다시 훑어
+    # statement_timeout(8초)에 걸리므로 키셋으로 읽는다 — select 의 id 가 그 시작점이다.
+    analysis = load_all_keyset(
+        db, "telegram_message_analysis", "id,channel_handle,message_id,sentiment,keywords"
     )
     if not analysis:
         print("[경고] telegram_message_analysis 가 비어 있습니다. "
               "먼저 analyze_telegram_messages.py 를 실행하세요.")
         return
 
-    messages = load_all(db, "telegram_messages", "channel_handle,message_id,posted_at")
+    messages = load_all_keyset(db, "telegram_messages", "id,channel_handle,message_id,posted_at")
     date_of = {
         (m["channel_handle"], m["message_id"]): datetime.fromisoformat(m["posted_at"])
         .astimezone(KST)
@@ -225,7 +227,7 @@ def main() -> None:
             if code:
                 themes_of_code[code].append(theme)
 
-    mentions = load_all(db, "telegram_message_stocks", "channel_handle,message_id,stock_code")
+    mentions = load_all_keyset(db, "telegram_message_stocks", "id,channel_handle,message_id,stock_code")
     codes_of_msg: dict[tuple[str, int], set[str]] = defaultdict(set)
     for m in mentions:
         codes_of_msg[(m["channel_handle"], m["message_id"])].add(m["stock_code"])
