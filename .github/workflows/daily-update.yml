@@ -643,26 +643,29 @@ jobs:
       # ── 국장 집계 전용 알림 ──────────────────────────────────────────────
       # 위 '수집 중단' 배열에 이 스텝들을 **더하지 않았다.** 그 배열의 기준은
       # "그날치가 영영 빈다"인데(sync 는 시계열이라 백필 불가, fetch 는 그날 메시지가
-      # 통째로 빈다), 아래 여섯은 전부 전량 재계산이라 다음 실행이 만회한다.
+      # 통째로 빈다), 아래 일곱은 전부 전량 재계산이라 다음 실행이 만회한다.
       # 그 기준을 지키면서도 실패를 보이게 하려면 자기 제목으로 여는 수밖에 없다
       # (미장 알림이 같은 이유로 그렇게 서 있다).
       #
-      # ⚠️ 이 알림을 붙인 계기: 이 여섯이 **어느 알림에도 안 잡히고 있었다**(참조 0회).
+      # ⚠️ 이 알림을 붙인 계기: 이 스텝들이 **어느 알림에도 안 잡히고 있었다**(참조 0회).
+      #    (채널 영향력 점수는 2026-08-13 에 뒤늦게 더했다 — 같은 이유로 빠져 있었다.)
       #    전부 continue-on-error 라 죽어도 잡은 초록으로 끝난다. 즉 집계가 멈춘 날
       #    워크플로는 성공으로 보이고 화면만 어제 값에 멈춘다 — 2026-08-11 아침 미장
       #    추출이 그렇게 조용히 죽었던 것과 똑같은 구조다.
       #
-      # ⚠️ 지금 실제로 다가오는 고장이 있다: `telegram_messages` 전량 조회가 식은 상태에서
-      #    5.4~7.5초인데 statement_timeout 이 8초다(2026-08-11 실측 143,686행, 하루 약
-      #    3,800행씩 증가). OFFSET 페이징이라 마지막 페이지가 표 전체를 스캔한다.
-      #    고치는 방법은 이미 있다 — common/supabase_client.load_all_keyset(4.2배 빠름).
-      #    국장 호출부를 옮기는 건 별도 PR 로 하되, 그때까지 이 그물로 버틴다.
+      # ⚠️ 여기 적어 뒀던 '다가오는 고장'은 2026-08-13 오전에 실제로 났다(이슈 #340).
+      #    `telegram_messages` 가 156,180행이 되자 `generate_telegram_narratives` 의
+      #    창 조회가 statement timeout(8초)에 걸렸다. 증가 속도도 적어 둔 것의 두 배였다
+      #    (3,800행/일 → 실측 7,000~8,400행/일).
+      #    갈림선은 표 크기가 아니라 **필터 + OFFSET** 조합이었다 — 같은 실행에서 필터 없는
+      #    load_all 세 곳은 멀쩡했다. 그 조합인 곳은 전부 키셋으로 옮겼다. 그러니 이 알림이
+      #    다시 57014 로 열리면 **남은 OFFSET 호출부가 아니라 다른 원인**부터 볼 것.
       - name: Summarize 국장 집계 (카더라 화면을 채우는 스텝)
         id: telegram_calc_health
         if: always()
         run: |
-          names=("extract_telegram_stocks.py" "calculate_stock_daily.py" "calculate_telegram_trending.py" "calculate_theme_daily.py" "calculate_telegram_sentiment.py" "generate_telegram_narratives.py")
-          outcomes=("${{ steps.telegram_extract.outcome }}" "${{ steps.telegram_stock_daily.outcome }}" "${{ steps.telegram_trending.outcome }}" "${{ steps.telegram_theme_daily.outcome }}" "${{ steps.telegram_sentiment.outcome }}" "${{ steps.telegram_narratives.outcome }}")
+          names=("extract_telegram_stocks.py" "calculate_channel_influence.py" "calculate_stock_daily.py" "calculate_telegram_trending.py" "calculate_theme_daily.py" "calculate_telegram_sentiment.py" "generate_telegram_narratives.py")
+          outcomes=("${{ steps.telegram_extract.outcome }}" "${{ steps.telegram_influence.outcome }}" "${{ steps.telegram_stock_daily.outcome }}" "${{ steps.telegram_trending.outcome }}" "${{ steps.telegram_theme_daily.outcome }}" "${{ steps.telegram_sentiment.outcome }}" "${{ steps.telegram_narratives.outcome }}")
 
           {
             echo "## 국장 집계"
@@ -694,7 +697,66 @@ jobs:
           # ⚠️ 본문은 **한 줄**로 둔다. 여러 줄로 적으면 이어지는 줄이 1열에 놓여
           #    블록 스칼라가 거기서 끊기고, 워크플로 파일 전체가 파싱에 실패한다
           #    (그러면 이 잡만이 아니라 그날 파이프라인이 통째로 안 돈다).
-          note=$(printf '카더라 화면을 채우는 집계 스텝이 실패했습니다. 그 시점의 값이 화면에 그대로 남아 있습니다(수집 자체는 별개이며, 그쪽이 멀쩡하면 원문은 계속 쌓입니다).\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n먼저 볼 것: job 로그의 해당 스텝 traceback.\n\n**지금 가장 가능성 높은 원인은 `statement timeout(57014)` 입니다.** `telegram_messages` 전량 조회가 식은 상태에서 5.4~7.5초인데 천장이 8초입니다(2026-08-11 실측). 그렇다면 그 호출부를 `common/supabase_client.load_all_keyset` 으로 옮기면 됩니다(같은 표에서 4.2배 빠르고 행 수 동일함을 확인해 두었습니다).\n\n여섯 스텝 모두 전량 재계산이라 **다음 실행이 성공하면 과거분까지 저절로 복구**됩니다. 며칠 연속 열리면 그때는 미루지 말 것.' \
+          note=$(printf '카더라 화면을 채우는 집계 스텝이 실패했습니다. 그 시점의 값이 화면에 그대로 남아 있습니다(수집 자체는 별개이며, 그쪽이 멀쩡하면 원문은 계속 쌓입니다).\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n먼저 볼 것: job 로그의 해당 스텝 traceback.\n\n`statement timeout(57014)` 이라면 **전에 겪은 그것과는 다른 원인입니다.** 필터 + OFFSET 조합은 2026-08-13 에 전부 키셋으로 옮겼습니다(`common/supabase_client.load_keyset`). 남은 후보는 필터 없는 `load_all` 세 곳(`calculate_stock_daily`·`calculate_telegram_sentiment`·`check_telegram_coverage`)과 `calculate_channel_influence` 의 `count=exact` 세 곳입니다. 표가 하루 7~8천 행씩 자라므로 그쪽이 천장에 닿을 차례입니다.\n\n일곱 스텝 모두 전량 재계산이라 **다음 실행이 성공하면 과거분까지 저절로 복구**됩니다. 며칠 연속 열리면 그때는 미루지 말 것.' \
+            "$(date -u '+%Y-%m-%d %H:%M')" "$failed" "$run_url")
+          existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$note"
+            echo "기존 알림 이슈 #$existing 에 코멘트 추가"
+          else
+            gh issue create --title "$title" --body "$note"
+            echo "새 알림 이슈 생성"
+          fi
+          exit 1
+
+      # ── LLM 분류 전용 알림 ───────────────────────────────────────────────
+      # ⚠️ 이 알림을 붙인 계기: 2026-08-13 오전에 '수거 + 제출'이 statement timeout 으로
+      #    죽어 **그날 분류 제출이 0건**이 됐는데(전날 2,850건) 이슈는 국장 집계 것만
+      #    열렸다. 이 두 스텝은 세 배열 어디에도 없어 참조 0회였다.
+      #
+      # 분류가 멈춘 날의 피해는 집계 실패와 결이 다르다. 화면이 '멈추는' 게 아니라
+      # 그날 감성·화제어의 **표본이 반쪽인 채로 갱신된다** — 낡은 값보다 알아채기 어렵다.
+      # 그래서 제목을 따로 둔다(제목이 곧 진단이라는, 위 알림들과 같은 이유다).
+      #
+      # 위 '수집 중단' 배열에 더하지 않은 이유도 같다: 분류는 최근 SCAN_DAYS(14일) 창의
+      # 미분류분을 다시 집어 가므로 다음 실행이 만회한다. ⚠️ 다만 그 창을 넘겨 멈추면
+      # 그 구간은 영구 미분류로 남는다 — 이 이슈가 2주 가까이 열려 있으면 그게 마지노선이다.
+      - name: Summarize 카더라 LLM 분류
+        id: telegram_analyze_health
+        if: always()
+        run: |
+          names=("analyze_telegram_messages.py (수거+제출)" "analyze_telegram_messages.py (수거)")
+          outcomes=("${{ steps.telegram_analyze.outcome }}" "${{ steps.telegram_analyze_collect.outcome }}")
+
+          {
+            echo "## 카더라 LLM 분류"
+            echo "| Script | Result |"
+            echo "|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          failed=0
+          failed_list=""
+          for i in "${!names[@]}"; do
+            script="${names[$i]}"
+            outcome="${outcomes[$i]}"
+            echo "$script: $outcome"
+            echo "| $script | $outcome |" >> "$GITHUB_STEP_SUMMARY"
+            [ "$outcome" = "success" ] || { failed=1; failed_list="${failed_list:+$failed_list, }$script"; }
+          done
+
+          echo "failed=$failed" >> "$GITHUB_OUTPUT"
+          echo "ANALYZE_FAILED_STEPS=$failed_list" >> "$GITHUB_ENV"
+
+      - name: Alert on 분류 failure (open/update GitHub issue)
+        if: ${{ !cancelled() && steps.telegram_analyze_health.outputs.failed == '1' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          failed="${ANALYZE_FAILED_STEPS:-요약 탭에서 확인}"
+          title="⚠️ 카더라 LLM 분류 중단"
+          # ⚠️ 본문은 위 알림들과 같은 이유로 **한 줄**로 둔다(여러 줄이면 워크플로 파싱이 깨진다).
+          note=$(printf '메시지 LLM 분류 스텝이 실패했습니다. 감성·화제어 카드가 **그날 표본이 반쪽인 채로** 갱신됩니다(화면이 멈추는 게 아니라서 눈으로는 잘 안 보입니다).\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n먼저 볼 것: job 로그의 해당 스텝 traceback. 제출이 안 됐으면 그날 새 분류는 0건입니다.\n\n분류는 최근 14일 창의 미분류분을 다시 집어 가므로 **다음 실행이 성공하면 소급 복구**됩니다. 다만 그 창을 넘겨 멈추면 그 구간은 영구 미분류로 남습니다 — 이 이슈가 2주 가까이 열려 있으면 미루지 말 것.' \
             "$(date -u '+%Y-%m-%d %H:%M')" "$failed" "$run_url")
           existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
           if [ -n "$existing" ]; then
@@ -707,7 +769,7 @@ jobs:
           exit 1
 
       # ── 미장 카더라 전용 알림 ────────────────────────────────────────────
-      # 위 두 알림과 **합치지 않았다.** 제목이 곧 진단이라는 같은 이유다.
+      # 위 알림들과 **합치지 않았다.** 제목이 곧 진단이라는 같은 이유다.
       #
       # ⚠️ 이 알림을 붙인 계기: 2026-08-11 첫 정기 실행에서 미국 종목 추출이
       #    statement timeout 으로 죽었는데 **워크플로가 초록으로 끝났다**.

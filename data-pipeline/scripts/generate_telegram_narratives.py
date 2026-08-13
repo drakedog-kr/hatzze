@@ -57,7 +57,7 @@ from anthropic import Anthropic  # noqa: E402
 from common.broadcast_content import weekly_top_stocks  # noqa: E402
 from common.channel_breadth import channel_breadth  # noqa: E402
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
-from common.supabase_client import PAGE_SIZE, get_client  # noqa: E402
+from common.supabase_client import PAGE_SIZE, get_client, load_keyset  # noqa: E402
 from common.surging import load_stock_daily, top_surging  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
 from common.timeutil import KST  # noqa: E402
@@ -470,33 +470,26 @@ def kst_date(posted_at: str) -> str:
 def load_messages_since(db, since_date: str) -> list[dict]:
     """posted_at 이 since_date(KST) 이후인 메시지만 페이지를 이어 받는다.
 
-    load_all 은 표 전체를 읽는데 telegram_messages 는 이미 4만 행이고 계속 자란다.
+    load_all 은 표 전체를 읽는데 telegram_messages 는 156,180행이고 하루 7~8천씩 자란다.
     며칠치 쓰자고 그걸 다 끌어올 이유가 없어 필터는 서버에 맡긴다. 페이징 규칙(유일 키
     id 정렬)은 load_all 과 똑같이 지킨다 — [[feedback-postgrest-1000-row-cap]] 의 그 함정.
+
+    ⚠️ **필터를 걸었다고 안전해지는 게 아니다.** 창을 3일로 좁혀 두고도 2026-08-13 오전에
+    이 조회가 `57014`(statement timeout)로 죽어 총평·종목 요약이 통째로 안 나왔다.
+    OFFSET 은 페이지마다 필터를 다시 적용하고 건너뛴 행까지 훑기 때문에, 오히려 필터 없는
+    전량 조회보다 먼저 죽는다(같은 실행에서 필터 없는 load_all 세 곳은 멀쩡했다).
+    그래서 키셋으로 넘긴다 — 그 대가로 select 에 `id` 가 필요하다(다음 페이지의 시작점).
 
     KST 경계가 UTC 보다 9시간 이르므로 하루 앞에서부터 받아 오고, 정확한 날짜 필터링은
     호출부가 kst_date 로 한다(경계 메시지를 흘리지 않으려는 여유분).
     """
     since_utc = f"{(date.fromisoformat(since_date) - timedelta(days=1)).isoformat()}T00:00:00Z"
-    rows: list[dict] = []
-    start = 0
-    while True:
-        page = (
-            db.table("telegram_messages")
-            .select("channel_handle,message_id,posted_at,text,views,forwards")
-            .gte("posted_at", since_utc)
-            .order("id")
-            .range(start, start + PAGE_SIZE - 1)
-            .execute()
-            .data
-        )
-        if not page:
-            break
-        rows += page
-        if len(page) < PAGE_SIZE:
-            break
-        start += PAGE_SIZE
-    return rows
+    return load_keyset(
+        db,
+        "telegram_messages",
+        "id,channel_handle,message_id,posted_at,text,views,forwards",
+        narrow=lambda q: q.gte("posted_at", since_utc),
+    )
 
 
 def build_brief_digest(db, latest: str) -> str | None:
@@ -841,8 +834,9 @@ def build_stock_digests(db, latest: str) -> tuple[list[tuple[str, str, str]], li
     # 한 번 실행에 168MB, 하루 2회면 336MB, 한 달이면 **9.85GB** 를 그냥 버리고 있었다.
     # Supabase 무료 플랜 Egress 한도(5GB/월)의 두 배를 이 한 줄이 혼자 썼다.
     #
-    # load_messages_since 가 컬럼 목록까지 이 자리와 똑같고(그 docstring 이 바로 이 문제를
-    # 적어 뒀다) since-1일부터 받아 오므로, 창 안 메시지는 하나도 빠지지 않는다.
+    # load_messages_since 가 이 자리와 같은 컬럼을 받고(키셋 페이징에 쓸 id 만 더 받는다.
+    # 그 docstring 이 바로 이 문제를 적어 뒀다) since-1일부터 받아 오므로, 창 안 메시지는
+    # 하나도 빠지지 않는다.
     # msgs 를 쓰는 네 곳 전부 창 밖 데이터가 필요 없어 결과는 정확히 같다.
     msgs = {(m["channel_handle"], m["message_id"]): m for m in load_messages_since(db, since)}
     analysis = {
