@@ -24,6 +24,13 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    version: "1.1.1",
+    date: "2026-08-13",
+    changes: [
+      "MDD 정밀분석의 테마 비교가 대표 10종목만 나란히 놓습니다. 반도체처럼 종목이 많은 테마에서 목록이 55줄까지 늘어나던 문제를 고쳤습니다.",
+    ],
+  },
+  {
     version: "1.1.0",
     date: "2026-08-12",
     changes: [
