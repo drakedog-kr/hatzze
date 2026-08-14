@@ -2,27 +2,42 @@ name: Daily Indicator Update
 
 on:
   schedule:
-    # ⚠️ 발화 시각 ≠ 실제 실행 시각. GitHub 예약 큐가 실측 90~150분 밀어서, 발화한 뒤
-    # 그만큼 지나 실제로 시작한다. 이 지연을 역이용해 실제 실행이 KST 원하는 시각에
-    # 떨어지도록 발화를 그보다 앞에 잡는다. (완료 시각 표기는 lib/format.ts
-    # SCHEDULED_HOURS_KST=[11,19] 와 연동.)
+    # ⚠️ 발화 시각 ≠ 실제 실행 시각. GitHub 예약 큐가 실행을 밀어낸다 —
+    # **2026-08-13 실측 61~68분**(예전엔 90~150분이었다. 이 값은 깃헙 사정으로 변한다).
+    # (완료 시각 표기는 lib/format.ts SCHEDULED_HOURS_KST 와 연동.)
     #
-    # ── 아침 ── 00:00 UTC 발화 → 큐 지연 ~100분 → 실제 실행 ~10:45 KST → 완료 ~11:00.
-    # 이 타이밍이 핵심이다: KRX Open API 는 **전날 자료를 그날 오전에야 올린다** — 실측상
-    # 07:40 엔 없고 ~10:44 실행이 받는다(성공한 실행은 매일 10:30~10:50 에 어제치를 받았다).
-    # 실행이 10:30 이전이면 어제 자료를 못 받고 그제치가 된다. 00:00 UTC 는 전 세계에서 가장
-    # 붐비는 슬롯이라 지연이 안정적으로 ~100분 나와 실행이 KRX 공표 직후로 밀린다 — 즉
-    # **여기선 붐비는 슬롯이 오히려 유리하다. 앞당기거나 딴 슬롯으로 옮기지 말 것**(그러면
-    # 지연이 줄어 KRX 공표 전에 실행돼 어제 자료를 놓친다).
+    # ⭐ **지연에 기대는 설계를 그만뒀다(2026-08-14).** 예전엔 "붐비는 슬롯의 큰 지연이
+    # 실행을 KRX 공표 뒤로 밀어 준다"는 계산으로 발화를 잡았는데, 지연이 100분에서 60분대로
+    # 줄자 그 계산이 통째로 어긋났다(실행이 10:45 예정 → 실제 10:00). 저녁도 같이 밀려
+    # 디시 표본 시간대가 1시간 반 이동해 있었다. 지금은 **발화를 이르게 잡고 잡 안에서
+    # 대기 게이트로 못 박는다**(아래 'KRX 공표(08:00 KST) 대기' 스텝). 지연이 얼마든
+    # 게이트를 지나는 시각은 같다.
+    #
+    # ── 아침 ── 발화 21:30 UTC(06:30 KST) → 지연 ~60분 → 실제 실행 ~07:30 → 카더라
+    # 블록 ~60분 → 지표 블록(08:00 게이트 뒤) → 완료 ~08:45~09:05 → A 브리핑 그 5분 뒤.
+    # (한 실행의 총 소요는 실측 75~105분이다 — 그날 메시지량과 LLM 배치에 따라 흔들린다.)
+    # **카더라를 먼저 돌린다** — KRX 와 무관해 아무 때나 되고, 그동안 08:00 을 기다린다.
+    # 그래서 카더라 면이 지표보다 한 시간쯤 먼저 새로워진다(출근 시간대 반영이 목적).
+    #
+    # ⚠️ KRX Open API 는 전 영업일 자료를 **08:00 KST 정각**에 올린다(2026-08-14 실측:
+    # 07:54:52 엔 7개 서비스 전부 0행, 08:00:00 에 전부 채워짐). 그 전에 지표를 받으면
+    # 그제치가 저장돼 지수가 하루 밀린다 — 그래서 게이트가 있다. 발화를 더 당겨도
+    # 지표는 08:00 전에 못 돈다.
     #
     # ⚠️ 2026-07-29 에 **지수 종가만** 야후로 옮겼지만(fetch_kospi_high_gap·
     # fetch_kosdaq_ratio), 이 제약은 그대로다 — 거래대금·VKOSPI·풋콜·시가총액·선물
     # 미결제약정·전종목 거래대금은 야후에 없어 여전히 KRX 이고 여전히 T+1 이다.
-    - cron: "0 0 * * *" # 발화 09:00 KST → 실제 실행 ~10:45 → 완료 ~11:00 (KRX 안전선)
-    # ── 오후 ── 발화 08:30 UTC(17:30 KST) → 큐 지연 ~140분 → 실제 실행 ~19:50 → 완료
-    # ~20:20. 화면은 오후 7시로 스냅한다(표기는 완료를 ±3시간 안에서 정각 스냅,
-    # lib/format.ts SCHEDULED_HOURS_KST). 실제 완료가 ~8시라 7시 표기는 ~1시간 이른
-    # 바닥값이다. 아침 실패 자동 만회 + 미국 야간/오후 데이터 재조회를 겸한다.
+    - cron: "30 21 * * *" # 발화 06:30 KST → 실제 실행 ~07:30 → 완료 ~08:45~09:05
+    # ── 오후 ── 발화 08:30 UTC(17:30 KST) → 지연 ~60분 → 실제 실행 ~18:40 → 카더라
+    # 블록 ~60분 → 지표 블록 → 완료 ~20:00~20:25 → B 마감 리포트가 그 5분 뒤.
+    # (오후가 아침보다 긴 건 발송 전 sleep 300 과 그날 쌓인 메시지량 때문이다.)
+    # 아침 실패 자동 만회 + 그날 종가(야후) 확보 + 미국 야간/오후 데이터 재조회를 겸한다.
+    #
+    # ⭐ 순서를 뒤집은 덕에 **디시 표본 시간대가 눈금과 다시 맞는다.** 디시 지표는 실행
+    # 직전 ~2시간이 표본이고 저장값은 오후 실행분인데, 지연이 줄면서 실행이 20:00 →
+    # 18:38 로 당겨져 표본이 16:20~18:40 으로 밀려 있었다(눈금은 17:45~20:00 기준으로
+    # 잡혀 있다 — PR #305). 지표를 카더라 뒤로 보내면 디시가 ~19:45 에 돌아 표본이
+    # 17:45~19:45 로 돌아온다. **오후 발화를 옮기면 이 정렬이 다시 깨진다.**
     #
     # ⚠️ **이 실행에 시각 하한이 생겼다(2026-07-29). 16:00 KST 보다 앞당기지 말 것.**
     # 지수 종가를 야후에서 받게 되면서, **그날 종가를 담는 실행은 오후 하나뿐**이 됐다
@@ -30,7 +45,7 @@ on:
     # 16:00 은 정규장 마감 15:30 에 여유 30분을 더한 값이다 — 야후가 마감 직후 몇 분 동안
     # 낡은 값을 주는 걸 실측했다(2026-07-28 15:16~15:37). 이 실행을 16:00 앞으로 옮기면
     # 그날 종가가 통째로 하루 밀린다.
-    - cron: "30 8 * * *" # 발화 17:30 KST → 실제 실행 ~19:50 → 완료 ~20:20 (표기 오후 7시)
+    - cron: "30 8 * * *" # 발화 17:30 KST → 실제 실행 ~18:40 → 완료 ~20:00~20:25
   workflow_dispatch:
     inputs:
       send_telegram:
@@ -78,6 +93,184 @@ jobs:
       - name: Install dependencies
         run: pip install -r data-pipeline/requirements.txt
 
+
+      # ── 카더라 리포트(텔레그램) 파이프라인 ──────────────────────────────
+      # 위 지표 파이프라인과 독립적이며, 자기들끼리는 순서 의존이 있다:
+      #   상장사 사전 → 채널 동기화/구독자 스냅샷 → 메시지 수집 → 채널 영향력
+      #   → 종목 추출 → 종목 일별 집계.
+      # 각 스텝은 DB에서 읽어 이어가므로 하나가 실패해도 다음 스텝은 직전까지의
+      # 저장분으로 동작한다(graceful degradation). 지표용 실패 알림/요약과는
+      # 분리하려고 아래 Summarize results 집계 배열에는 넣지 않는다.
+      # 대신 이 파이프라인의 '재료' 두 스텝(sync·fetch)만 따로 재는 집계·알림이
+      # 잡 끝에 붙어 있다(Summarize 카더라 collection).
+      - name: (텔레그램) KRX 상장종목 마스터 갱신
+        id: telegram_krx_stocks
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_krx_stocks.py
+
+
+      - name: (텔레그램) 채널 동기화 + 구독자 스냅샷
+        id: telegram_sync
+        continue-on-error: true
+        run: python data-pipeline/scripts/sync_telegram_channels.py
+
+      - name: (텔레그램) 메시지 수집
+        id: telegram_fetch
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_telegram.py
+
+      # 위 수집기가 재는 것은 '총 몇 건'이고, 이 스텝이 재는 것은 '며칠째 몇 개 채널'이다.
+      # 문턱을 하나 더 얹지 않고 따로 둔 이유는 그 스크립트 main() 끝 주석에 있다 —
+      # 0건 문턱을 비율로 바꾸면 캐시가 차는 중인 정상적인 날에도 울린다. 연속 일수는
+      # 그 반례를 통과시키면서 '오래 낮은' 상태만 잡는다(판정 근거는 이 스크립트 주석).
+      # 수집기 바로 뒤여야 오늘 칸이 채워진 상태로 잰다.
+      - name: (텔레그램) 수집 커버리지 검사
+        id: telegram_coverage
+        continue-on-error: true
+        run: python data-pipeline/scripts/check_telegram_coverage.py
+
+      # 분류는 Batch API(토큰 값 절반)로 보내므로 응답 시각을 우리가 정할 수 없다.
+      # 그래서 수집 직후 제출해 두고, 아래 집계 스텝들이 도는 20~30분을 대기 시간으로
+      # 쓴 뒤 집계 직전에 수거한다. 그 안에 안 끝난 배치는 다음 실행이 가져간다.
+      - name: (텔레그램) 메시지 LLM 분류 — 수거 + 제출
+        id: telegram_analyze
+        continue-on-error: true
+        run: python data-pipeline/scripts/analyze_telegram_messages.py
+
+      - name: (텔레그램) 채널 영향력 점수
+        id: telegram_influence
+        continue-on-error: true
+        run: python data-pipeline/scripts/calculate_channel_influence.py
+
+      - name: (텔레그램) 종목 추출
+        id: telegram_extract
+        continue-on-error: true
+        run: python data-pipeline/scripts/extract_telegram_stocks.py
+
+      - name: (텔레그램) 종목 일별 집계
+        id: telegram_stock_daily
+        continue-on-error: true
+        run: python data-pipeline/scripts/calculate_stock_daily.py
+
+      # ── 미장 카더라 ────────────────────────────────────────────────────
+      # 같은 메시지를 미국 종목 사전으로 한 번 더 읽는다. 수집을 새로 하지 않는다 —
+      # 317개 채널 중 284개가 이미 미국 종목을 말하고 있고, 그중 79%는 제목에
+      # '미국'이 안 붙은 평범한 국내 채널이다.
+      #
+      # ⚠️ 국내 추출(telegram_extract) **뒤에** 와야 한다. 동시 언급 집계가
+      #    telegram_message_stocks 를 읽는데, 국내 추출이 그걸 매 실행 전량 재생성한다.
+      - name: (텔레그램) 미국 종목 추출
+        id: telegram_us_extract
+        continue-on-error: true
+        run: python data-pipeline/scripts/extract_telegram_us_stocks.py
+
+      - name: (텔레그램) 미국 종목·채널 일별 집계
+        id: telegram_us_daily
+        continue-on-error: true
+        run: python data-pipeline/scripts/calculate_us_stock_daily.py
+
+      - name: (텔레그램) 미국×국내 동시 언급
+        id: telegram_us_comention
+        continue-on-error: true
+        run: python data-pipeline/scripts/calculate_us_comention.py
+
+      # 미장 트렌딩·테마는 미국 종목 추출 바로 뒤여도 되지만(입력이 telegram_message_us_stocks
+      # 와 telegram_us_stock_daily 뿐), 국내 짝 옆에 둔다 — 같은 종류의 계산이 흩어져 있으면
+      # 나중에 "이게 왜 여기 있지"를 다시 풀어야 한다.
+      - name: (텔레그램) 미장 트렌딩 메시지 선별
+        id: telegram_us_trending
+        continue-on-error: true
+        run: python data-pipeline/scripts/calculate_us_trending.py
+
+      - name: (텔레그램) 미장 테마 일별 집계
+        id: telegram_us_theme
+        continue-on-error: true
+        run: python data-pipeline/scripts/calculate_us_theme_daily.py
+
+      - name: (텔레그램) 트렌딩 메시지 선별
+        id: telegram_trending
+        continue-on-error: true
+        run: python data-pipeline/scripts/calculate_telegram_trending.py
+
+      - name: (텔레그램) 테마 일별 집계
+        id: telegram_theme_daily
+        continue-on-error: true
+        run: python data-pipeline/scripts/calculate_theme_daily.py
+
+      # LLM 계층 — 메시지별 분류(돈이 드는 단계, 증분) → 결정적 집계 → 문장 생성.
+      # 분류가 실패해도 집계는 직전까지 저장된 분류분으로 돌고, 집계가 실패하면
+      # 문장 생성이 조용히 건너뛴다. 위 스텝들과 마찬가지로 실패 알림과는 분리한다.
+      # 위에서 제출한 배치를 여기서 수거한다(제출은 하지 않는다 — --collect-only).
+      - name: (텔레그램) 메시지 LLM 분류 — 수거
+        id: telegram_analyze_collect
+        continue-on-error: true
+        run: python data-pipeline/scripts/analyze_telegram_messages.py --collect-only
+
+      - name: (텔레그램) 센티먼트·화제어 집계
+        id: telegram_sentiment
+        continue-on-error: true
+        run: python data-pipeline/scripts/calculate_telegram_sentiment.py
+
+      # ⚠️ **미장 센티먼트는 여기 있어야 한다** — 위 미장 세 스텝 옆이 아니다.
+      #    입력이 `telegram_message_analysis` 라, 그날 분류를 수거하는
+      #    telegram_analyze_collect **뒤에** 와야 오늘치를 센다. 앞에 두면 조용히
+      #    어제 분류로 오늘 카드를 그린다(실패도 안 나서 알아채기 어렵다).
+      #    국내 센티먼트 집계와 같은 자리인 것은 그래서다.
+      - name: (텔레그램) 미장 센티먼트·화제어 집계
+        id: telegram_us_sentiment
+        continue-on-error: true
+        run: python data-pipeline/scripts/calculate_us_telegram_sentiment.py
+
+      # 미장 LLM 문장. 미장 센티먼트·테마·동시언급이 전부 끝난 뒤여야 digest 가 찬다.
+      # ⚠️ 국장 총평(아래)과 **따로** 두는 이유: 한쪽이 실패해도 다른 쪽은 나가야 하고,
+      #    미장 실패는 미장 알림에만 잡혀야 한다.
+      - name: (텔레그램) 미장 총평·종목 요약 생성
+        id: telegram_us_narratives
+        continue-on-error: true
+        run: python data-pipeline/scripts/generate_us_telegram_narratives.py
+
+      - name: (텔레그램) 총평·종목 요약 생성
+        id: telegram_narratives
+        continue-on-error: true
+        run: python data-pipeline/scripts/generate_telegram_narratives.py
+
+      # ── KRX 공표 대기 게이트 ─────────────────────────────────────────────
+      # **KRX Open API 는 전 영업일 자료를 08:00 KST 정각에 올린다**(2026-08-14 실측:
+      # 07:54:52 엔 7개 서비스 전부 0행, 08:00:00 에 전부 채워짐. 5분 간격 30회 폴링).
+      # 그 전에 지표를 받으면 어제치가 아니라 그제치가 저장돼 지수가 하루 밀린다.
+      #
+      # 큐 지연으로 실행 시각을 맞추는 대신 여기서 못 박는다. 지연이 61분이든 140분이든
+      # 이 줄을 지나는 시각은 늘 08:00 이후다. (아침 실행이 08:00 뒤에 시작하면 즉시
+      # 통과하므로 평소엔 아무 일도 하지 않는다 — 지연이 짧아진 날을 위한 안전장치다.)
+      #
+      # 오후 실행은 이미 한참 뒤라 그냥 통과한다.
+      # ⚠️ **continue-on-error 가 붙어 있는 이유.** 이 스텝이 실패하면 뒤따르는 지표 스텝은
+      #    (조건이 없으므로) 통째로 **건너뛰어진다** — 각자 continue-on-error 를 달고 있어도
+      #    그건 자기 실패를 감쌀 뿐 앞 스텝의 실패는 못 막는다. 게이트 하나가 지표 28개를
+      #    데려가는 셈이라, 게이트가 깨지면 **기다리지 않고 그냥 진행**하는 편이 낫다.
+      #    (그 경우 최악이 '그제 자료로 하루 밀림'인데, 다음 실행이 만회한다.)
+      # ⚠️ cancelled() 를 뺀 이유: 잡을 취소했는데 여기서 한 시간을 자고 있으면 안 된다.
+      - name: KRX 공표(08:00 KST) 대기
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: |
+          # `date -d 'today 08:00'` 대신 날짜를 명시적으로 넣는다 — 러너(GNU date)와 손으로
+          # 돌리는 맥(BSD date)의 파싱이 갈리는 자리라, 애매한 표현을 쓰지 않는다.
+          today=$(TZ=Asia/Seoul date +%Y-%m-%d)
+          target=$(TZ=Asia/Seoul date -d "$today 08:00" +%s 2>/dev/null || TZ=Asia/Seoul date -j -f '%Y-%m-%d %H:%M' "$today 08:00" +%s)
+          now=$(date +%s)
+          wait=$(( target - now ))
+          if [ "$wait" -gt 0 ]; then
+            echo "KRX 공표까지 $((wait / 60))분 대기합니다 (현재 $(TZ=Asia/Seoul date '+%H:%M') KST)"
+            sleep "$wait"
+          else
+            echo "이미 08:00 KST 를 지났습니다 (현재 $(TZ=Asia/Seoul date '+%H:%M') KST) — 대기 없음"
+          fi
+
+      # ── 지표 파이프라인 ─────────────────────────────────────────────────
+      # 위 카더라보다 **뒤에** 둔다. 카더라는 KRX 와 무관해 아무 때나 돌 수 있고,
+      # 지표는 08:00 을 기다려야 한다. 순서를 이렇게 두면 기다리는 동안 카더라가
+      # 끝나 있어서, 화면의 카더라 면이 지표보다 한 시간쯤 먼저 새로워진다.
 
       - name: Fetch KOSPI 52-week-high gap
         id: kospi_high_gap
@@ -228,146 +421,6 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/generate_daily_summary.py
 
-      # ── 카더라 리포트(텔레그램) 파이프라인 ──────────────────────────────
-      # 위 지표 파이프라인과 독립적이며, 자기들끼리는 순서 의존이 있다:
-      #   상장사 사전 → 채널 동기화/구독자 스냅샷 → 메시지 수집 → 채널 영향력
-      #   → 종목 추출 → 종목 일별 집계.
-      # 각 스텝은 DB에서 읽어 이어가므로 하나가 실패해도 다음 스텝은 직전까지의
-      # 저장분으로 동작한다(graceful degradation). 지표용 실패 알림/요약과는
-      # 분리하려고 아래 Summarize results 집계 배열에는 넣지 않는다.
-      # 대신 이 파이프라인의 '재료' 두 스텝(sync·fetch)만 따로 재는 집계·알림이
-      # 잡 끝에 붙어 있다(Summarize 카더라 collection).
-      - name: (텔레그램) KRX 상장종목 마스터 갱신
-        id: telegram_krx_stocks
-        continue-on-error: true
-        run: python data-pipeline/scripts/fetch_krx_stocks.py
-
-
-      - name: (텔레그램) 채널 동기화 + 구독자 스냅샷
-        id: telegram_sync
-        continue-on-error: true
-        run: python data-pipeline/scripts/sync_telegram_channels.py
-
-      - name: (텔레그램) 메시지 수집
-        id: telegram_fetch
-        continue-on-error: true
-        run: python data-pipeline/scripts/fetch_telegram.py
-
-      # 위 수집기가 재는 것은 '총 몇 건'이고, 이 스텝이 재는 것은 '며칠째 몇 개 채널'이다.
-      # 문턱을 하나 더 얹지 않고 따로 둔 이유는 그 스크립트 main() 끝 주석에 있다 —
-      # 0건 문턱을 비율로 바꾸면 캐시가 차는 중인 정상적인 날에도 울린다. 연속 일수는
-      # 그 반례를 통과시키면서 '오래 낮은' 상태만 잡는다(판정 근거는 이 스크립트 주석).
-      # 수집기 바로 뒤여야 오늘 칸이 채워진 상태로 잰다.
-      - name: (텔레그램) 수집 커버리지 검사
-        id: telegram_coverage
-        continue-on-error: true
-        run: python data-pipeline/scripts/check_telegram_coverage.py
-
-      # 분류는 Batch API(토큰 값 절반)로 보내므로 응답 시각을 우리가 정할 수 없다.
-      # 그래서 수집 직후 제출해 두고, 아래 집계 스텝들이 도는 20~30분을 대기 시간으로
-      # 쓴 뒤 집계 직전에 수거한다. 그 안에 안 끝난 배치는 다음 실행이 가져간다.
-      - name: (텔레그램) 메시지 LLM 분류 — 수거 + 제출
-        id: telegram_analyze
-        continue-on-error: true
-        run: python data-pipeline/scripts/analyze_telegram_messages.py
-
-      - name: (텔레그램) 채널 영향력 점수
-        id: telegram_influence
-        continue-on-error: true
-        run: python data-pipeline/scripts/calculate_channel_influence.py
-
-      - name: (텔레그램) 종목 추출
-        id: telegram_extract
-        continue-on-error: true
-        run: python data-pipeline/scripts/extract_telegram_stocks.py
-
-      - name: (텔레그램) 종목 일별 집계
-        id: telegram_stock_daily
-        continue-on-error: true
-        run: python data-pipeline/scripts/calculate_stock_daily.py
-
-      # ── 미장 카더라 ────────────────────────────────────────────────────
-      # 같은 메시지를 미국 종목 사전으로 한 번 더 읽는다. 수집을 새로 하지 않는다 —
-      # 317개 채널 중 284개가 이미 미국 종목을 말하고 있고, 그중 79%는 제목에
-      # '미국'이 안 붙은 평범한 국내 채널이다.
-      #
-      # ⚠️ 국내 추출(telegram_extract) **뒤에** 와야 한다. 동시 언급 집계가
-      #    telegram_message_stocks 를 읽는데, 국내 추출이 그걸 매 실행 전량 재생성한다.
-      - name: (텔레그램) 미국 종목 추출
-        id: telegram_us_extract
-        continue-on-error: true
-        run: python data-pipeline/scripts/extract_telegram_us_stocks.py
-
-      - name: (텔레그램) 미국 종목·채널 일별 집계
-        id: telegram_us_daily
-        continue-on-error: true
-        run: python data-pipeline/scripts/calculate_us_stock_daily.py
-
-      - name: (텔레그램) 미국×국내 동시 언급
-        id: telegram_us_comention
-        continue-on-error: true
-        run: python data-pipeline/scripts/calculate_us_comention.py
-
-      # 미장 트렌딩·테마는 미국 종목 추출 바로 뒤여도 되지만(입력이 telegram_message_us_stocks
-      # 와 telegram_us_stock_daily 뿐), 국내 짝 옆에 둔다 — 같은 종류의 계산이 흩어져 있으면
-      # 나중에 "이게 왜 여기 있지"를 다시 풀어야 한다.
-      - name: (텔레그램) 미장 트렌딩 메시지 선별
-        id: telegram_us_trending
-        continue-on-error: true
-        run: python data-pipeline/scripts/calculate_us_trending.py
-
-      - name: (텔레그램) 미장 테마 일별 집계
-        id: telegram_us_theme
-        continue-on-error: true
-        run: python data-pipeline/scripts/calculate_us_theme_daily.py
-
-      - name: (텔레그램) 트렌딩 메시지 선별
-        id: telegram_trending
-        continue-on-error: true
-        run: python data-pipeline/scripts/calculate_telegram_trending.py
-
-      - name: (텔레그램) 테마 일별 집계
-        id: telegram_theme_daily
-        continue-on-error: true
-        run: python data-pipeline/scripts/calculate_theme_daily.py
-
-      # LLM 계층 — 메시지별 분류(돈이 드는 단계, 증분) → 결정적 집계 → 문장 생성.
-      # 분류가 실패해도 집계는 직전까지 저장된 분류분으로 돌고, 집계가 실패하면
-      # 문장 생성이 조용히 건너뛴다. 위 스텝들과 마찬가지로 실패 알림과는 분리한다.
-      # 위에서 제출한 배치를 여기서 수거한다(제출은 하지 않는다 — --collect-only).
-      - name: (텔레그램) 메시지 LLM 분류 — 수거
-        id: telegram_analyze_collect
-        continue-on-error: true
-        run: python data-pipeline/scripts/analyze_telegram_messages.py --collect-only
-
-      - name: (텔레그램) 센티먼트·화제어 집계
-        id: telegram_sentiment
-        continue-on-error: true
-        run: python data-pipeline/scripts/calculate_telegram_sentiment.py
-
-      # ⚠️ **미장 센티먼트는 여기 있어야 한다** — 위 미장 세 스텝 옆이 아니다.
-      #    입력이 `telegram_message_analysis` 라, 그날 분류를 수거하는
-      #    telegram_analyze_collect **뒤에** 와야 오늘치를 센다. 앞에 두면 조용히
-      #    어제 분류로 오늘 카드를 그린다(실패도 안 나서 알아채기 어렵다).
-      #    국내 센티먼트 집계와 같은 자리인 것은 그래서다.
-      - name: (텔레그램) 미장 센티먼트·화제어 집계
-        id: telegram_us_sentiment
-        continue-on-error: true
-        run: python data-pipeline/scripts/calculate_us_telegram_sentiment.py
-
-      # 미장 LLM 문장. 미장 센티먼트·테마·동시언급이 전부 끝난 뒤여야 digest 가 찬다.
-      # ⚠️ 국장 총평(아래)과 **따로** 두는 이유: 한쪽이 실패해도 다른 쪽은 나가야 하고,
-      #    미장 실패는 미장 알림에만 잡혀야 한다.
-      - name: (텔레그램) 미장 총평·종목 요약 생성
-        id: telegram_us_narratives
-        continue-on-error: true
-        run: python data-pipeline/scripts/generate_us_telegram_narratives.py
-
-      - name: (텔레그램) 총평·종목 요약 생성
-        id: telegram_narratives
-        continue-on-error: true
-        run: python data-pipeline/scripts/generate_telegram_narratives.py
-
       # ── 채널 발송 ────────────────────────────────────────────────────────
       # 유일하게 밖으로 나가는 스텝이다. 구독자 전원에게 한 번 나간 숫자는 되돌릴 수
       # 없으므로 조건이 셋이고, 셋 다 이유가 다르다.
@@ -451,7 +504,7 @@ jobs:
           && steps.calculate_score.outcome == 'success'
           && github.run_attempt == '1'
           && steps.broadcast_when.outputs.weekday == 'true'
-          && github.event.schedule == '0 0 * * *'
+          && github.event.schedule == '30 21 * * *'
         run: |
           sleep 300   # 파이프라인 완료 후 5분(위 [5] 참고)
           python data-pipeline/scripts/send_telegram_broadcast.py --send --format morning

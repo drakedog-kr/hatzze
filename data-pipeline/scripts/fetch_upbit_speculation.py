@@ -100,7 +100,7 @@ def fetch_upbit_candles(min_days: int, today: date) -> dict[str, dict]:
     구간이다. (그래서 KST 문자열의 앞 10글자는 곧 UTC 날짜와 같고, 아래 `today` 비교도
     UTC 날짜인 `date.today()` 로 맞아떨어진다.)
 
-    그 라벨의 캔들은 **오전 실행(10:45 KST) 시점에 겨우 1시간 45분치**다. 그런데
+    그 라벨의 캔들은 **오전 실행(08:45 KST) 시점에 채 한 시간이 안 된다**. 그런데
     `compute_volume_surge` 는 그걸 하루치 30일 평균과 나눈다. 2026-07-29 실측:
 
         아침 실행이 저장한 급증도  10.8   (1.75시간치)
