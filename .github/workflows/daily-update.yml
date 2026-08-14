@@ -244,10 +244,20 @@ jobs:
       # 통과하므로 평소엔 아무 일도 하지 않는다 — 지연이 짧아진 날을 위한 안전장치다.)
       #
       # 오후 실행은 이미 한참 뒤라 그냥 통과한다.
+      # ⚠️ **continue-on-error 가 붙어 있는 이유.** 이 스텝이 실패하면 뒤따르는 지표 스텝은
+      #    (조건이 없으므로) 통째로 **건너뛰어진다** — 각자 continue-on-error 를 달고 있어도
+      #    그건 자기 실패를 감쌀 뿐 앞 스텝의 실패는 못 막는다. 게이트 하나가 지표 28개를
+      #    데려가는 셈이라, 게이트가 깨지면 **기다리지 않고 그냥 진행**하는 편이 낫다.
+      #    (그 경우 최악이 '그제 자료로 하루 밀림'인데, 다음 실행이 만회한다.)
+      # ⚠️ cancelled() 를 뺀 이유: 잡을 취소했는데 여기서 한 시간을 자고 있으면 안 된다.
       - name: KRX 공표(08:00 KST) 대기
-        if: always()
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         run: |
-          target=$(TZ=Asia/Seoul date -d 'today 08:00' +%s 2>/dev/null || TZ=Asia/Seoul date -j -f '%Y-%m-%d %H:%M' "$(TZ=Asia/Seoul date +%Y-%m-%d) 08:00" +%s)
+          # `date -d 'today 08:00'` 대신 날짜를 명시적으로 넣는다 — 러너(GNU date)와 손으로
+          # 돌리는 맥(BSD date)의 파싱이 갈리는 자리라, 애매한 표현을 쓰지 않는다.
+          today=$(TZ=Asia/Seoul date +%Y-%m-%d)
+          target=$(TZ=Asia/Seoul date -d "$today 08:00" +%s 2>/dev/null || TZ=Asia/Seoul date -j -f '%Y-%m-%d %H:%M' "$today 08:00" +%s)
           now=$(date +%s)
           wait=$(( target - now ))
           if [ "$wait" -gt 0 ]; then
