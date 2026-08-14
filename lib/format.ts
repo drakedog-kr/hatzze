@@ -68,10 +68,13 @@ const KST_UPDATE_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
 
 /**
  * 정기 실행의 **표기용 완료 시각**(KST). cron 발화 시각이 아니라 완료를 여기에 맞춰 스냅한다.
- * 아침 완료 ~11:00, 오후 완료 ~20:00(7시로 스냅) — .github/workflows/daily-update.yml 의
- * '발화+큐지연' 설계 참고.
+ * 아침 완료 ~08:45, 오후 완료 ~19:50 — .github/workflows/daily-update.yml 의 cron 주석 참고.
+ *
+ * ⚠️ **워크플로 일정을 바꾸면 여기도 같이 바꿀 것.** 2026-08-14 에 아침을 11시대에서
+ * 8시대로 당겼는데, 이 배열을 그대로 뒀다면 08:45 에 끝난 실행이 ±3시간 스냅에 걸려
+ * 화면에 "오전 11:00 기준"으로 표시됐을 것이다 — 실제보다 두 시간 늦은 거짓말이다.
  */
-const SCHEDULED_HOURS_KST = [11, 19];
+const SCHEDULED_HOURS_KST = [8, 19];
 /** 예정 시각에서 이만큼 안에 끝났으면 "예정대로 돌았다"고 보고 정각으로 스냅한다. */
 const SCHEDULE_SLACK_HOURS = 3;
 
