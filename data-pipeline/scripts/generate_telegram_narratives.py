@@ -55,7 +55,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from anthropic import Anthropic  # noqa: E402
 
 from common.broadcast_content import weekly_top_stocks  # noqa: E402
-from common.channel_breadth import channel_breadth  # noqa: E402
+from common.channel_breadth import channel_breadth_map  # noqa: E402
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.supabase_client import (  # noqa: E402
     PAGE_SIZE,
@@ -412,6 +412,8 @@ def tone_label(optimism_pct: int) -> str:
 # 지어내지 않게 한다(평일이면 대개 하루로 끝난다).
 NEWS_MIN_MSGS = 1000
 NEWS_EXCERPTS = 6  # 발췌 건수. 3건이면 한 사건에 쏠려 '공통 화제'가 안 보인다
+# 본문을 받아 볼 후보 수. 이 중 공백뿐인 것을 버리고 앞에서 NEWS_EXCERPTS 건을 쓴다.
+NEWS_EXCERPT_CANDIDATES = 30
 NEWS_TOP_STOCKS = 6
 
 
@@ -434,6 +436,8 @@ NEWS_TOP_STOCKS = 6
 # **머리는 버리지 않는다.** 뉴스 글은 제목·리드가 맨 앞에 있어 앞부분 자체가 값진
 # 재료다. 그래서 앞 EXCERPT_HEAD 자를 항상 남기고, 매칭이 그 밖일 때만 뒤에 창을
 # 덧붙인다. 매칭이 이미 앞쪽이면(55.1%) 발췌는 예전과 한 글자도 다르지 않다.
+# 종목별로 본문을 받아 볼 후보 수. 이 중 공백뿐인 것을 버리고 앞에서 3건을 쓴다.
+STOCK_EXCERPT_CANDIDATES = 10
 EXCERPT_CHARS = 180
 EXCERPT_HEAD = 90
 # 줄인 자리 표시. **STOCK_SYSTEM 이 이 기호를 글자 그대로 설명한다**(그쪽이 위에 있어
@@ -487,14 +491,52 @@ def load_messages_since(db, since_date: str) -> list[dict]:
 
     KST 경계가 UTC 보다 9시간 이르므로 하루 앞에서부터 받아 오고, 정확한 날짜 필터링은
     호출부가 kst_date 로 한다(경계 메시지를 흘리지 않으려는 여유분).
+
+    ⚠️⚠️ **본문(text)은 여기서 받지 않는다.** 키셋으로 옮긴 뒤에도 2026-08-14 리허설에서
+    또 `57014` 로 죽었다 — 창이 자라 38,000행 38페이지가 됐고(어제 24,410행 25페이지),
+    파이프라인이 같은 DB 를 두드리는 동안 그중 한 페이지가 8초를 넘겼다. 페이징 방식의
+    문제가 아니라 **본문을 품은 넓은 행을 4만 건 실어 나르는 것 자체**가 문제였다.
+
+    쓰는 쪽을 보면 본문이 필요한 건 **수십 건**이다 — 오간 이야기 발췌 6건, 종목별
+    대표 메시지 3건씩. 나머지 3만 9천 건의 본문은 받아서 버린다. 그래서 줄 세우기는
+    좁은 축(posted_at·views·forwards)으로 하고, 이긴 것의 본문만 attach_texts 로
+    따로 받는다. calculate_telegram_trending 이 같은 이유로 같은 모양이다.
+
+    `text is not null` 은 서버에 맡긴다 — 호출부 두 곳 모두 본문 없는 메시지를 버리므로
+    미리 걸러도 결과가 같고, 그만큼 덜 실어 온다.
     """
     since_utc = f"{(date.fromisoformat(since_date) - timedelta(days=1)).isoformat()}T00:00:00Z"
     return load_keyset(
         db,
         "telegram_messages",
-        "id,channel_handle,message_id,posted_at,text,views,forwards",
-        narrow=lambda q: q.gte("posted_at", since_utc),
+        "id,channel_handle,message_id,posted_at,views,forwards",
+        narrow=lambda q: q.gte("posted_at", since_utc).not_.is_("text", "null"),
     )
+
+
+TEXT_CHUNK = 50  # `.in_()` 목록이 길면 URL 이 커져 요청 자체가 안 나간다(PR #336 에서 밟았다)
+
+
+def attach_texts(db, rows: list[dict]) -> None:
+    """rows 에 본문을 채운다(제자리 수정). 각 row 는 load_messages_since 가 준 id 를 갖는다.
+
+    발췌로 **이긴 것만** 부르는 자리다. 수십 건이라 왕복 한두 번이면 끝나고, 그 대가로
+    load_messages_since 가 4만 건의 본문을 안 실어 온다(위 docstring 참고).
+    """
+    ids = [r["id"] for r in rows]
+    text_of: dict[str, str] = {}
+    for i in range(0, len(ids), TEXT_CHUNK):
+        page = (
+            db.table("telegram_messages")
+            .select("id,text")
+            .in_("id", ids[i : i + TEXT_CHUNK])
+            .execute()
+            .data
+        ) or []
+        for r in page:
+            text_of[r["id"]] = r["text"]
+    for r in rows:
+        r["text"] = text_of.get(r["id"]) or ""
 
 
 def build_brief_digest(db, latest: str) -> str | None:
@@ -618,7 +660,7 @@ def build_brief_digest(db, latest: str) -> str | None:
 
 def build_news_block(db, latest: str, window_since: str) -> list[str]:
     """'지금 오가는 이야기' 문장이 볼 발췌 + 화제 종목. 실패해도 총평은 살린다."""
-    msgs = [m for m in load_messages_since(db, window_since) if (m.get("text") or "").strip()]
+    msgs = load_messages_since(db, window_since)
     by_day: dict[str, list[dict]] = defaultdict(list)
     for m in msgs:
         d = kst_date(m["posted_at"])
@@ -643,8 +685,13 @@ def build_news_block(db, latest: str, window_since: str) -> list[str]:
     # 널리 퍼진 순 = 조회 + 확산×3. 종목 리포트의 [대표 메시지 발췌]와 같은 가중치라
     # 두 문장이 같은 기준으로 '화제'를 고른다.
     picked.sort(key=lambda m: (m.get("views") or 0) + (m.get("forwards") or 0) * 3, reverse=True)
+    # 본문은 이긴 것만 받는다(load_messages_since 주석 참고). 6건이 아니라 넉넉히 부르는
+    # 이유는 공백뿐인 본문이 섞일 수 있어서다 — 예전엔 그걸 정렬 전에 걸렀다.
+    head = picked[:NEWS_EXCERPT_CANDIDATES]
+    attach_texts(db, head)
+    excerpts = [m for m in head if (m.get("text") or "").strip()][:NEWS_EXCERPTS]
     out = ["", f"[{span} 오간 이야기] 조회·확산 상위 {NEWS_EXCERPTS}건 (표본 {len(picked)}건)"]
-    for m in picked[:NEWS_EXCERPTS]:
+    for m in excerpts:
         out.append(f"- {' '.join((m.get('text') or '').split())[:200]}")
 
     # 같은 기간의 화제 종목 — 발췌만으로는 어느 종목 얘기인지 흐릴 때가 있다.
@@ -720,20 +767,29 @@ def save_stock_breadth(db, latest: str) -> None:
     now = datetime.now(timezone.utc).isoformat()
     payload = []
     failed = []
+    # ⭐ **종목마다 부르지 않는다.** channel_breadth_map 이 창 안 메시지 키와 종목별 언급을
+    #    각각 한 번씩만 읽고 메모리에서 맞춘다(2026-08-15 개편). 예전처럼 종목마다 부르면
+    #    그 두 읽기를 60번 반복하게 된다.
+    try:
+        breadth = channel_breadth_map(db, codes, first, last)
+    except Exception as e:  # noqa: BLE001 — 여기서 터져도 뒤의 총평 생성은 살린다
+        print(f"[관심의 폭] 집계 실패, 저장을 건너뜁니다(화면이 직접 센다): {str(e)[:80]}")
+        return
     for c in codes:
-        try:
-            payload.append(
-                {
-                    "stock_code": c,
-                    "channel_count": channel_breadth(db, c, first, last),
-                    "window_start": first,
-                    "window_end": last,
-                    "computed_for": latest,
-                    "updated_at": now,
-                }
-            )
-        except Exception as e:  # noqa: BLE001 — 한 종목 실패가 전체를 데려가지 않게
-            failed.append((c, str(e)[:60]))
+        n = breadth.get(c)
+        if n is None:
+            failed.append((c, "집계에 없음"))
+            continue
+        payload.append(
+            {
+                "stock_code": c,
+                "channel_count": n,
+                "window_start": first,
+                "window_end": last,
+                "computed_for": latest,
+                "updated_at": now,
+            }
+        )
     if failed:
         print(f"[관심의 폭] {len(failed)}종목 실패(그 종목만 화면이 직접 센다): {failed[:3]}")
     if not payload:
@@ -874,7 +930,7 @@ def build_stock_digests(db, latest: str) -> tuple[list[tuple[str, str, str]], li
             f"[일별 추이] {series}  ※ 모양 파악용입니다. 이 숫자와 날짜를 문장에 옮기지 마세요",
         ]
 
-        keys = [k for k in by_code.get(code, []) if k in msgs and (msgs[k].get("text") or "").strip()]
+        keys = [k for k in by_code.get(code, []) if k in msgs]
         # 발췌는 창 안팎을 따지지 않고 오늘 것까지 본다 — 세는 값이 아니라 '무엇이 화제였나'의
         # 예시라, 최신 소식을 빼면 요약이 하루 늦은 얘기를 한다.
         keys = [k for k in keys if msgs[k]["posted_at"][:10] >= since]
@@ -892,6 +948,11 @@ def build_stock_digests(db, latest: str) -> tuple[list[tuple[str, str, str]], li
             key=lambda k: (msgs[k].get("views") or 0) + (msgs[k].get("forwards") or 0) * 3,
             reverse=True,
         )
+        # 본문은 여기서, 이긴 것만 받는다(load_messages_since 주석 참고). 3건이 아니라
+        # 넉넉히 부르는 이유는 공백뿐인 본문이 섞일 수 있어서다.
+        head = [msgs[k] for k in keys[:STOCK_EXCERPT_CANDIDATES]]
+        attach_texts(db, head)
+        keys = [k for k in keys[:STOCK_EXCERPT_CANDIDATES] if (msgs[k].get("text") or "").strip()]
         if keys:
             lines.append("")
             lines.append("[대표 메시지 발췌]")
