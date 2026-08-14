@@ -21,10 +21,10 @@ import sys
 from datetime import date
 from pathlib import Path
 
-import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from common.http_client import get_with_retry  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
 
@@ -66,7 +66,7 @@ def _is_brokerage(name: str, artist: str) -> bool:
 
 
 def fetch_brokerage_froth() -> tuple[float, list[dict]]:
-    resp = requests.get(RSS_URL, timeout=REQUEST_TIMEOUT_SEC)
+    resp = get_with_retry(RSS_URL, label="AppStore", timeout=REQUEST_TIMEOUT_SEC)
     resp.raise_for_status()
     entries = resp.json().get("feed", {}).get("entry", [])
     if isinstance(entries, dict):  # 결과가 1개면 dict로 올 수 있어 리스트로 정규화

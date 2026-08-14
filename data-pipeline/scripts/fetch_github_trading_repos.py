@@ -21,11 +21,11 @@ import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.config import GITHUB_TOKEN  # noqa: E402
+from common.http_client import get_with_retry  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
 
@@ -66,8 +66,9 @@ def fetch_trading_bot_repo_count() -> int:
     if GITHUB_TOKEN:
         headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
 
-    resp = requests.get(
+    resp = get_with_retry(
         GITHUB_SEARCH_URL,
+        label="GitHub",
         params={"q": query},
         headers=headers,
         timeout=REQUEST_TIMEOUT_SEC,
