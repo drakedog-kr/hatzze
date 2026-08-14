@@ -30,6 +30,7 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.config import ALADIN_TTB_KEY  # noqa: E402
+from common.retry import backoff_delay  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
 
@@ -41,7 +42,8 @@ PAGES = 2  # 1페이지=1~50위, 2페이지=51~100위
 ECONOMY_CATEGORY_KEYWORD = "경제경영"
 REQUEST_TIMEOUT_SEC = 30  # 알라딘 API가 가끔 응답이 느려서 여유 있게 설정
 MAX_RETRIES = 3
-RETRY_DELAY_SEC = 3
+RETRY_DELAY_SEC = 3      # 첫 재시도까지의 대기(이후 지수 백오프로 늘어난다)
+RETRY_MAX_DELAY_SEC = 20  # 백오프 상한 — common/http_client 와 같은 눈금
 
 INDICATOR_SLUG = "bestseller_finance_ratio"
 INDICATOR_META = {
@@ -84,7 +86,9 @@ def fetch_page(page: int) -> list[dict]:
             last_error = e
             print(f"[Aladin] {page}페이지 요청 실패 ({attempt}/{MAX_RETRIES}): {e}")
             if attempt < MAX_RETRIES:
-                time.sleep(RETRY_DELAY_SEC)
+                # 고정 3초였는데 지수 백오프로 바꿨다(3 → 6 → …). 상대가 잠깐 막힌
+                # 경우 같은 간격으로 두드리면 같은 벽에 다시 부딪힌다.
+                time.sleep(backoff_delay(attempt, RETRY_DELAY_SEC, RETRY_MAX_DELAY_SEC))
 
     raise RuntimeError(f"알라딘 API {page}페이지 요청이 {MAX_RETRIES}번 모두 실패했습니다") from last_error
 

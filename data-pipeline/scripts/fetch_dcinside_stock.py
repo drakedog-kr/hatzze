@@ -67,7 +67,6 @@ import time
 from datetime import timedelta
 from pathlib import Path
 
-import requests
 from bs4 import BeautifulSoup
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -78,6 +77,7 @@ from common.details import (  # noqa: E402
     sentiment_details,
     store_abs_scale_details,
 )
+from common.http_client import get_with_retry  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
@@ -128,11 +128,13 @@ INDICATOR_META = {
 
 
 def fetch_page(gallery_id: str, page: int) -> BeautifulSoup:
-    resp = requests.get(
+    # timeout 을 안 넘긴다 — http_client 의 기본값(30초)을 쓴다. 예전엔 10초였는데
+    # 2026-08-14 아침에 **연결 자체가** 10초를 못 넘겨 스텝이 통째로 실패했다.
+    resp = get_with_retry(
         MGALLERY_LIST_URL,
+        label="DCInside",
         params={"id": gallery_id, "page": page},
         headers=HEADERS,
-        timeout=10,
     )
     resp.raise_for_status()
     return BeautifulSoup(resp.text, "html.parser")

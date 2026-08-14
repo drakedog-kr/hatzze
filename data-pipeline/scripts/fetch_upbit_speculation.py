@@ -37,11 +37,11 @@ import sys
 from datetime import date, timedelta
 from pathlib import Path
 
-import requests
 import yfinance as yf
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from common.http_client import get_with_retry  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
 
@@ -122,7 +122,9 @@ def fetch_upbit_candles(min_days: int, today: date) -> dict[str, dict]:
         if to_param:
             params["to"] = to_param
 
-        resp = requests.get(UPBIT_CANDLES_URL, params=params, timeout=REQUEST_TIMEOUT_SEC)
+        resp = get_with_retry(
+            UPBIT_CANDLES_URL, label="Upbit", params=params, timeout=REQUEST_TIMEOUT_SEC
+        )
         resp.raise_for_status()
         page = resp.json()
         if not page:

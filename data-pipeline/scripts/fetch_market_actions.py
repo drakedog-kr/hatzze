@@ -56,10 +56,10 @@ import sys
 from datetime import date, timedelta
 from pathlib import Path
 
-import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from common.http_client import post_with_retry  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
 
@@ -96,8 +96,9 @@ INDICATOR_META = {
 
 def search_market_actions(kwd: str, from_date: date, to_date: date) -> list[tuple[str, str, date]]:
     """(시장명, 제목, 날짜) 리스트를 반환. 시/분/초는 버리고 날짜만 쓴다."""
-    resp = requests.post(
+    resp = post_with_retry(
         KIND_SEARCH_URL,
+        label="KIND",
         data={
             "method": "searchTotalInfoSub",
             "forward": "searchtotalinfo_detail",
