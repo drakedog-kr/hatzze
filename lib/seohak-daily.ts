@@ -47,13 +47,7 @@ export const REGIME_SHARE: Record<string, number> = {
  * 여름(7~8월)과 네 마녀의 날은 1.0 근처(0.99~1.01)라 뺐다 — 있을 것 같았는데 없었다.
  * 신호가 있는 것만 남긴다.
  */
-export const CALENDAR_WINDOWS = [
-  { key: "newyear", label: "새해 첫 주", note: "아무도 안 삽니다", buy: 0.739, sell: 0.814, days: 63 },
-  { key: "earnings", label: "미국 실적 시즌", note: "덜 팝니다", buy: 1.004, sell: 0.944, days: 552 },
-  { key: "blackfriday", label: "블랙프라이데이 주간", note: "둘 다 조용합니다", buy: 0.837, sell: 0.874, days: 50 },
-  { key: "xmas", label: "크리스마스 직전", note: "팔기 시작합니다", buy: 0.984, sell: 1.061, days: 39 },
-  { key: "yearend", label: "연말 마지막 주", note: "정리하는 주", buy: 0.909, sell: 1.184, days: 42 },
-] as const;
+export { CALENDAR_WINDOWS, windowsInMonth } from "./seohak-windows";
 
 /**
  * "무엇에 반응하나" 실측. 전부 **다음 영업일 결제**를 추세 대비로 잰 값이다.

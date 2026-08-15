@@ -8,10 +8,12 @@ import {
   type Peer,
   type SeohakOverview,
 } from "@/lib/seohak-data";
+import { getSeohakCalendar } from "@/lib/seohak-calendar";
 import { getSeohakEquityType } from "@/lib/seohak-equity-type";
 import { getSeohakEtf } from "@/lib/seohak-etf";
 import { getSeohakQuarterly } from "@/lib/seohak-quarterly";
 import { DailySection } from "./DailyCards";
+import { CalendarHero } from "./CalendarHero";
 import { EquityTypeSection } from "./EquityTypeSection";
 import { EtfSection } from "./EtfCards";
 import { QuarterlyCards } from "./QuarterlyCards";
@@ -269,12 +271,13 @@ export default async function SeohakPage() {
   // 아래 셋은 서로 의존이 없다. 순서대로 await 하면 왕복이 앞뒤로 붙으므로 함께 띄운다.
   // ⚠️ 분기·ETF 두 층은 표가 아직 없을 수 있어 null 을 돌려준다(마이그레이션 043·042).
   // 그 경우 그 섹션만 접고 나머지는 그대로 뜬다.
-  const [peers, daily, quarterly, etf, equityType] = await Promise.all([
+  const [peers, daily, quarterly, etf, equityType, calendar] = await Promise.all([
     getPeers(ov.asOf),
     getSeohakDaily(),
     getSeohakQuarterly(),
     getSeohakEtf(),
     getSeohakEquityType(),
+    getSeohakCalendar(),
   ]);
   const maxInflow = Math.max(...ov.cohorts.map((c) => c.inflow));
   const recent = ov.cohorts.filter((c) => c.year >= 2025).reduce((s, c) => s + c.inflow, 0);
@@ -290,6 +293,10 @@ export default async function SeohakPage() {
           써서 "카드 하나가 한 행을 통째로 먹는" 모양을 피한다 — 칸 합이 12라 3줄이 찬다.
           ⚠️ 이 격자는 아래 2열 래퍼 **바깥**에 있어야 한다. 안에 넣으면 380px 한 칸에
           갇혀 4열이 1열로 접힌다(실제로 그렇게 깨졌다). */}
+      {/* 히어로 = 달력. 이 화면에서 가장 눈에 붙는 그림이고, 나머지 층이 그 아래에서
+          '왜 그런가'를 답한다. */}
+      {calendar && <CalendarHero c={calendar} />}
+
       <DailySection d={daily} />
 
       {equityType && <EquityTypeSection e={equityType} />}

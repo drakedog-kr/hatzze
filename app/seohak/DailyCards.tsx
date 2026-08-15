@@ -188,109 +188,6 @@ function BuySellShift({ d }: { d: SeohakDaily }) {
   );
 }
 
-/* ── ③ 달력 ───────────────────────────────────────────────────────────
-   막대·띠·목록을 차례로 버리고 **진짜 달력 격자**로 왔다. 이 데이터가 말하는 건
-   "1년 중 어느 주에 무슨 일이 벌어지나"인데, 그건 달력의 생김새 그대로다 — 막대로
-   그리면 독자가 머릿속에서 다시 달력으로 옮겨 놓아야 한다.
-
-   가로 12칸이 월, 세로 5칸이 그달의 몇째 주다. 칸 하나가 한 주다. */
-function CalendarCard({ asOf }: { asOf: string }) {
-  /**
-   * 색은 **한 가지**만 쓴다. 처음엔 '사는 주 / 파는 주'로 두 색을 썼는데, 달력이 답할
-   * 질문은 "언제"지 "무엇을"이 아니다. 방향까지 색에 실으면 칸 하나가 두 가지를
-   * 말하려다 둘 다 못 말한다 — 방향은 아래 목록의 문장이 맡는다.
-   *
-   * '미국 실적 시즌'은 뺐다. 1·4·7·10월 후반 12주라 격자의 4분의 1을 물들이는데
-   * 실측 차이가 0.4%다. 아무 일도 없는 구간이 가장 넓게 칠해지면 그림이 거짓말을 한다.
-   */
-  const HIGHLIGHT = new Set(["newyear", "blackfriday", "xmas", "yearend"]);
-  const shown = CALENDAR_WINDOWS.filter((w) => HIGHLIGHT.has(w.key));
-  const meta = (k: string) => CALENDAR_WINDOWS.find((w) => w.key === k)!;
-
-  // 주차는 1일부터 7일씩 끊는다. 요일 기준 주가 아니라 '그달 몇째 주'라 해마다 자리가 안 흔들린다.
-  const wk = (d: number) => Math.min(5, Math.ceil(d / 7));
-  const marks = new Map<string, string>();
-  const put = (m: number, from: number, to: number, key: string) => {
-    for (let w = wk(from); w <= wk(to); w++) marks.set(`${m}-${w}`, key);
-  };
-  put(1, 1, 8, "newyear");
-  put(11, 24, 30, "blackfriday");
-  put(12, 20, 24, "xmas");
-  put(12, 26, 31, "yearend");
-
-  const [, tm, td] = asOf.split("-").map(Number);
-  const todayKey = `${tm}-${wk(td)}`;
-  const hereKey = marks.get(todayKey);
-
-  /** 매수·매도 중 더 크게 움직인 쪽을 문장으로. 한쪽만 보이면 큰 쪽을 놓친다. */
-  const phrase = (w: (typeof CALENDAR_WINDOWS)[number]) => {
-    const useBuy = Math.abs(w.buy - 1) >= Math.abs(w.sell - 1);
-    const v = useBuy ? w.buy : w.sell;
-    const pct = Math.round(Math.abs(v - 1) * 100);
-    return `${pct}% ${v > 1 ? "더" : "덜"} ${useBuy ? "삽니다" : "팝니다"}`;
-  };
-
-  return (
-    <>
-      <Verdict>
-        {hereKey ? (
-          <>이번 주는 <Em>{meta(hereKey).label}</Em>입니다</>
-        ) : (
-          <>이번 주는 <Em>평범한 주</Em>입니다</>
-        )}
-      </Verdict>
-
-      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 7 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 3 }}>
-          {[1, 2, 3, 4, 5].map((w) =>
-            Array.from({ length: 12 }, (_, k) => k + 1).map((m) => {
-              const key = marks.get(`${m}-${w}`);
-              const isToday = todayKey === `${m}-${w}`;
-              return (
-                <span
-                  key={`${m}-${w}`}
-                  title={key ? `${m}월 ${w}째 주 · ${meta(key).label}` : `${m}월 ${w}째 주`}
-                  style={{
-                    height: 14,
-                    borderRadius: 2,
-                    background: key ? C.blue : C.track,
-                    // 오늘 주는 색이 아니라 **테두리**로 표시한다. 색으로 하면 구간 색과
-                    // 섞여 "오늘이 특별한 구간"으로 잘못 읽힌다.
-                    boxShadow: isToday ? `0 0 0 2px ${C.ink}` : undefined,
-                  }}
-                />
-              );
-            }),
-          )}
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 3,
-                      fontSize: 8.5, color: C.faint, textAlign: "center", letterSpacing: "-0.02em" }}>
-          {Array.from({ length: 12 }, (_, k) => k + 1).map((m) => (
-            <span key={m}>{m}</span>
-          ))}
-        </div>
-
-        <ul style={{ listStyle: "none", margin: "3px 0 0", padding: 0, display: "flex",
-                     flexDirection: "column", gap: 5 }}>
-          {shown.map((m) => (
-            <li key={m.key} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 11.5 }}>
-              <span style={{ width: 9, height: 9, borderRadius: 2, flexShrink: 0, background: C.blue }} />
-              <span style={{ color: hereKey === m.key ? C.ink : C.sub,
-                             fontWeight: hereKey === m.key ? 800 : 500, minWidth: 0,
-                             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {m.label}
-              </span>
-              <span style={{ marginLeft: "auto", flexShrink: 0, color: C.sub2, fontWeight: 700 }}>
-                {phrase(m)}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </>
-  );
-}
-
 /* ── ④ 무엇에 반응하나 ─────────────────────────────────────────────────
    달력 카드와 짝이다. 저쪽이 "언제 달라지나"라면 이쪽은 "무엇에 달라지나"인데,
    답이 **아무것에도**라서 그리기가 까다로웠다.
@@ -519,13 +416,6 @@ export function DailySection({ d }: { d: SeohakDaily }) {
             note="최근 20일"
             foot="'평소'는 앞뒤 반년의 중앙값입니다.">
         <BuySellShift d={d} />
-      </Card>
-
-      <Card icon="calendar_month" title="해마다 되풀이되는 날들"
-            desc="매년 같은 시기에 매매가 달라지는 구간입니다."
-            note="2015~2026"
-            foot="실적 시즌·여름·네 마녀의 날은 평소와 달라지지 않아 뺐습니다.">
-        <CalendarCard asOf={d.asOf} />
       </Card>
 
       <Card icon="troubleshoot" title="무엇에 반응하나"
