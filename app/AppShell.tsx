@@ -169,6 +169,17 @@ const NAV: NavItem[] = [
     ],
   },
   { href: "/mdd", label: "MDD 정밀분석", icon: "trending_down", sub: "고점에서 얼마나 내려왔고 언제 회복했을까" },
+  // ⚠️ **'준비 중' 배지를 단 채로 NAV 에 있다.** 화면은 다 만들어졌지만 아직 안 열었다.
+  // COMING_SOON 에 두면 본문 헤더(PageHeader)가 NAV 에서 경로를 못 찾아 **제목 칸을
+  // 통째로 비운다** — 그래서 이 화면만 제목도 부제도 없이 카드부터 시작했다.
+  // 열 때는 이 줄의 badge 만 지우면 된다.
+  {
+    href: "/seohak",
+    label: "서학개미 해부도",
+    Glyph: AntIcon,
+    sub: "한국인이 미국 주식에 얼마를 넣었고 지금 얼마가 됐나",
+    badge: "준비 중",
+  },
 ];
 
 // 외부(텔레그램) 링크라 NAV 배열이 아니라 따로 둔다 — pathname 기반 active 판정 대상이
@@ -198,15 +209,9 @@ const TELEGRAM = {
 // `after` 는 이 항목이 사이드바에서 **어느 NAV 항목 뒤에** 붙는지다. 배열 순서가 아니라
 // 자리를 데이터로 적는 이유는, 미장 카더라가 국장 카더라 바로 밑에 있어야 하기 때문이다 —
 // 예고 항목을 전부 목록 끝에 몰면 짝인 둘이 MDD 를 사이에 두고 떨어진다.
-const COMING_SOON: { label: string; badge: string; tip: string; after: string; Glyph: Glyph }[] = [
-  {
-    label: "서학개미 해부도",
-    badge: "준비 중",
-    tip: "현재 열심히 개발 중입니다!",
-    after: "/mdd",
-    Glyph: AntIcon,
-  },
-];
+// 지금은 비어 있다 — 서학개미 해부도가 NAV 로 옮겨 갔다(화면이 생겼고, 아직 안 열었으니
+// '준비 중' 배지만 NAV 항목에 그대로 달고 있다). 다음 예고 항목이 생기면 여기에 넣는다.
+const COMING_SOON: { label: string; badge: string; tip: string; after: string; Glyph: Glyph }[] = [];
 
 /**
  * 사이드바·모바일 메뉴가 그리는 순서. NAV 항목 사이사이에 예고 항목을 끼운다.
