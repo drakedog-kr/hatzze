@@ -66,6 +66,11 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
   const meta = monthMeta(month);
   const windows = windowsInMonth(meta.month);
   const day = byDate.get(picked);
+  // 선택한 날이 어느 구간에 드는지. 오른쪽 칸이 "이 날은 ~에 듭니다"로 쓴다.
+  const pickedDay = Number(picked.slice(8));
+  const pickedWindow = picked.startsWith(month)
+    ? windows.find((w) => pickedDay >= w.fromDay && pickedDay <= w.toDay)
+    : undefined;
 
   // 달을 바꾸면 그 달의 마지막 거래일로 선택을 옮긴다. 안 그러면 다른 달의 날짜가
   // 선택된 채로 남아 아래 패널이 화면과 어긋난다.
@@ -94,6 +99,11 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
         note={`${meta.year}년 ${meta.month}월`}
       />
 
+      {/* 카드 격자가 한 줄에 3칸이라 달력이 3칸을 다 먹으면 혼자만 커 보인다.
+          **달력 2칸 · 설명 1칸**으로 가른다. 정확한 열 맞춤보다 wrap 이 중요해서
+          카더라의 시트 쌍 어법(flex + minWidth)을 따른다 — 좁아지면 세로로 접힌다. */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 0 }}>
+      <div style={{ flex: "2 1 min(560px, 100%)", minWidth: 0, display: "flex", flexDirection: "column" }}>
       <div style={{ padding: "12px 18px 0", display: "flex", alignItems: "center",
                     justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -216,48 +226,66 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
         </div>
       </div>
 
-      {/* ── 클릭한 날 ── */}
-      <div style={{ margin: "14px 18px 0", padding: "12px 14px", background: C.soft,
-                    borderRadius: R.control }}>
-        {day ? (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "baseline" }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 11.5, color: C.sub2, fontWeight: 600 }}>{day.date} 결제</div>
-              <div style={{ fontSize: 17, fontWeight: 800, color: C.ink, wordBreak: "keep-all" }}>
-                {day.net >= 0 ? (
-                  <>
-                    <span style={{ color: C.blue }}>{usd(day.net)}</span>어치를 더 샀습니다
-                  </>
-                ) : (
-                  <>
-                    <span style={{ color: C.ink }}>{usd(-day.net)}</span>어치를 더 팔았습니다
-                  </>
-                )}
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 16, marginLeft: "auto", flexWrap: "wrap" }}>
-              {[
-                { k: "산 금액", v: usd(day.buy), n: `${cnt(day.buyCount)}번` },
-                { k: "판 금액", v: usd(day.sell), n: `${cnt(day.sellCount)}번` },
-                {
-                  k: "한 번 살 때",
-                  v: day.buyCount ? usd(day.buy / day.buyCount) : "—",
-                  n: "평균",
-                },
-              ].map((s) => (
-                <div key={s.k} style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                  <span style={{ fontSize: 10.5, color: C.sub2, fontWeight: 600 }}>{s.k}</span>
-                  <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 800, color: C.ink }}>
-                    {s.v}
-                  </span>
-                  <span style={{ fontSize: 10, color: C.faint }}>{s.n}</span>
+      </div>
+
+      {/* ── 오른쪽 한 칸: 클릭한 날 ── */}
+      <aside style={{ flex: "1 1 min(260px, 100%)", minWidth: 0, padding: "12px 18px 0",
+                      display: "flex", flexDirection: "column" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12,
+                      background: C.soft, borderRadius: R.control, padding: "14px 15px" }}>
+          {day ? (
+            <>
+              <div>
+                <div style={{ fontSize: 11.5, color: C.sub2, fontWeight: 600 }}>
+                  {day.date} 결제
+                  {pickedWindow && <> · {pickedWindow.label}</>}
                 </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <span style={{ fontSize: 12.5, color: C.sub }}>날짜를 누르면 그날 매매를 봅니다.</span>
-        )}
+                <div style={{ fontSize: 17, fontWeight: 800, color: C.ink, lineHeight: 1.4,
+                              wordBreak: "keep-all", marginTop: 3 }}>
+                  <span style={{ color: day.net >= 0 ? C.blue : C.ink }}>
+                    {usd(Math.abs(day.net))}
+                  </span>
+                  어치를 더 {day.net >= 0 ? "샀습니다" : "팔았습니다"}
+                </div>
+              </div>
+
+              <ul style={{ listStyle: "none", margin: 0, padding: "10px 0 0", display: "flex",
+                           flexDirection: "column", gap: 9, borderTop: `1px solid ${C.line}` }}>
+                {[
+                  { k: "산 금액", v: usd(day.buy), n: `${cnt(day.buyCount)}번` },
+                  { k: "판 금액", v: usd(day.sell), n: `${cnt(day.sellCount)}번` },
+                  {
+                    k: "한 번 살 때",
+                    v: day.buyCount ? usd(day.buy / day.buyCount) : "—",
+                    n: "평균",
+                  },
+                ].map((s) => (
+                  <li key={s.k} style={{ display: "flex", alignItems: "baseline",
+                                         justifyContent: "space-between", gap: 8 }}>
+                    <span style={{ fontSize: 11.5, color: C.sub, fontWeight: 600 }}>{s.k}</span>
+                    <span style={{ textAlign: "right" }}>
+                      <b style={{ fontFamily: MONO, fontSize: 14, fontWeight: 800, color: C.ink,
+                                  display: "block" }}>{s.v}</b>
+                      <span style={{ fontSize: 10, color: C.faint }}>{s.n}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+
+              {pickedWindow && (
+                <p style={{ margin: 0, marginTop: "auto", paddingTop: 10, fontSize: 11.5,
+                            lineHeight: 1.5, color: C.sub2, borderTop: `1px solid ${C.line}`,
+                            wordBreak: "keep-all" }}>
+                  이 날은 <b style={{ color: C.ink }}>{pickedWindow.label}</b>에 듭니다.
+                  2015~2026 의 {pickedWindow.days}일을 모아 보면 {pickedWindow.note}
+                </p>
+              )}
+            </>
+          ) : (
+            <span style={{ fontSize: 12.5, color: C.sub }}>날짜를 누르면 그날 매매를 봅니다.</span>
+          )}
+        </div>
+      </aside>
       </div>
 
       <div className="hz-sheet-foot" style={{ fontSize: 12, color: C.sub }}>
