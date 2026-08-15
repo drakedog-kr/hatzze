@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 import type { CalendarDay, SeohakCalendar } from "@/lib/seohak-calendar";
-import { windowsInMonth } from "@/lib/seohak-windows";
+import { CALENDAR_WINDOWS, REACTIONS, windowsInMonth } from "@/lib/seohak-windows";
 import { SectionHead } from "../kadera/SectionHead";
 import { C, Icon, MONO, R } from "../ui";
 
@@ -51,6 +51,76 @@ function shiftMonth(month: string, by: number) {
   const [y, m] = month.split("-").map(Number);
   const d = new Date(Date.UTC(y, m - 1 + by, 1));
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+
+/* ── 사건 대 날짜 ────────────────────────────────────────────────────
+   원래 별도 카드('무엇에 반응하나')였는데 달력 안으로 들였다. 이 카드가 하는 말이
+   **"매매를 바꾸는 건 사건이 아니라 날짜다"** 라서, 날짜를 그리는 화면의 결론으로
+   붙어야 제자리다. 따로 두면 독자가 두 화면을 머릿속에서 이어 붙여야 한다.
+
+   시트 전체 폭을 쓰니 좁은 카드에서보다 띠가 길어져 '무반응'이 더 또렷하다. */
+function EventsVsDates() {
+  const yearend = CALENDAR_WINDOWS.find((w) => w.key === "yearend")!;
+  const rows = [
+    ...REACTIONS.map((r) => {
+      const c: number[] = [];
+      if (r.buy !== null) c.push(r.buy);
+      if (r.sell !== null) c.push(r.sell);
+      // 매수·매도 중 더 크게 움직인 쪽. 순매수로 뭉치면 둘이 서로 상쇄한다.
+      const dev = c.length ? c.reduce((a, b) => (Math.abs(b - 1) > Math.abs(a - 1) ? b : a)) : 1;
+      return { label: r.label, diff: Math.round(Math.abs(dev - 1) * 100), strong: false };
+    }),
+    { label: "연말 마지막 주가 오면", diff: Math.round(Math.abs(yearend.sell - 1) * 100), strong: true },
+  ];
+  /** 축 오른쪽 끝(%). 가장 큰 값보다 넉넉히 잡아 막대가 벽에 닿지 않게 한다. */
+  const AXIS = 20;
+  /** 이 밖으로 나가야 '달라졌다'고 본다. 20영업일 창의 날짜별 흔들림이 이 폭이다. */
+  const NOISE = 5;
+
+  return (
+    <div style={{ padding: "16px 18px 0", borderTop: `1px solid ${C.line}`, marginTop: 14 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap",
+                    marginBottom: 10 }}>
+        <b style={{ fontSize: 14, fontWeight: 800, color: C.ink }}>
+          사건보다 <span style={{ color: C.blue }}>날짜에 더 반응</span>합니다
+        </b>
+        <span style={{ fontSize: 11.5, color: C.sub2 }}>
+          이런 일이 있던 다음 날, 매매가 얼마나 달라졌는지입니다
+        </span>
+      </div>
+
+      <div style={{ position: "relative", display: "grid", gap: "9px 22px",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))" }}>
+        {rows.map((r) => (
+          <div key={r.label} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            <span style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 11.5 }}>
+              <span style={{ fontWeight: r.strong ? 800 : 600, color: r.strong ? C.ink : C.label,
+                             minWidth: 0, overflow: "hidden", textOverflow: "ellipsis",
+                             whiteSpace: "nowrap" }}>{r.label}</span>
+              <span style={{ flexShrink: 0, fontWeight: 700, color: r.strong ? C.blue : C.sub2 }}>
+                {r.diff <= NOISE ? "그대로" : `${r.diff}% 달라짐`}
+              </span>
+            </span>
+            {/* 줄마다 '차이 없음' 구역을 깔아 짧은 막대가 '작은 반응'이 아니라
+                '무반응'으로 읽히게 한다. */}
+            <span style={{ position: "relative", height: 7, borderRadius: 4, background: C.soft }}>
+              <span aria-hidden style={{ position: "absolute", left: 0, top: 0, bottom: 0,
+                                         width: `${(NOISE / AXIS) * 100}%`, background: C.chip,
+                                         borderRight: `1px dashed ${C.line}`,
+                                         borderRadius: "4px 0 0 4px" }} />
+              <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 4,
+                             width: `${Math.max(2, Math.min(100, (r.diff / AXIS) * 100))}%`,
+                             background: r.strong ? C.blue : C.bar }} />
+            </span>
+          </div>
+        ))}
+      </div>
+      <span style={{ display: "block", fontSize: 10.5, color: C.faint, marginTop: 8 }}>
+        회색 구역 안({NOISE}% 이내)은 평소 흔들림과 구별되지 않습니다 · 맨 아래 연말은 견주기용입니다
+      </span>
+    </div>
+  );
 }
 
 export function CalendarHero({ c }: { c: SeohakCalendar }) {
@@ -287,6 +357,8 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
         </div>
       </aside>
       </div>
+
+      <EventsVsDates />
 
       <div className="hz-sheet-foot" style={{ fontSize: 12, color: C.sub }}>
         <span>

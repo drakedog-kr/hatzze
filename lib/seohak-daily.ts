@@ -47,20 +47,8 @@ export const REGIME_SHARE: Record<string, number> = {
  * 여름(7~8월)과 네 마녀의 날은 1.0 근처(0.99~1.01)라 뺐다 — 있을 것 같았는데 없었다.
  * 신호가 있는 것만 남긴다.
  */
-export { CALENDAR_WINDOWS, windowsInMonth } from "./seohak-windows";
+export { CALENDAR_WINDOWS, REACTIONS, windowsInMonth } from "./seohak-windows";
 
-/**
- * "무엇에 반응하나" 실측. 전부 **다음 영업일 결제**를 추세 대비로 잰 값이다.
- *
- * 넷 다 1.0 근처라는 게 이 카드의 결론이다. 순매수 하나로 뭉쳐 보면 매도가 더 크게
- * 줄어드는 바람에 "떨어질 때 산다"로 잘못 읽힌다 — 매수·매도를 갈라야 보인다.
- */
-export const REACTIONS = [
-  { label: "나스닥 −2% 이하", buy: 0.972, sell: 0.924, days: 98, src: "2021~2026 · 1,338일" },
-  { label: "원/달러 +0.7% 이상", buy: 1.005, sell: 1.0, days: 376, src: "2010~2026" },
-  { label: "월급날 언저리(25일)", buy: 0.977, sell: null, days: 0, src: "2015~2026 · 일자별 0.93~1.12" },
-  { label: "미국을 크게 판 날", buy: null, sell: null, days: 600, src: "다른 시장 순매수 백만 달러 단위 미동" },
-] as const;
 
 /** 추세 정규화 창의 한쪽 길이(영업일). ±60 = 약 반년. */
 const NORM_HALF = 60;

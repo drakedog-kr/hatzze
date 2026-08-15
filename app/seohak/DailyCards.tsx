@@ -1,9 +1,4 @@
-import {
-  CALENDAR_WINDOWS,
-  REACTIONS,
-  SIZE_RATIO_TYPICAL,
-  type SeohakDaily,
-} from "@/lib/seohak-daily";
+import { CALENDAR_WINDOWS, SIZE_RATIO_TYPICAL, type SeohakDaily } from "@/lib/seohak-daily";
 import { C, Icon, MONO, R } from "../ui";
 
 /**
@@ -98,51 +93,22 @@ export const CARD_GRID: React.CSSProperties = {
   gap: 14,
 };
 
-/* ── ① 어제 얼마나 사고팔았나 ────────────────────────────────────────────
-   배수를 다 걷어내고 실제 금액·건수만 남겼다. 두 막대는 같은 자로 그려 길이 차이가
-   곧 "얼마나 더 샀나"가 되게 한다. */
-function TodayTrade({ d }: { d: SeohakDaily }) {
-  const net = d.today.buy - d.today.sell;
-  const max = Math.max(d.today.buy, d.today.sell) || 1;
-  const row = (label: string, amt: number, count: number, fill: string) => (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: C.label }}>{label}</span>
-        <span style={{ fontFamily: MONO, fontSize: 15, fontWeight: 800, color: C.ink }}>{usd(amt)}</span>
-      </div>
-      <span style={{ height: 14, background: C.track, borderRadius: 3, overflow: "hidden", display: "block" }}>
-        <span style={{ display: "block", width: `${(amt / max) * 100}%`, height: "100%", background: fill }} />
-      </span>
-      <span style={{ fontSize: 11, color: C.sub2 }}>{cnt(count)}번</span>
-    </div>
-  );
-  return (
-    <>
-      <Verdict>
-        어제는 <Em>{usd(Math.abs(net))}</Em>어치를 더 {net >= 0 ? "샀습니다" : "팔았습니다"}
-      </Verdict>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {row("산 금액", d.today.buy, d.today.buyCount, C.blue)}
-        {row("판 금액", d.today.sell, d.today.sellCount, C.marker)}
-      </div>
-      <div style={{ marginTop: "auto", fontSize: 12, color: C.sub }}>
-        한 번 살 때 평균{" "}
-        <b style={{ fontFamily: MONO, color: C.ink }}>${Math.round(d.perTrade).toLocaleString("ko-KR")}</b>
-      </div>
-    </>
-  );
-}
+/* ── ① 얼마나 샀고, 그게 평소와 얼마나 다른가 ────────────────────────
+   원래 카드 둘이었다. '어제 얼마나 사고팔았나'(실제 금액)와 '평소보다 많이 했나'
+   (평소 대비 배수)를 나란히 뒀는데, 둘 다 같은 하루를 말하면서 **어느 쪽도 혼자서는
+   문장이 안 됐다.** 금액만 보면 큰지 작은지 모르고, 배수만 보면 얼마인지 모른다.
 
-/* ── ② 사자와 팔자 ─────────────────────────────────────────────────────
-   산점도를 버렸다. 축 둘과 자취 40점을 250px 칸에서 읽히게 만들 방법이 없었고,
-   카드가 할 말은 "어느 쪽이 움직였나" 하나였다. **평소를 0으로 둔 좌우 막대 둘**이면
-   같은 말을 설명 없이 한다. */
-function BuySellShift({ d }: { d: SeohakDaily }) {
+   합치면 한 줄이 된다: "$811M 샀는데 그건 평소보다 7% 적다."
+
+   ⭐ 그리고 **평소 대비를 앞세운다.** 실제 금액은 위 달력의 오른쪽 칸이 아무 날짜나
+   골라 보여주므로, 이 카드가 금액을 주인공으로 삼으면 히어로와 같은 말을 두 번 한다.
+   여기서만 할 수 있는 말은 '평소와 견주면' 쪽이다. */
+function DayVsUsual({ d }: { d: SeohakDaily }) {
   const rows = [
-    { k: "사는 양", v: d.regime.buy, fill: C.blue },
-    { k: "파는 양", v: d.regime.sell, fill: C.marker },
+    { k: "사는 양", rel: d.regime.buy, amt: d.today.buy, n: d.today.buyCount, fill: C.blue },
+    { k: "파는 양", rel: d.regime.sell, amt: d.today.sell, n: d.today.sellCount, fill: C.marker },
   ];
-  const span = Math.max(0.2, ...rows.map((r) => Math.abs(r.v - 1))) * 1.2;
+  const span = Math.max(0.2, ...rows.map((r) => Math.abs(r.rel - 1))) * 1.2;
   const up = (v: number) => v >= 1;
   // 네 조합을 문장으로. 사분면 이름("둘 다 줄었다")을 그대로 쓰면 그게 무슨 뜻인지
   // 또 설명해야 하므로, 뜻을 바로 적는다.
@@ -155,25 +121,30 @@ function BuySellShift({ d }: { d: SeohakDaily }) {
   ) : (
     <><Em>파는 쪽만</Em> 평소보다 늘었습니다</>
   );
+
   return (
     <>
       <Verdict>{verdict}</Verdict>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: "auto" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 13, marginTop: "auto" }}>
         {rows.map((r) => {
-          const w = (Math.abs(r.v - 1) / span) * 50;
-          const right = r.v >= 1;
+          const w = (Math.abs(r.rel - 1) / span) * 50;
+          const right = r.rel >= 1;
           return (
             <div key={r.k} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: C.label }}>{r.k}</span>
                 <span style={{ fontSize: 13, fontWeight: 800, color: right ? C.ink : C.blue }}>
-                  {asPct(r.v)}
+                  {asPct(r.rel)}
                 </span>
               </div>
               <span style={{ position: "relative", height: 14, background: C.soft, borderRadius: 3 }}>
                 <span style={{ position: "absolute", left: "50%", top: -3, bottom: -3, width: 1.5, background: C.marker }} />
                 <span style={{ position: "absolute", top: 3, height: 8, borderRadius: 2,
                                left: right ? "50%" : `${50 - w}%`, width: `${Math.max(1, w)}%`, background: r.fill }} />
+              </span>
+              {/* 배수 아래에 실제 값을 붙인다 — 이게 두 카드를 합친 이유다. */}
+              <span style={{ fontSize: 11, color: C.sub2 }}>
+                어제 <b style={{ fontFamily: MONO, color: C.ink }}>{usd(r.amt)}</b> · {cnt(r.n)}번
               </span>
             </div>
           );
@@ -183,69 +154,6 @@ function BuySellShift({ d }: { d: SeohakDaily }) {
           <span>평소</span>
           <span>더 한다</span>
         </div>
-      </div>
-    </>
-  );
-}
-
-/* ── ④ 무엇에 반응하나 ─────────────────────────────────────────────────
-   달력 카드와 짝이다. 저쪽이 "언제 달라지나"라면 이쪽은 "무엇에 달라지나"인데,
-   답이 **아무것에도**라서 그리기가 까다로웠다.
-
-   막대 다섯 개를 나란히 놓으면 "짧다"만 보이지 "없다"가 안 보인다. 그래서 다섯 줄에
-   걸쳐 **'차이 없음' 구역**을 하나의 세로 띠로 깔았다. 넷이 그 안에서 끝나고 하나만
-   띠 밖으로 나가는 그림이라, 짧은 막대가 '작은 반응'이 아니라 '무반응'으로 읽힌다. */
-function Reactions() {
-  const yearend = CALENDAR_WINDOWS.find((w) => w.key === "yearend")!;
-  const rows = [
-    ...REACTIONS.map((r) => {
-      const c: number[] = [];
-      if (r.buy !== null) c.push(r.buy);
-      if (r.sell !== null) c.push(r.sell);
-      // 매수·매도 중 더 크게 움직인 쪽을 쓴다. 순매수로 뭉치면 둘이 서로 상쇄한다.
-      const dev = c.length ? c.reduce((a, b) => (Math.abs(b - 1) > Math.abs(a - 1) ? b : a)) : 1;
-      return { label: r.label, diff: Math.round(Math.abs(dev - 1) * 100), strong: false };
-    }),
-    { label: "연말 마지막 주", diff: Math.round(Math.abs(yearend.sell - 1) * 100), strong: true },
-  ];
-  /** 축 오른쪽 끝(%). 가장 큰 값보다 넉넉히 잡아 막대가 벽에 닿지 않게 한다. */
-  const AXIS = 20;
-  /** 이 밖으로 나가야 '달라졌다'고 본다. 20영업일 창의 날짜별 흔들림이 이 폭이다. */
-  const NOISE = 5;
-
-  return (
-    <>
-      <Verdict>
-        사건보다 <Em>날짜에 더 반응</Em>합니다
-      </Verdict>
-
-      <div style={{ marginTop: "auto", position: "relative", display: "flex",
-                    flexDirection: "column", gap: 9, paddingTop: 4 }}>
-        {/* 다섯 줄을 관통하는 '차이 없음' 구역. 막대보다 뒤에 깔린다. */}
-        <span aria-hidden style={{ position: "absolute", left: 0, top: 0, bottom: 16,
-                                   width: `${(NOISE / AXIS) * 100}%`, background: C.soft,
-                                   borderRight: `1px dashed ${C.line}`, borderRadius: "3px 0 0 3px" }} />
-        {rows.map((r) => (
-          <div key={r.label} style={{ position: "relative", display: "flex", flexDirection: "column", gap: 3 }}>
-            <span style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 11.5 }}>
-              <span style={{ fontWeight: r.strong ? 800 : 600, color: r.strong ? C.ink : C.label,
-                             minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {r.label}
-              </span>
-              <span style={{ flexShrink: 0, fontWeight: 700, color: r.strong ? C.blue : C.sub2 }}>
-                {r.diff <= NOISE ? "그대로" : `${r.diff}% 달라짐`}
-              </span>
-            </span>
-            <span style={{ height: 7, borderRadius: 4, background: "transparent" }}>
-              <span style={{ display: "block", height: "100%", borderRadius: 4,
-                             width: `${Math.max(2, Math.min(100, (r.diff / AXIS) * 100))}%`,
-                             background: r.strong ? C.blue : C.bar }} />
-            </span>
-          </div>
-        ))}
-        <span style={{ fontSize: 9.5, color: C.faint, marginTop: -2 }}>
-          회색 구역 안({NOISE}% 이내)은 평소 흔들림과 구별되지 않습니다
-        </span>
       </div>
     </>
   );
@@ -404,25 +312,11 @@ function HowManyToday({ d }: { d: SeohakDaily }) {
 export function DailySection({ d }: { d: SeohakDaily }) {
   return (
     <div style={CARD_GRID}>
-      <Card icon="candlestick_chart" title="어제 얼마나 사고팔았나"
-            desc="예탁결제원에 결제된 미국 주식 매매입니다."
-            note={`${d.asOf} 결제`}
-            foot="결제일 기준이라 거래일보다 하루 늦습니다.">
-        <TodayTrade d={d} />
-      </Card>
-
-      <Card icon="swap_vert" title="평소보다 많이 했나, 적게 했나"
-            desc="사는 양과 파는 양을 각각 평소와 견줍니다."
+      <Card icon="swap_vert" title="평소와 얼마나 다른가"
+            desc="어제 사고판 양을 각각 평소와 견줍니다."
             note="최근 20일"
-            foot="'평소'는 앞뒤 반년의 중앙값입니다.">
-        <BuySellShift d={d} />
-      </Card>
-
-      <Card icon="troubleshoot" title="무엇에 반응하나"
-            desc="이런 일이 있던 다음 날, 매매가 얼마나 달라졌는지입니다."
-            note="실측"
-            foot="맨 아래 연말은 견주기용입니다. 어떤 사건도 그만큼 못 흔듭니다.">
-        <Reactions />
+            foot={`'평소'는 앞뒤 반년의 중앙값입니다. 한 번 살 때 평균 $${Math.round(d.perTrade).toLocaleString("ko-KR")}.`}>
+        <DayVsUsual d={d} />
       </Card>
 
       <Card icon="groups" title="사는 사람과 파는 사람"

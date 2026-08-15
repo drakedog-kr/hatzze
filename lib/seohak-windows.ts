@@ -41,3 +41,16 @@ export function windowsInMonth(month: number) {
     "months" in w ? (w.months as readonly number[]).includes(month) : w.from[0] === month,
   ).map((w) => ({ ...w, fromDay: w.from[1], toDay: w.to[1] }));
 }
+
+/**
+ * "무엇에 반응하나" 실측. 전부 **다음 영업일 결제**를 추세 대비로 잰 값이다.
+ *
+ * 넷 다 1.0 근처라는 게 이 카드의 결론이다. 순매수 하나로 뭉쳐 보면 매도가 더 크게
+ * 줄어드는 바람에 "떨어질 때 산다"로 잘못 읽힌다 — 매수·매도를 갈라야 보인다.
+ */
+export const REACTIONS = [
+  { label: "나스닥 −2% 이하", buy: 0.972, sell: 0.924, days: 98, src: "2021~2026 · 1,338일" },
+  { label: "원/달러 +0.7% 이상", buy: 1.005, sell: 1.0, days: 376, src: "2010~2026" },
+  { label: "월급날 언저리(25일)", buy: 0.977, sell: null, days: 0, src: "2015~2026 · 일자별 0.93~1.12" },
+  { label: "미국을 크게 판 날", buy: null, sell: null, days: 600, src: "다른 시장 순매수 백만 달러 단위 미동" },
+] as const;
