@@ -17,6 +17,7 @@ import { CalendarHero } from "./CalendarHero";
 import { EquityTypeSection } from "./EquityTypeSection";
 import { EtfSection } from "./EtfCards";
 import { QuarterlyCards } from "./QuarterlyCards";
+import { SectionCaps } from "../kadera/parts";
 import { SectionHead } from "../kadera/SectionHead";
 import { pageMetadata } from "../seo";
 import { C, R } from "../ui";
@@ -297,24 +298,20 @@ export default async function SeohakPage() {
           '왜 그런가'를 답한다. */}
       {calendar && <CalendarHero c={calendar} />}
 
+      {/* ── 구간 나누기 ───────────────────────────────────────────────
+          카더라·브리핑·MDD 가 쓰는 것과 같은 머리 배지(SectionCaps)로 장을 가른다.
+          히어로(달력)는 어느 장에도 안 넣는다 — 카더라도 히어로를 첫 배지 위에 둔다.
+
+          기준은 **갱신 주기가 아니라 질문**이다. 주기로 나누면 "매일/매월/분기"가
+          되는데, 그건 우리 파이프라인 사정이지 읽는 사람의 관심이 아니다. */}
+      <SectionCaps label="어떻게 사고파나" count={4} />
       <DailySection d={daily} />
 
+      <SectionCaps label="무엇에 담았나" count={etf ? 4 : 1} />
       {equityType && <EquityTypeSection e={equityType} />}
+      {etf && <EtfSection e={etf} />}
 
-      {/* ── ETF 층 ────────────────────────────────────────────────────
-          미국에 가는 두 번째 길. 일별이라 위 층과 붙여 두되, 곁길이라는 걸 각주가
-          매번 밝힌다 — 서학개미 보유의 62.9% 는 보통주 직접 보유다(2025-06 조사). */}
-      {etf && (
-        <>
-          <SectionHead
-            icon="alt_route"
-            title="국내 상장 ETF로는"
-            desc="미국에 직접 사는 대신 국내 상장 ETF로 간 몫입니다."
-            note={`${etf.rows.length}종목`}
-          />
-          <EtfSection e={etf} />
-        </>
-      )}
+      <SectionCaps label="얼마가 쌓였나" count={4} />
 
 {/* ── 넣은 돈과 그 결과 ────────────────────────────────────────
           맨 위에 있었는데 내렸다. 40년 곡선은 배경이지 주인공이 아니다 — 이 페이지가
@@ -474,7 +471,12 @@ export default async function SeohakPage() {
 
       {/* ── 분기 층 ───────────────────────────────────────────────────
           가장 아래다. 13F 마감이 분기말 +45일이라 가장 느리게 바뀐다. */}
-      {quarterly && <QuarterlyCards q={quarterly} />}
+      {quarterly && (
+        <>
+          <SectionCaps label="누구의 돈인가" count={2} />
+          <QuarterlyCards q={quarterly} />
+        </>
+      )}
 
     </div>
   );

@@ -205,21 +205,21 @@ export function EtfSection({ e }: { e: SeohakEtf }) {
   return (
     <div style={CARD_GRID}>
       <Card icon="sell" title="얼마나 비싸게 사고 있나"
-            desc="ETF 값과 그 안에 실제로 든 자산 값의 차이입니다."
+            desc="국내 상장 미국 ETF 값과, 그 안에 실제로 든 자산 값의 차이입니다."
             note={`${e.asOf} 종가`}
             foot={`거래대금 1억 이상 ${e.liquid.length}종목만 셉니다. 예측이 아니라 산수입니다.`}>
         <Premium e={e} />
       </Card>
 
       <Card icon="input" title="어느 ETF로 돈이 들어갔나"
-            desc="거래대금이 아니라 새로 만들어지거나 없어진 몫입니다."
+            desc="국내 상장 미국 ETF 로 실제로 들어온 돈입니다. 거래대금이 아닙니다."
             note={`${e.asOf} 기준`}
             foot="상장좌수 변화 × 순자산가치로 잽니다. 같은 돈이 오간 것은 안 셉니다.">
         <Flows e={e} />
       </Card>
 
       <Card icon="grid_view" title="이번 주 어디로 갔나"
-            desc="5영업일 등락과 그동안 오간 돈을 겹쳐 봅니다."
+            desc="국내 상장 미국 ETF 의 5영업일 등락과 그동안 오간 돈입니다."
             note="최근 5영업일"
             foot={`돈이 실제로 오간 종목만 셉니다. 레버리지·인버스는 거래대금의 ${e.leverageShare.toFixed(1)}% 뿐입니다.`}>
         <WeekGrid e={e} />
