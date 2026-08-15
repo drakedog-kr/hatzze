@@ -25,21 +25,21 @@ import { C, Icon, MONO, R } from "../ui";
  *  ③ 제목 아래 **설명 한 줄**을 둔다(브리핑의 desc 와 같은 자리). 각주는 출처·한계만.
  */
 
-const usd = (v: number) => {
+export const usd = (v: number) => {
   const a = Math.abs(v);
   if (a >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
   if (a >= 1e6) return `$${(v / 1e6).toFixed(0)}M`;
   return `$${Math.round(v).toLocaleString("ko-KR")}`;
 };
-const cnt = (v: number) => v.toLocaleString("ko-KR");
+export const cnt = (v: number) => v.toLocaleString("ko-KR");
 /** 배수를 사람 말로. 1.184 → "18% 더". 0.739 → "26% 덜". */
-const asPct = (mult: number) => {
+export const asPct = (mult: number) => {
   const d = Math.round(Math.abs(mult - 1) * 100);
   if (d === 0) return "평소와 같이";
   return `${d}% ${mult > 1 ? "더" : "덜"}`;
 };
 
-function Card({
+export function Card({
   icon,
   title,
   desc,
@@ -77,7 +77,7 @@ function Card({
 }
 
 /** 결론 문장. 카드마다 같은 자리에서 같은 크기로 나온다. */
-function Verdict({ children }: { children: React.ReactNode }) {
+export function Verdict({ children }: { children: React.ReactNode }) {
   return (
     <p style={{ margin: 0, fontSize: 15, lineHeight: 1.45, fontWeight: 700, color: C.ink, wordBreak: "keep-all" }}>
       {children}
@@ -85,9 +85,18 @@ function Verdict({ children }: { children: React.ReactNode }) {
   );
 }
 
-const Em = ({ children }: { children: React.ReactNode }) => (
+export const Em = ({ children }: { children: React.ReactNode }) => (
   <span style={{ color: C.blue }}>{children}</span>
 );
+
+/** 카드 격자. 세 층(일별·분기·ETF)이 같은 자를 쓴다.
+ *  ⚠️ auto-**fill** 이다. auto-fit 은 빈 트랙을 접어서 마지막 줄에 혼자 남은 카드를
+ *  행 전체로 늘려 버린다 — "카드 하나가 가로로 쭉 길어지는" 그 모양이다. */
+export const CARD_GRID: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(min(300px, 100%), 1fr))",
+  gap: 14,
+};
 
 /* ── ① 어제 얼마나 사고팔았나 ────────────────────────────────────────────
    배수를 다 걷어내고 실제 금액·건수만 남겼다. 두 막대는 같은 자로 그려 길이 차이가
@@ -438,9 +447,66 @@ function Turnover({ d }: { d: SeohakDaily }) {
   );
 }
 
+/* ── ⑦ 오늘 몇 명이 움직였나 ───────────────────────────────────────────
+   이 카드만 **건수**를 본다. 금액은 큰손 하나가 흔들 수 있지만 건수는 못 흔든다 —
+   1건당 평균이 $39,234 라 $1B 를 옮기려면 2만 5천 번을 눌러야 한다.
+
+   그림은 최근 60영업일을 그대로 세워 놓은 기둥이다. "오늘이 이 무리 안에서 어디쯤"이
+   질문이므로, 백분위 숫자만 쓰면 독자가 무리를 상상해야 한다. 무리를 그려 주고 오늘만
+   칠하면 상상할 게 없다. */
+function HowManyToday({ d }: { d: SeohakDaily }) {
+  const spark = d.countSpark;
+  const max = Math.max(...spark);
+  const median = [...spark].sort((a, b) => a - b)[Math.floor(spark.length / 2)];
+  const p = Math.round(d.countPercentile);
+  const vsMedian = Math.round((d.today.buyCount / median - 1) * 100);
+
+  return (
+    <>
+      <Verdict>
+        {p >= 80 ? (
+          <><Em>평소보다 훨씬 많은</Em> 사람이 샀습니다</>
+        ) : p >= 55 ? (
+          <>평소보다 <Em>조금 많이</Em> 샀습니다</>
+        ) : p >= 25 ? (
+          <><Em>평범한 하루</Em>였습니다</>
+        ) : (
+          <>평소보다 <Em>조용한 하루</Em>였습니다</>
+        )}
+      </Verdict>
+
+      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+          <span style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>어제 산 횟수</span>
+          <span style={{ fontFamily: MONO, fontSize: 21, fontWeight: 800, color: C.ink,
+                         letterSpacing: "-0.02em" }}>{cnt(d.today.buyCount)}번</span>
+        </div>
+        {/* 60일 기둥. 중앙값 선을 하나 그어야 '높다·낮다'가 눈으로 판정된다. */}
+        <div style={{ position: "relative", display: "flex", alignItems: "flex-end",
+                      gap: 1.5, height: 46 }}>
+          <span aria-hidden style={{ position: "absolute", left: 0, right: 0,
+                                     bottom: `${(median / max) * 100}%`, height: 1,
+                                     background: C.line, zIndex: 1 }} />
+          {spark.map((v, i) => (
+            <span key={i} style={{ flex: 1, height: `${Math.max(4, (v / max) * 100)}%`,
+                                   borderRadius: 1,
+                                   background: i === spark.length - 1 ? C.blue : C.track }} />
+          ))}
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: C.faint }}>
+          <span>60영업일 전</span>
+          <span style={{ color: C.sub2, fontWeight: 700 }}>
+            중앙값보다 {Math.abs(vsMedian)}% {vsMedian >= 0 ? "많음" : "적음"}
+          </span>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export function DailySection({ d }: { d: SeohakDaily }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(300px, 100%), 1fr))", gap: 14 }}>
+    <div style={CARD_GRID}>
       <Card icon="candlestick_chart" title="어제 얼마나 사고팔았나"
             desc="예탁결제원에 결제된 미국 주식 매매입니다."
             note={`${d.asOf} 결제`}
@@ -481,6 +547,13 @@ export function DailySection({ d }: { d: SeohakDaily }) {
             note="최근 1년"
             foot="같은 돈이 사고팔리며 여러 번 오갑니다.">
         <Turnover d={d} />
+      </Card>
+
+      <Card icon="bar_chart" title="오늘 몇 명이 움직였나"
+            desc="금액 말고 산 횟수만 셉니다. 큰손 하나가 못 흔드는 값입니다."
+            note="최근 60일"
+            foot="결제 건수라 사람 수가 아니라 거래 횟수입니다.">
+        <HowManyToday d={d} />
       </Card>
     </div>
   );

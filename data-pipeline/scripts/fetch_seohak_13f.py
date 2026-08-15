@@ -38,6 +38,14 @@ EDGAR 전문검색은 `locationCodes` 로 제출자의 소재 국가를 걸 수 
    대조하는 방식으로는 못 잡는다.** 잡히는 건 "분산된 포트폴리오에서 한 종목이 절반을
    넘을 수 없다"는 구조적 사실뿐이라 그걸 규칙으로 쓴다(SUSPECT_* 참고).
 
+   ⚠️⚠️ **판정은 신고서 단위로 하되 표시는 행 단위로 한다.** 처음엔 의심스러운 신고서
+   전체에 깃발을 꽂았는데, 미래에셋 2026-03-31 은 1,568행 중 **버크셔 한 줄만** 틀렸다.
+   신고서를 통째로 빼니 멀쩡한 1,567행($34.7B)까지 사라져 그 분기만 기관 몫이
+   34.6%→27.1% 로 꺼졌고, 기관을 뺀 '나머지'가 +14.4% 를 번 것처럼 보였다.
+   **데이터 오류를 지우려던 장치가 새 거짓말을 만든 것이다.** 지금은 큰 줄부터 빼면서
+   총액이 직전 분기 수준으로 돌아오는지 보고, **되돌아오게 만든 줄에만** 깃발을 꽂는다.
+   한 줄로 설명이 안 되면(빼도 여전히 3배 이상) 그때는 신고서 전체를 의심한다.
+
 실행:
     cd data-pipeline && source .venv/bin/activate
     python scripts/fetch_seohak_13f.py --dry-run   # 조회만, DB 안 씀
@@ -222,6 +230,45 @@ def parse_holdings(xml: str) -> dict[str, dict]:
     return aggregated
 
 
+def find_bad_rows(
+    holdings: dict[str, dict], total_value: int, prev_total: int | None
+) -> set[str]:
+    """원문 오류로 의심되는 **줄**을 고른다.
+
+    신호는 신고서 단위로 잡는다("분산된 포트폴리오에서 한 종목이 절반을 넘을 수 없다"
+    + "총액이 직전 분기의 3배를 넘었다"). 하지만 **깃발은 줄에 꽂는다.** 큰 것부터
+    빼면서 총액이 직전 분기 수준으로 돌아오는지 보고, 돌아오게 만든 줄만 돌려준다.
+
+    한 줄로 설명이 안 되면 — 지배적인 줄을 다 빼도 여전히 3배 이상이면 — 그건 특정
+    종목의 오타가 아니라 신고서 전체가 이상한 것이라 전부 돌려준다.
+
+    직전 분기가 없으면(그 기관의 첫 분기) 비교 기준이 없으므로 아무것도 안 뺀다.
+    첫 분기가 통째로 틀렸을 가능성은 남지만, 기준 없이 지우면 정상 신고를 지운다.
+    """
+    if prev_total is None or len(holdings) < SUSPECT_MIN_POSITIONS:
+        return set()
+
+    ceiling = prev_total * SUSPECT_TOTAL_JUMP
+    if total_value < ceiling:
+        return set()
+
+    flagged: set[str] = set()
+    running = total_value
+    for cusip, entry in sorted(
+        holdings.items(), key=lambda kv: -kv[1]["value_usd"]
+    ):
+        if running < ceiling:
+            break
+        # 남은 것 중 가장 큰 줄이 신고서를 지배하지 못하면, 총액이 큰 건 한 줄 탓이
+        # 아니다. 거기서 멈춰야 멀쩡한 대형 보유를 안 지운다.
+        if not running or entry["value_usd"] / running <= SUSPECT_TOP_SHARE:
+            break
+        flagged.add(cusip)
+        running -= entry["value_usd"]
+
+    return flagged if running < ceiling else set(holdings)
+
+
 def main() -> None:
     dry_run = "--dry-run" in sys.argv
     db = None if dry_run else get_client()
@@ -261,18 +308,14 @@ def main() -> None:
         prev_total: int | None = None
         for report_date, holdings in sorted(quarters):
             total_value = sum(e["value_usd"] for e in holdings.values())
-            top_value = max(e["value_usd"] for e in holdings.values())
-            top_share = top_value / total_value if total_value else 0
-            jumped = prev_total is not None and total_value >= prev_total * SUSPECT_TOTAL_JUMP
-            suspect = (
-                len(holdings) >= SUSPECT_MIN_POSITIONS
-                and top_share > SUSPECT_TOP_SHARE
-                and jumped
+            suspect_cusips = find_bad_rows(holdings, total_value, prev_total)
+            clean_total = total_value - sum(
+                holdings[c]["value_usd"] for c in suspect_cusips
             )
-            # 의심 분기의 총액은 다음 분기 판정의 기준으로 쓰지 않는다. 틀린 값을
-            # 기준선에 넣으면 그다음 정상 분기가 '급감'으로 보인다.
-            if not suspect:
-                prev_total = total_value
+            # 의심 줄을 뺀 총액만 다음 분기 판정의 기준으로 쓴다. 틀린 값을 기준선에
+            # 넣으면 그다음 정상 분기가 '급감'으로 보인다.
+            if suspect_cusips != set(holdings):
+                prev_total = clean_total
 
             rows = [
                 {
@@ -283,15 +326,17 @@ def main() -> None:
                     "issuer": entry["issuer"],
                     "value_usd": entry["value_usd"],
                     "shares": entry["shares"] or None,
-                    "suspect": suspect,
+                    "suspect": cusip in suspect_cusips,
                 }
                 for cusip, entry in holdings.items()
             ]
-            flag = (
-                f"  ⚠ 최대 종목 {top_share:.1%} + 총액 급증 — 원문 오류 의심"
-                if suspect
-                else ""
-            )
+            flag = ""
+            if suspect_cusips:
+                worst = max(suspect_cusips, key=lambda c: holdings[c]["value_usd"])
+                flag = (
+                    f"  ⚠ {len(suspect_cusips)}줄 제외 → ${clean_total/1e9:.2f}B "
+                    f"(최대: {holdings[worst]['issuer'][:24]})"
+                )
             print(
                 f"  {name[:34]:<34} {report_date}  {len(rows):>4}종목  "
                 f"${total_value/1e9:>7.2f}B{flag}"

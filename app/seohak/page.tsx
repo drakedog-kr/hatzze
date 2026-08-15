@@ -8,7 +8,11 @@ import {
   type Peer,
   type SeohakOverview,
 } from "@/lib/seohak-data";
+import { getSeohakEtf } from "@/lib/seohak-etf";
+import { getSeohakQuarterly } from "@/lib/seohak-quarterly";
 import { DailySection } from "./DailyCards";
+import { EtfSection } from "./EtfCards";
+import { QuarterlyCards } from "./QuarterlyCards";
 import { SectionHead } from "../kadera/SectionHead";
 import { pageMetadata } from "../seo";
 import { C, R } from "../ui";
@@ -74,7 +78,7 @@ function PrincipalVsValue({ series }: { series: SeohakOverview["series"] }) {
 
   return (
     <div style={{ padding: "14px 18px 6px" }}>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="auto" role="img" aria-label="원금과 평가액 추이">
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }} role="img" aria-label="원금과 평가액 추이">
         {/* 두 선 사이를 채워 손익을 면적으로 보인다. 파랑 tint 라 선보다 뒤로 앉는다. */}
         <path d={area} fill={C.blueTint} />
         <path d={line("value")} fill="none" stroke={C.blue} strokeWidth={2} strokeLinejoin="round" />
@@ -177,7 +181,7 @@ function MonthlyBars({ rows }: { rows: SeohakOverview["breakdown"]["rows"] }) {
 
   return (
     <div style={{ padding: "6px 18px 8px" }}>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="auto" role="img" aria-label="월별 순매수와 평가변동">
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }} role="img" aria-label="월별 순매수와 평가변동">
         <line x1={0} y1={zero} x2={W} y2={zero} stroke={C.marker} strokeWidth={1} />
         {rows.map((r, i) => {
           const cx = slot * (i + 0.5);
@@ -261,7 +265,14 @@ function BarRow({
 export default async function SeohakPage() {
   const ov = await getSeohakOverview();
   // 아래 셋은 서로 의존이 없다. 순서대로 await 하면 왕복이 앞뒤로 붙으므로 함께 띄운다.
-  const [peers, daily] = await Promise.all([getPeers(ov.asOf), getSeohakDaily()]);
+  // ⚠️ 분기·ETF 두 층은 표가 아직 없을 수 있어 null 을 돌려준다(마이그레이션 043·042).
+  // 그 경우 그 섹션만 접고 나머지는 그대로 뜬다.
+  const [peers, daily, quarterly, etf] = await Promise.all([
+    getPeers(ov.asOf),
+    getSeohakDaily(),
+    getSeohakQuarterly(),
+    getSeohakEtf(),
+  ]);
   const maxInflow = Math.max(...ov.cohorts.map((c) => c.inflow));
   const recent = ov.cohorts.filter((c) => c.year >= 2025).reduce((s, c) => s + c.inflow, 0);
   const recentShare = (recent / ov.principal) * 100;
@@ -277,6 +288,21 @@ export default async function SeohakPage() {
           ⚠️ 이 격자는 아래 2열 래퍼 **바깥**에 있어야 한다. 안에 넣으면 380px 한 칸에
           갇혀 4열이 1열로 접힌다(실제로 그렇게 깨졌다). */}
       <DailySection d={daily} />
+
+      {/* ── ETF 층 ────────────────────────────────────────────────────
+          미국에 가는 두 번째 길. 일별이라 위 층과 붙여 두되, 곁길이라는 걸 각주가
+          매번 밝힌다 — 서학개미 보유의 72.1% 는 보통주 직접 보유다. */}
+      {etf && (
+        <>
+          <SectionHead
+            icon="alt_route"
+            title="국내 상장 ETF로는"
+            desc="미국에 직접 사는 대신 국내 상장 ETF로 간 몫입니다."
+            note={`${etf.rows.length}종목`}
+          />
+          <EtfSection e={etf} />
+        </>
+      )}
 
 {/* ── 넣은 돈과 그 결과 ────────────────────────────────────────
           맨 위에 있었는데 내렸다. 40년 곡선은 배경이지 주인공이 아니다 — 이 페이지가
@@ -433,6 +459,10 @@ export default async function SeohakPage() {
           </section>
         </div>
       </div>
+
+      {/* ── 분기 층 ───────────────────────────────────────────────────
+          가장 아래다. 13F 마감이 분기말 +45일이라 가장 느리게 바뀐다. */}
+      {quarterly && <QuarterlyCards q={quarterly} />}
 
     </div>
   );
