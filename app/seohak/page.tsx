@@ -1,15 +1,14 @@
 import type { Metadata } from "next";
 
+import { getSeohakDaily } from "@/lib/seohak-daily";
 import {
-  getLatestSettlement,
-  getNpsPortfolio,
   getPeers,
   getSeohakOverview,
   type Cohort,
-  type NpsPortfolio,
   type Peer,
   type SeohakOverview,
 } from "@/lib/seohak-data";
+import { DailySection } from "./DailyCards";
 import { SectionHead } from "../kadera/SectionHead";
 import { pageMetadata } from "../seo";
 import { C, R } from "../ui";
@@ -259,69 +258,10 @@ function BarRow({
   );
 }
 
-/**
- * 국민연금 미국 포트폴리오.
- *
- * ⚠️ **개인이 아니라 기관이다.** 제목과 각주 양쪽에서 그걸 말한다 — "한국인이 엔비디아를
- * 6.8% 담았다" 로 읽히면 거짓이고, 종목별 개인 보유 비중은 어떤 공개 원천으로도 안 나온다.
- */
-function NpsSheet({ nps }: { nps: NpsPortfolio }) {
-  const max = nps.top[0]?.value ?? 1;
-  return (
-    <section className="hz-sheet">
-      <SectionHead
-        icon="account_balance"
-        title="국민연금은 미국에서 무엇을 들고 있나"
-        desc="개인이 아니라 기관입니다. 전 국민의 노후 자금이 미국 주식에 어떻게 들어가 있는지입니다."
-        note={`${nps.reportDate} 기준`}
-      />
-      <div style={{ display: "flex", gap: 22, padding: "16px 18px 6px", flexWrap: "wrap" }}>
-        <div>
-          <div style={{ fontSize: 11.5, color: C.sub2, marginBottom: 3 }}>보유 종목</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: C.ink }}>{nps.positions.toLocaleString("ko-KR")}</div>
-        </div>
-        <div>
-          <div style={{ fontSize: 11.5, color: C.sub2, marginBottom: 3 }}>평가액</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: C.ink }}>{usdB(nps.total / 1_000_000)}</div>
-        </div>
-        {nps.prevDate && (
-          <div style={{ marginLeft: "auto", textAlign: "right" }}>
-            <div style={{ fontSize: 11.5, color: C.sub2, marginBottom: 3 }}>직전 분기 대비</div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>
-              신규 {nps.added} · 처분 {nps.removed}
-            </div>
-          </div>
-        )}
-      </div>
-      <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-        {nps.top.map((h) => (
-          <BarRow
-            key={h.issuer}
-            label={h.issuer}
-            value={usdB(h.value / 1_000_000)}
-            ratio={h.value / max}
-            right={
-              <span style={{ fontSize: 12, color: C.sub2, textAlign: "right" }}>{h.sharePct.toFixed(1)}%</span>
-            }
-          />
-        ))}
-      </ul>
-      <div className="hz-sheet-foot">
-        미 증권거래위원회(SEC) 13F 신고. 분기말 기준이고 제출이 최대 45일 늦습니다. 이 표의 비중은 국민연금
-        포트폴리오 안에서의 비중이지, 한국인 전체가 그 종목을 그만큼 들었다는 뜻이 아닙니다.
-      </div>
-    </section>
-  );
-}
-
 export default async function SeohakPage() {
   const ov = await getSeohakOverview();
   // 아래 셋은 서로 의존이 없다. 순서대로 await 하면 왕복이 앞뒤로 붙으므로 함께 띄운다.
-  const [peers, nps, today] = await Promise.all([
-    getPeers(ov.asOf),
-    getNpsPortfolio(),
-    getLatestSettlement(),
-  ]);
+  const [peers, daily] = await Promise.all([getPeers(ov.asOf), getSeohakDaily()]);
   const maxInflow = Math.max(...ov.cohorts.map((c) => c.inflow));
   const recent = ov.cohorts.filter((c) => c.year >= 2025).reduce((s, c) => s + c.inflow, 0);
   const recentShare = (recent / ov.principal) * 100;
@@ -331,7 +271,16 @@ export default async function SeohakPage() {
     // 걸려 있어서, 짧은 시트 아래에 200px 짜리 빈 바닥이 생긴다(실측). 카더라와 같은
     // 맨 세로 흐름으로 둔다.
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* ── 히어로 ─────────────────────────────────────────────────── */}
+      {/* ── ② 오늘 · 일별 층 ──────────────────────────────────────────
+          예탁원 결제 통계 하나에서 나오는 일곱 장. 브리핑과 같은 4열 셀 격자(.hz-cards)를
+          써서 "카드 하나가 한 행을 통째로 먹는" 모양을 피한다 — 칸 합이 12라 3줄이 찬다.
+          ⚠️ 이 격자는 아래 2열 래퍼 **바깥**에 있어야 한다. 안에 넣으면 380px 한 칸에
+          갇혀 4열이 1열로 접힌다(실제로 그렇게 깨졌다). */}
+      <DailySection d={daily} />
+
+{/* ── 넣은 돈과 그 결과 ────────────────────────────────────────
+          맨 위에 있었는데 내렸다. 40년 곡선은 배경이지 주인공이 아니다 — 이 페이지가
+          매일 답해야 하는 건 '오늘'이다. */}
       <section className="hz-sheet">
         <SectionHead
           icon="savings"
@@ -369,9 +318,8 @@ export default async function SeohakPage() {
           </div>
         </div>
         <PrincipalVsValue series={ov.series} />
-        <div className="hz-sheet-foot">
-          미 재무부 국제자본흐름(TIC) 통계. 원금은 1985년부터의 누적 순매수이고, 평가액은 그달 말 잔고입니다.
-          기관과 개인이 함께 들어 있습니다.
+        <div className="hz-sheet-foot" style={{ fontSize: 12, color: C.sub }}>
+          1985년부터의 누적 순매수와 그달 말 잔고입니다.
         </div>
       </section>
 
@@ -381,106 +329,7 @@ export default async function SeohakPage() {
           막대가 살아 있으려면 70px 은 더 있어야 한다.
           ⚠️ 국민연금은 여기 안 넣는다 — 줄이 네 칸(168+82+58)이라 한 칸 522px 에서 막대가
           60px 로 죽는다. 전폭으로 둔다. */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 16, alignItems: "start" }}>
-  {/* ── 오늘의 서학개미 (매일 갱신) ─────────────────────────────── */}
-        {today && (
-          <section className="hz-sheet">
-            <SectionHead
-              icon="today"
-              title="직전 거래일, 실제로 사고판 것"
-              desc="예탁결제원 결제 기준입니다. 이 화면에서 유일하게 매일 바뀌는 칸입니다."
-              note={`${today.date} 결제`}
-            />
-            <div style={{ display: "flex", gap: 22, padding: "16px 18px 6px", flexWrap: "wrap" }}>
-              <div>
-                <div style={{ fontSize: 11.5, color: C.sub2, marginBottom: 3 }}>매수</div>
-                <div style={{ fontSize: 26, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
-                  {usdB(today.usBuy / 1_000_000)}
-                </div>
-                <div style={{ fontSize: 11.5, color: C.sub2, marginTop: 2 }}>
-                  {today.usBuyCount.toLocaleString("ko-KR")}건
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: 11.5, color: C.sub2, marginBottom: 3 }}>매도</div>
-                <div style={{ fontSize: 26, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
-                  {usdB(today.usSell / 1_000_000)}
-                </div>
-                <div style={{ fontSize: 11.5, color: C.sub2, marginTop: 2 }}>
-                  {today.usSellCount.toLocaleString("ko-KR")}건
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: 11.5, color: C.sub2, marginBottom: 3 }}>1건당 매수</div>
-                <div style={{ fontSize: 26, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
-                  ${Math.round(today.usBuy / Math.max(1, today.usBuyCount)).toLocaleString("ko-KR")}
-                </div>
-              </div>
-              <div style={{ marginLeft: "auto", textAlign: "right" }}>
-                <div style={{ fontSize: 11.5, color: C.sub2, marginBottom: 3 }}>해외주식 매수 중 미국</div>
-                <div style={{ fontSize: 30, fontWeight: 800, color: C.blue, letterSpacing: "-.02em" }}>
-                  {((today.usBuy / Math.max(1, today.allStockBuy)) * 100).toFixed(1)}%
-                </div>
-              </div>
-            </div>
-            <div className="hz-sheet-foot">
-              결제일은 거래일보다 1영업일 늦습니다. 한국예탁결제원 국제거래 외화증권 예탁결제 통계이고, 예탁원을
-              거치지 않는 기관 거래는 잡히지 않습니다.
-            </div>
-          </section>
-        )}
-  {/* ── 역전 ───────────────────────────────────────────────────── */}
-        {ov.reversal.ratioNow !== null && (
-          <section className="hz-sheet">
-            <SectionHead
-              icon="swap_horiz"
-              title="격차가 사라지고 있습니다"
-              desc="우리가 든 미국 주식과, 그들이 든 한국 주식을 견줍니다."
-              note={`${ov.asOf} 기준`}
-            />
-            <div style={{ display: "flex", gap: 22, padding: "16px 18px 4px", flexWrap: "wrap", alignItems: "baseline" }}>
-              <div>
-                <div style={{ fontSize: 11.5, color: C.sub2, marginBottom: 3 }}>우리가 든 미국 주식</div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: C.ink }}>{usdB(ov.reversal.ours)}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 11.5, color: C.sub2, marginBottom: 3 }}>그들이 든 한국 주식</div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: C.ink }}>{usdB(ov.reversal.theirs)}</div>
-              </div>
-              <div style={{ marginLeft: "auto", textAlign: "right" }}>
-                <div style={{ fontSize: 11.5, color: C.sub2, marginBottom: 3 }}>
-                  {ov.reversal.peakMonth} {ov.reversal.peakRatio.toFixed(2)}배 →
-                </div>
-                <div style={{ fontSize: 30, fontWeight: 800, color: C.blue, letterSpacing: "-.02em" }}>
-                  {ov.reversal.ratioNow.toFixed(2)}배
-                </div>
-              </div>
-            </div>
-            <div className="hz-sheet-foot">
-              <span>
-              {ov.reversal.peakMonth}에 {ov.reversal.peakRatio.toFixed(2)}배였던 것이 지금{" "}
-              {ov.reversal.ratioNow.toFixed(2)}배입니다.{" "}
-              {ov.reversal.usNetSincePeak < 0 ? (
-                <>
-                  그 사이 미국 투자자는 한국 주식을 오히려{" "}
-                  <b style={{ color: C.ink }}>{usdB(Math.abs(ov.reversal.usNetSincePeak))} 순매도</b>했습니다.
-                  {ov.reversal.theirsGrowth &&
-                    ` 그런데도 그들이 든 몫은 ${ov.reversal.theirsGrowth.toFixed(1)}배가 됐습니다.`}{" "}
-                  격차가 좁혀진 건 그들이 사서가 아니라 한국 증시가 크게 올랐기 때문입니다.
-                </>
-              ) : (
-                <>같은 기간 미국 투자자의 한국 주식 순매수는 {usdB(ov.reversal.usNetSincePeak)}였습니다.</>
-              )}
-            </span>
-            </div>
-          </section>
-        )}
-      </div>
-
-      {/* 왼쪽 한 장 · 오른쪽 두 장을 세로로 쌓아 키를 맞춘다. 실측 높이가 코호트 659,
-          분해 329, 비교국 433 이라 329+16+433=778 로 왼쪽과 가깝다 — 처음엔 코호트와
-          분해를 나란히 뒀는데 오른쪽이 330px 비었다. */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 16, alignItems: "start" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 16, alignItems: "start" }}>
   {/* ── 코호트 ─────────────────────────────────────────────────── */}
         <section className="hz-sheet">
           <SectionHead
@@ -513,11 +362,9 @@ export default async function SeohakPage() {
               <b> 가 각각 flex 항목이 되어, 칸이 좁아지는 순간 "원/금/의" 처럼 낱글자로
               눌린다(2열 격자로 바꾸자마자 실제로 깨졌다). 통째로 <span> 하나에 담는다.
               JSX 는 태그 사이 줄바꿈의 공백을 지우므로 조사 공백은 {" "} 로 명시한다. */}
-          <div className="hz-sheet-foot">
+          <div className="hz-sheet-foot" style={{ fontSize: 12, color: C.sub }}>
             <span>
-              원금의{" "}
-              <b style={{ color: C.ink }}>{recentShare.toFixed(0)}%가</b> 2025년 이후에 들어왔습니다. 전체 손익{" "}
-              {pct(ov.returnPct, 0)}는 오래 보유한 쪽이 만든 숫자라, 대부분의 계좌는 이 표 아래쪽에 있습니다.
+              원금의{" "}<b style={{ color: C.ink }}>{recentShare.toFixed(0)}%가</b> 2025년 이후에 들어왔습니다.
             </span>
           </div>
         </section>
@@ -555,7 +402,7 @@ export default async function SeohakPage() {
               </div>
             </div>
             <MonthlyBars rows={ov.breakdown.rows} />
-            <div className="hz-sheet-foot">
+            <div className="hz-sheet-foot" style={{ fontSize: 12, color: C.sub }}>
               진한 막대가 새로 넣은 돈, 옅은 막대가 평가액 변동입니다. 아래로 뻗은 달은 순매도이거나 평가손실입니다.
               두 값의 합이 잔고 증감과 정확히 일치하지는 않습니다. 원천이 잔차를 따로 두기 때문입니다.
             </div>
@@ -579,7 +426,7 @@ export default async function SeohakPage() {
                 />
               ))}
             </ul>
-            <div className="hz-sheet-foot">
+            <div className="hz-sheet-foot" style={{ fontSize: 12, color: C.sub }}>
               TIC 은 보관기관이 어디에 있는지로 집계합니다. 싱가포르·영국처럼 금융 중심지가 크게 잡히는 건 그
               나라 사람이 많이 사서가 아니라 제3국 돈이 거기를 거치기 때문이라, 인구로 나눠 견주면 안 됩니다.
             </div>
@@ -587,29 +434,6 @@ export default async function SeohakPage() {
         </div>
       </div>
 
-{/* ── 국민연금 ───────────────────────────────────────────────── */}
-      {nps && <NpsSheet nps={nps} />}
-
-{/* ── 방법 ───────────────────────────────────────────────────── */}
-      <section className="hz-sheet">
-        <SectionHead
-          icon="function"
-          title="어떻게 계산했나"
-          desc="연도별 수익률은 계산 방법에 따라 크게 갈립니다. 그래서 방법을 적어 둡니다."
-        />
-        <div style={{ padding: "14px 18px", fontSize: 12.5, lineHeight: 1.7, color: C.inkSoft }}>
-          연도별 수익률은 <b style={{ color: C.ink }}>잔고에서 순매수를 뺀 나머지를 수익으로 보는</b> 방식으로
-          냈습니다. 잔고는 실측이고 순매수만 추정이라, 이 방식이라야 연도별 합계가 실제 잔고와 맞아떨어집니다.
-          지금 어긋남은 <b style={{ color: C.ink }}>{pct(ov.closureErrorPct)}</b> 입니다. 원천이 제공하는
-          평가변동 값을 그대로 쓰면 −14.8%, 미국 주가지수로 갈음하면 +21.1% 까지 벌어집니다.
-          {/* 국민연금 시트가 붙으면서 "모든 수치가 TIC 하나에서 나온다"가 거짓이 됐다.
-              원천은 둘이고, 어느 카드가 어느 쪽인지 여기서 못박는다. */}
-          <div style={{ marginTop: 10, color: C.sub2, fontSize: 11.5 }}>
-            원천은 둘입니다. 국민연금 시트만 미 증권거래위원회(SEC) 13F 이고, 나머지는 전부 미 재무부
-            국제자본흐름(TIC) 통계입니다. 특정 종목을 사거나 팔라는 뜻이 아니며, 매수·매도 신호가 아닙니다.
-          </div>
-        </div>
-      </section>
     </div>
   );
 }
