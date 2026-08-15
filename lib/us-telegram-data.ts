@@ -22,7 +22,7 @@ import { cache } from "react";
 
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { sentimentTone } from "@/lib/format";
-import { channelMeta, fetchAllRows, lastSyncedAt, optimismPct, toPercents } from "@/lib/telegram-data";
+import { channelMeta, fetchAllRows, lastKaderaUpdatedAt, optimismPct, toPercents } from "@/lib/telegram-data";
 import { changeRateOf, fetchYahooQuote } from "@/lib/yahoo-quote";
 import { yahooSymbol } from "@/lib/yahoo-history";
 import { US_THEMES } from "@/lib/us-stock-themes";
@@ -296,7 +296,8 @@ export async function getUsKaderaSummary(): Promise<UsKaderaSummary> {
   const [channelRows, { rows, dates }, lastUpdated] = await Promise.all([
     loadChannelDaily(),
     loadUsStockDaily(US_WINDOW_DAYS),
-    lastSyncedAt(getSupabaseAdmin()),
+    // 국장과 같은 규칙으로 '이 화면이 만들어진 시각'을 쓴다(telegram-data 의 주석 참고).
+    lastKaderaUpdatedAt(getSupabaseAdmin(), "telegram_us_daily_brief"),
   ]);
   const handles = new Set(channelRows.map((r) => r.channel_handle));
   const usHandles = new Set(channelRows.filter((r) => (r.us_msgs || 0) > 0).map((r) => r.channel_handle));
