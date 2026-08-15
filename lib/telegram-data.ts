@@ -331,6 +331,37 @@ async function storedCollectionStats(
     미장 카더라도 같은 값을 쓴다(getUsKaderaSummary). 수집이 한 벌이라 두 화면의
     '최종 업데이트'는 같은 시각이어야 맞다 — 미국 집계는 같은 실행 안에서 이 수집
     바로 뒤에 돈다. 그래서 export 한다. */
+/**
+ * 카더라 화면의 '최종 업데이트' — **그 화면 내용이 만들어진 시각**.
+ *
+ * 예전엔 `lastSyncedAt`(채널 동기화 시각)을 썼는데, 2026-08-14 에 파이프라인 순서를
+ * 뒤집으면서(카더라 먼저 → 지표 나중) 그 스텝이 **맨 앞**으로 갔다. 그 바람에 카더라
+ * 화면만 06:55 를 가리켜 "오전 6시경 기준"으로 뜨고, 브리핑(`/`)은 08:33 을 가리켜
+ * "오전 9:00 기준"으로 떠서 같은 실행인데 화면마다 다른 시각을 말했다.
+ *
+ * 총평(`telegram_daily_brief`)은 카더라 블록의 **마지막** 산출이고 이 화면의 머리
+ * 카드이기도 하다. 그 갱신 시각이 "이 화면이 언제 만들어졌나"에 가장 가깝다.
+ *
+ * ⚠️ `updated_at` 이 있는 표를 고른 이유: 집계 표들은 `created_at` 뿐이라 upsert 로
+ * 다시 써도 시각이 안 오른다. 그러면 저녁 실행 뒤에도 아침 시각을 말한다.
+ *
+ * ⚠️ 총평 생성이 실패한 날은 이 값이 안 오른다(전 실행 시각에 머문다). 그건 감추지
+ * 않는 편이 낫다 — 화면 머리의 요약이 실제로 낡았다는 뜻이다.
+ */
+export async function lastKaderaUpdatedAt(
+  db: ReturnType<typeof getSupabaseAdmin>,
+  table: "telegram_daily_brief" | "telegram_us_daily_brief" = "telegram_daily_brief",
+): Promise<string | null> {
+  const { data } = await db
+    .from(table)
+    .select("updated_at")
+    .order("date", { ascending: false })
+    .limit(1);
+  const updated = data?.[0]?.updated_at as string | undefined;
+  // 표가 비어 있으면(첫 실행 전) 옛 기준으로 물러난다 — 라벨이 통째로 사라지는 것보다 낫다.
+  return updated ?? (await lastSyncedAt(db));
+}
+
 export async function lastSyncedAt(db: ReturnType<typeof getSupabaseAdmin>): Promise<string | null> {
   const { data } = await db
     .from("telegram_channels")
@@ -350,7 +381,7 @@ export async function lastSyncedAt(db: ReturnType<typeof getSupabaseAdmin>): Pro
  */
 export async function getTelegramSummary(): Promise<TelegramSummary> {
   const db = getSupabaseAdmin();
-  const [stored, lastUpdated] = await Promise.all([storedCollectionStats(db), lastSyncedAt(db)]);
+  const [stored, lastUpdated] = await Promise.all([storedCollectionStats(db), lastKaderaUpdatedAt(db)]);
   if (stored) return { ...stored, lastUpdated };
   return { ...(await computeSummaryLive(db)), lastUpdated };
 }
