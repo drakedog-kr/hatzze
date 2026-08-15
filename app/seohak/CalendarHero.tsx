@@ -165,7 +165,7 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
       <SectionHead
         icon="calendar_month"
         title="언제 사고 언제 파나"
-        desc="날짜 칸은 그날 실제 결제된 순매수입니다. 오른쪽은 고른 날과, 매매를 바꾸는 것들입니다."
+        desc="국내 증권사를 거쳐 그날 결제된 순매수입니다. 오른쪽은 고른 날과, 매매를 바꾸는 것들입니다."
         note={`${meta.year}년 ${meta.month}월`}
       />
 
@@ -328,8 +328,10 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
 
       <div className="hz-sheet-foot" style={{ fontSize: 12, color: C.sub }}>
         <span>
-          결제일 기준이라 거래일보다 하루 늦습니다. 구간은 2015~2026 을 모아 잰 값이고,
-          날짜 하나하나의 성향은 표본이 부족해 재지 않습니다.
+          <b style={{ color: C.ink }}>예탁결제원을 거친 매매만 잡힙니다.</b> 글로벌 수탁은행을 직접
+          쓰는 대형 기관은 빠져서, 미 재무부가 집계한 한국의 순매수보다 늘 작습니다(연간 20~71%).
+          1건당 금액이 역대 어느 날도 10만 달러를 안 넘는 것도 그래서입니다. 결제일 기준이라
+          거래일보다 하루 늦고, 구간은 2015~2026 을 모아 잰 값입니다.
         </span>
       </div>
     </section>
