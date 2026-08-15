@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import type { CalendarDay, SeohakCalendar } from "@/lib/seohak-calendar";
 import { CALENDAR_WINDOWS, REACTIONS, windowsInMonth } from "@/lib/seohak-windows";
 import { SectionHead } from "../kadera/SectionHead";
+import { BUY, SELL } from "./tone";
 import { C, Icon, MONO, R } from "../ui";
 
 /**
@@ -98,7 +99,7 @@ function EventsVsDates() {
               <span style={{ fontWeight: r.strong ? 800 : 600, color: r.strong ? C.ink : C.label,
                              minWidth: 0, overflow: "hidden", textOverflow: "ellipsis",
                              whiteSpace: "nowrap" }}>{r.label}</span>
-              <span style={{ flexShrink: 0, fontWeight: 700, color: r.strong ? C.blue : C.sub2 }}>
+              <span style={{ flexShrink: 0, fontWeight: 700, color: r.strong ? C.ink : C.sub2 }}>
                 {r.diff <= NOISE ? "그대로" : `${r.diff}% 달라짐`}
               </span>
             </span>
@@ -111,7 +112,7 @@ function EventsVsDates() {
                                          borderRadius: "4px 0 0 4px" }} />
               <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 4,
                              width: `${Math.max(2, Math.min(100, (r.diff / AXIS) * 100))}%`,
-                             background: r.strong ? C.blue : C.bar }} />
+                             background: r.strong ? C.ink : C.bar }} />
             </span>
           </div>
         ))}
@@ -217,11 +218,12 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
               const isPicked = date === picked;
               // 색 진하기는 순매수 크기. 파랑이면 더 샀고 회색이면 더 팔았다.
               const strength = row ? Math.min(1, Math.abs(row.net) / c.scale) : 0;
+              // 빨강이 사는 쪽, 파랑이 파는 쪽 — 국내 관행이다(app/seohak/tone.ts).
+              // 두 색을 같은 식으로 섞는다. 앞서 회색 쪽만 62%로 눌러 뒀는데, 색이
+              // 갈리는 지금은 한쪽만 약하면 '판 날이 늘 조용한' 것처럼 보인다.
               const bg = !row
                 ? C.soft
-                : row.net >= 0
-                  ? `color-mix(in srgb, ${C.blue} ${18 + strength * 72}%, ${C.card})`
-                  : `color-mix(in srgb, ${C.inkSoft} ${18 + strength * 62}%, ${C.card})`;
+                : `color-mix(in srgb, ${row.net >= 0 ? BUY : SELL} ${16 + strength * 74}%, ${C.card})`;
               return (
                 <button
                   key={date}
@@ -244,10 +246,12 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                                  color: strength > 0.45 ? C.card : row ? C.ink : C.disabled }}>
                     {d}
                   </span>
+                  {/* 구간 점. 이제 파랑이 '판다'는 뜻을 가지므로 점은 잉크색으로 뺀다 —
+                      파랑 점을 빨간 칸에 찍으면 "이 날은 판 날"로 읽힌다. */}
                   {inWindow && (
                     <span aria-hidden style={{ position: "absolute", left: 3, bottom: 3,
                                                width: 4, height: 4, borderRadius: "50%",
-                                               background: strength > 0.45 ? C.card : C.blue }} />
+                                               background: strength > 0.4 ? C.card : C.ink }} />
                   )}
                 </button>
               );
@@ -257,13 +261,13 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
           <div style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 9.5,
                         color: C.faint, flexWrap: "wrap" }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-              <span style={{ width: 8, height: 8, borderRadius: 2, background: C.blue }} /> 더 샀다
+              <span style={{ width: 8, height: 8, borderRadius: 2, background: BUY }} /> 더 샀다
             </span>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-              <span style={{ width: 8, height: 8, borderRadius: 2, background: C.inkSoft }} /> 더 팔았다
+              <span style={{ width: 8, height: 8, borderRadius: 2, background: SELL }} /> 더 팔았다
             </span>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-              <span style={{ width: 4, height: 4, borderRadius: "50%", background: C.blue }} /> 구간
+              <span style={{ width: 4, height: 4, borderRadius: "50%", background: C.ink }} /> 구간
             </span>
           </div>
         </div>
@@ -298,7 +302,7 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                   </div>
                   <div style={{ fontSize: 17, fontWeight: 800, color: C.ink, lineHeight: 1.35,
                                 wordBreak: "keep-all", marginTop: 2 }}>
-                    <span style={{ color: day.net >= 0 ? C.blue : C.ink }}>{usd(Math.abs(day.net))}</span>
+                    <span style={{ color: day.net >= 0 ? BUY : SELL }}>{usd(Math.abs(day.net))}</span>
                     어치를 더 {day.net >= 0 ? "샀습니다" : "팔았습니다"}
                   </div>
                 </div>
