@@ -56,70 +56,83 @@ function shiftMonth(month: string, by: number) {
 
 
 /* ── 사건 대 날짜 ────────────────────────────────────────────────────
-   원래 별도 카드('무엇에 반응하나')였는데 달력 안으로 들였다. 이 카드가 하는 말이
-   **"매매를 바꾸는 건 사건이 아니라 날짜다"** 라서, 날짜를 그리는 화면의 결론으로
-   붙어야 제자리다. 따로 두면 독자가 두 화면을 머릿속에서 이어 붙여야 한다.
+   ⚠️⚠️ **세 번째 판이다. 앞의 둘은 막대였고 둘 다 "무슨 말인지 모르겠다"를 받았다.**
 
-   시트 전체 폭을 쓰니 좁은 카드에서보다 띠가 길어져 '무반응'이 더 또렷하다. */
+   원인은 스타일이 아니라 형태였다. 이 데이터는 '다섯 개의 값'이 아니라 **"넷을
+   의심해서 재 봤는데 아니었다"는 결과**다. 값이 거의 0인 것 넷을 막대로 그리면
+   아무리 잘 그려도 안 읽힌다 — 없는 것을 막대로는 못 보여준다.
+
+   게다가 "8% 달라짐"이 **무엇이** 달라졌다는 건지 화면에 없었다. 매매량인지 순매수인지
+   매수인지 매도인지. 조건("나스닥 −2% 이하")도 조건인지 대상인지 모호했다.
+
+   그래서 막대를 버리고 문장으로 쓴다. 가설 넷과 그 결과를 줄로 세우고, 마지막에
+   "정작 달라지는 건 날짜"로 위 달력을 가리킨다. 이 층이 달력 안에 있는 이유가 그거다. */
 function EventsVsDates() {
   const yearend = CALENDAR_WINDOWS.find((w) => w.key === "yearend")!;
-  const rows = [
-    ...REACTIONS.map((r) => {
-      const c: number[] = [];
-      if (r.buy !== null) c.push(r.buy);
-      if (r.sell !== null) c.push(r.sell);
-      // 매수·매도 중 더 크게 움직인 쪽. 순매수로 뭉치면 둘이 서로 상쇄한다.
-      const dev = c.length ? c.reduce((a, b) => (Math.abs(b - 1) > Math.abs(a - 1) ? b : a)) : 1;
-      return { label: r.label, diff: Math.round(Math.abs(dev - 1) * 100), strong: false };
-    }),
-    { label: "연말 마지막 주가 오면", diff: Math.round(Math.abs(yearend.sell - 1) * 100), strong: true },
-  ];
-  /** 축 오른쪽 끝(%). 가장 큰 값보다 넉넉히 잡아 막대가 벽에 닿지 않게 한다. */
-  const AXIS = 20;
   /** 이 밖으로 나가야 '달라졌다'고 본다. 20영업일 창의 날짜별 흔들림이 이 폭이다. */
   const NOISE = 5;
 
+  const rows = REACTIONS.map((r) => {
+    // 매수·매도 중 더 크게 움직인 쪽만 말한다. 순매수로 뭉치면 둘이 서로 상쇄해
+    // "떨어질 때 산다"는 없는 결론이 나온다.
+    const sides: { side: "사는" | "파는"; v: number }[] = [];
+    if (r.buy !== null) sides.push({ side: "사는", v: r.buy });
+    if (r.sell !== null) sides.push({ side: "파는", v: r.sell });
+    const top = sides.length
+      ? sides.reduce((a, b) => (Math.abs(b.v - 1) > Math.abs(a.v - 1) ? b : a))
+      : null;
+    const pct = top ? Math.round(Math.abs(top.v - 1) * 100) : 0;
+    return {
+      label: r.label,
+      changed: pct > NOISE,
+      // 무엇이 얼마나 달라졌는지를 문장 그대로 쓴다. 숫자만 두면 "8% 달라짐"이 된다.
+      // 다른 것을 재는 줄은 자기 결론(verdict)을 들고 있다.
+      result:
+        "verdict" in r && r.verdict
+          ? r.verdict
+          : top && pct > NOISE
+            ? `${top.side} 양만 ${pct}% ${top.v > 1 ? "늘어납니다" : "줄어듭니다"}`
+            : "사고파는 양 그대로",
+    };
+  });
+  // 읽는 사람이 "다 그대로네"를 먼저 보게 안 달라진 것부터 세운다.
+  rows.sort((a, b) => Number(a.changed) - Number(b.changed));
+  const quiet = rows.filter((r) => !r.changed).length;
+  // "넷을 재 봤는데 3개는" 처럼 세는 말이 섞이면 읽다가 걸린다. 작은 수는 우리말로.
+  const KO = ["", "하나", "둘", "셋", "넷", "다섯"];
+  const koCount = (n: number) => KO[n] ?? String(n);
+  const yearendPct = Math.round(Math.abs(yearend.sell - 1) * 100);
+
   return (
     <div style={{ paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap",
-                    marginBottom: 10 }}>
-        <b style={{ fontSize: 14, fontWeight: 800, color: C.ink }}>
-          사건보다 <span style={{ color: C.blue }}>날짜에 더 반응</span>합니다
-        </b>
-        <span style={{ fontSize: 11.5, color: C.sub2 }}>
-          이런 일이 있던 다음 날, 매매가 얼마나 달라졌는지입니다
-        </span>
-      </div>
+      <p style={{ margin: 0, fontSize: 13.5, fontWeight: 800, color: C.ink, lineHeight: 1.45,
+                  wordBreak: "keep-all" }}>
+        매매를 바꾸는 게 뭔지 {koCount(rows.length)}을 재 봤는데,{" "}
+        {quiet === rows.length ? "전부" : `${koCount(quiet)}은`}{" "}
+        <span style={{ color: C.blue }}>아무 차이가 없었습니다</span>
+      </p>
 
-      <div style={{ position: "relative", display: "grid", gap: "9px 22px",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(min(215px, 100%), 1fr))" }}>
+      <ul style={{ listStyle: "none", margin: "9px 0 0", padding: 0, display: "flex",
+                   flexDirection: "column", gap: 6 }}>
         {rows.map((r) => (
-          <div key={r.label} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-            <span style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 11.5 }}>
-              <span style={{ fontWeight: r.strong ? 800 : 600, color: r.strong ? C.ink : C.label,
-                             minWidth: 0, overflow: "hidden", textOverflow: "ellipsis",
-                             whiteSpace: "nowrap" }}>{r.label}</span>
-              <span style={{ flexShrink: 0, fontWeight: 700, color: r.strong ? C.ink : C.sub2 }}>
-                {r.diff <= NOISE ? "그대로" : `${r.diff}% 달라짐`}
-              </span>
+          <li key={r.label}
+              style={{ display: "flex", alignItems: "baseline", gap: 10, fontSize: 12,
+                       paddingBottom: 6, borderBottom: `1px solid ${C.sheetRow}` }}>
+            <span style={{ color: C.label, minWidth: 0, flex: 1 }}>{r.label}</span>
+            <span style={{ flexShrink: 0, fontWeight: r.changed ? 800 : 600,
+                           color: r.changed ? C.ink : C.faint }}>
+              {r.result}
             </span>
-            {/* 줄마다 '차이 없음' 구역을 깔아 짧은 막대가 '작은 반응'이 아니라
-                '무반응'으로 읽히게 한다. */}
-            <span style={{ position: "relative", height: 7, borderRadius: 4, background: C.soft }}>
-              <span aria-hidden style={{ position: "absolute", left: 0, top: 0, bottom: 0,
-                                         width: `${(NOISE / AXIS) * 100}%`, background: C.chip,
-                                         borderRight: `1px dashed ${C.line}`,
-                                         borderRadius: "4px 0 0 4px" }} />
-              <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 4,
-                             width: `${Math.max(2, Math.min(100, (r.diff / AXIS) * 100))}%`,
-                             background: r.strong ? C.ink : C.bar }} />
-            </span>
-          </div>
+          </li>
         ))}
-      </div>
-      <span style={{ display: "block", fontSize: 10.5, color: C.faint, marginTop: 8 }}>
-        회색 구역 안({NOISE}% 이내)은 평소 흔들림과 구별되지 않습니다 · 맨 아래 연말은 견주기용입니다
-      </span>
+      </ul>
+
+      <p style={{ margin: "10px 0 0", fontSize: 12.5, lineHeight: 1.55, color: C.sub,
+                  wordBreak: "keep-all" }}>
+        정작 크게 달라지는 건 사건이 아니라 <b style={{ color: C.ink }}>날짜</b>입니다 — 연말
+        마지막 주에는 파는 양이 <b style={{ color: C.ink }}>{yearendPct}%</b> 늘어납니다.
+        위 달력에서 12월로 넘겨 보세요.
+      </p>
     </div>
   );
 }
