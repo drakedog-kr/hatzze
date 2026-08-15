@@ -8,9 +8,11 @@ import {
   type Peer,
   type SeohakOverview,
 } from "@/lib/seohak-data";
+import { getSeohakEquityType } from "@/lib/seohak-equity-type";
 import { getSeohakEtf } from "@/lib/seohak-etf";
 import { getSeohakQuarterly } from "@/lib/seohak-quarterly";
 import { DailySection } from "./DailyCards";
+import { EquityTypeSection } from "./EquityTypeSection";
 import { EtfSection } from "./EtfCards";
 import { QuarterlyCards } from "./QuarterlyCards";
 import { SectionHead } from "../kadera/SectionHead";
@@ -267,11 +269,12 @@ export default async function SeohakPage() {
   // 아래 셋은 서로 의존이 없다. 순서대로 await 하면 왕복이 앞뒤로 붙으므로 함께 띄운다.
   // ⚠️ 분기·ETF 두 층은 표가 아직 없을 수 있어 null 을 돌려준다(마이그레이션 043·042).
   // 그 경우 그 섹션만 접고 나머지는 그대로 뜬다.
-  const [peers, daily, quarterly, etf] = await Promise.all([
+  const [peers, daily, quarterly, etf, equityType] = await Promise.all([
     getPeers(ov.asOf),
     getSeohakDaily(),
     getSeohakQuarterly(),
     getSeohakEtf(),
+    getSeohakEquityType(),
   ]);
   const maxInflow = Math.max(...ov.cohorts.map((c) => c.inflow));
   const recent = ov.cohorts.filter((c) => c.year >= 2025).reduce((s, c) => s + c.inflow, 0);
@@ -289,9 +292,11 @@ export default async function SeohakPage() {
           갇혀 4열이 1열로 접힌다(실제로 그렇게 깨졌다). */}
       <DailySection d={daily} />
 
+      {equityType && <EquityTypeSection e={equityType} />}
+
       {/* ── ETF 층 ────────────────────────────────────────────────────
           미국에 가는 두 번째 길. 일별이라 위 층과 붙여 두되, 곁길이라는 걸 각주가
-          매번 밝힌다 — 서학개미 보유의 72.1% 는 보통주 직접 보유다. */}
+          매번 밝힌다 — 서학개미 보유의 62.9% 는 보통주 직접 보유다(2025-06 조사). */}
       {etf && (
         <>
           <SectionHead

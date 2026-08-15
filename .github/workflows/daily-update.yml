@@ -452,6 +452,13 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_seohak_settlement.py
 
+      # 연 1회 원천(미 재무부 SHL 조사)이라 이미 받은 해는 건너뛴다. 매일 실행에서는
+      # 목록 페이지를 한 번 두드리고 끝나고, 새 판이 올라온 날에만 zip 을 받는다.
+      - name: (서학개미) 주식 종류별 보유 (미 재무부 SHL 연례조사)
+        id: seohak_equity_type
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_seohak_equity_type.py
+
       # 국내 상장 미국 ETF. 이것도 매일 새 값이 있다. 기본이 400달력일 훑기라
       # 파이프라인이 며칠 멈췄다 돌아도 저절로 메운다(이미 저장된 날은 건너뛴다).
       - name: (서학개미) 국내 상장 미국 ETF 시세·순자산 (KRX)
