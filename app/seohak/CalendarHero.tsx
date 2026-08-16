@@ -49,7 +49,7 @@ const dayLabel = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.sl
 const fullLabel = (date: string) => `${date.slice(0, 4)}/${dayLabel(date)}`;
 /** 간격도 4의 배수 넷으로만. */
 const S = { xs: 4, sm: 8, md: 12, lg: 16 } as const;
-/** 모서리 셋 — 마크 2 · 달력 칸 4 · 상자 R.control. 그 밖의 값은 쓰지 않는다. */
+/** 모서리 넷 — 마크 2 · 달력 칸 4 · 상자 R.control · 알약 R.pill. 그 밖의 값은 쓰지 않는다. */
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
 
@@ -219,6 +219,15 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
   // 선택한 날이 어느 구간에 드는지. 오른쪽 칸이 "이 날은 ~에 듭니다"로 쓴다.
   const pickedWindow = CALENDAR_WINDOWS.find((w) => marks.get(w.key)!.has(picked));
 
+  /** 그 달로 옮기고, 그 달에서 가장 크게 움직인 날을 고른다. */
+  const jumpToMonth = (next: string) => {
+    setMonth(next);
+    const inNext = c.days.filter((d) => d.date.startsWith(next));
+    const pick = inNext.reduce<CalendarDay | null>(
+      (a, d) => (!a || Math.abs(d.net) > Math.abs(a.net) ? d : a), null);
+    if (pick) setPicked(pick.date);
+  };
+
   /**
    * 그 창이 가장 최근에 있었던 자리로 간다.
    *
@@ -261,6 +270,21 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
     const inNext = c.days.filter((d) => d.date.startsWith(next));
     if (inNext.length) setPicked(inNext[inNext.length - 1].date);
   };
+  /**
+   * 달력 아래 최근 열두 달. 화살표만으로는 한 해를 훑는 데 열두 번 눌러야 하고, 정작
+   * 달력 칸 아래가 90px 비어 있었다.
+   *
+   * ⭐ 채우는 김에 이 페이지의 바탕 사실이 보인다 — **거의 매달 빨갛다.** 1999년부터
+   * 330개월 중 222개월이 순매수로 끝났다. 막대가 아니라 색 칸이라 눈이 안 피로하다.
+   */
+  const recentMonths = useMemo(() => {
+    const byMonth = new Map<string, number>();
+    for (const d of c.days) byMonth.set(d.date.slice(0, 7), (byMonth.get(d.date.slice(0, 7)) ?? 0) + d.net);
+    const keys = [...byMonth.keys()].sort().slice(-12);
+    const scale = Math.max(...keys.map((k) => Math.abs(byMonth.get(k)!)), 1);
+    return keys.map((k) => ({ key: k, net: byMonth.get(k)!, scale }));
+  }, [c.days]);
+
   const cells: (number | null)[] = [
     ...Array.from({ length: meta.firstWeekday }, () => null),
     ...Array.from({ length: meta.length }, (_, i) => i + 1),
@@ -294,7 +318,7 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
           처음엔 반대(달력 2칸)로 뒀는데 달력만 커 보였다. 달력은 '어느 날을 고를까'를
           묻는 손잡이라 작아도 되고, 정작 읽을 것은 고른 날의 내용이다. 반응 스트립도
           아래 별도 줄에서 오른쪽으로 들여 세로를 줄였다. */}
-      <div style={{ display: "flex", flexWrap: "wrap", padding: "12px 22px 18px", gap: S.lg }}>
+      <div style={{ display: "flex", flexWrap: "wrap", padding: "18px 22px", gap: S.md }}>
         {/* ── 왼쪽 한 칸: 달력 ── */}
         <div style={{ flex: "1 1 220px", maxWidth: 380, minWidth: 0, display: "flex",
                       flexDirection: "column", gap: S.sm }}>
@@ -323,6 +347,17 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
             <span style={{ fontSize: T.body, fontWeight: 800, color: C.ink, marginLeft: 2 }}>
               {meta.year}년 {meta.month}월
             </span>
+            {/* 달을 몇 번 넘기고 나면 돌아올 길이 화살표뿐이다. '오늘'은 자료의 마지막
+                결제일이다(시트 머리의 기준일과 같은 날). */}
+            <button type="button" onClick={() => { setMonth(c.asOfMonth); setPicked(c.asOf); }}
+                    disabled={month === c.asOfMonth && picked === c.asOf}
+                    style={{ marginLeft: "auto", fontSize: T.tiny, fontFamily: "inherit",
+                             padding: "3px 8px", borderRadius: R.pill,
+                             border: `1px solid ${C.line}`, background: C.card,
+                             color: month === c.asOfMonth && picked === c.asOf ? C.disabled : C.sub,
+                             cursor: month === c.asOfMonth && picked === c.asOf ? "default" : "pointer" }}>
+              오늘
+            </button>
           </div>
 
           {/* 그달에 걸치는 구간. 구글 캘린더의 종일 일정처럼 격자 **바로 위**에 둔다.
@@ -416,6 +451,32 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
               <span style={{ width: 8, height: 8, borderRadius: 2, background: SELL }} /> 더 팔았다
             </span>
           </div>
+
+          {/* marginTop:auto — 칸 셋의 바닥을 맞춘다. 달력은 6줄일 때와 5줄일 때 높이가
+              달라서, 붙여 두면 달마다 아래가 들쭉날쭉해진다. */}
+          <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: S.xs }}>
+            <span style={{ fontSize: T.tiny, color: C.sub2, fontWeight: 600 }}>최근 열두 달</span>
+            <div style={{ display: "flex", gap: 2 }}>
+              {recentMonths.map((m) => {
+                const strength = Math.min(1, Math.abs(m.net) / m.scale);
+                return (
+                  <button key={m.key} type="button" onClick={() => jumpToMonth(m.key)}
+                          title={`${m.key} · 순매수 ${usd(m.net)}`}
+                          style={{ flex: 1, minWidth: 0, height: 22, borderRadius: 3, padding: 0,
+                                   cursor: "pointer",
+                                   border: m.key === month ? `2px solid ${C.ink}` : "2px solid transparent",
+                                   background: `color-mix(in srgb, ${m.net >= 0 ? BUY : SELL} ${16 + strength * 74}%, ${C.card})` }} />
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", gap: 2, fontSize: T.tiny, color: C.faint }}>
+              {recentMonths.map((m) => (
+                <span key={m.key} style={{ flex: 1, minWidth: 0, textAlign: "center" }}>
+                  {Number(m.key.slice(5))}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* ── 오른쪽 두 칸: 고른 날 + 매매를 바꾸는 것들 ── */}
@@ -426,10 +487,13 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
               '라벨·날짜·값', 어떤 줄은 각주였다. 값 하나하나는 그럴듯한데 나란히 두면
               규칙이 안 보여 지저분해진다. 지금은 **한 가지 줄 꼴**(라벨 · 보조 · 값)만
               쓰고, 그 줄을 만드는 자리도 `Row` 하나뿐이다. */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: S.sm, alignItems: "flex-start" }}>
+          {/* ⚠️ 한때 alignItems:flex-start 였다. 그때는 역대 카드가 제일 짧아서(274 vs 356)
+                늘리면 카드 안이 82px 비었기 때문이다. 지금은 역대가 제일 기니 늘려도 구멍이
+                안 생기고, 대신 가운데 칸 두 카드가 남는 29px 를 나눠 가져 세 칸 바닥이 맞는다. */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: S.md }}>
             {/* 왼쪽 칸 — 이 달 위, 고른 날 아래. 둘은 '지금 보고 있는 것'이라 한 묶음이다. */}
             <div style={{ flex: "1 1 min(210px, 100%)", minWidth: 0, display: "flex",
-                          flexDirection: "column", gap: S.sm }}>
+                          flexDirection: "column", gap: S.md }}>
               <Box
                 head={`이 달 · ${monthDays.length}거래일`}
                 amount={monthNet}
