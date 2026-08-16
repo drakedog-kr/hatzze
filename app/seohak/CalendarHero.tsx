@@ -516,7 +516,7 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                         붙어 있어 스스로 말하는데, 구간 값은 여러 해를 모은 것이라 기간을
                         밝히지 않으면 "언제 잰 거냐"가 남는다. */}
                     <span style={{ fontSize: T.tiny, color: C.faint }}>
-                      2015~2026년을 모아 잰 값입니다
+                      2015~2026년을 모아 잰 값입니다 · 2월은 12년 내리 순매수였습니다
                     </span>
                   </div>
                 </Card>
