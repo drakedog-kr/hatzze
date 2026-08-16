@@ -1,44 +1,45 @@
-import type { SeohakYear } from "@/lib/seohak-yearly";
+import { type SeohakDaily } from "@/lib/seohak-daily";
 import { BUY, SELL } from "./tone";
 import { C, Icon, MONO, R } from "../ui";
 
 /**
- * '어떻게 사고파나' 층 — **산 것과 판 것, 두 막대뿐.**
+ * 일별 층.
  *
- * ## 여덟 판을 갈아엎고 남은 규칙 하나
+ * ## 세 번째 판 — 규칙을 정하고 다시 짰다 (2026-08-16)
  *
- * 이 섹션은 카드 셋을 각각 대여섯 번씩 다시 썼고 전부 "무슨 말인지 모르겠다"를 받았다.
- * 낱말도 바꿔 보고 그림도 바꿔 보고 잉크도 줄여 봤는데 계속 실패했다.
+ * 앞의 두 판이 "무슨 말인지 모르겠다"는 평을 받았다. 원인은 배치나 크기가 아니라
+ * **무엇을 화면에 내놓았는가**였다.
  *
- * ⭐⭐⭐ 공통점은 **전부 파생된 개념을 보여줬다**는 것이다.
+ *  ⛔ 지표를 정규화 배수(0.930 · 0.641 · 1.18)로 만들어 놓고 그 배수를 그대로 노출했다.
+ *     그건 분석가의 언어다. 독자는 "0.930이 뭔데"에서 멈춘다.
+ *  ⛔ 비교 대상이 화면에 없었다. 배수만 있고 '평소'가 안 보이니 크고 작음을 판단할 수 없다.
  *
- *   '평소의 몇 %'  → '평소'가 뭔지 정의해야 한다(2년 중앙값)
- *   '한 번에 얼마'  → 결제 건수가 사람 수가 아니라고 해명해야 한다
- *   '순매수'       → 수익이 아니라고 해명해야 한다
- *   '늘어난 것'     → 잔고가 불었다는 뜻이 아니라고 해명해야 한다
+ * 그래서 규칙 셋을 두고 전부 고쳤다.
  *
- * 그리고 그 해명을 각주로 떠받쳤다. **각주가 필요하다는 것 자체가 안 직관적이라는
- * 증거였다**(Hun 지적). 설명이 늘수록 카드는 더 안 읽힌다.
- *
- * 그래서 파생을 전부 버렸다. 남은 건 원자료 둘 — **산 금액과 판 금액**. 나란히 놓으면
- * 어느 쪽이 긴지가 곧 답이고, 2023년에 파란 막대가 더 긴 것도 그냥 보인다.
- * ⭐ 이 파일에는 '순매수'도 '평소'도 안 나온다.
+ *  ① **큰 숫자는 배수가 아니라 실제 값**이다. 배수는 그림의 눈금으로만 쓰고 안 보여준다.
+ *  ② **결론은 문장으로** 쓴다. "평소보다 7% 적게 샀습니다" 처럼 읽으면 끝나야 한다.
+ *  ③ 제목 아래 **설명 한 줄**을 둔다(브리핑의 desc 와 같은 자리). 각주는 출처·한계만.
  */
 
 export const usd = (v: number) => {
   const a = Math.abs(v);
-  if (a >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
+  if (a >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
   if (a >= 1e6) return `$${(v / 1e6).toFixed(0)}M`;
   return `$${Math.round(v).toLocaleString("ko-KR")}`;
 };
 export const cnt = (v: number) => v.toLocaleString("ko-KR");
+/** 배수를 사람 말로. 1.184 → "18% 더". 0.739 → "26% 덜". */
+export const asPct = (mult: number) => {
+  const d = Math.round(Math.abs(mult - 1) * 100);
+  if (d === 0) return "평소와 같이";
+  return `${d}% ${mult > 1 ? "더" : "덜"}`;
+};
 
 export function Card({
   icon,
   title,
   desc,
   note,
-  noteHelp,
   foot,
   children,
 }: {
@@ -47,10 +48,7 @@ export function Card({
   /** 제목 아래 한 줄. 이 카드가 무엇을 재는지 여기서 끝내야 한다. */
   desc: string;
   note?: string;
-  /** 알약 옆 물음표. 정의·한계처럼 '찾을 때만' 필요한 건 각주 대신 여기로. */
-  noteHelp?: string;
-  /** 없으면 안 그린다 — 각주가 없어도 되는 카드가 제일 좋은 카드다. */
-  foot?: string;
+  foot: string;
   children: React.ReactNode;
 }) {
   return (
@@ -61,28 +59,15 @@ export function Card({
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
           <h3 style={{ margin: 0, fontSize: 13.5, fontWeight: 800, color: C.ink,
                        lineHeight: 1.3, letterSpacing: "-.01em", wordBreak: "keep-all" }}>{title}</h3>
-          <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.45, color: C.sub2,
-                      wordBreak: "keep-all" }}>{desc}</p>
+          <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.45, color: C.sub2, wordBreak: "keep-all" }}>{desc}</p>
         </div>
         {note && (
-          <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4,
-                         fontSize: 11, fontWeight: 700, color: C.sub,
-                         background: C.chip, borderRadius: R.pill, padding: "3px 8px" }}>
-            {note}
-            {noteHelp && (
-              <span className="hz-tip hz-tip-wide hz-tip-end" data-tip={noteHelp} data-ga-tip={title}
-                    style={{ display: "inline-flex", cursor: "help" }}>
-                <Icon name="help" style={{ fontSize: 12, color: C.hint }} />
-              </span>
-            )}
-          </span>
+          <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, color: C.sub,
+                         background: C.chip, borderRadius: R.pill, padding: "3px 8px" }}>{note}</span>
         )}
       </div>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>{children}</div>
-      {foot && (
-        <p style={{ margin: 0, fontSize: 12, lineHeight: 1.45, color: C.sub2,
-                    wordBreak: "keep-all" }}>{foot}</p>
-      )}
+      <p style={{ margin: 0, fontSize: 12, lineHeight: 1.45, color: C.sub2, wordBreak: "keep-all" }}>{foot}</p>
     </section>
   );
 }
@@ -90,8 +75,7 @@ export function Card({
 /** 결론 문장. 카드마다 같은 자리에서 같은 크기로 나온다. */
 export function Verdict({ children }: { children: React.ReactNode }) {
   return (
-    <p style={{ margin: 0, fontSize: 15, lineHeight: 1.45, fontWeight: 700, color: C.ink,
-                wordBreak: "keep-all" }}>
+    <p style={{ margin: 0, fontSize: 15, lineHeight: 1.45, fontWeight: 700, color: C.ink, wordBreak: "keep-all" }}>
       {children}
     </p>
   );
@@ -110,191 +94,261 @@ export const CARD_GRID: React.CSSProperties = {
   gap: 14,
 };
 
-/** 산 것·판 것 두 막대. 이 섹션의 유일한 그림이라 한 곳에서만 만든다. */
-function Pair({
-  label, buy, sell, max, dim, strong,
-}: {
-  label: string; buy: number; sell: number; max: number; dim?: boolean; strong?: boolean;
-}) {
-  const w = (v: number) => `${Math.max(1.5, (v / max) * 100)}%`;
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 9, opacity: dim ? 0.5 : 1 }}>
-      <span style={{ flex: "0 0 32px", fontSize: 11.5, color: strong ? C.ink : C.sub,
-                     fontWeight: strong ? 800 : 600 }}>{label}</span>
-      <span style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-        <span style={{ height: 9, borderRadius: 2, width: w(buy), background: BUY }} />
-        <span style={{ height: 9, borderRadius: 2, width: w(sell), background: SELL }} />
-      </span>
-      <span style={{ flex: "0 0 58px", display: "flex", flexDirection: "column", gap: 3,
-                     textAlign: "right", fontFamily: MONO, fontSize: 11, fontWeight: 700 }}>
-        <span style={{ color: C.ink }}>{usd(buy)}</span>
-        <span style={{ color: C.sub2 }}>{usd(sell)}</span>
-      </span>
-    </div>
-  );
-}
+/* ── ① 평소와 얼마나 다른가 (한 행 전체) ──────────────────────────────
+   ⚠️⚠️ **네 번째 판이다.** 앞의 셋이 각각 이렇게 실패했다.
 
-function Legend() {
-  return (
-    <div style={{ display: "flex", gap: 12, fontSize: 11, color: C.sub }}>
-      {[{ c: BUY, t: "산 것" }, { c: SELL, t: "판 것" }].map((l) => (
-        <span key={l.t} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-          <span style={{ width: 9, height: 9, borderRadius: 2, background: l.c }} />
-          {l.t}
-        </span>
-      ))}
-    </div>
-  );
-}
+   1판 두 줄짜리 배수 선 — 두 번 평활돼 모양이 없었고, 기준(±60일)이 나중에 바뀌었다.
+   2판 거울 막대 240개 — "눈 아프다".
+   3판 옅은 띠 + 5일 평균선 — 차분해졌지만 **여전히 지저분했다.** 띠 2 + 선 2 + 점선 2 +
+       라벨 2 + 축까지 아홉 덩어리였다. 게다가 옆 스파크라인은 기준점이 없어 뜻이 없었다.
 
-type Month = { month: string; buy: number; sell: number };
-type VsUsual = { buy: number; sell: number; buyCount: number };
+   ⭐ 근본 원인은 **내가 데이터를 자랑하고 있었다**는 것이다. 이 카드가 하는 말은 하나다 —
+   "요즘 사는 양은 평소의 88%, 파는 양은 63%".
 
-/* ── ⓪ 평소와 견주면 ────────────────────────────────────────────────────
-   ⚠️ 이 지표를 한 번 통째로 버렸다가 되살렸다. 앞서 "무슨 말인지 모르겠다"를 받은 건
-   **지표가 아니라 그림**이었는데(선 둘 + 띠 둘 + 점선 둘 + 스파크라인) 지표까지 같이
-   버렸다. 물어볼 값어치가 있는 질문이다 — "요즘 사람들이 평소보다 활발한가".
+   그래서 **'평소의 몇 %' 한 가지 언어로 통일한다.** 세로축도, 옆 숫자 셋도 같은 자다.
+   그림에 남는 건 기준선 하나 + 선 둘 + 끝점 둘, 다섯뿐이다. 스파크라인은 지웠다 —
+   횟수도 같은 언어의 숫자 하나로 말하면 그림이 필요 없다. */
+function VsUsual({ d }: { d: SeohakDaily }) {
+  const r = d.recentPct;
+  const W = 1000;
+  const H = 170;
+  const PAD = { t: 16, b: 22, l: 0, r: 0 };
+  const vals = r.flatMap((p) => [p.buy, p.sell]);
+  // 축은 늘 100(평소)을 품는다. 안 그러면 기준선이 밖으로 나가 '평소의 %'가 뜻을 잃는다.
+  const lo = Math.min(100, ...vals) * 0.96;
+  const hi = Math.max(100, ...vals) * 1.04;
+  const x = (i: number) => (i / Math.max(1, r.length - 1)) * W;
+  const y = (v: number) => H - PAD.b - ((v - lo) / (hi - lo)) * (H - PAD.t - PAD.b);
+  const path = (k: "buy" | "sell") =>
+    r.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p[k]).toFixed(1)}`).join("");
 
-   ⭐ 그림은 **막대 셋과 눈금 하나**뿐이다. 막대가 '평소' 선에 못 미치면 평소보다 적고,
-   넘으면 많다. 배터리 눈금과 같은 어법이라 배울 게 없다. 세로축도 시계열도 없다.
-
-   ⚠️ '평소'가 무엇인지는 제목 옆 물음표가 맡는다. 각주로 깔면 카드 바닥이 무거워지고
-   정작 필요할 때는 못 찾는다(달력에서 같은 판단을 했다). */
-function VsUsualCard({ v }: { v: VsUsual }) {
-  /** 축 오른쪽 끝(%). 100 이 눈금 자리이고, 넘치는 값도 담기게 여유를 둔다. */
-  const AXIS = Math.max(130, ...[v.buy, v.sell, v.buyCount].map((x) => x * 1.15));
-  const rows = [
-    { k: "산 금액", v: v.buy, tone: BUY },
-    { k: "판 금액", v: v.sell, tone: SELL },
-    { k: "산 횟수", v: v.buyCount, tone: C.marker },
+  const tiles = [
+    { k: "사는 양", v: d.vsUsual.buy, tone: BUY, sub: `어제 ${usd(d.today.buy)}` },
+    { k: "파는 양", v: d.vsUsual.sell, tone: SELL, sub: `어제 ${usd(d.today.sell)}` },
+    { k: "산 횟수", v: d.vsUsual.buyCount, tone: C.marker, sub: `어제 ${cnt(d.today.buyCount)}번` },
   ];
-  const lowAll = v.buy < 100 && v.sell < 100;
-  const highAll = v.buy >= 100 && v.sell >= 100;
+  const up = (v: number) => v >= 100;
+  const verdict = up(d.vsUsual.buy) && up(d.vsUsual.sell) ? (
+    <>요즘 <Em>사는 것도 파는 것도 평소보다 많습니다</Em></>
+  ) : !up(d.vsUsual.buy) && !up(d.vsUsual.sell) ? (
+    <>요즘 <Em>사는 것도 파는 것도 평소보다 적습니다</Em></>
+  ) : up(d.vsUsual.buy) ? (
+    <><Em>사는 쪽만</Em> 평소보다 많습니다</>
+  ) : (
+    <><Em>파는 쪽만</Em> 평소보다 많습니다</>
+  );
+
+  return (
+    <>
+      <Verdict>{verdict}</Verdict>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 18 }}>
+        <div style={{ flex: "2 1 min(400px, 100%)", minWidth: 0 }}>
+          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}
+               role="img" aria-label="사는 양과 파는 양이 평소의 몇 %인지, 최근 반년">
+            <line x1={0} x2={W} y1={y(100)} y2={y(100)} stroke={C.marker} strokeWidth={1.5} />
+            <text x={0} y={y(100) - 7} fontSize={14} fill={C.sub2} fontWeight={700}>평소</text>
+            {(["sell", "buy"] as const).map((k) => (
+              <path key={k} d={path(k)} fill="none" stroke={k === "buy" ? BUY : SELL}
+                    strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
+            ))}
+            {(["sell", "buy"] as const).map((k) => (
+              <circle key={k} cx={W} cy={y(r[r.length - 1][k])} r={5}
+                      fill={k === "buy" ? BUY : SELL} stroke={C.card} strokeWidth={2} />
+            ))}
+            <text x={0} y={H - 4} fontSize={13} fill={C.faint}>
+              {r[0]?.date.slice(0, 7).replace("-", "년 ")}월
+            </text>
+            <text x={W} y={H - 4} fontSize={13} fill={C.faint} textAnchor="end">어제</text>
+          </svg>
+        </div>
+
+        <div style={{ flex: "1 1 min(210px, 100%)", minWidth: 0, display: "flex",
+                      flexDirection: "column", gap: 8 }}>
+          {tiles.map((t) => (
+            <div key={t.k} style={{ background: C.soft, borderRadius: R.control, padding: "10px 12px",
+                                    display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ width: 9, height: 9, borderRadius: 2, background: t.tone, flexShrink: 0 }} />
+              <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                <span style={{ fontSize: 12, color: C.label, fontWeight: 700 }}>{t.k}</span>
+                <span style={{ fontSize: 10.5, color: C.faint }}>{t.sub}</span>
+              </span>
+              <span style={{ marginLeft: "auto", display: "flex", alignItems: "baseline", gap: 4 }}>
+                <b style={{ fontFamily: MONO, fontSize: 20, fontWeight: 800, color: C.ink,
+                            letterSpacing: "-0.02em" }}>{Math.round(t.v)}%</b>
+                <span style={{ fontSize: 10.5, color: C.faint }}>평소의</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ── ⑤ 사자와 팔자의 결 ─────────────────────────────────────────────────
+   ⚠️⚠️ 앞 판은 **곱셈 항등식**이었다 — "판 돈은 산 돈의 85% = 파는 횟수 75% × 한 번의
+   크기 113%". 수식으로는 우아한데 "왜 곱하기가 있는지 모르겠다"를 받았다.
+
+   맞는 지적이다. 곱셈은 **읽는 사람에게 일을 시킨다.** 게다가 "75%"가 무엇의 75%인지
+   화면에 없었다(사는 횟수의). 제목의 '사람'도 틀렸다 — 원천은 결제 건수다.
+
+   그래서 식을 버리고 **양쪽을 나란히 놓는다.** 횟수는 사자가 길고 크기는 팔자가 긴,
+   서로 엇갈리는 두 줄이 곧 결론이다. 곱하지 않아도 눈이 먼저 읽는다. */
+function BuyerVsSeller({ d }: { d: SeohakDaily }) {
+  const f = d.flow20;
+  const rows = [
+    {
+      k: "몇 번",
+      unit: "번",
+      buy: f.buyCount,
+      sell: f.sellCount,
+      fmt: (v: number) => cnt(Math.round(v)),
+    },
+    {
+      k: "한 번에 얼마",
+      unit: "",
+      buy: f.buyPer,
+      sell: f.sellPer,
+      fmt: (v: number) => `$${Math.round(v).toLocaleString("ko-KR")}`,
+    },
+  ];
+  const bigger = d.sizeRatio >= 1;
+  const fewer = d.countRatio < 1;
 
   return (
     <>
       <Verdict>
-        {lowAll ? (
-          <>요즘 <Em>사는 것도 파는 것도 평소보다 적습니다</Em></>
-        ) : highAll ? (
-          <>요즘 <Em>사는 것도 파는 것도 평소보다 많습니다</Em></>
-        ) : v.buy >= 100 ? (
-          <><Em>사는 쪽만</Em> 평소보다 많습니다</>
-        ) : (
-          <><Em>파는 쪽만</Em> 평소보다 많습니다</>
-        )}
+        파는 쪽은 <Em>{fewer ? "더 뜸하게" : "더 자주"}, {bigger ? "더 크게" : "더 잘게"}</Em> 움직입니다
       </Verdict>
 
-      <div style={{ position: "relative", display: "flex",
-                    flexDirection: "column", gap: 12, paddingBottom: 18 }}>
-        {/* '평소' 눈금. 막대 뒤가 아니라 **위**에 그어야 어느 막대가 넘었는지 보인다. */}
-        <span aria-hidden style={{ position: "absolute", left: `calc(56px + (100% - 56px) * ${100 / AXIS})`,
-                                   top: -2, bottom: 14, width: 1.5, background: C.ink, opacity: 0.55 }} />
-        <span style={{ position: "absolute", left: `calc(56px + (100% - 56px) * ${100 / AXIS})`,
-                       bottom: 0, transform: "translateX(-50%)", fontSize: 10.5,
-                       color: C.sub, fontWeight: 700, whiteSpace: "nowrap" }}>평소</span>
+      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
+        {rows.map((r) => {
+          const max = Math.max(r.buy, r.sell) || 1;
+          return (
+            <div key={r.k} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ fontSize: 11.5, color: C.sub2, fontWeight: 600 }}>{r.k}</span>
+              {[
+                { label: "사는 쪽", v: r.buy, tone: BUY },
+                { label: "파는 쪽", v: r.sell, tone: SELL },
+              ].map((side) => (
+                <div key={side.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ flex: "0 0 46px", fontSize: 11.5, color: C.label }}>{side.label}</span>
+                  <span style={{ flex: 1, height: 10, background: C.soft, borderRadius: 3,
+                                 overflow: "hidden" }}>
+                    <span style={{ display: "block", height: "100%", borderRadius: 3,
+                                   width: `${(side.v / max) * 100}%`, background: side.tone }} />
+                  </span>
+                  <b style={{ flex: "0 0 66px", textAlign: "right", fontFamily: MONO, fontSize: 12,
+                              fontWeight: 800, color: C.ink }}>
+                    {r.fmt(side.v)}{r.unit}
+                  </b>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+/* ── ⑥ 사고판 끝에 얼마가 늘었나 ────────────────────────────────────────
+   ⚠️⚠️ **세 판을 갈아엎었다. 말이 아니라 주장이 문제였다.**
+
+   1판 "오간 돈과 남은 돈"  — 분모가 매수+매도라 머릿속에 안 그려졌다
+   2판 "새 돈은 얼마나 되나" — '새 돈'을 내가 지어냈다
+   3판 "산 돈은 어디서 왔나" — 또 "이해가 안 간다"
+
+   ⭐ 3판의 진짜 문제는 낱말이 아니었다. **"산 돈의 90%는 판 돈이었다"는 관찰이 아니라
+   추론**이다. 실제로 본 건 매수 총액과 매도 총액 둘뿐이고, 사람들이 판 돈으로 다시
+   샀는지 새로 넣고 따로 빼 갔는지는 이 자료로 알 수 없다. 각주에 "누가 무슨 돈으로
+   샀는지는 아닙니다"라고 적어 둔 것 자체가 **헤드라인이 근거를 넘었다는 자백**이었다.
+   독자는 그 틈을 느낀다.
+
+   그래서 **잰 것만 말한다.** 산 것 · 판 것 · 그 차이, 셋 다 실측이고 셋째는 앞 둘의
+   뺄셈이다. 같은 자 위에 막대 셋을 세우면 마지막 막대가 얼마나 짧은지가 곧 메시지다.
+
+   ⚠️⚠️ **5판 — '늘어난 것'을 '수익'으로 읽는다.** 그렇게 물어 왔다. '늘었다'는 잔고가
+   불었다는 뜻으로 들리는데 이건 **순매수**(얼마를 더 넣었나)지 그 돈이 얼마가 됐나가
+   아니다. '새 돈'과 똑같은 실수를 낱말만 바꿔 되풀이한 셈이다.
+
+   ⭐ 이제 이름을 **순매수**로 못박고 옆에 `(산 것 − 판 것)` 을 붙인다. 국내 투자자에게
+   '외국인 순매수'로 익숙한 말이라 지어낸 말보다 안전하다. 그리고 각주가 **"수익이
+   아니다"** 를 명시하고 수익을 답하는 섹션을 가리킨다. */
+function AfterAllThat({ d }: { d: SeohakDaily }) {
+  const t = d.turnover;
+  const net = t.buy - t.sell;
+  const rows = [
+    { k: "산 것", sub: "", v: t.buy, tone: BUY },
+    { k: "판 것", sub: "", v: t.sell, tone: SELL },
+    { k: "순매수", sub: "산 것 − 판 것", v: Math.abs(net), tone: C.ink, strong: true },
+  ];
+  const max = Math.max(...rows.map((r) => r.v)) || 1;
+  const times = net ? Math.round(t.buy / Math.abs(net)) : 0;
+
+  return (
+    <>
+      <Verdict>
+        1년간 그렇게 사고팔았지만 <Em>순매수는 {times}분의 1</Em>입니다
+      </Verdict>
+
+      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 11 }}>
         {rows.map((r) => (
-          <div key={r.k} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ flex: "0 0 46px", fontSize: 11.5, color: C.label, fontWeight: 600 }}>
-              {r.k}
+          <div key={r.k} style={{ display: "flex", alignItems: "center", gap: 9 }}>
+            <span style={{ flex: "0 0 76px", display: "flex", flexDirection: "column" }}>
+              <span style={{ fontSize: 12, color: r.strong ? C.ink : C.label,
+                             fontWeight: r.strong ? 800 : 600 }}>{r.k}</span>
+              {r.sub && <span style={{ fontSize: 9.5, color: C.faint }}>{r.sub}</span>}
             </span>
-            <span style={{ flex: 1, height: 16, background: C.soft, borderRadius: 3,
-                           minWidth: 0 }}>
+            <span style={{ flex: 1, height: 14, background: C.soft, borderRadius: 3,
+                           overflow: "hidden" }}>
               <span style={{ display: "block", height: "100%", borderRadius: 3,
-                             width: `${Math.min(100, (r.v / AXIS) * 100)}%`, background: r.tone }} />
+                             width: `${Math.max(1.5, (r.v / max) * 100)}%`, background: r.tone }} />
             </span>
-            <b style={{ flex: "0 0 46px", textAlign: "right", fontFamily: MONO, fontSize: 15,
-                        fontWeight: 800, color: C.ink }}>{Math.round(r.v)}%</b>
+            <b style={{ flex: "0 0 74px", textAlign: "right", fontFamily: MONO, fontSize: 13,
+                        fontWeight: 800, color: C.ink }}>{usd(r.v)}</b>
           </div>
         ))}
+        <span style={{ fontSize: 11.5, color: C.sub2, paddingTop: 7,
+                       borderTop: `1px solid ${C.line}` }}>
+          {t.days}거래일 동안 {net >= 0 ? "산 것이 판 것보다" : "판 것이 산 것보다"}{" "}
+          <b style={{ fontFamily: MONO, color: C.ink }}>{usd(Math.abs(net))}</b> 많았습니다
+        </span>
       </div>
     </>
   );
 }
 
-/* ── ① 달마다 ────────────────────────────────────────────────────────── */
-function ByMonth({ months }: { months: Month[] }) {
-  const rows = months.slice(-12);
-  const max = Math.max(...rows.flatMap((m) => [m.buy, m.sell])) || 1;
-  const last = rows[rows.length - 1];
-
+export function DailySection({ d }: { d: SeohakDaily }) {
   return (
-    <>
-      <Verdict>
-        이번 달은 <Em>{last.buy >= last.sell ? "산 것" : "판 것"}이 더 많습니다</Em>
-      </Verdict>
-      <Legend />
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: "auto" }}>
-        {/* 이번 달은 아직 안 끝났으니 옅게. 연도 카드의 진행 중인 해와 같은 어법이라
-            따로 설명하지 않는다 — 달 이름만 봐도 진행 중인 걸 안다. */}
-        {rows.map((m, i) => (
-          <Pair key={m.month} label={`${Number(m.month.slice(5))}월`} buy={m.buy} sell={m.sell}
-                max={max} dim={i === rows.length - 1} strong={i === rows.length - 1} />
-        ))}
-      </div>
-    </>
-  );
-}
+    // 한 행짜리 카드 하나 + 반 칸짜리 둘. 셋을 같은 격자에 두면 첫 카드만 늘리려고
+    // gridColumn 을 손대야 하는데, 그 격자는 폭에 따라 열 수가 바뀌어 span 이 어긋난다
+    // (예전에 span 2 로 그렇게 깨졌다). 세로 흐름 + 안쪽 2열이 안 깨진다.
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <Card icon="show_chart" title="평소와 얼마나 다른가"
+            desc="사고파는 양이 평소의 몇 %인지, 반년치를 봅니다."
+            note="최근 6개월"
+            foot="'평소'는 최근 2년 하루 값의 중앙값이라 시간이 지나도 자리가 안 바뀝니다. 선은 5일 평균입니다.">
+        <VsUsual d={d} />
+      </Card>
 
-/* ── ② 해마다 ────────────────────────────────────────────────────────── */
-function ByYear({ years }: { years: SeohakYear[] }) {
-  const max = Math.max(...years.flatMap((y) => [y.buy, y.sell])) || 1;
-  // 판 것이 더 길었던 해. 이 그림에서 눈에 걸리는 유일한 자리라 결론 문장이 그걸 짚는다.
-  const flipped = years.filter((y) => y.sell > y.buy);
-
-  return (
-    <>
-      <Verdict>
-        {flipped.length > 0 ? (
-          <><Em>{flipped.map((y) => `${y.year}년`).join("·")}</Em>만 판 것이 더 많았습니다</>
-        ) : (
-          <>해마다 <Em>산 것이 더 많았습니다</Em></>
-        )}
-      </Verdict>
-      <Legend />
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: "auto" }}>
-        {years.map((y) => (
-          <Pair key={y.year} label={`'${String(y.year).slice(2)}`} buy={y.buy} sell={y.sell}
-                max={max} dim={y.partial} strong={y.sell > y.buy} />
-        ))}
-      </div>
-    </>
-  );
-}
-
-export function DailySection({
-  vsUsual,
-  months,
-  years,
-}: {
-  vsUsual: VsUsual | null;
-  months: Month[] | null;
-  years: SeohakYear[] | null;
-}) {
-  return (
-    <div style={CARD_GRID}>
-      {vsUsual && (
-        <Card icon="speed" title="평소와 견주면"
-              desc="요즘 사고파는 양이 평소의 몇 %인지입니다."
+      <div style={{ display: "grid", gap: 14,
+                    gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))" }}>
+        <Card icon="compare_arrows" title="사자와 팔자의 결"
+              desc="사는 쪽과 파는 쪽이 어떻게 다르게 움직이는지입니다."
               note="최근 20일"
-              noteHelp="'평소'는 최근 2년 하루 값의 중앙값입니다. 고정된 기준이라 시간이 지나도 이 자리가 다시 바뀌지 않습니다. '요즘'은 최근 20영업일입니다.">
-          <VsUsualCard v={vsUsual} />
+              foot="원천이 결제 건수라 사람 수가 아니라 거래 횟수입니다. 한 사람이 여러 번 눌렀을 수 있습니다.">
+          <BuyerVsSeller d={d} />
         </Card>
-      )}
-      {months && months.length > 1 && (
-        <Card icon="calendar_view_month" title="달마다 얼마나 사고팔았나"
-              desc="한 달에 산 금액과 판 금액입니다."
-              note="최근 12개월">
-          <ByMonth months={months} />
+
+        <Card icon="savings" title="얼마나 사고팔았나"
+              desc="1년간 사고판 금액과, 그중 순매수입니다."
+              note="최근 1년"
+              foot="순매수는 수익이 아닙니다 — 얼마를 더 넣었는지입니다. 그 돈이 지금 얼마가 됐는지는 아래 '얼마가 쌓였나'에서 봅니다.">
+          <AfterAllThat d={d} />
         </Card>
-      )}
-      {years && (
-        <Card icon="bar_chart" title="해마다 얼마나 사고팔았나"
-              desc="한 해에 산 금액과 판 금액입니다."
-              note={`${years[0].year}~`}>
-          <ByYear years={years} />
-        </Card>
-      )}
+      </div>
     </div>
   );
 }

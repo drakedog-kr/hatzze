@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 import type { CalendarDay, SeohakCalendar } from "@/lib/seohak-calendar";
-import { CALENDAR_WINDOWS, REACTIONS, windowsInMonth } from "@/lib/seohak-windows";
+import { CALENDAR_WINDOWS, REACTIONS, nextWindow, windowsInMonth } from "@/lib/seohak-windows";
 import { SectionHead } from "../kadera/SectionHead";
 import { BUY, SELL } from "./tone";
 import { C, Icon, MONO, R } from "../ui";
@@ -165,14 +165,45 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
     ? windows.find((w) => pickedDay >= w.fromDay && pickedDay <= w.toDay)
     : undefined;
 
-  // 달을 바꾸면 그 달의 마지막 거래일로 선택을 옮긴다. 안 그러면 다른 달의 날짜가
-  // 선택된 채로 남아 아래 패널이 화면과 어긋난다.
+  // 달을 바꾸면 그 달의 거래일 중 가장 크게 움직인 날로 선택을 옮긴다. 마지막 날을
+  // 고르면 휴장 여파로 결제가 $1 뿐인 날에 착지하는 수가 있다(12-26 에서 실제로 그랬다).
+  const jumpTo = (next: string) => {
+    setMonth(next);
+    const inNext = c.days.filter((d) => d.date.startsWith(next));
+    // ⚠️ 구간이 있는 달로 갔으면 **구간 안에서** 고른다. 달 전체의 최대일을 집으면
+    // 블프를 보러 갔는데 11/3 에 착지한다 — 정작 구간 밖이다.
+    const wins = windowsInMonth(Number(next.slice(5)));
+    const inWin = inNext.filter((d) => {
+      const day = Number(d.date.slice(8));
+      return wins.some((w) => day >= w.fromDay && day <= w.toDay);
+    });
+    const pick = (inWin.length ? inWin : inNext).reduce<CalendarDay | null>(
+      (a, d) => (!a || Math.abs(d.net) > Math.abs(a.net) ? d : a),
+      null,
+    );
+    if (pick) setPicked(pick.date);
+  };
   const goMonth = (by: number) => {
     const next = shiftMonth(month, by);
     setMonth(next);
     const inNext = c.days.filter((d) => d.date.startsWith(next));
     if (inNext.length) setPicked(inNext[inNext.length - 1].date);
   };
+  // 오늘 다음에 오는 구간. 구간 없는 달에서 이 화면의 값진 것을 지킨다.
+  const ahead = useMemo(() => nextWindow(new Date(`${c.asOf}T00:00:00Z`)), [c.asOf]);
+  /**
+   * 그 구간을 **볼 수 있는** 달. 다음 블랙프라이데이는 2026-11 인데 그 달은 아직
+   * 자료가 없어서, 눌러서 가면 달력이 텅 빈다. 받아 둔 구간 안에서 같은 달 중
+   * 가장 최근 것으로 데려간다(지난해 11월).
+   */
+  const aheadSample = useMemo(() => {
+    if (!ahead) return undefined;
+    const mm = String(ahead.window.from[0]).padStart(2, "0");
+    return [...new Set(c.days.map((d) => d.date.slice(0, 7)))]
+      .filter((m) => m.endsWith(`-${mm}`))
+      .sort()
+      .pop();
+  }, [ahead, c.days]);
 
   const cells: (number | null)[] = [
     ...Array.from({ length: meta.firstWeekday }, () => null),
@@ -308,11 +339,12 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                                  color: strength > 0.45 ? C.card : row ? C.ink : C.disabled }}>
                     {d}
                   </span>
-                  {/* 구간 점. 이제 파랑이 '판다'는 뜻을 가지므로 점은 잉크색으로 뺀다 —
-                      파랑 점을 빨간 칸에 찍으면 "이 날은 판 날"로 읽힌다. */}
+                  {/* 구간에 든 날. 4px 점은 너무 약해서 이 화면의 가장 값진 정보가
+                      안 보였다 — 칸 아래에 굵은 밑줄로 바꾼다. 색은 잉크다(파랑을 쓰면
+                      빨간 칸 위에서 "이 날은 판 날"로 읽힌다). */}
                   {inWindow && (
-                    <span aria-hidden style={{ position: "absolute", left: 3, bottom: 3,
-                                               width: 4, height: 4, borderRadius: "50%",
+                    <span aria-hidden style={{ position: "absolute", left: 3, right: 3, bottom: 2,
+                                               height: 2.5, borderRadius: 2,
                                                background: strength > 0.4 ? C.card : C.ink }} />
                   )}
                 </button>
@@ -329,7 +361,7 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
               <span style={{ width: 8, height: 8, borderRadius: 2, background: SELL }} /> 더 팔았다
             </span>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-              <span style={{ width: 4, height: 4, borderRadius: "50%", background: C.ink }} /> 구간
+              <span style={{ width: 10, height: 2.5, borderRadius: 2, background: C.ink }} /> 구간
             </span>
           </div>
         </div>
@@ -337,8 +369,11 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
         {/* ── 오른쪽 두 칸: 고른 날 + 매매를 바꾸는 것들 ── */}
         <div style={{ flex: "2 1 580px", minWidth: 0, display: "flex",
                       flexDirection: "column", gap: 12 }}>
-          {/* 그달에 걸치는 구간 띠. 구글 캘린더의 종일 일정 자리다. */}
-          {windows.length > 0 && (
+          {/* 그달에 걸치는 구간 띠. 구글 캘린더의 종일 일정 자리다.
+              ⭐ 구간이 없는 달(1년 중 아홉 달)에는 **다음 구간까지 며칠**을 대신 띄운다.
+              이 화면에서 다른 데서 못 얻는 유일한 정보가 구간인데, 그게 아홉 달 동안
+              통째로 안 보이면 처음 온 사람은 값진 걸 못 보고 지나간다. */}
+          {windows.length > 0 ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               {windows.map((w) => (
                 <div key={w.key}
@@ -351,6 +386,29 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                 </div>
               ))}
             </div>
+          ) : (
+            ahead && (
+              <button type="button" onClick={() => aheadSample && jumpTo(aheadSample)}
+                      disabled={!aheadSample}
+                      style={{ display: "flex", alignItems: "center", gap: 8, width: "100%",
+                               fontSize: 11.5, background: C.blueTint, borderRadius: R.control,
+                               padding: "5px 9px", border: "none", cursor: "pointer",
+                               font: "inherit", textAlign: "left" }}>
+                <Icon name="event_upcoming" style={{ fontSize: 14, color: C.blue }} />
+                <span style={{ color: C.sub2 }}>다음 구간</span>
+                <b style={{ color: C.ink }}>{ahead.window.label}</b>
+                <span style={{ color: C.sub2 }}>· {ahead.window.note}</span>
+                <span style={{ marginLeft: "auto", flexShrink: 0, display: "inline-flex",
+                               alignItems: "baseline", gap: 6 }}>
+                  <b style={{ color: C.blue }}>{ahead.days}일 뒤</b>
+                  {aheadSample && (
+                    <span style={{ color: C.sub2, fontSize: 10.5 }}>
+                      {aheadSample.slice(0, 4)}년 보기 →
+                    </span>
+                  )}
+                </span>
+              </button>
+            )
           )}
 
           {/* 이 달 · 고른 날 — 두 칸.

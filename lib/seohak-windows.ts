@@ -25,8 +25,6 @@
 export const CALENDAR_WINDOWS = [
   { key: "newyear", label: "새해 첫 주", note: "아무도 안 삽니다",
     from: [1, 1], to: [1, 8], buy: 0.739, sell: 0.814, days: 63 },
-  { key: "earnings", label: "미국 실적 시즌", note: "덜 팝니다",
-    from: [1, 15], to: [1, 31], months: [1, 4, 7, 10], buy: 1.004, sell: 0.944, days: 552 },
   { key: "blackfriday", label: "블랙프라이데이 주간", note: "둘 다 조용합니다",
     from: [11, 24], to: [11, 30], buy: 0.837, sell: 0.874, days: 50 },
   { key: "xmas", label: "크리스마스 직전", note: "팔기 시작합니다",
@@ -35,11 +33,45 @@ export const CALENDAR_WINDOWS = [
     from: [12, 26], to: [12, 31], buy: 0.909, sell: 1.184, days: 42 },
 ] as const;
 
+/**
+ * ⚠️ '미국 실적 시즌'을 뺐다. 1·4·7·10월 후반이라 **띠가 뜨는 달의 3분의 2를
+ * 차지**하는데 실측 차이가 매수 0.4%다. 아무 일도 없는 구간이 화면을 넓게 물들이면
+ * 진짜 구간(연말·신년·블프)이 묽어진다. 작은 카드에선 이미 뺐던 걸 히어로가 계속
+ * 쓰고 있었다.
+ */
+
 /** 그 달에 걸치는 구간들. 달력이 종일 일정처럼 띠로 얹는다. */
 export function windowsInMonth(month: number) {
-  return CALENDAR_WINDOWS.filter((w) =>
-    "months" in w ? (w.months as readonly number[]).includes(month) : w.from[0] === month,
-  ).map((w) => ({ ...w, fromDay: w.from[1], toDay: w.to[1] }));
+  return CALENDAR_WINDOWS.filter((w) => w.from[0] === month).map((w) => ({
+    ...w,
+    fromDay: w.from[1],
+    toDay: w.to[1],
+  }));
+}
+
+/**
+ * 오늘 다음에 오는 구간과 남은 날.
+ *
+ * ⭐ 구간이 없는 달(1년 중 아홉 달)에는 이 화면의 가장 값진 것이 통째로 안 보인다.
+ * "다음은 ○○까지 N일"이 늘 자리를 지키면 날짜가 지날수록 숫자가 줄어 **오늘 볼 이유**가
+ * 생긴다 — 한 해를 통째로 펼치면 매일 같은 그림이라 지루해지는 것과 반대다.
+ */
+export function nextWindow(today: Date) {
+  const y = today.getUTCFullYear();
+  const at = (year: number, w: (typeof CALENDAR_WINDOWS)[number]) =>
+    Date.UTC(year, w.from[0] - 1, w.from[1]);
+  const now = Date.UTC(y, today.getUTCMonth(), today.getUTCDate());
+
+  const upcoming = [y, y + 1]
+    .flatMap((year) => CALENDAR_WINDOWS.map((w) => ({ w, at: at(year, w) })))
+    .filter((c) => c.at > now)
+    .sort((a, b) => a.at - b.at)[0];
+  if (!upcoming) return null;
+  return {
+    window: upcoming.w,
+    days: Math.round((upcoming.at - now) / 86_400_000),
+    month: `${new Date(upcoming.at).getUTCFullYear()}-${String(upcoming.w.from[0]).padStart(2, "0")}`,
+  };
 }
 
 /**
