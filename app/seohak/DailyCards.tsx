@@ -94,25 +94,33 @@ export const CARD_GRID: React.CSSProperties = {
   gap: 14,
 };
 
-/* ── ① 얼마나 샀고, 그게 평소와 얼마나 다른가 ────────────────────────
-   원래 카드 둘이었다. '어제 얼마나 사고팔았나'(실제 금액)와 '평소보다 많이 했나'
-   (평소 대비 배수)를 나란히 뒀는데, 둘 다 같은 하루를 말하면서 **어느 쪽도 혼자서는
-   문장이 안 됐다.** 금액만 보면 큰지 작은지 모르고, 배수만 보면 얼마인지 모른다.
+/* ── ① 평소와 얼마나 다른가 (한 행 전체) ──────────────────────────────
+   카드 셋을 하나로 접었다. '어제 얼마나 사고팔았나'(금액) · '평소보다 많이 했나'(배수) ·
+   '어제 몇 번 샀나'(횟수)가 전부 **같은 질문의 다른 축**이었다 — 어제가 평소와 얼마나
+   달랐나. 따로 두면 독자가 셋을 머릿속에서 겹쳐야 한다.
 
-   합치면 한 줄이 된다: "$811M 샀는데 그건 평소보다 7% 적다."
+   ⭐ 한 행을 다 쓰면서 **40일 궤적**을 그린다. 그동안 `d.trail` 을 계산만 하고 안 썼다.
+   숫자 하나로는 "어제 17% 적다"까지인데, 궤적이 있으면 **"2주째 적다"** 가 보인다.
+   이 카드가 넓어져야 할 이유가 그거다.
 
-   ⭐ 그리고 **평소 대비를 앞세운다.** 실제 금액은 위 달력의 오른쪽 칸이 아무 날짜나
-   골라 보여주므로, 이 카드가 금액을 주인공으로 삼으면 히어로와 같은 말을 두 번 한다.
-   여기서만 할 수 있는 말은 '평소와 견주면' 쪽이다. */
-function DayVsUsual({ d }: { d: SeohakDaily }) {
-  const rows = [
-    { k: "사는 양", rel: d.regime.buy, amt: d.today.buy, n: d.today.buyCount, fill: BUY },
-    { k: "파는 양", rel: d.regime.sell, amt: d.today.sell, n: d.today.sellCount, fill: SELL },
-  ];
-  const span = Math.max(0.2, ...rows.map((r) => Math.abs(r.rel - 1))) * 1.2;
+   ⚠️ 궤적의 각 점은 20영업일 창의 중앙값이라 옆 점과 많이 겹친다. 하루치 등락이 아니라
+   **흐름**으로 읽어야 하는 선이고, 각주가 그걸 밝힌다. */
+function VsUsual({ d }: { d: SeohakDaily }) {
+  const t = d.trail;
+  const W = 1000;
+  const H = 150;
+  const PAD = { t: 14, r: 8, b: 20, l: 8 };
+  const all = t.flatMap((p) => [p.buy, p.sell]).filter((v) => v > 0);
+  // 축은 늘 1.0(평소)을 품어야 한다. 안 그러면 기준선이 화면 밖으로 나가 "평소보다"가
+  // 무엇 대비인지 사라진다.
+  const lo = Math.min(0.95, ...all);
+  const hi = Math.max(1.05, ...all);
+  const x = (i: number) => PAD.l + (i / Math.max(1, t.length - 1)) * (W - PAD.l - PAD.r);
+  const y = (v: number) => H - PAD.b - ((v - lo) / (hi - lo)) * (H - PAD.t - PAD.b);
+  const line = (k: "buy" | "sell") =>
+    t.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p[k]).toFixed(1)}`).join("");
+
   const up = (v: number) => v >= 1;
-  // 네 조합을 문장으로. 사분면 이름("둘 다 줄었다")을 그대로 쓰면 그게 무슨 뜻인지
-  // 또 설명해야 하므로, 뜻을 바로 적는다.
   const verdict = up(d.regime.buy) && up(d.regime.sell) ? (
     <>평소보다 <Em>사는 것도 파는 것도 늘었습니다</Em></>
   ) : !up(d.regime.buy) && !up(d.regime.sell) ? (
@@ -123,37 +131,86 @@ function DayVsUsual({ d }: { d: SeohakDaily }) {
     <><Em>파는 쪽만</Em> 평소보다 늘었습니다</>
   );
 
+  const spark = d.countSpark;
+  const sparkMax = Math.max(...spark);
+  const p = Math.round(d.countPercentile);
+
   return (
     <>
       <Verdict>{verdict}</Verdict>
-      <div style={{ display: "flex", flexDirection: "column", gap: 13, marginTop: "auto" }}>
-        {rows.map((r) => {
-          const w = (Math.abs(r.rel - 1) / span) * 50;
-          const right = r.rel >= 1;
-          return (
-            <div key={r.k} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: C.label }}>{r.k}</span>
-                <span style={{ fontSize: 13, fontWeight: 800, color: right ? C.ink : C.blue }}>
-                  {asPct(r.rel)}
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 18 }}>
+        {/* ── 왼쪽 두 칸: 40일 궤적 ── */}
+        <div style={{ flex: "2 1 min(420px, 100%)", minWidth: 0, display: "flex",
+                      flexDirection: "column", gap: 8 }}>
+          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}
+               role="img" aria-label="사는 양과 파는 양의 40일 궤적">
+            {/* 평소(1.0) 기준선. 데이터가 아니라 자라서 점선으로 둔다. */}
+            <line x1={PAD.l} x2={W - PAD.r} y1={y(1)} y2={y(1)} stroke={C.marker}
+                  strokeWidth={1} strokeDasharray="4 4" />
+            <text x={PAD.l} y={y(1) - 5} fontSize={13} fill={C.faint}>평소</text>
+            <path d={line("sell")} fill="none" stroke={SELL} strokeWidth={2.5}
+                  strokeLinejoin="round" strokeLinecap="round" />
+            <path d={line("buy")} fill="none" stroke={BUY} strokeWidth={2.5}
+                  strokeLinejoin="round" strokeLinecap="round" />
+            {/* 어제 자리를 점으로 짚는다. 선 끝이 어디인지 눈이 바로 못 찾는다. */}
+            {(["sell", "buy"] as const).map((k) => (
+              <circle key={k} cx={x(t.length - 1)} cy={y(t[t.length - 1][k])} r={4}
+                      fill={k === "buy" ? BUY : SELL} stroke={C.card} strokeWidth={2} />
+            ))}
+            <text x={PAD.l} y={H - 5} fontSize={13} fill={C.faint}>{t[0]?.date.slice(5)}</text>
+            <text x={W - PAD.r} y={H - 5} fontSize={13} fill={C.faint} textAnchor="end">어제</text>
+          </svg>
+
+          <div style={{ display: "grid", gap: 8,
+                        gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))" }}>
+            {[
+              { k: "사는 양", rel: d.regime.buy, amt: d.today.buy, n: d.today.buyCount, tone: BUY },
+              { k: "파는 양", rel: d.regime.sell, amt: d.today.sell, n: d.today.sellCount, tone: SELL },
+            ].map((r) => (
+              <div key={r.k} style={{ background: C.soft, borderRadius: R.control, padding: "9px 11px",
+                                      display: "flex", flexDirection: "column", gap: 2 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5,
+                               color: C.sub2, fontWeight: 600 }}>
+                  <span style={{ width: 9, height: 9, borderRadius: 2, background: r.tone }} />
+                  {r.k}
+                </span>
+                <span style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+                  <b style={{ fontSize: 18, fontWeight: 800, color: C.ink }}>{asPct(r.rel)}</b>
+                  <span style={{ fontSize: 11.5, color: C.sub }}>
+                    어제 <b style={{ fontFamily: MONO, color: C.ink }}>{usd(r.amt)}</b> · {cnt(r.n)}번
+                  </span>
                 </span>
               </div>
-              <span style={{ position: "relative", height: 14, background: C.soft, borderRadius: 3 }}>
-                <span style={{ position: "absolute", left: "50%", top: -3, bottom: -3, width: 1.5, background: C.marker }} />
-                <span style={{ position: "absolute", top: 3, height: 8, borderRadius: 2,
-                               left: right ? "50%" : `${50 - w}%`, width: `${Math.max(1, w)}%`, background: r.fill }} />
-              </span>
-              {/* 배수 아래에 실제 값을 붙인다 — 이게 두 카드를 합친 이유다. */}
-              <span style={{ fontSize: 11, color: C.sub2 }}>
-                어제 <b style={{ fontFamily: MONO, color: C.ink }}>{usd(r.amt)}</b> · {cnt(r.n)}번
-              </span>
-            </div>
-          );
-        })}
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: C.faint }}>
-          <span>덜 한다</span>
-          <span>평소</span>
-          <span>더 한다</span>
+            ))}
+          </div>
+        </div>
+
+        {/* ── 오른쪽 한 칸: 산 횟수. 원래 '어제 몇 번 샀나' 카드였다.
+            금액은 큰손 하나가 흔들 수 있지만 횟수는 못 흔든다 — 같은 질문의 다른 축이라
+            여기 붙는 게 맞다. */}
+        <div style={{ flex: "1 1 min(230px, 100%)", minWidth: 0, background: C.soft,
+                      borderRadius: R.control, padding: "11px 13px", display: "flex",
+                      flexDirection: "column", gap: 8 }}>
+          <span style={{ fontSize: 11.5, color: C.sub2, fontWeight: 600 }}>어제 산 횟수</span>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+            <b style={{ fontFamily: MONO, fontSize: 20, fontWeight: 800, color: C.ink,
+                        letterSpacing: "-0.02em" }}>{cnt(d.today.buyCount)}번</b>
+            <span style={{ fontSize: 11.5, color: C.sub }}>
+              {p >= 80 ? "훨씬 자주" : p >= 55 ? "조금 자주" : p >= 25 ? "평범하게" : "뜸하게"} 샀습니다
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 1.5, height: 52,
+                        marginTop: "auto" }}>
+            {spark.map((v, i) => (
+              <span key={i} style={{ flex: 1, height: `${Math.max(4, (v / sparkMax) * 100)}%`,
+                                     borderRadius: 1,
+                                     background: i === spark.length - 1 ? BUY : C.track }} />
+            ))}
+          </div>
+          <span style={{ fontSize: 10.5, color: C.faint }}>
+            최근 {spark.length}영업일 · 그중 상위 {Math.max(1, 100 - p)}%
+          </span>
         </div>
       </div>
     </>
@@ -281,93 +338,35 @@ function WhereFrom({ d }: { d: SeohakDaily }) {
   );
 }
 
-/* ── ⑦ 오늘 몇 명이 움직였나 ───────────────────────────────────────────
-   이 카드만 **건수**를 본다. 금액은 큰손 하나가 흔들 수 있지만 건수는 못 흔든다 —
-   1건당 평균이 $39,234 라 $1B 를 옮기려면 2만 5천 번을 눌러야 한다.
-
-   그림은 최근 60영업일을 그대로 세워 놓은 기둥이다. "오늘이 이 무리 안에서 어디쯤"이
-   질문이므로, 백분위 숫자만 쓰면 독자가 무리를 상상해야 한다. 무리를 그려 주고 오늘만
-   칠하면 상상할 게 없다. */
-function HowManyToday({ d }: { d: SeohakDaily }) {
-  const spark = d.countSpark;
-  const max = Math.max(...spark);
-  const median = [...spark].sort((a, b) => a - b)[Math.floor(spark.length / 2)];
-  const p = Math.round(d.countPercentile);
-  const vsMedian = Math.round((d.today.buyCount / median - 1) * 100);
-
-  return (
-    <>
-      <Verdict>
-        {p >= 80 ? (
-          <>평소보다 <Em>훨씬 자주</Em> 샀습니다</>
-        ) : p >= 55 ? (
-          <>평소보다 <Em>조금 많이</Em> 샀습니다</>
-        ) : p >= 25 ? (
-          <><Em>평범한 하루</Em>였습니다</>
-        ) : (
-          <>평소보다 <Em>조용한 하루</Em>였습니다</>
-        )}
-      </Verdict>
-
-      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-          <span style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>어제 산 횟수</span>
-          <span style={{ fontFamily: MONO, fontSize: 21, fontWeight: 800, color: C.ink,
-                         letterSpacing: "-0.02em" }}>{cnt(d.today.buyCount)}번</span>
-        </div>
-        {/* 60일 기둥. 중앙값 선을 하나 그어야 '높다·낮다'가 눈으로 판정된다. */}
-        <div style={{ position: "relative", display: "flex", alignItems: "flex-end",
-                      gap: 1.5, height: 46 }}>
-          <span aria-hidden style={{ position: "absolute", left: 0, right: 0,
-                                     bottom: `${(median / max) * 100}%`, height: 1,
-                                     background: C.line, zIndex: 1 }} />
-          {spark.map((v, i) => (
-            <span key={i} style={{ flex: 1, height: `${Math.max(4, (v / max) * 100)}%`,
-                                   borderRadius: 1,
-                                   background: i === spark.length - 1 ? C.blue : C.track }} />
-          ))}
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: C.faint }}>
-          <span>60영업일 전</span>
-          <span style={{ color: C.sub2, fontWeight: 700 }}>
-            중앙값보다 {Math.abs(vsMedian)}% {vsMedian >= 0 ? "많음" : "적음"}
-          </span>
-        </div>
-      </div>
-    </>
-  );
-}
-
 export function DailySection({ d }: { d: SeohakDaily }) {
   return (
-    <div style={CARD_GRID}>
-      <Card icon="swap_vert" title="평소와 얼마나 다른가"
-            desc="어제 사고판 양을 각각 평소와 견줍니다."
+    // 한 행짜리 카드 하나 + 반 칸짜리 둘. 셋을 같은 격자에 두면 첫 카드만 늘리려고
+    // gridColumn 을 손대야 하는데, 그 격자는 폭에 따라 열 수가 바뀌어 span 이 어긋난다
+    // (예전에 span 2 로 그렇게 깨졌다). 세로 흐름 + 안쪽 2열이 안 깨진다.
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <Card icon="show_chart" title="평소와 얼마나 다른가"
+            desc="어제 사고판 양과 산 횟수를, 각각 평소와 견줍니다."
             note="최근 20일"
-            foot={`'평소'는 앞뒤 반년의 중앙값입니다. 한 번 살 때 평균 $${Math.round(d.perTrade).toLocaleString("ko-KR")}.`}>
-        <DayVsUsual d={d} />
+            foot="'평소'는 앞뒤 반년의 중앙값입니다. 궤적의 한 점은 20영업일 창의 중앙값이라 하루치 등락이 아니라 흐름으로 읽습니다.">
+        <VsUsual d={d} />
       </Card>
 
-      <Card icon="compare_arrows" title="사자와 팔자의 결"
-            desc="사는 쪽과 파는 쪽이 어떻게 다르게 움직이는지입니다."
-            note="최근 20일"
-            foot="원천이 결제 건수라 사람 수가 아니라 거래 횟수입니다. 한 사람이 여러 번 눌렀을 수 있습니다.">
-        <BuyerVsSeller d={d} />
-      </Card>
+      <div style={{ display: "grid", gap: 14,
+                    gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))" }}>
+        <Card icon="compare_arrows" title="사자와 팔자의 결"
+              desc="사는 쪽과 파는 쪽이 어떻게 다르게 움직이는지입니다."
+              note="최근 20일"
+              foot="원천이 결제 건수라 사람 수가 아니라 거래 횟수입니다. 한 사람이 여러 번 눌렀을 수 있습니다.">
+          <BuyerVsSeller d={d} />
+        </Card>
 
-      <Card icon="savings" title="산 돈은 어디서 왔나"
-            desc="1년간 산 돈을 판 돈과 새로 넣은 돈으로 가릅니다."
-            note="최근 1년"
-            foot="산 돈에서 판 돈을 뺀 나머지가 새로 넣은 몫입니다. 합계로 갈라낸 값이라 누가 무슨 돈으로 샀는지는 아닙니다.">
-        <WhereFrom d={d} />
-      </Card>
-
-      <Card icon="bar_chart" title="어제 몇 번 샀나"
-            desc="금액 말고 산 횟수만 셉니다. 큰손 하나가 못 흔드는 값입니다."
-            note="최근 60일"
-            foot="원천이 결제 건수라 사람 수가 아니라 거래 횟수입니다.">
-        <HowManyToday d={d} />
-      </Card>
+        <Card icon="savings" title="산 돈은 어디서 왔나"
+              desc="1년간 산 돈을 판 돈과 새로 넣은 돈으로 가릅니다."
+              note="최근 1년"
+              foot="산 돈에서 판 돈을 뺀 나머지가 새로 넣은 몫입니다. 합계로 갈라낸 값이라 누가 무슨 돈으로 샀는지는 아닙니다.">
+          <WhereFrom d={d} />
+        </Card>
+      </div>
     </div>
   );
 }
