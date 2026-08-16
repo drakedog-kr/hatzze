@@ -254,61 +254,55 @@ function BuyerVsSeller({ d }: { d: SeohakDaily }) {
   );
 }
 
-/* ── ⑥ 쌓는 해인가, 빼는 해인가 ────────────────────────────────────────
-   ⚠️⚠️ **다섯 판을 갈아엎고서야 질문이 잘못됐다는 걸 알았다.**
+/* ── ⑥ 해마다 얼마가 들어왔나 ──────────────────────────────────────────
+   ⚠️⚠️ **일곱 판째다.** 6판(연도별 비율)까지 왔는데 "순매수가 순매도보다 많았다는
+   거야?" 라고 물어 왔다. 순매수와 순매도는 **별개 두 값이 아니라 같은 값의 부호**인데
+   그렇게 안 읽혔다.
 
-     1판 오간 돈과 남은 돈    분모가 매수+매도라 안 그려졌다
-     2판 새 돈은 얼마나 되나  '새 돈'을 지어냈다
-     3판 산 돈은 어디서 왔나  헤드라인이 근거(추론)를 넘었다
-     4판 사고판 끝에 얼마가   '늘어난 것'이 수익으로 읽혔다
-     5판 얼마나 사고팔았나    낱말은 맞는데 **"무슨 쓸모냐"**
+   원인이 둘이었다.
 
-   ⭐ 5판까지는 전부 "1년 치를 어떻게 말할까"를 고쳤는데, 진짜 문제는 **1년 치 정지된
-   숫자엔 쓸모가 없다**는 것이었다. 한 번 보면 끝이고 알고 나서 할 게 없다.
+   ① **한 카드에서 말을 세 가지로 썼다.** 축은 "순매수 ÷ 산 것", 결론은 "산 것의 8%가
+      쌓였습니다", 각주는 "산 것보다 판 것이 많았습니다". 셋 다 같은 얘긴데 낱말이 달라
+      독자가 서로 다른 값으로 읽는다.
+   ② **비율로 만든 게 또 영리한 척이었다.** 순매수를 매수액으로 나눈 값은 분모를 한 번
+      더 설명해야 한다. 금액 그대로면 설명이 필요 없다.
 
-   같은 값도 **여러 해를 나란히 놓으면 국면이 된다.** 실측하니 2020년엔 산 것의 18.1%가
-   쌓였는데 **2023년은 −2.1%, 즉 순매도였다** — 나스닥이 43% 오른 해에 판 것이 더
-   많았다. 정지된 숫자로는 절대 안 보이는 사실이고, 이게 이 카드의 쓸모다. */
-function AccumulateOrDrain({ years }: { years: SeohakYear[] }) {
-  const H = 120;
-  const lo = Math.min(-3, ...years.map((y) => y.netPct));
-  const hi = Math.max(3, ...years.map((y) => y.netPct));
-  const zero = (hi / (hi - lo)) * H;
+   ⭐ 이제 **말은 '순매수' 하나**, **값은 금액 그대로**. 음수인 해만 '순매도'라고 부른다. */
+function NetByYear({ years }: { years: SeohakYear[] }) {
+  const H = 118;
+  const peak = Math.max(...years.map((y) => Math.abs(y.net))) || 1;
+  const negs = years.filter((y) => y.net < 0);
+  const lowest = Math.min(...years.map((y) => y.net));
+  // 0 선의 자리. 음수 해가 없으면 바닥에 붙이고, 있으면 그 깊이만큼 자리를 남긴다.
+  const zero = lowest < 0 ? (peak / (peak + Math.abs(lowest))) * H : H - 14;
   const last = years[years.length - 1];
-  const drained = years.filter((y) => y.net < 0);
 
   return (
     <>
       <Verdict>
-        {last.netPct >= 0 ? (
-          <>올해는 산 것의 <Em>{last.netPct.toFixed(0)}%</Em>가 쌓였습니다</>
-        ) : (
-          <>올해는 <Em>판 것이 더 많습니다</Em></>
-        )}
+        올해는 지금까지 <Em>{usd(Math.abs(last.net))}</Em>{" "}
+        {last.net >= 0 ? "순매수" : "순매도"}입니다
       </Verdict>
 
-      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 7 }}>
-        {/* 0 선을 낀 막대. 위로 뻗으면 쌓은 해, 아래로 뻗으면 뺀 해다.
-            비율 하나만 그리므로 눈금도 범례도 필요 없다. */}
-        <div style={{ position: "relative", height: H, display: "flex", alignItems: "stretch",
-                      gap: 5 }}>
+      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ position: "relative", height: H, display: "flex", gap: 5 }}>
           <span aria-hidden style={{ position: "absolute", left: 0, right: 0, top: zero,
                                      height: 1, background: C.marker }} />
           {years.map((y) => {
-            const up = y.netPct >= 0;
-            const h = (Math.abs(y.netPct) / (hi - lo)) * H;
+            const up = y.net >= 0;
+            const h = Math.max(3, (Math.abs(y.net) / (peak + Math.max(0, -lowest))) * H);
             return (
               <div key={y.year} style={{ flex: 1, position: "relative", minWidth: 0 }}
-                   title={`${y.year} · 산 것 ${usd(y.buy)} · 순매수 ${usd(y.net)}`}>
+                   title={`${y.year} · 산 것 ${usd(y.buy)} · 판 것 ${usd(y.sell)}`}>
                 <span style={{ position: "absolute", left: 0, right: 0,
-                               top: up ? zero - h : zero, height: Math.max(3, h),
+                               top: up ? zero - h : zero, height: h,
                                background: up ? BUY : SELL, borderRadius: 3,
                                opacity: y.partial ? 0.45 : 1 }} />
                 <span style={{ position: "absolute", left: 0, right: 0,
-                               top: up ? zero - h - 15 : zero + h + 3, textAlign: "center",
-                               fontSize: 10.5, fontWeight: 800,
-                               color: up ? C.ink : SELL }}>
-                  {y.netPct >= 0 ? "" : "−"}{Math.abs(y.netPct).toFixed(0)}%
+                               top: up ? zero - h - 14 : zero + h + 2, textAlign: "center",
+                               fontSize: 10, fontWeight: 700, color: up ? C.sub : SELL,
+                               whiteSpace: "nowrap" }}>
+                  {usd(Math.abs(y.net))}
                 </span>
               </div>
             );
@@ -324,13 +318,13 @@ function AccumulateOrDrain({ years }: { years: SeohakYear[] }) {
         </div>
         <span style={{ fontSize: 11.5, color: C.sub2, paddingTop: 7,
                        borderTop: `1px solid ${C.line}` }}>
-          {drained.length > 0 ? (
+          {negs.length > 0 ? (
             <>
-              <b style={{ color: C.ink }}>{drained.map((y) => `${y.year}년`).join("·")}</b>은
-              산 것보다 판 것이 많았습니다
+              <b style={{ color: C.ink }}>{negs.map((y) => `${y.year}년`).join("·")}</b>은
+              순매도였습니다 — 그해엔 판 것이 더 많았습니다
             </>
           ) : (
-            <>이 구간 내내 산 것이 판 것보다 많았습니다</>
+            <>이 구간 내내 순매수였습니다</>
           )}
         </span>
       </div>
@@ -361,11 +355,11 @@ export function DailySection({ d, years }: { d: SeohakDaily; years: SeohakYear[]
         </Card>
 
         {years && (
-          <Card icon="savings" title="쌓는 해인가, 빼는 해인가"
-                desc="해마다 산 것 중 순매수가 얼마였는지입니다."
+          <Card icon="savings" title="해마다 얼마가 들어왔나"
+                desc="산 금액에서 판 금액을 뺀 순매수입니다."
                 note={`${years[0].year}~`}
                 foot="순매수는 수익이 아니라 '얼마를 더 넣었나'입니다. 옅은 막대는 아직 안 끝난 해입니다.">
-            <AccumulateOrDrain years={years} />
+            <NetByYear years={years} />
           </Card>
         )}
       </div>
