@@ -121,12 +121,28 @@ export type SeohakDaily = {
   /** 최근 40영업일 궤적(꼬리). 오늘이 마지막. */
   trail: { date: string; buy: number; sell: number }[];
 
-  /** ── 사람 수와 덩어리 ── */
-  countRatio: number; // 매도건수 ÷ 매수건수. 1보다 작으면 사는 사람이 더 많다
+  /** ── 사자와 팔자의 결 ──
+   *  비율만 두면 화면이 "75% × 113%" 같은 식을 쓰게 된다. 곱셈은 읽는 사람에게
+   *  일을 시키는 것이라, 양쪽의 **실제 값**도 같이 담아 나란히 견주게 한다. */
+  countRatio: number; // 매도건수 ÷ 매수건수. 1보다 작으면 사는 횟수가 더 많다
   sizeRatio: number; // 매도 1건 ÷ 매수 1건. 1보다 크면 파는 쪽이 큰 덩어리
+  flow20: { buyCount: number; sellCount: number; buyPer: number; sellPer: number };
 
-  /** ── 회전 ── */
-  turnover: { days: number; gross: number; net: number; offsetPct: number };
+  /**
+   * ── 새 돈 ──
+   * `gross`(매수+매도)를 분모로 쓰면 "오간 돈의 5%"가 되는데, 매수와 매도를 더한 값은
+   * 머릿속에 안 그려진다. **산 돈을 분모로** 두면 "산 것 중 새 돈이 얼마"가 되어
+   * 한 문장으로 읽힌다. 둘 다 담아 두고 화면은 buy 쪽을 쓴다.
+   */
+  turnover: {
+    days: number;
+    buy: number;
+    sell: number;
+    gross: number;
+    net: number;
+    /** 순매수 ÷ 산 돈. "산 것 중 새로 들어온 몫". */
+    newMoneyPct: number;
+  };
 
   /** ── 오늘 몇 명 ── */
   countPercentile: number; // 받아 온 구간 안에서의 백분위
@@ -177,8 +193,10 @@ export async function getSeohakDaily(): Promise<SeohakDaily> {
   // 회전 — 받아 온 구간의 마지막 250영업일(약 1년).
   const yearFrom = Math.max(0, rows.length - 250);
   const year = rows.slice(yearFrom);
-  const grossSum = year.reduce((s, r) => s + r.buy + r.sell, 0);
-  const netSum = year.reduce((s, r) => s + r.buy - r.sell, 0);
+  const yearBuy = year.reduce((s, r) => s + r.buy, 0);
+  const yearSell = year.reduce((s, r) => s + r.sell, 0);
+  const grossSum = yearBuy + yearSell;
+  const netSum = yearBuy - yearSell;
 
   // 매수 건수의 백분위. 받아 온 구간(약 2년) 안에서만 잰다 — 32년 전체로 재려면
   // 전량조회가 필요한데, 카드가 말하는 건 "요즘 대비 오늘"이라 이 창이면 충분하다.
@@ -203,9 +221,19 @@ export async function getSeohakDaily(): Promise<SeohakDaily> {
       (win20.reduce((s, r) => s + r.buy, 0) / win20.reduce((s, r) => s + r.buyCount, 0)),
     turnover: {
       days: year.length,
+      buy: yearBuy,
+      sell: yearSell,
       gross: grossSum,
       net: netSum,
-      offsetPct: grossSum ? (1 - Math.abs(netSum) / grossSum) * 100 : 0,
+      newMoneyPct: yearBuy ? (netSum / yearBuy) * 100 : 0,
+    },
+    flow20: {
+      buyCount: win20.reduce((s, r) => s + r.buyCount, 0),
+      sellCount: win20.reduce((s, r) => s + r.sellCount, 0),
+      buyPer:
+        win20.reduce((s, r) => s + r.buy, 0) / (win20.reduce((s, r) => s + r.buyCount, 0) || 1),
+      sellPer:
+        win20.reduce((s, r) => s + r.sell, 0) / (win20.reduce((s, r) => s + r.sellCount, 0) || 1),
     },
     countPercentile: (rank / counts.length) * 100,
     countVsUsual: (() => {

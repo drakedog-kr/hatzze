@@ -1,4 +1,5 @@
-import { CALENDAR_WINDOWS, SIZE_RATIO_TYPICAL, type SeohakDaily } from "@/lib/seohak-daily";
+import { type SeohakDaily } from "@/lib/seohak-daily";
+import { BUY, SELL } from "./tone";
 import { C, Icon, MONO, R } from "../ui";
 
 /**
@@ -105,8 +106,8 @@ export const CARD_GRID: React.CSSProperties = {
    여기서만 할 수 있는 말은 '평소와 견주면' 쪽이다. */
 function DayVsUsual({ d }: { d: SeohakDaily }) {
   const rows = [
-    { k: "사는 양", rel: d.regime.buy, amt: d.today.buy, n: d.today.buyCount, fill: C.blue },
-    { k: "파는 양", rel: d.regime.sell, amt: d.today.sell, n: d.today.sellCount, fill: C.marker },
+    { k: "사는 양", rel: d.regime.buy, amt: d.today.buy, n: d.today.buyCount, fill: BUY },
+    { k: "파는 양", rel: d.regime.sell, amt: d.today.sell, n: d.today.sellCount, fill: SELL },
   ];
   const span = Math.max(0.2, ...rows.map((r) => Math.abs(r.rel - 1))) * 1.2;
   const up = (v: number) => v >= 1;
@@ -159,94 +160,116 @@ function DayVsUsual({ d }: { d: SeohakDaily }) {
   );
 }
 
-/* ── ⑤ 사람 수와 덩어리 ─────────────────────────────────────────────────
-   두 숫자를 나란히 놓기만 했더니 "그래서 뭐"가 됐다. 사실 이 둘은 나란한 게 아니라
-   **곱하면 판 돈÷산 돈이 되는 분해**다.
+/* ── ⑤ 사자와 팔자의 결 ─────────────────────────────────────────────────
+   ⚠️⚠️ 앞 판은 **곱셈 항등식**이었다 — "판 돈은 산 돈의 85% = 파는 횟수 75% × 한 번의
+   크기 113%". 수식으로는 우아한데 "왜 곱하기가 있는지 모르겠다"를 받았다.
 
-       판 돈 ÷ 산 돈 = (파는 횟수 ÷ 사는 횟수) × (한 번 팔 때 ÷ 한 번 살 때)
+   맞는 지적이다. 곱셈은 **읽는 사람에게 일을 시킨다.** 게다가 "75%"가 무엇의 75%인지
+   화면에 없었다(사는 횟수의). 제목의 '사람'도 틀렸다 — 원천은 결제 건수다.
 
-   항등식이라 눈금을 맞출 필요도 없다(같은 20일 창의 합계로 계산한다). 그래서 "파는
-   쪽이 적다"가 **횟수가 적어서인지 덩어리가 작아서인지**를 그림이 바로 답한다. */
-function CountVsSize({ d }: { d: SeohakDaily }) {
-  const countPct = Math.round(d.countRatio * 100);
-  const sizePct = Math.round(d.sizeRatio * 100);
-  const totalPct = Math.round(d.sellBuy * 100);
-  const typicalPct = Math.round(SIZE_RATIO_TYPICAL * 100);
-
-  // 어느 쪽이 더 크게 벌어졌나. 결론 문장을 여기서 고른다.
-  const countDev = Math.abs(d.countRatio - 1);
-  const sizeDev = Math.abs(d.sizeRatio - 1);
-  const verdict =
-    countDev >= sizeDev ? (
-      d.countRatio < 1 ? (
-        <>파는 쪽은 <Em>횟수가 적을 뿐</Em>입니다</>
-      ) : (
-        <>파는 <Em>횟수가 더 많습니다</Em></>
-      )
-    ) : d.sizeRatio > 1 ? (
-      <><Em>적은 사람이 크게</Em> 팝니다</>
-    ) : (
-      <>파는 쪽이 <Em>더 잘게 나눠</Em> 팝니다</>
-    );
-
-  const Factor = ({ label, value, note, accent }: {
-    label: string; value: number; note: string; accent?: boolean;
-  }) => (
-    <div style={{ background: C.soft, borderRadius: R.control, padding: "9px 10px",
-                  display: "flex", flexDirection: "column", gap: 1 }}>
-      <span style={{ fontSize: 10.5, color: C.sub2, fontWeight: 600 }}>{label}</span>
-      <span style={{ fontFamily: MONO, fontSize: 19, fontWeight: 800,
-                     color: accent ? C.blue : C.ink, letterSpacing: "-0.02em" }}>
-        {value}%
-      </span>
-      <span style={{ fontSize: 10, color: C.faint }}>{note}</span>
-    </div>
-  );
+   그래서 식을 버리고 **양쪽을 나란히 놓는다.** 횟수는 사자가 길고 크기는 팔자가 긴,
+   서로 엇갈리는 두 줄이 곧 결론이다. 곱하지 않아도 눈이 먼저 읽는다. */
+function BuyerVsSeller({ d }: { d: SeohakDaily }) {
+  const f = d.flow20;
+  const rows = [
+    {
+      k: "몇 번",
+      unit: "번",
+      buy: f.buyCount,
+      sell: f.sellCount,
+      fmt: (v: number) => cnt(Math.round(v)),
+    },
+    {
+      k: "한 번에 얼마",
+      unit: "",
+      buy: f.buyPer,
+      sell: f.sellPer,
+      fmt: (v: number) => `$${Math.round(v).toLocaleString("ko-KR")}`,
+    },
+  ];
+  const bigger = d.sizeRatio >= 1;
+  const fewer = d.countRatio < 1;
 
   return (
     <>
-      <Verdict>{verdict}</Verdict>
+      <Verdict>
+        파는 쪽은 <Em>{fewer ? "더 뜸하게" : "더 자주"}, {bigger ? "더 크게" : "더 잘게"}</Em> 움직입니다
+      </Verdict>
 
-      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 9 }}>
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between",
-                      gap: 8, paddingBottom: 8, borderBottom: `1px solid ${C.line}` }}>
-          <span style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>판 돈은 산 돈의</span>
-          <span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 800, color: C.ink,
-                         letterSpacing: "-0.02em" }}>{totalPct}%</span>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 7, alignItems: "center" }}>
-          <Factor label="파는 횟수" value={countPct} note="사는 횟수 대비"
-                  accent={countDev >= sizeDev} />
-          <span style={{ fontSize: 13, fontWeight: 800, color: C.faint }}>×</span>
-          <Factor label="한 번의 크기" value={sizePct} note={`평소 ${typicalPct}%`}
-                  accent={sizeDev > countDev} />
-        </div>
+      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
+        {rows.map((r) => {
+          const max = Math.max(r.buy, r.sell) || 1;
+          return (
+            <div key={r.k} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ fontSize: 11.5, color: C.sub2, fontWeight: 600 }}>{r.k}</span>
+              {[
+                { label: "사는 쪽", v: r.buy, tone: BUY },
+                { label: "파는 쪽", v: r.sell, tone: SELL },
+              ].map((side) => (
+                <div key={side.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ flex: "0 0 46px", fontSize: 11.5, color: C.label }}>{side.label}</span>
+                  <span style={{ flex: 1, height: 10, background: C.soft, borderRadius: 3,
+                                 overflow: "hidden" }}>
+                    <span style={{ display: "block", height: "100%", borderRadius: 3,
+                                   width: `${(side.v / max) * 100}%`, background: side.tone }} />
+                  </span>
+                  <b style={{ flex: "0 0 66px", textAlign: "right", fontFamily: MONO, fontSize: 12,
+                              fontWeight: 800, color: C.ink }}>
+                    {r.fmt(side.v)}{r.unit}
+                  </b>
+                </div>
+              ))}
+            </div>
+          );
+        })}
       </div>
     </>
   );
 }
 
-/* ── ⑥ 오간 돈과 남은 돈 ──────────────────────────────────────────────── */
-function Turnover({ d }: { d: SeohakDaily }) {
-  const netPct = d.turnover.gross ? (Math.abs(d.turnover.net) / d.turnover.gross) * 100 : 0;
+/* ── ⑥ 새 돈은 얼마나 되나 ──────────────────────────────────────────────
+   ⚠️⚠️ 앞 판은 "1년간 $650.94B이 오갔는데 실제로 늘어난 건 $33.74B" 였고 "무슨 뜻인지
+   하나도 모르겠다"를 받았다.
+
+   범인은 **분모**다. '오간 돈'은 매수와 매도를 더한 값인데, 그 합은 머릿속에 안
+   그려진다(사는 것과 파는 것을 왜 더하나). 분모를 **산 돈**으로 바꾸면 그대로 한
+   문장이 된다 — "1년간 $342B를 샀는데 그중 새 돈은 $34B, 나머지는 판 돈으로 다시 산 것".
+
+   그림도 하나뿐이다: 산 돈 막대를 새 돈과 되산 돈으로 가른다. */
+function NewMoney({ d }: { d: SeohakDaily }) {
+  const t = d.turnover;
+  const newPct = Math.max(0, Math.min(100, t.newMoneyPct));
+  const recycled = Math.max(0, t.buy - Math.max(0, t.net));
+
   return (
     <>
       <Verdict>
-        1년간 <Em>{usd(d.turnover.gross)}</Em>이 오갔는데
-        <br />
-        실제로 늘어난 건 <Em>{usd(d.turnover.net)}</Em>입니다
+        1년간 산 돈의 <Em>{newPct.toFixed(0)}%</Em>만 새로 들어온 돈입니다
       </Verdict>
-      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={{ height: 30, background: C.bar, borderRadius: 5, overflow: "hidden", position: "relative" }}>
-          <span style={{ position: "absolute", left: 0, top: 0, bottom: 0,
-                         width: `${Math.max(2, netPct)}%`, background: C.blue }} />
+
+      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 9 }}>
+        <div style={{ display: "flex", height: 30, gap: 2 }}>
+          <span style={{ width: `${Math.max(3, newPct)}%`, background: BUY, borderRadius: 3 }} />
+          <span style={{ flex: 1, background: C.track, borderRadius: 3 }} />
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, color: C.sub }}>
-          <span>
-            늘어난 몫 <b style={{ color: C.ink }}>{netPct.toFixed(1)}%</b>
-          </span>
-          <span style={{ color: C.sub2 }}>나머지는 사고판 것이 서로 상쇄</span>
-        </div>
+        <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex",
+                     flexDirection: "column", gap: 6 }}>
+          {[
+            { c: BUY, k: "새로 들어온 돈", v: usd(Math.max(0, t.net)), n: "순매수" },
+            { c: C.track, k: "판 돈으로 다시 산 것", v: usd(recycled), n: "같은 돈이 도는 몫" },
+          ].map((r) => (
+            <li key={r.k} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 11.5 }}>
+              <span style={{ width: 9, height: 9, borderRadius: 2, background: r.c, flexShrink: 0 }} />
+              <span style={{ color: C.sub }}>{r.k}</span>
+              <span style={{ marginLeft: "auto", color: C.faint, fontSize: 10 }}>{r.n}</span>
+              <b style={{ fontFamily: MONO, color: C.ink, minWidth: 62, textAlign: "right" }}>{r.v}</b>
+            </li>
+          ))}
+        </ul>
+        <span style={{ fontSize: 11, color: C.sub2, paddingTop: 6,
+                       borderTop: `1px solid ${C.line}` }}>
+          {t.days}거래일 동안 <b style={{ fontFamily: MONO, color: C.ink }}>{usd(t.buy)}</b>어치를 샀습니다
+        </span>
       </div>
     </>
   );
@@ -270,7 +293,7 @@ function HowManyToday({ d }: { d: SeohakDaily }) {
     <>
       <Verdict>
         {p >= 80 ? (
-          <><Em>평소보다 훨씬 많은</Em> 사람이 샀습니다</>
+          <>평소보다 <Em>훨씬 자주</Em> 샀습니다</>
         ) : p >= 55 ? (
           <>평소보다 <Em>조금 많이</Em> 샀습니다</>
         ) : p >= 25 ? (
@@ -319,24 +342,24 @@ export function DailySection({ d }: { d: SeohakDaily }) {
         <DayVsUsual d={d} />
       </Card>
 
-      <Card icon="groups" title="사는 사람과 파는 사람"
-            desc="판 돈이 산 돈보다 적은 까닭을 둘로 쪼갭니다."
+      <Card icon="compare_arrows" title="사자와 팔자의 결"
+            desc="사는 쪽과 파는 쪽이 어떻게 다르게 움직이는지입니다."
             note="최근 20일"
-            foot="두 값을 곱하면 위의 비율이 됩니다. 결제 건수라 사람 수가 아니라 거래 횟수입니다.">
-        <CountVsSize d={d} />
+            foot="원천이 결제 건수라 사람 수가 아니라 거래 횟수입니다. 한 사람이 여러 번 눌렀을 수 있습니다.">
+        <BuyerVsSeller d={d} />
       </Card>
 
-      <Card icon="sync" title="오간 돈과 남은 돈"
-            desc="사고판 금액을 다 더한 것과, 그 차이입니다."
+      <Card icon="savings" title="새 돈은 얼마나 되나"
+            desc="1년간 산 돈 중 실제로 새로 들어온 몫입니다."
             note="최근 1년"
-            foot="같은 돈이 사고팔리며 여러 번 오갑니다.">
-        <Turnover d={d} />
+            foot="나머지는 갖고 있던 것을 판 돈으로 다시 산 것입니다. 같은 돈이 여러 번 돕니다.">
+        <NewMoney d={d} />
       </Card>
 
-      <Card icon="bar_chart" title="오늘 몇 명이 움직였나"
+      <Card icon="bar_chart" title="어제 몇 번 샀나"
             desc="금액 말고 산 횟수만 셉니다. 큰손 하나가 못 흔드는 값입니다."
             note="최근 60일"
-            foot="결제 건수라 사람 수가 아니라 거래 횟수입니다.">
+            foot="원천이 결제 건수라 사람 수가 아니라 거래 횟수입니다.">
         <HowManyToday d={d} />
       </Card>
     </div>
