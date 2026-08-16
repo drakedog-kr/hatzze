@@ -253,54 +253,56 @@ function BuyerVsSeller({ d }: { d: SeohakDaily }) {
   );
 }
 
-/* ── ⑥ 산 돈은 어디서 왔나 ──────────────────────────────────────────────
-   ⚠️⚠️ 두 판을 갈아엎었다.
+/* ── ⑥ 사고판 끝에 얼마가 늘었나 ────────────────────────────────────────
+   ⚠️⚠️ **세 판을 갈아엎었다. 말이 아니라 주장이 문제였다.**
 
-   1판 "오간 돈과 남은 돈" — 분모가 매수+매도라 **머릿속에 안 그려졌다.** 사는 것과
-   파는 것을 왜 더하나.
-   2판 "새 돈은 얼마나 되나" — 분모는 고쳤는데 **'새 돈'이라는 말을 내가 지어냈다.**
-   "새 돈이 무슨 뜻이냐"를 받았다. 스스로 설명이 안 되는 이름이었다.
+   1판 "오간 돈과 남은 돈"  — 분모가 매수+매도라 머릿속에 안 그려졌다
+   2판 "새 돈은 얼마나 되나" — '새 돈'을 내가 지어냈다
+   3판 "산 돈은 어디서 왔나" — 또 "이해가 안 간다"
 
-   ⭐ 고쳐 놓고 보니 질문이 잘못돼 있었다. 이 데이터가 답하는 건 "얼마인가"가 아니라
-   **"산 돈이 어디서 왔나"** 다. 그렇게 물으면 두 조각이 저절로 서로를 설명한다 —
-   갖고 있던 걸 판 돈이거나, 새로 넣은 돈이거나. 둘뿐이고 겹치지 않는다.
+   ⭐ 3판의 진짜 문제는 낱말이 아니었다. **"산 돈의 90%는 판 돈이었다"는 관찰이 아니라
+   추론**이다. 실제로 본 건 매수 총액과 매도 총액 둘뿐이고, 사람들이 판 돈으로 다시
+   샀는지 새로 넣고 따로 빼 갔는지는 이 자료로 알 수 없다. 각주에 "누가 무슨 돈으로
+   샀는지는 아닙니다"라고 적어 둔 것 자체가 **헤드라인이 근거를 넘었다는 자백**이었다.
+   독자는 그 틈을 느낀다.
 
-   ⚠️ 합계에서 갈라낸 값이지 개인별 자금 출처가 아니다. 각주가 그걸 밝힌다. */
-function WhereFrom({ d }: { d: SeohakDaily }) {
+   그래서 **잰 것만 말한다.** 산 것 · 판 것 · 그 차이, 셋 다 실측이고 셋째는 앞 둘의
+   뺄셈이다. 같은 자 위에 막대 셋을 세우면 마지막 막대가 얼마나 짧은지가 곧 메시지다. */
+function AfterAllThat({ d }: { d: SeohakDaily }) {
   const t = d.turnover;
-  const fresh = Math.max(0, t.net);
-  const recycled = Math.max(0, t.buy - fresh);
-  const freshPct = t.buy ? (fresh / t.buy) * 100 : 0;
+  const net = t.buy - t.sell;
+  const rows = [
+    { k: "산 것", v: t.buy, tone: BUY },
+    { k: "판 것", v: t.sell, tone: SELL },
+    { k: "늘어난 것", v: Math.abs(net), tone: C.ink, strong: true },
+  ];
+  const max = Math.max(...rows.map((r) => r.v)) || 1;
+  const times = net ? Math.round(t.buy / Math.abs(net)) : 0;
 
   return (
     <>
       <Verdict>
-        산 돈의 <Em>{(100 - freshPct).toFixed(0)}%</Em>는 갖고 있던 걸 판 돈이었습니다
+        1년간 산 것의 <Em>{times}분의 1</Em>만 실제로 늘었습니다
       </Verdict>
 
-      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 9 }}>
-        <div style={{ display: "flex", height: 30, gap: 2 }}>
-          <span style={{ flex: 1, background: C.track, borderRadius: 3 }} />
-          <span style={{ width: `${Math.max(3, freshPct)}%`, background: BUY, borderRadius: 3 }} />
-        </div>
-        <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex",
-                     flexDirection: "column", gap: 6 }}>
-          {[
-            { c: C.track, k: "갖고 있던 걸 판 돈", v: usd(recycled), n: `${(100 - freshPct).toFixed(0)}%` },
-            { c: BUY, k: "새로 넣은 돈", v: usd(fresh), n: `${freshPct.toFixed(0)}%` },
-          ].map((r) => (
-            <li key={r.k} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 11.5 }}>
-              <span style={{ width: 9, height: 9, borderRadius: 2, background: r.c, flexShrink: 0 }} />
-              <span style={{ color: C.sub }}>{r.k}</span>
-              <span style={{ marginLeft: "auto", color: C.faint, fontSize: 10 }}>{r.n}</span>
-              <b style={{ fontFamily: MONO, color: C.ink, minWidth: 62, textAlign: "right" }}>{r.v}</b>
-            </li>
-          ))}
-        </ul>
-        <span style={{ fontSize: 11, color: C.sub2, paddingTop: 6,
+      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 11 }}>
+        {rows.map((r) => (
+          <div key={r.k} style={{ display: "flex", alignItems: "center", gap: 9 }}>
+            <span style={{ flex: "0 0 58px", fontSize: 12, color: r.strong ? C.ink : C.label,
+                           fontWeight: r.strong ? 800 : 600 }}>{r.k}</span>
+            <span style={{ flex: 1, height: 14, background: C.soft, borderRadius: 3,
+                           overflow: "hidden" }}>
+              <span style={{ display: "block", height: "100%", borderRadius: 3,
+                             width: `${Math.max(1.5, (r.v / max) * 100)}%`, background: r.tone }} />
+            </span>
+            <b style={{ flex: "0 0 74px", textAlign: "right", fontFamily: MONO, fontSize: 13,
+                        fontWeight: 800, color: C.ink }}>{usd(r.v)}</b>
+          </div>
+        ))}
+        <span style={{ fontSize: 11.5, color: C.sub2, paddingTop: 7,
                        borderTop: `1px solid ${C.line}` }}>
-          {t.days}거래일 동안 <b style={{ fontFamily: MONO, color: C.ink }}>{usd(t.buy)}</b>어치를 사고{" "}
-          <b style={{ fontFamily: MONO, color: C.ink }}>{usd(t.sell)}</b>어치를 팔았습니다
+          {t.days}거래일 동안 {net >= 0 ? "산 것이 판 것보다" : "판 것이 산 것보다"}{" "}
+          <b style={{ fontFamily: MONO, color: C.ink }}>{usd(Math.abs(net))}</b> 많았습니다
         </span>
       </div>
     </>
@@ -329,11 +331,11 @@ export function DailySection({ d }: { d: SeohakDaily }) {
           <BuyerVsSeller d={d} />
         </Card>
 
-        <Card icon="savings" title="산 돈은 어디서 왔나"
-              desc="1년간 산 돈을 판 돈과 새로 넣은 돈으로 가릅니다."
+        <Card icon="savings" title="사고판 끝에 얼마가 늘었나"
+              desc="1년간 사고판 금액과, 그 차이입니다."
               note="최근 1년"
-              foot="산 돈에서 판 돈을 뺀 나머지가 새로 넣은 몫입니다. 합계로 갈라낸 값이라 누가 무슨 돈으로 샀는지는 아닙니다.">
-          <WhereFrom d={d} />
+              foot="'늘어난 것'은 산 것에서 판 것을 뺀 값입니다. 셋 다 예탁결제원 결제 금액입니다.">
+          <AfterAllThat d={d} />
         </Card>
       </div>
     </div>
