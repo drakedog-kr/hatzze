@@ -45,8 +45,6 @@ const T = { big: 20, body: 12, tiny: 10 } as const;
 
 /** "M/D" — 달력 안이라 연도는 군더더기다. */
 const dayLabel = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8))}`;
-/** "YYYY/M/D" — 32년을 오가는 줄에는 연도가 있어야 한다. 구분자는 `dayLabel` 과 맞춘다. */
-const fullLabel = (date: string) => `${date.slice(0, 4)}/${dayLabel(date)}`;
 /** 간격도 4의 배수 넷으로만. */
 const S = { xs: 4, sm: 8, md: 12, lg: 16 } as const;
 /** 모서리 넷 — 마크 2 · 달력 칸 4 · 상자 R.control · 알약 R.pill. 그 밖의 값은 쓰지 않는다. */
@@ -116,23 +114,28 @@ type RowSpec = { k: string; n: string; v: string; on?: () => void };
  *
  * ⭐ 값을 `−19%` 가 아니라 **"평소보다 19% 덜 삽니다"** 로 낸다. 부호를 말로 풀면
  * 방향을 되짚을 일이 없다. 그리고 진짜 값은 % 가 아니라 **횟수**다 — 17번 중 16번과
- * 17번 중 12번은 같은 −33% 라도 전혀 다른 이야기다. 그래서 횟수를 크게 둔다.
+ * 12번은 같은 −33% 라도 전혀 다른 이야기다.
+ *
+ * ⛔ **해마다의 성패를 17칸으로 그려 봤다가 즉시 뺐다.** 폭 546px 에 17칸이면 한 칸이
+ * 28px 이라, 여섯 줄이 모이니 줄무늬 밭이 된다("눈 아프다"). 정보는 맞았지만 이 카드가
+ * 낼 잉크의 양이 아니었다. 근거는 상수 머리말에 글자로 남겼다.
  */
 function WindowRow({ w, onJump }: { w: (typeof CALENDAR_WINDOWS)[number]; onJump: () => void }) {
   // 우연 기준선(17번 중 11번)을 넘어야 잉크를 준다. 아래면 흐리게 둬서 눈이 안 멈춘다.
   const strong = w.hit / w.of >= 0.85;
   return (
     <button type="button" onClick={onJump} className="hz-jump"
-            style={{ display: "flex", flexDirection: "column", gap: 2, width: "100%",
+            style={{ display: "flex", flexDirection: "column", gap: S.xs, width: "100%",
                      border: "none", cursor: "pointer", font: "inherit", textAlign: "left" }}>
-      <span style={{ display: "flex", alignItems: "baseline", gap: S.sm, width: "100%" }}>
+      <span style={{ display: "flex", alignItems: "baseline", gap: S.sm, width: "100%",
+                     flexWrap: "wrap" }}>
         <b style={{ fontSize: T.body, color: C.ink }}>{w.label}</b>
+        <span style={{ fontSize: T.body, color: C.sub }}>{w.phrase}</span>
         <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: T.tiny,
                        color: C.faint, flexShrink: 0 }}>
           {w.of}번 중 <b style={{ color: strong ? C.ink : C.sub2 }}>{w.hit}번</b>
         </span>
       </span>
-      <span style={{ fontSize: T.body, color: C.sub }}>{w.phrase}</span>
     </button>
   );
 }
@@ -248,21 +251,6 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
       (a, d) => (!a || Math.abs(d.net) > Math.abs(a.net) ? d : a), null);
     setPicked(pick ? pick.date : last[0]);
   };
-
-  /**
-   * 기록 줄을 눌렀을 때 달력을 그 날로 옮기는 손잡이. **받아 둔 24개월 안일 때만** 준다.
-   *
-   * 32년 기록이라 1994년처럼 달력이 못 가는 날이 섞인다. 그런 줄은 버튼이 아니라
-   * 그냥 글로 남는다(밑줄이 없어져서 눌러도 되는지 손이 먼저 안다). 32년치를 다 실어
-   * 어디든 가게도 해 봤는데, 열 배열로 눌러도 브로틀리 82KB 라(지금 16.5KB) 접었다.
-   */
-  const jumpable = (date: string) =>
-    byDate.has(date)
-      ? () => {
-          setMonth(date.slice(0, 7));
-          setPicked(date);
-        }
-      : undefined;
 
   const goMonth = (by: number) => {
     const next = shiftMonth(month, by);
@@ -525,40 +513,13 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
               )}
             </div>
 
-            {/* 오른쪽 칸 — 32년 기록.
-                ⭐ 왼쪽 두 상자와 **줄 라벨을 일부러 겹쳐 뒀다**('가장 많이 산 날'·'가장
-                많이 판 날'). 같은 말이 이 달과 32년에 나란히 있어야 지금이 어느 만큼인지
-                한눈에 잡힌다. 그래서 이 칸도 왼쪽과 같은 순매수를 쓴다 — 여기만 총액으로
-                재면 같은 라벨이 다른 뜻이 된다.
-                ⚠️ '가장 바빴던 날'의 값만 금액이 아니라 횟수다. 단위(번)가 달라 금액과
-                섞여 읽힐 일이 없어서 이 줄만 예외로 둔다. */}
-            {c.records && (
-              <div style={{ flex: "2 1 min(420px, 100%)", minWidth: 0, display: "flex" }}>
+            {/* 오른쪽 칸 — 되풀이되는 때 한 판.
+                ⭐ 한때 위에 '역대 기록'(가장 많이 산 날 등) 세 줄이 함께 있었다. 실측이라
+                틀릴 게 없었지만 이 시트가 하려는 말과는 무관해서 뺐다 — 여기는 '되풀이'를
+                말하는 자리고, 최대·최소는 되풀이가 아니다. */}
+            <div style={{ flex: "2 1 min(420px, 100%)", minWidth: 0, display: "flex" }}>
                 <Card>
-                  <Group
-                    head="역대 기록"
-                    rows={[
-                      {
-                        k: "가장 많이 산 날", n: fullLabel(c.records.topBuy.date),
-                        v: `+${usd(Math.abs(c.records.topBuy.value))}`,
-                        on: jumpable(c.records.topBuy.date),
-                      },
-                      {
-                        k: "가장 많이 판 날", n: fullLabel(c.records.topSell.date),
-                        v: `−${usd(Math.abs(c.records.topSell.value))}`,
-                        on: jumpable(c.records.topSell.date),
-                      },
-                      {
-                        k: "가장 바빴던 날", n: fullLabel(c.records.busiest.date),
-                        v: `${cnt(c.records.busiest.value)}번`,
-                        on: jumpable(c.records.busiest.date),
-                      },
-                    ]}
-                  />
-                  {/* marginTop:auto — 이 묶음의 마지막 줄을 옆 카드(고른 날)의 마지막 줄과
-                      같은 높이에 앉힌다. 카드 둘의 바닥이 이미 맞아 있으니, 아래에 붙이면
-                      가로 열이 저절로 선다. */}
-                  <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: S.sm }}>
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: S.sm }}>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: S.xs,
                                    fontSize: T.body, color: C.sub2, fontWeight: 600 }}>
                       해마다 되풀이되는 때
@@ -569,10 +530,12 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                         <Icon name="help" style={{ fontSize: 12, color: C.hint }} />
                       </span>
                     </span>
-                    {/* 여덟 줄이라 한 줄에 둘씩. 칸이 190px 아래로 좁아지면 한 줄로 접힌다. */}
-                    <ul style={{ listStyle: "none", margin: 0, padding: "8px 0 0", display: "grid",
-                                 gridTemplateColumns: "repeat(auto-fit, minmax(min(190px, 100%), 1fr))",
-                                 gap: S.sm, columnGap: S.md,
+                    {/* 카드를 통째로 쓰게 되면서 한 열로 편다. 줄마다 해마다의 칸이 붙어
+                        가로로 길어야 하고, `space-between` 이 남는 높이를 줄 사이로 고르게
+                        나눠 마지막 줄이 옆 카드의 마지막 줄과 같은 높이에 앉는다. */}
+                    <ul style={{ listStyle: "none", margin: 0, padding: "10px 0 0", flex: 1,
+                                 display: "flex", flexDirection: "column",
+                                 justifyContent: "space-between",
                                  borderTop: `1px solid ${C.line}` }}>
                       {CALENDAR_WINDOWS.map((w) => (
                         <li key={w.key}>
@@ -582,8 +545,7 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                     </ul>
                   </div>
                 </Card>
-              </div>
-            )}
+            </div>
           </div>
         </div>
       </div>

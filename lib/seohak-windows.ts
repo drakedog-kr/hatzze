@@ -61,6 +61,12 @@ export type CalendarWindow = {
   /** `of` 해 중 `hit` 해가 같은 방향이었다. 이게 이 카드의 근거다. */
   hit: number;
   of: number;
+  /**
+   * 2010년부터 해마다 한 글자 — `1` 같은 방향 · `0` 아니었다 · `-` 자료 없음.
+   * 화면이 이걸 칸으로 그린다. `hit`·`of` 는 여기서 세면 나오지만, 손으로 적어 두면
+   * 둘이 어긋날 때 바로 보이므로 일부러 따로 둔다.
+   */
+  marks: string;
   pick: Pick;
 };
 
@@ -89,17 +95,23 @@ type Pick =
  */
 export const CALENDAR_WINDOWS: CalendarWindow[] = [
   { key: "newyear", label: "새해 첫 사흘", phrase: "평소보다 33% 덜 삽니다",
-    hit: 17, of: 17, pick: { at: "yearStart" } },
+    hit: 17, of: 17, marks: "11111111111111111",
+    pick: { at: "yearStart" } },
   { key: "seol", label: "설날 기간", phrase: "평소보다 19% 덜 팝니다",
-    hit: 12, of: 17, pick: { at: "after", on: "seol" } },
+    hit: 12, of: 17, marks: "11011011101001111",
+    pick: { at: "after", on: "seol" } },
   { key: "feb", label: "2월 첫 보름", phrase: "평소보다 13% 더 삽니다",
-    hit: 14, of: 17, pick: { at: "range", from: "02-01", to: "02-15" } },
+    hit: 14, of: 17, marks: "11101111111101011",
+    pick: { at: "range", from: "02-01", to: "02-15" } },
   { key: "chuseok", label: "추석 기간", phrase: "평소보다 17% 덜 팝니다",
-    hit: 12, of: 16, pick: { at: "after", on: "chuseok" } },
+    hit: 12, of: 16, marks: "1100110111111110-",
+    pick: { at: "after", on: "chuseok" } },
   { key: "blackfriday", label: "블랙프라이데이 직후", phrase: "평소보다 17% 덜 삽니다",
-    hit: 14, of: 16, pick: { at: "after", on: "blackFriday" } },
+    hit: 14, of: 16, marks: "1101111111011111-",
+    pick: { at: "after", on: "blackFriday" } },
   { key: "yearend", label: "그해 마지막 사흘", phrase: "평소보다 29% 더 팝니다",
-    hit: 14, of: 16, pick: { at: "yearEnd" } },
+    hit: 14, of: 16, marks: "1011011111111111-",
+    pick: { at: "yearEnd" } },
 ];
 
 /** 우연이라도 이만큼은 같은 방향으로 나온다. 화면 각주가 인용한다. */
