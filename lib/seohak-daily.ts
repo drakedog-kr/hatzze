@@ -132,8 +132,10 @@ export type SeohakDaily = {
    * 시간이 지나도 다시 안 바뀐다.
    */
   recent: { date: string; buy: number; sell: number }[];
+  /** 화면이 그리는 계열 — 하루 금액을 `usual` 로 나눈 뒤 5일 평균한 값(%). */
+  recentPct: { date: string; buy: number; sell: number }[];
   /** '평소' — 받아 온 구간(약 2년) 일별 금액의 중앙값. 고정 창이라 값이 안 흔들린다. */
-  usual: { buy: number; sell: number };
+  usual: { buy: number; sell: number; buyCount: number };
   /**
    * 최근 20영업일이 '평소'의 몇 %인가.
    *
@@ -142,7 +144,7 @@ export type SeohakDaily = {
    * 긋고 옆 숫자는 regime 을 쓰면 **같은 '평소'라는 말이 두 기준을 가리킨다.**
    * 그래서 화면용 비율은 여기서 `usual` 하나로 낸다.
    */
-  vsUsual: { buy: number; sell: number };
+  vsUsual: { buy: number; sell: number; buyCount: number };
 
   /** ── 사자와 팔자의 결 ──
    *  비율만 두면 화면이 "75% × 113%" 같은 식을 쓰게 된다. 곱셈은 읽는 사람에게
@@ -211,11 +213,18 @@ export async function getSeohakDaily(): Promise<SeohakDaily> {
   // 화면에 그릴 원자료. 120영업일이면 약 반년이라 계절 한 바퀴가 안 들어가도
   // "요즘"의 모양은 다 담긴다.
   const recent = rows.slice(-120).map((r) => ({ date: r.date, buy: r.buy, sell: r.sell }));
-  const usual = { buy: median(buys), sell: median(sells) };
+  const usual = {
+    buy: median(buys),
+    sell: median(sells),
+    buyCount: median(rows.map((r) => r.buyCount)),
+  };
   const last20 = rows.slice(-WINDOW);
   const vsUsual = {
     buy: usual.buy ? (median(last20.map((r) => r.buy)) / usual.buy) * 100 : 100,
     sell: usual.sell ? (median(last20.map((r) => r.sell)) / usual.sell) * 100 : 100,
+    buyCount: usual.buyCount
+      ? (median(last20.map((r) => r.buyCount)) / usual.buyCount) * 100
+      : 100,
   };
 
   // 회전 — 받아 온 구간의 마지막 250영업일(약 1년).
@@ -241,6 +250,17 @@ export async function getSeohakDaily(): Promise<SeohakDaily> {
     perTrade: t.buyCount ? t.buy / t.buyCount : 0,
     regime: { name, buy: relBuy, sell: relSell },
     recent,
+    // 화면은 '평소의 몇 %' 한 가지 언어만 쓴다. 그림의 세로축도 옆 숫자도 같은 자다.
+    // 5일 평균은 한 번만 씌운다 — 두 번 평활하면 모양이 사라진다.
+    recentPct: recent.map((r, i, arr) => {
+      const w = arr.slice(Math.max(0, i - 4), i + 1);
+      const avg = (k: "buy" | "sell") => w.reduce((s2, x) => s2 + x[k], 0) / w.length;
+      return {
+        date: r.date,
+        buy: usual.buy ? (avg("buy") / usual.buy) * 100 : 100,
+        sell: usual.sell ? (avg("sell") / usual.sell) * 100 : 100,
+      };
+    }),
     usual,
     vsUsual,
     countRatio:

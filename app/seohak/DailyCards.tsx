@@ -95,64 +95,44 @@ export const CARD_GRID: React.CSSProperties = {
 };
 
 /* ── ① 평소와 얼마나 다른가 (한 행 전체) ──────────────────────────────
-   ⚠️⚠️ **앞 판의 선 그림을 버렸다.** 두 가지가 틀렸다.
+   ⚠️⚠️ **네 번째 판이다.** 앞의 셋이 각각 이렇게 실패했다.
 
-   ① **모양이 없었다.** 매수와 매도는 둘 다 전체 활동량에 끌려 상관이 높은데, 거기에
-      20일 중앙값을 씌우니 두 번 평활된 선이 되어 나란히 흐를 뿐이었다. 선 두 개를
-      그렸지만 사실상 한 줄을 두 번 그린 셈이다.
-   ② **나중에 값이 바뀌었다.** 기준이 ±60영업일 중앙값이라 최근 날짜는 뒤쪽 절반이
-      아직 없다. 실측 262표본에서 **65%가 5%p 넘게** 달라졌다.
+   1판 두 줄짜리 배수 선 — 두 번 평활돼 모양이 없었고, 기준(±60일)이 나중에 바뀌었다.
+   2판 거울 막대 240개 — "눈 아프다".
+   3판 옅은 띠 + 5일 평균선 — 차분해졌지만 **여전히 지저분했다.** 띠 2 + 선 2 + 점선 2 +
+       라벨 2 + 축까지 아홉 덩어리였다. 게다가 옆 스파크라인은 기준점이 없어 뜻이 없었다.
 
-   그래서 **원자료로 돌아간다.** 하루하루 실제 금액은 튀어서 모양이 있고, '평소'를
-   2년 고정 창의 중앙값으로 두면 값이 다시 안 바뀐다.
+   ⭐ 근본 원인은 **내가 데이터를 자랑하고 있었다**는 것이다. 이 카드가 하는 말은 하나다 —
+   "요즘 사는 양은 평소의 88%, 파는 양은 63%".
 
-   ⭐ 위로 빨강(산 금액) 아래로 파랑(판 금액)인 **거울 막대**다. 하루가 위아래 한 쌍이라
-   그날의 균형이 그대로 보이고, 양쪽에 그은 '평소' 선 덕분에 "요즘은 선 아래"가 눈으로
-   판정된다. 배수도 창도 설명할 필요가 없다. */
+   그래서 **'평소의 몇 %' 한 가지 언어로 통일한다.** 세로축도, 옆 숫자 셋도 같은 자다.
+   그림에 남는 건 기준선 하나 + 선 둘 + 끝점 둘, 다섯뿐이다. 스파크라인은 지웠다 —
+   횟수도 같은 언어의 숫자 하나로 말하면 그림이 필요 없다. */
 function VsUsual({ d }: { d: SeohakDaily }) {
-  const r = d.recent;
+  const r = d.recentPct;
   const W = 1000;
-  // 거울로 세로를 반씩 나눠 쓰므로 한쪽 몫이 절반뿐이다. 132 면 실제 렌더가 66px 이라
-  // '평소' 선과 데이터가 겹쳐 아무것도 안 읽힌다.
-  const H = 230;
-  const MID = H / 2;
-  const peak = Math.max(...r.flatMap((x) => [x.buy, x.sell]), d.usual.buy, d.usual.sell) || 1;
+  const H = 170;
+  const PAD = { t: 16, b: 22, l: 0, r: 0 };
+  const vals = r.flatMap((p) => [p.buy, p.sell]);
+  // 축은 늘 100(평소)을 품는다. 안 그러면 기준선이 밖으로 나가 '평소의 %'가 뜻을 잃는다.
+  const lo = Math.min(100, ...vals) * 0.96;
+  const hi = Math.max(100, ...vals) * 1.04;
   const x = (i: number) => (i / Math.max(1, r.length - 1)) * W;
-  const h = (v: number) => (v / peak) * (MID - 14);
+  const y = (v: number) => H - PAD.b - ((v - lo) / (hi - lo)) * (H - PAD.t - PAD.b);
+  const path = (k: "buy" | "sell") =>
+    r.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p[k]).toFixed(1)}`).join("");
 
-  /** 5영업일 이동평균. 원자료는 옅은 면으로 깔고 눈이 따라갈 선은 이걸로 그린다. */
-  const smooth = (key: "buy" | "sell") =>
-    r.map((_, i) => {
-      const w = r.slice(Math.max(0, i - 4), i + 1).map((p) => p[key]);
-      return w.reduce((a, b) => a + b, 0) / w.length;
-    });
-  /** 원자료 띠. 가운데 축에서 시작해 값을 따라 갔다가 축으로 돌아온다. */
-  const band = (key: "buy" | "sell", dir: -1 | 1) =>
-    `M0,${MID}` +
-    r.map((p, i) => `L${x(i).toFixed(1)},${(MID + dir * h(p[key])).toFixed(1)}`).join("") +
-    `L${W},${MID}Z`;
-  const trend = (vals: number[], dir: -1 | 1) =>
-    vals.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${(MID + dir * h(v)).toFixed(1)}`).join("");
-
-  // ⚠️ regime(±60일 정규화)이 아니라 vsUsual 을 쓴다. 그림의 '평소' 선과 같은 기준이라야
-  // 같은 말이 두 가지를 가리키지 않는다.
-  const buyPct = d.vsUsual.buy;
-  const sellPct = d.vsUsual.sell;
-  const spark = d.countSpark;
-  const sparkMax = Math.max(...spark);
-  const sparkMin = Math.min(...spark);
-  const sparkY = (v: number) => 34 - ((v - sparkMin) / (sparkMax - sparkMin || 1)) * 30;
-  const sparkPath = spark
-    .map((v, i) => `${i ? "L" : "M"}${((i / (spark.length - 1)) * 200).toFixed(1)},${sparkY(v).toFixed(1)}`)
-    .join("");
-  const p = Math.round(d.countPercentile);
-
+  const tiles = [
+    { k: "사는 양", v: d.vsUsual.buy, tone: BUY, sub: `어제 ${usd(d.today.buy)}` },
+    { k: "파는 양", v: d.vsUsual.sell, tone: SELL, sub: `어제 ${usd(d.today.sell)}` },
+    { k: "산 횟수", v: d.vsUsual.buyCount, tone: C.marker, sub: `어제 ${cnt(d.today.buyCount)}번` },
+  ];
   const up = (v: number) => v >= 100;
-  const verdict = up(buyPct) && up(sellPct) ? (
+  const verdict = up(d.vsUsual.buy) && up(d.vsUsual.sell) ? (
     <>요즘 <Em>사는 것도 파는 것도 평소보다 많습니다</Em></>
-  ) : !up(buyPct) && !up(sellPct) ? (
+  ) : !up(d.vsUsual.buy) && !up(d.vsUsual.sell) ? (
     <>요즘 <Em>사는 것도 파는 것도 평소보다 적습니다</Em></>
-  ) : up(buyPct) ? (
+  ) : up(d.vsUsual.buy) ? (
     <><Em>사는 쪽만</Em> 평소보다 많습니다</>
   ) : (
     <><Em>파는 쪽만</Em> 평소보다 많습니다</>
@@ -163,96 +143,43 @@ function VsUsual({ d }: { d: SeohakDaily }) {
       <Verdict>{verdict}</Verdict>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 18 }}>
-        <div style={{ flex: "2 1 min(420px, 100%)", minWidth: 0, display: "flex",
-                      flexDirection: "column", gap: 6 }}>
+        <div style={{ flex: "2 1 min(400px, 100%)", minWidth: 0 }}>
           <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}
-               role="img" aria-label="최근 반년의 산 금액과 판 금액 흐름">
-            {/* ⚠️ 막대 240개를 최대 채도로 그렸더니 "눈 아프다"를 받았다. 잉크가 너무
-                많았다 — 마디마다 같은 목소리로 외치면 눈이 쉴 데가 없다.
-                원자료는 **옅은 띠**로 깔아 결만 남기고, 눈이 따라갈 선은 5일 평균
-                하나씩만 또렷하게 둔다(dataviz 의 '얇은 마크·물러선 배경'). */}
-            <path d={band("buy", -1)} fill={BUY} opacity={0.18} />
-            <path d={band("sell", 1)} fill={SELL} opacity={0.18} />
-            <path d={trend(smooth("buy"), -1)} fill="none" stroke={BUY} strokeWidth={2}
-                  strokeLinejoin="round" strokeLinecap="round" />
-            <path d={trend(smooth("sell"), 1)} fill="none" stroke={SELL} strokeWidth={2}
-                  strokeLinejoin="round" strokeLinecap="round" />
-            {/* '평소' 선. 데이터가 아니라 자라서 점선으로 둔다. 2년 고정 창의 중앙값이라
-                시간이 지나도 이 자리가 다시 안 바뀐다. */}
-            {/* '평소' 선 둘. 이 그림의 핵심이라 막대에 묻히면 안 된다 — 라벨을 오른쪽
-                끝에 카드색 판을 깔고 얹어 막대 위에서도 읽히게 한다. */}
-            {[
-              { y: MID - h(d.usual.buy), t: "평소 산 금액", anchor: -1 },
-              { y: MID + h(d.usual.sell), t: "평소 판 금액", anchor: 1 },
-            ].map((g) => (
-              <g key={g.t}>
-                <line x1={0} x2={W} y1={g.y} y2={g.y} stroke={C.ink} strokeWidth={1.5}
-                      strokeDasharray="6 4" opacity={0.7} />
-                <rect x={W - 122} y={g.y + (g.anchor < 0 ? -19 : 3)} width={118} height={16}
-                      fill={C.card} rx={3} opacity={0.9} />
-                <text x={W - 6} y={g.y + (g.anchor < 0 ? -7 : 15)} fontSize={13} fill={C.sub}
-                      textAnchor="end" fontWeight={700}>{g.t}</text>
-              </g>
+               role="img" aria-label="사는 양과 파는 양이 평소의 몇 %인지, 최근 반년">
+            <line x1={0} x2={W} y1={y(100)} y2={y(100)} stroke={C.marker} strokeWidth={1.5} />
+            <text x={0} y={y(100) - 7} fontSize={14} fill={C.sub2} fontWeight={700}>평소</text>
+            {(["sell", "buy"] as const).map((k) => (
+              <path key={k} d={path(k)} fill="none" stroke={k === "buy" ? BUY : SELL}
+                    strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
             ))}
-            <line x1={0} x2={W} y1={MID} y2={MID} stroke={C.line} strokeWidth={1} />
+            {(["sell", "buy"] as const).map((k) => (
+              <circle key={k} cx={W} cy={y(r[r.length - 1][k])} r={5}
+                      fill={k === "buy" ? BUY : SELL} stroke={C.card} strokeWidth={2} />
+            ))}
+            <text x={0} y={H - 4} fontSize={13} fill={C.faint}>
+              {r[0]?.date.slice(0, 7).replace("-", "년 ")}월
+            </text>
+            <text x={W} y={H - 4} fontSize={13} fill={C.faint} textAnchor="end">어제</text>
           </svg>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11,
-                        color: C.faint }}>
-            <span>{r[0]?.date.slice(0, 7).replace("-", "년 ")}월</span>
-            <span>{r.length}거래일 · 진한 선은 5일 평균</span>
-            <span>어제</span>
-          </div>
         </div>
 
-        {/* 오른쪽 한 칸 — 요약 셋. 그림이 '언제'를 말하고 여기가 '얼마나'를 말한다. */}
-        <div style={{ flex: "1 1 min(220px, 100%)", minWidth: 0, display: "flex",
+        <div style={{ flex: "1 1 min(210px, 100%)", minWidth: 0, display: "flex",
                       flexDirection: "column", gap: 8 }}>
-          {[
-            { k: "사는 양", v: buyPct, tone: BUY },
-            { k: "파는 양", v: sellPct, tone: SELL },
-          ].map((t) => (
-            <div key={t.k} style={{ background: C.soft, borderRadius: R.control, padding: "9px 11px",
-                                    display: "flex", alignItems: "baseline", gap: 8 }}>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5,
-                             color: C.sub2, fontWeight: 600 }}>
-                <span style={{ width: 9, height: 9, borderRadius: 2, background: t.tone }} />
-                {t.k}
+          {tiles.map((t) => (
+            <div key={t.k} style={{ background: C.soft, borderRadius: R.control, padding: "10px 12px",
+                                    display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ width: 9, height: 9, borderRadius: 2, background: t.tone, flexShrink: 0 }} />
+              <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                <span style={{ fontSize: 12, color: C.label, fontWeight: 700 }}>{t.k}</span>
+                <span style={{ fontSize: 10.5, color: C.faint }}>{t.sub}</span>
               </span>
-              <span style={{ marginLeft: "auto", display: "flex", alignItems: "baseline", gap: 5 }}>
-                <b style={{ fontFamily: MONO, fontSize: 18, fontWeight: 800, color: C.ink }}>
-                  {Math.round(t.v)}%
-                </b>
-                <span style={{ fontSize: 11, color: C.faint }}>평소의</span>
+              <span style={{ marginLeft: "auto", display: "flex", alignItems: "baseline", gap: 4 }}>
+                <b style={{ fontFamily: MONO, fontSize: 20, fontWeight: 800, color: C.ink,
+                            letterSpacing: "-0.02em" }}>{Math.round(t.v)}%</b>
+                <span style={{ fontSize: 10.5, color: C.faint }}>평소의</span>
               </span>
             </div>
           ))}
-          <div style={{ background: C.soft, borderRadius: R.control, padding: "9px 11px",
-                        display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-            <span style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <span style={{ fontSize: 11.5, color: C.sub2, fontWeight: 600 }}>어제 산 횟수</span>
-              <b style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 16, fontWeight: 800,
-                          color: C.ink }}>{cnt(d.today.buyCount)}번</b>
-            </span>
-            {/* 위 그림과 같은 병을 앓고 있었다 — 비슷한 높이의 막대 60개가 회색 덩어리
-                하나로 보였다. 선 하나로 바꾸고 어제만 점으로 짚는다. */}
-            {/* ⚠️ preserveAspectRatio="none" 이 필요하다. viewBox 비율(200:38)과 고정
-                높이(38px)가 싸우면 기본값 meet 이 200px 로 줄여 **가운데 정렬**해 버린다 —
-                선이 칸 한복판에만 뜨고 양옆이 빈다. 스파크라인은 가로로 늘어나야 한다. */}
-            <svg viewBox="0 0 200 38" preserveAspectRatio="none"
-                 style={{ width: "100%", height: 38, display: "block", marginTop: "auto" }}
-                 role="img" aria-label="최근 60영업일 산 횟수">
-              <path d={sparkPath} fill="none" stroke={C.marker} strokeWidth={1.5}
-                    vectorEffect="non-scaling-stroke"
-                    strokeLinejoin="round" strokeLinecap="round" />
-              {/* 늘어난 좌표계에서 원은 타원이 된다. 마지막 점은 세로 획으로 짚는다. */}
-              <line x1={199} x2={199} y1={sparkY(spark[spark.length - 1]) - 4}
-                    y2={sparkY(spark[spark.length - 1]) + 4} stroke={BUY} strokeWidth={3}
-                    vectorEffect="non-scaling-stroke" strokeLinecap="round" />
-            </svg>
-            <span style={{ fontSize: 10.5, color: C.faint }}>
-              최근 {spark.length}영업일 중 {p >= 50 ? "많은" : "적은"} 쪽 {Math.max(1, p >= 50 ? 100 - p : p)}%
-            </span>
-          </div>
         </div>
       </div>
     </>
@@ -387,9 +314,9 @@ export function DailySection({ d }: { d: SeohakDaily }) {
     // (예전에 span 2 로 그렇게 깨졌다). 세로 흐름 + 안쪽 2열이 안 깨진다.
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <Card icon="show_chart" title="평소와 얼마나 다른가"
-            desc="반년치를 하루씩 세워, 요즘 사고파는 양이 평소와 얼마나 다른지 봅니다."
+            desc="사고파는 양이 평소의 몇 %인지, 반년치를 봅니다."
             note="최근 6개월"
-            foot="옅은 띠가 하루씩 실제 결제된 금액이고 진한 선은 5일 평균입니다. '평소'는 최근 2년 하루 금액의 중앙값이라, 시간이 지나도 이 선의 자리가 다시 바뀌지 않습니다.">
+            foot="'평소'는 최근 2년 하루 값의 중앙값이라 시간이 지나도 자리가 안 바뀝니다. 선은 5일 평균입니다.">
         <VsUsual d={d} />
       </Card>
 
