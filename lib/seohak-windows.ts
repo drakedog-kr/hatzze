@@ -94,8 +94,6 @@ export const CALENDAR_WINDOWS: CalendarWindow[] = [
     hit: 12, of: 17, pick: { at: "after", on: "seol" } },
   { key: "feb", label: "2월 첫 보름", phrase: "평소보다 13% 더 삽니다",
     hit: 14, of: 17, pick: { at: "range", from: "02-01", to: "02-15" } },
-  { key: "june", label: "6월 마지막 주", phrase: "평소보다 8% 더 팝니다",
-    hit: 13, of: 17, pick: { at: "range", from: "06-25", to: "06-30" } },
   { key: "chuseok", label: "추석 기간", phrase: "평소보다 17% 덜 팝니다",
     hit: 12, of: 16, pick: { at: "after", on: "chuseok" } },
   { key: "blackfriday", label: "블랙프라이데이 직후", phrase: "평소보다 17% 덜 삽니다",
