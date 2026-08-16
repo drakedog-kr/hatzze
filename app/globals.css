@@ -2497,6 +2497,21 @@ main.hz-scroll { overflow-x: clip; }
   background: var(--c-hover);
 }
 
+/* 서학 달력의 '눌러서 그 날로 간다' 줄. 목록 간격이 4px 로 촘촘해서 .hz-row-link 의
+   여백(7/9)을 쓰면 위아래 줄의 호버 바탕이 맞붙어 한 덩어리로 보인다. 여기만 얇게 둔다.
+   ⚠️ 바탕을 인라인 style 로 주면 안 된다 — 인라인이 :hover 를 이겨 하이라이트가 통째로
+   안 먹는다(.hz-pick 주석과 같은 함정). background 는 이 클래스에만 있다. */
+.hz-jump {
+  background: none;
+  padding: 3px 6px;
+  margin: -3px -6px;
+  border-radius: var(--r-control);
+  transition: background 0.12s ease;
+}
+.hz-jump:hover {
+  background: var(--c-hover);
+}
+
 /* 종목 검색 드롭다운의 항목 — 고르면 그 종목이 열리는 자리라, 회색 호버 대신 파란 틴트로
    "이게 지금 걸려 있다"를 짚어 준다. 카더라의 목록 행들도 .hz-row-link 를 쓰므로 클래스를
    통째로 바꾸지 않고 여기서만 덮는다.

@@ -81,7 +81,7 @@ function PrincipalVsValue({ series }: { series: SeohakOverview["series"] }) {
   });
 
   return (
-    <div style={{ padding: "14px 18px 6px" }}>
+    <div style={{ padding: "14px 22px 6px" }}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }} role="img" aria-label="원금과 평가액 추이">
         {/* 두 선 사이를 채워 손익을 면적으로 보인다. 파랑 tint 라 선보다 뒤로 앉는다. */}
         <path d={area} fill={C.blueTint} />
@@ -138,7 +138,7 @@ function CohortRow({ c, maxInflow }: { c: Cohort; maxInflow: number }) {
         gridTemplateColumns: "44px 1fr 76px 62px",
         alignItems: "center",
         gap: 10,
-        padding: "9px 18px",
+        padding: "9px 22px",
         borderTop: `1px solid ${C.sheetRow}`,
       }}
     >
@@ -184,7 +184,7 @@ function MonthlyBars({ rows }: { rows: SeohakOverview["breakdown"]["rows"] }) {
   };
 
   return (
-    <div style={{ padding: "6px 18px 8px" }}>
+    <div style={{ padding: "6px 22px 8px" }}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }} role="img" aria-label="월별 순매수와 평가변동">
         <line x1={0} y1={zero} x2={W} y2={zero} stroke={C.marker} strokeWidth={1} />
         {rows.map((r, i) => {
@@ -234,7 +234,7 @@ function BarRow({
           : "minmax(0, 168px) minmax(24px, 1fr) 82px",
         alignItems: "center",
         gap: 10,
-        padding: "9px 18px",
+        padding: "9px 22px",
         borderTop: `1px solid ${C.sheetRow}`,
       }}
     >
@@ -328,7 +328,7 @@ export default async function SeohakPage() {
             flexWrap: "wrap",
             gap: 22,
             alignItems: "baseline",
-            padding: "16px 18px 4px",
+            padding: "16px 22px 4px",
           }}
         >
           <div>
@@ -378,7 +378,7 @@ export default async function SeohakPage() {
                 display: "grid",
                 gridTemplateColumns: "44px 1fr 76px 62px",
                 gap: 10,
-                padding: "4px 18px 8px",
+                padding: "4px 22px 8px",
                 fontSize: 11,
                 color: C.faint,
               }}
@@ -411,7 +411,7 @@ export default async function SeohakPage() {
               desc="잔고만 보면 둘을 구분할 수 없습니다. 새로 넣은 돈과 평가액 변동을 갈라 놓습니다."
               note={`최근 ${ov.breakdown.months}개월`}
             />
-            <div style={{ display: "flex", gap: 0, padding: "16px 18px 10px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 0, padding: "16px 22px 10px", flexWrap: "wrap" }}>
               <div style={{ flex: "1 1 150px" }}>
                 <div style={{ fontSize: 11.5, color: C.sub2, marginBottom: 3 }}>새로 넣은 돈</div>
                 <div style={{ fontSize: 24, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>

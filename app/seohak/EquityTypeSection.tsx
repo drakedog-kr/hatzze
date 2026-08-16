@@ -72,7 +72,7 @@ export function EquityTypeSection({ e }: { e: SeohakEquityType }) {
         note={`${latest.year}-06 기준`}
       />
 
-      <div style={{ padding: "14px 18px 4px", display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ padding: "14px 22px 4px", display: "flex", flexDirection: "column", gap: 16 }}>
         {/* ── 오늘의 3분할 ── */}
         {/* 칸 사이 2px 틈. 색이 갈려 있어도 경계가 있어야 '세 조각'으로 읽힌다(dataviz 규격). */}
         <div style={{ display: "flex", height: 34, gap: 2 }}>
@@ -109,7 +109,7 @@ export function EquityTypeSection({ e }: { e: SeohakEquityType }) {
       {/* ── 열두 해의 흐름. 한국 옆에 전 세계를 나란히 둔다 ──
           한국만 보면 2021년 급증을 '조사 분류가 바뀌었나'로 읽게 된다. 같은 해 전 세계가
           가만히 있었다는 대조가 있어야 한국인의 실제 변화라고 말할 수 있다. */}
-      <div style={{ padding: "6px 18px 4px", display: "grid", gap: 18,
+      <div style={{ padding: "6px 22px 4px", display: "grid", gap: 18,
                     gridTemplateColumns: "repeat(auto-fit, minmax(min(300px, 100%), 1fr))" }}>
         {[
           { title: "대한민국", rows: e.series, dim: false },

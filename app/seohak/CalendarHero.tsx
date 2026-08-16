@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 import type { CalendarDay, SeohakCalendar } from "@/lib/seohak-calendar";
-import { CALENDAR_WINDOWS, nextWindow, windowsInMonth } from "@/lib/seohak-windows";
+import { CALENDAR_WINDOWS, windowsInMonth } from "@/lib/seohak-windows";
 import { SectionHead } from "../kadera/SectionHead";
 import { BUY, SELL } from "./tone";
 import { C, Icon, MONO, R } from "../ui";
@@ -34,12 +34,14 @@ import { C, Icon, MONO, R } from "../ui";
  * 규칙이 안 보여서 화면이 지저분해진다.
  *
  *   big  20   금액 큰 숫자
- *   head 13.5 소제목·강조 문장
  *   body 12   라벨·값·목록
- *   sub  11   보조 설명
- *   tiny 10   달력 날짜·요일·축·범례
+ *   tiny 10   달력 날짜·요일·구간 띠·보조·범례
+ *
+ * ⭐ 처음엔 다섯이었다(13.5 소제목 · 11 보조를 더 뒀다). 조판을 정리하고 나니 그 둘을
+ * 쓰는 자리가 하나도 안 남았다 — **자에 눈금이 있으면 언젠가 누가 쓴다.** 안 쓰는 눈금은
+ * 지운다. 시트 머리(18·14·12.5)는 `SectionHead` 것이라 여기 자가 아니다.
  */
-const T = { big: 20, head: 13.5, body: 12, sub: 11, tiny: 10 } as const;
+const T = { big: 20, body: 12, tiny: 10 } as const;
 
 /** "M/D" — 달력 안이라 연도는 군더더기다. */
 const dayLabel = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8))}`;
@@ -127,9 +129,8 @@ function Row({ k, n, v, on }: { k: string; n: string; v: string; on?: () => void
     display: "flex", alignItems: "baseline", gap: S.sm, width: "100%",
   };
   return on ? (
-    <button type="button" onClick={on}
-            style={{ ...style, border: "none", background: "none", padding: 0,
-                     cursor: "pointer", font: "inherit" }}>
+    <button type="button" onClick={on} className="hz-jump"
+            style={{ ...style, border: "none", cursor: "pointer", font: "inherit" }}>
       {body}
     </button>
   ) : (
@@ -160,8 +161,7 @@ function Group({ head, rows }: { head?: string; rows: (RowSpec | null | undefine
 function Card({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ flex: 1, minWidth: 0, background: C.soft, borderRadius: R.control, padding: 12,
-                  display: "flex", flexDirection: "column", gap: S.md,
-                  justifyContent: "space-between" }}>
+                  display: "flex", flexDirection: "column", gap: S.md }}>
       {children}
     </div>
   );
@@ -254,8 +254,6 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
     const inNext = c.days.filter((d) => d.date.startsWith(next));
     if (inNext.length) setPicked(inNext[inNext.length - 1].date);
   };
-  // 오늘 다음에 오는 구간. 구간 없는 달에서 이 화면의 값진 것을 지킨다.
-  const ahead = useMemo(() => nextWindow(new Date(`${c.asOf}T00:00:00Z`)), [c.asOf]);
   /**
    * 그 구간을 **볼 수 있는** 달. 다음 블랙프라이데이는 2026-11 인데 그 달은 아직
    * 자료가 없어서, 눌러서 가면 달력이 텅 빈다. 받아 둔 구간 안에서 같은 달 중
@@ -267,7 +265,6 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
   );
   const sampleMonthFor = (month: number) =>
     loadedMonths.filter((m) => m.endsWith(`-${String(month).padStart(2, "0")}`)).pop();
-  const aheadSample = ahead ? sampleMonthFor(ahead.window.from[0]) : undefined;
 
   const cells: (number | null)[] = [
     ...Array.from({ length: meta.firstWeekday }, () => null),
@@ -288,22 +285,23 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
         icon="calendar_month"
         title="해마다 되풀이되는 날들"
         desc="해마다 같은 때가 오면 더 사거나 더 팝니다. 칸은 그날 실제 매매입니다."
-        note={`${meta.year}년 ${meta.month}월`}
-        /* 원래 시트 바닥에 네 줄짜리 각주로 있었다. 중요한 단서인데 그 길이로 깔려
-           있으니 시트 전체의 가독성을 깎았다 — 읽는 사람은 매번 넘기고, 정작 필요할
-           때는 못 찾는다. 제목 옆 물음표로 옮겨 **찾을 때만 열리게** 한다.
-           ⚠️ 핵심 한정("국내 증권사를 거쳐")은 툴팁에 숨기지 않고 위 desc 에 남긴다 —
-           툴팁은 hover 라 모바일에서 안 열린다. */
-        noteHelp="예탁결제원을 거친 매매만 잡힙니다. 글로벌 수탁은행을 직접 쓰는 대형 기관이 빠져서, 미 재무부가 집계한 한국의 순매수보다 늘 작습니다(연간 20~71%). 결제일 기준이라 거래일보다 하루 늦고, 아래 구간은 2015~2026 을 모아 잰 값입니다."
+        note={`${c.asOf} 기준`}
+        /* 원래 시트 바닥에 네 줄짜리 각주였고, 그다음엔 여기 툴팁에 세 문장이 들어갔다.
+           둘 다 길어서 안 읽힌다. 툴팁은 **한 문장이 넘으면 툴팁이 아니다** — 열어 놓고
+           읽어야 하는 순간 각주로 돌아간 것이다.
+           ⭐ 세 문장 중 남길 건 하나뿐이었다. 결제일 하루 지연과 구간 표본 기간은
+           화면에 이미 있거나(달력 날짜 · 카드) 읽는 데 걸림돌이 아니다. 대형 기관이
+           빠진다는 것만 숫자를 바꿔 읽게 만든다. */
+        noteHelp="국내 증권사를 거친 결제만 잡혀서, 수탁은행을 직접 쓰는 대형 기관은 빠져 있습니다."
       />
 
       {/* 달력 1칸 · 설명 2칸.
           처음엔 반대(달력 2칸)로 뒀는데 달력만 커 보였다. 달력은 '어느 날을 고를까'를
           묻는 손잡이라 작아도 되고, 정작 읽을 것은 고른 날의 내용이다. 반응 스트립도
           아래 별도 줄에서 오른쪽으로 들여 세로를 줄였다. */}
-      <div style={{ display: "flex", flexWrap: "wrap", padding: "12px 18px 0", gap: S.lg }}>
+      <div style={{ display: "flex", flexWrap: "wrap", padding: "12px 22px 18px", gap: S.lg }}>
         {/* ── 왼쪽 한 칸: 달력 ── */}
-        <div style={{ flex: "1 1 290px", minWidth: 0, display: "flex",
+        <div style={{ flex: "1 1 250px", minWidth: 0, display: "flex",
                       flexDirection: "column", gap: S.sm }}>
           <div style={{ display: "flex", alignItems: "center", gap: S.xs }}>
             {[-1, 1].map((by) => {
@@ -332,6 +330,21 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
             </span>
           </div>
 
+          {/* 그달에 걸치는 구간. 구글 캘린더의 종일 일정처럼 격자 **바로 위**에 둔다.
+              ⭐ 앞서 오른쪽 칸에 파란 띠로 크게 뒀는데, 이제 오른쪽 카드가 구간 넷을
+              항상 다 보여 준다. 여기 남길 몫은 "이 달 어느 날에 밑줄이 그어졌나"뿐이라
+              칸 안의 밑줄 마크를 그대로 앞에 달아 말없이 잇는다 — 범례가 따로 필요 없다. */}
+          {windows.map((w) => (
+            <span key={w.key}
+                  style={{ display: "flex", alignItems: "center", gap: S.xs,
+                           fontSize: T.tiny, color: C.sub2, minWidth: 0 }}>
+              <span aria-hidden style={{ width: 10, height: 2.5, borderRadius: 2,
+                                         background: C.ink, flexShrink: 0 }} />
+              <b style={{ color: C.ink, fontWeight: 700 }}>{w.label}</b>
+              <span style={{ color: C.faint }}>{w.fromDay}~{w.toDay}일</span>
+            </span>
+          ))}
+
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: S.xs }}>
             {WEEKDAYS.map((w, i) => (
               <span key={w} style={{ fontSize: T.tiny, fontWeight: 700, textAlign: "center",
@@ -359,7 +372,12 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                   disabled={!row}
                   title={row ? `${date} · 순매수 ${usd(row.net)}` : `${date} · 결제 없음`}
                   style={{
-                    position: "relative", height: 32,
+                    position: "relative",
+                    /* ⚠️ 높이를 못박으면 폭이 바뀔 때 칸이 납작해진다. 1,180px 아래에서는
+                       세 칸이 줄바꿈돼 달력이 시트 폭 전체를 쓰는데, 그때 칸이 80×40
+                       (2:1)이 되어 달력이 아니라 막대밭으로 보였다. 비율로 두고 위아래만
+                       막는다 — 세 칸일 때 49×36, 줄바꿈됐을 때 75×46 이다. */
+                    aspectRatio: "1.35", minHeight: 34, maxHeight: 46,
                     // 빈 칸에 테두리를 두면 달의 절반이 '빈 상자밭'이 된다(결제는 T+1 이라
                     // 이 달의 남은 날은 아직 자료가 없다).
                     border: isPicked ? `2px solid ${C.ink}` : "2px solid transparent",
@@ -394,65 +412,18 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
             <span style={{ display: "inline-flex", alignItems: "center", gap: S.xs }}>
               <span style={{ width: 8, height: 8, borderRadius: 2, background: SELL }} /> 더 팔았다
             </span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: S.xs }}>
-              <span style={{ width: 10, height: 2.5, borderRadius: 2, background: C.ink }} /> 해마다 오는 날
-            </span>
-            <span style={{ marginLeft: "auto", color: C.faint }}>국내 증권사를 거친 결제</span>
           </div>
         </div>
 
         {/* ── 오른쪽 두 칸: 고른 날 + 매매를 바꾸는 것들 ── */}
-        <div style={{ flex: "2 1 580px", minWidth: 0, display: "flex",
+        <div style={{ flex: "2 1 500px", minWidth: 0, display: "flex",
                       flexDirection: "column", gap: S.md }}>
-          {/* 그달에 걸치는 구간 띠. 구글 캘린더의 종일 일정 자리다.
-              ⭐ 구간이 없는 달(1년 중 아홉 달)에는 **다음 구간까지 며칠**을 대신 띄운다.
-              이 화면에서 다른 데서 못 얻는 유일한 정보가 구간인데, 그게 아홉 달 동안
-              통째로 안 보이면 처음 온 사람은 값진 걸 못 보고 지나간다. */}
-          {windows.length > 0 ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: S.xs }}>
-              {windows.map((w) => (
-                <div key={w.key}
-                     style={{ display: "flex", alignItems: "center", gap: S.sm, fontSize: T.body,
-                              background: C.blueTint, borderRadius: R.control, padding: "8px 12px",
-                              wordBreak: "keep-all", flexWrap: "wrap" }}>
-                  <Icon name="event_repeat" style={{ fontSize: T.head, color: C.blue }} />
-                  <b style={{ color: C.ink }}>{w.label}</b>
-                  <span style={{ color: C.sub2 }}>{w.fromDay}일~{w.toDay}일 · {w.note}</span>
-                  <span style={{ marginLeft: "auto", color: C.faint, flexShrink: 0 }}>표본 {w.days}일</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            ahead && (
-              <button type="button" onClick={() => aheadSample && jumpTo(aheadSample)}
-                      disabled={!aheadSample}
-                      style={{ display: "flex", alignItems: "center", gap: S.sm, width: "100%",
-                               fontSize: T.body, background: C.blueTint, borderRadius: R.control,
-                               padding: "8px 12px", wordBreak: "keep-all",
-                               flexWrap: "wrap", border: "none", cursor: "pointer",
-                               font: "inherit", textAlign: "left" }}>
-                <Icon name="event_upcoming" style={{ fontSize: T.head, color: C.blue, flexShrink: 0 }} />
-                <b style={{ color: C.ink }}>{ahead.window.label}</b>
-                <span style={{ color: C.sub2 }}>· {ahead.window.note}</span>
-                <span style={{ marginLeft: "auto", flexShrink: 0, display: "inline-flex",
-                               alignItems: "baseline", gap: S.sm }}>
-                  <b style={{ color: C.blue }}>{ahead.days}일 뒤</b>
-                  {aheadSample && (
-                    <span style={{ color: C.sub2 }}>
-                      {aheadSample.slice(0, 4)}년 보기 →
-                    </span>
-                  )}
-                </span>
-              </button>
-            )
-          )}
-
           {/* 이 달 · 고른 날 — 두 칸.
               ⚠️ 두 상자가 **줄 꼴이 서로 달랐다.** 어떤 줄은 '라벨·값', 어떤 줄은
               '라벨·날짜·값', 어떤 줄은 각주였다. 값 하나하나는 그럴듯한데 나란히 두면
               규칙이 안 보여 지저분해진다. 지금은 **한 가지 줄 꼴**(라벨 · 보조 · 값)만
               쓰고, 그 줄을 만드는 자리도 `Row` 하나뿐이다. */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: S.sm }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: S.sm, alignItems: "flex-start" }}>
             {/* 왼쪽 칸 — 이 달 위, 고른 날 아래. 둘은 '지금 보고 있는 것'이라 한 묶음이다. */}
             <div style={{ flex: "1 1 min(240px, 100%)", minWidth: 0, display: "flex",
                           flexDirection: "column", gap: S.sm }}>
@@ -526,13 +497,21 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                       },
                     ]}
                   />
-                  <Group
-                    head="해마다 오는 날 · 평소 대비"
-                    rows={WINDOWS_BY_SEASON.map((w) => {
-                      const sample = sampleMonthFor(w.from[0]);
-                      return { ...windowRow(w), on: sample ? () => jumpTo(sample) : undefined };
-                    })}
-                  />
+                  <div style={{ display: "flex", flexDirection: "column", gap: S.sm }}>
+                    <Group
+                      head="해마다 오는 날 · 평소 대비"
+                      rows={WINDOWS_BY_SEASON.map((w) => {
+                        const sample = sampleMonthFor(w.from[0]);
+                        return { ...windowRow(w), on: sample ? () => jumpTo(sample) : undefined };
+                      })}
+                    />
+                    {/* 위 넷만 몇 해치인지 안 적혀 있었다. 같은 카드의 역대 기록은 날짜가
+                        붙어 있어 스스로 말하는데, 구간 값은 여러 해를 모은 것이라 기간을
+                        밝히지 않으면 "언제 잰 거냐"가 남는다. */}
+                    <span style={{ fontSize: T.tiny, color: C.faint }}>
+                      2015~2026년을 모아 잰 값입니다
+                    </span>
+                  </div>
                 </Card>
               </div>
             )}
