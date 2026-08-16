@@ -296,7 +296,7 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
           아래 별도 줄에서 오른쪽으로 들여 세로를 줄였다. */}
       <div style={{ display: "flex", flexWrap: "wrap", padding: "12px 22px 18px", gap: S.lg }}>
         {/* ── 왼쪽 한 칸: 달력 ── */}
-        <div style={{ flex: "1 1 250px", minWidth: 0, display: "flex",
+        <div style={{ flex: "1 1 220px", maxWidth: 380, minWidth: 0, display: "flex",
                       flexDirection: "column", gap: S.sm }}>
           <div style={{ display: "flex", alignItems: "center", gap: S.xs }}>
             {[-1, 1].map((by) => {
@@ -373,12 +373,14 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                   disabled={!row}
                   title={row ? `${date} · 순매수 ${usd(row.net)}` : `${date} · 결제 없음`}
                   style={{
-                    position: "relative",
-                    /* ⚠️ 높이를 못박으면 폭이 바뀔 때 칸이 납작해진다. 1,180px 아래에서는
-                       세 칸이 줄바꿈돼 달력이 시트 폭 전체를 쓰는데, 그때 칸이 80×40
-                       (2:1)이 되어 달력이 아니라 막대밭으로 보였다. 비율로 두고 위아래만
-                       막는다 — 세 칸일 때 49×36, 줄바꿈됐을 때 75×46 이다. */
-                    aspectRatio: "1.35", minHeight: 34, maxHeight: 46,
+                    position: "relative", height: 34,
+                    /* ⚠️ 한때 `aspectRatio: 1.35 + minHeight: 34` 로 뒀는데 못 쓴다.
+                       격자 칸이 1fr 이라 폭이 36 이면 비율상 높이가 26.7 인데, minHeight 가
+                       34 로 올리면 aspect-ratio 가 **그 높이에 맞춰 폭을 46 으로 되민다**.
+                       7칸이면 322+간격 = 346 이라 격자(276)를 넘친다. minWidth:0 으로도
+                       안 막힌다 — 높이가 확정되면 폭이 따라오는 게 aspect-ratio 의 규칙이다.
+                       1:1:2 에서 칸이 36 폭이라 34 면 거의 정사각이고, 줄바꿈될 때는 왼쪽
+                       칸의 maxWidth 가 납작해지는 걸 막는다. */
                     // 빈 칸에 테두리를 두면 달의 절반이 '빈 상자밭'이 된다(결제는 T+1 이라
                     // 이 달의 남은 날은 아직 자료가 없다).
                     border: isPicked ? `2px solid ${C.ink}` : "2px solid transparent",
@@ -417,7 +419,7 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
         </div>
 
         {/* ── 오른쪽 두 칸: 고른 날 + 매매를 바꾸는 것들 ── */}
-        <div style={{ flex: "2 1 500px", minWidth: 0, display: "flex",
+        <div style={{ flex: "3 1 660px", minWidth: 0, display: "flex",
                       flexDirection: "column", gap: S.md }}>
           {/* 이 달 · 고른 날 — 두 칸.
               ⚠️ 두 상자가 **줄 꼴이 서로 달랐다.** 어떤 줄은 '라벨·값', 어떤 줄은
@@ -426,7 +428,7 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
               쓰고, 그 줄을 만드는 자리도 `Row` 하나뿐이다. */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: S.sm, alignItems: "flex-start" }}>
             {/* 왼쪽 칸 — 이 달 위, 고른 날 아래. 둘은 '지금 보고 있는 것'이라 한 묶음이다. */}
-            <div style={{ flex: "1 1 min(240px, 100%)", minWidth: 0, display: "flex",
+            <div style={{ flex: "1 1 min(210px, 100%)", minWidth: 0, display: "flex",
                           flexDirection: "column", gap: S.sm }}>
               <Box
                 head={`이 달 · ${monthDays.length}거래일`}
@@ -469,7 +471,7 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                 ⚠️ '가장 바빴던 날'의 값만 금액이 아니라 횟수다. 단위(번)가 달라 금액과
                 섞여 읽힐 일이 없어서 이 줄만 예외로 둔다. */}
             {c.records && (
-              <div style={{ flex: "1 1 min(240px, 100%)", minWidth: 0, display: "flex" }}>
+              <div style={{ flex: "2 1 min(420px, 100%)", minWidth: 0, display: "flex" }}>
                 <Card>
                   <Group
                     head="역대 기록"
