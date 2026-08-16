@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 import type { CalendarDay, SeohakCalendar } from "@/lib/seohak-calendar";
-import { CALENDAR_WINDOWS, REACTIONS, nextWindow, windowsInMonth } from "@/lib/seohak-windows";
+import { CALENDAR_WINDOWS, nextWindow, windowsInMonth } from "@/lib/seohak-windows";
 import { SectionHead } from "../kadera/SectionHead";
 import { BUY, SELL } from "./tone";
 import { C, Icon, MONO, R } from "../ui";
@@ -77,93 +77,34 @@ function shiftMonth(month: string, by: number) {
 
 
 /* ── 사건 대 날짜 ────────────────────────────────────────────────────
-   ⚠️⚠️ **세 번째 판이다. 앞의 둘은 막대였고 둘 다 "무슨 말인지 모르겠다"를 받았다.**
+   ⚠️⚠️ **네 판째다.** 막대 → 막대 → 문장 목록 → 지금. 앞의 셋이 전부 "뭔지 모르겠다"를
+   받았다.
 
-   원인은 스타일이 아니라 형태였다. 이 데이터는 '다섯 개의 값'이 아니라 **"넷을
-   의심해서 재 봤는데 아니었다"는 결과**다. 값이 거의 0인 것 넷을 막대로 그리면
-   아무리 잘 그려도 안 읽힌다 — 없는 것을 막대로는 못 보여준다.
+   ⭐ 이번에 안 것: 이 블록은 **부정 결과**였다. "넷을 재 봤는데 셋은 아무 차이가
+   없었습니다" + 그대로 · 그대로 · 그대로. 부정 결과는 만든 사람에게나 흥미롭지
+   **읽는 사람이 가져갈 게 없다.** 게다가 "재 봤는데"는 우리 얘기지 독자 얘기가 아니다.
 
-   게다가 "8% 달라짐"이 **무엇이** 달라졌다는 건지 화면에 없었다. 매매량인지 순매수인지
-   매수인지 매도인지. 조건("나스닥 −2% 이하")도 조건인지 대상인지 모호했다.
-
-   그래서 막대를 버리고 문장으로 쓴다. 가설 넷과 그 결과를 줄로 세우고, 마지막에
-   "정작 달라지는 건 날짜"로 위 달력을 가리킨다. 이 층이 달력 안에 있는 이유가 그거다. */
+   알맹이는 문장 하나뿐이었다 — "사건엔 안 움직이는데 연말엔 움직인다". 네 줄은 실험
+   노트라 지운다. 근거 수치는 코드에 남아 있고(REACTIONS), 화면엔 결론만 낸다. */
 function EventsVsDates({ onJump }: { onJump?: () => void }) {
   const yearend = CALENDAR_WINDOWS.find((w) => w.key === "yearend")!;
-  /** 이 밖으로 나가야 '달라졌다'고 본다. 20영업일 창의 날짜별 흔들림이 이 폭이다. */
-  const NOISE = 5;
-
-  const rows = REACTIONS.map((r) => {
-    // 매수·매도 중 더 크게 움직인 쪽만 말한다. 순매수로 뭉치면 둘이 서로 상쇄해
-    // "떨어질 때 산다"는 없는 결론이 나온다.
-    const sides: { side: "사는" | "파는"; v: number }[] = [];
-    if (r.buy !== null) sides.push({ side: "사는", v: r.buy });
-    if (r.sell !== null) sides.push({ side: "파는", v: r.sell });
-    const top = sides.length
-      ? sides.reduce((a, b) => (Math.abs(b.v - 1) > Math.abs(a.v - 1) ? b : a))
-      : null;
-    const pct = top ? Math.round(Math.abs(top.v - 1) * 100) : 0;
-    return {
-      label: r.label,
-      changed: pct > NOISE,
-      // 무엇이 얼마나 달라졌는지를 문장 그대로 쓴다. 숫자만 두면 "8% 달라짐"이 된다.
-      // 다른 것을 재는 줄은 자기 결론(verdict)을 들고 있다.
-      result:
-        "verdict" in r && r.verdict
-          ? r.verdict
-          : top && pct > NOISE
-            ? `${top.side} 양만 ${pct}% ${top.v > 1 ? "늘어납니다" : "줄어듭니다"}`
-            : "사고파는 양 그대로",
-    };
-  });
-  // 읽는 사람이 "다 그대로네"를 먼저 보게 안 달라진 것부터 세운다.
-  rows.sort((a, b) => Number(a.changed) - Number(b.changed));
-  const quiet = rows.filter((r) => !r.changed).length;
-  // "넷을 재 봤는데 3개는" 처럼 세는 말이 섞이면 읽다가 걸린다. 작은 수는 우리말로.
-  const KO = ["", "하나", "둘", "셋", "넷", "다섯"];
-  const koCount = (n: number) => KO[n] ?? String(n);
   const yearendPct = Math.round(Math.abs(yearend.sell - 1) * 100);
 
   return (
-    <div style={{ paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
-      <p style={{ margin: 0, fontSize: T.head, fontWeight: 800, color: C.ink, lineHeight: 1.45,
-                  wordBreak: "keep-all" }}>
-        매매를 바꾸는 게 뭔지 {koCount(rows.length)}을 재 봤는데,{" "}
-        {quiet === rows.length ? "전부" : `${koCount(quiet)}은`}{" "}
-        <span style={{ color: C.blue }}>아무 차이가 없었습니다</span>
-      </p>
-
-      <ul style={{ listStyle: "none", margin: "9px 0 0", padding: 0, display: "flex",
-                   flexDirection: "column", gap: S.sm }}>
-        {rows.map((r) => (
-          <li key={r.label}
-              style={{ display: "flex", alignItems: "baseline", gap: S.sm, fontSize: T.body,
-                       paddingBottom: 6, borderBottom: `1px solid ${C.sheetRow}` }}>
-            <span style={{ color: C.label, minWidth: 0, flex: 1 }}>{r.label}</span>
-            <span style={{ flexShrink: 0, fontWeight: r.changed ? 800 : 600,
-                           color: r.changed ? C.ink : C.faint }}>
-              {r.result}
-            </span>
-          </li>
-        ))}
-      </ul>
-
-      {/* "12월로 넘겨 보세요"라고 시키지 않는다. 시키는 문장은 군더더기이고, 정작
-          넘기려면 화살표를 여덟 번 눌러야 했다. 문장은 사실만 말하고 이동은 버튼이 한다. */}
-      <p style={{ margin: "10px 0 0", fontSize: T.body, lineHeight: 1.55, color: C.sub,
-                  wordBreak: "keep-all" }}>
-        정작 달라지는 건 <b style={{ color: C.ink }}>날짜</b>입니다. 연말 마지막 주에는 파는 양이{" "}
-        <b style={{ color: C.ink }}>{yearendPct}%</b> 늘어납니다.{" "}
-        {onJump && (
-          <button type="button" onClick={onJump}
-                  style={{ border: "none", background: "none", padding: 0, cursor: "pointer",
-                           font: "inherit", color: C.blue, fontWeight: 700,
-                           textDecoration: "underline", textUnderlineOffset: 2 }}>
-            그 달 보기
-          </button>
-        )}
-      </p>
-    </div>
+    <p style={{ margin: 0, paddingTop: S.md, borderTop: `1px solid ${C.line}`,
+                fontSize: T.body, lineHeight: 1.6, color: C.sub, wordBreak: "keep-all" }}>
+      나스닥이 급락해도, 환율이 뛰어도, 월급날이 와도{" "}
+      <b style={{ color: C.ink }}>사고파는 양은 그대로</b>입니다. 정작 달라지는 건 날짜라,
+      연말 마지막 주에는 파는 양이 <b style={{ color: C.ink }}>{yearendPct}%</b> 늘어납니다.{" "}
+      {onJump && (
+        <button type="button" onClick={onJump}
+                style={{ border: "none", background: "none", padding: 0, cursor: "pointer",
+                         font: "inherit", color: C.blue, fontWeight: 700,
+                         textDecoration: "underline", textUnderlineOffset: 2 }}>
+          그 달 보기
+        </button>
+      )}
+    </p>
   );
 }
 
@@ -293,8 +234,8 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
     <section className="hz-sheet">
       <SectionHead
         icon="calendar_month"
-        title="언제 사고 언제 파나"
-        desc="국내 증권사를 거쳐 그날 결제된 순매수입니다. 오른쪽은 고른 날과, 매매를 바꾸는 것들입니다."
+        title="해마다 되풀이되는 날들"
+        desc="해마다 같은 때가 오면 더 사거나 더 팝니다. 칸은 그날 실제 매매입니다."
         note={`${meta.year}년 ${meta.month}월`}
         /* 원래 시트 바닥에 네 줄짜리 각주로 있었다. 중요한 단서인데 그 길이로 깔려
            있으니 시트 전체의 가독성을 깎았다 — 읽는 사람은 매번 넘기고, 정작 필요할
@@ -402,8 +343,9 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
               <span style={{ width: 8, height: 8, borderRadius: 2, background: SELL }} /> 더 팔았다
             </span>
             <span style={{ display: "inline-flex", alignItems: "center", gap: S.xs }}>
-              <span style={{ width: 10, height: 2.5, borderRadius: 2, background: C.ink }} /> 구간
+              <span style={{ width: 10, height: 2.5, borderRadius: 2, background: C.ink }} /> 해마다 오는 날
             </span>
+            <span style={{ marginLeft: "auto", color: C.faint }}>국내 증권사를 거친 결제</span>
           </div>
         </div>
 
@@ -419,7 +361,8 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
               {windows.map((w) => (
                 <div key={w.key}
                      style={{ display: "flex", alignItems: "center", gap: S.sm, fontSize: T.body,
-                              background: C.blueTint, borderRadius: R.control, padding: "8px 12px" }}>
+                              background: C.blueTint, borderRadius: R.control, padding: "8px 12px",
+                              wordBreak: "keep-all", flexWrap: "wrap" }}>
                   <Icon name="event_repeat" style={{ fontSize: T.head, color: C.blue }} />
                   <b style={{ color: C.ink }}>{w.label}</b>
                   <span style={{ color: C.sub2 }}>{w.fromDay}일~{w.toDay}일 · {w.note}</span>
@@ -433,17 +376,17 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                       disabled={!aheadSample}
                       style={{ display: "flex", alignItems: "center", gap: S.sm, width: "100%",
                                fontSize: T.body, background: C.blueTint, borderRadius: R.control,
-                               padding: "8px 12px", border: "none", cursor: "pointer",
+                               padding: "8px 12px", wordBreak: "keep-all",
+                               flexWrap: "wrap", border: "none", cursor: "pointer",
                                font: "inherit", textAlign: "left" }}>
-                <Icon name="event_upcoming" style={{ fontSize: T.head, color: C.blue }} />
-                <span style={{ color: C.sub2 }}>다음 구간</span>
+                <Icon name="event_upcoming" style={{ fontSize: T.head, color: C.blue, flexShrink: 0 }} />
                 <b style={{ color: C.ink }}>{ahead.window.label}</b>
                 <span style={{ color: C.sub2 }}>· {ahead.window.note}</span>
                 <span style={{ marginLeft: "auto", flexShrink: 0, display: "inline-flex",
                                alignItems: "baseline", gap: S.sm }}>
                   <b style={{ color: C.blue }}>{ahead.days}일 뒤</b>
                   {aheadSample && (
-                    <span style={{ color: C.sub2, fontSize: T.sub }}>
+                    <span style={{ color: C.sub2 }}>
                       {aheadSample.slice(0, 4)}년 보기 →
                     </span>
                   )}
