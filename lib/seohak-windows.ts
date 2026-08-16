@@ -19,68 +19,75 @@
  * 그래서 달력 화면의 **날짜 칸은 그날의 실제 매매**(실측)를 그리고, 여기 구간은
  * **띠로 얹기만 한다.** 둘을 섞으면 잡음이 사실인 척한다.
  *
- * 구간 값은 표본 39~63일이라 실제로 잰다(전부 추세 대비 배수의 중앙값).
- * 여름(7~8월)과 네 마녀의 날은 1.0 근처(0.99~1.01)라 뺐다.
+ * ## ⚠️⚠️ 계절을 재려면 기준선이 **한 해**여야 한다
+ *
+ * 값은 전부 "그 무렵 평소 대비 배수의 중앙값"인데, '그 무렵'을 앞뒤 60거래일(반년)로
+ * 잡고 있었다. 그러면 **기준선 자체가 같은 계절을 물고 있다.** 2월의 기준선은 11월~5월
+ * 이라 겨울 비수기가 섞여 있고, 그래서 2월이 실제보다 낮게 나왔다(+14% 로 읽혔는데
+ * 한 해 기준선으로는 **+22%**).
+ *
+ * 앞뒤 125거래일(한 해)로 바꾸니 넷 중 둘의 숫자가 크게 달라졌다 — 크리스마스 직전은
+ * 팔자 +6% 에서 **사자 +9%** 로 축까지 뒤집혔고, 연말 마지막 주는 +18% → **+24%** 다.
+ *
+ * ## 표시할 축은 큰 쪽이 아니라 **안정한 쪽**으로 고른다(`show`)
+ *
+ * 후보 42개를 쓸어 보고 2015~2020 · 2021~2026 으로 갈라 부호가 같은 것만 남겼다.
+ * 블랙프라이데이는 사자가 −22% 로 팔자(−8%)보다 큰데, **전반 0.74 후반 1.05 로 부호가
+ * 뒤집힌다.** 큰 쪽을 자동으로 고르면 이 불안정한 값이 화면에 뜬다.
+ *
+ * ⭐ 42개를 뒤졌으니 우연이 섞인다. 전후반 갈라 보기가 그 그물이다.
  */
 export const CALENDAR_WINDOWS = [
-  { key: "newyear", label: "새해 첫 주", note: "아무도 안 삽니다",
-    from: [1, 1], to: [1, 8], buy: 0.739, sell: 0.814, days: 63 },
-  { key: "blackfriday", label: "블랙프라이데이 주간", note: "둘 다 조용합니다",
-    from: [11, 24], to: [11, 30], buy: 0.837, sell: 0.874, days: 50 },
-  { key: "xmas", label: "크리스마스 직전", note: "팔기 시작합니다",
-    from: [12, 20], to: [12, 24], buy: 0.984, sell: 1.061, days: 39 },
-  { key: "yearend", label: "연말 마지막 주", note: "정리하는 주",
-    from: [12, 26], to: [12, 31], buy: 0.909, sell: 1.184, days: 42 },
+  { key: "newyear", label: "새해 첫 주",
+    from: [1, 1], to: [1, 8], buy: 0.771, sell: 0.803, show: "buy", days: 64 },
+  { key: "feb", label: "2월",
+    from: [2, 1], to: [2, 29], buy: 1.215, sell: 1.118, show: "buy", days: 236 },
+  { key: "spring", label: "4~5월",
+    from: [4, 1], to: [5, 31], buy: 0.916, sell: 0.935, show: "buy", days: 507 },
+  { key: "chuseok", label: "추석 언저리",
+    from: [9, 25], to: [10, 5], buy: 0.869, sell: 0.890, show: "buy", days: 87 },
+  { key: "blackfriday", label: "블랙프라이데이 주간",
+    from: [11, 24], to: [11, 30], buy: 0.778, sell: 0.922, show: "sell", days: 50 },
+  { key: "xmas", label: "크리스마스 직전",
+    from: [12, 20], to: [12, 24], buy: 1.094, sell: 1.078, show: "buy", days: 39 },
+  { key: "yearend", label: "연말 마지막 주",
+    from: [12, 26], to: [12, 31], buy: 0.911, sell: 1.238, show: "sell", days: 43 },
 ] as const;
 
 /**
  * ⚠️ '미국 실적 시즌'을 뺐다. 1·4·7·10월 후반이라 **띠가 뜨는 달의 3분의 2를
  * 차지**하는데 실측 차이가 매수 0.4%다. 아무 일도 없는 구간이 화면을 넓게 물들이면
- * 진짜 구간(연말·신년·블프)이 묽어진다. 작은 카드에선 이미 뺐던 걸 히어로가 계속
- * 쓰고 있었다.
+ * 진짜 구간이 묽어진다.
+ *
+ * ⚠️ '분기 마지막 사흘'도 뺐다. 팔자 +9% 로 문턱은 넘는데 **연말 마지막 주·추석과
+ * 날이 겹친다.** 같은 날이 두 줄에 잡히면 어느 쪽 숫자를 봐야 할지 알 수 없다.
+ * 게다가 전반 +20% → 후반 +5% 로 효과가 반토막이라 남길 이유가 약했다.
+ *
+ * ⚠️ 요일·월초·월말·월급날·네 마녀의 날은 전부 3% 안쪽이라 뺐다.
  */
 
-/** 그 달에 걸치는 구간들. 달력이 종일 일정처럼 띠로 얹는다. */
-export function windowsInMonth(month: number) {
-  return CALENDAR_WINDOWS.filter((w) => w.from[0] === month).map((w) => ({
-    ...w,
-    fromDay: w.from[1],
-    toDay: w.to[1],
-  }));
+/**
+ * 그 달에 걸치는 구간들. 여러 달에 걸친 것(추석·4~5월)은 그 달 몫만 잘라 준다.
+ * `daysInMonth` 는 그달의 날 수 — 윤년과 30일 달 때문에 부르는 쪽이 알려 준다.
+ *
+ * `mark` 는 **달력 칸에 밑줄을 그을지**다. 한 달을 통째로 덮는 구간(2월·4~5월)까지
+ * 밑줄을 그으면 그 달 모든 칸에 줄이 생겨 표시가 뜻을 잃는다 — 며칠짜리만 긋는다.
+ */
+export function windowsInMonth(month: number, daysInMonth: number) {
+  return CALENDAR_WINDOWS.filter((w) => month >= w.from[0] && month <= w.to[0]).map((w) => {
+    const fromDay = w.from[0] === month ? w.from[1] : 1;
+    // ⚠️ 다음 달로 이어지는 구간(추석 9/25~10/5)의 이달 몫은 **그달 마지막 날**까지다.
+    // 31 로 두면 9월에 "25~31일"이 뜬다. 2월도 해마다 28·29 로 갈린다.
+    const toDay = Math.min(w.to[0] === month ? w.to[1] : 31, daysInMonth);
+    return { ...w, fromDay, toDay, mark: toDay - fromDay <= 11 };
+  });
 }
 
 /**
- * 오늘 다음에 오는 구간과 남은 날.
+ * "무엇에 반응하나" 실측. 전부 **다음 영업일 결제**를 추세 대비로 잰 값이다. 순매수
+ * 하나로 뭉쳐 보면 매도가 더 크게 줄어드는 바람에 "떨어질 때 산다"로 잘못 읽힌다 —
+ * 매수·매도를 갈라야 보인다.
  *
- * ⭐ 구간이 없는 달(1년 중 아홉 달)에는 이 화면의 가장 값진 것이 통째로 안 보인다.
- * "다음은 ○○까지 N일"이 늘 자리를 지키면 날짜가 지날수록 숫자가 줄어 **오늘 볼 이유**가
- * 생긴다 — 한 해를 통째로 펼치면 매일 같은 그림이라 지루해지는 것과 반대다.
- */
-export function nextWindow(today: Date) {
-  const y = today.getUTCFullYear();
-  const at = (year: number, w: (typeof CALENDAR_WINDOWS)[number]) =>
-    Date.UTC(year, w.from[0] - 1, w.from[1]);
-  const now = Date.UTC(y, today.getUTCMonth(), today.getUTCDate());
-
-  const upcoming = [y, y + 1]
-    .flatMap((year) => CALENDAR_WINDOWS.map((w) => ({ w, at: at(year, w) })))
-    .filter((c) => c.at > now)
-    .sort((a, b) => a.at - b.at)[0];
-  if (!upcoming) return null;
-  return {
-    window: upcoming.w,
-    days: Math.round((upcoming.at - now) / 86_400_000),
-    month: `${new Date(upcoming.at).getUTCFullYear()}-${String(upcoming.w.from[0]).padStart(2, "0")}`,
-  };
-}
-
-/**
- * "무엇에 반응하나" 실측. 전부 **다음 영업일 결제**를 추세 대비로 잰 값이다.
- *
- * 넷 다 1.0 근처라는 게 이 카드의 결론이다. 순매수 하나로 뭉쳐 보면 매도가 더 크게
- * 줄어드는 바람에 "떨어질 때 산다"로 잘못 읽힌다 — 매수·매도를 갈라야 보인다.
- */
-/**
  * ⛔ **화면에 올리지 말 것. 다섯 번 해 봤고 다섯 번 다 실패했다.**
  *
  * 막대 → 막대 → 문장 목록 → 한 문장 → 삭제. 매번 "이게 뭔지 모르겠다"를 받았는데,

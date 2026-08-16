@@ -89,25 +89,19 @@ function shiftMonth(month: string, by: number) {
 
    그래서 문장을 지우고 넷을 그냥 줄로 편다. 설명이 아니라 형태로.
 
-   ⭐ 값은 **더 크게 어긋난 쪽**만 낸다. 구간마다 이야기하는 축이 다르다(새해는 사자가
-   −26%, 연말은 팔자가 +18%). 한 축으로 통일하면 그 구간의 요점을 놓친다. 대신 어느
-   축인지를 값 옆에 붙여서 헷갈릴 자리를 없앤다. */
+   ⭐ 값은 한 축만 낸다. 구간마다 이야기하는 축이 다르기 때문이다(새해는 사자가 −23%,
+   연말은 팔자가 +24%). 어느 축인지는 **여기서 고르지 않는다** — 큰 쪽을 자동으로
+   집으면 표본이 흔들리는 값이 뽑힌다(블랙프라이데이의 사자가 그렇다). 상수가 전후반
+   대조로 정해 둔 `show` 를 따르고, 어느 축인지는 값 옆에 붙여 헷갈릴 자리를 없앤다. */
 function windowRow(w: (typeof CALENDAR_WINDOWS)[number]) {
-  const buyOff = Math.abs(w.buy - 1);
-  const sellOff = Math.abs(w.sell - 1);
-  const [side, ratio] = buyOff >= sellOff ? ["사는 양", w.buy] : ["파는 양", w.sell];
-  const pct = Math.round((ratio - 1) * 100);
-  return { k: w.label, n: side, v: `${pct >= 0 ? "+" : "−"}${Math.abs(pct)}%` };
+  const buy = w.show === "buy";
+  const pct = Math.round(((buy ? w.buy : w.sell) - 1) * 100);
+  return {
+    k: w.label,
+    n: buy ? "사는 양" : "파는 양",
+    v: `${pct >= 0 ? "+" : "−"}${Math.abs(pct)}%`,
+  };
 }
-
-/**
- * 달력 순서로 — 11월 → 12월 → 1월. 겨울 한 철의 이야기가 되어 순서 자체가 읽힌다.
- * 상수 배열의 순서(새해가 먼저)를 그대로 쓰면 이야기가 뒤에서부터 시작한다.
- */
-const WINDOWS_BY_SEASON = [...CALENDAR_WINDOWS].sort((a, b) => {
-  const key = (m: number) => (m >= 11 ? m - 12 : m);
-  return key(a.from[0]) - key(b.from[0]) || a.from[1] - b.from[1];
-});
 
 /**
  * 이 카드의 **유일한 줄 꼴** — 라벨 · 보조 · 값.
@@ -207,12 +201,12 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
   }, [c.days]);
 
   const meta = monthMeta(month);
-  const windows = windowsInMonth(meta.month);
+  const windows = windowsInMonth(meta.month, meta.length);
   const day = byDate.get(picked);
   // 선택한 날이 어느 구간에 드는지. 오른쪽 칸이 "이 날은 ~에 듭니다"로 쓴다.
   const pickedDay = Number(picked.slice(8));
   const pickedWindow = picked.startsWith(month)
-    ? windows.find((w) => pickedDay >= w.fromDay && pickedDay <= w.toDay)
+    ? windows.find((w) => w.mark && pickedDay >= w.fromDay && pickedDay <= w.toDay)
     : undefined;
 
   // 달을 바꾸면 그 달의 거래일 중 가장 크게 움직인 날로 선택을 옮긴다. 마지막 날을
@@ -222,7 +216,8 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
     const inNext = c.days.filter((d) => d.date.startsWith(next));
     // ⚠️ 구간이 있는 달로 갔으면 **구간 안에서** 고른다. 달 전체의 최대일을 집으면
     // 블프를 보러 갔는데 11/3 에 착지한다 — 정작 구간 밖이다.
-    const wins = windowsInMonth(Number(next.slice(5)));
+    const nextMeta = monthMeta(next);
+    const wins = windowsInMonth(nextMeta.month, nextMeta.length);
     const inWin = inNext.filter((d) => {
       const day = Number(d.date.slice(8));
       return wins.some((w) => day >= w.fromDay && day <= w.toDay);
@@ -283,8 +278,8 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
     <section className="hz-sheet">
       <SectionHead
         icon="calendar_month"
-        title="해마다 되풀이되는 날들"
-        desc="해마다 같은 때가 오면 더 사거나 더 팝니다. 칸은 그날 실제 매매입니다."
+        title="역사는 반복된다"
+        desc="서학개미들의 행동패턴입니다. 해마다 같은 때가 오면 같은 쪽으로 움직입니다."
         note={`${c.asOf} 기준`}
         /* 원래 시트 바닥에 네 줄짜리 각주였고, 그다음엔 여기 툴팁에 세 문장이 들어갔다.
            둘 다 길어서 안 읽힌다. 툴팁은 **한 문장이 넘으면 툴팁이 아니다** — 열어 놓고
@@ -334,16 +329,28 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
               ⭐ 앞서 오른쪽 칸에 파란 띠로 크게 뒀는데, 이제 오른쪽 카드가 구간 넷을
               항상 다 보여 준다. 여기 남길 몫은 "이 달 어느 날에 밑줄이 그어졌나"뿐이라
               칸 안의 밑줄 마크를 그대로 앞에 달아 말없이 잇는다 — 범례가 따로 필요 없다. */}
-          {windows.map((w) => (
-            <span key={w.key}
-                  style={{ display: "flex", alignItems: "center", gap: S.xs,
-                           fontSize: T.tiny, color: C.sub2, minWidth: 0 }}>
-              <span aria-hidden style={{ width: 10, height: 2.5, borderRadius: 2,
-                                         background: C.ink, flexShrink: 0 }} />
-              <b style={{ color: C.ink, fontWeight: 700 }}>{w.label}</b>
-              <span style={{ color: C.faint }}>{w.fromDay}~{w.toDay}일</span>
-            </span>
-          ))}
+          {windows.map((w) => {
+            const r = windowRow(w);
+            return (
+              <span key={w.key}
+                    style={{ display: "flex", alignItems: "center", gap: S.xs,
+                             fontSize: T.tiny, color: C.sub2, minWidth: 0 }}>
+                {/* 밑줄을 안 긋는 구간(2월·4~5월)에는 마크도 날짜도 달지 않는다. 이
+                    마크의 뜻은 "칸 아래 저 줄이 이거다"뿐이라, 줄이 없는데 마크만 있으면
+                    거짓말이다. 날짜는 그 달 전체라 네비의 '2026년 2월'과 겹친다. */}
+                {w.mark && (
+                  <span aria-hidden style={{ width: 10, height: 2.5, borderRadius: 2,
+                                             background: C.ink, flexShrink: 0 }} />
+                )}
+                <b style={{ color: C.ink, fontWeight: 700 }}>{w.label}</b>
+                {w.mark && <span style={{ color: C.faint }}>{w.fromDay}~{w.toDay}일</span>}
+                {/* 값까지 붙인다. 카드에서 눌러 왔을 때 "왜 이 달로 왔나"가 여기 있어야
+                    한다 — 라벨만 있으면 달 이름을 한 번 더 읽는 것으로 끝난다. */}
+                <span style={{ color: C.faint }}>· {r.n}</span>
+                <b style={{ color: C.ink, fontWeight: 700 }}>{r.v}</b>
+              </span>
+            );
+          })}
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: S.xs }}>
             {WEEKDAYS.map((w, i) => (
@@ -354,7 +361,7 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
               if (d === null) return <span key={`b${i}`} />;
               const date = `${month}-${String(d).padStart(2, "0")}`;
               const row = byDate.get(date);
-              const inWindow = windows.find((w) => d >= w.fromDay && d <= w.toDay);
+              const inWindow = windows.find((w) => w.mark && d >= w.fromDay && d <= w.toDay);
               const isPicked = date === picked;
               // 색 진하기는 순매수 크기. 파랑이면 더 샀고 회색이면 더 팔았다.
               const strength = row ? Math.min(1, Math.abs(row.net) / c.scale) : 0;
@@ -500,7 +507,7 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                   <div style={{ display: "flex", flexDirection: "column", gap: S.sm }}>
                     <Group
                       head="해마다 오는 날 · 평소 대비"
-                      rows={WINDOWS_BY_SEASON.map((w) => {
+                      rows={CALENDAR_WINDOWS.map((w) => {
                         const sample = sampleMonthFor(w.from[0]);
                         return { ...windowRow(w), on: sample ? () => jumpTo(sample) : undefined };
                       })}
