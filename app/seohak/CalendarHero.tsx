@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 import type { CalendarDay, SeohakCalendar } from "@/lib/seohak-calendar";
-import { CALENDAR_WINDOWS, windowsInMonth } from "@/lib/seohak-windows";
+import { CALENDAR_WINDOWS, CHANCE_BASELINE, windowDates, windowsInMonth } from "@/lib/seohak-windows";
 import { SectionHead } from "../kadera/SectionHead";
 import { BUY, SELL } from "./tone";
 import { C, Icon, MONO, R } from "../ui";
@@ -80,29 +80,6 @@ function shiftMonth(month: string, by: number) {
 }
 
 
-/* ── 구간 넷을 줄로 ──────────────────────────────────────────────────
-   ⚠️⚠️ **다섯 판째다.** 막대 → 막대 → 문장 목록 → 한 문장 → 지금.
-
-   ⭐ 문장으로 줄여 놨던 게 "나스닥이 급락해도 … 사고파는 양은 그대로"였는데, 그건
-   **부정 결과**다. 읽는 사람이 가져갈 게 없다. 정작 값진 쪽(구간 넷이 실제로 얼마나
-   다른가)은 한 달에 하나씩, 그 달에 갔을 때만 띠로 보였다 — 넷을 다 본 사람이 없다.
-
-   그래서 문장을 지우고 넷을 그냥 줄로 편다. 설명이 아니라 형태로.
-
-   ⭐ 값은 한 축만 낸다. 구간마다 이야기하는 축이 다르기 때문이다(새해는 사자가 −23%,
-   연말은 팔자가 +24%). 어느 축인지는 **여기서 고르지 않는다** — 큰 쪽을 자동으로
-   집으면 표본이 흔들리는 값이 뽑힌다(블랙프라이데이의 사자가 그렇다). 상수가 전후반
-   대조로 정해 둔 `show` 를 따르고, 어느 축인지는 값 옆에 붙여 헷갈릴 자리를 없앤다. */
-function windowRow(w: (typeof CALENDAR_WINDOWS)[number]) {
-  const buy = w.show === "buy";
-  const pct = Math.round(((buy ? w.buy : w.sell) - 1) * 100);
-  return {
-    k: w.label,
-    n: buy ? "사는 양" : "파는 양",
-    v: `${pct >= 0 ? "+" : "−"}${Math.abs(pct)}%`,
-  };
-}
-
 /**
  * 이 카드의 **유일한 줄 꼴** — 라벨 · 보조 · 값.
  *
@@ -133,6 +110,32 @@ function Row({ k, n, v, on }: { k: string; n: string; v: string; on?: () => void
 }
 
 type RowSpec = { k: string; n: string; v: string; on?: () => void };
+
+/**
+ * 되풀이되는 때 한 줄 — 이름 · 문장 · 몇 번 중 몇 번.
+ *
+ * ⭐ 값을 `−19%` 가 아니라 **"평소보다 19% 덜 삽니다"** 로 낸다. 부호를 말로 풀면
+ * 방향을 되짚을 일이 없다. 그리고 진짜 값은 % 가 아니라 **횟수**다 — 17번 중 16번과
+ * 17번 중 12번은 같은 −33% 라도 전혀 다른 이야기다. 그래서 횟수를 크게 둔다.
+ */
+function WindowRow({ w, onJump }: { w: (typeof CALENDAR_WINDOWS)[number]; onJump: () => void }) {
+  // 우연 기준선(17번 중 11번)을 넘어야 잉크를 준다. 아래면 흐리게 둬서 눈이 안 멈춘다.
+  const strong = w.hit / w.of >= 0.85;
+  return (
+    <button type="button" onClick={onJump} className="hz-jump"
+            style={{ display: "flex", flexDirection: "column", gap: 2, width: "100%",
+                     border: "none", cursor: "pointer", font: "inherit", textAlign: "left" }}>
+      <span style={{ display: "flex", alignItems: "baseline", gap: S.sm, width: "100%" }}>
+        <b style={{ fontSize: T.body, color: C.ink }}>{w.label}</b>
+        <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: T.tiny,
+                       color: C.faint, flexShrink: 0 }}>
+          {w.of}번 중 <b style={{ color: strong ? C.ink : C.sub2 }}>{w.hit}번</b>
+        </span>
+      </span>
+      <span style={{ fontSize: T.body, color: C.sub }}>{w.phrase}</span>
+    </button>
+  );
+}
 
 /** 제목 한 줄 + 그 아래 줄 목록. 이 카드에서 줄이 모이는 자리는 전부 이 꼴이다. */
 function Group({ head, rows }: { head?: string; rows: (RowSpec | null | undefined | false)[] }) {
@@ -200,34 +203,43 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
     return m;
   }, [c.days]);
 
+  /**
+   * 창이 걸치는 실제 결제일. **고정 날짜가 아니라 결제일 순서로** 잡는다 — 블랙프라이데이는
+   * 해마다 11/23~29 를 오가고, 연말·새해 직후는 휴장이 며칠이냐에 따라 밀린다.
+   */
+  const marks = useMemo(() => windowDates(c.days.map((d) => d.date)), [c.days]);
+  const markedDays = useMemo(
+    () => new Set([...marks.values()].flatMap((s) => [...s])),
+    [marks],
+  );
+
   const meta = monthMeta(month);
-  const windows = windowsInMonth(meta.month, meta.length);
+  const windows = windowsInMonth(month, marks);
   const day = byDate.get(picked);
   // 선택한 날이 어느 구간에 드는지. 오른쪽 칸이 "이 날은 ~에 듭니다"로 쓴다.
-  const pickedDay = Number(picked.slice(8));
-  const pickedWindow = picked.startsWith(month)
-    ? windows.find((w) => w.mark && pickedDay >= w.fromDay && pickedDay <= w.toDay)
-    : undefined;
+  const pickedWindow = CALENDAR_WINDOWS.find((w) => marks.get(w.key)!.has(picked));
 
-  // 달을 바꾸면 그 달의 거래일 중 가장 크게 움직인 날로 선택을 옮긴다. 마지막 날을
-  // 고르면 휴장 여파로 결제가 $1 뿐인 날에 착지하는 수가 있다(12-26 에서 실제로 그랬다).
-  const jumpTo = (next: string) => {
-    setMonth(next);
-    const inNext = c.days.filter((d) => d.date.startsWith(next));
-    // ⚠️ 구간이 있는 달로 갔으면 **구간 안에서** 고른다. 달 전체의 최대일을 집으면
-    // 블프를 보러 갔는데 11/3 에 착지한다 — 정작 구간 밖이다.
-    const nextMeta = monthMeta(next);
-    const wins = windowsInMonth(nextMeta.month, nextMeta.length);
-    const inWin = inNext.filter((d) => {
-      const day = Number(d.date.slice(8));
-      return wins.some((w) => day >= w.fromDay && day <= w.toDay);
-    });
-    const pick = (inWin.length ? inWin : inNext).reduce<CalendarDay | null>(
-      (a, d) => (!a || Math.abs(d.net) > Math.abs(a.net) ? d : a),
-      null,
-    );
-    if (pick) setPicked(pick.date);
+  /**
+   * 그 창이 가장 최근에 있었던 자리로 간다.
+   *
+   * ⚠️ **마지막 날이 아니라 첫날의 달**로 가야 한다. 블랙프라이데이 직후 사흘은 11월 말에
+   * 시작해 12월 초로 넘어가는 해가 있어서, 마지막 날을 집으면 블프를 보러 갔는데 달력이
+   * 12월을 편다.
+   */
+  const jumpToWindow = (key: string) => {
+    const days = [...marks.get(key)!].sort();
+    if (!days.length) return;
+    const year = days.at(-1)!.slice(0, 4);
+    const last = days.filter((d) => d.slice(0, 4) === year);
+    const month = last[0].slice(0, 7);
+    setMonth(month);
+    // 그 창 안에서 가장 크게 움직인 날. 첫날을 집으면 휴장 여파로 $1 짜리에 앉는 수가 있다.
+    const inWin = c.days.filter((d) => last.includes(d.date));
+    const pick = inWin.reduce<CalendarDay | null>(
+      (a, d) => (!a || Math.abs(d.net) > Math.abs(a.net) ? d : a), null);
+    setPicked(pick ? pick.date : last[0]);
   };
+
   /**
    * 기록 줄을 눌렀을 때 달력을 그 날로 옮기는 손잡이. **받아 둔 24개월 안일 때만** 준다.
    *
@@ -249,18 +261,6 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
     const inNext = c.days.filter((d) => d.date.startsWith(next));
     if (inNext.length) setPicked(inNext[inNext.length - 1].date);
   };
-  /**
-   * 그 구간을 **볼 수 있는** 달. 다음 블랙프라이데이는 2026-11 인데 그 달은 아직
-   * 자료가 없어서, 눌러서 가면 달력이 텅 빈다. 받아 둔 구간 안에서 같은 달 중
-   * 가장 최근 것으로 데려간다(지난해 11월).
-   */
-  const loadedMonths = useMemo(
-    () => [...new Set(c.days.map((d) => d.date.slice(0, 7)))].sort(),
-    [c.days],
-  );
-  const sampleMonthFor = (month: number) =>
-    loadedMonths.filter((m) => m.endsWith(`-${String(month).padStart(2, "0")}`)).pop();
-
   const cells: (number | null)[] = [
     ...Array.from({ length: meta.firstWeekday }, () => null),
     ...Array.from({ length: meta.length }, (_, i) => i + 1),
@@ -329,28 +329,22 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
               ⭐ 앞서 오른쪽 칸에 파란 띠로 크게 뒀는데, 이제 오른쪽 카드가 구간 넷을
               항상 다 보여 준다. 여기 남길 몫은 "이 달 어느 날에 밑줄이 그어졌나"뿐이라
               칸 안의 밑줄 마크를 그대로 앞에 달아 말없이 잇는다 — 범례가 따로 필요 없다. */}
-          {windows.map((w) => {
-            const r = windowRow(w);
-            return (
-              <span key={w.key}
-                    style={{ display: "flex", alignItems: "center", gap: S.xs,
-                             fontSize: T.tiny, color: C.sub2, minWidth: 0 }}>
-                {/* 밑줄을 안 긋는 구간(2월·4~5월)에는 마크도 날짜도 달지 않는다. 이
-                    마크의 뜻은 "칸 아래 저 줄이 이거다"뿐이라, 줄이 없는데 마크만 있으면
-                    거짓말이다. 날짜는 그 달 전체라 네비의 '2026년 2월'과 겹친다. */}
-                {w.mark && (
-                  <span aria-hidden style={{ width: 10, height: 2.5, borderRadius: 2,
-                                             background: C.ink, flexShrink: 0 }} />
-                )}
-                <b style={{ color: C.ink, fontWeight: 700 }}>{w.label}</b>
-                {w.mark && <span style={{ color: C.faint }}>{w.fromDay}~{w.toDay}일</span>}
-                {/* 값까지 붙인다. 카드에서 눌러 왔을 때 "왜 이 달로 왔나"가 여기 있어야
-                    한다 — 라벨만 있으면 달 이름을 한 번 더 읽는 것으로 끝난다. */}
-                <span style={{ color: C.faint }}>· {r.n}</span>
-                <b style={{ color: C.ink, fontWeight: 700 }}>{r.v}</b>
+          {windows.map((w) => (
+            <span key={w.key}
+                  style={{ display: "flex", alignItems: "center", gap: S.xs,
+                           fontSize: T.tiny, color: C.sub2, minWidth: 0 }}>
+              <span aria-hidden style={{ width: 10, height: 2.5, borderRadius: 2,
+                                         background: C.ink, flexShrink: 0 }} />
+              <b style={{ color: C.ink, fontWeight: 700 }}>{w.label}</b>
+              {/* 어느 칸에 밑줄이 그어졌는지. 창이 결제일로 잡혀 있어 달을 넘나드는 해가
+                  있다(2025년 블프 직후 사흘은 12/1~3 이다 — 11/28 에 결제가 없다).
+                  날짜를 안 적으면 "블랙프라이데이인데 왜 12월?"이 남는다. */}
+              <span style={{ color: C.faint }}>
+                {Number(w.days[0].slice(8))}
+                {w.days.length > 1 && `~${Number(w.days.at(-1)!.slice(8))}`}일
               </span>
-            );
-          })}
+            </span>
+          ))}
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: S.xs }}>
             {WEEKDAYS.map((w, i) => (
@@ -361,7 +355,7 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
               if (d === null) return <span key={`b${i}`} />;
               const date = `${month}-${String(d).padStart(2, "0")}`;
               const row = byDate.get(date);
-              const inWindow = windows.find((w) => w.mark && d >= w.fromDay && d <= w.toDay);
+              const inWindow = markedDays.has(date);
               const isPicked = date === picked;
               // 색 진하기는 순매수 크기. 파랑이면 더 샀고 회색이면 더 팔았다.
               const strength = row ? Math.min(1, Math.abs(row.net) / c.scale) : 0;
@@ -505,18 +499,25 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                     ]}
                   />
                   <div style={{ display: "flex", flexDirection: "column", gap: S.sm }}>
-                    <Group
-                      head="해마다 오는 날 · 평소 대비"
-                      rows={CALENDAR_WINDOWS.map((w) => {
-                        const sample = sampleMonthFor(w.from[0]);
-                        return { ...windowRow(w), on: sample ? () => jumpTo(sample) : undefined };
-                      })}
-                    />
-                    {/* 위 넷만 몇 해치인지 안 적혀 있었다. 같은 카드의 역대 기록은 날짜가
-                        붙어 있어 스스로 말하는데, 구간 값은 여러 해를 모은 것이라 기간을
-                        밝히지 않으면 "언제 잰 거냐"가 남는다. */}
-                    <span style={{ fontSize: T.tiny, color: C.faint }}>
-                      2015~2026년을 모아 잰 값입니다 · 2월은 12년 내리 순매수였습니다
+                    <span style={{ fontSize: T.body, color: C.sub2, fontWeight: 600 }}>
+                      해마다 되풀이되는 때
+                    </span>
+                    <ul style={{ listStyle: "none", margin: 0, padding: "8px 0 0", display: "flex",
+                                 flexDirection: "column", gap: S.sm,
+                                 borderTop: `1px solid ${C.line}` }}>
+                      {CALENDAR_WINDOWS.map((w) => (
+                        <li key={w.key}>
+                          <WindowRow w={w} onJump={() => jumpToWindow(w.key)} />
+                        </li>
+                      ))}
+                    </ul>
+                    {/* ⚠️ 이 줄이 표를 정직하게 만든다. 없으면 "17번 중 12번"과
+                        "17번 중 16번"이 똑같아 보인다. 우연의 기준선을 밝혀야 독자가
+                        각 줄을 스스로 잰다. 실측값이다(80칸 전체의 중앙값이 63%). */}
+                    <span style={{ fontSize: T.tiny, color: C.faint, lineHeight: 1.5,
+                                   wordBreak: "keep-all" }}>
+                      2010~2026년 · 우연이라도 {CHANCE_BASELINE.of}번 중{" "}
+                      {CHANCE_BASELINE.hit}번쯤은 같은 방향입니다
                     </span>
                   </div>
                 </Card>
