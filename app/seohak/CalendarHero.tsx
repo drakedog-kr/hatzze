@@ -43,6 +43,8 @@ const T = { big: 20, head: 13.5, body: 12, sub: 11, tiny: 10 } as const;
 
 /** "M/D" — 달력 안이라 연도는 군더더기다. */
 const dayLabel = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8))}`;
+/** "YYYY/M/D" — 32년을 오가는 줄에는 연도가 있어야 한다. 구분자는 `dayLabel` 과 맞춘다. */
+const fullLabel = (date: string) => `${date.slice(0, 4)}/${dayLabel(date)}`;
 /** 간격도 4의 배수 넷으로만. */
 const S = { xs: 4, sm: 8, md: 12, lg: 16 } as const;
 /** 모서리 셋 — 마크 2 · 달력 칸 4 · 상자 R.control. 그 밖의 값은 쓰지 않는다. */
@@ -76,37 +78,34 @@ function shiftMonth(month: string, by: number) {
 }
 
 
-/* ── 사건 대 날짜 ────────────────────────────────────────────────────
-   ⚠️⚠️ **네 판째다.** 막대 → 막대 → 문장 목록 → 지금. 앞의 셋이 전부 "뭔지 모르겠다"를
-   받았다.
+/* ── 구간 넷을 줄로 ──────────────────────────────────────────────────
+   ⚠️⚠️ **다섯 판째다.** 막대 → 막대 → 문장 목록 → 한 문장 → 지금.
 
-   ⭐ 이번에 안 것: 이 블록은 **부정 결과**였다. "넷을 재 봤는데 셋은 아무 차이가
-   없었습니다" + 그대로 · 그대로 · 그대로. 부정 결과는 만든 사람에게나 흥미롭지
-   **읽는 사람이 가져갈 게 없다.** 게다가 "재 봤는데"는 우리 얘기지 독자 얘기가 아니다.
+   ⭐ 문장으로 줄여 놨던 게 "나스닥이 급락해도 … 사고파는 양은 그대로"였는데, 그건
+   **부정 결과**다. 읽는 사람이 가져갈 게 없다. 정작 값진 쪽(구간 넷이 실제로 얼마나
+   다른가)은 한 달에 하나씩, 그 달에 갔을 때만 띠로 보였다 — 넷을 다 본 사람이 없다.
 
-   알맹이는 문장 하나뿐이었다 — "사건엔 안 움직이는데 연말엔 움직인다". 네 줄은 실험
-   노트라 지운다. 근거 수치는 코드에 남아 있고(REACTIONS), 화면엔 결론만 낸다. */
-function EventsVsDates({ onJump }: { onJump?: () => void }) {
-  const yearend = CALENDAR_WINDOWS.find((w) => w.key === "yearend")!;
-  const yearendPct = Math.round(Math.abs(yearend.sell - 1) * 100);
+   그래서 문장을 지우고 넷을 그냥 줄로 편다. 설명이 아니라 형태로.
 
-  return (
-    <p style={{ margin: 0, paddingTop: S.md, borderTop: `1px solid ${C.line}`,
-                fontSize: T.body, lineHeight: 1.6, color: C.sub, wordBreak: "keep-all" }}>
-      나스닥이 급락해도, 환율이 뛰어도, 월급날이 와도{" "}
-      <b style={{ color: C.ink }}>사고파는 양은 그대로</b>입니다. 정작 달라지는 건 날짜라,
-      연말 마지막 주에는 파는 양이 <b style={{ color: C.ink }}>{yearendPct}%</b> 늘어납니다.{" "}
-      {onJump && (
-        <button type="button" onClick={onJump}
-                style={{ border: "none", background: "none", padding: 0, cursor: "pointer",
-                         font: "inherit", color: C.blue, fontWeight: 700,
-                         textDecoration: "underline", textUnderlineOffset: 2 }}>
-          그 달 보기
-        </button>
-      )}
-    </p>
-  );
+   ⭐ 값은 **더 크게 어긋난 쪽**만 낸다. 구간마다 이야기하는 축이 다르다(새해는 사자가
+   −26%, 연말은 팔자가 +18%). 한 축으로 통일하면 그 구간의 요점을 놓친다. 대신 어느
+   축인지를 값 옆에 붙여서 헷갈릴 자리를 없앤다. */
+function windowRow(w: (typeof CALENDAR_WINDOWS)[number]) {
+  const buyOff = Math.abs(w.buy - 1);
+  const sellOff = Math.abs(w.sell - 1);
+  const [side, ratio] = buyOff >= sellOff ? ["사는 양", w.buy] : ["파는 양", w.sell];
+  const pct = Math.round((ratio - 1) * 100);
+  return { k: w.label, n: side, v: `${pct >= 0 ? "+" : "−"}${Math.abs(pct)}%` };
 }
+
+/**
+ * 달력 순서로 — 11월 → 12월 → 1월. 겨울 한 철의 이야기가 되어 순서 자체가 읽힌다.
+ * 상수 배열의 순서(새해가 먼저)를 그대로 쓰면 이야기가 뒤에서부터 시작한다.
+ */
+const WINDOWS_BY_SEASON = [...CALENDAR_WINDOWS].sort((a, b) => {
+  const key = (m: number) => (m >= 11 ? m - 12 : m);
+  return key(a.from[0]) - key(b.from[0]) || a.from[1] - b.from[1];
+});
 
 /**
  * 이 카드의 **유일한 줄 꼴** — 라벨 · 보조 · 값.
@@ -135,6 +134,65 @@ function Row({ k, n, v, on }: { k: string; n: string; v: string; on?: () => void
     </button>
   ) : (
     <span style={style}>{body}</span>
+  );
+}
+
+type RowSpec = { k: string; n: string; v: string; on?: () => void };
+
+/** 제목 한 줄 + 그 아래 줄 목록. 이 카드에서 줄이 모이는 자리는 전부 이 꼴이다. */
+function Group({ head, rows }: { head?: string; rows: (RowSpec | null | undefined | false)[] }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: S.sm }}>
+      {head && <span style={{ fontSize: T.body, color: C.sub2, fontWeight: 600 }}>{head}</span>}
+      <ul style={{ listStyle: "none", margin: 0, padding: "8px 0 0", display: "flex",
+                   flexDirection: "column", gap: S.xs, borderTop: `1px solid ${C.line}` }}>
+        {rows.filter(Boolean).map((r) => (
+          <li key={(r as RowSpec).k}>
+            <Row {...(r as RowSpec)} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** 세 상자가 공유하는 껍데기. 옅은 바닥과 여백이 여기 한 곳에만 적혀 있다. */
+function Card({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ flex: 1, minWidth: 0, background: C.soft, borderRadius: R.control, padding: 12,
+                  display: "flex", flexDirection: "column", gap: S.md,
+                  justifyContent: "space-between" }}>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * '얼마' 상자 — 제목 · 큰 금액 · 줄 목록. 이 달과 고른 날이 이 꼴을 쓴다.
+ *
+ * ⚠️ 오른쪽 역대 카드는 **일부러 이 꼴이 아니다.** 저건 재는 값이 아니라 찾아보는
+ * 목록이라 큰 숫자가 없다. 앞서 들은 지적("크기도 제각각")은 **뜻 없는 차이**에 대한
+ * 것이었다 — 종류가 다르면 달라야 하고, 종류가 같으면(이 달·고른 날) 같아야 한다.
+ */
+function Box({ head, amount, rows }: {
+  head: string; amount: number; rows: (RowSpec | null | undefined | false)[];
+}) {
+  return (
+    <Card>
+      <div style={{ display: "flex", flexDirection: "column", gap: S.sm }}>
+        <span style={{ fontSize: T.body, color: C.sub2, fontWeight: 600 }}>{head}</span>
+        <span style={{ display: "flex", alignItems: "baseline", gap: S.sm, flexWrap: "wrap" }}>
+          <b style={{ fontFamily: MONO, fontSize: T.big, fontWeight: 800,
+                      color: amount >= 0 ? BUY : SELL, letterSpacing: "-0.02em" }}>
+            {usd(Math.abs(amount))}
+          </b>
+          <span style={{ fontSize: T.body, color: C.sub }}>
+            더 {amount >= 0 ? "샀습니다" : "팔았습니다"}
+          </span>
+        </span>
+      </div>
+      <Group rows={rows} />
+    </Card>
   );
 }
 
@@ -175,6 +233,21 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
     );
     if (pick) setPicked(pick.date);
   };
+  /**
+   * 기록 줄을 눌렀을 때 달력을 그 날로 옮기는 손잡이. **받아 둔 24개월 안일 때만** 준다.
+   *
+   * 32년 기록이라 1994년처럼 달력이 못 가는 날이 섞인다. 그런 줄은 버튼이 아니라
+   * 그냥 글로 남는다(밑줄이 없어져서 눌러도 되는지 손이 먼저 안다). 32년치를 다 실어
+   * 어디든 가게도 해 봤는데, 열 배열로 눌러도 브로틀리 82KB 라(지금 16.5KB) 접었다.
+   */
+  const jumpable = (date: string) =>
+    byDate.has(date)
+      ? () => {
+          setMonth(date.slice(0, 7));
+          setPicked(date);
+        }
+      : undefined;
+
   const goMonth = (by: number) => {
     const next = shiftMonth(month, by);
     setMonth(next);
@@ -188,14 +261,13 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
    * 자료가 없어서, 눌러서 가면 달력이 텅 빈다. 받아 둔 구간 안에서 같은 달 중
    * 가장 최근 것으로 데려간다(지난해 11월).
    */
-  const aheadSample = useMemo(() => {
-    if (!ahead) return undefined;
-    const mm = String(ahead.window.from[0]).padStart(2, "0");
-    return [...new Set(c.days.map((d) => d.date.slice(0, 7)))]
-      .filter((m) => m.endsWith(`-${mm}`))
-      .sort()
-      .pop();
-  }, [ahead, c.days]);
+  const loadedMonths = useMemo(
+    () => [...new Set(c.days.map((d) => d.date.slice(0, 7)))].sort(),
+    [c.days],
+  );
+  const sampleMonthFor = (month: number) =>
+    loadedMonths.filter((m) => m.endsWith(`-${String(month).padStart(2, "0")}`)).pop();
+  const aheadSample = ahead ? sampleMonthFor(ahead.window.from[0]) : undefined;
 
   const cells: (number | null)[] = [
     ...Array.from({ length: meta.firstWeekday }, () => null),
@@ -210,26 +282,6 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
   const monthSell = monthDays.reduce((s, d) => s + d.sell, 0);
   const topBuy = monthDays.reduce<CalendarDay | null>((a, d) => (!a || d.net > a.net ? d : a), null);
   const topSell = monthDays.reduce<CalendarDay | null>((a, d) => (!a || d.net < a.net ? d : a), null);
-  /** 받아 둔 구간 안에서 가장 최근 12월. '연말 보기'가 여기로 간다. */
-  const decemberMonth = useMemo(() => {
-    const months = [...new Set(c.days.map((d) => d.date.slice(0, 7)))].sort().reverse();
-    return months.find((m) => m.endsWith("-12"));
-  }, [c.days]);
-  const jumpToDecember = () => {
-    if (!decemberMonth) return;
-    setMonth(decemberMonth);
-    const inDec = c.days.filter((d) => d.date.startsWith(decemberMonth));
-    // ⚠️ 구간의 **첫** 거래일을 고르면 안 된다. 12-26 은 성탄 휴장 여파로 결제가 $1
-    // 뿐인 해가 있어서, 눌러 놓고 "$1 더 팔았습니다"가 뜬다. 구간 안에서 **가장 크게
-    // 움직인 날**로 데려가야 오른쪽 칸이 그 구간의 이야기를 한다.
-    const inWindow = inDec.filter((d) => Number(d.date.slice(8)) >= 26);
-    const pick = (inWindow.length ? inWindow : inDec).reduce<CalendarDay | null>(
-      (a, d) => (!a || Math.abs(d.net) > Math.abs(a.net) ? d : a),
-      null,
-    );
-    if (pick) setPicked(pick.date);
-  };
-
   return (
     <section className="hz-sheet">
       <SectionHead
@@ -401,11 +453,13 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
               규칙이 안 보여 지저분해진다. 지금은 **한 가지 줄 꼴**(라벨 · 보조 · 값)만
               쓰고, 그 줄을 만드는 자리도 `Row` 하나뿐이다. */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: S.sm }}>
-            {[
-              {
-                head: `이 달 · ${monthDays.length}거래일`,
-                amount: monthNet,
-                rows: [
+            {/* 왼쪽 칸 — 이 달 위, 고른 날 아래. 둘은 '지금 보고 있는 것'이라 한 묶음이다. */}
+            <div style={{ flex: "1 1 min(240px, 100%)", minWidth: 0, display: "flex",
+                          flexDirection: "column", gap: S.sm }}>
+              <Box
+                head={`이 달 · ${monthDays.length}거래일`}
+                amount={monthNet}
+                rows={[
                   { k: "산 금액", n: "", v: usd(monthBuy) },
                   { k: "판 금액", n: "", v: usd(monthSell) },
                   // ⚠️ 위 두 줄은 **총액**이고 이 두 줄은 **차액**이다. 같은 칸에 부호
@@ -419,55 +473,70 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                     k: "가장 많이 판 날", n: dayLabel(topSell.date), v: `−${usd(Math.abs(topSell.net))}`,
                     on: () => setPicked(topSell.date),
                   },
-                ],
-              },
-              day && {
-                head: `고른 날 · ${day.date}${pickedWindow ? ` · ${pickedWindow.label}` : ""}`,
-                amount: day.net,
-                rows: [
-                  { k: "산 금액", n: `${cnt(day.buyCount)}번`, v: usd(day.buy) },
-                  { k: "판 금액", n: `${cnt(day.sellCount)}번`, v: usd(day.sell) },
-                  { k: "한 번 살 때", n: "평균",
-                    v: day.buyCount ? usd(day.buy / day.buyCount) : "—" },
-                ],
-              },
-            ]
-              .filter(Boolean)
-              .map((box) => {
-                const b = box as {
-                  head: string; amount: number;
-                  rows: ({ k: string; n: string; v: string; on?: () => void } | null | undefined)[];
-                };
-                return (
-                  <div key={b.head} style={{ flex: "1 1 min(240px, 100%)", minWidth: 0,
-                                             background: C.soft, borderRadius: R.control,
-                                             padding: "12px 12px", display: "flex",
-                                             flexDirection: "column", gap: S.sm }}>
-                    <span style={{ fontSize: T.body, color: C.sub2, fontWeight: 600 }}>{b.head}</span>
-                    <span style={{ display: "flex", alignItems: "baseline", gap: S.sm, flexWrap: "wrap" }}>
-                      <b style={{ fontFamily: MONO, fontSize: T.big, fontWeight: 800,
-                                  color: b.amount >= 0 ? BUY : SELL, letterSpacing: "-0.02em" }}>
-                        {usd(Math.abs(b.amount))}
-                      </b>
-                      <span style={{ fontSize: T.body, color: C.sub }}>
-                        더 {b.amount >= 0 ? "샀습니다" : "팔았습니다"}
-                      </span>
-                    </span>
-                    <ul style={{ listStyle: "none", margin: 0, padding: "8px 0 0", display: "flex",
-                                 flexDirection: "column", gap: S.xs,
-                                 borderTop: `1px solid ${C.line}` }}>
-                      {b.rows.filter(Boolean).map((r) => (
-                        <li key={r!.k}>
-                          <Row {...r!} />
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                );
-              })}
-          </div>
+                ]}
+              />
+              {day && (
+                <Box
+                  head={`고른 날 · ${day.date}${pickedWindow ? ` · ${pickedWindow.label}` : ""}`}
+                  amount={day.net}
+                  rows={[
+                    { k: "산 금액", n: `${cnt(day.buyCount)}번`, v: usd(day.buy) },
+                    { k: "판 금액", n: `${cnt(day.sellCount)}번`, v: usd(day.sell) },
+                    { k: "한 번 살 때", n: "평균",
+                      v: day.buyCount ? usd(day.buy / day.buyCount) : "—" },
+                  ]}
+                />
+              )}
+            </div>
 
-          <EventsVsDates onJump={decemberMonth ? jumpToDecember : undefined} />
+            {/* 오른쪽 칸 — 32년 기록.
+                ⭐ 왼쪽 두 상자와 **줄 라벨을 일부러 겹쳐 뒀다**('가장 많이 산 날'·'가장
+                많이 판 날'). 같은 말이 이 달과 32년에 나란히 있어야 지금이 어느 만큼인지
+                한눈에 잡힌다. 그래서 이 칸도 왼쪽과 같은 순매수를 쓴다 — 여기만 총액으로
+                재면 같은 라벨이 다른 뜻이 된다.
+                ⚠️ '가장 바빴던 날'의 값만 금액이 아니라 횟수다. 단위(번)가 달라 금액과
+                섞여 읽힐 일이 없어서 이 줄만 예외로 둔다. */}
+            {c.records && (
+              <div style={{ flex: "1 1 min(240px, 100%)", minWidth: 0, display: "flex" }}>
+                <Card>
+                  <Group
+                    head="역대 기록"
+                    rows={[
+                      {
+                        k: "가장 많이 산 날", n: fullLabel(c.records.topBuy.date),
+                        v: `+${usd(Math.abs(c.records.topBuy.value))}`,
+                        on: jumpable(c.records.topBuy.date),
+                      },
+                      {
+                        k: "가장 많이 판 날", n: fullLabel(c.records.topSell.date),
+                        v: `−${usd(Math.abs(c.records.topSell.value))}`,
+                        on: jumpable(c.records.topSell.date),
+                      },
+                      {
+                        k: "가장 바빴던 날", n: fullLabel(c.records.busiest.date),
+                        v: `${cnt(c.records.busiest.value)}번`,
+                        on: jumpable(c.records.busiest.date),
+                      },
+                      // 1994-10-21. 매수 딱 한 건으로 표가 시작한다. 위 세 줄이 전부
+                      // 최근인 것과 나란히 놓이면 32년이 한눈에 들어온다.
+                      {
+                        k: "기록의 첫 날", n: fullLabel(c.records.first.date),
+                        v: `+${usd(Math.abs(c.records.first.value))}`,
+                        on: jumpable(c.records.first.date),
+                      },
+                    ]}
+                  />
+                  <Group
+                    head="해마다 오는 날 · 평소 대비"
+                    rows={WINDOWS_BY_SEASON.map((w) => {
+                      const sample = sampleMonthFor(w.from[0]);
+                      return { ...windowRow(w), on: sample ? () => jumpTo(sample) : undefined };
+                    })}
+                  />
+                </Card>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

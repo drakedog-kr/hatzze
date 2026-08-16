@@ -5,7 +5,6 @@ import {
   getPeers,
   getSeohakOverview,
   type Cohort,
-  type Peer,
   type SeohakOverview,
 } from "@/lib/seohak-data";
 import { getSeohakCalendar } from "@/lib/seohak-calendar";
