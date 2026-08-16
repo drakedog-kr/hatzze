@@ -118,8 +118,31 @@ export type SeohakDaily = {
 
   /** ── 사분면 ── */
   regime: { name: Quadrant; buy: number; sell: number };
-  /** 최근 40영업일 궤적(꼬리). 오늘이 마지막. */
-  trail: { date: string; buy: number; sell: number }[];
+  /**
+   * 최근 120영업일의 **실제 금액**. 배수가 아니라 원자료다.
+   *
+   * ⚠️⚠️ 앞서 화면은 `trail`(20일 창 중앙값의 배수)을 선으로 그렸는데 두 가지가 틀렸다.
+   *  ① **모양이 없다.** 매수·매도는 둘 다 전체 활동량에 끌려 상관이 높은데, 거기에
+   *     20일 중앙값을 씌우면 두 번 평활된 선이 되어 나란히 흐를 뿐이다.
+   *  ② **나중에 값이 바뀐다.** 기준이 ±60영업일 중앙값이라 최근 날짜는 '뒤쪽 60일'이
+   *     아직 없다. 실측(262표본)으로 **65%가 5%p 넘게** 바뀌고 10~90% 구간이
+   *     −9.3 ~ +19.7%p 였다. 헤드라인 숫자가 나중에 뒤집히면 안 된다.
+   *
+   * 원자료 막대는 하루하루가 튀어 모양이 있고, 아래 `usual`(고정 창 중앙값)은
+   * 시간이 지나도 다시 안 바뀐다.
+   */
+  recent: { date: string; buy: number; sell: number }[];
+  /** '평소' — 받아 온 구간(약 2년) 일별 금액의 중앙값. 고정 창이라 값이 안 흔들린다. */
+  usual: { buy: number; sell: number };
+  /**
+   * 최근 20영업일이 '평소'의 몇 %인가.
+   *
+   * ⚠️⚠️ **`regime` 과 기준이 다르다.** regime 은 ±60일 중앙값으로 정규화한 값이라
+   * 최근 날짜에서 나중에 바뀐다(실측 65%가 5%p 초과). 화면이 그림에는 `usual` 선을
+   * 긋고 옆 숫자는 regime 을 쓰면 **같은 '평소'라는 말이 두 기준을 가리킨다.**
+   * 그래서 화면용 비율은 여기서 `usual` 하나로 낸다.
+   */
+  vsUsual: { buy: number; sell: number };
 
   /** ── 사자와 팔자의 결 ──
    *  비율만 두면 화면이 "75% × 113%" 같은 식을 쓰게 된다. 곱셈은 읽는 사람에게
@@ -185,10 +208,15 @@ export async function getSeohakDaily(): Promise<SeohakDaily> {
           ? "팔자만 늘었다"
           : "둘 다 줄었다";
 
-  const trail: SeohakDaily["trail"] = [];
-  for (let i = Math.max(WINDOW, last - 39); i <= last; i++) {
-    trail.push({ date: rows[i].date, buy: windowRel(buys, i), sell: windowRel(sells, i) });
-  }
+  // 화면에 그릴 원자료. 120영업일이면 약 반년이라 계절 한 바퀴가 안 들어가도
+  // "요즘"의 모양은 다 담긴다.
+  const recent = rows.slice(-120).map((r) => ({ date: r.date, buy: r.buy, sell: r.sell }));
+  const usual = { buy: median(buys), sell: median(sells) };
+  const last20 = rows.slice(-WINDOW);
+  const vsUsual = {
+    buy: usual.buy ? (median(last20.map((r) => r.buy)) / usual.buy) * 100 : 100,
+    sell: usual.sell ? (median(last20.map((r) => r.sell)) / usual.sell) * 100 : 100,
+  };
 
   // 회전 — 받아 온 구간의 마지막 250영업일(약 1년).
   const yearFrom = Math.max(0, rows.length - 250);
@@ -212,7 +240,9 @@ export async function getSeohakDaily(): Promise<SeohakDaily> {
     today: t,
     perTrade: t.buyCount ? t.buy / t.buyCount : 0,
     regime: { name, buy: relBuy, sell: relSell },
-    trail,
+    recent,
+    usual,
+    vsUsual,
     countRatio:
       win20.reduce((s, r) => s + r.sellCount, 0) / win20.reduce((s, r) => s + r.buyCount, 0),
     sizeRatio:
