@@ -45,6 +45,14 @@ export type SeohakCalendar = {
   lastMonth: string;
   /** 칸 색의 기준. 이 구간 순매수 절댓값의 상위 10% 값이다. */
   scale: number;
+  /**
+   * 달마다 접은 산 것·판 것. 이미 받아 둔 일별을 접기만 하므로 질의가 안 는다.
+   *
+   * ⭐ 화면은 이 둘을 **막대 두 개로만** 그린다. '순매수'도 '평소의 %'도 안 쓴다 —
+   * 파생 개념은 매번 각주로 떠받쳐야 했고, 각주가 필요하다는 것 자체가 안 직관적이라는
+   * 증거였다(Hun 지적). 산 것과 판 것은 그 자체로 설명이 필요 없다.
+   */
+  months: { month: string; buy: number; sell: number }[];
 };
 
 export async function getSeohakCalendar(): Promise<SeohakCalendar | null> {
@@ -97,10 +105,20 @@ export async function getSeohakCalendar(): Promise<SeohakCalendar | null> {
   const sorted = days.map((d) => Math.abs(d.net)).sort((a, b) => a - b);
   const scale = sorted[Math.floor(sorted.length * 0.9)] || 1;
 
+  const byMonth = new Map<string, { month: string; buy: number; sell: number }>();
+  for (const d of days) {
+    const key = d.date.slice(0, 7);
+    const slot = byMonth.get(key) ?? { month: key, buy: 0, sell: 0 };
+    slot.buy += d.buy;
+    slot.sell += d.sell;
+    byMonth.set(key, slot);
+  }
+
   return {
     asOf,
     asOfMonth: asOf.slice(0, 7),
     days,
+    months: [...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month)),
     firstMonth: days[0].date.slice(0, 7),
     lastMonth: asOf.slice(0, 7),
     scale,

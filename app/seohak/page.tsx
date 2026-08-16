@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
 
-import { getSeohakDaily } from "@/lib/seohak-daily";
 import {
   getPeers,
   getSeohakOverview,
   type Cohort,
-  type Peer,
   type SeohakOverview,
 } from "@/lib/seohak-data";
 import { getSeohakCalendar } from "@/lib/seohak-calendar";
@@ -273,9 +271,8 @@ export default async function SeohakPage() {
   // 아래 셋은 서로 의존이 없다. 순서대로 await 하면 왕복이 앞뒤로 붙으므로 함께 띄운다.
   // ⚠️ 분기·ETF 두 층은 표가 아직 없을 수 있어 null 을 돌려준다(마이그레이션 043·042).
   // 그 경우 그 섹션만 접고 나머지는 그대로 뜬다.
-  const [peers, daily, quarterly, etf, equityType, calendar, years] = await Promise.all([
+  const [peers, quarterly, etf, equityType, calendar, years] = await Promise.all([
     getPeers(ov.asOf),
-    getSeohakDaily(),
     getSeohakQuarterly(),
     getSeohakEtf(),
     getSeohakEquityType(),
@@ -306,8 +303,8 @@ export default async function SeohakPage() {
 
           기준은 **갱신 주기가 아니라 질문**이다. 주기로 나누면 "매일/매월/분기"가
           되는데, 그건 우리 파이프라인 사정이지 읽는 사람의 관심이 아니다. */}
-      <SectionCaps label="어떻게 사고파나" count={3} />
-      <DailySection d={daily} years={years} />
+      <SectionCaps label="어떻게 사고파나" count={2} />
+      <DailySection months={calendar?.months ?? null} years={years} />
 
       <SectionCaps label="무엇에 담았나" count={etf ? 4 : 1} />
       {equityType && <EquityTypeSection e={equityType} />}

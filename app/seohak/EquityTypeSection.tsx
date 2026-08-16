@@ -60,7 +60,7 @@ function Column({ m, dim, label }: { m: EquityMix; dim?: boolean; label?: string
 }
 
 export function EquityTypeSection({ e }: { e: SeohakEquityType }) {
-  const { latest, first, mover, worldLatest } = e;
+  const { latest, mover, worldLatest } = e;
   const worldMover = worldLatest[`${mover.key}Pct`] - e.world[0][`${mover.key}Pct`];
 
   return (
