@@ -350,12 +350,10 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
             {/* 달을 몇 번 넘기고 나면 돌아올 길이 화살표뿐이다. '오늘'은 자료의 마지막
                 결제일이다(시트 머리의 기준일과 같은 날). */}
             <button type="button" onClick={() => { setMonth(c.asOfMonth); setPicked(c.asOf); }}
-                    disabled={month === c.asOfMonth && picked === c.asOf}
+                    className="hz-jump"
                     style={{ marginLeft: "auto", fontSize: T.tiny, fontFamily: "inherit",
                              padding: "3px 8px", borderRadius: R.pill,
-                             border: `1px solid ${C.line}`, background: C.card,
-                             color: month === c.asOfMonth && picked === c.asOf ? C.disabled : C.sub,
-                             cursor: month === c.asOfMonth && picked === c.asOf ? "default" : "pointer" }}>
+                             border: `1px solid ${C.line}`, color: C.sub, cursor: "pointer" }}>
               오늘
             </button>
           </div>
@@ -568,8 +566,10 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                     <span style={{ fontSize: T.body, color: C.sub2, fontWeight: 600 }}>
                       해마다 되풀이되는 때
                     </span>
-                    <ul style={{ listStyle: "none", margin: 0, padding: "8px 0 0", display: "flex",
-                                 flexDirection: "column", gap: S.sm,
+                    {/* 여덟 줄이라 한 줄에 둘씩. 칸이 190px 아래로 좁아지면 한 줄로 접힌다. */}
+                    <ul style={{ listStyle: "none", margin: 0, padding: "8px 0 0", display: "grid",
+                                 gridTemplateColumns: "repeat(auto-fit, minmax(min(190px, 100%), 1fr))",
+                                 gap: S.sm, columnGap: S.md,
                                  borderTop: `1px solid ${C.line}` }}>
                       {CALENDAR_WINDOWS.map((w) => (
                         <li key={w.key}>

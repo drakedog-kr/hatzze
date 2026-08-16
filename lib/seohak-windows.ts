@@ -61,29 +61,80 @@ export type CalendarWindow = {
   /** `of` 해 중 `hit` 해가 같은 방향이었다. 이게 이 카드의 근거다. */
   hit: number;
   of: number;
-  /** 그해 이 창에 드는 결제일을 뽑는 법. 고정 날짜가 아니라 결제일 순서로 잡는다. */
-  pick: "afterBlackFriday" | "yearEnd" | "yearStart" | "febFirstHalf";
+  pick: Pick;
 };
 
+type Pick =
+  | { at: "yearStart" | "yearEnd" }
+  | { at: "after"; on: "blackFriday" | "mlk" | "seol" | "chuseok" }
+  | { at: "range"; from: string; to: string };
+
+/**
+ * ⚠️ 여덟 전부 **같은 자**로 잰 값이다 — 창 주변 ±30결제일(±5 제외) 대비, 해마다 한 값,
+ * 그 값이 어느 쪽이었나를 센다. 자를 섞으면 숫자가 바뀐다(2월 첫 보름은 한 해 기준선으로
+ * 재면 +28% 17/17 인데, 주변 기준선으로는 +13% 14/17 이다. 계절을 떼어 내려면 주변이
+ * 맞아서 이쪽을 쓴다).
+ *
+ * ⚠️ '분기말 사흘'은 뺐다. 재고 보니 코드가 6·9월 마지막 **이틀**만 보고 있어서 라벨과
+ * 다른 것을 재고 있었다. 제대로 잡으면 12월 말과 겹친다.
+ *
+ * ⛔ 아래 순서는 **달력 순서**다. 설날·추석은 음력이라 해마다 3주씩 옮겨 다니므로 대략
+ * 자리로만 끼워 둔 것이다.
+ */
 export const CALENDAR_WINDOWS: CalendarWindow[] = [
-  { key: "blackfriday", label: "블랙프라이데이 직후", phrase: "평소보다 19% 덜 삽니다",
-    hit: 13, of: 16, pick: "afterBlackFriday" },
-  { key: "yearend", label: "그해 마지막 사흘", phrase: "평소보다 29% 더 팝니다",
-    hit: 14, of: 16, pick: "yearEnd" },
   { key: "newyear", label: "새해 첫 사흘", phrase: "평소보다 33% 덜 삽니다",
-    hit: 16, of: 17, pick: "yearStart" },
-  { key: "feb", label: "2월 전반", phrase: "평소보다 28% 더 삽니다",
-    hit: 17, of: 17, pick: "febFirstHalf" },
+    hit: 17, of: 17, pick: { at: "yearStart" } },
+  { key: "mlk", label: "마틴루터킹데이 직후", phrase: "평소보다 17% 덜 팝니다",
+    hit: 13, of: 17, pick: { at: "after", on: "mlk" } },
+  { key: "seol", label: "설날 직후 사흘", phrase: "평소보다 19% 덜 팝니다",
+    hit: 12, of: 17, pick: { at: "after", on: "seol" } },
+  { key: "feb", label: "2월 첫 보름", phrase: "평소보다 13% 더 삽니다",
+    hit: 14, of: 17, pick: { at: "range", from: "02-01", to: "02-15" } },
+  { key: "june", label: "6월 마지막 주", phrase: "평소보다 8% 더 팝니다",
+    hit: 13, of: 17, pick: { at: "range", from: "06-25", to: "06-30" } },
+  { key: "chuseok", label: "추석 직후 사흘", phrase: "평소보다 17% 덜 팝니다",
+    hit: 12, of: 16, pick: { at: "after", on: "chuseok" } },
+  { key: "blackfriday", label: "블랙프라이데이 직후", phrase: "평소보다 17% 덜 삽니다",
+    hit: 14, of: 16, pick: { at: "after", on: "blackFriday" } },
+  { key: "yearend", label: "그해 마지막 사흘", phrase: "평소보다 29% 더 팝니다",
+    hit: 14, of: 16, pick: { at: "yearEnd" } },
 ];
 
 /** 우연이라도 이만큼은 같은 방향으로 나온다. 화면 각주가 인용한다. */
 export const CHANCE_BASELINE = { hit: 11, of: 17 };
 
-/** 그해 추수감사절(11월 넷째 목요일) 다음 날. */
-function blackFriday(year: number) {
-  const first = new Date(Date.UTC(year, 10, 1)).getUTCDay();
-  const day = 1 + ((4 - first + 7) % 7) + 21 + 1;
-  return `${year}-11-${String(day).padStart(2, "0")}`;
+/**
+ * 음력 명절. **계산으로 못 구해서 손으로 적는다.**
+ *
+ * ⚠️⚠️ 표에 없는 해는 그 창이 조용히 빠진다. 자료가 2027년으로 넘어가기 전에 채울 것.
+ * 여기 값이 틀리면 창이 엉뚱한 날을 가리키므로, 넣을 때 반드시 달력과 대조할 것.
+ */
+const LUNAR: Record<string, { seol: string; chuseok: string }> = {
+  "2015": { seol: "02-19", chuseok: "09-27" }, "2016": { seol: "02-08", chuseok: "09-15" },
+  "2017": { seol: "01-28", chuseok: "10-04" }, "2018": { seol: "02-16", chuseok: "09-24" },
+  "2019": { seol: "02-05", chuseok: "09-13" }, "2020": { seol: "01-25", chuseok: "10-01" },
+  "2021": { seol: "02-12", chuseok: "09-21" }, "2022": { seol: "02-01", chuseok: "09-10" },
+  "2023": { seol: "01-22", chuseok: "09-29" }, "2024": { seol: "02-10", chuseok: "09-17" },
+  "2025": { seol: "01-29", chuseok: "10-06" }, "2026": { seol: "02-17", chuseok: "09-25" },
+};
+
+const nthDow = (year: number, month: number, dow: number, n: number) => {
+  const first = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+  const day = 1 + ((dow - first + 7) % 7) + (n - 1) * 7;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+};
+const shiftDays = (date: string, by: number) => {
+  const t = new Date(`${date}T00:00:00Z`);
+  t.setUTCDate(t.getUTCDate() + by);
+  return t.toISOString().slice(0, 10);
+};
+/** 이벤트 날짜. 없으면 그해는 건너뛴다. */
+function anchor(on: string, year: string) {
+  const y = Number(year);
+  if (on === "blackFriday") return shiftDays(nthDow(y, 11, 4, 4), 1); // 추수감사절 다음 날
+  if (on === "mlk") return nthDow(y, 1, 1, 3);                        // 1월 셋째 월요일
+  const lunar = LUNAR[year];
+  return lunar ? `${year}-${on === "seol" ? lunar.seol : lunar.chuseok}` : null;
 }
 
 /**
@@ -105,13 +156,15 @@ export function windowDates(dates: string[]): Map<string, Set<string>> {
   for (const [year, days] of byYear) {
     for (const w of CALENDAR_WINDOWS) {
       let picked: string[] = [];
-      if (w.pick === "yearStart") picked = days.slice(0, 3);
-      else if (w.pick === "yearEnd") picked = days.at(-1)! >= `${year}-12-20` ? days.slice(-3) : [];
-      else if (w.pick === "febFirstHalf") picked = days.filter((d) => d.slice(5) <= "02-15" && d.slice(5) >= "02-01");
-      else {
-        const bf = blackFriday(Number(year));
-        const from = days.findIndex((d) => d >= bf);
-        picked = from < 0 ? [] : days.slice(from, from + 3);
+      if (w.pick.at === "yearStart") picked = days.slice(0, 3);
+      else if (w.pick.at === "yearEnd") picked = days.at(-1)! >= `${year}-12-20` ? days.slice(-3) : [];
+      else if (w.pick.at === "range") {
+        const { from, to } = w.pick;
+        picked = days.filter((d) => d.slice(5) >= from && d.slice(5) <= to);
+      } else if (w.pick.at === "after") {
+        const at = anchor(w.pick.on, year);
+        const i = at ? days.findIndex((d) => d >= at) : -1;
+        picked = i < 0 ? [] : days.slice(i, i + 3);
       }
       for (const d of picked) out.get(w.key)!.add(d);
     }
