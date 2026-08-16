@@ -35,14 +35,50 @@ export type CalendarDay = {
   net: number;
 };
 
-/* ⛔ **역대 기록(가장 많이 산 날 · 판 날 · 바빴던 날 · 표의 첫 날)은 화면에서 뺐다.**
-   실측이라 틀릴 게 없었지만 이 시트가 하려는 말('되풀이')과 무관해서다.
+/** 32년 기록 하나. 날짜와 값, 그리고 그 값이 무엇인지. */
+export type CalendarRecord = { date: string; value: number };
 
-   ⭐ 되살릴 일이 있으면 지운 코드를 다시 짜지 말고 히스토리를 볼 것. 순매수 기록을
-   전량조회 없이 정확히 뽑는 요령이 거기 있다 — PostgREST 는 식으로 정렬하지 못하는데
-   (순매수는 컬럼이 아니라 buy−sell 이다), **순매수가 X 를 넘으려면 매수액도 X 를
-   넘는다**는 성질로 후보를 좁히면 7,059행 대신 457행만 보면 된다. 근사가 아니라
-   정확한 답이다. */
+/**
+ * 32년치에서 뽑은 기록들. 달력이 든 24개월 **밖**에도 있을 수 있다.
+ *
+ * ## ⚠️⚠️ 비율로 뽑으면 전부 1999~2005년이 나온다
+ *
+ * "그 시절 평소 대비 몇 배"로 특별한 날을 고르려 했다. 두 가지로 재 봤는데 둘 다 못 쓴다.
+ *
+ *   - 앞 250거래일 중앙값 대비 → 1위 1999-05-31 이 **×11,785**. 그 무렵 하루 매매가
+ *     수천 달러라 분모가 0에 가깝다. 상위 12개가 전부 1999~2005년이었다.
+ *   - 앞뒤 60거래일 중앙값 대비(추세를 뺀 창) → 1위 2018-01-19 ×4.11, 순매수 상위
+ *     10개 중 **9개가 2017년 10월**. 여전히 분모가 작던 시절만 골라낸다.
+ *
+ * 게다가 앞 창은 **추세와 사건을 섞는다**. 2020년 3월 코로나 주간이 ×3.8~5.4 로 뜨는데,
+ * 그건 그 주가 특별해서가 아니라 분모가 2019년(하루 $117M)이고 2020년 평균은 $680M
+ * 이어서다. 정작 그 주는 2020년 평균에도 못 미쳤다.
+ *
+ * 그래서 **원값 기록만 쓴다.** 시장이 32년간 계속 커졌으니 기록은 대체로 최근에 몰리는데,
+ * 그게 사실이다. 1994년의 하루와 2026년의 하루를 억지로 같은 자로 재지 않는다.
+ *
+ * ## 순매수 기록을 정렬 없이 정확히 뽑는 법
+ *
+ * PostgREST 는 식으로 정렬하지 못한다 — 순매수는 컬럼이 아니라 `buy − sell` 이다.
+ * 전량(7,059행)을 훑는 대신 **상한을 아는 성질**을 쓴다.
+ *
+ *   순매수 > X 인 날은 반드시 매수액 > X 다(매도액은 음수가 될 수 없으므로).
+ *
+ * 받아 둔 24개월의 최대 순매수를 X 로 잡으면, 역대 최대 순매수일은 반드시
+ * `buy_amount ≥ X` 인 날 안에 있다. 오늘 기준 그런 날이 332일뿐이라 한 번에 받는다.
+ * 매도 쪽도 대칭이다(411일). 근사가 아니라 **정확한 답**이고, 전량 조회의 1/10 이다.
+ */
+export type SeohakRecords = {
+  /** 역대 최대 순매수일. */
+  topBuy: CalendarRecord;
+  /** 역대 최대 순매도일. 값은 음수다. */
+  topSell: CalendarRecord;
+  /** 역대 최다 매수 건수일. 값은 금액이 아니라 **횟수**다. */
+  busiest: CalendarRecord;
+};
+
+/* ⚠️ '표의 첫 날'(1994-10-21, 매수 1건 $24,486)도 한때 여기 있었다. 카드에서 뺐으므로
+   받지도 않는다. 되살리려면 `settle_date.asc` 로 한 행만 더 받으면 된다. */
 
 export type SeohakCalendar = {
   /** 처음 펼칠 달(최신 결제일이 든 달). "YYYY-MM". */
@@ -54,6 +90,8 @@ export type SeohakCalendar = {
   lastMonth: string;
   /** 칸 색의 기준. 이 구간 순매수 절댓값의 상위 10% 값이다. */
   scale: number;
+  /** 32년 기록. 뽑지 못하면 없다(카드가 통째로 빠진다). */
+  records: SeohakRecords | null;
 };
 
 export async function getSeohakCalendar(): Promise<SeohakCalendar | null> {
@@ -113,5 +151,70 @@ export async function getSeohakCalendar(): Promise<SeohakCalendar | null> {
     firstMonth: days[0].date.slice(0, 7),
     lastMonth: asOf.slice(0, 7),
     scale,
+    records: await getRecords(days),
+  };
+}
+
+/** 미국 주식만. 세 군데서 같은 걸 쓴다. */
+const US_STOCK = { market_code: "US", security_type: "주식" } as const;
+
+/**
+ * 32년 기록 셋. 근거와 뽑는 법은 `SeohakRecords` 머리말에 있다.
+ *
+ * 하나는 **한 행짜리**(가장 바빴던 날)이고, 순매수·순매도는 상한으로 좁힌 한 번의
+ * 조회로 함께 받는다.
+ */
+async function getRecords(loaded: CalendarDay[]): Promise<SeohakRecords | null> {
+  const db = getSupabaseServer();
+
+  // 좁히는 상한. 받아 둔 24개월의 최댓값이라 늘 실재하는 날의 값이고, 따라서
+  // 역대 기록은 반드시 이 문턱 위에 있다.
+  const capBuy = Math.max(...loaded.map((d) => d.net));
+  const capSell = Math.max(...loaded.map((d) => -d.net));
+  // ⚠️ 문턱이 0 이하면(24개월 내내 한 방향뿐이면) 조건이 표 전체를 뜻하게 된다.
+  // 그런 달은 아직 없었지만, 그때는 기록 대신 아무것도 내지 않는다.
+  if (!(capBuy > 0) || !(capSell > 0)) return null;
+
+  // ⚠️ PostgREST 는 한 번에 1000행까지만 준다. 좁힌 집합이 오늘은 743일이지만 해마다
+  // 자라니, 캡에 걸려 조용히 잘린 채 "역대 최대"를 말하는 일이 없도록 넘겨 받는다.
+  const extPages = async () => {
+    const out: { settle_date: string; buy_amount: number; sell_amount: number }[] = [];
+    for (let start = 0; ; start += 1000) {
+      const { data, error } = await db
+        .from("seohak_settlement_daily")
+        .select("settle_date, buy_amount, sell_amount")
+        .match(US_STOCK)
+        .or(`buy_amount.gte.${capBuy},sell_amount.gte.${capSell}`)
+        .order("settle_date", { ascending: true })
+        .range(start, start + 999);
+      if (error) return out;
+      const page = (data ?? []) as typeof out;
+      out.push(...page);
+      if (page.length < 1000) return out;
+    }
+  };
+
+  const [ext, { data: busy }] = await Promise.all([
+    extPages(),
+    db
+      .from("seohak_settlement_daily")
+      .select("settle_date, buy_count")
+      .match(US_STOCK)
+      .order("buy_count", { ascending: false })
+      .limit(1),
+  ]);
+  if (!ext.length || !busy?.length) return null;
+
+  const nets = ext.map((r) => ({
+    date: r.settle_date,
+    value: Number(r.buy_amount ?? 0) - Number(r.sell_amount ?? 0),
+  }));
+  const topBuy = nets.reduce((a, b) => (b.value > a.value ? b : a));
+  const topSell = nets.reduce((a, b) => (b.value < a.value ? b : a));
+
+  return {
+    topBuy,
+    topSell,
+    busiest: { date: busy[0].settle_date as string, value: Number(busy[0].buy_count ?? 0) },
   };
 }

@@ -45,6 +45,8 @@ const T = { big: 20, body: 12, tiny: 10 } as const;
 
 /** "M/D" — 달력 안이라 연도는 군더더기다. */
 const dayLabel = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8))}`;
+/** "YYYY/M/D" — 32년을 오가는 줄에는 연도가 있어야 한다. 구분자는 `dayLabel` 과 맞춘다. */
+const fullLabel = (date: string) => `${date.slice(0, 4)}/${dayLabel(date)}`;
 /** 간격도 4의 배수 넷으로만. */
 const S = { xs: 4, sm: 8, md: 12, lg: 16 } as const;
 /** 모서리 넷 — 마크 2 · 달력 칸 4 · 상자 R.control · 알약 R.pill. 그 밖의 값은 쓰지 않는다. */
@@ -251,6 +253,20 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
       (a, d) => (!a || Math.abs(d.net) > Math.abs(a.net) ? d : a), null);
     setPicked(pick ? pick.date : last[0]);
   };
+
+  /**
+   * 기록 줄을 눌렀을 때 달력을 그 날로 옮기는 손잡이. **받아 둔 24개월 안일 때만** 준다.
+   *
+   * 32년 기록이라 1994년처럼 달력이 못 가는 날이 섞인다. 그런 줄은 버튼이 아니라
+   * 그냥 글로 남는다(밑줄이 없어져서 눌러도 되는지 손이 먼저 안다).
+   */
+  const jumpable = (date: string) =>
+    byDate.has(date)
+      ? () => {
+          setMonth(date.slice(0, 7));
+          setPicked(date);
+        }
+      : undefined;
 
   const goMonth = (by: number) => {
     const next = shiftMonth(month, by);
@@ -513,10 +529,10 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
               )}
             </div>
 
-            {/* 오른쪽 칸 — 되풀이되는 때 한 판.
-                ⭐ 한때 위에 '역대 기록'(가장 많이 산 날 등) 세 줄이 함께 있었다. 실측이라
-                틀릴 게 없었지만 이 시트가 하려는 말과는 무관해서 뺐다 — 여기는 '되풀이'를
-                말하는 자리고, 최대·최소는 되풀이가 아니다. */}
+            {/* 오른쪽 칸 — 되풀이되는 때가 먼저, 역대 기록이 아래.
+                ⭐ 순서가 뜻이다. 이 시트의 주장은 '되풀이'고, 역대 기록은 그 아래 붙는
+                참고다. 위에 뒀을 때는 카드를 열자마자 최대·최소가 먼저 눈에 들어와
+                주장이 뒤로 밀렸다. */}
             <div style={{ flex: "2 1 min(420px, 100%)", minWidth: 0, display: "flex" }}>
                 <Card>
                   <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: S.sm }}>
@@ -544,6 +560,31 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                       ))}
                     </ul>
                   </div>
+
+                  {c.records && (
+                    <Group
+                      head="역대 기록"
+                      rows={[
+                        {
+                          k: "가장 많이 산 날", n: fullLabel(c.records.topBuy.date),
+                          v: `+${usd(Math.abs(c.records.topBuy.value))}`,
+                          on: jumpable(c.records.topBuy.date),
+                        },
+                        {
+                          k: "가장 많이 판 날", n: fullLabel(c.records.topSell.date),
+                          v: `−${usd(Math.abs(c.records.topSell.value))}`,
+                          on: jumpable(c.records.topSell.date),
+                        },
+                        // ⚠️ 이 줄만 값이 금액이 아니라 횟수다. 단위(번)가 달라 금액과
+                        // 섞여 읽힐 일이 없어서 예외로 둔다.
+                        {
+                          k: "가장 바빴던 날", n: fullLabel(c.records.busiest.date),
+                          v: `${cnt(c.records.busiest.value)}번`,
+                          on: jumpable(c.records.busiest.date),
+                        },
+                      ]}
+                    />
+                  )}
                 </Card>
             </div>
           </div>
