@@ -553,18 +553,21 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                         v: `${cnt(c.records.busiest.value)}번`,
                         on: jumpable(c.records.busiest.date),
                       },
-                      // 1994-10-21. 매수 딱 한 건으로 표가 시작한다. 위 세 줄이 전부
-                      // 최근인 것과 나란히 놓이면 32년이 한눈에 들어온다.
-                      {
-                        k: "기록의 첫 날", n: fullLabel(c.records.first.date),
-                        v: `+${usd(Math.abs(c.records.first.value))}`,
-                        on: jumpable(c.records.first.date),
-                      },
                     ]}
                   />
-                  <div style={{ display: "flex", flexDirection: "column", gap: S.sm }}>
-                    <span style={{ fontSize: T.body, color: C.sub2, fontWeight: 600 }}>
+                  {/* marginTop:auto — 이 묶음의 마지막 줄을 옆 카드(고른 날)의 마지막 줄과
+                      같은 높이에 앉힌다. 카드 둘의 바닥이 이미 맞아 있으니, 아래에 붙이면
+                      가로 열이 저절로 선다. */}
+                  <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: S.sm }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: S.xs,
+                                   fontSize: T.body, color: C.sub2, fontWeight: 600 }}>
                       해마다 되풀이되는 때
+                      {/* 기준선은 이 표를 읽는 데 꼭 필요한데, 각주로 깔아 두면 여섯 줄
+                          아래 잉크만 한 겹 더 얹는 꼴이었다. 찾을 때만 열리게 옮긴다. */}
+                      <span className="hz-tip hz-tip-wide" data-tip={`2010~2026년, 해마다 같은 방향이었는지를 셉니다. 우연이라도 ${CHANCE_BASELINE.of}번 중 ${CHANCE_BASELINE.hit}번쯤은 같은 방향이라, 12번은 동전 던지기에 가깝고 17번은 분명히 다릅니다.`}
+                            style={{ display: "inline-flex", cursor: "help" }}>
+                        <Icon name="help" style={{ fontSize: 12, color: C.hint }} />
+                      </span>
                     </span>
                     {/* 여덟 줄이라 한 줄에 둘씩. 칸이 190px 아래로 좁아지면 한 줄로 접힌다. */}
                     <ul style={{ listStyle: "none", margin: 0, padding: "8px 0 0", display: "grid",
@@ -577,14 +580,6 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                         </li>
                       ))}
                     </ul>
-                    {/* ⚠️ 이 줄이 표를 정직하게 만든다. 없으면 "17번 중 12번"과
-                        "17번 중 16번"이 똑같아 보인다. 우연의 기준선을 밝혀야 독자가
-                        각 줄을 스스로 잰다. 실측값이다(80칸 전체의 중앙값이 63%). */}
-                    <span style={{ fontSize: T.tiny, color: C.faint, lineHeight: 1.5,
-                                   wordBreak: "keep-all" }}>
-                      2010~2026년 · 우연이라도 {CHANCE_BASELINE.of}번 중{" "}
-                      {CHANCE_BASELINE.hit}번쯤은 같은 방향입니다
-                    </span>
                   </div>
                 </Card>
               </div>

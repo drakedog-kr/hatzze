@@ -75,9 +75,10 @@ export type SeohakRecords = {
   topSell: CalendarRecord;
   /** 역대 최다 매수 건수일. 값은 금액이 아니라 **횟수**다. */
   busiest: CalendarRecord;
-  /** 표의 첫 날. 값은 그날 순매수(1994-10-21 은 매수 1건뿐이다). */
-  first: CalendarRecord;
 };
+
+/* ⚠️ '표의 첫 날'(1994-10-21, 매수 1건 $24,486)도 한때 여기 있었다. 카드에서 뺐으므로
+   받지도 않는다. 되살리려면 `settle_date.asc` 로 한 행만 더 받으면 된다. */
 
 export type SeohakCalendar = {
   /** 처음 펼칠 달(최신 결제일이 든 달). "YYYY-MM". */
@@ -158,10 +159,10 @@ export async function getSeohakCalendar(): Promise<SeohakCalendar | null> {
 const US_STOCK = { market_code: "US", security_type: "주식" } as const;
 
 /**
- * 32년 기록 넷. 근거와 뽑는 법은 `SeohakRecords` 머리말에 있다.
+ * 32년 기록 셋. 근거와 뽑는 법은 `SeohakRecords` 머리말에 있다.
  *
- * 쿼리 셋 중 둘은 **한 행짜리**(가장 바빴던 날 · 표의 첫 날)이고, 순매수·순매도만
- * 상한으로 좁힌 한 번의 조회로 함께 받는다.
+ * 하나는 **한 행짜리**(가장 바빴던 날)이고, 순매수·순매도는 상한으로 좁힌 한 번의
+ * 조회로 함께 받는다.
  */
 async function getRecords(loaded: CalendarDay[]): Promise<SeohakRecords | null> {
   const db = getSupabaseServer();
@@ -193,7 +194,7 @@ async function getRecords(loaded: CalendarDay[]): Promise<SeohakRecords | null> 
     }
   };
 
-  const [ext, { data: busy }, { data: first }] = await Promise.all([
+  const [ext, { data: busy }] = await Promise.all([
     extPages(),
     db
       .from("seohak_settlement_daily")
@@ -201,14 +202,8 @@ async function getRecords(loaded: CalendarDay[]): Promise<SeohakRecords | null> 
       .match(US_STOCK)
       .order("buy_count", { ascending: false })
       .limit(1),
-    db
-      .from("seohak_settlement_daily")
-      .select("settle_date, buy_amount, sell_amount")
-      .match(US_STOCK)
-      .order("settle_date", { ascending: true })
-      .limit(1),
   ]);
-  if (!ext.length || !busy?.length || !first?.length) return null;
+  if (!ext.length || !busy?.length) return null;
 
   const nets = ext.map((r) => ({
     date: r.settle_date,
@@ -221,9 +216,5 @@ async function getRecords(loaded: CalendarDay[]): Promise<SeohakRecords | null> 
     topBuy,
     topSell,
     busiest: { date: busy[0].settle_date as string, value: Number(busy[0].buy_count ?? 0) },
-    first: {
-      date: first[0].settle_date as string,
-      value: Number(first[0].buy_amount ?? 0) - Number(first[0].sell_amount ?? 0),
-    },
   };
 }
