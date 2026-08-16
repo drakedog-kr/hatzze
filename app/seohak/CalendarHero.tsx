@@ -67,7 +67,7 @@ function shiftMonth(month: string, by: number) {
 
    그래서 막대를 버리고 문장으로 쓴다. 가설 넷과 그 결과를 줄로 세우고, 마지막에
    "정작 달라지는 건 날짜"로 위 달력을 가리킨다. 이 층이 달력 안에 있는 이유가 그거다. */
-function EventsVsDates() {
+function EventsVsDates({ onJump }: { onJump?: () => void }) {
   const yearend = CALENDAR_WINDOWS.find((w) => w.key === "yearend")!;
   /** 이 밖으로 나가야 '달라졌다'고 본다. 20영업일 창의 날짜별 흔들림이 이 폭이다. */
   const NOISE = 5;
@@ -127,11 +127,20 @@ function EventsVsDates() {
         ))}
       </ul>
 
+      {/* "12월로 넘겨 보세요"라고 시키지 않는다. 시키는 문장은 군더더기이고, 정작
+          넘기려면 화살표를 여덟 번 눌러야 했다. 문장은 사실만 말하고 이동은 버튼이 한다. */}
       <p style={{ margin: "10px 0 0", fontSize: 12.5, lineHeight: 1.55, color: C.sub,
                   wordBreak: "keep-all" }}>
-        정작 크게 달라지는 건 사건이 아니라 <b style={{ color: C.ink }}>날짜</b>입니다 — 연말
-        마지막 주에는 파는 양이 <b style={{ color: C.ink }}>{yearendPct}%</b> 늘어납니다.
-        위 달력에서 12월로 넘겨 보세요.
+        정작 달라지는 건 <b style={{ color: C.ink }}>날짜</b>입니다. 연말 마지막 주에는 파는 양이{" "}
+        <b style={{ color: C.ink }}>{yearendPct}%</b> 늘어납니다.{" "}
+        {onJump && (
+          <button type="button" onClick={onJump}
+                  style={{ border: "none", background: "none", padding: 0, cursor: "pointer",
+                           font: "inherit", color: C.blue, fontWeight: 700,
+                           textDecoration: "underline", textUnderlineOffset: 2 }}>
+            그 달 보기
+          </button>
+        )}
       </p>
     </div>
   );
@@ -171,8 +180,42 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
   ];
   while (cells.length % 7) cells.push(null);
 
+  // ── 이 달의 이야기. 고른 날만 말하면 정작 '이 달이 어떤 달인가'가 화면에 없다.
   const monthDays = c.days.filter((d) => d.date.startsWith(month));
   const monthNet = monthDays.reduce((s, d) => s + d.net, 0);
+  const monthBuy = monthDays.reduce((s, d) => s + d.buy, 0);
+  const monthSell = monthDays.reduce((s, d) => s + d.sell, 0);
+  const topBuy = monthDays.reduce<CalendarDay | null>((a, d) => (!a || d.net > a.net ? d : a), null);
+  const topSell = monthDays.reduce<CalendarDay | null>((a, d) => (!a || d.net < a.net ? d : a), null);
+  // 받아 둔 24개월과 견줘 이 달이 큰 달인지 작은 달인지. 절댓값 순매수의 중앙값을 쓴다 —
+  // 평균은 한 달 이상치가 끌고 간다.
+  const monthlyNets = useMemo(() => {
+    const by = new Map<string, number>();
+    for (const d of c.days) by.set(d.date.slice(0, 7), (by.get(d.date.slice(0, 7)) ?? 0) + d.net);
+    return [...by.values()].map(Math.abs).sort((a, b) => a - b);
+  }, [c.days]);
+  const medianNet = monthlyNets[Math.floor(monthlyNets.length / 2)] || 1;
+  const vsUsual = Math.round((Math.abs(monthNet) / medianNet - 1) * 100);
+
+  /** 받아 둔 구간 안에서 가장 최근 12월. '연말 보기'가 여기로 간다. */
+  const decemberMonth = useMemo(() => {
+    const months = [...new Set(c.days.map((d) => d.date.slice(0, 7)))].sort().reverse();
+    return months.find((m) => m.endsWith("-12"));
+  }, [c.days]);
+  const jumpToDecember = () => {
+    if (!decemberMonth) return;
+    setMonth(decemberMonth);
+    const inDec = c.days.filter((d) => d.date.startsWith(decemberMonth));
+    // ⚠️ 구간의 **첫** 거래일을 고르면 안 된다. 12-26 은 성탄 휴장 여파로 결제가 $1
+    // 뿐인 해가 있어서, 눌러 놓고 "$1 더 팔았습니다"가 뜬다. 구간 안에서 **가장 크게
+    // 움직인 날**로 데려가야 오른쪽 칸이 그 구간의 이야기를 한다.
+    const inWindow = inDec.filter((d) => Number(d.date.slice(8)) >= 26);
+    const pick = (inWindow.length ? inWindow : inDec).reduce<CalendarDay | null>(
+      (a, d) => (!a || Math.abs(d.net) > Math.abs(a.net) ? d : a),
+      null,
+    );
+    if (pick) setPicked(pick.date);
+  };
 
   return (
     <section className="hz-sheet">
@@ -310,42 +353,104 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
             </div>
           )}
 
-          {/* 고른 날 */}
-          <div style={{ background: C.soft, borderRadius: R.control, padding: "12px 14px",
-                        display: "flex", flexWrap: "wrap", gap: 14, alignItems: "baseline" }}>
-            {day ? (
-              <>
-                <div style={{ minWidth: 0 }}>
+          {/* 이 달 · 고른 날 — 두 칸.
+              앞 판은 고른 날만 있었고 '이 달 순매수'가 날짜 값들 사이에 끼어 있었다.
+              달 단위 값과 날짜 단위 값이 한 줄에 섞이면 어느 쪽 이야긴지 모른다. */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            <div style={{ flex: "1 1 min(240px, 100%)", minWidth: 0, background: C.soft,
+                          borderRadius: R.control, padding: "11px 13px", display: "flex",
+                          flexDirection: "column", gap: 8 }}>
+              <div style={{ fontSize: 11.5, color: C.sub2, fontWeight: 600 }}>
+                이 달 · {monthDays.length}거래일
+              </div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+                <b style={{ fontFamily: MONO, fontSize: 20, fontWeight: 800,
+                            color: monthNet >= 0 ? BUY : SELL, letterSpacing: "-0.02em" }}>
+                  {usd(Math.abs(monthNet))}
+                </b>
+                <span style={{ fontSize: 11.5, color: C.sub }}>
+                  {monthNet >= 0 ? "더 샀습니다" : "더 팔았습니다"}
+                </span>
+              </div>
+              <div style={{ display: "flex", gap: 12, fontSize: 11, color: C.sub2 }}>
+                <span>산 <b style={{ fontFamily: MONO, color: C.ink }}>{usd(monthBuy)}</b></span>
+                <span>판 <b style={{ fontFamily: MONO, color: C.ink }}>{usd(monthSell)}</b></span>
+              </div>
+              {/* 그 달의 두 극점. 누르면 달력의 선택이 그 날로 옮겨간다 — 달 요약이
+                  날짜 상세로 이어지는 손잡이다. */}
+              <ul style={{ listStyle: "none", margin: 0, padding: "8px 0 0", display: "flex",
+                           flexDirection: "column", gap: 4,
+                           borderTop: `1px solid ${C.line}` }}>
+                {[
+                  { k: "가장 많이 산 날", d: topBuy, tone: BUY },
+                  { k: "가장 많이 판 날", d: topSell, tone: SELL },
+                ].map((r) =>
+                  r.d ? (
+                    <li key={r.k}>
+                      <button type="button" onClick={() => r.d && setPicked(r.d.date)}
+                              style={{ width: "100%", border: "none", background: "none", padding: 0,
+                                       cursor: "pointer", font: "inherit", display: "flex",
+                                       alignItems: "baseline", gap: 8, fontSize: 11.5 }}>
+                        <span style={{ color: C.sub }}>{r.k}</span>
+                        <span style={{ marginLeft: "auto", color: C.sub2 }}>
+                          {Number(r.d.date.slice(5, 7))}/{Number(r.d.date.slice(8))}
+                        </span>
+                        <b style={{ fontFamily: MONO, color: r.tone, minWidth: 62,
+                                    textAlign: "right" }}>{usd(Math.abs(r.d.net))}</b>
+                      </button>
+                    </li>
+                  ) : null,
+                )}
+              </ul>
+              {monthDays.length >= 5 && (
+                <span style={{ fontSize: 10.5, color: C.faint }}>
+                  순매수 크기가 최근 2년 보통 달보다{" "}
+                  {Math.abs(vsUsual) <= 10 ? "비슷합니다" : `${Math.abs(vsUsual)}% ${vsUsual > 0 ? "큽니다" : "작습니다"}`}
+                </span>
+              )}
+            </div>
+
+            <div style={{ flex: "1 1 min(240px, 100%)", minWidth: 0, background: C.soft,
+                          borderRadius: R.control, padding: "11px 13px", display: "flex",
+                          flexDirection: "column", gap: 8 }}>
+              {day ? (
+                <>
                   <div style={{ fontSize: 11.5, color: C.sub2, fontWeight: 600 }}>
-                    {day.date} 결제{pickedWindow && <> · {pickedWindow.label}</>}
+                    고른 날 · {day.date}{pickedWindow && <> · {pickedWindow.label}</>}
                   </div>
-                  <div style={{ fontSize: 17, fontWeight: 800, color: C.ink, lineHeight: 1.35,
-                                wordBreak: "keep-all", marginTop: 2 }}>
-                    <span style={{ color: day.net >= 0 ? BUY : SELL }}>{usd(Math.abs(day.net))}</span>
-                    어치를 더 {day.net >= 0 ? "샀습니다" : "팔았습니다"}
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+                    <b style={{ fontFamily: MONO, fontSize: 20, fontWeight: 800,
+                                color: day.net >= 0 ? BUY : SELL, letterSpacing: "-0.02em" }}>
+                      {usd(Math.abs(day.net))}
+                    </b>
+                    <span style={{ fontSize: 11.5, color: C.sub }}>
+                      {day.net >= 0 ? "더 샀습니다" : "더 팔았습니다"}
+                    </span>
                   </div>
-                </div>
-                <div style={{ display: "flex", gap: 16, marginLeft: "auto", flexWrap: "wrap" }}>
-                  {[
-                    { k: "산 금액", v: usd(day.buy), n: `${cnt(day.buyCount)}번` },
-                    { k: "판 금액", v: usd(day.sell), n: `${cnt(day.sellCount)}번` },
-                    { k: "한 번 살 때", v: day.buyCount ? usd(day.buy / day.buyCount) : "—", n: "평균" },
-                    { k: "이 달 순매수", v: usd(monthNet), n: `${monthDays.length}거래일` },
-                  ].map((s) => (
-                    <div key={s.k} style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                      <span style={{ fontSize: 10.5, color: C.sub2, fontWeight: 600 }}>{s.k}</span>
-                      <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 800, color: C.ink }}>{s.v}</span>
-                      <span style={{ fontSize: 10, color: C.faint }}>{s.n}</span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <span style={{ fontSize: 12.5, color: C.sub }}>날짜를 누르면 그날 매매를 봅니다.</span>
-            )}
+                  <ul style={{ listStyle: "none", margin: 0, padding: "8px 0 0", display: "flex",
+                               flexDirection: "column", gap: 5, borderTop: `1px solid ${C.line}` }}>
+                    {[
+                      { k: "산 금액", v: usd(day.buy), n: `${cnt(day.buyCount)}번` },
+                      { k: "판 금액", v: usd(day.sell), n: `${cnt(day.sellCount)}번` },
+                      { k: "한 번 살 때", v: day.buyCount ? usd(day.buy / day.buyCount) : "—", n: "평균" },
+                    ].map((r) => (
+                      <li key={r.k} style={{ display: "flex", alignItems: "baseline", gap: 8,
+                                             fontSize: 11.5 }}>
+                        <span style={{ color: C.sub }}>{r.k}</span>
+                        <span style={{ marginLeft: "auto", color: C.faint, fontSize: 10 }}>{r.n}</span>
+                        <b style={{ fontFamily: MONO, color: C.ink, minWidth: 62,
+                                    textAlign: "right" }}>{r.v}</b>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <span style={{ fontSize: 12.5, color: C.sub }}>날짜를 누르면 그날 매매를 봅니다.</span>
+              )}
+            </div>
           </div>
 
-          <EventsVsDates />
+          <EventsVsDates onJump={decemberMonth ? jumpToDecember : undefined} />
         </div>
       </div>
 
