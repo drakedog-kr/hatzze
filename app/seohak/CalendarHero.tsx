@@ -26,6 +26,27 @@ import { C, Icon, MONO, R } from "../ui";
  * 달을 넘길 때 왕복이 없다.
  */
 
+/**
+ * 이 카드의 **자**. 값을 손으로 적지 말고 여기서 고른다.
+ *
+ * ⚠️ 자가 없을 때 글자 크기가 **11가지**(9.5·10·10.5·11·11.5·12·12.5·13.5·14·16·20),
+ * 간격이 9가지, 안쪽 여백이 5가지로 흩어져 있었다. 값 하나하나는 그럴듯한데 모아 놓으면
+ * 규칙이 안 보여서 화면이 지저분해진다.
+ *
+ *   big  20   금액 큰 숫자
+ *   head 13.5 소제목·강조 문장
+ *   body 12   라벨·값·목록
+ *   sub  11   보조 설명
+ *   tiny 10   달력 날짜·요일·축·범례
+ */
+const T = { big: 20, head: 13.5, body: 12, sub: 11, tiny: 10 } as const;
+
+/** "M/D" — 달력 안이라 연도는 군더더기다. */
+const dayLabel = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8))}`;
+/** 간격도 4의 배수 넷으로만. */
+const S = { xs: 4, sm: 8, md: 12, lg: 16 } as const;
+/** 모서리 셋 — 마크 2 · 달력 칸 4 · 상자 R.control. 그 밖의 값은 쓰지 않는다. */
+
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
 
 const usd = (v: number) => {
@@ -105,7 +126,7 @@ function EventsVsDates({ onJump }: { onJump?: () => void }) {
 
   return (
     <div style={{ paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
-      <p style={{ margin: 0, fontSize: 13.5, fontWeight: 800, color: C.ink, lineHeight: 1.45,
+      <p style={{ margin: 0, fontSize: T.head, fontWeight: 800, color: C.ink, lineHeight: 1.45,
                   wordBreak: "keep-all" }}>
         매매를 바꾸는 게 뭔지 {koCount(rows.length)}을 재 봤는데,{" "}
         {quiet === rows.length ? "전부" : `${koCount(quiet)}은`}{" "}
@@ -113,10 +134,10 @@ function EventsVsDates({ onJump }: { onJump?: () => void }) {
       </p>
 
       <ul style={{ listStyle: "none", margin: "9px 0 0", padding: 0, display: "flex",
-                   flexDirection: "column", gap: 6 }}>
+                   flexDirection: "column", gap: S.sm }}>
         {rows.map((r) => (
           <li key={r.label}
-              style={{ display: "flex", alignItems: "baseline", gap: 10, fontSize: 12,
+              style={{ display: "flex", alignItems: "baseline", gap: S.sm, fontSize: T.body,
                        paddingBottom: 6, borderBottom: `1px solid ${C.sheetRow}` }}>
             <span style={{ color: C.label, minWidth: 0, flex: 1 }}>{r.label}</span>
             <span style={{ flexShrink: 0, fontWeight: r.changed ? 800 : 600,
@@ -129,7 +150,7 @@ function EventsVsDates({ onJump }: { onJump?: () => void }) {
 
       {/* "12월로 넘겨 보세요"라고 시키지 않는다. 시키는 문장은 군더더기이고, 정작
           넘기려면 화살표를 여덟 번 눌러야 했다. 문장은 사실만 말하고 이동은 버튼이 한다. */}
-      <p style={{ margin: "10px 0 0", fontSize: 12.5, lineHeight: 1.55, color: C.sub,
+      <p style={{ margin: "10px 0 0", fontSize: T.body, lineHeight: 1.55, color: C.sub,
                   wordBreak: "keep-all" }}>
         정작 달라지는 건 <b style={{ color: C.ink }}>날짜</b>입니다. 연말 마지막 주에는 파는 양이{" "}
         <b style={{ color: C.ink }}>{yearendPct}%</b> 늘어납니다.{" "}
@@ -143,6 +164,36 @@ function EventsVsDates({ onJump }: { onJump?: () => void }) {
         )}
       </p>
     </div>
+  );
+}
+
+/**
+ * 이 카드의 **유일한 줄 꼴** — 라벨 · 보조 · 값.
+ *
+ * 누를 수 있는 줄(가장 많이 산 날)과 아닌 줄(산 금액)이 같은 모양이라야 눈이 규칙을
+ * 잡는다. 누를 수 있으면 값에 밑줄만 들어간다.
+ */
+function Row({ k, n, v, on }: { k: string; n: string; v: string; on?: () => void }) {
+  const body = (
+    <>
+      <span style={{ fontSize: T.body, color: C.sub }}>{k}</span>
+      <span style={{ marginLeft: "auto", fontSize: T.tiny, color: C.faint }}>{n}</span>
+      <b style={{ fontFamily: MONO, fontSize: T.body, color: C.ink, minWidth: 62,
+                  textAlign: "right", textDecoration: on ? "underline" : "none",
+                  textUnderlineOffset: 2 }}>{v}</b>
+    </>
+  );
+  const style: React.CSSProperties = {
+    display: "flex", alignItems: "baseline", gap: S.sm, width: "100%",
+  };
+  return on ? (
+    <button type="button" onClick={on}
+            style={{ ...style, border: "none", background: "none", padding: 0,
+                     cursor: "pointer", font: "inherit" }}>
+      {body}
+    </button>
+  ) : (
+    <span style={style}>{body}</span>
   );
 }
 
@@ -218,16 +269,6 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
   const monthSell = monthDays.reduce((s, d) => s + d.sell, 0);
   const topBuy = monthDays.reduce<CalendarDay | null>((a, d) => (!a || d.net > a.net ? d : a), null);
   const topSell = monthDays.reduce<CalendarDay | null>((a, d) => (!a || d.net < a.net ? d : a), null);
-  // 받아 둔 24개월과 견줘 이 달이 큰 달인지 작은 달인지. 절댓값 순매수의 중앙값을 쓴다 —
-  // 평균은 한 달 이상치가 끌고 간다.
-  const monthlyNets = useMemo(() => {
-    const by = new Map<string, number>();
-    for (const d of c.days) by.set(d.date.slice(0, 7), (by.get(d.date.slice(0, 7)) ?? 0) + d.net);
-    return [...by.values()].map(Math.abs).sort((a, b) => a - b);
-  }, [c.days]);
-  const medianNet = monthlyNets[Math.floor(monthlyNets.length / 2)] || 1;
-  const vsUsual = Math.round((Math.abs(monthNet) / medianNet - 1) * 100);
-
   /** 받아 둔 구간 안에서 가장 최근 12월. '연말 보기'가 여기로 간다. */
   const decemberMonth = useMemo(() => {
     const months = [...new Set(c.days.map((d) => d.date.slice(0, 7)))].sort().reverse();
@@ -267,11 +308,11 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
           처음엔 반대(달력 2칸)로 뒀는데 달력만 커 보였다. 달력은 '어느 날을 고를까'를
           묻는 손잡이라 작아도 되고, 정작 읽을 것은 고른 날의 내용이다. 반응 스트립도
           아래 별도 줄에서 오른쪽으로 들여 세로를 줄였다. */}
-      <div style={{ display: "flex", flexWrap: "wrap", padding: "12px 18px 0", gap: 18 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", padding: "12px 18px 0", gap: S.lg }}>
         {/* ── 왼쪽 한 칸: 달력 ── */}
         <div style={{ flex: "1 1 290px", minWidth: 0, display: "flex",
-                      flexDirection: "column", gap: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      flexDirection: "column", gap: S.sm }}>
+          <div style={{ display: "flex", alignItems: "center", gap: S.xs }}>
             {[-1, 1].map((by) => {
               const target = shiftMonth(month, by);
               const disabled = target < c.firstMonth || target > c.lastMonth;
@@ -289,18 +330,18 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                     cursor: disabled ? "default" : "pointer", padding: 0,
                   }}
                 >
-                  <Icon name={by < 0 ? "chevron_left" : "chevron_right"} style={{ fontSize: 16 }} />
+                  <Icon name={by < 0 ? "chevron_left" : "chevron_right"} style={{ fontSize: T.big }} />
                 </button>
               );
             })}
-            <span style={{ fontSize: 12.5, fontWeight: 800, color: C.ink, marginLeft: 2 }}>
+            <span style={{ fontSize: T.body, fontWeight: 800, color: C.ink, marginLeft: 2 }}>
               {meta.year}년 {meta.month}월
             </span>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: S.xs }}>
             {WEEKDAYS.map((w, i) => (
-              <span key={w} style={{ fontSize: 9.5, fontWeight: 700, textAlign: "center",
+              <span key={w} style={{ fontSize: T.tiny, fontWeight: 700, textAlign: "center",
                                      color: i === 0 || i === 6 ? C.faint : C.sub2 }}>{w}</span>
             ))}
             {cells.map((d, i) => {
@@ -334,7 +375,7 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                     display: "flex", alignItems: "flex-start", justifyContent: "flex-end",
                   }}
                 >
-                  <span style={{ fontSize: 9.5, fontWeight: 700, padding: "2px 4px",
+                  <span style={{ fontSize: T.tiny, fontWeight: 700, padding: "3px 4px",
                                  // 칸이 진해지면 흰 글자로 뒤집는다. 아니면 숫자가 묻힌다.
                                  color: strength > 0.45 ? C.card : row ? C.ink : C.disabled }}>
                     {d}
@@ -352,15 +393,15 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
             })}
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 9.5,
+          <div style={{ display: "flex", alignItems: "center", gap: S.sm, fontSize: T.tiny,
                         color: C.faint, flexWrap: "wrap" }}>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: S.xs }}>
               <span style={{ width: 8, height: 8, borderRadius: 2, background: BUY }} /> 더 샀다
             </span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: S.xs }}>
               <span style={{ width: 8, height: 8, borderRadius: 2, background: SELL }} /> 더 팔았다
             </span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: S.xs }}>
               <span style={{ width: 10, height: 2.5, borderRadius: 2, background: C.ink }} /> 구간
             </span>
           </div>
@@ -368,18 +409,18 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
 
         {/* ── 오른쪽 두 칸: 고른 날 + 매매를 바꾸는 것들 ── */}
         <div style={{ flex: "2 1 580px", minWidth: 0, display: "flex",
-                      flexDirection: "column", gap: 12 }}>
+                      flexDirection: "column", gap: S.md }}>
           {/* 그달에 걸치는 구간 띠. 구글 캘린더의 종일 일정 자리다.
               ⭐ 구간이 없는 달(1년 중 아홉 달)에는 **다음 구간까지 며칠**을 대신 띄운다.
               이 화면에서 다른 데서 못 얻는 유일한 정보가 구간인데, 그게 아홉 달 동안
               통째로 안 보이면 처음 온 사람은 값진 걸 못 보고 지나간다. */}
           {windows.length > 0 ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: S.xs }}>
               {windows.map((w) => (
                 <div key={w.key}
-                     style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5,
-                              background: C.blueTint, borderRadius: R.control, padding: "5px 9px" }}>
-                  <Icon name="event_repeat" style={{ fontSize: 14, color: C.blue }} />
+                     style={{ display: "flex", alignItems: "center", gap: S.sm, fontSize: T.body,
+                              background: C.blueTint, borderRadius: R.control, padding: "8px 12px" }}>
+                  <Icon name="event_repeat" style={{ fontSize: T.head, color: C.blue }} />
                   <b style={{ color: C.ink }}>{w.label}</b>
                   <span style={{ color: C.sub2 }}>{w.fromDay}일~{w.toDay}일 · {w.note}</span>
                   <span style={{ marginLeft: "auto", color: C.faint, flexShrink: 0 }}>표본 {w.days}일</span>
@@ -390,19 +431,19 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
             ahead && (
               <button type="button" onClick={() => aheadSample && jumpTo(aheadSample)}
                       disabled={!aheadSample}
-                      style={{ display: "flex", alignItems: "center", gap: 8, width: "100%",
-                               fontSize: 11.5, background: C.blueTint, borderRadius: R.control,
-                               padding: "5px 9px", border: "none", cursor: "pointer",
+                      style={{ display: "flex", alignItems: "center", gap: S.sm, width: "100%",
+                               fontSize: T.body, background: C.blueTint, borderRadius: R.control,
+                               padding: "8px 12px", border: "none", cursor: "pointer",
                                font: "inherit", textAlign: "left" }}>
-                <Icon name="event_upcoming" style={{ fontSize: 14, color: C.blue }} />
+                <Icon name="event_upcoming" style={{ fontSize: T.head, color: C.blue }} />
                 <span style={{ color: C.sub2 }}>다음 구간</span>
                 <b style={{ color: C.ink }}>{ahead.window.label}</b>
                 <span style={{ color: C.sub2 }}>· {ahead.window.note}</span>
                 <span style={{ marginLeft: "auto", flexShrink: 0, display: "inline-flex",
-                               alignItems: "baseline", gap: 6 }}>
+                               alignItems: "baseline", gap: S.sm }}>
                   <b style={{ color: C.blue }}>{ahead.days}일 뒤</b>
                   {aheadSample && (
-                    <span style={{ color: C.sub2, fontSize: 10.5 }}>
+                    <span style={{ color: C.sub2, fontSize: T.sub }}>
                       {aheadSample.slice(0, 4)}년 보기 →
                     </span>
                   )}
@@ -412,100 +453,75 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
           )}
 
           {/* 이 달 · 고른 날 — 두 칸.
-              앞 판은 고른 날만 있었고 '이 달 순매수'가 날짜 값들 사이에 끼어 있었다.
-              달 단위 값과 날짜 단위 값이 한 줄에 섞이면 어느 쪽 이야긴지 모른다. */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-            <div style={{ flex: "1 1 min(240px, 100%)", minWidth: 0, background: C.soft,
-                          borderRadius: R.control, padding: "11px 13px", display: "flex",
-                          flexDirection: "column", gap: 8 }}>
-              <div style={{ fontSize: 11.5, color: C.sub2, fontWeight: 600 }}>
-                이 달 · {monthDays.length}거래일
-              </div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-                <b style={{ fontFamily: MONO, fontSize: 20, fontWeight: 800,
-                            color: monthNet >= 0 ? BUY : SELL, letterSpacing: "-0.02em" }}>
-                  {usd(Math.abs(monthNet))}
-                </b>
-                <span style={{ fontSize: 11.5, color: C.sub }}>
-                  {monthNet >= 0 ? "더 샀습니다" : "더 팔았습니다"}
-                </span>
-              </div>
-              <div style={{ display: "flex", gap: 12, fontSize: 11, color: C.sub2 }}>
-                <span>산 <b style={{ fontFamily: MONO, color: C.ink }}>{usd(monthBuy)}</b></span>
-                <span>판 <b style={{ fontFamily: MONO, color: C.ink }}>{usd(monthSell)}</b></span>
-              </div>
-              {/* 그 달의 두 극점. 누르면 달력의 선택이 그 날로 옮겨간다 — 달 요약이
-                  날짜 상세로 이어지는 손잡이다. */}
-              <ul style={{ listStyle: "none", margin: 0, padding: "8px 0 0", display: "flex",
-                           flexDirection: "column", gap: 4,
-                           borderTop: `1px solid ${C.line}` }}>
-                {[
-                  { k: "가장 많이 산 날", d: topBuy, tone: BUY },
-                  { k: "가장 많이 판 날", d: topSell, tone: SELL },
-                ].map((r) =>
-                  r.d ? (
-                    <li key={r.k}>
-                      <button type="button" onClick={() => r.d && setPicked(r.d.date)}
-                              style={{ width: "100%", border: "none", background: "none", padding: 0,
-                                       cursor: "pointer", font: "inherit", display: "flex",
-                                       alignItems: "baseline", gap: 8, fontSize: 11.5 }}>
-                        <span style={{ color: C.sub }}>{r.k}</span>
-                        <span style={{ marginLeft: "auto", color: C.sub2 }}>
-                          {Number(r.d.date.slice(5, 7))}/{Number(r.d.date.slice(8))}
-                        </span>
-                        <b style={{ fontFamily: MONO, color: r.tone, minWidth: 62,
-                                    textAlign: "right" }}>{usd(Math.abs(r.d.net))}</b>
-                      </button>
-                    </li>
-                  ) : null,
-                )}
-              </ul>
-              {monthDays.length >= 5 && (
-                <span style={{ fontSize: 10.5, color: C.faint }}>
-                  순매수 크기가 최근 2년 보통 달보다{" "}
-                  {Math.abs(vsUsual) <= 10 ? "비슷합니다" : `${Math.abs(vsUsual)}% ${vsUsual > 0 ? "큽니다" : "작습니다"}`}
-                </span>
-              )}
-            </div>
-
-            <div style={{ flex: "1 1 min(240px, 100%)", minWidth: 0, background: C.soft,
-                          borderRadius: R.control, padding: "11px 13px", display: "flex",
-                          flexDirection: "column", gap: 8 }}>
-              {day ? (
-                <>
-                  <div style={{ fontSize: 11.5, color: C.sub2, fontWeight: 600 }}>
-                    고른 날 · {day.date}{pickedWindow && <> · {pickedWindow.label}</>}
-                  </div>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-                    <b style={{ fontFamily: MONO, fontSize: 20, fontWeight: 800,
-                                color: day.net >= 0 ? BUY : SELL, letterSpacing: "-0.02em" }}>
-                      {usd(Math.abs(day.net))}
-                    </b>
-                    <span style={{ fontSize: 11.5, color: C.sub }}>
-                      {day.net >= 0 ? "더 샀습니다" : "더 팔았습니다"}
+              ⚠️ 두 상자가 **줄 꼴이 서로 달랐다.** 어떤 줄은 '라벨·값', 어떤 줄은
+              '라벨·날짜·값', 어떤 줄은 각주였다. 값 하나하나는 그럴듯한데 나란히 두면
+              규칙이 안 보여 지저분해진다. 지금은 **한 가지 줄 꼴**(라벨 · 보조 · 값)만
+              쓰고, 그 줄을 만드는 자리도 `Row` 하나뿐이다. */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: S.sm }}>
+            {[
+              {
+                head: `이 달 · ${monthDays.length}거래일`,
+                amount: monthNet,
+                rows: [
+                  { k: "산 금액", n: "", v: usd(monthBuy) },
+                  { k: "판 금액", n: "", v: usd(monthSell) },
+                  // ⚠️ 위 두 줄은 **총액**이고 이 두 줄은 **차액**이다. 같은 칸에 부호
+                  // 없이 나란히 두면 같은 종류로 읽혀서 $739M 을 $10.16B 와 견주게 된다.
+                  // 부호를 붙여 "차이"임을 형태로 알린다.
+                  topBuy && {
+                    k: "가장 많이 산 날", n: dayLabel(topBuy.date), v: `+${usd(Math.abs(topBuy.net))}`,
+                    on: () => setPicked(topBuy.date),
+                  },
+                  topSell && {
+                    k: "가장 많이 판 날", n: dayLabel(topSell.date), v: `−${usd(Math.abs(topSell.net))}`,
+                    on: () => setPicked(topSell.date),
+                  },
+                ],
+              },
+              day && {
+                head: `고른 날 · ${day.date}${pickedWindow ? ` · ${pickedWindow.label}` : ""}`,
+                amount: day.net,
+                rows: [
+                  { k: "산 금액", n: `${cnt(day.buyCount)}번`, v: usd(day.buy) },
+                  { k: "판 금액", n: `${cnt(day.sellCount)}번`, v: usd(day.sell) },
+                  { k: "한 번 살 때", n: "평균",
+                    v: day.buyCount ? usd(day.buy / day.buyCount) : "—" },
+                ],
+              },
+            ]
+              .filter(Boolean)
+              .map((box) => {
+                const b = box as {
+                  head: string; amount: number;
+                  rows: ({ k: string; n: string; v: string; on?: () => void } | null | undefined)[];
+                };
+                return (
+                  <div key={b.head} style={{ flex: "1 1 min(240px, 100%)", minWidth: 0,
+                                             background: C.soft, borderRadius: R.control,
+                                             padding: "12px 12px", display: "flex",
+                                             flexDirection: "column", gap: S.sm }}>
+                    <span style={{ fontSize: T.body, color: C.sub2, fontWeight: 600 }}>{b.head}</span>
+                    <span style={{ display: "flex", alignItems: "baseline", gap: S.sm, flexWrap: "wrap" }}>
+                      <b style={{ fontFamily: MONO, fontSize: T.big, fontWeight: 800,
+                                  color: b.amount >= 0 ? BUY : SELL, letterSpacing: "-0.02em" }}>
+                        {usd(Math.abs(b.amount))}
+                      </b>
+                      <span style={{ fontSize: T.body, color: C.sub }}>
+                        더 {b.amount >= 0 ? "샀습니다" : "팔았습니다"}
+                      </span>
                     </span>
+                    <ul style={{ listStyle: "none", margin: 0, padding: "8px 0 0", display: "flex",
+                                 flexDirection: "column", gap: S.xs,
+                                 borderTop: `1px solid ${C.line}` }}>
+                      {b.rows.filter(Boolean).map((r) => (
+                        <li key={r!.k}>
+                          <Row {...r!} />
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  <ul style={{ listStyle: "none", margin: 0, padding: "8px 0 0", display: "flex",
-                               flexDirection: "column", gap: 5, borderTop: `1px solid ${C.line}` }}>
-                    {[
-                      { k: "산 금액", v: usd(day.buy), n: `${cnt(day.buyCount)}번` },
-                      { k: "판 금액", v: usd(day.sell), n: `${cnt(day.sellCount)}번` },
-                      { k: "한 번 살 때", v: day.buyCount ? usd(day.buy / day.buyCount) : "—", n: "평균" },
-                    ].map((r) => (
-                      <li key={r.k} style={{ display: "flex", alignItems: "baseline", gap: 8,
-                                             fontSize: 11.5 }}>
-                        <span style={{ color: C.sub }}>{r.k}</span>
-                        <span style={{ marginLeft: "auto", color: C.faint, fontSize: 10 }}>{r.n}</span>
-                        <b style={{ fontFamily: MONO, color: C.ink, minWidth: 62,
-                                    textAlign: "right" }}>{r.v}</b>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              ) : (
-                <span style={{ fontSize: 12.5, color: C.sub }}>날짜를 누르면 그날 매매를 봅니다.</span>
-              )}
-            </div>
+                );
+              })}
           </div>
 
           <EventsVsDates onJump={decemberMonth ? jumpToDecember : undefined} />
