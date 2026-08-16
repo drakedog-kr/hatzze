@@ -303,8 +303,8 @@ export default async function SeohakPage() {
 
           기준은 **갱신 주기가 아니라 질문**이다. 주기로 나누면 "매일/매월/분기"가
           되는데, 그건 우리 파이프라인 사정이지 읽는 사람의 관심이 아니다. */}
-      <SectionCaps label="어떻게 사고파나" count={2} />
-      <DailySection months={calendar?.months ?? null} years={years} />
+      <SectionCaps label="어떻게 사고파나" count={3} />
+      <DailySection vsUsual={calendar?.vsUsual ?? null} months={calendar?.months ?? null} years={years} />
 
       <SectionCaps label="무엇에 담았나" count={etf ? 4 : 1} />
       {equityType && <EquityTypeSection e={equityType} />}

@@ -53,6 +53,16 @@ export type SeohakCalendar = {
    * 증거였다(Hun 지적). 산 것과 판 것은 그 자체로 설명이 필요 없다.
    */
   months: { month: string; buy: number; sell: number }[];
+  /**
+   * 요즘(최근 20영업일)이 평소의 몇 %인가.
+   *
+   * ⭐ '평소'는 **받아 둔 구간 전체(약 2년)의 하루 중앙값**이다. 고정 창이라 시간이
+   * 지나도 값이 다시 안 바뀐다. ±60일 창으로 정규화하던 앞 판은 최근 날짜의 뒤쪽
+   * 절반이 없어서 **65%가 나중에 5%p 넘게 달라졌다**(262표본 실측).
+   *
+   * 이미 받아 둔 일별을 접기만 하므로 질의가 안 는다.
+   */
+  vsUsual: { buy: number; sell: number; buyCount: number };
 };
 
 export async function getSeohakCalendar(): Promise<SeohakCalendar | null> {
@@ -114,10 +124,25 @@ export async function getSeohakCalendar(): Promise<SeohakCalendar | null> {
     byMonth.set(key, slot);
   }
 
+  const med = (xs: number[]) => {
+    const v = xs.filter((x) => x > 0).sort((a, b) => a - b);
+    return v.length ? v[Math.floor(v.length / 2)] : 0;
+  };
+  const last20 = days.slice(-20);
+  const ratio = (pick: (d: CalendarDay) => number) => {
+    const base = med(days.map(pick));
+    return base ? (med(last20.map(pick)) / base) * 100 : 100;
+  };
+
   return {
     asOf,
     asOfMonth: asOf.slice(0, 7),
     days,
+    vsUsual: {
+      buy: ratio((d) => d.buy),
+      sell: ratio((d) => d.sell),
+      buyCount: ratio((d) => d.buyCount),
+    },
     months: [...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month)),
     firstMonth: days[0].date.slice(0, 7),
     lastMonth: asOf.slice(0, 7),

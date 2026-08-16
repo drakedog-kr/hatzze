@@ -38,6 +38,7 @@ export function Card({
   title,
   desc,
   note,
+  noteHelp,
   foot,
   children,
 }: {
@@ -46,6 +47,8 @@ export function Card({
   /** 제목 아래 한 줄. 이 카드가 무엇을 재는지 여기서 끝내야 한다. */
   desc: string;
   note?: string;
+  /** 알약 옆 물음표. 정의·한계처럼 '찾을 때만' 필요한 건 각주 대신 여기로. */
+  noteHelp?: string;
   /** 없으면 안 그린다 — 각주가 없어도 되는 카드가 제일 좋은 카드다. */
   foot?: string;
   children: React.ReactNode;
@@ -62,8 +65,17 @@ export function Card({
                       wordBreak: "keep-all" }}>{desc}</p>
         </div>
         {note && (
-          <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, color: C.sub,
-                         background: C.chip, borderRadius: R.pill, padding: "3px 8px" }}>{note}</span>
+          <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4,
+                         fontSize: 11, fontWeight: 700, color: C.sub,
+                         background: C.chip, borderRadius: R.pill, padding: "3px 8px" }}>
+            {note}
+            {noteHelp && (
+              <span className="hz-tip hz-tip-wide hz-tip-end" data-tip={noteHelp} data-ga-tip={title}
+                    style={{ display: "inline-flex", cursor: "help" }}>
+                <Icon name="help" style={{ fontSize: 12, color: C.hint }} />
+              </span>
+            )}
+          </span>
         )}
       </div>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>{children}</div>
@@ -136,6 +148,69 @@ function Legend() {
 }
 
 type Month = { month: string; buy: number; sell: number };
+type VsUsual = { buy: number; sell: number; buyCount: number };
+
+/* ── ⓪ 평소와 견주면 ────────────────────────────────────────────────────
+   ⚠️ 이 지표를 한 번 통째로 버렸다가 되살렸다. 앞서 "무슨 말인지 모르겠다"를 받은 건
+   **지표가 아니라 그림**이었는데(선 둘 + 띠 둘 + 점선 둘 + 스파크라인) 지표까지 같이
+   버렸다. 물어볼 값어치가 있는 질문이다 — "요즘 사람들이 평소보다 활발한가".
+
+   ⭐ 그림은 **막대 셋과 눈금 하나**뿐이다. 막대가 '평소' 선에 못 미치면 평소보다 적고,
+   넘으면 많다. 배터리 눈금과 같은 어법이라 배울 게 없다. 세로축도 시계열도 없다.
+
+   ⚠️ '평소'가 무엇인지는 제목 옆 물음표가 맡는다. 각주로 깔면 카드 바닥이 무거워지고
+   정작 필요할 때는 못 찾는다(달력에서 같은 판단을 했다). */
+function VsUsualCard({ v }: { v: VsUsual }) {
+  /** 축 오른쪽 끝(%). 100 이 눈금 자리이고, 넘치는 값도 담기게 여유를 둔다. */
+  const AXIS = Math.max(130, ...[v.buy, v.sell, v.buyCount].map((x) => x * 1.15));
+  const rows = [
+    { k: "산 금액", v: v.buy, tone: BUY },
+    { k: "판 금액", v: v.sell, tone: SELL },
+    { k: "산 횟수", v: v.buyCount, tone: C.marker },
+  ];
+  const lowAll = v.buy < 100 && v.sell < 100;
+  const highAll = v.buy >= 100 && v.sell >= 100;
+
+  return (
+    <>
+      <Verdict>
+        {lowAll ? (
+          <>요즘 <Em>사는 것도 파는 것도 평소보다 적습니다</Em></>
+        ) : highAll ? (
+          <>요즘 <Em>사는 것도 파는 것도 평소보다 많습니다</Em></>
+        ) : v.buy >= 100 ? (
+          <><Em>사는 쪽만</Em> 평소보다 많습니다</>
+        ) : (
+          <><Em>파는 쪽만</Em> 평소보다 많습니다</>
+        )}
+      </Verdict>
+
+      <div style={{ position: "relative", display: "flex",
+                    flexDirection: "column", gap: 12, paddingBottom: 18 }}>
+        {/* '평소' 눈금. 막대 뒤가 아니라 **위**에 그어야 어느 막대가 넘었는지 보인다. */}
+        <span aria-hidden style={{ position: "absolute", left: `calc(56px + (100% - 56px) * ${100 / AXIS})`,
+                                   top: -2, bottom: 14, width: 1.5, background: C.ink, opacity: 0.55 }} />
+        <span style={{ position: "absolute", left: `calc(56px + (100% - 56px) * ${100 / AXIS})`,
+                       bottom: 0, transform: "translateX(-50%)", fontSize: 10.5,
+                       color: C.sub, fontWeight: 700, whiteSpace: "nowrap" }}>평소</span>
+        {rows.map((r) => (
+          <div key={r.k} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ flex: "0 0 46px", fontSize: 11.5, color: C.label, fontWeight: 600 }}>
+              {r.k}
+            </span>
+            <span style={{ flex: 1, height: 16, background: C.soft, borderRadius: 3,
+                           minWidth: 0 }}>
+              <span style={{ display: "block", height: "100%", borderRadius: 3,
+                             width: `${Math.min(100, (r.v / AXIS) * 100)}%`, background: r.tone }} />
+            </span>
+            <b style={{ flex: "0 0 46px", textAlign: "right", fontFamily: MONO, fontSize: 15,
+                        fontWeight: 800, color: C.ink }}>{Math.round(r.v)}%</b>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
 
 /* ── ① 달마다 ────────────────────────────────────────────────────────── */
 function ByMonth({ months }: { months: Month[] }) {
@@ -188,15 +263,24 @@ function ByYear({ years }: { years: SeohakYear[] }) {
 }
 
 export function DailySection({
+  vsUsual,
   months,
   years,
 }: {
+  vsUsual: VsUsual | null;
   months: Month[] | null;
   years: SeohakYear[] | null;
 }) {
   return (
-    <div style={{ display: "grid", gap: 14,
-                  gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))" }}>
+    <div style={CARD_GRID}>
+      {vsUsual && (
+        <Card icon="speed" title="평소와 견주면"
+              desc="요즘 사고파는 양이 평소의 몇 %인지입니다."
+              note="최근 20일"
+              noteHelp="'평소'는 최근 2년 하루 값의 중앙값입니다. 고정된 기준이라 시간이 지나도 이 자리가 다시 바뀌지 않습니다. '요즘'은 최근 20영업일입니다.">
+          <VsUsualCard v={vsUsual} />
+        </Card>
+      )}
       {months && months.length > 1 && (
         <Card icon="calendar_view_month" title="달마다 얼마나 사고팔았나"
               desc="한 달에 산 금액과 판 금액입니다."
