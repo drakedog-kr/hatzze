@@ -227,36 +227,41 @@ function BuyerVsSeller({ d }: { d: SeohakDaily }) {
   );
 }
 
-/* ── ⑥ 새 돈은 얼마나 되나 ──────────────────────────────────────────────
-   ⚠️⚠️ 앞 판은 "1년간 $650.94B이 오갔는데 실제로 늘어난 건 $33.74B" 였고 "무슨 뜻인지
-   하나도 모르겠다"를 받았다.
+/* ── ⑥ 산 돈은 어디서 왔나 ──────────────────────────────────────────────
+   ⚠️⚠️ 두 판을 갈아엎었다.
 
-   범인은 **분모**다. '오간 돈'은 매수와 매도를 더한 값인데, 그 합은 머릿속에 안
-   그려진다(사는 것과 파는 것을 왜 더하나). 분모를 **산 돈**으로 바꾸면 그대로 한
-   문장이 된다 — "1년간 $342B를 샀는데 그중 새 돈은 $34B, 나머지는 판 돈으로 다시 산 것".
+   1판 "오간 돈과 남은 돈" — 분모가 매수+매도라 **머릿속에 안 그려졌다.** 사는 것과
+   파는 것을 왜 더하나.
+   2판 "새 돈은 얼마나 되나" — 분모는 고쳤는데 **'새 돈'이라는 말을 내가 지어냈다.**
+   "새 돈이 무슨 뜻이냐"를 받았다. 스스로 설명이 안 되는 이름이었다.
 
-   그림도 하나뿐이다: 산 돈 막대를 새 돈과 되산 돈으로 가른다. */
-function NewMoney({ d }: { d: SeohakDaily }) {
+   ⭐ 고쳐 놓고 보니 질문이 잘못돼 있었다. 이 데이터가 답하는 건 "얼마인가"가 아니라
+   **"산 돈이 어디서 왔나"** 다. 그렇게 물으면 두 조각이 저절로 서로를 설명한다 —
+   갖고 있던 걸 판 돈이거나, 새로 넣은 돈이거나. 둘뿐이고 겹치지 않는다.
+
+   ⚠️ 합계에서 갈라낸 값이지 개인별 자금 출처가 아니다. 각주가 그걸 밝힌다. */
+function WhereFrom({ d }: { d: SeohakDaily }) {
   const t = d.turnover;
-  const newPct = Math.max(0, Math.min(100, t.newMoneyPct));
-  const recycled = Math.max(0, t.buy - Math.max(0, t.net));
+  const fresh = Math.max(0, t.net);
+  const recycled = Math.max(0, t.buy - fresh);
+  const freshPct = t.buy ? (fresh / t.buy) * 100 : 0;
 
   return (
     <>
       <Verdict>
-        1년간 산 돈의 <Em>{newPct.toFixed(0)}%</Em>만 새로 들어온 돈입니다
+        산 돈의 <Em>{(100 - freshPct).toFixed(0)}%</Em>는 갖고 있던 걸 판 돈이었습니다
       </Verdict>
 
       <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 9 }}>
         <div style={{ display: "flex", height: 30, gap: 2 }}>
-          <span style={{ width: `${Math.max(3, newPct)}%`, background: BUY, borderRadius: 3 }} />
           <span style={{ flex: 1, background: C.track, borderRadius: 3 }} />
+          <span style={{ width: `${Math.max(3, freshPct)}%`, background: BUY, borderRadius: 3 }} />
         </div>
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex",
                      flexDirection: "column", gap: 6 }}>
           {[
-            { c: BUY, k: "새로 들어온 돈", v: usd(Math.max(0, t.net)), n: "순매수" },
-            { c: C.track, k: "판 돈으로 다시 산 것", v: usd(recycled), n: "같은 돈이 도는 몫" },
+            { c: C.track, k: "갖고 있던 걸 판 돈", v: usd(recycled), n: `${(100 - freshPct).toFixed(0)}%` },
+            { c: BUY, k: "새로 넣은 돈", v: usd(fresh), n: `${freshPct.toFixed(0)}%` },
           ].map((r) => (
             <li key={r.k} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 11.5 }}>
               <span style={{ width: 9, height: 9, borderRadius: 2, background: r.c, flexShrink: 0 }} />
@@ -268,7 +273,8 @@ function NewMoney({ d }: { d: SeohakDaily }) {
         </ul>
         <span style={{ fontSize: 11, color: C.sub2, paddingTop: 6,
                        borderTop: `1px solid ${C.line}` }}>
-          {t.days}거래일 동안 <b style={{ fontFamily: MONO, color: C.ink }}>{usd(t.buy)}</b>어치를 샀습니다
+          {t.days}거래일 동안 <b style={{ fontFamily: MONO, color: C.ink }}>{usd(t.buy)}</b>어치를 사고{" "}
+          <b style={{ fontFamily: MONO, color: C.ink }}>{usd(t.sell)}</b>어치를 팔았습니다
         </span>
       </div>
     </>
@@ -349,11 +355,11 @@ export function DailySection({ d }: { d: SeohakDaily }) {
         <BuyerVsSeller d={d} />
       </Card>
 
-      <Card icon="savings" title="새 돈은 얼마나 되나"
-            desc="1년간 산 돈 중 실제로 새로 들어온 몫입니다."
+      <Card icon="savings" title="산 돈은 어디서 왔나"
+            desc="1년간 산 돈을 판 돈과 새로 넣은 돈으로 가릅니다."
             note="최근 1년"
-            foot="나머지는 갖고 있던 것을 판 돈으로 다시 산 것입니다. 같은 돈이 여러 번 돕니다.">
-        <NewMoney d={d} />
+            foot="산 돈에서 판 돈을 뺀 나머지가 새로 넣은 몫입니다. 합계로 갈라낸 값이라 누가 무슨 돈으로 샀는지는 아닙니다.">
+        <WhereFrom d={d} />
       </Card>
 
       <Card icon="bar_chart" title="어제 몇 번 샀나"
