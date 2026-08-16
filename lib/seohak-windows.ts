@@ -66,7 +66,7 @@ export type CalendarWindow = {
 
 type Pick =
   | { at: "yearStart" | "yearEnd" }
-  | { at: "after"; on: "blackFriday" | "mlk" | "seol" | "chuseok" }
+  | { at: "after"; on: "blackFriday" | "seol" | "chuseok" }
   | { at: "range"; from: string; to: string };
 
 /**
@@ -78,21 +78,25 @@ type Pick =
  * ⚠️ '분기말 사흘'은 뺐다. 재고 보니 코드가 6·9월 마지막 **이틀**만 보고 있어서 라벨과
  * 다른 것을 재고 있었다. 제대로 잡으면 12월 말과 겹친다.
  *
+ * ⚠️ 설날·추석 줄의 **라벨은 '기간'이지만 재는 창은 명절 뒤 첫 세 결제일**이다. 명절
+ * 당일엔 결제가 없어서 그 자리가 곧 '기간이 닿는 첫 결제일'이다. 창을 진짜로 앞뒤 사흘씩
+ * 넓히면 숫자가 달라진다 — 설날은 **부호까지 뒤집혀** '파는 양 −19%'가 '사는 양 +16%'가
+ * 되고(둘 다 12/17), 추석은 파는 양 −13% 9/16 으로 약해진다. 라벨을 고칠 때 창도 같이
+ * 넓히려거든 반드시 다시 재고 숫자를 바꿀 것.
+ *
  * ⛔ 아래 순서는 **달력 순서**다. 설날·추석은 음력이라 해마다 3주씩 옮겨 다니므로 대략
  * 자리로만 끼워 둔 것이다.
  */
 export const CALENDAR_WINDOWS: CalendarWindow[] = [
   { key: "newyear", label: "새해 첫 사흘", phrase: "평소보다 33% 덜 삽니다",
     hit: 17, of: 17, pick: { at: "yearStart" } },
-  { key: "mlk", label: "마틴루터킹데이 직후", phrase: "평소보다 17% 덜 팝니다",
-    hit: 13, of: 17, pick: { at: "after", on: "mlk" } },
-  { key: "seol", label: "설날 직후 사흘", phrase: "평소보다 19% 덜 팝니다",
+  { key: "seol", label: "설날 기간", phrase: "평소보다 19% 덜 팝니다",
     hit: 12, of: 17, pick: { at: "after", on: "seol" } },
   { key: "feb", label: "2월 첫 보름", phrase: "평소보다 13% 더 삽니다",
     hit: 14, of: 17, pick: { at: "range", from: "02-01", to: "02-15" } },
   { key: "june", label: "6월 마지막 주", phrase: "평소보다 8% 더 팝니다",
     hit: 13, of: 17, pick: { at: "range", from: "06-25", to: "06-30" } },
-  { key: "chuseok", label: "추석 직후 사흘", phrase: "평소보다 17% 덜 팝니다",
+  { key: "chuseok", label: "추석 기간", phrase: "평소보다 17% 덜 팝니다",
     hit: 12, of: 16, pick: { at: "after", on: "chuseok" } },
   { key: "blackfriday", label: "블랙프라이데이 직후", phrase: "평소보다 17% 덜 삽니다",
     hit: 14, of: 16, pick: { at: "after", on: "blackFriday" } },
@@ -132,7 +136,6 @@ const shiftDays = (date: string, by: number) => {
 function anchor(on: string, year: string) {
   const y = Number(year);
   if (on === "blackFriday") return shiftDays(nthDow(y, 11, 4, 4), 1); // 추수감사절 다음 날
-  if (on === "mlk") return nthDow(y, 1, 1, 3);                        // 1월 셋째 월요일
   const lunar = LUNAR[year];
   return lunar ? `${year}-${on === "seol" ? lunar.seol : lunar.chuseok}` : null;
 }
