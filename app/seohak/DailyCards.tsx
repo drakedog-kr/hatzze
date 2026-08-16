@@ -267,14 +267,22 @@ function BuyerVsSeller({ d }: { d: SeohakDaily }) {
    독자는 그 틈을 느낀다.
 
    그래서 **잰 것만 말한다.** 산 것 · 판 것 · 그 차이, 셋 다 실측이고 셋째는 앞 둘의
-   뺄셈이다. 같은 자 위에 막대 셋을 세우면 마지막 막대가 얼마나 짧은지가 곧 메시지다. */
+   뺄셈이다. 같은 자 위에 막대 셋을 세우면 마지막 막대가 얼마나 짧은지가 곧 메시지다.
+
+   ⚠️⚠️ **5판 — '늘어난 것'을 '수익'으로 읽는다.** 그렇게 물어 왔다. '늘었다'는 잔고가
+   불었다는 뜻으로 들리는데 이건 **순매수**(얼마를 더 넣었나)지 그 돈이 얼마가 됐나가
+   아니다. '새 돈'과 똑같은 실수를 낱말만 바꿔 되풀이한 셈이다.
+
+   ⭐ 이제 이름을 **순매수**로 못박고 옆에 `(산 것 − 판 것)` 을 붙인다. 국내 투자자에게
+   '외국인 순매수'로 익숙한 말이라 지어낸 말보다 안전하다. 그리고 각주가 **"수익이
+   아니다"** 를 명시하고 수익을 답하는 섹션을 가리킨다. */
 function AfterAllThat({ d }: { d: SeohakDaily }) {
   const t = d.turnover;
   const net = t.buy - t.sell;
   const rows = [
-    { k: "산 것", v: t.buy, tone: BUY },
-    { k: "판 것", v: t.sell, tone: SELL },
-    { k: "늘어난 것", v: Math.abs(net), tone: C.ink, strong: true },
+    { k: "산 것", sub: "", v: t.buy, tone: BUY },
+    { k: "판 것", sub: "", v: t.sell, tone: SELL },
+    { k: "순매수", sub: "산 것 − 판 것", v: Math.abs(net), tone: C.ink, strong: true },
   ];
   const max = Math.max(...rows.map((r) => r.v)) || 1;
   const times = net ? Math.round(t.buy / Math.abs(net)) : 0;
@@ -282,14 +290,17 @@ function AfterAllThat({ d }: { d: SeohakDaily }) {
   return (
     <>
       <Verdict>
-        1년간 산 것의 <Em>{times}분의 1</Em>만 실제로 늘었습니다
+        1년간 그렇게 사고팔았지만 <Em>순매수는 {times}분의 1</Em>입니다
       </Verdict>
 
       <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 11 }}>
         {rows.map((r) => (
           <div key={r.k} style={{ display: "flex", alignItems: "center", gap: 9 }}>
-            <span style={{ flex: "0 0 58px", fontSize: 12, color: r.strong ? C.ink : C.label,
-                           fontWeight: r.strong ? 800 : 600 }}>{r.k}</span>
+            <span style={{ flex: "0 0 76px", display: "flex", flexDirection: "column" }}>
+              <span style={{ fontSize: 12, color: r.strong ? C.ink : C.label,
+                             fontWeight: r.strong ? 800 : 600 }}>{r.k}</span>
+              {r.sub && <span style={{ fontSize: 9.5, color: C.faint }}>{r.sub}</span>}
+            </span>
             <span style={{ flex: 1, height: 14, background: C.soft, borderRadius: 3,
                            overflow: "hidden" }}>
               <span style={{ display: "block", height: "100%", borderRadius: 3,
@@ -331,10 +342,10 @@ export function DailySection({ d }: { d: SeohakDaily }) {
           <BuyerVsSeller d={d} />
         </Card>
 
-        <Card icon="savings" title="사고판 끝에 얼마가 늘었나"
-              desc="1년간 사고판 금액과, 그 차이입니다."
+        <Card icon="savings" title="얼마나 사고팔았나"
+              desc="1년간 사고판 금액과, 그중 순매수입니다."
               note="최근 1년"
-              foot="'늘어난 것'은 산 것에서 판 것을 뺀 값입니다. 셋 다 예탁결제원 결제 금액입니다.">
+              foot="순매수는 수익이 아닙니다 — 얼마를 더 넣었는지입니다. 그 돈이 지금 얼마가 됐는지는 아래 '얼마가 쌓였나'에서 봅니다.">
           <AfterAllThat d={d} />
         </Card>
       </div>
