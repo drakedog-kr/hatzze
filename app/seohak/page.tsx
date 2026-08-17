@@ -257,7 +257,12 @@ export default async function SeohakPage() {
   const cohortCols = [ov.cohorts.slice(0, cohortHalf), ov.cohorts.slice(cohortHalf)].filter(
     (col) => col.length,
   );
-  const recent = ov.cohorts.filter((c) => c.year >= 2025).reduce((s, c) => s + c.inflow, 0);
+  // '최근'은 마지막 두 해다. 연도를 손으로 박으면 해가 바뀐 날 "2025년 이후"가 세 해가
+  // 되면서 각주만 조용히 거짓이 된다. 개월 수도 같은 기준에서 낸다(2026-05 이면 17개월).
+  const latestYear = ov.cohorts[ov.cohorts.length - 1].year;
+  const recentFrom = latestYear - 1;
+  const recentMonths = (latestYear - recentFrom) * 12 + Number(ov.asOf.slice(5, 7));
+  const recent = ov.cohorts.filter((c) => c.year >= recentFrom).reduce((s, c) => s + c.inflow, 0);
   const recentShare = (recent / ov.principal) * 100;
 
   return (
@@ -363,12 +368,16 @@ export default async function SeohakPage() {
             눌린다(2열 격자로 바꾸자마자 실제로 깨졌다). 통째로 <span> 하나에 담는다.
             JSX 는 태그 사이 줄바꿈의 공백을 지우므로 조사 공백은 {" "} 로 명시한다. */}
         <div className="hz-sheet-foot" style={{ fontSize: 12, color: C.sub }}>
+          {/* ⚠️ 앞 판은 "원금의 33%가 2025년 이후에 들어왔습니다"로 시작했다. **그 자리의
+              '원금'이 무엇인지 문장 안에 없어서** 33% 의 분모를 알 수 없었다. 정의를 먼저
+              놓고 발견을 뒤에 붙인다. */}
           <span>
-            원금의{" "}
-            <b style={{ color: C.ink }}>{recentShare.toFixed(0)}%가</b>{" "}
-            2025년 이후에 들어왔습니다. 넣은 돈은 1985년부터의 누적 순매수, 평가액은 그달 말 잔고입니다.
-            해별 &apos;지금&apos;은 그 해에 들어온 돈이 이후 시세를 그대로 따라갔다고 볼 때의
-            값입니다.
+            넣은 원금 {usdB(ov.principal)}는 1985년부터 쌓인 누적 순매수인데, 그중{" "}
+            <b style={{ color: C.ink }}>
+              {recentShare.toFixed(0)}%가 최근 {recentMonths}개월에
+            </b>{" "}
+            들어왔습니다. 평가액은 그달 말 잔고입니다. 해별 &apos;지금&apos;은 그 해에 들어온
+            돈이 이후 시세를 그대로 따라갔다고 볼 때의 값입니다.
           </span>
         </div>
       </section>
