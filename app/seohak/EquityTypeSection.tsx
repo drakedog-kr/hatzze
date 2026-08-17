@@ -5,26 +5,54 @@ import { C, MONO } from "../ui";
 /**
  * 무엇을 들고 있나 — 보통주 · 펀드·ETF · 우선주·기타.
  *
+ * ## ⚠️⚠️ 12칸 두 줄을 두 막대로 바꿨다
+ *
+ * 앞 판은 한국 12년 + 전 세계 12년을 3분할 기둥으로 세웠다. **칸이 24개, 조각이 72개**
+ * 였고 셋 다 비슷한 파랑이라 무엇이 변했는지 한눈에 안 읽혔다("직관적이지 않고 복잡해
+ * 보인다"). 정작 이 카드가 하려는 말은 하나다 — **11년 전과 지금이 이만큼 다르다.**
+ *
+ * 그래서 **두 시점만 나란히** 둔다. 조각이 72개에서 6개로 줄고, 칸마다 %를 안에 적어
+ * 범례를 오가지 않아도 된다.
+ *
+ * ## ⭐ 주인공이 바뀌었다
+ *
+ * `mover` 는 가장 크게 움직인 칸을 고르는데 그게 보통주(−9.2%p)다. 하지만 읽는 사람에게
+ * 뜻이 있는 쪽은 **늘어난 칸**이다 — 우선주·기타가 7.7% → 16.4% 로 두 배가 됐다.
+ * 그리고 **펀드·ETF 는 20.2% → 20.6% 로 사실상 그대로다**(11년 동안 +0.4%p). "한국인이
+ * ETF 로 옮겨 갔다"는 흔한 이야기가 이 자료에서는 안 보인다는 뜻이라 그걸 문장으로 낸다.
+ *
+ * ⚠️ 전 세계 기둥은 뺐지만 **한 줄로는 남긴다.** 한국의 '우선주·기타'가 2021년에
+ * 10.4%→19.2% 로 뛴 게 조사 분류가 바뀐 탓이 아니라고 말할 수 있는 근거가 그것뿐이다
+ * (같은 해 전 세계는 6.8→6.7 로 가만히 있었다).
+ *
  * ## 색 셋은 검증기로 골랐다
  *
- * 처음엔 `blue → bar(#cfe6fc) → marker(#c7d5e3)` 로 잡았는데, dataviz 검증기가
- * 인접 쌍 `#cfe6fc↔#c7d5e3` 을 **정상 시력 ΔE 5.0**(하한 15)으로 떨어뜨렸다 —
- * 색약이 아니어도 구분이 안 된다는 뜻이다([[project_seohak_anatomy_page]] 의
- * BLUE_SCALE 경고와 같은 결). 지금 셋은 전 쌍 ΔE 24.2(색약) / 24.7(정상)로 통과한다.
+ * 처음엔 `blue → bar(#cfe6fc) → marker(#c7d5e3)` 로 잡았는데, dataviz 검증기가 인접 쌍
+ * `#cfe6fc↔#c7d5e3` 을 **정상 시력 ΔE 5.0**(하한 15)으로 떨어뜨렸다 — 색약이 아니어도
+ * 구분이 안 된다는 뜻이다. 지금 셋은 전 쌍 ΔE 24.2(색약) / 24.7(정상)로 통과한다.
  *
  *   node scripts/validate_palette.js "#3182f6,#c7d5e3,#3c5064" --mode light --pairs all
  *
- * ⚠️ 검증기가 `#c7d5e3` 의 배경 대비를 1.49 로 경고한다. 그건 **눈에 보이는 라벨을
- * 달면 해소되는 종류**라, 세 칸 모두 이름과 값을 직접 붙였다(범례에만 두면 안 된다).
- *
  * ⚠️⚠️ **다크 작업 때 이 자리를 볼 것.** `inkSoft` 는 글자용 토큰이라 다크에서 밝아진다.
- * 그러면 '우선주·기타'와 '보통주'의 명암이 뒤집힌다 — 정체는 라벨이 지고 있으니
- * 안 깨지지만, 두 칸의 인상이 바뀐다.
+ * 그러면 '우선주·기타'와 '보통주'의 명암이 뒤집힌다 — 칸 안 글자색(`INK_ON`)도 같이
+ * 갈리므로 둘을 한 번에 확인할 것.
  */
 const FILL = {
   common: C.blue,
   funds: C.marker,
   other: C.inkSoft,
+} as const;
+
+/**
+ * 칸 안에 얹는 글자색. 밝은 칸(펀드·ETF)만 잉크고 나머지는 흰색이다.
+ *
+ * ⚠️ 검증기가 `#c7d5e3` 의 배경 대비를 1.49 로 경고했던 그 칸이다. 흰 글자를 얹으면
+ * 아예 안 읽힌다.
+ */
+const INK_ON = {
+  common: C.card,
+  funds: C.ink,
+  other: C.card,
 } as const;
 
 const PARTS = [
@@ -38,30 +66,49 @@ const usdB = (mn: number) =>
 const pp = (v: number) =>
   `${v >= 0 ? "+" : "−"}${Math.abs(v).toLocaleString("ko-KR", { maximumFractionDigits: 1 })}%p`;
 
-/** 100% 기준 세로 기둥 하나. 12개가 모여 흐름이 된다. */
-function Column({ m, dim, label }: { m: EquityMix; dim?: boolean; label?: string }) {
+/**
+ * 한 해의 3분할 막대. 칸 안에 %를 적는다.
+ *
+ * ⚠️ 좁은 칸에 글자를 넣으면 넘친다. **7% 미만이면 비운다.** 9% 로 뒀더니 2014년
+ * 우선주·기타(7.7%)만 빈 칸이 되어 "왜 저기만 숫자가 없나"가 남았다. 이 시트는 폭을
+ * 통째로 쓰므로 막대가 883px 이고 7.7% 가 68px 이라 "7.7%"(28px)가 넉넉히 들어간다.
+ * ⚠️ 좁은 화면에서는 이 여유가 사라진다 — 모바일 작업 때 다시 볼 것. 넘치더라도
+ * `overflow: hidden` 이 옆 칸을 덮는 것만은 막는다.
+ */
+function MixBar({ m, when }: { m: EquityMix; when: string }) {
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, minWidth: 0 }}>
-      <div
-        title={`${m.year} · 보통주 ${m.commonPct.toFixed(1)}% · 펀드·ETF ${m.fundsPct.toFixed(1)}% · 우선주·기타 ${m.otherPct.toFixed(1)}%`}
-        style={{ width: "100%", height: 74, display: "flex", flexDirection: "column",
-                 gap: 1.5, opacity: dim ? 0.5 : 1 }}
-      >
+    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+      <span style={{ flex: "0 0 62px", fontSize: 11.5, color: C.sub2, fontWeight: 700 }}>
+        {when}
+      </span>
+      <div style={{ flex: 1, display: "flex", height: 30, gap: 2, minWidth: 0 }}>
         {PARTS.map((p) => (
-          <span key={p.key} style={{ height: `${m[`${p.key}Pct`]}%`, background: FILL[p.key],
-                                     borderRadius: 1.5 }} />
+          <span key={p.key}
+                title={`${m.year} · ${p.label} ${m[`${p.key}Pct`].toFixed(1)}%`}
+                style={{ width: `${m[`${p.key}Pct`]}%`, background: FILL[p.key], borderRadius: 3,
+                         display: "flex", alignItems: "center", justifyContent: "center",
+                         minWidth: 0, overflow: "hidden" }}>
+            {m[`${p.key}Pct`] >= 7 && (
+              <b style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color: INK_ON[p.key],
+                          letterSpacing: "-0.02em", whiteSpace: "nowrap" }}>
+                {m[`${p.key}Pct`].toFixed(1)}%
+              </b>
+            )}
+          </span>
         ))}
       </div>
-      {label !== undefined && (
-        <span style={{ fontSize: 8.5, color: C.faint, letterSpacing: "-0.03em" }}>{label}</span>
-      )}
     </div>
   );
 }
 
 export function EquityTypeSection({ e }: { e: SeohakEquityType }) {
-  const { latest, mover, worldLatest } = e;
-  const worldMover = worldLatest[`${mover.key}Pct`] - e.world[0][`${mover.key}Pct`];
+  const { latest, first, worldLatest } = e;
+  // 늘어난 칸이 이야기의 주인공이다. `mover`(가장 크게 움직인 칸)는 줄어든 쪽을 집는다.
+  const grew = [...PARTS]
+    .map((p) => ({ ...p, delta: latest[`${p.key}Pct`] - first[`${p.key}Pct`] }))
+    .reduce((a, b) => (b.delta > a.delta ? b : a));
+  const fundsDelta = latest.fundsPct - first.fundsPct;
+  const worldOther = worldLatest.otherPct - e.world[0].otherPct;
 
   return (
     <section className="hz-sheet">
@@ -72,16 +119,12 @@ export function EquityTypeSection({ e }: { e: SeohakEquityType }) {
         note={`${latest.year}-06 기준`}
       />
 
-      <div style={{ padding: "14px 22px 4px", display: "flex", flexDirection: "column", gap: 16 }}>
-        {/* ── 오늘의 3분할 ── */}
-        {/* 칸 사이 2px 틈. 색이 갈려 있어도 경계가 있어야 '세 조각'으로 읽힌다(dataviz 규격). */}
-        <div style={{ display: "flex", height: 34, gap: 2 }}>
-          {PARTS.map((p) => (
-            <span key={p.key} style={{ width: `${latest[`${p.key}Pct`]}%`, background: FILL[p.key],
-                                       borderRadius: 3 }} />
-          ))}
-        </div>
+      <div style={{ padding: "16px 22px 4px", display: "flex", flexDirection: "column", gap: 8 }}>
+        <MixBar m={first} when={`${first.year}년`} />
+        <MixBar m={latest} when={`${latest.year}년`} />
+      </div>
 
+      <div style={{ padding: "12px 22px 4px" }}>
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid",
                      gridTemplateColumns: "repeat(auto-fit, minmax(min(190px, 100%), 1fr))", gap: 12 }}>
           {PARTS.map((p) => (
@@ -94,10 +137,10 @@ export function EquityTypeSection({ e }: { e: SeohakEquityType }) {
               <span style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
                 <b style={{ fontFamily: MONO, fontSize: 21, fontWeight: 800, color: C.ink,
                             letterSpacing: "-0.02em" }}>
-                  {latest[`${p.key}Pct`].toFixed(1)}%
+                  {usdB(latest[p.key])}
                 </b>
                 <span style={{ fontFamily: MONO, fontSize: 12, color: C.sub2, fontWeight: 700 }}>
-                  {usdB(latest[p.key])}
+                  {pp(latest[`${p.key}Pct`] - first[`${p.key}Pct`])}
                 </span>
               </span>
               <span style={{ fontSize: 11, color: C.faint }}>{p.desc}</span>
@@ -106,33 +149,13 @@ export function EquityTypeSection({ e }: { e: SeohakEquityType }) {
         </ul>
       </div>
 
-      {/* ── 열두 해의 흐름. 한국 옆에 전 세계를 나란히 둔다 ──
-          한국만 보면 2021년 급증을 '조사 분류가 바뀌었나'로 읽게 된다. 같은 해 전 세계가
-          가만히 있었다는 대조가 있어야 한국인의 실제 변화라고 말할 수 있다. */}
-      <div style={{ padding: "6px 22px 4px", display: "grid", gap: 18,
-                    gridTemplateColumns: "repeat(auto-fit, minmax(min(300px, 100%), 1fr))" }}>
-        {[
-          { title: "대한민국", rows: e.series, dim: false },
-          { title: "전 세계", rows: e.world, dim: true },
-        ].map((panel) => (
-          <div key={panel.title} style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: panel.dim ? C.sub2 : C.ink }}>
-              {panel.title}
-            </span>
-            <div style={{ display: "flex", gap: 3, alignItems: "flex-end" }}>
-              {panel.rows.map((m, i) => (
-                <Column key={m.year} m={m} dim={panel.dim}
-                        label={m.year % 5 === 0 || i === panel.rows.length - 1 ? `${m.year}` : ""} />
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-
       <div className="hz-sheet-foot" style={{ fontSize: 12, color: C.sub }}>
         <span>
-          열한 해 동안 한국은 <b style={{ color: C.ink }}>{mover.label}가 {pp(mover.deltaPp)}</b> 움직였는데
-          같은 기간 전 세계는 {pp(worldMover)} 였습니다. 미 재무부 연례 조사라 해마다 6월 말 기준으로 한 번 바뀌고,
+          {latest.year - first.year}년 동안{" "}
+          <b style={{ color: C.ink }}>{grew.label}가 {pp(grew.delta)}</b> 늘었고{" "}
+          <b style={{ color: C.ink }}>펀드·ETF 는 {pp(fundsDelta)} 로 그대로</b>입니다.
+          같은 기간 전 세계의 우선주·기타는 {pp(worldOther)} 였으니 조사 분류가 바뀐 것은
+          아닙니다. 미 재무부 연례 조사라 해마다 6월 말 기준으로 한 번 바뀌고,
           &apos;우선주·기타&apos;가 무엇인지는 원천이 더 쪼개지 않습니다.
         </span>
       </div>
