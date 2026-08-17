@@ -268,10 +268,8 @@ function WeekGrid({ e }: { e: SeohakEtf }) {
  */
 export function EtfSection({ e }: { e: SeohakEtf }) {
   return (
-    // ⭐ 이 줄만 `stretch` 로 덮는다. 두 카드의 자연 높이가 572 대 597 로 25px 밖에
-    // 안 벌어져서, 늘려도 구멍이 안 생기고 바닥·각주 띠가 딱 맞는다. 분기 층은 292 대
-    // 392 라 같은 짓을 하면 78px 짜리 흰 구멍이 생긴다(`CARD_GRID` 머리말 참고).
-    <div style={{ ...CARD_GRID, alignItems: "stretch" }}>
+    // 두 카드의 자연 높이가 572 로 같아서 늘려도 구멍이 안 생긴다(`CARD_GRID` 머리말).
+    <div style={CARD_GRID}>
       <Card icon="input" title="ETF 자금 유입"
             desc="미국 ETF 로 실제로 들어온 돈입니다. 거래대금이 아닙니다."
             note={`${e.asOf} 기준`}

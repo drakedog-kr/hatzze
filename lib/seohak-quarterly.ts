@@ -36,6 +36,17 @@ export type QuarterPoint = {
   restQ: number;
 };
 
+/** 13F 를 낸 기관 한 곳. */
+export type Filer = {
+  /** 화면용 한국어 이름. 표에 없으면 원천의 영문 이름을 그대로 쓴다. */
+  name: string;
+  usd: number;
+  /** 그 분기 신고액 합에서 차지하는 몫(%). */
+  share: number;
+  /** 신고한 종목 수. */
+  holdings: number;
+};
+
 export type SeohakQuarterly = {
   /** 마지막으로 다 채워진 분기. */
   asOf: string;
@@ -53,7 +64,79 @@ export type SeohakQuarterly = {
   restTotal: number;
   /** 몇 분기를 접은 값인가. */
   quarters: number;
+  /** `asOf` 분기에 13F 를 낸 기관들, 신고액 큰 순. 표가 없으면 빈 배열. */
+  filers: Filer[];
 };
+
+/**
+ * 13F 신고자 이름 — 영문 원천 → 화면용.
+ *
+ * ⚠️ 표에 없는 이름은 **영문 그대로 낸다.** 빈칸으로 두면 새 기관이 신고를 시작한
+ * 분기에 이름 없는 줄이 생긴다. 지금까지 신고한 곳은 아홉이고 전부 여기 있다.
+ */
+const FILER_KO: Record<string, string> = {
+  "National Pension Service": "국민연금",
+  "Korea Investment CORP": "한국투자공사",
+  "Mirae Asset Global Investments Co., Ltd.": "미래에셋",
+  "BANK OF KOREA": "한국은행",
+  "Hanwha Asset Management Co., Ltd.": "한화자산운용",
+  "Must Asset Management Inc.": "머스트자산운용",
+  "Hyundai Investments Co., Ltd.": "현대인베스트먼트",
+  "AJU IB Investment Co., Ltd.": "아주IB투자",
+  "Samsung C&T Corp": "삼성물산",
+};
+
+/**
+ * 그 분기 신고자별 합계.
+ *
+ * ## ⚠️⚠️ `suspect` 를 반드시 걸러야 한다
+ *
+ * 안 거르면 2026-03 합이 **$483.7B** 인데 걸러야 $219.1B 다. 집계표
+ * (`seohak_quarterly_returns.institution_usd`)가 $219.1B 이므로 **거른 쪽이 맞다.**
+ * 차이 하나가 미래에셋의 $299.5B → $34.9B 인데, 13F 는 단위를 잘못 적어 내는 신고가
+ * 드물지 않다. 안 거르면 이 표만 집계표와 다른 이야기를 하게 된다.
+ *
+ * ## ⚠️ 한 분기가 ~2,900행이라 세 번 왕복한다
+ *
+ * PostgREST 의 집계 함수가 꺼져 있어(`PGRST123`) 합을 여기서 낸다. 압축 전 약 200KB.
+ * 자주 바뀌는 자료가 아니므로(분기 1회) 나중에 집계 열을 만들 자리다.
+ */
+async function loadFilers(quarter: string): Promise<Filer[]> {
+  const rows: { filer_name: string; value_usd: number | null }[] = [];
+  for (let start = 0; ; start += 1000) {
+    const { data, error } = await getSupabaseServer()
+      .from("seohak_institution_13f")
+      .select("filer_name, value_usd")
+      .eq("report_date", quarter)
+      .eq("suspect", false)
+      .range(start, start + 999);
+    // 실패를 빈 배열로 흘리지 않는다. 목록만 접히고 나머지 카드는 그대로 뜬다.
+    if (error) return [];
+    const page = data ?? [];
+    rows.push(...(page as typeof rows));
+    if (page.length < 1000) break;
+  }
+  if (!rows.length) return [];
+
+  const by = new Map<string, { usd: number; holdings: number }>();
+  for (const r of rows) {
+    const cur = by.get(r.filer_name) ?? { usd: 0, holdings: 0 };
+    cur.usd += Number(r.value_usd ?? 0);
+    cur.holdings += 1;
+    by.set(r.filer_name, cur);
+  }
+  const total = [...by.values()].reduce((s, v) => s + v.usd, 0);
+  // ⚠️ 몫의 분모는 집계표의 institutionUsd 가 아니라 **여기서 낸 합**이다. 둘이 어긋난
+  // 분기가 생기면 화면의 %가 100 을 안 맞춘다.
+  return [...by.entries()]
+    .map(([name, v]) => ({
+      name: FILER_KO[name] ?? name,
+      usd: v.usd,
+      share: total ? (v.usd / total) * 100 : 0,
+      holdings: v.holdings,
+    }))
+    .sort((a, b) => b.usd - a.usd);
+}
 
 export async function getSeohakQuarterly(): Promise<SeohakQuarterly | null> {
   const { data, error } = await getSupabaseServer()
@@ -104,9 +187,14 @@ export async function getSeohakQuarterly(): Promise<SeohakQuarterly | null> {
   const last = rows[rows.length - 1];
   const institutionUsd = Number(last.institution_usd ?? 0);
   const totalUsd = Number(last.total_usd ?? 0);
+  // 신고자 목록은 **같은 분기**여야 한다. 13F 원천에는 더 최근 분기가 들어와 있을 수
+  // 있는데(집계는 filer_count 문턱을 넘어야 잡힌다), 그걸 그리면 카드 머리의 기준일과
+  // 표의 기준일이 갈린다.
+  const filers = await loadFilers(last.quarter_end as string);
 
   return {
     asOf: last.quarter_end as string,
+    filers,
     share: Number(last.institution_share ?? 0) * 100,
     institutionUsd,
     totalUsd,
