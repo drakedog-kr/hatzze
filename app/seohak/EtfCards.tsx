@@ -34,35 +34,105 @@ const signed = (v: number) => (v >= 0 ? `+${won(v)}` : won(v));
 const shortName = (name: string) => name.replace("미국", "").replace(/\s{2,}/g, " ").trim();
 
 /**
+ * 순위표 — **카더라의 테마 로테이션·이슈 키워드에서 가져온 조판이다.**
+ *
+ * 앞 판은 두 카드가 통째로 흰 바탕에 글자만 얹힌 목록이었다("다 하얀색이라 구분이 잘
+ * 안돼"). 카더라의 그 두 시트가 흰 바탕에서도 갈라져 보이는 까닭은 넷이다. 그대로 옮긴다.
+ *
+ *   ① 머리 띠   `--c-soft` 로 파인 한 줄. 칸 이름을 여기서 대므로 줄마다 되풀이가 없다
+ *   ② 순위 배지 `--c-plate` 판에 얹은 번호. 줄의 왼쪽 끝을 고정해 눈이 탈 세로선이 생긴다
+ *   ③ 구분선   줄 사이 `--c-sheet-row`
+ *   ④ 막대     제 칸을 쓰되 6px 이라 세로를 안 먹는다
+ *
+ * ⚠️ **막대 색은 값 글자색과 다르다.** 값은 BUY/SELL 원색(#d03a46 · #3182f6)이고 막대는
+ * 한 톤 옅은 `--c-warm-2`·`--c-blue-2` 다. 다섯 줄을 원색 막대로 세우면 그 칸이 카드에서
+ * 제일 센 잉크가 되는데, 이 표에서 읽어야 할 것은 길이가 아니라 이름과 금액이다.
+ * 카더라도 같은 이유로 막대만 2단계 색을 쓴다.
+ *
+ * ⚠️ 안쪽 하한이 320px 이다. 18(배지)+48(막대)+58(값)에 간격 24 를 더하면 148 이 고정이라
+ * 280px 에서는 이름 칸이 132px 로 줄어 `TIGER 필라델피아반도체나스닥` 이 반 토막 난다.
+ */
+function RankTable({ head, hint, tone, barTone, rows }: {
+  head: string;
+  /** 값 칸의 이름. 줄마다 단위를 되풀이하지 않으려고 머리 띠에 한 번만 적는다. */
+  hint: string;
+  tone: string;
+  barTone: string;
+  rows: { key: string; name: string; weight: number; value: string; aside?: string }[];
+}) {
+  const max = Math.max(...rows.map((r) => Math.abs(r.weight)), 1);
+  const hasAside = rows.some((r) => r.aside !== undefined);
+  const cols = hasAside ? "18px minmax(0, 1fr) 40px 44px 46px" : "18px minmax(0, 1fr) 48px 58px";
+
+  return (
+    <div style={{ minWidth: 0, display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 9px",
+                    background: C.soft, borderRadius: R.control, fontSize: 10.5, fontWeight: 700 }}>
+        <span style={{ width: 7, height: 7, borderRadius: 2, background: tone, flexShrink: 0 }} />
+        <span style={{ color: C.label }}>{head}</span>
+        <span style={{ marginLeft: "auto", color: C.faint, fontWeight: 600 }}>{hint}</span>
+      </div>
+      <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+        {rows.map((r, i) => (
+          <li key={r.key}
+              style={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 8,
+                       padding: "6px 9px",
+                       borderBottom: i < rows.length - 1 ? `1px solid ${C.sheetRow}` : undefined }}>
+            <span style={{ width: 18, height: 18, borderRadius: 5, background: "var(--c-plate)",
+                           color: "var(--c-cold-ink)", fontSize: 10, fontWeight: 800,
+                           display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {i + 1}
+            </span>
+            <span style={{ fontSize: 11.5, color: C.sub, minWidth: 0, overflow: "hidden",
+                           textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
+            {/* 막대는 클래스로 둔다. 인라인으로 두면 좁은 화면에서 이 칸을 접는 규칙을
+                이겨서 막대만 살아남는다(카더라에서 실제로 터진 자리다). 채움 폭·색만 인라인. */}
+            <span className="hz-bar">
+              <span style={{ width: `${Math.max(4, (Math.abs(r.weight) / max) * 100)}%`,
+                             background: barTone }} />
+            </span>
+            {r.aside !== undefined && (
+              <span style={{ fontFamily: MONO, fontSize: 10, color: C.faint, textAlign: "right",
+                             overflow: "hidden", whiteSpace: "nowrap" }}>{r.aside}</span>
+            )}
+            <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: tone,
+                           textAlign: "right" }}>{r.value}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
  * ⑪ ETF 자금 유입 — 들어온 곳과 빠진 곳을 좌우로.
  *
  * 거래대금이 아니라 **상장좌수 변화 × NAV** 다. 같은 돈이 오간 것은 안 세고 설정·환매만
  * 센다 — 그래서 272종목 중 84종목만 값이 0 이 아니다.
  *
- * ## ⚠️⚠️⚠️ 막대를 지웠다. 세 판을 거쳐서
+ * ## ⚠️⚠️⚠️ 막대는 다섯 판을 거쳤다. 지금 자리가 왜 여기인지
  *
  * 1판 한 방향 막대 — 빠져나간 돈도 오른쪽으로 자라고 부호는 색의 진하기로만 갈랐다.
  *     **−113억이 +113억과 같은 그림**이었다.
  * 2판 0 을 가운데 둔 양방향 막대 — 방향은 잡혔는데 유출 최대가 113억, 유입 최대가
  *     559억이라 **왼쪽 절반이 텅 비었다.**
  * 3판 0 을 양쪽 실제 크기로 나눠 빈칸을 없앴다.
- * 4판(지금) **막대 자체를 지웠다.**
+ * 4판 **막대 자체를 지웠다** — 자리를 너무 많이 먹었다("왜케 자리를 많이 차지해").
+ * 5판(지금) **한 방향 막대를 제 칸에 되돌렸다.** 방향은 칸이 이미 나눠 놓았으므로
+ *     막대는 그 칸 안의 크기만 말하면 된다 — 4판이 지운 것은 막대가 아니라 폭이었다.
  *
- * ⭐ 3판까지는 막대를 어떻게 그릴지만 고쳤는데, 정작 물어야 할 것은 **막대가 그 자리값을
- * 하느냐**였다. 줄이 일곱뿐이고 금액이 바로 옆에 적혀 있다 — 길이가 더 말해 주는 게 없다.
- * 그런데도 일곱 줄을 세로로 쓰면서 폭은 3분의 2만 썼다.
+ * ⭐ 그래서 되돌려도 4판의 교훈이 안 깨진다. 지금 막대는 48px 짜리 제 칸에 6px 높이로
+ * 앉아 세로를 한 픽셀도 안 먹는다. `RankTable` 머리말 참고.
  *
- * 지금은 **들어온 곳과 빠진 곳을 좌우 두 칸으로** 담는다. 같은 정보에 높이는 절반이고
- * 폭은 다 쓴다. 방향은 색과 칸 제목이 지므로(빨강 왼쪽 · 파랑 오른쪽) 막대가 없어도
- * 헷갈릴 자리가 없다. 남은 자리는 종목을 넷에서 **다섯씩**으로 늘리는 데 썼다.
+ * 방향은 색과 칸 제목이 진다(빨강 위 · 파랑 아래). 종목은 다섯씩이다.
  *
  * ⭐ 이 카드의 진짜 발견은 순위표가 아니라 **환헤지형만 방향이 반대**라는 것이라, 그걸
  * 아래에 별도 줄로 세운다.
  */
 function Flows({ e }: { e: SeohakEtf }) {
   const sides = [
-    { key: "in", head: "들어온 곳", rows: e.inflow, tone: BUY },
-    { key: "out", head: "빠진 곳", rows: e.outflow, tone: SELL },
+    { key: "in", head: "들어온 곳", rows: e.inflow, tone: BUY, bar: "var(--c-warm-2)" },
+    { key: "out", head: "빠진 곳", rows: e.outflow, tone: SELL, bar: "var(--c-blue-2)" },
   ];
   const split = e.hedgedFlow < 0 && e.unhedgedFlow > 0;
 
@@ -74,29 +144,21 @@ function Flows({ e }: { e: SeohakEtf }) {
 
       <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 11 }}>
         <div style={{ display: "grid", gap: 14,
-                      gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))" }}>
+                      gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))" }}>
           {sides.map((s) => (
-            <div key={s.key} style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 6 }}>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11,
-                             color: C.sub2, fontWeight: 700 }}>
-                <span style={{ width: 8, height: 8, borderRadius: 2, background: s.tone, flexShrink: 0 }} />
-                {s.head}
-              </span>
-              <ul style={{ listStyle: "none", margin: 0, padding: "6px 0 0", display: "flex",
-                           flexDirection: "column", gap: 5, borderTop: `1px solid ${C.line}` }}>
-                {s.rows.map((r) => (
-                  <li key={r.code} style={{ display: "flex", gap: 8, fontSize: 11.5,
-                                            alignItems: "baseline" }}>
-                    <span style={{ color: C.sub, minWidth: 0, overflow: "hidden",
-                                   textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {shortName(r.name)}
-                    </span>
-                    <span style={{ marginLeft: "auto", flexShrink: 0, fontFamily: MONO,
-                                   fontWeight: 700, color: s.tone }}>{signed(r.netFlow)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <RankTable
+              key={s.key}
+              head={s.head}
+              hint="하루 순유입"
+              tone={s.tone}
+              barTone={s.bar}
+              rows={s.rows.map((r) => ({
+                key: r.code,
+                name: shortName(r.name),
+                weight: r.netFlow,
+                value: signed(r.netFlow),
+              }))}
+            />
           ))}
         </div>
 
@@ -148,7 +210,9 @@ function Flows({ e }: { e: SeohakEtf }) {
  * `KODEX 미국S&P500테크놀로지` 같은 섹터 상품이 지수형으로 딸려 들어온다. 채권 필터는
  * 실측으로 오분류가 0 이었지만 이쪽은 안 그렇다.
  *
- * 칸 꼴은 `Flows` 와 같다 — 오른 쪽 빨강, 내린 쪽 파랑, 좌우 두 칸.
+ * 칸 꼴은 `Flows` 와 같다 — 오른 쪽 빨강, 내린 쪽 파랑, `RankTable` 두 벌.
+ * 여기만 칸이 하나 더 있다(그 주 오간 돈). 흐린 회색이고 머리 띠에서 이름을 안 댄다 —
+ * 이름을 대면 등락 옆의 대등한 지표로 읽혀서 위에 적어 둔 "인과로 엮지 않는다"가 깨진다.
  */
 function WeekGrid({ e }: { e: SeohakEtf }) {
   const moved = e.week.filter((w) => Number.isFinite(w.changePct));
@@ -156,8 +220,8 @@ function WeekGrid({ e }: { e: SeohakEtf }) {
   const up = byChange.slice(0, 5);
   const down = byChange.slice(-5).reverse();
   const sides = [
-    { key: "up", head: "오른 것", rows: up, tone: BUY },
-    { key: "down", head: "내린 것", rows: down, tone: SELL },
+    { key: "up", head: "오른 것", rows: up, tone: BUY, bar: "var(--c-warm-2)" },
+    { key: "down", head: "내린 것", rows: down, tone: SELL, bar: "var(--c-blue-2)" },
   ];
   const chg = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(1)}%`;
 
@@ -170,34 +234,24 @@ function WeekGrid({ e }: { e: SeohakEtf }) {
 
       <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 9 }}>
         <div style={{ display: "grid", gap: 14,
-                      gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))" }}>
+                      gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))" }}>
           {sides.map((s) => (
-            <div key={s.key} style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 6 }}>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11,
-                             color: C.sub2, fontWeight: 700 }}>
-                <span style={{ width: 8, height: 8, borderRadius: 2, background: s.tone, flexShrink: 0 }} />
-                {s.head}
-              </span>
-              <ul style={{ listStyle: "none", margin: 0, padding: "6px 0 0", display: "flex",
-                           flexDirection: "column", gap: 5, borderTop: `1px solid ${C.line}` }}>
-                {s.rows.map((r) => (
-                  <li key={r.code} style={{ display: "flex", gap: 8, fontSize: 11.5,
-                                            alignItems: "baseline" }}>
-                    <span style={{ color: C.sub, minWidth: 0, overflow: "hidden",
-                                   textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {shortName(r.name)}
-                    </span>
-                    {/* 그 주 자금을 옆에 두되 **인과로 엮지 않는다.** 둘 다 그 주의 기록이다. */}
-                    <span style={{ marginLeft: "auto", flexShrink: 0, fontSize: 10,
-                                   color: C.faint, fontFamily: MONO }}>
-                      {r.netFlow ? signed(r.netFlow) : "—"}
-                    </span>
-                    <b style={{ flexShrink: 0, minWidth: 46, textAlign: "right", fontFamily: MONO,
-                                fontWeight: 700, color: s.tone }}>{chg(r.changePct)}</b>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <RankTable
+              key={s.key}
+              head={s.head}
+              hint="등락"
+              tone={s.tone}
+              barTone={s.bar}
+              rows={s.rows.map((r) => ({
+                key: r.code,
+                name: shortName(r.name),
+                weight: r.changePct,
+                /* 그 주 자금을 옆에 두되 **인과로 엮지 않는다.** 둘 다 그 주의 기록일
+                   뿐이라 흐린 회색으로 두고 머리 띠에서 이름을 대지 않는다 — 각주가 맡는다. */
+                aside: r.netFlow ? signed(r.netFlow) : "—",
+                value: chg(r.changePct),
+              }))}
+            />
           ))}
         </div>
         <span style={{ fontSize: 10.5, color: C.faint }}>
