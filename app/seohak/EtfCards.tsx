@@ -19,8 +19,6 @@ const won = (v: number) => {
   return `${sign}${Math.round(a / 1e8).toLocaleString("ko-KR")}억`;
 };
 const signed = (v: number) => (v >= 0 ? `+${won(v)}` : won(v));
-const pct = (v: number, d = 2) =>
-  `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(d)}%`;
 /**
  * 좁은 칸에 맞게 이름을 줄인다.
  *
@@ -34,50 +32,85 @@ const pct = (v: number, d = 2) =>
  */
 const shortName = (name: string) => name.replace("미국", "").replace(/\s{2,}/g, " ").trim();
 
-/* ── ⑩ ETF 괴리율 ─────────────────────────────────────────
-   괴리율은 **분포**다. 대부분 0 근처에 뭉치고 몇 개만 멀리 나간다. 상위 몇 종목만
-   표로 뽑으면 "다들 이만큼 비싸다"로 읽히므로, 203종목을 전부 점으로 찍은 수직선
-   위에 그 몇 개를 얹는다. 뭉친 곳이 곧 "보통은 이렇다"가 된다. */
+/**
+ * ⑩ 제값과의 차이 — 괴리율을 **원**으로 말한다.
+ *
+ * ## ⚠️⚠️ 앞 판은 "뭔지 이해를 못 하겠다"를 받았다
+ *
+ * 202종목을 점으로 찍은 수직선 + "보통은 +0.07% 인데 가장 비싼 건 +1.28%" 였다. 분포를
+ * 보여 주겠다는 뜻이었는데 읽는 사람에게는 셋 다 낯선 말이었다 — **괴리율 · 순자산가치 ·
+ * 그리고 +0.07% 가 큰지 작은지.**
+ *
+ * ⭐ 고칠 것은 그림이 아니라 **단위**였다. 괴리율 1.28% 는 "100만 원어치를 사면서 웃돈
+ * 12,800원을 더 낸다"는 뜻이다. 원으로 바꾸면 설명이 필요 없다. 이 카드의 모든 숫자를
+ * 100만 원 기준 원화로 통일한다 — %는 어디에도 안 쓴다.
+ *
+ * ⭐ 점 202개도 지운다. 뭉친 자리가 곧 "보통은 이렇다"라는 건 그린 사람만 아는 규칙이고,
+ * 같은 말을 **몇 종목인지 세어서** 하면 그림이 필요 없다.
+ *
+ * ⚠️ 문턱은 ±0.2%(=100만 원당 ±2,000원)다. 분위수가 아니라 **뜻으로** 잡았다 — 2,000원은
+ * 100만 원 거래에서 사람이 신경 쓸 만한 가장 작은 단위다. 분위수로 잡으면 시장이 조용한
+ * 날에도 늘 3분의 1이 '웃돈'으로 찍힌다.
+ */
+const PER_MILLION = 1_000_000;
+/**
+ * 괴리율(%)을 100만 원어치를 살 때 더 내는(덜 내는) 돈으로. 부호는 문장이 진다.
+ *
+ * ⚠️ **반올림한다.** 그대로 내면 729원 · 12,803원 · 14,156원 처럼 나오는데, 이 카드가
+ * 하는 말은 "이만큼입니다"라 자릿수를 다 보여 줄 이유가 없다. 원자료가 소수 둘째 자리
+ * 괴리율이라 마지막 자리는 어차피 뜻이 없다.
+ */
+const perMillion = (premiumPct: number) => {
+  const raw = Math.abs((premiumPct / 100) * PER_MILLION);
+  const step = raw >= 1000 ? 100 : 10;
+  return `${(Math.round(raw / step) * step).toLocaleString("ko-KR")}원`;
+};
+/** 이 카드가 '거의 제값'으로 보는 폭. 100만 원당 2,000원. */
+const FAIR_PCT = 0.2;
+
 function Premium({ e }: { e: SeohakEtf }) {
-  const span = Math.max(1, ...e.liquid.map((r) => Math.abs(r.premium)));
-  const pos = (v: number) => 50 + (v / span) * 48;
-  const top = e.richest[0];
+  const rich = e.liquid.filter((r) => r.premium > FAIR_PCT);
+  const cheap = e.liquid.filter((r) => r.premium < -FAIR_PCT);
+  const fair = e.liquid.length - rich.length - cheap.length;
+  const mid = e.medianPremium;
+
+  const buckets = [
+    { k: "거의 제값", n: fair, note: `100만 원당 ${perMillion(FAIR_PCT)} 안` },
+    { k: "웃돈이 붙었다", n: rich.length, note: rich.length ? `최대 ${perMillion(rich[0].premium)}` : "" },
+    { k: "오히려 싸다", n: cheap.length,
+      note: cheap.length ? `최대 ${perMillion(cheap[cheap.length - 1].premium)}` : "" },
+  ];
 
   return (
     <>
       <Verdict>
-        보통은 <Em>{pct(e.medianPremium)}</Em>인데 가장 비싼 건 <Em>{pct(top.premium)}</Em>입니다
+        100만 원어치를 사면 {mid >= 0 ? "웃돈이 보통" : "보통"}{" "}
+        <Em>{perMillion(mid)}</Em>{mid >= 0 ? "입니다" : " 싸게 삽니다"}
       </Verdict>
 
       <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 9 }}>
-        {/* 점 분포. 겹치는 점이 곧 밀도라 따로 히스토그램을 안 그려도 된다. */}
-        <div style={{ position: "relative", height: 26 }}>
-          <span aria-hidden style={{ position: "absolute", left: 0, right: 0, top: 12, height: 1,
-                                     background: C.line }} />
-          <span aria-hidden style={{ position: "absolute", left: "50%", top: 4, height: 17, width: 1,
-                                     background: C.marker }} />
-          {e.liquid.map((r) => (
-            <span key={r.code} title={`${r.name} ${pct(r.premium)}`}
-                  style={{ position: "absolute", left: `${pos(r.premium)}%`, top: 9,
-                           width: 7, height: 7, borderRadius: "50%", marginLeft: -3.5,
-                           background: C.blue, opacity: 0.28 }} />
-          ))}
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: C.faint,
-                      marginTop: -6 }}>
-          <span>싸게 산다</span>
-          <span>순자산가치</span>
-          <span>비싸게 산다</span>
-        </div>
-
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex",
-                     flexDirection: "column", gap: 5, paddingTop: 4, borderTop: `1px solid ${C.line}` }}>
+                     flexDirection: "column", gap: 7 }}>
+          {buckets.map((b) => (
+            <li key={b.k} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 12 }}>
+              <span style={{ color: C.label, fontWeight: 600 }}>{b.k}</span>
+              <span style={{ fontSize: 10.5, color: C.faint }}>{b.note}</span>
+              <b style={{ marginLeft: "auto", flexShrink: 0, fontFamily: MONO, fontSize: 13,
+                          fontWeight: 800, color: C.ink }}>{b.n}종목</b>
+            </li>
+          ))}
+        </ul>
+
+        {/* 이름을 붙여야 "그게 어느 상품이냐"가 남지 않는다. 웃돈이 큰 쪽만 낸다 —
+            싸게 사는 쪽은 위 줄이 최대치를 이미 말했다. */}
+        <ul style={{ listStyle: "none", margin: 0, padding: "7px 0 0", display: "flex",
+                     flexDirection: "column", gap: 5, borderTop: `1px solid ${C.line}` }}>
           {e.richest.slice(0, 3).map((r) => (
             <li key={r.code} style={{ display: "flex", gap: 8, fontSize: 11.5, alignItems: "baseline" }}>
               <span style={{ color: C.sub, minWidth: 0, overflow: "hidden",
                              textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{shortName(r.name)}</span>
               <span style={{ marginLeft: "auto", flexShrink: 0, fontFamily: MONO,
-                             fontWeight: 700, color: C.ink }}>{pct(r.premium)}</span>
+                             fontWeight: 700, color: C.ink }}>{perMillion(r.premium)}</span>
             </li>
           ))}
         </ul>
@@ -224,10 +257,10 @@ export function EtfSection({ e }: { e: SeohakEtf }) {
       <div style={{ display: "grid", gap: 14,
                     gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))",
                     alignItems: "start" }}>
-        <Card icon="sell" title="ETF 괴리율"
-              desc="국내 상장 미국 ETF 값과, 그 안에 실제로 든 자산 값의 차이입니다."
+        <Card icon="sell" title="제값과의 차이"
+              desc="ETF 한 주 값과, 그 안에 든 자산 값의 차이입니다. 100만 원어치를 살 때로 바꿔 적었습니다."
               note={`${e.asOf} 종가`}
-              foot={`거래대금 1억 이상 ${e.liquid.length}종목만 셉니다. 예측이 아니라 산수입니다.`}>
+              foot={`업계에서 괴리율이라 부르는 값입니다. 거래대금 1억 이상 ${e.liquid.length}종목만 셉니다. 예측이 아니라 산수입니다.`}>
           <Premium e={e} />
         </Card>
 
