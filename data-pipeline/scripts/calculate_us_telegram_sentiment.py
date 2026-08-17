@@ -92,6 +92,37 @@ ISSUE_KEYWORD_MIN_MENTIONS = 12  # 미국 메시지에서의 최소 언급 수
 ISSUE_KEYWORD_MIN_CHANNELS = 5   # 서로 다른 채널 수. 한 채널 복붙을 막는다
 ISSUE_KEYWORD_MIN_DAYS = 2       # 서로 다른 날짜 수. 하루짜리 이벤트를 막는다
 
+# ⭐ **창이 얇으면 하루씩 넓힌다**(2026-08-17에 넣었다). 위 문턱 셋은 전부 절대값이라
+#    창 안 대화량이 줄어도 같이 안 줄어든다. 그래서 **창에 평일이 한 날도 없는 날**
+#    — 월요일 아침 실행 — 에 카드가 통째로 무너졌다. 실제로 2026-08-17 아침에 1줄만
+#    저장됐다.
+#
+# 무너지는 이유는 두 겹이다.
+#   ① 창(토·일·월아침) 안 미국 화제어 언급이 770회. 평일 창은 ~5,000회다. 12회 문턱을
+#      넘는 말이 3개뿐이 된다. 실측으로 미중분리(11회)·정부정책(11회)·기술주(10회)가
+#      **1위보다 쏠림이 높은데도**(2.95·2.70·2.68 vs 1위 2.11) 회수 한두 번으로 잘렸다.
+#   ② 주말엔 국장이 쉬어 전체 대화 중 미국 몫(쏠림의 기준선)이 13.6% → 33.9% 로 뛴다.
+#      모두의 쏠림이 절반이 되니 HBM 처럼 평소 통과하던 말도 같이 떨어진다.
+#
+# 그래서 **10줄이 찰 때까지 창을 하루씩 넓힌다.** 문턱을 낮추는 길도 있었지만 그러면
+# 평일에도 얇은 말이 올라온다 — 창을 넓히는 쪽은 평일에 아무것도 안 바꾼다.
+#
+# 실행 42회(2026-07-28~08-17 · 아침 07:33 · 저녁 19:00 을 그대로 재현)로 재 봤다:
+#
+#   창 3일 …… 36회 (86%)   지금과 똑같다
+#   창 4일 ……  6회 (14%)   월요일 아침 3회 · 월요일 저녁 1회 · 화요일 아침 1회 · 오늘 저녁 1회
+#   창 5일 이상 … 0회
+#
+# 즉 실제로는 **한 칸 넓히면 끝**이고 아래 상한 7 은 쓰인 적이 없다. 그래도 7 로 두는
+# 것은 연휴 때문이다 — 표본에 연휴가 없어 **연휴는 아직 안 재봤다.** 조용한 날을
+# 복제해 투영하면 닷새 연속 조용해도 4일에서 풀리지만, 복제는 같은 화제어를 두 번 세는
+# 모델이라 낙관 쪽으로 치우친다. 실측이 아니다.
+#
+# ⚠️ 화면 라벨은 "최근 3일"에 **고정**이다(2026-08-17 지시). 창이 4일인 6% 의 실행에서는
+#    라벨이 실제 창과 어긋난다. 실제 창을 화면에 드러내려면 표에 window_days 열이
+#    하나 더 필요하다 — 지금은 일부러 안 만들었다.
+ISSUE_KEYWORD_MAX_COUNT_DAYS = 7
+
 # ⭐ **쏠림은 줄 세우는 값이 아니라 자격이다**(2026-08-12에 바꿨다).
 #
 # 처음엔 쏠림 순으로 세웠다. 이유는 지금도 유효하다 — 빈도로 세우면 국장 카드를 베낀다.
@@ -193,8 +224,8 @@ def issue_keyword_rows(
     keyword_rows: list[dict],
     all_total_by_date: dict[str, int],
     channels_of: dict[tuple[str, str], set[str]],
-) -> list[dict]:
-    """이슈 키워드 카드에 그대로 그릴 상위 N줄. **쏠림 순이다.**
+) -> tuple[list[dict], int]:
+    """이슈 키워드 카드에 그대로 그릴 상위 N줄과 **그 줄을 뽑은 창의 길이(일)**.
 
     창(14일)·증감 판정(최근 3일 vs 5일 이전 점유율)은 국내와 같은 상수를 import 해
     쓴다. 다른 것은 정렬 기준 하나뿐이다:
@@ -203,11 +234,18 @@ def issue_keyword_rows(
 
     왜 빈도가 아닌지는 migration_034 주석에 실측과 함께 적어 두었다(빈도로 뽑으면
     국장 카드와 10줄 중 6줄이 겹친다).
+
+    세는 창은 3일에서 시작해 **10줄이 찰 때까지 하루씩 넓힌다**(최대 7일). 왜 그래야
+    하는지는 ISSUE_KEYWORD_MAX_COUNT_DAYS 주석에 실측과 함께 적어 두었다.
+
+    ⚠️ 창 길이는 **증감 판정에는 안 쓴다.** 그쪽은 처음부터 "최근 3일 vs 5일 이상 이전"
+       이고 화면 라벨도 그렇게 적혀 있다 — 창이 넓어졌다고 여기까지 따라 움직이면
+       하이라이트 칸의 %p 가 말없이 다른 기간을 가리키게 된다.
     """
     since = (datetime.now(timezone.utc) - timedelta(days=ISSUE_KEYWORD_WINDOW_DAYS)).date().isoformat()
     rows = [r for r in keyword_rows if r["date"] >= since]
     if not rows:
-        return []
+        return [], ISSUE_KEYWORD_COUNT_DAYS
 
     dates = sorted({r["date"] for r in rows})
     latest = datetime.fromisoformat(dates[-1]).date()
@@ -217,61 +255,81 @@ def issue_keyword_rows(
 
     recent_dates = set(dates[-3:])
     prior_dates = {d for d in dates if days_before(d) >= 5}
-    window = {d for d in dates if days_before(d) < ISSUE_KEYWORD_COUNT_DAYS}
 
     day_total: Counter = Counter()
     for r in rows:
         day_total[r["date"]] += r["mention_count"] or 0
 
-    us_win: Counter = Counter()
-    all_win: Counter = Counter()
-    chan_win: defaultdict = defaultdict(set)
-    day_win: defaultdict = defaultdict(set)
+    # 증감용 점유율은 창과 무관하므로 한 번만 모은다(위 docstring 의 ⚠️).
     recent_share: defaultdict = defaultdict(float)
     prior_share: defaultdict = defaultdict(float)
     for r in rows:
-        n = r["mention_count"] or 0
-        if r["date"] in window:
-            us_win[r["keyword"]] += n
-            all_win[r["keyword"]] += r["total_count"] or 0
-            # 분산도 **같은 창**으로 센다. 전 기간으로 세면 "3일에 22회"인데 "21일에
-            # 걸쳐 있다"는 어긋난 짝이 화면에 뜬다.
-            chan_win[r["keyword"]] |= channels_of.get((r["date"], r["keyword"]), set())
-            day_win[r["keyword"]].add(r["date"])
-        share = n / max(day_total[r["date"]], 1)
+        share = (r["mention_count"] or 0) / max(day_total[r["date"]], 1)
         if r["date"] in recent_dates:
             recent_share[r["keyword"]] += share
         if r["date"] in prior_dates:
             prior_share[r["keyword"]] += share
 
-    # 쏠림의 기준선 — 창 안 **전체 화제어 언급 중 미국 몫**. 이 값이 1배다.
-    #
-    # ⚠️ 분모를 `sum(all_win.values())` 로 두면 안 된다(한 번 그렇게 썼다가 100% 미국인
-    #    말이 2.2배로 나왔다). all_win 은 **미국분이 하나라도 있는 말만** 담고 있어서,
-    #    미국이 전혀 안 쓴 말이 통째로 빠진 채 기준선이 부풀려진다(16% → 45%).
-    #    분모는 창 안 모든 화제어의 합이어야 한다.
-    us_total = sum(us_win.values())
-    all_total = sum(all_total_by_date.get(d, 0) for d in window)
-    baseline = us_total / max(1, all_total)
+    def qualify(count_days: int):
+        """창을 count_days 일로 잡았을 때 자격을 통과한 줄과, 그 창에서 센 분산."""
+        window = {d for d in dates if days_before(d) < count_days}
+
+        us_win: Counter = Counter()
+        all_win: Counter = Counter()
+        chan_win: defaultdict = defaultdict(set)
+        day_win: defaultdict = defaultdict(set)
+        for r in rows:
+            if r["date"] not in window:
+                continue
+            us_win[r["keyword"]] += r["mention_count"] or 0
+            all_win[r["keyword"]] += r["total_count"] or 0
+            # 분산도 **같은 창**으로 센다. 전 기간으로 세면 "3일에 22회"인데 "21일에
+            # 걸쳐 있다"는 어긋난 짝이 화면에 뜬다.
+            chan_win[r["keyword"]] |= channels_of.get((r["date"], r["keyword"]), set())
+            day_win[r["keyword"]].add(r["date"])
+
+        # 쏠림의 기준선 — 창 안 **전체 화제어 언급 중 미국 몫**. 이 값이 1배다.
+        #
+        # ⚠️ 분모를 `sum(all_win.values())` 로 두면 안 된다(한 번 그렇게 썼다가 100% 미국인
+        #    말이 2.2배로 나왔다). all_win 은 **미국분이 하나라도 있는 말만** 담고 있어서,
+        #    미국이 전혀 안 쓴 말이 통째로 빠진 채 기준선이 부풀려진다(16% → 45%).
+        #    분모는 창 안 모든 화제어의 합이어야 한다.
+        # ⚠️ 창이 넓어지면 이 값도 같이 다시 잰다. 주말이 섞인 창은 기준선이 두 배로
+        #    뛰므로(13.6% → 33.9%) 3일치 기준선을 4일 창에 물려 쓰면 안 된다.
+        us_total = sum(us_win.values())
+        all_total = sum(all_total_by_date.get(d, 0) for d in window)
+        baseline = us_total / max(1, all_total)
+
+        scored = []
+        for word, count in us_win.items():
+            if count < ISSUE_KEYWORD_MIN_MENTIONS:
+                continue
+            if len(chan_win.get(word, ())) < ISSUE_KEYWORD_MIN_CHANNELS:
+                continue
+            if len(day_win.get(word, ())) < ISSUE_KEYWORD_MIN_DAYS:
+                continue
+            total = max(count, all_win.get(word, count))
+            skew = (count / total) / max(baseline, 1e-9)
+            if skew < ISSUE_KEYWORD_MIN_SKEW:
+                continue
+            # 언급 수로 세운다(위 ISSUE_KEYWORD_MIN_SKEW 주석). 동점은 화제어로 가른다 —
+            # 안 가르면 순위가 실행마다 흔들린다.
+            scored.append((-count, word, count, total, skew))
+        return sorted(scored, key=lambda s: (s[0], s[1]))[:ISSUE_KEYWORD_LIMIT], chan_win, day_win
+
+    # 10줄이 차면 거기서 멈춘다. 끝까지 못 채우면 **가장 많이 건진 창**을 쓴다 —
+    # 넓힌다고 줄이 반드시 느는 것은 아니라서다(기준선이 같이 움직여 쏠림이 뒤집힐 수
+    # 있다). 같은 줄 수면 좁은 창이 이긴다(`>` 비교).
+    best = None
+    for count_days in range(ISSUE_KEYWORD_COUNT_DAYS, ISSUE_KEYWORD_MAX_COUNT_DAYS + 1):
+        ranked, chan_win, day_win = qualify(count_days)
+        if best is None or len(ranked) > len(best[0]):
+            best = (ranked, chan_win, day_win, count_days)
+        if len(ranked) >= ISSUE_KEYWORD_LIMIT:
+            break
+    ranked, chan_win, day_win, used_days = best
 
     can_compare = bool(prior_dates)
-    scored = []
-    for word, count in us_win.items():
-        if count < ISSUE_KEYWORD_MIN_MENTIONS:
-            continue
-        if len(chan_win.get(word, ())) < ISSUE_KEYWORD_MIN_CHANNELS:
-            continue
-        if len(day_win.get(word, ())) < ISSUE_KEYWORD_MIN_DAYS:
-            continue
-        total = max(count, all_win.get(word, count))
-        skew = (count / total) / max(baseline, 1e-9)
-        if skew < ISSUE_KEYWORD_MIN_SKEW:
-            continue
-        # 언급 수로 세운다(위 ISSUE_KEYWORD_MIN_SKEW 주석). 동점은 화제어로 가른다 —
-        # 안 가르면 순위가 실행마다 흔들린다.
-        scored.append((-count, word, count, total, skew))
-    ranked = sorted(scored, key=lambda s: (s[0], s[1]))[:ISSUE_KEYWORD_LIMIT]
-
     out = []
     for i, (_, word, count, total, skew) in enumerate(ranked, 1):
         recent_avg = recent_share.get(word, 0.0) / max(len(recent_dates), 1)
@@ -299,7 +357,7 @@ def issue_keyword_rows(
                 "computed_for": dates[-1],
             }
         )
-    return out
+    return out, used_days
 
 
 def main() -> None:
@@ -459,15 +517,24 @@ def main() -> None:
               f"중립 {overall['neutral_count'] * 100 // n}% · "
               f"비관 {overall['negative_count'] * 100 // n}%")
 
-    issue_rows = issue_keyword_rows(keyword_rows, all_total_by_date, channels_by_day)
+    issue_rows, issue_days = issue_keyword_rows(keyword_rows, all_total_by_date, channels_by_day)
     arrow = {"up": "▲", "down": "▼", "flat": "·", None: " "}
-    print("  이슈 키워드(쏠림 %.1f배 이상 · 언급 수 순):" % ISSUE_KEYWORD_MIN_SKEW)
+    # 창 길이는 표에 안 담긴다(화면 라벨이 "최근 3일" 고정이라 열을 안 만들었다). 넓힌
+    # 날을 나중에 되짚을 수 있도록 실행 로그에는 남긴다 — 3일이 아닌 날이 곧 그 날이다.
+    widened = "" if issue_days == ISSUE_KEYWORD_COUNT_DAYS else "  ← 얇아서 넓혔다"
+    print("  이슈 키워드(창 %d일 · 쏠림 %.1f배 이상 · 언급 수 순):%s"
+          % (issue_days, ISSUE_KEYWORD_MIN_SKEW, widened))
     for r in issue_rows:
         d = r["share_delta"]
         print(f"    {r['rank']:2} {r['keyword']:<14} 쏠림 {r['skew']:>5.1f}배 · "
               f"미국 {r['mention_count']}/{r['total_count']}회 · "
               f"{r['channel_count']}채널 · {r['day_count']}일 {arrow[r['trend']]}"
               f"{'' if d is None else f' {d * 100:+.2f}%p'}")
+    if len(issue_rows) < ISSUE_KEYWORD_LIMIT:
+        # 창을 상한까지 넓히고도 못 채운 날. 카드가 짧게 뜨므로 로그에 이유를 남긴다.
+        print(f"  ⚠️ 창을 {ISSUE_KEYWORD_MAX_COUNT_DAYS}일까지 넓혀도 "
+              f"{len(issue_rows)}줄뿐입니다(목표 {ISSUE_KEYWORD_LIMIT}줄). "
+              f"긴 연휴처럼 대화가 오래 얇았던 구간입니다.")
 
     tone_rows = stock_tone_rows(tickers_of_msg, tone_of, date_of, views_of, dates)
     decided = [

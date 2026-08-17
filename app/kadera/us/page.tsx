@@ -1417,11 +1417,17 @@ export default async function UsKaderaPage() {
                   key={k.keyword}
                   className="hz-trow hz-cols-kw hz-tip hz-tip-wide hz-tip-end"
                   style={{ flex: 1 }}
-                  /* 줄에 안 적은 것만 담는다. 창(3일)·언급 수·변화폭은 이미 줄에 있다.
+                  /* 줄에 안 적은 것만 담는다. 언급 수·변화폭은 이미 줄에 있다.
                      남는 것은 **표본의 모양** 하나 — 전체 대화에서 몇 번 중 몇 번이
                      미국 얘기였고, 그게 몇 채널·며칠에 걸쳐 있었나. 복붙 한 건이
-                     아니라는 것이 여기서 읽힌다. */
-                  data-tip={`최근 ${US_WINDOW_DAYS}일 전체 대화에서 ${k.totalCount}회 나왔고 그중 ${k.mentionCount}회가 미국 얘기입니다 · ${k.channelCount}개 채널이 ${k.dayCount}일에 걸쳐 말했습니다`}
+                     아니라는 것이 여기서 읽힌다.
+
+                     ⚠️ **여기서 창을 말하지 않는다.** 한때 "최근 3일 전체 대화에서"로
+                     시작했는데, 파이프라인이 얇은 날 창을 하루씩 넓히므로(월요일 아침
+                     처럼 창에 평일이 한 날도 없는 날 — calculate_us_telegram_sentiment.py
+                     의 ISSUE_KEYWORD_MAX_COUNT_DAYS 주석) 같은 문장 안에서 "최근 3일"과
+                     "4일에 걸쳐"가 부딪쳤다. 기간은 끝의 dayCount 가 혼자 말하게 둔다. */
+                  data-tip={`전체 대화에서 ${k.totalCount}회 나왔고 그중 ${k.mentionCount}회가 미국 얘기입니다 · ${k.channelCount}개 채널이 ${k.dayCount}일에 걸쳐 말했습니다`}
                 >
                   <RankBadge n={k.rank} />
                   {/* 옆 테마 표는 %p 를 이름 줄 오른끝(막대 바로 위)에 둔다. 이 표는
