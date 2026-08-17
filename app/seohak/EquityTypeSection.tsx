@@ -125,14 +125,18 @@ export function EquityTypeSection({ e }: { e: SeohakEquityType }) {
   const worldBand = e.world.map((w) => w.otherPct);
   const worldLo = Math.min(...worldBand);
   const worldHi = Math.max(...worldBand);
+  /* ⚠️⚠️ **이 페이지에서 모집단이 다른 유일한 카드다.** 나머지는 예탁원 결제(국내 증권사를
+     거친 개인 채널)로 재는데, 이건 미 재무부 SHL 연례 조사라 **국민연금까지 포함한 전
+     국민**이다. 원천이 부문을 안 나눠서 개인만 뗄 방법이 없다. 그래서 제목 옆 배지와 설명
+     양쪽에 '전 국민'을 박는다 — 한쪽에만 적으면 다른 쪽을 보고 개인 것으로 읽는다. */
 
   return (
     <section className="hz-sheet">
       <SectionHead
         icon="pie_chart"
         title="종류별 구성"
-        desc="한국인이 든 미국 주식을 종류로 가른 것입니다."
-        note={`${latest.year}-06 기준`}
+        desc="한국인이 든 미국 주식을 종류로 가른 것입니다. 이 카드만 개인이 아니라 전 국민 기준입니다."
+        note={`${latest.year}-06 · 전 국민`}
       />
 
       <div style={{ padding: "16px 22px 4px", display: "flex", flexDirection: "column", gap: 6 }}>

@@ -104,6 +104,18 @@ export type SeohakOverview = {
     valueShare: number;
     /** 자료 첫 해. 각주가 창을 밝히는 데 쓴다. */
     from: number;
+    /**
+     * 개인 채널의 연도별 코호트.
+     *
+     * ⚠️ **금액과 시점은 실측이고 수익률은 시장 눈금을 빌린 값이다.** 개인이 실제로 무슨
+     * 종목을 들었는지는 어떤 공개 원천에도 없다. 그래서 연도별 % 는 "그 해 들어온 돈이
+     * 이후 시장을 따라갔다면" 이고, TIC 전수로 낸 코호트와 **% 는 같고 금액만 다르다.**
+     *
+     * ⭐ 그래도 합계는 완전히 달라진다. 전 국민은 $317.1B → $814.6B(+157%)인데 개인은
+     * $106.7B → $195.7B(**+83%**)다. **개인 돈이 늦게 들어왔기 때문**이다 — 2020년
+     * 이전 개인 유입은 통틀어 $5.6B 이고 81%가 2020년 이후다.
+     */
+    cohorts: Cohort[];
   } | null;
   /**
    * 잔고 증감을 순매수 몫과 평가 몫으로 가른 것. **해 단위다.**
@@ -221,15 +233,20 @@ const COHORT_FROM = 2015;
  * 굴린다. 12월 지수로 굴리면 $178.4B(21.90%)가 나와 **8.8% 어긋난다** — 한 해 동안 오른
  * 만큼을 그 해 유입 전체에서 빼 버리기 때문이다.
  *
- * ⚠️ 올해분만 일별표에서 받는다. 연간표의 올해 행은 **오늘까지**를 담는데 TIC 은 두어 달
- * 뒤처져 있어(2026-08 vs 2026-05), 그대로 쓰면 창이 어긋난 유입 $5.9B 이 섞인다.
+ * ⚠️⚠️ **그 근사는 합계에만 쓴다.** 연도별 코호트까지 연중 지수로 내면 그 해 안의
+ * 유입 시점이 뭉개져 **연도별 수익률이 크게 틀린다** — 2021년이 일별 +93% 인데 연간
+ * 근사로는 +68%, 2022년은 +72% 인데 +96% 로 나왔다(합계는 오차가 상쇄돼 +83% vs +84%
+ * 로 멀쩡해서 표만 보면 안 걸린다). 그래서 **화면에 세우는 해(COHORT_FROM~)는 일별표를
+ * 받는다** — 2,700행·3회 왕복이고, 그 앞은 개인 유입이 통틀어 $5.6B 라 근사로 둔다.
+ *
+ * ⚠️ 올해 행을 연간표에서 쓰면 안 된다. 연간표의 올해 행은 **오늘까지**를 담는데 TIC 은
+ * 두어 달 뒤처져 있어(2026-08 vs 2026-05), 그대로 쓰면 창이 어긋난 유입 $5.9B 이 섞인다.
  */
 async function loadChannel(
   level: Map<string, number>,
   asOfMonth: string,
 ): Promise<SeohakOverview["channel"] | null> {
   const sb = getSupabaseServer();
-  const asOfYear = Number(asOfMonth.slice(0, 4));
   // ⚠️ `buildIndex` 의 키는 원천 그대로라 **"2026-05-01"** 이다. "2026-05" 로 찾으면
   // 전부 undefined 가 되고 이 카드가 통째로 사라진다(실제로 그렇게 났다).
   const byMonth = new Map<string, number>();
@@ -238,21 +255,28 @@ async function loadChannel(
   const yearly = await sb
     .from("seohak_settlement_yearly")
     .select("year, us_buy_amount, us_sell_amount")
-    .lt("year", asOfYear)
+    .lt("year", COHORT_FROM)
     .order("year", { ascending: true });
   if (yearly.error) return null;
 
   // ⚠️ 정렬 키를 반드시 박는다. 이 자료를 처음 재다가 정렬 없이 페이징해서 값이
   // $112.6B → $164.1B 로 튀었다(이 저장소가 네 번 겪은 함정).
-  const daily = await sb
-    .from("seohak_settlement_daily")
-    .select("settle_date, buy_amount, sell_amount")
-    .eq("market_code", "US")
-    .eq("security_type", "주식")
-    .gte("settle_date", `${asOfYear}-01-01`)
-    .lte("settle_date", `${asOfMonth}-31`)
-    .order("settle_date", { ascending: true });
-  if (daily.error) return null;
+  const daily: { settle_date: string; buy_amount: number | null; sell_amount: number | null }[] = [];
+  for (let start = 0; ; start += 1000) {
+    const { data, error } = await sb
+      .from("seohak_settlement_daily")
+      .select("settle_date, buy_amount, sell_amount")
+      .eq("market_code", "US")
+      .eq("security_type", "주식")
+      .gte("settle_date", `${COHORT_FROM}-01-01`)
+      .lte("settle_date", `${asOfMonth}-31`)
+      .order("settle_date", { ascending: true })
+      .range(start, start + 999);
+    if (error) return null;
+    const page = (data ?? []) as typeof daily;
+    daily.push(...page);
+    if (page.length < 1000) break;
+  }
 
   const now = byMonth.get(asOfMonth);
   if (!now) return null;
@@ -261,23 +285,45 @@ async function loadChannel(
 
   let principal = 0;
   let value = 0;
-  let from = asOfYear;
+  let from = COHORT_FROM;
+  const byYear = new Map<number, { inflow: number; now: number }>();
+  const add = (y: number, net: number, grown: number) => {
+    const cur = byYear.get(y) ?? { inflow: 0, now: 0 };
+    cur.inflow += net;
+    cur.now += grown;
+    byYear.set(y, cur);
+  };
   for (const r of yearly.data ?? []) {
     const y = Number(r.year);
     const net = (Number(r.us_buy_amount ?? 0) - Number(r.us_sell_amount ?? 0)) / 1e6;
     if (!net) continue;
     from = Math.min(from, y);
     principal += net;
-    value += net * (now / midYear(y));
+    const grown = net * (now / midYear(y));
+    value += grown;
+    add(y, net, grown);
   }
-  // 올해분은 달 단위로 굴린다 — 행이 몇백 개뿐이라 근사할 이유가 없다.
-  for (const r of daily.data ?? []) {
-    const month = (r.settle_date as string).slice(0, 7);
+  // 화면에 세우는 해는 달 단위로 굴린다. 여기가 이 카드의 표라 근사하면 안 된다.
+  for (const r of daily) {
+    const month = r.settle_date.slice(0, 7);
     const net = (Number(r.buy_amount ?? 0) - Number(r.sell_amount ?? 0)) / 1e6;
     principal += net;
-    value += net * (now / (byMonth.get(month) ?? now));
+    const grown = net * (now / (byMonth.get(month) ?? now));
+    value += grown;
+    add(Number(r.settle_date.slice(0, 4)), net, grown);
   }
-  return { principal, value, principalShare: 0, valueShare: 0, from };
+  // 화면에 세우는 코호트. COHORT_FROM 아래는 개인 유입이 연 $1B 도 안 돼 줄이 안 보인다
+  // (2015년 $0.5B · 2016년 $0.04B). 순매도 해(2023년 −$2.8B)는 남긴다 — 그게 사실이다.
+  const cohorts: Cohort[] = [...byYear.entries()]
+    .filter(([y, v]) => y >= COHORT_FROM && v.inflow !== 0)
+    .sort((a, b) => a[0] - b[0])
+    .map(([year, v]) => ({
+      year,
+      inflow: v.inflow,
+      nowValue: v.now,
+      returnPct: (v.now / v.inflow - 1) * 100,
+    }));
+  return { principal, value, principalShare: 0, valueShare: 0, from, cohorts };
 }
 
 export async function getSeohakOverview(): Promise<SeohakOverview> {

@@ -1,7 +1,7 @@
 import type { SeohakOverview } from "@/lib/seohak-data";
 import type { SeohakQuarterly } from "@/lib/seohak-quarterly";
-import { C, MONO, R } from "../ui";
-import { CARD_GRID, Card, Em, Verdict } from "./DailyCards";
+import { C, MONO } from "../ui";
+import { Card, Em, Verdict } from "./DailyCards";
 
 /**
  * 분기 층 — 기관과 나머지.
@@ -29,8 +29,6 @@ const usdB = (v: number) =>
  * 섞으면 $106.7B 가 $0.0B 로 찍힌다(실제로 그렇게 났다).
  */
 const usdBmn = (mn: number) => usdB(mn * 1e6);
-const pct = (v: number, digits = 1) =>
-  `${v >= 0 ? "+" : "−"}${Math.abs(v).toLocaleString("ko-KR", { maximumFractionDigits: digits })}%`;
 
 /**
  * 이 층의 두 색. **기관은 잉크, 나머지는 파랑**이다.
@@ -106,7 +104,13 @@ function WhoOwns({ q, ch }: { q: SeohakQuarterly; ch: NonNullable<SeohakOverview
         <Em>{ch.valueShare.toFixed(0)}%</Em>가 국내 증권사를 거친 돈입니다
       </Verdict>
 
-      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 11 }}>
+      {/* ⭐ 카드가 전폭(1,004px)이라 안을 두 칸으로 나눈다. 한 칸으로 두면 신고자 줄의
+          이름 칸이 700px 가 되어 "국민연금" 네 글자 뒤로 빈 벌판이 생긴다.
+          하한 380px 은 왼쪽 칸 기준이다 — 막대 위 줄에 라벨·금액·%가 한 줄로 서려면
+          그만큼 필요하다. 좁아지면 스스로 한 칸으로 접힌다. */}
+      <div style={{ marginTop: "auto", display: "grid", gap: 18, alignItems: "start",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 11, minWidth: 0 }}>
         {/* 두 줄을 세로로 겹쳐 둔다. 파란 칸이 줄어드는 것 자체가 "개인 돈이 늦게
             들어와 덜 굴렀다"는 말이라, 나란히 놓여야 그 줄어듦이 보인다. */}
         <SplitBar label="넣은 돈" share={ch.principalShare}
@@ -125,11 +129,12 @@ function WhoOwns({ q, ch }: { q: SeohakQuarterly; ch: NonNullable<SeohakOverview
           </span>
         </div>
 
+      </div>
+
         {/* 신고자 목록. 막대는 1위 대비라 1위가 칸을 꽉 채운다 — 전체 대비로 두면
             국민연금이 60% 라 나머지 넷이 전부 손톱만 해진다. */}
         {big.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 5, paddingTop: 7,
-                        borderTop: `1px solid ${C.line}` }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 5, minWidth: 0 }}>
             <span style={{ fontSize: 10.5, color: C.sub2, fontWeight: 600 }}>
               그 기관 중 이름을 아는 곳 · {q.asOf.slice(0, 7)} 기준 {usdB(q.institutionUsd)}
             </span>
@@ -173,113 +178,14 @@ function WhoOwns({ q, ch }: { q: SeohakQuarterly; ch: NonNullable<SeohakOverview
   );
 }
 
-/* ── ⑨ 기관과 나머지, 누가 잘했나 ───────────────────────────────────────
-   ⚠️⚠️ **분기 하나를 막대로 그리면 안 된다.** TIC 순매수가 연준 추정 분해값이라
-   분기 단위 오차가 크다(2025Q2 나스닥 +17.8% 인데 폐합식은 +7.15%). 오차는 방향이
-   랜덤이라 누적에서 상쇄되므로 — 7분기 복리 +20.89% vs 한 번에 닫으면 +22.21% —
-   **누적 곡선 두 줄**로 그린다. 이 그림은 마디 하나가 틀려도 결론이 안 뒤집힌다. */
-function WhoDidBetter({ q }: { q: SeohakQuarterly }) {
-  // ⚠️⚠️ viewBox 가 300×84 였다. 카드가 495px 이 되면서 안쪽 451px 에 1.5배로 늘어났고,
-  // `fontSize={9}` 가 **13.5px 로 그려졌다** — 카드에서 제일 큰 작은 글씨가 축 라벨이
-  // 됐고 선도 2 → 3px 로 굵어졌다. 그림이 서툴러 보이던 가장 큰 이유다.
-  // 450 이면 그 폭에서 배율이 1 이라 적은 값이 그대로 그려진다.
-  const W = 450;
-  // ⭐ 높이는 **옆 카드에 맞춘 값**이다. `width:100%·height:auto` 라 그려지는 높이가 곧
-  // 이 값이고(카드 495px 일 때 안쪽이 451px 이라 배율 ≈1), 132 로 뒀을 때 두 장이
-  // 398 대 448 로 50px 어긋났다. 185 면 451 대 448 이 되어 바닥이 맞는다.
-  // ⚠️ 그래서 옆 카드의 줄 수가 바뀌면 이 값도 다시 잡아야 한다.
-  const H = 185;
-  const PAD = { t: 10, b: 18, l: 2, r: 2 };
-  const all = q.race.flatMap((p) => [p.institution, p.rest]);
-  // 위아래 12% 를 비운다. 안 비우면 100 선이 바닥에 딱 붙고 두 곡선이 왼쪽 아래
-  // 모서리에서 시작해 그림이 눌린 것처럼 보인다.
-  const rawLo = Math.min(100, ...all);
-  const rawHi = Math.max(...all);
-  const pad = (rawHi - rawLo || 1) * 0.12;
-  const lo = rawLo - pad;
-  const hi = rawHi + pad;
-  const x = (i: number) => PAD.l + (i / (q.race.length - 1)) * (W - PAD.l - PAD.r);
-  const y = (v: number) => H - PAD.b - ((v - lo) / (hi - lo || 1)) * (H - PAD.t - PAD.b);
-  const path = (key: "institution" | "rest") =>
-    q.race.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p[key]).toFixed(1)}`).join("");
-  // 두 곡선 사이를 채운다. **이 면적이 곧 결론 문장의 '몇 %p 앞섰나'** 라, 숫자를
-  // 안 읽어도 벌어지는 모양으로 전달된다.
-  const band =
-    path("institution") +
-    q.race
-      .slice()
-      .reverse()
-      .map((p, i) => `L${x(q.race.length - 1 - i).toFixed(1)},${y(p.rest).toFixed(1)}`)
-      .join("") +
-    "Z";
-
-  const ahead = q.instTotal >= q.restTotal;
-  const gap = Math.abs(q.instTotal - q.restTotal);
-  const last = q.race[q.race.length - 1];
-
-  return (
-    <>
-      <Verdict>
-        {q.quarters}분기 동안 <Em>{ahead ? "기관" : "나머지"}가 {pct(gap).replace("+", "")}p 앞섰습니다</Em>
-      </Verdict>
-
-      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={{ display: "flex", gap: 8 }}>
-          {[
-            { label: "기관", v: q.instTotal, color: INST },
-            { label: "나머지", v: q.restTotal, color: REST },
-          ].map((s) => (
-            <div key={s.label} style={{ flex: 1, background: C.soft, borderRadius: R.control,
-                                        padding: "8px 10px", display: "flex", flexDirection: "column", gap: 1 }}>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 5,
-                             fontSize: 10.5, color: C.sub2, fontWeight: 600 }}>
-                <span style={{ width: 8, height: 8, borderRadius: 2, background: s.color }} />
-                {s.label}
-              </span>
-              <span style={{ fontFamily: MONO, fontSize: 18, fontWeight: 800, color: C.ink,
-                             letterSpacing: "-0.02em" }}>{pct(s.v)}</span>
-            </div>
-          ))}
-        </div>
-
-        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}
-             role="img" aria-label="기관과 나머지의 누적 수익 곡선">
-          {/* 벌어진 폭 = 결론 문장의 %p. 두 선보다 뒤에 앉게 먼저 그린다. */}
-          <path d={band} fill={C.chip} />
-          {/* 100 기준선. 원금 자리라 이게 없으면 두 곡선의 높낮이만 보인다.
-              점선이라 데이터선과 안 헷갈리고, 라벨을 붙여 '무슨 선'인지 말한다. */}
-          <line x1={PAD.l} x2={W - 22} y1={y(100)} y2={y(100)} stroke={C.marker}
-                strokeWidth={1} strokeDasharray="3 3" />
-          <text x={W - 19} y={y(100) + 3} fontSize={9} fill={C.faint}>원금</text>
-          <path d={path("rest")} fill="none" stroke={REST} strokeWidth={1.6}
-                strokeLinejoin="round" strokeLinecap="round" />
-          <path d={path("institution")} fill="none" stroke={INST} strokeWidth={1.6}
-                strokeLinejoin="round" strokeLinecap="round" />
-          {/* 끝점. 곡선이 어디서 끝나는지가 이 그림의 결론이라 점을 찍어 못박는다.
-              흰 테를 둘러 두 점이 겹쳐도 갈린다. */}
-          {[
-            { v: last.rest, fill: REST },
-            { v: last.institution, fill: INST },
-          ].map((d) => (
-            <circle key={d.fill} cx={x(q.race.length - 1)} cy={y(d.v)} r={2.8}
-                    fill={d.fill} stroke={C.card} strokeWidth={1.4} />
-          ))}
-          <text x={PAD.l} y={H - 4} fontSize={9} fill={C.faint}>{q.race[0].quarter.slice(0, 7)}</text>
-          <text x={W - PAD.r} y={H - 4} fontSize={9} fill={C.faint} textAnchor="end">
-            {last.quarter.slice(0, 7)}
-          </text>
-        </svg>
-      </div>
-    </>
-  );
-}
-
 export function QuarterlyCards({ q, ch }: {
   q: SeohakQuarterly;
   ch: SeohakOverview["channel"];
 }) {
+  // ⭐ 카드가 하나뿐이라 격자를 안 쓴다. `CARD_GRID` 는 auto-fit 이라 혼자 남으면
+  // 어차피 한 칸을 다 쓰는데, 격자를 통과시키면 그 사실이 코드에서 안 보인다.
   return (
-    <div style={CARD_GRID}>
+    <>
       {ch && (
         <Card icon="account_balance" title="개인과 기관"
               desc="미국 주식에 든 한국 돈을 국내 증권사를 거친 것과 아닌 것으로 가릅니다."
@@ -288,13 +194,6 @@ export function QuarterlyCards({ q, ch }: {
           <WhoOwns q={q} ch={ch} />
         </Card>
       )}
-
-      <Card icon="emoji_events" title="보유분 수익률"
-            desc="산 것과 판 것을 걷어내고 들고 있던 것만의 수익률입니다."
-            note={`${q.quarters}분기 누적`}
-            foot="분기 하나는 추정 오차가 커서 누적으로만 봅니다. ⚠️ 여기 '나머지'는 개인이 아니라 13F 를 안 내는 전부라, 그 안에도 기관이 많습니다.">
-        <WhoDidBetter q={q} />
-      </Card>
-    </div>
+    </>
   );
 }
