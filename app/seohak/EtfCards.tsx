@@ -126,16 +126,29 @@ function RankTable({ head, hint, tone, barTone, rows }: {
  *
  * 방향은 색과 칸 제목이 진다(빨강 위 · 파랑 아래). 종목은 다섯씩이다.
  *
- * ⭐ 이 카드의 진짜 발견은 순위표가 아니라 **환헤지형만 방향이 반대**라는 것이라, 그걸
- * 아래에 별도 줄로 세운다.
+ * ## ⛔ 환헤지 두 상자를 뺐다. **"진짜 발견"이라고 적어 뒀던 것이 잡음이었다**
+ *
+ * 주석이 "환헤지형만 방향이 반대"를 이 카드의 요점이라고 적고 있었다. 149거래일로
+ * 재니 무너졌다.
+ *
+ *   부호가 갈린 날 66/149일(44%)  ·  **두 축이 무관할 때 기대치 54%**
+ *   일별 흐름 상관 r = +0.216 (약하지만 **같은 방향**)
+ *
+ * 우연보다 9.5%p **덜** 갈린다 — 주장의 반대다. 그런데도 갈릴 때마다 "환헤지형에서만
+ * 돈이 빠졌습니다" 줄이 떠서 이틀에 한 번꼴로 발견처럼 보였다. 채권형을 빼면서 값이
+ * −85억 → −10억 으로 준 것도 신호였다(근거의 대부분이 채권 ETF 였다).
+ *
+ * ⚠️ 규모도 안 맞는다. 환헤지형은 217종목 중 29개, 거래대금의 **2.4%**(중앙값)다.
+ *
+ * ⭐ 창을 늘리면 방향이 있긴 하다 — 149일 누적으로 헤지 −3,175억, 비헤지 +283,185억.
+ * "환헤지를 버리고 환율을 그대로 받는 쪽으로 간다"는 일관된데, 전체의 1.1% 라 이 카드에
+ * 자리를 줄 값어치가 없다고 봤다. 되살린다면 **하루치가 아니라 창 전체 값**으로 각주에.
  */
 function Flows({ e }: { e: SeohakEtf }) {
   const sides = [
     { key: "in", head: "들어온 곳", rows: e.inflow, tone: BUY, bar: "var(--c-warm-2)" },
     { key: "out", head: "빠진 곳", rows: e.outflow, tone: SELL, bar: "var(--c-blue-2)" },
   ];
-  const split = e.hedgedFlow < 0 && e.unhedgedFlow > 0;
-
   return (
     <>
       <Verdict>
@@ -162,28 +175,6 @@ function Flows({ e }: { e: SeohakEtf }) {
           ))}
         </div>
 
-        <div style={{ display: "flex", gap: 7, paddingTop: 9, borderTop: `1px solid ${C.line}` }}>
-          {/* ⚠️ 이름만으로는 안 읽힌다("이거 무슨 뜻이니"). 국내 상장 미국 ETF 는 원화로
-              사지만 안에 든 건 달러 자산이라, 환율까지 받을지 말지가 갈린다. 한 줄로 붙인다. */}
-          {[
-            { label: "환헤지형 (H)", note: "환율 영향을 막은 것", v: e.hedgedFlow },
-            { label: "환헤지 없음", note: "환율을 그대로 받는 것", v: e.unhedgedFlow },
-          ].map((s) => (
-            <div key={s.label} style={{ flex: 1, background: C.soft, borderRadius: R.control,
-                                        padding: "7px 9px", display: "flex", flexDirection: "column", gap: 1 }}>
-              <span style={{ fontSize: 10.5, color: C.label, fontWeight: 700 }}>{s.label}</span>
-              <span style={{ fontSize: 10, color: C.faint }}>{s.note}</span>
-              {/* 위 목록과 같은 규칙이다. 앞 판은 양수를 파랑으로 칠해 어긋나 있었다. */}
-              <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 800,
-                             color: s.v >= 0 ? BUY : SELL }}>{signed(s.v)}</span>
-            </div>
-          ))}
-        </div>
-        {split && (
-          <span style={{ fontSize: 10.5, color: C.faint }}>
-            환헤지형에서만 돈이 빠졌습니다
-          </span>
-        )}
       </div>
     </>
   );
@@ -254,9 +245,6 @@ function WeekGrid({ e }: { e: SeohakEtf }) {
             />
           ))}
         </div>
-        <span style={{ fontSize: 10.5, color: C.faint }}>
-          {e.weekFrom.slice(5)} ~ {e.asOf.slice(5)} · 회색은 그동안 오간 돈입니다
-        </span>
       </div>
     </>
   );
@@ -280,7 +268,12 @@ function WeekGrid({ e }: { e: SeohakEtf }) {
  */
 export function EtfSection({ e }: { e: SeohakEtf }) {
   return (
-    <div style={{ display: "grid", gap: 14, alignItems: "start",
+    // ⭐ `alignItems` 를 **주지 않는다.** 격자 기본값(stretch)이라 두 카드가 같은 높이로
+    // 늘어난다. 환헤지 상자를 빼고 나니 둘이 572 대 597 로 25px 어긋나 있었는데, 나란히
+    // 놓인 같은 꼴의 카드는 바닥이 어긋나면 한쪽이 덜 만들어진 것처럼 보인다.
+    // 남는 25px 은 `Card` 본문의 flex:1 이 먹고, 그 안에서 `marginTop:auto` 가 목록을
+    // 바닥에 붙이므로 결론 문장 아래로 간다 — 표가 밀려 내려가지 않는다.
+    <div style={{ display: "grid", gap: 14,
                   gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))" }}>
       <Card icon="input" title="ETF 자금 유입"
             desc="미국 ETF 로 실제로 들어온 돈입니다. 거래대금이 아닙니다."
@@ -292,7 +285,11 @@ export function EtfSection({ e }: { e: SeohakEtf }) {
       <Card icon="grid_view" title="주간 등락"
             desc="미국 ETF 가 5영업일 동안 얼마나 오르내렸는지입니다."
             note="최근 5영업일"
-            foot={`거래대금 1억 이상 ${e.week.length}종목을 셉니다. 돈이 안 오간 종목은 금액 자리가 비어 있습니다. 레버리지·인버스는 거래대금의 ${e.leverageShare.toFixed(1)}% 뿐입니다.`}>
+            /* ⭐ 날짜 범위와 회색 칸 설명이 본문 맨 아래 한 줄로 붙어 있었다. 그 한 줄
+               때문에 본문 높이가 옆 카드보다 25px 커서, 두 카드를 같은 높이로 늘리면
+               표 머리가 서로 다른 y 에 앉았다(113 vs 98). 각주로 옮기면 두 본문이 같은
+               꼴이 되어 표까지 나란해진다. */
+            foot={`${e.weekFrom.slice(5)} ~ ${e.asOf.slice(5)} 5영업일입니다. 회색은 그동안 오간 돈이고, 안 오간 종목은 그 자리가 비어 있습니다. 거래대금 1억 이상 ${e.week.length}종목을 셉니다. 레버리지·인버스는 거래대금의 ${e.leverageShare.toFixed(1)}% 뿐입니다.`}>
         <WeekGrid e={e} />
       </Card>
     </div>
