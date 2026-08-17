@@ -12,6 +12,11 @@ import { getSupabaseServer } from "@/lib/supabase-server";
  * ⚠️ 예전에 여기 적혀 있던 72.1/20.2 는 **2014년** 값이었다 — 한국 보유가 $59B 이던
  * 시절 숫자를 현재값처럼 인용했다. 지금 값은 seohak_equity_type 이 매년 갱신한다. 게다가
  * 여기 담긴 건 **국내 상장** ETF 라 미국에 직접 상장된 ETF(QQQ 같은)는 안 들어온다.
+ *
+ * ⚠️⚠️ **주식만이 아니다.** 272종목 중 52개가 국채·채권혼합형이다(ACE 미국30년국채액티브,
+ * 1Q 미국S&P500미국채혼합50 …). 이 페이지가 '미국 주식' 이야기라 순위표에 국채 ETF 가
+ * 끼면 어긋나 보인다 — 지금은 각주에 밝혀 두었을 뿐이다. 걸러 내려면 이름으로 자르는
+ * 수밖에 없는데 '혼합50' 은 절반이 주식이라 깔끔히 안 갈린다. 결정이 필요한 자리다.
  * "서학개미가 어디에 있나"의 답이 아니라 "국내 상장 ETF 로는 어디로 갔나"의 답이다.
  *
  * ## 세 값이 서로 다른 것을 잰다
@@ -181,8 +186,10 @@ export async function getSeohakEtf(): Promise<SeohakEtf | null> {
     medianPremium: mid,
     richest: liquid.slice(0, 4),
     cheapest: liquid.slice(-3).reverse(),
-    inflow: byFlow.filter((r) => r.netFlow > 0).slice(0, 4),
-    outflow: byFlow.filter((r) => r.netFlow < 0).slice(-3).reverse(),
+    // 카드가 좌우 두 칸으로 갈렸다. 한 칸에 다섯씩이면 두 칸 높이가 맞고, 값이 0 이
+    // 아닌 종목이 84개라 재료는 넉넉하다.
+    inflow: byFlow.filter((r) => r.netFlow > 0).slice(0, 5),
+    outflow: byFlow.filter((r) => r.netFlow < 0).slice(-5).reverse(),
     netFlowTotal: rows.reduce((s, r) => s + r.netFlow, 0),
     hedgedFlow: rows.filter((r) => r.hedged).reduce((s, r) => s + r.netFlow, 0),
     unhedgedFlow: rows.filter((r) => !r.hedged).reduce((s, r) => s + r.netFlow, 0),
