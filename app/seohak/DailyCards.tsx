@@ -1,6 +1,7 @@
 import { type SeohakDaily } from "@/lib/seohak-daily";
+import { SectionHead } from "../kadera/SectionHead";
 import { BUY, SELL } from "./tone";
-import { C, Icon, MONO, R } from "../ui";
+import { C, MONO, R } from "../ui";
 
 /**
  * 일별 층.
@@ -35,6 +36,28 @@ export const asPct = (mult: number) => {
   return `${d}% ${mult > 1 ? "더" : "덜"}`;
 };
 
+/**
+ * 카드 껍데기.
+ *
+ * ## ⭐ 손으로 그리던 머리를 `SectionHead` 로 갈았다
+ *
+ * 이 페이지엔 시트 꼴이 **둘**이었다. 달력·시작 연도별 성과·종류별 구성·잔고가 변한
+ * 이유 넷은 `SectionHead` 를 써서 머리에 `--c-title-band`(#eef3f9) 띠가 깔리는데, 이
+ * `Card` 로 만든 다섯 장(평소와의 차이 · ETF 둘 · 기관 몫 · 보유분 수익률)만 머리가
+ * 흰 바탕이었다. 나란히 놓으면 같은 페이지의 카드들이 서로 다른 물건처럼 보인다.
+ *
+ * 머리를 손으로 그릴 이유가 애초에 없었다 — `SectionHead` 와 아이콘·제목·설명·기간
+ * 알약이 전부 같고 값만 조금씩 어긋나 있었다(제목 13.5/800 → 14/700, 설명 sub2 → sub).
+ *
+ * 함께 달라진 것 둘.
+ *   ① 안쪽 여백이 시트 전체(`--hz-card-pad`)가 아니라 **띠마다** 붙는다. 머리·각주는
+ *      제 padding 을 갖고 본문만 여기서 준다 — 그래야 띠가 카드 폭을 꽉 채운다.
+ *   ② 각주가 맨 `<p>` 에서 `.hz-sheet-foot` 띠로 바뀐다. 나란한 시트끼리 바닥 높이가
+ *      같아진다(min-height 39px).
+ *
+ * ⚠️ `.hz-sheet-foot` 은 display:flex 다. 안에 맨 텍스트와 태그를 섞어 두면 좁은 폭에서
+ * 낱글자로 눌린다 — 통째로 `<span>` 하나에 담는다.
+ */
 export function Card({
   icon,
   title,
@@ -52,22 +75,17 @@ export function Card({
   children: React.ReactNode;
 }) {
   return (
-    <section className="hz-sheet" style={{ padding: "var(--hz-card-pad)", display: "flex",
-                                           flexDirection: "column", gap: 14, minWidth: 0 }}>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-        <Icon name={icon} style={{ fontSize: 18, color: C.muted, marginTop: 1, flexShrink: 0 }} />
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
-          <h3 style={{ margin: 0, fontSize: 13.5, fontWeight: 800, color: C.ink,
-                       lineHeight: 1.3, letterSpacing: "-.01em", wordBreak: "keep-all" }}>{title}</h3>
-          <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.45, color: C.sub2, wordBreak: "keep-all" }}>{desc}</p>
-        </div>
-        {note && (
-          <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, color: C.sub,
-                         background: C.chip, borderRadius: R.pill, padding: "3px 8px" }}>{note}</span>
-        )}
+    <section className="hz-sheet" style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+      <SectionHead icon={icon} title={title} desc={desc} note={note} />
+      {/* flex:1 을 유지할 것. `Flows`·`WeekGrid` 가 `marginTop:auto` 로 목록을 카드 바닥에
+          붙이는데, 이 칸이 안 늘어나면 그 auto 가 놀아서 두 카드의 목록 높이가 갈린다. */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 14, minWidth: 0,
+                    padding: "14px 22px" }}>
+        {children}
       </div>
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>{children}</div>
-      <p style={{ margin: 0, fontSize: 12, lineHeight: 1.45, color: C.sub2, wordBreak: "keep-all" }}>{foot}</p>
+      <div className="hz-sheet-foot" style={{ fontSize: 12, color: C.sub }}>
+        <span>{foot}</span>
+      </div>
     </section>
   );
 }
