@@ -407,6 +407,18 @@ export default async function SeohakPage() {
       <SectionCaps label="어떻게 사고파나" count={1} />
       <DailySection d={daily} />
 
+      {/* ── 분기 층 ───────────────────────────────────────────────────
+          ⭐ 맨 아래였다. 13F 마감이 분기말 +45일이라 **갱신이 가장 느리다**는 이유로
+          내려놓았는데, 그건 위 주석이 경계한 바로 그 기준이다 — 우리 파이프라인 사정이지
+          읽는 사람의 관심이 아니다. 질문으로 보면 '누가'는 '어떻게'와 한 짝이라 바로
+          뒤가 제자리다. 아래 두 장은 그릇('무엇에')과 잔고('얼마가')를 묻는 딴 갈래다. */}
+      {quarterly && (
+        <>
+          <SectionCaps label="누구의 돈인가" count={2} />
+          <QuarterlyCards q={quarterly} />
+        </>
+      )}
+
       {/* ⭐ '무엇에 담았나'였다. 그 이름일 때는 종류별 구성(SHL 연례)까지 여기 있었는데,
           그걸 아래로 내리고 나니 남은 둘이 전부 **국내 상장 ETF** 이야기다. 미국에 직접
           상장된 QQQ 같은 건 안 들어오는 딴 그릇이라, 이름으로 그 경계를 밝힌다. */}
@@ -575,15 +587,6 @@ export default async function SeohakPage() {
             </div>
           </section>
       </div>
-
-      {/* ── 분기 층 ───────────────────────────────────────────────────
-          가장 아래다. 13F 마감이 분기말 +45일이라 가장 느리게 바뀐다. */}
-      {quarterly && (
-        <>
-          <SectionCaps label="누구의 돈인가" count={2} />
-          <QuarterlyCards q={quarterly} />
-        </>
-      )}
 
     </div>
   );

@@ -1,7 +1,7 @@
 import type { SeohakEtf } from "@/lib/seohak-etf";
 import { C, MONO, R } from "../ui";
 import { BUY, SELL } from "./tone";
-import { Card, Em, Verdict } from "./DailyCards";
+import { CARD_GRID, Card, Em, Verdict } from "./DailyCards";
 
 /**
  * ETF 층 — 미국에 가는 두 번째 길.
@@ -268,13 +268,10 @@ function WeekGrid({ e }: { e: SeohakEtf }) {
  */
 export function EtfSection({ e }: { e: SeohakEtf }) {
   return (
-    // ⭐ `alignItems` 를 **주지 않는다.** 격자 기본값(stretch)이라 두 카드가 같은 높이로
-    // 늘어난다. 환헤지 상자를 빼고 나니 둘이 572 대 597 로 25px 어긋나 있었는데, 나란히
-    // 놓인 같은 꼴의 카드는 바닥이 어긋나면 한쪽이 덜 만들어진 것처럼 보인다.
-    // 남는 25px 은 `Card` 본문의 flex:1 이 먹고, 그 안에서 `marginTop:auto` 가 목록을
-    // 바닥에 붙이므로 결론 문장 아래로 간다 — 표가 밀려 내려가지 않는다.
-    <div style={{ display: "grid", gap: 14,
-                  gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))" }}>
+    // ⭐ 이 줄만 `stretch` 로 덮는다. 두 카드의 자연 높이가 572 대 597 로 25px 밖에
+    // 안 벌어져서, 늘려도 구멍이 안 생기고 바닥·각주 띠가 딱 맞는다. 분기 층은 292 대
+    // 392 라 같은 짓을 하면 78px 짜리 흰 구멍이 생긴다(`CARD_GRID` 머리말 참고).
+    <div style={{ ...CARD_GRID, alignItems: "stretch" }}>
       <Card icon="input" title="ETF 자금 유입"
             desc="미국 ETF 로 실제로 들어온 돈입니다. 거래대금이 아닙니다."
             note={`${e.asOf} 기준`}

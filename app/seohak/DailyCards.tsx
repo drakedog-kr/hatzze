@@ -103,13 +103,26 @@ export const Em = ({ children }: { children: React.ReactNode }) => (
   <span style={{ color: C.blue }}>{children}</span>
 );
 
-/** 카드 격자. 세 층(일별·분기·ETF)이 같은 자를 쓴다.
- *  ⚠️ auto-**fill** 이다. auto-fit 은 빈 트랙을 접어서 마지막 줄에 혼자 남은 카드를
- *  행 전체로 늘려 버린다 — "카드 하나가 가로로 쭉 길어지는" 그 모양이다. */
+/**
+ * 카드 두 장을 나란히 놓는 격자. ETF 층과 분기 층이 같은 자를 쓴다.
+ *
+ * ⚠️ 하한이 **380px** 이다. 300px 이던 시절에는 1,004px 폭에서 트랙이 셋 잡혀 카드가
+ * 325px 로 쪼그라들고 오른쪽 한 칸이 빈 채로 남았다. 380 이면 3열에 1,168px 가 필요해
+ * 2열로 떨어지고, 카드가 495px 씩 돼서 ETF 층과 폭이 같아진다.
+ *
+ * ⚠️⚠️ `alignItems: start` 다. **바닥을 맞추려면 두 카드의 자연 높이가 비슷해야 한다.**
+ * ETF 두 장은 572 대 597 이라 늘려도 25px 만 벌어지지만, 분기 두 장은 292 대 392 라
+ * 늘리면 기관 몫 안에 **78px 짜리 흰 구멍**이 생긴다(결론 문장과 막대 사이). 이 페이지의
+ * 다른 2열 줄도 바닥이 어긋나 있으므로(종류별 구성 575 · 잔고가 변한 이유 610) 들쭉날쭉한
+ * 바닥이 오히려 이 격자의 기본이다.
+ *
+ * 바닥을 맞추고 싶은 줄만 `{ ...CARD_GRID, alignItems: "stretch" }` 로 덮는다.
+ */
 export const CARD_GRID: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(min(300px, 100%), 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))",
   gap: 14,
+  alignItems: "start",
 };
 
 /* ── ① 평소와의 차이 (한 행 전체) ──────────────────────────────
