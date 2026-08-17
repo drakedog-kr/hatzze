@@ -33,32 +33,41 @@ const signed = (v: number) => (v >= 0 ? `+${won(v)}` : won(v));
 const shortName = (name: string) => name.replace("미국", "").replace(/\s{2,}/g, " ").trim();
 
 /**
- * ⑩ 제값과의 차이 — 괴리율을 **원**으로 말한다.
+ * ⑩ 제값과의 차이 — 100만 원어치를 살 때 붙는 웃돈.
  *
- * ## ⚠️⚠️ 앞 판은 "뭔지 이해를 못 하겠다"를 받았다
+ * ## ⚠️⚠️⚠️ 세 판째다. 매번 다른 것이 문제였다
  *
- * 202종목을 점으로 찍은 수직선 + "보통은 +0.07% 인데 가장 비싼 건 +1.28%" 였다. 분포를
- * 보여 주겠다는 뜻이었는데 읽는 사람에게는 셋 다 낯선 말이었다 — **괴리율 · 순자산가치 ·
- * 그리고 +0.07% 가 큰지 작은지.**
+ * 1판 202종목 점 분포 + "보통은 +0.07%, 가장 비싼 건 +1.28%"
+ *     → **낱말이 낯설었다**(괴리율 · 순자산가치 · %가 큰지 작은지).
+ * 2판 원 단위로 바꾸고 세 줄 표
+ *     → **그림이 없고 글이 많았다.** "이 카드가 뭘 말하려는지 모르겠다".
+ * 3판(지금) 문장 하나 + 3분할 막대 하나 + 이름 셋.
  *
- * ⭐ 고칠 것은 그림이 아니라 **단위**였다. 괴리율 1.28% 는 "100만 원어치를 사면서 웃돈
- * 12,800원을 더 낸다"는 뜻이다. 원으로 바꾸면 설명이 필요 없다. 이 카드의 모든 숫자를
- * 100만 원 기준 원화로 통일한다 — %는 어디에도 안 쓴다.
+ * ⭐ 이 카드는 **발견이 아니라 값을 말하는 카드**다. "이 그릇(국내 상장 미국 ETF)을 쓰면
+ * 제값보다 얼마를 더 내나". 그래서 결론 문장은 금액이고, 그림은 그 금액의 분포다.
  *
- * ⭐ 점 202개도 지운다. 뭉친 자리가 곧 "보통은 이렇다"라는 건 그린 사람만 아는 규칙이고,
- * 같은 말을 **몇 종목인지 세어서** 하면 그림이 필요 없다.
+ * ## ⛔ 재 봤지만 못 쓴 것들
  *
- * ⚠️ 문턱은 ±0.2%(=100만 원당 ±2,000원)다. 분위수가 아니라 **뜻으로** 잡았다 — 2,000원은
- * 100만 원 거래에서 사람이 신경 쓸 만한 가장 작은 단위다. 분위수로 잡으면 시장이 조용한
- * 날에도 늘 3분의 1이 '웃돈'으로 찍힌다.
+ * - **웃돈은 수요의 흔적이 아니다.** 자금 유입과의 순위상관이 22거래일 내내 −0.14~+0.23
+ *   으로 0 근처다. "돈이 몰린 상품에 웃돈이 붙는다"는 그럴듯한 이야기가 안 맞는다.
+ * - **'오른 것 vs 내린 것' 두 막대는 못 쓴다.** 22일 중 5일은 한쪽이 9~11종목뿐이다 —
+ *   전부 미국 지수를 따라가니 같은 날은 대체로 같은 방향으로 움직인다.
+ * - 거래대금이 작을수록 |웃돈| 이 크긴 한데(1~5억 0.26% → 20~100억 0.14%) 100억+ 에서
+ *   0.20% 로 되올라가 단조롭지 않다.
+ *
+ * ⭐ 남은 하나는 **왜 웃돈이 생기나**다. 그날 등락과의 순위상관이 22일 중 18일 양수이고
+ *   중앙 +0.46 이다 — 미국 장이 닫혀 있는 동안 국내에서 먼저 오르면 안에 든 자산 값은
+ *   그대로라 그 차이가 웃돈으로 남는다. 발견이 아니라 **정의의 설명**이라 각주에 둔다.
+ *
+ * ⚠️ 문턱 ±0.2%(=100만 원당 2,000원)는 분위수가 아니라 **뜻으로** 잡았다. 분위수로 잡으면
+ * 조용한 날에도 늘 3분의 1이 '웃돈'으로 찍힌다.
  */
 const PER_MILLION = 1_000_000;
 /**
  * 괴리율(%)을 100만 원어치를 살 때 더 내는(덜 내는) 돈으로. 부호는 문장이 진다.
  *
- * ⚠️ **반올림한다.** 그대로 내면 729원 · 12,803원 · 14,156원 처럼 나오는데, 이 카드가
- * 하는 말은 "이만큼입니다"라 자릿수를 다 보여 줄 이유가 없다. 원자료가 소수 둘째 자리
- * 괴리율이라 마지막 자리는 어차피 뜻이 없다.
+ * ⚠️ **반올림한다.** 그대로 내면 729원 · 12,803원 처럼 나오는데 원자료가 소수 둘째 자리
+ * 괴리율이라 마지막 자리는 뜻이 없다.
  */
 const perMillion = (premiumPct: number) => {
   const raw = Math.abs((premiumPct / 100) * PER_MILLION);
@@ -69,40 +78,49 @@ const perMillion = (premiumPct: number) => {
 const FAIR_PCT = 0.2;
 
 function Premium({ e }: { e: SeohakEtf }) {
-  const rich = e.liquid.filter((r) => r.premium > FAIR_PCT);
-  const cheap = e.liquid.filter((r) => r.premium < -FAIR_PCT);
-  const fair = e.liquid.length - rich.length - cheap.length;
+  const cheap = e.liquid.filter((r) => r.premium < -FAIR_PCT).length;
+  const rich = e.liquid.filter((r) => r.premium > FAIR_PCT).length;
+  const fair = e.liquid.length - cheap - rich;
+  const total = e.liquid.length || 1;
   const mid = e.medianPremium;
 
-  const buckets = [
-    { k: "거의 제값", n: fair, note: `100만 원당 ${perMillion(FAIR_PCT)} 안` },
-    { k: "웃돈이 붙었다", n: rich.length, note: rich.length ? `최대 ${perMillion(rich[0].premium)}` : "" },
-    { k: "오히려 싸다", n: cheap.length,
-      note: cheap.length ? `최대 ${perMillion(cheap[cheap.length - 1].premium)}` : "" },
+  /* 싸다 → 제값 → 웃돈. 왼쪽이 싼 쪽이라 숫자선처럼 읽힌다.
+     색은 `EquityTypeSection` 과 같은 검증된 셋이고, 가장 큰 칸이 파랑인 규칙도 같다. */
+  const parts = [
+    { k: "cheap", label: "싸다", n: cheap, fill: C.marker, ink: C.ink },
+    { k: "fair", label: "거의 제값", n: fair, fill: C.blue, ink: C.card },
+    { k: "rich", label: "웃돈", n: rich, fill: C.inkSoft, ink: C.card },
   ];
 
   return (
     <>
       <Verdict>
-        100만 원어치를 사면 {mid >= 0 ? "웃돈이 보통" : "보통"}{" "}
-        <Em>{perMillion(mid)}</Em>{mid >= 0 ? "입니다" : " 싸게 삽니다"}
+        100만 원어치에 {mid >= 0 ? "웃돈" : "할인"} <Em>{perMillion(mid)}</Em>
+        {mid >= 0 ? "이 붙습니다" : "을 받습니다"}
       </Verdict>
 
       <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 9 }}>
-        <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex",
-                     flexDirection: "column", gap: 7 }}>
-          {buckets.map((b) => (
-            <li key={b.k} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 12 }}>
-              <span style={{ color: C.label, fontWeight: 600 }}>{b.k}</span>
-              <span style={{ fontSize: 10.5, color: C.faint }}>{b.note}</span>
-              <b style={{ marginLeft: "auto", flexShrink: 0, fontFamily: MONO, fontSize: 13,
-                          fontWeight: 800, color: C.ink }}>{b.n}종목</b>
-            </li>
+        <div style={{ display: "flex", height: 30, gap: 2, minWidth: 0 }}>
+          {parts.map((p) => (
+            <span key={p.k} title={`${p.label} ${p.n}종목`}
+                  style={{ width: `${(p.n / total) * 100}%`, background: p.fill, borderRadius: 3,
+                           display: "flex", alignItems: "center", justifyContent: "center",
+                           minWidth: 0, overflow: "hidden" }}>
+              {/* 15% 미만이면 글자를 비운다. 아래 범례가 그 칸을 말한다. */}
+              {p.n / total >= 0.15 && (
+                <b style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 800, color: p.ink,
+                            whiteSpace: "nowrap" }}>{p.n}종목</b>
+              )}
+            </span>
           ))}
-        </ul>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10.5,
+                      color: C.faint }}>
+          <span>2,000원 넘게 싸다</span>
+          <span>±2,000원</span>
+          <span>2,000원 넘게 웃돈</span>
+        </div>
 
-        {/* 이름을 붙여야 "그게 어느 상품이냐"가 남지 않는다. 웃돈이 큰 쪽만 낸다 —
-            싸게 사는 쪽은 위 줄이 최대치를 이미 말했다. */}
         <ul style={{ listStyle: "none", margin: 0, padding: "7px 0 0", display: "flex",
                      flexDirection: "column", gap: 5, borderTop: `1px solid ${C.line}` }}>
           {e.richest.slice(0, 3).map((r) => (
@@ -258,9 +276,9 @@ export function EtfSection({ e }: { e: SeohakEtf }) {
                     gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))",
                     alignItems: "start" }}>
         <Card icon="sell" title="제값과의 차이"
-              desc="ETF 한 주 값과, 그 안에 든 자산 값의 차이입니다. 100만 원어치를 살 때로 바꿔 적었습니다."
+              desc="100만 원어치를 살 때 제값보다 얼마를 더 내는지입니다."
               note={`${e.asOf} 종가`}
-              foot={`업계에서 괴리율이라 부르는 값입니다. 거래대금 1억 이상 ${e.liquid.length}종목만 셉니다. 예측이 아니라 산수입니다.`}>
+              foot={`값이 오른 날 웃돈이 커집니다 — 미국 장이 닫혀 있는 동안 국내에서 먼저 오르면 안에 든 자산 값은 그대로여서입니다. 업계에서 괴리율이라 부르는 값이고, 거래대금 1억 이상 ${e.liquid.length}종목만 셉니다.`}>
           <Premium e={e} />
         </Card>
 
