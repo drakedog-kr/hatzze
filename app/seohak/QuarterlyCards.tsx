@@ -1,3 +1,4 @@
+import type { SeohakOverview } from "@/lib/seohak-data";
 import type { SeohakQuarterly } from "@/lib/seohak-quarterly";
 import { C, MONO, R } from "../ui";
 import { CARD_GRID, Card, Em, Verdict } from "./DailyCards";
@@ -22,6 +23,12 @@ import { CARD_GRID, Card, Em, Verdict } from "./DailyCards";
  */
 const usdB = (v: number) =>
   `$${(v / 1e9).toLocaleString("ko-KR", { maximumFractionDigits: Math.abs(v) < 1e10 ? 1 : 0 })}B`;
+/**
+ * ⚠️⚠️ **이 파일에는 단위가 둘이다.** 13F(`seohak_institution_13f.value_usd`)는 원 달러라
+ * `usdB` 를 그대로 쓰고, TIC 에서 온 값(`SeohakOverview.channel`)은 **백만 달러**다.
+ * 섞으면 $106.7B 가 $0.0B 로 찍힌다(실제로 그렇게 났다).
+ */
+const usdBmn = (mn: number) => usdB(mn * 1e6);
 const pct = (v: number, digits = 1) =>
   `${v >= 0 ? "+" : "−"}${Math.abs(v).toLocaleString("ko-KR", { maximumFractionDigits: digits })}%`;
 
@@ -39,22 +46,52 @@ const pct = (v: number, digits = 1) =>
 const INST = C.inkSoft;
 const REST = C.blue;
 
-/* ── ⑧ 기관 몫 ──────────────────────────────────────────────────
-   막대 하나를 둘로 가르는 게 이 데이터의 생김새다. 다만 **비중이 거의 안 변한다는 것**
-   자체가 사실이라(26.6~34.6%), 아래에 분기별 점을 얇게 깔아 "요즘 갑자기 기관이
-   늘었다"는 식의 오해를 막는다.
+/** 원금·잔고 두 줄에 쓰는 가로 막대. 같은 자로 두 번 재는 게 이 카드의 요점이다. */
+function SplitBar({ label, share, left, right }: {
+  label: string;
+  /** 개인 채널 몫(%). */
+  share: number;
+  left: string;
+  right: string;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 11.5 }}>
+        <span style={{ color: C.sub2, fontWeight: 700 }}>{label}</span>
+        <span style={{ marginLeft: "auto", fontFamily: MONO, color: C.sub2 }}>{left}</span>
+        <b style={{ fontFamily: MONO, fontSize: 14, color: C.ink, minWidth: 40, textAlign: "right" }}>
+          {share.toFixed(0)}%
+        </b>
+      </div>
+      <div style={{ display: "flex", height: 14, borderRadius: 4, overflow: "hidden" }}>
+        <span style={{ width: `${share}%`, background: REST }} />
+        <span style={{ flex: 1, background: INST }} />
+      </div>
+      <span style={{ fontSize: 10.5, color: C.faint, textAlign: "right" }}>{right}</span>
+    </div>
+  );
+}
 
-   ## ⭐ '기관 9곳'이라고만 하고 누구인지는 안 알려주고 있었다
+/* ── ⑧ 개인과 기관 ────────────────────────────────────────────────
+   ## ⛔ 앞 판은 **분자와 분모의 모집단이 달랐다**
 
-   신고자 목록을 아래에 붙인다. 이 장의 제목이 '누구의 돈인가'인데 정작 그 '누구'가
-   화면에 없었다. 덤으로 카드 높이가 292 → 옆 카드와 비슷해져 두 장의 바닥이 맞는다.
+   13F 9곳($219B)을 TIC 전수($681B)로 나눠 "기관 32% · 나머지 68%"라 적고 결론 문장을
+   "68%는 기관 밖입니다"로 냈다. 13F 는 미국에 신고 의무가 있는 대형 9곳뿐이라 그 비율은
+   기관 몫이 아니라 **13F 포착률**이다. 그 '나머지 $462B' 안에 13F 에 안 잡히는 기관이
+   $293B 있었다 — 즉 나머지의 63%가 또 기관이었다.
 
-   ⚠️ **아홉 곳이 늘 아홉은 아니다.** 지금까지 신고한 곳이 아홉이고 분기마다 일곱쯤
-   낸다(2026-03 은 일곱, 한화·머스트가 최근 빠졌다). 그래서 줄 수는 자료가 정한다. */
-function InstitutionShare({ q }: { q: SeohakQuarterly }) {
-  const lo = Math.min(...q.shareTrail.map((s) => s.share));
-  const hi = Math.max(...q.shareTrail.map((s) => s.share));
-  const span = Math.max(4, hi - lo);
+   실측하면 개인 채널은 잔고의 **약 25%** 다. 화면의 68%는 세 배 가까이 틀렸고, 그걸
+   32:68 막대로 칠해 그림으로까지 굳혀 놓고 있었다.
+
+   ## 지금 판
+
+   예탁원 결제(국내 증권사 경유)로 가른다. 자세한 근거·한계는 `SeohakOverview.channel`
+   머리말에 있다. 13F 는 '기관 전부'가 아니라 **그 안에서 이름을 아는 곳**으로 자리를
+   내려 신고자 목록으로만 남긴다.
+
+   ⚠️ **두 자료의 기준일이 다르다.** 채널은 TIC 월 단위(2026-05), 신고자 목록은 13F
+   분기(2026-03)다. 각 블록이 제 날짜를 달고 있어야 한다. */
+function WhoOwns({ q, ch }: { q: SeohakQuarterly; ch: NonNullable<SeohakOverview["channel"]> }) {
   // 1% 아래는 한 줄로 접는다. 2026-03 기준 세 곳을 합쳐 0.1% 라, 각자 한 줄씩 주면
   // 막대가 안 보이는 줄만 셋이 된다.
   const big = q.filers.filter((f) => f.share >= 1);
@@ -65,81 +102,72 @@ function InstitutionShare({ q }: { q: SeohakQuarterly }) {
   return (
     <>
       <Verdict>
-        미국 주식에 든 한국 돈의 <Em>{(100 - q.share).toFixed(0)}%</Em>는 기관 밖입니다
+        넣은 돈의 <Em>{ch.principalShare.toFixed(0)}%</Em>, 지금 잔고의{" "}
+        <Em>{ch.valueShare.toFixed(0)}%</Em>가 국내 증권사를 거친 돈입니다
       </Verdict>
 
-      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 9 }}>
-        <div style={{ display: "flex", height: 30, borderRadius: 5, overflow: "hidden" }}>
-          <span style={{ width: `${q.share}%`, background: INST }} />
-          <span style={{ flex: 1, background: REST }} />
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 11.5 }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, minWidth: 0 }}>
-            <span style={{ width: 8, height: 8, borderRadius: 2, background: INST, flexShrink: 0 }} />
-            <span style={{ color: C.sub }}>기관</span>
-            <b style={{ fontFamily: MONO, color: C.ink }}>{usdB(q.institutionUsd)}</b>
-          </span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, minWidth: 0 }}>
+      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 11 }}>
+        {/* 두 줄을 세로로 겹쳐 둔다. 파란 칸이 줄어드는 것 자체가 "개인 돈이 늦게
+            들어와 덜 굴렀다"는 말이라, 나란히 놓여야 그 줄어듦이 보인다. */}
+        <SplitBar label="넣은 돈" share={ch.principalShare}
+                  left={usdBmn(ch.principal)} right={`전체 ${usdBmn(ch.principal / (ch.principalShare / 100))}`} />
+        <SplitBar label="지금 잔고" share={ch.valueShare}
+                  left={usdBmn(ch.value)} right={`전체 ${usdBmn(ch.value / (ch.valueShare / 100))}`} />
+
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 11 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
             <span style={{ width: 8, height: 8, borderRadius: 2, background: REST, flexShrink: 0 }} />
-            <span style={{ color: C.sub }}>나머지</span>
-            <b style={{ fontFamily: MONO, color: C.ink }}>{usdB(q.restUsd)}</b>
+            <span style={{ color: C.sub }}>국내 증권사를 거친 돈</span>
+          </span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: INST, flexShrink: 0 }} />
+            <span style={{ color: C.sub }}>수탁은행을 직접 쓰는 기관</span>
           </span>
         </div>
 
         {/* 신고자 목록. 막대는 1위 대비라 1위가 칸을 꽉 채운다 — 전체 대비로 두면
             국민연금이 60% 라 나머지 넷이 전부 손톱만 해진다. */}
         {big.length > 0 && (
-          <ul style={{ listStyle: "none", margin: 0, padding: "6px 0 0",
-                       borderTop: `1px solid ${C.line}`, display: "flex",
-                       flexDirection: "column" }}>
-            {big.map((f, i) => (
-              <li key={f.name}
-                  title={`${f.name} · ${f.holdings.toLocaleString("ko-KR")}종목`}
-                  style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 46px 54px 34px",
-                           alignItems: "center", gap: 8, padding: "5px 0",
-                           borderBottom: i < big.length - 1 || small.length
-                             ? `1px solid ${C.sheetRow}` : undefined }}>
-                <span style={{ fontSize: 11.5, color: C.sub, minWidth: 0, overflow: "hidden",
-                               textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
-                <span className="hz-bar">
-                  <span style={{ width: `${Math.max(4, (f.share / topShare) * 100)}%`,
-                                 background: INST }} />
-                </span>
-                <span style={{ fontFamily: MONO, fontSize: 11.5, color: C.ink, fontWeight: 700,
-                               textAlign: "right" }}>{usdB(f.usd)}</span>
-                <span style={{ fontFamily: MONO, fontSize: 10.5, color: C.faint,
-                               textAlign: "right" }}>{f.share.toFixed(0)}%</span>
-              </li>
-            ))}
-            {small.length > 0 && (
-              <li style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 46px 54px 34px",
-                           alignItems: "center", gap: 8, padding: "5px 0" }}>
-                <span style={{ fontSize: 11.5, color: C.faint }}>그 밖 {small.length}곳</span>
-                <span />
-                <span style={{ fontFamily: MONO, fontSize: 11.5, color: C.sub2,
-                               textAlign: "right" }}>{usdB(smallUsd)}</span>
-                <span style={{ fontFamily: MONO, fontSize: 10.5, color: C.faint,
-                               textAlign: "right" }}>0%</span>
-              </li>
-            )}
-          </ul>
-        )}
-
-        {/* 비중 추이. 값이 안 움직인다는 걸 보여주는 게 목적이라 세로 폭을 좁게 둔다. */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 3, paddingTop: 4,
-                      borderTop: `1px solid ${C.line}` }}>
-          <span style={{ fontSize: 10.5, color: C.sub2, fontWeight: 600 }}>
-            기관 몫은 {q.quarters + 1}분기 내내 {lo.toFixed(0)}~{hi.toFixed(0)}% 였습니다
-          </span>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 22 }}>
-            {q.shareTrail.map((s, i) => (
-              <span key={s.quarter} title={`${s.quarter} · ${s.share.toFixed(1)}%`}
-                    style={{ flex: 1, borderRadius: 1,
-                             height: `${20 + ((s.share - lo) / span) * 80}%`,
-                             background: i === q.shareTrail.length - 1 ? INST : C.track }} />
-            ))}
+          <div style={{ display: "flex", flexDirection: "column", gap: 5, paddingTop: 7,
+                        borderTop: `1px solid ${C.line}` }}>
+            <span style={{ fontSize: 10.5, color: C.sub2, fontWeight: 600 }}>
+              그 기관 중 이름을 아는 곳 · {q.asOf.slice(0, 7)} 기준 {usdB(q.institutionUsd)}
+            </span>
+            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex",
+                         flexDirection: "column" }}>
+              {big.map((f, i) => (
+                <li key={f.name}
+                    title={`${f.name} · ${f.holdings.toLocaleString("ko-KR")}종목`}
+                    style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 46px 54px 34px",
+                             alignItems: "center", gap: 8, padding: "5px 0",
+                             borderBottom: i < big.length - 1 || small.length
+                               ? `1px solid ${C.sheetRow}` : undefined }}>
+                  <span style={{ fontSize: 11.5, color: C.sub, minWidth: 0, overflow: "hidden",
+                                 textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
+                  <span className="hz-bar">
+                    <span style={{ width: `${Math.max(4, (f.share / topShare) * 100)}%`,
+                                   background: INST }} />
+                  </span>
+                  <span style={{ fontFamily: MONO, fontSize: 11.5, color: C.ink, fontWeight: 700,
+                                 textAlign: "right" }}>{usdB(f.usd)}</span>
+                  <span style={{ fontFamily: MONO, fontSize: 10.5, color: C.faint,
+                                 textAlign: "right" }}>{f.share.toFixed(0)}%</span>
+                </li>
+              ))}
+              {small.length > 0 && (
+                <li style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 46px 54px 34px",
+                             alignItems: "center", gap: 8, padding: "5px 0" }}>
+                  <span style={{ fontSize: 11.5, color: C.faint }}>그 밖 {small.length}곳</span>
+                  <span />
+                  <span style={{ fontFamily: MONO, fontSize: 11.5, color: C.sub2,
+                                 textAlign: "right" }}>{usdB(smallUsd)}</span>
+                  <span style={{ fontFamily: MONO, fontSize: 10.5, color: C.faint,
+                                 textAlign: "right" }}>0%</span>
+                </li>
+              )}
+            </ul>
           </div>
-        </div>
+        )}
       </div>
     </>
   );
@@ -246,20 +274,25 @@ function WhoDidBetter({ q }: { q: SeohakQuarterly }) {
   );
 }
 
-export function QuarterlyCards({ q }: { q: SeohakQuarterly }) {
+export function QuarterlyCards({ q, ch }: {
+  q: SeohakQuarterly;
+  ch: SeohakOverview["channel"];
+}) {
   return (
     <div style={CARD_GRID}>
-      <Card icon="account_balance" title="기관 몫"
-            desc="미국 주식에 든 한국 돈 중 기관이 아닌 몫입니다."
-            note={`${q.asOf.slice(0, 7)} 기준`}
-            foot="SEC 에 13F 를 내는 한국 기관 9곳만 셉니다. 실제 기관 몫은 이보다 큽니다.">
-        <InstitutionShare q={q} />
-      </Card>
+      {ch && (
+        <Card icon="account_balance" title="개인과 기관"
+              desc="미국 주식에 든 한국 돈을 국내 증권사를 거친 것과 아닌 것으로 가릅니다."
+              note={`${ch.from}년부터`}
+              foot="예탁원 결제는 국내 증권사를 거친 것만 잡습니다. 수탁은행을 직접 쓰는 대형 기관은 안 들어오지만 국내 증권사를 쓰는 법인·중소 기관은 들어오므로, 파란 몫은 개인의 상한입니다. 잔고는 유입을 시장 수익으로 굴린 값이라 추정입니다. 눈금을 나스닥으로 바꿔도 1.5%p 안에서 움직입니다.">
+          <WhoOwns q={q} ch={ch} />
+        </Card>
+      )}
 
       <Card icon="emoji_events" title="보유분 수익률"
             desc="산 것과 판 것을 걷어내고 들고 있던 것만의 수익률입니다."
             note={`${q.quarters}분기 누적`}
-            foot="분기 하나는 추정 오차가 커서 누적으로만 봅니다. '나머지'는 개인이 아니라 그 9곳이 아닌 전부입니다.">
+            foot="분기 하나는 추정 오차가 커서 누적으로만 봅니다. ⚠️ 여기 '나머지'는 개인이 아니라 13F 를 안 내는 전부라, 그 안에도 기관이 많습니다.">
         <WhoDidBetter q={q} />
       </Card>
     </div>

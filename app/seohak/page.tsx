@@ -415,7 +415,7 @@ export default async function SeohakPage() {
       {quarterly && (
         <>
           <SectionCaps label="누구의 돈인가" count={2} />
-          <QuarterlyCards q={quarterly} />
+          <QuarterlyCards q={quarterly} ch={ov.channel} />
         </>
       )}
 

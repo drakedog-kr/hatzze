@@ -68,6 +68,44 @@ export type SeohakOverview = {
   cohorts: Cohort[];
   series: { month: string; principal: number; value: number }[];
   /**
+   * 국내 증권사(예탁원 결제)를 거친 몫 — **개인과 기관을 가르는 유일한 미국장 자료다.**
+   *
+   * ## ⚠️⚠️ 13F ÷ TIC 은 기관 몫이 아니다
+   *
+   * 앞 판은 13F 9곳($219B)을 TIC 전수($681B)로 나눠 "기관 32% · 나머지 68%"라 적었다.
+   * **분자와 분모의 모집단이 다르다.** 13F 는 미국에 신고 의무가 있는 대형 9곳뿐이라
+   * 그 비율은 기관 몫이 아니라 **13F 포착률**이다. 실제로 그 '나머지 $462B' 안에
+   * 13F 에 안 잡히는 기관이 $293B 있었다(2026-03 실측).
+   *
+   * ## 이 자료가 가르는 것
+   *
+   * 예탁원 결제는 **국내 증권사를 거친 미국 주식만** 잡는다. 수탁은행을 직접 쓰는
+   * 대형 기관(국민연금·KIC·대형 운용사)은 통째로 빠진다. 그래서 이 채널이 곧
+   * '개인 + 국내 증권사를 쓰는 중소 기관·법인' 이고, 개인 몫의 **상한**이다.
+   *
+   * ## 왜 두 숫자를 다 내는가
+   *
+   * 원금 34% · 잔고 24% 다. 개인 돈이 **늦게 들어와 덜 굴렀다**(개인 배수 1.56x,
+   * 시장 전체 2.29x). 하나만 내면 절반의 이야기가 된다.
+   *
+   * ## 이 값이 안 흔들린다는 근거
+   *
+   * 유입을 굴릴 눈금을 나스닥으로 바꿔도 24.8% → 23.3% 로 **1.5%p 밖에 안 갈린다**
+   * (개인 돈이 젊어서 눈금 선택이 덜 먹는다). 개인 배수를 억지로 올려도 2.29x 를
+   * 넘는 순간 "늦게 들어온 돈이 먼저 들어온 돈보다 배수가 높다"가 되어 산수가
+   * 어긋나므로, 잔고 몫의 **논리적 상한은 36.4%**(= 원금 몫)다.
+   */
+  channel: {
+    /** 이 채널이 넣은 누적 순매수. */
+    principal: number;
+    /** 그 유입을 합성지수로 굴린 지금 값. */
+    value: number;
+    principalShare: number;
+    valueShare: number;
+    /** 자료 첫 해. 각주가 창을 밝히는 데 쓴다. */
+    from: number;
+  } | null;
+  /**
    * 잔고 증감을 순매수 몫과 평가 몫으로 가른 것. **해 단위다.**
    *
    * ⚠️ 앞 판은 최근 12개월을 달별로 냈는데, 그 창이 가장 중요한 사실을 가렸다. 새 돈의
@@ -168,6 +206,80 @@ function buildIndex(rows: FlowRow[]): Map<string, number> {
 /** 코호트를 낼 최소 연도. 이보다 앞은 금액이 너무 작아(연 $1B 미만) 줄이 의미가 없다. */
 const COHORT_FROM = 2015;
 
+/**
+ * 예탁원 채널의 유입을 합성지수로 굴린다.
+ *
+ * ## ⚠️ 33행으로 끝낸다. 7,059행을 받지 않는다
+ *
+ * 일별표(`seohak_settlement_daily`)를 전량 받으면 7,059행·8회 왕복인데, 연간표
+ * (`seohak_settlement_yearly`)는 33행이다. 실측으로 결과가 같다:
+ *
+ *   일별 7,059행   잔고 $195.7B (24.02%)
+ *   연간 33행      잔고 $194.6B (23.89%)   ← 0.13%p 차
+ *
+ * ⚠️⚠️ **연중 지수를 써야 한다.** 그 해 유입이 연중 고르게 들어온다고 보고 6월 지수로
+ * 굴린다. 12월 지수로 굴리면 $178.4B(21.90%)가 나와 **8.8% 어긋난다** — 한 해 동안 오른
+ * 만큼을 그 해 유입 전체에서 빼 버리기 때문이다.
+ *
+ * ⚠️ 올해분만 일별표에서 받는다. 연간표의 올해 행은 **오늘까지**를 담는데 TIC 은 두어 달
+ * 뒤처져 있어(2026-08 vs 2026-05), 그대로 쓰면 창이 어긋난 유입 $5.9B 이 섞인다.
+ */
+async function loadChannel(
+  level: Map<string, number>,
+  asOfMonth: string,
+): Promise<SeohakOverview["channel"] | null> {
+  const sb = getSupabaseServer();
+  const asOfYear = Number(asOfMonth.slice(0, 4));
+  // ⚠️ `buildIndex` 의 키는 원천 그대로라 **"2026-05-01"** 이다. "2026-05" 로 찾으면
+  // 전부 undefined 가 되고 이 카드가 통째로 사라진다(실제로 그렇게 났다).
+  const byMonth = new Map<string, number>();
+  for (const [k, v] of level) byMonth.set(k.slice(0, 7), v);
+
+  const yearly = await sb
+    .from("seohak_settlement_yearly")
+    .select("year, us_buy_amount, us_sell_amount")
+    .lt("year", asOfYear)
+    .order("year", { ascending: true });
+  if (yearly.error) return null;
+
+  // ⚠️ 정렬 키를 반드시 박는다. 이 자료를 처음 재다가 정렬 없이 페이징해서 값이
+  // $112.6B → $164.1B 로 튀었다(이 저장소가 네 번 겪은 함정).
+  const daily = await sb
+    .from("seohak_settlement_daily")
+    .select("settle_date, buy_amount, sell_amount")
+    .eq("market_code", "US")
+    .eq("security_type", "주식")
+    .gte("settle_date", `${asOfYear}-01-01`)
+    .lte("settle_date", `${asOfMonth}-31`)
+    .order("settle_date", { ascending: true });
+  if (daily.error) return null;
+
+  const now = byMonth.get(asOfMonth);
+  if (!now) return null;
+  /** 그 해 6월 지수. 없으면 있는 것 중 가장 가까운 뒤쪽을 쓴다. */
+  const midYear = (y: number) => byMonth.get(`${y}-06`) ?? byMonth.get(`${y}-12`) ?? now;
+
+  let principal = 0;
+  let value = 0;
+  let from = asOfYear;
+  for (const r of yearly.data ?? []) {
+    const y = Number(r.year);
+    const net = (Number(r.us_buy_amount ?? 0) - Number(r.us_sell_amount ?? 0)) / 1e6;
+    if (!net) continue;
+    from = Math.min(from, y);
+    principal += net;
+    value += net * (now / midYear(y));
+  }
+  // 올해분은 달 단위로 굴린다 — 행이 몇백 개뿐이라 근사할 이유가 없다.
+  for (const r of daily.data ?? []) {
+    const month = (r.settle_date as string).slice(0, 7);
+    const net = (Number(r.buy_amount ?? 0) - Number(r.sell_amount ?? 0)) / 1e6;
+    principal += net;
+    value += net * (now / (byMonth.get(month) ?? now));
+  }
+  return { principal, value, principalShare: 0, valueShare: 0, from };
+}
+
 export async function getSeohakOverview(): Promise<SeohakOverview> {
   const rows = await loadKoreaFlows();
   if (rows.length < 2) throw new Error("seohak_country_flows 행이 부족합니다");
@@ -217,6 +329,15 @@ export async function getSeohakOverview(): Promise<SeohakOverview> {
   // ── 아래 카드들은 같은 rows 를 재활용한다 ────────────────────────────
   // 카드마다 표를 다시 읽지 않는다. 498행이 한 번 오면 나머지는 전부 그 위의 산수라,
   // 왕복을 늘리면 화면만 느려지고 값은 한 글자도 안 달라진다.
+
+  // 개인과 기관 — 예탁원 채널. 여기서 내는 이유는 **합성지수가 여기 있어서**다.
+  const asOfMonth = last.month.slice(0, 7);
+  const rawChannel = await loadChannel(level, asOfMonth);
+  const channel = rawChannel && {
+    ...rawChannel,
+    principalShare: principal ? (rawChannel.principal / principal) * 100 : 0,
+    valueShare: marketValue ? (rawChannel.value / marketValue) * 100 : 0,
+  };
 
   // 잔고가 변한 이유 — 해별. 코호트와 같은 해(COHORT_FROM)부터 낸다. 두 카드가 같은
   // 층에 나란히 있어서 창이 갈리면 "2015년"이 두 뜻이 된다.
@@ -277,6 +398,9 @@ export async function getSeohakOverview(): Promise<SeohakOverview> {
     closureErrorPct: (synthetic / marketValue - 1) * 100,
     cohorts,
     series,
+    // 조회가 실패하면 그 카드만 접는다. 0 으로 채우면 "개인이 아무것도 안 넣었다"가
+    // 화면에 뜨는데, 그건 고장이 아니라 사실처럼 읽힌다.
+    channel: channel ?? null,
     breakdown,
     reversal,
   };
