@@ -229,14 +229,14 @@ export function EtfSection({ e }: { e: SeohakEtf }) {
     <div style={{ display: "grid", gap: 14, alignItems: "start",
                   gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))" }}>
       <Card icon="input" title="ETF 자금 유입"
-            desc="국내 상장 미국 ETF 로 실제로 들어온 돈입니다. 거래대금이 아닙니다."
+            desc="미국 ETF 로 실제로 들어온 돈입니다. 거래대금이 아닙니다."
             note={`${e.asOf} 기준`}
             foot="상장좌수 변화 × 순자산가치로 잽니다. 같은 돈이 오간 것은 안 셉니다. 이 페이지는 미국 주식 이야기라 국채·회사채·채권혼합형은 뺐습니다.">
         <Flows e={e} />
       </Card>
 
       <Card icon="grid_view" title="주간 등락"
-            desc="국내 상장 미국 ETF 가 5영업일 동안 얼마나 오르내렸는지입니다."
+            desc="미국 ETF 가 5영업일 동안 얼마나 오르내렸는지입니다."
             note="최근 5영업일"
             foot={`거래대금 1억 이상 ${e.week.length}종목을 셉니다. 돈이 안 오간 종목은 금액 자리가 비어 있습니다. 레버리지·인버스는 거래대금의 ${e.leverageShare.toFixed(1)}% 뿐입니다.`}>
         <WeekGrid e={e} />

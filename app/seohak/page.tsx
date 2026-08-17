@@ -306,7 +306,10 @@ export default async function SeohakPage() {
       <SectionCaps label="어떻게 사고파나" count={1} />
       <DailySection d={daily} />
 
-      <SectionCaps label="무엇에 담았나" count={etf ? 2 : 0} />
+      {/* ⭐ '무엇에 담았나'였다. 그 이름일 때는 종류별 구성(SHL 연례)까지 여기 있었는데,
+          그걸 아래로 내리고 나니 남은 둘이 전부 **국내 상장 ETF** 이야기다. 미국에 직접
+          상장된 QQQ 같은 건 안 들어오는 딴 그릇이라, 이름으로 그 경계를 밝힌다. */}
+      <SectionCaps label="국내 상장 ETF" count={etf ? 2 : 0} />
       {etf && <EtfSection e={etf} />}
 
       {/* ⭐ '종류별 구성'은 여기 있었는데 아래로 내렸다. 섹션 질문("무엇에 담았나")에
