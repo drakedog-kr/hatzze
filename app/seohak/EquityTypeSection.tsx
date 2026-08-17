@@ -5,21 +5,24 @@ import { C, MONO } from "../ui";
 /**
  * 무엇을 들고 있나 — 보통주 · 펀드·ETF · 우선주·기타.
  *
- * ## ⚠️⚠️ 12칸 두 줄을 두 막대로 바꿨다
+ * ## ⚠️⚠️ 12칸 두 줄을 다섯 막대로 바꿨다
  *
  * 앞 판은 한국 12년 + 전 세계 12년을 3분할 기둥으로 세웠다. **칸이 24개, 조각이 72개**
  * 였고 셋 다 비슷한 파랑이라 무엇이 변했는지 한눈에 안 읽혔다("직관적이지 않고 복잡해
- * 보인다"). 정작 이 카드가 하려는 말은 하나다 — **11년 전과 지금이 이만큼 다르다.**
+ * 보인다"). 지금은 **최근 다섯 해만** 가로 막대로 눕히고 칸마다 %를 안에 적는다 —
+ * 조각 15개, 범례를 오가지 않아도 된다.
  *
- * 그래서 **두 시점만 나란히** 둔다. 조각이 72개에서 6개로 줄고, 칸마다 %를 안에 적어
- * 범례를 오가지 않아도 된다.
+ * ## ⚠️⚠️⚠️ 창을 바꾸면 결론이 **뒤집힌다.** 둘 다 적을 것
  *
- * ## ⭐ 주인공이 바뀌었다
+ *   11년(2014→2025)  보통주 −9.2%p · 펀드·ETF **+0.5%p** · 우선주·기타 +8.7%p
+ *   5년(2021→2025)   보통주 −3.8%p · 펀드·ETF **+6.5%p** · 우선주·기타 −2.8%p
  *
- * `mover` 는 가장 크게 움직인 칸을 고르는데 그게 보통주(−9.2%p)다. 하지만 읽는 사람에게
- * 뜻이 있는 쪽은 **늘어난 칸**이다 — 우선주·기타가 7.7% → 16.4% 로 두 배가 됐다.
- * 그리고 **펀드·ETF 는 20.2% → 20.6% 로 사실상 그대로다**(11년 동안 +0.4%p). "한국인이
- * ETF 로 옮겨 갔다"는 흔한 이야기가 이 자료에서는 안 보인다는 뜻이라 그걸 문장으로 낸다.
+ * 11년으로 보면 "펀드·ETF 는 제자리"고 5년으로 보면 "펀드·ETF 가 늘고 있다"다. **정반대
+ * 다.** 갈림의 정체는 2021~2022년 우선주·기타의 스파이크(10.4 → 19.2 → **24.9%**)이고,
+ * 그게 지금 되돌아오는 중이라 5년 창의 시작점이 유난히 높다.
+ *
+ * ⛔ 그래서 5년 막대만 그려 놓고 "ETF 로 옮겨 간다"고 쓰면 창을 골라 이야기를 만든
+ * 것이 된다. 각주가 **두 창을 같이** 말한다.
  *
  * ⚠️ 전 세계 기둥은 뺐지만 **한 줄로는 남긴다.** 한국의 '우선주·기타'가 2021년에
  * 10.4%→19.2% 로 뛴 게 조사 분류가 바뀐 탓이 아니라고 말할 수 있는 근거가 그것뿐이다
@@ -102,13 +105,26 @@ function MixBar({ m, when }: { m: EquityMix; when: string }) {
 }
 
 export function EquityTypeSection({ e }: { e: SeohakEquityType }) {
-  const { latest, first, worldLatest } = e;
-  // 늘어난 칸이 이야기의 주인공이다. `mover`(가장 크게 움직인 칸)는 줄어든 쪽을 집는다.
+  const { latest, first } = e;
+  /** 화면에 그리는 다섯 해. 자료가 다섯 해보다 짧으면 있는 만큼만 나온다. */
+  const recent = e.series.slice(-5);
+  const since = recent[0];
+  /** 그린 창(5년)에서 가장 크게 늘어난 칸. 이게 그림이 말하는 것이다. */
   const grew = [...PARTS]
-    .map((p) => ({ ...p, delta: latest[`${p.key}Pct`] - first[`${p.key}Pct`] }))
+    .map((p) => ({ ...p, delta: latest[`${p.key}Pct`] - since[`${p.key}Pct`] }))
     .reduce((a, b) => (b.delta > a.delta ? b : a));
-  const fundsDelta = latest.fundsPct - first.fundsPct;
-  const worldOther = worldLatest.otherPct - e.world[0].otherPct;
+  /** ⚠️ 같은 칸을 **전 구간**으로도 재 둔다. 두 창의 부호가 갈리는 일이 실제로 있다. */
+  const grewLong = latest[`${grew.key}Pct`] - first[`${grew.key}Pct`];
+  /** 창이 갈리는 까닭 — 우선주·기타가 언제 얼마까지 튀었나. */
+  const spike = e.series.reduce((a, b) => (b.otherPct > a.otherPct ? b : a));
+  /**
+   * 전 세계 '우선주·기타'가 머문 띠. **한 시점의 차이(%p)를 적으면 안 된다** — 앞 판은
+   * 전 구간 변화(−0.4%p)를 "그해"라고 적어 기간이 어긋나 있었다. 띠로 말하면 어느 창을
+   * 봐도 참이다.
+   */
+  const worldBand = e.world.map((w) => w.otherPct);
+  const worldLo = Math.min(...worldBand);
+  const worldHi = Math.max(...worldBand);
 
   return (
     <section className="hz-sheet">
@@ -119,12 +135,16 @@ export function EquityTypeSection({ e }: { e: SeohakEquityType }) {
         note={`${latest.year}-06 기준`}
       />
 
-      <div style={{ padding: "16px 22px 4px", display: "flex", flexDirection: "column", gap: 8 }}>
-        <MixBar m={first} when={`${first.year}년`} />
-        <MixBar m={latest} when={`${latest.year}년`} />
+      <div style={{ padding: "16px 22px 4px", display: "flex", flexDirection: "column", gap: 6 }}>
+        {recent.map((m) => <MixBar key={m.year} m={m} when={`${m.year}년`} />)}
       </div>
 
-      <div style={{ padding: "12px 22px 4px" }}>
+      <div style={{ padding: "12px 22px 4px", display: "flex", flexDirection: "column", gap: 8 }}>
+        {/* ⚠️ 이 줄이 없으면 범례의 %p 가 어느 창인지 모른다. 앞 판은 막대가 5년인데
+            %p 는 11년 값이라 **막대에서 줄어드는 칸이 범례에서는 +8.7%p** 였다. */}
+        <span style={{ fontSize: 11, color: C.faint }}>
+          지금 금액 · {since.year}년 대비 변화
+        </span>
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid",
                      gridTemplateColumns: "repeat(auto-fit, minmax(min(190px, 100%), 1fr))", gap: 12 }}>
           {PARTS.map((p) => (
@@ -140,7 +160,7 @@ export function EquityTypeSection({ e }: { e: SeohakEquityType }) {
                   {usdB(latest[p.key])}
                 </b>
                 <span style={{ fontFamily: MONO, fontSize: 12, color: C.sub2, fontWeight: 700 }}>
-                  {pp(latest[`${p.key}Pct`] - first[`${p.key}Pct`])}
+                  {pp(latest[`${p.key}Pct`] - since[`${p.key}Pct`])}
                 </span>
               </span>
               <span style={{ fontSize: 11, color: C.faint }}>{p.desc}</span>
@@ -151,12 +171,14 @@ export function EquityTypeSection({ e }: { e: SeohakEquityType }) {
 
       <div className="hz-sheet-foot" style={{ fontSize: 12, color: C.sub }}>
         <span>
-          {latest.year - first.year}년 동안{" "}
-          <b style={{ color: C.ink }}>{grew.label}가 {pp(grew.delta)}</b> 늘었고{" "}
-          <b style={{ color: C.ink }}>펀드·ETF 는 {pp(fundsDelta)} 로 그대로</b>입니다.
-          같은 기간 전 세계의 우선주·기타는 {pp(worldOther)} 였으니 조사 분류가 바뀐 것은
-          아닙니다. 미 재무부 연례 조사라 해마다 6월 말 기준으로 한 번 바뀌고,
-          &apos;우선주·기타&apos;가 무엇인지는 원천이 더 쪼개지 않습니다.
+          {since.year}년부터 <b style={{ color: C.ink }}>{grew.label}가 {pp(grew.delta)}</b>{" "}
+          늘었습니다. 다만{" "}
+          <b style={{ color: C.ink }}>{first.year}년까지 늘이면 {pp(grewLong)}</b>
+          라, 어디서 끊느냐에 따라 이야기가 갈립니다 — {spike.year}년에 우선주·기타가{" "}
+          {spike.otherPct.toFixed(1)}% 까지 튀었다가 돌아오는 중이어서입니다. 같은 기간 전
+          세계의 우선주·기타는 {worldLo.toFixed(1)}~{worldHi.toFixed(1)}% 에 머물러 있었으니
+          조사 분류가 바뀐 것은 아닙니다. 미 재무부 연례 조사라 해마다 6월 말 기준으로 한 번
+          바뀌고, &apos;우선주·기타&apos;가 무엇인지는 원천이 더 쪼개지 않습니다.
         </span>
       </div>
     </section>
