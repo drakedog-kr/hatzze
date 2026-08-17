@@ -13,10 +13,9 @@ import { getSupabaseServer } from "@/lib/supabase-server";
  * 시절 숫자를 현재값처럼 인용했다. 지금 값은 seohak_equity_type 이 매년 갱신한다. 게다가
  * 여기 담긴 건 **국내 상장** ETF 라 미국에 직접 상장된 ETF(QQQ 같은)는 안 들어온다.
  *
- * ⚠️⚠️ **주식만이 아니다.** 272종목 중 52개가 국채·채권혼합형이다(ACE 미국30년국채액티브,
- * 1Q 미국S&P500미국채혼합50 …). 이 페이지가 '미국 주식' 이야기라 순위표에 국채 ETF 가
- * 끼면 어긋나 보인다 — 지금은 각주에 밝혀 두었을 뿐이다. 걸러 내려면 이름으로 자르는
- * 수밖에 없는데 '혼합50' 은 절반이 주식이라 깔끔히 안 갈린다. 결정이 필요한 자리다.
+ * ⚠️⚠️ **채권형은 뺀다**(`BOND_LIKE`). 272 → 217종목. 이 페이지가 '미국 주식' 이야기라
+ * 순위표에 국채 ETF 가 끼면 어긋나 보인다. 그 여파로 세 카드의 수가 다 바뀐다 —
+ * 괴리율 202 → 161종목, 자금이 오간 종목 84 → 69개, 하루 합계 +2,477 → +2,268억.
  * "서학개미가 어디에 있나"의 답이 아니라 "국내 상장 ETF 로는 어디로 갔나"의 답이다.
  *
  * ## 세 값이 서로 다른 것을 잰다
@@ -127,6 +126,25 @@ async function loadRecent(): Promise<Raw[]> {
 
 const n = (v: number | null | undefined) => Number(v ?? 0);
 
+/**
+ * 채권형·채권혼합형을 걸러 낸다. 이 페이지는 **미국 주식** 이야기다.
+ *
+ * 원천(KRX `etp/etf_bydd_trd`)에 자산군 칸이 없어서 이름으로 자를 수밖에 없다. 272종목
+ * 중 55개가 걸리고, 실측으로 **빠진 것 전부가 실제 채권형**이었다(국채·회사채·하이일드·
+ * 머니마켓·혼합50).
+ *
+ * ⚠️⚠️ **`CP` 를 넣으면 안 된다.** 기업어음을 잡으려고 넣었다가 `KIWOOM 미국CPU반도체
+ * TOP4+` 와 `KODEX 미국CPU반도체TOP10` 이 채권으로 빠졌다. CP 만 담는 상품은 목록에
+ * 없으니 아예 뺀다. 같은 이유로 `금리` 도 안 넣는다.
+ *
+ * ⚠️ '혼합50'(주식 절반 + 국채 절반)은 **뺀다.** 절반이 주식이라 아깝지만, 남기면
+ * 자금 유입 순위에 "S&P500미국채혼합50" 이 S&P500 과 나란히 서서 같은 것으로 읽힌다.
+ *
+ * ⭐ 남는 쪽에 커버드콜·배당·리츠·우선증권이 있는 건 맞다. 전부 주식(과 그 파생)이라
+ * 이 페이지의 이야기 안이다.
+ */
+const BOND_LIKE = /국채|채권|회사채|혼합|하이일드|크레딧|머니마켓|MMF|TIPS/;
+
 export async function getSeohakEtf(): Promise<SeohakEtf | null> {
   const raw = await loadRecent();
   if (!raw.length) return null;
@@ -136,7 +154,9 @@ export async function getSeohakEtf(): Promise<SeohakEtf | null> {
   const today = raw.filter((r) => r.trade_date === asOf);
   if (!today.length) return null;
 
-  const rows: EtfRow[] = today.map((r) => ({
+  const rows: EtfRow[] = today
+    .filter((r) => !BOND_LIKE.test(r.isu_nm))
+    .map((r) => ({
     code: r.isu_cd,
     name: r.isu_nm,
     premium: n(r.premium_pct),
@@ -145,7 +165,7 @@ export async function getSeohakEtf(): Promise<SeohakEtf | null> {
     netFlow: n(r.net_flow),
     hedged: !!r.is_hedged,
     leverage: !!r.is_leverage,
-  }));
+    }));
 
   const liquid = rows
     .filter((r) => r.tradeValue >= MIN_TRADE_VALUE && r.premium !== 0)

@@ -218,13 +218,16 @@ function Flows({ e }: { e: SeohakEtf }) {
         </div>
 
         <div style={{ display: "flex", gap: 7, paddingTop: 9, borderTop: `1px solid ${C.line}` }}>
+          {/* ⚠️ 이름만으로는 안 읽힌다("이거 무슨 뜻이니"). 국내 상장 미국 ETF 는 원화로
+              사지만 안에 든 건 달러 자산이라, 환율까지 받을지 말지가 갈린다. 한 줄로 붙인다. */}
           {[
-            { label: "환헤지형 (H)", v: e.hedgedFlow },
-            { label: "환헤지 없음", v: e.unhedgedFlow },
+            { label: "환헤지형 (H)", note: "환율 영향을 막은 것", v: e.hedgedFlow },
+            { label: "환헤지 없음", note: "환율을 그대로 받는 것", v: e.unhedgedFlow },
           ].map((s) => (
             <div key={s.label} style={{ flex: 1, background: C.soft, borderRadius: R.control,
                                         padding: "7px 9px", display: "flex", flexDirection: "column", gap: 1 }}>
-              <span style={{ fontSize: 10, color: C.sub2, fontWeight: 600 }}>{s.label}</span>
+              <span style={{ fontSize: 10.5, color: C.label, fontWeight: 700 }}>{s.label}</span>
+              <span style={{ fontSize: 10, color: C.faint }}>{s.note}</span>
               {/* 위 목록과 같은 규칙이다. 앞 판은 양수를 파랑으로 칠해 어긋나 있었다. */}
               <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 800,
                              color: s.v >= 0 ? BUY : SELL }}>{signed(s.v)}</span>
@@ -310,7 +313,7 @@ export function EtfSection({ e }: { e: SeohakEtf }) {
       <Card icon="input" title="ETF 자금 유입"
             desc="국내 상장 미국 ETF 로 실제로 들어온 돈입니다. 거래대금이 아닙니다."
             note={`${e.asOf} 기준`}
-            foot="상장좌수 변화 × 순자산가치로 잽니다. 같은 돈이 오간 것은 안 셉니다. 미국 자산을 담은 ETF 전부라 국채·채권혼합형도 들어 있습니다(272종목 중 52).">
+            foot="상장좌수 변화 × 순자산가치로 잽니다. 같은 돈이 오간 것은 안 셉니다. 이 페이지는 미국 주식 이야기라 국채·회사채·채권혼합형은 뺐습니다.">
         <Flows e={e} />
       </Card>
 
