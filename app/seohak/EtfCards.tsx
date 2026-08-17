@@ -74,6 +74,16 @@ const perMillion = (premiumPct: number) => {
   const step = raw >= 1000 ? 100 : 10;
   return `${(Math.round(raw / step) * step).toLocaleString("ko-KR")}원`;
 };
+/**
+ * 100만 원을 내면 실제로 몇 원어치를 받나. 100원 단위로 반올림한다.
+ *
+ * ⭐ "웃돈 730원" 보다 이 꼴이 먼저 온다. **"왜 돈을 더 내는가"를 물어 왔기 때문**이다 —
+ * 낸 돈과 받은 것을 나란히 두면 그 물음이 문장 안에서 풀린다. 웃돈은 그 차액이다.
+ */
+const worthPerMillion = (premiumPct: number) => {
+  const worth = PER_MILLION / (1 + premiumPct / 100);
+  return `${(Math.round(worth / 100) * 100).toLocaleString("ko-KR")}원`;
+};
 /** 이 카드가 '거의 제값'으로 보는 폭. 100만 원당 2,000원. */
 const FAIR_PCT = 0.2;
 
@@ -87,16 +97,15 @@ function Premium({ e }: { e: SeohakEtf }) {
   /* 싸다 → 제값 → 웃돈. 왼쪽이 싼 쪽이라 숫자선처럼 읽힌다.
      색은 `EquityTypeSection` 과 같은 검증된 셋이고, 가장 큰 칸이 파랑인 규칙도 같다. */
   const parts = [
-    { k: "cheap", label: "싸다", n: cheap, fill: C.marker, ink: C.ink },
+    { k: "cheap", label: "더 받는다", n: cheap, fill: C.marker, ink: C.ink },
     { k: "fair", label: "거의 제값", n: fair, fill: C.blue, ink: C.card },
-    { k: "rich", label: "웃돈", n: rich, fill: C.inkSoft, ink: C.card },
+    { k: "rich", label: "덜 받는다", n: rich, fill: C.inkSoft, ink: C.card },
   ];
 
   return (
     <>
       <Verdict>
-        100만 원어치에 {mid >= 0 ? "웃돈" : "할인"} <Em>{perMillion(mid)}</Em>
-        {mid >= 0 ? "이 붙습니다" : "을 받습니다"}
+        100만 원을 내면 <Em>{worthPerMillion(mid)}</Em>어치를 받습니다
       </Verdict>
 
       <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 9 }}>
@@ -114,21 +123,24 @@ function Premium({ e }: { e: SeohakEtf }) {
             </span>
           ))}
         </div>
+        {/* ⚠️ 문턱을 글자로 박아 두면 안 된다. `FAIR_PCT` 를 고치는 날 이 줄이 거짓이
+            된다 — 같은 값에서 뽑는다. */}
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10.5,
                       color: C.faint }}>
-          <span>2,000원 넘게 싸다</span>
-          <span>±2,000원</span>
-          <span>2,000원 넘게 웃돈</span>
+          <span>{perMillion(FAIR_PCT)} 넘게 더 받는다</span>
+          <span>±{perMillion(FAIR_PCT)}</span>
+          <span>{perMillion(FAIR_PCT)} 넘게 덜 받는다</span>
         </div>
 
         <ul style={{ listStyle: "none", margin: 0, padding: "7px 0 0", display: "flex",
                      flexDirection: "column", gap: 5, borderTop: `1px solid ${C.line}` }}>
+          <li style={{ fontSize: 10.5, color: C.faint }}>100만 원을 내면 받는 것</li>
           {e.richest.slice(0, 3).map((r) => (
             <li key={r.code} style={{ display: "flex", gap: 8, fontSize: 11.5, alignItems: "baseline" }}>
               <span style={{ color: C.sub, minWidth: 0, overflow: "hidden",
                              textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{shortName(r.name)}</span>
               <span style={{ marginLeft: "auto", flexShrink: 0, fontFamily: MONO,
-                             fontWeight: 700, color: C.ink }}>{perMillion(r.premium)}</span>
+                             fontWeight: 700, color: C.ink }}>{worthPerMillion(r.premium)}</span>
             </li>
           ))}
         </ul>
@@ -276,9 +288,9 @@ export function EtfSection({ e }: { e: SeohakEtf }) {
                     gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))",
                     alignItems: "start" }}>
         <Card icon="sell" title="제값과의 차이"
-              desc="100만 원어치를 살 때 제값보다 얼마를 더 내는지입니다."
+              desc="ETF 시세와, 그 안에 든 미국 주식 값의 차이입니다. 미국 장이 닫힌 동안 국내에서 시세만 먼저 움직여 생깁니다."
               note={`${e.asOf} 종가`}
-              foot={`값이 오른 날 웃돈이 커집니다 — 미국 장이 닫혀 있는 동안 국내에서 먼저 오르면 안에 든 자산 값은 그대로여서입니다. 업계에서 괴리율이라 부르는 값이고, 거래대금 1억 이상 ${e.liquid.length}종목만 셉니다.`}>
+              foot={`그날 시세가 오른 ETF 일수록 차이가 큽니다(22거래일 중 18일). 업계에서 괴리율이라 부르는 값이고, 거래대금 1억 이상 ${e.liquid.length}종목만 셉니다.`}>
           <Premium e={e} />
         </Card>
 
