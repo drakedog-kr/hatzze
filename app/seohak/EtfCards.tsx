@@ -244,69 +244,87 @@ function Flows({ e }: { e: SeohakEtf }) {
   );
 }
 
-/* ── ⑫ 이번 주 어디로 갔나 ─────────────────────────────────────────────
-   등락과 자금은 서로 다른 축이라 산점도가 자연스러운데, 300px 칸에서 축 둘은 안
-   읽힌다. 이 데이터가 실제로 답하는 건 **부호 조합 네 가지**뿐이라 2×2 격자로 접는다.
-   "올랐는데 돈이 나갔다" 칸이 차 있으면 그게 이 주의 이야기다. */
+/**
+ * ⑫ 주간 등락 — 5영업일 동안 많이 오른 것과 내린 것.
+ *
+ * ## ⛔ 앞 판(2×2 격자)은 **전제가 비어 있었다.** 지우고 다시 세웠다
+ *
+ * 값의 방향 × 돈의 방향으로 네 칸을 만들고 "44% 는 값이 간 쪽과 돈이 간 쪽이
+ * 반대였습니다"를 결론으로 냈다. 그런데 **그 둘 사이에 관계가 없다.**
+ *
+ * 15주를 재 보니 두 축의 파이(phi)가 **−0.18 ~ +0.18** 을 오가고 부호도 7:8 로 갈렸다.
+ * 카이제곱 p 는 대부분 0.05 위다. 즉 "44%"는 관계의 크기가 아니라 **그 주에 몇 종목이
+ * 올랐는지**의 부산물이다 — 실제로 44% 도 66% 도 나왔고, 그 차이는 오름 종목 비율이
+ * 만든 것이지 엇갈림이 커진 게 아니다. 읽는 사람은 그걸 신호로 읽는다.
+ *
+ * ⭐ 그래서 **관계를 주장하지 않는다.** 이 자료가 흔들림 없이 답하는 건 "무엇이 얼마나
+ * 올랐나" 하나뿐이라 그것만 낸다. 옆에 그 주의 자금을 나란히 두되 **인과로 엮지 않는다** —
+ * 둘 다 그 종목의 그 주 기록일 뿐이다.
+ *
+ * ⚠️ 분류(지수형·테마형)로 가르는 안도 재 봤는데 접었다. 이름으로 자를 수밖에 없는데
+ * `KODEX 미국S&P500테크놀로지` 같은 섹터 상품이 지수형으로 딸려 들어온다. 채권 필터는
+ * 실측으로 오분류가 0 이었지만 이쪽은 안 그렇다.
+ *
+ * 칸 꼴은 `Flows` 와 같다 — 오른 쪽 빨강, 내린 쪽 파랑, 좌우 두 칸.
+ */
 function WeekGrid({ e }: { e: SeohakEtf }) {
-  const cells = [
-    { up: true, inflow: true, label: "올랐고 들어왔다" },
-    { up: true, inflow: false, label: "올랐는데 나갔다" },
-    { up: false, inflow: true, label: "내렸는데 들어왔다" },
-    { up: false, inflow: false, label: "내렸고 나갔다" },
-  ].map((c) => {
-    const list = e.week.filter(
-      (w) => w.changePct >= 0 === c.up && w.netFlow >= 0 === c.inflow && w.netFlow !== 0,
-    );
-    // 대표는 자금이 가장 크게 움직인 것으로 고른다. 등락으로 고르면 거래가 거의 없는
-    // 종목이 뽑혀 "이 주의 이야기"가 안 된다.
-    const lead = [...list].sort((a, b) => Math.abs(b.netFlow) - Math.abs(a.netFlow))[0];
-    return { ...c, count: list.length, lead };
-  });
-  const odd = cells.filter((c) => c.up !== c.inflow).reduce((s, c) => s + c.count, 0);
-  const total = cells.reduce((s, c) => s + c.count, 0) || 1;
+  const moved = e.week.filter((w) => Number.isFinite(w.changePct));
+  const byChange = [...moved].sort((a, b) => b.changePct - a.changePct);
+  const up = byChange.slice(0, 5);
+  const down = byChange.slice(-5).reverse();
+  const sides = [
+    { key: "up", head: "오른 것", rows: up, tone: BUY },
+    { key: "down", head: "내린 것", rows: down, tone: SELL },
+  ];
+  const chg = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(1)}%`;
 
   return (
     <>
       <Verdict>
-        {Math.round((odd / total) * 100)}% 는 <Em>값이 간 쪽과 돈이 간 쪽이 반대</Em>였습니다
+        가장 많이 오른 건 <Em>{chg(byChange[0]?.changePct ?? 0)}</Em>, 가장 많이 내린 건{" "}
+        <Em>{chg(byChange[byChange.length - 1]?.changePct ?? 0)}</Em>입니다
       </Verdict>
 
-      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-          {cells.map((c) => {
-            const contrary = c.up !== c.inflow;
-            return (
-              <div key={c.label}
-                   style={{ background: contrary ? C.chip : C.soft, borderRadius: R.control,
-                            padding: "8px 9px", display: "flex", flexDirection: "column", gap: 2,
-                            minWidth: 0 }}>
-                <span style={{ fontSize: 10, color: C.sub2, fontWeight: 600 }}>{c.label}</span>
-                <span style={{ fontFamily: MONO, fontSize: 16, fontWeight: 800,
-                               color: contrary ? C.blue : C.ink }}>{c.count}종목</span>
-                <span style={{ fontSize: 10, color: C.faint, minWidth: 0, overflow: "hidden",
-                               textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {c.lead ? shortName(c.lead.name) : "없음"}
-                </span>
-              </div>
-            );
-          })}
+      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 9 }}>
+        <div style={{ display: "grid", gap: 14,
+                      gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))" }}>
+          {sides.map((s) => (
+            <div key={s.key} style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11,
+                             color: C.sub2, fontWeight: 700 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 2, background: s.tone, flexShrink: 0 }} />
+                {s.head}
+              </span>
+              <ul style={{ listStyle: "none", margin: 0, padding: "6px 0 0", display: "flex",
+                           flexDirection: "column", gap: 5, borderTop: `1px solid ${C.line}` }}>
+                {s.rows.map((r) => (
+                  <li key={r.code} style={{ display: "flex", gap: 8, fontSize: 11.5,
+                                            alignItems: "baseline" }}>
+                    <span style={{ color: C.sub, minWidth: 0, overflow: "hidden",
+                                   textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {shortName(r.name)}
+                    </span>
+                    {/* 그 주 자금을 옆에 두되 **인과로 엮지 않는다.** 둘 다 그 주의 기록이다. */}
+                    <span style={{ marginLeft: "auto", flexShrink: 0, fontSize: 10,
+                                   color: C.faint, fontFamily: MONO }}>
+                      {r.netFlow ? signed(r.netFlow) : "—"}
+                    </span>
+                    <b style={{ flexShrink: 0, minWidth: 46, textAlign: "right", fontFamily: MONO,
+                                fontWeight: 700, color: s.tone }}>{chg(r.changePct)}</b>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
         <span style={{ fontSize: 10.5, color: C.faint }}>
-          {e.weekFrom.slice(5)} ~ {e.asOf.slice(5)} · 파란 칸이 엇갈린 쪽입니다
+          {e.weekFrom.slice(5)} ~ {e.asOf.slice(5)} · 회색은 그동안 오간 돈입니다
         </span>
       </div>
     </>
   );
 }
 
-/**
- * 무엇에 담았나 — ETF 석 장.
- *
- * ⭐ **자금 유입이 전폭이다.** 이 섹션에서 매일 답하는 가장 값진 카드고, 종목 이름이
- * 붙은 목록이라 넓어지는 만큼 그대로 값을 한다(325px 칸에서는 "KODEX 배당커버드콜
- * 액티브…" 처럼 이름이 잘렸다). 괴리율과 등락은 그 아래 격자에 둔다.
- */
 export function EtfSection({ e }: { e: SeohakEtf }) {
   return (
     <>
@@ -330,10 +348,10 @@ export function EtfSection({ e }: { e: SeohakEtf }) {
           <Premium e={e} />
         </Card>
 
-        <Card icon="grid_view" title="등락과 자금 방향"
-              desc="국내 상장 미국 ETF 의 5영업일 등락과 그동안 오간 돈입니다."
+        <Card icon="grid_view" title="주간 등락"
+              desc="국내 상장 미국 ETF 가 5영업일 동안 얼마나 오르내렸는지입니다."
               note="최근 5영업일"
-              foot={`돈이 실제로 오간 종목만 셉니다. 레버리지·인버스는 거래대금의 ${e.leverageShare.toFixed(1)}% 뿐입니다.`}>
+              foot={`거래대금 1억 이상 ${e.week.length}종목을 셉니다. 돈이 안 오간 종목은 금액 자리가 비어 있습니다. 레버리지·인버스는 거래대금의 ${e.leverageShare.toFixed(1)}% 뿐입니다.`}>
           <WeekGrid e={e} />
         </Card>
       </div>
