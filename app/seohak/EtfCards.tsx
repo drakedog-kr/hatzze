@@ -216,13 +216,18 @@ function WeekGrid({ e }: { e: SeohakEtf }) {
  * 각주감이다. 지운 코드가 필요하면 히스토리를 볼 것 — 괴리율을 원으로 옮기는 요령
  * (`worthPerMillion`)과 ±0.2% 문턱을 뜻으로 잡은 근거가 거기 있다.
  *
- * ⭐ 남은 둘은 **목록 카드**라 폭이 곧 값이다. 종목 이름이 길고(“TIGER 미국필라델피아
- * 반도체나스닥”) 좌우 두 칸으로 담기므로, 나란히 두는 것보다 각각 한 행을 쓰는 편이
- * 더 많이 보여 준다.
+ * ⭐ 남은 둘은 **좌우 두 열**이다(495px 씩). 전폭 두 행으로도 뒀다가 되돌렸다 — 한 행을
+ * 통째로 쓰면 이름이 다 보이는 대신 섹션이 세로로 길어지고, 두 카드가 같은 꼴이라
+ * 나란히 두면 견주기가 쉽다.
+ *
+ * ⚠️ 그래서 카드 안쪽 두 칸(들어온 곳/빠진 곳)은 495px 에서 **위아래로 접힌다**
+ * (안쪽 minmax 가 280px). 접히는 편이 낫다 — 억지로 2열을 유지하면 한 칸이 218px 라
+ * "TIGER 미국필라델피아반도체나스닥"(170px)이 값(62px)에 밀려 잘린다.
  */
 export function EtfSection({ e }: { e: SeohakEtf }) {
   return (
-    <>
+    <div style={{ display: "grid", gap: 14, alignItems: "start",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))" }}>
       <Card icon="input" title="ETF 자금 유입"
             desc="국내 상장 미국 ETF 로 실제로 들어온 돈입니다. 거래대금이 아닙니다."
             note={`${e.asOf} 기준`}
@@ -236,6 +241,6 @@ export function EtfSection({ e }: { e: SeohakEtf }) {
             foot={`거래대금 1억 이상 ${e.week.length}종목을 셉니다. 돈이 안 오간 종목은 금액 자리가 비어 있습니다. 레버리지·인버스는 거래대금의 ${e.leverageShare.toFixed(1)}% 뿐입니다.`}>
         <WeekGrid e={e} />
       </Card>
-    </>
+    </div>
   );
 }
