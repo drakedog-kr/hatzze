@@ -165,8 +165,17 @@ function Premium({ e }: { e: SeohakEtf }) {
  * 지금은 **0 을 가운데 두고 양쪽으로 뻗는다.** 방향이 위치로 드러나므로 색은 거들기만
  * 한다. 그리고 색은 국내 관행(`tone.ts`)을 따른다 — **들어오면 빨강, 빠지면 파랑.**
  *
- * ⚠️ 반쪽 축이라 **길이가 절반**이 된다. 같은 금액이 앞 판보다 짧아 보이므로, 축 양 끝에
- * '나갔다 / 들어왔다' 를 적어 짧아진 게 값이 작아진 게 아니라는 걸 알린다.
+ * ## ⚠️⚠️ 0 을 화면 가운데 두면 안 된다. **양쪽 실제 크기로 나눈다**
+ *
+ * 처음엔 축을 반씩(50:50) 갈랐다. 그런데 유출 최대가 113억, 유입 최대가 559억이라
+ * **왼쪽 절반이 5분의 1만 차고 나머지가 텅 비었다**("여백의 미가 아니라 그냥 빈 느낌").
+ *
+ * 그래서 0 의 자리를 `유출최대 ÷ (유출최대+유입최대)` 로 잡는다 — 오늘은 16.8% 다.
+ * 양쪽이 각자 제 공간을 다 쓰고, **1억이 차지하는 픽셀은 양쪽이 같다**(눈금이 안 휜다).
+ *
+ * ⚠️ 그래서 0 의 자리가 날마다 움직인다. 축에 '0' 을 찍어 어디가 기준인지 늘 보이게 한다.
+ * ⚠️ 이름 칸도 34%(341px)에서 220px 로 줄였다. 가장 긴 이름이 170px 이라 남는 폭이
+ * 그대로 빈칸이었다.
  *
  * ⭐ 이 카드의 진짜 발견은 순위표가 아니라 **환헤지형만 방향이 반대**라는 것이라, 그걸
  * 아래에 별도 줄로 세운다.
@@ -174,25 +183,31 @@ function Premium({ e }: { e: SeohakEtf }) {
 function Flows({ e }: { e: SeohakEtf }) {
   // 큰 유입 → 큰 유출 순. 가운데 축을 쓰므로 값 순으로 세워야 위아래가 곧 방향이 된다.
   const rows = [...e.inflow, ...e.outflow].sort((a, b) => b.netFlow - a.netFlow);
-  const max = Math.max(1, ...rows.map((r) => Math.abs(r.netFlow)));
+  const maxIn = Math.max(0, ...rows.map((r) => r.netFlow));
+  const maxOut = Math.max(0, ...rows.map((r) => -r.netFlow));
+  const span = maxIn + maxOut || 1;
+  /** 0 의 자리(%). 양쪽 실제 크기로 나눠 어느 쪽도 빈칸을 남기지 않는다. */
+  const zero = (maxOut / span) * 100;
+  const NAME = 220;
+  const VALUE = 62;
 
   const bar = (r: EtfRow) => {
     const up = r.netFlow >= 0;
-    /* 반쪽 폭이라 50 을 곱한다. 최소 1.2% 는 0 에 가까운 값도 한 획은 보이게 하는 값이다. */
-    const w = Math.max(1.2, (Math.abs(r.netFlow) / max) * 50);
+    /* 최소 1.2% 는 0 에 가까운 값도 한 획은 보이게 하는 값이다. */
+    const w = Math.max(1.2, (Math.abs(r.netFlow) / span) * 100);
     return (
       <li key={r.code} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5 }}>
-        <span style={{ flex: "0 0 34%", minWidth: 0, color: C.sub, overflow: "hidden",
+        <span style={{ flex: `0 0 ${NAME}px`, minWidth: 0, color: C.sub, overflow: "hidden",
                        textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{shortName(r.name)}</span>
         <span style={{ flex: 1, position: "relative", height: 11, minWidth: 0 }}>
-          <span aria-hidden style={{ position: "absolute", left: "50%", top: 0, bottom: 0,
+          <span aria-hidden style={{ position: "absolute", left: `${zero}%`, top: 0, bottom: 0,
                                      width: 1, background: C.line }} />
           <span style={{ position: "absolute", top: 0, bottom: 0, width: `${w}%`,
-                         ...(up ? { left: "50%", borderRadius: "0 3px 3px 0" }
-                                : { right: "50%", borderRadius: "3px 0 0 3px" }),
+                         ...(up ? { left: `${zero}%`, borderRadius: "0 3px 3px 0" }
+                                : { right: `${100 - zero}%`, borderRadius: "3px 0 0 3px" }),
                          background: up ? BUY : SELL }} />
         </span>
-        <span style={{ flex: "0 0 62px", textAlign: "right", fontFamily: MONO, fontWeight: 700,
+        <span style={{ flex: `0 0 ${VALUE}px`, textAlign: "right", fontFamily: MONO, fontWeight: 700,
                        color: up ? BUY : SELL }}>{signed(r.netFlow)}</span>
       </li>
     );
@@ -207,15 +222,16 @@ function Flows({ e }: { e: SeohakEtf }) {
       </Verdict>
 
       <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 9 }}>
-        {/* 축 이름. 막대가 반쪽 폭이라 짧아 보이는 것을 여기서 받아 준다. */}
+        {/* 축. 0 의 자리가 날마다 움직이므로 그 자리에 '0' 을 찍는다. */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 10,
                       color: C.faint }}>
-          <span style={{ flex: "0 0 34%" }} />
-          <span style={{ flex: 1, display: "flex", justifyContent: "space-between" }}>
-            <span>← 빠졌다</span>
-            <span>들어왔다 →</span>
+          <span style={{ flex: `0 0 ${NAME}px` }} />
+          <span style={{ flex: 1, position: "relative", height: 13, minWidth: 0 }}>
+            <span style={{ position: "absolute", left: 0 }}>← 빠졌다</span>
+            <span style={{ position: "absolute", left: `${zero}%`, transform: "translateX(-50%)" }}>0</span>
+            <span style={{ position: "absolute", right: 0 }}>들어왔다 →</span>
           </span>
-          <span style={{ flex: "0 0 62px" }} />
+          <span style={{ flex: `0 0 ${VALUE}px` }} />
         </div>
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex",
                      flexDirection: "column", gap: 5 }}>
