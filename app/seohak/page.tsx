@@ -36,6 +36,14 @@ function usdB(mn: number): string {
   return `$${(mn / 1000).toLocaleString("ko-KR", { maximumFractionDigits: 1 })}B`;
 }
 
+/**
+ * 부호가 붙는 금액. 음수 기호를 **통화 기호 앞**에 둔다 — usdB 를 그냥 쓰면 "$-0.4B"
+ * 가 되는데, 기호와 숫자 사이에 낀 빼기는 한 박자 늦게 읽힌다.
+ */
+function usdSigned(mn: number): string {
+  return `${mn < 0 ? "−" : ""}${usdB(Math.abs(mn))}`;
+}
+
 /** 음수는 U+2212(−)로 낸다. 본문에 손으로 적은 값과 부호 모양이 갈리면 안 된다. */
 function pct(v: number, digits = 1): string {
   const n = Math.abs(v).toLocaleString("ko-KR", { maximumFractionDigits: digits });
@@ -196,46 +204,132 @@ function CohortColumn({ rows, maxInflow }: { rows: Cohort[]; maxInflow: number }
   );
 }
 
-/**
- * 월별 순매수·평가변동 두 칸 막대.
- *
- * div 로 짜다가 SVG 로 바꿨다. **음수가 섞이는 차트라 0 축이 있어야 하는데**, div 를
- * flex-end 로 쌓으면 음수도 위로 자라서 색만 다른 같은 모양이 된다 — 각주에는 "아래로
- * 뻗는다"고 적어 놓고 화면은 안 뻗던 상태였다. SVG 는 0 을 y 좌표로 못박을 수 있다.
- */
-function MonthlyBars({ rows }: { rows: SeohakOverview["breakdown"]["rows"] }) {
-  const W = 1200;
-  const H = 120;
-  const PAD = { t: 8, b: 20 };
-  const span = Math.max(...rows.map((r) => Math.max(Math.abs(r.netPurchase), Math.abs(r.valuation)))) || 1;
-  const zero = PAD.t + (H - PAD.t - PAD.b) / 2;
-  const scale = (H - PAD.t - PAD.b) / 2 / span;
-  const slot = W / rows.length;
-  const bw = Math.min(16, slot * 0.22);
+/** 잔고 증감 표의 칸 배치. 머리줄과 몸줄이 어긋나면 안 되므로 한 곳에서 낸다. */
+const FLOW_COLS = "34px 1fr 58px 62px";
 
-  const bar = (v: number, cx: number, fill: string) => {
-    const h = Math.max(1.5, Math.abs(v) * scale);
-    return <rect x={cx - bw / 2} y={v >= 0 ? zero - h : zero} width={bw} height={h} rx={2} fill={fill} />;
-  };
+/** 머리줄 이름 앞에 붙는 색 견본. 범례 줄을 따로 두면 494px 칸에서 한 줄이 아깝다. */
+function Swatch({ fill }: { fill: string }) {
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        width: 8,
+        height: 8,
+        borderRadius: 2,
+        background: fill,
+        marginRight: 5,
+      }}
+    />
+  );
+}
+
+/**
+ * 색 세 가지. **금액의 부호가 아니라 '무엇인가'로 먼저 가르고, 그다음에 부호로 가른다.**
+ * 새 돈은 이 창(2015~)에서 한 해도 음수인 적이 없지만, 코드는 두 쪽 다 처리한다.
+ *
+ * 평가 마이너스에 회색을 주면 안 된다. 2022년 −$80.8B 가 이 표에서 가장 중요한 줄인데
+ * 가장 옅은 색이 되어 눈에 안 걸린다. 진한 슬레이트(`inkSoft`)로 두면 파랑 계열 둘과
+ * 계통이 갈려서 "이 해만 반대쪽"이 한눈에 잡힌다.
+ *
+ * ⛔ 빨강·초록을 쓰지 않는다. 이 페이지에서 빨강은 사자, 파랑은 팔자 뜻으로 이미
+ * 쓰이고 있어서(ETF 두 장) 손익 뜻으로 겹쳐 쓰면 같은 화면에서 색이 두 말을 한다.
+ */
+const FLOW_FILL = {
+  /** 새로 넣은 돈. 이 카드의 주인공이라 강조색. */
+  cash: C.blue,
+  /** 평가액이 는 몫. 같은 계열의 옅은 채움(트랙과 다른 값이어야 한다). */
+  gain: C.bar,
+  /** 평가액이 준 몫. */
+  loss: C.inkSoft,
+} as const;
+
+/**
+ * 한 해 줄. 0 을 세로선으로 못박고 **양쪽으로 뻗는** 누적 막대다.
+ *
+ * 0 의 위치는 가운데가 아니라 `zeroPct` 다. 왼쪽으로 가장 멀리 가는 해(2022년 $80.8B)와
+ * 오른쪽으로 가장 멀리 가는 해(2025년 $148.8B)의 비로 잡는다 — 가운데에 두면 오른쪽
+ * 절반에 148.8 을 욱여넣느라 눈금이 좌우로 갈려서 길이를 못 견준다.
+ *
+ * 새 돈을 **0 에 붙여** 먼저 그린다. 그래야 파란 칸의 길이가 해마다 바로 견줘진다.
+ */
+function FlowRow({
+  y,
+  unit,
+  zeroPct,
+}: {
+  y: SeohakOverview["breakdown"]["years"][number];
+  /** 금액 1 당 몇 %. 두 방향이 같은 눈금을 쓰게 한 곳에서 받는다. */
+  unit: number;
+  zeroPct: number;
+}) {
+  // 0 에 붙는 순서대로. 같은 방향이면 뒤엣것이 앞엣것 바깥에 쌓인다.
+  const segs = [
+    { v: y.netPurchase, fill: FLOW_FILL.cash },
+    { v: y.valuation, fill: y.valuation >= 0 ? FLOW_FILL.gain : FLOW_FILL.loss },
+  ];
+  let right = 0;
+  let left = 0;
+  const drawn = segs.map((s, i) => {
+    const w = Math.abs(s.v) * unit;
+    const start = s.v >= 0 ? zeroPct + right : zeroPct - left - w;
+    if (s.v >= 0) right += w;
+    else left += w;
+    return { key: i, fill: s.fill, start, w };
+  });
 
   return (
-    <div style={{ padding: "6px 22px 8px" }}>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }} role="img" aria-label="월별 순매수와 평가변동">
-        <line x1={0} y1={zero} x2={W} y2={zero} stroke={C.marker} strokeWidth={1} />
-        {rows.map((r, i) => {
-          const cx = slot * (i + 0.5);
-          return (
-            <g key={r.month}>
-              {bar(r.valuation, cx - bw * 0.65, r.valuation >= 0 ? C.blueTint : C.track)}
-              {bar(r.netPurchase, cx + bw * 0.65, r.netPurchase >= 0 ? C.blue : C.marker)}
-              <text x={cx} y={H - 5} textAnchor="middle" fontSize={11} fill={C.faint}>
-                {r.month.slice(5)}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
-    </div>
+    <li
+      style={{
+        display: "grid",
+        gridTemplateColumns: FLOW_COLS,
+        alignItems: "center",
+        gap: 10,
+        padding: "7px 0",
+        borderTop: `1px solid ${C.sheetRow}`,
+      }}
+    >
+      <span style={{ fontSize: 12.5, fontWeight: 600, color: C.label }}>{y.year}</span>
+      <span style={{ position: "relative", display: "block", height: 12 }}>
+        {/* 0 선. 막대 아래 깔면 폭 0 인 해에서 사라지므로 위에 얹는다. */}
+        <span
+          style={{
+            position: "absolute",
+            left: `${zeroPct}%`,
+            top: -2,
+            bottom: -2,
+            width: 1,
+            background: C.marker,
+          }}
+        />
+        {drawn.map((d) => (
+          <span
+            key={d.key}
+            style={{
+              position: "absolute",
+              left: `${d.start}%`,
+              width: `${d.w}%`,
+              top: 0,
+              height: 12,
+              background: d.fill,
+              borderRadius: 2,
+            }}
+          />
+        ))}
+      </span>
+      <span style={{ fontSize: 12, color: C.sub2, textAlign: "right" }}>
+        {usdSigned(y.netPurchase)}
+      </span>
+      <span
+        style={{
+          fontSize: 12,
+          fontWeight: y.valuation < 0 ? 700 : 400,
+          color: y.valuation < 0 ? C.ink : C.sub2,
+          textAlign: "right",
+        }}
+      >
+        {usdSigned(y.valuation)}
+      </span>
+    </li>
   );
 }
 export default async function SeohakPage() {
@@ -264,6 +358,31 @@ export default async function SeohakPage() {
   const recentMonths = (latestYear - recentFrom) * 12 + Number(ov.asOf.slice(5, 7));
   const recent = ov.cohorts.filter((c) => c.year >= recentFrom).reduce((s, c) => s + c.inflow, 0);
   const recentShare = (recent / ov.principal) * 100;
+
+  // ── 잔고가 변한 이유 ─────────────────────────────────────────────────
+  // 좌우 눈금을 한 곳에서 낸다. 0 을 가운데 두면 왼쪽으로 가장 멀리 가는 해(2022년
+  // $80.8B)와 오른쪽으로 가장 멀리 가는 해(2025년 $148.7B)가 서로 다른 눈금을 쓰게 되어
+  // 길이를 견줄 수 없다. 0 을 35% 지점에 두면 양쪽이 같은 눈금이 된다.
+  const flowSpan = (keep: (v: number) => boolean) =>
+    Math.max(
+      ...ov.breakdown.years.map(
+        (y) =>
+          (keep(y.netPurchase) ? Math.abs(y.netPurchase) : 0) +
+          (keep(y.valuation) ? Math.abs(y.valuation) : 0),
+      ),
+    );
+  const flowRight = flowSpan((v) => v >= 0);
+  const flowLeft = flowSpan((v) => v < 0);
+  const flowZeroPct = (flowLeft / (flowLeft + flowRight)) * 100;
+  const flowUnit = 100 / (flowLeft + flowRight);
+  const flowTotal = ov.breakdown.netPurchase + ov.breakdown.valuation;
+  const flowCashShare = (ov.breakdown.netPurchase / flowTotal) * 100;
+  // 평가액이 가장 크게 빠진 해. 각주가 그 줄을 손으로 가리킨다 — 자료가 자라도 문장이
+  // 거짓이 되지 않게 값에서 뽑는다.
+  const worstYear = ov.breakdown.years.reduce<SeohakOverview["breakdown"]["years"][number] | null>(
+    (a, b) => (b.valuation < 0 && b.valuation < (a?.valuation ?? 0) ? b : a),
+    null,
+  );
 
   return (
     // hz-cards 를 쓰지 않는다. 그건 브리핑의 4열 셀 격자라 자식마다 min-height 274px 가
@@ -395,42 +514,64 @@ export default async function SeohakPage() {
       함께 그리던 시절에는 안 들어갔다). */}
         {equityType && <EquityTypeSection e={equityType} />}
 
-    {/* ── 잔고가 늘어난 이유 ──────────────────────────────────────── */}
+    {/* ── 잔고가 변한 이유 ────────────────────────────────────────────
+        ⭐ 제목이 '순매수와 평가차익'이었다. **'평가차익'은 이익이라는 뜻인데 이 값은
+        마이너스가 된다**(2022년 −$80.8B). 게다가 제목만 '평가차익'이고 설명·라벨·각주는
+        전부 '평가액 변동'이라 한 카드 안에서 말이 두 개였다. */}
           <section className="hz-sheet">
             <SectionHead
               icon="call_split"
-              title="순매수와 평가차익"
-              desc="잔고만 보면 둘을 구분할 수 없습니다. 새로 넣은 돈과 평가액 변동을 갈라 놓습니다."
-              note={`최근 ${ov.breakdown.months}개월`}
+              title="잔고가 변한 이유"
+              desc="잔고 증감을 새로 넣은 돈과 평가액 변동으로 가릅니다."
+              note={`${ov.breakdown.from}년부터`}
             />
-            <div style={{ display: "flex", gap: 0, padding: "16px 22px 10px", flexWrap: "wrap" }}>
-              <div style={{ flex: "1 1 150px" }}>
-                <div style={{ fontSize: 11.5, color: C.sub2, marginBottom: 3 }}>새로 넣은 돈</div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
-                  {usdB(ov.breakdown.netPurchase)}
-                </div>
-              </div>
-              <div style={{ flex: "1 1 150px" }}>
-                <div style={{ fontSize: 11.5, color: C.sub2, marginBottom: 3 }}>평가액 변동</div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: C.blue, letterSpacing: "-.02em" }}>
-                  {usdB(ov.breakdown.valuation)}
-                </div>
-              </div>
-              <div style={{ flex: "1 1 150px" }}>
-                <div style={{ fontSize: 11.5, color: C.sub2, marginBottom: 3 }}>새로 넣은 돈의 몫</div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
-                  {(
-                    (ov.breakdown.netPurchase / (ov.breakdown.netPurchase + ov.breakdown.valuation)) *
-                    100
-                  ).toFixed(0)}
-                  %
-                </div>
-              </div>
+            <div style={{ padding: "10px 22px 0" }}>
+              <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+                {/* 머리줄이 곧 범례다. 색 견본을 이름 옆에 붙이면 따로 범례를 둘 자리를
+                    안 쓴다 — 494px 칸에서 그 한 줄이 아깝다. */}
+                <li
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: FLOW_COLS,
+                    gap: 10,
+                    padding: "0 0 8px",
+                    fontSize: 11,
+                    color: C.faint,
+                  }}
+                >
+                  <span>해</span>
+                  <span />
+                  <span style={{ textAlign: "right" }}>
+                    <Swatch fill={FLOW_FILL.cash} />새 돈
+                  </span>
+                  <span style={{ textAlign: "right" }}>
+                    <Swatch fill={FLOW_FILL.gain} />평가액
+                  </span>
+                </li>
+                {ov.breakdown.years.map((y) => (
+                  <FlowRow key={y.year} y={y} unit={flowUnit} zeroPct={flowZeroPct} />
+                ))}
+              </ul>
             </div>
-            <MonthlyBars rows={ov.breakdown.rows} />
             <div className="hz-sheet-foot" style={{ fontSize: 12, color: C.sub }}>
-              진한 막대가 새로 넣은 돈, 옅은 막대가 평가액 변동입니다. 아래로 뻗은 달은 순매도이거나 평가손실입니다.
-              두 값의 합이 잔고 증감과 정확히 일치하지는 않습니다. 원천이 잔차를 따로 두기 때문입니다.
+              <span>
+                {ov.breakdown.from}년부터 잔고는 {usdSigned(flowTotal)} 늘었고 그중{" "}
+                <b style={{ color: C.ink }}>{flowCashShare.toFixed(0)}%가 새로 넣은 돈</b>
+                입니다. {worstYear ? (
+                  <>
+                    {/* 머리줄 견본은 파랑 둘뿐이라 **진한 슬레이트가 무엇인지 설명이 없다.**
+                        범례 칸을 하나 더 두는 대신 이 문장이 색과 방향을 같이 말한다.
+                        조사는 '를'로 고정한다 — 이 값은 "…달러"로 읽히고 '러'가 모음으로
+                        끝나므로 금액이 얼마든 '을'이 되지 않는다. */}
+                    {worstYear.year}년처럼 평가액이 빠진 해는 진한 색으로 왼쪽으로 뻗습니다. 그
+                    해에는 {usdB(worstYear.netPurchase)}를 새로 넣고도 평가액이{" "}
+                    <b style={{ color: C.ink }}>{usdB(Math.abs(worstYear.valuation))}</b> 빠져
+                    잔고가 줄었습니다.{" "}
+                  </>
+                ) : null}
+                두 값의 합이 잔고 증감과 정확히 일치하지는 않습니다. 원천이 잔차를 따로 두기
+                때문입니다.
+              </span>
             </div>
           </section>
       </div>

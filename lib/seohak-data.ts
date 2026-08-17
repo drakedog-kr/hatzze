@@ -67,12 +67,23 @@ export type SeohakOverview = {
   closureErrorPct: number;
   cohorts: Cohort[];
   series: { month: string; principal: number; value: number }[];
-  /** 최근 12개월 잔고 증가를 순매수 몫과 평가 몫으로 가른 것. */
+  /**
+   * 잔고 증감을 순매수 몫과 평가 몫으로 가른 것. **해 단위다.**
+   *
+   * ⚠️ 앞 판은 최근 12개월을 달별로 냈는데, 그 창이 가장 중요한 사실을 가렸다. 새 돈의
+   * 몫은 해마다 14%~49% 로 흔들리고 2022년에는 **−59%** 였다($30.0B 을 넣었는데 평가액이
+   * $80.8B 빠져 잔고가 줄었다). 12개월만 보면 그게 "31%" 한 숫자로 뭉개진다.
+   *
+   * ⛔ 그 몫(%)은 여기서 안 낸다. 분모(순매수+평가)가 0 근처면 값이 폭발한다 — 2018년은
+   * 851%, 2015년은 105% 가 나온다. 화면은 두 금액과 막대로만 말한다.
+   */
   breakdown: {
-    months: number;
+    /** 화면에 그리는 첫 해. 각주가 창을 밝히는 데 쓴다. */
+    from: number;
+    /** 그린 창 전체의 합. 각주의 요약 문장이 쓴다. */
     netPurchase: number;
     valuation: number;
-    rows: { month: string; netPurchase: number; valuation: number }[];
+    years: { year: number; netPurchase: number; valuation: number }[];
   };
   /** 우리가 든 미국 주식 ÷ 그들이 든 한국 주식. */
   reversal: {
@@ -207,17 +218,25 @@ export async function getSeohakOverview(): Promise<SeohakOverview> {
   // 카드마다 표를 다시 읽지 않는다. 498행이 한 번 오면 나머지는 전부 그 위의 산수라,
   // 왕복을 늘리면 화면만 느려지고 값은 한 글자도 안 달라진다.
 
-  // 잔고가 늘어난 이유 — 최근 12개월.
-  const tail = rows.slice(-12);
+  // 잔고가 변한 이유 — 해별. 코호트와 같은 해(COHORT_FROM)부터 낸다. 두 카드가 같은
+  // 층에 나란히 있어서 창이 갈리면 "2015년"이 두 뜻이 된다.
+  const byYearFlow = new Map<number, { netPurchase: number; valuation: number }>();
+  for (const r of rows) {
+    const y = Number(r.month.slice(0, 4));
+    if (y < COHORT_FROM) continue;
+    const cur = byYearFlow.get(y) ?? { netPurchase: 0, valuation: 0 };
+    cur.netPurchase += r.netPurchase;
+    cur.valuation += r.valuationChange;
+    byYearFlow.set(y, cur);
+  }
+  const years = [...byYearFlow.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([year, v]) => ({ year, ...v }));
   const breakdown = {
-    months: tail.length,
-    netPurchase: tail.reduce((s, r) => s + r.netPurchase, 0),
-    valuation: tail.reduce((s, r) => s + r.valuationChange, 0),
-    rows: tail.map((r) => ({
-      month: r.month.slice(0, 7),
-      netPurchase: r.netPurchase,
-      valuation: r.valuationChange,
-    })),
+    from: years[0]?.year ?? COHORT_FROM,
+    netPurchase: years.reduce((s, y) => s + y.netPurchase, 0),
+    valuation: years.reduce((s, y) => s + y.valuation, 0),
+    years,
   };
 
   // 역전 — 우리가 든 미국 주식 vs 그들이 든 한국 주식.
