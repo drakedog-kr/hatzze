@@ -354,14 +354,25 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                 </button>
               );
             })}
-            <span style={{ fontSize: T.body, fontWeight: 800, color: C.ink, marginLeft: 2 }}>
+            {/* ⚠️⚠️ 남는 폭을 **이 칸이 먹는다.** 예전엔 '오늘' 쪽에 `marginLeft:auto` 로
+                밀어 뒀는데, 그러면 버튼이 격자보다 **6px 밖에** 앉는다(격자 오른쪽 461,
+                버튼 467). 폭을 237·280·311·360 으로 바꿔 가며 재도 늘 6px 이었다 —
+                자유 폭을 셀 때 쓰는 이 글자의 폭(58)과 실제로 그려지는 폭(64)이 갈려서,
+                그 차이가 그대로 뒤로 밀린다. 굵기 800 의 글꼴 지표 문제라 글자를 바꾸면
+                값도 바뀐다. 남는 폭을 auto 마진이 아니라 이 칸이 먹게 두면 안 생긴다. */}
+            <span style={{ fontSize: T.body, fontWeight: 800, color: C.ink, marginLeft: 2,
+                           flex: 1, minWidth: 0 }}>
               {meta.year}년 {meta.month}월
             </span>
             {/* 달을 몇 번 넘기고 나면 돌아올 길이 화살표뿐이다. '오늘'은 자료의 마지막
                 결제일이다(시트 머리의 기준일과 같은 날). */}
             <button type="button" onClick={() => { setMonth(c.asOfMonth); setPicked(c.asOf); }}
                     className="hz-jump"
-                    style={{ marginLeft: "auto", fontSize: T.tiny, fontFamily: "inherit",
+                    /* ⚠️ `margin: 0` 이 있어야 한다. `.hz-jump` 는 `margin: -3px -6px` 로
+                       호버 영역을 글자 밖까지 넓히는데, 그건 **맨 글자 링크**용 값이다.
+                       이건 테두리 있는 알약이라 그 음수 마진이 그대로 밖으로 나가서
+                       버튼이 달력 격자보다 6px 오른쪽에 앉았다(격자 461 · 버튼 467). */
+                    style={{ flexShrink: 0, margin: 0, fontSize: T.tiny, fontFamily: "inherit",
                              padding: "3px 8px", borderRadius: R.pill,
                              border: `1px solid ${C.line}`, color: C.sub, cursor: "pointer" }}>
               오늘
@@ -487,8 +498,12 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
           </div>
         </div>
 
-        {/* ── 오른쪽 두 칸: 고른 날 + 매매를 바꾸는 것들 ── */}
-        <div style={{ flex: "3 1 660px", minWidth: 0, display: "flex",
+        {/* ── 오른쪽 두 칸: 고른 날 + 매매를 바꾸는 것들 ──
+            ⭐ 1:2 였다가 **1:1:1** 로 바꿨다(달력 : 이 달·고른 날 : 되풀이되는 때).
+            바탕값이 곧 비율이라 여기 452 = 210×2 + 칸 사이 12 다. 셋을 정확히 삼등분
+            하려면 바깥 바탕값(220)과 이 값이 1:2 여야 한다 — flex 비율은 **남는 폭만**
+            나누므로, 바탕이 어긋나 있으면 비율을 1:2 로 적어도 결과는 1:2 가 아니다. */}
+        <div style={{ flex: "2 1 452px", minWidth: 0, display: "flex",
                       flexDirection: "column", gap: S.md }}>
           {/* 이 달 · 고른 날 — 두 칸.
               ⚠️ 두 상자가 **줄 꼴이 서로 달랐다.** 어떤 줄은 '라벨·값', 어떤 줄은
@@ -539,7 +554,7 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                 ⭐ 순서가 뜻이다. 이 시트의 주장은 '되풀이'고, 역대 기록은 그 아래 붙는
                 참고다. 위에 뒀을 때는 카드를 열자마자 최대·최소가 먼저 눈에 들어와
                 주장이 뒤로 밀렸다. */}
-            <div style={{ flex: "2 1 min(420px, 100%)", minWidth: 0, display: "flex" }}>
+            <div style={{ flex: "1 1 min(210px, 100%)", minWidth: 0, display: "flex" }}>
                 <Card>
                   <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: S.sm }}>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: S.xs,
