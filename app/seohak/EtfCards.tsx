@@ -1,6 +1,6 @@
 import type { EtfRow, SeohakEtf } from "@/lib/seohak-etf";
 import { C, MONO, R } from "../ui";
-import { CARD_GRID, Card, Em, Verdict } from "./DailyCards";
+import { Card, Em, Verdict } from "./DailyCards";
 
 /**
  * ETF 층 — 미국에 가는 두 번째 길.
@@ -201,16 +201,16 @@ function WeekGrid({ e }: { e: SeohakEtf }) {
   );
 }
 
+/**
+ * 무엇에 담았나 — ETF 석 장.
+ *
+ * ⭐ **자금 유입이 전폭이다.** 이 섹션에서 매일 답하는 가장 값진 카드고, 종목 이름이
+ * 붙은 목록이라 넓어지는 만큼 그대로 값을 한다(325px 칸에서는 "KODEX 배당커버드콜
+ * 액티브…" 처럼 이름이 잘렸다). 괴리율과 등락은 그 아래 격자에 둔다.
+ */
 export function EtfSection({ e }: { e: SeohakEtf }) {
   return (
-    <div style={CARD_GRID}>
-      <Card icon="sell" title="ETF 괴리율"
-            desc="국내 상장 미국 ETF 값과, 그 안에 실제로 든 자산 값의 차이입니다."
-            note={`${e.asOf} 종가`}
-            foot={`거래대금 1억 이상 ${e.liquid.length}종목만 셉니다. 예측이 아니라 산수입니다.`}>
-        <Premium e={e} />
-      </Card>
-
+    <>
       <Card icon="input" title="ETF 자금 유입"
             desc="국내 상장 미국 ETF 로 실제로 들어온 돈입니다. 거래대금이 아닙니다."
             note={`${e.asOf} 기준`}
@@ -218,12 +218,26 @@ export function EtfSection({ e }: { e: SeohakEtf }) {
         <Flows e={e} />
       </Card>
 
-      <Card icon="grid_view" title="등락과 자금 방향"
-            desc="국내 상장 미국 ETF 의 5영업일 등락과 그동안 오간 돈입니다."
-            note="최근 5영업일"
-            foot={`돈이 실제로 오간 종목만 셉니다. 레버리지·인버스는 거래대금의 ${e.leverageShare.toFixed(1)}% 뿐입니다.`}>
-        <WeekGrid e={e} />
-      </Card>
-    </div>
+      {/* ⚠️ `CARD_GRID` 를 쓰면 안 된다. 그건 **auto-fill** 이라 1,004px 에서 300px 트랙을
+          셋 만들고, 카드가 둘뿐이니 325px 씩 쓰고 오른쪽 한 칸이 빈다. 여기는 늘 둘이므로
+          auto-fit 으로 절반씩(494px) 나눠 쓴다. */}
+      <div style={{ display: "grid", gap: 14,
+                    gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))",
+                    alignItems: "start" }}>
+        <Card icon="sell" title="ETF 괴리율"
+              desc="국내 상장 미국 ETF 값과, 그 안에 실제로 든 자산 값의 차이입니다."
+              note={`${e.asOf} 종가`}
+              foot={`거래대금 1억 이상 ${e.liquid.length}종목만 셉니다. 예측이 아니라 산수입니다.`}>
+          <Premium e={e} />
+        </Card>
+
+        <Card icon="grid_view" title="등락과 자금 방향"
+              desc="국내 상장 미국 ETF 의 5영업일 등락과 그동안 오간 돈입니다."
+              note="최근 5영업일"
+              foot={`돈이 실제로 오간 종목만 셉니다. 레버리지·인버스는 거래대금의 ${e.leverageShare.toFixed(1)}% 뿐입니다.`}>
+          <WeekGrid e={e} />
+        </Card>
+      </div>
+    </>
   );
 }

@@ -306,11 +306,13 @@ export default async function SeohakPage() {
       <SectionCaps label="어떻게 사고파나" count={1} />
       <DailySection d={daily} />
 
-      <SectionCaps label="무엇에 담았나" count={etf ? 4 : 1} />
-      {equityType && <EquityTypeSection e={equityType} />}
+      <SectionCaps label="무엇에 담았나" count={etf ? 3 : 0} />
       {etf && <EtfSection e={etf} />}
 
-      <SectionCaps label="얼마가 쌓였나" count={4} />
+      {/* ⭐ '종류별 구성'은 여기 있었는데 아래로 내렸다. 섹션 질문("무엇에 담았나")에
+          직접 답하는 유일한 카드였지만 **1년에 한 번 바뀌는 자료**라(미 재무부 연례 조사)
+          매일 갱신되는 ETF 석 장과 결이 달랐다. 잔고를 다루는 아래 장이 제 자리다. */}
+      <SectionCaps label="얼마가 쌓였나" count={equityType ? 5 : 4} />
 
 {/* ── 넣은 돈과 그 결과 ────────────────────────────────────────
           맨 위에 있었는데 내렸다. 40년 곡선은 배경이지 주인공이 아니다 — 이 페이지가
@@ -364,6 +366,12 @@ export default async function SeohakPage() {
           ⚠️ 국민연금은 여기 안 넣는다 — 줄이 네 칸(168+82+58)이라 한 칸 522px 에서 막대가
           60px 로 죽는다. 전폭으로 둔다. */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 16, alignItems: "start" }}>
+  {/* ── 종류별 구성 ────────────────────────────────────────────────
+      전폭 시트였는데 격자 안 한 칸으로 내렸다. 창이 최근 다섯 해라 가장 좁은 조각이
+      14.1% 이고, 494px 칸에서도 53px 이라 칸 안 % 가 그대로 들어간다(2014년 7.7% 를
+      함께 그리던 시절에는 안 들어갔다). */}
+        {equityType && <EquityTypeSection e={equityType} />}
+
   {/* ── 코호트 ─────────────────────────────────────────────────── */}
         <section className="hz-sheet">
           <SectionHead
