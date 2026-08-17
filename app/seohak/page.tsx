@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 
 import { getSeohakDaily } from "@/lib/seohak-daily";
 import {
-  getPeers,
   getSeohakOverview,
   type Cohort,
   type SeohakOverview,
@@ -203,76 +202,12 @@ function MonthlyBars({ rows }: { rows: SeohakOverview["breakdown"]["rows"] }) {
     </div>
   );
 }
-
-/** 가로 막대 한 줄. 코호트·비교국·국민연금이 같은 어법을 쓴다. */
-function BarRow({
-  label,
-  value,
-  ratio,
-  right,
-  strong,
-}: {
-  label: string;
-  value: string;
-  ratio: number;
-  right?: React.ReactNode;
-  strong?: boolean;
-}) {
-  return (
-    <li
-      style={{
-        display: "grid",
-        // 이름 칸 108px 은 나라 이름엔 넉넉한데 13F 발행사명(영문 대문자)엔 좁아
-        // "NVIDIA CORPOR…" 로 잘렸다. 두 표가 같은 줄 어법을 쓰므로 넓은 쪽에 맞춘다.
-        //
-        // ⚠️ 168px 을 **고정으로 두면 폰에서 넘친다.** 네 칸일 때 168+82+58 에 간격 30 과
-        // 안쪽 여백 36 을 더하면 374px 인데 375 화면의 시트 안쪽은 331px 이다(실측:
-        // scrollWidth 356 > clientWidth 331). minmax 로 두면 넓을 땐 168 을 다 쓰고
-        // 좁아지면 이름부터 줄어든다 — 막대는 24px 아래로 안 내려가게 바닥을 준다.
-        gridTemplateColumns: right
-          ? "minmax(0, 168px) minmax(24px, 1fr) 82px 58px"
-          : "minmax(0, 168px) minmax(24px, 1fr) 82px",
-        alignItems: "center",
-        gap: 10,
-        padding: "9px 22px",
-        borderTop: `1px solid ${C.sheetRow}`,
-      }}
-    >
-      <span
-        style={{
-          fontSize: 12.5,
-          fontWeight: strong ? 700 : 500,
-          color: strong ? C.ink : C.label,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {label}
-      </span>
-      <span style={{ height: 8, background: C.track, borderRadius: R.pill, overflow: "hidden" }}>
-        <span
-          style={{
-            display: "block",
-            width: `${Math.max(2, ratio * 100)}%`,
-            height: "100%",
-            background: strong ? C.blue : C.bar,
-          }}
-        />
-      </span>
-      <span style={{ fontSize: 12, color: strong ? C.ink : C.sub2, textAlign: "right" }}>{value}</span>
-      {right}
-    </li>
-  );
-}
-
 export default async function SeohakPage() {
   const ov = await getSeohakOverview();
   // 아래 셋은 서로 의존이 없다. 순서대로 await 하면 왕복이 앞뒤로 붙으므로 함께 띄운다.
   // ⚠️ 분기·ETF 두 층은 표가 아직 없을 수 있어 null 을 돌려준다(마이그레이션 043·042).
   // 그 경우 그 섹션만 접고 나머지는 그대로 뜬다.
-  const [peers, daily, quarterly, etf, equityType, calendar] = await Promise.all([
-    getPeers(ov.asOf),
+  const [daily, quarterly, etf, equityType, calendar] = await Promise.all([
     getSeohakDaily(),
     getSeohakQuarterly(),
     getSeohakEtf(),
@@ -315,7 +250,7 @@ export default async function SeohakPage() {
       {/* ⭐ '종류별 구성'은 여기 있었는데 아래로 내렸다. 섹션 질문("무엇에 담았나")에
           직접 답하는 유일한 카드였지만 **1년에 한 번 바뀌는 자료**라(미 재무부 연례 조사)
           매일 갱신되는 ETF 석 장과 결이 달랐다. 잔고를 다루는 아래 장이 제 자리다. */}
-      <SectionCaps label="얼마가 쌓였나" count={equityType ? 5 : 4} />
+      <SectionCaps label="얼마가 쌓였나" count={equityType ? 4 : 3} />
 
 {/* ── 넣은 돈과 그 결과 ────────────────────────────────────────
           맨 위에 있었는데 내렸다. 40년 곡선은 배경이지 주인공이 아니다 — 이 페이지가
@@ -363,9 +298,9 @@ export default async function SeohakPage() {
       </section>
 
             {/* 2열 격자. 미디어쿼리 대신 auto-fit + minmax 로 접는다 — globals.css 를 건드리지
-          않고도 폭에 따라 스스로 1열이 된다. 하한 380px 은 실측이다: 이 안에서 가장 넓은
-          줄(비교국)이 이름 168 + 값 82 + 간격 20 + 안쪽 여백 36 = 306px 를 고정으로 쓰고,
-          막대가 살아 있으려면 70px 은 더 있어야 한다.
+          않고도 폭에 따라 스스로 1열이 된다. 하한 380px 은 실측이다: 코호트 줄이 이름 168 +
+          값 82 + 간격 20 + 안쪽 여백 36 = 306px 를 고정으로 쓰고, 막대가 살아 있으려면
+          70px 은 더 있어야 한다.
           ⚠️ 국민연금은 여기 안 넣는다 — 줄이 네 칸(168+82+58)이라 한 칸 522px 에서 막대가
           60px 로 죽는다. 전폭으로 둔다. */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 16, alignItems: "start" }}>
@@ -450,30 +385,6 @@ export default async function SeohakPage() {
             <div className="hz-sheet-foot" style={{ fontSize: 12, color: C.sub }}>
               진한 막대가 새로 넣은 돈, 옅은 막대가 평가액 변동입니다. 아래로 뻗은 달은 순매도이거나 평가손실입니다.
               두 값의 합이 잔고 증감과 정확히 일치하지는 않습니다. 원천이 잔차를 따로 두기 때문입니다.
-            </div>
-          </section>
-    {/* ── 비교국 ─────────────────────────────────────────────────── */}
-          <section className="hz-sheet">
-            <SectionHead
-              icon="public"
-              title="나라별 보유액"
-              desc="같은 달, 나라별로 보유한 미국 주식입니다."
-              note={`${ov.asOf} 기준`}
-            />
-            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-              {peers.map((p) => (
-                <BarRow
-                  key={p.code}
-                  label={p.name}
-                  value={usdB(p.holdings)}
-                  ratio={p.holdings / peers[0].holdings}
-                  strong={p.isHome}
-                />
-              ))}
-            </ul>
-            <div className="hz-sheet-foot" style={{ fontSize: 12, color: C.sub }}>
-              TIC 은 보관기관이 어디에 있는지로 집계합니다. 싱가포르·영국처럼 금융 중심지가 크게 잡히는 건 그
-              나라 사람이 많이 사서가 아니라 제3국 돈이 거기를 거치기 때문이라, 인구로 나눠 견주면 안 됩니다.
             </div>
           </section>
         </div>
