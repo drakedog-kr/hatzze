@@ -106,7 +106,10 @@ export const CALENDAR_WINDOWS: CalendarWindow[] = [
   { key: "chuseok", label: "추석 기간", phrase: "평소보다 17% 덜 팝니다",
     hit: 12, of: 16, marks: "1100110111111110-",
     pick: { at: "after", on: "chuseok" } },
-  { key: "blackfriday", label: "블랙프라이데이 직후", phrase: "평소보다 17% 덜 삽니다",
+  // ⚠️ '블랙프라이데이 직후'였다. 9자라 311px 칸에서 이 줄만 두 줄로 접혔다(높이 47 vs
+  // 나머지 24). 창은 그대로 **행사 뒤 세 결제일**이고 이름에서 '직후'만 뺀 것이다 —
+  // 날짜는 카드 안 띠가 적어 준다(그래서 "블랙프라이데이인데 왜 12월?"이 안 남는다).
+  { key: "blackfriday", label: "블랙프라이데이", phrase: "평소보다 17% 덜 삽니다",
     hit: 14, of: 16, marks: "1101111111011111-",
     pick: { at: "after", on: "blackFriday" } },
   { key: "yearend", label: "그해 마지막 사흘", phrase: "평소보다 29% 더 팝니다",
