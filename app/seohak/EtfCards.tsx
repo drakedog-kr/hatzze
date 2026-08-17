@@ -1,5 +1,6 @@
 import type { EtfRow, SeohakEtf } from "@/lib/seohak-etf";
 import { C, MONO, R } from "../ui";
+import { BUY, SELL } from "./tone";
 import { Card, Em, Verdict } from "./DailyCards";
 
 /**
@@ -149,28 +150,53 @@ function Premium({ e }: { e: SeohakEtf }) {
   );
 }
 
-/* ── ⑪ 어느 ETF 로 돈이 들어갔나 ───────────────────────────────────────
-   거래대금이 아니라 **상장좌수 변화 × NAV** 다. 같은 돈이 오간 것은 안 세고 설정·환매만
-   센다 — 그래서 272종목 중 84종목만 값이 0 이 아니다.
-
-   ⭐ 이 카드의 진짜 발견은 순위표가 아니라 **환헤지형만 방향이 반대**라는 것이라,
-   그걸 아래에 별도 줄로 세운다. */
+/**
+ * ⑪ ETF 자금 유입 — 가운데를 0 으로 두고 양쪽으로 뻗는 막대.
+ *
+ * 거래대금이 아니라 **상장좌수 변화 × NAV** 다. 같은 돈이 오간 것은 안 세고 설정·환매만
+ * 센다 — 그래서 272종목 중 84종목만 값이 0 이 아니다.
+ *
+ * ## ⚠️⚠️ 앞 판은 빠져나간 돈도 **같은 방향으로** 뻗었다
+ *
+ * 막대가 전부 왼쪽에서 시작해 오른쪽으로 자랐고, 들어온 것과 빠진 것을 파랑(진함)과
+ * 회색(연함)으로만 갈랐다. 그러니 **−113억이 +113억과 같은 그림**이었다 — 길이가 같고
+ * 색만 옅다. 부호를 색의 진하기로 말하면 눈이 먼저 길이를 읽고 방향은 나중에 읽는다.
+ *
+ * 지금은 **0 을 가운데 두고 양쪽으로 뻗는다.** 방향이 위치로 드러나므로 색은 거들기만
+ * 한다. 그리고 색은 국내 관행(`tone.ts`)을 따른다 — **들어오면 빨강, 빠지면 파랑.**
+ *
+ * ⚠️ 반쪽 축이라 **길이가 절반**이 된다. 같은 금액이 앞 판보다 짧아 보이므로, 축 양 끝에
+ * '나갔다 / 들어왔다' 를 적어 짧아진 게 값이 작아진 게 아니라는 걸 알린다.
+ *
+ * ⭐ 이 카드의 진짜 발견은 순위표가 아니라 **환헤지형만 방향이 반대**라는 것이라, 그걸
+ * 아래에 별도 줄로 세운다.
+ */
 function Flows({ e }: { e: SeohakEtf }) {
-  const rows = [...e.inflow, ...e.outflow];
+  // 큰 유입 → 큰 유출 순. 가운데 축을 쓰므로 값 순으로 세워야 위아래가 곧 방향이 된다.
+  const rows = [...e.inflow, ...e.outflow].sort((a, b) => b.netFlow - a.netFlow);
   const max = Math.max(1, ...rows.map((r) => Math.abs(r.netFlow)));
-  const bar = (r: EtfRow) => (
-    <li key={r.code} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5 }}>
-      <span style={{ flex: "0 0 47%", minWidth: 0, color: C.sub, overflow: "hidden",
-                     textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{shortName(r.name)}</span>
-      <span style={{ flex: 1, height: 7, background: C.soft, borderRadius: 4, overflow: "hidden" }}>
-        <span style={{ display: "block", height: "100%", borderRadius: 4,
-                       width: `${(Math.abs(r.netFlow) / max) * 100}%`,
-                       background: r.netFlow >= 0 ? C.blue : C.marker }} />
-      </span>
-      <span style={{ flex: "0 0 58px", textAlign: "right", fontFamily: MONO, fontWeight: 700,
-                     color: r.netFlow >= 0 ? C.ink : C.sub2 }}>{signed(r.netFlow)}</span>
-    </li>
-  );
+
+  const bar = (r: EtfRow) => {
+    const up = r.netFlow >= 0;
+    /* 반쪽 폭이라 50 을 곱한다. 최소 1.2% 는 0 에 가까운 값도 한 획은 보이게 하는 값이다. */
+    const w = Math.max(1.2, (Math.abs(r.netFlow) / max) * 50);
+    return (
+      <li key={r.code} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5 }}>
+        <span style={{ flex: "0 0 34%", minWidth: 0, color: C.sub, overflow: "hidden",
+                       textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{shortName(r.name)}</span>
+        <span style={{ flex: 1, position: "relative", height: 11, minWidth: 0 }}>
+          <span aria-hidden style={{ position: "absolute", left: "50%", top: 0, bottom: 0,
+                                     width: 1, background: C.line }} />
+          <span style={{ position: "absolute", top: 0, bottom: 0, width: `${w}%`,
+                         ...(up ? { left: "50%", borderRadius: "0 3px 3px 0" }
+                                : { right: "50%", borderRadius: "3px 0 0 3px" }),
+                         background: up ? BUY : SELL }} />
+        </span>
+        <span style={{ flex: "0 0 62px", textAlign: "right", fontFamily: MONO, fontWeight: 700,
+                       color: up ? BUY : SELL }}>{signed(r.netFlow)}</span>
+      </li>
+    );
+  };
 
   const split = e.hedgedFlow < 0 && e.unhedgedFlow > 0;
 
@@ -181,6 +207,16 @@ function Flows({ e }: { e: SeohakEtf }) {
       </Verdict>
 
       <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 9 }}>
+        {/* 축 이름. 막대가 반쪽 폭이라 짧아 보이는 것을 여기서 받아 준다. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 10,
+                      color: C.faint }}>
+          <span style={{ flex: "0 0 34%" }} />
+          <span style={{ flex: 1, display: "flex", justifyContent: "space-between" }}>
+            <span>← 빠졌다</span>
+            <span>들어왔다 →</span>
+          </span>
+          <span style={{ flex: "0 0 62px" }} />
+        </div>
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex",
                      flexDirection: "column", gap: 5 }}>
           {rows.map(bar)}
@@ -193,8 +229,9 @@ function Flows({ e }: { e: SeohakEtf }) {
             <div key={s.label} style={{ flex: 1, background: C.soft, borderRadius: R.control,
                                         padding: "7px 9px", display: "flex", flexDirection: "column", gap: 1 }}>
               <span style={{ fontSize: 10, color: C.sub2, fontWeight: 600 }}>{s.label}</span>
+              {/* 여기도 같은 규칙이다. 앞 판은 양수를 파랑으로 칠해 막대와 어긋났다. */}
               <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 800,
-                             color: s.v >= 0 ? C.blue : C.ink }}>{signed(s.v)}</span>
+                             color: s.v >= 0 ? BUY : SELL }}>{signed(s.v)}</span>
             </div>
           ))}
         </div>
