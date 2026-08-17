@@ -306,7 +306,7 @@ export default async function SeohakPage() {
       <SectionCaps label="어떻게 사고파나" count={1} />
       <DailySection d={daily} />
 
-      <SectionCaps label="무엇에 담았나" count={etf ? 3 : 0} />
+      <SectionCaps label="무엇에 담았나" count={etf ? 2 : 0} />
       {etf && <EtfSection e={etf} />}
 
       {/* ⭐ '종류별 구성'은 여기 있었는데 아래로 내렸다. 섹션 질문("무엇에 담았나")에

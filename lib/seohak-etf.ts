@@ -23,7 +23,9 @@ import { getSupabaseServer } from "@/lib/supabase-server";
  * - `trade_value` (거래대금) — 같은 돈이 오간 것까지 센다. 회전이지 유입이 아니다.
  * - `net_flow` (순유입) — 상장좌수 변화 × NAV. 설정·환매만 잡으므로 **실제로 남은 돈**이다.
  *   실측 2026-08-13 에 272종목 중 좌수가 변한 건 84종목뿐이었다.
- * - `premium_pct` (괴리율) — 종가와 NAV 의 차. 예측이 아니라 산수다.
+ * - `premium_pct` (괴리율) — 종가와 NAV 의 차. ⛔ **화면에서 뺐다**(2026-08 '제값과의
+ *   차이' 카드 삭제). `EtfRow.premium` 은 남겨 두었지만 쓰는 자리가 없다 — 되살릴 때
+ *   히스토리에 괴리율을 원으로 옮기는 요령과 ±0.2% 문턱의 근거가 있다.
  */
 
 /** 괴리율 순위에 넣을 최소 거래대금(원). 이보다 작으면 한두 호가에 값이 튄다. */
@@ -56,12 +58,6 @@ export type SeohakEtf = {
   asOf: string;
   /** 그날 미국 ETF 전체. */
   rows: EtfRow[];
-  /** 괴리율을 재기에 충분히 거래된 것만. */
-  liquid: EtfRow[];
-  medianPremium: number;
-  /** 괴리율 위·아래 끝. */
-  richest: EtfRow[];
-  cheapest: EtfRow[];
   /** 순유입 위·아래 끝. */
   inflow: EtfRow[];
   outflow: EtfRow[];
@@ -167,11 +163,6 @@ export async function getSeohakEtf(): Promise<SeohakEtf | null> {
     leverage: !!r.is_leverage,
     }));
 
-  const liquid = rows
-    .filter((r) => r.tradeValue >= MIN_TRADE_VALUE && r.premium !== 0)
-    .sort((a, b) => b.premium - a.premium);
-  const mid = liquid.length ? liquid[Math.floor(liquid.length / 2)].premium : 0;
-
   const byFlow = [...rows].sort((a, b) => b.netFlow - a.netFlow);
   const tradeValueTotal = rows.reduce((s, r) => s + r.tradeValue, 0);
 
@@ -202,10 +193,6 @@ export async function getSeohakEtf(): Promise<SeohakEtf | null> {
   return {
     asOf,
     rows,
-    liquid,
-    medianPremium: mid,
-    richest: liquid.slice(0, 4),
-    cheapest: liquid.slice(-3).reverse(),
     // 카드가 좌우 두 칸으로 갈렸다. 한 칸에 다섯씩이면 두 칸 높이가 맞고, 값이 0 이
     // 아닌 종목이 84개라 재료는 넉넉하다.
     inflow: byFlow.filter((r) => r.netFlow > 0).slice(0, 5),
