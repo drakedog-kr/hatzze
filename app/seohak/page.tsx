@@ -123,10 +123,16 @@ function PrincipalVsValue({ series }: { series: SeohakOverview["series"] }) {
   );
 }
 
+/** 코호트 표의 칸 배치. 머리줄과 몸줄이 어긋나면 안 되므로 한 곳에서 낸다. */
+const COHORT_COLS = "44px 1fr 76px 62px";
+
 /**
  * 코호트 줄. 막대는 '그 해 들어온 돈의 크기', 오른쪽 숫자는 '지금 수익률'이다.
  * 둘을 한 줄에 두는 이유는, 돈이 가장 많이 들어온 해가 수익률이 가장 낮은 해라는
  * 사실이 그 두 값을 나란히 놓아야만 보이기 때문이다.
+ *
+ * ⚠️ 좌우 여백(22px)은 이 줄이 아니라 **바깥 열 컨테이너**가 준다. 표를 2열로 세우면서
+ * 줄마다 여백을 두면 오른쪽 열의 왼쪽에도 22px 이 붙어 가운데만 벌어진다.
  */
 function CohortRow({ c, maxInflow }: { c: Cohort; maxInflow: number }) {
   const w = Math.max(2, (c.inflow / maxInflow) * 100);
@@ -134,10 +140,10 @@ function CohortRow({ c, maxInflow }: { c: Cohort; maxInflow: number }) {
     <li
       style={{
         display: "grid",
-        gridTemplateColumns: "44px 1fr 76px 62px",
+        gridTemplateColumns: COHORT_COLS,
         alignItems: "center",
         gap: 10,
-        padding: "9px 22px",
+        padding: "9px 0",
         borderTop: `1px solid ${C.sheetRow}`,
       }}
     >
@@ -157,6 +163,36 @@ function CohortRow({ c, maxInflow }: { c: Cohort; maxInflow: number }) {
         {pct(c.returnPct, 0)}
       </span>
     </li>
+  );
+}
+
+/**
+ * 코호트 표 한 열. **머리줄을 열마다 다시 낸다** — 12해를 한 줄로 세우면 표만 456px 이라
+ * 카드가 900px 가까이 자란다. 반씩 나눠 나란히 두면 그 절반이고, 막대는 두 열이 같은
+ * `maxInflow` 로 정규화되므로 열이 갈려도 길이를 견줄 수 있다.
+ */
+function CohortColumn({ rows, maxInflow }: { rows: Cohort[]; maxInflow: number }) {
+  return (
+    <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+      <li
+        style={{
+          display: "grid",
+          gridTemplateColumns: COHORT_COLS,
+          gap: 10,
+          padding: "0 0 8px",
+          fontSize: 11,
+          color: C.faint,
+        }}
+      >
+        <span>들어온 해</span>
+        <span />
+        <span style={{ textAlign: "right" }}>넣은 돈</span>
+        <span style={{ textAlign: "right" }}>지금</span>
+      </li>
+      {rows.map((c) => (
+        <CohortRow key={c.year} c={c} maxInflow={maxInflow} />
+      ))}
+    </ul>
   );
 }
 
@@ -215,6 +251,12 @@ export default async function SeohakPage() {
     getSeohakCalendar(),
   ]);
   const maxInflow = Math.max(...ov.cohorts.map((c) => c.inflow));
+  // 코호트 표를 두 열로 나눈다. 홀수면 앞 열이 한 줄 길다 — 뒤 열이 길면 오른쪽만
+  // 아래로 삐져나와 카드 바닥이 어긋난다.
+  const cohortHalf = Math.ceil(ov.cohorts.length / 2);
+  const cohortCols = [ov.cohorts.slice(0, cohortHalf), ov.cohorts.slice(cohortHalf)].filter(
+    (col) => col.length,
+  );
   const recent = ov.cohorts.filter((c) => c.year >= 2025).reduce((s, c) => s + c.inflow, 0);
   const recentShare = (recent / ov.principal) * 100;
 
@@ -250,16 +292,25 @@ export default async function SeohakPage() {
       {/* ⭐ '종류별 구성'은 여기 있었는데 아래로 내렸다. 섹션 질문("무엇에 담았나")에
           직접 답하는 유일한 카드였지만 **1년에 한 번 바뀌는 자료**라(미 재무부 연례 조사)
           매일 갱신되는 ETF 석 장과 결이 달랐다. 잔고를 다루는 아래 장이 제 자리다. */}
-      <SectionCaps label="얼마가 쌓였나" count={equityType ? 4 : 3} />
+      <SectionCaps label="얼마가 쌓였나" count={equityType ? 3 : 2} />
 
 {/* ── 넣은 돈과 그 결과 ────────────────────────────────────────
           맨 위에 있었는데 내렸다. 40년 곡선은 배경이지 주인공이 아니다 — 이 페이지가
-          매일 답해야 하는 건 '오늘'이다. */}
+          매일 답해야 하는 건 '오늘'이다.
+
+          ## ⭐ '원금과 평가액'과 '시작 연도별 성과'를 한 장으로 합쳤다
+
+          둘은 같은 산수였다. 앞 카드의 `+156.9%` 는 뒤 카드 열두 해를 합친 값이라,
+          **앞 장이 뒤 장의 합계**였는데 이름이 달라 딴 이야기처럼 보였다. 지금은
+          위가 전체, 아래가 그 전체를 들어온 해로 쪼갠 것이다.
+
+          ⚠️ 표를 **2열**로 세운다. 12해를 한 줄로 늘이면 표만 456px 이라 카드가
+          900px 가까이 자란다(합치기 전 두 장 합이 417+607=1,024px 였다). */}
       <section className="hz-sheet">
         <SectionHead
           icon="savings"
-          title="원금과 평가액"
-          desc="한국인이 미국 주식에 실제로 넣은 원금과, 그 돈이 지금 얼마가 됐는지입니다."
+          title="시작 연도별 성과"
+          desc="한국인이 미국 주식에 넣은 원금이 지금 얼마가 됐는지, 들어온 해별로도 나눠 봅니다."
           note={`${ov.asOf} 기준`}
         />
         <div
@@ -292,15 +343,40 @@ export default async function SeohakPage() {
           </div>
         </div>
         <PrincipalVsValue series={ov.series} />
+        {/* 좌우 22px 은 여기서 준다(줄이 아니라). 열 사이 간격은 28px 로 두 열의 마지막
+            칸('지금')과 다음 열의 첫 칸('들어온 해')이 붙어 보이지 않게 한다. */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(330px, 100%), 1fr))",
+            columnGap: 28,
+            padding: "8px 22px 0",
+            alignItems: "start",
+          }}
+        >
+          {cohortCols.map((rows) => (
+            <CohortColumn key={rows[0].year} rows={rows} maxInflow={maxInflow} />
+          ))}
+        </div>
+        {/* ⚠️ `.hz-sheet-foot` 은 **display:flex** 다. 안에 <b> 를 직접 두면 맨 텍스트와
+            <b> 가 각각 flex 항목이 되어, 칸이 좁아지는 순간 "원/금/의" 처럼 낱글자로
+            눌린다(2열 격자로 바꾸자마자 실제로 깨졌다). 통째로 <span> 하나에 담는다.
+            JSX 는 태그 사이 줄바꿈의 공백을 지우므로 조사 공백은 {" "} 로 명시한다. */}
         <div className="hz-sheet-foot" style={{ fontSize: 12, color: C.sub }}>
-          1985년부터의 누적 순매수와 그달 말 잔고입니다.
+          <span>
+            원금의{" "}
+            <b style={{ color: C.ink }}>{recentShare.toFixed(0)}%가</b>{" "}
+            2025년 이후에 들어왔습니다. 넣은 돈은 1985년부터의 누적 순매수, 평가액은 그달 말 잔고입니다.
+            해별 &apos;지금&apos;은 그 해에 들어온 돈이 이후 시세를 그대로 따라갔다고 볼 때의
+            값입니다.
+          </span>
         </div>
       </section>
 
             {/* 2열 격자. 미디어쿼리 대신 auto-fit + minmax 로 접는다 — globals.css 를 건드리지
-          않고도 폭에 따라 스스로 1열이 된다. 하한 380px 은 실측이다: 코호트 줄이 이름 168 +
-          값 82 + 간격 20 + 안쪽 여백 36 = 306px 를 고정으로 쓰고, 막대가 살아 있으려면
-          70px 은 더 있어야 한다.
+          않고도 폭에 따라 스스로 1열이 된다. 하한 380px 은 종류별 구성의 막대에서 온다:
+          가장 좁은 조각이 14.1% 라 안쪽 폭 344px 에서 48px 이고, 거기 "14.1%"(28px)가
+          겨우 들어간다.
           ⚠️ 국민연금은 여기 안 넣는다 — 줄이 네 칸(168+82+58)이라 한 칸 522px 에서 막대가
           60px 로 죽는다. 전폭으로 둔다. */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 16, alignItems: "start" }}>
@@ -310,45 +386,6 @@ export default async function SeohakPage() {
       함께 그리던 시절에는 안 들어갔다). */}
         {equityType && <EquityTypeSection e={equityType} />}
 
-  {/* ── 코호트 ─────────────────────────────────────────────────── */}
-        <section className="hz-sheet">
-          <SectionHead
-            icon="calendar_month"
-            title="시작 연도별 성과"
-            desc="들어온 해별로 나눠, 그 해에 넣은 돈이 지금 얼마가 됐는지 봅니다."
-            note="연도별"
-          />
-          <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-            <li
-              style={{
-                display: "grid",
-                gridTemplateColumns: "44px 1fr 76px 62px",
-                gap: 10,
-                padding: "4px 22px 8px",
-                fontSize: 11,
-                color: C.faint,
-              }}
-            >
-              <span>들어온 해</span>
-              <span />
-              <span style={{ textAlign: "right" }}>넣은 돈</span>
-              <span style={{ textAlign: "right" }}>지금</span>
-            </li>
-            {ov.cohorts.map((c) => (
-              <CohortRow key={c.year} c={c} maxInflow={maxInflow} />
-            ))}
-          </ul>
-          {/* ⚠️ `.hz-sheet-foot` 은 **display:flex** 다. 안에 <b> 를 직접 두면 맨 텍스트와
-              <b> 가 각각 flex 항목이 되어, 칸이 좁아지는 순간 "원/금/의" 처럼 낱글자로
-              눌린다(2열 격자로 바꾸자마자 실제로 깨졌다). 통째로 <span> 하나에 담는다.
-              JSX 는 태그 사이 줄바꿈의 공백을 지우므로 조사 공백은 {" "} 로 명시한다. */}
-          <div className="hz-sheet-foot" style={{ fontSize: 12, color: C.sub }}>
-            <span>
-              원금의{" "}<b style={{ color: C.ink }}>{recentShare.toFixed(0)}%가</b> 2025년 이후에 들어왔습니다.
-            </span>
-          </div>
-        </section>
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
     {/* ── 잔고가 늘어난 이유 ──────────────────────────────────────── */}
           <section className="hz-sheet">
             <SectionHead
@@ -387,7 +424,6 @@ export default async function SeohakPage() {
               두 값의 합이 잔고 증감과 정확히 일치하지는 않습니다. 원천이 잔차를 따로 두기 때문입니다.
             </div>
           </section>
-        </div>
       </div>
 
       {/* ── 분기 층 ───────────────────────────────────────────────────
