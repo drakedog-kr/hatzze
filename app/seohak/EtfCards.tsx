@@ -34,7 +34,7 @@ const pct = (v: number, d = 2) =>
  */
 const shortName = (name: string) => name.replace("미국", "").replace(/\s{2,}/g, " ").trim();
 
-/* ── ⑩ 얼마나 비싸게 사고 있나 ─────────────────────────────────────────
+/* ── ⑩ ETF 괴리율 ─────────────────────────────────────────
    괴리율은 **분포**다. 대부분 0 근처에 뭉치고 몇 개만 멀리 나간다. 상위 몇 종목만
    표로 뽑으면 "다들 이만큼 비싸다"로 읽히므로, 203종목을 전부 점으로 찍은 수직선
    위에 그 몇 개를 얹는다. 뭉친 곳이 곧 "보통은 이렇다"가 된다. */
@@ -204,21 +204,21 @@ function WeekGrid({ e }: { e: SeohakEtf }) {
 export function EtfSection({ e }: { e: SeohakEtf }) {
   return (
     <div style={CARD_GRID}>
-      <Card icon="sell" title="얼마나 비싸게 사고 있나"
+      <Card icon="sell" title="ETF 괴리율"
             desc="국내 상장 미국 ETF 값과, 그 안에 실제로 든 자산 값의 차이입니다."
             note={`${e.asOf} 종가`}
             foot={`거래대금 1억 이상 ${e.liquid.length}종목만 셉니다. 예측이 아니라 산수입니다.`}>
         <Premium e={e} />
       </Card>
 
-      <Card icon="input" title="어느 ETF로 돈이 들어갔나"
+      <Card icon="input" title="ETF 자금 유입"
             desc="국내 상장 미국 ETF 로 실제로 들어온 돈입니다. 거래대금이 아닙니다."
             note={`${e.asOf} 기준`}
             foot="상장좌수 변화 × 순자산가치로 잽니다. 같은 돈이 오간 것은 안 셉니다.">
         <Flows e={e} />
       </Card>
 
-      <Card icon="grid_view" title="이번 주 어디로 갔나"
+      <Card icon="grid_view" title="등락과 자금 방향"
             desc="국내 상장 미국 ETF 의 5영업일 등락과 그동안 오간 돈입니다."
             note="최근 5영업일"
             foot={`돈이 실제로 오간 종목만 셉니다. 레버리지·인버스는 거래대금의 ${e.leverageShare.toFixed(1)}% 뿐입니다.`}>

@@ -3,7 +3,7 @@ import { SectionHead } from "../kadera/SectionHead";
 import { C, MONO } from "../ui";
 
 /**
- * 무엇을 들고 있나 — 보통주 · 펀드·ETF · 우선주·기타.
+ * 종류별 구성 — 보통주 · 펀드·ETF · 우선주·기타.
  *
  * ## ⚠️⚠️ 12칸 두 줄을 다섯 막대로 바꿨다
  *
@@ -130,7 +130,7 @@ export function EquityTypeSection({ e }: { e: SeohakEquityType }) {
     <section className="hz-sheet">
       <SectionHead
         icon="pie_chart"
-        title="무엇을 들고 있나"
+        title="종류별 구성"
         desc="한국인이 든 미국 주식을 종류로 가른 것입니다."
         note={`${latest.year}-06 기준`}
       />

@@ -318,7 +318,7 @@ export default async function SeohakPage() {
       <section className="hz-sheet">
         <SectionHead
           icon="savings"
-          title="넣은 돈과 그 결과"
+          title="원금과 평가액"
           desc="한국인이 미국 주식에 실제로 넣은 원금과, 그 돈이 지금 얼마가 됐는지입니다."
           note={`${ov.asOf} 기준`}
         />
@@ -368,7 +368,7 @@ export default async function SeohakPage() {
         <section className="hz-sheet">
           <SectionHead
             icon="calendar_month"
-            title="언제 시작했느냐가 전부입니다"
+            title="시작 연도별 성과"
             desc="들어온 해별로 나눠, 그 해에 넣은 돈이 지금 얼마가 됐는지 봅니다."
             note="연도별"
           />
@@ -407,7 +407,7 @@ export default async function SeohakPage() {
           <section className="hz-sheet">
             <SectionHead
               icon="call_split"
-              title="더 사서 늘었나, 올라서 늘었나"
+              title="순매수와 평가차익"
               desc="잔고만 보면 둘을 구분할 수 없습니다. 새로 넣은 돈과 평가액 변동을 갈라 놓습니다."
               note={`최근 ${ov.breakdown.months}개월`}
             />
@@ -445,7 +445,7 @@ export default async function SeohakPage() {
           <section className="hz-sheet">
             <SectionHead
               icon="public"
-              title="다른 나라와 견주면"
+              title="나라별 보유액"
               desc="같은 달, 나라별로 보유한 미국 주식입니다."
               note={`${ov.asOf} 기준`}
             />

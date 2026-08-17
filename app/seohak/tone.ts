@@ -11,7 +11,7 @@ import { C } from "../ui";
  * 이 페이지에서 매수·매도를 색으로 가르는 자리가 셋이다.
  *
  *   ✅ 달력 칸(CalendarHero)
- *   ⏳ '평소와 얼마나 다른가'(DailyCards 의 DayVsUsual) — 아직 파랑/회색
+ *   ⏳ '평소와의 차이'(DailyCards 의 VsUsual) — 아직 파랑/회색
  *   ⏳ ETF 자금 유입(EtfCards 의 Flows) — 아직 파랑/회색
  *
  * 한 섹션씩 손보는 중이라 일부러 이렇게 두었다. **그 섹션에 손댈 때 이 파일을 보고

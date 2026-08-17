@@ -18,7 +18,7 @@ const usdB = (v: number) => `$${(v / 1e9).toLocaleString("ko-KR", { maximumFract
 const pct = (v: number, digits = 1) =>
   `${v >= 0 ? "+" : "−"}${Math.abs(v).toLocaleString("ko-KR", { maximumFractionDigits: digits })}%`;
 
-/* ── ⑧ 기관 몫을 빼면 ──────────────────────────────────────────────────
+/* ── ⑧ 기관 몫 ──────────────────────────────────────────────────
    막대 하나를 둘로 가르는 게 이 데이터의 생김새다. 다만 **비중이 거의 안 변한다는 것**
    자체가 사실이라(26.6~34.6%), 아래에 분기별 점을 얇게 깔아 "요즘 갑자기 기관이
    늘었다"는 식의 오해를 막는다. */
@@ -138,14 +138,14 @@ function WhoDidBetter({ q }: { q: SeohakQuarterly }) {
 export function QuarterlyCards({ q }: { q: SeohakQuarterly }) {
   return (
     <div style={CARD_GRID}>
-      <Card icon="account_balance" title="기관 몫을 빼면"
+      <Card icon="account_balance" title="기관 몫"
             desc="미국 주식에 든 한국 돈 중 기관이 아닌 몫입니다."
             note={`${q.asOf.slice(0, 7)} 기준`}
             foot="SEC 에 13F 를 내는 한국 기관 9곳만 셉니다. 실제 기관 몫은 이보다 큽니다.">
         <InstitutionShare q={q} />
       </Card>
 
-      <Card icon="emoji_events" title="기관과 나머지, 누가 잘했나"
+      <Card icon="emoji_events" title="보유분 수익률"
             desc="산 것과 판 것을 걷어내고 들고 있던 것만의 수익률입니다."
             note={`${q.quarters}분기 누적`}
             foot="분기 하나는 추정 오차가 커서 누적으로만 봅니다. '나머지'는 개인이 아니라 그 9곳이 아닌 전부입니다.">

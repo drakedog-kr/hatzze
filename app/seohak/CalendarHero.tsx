@@ -306,7 +306,7 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
     <section className="hz-sheet">
       <SectionHead
         icon="calendar_month"
-        title="역사는 반복된다"
+        title="되풀이되는 때"
         desc="서학개미들의 행동패턴입니다. 사고파는 건수는 늘 그대로고, 해마다 같은 때가 오면 한 번에 넣는 금액이 달라집니다."
         note={`${c.asOf} 기준`}
         /* 원래 시트 바닥에 네 줄짜리 각주였고, 그다음엔 여기 툴팁에 세 문장이 들어갔다.

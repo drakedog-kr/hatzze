@@ -94,7 +94,7 @@ export const CARD_GRID: React.CSSProperties = {
   gap: 14,
 };
 
-/* ── ① 평소와 얼마나 다른가 (한 행 전체) ──────────────────────────────
+/* ── ① 평소와의 차이 (한 행 전체) ──────────────────────────────
    ⚠️⚠️ **네 번째 판이다.** 앞의 셋이 각각 이렇게 실패했다.
 
    1판 두 줄짜리 배수 선 — 두 번 평활돼 모양이 없었고, 기준(±60일)이 나중에 바뀌었다.
@@ -228,7 +228,7 @@ function VsUsual({ d }: { d: SeohakDaily }) {
  */
 export function DailySection({ d }: { d: SeohakDaily }) {
   return (
-    <Card icon="show_chart" title="평소와 얼마나 다른가"
+    <Card icon="show_chart" title="평소와의 차이"
           desc="사고파는 양이 평소의 몇 %인지, 반년치를 봅니다."
           note="최근 6개월"
           foot="'평소'는 최근 2년 하루 값의 중앙값이라 시간이 지나도 자리가 안 바뀝니다. 선은 5일 평균이고, 횟수는 사람 수가 아니라 결제 건수입니다. 아래 두 줄은 기간이 달라 각각 적었습니다.">
