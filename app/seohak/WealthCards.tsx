@@ -2,7 +2,7 @@ import type { SeohakOverview } from "@/lib/seohak-data";
 import type { HouseholdAssets } from "@/lib/seohak-external";
 import { C, MONO } from "../ui";
 import { Baseline, CHART, Card, Chart, Em, RefLine, SignEm, Tiles, Verdict } from "./DailyCards";
-import { type Fx, Money, md, quarterMonth } from "./money";
+import { type Fx, Money, md, quarterMonth, ymEnd } from "./money";
 import { S, T } from "./scale";
 import { signInk } from "./tone";
 
@@ -291,9 +291,16 @@ export function WealthCards({ ch, fx, household }: {
   return (
     <>
       {ch && fx && (
+        /* ⚠️⚠️ 알약이 `환율 8/14 기준` 뿐이었다. **금액과 환율의 기준일이 다르다** —
+            금액은 TIC 이 끊긴 5월 말이고 환율만 최신이다. 하나만 적으면 나머지가
+            그 날짜인 줄 읽힌다. 둘 다 적는다.
+            ⚠️ 물음표는 **'지금' 이 실측 잔고가 아니라는 말**이다. 개인이 실제로 무슨
+            종목을 들었는지는 어떤 공개 원천에도 없어서, 넣은 돈을 시장 수익률로 굴린
+            값이다(`lib/seohak-data.ts` 의 `buildIndex`). +84% 도 거기서 나온다. */
         <Card icon="currency_exchange" title="원화로 보면"
               desc="달러로 잰 수익을 원화로 옮기면 얼마인지"
-              note={`환율 ${md(fx.nowDate)} 기준`}
+              note={`${ymEnd(ch.asOf)} · 환율 ${md(fx.nowDate)}`}
+              noteHelp="넣은 돈은 실측이고, 지금 값은 그 돈이 시장을 따라갔다고 볼 때의 추정입니다."
               foot="환율이 평균으로 돌아가면 원화 수익도 그만큼 줄어듭니다.">
           <InWon ch={ch} fx={fx} />
         </Card>

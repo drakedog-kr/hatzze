@@ -123,8 +123,21 @@ export const CHANCE_BASELINE = { hit: 11, of: 17 };
 /**
  * 음력 명절. **계산으로 못 구해서 손으로 적는다.**
  *
- * ⚠️⚠️ 표에 없는 해는 그 창이 조용히 빠진다. 자료가 2027년으로 넘어가기 전에 채울 것.
- * 여기 값이 틀리면 창이 엉뚱한 날을 가리키므로, 넣을 때 반드시 달력과 대조할 것.
+ * ⚠️⚠️ 표에 없는 해는 그 창이 **조용히 빠진다.** 화면의 `12번 중 12번` 은 2010년부터
+ * 센 값인데 이 표는 2015년부터라, 달력은 이미 2010~2014 의 설날·추석을 못 그린다.
+ * (숫자 자체는 맞다 — 2010~2014 를 손으로 되살려 재계산하니 `marks` 문자열까지 글자
+ * 단위로 같았다.)
+ *
+ * ## ⭐ 값은 **계산으로 검증할 수 있다**
+ *
+ * 설날은 음력 1월 1일, 추석은 8월 15일이고 그 역법이 `Intl` 에 들어 있다.
+ *
+ *   node -e 'const f=new Intl.DateTimeFormat("en-u-ca-chinese",
+ *     {year:"numeric",month:"numeric",day:"numeric",timeZone:"Asia/Seoul"}); ...'
+ *
+ * `ca-chinese` 로 2015·2020·2024·2025·2026 을 뽑아 이 표와 대조하니 다섯 다 일치했다.
+ * ⛔ `ca-korean` 은 안 된다 — 그건 단기(檀紀) 연호라 월·일이 그레고리력 그대로다.
+ * ⚠️ 손으로 적으면 하루씩 틀린다(2027 설날을 2/6 으로 잘못 짚었다가 계산으로 잡았다).
  */
 const LUNAR: Record<string, { seol: string; chuseok: string }> = {
   "2015": { seol: "02-19", chuseok: "09-27" }, "2016": { seol: "02-08", chuseok: "09-15" },
@@ -133,6 +146,7 @@ const LUNAR: Record<string, { seol: string; chuseok: string }> = {
   "2021": { seol: "02-12", chuseok: "09-21" }, "2022": { seol: "02-01", chuseok: "09-10" },
   "2023": { seol: "01-22", chuseok: "09-29" }, "2024": { seol: "02-10", chuseok: "09-17" },
   "2025": { seol: "01-29", chuseok: "10-06" }, "2026": { seol: "02-17", chuseok: "09-25" },
+  "2027": { seol: "02-07", chuseok: "09-15" }, "2028": { seol: "01-26", chuseok: "10-03" },
 };
 
 const nthDow = (year: number, month: number, dow: number, n: number) => {

@@ -69,6 +69,12 @@ export function rateOverMonths(fx: Fx, months: number): number {
  */
 export const md = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
 
+/**
+ * 달 알약 — `"2026-05"` → `"5월 말"`. 잔액이 그달 말 기준일 때 쓴다.
+ * ⚠️ `md()` 와 같은 이유로 연도를 뗀다.
+ */
+export const ymEnd = (ym: string) => `${Number(ym.slice(5, 7))}월 말`;
+
 /** "2026Q1" → "2026-03". 분기값은 그 분기 끝 달의 환율로 옮긴다. */
 export const quarterMonth = (q: string) =>
   `${q.slice(0, 4)}-${String(Number(q.slice(5)) * 3).padStart(2, "0")}`;

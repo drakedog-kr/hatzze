@@ -1,7 +1,7 @@
 import type { SeohakOverview } from "@/lib/seohak-data";
 import { C, MONO } from "../ui";
 import { Card, Em, Tiles, Verdict } from "./DailyCards";
-import { type Fx, Money, rateOverMonths } from "./money";
+import { type Fx, Money, rateOverMonths, ymEnd } from "./money";
 import { S, T } from "./scale";
 
 /**
@@ -113,7 +113,7 @@ function HoldingPeriod({ ch, fx }: { ch: NonNullable<SeohakOverview["channel"]>;
               매수**라 어느 환율 하나로도 원화로 못 옮긴다(30년치가 1,200~1,400원을 오간다).
               통화를 안 타는 말로 바꾼다 — 이 타일이 말하는 건 비율이지 그 절대액이 아니다. */}
           <Tiles items={[
-            { k: "최근 12개월 거래", n: "매수 + 매도",
+            { k: "12개월 거래", n: "매수 + 매도",
               v: <Money usd={t.traded * 1e6} rate={fx ? rateOverMonths(fx, 12) : undefined} fx={fx} /> },
             { k: "산 것 중 남은 것", n: "역대 누적 매수 대비", v: `${leftPct.toFixed(1)}%` },
           ]} />
@@ -133,9 +133,16 @@ export function TradingCards({ ch, fx }: { ch: SeohakOverview["channel"]; fx: Fx
           ⚠️ 이 주석은 `{ch.turnover && (` **바깥**에 있어야 한다. 안쪽은 JSX 자식 자리가
           아니라 식 자리라 중괄호 주석이 못 들어간다. */}
       {ch.turnover && (
+        /* ⚠️⚠️ 알약이 `최근 10년` 이었다. 그건 아래 표가 덮는 기간이지 **이 숫자가 언제
+            것인지**가 아니다 — 페이지 머리가 "8/14 기준" 이라 이 카드까지 어제 것으로
+            읽힌다. 실제로는 TIC 이 끊긴 5월 말이 창의 끝이다(`channel.asOf`).
+            표가 덮는 해는 줄이 직접 보여 주므로(2017~지금) 알약에서 뺀다.
+            ⚠️ 물음표는 **분모가 추정**이라는 말이다. 이 카드의 각주는 지시로 뗐는데
+            그때 이 문장이 화면에서 사라졌다 — 값을 바꿔 읽게 하는 말이라 되살린다. */
         <Card icon="schedule" title="얼마나 오래 들고 있나"
               desc="한 번 산 것을 평균 몇 달 만에 되파는지"
-              note="최근 10년">
+              note={`${ymEnd(ch.asOf)} 기준`}
+              noteHelp="거래액은 실측이고 나누는 잔고는 추정이라, ±20%면 5.9~8.8개월입니다.">
           <HoldingPeriod ch={ch} fx={fx} />
         </Card>
       )}

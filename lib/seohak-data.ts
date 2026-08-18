@@ -96,6 +96,16 @@ export type SeohakOverview = {
    * 어긋나므로, 잔고 몫의 **논리적 상한은 36.4%**(= 원금 몫)다.
    */
   channel: {
+    /**
+     * 이 채널 숫자의 **기준월**(YYYY-MM).
+     *
+     * ⚠️⚠️ 예탁원 자료는 어제까지 있는데 이 값은 **TIC 의 마지막 달**이다. 잔고를 굴리는
+     * 합성지수가 TIC 에서 나오므로 그 뒤 결제는 통째로 잘라 낸다(2026-08-14 까지 있는데
+     * 창은 2026-05-31, 그 사이 순매수 $5.9B 가 양쪽에서 빠진다). 원금과 평가액의 창이
+     * 같아 계산은 일관되지만, **화면이 그 날짜를 밝혀야 한다** — 안 그러면 페이지 머리의
+     * "8/14 기준" 을 보고 이 카드까지 어제 것으로 읽는다.
+     */
+    asOf: string;
     /** 이 채널이 넣은 누적 순매수. */
     principal: number;
     /** 그 유입을 합성지수로 굴린 지금 값. */
@@ -440,6 +450,7 @@ async function loadChannel(
     .map(([year, net]) => ({ year, net, stockNet: stockNet.get(year) ?? 0 }));
 
   return {
+    asOf: asOfMonth,
     principal,
     value,
     principalShare: 0,
