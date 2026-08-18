@@ -58,24 +58,22 @@ const shortName = (name: string) => name.replace("미국", "").replace(/\s{2,}/g
  * ⚠️ 안쪽 하한이 320px 이다. 18(배지)+48(막대)+58(값)에 간격 24 를 더하면 148 이 고정이라
  * 280px 에서는 이름 칸이 132px 로 줄어 `TIGER 필라델피아반도체나스닥` 이 반 토막 난다.
  */
-function RankTable({ head, hint, asideHint, tone, ink, barTone, rows }: {
+function RankTable({ head, hint, tone, ink, barTone, rows }: {
   head: string;
   /** 값 칸의 이름. 줄마다 단위를 되풀이하지 않으려고 머리 띠에 한 번만 적는다. */
   hint: string;
-  /** 회색 보조 칸의 이름. 이게 없으면 그 숫자가 뭔지 각주로 설명해야 한다. */
-  asideHint?: string;
   /** 머리 네모의 **면** 색. */
   tone: string;
   /** 값 **글자** 색. 면 색과 다른 값이다(머리말 참고). */
   ink: string;
   barTone: string;
-  rows: { key: string; name: string; weight: number; value: string; aside?: string }[];
+  rows: { key: string; name: string; weight: number; value: string }[];
 }) {
   const max = Math.max(...rows.map((r) => Math.abs(r.weight)), 1);
-  const hasAside = rows.some((r) => r.aside !== undefined);
-  /* ⚠️ 보조 칸이 44px 였다. 이름을 '주간 순유입'(46px)으로 바꾸면서 48px 로 넓힌다 —
-     줄어드는 건 이름 칸 4px 뿐이다(495px 카드에서 250 → 246). */
-  const cols = hasAside ? "18px minmax(0, 1fr) 40px 48px 46px" : "18px minmax(0, 1fr) 48px 58px";
+  /* ⛔ 여기 다섯째 칸(옅은 회색 보조값)이 있었다. '주간 등락' 이 그 주 순유입을 등락
+     옆에 세우는 데 썼는데 뺐다 — 까닭은 `WeekGrid` 머리말. 두 카드가 같은 네 칸을
+     쓰게 되어 조건 분기도 함께 사라진다. */
+  const cols = "18px minmax(0, 1fr) 48px 58px";
 
   return (
     /* ⭐ `height:100%` + 아래 `<ul>` 의 1fr 줄. 두 카드의 세로가 늘 같아야 하는데
@@ -92,9 +90,6 @@ function RankTable({ head, hint, asideHint, tone, ink, barTone, rows }: {
                                    justifySelf: "center" }} />
         <span style={{ color: C.label }}>{head}</span>
         <span />
-        {hasAside && (
-          <span style={{ color: C.faint, fontWeight: 600, textAlign: "right" }}>{asideHint}</span>
-        )}
         <span style={{ color: C.faint, fontWeight: 600, textAlign: "right" }}>{hint}</span>
       </div>
       <ul style={{ listStyle: "none", margin: 0, padding: 0, flex: 1, minHeight: 0,
@@ -117,10 +112,6 @@ function RankTable({ head, hint, asideHint, tone, ink, barTone, rows }: {
               <span style={{ width: `${Math.max(4, (Math.abs(r.weight) / max) * 100)}%`,
                              background: barTone }} />
             </span>
-            {r.aside !== undefined && (
-              <span style={{ fontFamily: MONO, fontSize: T.tiny, color: C.faint, textAlign: "right",
-                             overflow: "hidden", whiteSpace: "nowrap" }}>{r.aside}</span>
-            )}
             <span style={{ fontFamily: MONO, fontSize: T.small, fontWeight: 700, color: ink,
                            textAlign: "right" }}>{r.value}</span>
           </li>
@@ -228,16 +219,34 @@ function Flows({ e }: { e: SeohakEtf }) {
  * 만든 것이지 엇갈림이 커진 게 아니다. 읽는 사람은 그걸 신호로 읽는다.
  *
  * ⭐ 그래서 **관계를 주장하지 않는다.** 이 자료가 흔들림 없이 답하는 건 "무엇이 얼마나
- * 올랐나" 하나뿐이라 그것만 낸다. 옆에 그 주의 자금을 나란히 두되 **인과로 엮지 않는다** —
- * 둘 다 그 종목의 그 주 기록일 뿐이다.
+ * 올랐나" 하나뿐이라 그것만 낸다.
+ *
+ * ## ⛔⛔ 그 주 자금을 옆 칸에 나란히 뒀었다. **뺐다**
+ *
+ * "인과로 엮지 않는다"고 주석에 적어 두고는, 정작 화면은 두 값을 **한 줄에 나란히**
+ * 놓았다. 배치가 곧 주장이다 — 나란히 두면 읽는 사람은 잇는다.
+ *
+ * 실제로 그렇게 읽혔다. `ACE 미국우주테크액티브` 가 순유입 −12억에 등락 +17.0% 로
+ * 찍히자 "돈이 빠졌는데 어떻게 올랐나" 라는 물음이 나왔다. 답은 **둘이 다른 것을
+ * 재기 때문**이다.
+ *
+ *   종가  8,025 → 9,390원   (+17.0%)   ← 담고 있는 종목이 올랐다(NAV +17.5%)
+ *   좌수  1,885 → 1,870만좌 (−0.8%)    ← 그 0.8% 가 −12억으로 찍힌다
+ *   순자산 1,498 → 1,747억  (+249억)   ← 펀드는 오히려 커졌다
+ *
+ * ⭐ 한 문장으로 풀 수 있었지만 그 문장을 둘 자리가 없다(각주 띠는 짝과 어긋나고,
+ * 칸 이름은 48px 다). **설명이 있어야 안 틀리는 배치라면 배치가 틀린 것이다.**
+ * 이름을 '오간 돈' 에서 '주간 순유입' 으로 고쳐 봐도 오해의 결이 바뀔 뿐이었다.
+ *
+ * ⚠️ 자료(`SeohakEtf.week[].netFlow`)는 로더에 남겨 둔다. 되살린다면 등락 옆이 아니라
+ * **제 카드**여야 한다.
  *
  * ⚠️ 분류(지수형·테마형)로 가르는 안도 재 봤는데 접었다. 이름으로 자를 수밖에 없는데
  * `KODEX 미국S&P500테크놀로지` 같은 섹터 상품이 지수형으로 딸려 들어온다. 채권 필터는
  * 실측으로 오분류가 0 이었지만 이쪽은 안 그렇다.
  *
- * 칸 꼴은 `Flows` 와 같다 — 오른 쪽 빨강, 내린 쪽 파랑, `RankTable` 두 벌.
- * 여기만 칸이 하나 더 있다(그 주 오간 돈). 흐린 회색이고 머리 띠에서 이름을 안 댄다 —
- * 이름을 대면 등락 옆의 대등한 지표로 읽혀서 위에 적어 둔 "인과로 엮지 않는다"가 깨진다.
+ * 칸 꼴은 `Flows` 와 **완전히 같다** — 오른 쪽 빨강, 내린 쪽 파랑, `RankTable` 두 벌,
+ * 네 칸. 보조 칸을 빼면서 이름 칸이 48px 넓어져 긴 종목명이 덜 잘린다.
  */
 function WeekGrid({ e }: { e: SeohakEtf }) {
   const moved = e.week.filter((w) => Number.isFinite(w.changePct));
@@ -247,7 +256,6 @@ function WeekGrid({ e }: { e: SeohakEtf }) {
   const sides = [
     { key: "up", head: "오른 것", rows: up, tone: BUY, ink: BUY_INK, bar: "var(--c-warm-2)" },
     { key: "down", head: "내린 것", rows: down, tone: SELL, ink: SELL_INK, bar: "var(--c-blue-2)" },
-
   ];
   const chg = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(1)}%`;
 
@@ -273,14 +281,6 @@ function WeekGrid({ e }: { e: SeohakEtf }) {
               key={s.key}
               head={s.head}
               hint="등락"
-              /* ⛔ '오간 돈' 이라고 붙였다가 고쳤다. **뜻이 정확히 거꾸로 읽힌다** —
-                 '오갔다'는 손바뀜, 곧 거래대금으로 읽히는데 이 값은 그 반대다.
-                 상장좌수 변화 × NAV 라 **설정·환매만** 잡는다(같은 돈이 오간 것은 안 센다).
-                 옆 카드가 같은 값을 '하루 순유입' 이라 부르므로 창만 바꿔 짝을 맞춘다.
-                 ⚠️ 이름은 주되 색은 옅은 회색 그대로다. 등락과 대등한 지표로 보이면
-                 안 된다 — 둘 다 그 주의 기록일 뿐 인과로 엮지 않는다는 게 이 카드의
-                 전제다(`WeekGrid` 머리말에 15주 실측이 있다). */
-              asideHint="주간 순유입"
               tone={s.tone}
               ink={s.ink}
               barTone={s.bar}
@@ -288,9 +288,6 @@ function WeekGrid({ e }: { e: SeohakEtf }) {
                 key: r.code,
                 name: shortName(r.name),
                 weight: r.changePct,
-                /* 그 주 자금을 옆에 두되 **인과로 엮지 않는다.** 둘 다 그 주의 기록일
-                   뿐이라 흐린 회색으로 두고 머리 띠에서 이름을 대지 않는다 — 각주가 맡는다. */
-                aside: r.netFlow ? signed(r.netFlow) : "—",
                 value: chg(r.changePct),
               }))}
             />
@@ -342,9 +339,10 @@ export function EtfSection({ e }: { e: SeohakEtf }) {
           옆 카드의 각주를 떼자 이 카드만 39px 짜리 띠를 갖게 됐고, 두 카드를 같은
           높이로 늘리니 그 차이가 표로 갔다 — 줄 간격이 35 대 31, 둘째 표 머리가 20px
           어긋났다. 그래서 이 각주도 뗀다. 하던 말 둘은 각자 제자리를 찾아갔다.
-            · "회색은 그동안 오간 돈" → 머리 띠의 칸 이름(`asideHint`)
             · "거래대금 1억 이상 N종목" → 알약 옆 물음표. 표본을 밝히는 문장이라
-              없앨 수는 없지만, 늘 보일 필요는 없다. */}
+              없앨 수는 없지만, 늘 보일 필요는 없다.
+            · "회색은 그동안 오간 돈" → 그 칸을 통째로 뺐으므로 설명할 것도 없어졌다
+              (까닭은 `WeekGrid` 머리말). */}
       <Card icon="grid_view" title="주간 등락"
             desc="미국 ETF가 5영업일 동안 얼마나 오르내렸는지"
             note={`${e.weekFrom.slice(5)} ~ ${e.asOf.slice(5)}`}
