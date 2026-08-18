@@ -196,7 +196,7 @@ export function WealthCards({ ch, fx, household }: {
         <Card icon="currency_exchange" title="원화로 보면"
               desc="달러로 잰 수익을 원화로 옮기면 얼마인지입니다."
               note={`환율 ${fx.nowDate}`}
-              foot="개인이 달러를 산 평균 환율은 해마다의 유입을 그해 평균 환율로 가중해 낸 값입니다. 환율이 그 평균으로 돌아가면 원화 수익도 그만큼 줄어듭니다. 환율은 연준이 내는 H.10(FRED DEXKOUS)입니다.">
+              foot="환율이 평균으로 돌아가면 원화 수익도 그만큼 줄어듭니다.">
           <InWon ch={ch} fx={fx} />
         </Card>
       )}
@@ -204,7 +204,7 @@ export function WealthCards({ ch, fx, household }: {
         <Card icon="savings" title="가계 자산 속 해외주식"
               desc="가계가 든 국내주식과 해외주식을 나란히 둡니다."
               note={`${household.asOf} · 가계 부문`}
-              foot="한국은행 자금순환표의 '가계 및 비영리단체' 부문이라, 이 페이지에서 유일하게 법인이 안 섞인 숫자입니다. 다만 해외주식은 전 세계이고(미국만 못 뗍니다) 해외 상장 ETF 는 '투자펀드'로 따로 잡혀 빠져 있어 실제보다 낮습니다. 분기 자료라 서너 달 늦게 나옵니다.">
+              foot="해외주식은 미국만이 아닌 전 세계이고, 해외 ETF 는 빠져 있습니다.">
           <HouseholdShare h={household} />
         </Card>
       )}

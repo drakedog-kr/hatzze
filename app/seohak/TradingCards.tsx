@@ -186,7 +186,7 @@ export function TradingCards({ ch }: { ch: SeohakOverview["channel"] }) {
         <Card icon="schedule" title="얼마나 오래 들고 있나"
               desc="한 번 산 것을 평균 몇 달 만에 되파는지입니다."
               note={`최근 12개월`}
-              foot="한 해 (매수+매도)를 그 시점 잔고로 나눈 회전율에서 냈습니다. 매수·매도는 예탁원 실측이지만 잔고는 유입을 시장 수익으로 굴린 추정이라, 잔고를 ±20% 흔들면 5.9~8.8개월로 움직입니다. 해마다 오르내리는 값이라 추세로 읽으면 안 됩니다.">
+              foot="잔고가 추정이라 5.9~8.8개월 사이에서 움직입니다.">
           <HoldingPeriod ch={ch} />
         </Card>
       )}
@@ -194,7 +194,7 @@ export function TradingCards({ ch }: { ch: SeohakOverview["channel"] }) {
         <Card icon="account_balance_wallet" title="미국 채권도 산다"
               desc="같은 길로 미국 채권에도 돈이 오갑니다."
               note={`${ch.bondYears[0].year}년부터`}
-              foot="예탁원 결제의 증권 구분이 '채권'인 것만 셉니다. 주식과 같은 국내 증권사 채널이라 모집단이 같습니다. 회사채·국채를 안 가릅니다.">
+              foot="주식과 같은 국내 증권사 채널이고, 국채·회사채를 안 가릅니다.">
           <BondFlow ch={ch} />
         </Card>
       )}

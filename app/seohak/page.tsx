@@ -293,15 +293,13 @@ export default async function SeohakPage() {
           {/* ⚠️ 앞 판은 "원금의 33%가 2025년 이후에 들어왔습니다"로 시작했다. **그 자리의
               '원금'이 무엇인지 문장 안에 없어서** 33% 의 분모를 알 수 없었다. 정의를 먼저
               놓고 발견을 뒤에 붙인다. */}
+          {/* ⚠️ 한 줄에 들어가야 한다(전폭 105자). 세 가지를 다 적다 두 줄이 됐었다 —
+              창·전 국민 대비·추정. 그중 **전 국민보다 낮은 까닭**만 남긴다. 그게 없으면
+              옆 페이지 숫자와 견주다 "개인이 못했다"로 읽힌다. */}
           <span>
-            국내 증권사를 거쳐 {ov.channel?.from}년부터 쌓인 누적 순매수이고, 그중{" "}
-            <b style={{ color: C.ink }}>
-              {recentShare.toFixed(0)}%가 최근 {recentMonths}개월에
-            </b>{" "}
-            들어왔습니다. 같은 기간 전 국민 기준은 {usdB(ov.principal)} → {usdB(ov.marketValue)}(
-            {pct(ov.returnPct, 0)})인데, 개인 쪽이 낮은 것은 실력이 아니라{" "}
-            <b style={{ color: C.ink }}>늦게 들어왔기 때문</b>입니다. 해별 &apos;지금&apos;은 그
-            해에 들어온 돈이 이후 시장을 그대로 따라갔다고 볼 때의 값이라 추정입니다.
+            넣은 돈의 <b style={{ color: C.ink }}>{recentShare.toFixed(0)}%가 최근{" "}
+            {recentMonths}개월에</b> 들어왔습니다. 전 국민 기준({pct(ov.returnPct, 0)})보다 낮은
+            건 <b style={{ color: C.ink }}>늦게 들어왔기 때문</b>이고, 해별 값은 추정입니다.
           </span>
         </div>
       </section>
