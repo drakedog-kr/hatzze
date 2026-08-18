@@ -3,13 +3,11 @@ import type { Metadata } from "next";
 import { getSeohakDaily } from "@/lib/seohak-daily";
 import { getSeohakOverview, type Cohort } from "@/lib/seohak-data";
 import { getSeohakCalendar } from "@/lib/seohak-calendar";
-import { getSeohakEquityType } from "@/lib/seohak-equity-type";
 import { getSeohakEtf } from "@/lib/seohak-etf";
 import { getHouseholdAssets, getUsdKrw } from "@/lib/seohak-external";
 import { getSeohakQuarterly } from "@/lib/seohak-quarterly";
 import { DailySection } from "./DailyCards";
 import { CalendarHero } from "./CalendarHero";
-import { EquityTypeSection } from "./EquityTypeSection";
 import { EtfSection } from "./EtfCards";
 import { QuarterlyCards } from "./QuarterlyCards";
 import { TradingCards } from "./TradingCards";
@@ -140,11 +138,10 @@ export default async function SeohakPage() {
   // 아래 셋은 서로 의존이 없다. 순서대로 await 하면 왕복이 앞뒤로 붙으므로 함께 띄운다.
   // ⚠️ 분기·ETF 두 층은 표가 아직 없을 수 있어 null 을 돌려준다(마이그레이션 043·042).
   // 그 경우 그 섹션만 접고 나머지는 그대로 뜬다.
-  const [daily, quarterly, etf, equityType, calendar, fx, household] = await Promise.all([
+  const [daily, quarterly, etf, calendar, fx, household] = await Promise.all([
     getSeohakDaily(),
     getSeohakQuarterly(),
     getSeohakEtf(),
-    getSeohakEquityType(),
     getSeohakCalendar(),
     // ⚠️ 바깥 원천 둘. 실패하면 null 이라 그 카드만 접힌다(lib/seohak-external.ts 머리말).
     getUsdKrw(),
@@ -209,16 +206,21 @@ export default async function SeohakPage() {
         </>
       )}
 
-      {/* ⭐ '무엇에 담았나'였다. 그 이름일 때는 종류별 구성(SHL 연례)까지 여기 있었는데,
-          그걸 아래로 내리고 나니 남은 둘이 전부 **국내 상장 ETF** 이야기다. 미국에 직접
-          상장된 QQQ 같은 건 안 들어오는 딴 그릇이라, 이름으로 그 경계를 밝힌다. */}
+      {/* ⭐ '무엇에 담았나'였다. 남은 둘이 전부 **국내 상장 ETF** 이야기라 이름을 그렇게
+          바꿨다. 미국에 직접 상장된 QQQ 같은 건 안 들어오는 딴 그릇이라, 이름으로 그
+          경계를 밝힌다. */}
       <SectionCaps label="국내 상장 ETF" count={etf ? 2 : 0} />
       {etf && <EtfSection e={etf} />}
 
-      {/* ⭐ '종류별 구성'은 여기 있었는데 아래로 내렸다. 섹션 질문("무엇에 담았나")에
-          직접 답하는 유일한 카드였지만 **1년에 한 번 바뀌는 자료**라(미 재무부 연례 조사)
-          매일 갱신되는 ETF 석 장과 결이 달랐다. 잔고를 다루는 아래 장이 제 자리다. */}
-      <SectionCaps label="얼마가 쌓였나" count={(equityType ? 2 : 1) + (fx ? 1 : 0) + (household ? 1 : 0)} />
+      {/* ⛔ '종류별 구성'(미 재무부 SHL 연례)이 여기 있었는데 **뺐다.**
+          그 카드는 부문을 안 나누는 조사라 **국민연금까지 포함한 전 국민** 값이었다.
+          그런데 전 국민 잔고의 76%가 기관이므로, 그 구성(보통주 62.9%)은 사실상
+          **기관의 포트폴리오를 그려 놓고 개인 페이지에 얹은 것**이었다.
+          제목 배지와 설명 양쪽에 '전 국민'을 박아 두긴 했는데, 한 카드에 면책이 둘이나
+          필요하다는 것 자체가 자리가 아니라는 신호였다.
+          ⚠️ 표(`seohak_equity_type`)와 그걸 채우는 파이프라인은 그대로 남는다. 개인만
+          가를 길이 생기면 그때 되살릴 것. */}
+      <SectionCaps label="얼마가 쌓였나" count={1 + (fx ? 1 : 0) + (household ? 1 : 0)} />
 
 {/* ── 넣은 돈과 그 결과 ────────────────────────────────────────
           맨 위에 있었는데 내렸다. 40년 곡선은 배경이지 주인공이 아니다 — 이 페이지가
@@ -304,12 +306,6 @@ export default async function SeohakPage() {
         </div>
       </section>
 
-            {/* 2열 격자. 미디어쿼리 대신 auto-fit + minmax 로 접는다 — globals.css 를 건드리지
-          않고도 폭에 따라 스스로 1열이 된다. 하한 380px 은 종류별 구성의 막대에서 온다:
-          가장 좁은 조각이 14.1% 라 안쪽 폭 344px 에서 48px 이고, 거기 "14.1%"(28px)가
-          겨우 들어간다.
-          ⚠️ 국민연금은 여기 안 넣는다 — 줄이 네 칸(168+82+58)이라 한 칸 522px 에서 막대가
-          60px 로 죽는다. 전폭으로 둔다. */}
       {/* 원화·가계 두 장. 앞의 것은 예탁원 채널, 뒤의 것은 자금순환표 가계 부문이라
           **모집단이 다르다** — 두 카드의 숫자를 더하거나 나누면 안 된다(각주가 밝힌다). */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 16, alignItems: "start" }}>
@@ -317,11 +313,6 @@ export default async function SeohakPage() {
       </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 16, alignItems: "start" }}>
-  {/* ── 종류별 구성 ────────────────────────────────────────────────
-      전폭 시트였는데 격자 안 한 칸으로 내렸다. 창이 최근 다섯 해라 가장 좁은 조각이
-      14.1% 이고, 494px 칸에서도 53px 이라 칸 안 % 가 그대로 들어간다(2014년 7.7% 를
-      함께 그리던 시절에는 안 들어갔다). */}
-        {equityType && <EquityTypeSection e={equityType} />}
 
       </div>
 
