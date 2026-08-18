@@ -161,8 +161,6 @@ export default async function SeohakPage() {
   const chPrincipal = ov.channel?.principal ?? 0;
   const recent = co.filter((c) => c.year >= recentFrom).reduce((s, c) => s + c.inflow, 0);
   const recentShare = chPrincipal ? (recent / chPrincipal) * 100 : 0;
-  const chValue = ov.channel?.value ?? 0;
-  const chReturn = chPrincipal ? (chValue / chPrincipal - 1) * 100 : 0;
 
   return (
     // hz-cards 를 쓰지 않는다. 그건 브리핑의 4열 셀 격자라 자식마다 min-height 274px 가
@@ -235,35 +233,11 @@ export default async function SeohakPage() {
           desc="개인이 미국 주식에 넣은 원금이 지금 얼마가 됐는지, 들어온 해별로도 나눠 봅니다."
           note={`${ov.asOf} 기준`}
         />
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 22,
-            alignItems: "baseline",
-            padding: "16px 22px 4px",
-          }}
-        >
-          <div>
-            <div style={{ fontSize: 11.5, color: C.sub2, marginBottom: 3 }}>넣은 원금</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: C.sub, letterSpacing: "-.02em" }}>
-              {usdB(chPrincipal)}
-            </div>
-          </div>
-          <div style={{ fontSize: 18, color: C.hint, alignSelf: "center" }}>→</div>
-          <div>
-            <div style={{ fontSize: 11.5, color: C.sub2, marginBottom: 3 }}>지금 평가액</div>
-            <div style={{ fontSize: 30, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
-              {usdB(chValue)}
-            </div>
-          </div>
-          <div style={{ marginLeft: "auto", textAlign: "right" }}>
-            <div style={{ fontSize: 11.5, color: C.sub2, marginBottom: 3 }}>전체 손익</div>
-            <div style={{ fontSize: 30, fontWeight: 800, color: C.blue, letterSpacing: "-.02em" }}>
-              {pct(chReturn)}
-            </div>
-          </div>
-        </div>
+        {/* ⛔ 큰 숫자 셋(넣은 원금 → 지금 평가액 · 전체 손익)이 여기 있었는데 **뺐다.**
+            '평가액'이라 적었지만 예탁원은 잔고를 안 준다 — 유입을 시장 지수로 굴린
+            **추정**이다. 실측 금액처럼 큰 글씨로 걸어 두면 기준이 안 보인다.
+            ⭐ 게다가 같은 수치를 아래 '원화로 보면' 이 더 잘 말한다(달러 +84% vs
+            원화 +102%). 그쪽은 추정이라는 걸 세 칸으로 갈라 보여 준다. */}
         {/* 좌우 22px 은 여기서 준다(줄이 아니라). 열 사이 간격은 28px 로 두 열의 마지막
             칸('지금')과 다음 열의 첫 칸('들어온 해')이 붙어 보이지 않게 한다. */}
         <div
@@ -290,10 +264,16 @@ export default async function SeohakPage() {
           {/* ⚠️ 한 줄에 들어가야 한다(전폭 105자). 세 가지를 다 적다 두 줄이 됐었다 —
               창·전 국민 대비·추정. 그중 **전 국민보다 낮은 까닭**만 남긴다. 그게 없으면
               옆 페이지 숫자와 견주다 "개인이 못했다"로 읽힌다. */}
+          {/* ⚠️ '전 국민 기준(+157%)보다 낮다' 는 문장이 있었는데 뺐다. 견줄 상대였던
+              큰 숫자(+83.5%)가 화면에서 사라져 가리킬 곳이 없어졌다. */}
           <span>
             넣은 돈의 <b style={{ color: C.ink }}>{recentShare.toFixed(0)}%가 최근{" "}
-            {recentMonths}개월에</b> 들어왔습니다. 전 국민 기준({pct(ov.returnPct, 0)})보다 낮은
-            건 <b style={{ color: C.ink }}>늦게 들어왔기 때문</b>이고, 해별 값은 추정입니다.
+            {recentMonths}개월에</b>{" "}
+            {/* ⚠️ `</b>` 뒤 공백을 맨 칸으로 두면 안 된다. **여러 줄에 걸친 글자 덩어리는
+                양 끝 공백이 통째로 잘린다** — "17개월에들어왔습니다" 가 됐다(이 파일에서
+                두 번째다). 붙여야 할 자리는 늘 `{" "}` 로 못박는다. */}
+            들어왔습니다. 해별 &apos;지금&apos;은 그 해 돈이 이후 시장을 따라갔다고 볼 때의
+            추정입니다.
           </span>
         </div>
       </section>
