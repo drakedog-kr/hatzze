@@ -66,6 +66,10 @@ jobs:
       NAVER_HUB_KEY_ID: ${{ secrets.NAVER_HUB_KEY_ID }}
       NAVER_HUB_KEY: ${{ secrets.NAVER_HUB_KEY }}
       KRX_API_KEY: ${{ secrets.KRX_API_KEY }}
+      # ⚠️ 예탁원(서학개미 결제). 시크릿은 2026-08-10 에 등록돼 있었는데 **여기 줄이 없어서
+      #    스텝까지 안 내려갔다.** 그대로 뒀으면 첫 실행에서 예탁원 스텝이 키 없음으로
+      #    죽고 알림만 열렸을 것이다 — 로컬에서는 .env.local 로 잘 돌아서 안 보인다.
+      KSD_API_KEY: ${{ secrets.KSD_API_KEY }}
       ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
       ALADIN_TTB_KEY: ${{ secrets.ALADIN_TTB_KEY }}
       YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
