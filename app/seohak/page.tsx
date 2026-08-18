@@ -76,9 +76,10 @@ export default async function SeohakPage() {
           ⚠️ 배지의 숫자는 **손으로 적지 않는다.** 카드를 빼면서 실제 장수와 어긋난 적이
           있다(3 이라 적혀 있는데 두 장이었다). 있는 자료로 세게 둔다. */}
       <SectionCaps label="어떻게 사고파나" count={1 + (ov.channel?.turnover ? 1 : 0)} />
-      <DailySection d={daily} />
-      {/* 예탁원 채널이라 위 카드와 모집단이 같다. */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 14 }}>
+      {/* 둘 다 예탁원 채널이라 모집단이 같다. 아래 두 층과 같은 2열 격자를 쓴다 —
+          섹션마다 열 수가 다르면 훑을 때 리듬이 끊긴다. */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 14, alignItems: "start" }}>
+        <DailySection d={daily} />
         <TradingCards ch={ov.channel} />
       </div>
 
