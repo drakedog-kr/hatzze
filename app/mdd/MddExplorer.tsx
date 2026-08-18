@@ -1143,7 +1143,13 @@ function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel: string
           )}
         </div>
         {!atHigh && <DrawdownGauge current={a.currentDd} mdd={a.mdd} periodLabel={periodLabel} />}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 10, marginTop: "auto", paddingTop: 14, borderTop: `1px solid ${C.sheetRow}` }}>
+        {/* 위 여백이 14 가 아니라 18.5 인 것은 **옆 칸과 선을 맞추기 위해서**다. 이 블록과
+            왼쪽 칸의 전고점·저점 두 줄은 둘 다 marginTop:auto 로 칸 바닥에 붙으므로, 두
+            블록의 높이가 같아야 위 경계선이 한 줄에 선다. 왼쪽은 줄마다 1 + 10 + 글줄 19.5
+            + 10 = 40.5, 두 줄이라 81 이다. 이 칸은 1 + 여백 + 통계칸 61.5 라 여백이 18.5.
+            14 로 두면 4.5px 어긋나는데, 거의 맞아서 오히려 더 틀려 보인다.
+            ⚠️ 글자 크기를 건드리면 이 숫자를 다시 재야 한다(둘 중 한쪽만 바뀌어도 어긋난다). */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 10, marginTop: "auto", paddingTop: 18.5, borderTop: `1px solid ${C.sheetRow}` }}>
           {/* 보조 줄에 조회 기간 이름("최근 10년")은 안 붙인다 — '전체' 조회에서
               "상장 이후·약 27년 6,646일 중"이 되어 칸을 넘겼다(실측 121 > 115px).
               옆 칸 '기간 최저점'도 기간을 안 적고, 기간은 바로 위 토글이 말한다. */}
