@@ -58,10 +58,12 @@ const shortName = (name: string) => name.replace("미국", "").replace(/\s{2,}/g
  * ⚠️ 안쪽 하한이 320px 이다. 18(배지)+48(막대)+58(값)에 간격 24 를 더하면 148 이 고정이라
  * 280px 에서는 이름 칸이 132px 로 줄어 `TIGER 필라델피아반도체나스닥` 이 반 토막 난다.
  */
-function RankTable({ head, hint, tone, ink, barTone, rows }: {
+function RankTable({ head, hint, asideHint, tone, ink, barTone, rows }: {
   head: string;
   /** 값 칸의 이름. 줄마다 단위를 되풀이하지 않으려고 머리 띠에 한 번만 적는다. */
   hint: string;
+  /** 회색 보조 칸의 이름. 이게 없으면 그 숫자가 뭔지 각주로 설명해야 한다. */
+  asideHint?: string;
   /** 머리 네모의 **면** 색. */
   tone: string;
   /** 값 **글자** 색. 면 색과 다른 값이다(머리말 참고). */
@@ -78,11 +80,20 @@ function RankTable({ head, hint, tone, ink, barTone, rows }: {
        '주간 등락' 쪽이 22px 더 컸다(결론 문장이 한 줄 더 접힌다). 표가 그 폭을 줄
        간격으로 나눠 먹으면 짧은 쪽 바닥에 구멍이 안 생긴다. */
     <div style={{ minWidth: 0, height: "100%", display: "flex", flexDirection: "column" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 9px",
-                    background: C.soft, borderRadius: R.control, fontSize: T.tiny, fontWeight: 700 }}>
-        <span style={{ width: 7, height: 7, borderRadius: 2, background: tone, flexShrink: 0 }} />
+      {/* ⭐ 머리 띠가 줄과 **같은 격자**를 쓴다. 예전엔 flex 라 이름이 칸 위가 아니라
+          오른쪽 끝에 몰려 있었고, 그래서 회색 보조 칸만 이름이 없어 "회색은 그동안 오간
+          돈" 이라는 각주가 따로 있어야 했다. 칸마다 이름을 붙이면 그 각주가 사라진다. */}
+      <div style={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 8,
+                    padding: "5px 9px", background: C.soft, borderRadius: R.control,
+                    fontSize: T.tiny, fontWeight: 700 }}>
+        <span aria-hidden style={{ width: 7, height: 7, borderRadius: 2, background: tone,
+                                   justifySelf: "center" }} />
         <span style={{ color: C.label }}>{head}</span>
-        <span style={{ marginLeft: "auto", color: C.faint, fontWeight: 600 }}>{hint}</span>
+        <span />
+        {hasAside && (
+          <span style={{ color: C.faint, fontWeight: 600, textAlign: "right" }}>{asideHint}</span>
+        )}
+        <span style={{ color: C.faint, fontWeight: 600, textAlign: "right" }}>{hint}</span>
       </div>
       <ul style={{ listStyle: "none", margin: 0, padding: 0, flex: 1, minHeight: 0,
                    display: "grid", gridTemplateRows: `repeat(${rows.length}, minmax(29px, 1fr))` }}>
@@ -158,9 +169,13 @@ function RankTable({ head, hint, tone, ink, barTone, rows }: {
  * 자리를 줄 값어치가 없다고 봤다. 되살린다면 **하루치가 아니라 창 전체 값**으로 각주에.
  */
 function Flows({ e }: { e: SeohakEtf }) {
+  /* ⚠️ 두 칸이 `hint` 를 "하루 순유입" 으로 함께 쓰고 있었다. 빠진 곳에 그렇게 적으면
+     **칸 이름과 값 이름이 서로 반대**를 가리킨다. 칸마다 제 이름을 준다. */
   const sides = [
-    { key: "in", head: "들어온 곳", rows: e.inflow, tone: BUY, ink: BUY_INK, bar: "var(--c-warm-2)" },
-    { key: "out", head: "빠진 곳", rows: e.outflow, tone: SELL, ink: SELL_INK, bar: "var(--c-blue-2)" },
+    { key: "in", head: "들어온 곳", hint: "하루 순유입",
+      rows: e.inflow, tone: BUY, ink: BUY_INK, bar: "var(--c-warm-2)" },
+    { key: "out", head: "빠진 곳", hint: "하루 순유출",
+      rows: e.outflow, tone: SELL, ink: SELL_INK, bar: "var(--c-blue-2)" },
   ];
   return (
     <>
@@ -178,7 +193,7 @@ function Flows({ e }: { e: SeohakEtf }) {
             <RankTable
               key={s.key}
               head={s.head}
-              hint="하루 순유입"
+              hint={s.hint}
               tone={s.tone}
               ink={s.ink}
               barTone={s.bar}
@@ -230,6 +245,7 @@ function WeekGrid({ e }: { e: SeohakEtf }) {
   const sides = [
     { key: "up", head: "오른 것", rows: up, tone: BUY, ink: BUY_INK, bar: "var(--c-warm-2)" },
     { key: "down", head: "내린 것", rows: down, tone: SELL, ink: SELL_INK, bar: "var(--c-blue-2)" },
+
   ];
   const chg = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(1)}%`;
 
@@ -255,6 +271,9 @@ function WeekGrid({ e }: { e: SeohakEtf }) {
               key={s.key}
               head={s.head}
               hint="등락"
+              /* 이름을 주되 옅은 회색 그대로다. 등락과 대등한 지표로 보이면 안 된다 —
+                 둘 다 그 주의 기록일 뿐 인과로 엮지 않는다는 게 이 카드의 전제다. */
+              asideHint="오간 돈"
               tone={s.tone}
               ink={s.ink}
               barTone={s.bar}
@@ -295,21 +314,34 @@ export function EtfSection({ e }: { e: SeohakEtf }) {
   return (
     // 두 카드의 자연 높이가 572 로 같아서 늘려도 구멍이 안 생긴다(`CARD_GRID` 머리말).
     <div style={CARD_GRID}>
+      {/* ⚠️ 각주를 뗐다. 하던 말 둘 중 '거래대금이 아니다' 는 부제가 이미 하고, 채권형
+          제외는 부제의 '미국 주식 ETF' 가 말한다. 같은 말을 두 자리에서 하고 있었다. */}
       <Card icon="input" title="ETF 자금 유입"
-            desc="미국 ETF 로 실제로 들어온 돈입니다. 거래대금이 아닙니다."
+            /* ⚠️ 42자면 **두 줄로 접힌다.** 쓸 수 있는 폭이 303px 인데 351px 였다(1,280px
+               실측). 옆 카드 부제는 한 줄이라 그 19px 차이가 그대로 아래로 밀려 두 표의
+               머리가 서로 다른 높이에 앉았다(161 vs 143).
+               ⭐ 길이를 **짝과 맞춰** 224px 로 잡는다(짝은 228px). 접히는 폭이 갈리면
+               좁은 화면에서 한쪽만 두 줄이 되어 같은 어긋남이 되살아난다 — 249px 로
+               두면 카드 463~488px 구간이 그 창이었다(뷰포트 1,226~1,276px). */
+            desc="거래대금이 아니라 실제로 오간 미국 ETF 자금"
             note={`${e.asOf} 기준`}
-            foot="상장좌수 변화 × 순자산가치라 거래대금이 아니고, 채권형은 뺐습니다.">
+            /* 부제에서 밀려난 '채권형 제외' 가 여기로 온다. 짝도 같은 자리에 표본을
+               밝히고 있어 두 카드가 같은 꼴이다. */
+            noteHelp="상장좌수 변화 × 순자산가치로 재고, 채권형은 뺐습니다.">
         <Flows e={e} />
       </Card>
 
+      {/* ## ⚠️ 각주 띠는 **둘 다 있거나 둘 다 없어야 한다**
+          옆 카드의 각주를 떼자 이 카드만 39px 짜리 띠를 갖게 됐고, 두 카드를 같은
+          높이로 늘리니 그 차이가 표로 갔다 — 줄 간격이 35 대 31, 둘째 표 머리가 20px
+          어긋났다. 그래서 이 각주도 뗀다. 하던 말 둘은 각자 제자리를 찾아갔다.
+            · "회색은 그동안 오간 돈" → 머리 띠의 칸 이름(`asideHint`)
+            · "거래대금 1억 이상 N종목" → 알약 옆 물음표. 표본을 밝히는 문장이라
+              없앨 수는 없지만, 늘 보일 필요는 없다. */}
       <Card icon="grid_view" title="주간 등락"
-            desc="미국 ETF 가 5영업일 동안 얼마나 오르내렸는지입니다."
+            desc="미국 ETF가 5영업일 동안 얼마나 오르내렸는지"
             note={`${e.weekFrom.slice(5)} ~ ${e.asOf.slice(5)}`}
-            /* ⭐ 날짜 범위와 회색 칸 설명이 본문 맨 아래 한 줄로 붙어 있었다. 그 한 줄
-               때문에 본문 높이가 옆 카드보다 25px 커서, 두 카드를 같은 높이로 늘리면
-               표 머리가 서로 다른 y 에 앉았다(113 vs 98). 각주로 옮기면 두 본문이 같은
-               꼴이 되어 표까지 나란해진다. */
-            foot={`회색은 그동안 오간 돈이고, 거래대금 1억 이상 ${e.week.length}종목을 셉니다.`}>
+            noteHelp={`거래대금 1억 이상 ${e.week.length}종목을 셉니다.`}>
         <WeekGrid e={e} />
       </Card>
     </div>

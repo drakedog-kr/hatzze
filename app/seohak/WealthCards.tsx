@@ -149,9 +149,21 @@ function FxChart({ fx, avgRate }: { fx: UsdKrw; avgRate: number }) {
   const y = (v: number) => CHART.h - ((v - lo) / (hi - lo)) * CHART.h;
   const line = vals.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
 
+  /* ⚠️ 툴팁 순서는 `vals` 와 같아야 한다. 마지막 하나만 달이 아니라 **그날**이다
+     (월평균의 마지막 달은 반쪽이라 최신 일별로 갈아 붙였다) — 날짜를 그대로 적어
+     둘이 다른 값이라는 게 드러나게 둔다. */
+  const tips = [
+    ...pts.map(([m, v]) => ({
+      key: m,
+      text: `${m.slice(0, 4)}년 ${Number(m.slice(5, 7))}월 · ${krw(v)}`,
+    })),
+    { key: fx.nowDate, text: `${fx.nowDate} · ${krw(fx.now)}` },
+  ];
+
   return (
     <Chart
-      note="원/달러 · 최근 10년"
+      note="원/달러 월평균 · 최근 10년"
+      tips={tips}
       legend={
         <Baseline>
           평균 산 값 <b style={{ fontFamily: MONO, color: C.ink }}>{krw(avgRate)}</b>
@@ -269,7 +281,7 @@ export function WealthCards({ ch, fx, household }: {
     <>
       {ch && fx && (
         <Card icon="currency_exchange" title="원화로 보면"
-              desc="달러로 잰 수익을 원화로 옮기면 얼마인지입니다."
+              desc="달러로 잰 수익을 원화로 옮기면 얼마인지"
               note={`환율 ${fx.nowDate}`}
               foot="환율이 평균으로 돌아가면 원화 수익도 그만큼 줄어듭니다.">
           <InWon ch={ch} fx={fx} />
@@ -277,9 +289,9 @@ export function WealthCards({ ch, fx, household }: {
       )}
       {household && (
         <Card icon="savings" title="가계 자산 속 해외주식"
-              desc="가계가 든 국내주식과 해외주식을 나란히 둡니다."
+              desc="가계가 든 국내주식과 해외주식을 나란히"
               note={`${household.asOf} · 가계 부문`}
-              foot="해외주식은 미국만이 아닌 전 세계이고, 해외 ETF 는 빠져 있습니다.">
+              foot="해외주식은 미국만이 아닌 전 세계이고, 해외 ETF는 빠져 있습니다.">
           <HouseholdShare h={household} />
         </Card>
       )}

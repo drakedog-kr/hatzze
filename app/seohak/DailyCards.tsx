@@ -59,21 +59,39 @@ export function Card({
   title,
   desc,
   note,
+  noteHelp,
   foot,
   children,
 }: {
   icon: string;
+  /**
+   * 제목 아래 한 줄.
+   *
+   * ⚠️ **명사구로 끝낸다.** 다른 화면(카더라·MDD)의 부제가 전부 그런데 이 페이지만
+   * '~입니다' 로 문장을 쓰고 있었다.
+   * ⚠️ **한 줄에 들어가야 한다.** 두 줄로 접히면 그만큼이 아래로 밀려 나란한 카드의
+   * 표 머리가 서로 다른 높이에 앉는다. 쓸 수 있는 폭은 알약을 뺀 나머지다(1,280px
+   * 에서 303px).
+   */
   title: string;
-  /** 제목 아래 한 줄. 이 카드가 무엇을 재는지 여기서 끝내야 한다. */
   desc: string;
   note?: string;
+  /**
+   * 알약 옆 물음표에 담기는 한 문장.
+   *
+   * ⭐ 각주 띠와 다르다. 띠는 늘 자리를 차지해서 **한 카드에만 있으면 짝과 어긋나는데**,
+   * 이건 찾을 때만 열린다. 표본을 밝히는 것처럼 늘 보일 필요는 없지만 없으면 안 되는
+   * 문장에 쓴다.
+   * ⚠️ 한 문장을 넘기면 툴팁이 아니다 — 열어 놓고 읽어야 하는 순간 각주로 돌아간 것이다.
+   */
+  noteHelp?: string;
   /** 없으면 바닥 띠를 아예 안 그린다. 적을 게 없는데 띠만 남으면 빈 칸이 된다. */
   foot?: string;
   children: React.ReactNode;
 }) {
   return (
     <section className="hz-sheet" style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-      <SectionHead icon={icon} title={title} desc={desc} note={note} />
+      <SectionHead icon={icon} title={title} desc={desc} note={note} noteHelp={noteHelp} />
       {/* flex:1 을 유지할 것. `Flows`·`WeekGrid` 가 `marginTop:auto` 로 목록을 카드 바닥에
           붙이는데, 이 칸이 안 늘어나면 그 auto 가 놀아서 두 카드의 목록 높이가 갈린다. */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: S.md, minWidth: 0,
@@ -193,7 +211,9 @@ export const CHART = { w: 1000, h: 100 } as const;
  * ⛔ 세로 눈금이 폭마다 달라진다는 뜻이므로, 이 그림에 **각도로 읽는 말**("가파르게")을
  * 붙이면 안 된다. 읽는 것은 기준선과의 위아래뿐이다.
  */
-export function Chart({ note, legend, aria, minHeight = 96, children }: {
+export type ChartTip = { key: string; text: string };
+
+export function Chart({ note, legend, aria, minHeight = 96, tips, children }: {
   note: string;
   legend: React.ReactNode;
   aria: string;
@@ -203,6 +223,14 @@ export function Chart({ note, legend, aria, minHeight = 96, children }: {
    * 660px 폭 카드에서 그림이 70px 라 세로가 9배 눌린 띠가 됐다.
    */
   minHeight?: number;
+  /**
+   * 지점마다의 툴팁. **점 개수와 순서가 그림과 같아야 한다** — 띠를 균등하게 나누므로
+   * 하나라도 어긋나면 엉뚱한 날짜가 뜬다.
+   *
+   * ⭐ 브리핑의 상승 속도·MDD 낙폭 차트와 같은 어법이다(`.hz-vline` 세로 기준선 +
+   * `.hz-tip` 툴팁). 상태가 없어 서버 컴포넌트에서도 그대로 쓴다.
+   */
+  tips?: ChartTip[];
   children: React.ReactNode;
 }) {
   return (
@@ -212,12 +240,27 @@ export function Chart({ note, legend, aria, minHeight = 96, children }: {
         <span style={{ flexShrink: 0 }}>{note}</span>
         {legend}
       </div>
-      <div style={{ flex: 1, minHeight }}>
+      <div style={{ flex: 1, minHeight, position: "relative" }}>
         <svg viewBox={`0 0 ${CHART.w} ${CHART.h}`} preserveAspectRatio="none"
              style={{ width: "100%", height: "100%", display: "block" }}
              role="img" aria-label={aria}>
           {children}
         </svg>
+        {/* 지점 띠. 그림 위를 균등하게 나눠 덮고, 마우스가 올라간 칸만 세로선과 툴팁을
+            연다. ⚠️ 양 끝 넷은 여는 방향을 안쪽으로 튼다 — 안 그러면 폭 넓은 툴팁이
+            카드 밖으로 나가 가로 스크롤을 만든다(브리핑에서 겪은 자리다). */}
+        {tips && tips.length > 1 && (
+          <div aria-hidden style={{ position: "absolute", inset: 0, display: "flex" }}>
+            {tips.map((t, i) => {
+              const at = i / (tips.length - 1);
+              const edge = at < 0.25 ? " hz-tip-start" : at > 0.75 ? " hz-tip-end" : "";
+              return (
+                <div key={t.key} className={`hz-tip hz-vline${edge}`} data-tip={t.text}
+                     style={{ flex: 1, position: "relative" }} />
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -331,13 +374,19 @@ function VsUsual({ d }: { d: SeohakDaily }) {
           말을 들었는데, 정작 꼭 필요한 '평소가 무엇인가' 는 기준선 범례가 그 선 옆에서
           한 마디로 말한다. 나머지 둘(5일 평균 · 결제 건수)은 값을 바꿔 읽게 하지 않는다. */}
       <Chart
-        /* ⚠️ `replace("-", "년 ")` 만 하면 "2026년 02월" 이 된다. 앞자리 0 을 떼야 한다. */
-        note={`${r[0]?.date.slice(0, 4)}년 ${Number(r[0]?.date.slice(5, 7))}월 ~ 어제`}
+        /* ⚠️ `replace("-", "년 ")` 만 하면 "2026년 02월" 이 된다. 앞자리 0 을 떼야 한다.
+           ⭐ '5일 평균' 을 여기 적는다. 지운 각주에 있던 세 문장 중 이것만은 지점에
+           마우스를 올리면 나오는 숫자의 뜻을 바꾼다 — 그날 하루가 아니라 닷새 평균이다. */
+        note={`${r[0]?.date.slice(0, 4)}년 ${Number(r[0]?.date.slice(5, 7))}월 ~ 어제 · 5일 평균`}
         legend={<Baseline>평소(2년 중앙값) = 100%</Baseline>}
         aria="사는 양과 파는 양이 평소의 몇 %인지, 최근 반년"
         /* 이 카드의 주인공이라 다른 그림보다 바닥이 높다. 선이 둘이고 반년치라
            120 아래로 내려가면 두 선이 기준선 근처에서 엉겨 붙는다. */
         minHeight={120}
+        tips={r.map((p) => ({
+          key: p.date,
+          text: `${p.date} · 사는 양 ${Math.round(p.buy)}% · 파는 양 ${Math.round(p.sell)}%`,
+        }))}
       >
         <RefLine y={y(100)} />
         {(["sell", "buy"] as const).map((k) => (
@@ -397,7 +446,7 @@ function VsUsual({ d }: { d: SeohakDaily }) {
 export function DailySection({ d }: { d: SeohakDaily }) {
   return (
     <Card icon="show_chart" title="평소와의 차이"
-          desc="사고파는 양이 평소의 몇 %인지, 반년치를 봅니다."
+          desc="사고파는 양이 평소의 몇 %인지 · 반년치"
           note="최근 6개월">
       <VsUsual d={d} />
     </Card>

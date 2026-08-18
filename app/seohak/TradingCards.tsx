@@ -135,7 +135,7 @@ export function TradingCards({ ch }: { ch: SeohakOverview["channel"] }) {
           아니라 식 자리라 중괄호 주석이 못 들어간다. */}
       {ch.turnover && (
         <Card icon="schedule" title="얼마나 오래 들고 있나"
-              desc="한 번 산 것을 평균 몇 달 만에 되파는지입니다."
+              desc="한 번 산 것을 평균 몇 달 만에 되파는지"
               note="최근 10년">
           <HoldingPeriod ch={ch} />
         </Card>
