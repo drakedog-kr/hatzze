@@ -107,7 +107,10 @@ function HoldingPeriod({ ch }: { ch: NonNullable<SeohakOverview["channel"]> }) {
  * $3.2B 를 넣었다 — 주식만 보면 "발을 뺐다"인데 채권까지 보면 "옮겼다"다.
  */
 function BondFlow({ ch }: { ch: NonNullable<SeohakOverview["channel"]> }) {
-  const rows = ch.bondYears.filter((y) => y.net !== 0 || y.stockNet !== 0);
+  // ⭐ **최근 열 해만.** 옆 카드(보유기간)가 잔고 문턱 때문에 열 줄로 서는데, 이쪽만
+  // 열두 줄이면 나란히 놓인 두 표의 줄 수가 달라 한쪽이 흘러내린 것처럼 보인다.
+  // 앞 두 해는 채권이 $0.02B 대라 막대도 안 보이던 줄이다.
+  const rows = ch.bondYears.filter((y) => y.net !== 0 || y.stockNet !== 0).slice(-10);
   if (!rows.length) return null;
   const max = Math.max(...rows.flatMap((y) => [Math.abs(y.net), Math.abs(y.stockNet)]), 1);
   /**
@@ -193,7 +196,7 @@ export function TradingCards({ ch }: { ch: SeohakOverview["channel"] }) {
       {ch.bondYears.length > 0 && (
         <Card icon="account_balance_wallet" title="미국 채권도 산다"
               desc="같은 길로 미국 채권에도 돈이 오갑니다."
-              note={`${ch.bondYears[0].year}년부터`}
+              note="최근 10년"
               foot="주식과 같은 국내 증권사 채널이고, 국채·회사채를 안 가릅니다.">
           <BondFlow ch={ch} />
         </Card>
