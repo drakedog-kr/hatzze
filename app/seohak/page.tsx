@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { getSeohakDaily } from "@/lib/seohak-daily";
-import { getSeohakOverview, type Cohort } from "@/lib/seohak-data";
+import { getSeohakOverview } from "@/lib/seohak-data";
 import { getSeohakCalendar } from "@/lib/seohak-calendar";
 import { getSeohakEtf } from "@/lib/seohak-etf";
 import { getHouseholdAssets, getUsdKrw } from "@/lib/seohak-external";
@@ -11,9 +11,7 @@ import { EtfSection } from "./EtfCards";
 import { TradingCards } from "./TradingCards";
 import { WealthCards } from "./WealthCards";
 import { SectionCaps } from "../kadera/parts";
-import { SectionHead } from "../kadera/SectionHead";
 import { pageMetadata } from "../seo";
-import { C, R } from "../ui";
 
 export async function generateMetadata(): Promise<Metadata> {
   return pageMetadata({
@@ -25,111 +23,6 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export const dynamic = "force-dynamic";
-
-/**
- * 백만 달러 단위 값을 "$1,234B" 로. 원천이 백만 달러라 나눗셈이 여기 한 곳에만 있다.
- *
- * ⚠️ 자릿수가 크기에 따라 다르다. $1B 아래는 **두 자리**를 준다 — 개인 코호트의 초기
- * 해가 $0.04B 인데 한 자리로 두면 `$0B` 가 되고, 그 줄이 "+560%" 를 달고 있어서
- * "아무것도 안 넣었는데 여섯 배"로 읽힌다.
- *
- * ⚠️ 음수 기호는 **통화 기호 앞**이다. `$-2.8B` 는 기호와 숫자 사이에 낀 빼기라 한 박자
- * 늦게 읽힌다(2023년 개인 순매도 줄).
- */
-function usdB(mn: number): string {
-  const abs = Math.abs(mn) / 1000;
-  const digits = abs < 1 ? 2 : 1;
-  return `${mn < 0 ? "−" : ""}$${abs.toLocaleString("ko-KR", { maximumFractionDigits: digits })}B`;
-}
-
-/** 음수는 U+2212(−)로 낸다. 본문에 손으로 적은 값과 부호 모양이 갈리면 안 된다. */
-function pct(v: number, digits = 1): string {
-  const n = Math.abs(v).toLocaleString("ko-KR", { maximumFractionDigits: digits });
-  return `${v >= 0 ? "+" : "−"}${n}%`;
-}
-
-/** 코호트 표의 칸 배치. 머리줄과 몸줄이 어긋나면 안 되므로 한 곳에서 낸다. */
-const COHORT_COLS = "44px 1fr 76px 62px";
-
-/**
- * 코호트 줄. 막대는 '그 해 들어온 돈의 크기', 오른쪽 숫자는 '지금 수익률'이다.
- * 둘을 한 줄에 두는 이유는, 돈이 가장 많이 들어온 해가 수익률이 가장 낮은 해라는
- * 사실이 그 두 값을 나란히 놓아야만 보이기 때문이다.
- *
- * ⚠️ 좌우 여백(22px)은 이 줄이 아니라 **바깥 열 컨테이너**가 준다. 표를 2열로 세우면서
- * 줄마다 여백을 두면 오른쪽 열의 왼쪽에도 22px 이 붙어 가운데만 벌어진다.
- */
-function CohortRow({ c, maxInflow }: { c: Cohort; maxInflow: number }) {
-  // 막대는 절댓값이다. 음수 폭을 그대로 주면 CSS 가 0 으로 뭉개 순매도 해만 막대가 사라진다.
-  const w = Math.max(2, (Math.abs(c.inflow) / maxInflow) * 100);
-  return (
-    <li
-      style={{
-        display: "grid",
-        gridTemplateColumns: COHORT_COLS,
-        alignItems: "center",
-        gap: 10,
-        padding: "9px 0",
-        borderTop: `1px solid ${C.sheetRow}`,
-      }}
-    >
-      <span style={{ fontSize: 12.5, fontWeight: 600, color: C.label }}>{c.year}</span>
-      <span style={{ height: 8, background: C.track, borderRadius: R.pill, overflow: "hidden" }}>
-        <span style={{ display: "block", width: `${w}%`, height: "100%", background: C.bar }} />
-      </span>
-      <span style={{ fontSize: 12, color: C.sub2, textAlign: "right" }}>{usdB(c.inflow)}</span>
-      {/* ⚠️ **순매도 해에는 수익률을 안 낸다.** 분자·분모가 둘 다 음수라 비가 양수로
-          나오는데(2023년 −$2.8B → −$4.5B 가 "+61%"), 그건 수익이 아니라 "빼 간 돈이
-          남았더라면"이다. 그 해에 한 일은 판 것이므로 그렇게 적는다. */}
-      {c.inflow < 0 ? (
-        <span style={{ fontSize: 11.5, fontWeight: 600, textAlign: "right", color: C.faint }}>
-          순매도
-        </span>
-      ) : (
-        <span
-          style={{
-            fontSize: 13,
-            fontWeight: 700,
-            textAlign: "right",
-            color: c.returnPct >= 100 ? C.blue : C.ink,
-          }}
-        >
-          {pct(c.returnPct, 0)}
-        </span>
-      )}
-    </li>
-  );
-}
-
-/**
- * 코호트 표 한 열. **머리줄을 열마다 다시 낸다** — 12해를 한 줄로 세우면 표만 456px 이라
- * 카드가 900px 가까이 자란다. 반씩 나눠 나란히 두면 그 절반이고, 막대는 두 열이 같은
- * `maxInflow` 로 정규화되므로 열이 갈려도 길이를 견줄 수 있다.
- */
-function CohortColumn({ rows, maxInflow }: { rows: Cohort[]; maxInflow: number }) {
-  return (
-    <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-      <li
-        style={{
-          display: "grid",
-          gridTemplateColumns: COHORT_COLS,
-          gap: 10,
-          padding: "0 0 8px",
-          fontSize: 11,
-          color: C.faint,
-        }}
-      >
-        <span>들어온 해</span>
-        <span />
-        <span style={{ textAlign: "right" }}>넣은 돈</span>
-        <span style={{ textAlign: "right" }}>지금</span>
-      </li>
-      {rows.map((c) => (
-        <CohortRow key={c.year} c={c} maxInflow={maxInflow} />
-      ))}
-    </ul>
-  );
-}
 
 export default async function SeohakPage() {
   const ov = await getSeohakOverview();
@@ -144,24 +37,6 @@ export default async function SeohakPage() {
     getUsdKrw(),
     getHouseholdAssets(),
   ]);
-  // ⭐⭐ 코호트를 **개인 채널로** 낸다. TIC 전수(`ov.cohorts`)는 국민연금까지 포함한
-  // 전 국민 숫자라, 개인을 분석하는 이 페이지의 주제와 모집단이 다르다. 합계가 통째로
-  // 갈린다 — 전 국민 $317.1B → $814.6B(+157%), 개인 $106.7B → $195.7B(**+83%**).
-  const co = ov.channel?.cohorts ?? [];
-  const maxInflow = Math.max(...co.map((c) => Math.abs(c.inflow)), 1);
-  // 코호트 표를 두 열로 나눈다. 홀수면 앞 열이 한 줄 길다 — 뒤 열이 길면 오른쪽만
-  // 아래로 삐져나와 카드 바닥이 어긋난다.
-  const cohortHalf = Math.ceil(co.length / 2);
-  const cohortCols = [co.slice(0, cohortHalf), co.slice(cohortHalf)].filter((col) => col.length);
-  // '최근'은 마지막 두 해다. 연도를 손으로 박으면 해가 바뀐 날 "2025년 이후"가 세 해가
-  // 되면서 각주만 조용히 거짓이 된다. 개월 수도 같은 기준에서 낸다(2026-05 이면 17개월).
-  const latestYear = co.length ? co[co.length - 1].year : Number(ov.asOf.slice(0, 4));
-  const recentFrom = latestYear - 1;
-  const recentMonths = (latestYear - recentFrom) * 12 + Number(ov.asOf.slice(5, 7));
-  const chPrincipal = ov.channel?.principal ?? 0;
-  const recent = co.filter((c) => c.year >= recentFrom).reduce((s, c) => s + c.inflow, 0);
-  const recentShare = chPrincipal ? (recent / chPrincipal) * 100 : 0;
-
   return (
     // hz-cards 를 쓰지 않는다. 그건 브리핑의 4열 셀 격자라 자식마다 min-height 274px 가
     // 걸려 있어서, 짧은 시트 아래에 200px 짜리 빈 바닥이 생긴다(실측). 카더라와 같은
@@ -182,112 +57,57 @@ export default async function SeohakPage() {
 
           기준은 **갱신 주기가 아니라 질문**이다. 주기로 나누면 "매일/매월/분기"가
           되는데, 그건 우리 파이프라인 사정이지 읽는 사람의 관심이 아니다. */}
-      <SectionCaps label="어떻게 사고파나" count={ov.channel?.turnover ? 3 : 1} />
+      {/* ── 구간 나누기 ───────────────────────────────────────────────
+          카더라·브리핑·MDD 가 쓰는 것과 같은 머리 배지(SectionCaps)로 장을 가른다.
+          히어로(달력)는 어느 장에도 안 넣는다 — 카더라도 히어로를 첫 배지 위에 둔다.
+
+          ## ⭐ 기준은 **갱신 주기가 아니라 질문**이다
+
+          주기로 나누면 "매일/매월/분기"가 되는데 그건 우리 파이프라인 사정이지 읽는
+          사람의 관심이 아니다. 카드를 여럿 빼고 나서 기능으로 다시 묶었다.
+
+            어떻게 사고파나   행동  — 얼마나 사고파나 · 얼마나 자주 갈아타나
+            얼마나 큰 돈인가  규모  — 원화로 얼마 · 가계 자산에서 어느 자리
+            국내 상장 ETF     딴 길 — 미국에 직접 상장된 건 안 들어오는 그릇
+
+          순서도 뜻이다. 히어로가 '어제 얼마나 샀나'로 시작하므로 행동이 바로 뒤에
+          붙고, 거기서 규모로 줌아웃한 다음, 곁길인 ETF 가 마지막이다.
+
+          ⚠️ 배지의 숫자는 **손으로 적지 않는다.** 카드를 빼면서 실제 장수와 어긋난 적이
+          있다(3 이라 적혀 있는데 두 장이었다). 있는 자료로 세게 둔다. */}
+      <SectionCaps label="어떻게 사고파나" count={1 + (ov.channel?.turnover ? 1 : 0)} />
       <DailySection d={daily} />
-      {/* 매매 습관 두 장. 예탁원 채널이라 위 카드와 모집단이 같다. */}
+      {/* 예탁원 채널이라 위 카드와 모집단이 같다. */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 14 }}>
         <TradingCards ch={ov.channel} />
       </div>
 
-      {/* ⛔ '개인과 기관' 이 여기 있었는데 **뺐다.**
-          그 카드가 답하던 건 "개인이 전체의 몇 %인가"였다. 사실이지만 **읽는 개인의
-          판단을 아무것도 바꾸지 않는다** — 게다가 절반이 신고자 목록(국민연금·KIC)이라
-          개인 페이지에 기관 이야기를 얹고 있었다.
-          ⭐ 다만 그 카드가 혼자 지고 있던 몫이 하나 있었다 — **이 화면이 말하는 '개인'이
-          무엇인지**. 그건 카드가 아니라 머리에 있을 말이라 화면 부제로 옮겼다
-          (`AppShell` 의 NAV `sub`).
-          ⚠️ 13F 표·로더(`seohak_institution_13f`, `getSeohakQuarterly`)와 파이프라인은
-          그대로 남는다. 기관을 다시 다룰 자리가 생기면 그때 되살릴 것. */}
-      {/* ⭐ '무엇에 담았나'였다. 남은 둘이 전부 **국내 상장 ETF** 이야기라 이름을 그렇게
-          바꿨다. 미국에 직접 상장된 QQQ 같은 건 안 들어오는 딴 그릇이라, 이름으로 그
-          경계를 밝힌다. */}
-      <SectionCaps label="국내 상장 ETF" count={etf ? 2 : 0} />
-      {etf && <EtfSection e={etf} />}
-
-      {/* ⛔ '종류별 구성'(미 재무부 SHL 연례)이 여기 있었는데 **뺐다.**
-          그 카드는 부문을 안 나누는 조사라 **국민연금까지 포함한 전 국민** 값이었다.
-          그런데 전 국민 잔고의 76%가 기관이므로, 그 구성(보통주 62.9%)은 사실상
-          **기관의 포트폴리오를 그려 놓고 개인 페이지에 얹은 것**이었다.
-          제목 배지와 설명 양쪽에 '전 국민'을 박아 두긴 했는데, 한 카드에 면책이 둘이나
-          필요하다는 것 자체가 자리가 아니라는 신호였다.
-          ⚠️ 표(`seohak_equity_type`)와 그걸 채우는 파이프라인은 그대로 남는다. 개인만
-          가를 길이 생기면 그때 되살릴 것. */}
-      <SectionCaps label="얼마가 쌓였나" count={1 + (fx ? 1 : 0) + (household ? 1 : 0)} />
-
-{/* ── 넣은 돈과 그 결과 ────────────────────────────────────────
-          맨 위에 있었는데 내렸다. 40년 곡선은 배경이지 주인공이 아니다 — 이 페이지가
-          매일 답해야 하는 건 '오늘'이다.
-
-          ## ⭐ '원금과 평가액'과 '시작 연도별 성과'를 한 장으로 합쳤다
-
-          둘은 같은 산수였다. 앞 카드의 `+156.9%` 는 뒤 카드 열두 해를 합친 값이라,
-          **앞 장이 뒤 장의 합계**였는데 이름이 달라 딴 이야기처럼 보였다. 지금은
-          위가 전체, 아래가 그 전체를 들어온 해로 쪼갠 것이다.
-
-          ⚠️ 표를 **2열**로 세운다. 12해를 한 줄로 늘이면 표만 456px 이라 카드가
-          900px 가까이 자란다(합치기 전 두 장 합이 417+607=1,024px 였다). */}
-      <section className="hz-sheet">
-        <SectionHead
-          icon="savings"
-          title="시작 연도별 성과"
-          desc="개인이 미국 주식에 넣은 원금이 지금 얼마가 됐는지, 들어온 해별로도 나눠 봅니다."
-          note={`${ov.asOf} 기준`}
-        />
-        {/* ⛔ 큰 숫자 셋(넣은 원금 → 지금 평가액 · 전체 손익)이 여기 있었는데 **뺐다.**
-            '평가액'이라 적었지만 예탁원은 잔고를 안 준다 — 유입을 시장 지수로 굴린
-            **추정**이다. 실측 금액처럼 큰 글씨로 걸어 두면 기준이 안 보인다.
-            ⭐ 게다가 같은 수치를 아래 '원화로 보면' 이 더 잘 말한다(달러 +84% vs
-            원화 +102%). 그쪽은 추정이라는 걸 세 칸으로 갈라 보여 준다. */}
-        {/* 좌우 22px 은 여기서 준다(줄이 아니라). 열 사이 간격은 28px 로 두 열의 마지막
-            칸('지금')과 다음 열의 첫 칸('들어온 해')이 붙어 보이지 않게 한다. */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(min(330px, 100%), 1fr))",
-            columnGap: 28,
-            padding: "8px 22px 0",
-            alignItems: "start",
-          }}
-        >
-          {cohortCols.map((rows) => (
-            <CohortColumn key={rows[0].year} rows={rows} maxInflow={maxInflow} />
-          ))}
-        </div>
-        {/* ⚠️ `.hz-sheet-foot` 은 **display:flex** 다. 안에 <b> 를 직접 두면 맨 텍스트와
-            <b> 가 각각 flex 항목이 되어, 칸이 좁아지는 순간 "원/금/의" 처럼 낱글자로
-            눌린다(2열 격자로 바꾸자마자 실제로 깨졌다). 통째로 <span> 하나에 담는다.
-            JSX 는 태그 사이 줄바꿈의 공백을 지우므로 조사 공백은 {" "} 로 명시한다. */}
-        <div className="hz-sheet-foot" style={{ fontSize: 12, color: C.sub }}>
-          {/* ⚠️ 앞 판은 "원금의 33%가 2025년 이후에 들어왔습니다"로 시작했다. **그 자리의
-              '원금'이 무엇인지 문장 안에 없어서** 33% 의 분모를 알 수 없었다. 정의를 먼저
-              놓고 발견을 뒤에 붙인다. */}
-          {/* ⚠️ 한 줄에 들어가야 한다(전폭 105자). 세 가지를 다 적다 두 줄이 됐었다 —
-              창·전 국민 대비·추정. 그중 **전 국민보다 낮은 까닭**만 남긴다. 그게 없으면
-              옆 페이지 숫자와 견주다 "개인이 못했다"로 읽힌다. */}
-          {/* ⚠️ '전 국민 기준(+157%)보다 낮다' 는 문장이 있었는데 뺐다. 견줄 상대였던
-              큰 숫자(+83.5%)가 화면에서 사라져 가리킬 곳이 없어졌다. */}
-          <span>
-            넣은 돈의 <b style={{ color: C.ink }}>{recentShare.toFixed(0)}%가 최근{" "}
-            {recentMonths}개월에</b>{" "}
-            {/* ⚠️ `</b>` 뒤 공백을 맨 칸으로 두면 안 된다. **여러 줄에 걸친 글자 덩어리는
-                양 끝 공백이 통째로 잘린다** — "17개월에들어왔습니다" 가 됐다(이 파일에서
-                두 번째다). 붙여야 할 자리는 늘 `{" "}` 로 못박는다. */}
-            들어왔습니다. 해별 &apos;지금&apos;은 그 해 돈이 이후 시장을 따라갔다고 볼 때의
-            추정입니다.
-          </span>
-        </div>
-      </section>
-
       {/* 원화·가계 두 장. 앞의 것은 예탁원 채널, 뒤의 것은 자금순환표 가계 부문이라
-          **모집단이 다르다** — 두 카드의 숫자를 더하거나 나누면 안 된다(각주가 밝힌다). */}
+          **모집단이 다르다** — 두 카드의 숫자를 더하거나 나누면 안 된다(각주가 밝힌다).
+          ⭐ 그래도 한 묶음인 이유는 둘 다 **규모**를 묻기 때문이다. 하나는 "원화로 얼마",
+          하나는 "가계 자산에서 어느 자리". */}
+      <SectionCaps label="얼마나 큰 돈인가" count={(fx ? 1 : 0) + (household ? 1 : 0)} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 16, alignItems: "start" }}>
         <WealthCards ch={ov.channel} fx={fx} household={household} />
       </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 16, alignItems: "start" }}>
+      {/* ⭐ '무엇에 담았나'였다. 남은 둘이 전부 **국내 상장 ETF** 이야기라 이름을 그렇게
+          바꿨다. 미국에 직접 상장된 QQQ 같은 건 안 들어오는 딴 그릇이라, 이름으로 그
+          경계를 밝힌다. 이 묶음만 질문이 아니라 이름인 까닭이 그것이다 — 여기서 가릴
+          것은 '무엇을 묻나'가 아니라 '어느 그릇인가'다. */}
+      <SectionCaps label="국내 상장 ETF" count={etf ? 2 : 0} />
+      {etf && <EtfSection e={etf} />}
 
-      </div>
-
+      {/* ⛔ 여기서 뺀 카드들과 그 까닭
+          · 개인과 기관     — "개인이 전체의 몇 %인가". 사실이지만 읽는 개인의 판단을
+                             바꾸지 않고, 절반이 신고자 목록이라 기관 이야기였다.
+                             '이 화면의 개인이 무엇인가'만 화면 부제로 옮겼다.
+          · 종류별 구성     — 미 재무부 SHL 은 부문을 안 나눠 **전 국민** 값이다. 그 잔고의
+                             76%가 기관이라, 사실상 기관 포트폴리오를 그려 놓고 있었다.
+          · 시작 연도별 성과 — 연도별 % 가 통째로 시장 지수에서 나온다(예탁원이 바꾸는 건
+                             금액뿐). 게다가 "2015년에 넣었으면" 은 지금을 안 말한다.
+          · 미국 채권도 산다 — 핵심이 2023년이라 절반이 과거. 지금 상태로는 한 줄이다.
+          ⚠️ 표·로더·파이프라인은 전부 남겨 뒀다. 되살릴 길이 생기면 그때. */}
     </div>
   );
 }
