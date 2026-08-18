@@ -81,12 +81,12 @@ function RankTable({ head, hint, tone, ink, barTone, rows }: {
           돈" 이라는 각주가 따로 있어야 했다. 칸마다 이름을 붙이면 그 각주가 사라진다. */}
       <div style={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 8,
                     padding: "5px 9px", background: C.soft, borderRadius: R.control,
-                    fontSize: T.tiny, fontWeight: 700 }}>
+                    fontSize: T.small, fontWeight: 700 }}>
         <span aria-hidden style={{ width: 7, height: 7, borderRadius: 2, background: tone,
                                    justifySelf: "center" }} />
         <span style={{ color: C.label }}>{head}</span>
         <span />
-        <span style={{ color: C.faint, fontWeight: 600, textAlign: "right" }}>{hint}</span>
+        <span style={{ color: C.muted, fontWeight: 600, textAlign: "right" }}>{hint}</span>
       </div>
       <ul style={{ listStyle: "none", margin: 0, padding: 0, flex: 1, minHeight: 0,
                    display: "grid", gridTemplateRows: `repeat(${rows.length}, minmax(29px, 1fr))` }}>
@@ -96,7 +96,7 @@ function RankTable({ head, hint, tone, ink, barTone, rows }: {
                        padding: "6px 9px",
                        borderBottom: i < rows.length - 1 ? `1px solid ${C.sheetRow}` : undefined }}>
             <span style={{ width: 18, height: 18, borderRadius: 5, background: "var(--c-plate)",
-                           color: "var(--c-cold-ink)", fontSize: T.tiny, fontWeight: 800,
+                           color: "var(--c-cold-ink)", fontSize: T.small, fontWeight: 800,
                            display: "flex", alignItems: "center", justifyContent: "center" }}>
               {i + 1}
             </span>

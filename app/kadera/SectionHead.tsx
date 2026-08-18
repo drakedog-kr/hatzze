@@ -84,7 +84,12 @@ export function SectionHead({
               생긴다. 안쪽으로 열리게 방향을 고정한다. */}
           {noteHelp && (
             <span className="hz-tip hz-tip-wide hz-tip-end" data-tip={noteHelp} data-ga-tip={title} style={{ display: "inline-flex", cursor: "help" }}>
-              <Icon name="help" style={{ fontSize: 12, color: C.hint }} />
+              {/* ⚠️ `C.hint`(#c7d5e3) 였다. 그 토큰은 **점선·비활성 아이콘**용이라 흰 카드
+                  위 명암비가 1.49 다 — 그림에 요구되는 3:1 에도 한참 못 미친다. 누를 수
+                  있는 표시가 안 보이면 툴팁이 있다는 걸 알 길이 없다. muted 는 4.79.
+                  ⚠️ 이 머리는 다섯 화면이 함께 쓴다. 여기 물음표가 뜨는 모든 카드가 같이
+                  진해진다(서학개미 해부도에서 재다 찾았지만 고장은 공용이었다). */}
+              <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
             </span>
           )}
         </span>

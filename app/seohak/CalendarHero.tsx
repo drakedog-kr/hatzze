@@ -46,6 +46,26 @@ const fullLabel = (date: string) => `${date.slice(0, 4)}/${dayLabel(date)}`;
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
 
+/**
+ * 달력 칸과 열두 달 띠의 바탕색. 빨강이 사는 쪽, 파랑이 파는 쪽이다(tone.ts).
+ *
+ * ## ⚠️⚠️ 진하기 위쪽을 **78%** 에서 끊는다
+ *
+ * 90% 까지 갔었고, 진해지면 날짜 숫자를 흰 글자로 뒤집었다. 재 보니 **그 규칙이 근거가
+ * 없었다** — 어느 진하기에서도 잉크가 흰 글자를 이긴다.
+ *
+ *   빨강  잉크 12.87 → 3.93   ·  흰 1.27 → 4.15   (둘이 만나는 건 100% 뿐)
+ *   파랑  잉크 13.51 → 5.07   ·  흰 1.21 → 3.21   (흰 글자는 끝까지 못 넘는다)
+ *
+ * 그래서 뒤집기를 없애고 늘 잉크로 둔다. 대신 빨강 잉크가 82% 에서 4.41 로 4.5 아래로
+ * 떨어지므로 위쪽을 78%(4.71)에서 끊는다. 색의 폭은 74 → 62 로 조금 줄지만, 날짜가
+ * 안 읽히는 칸이 사라진다.
+ *
+ * ⚠️ 열두 달 띠도 같은 식을 쓴다. 같은 자료를 두 자로 칠하면 안 된다.
+ */
+const cellBg = (net: number, strength: number) =>
+  `color-mix(in srgb, ${net >= 0 ? BUY : SELL} ${(16 + strength * 62).toFixed(1)}%, ${C.card})`;
+
 const cnt = (v: number) => v.toLocaleString("ko-KR");
 /** 결제일 → 그 달. 금액을 **그 돈이 오간 달의 환율**로 옮기는 데 쓴다(money.tsx 머리말). */
 const monthOf = (date: string) => date.slice(0, 7);
@@ -88,7 +108,7 @@ function Row({ k, n, v, sign, on }: {
   const body = (
     <>
       <span style={{ fontSize: T.body, color: C.sub }}>{k}</span>
-      <span style={{ marginLeft: "auto", fontSize: T.tiny, color: C.faint }}>{n}</span>
+      <span style={{ marginLeft: "auto", fontSize: T.small, color: C.muted }}>{n}</span>
       <b style={{ fontFamily: MONO, fontSize: T.body, color: ink, minWidth: 62,
                   textAlign: "right", textDecoration: on ? "underline" : "none",
                   textUnderlineOffset: 2 }}>{v}</b>
@@ -140,8 +160,8 @@ function WindowRow({ w, onJump }: { w: (typeof CALENDAR_WINDOWS)[number]; onJump
                      flexWrap: "wrap" }}>
         <b style={{ fontSize: T.body, color: C.ink }}>{w.label}</b>
         <span style={{ fontSize: T.body, color: C.sub }}>{w.phrase}</span>
-        <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: T.tiny,
-                       color: C.faint, flexShrink: 0 }}>
+        <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: T.small,
+                       color: C.muted, flexShrink: 0 }}>
           {w.of}번 중 <b style={{ color: strong ? C.ink : C.sub2 }}>{w.hit}번</b>
         </span>
       </span>
@@ -388,7 +408,7 @@ export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
                        호버 영역을 글자 밖까지 넓히는데, 그건 **맨 글자 링크**용 값이다.
                        이건 테두리 있는 알약이라 그 음수 마진이 그대로 밖으로 나가서
                        버튼이 달력 격자보다 6px 오른쪽에 앉았다(격자 461 · 버튼 467). */
-                    style={{ flexShrink: 0, margin: 0, fontSize: T.tiny, fontFamily: "inherit",
+                    style={{ flexShrink: 0, margin: 0, fontSize: T.small, fontFamily: "inherit",
                              padding: "3px 8px", borderRadius: R.pill,
                              border: `1px solid ${C.line}`, color: C.sub, cursor: "pointer" }}>
               오늘
@@ -402,14 +422,14 @@ export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
           {windows.map((w) => (
             <span key={w.key}
                   style={{ display: "flex", alignItems: "center", gap: S.xs,
-                           fontSize: T.tiny, color: C.sub2, minWidth: 0 }}>
+                           fontSize: T.small, color: C.sub2, minWidth: 0 }}>
               <span aria-hidden style={{ width: 10, height: 2.5, borderRadius: 2,
                                          background: C.ink, flexShrink: 0 }} />
               <b style={{ color: C.ink, fontWeight: 700 }}>{w.label}</b>
               {/* 어느 칸에 밑줄이 그어졌는지. 창이 결제일로 잡혀 있어 달을 넘나드는 해가
                   있다(2025년 블프 직후 사흘은 12/1~3 이다 — 11/28 에 결제가 없다).
                   날짜를 안 적으면 "블랙프라이데이인데 왜 12월?"이 남는다. */}
-              <span style={{ color: C.faint }}>
+              <span style={{ color: C.muted }}>
                 {Number(w.days[0].slice(8))}
                 {w.days.length > 1 && `~${Number(w.days.at(-1)!.slice(8))}`}일
               </span>
@@ -425,8 +445,8 @@ export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
           <div style={{ display: "flex", flexDirection: "column", gap: S.xs, flex: 1, minHeight: 0 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: S.xs }}>
             {WEEKDAYS.map((w, i) => (
-              <span key={w} style={{ fontSize: T.tiny, fontWeight: 700, textAlign: "center",
-                                     color: i === 0 || i === 6 ? C.faint : C.sub2 }}>{w}</span>
+              <span key={w} style={{ fontSize: T.small, fontWeight: 700, textAlign: "center",
+                                     color: i === 0 || i === 6 ? C.muted : C.sub2 }}>{w}</span>
             ))}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: S.xs,
@@ -437,14 +457,12 @@ export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
               const row = byDate.get(date);
               const inWindow = markedDays.has(date);
               const isPicked = date === picked;
-              // 색 진하기는 순매수 크기. 파랑이면 더 샀고 회색이면 더 팔았다.
+              // 색 진하기는 순매수 크기. 빨강이면 더 샀고 파랑이면 더 팔았다.
               const strength = row ? Math.min(1, Math.abs(row.net) / c.scale) : 0;
               // 빨강이 사는 쪽, 파랑이 파는 쪽 — 국내 관행이다(app/seohak/tone.ts).
               // 두 색을 같은 식으로 섞는다. 앞서 회색 쪽만 62%로 눌러 뒀는데, 색이
               // 갈리는 지금은 한쪽만 약하면 '판 날이 늘 조용한' 것처럼 보인다.
-              const bg = !row
-                ? C.soft
-                : `color-mix(in srgb, ${row.net >= 0 ? BUY : SELL} ${16 + strength * 74}%, ${C.card})`;
+              const bg = !row ? C.soft : cellBg(row.net, strength);
               return (
                 <button
                   key={date}
@@ -471,9 +489,8 @@ export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
                     display: "flex", alignItems: "flex-start", justifyContent: "flex-end",
                   }}
                 >
-                  <span style={{ fontSize: T.tiny, fontWeight: 700, padding: "3px 4px",
-                                 // 칸이 진해지면 흰 글자로 뒤집는다. 아니면 숫자가 묻힌다.
-                                 color: strength > 0.45 ? C.card : row ? C.ink : C.disabled }}>
+                  <span style={{ fontSize: T.small, fontWeight: 700, padding: "3px 4px",
+                                 color: row ? C.ink : C.disabled }}>
                     {d}
                   </span>
                   {/* 구간에 든 날. 4px 점은 너무 약해서 이 화면의 가장 값진 정보가
@@ -481,8 +498,7 @@ export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
                       빨간 칸 위에서 "이 날은 판 날"로 읽힌다). */}
                   {inWindow && (
                     <span aria-hidden style={{ position: "absolute", left: 3, right: 3, bottom: 2,
-                                               height: 2.5, borderRadius: 2,
-                                               background: strength > 0.4 ? C.card : C.ink }} />
+                                               height: 2.5, borderRadius: 2, background: C.ink }} />
                   )}
                 </button>
               );
@@ -490,8 +506,8 @@ export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
           </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: S.sm, fontSize: T.tiny,
-                        color: C.faint, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: S.sm, fontSize: T.small,
+                        color: C.muted, flexWrap: "wrap" }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: S.xs }}>
               <span style={{ width: 8, height: 8, borderRadius: 2, background: BUY }} /> 더 샀다
             </span>
@@ -503,7 +519,7 @@ export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
           {/* marginTop:auto — 칸 셋의 바닥을 맞춘다. 달력은 6줄일 때와 5줄일 때 높이가
               달라서, 붙여 두면 달마다 아래가 들쭉날쭉해진다. */}
           <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: S.xs }}>
-            <span style={{ fontSize: T.tiny, color: C.sub2, fontWeight: 600 }}>최근 열두 달</span>
+            <span style={{ fontSize: T.small, color: C.sub2, fontWeight: 600 }}>최근 열두 달</span>
             <div style={{ display: "flex", gap: 2 }}>
               {recentMonths.map((m) => {
                 const strength = Math.min(1, Math.abs(m.net) / m.scale);
@@ -513,11 +529,11 @@ export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
                           style={{ flex: 1, minWidth: 0, height: 22, borderRadius: 3, padding: 0,
                                    cursor: "pointer",
                                    border: m.key === month ? `2px solid ${C.ink}` : "2px solid transparent",
-                                   background: `color-mix(in srgb, ${m.net >= 0 ? BUY : SELL} ${16 + strength * 74}%, ${C.card})` }} />
+                                   background: cellBg(m.net, strength) }} />
                 );
               })}
             </div>
-            <div style={{ display: "flex", gap: 2, fontSize: T.tiny, color: C.faint }}>
+            <div style={{ display: "flex", gap: 2, fontSize: T.small, color: C.muted }}>
               {recentMonths.map((m) => (
                 <span key={m.key} style={{ flex: 1, minWidth: 0, textAlign: "center" }}>
                   {Number(m.key.slice(5))}
@@ -609,7 +625,9 @@ export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
                           아래 잉크만 한 겹 더 얹는 꼴이었다. 찾을 때만 열리게 옮긴다. */}
                       <span className="hz-tip hz-tip-wide" data-tip={`2010~2026년, 해마다 같은 방향이었는지를 셉니다. 우연이라도 ${CHANCE_BASELINE.of}번 중 ${CHANCE_BASELINE.hit}번쯤은 같은 방향이라, 12번은 동전 던지기에 가깝고 17번은 분명히 다릅니다.`}
                             style={{ display: "inline-flex", cursor: "help" }}>
-                        <Icon name="help" style={{ fontSize: 12, color: C.hint }} />
+                        {/* ⚠️ `C.hint` 였다. 그건 점선·비활성용(명암비 1.49)이라 **누를 수
+                            있는 표시**에 쓰면 안 된다. 그림도 3:1 은 넘어야 한다. */}
+                        <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
                       </span>
                     </span>
                     <ul style={{ listStyle: "none", margin: 0, padding: "10px 0 0",

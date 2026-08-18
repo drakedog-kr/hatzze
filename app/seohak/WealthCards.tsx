@@ -88,7 +88,7 @@ function InWon({ ch, fx }: {
                   ⚠️ 색이 `C.hint` 였다. 그건 점선·비활성 아이콘 값이라 글자에 쓰지 말라고
                   `ui.tsx` 가 못박아 뒀다 — 실제로 화면에서 안 보였다. */}
               {i > 0 && (
-                <span style={{ fontSize: T.lead, color: C.faint, alignSelf: "flex-end",
+                <span style={{ fontSize: T.lead, color: C.muted, alignSelf: "flex-end",
                                paddingBottom: 3 }}>→</span>
               )}
               <span style={{ display: "flex", flexDirection: "column" }}>

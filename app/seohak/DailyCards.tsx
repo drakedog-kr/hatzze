@@ -114,8 +114,15 @@ export function Verdict({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * '여길 봐라' 파란 강조.
+ *
+ * ⚠️ `C.blue` 가 아니라 `C.blueInk` 다. 원색은 **면**(막대·칸)에 쓰는 값이라 흰 카드
+ * 위 명암비가 **3.71** 로 4.5 에 못 미친다 — `ui.tsx` 가 "글자에 쓰지 말 것" 이라고
+ * 적어 뒀는데 이 자리가 그걸 어기고 있었다. blueInk 는 5.23 이다.
+ */
 export const Em = ({ children }: { children: React.ReactNode }) => (
-  <span style={{ color: C.blue }}>{children}</span>
+  <span style={{ color: C.blueInk }}>{children}</span>
 );
 
 /**
@@ -177,7 +184,11 @@ export function Tiles({ items }: { items: Tile[] }) {
               {t.k}
             </span>
           </span>
-          <span style={{ fontSize: T.tiny, color: C.faint, minWidth: 0, overflow: "hidden",
+          {/* ⚠️ `C.muted` 로는 **강조 타일에서만** 4.20 으로 떨어진다(빨강 틴트 위). 타일마다
+              바탕이 다른데 글자색을 바탕에 따라 가르면 눈에 안 보이는 차이로 코드만 는다.
+              어느 바탕에서도 4.5 를 넘는 값 하나로 둔다 — 흰 4.87 · 회색 5.26 · 틴트 4.87.
+              (sub2 는 틴트 위 4.48 이라 아슬아슬하게 못 넘는다. 실측이 아니면 못 걸렀다.) */}
+          <span style={{ fontSize: T.small, color: C.sub, minWidth: 0, overflow: "hidden",
                          textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.n}</span>
           <span style={{ fontFamily: MONO, fontSize: T.lead, fontWeight: 800,
                          color: t.ink ?? C.ink }}>{t.v}</span>
@@ -234,7 +245,7 @@ export function Chart({ note, legend, aria, minHeight = 96, tips, children }: {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: S.xs, flex: 1, minHeight: 0 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
-                    gap: S.sm, fontSize: T.tiny, color: C.faint }}>
+                    gap: S.sm, fontSize: T.small, color: C.muted }}>
         <span style={{ flexShrink: 0 }}>{note}</span>
         {legend}
       </div>
