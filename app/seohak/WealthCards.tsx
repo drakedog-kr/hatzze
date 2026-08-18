@@ -95,7 +95,7 @@ function InWon({ ch, fx }: {
                 <span style={{ fontSize: T.body, color: C.sub2, marginBottom: 3 }}>{b.k}</span>
                 <b style={{ fontFamily: MONO, fontSize: T.big, fontWeight: b.now ? 800 : 700,
                             color: b.now ? C.ink : C.sub, letterSpacing: "-.02em" }}>
-                  <Money usd={b.usd} rate={b.rate} fx={fx} suffix="원" />
+                  <Money usd={b.usd} rate={b.rate} fx={fx} />
                 </b>
               </span>
             </span>

@@ -80,8 +80,15 @@ export function usd(v: number): string {
 /**
  * 원. 조 → 억 → 만 순으로 떨어진다.
  *
- * ⚠️ '원' 을 안 붙인다. 조·억·만 이 이미 원화라고 말하고, 표 안에서 줄마다 붙으면
- * 글자만 는다(ETF 카드가 쭉 그렇게 해 왔다). 히어로의 큰 숫자에만 부르는 쪽이 붙인다.
+ * ## ⚠️ '원' 을 **붙인다**
+ *
+ * 안 붙이고 뒀었다 — 조·억·만 이 이미 원화라고 말한다고 봤다. 그런데 달러 쪽은 `$` 가
+ * **앞에 서서 통화를 먼저 알려 주는데** 원화 쪽은 끝까지 읽어야 알 수 있다. 통화를
+ * 갈아 끼우는 화면에서 그 비대칭은 그냥 헷갈린다.
+ *
+ * ⚠️ 붙여 쓴다(`8,591억원`). 이 저장소가 쭉 그래 왔다 — `104.3조원` · `4조원` · `억원`.
+ * 맞춤법대로면 띄는 쪽이지만, 값의 표기는 한 화면 안에서 같은 게 먼저다.
+ *
  * ⚠️⚠️ 조 단위 소수 한 자리는 **100조까지 유지한다.** 10조에서 끊었더니 이 달 산 금액
  * 14.4조와 판 금액 13.5조가 **둘 다 "14조"** 로 찍혔다. 자릿수를 아끼려다 서로 다른 두
  * 값이 같아 보이면 아낀 게 아니다.
@@ -92,11 +99,11 @@ export function won(v: number): string {
   if (a >= 1e12) {
     const t = a / 1e12;
     return `${s}${t.toLocaleString("ko-KR", { maximumFractionDigits: t >= 100 ? 0 : 1,
-                                              minimumFractionDigits: t >= 100 ? 0 : 1 })}조`;
+                                              minimumFractionDigits: t >= 100 ? 0 : 1 })}조원`;
   }
-  if (a >= 1e8) return `${s}${Math.round(a / 1e8).toLocaleString("ko-KR")}억`;
-  if (a >= 1e4) return `${s}${Math.round(a / 1e4).toLocaleString("ko-KR")}만`;
-  return `${s}${Math.round(a).toLocaleString("ko-KR")}`;
+  if (a >= 1e8) return `${s}${Math.round(a / 1e8).toLocaleString("ko-KR")}억원`;
+  if (a >= 1e4) return `${s}${Math.round(a / 1e4).toLocaleString("ko-KR")}만원`;
+  return `${s}${Math.round(a).toLocaleString("ko-KR")}원`;
 }
 
 /**
@@ -105,7 +112,7 @@ export function won(v: number): string {
  * ⚠️ 두 벌 다 `<span>` 이라 부모의 정렬·줄바꿈을 그대로 탄다. 숨는 쪽은
  * `display:none` 이라 자리를 안 먹는다.
  */
-export function Money({ usd: v, krw: w, at, rate, fx, suffix, signed }: {
+export function Money({ usd: v, krw: w, at, rate, fx, signed }: {
   usd?: number;
   krw?: number;
   /** 이 값이 속한 달(YYYY-MM). 안 넘기면 최신 환율이다. */
@@ -118,15 +125,13 @@ export function Money({ usd: v, krw: w, at, rate, fx, suffix, signed }: {
    */
   rate?: number;
   fx: Fx | null;
-  /** 원화 쪽에만 붙는 꼬리(대개 "원"). 달러엔 `$` 가 앞에 있어 안 붙인다. */
-  suffix?: string;
   /** 양수에 `+` 를 붙인다. 음수 부호는 두 형식이 이미 넣는다. */
   signed?: boolean;
 }) {
   const plus = (t: string) => (signed && !t.startsWith("\u2212") ? `+${t}` : t);
   if (!fx) {
     // 환율이 없으면 원천이 준 통화 그대로 낸다. 없는 값을 지어내지 않는다.
-    return <>{v !== undefined ? plus(usdFmt(v)) : plus(won(w ?? 0)) + (suffix ?? "")}</>;
+    return <>{v !== undefined ? plus(usdFmt(v)) : plus(won(w ?? 0))}</>;
   }
   const r = rate ?? rateAt(fx, at);
   const dollars = v !== undefined ? v : (w ?? 0) / r;
@@ -134,7 +139,7 @@ export function Money({ usd: v, krw: w, at, rate, fx, suffix, signed }: {
   return (
     <>
       <span className="hz-usd">{plus(usdFmt(dollars))}</span>
-      <span className="hz-krw">{plus(won(wons))}{suffix}</span>
+      <span className="hz-krw">{plus(won(wons))}</span>
     </>
   );
 }
