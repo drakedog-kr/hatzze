@@ -5,12 +5,15 @@ import { getSeohakOverview, type Cohort } from "@/lib/seohak-data";
 import { getSeohakCalendar } from "@/lib/seohak-calendar";
 import { getSeohakEquityType } from "@/lib/seohak-equity-type";
 import { getSeohakEtf } from "@/lib/seohak-etf";
+import { getHouseholdAssets, getUsdKrw } from "@/lib/seohak-external";
 import { getSeohakQuarterly } from "@/lib/seohak-quarterly";
 import { DailySection } from "./DailyCards";
 import { CalendarHero } from "./CalendarHero";
 import { EquityTypeSection } from "./EquityTypeSection";
 import { EtfSection } from "./EtfCards";
 import { QuarterlyCards } from "./QuarterlyCards";
+import { TradingCards } from "./TradingCards";
+import { WealthCards } from "./WealthCards";
 import { SectionCaps } from "../kadera/parts";
 import { SectionHead } from "../kadera/SectionHead";
 import { pageMetadata } from "../seo";
@@ -137,12 +140,15 @@ export default async function SeohakPage() {
   // 아래 셋은 서로 의존이 없다. 순서대로 await 하면 왕복이 앞뒤로 붙으므로 함께 띄운다.
   // ⚠️ 분기·ETF 두 층은 표가 아직 없을 수 있어 null 을 돌려준다(마이그레이션 043·042).
   // 그 경우 그 섹션만 접고 나머지는 그대로 뜬다.
-  const [daily, quarterly, etf, equityType, calendar] = await Promise.all([
+  const [daily, quarterly, etf, equityType, calendar, fx, household] = await Promise.all([
     getSeohakDaily(),
     getSeohakQuarterly(),
     getSeohakEtf(),
     getSeohakEquityType(),
     getSeohakCalendar(),
+    // ⚠️ 바깥 원천 둘. 실패하면 null 이라 그 카드만 접힌다(lib/seohak-external.ts 머리말).
+    getUsdKrw(),
+    getHouseholdAssets(),
   ]);
   // ⭐⭐ 코호트를 **개인 채널로** 낸다. TIC 전수(`ov.cohorts`)는 국민연금까지 포함한
   // 전 국민 숫자라, 개인을 분석하는 이 페이지의 주제와 모집단이 다르다. 합계가 통째로
@@ -184,8 +190,12 @@ export default async function SeohakPage() {
 
           기준은 **갱신 주기가 아니라 질문**이다. 주기로 나누면 "매일/매월/분기"가
           되는데, 그건 우리 파이프라인 사정이지 읽는 사람의 관심이 아니다. */}
-      <SectionCaps label="어떻게 사고파나" count={1} />
+      <SectionCaps label="어떻게 사고파나" count={ov.channel?.turnover ? 3 : 1} />
       <DailySection d={daily} />
+      {/* 매매 습관 두 장. 예탁원 채널이라 위 카드와 모집단이 같다. */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 14 }}>
+        <TradingCards ch={ov.channel} />
+      </div>
 
       {/* ── 분기 층 ───────────────────────────────────────────────────
           ⭐ 맨 아래였다. 13F 마감이 분기말 +45일이라 **갱신이 가장 느리다**는 이유로
@@ -208,7 +218,7 @@ export default async function SeohakPage() {
       {/* ⭐ '종류별 구성'은 여기 있었는데 아래로 내렸다. 섹션 질문("무엇에 담았나")에
           직접 답하는 유일한 카드였지만 **1년에 한 번 바뀌는 자료**라(미 재무부 연례 조사)
           매일 갱신되는 ETF 석 장과 결이 달랐다. 잔고를 다루는 아래 장이 제 자리다. */}
-      <SectionCaps label="얼마가 쌓였나" count={equityType ? 2 : 1} />
+      <SectionCaps label="얼마가 쌓였나" count={(equityType ? 2 : 1) + (fx ? 1 : 0) + (household ? 1 : 0)} />
 
 {/* ── 넣은 돈과 그 결과 ────────────────────────────────────────
           맨 위에 있었는데 내렸다. 40년 곡선은 배경이지 주인공이 아니다 — 이 페이지가
@@ -300,6 +310,12 @@ export default async function SeohakPage() {
           겨우 들어간다.
           ⚠️ 국민연금은 여기 안 넣는다 — 줄이 네 칸(168+82+58)이라 한 칸 522px 에서 막대가
           60px 로 죽는다. 전폭으로 둔다. */}
+      {/* 원화·가계 두 장. 앞의 것은 예탁원 채널, 뒤의 것은 자금순환표 가계 부문이라
+          **모집단이 다르다** — 두 카드의 숫자를 더하거나 나누면 안 된다(각주가 밝힌다). */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 16, alignItems: "start" }}>
+        <WealthCards ch={ov.channel} fx={fx} household={household} />
+      </div>
+
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 16, alignItems: "start" }}>
   {/* ── 종류별 구성 ────────────────────────────────────────────────
       전폭 시트였는데 격자 안 한 칸으로 내렸다. 창이 최근 다섯 해라 가장 좁은 조각이

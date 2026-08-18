@@ -116,6 +116,37 @@ export type SeohakOverview = {
      * 이전 개인 유입은 통틀어 $5.6B 이고 81%가 2020년 이후다.
      */
     cohorts: Cohort[];
+    /**
+     * 최근 12개월 총거래(매수+매도)와 그 회전율.
+     *
+     * ⚠️ **분자는 실측이고 분모(`value`)는 추정이다.** 유입을 시장 지수로 굴린 값이라
+     * 개인 포트폴리오가 시장과 다르면 그만큼 틀린다 — ±20% 로 흔들면 보유기간이
+     * 5.9~8.8개월로 움직인다. 화면은 '지금 어느 자리인가'로만 말할 것.
+     *
+     * ⛔ **"점점 오래 들고 있다"고 쓰면 안 된다.** 해마다 오르내린다:
+     * 2019년 8.1 → 2020년 4.5 → 2021년 4.8 → 2022년 5.8 → 2023년 7.2 → 2024년 5.3 →
+     * 2025년 5.8 → 지금 7.3개월. 2023년에 이미 7.2였다.
+     */
+    turnover: {
+      /** 최근 12개월 매수+매도. */
+      traded: number;
+      /** traded ÷ 잔고. 한 해에 몇 번 갈아탔나. */
+      times: number;
+      /** 평균 보유기간(개월). 왕복 한 번이 매수+매도라 회전율의 절반으로 나눈다. */
+      months: number;
+      /** 해별 보유기간. '지금이 어느 자리인가'를 말하는 데 쓴다. */
+      byYear: { year: number; months: number }[];
+    } | null;
+    /** 역대 누적 매수·매도. "산 것 중 남은 건 8%" 를 말한다. */
+    grossBuy: number;
+    grossSell: number;
+    /**
+     * 미국 **채권**. 같은 예탁원 채널이고 `security_type` 만 다르다.
+     *
+     * ⭐ 2023년이 이 자료의 핵심이다 — 주식에서 $2.8B 를 빼면서 채권으로는 $3.2B 를
+     * 넣었다. 주식만 보면 "발을 뺐다"인데 채권까지 보면 "옮겼다"다.
+     */
+    bondYears: { year: number; net: number; stockNet: number }[];
   } | null;
   /**
    * 잔고 증감을 순매수 몫과 평가 몫으로 가른 것. **해 단위다.**
@@ -261,22 +292,37 @@ async function loadChannel(
 
   // ⚠️ 정렬 키를 반드시 박는다. 이 자료를 처음 재다가 정렬 없이 페이징해서 값이
   // $112.6B → $164.1B 로 튀었다(이 저장소가 네 번 겪은 함정).
-  const daily: { settle_date: string; buy_amount: number | null; sell_amount: number | null }[] = [];
+  type Row = {
+    settle_date: string;
+    security_type: string;
+    buy_amount: number | null;
+    sell_amount: number | null;
+  };
+  // ⭐ 주식·채권을 한 번에 받는다. 채권 카드 때문에 왕복을 또 돌 이유가 없다.
+  const rows: Row[] = [];
   for (let start = 0; ; start += 1000) {
     const { data, error } = await sb
       .from("seohak_settlement_daily")
-      .select("settle_date, buy_amount, sell_amount")
+      .select("settle_date, security_type, buy_amount, sell_amount")
       .eq("market_code", "US")
-      .eq("security_type", "주식")
       .gte("settle_date", `${COHORT_FROM}-01-01`)
       .lte("settle_date", `${asOfMonth}-31`)
       .order("settle_date", { ascending: true })
+      .order("security_type", { ascending: true })
       .range(start, start + 999);
     if (error) return null;
-    const page = (data ?? []) as typeof daily;
-    daily.push(...page);
+    const page = (data ?? []) as Row[];
+    rows.push(...page);
     if (page.length < 1000) break;
   }
+  const daily = rows.filter((r) => r.security_type === "주식");
+
+  // ── 역대 누적 매수·매도. 연간표가 주식만 담으므로 그걸 쓴다(전 기간 실측).
+  const gross = await sb
+    .from("seohak_settlement_yearly")
+    .select("us_buy_amount, us_sell_amount");
+  const grossBuy = (gross.data ?? []).reduce((s, r) => s + Number(r.us_buy_amount ?? 0) / 1e6, 0);
+  const grossSell = (gross.data ?? []).reduce((s, r) => s + Number(r.us_sell_amount ?? 0) / 1e6, 0);
 
   const now = byMonth.get(asOfMonth);
   if (!now) return null;
@@ -323,7 +369,95 @@ async function loadChannel(
       nowValue: v.now,
       returnPct: (v.now / v.inflow - 1) * 100,
     }));
-  return { principal, value, principalShare: 0, valueShare: 0, from, cohorts };
+  // ── 회전율. 분모는 그 시점의 채널 잔고를 같은 방식으로 되짚어 낸다.
+  //
+  // ⚠️⚠️ **2015년 이전 유입을 빼먹으면 안 된다.** 처음에 `daily`(2015~)만 더했더니
+  // 옛 해의 분모가 작아져 회전율이 부풀고 보유기간이 짧게 나왔다 — 2019년이 8.1개월인데
+  // 5.4개월로 찍혔다. 금액은 $5.6B 로 작아도 **일찍 들어온 만큼 많이 굴러서** 그 시점
+  // 잔고에서는 몫이 크다.
+  const valueAt = (upto: string) => {
+    const lv = byMonth.get(upto);
+    if (!lv) return 0;
+    let v = 0;
+    for (const r of yearly.data ?? []) {
+      const y = Number(r.year);
+      if (`${y}-12` > upto) continue;
+      const net = (Number(r.us_buy_amount ?? 0) - Number(r.us_sell_amount ?? 0)) / 1e6;
+      v += net * (lv / midYear(y));
+    }
+    for (const r of daily) {
+      const m = r.settle_date.slice(0, 7);
+      if (m > upto) continue;
+      v += ((Number(r.buy_amount ?? 0) - Number(r.sell_amount ?? 0)) / 1e6) * (lv / (byMonth.get(m) ?? lv));
+    }
+    return v;
+  };
+  const gross12 = daily
+    .filter((r) => r.settle_date.slice(0, 7) > shiftMonths(asOfMonth, -12))
+    .reduce((s, r) => s + (Number(r.buy_amount ?? 0) + Number(r.sell_amount ?? 0)) / 1e6, 0);
+  const holdMonths = (traded: number, held: number) => (held > 0 ? 12 / (traded / held / 2) : 0);
+  const years = [...new Set(daily.map((r) => Number(r.settle_date.slice(0, 4))))].sort();
+  const turnover = value > 0
+    ? {
+        traded: gross12,
+        times: gross12 / value,
+        months: holdMonths(gross12, value),
+        byYear: years
+          .map((year) => {
+            const t = daily
+              .filter((r) => r.settle_date.startsWith(String(year)))
+              .reduce((s, r) => s + (Number(r.buy_amount ?? 0) + Number(r.sell_amount ?? 0)) / 1e6, 0);
+            // ⚠️ 그 해 말 잔고다. 마지막 해는 자료가 반년뿐이라 회전율이 낮게 나오므로 뺀다.
+            const held = valueAt(`${year}-12`);
+            return { year, months: holdMonths(t, held) };
+          })
+          // ⚠️ 초기 해는 뺀다. 채널 잔고가 $5B 도 안 되던 시절이라 분모가 몇 푼이라
+          // 회전율이 튄다(2015년 잔고 $0.7B). 마지막 해도 뺀다 — 자료가 반년뿐이라
+          // 거래는 반년치인데 잔고는 지금 것이라 회전율이 반토막 난다.
+          .filter(
+            (y) =>
+              y.months > 0 &&
+              y.year < Number(asOfMonth.slice(0, 4)) &&
+              valueAt(`${y.year}-12`) >= 5000,
+          ),
+      }
+    : null;
+
+  // ── 채권. 주식과 같은 해에 얼마를 넣었는지 나란히 둔다.
+  const netBy = (type: string) => {
+    const m = new Map<number, number>();
+    for (const r of rows) {
+      if (r.security_type !== type) continue;
+      const y = Number(r.settle_date.slice(0, 4));
+      m.set(y, (m.get(y) ?? 0) + (Number(r.buy_amount ?? 0) - Number(r.sell_amount ?? 0)) / 1e6);
+    }
+    return m;
+  };
+  const bondNet = netBy("채권");
+  const stockNet = netBy("주식");
+  const bondYears = [...bondNet.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([year, net]) => ({ year, net, stockNet: stockNet.get(year) ?? 0 }));
+
+  return {
+    principal,
+    value,
+    principalShare: 0,
+    valueShare: 0,
+    from,
+    cohorts,
+    turnover,
+    grossBuy,
+    grossSell,
+    bondYears,
+  };
+}
+
+/** "2026-05" 에서 n개월 옮긴다. 회전율 창을 자를 때만 쓴다. */
+function shiftMonths(month: string, n: number): string {
+  const [y, m] = month.split("-").map(Number);
+  const t = (y * 12 + (m - 1)) + n;
+  return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, "0")}`;
 }
 
 export async function getSeohakOverview(): Promise<SeohakOverview> {
