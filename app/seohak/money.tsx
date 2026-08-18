@@ -1,7 +1,9 @@
 import type { UsdKrw } from "@/lib/seohak-external";
 
 /**
- * 이 페이지의 **돈 표시** — 달러와 원을 한 번에 그려 두고 CSS 가 하나만 보여 준다.
+ * 이 페이지의 **표시 형식** — 돈(달러·원)과 날짜.
+ *
+ * 돈은 달러와 원을 한 번에 그려 두고 CSS 가 하나만 보여 준다.
  *
  * ## ⚠️⚠️ 규칙: **그 돈이 오간 때의 환율로 옮긴다**
  *
@@ -56,6 +58,16 @@ export function rateOverMonths(fx: Fx, months: number): number {
   if (!keys.length) return fx.now;
   return keys.reduce((s, k) => s + fx.rate[k], 0) / keys.length;
 }
+
+/**
+ * 날짜 알약의 표기 — `"2026-08-14"` → `"8/14"`.
+ *
+ * ⚠️ **연도를 뗀다.** 이 알약들은 "언제 자료인가" 를 말하는 신선도 표시라 늘 최근이고,
+ * 카드 안에서도 이미 `8/12` 꼴을 쓰고 있었다(달력의 '가장 많이 산 날'). 알약만 긴
+ * `2026-08-14` 로 두면 같은 화면이 날짜를 두 꼴로 적는다.
+ * ⚠️ 32년을 오가는 '역대 기록' 은 예외다. 거기는 연도가 있어야 한다(`fullLabel`).
+ */
+export const md = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
 
 /** "2026Q1" → "2026-03". 분기값은 그 분기 끝 달의 환율로 옮긴다. */
 export const quarterMonth = (q: string) =>

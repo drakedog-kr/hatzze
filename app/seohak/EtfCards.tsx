@@ -2,7 +2,7 @@ import type { SeohakEtf } from "@/lib/seohak-etf";
 import { C, MONO, R } from "../ui";
 import { BUY, BUY_INK, SELL, SELL_INK } from "./tone";
 import { CARD_GRID, Card, SignEm, Verdict } from "./DailyCards";
-import { type Fx, Money } from "./money";
+import { type Fx, Money, md } from "./money";
 import { S, T } from "./scale";
 
 /**
@@ -340,7 +340,7 @@ export function EtfSection({ e, fx }: { e: SeohakEtf; fx: Fx | null }) {
                좁은 화면에서 한쪽만 두 줄이 되어 같은 어긋남이 되살아난다 — 249px 로
                두면 카드 463~488px 구간이 그 창이었다(뷰포트 1,226~1,276px). */
             desc="거래대금이 아니라 실제로 오간 미국 ETF 자금"
-            note={`${e.asOf} 기준`}
+            note={`${md(e.asOf)} 기준`}
             /* 부제에서 밀려난 '채권형 제외' 가 여기로 온다. 짝도 같은 자리에 표본을
                밝히고 있어 두 카드가 같은 꼴이다. */
             noteHelp="상장좌수 변화 × 순자산가치로 재고, 채권형은 뺐습니다.">
@@ -357,7 +357,7 @@ export function EtfSection({ e, fx }: { e: SeohakEtf; fx: Fx | null }) {
               (까닭은 `WeekGrid` 머리말). */}
       <Card icon="grid_view" title="주간 등락"
             desc="미국 ETF가 5영업일 동안 얼마나 오르내렸는지"
-            note={`${e.weekFrom.slice(5)} ~ ${e.asOf.slice(5)}`}
+            note={`${md(e.weekFrom)} ~ ${md(e.asOf)}`}
             noteHelp={`거래대금 1억 이상 ${e.week.length}종목을 셉니다.`}>
         <WeekGrid e={e} />
       </Card>

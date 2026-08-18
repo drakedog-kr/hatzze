@@ -2,7 +2,7 @@ import type { SeohakOverview } from "@/lib/seohak-data";
 import type { HouseholdAssets } from "@/lib/seohak-external";
 import { C, MONO } from "../ui";
 import { Baseline, CHART, Card, Chart, Em, RefLine, SignEm, Tiles, Verdict } from "./DailyCards";
-import { type Fx, Money, quarterMonth } from "./money";
+import { type Fx, Money, md, quarterMonth } from "./money";
 import { S, T } from "./scale";
 import { signInk } from "./tone";
 
@@ -293,7 +293,7 @@ export function WealthCards({ ch, fx, household }: {
       {ch && fx && (
         <Card icon="currency_exchange" title="원화로 보면"
               desc="달러로 잰 수익을 원화로 옮기면 얼마인지"
-              note={`환율 ${fx.nowDate}`}
+              note={`환율 ${md(fx.nowDate)} 기준`}
               foot="환율이 평균으로 돌아가면 원화 수익도 그만큼 줄어듭니다.">
           <InWon ch={ch} fx={fx} />
         </Card>

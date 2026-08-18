@@ -7,7 +7,7 @@ import { CALENDAR_WINDOWS, CHANCE_BASELINE, windowDates, windowsInMonth } from "
 import { SectionHead } from "../kadera/SectionHead";
 import { BUY, SELL, signInk } from "./tone";
 import { S, T } from "./scale";
-import { type Fx, Money, both } from "./money";
+import { type Fx, Money, both, md } from "./money";
 import { C, Icon, MONO, R } from "../ui";
 
 /**
@@ -38,10 +38,10 @@ import { C, Icon, MONO, R } from "../ui";
  * 글자가 아니라 그림이고, 24px 단추 안에 22 를 넣으면 꽉 찬다.
  */
 
-/** "M/D" — 달력 안이라 연도는 군더더기다. */
-const dayLabel = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8))}`;
-/** "YYYY/M/D" — 32년을 오가는 줄에는 연도가 있어야 한다. 구분자는 `dayLabel` 과 맞춘다. */
-const fullLabel = (date: string) => `${date.slice(0, 4)}/${dayLabel(date)}`;
+/* "M/D" 를 만들던 `dayLabel` 이 여기 있었다. 알약과 카드가 같은 꼴을 써야 해서
+   `money.ts` 의 `md()` 로 모았다. */
+/** "YYYY/M/D" — 32년을 오가는 줄에는 연도가 있어야 한다. 구분자는 `md()` 와 맞춘다. */
+const fullLabel = (date: string) => `${date.slice(0, 4)}/${md(date)}`;
 /** 모서리 넷 — 마크 2 · 달력 칸 4 · 상자 R.control · 알약 R.pill. 그 밖의 값은 쓰지 않는다. */
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
@@ -362,7 +362,7 @@ export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
         /* ⚠️ 부제는 **명사구**로 끝낸다. 다른 화면(카더라·MDD)의 부제가 전부 그런데
            이 페이지만 '~입니다' 로 문장을 쓰고 있었다. 두 문장이던 것도 한 줄로 줄인다. */
         desc="하루 단위로 본 행동 패턴 · 사고파는 건수는 늘 그대로고 달라지는 건 한 번에 넣는 금액"
-        note={`${c.asOf} 기준`}
+        note={`${md(c.asOf)} 기준`}
         /* 원래 시트 바닥에 네 줄짜리 각주였고, 그다음엔 여기 툴팁에 세 문장이 들어갔다.
            둘 다 길어서 안 읽힌다. 툴팁은 **한 문장이 넘으면 툴팁이 아니다** — 열어 놓고
            읽어야 하는 순간 각주로 돌아간 것이다.
@@ -587,12 +587,12 @@ export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
                   // 없이 나란히 두면 같은 종류로 읽혀서 $739M 을 $10.16B 와 견주게 된다.
                   // 부호를 붙여 "차이"임을 형태로 알린다.
                   topBuy && {
-                    k: "가장 많이 산 날", n: dayLabel(topBuy.date), sign: 1,
+                    k: "가장 많이 산 날", n: md(topBuy.date), sign: 1,
                     v: <>+<Money usd={Math.abs(topBuy.net)} at={monthOf(topBuy.date)} fx={fx} /></>,
                     on: () => setPicked(topBuy.date),
                   },
                   topSell && {
-                    k: "가장 많이 판 날", n: dayLabel(topSell.date), sign: -1,
+                    k: "가장 많이 판 날", n: md(topSell.date), sign: -1,
                     v: <>−<Money usd={Math.abs(topSell.net)} at={monthOf(topSell.date)} fx={fx} /></>,
                     on: () => setPicked(topSell.date),
                   },
