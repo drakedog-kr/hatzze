@@ -382,6 +382,16 @@ jobs:
       # ⚠️ 매일 돌려도 된다. 재무부가 **앞 달을 수정**하므로 전 기간을 통째로 다시
       #    쓰는 게 맞고(실측: 2026-05 잔고가 다음 발표에서 +961 바뀌었다), 9MB 내려받아
       #    3,500행 upsert 라 비용이 없다.
+      - name: Fetch 예탁원 외화증권 결제 (서학개미)
+        id: seohak_settlement
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_seohak_settlement.py
+
+      - name: Fetch 국내 상장 미국 ETF (서학개미)
+        id: seohak_etf
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_seohak_etf.py
+
       - name: Fetch TIC 나라별 미국 증권 보유·순매수 (서학개미)
         id: seohak_tic
         continue-on-error: true
@@ -843,15 +853,18 @@ jobs:
       #    안 움직인다 — 없어지는 게 아니라서 눈에 안 띈다. 그게 이 화면이 파이프라인
       #    없이 110일을 버틴 방식이다.
       #
-      # ⚠️ 하루 실패는 다음 실행이 만회한다(전 기간을 다시 쓴다). 며칠 연속 열리면
-      #    그때는 재무부가 파일 이름이나 계열 키를 바꾼 것이니 스크립트 머리말의
-      #    source_id 규칙부터 볼 것 — 계열을 못 찾으면 일부러 죽게 해 뒀다.
+      # ⚠️ 하루 실패는 다음 실행이 만회한다(셋 다 최근 며칠을 다시 받는다). 며칠 연속
+      #    열리면 원천이 바뀐 것이니 스크립트 머리말부터 볼 것.
+      #      예탁원  주소가 `/service/` 없이 `_V2` 다. 없는 주소를 부르면 "등록되지 않은
+      #              서비스키" 가 오는데 **키 문제가 아니다**(그 메시지로 한 번 헤맸다).
+      #      ETF     KRX 는 휴장일에도 1,163행을 준다. 거래대금 합계 0 으로 가른다.
+      #      TIC     계열 키(source_id)를 못 찾으면 일부러 죽게 해 뒀다.
       - name: Summarize 서학개미 수집
         id: seohak_health
         if: always()
         run: |
-          names=("fetch_seohak_tic.py")
-          outcomes=("${{ steps.seohak_tic.outcome }}")
+          names=("fetch_seohak_settlement.py" "fetch_seohak_etf.py" "fetch_seohak_tic.py")
+          outcomes=("${{ steps.seohak_settlement.outcome }}" "${{ steps.seohak_etf.outcome }}" "${{ steps.seohak_tic.outcome }}")
 
           {
             echo "## 서학개미 해부도"

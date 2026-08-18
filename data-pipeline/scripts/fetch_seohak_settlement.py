@@ -1,42 +1,37 @@
-"""예탁결제원 국제거래 외화증권 결제 통계를 seohak_settlement_daily 에 upsert.
+"""한국예탁결제원 외화증권 결제 통계를 `seohak_settlement_daily` 에 upsert.
 
-TIC(월별)·13F(분기별)가 못 하는 **일별 층**을 맡는다. 거래일 대비 T+1 영업일이라
-오늘 실행하면 직전 영업일까지 들어온다.
+서학개미 해부도의 **일별 뼈대**다. 달력 히어로·'평소와의 차이'·'얼마나 오래 들고 있나'가
+전부 이 표를 읽는다. 개인과 기관을 가르는 유일한 미국장 자료이기도 하다 — 국내 증권사를
+거친 결제만 잡히므로 수탁은행을 직접 쓰는 대형 기관이 빠진다.
 
-원천: 공공데이터포털 금융위원회_국제거래외화증권예탁결제정보
-      GetDrForeSecuSettInfoService_V2 / getMarkForeSecuSettStat_V2
+## 원천
 
-## 함정 셋 (전부 실측으로 밟았다)
+공공데이터포털 `금융위원회_국제거래외화증권예탁결제정보`.
 
-1. **경로에 `_V2` 가 한 번 더 붙는다.** 상세페이지의 host 문자열이
-   `…/GetDrForeSecuSettInfoService_V2` 라 오퍼레이션을 `getMarkForeSecuSettStat` 로
-   부르기 쉬운데, 실제 경로는 `getMarkForeSecuSettStat_V2` 다. 틀리면
-   `NO_OPENAPI_SERVICE_ERROR`(코드 12)가 오는데 **키가 틀렸을 때와 구분이 안 돼**
-   키 문제로 오진하게 된다.
+    https://apis.data.go.kr/1160100/GetDrForeSecuSettInfoService_V2/getMarkForeSecuSettStat_V2
 
-2. ⚠️⚠️ **날짜 범위 필터가 조용히 무시된다.** `beginFrcrScrtDpsgStlDt`/`end…` 를 넣으면
-   에러 없이 **전체 101,676행**을 준다. 필터가 먹은 줄 알고 1994년 자료를 오늘 것으로
-   읽게 되는 종류의 실패다. 먹는 건 단일일 `frcrScrtDpsgStlDt=YYYYMMDD` 뿐이라
-   하루씩 돈다.
+⚠️⚠️ **주소에 `/service/` 가 없고 끝에 `_V2` 가 붙는다.** 다른 금융위 API 는 거의 다
+`/1160100/service/<Service>/<op>` 꼴이라 그 관례대로 찍으면 안 나온다. 그때 돌아오는
+응답이 `SERVICE_KEY_IS_NOT_REGISTERED_ERROR`(등록되지 않은 서비스키)인데, **키 문제가
+아니라 없는 주소를 불렀다는 뜻**이다. 실제로 그 메시지를 키 문제로 읽고 며칠 헤맸다.
 
-3. **금액은 Stat 쪽에만 있다.** 같은 서비스의 `getForeSecuSettInfo_V2` 는 건수만 준다.
+## ⚠️⚠️ 날짜 범위 필터가 **조용히 무시된다**
 
-## 왜 미국만 안 담나
+    frcrScrtDpsgStlDt=20260814                     → 24행   ✅ 먹는다
+    basDt=20260814                                 → 101,818행 (전체)
+    beginFrcrScrtDpsgStlDt=…&endFrcrScrtDpsgStlDt=… → 101,818행 (전체)
 
-"해외주식 매수 중 미국이 몇 %인가"가 이 표에서 가장 센 값인데, 그건 분모가 있어야
-나온다. 하루 25행이라 32년을 다 담아도 30만 행 언저리다.
+뒤의 둘은 **에러도 안 내고 전량을 준다.** 범위로 받는 줄 알고 쓰면 10만 행을 받아 놓고
+"많이 왔네" 하고 넘어가게 된다. 그래서 이 스크립트는 **날짜 하나씩** 부른다.
 
-## 트래픽
+## 며칠을 다시 받나
 
-개발계정이 일 10,000회다. 첫 적재는 8,000영업일이라 **하루에 다 못 채운다** —
-`--from` 으로 나눠 돌리거나 며칠에 걸쳐 이어 받는다(이미 저장된 날은 건너뛴다).
-매일 실행에서는 새 영업일 한둘만 받으므로 트래픽이 사실상 안 든다.
+기본 10일이다. 하루치만 받으면 러너가 실패한 날의 구멍이 영영 남는다(이 표는 1994년부터
+7,059 결제일인데 미국 휴장이면 행 자체가 없거나 0 이라, 빠진 날을 나중에 알아채기 어렵다).
+열흘이면 연휴를 건너뛰고도 메워지고, 요청은 하루 10회뿐이다.
 
-실행:
-    cd data-pipeline && source .venv/bin/activate
-    python scripts/fetch_seohak_settlement.py --dry-run          # 조회만
-    python scripts/fetch_seohak_settlement.py                    # 최근 구간 채우기
-    python scripts/fetch_seohak_settlement.py --from 1994-08-01  # 소급 적재
+⭐ 결제일 기준이라 **거래일보다 1영업일 늦다.** 오늘 새벽 실행에서 어제 거래분이 아직
+안 올라와 있을 수 있는데, 열흘을 훑으므로 다음 실행이 저절로 만회한다.
 """
 
 from __future__ import annotations
@@ -54,163 +49,105 @@ from common.config import KSD_API_KEY  # noqa: E402
 from common.retry import backoff_delay  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 
-TABLE = "seohak_settlement_daily"
-UPSERT_CHUNK = 500
-
-BASE_URL = (
+ENDPOINT = (
     "https://apis.data.go.kr/1160100/GetDrForeSecuSettInfoService_V2"
     "/getMarkForeSecuSettStat_V2"
 )
-TIMEOUT_SEC = 40
-MAX_ATTEMPTS = 4
-REQUEST_INTERVAL_SEC = 0.05
-
-# 이 원천의 첫 결제일. 이보다 앞을 물으면 빈 응답이 온다.
-FIRST_DATE = date(1994, 8, 16)
-# 한 실행에서 받을 최대 일수. 개발계정 트래픽(일 10,000)에 여유를 두고, 소급 적재가
-# 실수로 하루 한도를 다 태우지 않게 막는다.
-MAX_DAYS_PER_RUN = 4000
-# ⚠️ 상한에 걸리면 **조용히 그 지점에서 멈춘다**(끝 줄에 그렇게 찍기는 한다). 1994년부터
-# 한 번에 돌리면 2009년쯤에서 끊기는데, 연도 롤업이 "2009 다음이 2026" 이라는 이상한
-# 표를 만들 때까지 눈치채기 어렵다. 소급 적재는 **끝 줄을 확인하고 다시 돌릴 것.**
+REQUEST_TIMEOUT_SEC = 30
+MAX_RETRIES = 4
+# 하루에 24행쯤이라(시장×종류) 100이면 넉넉하다. 넘치면 아래에서 알아채고 죽는다.
+ROWS_PER_DAY = 200
+LOOKBACK_DAYS = 10
+CHUNK = 500
 
 
-def fetch_day(day: date) -> list[dict] | None:
-    """하루치 전 시장. 자료가 없는 날(휴일 등)은 빈 목록이고, 조회 실패는 None 이다.
-
-    빈 목록과 실패를 구분하는 이유: 빈 날을 '받았다'고 기록해야 다음 실행이 같은 날을
-    다시 묻지 않는데, 실패까지 그렇게 다루면 구멍이 영구히 남는다.
-    """
+def fetch_day(day: date) -> list[dict]:
+    """그 결제일의 모든 시장·종류 행. 없으면 빈 목록."""
     params = {
         "serviceKey": KSD_API_KEY,
-        "numOfRows": 200,
-        "pageNo": 1,
         "resultType": "json",
+        "numOfRows": ROWS_PER_DAY,
+        "pageNo": 1,
         "frcrScrtDpsgStlDt": day.strftime("%Y%m%d"),
     }
-    last_error: Exception | None = None
-    for attempt in range(1, MAX_ATTEMPTS + 1):
+    last: Exception | None = None
+    for attempt in range(MAX_RETRIES):
         try:
-            resp = requests.get(BASE_URL, params=params, timeout=TIMEOUT_SEC)
-            resp.raise_for_status()
-            payload = resp.json()
-            body = payload.get("response", {}).get("body")
-            if body is None:
-                # 인증 오류·서비스 경로 오류는 OpenAPI_ServiceResponse 로 온다.
-                head = payload.get("OpenAPI_ServiceResponse", {}).get("cmmMsgHeader", {})
-                raise RuntimeError(head.get("errMsg") or str(payload)[:200])
-            items = body.get("items") or {}
-            rows = items.get("item") or []
-            return rows if isinstance(rows, list) else [rows]
-        except (requests.Timeout, requests.ConnectionError, requests.HTTPError) as exc:
-            last_error = exc
-            if attempt < MAX_ATTEMPTS:
-                time.sleep(backoff_delay(attempt))
-        except RuntimeError as exc:
-            # 재시도해도 안 바뀌는 종류(키·경로)라 바로 올린다.
-            raise SystemExit(f"예탁원 API 오류: {exc}")
-    print(f"  ! {day} 조회 실패: {last_error}")
-    return None
+            res = requests.get(ENDPOINT, params=params, timeout=REQUEST_TIMEOUT_SEC)
+            res.raise_for_status()
+            body = res.json()["response"]["body"]
+            total = int(body.get("totalCount") or 0)
+            if total == 0:
+                return []
+            # ⚠️ 필터가 먹었는지 여기서 확인한다. 무시되면 10만이 온다 — 그걸 그대로
+            # 저장하면 표가 통째로 오염된다.
+            if total > ROWS_PER_DAY:
+                raise RuntimeError(
+                    f"{day} 하루에 {total}행 — 날짜 필터가 무시된 것으로 보인다"
+                )
+            item = body.get("items", {}).get("item") or []
+            return item if isinstance(item, list) else [item]
+        except Exception as exc:  # noqa: BLE001
+            last = exc
+            delay = backoff_delay(attempt + 1, base_sec=2, max_sec=15)
+            print(f"[예탁원] {day} 조회 실패({exc}) — {delay:.0f}초 뒤 재시도")
+            time.sleep(delay)
+    raise RuntimeError(f"{day} 조회 실패: {last}")
 
 
-def to_rows(day: date, items: list[dict]) -> list[dict]:
-    out = []
-    for it in items:
-        code = (it.get("scrsMrktNtnlDcd") or "").strip()
-        kind = (it.get("scrsDcdNm") or "").strip()
-        if not code or not kind:
-            continue
-        out.append(
-            {
-                "settle_date": day.isoformat(),
-                "market_code": code,
-                "market_name": (it.get("scrsMrktNtnlDcdNm") or code).strip(),
-                "security_type": kind,
-                "buy_count": int(float(it.get("buynCcnt") or 0)),
-                "buy_amount": float(it.get("buynAmt") or 0),
-                "sell_count": int(float(it.get("dpsgScrtSlngCcnt") or 0)),
-                "sell_amount": float(it.get("dpsgScrtSlngAmt") or 0),
-            }
-        )
-    return out
-
-
-def stored_dates(db, since: date) -> set[str]:
-    """이미 저장된 결제일. 하루씩 도는 원천이라 이게 없으면 매 실행 전체를 다시 받는다."""
-    seen: set[str] = set()
-    start = 0
-    while True:
-        page = (
-            db.table(TABLE)
-            .select("settle_date")
-            .gte("settle_date", since.isoformat())
-            .order("settle_date")
-            .range(start, start + 999)
-            .execute()
-        )
-        rows = page.data or []
-        seen.update(r["settle_date"] for r in rows)
-        if len(rows) < 1000:
-            return seen
-        start += 1000
+def to_row(x: dict) -> dict:
+    d = x["frcrScrtDpsgStlDt"]
+    return {
+        "settle_date": f"{d[:4]}-{d[4:6]}-{d[6:]}",
+        "market_code": x["scrsMrktNtnlDcd"],
+        "market_name": x["scrsMrktNtnlDcdNm"],
+        "security_type": x["scrsDcdNm"],
+        # ⚠️ 원천이 전부 문자열이고 금액엔 소수점이 있다(811473491.62). 건수만 int.
+        "buy_count": int(x["buynCcnt"] or 0),
+        "buy_amount": float(x["buynAmt"] or 0),
+        "sell_count": int(x["dpsgScrtSlngCcnt"] or 0),
+        "sell_amount": float(x["dpsgScrtSlngAmt"] or 0),
+    }
 
 
 def main() -> None:
     if not KSD_API_KEY:
-        raise SystemExit("KSD_API_KEY 가 없습니다(.env.local 확인). Decoding 키를 넣으세요.")
+        print("[예탁원] KSD_API_KEY 없음 — 건너뜁니다")
+        sys.exit(1)
 
-    dry_run = "--dry-run" in sys.argv
-    since = FIRST_DATE
-    if "--from" in sys.argv:
-        since = date.fromisoformat(sys.argv[sys.argv.index("--from") + 1])
-    elif not dry_run:
-        # 기본은 최근 40일만 훑는다. 매일 실행에서 새 영업일 한둘을 채우는 게 목적이라
-        # 32년을 매번 확인할 이유가 없다(소급은 --from 으로 따로 돌린다).
-        since = date.today() - timedelta(days=40)
-
-    db = None if dry_run else get_client()
-    done = set() if dry_run else stored_dates(db, since)
-
-    day = since
     today = date.today()
-    fetched = saved = skipped = 0
-    while day <= today and fetched < MAX_DAYS_PER_RUN:
-        if day.weekday() >= 5 or day.isoformat() in done:
-            day += timedelta(days=1)
-            continue
-
+    rows: list[dict] = []
+    days_with_data = 0
+    for back in range(LOOKBACK_DAYS):
+        day = today - timedelta(days=back)
         items = fetch_day(day)
-        fetched += 1
-        time.sleep(REQUEST_INTERVAL_SEC)
-        if items is None:
-            day += timedelta(days=1)
+        if not items:
             continue
-        rows = to_rows(day, items)
-        if not rows:
-            skipped += 1
-            day += timedelta(days=1)
-            continue
+        days_with_data += 1
+        rows.extend(to_row(x) for x in items)
 
-        if dry_run:
-            us = next((r for r in rows if r["market_code"] == "US" and r["security_type"] == "주식"), None)
-            if us:
-                print(
-                    f"  {day} · {len(rows):>2}행 · 미국 주식 매수 {us['buy_count']:>7,}건 "
-                    f"${us['buy_amount']/1e9:>5,.2f}B · 매도 {us['sell_count']:>7,}건 ${us['sell_amount']/1e9:>5,.2f}B"
-                )
-        else:
-            for i in range(0, len(rows), UPSERT_CHUNK):
-                db.table(TABLE).upsert(
-                    rows[i : i + UPSERT_CHUNK],
-                    on_conflict="settle_date,market_code,security_type",
-                ).execute()
-            saved += len(rows)
-        day += timedelta(days=1)
+    if not rows:
+        raise RuntimeError(f"최근 {LOOKBACK_DAYS}일에 결제 자료가 하나도 없다")
 
-    tail = " (한 실행 상한에 걸렸습니다 — 다시 돌리면 이어 받습니다)" if fetched >= MAX_DAYS_PER_RUN else ""
+    db = get_client()
+    for i in range(0, len(rows), CHUNK):
+        db.table("seohak_settlement_daily").upsert(
+            rows[i : i + CHUNK],
+            on_conflict="settle_date,market_code,security_type",
+        ).execute()
+
+    us = [r for r in rows if r["market_code"] == "US" and r["security_type"] == "주식"]
+    latest = max(r["settle_date"] for r in rows)
     print(
-        f"{'[dry-run] ' if dry_run else ''}완료 · 조회 {fetched}일 · 저장 {saved}행 · 자료 없는 날 {skipped}일{tail}"
+        f"[Supabase] seohak_settlement_daily upsert 완료: {len(rows)}행 "
+        f"· 결제일 {days_with_data}일 · 최신 {latest}"
     )
+    for r in sorted(us, key=lambda r: r["settle_date"])[-3:]:
+        net = (r["buy_amount"] - r["sell_amount"]) / 1e6
+        print(
+            f"  {r['settle_date']} 미국 주식  순매수 ${net:,.0f}M "
+            f"(매수 {r['buy_count']:,}건 · 매도 {r['sell_count']:,}건)"
+        )
 
 
 if __name__ == "__main__":

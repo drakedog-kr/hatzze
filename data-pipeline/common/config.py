@@ -13,12 +13,10 @@ FRED_API_KEY = os.environ.get("FRED_API_KEY")
 NAVER_HUB_KEY_ID = os.environ.get("NAVER_HUB_KEY_ID")
 NAVER_HUB_KEY = os.environ.get("NAVER_HUB_KEY")
 KRX_API_KEY = os.environ.get("KRX_API_KEY")
+# 한국예탁결제원 외화증권 결제(공공데이터포털 금융위원회). 서학개미 해부도의 일별 뼈대다.
+KSD_API_KEY = os.environ.get("KSD_API_KEY")
 ECOS_API_KEY = os.environ.get("ECOS_API_KEY")
 ALADIN_TTB_KEY = os.environ.get("ALADIN_TTB_KEY")
-# 공공데이터포털(data.go.kr) 인증키 — 한국예탁결제원 국제거래 외화증권 예탁결제 통계.
-# **Decoding 키**를 넣어야 한다. Encoding 키를 쓰면 requests 가 한 번 더 인코딩해
-# 인증이 깨진다. 개발계정 트래픽은 일 10,000회.
-KSD_API_KEY = os.environ.get("KSD_API_KEY")
 YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY")
 KMA_API_KEY = os.environ.get("KMA_API_KEY")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")  # 선택 — 없으면 비인증으로 호출(rate limit만 낮음)
