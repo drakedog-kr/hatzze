@@ -5,7 +5,8 @@ import { useMemo, useState } from "react";
 import type { CalendarDay, SeohakCalendar } from "@/lib/seohak-calendar";
 import { CALENDAR_WINDOWS, CHANCE_BASELINE, windowDates, windowsInMonth } from "@/lib/seohak-windows";
 import { SectionHead } from "../kadera/SectionHead";
-import { BUY, SELL } from "./tone";
+import { BUY, SELL, signInk } from "./tone";
+import { S, T } from "./scale";
 import { C, Icon, MONO, R } from "../ui";
 
 /**
@@ -27,28 +28,19 @@ import { C, Icon, MONO, R } from "../ui";
  */
 
 /**
- * 이 카드의 **자**. 값을 손으로 적지 말고 여기서 고른다.
+ * ⭐ 이 카드가 혼자 들고 있던 자(`T`·`S`)를 **페이지 자**(`./scale`)로 옮겼다.
  *
- * ⚠️ 자가 없을 때 글자 크기가 **11가지**(9.5·10·10.5·11·11.5·12·12.5·13.5·14·16·20),
- * 간격이 9가지, 안쪽 여백이 5가지로 흩어져 있었다. 값 하나하나는 그럴듯한데 모아 놓으면
- * 규칙이 안 보여서 화면이 지저분해진다.
+ * 여기서 먼저 배운 것이라(글자 11가지 → 3가지) 다른 카드들은 그대로 흩어져 있었다.
+ * 이제 다섯 파일이 같은 다섯 단을 쓴다. 근거는 `scale.ts` 머리말.
  *
- *   big  20   금액 큰 숫자
- *   body 12   라벨·값·목록
- *   tiny 10   달력 날짜·요일·구간 띠·보조·범례
- *
- * ⭐ 처음엔 다섯이었다(13.5 소제목 · 11 보조를 더 뒀다). 조판을 정리하고 나니 그 둘을
- * 쓰는 자리가 하나도 안 남았다 — **자에 눈금이 있으면 언젠가 누가 쓴다.** 안 쓰는 눈금은
- * 지운다. 시트 머리(18·14·12.5)는 `SectionHead` 것이라 여기 자가 아니다.
+ * ⚠️ 옮기면서 `big` 이 20 → 22 가 됐다. 아래 화살표 아이콘만 그 자를 안 쓴다 —
+ * 글자가 아니라 그림이고, 24px 단추 안에 22 를 넣으면 꽉 찬다.
  */
-const T = { big: 20, body: 12, tiny: 10 } as const;
 
 /** "M/D" — 달력 안이라 연도는 군더더기다. */
 const dayLabel = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8))}`;
 /** "YYYY/M/D" — 32년을 오가는 줄에는 연도가 있어야 한다. 구분자는 `dayLabel` 과 맞춘다. */
 const fullLabel = (date: string) => `${date.slice(0, 4)}/${dayLabel(date)}`;
-/** 간격도 4의 배수 넷으로만. */
-const S = { xs: 4, sm: 8, md: 12, lg: 16 } as const;
 /** 모서리 넷 — 마크 2 · 달력 칸 4 · 상자 R.control · 알약 R.pill. 그 밖의 값은 쓰지 않는다. */
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
@@ -87,11 +79,17 @@ function shiftMonth(month: string, by: number) {
  * 잡는다. 누를 수 있으면 값에 밑줄만 들어간다.
  */
 function Row({ k, n, v, on }: { k: string; n: string; v: string; on?: () => void }) {
+  /* ⭐ 부호가 붙은 값은 색으로도 방향을 말한다 — 오르면 빨강, 내리면 파랑(국내 관행).
+     `+$1.18B` 와 `−$1.00B` 가 둘 다 검정이라 굵기 말고는 구분이 없었다.
+     ⚠️ 값 문자열에서 읽는다. 이 줄 꼴은 금액·횟수·차액을 다 받는데 부호를 붙일지는
+     부르는 쪽이 이미 정해 두었고(`+${usd(...)}`), 그 판단을 두 곳에 두면 갈린다.
+     ⚠️ 마이너스는 하이픈이 아니라 U+2212 다. `usd()` 가 그 글자를 쓴다. */
+  const ink = v.startsWith("+") ? signInk(1) : v.startsWith("\u2212") ? signInk(-1) : C.ink;
   const body = (
     <>
       <span style={{ fontSize: T.body, color: C.sub }}>{k}</span>
       <span style={{ marginLeft: "auto", fontSize: T.tiny, color: C.faint }}>{n}</span>
-      <b style={{ fontFamily: MONO, fontSize: T.body, color: C.ink, minWidth: 62,
+      <b style={{ fontFamily: MONO, fontSize: T.body, color: ink, minWidth: 62,
                   textAlign: "right", textDecoration: on ? "underline" : "none",
                   textUnderlineOffset: 2 }}>{v}</b>
     </>
@@ -184,8 +182,10 @@ function Box({ head, amount, rows }: {
       <div style={{ display: "flex", flexDirection: "column", gap: S.sm }}>
         <span style={{ fontSize: T.body, color: C.sub2, fontWeight: 600 }}>{head}</span>
         <span style={{ display: "flex", alignItems: "baseline", gap: S.sm, flexWrap: "wrap" }}>
+          {/* ⚠️ 면 색(BUY/SELL)이 아니라 글자 색이다. 파랑 원색은 흰 상자 위 명암비가
+              3.71 이라 이 크기여도 4.5 에 못 미친다. */}
           <b style={{ fontFamily: MONO, fontSize: T.big, fontWeight: 800,
-                      color: amount >= 0 ? BUY : SELL, letterSpacing: "-0.02em" }}>
+                      color: signInk(amount), letterSpacing: "-0.02em" }}>
             {usd(Math.abs(amount))}
           </b>
           <span style={{ fontSize: T.body, color: C.sub }}>
@@ -350,7 +350,8 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                     cursor: disabled ? "default" : "pointer", padding: 0,
                   }}
                 >
-                  <Icon name={by < 0 ? "chevron_left" : "chevron_right"} style={{ fontSize: T.big }} />
+                  {/* 글자가 아니라 그림이라 자 밖이다. 24px 단추에 맞춘 광학 크기. */}
+                  <Icon name={by < 0 ? "chevron_left" : "chevron_right"} style={{ fontSize: 20 }} />
                 </button>
               );
             })}
@@ -400,11 +401,21 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
             </span>
           ))}
 
+          {/* ## ⭐ 요일 줄과 날짜 격자를 **둘로 갈랐다**
+              한 격자였을 때 날짜 칸이 34px 로 못 박혀 있어서, 오른쪽 칸이 길어지는 폭
+              (1,060px 에서 줄이 두 줄로 접힌다)에서는 달력 아래가 **94px 비었다.**
+              칸 격자만 `flex:1` 로 두면 그 폭을 칸 높이가 나눠 먹는다.
+              ⚠️ 갈라야 하는 이유: `gridAutoRows` 는 요일 줄에도 걸린다. 한 격자에 두면
+              '일 월 화…' 한 줄이 34px 짜리 띠가 된다. */}
+          <div style={{ display: "flex", flexDirection: "column", gap: S.xs, flex: 1, minHeight: 0 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: S.xs }}>
             {WEEKDAYS.map((w, i) => (
               <span key={w} style={{ fontSize: T.tiny, fontWeight: 700, textAlign: "center",
                                      color: i === 0 || i === 6 ? C.faint : C.sub2 }}>{w}</span>
             ))}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: S.xs,
+                        flex: 1, minHeight: 0, gridAutoRows: "minmax(34px, 1fr)" }}>
             {cells.map((d, i) => {
               if (d === null) return <span key={`b${i}`} />;
               const date = `${month}-${String(d).padStart(2, "0")}`;
@@ -427,7 +438,8 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                   disabled={!row}
                   title={row ? `${date} · 순매수 ${usd(row.net)}` : `${date} · 결제 없음`}
                   style={{
-                    position: "relative", height: 34,
+                    // 높이는 위 격자의 `gridAutoRows` 가 정한다(바닥값 34).
+                    position: "relative",
                     /* ⚠️ 한때 `aspectRatio: 1.35 + minHeight: 34` 로 뒀는데 못 쓴다.
                        격자 칸이 1fr 이라 폭이 36 이면 비율상 높이가 26.7 인데, minHeight 가
                        34 로 올리면 aspect-ratio 가 **그 높이에 맞춰 폭을 46 으로 되민다**.
@@ -459,6 +471,7 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                 </button>
               );
             })}
+          </div>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: S.sm, fontSize: T.tiny,
@@ -555,8 +568,14 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                 참고다. 위에 뒀을 때는 카드를 열자마자 최대·최소가 먼저 눈에 들어와
                 주장이 뒤로 밀렸다. */}
             <div style={{ flex: "1 1 min(210px, 100%)", minWidth: 0, display: "flex" }}>
+                {/* ## ⚠️⚠️ 남는 폭은 **묶음 사이**로 간다, 줄 사이가 아니라
+                    앞 판은 아래 `<ul>` 이 `flex:1 + space-between` 이라 남는 50px 를 줄
+                    사이로 흩뿌렸다. 그러면 줄 간격이 34px 인데 '해마다 되풀이되는 때' 와
+                    '역대 기록' 사이는 12px 가 되어, **위계가 거꾸로 선다** — 다른 묶음
+                    사이가 같은 묶음 안보다 좁다("완전 다른건데 스페이싱 간격이 똑같아").
+                    지금은 줄이 8px 로 붙고 남는 폭이 통째로 묶음 사이 틈이 된다. */}
                 <Card>
-                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: S.sm }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: S.sm }}>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: S.xs,
                                    fontSize: T.body, color: C.sub2, fontWeight: 600 }}>
                       해마다 되풀이되는 때
@@ -567,12 +586,8 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                         <Icon name="help" style={{ fontSize: 12, color: C.hint }} />
                       </span>
                     </span>
-                    {/* 카드를 통째로 쓰게 되면서 한 열로 편다. 줄마다 해마다의 칸이 붙어
-                        가로로 길어야 하고, `space-between` 이 남는 높이를 줄 사이로 고르게
-                        나눠 마지막 줄이 옆 카드의 마지막 줄과 같은 높이에 앉는다. */}
-                    <ul style={{ listStyle: "none", margin: 0, padding: "10px 0 0", flex: 1,
-                                 display: "flex", flexDirection: "column",
-                                 justifyContent: "space-between",
+                    <ul style={{ listStyle: "none", margin: 0, padding: "10px 0 0",
+                                 display: "flex", flexDirection: "column", gap: S.sm,
                                  borderTop: `1px solid ${C.line}` }}>
                       {CALENDAR_WINDOWS.map((w) => (
                         <li key={w.key}>
@@ -582,7 +597,13 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                     </ul>
                   </div>
 
+                  {/* `marginTop:auto` — 역대 기록은 늘 카드 바닥이다. 위 묶음이 몇 줄이든
+                      셋 칸의 바닥이 맞는다.
+                      ⚠️ `paddingTop` 을 함께 준다. 남는 폭에만 기대면 **카드가 딱 맞게 찰 때
+                      틈이 0 이 되어** 묶음 사이가 줄 사이(8)보다 좁아진다 — 1,060px 에서
+                      실제로 그랬다(줄이 두 줄로 접혀 카드를 꽉 채운다). 이 값이 바닥이다. */}
                   {c.records && (
+                    <div style={{ marginTop: "auto", paddingTop: S.md }}>
                     <Group
                       head="역대 기록"
                       rows={[
@@ -605,6 +626,7 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                         },
                       ]}
                     />
+                    </div>
                   )}
                 </Card>
             </div>

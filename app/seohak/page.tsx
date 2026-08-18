@@ -5,12 +5,13 @@ import { getSeohakOverview } from "@/lib/seohak-data";
 import { getSeohakCalendar } from "@/lib/seohak-calendar";
 import { getSeohakEtf } from "@/lib/seohak-etf";
 import { getHouseholdAssets, getUsdKrw } from "@/lib/seohak-external";
-import { DailySection } from "./DailyCards";
+import { CARD_GRID, DailySection } from "./DailyCards";
 import { CalendarHero } from "./CalendarHero";
 import { EtfSection } from "./EtfCards";
 import { TradingCards } from "./TradingCards";
 import { WealthCards } from "./WealthCards";
 import { SectionCaps } from "../kadera/parts";
+import { S } from "./scale";
 import { pageMetadata } from "../seo";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -41,7 +42,7 @@ export default async function SeohakPage() {
     // hz-cards 를 쓰지 않는다. 그건 브리핑의 4열 셀 격자라 자식마다 min-height 274px 가
     // 걸려 있어서, 짧은 시트 아래에 200px 짜리 빈 바닥이 생긴다(실측). 카더라와 같은
     // 맨 세로 흐름으로 둔다.
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: S.lg }}>
       {/* ── ② 오늘 · 일별 층 ──────────────────────────────────────────
           예탁원 결제 통계 하나에서 나오는 일곱 장. 브리핑과 같은 4열 셀 격자(.hz-cards)를
           써서 "카드 하나가 한 행을 통째로 먹는" 모양을 피한다 — 칸 합이 12라 3줄이 찬다.
@@ -78,11 +79,9 @@ export default async function SeohakPage() {
       <SectionCaps label="어떻게 사고파나" count={1 + (ov.channel?.turnover ? 1 : 0)} />
       {/* 둘 다 예탁원 채널이라 모집단이 같다. 아래 두 층과 같은 2열 격자를 쓴다 —
           섹션마다 열 수가 다르면 훑을 때 리듬이 끊긴다.
-          ⚠️ `alignItems` 를 주지 않는다(기본값 stretch). **같은 행의 카드는 늘 세로가
-          같아야 한다.** 남는 폭은 짧은 카드의 **바닥**으로 간다 — 카드 안 `marginTop:auto`
-          를 전부 걷은 이유가 그것이다. 그게 남아 있으면 남는 폭이 결론 문장과 그림
-          사이로 밀려 들어가 빈 띠가 된다(실제로 그렇게 보였다). */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 14 }}>
+          ⚠️ 세 층이 **같은 격자**(`CARD_GRID`)를 쓴다. 손으로 적었을 때 칸 사이가
+          14 · 16 · 14 로 갈려 있었다. 규칙과 근거는 `CARD_GRID` 머리말. */}
+      <div style={CARD_GRID}>
         <DailySection d={daily} />
         <TradingCards ch={ov.channel} />
       </div>
@@ -92,7 +91,7 @@ export default async function SeohakPage() {
           ⭐ 그래도 한 묶음인 이유는 둘 다 **규모**를 묻기 때문이다. 하나는 "원화로 얼마",
           하나는 "가계 자산에서 어느 자리". */}
       <SectionCaps label="얼마나 큰 돈인가" count={(fx ? 1 : 0) + (household ? 1 : 0)} />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 16 }}>
+      <div style={CARD_GRID}>
         <WealthCards ch={ov.channel} fx={fx} household={household} />
       </div>
 

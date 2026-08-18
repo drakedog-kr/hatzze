@@ -1,6 +1,7 @@
 import { type SeohakDaily } from "@/lib/seohak-daily";
 import { SectionHead } from "../kadera/SectionHead";
-import { BUY, SELL } from "./tone";
+import { BUY, SELL, signInk } from "./tone";
+import { S, T } from "./scale";
 import { C, MONO, R } from "../ui";
 
 /**
@@ -29,22 +30,17 @@ export const usd = (v: number) => {
   return `$${Math.round(v).toLocaleString("ko-KR")}`;
 };
 export const cnt = (v: number) => v.toLocaleString("ko-KR");
-/** 배수를 사람 말로. 1.184 → "18% 더". 0.739 → "26% 덜". */
-export const asPct = (mult: number) => {
-  const d = Math.round(Math.abs(mult - 1) * 100);
-  if (d === 0) return "평소와 같이";
-  return `${d}% ${mult > 1 ? "더" : "덜"}`;
-};
+/* 배수를 "18% 더"·"26% 덜" 로 옮기던 `asPct` 가 여기 있었다. 타일이 배수를 그대로
+   `88%` 로 내면서 부르는 곳이 0 이 됐다. 함께 배운 것은 아래 각주 줄에 남겨 뒀다. */
 
 /**
  * 카드 껍데기.
  *
  * ## ⭐ 손으로 그리던 머리를 `SectionHead` 로 갈았다
  *
- * 이 페이지엔 시트 꼴이 **둘**이었다. 달력·시작 연도별 성과·종류별 구성·잔고가 변한
- * 이유 넷은 `SectionHead` 를 써서 머리에 `--c-title-band`(#eef3f9) 띠가 깔리는데, 이
- * `Card` 로 만든 다섯 장(평소와의 차이 · ETF 둘 · 기관 몫 · 보유분 수익률)만 머리가
- * 흰 바탕이었다. 나란히 놓으면 같은 페이지의 카드들이 서로 다른 물건처럼 보인다.
+ * 이 페이지엔 시트 꼴이 **둘**이었다. 달력 쪽은 `SectionHead` 를 써서 머리에
+ * `--c-title-band`(#eef3f9) 띠가 깔리는데, 이 `Card` 로 만든 카드들만 머리가 흰
+ * 바탕이었다. 나란히 놓으면 같은 페이지의 카드들이 서로 다른 물건처럼 보인다.
  *
  * 머리를 손으로 그릴 이유가 애초에 없었다 — `SectionHead` 와 아이콘·제목·설명·기간
  * 알약이 전부 같고 값만 조금씩 어긋나 있었다(제목 13.5/800 → 14/700, 설명 sub2 → sub).
@@ -80,12 +76,12 @@ export function Card({
       <SectionHead icon={icon} title={title} desc={desc} note={note} />
       {/* flex:1 을 유지할 것. `Flows`·`WeekGrid` 가 `marginTop:auto` 로 목록을 카드 바닥에
           붙이는데, 이 칸이 안 늘어나면 그 auto 가 놀아서 두 카드의 목록 높이가 갈린다. */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 14, minWidth: 0,
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: S.md, minWidth: 0,
                     padding: "14px 22px" }}>
         {children}
       </div>
       {foot && (
-        <div className="hz-sheet-foot" style={{ fontSize: 12, color: C.sub }}>
+        <div className="hz-sheet-foot" style={{ fontSize: T.body, color: C.sub }}>
           <span>{foot}</span>
         </div>
       )}
@@ -96,7 +92,8 @@ export function Card({
 /** 결론 문장. 카드마다 같은 자리에서 같은 크기로 나온다. */
 export function Verdict({ children }: { children: React.ReactNode }) {
   return (
-    <p style={{ margin: 0, fontSize: 15, lineHeight: 1.45, fontWeight: 700, color: C.ink, wordBreak: "keep-all" }}>
+    <p style={{ margin: 0, fontSize: T.lead, lineHeight: 1.45, fontWeight: 700, color: C.ink,
+                wordBreak: "keep-all" }}>
       {children}
     </p>
   );
@@ -107,7 +104,154 @@ export const Em = ({ children }: { children: React.ReactNode }) => (
 );
 
 /**
- * 카드 두 장을 나란히 놓는 격자. ETF 층과 분기 층이 같은 자를 쓴다.
+ * 부호 있는 값의 강조 — 파랑 대신 **방향 색**을 쓴다.
+ *
+ * ⚠️ `Em` 은 '여길 봐라' 라는 파란 강조고 그건 그대로 둔다. 다만 값에 부호가 붙으면
+ * 얘기가 달라진다 — "가장 많이 오른 건 **+17.0%**, 가장 많이 내린 건 **−3.6%**" 가
+ * 둘 다 파랑이라 **한 문장 안에서 오른 것과 내린 것이 같은 색**이었다. 게다가 한국
+ * 독자에게 파란 플러스는 손해다.
+ *
+ * ⛔ 부호가 없는 값(7.3개월 · 100원 중 14원)에는 쓰지 말 것. 방향이 없는 곳에 방향
+ * 색을 칠하면 없는 뜻이 생긴다.
+ */
+export const SignEm = ({ v, children }: { v: number; children: React.ReactNode }) => (
+  <span style={{ color: signInk(v) }}>{children}</span>
+);
+
+/**
+ * 요약 타일 한 줄 — 카드 바닥에 서는 작은 상자들.
+ *
+ * ## ⭐ 세 카드가 각자 만들던 걸 하나로 모았다
+ *
+ * '평소와의 차이'(셋) · '얼마나 오래 들고 있나'(둘) · '원화로 보면'(셋)이 거의 같은
+ * 상자를 조금씩 다르게 그리고 있었다(글자 10/10.5/12 · 값 14/15/20 · 여백 7/10).
+ *
+ * ⭐ '평소와의 차이' 는 이걸 **세로로 쌓고** 있었다. 상자 셋이 160px 를 먹는데 담긴 건
+ * 이름·보조·숫자뿐이라 "공간은 엄청 차지하는데 내용은 별로 없다"는 말을 들었다.
+ * 가로로 눕히면 같은 내용이 64px 에 들어간다.
+ *
+ * ⛔ `v` 에 부호 있는 값이 오면 `ink` 에 `signInk(...)` 를 넘길 것. 다만 '평소의 88%'
+ * 같은 비율에는 쓰지 않는다 — 이유는 `tone.ts` 의 `signInk` 머리말.
+ */
+export type Tile = {
+  k: string;
+  /** 이름 아래 한 줄. 단위나 분모처럼 값을 읽는 데 필요한 것만. */
+  n: string;
+  v: string;
+  /** 이름 앞 네모. 그림의 선과 이 타일을 잇는 자리에만 준다. */
+  tone?: string;
+  ink?: string;
+  bg?: string;
+};
+
+export function Tiles({ items }: { items: Tile[] }) {
+  return (
+    <div style={{ display: "flex", gap: S.sm }}>
+      {items.map((t) => (
+        <div key={t.k} style={{ flex: 1, minWidth: 0, background: t.bg ?? C.soft,
+                                borderRadius: R.control, padding: S.sm,
+                                display: "flex", flexDirection: "column", gap: 1 }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
+            {t.tone && (
+              <span aria-hidden style={{ width: 7, height: 7, borderRadius: 2,
+                                         background: t.tone, flexShrink: 0 }} />
+            )}
+            <span style={{ fontSize: T.small, fontWeight: 700, color: C.label, minWidth: 0,
+                           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {t.k}
+            </span>
+          </span>
+          <span style={{ fontSize: T.tiny, color: C.faint, minWidth: 0, overflow: "hidden",
+                         textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.n}</span>
+          <span style={{ fontFamily: MONO, fontSize: T.lead, fontWeight: 800,
+                         color: t.ink ?? C.ink }}>{t.v}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** 그림의 좌표계. 두 그림이 같은 틀을 쓰므로 여기 한 곳에만 적는다. */
+export const CHART = { w: 1000, h: 100 } as const;
+
+/**
+ * 그림틀 — 머리 한 줄 + 늘어나는 그림.
+ *
+ * ## ⚠️⚠️ SVG 안에 글자를 두면 안 된다
+ *
+ * '평소와의 차이' 의 축 라벨이 `fontSize={14}` 로 적혀 있었는데 **화면에는 6px 로
+ * 그려지고 있었다.** viewBox 폭이 1000 인데 카드가 451px 라 안의 모든 것이 0.45배로
+ * 줄기 때문이다. 그래서 라벨은 전부 이 머리 줄에 HTML 로 뺀다.
+ *
+ * ## ⭐ `flex:1` + `preserveAspectRatio="none"`
+ *
+ * 같은 행의 두 카드는 늘 세로가 같아야 하는데, 짝이 몇 줄로 접히느냐에 따라 높이가
+ * 오르내린다. 그림이 그 폭을 먹으면 카드에 구멍이 안 생긴다. 대신 세로로 눌리고
+ * 늘어나므로 안에 원을 그리면 타원이 되고, 선 굵기는 `non-scaling-stroke` 로 고정해야
+ * 한다(`RefLine`·`Line` 이 이미 그렇게 돼 있다).
+ *
+ * ⛔ 세로 눈금이 폭마다 달라진다는 뜻이므로, 이 그림에 **각도로 읽는 말**("가파르게")을
+ * 붙이면 안 된다. 읽는 것은 기준선과의 위아래뿐이다.
+ */
+export function Chart({ note, legend, aria, minHeight = 96, children }: {
+  note: string;
+  legend: React.ReactNode;
+  aria: string;
+  /**
+   * ⚠️⚠️ **바닥값을 넉넉히 줄 것.** `flex:1` 은 *남는* 폭만 먹으므로, 짝이 없어 늘어날
+   * 일이 없는 폭(1열로 접힌 화면)에서는 그림이 이 값에 눌러앉는다. 62 로 뒀더니
+   * 660px 폭 카드에서 그림이 70px 라 세로가 9배 눌린 띠가 됐다.
+   */
+  minHeight?: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: S.xs, flex: 1, minHeight: 0 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                    gap: S.sm, fontSize: T.tiny, color: C.faint }}>
+        <span style={{ flexShrink: 0 }}>{note}</span>
+        {legend}
+      </div>
+      <div style={{ flex: 1, minHeight }}>
+        <svg viewBox={`0 0 ${CHART.w} ${CHART.h}`} preserveAspectRatio="none"
+             style={{ width: "100%", height: "100%", display: "block" }}
+             role="img" aria-label={aria}>
+          {children}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 기준선 범례 — 점선 조각 + 이름. `Chart` 의 오른쪽 자리다.
+ *
+ * ⚠️ 점선 색이 `C.marker` 가 아니라 `C.sub2` 다. marker 는 '자' 라는 뜻에 맞지만
+ * #c7d5e3 이라 환율 그림의 옅은 파란 채움 위에서 사라진다. 범례가 가리키는 선은
+ * 반드시 보여야 하므로 읽히는 값으로 둔다.
+ */
+export function Baseline({ children }: { children: React.ReactNode }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, minWidth: 0,
+                   overflow: "hidden", whiteSpace: "nowrap" }}>
+      <span aria-hidden style={{ width: 12, height: 0, borderTop: `1.5px dashed ${C.sub2}`,
+                                 flexShrink: 0 }} />
+      <span style={{ color: C.sub, overflow: "hidden", textOverflow: "ellipsis" }}>{children}</span>
+    </span>
+  );
+}
+
+/** 기준선. 가로 전폭. */
+export function RefLine({ y }: { y: number }) {
+  return (
+    <line x1={0} x2={CHART.w} y1={y} y2={y} stroke={C.sub2} strokeWidth={1.5}
+          strokeDasharray="5 4" vectorEffect="non-scaling-stroke" />
+  );
+}
+
+/**
+ * 카드 두 장을 나란히 놓는 격자. **세 층이 다 이걸 쓴다** — 손으로 적었을 때
+ * 칸 사이가 14 · 16 · 14 로 갈려 있었다.
  *
  * ⚠️ 하한이 **380px** 이다. 300px 이던 시절에는 1,004px 폭에서 트랙이 셋 잡혀 카드가
  * 325px 로 쪼그라들고 오른쪽 한 칸이 빈 채로 남았다. 380 이면 3열에 1,168px 가 필요해
@@ -128,7 +272,7 @@ export const Em = ({ children }: { children: React.ReactNode }) => (
 export const CARD_GRID: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))",
-  gap: 14,
+  gap: S.lg,
 };
 
 /* ── ① 평소와의 차이 (한 행 전체) ──────────────────────────────
@@ -148,22 +292,22 @@ export const CARD_GRID: React.CSSProperties = {
 function VsUsual({ d }: { d: SeohakDaily }) {
   const r = d.recentPct;
   const net = d.turnover.buy - d.turnover.sell;
-  const W = 1000;
-  const H = 170;
-  const PAD = { t: 16, b: 22, l: 0, r: 0 };
   const vals = r.flatMap((p) => [p.buy, p.sell]);
   // 축은 늘 100(평소)을 품는다. 안 그러면 기준선이 밖으로 나가 '평소의 %'가 뜻을 잃는다.
   const lo = Math.min(100, ...vals) * 0.96;
   const hi = Math.max(100, ...vals) * 1.04;
-  const x = (i: number) => (i / Math.max(1, r.length - 1)) * W;
-  const y = (v: number) => H - PAD.b - ((v - lo) / (hi - lo)) * (H - PAD.t - PAD.b);
+  const x = (i: number) => (i / Math.max(1, r.length - 1)) * CHART.w;
+  const y = (v: number) => CHART.h - ((v - lo) / (hi - lo)) * CHART.h;
   const path = (k: "buy" | "sell") =>
     r.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p[k]).toFixed(1)}`).join("");
 
+  /* ⛔ 값에 `signInk` 를 쓰지 않는다. 88% 는 부호가 아니라 평소 대비 비율이라 방향이
+     둘로 갈린다 — 덜 파는 것이 나쁜 일인가? 사자·팔자 구분은 앞의 네모가 진다.
+     ⚠️ '산 횟수' 에는 네모를 안 준다. 그림에 그 선이 없는데 네모를 달면 범례가 거짓이 된다. */
   const tiles = [
-    { k: "사는 양", v: d.vsUsual.buy, tone: BUY, sub: `어제 ${usd(d.today.buy)}` },
-    { k: "파는 양", v: d.vsUsual.sell, tone: SELL, sub: `어제 ${usd(d.today.sell)}` },
-    { k: "산 횟수", v: d.vsUsual.buyCount, tone: C.marker, sub: `어제 ${cnt(d.today.buyCount)}번` },
+    { k: "사는 양", n: `어제 ${usd(d.today.buy)}`, v: `${Math.round(d.vsUsual.buy)}%`, tone: BUY },
+    { k: "파는 양", n: `어제 ${usd(d.today.sell)}`, v: `${Math.round(d.vsUsual.sell)}%`, tone: SELL },
+    { k: "산 횟수", n: `어제 ${cnt(d.today.buyCount)}번`, v: `${Math.round(d.vsUsual.buyCount)}%` },
   ];
   const up = (v: number) => v >= 100;
   const verdict = up(d.vsUsual.buy) && up(d.vsUsual.sell) ? (
@@ -180,46 +324,30 @@ function VsUsual({ d }: { d: SeohakDaily }) {
     <>
       <Verdict>{verdict}</Verdict>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 18 }}>
-        <div style={{ flex: "2 1 min(400px, 100%)", minWidth: 0 }}>
-          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}
-               role="img" aria-label="사는 양과 파는 양이 평소의 몇 %인지, 최근 반년">
-            <line x1={0} x2={W} y1={y(100)} y2={y(100)} stroke={C.marker} strokeWidth={1.5} />
-            <text x={0} y={y(100) - 7} fontSize={14} fill={C.sub2} fontWeight={700}>평소</text>
-            {(["sell", "buy"] as const).map((k) => (
-              <path key={k} d={path(k)} fill="none" stroke={k === "buy" ? BUY : SELL}
-                    strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
-            ))}
-            {(["sell", "buy"] as const).map((k) => (
-              <circle key={k} cx={W} cy={y(r[r.length - 1][k])} r={5}
-                      fill={k === "buy" ? BUY : SELL} stroke={C.card} strokeWidth={2} />
-            ))}
-            <text x={0} y={H - 4} fontSize={13} fill={C.faint}>
-              {r[0]?.date.slice(0, 7).replace("-", "년 ")}월
-            </text>
-            <text x={W} y={H - 4} fontSize={13} fill={C.faint} textAnchor="end">어제</text>
-          </svg>
-        </div>
+      {/* ⭐ 그림이 결론 바로 아래, 요약 타일이 그 아래. 이 페이지의 카드는 전부
+          **결론 → 그림 → 보조** 순이다. 예전엔 그림과 타일이 좌우로 붙어 있었는데,
+          카드가 495px 로 좁아지면서 어차피 위아래로 접혔다.
+          ⭐ 각주 한 덩이를 여기서 없앴다. 세 문장짜리라 "읽어도 무슨 뜻인지 모르겠다"는
+          말을 들었는데, 정작 꼭 필요한 '평소가 무엇인가' 는 기준선 범례가 그 선 옆에서
+          한 마디로 말한다. 나머지 둘(5일 평균 · 결제 건수)은 값을 바꿔 읽게 하지 않는다. */}
+      <Chart
+        /* ⚠️ `replace("-", "년 ")` 만 하면 "2026년 02월" 이 된다. 앞자리 0 을 떼야 한다. */
+        note={`${r[0]?.date.slice(0, 4)}년 ${Number(r[0]?.date.slice(5, 7))}월 ~ 어제`}
+        legend={<Baseline>평소(2년 중앙값) = 100%</Baseline>}
+        aria="사는 양과 파는 양이 평소의 몇 %인지, 최근 반년"
+        /* 이 카드의 주인공이라 다른 그림보다 바닥이 높다. 선이 둘이고 반년치라
+           120 아래로 내려가면 두 선이 기준선 근처에서 엉겨 붙는다. */
+        minHeight={120}
+      >
+        <RefLine y={y(100)} />
+        {(["sell", "buy"] as const).map((k) => (
+          <path key={k} d={path(k)} fill="none" stroke={k === "buy" ? BUY : SELL}
+                strokeWidth={2} strokeLinejoin="round" strokeLinecap="round"
+                vectorEffect="non-scaling-stroke" />
+        ))}
+      </Chart>
 
-        <div style={{ flex: "1 1 min(210px, 100%)", minWidth: 0, display: "flex",
-                      flexDirection: "column", gap: 8 }}>
-          {tiles.map((t) => (
-            <div key={t.k} style={{ background: C.soft, borderRadius: R.control, padding: "10px 12px",
-                                    display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ width: 9, height: 9, borderRadius: 2, background: t.tone, flexShrink: 0 }} />
-              <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-                <span style={{ fontSize: 12, color: C.label, fontWeight: 700 }}>{t.k}</span>
-                <span style={{ fontSize: 10.5, color: C.faint }}>{t.sub}</span>
-              </span>
-              <span style={{ marginLeft: "auto", display: "flex", alignItems: "baseline", gap: 4 }}>
-                <b style={{ fontFamily: MONO, fontSize: 20, fontWeight: 800, color: C.ink,
-                            letterSpacing: "-0.02em" }}>{Math.round(t.v)}%</b>
-                <span style={{ fontSize: 10.5, color: C.faint }}>평소의</span>
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
+      <Tiles items={tiles} />
 
       {/* ⭐ 카드 둘을 접으면서 **거기서 쓸모 있던 한 줄씩만** 데려왔다.
           - '얼마나 사고팔았나'(막대 셋)는 통째로 뺐다. 1년 총매수·총매도 막대는 이 카드가
@@ -230,16 +358,19 @@ function VsUsual({ d }: { d: SeohakDaily }) {
 
           ⚠️ 셋의 **창이 다르다**(그림 6개월 · 결 20일 · 순매수 250거래일). 한 카드에
           모으면 같은 창으로 읽히므로 문장마다 기간을 직접 적는다. */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 12,
+      <div style={{ display: "flex", flexDirection: "column", gap: S.xs, paddingTop: S.md,
                     borderTop: `1px solid ${C.line}` }}>
-        <span style={{ fontSize: 12.5, lineHeight: 1.5, color: C.sub, wordBreak: "keep-all" }}>
+        <span style={{ fontSize: T.body, lineHeight: 1.5, color: C.sub, wordBreak: "keep-all" }}>
           최근 {cnt(d.turnover.days)}거래일 동안{" "}
           {net >= 0 ? "산 것이 판 것보다" : "판 것이 산 것보다"}{" "}
-          <b style={{ fontFamily: MONO, color: C.ink }}>{usd(Math.abs(net))}</b> 많았습니다
+          <b style={{ fontFamily: MONO, color: signInk(net) }}>{usd(Math.abs(net))}</b> 많았습니다
         </span>
-        {/* ⚠️ `asPct` 를 쓰면 "횟수가 25% 덜, 한 번에 13% 더 움직였습니다"가 되어 말이
-            엉킨다. 그 함수는 '평소 대비 배수'용이지 두 쪽을 견주는 자리엔 안 맞는다. */}
-        <span style={{ fontSize: 12.5, lineHeight: 1.5, color: C.sub, wordBreak: "keep-all" }}>
+        {/* ⚠️ 이 줄을 "횟수가 25% 덜, 한 번에 13% 더 움직였습니다" 로 쓰면 말이 엉킨다.
+            '덜·더' 어법은 **평소 대비** 배수용이지 사자와 팔자 두 쪽을 견주는 자리엔
+            안 맞는다. 여기서는 '적고·큽니다' 로 쓴다.
+            ⛔ 여기 숫자에는 부호색을 쓰지 않는다. 오르내림이 아니라 사자와 팔자를 견준
+            값이라, 25% 가 빨강이면 "많이 사서 좋다"로 읽힌다. */}
+        <span style={{ fontSize: T.body, lineHeight: 1.5, color: C.sub, wordBreak: "keep-all" }}>
           최근 20일, 파는 쪽은 사는 쪽보다{" "}
           <b style={{ color: C.ink }}>
             횟수가 {Math.abs(Math.round((d.countRatio - 1) * 100))}%{" "}
@@ -267,8 +398,7 @@ export function DailySection({ d }: { d: SeohakDaily }) {
   return (
     <Card icon="show_chart" title="평소와의 차이"
           desc="사고파는 양이 평소의 몇 %인지, 반년치를 봅니다."
-          note="최근 6개월"
-          foot="'평소'는 최근 2년 하루 값의 중앙값이라 시간이 지나도 자리가 안 바뀝니다. 선은 5일 평균이고, 횟수는 사람 수가 아니라 결제 건수입니다. 아래 두 줄은 기간이 달라 각각 적었습니다.">
+          note="최근 6개월">
       <VsUsual d={d} />
     </Card>
   );

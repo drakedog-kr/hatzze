@@ -1,7 +1,8 @@
 import type { SeohakEtf } from "@/lib/seohak-etf";
 import { C, MONO, R } from "../ui";
-import { BUY, SELL } from "./tone";
-import { CARD_GRID, Card, Em, Verdict } from "./DailyCards";
+import { BUY, BUY_INK, SELL, SELL_INK } from "./tone";
+import { CARD_GRID, Card, SignEm, Verdict } from "./DailyCards";
+import { S, T } from "./scale";
 
 /**
  * ETF 층 — 미국에 가는 두 번째 길.
@@ -47,19 +48,24 @@ const shortName = (name: string) => name.replace("미국", "").replace(/\s{2,}/g
  *   ③ 구분선   줄 사이 `--c-sheet-row`
  *   ④ 막대     제 칸을 쓰되 6px 이라 세로를 안 먹는다
  *
- * ⚠️ **막대 색은 값 글자색과 다르다.** 값은 BUY/SELL 원색(#d03a46 · #3182f6)이고 막대는
- * 한 톤 옅은 `--c-warm-2`·`--c-blue-2` 다. 다섯 줄을 원색 막대로 세우면 그 칸이 카드에서
+ * ⚠️ **색이 셋이다.** 머리 네모는 원색(BUY/SELL), 막대는 한 톤 옅은
+ * `--c-warm-2`·`--c-blue-2`, 값 글자는 읽히는 값(BUY_INK/SELL_INK)이다.
+ * ⛔ 값 글자에 원색을 쓰면 안 된다 — 파랑(#3182f6)이 흰 카드 위 **명암비 3.71** 이라
+ * 4.5 에 못 미친다. 실제로 그렇게 돼 있었다. 자세한 건 `tone.ts` 머리말. 다섯 줄을 원색 막대로 세우면 그 칸이 카드에서
  * 제일 센 잉크가 되는데, 이 표에서 읽어야 할 것은 길이가 아니라 이름과 금액이다.
  * 카더라도 같은 이유로 막대만 2단계 색을 쓴다.
  *
  * ⚠️ 안쪽 하한이 320px 이다. 18(배지)+48(막대)+58(값)에 간격 24 를 더하면 148 이 고정이라
  * 280px 에서는 이름 칸이 132px 로 줄어 `TIGER 필라델피아반도체나스닥` 이 반 토막 난다.
  */
-function RankTable({ head, hint, tone, barTone, rows }: {
+function RankTable({ head, hint, tone, ink, barTone, rows }: {
   head: string;
   /** 값 칸의 이름. 줄마다 단위를 되풀이하지 않으려고 머리 띠에 한 번만 적는다. */
   hint: string;
+  /** 머리 네모의 **면** 색. */
   tone: string;
+  /** 값 **글자** 색. 면 색과 다른 값이다(머리말 참고). */
+  ink: string;
   barTone: string;
   rows: { key: string; name: string; weight: number; value: string; aside?: string }[];
 }) {
@@ -68,25 +74,29 @@ function RankTable({ head, hint, tone, barTone, rows }: {
   const cols = hasAside ? "18px minmax(0, 1fr) 40px 44px 46px" : "18px minmax(0, 1fr) 48px 58px";
 
   return (
-    <div style={{ minWidth: 0, display: "flex", flexDirection: "column" }}>
+    /* ⭐ `height:100%` + 아래 `<ul>` 의 1fr 줄. 두 카드의 세로가 늘 같아야 하는데
+       '주간 등락' 쪽이 22px 더 컸다(결론 문장이 한 줄 더 접힌다). 표가 그 폭을 줄
+       간격으로 나눠 먹으면 짧은 쪽 바닥에 구멍이 안 생긴다. */
+    <div style={{ minWidth: 0, height: "100%", display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 9px",
-                    background: C.soft, borderRadius: R.control, fontSize: 10.5, fontWeight: 700 }}>
+                    background: C.soft, borderRadius: R.control, fontSize: T.tiny, fontWeight: 700 }}>
         <span style={{ width: 7, height: 7, borderRadius: 2, background: tone, flexShrink: 0 }} />
         <span style={{ color: C.label }}>{head}</span>
         <span style={{ marginLeft: "auto", color: C.faint, fontWeight: 600 }}>{hint}</span>
       </div>
-      <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+      <ul style={{ listStyle: "none", margin: 0, padding: 0, flex: 1, minHeight: 0,
+                   display: "grid", gridTemplateRows: `repeat(${rows.length}, minmax(29px, 1fr))` }}>
         {rows.map((r, i) => (
           <li key={r.key}
               style={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 8,
                        padding: "6px 9px",
                        borderBottom: i < rows.length - 1 ? `1px solid ${C.sheetRow}` : undefined }}>
             <span style={{ width: 18, height: 18, borderRadius: 5, background: "var(--c-plate)",
-                           color: "var(--c-cold-ink)", fontSize: 10, fontWeight: 800,
+                           color: "var(--c-cold-ink)", fontSize: T.tiny, fontWeight: 800,
                            display: "flex", alignItems: "center", justifyContent: "center" }}>
               {i + 1}
             </span>
-            <span style={{ fontSize: 11.5, color: C.sub, minWidth: 0, overflow: "hidden",
+            <span style={{ fontSize: T.small, color: C.sub, minWidth: 0, overflow: "hidden",
                            textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
             {/* 막대는 클래스로 둔다. 인라인으로 두면 좁은 화면에서 이 칸을 접는 규칙을
                 이겨서 막대만 살아남는다(카더라에서 실제로 터진 자리다). 채움 폭·색만 인라인. */}
@@ -95,10 +105,10 @@ function RankTable({ head, hint, tone, barTone, rows }: {
                              background: barTone }} />
             </span>
             {r.aside !== undefined && (
-              <span style={{ fontFamily: MONO, fontSize: 10, color: C.faint, textAlign: "right",
+              <span style={{ fontFamily: MONO, fontSize: T.tiny, color: C.faint, textAlign: "right",
                              overflow: "hidden", whiteSpace: "nowrap" }}>{r.aside}</span>
             )}
-            <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: tone,
+            <span style={{ fontFamily: MONO, fontSize: T.small, fontWeight: 700, color: ink,
                            textAlign: "right" }}>{r.value}</span>
           </li>
         ))}
@@ -149,20 +159,20 @@ function RankTable({ head, hint, tone, barTone, rows }: {
  */
 function Flows({ e }: { e: SeohakEtf }) {
   const sides = [
-    { key: "in", head: "들어온 곳", rows: e.inflow, tone: BUY, bar: "var(--c-warm-2)" },
-    { key: "out", head: "빠진 곳", rows: e.outflow, tone: SELL, bar: "var(--c-blue-2)" },
+    { key: "in", head: "들어온 곳", rows: e.inflow, tone: BUY, ink: BUY_INK, bar: "var(--c-warm-2)" },
+    { key: "out", head: "빠진 곳", rows: e.outflow, tone: SELL, ink: SELL_INK, bar: "var(--c-blue-2)" },
   ];
   return (
     <>
       <Verdict>
-        하루에 <Em>{signed(e.netFlowTotal)}</Em>이 실제로 들어왔습니다
+        하루에 <SignEm v={e.netFlowTotal}>{signed(e.netFlowTotal)}</SignEm>이 실제로 들어왔습니다
       </Verdict>
 
       {/* ⚠️ `marginTop:auto` 를 안 쓴다. 격자가 stretch 라 남는 폭이 통째로
           결론 문장과 그림 사이로 밀려 들어가 빈 띠가 된다. 위에 붙이고 남는 건
           카드 바닥으로 보낸다. */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
-        <div style={{ display: "grid", gap: 14,
+      <div style={{ display: "flex", flexDirection: "column", gap: S.md, flex: 1, minHeight: 0 }}>
+        <div style={{ display: "grid", gap: S.md, flex: 1, minHeight: 0,
                       gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))" }}>
           {sides.map((s) => (
             <RankTable
@@ -170,6 +180,7 @@ function Flows({ e }: { e: SeohakEtf }) {
               head={s.head}
               hint="하루 순유입"
               tone={s.tone}
+              ink={s.ink}
               barTone={s.bar}
               rows={s.rows.map((r) => ({
                 key: r.code,
@@ -217,23 +228,27 @@ function WeekGrid({ e }: { e: SeohakEtf }) {
   const up = byChange.slice(0, 5);
   const down = byChange.slice(-5).reverse();
   const sides = [
-    { key: "up", head: "오른 것", rows: up, tone: BUY, bar: "var(--c-warm-2)" },
-    { key: "down", head: "내린 것", rows: down, tone: SELL, bar: "var(--c-blue-2)" },
+    { key: "up", head: "오른 것", rows: up, tone: BUY, ink: BUY_INK, bar: "var(--c-warm-2)" },
+    { key: "down", head: "내린 것", rows: down, tone: SELL, ink: SELL_INK, bar: "var(--c-blue-2)" },
   ];
   const chg = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(1)}%`;
 
   return (
     <>
       <Verdict>
-        가장 많이 오른 건 <Em>{chg(byChange[0]?.changePct ?? 0)}</Em>, 가장 많이 내린 건{" "}
-        <Em>{chg(byChange[byChange.length - 1]?.changePct ?? 0)}</Em>입니다
+        가장 많이 오른 건{" "}
+        <SignEm v={byChange[0]?.changePct ?? 0}>{chg(byChange[0]?.changePct ?? 0)}</SignEm>,{" "}
+        가장 많이 내린 건{" "}
+        <SignEm v={byChange[byChange.length - 1]?.changePct ?? 0}>
+          {chg(byChange[byChange.length - 1]?.changePct ?? 0)}
+        </SignEm>입니다
       </Verdict>
 
       {/* ⚠️ `marginTop:auto` 를 안 쓴다. 격자가 stretch 라 남는 폭이 통째로
           결론 문장과 그림 사이로 밀려 들어가 빈 띠가 된다. 위에 붙이고 남는 건
           카드 바닥으로 보낸다. */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-        <div style={{ display: "grid", gap: 14,
+      <div style={{ display: "flex", flexDirection: "column", gap: S.md, flex: 1, minHeight: 0 }}>
+        <div style={{ display: "grid", gap: S.md, flex: 1, minHeight: 0,
                       gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))" }}>
           {sides.map((s) => (
             <RankTable
@@ -241,6 +256,7 @@ function WeekGrid({ e }: { e: SeohakEtf }) {
               head={s.head}
               hint="등락"
               tone={s.tone}
+              ink={s.ink}
               barTone={s.bar}
               rows={s.rows.map((r) => ({
                 key: r.code,

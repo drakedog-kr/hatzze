@@ -1,7 +1,9 @@
 import type { SeohakOverview } from "@/lib/seohak-data";
 import type { HouseholdAssets, UsdKrw } from "@/lib/seohak-external";
-import { C, MONO, R } from "../ui";
-import { Card, Em, Verdict } from "./DailyCards";
+import { C, MONO } from "../ui";
+import { Baseline, CHART, Card, Chart, Em, RefLine, SignEm, Tiles, Verdict } from "./DailyCards";
+import { S, T } from "./scale";
+import { signInk } from "./tone";
 
 /**
  * 자산 두 장 — 원화로 보면 · 가계 자산 속 해외주식.
@@ -13,6 +15,10 @@ import { Card, Em, Verdict } from "./DailyCards";
 /** 백만 달러 × 원 → "276조". 이 페이지에서 원화가 나오는 유일한 자리다. */
 const won = (mn: number, rate: number) =>
   `${((mn * 1e6 * rate) / 1e12).toLocaleString("ko-KR", { maximumFractionDigits: 0 })}조`;
+/** 조 단위 값. ⚠️ `toFixed(0)` 로 두면 `1400조`·`2714조` 처럼 자리 구분이 사라진다. */
+const jo = (v: number) => `${Math.round(v).toLocaleString("ko-KR")}조`;
+/** 환율. 같은 이유로 `1286원` 이 아니라 `1,286원` 이다. */
+const krw = (v: number) => `${Math.round(v).toLocaleString("ko-KR")}원`;
 const pct = (v: number, digits = 1) =>
   `${v >= 0 ? "+" : "−"}${Math.abs(v).toLocaleString("ko-KR", { maximumFractionDigits: digits })}%`;
 
@@ -54,48 +60,56 @@ function InWon({ ch, fx }: {
   return (
     <>
       <Verdict>
-        달러로는 <Em>{pct(usdRet, 0)}</Em>인데 원화로는 <Em>{pct(wonRet, 0)}</Em>입니다
+        달러로는 <SignEm v={usdRet}>{pct(usdRet, 0)}</SignEm>인데 원화로는{" "}
+        <SignEm v={wonRet}>{pct(wonRet, 0)}</SignEm>입니다
       </Verdict>
 
-      {/* ⚠️ `marginTop:auto` 를 안 쓴다. 격자가 stretch 라 남는 폭이 통째로
-          결론 문장과 그림 사이로 밀려 들어가 빈 띠가 된다. 위에 붙이고 남는 건
-          맨 아래 환율 그림이 먹는다(`flex:1`). */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 11, flex: 1, minHeight: 0 }}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 20, alignItems: "baseline" }}>
-          <div>
-            <div style={{ fontSize: 11.5, color: C.sub2, marginBottom: 3 }}>넣은 돈</div>
-            <div style={{ fontSize: 21, fontWeight: 700, color: C.sub, letterSpacing: "-.02em" }}>
-              {won(ch.principal, avgRate)}원
-            </div>
-          </div>
-          <div style={{ fontSize: 18, color: C.hint, alignSelf: "center" }}>→</div>
-          <div>
-            <div style={{ fontSize: 11.5, color: C.sub2, marginBottom: 3 }}>지금</div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
-              {won(ch.value, fx.now)}원
-            </div>
-          </div>
-        </div>
+      {/* ⚠️ `marginTop:auto` 를 안 쓴다. 격자가 stretch 라 남는 폭이 통째로 결론 문장과
+          그림 사이로 밀려 들어가 빈 띠가 된다. 남는 건 가운데 환율 그림이 먹는다(`flex:1`).
 
-        {/* 수익을 둘로 가른다. 이 세 칸이 카드의 결론이다. */}
-        <div style={{ display: "flex", gap: 7 }}>
+          ## ⭐ 순서를 이 페이지의 것으로 맞췄다 — **결론 → 그림 → 보조**
+          환율 그림이 카드 맨 아래에 있었다. 옆 '평소와의 차이' 는 그림이 결론 바로
+          아래라 두 카드가 서로 다른 규칙으로 보였다("통일성이 없어서 별로야").
+          큰 숫자 둘은 결론의 일부다 — 문장이 말한 +84%/+102% 를 금액으로 되풀이한다. */}
+      <div style={{ display: "flex", flexDirection: "column", gap: S.md, flex: 1, minHeight: 0 }}>
+        {/* ⭐ 두 금액이 21 과 28 로 크기가 갈려 있었다. 한 자로 묶고 무게와 색으로만
+            가른다 — 크기를 두 단 쓰면 그만큼 자가 늘어난다. */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: S.md, alignItems: "baseline" }}>
           {[
-            { label: "종목에서", note: "달러 기준", v: pct(usdRet, 0), strong: false },
-            { label: "환율에서", note: `${avgRate.toFixed(0)}원 → ${fx.now.toFixed(0)}원`, v: pct(fxRet, 0), strong: false },
-            { label: "합쳐서", note: "원화 기준", v: pct(wonRet, 0), strong: true },
-          ].map((s) => (
-            <div key={s.label} style={{ flex: 1, background: s.strong ? C.blueTint : C.soft,
-                                        borderRadius: R.control, padding: "7px 9px",
-                                        display: "flex", flexDirection: "column", gap: 1 }}>
-              <span style={{ fontSize: 10.5, color: C.label, fontWeight: 700 }}>{s.label}</span>
-              <span style={{ fontSize: 10, color: C.faint }}>{s.note}</span>
-              <span style={{ fontFamily: MONO, fontSize: 15, fontWeight: 800,
-                             color: s.strong ? C.blue : C.ink }}>{s.v}</span>
-            </div>
+            { k: "넣은 돈", v: `${won(ch.principal, avgRate)}원`, now: false },
+            { k: "지금", v: `${won(ch.value, fx.now)}원`, now: true },
+          ].map((b, i) => (
+            <span key={b.k} style={{ display: "flex", alignItems: "baseline", gap: S.md }}>
+              {/* ⚠️ `alignSelf` 를 줘야 한다. 바깥 줄이 baseline 정렬이라 그냥 두면 화살표가
+                  **금액이 아니라 라벨 줄**에 가서 앉는다(실제로 그렇게 났다). 잇는 것은
+                  두 금액이므로 아래 끝에 붙인다.
+                  ⚠️ 색이 `C.hint` 였다. 그건 점선·비활성 아이콘 값이라 글자에 쓰지 말라고
+                  `ui.tsx` 가 못박아 뒀다 — 실제로 화면에서 안 보였다. */}
+              {i > 0 && (
+                <span style={{ fontSize: T.lead, color: C.faint, alignSelf: "flex-end",
+                               paddingBottom: 3 }}>→</span>
+              )}
+              <span style={{ display: "flex", flexDirection: "column" }}>
+                <span style={{ fontSize: T.body, color: C.sub2, marginBottom: 3 }}>{b.k}</span>
+                <b style={{ fontFamily: MONO, fontSize: T.big, fontWeight: b.now ? 800 : 700,
+                            color: b.now ? C.ink : C.sub, letterSpacing: "-.02em" }}>{b.v}</b>
+              </span>
+            </span>
           ))}
         </div>
 
         <FxChart fx={fx} avgRate={avgRate} />
+
+        {/* 수익을 둘로 가른다. 이 세 칸이 카드의 결론이다.
+            ⚠️ '합쳐서' 가 파란 글자에 파란 바탕이었다. **파란 플러스는 손해로 읽힌다** —
+            오르면 빨강이 국내 관행이다(tone.ts). 강조 바탕도 부호를 따라간다. */}
+        <Tiles items={[
+          { k: "종목에서", n: "달러 기준", v: pct(usdRet, 0), ink: signInk(usdRet) },
+          { k: "환율에서", n: `${krw(avgRate)} → ${krw(fx.now)}`,
+            v: pct(fxRet, 0), ink: signInk(fxRet) },
+          { k: "합쳐서", n: "원화 기준", v: pct(wonRet, 0), ink: signInk(wonRet),
+            bg: wonRet >= 0 ? "var(--c-hot-tint)" : "var(--c-cold-tint)" },
+        ]} />
       </div>
     </>
   );
@@ -131,37 +145,25 @@ function FxChart({ fx, avgRate }: { fx: UsdKrw; avgRate: number }) {
   if (vals.length < 24) return null;
   const lo = Math.min(...vals, avgRate) * 0.985;
   const hi = Math.max(...vals, avgRate) * 1.015;
-  const W = 1000;
-  const H = 100;
-  const x = (i: number) => (i / (vals.length - 1)) * W;
-  const y = (v: number) => H - ((v - lo) / (hi - lo)) * H;
+  const x = (i: number) => (i / (vals.length - 1)) * CHART.w;
+  const y = (v: number) => CHART.h - ((v - lo) / (hi - lo)) * CHART.h;
   const line = vals.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 5, flex: 1, minHeight: 0 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
-                    gap: 8, fontSize: 10.5, color: C.faint }}>
-        <span>원/달러 · 최근 10년</span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-          <span style={{ width: 12, height: 0, borderTop: `1.5px dashed ${C.sub2}` }} />
-          <span style={{ color: C.sub }}>
-            평균 산 값 <b style={{ fontFamily: MONO, color: C.ink }}>{avgRate.toFixed(0)}원</b>
-          </span>
-        </span>
-      </div>
-      <div style={{ flex: 1, minHeight: 58 }}>
-        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none"
-             style={{ width: "100%", height: "100%", display: "block" }}
-             role="img"
-             aria-label={`원/달러 환율이 최근 10년 동안 평균 산 값 ${avgRate.toFixed(0)}원의 위아래로 어떻게 움직였는지`}>
-          <path d={`${line}L${W},${H}L0,${H}Z`} fill={C.blueTint} />
-          <line x1={0} x2={W} y1={y(avgRate)} y2={y(avgRate)} stroke={C.sub2}
-                strokeWidth={1.5} strokeDasharray="5 4" vectorEffect="non-scaling-stroke" />
-          <path d={line} fill="none" stroke={C.blue} strokeWidth={2}
-                strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-        </svg>
-      </div>
-    </div>
+    <Chart
+      note="원/달러 · 최근 10년"
+      legend={
+        <Baseline>
+          평균 산 값 <b style={{ fontFamily: MONO, color: C.ink }}>{krw(avgRate)}</b>
+        </Baseline>
+      }
+      aria={`원/달러 환율이 최근 10년 동안 평균 산 값 ${krw(avgRate)}의 위아래로 어떻게 움직였는지`}
+    >
+      <path d={`${line}L${CHART.w},${CHART.h}L0,${CHART.h}Z`} fill={C.blueTint} />
+      <RefLine y={y(avgRate)} />
+      <path d={line} fill="none" stroke={C.blue} strokeWidth={2}
+            strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+    </Chart>
   );
 }
 
@@ -178,18 +180,22 @@ function FxChart({ fx, avgRate }: { fx: UsdKrw; avgRate: number }) {
  * '해외 ÷ 국내'로 재면 2024Q4 17.8% → 2026Q1 15.7% 라 **"비중이 내려왔다"** 가 되고,
  * '해외 ÷ (국내+해외)'로 재면 10% → 14% 라 **"비중이 올라왔다"** 가 된다. 같은 자료다.
  *
- * ⭐ 그래서 화면은 **오른 것을 주로 말하고 내린 것을 단서로 붙인다.** 8분기를 통으로
- * 보면 오른 게 맞고(10→14%), 꼭짓점(15%)에서 내려온 것도 맞다. 하나만 적으면 창을
- * 골라 이야기를 만든 것이 된다.
+ * ⭐ 그래서 화면은 **표가 양쪽을 다 보여 주게** 둔다. 8분기를 통으로 보면 오른 게
+ * 맞고(10→14%), 꼭짓점(15%)에서 내려온 것도 맞다. 여덟 줄이 그 둘을 다 적고 있으므로
+ * 글로 한쪽을 고를 이유가 없다.
  *
  * ⚠️ 자는 **'100원 중 몇 원'(해외 ÷ 국내+해외) 하나로 통일한다.** 두 자를 섞었더니
  * 결론 문장이 "100원 중 14원"인데 표는 16% 를 적고 있었다.
+ *
+ * ## ⭐ 다섯 줄짜리 문단을 타일 둘로 접었다
+ *
+ * 카드 바닥에 네 문장이 붙어 있었다("각 카드 하단에 설명 칸은 다 한줄로"). 그중 셋은
+ * 위 여덟 줄이 이미 말하는 것이었고(2.1배 · 10→14% · 꼭짓점), 남은 하나만 새 사실이었다 —
+ * **가계 금융자산 전체에서는 3.5%** 다. 그 하나와 증가 배수만 타일로 세운다.
  */
 function HouseholdShare({ h }: { h: HouseholdAssets }) {
   const first = h.series[0];
   const barMax = Math.max(...h.series.map((s) => s.domestic + s.foreign), 1);
-  const shares = h.series.map((s) => s.share);
-  const hi = Math.max(...shares);
 
   return (
     <>
@@ -198,19 +204,21 @@ function HouseholdShare({ h }: { h: HouseholdAssets }) {
         <Em>{h.foreignShare.toFixed(0)}원</Em>입니다
       </Verdict>
 
-      {/* ⚠️ `marginTop:auto` 를 안 쓴다. 격자가 stretch 라 남는 폭이 통째로
-          결론 문장과 그림 사이로 밀려 들어가 빈 띠가 된다. 위에 붙이고 남는 건
-          카드 바닥으로 보낸다. */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
-        {/* 국내 대 해외. 길이는 금액, 오른쪽 숫자는 비중이다. */}
-        <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex",
-                     flexDirection: "column", gap: 4 }}>
+      {/* ⚠️ `marginTop:auto` 를 안 쓴다. 격자가 stretch 라 남는 폭이 통째로 결론 문장과
+          그림 사이로 밀려 들어가 빈 띠가 된다. 남는 건 표가 줄 간격으로 나눠 먹는다. */}
+      <div style={{ display: "flex", flexDirection: "column", gap: S.md, flex: 1, minHeight: 0 }}>
+        {/* 국내 대 해외. 길이는 금액, 오른쪽 숫자는 비중이다.
+            ⭐ 줄마다 `1fr` 이라 남는 폭을 표가 고르게 나눠 먹는다 — 옆 카드가 몇 줄로
+            접히든 이 카드에 구멍이 안 생긴다('얼마나 오래 들고 있나' 와 같은 수). */}
+        <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", rowGap: S.xs,
+                     flex: 1, minHeight: 0,
+                     gridTemplateRows: `repeat(${h.series.length}, minmax(17px, 1fr))` }}>
           {h.series.map((s, i) => {
             const last = i === h.series.length - 1;
             return (
               <li key={s.quarter} style={{ display: "grid", gridTemplateColumns: "50px 1fr 44px",
-                                           alignItems: "center", gap: 9 }}>
-                <span style={{ fontSize: 10.5, fontWeight: last ? 800 : 600,
+                                           alignItems: "center", gap: S.sm }}>
+                <span style={{ fontSize: T.small, fontWeight: last ? 800 : 600,
                                color: last ? C.ink : C.sub2 }}>{s.quarter}</span>
                 <span style={{ display: "flex", height: 11, gap: 2 }}>
                   <span style={{ width: `${(s.domestic / barMax) * 100}%`, background: C.bar,
@@ -218,7 +226,7 @@ function HouseholdShare({ h }: { h: HouseholdAssets }) {
                   <span style={{ width: `${(s.foreign / barMax) * 100}%`, background: C.blue,
                                  borderRadius: 2 }} />
                 </span>
-                <span style={{ fontFamily: MONO, fontSize: 11, textAlign: "right",
+                <span style={{ fontFamily: MONO, fontSize: T.small, textAlign: "right",
                                fontWeight: last ? 800 : 400, color: last ? C.ink : C.sub2 }}>
                   {s.share.toFixed(0)}%
                 </span>
@@ -227,31 +235,26 @@ function HouseholdShare({ h }: { h: HouseholdAssets }) {
           })}
         </ul>
 
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 11 }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-            <span style={{ width: 8, height: 8, borderRadius: 2, background: C.bar }} />
-            <span style={{ color: C.sub }}>국내주식</span>
-            <b style={{ fontFamily: MONO, color: C.ink }}>{h.domestic.toFixed(0)}조</b>
-          </span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-            <span style={{ width: 8, height: 8, borderRadius: 2, background: C.blue }} />
-            <span style={{ color: C.sub }}>해외주식</span>
-            <b style={{ fontFamily: MONO, color: C.ink }}>{h.foreign.toFixed(0)}조</b>
-          </span>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: S.sm,
+                      fontSize: T.small }}>
+          {[
+            { k: "국내주식", v: h.domestic, tone: C.bar },
+            { k: "해외주식", v: h.foreign, tone: C.blue },
+          ].map((g) => (
+            <span key={g.k} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+              <span aria-hidden style={{ width: 8, height: 8, borderRadius: 2, background: g.tone }} />
+              <span style={{ color: C.sub }}>{g.k}</span>
+              <b style={{ fontFamily: MONO, color: C.ink }}>{jo(g.v)}</b>
+            </span>
+          ))}
         </div>
 
-        <span style={{ fontSize: 11, color: C.sub, paddingTop: 8, borderTop: `1px solid ${C.line}` }}>
-          해외주식은 {first.quarter} {first.foreign.toFixed(0)}조에서{" "}
-          <b style={{ color: C.ink }}>
-            {h.foreign.toFixed(0)}조로 {(h.foreign / (first.foreign || 1)).toFixed(1)}배
-          </b>{" "}
-          늘었고, 주식 중 몫도 {first.share.toFixed(0)}% 에서{" "}
-          <b style={{ color: C.ink }}>{h.foreignShare.toFixed(0)}%</b> 가 됐습니다. 다만{" "}
-          {hi.toFixed(0)}% 였던 때보다는 낮은데, 그 사이 국내주식이 더 올랐기 때문입니다.
-          가계 금융자산 전체로 보면 해외주식은{" "}
-          <b style={{ color: C.ink }}>{((h.foreign / h.total) * 100).toFixed(1)}%</b> 이고
-          현금·예금이 {h.cash.toFixed(0)}조입니다.
-        </span>
+        <Tiles items={[
+          { k: "2년 새", n: `${first.quarter} ${jo(first.foreign)}에서`,
+            v: `${(h.foreign / (first.foreign || 1)).toFixed(1)}배` },
+          { k: "금융자산 중", n: `현금·예금 ${jo(h.cash)}`,
+            v: `${((h.foreign / h.total) * 100).toFixed(1)}%` },
+        ]} />
       </div>
     </>
   );

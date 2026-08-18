@@ -1,6 +1,7 @@
 import type { SeohakOverview } from "@/lib/seohak-data";
-import { C, MONO, R } from "../ui";
-import { Card, Em, Verdict } from "./DailyCards";
+import { C, MONO } from "../ui";
+import { Card, Em, Tiles, Verdict } from "./DailyCards";
+import { S, T } from "./scale";
 
 /**
  * 매매 습관 — 얼마나 오래 들고 있나.
@@ -62,7 +63,7 @@ function HoldingPeriod({ ch }: { ch: NonNullable<SeohakOverview["channel"]> }) {
           ("공백이 너무 커보여"). 결론과 표는 붙여 두고, 남는 폭은 아래 요약 띠만
           바닥으로 밀어 먹는다 — 그 띠는 이미 구분선을 달고 있어서 카드 바닥에 붙으면
           발판처럼 읽힌다. */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, minHeight: 0 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: S.sm, flex: 1, minHeight: 0 }}>
         {/* 해마다의 자리. 막대 길이가 보유기간이고, 마지막 칸이 '지금'이다.
             ⭐ 최소 폭을 8% 주는 이유: 4.5개월이 가장 짧은데 lo 를 0 으로 잡으면 축이
             0~8개월이 되어 칸들이 다 비슷해진다. lo 를 데이터 최솟값에 붙이고 최소 폭을
@@ -79,18 +80,18 @@ function HoldingPeriod({ ch }: { ch: NonNullable<SeohakOverview["channel"]> }) {
             고르게 나눠 먹으면 폭이 어떻든 구멍이 안 생긴다.
             ⚠️ 줄 수를 `perCol` 로 **두 열 모두 같게** 박는다. 6줄·5줄로 두고 늘리면
             두 열의 줄이 가로로 어긋난다(한쪽은 6등분, 한쪽은 5등분이라). */}
-        <div style={{ display: "grid", columnGap: 26, rowGap: 4, flex: 1, minHeight: 0,
+        <div style={{ display: "grid", columnGap: 26, rowGap: S.xs, flex: 1, minHeight: 0,
                       gridTemplateColumns: "repeat(auto-fit, minmax(min(300px, 100%), 1fr))" }}>
           {cols.map((col) => (
             <ul key={col[0].year} style={{ listStyle: "none", margin: 0, padding: 0,
-                                           display: "grid", rowGap: 4,
+                                           display: "grid", rowGap: S.xs,
                                            gridTemplateRows: `repeat(${perCol}, minmax(17px, 1fr))` }}>
               {col.map((y) => {
                 const nowRow = y.year === 0;
                 return (
                   <li key={y.year} style={{ display: "grid", gridTemplateColumns: "36px 1fr 46px",
-                                            alignItems: "center", gap: 9 }}>
-                    <span style={{ fontSize: 11, fontWeight: nowRow ? 800 : 600,
+                                            alignItems: "center", gap: S.sm }}>
+                    <span style={{ fontSize: T.small, fontWeight: nowRow ? 800 : 600,
                                    color: nowRow ? C.ink : C.sub2 }}>
                       {nowRow ? "지금" : y.year}
                     </span>
@@ -98,7 +99,7 @@ function HoldingPeriod({ ch }: { ch: NonNullable<SeohakOverview["channel"]> }) {
                       <span style={{ width: `${8 + ((y.months - lo) / span) * 92}%`,
                                      background: nowRow ? C.blue : C.bar }} />
                     </span>
-                    <span style={{ fontFamily: MONO, fontSize: 11.5, textAlign: "right",
+                    <span style={{ fontFamily: MONO, fontSize: T.small, textAlign: "right",
                                    fontWeight: nowRow ? 800 : 400,
                                    color: nowRow ? C.ink : C.sub2 }}>
                       {y.months.toFixed(1)}
@@ -110,22 +111,13 @@ function HoldingPeriod({ ch }: { ch: NonNullable<SeohakOverview["channel"]> }) {
           ))}
         </div>
 
-        <div style={{ display: "flex", gap: 7, marginTop: "auto", paddingTop: 9,
-                      borderTop: `1px solid ${C.line}` }}>
-          {[
-            { label: "최근 12개월 거래", note: "매수 + 매도", v: usdB(t.traded) },
-            { label: "산 것 중 남은 것", note: `${usdB(ch.grossBuy)} 중`, v: `${leftPct.toFixed(1)}%` },
-          ].map((s) => (
-            <div key={s.label} style={{ flex: 1, background: C.soft, borderRadius: R.control,
-                                        padding: "7px 9px", display: "flex",
-                                        flexDirection: "column", gap: 1 }}>
-              <span style={{ fontSize: 10.5, color: C.label, fontWeight: 700 }}>{s.label}</span>
-              <span style={{ fontSize: 10, color: C.faint }}>{s.note}</span>
-              <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 800, color: C.ink }}>
-                {s.v}
-              </span>
-            </div>
-          ))}
+        {/* ⭐ 손으로 그리던 상자 둘을 공용 `Tiles` 로 갈았다. 세 카드가 거의 같은 상자를
+            글자 10/10.5/12, 값 14/15/20 으로 조금씩 다르게 그리고 있었다. */}
+        <div style={{ marginTop: "auto", paddingTop: 9, borderTop: `1px solid ${C.line}` }}>
+          <Tiles items={[
+            { k: "최근 12개월 거래", n: "매수 + 매도", v: usdB(t.traded) },
+            { k: "산 것 중 남은 것", n: `${usdB(ch.grossBuy)} 중`, v: `${leftPct.toFixed(1)}%` },
+          ]} />
         </div>
       </div>
     </>
