@@ -185,10 +185,15 @@ export function TradingCards({ ch }: { ch: SeohakOverview["channel"] }) {
   if (!ch) return null;
   return (
     <>
+      {/* ⚠️ 알약이 '최근 12개월' 이었다. 그건 **결론 문장의 창**이지 표의 창이 아니다 —
+          표는 열 해를 세운다. 12개월이라는 창은 '지금' 줄과 아래 '최근 12개월 거래'
+          상자가 이미 말하고 있으므로, 알약은 표가 덮는 기간을 적는다(옆 채권 카드와 같은 자).
+          ⚠️ 이 주석은 `{ch.turnover && (` **바깥**에 있어야 한다. 안쪽은 JSX 자식 자리가
+          아니라 식 자리라 중괄호 주석이 못 들어간다. */}
       {ch.turnover && (
         <Card icon="schedule" title="얼마나 오래 들고 있나"
               desc="한 번 산 것을 평균 몇 달 만에 되파는지입니다."
-              note={`최근 12개월`}
+              note="최근 10년"
               foot="잔고가 추정이라 5.9~8.8개월 사이에서 움직입니다.">
           <HoldingPeriod ch={ch} />
         </Card>
