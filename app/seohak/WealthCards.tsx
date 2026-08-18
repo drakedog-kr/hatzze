@@ -59,8 +59,8 @@ function InWon({ ch, fx }: {
 
       {/* ⚠️ `marginTop:auto` 를 안 쓴다. 격자가 stretch 라 남는 폭이 통째로
           결론 문장과 그림 사이로 밀려 들어가 빈 띠가 된다. 위에 붙이고 남는 건
-          카드 바닥으로 보낸다. */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+          맨 아래 환율 그림이 먹는다(`flex:1`). */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 11, flex: 1, minHeight: 0 }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 20, alignItems: "baseline" }}>
           <div>
             <div style={{ fontSize: 11.5, color: C.sub2, marginBottom: 3 }}>넣은 돈</div>
@@ -94,8 +94,74 @@ function InWon({ ch, fx }: {
             </div>
           ))}
         </div>
+
+        <FxChart fx={fx} avgRate={avgRate} />
       </div>
     </>
+  );
+}
+
+/**
+ * 환율 그림 — **가운데 점선이 그들이 달러를 산 평균값**이고 파란 선이 실제 환율이다.
+ *
+ * ## ⭐ 이게 왜 여기 있나
+ *
+ * 이 카드의 각주가 "환율이 평균으로 돌아가면 원화 수익도 줄어듭니다" 라고 경고하는데,
+ * 숫자로만 적으면 그 말이 얼마나 먼 이야기인지 알 수 없다. 선과 점선의 벌어진 폭이
+ * 곧 각주가 말하는 크기다.
+ *
+ * ## ⭐ `flex:1` 로 두는 이유 — 남는 폭을 여기서 먹는다
+ *
+ * 같은 행의 두 카드는 늘 세로가 같은데, 이 카드가 짝보다 115px 짧았다. 그 폭이 카드
+ * 바닥의 빈 띠로 남으면 "뭐가 빠졌나"로 읽힌다. 그림이 늘어나 먹으면 폭이 어떻든 구멍이
+ * 안 생긴다(옆 카드의 문단이 몇 줄로 접히든 상관없다).
+ *
+ * ⚠️ 그래서 `preserveAspectRatio="none"` 이다. 세로로 눌리고 늘어나므로
+ *   ① 글자를 SVG 안에 두면 안 된다(라벨은 위에 HTML 로 뺐다).
+ *   ② 선 굵기는 `vector-effect="non-scaling-stroke"` 로 고정한다. 안 그러면 세로로
+ *      눌릴 때 선만 굵어진다.
+ * ⛔ 세로 눈금이 늘어난다는 건 **기울기가 폭마다 달라진다**는 뜻이다. 그래서 이 그림에
+ * 각도로 읽는 말("가파르게")을 붙이면 안 된다. 읽는 것은 점선과의 위아래뿐이다.
+ */
+function FxChart({ fx, avgRate }: { fx: UsdKrw; avgRate: number }) {
+  // 최근 10년. 옆 '얼마나 오래 들고 있나' 와 같은 창이다.
+  const pts = [...fx.monthly.entries()].sort(([a], [b]) => a.localeCompare(b)).slice(-120);
+  // ⚠️ 월평균의 마지막 달은 아직 안 끝나 반쪽이다. 끝점은 최신 일별로 갈아 붙인다.
+  const vals = [...pts.map(([, v]) => v), fx.now];
+  if (vals.length < 24) return null;
+  const lo = Math.min(...vals, avgRate) * 0.985;
+  const hi = Math.max(...vals, avgRate) * 1.015;
+  const W = 1000;
+  const H = 100;
+  const x = (i: number) => (i / (vals.length - 1)) * W;
+  const y = (v: number) => H - ((v - lo) / (hi - lo)) * H;
+  const line = vals.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 5, flex: 1, minHeight: 0 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                    gap: 8, fontSize: 10.5, color: C.faint }}>
+        <span>원/달러 · 최근 10년</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+          <span style={{ width: 12, height: 0, borderTop: `1.5px dashed ${C.sub2}` }} />
+          <span style={{ color: C.sub }}>
+            평균 산 값 <b style={{ fontFamily: MONO, color: C.ink }}>{avgRate.toFixed(0)}원</b>
+          </span>
+        </span>
+      </div>
+      <div style={{ flex: 1, minHeight: 58 }}>
+        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none"
+             style={{ width: "100%", height: "100%", display: "block" }}
+             role="img"
+             aria-label={`원/달러 환율이 최근 10년 동안 평균 산 값 ${avgRate.toFixed(0)}원의 위아래로 어떻게 움직였는지`}>
+          <path d={`${line}L${W},${H}L0,${H}Z`} fill={C.blueTint} />
+          <line x1={0} x2={W} y1={y(avgRate)} y2={y(avgRate)} stroke={C.sub2}
+                strokeWidth={1.5} strokeDasharray="5 4" vectorEffect="non-scaling-stroke" />
+          <path d={line} fill="none" stroke={C.blue} strokeWidth={2}
+                strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        </svg>
+      </div>
+    </div>
   );
 }
 
