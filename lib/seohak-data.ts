@@ -1,4 +1,4 @@
-import { getSupabaseServer } from "@/lib/supabase-server";
+import { getSupabaseServer, warnIfRowCapped } from "@/lib/supabase-server";
 
 /**
  * 서학개미 해부도(/seohak)의 데이터층.
@@ -299,6 +299,7 @@ async function loadChannel(
     .lt("year", COHORT_FROM)
     .order("year", { ascending: true });
   if (yearly.error) return null;
+  warnIfRowCapped(yearly.data, "loadChannel 의 연간표(2015년 이전)");
 
   // ⚠️ 정렬 키를 반드시 박는다. 이 자료를 처음 재다가 정렬 없이 페이징해서 값이
   // $112.6B → $164.1B 로 튀었다(이 저장소가 네 번 겪은 함정).
@@ -337,6 +338,7 @@ async function loadChannel(
   const gross = await sb
     .from("seohak_settlement_yearly")
     .select("us_buy_amount, us_sell_amount");
+  warnIfRowCapped(gross.data, "loadChannel 의 역대 누적 매수·매도");
   const grossBuy = (gross.data ?? []).reduce((s, r) => s + Number(r.us_buy_amount ?? 0) / 1e6, 0);
   const grossSell = (gross.data ?? []).reduce((s, r) => s + Number(r.us_sell_amount ?? 0) / 1e6, 0);
 
@@ -627,6 +629,7 @@ export async function getLatestSettlement(): Promise<SettlementDay | null> {
     .select("market_code, security_type, buy_count, buy_amount, sell_count, sell_amount")
     .eq("settle_date", day);
   if (error) throw new Error(`결제 통계 조회 실패: ${error.message}`);
+  warnIfRowCapped(data, "getSettlementDay 의 하루 결제(전 시장)");
 
   const rows = data ?? [];
   const us = rows.find((r) => r.market_code === "US" && r.security_type === "주식");
@@ -652,6 +655,7 @@ export async function getPeers(month: string): Promise<Peer[]> {
     .select("country_code, holdings_usd_mn")
     .eq("month", `${month}-01`);
   if (error) throw new Error(`비교국 조회 실패: ${error.message}`);
+  warnIfRowCapped(data, "getPeers 의 한 달 나라별 잔고");
   return (data ?? [])
     .map((r) => ({
       code: r.country_code as string,

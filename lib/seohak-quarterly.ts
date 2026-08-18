@@ -1,4 +1,4 @@
-import { getSupabaseServer } from "@/lib/supabase-server";
+import { getSupabaseServer, warnIfRowCapped } from "@/lib/supabase-server";
 
 /**
  * 서학개미 해부도의 **분기 층** — 기관과 나머지.
@@ -145,6 +145,7 @@ export async function getSeohakQuarterly(): Promise<SeohakQuarterly | null> {
       "quarter_end, institution_usd, total_usd, institution_share, institution_return, rest_return, filer_count",
     )
     .order("quarter_end", { ascending: true });
+  warnIfRowCapped(data, "getSeohakQuarterly 의 분기 수익률 전체");
 
   // ⚠️ error 를 안 받으면 조회 실패가 조용히 '데이터 없음'이 된다(telegram-data.ts 에서
   // 13곳 중 12곳이 이랬다). 여기서는 표가 아직 없을 수도 있으므로 던지지 말고 null 을
