@@ -77,8 +77,12 @@ export default async function SeohakPage() {
           있다(3 이라 적혀 있는데 두 장이었다). 있는 자료로 세게 둔다. */}
       <SectionCaps label="어떻게 사고파나" count={1 + (ov.channel?.turnover ? 1 : 0)} />
       {/* 둘 다 예탁원 채널이라 모집단이 같다. 아래 두 층과 같은 2열 격자를 쓴다 —
-          섹션마다 열 수가 다르면 훑을 때 리듬이 끊긴다. */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 14, alignItems: "start" }}>
+          섹션마다 열 수가 다르면 훑을 때 리듬이 끊긴다.
+          ⚠️ `alignItems` 를 주지 않는다(기본값 stretch). **같은 행의 카드는 늘 세로가
+          같아야 한다.** 남는 폭은 짧은 카드의 **바닥**으로 간다 — 카드 안 `marginTop:auto`
+          를 전부 걷은 이유가 그것이다. 그게 남아 있으면 남는 폭이 결론 문장과 그림
+          사이로 밀려 들어가 빈 띠가 된다(실제로 그렇게 보였다). */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 14 }}>
         <DailySection d={daily} />
         <TradingCards ch={ov.channel} />
       </div>
@@ -88,7 +92,7 @@ export default async function SeohakPage() {
           ⭐ 그래도 한 묶음인 이유는 둘 다 **규모**를 묻기 때문이다. 하나는 "원화로 얼마",
           하나는 "가계 자산에서 어느 자리". */}
       <SectionCaps label="얼마나 큰 돈인가" count={(fx ? 1 : 0) + (household ? 1 : 0)} />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 16, alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 16 }}>
         <WealthCards ch={ov.channel} fx={fx} household={household} />
       </div>
 

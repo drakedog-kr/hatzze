@@ -158,7 +158,10 @@ function Flows({ e }: { e: SeohakEtf }) {
         하루에 <Em>{signed(e.netFlowTotal)}</Em>이 실제로 들어왔습니다
       </Verdict>
 
-      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 11 }}>
+      {/* ⚠️ `marginTop:auto` 를 안 쓴다. 격자가 stretch 라 남는 폭이 통째로
+          결론 문장과 그림 사이로 밀려 들어가 빈 띠가 된다. 위에 붙이고 남는 건
+          카드 바닥으로 보낸다. */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
         <div style={{ display: "grid", gap: 14,
                       gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))" }}>
           {sides.map((s) => (
@@ -226,7 +229,10 @@ function WeekGrid({ e }: { e: SeohakEtf }) {
         <Em>{chg(byChange[byChange.length - 1]?.changePct ?? 0)}</Em>입니다
       </Verdict>
 
-      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 9 }}>
+      {/* ⚠️ `marginTop:auto` 를 안 쓴다. 격자가 stretch 라 남는 폭이 통째로
+          결론 문장과 그림 사이로 밀려 들어가 빈 띠가 된다. 위에 붙이고 남는 건
+          카드 바닥으로 보낸다. */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
         <div style={{ display: "grid", gap: 14,
                       gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))" }}>
           {sides.map((s) => (
