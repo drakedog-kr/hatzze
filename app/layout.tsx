@@ -66,10 +66,16 @@ export default async function RootLayout({
   // 받으므로, 기본값을 다시 뒤집으려면 비교 대상만 바꾸면 된다.
   // 다만 아래 theme-color 메타는 이 값을 따라가야 한다(globals.css 의 color-scheme 은
   // :root=light / [data-theme=dark]=dark 로 갈라 둬서 기본값과 무관하게 맞는다).
-  const theme = (await cookies()).get("hz-theme")?.value === "dark" ? "dark" : "light";
+  const jar = await cookies();
+  const theme = jar.get("hz-theme")?.value === "dark" ? "dark" : "light";
+  // 서학개미 해부도의 통화 스위치(달러/원). **기본은 원화**라 usd 일 때만 속성을 붙인다 —
+  // 값을 늘 붙이면 기본값이 두 곳(여기와 globals.css)에 적히고 언젠가 갈린다.
+  // ⚠️ 이 한 줄이 없으면 새로고침 때마다 원화로 돌아간다(쿠키만으로는 서버가 못 안다).
+  const cur = jar.get("hz-cur")?.value === "usd" ? "usd" : undefined;
 
   return (
-    <html lang="ko" data-theme={theme} className={`${pretendard.variable} h-full antialiased`}>
+    <html lang="ko" data-theme={theme} data-cur={cur}
+          className={`${pretendard.variable} h-full antialiased`}>
       <head>
         {/* 모바일 브라우저의 주소창·상태바 색. 안 주면 다크에서 어두운 화면 위에 흰
             주소창이 얹혀 페이지가 잘린 것처럼 보인다. 쿠키로 정한 theme 을 그대로
@@ -143,7 +149,7 @@ export default async function RootLayout({
           <body>에 속성을 주입해 불일치 경고를 낸다. body 자신의 속성 불일치만
           무시한다 — 내부 컴포넌트 hydration 검사에는 영향 없다. */}
       <body className="font-sans" suppressHydrationWarning>
-        <AppShell theme={theme}>
+        <AppShell theme={theme} currency={cur === "usd" ? "usd" : "krw"}>
           {children}
         </AppShell>
       </body>

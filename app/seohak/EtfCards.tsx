@@ -2,6 +2,7 @@ import type { SeohakEtf } from "@/lib/seohak-etf";
 import { C, MONO, R } from "../ui";
 import { BUY, BUY_INK, SELL, SELL_INK } from "./tone";
 import { CARD_GRID, Card, SignEm, Verdict } from "./DailyCards";
+import { type Fx, Money } from "./money";
 import { S, T } from "./scale";
 
 /**
@@ -16,14 +17,9 @@ import { S, T } from "./scale";
  * 그 카드를 뺄 때 인용도 같이 뗐다.
  */
 
-/** 원 단위를 "1,234억"·"1.2조" 로. 이 층만 원화라 여기에만 둔다. */
-const won = (v: number) => {
-  const a = Math.abs(v);
-  const sign = v < 0 ? "−" : "";
-  if (a >= 1e12) return `${sign}${(a / 1e12).toFixed(1)}조`;
-  return `${sign}${Math.round(a / 1e8).toLocaleString("ko-KR")}억`;
-};
-const signed = (v: number) => (v >= 0 ? `+${won(v)}` : won(v));
+/* 이 층의 `won()`·`signed()` 가 여기 있었다. KRX 자료라 원화가 원천인데, 통화 스위치가
+   붙으면서 달러 짝을 함께 그려야 해서 `money.tsx` 의 `<Money krw={…}>` 로 넘어갔다.
+   ⚠️ **환산 방향이 다른 카드와 반대다.** 여기는 원 → 달러다. */
 /**
  * 좁은 칸에 맞게 이름을 줄인다.
  *
@@ -67,7 +63,7 @@ function RankTable({ head, hint, tone, ink, barTone, rows }: {
   /** 값 **글자** 색. 면 색과 다른 값이다(머리말 참고). */
   ink: string;
   barTone: string;
-  rows: { key: string; name: string; weight: number; value: string }[];
+  rows: { key: string; name: string; weight: number; value: React.ReactNode }[];
 }) {
   const max = Math.max(...rows.map((r) => Math.abs(r.weight)), 1);
   /* ⛔ 여기 다섯째 칸(옅은 회색 보조값)이 있었다. '주간 등락' 이 그 주 순유입을 등락
@@ -161,7 +157,7 @@ function RankTable({ head, hint, tone, ink, barTone, rows }: {
  * "환헤지를 버리고 환율을 그대로 받는 쪽으로 간다"는 일관된데, 전체의 1.1% 라 이 카드에
  * 자리를 줄 값어치가 없다고 봤다. 되살린다면 **하루치가 아니라 창 전체 값**으로 각주에.
  */
-function Flows({ e }: { e: SeohakEtf }) {
+function Flows({ e, fx }: { e: SeohakEtf; fx: Fx | null }) {
   /* ⚠️ 두 칸이 `hint` 를 "하루 순유입" 으로 함께 쓰고 있었다. 빠진 곳에 그렇게 적으면
      **칸 이름과 값 이름이 서로 반대**를 가리킨다. 칸마다 제 이름을 준다. */
   const sides = [
@@ -173,7 +169,11 @@ function Flows({ e }: { e: SeohakEtf }) {
   return (
     <>
       <Verdict>
-        하루에 <SignEm v={e.netFlowTotal}>{signed(e.netFlowTotal)}</SignEm>이 실제로 들어왔습니다
+        하루에{" "}
+        <SignEm v={e.netFlowTotal}>
+          <Money krw={e.netFlowTotal} at={e.asOf.slice(0, 7)} fx={fx} signed />
+        </SignEm>
+        이 실제로 들어왔습니다
       </Verdict>
 
       {/* ⚠️ `marginTop:auto` 를 안 쓴다. 격자가 stretch 라 남는 폭이 통째로
@@ -194,7 +194,7 @@ function Flows({ e }: { e: SeohakEtf }) {
                 key: r.code,
                 name: shortName(r.name),
                 weight: r.netFlow,
-                value: signed(r.netFlow),
+                value: <Money krw={r.netFlow} at={e.asOf.slice(0, 7)} fx={fx} signed />,
               }))}
             />
           ))}
@@ -314,7 +314,7 @@ function WeekGrid({ e }: { e: SeohakEtf }) {
  * (안쪽 minmax 가 280px). 접히는 편이 낫다 — 억지로 2열을 유지하면 한 칸이 218px 라
  * "TIGER 미국필라델피아반도체나스닥"(170px)이 값(62px)에 밀려 잘린다.
  */
-export function EtfSection({ e }: { e: SeohakEtf }) {
+export function EtfSection({ e, fx }: { e: SeohakEtf; fx: Fx | null }) {
   return (
     // 두 카드의 자연 높이가 572 로 같아서 늘려도 구멍이 안 생긴다(`CARD_GRID` 머리말).
     <div style={CARD_GRID}>
@@ -332,7 +332,7 @@ export function EtfSection({ e }: { e: SeohakEtf }) {
             /* 부제에서 밀려난 '채권형 제외' 가 여기로 온다. 짝도 같은 자리에 표본을
                밝히고 있어 두 카드가 같은 꼴이다. */
             noteHelp="상장좌수 변화 × 순자산가치로 재고, 채권형은 뺐습니다.">
-        <Flows e={e} />
+        <Flows e={e} fx={fx} />
       </Card>
 
       {/* ## ⚠️ 각주 띠는 **둘 다 있거나 둘 다 없어야 한다**

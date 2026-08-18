@@ -11,6 +11,7 @@ import { EtfSection } from "./EtfCards";
 import { TradingCards } from "./TradingCards";
 import { WealthCards } from "./WealthCards";
 import { SectionCaps } from "../kadera/parts";
+import { toFx } from "./money";
 import { S } from "./scale";
 import { pageMetadata } from "../seo";
 
@@ -38,6 +39,10 @@ export default async function SeohakPage() {
     getUsdKrw(),
     getHouseholdAssets(),
   ]);
+  /* 통화 스위치의 재료. 카드는 금액을 **두 벌 다 그려 두고**(`money.tsx`) 뿌리의
+     `data-cur` 를 보고 globals.css 가 한쪽을 숨긴다. `Map` 을 맨 객체로 펴는 건
+     달력이 클라이언트 컴포넌트라 직렬화를 타기 때문이다. */
+  const rates = toFx(fx);
   return (
     // hz-cards 를 쓰지 않는다. 그건 브리핑의 4열 셀 격자라 자식마다 min-height 274px 가
     // 걸려 있어서, 짧은 시트 아래에 200px 짜리 빈 바닥이 생긴다(실측). 카더라와 같은
@@ -50,7 +55,7 @@ export default async function SeohakPage() {
           갇혀 4열이 1열로 접힌다(실제로 그렇게 깨졌다). */}
       {/* 히어로 = 달력. 이 화면에서 가장 눈에 붙는 그림이고, 나머지 층이 그 아래에서
           '왜 그런가'를 답한다. */}
-      {calendar && <CalendarHero c={calendar} />}
+      {calendar && <CalendarHero c={calendar} fx={rates} />}
 
       {/* ── 구간 나누기 ───────────────────────────────────────────────
           카더라·브리핑·MDD 가 쓰는 것과 같은 머리 배지(SectionCaps)로 장을 가른다.
@@ -82,8 +87,8 @@ export default async function SeohakPage() {
           ⚠️ 세 층이 **같은 격자**(`CARD_GRID`)를 쓴다. 손으로 적었을 때 칸 사이가
           14 · 16 · 14 로 갈려 있었다. 규칙과 근거는 `CARD_GRID` 머리말. */}
       <div style={CARD_GRID}>
-        <DailySection d={daily} />
-        <TradingCards ch={ov.channel} />
+        <DailySection d={daily} fx={rates} />
+        <TradingCards ch={ov.channel} fx={rates} />
       </div>
 
       {/* 원화·가계 두 장. 앞의 것은 예탁원 채널, 뒤의 것은 자금순환표 가계 부문이라
@@ -92,7 +97,7 @@ export default async function SeohakPage() {
           하나는 "가계 자산에서 어느 자리". */}
       <SectionCaps label="얼마나 큰 돈인가" count={(fx ? 1 : 0) + (household ? 1 : 0)} />
       <div style={CARD_GRID}>
-        <WealthCards ch={ov.channel} fx={fx} household={household} />
+        <WealthCards ch={ov.channel} fx={rates} household={household} />
       </div>
 
       {/* ⭐ '무엇에 담았나'였다. 남은 둘이 전부 **국내 상장 ETF** 이야기라 이름을 그렇게
@@ -100,7 +105,7 @@ export default async function SeohakPage() {
           경계를 밝힌다. 이 묶음만 질문이 아니라 이름인 까닭이 그것이다 — 여기서 가릴
           것은 '무엇을 묻나'가 아니라 '어느 그릇인가'다. */}
       <SectionCaps label="국내 상장 ETF" count={etf ? 2 : 0} />
-      {etf && <EtfSection e={etf} />}
+      {etf && <EtfSection e={etf} fx={rates} />}
 
       {/* ⛔ 여기서 뺀 카드들과 그 까닭
           · 개인과 기관     — "개인이 전체의 몇 %인가". 사실이지만 읽는 개인의 판단을

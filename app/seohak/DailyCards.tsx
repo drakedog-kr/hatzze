@@ -2,6 +2,7 @@ import { type SeohakDaily } from "@/lib/seohak-daily";
 import { SectionHead } from "../kadera/SectionHead";
 import { BUY, SELL, signInk } from "./tone";
 import { S, T } from "./scale";
+import { type Fx, Money, rateOverMonths } from "./money";
 import { C, MONO, R } from "../ui";
 
 /**
@@ -23,12 +24,8 @@ import { C, MONO, R } from "../ui";
  *  ③ 제목 아래 **설명 한 줄**을 둔다(브리핑의 desc 와 같은 자리). 각주는 출처·한계만.
  */
 
-export const usd = (v: number) => {
-  const a = Math.abs(v);
-  if (a >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
-  if (a >= 1e6) return `$${(v / 1e6).toFixed(0)}M`;
-  return `$${Math.round(v).toLocaleString("ko-KR")}`;
-};
+/* `usd()` 가 여기 있었다. 통화 스위치가 붙으면서 원화 짝과 한 자리에 있어야 해서
+   `money.tsx` 로 옮겼다(달력도 제 사본을 갖고 있었다 — 이제 하나다). */
 export const cnt = (v: number) => v.toLocaleString("ko-KR");
 /* 배수를 "18% 더"·"26% 덜" 로 옮기던 `asPct` 가 여기 있었다. 타일이 배수를 그대로
    `88%` 로 내면서 부르는 곳이 0 이 됐다. 함께 배운 것은 아래 각주 줄에 남겨 뒀다. */
@@ -153,9 +150,10 @@ export const SignEm = ({ v, children }: { v: number; children: React.ReactNode }
  */
 export type Tile = {
   k: string;
-  /** 이름 아래 한 줄. 단위나 분모처럼 값을 읽는 데 필요한 것만. */
-  n: string;
-  v: string;
+  /** 이름 아래 한 줄. 단위나 분모처럼 값을 읽는 데 필요한 것만.
+   *  ⚠️ 노드다 — 금액이 오면 `<Money>` 가 두 통화를 함께 그려야 한다. */
+  n: React.ReactNode;
+  v: React.ReactNode;
   /** 이름 앞 네모. 그림의 선과 이 타일을 잇는 자리에만 준다. */
   tone?: string;
   ink?: string;
@@ -332,7 +330,7 @@ export const CARD_GRID: React.CSSProperties = {
    그래서 **'평소의 몇 %' 한 가지 언어로 통일한다.** 세로축도, 옆 숫자 셋도 같은 자다.
    그림에 남는 건 기준선 하나 + 선 둘 + 끝점 둘, 다섯뿐이다. 스파크라인은 지웠다 —
    횟수도 같은 언어의 숫자 하나로 말하면 그림이 필요 없다. */
-function VsUsual({ d }: { d: SeohakDaily }) {
+function VsUsual({ d, fx }: { d: SeohakDaily; fx: Fx | null }) {
   const r = d.recentPct;
   const net = d.turnover.buy - d.turnover.sell;
   const vals = r.flatMap((p) => [p.buy, p.sell]);
@@ -347,9 +345,13 @@ function VsUsual({ d }: { d: SeohakDaily }) {
   /* ⛔ 값에 `signInk` 를 쓰지 않는다. 88% 는 부호가 아니라 평소 대비 비율이라 방향이
      둘로 갈린다 — 덜 파는 것이 나쁜 일인가? 사자·팔자 구분은 앞의 네모가 진다.
      ⚠️ '산 횟수' 에는 네모를 안 준다. 그림에 그 선이 없는데 네모를 달면 범례가 거짓이 된다. */
+  /** 어제 하루치라 그달 환율이다. */
+  const ym = d.asOf.slice(0, 7);
   const tiles = [
-    { k: "사는 양", n: `어제 ${usd(d.today.buy)}`, v: `${Math.round(d.vsUsual.buy)}%`, tone: BUY },
-    { k: "파는 양", n: `어제 ${usd(d.today.sell)}`, v: `${Math.round(d.vsUsual.sell)}%`, tone: SELL },
+    { k: "사는 양", n: <>어제 <Money usd={d.today.buy} at={ym} fx={fx} /></>,
+      v: `${Math.round(d.vsUsual.buy)}%`, tone: BUY },
+    { k: "파는 양", n: <>어제 <Money usd={d.today.sell} at={ym} fx={fx} /></>,
+      v: `${Math.round(d.vsUsual.sell)}%`, tone: SELL },
     { k: "산 횟수", n: `어제 ${cnt(d.today.buyCount)}번`, v: `${Math.round(d.vsUsual.buyCount)}%` },
   ];
   const up = (v: number) => v >= 100;
@@ -412,7 +414,11 @@ function VsUsual({ d }: { d: SeohakDaily }) {
         <span style={{ fontSize: T.body, lineHeight: 1.5, color: C.sub, wordBreak: "keep-all" }}>
           최근 {cnt(d.turnover.days)}거래일 동안{" "}
           {net >= 0 ? "산 것이 판 것보다" : "판 것이 산 것보다"}{" "}
-          <b style={{ fontFamily: MONO, color: signInk(net) }}>{usd(Math.abs(net))}</b> 많았습니다
+          {/* ⚠️ 창이 250거래일이라 한 달로 못 집는다. 그 기간 **월평균의 평균**으로
+              옮긴다 — 1년이면 환율이 ±5% 안팎이라 이 근사가 값의 뜻을 안 바꾼다. */}
+          <b style={{ fontFamily: MONO, color: signInk(net) }}>
+            <Money usd={Math.abs(net)} rate={fx ? rateOverMonths(fx, 12) : undefined} fx={fx} />
+          </b> 많았습니다
         </span>
         {/* ⚠️ 이 줄을 "횟수가 25% 덜, 한 번에 13% 더 움직였습니다" 로 쓰면 말이 엉킨다.
             '덜·더' 어법은 **평소 대비** 배수용이지 사자와 팔자 두 쪽을 견주는 자리엔
@@ -443,12 +449,12 @@ function VsUsual({ d }: { d: SeohakDaily }) {
  * ⚠️ 카드가 하나뿐이라 격자가 필요 없다. 예전엔 `CARD_GRID` 에 셋을 담고 첫 카드만
  * 늘리려 애썼는데(span 이 열 수에 따라 어긋났다) 그 문제도 같이 사라진다.
  */
-export function DailySection({ d }: { d: SeohakDaily }) {
+export function DailySection({ d, fx }: { d: SeohakDaily; fx: Fx | null }) {
   return (
     <Card icon="show_chart" title="평소와의 차이"
           desc="사고파는 양이 평소의 몇 %인지 · 반년치"
           note="최근 6개월">
-      <VsUsual d={d} />
+      <VsUsual d={d} fx={fx} />
     </Card>
   );
 }

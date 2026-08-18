@@ -1,7 +1,8 @@
 import type { SeohakOverview } from "@/lib/seohak-data";
-import type { HouseholdAssets, UsdKrw } from "@/lib/seohak-external";
+import type { HouseholdAssets } from "@/lib/seohak-external";
 import { C, MONO } from "../ui";
 import { Baseline, CHART, Card, Chart, Em, RefLine, SignEm, Tiles, Verdict } from "./DailyCards";
+import { type Fx, Money, quarterMonth } from "./money";
 import { S, T } from "./scale";
 import { signInk } from "./tone";
 
@@ -12,11 +13,9 @@ import { signInk } from "./tone";
  * **모집단이 서로 다르므로 두 카드의 숫자를 더하거나 나누면 안 된다.** 각주가 밝힌다.
  */
 
-/** 백만 달러 × 원 → "276조". 이 페이지에서 원화가 나오는 유일한 자리다. */
-const won = (mn: number, rate: number) =>
-  `${((mn * 1e6 * rate) / 1e12).toLocaleString("ko-KR", { maximumFractionDigits: 0 })}조`;
-/** 조 단위 값. ⚠️ `toFixed(0)` 로 두면 `1400조`·`2714조` 처럼 자리 구분이 사라진다. */
-const jo = (v: number) => `${Math.round(v).toLocaleString("ko-KR")}조`;
+/* 손으로 원화를 만들던 `won(mn, rate)` 가 여기 있었다. 통화 스위치가 붙으면서
+   `<Money>` 가 두 벌을 함께 그린다. ⚠️ 이 파일의 채널 값은 **백만 달러** 단위라
+   `* 1e6` 으로 달러에 맞춰 넘긴다. */
 /** 환율. 같은 이유로 `1286원` 이 아니라 `1,286원` 이다. */
 const krw = (v: number) => `${Math.round(v).toLocaleString("ko-KR")}원`;
 const pct = (v: number, digits = 1) =>
@@ -40,14 +39,14 @@ const pct = (v: number, digits = 1) =>
  */
 function InWon({ ch, fx }: {
   ch: NonNullable<SeohakOverview["channel"]>;
-  fx: UsdKrw;
+  fx: Fx;
 }) {
   /** 유입을 그달 환율로 환산한 가중평균. "그들이 달러를 산 값"이다. */
   let wSum = 0;
   let wNet = 0;
   for (const c of ch.cohorts) {
     // 코호트는 해 단위라 그 해 6월 환율로 대표한다. 달 단위 유입은 이미 채널이 접었다.
-    const rate = fx.monthly.get(`${c.year}-06`) ?? fx.monthly.get(`${c.year}-12`);
+    const rate = fx.rate[`${c.year}-06`] ?? fx.rate[`${c.year}-12`];
     if (!rate) continue;
     wSum += c.inflow * rate;
     wNet += c.inflow;
@@ -75,9 +74,12 @@ function InWon({ ch, fx }: {
         {/* ⭐ 두 금액이 21 과 28 로 크기가 갈려 있었다. 한 자로 묶고 무게와 색으로만
             가른다 — 크기를 두 단 쓰면 그만큼 자가 늘어난다. */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: S.md, alignItems: "baseline" }}>
+          {/* ⚠️⚠️ **두 금액의 환율이 서로 다르다.** 넣은 돈은 유입 가중평균(1,286원),
+              지금은 최신(1,414원)이다. 그 차이가 곧 이 카드의 주장이라 하나로 통일하면
+              안 된다 — 같은 환율로 두면 '환율에서 +10%' 가 화면에서 사라진다. */}
           {[
-            { k: "넣은 돈", v: `${won(ch.principal, avgRate)}원`, now: false },
-            { k: "지금", v: `${won(ch.value, fx.now)}원`, now: true },
+            { k: "넣은 돈", usd: ch.principal * 1e6, rate: avgRate, now: false },
+            { k: "지금", usd: ch.value * 1e6, rate: fx.now, now: true },
           ].map((b, i) => (
             <span key={b.k} style={{ display: "flex", alignItems: "baseline", gap: S.md }}>
               {/* ⚠️ `alignSelf` 를 줘야 한다. 바깥 줄이 baseline 정렬이라 그냥 두면 화살표가
@@ -92,7 +94,9 @@ function InWon({ ch, fx }: {
               <span style={{ display: "flex", flexDirection: "column" }}>
                 <span style={{ fontSize: T.body, color: C.sub2, marginBottom: 3 }}>{b.k}</span>
                 <b style={{ fontFamily: MONO, fontSize: T.big, fontWeight: b.now ? 800 : 700,
-                            color: b.now ? C.ink : C.sub, letterSpacing: "-.02em" }}>{b.v}</b>
+                            color: b.now ? C.ink : C.sub, letterSpacing: "-.02em" }}>
+                  <Money usd={b.usd} rate={b.rate} fx={fx} suffix="원" />
+                </b>
               </span>
             </span>
           ))}
@@ -137,9 +141,9 @@ function InWon({ ch, fx }: {
  * ⛔ 세로 눈금이 늘어난다는 건 **기울기가 폭마다 달라진다**는 뜻이다. 그래서 이 그림에
  * 각도로 읽는 말("가파르게")을 붙이면 안 된다. 읽는 것은 점선과의 위아래뿐이다.
  */
-function FxChart({ fx, avgRate }: { fx: UsdKrw; avgRate: number }) {
+function FxChart({ fx, avgRate }: { fx: Fx; avgRate: number }) {
   // 최근 10년. 옆 '얼마나 오래 들고 있나' 와 같은 창이다.
-  const pts = [...fx.monthly.entries()].sort(([a], [b]) => a.localeCompare(b)).slice(-120);
+  const pts = Object.entries(fx.rate).sort(([a], [b]) => a.localeCompare(b)).slice(-120);
   // ⚠️ 월평균의 마지막 달은 아직 안 끝나 반쪽이다. 끝점은 최신 일별로 갈아 붙인다.
   const vals = [...pts.map(([, v]) => v), fx.now];
   if (vals.length < 24) return null;
@@ -205,8 +209,10 @@ function FxChart({ fx, avgRate }: { fx: UsdKrw; avgRate: number }) {
  * 위 여덟 줄이 이미 말하는 것이었고(2.1배 · 10→14% · 꼭짓점), 남은 하나만 새 사실이었다 —
  * **가계 금융자산 전체에서는 3.5%** 다. 그 하나와 증가 배수만 타일로 세운다.
  */
-function HouseholdShare({ h }: { h: HouseholdAssets }) {
+function HouseholdShare({ h, fx }: { h: HouseholdAssets; fx: Fx | null }) {
   const first = h.series[0];
+  /** 분기값은 그 분기 **끝 달**의 환율로 옮긴다. 잔액표라 시점값이다. */
+  const at = quarterMonth(h.asOf);
   const barMax = Math.max(...h.series.map((s) => s.domestic + s.foreign), 1);
 
   return (
@@ -256,15 +262,20 @@ function HouseholdShare({ h }: { h: HouseholdAssets }) {
             <span key={g.k} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
               <span aria-hidden style={{ width: 8, height: 8, borderRadius: 2, background: g.tone }} />
               <span style={{ color: C.sub }}>{g.k}</span>
-              <b style={{ fontFamily: MONO, color: C.ink }}>{jo(g.v)}</b>
+              <b style={{ fontFamily: MONO, color: C.ink }}>
+                <Money krw={g.v * 1e12} at={at} fx={fx} />
+              </b>
             </span>
           ))}
         </div>
 
         <Tiles items={[
-          { k: "2년 새", n: `${first.quarter} ${jo(first.foreign)}에서`,
+          { k: "2년 새",
+            n: <>{first.quarter}{" "}
+                 <Money krw={first.foreign * 1e12} at={quarterMonth(first.quarter)} fx={fx} />에서</>,
             v: `${(h.foreign / (first.foreign || 1)).toFixed(1)}배` },
-          { k: "금융자산 중", n: `현금·예금 ${jo(h.cash)}`,
+          { k: "금융자산 중",
+            n: <>현금·예금 <Money krw={h.cash * 1e12} at={at} fx={fx} /></>,
             v: `${((h.foreign / h.total) * 100).toFixed(1)}%` },
         ]} />
       </div>
@@ -274,7 +285,7 @@ function HouseholdShare({ h }: { h: HouseholdAssets }) {
 
 export function WealthCards({ ch, fx, household }: {
   ch: SeohakOverview["channel"];
-  fx: UsdKrw | null;
+  fx: Fx | null;
   household: HouseholdAssets | null;
 }) {
   return (
@@ -292,7 +303,7 @@ export function WealthCards({ ch, fx, household }: {
               desc="가계가 든 국내주식과 해외주식을 나란히"
               note={`${household.asOf} · 가계 부문`}
               foot="해외주식은 미국만이 아닌 전 세계이고, 해외 ETF는 빠져 있습니다.">
-          <HouseholdShare h={household} />
+          <HouseholdShare h={household} fx={fx} />
         </Card>
       )}
     </>

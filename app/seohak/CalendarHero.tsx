@@ -7,6 +7,7 @@ import { CALENDAR_WINDOWS, CHANCE_BASELINE, windowDates, windowsInMonth } from "
 import { SectionHead } from "../kadera/SectionHead";
 import { BUY, SELL, signInk } from "./tone";
 import { S, T } from "./scale";
+import { type Fx, Money, both } from "./money";
 import { C, Icon, MONO, R } from "../ui";
 
 /**
@@ -45,14 +46,9 @@ const fullLabel = (date: string) => `${date.slice(0, 4)}/${dayLabel(date)}`;
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
 
-const usd = (v: number) => {
-  const a = Math.abs(v);
-  const sign = v < 0 ? "−" : "";
-  if (a >= 1e9) return `${sign}$${(a / 1e9).toFixed(2)}B`;
-  if (a >= 1e6) return `${sign}$${(a / 1e6).toFixed(0)}M`;
-  return `${sign}$${Math.round(a).toLocaleString("ko-KR")}`;
-};
 const cnt = (v: number) => v.toLocaleString("ko-KR");
+/** 결제일 → 그 달. 금액을 **그 돈이 오간 달의 환율**로 옮기는 데 쓴다(money.tsx 머리말). */
+const monthOf = (date: string) => date.slice(0, 7);
 
 /** "2026-08" → 그달 1일의 요일과 날 수. UTC 로만 다뤄 시간대 밀림을 막는다. */
 function monthMeta(month: string) {
@@ -78,13 +74,17 @@ function shiftMonth(month: string, by: number) {
  * 누를 수 있는 줄(가장 많이 산 날)과 아닌 줄(산 금액)이 같은 모양이라야 눈이 규칙을
  * 잡는다. 누를 수 있으면 값에 밑줄만 들어간다.
  */
-function Row({ k, n, v, on }: { k: string; n: string; v: string; on?: () => void }) {
+function Row({ k, n, v, sign, on }: {
+  k: string; n: string; v: React.ReactNode;
+  /** 값의 방향. 주면 색이 따라간다. 안 주면 잉크 그대로다. */
+  sign?: number;
+  on?: () => void;
+}) {
   /* ⭐ 부호가 붙은 값은 색으로도 방향을 말한다 — 오르면 빨강, 내리면 파랑(국내 관행).
      `+$1.18B` 와 `−$1.00B` 가 둘 다 검정이라 굵기 말고는 구분이 없었다.
-     ⚠️ 값 문자열에서 읽는다. 이 줄 꼴은 금액·횟수·차액을 다 받는데 부호를 붙일지는
-     부르는 쪽이 이미 정해 두었고(`+${usd(...)}`), 그 판단을 두 곳에 두면 갈린다.
-     ⚠️ 마이너스는 하이픈이 아니라 U+2212 다. `usd()` 가 그 글자를 쓴다. */
-  const ink = v.startsWith("+") ? signInk(1) : v.startsWith("\u2212") ? signInk(-1) : C.ink;
+     ⚠️ 예전엔 값 **문자열**의 첫 글자로 읽었는데, 통화 스위치가 붙으면서 값이 두 벌
+     짜리 노드가 되어 못 읽는다. 부르는 쪽이 숫자로 넘긴다. */
+  const ink = sign === undefined ? C.ink : signInk(sign);
   const body = (
     <>
       <span style={{ fontSize: T.body, color: C.sub }}>{k}</span>
@@ -107,7 +107,7 @@ function Row({ k, n, v, on }: { k: string; n: string; v: string; on?: () => void
   );
 }
 
-type RowSpec = { k: string; n: string; v: string; on?: () => void };
+type RowSpec = { k: string; n: string; v: React.ReactNode; sign?: number; on?: () => void };
 
 /**
  * 되풀이되는 때 한 줄 — 이름 · 문장 · 몇 번 중 몇 번.
@@ -174,8 +174,12 @@ function Card({ children }: { children: React.ReactNode }) {
  * 목록이라 큰 숫자가 없다. 앞서 들은 지적("크기도 제각각")은 **뜻 없는 차이**에 대한
  * 것이었다 — 종류가 다르면 달라야 하고, 종류가 같으면(이 달·고른 날) 같아야 한다.
  */
-function Box({ head, amount, rows }: {
-  head: string; amount: number; rows: (RowSpec | null | undefined | false)[];
+function Box({ head, amount, at, fx, rows }: {
+  head: string; amount: number;
+  /** 이 상자의 달. 금액을 그 달 환율로 옮긴다. */
+  at: string;
+  fx: Fx | null;
+  rows: (RowSpec | null | undefined | false)[];
 }) {
   return (
     <Card>
@@ -186,7 +190,7 @@ function Box({ head, amount, rows }: {
               3.71 이라 이 크기여도 4.5 에 못 미친다. */}
           <b style={{ fontFamily: MONO, fontSize: T.big, fontWeight: 800,
                       color: signInk(amount), letterSpacing: "-0.02em" }}>
-            {usd(Math.abs(amount))}
+            <Money usd={Math.abs(amount)} at={at} fx={fx} />
           </b>
           <span style={{ fontSize: T.body, color: C.sub }}>
             더 {amount >= 0 ? "샀습니다" : "팔았습니다"}
@@ -198,7 +202,7 @@ function Box({ head, amount, rows }: {
   );
 }
 
-export function CalendarHero({ c }: { c: SeohakCalendar }) {
+export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
   const [month, setMonth] = useState(c.asOfMonth);
   const [picked, setPicked] = useState<string>(c.asOf);
 
@@ -438,7 +442,8 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                   type="button"
                   onClick={() => row && setPicked(date)}
                   disabled={!row}
-                  title={row ? `${date} · 순매수 ${usd(row.net)}` : `${date} · 결제 없음`}
+                  /* ⚠️ 속성이라 통화 하나를 CSS 로 숨길 수가 없다. 둘 다 적는다. */
+                  title={row ? `${date} · 순매수 ${both(row.net, fx, month)}` : `${date} · 결제 없음`}
                   style={{
                     // 높이는 위 격자의 `gridAutoRows` 가 정한다(바닥값 34).
                     position: "relative",
@@ -495,7 +500,7 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                 const strength = Math.min(1, Math.abs(m.net) / m.scale);
                 return (
                   <button key={m.key} type="button" onClick={() => jumpToMonth(m.key)}
-                          title={`${m.key} · 순매수 ${usd(m.net)}`}
+                          title={`${m.key} · 순매수 ${both(m.net, fx, m.key)}`}
                           style={{ flex: 1, minWidth: 0, height: 22, borderRadius: 3, padding: 0,
                                    cursor: "pointer",
                                    border: m.key === month ? `2px solid ${C.ink}` : "2px solid transparent",
@@ -535,18 +540,22 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
               <Box
                 head={`이 달 · ${monthDays.length}거래일`}
                 amount={monthNet}
+                at={month}
+                fx={fx}
                 rows={[
-                  { k: "산 금액", n: "", v: usd(monthBuy) },
-                  { k: "판 금액", n: "", v: usd(monthSell) },
+                  { k: "산 금액", n: "", v: <Money usd={monthBuy} at={month} fx={fx} /> },
+                  { k: "판 금액", n: "", v: <Money usd={monthSell} at={month} fx={fx} /> },
                   // ⚠️ 위 두 줄은 **총액**이고 이 두 줄은 **차액**이다. 같은 칸에 부호
                   // 없이 나란히 두면 같은 종류로 읽혀서 $739M 을 $10.16B 와 견주게 된다.
                   // 부호를 붙여 "차이"임을 형태로 알린다.
                   topBuy && {
-                    k: "가장 많이 산 날", n: dayLabel(topBuy.date), v: `+${usd(Math.abs(topBuy.net))}`,
+                    k: "가장 많이 산 날", n: dayLabel(topBuy.date), sign: 1,
+                    v: <>+<Money usd={Math.abs(topBuy.net)} at={monthOf(topBuy.date)} fx={fx} /></>,
                     on: () => setPicked(topBuy.date),
                   },
                   topSell && {
-                    k: "가장 많이 판 날", n: dayLabel(topSell.date), v: `−${usd(Math.abs(topSell.net))}`,
+                    k: "가장 많이 판 날", n: dayLabel(topSell.date), sign: -1,
+                    v: <>−<Money usd={Math.abs(topSell.net)} at={monthOf(topSell.date)} fx={fx} /></>,
                     on: () => setPicked(topSell.date),
                   },
                 ]}
@@ -555,11 +564,17 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                 <Box
                   head={`고른 날 · ${day.date}${pickedWindow ? ` · ${pickedWindow.label}` : ""}`}
                   amount={day.net}
+                  at={monthOf(day.date)}
+                  fx={fx}
                   rows={[
-                    { k: "산 금액", n: `${cnt(day.buyCount)}번`, v: usd(day.buy) },
-                    { k: "판 금액", n: `${cnt(day.sellCount)}번`, v: usd(day.sell) },
+                    { k: "산 금액", n: `${cnt(day.buyCount)}번`,
+                      v: <Money usd={day.buy} at={monthOf(day.date)} fx={fx} /> },
+                    { k: "판 금액", n: `${cnt(day.sellCount)}번`,
+                      v: <Money usd={day.sell} at={monthOf(day.date)} fx={fx} /> },
                     { k: "한 번 살 때", n: "평균",
-                      v: day.buyCount ? usd(day.buy / day.buyCount) : "—" },
+                      v: day.buyCount
+                        ? <Money usd={day.buy / day.buyCount} at={monthOf(day.date)} fx={fx} />
+                        : "—" },
                   ]}
                 />
               )}
@@ -611,12 +626,16 @@ export function CalendarHero({ c }: { c: SeohakCalendar }) {
                       rows={[
                         {
                           k: "가장 많이 산 날", n: fullLabel(c.records.topBuy.date),
-                          v: `+${usd(Math.abs(c.records.topBuy.value))}`,
+                          sign: 1,
+                          v: <>+<Money usd={Math.abs(c.records.topBuy.value)}
+                                       at={monthOf(c.records.topBuy.date)} fx={fx} /></>,
                           on: jumpable(c.records.topBuy.date),
                         },
                         {
                           k: "가장 많이 판 날", n: fullLabel(c.records.topSell.date),
-                          v: `−${usd(Math.abs(c.records.topSell.value))}`,
+                          sign: -1,
+                          v: <>−<Money usd={Math.abs(c.records.topSell.value)}
+                                       at={monthOf(c.records.topSell.date)} fx={fx} /></>,
                           on: jumpable(c.records.topSell.date),
                         },
                         // ⚠️ 이 줄만 값이 금액이 아니라 횟수다. 단위(번)가 달라 금액과

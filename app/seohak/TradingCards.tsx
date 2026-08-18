@@ -1,6 +1,7 @@
 import type { SeohakOverview } from "@/lib/seohak-data";
 import { C, MONO } from "../ui";
 import { Card, Em, Tiles, Verdict } from "./DailyCards";
+import { type Fx, Money, rateOverMonths } from "./money";
 import { S, T } from "./scale";
 
 /**
@@ -14,15 +15,9 @@ import { S, T } from "./scale";
  * ⚠️ 자료(`channel.bondYears`)는 로더에 남겨 둔다 — 지금을 말할 방법이 생기면 되살릴 것.
  */
 
-/**
- * 백만 달러 → "$1.2B". 이 파일의 값은 전부 백만 달러다.
- * ⚠️ $1B 아래는 두 자리다. 한 자리로 두면 2016년 채권 $0.04B 가 `$0B` 로 찍힌다.
- */
-const usdB = (mn: number) => {
-  const abs = Math.abs(mn) / 1000;
-  const digits = abs < 1 ? 2 : abs < 10 ? 1 : 0;
-  return `${mn < 0 ? "−" : ""}$${abs.toLocaleString("ko-KR", { maximumFractionDigits: digits })}B`;
-};
+/* `usdB()` 가 여기 있었다. 이 파일의 값은 백만 달러 단위라 따로 옮기는 함수가 필요했는데,
+   통화 스위치가 붙으면서 금액이 전부 `<Money>` 를 타게 됐다 — 부르는 쪽에서 `* 1e6` 으로
+   달러에 맞추고 자릿수는 `money.tsx` 의 `usd()` 가 정한다. */
 
 /**
  * ⑬ 얼마나 오래 들고 있나.
@@ -38,7 +33,7 @@ const usdB = (mn: number) => {
  * 회전율 = (매수+매도) ÷ 잔고인데, 분자는 예탁원 실측이고 분모는 유입을 시장 지수로
  * 굴린 값이다. ±20% 로 흔들면 보유기간이 **5.9~8.8개월**로 움직인다. 각주가 밝힌다.
  */
-function HoldingPeriod({ ch }: { ch: NonNullable<SeohakOverview["channel"]> }) {
+function HoldingPeriod({ ch, fx }: { ch: NonNullable<SeohakOverview["channel"]>; fx: Fx | null }) {
   const t = ch.turnover;
   if (!t) return null;
   const years = t.byYear;
@@ -114,9 +109,13 @@ function HoldingPeriod({ ch }: { ch: NonNullable<SeohakOverview["channel"]> }) {
         {/* ⭐ 손으로 그리던 상자 둘을 공용 `Tiles` 로 갈았다. 세 카드가 거의 같은 상자를
             글자 10/10.5/12, 값 14/15/20 으로 조금씩 다르게 그리고 있었다. */}
         <div style={{ marginTop: "auto", paddingTop: 9, borderTop: `1px solid ${C.line}` }}>
+          {/* ⚠️ 오른쪽 칸의 보조 줄이 `$1,419B 중` 이었다. 그건 **1985년부터의 누적
+              매수**라 어느 환율 하나로도 원화로 못 옮긴다(30년치가 1,200~1,400원을 오간다).
+              통화를 안 타는 말로 바꾼다 — 이 타일이 말하는 건 비율이지 그 절대액이 아니다. */}
           <Tiles items={[
-            { k: "최근 12개월 거래", n: "매수 + 매도", v: usdB(t.traded) },
-            { k: "산 것 중 남은 것", n: `${usdB(ch.grossBuy)} 중`, v: `${leftPct.toFixed(1)}%` },
+            { k: "최근 12개월 거래", n: "매수 + 매도",
+              v: <Money usd={t.traded * 1e6} rate={fx ? rateOverMonths(fx, 12) : undefined} fx={fx} /> },
+            { k: "산 것 중 남은 것", n: "역대 누적 매수 대비", v: `${leftPct.toFixed(1)}%` },
           ]} />
         </div>
       </div>
@@ -124,7 +123,7 @@ function HoldingPeriod({ ch }: { ch: NonNullable<SeohakOverview["channel"]> }) {
   );
 }
 
-export function TradingCards({ ch }: { ch: SeohakOverview["channel"] }) {
+export function TradingCards({ ch, fx }: { ch: SeohakOverview["channel"]; fx: Fx | null }) {
   if (!ch) return null;
   return (
     <>
@@ -137,7 +136,7 @@ export function TradingCards({ ch }: { ch: SeohakOverview["channel"] }) {
         <Card icon="schedule" title="얼마나 오래 들고 있나"
               desc="한 번 산 것을 평균 몇 달 만에 되파는지"
               note="최근 10년">
-          <HoldingPeriod ch={ch} />
+          <HoldingPeriod ch={ch} fx={fx} />
         </Card>
       )}
     </>
