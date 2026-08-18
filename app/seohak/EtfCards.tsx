@@ -73,7 +73,9 @@ function RankTable({ head, hint, asideHint, tone, ink, barTone, rows }: {
 }) {
   const max = Math.max(...rows.map((r) => Math.abs(r.weight)), 1);
   const hasAside = rows.some((r) => r.aside !== undefined);
-  const cols = hasAside ? "18px minmax(0, 1fr) 40px 44px 46px" : "18px minmax(0, 1fr) 48px 58px";
+  /* ⚠️ 보조 칸이 44px 였다. 이름을 '주간 순유입'(46px)으로 바꾸면서 48px 로 넓힌다 —
+     줄어드는 건 이름 칸 4px 뿐이다(495px 카드에서 250 → 246). */
+  const cols = hasAside ? "18px minmax(0, 1fr) 40px 48px 46px" : "18px minmax(0, 1fr) 48px 58px";
 
   return (
     /* ⭐ `height:100%` + 아래 `<ul>` 의 1fr 줄. 두 카드의 세로가 늘 같아야 하는데
@@ -271,9 +273,14 @@ function WeekGrid({ e }: { e: SeohakEtf }) {
               key={s.key}
               head={s.head}
               hint="등락"
-              /* 이름을 주되 옅은 회색 그대로다. 등락과 대등한 지표로 보이면 안 된다 —
-                 둘 다 그 주의 기록일 뿐 인과로 엮지 않는다는 게 이 카드의 전제다. */
-              asideHint="오간 돈"
+              /* ⛔ '오간 돈' 이라고 붙였다가 고쳤다. **뜻이 정확히 거꾸로 읽힌다** —
+                 '오갔다'는 손바뀜, 곧 거래대금으로 읽히는데 이 값은 그 반대다.
+                 상장좌수 변화 × NAV 라 **설정·환매만** 잡는다(같은 돈이 오간 것은 안 센다).
+                 옆 카드가 같은 값을 '하루 순유입' 이라 부르므로 창만 바꿔 짝을 맞춘다.
+                 ⚠️ 이름은 주되 색은 옅은 회색 그대로다. 등락과 대등한 지표로 보이면
+                 안 된다 — 둘 다 그 주의 기록일 뿐 인과로 엮지 않는다는 게 이 카드의
+                 전제다(`WeekGrid` 머리말에 15주 실측이 있다). */
+              asideHint="주간 순유입"
               tone={s.tone}
               ink={s.ink}
               barTone={s.bar}
