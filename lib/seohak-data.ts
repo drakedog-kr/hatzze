@@ -316,7 +316,13 @@ async function loadChannel(
       .select("settle_date, security_type, buy_amount, sell_amount")
       .eq("market_code", "US")
       .gte("settle_date", `${COHORT_FROM}-01-01`)
-      .lte("settle_date", `${asOfMonth}-31`)
+      /* ⚠️⚠️ `${asOfMonth}-31` 이었다. **31일이 없는 달에서 통째로 죽는다** —
+         TIC 이 2026-05 에서 2026-06 으로 넘어가자 `2026-06-31` 이라는 없는 날짜가
+         돼서 조회가 에러를 냈고, `if (error) return null` 을 타고 채널이 null 이 되어
+         '원화로 보면'·'얼마나 오래 들고 있나' 두 장이 화면에서 사라졌다.
+         4·6·9·11월과 2월, 곧 열두 달 중 다섯 달이 그 상태다.
+         ⭐ 다음 달 1일 **미만**으로 두면 달 길이를 몰라도 된다. */
+      .lt("settle_date", `${shiftMonths(asOfMonth, 1)}-01`)
       .order("settle_date", { ascending: true })
       .order("security_type", { ascending: true })
       .range(start, start + 999);
