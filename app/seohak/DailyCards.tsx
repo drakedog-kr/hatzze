@@ -71,7 +71,8 @@ export function Card({
   /** 제목 아래 한 줄. 이 카드가 무엇을 재는지 여기서 끝내야 한다. */
   desc: string;
   note?: string;
-  foot: string;
+  /** 없으면 바닥 띠를 아예 안 그린다. 적을 게 없는데 띠만 남으면 빈 칸이 된다. */
+  foot?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -83,9 +84,11 @@ export function Card({
                     padding: "14px 22px" }}>
         {children}
       </div>
-      <div className="hz-sheet-foot" style={{ fontSize: 12, color: C.sub }}>
-        <span>{foot}</span>
-      </div>
+      {foot && (
+        <div className="hz-sheet-foot" style={{ fontSize: 12, color: C.sub }}>
+          <span>{foot}</span>
+        </div>
+      )}
     </section>
   );
 }

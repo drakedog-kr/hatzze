@@ -49,7 +49,10 @@ function HoldingPeriod({ ch }: { ch: NonNullable<SeohakOverview["channel"]> }) {
         요즘은 한 번 사면 <Em>{t.months.toFixed(1)}개월</Em>쯤 들고 있습니다
       </Verdict>
 
-      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+      {/* ⚠️ `marginTop:auto` 를 안 쓴다. 두 카드가 stretch 로 같은 높이가 되는데, 그러면
+          남는 폭이 통째로 **결론 문장과 표 사이**로 밀려 들어가 빈 띠가 생긴다("공백이
+          너무 커보여"). 위에 붙이고 남는 건 카드 바닥으로 보낸다. */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {/* 해마다의 자리. 막대 길이가 보유기간이고, 마지막 칸이 '지금'이다.
             ⭐ 최소 폭을 8% 주는 이유: 4.5개월이 가장 짧은데 lo 를 0 으로 잡으면 축이
             0~8개월이 되어 칸들이 다 비슷해진다. lo 를 데이터 최솟값에 붙이고 최소 폭을
@@ -100,6 +103,9 @@ function HoldingPeriod({ ch }: { ch: NonNullable<SeohakOverview["channel"]> }) {
   );
 }
 
+/** 채권 표의 칸 배치. 머리줄과 몸줄이 어긋나면 안 되므로 한 곳에서 낸다. */
+const BOND_COLS = "34px 1fr 62px 62px";
+
 /**
  * ⑭ 미국 채권도 산다.
  *
@@ -112,7 +118,9 @@ function BondFlow({ ch }: { ch: NonNullable<SeohakOverview["channel"]> }) {
   // 앞 두 해는 채권이 $0.02B 대라 막대도 안 보이던 줄이다.
   const rows = ch.bondYears.filter((y) => y.net !== 0 || y.stockNet !== 0).slice(-10);
   if (!rows.length) return null;
-  const max = Math.max(...rows.flatMap((y) => [Math.abs(y.net), Math.abs(y.stockNet)]), 1);
+  // ⭐ 막대 눈금은 **채권만** 기준이다. 주식까지 넣으면 최대가 $32.5B 이라 채권
+  // 막대가 전부 손톱만 해진다(2025년 $9.9B 가 30%).
+  const max = Math.max(...rows.map((y) => Math.abs(y.net)), 1);
   /**
    * ⚠️ **결론 문장은 마지막 줄이 아니라 마지막 '온전한 해'를 쓴다.** 올해는 자료가 반년
    * 뿐이라 가장 작은 값인데(2026년 $0.4B), 그걸 머리에 걸면 "채권은 얼마 안 된다"로
@@ -132,18 +140,17 @@ function BondFlow({ ch }: { ch: NonNullable<SeohakOverview["channel"]> }) {
       <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex",
                      flexDirection: "column" }}>
-          <li style={{ display: "grid", gridTemplateColumns: "34px 1fr 56px 1fr 56px", gap: 8,
+          <li style={{ display: "grid", gridTemplateColumns: BOND_COLS, gap: 9,
                        padding: "0 0 6px", fontSize: 10.5, color: C.faint }}>
             <span>해</span>
             <span />
             <span style={{ textAlign: "right" }}>채권</span>
-            <span />
             <span style={{ textAlign: "right" }}>주식</span>
           </li>
           {rows.map((y) => (
             <li key={y.year}
-                style={{ display: "grid", gridTemplateColumns: "34px 1fr 56px 1fr 56px",
-                         alignItems: "center", gap: 8, padding: "5px 0",
+                style={{ display: "grid", gridTemplateColumns: BOND_COLS,
+                         alignItems: "center", gap: 9, padding: "5px 0",
                          borderTop: `1px solid ${C.sheetRow}`,
                          // 주식이 빠진 해를 살짝 띄운다. 이 카드가 가리키는 줄이다.
                          background: y.stockNet < 0 ? C.soft : undefined }}>
@@ -153,16 +160,16 @@ function BondFlow({ ch }: { ch: NonNullable<SeohakOverview["channel"]> }) {
                 <span style={{ width: `${Math.max(3, (Math.abs(y.net) / max) * 100)}%`,
                                background: y.net >= 0 ? "var(--c-warm-2)" : "var(--c-blue-2)" }} />
               </span>
-              <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700,
+              <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800,
                              color: y.net >= 0 ? BUY : SELL, textAlign: "right" }}>
                 {usdB(y.net)}
               </span>
-              <span className="hz-bar">
-                <span style={{ width: `${Math.max(3, (Math.abs(y.stockNet) / max) * 100)}%`,
-                               background: y.stockNet >= 0 ? "var(--c-warm-2)" : "var(--c-blue-2)" }} />
-              </span>
-              <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700,
-                             color: y.stockNet >= 0 ? BUY : SELL, textAlign: "right" }}>
+              {/* 주식은 **숫자만.** 막대를 나란히 두면 한 줄에 막대가 둘이라 어느 쪽이
+                  채권인지 매번 되짚어야 한다("채권이랑 주식 구분이 잘 안돼").
+                  이 카드의 주인공은 채권이고 주식은 견줄 자리이므로, 색으로만 방향을
+                  말하고 길이는 안 준다. */}
+              <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 600,
+                             color: y.stockNet >= 0 ? C.sub2 : SELL, textAlign: "right" }}>
                 {usdB(y.stockNet)}
               </span>
             </li>
@@ -193,16 +200,14 @@ export function TradingCards({ ch }: { ch: SeohakOverview["channel"] }) {
       {ch.turnover && (
         <Card icon="schedule" title="얼마나 오래 들고 있나"
               desc="한 번 산 것을 평균 몇 달 만에 되파는지입니다."
-              note="최근 10년"
-              foot="잔고가 추정이라 5.9~8.8개월 사이에서 움직입니다.">
+              note="최근 10년">
           <HoldingPeriod ch={ch} />
         </Card>
       )}
       {ch.bondYears.length > 0 && (
         <Card icon="account_balance_wallet" title="미국 채권도 산다"
               desc="같은 길로 미국 채권에도 돈이 오갑니다."
-              note="최근 10년"
-              foot="주식과 같은 국내 증권사 채널이고, 국채·회사채를 안 가릅니다.">
+              note="최근 10년">
           <BondFlow ch={ch} />
         </Card>
       )}
