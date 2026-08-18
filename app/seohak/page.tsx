@@ -5,11 +5,9 @@ import { getSeohakOverview, type Cohort } from "@/lib/seohak-data";
 import { getSeohakCalendar } from "@/lib/seohak-calendar";
 import { getSeohakEtf } from "@/lib/seohak-etf";
 import { getHouseholdAssets, getUsdKrw } from "@/lib/seohak-external";
-import { getSeohakQuarterly } from "@/lib/seohak-quarterly";
 import { DailySection } from "./DailyCards";
 import { CalendarHero } from "./CalendarHero";
 import { EtfSection } from "./EtfCards";
-import { QuarterlyCards } from "./QuarterlyCards";
 import { TradingCards } from "./TradingCards";
 import { WealthCards } from "./WealthCards";
 import { SectionCaps } from "../kadera/parts";
@@ -21,7 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return pageMetadata({
     title: "서학개미 해부도 | hatzze",
     description:
-      "한국인이 미국 주식에 넣은 돈은 얼마이고, 언제 넣었고, 지금 얼마가 됐는지. 미 재무부 통계로 1985년부터 되짚습니다.",
+      "개인이 미국 주식에 넣은 돈은 얼마이고, 언제 넣었고, 지금 얼마가 됐는지. 예탁결제원 결제와 미 재무부 통계로 되짚습니다.",
     path: "/seohak",
   });
 }
@@ -138,9 +136,8 @@ export default async function SeohakPage() {
   // 아래 셋은 서로 의존이 없다. 순서대로 await 하면 왕복이 앞뒤로 붙으므로 함께 띄운다.
   // ⚠️ 분기·ETF 두 층은 표가 아직 없을 수 있어 null 을 돌려준다(마이그레이션 043·042).
   // 그 경우 그 섹션만 접고 나머지는 그대로 뜬다.
-  const [daily, quarterly, etf, calendar, fx, household] = await Promise.all([
+  const [daily, etf, calendar, fx, household] = await Promise.all([
     getSeohakDaily(),
-    getSeohakQuarterly(),
     getSeohakEtf(),
     getSeohakCalendar(),
     // ⚠️ 바깥 원천 둘. 실패하면 null 이라 그 카드만 접힌다(lib/seohak-external.ts 머리말).
@@ -194,18 +191,15 @@ export default async function SeohakPage() {
         <TradingCards ch={ov.channel} />
       </div>
 
-      {/* ── 분기 층 ───────────────────────────────────────────────────
-          ⭐ 맨 아래였다. 13F 마감이 분기말 +45일이라 **갱신이 가장 느리다**는 이유로
-          내려놓았는데, 그건 위 주석이 경계한 바로 그 기준이다 — 우리 파이프라인 사정이지
-          읽는 사람의 관심이 아니다. 질문으로 보면 '누가'는 '어떻게'와 한 짝이라 바로
-          뒤가 제자리다. 아래 두 장은 그릇('무엇에')과 잔고('얼마가')를 묻는 딴 갈래다. */}
-      {quarterly && (
-        <>
-          <SectionCaps label="누구의 돈인가" count={1} />
-          <QuarterlyCards q={quarterly} ch={ov.channel} />
-        </>
-      )}
-
+      {/* ⛔ '개인과 기관' 이 여기 있었는데 **뺐다.**
+          그 카드가 답하던 건 "개인이 전체의 몇 %인가"였다. 사실이지만 **읽는 개인의
+          판단을 아무것도 바꾸지 않는다** — 게다가 절반이 신고자 목록(국민연금·KIC)이라
+          개인 페이지에 기관 이야기를 얹고 있었다.
+          ⭐ 다만 그 카드가 혼자 지고 있던 몫이 하나 있었다 — **이 화면이 말하는 '개인'이
+          무엇인지**. 그건 카드가 아니라 머리에 있을 말이라 화면 부제로 옮겼다
+          (`AppShell` 의 NAV `sub`).
+          ⚠️ 13F 표·로더(`seohak_institution_13f`, `getSeohakQuarterly`)와 파이프라인은
+          그대로 남는다. 기관을 다시 다룰 자리가 생기면 그때 되살릴 것. */}
       {/* ⭐ '무엇에 담았나'였다. 남은 둘이 전부 **국내 상장 ETF** 이야기라 이름을 그렇게
           바꿨다. 미국에 직접 상장된 QQQ 같은 건 안 들어오는 딴 그릇이라, 이름으로 그
           경계를 밝힌다. */}
