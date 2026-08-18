@@ -67,6 +67,19 @@ const cellBg = (net: number, strength: number) =>
   `color-mix(in srgb, ${net >= 0 ? BUY : SELL} ${(16 + strength * 62).toFixed(1)}%, ${C.card})`;
 
 const cnt = (v: number) => v.toLocaleString("ko-KR");
+/**
+ * 결제 건수. **`번` 이 아니라 `건` 이다.**
+ *
+ * ⚠️⚠️ 이 화면의 '번' 이 **두 가지**를 세고 있었다.
+ *   ① 거래 건수   `34,440번` · `84,703번`     ← 예탁원 결제 건수
+ *   ② 해          `17번 중 17번`              ← 되풀이되는 때가 맞은 햇수
+ * 같은 자에 다른 물건을 얹은 꼴이라 "다 번이라고만 나와서 헷갈린다"는 말을 들었다.
+ * 거래 쪽을 표준 단위인 `건` 으로 옮기면 남은 `번` 은 햇수 하나만 가리킨다.
+ *
+ * ⭐ 덤으로 **사람 수로 읽힐 여지가 준다.** 사람은 '명' 으로 센다 — 지운 각주가
+ * "횟수는 사람 수가 아니라 결제 건수입니다" 라고 적어 두던 그 자리다.
+ */
+const cases = (v: number) => `${cnt(v)}건`;
 /** 결제일 → 그 달. 금액을 **그 돈이 오간 달의 환율**로 옮기는 데 쓴다(money.tsx 머리말). */
 const monthOf = (date: string) => date.slice(0, 7);
 
@@ -592,11 +605,11 @@ export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
                   at={monthOf(day.date)}
                   fx={fx}
                   rows={[
-                    { k: "산 금액", n: `${cnt(day.buyCount)}번`,
+                    { k: "산 금액", n: cases(day.buyCount),
                       v: <Money usd={day.buy} at={monthOf(day.date)} fx={fx} /> },
-                    { k: "판 금액", n: `${cnt(day.sellCount)}번`,
+                    { k: "판 금액", n: cases(day.sellCount),
                       v: <Money usd={day.sell} at={monthOf(day.date)} fx={fx} /> },
-                    { k: "한 번 살 때", n: "평균",
+                    { k: "한 건당", n: "평균 매수",
                       v: day.buyCount
                         ? <Money usd={day.buy / day.buyCount} at={monthOf(day.date)} fx={fx} />
                         : "—" },
@@ -669,7 +682,7 @@ export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
                         // 섞여 읽힐 일이 없어서 예외로 둔다.
                         {
                           k: "가장 바빴던 날", n: fullLabel(c.records.busiest.date),
-                          v: `${cnt(c.records.busiest.value)}번`,
+                          v: cases(c.records.busiest.value),
                           on: jumpable(c.records.busiest.date),
                         },
                       ]}

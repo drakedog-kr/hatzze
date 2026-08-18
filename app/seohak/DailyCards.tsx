@@ -363,7 +363,9 @@ function VsUsual({ d, fx }: { d: SeohakDaily; fx: Fx | null }) {
       v: `${Math.round(d.vsUsual.buy)}%`, tone: BUY },
     { k: "파는 양", n: <>어제 <Money usd={d.today.sell} at={ym} fx={fx} /></>,
       v: `${Math.round(d.vsUsual.sell)}%`, tone: SELL },
-    { k: "산 횟수", n: `어제 ${cnt(d.today.buyCount)}번`, v: `${Math.round(d.vsUsual.buyCount)}%` },
+    /* ⚠️ '횟수 / N번' 이었다. 이 화면의 '번' 이 거래 건수와 **햇수**(`17번 중 17번`)
+       둘을 겸하고 있어서 헷갈린다. 거래 쪽은 표준 단위인 `건` 으로 옮긴다. */
+    { k: "산 건수", n: `어제 ${cnt(d.today.buyCount)}건`, v: `${Math.round(d.vsUsual.buyCount)}%` },
   ];
   const up = (v: number) => v >= 100;
   const verdict = up(d.vsUsual.buy) && up(d.vsUsual.sell) ? (
@@ -439,8 +441,8 @@ function VsUsual({ d, fx }: { d: SeohakDaily; fx: Fx | null }) {
         <span style={{ fontSize: T.body, lineHeight: 1.5, color: C.sub, wordBreak: "keep-all" }}>
           최근 20일, 파는 쪽은 사는 쪽보다{" "}
           <b style={{ color: C.ink }}>
-            횟수가 {Math.abs(Math.round((d.countRatio - 1) * 100))}%{" "}
-            {d.countRatio < 1 ? "적고" : "많고"}, 한 번에{" "}
+            건수가 {Math.abs(Math.round((d.countRatio - 1) * 100))}%{" "}
+            {d.countRatio < 1 ? "적고" : "많고"}, 한 건이{" "}
             {Math.abs(Math.round((d.sizeRatio - 1) * 100))}%{" "}
             {d.sizeRatio > 1 ? "큽니다" : "작습니다"}
           </b>
