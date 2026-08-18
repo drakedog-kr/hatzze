@@ -743,7 +743,11 @@ function Sheet({ children, style }: { children: React.ReactNode; style?: React.C
 function Foot({ children }: { children: React.ReactNode }) {
   return (
     <div className="hz-sheet-foot" style={{ marginTop: "auto" }}>
-      <span style={{ fontSize: 12, lineHeight: 1.6, color: C.sub, padding: "9px 0", wordBreak: "keep-all" }}>{children}</span>
+      {/* ⚠️ 안쪽에 세로 padding 을 주지 말 것. 띠가 이미 위아래 11px 을 들고 있어서, 겹치면
+          한 줄 각주가 41 → 60px 이 된다(이 페이지의 바닥 띠만 다른 화면보다 18px 두꺼웠다).
+          여기에 9px 이 있었던 건 띠가 `padding: 0 22px` 이던 시절의 잔재다 — 그때는 띠 자신에게
+          세로 여백이 없어 안쪽이 그 일을 대신했다. */}
+      <span style={{ fontSize: 12, lineHeight: 1.6, color: C.sub, wordBreak: "keep-all" }}>{children}</span>
     </div>
   );
 }
