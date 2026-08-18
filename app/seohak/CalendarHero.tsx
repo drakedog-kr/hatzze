@@ -98,8 +98,15 @@ function Row({ k, n, v, sign, on }: {
     display: "flex", alignItems: "baseline", gap: S.sm, width: "100%",
   };
   return on ? (
+    /* ⚠️⚠️ `.hz-jump` 의 **좌우** 음수 마진(-6px)을 되돌린다. 그건 맨 글자 링크의 호버
+       영역을 넓히려는 값인데, `width:100%` 인 버튼에 걸리면 왼쪽으로만 6px 밀려 나가고
+       오른쪽은 그만큼 짧아진다 — 누를 수 있는 줄의 값만 위 두 줄보다 **12px 왼쪽**에
+       서서 오른쪽 끝이 안 맞았다(872 대 884, 실측).
+       세로(-3px)는 그대로 둔다. 같이 없애면 줄 간격이 벌어진다.
+       ⭐ 같은 함정을 `.hz-row-link.hz-pick` 과 달력의 '오늘' 알약이 먼저 겪었다. */
     <button type="button" onClick={on} className="hz-jump"
-            style={{ ...style, border: "none", cursor: "pointer", font: "inherit" }}>
+            style={{ ...style, border: "none", cursor: "pointer", font: "inherit",
+                     margin: "-3px 0", padding: "3px 0" }}>
       {body}
     </button>
   ) : (
@@ -124,9 +131,11 @@ function WindowRow({ w, onJump }: { w: (typeof CALENDAR_WINDOWS)[number]; onJump
   // 우연 기준선(17번 중 11번)을 넘어야 잉크를 준다. 아래면 흐리게 둬서 눈이 안 멈춘다.
   const strong = w.hit / w.of >= 0.85;
   return (
+    // ⚠️ 좌우 음수 마진을 되돌리는 까닭은 `Row` 와 같다. 오른쪽 '17번 중 17번' 이 밀린다.
     <button type="button" onClick={onJump} className="hz-jump"
             style={{ display: "flex", flexDirection: "column", gap: S.xs, width: "100%",
-                     border: "none", cursor: "pointer", font: "inherit", textAlign: "left" }}>
+                     border: "none", cursor: "pointer", font: "inherit", textAlign: "left",
+                     margin: "-3px 0", padding: "3px 0" }}>
       <span style={{ display: "flex", alignItems: "baseline", gap: S.sm, width: "100%",
                      flexWrap: "wrap" }}>
         <b style={{ fontSize: T.body, color: C.ink }}>{w.label}</b>
