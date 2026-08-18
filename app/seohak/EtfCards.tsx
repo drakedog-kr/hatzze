@@ -100,8 +100,20 @@ function RankTable({ head, hint, tone, ink, barTone, rows }: {
                            display: "flex", alignItems: "center", justifyContent: "center" }}>
               {i + 1}
             </span>
-            <span style={{ fontSize: T.small, color: C.sub, minWidth: 0, overflow: "hidden",
-                           textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
+            {/* ⭐ 이 칸이 **행에서 제일 중요한데 제일 연하고 작았다**(11px/400/sub).
+                본보기로 삼은 카더라의 테마 로테이션 행은 이름이 13.5px/700/잉크다 —
+                순위표에서 읽는 것은 이름이고 숫자는 그 이름을 줄 세우는 자다.
+                ⚠️ 크기는 12 로 잡는다. 1,060px 에서 이름 칸이 202px 인데 가장 긴 이름
+                (`ACE 빅테크7+데일리타겟커버드콜(합성)`)이 12/600 에서 195px,
+                13/600 에서는 211px 라 말줄임표가 붙는다. */}
+            {/* ⚠️ 12px 로 올리면서 1,060px(이름 칸 178px)에서 가장 긴 이름 둘에 말줄임표가
+                붙는다. 11px 로 두면 안 붙지만 그건 안 읽히는 크기였다 — 잘린 꼬리는
+                `title` 로 되찾을 수 있고, 안 읽히는 글자는 되찾을 길이 없다. */}
+            <span title={r.name}
+                  style={{ fontSize: T.body, fontWeight: 600, color: C.ink, minWidth: 0,
+                           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {r.name}
+            </span>
             {/* 막대는 클래스로 둔다. 인라인으로 두면 좁은 화면에서 이 칸을 접는 규칙을
                 이겨서 막대만 살아남는다(카더라에서 실제로 터진 자리다). 채움 폭·색만 인라인. */}
             <span className="hz-bar">
