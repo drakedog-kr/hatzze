@@ -215,9 +215,14 @@ const TELEGRAM = {
 // `after` 는 이 항목이 사이드바에서 **어느 NAV 항목 뒤에** 붙는지다. 배열 순서가 아니라
 // 자리를 데이터로 적는 이유는, 미장 카더라가 국장 카더라 바로 밑에 있어야 하기 때문이다 —
 // 예고 항목을 전부 목록 끝에 몰면 짝인 둘이 MDD 를 사이에 두고 떨어진다.
-// 지금은 비어 있다 — 서학개미 해부도가 NAV 로 옮겨 갔다(화면이 생겼고, 아직 안 열었으니
-// '준비 중' 배지만 NAV 항목에 그대로 달고 있다). 다음 예고 항목이 생기면 여기에 넣는다.
-const COMING_SOON: { label: string; badge: string; tip: string; after: string; Glyph: Glyph }[] = [];
+// 아이콘은 NAV 항목과 같은 규칙이다 — 직접 그린 Glyph 든 Material Symbols 이름(icon)이든
+// 하나만 있으면 되고, NavGlyph 가 골라 그린다. 서학개미 시절엔 개미를 직접 그려야 해서
+// Glyph 만 받았는데, 폰트에 있는 그림이면 굳이 SVG 를 만들 이유가 없다.
+const COMING_SOON: { label: string; badge: string; tip: string; after: string; icon?: string; Glyph?: Glyph }[] = [
+  // 카더라 리포트 묶음 바로 뒤에 붙인다. 이 화면은 카더라에 오른 미국 종목을 그 회사
+  // 임원의 공시(SEC Form 4)와 맞대 보는 것이라, 재료의 절반이 미장 카더라에서 온다.
+  { label: "내부자 리포트", badge: "준비 중", tip: "현재 열심히 개발 중입니다!", after: "/kadera", icon: "contact_page" },
+];
 
 /**
  * 사이드바·모바일 메뉴가 그리는 순서. NAV 항목 사이사이에 예고 항목을 끼운다.
@@ -413,7 +418,7 @@ function Sidebar() {
                   borderRadius: R.nav,
                 }}
               >
-                <soon.Glyph size={20} dimmed />
+                <NavGlyph item={soon} size={20} />
                 {/* 배지를 라벨 '우측 상단'에 위첨자로 띄운다(로고 옆 베타 배지와 같은 어법).
                     absolute 라 배지가 행 폭 계산에서 빠져 라벨이 눌리지도, 항목이 넘치지도 않는다. */}
                 <span style={{ position: "relative", display: "inline-flex" }}>
@@ -629,7 +634,7 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
                 data-tip={soon.tip}
                 style={{ ...rowStyle(false), color: C.faint }}
               >
-                <soon.Glyph size={20} dimmed />
+                <NavGlyph item={soon} size={20} />
                 <span style={{ fontSize: 15 }}>{soon.label}</span>
                 <span
                   style={{
