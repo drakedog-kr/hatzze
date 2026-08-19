@@ -66,6 +66,10 @@ jobs:
       NAVER_HUB_KEY_ID: ${{ secrets.NAVER_HUB_KEY_ID }}
       NAVER_HUB_KEY: ${{ secrets.NAVER_HUB_KEY }}
       KRX_API_KEY: ${{ secrets.KRX_API_KEY }}
+      # ⚠️ 예탁원(서학개미 결제). 시크릿은 2026-08-10 에 등록돼 있었는데 **여기 줄이 없어서
+      #    스텝까지 안 내려갔다.** 그대로 뒀으면 첫 실행에서 예탁원 스텝이 키 없음으로
+      #    죽고 알림만 열렸을 것이다 — 로컬에서는 .env.local 로 잘 돌아서 안 보인다.
+      KSD_API_KEY: ${{ secrets.KSD_API_KEY }}
       ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
       ALADIN_TTB_KEY: ${{ secrets.ALADIN_TTB_KEY }}
       YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
@@ -372,6 +376,30 @@ jobs:
         id: upbit_speculation
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_upbit_speculation.py
+
+      # ── 서학개미 해부도 ─────────────────────────────────────────────────
+      # ⚠️⚠️ 이 화면은 **파이프라인에 아예 안 붙어 있었다.** 2026-08-19 에 확인하니
+      #    `seohak_country_flows` 의 마지막 달이 2026-05 로 110일 묵어 있었다 —
+      #    수집 스크립트가 없어서 누가 한 번 손으로 채운 뒤 그대로 멈춰 있었다.
+      #    그 표가 '원화로 보면'·'얼마나 오래 들고 있나' 두 카드의 기준일을 정하므로,
+      #    화면이 5월 말 값을 "지금"이라고 내고 있었다.
+      # ⚠️ 매일 돌려도 된다. 재무부가 **앞 달을 수정**하므로 전 기간을 통째로 다시
+      #    쓰는 게 맞고(실측: 2026-05 잔고가 다음 발표에서 +961 바뀌었다), 9MB 내려받아
+      #    3,500행 upsert 라 비용이 없다.
+      - name: Fetch 예탁원 외화증권 결제 (서학개미)
+        id: seohak_settlement
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_seohak_settlement.py
+
+      - name: Fetch 국내 상장 미국 ETF (서학개미)
+        id: seohak_etf
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_seohak_etf.py
+
+      - name: Fetch TIC 나라별 미국 증권 보유·순매수 (서학개미)
+        id: seohak_tic
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_seohak_tic.py
 
 
       - name: Fetch GitHub trading bot repo count
@@ -811,6 +839,65 @@ jobs:
           title="⚠️ 카더라 LLM 분류 중단"
           # ⚠️ 본문은 위 알림들과 같은 이유로 **한 줄**로 둔다(여러 줄이면 워크플로 파싱이 깨진다).
           note=$(printf '메시지 LLM 분류 스텝이 실패했습니다. 감성·화제어 카드가 **그날 표본이 반쪽인 채로** 갱신됩니다(화면이 멈추는 게 아니라서 눈으로는 잘 안 보입니다).\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n먼저 볼 것: job 로그의 해당 스텝 traceback. 제출이 안 됐으면 그날 새 분류는 0건입니다.\n\n분류는 최근 14일 창의 미분류분을 다시 집어 가므로 **다음 실행이 성공하면 소급 복구**됩니다. 다만 그 창을 넘겨 멈추면 그 구간은 영구 미분류로 남습니다 — 이 이슈가 2주 가까이 열려 있으면 미루지 말 것.' \
+            "$(date -u '+%Y-%m-%d %H:%M')" "$failed" "$run_url")
+          existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$note"
+            echo "기존 알림 이슈 #$existing 에 코멘트 추가"
+          else
+            gh issue create --title "$title" --body "$note"
+            echo "새 알림 이슈 생성"
+          fi
+          exit 1
+
+      # ── 서학개미 해부도 전용 알림 ────────────────────────────────────────
+      # 위 알림들과 **합치지 않았다.** 제목이 곧 진단이라는 같은 이유다.
+      #
+      # ⚠️ 이 스텝이 죽으면 화면이 **조용히 낡는다.** 카드는 그대로 뜨고 알약의 기준일만
+      #    안 움직인다 — 없어지는 게 아니라서 눈에 안 띈다. 그게 이 화면이 파이프라인
+      #    없이 110일을 버틴 방식이다.
+      #
+      # ⚠️ 하루 실패는 다음 실행이 만회한다(셋 다 최근 며칠을 다시 받는다). 며칠 연속
+      #    열리면 원천이 바뀐 것이니 스크립트 머리말부터 볼 것.
+      #      예탁원  주소가 `/service/` 없이 `_V2` 다. 없는 주소를 부르면 "등록되지 않은
+      #              서비스키" 가 오는데 **키 문제가 아니다**(그 메시지로 한 번 헤맸다).
+      #      ETF     KRX 는 휴장일에도 1,163행을 준다. 거래대금 합계 0 으로 가른다.
+      #      TIC     계열 키(source_id)를 못 찾으면 일부러 죽게 해 뒀다.
+      - name: Summarize 서학개미 수집
+        id: seohak_health
+        if: always()
+        run: |
+          names=("fetch_seohak_settlement.py" "fetch_seohak_etf.py" "fetch_seohak_tic.py")
+          outcomes=("${{ steps.seohak_settlement.outcome }}" "${{ steps.seohak_etf.outcome }}" "${{ steps.seohak_tic.outcome }}")
+
+          {
+            echo "## 서학개미 해부도"
+            echo "| Script | Result |"
+            echo "|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          failed=0
+          failed_list=""
+          for i in "${!names[@]}"; do
+            script="${names[$i]}"
+            outcome="${outcomes[$i]}"
+            echo "$script: $outcome"
+            echo "| $script | $outcome |" >> "$GITHUB_STEP_SUMMARY"
+            [ "$outcome" = "success" ] || { failed=1; failed_list="${failed_list:+$failed_list, }$script"; }
+          done
+
+          echo "failed=$failed" >> "$GITHUB_OUTPUT"
+          echo "SEOHAK_FAILED_SCRIPTS=$failed_list" >> "$GITHUB_ENV"
+
+      - name: Alert on 서학개미 failure (open/update GitHub issue)
+        if: ${{ !cancelled() && steps.seohak_health.outputs.failed == '1' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          failed="${SEOHAK_FAILED_SCRIPTS:-요약 탭에서 확인}"
+          title="⚠️ 서학개미 해부도 수집 중단"
+          note=$(printf '서학개미 수집이 실패했습니다. 카드는 그대로 뜨고 **알약의 기준일만 안 움직입니다** — 없어지지 않아서 눈에 안 띕니다.\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n하루 실패는 다음 실행이 만회합니다(전 기간을 다시 씁니다). 며칠 연속 열리면 재무부가 파일 이름이나 계열 키를 바꾼 것이니 `fetch_seohak_tic.py` 머리말의 source_id 규칙부터 보세요 — 계열을 못 찾으면 일부러 죽게 해 뒀습니다.' \
             "$(date -u '+%Y-%m-%d %H:%M')" "$failed" "$run_url")
           existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
           if [ -n "$existing" ]; then

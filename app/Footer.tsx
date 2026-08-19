@@ -32,9 +32,17 @@ const CONTACT_EMAIL = "hatzze@proton.me";
 // api.telegram.org(우리 발송 봇)은 우리 설비지 자료 출처가 아니라 여기 안 적는다.
 const SOURCE_GROUPS: { label: string; items: string }[] = [
   { label: "증시·시세", items: "한국거래소 통계정보 · 야후 파이낸스" },
-  // ECOS 에서 받는 건 GDP(200Y109)·소비자심리지수(511Y002)·외국인 순매수(802Y001) 셋이다.
-  // 옛 라벨의 "금리" 는 FRED 를 가리키던 말이라 같이 뗀다 — 금리는 하나도 안 받는다.
-  { label: "거시·경제통계", items: "한국은행(ECOS)" },
+  /* 서학개미 해부도가 통째로 여기서 나온다. 넷 다 출처 표기를 요구하는 원천이라
+     화면에 이름이 있어야 한다.
+       미 재무부 TIC  — 한국인이 든 미국 주식 잔고·순매수(월별, 1985~)
+       한국예탁결제원 — 국내 증권사를 거친 외화증권 결제(일별, 1994~)
+       ⚠️ SEC 13F 는 '개인과 기관' 카드를 빼면서 화면에서 안 쓰게 됐다(표는 남아 있다). */
+  { label: "해외투자", items: "미 재무부(TIC) · 한국예탁결제원" },
+  /* ECOS 에서 받는 건 GDP(200Y109)·소비자심리지수(511Y002)·외국인 순매수(802Y001),
+     그리고 자금순환표(281Y002 · 가계 부문 금융자산) 넷이다.
+     FRED 는 **원/달러 환율(DEXKOUS)만** 받는다 — 나스닥·S&P 같은 벤더 지수는 안 쓴다
+     (그쪽은 FRED 를 거쳐도 벤더 약관을 따른다. lib/seohak-external.ts 머리말 참고). */
+  { label: "거시·경제통계", items: "한국은행(ECOS) · 미 연준(FRED)" },
   { label: "검색·뉴스", items: "네이버 · 유튜브" },
   { label: "커뮤니티·소비", items: "텔레그램 · 디시인사이드 · 알라딘" },
   { label: "가상자산·기타", items: "업비트 · GitHub · 앱스토어" },
@@ -145,6 +153,11 @@ export default function Footer() {
             <FooterLink href="/kadera">국장 카더라</FooterLink>
             <FooterLink href="/kadera/us">미장 카더라</FooterLink>
             <FooterLink href="/mdd">MDD 정밀분석</FooterLink>
+            {/* ⚠️ 사이드바에서는 이 항목만 '준비 중' 배지를 달고 있는데(AppShell 의 NAV)
+                푸터에는 배지 자리가 없다. 그대로 둔다 — 푸터는 **목적지 목록**이라
+                상태를 말하는 자리가 아니고, 배지를 뗄 때 고칠 곳이 늘어나면 한쪽만
+                남는다. 여는 날 지울 것은 NAV 의 badge 한 줄뿐이다. */}
+            <FooterLink href="/seohak">서학개미 해부도</FooterLink>
             {/* 사이드바가 모바일에서 숨겨져 텔레그램 링크가 사라진다 — 내부 내비게이션과
                 같은 방식으로 푸터에 두어 좁은 화면에서도 닿게 한다. 라벨과 aria 는
                 AppShell 의 TELEGRAM 상수와 같은 문구로 맞춘다(두 내비게이션이 같은

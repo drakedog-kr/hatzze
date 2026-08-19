@@ -13,6 +13,8 @@ FRED_API_KEY = os.environ.get("FRED_API_KEY")
 NAVER_HUB_KEY_ID = os.environ.get("NAVER_HUB_KEY_ID")
 NAVER_HUB_KEY = os.environ.get("NAVER_HUB_KEY")
 KRX_API_KEY = os.environ.get("KRX_API_KEY")
+# 한국예탁결제원 외화증권 결제(공공데이터포털 금융위원회). 서학개미 해부도의 일별 뼈대다.
+KSD_API_KEY = os.environ.get("KSD_API_KEY")
 ECOS_API_KEY = os.environ.get("ECOS_API_KEY")
 ALADIN_TTB_KEY = os.environ.get("ALADIN_TTB_KEY")
 YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY")

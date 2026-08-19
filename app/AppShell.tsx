@@ -169,6 +169,23 @@ const NAV: NavItem[] = [
     ],
   },
   { href: "/mdd", label: "MDD 정밀분석", icon: "trending_down", sub: "고점에서 얼마나 내려왔고 언제 회복했을까" },
+  // ⚠️ **'준비 중' 배지를 단 채로 NAV 에 있다.** 화면은 다 만들어졌지만 아직 안 열었다.
+  // COMING_SOON 에 두면 본문 헤더(PageHeader)가 NAV 에서 경로를 못 찾아 **제목 칸을
+  // 통째로 비운다** — 그래서 이 화면만 제목도 부제도 없이 카드부터 시작했다.
+  // 열 때는 이 줄의 badge 만 지우면 된다.
+  {
+    href: "/seohak",
+    label: "서학개미 해부도",
+    Glyph: AntIcon,
+    // ⚠️ "한국인이…" 였다. 이 화면은 **개인**을 재는데 그 부제는 국민연금까지 포함한
+    // 전 국민을 가리켰다. 화면의 모집단이 부제와 갈리면 카드 숫자를 통째로 다르게 읽는다.
+    // ⚠️ 그다음엔 "얼마를 넣었고 지금 얼마가 됐나" 였는데, 그건 **카드 한 장**('원화로
+    // 보면')만 가리켰다. 화면이 자라면서 매매 습관·보유기간·가계 자리·ETF 까지 들어왔다.
+    // 두 축(어떻게 사고파나 · 그래서 얼마가 됐나)으로 줄여 적는다.
+    sub: "개인이 미국 주식을 어떻게 사고팔고 얼마가 됐나",
+    // ⚠️ `badge: "준비 중"` 이 여기 있었다. 이 줄을 지우는 것이 곧 **화면을 여는 것**이다
+    //    (사이드바에 예고로 걸어 두고 만들었다). 2026-08-19 에 뗐다.
+  },
 ];
 
 // 외부(텔레그램) 링크라 NAV 배열이 아니라 따로 둔다 — pathname 기반 active 판정 대상이
@@ -198,15 +215,9 @@ const TELEGRAM = {
 // `after` 는 이 항목이 사이드바에서 **어느 NAV 항목 뒤에** 붙는지다. 배열 순서가 아니라
 // 자리를 데이터로 적는 이유는, 미장 카더라가 국장 카더라 바로 밑에 있어야 하기 때문이다 —
 // 예고 항목을 전부 목록 끝에 몰면 짝인 둘이 MDD 를 사이에 두고 떨어진다.
-const COMING_SOON: { label: string; badge: string; tip: string; after: string; Glyph: Glyph }[] = [
-  {
-    label: "서학개미 해부도",
-    badge: "준비 중",
-    tip: "현재 열심히 개발 중입니다!",
-    after: "/mdd",
-    Glyph: AntIcon,
-  },
-];
+// 지금은 비어 있다 — 서학개미 해부도가 NAV 로 옮겨 갔다(화면이 생겼고, 아직 안 열었으니
+// '준비 중' 배지만 NAV 항목에 그대로 달고 있다). 다음 예고 항목이 생기면 여기에 넣는다.
+const COMING_SOON: { label: string; badge: string; tip: string; after: string; Glyph: Glyph }[] = [];
 
 /**
  * 사이드바·모바일 메뉴가 그리는 순서. NAV 항목 사이사이에 예고 항목을 끼운다.
@@ -724,6 +735,78 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
   );
 }
 
+/**
+ * 이용자의 선택을 1년짜리 쿠키로 남긴다(테마 · 통화).
+ *
+ * ⚠️ 컴포넌트 **밖**에 둔다. 리액트 컴파일러 규칙이 컴포넌트 안에서 바깥 값(여기서는
+ * `document.cookie`)에 대입하는 것을 막는다 — 함수로 감싸면 그 대입이 이 모듈의 일이
+ * 되어 통과한다. 테마 토글이 먼저 쓰던 줄도 여기로 모았다.
+ * ⚠️ 쿠키가 없으면 새로고침마다 기본값으로 돌아간다. 서버는 첫 렌더에서 쿠키 말고는
+ * 이용자의 선택을 알 길이 없다(layout.tsx 가 둘 다 읽는다).
+ */
+function remember(name: string, value: string) {
+  document.cookie = `${name}=${value}; path=/; max-age=31536000; SameSite=Lax`;
+}
+
+/**
+ * 통화 스위치 — **서학개미 해부도에서만** 뜬다.
+ *
+ * 그 화면은 예탁원 결제(달러)와 KRX·한국은행(원)을 함께 다루는데, 원천이 준 통화를
+ * 그대로 내면 한 페이지에 두 통화가 섞인다. 기본을 원화로 두고 이 스위치로 갈아 끼운다.
+ *
+ * ## ⭐ 테마 토글과 같은 수다
+ *
+ * 뿌리 요소의 `data-cur` 하나를 바꾸면 globals.css 가 숨길 쪽을 고른다. 금액은 카드가
+ * **두 벌 다 그려 놓았다**(`app/seohak/money.tsx`) — 그 화면의 카드가 거의 다 서버
+ * 컴포넌트라, 통화를 리액트 상태로 두면 그 전부를 클라이언트로 끌어와야 한다.
+ *
+ * ⚠️ 환율(FRED)을 못 받은 날에는 카드가 달러만 낸다(`Money` 가 그렇게 떨어진다).
+ * 그때 이 스위치는 눌러도 화면이 안 바뀐다. **셸은 그 사정을 모른다** — 레이아웃이
+ * 페이지의 로더 결과를 볼 수 없어서다. 드문 고장 경로이고, 그날은 페이지가 어차피
+ * 성한 모습이 아니라 여기서 가리지 않는다.
+ */
+function CurrencyToggle({ initial }: { initial: "krw" | "usd" }) {
+  const [cur, setCur] = useState<"krw" | "usd">(initial);
+  const pick = (next: "krw" | "usd") => {
+    if (next === cur) return;
+    track("currency_toggle", { to: next });
+    setCur(next);
+    // 기본이 원화라 usd 일 때만 속성을 붙인다(layout.tsx 와 같은 규칙).
+    if (next === "usd") document.documentElement.setAttribute("data-cur", "usd");
+    else document.documentElement.removeAttribute("data-cur");
+    remember("hz-cur", next);
+  };
+  return (
+    <span className="hz-cur-switch" role="group" aria-label="통화 바꾸기">
+      {([["krw", "₩"], ["usd", "$"]] as const).map(([k, glyph]) => (
+        <button key={k} type="button" onClick={() => pick(k)} aria-pressed={cur === k}
+                aria-label={k === "krw" ? "원화로 보기" : "달러로 보기"}>
+          {glyph}
+        </button>
+      ))}
+    </span>
+  );
+}
+
+/**
+ * 머리 오른쪽 도구 묶음. 통화 스위치가 **테마 단추 왼쪽**이다.
+ *
+ * ⚠️ 통화는 서학개미 해부도에만 있는 개념이라 경로로 가린다. 다른 화면에 두면 눌러도
+ * 아무것도 안 바뀌는 단추가 된다.
+ */
+function PageTools({ theme, currency }: {
+  theme: "light" | "dark";
+  currency: "krw" | "usd" | null;
+}) {
+  const pathname = usePathname();
+  return (
+    <>
+      {currency && pathname.startsWith("/seohak") && <CurrencyToggle initial={currency} />}
+      <ThemeToggle initial={theme} />
+    </>
+  );
+}
+
 function ThemeToggle({ initial, variant = "icon" }: { initial: "light" | "dark"; variant?: "icon" | "row" }) {
   // 초기값은 서버가 쿠키로 SSR한 값(prop)이라 아이콘도 첫 렌더부터 정확하다.
   const [theme, setTheme] = useState<"light" | "dark">(initial);
@@ -735,7 +818,7 @@ function ThemeToggle({ initial, variant = "icon" }: { initial: "light" | "dark";
     track("theme_toggle", { to: next });
     setTheme(next);
     document.documentElement.setAttribute("data-theme", next);
-    document.cookie = `hz-theme=${next}; path=/; max-age=31536000; SameSite=Lax`;
+    remember("hz-theme", next);
     // 모바일 주소창 색도 같이 돌린다. 이 메타는 layout.tsx 가 쿠키를 보고 SSR 하므로,
     // 여기서 안 고치면 다음 페이지 로드까지 주소창만 이전 테마로 남는다.
     // 값을 또 적지 않고 방금 바뀐 data-theme 의 --c-bg 를 읽어 globals.css 를 따라간다.
@@ -829,7 +912,7 @@ function ThemeToggle({ initial, variant = "icon" }: { initial: "light" | "dark";
  * 자기 제목(legal.tsx 의 DocTitle)을 갖고 있으니 여기서 보탤 것이 없다. 도구 묶음은
  * 남긴다 — 테마 토글은 어느 화면에서나 같은 자리에 있어야 한다.
  */
-function PageHeader({ theme }: { theme: "light" | "dark" }) {
+function PageHeader({ theme, currency }: { theme: "light" | "dark"; currency: "krw" | "usd" }) {
   const pathname = usePathname();
   const page = NAV.find((n) => isActive(n.href, pathname));
   // 서브 페이지에서는 서브의 이름을 h1 으로 쓴다. 부모(구역)의 이름을 그대로 두면
@@ -888,7 +971,7 @@ function PageHeader({ theme }: { theme: "light" | "dark" }) {
           셋 다 기능이 없어 모양만 있는 자리였고(2026-08-03), 로그인이 없는
           서비스라 프로필 칩은 앞으로도 가리킬 대상이 없다. */}
       <div className="hz-page-tools">
-        <ThemeToggle initial={theme} />
+        <PageTools theme={theme} currency={currency} />
       </div>
     </header>
   );
@@ -896,11 +979,13 @@ function PageHeader({ theme }: { theme: "light" | "dark" }) {
 
 function TopBar({
   theme,
+  currency,
   scrolledDown,
   menuOpen,
   onMenuToggle,
 }: {
   theme: "light" | "dark";
+  currency: "krw" | "usd";
   scrolledDown: boolean;
   menuOpen: boolean;
   onMenuToggle: () => void;
@@ -945,7 +1030,7 @@ function TopBar({
           데스크톱에서는 햄버거가 display:none 이라 flex 에서 아예 빠지고, 남는 건
           예전과 같은 토글 하나다 — 순서를 바꿔도 데스크톱은 그대로다. */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-        <ThemeToggle initial={theme} />
+        <PageTools theme={theme} currency={currency} />
         <button
           type="button"
           className="hz-menu-btn"
@@ -1238,9 +1323,12 @@ function ToTop({
 
 export default function AppShell({
   theme,
+  currency,
   children,
 }: {
   theme: "light" | "dark";
+  /** 통화 스위치의 초기값(쿠키). 서학개미 해부도에서만 화면에 뜬다. */
+  currency: "krw" | "usd";
   children: React.ReactNode;
 }) {
   const mainRef = useRef<HTMLElement>(null);
@@ -1315,6 +1403,7 @@ export default function AppShell({
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, background: C.bg }}>
         <TopBar
           theme={theme}
+          currency={currency}
           scrolledDown={scrolledDown}
           menuOpen={menuOpen}
           onMenuToggle={() => setMenuOpen((v) => !v)}
@@ -1352,7 +1441,7 @@ export default function AppShell({
             }}
           >
             <NewsStrip />
-            <PageHeader theme={theme} />
+            <PageHeader theme={theme} currency={currency} />
             {children}
             <Footer />
           </div>
