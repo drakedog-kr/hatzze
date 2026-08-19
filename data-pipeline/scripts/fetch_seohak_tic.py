@@ -55,6 +55,7 @@ import json
 import sys
 import time
 import zipfile
+from datetime import date
 from pathlib import Path
 
 import requests
@@ -86,6 +87,15 @@ SERIES = {
 # ⚠️ Supabase 는 한 번에 다 받으면 statement timeout 에 걸린다. 이 저장소의 다른
 # 쓰기가 전부 500행씩 쪼개는 것과 같은 이유다.
 CHUNK = 500
+# 내려받기가 막혔을 때, 표가 이만큼(달력일) 안 갱신됐어야 알람을 켠다.
+# ⚠️ 재무부 자료가 **몇 달 된 것**이라 "가장 최근 달"로는 신선도를 못 잰다(늘 낡았다).
+#    그래서 `updated_at` 즉 **마지막으로 성공한 실행**을 본다. 월 단위 자료라
+#    하루이틀 못 받는 건 아무 손해가 없다.
+STALE_ALERT_DAYS = 7
+
+
+class Unreachable(RuntimeError):
+    """cslt.zip 을 못 받았다. 표가 낡았을 때만 알람이 된다."""
 
 
 def download_cslt() -> dict:
@@ -102,16 +112,54 @@ def download_cslt() -> dict:
                 print(f"[TIC] {len(res.content) / 1e6:.1f}MB 내려받음 → {name}")
                 with z.open(name) as f:
                     return json.load(f)
-        except Exception as exc:  # noqa: BLE001 — 재시도 후 호출자가 죽는다
+        except Exception as exc:  # noqa: BLE001 — 재시도 후 호출자가 판단한다
             last = exc
+            # ⚠️ 마지막 시도 뒤에는 안 잔다. 백오프가 3·6·12·24 라 네 번째 실패 뒤에도
+            #    24초를 자고 나서 예외를 던지고 있었다. 레포의 다른 재시도 루프
+            #    아홉 곳은 전부 `if attempt < MAX` 로 이걸 거른다.
+            if attempt + 1 >= MAX_RETRIES:
+                break
             delay = backoff_delay(attempt + 1, base_sec=3, max_sec=30)
             print(f"[TIC] 내려받기 실패({exc}) — {delay:.0f}초 뒤 재시도")
             time.sleep(delay)
-    raise RuntimeError(f"cslt.zip 내려받기 실패: {last}")
+    raise Unreachable(f"cslt.zip 내려받기 실패: {last}")
+
+
+def last_success(db) -> date | None:
+    """마지막으로 이 표에 성공적으로 쓴 날. 내려받기가 막혔을 때 알람을 켤 잣대다."""
+    res = (
+        db.table("seohak_country_flows")
+        .select("updated_at")
+        .order("updated_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    return date.fromisoformat(res.data[0]["updated_at"][:10]) if res.data else None
 
 
 def main() -> None:
-    doc = download_cslt()
+    try:
+        doc = download_cslt()
+    except Unreachable as exc:
+        # ⚠️ 하루 못 받는 것은 사건이 아니다. 이 자료는 **한 달에 한 번** 바뀌므로
+        #    어제 받은 것과 오늘 받을 것이 같다. 그런데도 실패로 끝내면 알림 이슈가
+        #    열리고, 그런 알람은 며칠이면 아무도 안 보게 된다.
+        #    ⭐ 신선도는 '자료의 달'이 아니라 **마지막 성공 실행**으로 잰다 — 재무부
+        #    자료는 원래 몇 달 된 것이라 달로 재면 늘 낡았다고 나온다.
+        db = get_client()
+        seen = last_success(db)
+        if seen is None:
+            raise
+        stale = (date.today() - seen).days
+        if stale <= STALE_ALERT_DAYS:
+            print(
+                f"[TIC] 내려받기 실패({exc}). 표는 {seen} 에 채워져 {stale}일 됐고 "
+                f"{STALE_ALERT_DAYS}일 안쪽이라 다음 실행이 만회합니다."
+            )
+            return
+        raise RuntimeError(
+            f"cslt.zip 을 못 받았고 표가 {seen} 이후 {stale}일 안 갱신됐다"
+        ) from exc
     print(f"[TIC] release {doc.get('releaseID')} · {doc.get('transmissionDt')}")
 
     wanted = {

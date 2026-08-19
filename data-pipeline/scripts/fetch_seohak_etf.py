@@ -62,6 +62,9 @@ NOT_EQUITY = ("채권혼합", "달러선물", "SOFR", "달러단기", "머니마
 KRX_URL = "https://data-dbg.krx.co.kr/svc/apis/etp/etf_bydd_trd"
 LOOKBACK_DAYS = 7
 CHUNK = 500
+# 한 거래일도 못 받았을 때, 표가 이만큼(달력일) 낡았어야 알람을 켠다.
+# KRX 는 당일치를 주므로 정상이면 오늘이 최신이고, 가장 긴 휴장은 연휴+주말 닷새다.
+STALE_ALERT_DAYS = 6
 
 
 def is_us_equity(name: str) -> bool:
@@ -175,7 +178,31 @@ def main() -> None:
         }
 
     if not rows:
-        raise RuntimeError(f"최근 {LOOKBACK_DAYS}일에 ETF 자료가 하나도 없다")
+        # ⚠️ "못 받았다"와 "표가 낡았다"는 다른 사건이다. KRX 가 하루 막히거나 연휴가
+        #    길면 이번 실행이 빈손일 수 있는데, 이레를 되돌아보므로 다음 실행이
+        #    메운다. 잣대를 **표의 최신 거래일**로 옮긴다 — 하루 실패마다 알람을
+        #    켜면 며칠이면 아무도 그 알람을 안 보게 되고 진짜 고장이 거기 묻힌다.
+        newest = (
+            db.table("seohak_etf_daily")
+            .select("trade_date")
+            .order("trade_date", desc=True)
+            .limit(1)
+            .execute()
+            .data
+        )
+        if not newest:
+            raise RuntimeError("ETF 자료를 하나도 못 받았고 표도 비어 있다")
+        seen = date.fromisoformat(newest[0]["trade_date"])
+        stale = (date.today() - seen).days
+        if stale <= STALE_ALERT_DAYS:
+            print(
+                f"[ETF] 최근 {LOOKBACK_DAYS}일에 새로 받은 게 없습니다. 표는 {seen} 까지 "
+                f"있어 {stale}일 됐고 {STALE_ALERT_DAYS}일 안쪽이라 다음 실행이 만회합니다."
+            )
+            return
+        raise RuntimeError(
+            f"ETF 자료를 하나도 못 받았고 표가 {seen} 에서 {stale}일 멈춰 있다"
+        )
 
     for i in range(0, len(rows), CHUNK):
         db.table("seohak_etf_daily").upsert(
