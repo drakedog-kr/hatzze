@@ -11,6 +11,7 @@ import { EtfSection } from "./EtfCards";
 import { TradingCards } from "./TradingCards";
 import { WealthCards } from "./WealthCards";
 import { SectionCaps } from "../kadera/parts";
+import { SEOHAK_CARD } from "../og-copy";
 import { toFx } from "./money";
 import { S } from "./scale";
 import { pageMetadata } from "../seo";
@@ -23,6 +24,9 @@ export async function generateMetadata(): Promise<Metadata> {
     description:
       "개인이 미국 주식을 언제 사고팔고 얼마나 들고 있는지, 넣은 돈이 지금 얼마가 됐는지 봅니다. 예탁결제원 결제와 미 재무부·한국은행·거래소 통계를 씁니다.",
     path: "/seohak",
+    // ⚠️ `ownImage` 를 안 주면 옆의 opengraph-image.tsx 가 그린 카드가 **아예 안 쓰인다**
+    //    (페이지가 openGraph 를 선언하는 순간 컨벤션 이미지가 무시된다 — app/seo.ts 주석).
+    ownImage: SEOHAK_CARD.alt,
   });
 }
 
