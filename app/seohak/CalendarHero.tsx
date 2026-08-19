@@ -47,7 +47,15 @@ const fullLabel = (date: string) => `${date.slice(0, 4)}/${md(date)}`;
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
 
 /**
- * 달력 칸과 열두 달 띠의 바탕색. 빨강이 사는 쪽, 파랑이 파는 쪽이다(tone.ts).
+ * 달력 칸과 열두 달 띠의 **바탕 변수**. 색과 진하기만 주고 섞는 것은 CSS 가 한다.
+ *
+ * ## ⚠️⚠️ 위쪽 한계가 테마마다 다르다
+ *
+ * 날짜 숫자가 이 위에 얹히는데, 진해질수록 글자가 안 읽힌다. 그 한계가 갈린다 —
+ * 라이트는 78%, 다크는 60% 다(실측은 globals.css 의 `.hz-cal-cell` 주석에).
+ * 한 값으로 통일하면 라이트가 가진 여유를 버리므로 **폭만 CSS 변수로 넘긴다.**
+ *
+ * ⚠️ 인라인 `color-mix` 로 두면 테마를 못 가른다. 서버에서 그릴 때는 테마를 모른다.
  *
  * ## ⚠️⚠️ 진하기 위쪽을 **78%** 에서 끊는다
  *
@@ -63,8 +71,8 @@ const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
  *
  * ⚠️ 열두 달 띠도 같은 식을 쓴다. 같은 자료를 두 자로 칠하면 안 된다.
  */
-const cellBg = (net: number, strength: number) =>
-  `color-mix(in srgb, ${net >= 0 ? BUY : SELL} ${(16 + strength * 62).toFixed(1)}%, ${C.card})`;
+const cellVars = (net: number, strength: number) =>
+  ({ "--hz-cal-tone": net >= 0 ? BUY : SELL, "--hz-cal-s": strength.toFixed(3) }) as React.CSSProperties;
 
 const cnt = (v: number) => v.toLocaleString("ko-KR");
 /**
@@ -475,7 +483,7 @@ export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
               // 빨강이 사는 쪽, 파랑이 파는 쪽 — 국내 관행이다(app/seohak/tone.ts).
               // 두 색을 같은 식으로 섞는다. 앞서 회색 쪽만 62%로 눌러 뒀는데, 색이
               // 갈리는 지금은 한쪽만 약하면 '판 날이 늘 조용한' 것처럼 보인다.
-              const bg = !row ? C.soft : cellBg(row.net, strength);
+              const cellStyle = row ? cellVars(row.net, strength) : { background: C.soft };
               return (
                 <button
                   key={date}
@@ -484,8 +492,10 @@ export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
                   disabled={!row}
                   /* ⚠️ 속성이라 통화 하나를 CSS 로 숨길 수가 없다. 둘 다 적는다. */
                   title={row ? `${date} · 순매수 ${both(row.net, fx, month)}` : `${date} · 결제 없음`}
+                  className={row ? "hz-cal-cell" : undefined}
                   style={{
                     // 높이는 위 격자의 `gridAutoRows` 가 정한다(바닥값 34).
+                    ...cellStyle,
                     position: "relative",
                     /* ⚠️ 한때 `aspectRatio: 1.35 + minHeight: 34` 로 뒀는데 못 쓴다.
                        격자 칸이 1fr 이라 폭이 36 이면 비율상 높이가 26.7 인데, minHeight 가
@@ -497,7 +507,7 @@ export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
                     // 빈 칸에 테두리를 두면 달의 절반이 '빈 상자밭'이 된다(결제는 T+1 이라
                     // 이 달의 남은 날은 아직 자료가 없다).
                     border: isPicked ? `2px solid ${C.ink}` : "2px solid transparent",
-                    borderRadius: 4, background: bg, padding: 0,
+                    borderRadius: 4, padding: 0,
                     cursor: row ? "pointer" : "default",
                     display: "flex", alignItems: "flex-start", justifyContent: "flex-end",
                   }}
@@ -539,10 +549,10 @@ export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
                 return (
                   <button key={m.key} type="button" onClick={() => jumpToMonth(m.key)}
                           title={`${m.key} · 순매수 ${both(m.net, fx, m.key)}`}
+                          className="hz-cal-cell"
                           style={{ flex: 1, minWidth: 0, height: 22, borderRadius: 3, padding: 0,
-                                   cursor: "pointer",
-                                   border: m.key === month ? `2px solid ${C.ink}` : "2px solid transparent",
-                                   background: cellBg(m.net, strength) }} />
+                                   cursor: "pointer", ...cellVars(m.net, strength),
+                                   border: m.key === month ? `2px solid ${C.ink}` : "2px solid transparent" }} />
                 );
               })}
             </div>
