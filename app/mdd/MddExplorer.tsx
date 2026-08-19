@@ -743,7 +743,11 @@ function Sheet({ children, style }: { children: React.ReactNode; style?: React.C
 function Foot({ children }: { children: React.ReactNode }) {
   return (
     <div className="hz-sheet-foot" style={{ marginTop: "auto" }}>
-      <span style={{ fontSize: 12, lineHeight: 1.6, color: C.sub, padding: "9px 0", wordBreak: "keep-all" }}>{children}</span>
+      {/* ⚠️ 안쪽에 세로 padding 을 주지 말 것. 띠가 이미 위아래 11px 을 들고 있어서, 겹치면
+          한 줄 각주가 41 → 60px 이 된다(이 페이지의 바닥 띠만 다른 화면보다 18px 두꺼웠다).
+          여기에 9px 이 있었던 건 띠가 `padding: 0 22px` 이던 시절의 잔재다 — 그때는 띠 자신에게
+          세로 여백이 없어 안쪽이 그 일을 대신했다. */}
+      <span style={{ fontSize: 12, lineHeight: 1.6, color: C.sub, wordBreak: "keep-all" }}>{children}</span>
     </div>
   );
 }
@@ -1139,7 +1143,13 @@ function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel: string
           )}
         </div>
         {!atHigh && <DrawdownGauge current={a.currentDd} mdd={a.mdd} periodLabel={periodLabel} />}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 10, marginTop: "auto", paddingTop: 14, borderTop: `1px solid ${C.sheetRow}` }}>
+        {/* 위 여백이 14 가 아니라 18.5 인 것은 **옆 칸과 선을 맞추기 위해서**다. 이 블록과
+            왼쪽 칸의 전고점·저점 두 줄은 둘 다 marginTop:auto 로 칸 바닥에 붙으므로, 두
+            블록의 높이가 같아야 위 경계선이 한 줄에 선다. 왼쪽은 줄마다 1 + 10 + 글줄 19.5
+            + 10 = 40.5, 두 줄이라 81 이다. 이 칸은 1 + 여백 + 통계칸 61.5 라 여백이 18.5.
+            14 로 두면 4.5px 어긋나는데, 거의 맞아서 오히려 더 틀려 보인다.
+            ⚠️ 글자 크기를 건드리면 이 숫자를 다시 재야 한다(둘 중 한쪽만 바뀌어도 어긋난다). */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 10, marginTop: "auto", paddingTop: 18.5, borderTop: `1px solid ${C.sheetRow}` }}>
           {/* 보조 줄에 조회 기간 이름("최근 10년")은 안 붙인다 — '전체' 조회에서
               "상장 이후·약 27년 6,646일 중"이 되어 칸을 넘겼다(실측 121 > 115px).
               옆 칸 '기간 최저점'도 기간을 안 적고, 기간은 바로 위 토글이 말한다. */}

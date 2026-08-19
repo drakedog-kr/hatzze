@@ -54,6 +54,13 @@ export const dynamic = "force-dynamic";
 /** 옆에 나란히 두는 시트의 최소 폭. 국내 페이지와 같은 값이라 두 화면의 접히는 지점이 같다. */
 const SHEET_PAIR_MIN = "min(460px, 100%)";
 
+/**
+ * 테마 로테이션·이슈 키워드가 세우는 줄 수. **둘이 같아야** 나란히 선 두 표의 줄이
+ * 가로로 맞는다(그래서 한 상수다). 파이프라인 짝은 calculate_us_telegram_sentiment.py
+ * 의 ISSUE_KEYWORD_LIMIT 이다.
+ */
+const SHEET_ROWS = 10;
+
 const clip: React.CSSProperties = {
   overflow: "hidden",
   textOverflow: "ellipsis",
@@ -309,7 +316,7 @@ export default async function UsKaderaPage() {
     getUsChannelShare(30),
     getUsSentiment(),
     getUsIssueKeywords(),
-    getUsThemeRotation(10),
+    getUsThemeRotation(SHEET_ROWS),
     getUsDailyBrief(),
     getUsStockReports(4),
     // 기간 탭이 즉시 전환되도록 세 창을 한 번에 받아 둔다(국장과 같은 이유).
@@ -1351,7 +1358,11 @@ export default async function UsKaderaPage() {
                 fontSize: 13,
               }}
             >
-              아직 화제어 집계가 없습니다. 한 말이 여러 채널·여러 날에 20회 넘게
+              {/* ⚠️ 숫자는 calculate_us_telegram_sentiment.py 의
+                  ISSUE_KEYWORD_MIN_MENTIONS 를 손으로 베낀 것이다. 20 이라 적혀
+                  있었는데, 하루 뒤 기간을 7일에서 3일로 줄이며 문턱을 12 로 내렸을 때
+                  (9f43f0c) 이 문장만 안 따라왔다. 저쪽을 고치면 여기도 함께 고칠 것. */}
+              아직 화제어 집계가 없습니다. 한 말이 여러 채널·여러 날에 12회 넘게
               나와야 줄에 오릅니다.
             </p>
           ) : (
@@ -1416,12 +1427,24 @@ export default async function UsKaderaPage() {
                 <div
                   key={k.keyword}
                   className="hz-trow hz-cols-kw hz-tip hz-tip-wide hz-tip-end"
-                  style={{ flex: 1 }}
-                  /* 줄에 안 적은 것만 담는다. 창(3일)·언급 수·변화폭은 이미 줄에 있다.
+                  /* 목록이 다 찼을 때만 남는 높이를 나눠 갖는다.
+                     ⚠️ **`flex: 1` 을 무조건 주면 줄이 적은 날 카드가 무너진다.** 한 줄이면
+                     그 한 줄이 카드 높이를 통째로 먹어, 글자가 거대한 여백 한가운데 뜬다
+                     (2026-08-17 월요일 아침에 실제로 그렇게 났다). 줄이 모자란 날은 어차피
+                     옆 표와 줄이 안 맞으니, 늘리지 말고 남는 자리를 아래에 비워 둔다 —
+                     목록이 짧다는 것이 그대로 읽힌다. */
+                  style={{ flex: keywords.length >= SHEET_ROWS ? 1 : "0 0 auto" }}
+                  /* 줄에 안 적은 것만 담는다. 언급 수·변화폭은 이미 줄에 있다.
                      남는 것은 **표본의 모양** 하나 — 전체 대화에서 몇 번 중 몇 번이
                      미국 얘기였고, 그게 몇 채널·며칠에 걸쳐 있었나. 복붙 한 건이
-                     아니라는 것이 여기서 읽힌다. */
-                  data-tip={`최근 ${US_WINDOW_DAYS}일 전체 대화에서 ${k.totalCount}회 나왔고 그중 ${k.mentionCount}회가 미국 얘기입니다 · ${k.channelCount}개 채널이 ${k.dayCount}일에 걸쳐 말했습니다`}
+                     아니라는 것이 여기서 읽힌다.
+
+                     ⚠️ **여기서 창을 말하지 않는다.** 한때 "최근 3일 전체 대화에서"로
+                     시작했는데, 파이프라인이 얇은 날 창을 하루씩 넓히므로(월요일 아침
+                     처럼 창에 평일이 한 날도 없는 날 — calculate_us_telegram_sentiment.py
+                     의 ISSUE_KEYWORD_MAX_COUNT_DAYS 주석) 같은 문장 안에서 "최근 3일"과
+                     "4일에 걸쳐"가 부딪쳤다. 기간은 끝의 dayCount 가 혼자 말하게 둔다. */
+                  data-tip={`전체 대화에서 ${k.totalCount}회 나왔고 그중 ${k.mentionCount}회가 미국 얘기입니다 · ${k.channelCount}개 채널이 ${k.dayCount}일에 걸쳐 말했습니다`}
                 >
                   <RankBadge n={k.rank} />
                   {/* 옆 테마 표는 %p 를 이름 줄 오른끝(막대 바로 위)에 둔다. 이 표는
