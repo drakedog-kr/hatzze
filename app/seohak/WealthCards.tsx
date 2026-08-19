@@ -298,7 +298,9 @@ export function WealthCards({ ch, fx, household }: {
             종목을 들었는지는 어떤 공개 원천에도 없어서, 넣은 돈을 시장 수익률로 굴린
             값이다(`lib/seohak-data.ts` 의 `buildIndex`). +84% 도 거기서 나온다. */
         <Card icon="currency_exchange" title="원화로 보면"
-              desc="달러로 잰 수익을 원화로 옮기면 얼마인지"
+              /* ⚠️ "달러로 잰 수익을 원화로 옮기면" 이었다. 그건 계산 **절차**다.
+                 이 카드가 말하는 건 환율이 수익의 얼마를 만들었나이므로 그렇게 적는다. */
+              desc="환율까지 더하면 실제로 얼마를 벌었는지"
               note={`${ymEnd(ch.asOf)} · 환율 ${md(fx.nowDate)}`}
               noteHelp="넣은 돈은 실측이고, 지금 값은 그 돈이 시장을 따라갔다고 볼 때의 추정입니다."
               foot="환율이 평균으로 돌아가면 원화 수익도 그만큼 줄어듭니다.">

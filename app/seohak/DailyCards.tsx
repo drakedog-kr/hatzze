@@ -469,7 +469,10 @@ function VsUsual({ d, fx }: { d: SeohakDaily; fx: Fx | null }) {
 export function DailySection({ d, fx }: { d: SeohakDaily; fx: Fx | null }) {
   return (
     <Card icon="show_chart" title="평소와의 차이"
-          desc="사고파는 양이 평소의 몇 %인지 · 반년치"
+          /* ⚠️ "평소의 몇 %인지 · 반년치" 였다. 그건 **어떻게 재는지**이고, 그 답은
+             그림의 기준선 범례가 이미 한다("평소(2년 중앙값) = 100%"). 부제는
+             무엇을 알 수 있는지를 말한다. */
+          desc="요즘 사고파는 양이 평소와 얼마나 다른지"
           note="최근 6개월">
       <VsUsual d={d} fx={fx} />
     </Card>

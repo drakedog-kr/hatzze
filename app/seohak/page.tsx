@@ -18,8 +18,10 @@ import { pageMetadata } from "../seo";
 export async function generateMetadata(): Promise<Metadata> {
   return pageMetadata({
     title: "서학개미 해부도 | hatzze",
+    // ⚠️ 앞 문장은 '원화로 보면' 카드 하나만 설명했고 원천도 둘만 적었다. 화면이
+    // 매매 습관·보유기간·가계 자리·ETF 까지 담게 됐으므로 둘 다 넓힌다.
     description:
-      "개인이 미국 주식에 넣은 돈은 얼마이고, 언제 넣었고, 지금 얼마가 됐는지. 예탁결제원 결제와 미 재무부 통계로 되짚습니다.",
+      "개인이 미국 주식을 언제 사고팔고 얼마나 들고 있는지, 넣은 돈이 지금 얼마가 됐는지 봅니다. 예탁결제원 결제와 미 재무부·한국은행·거래소 통계를 씁니다.",
     path: "/seohak",
   });
 }
@@ -95,7 +97,10 @@ export default async function SeohakPage() {
           **모집단이 다르다** — 두 카드의 숫자를 더하거나 나누면 안 된다(각주가 밝힌다).
           ⭐ 그래도 한 묶음인 이유는 둘 다 **규모**를 묻기 때문이다. 하나는 "원화로 얼마",
           하나는 "가계 자산에서 어느 자리". */}
-      <SectionCaps label="얼마나 큰 돈인가" count={(fx ? 1 : 0) + (household ? 1 : 0)} />
+      {/* ⚠️ '얼마나 큰 돈인가' 였다. 두 카드가 실제로 답하는 건 크기가 아니라 **지금
+          얼마인가**다 — 앞엣것은 276조원이 됐다는 결과이고 뒤엣것은 가계 주식에서
+          차지하는 자리다. 앞 층('어떻게 사고파나')을 '그 돈' 으로 받아 잇는다. */}
+      <SectionCaps label="그 돈은 지금 얼마인가" count={(fx ? 1 : 0) + (household ? 1 : 0)} />
       <div style={CARD_GRID}>
         <WealthCards ch={ov.channel} fx={rates} household={household} />
       </div>
