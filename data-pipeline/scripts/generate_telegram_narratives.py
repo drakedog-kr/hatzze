@@ -173,6 +173,9 @@ COMMON = """\
 - 이 데이터는 '텔레그램에서 무엇이 얼마나·어떤 톤으로 회자됐는가'이지, 주가나 기업 실적이
   아닙니다. 반드시 "언급", "화제", "관심" 같은 말로 서술하세요.
 - 주어진 숫자만 씁니다. 데이터에 없는 수치·사건·이유를 지어내지 마세요.
+- **숫자는 적힌 그대로 옮기고 단위(만·억·조)를 바꾸지 마세요.** 자릿수를 다시 묶어 적다가
+  단위를 통째로 밀어 쓴 적이 있습니다("2,407만 주"를 "24억 주"로). 단위를 옮겨 적어야
+  할 것 같으면 그 숫자는 아예 빼고 쓰세요.
 
 [절대 하지 말 것]
 - 매수/매도/투자 권유·신호, 목표가, 주가 상승/하락 예측('오를 것/내릴 것/앞으로').
@@ -445,6 +448,55 @@ EXCERPT_HEAD = 90
 EXCERPT_ELLIPSIS = " […] "
 
 
+# ── 발췌에 실린 숫자를 사람이 읽는 자릿수로 ───────────────────────────────────
+#
+# 공시 발췌는 수량을 원본 그대로 싣는다 — "보통주 취득수량 : 24,070,000주(400,043억)".
+# 모델은 이 자릿수를 스스로 다시 묶다가 단위를 통째로 밀어 읽는다. 2026-08-19 총평이
+# 그 24,070,000주(=2,407만 주)를 **"24억 주"**로 썼다. 발행주식 총수가 7.3억 주뿐이라
+# 있을 수 없는 값인데, 문장만 읽으면 그럴듯해서 눈으로도 잘 안 걸린다.
+#
+# 프롬프트로도 막지만(COMMON 의 단위 규칙), 그건 모델이 지켜 줘야 도는 그물이다.
+# 여기서 만·억·조로 묶어 주면 **모델이 자릿수를 셀 일 자체가 없어진다.** 문장이 이상하면
+# 프롬프트보다 digest 재료를 먼저 볼 것 — 이번 것도 재료 쪽 문제였다.
+#
+# 묶는 자리는 좁게 잡았다. '주'는 만 단위부터, '억'은 조 단위부터만 손댄다. "3,000주",
+# "5,000억원"처럼 이미 읽히는 숫자는 그대로 둔다(바꿔 봐야 원문과 멀어지기만 한다).
+
+
+def _myriad(n: int) -> str:
+    """정수 → 억·만으로 묶은 표기(24070000 → '2,407만', 730492365 → '7억 3,049만 2,365')."""
+    parts = []
+    for unit, label in ((10**8, "억"), (10**4, "만")):
+        if n >= unit:
+            parts.append(f"{n // unit:,}{label}")
+            n %= unit
+    if n or not parts:
+        parts.append(f"{n:,}")
+    return " ".join(parts)
+
+
+# 앞뒤가 숫자·쉼표·마침표면 더 긴 숫자의 일부이므로 건드리지 않는다. '주' 뒤의 몇 글자는
+# 수량이 아니라 다른 낱말의 첫 음절이다(주식·주가·주주·주당·주요·주간).
+_COUNT_RE = re.compile(
+    r"(?<![\d,.])(\d{1,3}(?:,\d{3})+|\d{5,})(주(?![식가주당요간])|억)(?![\d,.])"
+)
+
+
+def readable_counts(text: str) -> str:
+    """발췌 속 긴 숫자를 만·억·조로 묶는다(24,070,000주 → 2,407만주)."""
+
+    def sub(m: re.Match) -> str:
+        value, unit = int(m.group(1).replace(",", "")), m.group(2)
+        if value < 10**4:
+            return m.group(0)
+        if unit == "주":
+            return _myriad(value) + "주"
+        jo, rest = divmod(value, 10**4)  # 400,043억 → 40조 43억
+        return f"{jo:,}조" + (f" {rest:,}억" if rest else "")
+
+    return _COUNT_RE.sub(sub, text)
+
+
 def excerpt(text: str, needle: str | None) -> str:
     """[대표 메시지 발췌] 한 건 — 머리 + (필요할 때) 매칭 자리 주변.
 
@@ -453,7 +505,7 @@ def excerpt(text: str, needle: str | None) -> str:
     종목명으로 찾으면 못 만난다). 없거나 본문에서 못 찾으면 예전처럼 앞부분만 자른다 —
     자리를 모르면 창을 잡을 수 없고, 그때 머리는 최선의 추측이다.
     """
-    flat = " ".join((text or "").split())
+    flat = readable_counts(" ".join((text or "").split()))
     if len(flat) <= EXCERPT_CHARS:
         return flat
     at = flat.find(needle) if needle else -1
@@ -692,7 +744,7 @@ def build_news_block(db, latest: str, window_since: str) -> list[str]:
     excerpts = [m for m in head if (m.get("text") or "").strip()][:NEWS_EXCERPTS]
     out = ["", f"[{span} 오간 이야기] 조회·확산 상위 {NEWS_EXCERPTS}건 (표본 {len(picked)}건)"]
     for m in excerpts:
-        out.append(f"- {' '.join((m.get('text') or '').split())[:200]}")
+        out.append(f"- {readable_counts(' '.join((m.get('text') or '').split()))[:200]}")
 
     # 같은 기간의 화제 종목 — 발췌만으로는 어느 종목 얘기인지 흐릴 때가 있다.
     daily = [
