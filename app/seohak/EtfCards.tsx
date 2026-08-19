@@ -68,8 +68,9 @@ function RankTable({ head, hint, tone, ink, barTone, rows }: {
   const max = Math.max(...rows.map((r) => Math.abs(r.weight)), 1);
   /* ⛔ 여기 다섯째 칸(옅은 회색 보조값)이 있었다. '주간 등락' 이 그 주 순유입을 등락
      옆에 세우는 데 썼는데 뺐다 — 까닭은 `WeekGrid` 머리말. 두 카드가 같은 네 칸을
-     쓰게 되어 조건 분기도 함께 사라진다. */
-  const cols = "18px minmax(0, 1fr) 48px 58px";
+     쓰게 되어 조건 분기도 함께 사라진다.
+     ⚠️ 칸 폭은 이제 `.hz-rank-row`(globals.css)가 정한다. 좁은 화면에서 막대 칸을
+     접어야 하는데 **인라인 style 은 미디어쿼리를 이기기 때문**이다. */
 
   return (
     /* ⭐ `height:100%` + 아래 `<ul>` 의 1fr 줄. 두 카드의 세로가 늘 같아야 하는데
@@ -79,22 +80,20 @@ function RankTable({ head, hint, tone, ink, barTone, rows }: {
       {/* ⭐ 머리 띠가 줄과 **같은 격자**를 쓴다. 예전엔 flex 라 이름이 칸 위가 아니라
           오른쪽 끝에 몰려 있었고, 그래서 회색 보조 칸만 이름이 없어 "회색은 그동안 오간
           돈" 이라는 각주가 따로 있어야 했다. 칸마다 이름을 붙이면 그 각주가 사라진다. */}
-      <div style={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 8,
-                    padding: "5px 9px", background: C.soft, borderRadius: R.control,
+      <div className="hz-rank-row"
+           style={{ padding: "5px 9px", background: C.soft, borderRadius: R.control,
                     fontSize: T.small, fontWeight: 700 }}>
         <span aria-hidden style={{ width: 7, height: 7, borderRadius: 2, background: tone,
                                    justifySelf: "center" }} />
         <span style={{ color: C.label }}>{head}</span>
-        <span />
+        <span className="hz-rank-bar" />
         <span style={{ color: C.muted, fontWeight: 600, textAlign: "right" }}>{hint}</span>
       </div>
       <ul style={{ listStyle: "none", margin: 0, padding: 0, flex: 1, minHeight: 0,
                    display: "grid", gridTemplateRows: `repeat(${rows.length}, minmax(29px, 1fr))` }}>
         {rows.map((r, i) => (
-          <li key={r.key}
-              style={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 8,
-                       padding: "6px 9px",
-                       borderBottom: i < rows.length - 1 ? `1px solid ${C.sheetRow}` : undefined }}>
+          <li key={r.key} className="hz-rank-row"
+              style={{ borderBottom: i < rows.length - 1 ? `1px solid ${C.sheetRow}` : undefined }}>
             <span style={{ width: 18, height: 18, borderRadius: 5, background: "var(--c-plate)",
                            color: "var(--c-cold-ink)", fontSize: T.small, fontWeight: 800,
                            display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -116,7 +115,7 @@ function RankTable({ head, hint, tone, ink, barTone, rows }: {
             </span>
             {/* 막대는 클래스로 둔다. 인라인으로 두면 좁은 화면에서 이 칸을 접는 규칙을
                 이겨서 막대만 살아남는다(카더라에서 실제로 터진 자리다). 채움 폭·색만 인라인. */}
-            <span className="hz-bar">
+            <span className="hz-bar hz-rank-bar">
               <span style={{ width: `${Math.max(4, (Math.abs(r.weight) / max) * 100)}%`,
                              background: barTone }} />
             </span>

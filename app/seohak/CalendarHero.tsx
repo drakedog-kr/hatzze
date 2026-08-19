@@ -177,10 +177,13 @@ function WindowRow({ w, onJump }: { w: (typeof CALENDAR_WINDOWS)[number]; onJump
             style={{ display: "flex", flexDirection: "column", gap: S.xs, width: "100%",
                      border: "none", cursor: "pointer", font: "inherit", textAlign: "left",
                      margin: "-3px 0", padding: "3px 0" }}>
-      <span style={{ display: "flex", alignItems: "baseline", gap: S.sm, width: "100%",
+      {/* ⚠️ 좁은 화면에서 **문장이 긴 줄만** 횟수를 다음 줄로 밀어내 넷은 한 줄 둘은 두
+          줄이 됐다. `.hz-win-line` 이 ≤560 에서 전부 두 줄로 통일한다(globals.css). */}
+      <span className="hz-win-line"
+            style={{ display: "flex", alignItems: "baseline", gap: S.sm, width: "100%",
                      flexWrap: "wrap" }}>
         <b style={{ fontSize: T.body, color: C.ink }}>{w.label}</b>
-        <span style={{ fontSize: T.body, color: C.sub }}>{w.phrase}</span>
+        <span className="hz-win-phrase" style={{ fontSize: T.body, color: C.sub }}>{w.phrase}</span>
         <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: T.small,
                        color: C.muted, flexShrink: 0 }}>
           {w.of}번 중 <b style={{ color: strong ? C.ink : C.sub2 }}>{w.hit}번</b>
@@ -653,7 +656,10 @@ export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
                         <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
                       </span>
                     </span>
-                    <ul style={{ listStyle: "none", margin: 0, padding: "10px 0 0",
+                    {/* ⚠️ `.hz-win-list` 는 **컨테이너 쿼리의 기준**이다(globals.css).
+                        줄이 접히는 조건이 뷰포트가 아니라 이 칸의 폭이라서다. */}
+                    <ul className="hz-win-list"
+                        style={{ listStyle: "none", margin: 0, padding: "10px 0 0",
                                  display: "flex", flexDirection: "column", gap: S.sm,
                                  borderTop: `1px solid ${C.line}` }}>
                       {CALENDAR_WINDOWS.map((w) => (

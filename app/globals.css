@@ -3155,3 +3155,53 @@ main.hz-scroll { overflow-x: clip; }
     var(--c-card)
   );
 }
+
+/* ── 서학개미 좁은 화면(≤560) 손질 ───────────────────────────────────────
+   ⚠️ 인라인 style 은 미디어쿼리를 **이긴다.** 그래서 폭에 따라 달라져야 하는 값은
+   TSX 에서 빼 여기로 옮겼다(이 저장소가 여백에서 네 번 밟은 함정이다). */
+
+/* ① 순위표 한 줄. 좁아지면 **막대 칸을 통째로 접는다** — 이름이 그만큼 살아난다.
+      막대는 크기를 말하는데 그 크기는 바로 옆 숫자가 이미 말한다. */
+.hz-rank-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 48px 58px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+}
+@media (max-width: 560px) {
+  .hz-rank-row {
+    grid-template-columns: 18px minmax(0, 1fr) 58px;
+  }
+  .hz-rank-row > .hz-rank-bar {
+    display: none;
+  }
+}
+
+/* ② '해마다 되풀이되는 때' 한 줄. 넓을 땐 이름·문장·횟수가 한 줄인데, 좁아지면
+      **문장이 긴 줄만** 횟수를 다음 줄로 밀어내 넷은 한 줄 둘은 두 줄이 된다.
+      좁으면 여섯 줄 전부 두 줄로 통일한다 — 이름과 횟수가 위, 문장이 아래다.
+
+   ## ⚠️⚠️ 미디어쿼리가 아니라 **컨테이너 쿼리**다
+   기준은 뷰포트가 아니라 **이 칸의 폭**이다. 처음에 `@media (max-width: 560px)` 로
+   뒀더니 600px 에서 다시 들쭉날쭉했다(24/24/24/24/49/49) — 그 폭에서도 칸은 266px 라
+   좁은 쪽인데 뷰포트만 보면 넓은 쪽으로 잡힌다. 이 칸은 히어로가 1:1:1 로 나누므로
+   뷰포트와 폭이 따로 논다.
+
+   ⭐⭐ 문턱 280px 는 **양쪽을 다 재서** 잡았다. 줄마다 필요한 폭이 232~**269px** 라 그
+   위면 여섯 줄이 다 들어가는데, 데스크톱(1,280px)에서 이 칸이 **287px** 밖에 안 된다.
+   처음에 290 으로 뒀더니 데스크톱까지 두 줄로 접혀서 히어로가 쓸데없이 길어졌다.
+   269 와 287 사이가 쓸 수 있는 전부다. */
+.hz-win-list {
+  container-type: inline-size;
+}
+@container (max-width: 280px) {
+  .hz-win-line {
+    flex-wrap: wrap;
+  }
+  .hz-win-line > .hz-win-phrase {
+    order: 3;
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+}

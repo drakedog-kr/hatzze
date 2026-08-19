@@ -188,8 +188,12 @@ export function Tiles({ items }: { items: Tile[] }) {
               바탕이 다른데 글자색을 바탕에 따라 가르면 눈에 안 보이는 차이로 코드만 는다.
               어느 바탕에서도 4.5 를 넘는 값 하나로 둔다 — 흰 4.87 · 회색 5.26 · 틴트 4.87.
               (sub2 는 틴트 위 4.48 이라 아슬아슬하게 못 넘는다. 실측이 아니면 못 걸렀다.) */}
-          <span style={{ fontSize: T.small, color: C.sub, minWidth: 0, overflow: "hidden",
-                         textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.n}</span>
+          {/* ⚠️ `nowrap` + 말줄임이었다. 좁은 화면에서 `1,288원 → 1,...` 로 **잘렸다.**
+              접으면 타일이 두 줄이 되지만 세 칸이 함께 늘어나 높이는 안 어긋난다 —
+              잘린 글자는 못 되찾고 두 줄은 읽을 수 있다. */}
+          <span style={{ fontSize: T.small, color: C.sub, minWidth: 0, wordBreak: "keep-all" }}>
+            {t.n}
+          </span>
           <span style={{ fontFamily: MONO, fontSize: T.lead, fontWeight: 800,
                          color: t.ink ?? C.ink }}>{t.v}</span>
         </div>
