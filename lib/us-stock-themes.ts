@@ -39,7 +39,7 @@ export const US_THEMES: Record<string, string[]> = {
   "전기차·자율주행": ["TSLA", "RIVN", "LCID", "NIO", "XPEV", "GM", "F", "APTV", "UBER", "CVNA"],
   "전력·원자력": ["SMR", "OKLO", "CEG", "VST", "NRG", "NEE", "GEV", "PWR", "ETN", "CCJ", "HON", "FSLR", "ENPH", "BE"],
   "우주·방산": ["RKLB", "ASTS", "RDW", "LMT", "RTX", "NOC", "GD", "HII", "BA", "AXON"],
-  "바이오·헬스케어": ["LLY", "NVO", "MRK", "PFE", "ABBV", "AZN", "NVS", "JNJ", "UNH", "ISRG", "MDGL", "CVS", "CAH"],
+  "바이오·헬스케어": ["LLY", "MRNA", "NVO", "MRK", "PFE", "ABBV", "AZN", "NVS", "JNJ", "UNH", "ISRG", "MDGL", "CVS", "CAH"],
   "금융": ["GS", "JPM", "MS", "BAC", "BRK", "BX", "SCHW", "MA", "AXP", "PYPL", "SOFI", "UPST"],
   "가상자산": ["COIN", "MSTR", "CRCL", "GLXY", "CLSK", "RIOT", "CIFR", "HOOD"],
   "소비재·유통": ["KO", "WMT", "COST", "SBUX", "MCD", "NKE", "CMG", "PEP", "PM", "DIS", "DKNG", "ORLY", "DECK", "LUV", "DHI", "PLD", "WELL", "CPNG", "MELI", "URI", "ABNB", "BKNG", "CAT", "VZ"],

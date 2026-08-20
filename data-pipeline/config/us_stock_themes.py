@@ -57,9 +57,12 @@ US_THEMES: dict[str, list[str]] = {
         "ETN", "CCJ", "HON", "FSLR", "ENPH", "BE",
     ],
     "우주·방산": ["RKLB", "ASTS", "RDW", "LMT", "RTX", "NOC", "GD", "HII", "BA", "AXON"],
+    # MRNA 를 1위가 아니라 2위에 둔 이유: 코퍼스 전체로는 477건으로 LLY(422)보다 많은데
+    # 그중 341건이 08-19~20 이틀치(머크와의 흑색종 백신 3상 성공)다. 이 순서는 카드가
+    # 쓰는 '대표성' 순서라, 이틀짜리 급등으로 맨 앞자리를 주지 않는다.
     "바이오·헬스케어": [
-        "LLY", "NVO", "MRK", "PFE", "ABBV", "AZN", "NVS", "JNJ",
-        "UNH", "ISRG", "MDGL", "CVS", "CAH",
+        "LLY", "MRNA", "NVO", "MRK", "PFE", "ABBV", "AZN", "NVS",
+        "JNJ", "UNH", "ISRG", "MDGL", "CVS", "CAH",
     ],
     "금융": ["GS", "JPM", "MS", "BAC", "BRK", "BX", "SCHW", "MA", "AXP", "PYPL", "SOFI", "UPST"],
     # 코인 시세와 함께 움직이는 묶음. 금융과 갈라 둔 이유는 그날 오가는 얘기가
