@@ -320,6 +320,33 @@ NAME_EXCLUDE: dict[str, str] = {
 }
 
 
+# ── 스캔이 계속 물어오지만 넣지 않기로 한 것 ─────────────────────────────────
+#
+# `scripts/scan_us_stock_candidates.py` 가 주 1회 도는데, 이 목록이 없으면 **같은 후보를
+# 매주 다시** 들고 온다. "봤고, 안 넣기로 했다"를 적어 두는 자리다. 안 적어 두면 이슈가
+# 잡음이 되고, 잡음이 되면 아무도 안 본다.
+#
+# 이름이 아니라 **티커**를 키로 둔다 — 스캔이 제안하는 한글 이름은 실행마다 흔들린다
+# (같은 GILD 를 "길리어드"로도 "길리어드사이언스"로도 들고 온다).
+# 값은 왜 뺐는지. 나중에 마음이 바뀌면 여기서 지우면 다시 올라온다.
+SCAN_IGNORE: dict[str, str] = {
+    "NDAQ": "나스닥. 이 코퍼스의 3,268건은 대개 회사가 아니라 거래소·지수를 가리킨다",
+    "SKHY": "SK하이닉스 ADR. 국내 사전이 이미 세고 있어 넣으면 두 번 센다",
+    "SPCX": "스페이스X. SEC 신고자 목록에는 있지만 상장돼 있지 않다",
+    # 아래는 한글 일반명사가 영문 회사명과 **우연히** 소리가 맞은 것들이다.
+    "SW": "'소프트웨어' ↔ Smurfit Westrock (음차 0.55)",
+    "IR": "'기업설명회' ↔ Ingersoll Rand",
+    "FT": "'파이낸셜타임스'(매체) ↔ Franklin Universal Trust",
+    "PC": "'클라이언트' ↔ Premium Catering",
+    "WM": "'자산관리' ↔ Waste Management",
+    "LNG": "'액화천연가스' ↔ Cheniere Energy",
+    "SLG": "'리얼티' ↔ SL Green Realty",
+    "IP": "'지식재산권' ↔ International Paper",
+    "WTI": "'서부텍사스산원유' ↔ W&T Offshore",
+    "IT": "'정보기술' ↔ Gartner",
+}
+
+
 def primary_names() -> dict[str, str]:
     """티커 → 화면에 쓸 대표 표기. 사전에 **먼저 나온** 표기를 고른다.
 
@@ -346,4 +373,9 @@ def sanity_check() -> list[str]:
     for name in NEGATIVE_CONTEXT:
         if name not in US_NAMES:
             problems.append(f"{name}: NEGATIVE_CONTEXT 에만 있고 사전에 없다")
+    # 사전에 넣기로 마음을 바꿨으면 무시 목록에서도 빼야 한다. 안 빼면 스캔이
+    # "이미 넣은 것"을 계속 안 넣기로 한 것으로 여긴다.
+    for ticker in SCAN_IGNORE:
+        if ticker in set(US_NAMES.values()):
+            problems.append(f"{ticker}: 사전에 있으면서 SCAN_IGNORE 에도 있다")
     return problems

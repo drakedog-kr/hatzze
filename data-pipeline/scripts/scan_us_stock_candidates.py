@@ -58,6 +58,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common.supabase_client import get_client  # noqa: E402
 from config.us_stock_extraction import (  # noqa: E402
     NAME_EXCLUDE,
+    SCAN_IGNORE,
     TICKER_NEVER_BARE,
     US_NAMES,
 )
@@ -272,6 +273,63 @@ def measure_gain(rows: list[dict], texts: list[str]) -> None:
         row["gain"] = gain.get(row["name"], 0)
 
 
+def write_issue_body(path: Path, named: list[dict], args, window: str) -> None:
+    """주 1회 실행이 열 이슈의 본문. 문턱을 넘은 게 없으면 **빈 파일**을 쓴다.
+
+    빈 파일 = 이슈를 열지 않는다. 매주 여는 게 아니라 **놓치고 있는 게 생겼을 때만**
+    부른다. 같은 후보가 매주 다시 오르는 것은 SCAN_IGNORE 가 막는다.
+    """
+    hot = [r for r in named
+           if r["gain"] >= args.alert_min_gain
+           and r["score"] >= args.alert_min_score
+           and r["channels"] >= args.alert_min_channels
+           and not r["excluded"]]
+    if not hot:
+        path.write_text("")
+        return
+    lines = [
+        f"미국 종목 사전에 **없는데** 최근 오르내리는 종목이 {len(hot)}개 있습니다.",
+        "",
+        f"- 창: {window} · 문턱: 소득 ≥ {args.alert_min_gain} · 음차 ≥ {args.alert_min_score}"
+        f" · 채널 ≥ {args.alert_min_channels}",
+        "- 소득 = 그 한글 표기를 사전에 넣으면 실제로 잡히는 메시지 수",
+        "",
+        "| 티커 | 한글 후보 | 소득 | 채널 | 음차 | SEC 영문명 |",
+        "|---|---|---:|---:|---:|---|",
+    ]
+    for r in hot:
+        flag = " ⚠bare금지" if r["never_bare"] else ""
+        lines.append(f"| `{r['ticker']}` | {r['name']} | {r['gain']} | {r['channels']} "
+                     f"| {r['score']:.2f} | {r['english'][:40]}{flag} |")
+    lines += [
+        "",
+        "### 넣으려면",
+        "",
+        "`config/us_stock_extraction.py` 의 `US_NAMES` 에 아래를 더하고, 테마가 필요하면",
+        "`config/us_stock_themes.py` 와 그 TS 사본(`lib/us-stock-themes.ts`)도 같이 고칩니다.",
+        "추출은 전량 재계산이라 머지 뒤 첫 실행이 과거분까지 소급해 채웁니다.",
+        "",
+        "```python",
+    ]
+    lines += [f'    "{r["name"]}": "{r["ticker"]}",' for r in hot]
+    lines += [
+        "```",
+        "",
+        "### ⛔ 그냥 넣지 마십시오",
+        "",
+        "음차 점수는 '이 한글이 저 영문의 소리인가'만 잽니다. '그 자리가 회사 이야기인가'는",
+        "못 잽니다. 표본을 눈으로 보고 거를 것 셋입니다.",
+        "",
+        "- 회사 이름이 거래소·지수 이름이기도 한 것 (나스닥)",
+        "- 국내 상장사의 ADR (SK하이닉스). 국내 사전과 두 번 셉니다",
+        "- 우연히 소리가 맞는 일반명사 (소프트웨어 ↔ Smurfit Westrock)",
+        "",
+        "안 넣기로 했으면 `SCAN_IGNORE` 에 티커와 이유를 적어 주십시오. 안 적으면",
+        "**다음 주에 같은 후보가 다시 올라옵니다.**",
+    ]
+    path.write_text("\n".join(lines) + "\n")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--days", type=int, default=30, help="며칠치를 볼지(0=전체). 기본 30")
@@ -281,6 +339,15 @@ def main() -> None:
                     help="한 채널의 버릇을 거르는 문턱. 기본 2")
     ap.add_argument("--selftest", action="store_true",
                     help="지금 사전을 이 스캔이 되찾아 오는지만 센다")
+    # ── 주 1회 자동 실행이 이슈를 열 문턱 ──
+    # 표(①)보다 훨씬 좁게 잡는다. 표는 사람이 훑어보는 목록이고 이쪽은 사람을 부르는
+    # 알림이라, 잡음이 한 번 섞이면 다음 주부터 아무도 안 본다.
+    ap.add_argument("--alert-min-gain", type=int, default=30)
+    ap.add_argument("--alert-min-score", type=float, default=0.7)
+    ap.add_argument("--alert-min-channels", type=int, default=3)
+    ap.add_argument("--issue-body", metavar="경로",
+                    help="문턱을 넘은 후보가 있으면 그 경로에 이슈 본문을 쓴다. "
+                         "없으면 **빈 파일**을 쓴다(워크플로가 그걸로 이슈를 열지 말지 가른다)")
     args = ap.parse_args()
 
     db = get_client()
@@ -302,6 +369,12 @@ def main() -> None:
         return
 
     rows = build_rows(paren, notation, sec, known)
+    ignored = [r for r in rows if r["ticker"] in SCAN_IGNORE]
+    rows = [r for r in rows if r["ticker"] not in SCAN_IGNORE]
+    if ignored:
+        print(f"[무시] 안 넣기로 한 {len(ignored)}티커를 뺐다"
+              f"({', '.join(sorted(r['ticker'] for r in ignored))}). "
+              f"이유는 config/us_stock_extraction.py 의 SCAN_IGNORE 에 있다")
     named = [r for r in rows if r["name"] and r["score"] >= args.min_score
              and r["channels"] >= args.min_channels]
     measure_gain(named, texts)
@@ -349,6 +422,9 @@ def main() -> None:
     for r in ready:
         print(f'    "{r["name"]}": "{r["ticker"]}",'.ljust(44)
               + f'# {r["gain"]}건 · {r["channels"]}채널')
+
+    if args.issue_body:
+        write_issue_body(Path(args.issue_body), named, args, window)
 
 
 if __name__ == "__main__":

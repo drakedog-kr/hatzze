@@ -1,0 +1,74 @@
+# 미국 종목 사전에 없는데 자주 오르내리는 종목을 주 1회 찾아내 이슈로 알린다.
+#
+# ## 왜 따로 있나
+#
+# `daily-update.yml` 에 붙이지 않은 이유는 **주기가 다르기 때문**이다. 그쪽은 하루 두 번
+# 도는 데이터 파이프라인이고 이건 주 1회 도는 점검이다. 섞으면 매 실행마다 3분을 더 쓰고,
+# 알림 성격도 다르다 — 그쪽은 "고장났다", 이쪽은 "사람이 손볼 게 생겼다"다.
+#
+# ## 왜 필요한가
+#
+# 사전은 사람이 손으로 잇는 목록이라 새 종목이 뜨면 반드시 낡는다. 2026-08-19 에
+# 모더나가 언급 1위(272회·117채널)였는데 사전에 없어 미장 카더라에도 MDD 검색에도
+# 안 떴다. 사전 머리말이 이 점검을 돌리라고 이미 적어 뒀었는데 돌릴 것이 없었다.
+#
+# ⚠️ 주 1회라 **최대 엿새 늦는다.** 모더나는 하루 만에 1위가 됐다. 더 빨리 알아야 하면
+#    cron 을 늘릴 것 — 스크립트는 읽기만 해서 몇 번을 돌려도 안전하다.
+name: 미국 종목 사전 후보 스캔
+
+on:
+  schedule:
+    # 발화 월 01:00 UTC(10:00 KST). ⚠️ 깃헙 예약 큐가 실행을 밀어낸다(실측 60~68분).
+    # 아침 파이프라인이 08:45~09:05 KST 에 끝나므로 그 뒤라 코퍼스가 최신이다.
+    - cron: "0 1 * * 1"
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    # 후보가 나오면 이슈를 열거나 갱신한다.
+    permissions:
+      contents: read
+      issues: write
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r data-pipeline/requirements.txt
+
+      # 표 전체는 실행 로그에 남는다. 이슈에는 문턱을 넘은 것만 간다.
+      - name: 사전에 없는 후보 스캔
+        working-directory: data-pipeline
+        run: python scripts/scan_us_stock_candidates.py --days 30 --issue-body /tmp/issue.md
+
+      # 후보가 없으면 스크립트가 **빈 파일**을 남긴다 = 이슈를 열지 않는다.
+      # 매주 여는 게 아니라 놓치고 있는 게 생겼을 때만 부른다.
+      - name: 후보가 있으면 이슈 열기·갱신
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ ! -s /tmp/issue.md ]; then
+            echo "문턱을 넘은 후보가 없습니다. 이슈를 열지 않습니다."
+            exit 0
+          fi
+          title="📋 미국 종목 사전에 없는 종목이 있습니다"
+          existing=$(gh issue list --state open --search "$title in:title" \
+            --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            # 코멘트를 쌓지 않고 **본문을 갈아 끼운다.** 아직 안 넣은 후보는 다음 주에도
+            # 그대로 올라오는데, 그때마다 코멘트를 달면 같은 말이 매주 쌓여 아무도 안 본다.
+            gh issue edit "$existing" --body-file /tmp/issue.md
+            echo "기존 이슈 #$existing 의 본문을 최신 목록으로 갈아 끼웠습니다"
+          else
+            gh issue create --title "$title" --body-file /tmp/issue.md
+            echo "새 이슈를 열었습니다"
+          fi
