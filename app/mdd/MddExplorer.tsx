@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { CHARACTER_MIN_DD, CHARACTER_SPLIT_DAYS } from "@/lib/mdd";
 import type { DepthBucket, DrawdownCharacter, Episode, MddAnalysis, RiskProfile as RiskProfileData, YearStat } from "@/lib/mdd";
@@ -1210,6 +1210,12 @@ function deeperLabel(a: MddAnalysis): string {
   return fmtDayCount(a.deeperThanNowDays);
 }
 
+/** 눈금 줄 라벨 배치 결과. left 는 마커 라벨의 중심(px), null 이면 아직 안 쟀다. */
+type TickFit = { left: number | null; showStart: boolean; showEnd: boolean };
+const TICK_FIT_INIT: TickFit = { left: null, showStart: true, showEnd: true };
+/** 라벨끼리 최소로 띄울 간격(px). 이보다 가까우면 붙어 보여서 겹친 것과 다름없다. */
+const TICK_GAP = 6;
+
 /**
  * 0 ~ −100% 게이지. 현재 위치에 마커를, 기간 최대 낙폭에 기준선을 세운다.
  * 두 눈금이 겹칠 만큼 가까우면(지금이 곧 역대 최저) 기준선을 접는다 — 같은 자리에
@@ -1219,6 +1225,45 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
   const at = Math.min(100, Math.abs(current));
   const worst = Math.min(100, Math.abs(mdd));
   const showWorst = Math.abs(worst - at) > 3;
+  const [fit, setFit] = useState<TickFit>(TICK_FIT_INIT);
+  const rowRef = useRef<HTMLDivElement>(null);
+  const worstRef = useRef<HTMLSpanElement>(null);
+  const startRef = useRef<HTMLSpanElement>(null);
+  const endRef = useRef<HTMLSpanElement>(null);
+
+  /* 눈금 줄 세 라벨의 자리를 **그린 뒤에 재서** 정한다. 왜 상수로 못 박지 않는지는
+     아래 눈금 줄 주석에. 라벨을 클램프해도 폭·마커 위치는 안 변하니 한 번에 끝난다. */
+  useLayoutEffect(() => {
+    const row = rowRef.current;
+    const label = worstRef.current;
+    if (!showWorst || !row || !label) {
+      setFit((prev) => (prev.left === null && prev.showStart && prev.showEnd ? prev : TICK_FIT_INIT));
+      return;
+    }
+    const fitLabels = () => {
+      const track = row.clientWidth;
+      const half = label.getBoundingClientRect().width / 2;
+      // 라벨을 트랙 안으로 민다. 라벨이 트랙보다 넓으면 클램프 구간이 뒤집히므로 가운데.
+      const lo = Math.min(half, track / 2);
+      const hi = Math.max(track - half, track / 2);
+      const left = Math.min(Math.max((worst / 100) * track, lo), hi);
+      const startW = startRef.current?.getBoundingClientRect().width ?? 0;
+      const endW = endRef.current?.getBoundingClientRect().width ?? 0;
+      const showStart = left - half >= startW + TICK_GAP;
+      const showEnd = left + half <= track - endW - TICK_GAP;
+      setFit((prev) =>
+        prev.left === left && prev.showStart === showStart && prev.showEnd === showEnd ? prev : { left, showStart, showEnd },
+      );
+    };
+    fitLabels();
+    // 폭이 바뀌면(창 크기, 글꼴 늦게 도착) 다시 잰다. 우리가 바꾸는 건 left 뿐이라
+    // 관찰 대상의 크기를 건드리지 않는다 — 되먹임이 없다.
+    const ro = new ResizeObserver(fitLabels);
+    ro.observe(row);
+    ro.observe(label);
+    return () => ro.disconnect();
+  }, [showWorst, worst, mdd, periodLabel]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {/* 마커 위에 있던 값 라벨("−33.8%")은 걷었다(2026-08-04). 바로 위에 같은 값이 40px 로
@@ -1263,13 +1308,35 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
           <span style={{ position: "absolute", left: `${worst}%`, top: 8, transform: "translateX(-50%)", width: 1, height: 13, background: C.muted }} />
         )}
       </div>
-      <div style={{ position: "relative", height: 13 }}>
-        <span style={{ position: "absolute", left: 0, top: 0, fontSize: 11, fontWeight: 600, color: C.sub }}>0%</span>
+      {/* 눈금 줄. 가운데 라벨은 마커 위에 얹혀 있어서, 마커가 띠 끝에 설수록 끝 라벨을
+          덮는다. 모더나(지금 −64.0% · 최대 −95.4%)에서 처음 닿았다 — 라벨이 "−100%" 를
+          통째로 가린 채 트랙을 55.6px 넘어 **옆 칸까지** 나갔다. 국내 종목에는 이만큼
+          깊게 빠졌다가 얕게 회복한 예가 드물어 여태 안 보였다.
+
+          문턱을 "worst > NN 이면" 식으로 못 박지 않고 재는 이유: 이 라벨은 조회 기간
+          이름을 달고 있어 폭이 96.8px("최근 1년 최대 −9.9%")에서 145.1px("상장 이후·약
+          27년 최대 −99.9%")까지 오간다(11px/600 실측). 넓을 때는 **트랙 폭 287px 의
+          절반**이라, 어떤 문턱을 골라도 기간 이름이나 글꼴이 조금만 바뀌면 깨진다.
+
+          재서 두 가지를 정한다.
+           1. 라벨을 트랙 안으로 민다. 끝에 서면 중앙 정렬을 포기하고 트랙 끝에 맞춘다.
+           2. 그러고도 끝 라벨을 밟으면 **끝 라벨을 접는다**. 0% · −100% 는 양 끝이
+              어디인지 알려 줄 뿐이고, 밟힌 쪽은 마커 라벨이 자기 값으로 이미 말한다.
+          접을 때 visibility 를 쓰는 건 폭을 계속 잴 수 있어야 해서다 — 자리를 아예
+          비우면 다음 측정이 "접었으니 이제 안 겹치네" 로 되짚어 깜빡인다. */}
+      <div ref={rowRef} style={{ position: "relative", height: 13 }}>
+        <span
+          ref={startRef}
+          style={{ position: "absolute", left: 0, top: 0, fontSize: 11, fontWeight: 600, color: C.sub, visibility: fit.showStart ? "visible" : "hidden" }}
+        >
+          0%
+        </span>
         {showWorst && (
           <span
+            ref={worstRef}
             style={{
               position: "absolute",
-              left: `${worst}%`,
+              left: fit.left ?? `${worst}%`,
               top: 0,
               transform: "translateX(-50%)",
               fontSize: 11,
@@ -1281,7 +1348,12 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
             {periodLabel} 최대 {fmtPct(mdd)}
           </span>
         )}
-        <span style={{ position: "absolute", right: 0, top: 0, fontSize: 11, fontWeight: 600, color: C.sub }}>−100%</span>
+        <span
+          ref={endRef}
+          style={{ position: "absolute", right: 0, top: 0, fontSize: 11, fontWeight: 600, color: C.sub, visibility: fit.showEnd ? "visible" : "hidden" }}
+        >
+          −100%
+        </span>
       </div>
     </div>
   );
