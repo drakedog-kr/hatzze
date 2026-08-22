@@ -9,9 +9,15 @@
 
 ## 세 대목이 맡는 재료 (국내와 같은 얼개다)
 
-  ① 분위기   [전체] 낙관도 + [낙관도 추이]          100~115자 · 2문장
-  ② 테마 지형 [테마별] 점유율 + [미장 쏠림 화제어]    150~170자 · 2문장
-  ③ 이야기   [오간 이야기] 발췌 + [화제 종목]        185~210자 · 3문장
+  ① 분위기   [오늘 하루] + [전체] 낙관도·추이        100~115자 · 2문장
+  ② 테마 지형 [오늘 테마별] 몫 + [미장 쏠림 화제어]   150~170자 · 2문장
+  ③ 이야기   [오늘 오간 이야기] 발췌 + [화제 종목]    185~210자 · 3문장
+
+**숫자는 창 것, 주제는 오늘 것이다.** 화면 라벨이 '오늘의 요약'인데 셋째 대목까지 사흘
+창에서 뽑고 있었다. 실측(2026-08-22 기준, 최근 아홉 개 기준일): 발췌 6건 중 기준일 것이
+평균 2건이고 8/22 는 0건이라, 그날 요약이 이틀 전 모더나 이야기로 채워졌다. 그래서 발췌·
+화제 종목은 기준일부터 뒤로만 넓히고(NEWS_MIN_MSGS), 낙관도 퍼센트만 창 값으로 남긴다 —
+그 숫자를 확인할 곳이 옆 막대뿐이기 때문이다.
 
 ⏸ 셋째 대목엔 **함께 언급된 국내 종목**이 하나 더 있었다(2026-08-12 에 뺐다).
 그 짝을 보여주던 카드를 화면에서 내렸는데 재료만 남아, 요약이 화면 어디에도 없는 것으로
@@ -84,6 +90,17 @@ CARD_TOP_N = 4
 
 NEWS_EXCERPTS = 6      # 총평 셋째 대목이 볼 발췌 건수
 NEWS_TOP_STOCKS = 6
+# 발췌·화제 종목이 볼 표본. **기준일부터 시작해 뒤로만 넓힌다**(국내 총평과 같은 규칙,
+# generate_telegram_narratives.NEWS_MIN_MSGS). 예전엔 창 사흘 전체에서 조회수 상위를
+# 뽑아, 셋째 대목이 오늘 이야기를 안 했다(파일 머리 주석의 실측).
+#
+# 문턱 150 도 실측에서 나왔다 — 창 안 미국 언급 메시지가 평일 660~690건, 토요일 216건이다.
+# 150 이면 평일도 주말도 기준일 하루로 끝나고, 표본이 정말 무너진 날에만 뒤로 넓힌다.
+NEWS_MIN_MSGS = 150
+# 하루치 분위기를 따로 말할 최소 표본(telegram_us_sentiment_daily.message_count 기준).
+# 평일 660~880건 · 주말 185~270건이라, 주말도 살리되 수집이 무너진 날은 뺀다.
+BASE_DAY_MIN_MSGS = 120
+BASE_DAY_SAME_BAND = 5   # 하루와 창의 낙관도 차이가 이보다 작으면 '비슷하다'로 적는다
 COMENTION_ROWS = 5     # 셋째 대목에 줄 '함께 언급된 국내 종목' 짝 수
 STOCK_EXCERPTS = 3     # 종목 한 건당 발췌 수
 THEME_TOP_N = 5        # 화면 테마 카드가 8줄이지만 digest 는 위 5개면 충분하다
@@ -109,12 +126,25 @@ BRIEF_TONE_SYSTEM = US_COMMON + f"""
 [이번 대목 — 전체 분위기]
 여기는 **한국 주식 텔레그램 채널들이 미국 종목을 두고 나눈 이야기**입니다. 미국 시장
 자체의 분위기가 아니라, 한국 채널의 미국 이야기가 어느 쪽인지를 씁니다.
-그 분위기가 지금 어느 쪽이고 최근 며칠 어떻게 움직였는지를 **한두 문장**으로 쓰세요.
-[전체] 낙관도와 [낙관도 추이]가 근거입니다.
+**오늘 하루** 그 분위기가 어느 쪽인지를 먼저 쓰고, 그게 앞 사흘과 어떻게 다른지를 붙여
+**한두 문장**으로 쓰세요. [오늘 하루]가 주인공이고 [전체]·[낙관도 추이]는 견주는 배경입니다.
 
+- **세 가지를 담습니다.** ①오늘 하루가 어느 쪽인지(구간 라벨) ②그게 앞 사흘과 견줘
+  어떤지 ③[전체] 낙관도 퍼센트 한 번. 하나가 빠지면 문장이 길이를 못 채웁니다.
+- ⚠️ **[오늘 하루] 블록이 아예 없는 날이 있습니다**(그날 표본이 얇아 일부러 뺐습니다).
+  그때는 [전체]와 [낙관도 추이]로 최근 사흘의 분위기를 쓰세요. 블록이 없는데 오늘을
+  말하면 없는 하루를 지어내는 것입니다.
+- ⚠️ **[오늘 하루]에는 퍼센트가 없습니다. 일부러 뺐습니다.** 오늘 분위기는 거기 적힌
+  구간 라벨(낙관 우세·중립·비관 우세)과 '사흘보다 뜨겁다/식었다'로만 말하세요. 옆 막대가
+  사흘 값이라 오늘 퍼센트를 적으면 독자가 그 숫자를 확인할 곳이 없습니다.
+- **오늘이 앞 사흘과 비슷한 날**(하루 블록에 '비슷합니다'라고 적힌 날)에는 대비할 것이
+  없어 문장이 짧아집니다. 그때는 [낙관도 추이]로 **어떻게 여기까지 왔는지**를 한 문장 더
+  쓰세요 — 어느 즈음 올랐다가 어느 쪽으로 내렸는지를 숫자 말고 말로 적습니다.
 - **종목명·계약·발표 같은 구체적인 사건은 쓰지 마세요. 그건 셋째 대목이 맡습니다.**
 - **테마 이야기도 쓰지 마세요. 그건 둘째 대목이 통째로 맡습니다.**
-- **퍼센트는 [전체] 낙관도 하나만, 그것도 한 번만 씁니다.**
+- **[전체] 낙관도 퍼센트는 반드시 한 번 씁니다.** 그 값은 사흘치이고 옆 막대와 같은
+  숫자라, 이 문장에서 빠지면 독자가 기댈 숫자가 화면에 없습니다. 오늘 분위기는 구간
+  라벨로 말하고 사흘 값을 숫자로 붙이는 식입니다. **퍼센트는 그 하나뿐입니다.**
 - ⚠️ **분석 메시지 건수는 쓰지 마세요.** 이 문단 옆 카드가 자기 건수를 찍는데 창이
   어긋날 수 있습니다. 두 숫자가 나란히 다르면 어느 쪽도 못 믿습니다.
 - **[낙관도 추이]도 숫자로 읊지 말고 말로 옮기세요** — "83%에서 60%로 떨어졌다"가 아니라
@@ -125,9 +155,11 @@ BRIEF_TONE_SYSTEM = US_COMMON + f"""
 BRIEF_THEME_SYSTEM = US_COMMON + f"""
 
 [이번 대목 — 테마 지형]
-[테마별]과 [미장 쏠림 화제어]를 근거로, **미국 이야기가 어디에 몰려 있는지**를
+[오늘 테마별]과 [미장 쏠림 화제어]를 근거로, **오늘 미국 이야기가 어디에 몰려 있는지**를
 **두 문장**으로 쓰세요. 앞 대목이 온도 하나를 말했으니 여기는 그 관심이 어디에 있는지를 맡습니다.
 
+- **[오늘 테마별]은 기준일 하루의 몫입니다.** '최근 며칠'이 아니라 오늘 이야기로 쓰세요.
+  반대로 [미장 쏠림 화제어]는 사흘치라 '오늘'이라고 부르지 마세요.
 - **테마는 반드시 둘 이상 집으세요.** 1위만 적으면 이 대목이 매일 같은 얼굴이 됩니다.
   1위를 쓰고, **그 아래에서 한 가지를 더** 집어 대비를 만드세요.
 - [미장 쏠림 화제어]는 **전체 대화보다 미국 이야기에 유난히 몰린 말**입니다. 그냥 흔한
@@ -161,6 +193,11 @@ BRIEF_NEWS_SYSTEM = US_COMMON + f"""
 - 발췌는 근거로만 쓰고 그대로 베끼지 마세요. **여러 건에 공통으로 나오는 이야기**를
   고르세요 — 한 채널만 떠든 건 화제가 아닙니다.
 - 발췌에 섞인 링크·홍보 문구·가격 알림은 무시하세요.
+- ⚠️ **종목 이름과 화제어를 임의로 짝지어 쓰지 마세요.** 위 화제어 목록은 그날 많이 나온
+  말일 뿐, 어느 종목의 것인지가 적혀 있지 않습니다. "A사의 실적공개", "B사 리콜"처럼
+  붙여 쓰려면 **그 짝이 발췌 안에 실제로 있어야 합니다.** 없으면 없는 사건을 만든 것입니다.
+- ⚠️ **둘째 대목이 집은 '오늘 새로 오른 화제어'를 여기서 되풀이하지 마세요.** 방금 한
+  말입니다. 여기는 발췌에 실제로 담긴 사건을 씁니다.
 - **'무슨 일이 있었나'가 아니라 '무엇이 화제였나'를 씁니다.** 이 데이터는 텔레그램에서
   오간 말이지 확인된 사실이 아닙니다. "~를 체결했습니다"가 아니라 "~ 소식이 화제였습니다",
   "~라는 이야기가 돌았습니다"처럼 **화제·전언으로** 적으세요.
@@ -232,6 +269,28 @@ def load_us_messages(db, since_date: str) -> list[dict]:
     return out
 
 
+def news_sample(msgs: list[dict], since: str, end: str) -> tuple[list[dict], list[str]]:
+    """발췌가 볼 표본. 기준일부터 시작해 문턱에 닿을 때까지만 하루씩 뒤로 넓힌다.
+
+    창 전체에서 조회수로 줄을 세우면 오늘 글이 이틀 전 글에 밀린다(NEWS_MIN_MSGS 주석).
+    쓴 기간을 함께 돌려주는 이유는 블록 제목에 그대로 적기 위해서다 — 문장이 시점을
+    지어내지 않게 하려면 '어느 날 것인지'가 digest 에 적혀 있어야 한다.
+    """
+    by_day: dict[str, list[dict]] = defaultdict(list)
+    for m in msgs:
+        if since <= m["date"] <= end:
+            by_day[m["date"]].append(m)
+    picked: list[dict] = []
+    used: list[str] = []
+    for d in sorted(by_day, reverse=True):
+        picked += by_day[d]
+        used.append(d)
+        if len(picked) >= NEWS_MIN_MSGS:
+            break
+    used.sort()
+    return picked, used
+
+
 def build_brief_digest(db, latest: str, msgs: list[dict], name_of: dict[str, str]) -> str | None:
     """총평용 digest. 창은 화면 카드와 같다(기준일 포함 최근 WINDOW_DAYS 일)."""
     since, end = window_dates(latest)
@@ -283,6 +342,24 @@ def build_brief_digest(db, latest: str, msgs: list[dict], name_of: dict[str, str
     if len(trail) > 1:
         lines.append(f"[낙관도 추이] {' → '.join(trail)}")
 
+    # ── 오늘 하루 ───────────────────────────────────────────────────────────
+    # **퍼센트는 일부러 안 준다.** 옆 막대가 창(사흘) 값이라, 하루 낙관도를 문장에 적으면
+    # 독자가 그 숫자를 확인할 곳이 화면에 없다. 구간 라벨과 방향만 줘서 '오늘 이야기'는
+    # 하게 하되 '오늘 숫자'는 못 쓰게 한다.
+    day = next((r for r in sent if r["date"] == end), None)
+    day_opt = optimism(day["positive_count"], day["negative_count"]) if day else None
+    if day and day_opt is not None and (day["message_count"] or 0) >= BASE_DAY_MIN_MSGS:
+        diff = day_opt - opt
+        if abs(diff) < BASE_DAY_SAME_BAND:
+            moved = "최근 사흘 평균과 비슷합니다"
+        else:
+            moved = "최근 사흘 평균보다 " + ("뜨겁습니다" if diff > 0 else "식었습니다")
+        lines += [
+            "",
+            f"[오늘 하루] {end} · 이 하루만 보면 {tone_label(day_opt)}이고 {moved}.",
+            "  ※ 오늘 하루의 낙관도 퍼센트는 일부러 안 적었습니다. 퍼센트를 쓸 땐 위 [전체] 값만 쓰세요.",
+        ]
+
     # ── 테마 ────────────────────────────────────────────────────────────────
     themes = [
         r
@@ -290,7 +367,7 @@ def build_brief_digest(db, latest: str, msgs: list[dict], name_of: dict[str, str
         if r["date"] == end
     ]
     if themes:
-        lines += ["", f"[테마별] 그날 미국 언급 전체에서 차지한 몫 (상위 {THEME_TOP_N}개)"]
+        lines += ["", f"[오늘 테마별] {end} 하루의 미국 언급에서 차지한 몫 (상위 {THEME_TOP_N}개)"]
         for r in sorted(themes, key=lambda r: r["rank"])[:THEME_TOP_N]:
             lines.append(f"- {r['theme']}: 점유율 {float(r['share_pct']):.1f}% · 언급 {r['mention_count']}회")
 
@@ -312,23 +389,24 @@ def build_brief_digest(db, latest: str, msgs: list[dict], name_of: dict[str, str
         ]
 
     # ── 오간 이야기 발췌 ────────────────────────────────────────────────────
-    win = [m for m in msgs if since <= m["date"] <= end]
-    if win:
-        day_label = f"{since} ~ {end}" if since != end else since
-        top = sorted(win, key=lambda m: -(m.get("views") or 0))[:NEWS_EXCERPTS]
-        lines += ["", f"[오간 이야기] {day_label} · 조회수 상위 {len(top)}건 발췌"]
+    picked, used = news_sample(msgs, since, end)
+    if picked:
+        # 하루로 끝났고 그날이 기준일이면 '오늘'이라 불러도 된다. 넓혔으면 기간을 밝힌다.
+        span = "오늘" if used == [end] else f"{used[0][5:]}~{used[-1][5:]}"
+        top = sorted(picked, key=lambda m: -(m.get("views") or 0))[:NEWS_EXCERPTS]
+        lines += ["", f"[{span} 오간 이야기] 조회수 상위 {len(top)}건 발췌 (표본 {len(picked)}건)"]
         for m in top:
             first = m["mentions"][0]
             lines.append(f"- {excerpt(m['text'], first.get('match_text'))}")
 
         counter = Counter()
-        for m in win:
+        for m in picked:
             for x in m["mentions"]:
                 counter[x["ticker"]] += 1
         if counter:
             lines += [
                 "",
-                "[화제 종목] "
+                f"[{span} 화제 종목] "
                 + ", ".join(
                     f"{name_of.get(t, t)} {n}회" for t, n in counter.most_common(NEWS_TOP_STOCKS)
                 ),
