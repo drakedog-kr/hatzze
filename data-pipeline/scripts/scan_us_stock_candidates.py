@@ -60,6 +60,7 @@ from config.us_stock_extraction import (  # noqa: E402
     NAME_EXCLUDE,
     SCAN_IGNORE,
     TICKER_NEVER_BARE,
+    UNLISTED_REASON,
     US_NAMES,
 )
 
@@ -369,8 +370,19 @@ def main() -> None:
         return
 
     rows = build_rows(paren, notation, sec, known)
-    ignored = [r for r in rows if r["ticker"] in SCAN_IGNORE]
-    rows = [r for r in rows if r["ticker"] not in SCAN_IGNORE]
+    # ⚠️⚠️ **무시 사유가 아직 참인지 먼저 본다.** 무시 목록은 사람이 한 번 판단하고 적어
+    #      두는 것이라, 세상이 바뀌면 이유만 낡고 줄은 그대로 남는다. 실제로 스페이스X 를
+    #      "상장돼 있지 않다"고 빼 뒀는데 2026-06-12 에 나스닥에 상장했고, 그 뒤로 스캔이
+    #      매주 조용히 건너뛰었다 — 14일에 672건·124채널이던 종목이다.
+    #      상장을 이유로 든 티커가 SEC 상장 마스터에 나타나면 **무시를 풀어 후보로 되돌린다.**
+    #      경고만 하지 않는 이유는, 경고는 아무도 안 읽어서 이 사달이 났기 때문이다.
+    revived = sorted(t for t, why in SCAN_IGNORE.items() if UNLISTED_REASON in why and t in sec)
+    if revived:
+        print(f"[무시 해제] {', '.join(revived)} — '상장돼 있지 않다'로 빼 뒀는데 "
+              f"SEC 상장 마스터에 있다. 이유가 낡았으므로 후보로 되돌린다")
+    skip = {t for t in SCAN_IGNORE if t not in revived}
+    ignored = [r for r in rows if r["ticker"] in skip]
+    rows = [r for r in rows if r["ticker"] not in skip]
     if ignored:
         print(f"[무시] 안 넣기로 한 {len(ignored)}티커를 뺐다"
               f"({', '.join(sorted(r['ticker'] for r in ignored))}). "
