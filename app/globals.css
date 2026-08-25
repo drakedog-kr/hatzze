@@ -3440,14 +3440,21 @@ main.hz-scroll { overflow-x: clip; }
    없이 쓰려면 :hover 가 더 구체적이어야 한다(클래스 + 의사클래스). */
 .hz-foot-link:hover { color: var(--c-blue) !important; }
 
-/* ── 언더워터 차트 확대 보기 ────────────────────────────────────────
-   폰에서 이 차트는 뷰박스 720 units 가 화면 폭(≈350)으로 눌려 절반 축척이 된다. 연도·
+/* ── 차트 확대 보기 (폰 전용) ───────────────────────────────────────
+   폰에서 이 차트들은 뷰박스 720 units 가 화면 폭(≈350)으로 눌려 절반 축척이 된다. 연도·
    퍼센트 라벨이 11 units 라 실제 5~6px 로 찍혀 안 읽힌다(실기기 피드백 2026-08-05).
-   무대를 90도 돌려 화면의 **긴 변**을 쓰면 393×830 폰에서 350 → 830 으로 2배 남짓 커진다. */
-.mdd-zoom-btn {
+   무대를 90도 돌려 화면의 **긴 변**을 쓰면 393×830 폰에서 350 → 830 으로 2배 남짓 커진다.
+
+   ⭐ MDD 언더워터 차트가 먼저 쓰던 것을 **공용으로 뺐다**(2026-08-26, 이름도 mdd- →
+     hz-). 지금은 종목 상세의 '주가와 매매 시점' 차트(app/insider/ChartZoom.tsx)도 같은
+     것을 쓴다. 두 차트가 뷰박스 720 폭에 퍼센트로 얹은 오버레이라는 구조가 같아서,
+     무대만 돌려 주면 곡선·눈금·말풍선이 그대로 따라온다. */
+.hz-zoom-btn {
   position: absolute;
-  right: 22px;
-  bottom: 12px;
+  /* 감싸는 상자의 오른쪽 아래. MDD 는 카드 padding(22) 안쪽이고 종목 상세는 차트 상자
+     기준이라, 둘 다 곡선 끝과 안 겹치는 자리가 된다. */
+  right: 10px;
+  bottom: 6px;
   display: none; /* 폰에서만 (아래 미디어쿼리) — 넓은 화면은 이미 크다 */
   align-items: center;
   justify-content: center;
@@ -3459,7 +3466,7 @@ main.hz-scroll { overflow-x: clip; }
   color: var(--c-sub);
   cursor: pointer;
 }
-.mdd-zoom-scrim {
+.hz-zoom-scrim {
   position: fixed;
   inset: 0;
   z-index: 60;
@@ -3470,7 +3477,7 @@ main.hz-scroll { overflow-x: clip; }
      보람이 없었다 — 확대 보기는 '겹쳐 띄운 창'이 아니라 '이 차트만 보는 화면'이다. */
   background: var(--c-page);
 }
-.mdd-zoom-close {
+.hz-zoom-close {
   position: absolute;
   top: 14px;
   right: 14px;
@@ -3490,7 +3497,7 @@ main.hz-scroll { overflow-x: clip; }
    선다 — 크게 보려는 행동이 오히려 화면을 망친다.
    세로: 폭을 100vh 로 두고 90도 돌리면 그 폭이 화면의 긴 변을 타고 눕는다(393×830 폰에서
    350 → 830, 2배 남짓). 가로: 이미 긴 변이 가로라 돌릴 것 없이 폭만 채운다. */
-.mdd-zoom-stage {
+.hz-zoom-stage {
   width: 100%;
   padding: 0 24px;
   /* ⚠️ flex 자식은 기본이 flex-shrink:1 이다. 아래 세로 규칙에서 폭을 100vh(=830) 로
@@ -3499,14 +3506,14 @@ main.hz-scroll { overflow-x: clip; }
   flex: none;
 }
 @media (orientation: portrait) {
-  .mdd-zoom-stage {
+  .hz-zoom-stage {
     width: 100vh;
     transform: rotate(90deg);
     transform-origin: center;
   }
 }
 @media (max-width: 560px) {
-  .mdd-zoom-btn { display: flex; }
+  .hz-zoom-btn { display: flex; }
 }
 
 /* 시트 머리의 2단 요약(테마 로테이션의 유입↔이탈 · 이슈 키워드의 1위↔비중).

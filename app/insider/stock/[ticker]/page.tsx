@@ -11,6 +11,7 @@ import {
 } from "@/lib/insider-detail";
 
 import { SectionHead } from "../../../kadera/SectionHead";
+import { ChartZoom } from "../../ChartZoom";
 import { StockLogo } from "../../../StockLogo";
 import { pageMetadata } from "../../../seo";
 import { C, Icon, MONO } from "../../../ui";
@@ -503,7 +504,13 @@ export default async function StockDetailPage({
               <MarkBadges id="hz-mkf" />
             </div>
             <div className="hz-mkfilter-chart">
-              <PriceChart bars={d.bars} marks={d.marks} rate={d.usdKrw} />
+              {/* 폰에서는 뷰박스 720 이 화면 폭으로 눌려 축 라벨이 안 읽힌다. MDD 언더워터
+                  차트와 같은 확대 보기를 씌운다(같은 `.hz-zoom-*` · 같은 버튼 자리).
+                  ⚠️ 감싸도 마커 필터는 그대로 먹는다 — 그 규칙이 `.hz-mkfilter-chart` 의
+                     **자손**을 고르므로 한 겹 더 들어가도 닿는다. */}
+              <ChartZoom label="주가와 매매 시점 차트">
+                <PriceChart bars={d.bars} marks={d.marks} rate={d.usdKrw} />
+              </ChartZoom>
               <ChartLegend />
             </div>
           </div>

@@ -1507,7 +1507,7 @@ function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodLabel: s
           아이콘·같은 자리 어법이라 새 언어를 안 만든다. 폰에서만 뜬다(CSS). */}
       <button
         type="button"
-        className="mdd-zoom-btn"
+        className="hz-zoom-btn"
         aria-label="언더워터 차트 확대해서 보기"
         onClick={() => setZoom(true)}
       >
@@ -1520,11 +1520,11 @@ function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodLabel: s
         /* ⚠️ 닫기 판정은 target 으로 한다. 무대에 stopPropagation 을 걸면 편하지만, 그러면
            document 에 걸린 툴팁 탭 리스너(app/TipTap.tsx)까지 막혀서 곡선을 짚어도
            설명이 안 뜬다 — 확대해 놓고 정작 값을 못 보는 꼴이 된다. */
-        <div className="mdd-zoom-scrim" role="dialog" aria-modal="true" aria-label="언더워터 차트 확대" onClick={(e) => { if (e.target === e.currentTarget) setZoom(false); }}>
-          <button type="button" className="mdd-zoom-close" aria-label="닫기" onClick={() => setZoom(false)}>
+        <div className="hz-zoom-scrim" role="dialog" aria-modal="true" aria-label="언더워터 차트 확대" onClick={(e) => { if (e.target === e.currentTarget) setZoom(false); }}>
+          <button type="button" className="hz-zoom-close" aria-label="닫기" onClick={() => setZoom(false)}>
             <Icon name="close" style={{ fontSize: 20 }} />
           </button>
-          <div className="mdd-zoom-stage">
+          <div className="hz-zoom-stage">
             {chartWith(" mdd-crosshair-zoom")}
           </div>
         </div>
