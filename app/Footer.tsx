@@ -91,7 +91,15 @@ export default function Footer() {
     <footer style={{ marginTop: 56, borderTop: `1px solid ${C.line}`, paddingTop: 36 }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "40px 64px", justifyContent: "space-between" }}>
         {/* 브랜드 + 키워드 소개글 */}
-        <div style={{ maxWidth: 380 }}>
+        {/* 폭은 **재서 정한 값**이다(1280px 데스크톱 기준, 아래 소개문이 세 줄로 앉는 폭).
+            380 일 때 네 줄이었는데 마지막 줄이 "합니다." 두 마디만 남아 허전했다.
+              · 396  소개문이 세 줄이 되는 **최소** 폭. 여기 딱 붙이면 문구를 한 글자만
+                     고쳐도 도로 네 줄이 된다.
+              · 455  오른쪽 묶음(바로가기 + 데이터 출처, 485px)이 아래로 밀려나는 폭.
+                     1004 − 64(gap) − 485 = 455.
+            그래서 둘 사이를 넉넉히 띄운 420 으로 둔다. 소개문을 고칠 때는 세 줄이
+            유지되는지 같이 볼 것 — 늘리면 네 줄, 많이 줄이면 두 줄이 된다. */}
+        <div style={{ maxWidth: 420 }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 9 }}>
             <GhostSymbol size={26} />
             {/* 워드마크와 버전만 baseline 으로 묶는다 — 둘 다 글자라 밑선이 맞아야 한 줄로
