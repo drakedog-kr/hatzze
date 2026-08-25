@@ -1671,11 +1671,15 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
   display: flex;
   align-items: center;
   gap: 4px;
-  /* 자리표시자(높이 0) 기준으로 띄운다. top 6 은 윗줄과 살짝 떨어뜨리는 값이다. */
+  /* 자리표시자(높이 0) 기준으로 띄운다. top 6 은 윗줄과 살짝 떨어뜨리는 값이다.
+     ⭐ 폭은 **글 길이에 맞춘다.** 예전엔 left/right 로 양끝을 잡아 카드 폭을 다 먹었는데,
+        스무 자 남짓한 한 줄이 320px 짜리 검은 띠로 서서 가려진 줄을 필요 이상으로 덮었다.
+        넘칠 때만 접히게 max-width 로 상한만 둔다. */
   position: absolute;
   left: 8px;
-  right: 8px;
   top: 6px;
+  width: max-content;
+  max-width: calc(100% - 16px);
   z-index: 1;
   padding: 8px 6px 8px 10px;
   background: var(--c-ink);
@@ -3027,6 +3031,9 @@ main.hz-scroll { overflow-x: clip; }
   background: var(--c-blue-tint);
   color: var(--c-cold-ink);
   transition: background 0.12s ease, color 0.12s ease;
+  /* ⚠️ `.hz-tip` 이 `cursor: default` 로 못박아 둔다(그 주석 참고). 여기는 **누르면 나가는
+     링크**라 손가락 커서를 되찾아야 한다. 이 규칙이 뒤에 있어 이긴다. */
+  cursor: pointer;
 }
 .hz-tg-cta:hover,
 .hz-tg-cta:focus-visible {

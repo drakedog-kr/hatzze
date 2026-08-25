@@ -620,7 +620,13 @@ function Sidebar() {
           // (꽉 찬 파랑을 늘 깔면 사이드바에서 혼자 튀어 광고 배너처럼 읽혔다, 2026-08-03),
           // 호버·포커스에서만 현재 페이지 알약과 같은 파랑으로 꽉 찬다.
           // ⚠️ 두 값을 여기 인라인으로 되돌리면 인라인이 :hover 를 이겨 호버가 죽는다.
-          className="hz-tg-cta"
+          //
+          // `hz-tip` 은 이 화면의 공용 말풍선이다. 라벨("오늘 뭐래?")이 무엇을 주는
+          // 채널인지 말하지 않아서, 올려 보면 한 줄로 알려 준다.
+          // ⚠️ `.hz-tip` 이 커서를 default 로 못박으므로 `.hz-tg-cta` 가 pointer 를
+          //    되찾는다(globals.css). 누르면 나가는 링크인데 화살표면 거짓말이 된다.
+          className="hz-tip hz-tg-cta"
+          data-tip="텔레그램에서 매일 시장 요약을 해 드립니다"
           style={{
             display: "flex",
             alignItems: "center",
