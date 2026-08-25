@@ -1325,6 +1325,27 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
         반쯤 잘린 채** 남았다 — 없느니만 못한 꼴이다(2026-08-23 실측, 375px).
    ⭐ 접힘은 ` · ` 덩이 경계에서만 일어난다. 덩이 안은 StockCell 쪽에서 nowrap 으로 묶어
       두었다 — 안 묶으면 "외 2종" 이 "외" 와 "2종" 으로 갈라진다. */
+/* ── 줄 첫머리의 **이름** — 넓은 화면에선 한 줄로 자르고, 폰에서는 접는다 ──────────
+   ⚠️⚠️ `.hz-cellsub`(보조줄) 주석과 같은 함정이다. 자르기를 인라인 style 로 주면
+        미디어쿼리를 못 이겨서 폰에서 계속 잘린다. 그래서 클래스로 둔다.
+   ⭐ 폰에서 잘리던 게 실측으로 여섯이었다(2026-08-26, 375px): 스페이스X(3px 모자람) ·
+     세레브라스(6) · 스노우플레이크(17) · 뱅크오브아메리카(13) · 마이크로소프트(15) ·
+     마이크로스트래티지(41). 티커와 '카더라 언급' 알약이 첫 줄을 먼저 먹어서 이름 몫이
+     46~70px 밖에 안 남는 게 원인이다. 아래 `.hz-cellhead` 가 알약을 아랫줄로 내보낸다. */
+.hz-cellname {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 종목 칸의 로고와 글 묶음. 넓은 화면에선 한 줄짜리라 가운데 맞춤이 맞고, 폰에서는
+   줄이 셋까지 늘어나 로고가 한가운데 떠 보이므로 아래 미디어쿼리가 위 맞춤으로 바꾼다.
+   ⚠️ 그래서 정렬을 인라인 style 로 두면 안 된다(인라인이 미디어쿼리를 이긴다). */
+.hz-cellbody-wrap {
+  align-items: center;
+}
+
 .hz-cellsub {
   min-width: 0;
   overflow: hidden;
@@ -1344,6 +1365,39 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
        ⭐ anywhere 는 **자리가 없을 때만** 낱말을 가른다 — 한글은 keep-all 이 그대로
          지키고, 넘칠 수밖에 없는 영문만 접힌다. break-all 과 달리 평소엔 아무 일도 없다. */
     overflow-wrap: anywhere;
+  }
+
+  /* 이름은 자르지 말고 접는다. 폰에서 잘려 보이던 것들이 여기서 살아난다. */
+  .hz-cellname {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    word-break: keep-all;
+    /* 한글은 keep-all 이 지키고, 칸보다 넓은 영문 한 낱말만 접힌다(.hz-cellsub 과 같은 이유). */
+    overflow-wrap: anywhere;
+  }
+
+  /* ⭐ 첫 줄(티커 + 이름 + 알약)을 **접히게** 한다. 자리가 모자라면 알약이 아래로 내려가고
+     이름이 온전히 남는다. 반대로 두면 알약이 자리를 지키고 이름이 밀린다 — 읽는 사람이
+     찾는 건 알약이 아니라 이름이다.
+
+     ⚠️ `display: block` 으로 글줄처럼 흐르게도 해 봤다. 알약이 이름 꼬리에 붙어 모양은
+        나은데, 이름 몫이 그만큼 좁아져 **한글이 낱말 가운데서 갈라졌다**("스페이/스X").
+        알약을 통째로 내려보내는 이쪽이 이름을 지킨다. 되돌리지 말 것. */
+  .hz-cellhead {
+    flex-wrap: wrap;
+    row-gap: 4px;
+    /* 접혀서 두 줄이 되면 가운데 정렬이 어색하다. 왼쪽 끝으로 세운다. */
+    align-items: flex-start;
+  }
+
+  /* 보조줄이 두 줄로 접히는 폰에서는 1px 이 너무 붙어 보인다. */
+  .hz-cellbody {
+    gap: 3px;
+  }
+  /* 줄이 세 줄까지 늘어나면 로고가 한가운데 떠 보인다. 첫 줄 옆에 세운다. */
+  .hz-cellbody-wrap {
+    align-items: flex-start;
   }
 }
 
@@ -1380,7 +1434,9 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
   .hz-sheet-head,
   .hz-sheet-foot,
   .hz-thead,
-  .hz-trow { padding-left: 16px; padding-right: 16px; }
+  /* 좌우는 좁히고 위아래는 넓힌다. 폰에서는 보조줄이 두 줄로 접혀 줄 안쪽이 60px 가까이
+     되는데(실측 78px 줄), 위아래 9px 로는 글이 테두리에 붙어 빽빽해 보였다. */
+  .hz-trow { padding: 12px 16px; }
   .hz-panelgrid { padding: 10px; gap: 10px; }
   .hz-panel-pad { padding: 16px; }
   .hz-kd-hero > * { padding: 18px 16px; }
@@ -1566,6 +1622,59 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
 .hz-totop {
   display: none;
 }
+/* 내부자 리포트 첫 카드의 맨 윗줄 밑에 한 번 뜨는 쪽지(app/insider/TapHint.tsx).
+   종목 줄이 통째로 링크라는 걸 알려 준다.
+
+   ⚠️ 처음엔 폰(≤560)에서만 띄웠다. 폰에는 hover 가 없어 링크인 줄 알 길이 없다는 게
+   근거였는데, 데스크톱에서도 그 줄이 눌린다는 걸 아는 사람이 드물어 폭 제한을 걷었다.
+   그래서 이제 **데스크톱 방문자도 이 쪽지를 소비한다** — 데스크톱에서 한 번 닫은 사람은
+   나중에 폰으로 와도 안 뜬다(예전엔 안 그랬다. TapHint.tsx 주석과 짝을 맞춰 둘 것).
+
+   색은 PC 권유 띠와 같은 반전(ink 바탕 · bg 글자)이다. 새 어법을 만들지 않으려는
+   것이고, 카드 안의 데이터 줄들과 확실히 갈려서 '이건 잠깐 뜬 안내'로 읽힌다.
+
+   ⚠️ 위치는 `position: static` 이다. 줄 사이에 **자리를 차지하고** 끼어야 아래 줄들이
+   밀려나며 "이 줄에 붙은 말"로 보인다. 띄워서 겹치면 가린 줄이 눌리지도 않는다. */
+.hz-tap-hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+  margin: 6px 0 2px;
+  padding: 8px 6px 8px 10px;
+  background: var(--c-ink);
+  color: var(--c-bg);
+  border-radius: var(--r-control);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+/* ⚠️ 위 display:flex 가 브라우저 기본 [hidden]{display:none} 을 이긴다. 선택자를 한 단
+   올려 되찾는다 — 이게 없으면 이미 본 사람에게도 쪽지가 그대로 보인다. */
+.hz-tap-hint[hidden] {
+  display: none;
+}
+/* 바로 위 줄을 가리키는 삼각 꼭지. 왼쪽에서 22px 은 종목 로고(26px) 한가운데다 —
+   "이 줄" 이 아니라 "이 종목" 을 가리키게 된다. */
+.hz-tap-hint::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: 22px;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 5px solid var(--c-ink);
+}
+.hz-tap-hint-go {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
 
 /* 히어로 패딩/gap은 여기서 관리 — 모바일에서 좁혀야 고정 300px 게이지와
    냉정/보통/과열/광기 라벨이 화면 안에 온전히 들어온다. */
@@ -1671,6 +1780,7 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
     font-weight: 600;
     line-height: 1.5;
   }
+
 
   /* '맨 위로' 버튼 — 한 화면 넘게 내려가면 오른쪽 아래에 나타난다
      (AppShell 의 useScrolledPastFold 가 .is-on 을 붙인다).
@@ -2878,6 +2988,27 @@ main.hz-scroll { overflow-x: clip; }
    "눌린다"는 신호라 거짓말이 된다. */
 .hz-nav-item.hz-tip {
   cursor: default;
+}
+
+/* 사이드바 맨 아래 텔레그램 CTA. 평소엔 옅은 하늘색 타일이고, 호버·포커스에서
+   **현재 페이지 알약과 같은 파랑**(--c-nav-active)으로 꽉 찬다. 사이드바에서 '지금 여기'를
+   칠하는 색과 같아야 이 버튼이 광고 배너가 아니라 내비게이션의 일부로 읽힌다.
+
+   ⚠️ 바탕·글자를 인라인 style 로 두면 호버가 통째로 죽는다 — 인라인이 :hover 를 이긴다
+   (바로 위 .hz-nav-item 주석과 같은 함정). 그래서 평소 값까지 여기로 내렸다. 인라인으로
+   되돌리지 말 것.
+
+   흰 글자를 얹으므로 --c-blue 가 아니라 --c-nav-active 다. 브랜드 파랑 그대로면
+   14px/700 흰 글자가 AA(4.5)를 못 넘는다(globals.css 위쪽 토큰 주석). */
+.hz-tg-cta {
+  background: var(--c-blue-tint);
+  color: var(--c-cold-ink);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.hz-tg-cta:hover,
+.hz-tg-cta:focus-visible {
+  background: var(--c-nav-active);
+  color: #ffffff;
 }
 
 /* 카더라 종목 카드 → MDD 정밀분석 링크. 카드 하단에 은근히 붙는 작은 텍스트 링크다
