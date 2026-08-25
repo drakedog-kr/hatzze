@@ -57,7 +57,7 @@ export const INSIDER_LISTS: Record<InsiderListSlug, InsiderListSpec> = {
     icon: "trending_down",
   },
   hot: {
-    title: "채팅방이 뜨거운 종목",
+    title: "커뮤니티에서 뜨거운 종목",
     sub: "주식 텔레그램에서 가장 많이 회자된 미국 종목입니다.",
     help: "언급은 하루치, 임원 신고는 최근 7일입니다. 시점이 다릅니다.",
     icon: "local_fire_department",

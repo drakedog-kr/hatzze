@@ -298,7 +298,7 @@ export default async function StockDetailPage({
       </Link>
 
       {/* ── 히어로 ──────────────────────────────────────────────────
-          세 칸 — **종목 정체 · 공시에 남은 것 · 채팅방 언급 추이.**
+          세 칸 — **종목 정체 · 공시에 남은 것 · 커뮤니티 관심 추이.**
 
           ⭐ 예전엔 첫 칸이 로고와 시세뿐이라 아래가 통째로 비었다. 주가 일봉을 이미
           받고 있으므로 **52주 위치와 기간 수익률이 공짜로 나온다** — 새 원천 없이
@@ -403,10 +403,15 @@ export default async function StockDetailPage({
                     <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub }}>{s.label}</span>
                     <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: s.n ? C.ink : C.muted }}>
                       {s.n.toLocaleString("ko-KR")}
-                      {/* 단위는 숫자와 **같은 크기, 굵기만 다르게**. 예전엔 11px/700 이라
-                          숫자와 두 단이 벌어져 "17"과 "/63명"이 다른 줄처럼 읽혔다.
+                      {/* 단위는 값보다 **한 단 아래**다 — 이 저장소가 `num()` 주석에 적어 둔
+                          규칙이고, 그 자리는 값 13 옆에 단위 12/600 이다(한 포인트 차이에
+                          굵기와 색으로 가른다). 여기도 같은 비율로 17 옆에 15/600 이다.
+                          ⚠️ 11px/700 이었다. 여섯 단이 벌어져 단위가 각주처럼 작았다.
+                          ⚠️ 그렇다고 **같은 크기로 두면 안 된다** — `num()` 주석의 경고
+                             그대로 "17"과 "/63명"이 두 덩이로 읽힌다(2026-08-26 에 해 보고
+                             되돌렸다). 크기는 붙이고 굵기·색으로 가르는 게 답이다.
                           ⚠️ `<strong>` 안이라 굵기를 안 적으면 800 을 물려받는다. */}
-                      <span style={{ fontSize: 17, fontWeight: 400, color: C.sub2, marginLeft: 2 }}>{s.unit}</span>
+                      <span style={{ fontSize: 15, fontWeight: 600, color: C.sub2, marginLeft: 2 }}>{s.unit}</span>
                     </strong>
                   </div>
                   {/* ⭐ 수 하나보다 **방향**이 말이 많다. 같은 222건이어도 무엇이었는지가 다르다. */}
@@ -421,20 +426,21 @@ export default async function StockDetailPage({
             <div style={{ padding: "22px 22px 0" }}>
               <div className="hz-kd-hero-title">
                 <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>
-                  채팅방 언급 추이
+                  커뮤니티 관심 추이
                 </span>
               </div>
               {d.trend.length === 0 ? (
                 <p style={{ margin: "10px 0 0", fontSize: T.body, color: C.sub, lineHeight: 1.7 }}>
-                  이 종목은 아직 채팅방에서 잡힌 적이 없습니다.
+                  이 종목은 아직 커뮤니티에서 잡힌 적이 없습니다.
                 </p>
               ) : (
                 <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginTop: 10, flexWrap: "wrap" }}>
                   <strong style={{ fontFamily: MONO, fontSize: 24, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
                     {d.mentionsToday}
                   </strong>
-                  {/* 위 '공시에 남은 것'의 단위와 같은 규칙 — 숫자와 같은 크기, 굵기만 다르게. */}
-                  <span style={{ fontFamily: MONO, fontSize: 24, fontWeight: 400, color: C.sub }}>회</span>
+                  {/* 위 '공시에 남은 것'의 단위와 같은 규칙 — 값보다 한 단 아래(24 → 22),
+                      굵기와 색으로 가른다. */}
+                  <span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 600, color: C.sub }}>회</span>
                   <span style={{ fontSize: T.body, color: C.sub }}>
                     {fmtDate(d.mentionDate)} 하루 · 채널 {d.channelsToday}곳 · 최근 {d.trend.length}일 최다 {peak}회
                   </span>

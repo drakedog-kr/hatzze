@@ -206,7 +206,16 @@ export default async function InsiderPage() {
   const updates = [
     { label: "임원 신고", n: ov.latestInsiderFilings.count, unit: "건", when: fmtDate(ov.latestInsiderFilings.date) },
     { label: "의원 신고", n: ov.latestCongressFilings.count, unit: "건", when: fmtDate(ov.latestCongressFilings.date) },
-    { label: "채팅방에 오른 미국 종목", n: ov.mentionedCount, unit: "개", when: fmtDate(ov.mentionDate) },
+    {
+      label: "화제 종목",
+      n: ov.mentionedCount,
+      unit: "개",
+      when: fmtDate(ov.mentionDate),
+      // ⚠️ 라벨은 형제 둘("임원 신고"·"의원 신고")과 길이를 맞춰야 한다. 예전엔
+      //    "커뮤니티에 오른 미국 종목"(14자·118px)이라 이 줄만 두 줄로 접혔고, 그 바람에
+      //    줄 높이가 달라져 오른쪽 숫자 정렬까지 어긋났다. 짧게 두고 설명은 물음표가 한다.
+      help: "그날 주식 텔레그램에서 이름이 오르내린 미국 종목 수입니다.",
+    },
   ];
 
   return (
@@ -310,8 +319,29 @@ export default async function InsiderPage() {
                     borderBottom: i === updates.length - 1 ? "none" : "1px solid var(--c-sheet-row)",
                   }}
                 >
-                  <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub, wordBreak: "keep-all", minWidth: 0 }}>
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "baseline",
+                      gap: 4,
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      color: C.sub,
+                      wordBreak: "keep-all",
+                      minWidth: 0,
+                    }}
+                  >
                     {u.label}
+                    {u.help && (
+                      <span
+                        className="hz-tip hz-tip-wide"
+                        data-tip={u.help}
+                        data-ga-tip={u.label}
+                        style={{ display: "inline-flex", alignSelf: "center", cursor: "help", flexShrink: 0 }}
+                      >
+                        <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
+                      </span>
+                    )}
                   </span>
                   <span style={{ display: "flex", alignItems: "baseline", gap: 6, flexShrink: 0 }}>
                     <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: u.n ? C.ink : C.muted }}>
@@ -523,11 +553,11 @@ export default async function InsiderPage() {
           "얼마나 회자되나"와 "거물이 들고 있나"는 같은 종목을 두 각도에서 본다. */}
       <GroupTitle>카더라에 오른 종목</GroupTitle>
       <Pair>
-{/* ── ⑤ 채팅방이 뜨거운 종목 ─────────────────────────────────── */}
+{/* ── ⑤ 커뮤니티에서 뜨거운 종목 ─────────────────────────────────── */}
       <HalfSheet>
         <SectionHead
           icon="local_fire_department"
-          title="채팅방이 뜨거운 종목"
+          title="커뮤니티에서 뜨거운 종목"
           note={insiderNote("hot", ov)}
           noteHelp={`언급은 하루치, 임원 신고는 최근 ${ov.windowDays}일입니다. 시점이 다릅니다.`}
           desc="주식 텔레그램에서 가장 많이 회자된 미국 종목입니다."

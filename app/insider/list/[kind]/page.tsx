@@ -180,7 +180,7 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
             items: wideHotRows(cut(ov.rows), ov.usdKrw),
             total: ov.rows.length,
             cols: WIDE_COLS.hot,
-            heads: ["종목", "채팅방", "시세"],
+            heads: ["종목", "커뮤니티", "시세"],
           },
         ];
       case "managers":
