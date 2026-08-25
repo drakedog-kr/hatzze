@@ -257,7 +257,7 @@ async function TrendingSection() {
       <TrendingTabs
         icon="campaign"
         title="트렌딩 메시지"
-        desc="조회·공유로 가장 널리 퍼진 메시지"
+        desc="국장 관련 글 중 조회·공유로 가장 널리 퍼진 것"
         panels={[
           { key: "today", label: "오늘", count: trendingToday.length, node: <TrendingList items={trendingToday} /> },
           { key: "w1", label: "최근 7일", count: trending.length, node: <TrendingList items={trending} /> },
@@ -509,7 +509,7 @@ export default async function KaderaPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* ── 히어로: 모니터링 25 · 센티먼트 25 · 오늘의 요약 50 ───────────── */}
+      {/* ── 히어로: 모니터링 25 · 센티먼트 25 · 오늘의 브리핑 50 ───────────── */}
       <section className="hz-sheet">
         <div className="hz-kd-hero">
           {/* ① 모니터링 현황 */}
@@ -569,7 +569,7 @@ export default async function KaderaPage() {
                 </div>
               ))}
             </div>
-            {/* 통계 넷 바로 아래. marginTop:auto 로 칸 바닥에 붙인다 — 옆 '오늘의 요약'
+            {/* 통계 넷 바로 아래. marginTop:auto 로 칸 바닥에 붙인다 — 옆 '오늘의 브리핑'
                 칸이 문단 길이만큼 늘어나면 이 칸도 같이 늘어나는데, 그때 남는 자리가
                 통계 줄 사이가 아니라 이 줄 위 한 곳에만 생긴다.
                 ⭐ 여기 있던 '채널 등록 신청'은 탑바로 옮겼다(AppShell 의 ChannelRequest).
@@ -704,7 +704,7 @@ export default async function KaderaPage() {
             )}
           </div>
 
-          {/* ③ 오늘의 요약 */}
+          {/* ③ 오늘의 브리핑 */}
           <div className="hz-kd-hero-h">
             <div className="hz-kd-hero-title">
               {/* 시장 브리핑의 '오늘의 브리핑'과 같은 표식이다 — 옅은 하늘색 타일에 앉힌
@@ -727,7 +727,7 @@ export default async function KaderaPage() {
               >
                 <AiMark size={13} style={{ alignSelf: "center" }} />
               </span>
-              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>오늘의 요약</span>
+              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>오늘의 브리핑</span>
             </div>
             {/* 높이를 안 잡는다 — 글이 3줄이면 3줄, 4줄이면 4줄로 흐른다. 길이 자체는
                 파이프라인이 잡는다(generate_telegram_narratives.py 의 BRIEF_*_LEN).
@@ -744,7 +744,7 @@ export default async function KaderaPage() {
                 /* 굵힌 낱말을 **세 문단에 걸쳐** 기억한다. 문단마다 새로 세면 반도체가
                    2문단·3문단에서 각각 한 번씩 굵어져 화면에는 두 번으로 보인다. */
                 const used = new Set<string>();
-                return (sentiment?.summary ?? "오늘의 요약을 준비하고 있습니다.")
+                return (sentiment?.summary ?? "오늘의 브리핑을 준비하고 있습니다.")
                   .split(/\n{2,}/)
                   .map((para, i) => (
                     <p key={i} style={{ margin: 0, fontSize: 14, lineHeight: 1.7, color: "var(--c-ink-soft)", textWrap: "pretty", wordBreak: "keep-all" }}>

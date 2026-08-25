@@ -405,7 +405,7 @@ export default async function UsKaderaPage() {
 
   return (
     <>
-      {/* ── 히어로: 모니터링 25 · 센티먼트 25 · 오늘의 요약 50 ─────────────
+      {/* ── 히어로: 모니터링 25 · 센티먼트 25 · 오늘의 브리핑 50 ─────────────
           국장 카더라와 같은 판이다. 셋을 시트 세 장으로 흩어 놓았다가 한 판으로 모았다 —
           셋 다 "지금 어떤 상태인가"를 말하는데 따로 서면 무엇이 머리인지가 안 보였다. */}
       <section className="hz-sheet">
@@ -507,7 +507,7 @@ export default async function UsKaderaPage() {
                 </div>
               ))}
             </div>
-            {/* 통계 넷 바로 아래. marginTop:auto 로 칸 바닥에 붙인다 — 옆 '오늘의 요약'
+            {/* 통계 넷 바로 아래. marginTop:auto 로 칸 바닥에 붙인다 — 옆 '오늘의 브리핑'
                 칸이 문단 길이만큼 늘어나면 이 칸도 같이 늘어나는데, 그때 남는 자리가
                 통계 줄 사이가 아니라 이 줄 위 한 곳에만 생긴다(국장과 같은 수법).
                 국장으로 가는 통로를 여기 두는 이유: 두 화면은 같은 채널을 사전만 바꿔
@@ -806,7 +806,7 @@ export default async function UsKaderaPage() {
             )}
           </div>
 
-          {/* ③ 오늘의 요약 */}
+          {/* ③ 오늘의 브리핑 */}
           <div className="hz-kd-hero-h">
             <div className="hz-kd-hero-title">
               {/* 시장 브리핑·국장 카더라와 같은 표식 — 옅은 하늘색 타일에 ✨.
@@ -833,14 +833,14 @@ export default async function UsKaderaPage() {
                   color: C.ink,
                 }}
               >
-                오늘의 요약
+                오늘의 브리핑
               </span>
             </div>
             {/* 높이를 안 잡는다 — 길이는 파이프라인이 잡는다(BRIEF_*_LEN). 여기서 또 자르면
                 그쪽이 망가졌을 때 화면이 조용히 문장을 먹는다. */}
             {brief.paragraphs.length === 0 ? (
               <p style={{ margin: 0, fontSize: 13, color: C.sub }}>
-                오늘의 요약을 준비하고 있습니다. 집계가 끝난 뒤 만들어집니다.
+                오늘의 브리핑을 준비하고 있습니다. 집계가 끝난 뒤 만들어집니다.
               </p>
             ) : (
               <div
@@ -1743,7 +1743,7 @@ export default async function UsKaderaPage() {
         <TrendingTabs
           icon="campaign"
           title="트렌딩 메시지"
-          desc="미국 종목을 말한 글 중 조회·공유로 가장 널리 퍼진 것"
+          desc="미장 관련 글 중 조회·공유로 가장 널리 퍼진 것"
           panels={[
             {
               key: "today",

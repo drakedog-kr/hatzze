@@ -1,5 +1,5 @@
 -- Hatzze — 마이그레이션 008: telegram_channels 테이블 추가 (카더라 리포트)
--- 분석 대상 텔레그램 채널 목록. source of truth는 Hun이 관리하는 구글시트이고,
+-- 분석 대상 텔레그램 채널 목록. source of truth는 운영자가 관리하는 구글시트이고,
 -- sync_telegram_channels.py가 시트를 읽어 이 테이블로 upsert한다. 매일 수집기
 -- (fetch_telegram_*)는 이 테이블에서 is_active=true 인 채널만 골라 메시지를 모은다.
 --
