@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { INSIDER_LISTS, INSIDER_LIST_SLUGS, insiderListHref } from "./insider/lists";
 
 import { track } from "@/lib/ga";
 import { SLOGAN } from "./brand";
@@ -169,6 +170,22 @@ const NAV: NavItem[] = [
       },
     ],
   },
+  // ⚠️ COMING_SOON 에 두지 말 것 — 본문 헤더(PageHeader)가 NAV 에서 경로를 못 찾아
+  // **제목 칸을 통째로 비운다.** 예고 시절에도 배지만 달아 NAV 에 뒀던 이유다.
+  {
+    href: "/insider",
+    label: "내부자 리포트",
+    // 아이콘은 첫 판이던 `contact_page` 로 돌아왔다. 한때 중절모·선글라스 실루엣을 직접 그려 넣었지만
+    // (얼굴을 감춘 쪽), 옆의 폰트 아이콘들과 나란히 놓고 보면 이 그림이 낫다는 판단이다.
+    icon: "contact_page",
+    // ⚠️ "채팅방에 오른 미국 종목에 남은 공시 기록" 이었다. 그 부제는 이 화면의
+    //    모집단을 **카더라 종목으로** 못 박는데, 실제로는 의원 축이 650종목을 보고
+    //    거물 축은 보유 전부(migration_051)를 본다. 부제가 화면보다 좁으면 독자가
+    //    카드 숫자를 통째로 다르게 읽는다(서학개미에서 같은 실수를 했다).
+    sub: "임원과 의원, 월가 거물이 무엇을 사고팔았나",
+    // ⚠️ `badge: "준비 중"` 이 여기 있었다. 이 줄을 지우는 것이 곧 **화면을 여는 것**이다
+    //    (사이드바에 예고로 걸어 두고 만들었다). 2026-08-26 에 뗐다.
+  },
   { href: "/mdd", label: "MDD 정밀분석", icon: "trending_down", sub: "고점에서 얼마나 내려왔고 언제 회복했을까" },
   // ⚠️ **'준비 중' 배지를 단 채로 NAV 에 있다.** 화면은 다 만들어졌지만 아직 안 열었다.
   // COMING_SOON 에 두면 본문 헤더(PageHeader)가 NAV 에서 경로를 못 찾아 **제목 칸을
@@ -218,13 +235,7 @@ const TELEGRAM = {
 // 예고 항목을 전부 목록 끝에 몰면 짝인 둘이 MDD 를 사이에 두고 떨어진다.
 // 아이콘은 NAV 항목과 같은 규칙이다 — 직접 그린 Glyph 든 Material Symbols 이름(icon)이든
 // 하나만 있으면 되고, NavGlyph 가 골라 그린다.
-const COMING_SOON: { label: string; badge: string; tip: string; after: string; icon?: string; Glyph?: Glyph }[] = [
-  // 카더라 리포트 묶음 바로 뒤에 붙인다. 이 화면은 카더라에 오른 미국 종목을 그 회사
-  // 임원의 공시(SEC Form 4)와 맞대 보는 것이라, 재료의 절반이 미장 카더라에서 온다.
-  // 아이콘은 첫 판이던 `contact_page` 로 돌아왔다. 한때 중절모·선글라스 실루엣을 직접 그려 넣었지만
-  // (얼굴을 감춘 쪽), 옆의 폰트 아이콘들과 나란히 놓고 보면 이 그림이 낫다는 판단이다.
-  { label: "내부자 리포트", badge: "준비 중", tip: "현재 열심히 개발 중입니다!", after: "/kadera", icon: "contact_page" },
-];
+const COMING_SOON: { label: string; badge: string; tip: string; after: string; icon?: string; Glyph?: Glyph }[] = [];
 
 /**
  * 사이드바·모바일 메뉴가 그리는 순서. NAV 항목 사이사이에 예고 항목을 끼운다.
@@ -356,6 +367,23 @@ function useIntentPrefetch() {
 }
 
 /** NAV 항목의 현재 페이지 판정. 사이드바와 모바일 탭바가 같은 규칙을 써야 한다. */
+/**
+ * **사이드바에 안 나오지만 자기 제목이 있어야 하는** 하위 페이지.
+ *
+ * 내부자 리포트의 전체보기 여섯 장이 그렇다. NAV 의 children 으로 넣으면 사이드바에
+ * 여섯 줄이 더 생기고, 아예 안 넣으면 PageHeader 가 부모(`/insider`)를 집어
+ * **두 페이지가 같은 h1** 을 갖는다(그 문제로 /kadera 와 /kadera/us 가 한 번 겹쳤다).
+ *
+ * 명단·문구의 원본은 `app/insider/lists.ts` 다 — 여기서 베끼지 말고 그걸 읽는다.
+ * 카드와 전체보기가 같은 말을 해야 독자가 같은 자료로 읽는다.
+ */
+const DEEP_PAGES: Record<string, { label: string; sub: string }> = Object.fromEntries(
+  INSIDER_LIST_SLUGS.map((slug) => [
+    insiderListHref(slug),
+    { label: INSIDER_LISTS[slug].title, sub: INSIDER_LISTS[slug].sub },
+  ]),
+);
+
 function isActive(href: string, pathname: string) {
   return href === "/" ? pathname === "/" : pathname.startsWith(href);
 }
@@ -530,7 +558,9 @@ function Sidebar() {
                 // 비활성일 때 background 를 인라인으로 두면(예전 "transparent") 인라인이
                 // 우선순위에서 이겨 .hz-nav-item:hover 회색 배경이 먹히지 않는다. 값을 아예
                 // 빼서 호버는 CSS 가 담당하게 한다.
-                background: active ? C.blue : undefined,
+                // ⚠️ --c-blue 가 아니라 --c-nav-active 다. 흰 글자가 얹히는 자리라 브랜드
+                // 파랑 그대로면 명암비가 4.5 에 못 미친다(globals.css 의 토큰 주석).
+                background: active ? "var(--c-nav-active)" : undefined,
                 // ⚠️ 활성 항목에 파란 그림자를 주지 않는다. 0 10px 20px 이라 **바로 아래
                 // 항목 위로 번져서**, 그 항목만 호버 배경이 푸르스름하게 도드라졌다
                 // (카더라는 볼록하고 MDD 는 평평해 보이던 원인, 2026-08-03).
@@ -756,10 +786,11 @@ function remember(name: string, value: string) {
 }
 
 /**
- * 통화 스위치 — **서학개미 해부도에서만** 뜬다.
+ * 통화 스위치 — **달러 금액을 내는 화면에서만** 뜬다(서학개미 해부도 · 내부자 리포트).
  *
- * 그 화면은 예탁원 결제(달러)와 KRX·한국은행(원)을 함께 다루는데, 원천이 준 통화를
- * 그대로 내면 한 페이지에 두 통화가 섞인다. 기본을 원화로 두고 이 스위치로 갈아 끼운다.
+ * 서학개미는 예탁원 결제(달러)와 KRX·한국은행(원)을 함께 다뤄서, 원천이 준 통화를
+ * 그대로 내면 한 페이지에 두 통화가 섞인다. 내부자 리포트는 전부 달러라 한국 독자가
+ * 크기를 가늠하기 어렵다. 둘 다 기본을 원화로 두고 이 스위치로 갈아 끼운다.
  *
  * ## ⭐ 테마 토글과 같은 수다
  *
@@ -778,9 +809,9 @@ function CurrencyToggle({ initial }: { initial: "krw" | "usd" }) {
     if (next === cur) return;
     track("currency_toggle", { to: next });
     setCur(next);
-    // 기본이 원화라 usd 일 때만 속성을 붙인다(layout.tsx 와 같은 규칙).
-    if (next === "usd") document.documentElement.setAttribute("data-cur", "usd");
-    else document.documentElement.removeAttribute("data-cur");
+    // ⚠️ 원화도 **값을 적는다**(예전엔 속성을 지웠다). 지우면 "안 고름"과 같아져서,
+    //    달러가 기본인 화면(내부자 리포트)에서 ₩ 를 눌러도 달러로 돌아간다.
+    document.documentElement.setAttribute("data-cur", next);
     remember("hz-cur", next);
   };
   return (
@@ -796,19 +827,66 @@ function CurrencyToggle({ initial }: { initial: "krw" | "usd" }) {
 }
 
 /**
- * 머리 오른쪽 도구 묶음. 통화 스위치가 **테마 단추 왼쪽**이다.
+ * 통화 스위치가 뜨는 화면과 그 화면의 **기본 통화**.
  *
- * ⚠️ 통화는 서학개미 해부도에만 있는 개념이라 경로로 가린다. 다른 화면에 두면 눌러도
- * 아무것도 안 바뀌는 단추가 된다.
+ * ⚠️ 여기 없는 화면에 스위치를 두면 눌러도 아무것도 안 바뀌는 단추가 된다.
+ * ⚠️ 기본값은 CSS 에도 적혀 있다(`[data-cur-default]`, globals.css). **두 곳이 같아야
+ *    한다** — 갈리면 서버가 그린 화면과 스위치의 눌린 칸이 어긋난다.
+ */
+const CURRENCY_PAGES: { prefix: string; fallback: "krw" | "usd" }[] = [
+  { prefix: "/seohak", fallback: "krw" },
+  // 재료가 전부 미국 공시라 달러가 원본이고, 원화는 크기를 가늠하라고 얹은 것이다.
+  { prefix: "/insider", fallback: "usd" },
+];
+
+/**
+ * 채널 등록 신청. 국장 카더라 히어로의 큰 버튼이었는데 탑바로 옮겼다 — 그 자리에는
+ * 미장으로 건너가는 통로가 서는 편이 낫다는 판단이다(kadera/page.tsx 주석 참고).
+ *
+ * ⚠️ 카더라 두 화면에서만 뜬다. 채널을 늘리는 일은 그 두 화면의 재료를 늘리는 것이라,
+ *    브리핑이나 내부자에서 권하면 맥락이 없다.
+ * ⚠️ **좁은 화면에서는 글자가 빠지고 아이콘만 남는다**(globals.css 의 .hz-topbar-cta).
+ *    글자를 단 채로 두면 320px 탑바에 90px 이 더 붙어 햄버거가 도로 밀려난다 —
+ *    그 잘림을 오늘 고쳤다.
+ */
+function ChannelRequest() {
+  return (
+    <a
+      href="https://forms.gle/PRapNH9rz8YuF2zu9"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="hz-btn-soft hz-topbar-cta"
+      title="채널 등록 신청"
+      data-ga="cta_click"
+      data-ga-cta="register_channel"
+      data-ga-surface="topbar"
+    >
+      <Icon name="add_circle" style={{ fontSize: 15 }} />
+      <span className="hz-topbar-cta-label">채널 등록 신청</span>
+    </a>
+  );
+}
+
+/**
+ * 머리 오른쪽 도구 묶음. 통화 스위치와 채널 등록 신청이 **테마 단추 왼쪽**이다.
+ *
+ * ⚠️ 통화는 **달러 금액을 내는 화면에만** 있는 개념이라 경로로 가린다. 국장 화면에
+ * 두면 눌러도 아무것도 안 바뀌는 단추가 된다.
  */
 function PageTools({ theme, currency }: {
   theme: "light" | "dark";
+  /** null = 아직 아무것도 안 골랐다. 그때는 화면의 기본값을 쓴다. */
   currency: "krw" | "usd" | null;
 }) {
   const pathname = usePathname();
   return (
     <>
-      {currency && pathname.startsWith("/seohak") && <CurrencyToggle initial={currency} />}
+      {/* 쿠키로 고른 게 없으면(null) 그 화면의 기본값을 눌린 칸으로 쓴다. */}
+      {(() => {
+        const page = CURRENCY_PAGES.find((p) => pathname.startsWith(p.prefix));
+        return page ? <CurrencyToggle key={page.prefix} initial={currency ?? page.fallback} /> : null;
+      })()}
+      {pathname.startsWith("/kadera") && <ChannelRequest />}
       <ThemeToggle initial={theme} />
     </>
   );
@@ -919,7 +997,7 @@ function ThemeToggle({ initial, variant = "icon" }: { initial: "light" | "dark";
  * 자기 제목(legal.tsx 의 DocTitle)을 갖고 있으니 여기서 보탤 것이 없다. 도구 묶음은
  * 남긴다 — 테마 토글은 어느 화면에서나 같은 자리에 있어야 한다.
  */
-function PageHeader({ theme, currency }: { theme: "light" | "dark"; currency: "krw" | "usd" }) {
+function PageHeader({ theme, currency }: { theme: "light" | "dark"; currency: "krw" | "usd" | null }) {
   const pathname = usePathname();
   const page = NAV.find((n) => isActive(n.href, pathname));
   // 서브 페이지에서는 서브의 이름을 h1 으로 쓴다. 부모(구역)의 이름을 그대로 두면
@@ -930,10 +1008,13 @@ function PageHeader({ theme, currency }: { theme: "light" | "dark"; currency: "k
   // "카더라 리포트", 사이드바에는 "국장 카더라"로 같은 페이지가 두 이름을 갖는다.
   // 주소는 그대로라 색인이 끊기지 않고 제목만 갱신된다.
   const child = page?.children?.find((c) => c.href === pathname);
-  const title = child?.label ?? page?.label;
-  const sub = child?.sub ?? page?.sub;
+  // 사이드바에 안 나오는 하위 페이지(전체보기)도 자기 제목을 쓴다. 안 그러면 부모와
+  // 같은 h1 이 된다.
+  const deep = DEEP_PAGES[pathname];
+  const title = deep?.label ?? child?.label ?? page?.label;
+  const sub = deep?.sub ?? child?.sub ?? page?.sub;
   // 배지는 부모 것이다. 서브가 물려받으면 "25개 지표" 같은 남의 표찰이 따라 붙는다.
-  const badge = child ? undefined : page?.badge;
+  const badge = deep || child ? undefined : page?.badge;
   return (
     <header className="hz-page-head">
 {/* #267 의 가드: NAV 에 없는 경로(법률 문서)에서는 제목 칸을 통째로 비운다.
@@ -992,7 +1073,7 @@ function TopBar({
   onMenuToggle,
 }: {
   theme: "light" | "dark";
-  currency: "krw" | "usd";
+  currency: "krw" | "usd" | null;
   scrolledDown: boolean;
   menuOpen: boolean;
   onMenuToggle: () => void;
@@ -1083,13 +1164,24 @@ function TopBar({
  * ⭐ 키에 **버전을 박아 둔다** — 다음에 다른 소식으로 이 띠를 되쓸 때 키만 바꾸면
  * 예전에 닫은 사람에게도 새로 뜬다. 키를 재사용하면 그 사람들은 새 소식을 못 본다.
  */
-const NEWS_KEY = "hz-news-us-kadera";
+/* ⭐ 키를 갈아 끼우는 것이 곧 **띠를 되쓰는 것**이다. 소식은 하나뿐이라 아래 여섯만 바꾸면
+   이전 소식은 사라지고 새 소식만 뜬다. 예전 소식을 닫아 둔 사람도 키가 달라져 다시 본다
+   (닫힌 표시는 옛 키에 남아 있을 뿐 새 키를 막지 않는다).
+   ⚠️ 옛 키(`hz-news-us-kadera`)를 되쓰지 말 것 — 미장을 닫았던 사람은 새 소식을 못 본다. */
+const NEWS_KEY = "hz-news-insider";
 const NEWS_EVENT = "hz-news-change";
-const NEWS_HREF = "/kadera/us";
+const NEWS_HREF = "/insider";
 /* 문구를 셋으로 나눈 건 가운데 화면 이름에만 밑줄을 긋기 위해서다 —
    띠 전체가 이미 링크지만, 눌러서 가는 곳이 **어디인지**는 이름이 말해야 한다. */
-const NEWS_NAME = "미장 카더라";
-const NEWS_TAIL = "를 열었습니다. 미국 시장에선 무엇이 화제인지 봅니다.";
+const NEWS_NAME = "내부자 리포트";
+const NEWS_TAIL = "를 열었습니다. 임원과 의원, 월가 거물이 무엇을 사고팔았는지 봅니다.";
+/* ⚠️ **아이콘과 GA 라벨도 소식마다 갈아야 한다.** 예전엔 이 둘이 본문에 박혀 있어서
+   문구만 바꾸고 넘어갔고, 내부자 소식에 미장 카더라의 자유의 여신상이 그대로 붙어
+   있었다(2026-08-26). 갈아 끼울 것을 여기 여섯으로 모아 둔다.
+   ⭐ 아이콘은 **사이드바 NAV 의 그 화면 아이콘과 같은 것**을 쓴다. 띠를 눌러 가면
+     사이드바에서 방금 본 그림이 그 자리에 켜져 있어야 같은 곳이라고 읽힌다. */
+const NEWS_ICON = "contact_page";
+const NEWS_GA = "news-insider";
 
 const newsStore = {
   subscribe(cb: () => void) {
@@ -1131,8 +1223,8 @@ function NewsStrip() {
           ⚠️ dismiss 안의 dispatchEvent 는 동기지만 React 는 이벤트 핸들러에서 나온
           상태 변경을 핸들러가 끝난 뒤로 미룬다. 그래서 이 줄이 링크를 먼저 언마운트해
           이동을 막지 않는다(브라우저에서 눌러 확인했다). */}
-      <Link href={NEWS_HREF} className="hz-news-link" data-ga-cta="news-us-kadera" onClick={dismiss}>
-        <LibertyIcon size={17} />
+      <Link href={NEWS_HREF} className="hz-news-link" data-ga-cta={NEWS_GA} onClick={dismiss}>
+        <Icon name={NEWS_ICON} style={{ fontSize: 17, flexShrink: 0 }} />
         <span className="hz-news-text">
           {/* ⚠️ <a> 안에 <a> 를 넣을 수 없다. 바깥 링크가 이미 같은 곳으로 가므로
               여기서는 **밑줄만** 긋는다 — 눌리는 건 띠 전체다. */}
@@ -1335,7 +1427,7 @@ export default function AppShell({
 }: {
   theme: "light" | "dark";
   /** 통화 스위치의 초기값(쿠키). 서학개미 해부도에서만 화면에 뜬다. */
-  currency: "krw" | "usd";
+  currency: "krw" | "usd" | null;
   children: React.ReactNode;
 }) {
   const mainRef = useRef<HTMLElement>(null);

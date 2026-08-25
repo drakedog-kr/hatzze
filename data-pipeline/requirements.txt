@@ -29,3 +29,6 @@ anthropic>=0.117,<1
 # 없으면 text_check 가 문자 검사만 하고 넘어가므로 파이프라인은 안 죽는다.
 # 현재 확인 버전 0.23.
 kiwipiepy>=0.20,<1
+# pypdf — 미 하원 PTR 신고서 PDF 에서 매매 표를 읽는다(fetch_us_congress.py).
+# 353건 중 88% 가 텍스트 PDF 라 OCR 없이 처리된다. 현재 확인 버전 6.x.
+pypdf>=6.0,<7

@@ -72,7 +72,7 @@ function mddHref(code: string, market: string | null): string {
 }
 
 /** 셀 → 그 종목의 MDD 정밀분석으로 잇는 작은 링크. */
-function MddLink({ code, market, label = "MDD 정밀분석" }: { code: string; market: string | null; label?: string }) {
+function MddLink({ code, market, label = "MDD" }: { code: string; market: string | null; label?: string }) {
   return (
     <Link href={mddHref(code, market)} className="hz-mdd-link">
       {label}
@@ -571,20 +571,21 @@ export default async function KaderaPage() {
             </div>
             {/* 통계 넷 바로 아래. marginTop:auto 로 칸 바닥에 붙인다 — 옆 '오늘의 요약'
                 칸이 문단 길이만큼 늘어나면 이 칸도 같이 늘어나는데, 그때 남는 자리가
-                통계 줄 사이가 아니라 버튼 위 한 곳에만 생긴다. */}
+                통계 줄 사이가 아니라 이 줄 위 한 곳에만 생긴다.
+                ⭐ 여기 있던 '채널 등록 신청'은 탑바로 옮겼다(AppShell 의 ChannelRequest).
+                   두 카더라는 같은 채널을 사전만 바꿔 읽은 형제라, 이 자리에는 **서로
+                   건너가는 통로**가 서는 편이 낫다. 미장 히어로가 이미 그 모양이다. */}
             <div style={{ marginTop: "auto", paddingTop: 14 }}>
-              <a
-                href="https://forms.gle/PRapNH9rz8YuF2zu9"
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                href="/kadera/us"
                 className="hz-btn-soft"
                 data-ga="cta_click"
-                data-ga-cta="register_channel"
-                data-ga-surface="channel_rank"
+                data-ga-cta="to_us_kadera"
+                data-ga-surface="kr_hero"
               >
-                <Icon name="add_circle" style={{ fontSize: 15 }} />
-                채널 등록 신청
-              </a>
+                <Icon name="swap_horiz" style={{ fontSize: 15 }} />
+                미장 카더라 보기
+              </Link>
             </div>
           </div>
 
@@ -864,7 +865,7 @@ export default async function KaderaPage() {
             </div>
             <div className="hz-sheet-foot">
               <span style={{ fontSize: 12, lineHeight: 1.6, color: C.sub }}>
-                막대는 최근 7일 일별 언급량이고, 붉은 칸이 배수를 낸 최근 창입니다 · 배수는 언급 횟수가 아니라 그날 전체 대화에서 차지한 몫을 견준 값입니다
+                막대는 최근 7일 일별 언급량이고, 붉은 칸이 배수를 낸 최근 기간입니다 · 배수는 언급 횟수가 아니라 그날 전체 대화에서 차지한 몫을 견준 값입니다
               </span>
             </div>
           </>
@@ -1126,7 +1127,7 @@ export default async function KaderaPage() {
                       언급 {r.totalMentions.toLocaleString("ko-KR")}회
                       {r.channelCount !== null && ` · ${r.channelCount}개 채널`}
                     </span>
-                    <MddLink code={r.code} market={r.market} label="MDD 정밀분석" />
+                    <MddLink code={r.code} market={r.market} />
                   </div>
                 </div>
               );
@@ -1164,7 +1165,9 @@ export default async function KaderaPage() {
                   style={{ display: "inline-flex", alignItems: "center", justifyContent: "flex-end", gap: 3, cursor: "help" }}
                 >
                   영향력
-                  <Icon name="help" style={{ fontSize: 12, color: C.hint }} />
+                  {/* ⚠️ hint 는 점선·비활성 아이콘용이다(라이트 1.49·다크 2.3). 툴팁이
+                      있다는 유일한 표시라 보여야 한다 — SectionHead 와 같은 muted. */}
+                  <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
                 </span>
               </div>
               <ExpandableList

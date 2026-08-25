@@ -53,7 +53,7 @@ export default function Loading() {
   const half: React.CSSProperties = { flex: "1 1 calc(50% - 8px)", minWidth: "min(460px, 100%)" };
   return (
     <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 16 }} aria-hidden>
-      {/* 머리 — 숫자 세 칸(무엇을 보고 있나). */}
+      {/* 머리 — 숫자 세 칸(모니터링 현황). */}
       <section className="hz-sheet">
         <SheetHead />
         <div className="hz-panelgrid hz-panelgrid-3">

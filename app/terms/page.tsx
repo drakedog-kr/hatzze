@@ -23,7 +23,7 @@ const CONTACT_EMAIL = "hatzze@proton.me";
 
 function Mail() {
   return (
-    <a href={`mailto:${CONTACT_EMAIL}`} style={{ color: C.blue, textDecoration: "none", fontWeight: 600 }}>
+    <a href={`mailto:${CONTACT_EMAIL}`} style={{ color: C.blueInk, textDecoration: "none", fontWeight: 600 }}>
       {CONTACT_EMAIL}
     </a>
   );
@@ -31,7 +31,7 @@ function Mail() {
 
 function Inner({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link href={href} style={{ color: C.blue, textDecoration: "none", fontWeight: 600 }}>
+    <Link href={href} style={{ color: C.blueInk, textDecoration: "none", fontWeight: 600 }}>
       {children}
     </Link>
   );
@@ -78,6 +78,11 @@ export default function TermsPage() {
           <li>
             <B>MDD 정밀분석</B>. 종목의 과거 최대 낙폭과 회복 기간을 보여 드립니다
           </li>
+          <li>
+            <B>내부자 리포트</B>. 미국 증권거래위원회(SEC)와 미 하원이 공개한 공시를 모아, 기업
+            임원과 하원의원, 기관투자자가 어떤 미국 종목을 사고팔았다고 신고했는지 보여 드립니다.
+            함께 증권사 애널리스트들의 투자의견 집계도 인용해 보여 드립니다
+          </li>
         </Ul>
         <P>
           서비스의 구성과 지표는 개선을 위해 바뀔 수 있습니다. 지표를 새로 넣거나 빼는 경우
@@ -102,6 +107,15 @@ export default function TermsPage() {
           <li>
             MDD 정밀분석의 과거 낙폭과 회복 기간은 지나간 기록이며, 앞으로 같은 일이 반복된다는
             근거가 아닙니다
+          </li>
+          <li>
+            내부자 리포트가 보여 드리는 것은 <B>이미 신고된 과거의 매매</B>입니다. 신고까지는
+            시차가 있어 지금의 보유 상태와 다를 수 있으며, 누가 무엇을 샀거나 팔았다는 사실이
+            그 종목에 대한 평가나 신호가 아닙니다
+          </li>
+          <li>
+            함께 싣는 애널리스트 투자의견은 <B>외부 증권사들의 의견을 집계한 것을 그대로 인용한
+            것</B>이며, 운영자의 의견이 아닙니다. 원본 그대로 옮기고 출처를 함께 적습니다
           </li>
           <li>
             서비스는 특정 이용자의 사정에 맞춘 개별적인 조언을 하지 않으며, 자본시장과 금융투자업에
@@ -146,6 +160,11 @@ export default function TermsPage() {
             점수의 눈금과 지표별 가중치는 과거 자료를 바탕으로 정한 것이라, 다시 조정되면 같은
             시장 상황에서도 점수가 달라질 수 있습니다
           </li>
+          <li>
+            공시 자료에는 <B>제도상의 시차</B>가 있습니다. 기관투자자의 보유 내역은 분기말을
+            기준으로 신고되고, 하원의원의 매매 신고에도 기한이 있습니다. 화면에 적힌 기준일보다
+            지금의 실제 상태가 앞서 있을 수 있습니다
+          </li>
         </Ul>
         <P>
           서비스는 정보를 정확하고 최신으로 유지하기 위해 노력하지만, 그 정확성·완전성·적시성을
@@ -185,7 +204,8 @@ export default function TermsPage() {
         </P>
         <P>
           다만 서비스가 이용하는 <B>원본 자료의 권리는 각 제공 기관에 있습니다.</B> 서비스의 화면에는
-          한국거래소 통계정보를 사용한 결과가 포함되어 있습니다. 원본 자료를 다시 이용하실 때에는
+          한국거래소 통계정보를 사용한 결과가 포함되어 있고, 미국 공시 자료와 애널리스트 투자의견
+          집계는 각 제공처의 조건에 따라 출처를 밝혀 인용합니다. 원본 자료를 다시 이용하실 때에는
           해당 기관이 정한 조건을 따르셔야 합니다.
         </P>
       </Section>
@@ -217,7 +237,10 @@ export default function TermsPage() {
 
       <Section title="11. 문의">
         <P>
-          약관과 서비스에 관한 문의는 <Mail /> 로 보내 주시면 답변해 드립니다.
+          {/* ⚠️ 주소 뒤에 조사를 바로 붙이면(<Mail />로) 조사가 주소의 일부처럼 읽힌다.
+              떼어 쓰는 것도 규칙에 어긋나므로, 개인정보처리방침이 URL 에 쓰는 것과 같이
+              명사를 하나 끼운다. */}
+          약관과 서비스에 관한 문의는 <Mail /> 주소로 보내 주시면 답변해 드립니다.
         </P>
       </Section>
 

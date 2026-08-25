@@ -81,10 +81,21 @@ export default async function RootLayout({
   // :root=light / [data-theme=dark]=dark 로 갈라 둬서 기본값과 무관하게 맞는다).
   const jar = await cookies();
   const theme = jar.get("hz-theme")?.value === "dark" ? "dark" : "light";
-  // 서학개미 해부도의 통화 스위치(달러/원). **기본은 원화**라 usd 일 때만 속성을 붙인다 —
-  // 값을 늘 붙이면 기본값이 두 곳(여기와 globals.css)에 적히고 언젠가 갈린다.
-  // ⚠️ 이 한 줄이 없으면 새로고침 때마다 원화로 돌아간다(쿠키만으로는 서버가 못 안다).
-  const cur = jar.get("hz-cur")?.value === "usd" ? "usd" : undefined;
+  /**
+   * 통화 스위치(달러/원). 값이 **세 가지**다.
+   *
+   *   undefined  아직 아무것도 안 골랐다 → **화면이 자기 기본값을 쓴다**
+   *   "krw"      원화를 골랐다
+   *   "usd"      달러를 골랐다
+   *
+   * ⚠️⚠️ "안 고름"과 "원화 고름"을 반드시 갈라야 한다. 예전엔 둘 다 속성 없음이라
+   *      구별이 안 됐는데, 그러면 **화면마다 기본 통화를 달리 둘 수 없다** — 내부자
+   *      리포트는 달러가 기본이고 서학개미는 원화가 기본이라 이 구분이 필요하다.
+   *      (안 가르면 /insider 에서 ₩ 를 눌러도 다시 달러로 돌아간다.)
+   * ⚠️ 이 한 줄이 없으면 새로고침 때마다 기본값으로 돌아간다(쿠키만으로는 서버가 못 안다).
+   */
+  const picked = jar.get("hz-cur")?.value;
+  const cur = picked === "usd" ? "usd" : picked === "krw" ? "krw" : undefined;
 
   return (
     <html lang="ko" data-theme={theme} data-cur={cur}
@@ -162,7 +173,9 @@ export default async function RootLayout({
           <body>에 속성을 주입해 불일치 경고를 낸다. body 자신의 속성 불일치만
           무시한다 — 내부 컴포넌트 hydration 검사에는 영향 없다. */}
       <body className="font-sans" suppressHydrationWarning>
-        <AppShell theme={theme} currency={cur === "usd" ? "usd" : "krw"}>
+        {/* ⚠️ 여기서 "krw" 로 떨어뜨리면 안 된다 — 셸이 "안 고름"을 못 알아채고
+            화면별 기본 통화가 죽는다. undefined 를 그대로 넘긴다. */}
+        <AppShell theme={theme} currency={cur ?? null}>
           {children}
         </AppShell>
       </body>

@@ -52,6 +52,15 @@
      파랑 램프(--c-blue-2)는 여전히 #3d9cf5 다. 저건 순서를 명도로 말하는 데이터용
      눈금이라 브랜드색과 다른 물건이고, 화면에서 둘이 붙는 자리도 없다(전수 확인). */
   --c-blue: #3182f6;
+  /* 사이드바에서 **지금 보고 있는 항목**의 파란 알약. 브랜드 파랑(--c-blue)보다 한 단
+     어둡다 — 그 위에 흰 글자가 얹히는 유일한 자리라서다.
+     ⚠️⚠️ --c-blue 를 그대로 쓰면 흰 글자가 **AA 를 못 넘는다**(라이트 3.71 · 다크 3.57,
+     14px/700 이라 4.5 가 필요하다). 사이트 전체에서 유일하게 남아 있던 명암비 결함이고,
+     모든 화면의 주 내비게이션이라 매 페이지에 있었다(2026-08-25 실측).
+     ⭐ 값은 브랜드 파랑을 **같은 색상으로 어둡게만** 내려 4.6 이 되는 지점을 이분탐색으로
+       찾은 것이다. 색상을 바꾸지 않으므로 알약이 브랜드 파랑과 다른 색으로 보이지 않는다.
+     ⛔ 링크·강조에는 쓰지 말 것. 저기는 --c-blue 가 바탕이 아니라 글자색이라 셈이 다르다. */
+  --c-nav-active: #2b73da;
 
   /* 온도 4구간을 **면으로** 칠하는 두 벌. 위의 잉크(--c-cold ~ --c-mania)와 다른 물건이다 —
      저건 글자로 읽는 색이고 이건 칠하는 색이다.
@@ -281,6 +290,8 @@
   --c-hot: #fa616d;
   --c-mania: #fa616d;
   --c-blue: #3485fa;
+  /* 위 라이트 정의의 다크 짝. 같은 방식으로 잰 값이다. */
+  --c-nav-active: #2d73d8;
 
   /* 카드(#202027) 위 명암비 12.7 / 9.2 / 6.1 / 4.7 / 4.0 / 2.7 (hint 는 라이트와 같은 이유로 장식 전용).
      ink 를 순백(#fff)으로 두지 않는 이유: 이 변수는 큰 숫자뿐 아니라 AI 요약 같은
@@ -961,6 +972,36 @@ body {
   background: var(--c-title-band);
   border-bottom: 1px solid var(--c-sheet-line);
 }
+/* 머리의 글 칸(제목 + 설명). 넓을 땐 남는 자리를 다 먹는다(basis 0). */
+.hz-sheet-head-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+/* 우측에 조작부(기간 탭)가 붙는 머리. 탭이 커서 폭 하한을 더 넉넉히 준다. */
+.hz-sheet-head-txt-wide {
+  flex: 1 1 200px;
+}
+/* ⚠️⚠️ **좁은 화면에서는 알약을 아랫줄로 내린다.**
+   알약은 flexShrink:0 · white-space:nowrap 이라 절대 안 줄어든다. 그래서 자리가 모자라면
+   줄어들 수 있는 쪽인 글 칸이 혼자 다 내주고, 제목과 설명이 세로로 길게 접힌다. 실측:
+   375px 내부자 전체보기에서 머리 331 중 알약 190 → **글 칸 71px**(제목 2줄·설명 5줄),
+   320px 서학개미에서 머리 276 중 **글 칸 88px**(설명 3줄 이상).
+   ⭐ 넘치는 게 아니라 눌리는 것이라 `scrollWidth > clientWidth` 검사에는 **0건**으로
+     잡힌다. 줄 수를 세야 보인다.
+   ⭐ basis 150 은 제목 한 줄 + 설명 두 줄이 읽히는 하한이다. 이보다 좁아질 상황이면
+     알약을 내려보내고 글 칸이 머리 전체를 쓴다. */
+@media (max-width: 560px) {
+  .hz-sheet-head {
+    flex-wrap: wrap;
+  }
+  .hz-sheet-head-txt,
+  .hz-sheet-head-txt-wide {
+    flex: 1 1 150px;
+  }
+}
 /* 시트 바닥 각주 띠. 각주는 시트 밖(회색 바탕)이 아니라 안에 둔다 — 밖에 두면
    '이 시트에 딸린 말'이 아니라 다음 섹션의 머리처럼 읽힌다.
 
@@ -1275,6 +1316,35 @@ body {
 div > .hz-trow:last-child, /* 상자로 감싼 목록 — 이슈 키워드 */
 li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워 랭킹 */
   border-bottom: 0;
+}
+
+/* ── 줄의 보조줄 — 넓은 화면에선 한 줄로 자르고, 폰에서는 접는다 ──────────
+   ⚠️⚠️ 자르기(overflow·text-overflow·white-space)를 **인라인 style 로 주면 안 된다.**
+        인라인은 미디어쿼리를 못 이겨서, 폰에서 접으려 해도 계속 잘린다. 실제로 그것 때문에
+        임원 목록 열 줄 중 여섯 줄에서 꼬리의 날짜가 통째로 사라졌고, 두 줄은 **"8/…" 로
+        반쯤 잘린 채** 남았다 — 없느니만 못한 꼴이다(2026-08-23 실측, 375px).
+   ⭐ 접힘은 ` · ` 덩이 경계에서만 일어난다. 덩이 안은 StockCell 쪽에서 nowrap 으로 묶어
+      두었다 — 안 묶으면 "외 2종" 이 "외" 와 "2종" 으로 갈라진다. */
+.hz-cellsub {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 560px) {
+  .hz-cellsub {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    /* 낱말 안에서 갈라지는 것만 막는다. 덩이 단위 보호는 SubLine 쪽 nowrap 이 한다. */
+    word-break: keep-all;
+    /* ⚠️⚠️ keep-all 만으로는 **영문 한 낱말이 칸보다 넓을 때 빠져나간다.** 이 표엔 증권사
+       이름이 들어와서(Oppenheimer 83px) 320px 화면의 54px 칸을 그대로 넘어 옆 칸 위로
+       흘렀다(2026-08-25 실측). overflow 가 visible 이라 잘리지도 않고 겹친다.
+       ⭐ anywhere 는 **자리가 없을 때만** 낱말을 가른다 — 한글은 keep-all 이 그대로
+         지키고, 넘칠 수밖에 없는 영문만 접힌다. break-all 과 달리 평소엔 아무 일도 없다. */
+    overflow-wrap: anywhere;
+  }
 }
 
 /* 목록 맨 아랫줄의 '더 보기 / 접기'. 테두리 없는 줄이라 눌리는 자리라는 걸 호버가 말한다
@@ -1842,6 +1912,258 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
    여는 것은 탭이 맡는다(app/TipTap.tsx — 터치엔 호버가 없다). */
 .mdd-crosshair-zoom { display: flex !important; }
 
+/* ── 내부자 리포트 차트: 호버 띠와 마커 필터 ────────────────────────
+   호버 띠는 MDD 크로스헤어와 같은 어법이다(.hz-vline 이 실제 선을 그린다).
+   여기서는 띠를 가로로 펴 놓기만 한다. 폰에서는 끈다 — 툴팁이 시트에 잘려 안 읽힌다. */
+.hz-xhair { display: flex; }
+@media (max-width: 640px) {
+  .hz-xhair { display: none; }
+}
+
+/* 마커 필터 — **라디오 + CSS 만으로** 만든다. 리액트 상태로 두면 차트가 클라이언트
+   컴포넌트가 되고 일봉 130개가 통째로 번들을 탄다.
+
+   ## ⚠️⚠️ `:has()` 를 쓰지 말 것 — 규칙이 통째로 사라진다
+
+   처음엔 `.hz-mkfilter:has(#…:checked) .hz-mk:not(…)` 였다. 셀렉터는 맞고
+   `querySelectorAll` 로 17개가 잡히는데 **opacity 가 안 바뀌었다.** 원인은
+   **Lightning CSS 가 같은 선언을 가진 셀렉터 셋을 `:is(A, B, C)` 로 합치는 것**이고,
+   브라우저는 `:is()` 안의 `:has()` 를 거부해 규칙 전체를 버린다. 서빙되는 .css 파일에는
+   멀쩡히 들어 있어서 파일만 봐서는 안 보인다 — `document.styleSheets` 를 뒤져야 없는 게
+   보인다. (같은 도구가 box-shadow 의 var() 층도 조용히 지운 적이 있다.)
+
+   그래서 **형제 선택자(`~`)** 로 간다. 라디오가 차트 상자보다 앞에 있으면 된다.
+
+   ⚠️ 안 고른 축을 **지우지 않고 흐린다.** 지우면 남은 점의 자리가 그대로라 "이 종목엔
+      이것뿐"으로 읽힌다. 흐리면 전체 안에서의 몫이 보인다.
+   ⚠️ 라디오는 숨기되 **display:none 은 쓰지 않는다** — 키보드 초점을 잃어 탭으로 못 고른다. */
+.hz-mkfilter > input[type="radio"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.hz-mkfilter-set { display: inline-flex; gap: 4px; }
+.hz-mkfilter-set label {
+  display: inline-flex;
+  align-items: center;
+  /* 색 점과 글자 사이. 배지가 곧 범례라 점이 안에 들어온다. */
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--c-line);
+  background: var(--c-card);
+  color: var(--c-sub);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.hz-mkfilter-set label:hover { background: var(--c-chip); }
+
+/* ── 반쪽 카드의 세 칸 줄 ──────────────────────────────────────────
+   이름 · 한 줄 설명 · 값. 넓은 표(.hz-wide)와 같은 문법을 폭만 줄여 쓴다.
+
+   ⚠️ 두 칸으로 두면 사실이 오른쪽에 쌓인다. 실제로 그렇게 갔다가 금액·주식 수·날짜
+      셋이 오른쪽 끝에 붙어 **해독해야 읽히는 덩어리**가 됐다. 칸을 하나 더 내주고
+      칸마다 하나씩만 두는 편이 같은 정보를 훨씬 빨리 읽힌다.
+
+   ⚠️ 값 칸의 폭을 못박지 말 것 — 원화로 바꾸면 "$1K~$15K" 가 "142만원~2,121만원" 으로
+      두 배가 된다. 하한만 주고 위는 열어 둔다. */
+.hz-halfrow {
+  /* ⚠️⚠️ **설명 칸을 fr 로 두지 말 것.** 이름이 73~165px 로 들쭉날쭉해서, 이름 칸을
+     fr 로 잡으면 짧은 이름 뒤에 빈 자리가 남고 설명이 **양옆이 빈 채 가운데에 떠 보인다.**
+     실제로 그렇게 뒀다가 "가운데 위치가 안 어울린다"는 말을 들었다.
+
+     대신 설명을 auto 로 두고 오른쪽으로 붙인다. 그러면 빈 자리가 **이름 뒤 한 군데로
+     모이고**, 설명의 오른쪽 끝과 값의 오른쪽 끝이 각각 세로로 선다. 줄이 "이름 …
+     무엇을 언제 · 얼마"로 읽힌다.
+
+     ⚠️ 이름이 넘치면 이름이 잘린다(블랙스톤의 51자짜리 펀드 이름). 그게 맞는 순서다 —
+        설명·금액을 지키고 이름을 줄여야지, 반대로 가면 무슨 거래인지가 사라진다.
+
+     ⚠️ 값 칸에 96px 하한을 둔다. 한 줄은 저마다 독립된 격자라, 하한이 없으면 "$27K"
+        줄과 "673,200주" 줄의 칸 폭이 달라져 **설명의 오른쪽 끝이 줄마다 어긋난다.**
+        실측 대부분의 값이 96px 안에 들어와 이 하한 하나로 카드 전체가 나란히 선다. */
+  grid-template-columns: minmax(0, 1fr) auto minmax(96px, auto);
+}
+.hz-halfrow > *:nth-child(2) {
+  text-align: right;
+  /* 값과 사이를 한 칸 더 벌린다. 격자 간격 12px 만으로는 "8/11 접수 673,200주" 가
+     한 덩이로 붙어 읽힌다. */
+  padding-right: 14px;
+}
+
+/* 카드가 한 폭을 다 쓰는 좁은 화면에서는 가운데 칸이 뭉개진다. 설명을 이름 아래로
+   내리고 값만 오른쪽에 남긴다(.hz-wide 가 980 아래에서 하는 것과 같은 접기다). */
+@media (max-width: 560px) {
+  .hz-halfrow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 3px;
+  }
+  .hz-halfrow > *:nth-child(2) {
+    grid-column: 1;
+    /* 이름 아래로 내려오면 이름과 왼쪽 끝을 맞춘다 — 오른쪽 정렬이면 허공에 뜬다. */
+    text-align: left;
+    padding-right: 0;
+  }
+}
+
+/* ── 애널리스트 의견 한 줄 ────────────────────────────────────────
+   증권사·애널리스트 | 행동·등급 | 목표가. 반쪽 카드 줄(.hz-halfrow)과 같은 문법인데,
+   여기는 왼쪽이 두 줄이다 — 증권사와 애널리스트 이름을 한 줄에 이으면 40자를 넘긴다
+   ("Bank of America Securities · Wamsi Mohan"). 이름이 주인공이 아니라 **증권사**가
+   주인공이라 그쪽을 위에 세운다.
+   ⚠️ 마지막 줄의 밑선은 지운다 — 그 아래가 출처 문구라 선이 두 겹으로 보인다. */
+.hz-actionrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) auto minmax(96px, auto);
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--c-sheet-row);
+}
+.hz-actionrow:last-child { border-bottom: 0; }
+/* ⚠️ 아주 좁은 화면에서는 **이름 칸이 먼저 무너진다.** 목표가 칸이 96px 고정이고 등급
+   칸이 내용 폭이라, 줄어들 수 있는 건 이름 칸뿐이다. 320px 에서 65px 까지 내려가
+   증권사 이름이 세 줄로 접혔다(2026-08-25 실측).
+   ⭐ 문턱 344 는 재서 잡았다 — 이름 한 줄에 필요한 90px 을 주려면 줄 폭이 257 이어야 하고,
+     이 표의 줄 폭은 화면 폭 − 88 이라 345 부터 여유가 생긴다. **360·375 는 이미 이름이
+     한 줄이라 건드리지 않는다**(안드로이드 다수가 360 이다).
+   ⭐ 접는 방식은 '이름 한 줄 + 등급·목표가 한 줄'이다. 등급과 목표가는 짧아서 둘이
+     한 줄에 마주 보면 오히려 읽기 쉽다. */
+@media (max-width: 344px) {
+  .hz-actionrow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 3px;
+  }
+  .hz-actionrow > :first-child {
+    grid-column: 1 / -1;
+  }
+  .hz-actionrow > :nth-child(2) {
+    justify-content: flex-start;
+  }
+}
+
+/* ── 52주 위치 막대 ────────────────────────────────────────────────
+   ⚠️ **채우는 막대가 아니라 노브 하나다.** 저점부터 채우면 "얼마나 올랐나"로 읽히는데
+   이 값은 그게 아니라 **1년 범위 안 어디에 서 있나**다. 트랙은 회색으로 두고 점만 찍는다. */
+.hz-range {
+  position: relative;
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--c-track), var(--c-bar));
+}
+.hz-range-knob {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  border-radius: 50%;
+  background: var(--c-blue);
+  /* 카드색 링 — 트랙 위에 얹혀도 점의 경계가 산다. */
+  box-shadow: 0 0 0 2px var(--c-card);
+  transform: translateY(-50%);
+}
+
+/* ── 전체보기의 넓은 줄 ────────────────────────────────────────────
+   ⚠️ 전체보기는 시트가 페이지 폭을 다 쓴다(1440px 에서 1,164). 메인 카드의 두 칸짜리
+   줄(왼쪽 종목 · 오른쪽 값)을 그대로 쓰면 **가운데가 통째로 빈다** — 실측 68~75%가
+   흰 여백이었다. 그래서 같은 내용을 여러 칸으로 편다.
+
+   ⚠️ 열 머리(.hz-thead)와 데이터 행(.hz-trow)이 **같은 grid-template-columns** 를
+      인라인으로 받는다. 한쪽만 고치면 칸이 어긋난다.
+
+   ## ⚠️ 좁아지면 칸을 접는다
+
+   980 아래에서는 다섯 칸이 뭉개진다(종목 이름과 사람 이름이 같은 줄에 있어 먼저
+   잘린다). 그 폭에서는 **열 머리를 감추고** 줄을 두 칸으로 되돌린다 — 가운데 칸들은
+   줄바꿈되어 종목 아래로 흐른다. 메인 카드의 줄과 같은 모양이 된다. */
+@media (max-width: 979px) {
+  .hz-wide-head { display: none; }
+  .hz-wide {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    row-gap: 4px;
+  }
+  /* 가운데 칸들은 왼쪽 아래로 내려 붙는다. 오른쪽 정렬을 풀지 않으면 허공에 뜬다. */
+  .hz-wide > *:not(:first-child):not(:last-child) {
+    grid-column: 1;
+    text-align: left !important;
+    justify-content: flex-start !important;
+  }
+}
+
+/* 기간 선택 — 축 필터와 **같은 생김새**다. 한 줄에 나란히 서는 두 조작부가 서로 다르게
+   보이면 무엇이 무엇인지 매번 확인해야 한다. 다만 이쪽은 라디오가 아니라 **링크**다
+   (주소에 담아 서버가 그린다). */
+.hz-periodset { display: inline-flex; gap: 4px; }
+.hz-periodset a {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--c-line);
+  background: var(--c-card);
+  color: var(--c-sub);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.hz-periodset a:hover { background: var(--c-chip); }
+.hz-periodset a.is-on {
+  background: var(--c-blue-tint);
+  border-color: transparent;
+  color: var(--c-cold-ink);
+}
+
+.hz-mk { transition: opacity 0.15s ease; }
+
+/* ── 마커 호버 자리 ────────────────────────────────────────────────
+   차트 마커 위에 얹는 **HTML 점**. SVG 요소는 `::after` 를 안 그려서 이 화면의 말풍선을
+   못 붙이는데, 그렇다고 차트를 클라이언트 컴포넌트로 만들 수는 없다(일봉이 통째로 번들을
+   탄다). 그래서 자리마다 투명한 점을 하나 얹고 그게 호버와 말풍선을 받는다.
+
+   ⚠️ 눈에 보이는 고리는 SVG 쪽이다. 여기서는 **테두리 한 겹으로 불만 켠다** — 크기를
+      바꾸면 중심이 그대로여도 고리가 커졌다 작아졌다 해서 선에서 떠 보인다. */
+.hz-mkspot {
+  /* ⛔⛔ transform 을 쓰지 말 것. transform 이 걸린 요소는 `position: fixed` 자손의
+     **컨테이닝 블록**이 되는데, 이 화면의 말풍선은 시트의 overflow:hidden 을 피하려고
+     fixed 로 서 있다(아래 앵커 위치지정 블록). translate 로 가운데를 맞췄더니 말풍선이
+     다시 카드 경계에서 잘렸다 — 가운데 맞추기는 left/top 에서 절반을 빼서 한다. */
+  border-radius: 50%;
+  cursor: default;
+  /* 켜지기 전에는 아무것도 안 그린다 — 마커 위에 얇은 막이 하나 더 있으면 안 된다. */
+  box-shadow: 0 0 0 0 transparent;
+  transition: box-shadow 0.12s ease, background 0.12s ease;
+}
+/* 켜진 마커 — 카드색 틈 한 겹을 두고 축 색 고리를 두른다. 옅은 그림자 하나로는 겹친
+   마커 사이에서 어느 것이 켜졌는지 안 보인다. */
+.hz-mkspot:hover {
+  box-shadow:
+    0 0 0 2px var(--c-card),
+    0 0 0 4px color-mix(in srgb, var(--mk) 60%, transparent);
+}
+
+/* 고른 배지에 불을 켜고, 그 축이 아닌 마커를 흐린다. 축마다 두 줄씩 — 셀렉터가 서로
+   달라 Lightning CSS 가 합칠 수 없고, 합쳐도 `~` 는 `:is()` 안에서 멀쩡하다. */
+#hz-mkf-insider:checked ~ * .hz-mkfilter-set label[data-k="insider"],
+#hz-mkf-manager:checked ~ * .hz-mkfilter-set label[data-k="manager"],
+#hz-mkf-congress:checked ~ * .hz-mkfilter-set label[data-k="congress"],
+#hz-mkf-all:checked ~ * .hz-mkfilter-set label[data-k="all"] {
+  background: var(--c-blue-tint);
+  border-color: transparent;
+  color: var(--c-cold-ink);
+}
+#hz-mkf-insider:checked ~ .hz-mkfilter-chart .hz-mk:not(.hz-mk-insider) { opacity: 0.12; }
+#hz-mkf-manager:checked ~ .hz-mkfilter-chart .hz-mk:not(.hz-mk-manager) { opacity: 0.12; }
+#hz-mkf-congress:checked ~ .hz-mkfilter-chart .hz-mk:not(.hz-mk-congress) { opacity: 0.12; }
+
+/* 초점 링 — 라디오를 숨겼으니 라벨이 대신 받는다. 안 그리면 키보드로 어디 있는지 모른다. */
+.hz-mkfilter > input[type="radio"]:focus-visible ~ * .hz-mkfilter-set label { outline: 1px dashed var(--c-blue); }
+
 /* 로딩 자리표시자 — 결과와 같은 골격으로 은은하게 깜빡인다(레이아웃이 튀지 않게). */
 @keyframes hz-shimmer {
   0%, 100% { opacity: 1; }
@@ -2051,7 +2373,14 @@ main.hz-scroll { overflow-x: clip; }
 /* 긴 설명용 — 줄바꿈 허용 + 너비 제한 */
 .hz-tip-wide::after {
   white-space: normal;
-  width: 240px;
+  /* ⚠️ `width: 240px` 고정이었다. 그러면 글이 짧아도 상자가 안 줄어들어 **오른쪽에
+     빈 자리가 남는다** — "오늘 주식 텔레그램에서 언급된 종목입니다"(글자 198px)가
+     240px 상자에 들어가 24px 이 비었다(2026-08-26 실측).
+     ⭐ 아래 좁은 화면 규칙이 이미 쓰던 어법으로 맞춘다: 짧으면 글자만큼, 길면
+       상한에 걸려 줄바꿈. `max-content` 는 nowrap 이 아니라 **줄바꿈 없이 필요한 폭**
+       이라, white-space:normal 과 함께 두면 max-width 가 실제 상한이 된다. */
+  width: max-content;
+  max-width: 240px;
   text-align: left;
 }
 /* 좁은 화면에선 240px 가 카드보다 넓어, 안쪽으로 열어도(start/end) 화면을 넘는다.
@@ -2067,7 +2396,8 @@ main.hz-scroll { overflow-x: clip; }
     max-width: 58vw;
   }
   .hz-tip-wide::after {
-    width: min(240px, 58vw);
+    /* 위 .hz-tip::after 가 이미 width:max-content 라 상한만 좁히면 된다. */
+    max-width: min(240px, 58vw);
   }
 }
 
@@ -3082,13 +3412,24 @@ main.hz-scroll { overflow-x: clip; }
    서버 컴포넌트라, 통화를 리액트 상태로 두면 그 전부를 클라이언트로 끌어와야 한다.
    테마와 같은 수다 — 뿌리의 data-* 하나로 전역이 바뀐다.
 
-   ⚠️ 기본값(속성 없음)이 **원화**다. 서버가 그린 첫 화면과 쿠키가 어긋나 깜빡이지
-   않도록, 쿠키가 usd 일 때만 layout 이 속성을 붙인다.
+   ⚠️ 속성 값이 **세 가지**다 — 없음(아직 안 고름) · krw · usd. "안 고름"을 원화와
+   갈라 두는 이유는 **화면마다 기본 통화가 다르기 때문**이다(서학개미는 원화, 내부자
+   리포트는 달러). 안 가르면 달러 기본 화면에서 ₩ 를 눌러도 달러로 돌아간다.
    ⚠️ display 를 none 으로 둔다(visibility 가 아니라). 자리를 먹으면 표 칸이 두 배가 된다. */
 :root[data-cur="usd"] .hz-krw,
 :root:not([data-cur="usd"]) .hz-usd {
   display: none;
 }
+
+/* 화면이 정하는 기본 통화. **쿠키로 고른 게 없을 때만** 걸린다(`:not([data-cur])`).
+   한 번이라도 스위치를 누르면 그 선택이 온 사이트에 걸리고 이 규칙은 비켜난다.
+
+   ⚠️ 특이도로 위 규칙을 이겨야 한다 — 위가 (0,2,1), 여기는 클래스가 하나 더 붙어
+      (0,3,1) 이다. 순서가 아니라 특이도로 이기는 것이라 위아래를 바꿔도 안전하다.
+   ⚠️ `display: revert` 다. `inline` 으로 못박으면 SVG `<text>` 축 라벨이 깨진다 —
+      같은 클래스를 span 과 SVG text 가 함께 쓴다. */
+:root:not([data-cur]) [data-cur-default="usd"] .hz-krw { display: none; }
+:root:not([data-cur]) [data-cur-default="usd"] .hz-usd { display: revert; }
 
 /* 스위치 자체 — 두 칸짜리 알약. 테마 단추와 높이(38)를 맞춘다. */
 .hz-cur-switch {
@@ -3204,4 +3545,84 @@ main.hz-scroll { overflow-x: clip; }
     flex-basis: 100%;
     margin-left: 0;
   }
+}
+
+/* ── 아주 좁은 화면(≤360)의 탑바 ────────────────────────────────────────────
+   ⚠️⚠️ **320px 에서 햄버거가 화면 밖으로 14px 나가 눌리지 않았다**(2026-08-25 실측).
+   본문(.hz-main)이 overflow-x:hidden 이라 가로 스크롤도 안 생겨서, 페이지 넘침 검사에는
+   0건으로 잡힌다 — **잘린 채 조용히 못 쓰게 된다.** 메뉴가 안 열리므로 미관이 아니라
+   기능 결함이다.
+
+   실측한 셈: 320 − 좌우 패딩 32 = 288 이 전부인데, 로고 묶음이 124(hatzze 96 + 5 + 배지
+   30·min-content 라 더 못 준다), 오른쪽 묶음이 162(통화 70 + 8 + 테마 38 + 8 + 메뉴 38)
+   이라 사이 gap 16 까지 334 를 요구했다.
+
+   ⭐ 배지를 숨기면 35 가 한 번에 빠지지만, ≤560 에서는 사이드바가 없어 **'베타'가 화면
+     어디에도 안 남는다.** 대신 여백만 줄인다 — 좌우 패딩 8 + gap 8 = 16. 글자는 하나도
+     안 줄인다. 320 에서 통화 스위치까지 있는 /insider 가 6px, 없는 화면이 12px 남는다.
+   ⚠️ 통화 칩(.hz-cur-switch > button)의 좌우 패딩을 줄이는 건 **효과가 없다** — 글자가
+     한 자라 `min-width:30px` 이 이미 이기고 있어서, 패딩을 4 로 낮춰도 폭이 70 그대로다.
+     한 번 넣었다가 실측하고 뺐다.
+   ⭐ 문턱이 360 인 것은 그 아래가 실제로 쓰이는 폭이라서다 — 갤럭시 폴드 커버(280),
+     아이폰 SE 1세대(320). 360·375 는 이미 여유가 16px 이상이라 손대지 않는다. */
+@media (max-width: 360px) {
+  .hz-topbar {
+    padding: 0 12px;
+    gap: 8px;
+  }
+}
+
+/* 푸터 '데이터 출처' 두 칸. 넓을 땐 내용에 맞춰 두 칸(auto), 좁으면 한 칸으로 접는다.
+   ⚠️ 칸마다 min-width:140 이 있어야 출처 이름이 낱말 단위로 안 부서진다. 그런데 그
+   최소값 둘과 gap 32 를 더하면 312 라, 320px 화면(쓸 수 있는 폭 278)에서 넘쳤다.
+   ⭐ 문턱을 360 으로 둔 건 375 에서 이미 두 칸이 150.5px 씩 들어가기 때문이다 —
+     경계를 그 아래에 둬야 멀쩡한 폭을 건드리지 않는다. */
+.hz-foot-sources {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 12px 32px;
+}
+.hz-foot-sources > * {
+  min-width: 140px;
+}
+@media (max-width: 360px) {
+  .hz-foot-sources {
+    grid-template-columns: 1fr;
+  }
+  .hz-foot-sources > * {
+    min-width: 0;
+  }
+}
+
+/* 탑바의 '채널 등록 신청'. `hz-btn-soft` 를 그대로 쓰되 좌우 여백만 준다.
+   ⚠️ **좁은 화면에서는 글자를 뺀다.** 탑바는 320px 에서 여유가 6px 밖에 안 남는
+   자리라(햄버거가 잘려 못 누르던 것을 오늘 고쳤다), 90px 짜리 글자를 달고 있으면
+   그 수리가 그대로 무효가 된다. 아이콘만 남기고 정사각으로 줄인다 — 접근성 이름은
+   `title` 이 들고 있어 스크린리더에서는 그대로 읽힌다. */
+.hz-topbar-cta {
+  padding: 0 12px;
+  flex-shrink: 0;
+}
+@media (max-width: 560px) {
+  .hz-topbar-cta {
+    width: 38px;
+    padding: 0;
+  }
+  /* ⚠️ `> span` 으로 잡으면 **아이콘까지 사라진다** — Icon 도 span 이라 형제로 걸린다.
+     빈 네모만 남았다(2026-08-25 실측). 라벨만 골라야 한다. */
+  .hz-topbar-cta-label {
+    display: none;
+  }
+}
+
+/* 다크에서 종목 로고 타일의 **경계를 살린다.**
+   타일 색은 그림 가장자리에서 뽑아 쓰는데(StockLogo 의 readBandColor), 스페이스X·디웨이브
+   처럼 바탕이 검은 로고는 그 색이 다크 페이지와 거의 같아진다 — 실측 대비 1.1 로, 타일이
+   있는지 없는지 분간이 안 되고 한 줄에 선 로고들의 크기가 들쭉날쭉해 보인다(35개 중 3개).
+   ⚠️ 마스크(squircle)가 border 를 잘라내므로 **inset box-shadow** 로 준다. 마스크 안쪽을
+   따라 그려져서 모서리 모양이 그대로 유지된다.
+   ⚠️ var() 를 쓰지 않는다 — Lightning CSS 가 box-shadow 안의 var() 층을 지운 전례가 있다. */
+:root[data-theme="dark"] .hz-stock-logo,
+:root[data-theme="dark"] .hz-stock-badge {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
 }

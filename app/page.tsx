@@ -629,7 +629,9 @@ function Hero({
   // 나오는데 화면에는 68과 65가 떠 있으므로 눈에 보이는 두 숫자의 차이와 어긋난다.
   const delta = dailyScore.prevDay === null ? null : temp - Math.round(dailyScore.prevDay.score);
   // 전일 대비는 알약이 아니라 글자 색으로만 말한다(콘솔 리디자인) — 그래서 tint 가 없다.
-  const deltaColor = delta === null || delta === 0 ? C.sub2 : delta > 0 ? C.mania : C.blue;
+  // ⚠️ 내려간 쪽 색이 C.blue 였다. 원색은 **면**에 쓰는 값이라 흰 카드 위 글자로는
+  //    3.71 이다(11.5px/800 이라 4.5 가 필요하다). 파란 글자는 C.blueInk 다 — 5.23.
+  const deltaColor = delta === null || delta === 0 ? C.sub2 : delta > 0 ? C.mania : C.blueInk;
   const deltaText = delta === null ? "—" : delta === 0 ? "—" : `${delta > 0 ? "▲" : "▼"}${Math.abs(delta)}`;
   const deltaLabel = compareLabel(dailyScore.date, dailyScore.prevDay?.date ?? null);
 
@@ -1832,7 +1834,11 @@ function CardDivergence({ v }: { v: Pick }) {
               style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 700, color: C.sub2 }}
             >
               {t.label}
-              {t.tip && <Icon name="help" style={{ fontSize: 13, color: C.hint }} />}
+              {/* ⚠️ `C.hint` 였다. 그 토큰은 **점선·비활성 아이콘**용이라 명암비가 라이트
+                  1.49 · 다크 2.3 으로, 그림에 요구되는 3:1 에도 못 미친다. 이 물음표는
+                  장식이 아니라 **툴팁이 있다는 유일한 표시**라 안 보이면 기능이 사라진다.
+                  시트 머리(kadera/SectionHead)가 같은 이유로 이미 muted 로 옮겼다. */}
+              {t.tip && <Icon name="help" style={{ fontSize: 13, color: C.muted }} />}
             </span>
             <span style={{ fontSize: 11.5, color: C.muted }}>{t.hint}</span>
             {/* 색은 값이 아니라 **그 값이 뜻하는 과열도**(heat)로 낸다 — 위 주석 참고.

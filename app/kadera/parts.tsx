@@ -82,9 +82,21 @@ export function Pill({
     tone === "blue" ? "var(--c-blue-tint)" : tone === "hot" ? "var(--c-hot-tint)" : tone === "cold" ? "var(--c-cold-tint)" : C.chip;
   const fg =
     tone === "blue" || tone === "cold" ? "var(--c-cold-ink)" : tone === "hot" ? "var(--c-hot-ink)" : C.sub;
+  /**
+   * ⚠️⚠️ **브라우저 기본 `title` 을 쓰지 않는다.** 그건 OS 가 1초쯤 늦춰 띄우고 CSS 로
+   * 줄일 방법이 없다. 이 저장소는 자기 툴팁(`.hz-tip` + `data-tip`)이 있고 그쪽은
+   * opacity 0.12초라 사실상 즉시 뜬다. 알약만 기본 title 이라 혼자 늦었다
+   * (2026-08-26 에 "1초 넘게 기다려야 뜬다"는 지적을 받았다).
+   *
+   * ⭐ 긴 글은 `hz-tip-wide` 로 접는다. 기본 `.hz-tip::after` 는 `white-space: nowrap`
+   *   이라 29자짜리가 310px 한 줄이 되어 폰에서 화면을 넘는다. 문턱 16자는 이 저장소가
+   *   쓰는 두 갈래(짧은 라벨 vs 설명문)를 가르는 자리다.
+   */
+  const tip = title ? (title.length > 16 ? "hz-tip hz-tip-wide" : "hz-tip") : undefined;
   return (
     <span
-      title={title}
+      className={tip}
+      data-tip={title}
       style={{
         display: "inline-flex",
         alignItems: "center",

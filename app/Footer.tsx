@@ -43,6 +43,16 @@ const SOURCE_GROUPS: { label: string; items: string }[] = [
      FRED 는 **원/달러 환율(DEXKOUS)만** 받는다 — 나스닥·S&P 같은 벤더 지수는 안 쓴다
      (그쪽은 FRED 를 거쳐도 벤더 약관을 따른다. lib/seohak-external.ts 머리말 참고). */
   { label: "거시·경제통계", items: "한국은행(ECOS) · 미 연준(FRED)" },
+  /* 내부자 리포트가 여기서 나온다. 셋 다 이름을 적어야 하는 원천이다.
+       SEC EDGAR — 임원 Form 4 · 월가 거물 13F
+       미 하원    — STOCK Act 매매 신고(PTR)
+       ⚠️⚠️ stockanalysis.com 은 **약관이 출처 표기를 조건으로** 발췌를 허용한다
+            ("do not modify the content and clearly state where you got it from").
+            카드 안 문구는 짧게 줄였으니, 이름이 남는 곳은 여기뿐이다 — 지우지 말 것.
+            ⚠️ 한때 "stockanalysis.com(S&P Global)" 로 둘을 같이 적었다. 밝혀야 하는 건
+               **받아 온 곳**이라 앞의 것만 남긴다 — S&P Global 은 그 위의 집계 주체이지
+               우리가 약관을 맺은 상대가 아니고, 그 사실은 카드 물음표가 말한다. */
+  { label: "미국 공시·전망", items: "SEC EDGAR · 미 하원 · stockanalysis.com" },
   { label: "검색·뉴스", items: "네이버 · 유튜브" },
   { label: "커뮤니티·소비", items: "텔레그램 · 디시인사이드 · 알라딘" },
   { label: "가상자산·기타", items: "업비트 · GitHub · 앱스토어" },
@@ -176,11 +186,12 @@ export default function Footer() {
                 사이드바(AppShell 의 NAV)와 같게 둔다. */}
             <FooterLink href="/kadera">국장 카더라</FooterLink>
             <FooterLink href="/kadera/us">미장 카더라</FooterLink>
+            {/* ⚠️ 이 줄이 빠져 있었다. 화면을 여는 날(2026-08-26)에야 드러났는데, 예고
+                시절엔 '준비 중'이라 없는 게 맞았고 그 뒤로 아무도 다시 안 봤다.
+                ⭐ **여는 순간 고칠 곳이 NAV 의 badge 한 줄만은 아니다** — 푸터의 이
+                목록도 사이드바를 그대로 따라야 한다(바로 위 주석의 규칙). */}
+            <FooterLink href="/insider">내부자 리포트</FooterLink>
             <FooterLink href="/mdd">MDD 정밀분석</FooterLink>
-            {/* ⚠️ 사이드바에서는 이 항목만 '준비 중' 배지를 달고 있는데(AppShell 의 NAV)
-                푸터에는 배지 자리가 없다. 그대로 둔다 — 푸터는 **목적지 목록**이라
-                상태를 말하는 자리가 아니고, 배지를 뗄 때 고칠 곳이 늘어나면 한쪽만
-                남는다. 여는 날 지울 것은 NAV 의 badge 한 줄뿐이다. */}
             <FooterLink href="/seohak">서학개미 해부도</FooterLink>
             {/* 사이드바가 모바일에서 숨겨져 텔레그램 링크가 사라진다 — 내부 내비게이션과
                 같은 방식으로 푸터에 두어 좁은 화면에서도 닿게 한다. 라벨과 aria 는
@@ -192,9 +203,14 @@ export default function Footer() {
           </nav>
           <div>
             <GroupLabel>데이터 출처</GroupLabel>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, auto)", gap: "12px 32px" }}>
+            {/* ⚠️⚠️ 조판을 인라인이 아니라 **클래스**로 둔다. 칸 최소 140 × 2 + gap 32 = 312 를
+                요구하는데 320px 화면에서 쓸 수 있는 폭은 278 이라 24 가 넘쳤고, 본문이
+                overflow-x:hidden 이라 **가로 스크롤도 없이 그냥 잘렸다**(2026-08-25 실측).
+                인라인 style 은 미디어쿼리가 못 이기므로 좁은 폭에서 한 칸으로 접으려면
+                여기 있으면 안 된다(globals.css 의 .hz-foot-sources). */}
+            <div className="hz-foot-sources">
               {SOURCE_GROUPS.map((g) => (
-                <div key={g.label} style={{ minWidth: 140 }}>
+                <div key={g.label}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: C.ink, marginBottom: 3 }}>{g.label}</div>
                   <div style={{ fontSize: 12, lineHeight: 1.55, color: C.sub }}>{g.items}</div>
                 </div>
