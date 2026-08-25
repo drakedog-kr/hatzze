@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 
 import { Icon, R } from "../ui";
@@ -96,7 +95,7 @@ function markSeen(id: string) {
   window.dispatchEvent(new Event(EVENT));
 }
 
-export function TapHint({ id, href, text }: { id: string; href: string; text: string }) {
+export function TapHint({ id, text }: { id: string; text: string }) {
   const store = storeFor(id);
   const show = useSyncExternalStore(store.subscribe, store.getSnapshot, () => false);
   const ref = useRef<HTMLLIElement>(null);
@@ -118,34 +117,35 @@ export function TapHint({ id, href, text }: { id: string; href: string; text: st
 
   return (
     // ⚠️ `hidden` 이지 `return null` 이 아니다. 이유는 파일 머리 주석의 '하나'.
-    <li ref={ref} className="hz-tap-hint" hidden={!show}>
-      {/* 쪽지 자체를 링크로 둔다. "누르라"고 적어 놓고 정작 쪽지를 누르면 아무 일도 없으면
-          그게 더 헷갈린다. 목적지는 바로 위 줄과 같은 종목이다. */}
-      <Link href={href} onClick={() => markSeen(id)} className="hz-tap-hint-go">
+    // ⚠️ 바깥 <li> 는 **높이 0 인 자리표시자**다. 목록의 칸을 차지하면 아래 줄들이 통째로
+    //    밀려 내려가 화면이 덜컹인다. 실제 쪽지는 안쪽 상자가 띄워서 그린다.
+    <li ref={ref} className="hz-tap-hint-slot" hidden={!show}>
+      <div className="hz-tap-hint">
         <Icon name="arrow_upward" style={{ fontSize: 16, flexShrink: 0 }} />
         <span style={{ flex: 1, wordBreak: "keep-all" }}>{text}</span>
-      </Link>
-      <button
-        type="button"
-        onClick={() => markSeen(id)}
-        aria-label="닫기"
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-          width: 24,
-          height: 24,
-          borderRadius: R.control,
-          border: "none",
-          background: "transparent",
-          color: "inherit",
-          opacity: 0.7,
-          cursor: "pointer",
-        }}
-      >
-        <Icon name="close" style={{ fontSize: 16 }} />
-      </button>
+        <button
+          type="button"
+          className="hz-tap-hint-x"
+          onClick={() => markSeen(id)}
+          aria-label="닫기"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+            width: 24,
+            height: 24,
+            borderRadius: R.control,
+            border: "none",
+            background: "transparent",
+            color: "inherit",
+            opacity: 0.7,
+            cursor: "pointer",
+          }}
+        >
+          <Icon name="close" style={{ fontSize: 16 }} />
+        </button>
+      </div>
     </li>
   );
 }

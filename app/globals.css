@@ -1651,12 +1651,32 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
 
    ⚠️ 위치는 `position: static` 이다. 줄 사이에 **자리를 차지하고** 끼어야 아래 줄들이
    밀려나며 "이 줄에 붙은 말"로 보인다. 띄워서 겹치면 가린 줄이 눌리지도 않는다. */
+/* ⭐ 목록의 칸을 **안 차지한다.** 자리를 먹으면 아래 줄들이 통째로 밀려 내려가 화면이
+   덜컹인다(실측 78px 짜리 줄 하나만큼). 높이 0 인 자리표시자만 두고 쪽지는 그 위에 띄운다.
+   ⚠️ 그러면 가려진 줄이 안 눌리므로 손가락을 **통과**시킨다. 닫기 ✕ 만 되돌려 받는다
+      (아래 .hz-tap-hint-x). 가려진 줄을 누르면 그대로 그 종목으로 가고, 그 순간 쪽지도
+      '봤음' 으로 적혀 사라진다. */
+.hz-tap-hint-slot {
+  position: relative;
+  height: 0;
+  pointer-events: none;
+}
+.hz-tap-hint-slot[hidden] {
+  display: none;
+}
+.hz-tap-hint-x {
+  pointer-events: auto;
+}
 .hz-tap-hint {
   display: flex;
   align-items: center;
   gap: 4px;
-  position: relative;
-  margin: 6px 0 2px;
+  /* 자리표시자(높이 0) 기준으로 띄운다. top 6 은 윗줄과 살짝 떨어뜨리는 값이다. */
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 6px;
+  z-index: 1;
   padding: 8px 6px 8px 10px;
   background: var(--c-ink);
   color: var(--c-bg);
@@ -1665,30 +1685,16 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
   font-weight: 600;
   line-height: 1.45;
 }
-/* ⚠️ 위 display:flex 가 브라우저 기본 [hidden]{display:none} 을 이긴다. 선택자를 한 단
-   올려 되찾는다 — 이게 없으면 이미 본 사람에게도 쪽지가 그대로 보인다. */
-.hz-tap-hint[hidden] {
-  display: none;
-}
-/* 바로 위 줄을 가리키는 삼각 꼭지. 왼쪽에서 22px 은 종목 로고(26px) 한가운데다 —
-   "이 줄" 이 아니라 "이 종목" 을 가리키게 된다. */
+/* 바로 위 줄을 가리키는 삼각 꼭지. 쪽지가 left 8 에서 시작하므로 14 를 더하면 화면 기준
+   22px — 종목 로고(26px) 한가운데다. "이 줄" 이 아니라 "이 종목" 을 가리키게 된다. */
 .hz-tap-hint::before {
   content: "";
   position: absolute;
   top: -5px;
-  left: 22px;
+  left: 14px;
   border-left: 5px solid transparent;
   border-right: 5px solid transparent;
   border-bottom: 5px solid var(--c-ink);
-}
-.hz-tap-hint-go {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  flex: 1;
-  min-width: 0;
-  color: inherit;
-  text-decoration: none;
 }
 
 
