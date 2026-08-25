@@ -444,8 +444,9 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
                 "ticker,filing_count,txn_count,buy_count,sell_count,option_count,other_count,person_count,latest_filed_date",
               )
               .eq("as_of_date", asOf)
-              // 블록이 읽는 값이라 **짧은 창**이다. 규모(scale.officers)는 창과 무관하게
-              // us_insider_txn 전체에서 세므로 여기 영향을 안 받는다.
+              // 블록이 읽는 값이라 **짧은 창**이다. 규모(scale.officers)는 90일 창을
+              // 따로 걸어 us_insider_txn 에서 세므로 여기 영향을 안 받는다.
+              // (한때 창 없이 표 전체를 세어 30% 부풀었다 — officerCount 주석 참고.)
               .eq("window_days", INSIDER_RECENT_DAYS),
           { onError: (e) => console.error("[insider] 공시 집계 조회 실패", e) },
         )

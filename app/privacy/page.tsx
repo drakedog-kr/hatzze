@@ -147,7 +147,7 @@ export default function PrivacyPage() {
             이 사이트에서만 수집을 원하지 않으시면{" "}
             <b style={{ color: C.ink }}>hatzze.fun/?ga=off</b> 주소로 한 번 접속해 주십시오. 해당 기기에서는
             이후 수집이 이루어지지 않습니다. 되돌리시려면{" "}
-            <b style={{ color: C.ink }}>hatzze.fun/?ga=on</b> 으로 접속하시면 됩니다.
+            <b style={{ color: C.ink }}>hatzze.fun/?ga=on</b> 주소로 접속하시면 됩니다.
           </li>
         </Ul>
       </Section>
