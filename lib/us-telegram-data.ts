@@ -80,8 +80,11 @@ export type UsSurgingStock = {
  * 종목이 있어서다(버크셔 BRK → BRK-B). MDD 와 같은 함수를 쓰면 두 화면이 같은 종목에
  * 같은 심볼을 쓴다 — 한쪽만 예외를 알면 카드에는 시세가 뜨는데 MDD 는 못 여는 식이 된다.
  * 15분 재검증을 걸어 같은 티커 반복 조회의 야후 왕복을 줄인다.
+ *
+ * ⚠️ 내부자 리포트(lib/insider-data.ts)도 이 함수를 쓴다. 두 화면이 **같은 심볼 규칙과
+ * 같은 캐시**를 타야 한 종목이 한쪽에서만 시세가 뜨는 일이 없다. 고칠 때 둘 다 볼 것.
  */
-async function usQuotes(tickers: string[]): Promise<Map<string, { price: number; changeRate: number | null }>> {
+export async function usQuotes(tickers: string[]): Promise<Map<string, { price: number; changeRate: number | null }>> {
   const out = new Map<string, { price: number; changeRate: number | null }>();
   const got = await Promise.all(
     tickers.map(async (t) => {

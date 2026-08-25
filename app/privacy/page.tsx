@@ -184,7 +184,7 @@ export default function PrivacyPage() {
           heading="문의처"
           rows={[
             ["책임자", "hatzze 운영자"],
-            ["이메일", <a key="m" href={`mailto:${CONTACT_EMAIL}`} style={{ color: C.blue, textDecoration: "none", fontWeight: 600 }}>{CONTACT_EMAIL}</a>],
+            ["이메일", <a key="m" href={`mailto:${CONTACT_EMAIL}`} style={{ color: C.blueInk, textDecoration: "none", fontWeight: 600 }}>{CONTACT_EMAIL}</a>],
           ]}
         />
         <P>개인정보와 관련한 문의·불만·피해구제에 관한 사항을 접수하시면 지체 없이 답변해 드립니다.</P>

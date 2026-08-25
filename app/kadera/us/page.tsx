@@ -87,15 +87,27 @@ function fmtPrice(n: number, _market: "US"): string {
  * 지수(^GSPC)·통화 표기(USD)를 한꺼번에 가른다.
  * 테마 비교도 붙는다(2026-08-12) — lib/us-stock-themes.ts 를 만들면서 풀렸다.
  */
-function UsMddLink({
-  ticker,
-  label = "MDD 정밀분석",
-}: {
-  ticker: string;
-  label?: string;
-}) {
+function UsMddLink({ ticker, label = "MDD" }: { ticker: string; label?: string }) {
   return (
     <Link href={`/mdd?code=${ticker}&market=US`} className="hz-mdd-link">
+      {label}
+      <Icon name="arrow_outward" style={{ fontSize: 13 }} />
+    </Link>
+  );
+}
+
+/**
+ * 그 종목의 **내부자 리포트 상세**로 잇는 링크. 옆의 MDD 링크와 한 벌이다.
+ *
+ * ⭐ 라벨이 "내부자 리포트"가 아니라 **"공시"** 인 것은 옆의 "MDD"와 무게를 맞추기
+ *    위해서다. 둘은 나란히 서는 형제라 한쪽만 길면 저울이 기운다. 두 글자로 줄이면서도
+ *    틀릴 수가 없는 말을 고른 것이다 — 저 화면의 제목이 "○○(TICK) 내부자 공시" 다.
+ * ⭐ 조건을 안 건다. 카더라에 오른 종목은 언급 기록이 있어 상세가 404 로 안 떨어진다 —
+ *    실측으로 이 화면에 뜨는 88종목 전부 200 이다(2026-08-23).
+ */
+function UsInsiderLink({ ticker, label = "공시" }: { ticker: string; label?: string }) {
+  return (
+    <Link href={`/insider/stock/${encodeURIComponent(ticker)}`} className="hz-mdd-link">
       {label}
       <Icon name="arrow_outward" style={{ fontSize: 13 }} />
     </Link>
@@ -1083,7 +1095,8 @@ export default async function UsKaderaPage() {
                       </span>
                     )}
                     <span style={{ flex: 1 }} />
-                    <UsMddLink ticker={s.ticker} label="MDD" />
+                    <UsMddLink ticker={s.ticker} />
+                    <UsInsiderLink ticker={s.ticker} />
                   </div>
                 </div>
               );
@@ -1092,7 +1105,7 @@ export default async function UsKaderaPage() {
         )}
         <div className="hz-sheet-foot">
           <span style={{ fontSize: 11.5, lineHeight: 1.6, color: C.sub }}>
-            막대는 최근 7일 일별 언급량이고, 붉은 칸이 배수를 낸 최근 창입니다 ·
+            막대는 최근 7일 일별 언급량이고, 붉은 칸이 배수를 낸 최근 기간입니다 ·
             배수는 언급 횟수가 아니라 그날 전체 대화에서 차지한 몫을 견준
             값입니다
           </span>
@@ -1684,8 +1697,12 @@ export default async function UsKaderaPage() {
                     </p>
                   )}
 
-                  {/* 표본 크기는 왼쪽 아래, MDD 링크는 오른쪽 아래. 한 줄에 마주 보게 두면
-                      "이 리포트가 몇 건을 봤나"와 "더 파고들기"가 같은 높이에서 끝난다. */}
+                  {/* 표본 크기는 왼쪽 아래, 나가는 링크는 오른쪽 아래. 한 줄에 마주 보게 두면
+                      "이 리포트가 몇 건을 봤나"와 "더 파고들기"가 같은 높이에서 끝난다.
+                      ⚠️⚠️ 링크 둘을 **한 겹으로 묶어야 한다.** `space-between` 은 자식을
+                      고르게 벌리므로, 링크를 나란히 두면 자식이 셋이 되어 **MDD 가 줄
+                      한가운데로 떠 버린다**(2026-08-23 에 실제로 그랬다). 묶으면 다시
+                      "표본 ↔ 링크 묶음" 둘만 마주 본다. */}
                   <div
                     style={{
                       marginTop: "auto",
@@ -1707,7 +1724,10 @@ export default async function UsKaderaPage() {
                       언급 {r.recentMentions.toLocaleString("ko-KR")}회
                       {r.channelCount !== null && ` · ${r.channelCount}개 채널`}
                     </span>
-                    <UsMddLink ticker={r.ticker} />
+                    <span style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+                      <UsMddLink ticker={r.ticker} />
+                      <UsInsiderLink ticker={r.ticker} />
+                    </span>
                   </div>
                 </div>
               );

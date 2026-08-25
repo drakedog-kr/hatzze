@@ -43,6 +43,16 @@ const SOURCE_GROUPS: { label: string; items: string }[] = [
      FRED 는 **원/달러 환율(DEXKOUS)만** 받는다 — 나스닥·S&P 같은 벤더 지수는 안 쓴다
      (그쪽은 FRED 를 거쳐도 벤더 약관을 따른다. lib/seohak-external.ts 머리말 참고). */
   { label: "거시·경제통계", items: "한국은행(ECOS) · 미 연준(FRED)" },
+  /* 내부자 리포트가 여기서 나온다. 셋 다 이름을 적어야 하는 원천이다.
+       SEC EDGAR — 임원 Form 4 · 월가 거물 13F
+       미 하원    — STOCK Act 매매 신고(PTR)
+       ⚠️⚠️ stockanalysis.com 은 **약관이 출처 표기를 조건으로** 발췌를 허용한다
+            ("do not modify the content and clearly state where you got it from").
+            카드 안 문구는 짧게 줄였으니, 이름이 남는 곳은 여기뿐이다 — 지우지 말 것.
+            ⚠️ 한때 "stockanalysis.com(S&P Global)" 로 둘을 같이 적었다. 밝혀야 하는 건
+               **받아 온 곳**이라 앞의 것만 남긴다 — S&P Global 은 그 위의 집계 주체이지
+               우리가 약관을 맺은 상대가 아니고, 그 사실은 카드 물음표가 말한다. */
+  { label: "미국 공시·전망", items: "SEC EDGAR · 미 하원 · stockanalysis.com" },
   { label: "검색·뉴스", items: "네이버 · 유튜브" },
   { label: "커뮤니티·소비", items: "텔레그램 · 디시인사이드 · 알라딘" },
   { label: "가상자산·기타", items: "업비트 · GitHub · 앱스토어" },
@@ -192,9 +202,14 @@ export default function Footer() {
           </nav>
           <div>
             <GroupLabel>데이터 출처</GroupLabel>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, auto)", gap: "12px 32px" }}>
+            {/* ⚠️⚠️ 조판을 인라인이 아니라 **클래스**로 둔다. 칸 최소 140 × 2 + gap 32 = 312 를
+                요구하는데 320px 화면에서 쓸 수 있는 폭은 278 이라 24 가 넘쳤고, 본문이
+                overflow-x:hidden 이라 **가로 스크롤도 없이 그냥 잘렸다**(2026-08-25 실측).
+                인라인 style 은 미디어쿼리가 못 이기므로 좁은 폭에서 한 칸으로 접으려면
+                여기 있으면 안 된다(globals.css 의 .hz-foot-sources). */}
+            <div className="hz-foot-sources">
               {SOURCE_GROUPS.map((g) => (
-                <div key={g.label} style={{ minWidth: 140 }}>
+                <div key={g.label}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: C.ink, marginBottom: 3 }}>{g.label}</div>
                   <div style={{ fontSize: 12, lineHeight: 1.55, color: C.sub }}>{g.items}</div>
                 </div>

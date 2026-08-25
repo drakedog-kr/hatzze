@@ -58,7 +58,9 @@ export default function ChangelogPage() {
                   style={{
                     fontSize: 11,
                     fontWeight: 700,
-                    color: C.blue,
+                    // ⚠️ C.blue 는 **면**에 쓰는 원색이라 파란 tint 위 글자로는 3.3 이다.
+                    //    파란 글자 전용 값(blueInk)은 같은 tint 위에서 4.66 이다.
+                    color: C.blueInk,
                     background: "var(--c-blue-tint)",
                     borderRadius: 999,
                     padding: "2px 8px",

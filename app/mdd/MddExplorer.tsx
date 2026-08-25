@@ -851,8 +851,10 @@ function MeterRow({
         >
           {label}
         </span>
+        {/* ⚠️ 아래 물음표 색이 hint 였다 — 점선·비활성 아이콘용 토큰이라 라이트 1.49 ·
+            다크 2.3 이다. 툴팁이 있다는 유일한 표시라 SectionHead 와 같은 muted 로 맞춘다. */}
         {help && (
-          <span className="hz-tip hz-tip-wide" data-tip={help} style={{ flexShrink: 0, display: "inline-flex", cursor: "help", color: C.hint }}>
+          <span className="hz-tip hz-tip-wide" data-tip={help} style={{ flexShrink: 0, display: "inline-flex", cursor: "help", color: C.muted }}>
             <Icon name="help" style={{ fontSize: 13 }} />
           </span>
         )}

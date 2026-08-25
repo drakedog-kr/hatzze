@@ -40,10 +40,20 @@ export function SectionHead({
   right?: React.ReactNode;
 }) {
   return (
-    <div className="hz-sheet-head" style={{ flexWrap: right ? "wrap" : "nowrap" }}>
+    /* ⚠️⚠️ **좁은 화면에서는 줄바꿈이 켜져야 한다**(globals.css 의 ≤560 규칙). 알약은
+       flexShrink:0 · whiteSpace:nowrap 이라 절대 안 줄어들어서, 자리가 모자라면 **줄어들
+       수 있는 쪽인 글 칸이 혼자 다 내준다.** 375px 전체보기에서 머리 331 중 알약이 190 을
+       먹고 글 칸에 71px 만 남아 제목 두 줄·설명 다섯 줄이 됐고, 320px 에서는 서학개미
+       머리까지 같은 꼴이 됐다(2026-08-25 실측). 넘치는 게 아니라 **눌리는** 것이라
+       가로 스크롤 검사에는 0건으로 잡힌다.
+       ⚠️ 여기서 nowrap 을 인라인으로 도로 박지 말 것 — 인라인은 미디어쿼리를 이긴다. */
+    <div className="hz-sheet-head" style={right ? { flexWrap: "wrap" } : undefined}>
       {/* marginTop:1 — 18px 아이콘의 광학 중심을 13px 제목 첫 줄에 맞춘다. */}
       <Icon name={icon} style={{ fontSize: 18, color: C.muted, marginTop: 1, flexShrink: 0 }} />
-      <div style={{ display: "flex", flexDirection: "column", gap: 3, flex: right ? "1 1 200px" : 1, minWidth: 0 }}>
+      {/* ⚠️ flex 를 인라인으로 두지 말 것. 좁은 화면에서 basis 를 줘야(≤560 에서 150px)
+          "그 아래로 눌리느니 알약을 아랫줄로 내린다"가 성립하는데, 인라인이면 그 규칙이
+          안 먹는다. basis 0(`flex:1`)이면 글 칸이 끝없이 눌린다. */}
+      <div className={`hz-sheet-head-txt${right ? " hz-sheet-head-txt-wide" : ""}`}>
         {/* 800 → 700. 13px 에 800 은 획이 붙어 도리어 흐릿해 보였다. 크기를 올리고
             굵기를 한 단 내린다 — 커진 만큼 무게는 이미 붙는다. */}
         <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: C.ink, letterSpacing: "-.01em", wordBreak: "keep-all" }}>
@@ -61,6 +71,9 @@ export function SectionHead({
         <span
           style={{
             flexShrink: 0,
+            // 아랫줄로 내려간 경우 오른쪽 끝에 붙는다. 같은 줄일 때는 앞 칸이 이미
+            // 자라 있어 아무 영향이 없다(right 가지가 쓰는 규칙과 같다).
+            marginLeft: "auto",
             display: "inline-flex",
             alignItems: "center",
             gap: 4,

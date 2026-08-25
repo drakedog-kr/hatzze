@@ -82,7 +82,10 @@ export function InfoBlock({ heading, rows }: { heading: string; rows: [string, R
 
 export function Ext({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: C.blue, textDecoration: "none", fontWeight: 600 }}>
+    /* ⚠️ C.blue 가 아니라 C.blueInk 다. 원색은 면(막대·알약 바탕)에 쓰는 값이라 흰 바탕
+       위 글자로는 3.71 밖에 안 나온다 — 이 저장소가 ui.tsx 주석에 이미 적어 둔 규칙인데
+       법률 페이지의 바깥 링크만 원색으로 남아 있었다(2026-08-25 실측). */
+    <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: C.blueInk, textDecoration: "none", fontWeight: 600 }}>
       {children}
     </a>
   );
