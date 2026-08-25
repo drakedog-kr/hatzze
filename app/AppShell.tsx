@@ -840,7 +840,35 @@ const CURRENCY_PAGES: { prefix: string; fallback: "krw" | "usd" }[] = [
 ];
 
 /**
- * 머리 오른쪽 도구 묶음. 통화 스위치가 **테마 단추 왼쪽**이다.
+ * 채널 등록 신청. 국장 카더라 히어로의 큰 버튼이었는데 탑바로 옮겼다 — 그 자리에는
+ * 미장으로 건너가는 통로가 서는 편이 낫다는 판단이다(kadera/page.tsx 주석 참고).
+ *
+ * ⚠️ 카더라 두 화면에서만 뜬다. 채널을 늘리는 일은 그 두 화면의 재료를 늘리는 것이라,
+ *    브리핑이나 내부자에서 권하면 맥락이 없다.
+ * ⚠️ **좁은 화면에서는 글자가 빠지고 아이콘만 남는다**(globals.css 의 .hz-topbar-cta).
+ *    글자를 단 채로 두면 320px 탑바에 90px 이 더 붙어 햄버거가 도로 밀려난다 —
+ *    그 잘림을 오늘 고쳤다.
+ */
+function ChannelRequest() {
+  return (
+    <a
+      href="https://forms.gle/PRapNH9rz8YuF2zu9"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="hz-btn-soft hz-topbar-cta"
+      title="채널 등록 신청"
+      data-ga="cta_click"
+      data-ga-cta="register_channel"
+      data-ga-surface="topbar"
+    >
+      <Icon name="add_circle" style={{ fontSize: 15 }} />
+      <span className="hz-topbar-cta-label">채널 등록 신청</span>
+    </a>
+  );
+}
+
+/**
+ * 머리 오른쪽 도구 묶음. 통화 스위치와 채널 등록 신청이 **테마 단추 왼쪽**이다.
  *
  * ⚠️ 통화는 **달러 금액을 내는 화면에만** 있는 개념이라 경로로 가린다. 국장 화면에
  * 두면 눌러도 아무것도 안 바뀌는 단추가 된다.
@@ -858,6 +886,7 @@ function PageTools({ theme, currency }: {
         const page = CURRENCY_PAGES.find((p) => pathname.startsWith(p.prefix));
         return page ? <CurrencyToggle key={page.prefix} initial={currency ?? page.fallback} /> : null;
       })()}
+      {pathname.startsWith("/kadera") && <ChannelRequest />}
       <ThemeToggle initial={theme} />
     </>
   );

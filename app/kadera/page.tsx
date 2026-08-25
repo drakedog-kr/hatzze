@@ -571,20 +571,21 @@ export default async function KaderaPage() {
             </div>
             {/* 통계 넷 바로 아래. marginTop:auto 로 칸 바닥에 붙인다 — 옆 '오늘의 요약'
                 칸이 문단 길이만큼 늘어나면 이 칸도 같이 늘어나는데, 그때 남는 자리가
-                통계 줄 사이가 아니라 버튼 위 한 곳에만 생긴다. */}
+                통계 줄 사이가 아니라 이 줄 위 한 곳에만 생긴다.
+                ⭐ 여기 있던 '채널 등록 신청'은 탑바로 옮겼다(AppShell 의 ChannelRequest).
+                   두 카더라는 같은 채널을 사전만 바꿔 읽은 형제라, 이 자리에는 **서로
+                   건너가는 통로**가 서는 편이 낫다. 미장 히어로가 이미 그 모양이다. */}
             <div style={{ marginTop: "auto", paddingTop: 14 }}>
-              <a
-                href="https://forms.gle/PRapNH9rz8YuF2zu9"
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                href="/kadera/us"
                 className="hz-btn-soft"
                 data-ga="cta_click"
-                data-ga-cta="register_channel"
-                data-ga-surface="channel_rank"
+                data-ga-cta="to_us_kadera"
+                data-ga-surface="kr_hero"
               >
-                <Icon name="add_circle" style={{ fontSize: 15 }} />
-                채널 등록 신청
-              </a>
+                <Icon name="swap_horiz" style={{ fontSize: 15 }} />
+                미장 카더라 보기
+              </Link>
             </div>
           </div>
 
