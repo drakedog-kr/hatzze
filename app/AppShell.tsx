@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { track } from "@/lib/ga";
+import { SLOGAN } from "./brand";
 import { C, Icon, R } from "./ui";
 import { BetaBadge, LogoLockup } from "./Logo";
 import Footer from "./Footer";
@@ -397,7 +398,7 @@ function Sidebar() {
           <BetaBadge logoSize={30} style={{ height: "auto", fontSize: 10, padding: "3px 7px", lineHeight: 1.4 }} />
         </LogoTag>
         <p style={{ margin: "8px 0 0", fontSize: 11, fontWeight: 600, color: C.sub, letterSpacing: "0.02em", lineHeight: 1.5 }}>
-          데이터와 감성으로 읽는 시장
+          {SLOGAN}
         </p>
       </div>
       <nav style={{ display: "flex", flexDirection: "column", gap: 6 }}>

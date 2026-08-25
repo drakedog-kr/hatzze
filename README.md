@@ -1,4 +1,4 @@
-# hatzze | 데이터와 감성으로 읽는 시장
+# hatzze | 데이터와 여론으로 읽는 시장
 
 **v1.1.1 베타** · 🔗 **[hatzze.fun](https://hatzze.fun)**
 

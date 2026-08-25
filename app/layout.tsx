@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
 import AppShell from "./AppShell";
+import { SLOGAN } from "./brand";
 import { SITE_NAME, SITE_URL, pageMetadata } from "./seo";
 
 const pretendard = localFont({
@@ -23,9 +24,15 @@ const NAVER_VERIFICATION = process.env.NAVER_SITE_VERIFICATION;
 // NEXT_PUBLIC_ 은 빌드 시점에 인라인되므로 Vercel 에 넣은 뒤 재배포해야 반영된다.
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 
-const TITLE = "hatzze | 데이터와 감성으로 읽는 시장";
+const TITLE = `${SITE_NAME} | ${SLOGAN}`;
+// ⚠️ 이 한 문장이 **두 곳**에 나간다 — 홈의 meta description 과, 아래 JSON-LD 의
+//    WebSite.description(=검색엔진이 읽는 **사이트 전체** 소개)이다. 그래서 시장
+//    브리핑 하나만 설명하면 안 된다. 예전 문장("버핏지수·VKOSPI·레버리지 등 25개
+//    지표를 매일 하나의 과열도 점수로 환산합니다")은 다섯 화면짜리 서비스를 지수
+//    하나로 소개하고 있었다.
+//    질문형 첫 문장은 남긴다 — 검색 결과에서 눌러 볼 이유를 주는 자리다.
 const DESCRIPTION =
-  "오늘 코스피는 얼마나 뜨겁습니까. 버핏지수·VKOSPI·레버리지 등 25개 지표를 매일 하나의 과열도 점수로 환산합니다.";
+  "오늘 코스피는 얼마나 뜨겁습니까. 25개 지표로 잰 과열도와 함께, 주식 텔레그램에서 오간 이야기와 미국 공시에 남은 기록을 매일 정리합니다.";
 
 // 홈도 하위 페이지와 같은 pageMetadata()를 쓴다 — og:image URL 에 오늘 날짜·도수가
 // 실려 있어(카톡 캐시를 깨려고) 여기만 손으로 적어 두면 홈과 /kadera·/mdd 가 서로 다른
@@ -37,7 +44,13 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     ...(await pageMetadata({ title: TITLE, description: DESCRIPTION, path: "/" })),
     metadataBase: new URL(SITE_URL),
-    keywords: ["코스피 과열도", "시장 과열도", "버핏지수", "VKOSPI", "공포탐욕지수", "증시 심리", "코스피 지표", "hatzze", "햇쩨"],
+    // 뒤쪽 여섯은 브리핑 밖 화면들의 낱말이다. 앞의 아홉만 있을 때는 카더라·내부자·
+    // 서학개미가 한 번도 안 나와, 다섯 화면 중 하나만 신고하는 목록이었다.
+    // (구글은 2009년부터 이 메타를 랭킹에 쓰지 않는다. 네이버 쪽은 확인하지 않았다.)
+    keywords: [
+      "코스피 과열도", "시장 과열도", "버핏지수", "VKOSPI", "공포탐욕지수", "증시 심리", "코스피 지표", "hatzze", "햇쩨",
+      "카더라", "주식 텔레그램", "내부자 거래", "13F", "서학개미", "MDD",
+    ],
     verification: {
       ...(GOOGLE_VERIFICATION ? { google: GOOGLE_VERIFICATION } : {}),
       ...(NAVER_VERIFICATION
