@@ -11,6 +11,16 @@ telegram_messages 를 **조회수 순 상위 200건** 받아 점수로 다시 �
 정렬에 **본문까지 실어 나른 것**이 원인이라, 지금은 줄 세우기와 본문 받기를 나눴다
 (pick_top 주석의 실측 참고).
 
+⚠️ **미장 전용 글은 뺀다.** 미국 종목만 붙은 글은 미장 카더라의 트렌딩 카드가 이미
+싣는다. 국내 종목이 하나라도 붙어 있으면 빼지 않는다 — 'SK하이닉스 · 마이크론' 같은
+글은 국장 이야기이기도 하다(2026-08-26 실측: 30일 창 36건 중 미국 태그가 11건이었고
+그중 4건이 그런 글이었다). 종목 태그가 아무것도 없는 시황·금리 글도 그대로 남는다 —
+빼는 기준은 '국내 것이 아님'이 아니라 '미장 것임'이다.
+
+그래서 **extract_telegram_us_stocks.py 뒤에 실행해야 한다**(워크플로 순서가 이미
+그렇다). 그 표가 비었거나 조회가 실패하면 아무것도 빼지 않고 지나간다 — 목록이 통째로
+비는 것보다 미장 글이 몇 건 섞이는 쪽이 낫다.
+
 **캐싱이 아니라 계산을 옮기는 것이다.** telegram_messages 는 파이프라인이 돌 때만
 바뀐다 — 조회수·공유수도 그때 갱신된다. 실행 사이에 이 36줄은 상수다.
 
@@ -52,6 +62,9 @@ STORE_N = 36
 STOCK_TAGS_PER_MESSAGE = 3
 # 본문을 뒤늦게 받을 때 한 번에 묶는 id 수(위 fetch_texts 주석 참고).
 TEXT_CHUNK = 50
+# 태그 표를 id 로 걸을 때의 조각. 같은 이유로 나눈다 — `.in_()` 목록이 길면 요청이
+# 안 나간다.
+TAG_ID_CHUNK = 50
 
 # ⚠️ lib/telegram-data.ts 의 FIRST_COLLECTION_HOUR_KST 와 같은 값이어야 한다.
 FIRST_COLLECTION_HOUR_KST = 9
@@ -111,8 +124,61 @@ def fetch_texts(db, ids: list[str]) -> dict[str, str]:
     return out
 
 
-def pick_top(db, start: datetime) -> list[dict]:
-    """창 안에서 점수 상위 STORE_N 건. 후보는 조회수 순 CANDIDATES 건에서 고른다.
+def tagged_keys(db, table: str, ids: list[int]) -> set[tuple[str, int]]:
+    """`table` 에 행이 있는 (채널, 번호) 짝. 종목 이름은 안 받는다 — 있는지만 본다.
+
+    ⚠️ message_id 는 채널 안에서만 유일하다(stock_tags 주석과 같은 함정). 번호로 좁혀
+    받은 뒤 **(채널, 번호)** 로 짝짓는다. 한 번호가 여러 채널에 있어 행이 1,000행 상한에
+    걸릴 수 있으므로 페이징한다.
+    """
+    out: set[tuple[str, int]] = set()
+    for i in range(0, len(ids), TAG_ID_CHUNK):
+        chunk = ids[i : i + TAG_ID_CHUNK]
+        start = 0
+        while True:
+            page = (
+                db.table(table)
+                .select("channel_handle,message_id")
+                .in_("message_id", chunk)
+                .order("id")
+                .range(start, start + PAGE_SIZE - 1)
+                .execute()
+                .data
+            ) or []
+            out.update((r["channel_handle"], r["message_id"]) for r in page)
+            if len(page) < PAGE_SIZE:
+                break
+            start += PAGE_SIZE
+    return out
+
+
+def us_only_keys(db, rows: list[dict]) -> set[tuple[str, int]]:
+    """후보 중 **미국 종목만** 붙은 메시지. 국장 목록에서 뺄 것들이다(머리 주석 참고).
+
+    국내 태그를 확인하는 두 번째 조회는 **미국 태그가 붙은 것만** 대상으로 한다. 후보
+    200건 전부의 국내 태그를 받으면 한 건이 여러 종목을 갖는 표라 행이 수천으로 불어난다.
+
+    조회가 실패하면 빈 집합을 돌려준다 — 그날 목록에 미장 글이 섞일 뿐, 카드가 비지는
+    않는다. 이 갈래가 트렌딩 전체를 데려가지 않게 하는 것이 우선이다.
+    """
+    want = {(m["channel_handle"], m["message_id"]) for m in rows}
+    if not want:
+        return set()
+    try:
+        us = tagged_keys(db, "telegram_message_us_stocks", sorted({k[1] for k in want})) & want
+        if not us:
+            return set()
+        kr = tagged_keys(db, "telegram_message_stocks", sorted({k[1] for k in us}))
+    except Exception as e:  # noqa: BLE001 — 무엇이 터지든 목록은 남긴다
+        print(f"[경고] 미장 글을 못 가려냈습니다. 이번 회차는 그대로 둡니다: {e}")
+        return set()
+    return us - kr
+
+
+def pick_top(db, start: datetime) -> tuple[list[dict], int]:
+    """창 안에서 점수 상위 STORE_N 건과, 그 앞에서 뺀 미장 전용 글의 수.
+
+    후보는 조회수 순 CANDIDATES 건에서 고른다.
 
     ⚠️ **줄 세울 때는 본문을 받지 않는다.** 점수(score)가 조회·공유·댓글만 쓰므로 본문은
     정렬에 아무 쓸모가 없는데, 같이 실으면 DB 가 **본문을 품은 넓은 행 수만 건을 정렬**
@@ -143,6 +209,11 @@ def pick_top(db, start: datetime) -> list[dict]:
         .execute()
         .data
     ) or []
+    # 미장 전용 글은 **본문을 받기 전에** 뺀다 — 어차피 안 실을 것의 본문까지 나를
+    # 이유가 없다.
+    drop = us_only_keys(db, rows)
+    if drop:
+        rows = [m for m in rows if (m["channel_handle"], m["message_id"]) not in drop]
     texts = fetch_texts(db, [m["id"] for m in rows])
     cleaned = []
     for m in rows:
@@ -151,7 +222,7 @@ def pick_top(db, start: datetime) -> list[dict]:
             continue
         cleaned.append({**m, "text": t, "_score": score(m)})
     cleaned.sort(key=lambda m: -m["_score"])
-    return cleaned[:STORE_N]
+    return cleaned[:STORE_N], len(drop)
 
 
 def stock_tags(db, top: list[dict]) -> dict[tuple[str, int], list[str]]:
@@ -210,7 +281,7 @@ def main() -> None:
 
     for key, days in WINDOWS:
         start = window_start(days)
-        top = pick_top(db, start)
+        top, dropped = pick_top(db, start)
         tags = stock_tags(db, top)
         for rank, m in enumerate(top, 1):
             payload.append(
@@ -232,7 +303,9 @@ def main() -> None:
                     "updated_at": datetime.now(timezone.utc).isoformat(),
                 }
             )
-        print(f"[트렌딩] {key}: {len(top)}건 (창 시작 {start.isoformat()})")
+        print(
+            f"[트렌딩] {key}: {len(top)}건 (창 시작 {start.isoformat()}) · 미장 전용 {dropped}건 제외"
+        )
 
     if dry_run:
         for r in payload[:5]:

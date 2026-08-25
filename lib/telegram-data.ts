@@ -857,6 +857,59 @@ function trendingWindowKey(windowDays: TrendingWindow): string | null {
   return null; // 저장해 두지 않은 창은 예전처럼 즉석에서 뽑는다
 }
 
+/** 트렌딩에서 메시지를 가리키는 키. message_id 는 채널 안에서만 유일하다. */
+const msgKey = (m: { channelHandle: string; messageId: number }) => `${m.channelHandle}|${m.messageId}`;
+
+/**
+ * 후보 중 그 태그 표에 행이 있는 것들의 키. 종목 이름은 안 받는다 — 있는지만 본다.
+ *
+ * 번호로 좁혀 받은 뒤 (채널, 번호)로 짝짓는다. 한 번호가 여러 채널에 있어 1,000행을
+ * 넘길 수 있으므로 페이징한다. 조회가 실패하면 빈 집합이다(fetchAllRows 가 그렇게 돈다).
+ */
+async function taggedKeys(table: string, candidates: { channelHandle: string; messageId: number }[]): Promise<Set<string>> {
+  const want = new Set(candidates.map(msgKey));
+  if (!want.size) return new Set();
+  const db = getSupabaseAdmin();
+  const rows = await fetchAllRows<{ channel_handle: string; message_id: number }>(
+    "id",
+    () =>
+      db
+        .from(table)
+        .select("channel_handle,message_id")
+        .in("message_id", [...new Set(candidates.map((c) => c.messageId))]),
+    { onError: (e) => console.error(`[트렌딩] ${table} 조회 실패 — 미장 글을 못 가려냅니다:`, e) },
+  );
+  return new Set(rows.map((r) => `${r.channel_handle}|${r.message_id}`).filter((k) => want.has(k)));
+}
+
+/**
+ * 후보 중 **미국 종목만** 붙은 메시지의 키. 국장 트렌딩에서 뺄 것들이다.
+ *
+ * 같은 글을 미장 카더라의 트렌딩 카드가 이미 싣는다. 다만 국내 종목이 하나라도 붙어
+ * 있으면 빼지 않는다 — 'SK하이닉스 · 마이크론' 같은 글은 국장 이야기이기도 하다.
+ * 종목 태그가 아예 없는 시황·금리 글도 남는다. 빼는 기준은 '국내 것이 아님'이 아니라
+ * '미장 것임'이다.
+ *
+ * 국내 태그를 보는 두 번째 조회는 **미국 태그가 붙은 것만** 대상으로 한다. 후보 200건
+ * 전부의 국내 태그를 받으면 한 건이 여러 종목을 갖는 표라 행이 수천으로 불어난다.
+ *
+ * ⚠️ 파이프라인(calculate_telegram_trending.py 의 us_only_keys)과 **같은 규칙이어야
+ * 한다.** 평소 목록은 그쪽이 저장한 것이고 이 길은 저장분이 없는 날만 도는데, 규칙이
+ * 갈리면 하필 그런 날만 목록이 달라진다.
+ *
+ * 조회가 실패하면 아무것도 안 빠진다 — 카드가 비는 것보다 미장 글이 몇 건 섞이는 쪽이
+ * 낫다.
+ */
+async function usOnlyKeys(candidates: { channelHandle: string; messageId: number }[]): Promise<Set<string>> {
+  const us = await taggedKeys("telegram_message_us_stocks", candidates);
+  if (!us.size) return us;
+  const kr = await taggedKeys(
+    "telegram_message_stocks",
+    candidates.filter((c) => us.has(msgKey(c))),
+  );
+  return new Set([...us].filter((k) => !kr.has(k)));
+}
+
 /**
  * 파이프라인이 골라 둔 트렌딩 목록(마이그레이션 029). 없으면 null → 호출자가 직접 뽑는다.
  *
@@ -903,7 +956,7 @@ async function storedTrending(
     }
   }
   const { titleOf, photoUrlOf } = await channelMeta();
-  return data.map((r) => {
+  const list = data.map((r) => {
     const stocks = (Array.isArray(r.stocks) ? (r.stocks as string[]) : []).slice(0, 3);
     const text = r.text as string;
     return {
@@ -925,6 +978,19 @@ async function storedTrending(
       topics: stocks.length === 0 ? extractTopics(text) : [],
     };
   });
+
+  /* 미장 전용 글은 파이프라인이 이미 빼고 저장한다(calculate_telegram_trending.py).
+     그런데도 여기서 한 번 더 거르는 이유는 저장분이 **그 규칙보다 오래된 것**일 수
+     있어서다 — 규칙을 넣고 파이프라인이 아직 안 돈 사이, 또는 하루 거른 날. 카드 머리가
+     '국장 관련 글 중'이라고 적어 놓고 미장 글을 싣는 쪽이 나쁘다.
+
+     조회는 **종목 태그가 없는 줄만** 본다. stocks 가 차 있으면 국내 종목이 붙은 글이라
+     어차피 안 빠지므로(usOnlyKeys 와 같은 규칙) 물어볼 이유가 없다. 창마다 스무 건
+     남짓이다. */
+  const noKr = list.filter((m) => m.stocks.length === 0);
+  if (!noKr.length) return list;
+  const dropped = await taggedKeys("telegram_message_us_stocks", noKr);
+  return list.filter((m) => !dropped.has(msgKey(m)));
 }
 
 export async function getTrendingMessages(
@@ -966,7 +1032,7 @@ export async function getTrendingMessages(
 
   const { titleOf, photoUrlOf } = await channelMeta();
 
-  const top = msgs
+  const scored = msgs
     .map((m) => ({
       channelHandle: m.channel_handle,
       messageId: m.message_id as number,
@@ -982,8 +1048,12 @@ export async function getTrendingMessages(
       topics: [] as string[],
     }))
     .filter((m) => m.text.length > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+    .sort((a, b) => b.score - a.score);
+
+  // 미장 전용 글을 빼고 나서 자른다. 자른 뒤에 빼면 그 자리가 그냥 비어 목록이 36건에
+  // 못 미친다.
+  const dropped = await usOnlyKeys(scored);
+  const top = scored.filter((m) => !dropped.has(msgKey(m))).slice(0, limit);
 
   // 각 메시지에서 추출해둔 종목을 태그로 붙인다(사전 기반 추출 결과 재사용).
   // message_id 는 채널별로만 유일해서 채널을 안 걸면 다른 채널의 같은 번호 메시지까지
