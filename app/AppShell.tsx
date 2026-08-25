@@ -616,6 +616,11 @@ function Sidebar() {
           data-ga="cta_click"
           data-ga-cta="community"
           data-ga-surface="sidebar"
+          // 바탕·글자색은 .hz-tg-cta 가 쥔다. 평소엔 카드 아이콘 타일과 같은 옅은 하늘색이고
+          // (꽉 찬 파랑을 늘 깔면 사이드바에서 혼자 튀어 광고 배너처럼 읽혔다, 2026-08-03),
+          // 호버·포커스에서만 현재 페이지 알약과 같은 파랑으로 꽉 찬다.
+          // ⚠️ 두 값을 여기 인라인으로 되돌리면 인라인이 :hover 를 이겨 호버가 죽는다.
+          className="hz-tg-cta"
           style={{
             display: "flex",
             alignItems: "center",
@@ -623,10 +628,6 @@ function Sidebar() {
             gap: 8,
             padding: 14,
             borderRadius: R.control,
-            // 카드 아이콘 타일과 같은 옅은 하늘색. 꽉 찬 파랑은 사이드바에서 혼자 튀어
-            // 내비게이션이 아니라 광고 배너처럼 읽혔다(2026-08-03).
-            background: "var(--c-blue-tint)",
-            color: C.blueInk,
             fontSize: 14,
             fontWeight: 700,
             textDecoration: "none",

@@ -415,13 +415,19 @@ export function StockCell({
   return (
     <Link
       href={`/insider/stock/${encodeURIComponent(ticker)}`}
-      style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, textDecoration: "none" }}
+      // ⚠️ 세로 정렬은 `.hz-cellbody-wrap` 이 쥔다 — 인라인으로 두면 폰에서 위 맞춤으로
+      // 바꾸려 해도 인라인이 미디어쿼리를 이겨서 로고가 세 줄 한가운데 떠 있는다.
+      className="hz-cellbody-wrap"
+      style={{ display: "flex", gap: 10, minWidth: 0, textDecoration: "none" }}
     >
       <StockLogo code={ticker} name={name} market="US" size={26} />
-      <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+      <span className="hz-cellbody" style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
+        {/* ⚠️ 자르기는 인라인이 아니라 `.hz-cellname` 이 쥔다 — 인라인은 미디어쿼리를 못 이겨
+            폰에서도 계속 잘린다(globals.css 주석). 첫 줄은 `.hz-cellhead` 가 폰에서 접어
+            알약을 아래로 내보낸다. */}
+        <span className="hz-cellhead" style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
           <strong style={{ ...ROW.lead, fontFamily: MONO }}>{ticker}</strong>
-          <span style={{ ...ROW.sub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+          <span className="hz-cellname" style={{ ...ROW.sub }}>{name}</span>
           {badge}
         </span>
         {typeof sub === "string" ? (
@@ -1389,12 +1395,13 @@ function WideStock({ ticker, name, badge }: { ticker: string; name: string; badg
   return (
     <Link
       href={`/insider/stock/${encodeURIComponent(ticker)}`}
+      className="hz-cellhead"
       style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0, textDecoration: "none" }}
     >
       <StockLogo code={ticker} name={name} market="US" size={26} />
       <strong style={{ ...ROW.lead, fontFamily: MONO }}>{ticker}</strong>
       {name && name.toUpperCase() !== ticker.toUpperCase() && (
-        <span style={{ ...ROW.sub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+        <span className="hz-cellname" style={{ ...ROW.sub }}>{name}</span>
       )}
       {badge}
     </Link>

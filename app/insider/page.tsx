@@ -4,6 +4,7 @@ import { RANK_MIN_ANALYSTS, getInsiderOverview } from "@/lib/insider-data";
 import Link from "next/link";
 
 import { SectionHead } from "../kadera/SectionHead";
+import { TapHint } from "./TapHint";
 import { insiderListHref } from "./lists";
 import { Empty, GroupTitle, Money, T, addRows, congressRows, execRows, fmtDate, holderRowsView, hotRowsView, analystTopRows, insiderNote, managerAumRows, quarterLabel, trimRows } from "./parts";
 import { pageMetadata } from "../seo";
@@ -74,6 +75,26 @@ function HalfSheet({ children }: { children: React.ReactNode }) {
  *    가 이미 들어 있어(globals.css) 이 꼴이라야 선이 두 겹으로 안 겹친다.
  * ⚠️ marginTop:auto — 짝지은 두 시트의 줄 수가 달라도 바닥 띠가 같은 높이에서 만난다.
  */
+/**
+ * 목록의 **맨 윗줄 바로 밑에** 안내 쪽지를 끼운다.
+ *
+ * 카드마다 다는 게 아니라 **두 장에만** 단다 — 늘린 종목(종목 상세로 가는 길)과
+ * 운용자산이 큰 순(인물 상세로 가는 길). 이 화면의 상세 페이지가 그 둘뿐이라, 한 장씩만
+ * 알려 주면 나머지 카드는 눌러 보지 않아도 같은 곳으로 간다는 걸 알게 된다. 여덟 블록에
+ * 다 달면 안내가 아니라 잡음이 된다. 전체보기 페이지에도 안 단다 — 거기까지 온 사람은
+ * 이미 눌러 본 사람이다.
+ *
+ * ⚠️ 한때 '증권가가 긍정적으로 보는 종목' 에도 달았다가 뗐다. 그 카드도 종목 상세로 가는데
+ *    늘린 종목이 이미 같은 말을 하고 있어 두 번 배우는 꼴이었다.
+ *
+ * 표시는 id 별로 따로 남는다. 두 장이 가리키는 곳이 달라서 하나를 닫았다고 나머지를
+ * 안 알려 주면 그 카드는 영영 못 배운다.
+ */
+function withTapHint(rows: React.ReactNode[], hint: { id: string; href: string; text: string }) {
+  if (rows.length === 0) return rows;
+  return [rows[0], <TapHint key="__taphint" {...hint} />, ...rows.slice(1)];
+}
+
 function RowList({ items, href }: { items: React.ReactNode[]; href: string }) {
   return (
     <>
@@ -435,7 +456,14 @@ export default async function InsiderPage() {
         ) : (
           <RowList
             href="/insider/list/adds"
-            items={addRows(ov.managerAdds.slice(0, BLOCK_ROWS))}
+            // 맨 윗줄 **바로 밑에** 안내 쪽지를 끼운다(폰 첫 방문에만 뜬다, TapHint 참고).
+            // 이 블록에만 두는 이유는 화면에서 제일 먼저 나오는 카드라서다 — 여덟 블록에
+            // 다 달면 안내가 아니라 잡음이 된다. 전체보기(/insider/list/adds)에는 안 단다.
+            items={withTapHint(addRows(ov.managerAdds.slice(0, BLOCK_ROWS)), {
+              id: "adds",
+              href: `/insider/stock/${encodeURIComponent(ov.managerAdds[0].ticker)}`,
+              text: "종목을 누르면 임원·의원 기록까지 함께 나옵니다",
+            })}
           />
         )}
       </HalfSheet>
@@ -482,7 +510,12 @@ export default async function InsiderPage() {
         ) : (
           <RowList
             href={insiderListHref("managers")}
-            items={managerAumRows(ov.managerRanks.slice(0, BLOCK_ROWS), ov.usdKrw)}
+            items={withTapHint(managerAumRows(ov.managerRanks.slice(0, BLOCK_ROWS), ov.usdKrw), {
+              id: "managers",
+              // 이 카드만 목적지가 **인물 상세**다(나머지 둘은 종목 상세).
+              href: `/insider/investor/${ov.managerRanks[0].cik}`,
+              text: "이름을 누르면 담은 종목이 비중 순으로 나옵니다",
+            })}
           />
         )}
       </HalfSheet>
