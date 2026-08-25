@@ -107,6 +107,86 @@ jobs:
       # 분리하려고 아래 Summarize results 집계 배열에는 넣지 않는다.
       # 대신 이 파이프라인의 '재료' 두 스텝(sync·fetch)만 따로 재는 집계·알림이
       # 잡 끝에 붙어 있다(Summarize 카더라 collection).
+      # ── 내부자 리포트 ───────────────────────────────────────────────────
+      # ⚠️⚠️ **맨 앞에 둔다. 뒤로 옮기지 말 것.**
+      #
+      # 이 넷은 SEC·미 하원·stockanalysis 를 읽고 자기 표(us_insider_*·us_manager_*·
+      # us_congress_trade·us_analyst_*)에만 쓴다. KRX 도 카더라 표도 안 본다(us_stocks
+      # 만 읽는데 그건 종목 사전이라 이 흐름에서 안 바뀐다). **아무것도 안 기다려도 된다.**
+      #
+      # 한때 지표 블록 **뒤**(47번째)에 있었다. 그러면 중간의 'KRX 공표(08:00 KST) 대기'
+      # 게이트에 같이 걸린다 — KRX 와 무관한데 줄만 뒤에 서 있어서다. 2026-08-25 밤
+      # 22:55 에 리허설을 돌렸더니 자정을 넘겨 게이트가 **7시간 반**을 자기 시작했고,
+      # 잡의 6시간 제한이 먼저 와서 내부자 스텝은 시작조차 못 하고 잘렸다.
+      # 잡 하나에 스텝을 줄로 세운 구조라, 가운데 sleep 은 뒤의 모든 것을 멈춘다.
+      #
+      # ⭐ 앞에 두면 덤이 둘이다. 아무 시각에 dispatch 해도 바로 검증되고, 평소 실행에서도
+      #   내부자 화면이 카더라·지표보다 먼저 새로워진다.
+      # ⚠️ 대가는 카더라 시작이 그만큼 늦어지는 것이다 — 평소 5~6분(임원+의원+애널리스트),
+      #   13F 가 도는 달의 열엿새는 15분 안팎. 카더라 완료가 08:45~09:05 라 출근 시간대
+      #   반영에는 영향이 없다고 봤다.
+      # ⚠️⚠️ 이 화면도 **파이프라인에 안 붙어 있었다**(2026-08-21 까지). 지금 들어 있는
+      #    데이터는 전부 손으로 돌려 채운 것이라, 안 붙이면 하루 만에 낡는다.
+      #
+      # ⭐ 임원 축은 **최근 5영업일만** 훑는다. 집계(us_insider_daily)는 저장한 뒤
+      #    **DB 의 창을 읽어** 만들기 때문에 조금씩 받아도 90일 창이 제대로 나온다.
+      #    예전처럼 매 실행 90일을 훑으면 인덱스 65일 × 공시 수백 건이라 20분이 넘는다.
+      # ⚠️ EDGAR 일별 인덱스는 그날 접수가 끝난 뒤(미 동부 22:00 ≈ 11:00 KST) 만들어진다.
+      #    **아침 실행(07:30 KST)엔 전날 미국분이 아직 없고 오후 실행에서 잡힌다.**
+      #    5영업일을 되돌아보므로 어느 실행이 놓쳐도 다음이 만회한다.
+      - name: Fetch 미국 임원 공시 Form 4 (내부자 리포트)
+        id: us_insider
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_us_insider.py
+
+      # ⭐ 하원은 증분이다 — 이미 읽은 doc_id 와 `최근 신고일 − 7일` 기준선으로 건너뛴다
+      #    (5~8분 → 3.5초). 토요일만 전량 다시 읽어 뒤늦게 고쳐진 신고를 줍는다.
+      - name: Fetch 미 하원의원 매매 신고 (내부자 리포트)
+        id: us_congress
+        continue-on-error: true
+        run: |
+          if [ "$(date -u +%u)" = "6" ]; then
+            echo "토요일 — 전량 다시 읽는다"
+            python data-pipeline/scripts/fetch_us_congress.py --full
+          else
+            python data-pipeline/scripts/fetch_us_congress.py
+          fi
+
+      # ⚠️ 13F 는 **분기 자료라 매일 돌릴 이유가 없다.** 값이 안 바뀐다. 마감이
+      #    분기말+45일(2/14 · 5/15 · 8/14 · 11/14)이고 그 며칠 전부터 제출이 몰리므로
+      #    그 창에서만 돌린다. 한 번에 62곳 × 두 분기 + fails 파일 6개라 10분 안팎이다.
+      # ⚠️ 마감이 주말이면 다음 영업일로 밀리므로 25일까지 넉넉히 열어 둔다.
+      - name: Fetch 월가 거물 13F (내부자 리포트)
+        id: us_13f
+        continue-on-error: true
+        run: |
+          m=$(date -u +%m); d=$(date -u +%d)
+          case "$m" in
+            02|05|08|11)
+              if [ "$d" -ge 10 ] && [ "$d" -le 25 ]; then
+                python data-pipeline/scripts/fetch_us_13f.py
+              else
+                echo "13F 제출 창 밖($m/$d). 건너뛴다."
+              fi
+              ;;
+            *) echo "13F 마감 달이 아니다($m). 건너뛴다." ;;
+          esac
+
+      # ⚠️⚠️ 이건 API 가 아니라 **웹페이지**다(stockanalysis.com). 저쪽이 화면을 바꾸면
+      #    파싱이 깨진다. 못 받은 비율이 30% 를 넘거나 한 종목도 못 받으면 **스크립트가
+      #    스스로 죽어** 아래 요약이 실패로 잡고 알림 이슈가 열린다.
+      #    ⛔ 그 가드를 경고 출력으로 되돌리지 말 것 — 한동안 찍기만 하고 0 으로 끝나서
+      #       "성공했는데 0건"을 알아챌 방법이 아예 없었다(2026-08-25 에 고쳤다).
+      #    ⭐ 죽는 자리는 **저장 다음**이다. 앞에서 죽으면 그날 받아 둔 것까지 잃는다.
+      # ⚠️ 하루 한 번이면 충분하다. 애널리스트 의견은 하루에 몇 건씩만 바뀐다. 179종목을
+      #    1초 간격으로 받아 3분쯤 걸린다.
+      # ⭐ 원천이 기준 시점을 안 줘서 **받은 날짜로 쌓는다.** 그래서 매일 돌리는 것이
+      #    곧 추이를 만드는 일이다 — 건너뛴 날은 영영 못 메운다.
+      - name: Fetch 애널리스트 컨센서스 (내부자 리포트)
+        id: us_analyst
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_us_analyst.py
+
       - name: (텔레그램) KRX 상장종목 마스터 갱신
         id: telegram_krx_stocks
         continue-on-error: true
@@ -400,70 +480,6 @@ jobs:
         id: seohak_tic
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_seohak_tic.py
-
-
-      # ── 내부자 리포트 ───────────────────────────────────────────────────
-      # ⚠️⚠️ 이 화면도 **파이프라인에 안 붙어 있었다**(2026-08-21 까지). 지금 들어 있는
-      #    데이터는 전부 손으로 돌려 채운 것이라, 안 붙이면 하루 만에 낡는다.
-      #
-      # ⭐ 임원 축은 **최근 5영업일만** 훑는다. 집계(us_insider_daily)는 저장한 뒤
-      #    **DB 의 창을 읽어** 만들기 때문에 조금씩 받아도 90일 창이 제대로 나온다.
-      #    예전처럼 매 실행 90일을 훑으면 인덱스 65일 × 공시 수백 건이라 20분이 넘는다.
-      # ⚠️ EDGAR 일별 인덱스는 그날 접수가 끝난 뒤(미 동부 22:00 ≈ 11:00 KST) 만들어진다.
-      #    **아침 실행(07:30 KST)엔 전날 미국분이 아직 없고 오후 실행에서 잡힌다.**
-      #    5영업일을 되돌아보므로 어느 실행이 놓쳐도 다음이 만회한다.
-      - name: Fetch 미국 임원 공시 Form 4 (내부자 리포트)
-        id: us_insider
-        continue-on-error: true
-        run: python data-pipeline/scripts/fetch_us_insider.py
-
-      # ⭐ 하원은 증분이다 — 이미 읽은 doc_id 와 `최근 신고일 − 7일` 기준선으로 건너뛴다
-      #    (5~8분 → 3.5초). 토요일만 전량 다시 읽어 뒤늦게 고쳐진 신고를 줍는다.
-      - name: Fetch 미 하원의원 매매 신고 (내부자 리포트)
-        id: us_congress
-        continue-on-error: true
-        run: |
-          if [ "$(date -u +%u)" = "6" ]; then
-            echo "토요일 — 전량 다시 읽는다"
-            python data-pipeline/scripts/fetch_us_congress.py --full
-          else
-            python data-pipeline/scripts/fetch_us_congress.py
-          fi
-
-      # ⚠️ 13F 는 **분기 자료라 매일 돌릴 이유가 없다.** 값이 안 바뀐다. 마감이
-      #    분기말+45일(2/14 · 5/15 · 8/14 · 11/14)이고 그 며칠 전부터 제출이 몰리므로
-      #    그 창에서만 돌린다. 한 번에 62곳 × 두 분기 + fails 파일 6개라 10분 안팎이다.
-      # ⚠️ 마감이 주말이면 다음 영업일로 밀리므로 25일까지 넉넉히 열어 둔다.
-      - name: Fetch 월가 거물 13F (내부자 리포트)
-        id: us_13f
-        continue-on-error: true
-        run: |
-          m=$(date -u +%m); d=$(date -u +%d)
-          case "$m" in
-            02|05|08|11)
-              if [ "$d" -ge 10 ] && [ "$d" -le 25 ]; then
-                python data-pipeline/scripts/fetch_us_13f.py
-              else
-                echo "13F 제출 창 밖($m/$d). 건너뛴다."
-              fi
-              ;;
-            *) echo "13F 마감 달이 아니다($m). 건너뛴다." ;;
-          esac
-
-      # ⚠️⚠️ 이건 API 가 아니라 **웹페이지**다(stockanalysis.com). 저쪽이 화면을 바꾸면
-      #    파싱이 깨진다. 못 받은 비율이 30% 를 넘거나 한 종목도 못 받으면 **스크립트가
-      #    스스로 죽어** 아래 요약이 실패로 잡고 알림 이슈가 열린다.
-      #    ⛔ 그 가드를 경고 출력으로 되돌리지 말 것 — 한동안 찍기만 하고 0 으로 끝나서
-      #       "성공했는데 0건"을 알아챌 방법이 아예 없었다(2026-08-25 에 고쳤다).
-      #    ⭐ 죽는 자리는 **저장 다음**이다. 앞에서 죽으면 그날 받아 둔 것까지 잃는다.
-      # ⚠️ 하루 한 번이면 충분하다. 애널리스트 의견은 하루에 몇 건씩만 바뀐다. 179종목을
-      #    1초 간격으로 받아 3분쯤 걸린다.
-      # ⭐ 원천이 기준 시점을 안 줘서 **받은 날짜로 쌓는다.** 그래서 매일 돌리는 것이
-      #    곧 추이를 만드는 일이다 — 건너뛴 날은 영영 못 메운다.
-      - name: Fetch 애널리스트 컨센서스 (내부자 리포트)
-        id: us_analyst
-        continue-on-error: true
-        run: python data-pipeline/scripts/fetch_us_analyst.py
 
 
       - name: Fetch GitHub trading bot repo count
