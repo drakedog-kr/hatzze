@@ -403,7 +403,10 @@ export default async function StockDetailPage({
                     <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub }}>{s.label}</span>
                     <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: s.n ? C.ink : C.muted }}>
                       {s.n.toLocaleString("ko-KR")}
-                      <span style={{ fontSize: 11, fontWeight: 700, color: C.sub2, marginLeft: 2 }}>{s.unit}</span>
+                      {/* 단위는 숫자와 **같은 크기, 굵기만 다르게**. 예전엔 11px/700 이라
+                          숫자와 두 단이 벌어져 "17"과 "/63명"이 다른 줄처럼 읽혔다.
+                          ⚠️ `<strong>` 안이라 굵기를 안 적으면 800 을 물려받는다. */}
+                      <span style={{ fontSize: 17, fontWeight: 400, color: C.sub2, marginLeft: 2 }}>{s.unit}</span>
                     </strong>
                   </div>
                   {/* ⭐ 수 하나보다 **방향**이 말이 많다. 같은 222건이어도 무엇이었는지가 다르다. */}
@@ -430,7 +433,8 @@ export default async function StockDetailPage({
                   <strong style={{ fontFamily: MONO, fontSize: 24, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
                     {d.mentionsToday}
                   </strong>
-                  <span style={{ fontSize: T.body, fontWeight: 700, color: C.sub }}>회</span>
+                  {/* 위 '공시에 남은 것'의 단위와 같은 규칙 — 숫자와 같은 크기, 굵기만 다르게. */}
+                  <span style={{ fontFamily: MONO, fontSize: 24, fontWeight: 400, color: C.sub }}>회</span>
                   <span style={{ fontSize: T.body, color: C.sub }}>
                     {fmtDate(d.mentionDate)} 하루 · 채널 {d.channelsToday}곳 · 최근 {d.trend.length}일 최다 {peak}회
                   </span>
