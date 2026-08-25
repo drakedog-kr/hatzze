@@ -2373,7 +2373,14 @@ main.hz-scroll { overflow-x: clip; }
 /* 긴 설명용 — 줄바꿈 허용 + 너비 제한 */
 .hz-tip-wide::after {
   white-space: normal;
-  width: 240px;
+  /* ⚠️ `width: 240px` 고정이었다. 그러면 글이 짧아도 상자가 안 줄어들어 **오른쪽에
+     빈 자리가 남는다** — "오늘 주식 텔레그램에서 언급된 종목입니다"(글자 198px)가
+     240px 상자에 들어가 24px 이 비었다(2026-08-26 실측, Hun 이 잡았다).
+     ⭐ 아래 좁은 화면 규칙이 이미 쓰던 어법으로 맞춘다: 짧으면 글자만큼, 길면
+       상한에 걸려 줄바꿈. `max-content` 는 nowrap 이 아니라 **줄바꿈 없이 필요한 폭**
+       이라, white-space:normal 과 함께 두면 max-width 가 실제 상한이 된다. */
+  width: max-content;
+  max-width: 240px;
   text-align: left;
 }
 /* 좁은 화면에선 240px 가 카드보다 넓어, 안쪽으로 열어도(start/end) 화면을 넘는다.
@@ -2389,7 +2396,8 @@ main.hz-scroll { overflow-x: clip; }
     max-width: 58vw;
   }
   .hz-tip-wide::after {
-    width: min(240px, 58vw);
+    /* 위 .hz-tip::after 가 이미 width:max-content 라 상한만 좁히면 된다. */
+    max-width: min(240px, 58vw);
   }
 }
 
