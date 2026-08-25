@@ -14,6 +14,7 @@ import {
   dataUri,
   loadOgFonts,
 } from "../og-card";
+import { SLOGAN } from "../brand";
 import { stageForScore } from "../ui";
 
 /**
@@ -90,9 +91,14 @@ function BrandCard() {
       }}
     >
       <Wordmark size={128} />
-      <div style={{ marginTop: 40, fontSize: 48, fontWeight: 800, color: INK }}>데이터와 감성으로 읽는 시장</div>
+      <div style={{ marginTop: 40, fontSize: 48, fontWeight: 800, color: INK }}>{SLOGAN}</div>
+      {/* 부제는 태그라인이 못 적는 **범위**를 적는다 — 이 카드는 점수 카드가 아니라
+          사이트 대표 카드라서, 예전 부제("코스피 과열도를 매일 0~100 점수로 · 시장·감성
+          25개 지표")처럼 지수 하나만 말하면 다섯 화면짜리 서비스가 지수 사이트로 보인다.
+          아래 점수 카드(ScoreCard)의 한 줄은 반대다 — 거기는 햇쩨 지수 자체를 설명하는
+          자리라 '시장·감성'이라는 지표 묶음 이름이 맞다. 둘을 같이 고치지 말 것. */}
       <div style={{ marginTop: 20, fontSize: 30, fontWeight: 500, color: SUB }}>
-        코스피 과열도를 매일 0~100 점수로 · 시장·감성 25개 지표
+        25개 지표로 잰 코스피 과열도 · 텔레그램 여론 · 미국 공시와 통계
       </div>
     </div>
   );

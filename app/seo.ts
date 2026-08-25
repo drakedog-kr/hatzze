@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { getLatestDailyScore } from "@/lib/data";
 
+import { SLOGAN } from "./brand";
 import { stageForScore } from "./ui";
 
 export const SITE_URL = "https://hatzze.fun";
@@ -15,7 +16,7 @@ const OG_SIZE = { width: 1200, height: 630, type: "image/png" } as const;
 const OG_FALLBACK = {
   url: "/opengraph-image",
   ...OG_SIZE,
-  alt: "hatzze | 데이터와 감성으로 읽는 시장",
+  alt: `${SITE_NAME} | ${SLOGAN}`,
 };
 
 /**
