@@ -186,11 +186,12 @@ export default function Footer() {
                 사이드바(AppShell 의 NAV)와 같게 둔다. */}
             <FooterLink href="/kadera">국장 카더라</FooterLink>
             <FooterLink href="/kadera/us">미장 카더라</FooterLink>
+            {/* ⚠️ 이 줄이 빠져 있었다. 화면을 여는 날(2026-08-26)에야 드러났는데, 예고
+                시절엔 '준비 중'이라 없는 게 맞았고 그 뒤로 아무도 다시 안 봤다.
+                ⭐ **여는 순간 고칠 곳이 NAV 의 badge 한 줄만은 아니다** — 푸터의 이
+                목록도 사이드바를 그대로 따라야 한다(바로 위 주석의 규칙). */}
+            <FooterLink href="/insider">내부자 리포트</FooterLink>
             <FooterLink href="/mdd">MDD 정밀분석</FooterLink>
-            {/* ⚠️ 사이드바에서는 이 항목만 '준비 중' 배지를 달고 있는데(AppShell 의 NAV)
-                푸터에는 배지 자리가 없다. 그대로 둔다 — 푸터는 **목적지 목록**이라
-                상태를 말하는 자리가 아니고, 배지를 뗄 때 고칠 곳이 늘어나면 한쪽만
-                남는다. 여는 날 지울 것은 NAV 의 badge 한 줄뿐이다. */}
             <FooterLink href="/seohak">서학개미 해부도</FooterLink>
             {/* 사이드바가 모바일에서 숨겨져 텔레그램 링크가 사라진다 — 내부 내비게이션과
                 같은 방식으로 푸터에 두어 좁은 화면에서도 닿게 한다. 라벨과 aria 는
