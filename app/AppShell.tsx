@@ -1164,13 +1164,24 @@ function TopBar({
  * ⭐ 키에 **버전을 박아 둔다** — 다음에 다른 소식으로 이 띠를 되쓸 때 키만 바꾸면
  * 예전에 닫은 사람에게도 새로 뜬다. 키를 재사용하면 그 사람들은 새 소식을 못 본다.
  */
-const NEWS_KEY = "hz-news-us-kadera";
+/* ⭐ 키를 갈아 끼우는 것이 곧 **띠를 되쓰는 것**이다. 소식은 하나뿐이라 아래 여섯만 바꾸면
+   이전 소식은 사라지고 새 소식만 뜬다. 예전 소식을 닫아 둔 사람도 키가 달라져 다시 본다
+   (닫힌 표시는 옛 키에 남아 있을 뿐 새 키를 막지 않는다).
+   ⚠️ 옛 키(`hz-news-us-kadera`)를 되쓰지 말 것 — 미장을 닫았던 사람은 새 소식을 못 본다. */
+const NEWS_KEY = "hz-news-insider";
 const NEWS_EVENT = "hz-news-change";
-const NEWS_HREF = "/kadera/us";
+const NEWS_HREF = "/insider";
 /* 문구를 셋으로 나눈 건 가운데 화면 이름에만 밑줄을 긋기 위해서다 —
    띠 전체가 이미 링크지만, 눌러서 가는 곳이 **어디인지**는 이름이 말해야 한다. */
-const NEWS_NAME = "미장 카더라";
-const NEWS_TAIL = "를 열었습니다. 미국 시장에선 무엇이 화제인지 봅니다.";
+const NEWS_NAME = "내부자 리포트";
+const NEWS_TAIL = "를 열었습니다. 임원과 의원, 월가 거물이 무엇을 사고팔았는지 봅니다.";
+/* ⚠️ **아이콘과 GA 라벨도 소식마다 갈아야 한다.** 예전엔 이 둘이 본문에 박혀 있어서
+   문구만 바꾸고 넘어갔고, 내부자 소식에 미장 카더라의 자유의 여신상이 그대로 붙어
+   있었다(2026-08-26 에 Hun 이 잡았다). 갈아 끼울 것을 여기 여섯으로 모아 둔다.
+   ⭐ 아이콘은 **사이드바 NAV 의 그 화면 아이콘과 같은 것**을 쓴다. 띠를 눌러 가면
+     사이드바에서 방금 본 그림이 그 자리에 켜져 있어야 같은 곳이라고 읽힌다. */
+const NEWS_ICON = "contact_page";
+const NEWS_GA = "news-insider";
 
 const newsStore = {
   subscribe(cb: () => void) {
@@ -1212,8 +1223,8 @@ function NewsStrip() {
           ⚠️ dismiss 안의 dispatchEvent 는 동기지만 React 는 이벤트 핸들러에서 나온
           상태 변경을 핸들러가 끝난 뒤로 미룬다. 그래서 이 줄이 링크를 먼저 언마운트해
           이동을 막지 않는다(브라우저에서 눌러 확인했다). */}
-      <Link href={NEWS_HREF} className="hz-news-link" data-ga-cta="news-us-kadera" onClick={dismiss}>
-        <LibertyIcon size={17} />
+      <Link href={NEWS_HREF} className="hz-news-link" data-ga-cta={NEWS_GA} onClick={dismiss}>
+        <Icon name={NEWS_ICON} style={{ fontSize: 17, flexShrink: 0 }} />
         <span className="hz-news-text">
           {/* ⚠️ <a> 안에 <a> 를 넣을 수 없다. 바깥 링크가 이미 같은 곳으로 가므로
               여기서는 **밑줄만** 긋는다 — 눌리는 건 띠 전체다. */}
