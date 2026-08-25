@@ -3606,3 +3606,15 @@ main.hz-scroll { overflow-x: clip; }
     display: none;
   }
 }
+
+/* 다크에서 종목 로고 타일의 **경계를 살린다.**
+   타일 색은 그림 가장자리에서 뽑아 쓰는데(StockLogo 의 readBandColor), 스페이스X·디웨이브
+   처럼 바탕이 검은 로고는 그 색이 다크 페이지와 거의 같아진다 — 실측 대비 1.1 로, 타일이
+   있는지 없는지 분간이 안 되고 한 줄에 선 로고들의 크기가 들쭉날쭉해 보인다(35개 중 3개).
+   ⚠️ 마스크(squircle)가 border 를 잘라내므로 **inset box-shadow** 로 준다. 마스크 안쪽을
+   따라 그려져서 모서리 모양이 그대로 유지된다.
+   ⚠️ var() 를 쓰지 않는다 — Lightning CSS 가 box-shadow 안의 var() 층을 지운 전례가 있다. */
+:root[data-theme="dark"] .hz-stock-logo,
+:root[data-theme="dark"] .hz-stock-badge {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
