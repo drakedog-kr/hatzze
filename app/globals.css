@@ -2491,6 +2491,12 @@ main.hz-scroll { overflow-x: clip; }
 .hz-vline:hover::before {
   opacity: 0.6;
 }
+/* 터치로 연 상태에서도 선을 긋는다. `:hover` 만 두면 **폰에서는 값만 뜨고 선이 안 그려져**
+   그 값이 곡선의 어느 지점 것인지 알 수 없다 — 확대 보기를 켜 준 뒤 실제로 그랬다.
+   여는 클래스는 호버가 없는 기기에서만 붙으므로(app/TipTap.tsx) 겹쳐 켜질 일이 없다. */
+.hz-vline.hz-tip-open::before {
+  opacity: 0.6;
+}
 
 /* 가장자리에서 툴팁이 여는 방향을 튼다. 기본은 가운데 정렬(left:50% + translateX(-50%))
    이라, 폭이 넓은 툴팁(MDD 차트의 "날짜 · 가격 · 낙폭")이 양 끝 지점에서 컨테이너 밖으로
@@ -3541,10 +3547,23 @@ main.hz-scroll { overflow-x: clip; }
 }
 @media (orientation: portrait) {
   .hz-zoom-stage {
-    width: 100vh;
+    /* ⚠️ `100vh` 였다. 폰 브라우저의 `vh` 는 **주소창이 없다고 치고 잰 높이**라, 주소창이
+       떠 있는 실제 화면보다 크다. 돌려 놓으면 그 초과분이 곧 차트의 **양 끝**이라 가격
+       라벨이 통째로 잘렸다(실기기 실측 2026-08-26, 종목 상세 확대). `dvh` 는 지금 보이는
+       높이라 어느 상태에서도 안 넘친다. 확대 보기는 스크롤이 없으니 값이 흔들릴 일도 없다. */
+    width: 100dvh;
     transform: rotate(90deg);
     transform-origin: center;
   }
+}
+
+/* 확대 보기 안에서는 좁은 폭이어도 호버 띠를 켠다. 끄기로 한 이유가 "폰에선 툴팁이 시트에
+   잘려 어차피 안 읽힌다" 였는데, 확대 보기는 시트 밖 전체 화면이라 그 전제가 사라진다.
+   MDD 는 같은 일을 클래스(.mdd-crosshair-zoom)로 하는데, 여기는 감싸는 쪽이 자식 클래스를
+   못 바꾸는 구조(children 을 그대로 두 번 그린다)라 자손 선택자로 켠다.
+   여는 것은 탭이 맡는다(app/TipTap.tsx — 터치엔 호버가 없다). */
+.hz-zoom-stage .hz-xhair {
+  display: flex !important;
 }
 @media (max-width: 560px) {
   .hz-zoom-btn { display: flex; }
