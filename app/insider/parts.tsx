@@ -223,13 +223,13 @@ export function GroupTitle({ children }: { children: React.ReactNode }) {
  *    나머지가 남는다 — 실제로 툴팁이 두 자리에만 붙어 있었다.
  *
  * ⚠️ **하루치다.** `ourTickers` 가 `telegram_us_stock_daily` 를 `.eq("date", mentionDate)`
- *    로 하루만 읽는다. 툴팁이 "언급된 적이 있는" 이었는데 그건 쌓인 기간으로 읽혀서
+ *    로 하루만 읽는다. 툴팁이 "최근 언급된 적이 있는" 이었는데 그건 쌓인 기간으로 읽혀서
  *    실물보다 넓었다 — 8/25 하루가 107종목인데 최근 7일이면 160종목이라, 기간으로
  *    읽으면 53종목이 빠져 보인다(2026-08-25 실측). 하루로 두기로 하고 문구를 좁혔다.
  */
 export function KaderaPill() {
   return (
-    <Pill tone="plain" title="기준일 하루 동안 주식 텔레그램에서 언급된 종목입니다">
+    <Pill tone="plain" title="오늘 주식 텔레그램에서 언급된 종목입니다">
       카더라 언급
     </Pill>
   );
