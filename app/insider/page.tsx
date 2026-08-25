@@ -90,7 +90,7 @@ function HalfSheet({ children }: { children: React.ReactNode }) {
  * 표시는 id 별로 따로 남는다. 두 장이 가리키는 곳이 달라서 하나를 닫았다고 나머지를
  * 안 알려 주면 그 카드는 영영 못 배운다.
  */
-function withTapHint(rows: React.ReactNode[], hint: { id: string; href: string; text: string }) {
+function withTapHint(rows: React.ReactNode[], hint: { id: string; text: string }) {
   if (rows.length === 0) return rows;
   return [rows[0], <TapHint key="__taphint" {...hint} />, ...rows.slice(1)];
 }
@@ -461,7 +461,6 @@ export default async function InsiderPage() {
             // 다 달면 안내가 아니라 잡음이 된다. 전체보기(/insider/list/adds)에는 안 단다.
             items={withTapHint(addRows(ov.managerAdds.slice(0, BLOCK_ROWS)), {
               id: "adds",
-              href: `/insider/stock/${encodeURIComponent(ov.managerAdds[0].ticker)}`,
               text: "종목을 누르면 임원·의원 기록까지 함께 나옵니다",
             })}
           />
@@ -512,8 +511,6 @@ export default async function InsiderPage() {
             href={insiderListHref("managers")}
             items={withTapHint(managerAumRows(ov.managerRanks.slice(0, BLOCK_ROWS), ov.usdKrw), {
               id: "managers",
-              // 이 카드만 목적지가 **인물 상세**다(나머지 둘은 종목 상세).
-              href: `/insider/investor/${ov.managerRanks[0].cik}`,
               text: "이름을 누르면 담은 종목이 비중 순으로 나옵니다",
             })}
           />
