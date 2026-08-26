@@ -64,11 +64,12 @@ export function SectionHead({
         {desc && <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.5, color: C.sub, wordBreak: "keep-all" }}>{desc}</p>}
         {meta && <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.5, color: C.sub2 }}>{meta}</p>}
       </div>
-      {right && <div style={{ flexShrink: 0, marginLeft: "auto" }}>{right}</div>}
+      {right && <div className="hz-sheet-head-side" style={{ flexShrink: 0, marginLeft: "auto" }}>{right}</div>}
       {/* 기간 표기는 알약으로. 회색 맨글씨로 두면 제목 오른쪽에 떠 있는 부스러기처럼
           보이는데, 테두리 없는 알약이면 "이 시트의 조건"이라는 한 덩어리로 읽힌다. */}
       {!right && note && (
         <span
+          className="hz-sheet-head-side"
           style={{
             flexShrink: 0,
             // 아랫줄로 내려간 경우 오른쪽 끝에 붙는다. 같은 줄일 때는 앞 칸이 이미
