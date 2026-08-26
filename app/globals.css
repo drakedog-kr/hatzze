@@ -3834,3 +3834,44 @@ main.hz-scroll { overflow-x: clip; }
 :root[data-theme="dark"] .hz-stock-badge {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
 }
+
+/* ── 좁은 화면의 시트 머리: 설명을 배지 아래까지 편다 ────────────────────────
+   ⚠️⚠️ 설명이 배지 **옆 좁은 칸**에 갇혀 네 줄로 접혔다(375px 의 '주가와 매매 시점',
+   2026-08-26). 배지는 한 줄이라 그 아래가 통째로 비는데 설명은 그 자리를 못 썼다.
+
+   ⭐ 머리를 격자로 바꾸고 글 칸에 `display: contents` 를 걸어 제목·설명을 **부모 격자의
+     칸으로 끌어올린다.** 그러면 제목은 배지와 한 줄에 서고, 설명은 아랫줄에서 폭을 다 쓴다.
+     마크업을 바꾸지 않고 좁은 화면에서만 배치가 달라진다.
+   ⚠️ 자동 배치에 맡기면 안 된다 — DOM 순서가 아이콘·제목·설명·배지라, 설명이 배지 자리로
+     들어간다. 넷 다 칸을 손으로 지정한다.
+   ⚠️ 넓은 화면은 그대로 flex 다. 거기선 설명이 한 줄에 들어가고, 격자로 바꾸면 알약이
+     아랫줄로 내려가던 규칙(hz-sheet-head-txt 의 basis)이 함께 죽는다. */
+@media (max-width: 560px) {
+  .hz-sheet-head {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: start;
+    column-gap: 10px;
+    row-gap: 3px;
+  }
+  .hz-sheet-head-txt {
+    display: contents;
+  }
+  .hz-sheet-head > .ms {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .hz-sheet-head-txt > h3 {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .hz-sheet-head-side {
+    grid-column: 3;
+    grid-row: 1;
+    margin-left: 0;
+  }
+  /* 설명과 보조 줄은 제목 칸에서 시작해 배지 아래까지 편다. */
+  .hz-sheet-head-txt > p {
+    grid-column: 2 / -1;
+  }
+}
