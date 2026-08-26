@@ -1811,7 +1811,10 @@ export function AnalystActions({ rows, rate }: { rows: AnalystAction[]; rate: nu
     const act = r.action ? ACTION_KO[r.action] : undefined;
     return (
       <li key={`${r.date}-${r.firm}-${r.analyst}-${i}`}>
-        <div className="hz-trow hz-actionrow" style={{ padding: "7px 0" }}>
+        {/* ⚠️ 좌우 22 는 **줄이 들고 있어야 한다.** 목록(listStyle)에 주면 줄이 그만큼
+            안쪽으로 밀려서, 호버 하이라이트가 카드 끝까지 못 닿고 양옆에 흰 띠가 남는다
+            (2026-08-26). 다른 목록은 `.hz-trow` 가 `padding: 9px 22px` 로 이미 이 방식이다. */}
+        <div className="hz-trow hz-actionrow" style={{ padding: "7px 22px" }}>
           <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
             <strong className="hz-cellsub" style={{ ...ROW.lead, fontSize: 13 }}>
               {r.firm}
@@ -1862,7 +1865,7 @@ export function AnalystActions({ rows, rate }: { rows: AnalystAction[]; rate: nu
         name="stock_analyst_actions"
         initial={5}
         step={10}
-        listStyle={{ padding: "0 22px", display: "block" }}
+        listStyle={{ padding: 0, display: "block" }}
         footerClassName="hz-sheet-foot-row"
       />
     </div>

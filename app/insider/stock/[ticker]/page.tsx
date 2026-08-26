@@ -435,15 +435,46 @@ export default async function StockDetailPage({
                   이 종목은 아직 커뮤니티에서 잡힌 적이 없습니다.
                 </p>
               ) : (
-                <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginTop: 10, flexWrap: "wrap" }}>
-                  <strong style={{ fontFamily: MONO, fontSize: 24, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
-                    {d.mentionsToday}
-                  </strong>
-                  {/* 위 '공시에 남은 것'의 단위와 같은 규칙 — 값보다 한 단 아래(24 → 22),
-                      굵기와 색으로 가른다. */}
-                  <span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 600, color: C.sub }}>회</span>
-                  <span style={{ fontSize: T.body, color: C.sub }}>
-                    {fmtDate(d.mentionDate)} 하루 · 채널 {d.channelsToday}곳 · 최근 {d.trend.length}일 최다 {peak}회
+                /* ⚠️ 셋을 ` · ` 로 이어 한 줄로 두었더니 큰 숫자 옆에 긴 꼬리가 붙어
+                   읽히지 않았다. 서로 다른 것을 재는 값 셋(언제 · 얼마나 넓게 · 얼마나
+                   드문가)이라 한 줄로 이으면 어디서 끊어 읽을지가 안 보인다.
+                   ⭐ 큰 숫자는 왼쪽에 두고 셋은 **오른쪽 위에 한 줄씩** 세운다. 오른끝
+                     정렬이라 줄마다 시작점이 달라도 끝이 맞아 세 값이 한 묶음으로 읽힌다. */
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    marginTop: 10,
+                  }}
+                >
+                  <span style={{ display: "inline-flex", alignItems: "baseline", gap: 7 }}>
+                    <strong style={{ fontFamily: MONO, fontSize: 24, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
+                      {d.mentionsToday}
+                    </strong>
+                    {/* 위 '공시에 남은 것'의 단위와 같은 규칙 — 값보다 한 단 아래(24 → 22),
+                        굵기와 색으로 가른다. */}
+                    <span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 600, color: C.sub }}>회</span>
+                  </span>
+                  <span
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "flex-end",
+                      gap: 2,
+                      fontSize: T.small,
+                      color: C.sub,
+                      textAlign: "right",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <span>{fmtDate(d.mentionDate)} 하루</span>
+                    <span>채널 {d.channelsToday}곳</span>
+                    <span>
+                      최근 {d.trend.length}일 최다 {peak}회
+                    </span>
                   </span>
                 </div>
               )}
