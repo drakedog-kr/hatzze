@@ -456,6 +456,9 @@ export default async function StockDetailPage({
                     {/* 위 '공시에 남은 것'의 단위와 같은 규칙 — 값보다 한 단 아래(24 → 22),
                         굵기와 색으로 가른다. */}
                     <span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 600, color: C.sub }}>회</span>
+                    {/* '회' 는 숫자에 붙는 단위라 MONO 지만 '언급' 은 낱말이라 본문 글꼴이다.
+                        한 덩이로 묶어 MONO 로 두면 낱말이 숫자처럼 보인다. */}
+                    <span style={{ fontSize: 17, fontWeight: 600, color: C.sub }}>언급</span>
                   </span>
                   <span
                     style={{
