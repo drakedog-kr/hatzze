@@ -1004,7 +1004,7 @@ export function PriceChart({
               className="hz-krw"
               x={PAD_L - LABEL_GAP}
               y={y(v) + 4}
-              fontSize="10.5"
+              fontSize="11"
               fontFamily={MONO}
               fill={C.muted}
               textAnchor="end"
@@ -1015,7 +1015,7 @@ export function PriceChart({
               className="hz-usd"
               x={PAD_L - LABEL_GAP}
               y={y(v) + 4}
-              fontSize="10.5"
+              fontSize="11"
               fontFamily={MONO}
               fill={C.muted}
               textAnchor="end"
@@ -1025,7 +1025,7 @@ export function PriceChart({
           </g>
         ))}
         {monthTicks.map((t, i) => (
-          <text key={i} x={t.x} y={H - 6} fontSize="10.5" fontFamily={MONO} fill={C.muted} textAnchor="middle">
+          <text key={i} x={t.x} y={H - 6} fontSize="11" fontFamily={MONO} fill={C.muted} textAnchor="middle">
             {t.label}
           </text>
         ))}
@@ -1825,7 +1825,7 @@ export function AnalystActions({ rows, rate }: { rows: AnalystAction[]; rate: nu
             {act && (act.tone ? <Pill tone={act.tone}>{act.text}</Pill> : <span style={{ ...ROW.sub }}>{act.text}</span>)}
             {r.rating && <span style={{ ...ROW.sub, fontWeight: 600, color: C.ink }}>{CONSENSUS_KO[r.rating] ?? r.rating}</span>}
           </span>
-          <span style={{ ...ROW.value, fontWeight: 600, textAlign: "right", whiteSpace: "nowrap" }}>
+          <span style={{ ...ROW.value, textAlign: "right", whiteSpace: "nowrap" }}>
             {r.targetNow == null ? (
               <span style={{ ...ROW.sub }}>목표가 없음</span>
             ) : r.targetOld != null && r.targetOld !== r.targetNow ? (
@@ -2034,7 +2034,7 @@ export function HalfRow({
       <span style={{ ...ROW.sub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{note}</span>
       <span
         style={{
-          ...(valueMuted ? { ...ROW.sub, fontFamily: MONO } : { ...ROW.value, fontWeight: 600 }),
+          ...(valueMuted ? { ...ROW.sub, fontFamily: MONO } : ROW.value),
           textAlign: "right",
           whiteSpace: "nowrap",
         }}

@@ -315,7 +315,7 @@ export default async function StockDetailPage({
                 <strong style={{ fontFamily: MONO, fontSize: 20, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
                   {d.ticker}
                 </strong>
-                <span style={{ fontSize: T.body, color: C.sub, overflow: "hidden", textOverflow: "ellipsis" }}>
+                <span style={{ fontSize: T.body, fontWeight: 500, color: C.sub, overflow: "hidden", textOverflow: "ellipsis" }}>
                   {d.name || "이름 미상"}
                 </span>
               </span>
@@ -336,10 +336,10 @@ export default async function StockDetailPage({
                   <span className="hz-range-knob" style={{ left: `${d.week52.position}%` }} />
                 </span>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                  <span style={{ fontFamily: MONO, fontSize: 10.5, color: C.muted }}>
+                  <span style={{ fontFamily: MONO, fontSize: T.small, color: C.muted }}>
                     <Money usd={d.week52.low} rate={d.usdKrw} />
                   </span>
-                  <span style={{ fontFamily: MONO, fontSize: 10.5, color: C.muted }}>
+                  <span style={{ fontFamily: MONO, fontSize: T.small, color: C.muted }}>
                     <Money usd={d.week52.high} rate={d.usdKrw} />
                   </span>
                 </div>
@@ -359,7 +359,7 @@ export default async function StockDetailPage({
                     <span
                       style={{
                         fontFamily: MONO,
-                        fontSize: 12.5,
+                        fontSize: T.body,
                         fontWeight: 800,
                         color: r.pct > 0 ? "var(--c-hot-ink)" : r.pct < 0 ? "var(--c-cold-ink)" : C.sub,
                       }}
@@ -367,7 +367,7 @@ export default async function StockDetailPage({
                       {r.pct > 0 ? "+" : r.pct < 0 ? "−" : ""}
                       {Math.abs(r.pct).toFixed(1)}%
                     </span>
-                    <span style={{ fontSize: 10.5, color: C.muted }}>{r.label}</span>
+                    <span style={{ fontSize: T.small, color: C.muted }}>{r.label}</span>
                   </span>
                 ))}
               </div>
@@ -401,7 +401,7 @@ export default async function StockDetailPage({
               ].map((s) => (
                 <div key={s.label} style={{ display: "flex", flexDirection: "column", gap: 1 }}>
                   <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
-                    <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub }}>{s.label}</span>
+                    <span style={{ fontSize: T.small, fontWeight: 600, color: C.sub }}>{s.label}</span>
                     <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: s.n ? C.ink : C.muted }}>
                       {s.n.toLocaleString("ko-KR")}
                       {/* 단위는 값보다 **한 단 아래**다 — 이 저장소가 `num()` 주석에 적어 둔
@@ -416,7 +416,7 @@ export default async function StockDetailPage({
                     </strong>
                   </div>
                   {/* ⭐ 수 하나보다 **방향**이 말이 많다. 같은 222건이어도 무엇이었는지가 다르다. */}
-                  <span style={{ fontSize: 10.5, color: C.muted, textAlign: "right" }}>{s.sub}</span>
+                  <span style={{ fontSize: T.small, color: C.muted, textAlign: "right" }}>{s.sub}</span>
                 </div>
               ))}
             </div>
@@ -431,7 +431,7 @@ export default async function StockDetailPage({
                 </span>
               </div>
               {d.trend.length === 0 ? (
-                <p style={{ margin: "10px 0 0", fontSize: T.body, color: C.sub, lineHeight: 1.7 }}>
+                <p style={{ margin: "10px 0 0", fontSize: T.body, fontWeight: 500, color: C.sub, lineHeight: 1.7 }}>
                   이 종목은 아직 커뮤니티에서 잡힌 적이 없습니다.
                 </p>
               ) : (
