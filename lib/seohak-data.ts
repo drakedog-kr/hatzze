@@ -1,7 +1,7 @@
 import { getSupabaseServer, warnIfRowCapped } from "@/lib/supabase-server";
 
 /**
- * 서학개미 해부도(/seohak)의 데이터층.
+ * 서학개미 장부(/seohak)의 데이터층.
  *
  * 이 파일의 모든 숫자가 **표 하나(seohak_country_flows)에서 나온다.** 외부 주가지수를
  * 안 쓰는 게 설계의 핵심이다 — 이유가 둘이다.

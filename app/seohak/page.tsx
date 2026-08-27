@@ -18,7 +18,7 @@ import { pageMetadata } from "../seo";
 
 export async function generateMetadata(): Promise<Metadata> {
   return pageMetadata({
-    title: "서학개미 해부도 | hatzze",
+    title: "서학개미 장부 | hatzze",
     // ⚠️ 앞 문장은 '원화로 보면' 카드 하나만 설명했고 원천도 둘만 적었다. 화면이
     // 매매 습관·보유기간·가계 자리·ETF 까지 담게 됐으므로 둘 다 넓힌다.
     description:

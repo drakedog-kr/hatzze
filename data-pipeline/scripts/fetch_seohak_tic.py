@@ -1,5 +1,5 @@
 """미 재무부 TIC(Treasury International Capital)에서 나라별 미국 증권 보유·순매수를
-받아 `seohak_country_flows` 에 upsert. **서학개미 해부도의 뼈대다.**
+받아 `seohak_country_flows` 에 upsert. **서학개미 장부의 뼈대다.**
 
 ## 이 표가 없으면 화면 절반이 죽는다
 
