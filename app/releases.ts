@@ -29,6 +29,12 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 기다리는 동안 무엇이 보이나가 달라졌을 뿐 쓰는 법은 그대로다. Patch.
+    version: "1.4.3",
+    date: "2026-08-27",
+    changes: ["서학개미 장부를 누르면 곧바로 화면이 바뀝니다."],
+  },
+  {
     // 화면 이름만 바뀌었다. 주소도 카드도 그대로라 Patch.
     version: "1.4.2",
     date: "2026-08-27",
