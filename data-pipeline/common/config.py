@@ -15,9 +15,6 @@ NAVER_HUB_KEY = os.environ.get("NAVER_HUB_KEY")
 KRX_API_KEY = os.environ.get("KRX_API_KEY")
 # 한국예탁결제원 외화증권 결제(공공데이터포털 금융위원회). 서학개미 장부의 일별 뼈대다.
 KSD_API_KEY = os.environ.get("KSD_API_KEY")
-# Finnhub — 애널리스트 등급 분포. ⚠️ 무료 티어는 개인·비상업 이용 전제이고, 목표가
-# (`/stock/price-target`)는 유료다(실측 403). 분당 60회 상한이라 종목마다 1초씩 쉰다.
-FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY")
 ECOS_API_KEY = os.environ.get("ECOS_API_KEY")
 ALADIN_TTB_KEY = os.environ.get("ALADIN_TTB_KEY")
 YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY")
