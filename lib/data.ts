@@ -295,13 +295,15 @@ export type StockHighGap = {
 export type ClosePoint = { date: string; close: number };
 
 export async function getKospiCloseSeries(days = 61): Promise<ClosePoint[]> {
-  const { data } = await getSupabaseServer()
+  const { data, error } = await getSupabaseServer()
     .from("indicators")
     .select("id,indicator_values(date,raw_value)")
     .eq("slug", "kospi_close_raw")
     .order("date", { referencedTable: "indicator_values", ascending: false })
     .limit(days, { referencedTable: "indicator_values" })
     .maybeSingle();
+  // 실패해도 빈 배열이라 차트가 "자료 없음" 으로 보인다. 폴백은 그대로 두고 소리만 낸다.
+  if (error) console.error("[getKospiCloseSeries] 코스피 종가 계열을 못 읽었습니다", error);
   const rows = (data?.indicator_values ?? []) as { date: string; raw_value: number }[];
   // 위 쿼리는 최신순이라 뒤집어 시간 순으로 돌려준다.
   return rows
@@ -312,13 +314,14 @@ export async function getKospiCloseSeries(days = 61): Promise<ClosePoint[]> {
 }
 
 export async function getTopStockHighGaps(limit = 3): Promise<StockHighGap[]> {
-  const { data: rows } = await getSupabaseServer()
+  const { data: rows, error } = await getSupabaseServer()
     .from("indicators")
     .select("id,indicator_values(date,details)")
     .eq("slug", "turnover_concentration")
     .order("date", { referencedTable: "indicator_values", ascending: false })
     .limit(1, { referencedTable: "indicator_values" })
     .maybeSingle();
+  if (error) console.error("[getTopStockHighGaps] 고점 근접 종목을 못 읽었습니다", error);
 
   type StoredStock = { name: string; code?: string; price?: number; high52?: number; gap_pct?: number };
   const details = rows?.indicator_values?.[0]?.details as
