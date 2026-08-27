@@ -375,6 +375,21 @@ function AntIcon({ size = 16 }: { size?: number }) {
  * 한번 켜면 끄지 않는다(목록에 쌓아 둔다). 마우스가 들락날락할 때마다 프리페치가
  * 껐다 켜지면 그게 더 낭비다.
  *
+ * **쉬는 값은 `false` 다 — `undefined`(=Next 기본값) 가 아니다.** 기본값으로 두면
+ * 링크가 화면에 들어오는 순간 자동으로 프리페치가 나간다. 사이드바와 모바일 메뉴가
+ * 같은 목록을 두 벌 그리는 탓에 홈 한 번 여는 데 그 요청이 **9건** 붙었다.
+ * 이 사이트는 루트 레이아웃이 cookies() 를 읽어 전 라우트가 동적이라, 9건이 전부
+ * CDN 을 못 타고 함수를 깨운다(x-vercel-cache: MISS). 방문 1회에 함수 10회였다.
+ *
+ * 그 9건이 사 오던 건 loading 껍데기뿐이고(3.7~3.9KB), `/seohak` 과 `/` 는 loading.tsx
+ * 가 없어 본문이 `[null,null]` 인 빈 응답이었다. 끄면서 잃는 건 hover 없이 곧바로 누른
+ * 첫 탭에서 스켈레톤이 0.06~0.1초 늦게 뜨는 것뿐이다 — 뒤이어 기다릴 데이터 왕복이
+ * 0.6~1.3초라 그 10분의 1 미만이다. (전부 2026-08-27 프로덕션 실측)
+ *
+ * ⚠️ `false` 는 뷰포트 진입뿐 아니라 **hover 프리페치까지 끈다**(Next 문서 Link#prefetch).
+ * 그래서 아래 arm 이 선택이 아니라 필수다. 이 훅을 걷어내고 `prefetch={false}` 만
+ * 남기면 위에 적은 클릭 왕복 0.7~1.5초가 그대로 돌아온다.
+ *
  * prefetch 는 **프로덕션 빌드에서만 동작한다** — `npm run dev` 로는 확인할 수 없고
  * `npm run build:local` + `start:local`(hatzze-prod) 로 봐야 한다.
  */
@@ -382,8 +397,8 @@ function useIntentPrefetch() {
   const [armed, setArmed] = useState<string[]>([]);
   const arm = (href: string) => setArmed((a) => (a.includes(href) ? a : [...a, href]));
   return (href: string) => ({
-    // undefined = Next 기본값 유지(경계까지 부분 프리페치). true = 데이터까지 전부.
-    prefetch: armed.includes(href) ? true : undefined,
+    // true = 데이터까지 전부(클라이언트 캐시 5분). false = 자동 프리페치 없음.
+    prefetch: armed.includes(href),
     onMouseEnter: () => arm(href),
     onFocus: () => arm(href),
     onTouchStart: () => arm(href),
