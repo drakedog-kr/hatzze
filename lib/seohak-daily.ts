@@ -1,7 +1,7 @@
 import { getSupabaseServer } from "@/lib/supabase-server";
 
 /**
- * 서학개미 해부도의 **일별 층** 데이터.
+ * 서학개미 장부의 **일별 층** 데이터.
  *
  * 전부 `seohak_settlement_daily` 한 표에서 나온다(예탁결제원 결제 통계, 미국·주식만).
  * 결제일은 거래일보다 1영업일 늦다 — 휴장일 실측으로 확정한 값이다.

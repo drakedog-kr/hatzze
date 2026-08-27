@@ -457,7 +457,7 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_upbit_speculation.py
 
-      # ── 서학개미 해부도 ─────────────────────────────────────────────────
+      # ── 서학개미 장부 ──────────────────────────────────────────────────
       # ⚠️⚠️ 이 화면은 **파이프라인에 아예 안 붙어 있었다.** 2026-08-19 에 확인하니
       #    `seohak_country_flows` 의 마지막 달이 2026-05 로 110일 묵어 있었다 —
       #    수집 스크립트가 없어서 누가 한 번 손으로 채운 뒤 그대로 멈춰 있었다.
@@ -930,7 +930,7 @@ jobs:
           fi
           exit 1
 
-      # ── 서학개미 해부도 전용 알림 ────────────────────────────────────────
+      # ── 서학개미 장부 전용 알림 ─────────────────────────────────────────
       # 위 알림들과 **합치지 않았다.** 제목이 곧 진단이라는 같은 이유다.
       #
       # ⚠️ 이 스텝이 죽으면 화면이 **조용히 낡는다.** 카드는 그대로 뜨고 알약의 기준일만
@@ -951,7 +951,7 @@ jobs:
           outcomes=("${{ steps.seohak_settlement.outcome }}" "${{ steps.seohak_etf.outcome }}" "${{ steps.seohak_tic.outcome }}")
 
           {
-            echo "## 서학개미 해부도"
+            echo "## 서학개미 장부"
             echo "| Script | Result |"
             echo "|---|---|"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -976,7 +976,10 @@ jobs:
         run: |
           run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           failed="${SEOHAK_FAILED_SCRIPTS:-요약 탭에서 확인}"
-          title="⚠️ 서학개미 해부도 수집 중단"
+          # ⚠️ 이 제목으로 열린 이슈를 찾아 코멘트를 단다(아래 `in:title` 검색). 제목을 바꾸면
+          #    옛 제목으로 열려 있던 이슈는 못 찾고 새 이슈가 하나 더 열린다. 2026-08-27 개명
+          #    때는 옛 제목으로 열린 이슈가 없어 그대로 갈아 끼웠다.
+          title="⚠️ 서학개미 장부 수집 중단"
           note=$(printf '서학개미 수집이 실패했습니다. 카드는 그대로 뜨고 **알약의 기준일만 안 움직입니다** — 없어지지 않아서 눈에 안 띕니다.\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n하루 실패는 다음 실행이 만회합니다(전 기간을 다시 씁니다). 며칠 연속 열리면 재무부가 파일 이름이나 계열 키를 바꾼 것이니 `fetch_seohak_tic.py` 머리말의 source_id 규칙부터 보세요 — 계열을 못 찾으면 일부러 죽게 해 뒀습니다.' \
             "$(date -u '+%Y-%m-%d %H:%M')" "$failed" "$run_url")
           existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')

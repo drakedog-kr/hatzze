@@ -1,7 +1,7 @@
 import { getSupabaseServer, warnIfRowCapped } from "@/lib/supabase-server";
 
 /**
- * 서학개미 해부도의 **분기 층** — 기관과 나머지.
+ * 서학개미 장부의 **분기 층** — 기관과 나머지.
  *
  * 원천 표는 `seohak_quarterly_returns` 이고, 그건 `calculate_seohak_quarterly.py` 가
  * 13F 23,356행과 TIC 498개월을 접어 만든 것이다. 화면이 13F 를 직접 읽으면 방문 한 번에

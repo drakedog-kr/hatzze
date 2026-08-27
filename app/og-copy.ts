@@ -60,14 +60,14 @@ export const US_KADERA_CARD: OgCopy = {
  * ⛔ 숫자를 적지 않는다. 카드는 한 번 굳으면 못 고치는데 이 화면의 값은 매일 바뀐다.
  */
 export const SEOHAK_CARD: OgCopy = {
-  title: "서학개미 해부도",
+  title: "서학개미 장부",
   lines: [
     "개인이 미국 주식을 언제 사고파는지 봅니다.",
     "한 번 사면 얼마나 들고 있는지,",
     "넣은 돈이 지금 얼마가 됐는지 함께 봅니다.",
   ],
   foot: "hatzze.fun/seohak",
-  alt: "서학개미 해부도 · 개인이 미국 주식을 언제 사고파는지 봅니다",
+  alt: "서학개미 장부 · 개인이 미국 주식을 언제 사고파는지 봅니다",
 };
 
 export const MDD_CARD: OgCopy = {

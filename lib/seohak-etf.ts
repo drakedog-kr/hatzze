@@ -1,7 +1,7 @@
 import { getSupabaseServer } from "@/lib/supabase-server";
 
 /**
- * 서학개미 해부도의 **ETF 층** — 미국에 가는 두 번째 길.
+ * 서학개미 장부의 **ETF 층** — 미국에 가는 두 번째 길.
  *
  * 원천은 `seohak_etf_daily`(KRX Open API `etp/etf_bydd_trd`). 국내 상장 미국 ETF 만
  * 담기므로 하루 273행이다.

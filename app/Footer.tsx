@@ -32,7 +32,7 @@ const CONTACT_EMAIL = "hatzze@proton.me";
 // api.telegram.org(우리 발송 봇)은 우리 설비지 자료 출처가 아니라 여기 안 적는다.
 const SOURCE_GROUPS: { label: string; items: string }[] = [
   { label: "증시·시세", items: "한국거래소 통계정보 · 야후 파이낸스" },
-  /* 서학개미 해부도가 통째로 여기서 나온다. 넷 다 출처 표기를 요구하는 원천이라
+  /* 서학개미 장부가 통째로 여기서 나온다. 넷 다 출처 표기를 요구하는 원천이라
      화면에 이름이 있어야 한다.
        미 재무부 TIC  — 한국인이 든 미국 주식 잔고·순매수(월별, 1985~)
        한국예탁결제원 — 국내 증권사를 거친 외화증권 결제(일별, 1994~)
@@ -192,7 +192,7 @@ export default function Footer() {
                 목록도 사이드바를 그대로 따라야 한다(바로 위 주석의 규칙). */}
             <FooterLink href="/insider">내부자 리포트</FooterLink>
             <FooterLink href="/mdd">MDD 정밀분석</FooterLink>
-            <FooterLink href="/seohak">서학개미 해부도</FooterLink>
+            <FooterLink href="/seohak">서학개미 장부</FooterLink>
             {/* 사이드바가 모바일에서 숨겨져 텔레그램 링크가 사라진다 — 내부 내비게이션과
                 같은 방식으로 푸터에 두어 좁은 화면에서도 닿게 한다. 라벨과 aria 는
                 AppShell 의 TELEGRAM 상수와 같은 문구로 맞춘다(두 내비게이션이 같은
