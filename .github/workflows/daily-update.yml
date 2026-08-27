@@ -54,7 +54,79 @@ on:
         default: false
 
 jobs:
+  # ── 예약 실행 건너뛰기 게이트 ──────────────────────────────────────────────
+  #
+  # 이 발화 시각 뒤에 **수동 실행이 이미 돌았거나 지금 돌고 있으면** 예약 실행을
+  # 통째로 건너뛴다. 2026-08-27 에 필요해졌다 — 깃헙 예약 큐가 밀려 저녁 실행이
+  # 두 시간 넘게 안 생겼고(그날 아침 것은 207분 지각이었다), 손으로 대신 돌린 뒤
+  # 밀린 예약이 뒤늦게 풀리면 두 실행이 겹친다. 겹치면 셋이 문제다.
+  #
+  #   1. 일곱 집계가 전량 삭제 후 삽입이라 같은 표를 동시에 쓰면 뒤엉킨다.
+  #   2. 디시 표본은 '실행 직전 두 시간'이라, 늦게 돈 쪽이 눈금 밖 시간대의 값으로
+  #      방금 받은 값을 덮어쓴다(눈금은 17:45~20:00 표본 기준으로 재보정돼 있다).
+  #   3. 발송 조건을 양쪽이 다 만족해 같은 리포트가 두 번 나간다.
+  #
+  # ⚠️ **판단 기준은 '오늘 돌았나'가 아니라 '이 발화 뒤에 돌았나'다.** 아침에 손으로
+  #    한 번 돌렸다고 저녁 예약까지 막으면 안 된다. 그래서 크론 문자열로 이 실행의
+  #    발화 시각을 되짚어(가장 가까운 과거의 그 시각) 그 뒤에 생긴 수동 실행만 센다.
+  #
+  # ⚠️ **수동 실행이 실패했으면 막지 않는다.** 예약은 그 자체가 만회 수단이다.
+  #    그래서 '성공했거나 아직 도는 중'인 수동 실행만 건너뛸 이유로 본다.
+  #
+  # ⚠️ **게이트가 고장 나면 열려야 한다.** 조회가 실패해도 skip 은 false 로 남고,
+  #    update 잡의 조건도 `!cancelled()` 라 이 잡이 죽어도 파이프라인은 그냥 돈다.
+  #    닫히는 쪽으로 고장 나면 매일 도는 파이프라인이 조용히 멈춘다.
+  guard:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    outputs:
+      skip: ${{ steps.decide.outputs.skip }}
+    steps:
+      - name: 이 발화 뒤에 수동 실행이 있었나
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          CRON: ${{ github.event.schedule }}
+        run: |
+          skip=false
+          if [ "$EVENT" = "schedule" ]; then
+            case "$CRON" in
+              "30 21 * * *") fire_hm="21:30" ;;
+              "30 8 * * *")  fire_hm="08:30" ;;
+              *)             fire_hm="" ;;
+            esac
+            if [ -n "$fire_hm" ]; then
+              # 가장 가까운 과거의 발화 시각(UTC). 지연이 자정을 넘기면 오늘 날짜로
+              # 잡은 값이 미래가 되므로 하루를 뺀다 — 2026-08-27 아침이 실제로 그랬다
+              # (08-26 21:30 발화 → 08-27 00:57 실행).
+              now=$(date -u +%s)
+              fire=$(date -u -d "$(date -u +%Y-%m-%d) $fire_hm" +%s)
+              [ "$fire" -gt "$now" ] && fire=$(( fire - 86400 ))
+              since=$(date -u -d "@$fire" +%Y-%m-%dT%H:%M:%SZ)
+              q=".workflow_runs[] | select(.created_at >= \"$since\") | select(.status != \"completed\" or .conclusion == \"success\") | .html_url"
+              hit=$(gh api "/repos/$GITHUB_REPOSITORY/actions/workflows/daily-update.yml/runs?event=workflow_dispatch&per_page=20" --jq "$q" 2>/dev/null | head -1 || true)
+              if [ -n "$hit" ]; then
+                skip=true
+                echo "발화 $since 뒤에 수동 실행이 있어 이번 예약을 건너뜁니다: $hit"
+                echo "## 예약 실행을 건너뜀" >> "$GITHUB_STEP_SUMMARY"
+                echo "발화 \`$since\` 뒤의 수동 실행이 이 슬롯을 대신했습니다: $hit" >> "$GITHUB_STEP_SUMMARY"
+              else
+                echo "발화 $since 뒤에 수동 실행이 없습니다 — 그대로 진행합니다"
+              fi
+            fi
+          else
+            echo "예약 실행이 아닙니다($EVENT) — 게이트는 예약에만 건다"
+          fi
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+
   update:
+    needs: guard
+    # 게이트가 막았을 때만 건너뛴다. `!cancelled()` 로 두는 건 게이트 잡 자체가
+    # 죽어도(needs 가 실패하면 기본적으로 뒤가 통째로 skip 된다) 파이프라인은
+    # 돌게 하기 위해서다 — 위 '열려야 한다' 주석 참고.
+    if: ${{ !cancelled() && needs.guard.outputs.skip != 'true' }}
     runs-on: ubuntu-latest
     # 실패 시 알림 이슈를 열 수 있도록 issues 쓰기 권한 부여(감지 레이어).
     permissions:
