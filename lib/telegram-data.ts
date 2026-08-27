@@ -68,12 +68,16 @@ function addDaysISO(iso: string, n: number): string {
  */
 const kaderaBaseDate = cache(async (): Promise<string> => {
   const db = getSupabaseAdmin();
-  const { data } = await db
+  const { data, error } = await db
     .from("telegram_sentiment_daily")
     .select("date")
     .order("date", { ascending: false })
     .limit(1)
     .maybeSingle();
+  // ⚠️⚠️ 여기가 11곳 중 제일 위험하다. 실패하면 벽시계(오늘)로 물러나는데, 파이프라인이
+  //      어제까지만 넣어 뒀으면 오늘 날짜에는 행이 없어 **아래 창 계산이 전부 0** 이 된다.
+  //      "표가 비어 있어서"와 "조회가 실패해서"가 화면에서 똑같이 보인다.
+  if (error) console.error("[kaderaBaseDate] 기준일을 못 읽었습니다 — 벽시계로 물러납니다", error);
   return (data?.date as string | undefined) ?? todayKstDate();
 });
 
@@ -352,23 +356,25 @@ export async function lastKaderaUpdatedAt(
   db: ReturnType<typeof getSupabaseAdmin>,
   table: "telegram_daily_brief" | "telegram_us_daily_brief" = "telegram_daily_brief",
 ): Promise<string | null> {
-  const { data } = await db
+  const { data, error } = await db
     .from(table)
     .select("updated_at")
     .order("date", { ascending: false })
     .limit(1);
+  if (error) console.error(`[lastKaderaUpdatedAt] ${table} 의 갱신 시각을 못 읽었습니다`, error);
   const updated = data?.[0]?.updated_at as string | undefined;
   // 표가 비어 있으면(첫 실행 전) 옛 기준으로 물러난다 — 라벨이 통째로 사라지는 것보다 낫다.
   return updated ?? (await lastSyncedAt(db));
 }
 
 export async function lastSyncedAt(db: ReturnType<typeof getSupabaseAdmin>): Promise<string | null> {
-  const { data } = await db
+  const { data, error } = await db
     .from("telegram_channels")
     .select("synced_at")
     .not("synced_at", "is", null)
     .order("synced_at", { ascending: false })
     .limit(1);
+  if (error) console.error("[lastSyncedAt] 마지막 수집 시각을 못 읽었습니다", error);
   return (data?.[0]?.synced_at as string | undefined) ?? null;
 }
 
@@ -404,9 +410,12 @@ async function computeSummaryLive(
   const channelCount = collected.length;
   const totalSubscribers = collected.reduce((s, c) => s + (c.subscriber_count ?? 0), 0);
 
-  const { count: totalMentions } = await db
+  const { count: totalMentions, error: mentionsErr } = await db
     .from("telegram_message_stocks")
     .select("id", { count: "exact", head: true });
+  // ⚠️ 이 자리는 `data` 가 아니라 `count` 를 받아서, "data 만 받는 곳" 을 훑을 때 빠진다.
+  //    실패하면 아래 `totalMentions ?? 0` 이 걸려 **언급 0회**가 그대로 화면에 찍힌다.
+  if (mentionsErr) console.error("[computeSummaryLive] 총 언급 수를 못 읽었습니다", mentionsErr);
 
   // 활성 채널 = 최근 7일 안에 글을 올린 채널.
   // 예전엔 7일치 메시지를 전부 훑어 distinct 를 셌다. 채널이 12개(2천 행)일 땐 됐지만
@@ -416,7 +425,7 @@ async function computeSummaryLive(
   //
   // 이 둘도 재시도를 태운다 — 실패하면 '활성 채널'이 0 이 되고, 아래 '총 메시지'가
   // 기댈 폴백까지 같이 빈다.
-  const { data: lastStat } = await withRetry(() =>
+  const { data: lastStat, error: statErr } = await withRetry(() =>
     db
       .from("telegram_channel_stats")
       .select("date")
@@ -424,6 +433,8 @@ async function computeSummaryLive(
       .order("date", { ascending: false })
       .limit(1),
   );
+  // 재시도까지 하고도 실패하면 statDate 가 undefined 라 아래 주간 조회를 통째로 건너뛴다.
+  if (statErr) console.error("[computeSummaryLive] 주간 통계 기준일을 못 읽었습니다", statErr);
   const statDate = lastStat?.[0]?.date as string | undefined;
   const { data: weekly } = statDate
     ? await withRetry(() =>
@@ -1204,7 +1215,10 @@ async function channelBreadth(codes: string[], from: string, to: string): Promis
 /** 종목 텔레그램 리포트 — 특정 종목의 최근 창 언급 추이와 관심의 폭. */
 export async function getStockReport(code: string): Promise<StockReport | null> {
   const db = getSupabaseAdmin();
-  const { data: stock } = await db.from("stocks").select("name,market").eq("code", code).maybeSingle();
+  const { data: stock, error } = await db.from("stocks").select("name,market").eq("code", code).maybeSingle();
+  // ⚠️ null 을 돌려주면 호출부가 **없는 종목**으로 다룬다. 실재하는 종목이 조회 실패
+  //    한 번에 404 처럼 보이므로, 적어도 로그에서는 둘을 가를 수 있어야 한다.
+  if (error) console.error(`[getStockReport] ${code} 종목 정보를 못 읽었습니다`, error);
   if (!stock) return null;
 
   // **차트와 수치의 창이 다르다.** 막대는 STOCK_CHART_DAYS 일치를 그리고, 언급 수·채널
@@ -1398,10 +1412,11 @@ const THEME_PRIOR_GAP_DAYS = 5;
  */
 export async function getThemeRotation(limit = 10): Promise<ThemeRotation[]> {
   const db = getSupabaseAdmin();
-  const { data } = await db
+  const { data, error } = await db
     .from("telegram_theme_daily")
     .select("date,theme,share_pct,mention_count,stock_count")
     .gte("date", daysAgoKstDate(THEME_LOOKBACK_DAYS));
+  if (error) console.error("[getThemeRotation] 테마 집계를 못 읽었습니다", error);
   if (!data?.length) return [];
 
   const dates = [...new Set(data.map((r) => r.date))].sort();
@@ -1846,11 +1861,12 @@ export async function getEcosystemSentiment(): Promise<EcosystemSentiment | null
   // 반쪽 표본에 끌려다녔다. 두 카드가 같은 기간을 말해야 총평 문장도 옆 막대와 맞는다.
   const base = await kaderaBaseDate();
   const window = windowBefore(base, KADERA_WINDOW_DAYS);
-  const { data } = await db
+  const { data, error } = await db
     .from("telegram_sentiment_daily")
     .select("date,scope,positive_count,neutral_count,negative_count,message_count")
     .gte("date", window[0])
     .lte("date", window[window.length - 1]);
+  if (error) console.error("[getEcosystemSentiment] 감성 집계를 못 읽었습니다", error);
   if (!data?.length) return null;
 
   const agg = new Map<string, { pos: number; neu: number; neg: number; total: number }>();
@@ -1888,11 +1904,12 @@ export async function getEcosystemSentiment(): Promise<EcosystemSentiment | null
   // 예전엔 날짜를 안 보고 최신 한 행을 집었다. 그래서 그날 실행이 실패하면 이틀·사흘 전
   // 문장이 오늘 숫자 옆에 그대로 붙었다(2026-08-04 수집 타임아웃 같은 날). 못 찾으면
   // 문장 없이 숫자만 낸다 — 틀린 기간을 말하는 문장을 붙이는 것보다 없는 편이 낫다.
-  const { data: brief } = await db
+  const { data: brief, error: briefErr } = await db
     .from("telegram_daily_brief")
     .select("sentiment_summary")
     .eq("date", base)
     .maybeSingle();
+  if (briefErr) console.error("[getEcosystemSentiment] 총평 문장을 못 읽었습니다", briefErr);
 
   // 헤드라인은 중립을 뺀 낙관도 — 테마별 막대와 같은 기준으로 맞춘다(위 타입 주석 참고).
   const optimism = optimismPct(overall.pos, overall.neg) ?? 50;
@@ -2080,9 +2097,10 @@ async function computeIssueKeywords(limit: number): Promise<IssueKeyword[]> {
  */
 export async function getStockNarratives(): Promise<Record<string, string>> {
   const db = getSupabaseAdmin();
-  const { data } = await db
+  const { data, error } = await db
     .from("telegram_stock_narrative")
     .select("stock_code,narrative")
     .eq("date", await kaderaBaseDate());
+  if (error) console.error("[getStockNarratives] 종목 설명 문장을 못 읽었습니다", error);
   return Object.fromEntries((data ?? []).map((r) => [r.stock_code as string, r.narrative as string]));
 }
