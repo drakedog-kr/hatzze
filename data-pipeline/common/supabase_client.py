@@ -1,8 +1,53 @@
+import time
+
+import httpx  # supabase(postgrest)가 쓰는 HTTP 클라이언트. 전송 예외 타입만 빌려 온다.
 from supabase import Client, create_client
 
 from .config import SUPABASE_SECRET_KEY, SUPABASE_URL
 
 PAGE_SIZE = 1000  # PostgREST 기본 상한
+
+# 연결이 끊겼을 때 같은 페이지를 다시 받는 횟수와 그 사이 대기(초).
+TRANSPORT_RETRIES = 3
+TRANSPORT_BACKOFF = (1, 3, 8)
+
+
+def execute_with_retry(q):
+    """조회를 실행하되 **전송이 끊긴 경우에만** 같은 요청을 다시 던진다.
+
+    2026-08-27 아침 파이프라인(run #156)이 `calculate_telegram_sentiment.py` 에서
+    `httpx.RemoteProtocolError: <ConnectionTerminated error_code:0>` 로 죽었다.
+    Supabase 앞단이 keep-alive 연결을 **정상 종료(GOAWAY)** 하면서, 마침 그 위에 실려
+    있던 페이지 요청 하나가 예외가 된 것이다. 표가 잘린 것도 질의가 틀린 것도 아니라
+    **연결만 끊긴 것**이라, 같은 요청을 새 연결로 다시 던지면 그대로 이어진다.
+
+    **왜 postgrest 의 재시도로는 안 되나.** 거기에도 재시도가 있지만
+    (`send_with_retry`) **HTTP 503·520 응답만** 본다. 전송 계층 예외는 애초에 응답이
+    없어 그 조건에 안 걸리고 그대로 올라온다.
+
+    **왜 하필 페이징이 위험한가.** 10만 행대 표는 1,000행씩 끊어 받으므로 스크립트
+    하나가 **한 연결에 요청을 수백 번** 쏟는다(실측 2026-08-27: 위 스크립트가 읽는 표
+    셋에서 567회·52초). 한 번의 확률은 작아도 요청 수만큼 쌓이고, 표가 자랄수록 매일
+    커진다. 같은 이유로 이건 **재현되지 않는다** — 같은 조회를 로컬에서 완주시켜도
+    멀쩡하고 직전 8회 실행 로그에도 없었다. "다시 돌리니 되던데"로 닫을 종류가 아니다.
+
+    ⚠️ **읽기 전용이다.** insert·upsert 에 그대로 쓰면 안 된다. 요청은 닿았는데 응답만
+    못 받은 경우 다시 던지면 같은 행이 두 번 들어간다. 조회는 몇 번을 던져도 결과가
+    같아서(키셋 페이지는 `key > last` 라 이전 페이지와 무관하다) 안전하다.
+    """
+    for attempt in range(TRANSPORT_RETRIES + 1):
+        try:
+            return q.execute()
+        except httpx.TransportError as exc:
+            if attempt == TRANSPORT_RETRIES:
+                raise
+            delay = TRANSPORT_BACKOFF[attempt]
+            print(
+                f"[재시도] 연결이 끊겨 {delay}초 뒤 같은 페이지를 다시 받습니다 "
+                f"({attempt + 1}/{TRANSPORT_RETRIES}) — {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            time.sleep(delay)
 
 
 def get_client() -> Client:
@@ -34,14 +79,12 @@ def load_all(db, table: str, columns: str, order_by: str = "id") -> list[dict]:
     rows: list[dict] = []
     start = 0
     while True:
-        page = (
+        page = execute_with_retry(
             db.table(table)
             .select(columns)
             .order(order_by)
             .range(start, start + PAGE_SIZE - 1)
-            .execute()
-            .data
-        )
+        ).data
         if not page:
             break
         rows += page
@@ -99,7 +142,7 @@ def load_keyset(db, table: str, columns: str, key: str = "id", narrow=None) -> l
             q = narrow(q)
         if last is not None:
             q = q.gt(key, last)
-        page = q.execute().data or []
+        page = execute_with_retry(q).data or []
         if not page:
             break
         if key not in page[0]:

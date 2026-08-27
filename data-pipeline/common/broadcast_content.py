@@ -40,7 +40,7 @@ from collections.abc import Iterable
 from datetime import date, datetime, timedelta
 
 from .channel_breadth import channel_breadth_map
-from .supabase_client import load_keyset
+from .supabase_client import execute_with_retry, load_keyset
 from .surging import load_stock_daily
 from .text_check import problems
 from .timeutil import KST, today_kst
@@ -86,7 +86,7 @@ def _page(db, table: str, columns: str, order_key: str = "id", **filters) -> lis
         q = db.table(table).select(columns)
         for col, (op, val) in filters.items():
             q = getattr(q, op)(col, val)
-        page = q.order(order_key).range(start, start + PAGE - 1).execute().data
+        page = execute_with_retry(q.order(order_key).range(start, start + PAGE - 1)).data
         if not page:
             break
         rows += page

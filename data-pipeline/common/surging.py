@@ -26,6 +26,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from .channel_breadth import channel_breadth_map
+from .supabase_client import execute_with_retry
 from .timeutil import today_kst
 
 LOOKBACK_DAYS = 14   # getSurgingStocks 의 loadStockDaily(14)
@@ -51,7 +52,7 @@ def load_stock_daily(db) -> tuple[list[dict], list[str]]:
     start = 0
     PAGE = 1000
     while True:
-        page = (
+        page = execute_with_retry(
             db.table("telegram_stock_daily")
             # channel_count 는 안 받는다 — 여러 날을 묶은 '서로 다른 채널 수'는 일별
             # 개수로 복원할 수 없어서(common/channel_breadth.py) 쓸 데가 없다.
@@ -59,9 +60,7 @@ def load_stock_daily(db) -> tuple[list[dict], list[str]]:
             .gte("date", since)
             .order("id")
             .range(start, start + PAGE - 1)
-            .execute()
-            .data
-        )
+        ).data
         if not page:
             break
         rows += page
