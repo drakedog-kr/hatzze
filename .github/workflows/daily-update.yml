@@ -65,11 +65,20 @@ on:
     # 아무 값도 없는 것보다 낫다.
     - cron: "30 9 * * *" # 오후 백업(발화 18:30 KST → 실행 ~18:55 → 완료 ~20:20)
   workflow_dispatch:
+    # ⚠️ 예전엔 `send_telegram` 불리언 하나였는데 그게 **B 마감 리포트에만** 걸려 있었다.
+    #    A 어제 브리핑은 조건이 예약 크론에만 묶여 있어 수동으로는 보낼 방법이 아예 없었고,
+    #    체크박스 설명("오늘의 지수를 발송한다")은 둘 다 덮는 것처럼 읽혔다. 2026-08-28
+    #    아침에 깃헙 예약이 안 들어 손으로 돌려야 했는데, 그날 아침 브리핑을 보낼 길이
+    #    없다는 게 그제야 드러났다. 그래서 **어느 포맷을 보낼지 고르는 입력**으로 바꾼다.
     inputs:
-      send_telegram:
-        description: "텔레그램 채널에 오늘의 지수를 발송한다 (예약 실행이 아닌 수동 실행에서는 기본으로 안 보낸다)"
-        type: boolean
-        default: false
+      broadcast:
+        description: "수동 실행에서 채널에 무엇을 보낼지 (none=안 보냄 · morning=어제 브리핑 · evening=마감 리포트)"
+        type: choice
+        default: none
+        options:
+          - none
+          - morning
+          - evening
 
 jobs:
   # ── 예약 실행 건너뛰기 게이트 ──────────────────────────────────────────────
@@ -656,16 +665,20 @@ jobs:
       #   것이고, 그때 이미 발송된 글이 한 번 더 나가면 안 된다. 재실행 뒤에 정말
       #   보내야 하면 아래 [3] 수동 실행을 쓴다.
       #
-      # [3] 수동 실행은 명시적 opt-in — `github.event.inputs.send_telegram == 'true'`
-      #   workflow_dispatch 기본값이 false 라, 손으로 돌리는 실행은 기본적으로 조용하다.
-      #   보내려면 체크박스를 켜야 한다. [2]에 막힌 날의 탈출구이기도 하다.
+      # [3] 수동 실행은 명시적 opt-in — `github.event.inputs.broadcast == 'morning'|'evening'`
+      #   기본값이 `none` 이라 손으로 돌리는 실행은 기본적으로 조용하다. 보내려면 목록에서
+      #   포맷을 골라야 한다. [2]에 막힌 날의 탈출구이기도 하다.
       #
-      #   ⚠️ **`inputs.send_telegram` 으로 줄이지 말 것.** 함정이 둘이다. (a) `inputs`
-      #   컨텍스트는 workflow_dispatch/workflow_call 에서만 채워져서, 예약 실행에서 이걸
-      #   읽는 건 보장된 동작이 아니다. (b) `github.event.inputs.*` 는 boolean 으로
-      #   선언해도 **문자열**로 온다 — 체크를 껐을 때 값이 `'false'` 인데, 빈 문자열이
-      #   아니라서 조건식에서는 **참**이 된다. 즉 `github.event.inputs.send_telegram`
-      #   만 쓰면 수동 실행이 늘 발송된다. `== 'true'` 비교가 둘 다 막는다.
+      #   ⚠️ **A 와 B 를 한 스위치로 묶지 말 것.** 아침에 켜면 마감 리포트가, 저녁에 켜면
+      #   어제 브리핑이 나간다. 시각이 아니라 **사람이 고른 포맷**이 무엇을 보낼지 정해야
+      #   한다. 예전 불리언이 B 에만 걸려 있어서 아침에 켜면 마감 리포트가 나갔다.
+      #
+      #   ⚠️ **`inputs.broadcast` 로 줄이지 말 것.** 함정이 둘이다. (a) `inputs` 컨텍스트는
+      #   workflow_dispatch/workflow_call 에서만 채워져서, 예약 실행에서 이걸 읽는 건
+      #   보장된 동작이 아니다. (b) `github.event.inputs.*` 는 **문자열**로 온다 — 예약
+      #   실행에서는 값이 없어 빈 문자열이지만, 값이 있는 수동 실행에서 `'none'` 은 빈
+      #   문자열이 아니라 조건식에서 **참**이 된다. 즉 이름만 쓰면 늘 발송된다.
+      #   `== 'morning'`·`== 'evening'` 처럼 **값을 비교**해야 둘 다 막힌다.
       #
       # [4] 낡은 값 차단 — check_freshness / calculate_score 결과
       #   두 스텝 다 continue-on-error 라 실패해도 잡이 계속 흐른다. 그래서 outcome 을
@@ -720,8 +733,13 @@ jobs:
           steps.check_freshness.outcome == 'success'
           && steps.calculate_score.outcome == 'success'
           && github.run_attempt == '1'
-          && steps.broadcast_when.outputs.weekday == 'true'
-          && (github.event.schedule == '30 21 * * *' || github.event.schedule == '30 22 * * *')
+          && (
+            (
+              (github.event.schedule == '30 21 * * *' || github.event.schedule == '30 22 * * *')
+              && steps.broadcast_when.outputs.weekday == 'true'
+            )
+            || github.event.inputs.broadcast == 'morning'
+          )
         run: |
           sleep 300   # 파이프라인 완료 후 5분(위 [5] 참고)
           python data-pipeline/scripts/send_telegram_broadcast.py --send --format morning
@@ -735,7 +753,7 @@ jobs:
           && github.run_attempt == '1'
           && (
             ((github.event.schedule == '30 8 * * *' || github.event.schedule == '30 9 * * *') && steps.broadcast_when.outputs.weekday == 'true')
-            || github.event.inputs.send_telegram == 'true'
+            || github.event.inputs.broadcast == 'evening'
           )
         run: |
           sleep 300   # 파이프라인 완료 후 5분(위 [5] 참고)
