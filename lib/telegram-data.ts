@@ -5,6 +5,7 @@ import { cache } from "react";
 import { channelPhotoUrl } from "@/lib/channel-photo";
 import { sentimentTone } from "@/lib/format";
 import { THEMES } from "@/lib/stock-themes";
+import { LOAD_FAILED, type MaybeFailed } from "@/lib/load-state";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { changeRateOf, fetchYahooQuote } from "@/lib/yahoo-quote";
 
@@ -1410,13 +1411,16 @@ const THEME_PRIOR_GAP_DAYS = 5;
  * 절대 언급량은 주말에 급감해 비교가 안 되므로 '그날 전체 대비 점유율'로 본다.
  * 순위 변동·점유율 증감은 5일 이상 이전 데이터가 있을 때만 계산한다(축적 초기 왜곡 방지).
  */
-export async function getThemeRotation(limit = 10): Promise<ThemeRotation[]> {
+export async function getThemeRotation(limit = 10): Promise<MaybeFailed<ThemeRotation[]>> {
   const db = getSupabaseAdmin();
   const { data, error } = await db
     .from("telegram_theme_daily")
     .select("date,theme,share_pct,mention_count,stock_count")
     .gte("date", daysAgoKstDate(THEME_LOOKBACK_DAYS));
-  if (error) console.error("[getThemeRotation] 테마 집계를 못 읽었습니다", error);
+  if (error) {
+    console.error("[getThemeRotation] 테마 집계를 못 읽었습니다", error);
+    return LOAD_FAILED;
+  }
   if (!data?.length) return [];
 
   const dates = [...new Set(data.map((r) => r.date))].sort();
@@ -1854,7 +1858,7 @@ export function optimismPct(pos: number, neg: number): number | null {
  * 생태계 센티먼트 — 최근 7일 메시지 톤 구성 + 테마별 낙관 비중 + LLM 총평.
  * 테마는 파이프라인이 config/stock_themes.py(테마 로테이션과 같은 사전)로 묶어 둔 것이다.
  */
-export async function getEcosystemSentiment(): Promise<EcosystemSentiment | null> {
+export async function getEcosystemSentiment(): Promise<MaybeFailed<EcosystemSentiment | null>> {
   const db = getSupabaseAdmin();
   // 종목 리포트와 **같은 날짜 구간**을 본다(windowBefore = 기준일 뺀 그 앞 N일).
   // 예전엔 여기만 daysAgoISO 로 굴러 오늘이 섞였는데, 오늘은 하루가 덜 차서 낙관도가
@@ -1866,7 +1870,10 @@ export async function getEcosystemSentiment(): Promise<EcosystemSentiment | null
     .select("date,scope,positive_count,neutral_count,negative_count,message_count")
     .gte("date", window[0])
     .lte("date", window[window.length - 1]);
-  if (error) console.error("[getEcosystemSentiment] 감성 집계를 못 읽었습니다", error);
+  if (error) {
+    console.error("[getEcosystemSentiment] 감성 집계를 못 읽었습니다", error);
+    return LOAD_FAILED;
+  }
   if (!data?.length) return null;
 
   const agg = new Map<string, { pos: number; neu: number; neg: number; total: number }>();
@@ -2095,12 +2102,15 @@ async function computeIssueKeywords(limit: number): Promise<IssueKeyword[]> {
  * (build_stock_digests 도 `latest - 1일`에서 끝난다), 날짜를 안 보고 최신 행을 집으면
  * 막대는 기준일까지 그리는데 글은 그 하루 전까지를 말하게 된다.
  */
-export async function getStockNarratives(): Promise<Record<string, string>> {
+export async function getStockNarratives(): Promise<MaybeFailed<Record<string, string>>> {
   const db = getSupabaseAdmin();
   const { data, error } = await db
     .from("telegram_stock_narrative")
     .select("stock_code,narrative")
     .eq("date", await kaderaBaseDate());
-  if (error) console.error("[getStockNarratives] 종목 설명 문장을 못 읽었습니다", error);
+  if (error) {
+    console.error("[getStockNarratives] 종목 설명 문장을 못 읽었습니다", error);
+    return LOAD_FAILED;
+  }
   return Object.fromEntries((data ?? []).map((r) => [r.stock_code as string, r.narrative as string]));
 }

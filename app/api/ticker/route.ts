@@ -7,6 +7,7 @@ import {
   getSurgingStocks,
   getTopStocksWithTrend,
 } from "@/lib/telegram-data";
+import { isLoadFailed } from "@/lib/load-state";
 
 // 탑바 티커에 실을 값. 전부 우리가 만든 데이터다(카더라 집계).
 //
@@ -84,7 +85,9 @@ export async function GET() {
   // 헤드라인 숫자와 같은 값·같은 말(낙관)을 쓴다. 전체 대비 '긍정 비율'(sentiment.positive)
   // 을 쓰면 안 된다 — 중립이 절반쯤이라 구조적으로 낮게 나오고, 예전에 한 카드 안에서
   // '낙관'이 두 숫자로 갈렸던 바로 그 사고가 이번엔 두 화면 사이에서 난다.
-  if (sentiment) {
+  // ⚠️ LOAD_FAILED 는 truthy 라 `if (sentiment)` 만으로는 안 걸러진다. 티커는 곁다리라
+  //    실패했을 때 할 일은 빈 칸과 같다 — 이 칸만 빼고 나머지를 흘린다.
+  if (sentiment && !isLoadFailed(sentiment)) {
     quotes.push({
       key: "sentiment",
       label: "생태계 센티먼트",

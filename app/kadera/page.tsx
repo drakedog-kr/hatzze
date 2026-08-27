@@ -19,6 +19,7 @@ import {
 import type { ThemeRotation, TrendingMessage } from "@/lib/telegram-data";
 
 import { formatKstUpdate } from "@/lib/format";
+import { isLoadFailed } from "@/lib/load-state";
 
 import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
@@ -315,11 +316,11 @@ export default async function KaderaPage() {
     surging,
     channels,
     rising,
-    themes,
+    rawThemes,
     reports,
-    sentiment,
+    rawSentiment,
     keywords,
-    narratives,
+    rawNarratives,
   ] =
     await Promise.all([
       getTelegramSummary(),
@@ -334,6 +335,23 @@ export default async function KaderaPage() {
       getStockNarratives(),
     ]);
   const stockReports = reports.filter((r): r is NonNullable<typeof r> => r !== null);
+
+  /* ── 조회 실패를 "자료 없음" 과 가른다 ───────────────────────────────────
+     세 로더는 실패하면 `LOAD_FAILED` 를 돌려준다(lib/load-state.ts). 여기서 **한 번만**
+     갈라 두면 아래 렌더 1,000여 줄은 예전 타입 그대로 쓰고, 빈 상태를 그리는 자리에서만
+     문구를 바꿔 끼우면 된다.
+
+     ⭐ 폴백 값은 예전과 같다(`[]` · `null` · `{}`). 달라지는 건 **화면이 그 빈 값을 뭐라고
+     설명하느냐**뿐이다 — "아직 없습니다" 는 사실이 아닐 수 있고, 실패했을 때 그렇게 적으면
+     화면이 거짓말을 한다(2026-08-06 "언급 1,002회 · 0개 채널"). */
+  const themesFailed = isLoadFailed(rawThemes);
+  const themes = themesFailed ? [] : rawThemes;
+  const sentimentFailed = isLoadFailed(rawSentiment);
+  const sentiment = sentimentFailed ? null : rawSentiment;
+  /* ⚠️ 흐름 요약은 **문구를 안 붙인다.** 이 문단은 종목 카드 4장 안에 각각 들어가서, 한 줄을
+     넣으면 같은 문장이 네 번 뜬다. 게다가 문단이 빠져도 카드가 거짓을 말하지는 않는다 —
+     "요약이 없다"고 적는 자리가 아니라 그냥 없는 것이다. 실패는 #394 의 로그로만 잡는다. */
+  const narratives = isLoadFailed(rawNarratives) ? {} : rawNarratives;
 
   /* 요약 글에서 굵게 집을 낱말. **오늘 화면이 이미 뽑아 둔 것**만 쓴다(highlightTerms
      주석 참고). 여기 없는 종목은 요약에 나와도 굵어지지 않는다 — 회자되는 것과
@@ -608,7 +626,9 @@ export default async function KaderaPage() {
               )}
             </div>
             {!sentiment ? (
-              <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 분석된 메시지가 없습니다.</p>
+              <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>
+                {sentimentFailed ? "감성 집계를 불러오지 못했습니다." : "아직 분석된 메시지가 없습니다."}
+              </p>
             ) : (
               <>
                 {/* 이 칸이 답하는 건 "지금 분위기 좋아, 나빠?" 하나다. 그래서 숫자도 한 벌만
@@ -883,7 +903,9 @@ export default async function KaderaPage() {
             noteHelp="최근 3일 평균 점유율을 그 이전과 비교합니다. 하루치끼리 재면 표본 얇은 날에 크게 요동쳐서, 며칠씩 묶어서 봅니다. 점유율의 분모는 테마 사전에 든 종목의 언급이라 열 줄 밖까지 다 더하면 100%가 됩니다."
           />
           {themes.length === 0 ? (
-            <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>아직 집계된 테마가 없습니다.</p>
+            <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>
+              {themesFailed ? "테마를 불러오지 못했습니다." : "아직 집계된 테마가 없습니다."}
+            </p>
           ) : (
             <>
               <div className="hz-kd-duo" style={{ borderBottom: "1px solid var(--c-sheet-line)" }}>

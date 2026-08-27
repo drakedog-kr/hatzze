@@ -1,6 +1,7 @@
 import React from "react";
 
 import { getKospiCloseSeries, getLatestDailyScore, getPublicIndicators, getTopStockHighGaps } from "@/lib/data";
+import { isLoadFailed } from "@/lib/load-state";
 import type { ClosePoint, DailyScore, IndicatorCategory, IndicatorWithLatestValue, StockHighGap } from "@/lib/data";
 import { compareLabel, formatEokMixed, formatIndicatorValue, formatKstUpdate, formatSampleCount, sentimentTone, shortDate } from "@/lib/format";
 import { AiMark, BLUE_SCALE, C, Icon, MONO, R, stageForScore } from "./ui";
@@ -1279,7 +1280,7 @@ function CardTurnover({ v }: { v: Pick }) {
  * ⚠️ 막대 길이의 뜻이 예전과 **반대**다. 예전엔 '고점에 얼마나 가까운가'(깊을수록 짧음)
  * 였는데 목업은 '얼마나 빠졌나'(깊을수록 김)로 그린다. 50% 낙폭을 꽉 찬 막대로 둔다.
  */
-function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
+function CardHighGap({ v, tops, failed = false }: { v: Pick; tops: StockHighGap[]; failed?: boolean }) {
   const gap = v.raw ?? 0;
   const priorHigh = v.details?.prior_high;
   const num = (n: number) => n.toLocaleString("ko-KR", { maximumFractionDigits: 0 });
@@ -1301,6 +1302,12 @@ function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
           </span>
         )}
       </div>
+      {/* 조회가 깨졌을 때. 목록을 그냥 빼면 "오늘은 그런 종목이 없나 보다" 로 읽힌다. */}
+      {failed && (
+        <p style={{ margin: 0, fontSize: 12, color: C.sub }}>
+          고점 근접 종목을 불러오지 못했습니다.
+        </p>
+      )}
       {tops.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {/* 현재가·52주 고점 둘 다 야후 **종가**다. 실시간이 아니다 — 파이프라인이 하루 두 번
@@ -1353,7 +1360,7 @@ function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
  * 질문은 "얼마나 빨리 왔나" 하나뿐이고, 그 답은 큰 수치와 눈금 위 위치로 끝난다.
  * 축은 ±20%로 고정한다 — 값에 따라 축이 움직이면 어제와 오늘의 위치를 견줄 수 없다.
  */
-function CardSpeed({ v, path = [] }: { v: Pick; path?: ClosePoint[] }) {
+function CardSpeed({ v, path = [], failed = false }: { v: Pick; path?: ClosePoint[]; failed?: boolean }) {
   const from = v.details?.from_close;
   const to = v.details?.to_close;
   const spd = v.raw ?? 0;
@@ -1392,7 +1399,18 @@ function CardSpeed({ v, path = [] }: { v: Pick; path?: ClosePoint[] }) {
           </div>
         </div>
       ) : (
-        <HeatBar v={v} hideThreshold />
+        /* 점이 모자라면 게이지로 물러난다. 다만 **왜** 물러났는지는 갈린다 — 아직 궤적이
+           안 쌓인 것과 조회가 깨진 것은 다른 일이라, 뒤엣것만 한 줄로 밝힌다.
+           ⚠️ 실패했을 때만 감싼다. 늘 감싸면 **정상 경로의 마크업이 바뀌어** 이 카드가
+              평소에 그리던 모양까지 건드리게 된다. 고칠 이유가 없는 자리는 안 건드린다. */
+        failed ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <HeatBar v={v} hideThreshold />
+            <span style={{ fontSize: 11, color: C.sub }}>60일 궤적을 불러오지 못했습니다.</span>
+          </div>
+        ) : (
+          <HeatBar v={v} hideThreshold />
+        )
       )}
       <Foot text={v.desc} />
     </Shell>
@@ -2583,13 +2601,23 @@ function GenericCard({ v, icon }: { v: Pick; icon: string }) {
 }
 
 export default async function Home() {
-  const [dailyScore, indicators, topGaps, kospiPath] = await Promise.all([
+  const [dailyScore, indicators, rawTopGaps, rawKospiPath] = await Promise.all([
     getLatestDailyScore(),
     getPublicIndicators(),
     getTopStockHighGaps(3),
     // 상승 속도 카드의 60일 궤적. 내부용 지표라 getPublicIndicators 에 안 잡힌다.
     getKospiCloseSeries(61),
   ]);
+
+  /* 조회 실패를 "자료 없음" 과 가른다(lib/load-state.ts). 두 값 다 카드의 **곁가지**라,
+     실패하면 예전엔 그 구간이 소리 없이 사라졌다 — 고점 근접 목록이 통째로 빠지고
+     상승 속도 스파크라인이 안 그려졌는데, 카드는 멀쩡해 보였다.
+     ⭐ 이 저장소의 규칙은 "카드는 숨기지 말고 이유를 적을 것" 이다. 그래서 값을 감추는
+     대신 실패했다는 사실을 카드 안에 한 줄로 남긴다. */
+  const topGapsFailed = isLoadFailed(rawTopGaps);
+  const topGaps = topGapsFailed ? [] : rawTopGaps;
+  const kospiPathFailed = isLoadFailed(rawKospiPath);
+  const kospiPath = kospiPathFailed ? [] : rawKospiPath;
 
   const bySlug = new Map(indicators.map((i) => [i.slug, i]));
   const p = (slug: string) => pick(bySlug.get(slug));
@@ -2652,9 +2680,9 @@ export default async function Home() {
                     ③ 콘텐츠가 풍부한 2칸 카드들, ④ 해석이 한 단계 필요한 지표 순.
                     버핏지수는 예전에 맨 앞이었지만 분기 GDP 기반이라 30일 변동계수가
                     0.04로 거의 안 움직여(가중치 주석의 "느림·비타이밍"과 같은 이유) 뒤로 뺐다. */}
-                <CardHighGap v={p("kospi_high_gap")} tops={topGaps} />
+                <CardHighGap v={p("kospi_high_gap")} tops={topGaps} failed={topGapsFailed} />
                 <CardVolume v={p("kospi_volume_surge")} />
-                <CardSpeed v={p("kospi_speed_60d")} path={kospiPath} />
+                <CardSpeed v={p("kospi_speed_60d")} path={kospiPath} failed={kospiPathFailed} />
                 <CardLimitUp v={p("limit_up_breadth")} />
                 <CardNetBuy v={p("foreign_sell_at_high")} />
                 <CardTurnover v={p("turnover_concentration")} />
