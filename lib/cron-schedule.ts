@@ -26,7 +26,12 @@ export type Job = {
   label: string;
   /** 던질 워크플로 파일. 세 워크플로가 이 라우트 하나를 같이 쓴다. */
   workflow: string;
-  /** '이 몫이 이미 처리됐나'를 세는 경계(UTC, HH:MM). 발사 시각이 아니라 슬롯의 시작선이다. */
+  /** '이 몫이 이미 처리됐나'를 세는 경계(UTC, HH:MM). 발사 시각이 아니라 슬롯의 시작선이다.
+   *
+   * 하루 두 번 도는 파이프라인은 **슬롯 경계**(06:30·17:30 KST)를 쓴다. 아침 실행이
+   * 저녁 몫으로 세어지면 안 되기 때문이다. 하루 한 번짜리(발송·스캔)는 **KST 자정**
+   * (15:00Z)을 쓴다 — 그날 아무 때 손으로 돌린 실행도 '오늘 몫'으로 세어야 두 번
+   * 나가지 않는다. */
   fireUtc: string;
   /** 던질 때 넘길 입력. 요일에 따라 달라지므로 함수다. */
   inputs: (now: Date) => Record<string, string>;
@@ -81,7 +86,9 @@ export const CRON_TO_JOB: Record<string, Job> = {
     key: "broadcast",
     label: "채널 발송",
     workflow: BROADCAST,
-    fireUtc: "02:20",
+    // KST 자정. 예약(11:20 KST)이든 손으로 돌린 것이든 **그날 실행이 하나라도 있으면**
+    // 안 던진다. 예약 발화 시각(02:20Z)을 경계로 두면 그 전에 손으로 보낸 날 두 번 나간다.
+    fireUtc: "15:00",
     inputs: (now) => ({ send: "true", format: isKstSunday(now) ? "weekly" : "theme" }),
   },
 
@@ -90,7 +97,7 @@ export const CRON_TO_JOB: Record<string, Job> = {
     key: "us-dict-scan",
     label: "미국 종목 사전 스캔",
     workflow: SCAN,
-    fireUtc: "01:00",
+    fireUtc: "15:00", // KST 자정(위 발송과 같은 이유)
     inputs: () => ({}),
   },
 };
