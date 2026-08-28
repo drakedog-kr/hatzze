@@ -132,6 +132,13 @@ jobs:
   # ⚠️ **앞선 실행이 실패했으면 막지 않는다.** 예약은 그 자체가 만회 수단이다. 그래서
   #    '성공했거나 아직 도는 중'인 실행만 건너뛸 이유로 본다.
   #
+  #    ⛔ **단, 그 실행이 이미 발송했으면 막는다(2026-08-29).** 실패한 실행이 발송까지는
+  #       끝냈을 수 있다 — 2026-08-27 의 #159 가 그랬다(브리핑을 보내고 마지막 집계
+  #       스텝에서 죽었다). 그걸 '미처리'로 보고 백업이 만회하면 **같은 브리핑이 두 번**
+  #       나간다. 실행 전체의 결론이 아니라 **그 슬롯의 발송 스텝 결론**을 봐야 하는
+  #       이유다. 조합을 전부 훑어(도착 지연 0~720분 × 결과 셋) 찾아낸 자리이고, 백업이
+  #       앞선 실행의 종료 뒤에 도착하는 구간(실측 기준 약 한 시간)에서 터진다.
+  #
   #    ⭐ **취소(cancelled)는 예외로 '처리됨'으로 센다(2026-08-29).** 사람이 일부러 멈춘
   #       것을 20분 뒤 백업이 다시 돌리면 그 의도를 뒤집는다. 2026-08-28 에 실제로 그럴
   #       뻔했다 — 취소한 #160 을 백업 #161 이 뒤따랐는데, 마침 취소가 아직 진행 중
@@ -213,6 +220,24 @@ jobs:
                 # ⚠️ **main 것만 센다.** 브랜치에서 손으로 돌린 실행(2026-08-25 에 실제로
                 #    있었다)이 섞이면 "이미 처리됨"으로 읽혀 정작 필요한 백업을 막는다.
                 hit=$(gh api "/repos/$GITHUB_REPOSITORY/actions/workflows/daily-update.yml/runs?per_page=30&branch=main" --jq "$q" 2>/dev/null | head -1 || true)
+                if [ -z "$hit" ]; then
+                  # ⛔ 실패로 끝난 앞선 실행이라도 **발송까지는 했을 수 있다**(위 주석).
+                  #    그 슬롯의 발송 스텝이 성공한 실행이 있으면 만회하지 않는다.
+                  case "$fire_hm" in
+                    "21:30") step="A 어제 브리핑" ;;
+                    *)       step="B 마감 리포트" ;;
+                  esac
+                  ids=$(gh api "/repos/$GITHUB_REPOSITORY/actions/workflows/daily-update.yml/runs?per_page=30&branch=main" \
+                        --jq ".workflow_runs[] | select(.created_at >= \"$since\") | select(.created_at < \"$mine\") | .id" 2>/dev/null || true)
+                  for id in $ids; do
+                    sent=$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs" \
+                           --jq "[.jobs[].steps[] | select(.name | contains(\"$step\")) | select(.conclusion == \"success\")] | length" 2>/dev/null || echo 0)
+                    if [ "${sent:-0}" -gt 0 ]; then
+                      hit="https://github.com/$GITHUB_REPOSITORY/actions/runs/$id (이미 $step 발송함)"
+                      break
+                    fi
+                  done
+                fi
                 if [ -n "$hit" ]; then
                   skip=true
                   echo "발화 $since 뒤에 이 슬롯을 이미 처리한 실행이 있어 건너뜁니다: $hit"
