@@ -72,7 +72,11 @@ export async function GET(request: Request) {
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!res.ok) throw new Error(`실행 목록 조회 ${res.status}`);
-    runs = ((await res.json()) as { workflow_runs?: typeof runs }).workflow_runs ?? [];
+    const body = (await res.json()) as { workflow_runs?: typeof runs };
+    // ⚠️ 키가 **없는** 것과 빈 배열은 다르다. 실행이 없는 날은 `[]` 가 오고, 키가 통째로
+    //    없다면 응답 모양이 바뀐 것이라 판단 근거가 없다 — 그때는 던지지 않는다.
+    if (!Array.isArray(body.workflow_runs)) throw new Error("실행 목록 응답 모양이 다르다");
+    runs = body.workflow_runs;
   } catch (e) {
     // 못 정했으니 던지지 않는다(위 주석).
     return NextResponse.json(

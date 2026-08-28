@@ -224,7 +224,33 @@ jobs:
               fi
             fi
           else
-            echo "예약 실행이 아닙니다($EVENT) — 게이트는 예약에만 건다"
+            # ── 수동 실행(폴백 포함) ─────────────────────────────────────────
+            # 시각 검사는 안 한다(사람이 고른 시각이 곧 이유다). 대신 **동시에 두 개가
+            # 도는 것만** 막는다. Vercel 크론은 전달이 best effort 라 같은 예약을 두 번
+            # 부를 수 있는데(문서 명시), 두 요청이 1초 안에 겹치면 서로의 실행을 못 보고
+            # 둘 다 던진다. 그러면 파이프라인이 둘 돌고 브리핑이 두 번 나간다.
+            #
+            # 게이트는 실행이 **생긴 뒤** 도므로 그 경합을 여기서 풀 수 있다. 나보다 먼저
+            # 생겼고 아직 도는 중인 실행이 있으면 늦게 생긴 쪽만 빠진다.
+            # ⚠️ **끝난 실행은 안 센다.** 손으로 다시 돌리는 길(실패 뒤 재시도)을 막으면 안 된다.
+            mine=$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq ".created_at" 2>/dev/null || true)
+            if [ -z "$mine" ]; then
+              echo "내 실행 생성 시각을 못 읽어 게이트를 엽니다 — 그대로 진행합니다"
+            else
+              q=".workflow_runs[]"
+              q="$q | select(.status != \"completed\")"
+              q="$q | select(.created_at < \"$mine\" or (.created_at == \"$mine\" and .id < $GITHUB_RUN_ID))"
+              q="$q | .html_url"
+              busy=$(gh api "/repos/$GITHUB_REPOSITORY/actions/workflows/daily-update.yml/runs?per_page=30&branch=main" --jq "$q" 2>/dev/null | head -1 || true)
+              if [ -n "$busy" ]; then
+                skip=true
+                echo "이미 도는 실행이 있어 건너뜁니다(동시 실행 방지): $busy"
+                echo "## 실행을 건너뜀 — 이미 도는 실행이 있음" >> "$GITHUB_STEP_SUMMARY"
+                echo "$busy 가 아직 돌고 있어 이 실행은 아무것도 하지 않습니다." >> "$GITHUB_STEP_SUMMARY"
+              else
+                echo "수동 실행($EVENT) · 도는 실행 없음 — 그대로 진행합니다"
+              fi
+            fi
           fi
           echo "skip=$skip" >> "$GITHUB_OUTPUT"
 
