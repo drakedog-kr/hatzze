@@ -36,19 +36,19 @@ export type Job = {
   fireUtc: string;
   /** 던질 때 넘길 입력. 요일에 따라 달라지므로 함수다. */
   inputs: (now: Date) => Record<string, string>;
-  /** '이미 처리됨'으로 셀 실행의 **상한**(UTC, HH:MM). 없으면 상한 없음.
-   *
-   * 채널 발송에만 쓴다. 그 워크플로는 예약이 14:05 전에만 보내도록 막혀 있어서, 그 뒤에
-   * 생긴 실행은 **보낼 수 없는 실행**이다. 그런 실행을 '오늘 이미 돌았다'로 세면 폴백이
-   * 안 던져 그날 발송이 통째로 빈다. 그래서 상한 밖 실행은 없는 것으로 본다. */
-  untilUtc?: string;
 };
 
 /**
  * Vercel 크론 → 잡. 크론들이 같은 경로를 쓰므로 `x-vercel-cron-schedule` 헤더로 가른다.
  *
- * 시각은 **아침 07:00 · 저녁 18:00 KST**(22:00Z · 09:00Z)다. `workflow_dispatch` 는 큐를
- * 안 타서 생성과 시작이 같은 초라(실측), 여기 적은 시각이 곧 실행 시작 시각이다.
+ * ⭐ **깃헙 예약은 셋 다 껐다(2026-08-29).** 여기 적힌 시각이 그 워크플로가 도는 유일한
+ * 시각이다. `workflow_dispatch` 는 큐를 안 타서 생성과 시작이 같은 초라(실측), 적어 둔
+ * 시각이 곧 실행 시작 시각이 된다.
+ *
+ * 층을 하나로 줄인 이유: 시계가 둘(깃헙 예약 + Vercel)이면 "누가 먼저 돌았나"를 매 경계
+ * 마다 따져야 하고, 그 경계에서 중복 발송·누락이 계속 나왔다. 시계를 하나로 두면 그
+ * 질문 자체가 사라진다. 깃헙 예약이 다시 믿을 만해지는지는 제품과 무관한 카나리
+ * 워크플로(.github/workflows/cron-canary.yml)로 따로 지켜본다.
  *
  * 실측(2026-08-28)으로 고른 값이다. 실행 시작 +75분에 KRX 공표 게이트, +76분에 디시 수집이
  * 돌고, 소요는 아침 87분·저녁 83분이다. 그래서
@@ -82,30 +82,21 @@ export const CRON_TO_JOB: Record<string, Job> = {
     inputs: (now) => ({ broadcast: isKstWeekday(now) ? "evening" : "none" }),
   },
 
-  // ── 채널 발송(C 관심 이동 · D 주간 결산). 여기서는 Vercel 이 **폴백**이다. ──
+  // ── 채널 발송(C 관심 이동 · D 주간 결산). 14:00 KST. ──
   //
-  // 이 워크플로는 11:20 KST 에 발화해 잡 안에서 14:00 까지 기다린다(최대 3시간). 그
-  // 구조가 이미 **지연에는 강하다** — 예약이 두 시간 늦어도 발송 시각은 14:00 그대로다.
-  // 약한 건 슬롯이 통째로 버려지는 경우뿐이라, 주 시계를 뺏지 않고 14:05 에 확인만 한다.
-  //
-  // ⚠️ 여기에는 게이트 잡이 없다. 그래서 이 워크플로의 깃헙 예약은 **그대로 두고**
-  //    Vercel 이 "실행이 아예 없을 때만" 던진다. 둘 다 도는 상황을 애초에 안 만든다.
   // ⚠️ 요일이 곧 포맷이다 — 수·토는 C(theme), 일요일은 D(weekly). 크론의 `0,3,6` 은
-  //    UTC 05:05 기준 요일이라 KST 로도 같은 날이다(05:05Z = 14:05 KST).
-  "10 5 * * 0,3,6": {
+  //    UTC 05:00 기준 요일이라 KST 로도 같은 날이다(05:00Z = 14:00 KST).
+  "0 5 * * 0,3,6": {
     key: "broadcast",
     label: "채널 발송",
     workflow: BROADCAST,
-    // KST 자정. 예약(11:20 KST)이든 손으로 돌린 것이든 **그날 실행이 하나라도 있으면**
-    // 안 던진다. 예약 발화 시각(02:20Z)을 경계로 두면 그 전에 손으로 보낸 날 두 번 나간다.
+    // KST 자정. 그날 실행이 하나라도 있으면(손으로 돌린 것 포함) 안 던진다.
     fireUtc: "15:00",
-    // 05:05Z = 14:05 KST. 워크플로의 예약 발송 창과 같은 선이다(둘을 같이 옮길 것).
-    untilUtc: "05:05",
     inputs: (now) => ({ send: "true", format: isKstSunday(now) ? "weekly" : "theme" }),
   },
 
-  // ── 주 1회 사전 후보 스캔. 이슈만 여는 유지보수라 급하지 않아 폴백으로 둔다. ──
-  "0 2 * * 1": {
+  // ── 주 1회 사전 후보 스캔. 월 10:00 KST. ──
+  "0 1 * * 1": {
     key: "us-dict-scan",
     label: "미국 종목 사전 스캔",
     workflow: SCAN,
@@ -156,13 +147,11 @@ function kstDay(now: Date): number {
 }
 
 /** 실행 목록에서 이 몫의 실행이 있는지 본다. 결과(성공·실패)는 보지 않는다 — 위 주석 참고.
- *
- * `until` 을 주면 그 시각 **전에 생긴 실행만** 센다(채널 발송 전용, Job.untilUtc 주석). */
+ */
 export function hasRunSince(
   runs: { created_at: string; html_url?: string; conclusion?: string | null }[],
   since: string,
-  until?: string,
 ): { covered: boolean; url?: string } {
-  const hit = runs.find((r) => r.created_at >= since && (!until || r.created_at < until));
+  const hit = runs.find((r) => r.created_at >= since);
   return hit ? { covered: true, url: hit.html_url } : { covered: false };
 }

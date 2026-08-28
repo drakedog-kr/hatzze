@@ -1,0 +1,41 @@
+name: 예약 카나리 (제품과 무관)
+
+# 깃헙 예약이 다시 믿을 만해졌는지만 재는 장치다. **제품 데이터에 아무것도 안 한다** —
+# 시각 한 줄을 찍고 끝난다(10초 안팎).
+#
+# 왜 두나. 2026-08-26~28 에 깃헙 예약이 무너져(실행이 3~10시간 늦거나 아예 안 생김) 세
+# 워크플로의 예약을 다 끄고 시각을 Vercel Cron 으로 옮겼다. 그런데 "깃헙이 회복됐다"를
+# 알려면 계속 재 봐야 하는데, 제품 워크플로로 재면 그게 곧 사고다. 그래서 아무것도 안
+# 하는 워크플로를 하나 두고 그것만 본다.
+#
+# 읽는 법. 발화 시각과 실행 생성 시각의 차이가 지각이고, 실행이 아예 없는 시간대가
+# 버려진 슬롯이다. 둘 다 명령 한 줄로 뽑힌다.
+#
+#   gh run list --workflow="예약 카나리 (제품과 무관)" --limit 50 \
+#     --json createdAt,conclusion --jq '.[] | "\(.createdAt) \(.conclusion)"'
+#
+# 판단 잣대(2026-08-29 기준). 정상이던 때의 지각은 15~41분이었다. 며칠 동안 지각이 그
+# 범위로 돌아오고 버려진 슬롯이 없으면 제품 워크플로의 예약을 되살릴지 정한다.
+#
+# ⚠️ 매시 정각은 전 세계 예약이 몰리는 자리라 깃헙 문서가 피하라고 권한다. 그래서 :23 에
+#    둔다 — 우리가 재려는 건 '한산한 분에서도 안 오는가'다.
+# ⚠️ 하루 24번 돈다. public 저장소라 Actions 분은 무료이고 한 번에 10초 안팎이다.
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 시각만 찍는다
+        run: |
+          echo "발화(cron)     ${{ github.event.schedule || 'workflow_dispatch' }}"
+          echo "지금(UTC)      $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+          echo "지금(KST)      $(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M:%S')"
+          {
+            echo "## 예약 카나리"
+            echo "- 발화: \`${{ github.event.schedule || 'workflow_dispatch' }}\`"
+            echo "- 실행: $(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M:%S') KST"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -20,9 +20,11 @@ const api = (workflow: string, tail: string) =>
  * 예약이 걸린 워크플로 셋을 시각에 맞춰 깨운다. 어느 크론이 불렀는지로 무엇을 던질지
  * 가른다(lib/cron-schedule.ts 의 CRON_TO_JOB).
  *
- *   파이프라인 아침 07:00 · 저녁 18:00 — 여기서는 Vercel 이 **주 시계**다.
- *   채널 발송 수·토·일 14:05 · 사전 스캔 월 11:00 — 여기서는 **폴백**이다
- *   (그 둘은 깃헙 예약을 그대로 두고, 실행이 아예 없을 때만 대신 던진다).
+ *   파이프라인 아침 07:00 · 저녁 18:00 · 채널 발송 수·토·일 14:00 · 사전 스캔 월 10:00
+ *
+ * ⭐ **깃헙 예약은 셋 다 껐다(2026-08-29).** 시계가 여기 하나뿐이라 "누가 먼저 돌았나"를
+ *    따질 경계가 없다. 그래도 아래 '이미 돌았나' 검사는 남긴다 — Vercel 이 같은 예약을
+ *    두 번 부를 수 있기 때문이다(문서 명시).
  *
  * 깃헙 예약이 무너진 날(2026-08-26~28)에 사람이 화면을 보고 알아채 손으로 눌러야 했다.
  * 그 클릭을 대신하는 시계다. 판단 규칙과 시각의 근거는 lib/cron-schedule.ts 주석에 있다.
@@ -85,8 +87,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const until = job.untilUtc ? sinceIso(job.untilUtc, now) : undefined;
-  const { covered, url } = hasRunSince(runs, since, until);
+  const { covered, url } = hasRunSince(runs, since);
   if (covered) {
     return NextResponse.json({ ok: true, job: job.label, since, dispatched: false, covered: url });
   }
