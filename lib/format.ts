@@ -76,6 +76,10 @@ const KST_UPDATE_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
  *   아침  07:00 발사 + 소요 76~105분(평균 87) → 완료 08:16~08:45, 중심 08:27
  *   저녁  18:00 발사 + 소요 69~107분(평균 83) → 완료 19:09~19:47, 중심 19:23
  *
+ * 표기는 `오전 9시 기준` 처럼 **콜론 없이 '시'** 로 적는다(2026-08-29). `9:00` 은 그 시각에
+ * 정확히 잰 값처럼 읽히는데 실제 완료는 08:27 이고, 무엇보다 아래 '벗어난 실행' 쪽이
+ * `8시경` 이라 한 화면에서 콜론과 '시' 가 갈렸다. 이제 **'경' 의 유무만이 정확도를 가른다.**
+ *
  * 그래서 **아침 9시 · 오후 8시**는 그대로 둔다. 중심에서 아침은 33분, 저녁은 37분
  * 앞선다 — 슬랙 2시간 안이라 스냅이 유지되고, 표기를 실제 완료보다 뒤에 두는 원칙도
  * 그대로다.
@@ -130,7 +134,7 @@ export function formatKstUpdate(isoString: string): string {
   const scheduled = SCHEDULED_HOURS_KST.find((h) => Math.abs(hour - h) <= SCHEDULE_SLACK_HOURS);
   const time =
     scheduled !== undefined
-      ? `${scheduled < 12 ? "오전" : "오후"} ${scheduled % 12 || 12}:00`
+      ? `${scheduled < 12 ? "오전" : "오후"} ${scheduled % 12 || 12}시`
       : `${hour < 12 ? "오전" : "오후"} ${hour % 12 || 12}시경`;
 
   return `${get("year")}-${get("month")}-${get("day")}(${weekday}) ${time} 기준`;
