@@ -59,12 +59,26 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.http_client import post_with_retry  # noqa: E402
+from common.http_client import DEFAULT_RETRY_STATUSES, post_with_retry  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
 
 KIND_SEARCH_URL = "https://kind.krx.co.kr/disclosure/searchtotalinfo.do"
 REQUEST_TIMEOUT_SEC = 20
+
+# ⚠️ **이 호출만 403 을 재시도한다.** http_client 의 기본값에는 403 이 없고, 그 판단은
+# 맞다 — 대부분의 호스트에서 403 은 권한 문제라 다시 걸어도 결과가 같다. KIND 가 예외인
+# 이유는 **KRX 호스트라 일시 차단에 403 을 쓰기 때문**이다(common/krx_client.py 가 같은
+# 이유로 403 을 재시도 목록에 넣어 뒀다).
+#
+# 2026-08-28 실행에서 KRX 호출 아홉 스크립트가 한꺼번에 403 을 맞았다(로그 509줄).
+# `krx_get` 을 쓰는 여섯은 6회 백오프로 살아남았고, 이 스크립트만 **한 방에** 죽었다 —
+# 재시도가 없어서다. 같은 시각 한국 IP 에서는 같은 요청이 200 이었고, 직전 실행 세 건의
+# 로그에는 403 이 한 줄도 없었다. 승인 문제가 아니라 러너 IP 를 향한 간헐적 차단이다.
+#
+# ⛔ 이 인자를 "403 재시도는 무의미하다"며 지우지 말 것. 그 일반론은 맞지만 이 호스트는
+#    예외다. 지우면 다음 차단 물결에서 이 지표만 또 혼자 죽는다.
+KIND_RETRY_STATUSES = DEFAULT_RETRY_STATUSES | {403}
 PAGE_SIZE = 500  # 연간 발동 건수(수십 건 수준)를 한 페이지에 다 담기에 충분
 
 SIDECAR_KEYWORD = "사이드카"
@@ -113,6 +127,7 @@ def search_market_actions(kwd: str, from_date: date, to_date: date) -> list[tupl
         },
         headers={"User-Agent": "Mozilla/5.0"},
         timeout=REQUEST_TIMEOUT_SEC,
+        retry_statuses=KIND_RETRY_STATUSES,
     )
     resp.raise_for_status()
 
