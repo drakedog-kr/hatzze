@@ -1,4 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["icn1"]
+  "regions": ["icn1"],
+  "crons": [
+    { "path": "/api/cron/pipeline-fallback", "schedule": "10 23 * * *" },
+    { "path": "/api/cron/pipeline-fallback", "schedule": "10 10 * * *" }
+  ]
 }
