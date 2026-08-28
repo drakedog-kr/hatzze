@@ -28,6 +28,9 @@ on:
 jobs:
   tick:
     runs-on: ubuntu-latest
+    # 아무것도 안 하는 워크플로에 쓰기 토큰을 쥐여 줄 이유가 없다.
+    permissions:
+      contents: read
     steps:
       - name: 시각만 찍는다
         run: |
