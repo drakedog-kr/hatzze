@@ -89,12 +89,24 @@ export async function GET(request: Request) {
   // 요일에 따라 달라지는 입력은 잡 표가 정한다(주말이면 발송을 끄고, 일요일이면 주간 결산).
   const inputs = job.inputs(now);
 
-  const res = await fetch(api(job.workflow, "dispatches"), {
-    method: "POST",
-    headers: { ...gh, "Content-Type": "application/json" },
-    body: JSON.stringify({ ref: BRANCH, inputs }),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
+  // ⚠️ 던지기가 **끊기면(타임아웃·네트워크) 결과를 모른다.** 깃헙이 받은 뒤 끊겼을 수도
+  //    있어서 "안 던졌다"고 단정하지 않는다. 다음 호출이나 깃헙 백업이 실제 실행을 보고
+  //    판단한다. 여기서는 502 로 남겨 로그에 흔적만 남긴다(던지면 실행이 곧 생기므로
+  //    중복이 되진 않는다).
+  let res: Response;
+  try {
+    res = await fetch(api(job.workflow, "dispatches"), {
+      method: "POST",
+      headers: { ...gh, "Content-Type": "application/json" },
+      body: JSON.stringify({ ref: BRANCH, inputs }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (e) {
+    return NextResponse.json(
+      { ok: false, job: job.label, since, dispatched: "unknown", error: String(e) },
+      { status: 502 },
+    );
+  }
   if (!res.ok) {
     return NextResponse.json(
       { ok: false, job: job.label, since, dispatched: false, error: `dispatch ${res.status}` },
