@@ -87,7 +87,8 @@ jobs:
         id: when
         run: |
           DOW=$(TZ=Asia/Seoul date +%u)   # 1=월 … 7=일
-          themeday=false; sunday=false
+          HOUR=$(TZ=Asia/Seoul date +%-H)
+          themeday=false; sunday=false; ontime=false
           # 관심 이동(테마)은 3일 간격이다. 카더라 집계 창이 3일이라 그 주기로 보내면
           # 매번 완전히 새 구간을 말한다. 수·토로 고정한 건 (a) 수→토 3일 · 토→수 4일로
           # 3일에 가장 가까우면서 (b) 요일이 고정돼 구독자가 리듬을 익히기 때문이다.
@@ -99,9 +100,18 @@ jobs:
           # D 가 일요일에 같은 게이트를 지나 나가고 있다.
           { [ "$DOW" -eq 3 ] || [ "$DOW" -eq 6 ]; } && themeday=true
           [ "$DOW" -eq 7 ] && sunday=true
+          # ⭐ **너무 늦게 도착한 예약은 보내지 않는다(2026-08-29).** 이 워크플로는 11:20 에
+          # 발화해 잡 안에서 14:00 까지 기다리므로 지연에는 강하다. 그런데 예약이 몇 시간씩
+          # 늦게 **생기는** 날에는 대기가 이미 지난 뒤라 곧장 발송으로 간다. 2026-08-29 부터
+          # Vercel 이 14:05 에 폴백을 던지므로, 그 뒤에 도착한 예약이 그대로 돌면 **같은 글이
+          # 두 번 나간다.** 13~15시 안에서만 보내 그걸 막는다.
+          # ⚠️ 이 창은 **예약에만** 건다. 손으로(또는 폴백이) 보내는 건 사람이 고른 것이라
+          #    시각으로 막지 않는다 — 아래 발송 조건에서 갈라져 있다.
+          { [ "$HOUR" -ge 13 ] && [ "$HOUR" -le 15 ]; } && ontime=true
           echo "themeday=$themeday" >> "$GITHUB_OUTPUT"
           echo "sunday=$sunday" >> "$GITHUB_OUTPUT"
-          echo "DOW=$DOW · 테마일=$themeday 일요일=$sunday"
+          echo "ontime=$ontime" >> "$GITHUB_OUTPUT"
+          echo "DOW=$DOW · ${HOUR}시 · 테마일=$themeday 일요일=$sunday 제시각=$ontime"
 
       # 낡은 값 차단. 이 워크플로엔 수집·계산 스텝이 없어서 daily-update.yml 처럼
       # 앞 스텝 결과를 볼 수가 없다. 대신 같은 검사를 직접 돌려 게이트로 쓴다 — DB 조회만
@@ -118,7 +128,11 @@ jobs:
           steps.check_freshness.outcome == 'success'
           && github.run_attempt == '1'
           && (
-            (github.event_name == 'schedule' && steps.when.outputs.themeday == 'true')
+            (
+              github.event_name == 'schedule'
+              && steps.when.outputs.themeday == 'true'
+              && steps.when.outputs.ontime == 'true'
+            )
             || (github.event.inputs.send == 'true' && github.event.inputs.format == 'theme')
           )
         run: python data-pipeline/scripts/send_telegram_broadcast.py --send --format theme
@@ -130,7 +144,11 @@ jobs:
           steps.check_freshness.outcome == 'success'
           && github.run_attempt == '1'
           && (
-            (github.event_name == 'schedule' && steps.when.outputs.sunday == 'true')
+            (
+              github.event_name == 'schedule'
+              && steps.when.outputs.sunday == 'true'
+              && steps.when.outputs.ontime == 'true'
+            )
             || (github.event.inputs.send == 'true' && github.event.inputs.format == 'weekly')
           )
         run: python data-pipeline/scripts/send_telegram_broadcast.py --send --format weekly
