@@ -36,6 +36,12 @@ export type Job = {
   fireUtc: string;
   /** 던질 때 넘길 입력. 요일에 따라 달라지므로 함수다. */
   inputs: (now: Date) => Record<string, string>;
+  /** '이미 처리됨'으로 셀 실행의 **상한**(UTC, HH:MM). 없으면 상한 없음.
+   *
+   * 채널 발송에만 쓴다. 그 워크플로는 예약이 14:05 전에만 보내도록 막혀 있어서, 그 뒤에
+   * 생긴 실행은 **보낼 수 없는 실행**이다. 그런 실행을 '오늘 이미 돌았다'로 세면 폴백이
+   * 안 던져 그날 발송이 통째로 빈다. 그래서 상한 밖 실행은 없는 것으로 본다. */
+  untilUtc?: string;
 };
 
 /**
@@ -86,13 +92,15 @@ export const CRON_TO_JOB: Record<string, Job> = {
   //    Vercel 이 "실행이 아예 없을 때만" 던진다. 둘 다 도는 상황을 애초에 안 만든다.
   // ⚠️ 요일이 곧 포맷이다 — 수·토는 C(theme), 일요일은 D(weekly). 크론의 `0,3,6` 은
   //    UTC 05:05 기준 요일이라 KST 로도 같은 날이다(05:05Z = 14:05 KST).
-  "5 5 * * 0,3,6": {
+  "10 5 * * 0,3,6": {
     key: "broadcast",
     label: "채널 발송",
     workflow: BROADCAST,
     // KST 자정. 예약(11:20 KST)이든 손으로 돌린 것이든 **그날 실행이 하나라도 있으면**
     // 안 던진다. 예약 발화 시각(02:20Z)을 경계로 두면 그 전에 손으로 보낸 날 두 번 나간다.
     fireUtc: "15:00",
+    // 05:05Z = 14:05 KST. 워크플로의 예약 발송 창과 같은 선이다(둘을 같이 옮길 것).
+    untilUtc: "05:05",
     inputs: (now) => ({ send: "true", format: isKstSunday(now) ? "weekly" : "theme" }),
   },
 
@@ -147,11 +155,14 @@ function kstDay(now: Date): number {
   return new Date(now.getTime() + 9 * 60 * 60 * 1000).getUTCDay(); // 0=일 … 6=토
 }
 
-/** 실행 목록에서 이 슬롯의 실행이 있는지 본다. 결과(성공·실패)는 보지 않는다 — 위 주석 참고. */
+/** 실행 목록에서 이 몫의 실행이 있는지 본다. 결과(성공·실패)는 보지 않는다 — 위 주석 참고.
+ *
+ * `until` 을 주면 그 시각 **전에 생긴 실행만** 센다(채널 발송 전용, Job.untilUtc 주석). */
 export function hasRunSince(
   runs: { created_at: string; html_url?: string; conclusion?: string | null }[],
   since: string,
+  until?: string,
 ): { covered: boolean; url?: string } {
-  const hit = runs.find((r) => r.created_at >= since);
+  const hit = runs.find((r) => r.created_at >= since && (!until || r.created_at < until));
   return hit ? { covered: true, url: hit.html_url } : { covered: false };
 }

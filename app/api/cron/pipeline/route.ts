@@ -81,7 +81,8 @@ export async function GET(request: Request) {
     );
   }
 
-  const { covered, url } = hasRunSince(runs, since);
+  const until = job.untilUtc ? sinceIso(job.untilUtc, now) : undefined;
+  const { covered, url } = hasRunSince(runs, since, until);
   if (covered) {
     return NextResponse.json({ ok: true, job: job.label, since, dispatched: false, covered: url });
   }
