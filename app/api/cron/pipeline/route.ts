@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { hasRunSince, isKstWeekday, resolveSlot, sinceIso } from "@/lib/cron-fallback";
+import { hasRunSince, isKstWeekday, resolveSlot, sinceIso } from "@/lib/cron-schedule";
 
 // Vercel 크론이 부르는 자리다. 캐시가 끼면 판단이 굳으므로 매번 새로 돈다.
 export const dynamic = "force-dynamic";
@@ -11,10 +11,13 @@ const RUNS_URL = `https://api.github.com/repos/${REPO}/actions/workflows/${WORKF
 const DISPATCH_URL = `https://api.github.com/repos/${REPO}/actions/workflows/${WORKFLOW_FILE}/dispatches`;
 
 /**
- * 파이프라인이 **아예 안 돈 날**에만 워크플로를 손 대신 던진다.
+ * 파이프라인을 정시에 시작시킨다. 아침 07:00 · 저녁 18:00 KST.
  *
  * 깃헙 예약이 무너진 날(2026-08-26~28)에 사람이 화면을 보고 알아채 손으로 눌러야 했다.
- * 그 클릭을 대신하는 시계다. 판단 규칙과 시각의 근거는 lib/cron-fallback.ts 주석에 있다.
+ * 그 클릭을 대신하는 시계다. 판단 규칙과 시각의 근거는 lib/cron-schedule.ts 주석에 있다.
+ *
+ * 이미 이 슬롯의 실행이 있으면(깃헙 백업이 먼저 돌았거나 손으로 돌렸거나) 아무것도 하지
+ * 않는다. 그래서 주 시계이면서 동시에 중복 방지 장치다.
  *
  * ⚠️ **못 정하면 던지지 않는다.** 깃헙 조회가 실패하면 실행이 있는지 없는지 알 수 없는데,
  *    그 상태에서 던지면 이미 도는 파이프라인 위에 하나를 더 얹어 같은 표를 동시에 쓰고
@@ -68,7 +71,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: true, slot: slot.label, since, dispatched: false, covered: url });
   }
 
-  // 주말이면 데이터만 채우고 채널로는 보내지 않는다(lib/cron-fallback.ts 의 요일 주석).
+  // 주말이면 데이터만 채우고 채널로는 보내지 않는다(lib/cron-schedule.ts 의 요일 주석).
   const broadcast = isKstWeekday(now) ? slot.broadcast : "none";
 
   const res = await fetch(DISPATCH_URL, {
