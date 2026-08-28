@@ -128,8 +128,14 @@ jobs:
   #       '누가 이 슬롯을 처리했나'는 슬롯으로 묶고, '내가 얼마나 늦었나'는 자기
   #       발화로 잰다. 두 시각이 다른 이유가 이것이다.
   #
-  # ⚠️ **수동 실행이 실패했으면 막지 않는다.** 예약은 그 자체가 만회 수단이다.
-  #    그래서 '성공했거나 아직 도는 중'인 수동 실행만 건너뛸 이유로 본다.
+  # ⚠️ **앞선 실행이 실패했으면 막지 않는다.** 예약은 그 자체가 만회 수단이다. 그래서
+  #    '성공했거나 아직 도는 중'인 실행만 건너뛸 이유로 본다.
+  #
+  #    ⭐ **취소(cancelled)는 예외로 '처리됨'으로 센다(2026-08-29).** 사람이 일부러 멈춘
+  #       것을 20분 뒤 백업이 다시 돌리면 그 의도를 뒤집는다. 2026-08-28 에 실제로 그럴
+  #       뻔했다 — 취소한 #160 을 백업 #161 이 뒤따랐는데, 마침 취소가 아직 진행 중
+  #       (status != completed)이라 우연히 걸러졌을 뿐이다. 실패(failure)와 시간 초과
+  #       (timed_out)는 그대로 만회 대상이다.
   #
   # ⚠️ **게이트가 고장 나면 열려야 한다.** 조회가 실패해도 skip 은 false 로 남고,
   #    update 잡의 조건도 `!cancelled()` 라 이 잡이 죽어도 파이프라인은 그냥 돈다.
@@ -157,6 +163,9 @@ jobs:
               "30 8 * * *"|"30 9 * * *")   fire_hm="08:30" ;;
               *)                           fire_hm="" ;;
             esac
+            # 크론을 추가하고 이 표를 안 고치면 게이트가 통째로 열린다(안전한 쪽이지만
+            # 조용하면 안 된다). 로그에 남겨 다음 사람이 알아채게 한다.
+            [ -z "$fire_hm" ] && echo "[경고] 이 크론($CRON)이 게이트 표에 없습니다 — 검사 없이 진행합니다"
             if [ -n "$fire_hm" ]; then
               # 가장 가까운 과거의 발화 시각(UTC). 지연이 자정을 넘기면 오늘 날짜로
               # 잡은 값이 미래가 되므로 하루를 뺀다 — 2026-08-27 아침이 실제로 그랬다
@@ -198,9 +207,11 @@ jobs:
                 q=".workflow_runs[]"
                 q="$q | select(.created_at >= \"$since\")"
                 q="$q | select(.created_at < \"$mine\" or (.created_at == \"$mine\" and .id < $GITHUB_RUN_ID))"
-                q="$q | select(.status != \"completed\" or .conclusion == \"success\")"
+                q="$q | select(.status != \"completed\" or .conclusion == \"success\" or .conclusion == \"cancelled\")"
                 q="$q | .html_url"
-                hit=$(gh api "/repos/$GITHUB_REPOSITORY/actions/workflows/daily-update.yml/runs?per_page=30" --jq "$q" 2>/dev/null | head -1 || true)
+                # ⚠️ **main 것만 센다.** 브랜치에서 손으로 돌린 실행(2026-08-25 에 실제로
+                #    있었다)이 섞이면 "이미 처리됨"으로 읽혀 정작 필요한 백업을 막는다.
+                hit=$(gh api "/repos/$GITHUB_REPOSITORY/actions/workflows/daily-update.yml/runs?per_page=30&branch=main" --jq "$q" 2>/dev/null | head -1 || true)
                 if [ -n "$hit" ]; then
                   skip=true
                   echo "발화 $since 뒤에 이 슬롯을 이미 처리한 실행이 있어 건너뜁니다: $hit"
