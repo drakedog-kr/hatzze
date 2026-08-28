@@ -1,17 +1,21 @@
 import { NextResponse } from "next/server";
 
-import { hasRunSince, isKstWeekday, resolveSlot, sinceIso } from "@/lib/cron-schedule";
+import { hasRunSince, resolveJob, sinceIso } from "@/lib/cron-schedule";
 
 // Vercel 크론이 부르는 자리다. 캐시가 끼면 판단이 굳으므로 매번 새로 돈다.
 export const dynamic = "force-dynamic";
 
 const REPO = "drakedog-kr/hatzze";
-const WORKFLOW_FILE = "daily-update.yml";
-const RUNS_URL = `https://api.github.com/repos/${REPO}/actions/workflows/${WORKFLOW_FILE}/runs?per_page=20`;
-const DISPATCH_URL = `https://api.github.com/repos/${REPO}/actions/workflows/${WORKFLOW_FILE}/dispatches`;
+const api = (workflow: string, tail: string) =>
+  `https://api.github.com/repos/${REPO}/actions/workflows/${workflow}/${tail}`;
 
 /**
- * 파이프라인을 정시에 시작시킨다. 아침 07:00 · 저녁 18:00 KST.
+ * 예약이 걸린 워크플로 셋을 시각에 맞춰 깨운다. 어느 크론이 불렀는지로 무엇을 던질지
+ * 가른다(lib/cron-schedule.ts 의 CRON_TO_JOB).
+ *
+ *   파이프라인 아침 07:00 · 저녁 18:00 — 여기서는 Vercel 이 **주 시계**다.
+ *   채널 발송 수·토·일 14:05 · 사전 스캔 월 11:00 — 여기서는 **폴백**이다
+ *   (그 둘은 깃헙 예약을 그대로 두고, 실행이 아예 없을 때만 대신 던진다).
  *
  * 깃헙 예약이 무너진 날(2026-08-26~28)에 사람이 화면을 보고 알아채 손으로 눌러야 했다.
  * 그 클릭을 대신하는 시계다. 판단 규칙과 시각의 근거는 lib/cron-schedule.ts 주석에 있다.
@@ -40,13 +44,13 @@ export async function GET(request: Request) {
   }
 
   // 어느 예약이 불렀나. 두 크론이 같은 경로를 쓰므로 헤더로 가른다.
-  const slot = resolveSlot(request.headers.get("x-vercel-cron-schedule"));
-  if (!slot) {
+  const job = resolveJob(request.headers.get("x-vercel-cron-schedule"));
+  if (!job) {
     return NextResponse.json({ ok: false, error: "모르는 크론" }, { status: 400 });
   }
 
   const now = new Date();
-  const since = sinceIso(slot.fireUtc, now);
+  const since = sinceIso(job.fireUtc, now);
   const gh = {
     Accept: "application/vnd.github+json",
     Authorization: `Bearer ${token}`,
@@ -55,36 +59,36 @@ export async function GET(request: Request) {
 
   let runs: { created_at: string; html_url?: string }[];
   try {
-    const res = await fetch(RUNS_URL, { headers: gh, cache: "no-store" });
+    const res = await fetch(api(job.workflow, "runs?per_page=20"), { headers: gh, cache: "no-store" });
     if (!res.ok) throw new Error(`실행 목록 조회 ${res.status}`);
     runs = ((await res.json()) as { workflow_runs?: typeof runs }).workflow_runs ?? [];
   } catch (e) {
     // 못 정했으니 던지지 않는다(위 주석).
     return NextResponse.json(
-      { ok: false, slot: slot.label, dispatched: false, error: String(e) },
+      { ok: false, job: job.label, dispatched: false, error: String(e) },
       { status: 502 },
     );
   }
 
   const { covered, url } = hasRunSince(runs, since);
   if (covered) {
-    return NextResponse.json({ ok: true, slot: slot.label, since, dispatched: false, covered: url });
+    return NextResponse.json({ ok: true, job: job.label, since, dispatched: false, covered: url });
   }
 
-  // 주말이면 데이터만 채우고 채널로는 보내지 않는다(lib/cron-schedule.ts 의 요일 주석).
-  const broadcast = isKstWeekday(now) ? slot.broadcast : "none";
+  // 요일에 따라 달라지는 입력은 잡 표가 정한다(주말이면 발송을 끄고, 일요일이면 주간 결산).
+  const inputs = job.inputs(now);
 
-  const res = await fetch(DISPATCH_URL, {
+  const res = await fetch(api(job.workflow, "dispatches"), {
     method: "POST",
     headers: { ...gh, "Content-Type": "application/json" },
-    body: JSON.stringify({ ref: "main", inputs: { broadcast } }),
+    body: JSON.stringify({ ref: "main", inputs }),
   });
   if (!res.ok) {
     return NextResponse.json(
-      { ok: false, slot: slot.label, since, dispatched: false, error: `dispatch ${res.status}` },
+      { ok: false, job: job.label, since, dispatched: false, error: `dispatch ${res.status}` },
       { status: 502 },
     );
   }
 
-  return NextResponse.json({ ok: true, slot: slot.label, since, dispatched: true, broadcast });
+  return NextResponse.json({ ok: true, job: job.label, since, dispatched: true, inputs });
 }

@@ -21,17 +21,19 @@
 
 export type SlotKey = "morning" | "evening";
 
-export type Slot = {
-  key: SlotKey;
+export type Job = {
+  key: string;
   label: string;
-  /** 이 슬롯의 본 발화 시각(UTC, HH:MM). 여기부터 '이 슬롯의 실행'으로 센다. */
+  /** 던질 워크플로 파일. 세 워크플로가 이 라우트 하나를 같이 쓴다. */
+  workflow: string;
+  /** '이 몫이 이미 처리됐나'를 세는 경계(UTC, HH:MM). 발사 시각이 아니라 슬롯의 시작선이다. */
   fireUtc: string;
-  /** 던질 때 워크플로에 넘길 발송 포맷. 주말이면 none 으로 낮춘다(아래 참고). */
-  broadcast: SlotKey;
+  /** 던질 때 넘길 입력. 요일에 따라 달라지므로 함수다. */
+  inputs: (now: Date) => Record<string, string>;
 };
 
 /**
- * Vercel 크론 → 슬롯. 두 크론이 같은 경로를 쓰므로 `x-vercel-cron-schedule` 헤더로 가른다.
+ * Vercel 크론 → 잡. 크론들이 같은 경로를 쓰므로 `x-vercel-cron-schedule` 헤더로 가른다.
  *
  * 시각은 **아침 07:00 · 저녁 18:00 KST**(22:00Z · 09:00Z)다. `workflow_dispatch` 는 큐를
  * 안 타서 생성과 시작이 같은 초라(실측), 여기 적은 시각이 곧 실행 시작 시각이다.
@@ -44,14 +46,58 @@ export type Slot = {
  * ⚠️ `fireUtc` 는 발사 시각이 아니라 **슬롯의 경계**다(06:30·17:30 KST). "이 슬롯이 이미
  *    처리됐나"를 그 시각 기준으로 세므로, 발사 시각을 옮겨도 여기는 그대로 둔다.
  */
-export const CRON_TO_SLOT: Record<string, Slot> = {
-  "0 22 * * *": { key: "morning", label: "아침", fireUtc: "21:30", broadcast: "morning" },
-  "0 9 * * *": { key: "evening", label: "저녁", fireUtc: "08:30", broadcast: "evening" },
+const DAILY = "daily-update.yml";
+const BROADCAST = "telegram-broadcast.yml";
+const SCAN = "us-dict-scan.yml";
+
+export const CRON_TO_JOB: Record<string, Job> = {
+  // ── 파이프라인. 여기서는 Vercel 이 **주 시계**다(깃헙 예약은 백업만 남겼다). ──
+  "0 22 * * *": {
+    key: "pipeline-morning",
+    label: "파이프라인 아침",
+    workflow: DAILY,
+    fireUtc: "21:30",
+    inputs: (now) => ({ broadcast: isKstWeekday(now) ? "morning" : "none" }),
+  },
+  "0 9 * * *": {
+    key: "pipeline-evening",
+    label: "파이프라인 저녁",
+    workflow: DAILY,
+    fireUtc: "08:30",
+    inputs: (now) => ({ broadcast: isKstWeekday(now) ? "evening" : "none" }),
+  },
+
+  // ── 채널 발송(C 관심 이동 · D 주간 결산). 여기서는 Vercel 이 **폴백**이다. ──
+  //
+  // 이 워크플로는 11:20 KST 에 발화해 잡 안에서 14:00 까지 기다린다(최대 3시간). 그
+  // 구조가 이미 **지연에는 강하다** — 예약이 두 시간 늦어도 발송 시각은 14:00 그대로다.
+  // 약한 건 슬롯이 통째로 버려지는 경우뿐이라, 주 시계를 뺏지 않고 14:05 에 확인만 한다.
+  //
+  // ⚠️ 여기에는 게이트 잡이 없다. 그래서 이 워크플로의 깃헙 예약은 **그대로 두고**
+  //    Vercel 이 "실행이 아예 없을 때만" 던진다. 둘 다 도는 상황을 애초에 안 만든다.
+  // ⚠️ 요일이 곧 포맷이다 — 수·토는 C(theme), 일요일은 D(weekly). 크론의 `0,3,6` 은
+  //    UTC 05:05 기준 요일이라 KST 로도 같은 날이다(05:05Z = 14:05 KST).
+  "5 5 * * 0,3,6": {
+    key: "broadcast",
+    label: "채널 발송",
+    workflow: BROADCAST,
+    fireUtc: "02:20",
+    inputs: (now) => ({ send: "true", format: isKstSunday(now) ? "weekly" : "theme" }),
+  },
+
+  // ── 주 1회 사전 후보 스캔. 이슈만 여는 유지보수라 급하지 않아 폴백으로 둔다. ──
+  "0 2 * * 1": {
+    key: "us-dict-scan",
+    label: "미국 종목 사전 스캔",
+    workflow: SCAN,
+    fireUtc: "01:00",
+    inputs: () => ({}),
+  },
 };
 
-export function resolveSlot(schedule: string | null): Slot | null {
+export function resolveJob(schedule: string | null): Job | null {
   if (!schedule) return null;
-  return CRON_TO_SLOT[schedule.trim()] ?? null;
+  return CRON_TO_JOB[schedule.trim()] ?? null;
 }
 
 /**
@@ -78,9 +124,16 @@ export function sinceIso(fireUtc: string, now: Date): string {
  *    주말에 온도가 금요일 값 그대로인 글을 보내면 뮤트로 가는 지름길이다.
  */
 export function isKstWeekday(now: Date): boolean {
-  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  const dow = kst.getUTCDay(); // 0=일 … 6=토
-  return dow >= 1 && dow <= 5;
+  return kstDay(now) >= 1 && kstDay(now) <= 5;
+}
+
+/** 한국 시각 기준 일요일인가. 채널 발송의 포맷을 가르는 데만 쓴다(일=주간 결산). */
+export function isKstSunday(now: Date): boolean {
+  return kstDay(now) === 0;
+}
+
+function kstDay(now: Date): number {
+  return new Date(now.getTime() + 9 * 60 * 60 * 1000).getUTCDay(); // 0=일 … 6=토
 }
 
 /** 실행 목록에서 이 슬롯의 실행이 있는지 본다. 결과(성공·실패)는 보지 않는다 — 위 주석 참고. */
