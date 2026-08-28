@@ -1,3 +1,5 @@
+name: Daily Indicator Update
+
 on:
   # ⛔ **깃헙 예약을 껐다(2026-08-29).** 이 워크플로를 도는 유일한 길은 아래
   #    `workflow_dispatch` 이고, 시각은 Vercel Cron 이 지킨다(`vercel.json` 의 crons →
