@@ -6,6 +6,13 @@ import { hasRunSince, resolveJob, sinceIso } from "@/lib/cron-schedule";
 export const dynamic = "force-dynamic";
 
 const REPO = "drakedog-kr/hatzze";
+const BRANCH = "main";
+// ⚠️ 실행 목록은 **main 것만** 센다. 브랜치에서 손으로 돌린 실행(2026-08-25 에 실제로
+//    있었다)이 섞이면 "이미 처리됨"으로 읽혀 정작 필요한 발사를 막는다.
+const RUNS_QUERY = `runs?per_page=20&branch=${BRANCH}`;
+// 깃헙이 응답을 안 주면 함수가 제한 시간까지 매달렸다가 아무것도 못 한다. 끊고 502 를
+// 돌려 로그에 남기는 편이 낫다(어차피 못 정하면 안 던진다).
+const TIMEOUT_MS = 10_000;
 const api = (workflow: string, tail: string) =>
   `https://api.github.com/repos/${REPO}/actions/workflows/${workflow}/${tail}`;
 
@@ -43,7 +50,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "GH_DISPATCH_TOKEN 이 없습니다" }, { status: 500 });
   }
 
-  // 어느 예약이 불렀나. 두 크론이 같은 경로를 쓰므로 헤더로 가른다.
+  // 어느 예약이 불렀나. 크론 넷이 같은 경로를 쓰므로 헤더로 가른다.
   const job = resolveJob(request.headers.get("x-vercel-cron-schedule"));
   if (!job) {
     return NextResponse.json({ ok: false, error: "모르는 크론" }, { status: 400 });
@@ -59,7 +66,11 @@ export async function GET(request: Request) {
 
   let runs: { created_at: string; html_url?: string }[];
   try {
-    const res = await fetch(api(job.workflow, "runs?per_page=20"), { headers: gh, cache: "no-store" });
+    const res = await fetch(api(job.workflow, RUNS_QUERY), {
+      headers: gh,
+      cache: "no-store",
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
     if (!res.ok) throw new Error(`실행 목록 조회 ${res.status}`);
     runs = ((await res.json()) as { workflow_runs?: typeof runs }).workflow_runs ?? [];
   } catch (e) {
@@ -81,7 +92,8 @@ export async function GET(request: Request) {
   const res = await fetch(api(job.workflow, "dispatches"), {
     method: "POST",
     headers: { ...gh, "Content-Type": "application/json" },
-    body: JSON.stringify({ ref: "main", inputs }),
+    body: JSON.stringify({ ref: BRANCH, inputs }),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (!res.ok) {
     return NextResponse.json(
