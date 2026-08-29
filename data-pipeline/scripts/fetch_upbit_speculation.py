@@ -41,6 +41,7 @@ import yfinance as yf
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from common.yahoo_client import finite_close  # noqa: E402
 from common.http_client import get_with_retry  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
@@ -157,7 +158,10 @@ def fetch_yf_close(ticker: str, start: date, end: date) -> dict[str, float]:
         d = ts.date()
         if d >= end:
             continue  # 진행 중인 오늘 바 — fetch_upbit_candles 주석과 같은 이유
-        prices[d.isoformat()] = float(close)
+        value = finite_close(close)   # NaN 이면 버린다(yahoo_client.finite_close 주석)
+        if value is None:
+            continue
+        prices[d.isoformat()] = value
     return prices
 
 

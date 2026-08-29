@@ -36,6 +36,7 @@ import yfinance as yf
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from common.yahoo_client import finite_close  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
 
@@ -98,7 +99,12 @@ def fetch_gold_prices(start: date, end: date) -> dict[str, float]:
         if d >= end:
             print(f"[yfinance] {GOLD_TICKER}: {d} 는 아직 세션 진행 중이라 버립니다 ({close:.2f})")
             continue
-        prices[d.isoformat()] = float(close)
+        # 거래가 없었거나 데이터가 안 붙은 날은 NaN 으로 온다(common/yahoo_client.finite_close).
+        value = finite_close(close)
+        if value is None:
+            print(f"[yfinance] {GOLD_TICKER}: {d} 종가가 비어 건너뜁니다")
+            continue
+        prices[d.isoformat()] = value
     return prices
 
 

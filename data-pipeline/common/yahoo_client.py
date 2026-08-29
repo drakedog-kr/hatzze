@@ -39,6 +39,7 @@
 from __future__ import annotations
 
 import time
+import math
 from datetime import date, datetime, time as dtime
 from urllib.parse import quote
 
@@ -106,6 +107,28 @@ def _kst_date(epoch_sec: int) -> str:
 # 날부터 소수점이 길어져 한 시계열에 이음매가 생기고, kospi_speed_60d 의 details 처럼
 # 반올림 없이 그대로 싣는 자리에서 화면까지 새어 나온다. 지수는 소수점 둘째 자리까지
 # 호가되므로 여기서 맞춰 두면 옛 KRX 행과 완전히 같은 모양이 된다.
+def finite_close(value) -> float | None:
+    """yfinance 일봉 종가를 float 으로 바꾸되 **쓸 수 없는 값이면 None** 을 준다.
+
+    야후는 거래가 없었거나 데이터가 아직 안 붙은 날의 종가를 `NaN` 으로 준다. 그냥
+    `float()` 하면 NaN 이 그대로 흘러 들어가는데, 그게 Supabase 로 가는 순간
+    **`ValueError: Out of range float values are not JSON compliant`** 로 스크립트가
+    죽는다(httpx 가 `allow_nan=False` 로 직렬화한다). 계산에 섞이면 더 나쁘다 — 죽지
+    않고 지표가 조용히 NaN 이 된다.
+
+    2026-08-29 저녁 파이프라인이 그렇게 멈췄다. `GC=F` 251건 중 08-28 하나가 NaN 이라
+    `fetch_gold_ratio.py` 가 upsert 직전에 죽었고, 그 실패가 알림 이슈까지 열었다.
+
+    ⚠️ 야후를 **직접** 읽는 스크립트(`import yfinance`)는 전부 이걸 거쳐야 한다. 이
+    모듈의 다른 함수들은 차트 API 를 쓰는데 그쪽은 빈 바를 `null` 로 줘서 이미 거른다.
+    """
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return None
+    return f if math.isfinite(f) else None
+
+
 def _round(value) -> float:
     return round(float(value), 2)
 
