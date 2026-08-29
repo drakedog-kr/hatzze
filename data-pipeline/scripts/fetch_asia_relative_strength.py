@@ -27,6 +27,7 @@ import yfinance as yf
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from common.yahoo_client import finite_close  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
 
@@ -81,7 +82,14 @@ def fetch_prices(ticker: str, start: date, end: date) -> dict[str, float]:
     history = yf.Ticker(ticker).history(
         start=start.isoformat(), end=(end + timedelta(days=1)).isoformat()
     )
-    return {ts.date().isoformat(): float(close) for ts, close in history["Close"].items()}
+    # NaN 종가는 버린다 — 그대로 담으면 Supabase 저장에서 죽거나 지표가 조용히 NaN 이 된다
+    # (common/yahoo_client.finite_close 주석).
+    out: dict[str, float] = {}
+    for ts, close in history["Close"].items():
+        value = finite_close(close)
+        if value is not None:
+            out[ts.date().isoformat()] = value
+    return out
 
 
 def compute_20d_return(prices: dict[str, float]) -> dict[str, float]:

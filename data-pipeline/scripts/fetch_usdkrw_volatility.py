@@ -20,6 +20,7 @@ import yfinance as yf
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from common.yahoo_client import finite_close  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
 from common.details import upsert_details  # noqa: E402
@@ -94,7 +95,10 @@ def fetch_volatility_series(start: date, end: date) -> dict[str, tuple[float, fl
             continue
         d = ts.date()
         if start <= d <= end:
-            result[d.isoformat()] = (float(value), float(closes[ts]))
+            close_value = finite_close(closes[ts])
+            if close_value is None:   # NaN 이면 버린다(yahoo_client.finite_close 주석)
+                continue
+            result[d.isoformat()] = (float(value), close_value)
     return result
 
 
