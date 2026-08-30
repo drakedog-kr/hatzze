@@ -208,27 +208,6 @@ const NAV: NavItem[] = [
     // ⚠️ `badge: "준비 중"` 이 여기 있었다. 이 줄을 지우는 것이 곧 **화면을 여는 것**이다
     //    (사이드바에 예고로 걸어 두고 만들었다). 2026-08-19 에 뗐다.
   },
-  // ⚠️ **'준비 중' 배지를 단 채로 NAV 에 있다.** 화면은 만들어졌지만 아직 안 열었다.
-  // COMING_SOON 에 두면 본문 헤더(PageHeader)가 NAV 에서 경로를 못 찾아 **제목 칸을
-  // 통째로 비운다** — 내부자·서학개미가 걸어간 길과 같다. 열 때는 이 줄의 badge 만 지운다.
-  //
-  // 맨 아래인 것은 이 화면이 하루 중 07~09시에만 쓸모가 있어서다. 종일 보는 브리핑·카더라를
-  // 밀어낼 자리가 아니다.
-  //
-  // 아이콘 `preview` 는 창 안에 눈이 든 그림이라 이름 그대로 '미리보기' 를 가리킨다.
-  // ⚠️ 후보를 **20px 실물로 띄워 놓고** 골랐다(96px 로 보면 다 그럴듯하다). 이 그림은
-  // 안쪽 눈이 작아 20px 에서 점처럼 뭉치는 편이다 — 나중에 흐려 보이면 그게 이유이고,
-  // 그때 볼 대안은 `pageview`(문서에 돋보기)·`double_arrow`(겹화살표)·`next_plan` 이다.
-  // ⚠️ 위 내부자 리포트의 `contact_page` 와 **둘 다 네모 안에 뭐가 든 모양**이라 20px
-  // 사이드바에서 제일 닮은 한 쌍이다(세로로 두 칸 떨어져 있어 지금은 견딘다). 둘 중
-  // 하나를 바꿀 일이 생기면 이 쌍부터 볼 것.
-  {
-    href: "/preview",
-    label: "국장 미리보기",
-    icon: "preview",
-    sub: "간밤 미국에서 움직인 것이 오늘 아침 어디에 닿나",
-    badge: "준비 중",
-  },
 ];
 
 // 외부(텔레그램) 링크라 NAV 배열이 아니라 따로 둔다 — pathname 기반 active 판정 대상이
@@ -260,7 +239,34 @@ const TELEGRAM = {
 // 예고 항목을 전부 목록 끝에 몰면 짝인 둘이 MDD 를 사이에 두고 떨어진다.
 // 아이콘은 NAV 항목과 같은 규칙이다 — 직접 그린 Glyph 든 Material Symbols 이름(icon)이든
 // 하나만 있으면 되고, NavGlyph 가 골라 그린다.
-const COMING_SOON: { label: string; badge: string; tip: string; after: string; icon?: string; Glyph?: Glyph }[] = [];
+const COMING_SOON: { label: string; badge: string; tip: string; after: string; icon?: string; Glyph?: Glyph }[] = [
+  // 간밤 미장에서 크게 움직인 종목과, 그 종목과 사업으로 엮인 국내 종목을 개장 전에 잇는다.
+  //
+  // ⛔ **화면과 파이프라인은 다 만들어졌지만 아직 안 열었다.** 여기(COMING_SOON)에 있으면
+  // 사이드바에 눌리지 않는 줄로 서고, 주소를 직접 쳐도 배포된 곳에서는 404 다
+  // (app/preview/page.tsx 의 PUBLIC 상수). **두 곳을 같이 풀어야 열린다.**
+  //
+  // ⚠️ 한때 NAV 에 href 를 달고 배지만 '준비 중' 으로 뒀다. **배지는 표시일 뿐 아무것도
+  // 막지 않는다** — 2026-08-30 에 프로덕션 사이드바에서 그냥 눌려 들어가졌다.
+  // 본문 헤더는 DEEP_PAGES 의 "/preview" 항목이 대신 채운다.
+  //
+  // `after` 가 NAV 의 마지막 항목이라 사이드바 맨 아래에 선다. 끝에 두는 이유는 이 화면이
+  // 하루 중 07~09시에만 쓸모가 있어서다 — 종일 보는 브리핑·카더라를 밀어낼 자리가 아니다.
+  //
+  // 아이콘 `preview` 는 창 안에 눈이 든 그림이라 이름 그대로 '미리보기' 를 가리킨다.
+  // ⚠️ 후보를 **20px 실물로 띄워 놓고** 골랐다(96px 로 보면 다 그럴듯하다). 이 그림은
+  // 안쪽 눈이 작아 20px 에서 점처럼 뭉치는 편이다 — 나중에 흐려 보이면 그게 이유이고,
+  // 그때 볼 대안은 `pageview`(문서에 돋보기)·`double_arrow`(겹화살표)·`next_plan` 이다.
+  // ⚠️ 위 내부자 리포트의 `contact_page` 와 **둘 다 네모 안에 뭐가 든 모양**이라 20px
+  // 사이드바에서 제일 닮은 한 쌍이다(세로로 두 칸 떨어져 있어 지금은 견딘다).
+  {
+    label: "국장 미리보기",
+    badge: "준비 중",
+    tip: "현재 열심히 개발 중입니다!",
+    after: "/seohak",
+    icon: "preview",
+  },
+];
 
 /**
  * 사이드바·모바일 메뉴가 그리는 순서. NAV 항목 사이사이에 예고 항목을 끼운다.
@@ -417,12 +423,22 @@ function useIntentPrefetch() {
  * 명단·문구의 원본은 `app/insider/lists.ts` 다 — 여기서 베끼지 말고 그걸 읽는다.
  * 카드와 전체보기가 같은 말을 해야 독자가 같은 자료로 읽는다.
  */
-const DEEP_PAGES: Record<string, { label: string; sub: string }> = Object.fromEntries(
-  INSIDER_LIST_SLUGS.map((slug) => [
-    insiderListHref(slug),
-    { label: INSIDER_LISTS[slug].title, sub: INSIDER_LISTS[slug].sub },
-  ]),
-);
+const DEEP_PAGES: Record<string, { label: string; sub: string; badge?: string }> = {
+  ...Object.fromEntries(
+    INSIDER_LIST_SLUGS.map((slug) => [
+      insiderListHref(slug),
+      { label: INSIDER_LISTS[slug].title, sub: INSIDER_LISTS[slug].sub },
+    ]),
+  ),
+  // ⭐ 아직 안 연 화면. 사이드바에는 COMING_SOON 으로 서 있어 NAV 에서 못 찾으므로,
+  // 본문 헤더가 쓸 제목을 여기 둔다 — 로컬에서 볼 때 제목 칸이 비지 않는다.
+  // 여는 날 COMING_SOON → NAV 로 옮기면서 이 줄을 지운다.
+  "/preview": {
+    label: "국장 미리보기",
+    sub: "간밤 미국에서 움직인 것이 오늘 아침 어디에 닿나",
+    badge: "준비 중",
+  },
+};
 
 function isActive(href: string, pathname: string) {
   return href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -1061,12 +1077,16 @@ function PageHeader({ theme, currency }: { theme: "light" | "dark"; currency: "k
   const title = deep?.label ?? child?.label ?? page?.label;
   const sub = deep?.sub ?? child?.sub ?? page?.sub;
   // 배지는 부모 것이다. 서브가 물려받으면 "25개 지표" 같은 남의 표찰이 따라 붙는다.
-  const badge = deep || child ? undefined : page?.badge;
+  // 배지는 부모 것이라 서브는 물려받지 않는다. 다만 DEEP_PAGES 가 자기 배지를 들고
+  // 있으면 그건 자기 것이다(아직 안 연 화면의 '준비 중').
+  const badge = deep ? deep.badge : child ? undefined : page?.badge;
   return (
     <header className="hz-page-head">
 {/* #267 의 가드: NAV 에 없는 경로(법률 문서)에서는 제목 칸을 통째로 비운다.
           그 안에 콘솔 리디자인의 배지를 넣는다 — 둘은 서로 독립이다. */}
-      {page && (
+      {/* ⚠️ `page` 만으로는 부족하다 — NAV 에 없고 DEEP_PAGES 에만 있는 화면
+          (아직 안 연 /preview)이 제목 칸을 통째로 비운다. */}
+      {(page || deep) && (
         <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
           {/* 배지는 제목과 같은 줄, 세로 가운데 정렬. baseline 으로 두면 알약의 **글자**
               밑선이 제목 밑선에 맞아, 알약 자체는 그만큼(패딩+테두리) 아래로 내려앉는다 —

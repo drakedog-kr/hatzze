@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 
 import { getPreview, type PreviewLink, type PreviewMover } from "@/lib/kr-preview";
 
@@ -41,13 +42,32 @@ import { C, MONO } from "../ui";
  * 섹터가 열한 개라 **같은 문장이 열한 번** 나왔다. 그 안내는 카드 벽 위에 한 번만 둔다.
  */
 
+/**
+ * ⛔ **아직 안 연 화면이다.** true 로 바꾸는 것이 곧 **화면을 여는 것**이다.
+ *
+ * 열 때는 두 곳을 같이 푼다 — 여기와 `app/AppShell.tsx` 의 COMING_SOON 항목(그걸 NAV 로
+ * 옮겨야 사이드바에서 눌린다). 한쪽만 풀면 눌리는데 404 이거나, 안 눌리는데 주소로는
+ * 열린다.
+ *
+ * ⚠️ **'준비 중' 배지로는 못 막는다.** 2026-08-30 에 배지를 단 채 NAV 에 href 를 뒀더니
+ * 프로덕션 사이드바에서 그냥 눌려 들어가졌다. 배지는 표시일 뿐이다.
+ */
+const PUBLIC = false;
+
+/** 배포된 곳인가. Vercel 에서만 `VERCEL_ENV` 가 있고 로컬에는 없다 — 그래서 로컬에서는
+ *  PUBLIC 이 false 여도 그대로 보인다(만드는 중에 봐야 하니까). */
+const DEPLOYED = Boolean(process.env.VERCEL_ENV);
+
 export async function generateMetadata(): Promise<Metadata> {
-  return pageMetadata({
+  const meta = pageMetadata({
     title: "국장 미리보기",
     description:
       "간밤 미국에서 크게 움직인 종목과 사업으로 엮인 국내 종목을 개장 전에 잇습니다. 과거에 그런 날 개장이 어땠는지를 함께 봅니다.",
     path: "/preview",
   });
+  // 안 연 동안은 색인도 막는다. 아래에서 404 를 내므로 사실상 덤이지만, 사이드바에
+  // 링크가 있던 동안 크롤러가 주소를 이미 봤을 수 있다.
+  return PUBLIC ? meta : { ...meta, robots: { index: false, follow: false } };
 }
 
 const SIGN = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(2)}`;
@@ -160,6 +180,10 @@ function MoverBlock({ m }: { m: PreviewMover }) {
 /* ── 화면 ────────────────────────────────────────────────────────────────── */
 
 export default async function PreviewPage() {
+  // ⛔ 안 연 화면이라 배포된 곳에서는 없는 페이지다. 사이드바 링크를 지우는 것만으로는
+  // 부족하다 — 주소를 알면 그대로 열린다.
+  if (!PUBLIC && DEPLOYED) notFound();
+
   const { date, sectors, moverCount, pairCount } = await getPreview();
   const stamp = date ? `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))} 아침 기준` : undefined;
 

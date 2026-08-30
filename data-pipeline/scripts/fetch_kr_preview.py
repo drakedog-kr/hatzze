@@ -34,12 +34,14 @@ KRX 를 안 쓰므로 08시 공표를 기다릴 이유가 없다. 지표 블록 
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import os
 import sys
 import time
 import urllib.error
 import urllib.request
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -50,6 +52,13 @@ from config.us_kr_pairs import PAIRS, TICKERS, US_VOL  # noqa: E402
 from config.us_stock_themes import US_THEMES  # noqa: E402
 
 QUOTE = "https://finnhub.io/api/v1/quote?symbol={t}&token={k}"
+
+# 지수 대용. 핀허브 무료가 ^GSPC 를 안 줘서 S&P500 ETF 를 쓴다(spx_change 주석 참고).
+SPX_PROXY = "SPY"
+
+# 미 동부. 서머타임을 안 따지고 −4 로 고정한다 — 여기서는 **날짜만** 보는데, 정규장
+# (09:30~16:00 ET)은 −4 로 봐도 −5 로 봐도 같은 날짜에 들어간다.
+ET = timezone(timedelta(hours=-4))
 
 # ⚠️ 핀허브 무료 티어의 분당 한도가 60 이다. 55 마다 창을 넘긴다(여유 5건).
 BATCH = 55
@@ -72,33 +81,59 @@ FAIL_PCT_MAX = 20
 SECTOR = {t: k for k, v in US_THEMES.items() for t in v}
 
 
-def quote(ticker: str, key: str) -> float | None:
-    """간밤 등락률(%). 못 받으면 None."""
-    try:
-        with urllib.request.urlopen(QUOTE.format(t=ticker, k=key), timeout=15) as r:
-            d = json.load(r)
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
-        print(f"[경고] {ticker}: {type(e).__name__}")
-        return None
+def quote(ticker: str, key: str) -> tuple[float, str] | None:
+    """(간밤 등락률 %, 그 값이 속한 미국 장 날짜). 못 받으면 None.
+
+    ⭐ 날짜를 함께 돌려주는 이유는 **지수와 종목이 같은 날인지 맞춰 보기 위해서**다.
+    아래 `spx_change` 주석 참고 — 다른 날끼리 빼면 초과분이 아니라 잡음이 된다.
+    """
+    # ⚠️ 잡는 예외를 좁히지 말 것. 처음엔 (URLError, TimeoutError, JSONDecodeError) 만
+    # 잡았는데 2026-08-30 에 `http.client.RemoteDisconnected` 가 그 그물을 빠져나가
+    # 스크립트가 통째로 죽었다(핀허브가 연달아 부르면 응답 없이 연결을 끊는다).
+    # OSError 가 URLError·TimeoutError·ConnectionReset 을 다 덮고, HTTPException 이
+    # RemoteDisconnected·BadStatusLine 을 덮는다.
+    #
+    # 한 번은 다시 걸어 본다 — 끊긴 연결 하나 때문에 종목을 버릴 이유가 없다.
+    for attempt in (1, 2):
+        try:
+            with urllib.request.urlopen(QUOTE.format(t=ticker, k=key), timeout=15) as r:
+                d = json.load(r)
+            break
+        except (OSError, http.client.HTTPException, json.JSONDecodeError) as e:
+            if attempt == 1:
+                time.sleep(2)
+                continue
+            print(f"[경고] {ticker}: {type(e).__name__}")
+            return None
     # ⚠️ 429 는 본문이 `{"error": ...}` 로 온다. c 가 0 이거나 없으면 값이 아니다.
-    if not d.get("c") or d.get("dp") is None:
+    if not d.get("c") or d.get("dp") is None or not d.get("t"):
         print(f"[경고] {ticker}: {str(d)[:60]}")
         return None
-    return float(d["dp"])
+    # `t` 는 마지막 체결의 UTC 초. 미 동부로 옮겨 날짜만 본다(정규장은 한 날짜 안에 있다).
+    day = datetime.fromtimestamp(int(d["t"]), timezone.utc).astimezone(ET).strftime("%Y-%m-%d")
+    return float(d["dp"]), day
 
 
-def spx_change() -> float:
-    """S&P500 간밤 등락률(%). 종목의 초과분을 내는 데 쓴다.
+def spx_change(key: str) -> tuple[float, str]:
+    """S&P500 간밤 등락률(%)과 그 날짜. 종목의 초과분을 내는 데 쓴다.
 
-    ⚠️ 야후를 쓰는 이유는 핀허브 무료가 **지수를 안 주기** 때문이다(^GSPC 는 403).
-    이 저장소가 지수 종가에 이미 야후를 쓰고 있어 새 원천이 아니다.
+    ⚠️⚠️ **야후(^GSPC)로 되돌리지 말 것.** 2026-08-30 에 두 가지로 틀렸다.
+
+      ① 야후가 08-28(금) 종가를 **NaN 으로** 줬다. `pct_change()` 의 기본값이
+         fill_method='pad' 라 NaN 을 전날 값으로 메우고, 그래서 등락률이 **정확히
+         0.00%** 로 나왔다. 0 이면 초과분 계산에서 지수 몫이 통째로 빠진다 —
+         빠졌다는 티도 안 난다. 그날 문턱을 넘은 종목이 19개에서 24개로 늘었다.
+      ② NaN 을 버리고 계산해도 **하루 전 값**(+0.72%)이 나온다. 종목 시세는 핀허브라
+         금요일 것인데 지수만 목요일 것이라, 다른 날끼리 빼는 꼴이 된다.
+
+    핀허브 무료는 지수(^GSPC)를 안 주지만 **SPY 는 준다** — ETF 라 그냥 종목이다.
+    같은 API·같은 세션이라 날짜가 어긋날 수 없고, 야후 의존이 사라진다. 배당·괴리로
+    지수와 소수점이 조금 다르지만 베타 보정용으로는 차이가 없다.
     """
-    import yfinance as yf
-
-    h = yf.Ticker("^GSPC").history(period="5d", auto_adjust=False)
-    if len(h) < 2:
-        raise SystemExit("[중단] S&P500 을 못 받았습니다 — 초과분을 낼 수 없습니다")
-    return float(h["Close"].pct_change().iloc[-1] * 100)
+    q = quote(SPX_PROXY, key)
+    if q is None:
+        raise SystemExit(f"[중단] {SPX_PROXY} 를 못 받았습니다 — 초과분을 낼 수 없습니다")
+    return q
 
 
 def main() -> None:
@@ -110,22 +145,38 @@ def main() -> None:
     if not key:
         raise SystemExit("[중단] FINNHUB_API_KEY 가 없습니다")
 
-    spx = spx_change()
-    print(f"[기준] S&P500 간밤 {spx:+.2f}%")
+    spx, spx_day = spx_change(key)
+    print(f"[기준] {SPX_PROXY} {spx_day} 종가 {spx:+.2f}%")
 
     dps: dict[str, float] = {}
-    for i, t in enumerate(TICKERS):
-        if i and i % BATCH == 0:
+    days: dict[str, int] = {}
+    # 지수까지 세어 한 창에 담는다 — 71번째가 되면 429 가 난다.
+    for i, t in enumerate(TICKERS, start=1):
+        if i % BATCH == 0:
             print(f"[대기] 분당 한도 때문에 {WINDOW_SEC}초 쉽니다 ({i}/{len(TICKERS)})")
             time.sleep(WINDOW_SEC)
         v = quote(t, key)
         if v is not None:
-            dps[t] = v
+            dps[t], day = v[0], v[1]
+            days[day] = days.get(day, 0) + 1
 
     fail_pct = (len(TICKERS) - len(dps)) / len(TICKERS) * 100
     print(f"[수집] {len(dps)}/{len(TICKERS)}종목 (실패 {fail_pct:.0f}%)")
     if fail_pct > FAIL_PCT_MAX:
         raise SystemExit(f"[중단] 실패가 {fail_pct:.0f}% 입니다 — 반쪽짜리 카드는 '조용한 날'과 구별이 안 됩니다")
+
+    # ⚠️⚠️ **지수와 종목이 같은 날인지 맞춰 본다.** 다른 날끼리 빼면 초과분이 아니라
+    # 잡음이고, 그런데도 숫자는 멀쩡해 보인다(2026-08-30 에 실제로 그랬다 — spx_change
+    # 주석 참고). 지금은 지수도 종목도 같은 핀허브라 어긋날 일이 없지만, 원천이 갈리는
+    # 순간 다시 조용히 틀린다. 그래서 여기서 한 번 확인한다.
+    stock_day = max(days, key=lambda d: days[d]) if days else ""
+    if stock_day != spx_day:
+        raise SystemExit(
+            f"[중단] 지수는 {spx_day} 인데 종목 다수는 {stock_day} 입니다 — 다른 날끼리 빼면 초과분이 아닙니다"
+        )
+    if len(days) > 1:
+        odd = {d: n for d, n in days.items() if d != stock_day}
+        print(f"[경고] 날짜가 다른 종목이 섞였습니다: {odd} (다수 {stock_day} 기준으로 갑니다)")
 
     # 문턱을 넘은 종목만 남긴다.
     movers = []
