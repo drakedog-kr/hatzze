@@ -2013,6 +2013,35 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
   .mdd-pair { grid-template-columns: minmax(0, 1fr); }
 }
 
+/* 국장 미리보기의 섹터 카드 벽. 2열 격자이고 **한 줄의 두 카드는 키가 같다**.
+
+   ⚠️ 다단(columns)으로 흘려 담지 말 것. 빈 자리는 안 생기지만 좌우 카드의 머리가
+   제각각인 높이에서 시작해 줄이 안 맞는다. 카드 벽은 줄이 맞아야 벽으로 읽힌다.
+
+   ⚠️ align-items 를 start 로 두지 말 것. 그러면 머리만 맞고 바닥이 어긋난다. 기본값인
+   stretch 라야 짧은 카드가 같은 줄의 긴 카드까지 늘어나 위아래가 다 맞는다. 대신 짧은
+   카드 밑에 빈 자리가 생기므로, **섹터를 종목 수 순으로 세워** 키가 비슷한 것끼리
+   짝지어야 한다(page.tsx 의 정렬 주석 참고). */
+.hz-pv-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (max-width: 1024px) {
+  .hz-pv-grid { grid-template-columns: minmax(0, 1fr); }
+}
+/* 같은 줄에서 짧은 카드가 늘어날 때, 남는 자리를 **바닥에 몰지 않고 줄들이 나눠 갖는다.**
+   종목 수가 5 대 3 이면 짧은 쪽 바닥에 130px 짜리 빈 판이 생기는데, 그러면 카드가
+   덜 채워진 것처럼 보인다. 줄이 함께 늘면 여백이 리듬으로 읽힌다. */
+.hz-pv-grid > .hz-sheet {
+  display: flex;
+  flex-direction: column;
+}
+.hz-pv-grid .hz-trow {
+  flex: 1;
+  align-content: center;
+}
+
 /* 기간 토글 — 배경·글자색은 선택 여부에 따라 인라인으로 정하고, 호버만 여기서 맡는다.
    ⚠️ 호버 배경을 인라인에 두면 :hover 를 이겨서 아예 안 먹는다(카더라 '더 보기'가
    그래서 한 번도 호버가 안 보였다). */
