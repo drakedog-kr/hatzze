@@ -63,7 +63,7 @@ export const US_TICKER_NAMES: Record<string, string> = {
   PRU: "푸르덴셜 파이낸셜",
   MMM: "쓰리엠",
   AMGN: "암젠",
-  C: "시티그룹",
+  C: "씨티그룹",
   DE: "디어",
   DLTR: "달러트리",
   ICE: "인터콘티넨털 익스체인지",
