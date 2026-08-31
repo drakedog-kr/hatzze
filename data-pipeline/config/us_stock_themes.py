@@ -31,25 +31,26 @@ US_THEMES: dict[str, list[str]] = {
     "AI반도체": [
         "NVDA", "AMD", "AVGO", "TSM", "ARM", "MRVL", "QCOM", "INTC",
         "ALAB", "MPWR", "ON", "NXPI", "TXN", "SWKS", "QRVO", "NVTS",
-        "WOLF", "TSEM", "CBRS",
+        "WOLF", "TSEM", "CBRS", "CRDO",
     ],
     # 메모리를 AI반도체에서 떼어 낸 건 **국내 투자자에게 이게 별개의 이야기**라서다.
     # 마이크론·샌디스크 얘기는 곧 삼성전자·SK하이닉스 얘기로 이어진다.
     "메모리": ["MU", "SNDK", "WDC", "STX"],
     "반도체 장비·소재": [
         "ASML", "LRCX", "KLAC", "AMAT", "TER", "FORM", "AMKR",
-        "COHR", "LITE", "GLW", "SNPS", "CDNS", "CLS",
+        "COHR", "LITE", "GLW", "SNPS", "CDNS", "CLS", "CIEN",
     ],
     "빅테크": ["GOOGL", "AMZN", "AAPL", "META", "MSFT", "NFLX"],
     # '데이터센터를 짓는 쪽'. 소프트웨어와 갈라 둔다 — 이쪽은 전력·부품 수요로 이어져
     # 아래 전력·원자력 테마와 같이 움직이는 일이 잦다.
     "AI 인프라·클라우드": [
         "ORCL", "PLTR", "CRWV", "NBIS", "SMCI", "DELL", "ANET", "VRT",
-        "IREN", "WULF", "EQIX", "DLR", "IBM", "CSCO",
+        "IREN", "WULF", "EQIX", "DLR", "IBM", "CSCO", "NOK",
     ],
     "소프트웨어": [
         "CRM", "NOW", "ADBE", "SNOW", "DDOG", "NET", "PANW", "CRWD",
         "TEAM", "APP", "TTD", "RDDT", "RBLX", "SHOP", "ZBRA", "APH",
+        "OKTA", "WDAY", "INTU",
     ],
     "전기차·자율주행": ["TSLA", "RIVN", "LCID", "NIO", "XPEV", "GM", "F", "APTV", "UBER", "CVNA"],
     "전력·원자력": [
@@ -62,9 +63,9 @@ US_THEMES: dict[str, list[str]] = {
     # 쓰는 '대표성' 순서라, 이틀짜리 급등으로 맨 앞자리를 주지 않는다.
     "바이오·헬스케어": [
         "LLY", "MRNA", "NVO", "MRK", "PFE", "ABBV", "AZN", "NVS",
-        "JNJ", "UNH", "ISRG", "MDGL", "CVS", "CAH",
+        "JNJ", "UNH", "ISRG", "MDGL", "CVS", "CAH", "AMGN", "MDT", "EVMN",
     ],
-    "금융": ["GS", "JPM", "MS", "BAC", "BRK", "BX", "SCHW", "MA", "AXP", "PYPL", "SOFI", "UPST"],
+    "금융": ["GS", "JPM", "MS", "BAC", "BRK", "BX", "SCHW", "MA", "AXP", "PYPL", "SOFI", "UPST", "C"],
     # 코인 시세와 함께 움직이는 묶음. 금융과 갈라 둔 이유는 그날 오가는 얘기가
     # 실적이 아니라 코인 시세라, 섞으면 금융 테마의 순위가 코인 때문에 흔들린다.
     "가상자산": ["COIN", "MSTR", "CRCL", "GLXY", "CLSK", "RIOT", "CIFR", "HOOD"],
@@ -72,6 +73,7 @@ US_THEMES: dict[str, list[str]] = {
         "KO", "WMT", "COST", "SBUX", "MCD", "NKE", "CMG", "PEP", "PM",
         "DIS", "DKNG", "ORLY", "DECK", "LUV", "DHI", "PLD", "WELL",
         "CPNG", "MELI", "URI", "ABNB", "BKNG", "CAT", "VZ",
+        "HD", "BBY", "DLTR", "EBAY",
     ],
     "에너지·원자재": ["XOM", "CVX", "KMI", "VLO", "FCX", "NEM", "NUE", "ALB"],
     # 아직 작지만(합쳐 170회) 뜰 때 한꺼번에 뜨는 묶음이라 따로 둔다.
