@@ -38,7 +38,7 @@ export const US_THEMES: Record<string, string[]> = {
   "소프트웨어": ["CRM", "NOW", "ADBE", "SNOW", "DDOG", "NET", "PANW", "CRWD", "TEAM", "APP", "TTD", "RDDT", "RBLX", "SHOP", "ZBRA", "APH", "OKTA", "WDAY", "INTU"],
   "전기차·자율주행": ["TSLA", "RIVN", "LCID", "NIO", "XPEV", "GM", "F", "APTV", "UBER", "CVNA"],
   "전력·원자력": ["SMR", "OKLO", "CEG", "VST", "NRG", "NEE", "GEV", "PWR", "ETN", "CCJ", "HON", "FSLR", "ENPH", "BE"],
-  "우주·방산": ["RKLB", "ASTS", "RDW", "LMT", "RTX", "NOC", "GD", "HII", "BA", "AXON"],
+  "우주·방산": ["SPCX", "RKLB", "ASTS", "RDW", "LMT", "RTX", "NOC", "GD", "HII", "BA", "AXON"],
   "바이오·헬스케어": ["LLY", "MRNA", "NVO", "MRK", "PFE", "ABBV", "AZN", "NVS", "JNJ", "UNH", "ISRG", "MDGL", "CVS", "CAH", "AMGN", "MDT", "EVMN"],
   "금융": ["GS", "JPM", "MS", "BAC", "BRK", "BX", "SCHW", "MA", "AXP", "PYPL", "SOFI", "UPST", "C"],
   "가상자산": ["COIN", "MSTR", "CRCL", "GLXY", "CLSK", "RIOT", "CIFR", "HOOD"],
