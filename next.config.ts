@@ -39,6 +39,32 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [{ source: "/telegram", destination: "/kadera", permanent: true }];
   },
+
+  /**
+   * 공유 카드 이미지는 **가져가게 두되 색인에는 넣지 않는다.**
+   *
+   * 홈 카드 주소에는 카카오 캐시를 깨려고 `?v=<기준일>-<도수>` 가 붙는다(app/seo.ts).
+   * 그래서 **날마다 새 URL 이 하나씩 생기고**, 크롤러는 그걸 매번 새 페이지로 보고
+   * 가져간 뒤 "크롤링됨 - 색인이 생성되지 않음" 으로 쌓아 둔다. 2026-09-01 서치콘솔에
+   * 그렇게 쌓인 게 77건이었다(71건은 채널 아바타, 6건이 이 카드들).
+   *
+   * robots.txt 로 막으면 간단하지만 **그러면 안 된다** — 카카오·페이스북·X 의 미리보기
+   * 크롤러가 robots.txt 를 따르기 때문에, 막는 순간 공유 카드가 통째로 죽는다.
+   * `X-Robots-Tag: noindex` 는 가져가는 것은 그대로 두고 색인만 뗀다.
+   *
+   * ⚠️ 경로를 손으로 적는다. 새 화면에 `opengraph-image.tsx` 를 놓으면 여기 한 줄을
+   *    같이 넣을 것 — 안 넣어도 화면은 멀쩡해서 티가 안 난다.
+   */
+  async headers() {
+    const noindex = { key: "X-Robots-Tag", value: "noindex" };
+    return [
+      "/opengraph-image",
+      "/kadera/opengraph-image",
+      "/kadera/us/opengraph-image",
+      "/mdd/opengraph-image",
+      "/seohak/opengraph-image",
+    ].map((source) => ({ source, headers: [noindex] }));
+  },
 };
 
 export default nextConfig;
