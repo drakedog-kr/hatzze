@@ -763,7 +763,7 @@ function Foot({ children }: { children: React.ReactNode }) {
 function AbsentSheet({ icon, title, sub, body }: { icon: string; title: string; sub: string; body: string }) {
   return (
     <Sheet>
-      <SectionHead icon={icon} title={title} desc={sub} />
+      <SectionHead level={2} icon={icon} title={title} desc={sub} />
       <div style={{ padding: PAD }}>
         <p style={{ margin: 0, color: C.muted, fontSize: 12, lineHeight: 1.7, wordBreak: "keep-all" }}>
           <Icon name="info" style={{ fontSize: 14, verticalAlign: -2, marginRight: 4 }} />
@@ -1491,7 +1491,7 @@ function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodLabel: s
 
   return (
     <Sheet>
-      <SectionHead
+      <SectionHead level={2}
         icon="show_chart"
         title="언더워터 차트"
         desc="전고점을 0으로 두고 그 아래로 얼마나 잠겼는지"
@@ -1892,7 +1892,7 @@ function RiskProfile({ r, periodLabel, market }: { r: RiskProfileData; periodLab
 
   return (
     <Sheet>
-      <SectionHead
+      <SectionHead level={2}
         icon="monitoring"
         title="리스크 프로필"
         desc="이 종목을 들고 있으면 어떤 위험을 감수하게 되는지, 세 가지 각도로 봅니다"
@@ -2000,7 +2000,7 @@ function Attribution({
 
   return (
     <Sheet>
-      <SectionHead icon="call_split" title="시장 탓일까, 종목 탓일까" desc="지수·업종과 견줘 이 종목만의 낙폭이 얼마인지" note="같은 기간" />
+      <SectionHead level={2} icon="call_split" title="시장 탓일까, 종목 탓일까" desc="지수·업종과 견줘 이 종목만의 낙폭이 얼마인지" note="같은 기간" />
       <div style={{ flex: 1, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 18 }}>
         {/* 큰 수치는 **아래 각주·히어로 해설과 같은 값·같은 단위**여야 한다(2026-08-04).
             예전엔 여기만 '몫'(|gap| ÷ 자기 낙폭 = 14%)이라, 한 시트 안에서 14% 와 4.9%p 가
@@ -2091,7 +2091,7 @@ function Recovery({ a, periodLabel }: { a: MddAnalysis; periodLabel: string }) {
 
   return (
     <Sheet>
-      <SectionHead
+      <SectionHead level={2}
         icon="schedule"
         title="회복까지 걸린 기간"
         desc="과거 사례로 본 회복 소요 기간"
@@ -2214,7 +2214,7 @@ function Character({ ch, currentDd }: { ch: DrawdownCharacter | null; currentDd:
 
   return (
     <Sheet>
-      <SectionHead
+      <SectionHead level={2}
         icon="bolt"
         title="이 하락의 성격"
         desc="같은 깊이라도 빨리 빠진 하락과 오래 흘러내린 하락은 회복 양상이 다릅니다"
@@ -2311,7 +2311,7 @@ function Theme({ theme }: { theme: ThemeCmp }) {
         : `테마 ${theme.peers.length}종목 중 낙폭 ${rank}위입니다.`;
   return (
     <Sheet>
-      <SectionHead
+      <SectionHead level={2}
         icon="hub"
         title={`${theme.name} 대표 ${theme.peers.length}종목 안에서`}
         desc={`${self.name}, ${lead}`}
@@ -2346,7 +2346,7 @@ function TopDrawdowns({ eps }: { eps: Episode[] }) {
      이겨서 열이 안 줄어든다. */
   return (
     <Sheet>
-      <SectionHead icon="history" title="역대 낙폭 Top 5" desc="이만큼 빠졌던 구간과 회복까지 걸린 기간" note="−20% 이상" />
+      <SectionHead level={2} icon="history" title="역대 낙폭 Top 5" desc="이만큼 빠졌던 구간과 회복까지 걸린 기간" note="−20% 이상" />
       <div className="hz-thead mdd-top-row">
         <span>구간</span>
         <span>낙폭</span>

@@ -94,7 +94,7 @@ export function TrendingTabs({
 
   return (
     <>
-      <SectionHead icon={icon} title={title} desc={desc} right={tabs} />
+      <SectionHead level={2} icon={icon} title={title} desc={desc} right={tabs} />
       {current?.count === 0 ? (
         // 시트 안이라 여백은 셀과 같은 자리에서 낸다(머리가 자기 padding 을 갖고 있어
         // 문단이 시트 왼쪽 끝에 붙어 버린다).

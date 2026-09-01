@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const SITE_URL = "https://hatzze.fun";
+import { SITE_URL } from "./brand";
 
 /**
  * /robots.txt 자동 생성.

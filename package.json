@@ -9,7 +9,8 @@
     "lint": "eslint",
     "dev:alt": "NEXT_DIST_DIR=.next-alt next dev",
     "build:local": "NEXT_DIST_DIR=.next-local next build",
-    "start:local": "NEXT_DIST_DIR=.next-local next start"
+    "start:local": "NEXT_DIST_DIR=.next-local next start",
+    "check:routes": "node --experimental-strip-types --no-warnings scripts/check-routes.mjs"
   },
   "dependencies": {
     "@fontsource/bricolage-grotesque": "^5.3.0",

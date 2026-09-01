@@ -798,7 +798,7 @@ export default async function KaderaPage() {
 
       {/* ── 급부상 종목: 시트 안 3×2 셀 ─────────────────────────────── */}
       <section className="hz-sheet">
-        <SectionHead
+        <SectionHead level={2}
           icon="local_fire_department"
           title="급부상 종목"
           note="최근 3일 vs 평소"
@@ -895,7 +895,7 @@ export default async function KaderaPage() {
       {/* ── 테마 로테이션 · 이슈 키워드 (50:50) ──────────────────────── */}
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
         <section className="hz-sheet" style={{ flex: "1 1 calc(50% - 8px)", minWidth: SHEET_PAIR_MIN, display: "flex", flexDirection: "column" }}>
-          <SectionHead
+          <SectionHead level={2}
             icon="donut_small"
             title="테마 로테이션"
             note="3일 vs 이전"
@@ -950,7 +950,7 @@ export default async function KaderaPage() {
         </section>
 
         <section className="hz-sheet" style={{ flex: "1 1 calc(50% - 8px)", minWidth: SHEET_PAIR_MIN, display: "flex", flexDirection: "column" }}>
-          <SectionHead icon="tag" title="이슈 키워드" note="최근 3일" desc="종목명이 아닌 화제어 · 언급 횟수 기준" />
+          <SectionHead level={2} icon="tag" title="이슈 키워드" note="최근 3일" desc="종목명이 아닌 화제어 · 언급 횟수 기준" />
           {keywords.length === 0 ? (
             <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>아직 뽑을 화제어가 없습니다.</p>
           ) : (
@@ -1081,7 +1081,7 @@ export default async function KaderaPage() {
 
       {/* ── 주요 종목 리포트: 시트 안 2×2 셀 ────────────────────────── */}
       <section className="hz-sheet">
-        <SectionHead
+        <SectionHead level={2}
           icon="query_stats"
           title="주요 종목 리포트"
           note={`최근 ${KADERA_WINDOW_DAYS}일 · 상위 ${Math.max(1, stockReports.length)}종목`}
@@ -1169,7 +1169,7 @@ export default async function KaderaPage() {
       {/* ── 채널 파워 랭킹 · 뜨는 채널 (50:50) ───────────────────────── */}
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
         <section className="hz-sheet" style={{ flex: "1 1 calc(50% - 8px)", minWidth: SHEET_PAIR_MIN, display: "flex", flexDirection: "column" }}>
-          <SectionHead icon="military_tech" title="채널 파워 랭킹" desc="조회율·확산력까지 반영한 채널 영향력" />
+          <SectionHead level={2} icon="military_tech" title="채널 파워 랭킹" desc="조회율·확산력까지 반영한 채널 영향력" />
           {channels.length === 0 ? (
             <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>아직 채널 점수가 없습니다.</p>
           ) : (
@@ -1212,7 +1212,7 @@ export default async function KaderaPage() {
           {/* 기간 표기는 옆 시트와 "최근 7일"로 맞춘다. 구독자 스냅샷은 백필이 안 돼
               하루씩 쌓이므로 실제로 잰 구간이 그보다 짧은 날이 있다(getRisingChannels 의
               spanDays). 시트에 그 사정까지 적진 않는다. */}
-          <SectionHead icon="rocket_launch" title="뜨는 채널" note="최근 7일" desc="최근 구독자가 많이 늘어난 채널" />
+          <SectionHead level={2} icon="rocket_launch" title="뜨는 채널" note="최근 7일" desc="최근 구독자가 많이 늘어난 채널" />
           {(() => {
             const real = rising.filter((r) => !r.isPlaceholder);
             const topDelta = Math.max(1, ...real.map((r) => Math.abs(r.delta7d)));

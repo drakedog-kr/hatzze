@@ -913,7 +913,7 @@ export default async function UsKaderaPage() {
       <SectionCaps label="최근 뜨는 것" count={3} />
 
       <section className="hz-sheet">
-        <SectionHead
+        <SectionHead level={2}
           icon="local_fire_department"
           title="급부상 종목"
           note={`최근 ${US_WINDOW_DAYS}일 vs 평소`}
@@ -1122,7 +1122,7 @@ export default async function UsKaderaPage() {
             flexDirection: "column",
           }}
         >
-          <SectionHead
+          <SectionHead level={2}
             icon="donut_small"
             title="테마 로테이션"
             note="3일 vs 이전"
@@ -1356,7 +1356,7 @@ export default async function UsKaderaPage() {
             flexDirection: "column",
           }}
         >
-          <SectionHead
+          <SectionHead level={2}
             icon="tag"
             title="이슈 키워드"
             note="최근 3일"
@@ -1550,7 +1550,7 @@ export default async function UsKaderaPage() {
 
       <SectionCaps label="무슨 얘기가 오갔나" count={2} />
       <section className="hz-sheet">
-        <SectionHead
+        <SectionHead level={2}
           icon="query_stats"
           title="주요 종목 리포트"
           note={`최근 ${US_WINDOW_DAYS}일`}
@@ -1778,7 +1778,7 @@ export default async function UsKaderaPage() {
             flexDirection: "column",
           }}
         >
-          <SectionHead
+          <SectionHead level={2}
             icon="podcasts"
             title="미장을 많이 다루는 채널"
             note="최근 30일"
@@ -1888,7 +1888,7 @@ export default async function UsKaderaPage() {
             flexDirection: "column",
           }}
         >
-          <SectionHead
+          <SectionHead level={2}
             icon="hub"
             title="몇 곳이 말하나"
             note={

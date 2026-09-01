@@ -1,5 +1,8 @@
 import { C, Icon, R } from "../ui";
 
+/** 시트 제목의 생김새. h2·h3 가 이 하나를 나눠 쓴다(태그만 갈리고 화면은 같다). */
+const HEAD_STYLE = { margin: 0, fontSize: 14, fontWeight: 700, color: C.ink, letterSpacing: "-.01em", wordBreak: "keep-all" } as const;
+
 /**
  * 카더라 리포트 **시트**의 머리(아이콘 + 제목 + 우측 보조 + 설명).
  *
@@ -28,6 +31,7 @@ export function SectionHead({
   meta,
   noteHelp,
   right,
+  level = 3,
 }: {
   icon: string;
   title: string;
@@ -38,6 +42,17 @@ export function SectionHead({
   noteHelp?: string;
   /** 우측에 붙일 임의의 조작부(예: 기간 탭). note 와 동시에 쓰지 않는다. */
   right?: React.ReactNode;
+  /**
+   * 이 머리가 문서에서 몇 층인가. **생김새는 하나도 안 바뀐다** — 태그만 바뀐다.
+   *
+   * 기본값이 3 인 이유: 내부자 리포트와 홈은 시트 위에 구간 제목(h2)이 한 겹 더 있어서
+   * 시트가 h3 인 게 맞다(app/insider/parts.tsx 의 GroupTitle 주석 참고). 거기가 다수라
+   * 기본을 그쪽에 맞추고, **구간 제목이 없는 화면만 `level={2}` 를 준다.**
+   *
+   * 왜 손대나: `/kadera` 서버 HTML 에 h1 하나와 h3 일곱 개가 있고 h2 가 한 개도 없었다
+   * (2026-09-01 실측). 한 층을 건너뛴 문서가 된다.
+   */
+  level?: 2 | 3;
 }) {
   return (
     /* ⚠️⚠️ **좁은 화면에서는 줄바꿈이 켜져야 한다**(globals.css 의 ≤560 규칙). 알약은
@@ -56,9 +71,12 @@ export function SectionHead({
       <div className={`hz-sheet-head-txt${right ? " hz-sheet-head-txt-wide" : ""}`}>
         {/* 800 → 700. 13px 에 800 은 획이 붙어 도리어 흐릿해 보였다. 크기를 올리고
             굵기를 한 단 내린다 — 커진 만큼 무게는 이미 붙는다. */}
-        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: C.ink, letterSpacing: "-.01em", wordBreak: "keep-all" }}>
-          {title}
-        </h3>
+        {/* 태그만 갈린다. style 은 둘이 같은 것을 쓰므로 화면은 픽셀 하나 안 바뀐다. */}
+        {level === 2 ? (
+          <h2 style={HEAD_STYLE}>{title}</h2>
+        ) : (
+          <h3 style={HEAD_STYLE}>{title}</h3>
+        )}
         {/* 설명은 이 페이지에서 가장 자주 읽히는 작은 글씨다(시트마다 한 줄).
             11.5/sub2(명암비 2.7)로는 큰 화면에서 안 읽혔다. */}
         {desc && <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.5, color: C.sub, wordBreak: "keep-all" }}>{desc}</p>}

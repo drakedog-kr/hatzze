@@ -361,7 +361,7 @@ export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
   const topSell = monthDays.reduce<CalendarDay | null>((a, d) => (!a || d.net < a.net ? d : a), null);
   return (
     <section className="hz-sheet">
-      <SectionHead
+      <SectionHead level={2}
         icon="calendar_month"
         /* ⭐ '되풀이되는 때'였다. **카드의 4분의 1만 가리키는 이름**이었다 — 달력·이 달·
            고른 날·역대 기록을 두고 오른쪽 한 칸의 제목을 그대로 썼다. 게다가 그 칸 안에
