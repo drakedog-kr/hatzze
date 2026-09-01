@@ -26,6 +26,7 @@ import { pageMetadata } from "../seo";
 import { AiMark, C, Icon, MONO, R } from "../ui";
 import { ExpandableList } from "./ExpandableList";
 import { Avatar, ChangeRate, DayBars, DeltaPp, Highlight, Pill, QuoteDate, RankBadge, RankDelta, SectionCaps, Sparkline, highlightTerms, termsFor } from "./parts";
+import { stockHref } from "@/lib/stock-page";
 import { StockLogo } from "../StockLogo";
 import { SectionHead } from "./SectionHead";
 import { TrendingTabs } from "./TrendingTabs";
@@ -66,8 +67,15 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hr / 24)}일 전`;
 }
 
-/** 그 종목의 MDD 정밀분석 주소. 이름은 MDD 페이지가 code 로 찾으므로 URL 엔 code·market
-   만 실어 깔끔하게 둔다(코스닥은 market 으로 .KQ 심볼이 된다). */
+/**
+ * 그 종목의 MDD 정밀분석 주소. 이름은 MDD 페이지가 code 로 찾으므로 URL 엔 code·market
+ * 만 실어 깔끔하게 둔다(코스닥은 market 으로 .KQ 심볼이 된다).
+ *
+ * ⚠️ **종목 이름을 누르는 것은 여기로 안 온다.** 이름은 그 종목의 화면(`/stock/005930`)
+ *    으로 간다 — 이 저장소의 규칙이 "종목 이름을 누르면 그 종목의 상세로 간다" 이고,
+ *    내부자 리포트가 이미 그렇게 굴고 있다(app/insider/parts.tsx). 이 주소는 'MDD' 라고
+ *    적힌 작은 링크 전용이다. 낙폭은 그 도구가 답하는 것이라 갈 곳이 다르다.
+ */
 function mddHref(code: string, market: string | null): string {
   return `/mdd?code=${code}${market ? `&market=${market}` : ""}`;
 }
@@ -461,7 +469,7 @@ export default async function KaderaPage() {
               최근 {KADERA_WINDOW_DAYS}일 언급 {t.stockCount}종목 · 총 {t.mentions.toLocaleString("ko-KR")}회 · 주목도순
             </div>
             {t.stocks.map((s) => (
-              <Link key={s.code} href={mddHref(s.code, s.market)} className="hz-theme-pop-item">
+              <Link key={s.code} href={stockHref(s.code)} className="hz-theme-pop-item">
                 <span className="hz-theme-pop-name">{s.name}</span>
                 <span className="hz-theme-pop-cnt">{s.mentions}회</span>
                 <span className="hz-theme-pop-go">
@@ -825,7 +833,22 @@ export default async function KaderaPage() {
                       {/* minWidth:0 — flex 항목의 기본 min-width:auto 가 살아 있으면 이름이
                           줄지 않아 말줄임이 안 걸리고 셀 밖으로 넘친다(820px 에서 실측 3px).
                           줄어도 되는 건 이름뿐이라 여기만 풀어 준다. */}
-                      <strong style={{ ...clip, minWidth: 0, fontSize: 14, fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>{s.name}</strong>
+                      {/* ⚠️ 말줄임은 **링크가** 물어야 한다. flex 항목이 링크로 바뀌었으므로
+                          clip(nowrap·overflow·ellipsis)과 minWidth:0 이 여기 붙어야 예전과
+                          똑같이 줄어든다. 안쪽 strong 에 두면 자르는 상자가 없어 안 걸린다.
+                          ⚠️⚠️ **글자 크기도 링크가 물어야 한다.** 안쪽에만 두면 바깥 상자가
+                          자기 줄 높이를 **물려받은 글꼴**로 잡아 3px 높아진다(14 → 21px 이던
+                          줄이 24px). 실측으로 아래 카드가 2~4px 밀렸다. 크기·자간을 링크에
+                          두고 굵기만 strong 이 물려받게 하면 예전과 픽셀까지 같아진다
+                          (strong 은 Tailwind preflight 가 `bolder` 로 두므로 inherit 을 적어야
+                          800 이 된다. 안 적으면 900 이 된다). */}
+                      <Link
+                        href={stockHref(s.code)}
+                        className="hz-stock-link"
+                        style={{ ...clip, minWidth: 0, fontSize: 14, fontWeight: 800, letterSpacing: "-.01em" }}
+                      >
+                        <strong style={{ fontWeight: "inherit" }}>{s.name}</strong>
+                      </Link>
                       <span style={{ fontFamily: MONO, fontSize: 11, color: C.sub2, flexShrink: 0 }}>{s.code}</span>
                       <span style={{ flex: 1 }} />
                       {/* '몇 개 채널'과 '며칠에 몇 회'는 둘 다 이 배수의 표본 크기를 말한다 —
@@ -1111,7 +1134,16 @@ export default async function KaderaPage() {
                       종목명뿐이라 이름이 먼저 0 으로 눌려 사라진다. */}
                   <div className="hz-stock-head" style={{ display: "flex", alignItems: "baseline", gap: 10, minWidth: 0 }}>
                     <StockLogo code={r.code} name={r.name} market={r.market} size={30} />
-                    <strong style={{ ...clip, minWidth: 0, fontSize: 17, fontWeight: 800, letterSpacing: "-.02em", color: C.ink }}>{r.name}</strong>
+                    {/* 위 급부상 셀과 같은 규칙 — 자르는 상자와 **글자 크기**가 링크로 옮겨 간다.
+                        (17px 자리는 줄 높이가 이미 글자 쪽이 커서 티가 안 나지만, 규칙을
+                         자리마다 다르게 두면 다음 사람이 어느 쪽이 맞는지 모른다.) */}
+                    <Link
+                      href={stockHref(r.code)}
+                      className="hz-stock-link"
+                      style={{ ...clip, minWidth: 0, fontSize: 17, fontWeight: 800, letterSpacing: "-.02em" }}
+                    >
+                      <strong style={{ fontWeight: "inherit" }}>{r.name}</strong>
+                    </Link>
                     <span style={{ fontFamily: MONO, fontSize: 11, color: C.sub2, flexShrink: 0 }}>{r.code}</span>
                     {r.price != null && (
                       <span className="hz-stock-price" style={{ display: "flex", alignItems: "baseline", gap: 7, whiteSpace: "nowrap", flexShrink: 0 }}>
