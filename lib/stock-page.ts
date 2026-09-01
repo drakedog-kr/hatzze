@@ -20,9 +20,9 @@ import { THEMES } from "./stock-themes";
  * 그래서 **서버가 그리는** 종목 화면을 따로 연다. 여기 담기는 건 전부 우리 자료다 —
  * 어디서 몇 번 회자됐나. 시세·재무는 어디에나 있고 우리 원천도 아니라 곁다리로만 둔다.
  *
- * ## ⚠️ 이 화면은 467장이다
+ * ## ⚠️ 이 화면은 464장이다
  *
- * 조회 하나를 잘못 고르면 그 대가가 467배로 돌아온다. 두 가지를 특히 피한다.
+ * 조회 하나를 잘못 고르면 그 대가가 464배로 돌아온다. 두 가지를 특히 피한다.
  *
  *   ① **야후를 부르지 않는다.** `getStockReport` 는 시세를 야후에서 받는데(stockQuote),
  *      크롤러가 훑으면 종목마다 바깥 요청이 하나씩 붙는다. 여기서는 `stocks` 표에
@@ -56,6 +56,10 @@ export const STOCK_STAT_DAYS = 90;
  *
  * 2026-09-01 실측 분포(자료 52일):
  *   1일+ 2,636종목 · 5일+ 1,822 · 10일+ 1,113 · 15일+ 696 · **20일+ 467** · 30일+ 230
+ *
+ * ⚠️ 이 467 과 사이트맵에 실리는 464 는 **다른 잣대다.** 위 분포는 가진 자료 전부를
+ *    센 것이고, 실제 판정은 기준일을 빼고(아직 반나절뿐이라) `mention_count > 0` 인
+ *    날만 센다. 숫자가 안 맞아 보이면 이 둘부터 확인할 것.
  *
  * 20 으로 잡은 까닭은 아래쪽이 **하루 이틀 스쳐 간 종목**이기 때문이다. 그런 종목의
  * 화면은 막대가 거의 비어 있어 색인해 봐야 얇은 페이지가 2,000장 느는 것뿐이고,
@@ -97,8 +101,17 @@ export type StockPageData = {
   narrative: string | null;
   /** 이 종목이 속한 테마(사전 기준). 없으면 빈 배열. */
   themes: string[];
-  /** 색인 대상인가 — 사이트맵 자격과 같은 규칙. */
+  /** 색인 대상인가 — 사이트맵 자격과 같은 규칙. `loadFailed` 면 판정할 수 없어 늘 false 다. */
   indexable: boolean;
+  /**
+   * 일별 집계를 **못 읽었나.**
+   *
+   * ⛔ 이 값이 없으면 조회 실패가 "언급이 한 번도 없는 종목"과 화면에서 똑같아진다.
+   *    그 자체로도 거짓말이지만 더 나쁜 게 있다 — 언급 0 은 문턱 미달이라 **noindex** 가
+   *    붙는다. DB 가 한 번 삐끗한 사이에 크롤러가 왔다면 멀쩡한 화면이 색인에서 빠진다.
+   *    그래서 실패일 때는 색인 여부를 **말하지 않는다**(robots 자체를 안 붙인다).
+   */
+  loadFailed: boolean;
   /** 집계의 기준일(카더라와 같은 값). */
   baseDate: string;
 };
@@ -118,11 +131,6 @@ const THEMES_BY_STOCK: Map<string, string[]> = (() => {
   }
   return m;
 })();
-
-/** 한 테마에 속한 종목 이름들(사전 순서 그대로 — 앞쪽이 대형주다). */
-export function themePeers(theme: string): string[] {
-  return THEMES[theme] ?? [];
-}
 
 /**
  * 종목 화면 한 장치.
@@ -177,6 +185,7 @@ export const getStockPage = cache(async (code: string): Promise<StockPageData | 
   // ⚠️ 90일치라도 종목 하나는 90행을 못 넘는다(날짜당 한 행). 1,000행 캡과 무관하다.
   if (dailyRes.error) console.error(`[getStockPage] ${code} 언급 집계를 못 읽었습니다`, dailyRes.error);
 
+  const loadFailed = Boolean(dailyRes.error);
   const rows = (dailyRes.data ?? []) as DailyRow[];
   const byDate = new Map(rows.map((r) => [r.date, r]));
   // 언급이 0인 날은 표에 행이 자체가 없다. 있는 행만 그리면 종목마다 막대 개수가 달라져
@@ -226,7 +235,8 @@ export const getStockPage = cache(async (code: string): Promise<StockPageData | 
     recentMentions,
     narrative,
     themes: THEMES_BY_STOCK.get(name) ?? [],
-    indexable: activeDays >= STOCK_INDEX_MIN_DAYS,
+    indexable: !loadFailed && activeDays >= STOCK_INDEX_MIN_DAYS,
+    loadFailed,
     baseDate,
   };
 });
@@ -263,15 +273,36 @@ export async function listIndexableStocks(): Promise<IndexableStock[] | null> {
   const [from, to] = [days[0], days[days.length - 1]];
 
   const PAGE = 1000;
+  /**
+   * ⚠️⚠️ **`order` 를 빼지 말 것.** PostgREST 의 `range` 는 SQL 의 OFFSET/LIMIT 인데,
+   * ORDER BY 가 없으면 SQL 은 행 순서를 **약속하지 않는다.** 아래에서 30페이지를 한꺼번에
+   * 던지는데, 그중 몇은 Postgres 가 병렬 스캔으로 풀어 서로 다른 순서를 돌려준다.
+   * 그러면 같은 행이 두 페이지에 겹쳐 오고 다른 행은 어디에도 안 온다.
+   *
+   * 처음엔 정렬 없이 짰고 손으로 한 번 재서 464개가 나와 통과시켰다. 다섯 번 이어서
+   * 재 보니 **347 · 348 · 339 · 345 · 464** 였다(2026-09-01). 요청마다 100개 넘는 종목이
+   * 조용히 사라진다. 에러도 경고도 없고, 사이트맵은 여전히 멀쩡한 XML 이다.
+   *
+   * `id` 는 이 표의 기본키라 유일하고 인덱스가 있다. 유일하지 않은 키로 정렬하면
+   * 같은 값끼리의 순서가 또 안 정해져 같은 병이 남는다.
+   */
   const base = () =>
     db
       .from("telegram_stock_daily")
-      .select("stock_code,date", { count: "exact" })
+      .select("stock_code,date")
       .gte("date", from)
       .lte("date", to)
-      .gt("mention_count", 0);
+      .gt("mention_count", 0)
+      .order("id");
 
-  const head = await base().range(0, 0);
+  // 총 행수는 여기서 한 번만 센다. `count: "exact"` 는 요청마다 표를 통째로 세므로
+  // 30페이지에 다 붙이면 같은 COUNT 를 30번 돌린다.
+  const head = await db
+    .from("telegram_stock_daily")
+    .select("stock_code", { count: "exact", head: true })
+    .gte("date", from)
+    .lte("date", to)
+    .gt("mention_count", 0);
   if (head.error) {
     console.error("[listIndexableStocks] 행수를 못 셌습니다", head.error);
     return null;
@@ -346,7 +377,7 @@ export function fmtKoDate(iso: string): string {
  *
  * ## 왜 굳이 링크를 다나
  *
- * 종목 화면 467장은 **서로 이어져 있지 않으면 크롤러가 못 닿는다.** 사이트맵에만 있는
+ * 종목 화면 464장은 **서로 이어져 있지 않으면 크롤러가 못 닿는다.** 사이트맵에만 있는
  * 주소는 발견은 되어도 우선순위가 낮게 잡힌다. 사전이 이미 종목을 테마로 묶어 두고
  * 있으니, 새 자료 없이 화면마다 이웃 대여섯 개를 이어 줄 수 있다.
  *

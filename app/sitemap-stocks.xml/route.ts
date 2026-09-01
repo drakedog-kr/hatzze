@@ -20,7 +20,7 @@ import { STOCK_INDEX_MIN_DAYS, STOCK_STAT_DAYS, listIndexableStocks, stockHref }
  * ## ⛔ 못 읽었으면 빈 사이트맵을 내지 않는다
  *
  * 빈 `<urlset>` 은 "실을 게 없습니다" 라는 **뜻이 분명한 답**이다. 조회가 실패한 날
- * 그걸 내보내면 구글은 467장이 사라졌다고 읽고 색인에서 뺀다. 실패는 실패라고
+ * 그걸 내보내면 구글은 464장이 사라졌다고 읽고 색인에서 뺀다. 실패는 실패라고
  * 말해야 해서 500 을 낸다 — 크롤러는 500 을 보면 다음에 다시 온다.
  */
 export const dynamic = "force-dynamic";
