@@ -1098,9 +1098,23 @@ function PageHeader({ theme, currency }: { theme: "light" | "dark"; currency: "k
    *    있고 검색 대상도 아니다.
    */
   const parent = page && page.href !== pathname ? { name: page.label, path: page.href } : null;
+  /**
+   * ⛔ **이 셸이 이름을 아는 화면에만 낸다.**
+   *
+   * `/insider/stock/SPCX` 처럼 NAV·DEEP_PAGES 어디에도 없는 주소는 부모(`/insider`)를
+   * 집어 와서 제목이 "내부자 리포트" 가 된다. 그대로 구조화 데이터를 내면 두 가지가
+   * 어긋난다 — 이동 경로의 마지막이 부모와 같은 이름으로 겹치고(`홈 › 내부자 리포트 ›
+   * 내부자 리포트`), 화면의 `<title>`("스페이스X(SPCX) 내부자 공시")과도 다른 이름을
+   * 말한다. 구조화 데이터는 그 화면을 정확히 설명해야 하므로, 이름을 모르면 **안 내는
+   * 편이 맞다**(루트의 WebSite·Organization 은 그대로 남는다).
+   *
+   * 종목·투자자 상세는 아직 사이트맵에도 없다. 종목별 실주소 작업에서 자기 제목을
+   * 갖게 되면 그때 여기 조건을 풀면 된다.
+   */
+  const named = Boolean(deep) || child?.href === pathname || page?.href === pathname;
   return (
     <header className="hz-page-head">
-      {title && sub && !badge && (
+      {named && title && sub && !badge && (
         <PageJsonLd
           title={title}
           description={sub}
