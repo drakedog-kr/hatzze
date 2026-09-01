@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 
 import { withSubjectParticle, withTopicParticle } from "@/lib/format";
 import {
@@ -38,9 +38,9 @@ import { AiMark, C, Icon, MONO, R } from "../../ui";
  * 그래서 여기엔 클라이언트 컴포넌트를 두지 않는다(로고 하나만 예외 — 이미지 폴백이
  * 필요해서다. 이름은 그 옆에 글자로 따로 있다).
  *
- * ## ⚠️ 셀 화면이 467장이다
+ * ## ⚠️ 셀 화면이 464장이다
  *
- * 조회를 하나 잘못 고르면 그 대가가 467배다. 야후를 부르지 않고, 채널 합집합을 즉석에서
+ * 조회를 하나 잘못 고르면 그 대가가 464배다. 야후를 부르지 않고, 채널 합집합을 즉석에서
  * 세지 않는다 — 까닭은 lib/stock-page.ts 머리말에 적혀 있다.
  *
  * ## ⛔ 자기 제목을 자기가 그린다
@@ -48,7 +48,7 @@ import { AiMark, C, Icon, MONO, R } from "../../ui";
  * 셸(AppShell)의 본문 헤더는 NAV·DEEP_PAGES 에서 제목을 찾는데, `/stock/…` 은 어느
  * 쪽에도 없어 **제목 칸을 통째로 비운다**(그게 의도다. 종목 이름을 셸이 알 방법이
  * 없다 — 셸은 클라이언트 컴포넌트라 DB 를 못 읽는다). 그래서 h1 과 구조화 데이터를
- * 이 파일이 직접 낸다. 다른 화면처럼 셸에 맡기면 467장이 전부 같은 h1 을 갖는다.
+ * 이 파일이 직접 낸다. 다른 화면처럼 셸에 맡기면 464장이 전부 같은 h1 을 갖는다.
  */
 export const dynamic = "force-dynamic";
 
@@ -61,14 +61,21 @@ export async function generateMetadata({
   params: Promise<{ code: string }>;
 }): Promise<Metadata> {
   const { code } = await params;
-  const d = await getStockPage(code);
-  if (!d) return pageMetadata({ title: "종목 언급 추이 | hatzze", description: "", path: "/kadera" });
+  const d = await getStockPage(code.toUpperCase());
+  // ⛔ 없는 종목에 **canonical 을 주지 않는다.** 예전엔 `/kadera` 를 가리켰는데, 그건
+  //    "이 404 주소는 카더라와 같은 화면입니다" 라고 말하는 것이다. 실측으로는 notFound()
+  //    쪽 메타데이터가 이기지만(canonical `https://hatzze.fun` · noindex), 그 동작에
+  //    기대지 않고 여기서도 색인하지 말라고만 말해 둔다.
+  if (!d) return { title: "종목을 찾을 수 없습니다 | hatzze", robots: { index: false, follow: false } };
 
   const meta = await pageMetadata({
     title: `${d.name}(${d.code}) 텔레그램 언급 | hatzze`,
     description: `${withSubjectParticle(d.name)} 주식 텔레그램에서 얼마나 회자되는지 봅니다. 최근 ${STOCK_STAT_DAYS}일 언급 ${d.totalMentions.toLocaleString("ko-KR")}회, 언급된 날 ${d.activeDays}일. 일별 추이와 가장 많이 언급된 날을 함께 봅니다.`,
     path: stockHref(d.code),
   });
+  // ⛔ 집계를 **못 읽은 날에는 아무 말도 하지 않는다.** 그때는 언급이 0 으로 보여 문턱
+  //    미달이 되는데, 그 사이 크롤러가 오면 멀쩡한 화면에 noindex 를 내주게 된다.
+  if (d.loadFailed) return meta;
   // ⛔ 얇은 화면은 색인하지 않는다. 사이트맵에 싣는 문턱(STOCK_INDEX_MIN_DAYS)과
   //    **같은 규칙**이어야 한다 — 사이트맵엔 없는데 색인은 열려 있으면 두 신호가 어긋난다.
   //    follow 는 남긴다. 아래 '함께 보는 종목' 링크는 계속 타고 가도 되는 길이다.
@@ -174,8 +181,14 @@ function Quote({ d }: { d: StockPageData }) {
 
 export default async function StockPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
-  const d = await getStockPage(code);
+  // 종목코드에 대문자가 섞인 것이 80개 있다(0009K0 · 00088K 같은 새 체계). 그중 넷은
+  // 사이트맵에도 실린다. 소문자로 적힌 바깥 링크가 404 가 되지 않게 정본으로 넘긴다.
+  const upper = code.toUpperCase();
+  const d = await getStockPage(upper);
+  // 없는 종목은 **넘기기 전에** 404 를 낸다. 순서를 바꾸면 `/stock/abcdef` 같은 쓰레기
+  // 주소가 308 을 한 번 거친 뒤에야 404 가 되어 크롤러에 헛걸음을 두 번 시킨다.
   if (!d) notFound();
+  if (code !== upper) permanentRedirect(stockHref(upper));
 
   const peers = await themePeerStocks(d.code, d.themes);
   const marketLabel = d.market === "KOSDAQ" ? "코스닥" : d.market === "KOSPI" ? "코스피" : null;
@@ -248,31 +261,42 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
                 최근 {STOCK_STAT_DAYS}일
               </span>
             </div>
-            <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
-              <strong
-                style={{ fontFamily: MONO, fontSize: 24, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}
-              >
-                {d.totalMentions.toLocaleString("ko-KR")}
-              </strong>
-              <span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 600, color: C.sub }}>회</span>
-              <span style={{ fontSize: 17, fontWeight: 600, color: C.sub }}>언급</span>
-            </span>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <Stat label="언급된 날" value={`${d.activeDays}일`} />
-              {d.peak && (
-                <Stat label="가장 많던 날" value={`${d.peak.mentions.toLocaleString("ko-KR")}회`} sub={fmtKoDate(d.peak.date)} />
-              )}
-              {/* ⛔ '기간 채널 수'가 아니다. 날이 다르면 채널 명단도 달라서 일별 값으로는
-                  합집합을 못 만든다(lib/stock-page.ts 머리말 ②). 라벨이 **하루**라고
-                  말하고 있어야 이 값이 정확해진다. */}
-              {d.peakChannels && (
-                <Stat
-                  label="하루 최다 채널"
-                  value={`${d.peakChannels.channels}곳`}
-                  sub={fmtKoDate(d.peakChannels.date)}
-                />
-              )}
-            </div>
+            {/* ⛔ 못 읽은 날에 **0 을 찍지 않는다.** 옆 칸은 "못 불러왔다"고 말하는데 이 칸만
+                "0회 언급 · 언급된 날 0일" 이면 한 화면이 서로 다른 두 말을 하고, 그중 하나는
+                거짓이다. 고장은 고장이라고 적는다. */}
+            {d.loadFailed ? (
+              <p style={{ margin: 0, fontSize: 12, fontWeight: 500, color: C.sub, lineHeight: 1.7 }}>
+                집계를 지금 불러오지 못했습니다.
+              </p>
+            ) : (
+              <>
+                <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
+                <strong
+                  style={{ fontFamily: MONO, fontSize: 24, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}
+                >
+                  {d.totalMentions.toLocaleString("ko-KR")}
+                </strong>
+                <span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 600, color: C.sub }}>회</span>
+                <span style={{ fontSize: 17, fontWeight: 600, color: C.sub }}>언급</span>
+              </span>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <Stat label="언급된 날" value={`${d.activeDays}일`} />
+                {d.peak && (
+                  <Stat label="가장 많던 날" value={`${d.peak.mentions.toLocaleString("ko-KR")}회`} sub={fmtKoDate(d.peak.date)} />
+                )}
+                {/* ⛔ '기간 채널 수'가 아니다. 날이 다르면 채널 명단도 달라서 일별 값으로는
+                    합집합을 못 만든다(lib/stock-page.ts 머리말 ②). 라벨이 **하루**라고
+                    말하고 있어야 이 값이 정확해진다. */}
+                {d.peakChannels && (
+                  <Stat
+                    label="하루 최다 채널"
+                    value={`${d.peakChannels.channels}곳`}
+                    sub={fmtKoDate(d.peakChannels.date)}
+                  />
+                )}
+              </div>
+              </>
+            )}
           </div>
 
           <div className="hz-kd-hero-h">
@@ -281,7 +305,13 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
                 일별 언급 추이
               </span>
             </div>
-            {d.totalMentions === 0 ? (
+            {d.loadFailed ? (
+              /* ⛔ "잡힌 적이 없습니다" 로 적으면 안 된다. 못 읽은 것과 없는 것은 다르고,
+                 그 둘이 화면에서 같아지면 고장이 자료로 위장된다. */
+              <p style={{ margin: 0, fontSize: 12, fontWeight: 500, color: C.sub, lineHeight: 1.7 }}>
+                언급 자료를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오.
+              </p>
+            ) : d.totalMentions === 0 ? (
               <p style={{ margin: 0, fontSize: 12, fontWeight: 500, color: C.sub, lineHeight: 1.7 }}>
                 {withTopicParticle(d.name)} 최근 {STOCK_STAT_DAYS}일 사이 주식 텔레그램에서 잡힌 적이 없습니다.
               </p>
@@ -339,7 +369,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
       )}
 
       {/* ── 함께 보는 종목 ──────────────────────────────────────────
-          ⭐ 화면 467장이 서로 안 이어져 있으면 크롤러가 못 닿는다. 사전이 이미 종목을
+          ⭐ 화면 464장이 서로 안 이어져 있으면 크롤러가 못 닿는다. 사전이 이미 종목을
           테마로 묶어 두고 있으니 새 자료 없이 이웃을 이어 준다(lib/stock-page.ts).
           ⚠️ 손으로 고른 대표 바스켓이라 "이 테마의 전부"라고 말하지 않는다. */}
       {peers.length > 0 && (

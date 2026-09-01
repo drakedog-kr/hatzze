@@ -101,7 +101,6 @@ function HalfSheet({ children }: { children: React.ReactNode }) {
   );
 }
 
-
 export async function generateMetadata({ params }: { params: Promise<{ ticker: string }> }): Promise<Metadata> {
   const { ticker } = await params;
   const d = await getStockDetail(ticker);
