@@ -48,6 +48,7 @@ const EXCLUDED = new Map([
  */
 const DYNAMIC = new Map([
   ["/insider/list/[kind]", "슬러그 여덟 개를 sitemap.ts 가 INSIDER_LIST_SLUGS 로 펼친다"],
+  ["/stock/[code]", "sitemap-stocks.xml 이 DB 를 읽어 펼친다(lib/stock-page.ts listIndexableStocks)"],
   ["/insider/stock/[ticker]", "수가 많고 DB 를 읽어야 한다. 사이트맵 동적 생성 때 다룬다"],
   ["/insider/investor/[cik]", "위와 같다"],
 ]);

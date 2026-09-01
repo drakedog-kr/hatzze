@@ -33,7 +33,13 @@ import { SITE_URL } from "./brand";
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: { userAgent: "*", allow: "/", disallow: ["/api/channel-photo/", "/api/cron/"] },
-    sitemap: [`${SITE_URL}/sitemap.xml`, `${SITE_URL}/sitemap-pages.xml`],
+    sitemap: [
+      `${SITE_URL}/sitemap.xml`,
+      `${SITE_URL}/sitemap-pages.xml`,
+      // 종목 실주소 464장. 콘솔에 손으로 안 넣어도 크롤러는 여기서 찾아온다
+      // (app/sitemap-stocks.xml/route.ts 머리말 참고).
+      `${SITE_URL}/sitemap-stocks.xml`,
+    ],
     host: SITE_URL,
   };
 }

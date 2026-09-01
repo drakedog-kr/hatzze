@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { withObjectParticle } from "@/lib/format";
 import {
   PRICE_RANGES,
   PRICE_RANGE_DEFAULT,
@@ -99,32 +100,6 @@ function HalfSheet({ children }: { children: React.ReactNode }) {
     </section>
   );
 }
-
-/**
- * 이름 뒤에 붙는 목적격 조사를 **받침으로 골라** 준다("엔비디아를" · "코어위브를" · "스페이스X를").
- *
- * ⚠️ `을(를)` 로 때우고 있었다. 그 표기는 서식 문서에나 쓰는 것이라 검색 결과와 공유
- *    카드에 "엔비디아을(를) 월가 거물 …" 로 그대로 나갔다(2026-08-25 확인).
- * ⚠️ 이름이 로마자로 끝나는 종목이 있다(스페이스X, 티커 폴백). 한글 받침 규칙만으로는
- *    못 고르므로 로마자·숫자는 **한국어 음독의 끝소리**로 표를 둔다(X→엑스라 받침 있음,
- *    Y→와이라 없음). 표에 없는 글자는 받침 없음으로 본다 — 틀려도 "를"이라 덜 어색하다.
- */
-const FINAL_CONSONANT: Record<string, boolean> = {
-  // 로마자: 한국어로 읽었을 때 끝소리가 자음인 것만 true
-  c: true, f: true, l: true, m: true, n: true, r: true, s: true, x: true, z: true,
-  // 숫자: 영·일·삼·육·칠·팔
-  "0": true, "1": true, "3": true, "6": true, "7": true, "8": true,
-};
-function hasFinal(word: string): boolean {
-  const ch = word.trim().slice(-1);
-  if (!ch) return false;
-  const code = ch.charCodeAt(0);
-  // 한글 음절(가~힣)이면 종성 인덱스로 판정한다.
-  if (code >= 0xac00 && code <= 0xd7a3) return (code - 0xac00) % 28 !== 0;
-  return FINAL_CONSONANT[ch.toLowerCase()] ?? false;
-}
-/** 목적격 조사를 붙인 이름. */
-const withObjectParticle = (name: string) => `${name}${hasFinal(name) ? "을" : "를"}`;
 
 export async function generateMetadata({ params }: { params: Promise<{ ticker: string }> }): Promise<Metadata> {
   const { ticker } = await params;
