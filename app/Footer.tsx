@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TELEGRAM_URL } from "./brand";
 
 import { BetaBadge, GhostSymbol, Wordmark } from "./Logo";
 import { APP_VERSION } from "./releases";
@@ -197,7 +198,7 @@ export default function Footer() {
                 같은 방식으로 푸터에 두어 좁은 화면에서도 닿게 한다. 라벨과 aria 는
                 AppShell 의 TELEGRAM 상수와 같은 문구로 맞춘다(두 내비게이션이 같은
                 항목이라 문구가 갈리면 다른 곳으로 가는 링크처럼 보인다). */}
-            <FooterExternalLink href="https://t.me/hatzze69" cta="community" aria="오늘 뭐래? 텔레그램 채널 열기(새 탭)">
+            <FooterExternalLink href={TELEGRAM_URL} cta="community" aria="오늘 뭐래? 텔레그램 채널 열기(새 탭)">
               오늘 뭐래?
             </FooterExternalLink>
           </nav>

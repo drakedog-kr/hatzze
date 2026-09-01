@@ -23,3 +23,15 @@ export const SLOGAN = "데이터와 여론으로 읽는 시장";
  */
 export const SITE_URL = "https://hatzze.fun";
 export const SITE_NAME = "hatzze";
+
+/**
+ * 공식 텔레그램 채널. **여기가 유일한 정의다.**
+ *
+ * 사이드바(AppShell)·푸터·구조화 데이터 셋이 같은 주소를 쓴다. 앞의 둘은 사람이 누르는
+ * 링크고 마지막은 검색엔진에 "이 채널이 우리다" 라고 말하는 값(`sameAs`)이라, 하나가
+ * 어긋나면 **화면은 멀쩡한데 구글에만 틀린 말을 하게 된다.** 그런 어긋남은 눈에 안 보인다.
+ *
+ * ⚠️ 채널을 옮기면 저쪽 소개글의 되돌아오는 링크(`웹: https://hatzze.fun`)도 같이 봐야 한다.
+ *    `sameAs` 는 양쪽이 서로를 가리킬 때에만 값이 선다.
+ */
+export const TELEGRAM_URL = "https://t.me/hatzze69";

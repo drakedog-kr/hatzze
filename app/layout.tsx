@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
 import AppShell from "./AppShell";
-import { SLOGAN } from "./brand";
+import { SLOGAN, TELEGRAM_URL } from "./brand";
 import { SITE_NAME, SITE_URL, pageMetadata } from "./seo";
 
 const pretendard = localFont({
@@ -163,6 +163,18 @@ export default async function RootLayout({
                   name: SITE_NAME,
                   url: SITE_URL,
                   logo: `${SITE_URL}/icon.svg`,
+                  /**
+                   * "이 계정이 우리다" 를 검색엔진에 말하는 자리.
+                   *
+                   * 텔레그램 채널 소개글은 이미 `웹: https://hatzze.fun` 으로 우리를
+                   * 가리키는데 우리 쪽에서 저쪽을 안 가리키고 있었다. 한쪽만 이어진
+                   * 상태라 구글이 둘을 같은 주체로 묶을 근거가 없었다.
+                   *
+                   * ⛔ **가진 계정을 전부 적는 자리가 아니다.** 우리가 운영한다고
+                   *    말할 수 있고, 저쪽에서도 우리를 가리키는 것만 적는다. 한쪽만
+                   *    이어진 주소를 넣으면 값이 안 서고, 남의 계정을 넣으면 거짓이 된다.
+                   */
+                  sameAs: [TELEGRAM_URL],
                 },
               ],
             }),

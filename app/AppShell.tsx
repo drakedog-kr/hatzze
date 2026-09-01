@@ -7,7 +7,7 @@ import { INSIDER_LISTS, INSIDER_LIST_SLUGS, insiderListHref } from "./insider/li
 import { PageJsonLd } from "./JsonLd";
 
 import { track } from "@/lib/ga";
-import { SLOGAN } from "./brand";
+import { SLOGAN, TELEGRAM_URL } from "./brand";
 import { C, Icon, R } from "./ui";
 import { BetaBadge, LogoLockup } from "./Logo";
 import Footer from "./Footer";
@@ -222,7 +222,7 @@ const NAV: NavItem[] = [
 // aria-label 은 라벨과 따로 둔다. "오늘 뭐래?"만 읽히면 스크린리더 사용자는 이게 외부
 // 텔레그램으로 나가는 링크라는 걸 알 수 없다.
 const TELEGRAM = {
-  href: "https://t.me/hatzze69",
+  href: TELEGRAM_URL,
   label: "오늘 뭐래?",
   aria: "오늘 뭐래? 텔레그램 채널 열기(새 탭)",
   icon: "send",
