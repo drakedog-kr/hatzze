@@ -42,8 +42,11 @@ jobs:
           HOST: hatzze.fun
         run: |
           set -euo pipefail
+          # ⚠️ `s|</\?loc>||g` 로 쓰지 말 것. `\?` 는 GNU sed 전용이라 러너(ubuntu)에서는
+          #    돌지만 맥에서 손으로 확인할 때 태그가 안 벗겨진 채 통과한다 — 검증이
+          #    안 되는 코드가 된다. 두 번 치환하면 어느 sed 에서나 같다.
           urls=$(curl -sS --max-time 30 "https://$HOST/sitemap.xml" \
-                 | grep -o '<loc>[^<]*</loc>' | sed 's|</\?loc>||g')
+                 | grep -o '<loc>[^<]*</loc>' | sed -e 's|<loc>||g' -e 's|</loc>||g')
           if [ -z "$urls" ]; then
             echo "사이트맵에서 주소를 못 읽었습니다. 알리지 않고 실패합니다."
             exit 1
