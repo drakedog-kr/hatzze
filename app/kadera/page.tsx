@@ -835,9 +835,19 @@ export default async function KaderaPage() {
                           줄어도 되는 건 이름뿐이라 여기만 풀어 준다. */}
                       {/* ⚠️ 말줄임은 **링크가** 물어야 한다. flex 항목이 링크로 바뀌었으므로
                           clip(nowrap·overflow·ellipsis)과 minWidth:0 이 여기 붙어야 예전과
-                          똑같이 줄어든다. 안쪽 strong 에 두면 자르는 상자가 없어 안 걸린다. */}
-                      <Link href={stockHref(s.code)} className="hz-stock-link" style={{ ...clip, minWidth: 0 }}>
-                        <strong style={{ fontSize: 14, fontWeight: 800, letterSpacing: "-.01em" }}>{s.name}</strong>
+                          똑같이 줄어든다. 안쪽 strong 에 두면 자르는 상자가 없어 안 걸린다.
+                          ⚠️⚠️ **글자 크기도 링크가 물어야 한다.** 안쪽에만 두면 바깥 상자가
+                          자기 줄 높이를 **물려받은 글꼴**로 잡아 3px 높아진다(14 → 21px 이던
+                          줄이 24px). 실측으로 아래 카드가 2~4px 밀렸다. 크기·자간을 링크에
+                          두고 굵기만 strong 이 물려받게 하면 예전과 픽셀까지 같아진다
+                          (strong 은 Tailwind preflight 가 `bolder` 로 두므로 inherit 을 적어야
+                          800 이 된다. 안 적으면 900 이 된다). */}
+                      <Link
+                        href={stockHref(s.code)}
+                        className="hz-stock-link"
+                        style={{ ...clip, minWidth: 0, fontSize: 14, fontWeight: 800, letterSpacing: "-.01em" }}
+                      >
+                        <strong style={{ fontWeight: "inherit" }}>{s.name}</strong>
                       </Link>
                       <span style={{ fontFamily: MONO, fontSize: 11, color: C.sub2, flexShrink: 0 }}>{s.code}</span>
                       <span style={{ flex: 1 }} />
@@ -1124,9 +1134,15 @@ export default async function KaderaPage() {
                       종목명뿐이라 이름이 먼저 0 으로 눌려 사라진다. */}
                   <div className="hz-stock-head" style={{ display: "flex", alignItems: "baseline", gap: 10, minWidth: 0 }}>
                     <StockLogo code={r.code} name={r.name} market={r.market} size={30} />
-                    {/* 위 급부상 셀과 같은 규칙 — 자르는 상자가 링크로 옮겨 간다. */}
-                    <Link href={stockHref(r.code)} className="hz-stock-link" style={{ ...clip, minWidth: 0 }}>
-                      <strong style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-.02em" }}>{r.name}</strong>
+                    {/* 위 급부상 셀과 같은 규칙 — 자르는 상자와 **글자 크기**가 링크로 옮겨 간다.
+                        (17px 자리는 줄 높이가 이미 글자 쪽이 커서 티가 안 나지만, 규칙을
+                         자리마다 다르게 두면 다음 사람이 어느 쪽이 맞는지 모른다.) */}
+                    <Link
+                      href={stockHref(r.code)}
+                      className="hz-stock-link"
+                      style={{ ...clip, minWidth: 0, fontSize: 17, fontWeight: 800, letterSpacing: "-.02em" }}
+                    >
+                      <strong style={{ fontWeight: "inherit" }}>{r.name}</strong>
                     </Link>
                     <span style={{ fontFamily: MONO, fontSize: 11, color: C.sub2, flexShrink: 0 }}>{r.code}</span>
                     {r.price != null && (
