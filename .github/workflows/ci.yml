@@ -1,0 +1,30 @@
+name: 검사
+
+# PR 과 main 푸시에서 도는 가벼운 검사. **빌드는 하지 않는다** — 그건 Vercel 이 PR 마다
+# 이미 하고 있고, 여기서 또 하면 같은 일을 두 번 하면서 몇 분을 쓴다.
+on:
+  pull_request:
+    paths:
+      - "app/**"
+      - "scripts/**"
+      - ".github/workflows/ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "scripts/**"
+
+jobs:
+  routes:
+    name: 라우트와 사이트맵이 어긋나지 않는가
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      # 타입 스트립을 쓰므로 22 이상이어야 한다. 의존성 설치는 필요 없다 —
+      # 검사 스크립트가 app/sitemap.ts 만 불러 보고 끝난다(next 는 타입으로만 쓰인다).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm run check:routes

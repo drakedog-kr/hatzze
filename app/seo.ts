@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 
 import { getLatestDailyScore } from "@/lib/data";
 
-import { SLOGAN } from "./brand";
+import { SITE_NAME, SITE_URL, SLOGAN } from "./brand";
 import { stageForScore } from "./ui";
 
-export const SITE_URL = "https://hatzze.fun";
-export const SITE_NAME = "hatzze";
+// 정의는 app/brand.ts 에 있다. 여기서는 기존 import 경로를 지키려고 다시 내보내기만 한다.
+export { SITE_NAME, SITE_URL };
 
 type OgImage = { url: string; width: number; height: number; type: string; alt: string };
 

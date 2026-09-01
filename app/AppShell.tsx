@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { INSIDER_LISTS, INSIDER_LIST_SLUGS, insiderListHref } from "./insider/lists";
+import { PageJsonLd } from "./JsonLd";
 
 import { track } from "@/lib/ga";
 import { SLOGAN } from "./brand";
@@ -1080,8 +1081,48 @@ function PageHeader({ theme, currency }: { theme: "light" | "dark"; currency: "k
   // 배지는 부모 것이라 서브는 물려받지 않는다. 다만 DEEP_PAGES 가 자기 배지를 들고
   // 있으면 그건 자기 것이다(아직 안 연 화면의 '준비 중').
   const badge = deep ? deep.badge : child ? undefined : page?.badge;
+  /**
+   * 이 화면이 무엇인지 검색엔진에 말한다(구조화 데이터).
+   *
+   * **왜 여기냐.** 화면 파일마다 손으로 붙이면 새 화면을 열 때 또 빠뜨린다 — 사이트맵과
+   * 공유 카드를 두 번 빠뜨린 것과 같은 자리다(app/sitemap.ts 머리말). 제목·부제를 이미
+   * NAV 와 DEEP_PAGES 에서 뽑고 있으니, **그 한 곳에서 같이 낸다.** 새 화면을 NAV 에
+   * 넣는 순간 구조화 데이터도 저절로 따라온다.
+   *
+   * 클라이언트 컴포넌트지만 서버에서도 렌더되므로 첫 HTML 에 그대로 들어간다(크롤러가
+   * 자바스크립트를 안 돌려도 읽는다). 실제로 그런지는 배포 뒤 `curl | grep ld+json` 으로 볼 것.
+   *
+   * ⛔ **아직 안 연 화면('준비 중' 배지)에는 내지 않는다.** 그 화면들은 noindex 라
+   *    색인 대상이 아닌데 구조화 데이터만 내면 서로 어긋난 신호가 된다.
+   * ⛔ 제목이 없는 경로(법률 문서)에도 내지 않는다. 저 화면들은 자기 h1 을 따로 갖고
+   *    있고 검색 대상도 아니다.
+   */
+  const parent = page && page.href !== pathname ? { name: page.label, path: page.href } : null;
+  /**
+   * ⛔ **이 셸이 이름을 아는 화면에만 낸다.**
+   *
+   * `/insider/stock/SPCX` 처럼 NAV·DEEP_PAGES 어디에도 없는 주소는 부모(`/insider`)를
+   * 집어 와서 제목이 "내부자 리포트" 가 된다. 그대로 구조화 데이터를 내면 두 가지가
+   * 어긋난다 — 이동 경로의 마지막이 부모와 같은 이름으로 겹치고(`홈 › 내부자 리포트 ›
+   * 내부자 리포트`), 화면의 `<title>`("스페이스X(SPCX) 내부자 공시")과도 다른 이름을
+   * 말한다. 구조화 데이터는 그 화면을 정확히 설명해야 하므로, 이름을 모르면 **안 내는
+   * 편이 맞다**(루트의 WebSite·Organization 은 그대로 남는다).
+   *
+   * 종목·투자자 상세는 아직 사이트맵에도 없다. 종목별 실주소 작업에서 자기 제목을
+   * 갖게 되면 그때 여기 조건을 풀면 된다.
+   */
+  const named = Boolean(deep) || child?.href === pathname || page?.href === pathname;
   return (
     <header className="hz-page-head">
+      {named && title && sub && !badge && (
+        <PageJsonLd
+          title={title}
+          description={sub}
+          path={pathname}
+          trail={parent ? [parent] : []}
+          kind={deep || pathname.startsWith("/kadera") || pathname === "/insider" ? "CollectionPage" : "WebPage"}
+        />
+      )}
 {/* #267 의 가드: NAV 에 없는 경로(법률 문서)에서는 제목 칸을 통째로 비운다.
           그 안에 콘솔 리디자인의 배지를 넣는다 — 둘은 서로 독립이다. */}
       {/* ⚠️ `page` 만으로는 부족하다 — NAV 에 없고 DEEP_PAGES 에만 있는 화면

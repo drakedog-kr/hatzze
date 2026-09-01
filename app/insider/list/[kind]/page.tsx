@@ -263,7 +263,7 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
 
       {cards.map((card) => (
         <section className="hz-sheet" key={card.title}>
-          <SectionHead
+          <SectionHead level={2}
             icon={card.icon}
             title={card.title}
             // ⚠️ `right` 를 주면 SectionHead 가 note 알약을 통째로 안 그린다 — 물음표

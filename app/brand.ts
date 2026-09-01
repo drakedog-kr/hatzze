@@ -12,3 +12,14 @@
  * README 는 코드가 아니라 이 상수를 못 따라온다. 문구를 바꿀 때 첫 줄을 같이 고칠 것.
  */
 export const SLOGAN = "데이터와 여론으로 읽는 시장";
+
+/**
+ * 정식 주소와 서비스 이름. **여기가 유일한 정의다.**
+ *
+ * 예전엔 app/seo.ts · app/robots.ts · app/sitemap.ts 셋이 같은 문자열을 따로 들고 있었다.
+ * 그런데 seo.ts 는 lib/data(=`server-only`)를 끌고 오므로 **클라이언트 컴포넌트가 못
+ * 가져간다.** 사이드바(AppShell)가 구조화 데이터를 그리려면 주소가 필요한데 그 길이
+ * 막혀 있었다. 의존이 없는 이 파일로 내린다(SLOGAN 이 여기 있는 것과 같은 이유).
+ */
+export const SITE_URL = "https://hatzze.fun";
+export const SITE_NAME = "hatzze";

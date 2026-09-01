@@ -3890,7 +3890,11 @@ main.hz-scroll { overflow-x: clip; }
     grid-column: 1;
     grid-row: 1;
   }
-  .hz-sheet-head-txt > h3 {
+  /* ⚠️ **태그 이름으로 잡지 말 것.** 시트 제목은 화면에 따라 h2 이기도 h3 이기도 하다
+     (SectionHead 의 level — 구간 제목이 없는 화면은 h2 다). h3 만 적어 두면 h2 인
+     화면에서 이 규칙이 안 걸려 제목이 자동 배치로 떨어지는데, 그건 바로 위 주석이
+     경고하는 사고다(DOM 순서상 설명이 배지 자리로 들어간다). */
+  .hz-sheet-head-txt > :is(h2, h3) {
     grid-column: 2;
     grid-row: 1;
   }

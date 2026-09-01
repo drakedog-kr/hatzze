@@ -1,8 +1,8 @@
 import type { MetadataRoute } from "next";
 
-import { INSIDER_LIST_SLUGS } from "./insider/lists";
+import { SITE_URL } from "./brand";
 
-const SITE_URL = "https://hatzze.fun";
+import { INSIDER_LIST_SLUGS } from "./insider/lists";
 
 /**
  * /sitemap.xml 자동 생성 — 공개 라우트 목록.

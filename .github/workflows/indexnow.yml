@@ -1,0 +1,66 @@
+name: IndexNow 알림
+
+# 자료가 새로 들어간 뒤 "이 주소들 내용이 바뀌었다"를 검색엔진에 알린다.
+#
+# ## 왜 RSS 가 아니라 이것인가
+#
+# RSS 는 **새 글**을 알리는 물건이다. 그런데 hatzze 는 주소가 안 늘어난다 — 화면 여남은
+# 개의 내용이 매일 바뀔 뿐이라 날짜별 영구 주소가 없다. RSS 를 만들면 매일 같은 링크가
+# 날짜만 바뀐 채 실려서 사이트맵의 lastmod 가 이미 하는 일과 겹친다.
+# IndexNow 는 **바뀐 주소**를 알리는 규약이라 이 구조에 맞는다.
+#
+# 빙이 만든 규약이고 네이버가 2023-07 부터 지원한다. 한 번 붙이면 둘이 같이 커버된다.
+# ⛔ **구글은 IndexNow 를 안 쓴다.** 구글 쪽은 사이트맵과 크롤링이 전부다.
+#
+# ## 언제 도나
+#
+# 파이프라인(Daily Indicator Update)이 끝나면 자동으로 뒤따른다. 그 워크플로 파일은
+# 1,300줄이 넘고 게이트가 촘촘해서 **거기에 스텝을 끼워 넣지 않는다** — 알림 하나 때문에
+# 파이프라인이 흔들리면 손해가 훨씬 크다. 여기서 결과와 무관하게 따라 도는데, 실패한
+# 실행이어도 앞쪽 집계는 대개 들어가 있고 알림 자체는 부작용이 없기 때문이다.
+#
+# ## 주소 목록
+#
+# 사이트맵을 그대로 읽어 쓴다. 목록을 여기 또 적으면 두 곳이 어긋난다.
+on:
+  workflow_run:
+    workflows: ["Daily Indicator Update"]
+    types: [completed]
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: 사이트맵의 주소를 IndexNow 로 알린다
+        env:
+          # 키 파일이 public/ 에 그대로 들어 있다. IndexNow 는 **키를 공개하는 것이
+          # 전제인 규약**이다 — 그 파일을 띄울 수 있다는 것이 곧 소유 증명이다.
+          KEY: ab6f7eb990b731962fa46e5b6693c232
+          HOST: hatzze.fun
+        run: |
+          set -euo pipefail
+          # ⚠️ `s|</\?loc>||g` 로 쓰지 말 것. `\?` 는 GNU sed 전용이라 러너(ubuntu)에서는
+          #    돌지만 맥에서 손으로 확인할 때 태그가 안 벗겨진 채 통과한다 — 검증이
+          #    안 되는 코드가 된다. 두 번 치환하면 어느 sed 에서나 같다.
+          urls=$(curl -sS --max-time 30 "https://$HOST/sitemap.xml" \
+                 | grep -o '<loc>[^<]*</loc>' | sed -e 's|<loc>||g' -e 's|</loc>||g')
+          if [ -z "$urls" ]; then
+            echo "사이트맵에서 주소를 못 읽었습니다. 알리지 않고 실패합니다."
+            exit 1
+          fi
+          echo "$urls" | sed 's/^/  /'
+          body=$(printf '%s\n' "$urls" | jq -R . | jq -sc \
+                 --arg h "$HOST" --arg k "$KEY" \
+                 '{host:$h, key:$k, keyLocation:("https://"+$h+"/"+$k+".txt"), urlList:.}')
+          # 두 곳에 낸다. 규약상 한 곳에 내면 참여 엔진끼리 나눠 갖게 돼 있지만,
+          # 네이버는 자기 엔드포인트를 따로 두고 안내하므로 그쪽에도 직접 낸다.
+          for ep in https://api.indexnow.org/IndexNow https://searchadvisor.naver.com/indexnow; do
+            code=$(curl -sS -o /tmp/out.txt -w '%{http_code}' --max-time 30 \
+                   -X POST "$ep" -H 'Content-Type: application/json' -d "$body" || echo 000)
+            echo "$ep → $code $(head -c 200 /tmp/out.txt)"
+          done
+          # 알림이 실패해도 파이프라인 실패로 보지 않는다. 다음 실행이 같은 걸 또 알린다.
+          echo "완료"
