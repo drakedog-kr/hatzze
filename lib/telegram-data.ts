@@ -67,7 +67,7 @@ function addDaysISO(iso: string, n: number): string {
  *
  * 표가 비어 있으면(초기 환경) 벽시계로 떨어진다. 그때는 맞출 문장도 없다.
  */
-const kaderaBaseDate = cache(async (): Promise<string> => {
+export const kaderaBaseDate = cache(async (): Promise<string> => {
   const db = getSupabaseAdmin();
   const { data, error } = await db
     .from("telegram_sentiment_daily")

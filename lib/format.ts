@@ -237,3 +237,41 @@ export function sentimentTone(optimismPct: number): {
   if (optimismPct >= 41) return { label: "중립", tone: "neutral" };
   return { label: "비관 우세", tone: "cold" };
 }
+
+/**
+ * 이름 뒤에 붙는 조사를 **받침으로 골라** 준다("엔비디아를" · "코어위브를" · "스페이스X를").
+ *
+ * ⚠️ `을(를)` 로 때우고 있었다. 그 표기는 서식 문서에나 쓰는 것이라 검색 결과와 공유
+ *    카드에 "엔비디아을(를) 월가 거물 …" 로 그대로 나갔다(2026-08-25 확인).
+ * ⚠️ 이름이 로마자로 끝나는 종목이 있다(스페이스X, 티커 폴백). 한글 받침 규칙만으로는
+ *    못 고르므로 로마자·숫자는 **한국어 음독의 끝소리**로 표를 둔다(X→엑스라 받침 있음,
+ *    Y→와이라 없음). 표에 없는 글자는 받침 없음으로 본다 — 틀려도 "를"이라 덜 어색하다.
+ *
+ * ⚠️ **여기가 유일한 정의다.** 원래는 내부자 종목 상세 안에만 있었는데, 종목 실주소
+ *    화면도 같은 판정이 필요해졌다. 사본을 두면 한쪽만 고쳐져 두 화면이 같은 종목에
+ *    다른 조사를 붙인다.
+ */
+const FINAL_CONSONANT: Record<string, boolean> = {
+  // 로마자: 한국어로 읽었을 때 끝소리가 자음인 것만 true
+  c: true, f: true, l: true, m: true, n: true, r: true, s: true, x: true, z: true,
+  // 숫자: 영·일·삼·육·칠·팔
+  "0": true, "1": true, "3": true, "6": true, "7": true, "8": true,
+};
+
+export function hasFinal(word: string): boolean {
+  const ch = word.trim().slice(-1);
+  if (!ch) return false;
+  const code = ch.charCodeAt(0);
+  // 한글 음절(가~힣)이면 종성 인덱스로 판정한다.
+  if (code >= 0xac00 && code <= 0xd7a3) return (code - 0xac00) % 28 !== 0;
+  return FINAL_CONSONANT[ch.toLowerCase()] ?? false;
+}
+
+/** 목적격 조사를 붙인 이름("엔비디아를"). */
+export const withObjectParticle = (name: string) => `${name}${hasFinal(name) ? "을" : "를"}`;
+
+/** 주격 조사를 붙인 이름("엔비디아가" · "삼성전자가" · "SK하이닉스가"). */
+export const withSubjectParticle = (name: string) => `${name}${hasFinal(name) ? "이" : "가"}`;
+
+/** 보조사를 붙인 이름("엔비디아는" · "삼성전자는"). */
+export const withTopicParticle = (name: string) => `${name}${hasFinal(name) ? "은" : "는"}`;
