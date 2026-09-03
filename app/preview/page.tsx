@@ -781,9 +781,11 @@ export default async function PreviewPage() {
             <div className="hz-sheet-foot" style={{ marginTop: "auto" }}>
               {/* ⚠️ 안쪽에 세로 padding 을 주지 말 것 — 띠가 이미 위아래 11px 을 들고 있다
                   (globals.css 의 .hz-sheet-foot 주석 참고). */}
+              {/* ⚠️ **37자를 넘기지 말 것.** 폰(375)에서 이 띠의 글 칸이 343px 이고 12px 글자로
+                  37자가 310px 이다(실측 2026-09-04). 넘으면 두 줄이 되고 띠가 42 → 62px 이 된다.
+                  처음 쓴 98자짜리는 폰에서 세 줄(83px)이었다. */}
               <span style={{ fontSize: 12, lineHeight: 1.6, color: C.sub, wordBreak: "keep-all" }}>
-                고정된 목록이 아닙니다 · 국내 종목과 사업으로 엮인 미국 종목을 매일 아침 훑어 그날
-                평소 하루에 움직이던 폭보다 크게 움직인 곳만 남깁니다 · 그래서 목록이 날마다 바뀝니다
+                고정된 목록이 아닙니다 · 그날 평소보다 크게 움직인 곳만 남습니다
               </span>
             </div>
           </>
