@@ -203,6 +203,86 @@ async function liveFx(): Promise<number | null> {
   }
 }
 
+/* ── 견줄 국장 종가도 새로 받는다 ───────────────────────────────────────────
+ *
+ * ⚠️⚠️ **KRX 는 종가를 다음 날 08:00 에 올린다.** 아침 수집기가 그 시각 뒤에 도는 건
+ * 그래서인데, 그 값은 **그날 15:30 이 지나면 낡는다.** 15:30~다음 날 08:16 사이에는
+ * 담아 둔 기준이 직전 종가가 아니라 **그 앞 종가**가 된다.
+ *
+ * 실측(2026-09-04 02:50) — 담아 둔 삼성전자 기준은 09-02 의 250,500 인데, 09-03 도 장이
+ * 서서 250,000 에 닫혀 있었다. KRX 에 물어도 그 시각에는 09-02 가 최신이었다. 화면이
+ * 날짜를 적고 있어 거짓말은 아니지만, 그 사이의 % 는 한 세션 어긋난 값을 견준 것이다.
+ *
+ * 그래서 **당일 종가는 야후에서 받는다.** 15:30 직후부터 나온다. 두 원천을 09-03 종가로
+ * 맞춰 봤다 — 야후 meta 250,000 · 네이버 250,000 으로 같다(야후 **일봉**은 그날 칸이
+ * null 이었다. 일봉을 믿지 말고 meta 를 쓸 것).
+ */
+
+/** 야후 심볼 접미사. 지금 세 종목이 다 코스피라 `.KS` 하나면 된다.
+ *  ⚠️ 코스닥 종목을 넣게 되면 `.KQ` 로 갈라야 한다 — 표에 시장 칸이 없으므로 그때
+ *  `kr_overnight` 에 한 칸을 더하거나 심볼을 담는 편이 낫다. 지금은 실패하면 담아 둔
+ *  값으로 물러서므로 조용히 틀리지는 않는다. */
+const YF_SUFFIX = ".KS";
+const YF_CHART = (code: string) =>
+  `https://query1.finance.yahoo.com/v8/finance/chart/${code}${YF_SUFFIX}?range=1d&interval=1d&t=${bucketMs()}`;
+
+/** ms → 한국 시각의 {날짜문자열, 자정부터의 분, 요일}. */
+function kst(ms: number) {
+  const d = new Date(ms + 9 * 3600 * 1000);
+  return {
+    date: d.toISOString().slice(0, 10),
+    min: d.getUTCHours() * 60 + d.getUTCMinutes(),
+    day: d.getUTCDay(), // 0=일
+  };
+}
+
+const OPEN_MIN = 9 * 60;
+const CLOSE_MIN = 15 * 60 + 30;
+
+/**
+ * 종목별 **가장 최근에 끝난 정규장의 종가**와 그 날짜.
+ *
+ * ⭐ 판정은 야후의 시각 도장이 아니라 **지금이 장중인가**로 한다. 야후의
+ * `currentTradingPeriod.regular.end` 가 15:00 로 적혀 있어(KRX 는 2016년부터 15:30)
+ * 그 값을 믿으면 15:00~15:30 을 잘못 읽는다. `regularMarketTime` 자체는 15:30 을
+ * 가리키므로 둘이 서로 어긋난다 — 그래서 야후가 말하는 장 시간은 아예 안 쓴다.
+ *
+ * 장중(평일 09:00~15:30)이고 도장이 오늘이면 그건 **진행 중인 값**이라 종가가 아니다.
+ * 그때는 담아 둔 값이 이미 맞다(그날 아침 수집기가 직전 거래일 종가를 넣어 뒀다).
+ */
+async function liveCloses(
+  codes: string[],
+): Promise<Record<string, { close: number; date: string }>> {
+  const now = kst(Date.now());
+  const inSession =
+    now.day >= 1 && now.day <= 5 && now.min >= OPEN_MIN && now.min < CLOSE_MIN;
+
+  const got = await Promise.all(
+    codes.map(async (code) => {
+      try {
+        // ⚠️ User-Agent 가 없으면 야후가 429 를 준다.
+        const res = await fetch(YF_CHART(code), {
+          headers: { "User-Agent": "Mozilla/5.0" },
+          next: { revalidate: REVALIDATE_SEC },
+        });
+        if (!res.ok) return null;
+        const j = (await res.json()) as {
+          chart?: { result?: { meta?: { regularMarketPrice?: number; regularMarketTime?: number } }[] };
+        };
+        const m = j.chart?.result?.[0]?.meta;
+        if (!m?.regularMarketPrice || !m.regularMarketTime) return null;
+        const stamp = kst(m.regularMarketTime * 1000);
+        // 장중에 찍힌 오늘 값은 종가가 아니다.
+        if (inSession && stamp.date === now.date) return null;
+        return [code, { close: Math.round(m.regularMarketPrice), date: stamp.date }] as const;
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return Object.fromEntries(got.filter((x): x is NonNullable<typeof x> => x !== null));
+}
+
 /**
  * 담아 둔 줄 위에 **지금 값**을 덮어 준다. 하나라도 못 받으면 담아 둔 값을 그대로 돌려준다.
  */
@@ -210,19 +290,29 @@ export async function getOvernightLive(): Promise<OvernightData & { live: boolea
   const stored = await getOvernight();
   if (stored.rows.length === 0) return { ...stored, live: false };
 
-  const [perps, fx] = await Promise.all([livePerps(), liveFx()]);
+  const [perps, fx, closes] = await Promise.all([
+    livePerps(),
+    liveFx(),
+    liveCloses(stored.rows.map((r) => r.code)),
+  ]);
   if (!perps || !fx) return { ...stored, live: false };
 
   const rows = stored.rows.map((r) => {
     const p = perps.px[r.symbol];
     if (!p) return r;
     const krw = p.usd * fx;
+    // ⚠️ **담아 둔 것보다 나중 날짜일 때만** 갈아 끼운다. 야후가 하루 뒤처지거나 옛 값을
+    // 물어다 주면 기준이 거꾸로 가는데, 그건 화면에서 티가 안 난다.
+    const c = closes[r.code];
+    const base = c && c.date > r.prevCloseDate ? c : { close: r.prevClose, date: r.prevCloseDate };
     return {
       ...r,
       usd: p.usd,
       fx,
       krw: Math.round(krw),
-      diffPct: Number(((krw / r.prevClose - 1) * 100).toFixed(2)),
+      prevClose: base.close,
+      prevCloseDate: base.date,
+      diffPct: Number(((krw / base.close - 1) * 100).toFixed(2)),
       volumeUsd: p.vlm || r.volumeUsd,
       openInterest: p.oi || r.openInterest,
     };
