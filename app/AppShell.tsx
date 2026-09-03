@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { INSIDER_LISTS, INSIDER_LIST_SLUGS, insiderListHref } from "./insider/lists";
 import { PageJsonLd } from "./JsonLd";
+import { PREVIEW_PUBLIC } from "./screen-flags";
 
 import { track } from "@/lib/ga";
 import { SLOGAN } from "./brand";
@@ -1281,20 +1282,43 @@ function TopBar({
    이전 소식은 사라지고 새 소식만 뜬다. 예전 소식을 닫아 둔 사람도 키가 달라져 다시 본다
    (닫힌 표시는 옛 키에 남아 있을 뿐 새 키를 막지 않는다).
    ⚠️ 옛 키(`hz-news-us-kadera`)를 되쓰지 말 것 — 미장을 닫았던 사람은 새 소식을 못 본다. */
-const NEWS_KEY = "hz-news-insider";
 const NEWS_EVENT = "hz-news-change";
-const NEWS_HREF = "/insider";
-/* 문구를 셋으로 나눈 건 가운데 화면 이름에만 밑줄을 긋기 위해서다 —
-   띠 전체가 이미 링크지만, 눌러서 가는 곳이 **어디인지**는 이름이 말해야 한다. */
-const NEWS_NAME = "내부자 리포트";
-const NEWS_TAIL = "를 열었습니다. 임원과 의원, 월가 거물이 무엇을 사고팔았는지 봅니다.";
-/* ⚠️ **아이콘과 GA 라벨도 소식마다 갈아야 한다.** 예전엔 이 둘이 본문에 박혀 있어서
+
+/* 문구를 이름과 꼬리로 나눈 건 **이름에만 밑줄을 긋기** 위해서다 — 띠 전체가 이미
+   링크지만, 눌러서 가는 곳이 **어디인지**는 이름이 말해야 한다.
+
+   ⚠️ **아이콘과 GA 라벨도 소식마다 갈아야 한다.** 예전엔 이 둘이 본문에 박혀 있어서
    문구만 바꾸고 넘어갔고, 내부자 소식에 미장 카더라의 자유의 여신상이 그대로 붙어
-   있었다(2026-08-26). 갈아 끼울 것을 여기 여섯으로 모아 둔다.
+   있었다(2026-08-26). 갈아 끼울 것을 한 덩이로 모아 둔다.
    ⭐ 아이콘은 **사이드바 NAV 의 그 화면 아이콘과 같은 것**을 쓴다. 띠를 눌러 가면
-     사이드바에서 방금 본 그림이 그 자리에 켜져 있어야 같은 곳이라고 읽힌다. */
-const NEWS_ICON = "contact_page";
-const NEWS_GA = "news-insider";
+     사이드바에서 방금 본 그림이 그 자리에 켜져 있어야 같은 곳이라고 읽힌다.
+
+   ⭐ 키를 갈아 끼우는 것이 곧 **띠를 되쓰는 것**이다. 소식은 하나뿐이라 이 덩이만
+   바꾸면 이전 소식은 사라지고 새 소식만 뜬다. 예전 소식을 닫아 둔 사람도 키가 달라져
+   다시 본다(닫힌 표시는 옛 키에 남아 있을 뿐 새 키를 막지 않는다).
+   ⚠️ 옛 키를 되쓰지 말 것 — 그 소식을 닫았던 사람은 새 소식을 못 본다.
+
+   ⛔⛔ **국장 미리보기 띠는 화면을 여는 날 함께 켜진다.** 이 띠에는 푸터 바로가기 같은
+   조건부가 없어서, 띠만 먼저 넣으면 프로덕션에서 눌러 404 로 간다. 그래서 목적지가
+   열려 있을 때만 걸리도록 플래그로 가른다 — `app/screen-flags.ts` 한 줄을 true 로
+   바꾸는 순간 아래가 통째로 갈린다. 문구는 이미 정해 뒀다(2026-09-04, 45자). */
+const NEWS = PREVIEW_PUBLIC
+  ? {
+      key: "hz-news-preview",
+      href: "/preview",
+      name: "국장 미리보기",
+      tail: "를 열었습니다. 미장이 크게 움직인 아침마다 국장이 어땠는지 봅니다.",
+      icon: "preview",
+      ga: "news-preview",
+    }
+  : {
+      key: "hz-news-insider",
+      href: "/insider",
+      name: "내부자 리포트",
+      tail: "를 열었습니다. 임원과 의원, 월가 거물이 무엇을 사고팔았는지 봅니다.",
+      icon: "contact_page",
+      ga: "news-insider",
+    };
 
 const newsStore = {
   subscribe(cb: () => void) {
@@ -1303,7 +1327,7 @@ const newsStore = {
   },
   getSnapshot() {
     try {
-      return localStorage.getItem(NEWS_KEY) === null;
+      return localStorage.getItem(NEWS.key) === null;
     } catch {
       // 사생활 보호 모드 등에서 접근이 던진다. 닫은 걸 기억 못 하면 갈 때마다 다시
       // 뜨므로, 그때는 아예 안 띄운다(PcHint 와 같은 판단).
@@ -1316,11 +1340,11 @@ function NewsStrip() {
   const pathname = usePathname();
   const show = useSyncExternalStore(newsStore.subscribe, newsStore.getSnapshot, () => false);
 
-  if (!show || pathname.startsWith(NEWS_HREF)) return null;
+  if (!show || pathname.startsWith(NEWS.href)) return null;
 
   const dismiss = () => {
     try {
-      localStorage.setItem(NEWS_KEY, "1");
+      localStorage.setItem(NEWS.key, "1");
     } catch {}
     window.dispatchEvent(new Event(NEWS_EVENT));
   };
@@ -1336,13 +1360,13 @@ function NewsStrip() {
           ⚠️ dismiss 안의 dispatchEvent 는 동기지만 React 는 이벤트 핸들러에서 나온
           상태 변경을 핸들러가 끝난 뒤로 미룬다. 그래서 이 줄이 링크를 먼저 언마운트해
           이동을 막지 않는다(브라우저에서 눌러 확인했다). */}
-      <Link href={NEWS_HREF} className="hz-news-link" data-ga-cta={NEWS_GA} onClick={dismiss}>
-        <Icon name={NEWS_ICON} style={{ fontSize: 17, flexShrink: 0 }} />
+      <Link href={NEWS.href} className="hz-news-link" data-ga-cta={NEWS.ga} onClick={dismiss}>
+        <Icon name={NEWS.icon} style={{ fontSize: 17, flexShrink: 0 }} />
         <span className="hz-news-text">
           {/* ⚠️ <a> 안에 <a> 를 넣을 수 없다. 바깥 링크가 이미 같은 곳으로 가므로
               여기서는 **밑줄만** 긋는다 — 눌리는 건 띠 전체다. */}
-          <span className="hz-news-em">{NEWS_NAME}</span>
-          {NEWS_TAIL}
+          <span className="hz-news-em">{NEWS.name}</span>
+          {NEWS.tail}
         </span>
         <span className="hz-news-go">
           <span className="hz-news-go-label">보러 가기</span>

@@ -17,6 +17,7 @@
  *
  *   app/preview/page.tsx  배포된 곳에서 404 를 낼지(`!PUBLIC && DEPLOYED`), 색인을 막을지
  *   app/Footer.tsx        '바로가기' 목록에 줄을 낼지
+ *   app/AppShell.tsx      소식 띠가 어느 화면을 가리킬지(NEWS)
  *
  * ⚠️ 사이드바(app/AppShell.tsx)는 아직 이 플래그를 안 읽는다. 거기는 항목의 **모양**이
  *    갈려서다 — 안 연 화면은 `COMING_SOON`(href 가 아예 없는 타입)에, 연 화면은 `NAV` 에
@@ -26,9 +27,10 @@
  * ## 여는 절차
  *
  *   1. 아래 값을 true 로 바꾼다.
+ *      ↳ 이것만으로 푸터 바로가기와 **소식 띠**가 함께 켜진다. 띠 문구는 정해 뒀다.
  *   2. `app/AppShell.tsx` 의 COMING_SOON 항목을 지우고 NAV 에 `{ href: "/preview", ... }` 를
  *      같은 자리(서학개미 다음)에 넣는다.
- *   3. `app/releases.ts` 에 한 줄 올린다.
+ *   3. `app/releases.ts` 에 한 줄 올린다(화면이 하나 느는 것이라 Minor).
  *
  * ⛔ **여라는 말이 있기 전에는 바꾸지 말 것.** 화면이 다 만들어졌다는 것과 여는 것은
  *    다른 판단이다.
