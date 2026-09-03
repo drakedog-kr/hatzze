@@ -139,6 +139,58 @@ def krx_prev_close(codes: set[str]) -> tuple[dict[str, int], str] | None:
     return None
 
 
+YF_CHART = "https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=1d&interval=1d"
+
+# 야후 심볼 접미사. 지금 세 종목이 다 코스피라 `.KS` 하나면 된다.
+# ⚠️ 코스닥 종목을 넣게 되면 `.KQ` 로 갈라야 한다. 못 받은 종목은 KRX 값으로 남으므로
+#    조용히 틀리지는 않고 한 세션 낡을 뿐이다.
+YF_SUFFIX = ".KS"
+
+
+def in_session(now: datetime) -> bool:
+    """지금이 국내 정규장 시간인가(평일 09:00~15:30)."""
+    return now.weekday() < 5 and (9 * 60) <= (now.hour * 60 + now.minute) < (15 * 60 + 30)
+
+
+def yahoo_close(codes: set[str]) -> dict[str, tuple[int, str]]:
+    """종목별 **가장 최근에 끝난 정규장의 종가**와 그 날짜. 코드→(종가, YYYY-MM-DD).
+
+    ⚠️⚠️ **KRX 는 종가를 다음 날 08:00 에 올린다.** 그래서 오후 실행에서 KRX 만 보면 그날
+    장이 이미 끝났는데도 **그 전날 종가**와 견주게 된다. 여기서 당일 종가를 받아 덮는다.
+
+    ⚠️ **일봉을 쓰지 말 것.** 야후 일봉은 그날 칸이 비는 일이 있다(2026-09-03 이 그랬고
+    코스피 지수도 같은 날 비었다). `meta.regularMarketPrice` 를 쓴다.
+
+    ⚠️ **야후가 말하는 장 시간도 쓰지 않는다.** `currentTradingPeriod.regular.end` 가
+    15:00 로 적혀 있는데 KRX 는 2016년부터 15:30 이다. 정작 `regularMarketTime` 은 15:30 을
+    가리켜 야후 안에서 둘이 어긋난다. 그래서 **지금이 장중인가**로만 가른다.
+
+    ⭐ 화면 쪽(lib/kr-overnight.ts)이 10분마다 같은 판정을 한다. 한쪽만 고치면 저장값과
+      화면값이 갈리므로 **둘을 같이 고칠 것**.
+    """
+    now = datetime.now(KST)
+    live = in_session(now)
+    out: dict[str, tuple[int, str]] = {}
+    for code in sorted(codes):
+        url = YF_CHART.format(sym=f"{code}{YF_SUFFIX}")
+        try:
+            # ⚠️ User-Agent 가 없으면 야후가 429 를 준다.
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=15) as r:
+                meta = json.load(r)["chart"]["result"][0]["meta"]
+            px, ts = meta.get("regularMarketPrice"), meta.get("regularMarketTime")
+            if not px or not ts:
+                continue
+            stamp = datetime.fromtimestamp(ts, timezone.utc).astimezone(KST)
+            # 장중에 찍힌 오늘 값은 종가가 아니라 진행 중인 값이다.
+            if live and stamp.date() == now.date():
+                continue
+            out[code] = (round(px), stamp.date().isoformat())
+        except Exception as e:  # noqa: BLE001 — 이 원천이 죽어도 KRX 값으로 간다
+            print(f"[경고] 야후 종가 실패 {code}: {e}")
+    return out
+
+
 def usdkrw() -> float:
     """원/달러. yfinance 를 쓰는 다른 지표와 같은 원천으로 맞춘다."""
     import yfinance as yf  # 러너에 이미 있다(지표 여럿이 쓴다)
@@ -158,18 +210,19 @@ def main() -> None:
     args = ap.parse_args()
 
     now = datetime.now(KST)
-    # ⚠️⚠️ **개장 전(00~09시)에만 담는다.** 장 시간이라서가 아니라 **기준이 되는 종가 때문**이다.
+    # ⚠️⚠️ **장 시간(평일 09:00~15:30)에만 건너뛴다.** 이 카드는 "국장이 닫힌 동안" 의 값이라
+    # 장이 도는 중에는 뜻이 서지 않고, 그때 받은 값은 종가가 아니라 진행 중인 값이다.
     #
-    # 비교 대상은 `stocks.close_price` 인데, 그 표는 같은 잡의 `fetch_krx_stocks` 가 KRX 게이트
-    # (08:00) 뒤에 **직전 영업일 종가**로 채운다. 그래서 아침 실행에서는 어제 종가가 들어 있어
-    # 맞는데, 오후에 손으로 돌리면 그날 장이 이미 끝났는데도 표에는 **그 전날 종가**가 있다.
-    # 실측(2026-09-03 18:00): 삼성전자를 9/2 종가 250,500 과 견줘 −0.91% 가 나왔는데, 그날
-    # 실제 종가 250,000 기준으로는 −0.7% 였다. 화면에서는 어느 쪽인지 구별이 안 된다.
+    # 예전엔 `hour >= 9` 로 **오후 실행을 통째로** 막았다. 기준이 되는 종가를 KRX 에서만
+    # 받았기 때문이다 — KRX 는 종가를 **다음 날 08:00** 에 올려서, 오후에 돌리면 그날 장이
+    # 이미 끝났는데도 그 전날 종가와 견주게 됐다. 실측(2026-09-03 18:00): 삼성전자를 9/2 종가
+    # 250,500 과 견줘 −0.91% 가 나왔는데 그날 실제 종가 250,000 기준으로는 −0.7% 였다.
+    # 이제 당일 종가를 야후에서 받아 덮으므로(yahoo_close) 오후 실행도 맞는다.
     #
-    # ⚠️ 이 게이트는 순서 의존을 대신하지 못한다. 워크플로에서 **`fetch_krx_stocks` 뒤**에
+    # ⚠️ 이 게이트는 순서 의존을 대신하지 못한다. 워크플로에서 **KRX 08:00 게이트 뒤**에
     #    두는 것이 먼저다. 여기 시각 검사는 손으로 돌릴 때의 안전판이다.
-    if not args.force and now.hour >= 9:
-        print(f"[건너뜀] 지금 KST {now:%H:%M} — 개장 전에만 담습니다 (--force 로 넘김)")
+    if not args.force and in_session(now):
+        print(f"[건너뜀] 지금 KST {now:%H:%M} — 장 시간에는 담지 않습니다 (--force 로 넘김)")
         return
 
     db = get_client()
@@ -177,8 +230,18 @@ def main() -> None:
     got = krx_prev_close(codes)
     if got is None:
         raise SystemExit("[중단] KRX 에서 직전 거래일 종가를 못 받았습니다 — 견줄 기준이 없습니다")
-    closes, close_date = got
-    print(f"[기준] KRX {close_date} 종가")
+    krx_closes, krx_date = got
+    # 종목별 (종가, 날짜). KRX 가 바닥이고 야후가 **더 나중 날짜일 때만** 덮는다.
+    base: dict[str, tuple[float, str]] = {c: (float(v), krx_date) for c, v in krx_closes.items()}
+    print(f"[기준] KRX {krx_date} 종가 {len(base)}종목")
+
+    # ⚠️ **나중 날짜일 때만** 갈아 끼운다. 야후가 옛 값을 물어다 주면 기준이 거꾸로 가는데,
+    #    그건 화면에서 티가 안 난다.
+    for code, (px, d) in yahoo_close(codes).items():
+        if code not in base or d > base[code][1]:
+            was = base[code][1] if code in base else "없음"
+            print(f"[기준] {code}: 야후 {d} 종가 {px:,}원 으로 갱신 (KRX 는 {was})")
+            base[code] = (float(px), d)
 
     fx = usdkrw()
     px = perp_prices()
@@ -193,18 +256,18 @@ def main() -> None:
         if p["vlm"] < MIN_DAY_VOLUME_USD:
             print(f"[경고] {name}: 24시간 거래대금 ${p['vlm']:,.0f} 로 문턱 미달 — 건너뜁니다")
             continue
-        if code not in closes:
-            print(f"[경고] {name}: KRX {close_date} 응답에 없습니다 — 건너뜁니다")
+        if code not in base:
+            print(f"[경고] {name}: 어느 원천에도 종가가 없습니다 — 건너뜁니다")
             continue
 
+        prev, close_date = base[code]
         # ⚠️ 종가가 너무 낡으면 담지 않는다. 연휴를 감안해 나흘까지만 본다.
         gap_days = (today_kst() - datetime.strptime(close_date, "%Y-%m-%d").date()).days
         if gap_days > 4:
-            print(f"[경고] 종가가 {close_date} 로 {gap_days}일 낡았습니다 — 통째로 건너뜁니다")
-            return
+            print(f"[경고] {name}: 종가가 {close_date} 로 {gap_days}일 낡았습니다 — 건너뜁니다")
+            continue
 
         krw = p["usd"] * fx
-        prev = float(closes[code])
         rows.append(
             {
                 "date": today_kst().isoformat(),
