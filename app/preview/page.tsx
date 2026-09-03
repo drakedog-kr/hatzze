@@ -157,6 +157,21 @@ const PCT = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(2)}%`;
 const HL_DEX = "xyz";
 
 /**
+ * 이 화면의 자료가 **실제로 쓰이는 시각**(KST). `formatKstUpdate` 의 기본 눈금 [9, 20] 은
+ * 잡이 **끝나는** 시각이라 이 화면에는 안 맞는다 — 스텝이 79개인데 여기 쓰이는 둘은
+ * 앞쪽에 있다.
+ *
+ *   HERO_HOURS   종목 줄은 **맨 앞 스텝**이라 07시다. 기본 눈금에 대면 여유 2시간에 걸려
+ *                "오전 9시" 로 붙어 두 시간을 앞당겨 거짓말한다(2026-09-04 실측: 34줄이 전부 7시).
+ *   PERP_HOURS   하이퍼리퀴드는 **KRX 08:00 게이트 바로 뒤**라 아침 08시 · 저녁 18시다.
+ *                (이 눈금은 실시간을 못 받아 담아 둔 값으로 물러선 날에만 쓰인다.)
+ *
+ * ⚠️ 스텝 자리를 옮기면 이 값도 함께 옮길 것. 라벨은 조용히 틀린다.
+ */
+const HERO_HOURS = [7] as const;
+const PERP_HOURS = [8, 18] as const;
+
+/**
  * 살아 있는 값의 '시점' 표기 — "9/4 오전 2:40".
  *
  * ⚠️⚠️ **날짜를 ISO 문자열에서 잘라 쓰지 말 것.** `capturedAt` 은 UTC 라 한국 새벽에는
@@ -702,7 +717,7 @@ export default async function PreviewPage() {
                 작아지고, 그러면 기준선이 옆 두 칸보다 3px 내려앉는다(2026-09-03 실측).
                 옆 칸 설명과 같은 1.6 을 줘야 셋이 같은 줄에 앉는다. */}
             <span style={{ fontSize: 11.5, lineHeight: 1.6, color: C.sub }}>
-              최종 업데이트 · {updatedAt ? formatKstUpdate(updatedAt) : "—"}
+              최종 업데이트 · {updatedAt ? formatKstUpdate(updatedAt, HERO_HOURS) : "—"}
             </span>
           </div>
         </div>
@@ -838,7 +853,7 @@ export default async function PreviewPage() {
               overnight.capturedAt
                 ? overnight.live
                   ? `${kstStamp(overnight.capturedAt)} 시점`
-                  : `${formatKstUpdate(overnight.capturedAt).replace(" 기준", "")} 시점`
+                  : `${formatKstUpdate(overnight.capturedAt, PERP_HOURS).replace(" 기준", "")} 시점`
                 : undefined
             }
             desc={`국장이 닫힌 동안 해외 무기한선물에서 거래된 값입니다. 환율 ${Math.round(

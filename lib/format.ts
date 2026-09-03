@@ -122,8 +122,22 @@ const SCHEDULE_SLACK_HOURS = 2;
  * 워크플로 cron 주석). 완료는 그래도 날마다 흔들리므로, 예정 시각 ±3시간 안이면 그 정각으로
  * 스냅하고(정기 실행의 깔끔함 유지), 벗어난 실행(수동·재시도)은 실제 시각을 적어 거짓말을
  * 막는다 — 예전엔 무조건 정각 스냅이라 KST 23:28 에 끝난 실행이 "오후 5:00 기준"으로 표시됐다.
+ *
+ * ## ⚠️ 파이프라인 **끝**에 쓰이지 않는 자료는 자기 시각을 넘겨야 한다
+ *
+ * 기본값 [9, 20] 은 **잡이 끝나는 시각**이다(아침 08:27 · 저녁 19:23 완료). 그런데 스텝이
+ * 79개라 앞쪽에서 쓰이는 자료는 그보다 한참 이르다 — 국장 미리보기의 종목 줄은 맨 앞
+ * 스텝이라 **07시**에 쓰인다. 그 값에 기본 눈금을 대면 여유 2시간에 걸려 "오전 9시" 로
+ * 붙어 **두 시간을 앞당겨 거짓말한다**(2026-09-04 지적, 실측 34줄이 전부 7시).
+ *
+ * 그래서 `scheduledHours` 를 받는다. **화면이 자기 자료가 쓰이는 시각을 안다.**
+ * ⛔ 기본값을 고쳐서 맞추지 말 것 — 시장 브리핑(08:40·19:31)과 카더라는 지금 값이 맞고,
+ *    기본을 흔들면 멀쩡한 화면들이 같이 어긋난다.
  */
-export function formatKstUpdate(isoString: string): string {
+export function formatKstUpdate(
+  isoString: string,
+  scheduledHours: readonly number[] = SCHEDULED_HOURS_KST,
+): string {
   const parts = KST_UPDATE_FORMATTER.formatToParts(new Date(isoString));
   const get = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((p) => p.type === type)?.value ?? "";
@@ -131,7 +145,7 @@ export function formatKstUpdate(isoString: string): string {
   const weekday = get("weekday").replace("요일", "");
   const hour = Number(get("hour"));
 
-  const scheduled = SCHEDULED_HOURS_KST.find((h) => Math.abs(hour - h) <= SCHEDULE_SLACK_HOURS);
+  const scheduled = scheduledHours.find((h) => Math.abs(hour - h) <= SCHEDULE_SLACK_HOURS);
   const time =
     scheduled !== undefined
       ? `${scheduled < 12 ? "오전" : "오후"} ${scheduled % 12 || 12}시`
