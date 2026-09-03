@@ -212,7 +212,29 @@ function OvernightPanel({ r }: { r: OvernightRow }) {
         <StockLogo code={r.code} name={r.name} market="KOSPI" size={30} />
         <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
           <strong style={{ fontSize: 14, fontWeight: 700, color: C.ink, letterSpacing: "-.01em" }}>{r.name}</strong>
-          <span style={{ fontFamily: MONO, fontSize: 11, color: C.muted }}>{r.symbol}</span>
+          {/* 심볼이 곧 출처 링크다. 이 값이 어디서 온 것인지 화면 어디에도 안 적혀
+              있었는데, 심볼은 이미 그 시장의 주소 노릇을 한다 — 따로 '출처' 줄을
+              만들지 않고 이걸 누를 수 있게 한다.
+              ⚠️ 주소에는 **API 이름**(xyz:SMSN)을 그대로 넣는다. 하이퍼리퀴드가
+              보여 주는 이름은 다르지만(xyz:SAMSUNG) 사이트가 알아서 옮겨 준다
+              (2026-09-04 실측: SMSN→SAMSUNG · SKHX→SKHYNIX · HYUNDAI 그대로).
+              화면에 적힌 심볼과 주소가 같아야 '이 줄을 눌렀다'가 성립한다.
+              ⚠️ 파랗게 칠하지 않는다. 누를 수 있다는 것은 화살표와 호버로만 말한다 —
+              MDD·종목 이름 링크가 이미 쓰는 방식이다(globals.css 주석 참고). */}
+          <a
+            className="hz-perp-link"
+            href={`https://app.hyperliquid.xyz/trade/${r.symbol}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-ga="preview_perp_click"
+            data-ga-symbol={r.symbol}
+            style={{ fontFamily: MONO, fontSize: 11, display: "inline-flex", alignItems: "center", gap: 2, width: "fit-content" }}
+          >
+            {r.symbol}
+            {/* 11px 글자 옆이라 아이콘도 11px 이다. 12 로 두면 글자보다 커서 화살표가
+                먼저 눈에 든다 — 여기서 주인공은 심볼이다. */}
+            <Icon name="north_east" style={{ fontSize: 11 }} />
+          </a>
         </span>
       </div>
 
