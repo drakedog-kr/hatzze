@@ -151,6 +151,11 @@ function CellHead({ title, note }: { title: string; note?: string }) {
 
 const PCT = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(2)}%`;
 
+/** 하이퍼리퀴드에 이 마켓들을 띄운 빌더의 이름. 저장된 심볼의 접두사(`xyz:SMSN`)이고,
+ *  화면에서는 이 자리만 거래소 이름으로 바꿔 적는다. 주소에는 그대로 쓴다.
+ *  ⚠️ `data-pipeline/scripts/fetch_kr_overnight.py` 의 `DEX` 와 같은 값이다. */
+const HL_DEX = "xyz";
+
 /**
  * 살아 있는 값의 '시점' 표기 — "9/4 오전 2:40".
  *
@@ -204,10 +209,15 @@ function OvernightPanel({ r }: { r: OvernightRow }) {
           {/* 심볼이 곧 출처 링크다. 이 값이 어디서 온 것인지 화면 어디에도 안 적혀
               있었는데, 심볼은 이미 그 시장의 주소 노릇을 한다 — 따로 '출처' 줄을
               만들지 않고 이걸 누를 수 있게 한다.
-              ⚠️ 주소에는 **API 이름**(xyz:SMSN)을 그대로 넣는다. 하이퍼리퀴드가
-              보여 주는 이름은 다르지만(xyz:SAMSUNG) 사이트가 알아서 옮겨 준다
-              (2026-09-04 실측: SMSN→SAMSUNG · SKHX→SKHYNIX · HYUNDAI 그대로).
-              화면에 적힌 심볼과 주소가 같아야 '이 줄을 눌렀다'가 성립한다.
+
+              ⚠️⚠️ **화면에 내는 이름과 주소에 넣는 이름이 다르다.** 저장된 심볼은
+              `xyz:SMSN` 인데 그 `xyz` 는 하이퍼리퀴드에 마켓을 띄운 **빌더의 이름**이라
+              읽는 사람에게는 아무 뜻이 없었다. 화면에는 그 자리를 거래소 이름으로 바꿔
+              적고(`Hyperliquid:SMSN`), 주소·GA 라벨에는 **API 이름을 그대로** 쓴다.
+              ⛔ 주소까지 바꾸지 말 것 — `Hyperliquid:SMSN` 은 그 사이트에 없는 마켓이다.
+              ⚠️ 하이퍼리퀴드가 화면에 쓰는 이름은 또 다르지만(`xyz:SAMSUNG`) 사이트가
+              알아서 옮겨 준다(2026-09-04 실측: SMSN→SAMSUNG · SKHX→SKHYNIX · HYUNDAI 그대로).
+
               ⚠️ 파랗게 칠하지 않는다. 누를 수 있다는 것은 화살표와 호버로만 말한다 —
               MDD·종목 이름 링크가 이미 쓰는 방식이다(globals.css 주석 참고). */}
           <a
@@ -219,7 +229,7 @@ function OvernightPanel({ r }: { r: OvernightRow }) {
             data-ga-symbol={r.symbol}
             style={{ fontFamily: MONO, fontSize: 11, display: "inline-flex", alignItems: "center", gap: 2, width: "fit-content" }}
           >
-            {r.symbol}
+            {r.symbol.replace(`${HL_DEX}:`, "Hyperliquid:")}
             {/* 11px 글자 옆이라 아이콘도 11px 이다. 12 로 두면 글자보다 커서 화살표가
                 먼저 눈에 든다 — 여기서 주인공은 심볼이다. */}
             <Icon name="north_east" style={{ fontSize: 11 }} />
@@ -522,7 +532,17 @@ export default async function PreviewPage() {
                     //    그래서 −2 가 −1 이 됐다(2026-09-03).
                     // ⚠️ 부호를 헷갈리지 말 것. 이 블록은 flex-end 라 **음수를 키우면 내려간다**
                     //    (바깥 높이가 줄어 바닥이 상자 밖으로 나간다). 올리려면 0 쪽으로 간다.
-                    padding: k === 2 ? "8px 0 0" : "8px 0",
+                    // ⚠️⚠️ **마지막 줄의 위 여백만 6.7 이다(8 이 아니다).** 이 블록은 flex-end 라
+                    // 바닥이 못박혀 있어서, '장 중' 밑 구분선의 자리를 정하는 것은 **이 줄의
+                    // 높이 하나**다. 8 이면 그 선이 옆 칸('밤사이 가장 크게 움직인 곳')의 각주
+                    // 구분선보다 1.3px 위에 선다 — 두 선이 세로 칸막이를 사이에 두고 나란히
+                    // 놓여 그 어긋남이 눈에 띈다(2026-09-04 지적).
+                    // 실측: 이 줄 높이 30.5(=8+22.5) → 선 369.7 · 옆 칸 선 371.0.
+                    //       6.7 로 줄이면 높이 29.2 → 선 371.0 으로 맞는다.
+                    // ⚠️ 대신 marginBottom 을 건드려 맞추지 말 것. 그건 줄 전체를 내려서
+                    //    '종가' 글자 바닥이 옆 칸 각주 글자 바닥과 어긋난다(아래 주석 참고).
+                    //    여기는 상자를 **위에서만** 줄이므로 글자는 제자리에 있는다.
+                    padding: k === 2 ? "6.7px 0 0" : "8px 0",
                     marginBottom: k === 2 ? -1 : undefined,
                     borderBottom: k === 2 ? "none" : "1px solid var(--c-sheet-row)",
                   }}
