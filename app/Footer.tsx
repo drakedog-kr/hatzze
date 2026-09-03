@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { PREVIEW_PUBLIC } from "./screen-flags";
 import { BetaBadge, GhostSymbol, Wordmark } from "./Logo";
 import { APP_VERSION } from "./releases";
 import { C, MONO } from "./ui";
@@ -31,7 +32,13 @@ const CONTACT_EMAIL = "hatzze@proton.me";
 // 이 안 잡히니 라이브러리 이름으로 따로 볼 것. docs.google.com(채널 목록 시트)·
 // api.telegram.org(우리 발송 봇)은 우리 설비지 자료 출처가 아니라 여기 안 적는다.
 const SOURCE_GROUPS: { label: string; items: string }[] = [
-  { label: "증시·시세", items: "한국거래소 통계정보 · 야후 파이낸스" },
+  /* ⚠️ 2026-09-03 대조에서 둘이 빠져 있었다(위 대조법 grep 으로 찾았다).
+       핀허브        — 국장 미리보기가 미국 종목 간밤 등락을 여기서 받는다(무료 티어 quote).
+       하이퍼리퀴드  — 국내 장이 닫힌 동안의 삼성전자·SK하이닉스·현대차 무기한선물 값.
+                       빌더 마켓(`xyz`)이라 하이퍼리퀴드 본체 목록에는 없지만, 우리가
+                       부르는 호스트는 api.hyperliquid.xyz 하나다.
+     ⚠️ 야후는 지수 종가와 원/달러에 쓴다(개별 미국 종목은 핀허브). 둘을 합치지 말 것. */
+  { label: "증시·시세", items: "한국거래소 통계정보 · 야후 파이낸스 · 핀허브 · 하이퍼리퀴드" },
   /* 서학개미 장부가 통째로 여기서 나온다. 넷 다 출처 표기를 요구하는 원천이라
      화면에 이름이 있어야 한다.
        미 재무부 TIC  — 한국인이 든 미국 주식 잔고·순매수(월별, 1985~)
@@ -193,6 +200,12 @@ export default function Footer() {
             <FooterLink href="/insider">내부자 리포트</FooterLink>
             <FooterLink href="/mdd">MDD 정밀분석</FooterLink>
             <FooterLink href="/seohak">서학개미 장부</FooterLink>
+            {/* ⚠️⚠️ **안 연 화면은 여기 링크를 내지 않는다.** 눌리는데 404 가 되어서다
+                (2026-08-30 에 사이드바에서 그 일이 났다). 그렇다고 줄을 아예 빼 두면 여는
+                날 다시 넣는 걸 잊는다 — 내부자 리포트가 정확히 그랬다(위 주석).
+                그래서 **플래그를 읽어 조건부로** 둔다. 여는 날 `app/screen-flags.ts` 한 줄만
+                바꾸면 이 줄이 저절로 살아난다. */}
+            {PREVIEW_PUBLIC && <FooterLink href="/preview">국장 미리보기</FooterLink>}
             {/* 사이드바가 모바일에서 숨겨져 텔레그램 링크가 사라진다 — 내부 내비게이션과
                 같은 방식으로 푸터에 두어 좁은 화면에서도 닿게 한다. 라벨과 aria 는
                 AppShell 의 TELEGRAM 상수와 같은 문구로 맞춘다(두 내비게이션이 같은
