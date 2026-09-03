@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { INSIDER_LISTS, INSIDER_LIST_SLUGS, insiderListHref } from "./insider/lists";
 import { PageJsonLd } from "./JsonLd";
+import { PREVIEW_PUBLIC } from "./screen-flags";
 
 import { track } from "@/lib/ga";
 import { SLOGAN } from "./brand";
@@ -209,6 +210,28 @@ const NAV: NavItem[] = [
     // ⚠️ `badge: "준비 중"` 이 여기 있었다. 이 줄을 지우는 것이 곧 **화면을 여는 것**이다
     //    (사이드바에 예고로 걸어 두고 만들었다). 2026-08-19 에 뗐다.
   },
+  // 2026-09-04 에 열었다. COMING_SOON 에서 옮겨 온 항목이다.
+  //
+  // 맨 아래에 두는 이유는 이 화면이 하루 중 07~09시에만 쓸모가 있어서다 — 종일 보는
+  // 브리핑·카더라를 밀어낼 자리가 아니다.
+  //
+  // 아이콘 `preview` 는 창 안에 눈이 든 그림이라 이름 그대로 '미리보기' 를 가리킨다.
+  // ⚠️ 후보를 **20px 실물로 띄워 놓고** 골랐다(96px 로 보면 다 그럴듯하다). 이 그림은
+  // 안쪽 눈이 작아 20px 에서 점처럼 뭉치는 편이다 — 나중에 흐려 보이면 그게 이유이고,
+  // 그때 볼 대안은 `pageview`(문서에 돋보기)·`double_arrow`(겹화살표)·`next_plan` 이다.
+  // ⚠️ 위 내부자 리포트의 `contact_page` 와 **둘 다 네모 안에 뭐가 든 모양**이라 20px
+  // 사이드바에서 제일 닮은 한 쌍이다(세로로 두 칸 떨어져 있어 지금은 견딘다).
+  {
+    href: "/preview",
+    label: "국장 미리보기",
+    icon: "preview",
+    // ⚠️ **"어디에 닿나" 로 되돌리지 말 것.** 처음 문구가 "밤사이 미국에서 움직인 것이
+    // 오늘 아침 어디에 닿나" 였는데, '움직인 것'·'닿나' 둘 다 두루뭉술해서 이 화면이
+    // 무엇을 내주는지 안 잡혔다(2026-09-03). 이 화면이 내는 것은 **과거 기록**이다 —
+    // 그런 밤 뒤에 국내가 실제로 몇 %에 열렸는지. 그래서 과거형으로 적는다.
+    // ⛔ "얼마에 열릴까" 같은 미래형으로 바꾸지 말 것. 그 순간 해설이 아니라 예보가 된다.
+    sub: "밤사이 미국이 크게 움직인 날 국내는 보통 얼마에 열렸나",
+  },
 ];
 
 // 외부(텔레그램) 링크라 NAV 배열이 아니라 따로 둔다 — pathname 기반 active 판정 대상이
@@ -241,32 +264,13 @@ const TELEGRAM = {
 // 아이콘은 NAV 항목과 같은 규칙이다 — 직접 그린 Glyph 든 Material Symbols 이름(icon)이든
 // 하나만 있으면 되고, NavGlyph 가 골라 그린다.
 const COMING_SOON: { label: string; badge: string; tip: string; after: string; icon?: string; Glyph?: Glyph }[] = [
-  // 간밤 미장에서 크게 움직인 종목과, 그 종목과 사업으로 엮인 국내 종목을 개장 전에 잇는다.
+  // ⭐ **지금은 비어 있다.** 국장 미리보기가 여기 마지막 손님이었고 2026-09-04 에 NAV 로
+  // 옮겨 갔다. 배열과 그리는 코드는 남겨 둔다 — 다음 예고 화면이 생기면 한 줄만 넣으면 된다.
   //
-  // ⛔ **화면과 파이프라인은 다 만들어졌지만 아직 안 열었다.** 여기(COMING_SOON)에 있으면
-  // 사이드바에 눌리지 않는 줄로 서고, 주소를 직접 쳐도 배포된 곳에서는 404 다
-  // (app/preview/page.tsx 의 PUBLIC 상수). **두 곳을 같이 풀어야 열린다.**
-  //
-  // ⚠️ 한때 NAV 에 href 를 달고 배지만 '준비 중' 으로 뒀다. **배지는 표시일 뿐 아무것도
-  // 막지 않는다** — 2026-08-30 에 프로덕션 사이드바에서 그냥 눌려 들어가졌다.
-  // 본문 헤더는 DEEP_PAGES 의 "/preview" 항목이 대신 채운다.
-  //
-  // `after` 가 NAV 의 마지막 항목이라 사이드바 맨 아래에 선다. 끝에 두는 이유는 이 화면이
-  // 하루 중 07~09시에만 쓸모가 있어서다 — 종일 보는 브리핑·카더라를 밀어낼 자리가 아니다.
-  //
-  // 아이콘 `preview` 는 창 안에 눈이 든 그림이라 이름 그대로 '미리보기' 를 가리킨다.
-  // ⚠️ 후보를 **20px 실물로 띄워 놓고** 골랐다(96px 로 보면 다 그럴듯하다). 이 그림은
-  // 안쪽 눈이 작아 20px 에서 점처럼 뭉치는 편이다 — 나중에 흐려 보이면 그게 이유이고,
-  // 그때 볼 대안은 `pageview`(문서에 돋보기)·`double_arrow`(겹화살표)·`next_plan` 이다.
-  // ⚠️ 위 내부자 리포트의 `contact_page` 와 **둘 다 네모 안에 뭐가 든 모양**이라 20px
-  // 사이드바에서 제일 닮은 한 쌍이다(세로로 두 칸 떨어져 있어 지금은 견딘다).
-  {
-    label: "국장 미리보기",
-    badge: "준비 중",
-    tip: "현재 열심히 개발 중입니다!",
-    after: "/seohak",
-    icon: "preview",
-  },
+  // ⚠️ 다시 쓸 때 기억할 것: **배지는 표시일 뿐 아무것도 막지 않는다.** 한때 NAV 에
+  // href 를 달고 배지만 '준비 중' 으로 뒀는데, 2026-08-30 에 프로덕션 사이드바에서
+  // 그냥 눌려 들어가졌다. 여기(COMING_SOON)에 두면 href 필드 자체가 없어 링크가 안 생긴다.
+  // 대신 본문 헤더가 NAV 에서 경로를 못 찾으므로 DEEP_PAGES 에 제목을 따로 둬야 한다.
 ];
 
 /**
@@ -431,14 +435,6 @@ const DEEP_PAGES: Record<string, { label: string; sub: string; badge?: string }>
       { label: INSIDER_LISTS[slug].title, sub: INSIDER_LISTS[slug].sub },
     ]),
   ),
-  // ⭐ 아직 안 연 화면. 사이드바에는 COMING_SOON 으로 서 있어 NAV 에서 못 찾으므로,
-  // 본문 헤더가 쓸 제목을 여기 둔다 — 로컬에서 볼 때 제목 칸이 비지 않는다.
-  // 여는 날 COMING_SOON → NAV 로 옮기면서 이 줄을 지운다.
-  "/preview": {
-    label: "국장 미리보기",
-    sub: "간밤 미국에서 움직인 것이 오늘 아침 어디에 닿나",
-    badge: "준비 중",
-  },
 };
 
 function isActive(href: string, pathname: string) {
@@ -1276,20 +1272,43 @@ function TopBar({
    이전 소식은 사라지고 새 소식만 뜬다. 예전 소식을 닫아 둔 사람도 키가 달라져 다시 본다
    (닫힌 표시는 옛 키에 남아 있을 뿐 새 키를 막지 않는다).
    ⚠️ 옛 키(`hz-news-us-kadera`)를 되쓰지 말 것 — 미장을 닫았던 사람은 새 소식을 못 본다. */
-const NEWS_KEY = "hz-news-insider";
 const NEWS_EVENT = "hz-news-change";
-const NEWS_HREF = "/insider";
-/* 문구를 셋으로 나눈 건 가운데 화면 이름에만 밑줄을 긋기 위해서다 —
-   띠 전체가 이미 링크지만, 눌러서 가는 곳이 **어디인지**는 이름이 말해야 한다. */
-const NEWS_NAME = "내부자 리포트";
-const NEWS_TAIL = "를 열었습니다. 임원과 의원, 월가 거물이 무엇을 사고팔았는지 봅니다.";
-/* ⚠️ **아이콘과 GA 라벨도 소식마다 갈아야 한다.** 예전엔 이 둘이 본문에 박혀 있어서
+
+/* 문구를 이름과 꼬리로 나눈 건 **이름에만 밑줄을 긋기** 위해서다 — 띠 전체가 이미
+   링크지만, 눌러서 가는 곳이 **어디인지**는 이름이 말해야 한다.
+
+   ⚠️ **아이콘과 GA 라벨도 소식마다 갈아야 한다.** 예전엔 이 둘이 본문에 박혀 있어서
    문구만 바꾸고 넘어갔고, 내부자 소식에 미장 카더라의 자유의 여신상이 그대로 붙어
-   있었다(2026-08-26). 갈아 끼울 것을 여기 여섯으로 모아 둔다.
+   있었다(2026-08-26). 갈아 끼울 것을 한 덩이로 모아 둔다.
    ⭐ 아이콘은 **사이드바 NAV 의 그 화면 아이콘과 같은 것**을 쓴다. 띠를 눌러 가면
-     사이드바에서 방금 본 그림이 그 자리에 켜져 있어야 같은 곳이라고 읽힌다. */
-const NEWS_ICON = "contact_page";
-const NEWS_GA = "news-insider";
+     사이드바에서 방금 본 그림이 그 자리에 켜져 있어야 같은 곳이라고 읽힌다.
+
+   ⭐ 키를 갈아 끼우는 것이 곧 **띠를 되쓰는 것**이다. 소식은 하나뿐이라 이 덩이만
+   바꾸면 이전 소식은 사라지고 새 소식만 뜬다. 예전 소식을 닫아 둔 사람도 키가 달라져
+   다시 본다(닫힌 표시는 옛 키에 남아 있을 뿐 새 키를 막지 않는다).
+   ⚠️ 옛 키를 되쓰지 말 것 — 그 소식을 닫았던 사람은 새 소식을 못 본다.
+
+   ⛔⛔ **국장 미리보기 띠는 화면을 여는 날 함께 켜진다.** 이 띠에는 푸터 바로가기 같은
+   조건부가 없어서, 띠만 먼저 넣으면 프로덕션에서 눌러 404 로 간다. 그래서 목적지가
+   열려 있을 때만 걸리도록 플래그로 가른다 — `app/screen-flags.ts` 한 줄을 true 로
+   바꾸는 순간 아래가 통째로 갈린다. 문구는 이미 정해 뒀다(2026-09-04, 45자). */
+const NEWS = PREVIEW_PUBLIC
+  ? {
+      key: "hz-news-preview",
+      href: "/preview",
+      name: "국장 미리보기",
+      tail: "를 열었습니다. 미장이 크게 움직인 아침마다 국장이 어땠는지 봅니다.",
+      icon: "preview",
+      ga: "news-preview",
+    }
+  : {
+      key: "hz-news-insider",
+      href: "/insider",
+      name: "내부자 리포트",
+      tail: "를 열었습니다. 임원과 의원, 월가 거물이 무엇을 사고팔았는지 봅니다.",
+      icon: "contact_page",
+      ga: "news-insider",
+    };
 
 const newsStore = {
   subscribe(cb: () => void) {
@@ -1298,7 +1317,7 @@ const newsStore = {
   },
   getSnapshot() {
     try {
-      return localStorage.getItem(NEWS_KEY) === null;
+      return localStorage.getItem(NEWS.key) === null;
     } catch {
       // 사생활 보호 모드 등에서 접근이 던진다. 닫은 걸 기억 못 하면 갈 때마다 다시
       // 뜨므로, 그때는 아예 안 띄운다(PcHint 와 같은 판단).
@@ -1311,11 +1330,11 @@ function NewsStrip() {
   const pathname = usePathname();
   const show = useSyncExternalStore(newsStore.subscribe, newsStore.getSnapshot, () => false);
 
-  if (!show || pathname.startsWith(NEWS_HREF)) return null;
+  if (!show || pathname.startsWith(NEWS.href)) return null;
 
   const dismiss = () => {
     try {
-      localStorage.setItem(NEWS_KEY, "1");
+      localStorage.setItem(NEWS.key, "1");
     } catch {}
     window.dispatchEvent(new Event(NEWS_EVENT));
   };
@@ -1331,13 +1350,13 @@ function NewsStrip() {
           ⚠️ dismiss 안의 dispatchEvent 는 동기지만 React 는 이벤트 핸들러에서 나온
           상태 변경을 핸들러가 끝난 뒤로 미룬다. 그래서 이 줄이 링크를 먼저 언마운트해
           이동을 막지 않는다(브라우저에서 눌러 확인했다). */}
-      <Link href={NEWS_HREF} className="hz-news-link" data-ga-cta={NEWS_GA} onClick={dismiss}>
-        <Icon name={NEWS_ICON} style={{ fontSize: 17, flexShrink: 0 }} />
+      <Link href={NEWS.href} className="hz-news-link" data-ga-cta={NEWS.ga} onClick={dismiss}>
+        <Icon name={NEWS.icon} style={{ fontSize: 17, flexShrink: 0 }} />
         <span className="hz-news-text">
           {/* ⚠️ <a> 안에 <a> 를 넣을 수 없다. 바깥 링크가 이미 같은 곳으로 가므로
               여기서는 **밑줄만** 긋는다 — 눌리는 건 띠 전체다. */}
-          <span className="hz-news-em">{NEWS_NAME}</span>
-          {NEWS_TAIL}
+          <span className="hz-news-em">{NEWS.name}</span>
+          {NEWS.tail}
         </span>
         <span className="hz-news-go">
           <span className="hz-news-go-label">보러 가기</span>

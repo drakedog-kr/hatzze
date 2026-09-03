@@ -39,7 +39,7 @@ const APP = new URL("../app/", import.meta.url).pathname.replace(/\/$/, "");
  * 이 목록이 검사를 무력화하는 서랍이 된다.
  */
 const EXCLUDED = new Map([
-  ["/preview", "아직 안 연 화면. generateMetadata 가 noindex 를 붙인다(app/preview/page.tsx)"],
+  // 지금은 비어 있다. `/preview` 가 여기 있었고 2026-09-04 에 열면서 사이트맵으로 옮겼다.
 ]);
 
 /**

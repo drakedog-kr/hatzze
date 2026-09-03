@@ -18,13 +18,31 @@ export type PreviewLink = {
   code: string;
   market: string | null;
   why: string;
+  /** ⭐ 관계 **종류**(peer·supply·cycle·license·channel·rival). `why` 가 개별 이름이라면
+   *  이건 그걸 묶은 여섯 갈래다. 시트 부제가 그날 뜬 종류를 세어 문장을 짓는다.
+   *  ⚠️ 마이그레이션 061 전에 쓰인 줄은 null 이다 — 화면이 고정 문구로 물러선다. */
+  kind: string | null;
   /** 과거에 이런 날 개장 갭이 **코스피보다** 얼마나 더 컸는지의 평균(%p). */
   gap: number;
+  /** 과거에 그런 날이 몇 번 있었나. */
   events: number;
+  /** ⭐ 그 가운데 국내 개장이 미국과 같은 방향이었던 횟수. 마이그레이션 056 전 줄은 null 이다. */
+  wins: number | null;
+  /** ⭐⭐ 평소라면 그랬을 횟수. **wins 와 짝이라 따로 쓰지 않는다.** */
+  base: number | null;
+  /** ⭐ 과거 그런 날 이 종목의 **날것** 개장 갭 평균(%). 화면이 내는 건 이 값이다. */
+  krOpen: number | null;
+  /** ⭐⭐ 같은 날들의 코스피 개장 갭 평균(%). 지금은 화면에 안 낸다. */
+  kospiOpen: number | null;
+  /** ⭐ 개장 뒤(시가 → 종가) 평균(%). 하루 전체는 krOpen 과 곱해 화면이 낸다. */
+  krIntra: number | null;
 };
 
 export type PreviewMover = {
   ticker: string;
+  /** 그 종목의 미국 테마(섹터). 화면은 이걸 카드 위 작은 라벨로 쓴다 — 섹터로 묶어
+   *  큰 상자를 만들지 않는다(섹터마다 종목 수가 1~5 라 상자 키가 제각각이 된다). */
+  sector: string;
   usName: string;
   /** 간밤 등락률(%). 사람이 아는 숫자라 초과분이 아니라 이 값을 보인다. */
   dp: number;
@@ -36,17 +54,23 @@ export type PreviewMover = {
 export type PreviewSector = { sector: string; movers: PreviewMover[] };
 
 export type PreviewData = {
+  /** ⭐ 간밤 S&P500(SPY) 등락률(%). 히어로가 이 값으로 과거 같은 구간의 코스피 성적을 고른다. */
+  spx: number | null;
   /** 국내 거래일(KST). ⚠️ 간밤 미장은 그 전날 세션이라 미국 날짜와 하루 어긋난다. */
   date: string | null;
+  /** ⭐ 파이프라인이 이 줄들을 쓴 시각(ISO). 히어로 '최종 업데이트' 가 이 값을 쓴다.
+   *  수집기가 그날 줄을 통째로 갈아 끼우므로 `created_at` 이 곧 마지막 실행 시각이다. */
+  updatedAt: string | null;
   sectors: PreviewSector[];
   moverCount: number;
   pairCount: number;
 };
 
-const EMPTY: PreviewData = { date: null, sectors: [], moverCount: 0, pairCount: 0 };
+const EMPTY: PreviewData = { date: null, updatedAt: null, spx: null, sectors: [], moverCount: 0, pairCount: 0 };
 
 type Row = {
   date: string;
+  created_at: string;
   ticker: string;
   us_name: string;
   sector: string;
@@ -55,8 +79,15 @@ type Row = {
   stock_code: string;
   stock_name: string;
   why: string;
+  kind: string | null;
   gap: number;
   events: number;
+  wins: number | null;
+  base: number | null;
+  kr_open: number | null;
+  kospi_open: number | null;
+  spx_dp: number | null;
+  kr_intra: number | null;
 };
 
 export async function getPreview(): Promise<PreviewData> {
@@ -77,7 +108,7 @@ export async function getPreview(): Promise<PreviewData> {
   const date = latest.data[0].date as string;
   const { data, error } = await db
     .from("kr_preview_daily")
-    .select("date,ticker,us_name,sector,us_dp,us_z,stock_code,stock_name,why,gap,events")
+    .select("date,created_at,ticker,us_name,sector,us_dp,us_z,stock_code,stock_name,why,kind,gap,events,wins,base,kr_open,kospi_open,spx_dp,kr_intra")
     .eq("date", date);
   if (error || !data?.length) return EMPTY;
 
@@ -95,7 +126,7 @@ export async function getPreview(): Promise<PreviewData> {
   for (const r of rows) {
     let m = byTicker.get(r.ticker);
     if (!m) {
-      m = { ticker: r.ticker, usName: r.us_name, dp: Number(r.us_dp), z: Number(r.us_z), links: [] };
+      m = { ticker: r.ticker, sector: r.sector, usName: r.us_name, dp: Number(r.us_dp), z: Number(r.us_z), links: [] };
       byTicker.set(r.ticker, m);
     }
     m.links.push({
@@ -103,8 +134,14 @@ export async function getPreview(): Promise<PreviewData> {
       code: r.stock_code,
       market: mk.get(r.stock_code) ?? null,
       why: r.why,
+      kind: r.kind ?? null,
       gap: Number(r.gap),
       events: r.events,
+      wins: r.wins == null ? null : Number(r.wins),
+      base: r.base == null ? null : Number(r.base),
+      krOpen: r.kr_open == null ? null : Number(r.kr_open),
+      kospiOpen: r.kospi_open == null ? null : Number(r.kospi_open),
+      krIntra: r.kr_intra == null ? null : Number(r.kr_intra),
     });
   }
   // 한 종목 안에서는 과거 초과갭이 큰 쪽이 위다.
@@ -129,6 +166,10 @@ export async function getPreview(): Promise<PreviewData> {
 
   return {
     date,
+    spx: rows[0]?.spx_dp == null ? null : Number(rows[0].spx_dp),
+    // 줄마다 같은 값이지만 혹시 섞였다면 **가장 늦은 것**을 쓴다 — 화면이 "이 시각 기준"
+    // 이라고 말하는데 그보다 뒤에 쓰인 줄이 있으면 거짓이 된다.
+    updatedAt: rows.reduce<string | null>((a, r) => (!a || r.created_at > a ? r.created_at : a), null),
     sectors,
     moverCount: byTicker.size,
     pairCount: rows.length,

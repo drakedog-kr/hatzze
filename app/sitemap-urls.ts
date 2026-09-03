@@ -27,6 +27,9 @@ export const SITEMAP_ENTRIES: SitemapEntry[] = [
   { path: "/seohak", changeFrequency: "daily", priority: 0.7 },
   // 내부자 리포트는 2026-08-26 에 열렸는데 이 줄이 없어 색인이 0건이었다.
   { path: "/insider", changeFrequency: "daily", priority: 0.7 },
+  // 국장 미리보기(2026-09-04 오픈). 07~09시에만 쓸모가 있는 화면이지만 내용은 매일
+  // 새로 쌓이므로 daily 다.
+  { path: "/preview", changeFrequency: "daily", priority: 0.7 },
   // 카드 여덟 장의 '전체보기'. 화면 안에서만 링크가 걸려 있어 크롤러가 닿기 어렵다 —
   // 목록이 매일 바뀌는 실제 콘텐츠라 사이트맵에 직접 올린다.
   // (종목·투자자 상세는 수가 많고 DB 를 읽어야 해서 아직 없다. 종목별 실주소 작업에서 다룬다.)
