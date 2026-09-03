@@ -190,6 +190,33 @@ function CellHead({ title, note }: { title: string; note?: string }) {
 const PCT = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(2)}%`;
 
 /**
+ * 살아 있는 값의 '시점' 표기 — "9/4 오전 2:40".
+ *
+ * ⚠️⚠️ **날짜를 ISO 문자열에서 잘라 쓰지 말 것.** `capturedAt` 은 UTC 라 한국 새벽에는
+ * 하루 전 날짜가 나온다(02:40 KST = 전날 17:40Z). 이 카드가 제일 많이 읽히는 시간대가
+ * 바로 그 새벽이라 그 실수는 매일 밤 틀린다.
+ *
+ * ⚠️ 시·분과 **같은 포매터**에서 뽑는다. 날짜와 시각을 따로 만들면 자정 언저리에서 둘이
+ * 다른 날을 가리킬 수 있다(00:00 KST 는 전날 15:00Z 다).
+ *
+ * ⚠️ ko-KR 의 기본 `format()` 은 "9. 4. 오전 2:40" 처럼 점을 찍는다. 슬래시로 적으려고
+ * 조각을 직접 잇는다 — 다른 화면의 짧은 날짜(shortDate)와 같은 모양이다.
+ */
+const STAMP_FMT = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  month: "numeric",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+});
+function kstStamp(iso: string): string {
+  const parts = STAMP_FMT.formatToParts(new Date(iso));
+  const get = (t: Intl.DateTimeFormatPartTypes) => parts.find((x) => x.type === t)?.value ?? "";
+  return `${get("month")}/${get("day")} ${get("dayPeriod")} ${get("hour")}:${get("minute")}`;
+}
+
+/**
  * 국내 장이 닫힌 동안 밖에서 붙은 값. 종목 하나가 타일 하나다.
  *
  * ⚠️⚠️ **"오를 것" 으로 쓰지 말 것.** 이 값은 실측으로 그날 개장 갭과 상관 0.94~0.97 에
@@ -763,9 +790,11 @@ export default async function PreviewPage() {
       )}
       {overnight.rows.length > 0 && (
         <section className="hz-sheet">
-          {/* ⭐ '시점' 알약은 살아 있는 값일 때 **분까지** 적는다. 10분마다 새로 받으므로
-              "오후 8시" 로 뭉개면 방금 값인지 두 시간 전 값인지 구별이 안 된다. 담아 둔 값으로
-              물러선 날에는 집안 어법(formatKstUpdate)을 쓴다 — 그때는 아침 실행 시각이다.
+          {/* ⭐ '시점' 알약은 살아 있는 값일 때 **날짜와 분까지** 적는다("9/4 오전 2:40 시점").
+              10분마다 새로 받으므로 "오후 8시" 로 뭉개면 방금 값인지 두 시간 전 값인지 구별이
+              안 되고, 날짜가 없으면 새벽에 어제 것인지 오늘 것인지가 안 갈린다.
+              담아 둔 값으로 물러선 날에는 집안 어법(formatKstUpdate)을 쓴다 — 그쪽은 이미
+              연·월·일과 요일을 다 적는다(그때는 아침 실행 시각이다).
 
               ⭐ 환율은 **부제에 한 번만** 적는다(2026-09-03). 카드마다 되풀이하면 종목 셋에
               같은 숫자가 세 번 나오는데, 환율은 그날 하나뿐이라 카드의 값이 아니라 이 시트
@@ -779,9 +808,7 @@ export default async function PreviewPage() {
             note={
               overnight.capturedAt
                 ? overnight.live
-                  ? `${new Intl.DateTimeFormat("ko-KR", {
-                      timeZone: "Asia/Seoul", hour: "numeric", minute: "2-digit", hour12: true,
-                    }).format(new Date(overnight.capturedAt))} 시점`
+                  ? `${kstStamp(overnight.capturedAt)} 시점`
                   : `${formatKstUpdate(overnight.capturedAt).replace(" 기준", "")} 시점`
                 : undefined
             }
