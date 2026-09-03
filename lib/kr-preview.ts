@@ -93,26 +93,55 @@ type Row = {
 export async function getPreview(): Promise<PreviewData> {
   const db = getSupabaseServer();
 
-  // 가장 최근 날짜를 먼저 찾고 그 하루만 읽는다. 날짜를 오늘로 못박으면 파이프라인이
-  // 아직 안 돈 새벽에 화면이 통째로 빈다 — 어제 것이라도 있는 편이 낫고, 화면은 날짜를
-  // 함께 내므로 낡은 걸 낡았다고 말할 수 있다.
-  const latest = await db
-    .from("kr_preview_daily")
-    .select("date")
+  /**
+   * ⭐⭐ **날짜는 `kr_preview_day`(하루 한 줄)에서 고른다.** 종목 표에서 고르면 안 된다.
+   *
+   * 종목 표는 종목 줄만 담아서, 밤사이 크게 움직인 곳이 하나도 없는 날에는 그날 줄이 한
+   * 개도 안 생긴다. 거기서 "가장 최근 날짜" 를 고르면 **어제**가 잡혀 어제 종목이 그대로
+   * 그려지고 히어로의 S&P 숫자까지 어제 것이 된다. 그런 날을 위해 써 둔 문구
+   * ("…조용한 밤이었습니다")도 화면이 보는 줄이 어제 것이라 영영 안 뜬다.
+   *
+   * ⚠️ 날짜만으로는 못 가른다. 아침 실행(07:01) 전에 어제 것을 보여 주는 건 **의도한
+   *    동작**이라, "아직 안 돌았다" 와 "돌았는데 없었다" 가 오늘 날짜인지로는 구별되지
+   *    않는다. 돌았다는 **기록**이 있어야 갈린다(마이그레이션 063).
+   *
+   * ⚠️ 그 표가 아직 없으면(마이그레이션 전) 예전처럼 종목 표에서 고른다. 그때는 조용한
+   *    날 문제가 그대로지만 화면이 죽지는 않는다.
+   */
+  const day = await db
+    .from("kr_preview_day")
+    .select("date,spx_dp,created_at")
     .order("date", { ascending: false })
     .limit(1);
-  // 표가 아직 없거나(마이그레이션 전) 비어 있으면 빈 화면으로 둔다. 던지지 않는다 —
-  // 이 화면 하나 때문에 셸까지 무너뜨릴 이유가 없다.
-  if (latest.error || !latest.data?.length) return EMPTY;
+  const dayRow = (day.data?.[0] ?? null) as { date: string; spx_dp: number | null; created_at: string } | null;
 
-  const date = latest.data[0].date as string;
+  let date: string;
+  if (dayRow) {
+    date = dayRow.date;
+  } else {
+    // 가장 최근 날짜를 먼저 찾고 그 하루만 읽는다. 날짜를 오늘로 못박으면 파이프라인이
+    // 아직 안 돈 새벽에 화면이 통째로 빈다 — 어제 것이라도 있는 편이 낫고, 화면은 날짜를
+    // 함께 내므로 낡은 걸 낡았다고 말할 수 있다.
+    const latest = await db
+      .from("kr_preview_daily")
+      .select("date")
+      .order("date", { ascending: false })
+      .limit(1);
+    // 표가 아직 없거나(마이그레이션 전) 비어 있으면 빈 화면으로 둔다. 던지지 않는다 —
+    // 이 화면 하나 때문에 셸까지 무너뜨릴 이유가 없다.
+    if (latest.error || !latest.data?.length) return EMPTY;
+    date = latest.data[0].date as string;
+  }
+
   const { data, error } = await db
     .from("kr_preview_daily")
     .select("date,created_at,ticker,us_name,sector,us_dp,us_z,stock_code,stock_name,why,kind,gap,events,wins,base,kr_open,kospi_open,spx_dp,kr_intra")
     .eq("date", date);
-  if (error || !data?.length) return EMPTY;
-
-  const rows = data as Row[];
+  // ⚠️ **줄이 0개인 것은 고장이 아니다** — 조용한 밤이다. 그날치 한 줄이 있으면 날짜와
+  //    지수를 그 줄에서 꺼내 "오늘은 조용했다" 를 말할 수 있다. 그 줄조차 없을 때만 빈다.
+  if (error) return EMPTY;
+  const rows = (data ?? []) as Row[];
+  if (!rows.length && !dayRow) return EMPTY;
 
   // 시장(KOSPI/KOSDAQ)은 이 표에 없다. 로고가 접미사(.KS/.KQ)를 붙이는 데 쓰므로 따로 받는다.
   const codes = [...new Set(rows.map((r) => r.stock_code))];
@@ -166,10 +195,14 @@ export async function getPreview(): Promise<PreviewData> {
 
   return {
     date,
-    spx: rows[0]?.spx_dp == null ? null : Number(rows[0].spx_dp),
+    // ⭐ 그날치 한 줄이 먼저다. 종목이 0개인 날에는 그 줄에만 지수가 있다.
+    spx: dayRow?.spx_dp != null ? Number(dayRow.spx_dp) : rows[0]?.spx_dp == null ? null : Number(rows[0].spx_dp),
     // 줄마다 같은 값이지만 혹시 섞였다면 **가장 늦은 것**을 쓴다 — 화면이 "이 시각 기준"
     // 이라고 말하는데 그보다 뒤에 쓰인 줄이 있으면 거짓이 된다.
-    updatedAt: rows.reduce<string | null>((a, r) => (!a || r.created_at > a ? r.created_at : a), null),
+    updatedAt:
+      rows.reduce<string | null>((a, r) => (!a || r.created_at > a ? r.created_at : a), null) ??
+      dayRow?.created_at ??
+      null,
     sectors,
     moverCount: byTicker.size,
     pairCount: rows.length,

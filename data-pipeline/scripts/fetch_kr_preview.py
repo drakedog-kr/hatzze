@@ -397,6 +397,25 @@ def main() -> None:
         db.table("kr_preview_daily").upsert(kept, on_conflict="date,ticker,stock_code").execute()
     print(f"[저장] {today} · {len(kept)}줄")
 
+    # ⭐⭐ **그날치 한 줄은 종목이 0개여도 반드시 쓴다**(마이그레이션 063).
+    #
+    # 위 표는 종목 줄만 담아서, 조용한 밤에는 그날 줄이 한 개도 안 생긴다. 그러면 화면이
+    # "가장 최근 날짜" 를 찾다가 **어제**를 집어 어제 종목을 그대로 그린다 — 히어로의 S&P
+    # 숫자까지 어제 것이 된다. 그런 날을 위해 써 둔 문구("…조용한 밤이었습니다")도 화면이
+    # 보는 줄이 어제 것이라 영영 안 뜬다.
+    #
+    # ⚠️ 날짜만으로는 못 가른다. 아침 실행 전에 어제 것을 보여 주는 건 의도한 동작이라
+    #    "아직 안 돌았다" 와 "돌았는데 없었다" 가 구별되지 않는다. **돌았다는 기록**이
+    #    남아야 갈린다. 이 줄이 그 기록이다.
+    day_row = {"date": today.isoformat(), "spx_dp": round(shown, 2), "movers": len({r["ticker"] for r in kept})}
+    try:
+        db.table("kr_preview_day").upsert(day_row, on_conflict="date").execute()
+        print(f"[저장] 그날치 한 줄 · S&P {shown:+.2f}% · 미국 {day_row['movers']}종목")
+    except Exception as e:  # noqa: BLE001
+        # 마이그레이션 063 전에는 표가 없다. 그때는 종목 줄이 예전처럼 지수를 들고 있고
+        # 화면도 거기서 꺼내므로, 이것 때문에 스텝을 실패로 떨어뜨리지 않는다.
+        print(f"[경고] kr_preview_day 저장 실패: {e} (마이그레이션 063 을 아직 안 돌렸다면 정상)")
+
 
 if __name__ == "__main__":
     main()
