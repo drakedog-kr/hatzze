@@ -572,7 +572,14 @@ export default async function PreviewPage() {
           <CellHead title="밤사이 가장 크게 움직인 곳" />
           <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
             {loudest.length === 0 ? (
-              <span style={{ fontSize: 12.5, color: C.sub, lineHeight: 1.7 }}>아직 채울 자료가 없습니다.</span>
+              /* ⚠️⚠️ **조용한 밤과 자료 없음을 가른다.** 예전엔 둘 다 "아직 채울 자료가
+                 없습니다" 였는데, 그 말은 고장으로 읽혀서 같은 판의 브리핑이 하는 말
+                 ("고장이 아니라 조용한 밤이었습니다")과 정면으로 부딪쳤다(2026-09-04).
+                 `date` 가 있으면 파이프라인이 **돌았고** 걸린 종목이 없었다는 뜻이다
+                 (마이그레이션 063 의 그날치 한 줄이 그 사실을 남긴다). */
+              <span style={{ fontSize: 12.5, color: C.sub, lineHeight: 1.7 }}>
+                {date ? "평소 폭을 크게 넘어선 곳이 없었습니다" : "아직 채울 자료가 없습니다."}
+              </span>
             ) : (
               loudest.map((m) => (
                 <div key={m.ticker} style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
@@ -599,10 +606,18 @@ export default async function PreviewPage() {
           {/* ⚠️ 12px 이다. 시장 브리핑의 히어로 바닥 줄이 12 이고 '최종 업데이트' 만 11.5 다
               (2026-09-03 실측). 여기만 11.5 로 두면 같은 자리 같은 역할의 글자가 화면마다
               다른 크기가 된다. */}
+          {/* ⚠️ 조용한 밤에는 문구를 바꾼다. 줄 세울 종목이 없는데 "…견준 순서" 라고 적으면
+              없는 목록의 순서를 설명하는 꼴이다(2026-09-04). 대신 **무엇을 크게 움직였다고
+              보는지**를 적어 위 한 줄을 받쳐 준다.
+              ⛔ 이 바닥 줄을 통째로 숨기지 말 것. 옆 칸(①)이 flex-end 로 바닥까지 차 있어서
+                 이 칸만 바닥이 비면 판이 어긋나 보인다 — 이 칸이 비어 보이던 옛 문제가
+                 정확히 바닥 줄이 없어서였다(위 ② 칸 머리 주석). */}
           <span style={{ marginTop: "auto", paddingTop: 10, borderTop: "1px solid var(--c-sheet-row)",
                          fontSize: 12, color: C.sub, lineHeight: 1.6, whiteSpace: "nowrap",
                          overflow: "hidden", textOverflow: "ellipsis" }}>
-            그 종목이 평소 하루에 움직이던 폭과 견준 순서
+            {loudest.length === 0
+              ? "평소 하루 폭을 넘어선 곳이 기준입니다"
+              : "그 종목이 평소 하루에 움직이던 폭과 견준 순서"}
           </span>
         </div>
 
@@ -614,7 +629,7 @@ export default async function PreviewPage() {
           {moverCount === 0 ? (
             <p style={{ margin: 0, fontSize: 13, color: C.sub, lineHeight: 1.75, wordBreak: "keep-all" }}>
               밤사이 크게 움직인 종목이 없습니다. 눈여겨보는 미국 종목 가운데 평소 폭을 크게 넘어선 곳이 없었다는
-              뜻이고, 고장이 아니라 조용한 밤이었습니다. 한 해에 여드레쯤 이런 날이 옵니다.
+              뜻이고, 고장이 아니라 조용한 밤이었습니다. 한 해에 두세 번 있는 밤입니다.
             </p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -756,7 +771,7 @@ export default async function PreviewPage() {
         />
         {wall.length === 0 ? (
           <p style={{ margin: 0, padding: "20px 22px", fontSize: 13, lineHeight: 1.75, color: C.sub, wordBreak: "keep-all" }}>
-            밤사이 크게 움직인 종목이 없어 이어 붙일 자리도 없습니다. 한 해에 여드레쯤 이런 날이 옵니다.
+            밤사이 크게 움직인 종목이 없어 이어 붙일 자리도 없습니다
           </p>
         ) : (
           <>
