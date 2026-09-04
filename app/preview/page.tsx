@@ -88,7 +88,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const meta = await pageMetadata({
     title: "국장 미리보기",
     description:
-      "밤사이 미국에서 크게 움직인 종목과 사업으로 엮인 국내 종목을 개장 전에 잇습니다. 최근 5년, 그런 날 국내가 몇 %에 열려 몇 %로 닫았는지를 함께 봅니다.",
+      "밤사이 미장에서 크게 움직인 종목과 사업으로 엮인 국장 종목을 개장 전에 잇습니다. 최근 5년, 그런 날 국장이 몇 %에 열려 몇 %로 닫았는지를 함께 봅니다.",
     path: "/preview",
   });
   // 안 연 동안은 색인도 막는다. 아래에서 404 를 내므로 사실상 덤이지만, 사이드바에
@@ -523,7 +523,7 @@ export default async function PreviewPage() {
                   22px 였는데 줄과 줄 사이가 27px 이라 **머리글이 목록의 넷째 줄처럼** 보였다.
                   머리글은 목록보다 확실히 붙어 있어야 목록의 머리로 읽힌다(지금 16 대 27). */}
               <span style={{ fontSize: 11.5, color: C.sub, wordBreak: "keep-all" }}>
-                최근 5년, 미국이 이만큼 {spx != null && spx > 0 ? "오른" : "내린"} 아침에 코스피는
+                최근 5년, 미장이 이만큼 {spx != null && spx > 0 ? "오른" : "내린"} 아침에 코스피는
               </span>
               {/* ⭐ 라벨은 **개장 · 장 중 · 종가** 로 못박는다(2026-09-02 확정).
                   ⚠️ "개장 뒤" 로 쓰지 말 것 — 개장 직후 잠깐으로 읽히는데 실제로는 9시 시가에서
@@ -655,7 +655,7 @@ export default async function PreviewPage() {
               {/* ⚠️ "코스피보다 얼마나" 같은 말을 쓰지 말 것. 지수 대비 초과분은 코드 안 개념이고,
                   화면이 내는 숫자는 **그 종목이 실제로 몇 % 열렸나** 다. 문장도 그렇게 적는다. */}
               <p style={{ margin: 0, fontSize: 13, color: C.sub, lineHeight: 1.75, wordBreak: "keep-all" }}>
-                미국 종목이 평소보다 크게 움직인 날, 그 회사와 사업으로 엮인 국내 종목이 다음 날 아침 몇 %에
+                미장 종목이 평소보다 크게 움직인 날, 그 회사와 사업으로 엮인 국장 종목이 다음 날 아침 몇 %에
                 열렸는지를 최근 5년치로 세어 보여 드립니다.
               </p>
               {biggest && (
@@ -674,7 +674,7 @@ export default async function PreviewPage() {
                 <p style={{ margin: 0, fontSize: 13, color: C.sub, lineHeight: 1.75, wordBreak: "keep-all" }}>
                   {/* ⚠️ %p 를 문장에 쓰지 말 것. 지수 대비 초과분이라 읽는 사람에게 뜻이 안 선다.
                       화면 어디에서나 **그 종목이 실제로 몇 %에 열렸나** 로 적는다. */}
-                  국내에서 가장 크게 따라갔던 곳은{" "}
+                  국장에서 가장 크게 따라갔던 곳은{" "}
                   <strong style={{ color: C.ink, fontWeight: 700 }}>{strongest.l.stock}</strong>
                   {/* ⚠️ 관계 이름과 조사를 두 칸으로 나누지 말 것. 줄바꿈을 사이에 두면
                       JSX 가 공백을 지워 붙긴 하지만, 읽는 사람이 붙는지 뜨는지 알 수 없다.
@@ -691,7 +691,7 @@ export default async function PreviewPage() {
               {crowded && crowded[1] > 1 && (
                 <p style={{ margin: 0, fontSize: 13, color: C.sub, lineHeight: 1.75, wordBreak: "keep-all" }}>
                   <strong style={{ color: C.ink, fontWeight: 700 }}>{crowded[0]}</strong>
-                  {josa(crowded[0], "은", "는")} 밤사이 크게 움직인 미국 종목 {crowded[1]}곳과 한꺼번에 엮입니다.
+                  {josa(crowded[0], "은", "는")} 밤사이 크게 움직인 미장 종목 {crowded[1]}곳과 한꺼번에 엮입니다.
                 </p>
               )}
             </div>
@@ -781,8 +781,8 @@ export default async function PreviewPage() {
           level={2}
           icon="call_split"
           title="그런 아침 국장에서는"
-          note={moverCount ? `미국 ${moverCount}종목 · 국내 ${stockCount}종목` : undefined}
-          desc="밤사이 미국에서 크게 움직인 종목과 그 종목에 사업으로 엮인 국내 종목입니다"
+          note={moverCount ? `미장 ${moverCount}종목 · 국장 ${stockCount}종목` : undefined}
+          desc="밤사이 미장에서 크게 움직인 종목과 그 종목에 사업으로 엮인 국장 종목입니다"
         />
         {wall.length === 0 ? (
           <p style={{ margin: 0, padding: "20px 22px", fontSize: 13, lineHeight: 1.75, color: C.sub, wordBreak: "keep-all" }}>
