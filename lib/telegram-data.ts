@@ -2102,6 +2102,29 @@ async function computeIssueKeywords(limit: number): Promise<IssueKeyword[]> {
  * (build_stock_digests 도 `latest - 1일`에서 끝난다), 날짜를 안 보고 최신 행을 집으면
  * 막대는 기준일까지 그리는데 글은 그 하루 전까지를 말하게 된다.
  */
+/**
+ * 급부상 카드의 **한 줄** 요약(LLM) — 종목코드로 찾아 쓴다.
+ *
+ * 주요 종목 리포트가 쓰는 `getStockNarratives`(75~80자)와 **다른 글**이다. 급부상 카드는
+ * 3열 격자라 한 줄이 26자뿐이라, 저쪽 문장을 그대로 넣으면 세 줄이 된다.
+ * 만드는 곳: data-pipeline/scripts/generate_surging_oneliners.py.
+ *
+ * 날짜를 맞추는 이유는 저쪽과 같다 — 카드 막대는 기준일까지 그리는데 문장만 옛 날짜 것을
+ * 집으면 한 카드가 서로 다른 기간을 말한다.
+ */
+export async function getSurgingOneliners(): Promise<MaybeFailed<Record<string, string>>> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db
+    .from("telegram_surging_oneliner")
+    .select("stock_code,oneliner")
+    .eq("date", await kaderaBaseDate());
+  if (error) {
+    console.error("[getSurgingOneliners] 급부상 한 줄 요약을 못 읽었습니다", error);
+    return LOAD_FAILED;
+  }
+  return Object.fromEntries((data ?? []).map((r) => [r.stock_code as string, r.oneliner as string]));
+}
+
 export async function getStockNarratives(): Promise<MaybeFailed<Record<string, string>>> {
   const db = getSupabaseAdmin();
   const { data, error } = await db

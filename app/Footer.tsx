@@ -69,7 +69,9 @@ function FooterLink({ href, children }: { href: string; children: React.ReactNod
   return (
     <Link
       href={href}
-      style={{ display: "block", fontSize: 13, fontWeight: 600, color: C.sub, textDecoration: "none", padding: "4px 0" }}
+      className="hz-footer-link"
+      // 색·호버는 globals.css 의 .hz-footer-link — 인라인 color 는 :hover 를 이긴다.
+      style={{ display: "block", fontSize: 13, fontWeight: 500, padding: "5px 0" }}
     >
       {children}
     </Link>
@@ -87,7 +89,8 @@ function FooterExternalLink({ href, cta, aria, children }: { href: string; cta: 
       data-ga="cta_click"
       data-ga-cta={cta}
       data-ga-surface="footer"
-      style={{ display: "block", fontSize: 13, fontWeight: 600, color: C.sub, textDecoration: "none", padding: "4px 0" }}
+      className="hz-footer-link"
+      style={{ display: "block", fontSize: 13, fontWeight: 500, padding: "5px 0" }}
     >
       {children}
     </a>
@@ -96,7 +99,9 @@ function FooterExternalLink({ href, cta, aria, children }: { href: string; cta: 
 
 function GroupLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ fontSize: 11, fontWeight: 700, color: C.ink, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 10 }}>
+    /* 2026-09-04 리디자인: 자간 벌린 11px 캡스 → 12.5px 굵은 제목. 한글이라 uppercase 는
+       아무 일도 안 했고, 자간 .09em 은 작은 글자를 더 흐리게만 했다. */
+    <div style={{ fontSize: 12.5, fontWeight: 700, color: C.ink, letterSpacing: "-.01em", marginBottom: 12 }}>
       {children}
     </div>
   );
@@ -105,8 +110,10 @@ function GroupLabel({ children }: { children: React.ReactNode }) {
 export default function Footer() {
   const year = new Date().getFullYear();
   return (
-    <footer style={{ marginTop: 56, borderTop: `1px solid ${C.line}`, paddingTop: 36 }}>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "40px 64px", justifyContent: "space-between" }}>
+    /* 2026-09-04 리디자인: 위 여백 64 · 윗선 아래 40. 토스 푸터의 어법은 '조용한 회색 글 +
+       넉넉한 여백'이라 크기·색은 그대로 두고 간격과 굵기만 손봤다. */
+    <footer style={{ marginTop: 64, borderTop: `1px solid var(--c-divider-strong)`, paddingTop: 40 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "40px 72px", justifyContent: "space-between" }}>
         {/* 브랜드 + 키워드 소개글 */}
         {/* 폭은 **재서 정한 값**이다(1280px 데스크톱 기준, 아래 소개문이 세 줄로 앉는 폭).
             380 일 때 네 줄이었는데 마지막 줄이 "합니다." 두 마디만 남아 허전했다.
@@ -158,7 +165,7 @@ export default function Footer() {
               실제로 "코스피"가 코스/피 로, "개에서"가 개/에서 로 갈려 있었다. 폭만 넓혀서는
               못 고친다 — 폭을 바꾸면 끊기는 낱말만 바뀐다. 레포의 다른 한글 문단들과 같은
               처방이다(app/globals.css 의 .hz-news-text, app/page.tsx 의 지표 카드 제목·설명). */}
-          <p style={{ margin: "14px 0 0", fontSize: 13, lineHeight: 1.75, color: C.sub, wordBreak: "keep-all" }}>
+          <p style={{ margin: "16px 0 0", fontSize: 13, lineHeight: 1.8, color: C.sub, wordBreak: "keep-all" }}>
             {/* ⚠️ 소개문은 **화면 다섯 개 전부**를 담아야 한다. 예전 문장은 "코스피 시장의
                 과열도를 … 25개 지표를 한눈에"라 시장 브리핑 하나만 말했고, 그동안 카더라가
                 국장·미장 둘로 갈리고 MDD·서학개미·내부자가 붙어 다섯 중 하나만 설명하는
@@ -174,7 +181,7 @@ export default function Footer() {
           </p>
           {/* 문의는 소개글과 한 줄 띄워 따로 앉힌다 — 소개 문장에 이어 붙이면 25개 지표
               얘기의 꼬리처럼 읽혀서, 연락처라는 게 눈에 안 들어온다. */}
-          <p style={{ margin: "1em 0 0", fontSize: 13, lineHeight: 1.75, color: C.sub }}>
+          <p style={{ margin: "1em 0 0", fontSize: 13, lineHeight: 1.8, color: C.sub }}>
             {/* "문의:" 와 주소가 줄바꿈으로 갈라지면 라벨만 앞줄 끝에 남아 떠 보인다 — 한 덩어리로 묶는다. */}
             <span style={{ whiteSpace: "nowrap" }}>
               <b style={{ color: C.ink }}>문의</b>: <a href={`mailto:${CONTACT_EMAIL}`} style={{ color: C.sub, textDecoration: "none" }}>{CONTACT_EMAIL}</a>
@@ -183,7 +190,7 @@ export default function Footer() {
         </div>
 
         {/* 우측 그룹: 내부 링크 + 데이터 출처 */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "28px 48px" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "28px 56px" }}>
           <nav aria-label="바로가기">
             <GroupLabel>바로가기</GroupLabel>
             <FooterLink href="/">시장 브리핑</FooterLink>
@@ -224,8 +231,8 @@ export default function Footer() {
             <div className="hz-foot-sources">
               {SOURCE_GROUPS.map((g) => (
                 <div key={g.label}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: C.ink, marginBottom: 3 }}>{g.label}</div>
-                  <div style={{ fontSize: 12, lineHeight: 1.55, color: C.sub }}>{g.items}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: C.label, marginBottom: 3 }}>{g.label}</div>
+                  <div style={{ fontSize: 12, lineHeight: 1.65, color: C.sub }}>{g.items}</div>
                 </div>
               ))}
             </div>
@@ -234,9 +241,13 @@ export default function Footer() {
       </div>
 
       {/* 하단 바: 면책 + 저작권 */}
+      {/* 윗선 하나로 본문과 갈라 둔다 — 토스 푸터의 맨 아랫줄(회사 정보·저작권)이 그 꼴이다.
+          면책 문장은 법률 고지라 글자를 키우지 않고(12) 색만 유지한다. */}
       <div
         style={{
-          marginTop: 28,
+          marginTop: 36,
+          paddingTop: 18,
+          borderTop: "1px solid var(--c-divider)",
           display: "flex",
           flexWrap: "wrap",
           gap: "8px 20px",
@@ -244,7 +255,7 @@ export default function Footer() {
           alignItems: "center",
         }}
       >
-        <p style={{ margin: 0, fontSize: 11, color: "var(--c-muted)" }}>
+        <p style={{ margin: 0, fontSize: 12, lineHeight: 1.6, color: "var(--c-muted)" }}>
           이 서비스는 재미와 참고를 위한 정보 제공 목적이며, 투자 조언이나 매수·매도 추천이 아닙니다. 모든 투자 판단과 책임은 이용자 본인에게 있습니다.
         </p>
         {/* 이용약관·개인정보처리방침은 법정 고지라 '바로가기'(서비스 메뉴)가 아니라 저작권
@@ -252,13 +263,13 @@ export default function Footer() {
             순서는 이용약관이 먼저다 — 서비스 전반을 정하는 쪽이 앞이고, 처리방침은 그중
             개인정보 한 갈래를 따로 떼어 놓은 문서다(약관 10항이 그쪽을 가리킨다). */}
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-          <Link href="/terms" style={{ fontSize: 11, fontWeight: 600, color: C.sub, textDecoration: "none" }}>
+          <Link href="/terms" className="hz-footer-link" style={{ fontSize: 12, fontWeight: 600 }}>
             이용약관
           </Link>
-          <Link href="/privacy" style={{ fontSize: 11, fontWeight: 600, color: C.sub, textDecoration: "none" }}>
+          <Link href="/privacy" className="hz-footer-link" style={{ fontSize: 12, fontWeight: 600 }}>
             개인정보처리방침
           </Link>
-          <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: "var(--c-muted)" }}>Copyright © {year} hatzze.</p>
+          <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--c-muted)" }}>Copyright © {year} hatzze.</p>
         </div>
       </div>
     </footer>

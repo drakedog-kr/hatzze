@@ -199,7 +199,7 @@ function Group({ head, rows }: { head?: string; rows: (RowSpec | null | undefine
     <div style={{ display: "flex", flexDirection: "column", gap: S.sm }}>
       {head && <span style={{ fontSize: T.body, color: C.sub2, fontWeight: 600 }}>{head}</span>}
       <ul style={{ listStyle: "none", margin: 0, padding: "8px 0 0", display: "flex",
-                   flexDirection: "column", gap: S.xs, borderTop: `1px solid ${C.line}` }}>
+                   flexDirection: "column", gap: S.xs, borderTop: `1px solid ${C.hairline}` }}>
         {rows.filter(Boolean).map((r) => (
           <li key={(r as RowSpec).k}>
             <Row {...(r as RowSpec)} />
@@ -663,7 +663,7 @@ export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
                     <ul className="hz-win-list"
                         style={{ listStyle: "none", margin: 0, padding: "10px 0 0",
                                  display: "flex", flexDirection: "column", gap: S.sm,
-                                 borderTop: `1px solid ${C.line}` }}>
+                                 borderTop: `1px solid ${C.hairline}` }}>
                       {CALENDAR_WINDOWS.map((w) => (
                         <li key={w.key}>
                           <WindowRow w={w} onJump={() => jumpToWindow(w.key)} />

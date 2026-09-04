@@ -61,18 +61,23 @@ function HalfSheet({ h }: { h: number }) {
   );
 }
 
-/** 구간 제목(GroupTitle) 자리. */
+/** 구간 제목(SectionIntro) 자리 — 장 번호 + 제목 한 줄, 높이 26(20 × 1.3).
+    ⚠️ **실물의 눈금이 바뀌면 여기도 같이 고친다.** 부제 줄이 자리표시자에만 남아 있어서
+    로딩이 끝나는 순간 아래가 18px 튄 적이 있다. 자리표시자는 실물과 같은 골격이어야 한다. */
 function Cap() {
   return (
-    <div style={{ marginTop: 10 }}>
-      <Block h={13} w={120} r={5} />
+    <div className="hz-tx-intro">
+      <div style={{ display: "flex", alignItems: "center", gap: 8, height: 26 }}>
+        <Block h={12} w={16} r={4} />
+        <Block h={20} w={168} r={6} />
+      </div>
     </div>
   );
 }
 
 export default function Loading() {
   return (
-    <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 16 }} aria-hidden>
+    <div className="hz-tx" style={{ position: "relative" }} aria-hidden>
       {/* 머리 — 모니터링 현황 · 오늘의 업데이트 · 오늘의 요점(넓은 칸). */}
       <section className="hz-sheet">
         <div className="hz-kd-hero">

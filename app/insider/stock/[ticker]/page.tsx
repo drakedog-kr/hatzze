@@ -250,12 +250,16 @@ export default async function StockDetailPage({
   const trimmed = d.holders.filter((h) => h.move === "trim").length;
   const quarterMoves = added + trimmed > 0 ? `이번 분기 늘림 ${added} · 줄임 ${trimmed}곳` : "이번 분기 변화 없음";
 
+  // 장 번호는 **위에서부터 센다.** 첫 장(밖에서 보는 눈)은 애널리스트 커버리지가 없으면
+  // 아예 안 그려지므로, 고정 숫자를 박으면 그런 종목에서 01 이 비고 02 부터 시작한다.
+  // 앞 장이 몇 개 섰는지로 뒤 번호를 밀어 준다.
+  const ch1 = d.consensus ? 1 : 0;
 
   return (
     // ⭐ 내부자 리포트는 **달러가 기본**이다 — 재료가 전부 미국 공시라 달러가 원본이고,
     // 원화는 크기를 가늠하라고 얹은 것이다. 쿠키로 한 번이라도 고르면 그 선택이 이긴다
     // (규칙은 globals.css 의 `[data-cur-default]`).
-    <div data-cur-default="usd" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div className="hz-tx" data-cur-default="usd">
       <Link
         href="/insider"
         style={{
@@ -530,7 +534,7 @@ export default async function StockDetailPage({
         </section>
       )}
 
-      {d.consensus && <GroupTitle>밖에서 보는 눈</GroupTitle>}
+      {d.consensus && <GroupTitle n={1}>밖에서 보는 눈</GroupTitle>}
 
       {/* ── 월가 애널리스트의 시선 ────────────────────────────────────
           ⭐ 공시 셋(임원·거물·의원)이 "이미 무엇을 했나"라면 이건 **"밖에서는 이 회사를
@@ -551,7 +555,7 @@ export default async function StockDetailPage({
         </section>
       )}
 
-      <GroupTitle>월가 거물이 든 것</GroupTitle>
+      <GroupTitle n={ch1 + 1}>월가 거물이 든 것</GroupTitle>
 
       {/* ── 거물 보유 ────────────────────────────────────────────────── */}
       <section className="hz-sheet">
@@ -580,7 +584,7 @@ export default async function StockDetailPage({
 
       {/* ⭐ 메인 화면의 같은 구간과 **같은 문구**다. 두 화면이 같은 자료를 보는 것이라
           이름이 갈리면 다른 묶음으로 읽힌다. */}
-      <GroupTitle>임원과 의원의 신고</GroupTitle>
+      <GroupTitle n={ch1 + 2}>임원과 의원의 신고</GroupTitle>
 
       {/* ── 임원 신고: 산 것과 내놓은 것 ─────────────────────────────
           ⚠️⚠️ 둘로 가르면 **어느 쪽도 아닌 신고가 생긴다** — 옵션 행사(M)·무상 취득(A)·

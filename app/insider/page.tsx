@@ -235,7 +235,7 @@ export default async function InsiderPage() {
       // ⚠️ 라벨은 형제 둘("임원 신고"·"의원 신고")과 길이를 맞춰야 한다. 예전엔
       //    "커뮤니티에 오른 미국 종목"(14자·118px)이라 이 줄만 두 줄로 접혔고, 그 바람에
       //    줄 높이가 달라져 오른쪽 숫자 정렬까지 어긋났다. 짧게 두고 설명은 물음표가 한다.
-      help: "그날 주식 텔레그램에서 이름이 오르내린 미국 종목 수입니다.",
+      help: "그날 주식 텔레그램에서 이름이 오르내린 미장 종목 수입니다.",
     },
   ];
 
@@ -243,7 +243,7 @@ export default async function InsiderPage() {
     // ⭐ 내부자 리포트는 **달러가 기본**이다 — 재료가 전부 미국 공시라 달러가 원본이고,
     // 원화는 크기를 가늠하라고 얹은 것이다. 쿠키로 한 번이라도 고르면 그 선택이 이긴다
     // (규칙은 globals.css 의 `[data-cur-default]`).
-    <div data-cur-default="usd" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div className="hz-tx" data-cur-default="usd">
       {/* ── 히어로 ──────────────────────────────────────────────────
           세 칸이다 — **규모 · 네 축 교집합 · 오늘 새로 들어온 것.**
 
@@ -295,7 +295,7 @@ export default async function InsiderPage() {
                     justifyContent: "space-between",
                     gap: 10,
                     padding: i === 0 ? "0 0 10px" : "10px 0",
-                    borderBottom: i === arr.length - 1 ? "none" : "1px solid var(--c-sheet-row)",
+                    borderBottom: i === arr.length - 1 ? "none" : "1px solid var(--c-hairline)",
                   }}
                 >
                   <span style={{ fontSize: 11.5, color: C.sub, fontWeight: 600, wordBreak: "keep-all", minWidth: 0 }}>
@@ -337,7 +337,7 @@ export default async function InsiderPage() {
                     justifyContent: "space-between",
                     gap: 10,
                     padding: i === 0 ? "0 0 10px" : "10px 0",
-                    borderBottom: i === updates.length - 1 ? "none" : "1px solid var(--c-sheet-row)",
+                    borderBottom: i === updates.length - 1 ? "none" : "1px solid var(--c-hairline)",
                   }}
                 >
                   <span
@@ -404,7 +404,7 @@ export default async function InsiderPage() {
                       alignItems: "center",
                       gap: 10,
                       padding: i === 0 ? "0 0 9px" : "9px 0",
-                      borderBottom: i === highlights.length - 1 ? "none" : "1px solid var(--c-sheet-row)",
+                      borderBottom: i === highlights.length - 1 ? "none" : "1px solid var(--c-hairline)",
                       textDecoration: "none",
                       minWidth: 0,
                     }}
@@ -440,7 +440,7 @@ export default async function InsiderPage() {
 
       {/* ── 짝 ①: 거물이 분기 사이에 움직인 것 ─────────────────────────
           같은 계산의 양쪽 끝이라 나란히 둔다. 왼쪽이 늘린 쪽, 오른쪽이 줄인 쪽이다. */}
-      <GroupTitle>월가 거물의 분기 변화</GroupTitle>
+      <GroupTitle n={1}>월가 거물의 분기 변화</GroupTitle>
       <Pair>
 {/* ── ① 거물이 늘린 종목 ─────────────────────────────────────── */}
       <HalfSheet>
@@ -493,7 +493,7 @@ export default async function InsiderPage() {
           ⭐ 겸사겸사 길을 낸다 — 이 카드가 생기기 전에는 거물 63명 상세로 들어가는
              입구가 **종목 상세의 보유자 표 하나뿐**이었다(종목을 먼저 골라야 사람이
              보였다). */}
-      <GroupTitle>거물 명단과 증권가 시선</GroupTitle>
+      <GroupTitle n={2}>거물 명단과 증권가 시선</GroupTitle>
       <Pair>
 {/* ── ③ 신고 합계 큰 순 ──────────────────────────────────────── */}
       <HalfSheet>
@@ -538,7 +538,7 @@ export default async function InsiderPage() {
 
       {/* ── 짝 ③: 사람이 신고한 매매 ─────────────────────────────────
           임원과 의원은 둘 다 "자기 이름으로 신고할 의무가 있는 사람"이라 나란히 둔다. */}
-      <GroupTitle>임원과 의원의 신고</GroupTitle>
+      <GroupTitle n={3}>임원과 의원의 신고</GroupTitle>
       <Pair>
 {/* ── ③ 임원이 자기 돈으로 산 것 ─────────────────────────────── */}
       <HalfSheet>
@@ -581,7 +581,7 @@ export default async function InsiderPage() {
 
       {/* ── 짝 ④: 카더라에 오른 종목의 상태 ───────────────────────────
           "얼마나 회자되나"와 "거물이 들고 있나"는 같은 종목을 두 각도에서 본다. */}
-      <GroupTitle>카더라에 오른 종목</GroupTitle>
+      <GroupTitle n={4}>카더라에 오른 종목</GroupTitle>
       <Pair>
 {/* ── ⑤ 커뮤니티에서 뜨거운 종목 ─────────────────────────────────── */}
       <HalfSheet>
@@ -590,7 +590,7 @@ export default async function InsiderPage() {
           title="커뮤니티에서 뜨거운 종목"
           note={insiderNote("hot", ov)}
           noteHelp={`언급은 하루치, 임원 신고는 최근 ${ov.windowDays}일입니다. 시점이 다릅니다.`}
-          desc="주식 텔레그램에서 가장 많이 회자된 미국 종목입니다."
+          desc="주식 텔레그램에서 가장 많이 회자된 미장 종목입니다."
         />
         {ov.rows.length === 0 ? (
           <Empty>아직 채울 자료가 없습니다.</Empty>

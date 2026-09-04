@@ -7,6 +7,7 @@ import type { DepthBucket, DrawdownCharacter, Episode, MddAnalysis, RiskProfile 
 import { gaSearchTerm, gaStockCode, track } from "@/lib/ga";
 import { C, Icon, MONO, R } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
+import { SectionIntro } from "../SectionIntro";
 import { StockLogo } from "../StockLogo";
 
 export type StockOption = {
@@ -181,7 +182,8 @@ export function MddExplorer({
   /* 세로 간격은 시트끼리의 간격(Results 의 gap 16)과 같은 값 하나로 둔다. 예전엔 여기만
      20 이라 조회 바 밑의 틈이 시트 사이보다 넓어, 조회 바가 결과에서 떨어져 보였다. */
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    // 뿌리의 hz-tx 가 이번 리디자인을 켠다(globals.css). 세로 간격도 그쪽 값(18)을 쓴다.
+    <div className="hz-tx">
       {/* 제목도 설명 문단도 여기서 안 그린다 — 셸의 본문 헤더(AppShell 의 PageHeader)가
           제목과 한 줄 부제를 이미 그린다. 예전엔 그 아래에 세 갈래 설명("얼마나 빠졌는지 ·
           얼마나 드문지 · 얼마나 걸렸는지")을 한 문단 더 뒀는데, 바로 아래 시트들이 같은
@@ -515,7 +517,9 @@ function Controls({
               padding: showSuggest ? "14px 8px 8px" : 6,
               background: "var(--c-float)",
               border: `1px solid ${C.line}`,
-              borderRadius: 14,
+              /* 14 였다. 2026-09-04 눈금 재정렬에서 카드 16 · 타일/오버레이 12 로 통일했다 —
+                 토스 실측이 카드 16 다수, 컨트롤 10~12 다. 14 는 어느 쪽도 아니었다. */
+              borderRadius: 12,
               // 카드에는 그림자를 안 쓰지만 오버레이는 예외다 — 아래 내용을 실제로 가리고
               // 떠 있어서, 경계선만으로는 "위에 있다"가 안 읽힌다(globals.css 의 팝오버와 같은 규칙).
               boxShadow: "0 4px 16px var(--c-shadow-strong)",
@@ -608,16 +612,12 @@ function Controls({
 }
 
 /* ── 결과 ─────────────────────────────────────────────────────── */
-/** 시트 묶음 앞의 구간 이름 — 배지 + 시트 수.
-    생김새도 간격도 .hz-section-badge(globals.css) — 시장 브리핑·카더라의 같은 줄과
-    한 벌이다. 이 컨테이너의 gap 이 16 이라 클래스 기본값을 그대로 쓰면 위 30 이 된다. */
-function GroupLabel({ title, count }: { title: string; count: number }) {
-  return (
-    <div className="hz-section-badge">
-      <span>{title}</span>
-      <span className="hz-section-badge-n">{count}</span>
-    </div>
-  );
+/* 구간 제목. 설명은 달지 않는다 — **하는 일은 이름 짓기가 아니라 박자 만들기**다
+   (insider 의 GroupTitle 주석과 같은 판단). 아래 시트마다 제목과 부제가 이미 있어서,
+   그 위에 또 한 줄을 얹으면 같은 말이 두 번 난다. 생김새는 공용 SectionIntro 다.
+   `n` 은 장 번호다 — 이 화면은 두 장이라 01·02 로 읽는 순서를 말해 준다. */
+function GroupLabel({ n, title }: { n: number; title: string }) {
+  return <SectionIntro n={n} title={title} />;
 }
 
 /** 50:50 두 시트가 나란히 서는 줄. 좁아지면 한 장씩 접힌다. */
@@ -644,7 +644,9 @@ function Results({ data }: { data: MddResult }) {
         />
       )}
 
-      <GroupLabel title="과거 낙폭 사례" count={2} />
+      {/* ⚠️ 부제가 바로 아래 시트("역대 낙폭 Top 5")의 부제와 **글자까지 같았다.** 구간 부제는
+          그 아래 시트들을 아우르는 말이라야 한다 — 한 시트의 말을 그대로 올리면 되풀이다. */}
+      <GroupLabel n={1} title="과거 낙폭 사례" />
       {/* 시트는 데이터가 없어도 자리를 지킨다 — 이유는 AbsentSheet 주석 참고.
           짝의 칸 수도 그대로 유지해야 50:50 이 안 어긋난다. */}
       <Pair>
@@ -670,7 +672,7 @@ function Results({ data }: { data: MddResult }) {
         )}
       </Pair>
 
-      <GroupLabel title="이 하락의 정체" count={3} />
+      <GroupLabel n={2} title="이 하락의 정체" />
       <Pair>
         {data.attribution ? (
           <Attribution
@@ -1123,20 +1125,23 @@ function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel: string
               data-tip={`전고점(${fmtPrice(a.ath, data.market)}) 대비 현재가가 얼마나 내려와 있는지입니다`}
               style={{ display: "inline-flex", cursor: "help" }}
             >
-              <Icon name="help" style={{ fontSize: 14, color: C.hint }} />
+              <Icon name="help" style={{ fontSize: 14, color: C.muted }} />
             </span>
           </span>
           {/* 오른쪽 위에 있던 '상위 11%' 배지는 걷었다(2026-08-04). 바로 아래 타일이 같은
               것을 이미 말하는데다, '상위 N%' 자체가 무엇의 상위인지 한 번 더 생각하게 했다. */}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        {/* 밑선 맞춤은 CSS 가 한다(.hz-figrow) — 히어로 셋과 같은 짝이다.
+            ⚠️ 줄간이 0.78 이었다. 가운데 맞춤에서 숫자를 억지로 끌어올리던 값인데,
+            밑선으로 맞추면 필요 없을 뿐 아니라 밑선 자체를 밀어 도로 어긋난다. */}
+        <div className="hz-figrow">
           <strong
-            style={{ fontFamily: MONO, fontSize: 40, fontWeight: 800, lineHeight: 0.78, letterSpacing: "-.04em", color: atHigh ? C.ink : DOWN }}
+            style={{ fontFamily: MONO, fontSize: 40, fontWeight: 800, lineHeight: 1, letterSpacing: "-.04em", color: atHigh ? C.ink : DOWN }}
           >
             {atHigh ? "신고가 부근" : fmtPct(a.currentDd)}
           </strong>
           {!atHigh && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            <div className="hz-figrow-aside">
               <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub }}>전고점 대비</span>
               <span style={{ fontSize: 11.5, fontWeight: 700, color: C.sub }}>
                 저점 대비 <b style={{ color: fromLow >= 0 ? UP : DOWN, fontWeight: 800 }}>{fmtPct(fromLow)}</b>
@@ -1949,11 +1954,10 @@ function RiskProfile({ r, periodLabel, market }: { r: RiskProfileData; periodLab
           </div>
         ))}
       </div>
-      {/* 한 줄에 들어가야 바닥 띠가 39 로 선다. 보상이 조회 기간에 딸린다는 말은 패널
-          제목 옆 괄호가 이미 하고 있어 여기서 뺐다. */}
-      <Foot>
-        파랑은 하락, 빨강은 회복·수익입니다. 큰 하락은 고점 대비 −20% 이상 기준이고 막대는 최근 {RISK_ROWS}건까지, 앞 두 패널은 제곱근 눈금입니다.
-      </Foot>
+      {/* 각주 띠가 있었다("파랑은 하락, 빨강은 회복·수익입니다…"). 2026-09-05 에 뺐다 —
+          세 패널이 저마다 범례를 이미 달고 있어(그 해 최악 낙폭·그 해 수익 / 빠지는 데·
+          되돌아오는 데 / 이 종목·코스피) 같은 말을 시트 바닥에서 한 번 더 한 것이었다.
+          토스 라이팅의 Remove empty sentences. 눈금 이야기(제곱근)는 읽는 데 필요 없다. */}
     </Sheet>
   );
 }
@@ -2000,7 +2004,7 @@ function Attribution({
 
   return (
     <Sheet>
-      <SectionHead level={2} icon="call_split" title="시장 탓일까, 종목 탓일까" desc="지수·업종과 견줘 이 종목만의 낙폭이 얼마인지" note="같은 기간" />
+      <SectionHead level={3} icon="call_split" title="시장 탓일까, 종목 탓일까" desc="지수·업종과 견줘 이 종목만의 낙폭이 얼마인지" note="같은 기간" />
       <div style={{ flex: 1, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 18 }}>
         {/* 큰 수치는 **아래 각주·히어로 해설과 같은 값·같은 단위**여야 한다(2026-08-04).
             예전엔 여기만 '몫'(|gap| ÷ 자기 낙폭 = 14%)이라, 한 시트 안에서 14% 와 4.9%p 가
@@ -2047,7 +2051,7 @@ function Attribution({
             margin-top:auto 가 먹는다(옆 시트에 맞춰 늘어난 만큼 아래가 비기 때문). */}
         {gap !== null && (
           <div style={{ marginTop: "auto", display: "flex", gap: 9, background: C.soft, borderRadius: 10, padding: "12px 13px" }}>
-            <Icon name="bolt" style={{ fontSize: 15, color: C.hint, flex: "none", marginTop: 1 }} />
+            <Icon name="bolt" style={{ fontSize: 15, color: C.muted, flex: "none", marginTop: 1 }} />
             <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.7, color: C.inkSoft, wordBreak: "keep-all" }}>
               {excess ? (
                 <>
@@ -2091,7 +2095,7 @@ function Recovery({ a, periodLabel }: { a: MddAnalysis; periodLabel: string }) {
 
   return (
     <Sheet>
-      <SectionHead level={2}
+      <SectionHead level={3}
         icon="schedule"
         title="회복까지 걸린 기간"
         desc="과거 사례로 본 회복 소요 기간"
@@ -2214,7 +2218,7 @@ function Character({ ch, currentDd }: { ch: DrawdownCharacter | null; currentDd:
 
   return (
     <Sheet>
-      <SectionHead level={2}
+      <SectionHead level={3}
         icon="bolt"
         title="이 하락의 성격"
         desc="같은 깊이라도 빨리 빠진 하락과 오래 흘러내린 하락은 회복 양상이 다릅니다"
@@ -2346,7 +2350,7 @@ function TopDrawdowns({ eps }: { eps: Episode[] }) {
      이겨서 열이 안 줄어든다. */
   return (
     <Sheet>
-      <SectionHead level={2} icon="history" title="역대 낙폭 Top 5" desc="이만큼 빠졌던 구간과 회복까지 걸린 기간" note="−20% 이상" />
+      <SectionHead level={3} icon="history" title="역대 낙폭 Top 5" desc="이만큼 빠졌던 구간과 회복까지 걸린 기간" note="−20% 이상" />
       <div className="hz-thead mdd-top-row">
         <span>구간</span>
         <span>낙폭</span>

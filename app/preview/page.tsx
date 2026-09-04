@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { getOvernightLive, type OvernightRow } from "@/lib/kr-overnight";
 import { getPreview, type PreviewLink, type PreviewMover } from "@/lib/kr-preview";
 
-import { SectionCaps } from "../kadera/parts";
+import { SectionIntro } from "../SectionIntro";
 import { SectionHead } from "../kadera/SectionHead";
 import { pageMetadata } from "../seo";
 import { PREVIEW_PUBLIC } from "../screen-flags";
@@ -282,7 +282,7 @@ function OvernightPanel({ r }: { r: OvernightRow }) {
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 7, paddingTop: 12,
-                    borderTop: "1px solid var(--c-sheet-row)" }}>
+                    borderTop: "1px solid var(--c-hairline)" }}>
         {([
           // ⭐ "국장" 을 붙인다. 이 카드에는 값이 두 종류(해외 선물 · 국내 종가)라
           // 그냥 "종가" 면 위의 큰 숫자와 같은 시장 것으로 읽힌다.
@@ -316,10 +316,16 @@ function OvernightPanel({ r }: { r: OvernightRow }) {
  * 좋아서인지 구별이 안 된다. 같은 날들의 코스피 평균이 위에 한 줄 서 있어야, 밑의 숫자들이
  * 저마다 그것과 견줘 읽힌다. 설명 문장 없이도 뜻이 서는 건 이 한 줄 덕이다.
  */
+/** 히어로의 '밤사이 가장 크게 움직인 곳' 이 데려올 자리. 카더라 히어로의 칩이 시트로
+ *  내려가는 것과 같은 어법이다. */
+function moverAnchor(ticker: string) {
+  return `mv-${ticker}`;
+}
+
 function MoverPanel({ m }: { m: PreviewMover }) {
   const ink = m.dp > 0 ? HOT : COLD;
   return (
-    <div className="hz-panel-pad">
+    <div className="hz-panel-pad hz-mover-tile" id={moverAnchor(m.ticker)}>
       <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
         <StockLogo code={m.ticker} name={m.usName} market="US" size={30} />
         <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
@@ -351,8 +357,10 @@ function MoverPanel({ m }: { m: PreviewMover }) {
       {/* ⚠️⚠️ 위(사실)와 아래(과거)를 **선으로 가른다.** 둘 다 퍼센트라, 선이 없으면 눈이
           한 덩이로 읽고 "어젯밤 이 종목이 +0.38% 올랐다" 로 오해한다. 아랫단은 어젯밤 일이
           아니라 **과거 5년의 평균**이다. */}
+      {/* ⚠️ 미국 줄과 국내 줄을 가르는 선. 회색 타일 위라 `--c-hairline` 를 쓴다 —
+          흰 판용 `--c-sheet-row` 는 여기서 대비 1.037 이라 있으나 마나였다. */}
       <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 12,
-                    borderTop: "1px solid var(--c-sheet-row)" }}>
+                    borderTop: "1px solid var(--c-hairline)" }}>
         {/* 이 한 줄이 밑의 숫자들에 기준을 준다. */}
         {/* ⚠️ 쉼표로 끝나는 매달린 문장을 쓰지 말 것. 예전엔 "…열렸고," 로 끝나 밑의
             줄들이 그 문장의 뒷부분처럼 보였는데, 줄마다 종목이 달라 문장이 안 이어진다.
@@ -421,6 +429,11 @@ export default async function PreviewPage() {
   ]);
   const stamp = date ? `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))} 아침 기준` : undefined;
 
+  // 장이 몇 개인지 — 두 번째 장('개장 전 지금')은 밤사이 표가 없으면 통째로 안 그려진다.
+  // ⚠️ 그런 날에는 첫 장에도 번호를 주지 않는다. "01" 만 혼자 서 있으면 다음 장이 있다고
+  //    약속해 놓고 안 지키는 꼴이라, 독자는 없는 02 를 찾아 아래로 내려간다.
+  const hasOvernight = overnight.rows.length > 0;
+
   const movers = sectors.flatMap((s) => s.movers);
 
   // 평소 대비 가장 크게 움직인 넷. z 로 세운다 — 등락률로 세우면 늘 변동성 큰 종목만
@@ -458,7 +471,8 @@ export default async function PreviewPage() {
   const wall = [...movers].sort((a, b) => b.z - a.z);
 
   return (
-    <>
+    // 뿌리의 hz-tx 가 이번 리디자인을 켠다(globals.css).
+    <div className="hz-tx">
       {/* ── 히어로 — 간밤 뉴욕 · 평소와 달랐던 곳 · 오늘의 브리핑(아랫줄 전체) ── */}
       <section className="hz-hero-panel">
         {/* ① 간밤 뉴욕 — 이 밤이 얼마나 시끄러웠나 */}
@@ -503,7 +517,7 @@ export default async function PreviewPage() {
               빈다**(2026-09-03 전수검사에서 실측). 옆 두 칸은 그날도 각자 할 말이 있어서
               칸 하나만 덩그러니 비어 고장처럼 보인다. 그래서 그 자리를 한 줄로 메운다. */}
           {!after && (
-            <span style={{ marginTop: "auto", paddingTop: 10, borderTop: "1px solid var(--c-sheet-row)",
+            <span style={{ marginTop: "auto", paddingTop: 10, borderTop: "1px solid var(--c-hairline)",
                            fontSize: 12, lineHeight: 1.6, color: C.sub }}>
               과거 같은 구간을 고를 자료를 아직 못 받았습니다
             </span>
@@ -559,7 +573,9 @@ export default async function PreviewPage() {
                     //    여기는 상자를 **위에서만** 줄이므로 글자는 제자리에 있는다.
                     padding: k === 2 ? "6.7px 0 0" : "8px 0",
                     marginBottom: k === 2 ? -1 : undefined,
-                    borderBottom: k === 2 ? "none" : "1px solid var(--c-sheet-row)",
+                    // ⚠️ `--c-sheet-row` 가 아니라 `--c-hairline` 다. 이 칸은 회색 타일이라
+                    // 흰 판용 값을 쓰면 대비 1.037 로 선이 안 보인다(globals.css 주석).
+                    borderBottom: k === 2 ? "none" : "1px solid var(--c-hairline)",
                   }}
                 >
                   {/* ⚠️ 가운데 줄만 작게·흐리게 두지 말 것. "개장 뒤는 거의 0" 이라는 걸
@@ -596,8 +612,19 @@ export default async function PreviewPage() {
                 {date ? "평소 폭을 크게 넘어선 곳이 없었습니다" : "아직 채울 자료가 없습니다."}
               </span>
             ) : (
+              /* ⭐ 누르면 아래 그 종목 타일로 내려간다(2026-09-05 ). 히어로가 이름만
+                 늘어놓고 끝나면 "그래서 어디 있나"를 눈으로 찾아야 했다 — 카더라 히어로의
+                 '오늘 눈에 띄는 것' 칩이 시트로 데려가는 것과 같은 어법이다.
+                 호버·도착 강조는 CSS 가 맡는다(.hz-mover-link · .hz-mover-tile:target). */
               loudest.map((m) => (
-                <div key={m.ticker} style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
+                <a
+                  key={m.ticker}
+                  href={`#${moverAnchor(m.ticker)}`}
+                  className="hz-mover-link"
+                  data-ga="preview_mover_click"
+                  data-ga-symbol={m.ticker}
+                  style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}
+                >
                   <StockLogo code={m.ticker} name={m.usName} market="US" size={24} />
                   <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
                     <strong style={{ fontFamily: MONO, fontSize: 12.5, fontWeight: 800, color: C.ink }}>{m.ticker}</strong>
@@ -610,7 +637,7 @@ export default async function PreviewPage() {
                     </strong>
                     <span style={{ fontSize: 11, color: C.sub2, whiteSpace: "nowrap" }}>평소보다 {m.z.toFixed(1)}배</span>
                   </span>
-                </div>
+                </a>
               ))
             )}
           </div>
@@ -627,7 +654,7 @@ export default async function PreviewPage() {
               ⛔ 이 바닥 줄을 통째로 숨기지 말 것. 옆 칸(①)이 flex-end 로 바닥까지 차 있어서
                  이 칸만 바닥이 비면 판이 어긋나 보인다 — 이 칸이 비어 보이던 옛 문제가
                  정확히 바닥 줄이 없어서였다(위 ② 칸 머리 주석). */}
-          <span style={{ marginTop: "auto", paddingTop: 10, borderTop: "1px solid var(--c-sheet-row)",
+          <span style={{ marginTop: "auto", paddingTop: 10, borderTop: "1px solid var(--c-hairline)",
                          fontSize: 12, color: C.sub, lineHeight: 1.6, whiteSpace: "nowrap",
                          overflow: "hidden", textOverflow: "ellipsis" }}>
             {loudest.length === 0
@@ -738,7 +765,7 @@ export default async function PreviewPage() {
       {/* ⚠️ 배지는 **시트 제목과 다른 말**이어야 한다. 제목("미국과 엮인 국내 종목")이
           무엇을 모아 뒀는지 말하고, 배지는 그게 어떤 성격의 이야기인지 한 마디로 짚는다.
           한때 "과거 기록" 이었는데 그건 자료를 분류한 말이지 읽는 사람의 말이 아니었다. */}
-      <SectionCaps label="미장의 여파" />
+      <SectionIntro n={hasOvernight ? 1 : undefined} title="미장의 여파" />
       <section className="hz-sheet">
         {/* ⚠️ desc 를 비워 두지 말 것. 이 저장소의 시트 머리는 어디서나 제목 + 부제 한 줄이라,
             여기만 없으면 카드가 덜 만들어진 것처럼 보인다(2026-09-02 지적).
@@ -774,11 +801,11 @@ export default async function PreviewPage() {
             ⛔ "미국과 엮인 국내 종목" 으로 되돌리지 말 것 — 엮였다는 사실은 **부제**가 이미
             말한다(2026-09-04). 제목까지 그러면 같은 말이 두 번이고, 정작 이 시트가 무엇을
             내주는지(그런 아침의 국내 기록)는 아무 데도 안 적힌다. */}
-        {/* ⚠️ level={2} 를 빼지 말 것. 기본값 3 은 시트 위에 구간 제목(h2)이 한 겹 더 있는
+        {/* ⚠️ level={3} 를 빼지 말 것. 기본값 3 은 시트 위에 구간 제목(h2)이 한 겹 더 있는
             화면(내부자·홈)에 맞춘 값이다. 이 화면은 그 겹이 없어서 h3 를 쓰면 히어로 칸
             제목(h2)의 하위처럼 읽힌다. 시장 브리핑·카더라도 같은 자리에서 h2 다. */}
         <SectionHead
-          level={2}
+          level={3}
           icon="call_split"
           title="그런 아침 국장에서는"
           note={moverCount ? `미장 ${moverCount}종목 · 국장 ${stockCount}종목` : undefined}
@@ -829,9 +856,7 @@ export default async function PreviewPage() {
           이건 다른 축이라 뒤가 맞다.
           ⚠️ 자료가 없는 날(수집 실패·표 없음)에는 시트째 그리지 않는다. 빈 시트를 남기면
           고장으로 읽힌다 — 아래 시트는 그날도 자기 할 말이 있다. */}
-      {overnight.rows.length > 0 && (
-        <SectionCaps label="개장 전 지금" />
-      )}
+      {hasOvernight && <SectionIntro n={2} title="개장 전 지금" />}
       {overnight.rows.length > 0 && (
         <section className="hz-sheet">
           {/* ⭐ '시점' 알약은 살아 있는 값일 때 **날짜와 분까지** 적는다("9/4 오전 2:40 시점").
@@ -846,7 +871,7 @@ export default async function PreviewPage() {
               ⚠️ 원 단위로 반올림한다. 카드의 원화 값이 이미 원 단위라 여기만 소수점을 적으면
               정밀도가 어긋나 보인다. */}
           <SectionHead
-            level={2}
+            level={3}
             icon="schedule"
             title="해외에서 거래 중인 값"
             note={
@@ -873,7 +898,6 @@ export default async function PreviewPage() {
           </div>
         </section>
       )}
-
-    </>
+    </div>
   );
 }

@@ -168,7 +168,7 @@ const NAV: NavItem[] = [
         label: "미장 카더라",
         href: "/kadera/us",
         Glyph: LibertyIcon,
-        sub: "미국 시장에선 무엇이 화제인지",
+        sub: "미장에선 무엇이 화제인지",
       },
     ],
   },
@@ -461,8 +461,8 @@ function Sidebar() {
         flexShrink: 0,
         background: C.card,
         borderRight: `1px solid var(--c-divider)`,
-        padding: "26px 14px 22px",
-        gap: 40,
+        padding: "28px 14px 20px",
+        gap: 34,
       }}
     >
       <div style={{ padding: "0 6px" }}>
@@ -495,7 +495,7 @@ function Sidebar() {
                   display: "flex",
                   alignItems: "center",
                   gap: 12,
-                  padding: "12px 14px",
+                  padding: "11px 12px",
                   color: C.disabled,
                   fontWeight: 600,
                   borderRadius: R.nav,
@@ -537,8 +537,9 @@ function Sidebar() {
               display: "flex",
               alignItems: "center",
               gap: 10,
-              // 아이콘(20) + 간격(12) + 좌패딩(14) = 46 → 서브 아이콘이 부모 라벨 자리에 선다
-              padding: "8px 14px 8px 34px",
+              // 좌패딩(12) + 아이콘(20) + 간격(12) = 44 → 서브 아이콘이 **부모 라벨의 x** 에서
+              // 시작한다. 예전 34 는 부모 아이콘과 라벨 사이 어중간한 자리였다(2026-09-04).
+              padding: "8px 12px 8px 44px",
               borderRadius: R.nav,
             } as const;
             if (!child.href) {
@@ -604,20 +605,18 @@ function Sidebar() {
                 display: "flex",
                 alignItems: "center",
                 gap: 12,
-                padding: "12px 14px",
-                // 활성 항목이 옅은 tint 배경 + 파란 글자였는데, 목업은 **파란 알약에 흰 글자**다.
-                color: active ? "#ffffff" : C.sub,
-                fontWeight: active ? 700 : 600,
+                padding: "11px 12px",
+                // 활성 항목의 바탕·글자색은 여기 없다 — globals.css 의 .hz-nav-active 가 든다
+                // (옅은 하늘색 타일 + 파란 잉크, 2026-09-04 리디자인. 8월 목업의 꽉 찬 파랑
+                // 알약은 그 칸만 무거워 배너처럼 읽혔다).
                 // 비활성일 때 background 를 인라인으로 두면(예전 "transparent") 인라인이
                 // 우선순위에서 이겨 .hz-nav-item:hover 회색 배경이 먹히지 않는다. 값을 아예
-                // 빼서 호버는 CSS 가 담당하게 한다.
-                // ⚠️ --c-blue 가 아니라 --c-nav-active 다. 흰 글자가 얹히는 자리라 브랜드
-                // 파랑 그대로면 명암비가 4.5 에 못 미친다(globals.css 의 토큰 주석).
-                background: active ? "var(--c-nav-active)" : undefined,
+                // 빼서 호버는 CSS 가 담당하게 한다. 활성 색도 같은 이유로 인라인에 두지 않는다.
+                color: active ? undefined : C.sub,
+                fontWeight: active ? 700 : 600,
                 // ⚠️ 활성 항목에 파란 그림자를 주지 않는다. 0 10px 20px 이라 **바로 아래
                 // 항목 위로 번져서**, 그 항목만 호버 배경이 푸르스름하게 도드라졌다
                 // (카더라는 볼록하고 MDD 는 평평해 보이던 원인, 2026-08-03).
-                // 활성 표시는 꽉 찬 파랑 알약만으로 충분하다.
                 borderRadius: R.nav,
                 textDecoration: "none",
               }}
@@ -665,8 +664,9 @@ function Sidebar() {
             alignItems: "center",
             justifyContent: "center",
             gap: 8,
-            padding: 14,
-            borderRadius: R.control,
+            // 높이 44 · 모서리 12 — 카더라 히어로의 '미장 카더라 보기' 버튼과 같은 눈금이다.
+            padding: 12,
+            borderRadius: R.nav,
             fontSize: 14,
             fontWeight: 700,
             textDecoration: "none",
@@ -1129,7 +1129,10 @@ function PageHeader({ theme, currency }: { theme: "light" | "dark"; currency: "k
               밑선이 제목 밑선에 맞아, 알약 자체는 그만큼(패딩+테두리) 아래로 내려앉는다 —
               옆에 붙은 라벨이 아니라 매달린 것처럼 보였다. */}
           <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", minWidth: 0 }}>
-            <h1 style={{ margin: 0, fontSize: 23, fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>
+            {/* 크기는 .hz-page-title(globals.css)이 든다 — 폰에서 줄여야 하는데 인라인은
+                미디어쿼리를 이긴다. 2026-09-04 리디자인: 23 → 30. 구간 제목(21)·시트 머리(17)
+                보다 커야 "이 화면의 이름"으로 읽힌다(23 이던 땐 구간 제목 24 보다 작았다). */}
+            <h1 className="hz-page-title" style={{ margin: 0, fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>
               {title}
             </h1>
             {badge && (
@@ -1153,7 +1156,7 @@ function PageHeader({ theme, currency }: { theme: "light" | "dark"; currency: "k
               </span>
             )}
           </div>
-          <p style={{ margin: 0, fontSize: 13, color: C.sub2 }}>{sub}</p>
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: C.sub, wordBreak: "keep-all" }}>{sub}</p>
         </div>
       )}
       {/* 제목이 없을 때 도구가 왼쪽으로 붙지 않도록. justify-content:space-between 은
