@@ -855,7 +855,7 @@ function MeterRow({
             다크 2.3 이다. 툴팁이 있다는 유일한 표시라 SectionHead 와 같은 muted 로 맞춘다. */}
         {help && (
           <span className="hz-tip hz-tip-wide" data-tip={help} style={{ flexShrink: 0, display: "inline-flex", cursor: "help", color: C.muted }}>
-            <Icon name="help" style={{ fontSize: 13 }} />
+            <Icon name="help" label="설명" style={{ fontSize: 13 }} />
           </span>
         )}
       </span>
@@ -1123,7 +1123,7 @@ function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel: string
               data-tip={`전고점(${fmtPrice(a.ath, data.market)}) 대비 현재가가 얼마나 내려와 있는지입니다`}
               style={{ display: "inline-flex", cursor: "help" }}
             >
-              <Icon name="help" style={{ fontSize: 14, color: C.hint }} />
+              <Icon name="help" label="설명" style={{ fontSize: 14, color: C.hint }} />
             </span>
           </span>
           {/* 오른쪽 위에 있던 '상위 11%' 배지는 걷었다(2026-08-04). 바로 아래 타일이 같은

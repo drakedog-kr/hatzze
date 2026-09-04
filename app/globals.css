@@ -463,6 +463,29 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ── 화면에서만 감추는 글자 ───────────────────────────────────────
+   눈으로는 사라지고 읽어 주는 기계에는 남는다. `display:none` 이나
+   `visibility:hidden` 은 둘 다에서 사라져 못 쓴다.
+
+   쓰는 곳은 Icon 의 label 하나다(ui.tsx). 아이콘 리거처는 언제나 aria-hidden 으로
+   덮으므로, 그림이 혼자 뜻을 지는 자리에서는 이 글자가 대신 이름을 댄다.
+
+   ⚠️ absolute 가 핵심이다. 흐름 밖이라 **flex 항목으로 세지 않아** 부모의 gap 이
+      한 칸 더 벌어지지 않는다. static 으로 되돌리면 아이콘과 숫자 사이가 벌어진다.
+   ⚠️ width/height 0 은 안 된다 — 크롬이 빈 칸으로 보고 읽기를 건너뛴다. 1px 을
+      남기고 clip-path 로 잘라 낸다. */
+.hz-a11y-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* ── 세미 타이틀 배지 (전 페이지 공통) ─────────────────────────────
    시트 위에 얹혀 "여기부터 다른 묶음"을 말하는 줄이다("시장 지표 15",
    "최근 뜨는 것 3"). 지금까지는 배경 없는 10.5px 마이크로 캡스라 회색 바탕에

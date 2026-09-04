@@ -258,6 +258,7 @@ function UsTrendingList({ items }: { items: UsTrendingMessage[] }) {
               >
                 <Icon
                   name="visibility"
+                  label="조회수"
                   style={{ fontSize: 14, color: C.faint }}
                 />
                 {compact(m.views)}
@@ -267,6 +268,7 @@ function UsTrendingList({ items }: { items: UsTrendingMessage[] }) {
               >
                 <Icon
                   name="shortcut"
+                  label="전달"
                   style={{ fontSize: 14, color: C.faint }}
                 />
                 {compact(m.forwards)}
@@ -281,6 +283,7 @@ function UsTrendingList({ items }: { items: UsTrendingMessage[] }) {
                 >
                   <Icon
                     name="chat_bubble"
+                    label="댓글"
                     style={{ fontSize: 12, color: C.faint }}
                   />
                   {m.replies}
@@ -476,6 +479,7 @@ export default async function UsKaderaPage() {
                       >
                         <Icon
                           name="help"
+                          label="설명"
                           style={{ fontSize: 12, color: C.muted }}
                         />
                       </span>
@@ -667,6 +671,7 @@ export default async function UsKaderaPage() {
                       >
                         <Icon
                           name="help"
+                          label="설명"
                           style={{ fontSize: 12, color: C.muted }}
                         />
                       </span>

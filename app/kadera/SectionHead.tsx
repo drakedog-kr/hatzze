@@ -121,7 +121,7 @@ export function SectionHead({
                   있는 표시가 안 보이면 툴팁이 있다는 걸 알 길이 없다. muted 는 4.79.
                   ⚠️ 이 머리는 다섯 화면이 함께 쓴다. 여기 물음표가 뜨는 모든 카드가 같이
                   진해진다(서학개미 장부에서 재다 찾았지만 고장은 공용이었다). */}
-              <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
+              <Icon name="help" label="설명" style={{ fontSize: 12, color: C.muted }} />
             </span>
           )}
         </span>

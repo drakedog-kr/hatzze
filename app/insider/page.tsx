@@ -360,7 +360,7 @@ export default async function InsiderPage() {
                         data-ga-tip={u.label}
                         style={{ display: "inline-flex", alignSelf: "center", cursor: "help", flexShrink: 0 }}
                       >
-                        <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
+                        <Icon name="help" label="설명" style={{ fontSize: 12, color: C.muted }} />
                       </span>
                     )}
                   </span>

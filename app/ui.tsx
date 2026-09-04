@@ -101,19 +101,59 @@ export const MONO = "var(--font-pretendard), sans-serif";
 
 // className 은 .ms 에 덧붙는다(대체가 아니라). 지금 쓰임은 채운 글리프를 내는
 // .ms-fill 하나뿐인데, 아이콘 폰트 규칙(.ms)은 어느 경우에도 남아야 하므로 합쳐 준다.
+//
+// ⚠️⚠️ **리거처 이름은 안 보일 뿐 글자다.** 폰트가 "chevron_right" 라는 글자열을 글리프
+// 하나로 합쳐 그려 주는 것이라, 눈으로 보면 화살표지만 **읽어 주는 기계에는 그 이름이
+// 그대로 남는다.** 카더라 급부상 칩이 "급부상 디아이 5.1배chevron_right" 로 읽혔다
+// (2026-09-05 실측). 73자리가 전부 같은 꼴이었다.
+//
+// 그래서 **기본값을 aria-hidden 으로 둔다.** 아이콘은 거의 다 옆 글자를 거드는 그림이라
+// 지우는 편이 맞다. 눈으로 읽는 화면은 하나도 안 바뀐다.
+//
+// label 은 그 기본값을 뒤집는 마개다. **그림이 혼자 뜻을 지는 자리**에만 준다 — 눈 모양
+// 뒤에 숫자만 오는 카더라 통계 줄처럼, 그림을 빼면 그게 무슨 수인지 알 길이 없는 곳이다.
+// 이때도 글리프는 그대로 덮어 두고, 이름은 옆에 안 보이는 글자로 따로 세운다(아래 참고).
+//
+// ⚠️ **아이콘만 든 단추·링크에는 label 을 주지 말고 그 단추에 aria-label 을 달 것.**
+//    이름은 누를 수 있는 것에 붙어야 초점이 갔을 때 읽힌다. 이 저장소는 이미 그렇게
+//    하고 있다(테마 토글·햄버거·닫기·확대·달 넘김 …). 그런 자리에서 여기 기본값은
+//    바깥 aria-label 을 가리지 않는다 — 이름은 단추가 이미 쥐고 있고, 안쪽 리거처만
+//    조용해진다.
+//
+// ⚠️⚠️ **label 을 role="img" + aria-label 로 내면 안 된다.** 처음엔 그렇게 짰는데,
+//    크롬 접근성 나무를 직접 열어 보니 이름은 "설명" 으로 잘 잡히면서도 **안쪽 리거처가
+//    ignored=false 인 StaticText 로 그대로 남아 있었다**(2026-09-05, CDP
+//    Accessibility.getPartialAXTree 실측):
+//        ignored=false role=image      name="설명"
+//        ignored=false role=StaticText name="help"   ← 이게 안 지워진다
+//    role="img" 는 명세상 자식을 안 읽는 역할인데도 크롬은 나무에 남긴다. 글자 단위로
+//    훑는 읽기 모드에서는 그 "help" 에 그대로 닿는다. 그래서 **글리프는 어떤 경우에도
+//    aria-hidden 으로 덮고**, 이름이 필요하면 옆에 안 보이는 글자를 따로 세운다.
+//    .hz-a11y-only 는 화면에서만 사라지고 읽기에는 남는 상투 수법이다(globals.css).
+//    absolute 라 흐름 밖이라서 flex 항목으로 세지 않는다 — gap 이 한 칸 더 벌어지지 않는다.
 export function Icon({
   name,
+  label,
   style,
   className,
 }: {
   name: string;
+  /** 그림이 혼자 뜻을 지는 자리에만. 단추 안이라면 여기 말고 단추에 aria-label 을 준다. */
+  label?: string;
   style?: React.CSSProperties;
   className?: string;
 }) {
-  return (
-    <span className={className ? `ms ${className}` : "ms"} style={style}>
+  const glyph = (
+    <span className={className ? `ms ${className}` : "ms"} style={style} aria-hidden="true">
       {name}
     </span>
+  );
+  if (!label) return glyph;
+  return (
+    <>
+      {glyph}
+      <span className="hz-a11y-only">{label}</span>
+    </>
   );
 }
 

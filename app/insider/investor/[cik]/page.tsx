@@ -187,7 +187,7 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
                   data-tip="미국 상장주만 셉니다. 채권·현금·해외 주식은 빠집니다."
                   style={{ display: "inline-flex", cursor: "help" }}
                 >
-                  <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
+                  <Icon name="help" label="설명" style={{ fontSize: 12, color: C.muted }} />
                 </span>
               </span>
               <span style={{ display: "flex", alignItems: "baseline", gap: 6 }}>

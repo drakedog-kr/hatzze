@@ -662,7 +662,7 @@ function Hero({
               data-ga-tip="hatzze_index"
               style={{ display: "inline-flex", cursor: "help" }}
             >
-              <Icon name="help" style={{ fontSize: 15, color: C.muted }} />
+              <Icon name="help" label="설명" style={{ fontSize: 15, color: C.muted }} />
             </span>
           </span>
           {/* 구간 표시가 알약에서 **점 + 글자**로 내려앉았다. 큰 숫자가 이미 같은 색으로
@@ -1856,7 +1856,7 @@ function CardDivergence({ v }: { v: Pick }) {
                   1.49 · 다크 2.3 으로, 그림에 요구되는 3:1 에도 못 미친다. 이 물음표는
                   장식이 아니라 **툴팁이 있다는 유일한 표시**라 안 보이면 기능이 사라진다.
                   시트 머리(kadera/SectionHead)가 같은 이유로 이미 muted 로 옮겼다. */}
-              {t.tip && <Icon name="help" style={{ fontSize: 13, color: C.muted }} />}
+              {t.tip && <Icon name="help" label="설명" style={{ fontSize: 13, color: C.muted }} />}
             </span>
             <span style={{ fontSize: 11.5, color: C.muted }}>{t.hint}</span>
             {/* 색은 값이 아니라 **그 값이 뜻하는 과열도**(heat)로 낸다 — 위 주석 참고.

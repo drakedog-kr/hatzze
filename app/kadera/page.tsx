@@ -197,18 +197,21 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
                   ))}
                 </div>
               )}
+              {/* ⚠️ 이 세 아이콘만 label 을 받는다(ui.tsx 의 Icon 주석). 뒤에 숫자만
+                  오는 줄이라 그림을 지우면 "1.2만 · 340 · 12" 가 무엇의 수인지 사라진다.
+                  다른 자리 아이콘은 옆에 이미 글자가 있어 조용히 둔다. */}
               <div style={{ display: "flex", alignItems: "center", gap: 14, paddingTop: 2, fontSize: 11, fontFamily: MONO, fontWeight: 700, color: C.sub }}>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  <Icon name="visibility" style={{ fontSize: 14, color: C.faint }} />
+                  <Icon name="visibility" label="조회수" style={{ fontSize: 14, color: C.faint }} />
                   {compact(m.views)}
                 </span>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  <Icon name="shortcut" style={{ fontSize: 14, color: C.faint }} />
+                  <Icon name="shortcut" label="전달" style={{ fontSize: 14, color: C.faint }} />
                   {compact(m.forwards)}
                 </span>
                 {m.replies > 0 && (
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                    <Icon name="chat_bubble" style={{ fontSize: 12, color: C.faint }} />
+                    <Icon name="chat_bubble" label="댓글" style={{ fontSize: 12, color: C.faint }} />
                     {m.replies}
                   </span>
                 )}
@@ -577,7 +580,7 @@ export default async function KaderaPage() {
                         세워야 한다 — 옆 칸 '제외 후 환산 ?' 이 쓰는 것과 같은 기준이다. */}
                     {s.help && (
                       <span className="hz-tip hz-tip-wide" data-tip={s.help} data-ga-tip={s.label} style={{ display: "inline-flex", alignSelf: "center", cursor: "help", flexShrink: 0 }}>
-                        <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
+                        <Icon name="help" label="설명" style={{ fontSize: 12, color: C.muted }} />
                       </span>
                     )}
                   </span>
@@ -687,7 +690,7 @@ export default async function KaderaPage() {
                         data-ga-tip="sentiment_ratio"
                         style={{ display: "inline-flex", cursor: "help", flexShrink: 0 }}
                       >
-                        <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
+                        <Icon name="help" label="설명" style={{ fontSize: 12, color: C.muted }} />
                       </span>
                     </span>
                   </div>
@@ -1221,7 +1224,7 @@ export default async function KaderaPage() {
                   영향력
                   {/* ⚠️ hint 는 점선·비활성 아이콘용이다(라이트 1.49·다크 2.3). 툴팁이
                       있다는 유일한 표시라 보여야 한다 — SectionHead 와 같은 muted. */}
-                  <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
+                  <Icon name="help" label="설명" style={{ fontSize: 12, color: C.muted }} />
                 </span>
               </div>
               <ExpandableList
