@@ -23,7 +23,7 @@ scripts/generate_telegram_narratives.py 가 그 종목의 요약을 미리 만�
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from .channel_breadth import channel_breadth_map
 from .supabase_client import execute_with_retry
@@ -35,8 +35,20 @@ SHARE_SMOOTHING = 0.002  # 언급 1회가 그날 대화에서 차지하는 몫(�
 CARD_LIMIT = 5       # 사이트 카드 정원. 자르기 전에 여기까지 세워야 순서가 카드와 같다
 
 
-def load_stock_daily(db) -> tuple[list[dict], list[str]]:
+def load_stock_daily(db, base_date: str | None = None) -> tuple[list[dict], list[str]]:
     """최근 LOOKBACK_DAYS 일의 telegram_stock_daily(오늘 제외)와 날짜 목록.
+
+    ⚠️⚠️ **`base_date` 를 주면 화면과 같은 창**이 된다(기준일 **앞** LOOKBACK_DAYS 일).
+    안 주면 예전 그대로 '벽시계 오늘 제외'다. 둘은 같지 않다 — 파이프라인이 도는
+    2026-09-05 에 기준일은 09-04 인데, 벽시계 규칙은 그 09-04 를 창에 **넣는다.**
+    아직 덜 찬 하루가 점유율 분모에 들어가 순위가 통째로 갈린다(2026-09-05 실측:
+    벽시계 규칙 5개 중 화면과 겹치는 것이 2개뿐이었다).
+
+    저쪽(lib/telegram-data.loadStockDaily)은 이 함정을 이미 겪고 고쳤다 — 그 주석이
+    "예전엔 하한만 걸고 오늘을 코드에서 걸러 냈는데, 그 '오늘'이 벽시계라 자정마다
+    창이 굴렀다"고 적어 뒀다. 이쪽 사본만 옛 규칙으로 남아 있었다.
+    ⏳ 기본값을 바꾸면 텔레그램 방송이 고르는 종목도 같이 바뀐다. 그건 따로 판단할 일이라
+       여기서는 **부르는 쪽이 고르게** 두었다.
 
     창의 시작을 UTC 기준으로 잡는 건 프론트를 그대로 따른 것이다(TS 는
     `new Date(Date.now() - n일).toISOString()`). 파이프라인이 도는 시각(KST 10시대·19시대)
@@ -47,7 +59,13 @@ def load_stock_daily(db) -> tuple[list[dict], list[str]]:
     **에러 없이** 잘라서 최신 날짜가 통째로 빠진 채 '평소 대비'가 계산된다. 정렬 키는
     유일해야 한다(common/supabase_client.load_all 주석) — id 를 쓴다.
     """
-    since = (datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)).date().isoformat()
+    if base_date:
+        end_d = date.fromisoformat(base_date) - timedelta(days=1)
+        since = (end_d - timedelta(days=LOOKBACK_DAYS - 1)).isoformat()
+        until = end_d.isoformat()
+    else:
+        since = (datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)).date().isoformat()
+        until = None
     rows: list[dict] = []
     start = 0
     PAGE = 1000
@@ -68,14 +86,26 @@ def load_stock_daily(db) -> tuple[list[dict], list[str]]:
         if len(page) < PAGE:
             break
 
-    today = today_kst().isoformat()
-    rows = [r for r in rows if r["date"] < today]
+    cut = until if until else today_kst().isoformat()
+    rows = [r for r in rows if (r["date"] <= cut if until else r["date"] < cut)]
+    if until:
+        rows = [r for r in rows if r["date"] >= since]
     dates = sorted({r["date"] for r in rows})
     return rows, dates
 
 
-def top_surging(db, limit: int = CARD_LIMIT, preloaded: tuple[list[dict], list[str]] | None = None) -> list[dict]:
+def top_surging(
+    db,
+    limit: int = CARD_LIMIT,
+    preloaded: tuple[list[dict], list[str]] | None = None,
+    cap: int | None = None,
+) -> list[dict]:
     """급부상 상위 종목. 각 항목은 code·mentions·channels·ratio·is_new 를 갖는다.
+
+    ⚠️ `cap` 은 '정원'이다(기본 CARD_LIMIT). 화면은 6장을 그리는데
+    (app/kadera/page.tsx 의 getSurgingStocks(6)) 이 사본의 정원은 5라, 6번째 카드에
+    대응하는 종목을 여기서는 **원리적으로 못 얻는다.** 한 줄 요약처럼 여섯 장을 다
+    채워야 하는 호출은 `cap=6` 을 준다.
 
     종목명·요약 같은 표시용 값은 붙이지 않는다 — 호출부마다 필요한 게 달라서다.
     limit 을 CARD_LIMIT 보다 작게 줘도 **먼저 정원까지 세운 뒤 자른다.** tier 정렬이
@@ -131,7 +161,7 @@ def top_surging(db, limit: int = CARD_LIMIT, preloaded: tuple[list[dict], list[s
             return 3
         return 1 if s["ratio"] >= 1.3 else 2
 
-    top = sorted(scored, key=tier)[:CARD_LIMIT][:limit]
+    top = sorted(scored, key=tier)[: (cap or CARD_LIMIT)][:limit]
 
     # 채널 수는 정원을 자른 **뒤에** 센다 — 순위에 쓰이지 않는 표시용이라, 카드에
     # 오르지도 못할 종목(14일치면 1,700여 개)까지 물을 이유가 없다. 창은 언급 수와

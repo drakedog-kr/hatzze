@@ -432,9 +432,16 @@ def build_brief_digest(db, latest: str, msgs: list[dict], name_of: dict[str, str
 
 
 def build_stock_digests(
-    latest: str, msgs: list[dict], name_of: dict[str, str]
+    latest: str,
+    msgs: list[dict],
+    name_of: dict[str, str],
+    tickers: list[str] | None = None,
 ) -> tuple[list[tuple[str, str, str]], list[tuple[str, str]]]:
-    """(티커, 이름, digest) 목록과 '반드시 요약이 있어야 하는' 목록."""
+    """(티커, 이름, digest) 목록과 '반드시 요약이 있어야 하는' 목록.
+
+    `tickers` 를 주면 **그 종목들만** 만든다(순서도 준 대로). 급부상 한 줄 요약
+    (scripts/generate_surging_oneliners.py)이 쓰는 길이다 — 국내 짝과 같은 얼개다.
+    창에 언급이 없는 티커는 재료가 없어 조용히 빠진다."""
     since, end = window_dates(latest)
     win = [m for m in msgs if since <= m["date"] <= end]
 
@@ -444,10 +451,16 @@ def build_stock_digests(
             by_ticker[x["ticker"]].append({**m, "match_text": x.get("match_text")})
 
     ranked = sorted(by_ticker.items(), key=lambda kv: -len(kv[1]))
-    required = [(t, name_of.get(t, t)) for t, _ in ranked[:CARD_TOP_N]]
+    if tickers is not None:
+        # 준 순서를 지킨다. 창에 언급이 없는 티커는 by_ticker 에 없어 그대로 빠진다.
+        picked = [(t, by_ticker[t]) for t in tickers if t in by_ticker]
+        required = [(t, name_of.get(t, t)) for t, _ in picked]
+    else:
+        picked = ranked[:NARRATIVE_TOP_N]
+        required = [(t, name_of.get(t, t)) for t, _ in ranked[:CARD_TOP_N]]
 
     digests = []
-    for ticker, items in ranked[:NARRATIVE_TOP_N]:
+    for ticker, items in picked:
         name = name_of.get(ticker, ticker)
         by_day = Counter(m["date"] for m in items)
         chans = len({m["channel_handle"] for m in items})
