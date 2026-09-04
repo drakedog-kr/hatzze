@@ -4188,18 +4188,24 @@ main.hz-scroll { overflow-x: clip; }
   grid-column: 1;
   grid-row: 1;
   min-width: 0;
-  padding: 26px 26px 18px;
+  /* ⭐ **위 여백 14 는 시트 테두리와의 거리다**(2026-09-05 지적: "간격이 너무 넓다").
+     26 이었는데, 3분할 히어로를 쓰는 화면들(내부자 리포트·국장 미리보기)은 같은 자리가
+     14 여서 같은 셸인데 테두리 두께가 달라 보였다. **카드 안에 든 카드는 14, 맨 글씨는
+     26** 이 이 판의 규칙이다 — 회색 타일은 스스로 경계가 있어 바짝 붙어도 되지만 글은
+     아니다(옆 26, 3분할 쪽도 글 칸만 14+22=36 을 준다). 옆·아래는 그래서 안 건드린다. */
+  padding: 14px 26px 18px;
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
-/* 아래 여백 23 = 오른쪽 칸의 26 − 3. 글줄 상자(12 × 1.6)의 밑끝과 **글자의 밑끝**은
-   3px 차이라, 상자를 맞추면 눈에 보이는 글자가 버튼 밑선보다 3px 떠 보인다(실측 699.8 vs 703). */
+/* 아래 여백 11 = 옆 칸의 14 − 3. 글줄 상자(12 × 1.6)의 밑끝과 **글자의 밑끝**은
+   3px 차이라, 상자를 맞추면 눈에 보이는 글자가 버튼 밑선보다 3px 떠 보인다(실측 699.8 vs 703).
+   ⚠️ **옆 칸 여백을 바꾸면 이 값도 같이 바꾼다** — 둘은 한 선에 서기로 한 사이다(26/23 → 14/11). */
 .hz-tx-note {
   grid-column: 1;
   grid-row: 2;
   margin: 0;
-  padding: 18px 26px 23px;
+  padding: 18px 26px 11px;
   font-size: 12px;
   line-height: 1.6;
   color: var(--c-sub);
@@ -4241,10 +4247,12 @@ main.hz-scroll { overflow-x: clip; }
   white-space: nowrap;
 }
 .hz-tx-hero-title {
-  /* 눈썹 줄과는 붙이고(gap 14) 본문과는 조금 더 벌린다 — 제목이 본문의 첫 줄처럼 안 읽히게.
-     34 → 28: 화면 제목(30)보다 작아야 한다. 이건 오늘의 문장이지 화면의 이름이 아니다. */
-  margin: 0 0 6px;
-  font-size: 28px;
+  /* 눈썹 줄과는 붙이고 본문과는 조금 더 벌린다 — 제목이 본문의 첫 줄처럼 안 읽히게.
+     34 → 28 → **20**(2026-09-05 지적: "아까는 너무 큰 것 같았어"). 화면 제목(30)보다
+     작아야 하는 건 그대로고, 여기서 한 단 더 내려 구간 제목(20)과 같은 자리에 둔다 —
+     이건 오늘의 문장이지 화면의 이름이 아니다. */
+  margin: 0 0 4px;
+  font-size: 20px;
   font-weight: 800;
   letter-spacing: -0.03em;
   line-height: 1.28;
@@ -4252,13 +4260,15 @@ main.hz-scroll { overflow-x: clip; }
   word-break: keep-all;
 }
 .hz-tx-hero-title em { font-style: normal; }
-.hz-tx-hero-body { display: flex; flex-direction: column; gap: 12px; }
-/* 16 → 14.5. 토스 본문 16 을 그대로 가져왔더니 세 문단 450자가 너무 크게 읽혔다(지적).
-   토스는 문단이 두 줄이고 여기는 아홉 줄이라 같은 크기가 같은 무게가 아니다. */
+.hz-tx-hero-body { display: flex; flex-direction: column; gap: 10px; }
+/* 16 → 14.5 → 15 → **14**. 토스 본문 16 을 그대로 가져왔더니 세 문단 450자가 너무 크게
+   읽혔다(지적) — 토스는 문단이 두 줄이고 여기는 아홉 줄이라 같은 크기가 같은 무게가
+   아니다. 2026-09-05 에 한 단 더 내렸다. 리디자인 **전** 이 자리가 14 였고, 국장 미리보기의
+   같은 칸도 14 다. 세 화면이 같은 크기라야 한 벌로 읽힌다. */
 .hz-tx-hero-body p {
   margin: 0;
-  font-size: 15px;
-  line-height: 1.85;
+  font-size: 14px;
+  line-height: 1.75;
   letter-spacing: -0.01em;
   color: var(--c-ink-soft);
   text-wrap: pretty;
@@ -4428,19 +4438,22 @@ main.hz-scroll { overflow-x: clip; }
 
 
 /* ── 좌우 바꿈(국장 카더라, 2026-09-04 ): 데이터 타일이 **왼쪽**, 브리핑이 오른쪽 ──
-   격자 자리만 바꾼다. 안쪽 여백은 거울상이다 — 옆 칸의 바깥쪽(왼쪽) 26, 본문 쪽 0 이고
-   본문 칸의 왼쪽 26 이 둘 사이 간격이 된다. 시장 브리핑은 아직 반대(브리핑 왼쪽)다. */
+   격자 자리만 바꾼다. 안쪽 여백은 거울상이다 — 옆 칸의 바깥쪽(왼쪽) 14, 본문 쪽 0 이고
+   본문 칸의 왼쪽 26 이 둘 사이 간격이 된다. 시장 브리핑도 2026-09-04 부터 이 판을 쓴다. */
 .hz-tx-hero-flip { grid-template-columns: 400px minmax(0, 1fr); }
 .hz-tx-hero-flip > .hz-tx-hero-side {
   grid-column: 1;
   grid-row: 1 / 3;
-  padding: 26px 0 26px 26px;
+  /* ⭐ 14 는 3분할 히어로(.hz-kd-hero · .hz-hero-panel)의 시트 여백과 같은 값이다.
+     26 이던 것을 맞췄다 — 같은 셸을 쓰는 화면끼리 테두리 두께가 달라 보였다(2026-09-05
+     실측: 브리핑·카더라 27, 내부자·미리보기 15. 테두리 1px 포함). */
+  padding: 14px 0 14px 14px;
 }
 .hz-tx-hero-flip > .hz-tx-hero-main { grid-column: 2; grid-row: 1; }
 .hz-tx-hero-flip > .hz-tx-note { grid-column: 2; grid-row: 2; }
 @media (max-width: 1200px) {
   .hz-tx-hero-flip { grid-template-columns: minmax(0, 1fr); }
-  .hz-tx-hero-flip > .hz-tx-hero-side { grid-column: 1; grid-row: 1; padding: 26px 26px 18px; }
+  .hz-tx-hero-flip > .hz-tx-hero-side { grid-column: 1; grid-row: 1; padding: 14px 14px 18px; }
   .hz-tx-hero-flip > .hz-tx-hero-main { grid-column: 1; grid-row: 2; padding: 20px 26px 18px; }
   /* ⚠️⚠️ **`grid-column: 1` 을 빠뜨리면 안 된다.** 한 열로 접으면서 이 칸만 2열에 남겨
      뒀더니 격자가 **암묵 열**을 하나 더 만들었다 — 선언한 1fr 트랙이 0px 이 되고 내용이
@@ -4696,8 +4709,10 @@ main.hz-scroll { overflow-x: clip; }
   .hz-tx .hz-kd-hero + .hz-sheet-foot { padding: 0 14px 14px; }
   .hz-tx-tile { padding: 14px 14px; }
   .hz-tx-hero-main { padding: 18px 16px 16px; }
+  /* 옆·위 14 는 넓은 화면과 같은 값이다 — 히어로 카드와 그 안 타일 사이는 어느 폭에서나
+     14 로 둔다(2026-09-05). 아래 16 은 여백이 아니라 본문 칸과의 간격이라 그대로 둔다. */
   .hz-tx-hero-flip > .hz-tx-hero-side,
-  .hz-tx-hero-side { padding: 16px 16px 16px; }
+  .hz-tx-hero-side { padding: 14px 14px 16px; }
   .hz-tx-hero-flip > .hz-tx-hero-main { padding: 16px 16px 16px; }
   .hz-tx-note { padding: 12px 16px 16px; }
   .hz-tx .hz-panelgrid { padding: 12px 12px 14px; gap: 8px; }

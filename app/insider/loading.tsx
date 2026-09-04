@@ -19,7 +19,7 @@ import { C } from "../ui";
 
 /** 결과와 같은 골격으로 은은하게 깜빡이는 블록. globals.css 의 hz-shimmer 를 쓴다. */
 function Block({ h, w = "100%", r = 8 }: { h: number; w?: number | string; r?: number }) {
-  return <div className="hz-shimmer" style={{ height: h, width: w, borderRadius: r, background: C.bg }} />;
+  return <div className="hz-shimmer" style={{ height: h, width: w, maxWidth: "100%", borderRadius: r, background: C.bg }} />;
 }
 
 function HeroPane({ lines }: { lines: number }) {
