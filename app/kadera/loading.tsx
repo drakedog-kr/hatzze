@@ -20,9 +20,15 @@ import { C } from "../ui";
  * 아니기 때문이다(그건 Suspense 를 시트마다 걸었을 때 이야기다).
  */
 
-/** 결과와 같은 골격으로 은은하게 깜빡이는 블록. globals.css 의 hz-shimmer 를 쓴다. */
+/** 결과와 같은 골격으로 은은하게 깜빡이는 블록. globals.css 의 hz-shimmer 를 쓴다.
+ *
+ * ⚠️ `maxWidth: "100%"` 가 있어야 한다. 폭을 픽셀로 준 블록(340·420)은 좁은 화면에서
+ * 칸보다 넓어져 카드 밖으로 삐져나왔다(375px 에서 6px, 2026-09-05 실측). 골격은 결과가
+ * 들어올 자리를 잡아 두는 것이라 결과보다 커지면 안 된다. */
 function Block({ h, w = "100%", r = 8 }: { h: number; w?: number | string; r?: number }) {
-  return <div className="hz-shimmer" style={{ height: h, width: w, borderRadius: r, background: C.bg }} />;
+  return (
+    <div className="hz-shimmer" style={{ height: h, width: w, maxWidth: "100%", borderRadius: r, background: C.bg }} />
+  );
 }
 
 /** 시트 머리 — 맨 아이콘 + 제목 + 부제(SectionHead 와 같은 골격·같은 padding). */

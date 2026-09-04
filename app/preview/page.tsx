@@ -663,13 +663,15 @@ export default async function PreviewPage() {
           </span>
         </div>
 
-        {/* ③ 오늘의 브리핑 — 아랫줄을 통째로 쓴다.
+        {/* ③ 오늘의 브리핑 — 1:1:2 판의 셋째 칸(2fr).
+            ⚠️ 문단은 **14px** 이다(2026-09-05). 13 이었는데, 같은 자리를 쓰는 시장 브리핑·
+            카더라가 14 라 이 화면만 한 단 작았다. 리디자인 전 그 자리도 14 였다.
             ⚠️ 문장을 LLM 에 맡기지 않는다. 재료가 숫자 넷뿐이라 틀이 고정이고, 매일 두 번
             도는 화면에 모델 값을 태울 이유가 없다. 이름 뒤 조사만 josa() 로 받침에 맞춘다. */}
         <div className="hz-hero-cell hz-hero-divide hz-hero-wide">
           <CellHead title="오늘의 브리핑" />
           {moverCount === 0 ? (
-            <p style={{ margin: 0, fontSize: 13, color: C.sub, lineHeight: 1.75, wordBreak: "keep-all" }}>
+            <p style={{ margin: 0, fontSize: 14, color: C.sub, lineHeight: 1.75, wordBreak: "keep-all" }}>
               밤사이 크게 움직인 종목이 없습니다. 눈여겨보는 미국 종목 가운데 평소 폭을 크게 넘어선 곳이 없었다는
               뜻이고, 고장이 아니라 조용한 밤이었습니다. 한 해에 두세 번 있는 밤입니다.
             </p>
@@ -681,12 +683,12 @@ export default async function PreviewPage() {
                   나오는 조각들이 문장으로 붙는다. */}
               {/* ⚠️ "코스피보다 얼마나" 같은 말을 쓰지 말 것. 지수 대비 초과분은 코드 안 개념이고,
                   화면이 내는 숫자는 **그 종목이 실제로 몇 % 열렸나** 다. 문장도 그렇게 적는다. */}
-              <p style={{ margin: 0, fontSize: 13, color: C.sub, lineHeight: 1.75, wordBreak: "keep-all" }}>
+              <p style={{ margin: 0, fontSize: 14, color: C.sub, lineHeight: 1.75, wordBreak: "keep-all" }}>
                 미장 종목이 평소보다 크게 움직인 날, 그 회사와 사업으로 엮인 국장 종목이 다음 날 아침 몇 %에
                 열렸는지를 최근 5년치로 세어 보여 드립니다.
               </p>
               {biggest && (
-                <p style={{ margin: 0, fontSize: 13, color: C.sub, lineHeight: 1.75, wordBreak: "keep-all" }}>
+                <p style={{ margin: 0, fontSize: 14, color: C.sub, lineHeight: 1.75, wordBreak: "keep-all" }}>
                   밤사이 {moverCount}곳이 평소보다 크게 움직였습니다. 그중 제일 큰 것은{" "}
                   <strong style={{ color: C.ink, fontWeight: 700 }}>{biggest.usName}</strong>
                   {josa(biggest.usName, "으로", "로")},{" "}
@@ -698,7 +700,7 @@ export default async function PreviewPage() {
                 </p>
               )}
               {strongest && (
-                <p style={{ margin: 0, fontSize: 13, color: C.sub, lineHeight: 1.75, wordBreak: "keep-all" }}>
+                <p style={{ margin: 0, fontSize: 14, color: C.sub, lineHeight: 1.75, wordBreak: "keep-all" }}>
                   {/* ⚠️ %p 를 문장에 쓰지 말 것. 지수 대비 초과분이라 읽는 사람에게 뜻이 안 선다.
                       화면 어디에서나 **그 종목이 실제로 몇 %에 열렸나** 로 적는다. */}
                   국장에서 가장 크게 따라갔던 곳은{" "}
@@ -716,7 +718,7 @@ export default async function PreviewPage() {
                 </p>
               )}
               {crowded && crowded[1] > 1 && (
-                <p style={{ margin: 0, fontSize: 13, color: C.sub, lineHeight: 1.75, wordBreak: "keep-all" }}>
+                <p style={{ margin: 0, fontSize: 14, color: C.sub, lineHeight: 1.75, wordBreak: "keep-all" }}>
                   <strong style={{ color: C.ink, fontWeight: 700 }}>{crowded[0]}</strong>
                   {josa(crowded[0], "은", "는")} 밤사이 크게 움직인 미장 종목 {crowded[1]}곳과 한꺼번에 엮입니다.
                 </p>
@@ -881,7 +883,11 @@ export default async function PreviewPage() {
                   : `${formatKstUpdate(overnight.capturedAt, PERP_HOURS).replace(" 기준", "")} 시점`
                 : undefined
             }
-            desc={`국장이 닫힌 동안 해외 무기한선물에서 거래된 값입니다. 환율 ${Math.round(
+            /* ⚠️ '거래된' 이 아니라 **'거래되는'** 이다(2026-09-05 지적). 시트 제목이
+                "해외에서 거래 **중인** 값" 인데 설명만 과거였다 — 제 제목과 어긋난다.
+                이 화면을 읽는 시각은 국장이 열기 전이고 그때 저쪽은 아직 거래 중이다.
+                언제 값인지는 옆 '시점' 알약이 따로 말하므로 설명이 시제로 겹칠 이유가 없다. */
+            desc={`국장이 닫힌 동안 해외 무기한선물에서 거래되는 값입니다. 환율 ${Math.round(
               // ⚠️ 환율은 **하루에 하나**다(수집기가 실행마다 한 번 받아 모든 줄에 같은 값을
               //    넣는다). 그래서 어느 줄에서 꺼내도 같지만, 줄 순서가 거래대금 순이라
               //    rows[0] 은 날마다 다른 종목이다 — 가장 큰 값을 집어 뜻을 못박는다.

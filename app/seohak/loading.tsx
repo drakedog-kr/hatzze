@@ -22,7 +22,7 @@ import { S } from "./scale";
 
 /** 결과와 같은 골격으로 은은하게 깜빡이는 블록. globals.css 의 hz-shimmer 를 쓴다. */
 function Block({ h, w = "100%", r = 8 }: { h: number; w?: number | string; r?: number }) {
-  return <div className="hz-shimmer" style={{ height: h, width: w, borderRadius: r, background: C.bg }} />;
+  return <div className="hz-shimmer" style={{ height: h, width: w, maxWidth: "100%", borderRadius: r, background: C.bg }} />;
 }
 
 /** 시트 머리(아이콘 + 제목 + 부제). `.hz-sheet-head` 가 치수를 쥐므로 여기선 알맹이만 흉내 낸다. */
