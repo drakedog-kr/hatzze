@@ -22,7 +22,15 @@ import { cache } from "react";
 
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { sentimentTone } from "@/lib/format";
-import { channelMeta, fetchAllRows, lastKaderaUpdatedAt, optimismPct, toPercents } from "@/lib/telegram-data";
+import {
+  LLM_TEXT_CARRY_DAYS,
+  addDaysISO,
+  channelMeta,
+  fetchAllRows,
+  lastKaderaUpdatedAt,
+  optimismPct,
+  toPercents,
+} from "@/lib/telegram-data";
 import { changeRateOf, fetchYahooQuote } from "@/lib/yahoo-quote";
 import { yahooSymbol } from "@/lib/yahoo-history";
 import { US_THEMES } from "@/lib/us-stock-themes";
@@ -170,10 +178,14 @@ export async function getUsSurgingOneliners(): Promise<Record<string, string>> {
   const { dates } = await loadUsStockDaily(14);
   const base = dates.at(-1);
   if (!base) return {};
+  // 오래된 날부터 받아 뒤엣것이 이기게 둔다 — 기준일분이 아직 없으면 이틀까지 거슬러
+  // 가장 최근 문장을 쓴다(LLM_TEXT_CARRY_DAYS 주석).
   const { data, error } = await db
     .from("telegram_us_surging_oneliner")
-    .select("ticker,oneliner")
-    .eq("date", base);
+    .select("date,ticker,oneliner")
+    .gte("date", addDaysISO(base, -LLM_TEXT_CARRY_DAYS))
+    .lte("date", base)
+    .order("date", { ascending: true });
   if (error) {
     console.error("[getUsSurgingOneliners] 급부상 한 줄 요약을 못 읽었습니다", error);
     return {};
@@ -889,10 +901,13 @@ export async function getUsStockReports(limit = 4): Promise<UsStockReport[]> {
   const base = dates.at(-1)!;
   const { data, error } = await db
     .from("telegram_us_stock_narrative")
-    .select("ticker,narrative")
-    .eq("date", base)
-    .in("ticker", top.map(([t]) => t));
+    .select("date,ticker,narrative")
+    .gte("date", addDaysISO(base, -LLM_TEXT_CARRY_DAYS))
+    .lte("date", base)
+    .in("ticker", top.map(([t]) => t))
+    .order("date", { ascending: true });
   if (error) console.error("[getUsStockReports] 흐름 요약을 못 읽었습니다", error);
+  // Map 도 나중 set 이 이기므로 날짜 오름차순이면 가장 최근 문장만 남는다.
   const narrativeOf = new Map((data ?? []).map((r) => [r.ticker as string, r.narrative as string]));
 
   const chartDates = dates.slice(-US_CHART_DAYS);
