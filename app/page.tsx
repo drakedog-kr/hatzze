@@ -636,15 +636,20 @@ function Hero({
   const deltaText = delta === null ? "—" : delta === 0 ? "—" : `${delta > 0 ? "▲" : "▼"}${Math.abs(delta)}`;
   const deltaLabel = compareLabel(dailyScore.date, dailyScore.prevDay?.date ?? null);
 
-  // LLM 요약은 두 문단이다. 앞은 "오늘 가장 뜨거운 지표", 뒤는 "최근 며칠 온도 추세".
-  // 둘 다 브리핑 셀에 들어간다 — '오늘 → 왜 → 흐름' 순으로 읽힌다. 한때 뒤 문단을
-  // 햇쩨 지수 카드에 뒀는데, 그 셀이 게이지·눈금까지 넣으면서 문단을 받을 자리가 없다.
+  /* LLM 요약은 **세 문단**이다(2026-09-05 에 가운데를 끼웠다).
+       ① 오늘 가장 뜨거운 지표  ② 시장 지표 vs 감성 지표  ③ 최근 며칠 온도 추세
+     셋 다 브리핑 셀에 들어간다 — '무엇이 → 어느 종류가 → 어떤 흐름으로' 순으로 읽힌다.
+
+     ⚠️⚠️ **두 줄짜리 옛 자료를 그대로 살려야 한다.** 저장된 문장은 파이프라인이 다시
+     돌아야 세 줄이 되는데, 그때까지 인덱스를 [0][1][2] 로 못박으면 **추세 문단이 통째로
+     사라진다**(옛 자료의 [1] 은 추세인데 [2] 는 없다). 줄 수로 갈라 집는다. */
   const summaryLines = (dailyScore.ai_summary ?? "")
     .split("\n")
     .map((x) => x.trim())
     .filter(Boolean);
   const meaningLine = summaryLines[0] ?? null;
-  const trendLine = summaryLines[1] ?? null;
+  const balanceLine = summaryLines.length >= 3 ? summaryLines[1] : null;
+  const trendLine = (summaryLines.length >= 3 ? summaryLines[2] : summaryLines[1]) ?? null;
 
   return (
     // 히어로도 아래 지표 시트와 같은 어법이다 — 흰 판 하나를 헤어라인으로 갈라 셀을
@@ -915,12 +920,19 @@ function Hero({
             {renderRichSummary(meaningLine)}
           </p>
         )}
-        {/* 시장↔감성 온도 비교 문단이 여기 있었다("지금은 시장 지표의 온도가 39도로
-            감성 지표(21도)보다 높습니다…"). 히어로가 카드 둘에서 셀 하나로 합쳐지면서
-            요약이 한자리에 모였고, 그 안에서 이 문단만 LLM 이 아니라 우리가 만들어 낸
-            문장이라 결이 달랐다. 두 카테고리의 온도 차이는 바로 옆 '지표 분포'가
-            개수로 이미 보여 준다. 만들어 낸 문장은 넣지 않는다(2026-08-03 결정).
-            계산에 쓰던 marketHeat·socialHeat 프롭도 같이 걷었다. */}
+        {/* 시장↔감성 비교 문단이 **돌아왔다**(2026-09-05 Hun 요청).
+            ⚠️ 2026-08-03 에 뺐던 자리다. 그때 뺀 까닭 둘 중 하나는 이제 해당이 없다 —
+            그 문장은 **우리가 만들어 낸 템플릿**이라 옆 문단들과 결이 달랐는데, 지금
+            것은 LLM 이 쓴다(generate_daily_summary.BALANCE_SYSTEM).
+            남은 하나("옆 지표 분포가 개수로 이미 보여 준다")는 절반만 맞다 — 그 타일은
+            구간별 개수를 보여 줄 뿐 **시장/감성 중 어느 쪽이 뜨거운지는 말하지 않는다.**
+            ⚠️ 온도 숫자를 만들어 붙이지 말 것. 그때 걷어낸 marketHeat·socialHeat 를
+            되살리면 다시 템플릿 문장이 된다. 근거는 digest 가 주고 문장은 모델이 쓴다. */}
+        {balanceLine && (
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.7, color: C.inkSoft, textWrap: "pretty" }}>
+            {renderRichSummary(balanceLine)}
+          </p>
+        )}
         {/* 온도 추세 문단. 예전엔 햇쩨 지수 카드에 뒀는데(온도 이야기라서), 그 셀이
             게이지까지 넣기엔 좁아졌다. 브리핑 세 문단이 '오늘 → 왜 → 흐름' 순으로
             읽히는 편이 낫기도 하다. */}
