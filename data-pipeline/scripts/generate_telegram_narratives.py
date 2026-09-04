@@ -998,8 +998,15 @@ def save_stock_breadth(db, latest: str) -> None:
         print(f"[관심의 폭] 저장 실패(무시하고 계속): {e}")
 
 
-def build_stock_digests(db, latest: str) -> tuple[list[tuple[str, str, str]], list[tuple[str, str]]]:
+def build_stock_digests(
+    db, latest: str, codes: list[str] | None = None
+) -> tuple[list[tuple[str, str, str]], list[tuple[str, str]]]:
     """([(종목코드, 종목명, digest)], [(종목코드, 종목명)]).
+
+    `codes` 를 주면 **그 종목들만** digest 를 만든다(순서도 준 대로). 급부상 한 줄 요약
+    (scripts/generate_surging_oneliners.py)이 쓰는 길이다 — 창·발췌·톤을 똑같이 잡아야
+    두 문장이 같은 사흘을 말하므로, 그쪽에서 같은 코드를 베끼는 대신 여기를 부른다.
+    기본값(None)이면 예전 그대로 상위 N개 + 급부상 + 주간 결산이다.
 
     첫째는 요약을 만들 대상, 둘째는 **요약이 반드시 있어야 하는 종목**이다. 둘은 대개
     같지만 갈리는 자리가 있어 따로 돌려준다 — 아래 required 주석 참고.
@@ -1056,18 +1063,26 @@ def build_stock_digests(db, latest: str) -> tuple[list[tuple[str, str, str]], li
     # 갑자기 튀어나온 중소형주는 이유를 모르면 이름과 숫자만 남는다.
     #
     # 두 목록이 같은 표(14일치 telegram_stock_daily)를 보므로 한 번 읽어 같이 넘긴다.
-    stock_daily = load_stock_daily(db)
-    weekly, _ = weekly_top_stocks(db, preloaded=stock_daily)
-    extra = [s["code"] for s in top_surging(db, SURGING_NARRATIVE_N, preloaded=stock_daily)]
-    extra += [code for code, _m in weekly]
+    # ⭐ `codes` 를 받은 호출은 여기 확장을 통째로 건너뛴다. 대상은 준 목록 그대로이고
+    #    커버리지 검사(주간 결산 몫)도 그쪽 관심사가 아니다. 창·발췌·톤을 만드는 **아래
+    #    꼬리는 그대로 함께 쓴다** — 그래야 두 문장이 같은 사흘을 말한다.
+    weekly: list[tuple[str, int]] = []
+    if codes is None:
+        stock_daily = load_stock_daily(db)
+        weekly, _ = weekly_top_stocks(db, preloaded=stock_daily)
+        extra = [s["code"] for s in top_surging(db, SURGING_NARRATIVE_N, preloaded=stock_daily)]
+        extra += [code for code, _m in weekly]
 
-    have = {code for code, _ in top}
-    for code in extra:
-        # 집계 창(3일)에 행이 없으면 digest 를 만들 재료가 없다 — 그런 종목은 건너뛴다.
-        # 건너뛴 주간 종목은 아래 required 에 그대로 남아 커버리지 검사에 걸린다.
-        if code not in have and code in agg:
-            top.append((code, agg[code]))
-            have.add(code)
+        have = {code for code, _ in top}
+        for code in extra:
+            # 집계 창(3일)에 행이 없으면 digest 를 만들 재료가 없다 — 그런 종목은 건너뛴다.
+            # 건너뛴 주간 종목은 아래 required 에 그대로 남아 커버리지 검사에 걸린다.
+            if code not in have and code in agg:
+                top.append((code, agg[code]))
+                have.add(code)
+    else:
+        top = [(c, agg[c]) for c in codes if c in agg]
+        have = {code for code, _ in top}
 
     stocks = load_all(db, "stocks", "code,name", order_by="code")
     name_of = {s["code"]: s["name"] for s in stocks}
