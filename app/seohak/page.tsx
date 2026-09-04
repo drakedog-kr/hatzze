@@ -10,10 +10,10 @@ import { CalendarHero } from "./CalendarHero";
 import { EtfSection } from "./EtfCards";
 import { TradingCards } from "./TradingCards";
 import { WealthCards } from "./WealthCards";
-import { SectionCaps } from "../kadera/parts";
+import { SectionIntro } from "../SectionIntro";
 import { SEOHAK_CARD } from "../og-copy";
 import { toFx } from "./money";
-import { S } from "./scale";
+
 import { pageMetadata } from "../seo";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -53,7 +53,7 @@ export default async function SeohakPage() {
     // hz-cards 를 쓰지 않는다. 그건 브리핑의 4열 셀 격자라 자식마다 min-height 274px 가
     // 걸려 있어서, 짧은 시트 아래에 200px 짜리 빈 바닥이 생긴다(실측). 카더라와 같은
     // 맨 세로 흐름으로 둔다.
-    <div style={{ display: "flex", flexDirection: "column", gap: S.lg }}>
+    <div className="hz-tx">
       {/* ── ② 오늘 · 일별 층 ──────────────────────────────────────────
           예탁원 결제 통계 하나에서 나오는 일곱 장. 브리핑과 같은 4열 셀 격자(.hz-cards)를
           써서 "카드 하나가 한 행을 통째로 먹는" 모양을 피한다 — 칸 합이 12라 3줄이 찬다.
@@ -64,13 +64,13 @@ export default async function SeohakPage() {
       {calendar && <CalendarHero c={calendar} fx={rates} />}
 
       {/* ── 구간 나누기 ───────────────────────────────────────────────
-          카더라·브리핑·MDD 가 쓰는 것과 같은 머리 배지(SectionCaps)로 장을 가른다.
+          카더라·브리핑·MDD 가 쓰는 것과 같은 구간 제목(SectionIntro)으로 장을 가른다.
           히어로(달력)는 어느 장에도 안 넣는다 — 카더라도 히어로를 첫 배지 위에 둔다.
 
           기준은 **갱신 주기가 아니라 질문**이다. 주기로 나누면 "매일/매월/분기"가
           되는데, 그건 우리 파이프라인 사정이지 읽는 사람의 관심이 아니다. */}
       {/* ── 구간 나누기 ───────────────────────────────────────────────
-          카더라·브리핑·MDD 가 쓰는 것과 같은 머리 배지(SectionCaps)로 장을 가른다.
+          카더라·브리핑·MDD 가 쓰는 것과 같은 구간 제목(SectionIntro)으로 장을 가른다.
           히어로(달력)는 어느 장에도 안 넣는다 — 카더라도 히어로를 첫 배지 위에 둔다.
 
           ## ⭐ 기준은 **갱신 주기가 아니라 질문**이다
@@ -87,7 +87,7 @@ export default async function SeohakPage() {
 
           ⚠️ 배지의 숫자는 **손으로 적지 않는다.** 카드를 빼면서 실제 장수와 어긋난 적이
           있다(3 이라 적혀 있는데 두 장이었다). 있는 자료로 세게 둔다. */}
-      <SectionCaps label="어떻게 사고파나" count={1 + (ov.channel?.turnover ? 1 : 0)} />
+      <SectionIntro n={1} title="어떻게 사고파나" />
       {/* 둘 다 예탁원 채널이라 모집단이 같다. 아래 두 층과 같은 2열 격자를 쓴다 —
           섹션마다 열 수가 다르면 훑을 때 리듬이 끊긴다.
           ⚠️ 세 층이 **같은 격자**(`CARD_GRID`)를 쓴다. 손으로 적었을 때 칸 사이가
@@ -104,7 +104,7 @@ export default async function SeohakPage() {
       {/* ⚠️ '얼마나 큰 돈인가' 였다. 두 카드가 실제로 답하는 건 크기가 아니라 **지금
           얼마인가**다 — 앞엣것은 276조원이 됐다는 결과이고 뒤엣것은 가계 주식에서
           차지하는 자리다. 앞 층('어떻게 사고파나')을 '그 돈' 으로 받아 잇는다. */}
-      <SectionCaps label="그 돈은 지금 얼마인가" count={(fx ? 1 : 0) + (household ? 1 : 0)} />
+      <SectionIntro n={2} title="그 돈은 지금 얼마인가" />
       <div style={CARD_GRID}>
         <WealthCards ch={ov.channel} fx={rates} household={household} />
       </div>
@@ -113,7 +113,7 @@ export default async function SeohakPage() {
           바꿨다. 미국에 직접 상장된 QQQ 같은 건 안 들어오는 딴 그릇이라, 이름으로 그
           경계를 밝힌다. 이 묶음만 질문이 아니라 이름인 까닭이 그것이다 — 여기서 가릴
           것은 '무엇을 묻나'가 아니라 '어느 그릇인가'다. */}
-      <SectionCaps label="국내 상장 ETF" count={etf ? 2 : 0} />
+      <SectionIntro n={3} title="국내 상장 ETF" />
       {etf && <EtfSection e={etf} fx={rates} />}
 
       {/* ⛔ 여기서 뺀 카드들과 그 까닭

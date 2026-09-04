@@ -156,6 +156,31 @@ async function loadUsStockDaily(days: number): Promise<{ rows: DailyRow[]; dates
  * 그날 아침에 쏟아진다(실측: 새벽 4시~아침 8시가 미국 언급 비중 20~28%로 가장 높다).
  * 화면에서 이 날짜를 "그날 장"이라고 쓰면 안 된다.
  */
+/**
+ * 미장 급부상 카드의 **한 줄** 요약(LLM) — 티커로 찾아 쓴다. 국내 짝은
+ * `getSurgingOneliners`(lib/telegram-data.ts)이고, 만드는 곳은
+ * data-pipeline/scripts/generate_surging_oneliners.py 로 둘이 같다.
+ *
+ * 기준일을 `telegram_us_stock_daily` 의 마지막 날로 잡는 것은 바로 아래 흐름 요약
+ * (getUsStockReports)이 쓰는 방법 그대로다 — 두 문장이 한 화면에 서므로 날짜를 집는
+ * 규칙까지 같아야 한다.
+ */
+export async function getUsSurgingOneliners(): Promise<Record<string, string>> {
+  const db = getSupabaseAdmin();
+  const { dates } = await loadUsStockDaily(14);
+  const base = dates.at(-1);
+  if (!base) return {};
+  const { data, error } = await db
+    .from("telegram_us_surging_oneliner")
+    .select("ticker,oneliner")
+    .eq("date", base);
+  if (error) {
+    console.error("[getUsSurgingOneliners] 급부상 한 줄 요약을 못 읽었습니다", error);
+    return {};
+  }
+  return Object.fromEntries((data ?? []).map((r) => [r.ticker as string, r.oneliner as string]));
+}
+
 export async function getUsSurgingStocks(limit = 6): Promise<UsSurgingStock[]> {
   const { rows, dates } = await loadUsStockDaily(14);
   if (!rows.length) return [];

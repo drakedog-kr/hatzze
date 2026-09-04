@@ -36,7 +36,7 @@ const body: React.CSSProperties = { padding: "18px 22px", display: "flex", flexD
 export default function Loading() {
   return (
     // position:relative 는 아래 hz-loading-float 의 기준 상자가 되기 위한 것이다.
-    <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 20 }}>
+    <div className="hz-tx" style={{ position: "relative" }}>
       {/* 조회 바(종목 검색 + 기간 탭). 실제 Controls 가 앉을 자리를 그대로 비워 둔다. */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }} aria-hidden>
         <div style={{ flex: "1 1 260px", minWidth: 220 }}>

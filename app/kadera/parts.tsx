@@ -212,7 +212,9 @@ export function Avatar({ photoUrl, title, size = 30 }: { photoUrl: string | null
         alignItems: "center",
         justifyContent: "center",
         background: C.track,
-        color: C.sub,
+        /* ⚠️ C.sub 였다. 트랙(--c-track)은 다크에서 #3c3c47 이라 그 위 --c-sub 가 4.08 로
+           AA 를 못 넘겼다(2026-09-05 전수 점검). label 은 같은 면에서 5.4 다. */
+        color: C.label,
         fontSize: size * 0.42,
         fontWeight: 700,
       }}
@@ -251,19 +253,10 @@ export function RankBadge({ n }: { n: number }) {
   );
 }
 
-/** 구간 머리 배지("최근 뜨는 것 3"). 시트 사이를 갈라 페이지를 장으로 묶는다.
-    생김새는 .hz-section-badge(globals.css) — 시장 브리핑·MDD 의 같은 줄과 한 벌이다.
-
-    ⚠️ `count` 는 **그 구간에 든 시트 수**다(카드 안 항목 수가 아니다). 시트가 하나뿐인
-    구간에서는 넘기지 않는다 — "장 마감 뒤 붙은 값 1" 은 셀 것이 없는데 숫자만 붙은 꼴이다. */
-export function SectionCaps({ label, count }: { label: string; count?: number }) {
-  return (
-    <div className="hz-section-badge">
-      <span>{label}</span>
-      {count != null && <span className="hz-section-badge-n">{count}</span>}
-    </div>
-  );
-}
+/* 구간 머리 배지(SectionCaps)가 여기 있었다. 2026-09-04 리디자인에서 작은 회색 배지가
+   **큰 구간 제목**(app/SectionIntro.tsx)으로 올라가면서 소비자가 0이 됐다 — 스크롤로 훑을
+   때 장이 바뀐 것이 배지로는 안 잡혔다. 생김새를 쥐던 `.hz-section-badge` 규칙은 남아
+   있다(뿌리에 `hz-tx` 가 없는 화면의 안전망). */
 
 /**
  * 일별 언급량 7일 막대 + 날짜 축.

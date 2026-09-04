@@ -88,7 +88,7 @@ export function Card({
 }) {
   return (
     <section className="hz-sheet" style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-      <SectionHead level={2} icon={icon} title={title} desc={desc} note={note} noteHelp={noteHelp} />
+      <SectionHead level={3} icon={icon} title={title} desc={desc} note={note} noteHelp={noteHelp} />
       {/* flex:1 을 유지할 것. `Flows`·`WeekGrid` 가 `marginTop:auto` 로 목록을 카드 바닥에
           붙이는데, 이 칸이 안 늘어나면 그 auto 가 놀아서 두 카드의 목록 높이가 갈린다. */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: S.md, minWidth: 0,

@@ -241,7 +241,7 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
     // ⭐ 내부자 리포트는 **달러가 기본**이다 — 재료가 전부 미국 공시라 달러가 원본이고,
     // 원화는 크기를 가늠하라고 얹은 것이다. 쿠키로 한 번이라도 고르면 그 선택이 이긴다
     // (규칙은 globals.css 의 `[data-cur-default]`).
-    <div data-cur-default="usd" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div className="hz-tx" data-cur-default="usd">
       {/* 돌아갈 길. 사이드바가 /insider 를 켠 채로 두지만(주소가 그 아래라), 어느 카드에서
           왔는지는 사이드바가 못 말한다. */}
       <Link

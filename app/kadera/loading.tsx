@@ -28,11 +28,11 @@ function Block({ h, w = "100%", r = 8 }: { h: number; w?: number | string; r?: n
 /** 시트 머리 — 맨 아이콘 + 제목 + 부제(SectionHead 와 같은 골격·같은 padding). */
 function SheetHead() {
   return (
-    <div className="hz-sheet-head">
-      <Block h={18} w={18} r={5} />
+    <div className="hz-sheet-head hz-sheet-head-bold">
+      <Block h={40} w={40} r={12} />
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 5 }}>
-        <Block h={13} w={116} r={5} />
-        <Block h={11} w={196} r={5} />
+        <Block h={17} w={140} r={5} />
+        <Block h={12} w={220} r={5} />
       </div>
     </div>
   );
@@ -43,18 +43,23 @@ function Sheet({ h, style }: { h: number; style?: React.CSSProperties }) {
   return (
     <section className="hz-sheet" style={style}>
       <SheetHead />
-      <div style={{ padding: "20px 22px" }}>
+      <div style={{ padding: "4px 26px 24px" }}>
         <Block h={h} />
       </div>
     </section>
   );
 }
 
-/** 시트 사이의 마이크로 캡스 구간 머리. 자리를 지켜야 전환 때 아래가 밀리지 않는다. */
+/** 구간 제목(SectionIntro) 자리 — 장 번호 + 제목 한 줄, 높이 26(20 × 1.3).
+    ⚠️ **실물의 눈금이 바뀌면 여기도 같이 고친다.** 부제 줄이 자리표시자에만 남아 있어서
+    로딩이 끝나는 순간 아래가 18px 튄 적이 있다. 자리표시자는 실물과 같은 골격이어야 한다. */
 function Caps() {
   return (
-    <div style={{ marginTop: 10 }}>
-      <Block h={12} w={92} r={5} />
+    <div className="hz-tx-intro">
+      <div style={{ display: "flex", alignItems: "center", gap: 8, height: 26 }}>
+        <Block h={12} w={16} r={4} />
+        <Block h={20} w={150} r={6} />
+      </div>
     </div>
   );
 }
@@ -73,23 +78,27 @@ function Pair({ h }: { h: number }) {
 export default function Loading() {
   return (
     // position:relative 는 아래 hz-loading-float 의 기준 상자가 되기 위한 것이다.
-    <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 16 }} aria-hidden>
-      {/* 히어로 — 25:25:50 세 칸. 여기만 셀을 따로 그린다(나머지 시트는 한 덩어리로
-          충분하지만, 이 판은 첫 화면을 통째로 차지해서 칸이 셋이라는 게 보여야 한다). */}
-      <section className="hz-sheet">
-        <div className="hz-kd-hero">
-          <div className="hz-kd-hero-q">
-            <Block h={13} w={84} r={5} />
-            <Block h={190} />
+    <div className="hz-tx" style={{ position: "relative" }} aria-hidden>
+      {/* 히어로 — 브리핑(왼쪽) + 타일 세 덩이(오른쪽). page.tsx 의 .hz-tx-hero 와 같은
+          골격이라 전환 순간 판이 다른 모양이었다가 제자리를 찾는 것처럼 보이지 않는다. */}
+      <section className="hz-sheet hz-tx-hero hz-tx-hero-flip">
+        <div className="hz-tx-hero-main">
+          <Block h={13} w={96} r={5} />
+          <Block h={34} w={340} r={8} />
+          <Block h={150} />
+        </div>
+        <div className="hz-tx-note hz-tx-spot">
+          <Block h={30} w={420} r={15} />
+        </div>
+        <div className="hz-tx-hero-side">
+          <Block h={214} r={16} />
+          <div className="hz-tx-stats">
+            <Block h={66} r={14} />
+            <Block h={66} r={14} />
+            <Block h={66} r={14} />
+            <Block h={66} r={14} />
           </div>
-          <div className="hz-kd-hero-q">
-            <Block h={13} w={84} r={5} />
-            <Block h={190} />
-          </div>
-          <div className="hz-kd-hero-h">
-            <Block h={13} w={72} r={5} />
-            <Block h={190} />
-          </div>
+          <Block h={42} r={12} />
         </div>
       </section>
 

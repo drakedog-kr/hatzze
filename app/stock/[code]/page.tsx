@@ -194,7 +194,8 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
   const marketLabel = d.market === "KOSDAQ" ? "코스닥" : d.market === "KOSPI" ? "코스피" : null;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    // 뿌리의 hz-tx 가 이번 리디자인을 켠다(globals.css).
+    <div className="hz-tx">
       {/* 셸이 이 주소의 이름을 모른다(위 머리말). 구조화 데이터도 여기서 낸다. */}
       {/* ⚠️ 이름은 **화면에 보이는 것 그대로**여야 한다(JsonLd 머리말). h1 이 "삼성전자"
           이므로 여기도 그것이다. `<title>` 의 긴 꼴을 넣으면 검색 결과의 이동 경로가
@@ -346,7 +347,9 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
               문장이 aria-label 에도 들어간다.
               틀은 카더라의 종목 서술과 같다(app/kadera/page.tsx). 같은 성격의 글이
               화면마다 다른 꼴로 서면 독자가 매번 무엇인지 다시 읽어야 한다. */}
-          <div style={{ padding: "0 22px 20px" }}>
+          {/* 위 16 은 머리 헤어라인과 첫 내용 사이의 숨이다 — 다른 시트(.hz-tx .hz-panelgrid)와
+              같은 값이라 화면을 오갈 때 같은 자리에서 같은 간격을 만난다. */}
+          <div style={{ padding: "16px 22px 20px" }}>
             <div
               style={{ display: "flex", gap: 9, background: C.soft, borderRadius: R.control, padding: "12px 13px" }}
             >
@@ -381,7 +384,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
             desc="테마를 이루는 대표 종목입니다. 업종 전체가 아니라 손으로 고른 목록입니다."
             level={2}
           />
-          <div style={{ padding: "0 22px 20px", display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <div style={{ padding: "16px 22px 20px", display: "flex", flexWrap: "wrap", gap: 8 }}>
             {peers.map((p) => (
               <Link
                 key={p.code}

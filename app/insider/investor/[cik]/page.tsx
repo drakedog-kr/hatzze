@@ -143,7 +143,7 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
     // ⭐ 내부자 리포트는 **달러가 기본**이다 — 재료가 전부 미국 공시라 달러가 원본이고,
     // 원화는 크기를 가늠하라고 얹은 것이다. 쿠키로 한 번이라도 고르면 그 선택이 이긴다
     // (규칙은 globals.css 의 `[data-cur-default]`).
-    <div data-cur-default="usd" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div className="hz-tx" data-cur-default="usd">
       <Link
         href="/insider"
         style={{

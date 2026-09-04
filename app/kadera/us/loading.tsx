@@ -90,7 +90,7 @@ export default function Loading() {
       <div className="hz-loading-float">
         <span className="hz-loading-badge">
           <span className="hz-spinner" />
-          미국 종목 얘기를 모으는 중
+          미장 종목 얘기를 모으는 중
         </span>
       </div>
 

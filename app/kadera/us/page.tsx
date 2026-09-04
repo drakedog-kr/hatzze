@@ -9,6 +9,7 @@ import {
   getUsDailyBrief,
   getUsStockBreadth,
   getUsStockReports,
+  getUsSurgingOneliners,
   getUsSurgingStocks,
   getUsThemeRotation,
   getUsTrendingMessages,
@@ -20,7 +21,7 @@ import { formatKstUpdate } from "@/lib/format";
 
 import { pageMetadata } from "../../seo";
 import { US_KADERA_CARD } from "../../og-copy";
-import { AiMark, C, Icon, MONO, R } from "../../ui";
+import { AiMark, C, Icon, MONO } from "../../ui";
 import { StockLogo } from "../../StockLogo";
 import { ExpandableList } from "../ExpandableList";
 import {
@@ -31,13 +32,13 @@ import {
   Highlight,
   RankBadge,
   RankDelta,
-  SectionCaps,
   Sparkline,
   highlightTerms,
   termsFor,
 } from "../parts";
 import { TrendingTabs } from "../TrendingTabs";
 import { SectionHead } from "../SectionHead";
+import { SectionIntro } from "../../SectionIntro";
 
 export async function generateMetadata(): Promise<Metadata> {
   return pageMetadata({
@@ -224,13 +225,17 @@ function UsTrendingList({ items }: { items: UsTrendingMessage[] }) {
             {m.stocks.length > 0 && (
               <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
                 {m.stocks.map((t) => (
+                  /* ⚠️ 바탕은 `C.card` 가 아니라 **`C.chip`** 다(2026-09-05 지적의 이웃 건).
+                     말풍선이 예전엔 회색(--c-soft)이라 칩을 흰 판으로 띄웠는데, 이번 리디자인에서
+                     말풍선이 카드색이 되면서(.hz-tx .hz-bubble) **흰 칩이 흰 배경에 묻혔다.**
+                     대비 1.00 — 글자만 떠 있었다. 국장은 리디자인 때 고쳤고 미장만 빠졌다. */
                   <span
                     key={t}
                     style={{
                       fontSize: 11,
                       fontWeight: 700,
                       color: C.label,
-                      background: C.card,
+                      background: C.chip,
                       borderRadius: 999,
                       padding: "3px 8px",
                       whiteSpace: "nowrap",
@@ -258,7 +263,7 @@ function UsTrendingList({ items }: { items: UsTrendingMessage[] }) {
               >
                 <Icon
                   name="visibility"
-                  style={{ fontSize: 14, color: C.faint }}
+                  style={{ fontSize: 14, color: C.muted }}
                 />
                 {compact(m.views)}
               </span>
@@ -267,7 +272,7 @@ function UsTrendingList({ items }: { items: UsTrendingMessage[] }) {
               >
                 <Icon
                   name="shortcut"
-                  style={{ fontSize: 14, color: C.faint }}
+                  style={{ fontSize: 14, color: C.muted }}
                 />
                 {compact(m.forwards)}
               </span>
@@ -281,7 +286,7 @@ function UsTrendingList({ items }: { items: UsTrendingMessage[] }) {
                 >
                   <Icon
                     name="chat_bubble"
-                    style={{ fontSize: 12, color: C.faint }}
+                    style={{ fontSize: 12, color: C.muted }}
                   />
                   {m.replies}
                 </span>
@@ -319,6 +324,7 @@ export default async function UsKaderaPage() {
     trendWeek,
     trendMonth,
     breadth,
+    surgeLines,
   ] = await Promise.all([
     getUsKaderaSummary(),
     getUsSurgingStocks(6),
@@ -336,6 +342,7 @@ export default async function UsKaderaPage() {
     getUsTrendingMessages("w7", 36),
     getUsTrendingMessages("w30", 36),
     getUsStockBreadth(10),
+    getUsSurgingOneliners(),
   ]);
 
   /* 이슈 키워드 막대의 분모 — 화면에 세운 낱말들의 합(국장과 같은 규칙). */
@@ -344,6 +351,23 @@ export default async function UsKaderaPage() {
   /* 카드 위 하이라이트 두 칸에 쓸 최대·최소. 표 순서와는 무관하므로 따로 고른다.
      ⚠️ shareDelta 가 null 인 줄(비교할 7일 전 집계가 없는 테마)은 후보에서 뺀다 —
      0 으로 치면 "변동 없음"이 "가장 많이 유입"으로 올라온다. */
+  /* ── 히어로 헤드라인 ────────────────────────────────────────────────
+     국장과 같은 어법이다(그쪽 주석 참고). 주어만 '미국 여론'으로 바꾼다 — 같은 말을 쓰면
+     두 화면의 제목이 구별되지 않는다. 낱말 하나만 잉크색으로 짚되 원색이 아니라 잉크
+     토큰이다(회색 타일 위에서도 4.5 를 넘기는 값은 잉크 쪽이다). */
+  const toneInk =
+    sentiment?.tone === "hot" ? "var(--c-hot-ink)" : sentiment?.tone === "cold" ? "var(--c-cold-ink)" : C.ink;
+  const headline = !sentiment
+    ? { em: null, tail: "무엇에 주목하는지 모았습니다" }
+    : sentiment.tone === "hot"
+      ? { em: "낙관", tail: "이 우세합니다" }
+      : sentiment.tone === "cold"
+        ? { em: "비관", tail: "이 우세합니다" }
+        : { em: null, tail: "낙관과 비관이 팽팽합니다" };
+
+  /* 히어로 바닥 '오늘 눈에 띄는 것' — 시트 셋의 1위를 하나씩. 국장 카더라와 같은 어법이다
+     (두 화면은 사전만 바꾼 형제라 같은 자리에 같은 것이 서야 한다). LLM 문장이 아니라
+     집계값이라 날마다 사실이고, 없는 날은 그 칩만 빠진다. */
   const movedThemes = themes.rows.filter((t) => t.shareDelta !== null);
   const themeIn = movedThemes.length
     ? movedThemes.reduce((a, b) => (b.shareDelta! > a.shareDelta! ? b : a))
@@ -360,6 +384,32 @@ export default async function UsKaderaPage() {
       .sort(
         (a, b) => Math.abs(b.shareDelta!) - Math.abs(a.shareDelta!) || a.rank - b.rank,
       )[0] ?? null;
+
+  const spotlights = [
+    surging[0] && {
+      cap: "급부상",
+      name: surging[0].name,
+      val: `${surging[0].multiple >= 10 ? Math.round(surging[0].multiple) : surging[0].multiple.toFixed(1)}배`,
+      ink: "var(--c-hot-ink)",
+      href: "#surging",
+    },
+    themeIn && {
+      cap: "테마 유입",
+      name: themeIn.theme,
+      val: `▲${themeIn.shareDelta!.toFixed(1)}%p`,
+      ink: "var(--c-hot-ink)",
+      href: "#themes",
+    },
+    keywords[0] && {
+      cap: "화제어",
+      name: keywords[0].keyword,
+      val: `${keywords[0].mentionCount.toLocaleString("ko-KR")}회`,
+      ink: C.label,
+      href: "#keywords",
+    },
+  ].filter((x): x is NonNullable<typeof x> => Boolean(x));
+
+
 
   /* 요약 글에서 굵게 집을 낱말. **오늘 이 화면이 이미 뽑아 둔 것**만 쓴다(국장과 같은
      규칙 — parts.tsx 의 highlightTerms 주석 참고). 여기 없는 종목은 요약에 나와도
@@ -383,14 +433,14 @@ export default async function UsKaderaPage() {
   }[] = [
     { label: "모니터링 채널", value: `${summary.totalChannels}`, unit: "개" },
     {
-      label: "미국 얘기 채널",
+      label: "미장 얘기 채널",
       note: "30일",
       value: `${summary.usChannels}`,
       unit: "개",
-      help: "최근 30일 안에 미국 종목을 한 번이라도 언급한 채널입니다. 제목에 '미국'이 없는 평범한 국내 채널이 대부분입니다.",
+      help: "최근 30일 안에 미장 종목을 한 번이라도 언급한 채널입니다. 제목에 '미국'이 없는 평범한 국내 채널이 대부분입니다.",
     },
     {
-      label: "미국 종목 언급",
+      label: "미장 종목 언급",
       note: `${US_WINDOW_DAYS}일`,
       value: summary.mentions.toLocaleString("ko-KR"),
       unit: "회",
@@ -404,520 +454,201 @@ export default async function UsKaderaPage() {
   ];
 
   return (
-    <>
-      {/* ── 히어로: 모니터링 25 · 센티먼트 25 · 오늘의 브리핑 50 ─────────────
-          국장 카더라와 같은 판이다. 셋을 시트 세 장으로 흩어 놓았다가 한 판으로 모았다 —
-          셋 다 "지금 어떤 상태인가"를 말하는데 따로 서면 무엇이 머리인지가 안 보였다. */}
-      <section className="hz-sheet">
-        <div className="hz-kd-hero">
-          {/* ① 모니터링 현황 */}
-          <div className="hz-kd-hero-q">
-            <div className="hz-kd-hero-title">
-              <span
-                style={{
-                  fontSize: 14,
-                  fontWeight: 700,
-                  letterSpacing: "-.01em",
-                  color: C.ink,
-                }}
-              >
-                모니터링 현황
+    // 뿌리의 hz-tx 가 이번 리디자인을 켠다(globals.css). 국장 카더라와 같은 스코프라
+    // 시트 모서리·머리 타일·히어로 타일·구간 제목이 두 화면에서 같은 값으로 돈다.
+    <div className="hz-tx">
+      {/* ── 히어로: 데이터 타일(왼쪽) + 오늘의 브리핑(오른쪽) ─────────────────
+          2026-09-04. **국장 카더라와 같은 판이다** — 두 화면은 같은 채널을 사전만 바꿔 읽은
+          형제라, 히어로가 다르면 오갈 때 같은 것을 다시 읽어야 한다. 예전의 25:25:50 세 칸
+          (.hz-kd-hero)에서 국장이 쓰는 `.hz-tx-hero` 격자로 옮겼다.
+          `hz-tx-hero-flip` = 데이터가 왼쪽, 문장이 오른쪽. */}
+      <section className="hz-sheet hz-tx-hero hz-tx-hero-flip">
+        <div className="hz-tx-hero-main">
+          {/* ✨ 는 생성형 AI 고지(AI 기본법 §31)라 누를 수 있어야 한다(AiMark 주석). */}
+          <div className="hz-tx-eyebrow">
+            <span>
+              <AiMark size={15} />
+              오늘의 브리핑
+            </span>
+            {/* 기준 시각. formatKstUpdate 가 이미 "… 기준"으로 끝난다 — 또 붙이면 "기준 기준". */}
+            {summary.lastUpdated && (
+              <span className="hz-tx-eyebrow-r">
+                <Icon name="schedule" style={{ fontSize: 14, color: C.muted }} />
+                최종 업데이트 · {formatKstUpdate(summary.lastUpdated)}
               </span>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              {miniStats.map((s, i) => (
-                <div
-                  key={s.label}
-                  style={{
-                    display: "flex",
-                    // baseline 이 아니라 center 다 — 라벨(11.5)과 값(19)은 줄 상자 높이가
-                    // 달라 밑선을 맞추면 라벨이 줄 가운데보다 아래로 처진다(국장에서 실측).
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 8,
-                    padding: i === 0 ? "0 0 11px" : "11px 0",
-                    borderBottom:
-                      i === miniStats.length - 1
-                        ? "none"
-                        : "1px solid var(--c-sheet-row)",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 11.5,
-                      fontWeight: 600,
-                      color: C.sub,
-                      display: "inline-flex",
-                      alignItems: "baseline",
-                      gap: 4,
-                      minWidth: 0,
-                      // 이 칸은 25% 폭이라 좁은 구간에서 230px 까지 내려간다.
-                      // 기본 규칙이면 "미국 얘기 채널"이 토막나 읽히지 않는다.
-                      wordBreak: "keep-all",
-                    }}
-                  >
-                    {s.label}
-                    {s.note && (
-                      <span style={{ fontSize: 11, color: C.sub2 }}>
-                        {s.note}
-                      </span>
-                    )}
-                    {s.help && (
-                      <span
-                        className="hz-tip hz-tip-wide"
-                        data-tip={s.help}
-                        data-ga-tip={s.label}
-                        style={{
-                          display: "inline-flex",
-                          alignSelf: "center",
-                          cursor: "help",
-                          flexShrink: 0,
-                        }}
-                      >
-                        <Icon
-                          name="help"
-                          style={{ fontSize: 12, color: C.muted }}
-                        />
-                      </span>
-                    )}
-                  </span>
-                  <strong
-                    style={{
-                      fontFamily: MONO,
-                      fontSize: 19,
-                      fontWeight: 800,
-                      color: C.ink,
-                      letterSpacing: "-.03em",
-                      whiteSpace: "nowrap",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {s.value}
-                    <span
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: C.sub2,
-                        marginLeft: 3,
-                      }}
-                    >
-                      {s.unit}
-                    </span>
-                  </strong>
-                </div>
-              ))}
-            </div>
-            {/* 통계 넷 바로 아래. marginTop:auto 로 칸 바닥에 붙인다 — 옆 '오늘의 브리핑'
-                칸이 문단 길이만큼 늘어나면 이 칸도 같이 늘어나는데, 그때 남는 자리가
-                통계 줄 사이가 아니라 이 줄 위 한 곳에만 생긴다(국장과 같은 수법).
-                국장으로 가는 통로를 여기 두는 이유: 두 화면은 같은 채널을 사전만 바꿔
-                읽은 형제라, 한쪽을 보다 다른 쪽이 궁금해지는 게 자연스럽다. */}
-            <div style={{ marginTop: "auto", paddingTop: 14 }}>
-              <Link
-                href="/kadera"
-                className="hz-btn-soft"
-                data-ga="cta_click"
-                data-ga-cta="to_kr_kadera"
-                data-ga-surface="us_hero"
-              >
-                <Icon name="swap_horiz" style={{ fontSize: 15 }} />
-                국장 카더라 보기
-              </Link>
-            </div>
+            )}
           </div>
+          {/* 주어는 '미국 여론'이다. 국장이 "지금 여론은" 인데 여기서 같은 말을 쓰면 두 화면의
+              제목이 구별되지 않는다 — 한 낱말만 얹어 어느 시장 이야기인지 못박는다.
+              둘째 줄은 센티먼트 구간이 정한다(usSentimentTone). 옆 타일의 큰 숫자·알약과 같은
+              구간에서 나오므로 셋이 한 사실을 말한다. */}
+          <h2 className="hz-tx-hero-title">
+            지금 미장 여론은
+            <br />
+            {headline.em && <em style={{ color: toneInk }}>{headline.em}</em>}
+            {headline.tail}
+          </h2>
+          <div className="hz-tx-hero-body">
+            {brief.paragraphs.length === 0 ? (
+              <p>오늘의 브리핑을 준비하고 있습니다. 집계가 끝난 뒤 만들어집니다.</p>
+            ) : (
+              (() => {
+                /* 굵힌 낱말을 **세 대목에 걸쳐** 기억한다. 대목마다 새로 세면 엔비디아가
+                   2·3대목에서 각각 한 번씩, 화면에는 두 번 굵어진다(parts.tsx 주석). */
+                const used = new Set<string>();
+                return brief.paragraphs.map((para, i) => (
+                  /* particleAfterLatin — "TSMC의 7월 매출"의 TSMC 를 굵힌다. 미장은 라틴
+                     이름 + 조사가 흔해서, 뒤가 한글이면 무조건 막는 기본 규칙을 그대로 두면
+                     영문 종목이 하나도 안 굵어진다(highlightTerms 주석). */
+                  <p key={i}>{highlightTerms(para, summaryTerms, used, { particleAfterLatin: true })}</p>
+                ));
+              })()
+            )}
+          </div>
+        </div>
 
-          {/* ② 생태계 센티먼트 */}
-          <div className="hz-kd-hero-q">
-            {/* 제목 우측의 구간 라벨(낙관 우세 등). 큰 숫자만 두면 78% 가 높은 건지
-                낮은 건지 읽는 사람이 판단해야 한다 — 국장과 같은 경계·같은 말을 붙인다. */}
-            <div
-              className="hz-kd-hero-title"
-              style={{ justifyContent: "space-between", gap: 10 }}
-            >
-              <span
-                style={{
-                  fontSize: 14,
-                  fontWeight: 700,
-                  letterSpacing: "-.01em",
-                  color: C.ink,
-                }}
-              >
-                생태계 센티먼트
-              </span>
+        {/* 각주 문장이 있던 자리다. 화면 부제와 같은 말이라 뺐고(토스 라이팅의 Remove empty
+            sentences) 대신 아래 시트로 데려가는 칩을 세운다 — 국장과 같은 어법이다.
+            '신호 아님' 고지는 푸터 면책이 전 화면에서 든다. */}
+        {spotlights.length > 0 && (
+          <div className="hz-tx-note hz-tx-spot">
+            <span className="hz-tx-spot-cap">오늘 눈에 띄는 것</span>
+            {spotlights.map((sp) => (
+              <a key={sp.href} href={sp.href} className="hz-tx-chip" data-ga="kadera_spotlight_click" data-ga-target={sp.href.slice(1)}>
+                <span className="hz-tx-chip-cap">{sp.cap}</span>
+                <b>{sp.name}</b>
+                <span style={{ fontFamily: MONO, fontWeight: 800, color: sp.ink }}>{sp.val}</span>
+                {/* ⚠️ 국장과 같은 이유로 ↓ 가 아니라 `›` 다 — 앞이 늘 숫자라 ↓ 가 값에 붙어
+                    읽혔다. 두 화면의 히어로는 한 벌이라 여기도 같이 바꾼다. */}
+                <Icon name="chevron_right" />
+              </a>
+            ))}
+          </div>
+        )}
+
+        <aside className="hz-tx-hero-side">
+          {/* ① 생태계 센티먼트 — 큰 숫자 하나(낙관도)와 그 비율을 되풀이하는 막대. */}
+          <div className="hz-tx-tile">
+            <div className="hz-tx-tile-cap">
+              <span>생태계 센티먼트</span>
               {sentiment && (
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: C.label,
-                    whiteSpace: "nowrap",
-                  }}
-                >
+                <span className="hz-tx-pill" style={{ color: toneInk }}>
                   <span
-                    style={{
-                      width: 7,
-                      height: 7,
-                      borderRadius: "50%",
-                      background:
-                        sentiment.tone === "hot"
-                          ? "var(--c-warm-2)"
-                          : sentiment.tone === "cold"
-                            ? "var(--c-blue-2)"
-                            : C.hint,
-                    }}
+                    className="hz-tx-pill-dot"
+                    style={{ background: sentiment.tone === "hot" ? "var(--c-warm-2)" : sentiment.tone === "cold" ? "var(--c-blue-2)" : C.hint }}
                   />
                   {sentiment.label}
                 </span>
               )}
             </div>
             {!sentiment ? (
-              <p style={{ margin: 0, fontSize: 13, color: C.sub }}>
-                아직 미국 종목 얘기의 톤 집계가 없습니다.
-              </p>
+              <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 분석된 메시지가 없습니다.</p>
             ) : (
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  /* 16 은 .hz-kd-hero > * 의 gap 이다. 국장은 이 칸을 조각(<>)으로 두어
-                     형제들이 그 값을 그대로 받는데, 여기서는 marginTop:auto 를 쓰려고 한 겹
-                     감쌌다 — 그러면 간격을 손으로 같게 맞춰 줘야 두 화면이 같은 리듬이 된다. */
-                  gap: 16,
-                  flex: 1,
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: 12,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <strong
-                    style={{
-                      fontFamily: MONO,
-                      /* 국장 히어로와 같은 값이다(40/20). 34 로 두었더니 나란히 놓고 볼 때
-                         미장 쪽이 한 급 작아 보였다 — 같은 자리의 같은 수치는 같은 크기여야
-                         한다. marginTop:1 은 옆 칸 큰 숫자의 **숫자 윗선**에 맞추는 값으로,
-                         줄 상자 위끝끼리 맞추면 7px 어긋난다(국장 주석 참고). */
-                      fontSize: 40,
-                      fontWeight: 800,
-                      lineHeight: 1,
-                      marginTop: 1,
-                      letterSpacing: "-.04em",
-                      color:
-                        sentiment.tone === "cold"
-                          ? C.cold
-                          : sentiment.tone === "hot"
-                            ? C.hot
-                            : C.ink,
-                    }}
-                  >
+              <>
+                {/* 밑선 맞춤은 CSS 가 한다(.hz-figrow) — 곁줄에 padding 을 얹어 흉내 내지 말 것. */}
+                <div className="hz-figrow">
+                  <strong className="hz-tx-big" style={{ fontFamily: MONO, color: toneInk }}>
                     {sentiment.score}
-                    <span
-                      style={{
-                        fontSize: 20,
-                        fontWeight: 700,
-                        letterSpacing: "-.02em",
-                      }}
-                    >
-                      %
-                    </span>
+                    <span>%</span>
                   </strong>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 3,
-                      minWidth: 0,
-                      marginTop: 2,
-                    }}
-                  >
-                    <span
-                      style={{ fontSize: 11.5, fontWeight: 600, color: C.sub }}
-                    >
-                      최근 {sentiment.windowDays}일 ·{" "}
-                      {sentiment.messageCount.toLocaleString("ko-KR")}건 분석
+                  <div className="hz-figrow-aside">
+                    <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub }}>
+                      최근 {sentiment.windowDays}일 · {sentiment.messageCount.toLocaleString("ko-KR")}건 분석
                     </span>
-                    <span
-                      style={{
-                        fontSize: 11.5,
-                        fontWeight: 700,
-                        color: C.sub,
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 4,
-                        width: "fit-content",
-                      }}
-                    >
+                    {/* 툴팁은 문장이 아니라 물음표에 건다(국장 히어로와 같은 규칙). */}
+                    {/* ⚠️ `alignItems` 가 center 가 아니라 **baseline** 이다. 이 줄은 곁줄의
+                        마지막 줄이라 그 밑선이 옆의 큰 숫자와 한 선에 서야 하는데(.hz-figrow),
+                        center 로 두면 글자가 물음표와 함께 가운데로 밀려 **밑선이 2.6px 뜬다.**
+                        물음표만 alignSelf 로 가운데에 둔다 — 그림이라 글줄 밑선에 앉히면 낮다. */}
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: C.sub, display: "inline-flex", alignItems: "baseline", gap: 4, width: "fit-content" }}>
                       중립 {sentiment.neutral}% 제외 후 환산
                       <span
                         className="hz-tip hz-tip-wide"
                         data-tip="메시지를 비관/중립/낙관으로 나눈 뒤, 중립을 뺀 비관↔낙관 비율입니다. 시황·공시 같은 담담한 글이 절반이라, 같이 세면 늘 비관으로 기웁니다."
                         data-ga-tip="us_sentiment_ratio"
-                        style={{
-                          display: "inline-flex",
-                          cursor: "help",
-                          flexShrink: 0,
-                        }}
+                        style={{ display: "inline-flex", cursor: "help", flexShrink: 0, alignSelf: "center" }}
                       >
-                        <Icon
-                          name="help"
-                          style={{ fontSize: 12, color: C.muted }}
-                        />
+                        <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
                       </span>
                     </span>
                   </div>
                 </div>
-
-                {/* 큰 숫자와 **같은 값**을 그림으로 되풀이한다(국장 히어로와 같은 규칙).
-                    ⚠️ 중립은 안 그린다. 예전엔 비관·중립·낙관 세 칸이었는데, 그러면 이
-                    막대만 원자료를 말하고 바로 위 큰 숫자(중립 뺀 환산값)와 어긋난다 —
-                    한 칸 안에서 76% 와 '낙관 49' 가 나란히 서서 어느 쪽이 참인지 읽는
-                    사람이 판단해야 했다. 중립을 얼마나 뺐는지는 위 캡션 한 줄로 족하다. */}
-                <div
-                  style={{ display: "flex", flexDirection: "column", gap: 7 }}
-                >
-                  <span
-                    style={{
-                      display: "flex",
-                      height: 11,
-                      borderRadius: 3,
-                      overflow: "hidden",
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: `${100 - sentiment.score}%`,
-                        background: "var(--c-blue-2)",
-                      }}
-                    />
-                    <span
-                      style={{
-                        width: `${sentiment.score}%`,
-                        background: "var(--c-warm-2)",
-                      }}
-                    />
-                  </span>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  <div className="hz-tx-split">
+                    <span style={{ width: `${100 - sentiment.score}%`, background: "var(--c-blue-2)" }} />
+                    <span style={{ width: `${sentiment.score}%`, background: "var(--c-warm-2)" }} />
+                  </div>
                   {/* 두 라벨을 막대의 양 끝에 붙여 어느 쪽이 어느 색인지 위치로 읽히게 한다. */}
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      fontFamily: MONO,
-                      fontSize: 11.5,
-                      fontWeight: 700,
-                    }}
-                  >
-                    <span style={{ color: "var(--c-cold-ink)" }}>
-                      비관 {100 - sentiment.score}
-                    </span>
-                    <span style={{ color: "var(--c-hot-ink)" }}>
-                      낙관 {sentiment.score}
-                    </span>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 11.5, fontWeight: 700 }}>
+                    <span style={{ color: "var(--c-cold-ink)" }}>비관 {100 - sentiment.score}</span>
+                    <span style={{ color: "var(--c-hot-ink)" }}>낙관 {sentiment.score}</span>
                   </div>
                 </div>
-
-                {/* 테마별 낙관↔비관. 위 큰 숫자와 **같은 사흘**을 쪼갠 것이라, 76% 가
-                    어느 테마에서 온 값인지 눈으로 따라갈 수 있다(국장 히어로와 같은 자리·
-                    같은 얼개). marginTop:auto — 옆 칸 문단의 밑선에 맞춰 바닥에 붙인다.
-                    두 칸은 같은 높이로 늘어나므로, 둘 다 바닥에 붙이면 밑선이 정확히 같다. */}
                 {sentiment.byTheme.length > 0 && (
-                  <div
-                    style={{
-                      marginTop: "auto",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 9,
-                      paddingTop: 14,
-                      borderTop: "1px solid var(--c-sheet-row)",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        letterSpacing: ".06em",
-                        color: C.sub,
-                      }}
-                    >
-                      인기 테마별 비관 ↔ 낙관
-                    </span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 2 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".04em", color: C.sub }}>인기 테마별 비관 ↔ 낙관</span>
                     {sentiment.byTheme.map((t) => (
                       <div
                         key={t.name}
                         className="hz-tip hz-tip-wide"
                         data-tip={`${t.name} 언급 ${t.total}건 중 비관 ${t.negative}건 · 낙관 ${t.positive}건 (중립 제외 비율)`}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 10,
-                          minWidth: 0,
-                        }}
+                        style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}
                       >
-                        {/* 이름 칸 폭을 고정한다 — flex 로 두면 테마명 길이에 따라 막대
-                            시작점이 행마다 어긋나 눈이 세로로 훑질 못한다.
-                            ⚠️ 국장(62px)보다 넓다. 미장 테마명이 더 길어서다
-                            ('반도체 장비·소재' · 'AI 인프라·클라우드'). */}
-                        <span
-                          style={{
-                            ...clip,
-                            width: 86,
-                            flexShrink: 0,
-                            fontSize: 11,
-                            fontWeight: 700,
-                            color: C.label,
-                          }}
-                        >
-                          {t.name}
-                        </span>
-                        <span
-                          style={{
-                            flex: 1,
-                            minWidth: 0,
-                            display: "flex",
-                            height: 7,
-                            borderRadius: 999,
-                            overflow: "hidden",
-                          }}
-                        >
-                          <span
-                            style={{
-                              width: `${100 - t.pos}%`,
-                              background: "var(--c-blue-3)",
-                            }}
-                          />
-                          <span
-                            style={{
-                              width: `${t.pos}%`,
-                              background: "var(--c-warm-3)",
-                            }}
-                          />
+                        {/* 이름 칸 폭을 고정한다 — flex 로 두면 막대 시작점이 행마다 어긋난다. */}
+                        {/* 96 은 실측이다 — 78 에서 "AI 인프라·클라우드"가 잘렸다. 국장(62)보다 넓은 이유는
+                            미장 테마명이 길기 때문이다. 폭을 고정하는 이유는 그대로다: flex 로 두면
+                            막대 시작점이 행마다 어긋나 눈이 세로로 훑질 못한다. */}
+                        <span style={{ ...clip, width: 96, flexShrink: 0, fontSize: 11, fontWeight: 700, color: C.label }}>{t.name}</span>
+                        <span style={{ flex: 1, minWidth: 0, display: "flex", height: 7, borderRadius: 999, overflow: "hidden" }}>
+                          <span style={{ width: `${100 - t.pos}%`, background: "var(--c-blue-3)" }} />
+                          <span style={{ width: `${t.pos}%`, background: "var(--c-warm-3)" }} />
                         </span>
                       </div>
                     ))}
                   </div>
                 )}
-              </div>
+              </>
             )}
           </div>
 
-          {/* ③ 오늘의 브리핑 */}
-          <div className="hz-kd-hero-h">
-            <div className="hz-kd-hero-title">
-              {/* 시장 브리핑·국장 카더라와 같은 표식 — 옅은 하늘색 타일에 ✨.
-                  22px 인 건 이 제목 슬롯이 22px 로 못박혀 있어서다(globals.css). */}
-              <span
-                style={{
-                  width: 22,
-                  height: 22,
-                  borderRadius: 7,
-                  background: "var(--c-blue-tint)",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                <AiMark size={13} style={{ alignSelf: "center" }} />
-              </span>
-              <span
-                style={{
-                  fontSize: 14,
-                  fontWeight: 700,
-                  letterSpacing: "-.01em",
-                  color: C.ink,
-                }}
-              >
-                오늘의 브리핑
-              </span>
-            </div>
-            {/* 높이를 안 잡는다 — 길이는 파이프라인이 잡는다(BRIEF_*_LEN). 여기서 또 자르면
-                그쪽이 망가졌을 때 화면이 조용히 문장을 먹는다. */}
-            {brief.paragraphs.length === 0 ? (
-              <p style={{ margin: 0, fontSize: 13, color: C.sub }}>
-                오늘의 브리핑을 준비하고 있습니다. 집계가 끝난 뒤 만들어집니다.
-              </p>
-            ) : (
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 10,
-                  flex: 1,
-                }}
-              >
-                {(() => {
-                  /* 굵힌 낱말을 **세 대목에 걸쳐** 기억한다. 대목마다 새로 세면 엔비디아가
-                     2·3대목에서 각각 한 번씩 굵어져 화면에는 두 번으로 보인다(국장과 같은
-                     규칙 — 함정은 parts.tsx 의 highlightTerms 주석에). */
-                  const used = new Set<string>();
-                  return brief.paragraphs.map((para, i) => (
-                    <p
-                      key={i}
-                      style={{
-                        margin: 0,
-                        fontSize: 14,
-                        lineHeight: 1.7,
-                        color: "var(--c-ink-soft)",
-                        wordBreak: "keep-all",
-                        textWrap: "pretty",
-                      }}
-                    >
-                      {/* particleAfterLatin — "TSMC의 7월 매출"의 TSMC 를 굵힌다.
-                          국장에선 안 켠다(이름이 한글이라 필요가 없고, 켜 봐야 판정만
-                          늘어난다). 규칙과 실측은 parts.tsx 의 목록 주석에. */}
-                      {highlightTerms(para, summaryTerms, used, {
-                        particleAfterLatin: true,
-                      })}
-                    </p>
-                  ));
-                })()}
-              </div>
-            )}
-            {/* 기준 시각은 **언제나 이 칸 맨 아래 왼쪽**이다 — 요약 글이 날마다 3줄·4줄로
-                달라져도 자리가 안 흔들려야 "이 화면의 기준 시각"으로 읽힌다(국장 카더라·
-                시장 브리핑 히어로가 쓰는 것과 같은 조판·같은 schedule 아이콘).
-                formatKstUpdate 가 이미 "… 기준"으로 끝난다 — 또 붙이면 "기준 기준". */}
-            {summary.lastUpdated && (
-              <div
-                style={{
-                  marginTop: "auto",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 7,
-                  paddingTop: 10,
-                }}
-              >
-                <Icon name="schedule" style={{ fontSize: 14, color: C.muted }} />
-                <span style={{ fontSize: 11.5, color: C.sub }}>
-                  최종 업데이트 · {formatKstUpdate(summary.lastUpdated)}
+          {/* ② 모니터링 현황 — 넷을 2×2 타일로. 숫자와 단위는 절대 안 쪼갠다(nowrap). */}
+          <div className="hz-tx-stats">
+            {miniStats.map((s) => (
+              <div key={s.label} className="hz-tx-stat">
+                <span className="hz-tx-stat-l">
+                  {s.label}
+                  {s.note && <span style={{ color: C.sub2, fontWeight: 500 }}>{s.note}</span>}
+                  {s.help && (
+                    <span className="hz-tip hz-tip-wide" data-tip={s.help} data-ga-tip={s.label} style={{ display: "inline-flex", cursor: "help", flexShrink: 0 }}>
+                      <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
+                    </span>
+                  )}
                 </span>
+                <strong className="hz-tx-stat-v">
+                  {s.value}
+                  <small>{s.unit}</small>
+                </strong>
               </div>
-            )}
+            ))}
           </div>
-        </div>
-        {/* 이 문장은 빼면 안 된다(공개 저장소·법률). 히어로 시트의 각주 띠에 두면 첫
-            화면 안에 들면서도 그래픽을 밀어내지 않는다 — 국장 히어로와 같은 자리다. */}
-        <div className="hz-sheet-foot">
-          <span style={{ fontSize: 12, lineHeight: 1.6, color: C.sub }}>
-            미장 주식 텔레그램 채널들이 지금 무엇에 주목하는지를 모아 보여줍니다 · 조회·확산·언급량을 종합한 화제성 지표이며, 매수·매도 신호가 아닙니다
-          </span>
-        </div>
+
+          {/* ③ 국장으로 건너가는 통로. 두 화면은 형제라 서로 오가는 길이 히어로에 있어야 한다. */}
+          <Link href="/kadera" className="hz-tx-btn" data-ga="cta_click" data-ga-cta="to_kr_kadera" data-ga-surface="us_hero">
+            <Icon name="swap_horiz" style={{ fontSize: 17 }} />
+            국장 카더라 보기
+          </Link>
+        </aside>
       </section>
 
-      <SectionCaps label="최근 뜨는 것" count={3} />
+      <SectionIntro n={1} title="최근 뜨는 것" />
 
-      <section className="hz-sheet">
-        <SectionHead level={2}
+      {/* id 는 히어로 바로가기 칩의 목적지다(아래 이슈 키워드도 같다). */}
+      <section className="hz-sheet" id="surging">
+        <SectionHead level={3}
           icon="local_fire_department"
           title="급부상 종목"
           note={`최근 ${US_WINDOW_DAYS}일 vs 평소`}
-          desc="평소보다 언급이 갑자기 뛴 미국 종목 · 배수가 클수록 갑작스러운 관심"
+          desc="평소보다 언급이 갑자기 뛴 미장 종목 · 배수가 클수록 갑작스러운 관심"
         />
         {surging.length === 0 ? (
           <p
@@ -1057,6 +788,34 @@ export default async function UsKaderaPage() {
                     hot={US_WINDOW_DAYS}
                   />
 
+                  {/* 왜 뜨는지 한 줄. 국장 급부상 카드와 같은 자리·같은 상자다
+                      (app/kadera/page.tsx 의 같은 블록 주석 참고). 없는 종목은 이 줄만 빠진다. */}
+                  {surgeLines[s.ticker] && (
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 9,
+                        background: C.card,
+                        borderRadius: 12,
+                        padding: "12px 13px",
+                      }}
+                    >
+                      <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 13,
+                          lineHeight: 1.7,
+                          color: "var(--c-ink-soft)",
+                          textWrap: "pretty",
+                          wordBreak: "keep-all",
+                        }}
+                      >
+                        {surgeLines[s.ticker]}
+                      </p>
+                    </div>
+                  )}
+
                   {/* 국장 셀과 같은 마지막 줄이다. 다른 건 폴백뿐 — 국내는 야후가 안 되면
                       KRX 저장 종가로 떨어지는데(그때 등락률 대신 기준일을 단다) 미국은
                       그 저장분이 없어 그냥 빈칸이다. 틀린 숫자를 그리는 것보다 낫다. */}
@@ -1114,7 +873,7 @@ export default async function UsKaderaPage() {
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
         <section
-          className="hz-sheet"
+          className="hz-sheet" id="themes"
           style={{
             flex: "1 1 calc(50% - 8px)",
             minWidth: SHEET_PAIR_MIN,
@@ -1122,7 +881,7 @@ export default async function UsKaderaPage() {
             flexDirection: "column",
           }}
         >
-          <SectionHead level={2}
+          <SectionHead level={3}
             icon="donut_small"
             title="테마 로테이션"
             note="3일 vs 이전"
@@ -1130,7 +889,7 @@ export default async function UsKaderaPage() {
             /* ⚠️ 짧게 둔다. 옆 이슈 키워드의 설명(20자)보다 길면 좁은 폭에서 이쪽만
                두 줄이 되고, 그 순간 머리가 18.8px 커져 **아래 열 줄이 통째로 밀린다**
                (실측 1280·1366). 자세한 설명은 위 noteHelp 툴팁이 맡는다. */
-            desc="관심이 어느 미국 테마로 옮겨가는지 · 점유율 변화 기준"
+            desc="관심이 어느 미장 테마로 옮겨가는지 · 점유율 변화 기준"
           />
           {themes.rows.length === 0 ? (
             <p
@@ -1348,7 +1107,7 @@ export default async function UsKaderaPage() {
           )}
         </section>
         <section
-          className="hz-sheet"
+          className="hz-sheet" id="keywords"
           style={{
             flex: "1 1 calc(50% - 8px)",
             minWidth: SHEET_PAIR_MIN,
@@ -1356,7 +1115,7 @@ export default async function UsKaderaPage() {
             flexDirection: "column",
           }}
         >
-          <SectionHead level={2}
+          <SectionHead level={3}
             icon="tag"
             title="이슈 키워드"
             note="최근 3일"
@@ -1457,7 +1216,7 @@ export default async function UsKaderaPage() {
                      처럼 창에 평일이 한 날도 없는 날 — calculate_us_telegram_sentiment.py
                      의 ISSUE_KEYWORD_MAX_COUNT_DAYS 주석) 같은 문장 안에서 "최근 3일"과
                      "4일에 걸쳐"가 부딪쳤다. 기간은 끝의 dayCount 가 혼자 말하게 둔다. */
-                  data-tip={`전체 대화에서 ${k.totalCount}회 나왔고 그중 ${k.mentionCount}회가 미국 얘기입니다 · ${k.channelCount}개 채널이 ${k.dayCount}일에 걸쳐 말했습니다`}
+                  data-tip={`전체 대화에서 ${k.totalCount}회 나왔고 그중 ${k.mentionCount}회가 미장 얘기입니다 · ${k.channelCount}개 채널이 ${k.dayCount}일에 걸쳐 말했습니다`}
                 >
                   <RankBadge n={k.rank} />
                   {/* 옆 테마 표는 %p 를 이름 줄 오른끝(막대 바로 위)에 둔다. 이 표는
@@ -1548,13 +1307,13 @@ export default async function UsKaderaPage() {
         </section>
       </div>
 
-      <SectionCaps label="무슨 얘기가 오갔나" count={2} />
+      <SectionIntro n={2} title="무슨 얘기가 오갔나" />
       <section className="hz-sheet">
-        <SectionHead level={2}
+        <SectionHead level={3}
           icon="query_stats"
           title="주요 종목 리포트"
           note={`최근 ${US_WINDOW_DAYS}일`}
-          desc="가장 많이 회자된 미국 종목과, 그 종목을 두고 무슨 이야기가 오갔는지"
+          desc="가장 많이 회자된 미장 종목과, 그 종목을 두고 무슨 이야기가 오갔는지"
         />
         {reports.length === 0 ? (
           <p
@@ -1616,34 +1375,36 @@ export default async function UsKaderaPage() {
                         {r.ticker}
                       </span>
                     )}
-                    {r.price != null && (
+                    <span style={{ flex: 1 }} />
+                    {/* ⭐ 급부상 셀과 같은 포맷 — 표본은 오른쪽 위, 시세는 왼쪽 아래
+                        (국장 같은 자리의 주석 참고). 두 화면이 한 벌이라 같이 바꾼다. */}
+                    <span
+                      className="hz-stock-price"
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "flex-end",
+                        gap: 2,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {r.channelCount !== null && (
+                        <span style={{ fontSize: 11.5, color: C.sub2, whiteSpace: "nowrap" }}>
+                          {r.channelCount}개 채널
+                        </span>
+                      )}
                       <span
-                        className="hz-stock-price"
                         style={{
-                          display: "flex",
-                          alignItems: "baseline",
-                          gap: 7,
+                          fontFamily: MONO,
+                          fontSize: 11.5,
+                          fontWeight: 700,
+                          color: C.label,
                           whiteSpace: "nowrap",
-                          flexShrink: 0,
                         }}
                       >
-                        <span
-                          style={{
-                            fontFamily: MONO,
-                            fontSize: 15,
-                            fontWeight: 800,
-                            color: C.ink,
-                            letterSpacing: "-.02em",
-                          }}
-                        >
-                          {fmtPrice(r.price, "US")}
-                        </span>
-                        <ChangeRate
-                          rate={r.changeRate}
-                          style={{ fontSize: 12.5, fontWeight: 800 }}
-                        />
+                        최근 {US_WINDOW_DAYS}일 기준 {r.recentMentions.toLocaleString("ko-KR")}회
                       </span>
-                    )}
+                    </span>
                   </div>
 
                   {/* hot = 큰 숫자가 실제로 센 날 수. 창 밖 칸은 막대가 옅어진다.
@@ -1657,13 +1418,18 @@ export default async function UsKaderaPage() {
                     peakLabel={peak > 0 ? `최다 ${peak}회` : undefined}
                   />
 
+                  {/* ⚠️ 아래 상자의 바탕은 `C.soft` 가 아니라 **`C.card`** 다(2026-09-05 지적).
+                      이번 리디자인에서 이 패널이 회색 타일(--tx-tile)로 바뀌었는데, soft 는 그 타일과
+                      거의 같은 밝기라 상자가 통째로 묻혀 안 보였다. 국장은 리디자인 때 카드색으로
+                      고쳤는데 미장만 빠져 있었다 — 두 화면은 한 벌이다.
+                      ⚠️ 주석을 `? (` 바로 뒤에 넣지 말 것 — JSX 식 자리라 파서가 막힌다. */}
                   {r.narrative ? (
                     <div
                       style={{
                         display: "flex",
                         gap: 9,
-                        background: C.soft,
-                        borderRadius: R.control,
+                        background: C.card,
+                        borderRadius: 12,
                         padding: "12px 13px",
                       }}
                     >
@@ -1707,24 +1473,23 @@ export default async function UsKaderaPage() {
                     style={{
                       marginTop: "auto",
                       display: "flex",
-                      alignItems: "baseline",
+                      alignItems: "center",
                       justifyContent: "space-between",
                       gap: 12,
                       paddingTop: 2,
                     }}
                   >
-                    <span
-                      style={{
-                        fontFamily: MONO,
-                        fontSize: 11,
-                        color: C.sub2,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      언급 {r.recentMentions.toLocaleString("ko-KR")}회
-                      {r.channelCount !== null && ` · ${r.channelCount}개 채널`}
-                    </span>
-                    <span style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+                    {r.price != null ? (
+                      <span style={{ display: "flex", alignItems: "baseline", gap: 7, whiteSpace: "nowrap", minWidth: 0 }}>
+                        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: C.label }}>
+                          {fmtPrice(r.price, "US")}
+                        </span>
+                        <ChangeRate rate={r.changeRate} style={{ fontSize: 11.5, fontWeight: 800 }} />
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 11.5, color: C.sub2 }}>가격 정보 준비 중</span>
+                    )}
+                    <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <UsMddLink ticker={r.ticker} />
                       <UsInsiderLink ticker={r.ticker} />
                     </span>
@@ -1740,7 +1505,12 @@ export default async function UsKaderaPage() {
       <section className="hz-sheet">
         {/* 머리를 TrendingTabs 가 그린다 — 기간 탭이 머리 우측에 앉고 목록은 그 아래라
             둘이 상태를 공유해야 한다. 국장과 같은 컴포넌트를 그대로 쓴다. */}
+        {/* ⚠️ `level={3}` 을 빠뜨리면 안 된다(기본값이 2다). 이 화면은 구간 제목(h2)이
+            있으므로 시트 머리는 h3 여야 한다 — 2 로 두면 문서 개요에서 이 시트만 장과 같은
+            층으로 올라선다. 국장은 주고 미장만 빠져 있었다(2026-09-05 전수 검사).
+            ⚠️ 주석은 속성 자리에 못 넣는다 — 여는 태그 **위**에 둔다. */}
         <TrendingTabs
+          level={3}
           icon="campaign"
           title="트렌딩 메시지"
           desc="미장 관련 글 중 조회·공유로 가장 널리 퍼진 것"
@@ -1766,7 +1536,7 @@ export default async function UsKaderaPage() {
           ]}
         />
       </section>
-      <SectionCaps label="채널" count={2} />
+      <SectionIntro n={3} title="누가 말했나" />
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
         <section
@@ -1778,12 +1548,12 @@ export default async function UsKaderaPage() {
             flexDirection: "column",
           }}
         >
-          <SectionHead level={2}
+          <SectionHead level={3}
             icon="podcasts"
             title="미장을 많이 다루는 채널"
             note="최근 30일"
             noteHelp="30일에 100건 넘게 쓴 채널만 셉니다. 글이 몇 건뿐인 채널은 비중이 크게 흔들립니다."
-            desc="그 채널이 쓴 글 중 미국 종목을 말한 글의 비중"
+            desc="그 채널이 쓴 글 중 미장 종목을 말한 글의 비중"
           />
           {channels.length === 0 ? (
             <p
@@ -1888,7 +1658,7 @@ export default async function UsKaderaPage() {
             flexDirection: "column",
           }}
         >
-          <SectionHead level={2}
+          <SectionHead level={3}
             icon="hub"
             title="몇 곳이 말하나"
             note={
@@ -1998,6 +1768,6 @@ export default async function UsKaderaPage() {
           </div>
         </section>
       </div>
-    </>
+    </div>
   );
 }

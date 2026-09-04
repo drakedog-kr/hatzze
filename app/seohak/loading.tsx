@@ -57,16 +57,25 @@ function Sheet({ h, pad = 14 }: { h: number; pad?: number }) {
   );
 }
 
-/** 구간 머리 배지(SectionCaps) 자리. 실제 배지가 24px 이다. */
+/** 구간 제목(SectionIntro) 자리 — 장 번호 + 제목 한 줄, 높이 26(20 × 1.3).
+    ⚠️ **실물의 눈금이 바뀌면 여기도 같이 고친다.** 부제 줄이 자리표시자에만 남아 있어서
+    로딩이 끝나는 순간 아래가 18px 튄 적이 있다. 자리표시자는 실물과 같은 골격이어야 한다. */
 function Cap() {
-  return <Block h={24} w={148} r={12} />;
+  return (
+    <div className="hz-tx-intro">
+      <div style={{ display: "flex", alignItems: "center", gap: 8, height: 26 }}>
+        <Block h={12} w={16} r={4} />
+        <Block h={20} w={150} r={6} />
+      </div>
+    </div>
+  );
 }
 
 export default function Loading() {
   return (
     // position:relative 는 아래 hz-loading-float 의 기준 상자가 되기 위한 것이다.
     // gap 은 page.tsx 의 세로 흐름과 같은 S.lg 여야 전환 때 안 튄다.
-    <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: S.lg }}>
+    <div className="hz-tx" style={{ position: "relative" }}>
       {/* ⚠️ aria-hidden 은 **여기 자리표시자들에만** 건다. 루트에 걸면 맨 아래
           `role="status"` 안내까지 접근성 트리에서 통째로 빠져 스크린리더가 아무 말도
           안 듣는다 — 이웃 loading 넷(kadera·kadera/us·insider·insider/list)이 지금

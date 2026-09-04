@@ -35,11 +35,14 @@ export function TrendingTabs({
   title,
   desc,
   panels,
+  level = 2,
 }: {
   icon: string;
   title: string;
   desc?: string;
   panels: TrendingPanel[];
+  /** SectionHead 로 그대로 넘긴다(구간 제목이 있는 화면은 3). */
+  level?: 2 | 3;
 }) {
   const [active, setActive] = useState(panels[0]?.key);
   const current = panels.find((p) => p.key === active) ?? panels[0];
@@ -57,44 +60,39 @@ export function TrendingTabs({
   // 카드색이면 라이트에선 더 밝고 다크에선 더 어두워 양쪽에서 저절로 갈린다.
   // 판이 카드색이 된 만큼 **고른 칸은 흰색으로 못 띄운다** — 그 자리는 하늘색 틴트가
   // 맡는다(레포가 '지금 이것'을 가리킬 때 쓰는 그 색).
+  // bold(이번 리디자인) 머리에서는 판이 흰색이라 테두리 판이 도로 흐리다 — 회색 트랙에 흰 칩이
+  // 떠오르는 토스식 세그먼트로 바꾼다. 활성 칩은 옅은 그림자로 한 겹 위에 선다.
+  // 낱개 알약 3개 대신 하나의 세그먼티드 컨트롤로 묶는다 — 셋이 한 축의 눈금이라는 게
+  // 판 하나로 드러나고, 고른 칸만 떠올라 상태가 분명하다.
+  //
+  // ⭐ 생김새는 `.hz-seg`(globals.css)가 쥔다. 인라인이 아니라 클래스인 이유는 **스코프가
+  //   갈라야 하기 때문**이다 — 이번 리디자인(`.hz-tx`)에선 회색 트랙 위에 흰 칩이 뜨고, 그 밖에선
+  //   흰 판에 테두리다. 인라인 style 은 그 규칙을 이겨서 어느 화면에서도 한 모습이 된다.
+  //   (예전엔 선택 배경을 `${C.blue}14` 로 줬는데 var() 에 알파를 이어붙인 꼴이라 CSS 가
+  //    통째로 버렸다. 배경 없이 테두리 색만 바뀌고 있었다.)
   const tabs = (
-    <div style={{ display: "flex", gap: 2, background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, padding: 2 }}>
-      {panels.map((p) => {
-        const on = p.key === current?.key;
-        return (
-          <button
-            key={p.key}
-            type="button"
-            onClick={() => {
-              // title 을 같이 보낸다 — 이 컴포넌트는 트렌딩 말고 다른 카드도 쓸 수 있어서,
-              // tab 값(today/7d/30d)만으로는 어느 카드의 탭인지 구분이 안 된다.
-              track("kadera_tab_select", { tab: p.key, card: title });
-              setActive(p.key);
-            }}
-            aria-pressed={on}
-            style={{
-              padding: "5px 11px",
-              borderRadius: 6,
-              border: "none",
-              background: on ? "var(--c-blue-tint)" : "transparent",
-              color: on ? "var(--c-cold-ink)" : C.sub,
-              fontSize: 11,
-              fontWeight: 700,
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-              transition: "background .15s, color .15s",
-            }}
-          >
-            {p.label}
-          </button>
-        );
-      })}
+    <div className="hz-seg">
+      {panels.map((p) => (
+        <button
+          key={p.key}
+          type="button"
+          onClick={() => {
+            // title 을 같이 보낸다 — 이 컴포넌트는 트렌딩 말고 다른 카드도 쓸 수 있어서,
+            // tab 값(today/7d/30d)만으로는 어느 카드의 탭인지 구분이 안 된다.
+            track("kadera_tab_select", { tab: p.key, card: title });
+            setActive(p.key);
+          }}
+          aria-pressed={p.key === current?.key}
+        >
+          {p.label}
+        </button>
+      ))}
     </div>
   );
 
   return (
     <>
-      <SectionHead level={2} icon={icon} title={title} desc={desc} right={tabs} />
+      <SectionHead level={level} icon={icon} title={title} desc={desc} right={tabs} />
       {current?.count === 0 ? (
         // 시트 안이라 여백은 셀과 같은 자리에서 낸다(머리가 자기 padding 을 갖고 있어
         // 문단이 시트 왼쪽 끝에 붙어 버린다).

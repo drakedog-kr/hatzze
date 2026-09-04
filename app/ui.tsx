@@ -22,6 +22,9 @@ export const C = {
   bg: "var(--c-bg)", // main 안쪽 바탕
   soft: "var(--c-soft)", // 카드 안 타일·회색 박스
   chip: "var(--c-chip)", // 회색 칩 배경
+  /* 어느 바탕에서도 같아 보이는 구분선(반투명). 불투명한 line·sheetRow 는 흰 판
+     기준이라 회색 타일 위에서 사라진다 — 자세한 사정은 globals.css 의 --c-hairline. */
+  hairline: "var(--c-hairline)",
   line: "var(--c-line)",
   /* 카드 **안에서** 내용과 각주(또는 행과 행)를 가르는 줄. 칸을 가르는 격자선
      (--c-sheet-line)보다 한 톤 옅어야 둘이 구분된다 — 근거는 globals.css 주석.
