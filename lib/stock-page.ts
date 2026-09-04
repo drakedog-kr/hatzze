@@ -3,7 +3,7 @@ import "server-only";
 import { cache } from "react";
 
 import { getSupabaseAdmin } from "./supabase-server";
-import { KADERA_WINDOW_DAYS, kaderaBaseDate, windowBefore } from "./telegram-data";
+import { KADERA_WINDOW_DAYS, LLM_TEXT_CARRY_DAYS, addDaysISO, kaderaBaseDate, windowBefore } from "./telegram-data";
 import { THEMES } from "./stock-themes";
 
 /**
@@ -170,14 +170,19 @@ export const getStockPage = cache(async (code: string): Promise<StockPageData | 
       .gte("date", statDays[0])
       .lte("date", last)
       .order("date"),
-    // 문장은 기준일 한 벌만 있다. 상위 몇 종목만 있고 나머지는 없는 게 정상이라
-    // 실패와 부재를 구분하지 않는다 — 어느 쪽이든 문장을 안 그린다.
+    // 상위 몇 종목만 있고 나머지는 없는 게 정상이라 실패와 부재를 구분하지 않는다 —
+    // 어느 쪽이든 문장을 안 그린다.
+    // 기준일분이 아직 없으면 이틀까지 거슬러 가장 최근 것을 쓴다. 파이프라인이 도는
+    // 동안 문단이 사라지는 걸 막는다(LLM_TEXT_CARRY_DAYS 주석).
     (async () => {
       const { data } = await db
         .from("telegram_stock_narrative")
         .select("narrative")
-        .eq("date", baseDate)
         .eq("stock_code", code)
+        .gte("date", addDaysISO(baseDate, -LLM_TEXT_CARRY_DAYS))
+        .lte("date", baseDate)
+        .order("date", { ascending: false })
+        .limit(1)
         .maybeSingle();
       return (data?.narrative as string | undefined) ?? null;
     })().catch(() => null),

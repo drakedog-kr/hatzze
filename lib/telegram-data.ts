@@ -42,7 +42,7 @@ function daysAgoKstDate(days: number): string {
 }
 
 /** "YYYY-MM-DD" 에 n일을 더한 날짜. 창의 경계를 만들 때 쓴다. */
-function addDaysISO(iso: string, n: number): string {
+export function addDaysISO(iso: string, n: number): string {
   const d = new Date(`${iso}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
@@ -114,6 +114,29 @@ export function windowBefore(base: string, n: number): string[] {
  * 이슈 키워드, 테마 로테이션, 트렌딩 메시지(자체 기간 탭). 각자 이유가 있어 그대로 둔다.
  */
 export const KADERA_WINDOW_DAYS = 3;
+
+/**
+ * LLM 문장이 **기준일분이 아직 없을 때 며칠까지 거슬러 올라가 쓰나**.
+ *
+ * 파이프라인은 언급 집계를 20단계쯤에서 오늘 날짜로 쓰고 문장은 60단계쯤에서 만든다.
+ * 그 사이 몇 시간 동안 화면은 오늘치 문장을 찾다가 빈손이 됐다 — 미장 주요 종목
+ * 리포트는 "아직 만들어지지 않았습니다" 를 넷 다 띄웠고, 나머지 세 자리는 문단이
+ * 통째로 사라졌다(2026-09-05 지적. 그날은 실행이 늦어 두 시간 넘게 열려 있었다).
+ * 어제 문장을 그대로 두면 그 창이 메워진다.
+ *
+ * ⭐ **하루 묵어도 어긋나지 않는 글이라서 되는 것이다.** 이 문장들은 숫자가 아니라
+ * 화젯거리를 말한다("~가 화제였습니다"). 세는 창도 사흘이라 하루가 밀려도 겹치는 날이
+ * 이틀이다. 숫자를 인용하는 글이었다면 이렇게 못 한다 — 그때는 막대와 글이 서로 다른
+ * 기간을 말하게 된다(kaderaBaseDate 주석의 2026-08-05 사고).
+ *
+ * ⚠️ **2 는 겹침이 사라지기 직전 값이다.** 날짜 D 의 문장은 D-3~D-1 을 말하고 카드는
+ * base-3~base-1 을 센다(KADERA_WINDOW_DAYS). 소급 1 이면 이틀, 2 면 하루가 겹치고,
+ * **3 이면 하나도 안 겹친다** — 그때부터는 카드와 글이 서로 다른 기간을 말한다.
+ * 실측으로도 3 을 주니 09-05 카드에 09-02 문장이 붙었다(2026-09-05). 그래서 2 다.
+ * 파이프라인이 도는 몇 시간(소급 1)과 실행이 한 번 실패한 날(소급 2)까지만 덮는다.
+ * 여기서 못 찾으면 예전처럼 문단이 빠지거나 안내가 뜬다 — 그게 맞는 그림이다.
+ */
+export const LLM_TEXT_CARRY_DAYS = 2;
 
 /**
  * 종목 리포트 **막대 차트**가 그리는 일수. 세는 창(KADERA_WINDOW_DAYS)보다 길다.
@@ -2095,12 +2118,13 @@ async function computeIssueKeywords(limit: number): Promise<IssueKeyword[]> {
 }
 
 /**
- * 종목별 흐름 요약(LLM) — **기준일분만** 종목코드로 찾아 쓴다.
+ * 종목별 흐름 요약(LLM) — 기준일분을 먼저 찾고, **없으면 이틀까지 거슬러** 쓴다.
  * 파이프라인이 상위 몇 종목만 만들므로, 없는 종목은 카드에서 문단이 빠진다.
  *
- * 센티먼트 총평과 같은 이유로 날짜를 맞춘다 — 이 문장이 세는 창도 기준일 앞 3일이라
- * (build_stock_digests 도 `latest - 1일`에서 끝난다), 날짜를 안 보고 최신 행을 집으면
- * 막대는 기준일까지 그리는데 글은 그 하루 전까지를 말하게 된다.
+ * 예전엔 기준일분만 봤다. 이 문장이 세는 창이 기준일 앞 3일이라(build_stock_digests 도
+ * `latest - 1일`에서 끝난다) 날짜를 맞춰 두는 게 맞다고 봤는데, 그 탓에 파이프라인이
+ * 도는 동안 문단이 통째로 사라졌다. 하루 밀려도 세는 창이 이틀 겹치고 글이 화젯거리라
+ * 어긋나지 않는다 — 자세한 까닭은 LLM_TEXT_CARRY_DAYS 주석에 적었다.
  */
 /**
  * 급부상 카드의 **한 줄** 요약(LLM) — 종목코드로 찾아 쓴다.
@@ -2109,15 +2133,20 @@ async function computeIssueKeywords(limit: number): Promise<IssueKeyword[]> {
  * 3열 격자라 한 줄이 26자뿐이라, 저쪽 문장을 그대로 넣으면 세 줄이 된다.
  * 만드는 곳: data-pipeline/scripts/generate_surging_oneliners.py.
  *
- * 날짜를 맞추는 이유는 저쪽과 같다 — 카드 막대는 기준일까지 그리는데 문장만 옛 날짜 것을
- * 집으면 한 카드가 서로 다른 기간을 말한다.
+ * 날짜를 다루는 법도 저쪽과 같다 — 기준일분을 먼저 찾고 없으면 이틀까지 거슬러 쓴다
+ * (LLM_TEXT_CARRY_DAYS).
  */
 export async function getSurgingOneliners(): Promise<MaybeFailed<Record<string, string>>> {
   const db = getSupabaseAdmin();
+  const base = await kaderaBaseDate();
+  // 오래된 날부터 받아 같은 종목이 겹치면 **뒤엣것이 이긴다** — fromEntries 는 마지막
+  // 값을 남기므로 이 정렬만으로 "가장 최근 문장"이 골라진다(LLM_TEXT_CARRY_DAYS 주석).
   const { data, error } = await db
     .from("telegram_surging_oneliner")
-    .select("stock_code,oneliner")
-    .eq("date", await kaderaBaseDate());
+    .select("date,stock_code,oneliner")
+    .gte("date", addDaysISO(base, -LLM_TEXT_CARRY_DAYS))
+    .lte("date", base)
+    .order("date", { ascending: true });
   if (error) {
     console.error("[getSurgingOneliners] 급부상 한 줄 요약을 못 읽었습니다", error);
     return LOAD_FAILED;
@@ -2127,10 +2156,13 @@ export async function getSurgingOneliners(): Promise<MaybeFailed<Record<string, 
 
 export async function getStockNarratives(): Promise<MaybeFailed<Record<string, string>>> {
   const db = getSupabaseAdmin();
+  const base = await kaderaBaseDate();
   const { data, error } = await db
     .from("telegram_stock_narrative")
-    .select("stock_code,narrative")
-    .eq("date", await kaderaBaseDate());
+    .select("date,stock_code,narrative")
+    .gte("date", addDaysISO(base, -LLM_TEXT_CARRY_DAYS))
+    .lte("date", base)
+    .order("date", { ascending: true });
   if (error) {
     console.error("[getStockNarratives] 종목 설명 문장을 못 읽었습니다", error);
     return LOAD_FAILED;
