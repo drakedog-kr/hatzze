@@ -789,8 +789,10 @@ export default async function UsKaderaPage() {
                   />
 
                   {/* 왜 뜨는지 한 줄. 국장 급부상 카드와 같은 자리·같은 상자다
-                      (app/kadera/page.tsx 의 같은 블록 주석 참고). 없는 종목은 이 줄만 빠진다. */}
-                  {surgeLines[s.ticker] && (
+                      (app/kadera/page.tsx 의 같은 블록 주석에 까닭을 적었다). 문장이 아직
+                      없으면 줄을 지우지 말고 그렇다고 적는다 — 집계와 문장 사이가 20~40분
+                      뜨는데 그동안 이 줄만 사라지면 카드가 어제와 달라 보인다. */}
+                  {surgeLines[s.ticker] ? (
                     <div
                       style={{
                         display: "flex",
@@ -814,6 +816,18 @@ export default async function UsKaderaPage() {
                         {surgeLines[s.ticker]}
                       </p>
                     </div>
+                  ) : (
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 12.5,
+                        lineHeight: 1.7,
+                        color: C.sub2,
+                        wordBreak: "keep-all",
+                      }}
+                    >
+                      한 줄 요약은 오늘 집계가 끝나면 붙습니다.
+                    </p>
                   )}
 
                   {/* 국장 셀과 같은 마지막 줄이다. 다른 건 폴백뿐 — 국내는 야후가 안 되면
