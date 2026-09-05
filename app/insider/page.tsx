@@ -177,7 +177,7 @@ export default async function InsiderPage() {
   // 날이 흔한데, 그 줄이 사라지면 독자는 "오늘은 아무것도 없었다"가 아니라 "그런 걸
   // 안 보는 화면"으로 읽는다.
   /**
-   * 히어로의 '오늘의 요점' 넉 줄. 아래 카드 넷의 **첫 줄을 그대로** 끌어올린다.
+   * 히어로의 '오늘의 브리핑' 넉 줄. 아래 카드 넷의 **첫 줄을 그대로** 끌어올린다.
    *
    * ⚠️ 여기서 다시 정렬하지 않는다. 카드가 쓰는 배열의 [0] 을 그냥 집는다 — 순서
    *    규칙이 두 벌이 되면 "요점의 1위"와 "카드의 1위"가 언젠가 달라진다.
@@ -378,7 +378,7 @@ export default async function InsiderPage() {
             </div>
           </div>
 
-          {/* ③ 오늘의 요점 — 넷째 칸이 아니라 **제일 넓은 칸**이다(다른 화면과 같은
+          {/* ③ 오늘의 브리핑 — 넷째 칸이 아니라 **제일 넓은 칸**이다(다른 화면과 같은
               q·q·h 순서). 아래 카드 넷의 첫 줄을 그대로 끌어올린다.
 
               ⚠️ 여기 있던 "네 곳 모두에 흔적이 있는 종목 13개"를 뺐다. 실측해 보니
@@ -389,21 +389,26 @@ export default async function InsiderPage() {
                  좁혀야 한다. 그냥 되돌리지 말 것. */}
           <div className="hz-kd-hero-h">
             <div className="hz-kd-hero-title">
-              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>오늘의 요점</span>
+              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>오늘의 브리핑</span>
             </div>
             {highlights.length === 0 ? (
               <p style={{ margin: 0, fontSize: T.body, color: C.sub, lineHeight: 1.7 }}>아직 채울 자료가 없습니다.</p>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column" }}>
+              /* ⚠️ 줄마다 위아래 여백을 똑같이 9px 로 준다. 예전엔 첫 줄만 `0 0 9px` 이라
+                 위쪽 여백이 없었는데, 호버 바탕이 생기니 그 줄만 바탕이 글자를 스치듯
+                 잘려 나간다. 여백을 고르게 두고 목록 전체를 9px 끌어올리면 **보이는 자리는
+                 그대로**인 채 넉 줄의 하이라이트 상자만 같아진다. */
+              <div style={{ display: "flex", flexDirection: "column", marginTop: -9 }}>
                 {highlights.map((h, i) => (
                   <Link
                     key={h.label}
                     href={h.href}
+                    className="hz-briefrow"
                     style={{
                       display: "flex",
                       alignItems: "center",
                       gap: 10,
-                      padding: i === 0 ? "0 0 9px" : "9px 0",
+                      padding: "9px 0",
                       borderBottom: i === highlights.length - 1 ? "none" : "1px solid var(--c-hairline)",
                       textDecoration: "none",
                       minWidth: 0,

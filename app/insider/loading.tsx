@@ -78,7 +78,7 @@ function Cap() {
 export default function Loading() {
   return (
     <div className="hz-tx" style={{ position: "relative" }} aria-hidden>
-      {/* 머리 — 모니터링 현황 · 오늘의 업데이트 · 오늘의 요점(넓은 칸). */}
+      {/* 머리 — 모니터링 현황 · 오늘의 업데이트 · 오늘의 브리핑(넓은 칸). */}
       <section className="hz-sheet">
         <div className="hz-kd-hero">
           <HeroPane lines={3} />

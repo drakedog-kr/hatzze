@@ -151,6 +151,27 @@ function CellHead({ title, note }: { title: string; note?: string }) {
 
 const PCT = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(2)}%`;
 
+/**
+ * 24시간 거래대금($). 백만 달러 단위로 적되 **1M 이 안 되는 마켓을 0M 으로 뭉개지 않는다.**
+ *
+ * ⚠️ 반올림 하나만 쓰면 얇은 마켓이 통째로 사라진다. 2026-09-06 현대차가 실제로
+ *    $102,986(0.10M)였는데 화면에는 "$0M" 이라 떠 있었다 — 거래가 없었다는 뜻으로 읽힌다.
+ *    세 마켓이 나란히 서는 자리라, 한 칸만 0 이면 그 종목이 안 도는 것처럼 보인다.
+ * ⭐ 눈금을 세 단으로 나눈다. 1M 이상은 정수(자리가 많아 소수점이 군더더기다), 그 아래는
+ *    소수점 한 자리, 0.1M 도 안 되면 숫자를 적지 않고 상한만 말한다 — "$0.0M" 은
+ *    "$0M" 과 똑같이 없는 것처럼 읽히고, 자리를 더 늘리면 없는 정밀도를 꾸며 낸다.
+ * ⚠️ 진짜 0(그날 한 건도 안 붙은 마켓)은 "$0M" 으로 둔다. 그 자리에 "<$0.1M" 을 적으면
+ *    조금이라도 돌았다는 거짓이 된다.
+ */
+const VOL = (v: number | null) => {
+  if (v == null) return "—";
+  if (v <= 0) return "$0M";
+  const m = v / 1e6;
+  if (m >= 1) return `$${Math.round(m).toLocaleString("en-US")}M`;
+  if (m >= 0.1) return `$${m.toFixed(1)}M`;
+  return "<$0.1M";
+};
+
 /** 하이퍼리퀴드에 이 마켓들을 띄운 빌더의 이름. 저장된 심볼의 접두사(`xyz:SMSN`)이고,
  *  화면에서는 이 자리만 거래소 이름으로 바꿔 적는다. 주소에는 그대로 쓴다.
  *  ⚠️ `data-pipeline/scripts/fetch_kr_overnight.py` 의 `DEX` 와 같은 값이다. */
@@ -289,7 +310,7 @@ function OvernightPanel({ r }: { r: OvernightRow }) {
           [`${r.prevCloseDate.slice(5).replace("-", "/")} 국장 종가`, `${r.prevClose.toLocaleString("ko-KR")}원`],
           // ⚠️ 환율을 여기 붙이지 말 것. 그날 하나뿐인 값이라 시트 부제가 한 번 말한다.
           ["달러 표시가", `$${r.usd.toLocaleString("en-US", { maximumFractionDigits: 2 })}`],
-          ["24시간 거래대금", r.volumeUsd == null ? "—" : `$${Math.round(r.volumeUsd / 1e6).toLocaleString("en-US")}M`],
+          ["24시간 거래대금", VOL(r.volumeUsd)],
         ] as const).map(([k, v]) => (
           <div key={k} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
             <span style={{ fontSize: 11, color: C.muted }}>{k}</span>
