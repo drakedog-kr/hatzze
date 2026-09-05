@@ -104,6 +104,17 @@ def fetch(url: str, tries: int = 3) -> str | None:
     return None
 
 
+# SEC 목록은 **클래스까지** 적는다(BRK-A/BRK-B). 우리 사전은 클래스 없는 티커를 쓰므로
+# 그대로는 안 잡힌다. 같은 별칭이 이미 두 군데 있는데 여기만 빠져 있었다 —
+# `lib/yahoo-history.ts` 의 YAHOO_ALIAS, `extract_telegram_us_stocks.py` 의 SEC_TICKER_ALIAS.
+#
+# ⚠️ 그 탓에 **버크셔 임원 공시가 한 건도 안 들어왔다**(2026-09-05 확인: us_insider_txn·
+#    us_insider_daily 에 BRK 행 0). 로그는 "못 잡은 것 1개" 한 줄만 찍어서, 세지 않으면
+#    안 보인다. 카더라 쪽은 별칭이 있어 멀쩡히 잡히고 있었다(09-03 언급 12회).
+# ⚠️ 세 번째 사본이다. 클래스가 나뉜 종목을 사전에 더 넣으면 **세 곳을 같이** 고칠 것.
+SEC_TICKER_ALIAS = {"BRK": "BRK-B"}
+
+
 def ticker_by_cik(db) -> dict[int, str]:
     """us_stocks 의 티커를 SEC 의 티커↔CIK 표에 이어 붙인다.
 
@@ -111,14 +122,17 @@ def ticker_by_cik(db) -> dict[int, str]:
     사전이 자랄 수 있으므로 load_all 로 읽는다(1,000행 상한).
     """
     ours = {r["ticker"].upper() for r in load_all(db, "us_stocks", "ticker", order_by="ticker")}
+    # SEC 쪽 표기 → 우리 표기. 별칭을 거친 종목도 결과에는 **우리 티커**로 담아야
+    # 아래 집계·저장이 us_stocks 와 같은 열쇠를 쓴다.
+    sec_to_ours = {SEC_TICKER_ALIAS.get(t, t): t for t in ours}
     raw = fetch("https://www.sec.gov/files/company_tickers.json")
     if not raw:
         raise SystemExit("SEC 티커 표를 못 받았다")
     out: dict[int, str] = {}
     for v in json.loads(raw).values():
         t = v["ticker"].upper()
-        if t in ours:
-            out[int(v["cik_str"])] = t
+        if t in sec_to_ours:
+            out[int(v["cik_str"])] = sec_to_ours[t]
     missing = len(ours) - len(out)
     print(f"[사전] us_stocks {len(ours)}종목 중 CIK 가 잡힌 것 {len(out)}개 (못 잡은 것 {missing}개)")
     return out
