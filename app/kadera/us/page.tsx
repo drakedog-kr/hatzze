@@ -817,17 +817,28 @@ export default async function UsKaderaPage() {
                       </p>
                     </div>
                   ) : (
-                    <p
+                    <div
                       style={{
-                        margin: 0,
-                        fontSize: 12.5,
-                        lineHeight: 1.7,
-                        color: C.sub2,
-                        wordBreak: "keep-all",
+                        display: "flex",
+                        gap: 9,
+                        background: C.card,
+                        borderRadius: 12,
+                        padding: "12px 13px",
                       }}
                     >
-                      한 줄 요약은 오늘 집계가 끝나면 붙습니다.
-                    </p>
+                      <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 13,
+                          lineHeight: 1.7,
+                          color: C.sub2,
+                          wordBreak: "keep-all",
+                        }}
+                      >
+                        한 줄 요약은 오늘 집계가 끝나면 붙습니다.
+                      </p>
+                    </div>
                   )}
 
                   {/* 국장 셀과 같은 마지막 줄이다. 다른 건 폴백뿐 — 국내는 야후가 안 되면
@@ -1465,16 +1476,31 @@ export default async function UsKaderaPage() {
                       </p>
                     </div>
                   ) : (
-                    <p
+                    /* ⭐ 문장이 있을 때와 **같은 상자·같은 아이콘**이다(2026-09-05 지적).
+                       맨 글씨로 두면 카드 높이가 달라져 넉 장이 들쭉날쭉해진다. 글자색만
+                       흐리게(sub2) 두어 아직 내용이 아니라는 것을 말한다. */
+                    <div
                       style={{
-                        margin: 0,
-                        fontSize: 12.5,
-                        lineHeight: 1.7,
-                        color: C.sub2,
+                        display: "flex",
+                        gap: 9,
+                        background: C.card,
+                        borderRadius: 12,
+                        padding: "12px 13px",
                       }}
                     >
-                      이 종목의 흐름 요약은 아직 만들어지지 않았습니다.
-                    </p>
+                      <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 13,
+                          lineHeight: 1.7,
+                          color: C.sub2,
+                          wordBreak: "keep-all",
+                        }}
+                      >
+                        흐름 요약은 오늘 집계가 끝나면 붙습니다.
+                      </p>
+                    </div>
                   )}
 
                   {/* 표본 크기는 왼쪽 아래, 나가는 링크는 오른쪽 아래. 한 줄에 마주 보게 두면
