@@ -107,7 +107,7 @@ data-pipeline/
   backtest/       눈금·가중치 재보정 하네스
   common/         Supabase·야후·KRX·HTTP 클라이언트 · LLM 문장 검수
 supabase/         schema.sql + migration_001~062
-.github/workflows/  daily-update · telegram-broadcast · us-dict-scan · cron-canary · indexnow · ci
+.github/workflows/  daily-update · telegram-broadcast · us-dict-scan · indexnow · ci
 ```
 
 ---
@@ -166,7 +166,7 @@ python scripts/fetch_telegram.py           # 카더라 채널 메시지 수집
 
 **깃헙 예약은 셋 다 껐습니다.** 부하가 높으면 지연되고 심하면 슬롯을 통째로 버리기 때문입니다(공식 문서). 2026-08-26~28에 실행이 3~10시간씩 늦게 생기다가 08-28에는 네 발화 중 둘이 8시간 늦게 오고 둘은 아예 오지 않아, 하루 두 번을 다 손으로 돌렸습니다. `workflow_dispatch`는 배치 스케줄러가 아니라 실시간 경로라 생성과 시작이 같은 초입니다.
 
-깃헙 예약이 다시 믿을 만해지는지는 제품과 무관한 카나리(`cron-canary.yml`, 매시 :23)로 따로 재고 있습니다. 며칠 멀쩡하면 되돌릴지 정합니다.
+되돌릴지 정하려고 제품과 무관한 카나리를 매시 :23에 8일 돌려 봤습니다. 매시라면 190번이어야 할 190시간에 47번만 와서 전달률이 25%였고, 간격은 중앙 233분에 최대 503분이었습니다. 회복 기색이 없어 되돌리지 않기로 하고 카나리도 걷었습니다(2026-09-06).
 
 지표는 KRX가 전 영업일 자료를 08:00 KST에 올리므로, 잡 안의 대기 게이트가 그 시각을 못박습니다.
 
