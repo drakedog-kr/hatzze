@@ -846,6 +846,9 @@ export default async function KaderaPage() {
                         "왜 없어졌어"). 파이프라인이 집계를 끝낸 뒤 이 문장을 만들기까지
                         20~40분이 뜨는데, 그동안 이 줄만 사라지면 카드가 어제와 달라 보인다.
                         막대·배수·가격은 다 있으니 빈 건 문장뿐이라고 말해 주는 편이 낫다.
+                        ⭐ **상자와 아이콘은 문장이 있을 때와 똑같이 둔다**(2026-09-05 지적).
+                        글씨만 남기면 카드 높이가 달라져 여섯 장이 들쭉날쭉해진다. 글자색만
+                        흐리게(sub2) 두어 아직 내용이 아니라는 것을 말한다.
                         ⚠️ 급부상은 명단이 매일 갈려 **어제 문장을 물려받지 못한다** — 주요
                         종목 리포트가 쓰는 소급(LLM_TEXT_CARRY_DAYS)이 여기선 거의 안 듣는다. */}
                     {surgeLines[s.code] ? (
@@ -856,9 +859,12 @@ export default async function KaderaPage() {
                         </p>
                       </div>
                     ) : (
-                      <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.7, color: C.sub2, wordBreak: "keep-all" }}>
-                        한 줄 요약은 오늘 집계가 끝나면 붙습니다.
-                      </p>
+                      <div style={{ display: "flex", gap: 9, background: C.card, borderRadius: 12, padding: "12px 13px" }}>
+                        <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                        <p style={{ margin: 0, fontSize: 13, lineHeight: 1.7, color: C.sub2, wordBreak: "keep-all" }}>
+                          한 줄 요약은 오늘 집계가 끝나면 붙습니다.
+                        </p>
+                      </div>
                     )}
 
                     <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 8, paddingTop: 2, flexWrap: "wrap" }}>
@@ -1150,12 +1156,21 @@ export default async function KaderaPage() {
                     peakLabel={peak > 0 ? `최다 ${peak}회` : undefined}
                   />
 
-                  {/* 이번 리디자인(2026-09): 패널이 회색 타일이라 이 상자는 카드색으로 뜬다(soft 면 타일에 묻힌다). */}
-                  {narratives[r.code] && (
+                  {/* 이번 리디자인(2026-09): 패널이 회색 타일이라 이 상자는 카드색으로 뜬다(soft 면 타일에 묻힌다).
+                      ⭐ 문장이 없어도 **상자와 아이콘은 그대로** 두고 까닭만 적는다
+                      (2026-09-05 지적). 급부상 셀과 같은 규칙이다 — 그 블록 주석 참고. */}
+                  {narratives[r.code] ? (
                     <div style={{ display: "flex", gap: 9, background: C.card, borderRadius: 12, padding: "12px 13px" }}>
                       <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
                       <p style={{ margin: 0, fontSize: 13, lineHeight: 1.7, color: "var(--c-ink-soft)", textWrap: "pretty", wordBreak: "keep-all" }}>
                         {narratives[r.code]}
+                      </p>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", gap: 9, background: C.card, borderRadius: 12, padding: "12px 13px" }}>
+                      <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                      <p style={{ margin: 0, fontSize: 13, lineHeight: 1.7, color: C.sub2, wordBreak: "keep-all" }}>
+                        흐름 요약은 오늘 집계가 끝나면 붙습니다.
                       </p>
                     </div>
                   )}
