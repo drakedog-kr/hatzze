@@ -114,6 +114,18 @@ def fetch(url: str, tries: int = 3) -> str | None:
 # ⚠️ 세 번째 사본이다. 클래스가 나뉜 종목을 사전에 더 넣으면 **세 곳을 같이** 고칠 것.
 SEC_TICKER_ALIAS = {"BRK": "BRK-B"}
 
+# SEC 표기 → 우리 티커. **위 사전만으로는 반쪽이다.**
+#
+# CIK 는 위에서 찾지만, 거래를 담을 때 쓰는 티커는 공시 안 `<issuerTradingSymbol>` 에서
+# 온다(parse_filing 주석의 54건 사고 참고). 거기 값이 `BRK.B` 라 우리 사전의 `BRK` 와
+# 안 맞고, 저장 직전 `our_tickers` 걸러내기에서 통째로 버려졌다 — 인덱스도 잡히고
+# 파싱도 됐는데 마지막 한 줄에서 사라지니 로그에도 안 남는다(2026-09-05 실측:
+# 08-13 공시 두 건에서 거래 3건이 파싱됐는데 표에는 0건).
+#
+# ⚠️ **구분자가 자리마다 다르다.** company_tickers.json 은 하이픈(BRK-B), Form 4 XML 은
+#    점(BRK.A)이다. 둘 다 적어 둔다. 클래스도 A·B 둘 다 우리 `BRK` 로 모은다.
+OURS_BY_SEC = {"BRK-A": "BRK", "BRK-B": "BRK", "BRK.A": "BRK", "BRK.B": "BRK"}
+
 
 def ticker_by_cik(db) -> dict[int, str]:
     """us_stocks 의 티커를 SEC 의 티커↔CIK 표에 이어 붙인다.
@@ -255,7 +267,9 @@ def parse_filing(doc: str, ticker: str, cik: int, acc: str, filed: dt.date, path
     issuer_cik = _num(doc, "issuerCik")
     # 심볼이 비었거나 "NONE"·"N/A" 인 제출이 있다. 그때만 폴더 CIK 의 짐작으로 돌아간다.
     if sym and sym not in ("NONE", "N/A", "NA", "-"):
-        ticker = sym
+        # 클래스가 나뉜 종목은 우리 표기로 되돌린다(BRK.B → BRK). 안 되돌리면 아래
+        # our_tickers 걸러내기에서 조용히 버려진다(OURS_BY_SEC 주석).
+        ticker = OURS_BY_SEC.get(sym, sym)
     if issuer_cik:
         cik = int(issuer_cik)
     owner_block = re.search(r"<reportingOwner>(.*?)</reportingOwner>", doc, re.S)
@@ -374,6 +388,7 @@ def main() -> None:
 
     txns: list[dict] = []
     empty_days = []
+    dropped: dict[str, int] = defaultdict(int)
     for day in business_days(args.days):
         rows = index_rows(day, cik2ticker)
         if not rows:
@@ -392,6 +407,13 @@ def main() -> None:
             # ⚠️ 발행사 티커가 우리 종목이 아니면 버린다. 이 축은 카더라 종목만 담는다
             #    안 버리면 신고자 쪽 줄로 들어온 남의 회사가 우리 표에 섞인다
             #    (로빈후드가 신고한 자회사 펀드 RVI 가 HOOD 로 들어온 식).
+            # ⭐ 버린 것도 세어 둔다. 인덱스 CIK 는 우리 종목인데 발행사 티커가 우리
+            #    사전에 없으면 둘 중 하나다 — 신고자 쪽 줄로 들어온 남의 회사(정상)이거나,
+            #    **표기가 어긋나 제 종목을 못 알아본 것**(BRK.B 사고). 뒤엣것은 소리 없이
+            #    사라지므로 심볼을 찍어 둔다.
+            for r in parsed:
+                if r["ticker"] not in our_tickers:
+                    dropped[r["ticker"]] += 1
             parsed = [r for r in parsed if r["ticker"] in our_tickers]
             txns.extend(parsed)
             got += len(parsed)
@@ -407,6 +429,10 @@ def main() -> None:
         codes[t["transaction_code"] or "?"] += 1
     total = sum(codes.values())
     print(f"\n거래 {len(txns)}건 · 종목 {len({t['ticker'] for t in txns})}개 · 창 끝점 {as_of}")
+    if dropped:
+        top = sorted(dropped.items(), key=lambda x: -x[1])[:8]
+        print("  사전 밖이라 버린 발행사: " + " · ".join(f"{t} {n}건" for t, n in top))
+        print("    ↳ 남의 회사면 정상이다. 우리 종목이 여기 보이면 표기가 어긋난 것이다(OURS_BY_SEC).")
     print("  코드: " + " · ".join(f"{c} {n}({n / total:.0%})" for c, n in sorted(codes.items(), key=lambda x: -x[1])))
     buys = [t for t in txns if t["transaction_code"] in BUY_CODES]
     print(f"  장내 매수(P): {len(buys)}건" + (f" — {', '.join(sorted({b['ticker'] for b in buys}))}" if buys else " (없음. 우리 종목에선 정상이다)"))
