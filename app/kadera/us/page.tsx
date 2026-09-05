@@ -1104,10 +1104,17 @@ export default async function UsKaderaPage() {
                         최근 {US_WINDOW_DAYS}일 언급 {t.stockCount}종목 · 총{" "}
                         {t.mentionCount.toLocaleString("ko-KR")}회 · 주목도순
                       </div>
+                      {/* ⭐ 목적지가 MDD 가 아니라 **내부자 리포트의 그 종목 공시**다
+                          (2026-09-06 요청). 이 화면이 이미 쓰는 목적지이기도 하다 — 급부상
+                          종목·주요 종목 리포트 줄의 "공시" 알약(UsInsiderLink)과 같은 곳으로
+                          간다. 404 걱정은 없다: 테마 줄에 오른 종목은 telegram_us_stock_daily
+                          에 언급 기록이 있어 getStockDetail 의 `known` 을 반드시 통과한다.
+                          ⚠️ 국장 테마 줄(app/kadera/page.tsx)은 그대로 `/stock/[code]` 로
+                             간다. 클래스는 같이 쓰지만 목적지는 화면마다 따로다. */}
                       {t.stocks.map((st) => (
                         <Link
                           key={st.ticker}
-                          href={`/mdd?code=${st.ticker}&market=US`}
+                          href={`/insider/stock/${encodeURIComponent(st.ticker)}`}
                           className="hz-theme-pop-item"
                         >
                           <span className="hz-theme-pop-name">{st.name}</span>
@@ -1121,7 +1128,7 @@ export default async function UsKaderaPage() {
                         </Link>
                       ))}
                       <div className="hz-theme-pop-foot">
-                        종목을 누르면 MDD 정밀분석이 열립니다.
+                        종목을 누르면 그 종목의 내부자 공시가 열립니다.
                       </div>
                     </div>
                   )}

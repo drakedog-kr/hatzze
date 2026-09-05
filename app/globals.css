@@ -2665,7 +2665,8 @@ main.hz-scroll { overflow-x: clip; }
 
 /* ── 테마 로테이션 줄의 호버 카드 ──────────────────────────────────
    줄 어디에든 마우스를 올리면 그 줄 전체가 하늘색으로 물들고, 그 테마의 점유율을
-   만든 종목이 목록으로 열린다. 목록의 종목마다 MDD 정밀분석으로 가는 링크가 붙는다.
+   만든 종목이 목록으로 열린다. 목록의 종목마다 링크가 붙는다 — 목적지는 화면마다 다르다
+   (국장은 그 종목 화면, 미장은 내부자 공시).
    그래서 위의 data-tip 툴팁을 못 쓴다 — 그건 attr() 로 뽑은 문자열이라 링크를 담지
    못한다. 대신 실제 요소를 두고 :hover 로 여닫는다(카드는 서버 컴포넌트로 남는다).
 
@@ -2960,6 +2961,39 @@ main.hz-scroll { overflow-x: clip; }
 }
 .hz-row-link:hover {
   background: var(--c-hover);
+}
+
+/* 내부자 히어로 '오늘의 브리핑'의 넉 줄 — 누르면 그 줄이 요약한 목록으로 간다.
+   호버 색은 이 화면의 표 행(.hz-trow)과 같은 --c-blue-tint 다. 같은 화면에서 같은 동작이
+   다른 색으로 보이면 안 된다(.hz-trow 호버 주석과 같은 판단).
+
+   ⚠️⚠️ **바탕을 줄 자신에게 주면 안 된다.** 줄에는 인라인 style 로 밑선(border-bottom)이
+   달려 있어서, 여느 때처럼 음수 마진으로 바탕을 넓히면(.hz-theme-row·.hz-row-link 방식)
+   **밑선까지 같이 길어진다** — 부탁받지 않은 자리(칸 안쪽 22px 여백)가 바뀐다. 그래서
+   바탕만 가상 요소로 따로 깔고 줄의 상자는 그대로 둔다.
+   ⚠️ 줄에 `z-index: 0` 을 줘 **자기 쌓임 맥락**을 만드는 것이 핵심이다. 그게 없으면
+   `z-index: -1` 인 바탕이 조상(흰 시트)의 배경 뒤로 내려가 통째로 안 보인다.
+   ⚠️ 인라인 style 로 background 를 주지 말 것 — 인라인이 :hover 를 이겨 하이라이트가
+   아예 안 먹는다(.hz-pick 주석과 같은 함정). */
+.hz-briefrow {
+  position: relative;
+  z-index: 0;
+}
+.hz-briefrow::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  /* 좌우 12px 은 테마 로테이션 줄(.hz-theme-row)이 쓰는 값과 같다. 이 칸의 좌우 여백은
+     폭이 좁아져도 22px 그대로다 — 좁은 폭 규칙은 `.hz-kd-hero > *` 라 여기(`> .hz-kd-hero-h`)
+     보다 특정도가 낮아 못 이긴다. 그래서 어느 폭에서든 하이라이트가 칸 밖으로 안 나간다. */
+  inset: 0 -12px;
+  border-radius: var(--r-control);
+  background: transparent;
+  transition: background 0.13s ease;
+}
+.hz-briefrow:hover::before,
+.hz-briefrow:focus-visible::before {
+  background: var(--c-blue-tint);
 }
 
 /* 서학 달력의 '눌러서 그 날로 간다' 줄. 목록 간격이 4px 로 촘촘해서 .hz-row-link 의
@@ -4584,7 +4618,7 @@ main.hz-scroll { overflow-x: clip; }
 }
 /* ⭐ **주인공 칸은 회색으로 깔지 않는다.** 세 칸을 다 회색 타일로 두면 위계가 사라져
    "어디를 먼저 읽나"가 안 보인다(2026-09-04 지적). 넓은 칸(50%)이 늘 그 화면의 문장 자리다
-   — 내부자의 '오늘의 요점', 미장 카더라·미리보기의 '오늘의 브리핑'. 국장 카더라가 데이터
+   — 내부자·미장 카더라·미리보기 셋 다 '오늘의 브리핑'이다. 국장 카더라가 데이터
    타일 옆에 흰 브리핑을 두는 것과 같은 짜임이 되고, 회색 두 칸이 그 문장을 받쳐 준다. */
 .hz-tx .hz-kd-hero > .hz-kd-hero-h,
 .hz-tx .hz-hero-panel > .hz-hero-wide {

@@ -138,7 +138,11 @@ BALANCE_SYSTEM = COMMON + """
 - 근거는 과열도 상위권에 어느 종류가 몇 개 들었는지입니다. 지표 **이름은 쓰지 마세요**
   (바로 앞 문단이 이미 하나를 짚었습니다).
 - 두 종류가 엇비슷하면 억지로 가르지 말고 "두 종류가 비슷한 수준입니다" 처럼 적으세요.
-- 퍼센트 숫자는 최대 하나만 씁니다."""
+- 퍼센트 숫자는 최대 하나만 씁니다.
+- **'햇쩨 지수'와 ℃ 를 쓰지 마세요. 어제·오늘·지난주의 온도나 며칠간의 오르내림도
+  말하지 마세요.** 그건 바로 다음 문단이 통째로 맡는 일입니다. 이 문장은 두 종류의
+  대비 하나만 말합니다.
+- 저온·상온·고온·초고온 같은 구간 이름도 쓰지 마세요(첫 문단이 이미 말했습니다)."""
 
 # 문단 4: 최근 추세 (②)
 TREND_SYSTEM = COMMON + """
@@ -277,6 +281,8 @@ def build_digest(
     hot_count: int,
     rows: list[dict],
     recent: list[tuple[str, float]],
+    *,
+    index_lines: bool = True,
 ) -> str:
     """LLM에 넘길 지표 요약(사람이 읽는 한글 텍스트). 과열도 높은 순으로 정렬해
     모델이 '눈여겨볼 지표'를 고르기 쉽게 한다.
@@ -292,16 +298,25 @@ def build_digest(
       오래된→최신 순으로 받아 날짜별 목록으로 적는다(trend_lines 주석 참고).
     - [지표별]의 '뜻:' : 1번째 문단(주인공 뜻풀이)용. 주인공 카테고리(시장) 상위
       DESC_TOP_N개에만 설명문을 붙여, 모델이 지표 의미를 지어내지 않고 근거 있게 풀도록
-      한다. 시장 지표가 아예 없는 날을 대비해, 그때는 순서대로 앞 N개에 붙인다."""
-    lines = [
-        f"[전체] 햇쩨 지수 {score:.0f}℃ · {stage} 구간 · 초고온 구간에 든 지표 {hot_count}개",
-    ]
-    if recent:
-        lines += trend_lines(recent)
-    lines += [
-        "",
-        "[지표별] 과열도 높은 순 (0=저온 ~ 100=초고온, '초고온'=과열도 75 이상)",
-    ]
+      한다. 시장 지표가 아예 없는 날을 대비해, 그때는 순서대로 앞 N개에 붙인다.
+
+    ⭐ `index_lines=False` 는 **햇쩨 지수(℃)가 든 두 블록**([전체]·[최근 추세])을 뺀다.
+      갈림 문단(BALANCE) 전용이다. 프롬프트로 "온도를 말하지 말라"고만 하면 안 듣는다 —
+      2026-09-06 프로덕션 문장이 "어제 26℃에서 오늘 31℃로 5℃ 반등했으며, 감성 지표가…"
+      로 시작해 **바로 다음 문단과 같은 말을 두 번** 했다. 재료에 ℃ 가 있으면 문장이
+      그걸 집는다. 문단이 여럿인 요약에서 되풀이되는 고장이다 — 한 문단에 재료를
+      더해 주면 그 문단이 옆 문단의 일까지 해 버린다. 역할을 가르는 자리는 프롬프트가
+      아니라 **각 문단이 보는 자료**다.
+      갈림 문단이 쓸 근거는 [지표별]의 카테고리와 과열도뿐이라, 빼도 할 말은 그대로다."""
+    lines: list[str] = []
+    if index_lines:
+        lines.append(
+            f"[전체] 햇쩨 지수 {score:.0f}℃ · {stage} 구간 · 초고온 구간에 든 지표 {hot_count}개"
+        )
+        if recent:
+            lines += trend_lines(recent)
+        lines.append("")  # 위 블록과 [지표별] 사이를 띄운다. 위가 비면 띄울 것도 없다.
+    lines.append("[지표별] 과열도 높은 순 (0=저온 ~ 100=초고온, '초고온'=과열도 75 이상)")
     # 문턱에 걸린 지표(MENTION_RAW_GATES)는 후보에서 빼고, 목록에는 남기되 표시를 단다 —
     # 지워 버리면 모델이 보는 '가장 뜨거운 지표'가 실제와 달라져 다른 문장까지 어긋난다.
     eligible = [r for r in rows if mentionable(r)]
@@ -391,6 +406,8 @@ def main() -> None:
     rows.sort(key=lambda r: r["capped"], reverse=True)
     hot_count = sum(1 for r in rows if r["hot"])
     digest = build_digest(score, stage, hot_count, rows, recent)
+    # 갈림 문단만 ℃ 가 든 블록을 뺀 자료로 쓴다(build_digest 의 index_lines 주석 참고).
+    balance_digest = build_digest(score, stage, hot_count, rows, recent, index_lines=False)
 
     print("─" * 60)
     print(digest)
@@ -398,17 +415,17 @@ def main() -> None:
 
     anthropic = Anthropic(api_key=ANTHROPIC_API_KEY)
 
-    def one_sentence(system: str) -> str:
+    def one_sentence(system: str, source: str) -> str:
         resp = anthropic.messages.create(
             model=MODEL,
             max_tokens=300,
             system=system,
-            messages=[{"role": "user", "content": digest}],
+            messages=[{"role": "user", "content": source}],
         )
         # 별표(**...**)는 굵게 표시용이라 유지한다 — 프론트가 파싱해 <b>로 렌더한다.
         return "".join(b.text for b in resp.content if b.type == "text").strip()
 
-    def sized_sentence(system: str, length: tuple[int, int]) -> str:
+    def sized_sentence(system: str, length: tuple[int, int], source: str | None = None) -> str:
         """한 문장 — 길이가 목표를 벗어나면 다시 쓰게 한다.
 
         카더라 총평의 ask_brief_sentence 와 같은 방식이다. 후보를 모아 두고 목표 범위
@@ -416,11 +433,15 @@ def main() -> None:
         요약이 통째로 저장되지 않는 것보다 길이가 몇 자 어긋나는 게 낫다.
         """
         lo, hi = length
-        candidates = [one_sentence(system)]
+        # 문단마다 모델에게 준 자료가 다르다(갈림 문단은 ℃ 블록이 빠진다). 오타 검사의
+        # '원문에 있는가' 대조도 **그 문단이 실제로 본 자료**로 해야 한다 — 안 그러면
+        # 못 본 낱말을 근거로 통과시키거나 반대로 멀쩡한 말을 오타로 버린다.
+        src = digest if source is None else source
+        candidates = [one_sentence(system, src)]
         for _ in range(HERO_RETRIES):
             cur = candidates[-1]
             # 길이가 맞아도 글자가 깨졌거나 오타가 있으면 다시 쓴다(common/text_check.py).
-            found = problems(cur, digest)
+            found = problems(cur, src)
             if lo <= len(cur) <= hi and not found:
                 break
             if found:
@@ -434,9 +455,9 @@ def main() -> None:
                     f"{need} {lo}~{hi}자로 **한 문장**만 다시 쓰세요.\n"
                     f"[방금 쓴 문장]\n{cur}"
                 )
-            candidates.append(one_sentence(retry))
+            candidates.append(one_sentence(retry, src))
         # 깨진 후보는 길이가 맞아도 안 쓴다 — 길이는 어긋나도 읽히지만 깨진 글자는 못 읽는다.
-        usable = [t for t in candidates if t.strip() and is_clean(t, digest)] or [
+        usable = [t for t in candidates if t.strip() and is_clean(t, src)] or [
             t for t in candidates if t.strip()
         ]
         if not usable:
@@ -448,7 +469,7 @@ def main() -> None:
 
     # 주인공 문장과 추세 문장을 따로 생성해 문단 수를 항상 정확히 2로 고정한다.
     spotlight = sized_sentence(SPOTLIGHT_SYSTEM, SPOTLIGHT_LEN)
-    balance = sized_sentence(BALANCE_SYSTEM, BALANCE_LEN)
+    balance = sized_sentence(BALANCE_SYSTEM, BALANCE_LEN, balance_digest)
     trend = sized_sentence(TREND_SYSTEM, TREND_LEN)
     if not spotlight or not trend:
         print("[WARNING] LLM 응답이 비어 요약을 저장하지 않습니다.")
