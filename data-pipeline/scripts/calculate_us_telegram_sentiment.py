@@ -42,7 +42,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.supabase_client import get_client, load_all, load_all_keyset  # noqa: E402
+from common.supabase_client import has_column, get_client, load_all, load_all_keyset  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 from config.issue_keywords import EXCLUDE, MAX_KEYWORD_LEN, MIN_KEYWORD_LEN  # noqa: E402
 from config.stock_extraction import ALIASES as STOCK_ALIASES  # noqa: E402
@@ -387,9 +387,15 @@ def main() -> None:
     for m in us_mentions:
         tickers_of_msg[(m["channel_handle"], m["message_id"])].add(m["ticker"])
 
+    # text_hash 는 migration_065 가 더한 열이다. 아직 없으면 그 열 없이 읽고 중복 제거를 건너뛴다.
+    has_hash = has_column(db, "telegram_message_analysis", "text_hash")
     analysis = load_all_keyset(
-        db, "telegram_message_analysis", "id,channel_handle,message_id,sentiment,keywords"
+        db,
+        "telegram_message_analysis",
+        "id,channel_handle,message_id,sentiment,keywords" + (",text_hash" if has_hash else ""),
     )
+    if not has_hash:
+        print("[안내] text_hash 열이 없어 복붙 중복 제거 없이 집계합니다(migration_065).")
     if not analysis:
         print("[경고] telegram_message_analysis 가 비어 있습니다. "
               "먼저 analyze_telegram_messages.py 를 실행하세요.")
@@ -427,6 +433,17 @@ def main() -> None:
 
     tone_of = {(a["channel_handle"], a["message_id"]): a["sentiment"] for a in analysis}
 
+    # ── 같은 본문은 하루에 한 번만 센다(톤만) ─────────────────────────────
+    # 같은 글이 여러 채널에 포워드되면 지금까지는 그 수만큼 톤이 세어졌다. 최근 7일 실측:
+    # 분류 글의 28% 가 같은 본문이고 그 복붙 글의 낙관도가 74%(원글 62%)였다 — 홍보성
+    # 글이 많이 퍼진다. 그래서 (날짜, 본문 해시)가 같은 글은 첫 건만 톤에 넣는다.
+    # ⚠️ **화제어는 그대로 다 센다.** 열 채널이 같은 글을 퍼뜨린 건 "열 채널이 이 얘기를
+    #    한다"는 신호라서 화제어·트렌딩은 포워드 수를 그대로 쓴다(analyze_telegram_messages
+    #    .fan_out_duplicates 주석). 여기서 걷는 건 **분위기 비율**만이다. 국장과 같은 규칙.
+    # ⚠️ 해시가 null 인 행(migration_065 이전 · backfill 전)은 중복 판정 없이 그대로 센다.
+    seen_body: set[tuple[str, str]] = set()
+    folded_dup = 0
+
     for a in analysis:
         key = (a["channel_handle"], a["message_id"])
         date = date_of.get(key)
@@ -437,16 +454,23 @@ def main() -> None:
         is_us = key in us_keys
         if is_us:
             analyzed_us += 1
-            tone[(date, OVERALL)][a["sentiment"]] += 1
-            # 이 메시지가 말한 종목들이 속한 테마 **전부**에 같은 톤을 반영(중복 제거).
-            # 국내 calculate_telegram_sentiment 와 같은 규칙이다 — 한 글이 엔비디아와
-            # 마이크론을 같이 말하면 AI반도체와 메모리 둘 다 그 톤을 겪은 것이 맞다.
-            for theme in {
-                th
-                for tk in tickers_of_msg.get(key, ())
-                for th in themes_of_ticker.get(tk, ())
-            }:
-                tone[(date, theme)][a["sentiment"]] += 1
+            h = a.get("text_hash")
+            dup = bool(h) and (date, h) in seen_body
+            if h:
+                seen_body.add((date, h))
+            if dup:
+                folded_dup += 1
+            else:
+                tone[(date, OVERALL)][a["sentiment"]] += 1
+                # 이 메시지가 말한 종목들이 속한 테마 **전부**에 같은 톤을 반영(중복 제거).
+                # 국내 calculate_telegram_sentiment 와 같은 규칙이다 — 한 글이 엔비디아와
+                # 마이크론을 같이 말하면 AI반도체와 메모리 둘 다 그 톤을 겪은 것이 맞다.
+                for theme in {
+                    th
+                    for tk in tickers_of_msg.get(key, ())
+                    for th in themes_of_ticker.get(tk, ())
+                }:
+                    tone[(date, theme)][a["sentiment"]] += 1
 
         for word in a.get("keywords") or []:
             b, canonical = bucket_of(word)
@@ -463,6 +487,8 @@ def main() -> None:
     if not tone:
         print("[경고] 미국 언급 메시지 중 분류가 붙은 것이 없습니다. 저장을 건너뜁니다.")
         return
+    if folded_dup:
+        print(f"[집계] 같은 날 같은 본문이라 톤에서 접은 글 {folded_dup:,}건")
 
     sentiment_rows = [
         {

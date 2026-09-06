@@ -37,7 +37,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.supabase_client import get_client  # noqa: E402
+from common.supabase_client import has_column, get_client  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 from common.supabase_client import load_all, load_all_keyset  # noqa: E402
 from config.issue_keywords import (  # noqa: E402
@@ -199,9 +199,15 @@ def main() -> None:
 
     # 아래 셋은 전부 10만 행대다. OFFSET 페이징은 깊은 페이지가 앞부분을 다시 훑어
     # statement_timeout(8초)에 걸리므로 키셋으로 읽는다 — select 의 id 가 그 시작점이다.
+    # text_hash 는 migration_065 가 더한 열이다. 아직 없으면 그 열 없이 읽고 중복 제거를 건너뛴다.
+    has_hash = has_column(db, "telegram_message_analysis", "text_hash")
     analysis = load_all_keyset(
-        db, "telegram_message_analysis", "id,channel_handle,message_id,sentiment,keywords"
+        db,
+        "telegram_message_analysis",
+        "id,channel_handle,message_id,sentiment,keywords" + (",text_hash" if has_hash else ""),
     )
+    if not has_hash:
+        print("[안내] text_hash 열이 없어 복붙 중복 제거 없이 집계합니다(migration_065).")
     if not analysis:
         print("[경고] telegram_message_analysis 가 비어 있습니다. "
               "먼저 analyze_telegram_messages.py 를 실행하세요.")
@@ -242,6 +248,17 @@ def main() -> None:
     kw_spellings: dict[str, Counter] = defaultdict(Counter)      # 버킷 -> 실제 표기 빈도
     skipped_no_date = 0
 
+    # ── 같은 본문은 하루에 한 번만 센다(톤만) ─────────────────────────────
+    # 같은 글이 여러 채널에 포워드되면 지금까지는 그 수만큼 톤이 세어졌다. 최근 7일 실측:
+    # 분류 글의 28% 가 같은 본문이고 그 복붙 글의 낙관도가 74%(원글 62%)였다 — 홍보성
+    # 글이 많이 퍼진다. 그래서 (날짜, 본문 해시)가 같은 글은 첫 건만 톤에 넣는다.
+    # ⚠️ **화제어는 그대로 다 센다.** 열 채널이 같은 글을 퍼뜨린 건 "열 채널이 이 얘기를
+    #    한다"는 신호라서 화제어·트렌딩은 포워드 수를 그대로 쓴다(analyze_telegram_messages
+    #    .fan_out_duplicates 주석). 여기서 걷는 건 **분위기 비율**만이다.
+    # ⚠️ 해시가 null 인 행(migration_065 이전 · backfill 전)은 중복 판정 없이 그대로 센다.
+    seen_body: set[tuple[str, str]] = set()
+    folded_dup = 0
+
     for a in analysis:
         key = (a["channel_handle"], a["message_id"])
         date = date_of.get(key)
@@ -250,12 +267,18 @@ def main() -> None:
             continue
 
         sentiment = a["sentiment"]
-        tone[(date, OVERALL)][sentiment] += 1
-
-        # 이 메시지가 언급한 종목들이 속한 테마 전부에 같은 톤을 반영(중복 제거).
-        msg_themes = {t for code in codes_of_msg.get(key, ()) for t in themes_of_code.get(code, ())}
-        for theme in msg_themes:
-            tone[(date, theme)][sentiment] += 1
+        h = a.get("text_hash")
+        dup = bool(h) and (date, h) in seen_body
+        if h:
+            seen_body.add((date, h))
+        if dup:
+            folded_dup += 1
+        else:
+            tone[(date, OVERALL)][sentiment] += 1
+            # 이 메시지가 언급한 종목들이 속한 테마 전부에 같은 톤을 반영(중복 제거).
+            msg_themes = {t for code in codes_of_msg.get(key, ()) for t in themes_of_code.get(code, ())}
+            for theme in msg_themes:
+                tone[(date, theme)][sentiment] += 1
 
         for word in a.get("keywords") or []:
             b, canonical = bucket_of(word)
@@ -266,6 +289,9 @@ def main() -> None:
             kw_hits[(date, b)] += 1
             # 사전이 대표 표기를 정했으면 그걸, 아니면 실제 표기 중 최빈값을 쓴다.
             kw_spellings[b][canonical or word.strip()] += 1
+
+    if folded_dup:
+        print(f"[집계] 같은 날 같은 본문이라 톤에서 접은 글 {folded_dup:,}건")
 
     sentiment_rows = [
         {

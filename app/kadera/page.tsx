@@ -672,7 +672,7 @@ export default async function KaderaPage() {
                   </strong>
                   <div className="hz-figrow-aside">
                     <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub }}>
-                      최근 {KADERA_WINDOW_DAYS}일 · {sentiment.messageCount.toLocaleString("ko-KR")}건 분석
+                      최근 {sentiment.windowDays}일 · {sentiment.messageCount.toLocaleString("ko-KR")}건 분석
                     </span>
                     {/* 툴팁은 문장이 아니라 물음표에 건다(옛 히어로 주석과 같은 이유). */}
                     {/* ⚠️ `alignItems` 가 center 가 아니라 **baseline** 이다. 이 줄은 곁줄의
