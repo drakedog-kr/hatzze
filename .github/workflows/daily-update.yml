@@ -704,9 +704,16 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_put_call_ratio.py
 
+      # ⛔ 디시 감성과 같은 이유로 **저녁 슬롯에서만 돈다**(2026-09-07). 여기도 날짜당 한 칸이라
+      #    아침 결과는 저녁이 덮어쓴다.
+      #
+      # ⭐ 규모는 디시보다 훨씬 작다 — 아침엔 그날 기사가 아직 안 쌓여 318건뿐이고 저녁이
+      #    1,718건이다(2026-09-04 실측. 09-03 은 313 대 1,414 로 같은 모양). 아끼는 돈은 월 $0.8.
+      #    돈보다 **표본이 다섯 배 차이 나는데 같은 눈금에 넣던 것**을 없애는 쪽이 크다.
       - name: Fetch news headline sentiment
         id: news_sentiment
         continue-on-error: true
+        if: github.event.inputs.slot != 'morning'
         run: python data-pipeline/scripts/fetch_news_sentiment.py
 
       - name: Fetch KOSPI-vs-gold ratio
