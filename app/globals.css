@@ -4849,7 +4849,13 @@ main.hz-scroll { overflow-x: clip; }
    고지는 훑는 글이고 이건 읽는 글이다. 색은 전부 토큰이라 다크가 저절로 따라온다.
    카드 상자는 .hz-sheet 를 그대로 쓴다(테두리·radius·바닥 그림자를 새로 정하지 않는다).
    ══════════════════════════════════════════════════════════════════════════ */
-.hz-note-page { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; max-width: 1100px; align-items: start; }
+/* 폭 상한. 1100 이던 것을 1440 으로 올렸다(2026-09-07 지시: "다른 페이지들에 비해 콘텐츠
+   영역이 좁은 것 같아"). ⚠️ 실측 — 1600 화면에서 카더라는 1,324px 을 쓰는데 여기는 자기
+   상한에 걸려 1,100px 이었다. 224px 이 비어 있었다.
+   ⭐ **지금 이 1440 은 안 걸린다.** 셸의 본문 감싸개가 이미 모든 화면을 1,340px 로 묶는다
+   (실측: 1920 화면에서 카더라도 1,340). 그래서 이 값은 그 상한이 언젠가 올라갔을 때를
+   위한 두 번째 그물이다 — 이 화면은 읽는 글이라 폭이 그대로 한 줄 길이가 된다. */
+.hz-note-page { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; max-width: 1440px; align-items: start; }
 .hz-note-main { display: flex; flex-direction: column; gap: 22px; min-width: 0; max-width: 720px; }
 /* 오른쪽 칸 — 목차·언급된 종목·지난 노트(2026-09-06 피드백: 본문 옆 3분의 1이 비어 있었다).
    넓은 화면에서만 본문 옆에 서고 그 아래로는 본문 밑으로 내려간다. 1180 은 사이드바 210 을
@@ -4861,7 +4867,11 @@ main.hz-scroll { overflow-x: clip; }
    세로 flex 라 그 max-height 가 카드를 눌러서 `flex: none` 도 같이 필요하다. */
 .hz-note-rail { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 @media (min-width: 1180px) {
-  .hz-note-page { grid-template-columns: minmax(0, 1fr) 320px; }
+  /* 오른쪽 칸도 화면을 따라 넓힌다. ⚠️ **320px 로 못 박으면 안 된다** — 1280 화면에서는
+     남는 폭이 1,004px 뿐이라 칸을 넓히는 만큼 본문이 그대로 좁아진다(넓히려다 반대가 된다).
+     clamp 로 두면 좁은 화면은 320 을 지키고 넓은 화면에서만 늘어난다.
+     실측 1280 → 320(본문 662) · 1600 → 344(본문 958) · 1920 → 380(본문 1,038). */
+  .hz-note-page { grid-template-columns: minmax(0, 1fr) clamp(320px, 26%, 380px); }
   .hz-note-main { max-width: none; }
 }
 .hz-note { padding: 28px 30px 30px; }
