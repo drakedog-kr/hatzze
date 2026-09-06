@@ -488,7 +488,9 @@ jobs:
       - name: (텔레그램) 급부상 카드 유령 감시
         id: telegram_phantom
         continue-on-error: true
-        run: python data-pipeline/scripts/check_phantom_stocks.py
+        run: |
+          set -o pipefail
+          python data-pipeline/scripts/check_phantom_stocks.py | tee /tmp/phantom.log
 
       # ── 미장 카더라 ────────────────────────────────────────────────────
       # 같은 메시지를 미국 종목 사전으로 한 번 더 읽는다. 수집을 새로 하지 않는다 —
@@ -1171,8 +1173,8 @@ jobs:
         id: telegram_calc_health
         if: always()
         run: |
-          names=("extract_telegram_stocks.py" "calculate_channel_influence.py" "calculate_stock_daily.py" "check_phantom_stocks.py" "calculate_telegram_trending.py" "calculate_theme_daily.py" "calculate_telegram_sentiment.py" "generate_telegram_narratives.py" "generate_move_reasons.py" "extract_telegram_events.py")
-          outcomes=("${{ steps.telegram_extract.outcome }}" "${{ steps.telegram_influence.outcome }}" "${{ steps.telegram_stock_daily.outcome }}" "${{ steps.telegram_phantom.outcome }}" "${{ steps.telegram_trending.outcome }}" "${{ steps.telegram_theme_daily.outcome }}" "${{ steps.telegram_sentiment.outcome }}" "${{ steps.telegram_narratives.outcome }}" "${{ steps.telegram_move_reasons.outcome }}" "${{ steps.telegram_events.outcome }}")
+          names=("extract_telegram_stocks.py" "calculate_channel_influence.py" "calculate_stock_daily.py" "calculate_telegram_trending.py" "calculate_theme_daily.py" "calculate_telegram_sentiment.py" "generate_telegram_narratives.py" "generate_move_reasons.py" "extract_telegram_events.py")
+          outcomes=("${{ steps.telegram_extract.outcome }}" "${{ steps.telegram_influence.outcome }}" "${{ steps.telegram_stock_daily.outcome }}" "${{ steps.telegram_trending.outcome }}" "${{ steps.telegram_theme_daily.outcome }}" "${{ steps.telegram_sentiment.outcome }}" "${{ steps.telegram_narratives.outcome }}" "${{ steps.telegram_move_reasons.outcome }}" "${{ steps.telegram_events.outcome }}")
 
           {
             echo "## 국장 집계"
@@ -1206,6 +1208,40 @@ jobs:
           #    (그러면 이 잡만이 아니라 그날 파이프라인이 통째로 안 돈다).
           note=$(printf '카더라 화면을 채우는 집계 스텝이 실패했습니다. 그 시점의 값이 화면에 그대로 남아 있습니다(수집 자체는 별개이며, 그쪽이 멀쩡하면 원문은 계속 쌓입니다).\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n먼저 볼 것: job 로그의 해당 스텝 traceback.\n\n`statement timeout(57014)` 이라면 **전에 겪은 그것과는 다른 원인입니다.** 10만 행대 표 셋(`telegram_messages`·`telegram_message_analysis`·`telegram_message_stocks`)을 읽는 자리는 2026-08-13 에 전부 키셋으로 옮겼습니다(`common/supabase_client.load_keyset`). 남은 OFFSET 은 `stocks`·`telegram_channels` 같은 작은 표뿐이고, `calculate_channel_influence` 의 `count=exact` 도 같은 날 실측으로 콜드 0.34초·웜 0.06초라 후보가 아닙니다.\n\n일곱 스텝 모두 전량 재계산이라 **다음 실행이 성공하면 과거분까지 저절로 복구**됩니다. 며칠 연속 열리면 그때는 미루지 말 것.' \
             "$(date -u '+%Y-%m-%d %H:%M')" "$failed" "$run_url")
+          existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$note"
+            echo "기존 알림 이슈 #$existing 에 코멘트 추가"
+          else
+            gh issue create --title "$title" --body "$note"
+            echo "새 알림 이슈 생성"
+          fi
+          exit 1
+
+      # ── 유령 감시 전용 알림 ─────────────────────────────────────────────
+      # ⚠️ **국장 집계 배열에 넣지 않는다.** 이건 스텝이 죽은 게 아니라 **결과가 수상한**
+      #    경우다. 저쪽 이슈 본문은 statement timeout 진단문이라, 섞으면 유령을 보고
+      #    키셋 페이징을 뒤지게 된다. 제목이 곧 진단이라는 이 파일의 규칙 그대로다.
+      #
+      # ⚠️ **화면은 이미 그 값을 보여주고 있다.** 이 검사는 집계 뒤에 돌고 아무것도
+      #    되돌리지 않으며, /kadera 는 force-dynamic 이라 집계가 쓰이는 순간 반영된다.
+      #    한 줄 요약(LLM)도 뒤에서 그 유령을 요약한다. 즉 이 이슈는 '막았다'가 아니라
+      #    **'나갔으니 와서 보라'** 는 알림이다. 고쳐서 머지해야 다음 실행에서 사라진다.
+      #    막는 쪽(카드에서 빼기·방송 차단)은 잣대를 30일밖에 못 봐서 일부러 안 했다.
+      - name: Alert on 급부상 유령 의심 (open/update GitHub issue)
+        if: ${{ !cancelled() && steps.telegram_phantom.outcome == 'failure' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          # 의심 줄만 뽑는다. 그 줄만 '  - ' 로 시작한다(표 줄은 숫자로 열린다).
+          suspects=$(grep -E '^  - ' /tmp/phantom.log | head -8 | sed 's/^  - /- /' || true)
+          [ -n "$suspects" ] || suspects="(로그를 못 읽었습니다 — 스텝 로그를 직접 볼 것)"
+          title="⚠️ 급부상 카드에 유령 종목이 의심됩니다"
+          # ⚠️ 본문 형식 문자열은 **한 줄**로 둔다(위 알림들과 같은 이유 — 여러 줄로 적으면
+          #    블록 스칼라가 끊겨 워크플로 파일 전체가 파싱에 실패한다).
+          note=$(printf '급부상 카드에 오른 종목이 오탐 위험 이름인데, 창 안 언급이 복붙에 몰려 있거나 표본이 얇습니다. **이미 화면에 나갔고 한 줄 요약도 그 값으로 쓰였습니다** — 이 알림은 막은 게 아니라 알리는 것입니다.\n\n- 시각(UTC): %s\n- 의심 종목:\n%s\n- 로그: %s\n\n확인 순서: 그 종목의 창 안 언급을 열어 **자리마다** 규칙을 돌려 볼 것(`boundary_ok`). 눈에 띄는 표기가 진짜 범인을 가립니다 — 2026-09-07 에 `아스트라` 3건이 `아스트로처럼` 1건을 가리고 있었습니다. 어느 결인지 가리는 표는 `data-pipeline/config/stock_extraction.py` 문두에 있습니다.\n\n오탐일 수도 있습니다. 복붙이 곧 유령은 아닙니다 — 공시·특징주는 원래 여러 채널이 같은 문장을 나릅니다(`아스트-거래재개` 4채널은 진짜였습니다). 진짜로 판정했으면 이슈를 닫으세요.\n\n고친 뒤에는 **카드 끝자리를 다시 볼 것.** 유령을 빼면 순위가 당겨져 그 자리에 다음 유령이 올라옵니다.' \
+            "$(date -u '+%Y-%m-%d %H:%M')" "$suspects" "$run_url")
           existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
           if [ -n "$existing" ]; then
             gh issue comment "$existing" --body "$note"
