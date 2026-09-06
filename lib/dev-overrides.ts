@@ -14,12 +14,29 @@ import type { IndicatorDetails } from "@/lib/data";
 // - 파일이 없거나 JSON이 깨져도 조용히 무시(no-op)한다.
 // - dev에선 매 요청마다 파일을 다시 읽으므로, JSON을 고치고 새로고침하면
 //   서버 재시작 없이 바로 반영된다.
+/**
+ * 데일리 노트 한 편(표 `daily_note` 의 한 줄과 같은 모양). 원고를 표에 올리기 **전에**
+ * 로컬에서 조판을 보는 용도다 — 화면을 연 뒤에는 올리는 순간 공개되므로, 올리기 전에 볼
+ * 길이 이것뿐이다. 목록이 비어 있지 않으면 lib/daily-note.ts 가 DB 대신 이 목록을 읽는다.
+ */
+export type DevDailyNote = {
+  date: string;
+  title: string;
+  body_md: string;
+  short_md?: string | null;
+  updated_at?: string;
+  /** 언급된 종목(068). 국내 종목코드·미국 티커. 시세는 오버레이에서도 표를 읽는다. */
+  stocks?: { kr?: string[]; us?: string[] };
+};
+
 export type DevOverrides = {
   names?: Record<string, string>;
   descriptions?: Record<string, string>;
   details?: Record<string, IndicatorDetails>;
   // 히어로 카드의 '오늘의 요약' 문장을 로컬에서만 미리 보기 위한 오버레이.
   summary?: string;
+  // 데일리 노트(/daily). 비어 있으면 DB 를 읽는다.
+  dailyNotes?: DevDailyNote[];
 };
 
 const EMPTY: DevOverrides = {};
