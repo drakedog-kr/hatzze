@@ -1,6 +1,7 @@
 import Link from "next/link";
 
-import { PREVIEW_PUBLIC } from "./screen-flags";
+import { NOTE_PAGE } from "./daily/copy";
+import { DAILY_PUBLIC, PREVIEW_PUBLIC } from "./screen-flags";
 import { BetaBadge, GhostSymbol, Wordmark } from "./Logo";
 import { APP_VERSION } from "./releases";
 import { C, MONO } from "./ui";
@@ -213,6 +214,7 @@ export default function Footer() {
                 그래서 **플래그를 읽어 조건부로** 둔다. 여는 날 `app/screen-flags.ts` 한 줄만
                 바꾸면 이 줄이 저절로 살아난다. */}
             {PREVIEW_PUBLIC && <FooterLink href="/preview">국장 미리보기</FooterLink>}
+            {DAILY_PUBLIC && <FooterLink href={NOTE_PAGE.href}>{NOTE_PAGE.label}</FooterLink>}
             {/* 사이드바가 모바일에서 숨겨져 텔레그램 링크가 사라진다 — 내부 내비게이션과
                 같은 방식으로 푸터에 두어 좁은 화면에서도 닿게 한다. 라벨과 aria 는
                 AppShell 의 TELEGRAM 상수와 같은 문구로 맞춘다(두 내비게이션이 같은

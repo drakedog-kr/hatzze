@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 
 import { SITE_URL } from "./brand";
+import { DAILY_PUBLIC } from "./screen-flags";
 
 /**
  * /robots.txt 자동 생성.
@@ -39,6 +40,9 @@ export default function robots(): MetadataRoute.Robots {
       // 종목 실주소 464장. 콘솔에 손으로 안 넣어도 크롤러는 여기서 찾아온다
       // (app/sitemap-stocks.xml/route.ts 머리말 참고).
       `${SITE_URL}/sitemap-stocks.xml`,
+      // 데일리 노트 날짜별 글. 안 연 동안은 적지 않는다 — 그 화면들이 noindex 인데 사이트맵을
+      // 가리키면 두 신호가 어긋난다(app/sitemap-notes.xml 머리말).
+      ...(DAILY_PUBLIC ? [`${SITE_URL}/sitemap-notes.xml`] : []),
     ],
     host: SITE_URL,
   };
