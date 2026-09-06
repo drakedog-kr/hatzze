@@ -994,6 +994,9 @@ async function usOnlyKeys(candidates: { channelHandle: string; messageId: number
  * ⭐ **"11시간 전"은 여기서 안 만든다.** postedAt(절대 시각)을 그대로 넘기고 화면이
  * 렌더할 때 계산한다. 그래서 저장 목록이 그대로여도 나이는 계속 흘러간다.
  */
+/** 트렌딩에 올리는 본문의 최소 글자 수(공백 포함). 파이프라인(calculate_telegram_trending.MIN_TEXT_CHARS)과 같은 값. */
+export const TREND_MIN_CHARS = 10;
+
 async function storedTrending(
   key: string,
   limit: number,
@@ -1029,7 +1032,8 @@ async function storedTrending(
     }
   }
   const { titleOf, photoUrlOf } = await channelMeta();
-  const list = data.map((r) => {
+  // 저장분에도 한 번 더 건다 — 파이프라인이 문턱을 올리기 전 저장한 행이 남아 있을 수 있다.
+  const list = data.filter((r) => ((r.text as string) ?? "").length >= TREND_MIN_CHARS).map((r) => {
     const stocks = (Array.isArray(r.stocks) ? (r.stocks as string[]) : []).slice(0, 3);
     const text = r.text as string;
     return {
@@ -1120,7 +1124,7 @@ export async function getTrendingMessages(
       stocks: [] as string[],
       topics: [] as string[],
     }))
-    .filter((m) => m.text.length > 0)
+    .filter((m) => m.text.length >= TREND_MIN_CHARS)
     .sort((a, b) => b.score - a.score);
 
   // 미장 전용 글을 빼고 나서 자른다. 자른 뒤에 빼면 그 자리가 그냥 비어 목록이 36건에

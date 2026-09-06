@@ -800,7 +800,8 @@ export async function getUsTrendingMessages(window: UsTrendingWindow, limit = 36
     console.error("[getUsTrendingMessages] 목록을 못 읽었습니다", error);
     return [];
   }
-  return (data ?? []).map((r) => ({
+  // 공백 포함 10자 미만은 안 올린다(국장 TREND_MIN_CHARS 와 같은 값 · 파이프라인에도 같은 문턱).
+  return (data ?? []).filter((r) => ((r.text as string) ?? "").length >= 10).map((r) => ({
     channelHandle: r.channel_handle as string,
     messageId: r.message_id as number,
     channelTitle: titleOf.get(r.channel_handle as string) ?? (r.channel_handle as string),
