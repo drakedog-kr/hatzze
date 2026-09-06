@@ -73,14 +73,16 @@ export const CRON_TO_JOB: Record<string, Job> = {
     label: "파이프라인 아침",
     workflow: DAILY,
     fireUtc: "21:30",
-    inputs: (now) => ({ broadcast: isKstWeekday(now) ? "morning" : "none" }),
+    // ⭐ `slot` 은 워크플로가 아침·저녁을 가르는 유일한 표시다. **주말에는 `broadcast` 가
+    //    둘 다 'none' 이라 그것만으로는 못 가른다.** 지금은 디시 감성 스텝이 이걸 본다.
+    inputs: (now) => ({ broadcast: isKstWeekday(now) ? "morning" : "none", slot: "morning" }),
   },
   "0 9 * * *": {
     key: "pipeline-evening",
     label: "파이프라인 저녁",
     workflow: DAILY,
     fireUtc: "08:30",
-    inputs: (now) => ({ broadcast: isKstWeekday(now) ? "evening" : "none" }),
+    inputs: (now) => ({ broadcast: isKstWeekday(now) ? "evening" : "none", slot: "evening" }),
   },
 
   // ── 채널 발송(C 관심 이동 · D 주간 결산). 14:00 KST. ──
