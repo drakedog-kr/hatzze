@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { INSIDER_LISTS, INSIDER_LIST_SLUGS, insiderListHref } from "./insider/lists";
 import { PageJsonLd } from "./JsonLd";
-import { PREVIEW_PUBLIC } from "./screen-flags";
+import { NOTE_PAGE } from "./daily/copy";
+import { DAILY_PUBLIC, PREVIEW_PUBLIC } from "./screen-flags";
 
 import { track } from "@/lib/ga";
 import { SLOGAN } from "./brand";
@@ -232,6 +233,10 @@ const NAV: NavItem[] = [
     // ⛔ "얼마에 열릴까" 같은 미래형으로 바꾸지 말 것. 그 순간 해설이 아니라 예보가 된다.
     sub: "밤사이 미장이 크게 움직인 날 국장은 보통 얼마에 열렸나",
   },
+  // 데일리 노트 — 매일 저녁 한 편의 시장 정리 글. ⛔ 여는 것은 `app/screen-flags.ts` 의
+  // DAILY_PUBLIC 한 줄이다. 안 연 동안은 아래 COMING_SOON 에 눌리지 않는 줄로 서고, 열면
+  // 여기 맨 아래에 선다. 이름·부제·아이콘은 app/daily/copy.ts 한 곳에서 온다.
+  ...(DAILY_PUBLIC ? [{ href: NOTE_PAGE.href, label: NOTE_PAGE.label, icon: NOTE_PAGE.icon, sub: NOTE_PAGE.sub }] : []),
 ];
 
 // 외부(텔레그램) 링크라 NAV 배열이 아니라 따로 둔다 — pathname 기반 active 판정 대상이
@@ -264,13 +269,19 @@ const TELEGRAM = {
 // 아이콘은 NAV 항목과 같은 규칙이다 — 직접 그린 Glyph 든 Material Symbols 이름(icon)이든
 // 하나만 있으면 되고, NavGlyph 가 골라 그린다.
 const COMING_SOON: { label: string; badge: string; tip: string; after: string; icon?: string; Glyph?: Glyph }[] = [
-  // ⭐ **지금은 비어 있다.** 국장 미리보기가 여기 마지막 손님이었고 2026-09-04 에 NAV 로
-  // 옮겨 갔다. 배열과 그리는 코드는 남겨 둔다 — 다음 예고 화면이 생기면 한 줄만 넣으면 된다.
+  // ⭐ 국장 미리보기가 2026-09-04 에 NAV 로 옮겨 가 비었다가, 2026-09-06 에 데일리 노트가
+  // 들어왔다. 그 항목은 손으로 옮기지 않는다 — DAILY_PUBLIC 하나가 여기서 빼고 NAV 에 넣는다.
   //
   // ⚠️ 다시 쓸 때 기억할 것: **배지는 표시일 뿐 아무것도 막지 않는다.** 한때 NAV 에
   // href 를 달고 배지만 '준비 중' 으로 뒀는데, 2026-08-30 에 프로덕션 사이드바에서
   // 그냥 눌려 들어가졌다. 여기(COMING_SOON)에 두면 href 필드 자체가 없어 링크가 안 생긴다.
   // 대신 본문 헤더가 NAV 에서 경로를 못 찾으므로 DEEP_PAGES 에 제목을 따로 둬야 한다.
+  //
+  // 데일리 노트(2026-09-06 만듦, 아직 안 열었다). 사이드바 맨 아래(국장 미리보기 다음)에
+  // 서는 이유는 저녁에 한 번 읽는 글이라 종일 보는 브리핑·카더라 위에 둘 자리가 아니어서다.
+  ...(DAILY_PUBLIC
+    ? []
+    : [{ label: NOTE_PAGE.label, badge: "준비 중", tip: NOTE_PAGE.tip, after: "/preview", icon: NOTE_PAGE.icon }]),
 ];
 
 /**
@@ -429,6 +440,10 @@ function useIntentPrefetch() {
  * 카드와 전체보기가 같은 말을 해야 독자가 같은 자료로 읽는다.
  */
 const DEEP_PAGES: Record<string, { label: string; sub: string; badge?: string }> = {
+  // 데일리 노트 — 안 연 동안만. NAV 에 없으니(COMING_SOON 은 href 가 없다) 본문 헤더가 제목을
+  // 못 찾아 여기서 채운다. 배지가 있어 PageJsonLd 도 안 나간다(noindex 와 맞는다).
+  // 열면 DAILY_PUBLIC 이 이 항목을 빼고, NAV 의 /daily 항목이 제목을 준다.
+  ...(DAILY_PUBLIC ? {} : { [NOTE_PAGE.href]: { label: NOTE_PAGE.label, sub: NOTE_PAGE.sub, badge: "준비 중" } }),
   ...Object.fromEntries(
     INSIDER_LIST_SLUGS.map((slug) => [
       insiderListHref(slug),
@@ -1070,7 +1085,9 @@ function PageHeader({ theme, currency }: { theme: "light" | "dark"; currency: "k
   const child = page?.children?.find((c) => c.href === pathname);
   // 사이드바에 안 나오는 하위 페이지(전체보기)도 자기 제목을 쓴다. 안 그러면 부모와
   // 같은 h1 이 된다.
-  const deep = DEEP_PAGES[pathname];
+  // 날짜별 글(/daily/2026-09-05)은 안 연 동안 NAV 에 부모가 없어 /daily 의 것을 빌린다.
+  // 열고 나면 NAV 의 /daily 가 startsWith 로 잡으므로 이 가지는 안 탄다.
+  const deep = DEEP_PAGES[pathname] ?? (pathname.startsWith(`${NOTE_PAGE.href}/`) ? DEEP_PAGES[NOTE_PAGE.href] : undefined);
   const title = deep?.label ?? child?.label ?? page?.label;
   const sub = deep?.sub ?? child?.sub ?? page?.sub;
   // 배지는 부모 것이다. 서브가 물려받으면 "25개 지표" 같은 남의 표찰이 따라 붙는다.
@@ -1295,7 +1312,16 @@ const NEWS_EVENT = "hz-news-change";
    조건부가 없어서, 띠만 먼저 넣으면 프로덕션에서 눌러 404 로 간다. 그래서 목적지가
    열려 있을 때만 걸리도록 플래그로 가른다 — `app/screen-flags.ts` 한 줄을 true 로
    바꾸는 순간 아래가 통째로 갈린다. 문구는 이미 정해 뒀다(2026-09-04, 48자). */
-const NEWS = PREVIEW_PUBLIC
+const NEWS = DAILY_PUBLIC
+  ? {
+      key: "hz-news-daily",
+      href: NOTE_PAGE.href,
+      name: NOTE_PAGE.label,
+      tail: "를 열었습니다. 하루의 시장 이야기를 매일 저녁 한 편으로 정리합니다.",
+      icon: NOTE_PAGE.icon,
+      ga: "news-daily",
+    }
+  : PREVIEW_PUBLIC
   ? {
       key: "hz-news-preview",
       href: "/preview",

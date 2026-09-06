@@ -5035,3 +5035,164 @@ main.hz-scroll { overflow-x: clip; }
   .hz-tx .hz-dist-row:hover .hz-dist-pop,
   .hz-tx .hz-dist-row:focus-within .hz-dist-pop { transform: none; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   데일리 노트(/daily) — 읽는 문서의 조판.
+   지표 카드 벽이 아니라 한 줄로 읽히는 글이라 본문 폭을 720px 로 묶고(법정 고지의 68ch
+   와 같은 판단, 소제목·표가 있어 조금 넓다), 글자는 고지(14)보다 한 단 크게 둔다(15.5) —
+   고지는 훑는 글이고 이건 읽는 글이다. 색은 전부 토큰이라 다크가 저절로 따라온다.
+   카드 상자는 .hz-sheet 를 그대로 쓴다(테두리·radius·바닥 그림자를 새로 정하지 않는다).
+   ══════════════════════════════════════════════════════════════════════════ */
+/* 폭 상한. 1100 이던 것을 1440 으로 올렸다(2026-09-07 지시: "다른 페이지들에 비해 콘텐츠
+   영역이 좁은 것 같아"). ⚠️ 실측 — 1600 화면에서 카더라는 1,324px 을 쓰는데 여기는 자기
+   상한에 걸려 1,100px 이었다. 224px 이 비어 있었다.
+   ⭐ **지금 이 1440 은 안 걸린다.** 셸의 본문 감싸개가 이미 모든 화면을 1,340px 로 묶는다
+   (실측: 1920 화면에서 카더라도 1,340). 그래서 이 값은 그 상한이 언젠가 올라갔을 때를
+   위한 두 번째 그물이다 — 이 화면은 읽는 글이라 폭이 그대로 한 줄 길이가 된다. */
+.hz-note-page { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; max-width: 1440px; align-items: start; }
+.hz-note-main { display: flex; flex-direction: column; gap: 22px; min-width: 0; max-width: 720px; }
+/* 오른쪽 칸 — 목차·언급된 종목·지난 노트(2026-09-06 피드백: 본문 옆 3분의 1이 비어 있었다).
+   넓은 화면에서만 본문 옆에 서고 그 아래로는 본문 밑으로 내려간다. 1180 은 사이드바 210 을
+   뺀 본문 폭이 960 쯤 되는 자리라, 본문이 600 아래로 눌리지 않는 경계다. 320px 은 종목
+   이름·종가·등락률이 한 줄에 서는 폭이다. */
+/* ⛔ **스크롤을 따라 붙이지 않는다**(2026-09-06 지시: "원래처럼 맞춰서 움직이지 않게, 고정 형태").
+   한 번 `position: sticky` 로 붙여 봤다가 되돌렸다. 다시 붙일 생각이면 그때 걸린 둘을 먼저 볼 것 —
+   칸이 화면보다 높아(1,265 대 720) 아래 카드가 가려지므로 max-height + overflow 가 따라와야 하고,
+   세로 flex 라 그 max-height 가 카드를 눌러서 `flex: none` 도 같이 필요하다. */
+.hz-note-rail { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+@media (min-width: 1180px) {
+  /* 오른쪽 칸도 화면을 따라 넓힌다. ⚠️ **320px 로 못 박으면 안 된다** — 1280 화면에서는
+     남는 폭이 1,004px 뿐이라 칸을 넓히는 만큼 본문이 그대로 좁아진다(넓히려다 반대가 된다).
+     clamp 로 두면 좁은 화면은 320 을 지키고 넓은 화면에서만 늘어난다.
+     ⭐ 비율을 26% → 32% 로 올렸다(2026-09-07 지시). 바깥 폭을 다른 화면과 맞췄더니 본문이
+     970px 까지 벌어져 한 줄이 길어졌다 — 남는 폭을 오른쪽 칸이 더 가져가 본문을 되돌린다.
+     실측 1280 → 칸 321·본문 661(그대로) · 1600 → 424·878 · 1920 → 429·889. */
+  .hz-note-page { grid-template-columns: minmax(0, 1fr) clamp(320px, 32%, 440px); }
+  .hz-note-main { max-width: none; }
+}
+.hz-note { padding: 28px 30px 30px; }
+.hz-note-head {
+  display: flex; flex-direction: column; gap: 8px;
+  padding-bottom: 20px; border-bottom: 1px solid var(--c-sheet-row);
+}
+.hz-note-date { font-size: 13px; font-weight: 600; color: var(--c-muted); font-variant-numeric: tabular-nums; }
+/* 글 제목은 h2 다 — h1 은 셸의 "데일리 노트". 그래도 이 화면의 주인공이라 화면 제목(30)
+   바로 아래 크기(26)를 준다. keep-all 로 낱말 가운데서 안 끊는다. */
+.hz-note-title {
+  margin: 0; font-size: 26px; line-height: 1.32; font-weight: 800; letter-spacing: -.025em;
+  color: var(--c-ink); word-break: keep-all; overflow-wrap: anywhere;
+}
+.hz-note-body {
+  padding-top: 6px; font-size: 15.5px; line-height: 1.85; color: var(--c-ink-soft);
+  word-break: keep-all; overflow-wrap: anywhere;
+}
+.hz-note-body > p { margin: 14px 0 0; }
+/* scroll-margin 은 목차에서 뛰어온 자리 — 소제목이 화면 맨 위에 딱 붙지 않게 한 줄 띄운다. */
+.hz-note-body > h2 { margin: 30px 0 0; font-size: 20px; line-height: 1.4; font-weight: 800; letter-spacing: -.02em; color: var(--c-ink); scroll-margin-top: 16px; }
+.hz-note-body > h3 { margin: 32px 0 0; font-size: 18px; line-height: 1.4; font-weight: 700; letter-spacing: -.015em; color: var(--c-ink); scroll-margin-top: 16px; }
+.hz-note-body > h2 + p, .hz-note-body > h3 + p { margin-top: 10px; }
+.hz-note-body b { color: var(--c-ink); font-weight: 700; }
+.hz-note-body a { color: var(--c-cold-ink); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.hz-note-rule { border: 0; border-top: 1px solid var(--c-sheet-row); margin: 28px 0 0; }
+/* 표는 폭이 좁으면 가로로 밀린다 — 화면(main.hz-scroll)이 아니라 이 상자 안에서 밀려야 한다. */
+.hz-note-tablewrap { margin: 12px 0 0; overflow-x: auto; }
+.hz-note-table { width: 100%; border-collapse: collapse; font-size: 13.5px; line-height: 1.5; }
+.hz-note-table th, .hz-note-table td { padding: 8px 10px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--c-sheet-row); }
+.hz-note-table th { font-size: 12px; font-weight: 700; color: var(--c-sub); background: var(--c-sheet-head); white-space: nowrap; }
+.hz-note-table td:first-child { color: var(--c-ink); white-space: nowrap; }
+.hz-note-table td:last-child { font-variant-numeric: tabular-nums; }
+/* 원고 끝의 두 줄. 출처는 작고 옅게, 고지(※)는 회색 상자 — 본문과 다른 결이라는 신호. */
+.hz-note-body > p.hz-note-source { font-size: 13px; color: var(--c-muted); }
+.hz-note-body > p.hz-note-notice {
+  margin-top: 18px; padding: 12px 14px; font-size: 12.5px; line-height: 1.7;
+  color: var(--c-muted); background: var(--c-soft); border-radius: var(--r-control);
+}
+/* 글 카드 오른쪽 아래의 공유 단추. 생김새는 카드 바닥 버튼(.hz-btn-soft)과 같은 어법인데
+   높이만 한 단 낮다 — 저쪽은 카드 폭을 다 쓰는 행동 버튼이고 이건 글 끝에 붙는 곁다리다.
+   ⚠️ 파란 글자는 --c-blue 가 아니라 --c-cold-ink 다(--c-blue 는 흰 바탕에서 3.55). */
+.hz-note-foot { display: flex; justify-content: flex-end; margin-top: 22px; }
+.hz-note-share {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 34px; padding: 0 13px;
+  border-radius: var(--r-control);
+  border: 1px solid var(--c-line);
+  background: var(--c-bg);
+  color: var(--c-cold-ink);
+  font-family: inherit; font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  transition: border-color .14s ease, background .14s ease;
+}
+.hz-note-share:hover, .hz-note-share[data-done="true"] { border-color: var(--c-blue); background: var(--c-blue-tint); }
+/* 앞뒤 글. 한쪽이 없으면 빈 <span> 이 그 칸을 지킨다 — 다음 글 카드가 왼쪽으로 옮겨 앉지 않게. */
+.hz-note-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.hz-note-nav a {
+  display: flex; align-items: center; gap: 10px; min-width: 0; padding: 12px 14px;
+  background: var(--c-card); border: 1px solid var(--c-sheet-line); border-radius: var(--r-card);
+  color: var(--c-ink); text-decoration: none; font-size: 13.5px; font-weight: 600; line-height: 1.4;
+  word-break: keep-all;
+}
+.hz-note-nav a:hover { background: var(--c-hover); }
+.hz-note-nav a > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hz-note-nav a small { font-size: 11.5px; font-weight: 600; color: var(--c-muted); }
+.hz-note-nav .ms { flex: none; color: var(--c-muted); }
+.hz-note-nav-next { justify-content: flex-end; text-align: right; }
+/* 오른쪽 칸의 카드. 제목 줄은 시트 머리(SectionHead)보다 가볍다 — 곁다리라 글 제목과 겨루면 안 된다. */
+.hz-note-rail-card { padding: 16px 18px; }
+.hz-note-rail-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.hz-note-rail-head h2 { margin: 0; font-size: 14px; font-weight: 800; letter-spacing: -.01em; color: var(--c-ink); }
+.hz-note-rail-head span { font-size: 11.5px; color: var(--c-muted); white-space: nowrap; }
+/* 목차. 번호는 CSS 카운터 — 본문 h3 에는 번호가 없으니 여기만의 길잡이다. 누르면 #sec-N 으로 뛴다. */
+.hz-note-toc { list-style: none; margin: 0; padding: 0; counter-reset: toc; }
+.hz-note-toc li + li { border-top: 1px solid var(--c-sheet-row); }
+.hz-note-toc a { display: flex; gap: 10px; padding: 8px 0; font-size: 13.5px; line-height: 1.5; color: var(--c-ink-soft); text-decoration: none; word-break: keep-all; }
+.hz-note-toc a::before {
+  counter-increment: toc; content: counter(toc, decimal-leading-zero);
+  flex: none; padding-top: 3px; font-size: 11px; font-weight: 700; color: var(--c-muted); font-variant-numeric: tabular-nums;
+}
+.hz-note-toc a:hover { color: var(--c-cold-ink); }
+/* 언급된 종목. 이름은 왼쪽, 종가·등락률은 오른쪽 끝(종목 실주소 화면의 Stat 과 같은 어법). */
+.hz-note-stocks { list-style: none; margin: 0; padding: 0; }
+.hz-note-stocks li + li { border-top: 1px solid var(--c-sheet-row); }
+.hz-note-stocks a { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 8px 0; font-size: 13.5px; color: var(--c-ink); text-decoration: none; }
+.hz-note-stocks a:hover .hz-note-stock-name { text-decoration: underline; text-underline-offset: 3px; }
+.hz-note-stock-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.hz-note-stock-px { flex: none; display: inline-flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
+.hz-note-stock-px b { font-weight: 700; }
+.hz-note-stock-px i { font-style: normal; font-size: 12px; font-weight: 700; }
+.hz-note-stock-px small { font-size: 10.5px; color: var(--c-muted); }
+/* 미국 종목은 종가 원천이 없어 이름 칩만. 국내 줄 아래 선 하나로 갈라 다른 결임을 보인다.
+   ⚠️ 선 위아래 간격은 **국내 행 사이와 같아야 한다**(2026-09-06 지시). 국내 행은 위아래
+   8px 이라 여기도 8px 이다 — 위쪽 8px 은 마지막 행의 padding-bottom 이 이미 내므로
+   margin-top 은 0 이다. 12px 로 벌리면 이 선만 다른 선처럼 보인다. */
+.hz-note-us { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 0; padding-top: 8px; border-top: 1px solid var(--c-sheet-row); }
+.hz-note-us-lbl { flex-basis: 100%; font-size: 11px; font-weight: 700; color: var(--c-muted); }
+.hz-note-chip { font-size: 12px; line-height: 1.5; padding: 3px 9px; border-radius: var(--r-pill); background: var(--c-chip); color: var(--c-ink-soft); }
+/* ⚠️ 칩 안의 티커는 `--c-muted` 로 두면 안 된다. 칩 바탕(--c-chip)이 카드보다 밝아서
+   **다크에서 4.23 으로 미달**이고 라이트도 4.53 으로 아슬아슬하다(실측). `--c-label` 은
+   라이트 6.78 · 다크 5.88 이라 양쪽에 여유가 있다. 같은 색이라도 바탕이 다르면 값이 다르다. */
+.hz-note-chip small { margin-left: 4px; font-size: 11px; color: var(--c-label); }
+/* 지난 노트 목록. 날짜 칸은 폭을 고정해 제목이 세로로 한 줄에 맞는다. */
+.hz-note-archive { list-style: none; margin: 0; padding: 0; }
+.hz-note-archive li + li { border-top: 1px solid var(--c-sheet-row); }
+.hz-note-archive li a {
+  display: flex; align-items: baseline; gap: 10px; min-width: 0; padding: 8px 0;
+  color: var(--c-ink); text-decoration: none; font-size: 13.5px; line-height: 1.5; word-break: keep-all;
+}
+.hz-note-archive li a:hover span { text-decoration: underline; text-underline-offset: 3px; }
+.hz-note-archive time { flex: none; width: 74px; font-size: 12px; font-weight: 600; color: var(--c-muted); font-variant-numeric: tabular-nums; }
+.hz-note-archive li[aria-current="page"] a, .hz-note-archive li[aria-current="page"] time { color: var(--c-cold-ink); }
+.hz-note-archive li[aria-current="page"] a { font-weight: 700; }
+/* 글이 없을 때 — 조회 실패와 '아직 없음' 이 문장만 다르고 모양은 같다. */
+.hz-note-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 40px 24px; text-align: center; color: var(--c-muted); }
+.hz-note-empty p { margin: 0; font-size: 14px; line-height: 1.7; word-break: keep-all; }
+@media (max-width: 560px) {
+  .hz-note { padding: 20px 18px 22px; }
+  .hz-note-title { font-size: 22px; }
+  .hz-note-body { font-size: 15px; line-height: 1.8; }
+  .hz-note-body > h3 { font-size: 17px; margin-top: 28px; }
+  .hz-note-nav { grid-template-columns: 1fr; }
+  .hz-note-nav-next { justify-content: space-between; }
+  .hz-note-rail-card { padding: 14px 16px; }
+  /* 손가락으로 누르는 폭이라 34px 은 좁다. 글자는 그대로 두고 상자만 키운다. */
+  .hz-note-share { height: 40px; padding: 0 16px; }
+}

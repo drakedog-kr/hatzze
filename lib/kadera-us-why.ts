@@ -9,7 +9,7 @@ import { fetchDailyHistory, yahooSymbol } from "./yahoo-history";
 /**
  * 미장 '급등 종목' 과 '다가오는 일정' 자료. 국내 짝은 lib/kadera-why.ts.
  *
- * 표는 마이그레이션 067(telegram_us_stock_move_reason · telegram_us_stock_event).
+ * 표는 마이그레이션 069(telegram_us_stock_move_reason · telegram_us_stock_event).
  * 둘 다 **채널이 한 말**을 종목·날짜에 붙여 둔 것이지 우리가 확인한 사실이 아니다.
  *
  * ## ⚠️⚠️ 미장의 '그날'은 미국장 하루와 어긋난다
@@ -23,7 +23,7 @@ import { fetchDailyHistory, yahooSymbol } from "./yahoo-history";
  * 그 전 봉과 견준다 — 주말·휴장이 끼어도 자연히 직전 세션이 잡힌다. 화면 글자도 "그날"이
  * 아니라 **"직전 미국장 종가"** 다.
  *
- * ⛔ 표에 시세 컬럼을 두지 않은 까닭이 이것이다(마이그레이션 067 머리말). 국내는 다음 날
+ * ⛔ 표에 시세 컬럼을 두지 않은 까닭이 이것이다(마이그레이션 069 머리말). 국내는 다음 날
  *    KRX 가 확정값을 주지만 미장엔 그런 자리가 없어, 채워 두면 어느 세션인지 흐려진다.
  */
 

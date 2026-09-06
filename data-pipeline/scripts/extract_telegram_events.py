@@ -401,7 +401,7 @@ def main() -> None:
         try:
             us_saved += flush(us_rows, US_TABLE, "ticker")
         except Exception as exc:  # noqa: BLE001
-            # 미장 표가 아직 없는 환경(마이그레이션 067 전)에서도 국장 몫은 나가야 한다.
+            # 미장 표가 아직 없는 환경(마이그레이션 069 전)에서도 국장 몫은 나가야 한다.
             print(f"  [미장] 저장 실패: {type(exc).__name__}: {exc}")
     for i in range(0, len(scan_rows), 500):
         db.table(SCAN).upsert(scan_rows[i : i + 500], on_conflict="channel_handle,message_id").execute()

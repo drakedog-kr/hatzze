@@ -34,12 +34,19 @@ register("./ts-resolve.mjs", import.meta.url);
 
 const APP = new URL("../app/", import.meta.url).pathname.replace(/\/$/, "");
 
+// 안 연 화면은 사이트맵에 없는 게 맞다. 플래그를 **그대로 불러** 판단한다 — 여기 목록을
+// 손으로 맞추면 여는 날 잊는다(내부자 리포트의 사이트맵이 그렇게 빠졌다).
+const flags = await import(pathToFileURL(join(APP, "screen-flags.ts")).href);
+
 /**
  * 사이트맵에 없어도 되는 정적 라우트. **까닭을 반드시 적는다** — 까닭 없이 늘어나면
  * 이 목록이 검사를 무력화하는 서랍이 된다.
  */
 const EXCLUDED = new Map([
-  // 지금은 비어 있다. `/preview` 가 여기 있었고 2026-09-04 에 열면서 사이트맵으로 옮겼다.
+  // `/preview` 가 여기 있었고 2026-09-04 에 열면서 사이트맵으로 옮겼다.
+  // 데일리 노트 — 아직 안 열었다. 여는 순간 사이트맵 쪽(app/sitemap-urls.ts)이 같은 플래그로
+  // 켜지고 이 줄은 빠지므로, 여는 날 여기를 손댈 일이 없다.
+  ...(flags.DAILY_PUBLIC ? [] : [["/daily", "아직 안 연 화면(app/screen-flags.ts DAILY_PUBLIC=false). noindex 라 사이트맵에 없어야 한다"]]),
 ]);
 
 /**
@@ -51,6 +58,7 @@ const DYNAMIC = new Map([
   ["/stock/[code]", "sitemap-stocks.xml 이 DB 를 읽어 펼친다(lib/stock-page.ts listIndexableStocks)"],
   ["/insider/stock/[ticker]", "수가 많고 DB 를 읽어야 한다. 사이트맵 동적 생성 때 다룬다"],
   ["/insider/investor/[cik]", "위와 같다"],
+  ["/daily/[date]", "날짜가 표에서 온다. app/sitemap-notes.xml 이 읽어 펼친다(lib/daily-note.ts listAllNoteDates)"],
 ]);
 
 /** app/ 아래 page.tsx 를 훑어 라우트 경로를 만든다. */

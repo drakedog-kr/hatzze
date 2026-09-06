@@ -36,3 +36,28 @@
  *    다른 판단이다.
  */
 export const PREVIEW_PUBLIC = true;
+
+/**
+ * 데일리 노트(/daily) — 매일 저녁 한 편의 시장 정리 글. 2026-09-06 에 만들었고 **아직 안 열었다.**
+ *
+ * 국장 미리보기 때보다 읽는 곳이 하나 더다 — **사이드바도 이 값을 읽는다.** 안 연 동안은
+ * COMING_SOON(href 없음)에, 열면 NAV 에 서도록 같은 플래그로 갈라 두어서, 여는 날 항목을
+ * 손으로 옮기다 잊는 일(위 ②의 사고)이 없다.
+ *
+ *   app/daily/page.tsx · app/daily/[date]/page.tsx   배포된 곳에서 404 를 낼지, noindex 를 달지
+ *   app/AppShell.tsx                                  NAV ↔ COMING_SOON · DEEP_PAGES · 소식 띠(NEWS)
+ *   app/Footer.tsx                                    '바로가기' 목록
+ *   app/sitemap-urls.ts · app/sitemap-notes.xml       사이트맵(목록 화면 + 날짜별 글)
+ *   app/robots.ts                                     sitemap-notes.xml 을 적을지
+ *   scripts/check-routes.mjs                          안 연 동안 사이트맵에 없는 것을 정상으로 볼지
+ *
+ * ## 여는 절차
+ *
+ *   1. 아래 값을 true 로 바꾼다. 위 자리가 전부 같이 켜진다.
+ *   2. `app/releases.ts` 에 한 줄 올린다(화면이 하나 느는 것이라 Minor).
+ *   3. 머지 뒤 프로덕션을 찔러 본다 — `curl -s -o /dev/null -w '%{http_code}' https://hatzze.fun/daily` 가 200.
+ *
+ * ⛔ **여라는 말이 있기 전에는 바꾸지 말 것.** 화면이 다 만들어졌다는 것과 여는 것은
+ *    다른 판단이다.
+ */
+export const DAILY_PUBLIC = true;
