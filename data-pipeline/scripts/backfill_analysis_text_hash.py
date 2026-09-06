@@ -32,10 +32,12 @@ def main() -> None:
         print("[중단] text_hash 열이 없습니다. supabase/migration_065_analysis_text_hash.sql 을 먼저 돌리세요.")
         return
 
+    # sentiment·model 도 함께 읽어 그대로 되돌려 보낸다 — 아래 upsert 가 INSERT 모양을 갖추려면
+    # not null 열이 채워져 있어야 한다(실제로는 전부 기존 행이라 UPDATE 경로만 탄다).
     todo = load_keyset(
         db,
         "telegram_message_analysis",
-        "id,channel_handle,message_id",
+        "id,channel_handle,message_id,sentiment,model",
         narrow=lambda q: q.is_("text_hash", "null"),
     )
     print(f"[대상] 해시가 비어 있는 분류 행 {len(todo):,}건")
@@ -55,21 +57,17 @@ def main() -> None:
         if not h:
             missing += 1
             continue
-        rows.append({"id": r["id"], "text_hash": h})
+        rows.append({**r, "text_hash": h})
     print(f"[준비] 채울 수 있는 행 {len(rows):,}건 · 본문이 없어 못 채우는 행 {missing:,}건")
     if dry_run:
         return
 
+    # 500행씩 upsert — (channel_handle, message_id) 충돌 경로에서 text_hash 만 새로 적힌다.
+    # 해시별로 update 를 치면 20만 행에 17만 요청이 되어 몇 시간이 걸린다(첫 판이 그랬다).
     for i in range(0, len(rows), CHUNK):
         chunk = rows[i : i + CHUNK]
-        # id 로만 짝을 맞춘 부분 갱신. upsert 는 나머지 not null 열을 요구하므로 한 건씩 update 한다
-        # 대신 id 목록으로 묶어 같은 해시끼리 한 번에 친다.
-        by_hash: dict[str, list[str]] = {}
-        for r in chunk:
-            by_hash.setdefault(r["text_hash"], []).append(r["id"])
-        for h, ids in by_hash.items():
-            db.table("telegram_message_analysis").update({"text_hash": h}).in_("id", ids).execute()
-        print(f"  {min(i + CHUNK, len(rows)):,}/{len(rows):,}")
+        db.table("telegram_message_analysis").upsert(chunk, on_conflict="channel_handle,message_id").execute()
+        print(f"  {min(i + CHUNK, len(rows)):,}/{len(rows):,}", flush=True)
     print("[완료]")
 
 
