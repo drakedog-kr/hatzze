@@ -11,6 +11,10 @@
   - 매칭 앞 글자: 한글/영숫자/한자가 아니어야 함(다른 단어의 꼬리 방지)
   - 붙어 있는 뒤 한글: **덩어리 전체**가 조사 연쇄여야 함(JOSA_TAIL_RE 참고).
     한 글자만 보면 조사꼴 음절로 시작하는 합성어가 샌다("하이브|로자임"의 '로').
+    연쇄는 아무 조사나 이어 붙이지 않는다 — 둘째 자리부터는 JOSA_TRAILING 만
+    쓴다("아스트|로처럼"이 `로`+`처럼` 으로 설명되던 걸 막는다).
+  - 이름 뒤 종목코드 주석은 걷어 내고 그 뒤를 같은 잣대로 본다. 원천 채널이
+    본문에 자기네 태그를 박아 넣어 낱말이 갈라진 자리다("아스트(067390)로노바").
   - 띄어쓴 뒤 단어까지 봤을 때 '더 긴 고유명사의 앞부분'이면 SK 단독으로 안 센다:
       "SK 하이닉스"  → 붙이면 사전에 있는 더 긴 종목명 → 그 종목(SK하이닉스)으로 인정
       "SK hynix"    → 뒤가 로마자(영문 병기·해외 자회사명: SK On) → 거부
@@ -49,6 +53,7 @@ from config.stock_extraction import (  # noqa: E402
     HEAD_NOUN_NAMES,
     JOSA,
     JOSA_HEAD,
+    JOSA_TRAILING,
     US_TICKER_COLLISION,
 )
 
@@ -76,8 +81,12 @@ MASK_CHAR = "\x00"
 # "로부터"가 "로"에서 잘리지 않게 한다. 앞의 lookahead 가 첫 글자를 옛 한 글자 목록으로
 # 묶어, 이 규칙이 조이기만 하도록 만든다(config 쪽 JOSA_HEAD 주석 참고).
 JOSA_TAIL_RE = re.compile(
-    rf"(?=[{JOSA_HEAD}])(?:{'|'.join(sorted(JOSA, key=len, reverse=True))})+(?![가-힣])"
+    rf"(?=[{JOSA_HEAD}])(?:{'|'.join(sorted(JOSA, key=len, reverse=True))})"
+    rf"(?:{'|'.join(sorted(JOSA_TRAILING, key=len, reverse=True))})*(?![가-힣])"
 )
+# 채널이 본문에 끼워 넣은 종목코드 주석. 이름과 뒷말 사이를 갈라 놓아 뒤 경계 검사를
+# 무력화한다(config 쪽 결 ⑦ 주석 참고).
+CODE_ANNOTATION_RE = re.compile(r"\(\d{6}\)")
 
 
 def load_dictionary(db) -> tuple[dict[str, str], dict[str, str], set[str]]:
@@ -140,6 +149,16 @@ def boundary_ok(text: str, start: int, end: int, is_ambiguous: bool) -> bool:
         return False
     if not is_ambiguous:
         return True
+    # 원천이 본문에 끼워 넣은 종목코드 주석은 걷어 내고 그 뒤를 본다(결 ⑦).
+    # kwtok 채널이 글 끝 키워드 줄에 자기네 태그를 박는데, 그 태거가 우리와 같은
+    # 오탐을 내서 **한 낱말 한복판에** 코드가 들어간다("아스트(067390)로노바",
+    # 영문 티커에도 "SK(034730)YQ"). 끼어든 괄호 때문에 아래 검사가 '이름 뒤에
+    # 구두점이 왔다'고 읽어 그대로 통과시켰다. 주석을 건너뛰면 뒤가 `로노바`·`YQ` 라
+    # 원래 규칙이 제대로 막는다. 진짜 언급("한화(000880)의")은 뒤가 조사라 그대로 산다.
+    # 전량 재현(2026-09-07): 327자리가 걸리고 그중 진짜 언급 0건, 새 태그 0건.
+    annotation = CODE_ANNOTATION_RE.match(text, end)
+    if annotation:
+        end = annotation.end()
     # 오탐 위험군은 뒤 경계도 검사: 영숫자/한자 거부, 한글은 조사 연쇄만 허용.
     if end < len(text):
         nxt = text[end]
