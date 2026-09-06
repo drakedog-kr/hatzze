@@ -74,6 +74,7 @@ from generate_telegram_narratives import (  # noqa: E402
     LEN_MIN,
     MAX_RETRIES,
     MODEL,
+    NEWS_SCHEDULE_NOTE,
     SCHEDULE_BLOCK_HEAD,
     SCHEDULE_CHARS,
     SCHEDULE_EXCERPTS,
@@ -83,6 +84,7 @@ from generate_telegram_narratives import (  # noqa: E402
     kst_date,
     optimism,
     schedule_hit,
+    schedule_like,
     schedule_lines,
     sentiment_window,
     tone_label,
@@ -211,6 +213,9 @@ BRIEF_NEWS_SYSTEM = US_COMMON + f"""
   붙여 쓰려면 **그 짝이 발췌 안에 실제로 있어야 합니다.** 없으면 없는 사건을 만든 것입니다.
 - ⚠️ **둘째 대목이 집은 '오늘 새로 오른 화제어'를 여기서 되풀이하지 마세요.** 방금 한
   말입니다. 여기는 발췌에 실제로 담긴 사건을 씁니다.
+- ⚠️ **앞으로 잡힌 일정은 쓰지 마세요.** 상장·청약 예정, 행사·신제품 공개 예정, 편입 예정, 공시의
+  예정일 같은 것은 **넷째 대목이 통째로 맡습니다.** 여기서 미리 쓰면 두 대목이 같은 사건을 두 번
+  말합니다(실제로 그랬습니다). 발췌에 일정 글이 섞여 있어도 여기는 **이미 일어난 일**만 씁니다.
 - **'무슨 일이 있었나'가 아니라 '무엇이 화제였나'를 씁니다.** 이 데이터는 텔레그램에서
   오간 말이지 확인된 사실이 아닙니다. "~를 체결했습니다"가 아니라 "~ 소식이 화제였습니다",
   "~라는 이야기가 돌았습니다"처럼 **화제·전언으로** 적으세요.
@@ -445,6 +450,8 @@ def build_brief_digest(db, latest: str, msgs: list[dict], name_of: dict[str, str
         for m in top:
             first = m["mentions"][0]
             lines.append(f"- {excerpt(m['text'], first.get('match_text'))}")
+        # 재료 옆의 한 줄 — 셋째 대목이 일정 글을 사건으로 집어 가지 않게(국장 build_news_block 주석).
+        lines.append(NEWS_SCHEDULE_NOTE)
 
         counter = Counter()
         for m in picked:
@@ -650,10 +657,22 @@ def main() -> None:
             # 넷째 대목은 **재료가 있는 날만** 쓴다(국장 쪽 같은 자리의 주석 참고).
             if SCHEDULE_BLOCK_HEAD in brief_digest:
                 slots.append(("schedule", BRIEF_SCHEDULE_SYSTEM, BRIEF_SCHEDULE_LEN))
-            paragraphs = [
-                ask_brief_sentence(system, brief_digest, length, BRIEF_SENTENCE_CAP[key])
-                for key, system, length in slots
-            ]
+            paragraphs = []
+            for key, system, length in slots:
+                text = ask_brief_sentence(system, brief_digest, length, BRIEF_SENTENCE_CAP[key])
+                if key == "schedule" and not schedule_like(text):
+                    # 일정 재료를 두고 요약을 되풀이한 것이다(schedule_like 주석). 한 번 더 시키고,
+                    # 그래도 아니면 이 대목을 뺀다 — 없는 편이 틀린 것보다 낫다.
+                    print(f"[WARNING] 넷째 대목에 일정 표지가 없어 다시 씁니다: {text[:50]}…")
+                    text = ask_brief_sentence(
+                        system + "\n\n[다시 쓰기] 방금 쓴 문장은 일정이 아니라 분위기 요약이었습니다. "
+                        "[오간 앞으로의 일정] 발췌에 적힌 **날짜·예정된 일**만으로 다시 쓰세요.",
+                        brief_digest, length, BRIEF_SENTENCE_CAP[key],
+                    )
+                    if not schedule_like(text):
+                        print("[WARNING] 넷째 대목이 여전히 일정이 아니라 뺍니다.")
+                        text = ""
+                paragraphs.append(text)
             summary = "\n\n".join(p for p in paragraphs if p.strip()).strip()
             if summary:
                 db.table("telegram_us_daily_brief").upsert(
