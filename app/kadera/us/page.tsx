@@ -453,7 +453,7 @@ export default async function UsKaderaPage() {
   }[] = [
     { label: "모니터링 채널", value: `${summary.totalChannels}`, unit: "개" },
     {
-      label: "미장 얘기 채널",
+      label: "미장 언급 채널",
       note: "30일",
       value: `${summary.usChannels}`,
       unit: "개",
