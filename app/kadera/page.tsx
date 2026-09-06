@@ -27,7 +27,9 @@ import { pageMetadata } from "../seo";
 import { AiMark, C, Icon, MONO } from "../ui";
 import { ExpandableList } from "./ExpandableList";
 import { Avatar, ChangeRate, DayBars, DeltaPp, Highlight, Pill, QuoteDate, RankBadge, RankDelta, Sparkline, highlightTerms, termsFor } from "./parts";
-import { stockHref } from "@/lib/stock-page";
+import { fmtKoDate, stockHref } from "@/lib/stock-page";
+import { getMoveReasons, getUpcomingEvents, todayKst } from "@/lib/kadera-why";
+import { EventsCalendar } from "./EventsCalendar";
 import { StockLogo } from "../StockLogo";
 import { SectionHead } from "./SectionHead";
 import { SectionIntro } from "../SectionIntro";
@@ -97,6 +99,7 @@ function MddLink({ code, market, label = "MDD 정밀분석" }: { code: string; m
 /** 한 줄 말줄임 — 채널명·종목명처럼 셀을 밀어낼 수 있는 이름에 붙인다. */
 const clip: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
 
+
 /**
  * 시트 두 장이 한 줄에 나란히 설 최소 폭.
  *
@@ -112,6 +115,9 @@ const clip: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", te
    318px 칸 안에서 460px 로 버티며 오른쪽이 통째로 잘려 나갔다(#294 가 만든 회귀).
    min(460px, 100%) 면 넓을 땐 460 이 짝 기준으로 살아 있고, 좁을 땐 칸에 맞춰 접힌다. */
 const SHEET_PAIR_MIN = "min(460px, 100%)";
+
+/** '급등 종목' 카드에 세우는 타일 수. **3열 격자라 3의 배수여야** 마지막 줄이 찬다(급부상 카드와 같은 판). */
+const WHY_TILES = 9;
 /* 채널 표 두 벌(파워 랭킹·뜨는 채널)의 격자는 여기 없다 — globals.css 의 .hz-cols-ch /
    .hz-cols-rise 다. 폰에서 열을 접어야 하는데 인라인 style 은 미디어쿼리를 이겨서,
    여기 두면 @media 가 아무 일도 못 한다. 이유는 그 클래스 주석에 적어 뒀다. */
@@ -345,6 +351,8 @@ export default async function KaderaPage() {
     keywords,
     rawNarratives,
     rawSurgeLines,
+    rawWhy,
+    rawEvents,
   ] =
     await Promise.all([
       getTelegramSummary(),
@@ -358,6 +366,8 @@ export default async function KaderaPage() {
       getIssueKeywords(10),
       getStockNarratives(),
       getSurgingOneliners(),
+      getMoveReasons(),
+      getUpcomingEvents(35, 400),
     ]);
   const stockReports = reports.filter((r): r is NonNullable<typeof r> => r !== null);
 
@@ -379,6 +389,13 @@ export default async function KaderaPage() {
   const narratives = isLoadFailed(rawNarratives) ? {} : rawNarratives;
   // 급부상 카드의 한 줄. 없는 종목은 그 줄만 빠진다(주요 종목 리포트와 같은 규칙).
   const surgeLines = isLoadFailed(rawSurgeLines) ? {} : rawSurgeLines;
+  /* '급등 종목'·'다가오는 일정'도 같은 규칙 — 실패와 부재를 갈라 빈 자리의 문구를 바꾼다. */
+  const whyFailed = isLoadFailed(rawWhy);
+  const why = whyFailed ? null : rawWhy;
+  const eventsFailed = isLoadFailed(rawEvents);
+  const events = eventsFailed ? [] : rawEvents;
+  // 달력의 '오늘'은 집계 기준일이 아니라 벽시계(KST)다 — 사람이 사는 날짜여야 "내일"이 맞다.
+  const kaderaToday = todayKst();
 
   /* 요약 글에서 굵게 집을 낱말. **오늘 화면이 이미 뽑아 둔 것**만 쓴다(highlightTerms
      주석 참고). 여기 없는 종목은 요약에 나와도 굵어지지 않는다 — 회자되는 것과
@@ -901,6 +918,100 @@ export default async function KaderaPage() {
         )}
       </section>
 
+      {/* ── 급등 종목: 그날 오른 종목과 채널이 말한 까닭 ────────────────
+          그날 크게 오르내린 종목과 **채널이 말한 까닭** 한 줄. 독자의 첫 질문("이거 왜
+          올랐어")에 답하는 자리다 — 세는 값이 아니라 내용을 낸다(2026-09-04 지적).
+          ⭐ 세 번째 얼개다. 표(2026-09-06 오전)는 위아래 카드와 결이 달랐고, 급부상과 같은
+             3열 셀(같은 날 오후)은 30px 빨간 숫자 여섯이 한 판에 늘어서 시끄러웠다 —
+             막대가 없는 셀은 큰 숫자와 한 줄 글 사이가 비어 균형이 안 맞았다.
+             그래서 **주요 종목 리포트의 머리줄(로고·이름·코드)** 을 한 줄로 눕힌 목록이다.
+             까닭이 주인공이라 문장이 가운데 넓게 서고, 등락은 오른쪽에 작게 붙는다.
+          LLM 문장엔 늘 ✨(AiMark)가 붙는다 — 상자 대신 문장 앞에 인라인으로.
+          등락률은 그날 종가 기준이고 두 갈래에서 온다(lib/kadera-why.ts 머리말).
+          ⭐ 까닭이 없는 줄도 빼지 않는다 — "말한 곳이 없다"도 정보다. 글자색만 흐리다.
+          오르내림은 한 목록에 섞고 폭이 큰 순으로 세운다. 여덟부터 보여주고 더 보기로 연다. */}
+      <section className="hz-sheet" id="why">
+        <SectionHead level={3}
+          icon="trending_up"
+          title="급등 종목"
+          note={why ? fmtKoDate(why.date) : undefined}
+          desc="그날 오른 종목과 커뮤니티가 말한 이유"
+          noteHelp="그날 오른 종목에 커뮤니티가 말한 이유를 한 줄로 옮깁니다. 확인된 사실이 아니라 오간 이야기입니다. 등락률은 그날 종가 기준입니다."
+        />
+        {whyFailed ? (
+          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>까닭을 불러오지 못했습니다.</p>
+        ) : !why || why.rows.length === 0 ? (
+          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>
+            오늘 집계가 끝나면 채워집니다. 저녁 실행 뒤에 그날 것이 붙습니다.
+          </p>
+        ) : (
+          <>
+            {/* ⭐ **3열 × 3행, 아홉 장 고정이다**(2026-09-06). 바로 위 급부상 카드와 같은 판이라
+                두 시트를 이어서 훑을 때 눈이 자리를 다시 찾지 않는다. '더 보기'는 안 단다 — LLM
+                비용과는 무관하지만(문장은 파이프라인이 미리 만들어 둔 것을 읽을 뿐이다) 카드가
+                길어지고, 열 번째부터는 등락이 잦아들어 이 카드의 값어치가 떨어진다.
+                만들어 둔 나머지 줄은 표에 남아 **종목 화면**(/stock/[code] 의 '왜 움직였나')이
+                쓴다 — 그쪽이 검색으로 오는 자리다. */}
+            <div className="hz-panelgrid hz-panelgrid-3">
+              {why.rows.slice(0, WHY_TILES).map((r, i) => (
+                /* 2열 타일. 한 줄짜리 목록은 문장이 칸의 4할에서 끝나고 오른쪽 등락까지 빈 자리가
+                   길어 투박했다(2026-09-06 지적 "중간에 공백이 너무 커"). 반 폭 타일이면 45자
+                   문장이 한 줄 반을 채워 빈 자리가 없다. 타일 안은 머리줄(로고·이름·코드 / 등락·
+                   종가)과 문장 두 층뿐이다 — 큰 숫자·막대·AI 상자는 두지 않는다. */
+                <div key={r.code} className="hz-panel-pad hz-why-tile">
+                  {/* 머리줄은 **급부상 셀과 글자까지 같다** — 순위 배지 · 이름 · 코드, 오른쪽에 값 묶음.
+                      로고를 쓰다가 숫자로 바꿨다(2026-09-06): 두 카드가 나란히 서는데 한쪽만
+                      로고면 같은 자리가 다른 것으로 읽히고, 오름폭 순이라는 것도 배지가 말해 준다.
+                      baseline 정렬인 까닭은 급부상 셀 주석 참고(상자를 맞추면 글자 밑선이 어긋난다). */}
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+                    <RankBadge n={i + 1} />
+                    <Link
+                      href={stockHref(r.code)}
+                      className="hz-stock-link"
+                      style={{ ...clip, minWidth: 0, fontSize: 14, fontWeight: 800, letterSpacing: "-.01em" }}
+                    >
+                      <strong style={{ fontWeight: "inherit" }}>{r.name}</strong>
+                    </Link>
+                    <span style={{ fontFamily: MONO, fontSize: 11, color: C.sub2, flexShrink: 0 }}>{r.code}</span>
+                    <span style={{ flex: 1 }} />
+                    <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
+                      {r.changeRate !== null ? (
+                        <ChangeRate rate={r.changeRate} style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-.02em" }} />
+                      ) : (
+                        <span style={{ fontSize: 11.5, color: C.sub2, whiteSpace: "nowrap" }}>등락 준비 중</span>
+                      )}
+                      {r.closePrice != null && (
+                        <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 600, color: C.sub, whiteSpace: "nowrap" }}>
+                          {r.closePrice.toLocaleString("ko-KR")}원
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  {/* 까닭. 상자·아이콘은 급부상·주요 종목 리포트의 AI 상자와 같다(회색 타일 위 카드색 상자).
+                      marginTop:auto — 선을 못 그린 종목(상장 직후라 봉이 없다)은 위가 비는데, 그때
+                      문장이 바닥에 붙어야 3열 격자에서 세 장의 문장 줄이 나란히 선다(급부상 셀과 같은 수). */}
+                  <div style={{ marginTop: "auto", display: "flex", gap: 9, background: C.card, borderRadius: 12, padding: "12px 13px" }}>
+                    <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 13,
+                        lineHeight: 1.7,
+                        color: r.reason ? "var(--c-ink-soft)" : C.sub2,
+                        wordBreak: "keep-all",
+                        textWrap: "pretty",
+                      }}
+                    >
+                      {r.reason ?? "커뮤니티에서 이유를 말한 곳이 없습니다"}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </section>
+
       {/* ── 테마 로테이션 · 이슈 키워드 (50:50) ──────────────────────── */}
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
         <section className="hz-sheet" id="themes" style={{ flex: "1 1 calc(50% - 8px)", minWidth: SHEET_PAIR_MIN, display: "flex", flexDirection: "column" }}>
@@ -1200,6 +1311,38 @@ export default async function KaderaPage() {
       <Suspense fallback={<TrendingSkeleton />}>
         <TrendingSection />
       </Suspense>
+
+      {/* ── 다가오는 일정: 달력(1/3) + 고른 날의 일정(2/3) ──────────────
+          채널 글에서 뽑은 앞날의 일정. "앞으로 뭐 있어"에 답하는 자리다. 달력에는 **날짜가
+          적혀 있던 것만** 올린다 — 달·분기·연 단위는 놓을 칸이 없고, 모델이 "연말"을 12-31
+          로 굳혀 쓴 값이라 그 자리에 두면 거짓이 된다(lib/kadera-why.ts getUpcomingEvents).
+          ⭐ 네 번째 얼개다(표 → 아젠다 → 이것). 아젠다는 날짜별 머리 아래 줄이 길게 서서
+             오른쪽이 비었다. 달력은 어느 날에 얼마나 몰렸는지가 한눈에 들어오고, 누르면
+             그날 것만 옆에 선다(EventsCalendar 머리말). 같은 (종목, 날짜)를 여러 채널이
+             말하면 한 줄로 묶고 채널 수를 센다. */}
+      <section className="hz-sheet" id="events">
+        <SectionHead level={3}
+          icon="calendar_month"
+          title="다가오는 일정"
+          note="앞으로 5주"
+          desc="커뮤니티에서 날짜를 짚어 말한 일정"
+          noteHelp="커뮤니티 글에서 '언제 무엇이 있다'고 적힌 것을 모았습니다. 확정 일정은 공시로 확인하십시오."
+        />
+        {eventsFailed ? (
+          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>일정을 불러오지 못했습니다.</p>
+        ) : events.length === 0 ? (
+          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>
+            앞으로 5주 안에 날짜가 짚인 일정이 아직 없습니다. 커뮤니티 글이 쌓이면 채워집니다.
+          </p>
+        ) : (
+          <>
+            <EventsCalendar
+              today={kaderaToday}
+              events={events.map((e) => ({ code: e.code, name: e.name, market: e.market, date: e.date, event: e.event, channels: e.channels }))}
+            />
+          </>
+        )}
+      </section>
 
       <SectionIntro n={3} title="누가 말했나" />
 

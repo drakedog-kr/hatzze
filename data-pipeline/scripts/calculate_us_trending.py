@@ -67,6 +67,10 @@ def window_start(days: int | None) -> datetime:
     return start
 
 
+# 공백 포함 이 글자 수 미만인 본문은 트렌딩에 안 올린다(국장 calculate_telegram_trending.MIN_TEXT_CHARS 와 같은 값).
+MIN_TEXT_CHARS = 10
+
+
 def clean_text(raw: str | None) -> str:
     return re.sub(r"\s+", " ", raw or "").strip()
 
@@ -184,7 +188,7 @@ def main() -> None:
         for m in picked[key]:
             k = (m["channel_handle"], m["message_id"])
             text = texts.get(k, "")
-            if not text:
+            if len(text) < MIN_TEXT_CHARS:  # 공백뿐이거나 한마디뿐인 본문
                 # 본문이 공백뿐인 것(미디어만)은 화면에서도 걸러진다. 순위를 건너뛰지 않고
                 # 다음 것이 그 자리를 받도록 rank 를 여기서 센다.
                 continue

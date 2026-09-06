@@ -551,6 +551,20 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/generate_surging_oneliners.py
 
+      # '왜 올랐나' — 그날 크게 움직인 종목에 채널이 말한 까닭. 저녁 실행에서만 만든다
+      # (아침엔 그날 메시지가 몇백 건뿐이라 스크립트가 스스로 건너뛰고 KRX 확정값만 채운다).
+      # 입력은 telegram_stock_daily(그날) + 메시지 본문이라 stock_daily 뒤면 어디든 된다.
+      - name: (텔레그램) 등락 종목 까닭 생성
+        id: telegram_move_reasons
+        continue-on-error: true
+        run: python data-pipeline/scripts/generate_move_reasons.py
+
+      # '다가오는 일정' — 채널 글에서 앞날의 일정을 뽑는다. 증분(읽은 글은 다시 안 부른다).
+      - name: (텔레그램) 앞날 일정 추출
+        id: telegram_events
+        continue-on-error: true
+        run: python data-pipeline/scripts/extract_telegram_events.py
+
       # 미장 LLM 문장. 미장 센티먼트·테마·동시언급이 전부 끝난 뒤여야 digest 가 찬다.
       # ⚠️ 국장 총평(아래)과 **따로** 두는 이유: 한쪽이 실패해도 다른 쪽은 나가야 하고,
       #    미장 실패는 미장 알림에만 잡혀야 한다.
@@ -1114,8 +1128,8 @@ jobs:
         id: telegram_calc_health
         if: always()
         run: |
-          names=("extract_telegram_stocks.py" "calculate_channel_influence.py" "calculate_stock_daily.py" "calculate_telegram_trending.py" "calculate_theme_daily.py" "calculate_telegram_sentiment.py" "generate_telegram_narratives.py")
-          outcomes=("${{ steps.telegram_extract.outcome }}" "${{ steps.telegram_influence.outcome }}" "${{ steps.telegram_stock_daily.outcome }}" "${{ steps.telegram_trending.outcome }}" "${{ steps.telegram_theme_daily.outcome }}" "${{ steps.telegram_sentiment.outcome }}" "${{ steps.telegram_narratives.outcome }}")
+          names=("extract_telegram_stocks.py" "calculate_channel_influence.py" "calculate_stock_daily.py" "calculate_telegram_trending.py" "calculate_theme_daily.py" "calculate_telegram_sentiment.py" "generate_telegram_narratives.py" "generate_move_reasons.py" "extract_telegram_events.py")
+          outcomes=("${{ steps.telegram_extract.outcome }}" "${{ steps.telegram_influence.outcome }}" "${{ steps.telegram_stock_daily.outcome }}" "${{ steps.telegram_trending.outcome }}" "${{ steps.telegram_theme_daily.outcome }}" "${{ steps.telegram_sentiment.outcome }}" "${{ steps.telegram_narratives.outcome }}" "${{ steps.telegram_move_reasons.outcome }}" "${{ steps.telegram_events.outcome }}")
 
           {
             echo "## 국장 집계"

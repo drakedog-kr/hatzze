@@ -14,6 +14,8 @@ import {
   type StockTrendPoint,
 } from "@/lib/stock-page";
 
+import { daysFromToday, eventDateLabel, getStockEvents, getStockMoveReason, type UpcomingEvent } from "@/lib/kadera-why";
+import { Pill } from "../../kadera/parts";
 import { PageJsonLd } from "../../JsonLd";
 import { SectionHead } from "../../kadera/SectionHead";
 import { StockLogo } from "../../StockLogo";
@@ -190,7 +192,14 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
   if (!d) notFound();
   if (code !== upper) permanentRedirect(stockHref(upper));
 
-  const peers = await themePeerStocks(d.code, d.themes);
+  const [peers, why, events] = await Promise.all([
+    themePeerStocks(d.code, d.themes),
+    getStockMoveReason(d.code, d.baseDate),
+    getStockEvents(d.code),
+  ]);
+  // 그날 등락률. 파이프라인이 KRX 확정값을 채웠으면 그것, 아니면 stocks 의 값이 **그 날짜일 때만** 쓴다
+  // (이 화면은 야후를 안 부른다 — lib/stock-page.ts 머리말 ①). 둘 다 아니면 까닭만 보여준다.
+  const whyRate = why ? (why.changeRate ?? (d.priceDate === why.date ? d.changeRate : null)) : null;
   const marketLabel = d.market === "KOSDAQ" ? "코스닥" : d.market === "KOSPI" ? "코스피" : null;
 
   return (
@@ -335,6 +344,102 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
         </div>
       </section>
 
+      {/* ── 왜 움직였나(LLM) ────────────────────────────────────────
+          그날 채널이 말한 까닭 한 줄(카더라 '급등 종목'과 같은 표. 이쪽은 **내린 날도 보여준다**).
+          사흘 안의 것만 보여준다 —
+          지난주 까닭을 오늘 시세 옆에 두면 다른 날 이야기가 된다. 없는 게 정상이라 없으면 안 그린다. */}
+      {why && (
+        <section className="hz-sheet">
+          <SectionHead
+            icon="trending_up"
+            title="왜 움직였나"
+            note={fmtKoDate(why.date)}
+            desc="그날 커뮤니티가 말한 이유입니다. 확인된 사실이 아니라 오간 이야기입니다."
+            level={2}
+          />
+          <div style={{ padding: "16px 22px 20px" }}>
+            <div style={{ display: "flex", gap: 9, background: C.soft, borderRadius: R.control, padding: "12px 13px" }}>
+              <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 13,
+                    lineHeight: 1.7,
+                    color: why.reason ? C.inkSoft : C.sub2,
+                    textWrap: "pretty",
+                    wordBreak: "keep-all",
+                  }}
+                >
+                  {why.reason ?? "커뮤니티에서 이유를 말한 곳이 없습니다."}
+                </p>
+                <span style={{ fontSize: 11.5, color: C.sub2 }}>
+                  {whyRate != null && (
+                    <>
+                      <span
+                        style={{
+                          fontFamily: MONO,
+                          fontWeight: 700,
+                          color: whyRate > 0 ? "var(--c-hot-ink)" : whyRate < 0 ? "var(--c-cold-ink)" : C.sub2,
+                        }}
+                      >
+                        {whyRate > 0 ? "▲" : whyRate < 0 ? "▼" : ""}
+                        {Math.abs(whyRate).toFixed(2)}%
+                      </span>
+                      {" · "}
+                    </>
+                  )}
+                  커뮤니티 {why.channelCount}곳이 말했습니다
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+      {/* ── 다가오는 일정 ──────────────────────────────────────────
+          채널 글에서 뽑은 앞날의 일정. 카더라 카드와 달리 **달·분기·연 단위도** 보여준다 —
+          이 화면은 한 종목의 자리라 "10월 중"·"2027년"이 글로 서면 된다(eventDateLabel). */}
+      {events.length > 0 && (
+        <section className="hz-sheet">
+          <SectionHead
+            icon="calendar_month"
+            title="다가오는 일정"
+            desc="커뮤니티가 짚은 날입니다. 같은 일정을 두고 날짜가 갈리기도 합니다."
+            level={2}
+          />
+          <div style={{ paddingBottom: 6 }}>
+            {(() => {
+              // 카더라 '다가오는 일정'과 같은 아젠다 꼴 — 날짜가 머리, 그 아래 무슨 일. 여기는 한
+              // 종목의 자리라 줄에 이름이 없고, 달·분기·해만 짚인 일정도 머리로 선다("10월 중").
+              const groups = new Map<string, UpcomingEvent[]>();
+              for (const e of events) {
+                const k = `${e.date}|${e.precision}`;
+                const g = groups.get(k);
+                if (g) g.push(e);
+                else groups.set(k, [e]);
+              }
+              return [...groups.values()].map((items) => (
+                <div key={`${items[0].date}-${items[0].precision}`}>
+                  <div className="hz-agenda-day">
+                    <span style={{ fontSize: 13.5, fontWeight: 800, color: C.ink, letterSpacing: "-.01em" }}>{eventDateLabel(items[0])}</span>
+                    {items[0].precision === "day" && (
+                      <Pill tone={["오늘", "내일"].includes(daysFromToday(items[0].date)) ? "blue" : "plain"}>{daysFromToday(items[0].date)}</Pill>
+                    )}
+                  </div>
+                  {items.map((e) => (
+                    <div key={e.event} className="hz-trow hz-cols-cal-one">
+                      <span style={{ minWidth: 0, fontSize: 13.5, lineHeight: 1.6, color: C.inkSoft, wordBreak: "keep-all", textWrap: "pretty" }}>
+                        {e.event}
+                      </span>
+                      {e.channels >= 2 ? <Pill tone="blue">{e.channels}곳이 말함</Pill> : <span />}
+                    </div>
+                  ))}
+                </div>
+              ));
+            })()}
+          </div>
+        </section>
+      )}
       {/* ── 회자된 까닭(LLM) ────────────────────────────────────────
           파이프라인이 기준일에 상위 몇 종목만 써 둔다. 없는 게 정상이라 없으면 안 그린다.
           ⛔ 없는 자리를 그럴듯한 문장으로 메우지 말 것. */}

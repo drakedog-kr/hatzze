@@ -90,6 +90,11 @@ def window_start(days: int | None) -> datetime:
     return start
 
 
+# 공백 포함 이 글자 수 미만인 본문은 트렌딩에 안 올린다(2026-09-06 실측: "귀뜸 😂"·"❤️❤️❤️" 같은
+# 한마디가 조회수만으로 카드에 올라왔다). 프론트(lib/telegram-data.ts TREND_MIN_CHARS)와 같은 값.
+MIN_TEXT_CHARS = 10
+
+
 def clean_text(raw: str | None) -> str:
     """본문 정리 — 저쪽 `.replace(/\\s+/g, " ").trim()` 과 같은 규칙."""
     return re.sub(r"\s+", " ", raw or "").strip()
@@ -218,7 +223,7 @@ def pick_top(db, start: datetime) -> tuple[list[dict], int]:
     cleaned = []
     for m in rows:
         t = clean_text(texts.get(m["id"]))
-        if not t:  # 공백뿐인 본문은 화면에서도 걸러진다
+        if len(t) < MIN_TEXT_CHARS:  # 공백뿐이거나 한마디뿐인 본문은 화면에서도 걸러진다
             continue
         cleaned.append({**m, "text": t, "_score": score(m)})
     cleaned.sort(key=lambda m: -m["_score"])

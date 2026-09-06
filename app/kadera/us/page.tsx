@@ -16,6 +16,11 @@ import {
   US_WINDOW_DAYS,
 } from "@/lib/us-telegram-data";
 import type { UsTrendingMessage } from "@/lib/us-telegram-data";
+import { getUsMoveReasons, getUsUpcomingEvents } from "@/lib/kadera-us-why";
+import { todayKst } from "@/lib/kadera-why";
+import { fmtKoDate } from "@/lib/stock-page";
+import { isLoadFailed } from "@/lib/load-state";
+import { EventsCalendar } from "../EventsCalendar";
 
 import { formatKstUpdate } from "@/lib/format";
 
@@ -61,6 +66,9 @@ const SHEET_PAIR_MIN = "min(460px, 100%)";
  * 의 ISSUE_KEYWORD_LIMIT 이다.
  */
 const SHEET_ROWS = 10;
+
+/** 미장 '급등 종목' 카드에 세우는 타일 수. 3열 격자라 3의 배수여야 마지막 줄이 찬다(국장과 같다). */
+const US_WHY_TILES = 9;
 
 const clip: React.CSSProperties = {
   overflow: "hidden",
@@ -325,6 +333,8 @@ export default async function UsKaderaPage() {
     trendMonth,
     breadth,
     surgeLines,
+    rawWhy,
+    rawEvents,
   ] = await Promise.all([
     getUsKaderaSummary(),
     getUsSurgingStocks(6),
@@ -343,7 +353,17 @@ export default async function UsKaderaPage() {
     getUsTrendingMessages("w30", 36),
     getUsStockBreadth(10),
     getUsSurgingOneliners(),
+    getUsMoveReasons(),
+    getUsUpcomingEvents(35, 400),
   ]);
+
+  /* 국장과 같은 규칙 — 조회 실패와 자료 없음을 갈라 빈 자리의 문구를 바꾼다(lib/load-state.ts). */
+  const whyFailed = isLoadFailed(rawWhy);
+  const why = whyFailed ? null : rawWhy;
+  const eventsFailed = isLoadFailed(rawEvents);
+  const events = eventsFailed ? [] : rawEvents;
+  // 달력의 '오늘'은 집계 기준일이 아니라 벽시계(KST)다 — 사람이 사는 날짜여야 "내일"이 맞다.
+  const usToday = todayKst();
 
   /* 이슈 키워드 막대의 분모 — 화면에 세운 낱말들의 합(국장과 같은 규칙). */
   const keywordTotal = keywords.reduce((a, k) => a + k.mentionCount, 0);
@@ -841,7 +861,8 @@ export default async function UsKaderaPage() {
                     </div>
                   )}
 
-                  {/* 국장 셀과 같은 마지막 줄이다. 다른 건 폴백뿐 — 국내는 야후가 안 되면
+
+      {/* 국장 셀과 같은 마지막 줄이다. 다른 건 폴백뿐 — 국내는 야후가 안 되면
                       KRX 저장 종가로 떨어지는데(그때 등락률 대신 기준일을 단다) 미국은
                       그 저장분이 없어 그냥 빈칸이다. 틀린 숫자를 그리는 것보다 낫다. */}
                   <div
@@ -894,6 +915,73 @@ export default async function UsKaderaPage() {
             값입니다
           </span>
         </div>
+      </section>
+
+      {/* ── 급등 종목: 3열 × 3행 ────────────────────────────────────────
+          국장 짝은 app/kadera/page.tsx 의 같은 카드다. 얼개·타일 구성이 같아야 두 화면을
+          오갈 때 같은 자리에서 같은 것을 읽는다.
+          ⚠️⚠️ **등락률이 "그날"이 아니라 "직전 미국장"이다.** 집계 기준일은 메시지 작성일
+             (KST)인데 미국장은 KST 새벽 5시에 닫혀 하루가 어긋난다 — 자세한 사정과 세션을
+             집는 규칙은 lib/kadera-us-why.ts 머리말에. 그래서 머리의 날짜 알약도 세션 날짜다.
+          ⭐ 오른 종목만 담는다. 내린 종목의 까닭은 표에 남지만 이 구간이 '최근 뜨는 것'이다. */}
+      <section className="hz-sheet" id="why">
+        <SectionHead level={3}
+          icon="trending_up"
+          title="급등 종목"
+          note={why?.rows[0]?.sessionDate ? fmtKoDate(why.rows[0].sessionDate) : undefined}
+          desc="직전 미국장에서 오른 종목과 커뮤니티가 말한 이유"
+          noteHelp="커뮤니티가 미국 종목을 두고 한 말에서 이유를 한 줄로 옮깁니다. 확인된 사실이 아니라 오간 이야기입니다. 등락률은 직전 미국장 종가 기준입니다."
+        />
+        {whyFailed ? (
+          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>까닭을 불러오지 못했습니다.</p>
+        ) : !why || why.rows.length === 0 ? (
+          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>
+            오늘 집계가 끝나면 채워집니다. 저녁 실행 뒤에 그날 것이 붙습니다.
+          </p>
+        ) : (
+          <div className="hz-panelgrid hz-panelgrid-3">
+            {why.rows.slice(0, US_WHY_TILES).map((r, i) => (
+              <div key={r.ticker} className="hz-panel-pad hz-why-tile">
+                {/* 머리줄은 급부상 셀과 글자까지 같다(그쪽 baseline 주석 참고). */}
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+                  <RankBadge n={i + 1} />
+                  <strong style={{ ...clip, minWidth: 0, fontSize: 14, fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>
+                    {r.name}
+                  </strong>
+                  <span style={{ fontFamily: MONO, fontSize: 11, color: C.sub2, flexShrink: 0 }}>{r.ticker}</span>
+                  <span style={{ flex: 1 }} />
+                  <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
+                    {r.changeRate !== null ? (
+                      <ChangeRate rate={r.changeRate} style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-.02em" }} />
+                    ) : (
+                      <span style={{ fontSize: 11.5, color: C.sub2, whiteSpace: "nowrap" }}>등락 준비 중</span>
+                    )}
+                    {r.closePrice != null && (
+                      <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 600, color: C.sub, whiteSpace: "nowrap" }}>
+                        ${r.closePrice.toFixed(2)}
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div style={{ marginTop: "auto", display: "flex", gap: 9, background: C.card, borderRadius: 12, padding: "12px 13px" }}>
+                  <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 13,
+                      lineHeight: 1.7,
+                      color: r.reason ? "var(--c-ink-soft)" : C.sub2,
+                      wordBreak: "keep-all",
+                      textWrap: "pretty",
+                    }}
+                  >
+                    {r.reason ?? "커뮤니티에서 이유를 말한 곳이 없습니다"}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
@@ -1583,6 +1671,33 @@ export default async function UsKaderaPage() {
           ]}
         />
       </section>
+
+      {/* ── 다가오는 일정: 달력(1/3) + 고른 날(2/3) ─────────────────────
+          국장 짝과 **같은 컴포넌트**다(app/kadera/EventsCalendar.tsx). 줄의 링크만 갈린다 —
+          미국 종목엔 아직 실주소가 없어 MDD 로 보낸다(그 파일의 stockHrefOf).
+          날짜가 적혀 있던 일정만 올린다(lib/kadera-us-why.ts getUsUpcomingEvents). */}
+      <section className="hz-sheet" id="events">
+        <SectionHead level={3}
+          icon="calendar_month"
+          title="다가오는 일정"
+          note="앞으로 5주"
+          desc="커뮤니티에서 날짜를 짚어 말한 미국 종목 일정"
+          noteHelp="커뮤니티 글에서 '언제 무엇이 있다'고 적힌 것을 모았습니다. 확정 일정은 공시로 확인하십시오."
+        />
+        {eventsFailed ? (
+          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>일정을 불러오지 못했습니다.</p>
+        ) : events.length === 0 ? (
+          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>
+            앞으로 5주 안에 날짜가 짚인 일정이 아직 없습니다. 커뮤니티 글이 쌓이면 채워집니다.
+          </p>
+        ) : (
+          <EventsCalendar
+            today={usToday}
+            events={events.map((e) => ({ code: e.code, name: e.name, market: e.market, date: e.date, event: e.event, channels: e.channels }))}
+          />
+        )}
+      </section>
+
       <SectionIntro n={3} title="누가 말했나" />
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
