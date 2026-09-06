@@ -116,6 +116,39 @@ export function windowBefore(base: string, n: number): string[] {
 export const KADERA_WINDOW_DAYS = 3;
 
 /**
+ * **생태계 센티먼트(낙관도)만 쓰는 창** — 기준일(오늘)과 어제, 둘. 표본이 얇으면 하루씩 뒤로 넓힌다.
+ *
+ * 예전엔 위 KADERA_WINDOW_DAYS 를 windowBefore 로 써서 "기준일을 뺀 앞 3일"이었다. 그러면
+ * 오늘 들어온 글이 숫자에 하나도 안 들어가서, 카드가 사흘 전 분위기를 "지금 여론"이라고
+ * 보여 줬다. 실측(2026-09-06, 거래일 38일): 하루치 낙관도와 그날 코스피 등락의 상관이
+ * +0.62 인데 앞 3일 창은 −0.21 로 방향이 반대였다. 코스피 −10.8% 였던 7월 28일에 화면은
+ * 낙관이었고, +17.9% 였던 7월 31일엔 중립이었다. 오늘+어제는 +0.38 이다.
+ * ⚠️ **파이프라인 SENTIMENT_WINDOW_DAYS(generate_telegram_narratives.py)와 같은 값·같은
+ *    규칙이어야 한다.** 총평 문장이 인용하는 낙관도와 이 카드의 숫자가 같은 날들을 봐야 한다.
+ * ⚠️ 판정을 보류하는 날은 없다. 주말처럼 글이 적은 날은 창이 하루씩 길어질 뿐이다.
+ *    문턱 2,000 은 오늘+어제 건수 실측(56일 · 중앙 7,957 · 하위¼ 2,790)에서, 넓히는 날이
+ *    8일(대부분 주말과 수집 첫날)이 되는 값이다. 미장은 물량이 달라 자기 문턱(400)을 쓴다.
+ * 이 창을 쓰는 것: 낙관도 큰 숫자·3분할 막대·테마별 막대·"N건 분석" 캡션. 종목 리포트·
+ * 급부상·화제어는 그대로 KADERA_WINDOW_DAYS 다.
+ */
+export const SENTIMENT_WINDOW_DAYS = 2;
+export const SENTIMENT_WINDOW_MAX_DAYS = 4;
+export const SENTIMENT_MIN_MESSAGES = 2000;
+
+/**
+ * 낙관도가 볼 날짜 목록(오래된→최신). `countByDate` 는 날짜별 분석 건수(overall 의 message_count).
+ * 파이프라인 sentiment_window 와 같은 규칙이다(손으로 맞춘 사본).
+ */
+export function sentimentWindow(base: string, countByDate: Map<string, number>, floor: number): string[] {
+  const days = Array.from({ length: SENTIMENT_WINDOW_DAYS }, (_, k) => addDaysISO(base, -k));
+  const total = () => days.reduce((n, d) => n + (countByDate.get(d) ?? 0), 0);
+  while (total() < floor && days.length < SENTIMENT_WINDOW_MAX_DAYS) {
+    days.push(addDaysISO(base, -days.length));
+  }
+  return days.sort();
+}
+
+/**
  * LLM 문장이 **기준일분이 아직 없을 때 며칠까지 거슬러 올라가 쓰나**.
  *
  * 파이프라인은 언급 집계를 20단계쯤에서 오늘 날짜로 쓰고 문장은 60단계쯤에서 만든다.
@@ -136,7 +169,12 @@ export const KADERA_WINDOW_DAYS = 3;
  * 파이프라인이 도는 몇 시간(소급 1)과 실행이 한 번 실패한 날(소급 2)까지만 덮는다.
  * 여기서 못 찾으면 예전처럼 문단이 빠지거나 안내가 뜬다 — 그게 맞는 그림이다.
  */
-export const LLM_TEXT_CARRY_DAYS = 2;
+export const LLM_TEXT_CARRY_DAYS = 1;
+// ⚠️ 2 였다가 1 로 내렸다(2026-09-06). 위 계산은 카드 창이 base-3~base-1 일 때의 것이다. 낙관도
+//    카드가 오늘+어제(SENTIMENT_WINDOW_DAYS)로 바뀌면서 D-1 의 문장(D-2~D-1 을 말함)과 오늘
+//    카드(D-1~D)가 겹치는 날이 하루뿐이고, 2 를 두면 하나도 안 겹친다. 그래서 1 이다.
+//    종목 리포트 문장은 여전히 3일 창을 말하지만 같은 상수를 쓰니 하루만 거슬러 간다 — 그쪽은
+//    겹침이 이틀이라 넉넉하다.
 
 /**
  * 종목 리포트 **막대 차트**가 그리는 일수. 세는 창(KADERA_WINDOW_DAYS)보다 길다.
@@ -1798,6 +1836,8 @@ export type EcosystemSentiment = {
   neutral: number;
   negative: number; // 셋의 합은 항상 100(반올림 보정). 아래 3분할 막대가 이걸 그린다
   messageCount: number;
+  /** 이 숫자들이 본 날수. 보통 2(오늘+어제), 표본이 얇은 날은 3~4(SENTIMENT_WINDOW_DAYS 주석). */
+  windowDays: number;
   summary: string | null; // LLM 총평. 아직 생성 전이면 null
   /** 표본(positive/negative/total)을 같이 넘긴다 — 얇은 테마는 100:0 같은 극단값이
    *  나오는데, 몇 건 기준인지 보여줘야 그 숫자를 제대로 읽을 수 있다. */
@@ -1883,24 +1923,29 @@ export function optimismPct(pos: number, neg: number): number | null {
  */
 export async function getEcosystemSentiment(): Promise<MaybeFailed<EcosystemSentiment | null>> {
   const db = getSupabaseAdmin();
-  // 종목 리포트와 **같은 날짜 구간**을 본다(windowBefore = 기준일 뺀 그 앞 N일).
-  // 예전엔 여기만 daysAgoISO 로 굴러 오늘이 섞였는데, 오늘은 하루가 덜 차서 낙관도가
-  // 반쪽 표본에 끌려다녔다. 두 카드가 같은 기간을 말해야 총평 문장도 옆 막대와 맞는다.
+  // 창은 오늘+어제다(SENTIMENT_WINDOW_DAYS 주석). 넓힐 수 있는 최대 일수만큼 받아 두고,
+  // 날짜별 건수를 보고 며칠을 쓸지 정한다 — 파이프라인 digest 가 같은 규칙으로 같은 날을 본다.
+  // ⚠️ 예전의 "기준일 뺀 앞 3일"(windowBefore)은 오늘 글을 하나도 안 넣어 사흘 전 분위기를
+  //    오늘 것처럼 보여 줬다. 종목 리포트는 여전히 그 창을 쓴다 — 둘은 이제 다른 기간이다.
   const base = await kaderaBaseDate();
-  const window = windowBefore(base, KADERA_WINDOW_DAYS);
   const { data, error } = await db
     .from("telegram_sentiment_daily")
     .select("date,scope,positive_count,neutral_count,negative_count,message_count")
-    .gte("date", window[0])
-    .lte("date", window[window.length - 1]);
+    .gte("date", addDaysISO(base, -(SENTIMENT_WINDOW_MAX_DAYS - 1)))
+    .lte("date", base);
   if (error) {
     console.error("[getEcosystemSentiment] 감성 집계를 못 읽었습니다", error);
     return LOAD_FAILED;
   }
   if (!data?.length) return null;
 
+  const countByDate = new Map<string, number>();
+  for (const r of data) if (r.scope === "overall") countByDate.set(r.date, r.message_count ?? 0);
+  const window = new Set(sentimentWindow(base, countByDate, SENTIMENT_MIN_MESSAGES));
+
   const agg = new Map<string, { pos: number; neu: number; neg: number; total: number }>();
   for (const r of data) {
+    if (!window.has(r.date)) continue;
     const a = agg.get(r.scope) ?? { pos: 0, neu: 0, neg: 0, total: 0 };
     a.pos += r.positive_count ?? 0;
     a.neu += r.neutral_count ?? 0;
@@ -1954,6 +1999,7 @@ export async function getEcosystemSentiment(): Promise<MaybeFailed<EcosystemSent
     neutral,
     negative,
     messageCount: overall.total,
+    windowDays: window.size,
     summary: (brief?.sentiment_summary as string | null) ?? null,
     byTheme,
   };

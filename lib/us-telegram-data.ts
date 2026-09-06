@@ -29,6 +29,7 @@ import {
   fetchAllRows,
   lastKaderaUpdatedAt,
   optimismPct,
+  sentimentWindow,
   toPercents,
 } from "@/lib/telegram-data";
 import { changeRateOf, fetchYahooQuote } from "@/lib/yahoo-quote";
@@ -37,6 +38,12 @@ import { US_THEMES } from "@/lib/us-stock-themes";
 
 /** 급부상 판정에서 '최근'으로 볼 일수. 국내(KADERA_WINDOW_DAYS)와 같게 둔다. */
 export const US_WINDOW_DAYS = 3;
+/**
+ * 낙관도 창이 얇을 때 넓히는 문턱(오늘+어제 분석 건수). 규칙은 국장 sentimentWindow 와 같고
+ * 문턱만 미장 물량에 맞췄다 — 실측(56일) 오늘+어제 건수 중앙 1,252 · 하위¼ 666, 400 이면
+ * 넓히는 날이 9일(주말·수집 첫날). 파이프라인 US_SENTIMENT_MIN_MESSAGES 와 같은 값.
+ */
+export const US_SENTIMENT_MIN_MESSAGES = 400;
 /** 막대 차트가 그리는 일수. 세는 창보다 길어야 추이가 읽힌다(국내와 같은 이유). */
 export const US_CHART_DAYS = 7;
 /**
@@ -457,11 +464,11 @@ export async function getUsSentiment(): Promise<UsSentiment | null> {
   const rows = all.filter((r) => r.scope === "overall");
   if (!rows.length) return null;
 
-  // 창은 **기준일 포함 최근 N일**이다. 국장의 windowBefore 는 기준일을 빼는데,
-  // 그건 그쪽 기준일이 '오늘'이라 하루가 덜 찼기 때문이다. 미장 기준일은 이미
-  // 집계가 끝난 마지막 날이라 뺄 이유가 없다.
-  const windowFrom = addDays(base, -(US_WINDOW_DAYS - 1));
-  const win = rows.filter((r) => r.date >= windowFrom);
+  // 창은 오늘+어제, 표본이 얇으면 하루씩 넓힌다 — 국장과 **같은 규칙**(sentimentWindow).
+  // 예전엔 기준일 포함 3일이었고 국장은 기준일 뺀 3일이라, 두 화면이 서로 다른 창을 썼다.
+  const countByDate = new Map(rows.map((r) => [r.date, r.message_count ?? 0] as const));
+  const window = new Set(sentimentWindow(base, countByDate, US_SENTIMENT_MIN_MESSAGES));
+  const win = rows.filter((r) => window.has(r.date));
   const sum = win.reduce(
     (a, r) => ({
       pos: a.pos + (r.positive_count ?? 0),
@@ -481,7 +488,7 @@ export async function getUsSentiment(): Promise<UsSentiment | null> {
   // 76% 와 다른 사흘을 말하게 되어, 같은 칸 안에서 두 값이 어긋난다.
   const themeAgg = new Map<string, { pos: number; neg: number; total: number }>();
   for (const r of all) {
-    if (r.scope === "overall" || r.date < windowFrom) continue;
+    if (r.scope === "overall" || !window.has(r.date)) continue;
     const a = themeAgg.get(r.scope) ?? { pos: 0, neg: 0, total: 0 };
     a.pos += r.positive_count ?? 0;
     a.neg += r.negative_count ?? 0;
@@ -509,7 +516,7 @@ export async function getUsSentiment(): Promise<UsSentiment | null> {
     neutral,
     negative,
     messageCount: sum.total,
-    windowDays: win.length || US_WINDOW_DAYS,
+    windowDays: win.length || window.size,
     byTheme,
     series: rows
       .slice()

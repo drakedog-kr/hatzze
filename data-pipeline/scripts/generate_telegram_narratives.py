@@ -112,6 +112,35 @@ MAX_RETRIES = 3
 WINDOW_DAYS = 3
 WINDOW_OFFSET = WINDOW_DAYS - 1
 
+# ── 센티먼트(낙관도)만 쓰는 창 ─────────────────────────────────────────────
+#
+# 위 WINDOW_DAYS 는 발췌·종목 리포트·화제어가 쓰는 3일이다. 낙관도 숫자는 **다른 창**을
+# 쓴다 — 오늘과 어제, 둘. 예전엔 "기준일을 뺀 앞 3일"이었는데 그러면 오늘 들어온 글이
+# 숫자에 하나도 안 들어가서, 화면이 사흘 전 분위기를 오늘 것처럼 보여 줬다. 실측(2026-09-06,
+# 거래일 38일): 하루치 낙관도와 그날 코스피 등락의 상관이 +0.62 인데, 앞 3일 창은 −0.21 로
+# 방향이 반대였다. 코스피 −10.8% 였던 날 화면은 낙관이었다. 오늘+어제는 +0.38 이다.
+#
+# ⚠️ **프론트 SENTIMENT_WINDOW_DAYS(lib/telegram-data.ts)와 같은 값·같은 규칙이어야 한다.**
+#    총평 문장이 인용하는 낙관도와 옆 막대가 같은 날들을 봐야 한다.
+# ⚠️ 표본이 얇은 날(주말)은 창을 뒤로 하루씩 넓힌다 — 판정을 보류하는 날은 없다. 문턱은
+#    오늘+어제 건수 실측(56일)에서 중앙 7,957 · 하위¼ 2,790 이었고, 2,000 이면 넓히는 날이
+#    8일(대부분 주말·수집 첫날)이다.
+SENTIMENT_WINDOW_DAYS = 2
+SENTIMENT_WINDOW_MAX_DAYS = 4
+SENTIMENT_MIN_MESSAGES = 2000
+
+
+def sentiment_window(count_by_date: dict[str, int], latest: str, floor: int) -> list[str]:
+    """낙관도가 볼 날짜 목록(오래된→최신). 기준일과 어제, 표본이 얇으면 하루씩 더 뒤로.
+
+    프론트 lib/telegram-data.ts 의 sentimentWindow 와 같은 규칙이다(손으로 맞춘 사본).
+    """
+    base = date.fromisoformat(latest)
+    days = [(base - timedelta(days=k)).isoformat() for k in range(SENTIMENT_WINDOW_DAYS)]
+    while sum(count_by_date.get(d, 0) for d in days) < floor and len(days) < SENTIMENT_WINDOW_MAX_DAYS:
+        days.append((base - timedelta(days=len(days))).isoformat())
+    return sorted(days)
+
 # ── 기준일 하루 재료 ──────────────────────────────────────────────────────────
 #
 # 위 창은 기준일을 뺀 앞 사흘이다(build_brief_digest 주석). 사흘 숫자만 주면 총평이
@@ -233,26 +262,26 @@ COMMON = """\
 BRIEF_TONE_SYSTEM = COMMON + f"""
 
 [이번 대목 — 오늘의 분위기]
-**오늘 하루** 이 생태계의 분위기가 어느 쪽인지를 먼저 쓰고, 그게 앞 사흘과 어떻게 다른지를
+**오늘 하루** 이 생태계의 분위기가 어느 쪽인지를 먼저 쓰고, 그게 이 기간의 다른 날과 어떻게 다른지를
 붙여 **한두 문장**으로 쓰세요. [오늘 하루]가 주인공이고 [전체]·[낙관도 추이]는 견주는
 배경입니다.
 
-- **세 가지를 담습니다.** ①오늘 하루가 어느 쪽인지(구간 라벨) ②그게 앞 사흘과 견줘
+- **세 가지를 담습니다.** ①오늘 하루가 어느 쪽인지(구간 라벨) ②그게 이 기간의 다른 날과 견줘
   어떤지 ③[전체] 낙관도 퍼센트 한 번. 하나가 빠지면 문장이 길이를 못 채웁니다.
 - ⚠️ **[오늘 하루] 블록이 아예 없는 날이 있습니다**(그날 표본이 얇아 일부러 뺐습니다).
-  그때는 [전체]와 [낙관도 추이]로 최근 사흘의 분위기를 쓰세요. 블록이 없는데 오늘을
+  그때는 [전체]와 [낙관도 추이]로 이 기간의 분위기를 쓰세요. 블록이 없는데 오늘을
   말하면 없는 하루를 지어내는 것입니다.
 - ⚠️ **[오늘 하루]에는 퍼센트가 없습니다. 일부러 뺐습니다.** 오늘 분위기는 거기 적힌
-  구간 라벨(낙관 우세·중립·비관 우세)과 '사흘보다 뜨겁다/식었다'로만 말하세요. 옆 막대가
-  사흘 값이라 오늘 퍼센트를 적으면 독자가 그 숫자를 확인할 곳이 없습니다.
+  구간 라벨(낙관 우세·중립·비관 우세)과 '다른 날보다 뜨겁다/식었다'로만 말하세요. 옆 막대가
+  그 기간 값이라 오늘 퍼센트를 적으면 독자가 그 숫자를 확인할 곳이 없습니다.
 - 대화를 **가장 많이 채운 주제**는 써도 됩니다([오늘 화제어] 상위의 실적호조·AI투자 수준).
 - 하지만 **종목명·계약·발표 같은 구체적인 사건은 쓰지 마세요. 그건 셋째 문단이 맡습니다.**
   여기서 미리 쓰면 두 문단이 같은 말을 두 번 합니다(실제로 그랬습니다).
 - **테마 이야기도 쓰지 마세요. 그건 둘째 문단이 통째로 맡습니다.** 여기는 생태계 전체의
   온도 하나만 말합니다.
-- **[전체] 낙관도 퍼센트는 반드시 한 번 씁니다.** 그 값은 사흘치이고 옆 막대와 같은
+- **[전체] 낙관도 퍼센트는 반드시 한 번 씁니다.** 그 값은 [전체]에 적힌 기간(오늘 포함) 것이고 옆 막대와 같은
   숫자라, 이 문장에서 빠지면 독자가 기댈 숫자가 화면에 없습니다. 오늘 분위기는 구간
-  라벨로 말하고 사흘 값을 숫자로 붙이는 식입니다. **퍼센트는 그 하나뿐입니다.**
+  라벨로 말하고 기간 값을 숫자로 붙이는 식입니다. **퍼센트는 그 하나뿐입니다.**
 - ⚠️ **분석 메시지 건수는 쓰지 마세요**("9,119건을 분석한 결과" 같은 말). 이 문단 바로
   옆에 카드가 자기 건수를 찍는데, **그 카드는 화면을 여는 시점으로 기간을 다시 잡아서 이
   digest 와 하루가 어긋날 수 있습니다.** 두 숫자가 나란히 다르게 보이면 어느 쪽도 못 믿습니다.
@@ -825,7 +854,7 @@ def attach_texts(db, rows: list[dict]) -> None:
 
 
 def base_day_block(
-    all_sent: list[dict], kws: list[dict], latest: str, since: str, end: str
+    all_sent: list[dict], kws: list[dict], latest: str, since: str, end: str, sent_days: list[str]
 ) -> list[str]:
     """기준일 하루의 분위기와 화제어. **퍼센트는 일부러 주지 않는다.**
 
@@ -840,7 +869,11 @@ def base_day_block(
     day = next((r for r in all_sent if r["date"] == latest and r["scope"] == "overall"), None)
     if not day or (day["message_count"] or 0) < BASE_DAY_MIN_MSGS:
         return []
-    win = [r for r in all_sent if since <= r["date"] <= end and r["scope"] == "overall"]
+    # 견주는 상대는 낙관도 창의 **오늘을 뺀 나머지 날**(대개 어제)이다. 예전엔 앞 사흘이었다.
+    others = {d for d in sent_days if d != latest}
+    win = [r for r in all_sent if r["date"] in others and r["scope"] == "overall"]
+    if not win:
+        return []
     day_opt = optimism(day["positive_count"], day["negative_count"])
     win_opt = optimism(
         sum(r["positive_count"] for r in win), sum(r["negative_count"] for r in win)
@@ -850,9 +883,9 @@ def base_day_block(
 
     diff = day_opt - win_opt
     if abs(diff) < BASE_DAY_SAME_BAND:
-        moved = "최근 사흘 평균과 비슷합니다"
+        moved = "이 기간의 다른 날과 비슷합니다"
     else:
-        moved = "최근 사흘 평균보다 " + ("뜨겁습니다" if diff > 0 else "식었습니다")
+        moved = "이 기간의 다른 날보다 " + ("뜨겁습니다" if diff > 0 else "식었습니다")
     lines = [
         "",
         f"[오늘 하루] {latest} · 이 하루만 보면 {tone_label(day_opt)}이고 {moved}.",
@@ -916,6 +949,8 @@ def build_brief_digest(db, latest: str) -> str | None:
     끝을 벽시계로 잡고 있어, 새 데이터 없이 자정에만 하루 굴러 71%(08-02~08-04)를 찍는데
     문장은 66%(08-01~08-03)였다. 그래서 끝점을 이 `latest` 하나로 묶었다.
     """
+    # ⚠️ 두 창이 있다. `since..end`(기준일 뺀 앞 3일)는 **화제어**가 쓰는 창이고, 낙관도와
+    #    테마별 톤은 아래 `sent_days`(오늘+어제, 얇으면 넓힘)를 쓴다 — SENTIMENT_WINDOW_DAYS 주석.
     end = (datetime.fromisoformat(latest).date() - timedelta(days=1)).isoformat()  # 어제
     since = (date.fromisoformat(end) - timedelta(days=WINDOW_OFFSET)).isoformat()
     # 기준일 행도 같이 쓴다(base_day_block). 표가 작아 한 번에 받아 파이썬에서 가른다.
@@ -924,7 +959,9 @@ def build_brief_digest(db, latest: str) -> str | None:
         "telegram_sentiment_daily",
         "date,scope,positive_count,neutral_count,negative_count,message_count",
     )
-    sent = [r for r in all_sent if since <= r["date"] <= end]
+    count_by_date = {r["date"]: r["message_count"] for r in all_sent if r["scope"] == "overall"}
+    sent_days = sentiment_window(count_by_date, latest, SENTIMENT_MIN_MESSAGES)
+    sent = [r for r in all_sent if r["date"] in set(sent_days)]
 
     window: dict[str, Counter] = defaultdict(Counter)
     for r in sent:
@@ -943,7 +980,7 @@ def build_brief_digest(db, latest: str) -> str | None:
     if overall_opt is None:
         return None
     lines = [
-        f"[전체] 최근 {WINDOW_DAYS}일 분석 메시지 {n}건 · "
+        f"[전체] 최근 {len(sent_days)}일({sent_days[0][5:]}~{sent_days[-1][5:]}, 오늘 포함) 분석 메시지 {n}건 · "
         f"낙관도 {overall_opt}% · {tone_label(overall_opt)} "
         f"(낙관 : 비관 = {overall_opt} : {100 - overall_opt})",
         f"  ※ 낙관도는 중립을 뺀 값입니다. 전체의 {overall['neutral'] * 100 // n}%가 중립이라 제외했습니다.",
@@ -1008,7 +1045,7 @@ def build_brief_digest(db, latest: str) -> str | None:
 
     # 오늘치는 섞지 않고 나란히 둔다 — 문장이 인용할 숫자는 위 창 것, 말할 주제는
     # 아래 오늘 것이다(BASE_DAY_MIN_MSGS 주석).
-    lines += base_day_block(all_sent, kws, latest, since, end)
+    lines += base_day_block(all_sent, kws, latest, since, end, sent_days)
     lines += build_news_block(db, latest, since)
     lines += build_schedule_block(db, latest, since)
     return "\n".join(lines)

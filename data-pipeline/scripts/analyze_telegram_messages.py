@@ -54,7 +54,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from anthropic import Anthropic  # noqa: E402
 
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
-from common.supabase_client import get_client, load_keyset  # noqa: E402
+from common.supabase_client import get_client, has_column, load_keyset  # noqa: E402
 
 # Haiku 4.5 — 분류는 대량 호출이라 속도/비용이 중요하고, 3지선다 + 명사 추출 난이도엔
 # 충분하다. (히어로 요약도 같은 모델을 쓴다.)
@@ -150,6 +150,10 @@ SCHEMA = {
 # 이 시간을 넘겨도 안 끝난 배치는 포기한다(결과 보관이 24시간이라 그 뒤엔 기다릴
 # 이유가 없다). 포기하지 않으면 그 메시지들이 영구히 '처리 중'으로 묶인다.
 STALE_HOURS = 26
+
+# migration_065 의 해시 열이 있나. main 이 실행 초에 한 번 묻는다(has_column). 없으면 save_rows
+# 가 해시를 떼고 저장한다 — 마이그레이션이 늦어도 분류는 계속 돈다.
+HAS_HASH_COLUMN = False
 
 URL_RE = re.compile(r"https?://\S+")
 WS_RE = re.compile(r"\s+")
@@ -262,15 +266,21 @@ def build_prompt(batch: list[dict]) -> str:
     return "\n\n".join(parts)
 
 
-def analysis_row(handle: str, message_id: int, result: dict) -> dict:
+def analysis_row(handle: str, message_id: int, result: dict, text_hash: str | None = None) -> dict:
+    """분류 행 하나. `text_hash` 는 본문 해시(body_key) — 센티먼트 집계가 같은 날 같은 본문을
+    한 건으로 세는 데 쓴다(migration_065). 본문이 손에 없으면 None 으로 두고, 그 행은
+    집계에서 중복 판정 없이 그대로 센다."""
     keywords = [k.strip() for k in result.get("keywords", []) if k and k.strip()]
-    return {
+    row = {
         "channel_handle": handle,
         "message_id": message_id,
         "sentiment": result["sentiment"],
         "keywords": keywords[:3],  # 개수 제한은 프롬프트 + 여기서 이중으로
         "model": MODEL,
     }
+    if text_hash:
+        row["text_hash"] = text_hash
+    return row
 
 
 def save_rows(db, rows: list[dict]) -> None:
@@ -290,6 +300,11 @@ def save_rows(db, rows: list[dict]) -> None:
     unique = list({(r["channel_handle"], r["message_id"]): r for r in rows}.values())
     if len(unique) != len(rows):
         print(f"[저장] 같은 메시지에 두 번 매겨진 분류 {len(rows) - len(unique)}건 정리")
+    # 해시 열(migration_065)이 아직 없으면 그 키를 떼고 저장한다 — 없는 열이 한 요청을
+    # 통째로 거절해 분류가 멎는 것보다, 해시 없이 저장하고 뒤에 backfill 로 채우는 게 낫다.
+    if not HAS_HASH_COLUMN:
+        for r in unique:
+            r.pop("text_hash", None)
     for i in range(0, len(unique), 500):
         db.table("telegram_message_analysis").upsert(
             unique[i : i + 500], on_conflict="channel_handle,message_id"
@@ -314,7 +329,7 @@ def print_tone(rows: list[dict], label: str) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def collect_batches(client: Anthropic, db) -> int:
+def collect_batches(client: Anthropic, db, hash_of: dict[tuple[str, int], str] | None = None) -> int:
     inflight, _ = load_inflight(db)
     if not inflight:
         print("[수거] 처리 중인 배치가 없습니다.")
@@ -374,7 +389,11 @@ def collect_batches(client: Anthropic, db) -> int:
                     if not (0 <= i < len(targets)):
                         continue  # 모델이 없는 번호를 냈다
                     handle, mid = targets[i]
-                    rows.append(analysis_row(handle, int(mid), r))
+                    # 수거 시점엔 본문이 손에 없다. main 이 같은 실행에서 읽은 최근 메시지로
+                    # 해시 표를 넘겨 준다 — 그 창(SCAN_DAYS) 밖으로 밀린 글이면 None 이다.
+                    rows.append(
+                        analysis_row(handle, int(mid), r, (hash_of or {}).get((handle, int(mid))))
+                    )
         except Exception as exc:  # noqa: BLE001
             print(f"[수거] {bid} 결과 수신 실패: {type(exc).__name__}: {exc}")
             continue
@@ -449,7 +468,11 @@ def fan_out_duplicates(messages: list[dict], done: dict, candidates: list[dict])
         if label is None:
             remaining.append(m)
             continue
-        copied.append(analysis_row(m["channel_handle"], m["message_id"], label))
+        copied.append(
+            analysis_row(
+                m["channel_handle"], m["message_id"], label, body_key((m.get("text") or "").strip())
+            )
+        )
     return copied, remaining
 
 
@@ -539,15 +562,26 @@ def main() -> None:
 
     db = get_client()
     client = Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
+    global HAS_HASH_COLUMN
+    HAS_HASH_COLUMN = has_column(db, "telegram_message_analysis", "text_hash")
+    if not HAS_HASH_COLUMN:
+        print("[안내] telegram_message_analysis.text_hash 열이 없어 해시 없이 저장합니다(migration_065).")
+
+    # 최근 메시지는 수거·제출 양쪽이 쓴다 — 수거는 여기서 본문 해시를 얻는다(analysis_row).
+    messages = load_recent_messages(db)
+    hash_of = {
+        (m["channel_handle"], m["message_id"]): body_key((m.get("text") or "").strip())
+        for m in messages
+        if (m.get("text") or "").strip()
+    }
 
     # ① 지난 실행이 제출한 배치를 먼저 수거한다.
     if client and not dry_run:
-        collect_batches(client, db)
+        collect_batches(client, db, hash_of)
     if collect_only:
         return
 
     # ② 새로 제출할 것을 고른다.
-    messages = load_recent_messages(db)
     done = load_recent_analysis(db)
     inflight_rows, inflight_keys = load_inflight(db)
     sel = select_candidates(messages, done, inflight_keys)

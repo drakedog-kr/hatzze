@@ -54,6 +54,21 @@ def get_client() -> Client:
     return create_client(SUPABASE_URL, SUPABASE_SECRET_KEY)
 
 
+def has_column(db, table: str, column: str) -> bool:
+    """그 표에 그 열이 있나. **마이그레이션이 아직 안 돌았을 때 파이프라인이 죽지 않게** 쓴다.
+
+    PostgREST 는 없는 열을 select 하면 요청 자체를 거절한다(42703). 열 하나가 더해지는
+    변경은 코드가 먼저 배포되고 SQL 은 사람이 나중에 돌리는 순서가 잦아서, 그 사이 실행이
+    "없는 열" 한 줄로 통째로 멎는다. 한 행만 골라 물어보고 안 되면 없는 것으로 친다 —
+    호출부는 그 열 없이 예전처럼 돈다.
+    """
+    try:
+        db.table(table).select(column).limit(1).execute()
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def load_all(db, table: str, columns: str, order_by: str = "id") -> list[dict]:
     """표 전체를 페이지를 이어 받아 읽는다.
 
