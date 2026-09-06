@@ -67,6 +67,9 @@ jobs:
             gh issue edit "$existing" --body-file /tmp/issue.md
             echo "기존 이슈 #$existing 의 본문을 최신 목록으로 갈아 끼웠습니다"
           else
-            gh issue create --title "$title" --body-file /tmp/issue.md
-            echo "새 이슈를 열었습니다"
+            number=$(gh issue create --title "$title" --body-file /tmp/issue.md | sed 's#.*/##')
+            echo "새 이슈 #$number 를 열었습니다"
           fi
+          # 담당자를 붙인다(daily-update.yml 의 알림들과 같은 이유·같은 안전장치).
+          gh issue edit "${number:-$existing}" --add-assignee "${{ github.repository_owner }}" >/dev/null \
+            || echo "담당자 지정에 실패했습니다 — 이슈는 열려 있습니다"
