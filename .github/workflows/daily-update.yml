@@ -477,6 +477,19 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/calculate_stock_daily.py
 
+      # 급부상 카드에 오른 여섯이 유령인지 본다. 규칙이 제자리에 있나가 아니라 **결과**를
+      # 묻는 검사다 — 종목 추출의 오탐은 지금까지 전부 사람이 화면을 보다가 찾았고
+      # (디바이스·미래산업·카스·아스트·유니온), 규칙을 고치면 순위가 당겨져 **다음 유령이
+      # 그 자리에 올라온다**(2026-09-07 실측: 셋을 빼자 6위에 남성이 앉았다).
+      #
+      # stock_daily 뒤여야 한다 — 카드를 그 표에서 만든다. 걸려도 잡은 계속 흐른다.
+      # ⚠️ 방송 게이트에는 넣지 않는다. 카드 한 장이 수상하다고 그날 방송을 통째로 막는
+      #    건 과하다(check_freshness 는 화면 전체가 낡는 경우라 사정이 다르다).
+      - name: (텔레그램) 급부상 카드 유령 감시
+        id: telegram_phantom
+        continue-on-error: true
+        run: python data-pipeline/scripts/check_phantom_stocks.py
+
       # ── 미장 카더라 ────────────────────────────────────────────────────
       # 같은 메시지를 미국 종목 사전으로 한 번 더 읽는다. 수집을 새로 하지 않는다 —
       # 317개 채널 중 284개가 이미 미국 종목을 말하고 있고, 그중 79%는 제목에
@@ -1158,8 +1171,8 @@ jobs:
         id: telegram_calc_health
         if: always()
         run: |
-          names=("extract_telegram_stocks.py" "calculate_channel_influence.py" "calculate_stock_daily.py" "calculate_telegram_trending.py" "calculate_theme_daily.py" "calculate_telegram_sentiment.py" "generate_telegram_narratives.py" "generate_move_reasons.py" "extract_telegram_events.py")
-          outcomes=("${{ steps.telegram_extract.outcome }}" "${{ steps.telegram_influence.outcome }}" "${{ steps.telegram_stock_daily.outcome }}" "${{ steps.telegram_trending.outcome }}" "${{ steps.telegram_theme_daily.outcome }}" "${{ steps.telegram_sentiment.outcome }}" "${{ steps.telegram_narratives.outcome }}" "${{ steps.telegram_move_reasons.outcome }}" "${{ steps.telegram_events.outcome }}")
+          names=("extract_telegram_stocks.py" "calculate_channel_influence.py" "calculate_stock_daily.py" "check_phantom_stocks.py" "calculate_telegram_trending.py" "calculate_theme_daily.py" "calculate_telegram_sentiment.py" "generate_telegram_narratives.py" "generate_move_reasons.py" "extract_telegram_events.py")
+          outcomes=("${{ steps.telegram_extract.outcome }}" "${{ steps.telegram_influence.outcome }}" "${{ steps.telegram_stock_daily.outcome }}" "${{ steps.telegram_phantom.outcome }}" "${{ steps.telegram_trending.outcome }}" "${{ steps.telegram_theme_daily.outcome }}" "${{ steps.telegram_sentiment.outcome }}" "${{ steps.telegram_narratives.outcome }}" "${{ steps.telegram_move_reasons.outcome }}" "${{ steps.telegram_events.outcome }}")
 
           {
             echo "## 국장 집계"
