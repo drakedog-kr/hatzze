@@ -4819,6 +4819,14 @@ main.hz-scroll { overflow-x: clip; }
   background: transparent;
   padding: 18px 22px;
 }
+/* 미리보기 브리핑 문단의 눈금. **카더라·브리핑의 `.hz-tx-hero-body p` 와 한 벌이다** —
+   같은 자리의 같은 글이 화면마다 다른 크기로 읽히면 안 된다(그 규칙 주석).
+   ⚠️⚠️ TSX 에 인라인 fontSize 로 되살리지 말 것. 인라인은 아래 폰 규칙(≤560)을 이겨서,
+   옆 두 화면이 14.5 로 올라가는 동안 미리보기만 14 에 묶여 있었다(2026-09-07 지적). */
+.hz-tx .hz-hero-wide p {
+  font-size: 14px;
+  line-height: 1.75;
+}
 /* 칸 폭 계산에서 빼 두었던 헤어라인 몫(1·2px)을 되돌린다 — gap 이 그 일을 대신한다. */
 .hz-tx .hz-kd-hero-q { flex: 1 1 calc(25% - 8px); }
 .hz-tx .hz-kd-hero-h { flex: 1 1 calc(50% - 8px); }
@@ -4896,8 +4904,20 @@ main.hz-scroll { overflow-x: clip; }
 }
 
 @media (max-width: 900px) {
-  .hz-tx .hz-kd-hero { padding: 10px; gap: 8px; }
-  .hz-tx .hz-kd-hero > * { padding: 16px; }
+  /* ⚠️⚠️ **트레이 여백을 줄일 땐 두 판을 같이 줄인다.** 3분할 히어로는 판이 둘이다 —
+     내부자·종목·인물이 쓰는 `.hz-kd-hero` 와 국장 미리보기가 쓰는 `.hz-hero-panel`.
+     여기 `.hz-kd-hero` 만 적혀 있어서 미리보기만 데스크톱 값(판 14 + 칸 22 = 36)을
+     끝까지 들고 갔고, 같은 자리의 '오늘의 브리핑' 글 폭이 화면마다 달랐다
+     (2026-09-07 지적·실측 375px: 브리핑·카더라 317 · 내부자 289 · 미리보기 277). */
+  .hz-tx .hz-kd-hero,
+  .hz-tx .hz-hero-panel { padding: 10px; gap: 8px; }
+  .hz-tx .hz-kd-hero > *,
+  .hz-tx .hz-hero-cell { padding: 16px; }
+  /* ⚠️ 넓은 칸(글 칸)은 **따로 적어야 준다.** 위 `> *` 는 클래스 둘이라 스코프의
+     `.hz-tx .hz-kd-hero > .hz-kd-hero-h`(클래스 셋)한테 진다 — 트레이만 좁아지고 글 칸
+     좌우 22 는 그대로 남아, 3분할 두 화면끼리도 12px 어긋나 있었다. */
+  .hz-tx .hz-kd-hero > .hz-kd-hero-h,
+  .hz-tx .hz-hero-panel > .hz-hero-wide { padding: 16px; }
   .hz-tx .hz-kd-hero + .hz-sheet-foot { padding: 0 16px 16px; }
 }
 
@@ -4909,7 +4929,10 @@ main.hz-scroll { overflow-x: clip; }
   .hz-tx { gap: 14px; }
   /* 34 → 27 → 23. 화면 제목(24)보다 작아야 하는 건 넓은 화면과 같은 규칙이다. */
   .hz-tx-hero-title { font-size: 23px; margin-bottom: 4px; }
-  .hz-tx-hero-body p { font-size: 14.5px; line-height: 1.75; }
+  /* ⚠️ 미리보기의 브리핑 문단도 **같은 줄에서** 올린다. 한쪽만 적으면 폰에서 갈라진다 —
+     여백 규칙이 판 하나를 빠뜨려 글 폭이 어긋났던 것과 같은 실수다(≤900 주석). */
+  .hz-tx-hero-body p,
+  .hz-tx .hz-hero-wide p { font-size: 14.5px; line-height: 1.75; }
   .hz-tx-hero-main { gap: 12px; }
   /* 눈썹 줄은 두 덩이가 한 줄에 못 든다 — 기준 시각을 아랫줄로 내린다. */
   .hz-tx-eyebrow { flex-wrap: wrap; gap: 4px 10px; }
@@ -4931,9 +4954,13 @@ main.hz-scroll { overflow-x: clip; }
   .hz-tx .hz-sheet-head-ico > .ms { font-size: 18px; }
   .hz-tx .hz-sheet-head-title { font-size: 15.5px; line-height: 19px; }
   .hz-tx .hz-sheet-head-desc { font-size: 12.5px; line-height: 17px; }
-  /* 히어로 타일도 여백을 줄인다(3분할 히어로를 쓰는 화면들). */
-  .hz-tx .hz-kd-hero { padding: 8px; gap: 8px; }
-  .hz-tx .hz-kd-hero > * { padding: 14px 14px; }
+  /* 히어로 타일도 여백을 줄인다(3분할 히어로를 쓰는 화면들 — 판이 둘이다. ≤900 주석 참고). */
+  .hz-tx .hz-kd-hero,
+  .hz-tx .hz-hero-panel { padding: 8px; gap: 8px; }
+  .hz-tx .hz-kd-hero > *,
+  .hz-tx .hz-hero-cell { padding: 14px; }
+  .hz-tx .hz-kd-hero > .hz-kd-hero-h,
+  .hz-tx .hz-hero-panel > .hz-hero-wide { padding: 14px; }
   .hz-tx .hz-kd-hero + .hz-sheet-foot { padding: 0 14px 14px; }
   .hz-tx-tile { padding: 14px 14px; }
   .hz-tx-hero-main { padding: 18px 16px 16px; }
