@@ -19,6 +19,8 @@
       "SK 하이닉스"  → 붙이면 사전에 있는 더 긴 종목명 → 그 종목(SK하이닉스)으로 인정
       "SK hynix"    → 뒤가 로마자(영문 병기·해외 자회사명: SK On) → 거부
       "SK 그룹"      → 그룹 전체 지칭(config.GROUP_SUFFIXES) → 거부
+일반어와 글자가 같아 자리로는 못 가르는 이름은 메시지 전체에서 단서를 본다
+("남성"은 여성이 나오는 글이면 종목이 아니다 — config.HOMONYM_CUES).
 합성어의 꼬리로 쓰이는 이름은 **앞**에 띄어쓴 낱말까지 본다("뷰티 디바이스" → 거부).
 위 경계 규칙이 앞은 붙어 있는 한 글자만 보므로 이 자리가 비어 있었다(modifier_context 참고).
 우선주(…우) 등 파생 종목은 사전에서 제외해 잡음을 줄인다.
@@ -51,6 +53,7 @@ from config.stock_extraction import (  # noqa: E402
     EXCLUDE_NAMES,
     GROUP_SUFFIXES,
     HEAD_NOUN_NAMES,
+    HOMONYM_CUES,
     JOSA,
     JOSA_HEAD,
     JOSA_TRAILING,
@@ -313,6 +316,11 @@ def extract(text: str, pattern, match_to_code, method, ambiguous, caseless) -> d
     # 자세한 근거와 실측은 config.US_TICKER_COLLISION 주석.
     us_collision = {
         name for name, cues in US_TICKER_COLLISION.items() if any(c in text for c in cues)
+    }
+    # 국내 일반어와 글자가 같은 이름도 같은 방식으로 가른다("남성" ← 여성이 나오는 글).
+    # 자리로는 못 가르는 이름이라 메시지 전체를 본다(config.HOMONYM_CUES 주석).
+    us_collision |= {
+        name for name, cues in HOMONYM_CUES.items() if any(c in text for c in cues)
     }
 
     found: dict[str, tuple[str, str]] = {}
