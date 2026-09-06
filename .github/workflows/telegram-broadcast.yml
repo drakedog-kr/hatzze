@@ -242,6 +242,12 @@ jobs:
             gh issue comment "$existing" --body "$note"
             echo "기존 알림 이슈 #$existing 에 코멘트 추가"
           else
-            gh issue create --title "$title" --body "$note"
-            echo "새 알림 이슈 생성"
+            number=$(gh issue create --title "$title" --body "$note" | sed 's#.*/##')
+            echo "새 알림 이슈 #$number 생성"
           fi
+          # 담당자를 붙인다. 저장소 watch 설정과 무관하게 '나에게 할당됨'으로 뜨고 알림이
+          # 간다 — 여기 이슈는 봇이 열고 라벨도 멘션도 없어서, 안 붙이면 닿는지 여부가
+          # 전적으로 그 설정에 달린다.
+          # ⚠️ 실패해도 이슈는 남긴다. 알림 통로를 넓히려다 이슈 자체를 잃으면 본말이 뒤집힌다.
+          gh issue edit "${number:-$existing}" --add-assignee "${{ github.repository_owner }}" >/dev/null \
+            || echo "담당자 지정에 실패했습니다 — 이슈는 열려 있습니다"
