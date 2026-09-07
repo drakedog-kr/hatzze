@@ -55,11 +55,38 @@ MODEL = KR.MODEL
 TABLE = "telegram_stock_move_reason"
 
 MIN_DAY_MSGS = 1500   # 그날 본문 있는 메시지가 이 아래면(아침 실행) 만들지 않는다
-MIN_CHANNELS = 2      # 한 채널만 말한 종목은 후보가 아니다(복붙 코퍼스라 한 채널은 근거가 아니다)
+# 이 채널 수 미만은 후보가 아니다. 복붙 코퍼스라 한두 채널은 근거가 아니다.
+#
+# ⚠️ 2 였다가 3 으로 올렸다(2026-09-07 실전). 채널 2곳짜리 종목은 그날 글이 **상승률 순위
+#    나열과 공시 알림뿐**이라 이유가 될 문장이 없는데, 상한가면 등락 표기로 후보 상위에
+#    올라온다. 그러면 모델이 발췌에서 유일하게 내용이 있는 공시 제목을 이유 자리에 넣는다 —
+#    화면에 `신라에스지 ▲30.00% · 시가총액 미달에 따른 상장폐지 우려 관련 안내` 가 떴다.
+#    실측: 09-07 후보 40 중 채널 2곳이 5종목이고, 3 으로 올려도 오른 종목이 34개라 카드 9장이 찬다.
+MIN_CHANNELS = 3
 QUOTED_MIN = 7.0      # 채널 글의 등락 표기가 이만큼은 돼야 '크게 움직인' 후보
 HEAVY_N = 15          # 등락 표기가 없어도 그날 주목도 상위 N 은 후보(대형주는 %를 잘 안 적는다)
 CAP = 40              # 하루 최대 후보. 화면은 12줄부터 보여주고 더 보기로 연다
 EXCERPTS = 8          # 종목당 발췌 건수
+
+# ── 발췌에서 빼는 글: 이유가 없는 순위 나열 ──────────────────────────────────
+#
+# `[KRX 상승률 TOP10] … 1) 신라에스지 (30.00% / 2억) 2) …` 꼴은 **무엇이 얼마나 올랐나만**
+# 적혀 있고 왜 올랐는지가 없다. 그런데 시간마다 올라와 얇은 종목의 발췌를 통째로 차지하고,
+# 남는 게 없으니 모델이 옆에 있던 공시 제목까지 끌어와 이유로 쓴다(위 MIN_CHANNELS 주석).
+#
+# ⚠️ **이유가 붙은 목록까지 죽이면 안 된다.** `주요 상승 종목 현황 … 스카이랩스 +78.2% -
+#    반지형 혈압계 상장 이슈` 같은 글이 이 카드의 가장 좋은 재료다. 그래서 머리글로 거르되
+#    **항목마다 서술이 붙어 있으면 남긴다.**
+#    실측(7일 25,426건): 머리글 일치 45건 중 서술이 붙은 것은 1건뿐이고, 이유를 담은
+#    '주요 상승 종목 현황·특징주' 330건은 **하나도 안 걸린다.**
+_RANK_HEAD = re.compile(r"상승률\s*TOP|등락률\s*TOP|하락률\s*TOP|\[KRX\s*상승률|TOP\s*10\]")
+_ITEM_REASON = re.compile(r"[)\d%]\s*[-–—]\s*[가-힣]{4,}")
+
+
+def bare_ranking(text: str) -> bool:
+    """이유 없는 순위 나열인가. 항목마다 서술이 붙어 있으면 아니다."""
+    flat = " ".join((text or "").split())
+    return bool(_RANK_HEAD.search(flat)) and not _ITEM_REASON.search(flat)
 BATCH = 5             # 호출당 종목 수. 시스템 프롬프트 한 번에 다섯 종목을 읽힌다
 REASON_LEN = (12, 45)
 TEXT_CHUNK = 50       # `.in_()` 목록 길이(generate_telegram_narratives.TEXT_CHUNK 과 같은 이유)
@@ -404,7 +431,7 @@ def run_market(db, client, cfg: dict, day: str, dry_run: bool) -> int:
         for mk, needle in sorted(lst, key=rank):
             m = msgs[mk]
             t = m.get("text") or ""
-            if not t.strip():
+            if not t.strip() or bare_ranking(t):
                 continue
             k = re.sub(r"[^0-9A-Za-z가-힣]", "", t)[:80]
             if k in seen:
@@ -453,6 +480,21 @@ def run_market(db, client, cfg: dict, day: str, dry_run: bool) -> int:
         print(f"  [{tag} {name}] {('표기 ' + str(quoted[code])) if quoted.get(code) is not None else '표기 없음'} · {r or '(까닭 없음)'}")
     if out_rows:
         db.table(cfg["table"]).upsert(out_rows, on_conflict=f"date,{key}").execute()
+
+    # ⚠️⚠️ **그날 후보에서 빠진 행은 지운다.** upsert 만 하면 옛 실행이 넣은 행이 그대로 남고,
+    #    화면은 그 날짜의 행을 전부 읽어 등락 순으로 세우므로 **유령이 카드에 계속 뜬다.**
+    #    2026-09-07 에 문턱을 2 → 3 으로 올리고 다시 돌렸는데 표가 40 → 45행이 되고 걸러냈어야
+    #    할 두 종목이 그대로 카드에 남아 있었다(신라에스지·케이엠제약). 규칙을 바꿔도 화면이
+    #    안 바뀌면 여기를 볼 것 — 이 표는 '그날 것을 다시 만든다'가 아니라 '덮어쓴다' 였다.
+    keep = {r[key] for r in out_rows}
+    stale = [
+        r[key]
+        for r in (db.table(cfg["table"]).select(key).eq("date", day).range(0, 999).execute().data or [])
+        if r[key] not in keep
+    ]
+    if stale:
+        db.table(cfg["table"]).delete().eq("date", day).in_(key, stale).execute()
+        print(f"[정리] 후보에서 빠진 {len(stale)}행 삭제")
     print(f"[Supabase] {cfg['table']} {len(out_rows)}행 저장 (까닭 있음 {sum(1 for r in out_rows if r['reason'])})")
     return len(out_rows)
 

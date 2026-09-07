@@ -50,7 +50,7 @@ export type UsMoveReasonBoard = { date: string; rows: UsMoveReasonRow[] };
 /** 표에서 읽어 오는 최대 줄 수. 파이프라인 상한(generate_move_reasons.CAP)과 같다 */
 const BOARD_MAX = 40;
 /** 그중 야후 일봉을 실제로 부르는 줄 수. 국내와 같은 이유·같은 값(lib/kadera-why.ts QUOTE_ROWS) */
-const QUOTE_ROWS = 16;
+const QUOTE_ROWS = 24;
 /** 기준일에서 이보다 오래된 까닭은 카드에 안 올린다(주말·연휴는 사흘까지 거슬러 본다) */
 const BOARD_STALE_DAYS = 3;
 
