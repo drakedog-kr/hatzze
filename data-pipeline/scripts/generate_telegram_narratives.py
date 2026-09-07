@@ -1,14 +1,20 @@
 """집계 결과를 LLM(Claude Haiku)으로 문장화해 카더라 리포트 카드에 넣는다.
 
-  telegram_daily_brief.sentiment_summary : 히어로 '오늘의 요약' 총평(3대목 · 빈 줄로 이어 붙인다)
+  telegram_daily_brief.sentiment_summary : 히어로 '오늘의 요약' 총평(빈 줄로 이어 붙인다)
   telegram_stock_narrative.narrative     : 주요 종목 리포트의 흐름 요약(종목당 75~80자)
 
-총평의 세 대목은 각자 다른 재료를 맡는다. 한 대목을 늘리려 하지 말고, 남는 재료가
+총평의 대목들은 각자 다른 재료를 맡는다. 한 대목을 늘리려 하지 말고, 남는 재료가
 있으면 대목을 새로 낼 것 — 재료가 없는 대목은 길이를 올려도 안 늘어난다(BRIEF_*_LEN 주석).
 
   ① 분위기     [오늘 하루] + [전체] 낙관도·추이           100~115자 · 2문장
   ② 오늘 새 화제 [오늘 새로 오른 화제어] + [테마별] 건수     150~170자 · 2문장
   ③ 이야기     [오늘 오간 이야기] 발췌 + [화제 종목]       185~210자 · 3문장
+  ④ 일정      [오간 앞으로의 일정] 발췌                  110~165자 · 2문장
+
+④는 **재료가 있는 날만** 붙어서, 총평은 세 대목인 날과 네 대목인 날이 있다.
+
+⚠️ 한 대목은 **한 문단**이다. 모델이 그 약속을 깨고 총평 전체를 써 보내는 날이 있어,
+   어느 문단이 이 대목의 몫인지는 코드가 고른다(brief_body).
 
 ## 숫자는 창 것, 주제는 오늘 것
 
@@ -226,6 +232,11 @@ BRIEF_NEWS_LEN = (185, 210)
 # 자리가 없어서가 아니라 할 말이 그만큼 없어서다.
 BRIEF_SCHEDULE_LEN = (110, 165)
 BRIEF_RETRIES = 4
+# 총평 한 대목의 응답 상한. 대목 하나는 210자면 끝나니 400 이면 넉넉해 보이지만,
+# **모델이 총평 네 대목을 통째로 써 보내는 날**(brief_body 주석)에는 거기 걸려 마지막
+# 문장이 잘린 채 온다(2026-09-07 미장 실측 8회 중 1회). 잘린 문단이 곧 우리가 고른
+# 문단이라 화면에 그대로 나간다. 여유를 줘서 자르는 일은 코드(first_sentences)만 하게 한다.
+BRIEF_MAX_TOKENS = 800
 
 COMMON = """\
 당신은 한국 주식 텔레그램 채널들을 분석하는 대시보드 '카더라 리포트'의 문장을 쓰는 작성자입니다.
@@ -498,6 +509,35 @@ THEME_TOP_N = 4
 # 근거는 그 파일 주석 참고. **원문(digest)을 함께 넘겨야** 어절 검사까지 돈다.
 
 
+# 문장 경계. '문장부호 + 공백'에서만 나눠 소수점(94.5%)·날짜(07-26)를 피하고,
+# **로마자 뒤의 마침표에서는 나누지 않는다**(`Absolics Inc.` · `U.S.` · `Corp.`).
+#
+# ⭐ 2026-09-07 국장 넷째 대목이 "SKC는 11월 24일 반도체 글라스기판 제조사 Absolics Inc."
+#    에서 끊긴 채 저장됐다. 모델은 문장을 끝까지 썼는데 `Inc.` 다음 공백을 문장 끝으로
+#    읽어 뒷부분을 통째로 버린 것이다. 총평은 COMMON 이 '~습니다'를 강제하므로 진짜
+#    문장 끝은 늘 한글이다 — 로마자 뒤 마침표는 약어이지 문장 끝이 아니다.
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])(?<![A-Za-z]\.)\s+")
+
+# 문단 경계(빈 줄). 한 대목은 **한 문단**이다.
+_PARAGRAPH_SPLIT = re.compile(r"\n\s*\n")
+
+
+def split_paragraphs(text: str) -> list[str]:
+    """빈 줄로 나눈 문단 목록. 빈 문단은 버린다."""
+    return [p.strip() for p in _PARAGRAPH_SPLIT.split(text.strip()) if p.strip()]
+
+
+# 대목이 **문장을 끝까지 썼는지**. COMMON 이 '~습니다'를 강제하니 끝은 늘 한글 + 마침표다.
+# 로마자로 끝나면(`… Absolics Inc.`) 약어에서 잘린 것이고, 부호가 아예 없으면
+# (`… 보도가`) 모델이 max_tokens 에 걸려 멎은 것이다. 둘 다 화면에서는 똑같이
+# '말하다 만 문장'으로 읽힌다.
+_FINISHED = re.compile(r"[가-힣][.!?]$")
+
+
+def sentence_finished(text: str) -> bool:
+    return bool(_FINISHED.search((text or "").strip()))
+
+
 def first_sentences(text: str, limit: int) -> str:
     """앞에서 limit 문장까지만 남긴다. 모델이 끝없이 붙이는 걸 코드에서 막는 장치다.
 
@@ -509,9 +549,12 @@ def first_sentences(text: str, limit: int) -> str:
     그래서 limit 은 슬롯마다 다르다(BRIEF_SENTENCE_CAP). 레이아웃을 정하는 건 문장 수가
     아니라 길이라, 길이(BRIEF_*_LEN)로 잡고 문장 수는 폭주만 막는 선에서 둔다.
 
-    소수점(94.5%)이나 날짜(07-26)에서 잘리지 않도록 '문장부호 + 공백'에서만 나눈다.
+    ⚠️ **문단을 넘어가며 세지 않는다.** 문단 경계의 빈 줄도 `\\s+` 라, 예전엔 모델이 두
+    문단을 보내면 첫 문단의 문장과 둘째 문단의 문장이 한 줄로 이어 붙었다. 어느 문단을
+    쓸지는 brief_body 가 먼저 고르고, 여기는 그 한 문단 안에서만 센다.
     """
-    parts = re.split(r"(?<=[.!?])\s+", text.strip())
+    body = split_paragraphs(text)
+    parts = _SENTENCE_SPLIT.split(body[0]) if body else []
     return " ".join(p.strip() for p in parts[:limit] if p.strip())
 
 
@@ -622,14 +665,47 @@ NEWS_SCHEDULE_NOTE = (
 # 모델이 일정 재료를 두고 첫째·둘째 대목 요약을 되풀이한 것이다(2026-09-06 저녁 미장 실행:
 # 재료 8건이 있었는데 "최근 3일간 낙관도가 76%로 우세를…"를 냈다). 어제 시험 10회는 전부
 # 정상이었으니 실행마다 어쩌다 한 번 나는 종류라, 프롬프트가 아니라 **검사**로 막는다.
+#
+# ⚠️ 맨 날짜(`\d{1,2}일`)를 표지로 삼지 않는다. **분위기 요약이 바로 그렇게 말한다** —
+#    "최근 3일 미국 종목 관련 이야기에서…"의 '3일'이 표지로 잡혀 검사를 그냥 통과했다
+#    (2026-09-07 실측 8회 중 2회). 앞날의 날짜는 거의 늘 '9월 21일'처럼 월이 붙거나
+#    '오는 10일'로 온다.
 _SCHED_MARK = re.compile(
-    r"\d{1,2}월\s*\d{1,2}일|\d{1,2}일\b|다음\s*주|내주|예정|앞두|앞둔|청약|만기|편입|리밸런싱|상장|기준일"
+    r"\d{1,2}월\s*\d{1,2}일|오는\s*\d{1,2}일|다음\s*주|내주|예정|앞두|앞둔|청약|만기|편입|리밸런싱|상장|기준일"
 )
 
 
 def schedule_like(text: str) -> bool:
     """넷째 대목이 일정 이야기를 담고 있나. 표지 하나면 통과 — 걸러야 할 건 아예 없는 경우다."""
     return bool(_SCHED_MARK.search(text or ""))
+
+
+def brief_body(text: str, key: str) -> str:
+    """총평 한 대목이 쓸 **문단 하나**를 고른다.
+
+    한 대목은 한 문단이고 COMMON 도 "머리말 없이 지시된 문장만"이라고 적어 뒀는데,
+    모델이 그 약속을 깨고 **총평 네 대목을 통째로** 써 보내는 일이 있다. 실측
+    (2026-09-07 기준일 digest · 대목마다 6회):
+
+        국장  분위기 2/6 · 테마 0/6 · 이야기 0/6 · 일정 2/6 이 여러 문단
+        미장  일정 8/8 이 여러 문단  ← 넷째 대목이 프로덕션에서 한 번도 안 나온 까닭
+
+    여러 문단으로 올 때 모델은 늘 **총평 순서대로**(분위기 → 테마 → 이야기 → 일정)
+    쓴다. 그러니 앞 세 대목은 첫 문단이 제 몫이고, 넷째 대목만 뒤쪽 문단이다.
+    넷째는 자리 대신 **내용으로** 고른다 — 일정 표지가 있는 마지막 문단이다.
+    (앞 문단이 "최근 3일"처럼 표지를 흉내 내도 뒤쪽을 집으므로 안 밀린다.)
+
+    ⛔ 프롬프트로 막지 않는 이유: COMMON 의 "[출력] 설명·머리말 없이"가 이미 그 말이고,
+       그런데도 미장은 8/8 로 어겼다. 대목 수를 코드가 결정적으로 못박는 것은 이 파일이
+       처음부터 쓰던 방식이다(first_sentences 주석).
+    """
+    paras = split_paragraphs(text)
+    if not paras:
+        return ""
+    if key != "schedule":
+        return paras[0]
+    hits = [p for p in paras if schedule_like(p)]
+    return hits[-1] if hits else paras[-1]
 
 
 def schedule_prefilter(base: date) -> str:
@@ -1516,9 +1592,9 @@ def main() -> None:
         return "".join(b.text for b in resp.content if b.type == "text").strip()
 
     def ask_brief_sentence(
-        system: str, digest: str, length: tuple[int, int], sentences: int
+        system: str, digest: str, length: tuple[int, int], sentences: int, key: str
     ) -> str:
-        """총평 한 대목 — 앞 sentences 문장만 남기고, 길이가 벗어나면 다시 쓰게 한다.
+        """총평 한 대목 — 제 문단을 골라 앞 sentences 문장만 남기고, 길이가 벗어나면 다시 쓰게 한다.
 
         문장 **수**만 고정하고 길이를 안 잡았더니 73자와 207자 사이를 오갔다. 카드가
         고정 높이라 짧으면 상자 아래가 비어 "한 줄이 다냐"가 된다. 종목 요약과 같은
@@ -1527,17 +1603,26 @@ def main() -> None:
         **다시 쓰라는 말에도 문장 수를 적는다.** 안 적으면 모델이 첫 응답의 문장 수를
         잊고 길이만 맞추려다 한 문장에 몰아 쓴다(그러면 first_sentences 가 자르지도
         못하고 만연체만 남는다).
+
+        **key 는 어느 문단이 제 몫인지 고르는 데 쓴다**(brief_body). 재시도에서도 같이
+        골라야 한다 — 다시 쓸 때도 모델은 같은 식으로 문단을 덧붙인다.
         """
         lo, hi = length
         how_many = {1: "한 문장", 2: "한두 문장", 3: "두세 문장"}.get(sentences, f"{sentences}문장 이내")
-        candidates = [first_sentences(ask(system, digest), sentences)]
+        candidates = [first_sentences(brief_body(ask(system, digest, BRIEF_MAX_TOKENS), key), sentences)]
         for _ in range(BRIEF_RETRIES):
             cur = candidates[-1]
             # 길이가 맞아도 글자가 깨졌거나 오타가 있으면 다시 쓴다(common/text_check.py).
             found = problems(cur, digest)
-            if lo <= len(cur) <= hi and not found:
+            if lo <= len(cur) <= hi and not found and sentence_finished(cur):
                 break
-            if found:
+            if not sentence_finished(cur):
+                print(f"[WARNING] 문장이 끝나지 않아 다시 씁니다: …{cur[-30:]}")
+                fix = (
+                    f"방금 쓴 문장이 끝나지 않았습니다. 같은 뜻으로 **{how_many}**으로, "
+                    f"{lo}~{hi}자 안에서 **문장을 끝까지** 다시 써 주세요.\n\n{digest}"
+                )
+            elif found:
                 print(f"[WARNING] 문장을 버리고 다시 씁니다({' · '.join(found)}): {cur[:40]}…")
                 fix = f"방금 쓴 문장에 깨진 글자나 오타가 있습니다. 같은 뜻으로 **{how_many}**으로 다시 써 주세요.\n\n{digest}"
             else:
@@ -1547,13 +1632,17 @@ def main() -> None:
                     f"{lo}~{hi}자로 **{how_many}**으로 다시 써 주세요.\n\n"
                     f"{digest}\n\n[방금 쓴 문장]\n{cur}"
                 )
-            candidates.append(first_sentences(ask(system, fix), sentences))
+            candidates.append(first_sentences(brief_body(ask(system, fix, BRIEF_MAX_TOKENS), key), sentences))
         # 깨진 후보는 길이가 맞아도 안 쓴다 — 길이는 어긋나도 읽히지만 깨진 글자는 못 읽는다.
         usable = [t for t in candidates if t.strip() and is_clean(t, digest)] or [
             t for t in candidates if t.strip()
         ]
         if not usable:
             return ""
+        # 끝맺은 후보가 하나라도 있으면 그것들 중에서만 고른다 — 길이가 어긋나도 읽히지만
+        # 말하다 만 문장은 못 읽는다(2026-09-07 국장 넷째 대목이 그렇게 저장됐다).
+        finished = [t for t in usable if sentence_finished(t)]
+        usable = finished or usable
         in_goal = [t for t in usable if lo <= len(t) <= hi]
         if in_goal:
             return in_goal[0]
@@ -1588,7 +1677,7 @@ def main() -> None:
                 slots.append(("schedule", BRIEF_SCHEDULE_SYSTEM, BRIEF_SCHEDULE_LEN))
             paragraphs = []
             for key, system, length in slots:
-                text = ask_brief_sentence(system, brief_digest, length, BRIEF_SENTENCE_CAP[key])
+                text = ask_brief_sentence(system, brief_digest, length, BRIEF_SENTENCE_CAP[key], key)
                 if key == "schedule" and not schedule_like(text):
                     # 일정 재료를 두고 요약을 되풀이한 것이다(schedule_like 주석). 한 번 더 시키고,
                     # 그래도 아니면 이 대목을 뺀다 — 없는 편이 틀린 것보다 낫다.
@@ -1596,7 +1685,7 @@ def main() -> None:
                     text = ask_brief_sentence(
                         system + "\n\n[다시 쓰기] 방금 쓴 문장은 일정이 아니라 분위기 요약이었습니다. "
                         "[오간 앞으로의 일정] 발췌에 적힌 **날짜·예정된 일**만으로 다시 쓰세요.",
-                        brief_digest, length, BRIEF_SENTENCE_CAP[key],
+                        brief_digest, length, BRIEF_SENTENCE_CAP[key], key,
                     )
                     if not schedule_like(text):
                         print("[WARNING] 넷째 대목이 여전히 일정이 아니라 뺍니다.")

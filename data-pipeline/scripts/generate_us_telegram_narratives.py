@@ -1,17 +1,22 @@
 """미장 집계를 LLM(Claude Haiku)으로 문장화해 미장 카더라 카드에 넣는다.
 
-  telegram_us_daily_brief.sentiment_summary : '오늘의 요약' 총평(3대목 · 빈 줄로 이어 붙인다)
+  telegram_us_daily_brief.sentiment_summary : '오늘의 요약' 총평(빈 줄로 이어 붙인다)
   telegram_us_stock_narrative.narrative     : 주요 종목 리포트의 흐름 요약(종목당 75~80자)
 
 국내 짝은 `generate_telegram_narratives.py`. **그 파일을 고치지 않는다** — 매일 도는
 검증된 경로이고, 히어로·종목 리포트 문장은 손대지 않기로 정해 둔 자리다.
 길이·재시도·검수(common/text_check) 같은 기계는 그대로 베끼고 재료만 미국 것으로 바꾼다.
 
-## 세 대목이 맡는 재료 (국내와 같은 얼개다)
+## 대목이 맡는 재료 (국내와 같은 얼개다)
 
   ① 분위기   [오늘 하루] + [전체] 낙관도·추이        100~115자 · 2문장
   ② 테마 지형 [오늘 테마별] 몫 + [미장 쏠림 화제어]   150~170자 · 2문장
   ③ 이야기   [오늘 오간 이야기] 발췌 + [화제 종목]    185~210자 · 3문장
+  ④ 일정     [오간 앞으로의 일정] 발췌               110~165자 · 2문장
+
+④는 재료가 있는 날만 붙는다. 국내와 달리 이쪽은 모델이 **거의 늘** 앞 대목 요약을
+한 문단 먼저 쓴 뒤에 일정을 쓴다(실측 8/8). 그래서 어느 문단이 넷째 대목의 몫인지는
+코드가 고른다(generate_telegram_narratives.brief_body).
 
 **숫자는 창 것, 주제는 오늘 것이다.** 화면 라벨이 '오늘의 요약'인데 셋째 대목까지 사흘
 창에서 뽑고 있었다. 실측(2026-08-22 기준, 최근 아홉 개 기준일): 발췌 6건 중 기준일 것이
@@ -60,6 +65,7 @@ from common.timeutil import KST  # noqa: E402
 # 국내 스크립트에서 그대로 가져다 쓰는 기계. 길이 규칙·문장 자르기·낙관도 평활은
 # 두 화면이 같아야 하고, 손으로 베끼면 한쪽만 고쳤을 때 조용히 갈린다.
 from generate_telegram_narratives import (  # noqa: E402
+    BRIEF_MAX_TOKENS,
     BRIEF_NEWS_LEN,
     BRIEF_RETRIES,
     BRIEF_SCHEDULE_LEN,
@@ -79,6 +85,7 @@ from generate_telegram_narratives import (  # noqa: E402
     SCHEDULE_CHARS,
     SCHEDULE_EXCERPTS,
     SENTIMENT_WINDOW_DAYS,
+    brief_body,
     excerpt,
     first_sentences,
     kst_date,
@@ -86,6 +93,7 @@ from generate_telegram_narratives import (  # noqa: E402
     schedule_hit,
     schedule_like,
     schedule_lines,
+    sentence_finished,
     sentiment_window,
     tone_label,
 )
@@ -614,17 +622,25 @@ def main() -> None:
         )
         return "".join(b.text for b in resp.content if b.type == "text").strip()
 
-    def ask_brief_sentence(system: str, digest: str, length: tuple[int, int], sentences: int) -> str:
+    def ask_brief_sentence(
+        system: str, digest: str, length: tuple[int, int], sentences: int, key: str
+    ) -> str:
         """총평 한 대목. 국내 ask_brief_sentence 와 같은 규칙이다."""
         lo, hi = length
         how_many = {1: "한 문장", 2: "한두 문장", 3: "두세 문장"}.get(sentences, f"{sentences}문장 이내")
-        candidates = [first_sentences(ask(system, digest), sentences)]
+        candidates = [first_sentences(brief_body(ask(system, digest, BRIEF_MAX_TOKENS), key), sentences)]
         for _ in range(BRIEF_RETRIES):
             cur = candidates[-1]
             found = problems(cur, digest)
-            if lo <= len(cur) <= hi and not found:
+            if lo <= len(cur) <= hi and not found and sentence_finished(cur):
                 break
-            if found:
+            if not sentence_finished(cur):
+                print(f"[WARNING] 문장이 끝나지 않아 다시 씁니다: …{cur[-30:]}")
+                fix = (
+                    f"방금 쓴 문장이 끝나지 않았습니다. 같은 뜻으로 **{how_many}**으로, "
+                    f"{lo}~{hi}자 안에서 **문장을 끝까지** 다시 써 주세요.\n\n{digest}"
+                )
+            elif found:
                 print(f"[WARNING] 문장을 버리고 다시 씁니다({' · '.join(found)}): {cur[:40]}…")
                 fix = f"방금 쓴 문장에 깨진 글자나 오타가 있습니다. 같은 뜻으로 **{how_many}**으로 다시 써 주세요.\n\n{digest}"
             else:
@@ -634,12 +650,16 @@ def main() -> None:
                     f"{lo}~{hi}자로 **{how_many}**으로 다시 써 주세요.\n\n"
                     f"{digest}\n\n[방금 쓴 문장]\n{cur}"
                 )
-            candidates.append(first_sentences(ask(system, fix), sentences))
+            candidates.append(first_sentences(brief_body(ask(system, fix, BRIEF_MAX_TOKENS), key), sentences))
         usable = [t for t in candidates if t.strip() and is_clean(t, digest)] or [
             t for t in candidates if t.strip()
         ]
         if not usable:
             return ""
+        # 끝맺은 후보가 하나라도 있으면 그것들 중에서만 고른다 — 길이가 어긋나도 읽히지만
+        # 말하다 만 문장은 못 읽는다(2026-09-07 국장 넷째 대목이 그렇게 저장됐다).
+        finished = [t for t in usable if sentence_finished(t)]
+        usable = finished or usable
         in_goal = [t for t in usable if lo <= len(t) <= hi]
         if in_goal:
             return in_goal[0]
@@ -659,7 +679,7 @@ def main() -> None:
                 slots.append(("schedule", BRIEF_SCHEDULE_SYSTEM, BRIEF_SCHEDULE_LEN))
             paragraphs = []
             for key, system, length in slots:
-                text = ask_brief_sentence(system, brief_digest, length, BRIEF_SENTENCE_CAP[key])
+                text = ask_brief_sentence(system, brief_digest, length, BRIEF_SENTENCE_CAP[key], key)
                 if key == "schedule" and not schedule_like(text):
                     # 일정 재료를 두고 요약을 되풀이한 것이다(schedule_like 주석). 한 번 더 시키고,
                     # 그래도 아니면 이 대목을 뺀다 — 없는 편이 틀린 것보다 낫다.
@@ -667,7 +687,7 @@ def main() -> None:
                     text = ask_brief_sentence(
                         system + "\n\n[다시 쓰기] 방금 쓴 문장은 일정이 아니라 분위기 요약이었습니다. "
                         "[오간 앞으로의 일정] 발췌에 적힌 **날짜·예정된 일**만으로 다시 쓰세요.",
-                        brief_digest, length, BRIEF_SENTENCE_CAP[key],
+                        brief_digest, length, BRIEF_SENTENCE_CAP[key], key,
                     )
                     if not schedule_like(text):
                         print("[WARNING] 넷째 대목이 여전히 일정이 아니라 뺍니다.")
