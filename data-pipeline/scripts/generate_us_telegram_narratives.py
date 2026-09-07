@@ -82,7 +82,6 @@ from generate_telegram_narratives import (  # noqa: E402
     MODEL,
     NEWS_SCHEDULE_NOTE,
     SCHEDULE_BLOCK_HEAD,
-    SCHEDULE_CHARS,
     SCHEDULE_EXCERPTS,
     SENTIMENT_WINDOW_DAYS,
     brief_body,
@@ -90,6 +89,7 @@ from generate_telegram_narratives import (  # noqa: E402
     first_sentences,
     kst_date,
     optimism,
+    schedule_excerpt,
     schedule_hit,
     schedule_like,
     schedule_lines,
@@ -248,6 +248,8 @@ BRIEF_SCHEDULE_SYSTEM = US_COMMON + f"""
   만든 것입니다.
 - **날짜는 발췌에 적힌 그대로만** 쓰세요. 같은 일정을 서로 다른 날짜로 적은 발췌가 섞여
   있을 수 있으니, 어긋나 보이면 날짜를 빼고 '다음 주'처럼 적으세요.
+- ⚠️ **한 발췌 안에 날짜가 여럿이면 그 일에 붙은 것만** 쓰세요. 앞뒤 발췌의 날짜를 이
+  회사에 끌어다 붙이면 **없는 일정이 됩니다.** 어느 날짜인지 헷갈리면 날짜를 빼세요.
 - **앞 대목들이 이미 쓴 사건을 되풀이하지 마세요.**
 - 퍼센트·회수 같은 숫자는 쓰지 마세요. 이 대목이 쓰는 숫자는 날짜뿐입니다.
 - ⚠️ **한 갈래에 몰아 쓰지 마세요.** 같은 종류(상장이면 상장, 실적이면 실적)를 여러 건
@@ -493,7 +495,7 @@ def build_brief_digest(db, latest: str, msgs: list[dict], name_of: dict[str, str
         if key in seen:
             continue
         seen.add(key)
-        sched.append(text[:SCHEDULE_CHARS])
+        sched.append(schedule_excerpt(text, date.fromisoformat(end)))
         if len(sched) >= SCHEDULE_EXCERPTS:
             break
     lines += schedule_lines(sched, "오늘" if since == end else f"{since[5:]}~{end[5:]}")
