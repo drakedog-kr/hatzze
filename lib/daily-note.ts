@@ -60,8 +60,12 @@ type Row = {
 
 const TABLE = "daily_note";
 
-/** 지난 노트 목록에 보이는 수. 한 달치면 넘겨 보는 데 충분하고 한 화면에 들어간다. */
-export const NOTE_ARCHIVE_LIMIT = 30;
+/**
+ * 지난 노트 목록이 넘겨 볼 수 있는 편수. 화면엔 한 주(7편)씩 보이고(NoteArchiveList) 이
+ * 수까지 넘길 수 있다. 제목·날짜만이라 365편이어도 20KB 남짓이다. 그 뒤로는 목록에서
+ * 빠진다 — 사이트맵(listAllNoteDates)은 따로 전부 읽으니 검색엔 잡힌다.
+ */
+export const NOTE_ARCHIVE_LIMIT = 365;
 
 export const noteHref = (date: string) => `/daily/${date}`;
 
