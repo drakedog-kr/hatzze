@@ -28,7 +28,7 @@ import { AiMark, C, Icon, MONO } from "../ui";
 import { ExpandableList } from "./ExpandableList";
 import { Avatar, ChangeRate, DayBars, DeltaPp, Highlight, Pill, QuoteDate, RankBadge, RankDelta, Sparkline, highlightTerms, termsFor } from "./parts";
 import { fmtKoDate, stockHref } from "@/lib/stock-page";
-import { getMoveReasons, getUpcomingEvents, todayKst } from "@/lib/kadera-why";
+import { BOARD_TILES, getMoveReasons, getUpcomingEvents, todayKst } from "@/lib/kadera-why";
 import { EventsCalendar } from "./EventsCalendar";
 import { StockLogo } from "../StockLogo";
 import { SectionHead } from "./SectionHead";
@@ -116,8 +116,13 @@ const clip: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", te
    min(460px, 100%) 면 넓을 땐 460 이 짝 기준으로 살아 있고, 좁을 땐 칸에 맞춰 접힌다. */
 const SHEET_PAIR_MIN = "min(460px, 100%)";
 
-/** '급등 종목' 카드에 세우는 타일 수. **3열 격자라 3의 배수여야** 마지막 줄이 찬다(급부상 카드와 같은 판). */
-const WHY_TILES = 9;
+/**
+ * '급등 종목' 카드에 세우는 타일 수. **3열 격자라 3의 배수여야** 마지막 줄이 찬다(급부상 카드와 같은 판).
+ *
+ * ⚠️ 숫자를 여기 두지 않는다. lib/kadera-why 의 2차 시세 조회가 **이 장수만큼**을 채우므로,
+ *    두 값이 갈리면 화면 끝자리가 다시 '등락 준비 중' 으로 뜬다. 바꿀 땐 그쪽 한 곳만 고친다.
+ */
+const WHY_TILES = BOARD_TILES;
 /* 채널 표 두 벌(파워 랭킹·뜨는 채널)의 격자는 여기 없다 — globals.css 의 .hz-cols-ch /
    .hz-cols-rise 다. 폰에서 열을 접어야 하는데 인라인 style 은 미디어쿼리를 이겨서,
    여기 두면 @media 가 아무 일도 못 한다. 이유는 그 클래스 주석에 적어 뒀다. */

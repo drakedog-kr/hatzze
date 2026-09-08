@@ -61,9 +61,20 @@ const BOARD_MAX = 40;
  * ⭐ 정렬은 절댓값이 아니라 **부호 있는 값의 내림차순**이다 — 카드가 오른 종목만 담으므로
  *    많이 내린 줄에 시세를 물어 봐야 어차피 안 쓴다(내린 줄의 까닭은 표에 남아 종목 화면이 쓴다).
  * 아홉이 아니라 스물넷인 이유: quoted 는 장중 값이라 실제 종가 등락과 순위가 조금 뒤집히고,
- * 장중에 오른 줄이 종가로는 내리기도 해서 걸러지고 나면 아홉이 안 남는다. 화면 장수를 바꾸면 같이 볼 것.
+ * 장중에 오른 줄이 종가로는 내리기도 해서 걸러지고 나면 아홉이 안 남는다.
+ *
+ * ⚠️ **이 값만으로는 빈 칸을 못 막는다.** 여유를 얼마로 잡든, 고르는 잣대와 화면이 줄 세우는
+ *    잣대가 같은 값(quoted)이라 시세를 안 물어본 줄이 화면에 올라설 수 있다. 그래서 아래
+ *    getMoveReasons 가 **화면에 실제로 설 줄**을 보고 한 번 더 부른다(2차 조회 주석 참고).
  */
 const QUOTE_ROWS = 24;
+/**
+ * 화면이 그리는 장수. **app/kadera/page.tsx 가 이 값을 가져다 쓴다.**
+ *
+ * 라이브러리가 들고 있는 이유는 위 2차 조회가 "화면에 실제로 설 줄"을 알아야 하기 때문이다.
+ * 화면 쪽에 숫자를 따로 두면 둘이 갈리는 순간 2차 조회가 엉뚱한 줄을 채운다.
+ */
+export const BOARD_TILES = 9;
 /** 기준일에서 이보다 오래된 까닭은 '오늘' 카드에 안 올린다(주말·연휴는 사흘까지 거슬러 본다) */
 const BOARD_STALE_DAYS = 3;
 
@@ -171,54 +182,97 @@ export const getMoveReasons = cache(async (): Promise<MaybeFailed<MoveReasonBoar
       .slice(0, QUOTE_ROWS)
       .map((r) => r.stock_code),
   );
-  const out: MoveReasonRow[] = await Promise.all(
-    rows.map(async (r) => {
-      const s = info.get(r.stock_code);
-      const name = s?.name ?? r.stock_code;
-      const market = s?.market ?? null;
-      let changeRate: number | null = num(r.change_rate);
-      let changeSource: MoveReasonRow["changeSource"] = changeRate === null ? null : "krx";
-      let closePrice: number | null = r.close_price ?? null;
-      if (changeRate === null && s && s.price_date === date && s.change_rate != null) {
-        changeRate = num(s.change_rate);
-        changeSource = "krx";
-        closePrice = s.close_price ?? null;
-      }
-      // KRX 가 아직 그날 시세를 안 준 날은 야후 일봉에서 등락률을 채운다.
-      // ⚠️ 위에서 고른 줄만 부른다 — 나머지는 화면에 안 서므로 등락률도 필요 없다.
-      const bars = willQuote.has(r.stock_code) ? await yahooBars(r.stock_code, market) : null;
-      if (changeRate === null && bars) {
-        const y = changeOn(bars, date);
-        if (y) {
-          changeRate = y.rate;
-          changeSource = "yahoo";
-          closePrice = Math.round(y.close);
-        }
-      }
-      return {
-        code: r.stock_code,
-        name,
-        market,
-        date,
-        changeRate,
-        changeSource,
-        closePrice,
-        reason: r.reason ?? null,
-        channelCount: r.channel_count ?? 0,
-        mentionCount: r.mention_count ?? 0,
-        quotedChange: num(r.quoted_change_rate),
-      };
-    }),
-  );
-  // 오른 줄만 남긴다. 종가 등락률이 있으면 그것이 판정이고, 없으면 채널 글의 표기로 가른다.
-  const risers = out.filter((r) => (r.changeRate !== null ? r.changeRate > 0 : (r.quotedChange ?? 0) > 0));
-  risers.sort((a, b) => {
-    const ka = a.changeRate ?? a.quotedChange ?? 0;
-    const kb = b.changeRate ?? b.quotedChange ?? 0;
-    if (kb !== ka) return kb - ka;
-    return b.channelCount - a.channelCount;
+  const out: MoveReasonRow[] = rows.map((r) => {
+    const s = info.get(r.stock_code);
+    let changeRate: number | null = num(r.change_rate);
+    let changeSource: MoveReasonRow["changeSource"] = changeRate === null ? null : "krx";
+    let closePrice: number | null = r.close_price ?? null;
+    if (changeRate === null && s && s.price_date === date && s.change_rate != null) {
+      changeRate = num(s.change_rate);
+      changeSource = "krx";
+      closePrice = s.close_price ?? null;
+    }
+    return {
+      code: r.stock_code,
+      name: s?.name ?? r.stock_code,
+      market: s?.market ?? null,
+      date,
+      changeRate,
+      changeSource,
+      closePrice,
+      reason: r.reason ?? null,
+      channelCount: r.channel_count ?? 0,
+      mentionCount: r.mention_count ?? 0,
+      quotedChange: num(r.quoted_change_rate),
+    };
   });
-  return { date, rows: risers };
+
+  /**
+   * KRX 가 아직 그날 시세를 안 준 줄을 야후 일봉으로 채운다.
+   *
+   * 한 종목은 **한 번만** 부른다(asked). 아래 2차 조회가 여러 바퀴 돌 수 있는데, 그때마다
+   * 같은 종목을 다시 물으면 바깥 왕복이 바퀴 수만큼 곱해진다. 못 구한 종목도 asked 에
+   * 남으므로 다음 바퀴에서 다시 시도하지 않는다.
+   */
+  const asked = new Set<string>();
+  const fillFromYahoo = async (targets: MoveReasonRow[]): Promise<number> => {
+    const todo = targets.filter((r) => r.changeRate === null && !asked.has(r.code));
+    if (!todo.length) return 0;
+    todo.forEach((r) => asked.add(r.code));
+    await Promise.all(
+      todo.map(async (r) => {
+        const bars = await yahooBars(r.code, r.market);
+        const y = bars ? changeOn(bars, date) : null;
+        if (!y) return;
+        r.changeRate = y.rate;
+        r.changeSource = "yahoo";
+        r.closePrice = Math.round(y.close);
+      }),
+    );
+    return todo.length;
+  };
+
+  /** 오른 줄만, 큰 순으로. 등락률이 있으면 그것이 판정이고 없으면 채널 글의 표기로 가른다. */
+  const boardOf = (): MoveReasonRow[] =>
+    out
+      .filter((r) => (r.changeRate !== null ? r.changeRate > 0 : (r.quotedChange ?? 0) > 0))
+      .sort((a, b) => {
+        const ka = a.changeRate ?? a.quotedChange ?? 0;
+        const kb = b.changeRate ?? b.quotedChange ?? 0;
+        if (kb !== ka) return kb - ka;
+        return b.channelCount - a.channelCount;
+      });
+
+  // 1차 — 채널 글 표기로 줄 세워 위에서 QUOTE_ROWS 만 부른다. 왕복을 아끼는 자리다.
+  await fillFromYahoo(out.filter((r) => willQuote.has(r.code)));
+
+  /**
+   * 2차 — **화면에 실제로 설 줄** 가운데 아직 빈 것만 더 부른다.
+   *
+   * ## 1차만으로는 왜 모자라나
+   *
+   * 1차가 부를 줄을 고르는 잣대와 화면이 줄을 세우는 잣대가 **같은 값**(채널 글의 표기)이라,
+   * 시세를 안 물어본 줄이 자기 표기값으로 화면에 올라선다. 2026-09-09 01:30 KST 실측:
+   * 상한가(30%)를 적은 글이 많아 24칸을 전부 차지했고, 아세아시멘트(17.4%)·액트로(16.77%)는
+   * 밖으로 밀려 시세를 안 물어봤는데 7·8위로 섰다. 바로 아래 지니너스는 16.76% 로 0.01
+   * 낮은데 시세가 붙어 있었다. 그래서 카드 두 장이 '등락 준비 중' 으로 떴다.
+   *
+   * ## 한 바퀴로 안 끝나는 까닭
+   *
+   * 새로 채운 값이 0 이하면 그 줄은 목록에서 빠지고 그 자리에 다음 줄이 올라온다. 그 줄도
+   * 비어 있을 수 있다. 그래서 위 아홉 장이 다 채워지거나 더 부를 줄이 없을 때까지 돈다.
+   * 한 종목은 한 번만 부르므로(asked) 바퀴는 BOARD_MAX 를 못 넘는다.
+   *
+   * ## 왕복이 얼마나 느나
+   *
+   * 평소엔 **0** 이다 — 1차에서 이미 채워져 있어 첫 바퀴가 곧바로 끝난다. 오늘처럼 상한가
+   * 표기가 24칸을 채운 날에만 몇 건 더 부른다. KRX 가 그날 시세를 준 뒤로는 1차조차 안 탄다.
+   */
+  for (let round = 0; round < BOARD_MAX; round++) {
+    if (!(await fillFromYahoo(boardOf().slice(0, BOARD_TILES)))) break;
+  }
+
+  return { date, rows: boardOf() };
 });
 
 export type StockMoveReason = {

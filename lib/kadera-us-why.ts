@@ -49,8 +49,20 @@ export type UsMoveReasonBoard = { date: string; rows: UsMoveReasonRow[] };
 
 /** 표에서 읽어 오는 최대 줄 수. 파이프라인 상한(generate_move_reasons.CAP)과 같다 */
 const BOARD_MAX = 40;
-/** 그중 야후 일봉을 실제로 부르는 줄 수. 국내와 같은 이유·같은 값(lib/kadera-why.ts QUOTE_ROWS) */
+/**
+ * 그중 야후 일봉을 실제로 부르는 줄 수. 국내와 같은 이유·같은 값(lib/kadera-why.ts QUOTE_ROWS)
+ *
+ * ⚠️ **이 값만으로는 빈 칸을 못 막는다.** 고르는 잣대와 화면이 줄 세우는 잣대가 같은 값이라,
+ *    시세를 안 물어본 줄이 화면에 올라설 수 있다. 아래 2차 조회가 그 자리를 메운다.
+ */
 const QUOTE_ROWS = 24;
+/**
+ * 화면이 그리는 장수. **app/kadera/us/page.tsx 가 이 값을 가져다 쓴다.**
+ *
+ * 라이브러리가 들고 있는 이유는 2차 조회가 "화면에 실제로 설 줄"을 알아야 하기 때문이다.
+ * 화면 쪽에 숫자를 따로 두면 둘이 갈리는 순간 2차 조회가 엉뚱한 줄을 채운다.
+ */
+export const US_BOARD_TILES = 9;
 /** 기준일에서 이보다 오래된 까닭은 카드에 안 올린다(주말·연휴는 사흘까지 거슬러 본다) */
 const BOARD_STALE_DAYS = 3;
 
@@ -152,32 +164,69 @@ export const getUsMoveReasons = cache(async (): Promise<MaybeFailed<UsMoveReason
       .slice(0, QUOTE_ROWS)
       .map((r) => r.ticker),
   );
-  const out: UsMoveReasonRow[] = await Promise.all(
-    rows.map(async (r) => {
-      const session = willQuote.has(r.ticker) ? await lastUsSession(r.ticker, date) : null;
-      return {
-        ticker: r.ticker,
-        name: names.get(r.ticker) ?? r.ticker,
-        date,
-        changeRate: session?.rate ?? null,
-        sessionDate: session?.sessionDate ?? null,
-        closePrice: session?.close ?? null,
-        reason: r.reason ?? null,
-        channelCount: r.channel_count ?? 0,
-        mentionCount: r.mention_count ?? 0,
-        quotedChange: num(r.quoted_change_rate),
-      };
-    }),
-  );
-  // 오른 줄만. 세션 등락률이 있으면 그것이 판정이고, 없으면 채널 글의 표기로 가른다.
-  const risers = out.filter((r) => (r.changeRate !== null ? r.changeRate > 0 : (r.quotedChange ?? 0) > 0));
-  risers.sort((a, b) => {
-    const ka = a.changeRate ?? a.quotedChange ?? 0;
-    const kb = b.changeRate ?? b.quotedChange ?? 0;
-    if (kb !== ka) return kb - ka;
-    return b.channelCount - a.channelCount;
-  });
-  return { date, rows: risers };
+  const out: UsMoveReasonRow[] = rows.map((r) => ({
+    ticker: r.ticker,
+    name: names.get(r.ticker) ?? r.ticker,
+    date,
+    changeRate: null,
+    sessionDate: null,
+    closePrice: null,
+    reason: r.reason ?? null,
+    channelCount: r.channel_count ?? 0,
+    mentionCount: r.mention_count ?? 0,
+    quotedChange: num(r.quoted_change_rate),
+  }));
+
+  /**
+   * 시세를 아직 못 구한 줄을 야후 세션으로 채운다.
+   *
+   * 한 종목은 **한 번만** 부른다(asked). 아래 2차 조회가 여러 바퀴 돌 수 있는데, 그때마다
+   * 같은 종목을 다시 물으면 바깥 왕복이 바퀴 수만큼 곱해진다. 못 구한 종목도 asked 에
+   * 남으므로 다음 바퀴에서 다시 시도하지 않는다.
+   */
+  const asked = new Set<string>();
+  const fillFromYahoo = async (targets: UsMoveReasonRow[]): Promise<number> => {
+    const todo = targets.filter((r) => r.changeRate === null && !asked.has(r.ticker));
+    if (!todo.length) return 0;
+    todo.forEach((r) => asked.add(r.ticker));
+    await Promise.all(
+      todo.map(async (r) => {
+        const session = await lastUsSession(r.ticker, date);
+        if (!session) return;
+        r.changeRate = session.rate;
+        r.sessionDate = session.sessionDate;
+        r.closePrice = session.close;
+      }),
+    );
+    return todo.length;
+  };
+
+  /** 오른 줄만. 세션 등락률이 있으면 그것이 판정이고, 없으면 채널 글의 표기로 가른다. */
+  const boardOf = (): UsMoveReasonRow[] =>
+    out
+      .filter((r) => (r.changeRate !== null ? r.changeRate > 0 : (r.quotedChange ?? 0) > 0))
+      .sort((a, b) => {
+        const ka = a.changeRate ?? a.quotedChange ?? 0;
+        const kb = b.changeRate ?? b.quotedChange ?? 0;
+        if (kb !== ka) return kb - ka;
+        return b.channelCount - a.channelCount;
+      });
+
+  // 1차 — 채널 글 표기로 줄 세워 위에서 QUOTE_ROWS 만 부른다. 왕복을 아끼는 자리다.
+  await fillFromYahoo(out.filter((r) => willQuote.has(r.ticker)));
+
+  /**
+   * 2차 — **화면에 실제로 설 줄** 가운데 아직 빈 것만 더 부른다. 국내 짝(lib/kadera-why.ts)과
+   * 같은 이유·같은 구조다. 거기 주석에 국장에서 실제로 빈 칸이 뜬 실측이 적혀 있다.
+   *
+   * 새로 채운 값이 0 이하면 그 줄이 목록에서 빠지고 다음 줄이 올라오므로 한 바퀴로 안 끝난다.
+   * 한 종목은 한 번만 부르므로(asked) 바퀴는 BOARD_MAX 를 못 넘고, 평소엔 첫 바퀴에 끝난다.
+   */
+  for (let round = 0; round < BOARD_MAX; round++) {
+    if (!(await fillFromYahoo(boardOf().slice(0, US_BOARD_TILES)))) break;
+  }
+
+  return { date, rows: boardOf() };
 });
 
 // ─── 다가오는 일정 ─────────────────────────────────────────────────────────
