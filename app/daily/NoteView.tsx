@@ -240,16 +240,17 @@ function NoteStocksCard({ stocks }: { stocks: NoteStocks }) {
 }
 
 /**
- * 지난 노트 목록. 한 주(7편)씩 보이고 나머지는 넘겨 본다(NoteArchiveList). 지금 보고 있는
- * 글은 `aria-current` 로 표시하고 링크는 그대로 둔다.
- * 머리의 곁글은 연도 대신 **편수**다 — 넘기다 보면 해가 바뀌는 쪽이 생겨 연도 하나로는 틀린다.
+ * 지난 노트 목록. 달력 주(월~일) 단위로 보이고 아래 지난주·다음주로 넘긴다(NoteArchiveList).
+ * 지금 보고 있는 글은 `aria-current` 로 표시하고 링크는 그대로 둔다.
+ * 머리에 곁글(연도·편수)을 안 단다 — 어느 주인지는 넘김 줄이 말하고, 연도는 넘기다 보면
+ * 해가 바뀌는 주가 생겨 하나로는 틀린다.
  */
 function NoteArchive({ notes, current }: { notes: NoteStub[]; current: string | null }) {
   if (!notes.length) return null;
   // 표기·주소는 서버가 끝낸다. 클라이언트 컴포넌트가 lib/daily-note.ts 를 못 물기 때문이다.
   const items = notes.map((n) => ({ date: n.date, title: n.title, href: noteHref(n.date), label: fmtNoteDateShort(n.date) }));
   return (
-    <RailCard title="지난 노트" note={`${notes.length}편`}>
+    <RailCard title="지난 노트">
       <NoteArchiveList items={items} current={current} />
     </RailCard>
   );
