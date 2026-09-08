@@ -16,7 +16,7 @@ import {
   US_WINDOW_DAYS,
 } from "@/lib/us-telegram-data";
 import type { UsTrendingMessage } from "@/lib/us-telegram-data";
-import { getUsMoveReasons, getUsUpcomingEvents } from "@/lib/kadera-us-why";
+import { US_BOARD_TILES, getUsMoveReasons, getUsUpcomingEvents } from "@/lib/kadera-us-why";
 import { todayKst } from "@/lib/kadera-why";
 import { fmtKoDate } from "@/lib/stock-page";
 import { isLoadFailed } from "@/lib/load-state";
@@ -67,8 +67,13 @@ const SHEET_PAIR_MIN = "min(460px, 100%)";
  */
 const SHEET_ROWS = 10;
 
-/** 미장 '급등 종목' 카드에 세우는 타일 수. 3열 격자라 3의 배수여야 마지막 줄이 찬다(국장과 같다). */
-const US_WHY_TILES = 9;
+/**
+ * 미장 '급등 종목' 카드에 세우는 타일 수. 3열 격자라 3의 배수여야 마지막 줄이 찬다(국장과 같다).
+ *
+ * ⚠️ 숫자를 여기 두지 않는다. lib/kadera-us-why 의 2차 시세 조회가 **이 장수만큼**을 채우므로,
+ *    두 값이 갈리면 화면 끝자리가 '등락 준비 중' 으로 뜬다. 바꿀 땐 그쪽 한 곳만 고친다.
+ */
+const US_WHY_TILES = US_BOARD_TILES;
 
 const clip: React.CSSProperties = {
   overflow: "hidden",
