@@ -83,7 +83,7 @@ export default async function DailyDatePage({ params }: { params: Promise<{ date
   const [archive, neighbors, stocks] = await Promise.all([
     listNotes(),
     noteNeighbors(date),
-    r.note ? getNoteStocks(r.note.stocks) : Promise.resolve(EMPTY_STOCKS),
+    r.note ? getNoteStocks(r.note.stocks, r.note.date) : Promise.resolve(EMPTY_STOCKS),
   ]);
 
   return (
