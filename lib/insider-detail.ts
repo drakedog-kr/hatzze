@@ -31,6 +31,7 @@ import { fetchAllRows } from "@/lib/telegram-data";
 import { usQuotes } from "@/lib/us-telegram-data";
 import { fetchDailyHistory } from "@/lib/yahoo-history";
 import { displayName } from "@/lib/us-ticker-names";
+import { canonicalTicker, tickerSpellings } from "@/lib/us-ticker-spellings";
 
 /** 언급 추이로 그리는 날수. 표에 41일치가 있어 그보다 길게 잡을 이유가 없다. */
 export const MENTION_TREND_DAYS = 40;
@@ -309,22 +310,26 @@ function quartersOf(dates: string[]): { latest: string | null; prior: string | n
 }
 
 export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string): Promise<StockDetail | null> => {
-  const ticker = rawTicker.toUpperCase();
+  // ⚠️ 표마다 클래스 표기가 갈린다(13F 는 BRK-B, 의원은 BRK.B, 나머지는 BRK). 하나만
+  //    물으면 나머지 표가 통째로 안 잡혀 화면이 "0명" 이라고 **없다고 단언**한다.
+  //    까닭과 접미사를 기계로 붙이면 안 되는 이유는 lib/us-ticker-spellings.ts 주석에.
+  const ticker = canonicalTicker(rawTicker);
+  const spellings = tickerSpellings(rawTicker);
   const years = yearsOf(rangeKey);
   const db = getSupabaseAdmin();
   if (!db) return null;
 
   const [stockRows, mentionRows, holdingRows, managerRows, congressRows, insiderRows, consensusRows, actionRows] =
     await Promise.all([
-    db.from("us_stocks").select("ticker,name_ko,name_en").eq("ticker", ticker).limit(1),
+    db.from("us_stocks").select("ticker,name_ko,name_en").in("ticker", spellings).limit(1),
     fetchAllRows<{ date: string; mention_count: number | null; channel_count: number | null }>(
       "date",
-      () => db.from("telegram_us_stock_daily").select("date,mention_count,channel_count").eq("ticker", ticker),
+      () => db.from("telegram_us_stock_daily").select("date,mention_count,channel_count").in("ticker", spellings),
       { onError: (e) => console.error("[insider/stock] 언급 추이 조회 실패", e) },
     ),
     fetchAllRows<{ cik: number; shares: number | null; value: number | null; report_date: string }>(
       "cik",
-      () => db.from("us_manager_holding").select("cik,shares,value,report_date").eq("ticker", ticker),
+      () => db.from("us_manager_holding").select("cik,shares,value,report_date").in("ticker", spellings),
       { onError: (e) => console.error("[insider/stock] 거물 보유 조회 실패", e) },
     ),
     fetchAllRows<{ cik: number; person: string; firm: string }>(
@@ -346,7 +351,7 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
         db
           .from("us_congress_trade")
           .select("doc_id,member,state_dst,transaction_type,transaction_date,filed_date,amount_low,amount_high")
-          .eq("ticker", ticker),
+          .in("ticker", spellings),
       { onError: (e) => console.error("[insider/stock] 의원 신고 조회 실패", e) },
     ),
     fetchAllRows<{
@@ -365,7 +370,7 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
         db
           .from("us_insider_txn")
           .select("accession_no,seq,owner_name,owner_title,transaction_code,acquired_disposed,shares,price,transaction_date,filed_date,source_url")
-          .eq("ticker", ticker)
+          .in("ticker", spellings)
           .order("accession_no"),
       { onError: (e) => console.error("[insider/stock] 임원 신고 조회 실패", e) },
     ),
@@ -374,7 +379,7 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
     db
       .from("us_analyst_consensus")
       .select("consensus,analyst_count,strong_buy,buy,hold,sell,strong_sell,target_avg,target_low,target_high,target_count,as_of_date")
-      .eq("ticker", ticker)
+      .in("ticker", spellings)
       .order("as_of_date", { ascending: false })
       .limit(1),
     /**
@@ -390,7 +395,7 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
     db
       .from("us_analyst_action")
       .select("action_date,analyst,firm,rating_new,action,target_now,target_old")
-      .eq("ticker", ticker)
+      .in("ticker", spellings)
       .order("action_date", { ascending: false })
       .limit(30),
   ]);
