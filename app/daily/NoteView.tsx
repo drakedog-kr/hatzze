@@ -15,6 +15,7 @@ import { stockHref } from "@/lib/stock-page";
 
 import { Icon, MONO } from "../ui";
 import { ShareButton } from "./ShareButton";
+import { NoteArchiveList } from "./NoteArchiveList";
 
 /**
  * 데일리 노트 한 편 + 오른쪽 칸. `/daily`(최신)와 `/daily/[date]` 가 같은 것을 그린다.
@@ -238,22 +239,18 @@ function NoteStocksCard({ stocks }: { stocks: NoteStocks }) {
   );
 }
 
-/** 지난 노트 목록. 지금 보고 있는 글은 `aria-current` 로 표시하고 링크는 그대로 둔다. */
+/**
+ * 지난 노트 목록. 한 주(7편)씩 보이고 나머지는 넘겨 본다(NoteArchiveList). 지금 보고 있는
+ * 글은 `aria-current` 로 표시하고 링크는 그대로 둔다.
+ * 머리의 곁글은 연도 대신 **편수**다 — 넘기다 보면 해가 바뀌는 쪽이 생겨 연도 하나로는 틀린다.
+ */
 function NoteArchive({ notes, current }: { notes: NoteStub[]; current: string | null }) {
   if (!notes.length) return null;
-  const year = notes[0].date.slice(0, 4);
+  // 표기·주소는 서버가 끝낸다. 클라이언트 컴포넌트가 lib/daily-note.ts 를 못 물기 때문이다.
+  const items = notes.map((n) => ({ date: n.date, title: n.title, href: noteHref(n.date), label: fmtNoteDateShort(n.date) }));
   return (
-    <RailCard title="지난 노트" note={`${year}년`}>
-      <ul className="hz-note-archive" aria-label={`${year}년 지난 노트`}>
-        {notes.map((n) => (
-          <li key={n.date} aria-current={n.date === current ? "page" : undefined}>
-            <Link href={noteHref(n.date)}>
-              <time dateTime={n.date}>{fmtNoteDateShort(n.date)}</time>
-              <span>{n.title}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+    <RailCard title="지난 노트" note={`${notes.length}편`}>
+      <NoteArchiveList items={items} current={current} />
     </RailCard>
   );
 }
