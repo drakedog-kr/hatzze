@@ -136,9 +136,10 @@ BALANCE_SYSTEM = COMMON + """
 
 - **'시장 지표'와 '감성 지표'라는 말을 문장 안에 그대로 쓰세요.** '위를 차지했다' ·
   '그쪽' · '이쪽' 처럼 가리키는 말로 대신하지 마세요 — 무슨 뜻인지 안 읽힙니다.
-- 근거는 과열도 상위권에 어느 종류가 몇 개 들었는지입니다. **어느 쪽이 뜨거운지는 초고온에
-  든 개수로 정하고, 같으면 상위 5개 안의 개수로 정하세요** — 기준을 그때그때 바꾸면 같은
-  자료로 방향이 뒤집힙니다. 지표 **이름은 쓰지 마세요**(바로 앞 문단이 이미 하나를 짚었습니다).
+- **어느 쪽이 뜨거운지는 [갈림] 줄에 적힌 대로 쓰세요. 스스로 다시 판정하지 마세요.** 근거
+  숫자(초고온에 든 개수, 상위 5개 안의 개수)도 그 줄의 것을 씁니다. 판정을 모델에 맡겼더니 같은
+  자료로 방향이 뒤집히거나 한 문장 안에서 앞뒤가 어긋났습니다. 지표 **이름은 쓰지 마세요**
+  (바로 앞 문단이 이미 하나를 짚었습니다).
 - 두 종류가 엇비슷하면 억지로 가르지 말고 "두 종류가 비슷한 수준입니다" 처럼 적으세요.
 - 퍼센트 숫자는 최대 하나만 씁니다.
 - **'햇쩨 지수'와 ℃ 를 쓰지 마세요. 어제·오늘·지난주의 온도나 며칠간의 오르내림도
@@ -290,6 +291,42 @@ def trend_lines(recent: list[tuple[str, float]], today: date | None = None) -> l
     return lines
 
 
+# 갈림 문단이 견주는 두 종류의 이름. normalize_category 가 돌려주는 값과 같다.
+BALANCE_KINDS = ("시장", "감성")
+BALANCE_TOP_N = 5
+
+
+def balance_verdict_lines(rows: list[dict]) -> list[str]:
+    """[갈림] 블록 — **어느 종류가 더 뜨거운지를 파이썬이 정해 적어 준다.**
+
+    판정을 모델에 맡기고 기준만 프롬프트에 적었더니(초고온 개수 → 같으면 상위 5개) 같은
+    자료로 방향이 갈렸다. 실측 6회 중 1회, 프로덕션 사흘 중 하루(2026-09-07 저녁)는 첫
+    문장이 "감성이 더 고온"이라 해 놓고 둘째 문장이 "시장이 앞서는 구성"이라 적어 한 문단
+    안에서 앞뒤가 어긋났다. 규칙은 결정적이니 코드가 세고, 모델은 그 결과를 문장으로만 옮긴다.
+
+    기준: 초고온(과열도 75 이상)에 든 개수가 많은 쪽 → 같으면 상위 BALANCE_TOP_N 안의 개수가
+    많은 쪽 → 그것도 같으면 '비슷하다'. rows 는 과열도 내림차순으로 정렬돼 들어온다.
+    """
+    hot = {k: sum(1 for r in rows if r["hot"] and r["category"] == k) for k in BALANCE_KINDS}
+    top = {k: sum(1 for r in rows[:BALANCE_TOP_N] if r["category"] == k) for k in BALANCE_KINDS}
+    m, s = BALANCE_KINDS
+    if hot[m] != hot[s]:
+        hotter = m if hot[m] > hot[s] else s
+        why = "초고온에 든 개수"
+    elif top[m] != top[s]:
+        hotter = m if top[m] > top[s] else s
+        why = f"상위 {BALANCE_TOP_N}개 안의 개수"
+    else:
+        hotter = None
+        why = ""
+    verdict = f"{hotter} 지표가 더 뜨겁습니다({why} 기준)" if hotter else "두 종류가 비슷한 수준입니다"
+    return [
+        f"[갈림] {verdict}",
+        f"  초고온에 든 지표: 시장 {hot[m]}개 · 감성 {hot[s]}개 / 상위 {BALANCE_TOP_N}개 안: 시장 {top[m]}개 · 감성 {top[s]}개",
+        "  ※ 방향은 이 줄이 정한 대로 쓰세요. 근거 숫자도 이 줄의 것만 쓰세요.",
+    ]
+
+
 def build_digest(
     score: float,
     stage: str,
@@ -331,6 +368,9 @@ def build_digest(
         if recent:
             lines += trend_lines(recent)
         lines.append("")  # 위 블록과 [지표별] 사이를 띄운다. 위가 비면 띄울 것도 없다.
+    if not index_lines:
+        lines += balance_verdict_lines(rows)
+        lines.append("")
     lines.append("[지표별] 과열도 높은 순 (0=저온 ~ 100=초고온, '초고온'=과열도 75 이상)")
     # 문턱에 걸린 지표(MENTION_RAW_GATES)는 후보에서 빼고, 목록에는 남기되 표시를 단다 —
     # 지워 버리면 모델이 보는 '가장 뜨거운 지표'가 실제와 달라져 다른 문장까지 어긋난다.
