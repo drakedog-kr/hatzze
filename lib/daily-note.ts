@@ -2,8 +2,10 @@ import "server-only";
 
 import { cache } from "react";
 
+import { isKstWeekday } from "./cron-schedule";
 import { getDevOverrides } from "./dev-overrides";
 import { getSupabaseServer } from "./supabase-server";
+import { changeRateOf, fetchYahooQuote } from "./yahoo-quote";
 
 /**
  * 데일리 노트(/daily)가 읽는 것 — 표 `daily_note`(마이그레이션 067·068).
@@ -226,7 +228,10 @@ export type KrStockQuote = {
   code: string;
   name: string;
   market: string | null;
-  /** KRX 종가(원). `stocks` 표가 가진 **최근** 값이지 글 날짜의 값이 아니다 — 화면이 기준일을 적는다. */
+  /**
+   * 종가(원). 글 날짜가 오늘이고 KRX 가 아직 그날 값을 안 줬으면 야후 실시간(카더라 카드와
+   * 같은 소스), 그 밖에는 `stocks` 표의 **최근** KRX 값 — 글 날짜의 값이 아니다.
+   */
   price: number | null;
   changeRate: number | null;
   priceDate: string | null;
@@ -236,17 +241,44 @@ export type NoteStocks = { kr: KrStockQuote[]; us: UsStockRef[] };
 
 export const EMPTY_STOCKS: NoteStocks = { kr: [], us: [] };
 
+/** 벽시계 기준 오늘(KST). 글 날짜(YYYY-MM-DD)와 견주는 데만 쓴다. */
+function todayKst(now: Date): string {
+  return new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
 /**
- * 언급된 종목의 이름과 시세. 국내는 `stocks` 표의 최근 종가·등락률(KRX, 종목 실주소 화면과
- * 같은 열), 미국은 `us_stocks` 의 한글 이름만 — 미국 종가는 매일 받는 원천이 없다.
+ * 야후 실시간 — 카더라 카드(lib/telegram-data stockQuote)와 같은 심볼 규칙·같은 캐시.
+ * 등락률을 못 내면 null 을 줘 호출부가 KRX 저장값을 그대로 쓰게 한다.
+ */
+async function liveQuote(code: string, market: string | null): Promise<{ price: number; changeRate: number } | null> {
+  const q = await fetchYahooQuote(`${code}.${market === "KOSDAQ" ? "KQ" : "KS"}`, { next: { revalidate: 600 } });
+  if (!q) return null;
+  const changeRate = changeRateOf(q);
+  return changeRate === null ? null : { price: q.price, changeRate };
+}
+
+/**
+ * 언급된 종목의 이름과 시세. 국내는 `stocks` 표의 종가·등락률(KRX, 종목 실주소 화면과 같은
+ * 열), 미국은 `us_stocks` 의 한글 이름만 — 미국 종가는 매일 받는 원천이 없다.
  *
- * ⛔ 야후를 부르지 않는다(종목 실주소 화면 머리말의 같은 규칙). 하루에 한 편이지만 지난 글을
- *    크롤러가 훑으면 편마다 바깥 요청이 붙는다.
+ * ## 오늘 글만 야후를 본다
+ *
+ * KRX Open API 는 그날 종가를 다음 날 아침에야 준다. 그래서 저녁에 올린 글을 열면
+ * `stocks` 표는 전날 값이다(2026-09-08 저녁 실측: 23시에도 KRX 최신 기준일이 09-07).
+ * 카더라 카드는 같은 자리를 야후 실시간으로 먼저 채우고 KRX 로 폴백하니, 여기도 **글 날짜가
+ * 오늘(KST 평일)이고 KRX 가 그날 값에 못 미친 종목만** 야후를 본다.
+ *
+ * ⛔ 지난 글은 야후를 부르지 않는다(종목 실주소 화면 머리말의 같은 규칙). 크롤러가 지난 글을
+ *    훑으면 편마다 바깥 요청이 붙는다 — 이 조건이 그걸 막는다. 오늘 글 한 편 × 언급 종목 수가
+ *    상한이고, 야후 응답은 카더라와 같은 600초 캐시를 탄다.
+ * ⚠️ 야후 값에는 기준일이 없다. 평일에만 부르므로 글 날짜를 기준일로 적는다 — 평일 휴장일
+ *    (공휴일)엔 전 영업일 종가가 그날 날짜로 보일 수 있다. 다음 날 아침 KRX 가 따라오면
+ *    조건이 풀려 KRX 값으로 돌아간다.
  *
  * 순서는 글에 나온 차례(refs)를 그대로 지킨다. 못 읽으면 빈 목록 — 카드 하나가 빠질 뿐
  * 글은 그대로 보여야 한다.
  */
-export async function getNoteStocks(refs: NoteStockRefs): Promise<NoteStocks> {
+export async function getNoteStocks(refs: NoteStockRefs, noteDate: string): Promise<NoteStocks> {
   if (!refs.kr.length && !refs.us.length) return EMPTY_STOCKS;
   try {
     const db = getSupabaseServer();
@@ -262,11 +294,21 @@ export async function getNoteStocks(refs: NoteStockRefs): Promise<NoteStocks> {
     type UsRow = { ticker: string; name_ko: string | null };
     const krBy = new Map(((kr.data as KrRow[] | null) ?? []).map((r) => [r.code, r]));
     const usBy = new Map(((us.data as UsRow[] | null) ?? []).map((r) => [r.ticker, r]));
-    return {
-      kr: refs.kr.flatMap((code) => {
+    const now = new Date();
+    const liveDay = noteDate === todayKst(now) && isKstWeekday(now);
+    const krQuotes = await Promise.all(
+      refs.kr.flatMap((code) => {
         const r = krBy.get(code);
-        return r ? [{ code, name: r.name, market: r.market, price: r.close_price, changeRate: r.change_rate, priceDate: r.price_date }] : [];
+        if (!r) return [];
+        const stored: KrStockQuote = { code, name: r.name, market: r.market, price: r.close_price, changeRate: r.change_rate, priceDate: r.price_date };
+        if (!liveDay || (r.price_date != null && r.price_date >= noteDate)) return [Promise.resolve(stored)];
+        return [
+          liveQuote(code, r.market).then((q) => (q ? { ...stored, price: q.price, changeRate: q.changeRate, priceDate: noteDate } : stored)),
+        ];
       }),
+    );
+    return {
+      kr: krQuotes,
       us: refs.us.flatMap((ticker) => {
         const r = usBy.get(ticker);
         return r ? [{ ticker, name: r.name_ko || ticker }] : [];

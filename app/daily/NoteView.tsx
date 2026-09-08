@@ -189,8 +189,9 @@ function NoteToc({ blocks }: { blocks: NoteBlock[] }) {
 /**
  * 언급된 종목. 국내는 이름·최근 종가·등락률, 미국은 이름만(종가 원천이 없다).
  *
- * ⚠️ 종가는 **최근** 값이지 글 날짜의 값이 아니다 — 지난 글을 열어도 오늘 시세가 보인다.
- *    그래서 각주에 기준일을 적고, 기준일이 다른 줄은 그 줄에 따로 적는다.
+ * ⚠️ 종가는 오늘 글이면 야후 실시간(카더라 카드와 같은 소스), 지난 글이면 `stocks` 표의
+ *    **최근** KRX 값이다 — 지난 글을 열어도 오늘 시세가 보인다. 기준일이 다른 줄은 그 줄에
+ *    따로 적는다(lib/daily-note getNoteStocks 머리말).
  */
 function NoteStocksCard({ stocks }: { stocks: NoteStocks }) {
   if (!stocks.kr.length && !stocks.us.length) return null;

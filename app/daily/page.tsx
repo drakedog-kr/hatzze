@@ -47,7 +47,7 @@ export default async function DailyPage() {
   const [archive, neighbors, stocks] = await Promise.all([
     listNotes(),
     latest.note ? noteNeighbors(latest.note.date) : Promise.resolve(NO_NEIGHBORS),
-    latest.note ? getNoteStocks(latest.note.stocks) : Promise.resolve(EMPTY_STOCKS),
+    latest.note ? getNoteStocks(latest.note.stocks, latest.note.date) : Promise.resolve(EMPTY_STOCKS),
   ]);
 
   return <NoteView note={latest.note} failed={latest.failed} neighbors={neighbors} archive={archive.notes} stocks={stocks} />;
