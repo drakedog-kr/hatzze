@@ -45,6 +45,18 @@ const CLASS_ALIASES: Record<string, readonly string[]> = {
   BRK: ["BRK-A", "BRK-B", "BRK.A", "BRK.B"],
 };
 
+/**
+ * DB 에 **실제로 있는** 구두점 표기. 전수 측정으로 뽑은 것이고 이게 전부다.
+ *
+ * 왜 따로 두나 — 구두점이 **없는** 주소로 들어오면 어디에 구분자가 들어갔을지 알 길이
+ * 없다. `UHALB` 만 보고 `UHAL-B` 를 지어내려면 "뒤 한 글자는 클래스"라는 추측이
+ * 필요한데, 그 추측이 바로 위 주석의 CB·HDB·MAA 를 잘못 쪼개는 규칙이다.
+ * 그래서 지어내지 않고 **아는 표기만** 대조한다.
+ *
+ * ⛔ 여기 한 줄을 더할 땐 DB 를 실제로 조회해 그 표기가 있는지 확인한다.
+ */
+const PUNCTUATED_SPELLINGS: readonly string[] = ["BRK-A", "BRK-B", "BRK.A", "BRK.B", "UHAL-B"];
+
 /** 뿌리를 거꾸로 찾는 표. `BRK.B` → `BRK`. 위 표에서 한 번만 만든다. */
 const ROOT_OF: Record<string, string> = Object.fromEntries(
   Object.entries(CLASS_ALIASES).flatMap(([root, list]) => list.map((cls) => [cls, root])),
@@ -69,9 +81,10 @@ export function canonicalTicker(raw: string): string {
 /**
  * 이 종목을 찾을 때 표에 물어야 할 표기 전부. `.in("ticker", …)` 에 그대로 넣는다.
  *
- * 넓히는 갈래가 둘이다.
+ * 넓히는 갈래가 셋이다.
  *   ① 구두점만 다른 표기 — `BRK-B` 로 들어오면 `BRK.B` · `BRKB` 도 같이 본다.
- *   ② 손으로 적은 클래스 표(CLASS_ALIASES) — `BRK` 로 들어오면 `BRK-B` · `BRK.B` 도 본다.
+ *   ② 아는 구두점 표기(PUNCTUATED_SPELLINGS) — `UHALB` 로 들어와도 `UHAL-B` 를 찾는다.
+ *   ③ 손으로 적은 클래스 표(CLASS_ALIASES) — `BRK` 로 들어오면 `BRK-B` · `BRK.B` 도 본다.
  *
  * ⚠️ ①은 **없는 표기를 더 만들어 내지 않는다.** 들어온 글자를 구두점만 바꿔 볼 뿐이라,
  *    `MSA` 로 들어와도 `MS` 를 부르지 않는다(그게 위 주석의 사고를 막는 자리다).
@@ -87,7 +100,12 @@ export function tickerSpellings(raw: string): string[] {
     out.add(t.replace(/[.\-]/g, ""));
   }
 
-  // ② 뿌리 ↔ 클래스. 어느 쪽으로 들어와도 같은 묶음을 본다.
+  // ② 아는 구두점 표기 중 구두점만 뗀 모양이 같은 것. `UHALB` → `UHAL-B` 가 이 갈래다.
+  //    ①과 달리 **구두점 없는 주소로 들어와도** 짝을 찾아 준다.
+  const key = tickerKey(t);
+  for (const sp of PUNCTUATED_SPELLINGS) if (tickerKey(sp) === key) out.add(sp);
+
+  // ③ 뿌리 ↔ 클래스. 어느 쪽으로 들어와도 같은 묶음을 본다.
   const root = canonicalTicker(t);
   out.add(root);
   for (const cls of CLASS_ALIASES[root] ?? []) out.add(cls);
