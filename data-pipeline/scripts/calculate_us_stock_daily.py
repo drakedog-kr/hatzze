@@ -192,7 +192,16 @@ def main() -> None:
           f"telegram_us_channel_daily {len(channel_rows):,}행 저장 완료")
 
 
-BREADTH_WINDOW_DAYS = 14
+# 화면(lib/us-telegram-data.ts 의 US_WINDOW_DAYS)과 **같은 값이어야 한다.**
+#
+# ⚠️ 14 였다. 그러면 카드가 14일 합집합인 채널 수를 3일 언급 수 옆에 세워
+#    **채널 수가 언급 수보다 큰** 카드가 나온다 — 2026-09-08 실측으로 노보노디스크가
+#    "32개 채널 · 3일 12회", 엔비디아가 "206개 채널 · 202회" 였다. 32곳이 12번 말할 수는
+#    없다. 국장 짝(common/channel_breadth.py)은 처음부터 화면 창과 같은 창으로 센다.
+#
+#    화면은 창이 다르면 이 표를 안 쓰고 일별 최댓값으로 물러난다(getUsStockReports).
+#    그러니 여기를 고쳐야 합집합이 다시 쓰인다.
+BREADTH_WINDOW_DAYS = 3
 
 
 def save_breadth(db, messages: dict, us_mentions: list[dict]) -> None:
@@ -209,7 +218,11 @@ def save_breadth(db, messages: dict, us_mentions: list[dict]) -> None:
 
     표가 없으면(마이그레이션 미적용) 조용히 넘어간다. 이 스텝의 본 일은 위 두 표다.
     """
-    end = today_kst()
+    # 창의 **끝점도** 화면과 맞춘다. 화면의 windowBefore 는 기준일(오늘)을 빼고 그 앞
+    # N일을 세므로, 여기도 어제까지만 센다. 길이만 맞추고 끝점을 각자 잡으면 자정 언저리에
+    # 하루가 어긋난다(lib/telegram-data.ts 의 kaderaBaseDate 주석에 그 사고가 적혀 있다).
+    as_of = today_kst()
+    end = as_of - timedelta(days=1)
     first = (end - timedelta(days=BREADTH_WINDOW_DAYS - 1)).isoformat()
     last = end.isoformat()
 
@@ -227,7 +240,8 @@ def save_breadth(db, messages: dict, us_mentions: list[dict]) -> None:
 
     rows = [
         {
-            "as_of_date": last,
+            # as_of_date 는 '언제 찍은 스냅샷인가'(오늘)이고, 창은 그 앞 N일이다.
+            "as_of_date": as_of.isoformat(),
             "window_days": BREADTH_WINDOW_DAYS,
             "ticker": t,
             "channel_count": len(ch),
@@ -240,7 +254,7 @@ def save_breadth(db, messages: dict, us_mentions: list[dict]) -> None:
         return
     try:
         # 창 스냅샷이라 옛 as_of_date 는 안 남긴다(안 지우면 표가 매일 177행씩 자란다).
-        db.table("telegram_us_stock_breadth").delete().neq("as_of_date", last).execute()
+        db.table("telegram_us_stock_breadth").delete().neq("as_of_date", as_of.isoformat()).execute()
         for i in range(0, len(rows), 500):
             db.table("telegram_us_stock_breadth").upsert(
                 rows[i : i + 500], on_conflict="as_of_date,window_days,ticker"
@@ -250,7 +264,8 @@ def save_breadth(db, messages: dict, us_mentions: list[dict]) -> None:
               "마이그레이션 037 적용 여부를 확인하세요.")
         return
     top = sorted(rows, key=lambda r: -r["channel_count"])[:3]
-    print(f"[Supabase] telegram_us_stock_breadth {len(rows)}행 저장 (최근 {BREADTH_WINDOW_DAYS}일 · {last} 기준)")
+    print(f"[Supabase] telegram_us_stock_breadth {len(rows)}행 저장 "
+          f"({first}~{last} {BREADTH_WINDOW_DAYS}일 · {as_of.isoformat()} 스냅샷)")
     print("  가장 널리: " + " · ".join(f"{r['ticker']} {r['channel_count']}채널" for r in top))
 
 

@@ -76,6 +76,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client  # noqa: E402
+from common.timeutil import today_kst  # noqa: E402
 from config.indicator_thresholds import (  # noqa: E402
     INDICATOR_THRESHOLDS,
     NEGATIVE_CURRENT_CLAMP_SLUGS,
@@ -391,7 +392,7 @@ def main() -> None:
             latest_date, current, latest_details = get_latest_value(client, indicator_id)
         except InsufficientHistoryError as e:
             print(f"[WARNING] '{slug}' 값이 아직 없어 가중 평균에서 제외됨: {e}")
-            latest_date = date.today().isoformat()
+            latest_date = today_kst().isoformat()
             latest_details = {}
             current = None
             threshold = None
@@ -557,7 +558,14 @@ def main() -> None:
         ).eq("date", r["date"]).execute()
     print(f"[Supabase] indicator_values.normalized_score upsert 완료 ({len(results)}건, 원본 Progress 저장)")
 
-    today = date.today().isoformat()
+    # ⚠️⚠️ **date.today() 를 쓰면 안 된다.** 러너가 UTC 라 09:00 KST **이전**에 끝나는
+    #      아침 실행이 UTC 로는 아직 어제여서, 오늘 점수를 **어제 행에 덮어쓴다.**
+    #      실측(2026-09-08): 최근 20일 중 14일의 행이 다음 날 아침 08:0x~08:4x KST 에
+    #      갱신돼 있었다. 예를 들어 9월 5일 행에는 9월 6일 아침에 잰 값이 들어 있다.
+    #      그래서 히어로의 '전일 대비' 배지가 재는 실제 간격이 10.8시간에서 37.3시간까지
+    #      흔들렸다. common/timeutil.py 머리글이 바로 이 자리를 두고 today_kst() 를 쓰라고
+    #      적어 두었는데 여기만 안 따랐다.
+    today = today_kst().isoformat()
     now_utc = datetime.now(timezone.utc).isoformat()
     # prev_score(=덮어쓰기 직전 실행의 점수)를 여기서 함께 적던 것을 걷었다. 화면에서
     # 그 값을 읽던 자리가 없어졌고, 남겨 두면 아무도 안 읽는 칸을 매 실행 채우게 된다.

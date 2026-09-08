@@ -30,7 +30,9 @@ import {
   lastKaderaUpdatedAt,
   optimismPct,
   sentimentWindow,
+  todayKstDate,
   toPercents,
+  windowBefore,
 } from "@/lib/telegram-data";
 import { changeRateOf, fetchYahooQuote } from "@/lib/yahoo-quote";
 import { yahooSymbol } from "@/lib/yahoo-history";
@@ -38,6 +40,33 @@ import { US_THEMES } from "@/lib/us-stock-themes";
 
 /** 급부상 판정에서 '최근'으로 볼 일수. 국내(KADERA_WINDOW_DAYS)와 같게 둔다. */
 export const US_WINDOW_DAYS = 3;
+
+/**
+ * 미장 카더라의 **기준일** — telegram_us_sentiment_daily 의 최신 날짜.
+ *
+ * 국장 `kaderaBaseDate` 의 짝이고, 창을 여기에 매다는 이유도 같다(그쪽 주석 참고).
+ *
+ * ## ⚠️ 이걸 안 쓰고 벽시계를 쓰다 '3일'이 나흘이 됐다
+ *
+ * 예전엔 `new Date(Date.now() - days*86400_000)` 로 하한을 잡고 `.gte("date", since)` 만
+ * 걸었다. 경계일이 **양쪽 다** 들어와 3 을 넣으면 나흘이 잡힌다. 실측(2026-09-08):
+ * 히어로가 "미장 종목 언급 3일 2,377회"라고 적었는데 그건 9/5~9/8 나흘 합이고,
+ * 진짜 사흘(9/6~9/8)은 1,550회였다. 종목 수도 124 vs 108 로 갈렸다.
+ *
+ * 국장은 같은 함정을 이미 겪고 `windowBefore` 하나로 모았는데(그 주석의 1,828 vs 1,727),
+ * 이 파일만 그 헬퍼를 안 가져다 써서 되풀이했다.
+ */
+export const usKaderaBaseDate = cache(async (): Promise<string> => {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db
+    .from("telegram_us_sentiment_daily")
+    .select("date")
+    .order("date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) console.error("[usKaderaBaseDate] 기준일을 못 읽었습니다 — 벽시계로 물러납니다", error);
+  return (data?.date as string | undefined) ?? todayKstDate();
+});
 /**
  * 낙관도 창이 얇을 때 넓히는 문턱(오늘+어제 분석 건수). 규칙은 국장 sentimentWindow 와 같고
  * 문턱만 미장 물량에 맞췄다 — 실측(56일) 오늘+어제 건수 중앙 1,252 · 하위¼ 666, 400 이면
@@ -147,14 +176,24 @@ export const usNameMap = cache(async (): Promise<Map<string, string>> => {
   return new Map(rows.map((r) => [r.ticker, r.name_ko]));
 });
 
-/** 최근 N일치 일별 집계. 날짜 목록은 오름차순이다. */
+/**
+ * **기준일을 뺀** 그 앞 N일치 일별 집계. 날짜 목록은 오름차순이다.
+ *
+ * 국장 `loadStockDaily` 와 같은 규칙이다 — 창은 `windowBefore` 하나가 정하고,
+ * 위아래 경계를 **둘 다** 쿼리에 건다. 하한만 걸면 경계일이 양쪽 다 들어와
+ * N 일이 N+1 일이 된다(usKaderaBaseDate 주석의 2,377 vs 1,550).
+ */
 async function loadUsStockDaily(days: number): Promise<{ rows: DailyRow[]; dates: string[] }> {
   const db = getSupabaseAdmin();
-  const since = new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
+  const window = windowBefore(await usKaderaBaseDate(), days);
   // ⚠️ 정렬 키는 date 가 아니라 id 다. 하루에 종목 수백 행이 달려 date 는 유일하지 않고,
   //    유일하지 않은 키로 페이징하면 경계에서 행이 빠지거나 겹친다(fetchAllRows 주석 [2]).
   const rows = await fetchAllRows<DailyRow>("id", () =>
-    db.from("telegram_us_stock_daily").select("date,ticker,mention_count,channel_count,weighted_score").gte("date", since),
+    db
+      .from("telegram_us_stock_daily")
+      .select("date,ticker,mention_count,channel_count,weighted_score")
+      .gte("date", window[0])
+      .lte("date", window[window.length - 1]),
   );
   const dates = [...new Set(rows.map((r) => r.date))].sort();
   return { rows, dates };
@@ -182,9 +221,9 @@ async function loadUsStockDaily(days: number): Promise<{ rows: DailyRow[]; dates
  */
 export async function getUsSurgingOneliners(): Promise<Record<string, string>> {
   const db = getSupabaseAdmin();
-  const { dates } = await loadUsStockDaily(14);
-  const base = dates.at(-1);
-  if (!base) return {};
+  // ⚠️ `dates.at(-1)` 을 쓰면 안 된다 — 창이 기준일을 빼므로 그건 기준일 하루 앞이다.
+  //    LLM 문장은 기준일자로 저장되니 하루 어긋나면 카드가 통째로 빈다.
+  const base = await usKaderaBaseDate();
   // 오래된 날부터 받아 뒤엣것이 이기게 둔다 — 기준일분이 아직 없으면 이틀까지 거슬러
   // 가장 최근 문장을 쓴다(LLM_TEXT_CARRY_DAYS 주석).
   const { data, error } = await db
@@ -204,7 +243,8 @@ export async function getUsSurgingStocks(limit = 6): Promise<UsSurgingStock[]> {
   const { rows, dates } = await loadUsStockDaily(14);
   if (!rows.length) return [];
 
-  // 마지막 날은 아직 안 끝난 날이라 뺀다 — 오전에 보면 그날 몫이 늘 작아 보인다.
+  // 안 끝난 오늘은 loadUsStockDaily 의 창(windowBefore)이 이미 뺐다. 여기서는 그 꼬리
+  // US_WINDOW_DAYS 칸을 '최근'으로 잡고 나머지를 비교군으로 둔다.
   const recentN = Math.min(US_WINDOW_DAYS, Math.max(1, dates.length - 1));
   const recentDates = new Set(dates.slice(-recentN));
   const priorCount = Math.max(dates.length - recentN, 1);
@@ -259,28 +299,59 @@ export async function getUsSurgingStocks(limit = 6): Promise<UsSurgingStock[]> {
     .slice(0, limit);
 
   // 시세는 **고른 것만** 받는다. 후보 전부를 물으면 카드에 못 오를 종목까지 왕복한다.
-  const [quotes, breadth] = await Promise.all([usQuotes(ranked.map((s) => s.ticker)), usStockBreadth()]);
-  const chOf = new Map(breadth.rows.map((r) => [r.ticker, r.channelCount]));
+  const [quotes, chOf] = await Promise.all([
+    usQuotes(ranked.map((s) => s.ticker)),
+    breadthChannelsIfSameWindow("getUsSurgingStocks"),
+  ]);
   return ranked.map((s) => ({
     ...s,
-    // 창 전체의 **합집합**으로 덮어쓴다. 못 찾으면 위 폴백(일별 최댓값)이 남는다.
-    channelCount: chOf.get(s.ticker) ?? s.channelCount,
+    // 창이 같을 때만 합집합으로 덮어쓴다. 아니면 위 폴백(일별 최댓값)이 남는다.
+    channelCount: chOf?.get(s.ticker) ?? s.channelCount,
     price: quotes.get(s.ticker)?.price ?? null,
     changeRate: quotes.get(s.ticker)?.changeRate ?? null,
   }));
 }
 
+/**
+ * 종목별 채널 **합집합**을 쓸 수 있는지 판정하고, 쓸 수 있으면 티커→채널 수 표를 준다.
+ *
+ * ## ⚠️⚠️ 창이 다르면 안 쓴다
+ *
+ * breadth 표는 파이프라인이 **자기 창**으로 세어 둔 것이라, 그 창이 카드의 창과 다르면
+ * 채널 수와 언급 수가 서로 다른 기간을 말한다. 그러면 **채널 수가 언급 수보다 큰**
+ * 카드가 나온다 — 2026-09-08 실측으로 표가 14일 합집합이라 나이키가 "44개 채널 ·
+ * 최근 3일 31회", 노보노디스크가 "32개 채널 · 12회" 로 떴다. 44곳이 31번 말할 수는 없다.
+ *
+ * 창이 같을 때만 합집합을 쓰고, 다르면 일별 최댓값으로 물러난다. 최댓값은 실제보다
+ * 작지만(같은 채널을 며칠치 겹쳐 세지 않으려는 값이라) **모순되지는 않는다.**
+ * 파이프라인이 같은 창으로 세면(calculate_us_stock_daily.BREADTH_WINDOW_DAYS)
+ * 저절로 합집합이 다시 쓰인다.
+ */
+async function breadthChannelsIfSameWindow(where: string): Promise<Map<string, number> | null> {
+  const breadth = await usStockBreadth();
+  if (breadth.windowDays === US_WINDOW_DAYS) return new Map(breadth.rows.map((r) => [r.ticker, r.channelCount]));
+  if (breadth.windowDays) {
+    console.error(
+      `[${where}] breadth 창(${breadth.windowDays}일)이 카드 창(${US_WINDOW_DAYS}일)과 달라 ` +
+        "일별 최댓값으로 물러납니다 — calculate_us_stock_daily.BREADTH_WINDOW_DAYS 를 맞추십시오.",
+    );
+  }
+  return null;
+}
+
 /** 채널별 미장 비중과 국장 vs 미장 배분이 **같은 표 하나**를 본다. */
 const loadChannelDaily = cache(async (days = 30) => {
   const db = getSupabaseAdmin();
-  const since = new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
+  // 종목 집계와 같은 규칙으로 센다 — 하한만 걸면 '30일'이 31일이 된다.
+  const window = windowBefore(await usKaderaBaseDate(), days);
   return fetchAllRows<{ date: string; channel_handle: string; total_msgs: number; us_msgs: number; kr_msgs: number }>(
     "id",
     () =>
       db
         .from("telegram_us_channel_daily")
         .select("date,channel_handle,total_msgs,us_msgs,kr_msgs")
-        .gte("date", since),
+        .gte("date", window[0])
+        .lte("date", window[window.length - 1]),
   );
 });
 
@@ -887,6 +958,7 @@ export async function getUsStockReports(limit = 4): Promise<UsStockReport[]> {
   const [{ rows, dates }, nameOf] = await Promise.all([loadUsStockDaily(14), usNameMap()]);
   if (!rows.length) return [];
 
+  // 창은 이미 기준일이 빠진 14일이라, 그 꼬리 US_WINDOW_DAYS 칸이 곧 집계 구간이다.
   const windowFrom = dates.slice(-US_WINDOW_DAYS)[0] ?? dates[0];
   const agg = new Map<string, { mentions: number; channels: number; byDate: Map<string, number> }>();
   for (const r of rows) {
@@ -906,7 +978,7 @@ export async function getUsStockReports(limit = 4): Promise<UsStockReport[]> {
     .slice(0, limit);
   if (!top.length) return [];
 
-  const base = dates.at(-1)!;
+  const base = await usKaderaBaseDate();
   const { data, error } = await db
     .from("telegram_us_stock_narrative")
     .select("date,ticker,narrative")
@@ -919,14 +991,16 @@ export async function getUsStockReports(limit = 4): Promise<UsStockReport[]> {
   const narrativeOf = new Map((data ?? []).map((r) => [r.ticker as string, r.narrative as string]));
 
   const chartDates = dates.slice(-US_CHART_DAYS);
-  const [quotes, breadth] = await Promise.all([usQuotes(top.map(([t]) => t)), usStockBreadth()]);
-  const chOf = new Map(breadth.rows.map((r) => [r.ticker, r.channelCount]));
+  const [quotes, chOf] = await Promise.all([
+    usQuotes(top.map(([t]) => t)),
+    breadthChannelsIfSameWindow("getUsStockReports"),
+  ]);
   return top.map(([ticker, a]) => ({
     ticker,
     name: nameOf.get(ticker) ?? ticker,
     recentMentions: a.mentions,
-    // 창 전체 합집합. 없으면 일별 최댓값 폴백(getUsSurgingStocks 주석과 같은 이유).
-    channelCount: chOf.get(ticker) ?? a.channels ?? null,
+    // 창이 같을 때만 합집합. 다르면 일별 최댓값 폴백(breadthChannelsIfSameWindow 주석).
+    channelCount: chOf?.get(ticker) ?? a.channels ?? null,
     series: chartDates.map((d) => a.byDate.get(d) ?? 0),
     seriesDates: chartDates,
     price: quotes.get(ticker)?.price ?? null,

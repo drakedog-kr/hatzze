@@ -22,7 +22,7 @@ function daysAgoISO(days: number): string {
 }
 
 /** 오늘(KST) 날짜 문자열. 아직 하루가 덜 찬 오늘을 집계에서 제외할 때 쓴다. */
-function todayKstDate(): string {
+export function todayKstDate(): string {
   return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
