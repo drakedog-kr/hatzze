@@ -37,8 +37,8 @@ export type MoveReasonRow = {
   changeRate: number | null;
   changeSource: "krx" | "yahoo" | null;
   closePrice: number | null;
-  /** 채널이 말한 까닭. null = 그날 언급은 있었지만 까닭을 말한 글이 없다 */
-  reason: string | null;
+  /** 채널이 말한 까닭. **늘 채워져 있다** — 까닭이 없는 줄은 아래 getMoveReasons 가 뺀다 */
+  reason: string;
   channelCount: number;
   mentionCount: number;
   /** 채널 글에서 읽은 등락 표기(정렬 보조). 화면에 내지 않는다 */
@@ -142,6 +142,7 @@ function changeOn(bars: { date: string; close: number }[], date: string): { rate
  *    표에 남아 종목 화면(getStockMoveReason)이 쓴다 — "왜 떨어졌어"도 검색으로 오는 질문이다.
  * 등락률을 못 구한 줄은 채널 글의 표기(quoted)가 플러스일 때만 남긴다 — 시세만 늦은 것일 수
  *    있어서다. 그마저 없으면 오른 줄인지 알 길이 없으므로 뺀다.
+ * ⭐ **까닭이 없는 줄도 뺀다.** 자세한 사정은 아래 조회 뒤 주석에.
  */
 export const getMoveReasons = cache(async (): Promise<MaybeFailed<MoveReasonBoard | null>> => {
   const db = getSupabaseAdmin();
@@ -169,7 +170,16 @@ export const getMoveReasons = cache(async (): Promise<MaybeFailed<MoveReasonBoar
     console.error("[getMoveReasons] 까닭 목록을 못 읽었습니다", error);
     return LOAD_FAILED;
   }
-  const rows = (data ?? []) as ReasonRow[];
+  /**
+   * ⭐ **까닭이 없는 줄은 여기서 뺀다**(2026-09-10). 카드의 값어치는 등락률이 아니라 한 줄
+   * 설명인데, 까닭이 없는 줄이 오름폭만으로 자리를 차지하면 그 칸은 "말한 곳이 없습니다"
+   * 한 줄만 남는다. 실측 09-09: 오른 35줄 중 10줄이 그랬다. 그 자리엔 다음 줄이 올라온다.
+   * ⛔ 표에서 지우는 게 아니다 — 까닭 없는 줄도 종목 화면(getStockMoveReason)이 읽는다.
+   * 여기서 걸러야 아래 야후 조회도 **화면에 설 줄에만** 나간다.
+   */
+  const rows = ((data ?? []) as ReasonRow[])
+    .map((r) => ({ ...r, reason: (r.reason ?? "").trim() }))
+    .filter((r) => r.reason !== "");
   if (!rows.length) return { date, rows: [] };
 
   const info = await stockRows(rows.map((r) => r.stock_code));
@@ -200,7 +210,7 @@ export const getMoveReasons = cache(async (): Promise<MaybeFailed<MoveReasonBoar
       changeRate,
       changeSource,
       closePrice,
-      reason: r.reason ?? null,
+      reason: r.reason,
       channelCount: r.channel_count ?? 0,
       mentionCount: r.mention_count ?? 0,
       quotedChange: num(r.quoted_change_rate),

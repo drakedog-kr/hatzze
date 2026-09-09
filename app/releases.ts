@@ -29,6 +29,12 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 카드에 서는 종목이 달라진다. 화면 쓰는 법은 그대로라 Patch.
+    version: "1.12.2",
+    date: "2026-09-10",
+    changes: ["급등 종목 카드에 커뮤니티가 이유를 말한 종목만 올라갑니다."],
+  },
+  {
     // 카드 머리의 그림만 달라진다. 화면 쓰는 법은 그대로라 Patch.
     version: "1.12.1",
     date: "2026-09-09",

@@ -933,7 +933,9 @@ export default async function KaderaPage() {
              까닭이 주인공이라 문장이 가운데 넓게 서고, 등락은 오른쪽에 작게 붙는다.
           LLM 문장엔 늘 ✨(AiMark)가 붙는다 — 상자 대신 문장 앞에 인라인으로.
           등락률은 그날 종가 기준이고 두 갈래에서 온다(lib/kadera-why.ts 머리말).
-          ⭐ 까닭이 없는 줄도 빼지 않는다 — "말한 곳이 없다"도 정보다. 글자색만 흐리다.
+          ⭐ **까닭이 없는 줄은 안 올린다**(2026-09-10). 한때는 "말한 곳이 없습니다" 로 두고
+             글자색만 흐리게 했는데, 그 칸은 이름과 등락률만 남아 옆 급부상 카드가 이미 하는
+             말을 되풀이했다. 뺀 자리엔 다음 줄이 올라온다(lib/kadera-why.ts 조회 뒤 주석).
           오르내림은 한 목록에 섞고 폭이 큰 순으로 세운다. 여덟부터 보여주고 더 보기로 연다. */}
       <section className="hz-sheet" id="why">
         <SectionHead level={3}
@@ -1002,12 +1004,12 @@ export default async function KaderaPage() {
                         margin: 0,
                         fontSize: 13,
                         lineHeight: 1.7,
-                        color: r.reason ? "var(--c-ink-soft)" : C.sub2,
+                        color: "var(--c-ink-soft)",
                         wordBreak: "keep-all",
                         textWrap: "pretty",
                       }}
                     >
-                      {r.reason ?? "커뮤니티에서 이유를 말한 곳이 없습니다"}
+                      {r.reason}
                     </p>
                   </div>
                 </div>
