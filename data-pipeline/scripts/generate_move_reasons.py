@@ -47,7 +47,7 @@ from anthropic import Anthropic  # noqa: E402
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.prompt_style import PLAIN_PROSE_RULE_SHORT  # noqa: E402
 from common.supabase_client import get_client, load_all, load_all_keyset, load_keyset  # noqa: E402
-from common.text_check import is_clean  # noqa: E402
+from common.text_check import problems  # noqa: E402
 from common.timeutil import KST, today_kst  # noqa: E402
 
 import generate_telegram_narratives as KR  # noqa: E402
@@ -68,6 +68,10 @@ QUOTED_MIN = 7.0      # 채널 글의 등락 표기가 이만큼은 돼야 '크�
 HEAVY_N = 15          # 등락 표기가 없어도 그날 주목도 상위 N 은 후보(대형주는 %를 잘 안 적는다)
 CAP = 40              # 하루 최대 후보. 화면은 12줄부터 보여주고 더 보기로 연다
 EXCERPTS = 8          # 종목당 발췌 건수
+# 검수에 걸린 문장을 다시 물어보는 횟수. 종목 내러티브의 재시도 루프와 같은 뜻이다.
+# 2 인 까닭: 퍼센트를 적는 버릇처럼 되풀이되는 실패는 세 번째에도 안 고쳐지고, 이 자리는
+# 한 종목당 한 번의 추가 호출이 그대로 비용이라 길게 잡을 값이 아니다.
+REASON_RETRIES = 2
 
 # ── 발췌에서 빼는 글: 이유가 없는 순위 나열 ──────────────────────────────────
 #
@@ -81,7 +85,17 @@ EXCERPTS = 8          # 종목당 발췌 건수
 #    실측(7일 25,426건): 머리글 일치 45건 중 서술이 붙은 것은 1건뿐이고, 이유를 담은
 #    '주요 상승 종목 현황·특징주' 330건은 **하나도 안 걸린다.**
 _RANK_HEAD = re.compile(r"상승률\s*TOP|등락률\s*TOP|하락률\s*TOP|\[KRX\s*상승률|TOP\s*10\]")
-_ITEM_REASON = re.compile(r"[)\d%]\s*[-–—]\s*[가-힣]{4,}")
+#
+# ⭐ **구분자에 콜론을 더했다**(2026-09-10). 대시만 볼 때 `1. 머큐리 (30.00%) : 통신장비
+#    관련주, 시총700억대, 광케이블사업, 미국에서 AI 데이터센터 확대에 따른 광통신 인프라
+#    수요 주목` 꼴이 통째로 버려졌다. 항목마다 까닭이 붙은 좋은 재료인데 머리글이
+#    '상승률 TOP30' 이라 순위 나열로 몰린 것이다.
+#    실측(2026-09-03~09 · 글 30,714건 중 머리글 일치 54건 · **위 실측과 다른 주다**):
+#    대시만 보면 살아나는 글이
+#    **0건**, 콜론을 더하면 **5건**이고 다섯 다 그 채널의 TOP30 정리다. 이유 없는
+#    TOP10 나열 42건은 하나도 안 딸려 나온다 — 거기 붙은 콜론은 `시간: 정규장`·
+#    `거래소: KRX` 뿐이라 앞 글자가 `[)\d%]` 가 아니다.
+_ITEM_REASON = re.compile(r"[)\d%]\s*[-–—:]\s*[가-힣]{4,}")
 
 
 def bare_ranking(text: str) -> bool:
@@ -259,19 +273,27 @@ def starts_with_name(text: str, name: str) -> bool:
     return bool(name) and head.startswith(name)
 
 
-def clean_reason(text: str, name: str, digest: str) -> str | None:
+def clean_reason(text: str, name: str, digest: str) -> tuple[str | None, str]:
+    """모델 문장을 다듬어 (쓸 문장, 버린 까닭)로 돌려준다. 통과하면 까닭은 빈 문자열이다.
+
+    **버린 까닭을 같이 주는 이유**는 두 가지다. 하나는 로그에 남겨야 조용히 사라지지 않기
+    때문이고(2026-09-09 사고의 교훈), 하나는 아래 ask 의 재시도가 "모델이 까닭이 없다고
+    답한 것"과 "썼는데 검수에 걸린 것"을 갈라야 하기 때문이다. 앞은 정직한 답이라 다시
+    조르지 않고, 뒤만 다시 묻는다.
+    """
     t = " ".join((text or "").split()).strip().strip('"').strip("'").rstrip(".")
     if not t:
-        return None
+        return None, ""
     if re.search(r"\d\s*%|%", t):
-        return None
+        return None, "퍼센트를 적었다"
     if starts_with_name(t, name):
         t = t[len(name):].lstrip(" ,·:은는이가의") or t
     if len(t) > REASON_LEN[1] + 15 or len(t) < 4:
-        return None
-    if not is_clean(t, digest):
-        return None
-    return t
+        return None, f"길이 {len(t)}자"
+    bad = problems(t, digest)
+    if bad:
+        return None, "검수: " + " · ".join(bad)
+    return t, ""
 
 
 def resolve_n(n, batch: list[tuple[str, str, str]]) -> int | None:
@@ -300,8 +322,8 @@ def resolve_n(n, batch: list[tuple[str, str, str]]) -> int | None:
     return None
 
 
-def ask(client, batch: list[tuple[str, str, str]]) -> dict[str, str]:
-    """[(code, name, digest)] → {code: reason}. 못 짝지은 종목은 빠진다(경고를 찍는다)."""
+def ask_once(client, batch: list[tuple[str, str, str]]) -> dict[str, str]:
+    """한 번 물어 **날것 문장**을 {code: text} 로 돌려준다. 짝을 못 지은 응답은 경고로 남긴다."""
     prompt = "\n\n".join(f"### {i}\n{d}" for i, (_c, _n, d) in enumerate(batch, 1))
     res = client.messages.create(
         model=MODEL, max_tokens=600, system=SYSTEM,
@@ -310,27 +332,70 @@ def ask(client, batch: list[tuple[str, str, str]]) -> dict[str, str]:
     )
     data = json.loads("".join(b.text for b in res.content if b.type == "text"))
     items = data.get("results", []) or []
-    out: dict[str, str] = {}
+    raw: dict[str, str] = {}
     lost = 0
     for item in items:
         k = resolve_n(item.get("n"), batch)
         if k is None:
             lost += 1
             continue
-        code, name, digest = batch[k]
-        r = clean_reason(item.get("reason", ""), name, digest)
-        out[code] = r or ""
+        raw[batch[k][0]] = item.get("reason", "") or ""
     # 하나도 못 짝지었는데 개수가 맞으면 순서대로 읽는다. 모델이 번호를 제 방식으로 매긴
     # 것뿐이고 순서는 입력을 따랐던 실측(위 resolve_n)에 기댄 마지막 그물이다.
-    if not out and len(items) == len(batch):
+    if not raw and len(items) == len(batch):
         print(f"  [경고] 번호를 하나도 못 읽어 순서대로 짝지었습니다: {[i.get('n') for i in items]}")
-        for (code, name, digest), item in zip(batch, items):
-            out[code] = clean_reason(item.get("reason", ""), name, digest) or ""
+        for (code, _n, _d), item in zip(batch, items):
+            raw[code] = item.get("reason", "") or ""
     elif lost:
         print(f"  [경고] 짝지을 수 없는 응답 {lost}건을 버렸습니다: {[i.get('n') for i in items]}")
-    missing = [n for c, n, _d in batch if c not in out]
-    if missing:
-        print(f"  [경고] 응답에 없는 종목 {len(missing)}건: {', '.join(missing)}")
+    return raw
+
+
+def ask(client, batch: list[tuple[str, str, str]], retries: int = REASON_RETRIES) -> dict[str, str]:
+    """[(code, name, digest)] → {code: reason}. 까닭을 못 얻은 종목은 빈 문자열이다.
+
+    ⭐ **검수에 걸린 문장은 다시 묻는다**(2026-09-10). 종목 내러티브·히어로 요약은 진작
+    재시도 루프를 갖고 있는데(text_check 모듈 머리말 '쓰는 법') 여기만 없었다. 모델이
+    퍼센트를 적거나 오타를 흘리면 그 한 번으로 끝이라, 발췌에 까닭이 멀쩡히 있는데도
+    화면엔 "말한 곳이 없습니다" 가 떴다.
+
+    ⛔ **모델이 빈 문자열로 답한 것은 다시 안 묻는다.** 그건 "발췌에 까닭이 없다"는 정직한
+       답이라(SYSTEM 프롬프트가 그렇게 시킨다) 조르면 지어내라는 압박이 된다. 다시 묻는
+       것은 ⑴ 응답에 아예 없던 종목과 ⑵ 썼는데 검수에 걸린 종목뿐이다.
+    """
+    out: dict[str, str] = {}
+    todo = list(batch)
+    for attempt in range(retries + 1):
+        # 호출이 깨져도 앞 바퀴에서 이미 통과한 문장은 지키고, 남은 종목만 다음 바퀴로 넘긴다.
+        # 여기서 예외를 그대로 올리면 run_market 의 배치 except 가 받아 **묶음 전체**가 빈다.
+        try:
+            raw = ask_once(client, todo)
+        except Exception as exc:  # noqa: BLE001 — 어떤 실패든 다음 바퀴에 다시 묻는다
+            print(f"  [호출 실패] {type(exc).__name__}: {exc}")
+            raw = {}
+        again: list[tuple[str, str, str]] = []
+        for code, name, digest in todo:
+            if code not in raw:
+                print(f"  [경고] {name}: 응답에 없습니다")
+                again.append((code, name, digest))
+                continue
+            text, note = clean_reason(raw[code], name, digest)
+            if text:
+                out[code] = text
+            elif not note:
+                out[code] = ""  # 모델이 '까닭 없음'이라 답했다 — 정직한 답이라 안 조른다
+            else:
+                print(f"  [검수] {name}: {note} · {raw[code][:60]!r}")
+                again.append((code, name, digest))
+        if not again:
+            break
+        todo = again
+        if attempt < retries:
+            print(f"  [재시도 {attempt + 1}] {len(todo)}종목: {', '.join(n for _c, n, _d in todo)}")
+    for code, name, _d in todo:
+        if code not in out:
+            print(f"  [포기] {name}: {retries + 1}번 물었는데 쓸 문장을 못 얻었습니다")
+            out[code] = ""
     return out
 
 
