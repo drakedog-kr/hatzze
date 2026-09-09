@@ -897,7 +897,10 @@ export default async function PreviewPage() {
               정밀도가 어긋나 보인다. */}
           <SectionHead
             level={3}
-            icon="schedule"
+            /* ⚠️ schedule 이었다. 위 히어로 칸의 '최종 업데이트' 줄이 같은 시계를 쓰고 있어
+               한 화면에 둘이었다. 게다가 시각은 오른쪽 알약이 이미 적는다 — 이 시트를 다른
+               시트와 가르는 말은 제목의 **'해외에서'** 쪽이다. */
+            icon="public"
             title="해외에서 거래 중인 값"
             note={
               overnight.capturedAt

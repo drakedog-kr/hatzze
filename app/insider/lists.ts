@@ -78,7 +78,10 @@ export const INSIDER_LISTS: Record<InsiderListSlug, InsiderListSpec> = {
     title: "월가 거물이 들고 있는 종목",
     sub: "카더라에 오른 종목을 거물 몇 명이 들고 있는지 봅니다.",
     help: "13F는 분기말 기준이라 지금과 다를 수 있습니다.",
-    icon: "groups",
+    // ⚠️ groups 였다. 같은 화면의 `managers`("운용자산이 큰 순")가 이미 그 그림을 쓰고 있어
+    //    한 화면에 같은 아이콘이 둘이었다. groups 는 사람 명단인 managers 쪽이 갖는 것이 맞다 —
+    //    이 카드의 주어는 사람이 아니라 **종목**이고, 묻는 것은 "그 종목을 들고 있나"다.
+    icon: "inventory_2",
   },
 };
 

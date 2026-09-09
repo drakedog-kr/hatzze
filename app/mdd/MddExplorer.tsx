@@ -664,7 +664,8 @@ function Results({ data }: { data: MddResult }) {
           <Recovery a={a} periodLabel={periodLabel} />
         ) : (
           <AbsentSheet
-            icon="schedule"
+            /* ⚠️ 아래 실제 시트(`Recovery`)와 **같은 아이콘**이어야 한다 — 같은 자리에 번갈아 선다. */
+            icon="timer"
             title="회복까지 걸린 기간"
             sub="과거 사례로 본 회복 소요 기간"
             body="지금은 고점 부근이라 회복을 기다릴 하락이 없습니다."
@@ -2051,7 +2052,10 @@ function Attribution({
             margin-top:auto 가 먹는다(옆 시트에 맞춰 늘어난 만큼 아래가 비기 때문). */}
         {gap !== null && (
           <div style={{ marginTop: "auto", display: "flex", gap: 9, background: C.soft, borderRadius: 10, padding: "12px 13px" }}>
-            <Icon name="bolt" style={{ fontSize: 15, color: C.muted, flex: "none", marginTop: 1 }} />
+            {/* ⚠️ bolt 였다. 짝으로 나란히 서는 오른쪽 시트('이 하락의 성격')의 제목 아이콘이
+                같은 번개라, 한 줄에 같은 그림이 둘이었다. 이 상자는 시트의 **결론**이라
+                전구를 쓴다 — 이 파일의 info 는 '자료가 부족하다'는 안내 쪽이다. */}
+            <Icon name="lightbulb" style={{ fontSize: 15, color: C.muted, flex: "none", marginTop: 1 }} />
             <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.7, color: C.inkSoft, wordBreak: "keep-all" }}>
               {excess ? (
                 <>
@@ -2096,7 +2100,11 @@ function Recovery({ a, periodLabel }: { a: MddAnalysis; periodLabel: string }) {
   return (
     <Sheet>
       <SectionHead level={3}
-        icon="schedule"
+        /* ⚠️ schedule(벽시계) 이었다. 짝으로 나란히 서는 왼쪽 시트('역대 낙폭 Top 5')가
+           history 를 쓰는데 그것도 시계라, 한 줄에 시계 둘이 붙어 있었다. 이 시트가 답하는
+           것은 시각이 아니라 **얼마나 걸렸나**이므로 스톱워치가 뜻에도 더 가깝다.
+           ⚠️ 위 `AbsentSheet` 도 같이 바꿀 것 — 같은 자리에 번갈아 선다. */
+        icon="timer"
         title="회복까지 걸린 기간"
         desc="과거 사례로 본 회복 소요 기간"
         note={r.recoveredCount > 0 ? `표본 ${r.recoveredCount}회` : "전례 없음"}

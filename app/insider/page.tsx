@@ -610,7 +610,9 @@ export default async function InsiderPage() {
 {/* ── ⑥ 거물이 들고 있는 종목 ─────────────────────────────────── */}
       <HalfSheet>
         <SectionHead
-          icon="groups"
+          /* ⚠️ groups 로 되돌리지 말 것 — 위 ③("운용자산이 큰 순")이 그 그림을 쓴다.
+             까닭은 app/insider/lists.ts 의 `holders.icon` 주석. */
+          icon="inventory_2"
           title="월가 거물이 들고 있는 종목"
           note={insiderNote("holders", ov)}
           noteHelp={`분기말 기준이라 지금과 다를 수 있습니다${
