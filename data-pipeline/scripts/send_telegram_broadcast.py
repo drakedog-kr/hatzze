@@ -215,6 +215,34 @@ def load_daily_score(db) -> dict | None:
 
 
 def surging_for_message(db) -> list[dict]:
+    """급부상 종목 블록. **여기서 뭐가 터지든 빈 목록이 되고 글은 나간다.**
+
+    2026-09-09 저녁 실행에서 이 안의 채널 폭 조회가 `57014`(statement timeout)로 죽어
+    마감 리포트가 통째로 안 나갔다. 그런데 build_evening 은 `if surging:` 이라 이 목록이
+    비어도 온도·요약·CTA 로 글이 성립한다. 없어도 되는 블록이 필수인 글을 데려간 셈이다.
+
+    ⚠️ **그물을 함수 전체에 건다. 죽은 한 줄만 감싸지 말 것.** 처음엔 그날 터진
+    `top_surging` 만 감쌌는데, 그 위의 load_stock_daily 와 아래의 종목명·요약 조회는
+    여전히 밖에 있었다. 셋 다 같은 표를 같은 방식으로 읽으므로 같은 날 같은 이유로
+    터질 수 있다. "이 블록은 없어도 글이 나간다"가 규칙이면 블록 전체가 그물 안에
+    있어야 한다.
+
+    ⚠️ 조회를 다시 던지지 않는다. common.supabase_client.execute_with_retry 는
+    `httpx.TransportError`(연결 끊김)만 잡는데 57014 는 서버가 정상 응답으로 돌려주는
+    postgrest APIError 라 그 그물에 안 걸린다. 애초에 8초를 넘긴 질의는 다시 던져도
+    넘긴다. 질의를 싸게 만드는 건 별건이다(common/channel_breadth.py).
+
+    ⚠️ daily_score 는 여기 안 들어온다(main 에서 따로 읽는다). 그건 온도와 요약의
+    재료라 못 읽으면 실을 게 없고, main 이 이미 '행이 없으면 skip' 으로 처리한다.
+    """
+    try:
+        return _surging_for_message(db)
+    except Exception as e:  # noqa: BLE001 — 어떤 실패든 글은 나가야 한다
+        print(f"[경고] 급부상 종목을 못 만들었습니다({type(e).__name__}: {e}). 종목 블록을 뺍니다.")
+        return []
+
+
+def _surging_for_message(db) -> list[dict]:
     """메시지에 실을 급부상 종목 — 이름과 '왜 회자되나' 요약까지 붙여서.
 
     고르는 계산은 common/surging.py 가 한다(사이트 카드·내러티브 생성기와 같은 함수).
@@ -231,25 +259,9 @@ def surging_for_message(db) -> list[dict]:
         return []
 
     # 위에서 이미 읽은 걸 넘긴다 — 14일치를 한 실행에서 두 번 읽지 않는다.
-    #
-    # ⚠️ **여기서 죽으면 글 전체가 아니라 이 블록만 빠져야 한다.** 2026-09-09 저녁
-    #    실행에서 top_surging 안의 채널 폭 조회가 `57014`(statement timeout)로 죽어
-    #    마감 리포트가 통째로 안 나갔다. 그런데 build_evening 은 `if surging:` 이라
-    #    이 목록이 비어도 온도·요약·CTA 로 글이 성립한다. 없어도 되는 블록이 필수인
-    #    글을 데려간 셈이라, 위 '자료가 밀렸을 때'와 같은 자리로 합류시킨다.
-    #    2판(common/broadcast_digest.py load_new_faces)은 같은 호출을 처음부터
-    #    이렇게 감싸 두었다 — 1판에만 그물이 없었다.
-    #
-    #    ⚠️ 조회를 여기서 다시 던지지 않는다. common.supabase_client.execute_with_retry
-    #       는 `httpx.TransportError`(연결 끊김)만 잡는데 57014 는 서버가 정상 응답으로
-    #       돌려주는 postgrest APIError 라 그 그물에 안 걸린다. 애초에 8초를 넘긴
-    #       질의는 다시 던져도 8초를 넘긴다. 질의 자체를 싸게 만드는 건 별건이다
-    #       (common/channel_breadth.py).
-    try:
-        top = top_surging(db, SURGING_SHOW, preloaded=(rows, dates))
-    except Exception as e:  # noqa: BLE001 — 어떤 조회 실패든 글은 나가야 한다
-        print(f"[경고] 급부상 계산에 실패했습니다({type(e).__name__}: {e}). 종목 블록을 뺍니다.")
-        return []
+    # 2026-09-09 에 마감 리포트를 죽인 자리다(채널 폭 조회의 statement timeout).
+    # 여기서 터져도 글은 나간다 — 그물은 위 surging_for_message 가 건다.
+    top = top_surging(db, SURGING_SHOW, preloaded=(rows, dates))
     if not top:
         return []
 
