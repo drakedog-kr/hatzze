@@ -40,6 +40,7 @@ from collections.abc import Iterable
 from datetime import date, datetime, timedelta
 
 from .channel_breadth import channel_breadth_map
+from .prompt_style import PLAIN_PROSE_RULE
 from .supabase_client import execute_with_retry, load_keyset
 from .surging import load_stock_daily
 from .text_check import problems
@@ -480,6 +481,7 @@ _LLM_RULES = """\
 - **모든 문장을 '~습니다'/'~ㅂ니다'로 끝맺습니다.** "~이에요", "~네요", "~죠" 같은 해요체 금지.
 - 대시(—, –)를 문장 부호로 쓰지 마세요. 절을 이을 땐 마침표로 끊습니다.
 - 과장 없이 데이터가 말하는 만큼만 씁니다.
+""" + PLAIN_PROSE_RULE + """
 
 [절대 하지 말 것]
 - 매수/매도/투자 권유, 목표가, 상승·하락 예측('오를 것', '앞으로').
