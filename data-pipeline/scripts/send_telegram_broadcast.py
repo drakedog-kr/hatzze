@@ -231,7 +231,25 @@ def surging_for_message(db) -> list[dict]:
         return []
 
     # 위에서 이미 읽은 걸 넘긴다 — 14일치를 한 실행에서 두 번 읽지 않는다.
-    top = top_surging(db, SURGING_SHOW, preloaded=(rows, dates))
+    #
+    # ⚠️ **여기서 죽으면 글 전체가 아니라 이 블록만 빠져야 한다.** 2026-09-09 저녁
+    #    실행에서 top_surging 안의 채널 폭 조회가 `57014`(statement timeout)로 죽어
+    #    마감 리포트가 통째로 안 나갔다. 그런데 build_evening 은 `if surging:` 이라
+    #    이 목록이 비어도 온도·요약·CTA 로 글이 성립한다. 없어도 되는 블록이 필수인
+    #    글을 데려간 셈이라, 위 '자료가 밀렸을 때'와 같은 자리로 합류시킨다.
+    #    2판(common/broadcast_digest.py load_new_faces)은 같은 호출을 처음부터
+    #    이렇게 감싸 두었다 — 1판에만 그물이 없었다.
+    #
+    #    ⚠️ 조회를 여기서 다시 던지지 않는다. common.supabase_client.execute_with_retry
+    #       는 `httpx.TransportError`(연결 끊김)만 잡는데 57014 는 서버가 정상 응답으로
+    #       돌려주는 postgrest APIError 라 그 그물에 안 걸린다. 애초에 8초를 넘긴
+    #       질의는 다시 던져도 8초를 넘긴다. 질의 자체를 싸게 만드는 건 별건이다
+    #       (common/channel_breadth.py).
+    try:
+        top = top_surging(db, SURGING_SHOW, preloaded=(rows, dates))
+    except Exception as e:  # noqa: BLE001 — 어떤 조회 실패든 글은 나가야 한다
+        print(f"[경고] 급부상 계산에 실패했습니다({type(e).__name__}: {e}). 종목 블록을 뺍니다.")
+        return []
     if not top:
         return []
 
