@@ -974,7 +974,9 @@ function CardBuffett({ v }: { v: Pick }) {
   const jo = (won: number) => Math.round(won / 1e12).toLocaleString("ko-KR"); // 원 → 조원
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
-      <TitleRow desc={v.headline} icon="payments" name={v.name} />
+      {/* ⚠️ payments(지폐) 였다. 이 지표는 돈의 크기가 아니라 **나라 경제(GDP) 대비 증시
+          크기**라, 지폐보다 경제를 가리키는 그림이 가깝다. 지폐는 거래대금 카드로 옮겼다. */}
+      <TitleRow desc={v.headline} icon="account_balance" name={v.name} />
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={v.disp} unit={v.unit} color={v.color} size={32} />
         {ratio !== null && (
@@ -1130,7 +1132,9 @@ function CardMarketActions({ v }: { v: Pick }) {
   const maxN = Math.max(1, buyN, sellN, cbN);
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
-      <TitleRow desc={v.headline} icon="speed" name={v.name} badge="최근 한 달" />
+      {/* ⚠️ speed(속도계) 였다. 이 지표가 세는 것은 VI·사이드카·서킷브레이커 — 시장을
+          **멈추는** 장치이지 속도가 아니다. 속도계는 MDD 의 '하락 vs 회복 속도' 타일이 쓴다. */}
+      <TitleRow desc={v.headline} icon="shield" name={v.name} badge="최근 한 달" />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
         {/* 한글은 같은 font-size 라도 숫자보다 글리프가 커 보인다 — 다른 카드의 32px 숫자와
             '눈에 보이는 크기'를 맞춘 값이 30 이다. */}
@@ -1427,7 +1431,12 @@ function CardAsia({ v }: { v: Pick }) {
   const ROW_GAP = 9;
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
-      <TitleRow desc={v.headline} icon="public" name={v.name} badge="최근 한 달" />
+      {/* ⚠️ public(지구본) 이었다. 아래 CardNetBuy("고점권 외국인 매도")가 같은 지구본을
+          쓰고 있어 한 화면에 둘이었다. 지구본은 그쪽이 갖는다 — 저 카드는 **누가** 사고파는지
+          (외국인)를 말하는 자리라 방향에 매이지 않는 그림이 필요하고, 이 카드가 실제로 하는
+          일은 네 나라를 **한 기준선에서 견주는 것**이다. 아이콘이 카드의 모양을 되풀이하는
+          것은 이 화면의 어법이다(쏠림=pie_chart · 증권앱 순위=leaderboard). */}
+      <TitleRow desc={v.headline} icon="align_horizontal_left" name={v.name} badge="최근 한 달" />
       <Big
         disp={`${v.raw !== null && v.raw > 0 ? "+" : ""}${v.disp}`}
         unit={v.unit}
@@ -1566,7 +1575,10 @@ function CardVolume({ v }: { v: Pick }) {
   ];
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
-      <TitleRow desc={v.headline} icon="groups" name={v.name} />
+      {/* ⚠️ groups(사람 셋) 였다. 이 카드가 내는 값은 사람 수가 아니라 **억원**이다 —
+          "평소보다 돈이 얼마나 몰렸나". 지폐 그림은 위 버핏지수가 쓰던 것을 가져왔고,
+          그쪽은 나라 경제를 가리키는 그림으로 옮겼다. */}
+      <TitleRow desc={v.headline} icon="payments" name={v.name} />
       {surge !== null && (
         <Big disp={`${surge >= 0 ? "+" : ""}${surge}`} unit="%" color={v.color} size={32} sub="평소 대비" />
       )}

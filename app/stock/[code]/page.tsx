@@ -351,7 +351,10 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
       {why && (
         <section className="hz-sheet">
           <SectionHead
-            icon="trending_up"
+            /* ⚠️ trending_up 이었다. 카더라 '급등 종목' 카드에서 옮겨 온 값인데, 이 표는
+               **내린 날도 보여준다**(바로 위 주석). 아래 등락률이 ▼ 로 찍히는 날 아이콘만
+               혼자 올라가 있었다. 위아래 화살표는 방향을 말하지 않는다. */
+            icon="swap_vert"
             title="왜 움직였나"
             note={fmtKoDate(why.date)}
             desc="그날 커뮤니티가 말한 이유입니다. 확인된 사실이 아니라 오간 이야기입니다."
@@ -445,7 +448,11 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
           ⛔ 없는 자리를 그럴듯한 문장으로 메우지 말 것. */}
       {d.narrative && (
         <section className="hz-sheet">
-          <SectionHead icon="auto_awesome" title="무엇이 화제였습니까" note="최근 사흘" level={2} />
+          {/* ⚠️ icon 을 auto_awesome 으로 되돌리지 말 것. 바로 아래 본문의 ✨(AiMark)가 같은
+              글리프라 머리와 본문에 같은 그림이 두 번 섰고, 무엇보다 ✨ 는 "생성형 AI가 썼다"는
+              **고지 표시**다(app/ui.tsx AiMark 머리말). 장식으로 같이 쓰면 그 뜻이 흐려진다.
+              확성기는 카더라의 '트렌딩 메시지'와 같은 뜻으로 쓴다 — 채널에서 떠들썩했던 것. */}
+          <SectionHead icon="campaign" title="무엇이 화제였습니까" note="최근 사흘" level={2} />
           {/* ⚠️ 고지 문구를 **글자로 깔지 않는다.** ✨ 하나가 고지를 품는 것이 이 저장소의
               방식이다(app/ui.tsx AiMark 머리말: 문장마다 한 줄씩 깔면 정작 읽어야 할
               요약보다 고지가 길어진다). 누르거나 마우스를 올리면 문구가 뜨고, 같은
