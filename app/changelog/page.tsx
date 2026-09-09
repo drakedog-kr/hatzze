@@ -4,6 +4,7 @@ import { DOC_WIDTH } from "../legal";
 import { RELEASES } from "../releases";
 import { pageMetadata } from "../seo";
 import { C, MONO, R } from "../ui";
+import { ChangelogSeen } from "../VersionBadge";
 
 // og:image URL 에 그날의 도수가 실려 있어 요청마다 다시 계산해야 한다(상수로 두면
 // 서버가 살아 있는 동안 어제 URL 을 계속 내보낸다). 자세한 건 app/seo.ts 주석 참고.
@@ -27,6 +28,10 @@ export async function generateMetadata(): Promise<Metadata> {
 export default function ChangelogPage() {
   return (
     <div style={{ maxWidth: DOC_WIDTH }}>
+      {/* 이 화면을 봤다는 표시. 푸터 버전 옆의 빨간 N 이 여기서 꺼진다. 푸터를 눌러 온
+          사람은 누르는 순간 이미 꺼지지만, 사이드바·검색·주소 직접 입력으로 닿은 사람은
+          이 줄이 없으면 다 읽고 나가도 배지가 그대로 켜져 있다. 그리는 것은 없다. */}
+      <ChangelogSeen />
       <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: C.ink, letterSpacing: "-0.01em" }}>
         업데이트 기록
       </h1>
