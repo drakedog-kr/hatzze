@@ -27,7 +27,9 @@ telegram_message_stocks 를 telegram_messages 에 !inner 로 조인해(복합 FK
 
 ⚠️ 페이징 필수. 인기 종목은 7일치가 1,000행을 훌쩍 넘고(SK하이닉스 2,822행),
 PostgREST 는 넘친 만큼을 **에러 없이** 잘라서 채널 수가 조용히 적게 나온다.
-정렬 키는 유일해야 한다(common/supabase_client.load_all 주석) — id 를 쓴다.
+정렬 키는 두 함수가 다르다 — 종목으로 좁히는 `_mentions_by_code` 는 유일한 `id` 를
+쓰고(common/supabase_client.load_all 주석), 날짜로 좁히는 `_window_message_keys` 는
+그 필터와 같은 축인 `posted_at` 을 쓴다. 까닭은 그 함수 docstring 에 적었다.
 
 ⚠️⚠️ **OFFSET 이 아니라 키셋으로 넘긴다.** 조인과 날짜 필터가 걸린 질의에 OFFSET 을 쓰면
 페이지마다 그 필터를 다시 적용하고 건너뛴 행까지 훑는다. 2026-08-13·08-14 실행에서
@@ -43,17 +45,15 @@ PAGE = 1000
 IN_LIST_MAX = 200
 
 
-def _window_message_keys(db, first_date: str, last_date: str) -> set[tuple[str, int]]:
-    """창 안 메시지의 (채널, 메시지ID) 집합. 좁은 축 + 키셋이라 조인이 없다."""
-    end_exclusive = _next_day(last_date)
+def _keys_at_instant(db, instant: str) -> set[tuple[str, int]]:
+    """같은 시각(posted_at) 행만 id 키셋으로 마저 읽는다. 아래 타이 처리 전용."""
     keys: set[tuple[str, int]] = set()
     last_id: str | None = None
     while True:
         q = (
             db.table("telegram_messages")
             .select("id,channel_handle,message_id")
-            .gte("posted_at", f"{first_date}T00:00:00+09:00")
-            .lt("posted_at", f"{end_exclusive}T00:00:00+09:00")
+            .eq("posted_at", instant)
             .order("id")
             .limit(PAGE)
         )
@@ -66,6 +66,78 @@ def _window_message_keys(db, first_date: str, last_date: str) -> set[tuple[str, 
         last_id = page[-1]["id"]
         if len(page) < PAGE:
             break
+    return keys
+
+
+def _window_message_keys(db, first_date: str, last_date: str) -> set[tuple[str, int]]:
+    """창 안 메시지의 (채널, 메시지ID) 집합. 좁은 축 + 키셋이라 조인이 없다.
+
+    ⚠️⚠️ **정렬키는 `posted_at` 이다. `id` 로 되돌리지 말 것.**
+    예전엔 `id`(uuid) 로 넘겼다. 키셋이라 안전하다고 봤지만, 날짜 범위로 거른 질의를
+    `id` 로 정렬하면 인덱스 하나가 둘을 다 못 맡는다. 서버는 창에 드는 행을 **전부**
+    모아 정렬한 뒤 앞 1,000행만 돌려주므로, 한 페이지 비용이 창 크기에 비례하고
+    **첫 페이지가 가장 비싸다.**
+
+    2026-09-09 저녁 발송이 그 첫 페이지에서 `57014`(statement timeout)로 죽어 마감
+    리포트가 통째로 안 나갔다. 창은 12,648행으로 크지도 않았다 — 더 큰 창에서는
+    멀쩡히 돌던 질의라 "행이 늘어 넘었다"가 아니라 원래 8초 코앞이었던 것이다.
+
+    `posted_at` 으로 넘기면 `telegram_messages_posted_at_idx`(migration_009) 하나가
+    범위와 정렬을 같이 맡아 페이지마다 인덱스 구간만 읽는다. 비용이 창 크기와
+    무관해진다. 실측(2026-09-09, 같은 집합이 나오는지 대조하며):
+
+        창       행수      id 정렬 첫 페이지 / 총        posted_at 첫 페이지 / 총
+        3일    12,648     0.08초 / 0.8초              0.04초 / 0.5초
+        10일   43,000     0.05초 / 4.5초              0.04초 / 1.8초
+        30일  161,135     2.00초 / 32.5초             0.04초 / 6.1초
+
+    ⚠️ `posted_at` 은 유일하지 않다. 그래서 `gt` 가 아니라 `gte` 로 겹쳐 읽고 집합으로
+    중복을 흘린다(경계 시각의 행을 놓치지 않으려면 이래야 한다). 한 시각이 한 페이지를
+    통째로 채우면 커서가 안 움직이는데, 그때만 그 시각을 id 키셋으로 마저 읽고 다음
+    시각으로 건너뛴다. 실측(2026-09-09, 30일 161,135행): 한 시각에 가장 많이 몰린 게
+    15건이라 이 갈래는 사실상 안 타지만, 조용히 잘리는 것보다는 낫다.
+    """
+    end_exclusive = _next_day(last_date)
+    end_iso = f"{end_exclusive}T00:00:00+09:00"
+    keys: set[tuple[str, int]] = set()
+    cursor = f"{first_date}T00:00:00+09:00"
+    while True:
+        page = (
+            db.table("telegram_messages")
+            .select("posted_at,channel_handle,message_id")
+            .gte("posted_at", cursor)
+            .lt("posted_at", end_iso)
+            .order("posted_at")
+            .limit(PAGE)
+            .execute()
+            .data
+            or []
+        )
+        if not page:
+            break
+        keys.update((r["channel_handle"], r["message_id"]) for r in page)
+        if len(page) < PAGE:
+            break
+        nxt = page[-1]["posted_at"]
+        if nxt != cursor:
+            cursor = nxt
+            continue
+        # 한 시각이 페이지를 통째로 채웠다(위 주석). 그 시각을 마저 읽고 다음으로 넘긴다.
+        keys |= _keys_at_instant(db, cursor)
+        after = (
+            db.table("telegram_messages")
+            .select("posted_at")
+            .gt("posted_at", cursor)
+            .lt("posted_at", end_iso)
+            .order("posted_at")
+            .limit(1)
+            .execute()
+            .data
+            or []
+        )
+        if not after:
+            break
+        cursor = after[0]["posted_at"]
     return keys
 
 
