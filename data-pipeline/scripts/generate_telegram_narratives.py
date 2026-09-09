@@ -71,6 +71,7 @@ from anthropic import Anthropic  # noqa: E402
 from common.broadcast_content import weekly_top_stocks  # noqa: E402
 from common.channel_breadth import channel_breadth_map  # noqa: E402
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
+from common.prompt_style import PLAIN_PROSE_RULE  # noqa: E402
 from common.supabase_client import (  # noqa: E402
     PAGE_SIZE,
     get_client,
@@ -251,6 +252,7 @@ COMMON = """\
   읽힙니다. 좋은 예: "이 기간에", "사흘 동안", "최근 사흘".
 - **로마자·숫자 뒤에 조사를 띄우지 마세요**(나쁜 예: "HBM 과", "13F 는", "AI 가").
   붙여 씁니다: "HBM과", "13F는", "AI가". 한글과 로마자 사이는 원래 띄지 않습니다.
+""" + PLAIN_PROSE_RULE + """
 
 [데이터 읽는 법]
 - 이 데이터는 '텔레그램에서 무엇이 얼마나·어떤 톤으로 회자됐는가'이지, 주가나 기업 실적이

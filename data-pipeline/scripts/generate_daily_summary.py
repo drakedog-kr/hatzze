@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from anthropic import Anthropic  # noqa: E402
 
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
+from common.prompt_style import PLAIN_PROSE_RULE  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
@@ -75,6 +76,7 @@ COMMON = """\
   좋은 예: "이 기간에", "최근 90일".
 - **로마자·숫자 뒤에 조사를 띄우지 마세요**(나쁜 예: "HBM 과", "13F 는", "AI 가").
   붙여 씁니다: "HBM과", "13F는", "AI가". 한글과 로마자 사이는 원래 띄지 않습니다.
+""" + PLAIN_PROSE_RULE + """
 
 [데이터 읽는 법]
 - 각 지표의 '과열도'(0=저온 ~ 100=초고온)가 그 지표가 얼마나 뜨거운지의 유일한 값입니다.
