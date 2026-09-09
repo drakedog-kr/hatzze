@@ -3,8 +3,8 @@ import Link from "next/link";
 import { NOTE_PAGE } from "./daily/copy";
 import { DAILY_PUBLIC, PREVIEW_PUBLIC } from "./screen-flags";
 import { BetaBadge, GhostSymbol, Wordmark } from "./Logo";
-import { APP_VERSION } from "./releases";
-import { C, MONO } from "./ui";
+import { C } from "./ui";
+import { VersionLink } from "./VersionBadge";
 
 /** 문의 창구. 여기 한 곳만 바꾸면 본문 문구와 mailto: 가 같이 따라온다. */
 const CONTACT_EMAIL = "hatzze@proton.me";
@@ -148,18 +148,16 @@ export default function Footer() {
 
                   눌러서 업데이트 기록으로 간다. 밑줄을 늘 그어 두면 로고 옆에 줄 하나가
                   더 생겨 lockup 이 지저분해지므로, 호버에서만 긋고 평소엔 색으로만 둔다.
-                  title 을 붙이는 이유는 이 글자만으로는 눌리는 것인지 모르기 때문이다. */}
-              {/* ⚠️ 색과 밑줄은 인라인에 두지 않는다 — 인라인 style 은 globals.css 의
-                  :hover 를 이겨서 호버가 통째로 안 먹는다(같은 함정을 '더 보기' 버튼과
-                  MDD 기간 버튼에서 이미 밟았다). 글자꼴만 여기 두고 나머지는 클래스로. */}
-              <Link
-                href="/changelog"
-                title="업데이트 기록 보기"
-                className="hz-version-link"
-                style={{ fontFamily: MONO, fontSize: 11, fontWeight: 600, letterSpacing: "0.02em" }}
-              >
-                v.{APP_VERSION}
-              </Link>
+                  title 을 붙이는 이유는 이 글자만으로는 눌리는 것인지 모르기 때문이다.
+
+                  ⭐ 새 판이 나왔는데 아직 안 본 사람에게는 이 표기 우측 상단에 빨간 N 이
+                  붙는다. 그 판정은 방문자마다 다르고(localStorage) 서버는 모르는 값이라
+                  링크째 클라이언트 컴포넌트로 나가 있다 — app/VersionBadge.tsx.
+                  ⚠️ 배지가 붙어도 이 줄의 자리는 안 밀린다(배지는 글자 상자 위로 올라탄다).
+                     여기서 세로 정렬을 baseline 으로 두는 것도 그대로여야 한다 — 위 묶음의
+                     밑선은 첫 항목인 이 링크의 것이라, 링크를 flex 로 바꾼 뒤에도 워드마크와
+                     같은 줄에 앉는다(워드마크+베타 묶음이 쓰는 성질과 같다). */}
+              <VersionLink />
             </span>
           </span>
           {/* ⚠️ `keep-all` 이 없으면 한글이 **낱말 한가운데서** 끊긴다(CJK 기본값이 그렇다).
