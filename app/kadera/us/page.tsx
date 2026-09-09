@@ -928,7 +928,9 @@ export default async function UsKaderaPage() {
           ⚠️⚠️ **등락률이 "그날"이 아니라 "직전 미국장"이다.** 집계 기준일은 메시지 작성일
              (KST)인데 미국장은 KST 새벽 5시에 닫혀 하루가 어긋난다 — 자세한 사정과 세션을
              집는 규칙은 lib/kadera-us-why.ts 머리말에. 그래서 머리의 날짜 알약도 세션 날짜다.
-          ⭐ 오른 종목만 담는다. 내린 종목의 까닭은 표에 남지만 이 구간이 '최근 뜨는 것'이다. */}
+          ⭐ 오른 종목만 담는다. 내린 종목의 까닭은 표에 남지만 이 구간이 '최근 뜨는 것'이다.
+          ⭐ **까닭이 없는 줄도 안 올린다**(2026-09-10, 국장 짝과 같다). 뺀 자리엔 다음 줄이
+             올라온다 — 미장은 하루 줄 수가 적어 아홉이 안 찰 수도 있다(lib/kadera-us-why.ts). */}
       <section className="hz-sheet" id="why">
         <SectionHead level={3}
           icon="trending_up"
@@ -975,12 +977,12 @@ export default async function UsKaderaPage() {
                       margin: 0,
                       fontSize: 13,
                       lineHeight: 1.7,
-                      color: r.reason ? "var(--c-ink-soft)" : C.sub2,
+                      color: "var(--c-ink-soft)",
                       wordBreak: "keep-all",
                       textWrap: "pretty",
                     }}
                   >
-                    {r.reason ?? "커뮤니티에서 이유를 말한 곳이 없습니다"}
+                    {r.reason}
                   </p>
                 </div>
               </div>

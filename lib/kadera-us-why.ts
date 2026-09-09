@@ -37,8 +37,8 @@ export type UsMoveReasonRow = {
   /** 그 세션의 ET 날짜. 화면이 "9월 5일 종가"처럼 적는다 */
   sessionDate: string | null;
   closePrice: number | null;
-  /** 채널이 말한 까닭. null = 그날 언급은 있었지만 까닭을 말한 글이 없다 */
-  reason: string | null;
+  /** 채널이 말한 까닭. **늘 채워져 있다** — 까닭이 없는 줄은 아래 getUsMoveReasons 가 뺀다 */
+  reason: string;
   channelCount: number;
   mentionCount: number;
   /** 채널 글에서 읽은 등락 표기(정렬 보조). 화면에 내지 않는다 */
@@ -125,6 +125,7 @@ async function lastUsSession(
  *
  * ⛔ 파이프라인은 양방향을 만든다. 내린 종목의 까닭은 표에 남는다 — 지금은 읽는 화면이
  *    없지만(미국 종목엔 아직 실주소가 없다) 국내와 같은 규칙으로 둔다.
+ * ⭐ **까닭이 없는 줄도 뺀다.** 국내 짝과 같은 규칙이다 — 자세한 사정은 아래 조회 뒤 주석에.
  */
 export const getUsMoveReasons = cache(async (): Promise<MaybeFailed<UsMoveReasonBoard | null>> => {
   const db = getSupabaseAdmin();
@@ -152,7 +153,17 @@ export const getUsMoveReasons = cache(async (): Promise<MaybeFailed<UsMoveReason
     console.error("[getUsMoveReasons] 까닭 목록을 못 읽었습니다", error);
     return LOAD_FAILED;
   }
-  const rows = (data ?? []) as UsReasonRow[];
+  /**
+   * ⭐ **까닭이 없는 줄은 여기서 뺀다**(2026-09-10). 국내 짝(lib/kadera-why.ts)과 같은 규칙·
+   * 같은 자리다. 카드의 값어치는 등락률이 아니라 한 줄 설명이라, 까닭이 없는 줄이 오름폭
+   * 만으로 칸을 차지하면 그 칸엔 "말한 곳이 없습니다" 한 줄만 남는다. 그 자리엔 다음 줄이
+   * 올라온다. 표에서 지우는 게 아니라 이 카드에만 안 올리는 것이다.
+   * ⚠️ 미장은 하루 줄 수가 국내보다 적다(실측 09-08 총 17줄). 까닭 있는 오른 줄이 아홉에
+   *    못 미치면 카드가 그만큼만 선다 — 빈 칸을 만드는 것보다 짧은 게 낫다.
+   */
+  const rows = ((data ?? []) as UsReasonRow[])
+    .map((r) => ({ ...r, reason: (r.reason ?? "").trim() }))
+    .filter((r) => r.reason !== "");
   if (!rows.length) return { date, rows: [] };
 
   const names = await usNames(rows.map((r) => r.ticker));
@@ -171,7 +182,7 @@ export const getUsMoveReasons = cache(async (): Promise<MaybeFailed<UsMoveReason
     changeRate: null,
     sessionDate: null,
     closePrice: null,
-    reason: r.reason ?? null,
+    reason: r.reason,
     channelCount: r.channel_count ?? 0,
     mentionCount: r.mention_count ?? 0,
     quotedChange: num(r.quoted_change_rate),
