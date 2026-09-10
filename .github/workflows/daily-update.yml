@@ -509,6 +509,58 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/calculate_us_stock_daily.py
 
+      # ⚠️ **발송 스텝보다 앞에 둔다.** 아래 아침 발송이 파이프라인 중간으로 올라오면서
+      #    이 스텝이 그보다 뒤에 있으면 `steps.broadcast_when.outputs.weekday` 가 빈 문자열이
+      #    되어 예약 경로가 조용히 안 나간다(2026-09-10 에 옮기면서 밟았다).
+      - name: (텔레그램) 발송 요일 판정
+        id: broadcast_when
+        if: always()
+        run: |
+          DOW=$(TZ=Asia/Seoul date +%u)   # 1=월 … 7=일
+          KST=$(TZ=Asia/Seoul date '+%Y-%m-%d(%a) %H:%M')
+          weekday=false
+          [ "$DOW" -le 5 ] && weekday=true
+          echo "weekday=$weekday" >> "$GITHUB_OUTPUT"
+          echo "KST $KST · DOW=$DOW · 평일=$weekday"
+
+      # ── 개장 전 요약 발송 (평일 아침) ────────────────────────────────────
+      #
+      # ⭐⭐ **여기가 맞는 자리다 — 파이프라인 끝이 아니라 미국 종목 집계 바로 뒤.**
+      #    이 글은 09:00 개장 전에 도착해야 뜻이 선다. 끝에 두면 늦는다: 최근 아침 7회에서
+      #    도착이 08:44~09:40 이었고 **셋이 개장 뒤**였다(2026-09-10 실측, 그날은 09:40).
+      #    늦는 원인은 KRX 게이트가 아니라 텔레그램 블록이다(그날 07:11→09:29, 2시간 18분).
+      #    이 글이 쓰는 재료는 여기서 다 준비된다 — 밤사이 메시지(수집)·종목 태그(국내·미국
+      #    추출)·일정. 뒤에 남은 센티먼트·요약 문장 50분은 저녁 글과 화면이 쓰는 것이다.
+      #    같은 날 기준으로 08:26 에 나간다.
+      #
+      # ⚠️ **게이트를 갈아 끼웠다.** 여기는 calculate_score·check_freshness 앞이라 그 둘을
+      #    조건으로 못 쓴다. 대신 수집 커버리지 검사를 본다 — 이 글의 재료가 텔레그램이라
+      #    잣대로도 이쪽이 맞다(그 스텝은 문턱 아래면 종료 코드 1 을 낸다).
+      #    스크립트 안에도 짝이 되는 게이트가 있다(telegram_staleness_problems).
+      # ⛔ 게이트를 **없앤 게 아니다.** 수집이 죽은 날은 두 겹 다 막는다.
+      #
+      # ⚠️ 5분 대기는 남겨 뒀다(요청받은 사항). 다만 뜻이 달라졌다 — '파이프라인 완료 후'가
+      #    아니라 '집계가 표에 앉은 뒤'다. 이 시점의 화면은 급부상 카드까지는 오늘 것이고
+      #    총평 문장은 아직 어제 것이다(그 스텝이 09:29 에 끝난다).
+      #
+      # ⛔ 저녁 글(아래)은 옮기지 않는다. 온도를 싣기 때문에 calculate_score 뒤여야 한다.
+      - name: (텔레그램) 개장 전 요약 발송 (평일 아침)
+        id: telegram_morning
+        continue-on-error: true
+        if: >-
+          steps.telegram_coverage.outcome == 'success'
+          && github.run_attempt == '1'
+          && (
+            (
+              (github.event.schedule == '30 21 * * *' || github.event.schedule == '30 22 * * *')
+              && steps.broadcast_when.outputs.weekday == 'true'
+            )
+            || github.event.inputs.broadcast == 'morning'
+          )
+        run: |
+          sleep 300   # 위 ⚠️ 참고
+          python data-pipeline/scripts/send_telegram_broadcast.py --send --format morning2
+
       - name: (텔레그램) 미국×국내 동시 언급
         id: telegram_us_comention
         continue-on-error: true
@@ -909,22 +961,11 @@ jobs:
       #
       #   GitHub 표현식에서 숫자 비교를 하려 들지 말고 여기서 참/거짓을 만들어 넘긴다 —
       #   outputs 는 늘 문자열이라 `<= 5` 같은 비교가 조용히 어긋날 수 있다.
-      - name: (텔레그램) 발송 요일 판정
-        id: broadcast_when
-        if: always()
-        run: |
-          DOW=$(TZ=Asia/Seoul date +%u)   # 1=월 … 7=일
-          KST=$(TZ=Asia/Seoul date '+%Y-%m-%d(%a) %H:%M')
-          weekday=false
-          [ "$DOW" -le 5 ] && weekday=true
-          echo "weekday=$weekday" >> "$GITHUB_OUTPUT"
-          echo "KST $KST · DOW=$DOW · 평일=$weekday"
-
       # ── 발송 두 건 ────────────────────────────────────────────────────────
       # 이 워크플로가 보내는 건 파이프라인에 붙는 둘뿐이다.
       #
-      #   월~금 아침(파이프라인 완료 + 5분)  A 어제 브리핑
-      #   월~금 저녁(파이프라인 완료 + 5분)  B 마감 리포트
+      #   월~금 아침  개장 전 요약 — **위 카더라 블록 중간**(미국 종목 집계 뒤)에서 나간다
+      #   월~금 저녁  저녁 브리핑 — 온도를 실어서 여기(점수 계산 뒤)에 남는다
       #
       # 나머지 둘(C 관심 이동·D 주간 결산)은 오후 2시에 나가므로 파이프라인과 시각이
       # 맞지 않는다. 별도 워크플로로 뺐다 — .github/workflows/telegram-broadcast.yml.
@@ -942,24 +983,6 @@ jobs:
       #   여기 오기까지 자료 수집·점수 계산·카더라 집계가 전부 끝나 있고 뒤에 남은 건
       #   결과 집계와 알림뿐이다. 즉 실질적으로 '완료 후'가 맞다. 이 저장소는 public 이라
       #   Actions 분이 무료여서 러너를 5분 재우는 비용은 없다.
-      - name: (텔레그램) A 어제 브리핑 발송 (평일 아침)
-        id: telegram_morning
-        continue-on-error: true
-        if: >-
-          steps.check_freshness.outcome == 'success'
-          && steps.calculate_score.outcome == 'success'
-          && github.run_attempt == '1'
-          && (
-            (
-              (github.event.schedule == '30 21 * * *' || github.event.schedule == '30 22 * * *')
-              && steps.broadcast_when.outputs.weekday == 'true'
-            )
-            || github.event.inputs.broadcast == 'morning'
-          )
-        run: |
-          sleep 300   # 파이프라인 완료 후 5분(위 [5] 참고)
-          python data-pipeline/scripts/send_telegram_broadcast.py --send --format morning2
-
       - name: (텔레그램) B 마감 리포트 발송 (평일 저녁)
         id: telegram_broadcast
         continue-on-error: true
