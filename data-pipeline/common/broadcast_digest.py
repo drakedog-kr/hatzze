@@ -537,6 +537,27 @@ def event_block(R: Render, title: str, events: list[dict], limit: int) -> list[s
     return ["", f"📌 <b>{title}</b>", R.quote(*lines)]
 
 
+def _reasons_for(db, codes: list[str], since: date) -> dict[str, str]:
+    """종목별 가장 최근 까닭(since 이후). 이름만 있는 종목은 읽는 사람에게 아무것도 안 준다."""
+    if not codes:
+        return {}
+    rows = (
+        db.table("telegram_stock_move_reason")
+        .select("stock_code,reason,date")
+        .in_("stock_code", codes)
+        .gte("date", since.isoformat())
+        .order("date", desc=True)
+        .limit(500)
+        .execute()
+        .data
+    )
+    out: dict[str, str] = {}
+    for r in rows:
+        if r["stock_code"] not in out and (r.get("reason") or "").strip():
+            out[r["stock_code"]] = r["reason"].strip()
+    return out
+
+
 def load_new_faces(db, base_date: date) -> list[dict]:
     """처음 회자되기 시작한 종목 — 급부상 계산에서 is_new(직전 창에 언급 0)인 것.
 
@@ -1054,7 +1075,10 @@ def stored_digest_lines(db, days: list[date], R: Render) -> list[str]:
             .execute()
             .data
         )
-    except Exception:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 — 표가 없어도 글은 나가야 한다(머리말)
+        # ⚠️ 조용히 넘기지 않는다. 이 자리가 비면 수·일 글이 '지난 요약' 없이 만들어지는데,
+        #    글은 멀쩡해 보여서 표가 없다는 걸 알 길이 없다.
+        print(f"[안내] 지난 갈래를 못 읽었습니다({type(e).__name__}). '지난 요약' 없이 만듭니다.")
         return []
     out = []
     for r in rows:
