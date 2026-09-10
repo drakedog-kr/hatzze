@@ -1319,7 +1319,7 @@ const NEWS = {
   key: "hz-news-telegram-v2",
   href: TELEGRAM.href,
   name: "텔레그램 채널",
-  tail: " 글이 업그레이드되었습니다. 무슨 이야기가 돌았고 어떤 종목이 왜 움직였는지 매일 보냅니다.",
+  tail: " 글의 퀄리티가 향상되었습니다. 더 종합적이고 더 자세하게 정리합니다.",
   // 사이드바의 채널 아이콘(send)이 아니라 전구다 — '새 화면'이 아니라 '나아졌다'는 소식이라서.
   icon: "lightbulb",
   ga: "news-telegram",
