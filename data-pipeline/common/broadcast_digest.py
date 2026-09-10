@@ -217,8 +217,16 @@ def last_saturday(d: date) -> date:
     return d - timedelta(days=(d.weekday() - 5) % 7)
 
 
-def span_label(lo: datetime, hi: datetime) -> str:
-    """"9월 8일 18시 ~ 9월 9일 8시" — 창의 날짜를 그대로 적는다(1판과 같은 규칙)."""
+def span_label(lo: datetime, hi: datetime, drop_month: int | None = None) -> str:
+    """창의 날짜. `drop_month` 와 두 날짜의 달이 모두 같으면 '월'을 뺀다.
+
+    머리줄이 이미 "9월 10일(목) 개장 전" 이라 뒤에 "9월" 을 또 적으면 군더더기다
+    (2026-09-10 지적). → "9일 18시 ~ 10일 8시".
+    ⚠️ 달을 넘는 창(8월 31일 18시 ~ 9월 1일 8시)에서는 **둘 다 적는다.** 한쪽만 빼면
+    "8월 31일 18시 ~ 1일 8시" 가 되어 어느 달인지 흐려진다.
+    """
+    if drop_month is not None and lo.month == hi.month == drop_month:
+        return f"{lo.day}일 {lo.hour}시 ~ {hi.day}일 {hi.hour}시"
     return f"{lo.month}월 {lo.day}일 {lo.hour}시 ~ {hi.month}월 {hi.day}일 {hi.hour}시"
 
 
@@ -1117,7 +1125,10 @@ def build_morning2(db, llm, model: str, R: Render, as_of: date, now: datetime, s
     # 창이 끝난 날의 전날) 등락을 단다.
     chg_kr, chg_us = _changes_for(db, sections, [], now, None, ("session", hi.date() - timedelta(days=1)))
 
-    lines = ["🌅 <b>개장 전 요약</b>", f"{R.date_label(hi.date().isoformat())} 개장 전 · {span_label(lo, hi)}"]
+    lines = [
+        "🌅 <b>개장 전 요약</b>",
+        f"{R.date_label(hi.date().isoformat())} 개장 전 · {span_label(lo, hi, drop_month=hi.month)}",
+    ]
     if len(sections) < MIN_SECTIONS_TO_SEND:
         print(f"[skip] 갈래가 {len(sections)}개뿐이라(최소 {MIN_SECTIONS_TO_SEND}) 아침 글을 만들지 않습니다.")
         return ""
@@ -1254,7 +1265,11 @@ def build_us_weekend(db, llm, model: str, R: Render, as_of: date, now: datetime,
     # 한 주 구간 등락(지난 금요일 종가 대비 이번 금요일 종가). 미국은 뉴욕 날짜로 월~금.
     chg_kr, chg_us = _changes_for(db, sections, [], now, ("range", monday, fri), ("range", monday, fri))
 
-    lines = ["📈 <b>이번 주 미장 흐름</b>", f"{R.date_label(monday.isoformat())} ~ {R.date_label(fri.isoformat())} 미국장"]
+    # 기간은 **재료의 한국 날짜**로 적는다. 미국 금요일 장은 한국 토요일 새벽에 끝나므로
+    # 미국 날짜(월~금)로 적으면 읽는 사람이 "간밤 장은 빠졌나" 싶다(2026-09-10 지적).
+    # 창도 실제로 월요일 08시 ~ 토요일 08시(KST)라 이쪽이 재료와 맞는다.
+    # ⚠️ 뒤에 '미국장' 을 붙이지 않는다 — 붙이면 토요일에도 장이 선 것처럼 읽힌다.
+    lines = ["📈 <b>이번 주 미장 흐름</b>", f"{R.date_label(monday.isoformat())} ~ {R.date_label(sat.isoformat())}"]
     lines += render_sections(R, sections, mat, chg_kr, chg_us)
     optional = [b for b in [event_block(R, "다음 주 미장 일정", events, EVENT_LINES_WEEK)] if b]
     if store:
