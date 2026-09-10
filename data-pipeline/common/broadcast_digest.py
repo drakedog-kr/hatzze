@@ -1071,6 +1071,10 @@ def stored_digest_lines(db, days: list[date], R: Render) -> list[str]:
             db.table("telegram_daily_digest")
             .select("date,slot,sections")
             .in_("date", [d.isoformat() for d in days])
+            # ⚠️ **아침·저녁만 읽는다.** 수·일 글도 같은 표에 자기 갈래를 남기는데(store_digest),
+            #    슬롯을 안 가르면 수요일 글이 쓴 행이 그다음 일요일 재료에 섞여 같은 날이 두 번
+            #    들어가고 라벨도 '저녁'으로 잘못 붙는다.
+            .in_("slot", ["morning", "evening"])
             .order("date")
             .execute()
             .data
@@ -1083,7 +1087,7 @@ def stored_digest_lines(db, days: list[date], R: Render) -> list[str]:
     out = []
     for r in rows:
         secs = r["sections"] if isinstance(r["sections"], list) else json.loads(r["sections"])
-        slot = "아침" if r["slot"].startswith("morning") else "저녁"
+        slot = "아침" if r["slot"] == "morning" else "저녁"
         titles = " / ".join(s.get("title", "") for s in secs if s.get("title"))
         if titles:
             out.append(f"- {R.date_label(r['date'])} {slot}: {titles}")
