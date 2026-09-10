@@ -56,6 +56,10 @@ MODEL = KR.MODEL
 TABLE = "telegram_stock_move_reason"
 
 MIN_DAY_MSGS = 1500   # 그날 본문 있는 메시지가 이 아래면(아침 실행) 만들지 않는다
+# ⭐ `--min-msgs N` 으로 이 문턱을 낮출 수 있다. 쓰는 곳은 **토요일 14:00 채널 발송** 하나다 —
+#    그 글('이번 주 미장 흐름')이 금요일 미국장을 다루는데, 미국장은 토요일 새벽 05:00 KST 에
+#    이미 끝나 있어 14:00 시점의 700~1,200건이 얇은 표본이 아니라 **그 세션의 재료 전부**다.
+#    문턱을 그대로 두면 토요일 몫은 그날 18:00 실행에서야 만들어져 14:00 글이 못 쓴다.
 # 이 채널 수 미만은 후보가 아니다. 복붙 코퍼스라 한두 채널은 근거가 아니다.
 #
 # ⚠️ 2 였다가 3 으로 올렸다(2026-09-07 실전). 채널 2곳짜리 종목은 그날 글이 **상승률 순위
@@ -459,7 +463,7 @@ MARKETS = {
 }
 
 
-def run_market(db, client, cfg: dict, day: str, dry_run: bool) -> int:
+def run_market(db, client, cfg: dict, day: str, dry_run: bool, min_msgs: int = MIN_DAY_MSGS) -> int:
     """한 시장의 그날치 까닭을 만들어 저장한다. 저장한 행 수를 돌려준다."""
     tag, key = cfg["label"], cfg["key"]
 
@@ -479,8 +483,8 @@ def run_market(db, client, cfg: dict, day: str, dry_run: bool) -> int:
     #    한 번씩 부르는 편이 호출부가 단순하다(키셋이라 몇 초다).
     msgs = load_day_messages(db, day)
     print(f"[{tag} {day}] 본문 있는 메시지 {len(msgs):,}건")
-    if len(msgs) < MIN_DAY_MSGS:
-        print(f"[skip] 그날 메시지가 {MIN_DAY_MSGS}건 미만이라 까닭을 만들지 않습니다(아침 실행).")
+    if len(msgs) < min_msgs:
+        print(f"[skip] 그날 메시지가 {min_msgs}건 미만이라 까닭을 만들지 않습니다(아침 실행).")
         return 0
 
     # 3) 종목 ↔ 메시지 연결. 표 전체를 키셋으로 읽는다(집계 스크립트와 같은 길 —
@@ -614,6 +618,9 @@ def main() -> None:
     day = today_kst().isoformat()
     if "--date" in args:
         day = args[args.index("--date") + 1]
+    min_msgs = MIN_DAY_MSGS
+    if "--min-msgs" in args:
+        min_msgs = int(args[args.index("--min-msgs") + 1])
 
     if not ANTHROPIC_API_KEY and not dry_run:
         print("[skip] ANTHROPIC_API_KEY가 없어 까닭 생성을 건너뜁니다.")
@@ -626,7 +633,7 @@ def main() -> None:
         if (market == "kr" and us_only) or (market == "us" and kr_only):
             continue
         try:
-            total += run_market(db, client, cfg, day, dry_run)
+            total += run_market(db, client, cfg, day, dry_run, min_msgs)
         except Exception as exc:  # noqa: BLE001
             # 한쪽이 죽어도 다른 쪽은 나가야 한다(미장 표가 아직 없는 환경 포함).
             print(f"[{cfg['label']}] 실패: {type(exc).__name__}: {exc}")
