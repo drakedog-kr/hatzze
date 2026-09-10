@@ -291,6 +291,9 @@ def pick_excerpts(rows: list[dict], n: int) -> list[Excerpt]:
     return out
 
 
+PAGE_ROWS = 1000   # PostgREST 가 한 번에 주는 최대 행. 넘으면 **에러 없이** 자른다
+
+
 def _in_chunks(items: list, size: int = 150):
     for i in range(0, len(items), size):
         yield items[i : i + size]
@@ -308,19 +311,36 @@ def tag_stocks(db, excerpts: list[Excerpt]) -> tuple[dict[str, str], dict[str, s
     keys = {(e.channel, e.message_id): e for e in excerpts}
     ids = sorted({e.message_id for e in excerpts})
 
+    # ⚠️⚠️ **`message_id` 는 채널마다 따로 매겨진다.** 그래서 이 조회는 내 발췌뿐 아니라 같은
+    #    번호를 가진 **다른 채널의 행까지** 함께 받아 온다(실측 2026-09-10: 발췌 70건에 응답
+    #    216행, 그중 쓸모 있는 건 18행). 쓸모없는 행이 1,000행 캡을 갉아먹는 셈이라, 표가
+    #    자라면 어느 날 캡에 닿아 **에러 없이 잘린다** — 그러면 종목 줄만 조용히 비고 로그에는
+    #    "자료에 없는 종목 이름" 만 남는다(그 모습을 실제로 봤다).
+    #    복합 키로 좁히는 문법이 PostgREST 에 없으므로 **페이지를 끝까지 이어 받는다.**
+    def paged(table: str, columns: str, chunk: list[int]) -> list[dict]:
+        out: list[dict] = []
+        start = 0
+        while True:
+            page = execute_with_retry(
+                db.table(table).select(columns).in_("message_id", chunk).order("id").range(start, start + PAGE_ROWS - 1)
+            ).data
+            if not page:
+                break
+            out += page
+            if len(page) < PAGE_ROWS:
+                break
+            start += PAGE_ROWS
+        return out
+
     kr_codes: set[str] = set()
     us_tickers: set[str] = set()
     for chunk in _in_chunks(ids):
-        for r in execute_with_retry(
-            db.table("telegram_message_stocks").select("channel_handle,message_id,stock_code").in_("message_id", chunk)
-        ).data:
+        for r in paged("telegram_message_stocks", "id,channel_handle,message_id,stock_code", chunk):
             e = keys.get((r["channel_handle"], int(r["message_id"])))
             if e and r["stock_code"] not in e.kr:
                 e.kr.append(r["stock_code"])
                 kr_codes.add(r["stock_code"])
-        for r in execute_with_retry(
-            db.table("telegram_message_us_stocks").select("channel_handle,message_id,ticker").in_("message_id", chunk)
-        ).data:
+        for r in paged("telegram_message_us_stocks", "id,channel_handle,message_id,ticker", chunk):
             e = keys.get((r["channel_handle"], int(r["message_id"])))
             if e and r["ticker"] not in e.us:
                 e.us.append(r["ticker"])
