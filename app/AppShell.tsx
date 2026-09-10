@@ -1317,6 +1317,9 @@ const NEWS_EVENT = "hz-news-change";
    git 이력에 있다 — 되살릴 땐 키를 새로 딴다. */
 const NEWS = {
   key: "hz-news-telegram-v2",
+  // 이 시각 전에는 띠를 안 그린다. 새 형식의 첫 글(9/11 아침, 08:45~09:20 도착)이 나간 뒤에
+  // 떠야 눌러 들어간 사람이 새 글을 본다 — 머지 당일 저녁에 뜨면 옛 글이 맨 위에 있다.
+  from: "2026-09-11T09:30:00+09:00",
   href: TELEGRAM.href,
   name: "텔레그램 채널",
   tail: " 글의 퀄리티가 향상되었습니다. 더 종합적이고 더 자세하게 정리합니다.",
@@ -1326,12 +1329,17 @@ const NEWS = {
   ga: "news-telegram",
 };
 
+// 모듈이 읽힐 때 한 번만 본다(렌더 안에서 Date.now() 를 부르면 React 컴파일러 린트가 막는다).
+// 서버는 어차피 안 그리고(getServerSnapshot 이 false), 클라이언트는 페이지를 열 때마다 새로 읽는다.
+const NEWS_LIVE = Date.now() >= Date.parse(NEWS.from);
+
 const newsStore = {
   subscribe(cb: () => void) {
     window.addEventListener(NEWS_EVENT, cb);
     return () => window.removeEventListener(NEWS_EVENT, cb);
   },
   getSnapshot() {
+    if (!NEWS_LIVE) return false;
     try {
       return localStorage.getItem(NEWS.key) === null;
     } catch {
