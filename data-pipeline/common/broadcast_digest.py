@@ -99,6 +99,10 @@ SECTIONS = {"morning2": "세네", "evening2": "세네", "midweek": "세네", "us
 SECTION_RANGE = {"morning2": (3, 4), "evening2": (3, 4), "midweek": (3, 4), "us_week": (4, 4), "weekly2": (4, 4)}
 MAX_SECTIONS = 5
 RETRIES_WHEN_SHORT = 1
+# 이보다 적게 남으면 글을 아예 안 만든다. 갈래가 하나뿐인 '요약'은 요약이 아니고, 모델이
+# 형식을 통째로 어긴 날은 제목 없는 문단 하나만 남는다(파서 시험에서 그 모습을 봤다).
+# 다시 부르는 건 위 RETRIES_WHEN_SHORT 가 이미 한 번 한다 — 그러고도 모자라면 그날은 거른다.
+MIN_SECTIONS_TO_SEND = 2
 STOCKS_PER_SECTION = 4      # 종목 줄에 싣는 종목 수 상한(2026-09-10 결정). 넘치면 앞에서부터 넷
 EVENT_LINES_DAY = 4         # 오늘·내일 일정 줄 수
 EVENT_LINES_WEEK = 8        # 다음 주 일정 줄 수
@@ -533,34 +537,6 @@ def event_block(R: Render, title: str, events: list[dict], limit: int) -> list[s
     return ["", f"📌 <b>{title}</b>", R.quote(*lines)]
 
 
-def event_digest_lines(label: str, events: list[dict], limit: int) -> list[str]:
-    picked = [e for e in events if e["channels"] >= 2][:limit] or events[:limit]
-    if not picked:
-        return []
-    return [f"[{label}]"] + [f"- {e['date']} {e['name']} · {e['event']}" for e in picked]
-
-
-def _reasons_for(db, codes: list[str], since: date) -> dict[str, str]:
-    """종목별 가장 최근 까닭(since 이후). 이름만 있는 종목은 읽는 사람에게 아무것도 안 준다."""
-    if not codes:
-        return {}
-    rows = (
-        db.table("telegram_stock_move_reason")
-        .select("stock_code,reason,date")
-        .in_("stock_code", codes)
-        .gte("date", since.isoformat())
-        .order("date", desc=True)
-        .limit(500)
-        .execute()
-        .data
-    )
-    out: dict[str, str] = {}
-    for r in rows:
-        if r["stock_code"] not in out and (r.get("reason") or "").strip():
-            out[r["stock_code"]] = r["reason"].strip()
-    return out
-
-
 def load_new_faces(db, base_date: date) -> list[dict]:
     """처음 회자되기 시작한 종목 — 급부상 계산에서 is_new(직전 창에 언급 0)인 것.
 
@@ -823,7 +799,6 @@ def _split_blocks(text: str) -> list[str]:
     if len(blocks) >= 2:
         return blocks
     if text.count("근거:") >= 2:
-        parts = re.split(r"(?<=\n)(?=[^\n]*\n)", text)  # 자리표시. 아래에서 줄 단위로 다시 묶는다
         out, cur = [], []
         for line in text.split("\n"):
             cur.append(line)
@@ -1039,7 +1014,8 @@ def _fit(lines: list[str], optional_blocks: list[list[str]], cta: str) -> str:
     blocks = list(optional_blocks)
     while len(join(blocks)) > MESSAGE_SOFT_LIMIT and blocks:
         dropped = blocks.pop()
-        print(f"[안내] 글이 길어 블록을 뺍니다: {dropped[1][:24] if len(dropped) > 1 else dropped}")
+        label = next((l for l in dropped if l.strip()), "")
+        print(f"[안내] 글이 길어 블록을 뺍니다: {re.sub(r'<[^>]+>', '', label)[:24]}")
     return join(blocks)
 
 
@@ -1114,8 +1090,8 @@ def build_morning2(db, llm, model: str, R: Render, as_of: date, now: datetime, s
     chg_kr, chg_us = _changes_for(db, sections, [], now, None, ("session", hi.date() - timedelta(days=1)))
 
     lines = ["🌅 <b>개장 전 요약</b>", f"{R.date_label(hi.date().isoformat())} 개장 전 · {span_label(lo, hi)}"]
-    if not sections:
-        print("[skip] 갈래가 하나도 남지 않아 아침 글을 만들지 않습니다.")
+    if len(sections) < MIN_SECTIONS_TO_SEND:
+        print(f"[skip] 갈래가 {len(sections)}개뿐이라(최소 {MIN_SECTIONS_TO_SEND}) 아침 글을 만들지 않습니다.")
         return ""
     lines += render_sections(R, sections, mat, chg_kr, chg_us)
     optional = [b for b in [event_block(R, "오늘 일정", events, EVENT_LINES_DAY)] if b]
@@ -1143,8 +1119,8 @@ def build_evening2(db, llm, model: str, R: Render, as_of: date, now: datetime, s
         + (reason_lines("종목별 까닭 · 오늘 움직인 종목", kr_reasons, 10, with_change=True) if kr_d == day.isoformat() else [])
     )
     sections = compose_sections(llm, model, "evening2", digest, mat)
-    if not sections:
-        print("[skip] 갈래가 하나도 남지 않아 저녁 글을 만들지 않습니다.")
+    if len(sections) < MIN_SECTIONS_TO_SEND:
+        print(f"[skip] 갈래가 {len(sections)}개뿐이라(최소 {MIN_SECTIONS_TO_SEND}) 저녁 글을 만들지 않습니다.")
         return ""
     chg_kr, chg_us = _changes_for(
         db, sections, kr_reasons if kr_d == day.isoformat() else [], now,
@@ -1187,8 +1163,8 @@ def build_midweek(db, llm, model: str, R: Render, as_of: date, now: datetime, st
         + (reason_lines("종목별 까닭 · 최근 움직인 종목", kr_reasons, 8, with_change=True) if kr_reasons else [])
     )
     sections = compose_sections(llm, model, "midweek", digest, mat)
-    if not sections:
-        print("[skip] 갈래가 하나도 남지 않아 주중 글을 만들지 않습니다.")
+    if len(sections) < MIN_SECTIONS_TO_SEND:
+        print(f"[skip] 갈래가 {len(sections)}개뿐이라(최소 {MIN_SECTIONS_TO_SEND}) 주중 글을 만들지 않습니다.")
         return ""
     # 주초부터의 구간 등락(지난 금요일 종가 대비). 미국은 완료된 세션까지(as_of 전날).
     chg_kr, chg_us = _changes_for(db, sections, [], now, ("range", monday, as_of), ("range", monday, as_of - timedelta(days=1)))
@@ -1243,8 +1219,8 @@ def build_us_weekend(db, llm, model: str, R: Render, as_of: date, now: datetime,
         + (reason_lines("종목별 까닭 · 미국 종목", us_reasons, 8, with_change=False) if us_fresh else [])
     )
     sections = compose_sections(llm, model, "us_week", digest, mat)
-    if not sections:
-        print("[skip] 갈래가 하나도 남지 않아 미장 글을 만들지 않습니다.")
+    if len(sections) < MIN_SECTIONS_TO_SEND:
+        print(f"[skip] 갈래가 {len(sections)}개뿐이라(최소 {MIN_SECTIONS_TO_SEND}) 미장 글을 만들지 않습니다.")
         return ""
     events = load_events(db, sat + timedelta(days=2), sat + timedelta(days=8), "US")
     # 한 주 구간 등락(지난 금요일 종가 대비 이번 금요일 종가). 미국은 뉴욕 날짜로 월~금.
@@ -1280,8 +1256,8 @@ def build_weekly2(db, llm, model: str, R: Render, as_of: date, now: datetime, st
         + (reason_lines("종목별 까닭 · 이번 주 움직인 종목", kr_reasons, 8, with_change=True) if kr_reasons else [])
     )
     sections = compose_sections(llm, model, "weekly2", digest, mat)
-    if not sections:
-        print("[skip] 갈래가 하나도 남지 않아 주간 글을 만들지 않습니다.")
+    if len(sections) < MIN_SECTIONS_TO_SEND:
+        print(f"[skip] 갈래가 {len(sections)}개뿐이라(최소 {MIN_SECTIONS_TO_SEND}) 주간 글을 만들지 않습니다.")
         return ""
     # 한 주 구간 등락(지난 금요일 종가 대비 이번 금요일 종가).
     chg_kr, chg_us = _changes_for(db, sections, [], now, ("range", monday, friday), ("range", monday, friday))
