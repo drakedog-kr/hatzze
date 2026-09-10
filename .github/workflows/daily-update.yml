@@ -523,6 +523,23 @@ jobs:
           echo "weekday=$weekday" >> "$GITHUB_OUTPUT"
           echo "KST $KST · DOW=$DOW · 평일=$weekday"
 
+      # '다가오는 일정' — 채널 글에서 앞날의 일정을 뽑는다. 증분(읽은 글은 다시 안 부른다).
+      - name: (텔레그램) 앞날 일정 추출
+        id: telegram_events
+        continue-on-error: true
+        run: python data-pipeline/scripts/extract_telegram_events.py
+
+      # 미장 LLM 문장. 미장 센티먼트·테마·동시언급이 전부 끝난 뒤여야 digest 가 찬다.
+      # ⚠️ 국장 총평(아래)과 **따로** 두는 이유: 한쪽이 실패해도 다른 쪽은 나가야 하고,
+      #    미장 실패는 미장 알림에만 잡혀야 한다.
+
+      # ⚠️ 위 일정 추출은 **아침 발송보다 앞이어야 한다.** 발송이 파이프라인 중간으로 올라온 뒤
+      #    (2026-09-10) 이 스텝이 뒤에 남아, 밤사이 메시지에서 새로 뽑히는 일정이 그날 아침 글에
+      #    안 실리고 하루 밀렸다. 실측(09-08~09-11 '오늘 일정' 103건): **47%가 그날 아침 추출분**
+      #    이고 날마다 0~76% 로 널을 뛴다. 스텝이 1분짜리라 발송이 그만큼만 늦어진다.
+      # ⛔ 바로 위 '등락 종목 까닭' 은 옮기지 않았다 — 아침에는 그날 메시지가 문턱(1,500)에
+      #    못 미쳐 어차피 아무것도 안 만든다(실측 955~1,130건). 앞으로 와도 얻는 게 없다.
+
       # ── 개장 전 요약 발송 (평일 아침) ────────────────────────────────────
       #
       # ⭐⭐ **여기가 맞는 자리다 — 파이프라인 끝이 아니라 미국 종목 집계 바로 뒤.**
@@ -686,15 +703,6 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/generate_move_reasons.py
 
-      # '다가오는 일정' — 채널 글에서 앞날의 일정을 뽑는다. 증분(읽은 글은 다시 안 부른다).
-      - name: (텔레그램) 앞날 일정 추출
-        id: telegram_events
-        continue-on-error: true
-        run: python data-pipeline/scripts/extract_telegram_events.py
-
-      # 미장 LLM 문장. 미장 센티먼트·테마·동시언급이 전부 끝난 뒤여야 digest 가 찬다.
-      # ⚠️ 국장 총평(아래)과 **따로** 두는 이유: 한쪽이 실패해도 다른 쪽은 나가야 하고,
-      #    미장 실패는 미장 알림에만 잡혀야 한다.
       - name: (텔레그램) 미장 총평·종목 요약 생성
         id: telegram_us_narratives
         continue-on-error: true
