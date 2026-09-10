@@ -1320,10 +1320,9 @@ const NEWS = {
   href: TELEGRAM.href,
   name: "텔레그램 채널",
   tail: " 글의 퀄리티가 향상되었습니다. 더 종합적이고 더 자세하게 정리합니다.",
-  // 사이드바의 채널 아이콘(send)이 아니라 전구다 — '새 화면'이 아니라 '나아졌다'는 소식이라서.
-  // ⚠️ 맨 전구(lightbulb)는 MDD 본문이 이미 쓴다(한 화면에 같은 아이콘 두 번 금지). 반짝이 붙은
-  //    전구(tips_and_updates)는 본문 어디에도 없다.
-  icon: "tips_and_updates",
+  // 사이드바의 채널 아이콘(send)이 아니라 '올라갔다'는 그림이다 — '새 화면'이 아니라 '나아졌다'는
+  // 소식이라서. 전구(lightbulb)는 MDD 본문이 이미 써서 못 쓴다(한 화면에 같은 아이콘 두 번 금지).
+  icon: "upgrade",
   ga: "news-telegram",
 };
 
