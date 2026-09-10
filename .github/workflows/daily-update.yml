@@ -958,7 +958,7 @@ jobs:
           )
         run: |
           sleep 300   # 파이프라인 완료 후 5분(위 [5] 참고)
-          python data-pipeline/scripts/send_telegram_broadcast.py --send --format morning
+          python data-pipeline/scripts/send_telegram_broadcast.py --send --format morning2
 
       - name: (텔레그램) B 마감 리포트 발송 (평일 저녁)
         id: telegram_broadcast
@@ -973,7 +973,7 @@ jobs:
           )
         run: |
           sleep 300   # 파이프라인 완료 후 5분(위 [5] 참고)
-          python data-pipeline/scripts/send_telegram_broadcast.py --send --format evening
+          python data-pipeline/scripts/send_telegram_broadcast.py --send --format evening2
 
 
 

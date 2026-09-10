@@ -85,9 +85,9 @@ export const CRON_TO_JOB: Record<string, Job> = {
     inputs: (now) => ({ broadcast: isKstWeekday(now) ? "evening" : "none", slot: "evening" }),
   },
 
-  // ── 채널 발송(C 관심 이동 · D 주간 결산). 14:00 KST. ──
+  // ── 채널 발송(주중 점검 · 이번 주 미장 흐름 · 한 주 정리). 14:00 KST. ──
   //
-  // ⚠️ 요일이 곧 포맷이다 — 수·토는 C(theme), 일요일은 D(weekly). 크론의 `0,3,6` 은
+  // ⚠️ 요일이 곧 포맷이다 — 수=midweek · 토=us_weekend · 일=weekly2(broadcastFormat). 크론의 `0,3,6` 은
   //    UTC 05:00 기준 요일이라 KST 로도 같은 날이다(05:00Z = 14:00 KST).
   "0 5 * * 0,3,6": {
     key: "broadcast",
@@ -95,7 +95,7 @@ export const CRON_TO_JOB: Record<string, Job> = {
     workflow: BROADCAST,
     // KST 자정. 그날 실행이 하나라도 있으면(손으로 돌린 것 포함) 안 던진다.
     fireUtc: "15:00",
-    inputs: (now) => ({ send: "true", format: isKstSunday(now) ? "weekly" : "theme" }),
+    inputs: (now) => ({ send: "true", format: broadcastFormat(now) }),
   },
 
   // ── 주 1회 사전 후보 스캔. 월 10:00 KST. ──
@@ -140,9 +140,20 @@ export function isKstWeekday(now: Date): boolean {
   return kstDay(now) >= 1 && kstDay(now) <= 5;
 }
 
-/** 한국 시각 기준 일요일인가. 채널 발송의 포맷을 가르는 데만 쓴다(일=주간 결산). */
+/** 한국 시각 기준 일요일인가. */
 export function isKstSunday(now: Date): boolean {
   return kstDay(now) === 0;
+}
+
+/**
+ * 채널 발송 포맷. 요일이 곧 포맷이다 — 수=주중 점검 · 토=이번 주 미장 흐름 · 일=한 주 정리와 다음 주 일정.
+ * 크론이 0,3,6 에만 울리므로 나머지 요일은 오지 않지만, 오면 수요일 글로 둔다(값이 비면 워크플로가 기본값을 쓴다).
+ */
+export function broadcastFormat(now: Date): "midweek" | "us_weekend" | "weekly2" {
+  const day = kstDay(now);
+  if (day === 0) return "weekly2";
+  if (day === 6) return "us_weekend";
+  return "midweek";
 }
 
 function kstDay(now: Date): number {

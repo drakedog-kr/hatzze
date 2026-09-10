@@ -66,6 +66,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import requests  # noqa: E402
 
 from common import broadcast_content as bc  # noqa: E402
+from common import broadcast_digest as bd  # noqa: E402
 from common.config import ANTHROPIC_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_BROADCAST_CHAT_ID  # noqa: E402
 from common.retry import backoff_delay  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
@@ -889,11 +890,47 @@ def main() -> None:
     )
     parser.add_argument(
         "--format",
-        choices=["morning", "evening", "theme", "weekly"],
+        choices=["morning", "evening", "theme", "weekly", *bd.FORMATS],
         default="evening",
-        help="어떤 글을 만들지. morning=아침 브리핑 · evening=마감 리포트(기본) · theme=관심 이동 · weekly=주간 결산",
+        help=(
+            "어떤 글을 만들지. morning=아침 브리핑 · evening=마감 리포트(기본) · theme=관심 이동 · weekly=주간 결산. "
+            "2판(common/broadcast_digest.py): morning2=개장 전 요약 · evening2=저녁 브리핑 · "
+            "midweek=주중 점검(수) · us_weekend=이번 주 미장 흐름(토) · weekly2=한 주 정리와 다음 주 일정(일)"
+        ),
+    )
+    parser.add_argument(
+        "--as-of",
+        default=None,
+        help="2판 전용. '오늘'을 이 날짜(YYYY-MM-DD)로 못박는다 — 예시를 다른 요일로 만들 때(예: 수요일에 토요일 글).",
+    )
+    parser.add_argument(
+        "--notice",
+        default=None,
+        metavar="FILE",
+        help="공지 한 편을 파일(텔레그램 HTML)에서 읽어 보낸다. 포맷·신선도 게이트와 무관. --send 없으면 미리보기만.",
     )
     args = parser.parse_args()
+
+    # 공지(손으로 쓴 글)는 재료도 게이트도 없다. 같은 봇·같은 채널·같은 미리보기 절차만 빌린다 —
+    # 예전엔 텔레그램 앱에서 직접 올려서 링크 미리보기·UTM 이 정기 글과 달랐다(2026-09-04 공지).
+    if args.notice:
+        message = Path(args.notice).read_text(encoding="utf-8").strip()
+        read = as_read(message)
+        print("──── 채널에서 읽히는 모습 " + "─" * 34)
+        print(read)
+        print("──── 실제 전송 페이로드(HTML) " + "─" * 30)
+        print(message)
+        print("─" * 60)
+        print(f"[길이] 읽히는 글자 {len(read)}자 · 페이로드 {len(message)}자")
+        if not args.send:
+            print("[dry-run] 실제로 보내지 않았습니다. 보내려면 --send 를 붙이세요.")
+            return
+        chat_id = args.chat_id or TELEGRAM_BROADCAST_CHAT_ID
+        if not TELEGRAM_BOT_TOKEN or not chat_id:
+            print("[중단] TELEGRAM_BOT_TOKEN 또는 TELEGRAM_BROADCAST_CHAT_ID 가 없습니다.")
+            sys.exit(1)
+        send(TELEGRAM_BOT_TOKEN, str(chat_id), message)
+        return
 
     # 설정 도우미라 DB 도 안 붙고 메시지도 안 만든다. 토큰만 있으면 된다.
     if args.probe_chats:
@@ -914,6 +951,10 @@ def main() -> None:
         llm = Anthropic(api_key=ANTHROPIC_API_KEY)
     elif args.format in ("morning", "theme", "weekly"):
         print("[안내] ANTHROPIC_API_KEY 가 없어 해설 문단 없이 만듭니다.")
+    elif args.format in bd.FORMATS:
+        # 2판은 갈래가 곧 글이라 LLM 없이는 만들 수 없다.
+        print("[중단] ANTHROPIC_API_KEY 가 없어 갈래 요약을 만들 수 없습니다.")
+        sys.exit(1)
 
     # 신선도 게이트는 daily_score 를 본다. 온도를 싣는 건 마감 리포트뿐이지만, 점수가
     # 안 돌았다는 건 그날 파이프라인이 제대로 안 끝났다는 신호라 나머지 글도 같이 막는다.
@@ -928,8 +969,22 @@ def main() -> None:
         message = build_morning(db, llm)
     elif args.format == "theme":
         message = build_theme(db, llm)
-    else:
+    elif args.format == "weekly":
         message = build_weekly(db, llm)
+    else:
+        # 2판(갈래 요약). 표시 도구는 1판과 같은 함수를 넘겨 두 판의 글이 같은 모양이 되게 한다.
+        render = bd.Render(
+            cta_link=cta_link,
+            quote=quote,
+            paragraphs=paragraphs,
+            date_label=korean_date_label,
+            js_round=js_round,
+            stage_for_score=stage_for_score,
+            stage_emoji=STAGE_EMOJI,
+        )
+        as_of = date.fromisoformat(args.as_of) if args.as_of else None
+        # 갈래 저장은 실제 발송 때만(dry-run 이 표를 더럽히지 않게).
+        message = bd.build(args.format, db, llm, MODEL, render, as_of=as_of, store=args.send)
 
     if not message:
         return  # 재료가 없어 글을 못 만든 경우(각 builder 가 이유를 찍는다)
