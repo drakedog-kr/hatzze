@@ -66,6 +66,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import requests  # noqa: E402
 
 from common import broadcast_content as bc  # noqa: E402
+from common import broadcast_digest as bd  # noqa: E402
 from common.config import ANTHROPIC_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_BROADCAST_CHAT_ID  # noqa: E402
 from common.retry import backoff_delay  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
@@ -134,6 +135,16 @@ KADERA_MAX_LAG_DAYS = 3
 # daily_score 가 이보다 오래전에 쓰였으면 '이번 실행이 계산한 점수'가 아니라고 본다
 # (staleness_problems 주석 참고). 예약 실행 간격이 9시간 남짓이라 6이면 여유가 넉넉하다.
 MAX_SCORE_AGE_HOURS = 6
+
+# 개장 전 요약(morning2)이 쓰는 신선도 잣대. **이 글은 온도를 안 쓴다** — 재료가 밤사이
+# 메시지·미장 까닭·일정뿐이라(common/broadcast_digest.build_morning2) daily_score 나이를
+# 물어봐야 답이 안 나온다. 대신 "수집이 이번 실행에서 돌았나"를 직접 본다.
+#
+# ⭐ 이 글은 09:00 개장 **전에** 도착해야 해서 파이프라인 중간(미국 종목 집계 뒤)에서 나간다.
+#    그 시점의 daily_score 는 전날 저녁 것이라 아래 MAX_SCORE_AGE_HOURS 로 재면 13시간짜리다.
+#    잣대를 바꾸는 것이지 게이트를 푸는 게 아니다 — 수집이 죽은 날은 여전히 막힌다.
+# 실측(2026-09-10): 아침 수집이 07:17~07:32 에 돌고 발송이 08:26 이면 나이가 1시간 안쪽이다.
+MAX_TELEGRAM_AGE_HOURS = 6
 
 TELEGRAM_TIMEOUT_SEC = 20
 TELEGRAM_ATTEMPTS = 3
@@ -317,6 +328,30 @@ def score_age_hours(score_row: dict) -> float | None:
     if written.tzinfo is None:
         written = written.replace(tzinfo=timezone.utc)
     return (datetime.now(timezone.utc) - written).total_seconds() / 3600
+
+
+def telegram_staleness_problems(db) -> list[str]:
+    """텔레그램 수집이 이번 실행에서 돌았나. 비어 있으면 보내도 된다.
+
+    가장 최근 메시지의 작성 시각을 본다. `telegram_messages` 에는 수집 시각 컬럼이 없고
+    (마이그레이션 009), `posted_at` 에는 내림차순 인덱스가 있어 이 조회가 0.4초다.
+
+    수집이 통째로 실패하면 가장 최근 메시지가 지난 실행 것이라 나이가 12시간을 넘어 걸린다.
+    채널이 조용해서 걸릴 일은 없다 — 320개 채널이라 평일 아침에 몇 분 이상 비는 일이 없다.
+    """
+    rows = (
+        db.table("telegram_messages").select("posted_at").order("posted_at", desc=True).limit(1).execute().data
+    )
+    if not rows:
+        return ["telegram_messages 가 비어 있습니다."]
+    newest = datetime.fromisoformat(str(rows[0]["posted_at"]).replace("Z", "+00:00"))
+    age = (datetime.now(timezone.utc) - newest).total_seconds() / 3600
+    if age > MAX_TELEGRAM_AGE_HOURS:
+        return [
+            f"가장 최근 메시지가 {age:.1f}시간 전 것입니다(허용 {MAX_TELEGRAM_AGE_HOURS}시간). "
+            "이번 실행에서 수집이 안 돌았습니다."
+        ]
+    return []
 
 
 def staleness_problems(score_row: dict) -> list[str]:
@@ -889,11 +924,47 @@ def main() -> None:
     )
     parser.add_argument(
         "--format",
-        choices=["morning", "evening", "theme", "weekly"],
+        choices=["morning", "evening", "theme", "weekly", *bd.FORMATS],
         default="evening",
-        help="어떤 글을 만들지. morning=아침 브리핑 · evening=마감 리포트(기본) · theme=관심 이동 · weekly=주간 결산",
+        help=(
+            "어떤 글을 만들지. morning=아침 브리핑 · evening=마감 리포트(기본) · theme=관심 이동 · weekly=주간 결산. "
+            "2판(common/broadcast_digest.py): morning2=개장 전 요약 · evening2=저녁 브리핑 · "
+            "midweek=주중 점검(수) · us_weekend=이번 주 미장 흐름(토) · weekly2=한 주 정리와 다음 주 일정(일)"
+        ),
+    )
+    parser.add_argument(
+        "--as-of",
+        default=None,
+        help="2판 전용. '오늘'을 이 날짜(YYYY-MM-DD)로 못박는다 — 예시를 다른 요일로 만들 때(예: 수요일에 토요일 글).",
+    )
+    parser.add_argument(
+        "--notice",
+        default=None,
+        metavar="FILE",
+        help="공지 한 편을 파일(텔레그램 HTML)에서 읽어 보낸다. 포맷·신선도 게이트와 무관. --send 없으면 미리보기만.",
     )
     args = parser.parse_args()
+
+    # 공지(손으로 쓴 글)는 재료도 게이트도 없다. 같은 봇·같은 채널·같은 미리보기 절차만 빌린다 —
+    # 예전엔 텔레그램 앱에서 직접 올려서 링크 미리보기·UTM 이 정기 글과 달랐다(2026-09-04 공지).
+    if args.notice:
+        message = Path(args.notice).read_text(encoding="utf-8").strip()
+        read = as_read(message)
+        print("──── 채널에서 읽히는 모습 " + "─" * 34)
+        print(read)
+        print("──── 실제 전송 페이로드(HTML) " + "─" * 30)
+        print(message)
+        print("─" * 60)
+        print(f"[길이] 읽히는 글자 {len(read)}자 · 페이로드 {len(message)}자")
+        if not args.send:
+            print("[dry-run] 실제로 보내지 않았습니다. 보내려면 --send 를 붙이세요.")
+            return
+        chat_id = args.chat_id or TELEGRAM_BROADCAST_CHAT_ID
+        if not TELEGRAM_BOT_TOKEN or not chat_id:
+            print("[중단] TELEGRAM_BOT_TOKEN 또는 TELEGRAM_BROADCAST_CHAT_ID 가 없습니다.")
+            sys.exit(1)
+        send(TELEGRAM_BOT_TOKEN, str(chat_id), message)
+        return
 
     # 설정 도우미라 DB 도 안 붙고 메시지도 안 만든다. 토큰만 있으면 된다.
     if args.probe_chats:
@@ -914,11 +985,17 @@ def main() -> None:
         llm = Anthropic(api_key=ANTHROPIC_API_KEY)
     elif args.format in ("morning", "theme", "weekly"):
         print("[안내] ANTHROPIC_API_KEY 가 없어 해설 문단 없이 만듭니다.")
+    elif args.format in bd.FORMATS:
+        # 2판은 갈래가 곧 글이라 LLM 없이는 만들 수 없다.
+        print("[중단] ANTHROPIC_API_KEY 가 없어 갈래 요약을 만들 수 없습니다.")
+        sys.exit(1)
 
     # 신선도 게이트는 daily_score 를 본다. 온도를 싣는 건 마감 리포트뿐이지만, 점수가
     # 안 돌았다는 건 그날 파이프라인이 제대로 안 끝났다는 신호라 나머지 글도 같이 막는다.
+    # 개장 전 요약은 온도를 안 쓰므로 daily_score 가 없어도 만들 수 있다(위 상수 주석).
+    score_needed = args.format != "morning2"
     score_row = load_daily_score(db)
-    if not score_row:
+    if not score_row and score_needed:
         print("[skip] daily_score 행이 없어 보낼 내용이 없습니다.")
         return
 
@@ -928,8 +1005,22 @@ def main() -> None:
         message = build_morning(db, llm)
     elif args.format == "theme":
         message = build_theme(db, llm)
-    else:
+    elif args.format == "weekly":
         message = build_weekly(db, llm)
+    else:
+        # 2판(갈래 요약). 표시 도구는 1판과 같은 함수를 넘겨 두 판의 글이 같은 모양이 되게 한다.
+        render = bd.Render(
+            cta_link=cta_link,
+            quote=quote,
+            paragraphs=paragraphs,
+            date_label=korean_date_label,
+            js_round=js_round,
+            stage_for_score=stage_for_score,
+            stage_emoji=STAGE_EMOJI,
+        )
+        as_of = date.fromisoformat(args.as_of) if args.as_of else None
+        # 갈래 저장은 실제 발송 때만(dry-run 이 표를 더럽히지 않게).
+        message = bd.build(args.format, db, llm, MODEL, render, as_of=as_of, store=args.send)
 
     if not message:
         return  # 재료가 없어 글을 못 만든 경우(각 builder 가 이유를 찍는다)
@@ -942,7 +1033,7 @@ def main() -> None:
     print("─" * 60)
     print(f"[길이] 읽히는 글자 {len(read)}자 · 페이로드 {len(message)}자")
 
-    problems = staleness_problems(score_row)
+    problems = staleness_problems(score_row) if score_needed else telegram_staleness_problems(db)
     if problems:
         for p in problems:
             print(f"[신선도] {p}")

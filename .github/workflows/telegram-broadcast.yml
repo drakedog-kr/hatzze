@@ -1,18 +1,21 @@
 name: Telegram Broadcast (오후 2시)
 
-# 오후 2시(KST)에 나가는 두 글 — C 관심 이동(수·토) · D 주간 결산(일).
+# 오후 2시(KST)에 나가는 세 글 — 주중 점검(수) · 이번 주 미장 흐름(토) · 한 주 정리와 다음 주 일정(일).
+#
+# 2026-09-10 부터 2판(common/broadcast_digest.py)이다. 1판의 C 관심 이동(theme)·D 주간 결산(weekly)은
+# 스크립트에 남아 있지만 여기서는 더 부르지 않는다.
 #
 # **왜 파이프라인과 분리했나.** daily-update.yml 은 아침(~11:00)과 저녁(~20:20)에 돈다.
-# A 어제 브리핑·B 마감 리포트는 그 데이터가 막 갱신된 직후에 나가는 게 맞아 거기 붙였지만,
-# C·D 는 오후 2시라 어느 실행에도 붙지 않는다. 파이프라인 크론을 하나 더 늘리면 지표 수집
+# 아침·저녁 글은 그 데이터가 막 갱신된 직후에 나가는 게 맞아 거기 붙였지만,
+# 이 셋은 오후 2시라 어느 실행에도 붙지 않는다. 파이프라인 크론을 하나 더 늘리면 지표 수집
 # 26개가 통째로 한 번 더 도는 셈이라, 발송만 하는 가벼운 워크플로를 따로 뒀다.
 #
 # 자료는 그날 아침 실행이 이미 채워 뒀다(오후 2시면 완료 후 세 시간쯤 지난 시점).
 
 on:
   # ⛔ **깃헙 예약을 껐다(2026-08-29).** 시각은 Vercel Cron 이 지킨다 — 수·토·일 14:00 KST
-  #    에 `workflow_dispatch` 로 던지고, 요일에 따라 format 을 골라 넘긴다(수·토=theme,
-  #    일=weekly). 이유는 daily-update.yml 머리 주석 참고.
+  #    에 `workflow_dispatch` 로 던지고, 요일에 따라 format 을 골라 넘긴다(수=midweek,
+  #    토=us_weekend · 일=weekly2 — lib/cron-schedule.ts broadcastFormat). 이유는 daily-update.yml 머리 주석 참고.
   #
   #    ⚠️ 예약이 없으므로 아래 '발송 시각까지 대기' 스텝은 더 이상 돌지 않는다(조건이
   #       `event_name == 'schedule'` 이다). 되돌릴 때를 위해 남겨 둔다.
@@ -21,8 +24,8 @@ on:
       format:
         description: "보낼 글"
         type: choice
-        options: [theme, weekly]
-        default: theme
+        options: [midweek, us_weekend, weekly2]
+        default: midweek
       send:
         description: "실제로 발송한다 (끄면 미리보기만 찍고 안 보낸다)"
         type: boolean
@@ -133,7 +136,7 @@ jobs:
         id: when
         run: |
           DOW=$(TZ=Asia/Seoul date +%u)   # 1=월 … 7=일
-          themeday=false; sunday=false
+          wednesday=false; saturday=false; sunday=false
           # 관심 이동(테마)은 3일 간격이다. 카더라 집계 창이 3일이라 그 주기로 보내면
           # 매번 완전히 새 구간을 말한다. 수·토로 고정한 건 (a) 수→토 3일 · 토→수 4일로
           # 3일에 가장 가까우면서 (b) 요일이 고정돼 구독자가 리듬을 익히기 때문이다.
@@ -143,11 +146,13 @@ jobs:
           # 되풀이하는 A·B 를 주말에 안 보내는 것과는 사정이 다르다. 자료 게이트도 통과한다:
           # check_freshness 의 허용치가 **영업일** 기준이라 주말은 나이를 먹지 않고, 애초에
           # D 가 일요일에 같은 게이트를 지나 나가고 있다.
-          { [ "$DOW" -eq 3 ] || [ "$DOW" -eq 6 ]; } && themeday=true
+          [ "$DOW" -eq 3 ] && wednesday=true
+          [ "$DOW" -eq 6 ] && saturday=true
           [ "$DOW" -eq 7 ] && sunday=true
-          echo "themeday=$themeday" >> "$GITHUB_OUTPUT"
+          echo "wednesday=$wednesday" >> "$GITHUB_OUTPUT"
+          echo "saturday=$saturday" >> "$GITHUB_OUTPUT"
           echo "sunday=$sunday" >> "$GITHUB_OUTPUT"
-          echo "DOW=$DOW · 테마일=$themeday 일요일=$sunday"
+          echo "DOW=$DOW · 수요일=$wednesday 토요일=$saturday 일요일=$sunday"
 
       # 낡은 값 차단. 이 워크플로엔 수집·계산 스텝이 없어서 daily-update.yml 처럼
       # 앞 스텝 결과를 볼 수가 없다. 대신 같은 검사를 직접 돌려 게이트로 쓴다 — DB 조회만
@@ -157,19 +162,60 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/check_freshness.py
 
-      - name: (텔레그램) C 관심 이동 발송 (수·토 14:00)
-        id: telegram_theme
+      - name: (텔레그램) 주중 점검 발송 (수요일 14:00)
+        id: telegram_midweek
         continue-on-error: true
         if: >-
           steps.check_freshness.outcome == 'success'
           && github.run_attempt == '1'
           && (
-            (github.event_name == 'schedule' && steps.when.outputs.themeday == 'true')
-            || (github.event.inputs.send == 'true' && github.event.inputs.format == 'theme')
+            (github.event_name == 'schedule' && steps.when.outputs.wednesday == 'true')
+            || (github.event.inputs.send == 'true' && github.event.inputs.format == 'midweek')
           )
-        run: python data-pipeline/scripts/send_telegram_broadcast.py --send --format theme
+        run: python data-pipeline/scripts/send_telegram_broadcast.py --send --format midweek
 
-      - name: (텔레그램) D 주간 결산 발송 (일요일 14:00)
+      # ── 토요일 글이 쓸 미장 까닭을 여기서 만든다 ──────────────────────────
+      #
+      # ⚠️ **이 스텝이 없으면 토요일 글에서 '종목별 까닭' 재료가 통째로 빠진다.**
+      #    `telegram_us_stock_move_reason` 의 토요일 행은 파이프라인 **저녁 실행(18:00)** 에서
+      #    만들어지는데 이 글은 14:00 에 나간다. 실측(2026-09-05): 그 토요일 행 17개가 전부
+      #    18시 이후에 생겼다. 그래서 발송 직전에 미장 몫만 따로 만든다.
+      #
+      # ⚠️ 생성기의 문턱(MIN_DAY_MSGS=1500)도 낮춰야 한다 — 토요일 14:00 까지 메시지가
+      #    762~1,145건이라(2026-08-29·09-05 실측) 그대로면 스스로 건너뛴다. 얇은 표본이라서가
+      #    아니라 **토요일이 원래 조용해서**이고, 금요일 미국장은 05:00 KST 에 이미 끝나 있어
+      #    이 건수가 그 세션 재료의 전부다.
+      #
+      # ⛔ 국장 몫(`--us-only` 로 제외)은 건드리지 않는다. 토요일엔 국장이 닫혀 있고,
+      #    그 표는 저녁 실행이 자기 규칙대로 채운다.
+      # ⛔ 조건에 `send == 'true'` 를 넣어 **미리보기 실행에서는 안 돈다** — 미리보기가 표를
+      #    쓰고 LLM 을 부르면 그건 미리보기가 아니다(발송 스텝들과 같은 어법).
+      # ⚠️ 18:00 실행이 같은 날짜를 더 많은 메시지로 다시 만들어 덮는다(upsert + 낡은 행 삭제).
+      #    여기 결과는 14:00 글이 쓰고, 화면은 저녁 판을 쓴다.
+      - name: (텔레그램) 미장 까닭 생성 (토요일 발송용)
+        id: us_move_reasons
+        continue-on-error: true
+        if: >-
+          github.run_attempt == '1'
+          && (
+            (github.event_name == 'schedule' && steps.when.outputs.saturday == 'true')
+            || (github.event.inputs.send == 'true' && github.event.inputs.format == 'us_weekend')
+          )
+        run: python data-pipeline/scripts/generate_move_reasons.py --us-only --min-msgs 400
+
+      - name: (텔레그램) 이번 주 미장 흐름 발송 (토요일 14:00)
+        id: telegram_us_weekend
+        continue-on-error: true
+        if: >-
+          steps.check_freshness.outcome == 'success'
+          && github.run_attempt == '1'
+          && (
+            (github.event_name == 'schedule' && steps.when.outputs.saturday == 'true')
+            || (github.event.inputs.send == 'true' && github.event.inputs.format == 'us_weekend')
+          )
+        run: python data-pipeline/scripts/send_telegram_broadcast.py --send --format us_weekend
+
+      - name: (텔레그램) 한 주 정리와 다음 주 일정 발송 (일요일 14:00)
         id: telegram_weekly
         continue-on-error: true
         if: >-
@@ -177,9 +223,9 @@ jobs:
           && github.run_attempt == '1'
           && (
             (github.event_name == 'schedule' && steps.when.outputs.sunday == 'true')
-            || (github.event.inputs.send == 'true' && github.event.inputs.format == 'weekly')
+            || (github.event.inputs.send == 'true' && github.event.inputs.format == 'weekly2')
           )
-        run: python data-pipeline/scripts/send_telegram_broadcast.py --send --format weekly
+        run: python data-pipeline/scripts/send_telegram_broadcast.py --send --format weekly2
 
       # 수동 실행에서 send 를 껐을 때의 미리보기. 실제로는 안 보낸다.
       - name: 미리보기 (수동 실행 · 발송 끔)
@@ -189,8 +235,8 @@ jobs:
       - name: Summarize results
         if: always()
         run: |
-          names=("check_freshness.py" "broadcast(C테마)" "broadcast(D주간)")
-          outcomes=("${{ steps.check_freshness.outcome }}" "${{ steps.telegram_theme.outcome }}" "${{ steps.telegram_weekly.outcome }}")
+          names=("check_freshness.py" "generate_move_reasons.py(미장)" "broadcast(주중 점검)" "broadcast(미장 흐름)" "broadcast(한 주 정리)")
+          outcomes=("${{ steps.check_freshness.outcome }}" "${{ steps.us_move_reasons.outcome }}" "${{ steps.telegram_midweek.outcome }}" "${{ steps.telegram_us_weekend.outcome }}" "${{ steps.telegram_weekly.outcome }}")
 
           {
             echo "## Telegram broadcast summary"
@@ -209,7 +255,7 @@ jobs:
                 echo "| $name | success |" >> "$GITHUB_STEP_SUMMARY"
                 ;;
               skipped|"")
-                # 'skipped'는 실패가 아니다. 수·토엔 D 가, 일요일엔 C 가 **일부러**
+                # 'skipped'는 실패가 아니다. 세 스텝 중 그날 요일 것 하나만 돌고 나머지 둘은 **일부러**
                 # 건너뛴다. 이걸 실패로 세면 발송이 있는 날마다 알림 이슈가 열린다.
                 echo "| $name | skipped (예정된 건너뜀) |" >> "$GITHUB_STEP_SUMMARY"
                 ;;

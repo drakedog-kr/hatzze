@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { INSIDER_LISTS, INSIDER_LIST_SLUGS, insiderListHref } from "./insider/lists";
 import { PageJsonLd } from "./JsonLd";
 import { NOTE_PAGE } from "./daily/copy";
-import { DAILY_PUBLIC, PREVIEW_PUBLIC } from "./screen-flags";
+import { DAILY_PUBLIC } from "./screen-flags";
 
 import { track } from "@/lib/ga";
 import { SLOGAN } from "./brand";
@@ -1312,32 +1312,27 @@ const NEWS_EVENT = "hz-news-change";
    조건부가 없어서, 띠만 먼저 넣으면 프로덕션에서 눌러 404 로 간다. 그래서 목적지가
    열려 있을 때만 걸리도록 플래그로 가른다 — `app/screen-flags.ts` 한 줄을 true 로
    바꾸는 순간 아래가 통째로 갈린다. 문구는 이미 정해 뒀다(2026-09-04, 48자). */
-const NEWS = DAILY_PUBLIC
-  ? {
-      key: "hz-news-daily",
-      href: NOTE_PAGE.href,
-      name: NOTE_PAGE.label,
-      tail: "를 열었습니다. 하루의 시장 이야기를 매일 저녁 한 편으로 정리합니다.",
-      icon: NOTE_PAGE.icon,
-      ga: "news-daily",
-    }
-  : PREVIEW_PUBLIC
-  ? {
-      key: "hz-news-preview",
-      href: "/preview",
-      name: "국장 미리보기",
-      tail: "를 열었습니다. 미장이 크게 움직인 당일 아침마다 국장이 어땠는지 봅니다.",
-      icon: "preview",
-      ga: "news-preview",
-    }
-  : {
-      key: "hz-news-insider",
-      href: "/insider",
-      name: "내부자 리포트",
-      tail: "를 열었습니다. 임원과 의원, 월가 거물이 무엇을 사고팔았는지 봅니다.",
-      icon: "contact_page",
-      ga: "news-insider",
-    };
+/* 2026-09-11 · 텔레그램 채널 글 2판 소식. 목적지가 바깥(t.me)이라 새 탭으로 연다(아래 NewsStrip).
+   ⚠️ 문구에 숫자를 넣지 않는다(위 주석). 이전 소식들(내부자 → 국장 미리보기 → 데일리 노트)은
+   git 이력에 있다 — 되살릴 땐 키를 새로 딴다. */
+const NEWS = {
+  key: "hz-news-telegram-v2",
+  // 이 시각 전에는 띠를 안 그린다. 새 형식의 첫 글(9/11 아침, 08:45~09:20 도착)이 나간 뒤에
+  // 떠야 눌러 들어간 사람이 새 글을 본다 — 머지 당일 저녁에 뜨면 옛 글이 맨 위에 있다.
+  from: "2026-09-11T09:30:00+09:00",
+  href: TELEGRAM.href,
+  name: "텔레그램 채널",
+  tail: " 글의 퀄리티가 향상되었습니다. 더 종합적이고 더 자세하게 정리합니다.",
+  // 사이드바의 채널 아이콘(send)이 아니라 '올라갔다'는 그림이다 — '새 화면'이 아니라 '나아졌다'는
+  // 소식이라서. 전구(lightbulb)는 MDD 본문이 이미 써서 못 쓴다(한 화면에 같은 아이콘 두 번 금지).
+  icon: "upgrade",
+  ga: "news-telegram",
+};
+
+// 모듈이 읽힐 때 한 번만 본다(렌더 안에서 Date.now() 를 부르면 React 컴파일러 린트가 막는다).
+// 서버는 어차피 안 그리고(getServerSnapshot 이 false), 클라이언트는 페이지를 열 때마다 새로 읽는다.
+// 개발 서버에서는 시각과 무관하게 띄운다 — 문구·아이콘을 로컬에서 보려면 날짜를 기다릴 수 없다.
+const NEWS_LIVE = process.env.NODE_ENV !== "production" || Date.now() >= Date.parse(NEWS.from);
 
 const newsStore = {
   subscribe(cb: () => void) {
@@ -1345,6 +1340,7 @@ const newsStore = {
     return () => window.removeEventListener(NEWS_EVENT, cb);
   },
   getSnapshot() {
+    if (!NEWS_LIVE) return false;
     try {
       return localStorage.getItem(NEWS.key) === null;
     } catch {
@@ -1379,7 +1375,14 @@ function NewsStrip() {
           ⚠️ dismiss 안의 dispatchEvent 는 동기지만 React 는 이벤트 핸들러에서 나온
           상태 변경을 핸들러가 끝난 뒤로 미룬다. 그래서 이 줄이 링크를 먼저 언마운트해
           이동을 막지 않는다(브라우저에서 눌러 확인했다). */}
-      <Link href={NEWS.href} className="hz-news-link" data-ga-cta={NEWS.ga} onClick={dismiss}>
+      <Link
+        href={NEWS.href}
+        className="hz-news-link"
+        data-ga-cta={NEWS.ga}
+        onClick={dismiss}
+        // 바깥 주소(t.me)면 새 탭. 사이드바의 채널 링크와 같은 규칙이다.
+        {...(NEWS.href.startsWith("http") ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+      >
         <Icon name={NEWS.icon} style={{ fontSize: 17, flexShrink: 0 }} />
         <span className="hz-news-text">
           {/* ⚠️ <a> 안에 <a> 를 넣을 수 없다. 바깥 링크가 이미 같은 곳으로 가므로
