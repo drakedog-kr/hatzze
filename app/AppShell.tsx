@@ -1331,7 +1331,8 @@ const NEWS = {
 
 // 모듈이 읽힐 때 한 번만 본다(렌더 안에서 Date.now() 를 부르면 React 컴파일러 린트가 막는다).
 // 서버는 어차피 안 그리고(getServerSnapshot 이 false), 클라이언트는 페이지를 열 때마다 새로 읽는다.
-const NEWS_LIVE = Date.now() >= Date.parse(NEWS.from);
+// 개발 서버에서는 시각과 무관하게 띄운다 — 문구·아이콘을 로컬에서 보려면 날짜를 기다릴 수 없다.
+const NEWS_LIVE = process.env.NODE_ENV !== "production" || Date.now() >= Date.parse(NEWS.from);
 
 const newsStore = {
   subscribe(cb: () => void) {
