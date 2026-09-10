@@ -1312,32 +1312,17 @@ const NEWS_EVENT = "hz-news-change";
    조건부가 없어서, 띠만 먼저 넣으면 프로덕션에서 눌러 404 로 간다. 그래서 목적지가
    열려 있을 때만 걸리도록 플래그로 가른다 — `app/screen-flags.ts` 한 줄을 true 로
    바꾸는 순간 아래가 통째로 갈린다. 문구는 이미 정해 뒀다(2026-09-04, 48자). */
-const NEWS = DAILY_PUBLIC
-  ? {
-      key: "hz-news-daily",
-      href: NOTE_PAGE.href,
-      name: NOTE_PAGE.label,
-      tail: "를 열었습니다. 하루의 시장 이야기를 매일 저녁 한 편으로 정리합니다.",
-      icon: NOTE_PAGE.icon,
-      ga: "news-daily",
-    }
-  : PREVIEW_PUBLIC
-  ? {
-      key: "hz-news-preview",
-      href: "/preview",
-      name: "국장 미리보기",
-      tail: "를 열었습니다. 미장이 크게 움직인 당일 아침마다 국장이 어땠는지 봅니다.",
-      icon: "preview",
-      ga: "news-preview",
-    }
-  : {
-      key: "hz-news-insider",
-      href: "/insider",
-      name: "내부자 리포트",
-      tail: "를 열었습니다. 임원과 의원, 월가 거물이 무엇을 사고팔았는지 봅니다.",
-      icon: "contact_page",
-      ga: "news-insider",
-    };
+/* 2026-09-11 · 텔레그램 채널 글 2판 소식. 목적지가 바깥(t.me)이라 새 탭으로 연다(아래 NewsStrip).
+   ⚠️ 문구에 숫자를 넣지 않는다(위 주석). 이전 소식들(내부자 → 국장 미리보기 → 데일리 노트)은
+   git 이력에 있다 — 되살릴 땐 키를 새로 딴다. */
+const NEWS = {
+  key: "hz-news-telegram-v2",
+  href: TELEGRAM.href,
+  name: "텔레그램 채널",
+  tail: "에서 무슨 이야기가 돌았고 어떤 종목이 왜 움직였는지 매일 보냅니다.",
+  icon: TELEGRAM.icon,
+  ga: "news-telegram",
+};
 
 const newsStore = {
   subscribe(cb: () => void) {
@@ -1379,7 +1364,14 @@ function NewsStrip() {
           ⚠️ dismiss 안의 dispatchEvent 는 동기지만 React 는 이벤트 핸들러에서 나온
           상태 변경을 핸들러가 끝난 뒤로 미룬다. 그래서 이 줄이 링크를 먼저 언마운트해
           이동을 막지 않는다(브라우저에서 눌러 확인했다). */}
-      <Link href={NEWS.href} className="hz-news-link" data-ga-cta={NEWS.ga} onClick={dismiss}>
+      <Link
+        href={NEWS.href}
+        className="hz-news-link"
+        data-ga-cta={NEWS.ga}
+        onClick={dismiss}
+        // 바깥 주소(t.me)면 새 탭. 사이드바의 채널 링크와 같은 규칙이다.
+        {...(NEWS.href.startsWith("http") ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+      >
         <Icon name={NEWS.icon} style={{ fontSize: 17, flexShrink: 0 }} />
         <span className="hz-news-text">
           {/* ⚠️ <a> 안에 <a> 를 넣을 수 없다. 바깥 링크가 이미 같은 곳으로 가므로
