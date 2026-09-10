@@ -56,6 +56,22 @@ MODEL = KR.MODEL
 TABLE = "telegram_stock_move_reason"
 
 MIN_DAY_MSGS = 1500   # 그날 본문 있는 메시지가 이 아래면(아침 실행) 만들지 않는다
+
+# ⛔⛔ **장이 안 열린 날은 국장 까닭을 만들지 않는다.**
+#
+# '급등 종목' 은 값이 올랐다는 카드다. 주말·공휴일에는 KRX 세션이 없어 확정 등락률도 없고
+# 야후에도 그 날짜 봉이 없다. 그런데 채널은 주말에도 떠들어서 '주목도' 만으로 후보 열대여섯이
+# 잡히고, 그 날짜로 행이 써지면 화면이 **가장 최근 날짜**를 집는 규칙 때문에 금요일 40행 대신
+# 그 행들을 쓴다. 등락률을 못 구해 거의 다 걸러지고 카드가 아홉 장에서 한 장으로 준다
+# (lib/kadera-why.getMoveReasons 의 boardOf — 오른 줄만 남긴다).
+#
+# 요일로 막지 않고 **채널 글의 등락 표기 수**로 가른다. 공휴일까지 한 번에 걸리고, 실측이
+# 깨끗하게 갈린다(2026-09 국장): 금 72 · 월 98 · 화 68 · **토 1**.
+#
+# ⛔ 미장에는 걸지 않는다(`min_quoted` 를 0 으로 둔다). 국내 채널은 미국 종목 옆에 등락률을
+#    잘 안 적어서 **평일에도 2** 다 — 같은 문턱을 걸면 미장이 매일 사라진다. 그리고 미장 화면은
+#    `lastUsSession` 이 하루 전까지 거슬러 마지막 세션을 찾으므로 쉬는 날도 스스로 맞는다.
+KR_MIN_QUOTED = 10
 # ⭐ `--min-msgs N` 으로 이 문턱을 낮출 수 있다. 쓰는 곳은 **토요일 14:00 채널 발송** 하나다 —
 #    그 글('이번 주 미장 흐름')이 금요일 미국장을 다루는데, 미국장은 토요일 새벽 05:00 KST 에
 #    이미 끝나 있어 14:00 시점의 700~1,200건이 얇은 표본이 아니라 **그 세션의 재료 전부**다.
@@ -450,6 +466,7 @@ MARKETS = {
         "mentions": "telegram_message_stocks",
         "names": ("stocks", "code,name", "code", "name"),
         "fill_krx": True,
+        "min_quoted": KR_MIN_QUOTED,
     },
     "us": {
         "label": "미장",
@@ -522,6 +539,14 @@ def run_market(db, client, cfg: dict, day: str, dry_run: bool, min_msgs: int = M
         c for c in sorted(by_code, key=lambda c: -float(counts[c].get("weighted_score") or 0))
         if c not in moved
     ][:HEAVY_N]
+    min_quoted = cfg.get("min_quoted", 0)
+    if len(moved) < min_quoted:
+        print(
+            f"[{tag} {day}] 등락 표기 후보 {len(moved)}개뿐입니다(문턱 {min_quoted}). "
+            "장이 열리지 않은 날로 보고 만들지 않습니다 — 화면은 직전 거래일 자료를 그대로 씁니다."
+        )
+        return 0
+
     targets = (moved + heavy)[:CAP]
     tbl, cols, kcol, ncol = cfg["names"]
     name_of = {s[kcol]: s[ncol] for s in load_all(db, tbl, cols, order_by=kcol)}
