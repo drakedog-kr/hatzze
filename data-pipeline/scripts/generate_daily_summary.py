@@ -19,9 +19,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from anthropic import Anthropic  # noqa: E402
-
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
+from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 from common.prompt_style import PLAIN_PROSE_RULE  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
@@ -389,9 +388,9 @@ def build_digest(
 
 
 def main() -> None:
-    if not ANTHROPIC_API_KEY:
+    if not HAS_LLM_CREDENTIAL:
         # 키가 없으면 조용히 건너뛴다(설정 전 로컬/CI에서도 파이프라인이 안 깨지게).
-        print("[skip] ANTHROPIC_API_KEY가 없어 요약 생성을 건너뜁니다.")
+        print("[skip] LLM 자격(구독 토큰·API 키)이 없어 요약 생성을 건너뜁니다.")
         return
 
     client = get_client()
@@ -470,7 +469,7 @@ def main() -> None:
     print(digest)
     print("─" * 60)
 
-    anthropic = Anthropic(api_key=ANTHROPIC_API_KEY)
+    anthropic = get_llm_client(ANTHROPIC_API_KEY)
 
     def one_sentence(system: str, source: str) -> str:
         resp = anthropic.messages.create(

@@ -48,9 +48,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from anthropic import Anthropic  # noqa: E402
-
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
+from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 from common.prompt_style import PLAIN_PROSE_RULE_SHORT  # noqa: E402
 from common.supabase_client import get_client, load_all  # noqa: E402
 from common.surging import load_stock_daily, top_surging  # noqa: E402
@@ -228,12 +227,12 @@ def main() -> None:
     dry_run = "--dry-run" in args
     kr_only, us_only = "--kr-only" in args, "--us-only" in args
 
-    if not ANTHROPIC_API_KEY and not dry_run:
-        print("[skip] ANTHROPIC_API_KEY가 없어 한 줄 요약을 건너뜁니다.")
+    if not HAS_LLM_CREDENTIAL and not dry_run:
+        print("[skip] LLM 자격(구독 토큰·API 키)이 없어 한 줄 요약을 건너뜁니다.")
         return
 
     db = get_client()
-    client = None if dry_run else Anthropic(api_key=ANTHROPIC_API_KEY)
+    client = None if dry_run else get_llm_client(ANTHROPIC_API_KEY)
 
     total = 0
     if not us_only:
