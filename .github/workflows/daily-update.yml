@@ -274,6 +274,10 @@ jobs:
       KMA_API_KEY: ${{ secrets.KMA_API_KEY }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      # LLM 호출을 Max 구독으로 먼저 보낸다(common/llm_client.py). 이 줄이나 아래
+      # CLI 설치 스텝이 없으면 래퍼가 조용히 API 키로만 돈다 — 예전과 같은 동작이라
+      # 티가 안 난다. 실행 로그의 `[LLM]` 줄로 어느 경로였는지 확인한다.
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
       TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
@@ -294,6 +298,15 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r data-pipeline/requirements.txt
+
+      # 구독 경로는 `claude` CLI 를 자식 프로세스로 부른다. 러너엔 없으니 받아 둔다.
+      # 실패해도 파이프라인을 세우지 않는다 — 래퍼가 API 키로 되돌아간다.
+      - name: Install Claude Code CLI (LLM 구독 경로)
+        continue-on-error: true
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/claude" --version
 
       # ── 국장 미리보기 ───────────────────────────────────────────────────
       # ⚠️⚠️ **데이터 스텝 중 맨 앞이다. 뒤로 옮기지 말 것.**
