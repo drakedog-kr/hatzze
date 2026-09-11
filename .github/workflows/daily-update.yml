@@ -907,6 +907,17 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_seohak_tic.py
 
+      # ── 배당주 (화면은 아직 없다 — 표부터 쌓는다) ─────────────────────────
+      # 배당금 쪽 재료다. 현재가는 `stocks.close_price`(위 fetch_krx_stocks)를 그대로 쓴다.
+      #
+      # ⚠️ 날짜별 증분이 아니라 **매일 스냅숏 전량**(15페이지·7만 행)이다. 금융위 API 는
+      #    기준일 다음 영업일 13시 뒤에 갱신되므로 아침 실행은 이틀 전 스냅숏, 저녁 실행이
+      #    어제 것을 받는다. 둘 다 돌려도 같은 행을 다시 쓸 뿐이다.
+      - name: Fetch 예탁원 배당 기록 (배당주)
+        id: kr_dividends
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_kr_dividends.py
+
 
       - name: Fetch GitHub trading bot repo count
         id: github_trading_repos
@@ -1479,6 +1490,62 @@ jobs:
           # 간다 — 여기 이슈는 봇이 열고 라벨도 멘션도 없어서, 안 붙이면 닿는지 여부가
           # 전적으로 그 설정에 달린다.
           # ⚠️ 실패해도 이슈는 남긴다. 알림 통로를 넓히려다 이슈 자체를 잃으면 본말이 뒤집힌다.
+          gh issue edit "${number:-$existing}" --add-assignee "${{ github.repository_owner }}" >/dev/null \
+            || echo "담당자 지정에 실패했습니다 — 이슈는 열려 있습니다"
+          exit 1
+
+      # ── 배당주 수집 전용 알림 ────────────────────────────────────────────
+      # 화면이 아직 없어 죽어도 아무 데도 티가 안 난다. 그래서 더 알려야 한다 — 표가
+      # 몇 주 낡은 채로 화면을 열면 첫날부터 옛 값을 내보인다.
+      #
+      # ⚠️ 하루 실패는 다음 실행이 만회한다(전량을 다시 받는다). 며칠 연속 열리면 원천이
+      #    바뀐 것이니 스크립트 머리말부터 볼 것 — 주소가 `/service/` 없이 `_V2` 다.
+      #    "등록되지 않은 서비스키"는 활용신청이 풀린 것이지 키가 잘못된 게 아니다
+      #    (스크립트가 그 메시지를 그대로 찍는다).
+      - name: Summarize 배당주 수집
+        id: dividend_health
+        if: always()
+        run: |
+          names=("fetch_kr_dividends.py")
+          outcomes=("${{ steps.kr_dividends.outcome }}")
+
+          {
+            echo "## 배당주"
+            echo "| Script | Result |"
+            echo "|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          failed=0
+          failed_list=""
+          for i in "${!names[@]}"; do
+            script="${names[$i]}"
+            outcome="${outcomes[$i]}"
+            echo "$script: $outcome"
+            echo "| $script | $outcome |" >> "$GITHUB_STEP_SUMMARY"
+            [ "$outcome" = "success" ] || { failed=1; failed_list="${failed_list:+$failed_list, }$script"; }
+          done
+
+          echo "failed=$failed" >> "$GITHUB_OUTPUT"
+          echo "DIVIDEND_FAILED_SCRIPTS=$failed_list" >> "$GITHUB_ENV"
+
+      - name: Alert on 배당주 failure (open/update GitHub issue)
+        if: ${{ !cancelled() && steps.dividend_health.outputs.failed == '1' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          failed="${DIVIDEND_FAILED_SCRIPTS:-요약 탭에서 확인}"
+          title="⚠️ 배당주 수집 중단"
+          note=$(printf '배당주 수집이 실패했습니다. 화면이 아직 없어 표만 조용히 낡습니다.\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n하루 실패는 다음 실행이 만회합니다. 며칠 연속 열리면 원천이 바뀐 것이니 `fetch_kr_dividends.py` 머리말부터 보세요.' \
+            "$(date -u '+%Y-%m-%d %H:%M')" "$failed" "$run_url")
+          existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$note"
+            echo "기존 알림 이슈 #$existing 에 코멘트 추가"
+          else
+            number=$(gh issue create --title "$title" --body "$note" | sed 's#.*/##')
+            echo "새 알림 이슈 #$number 생성"
+          fi
           gh issue edit "${number:-$existing}" --add-assignee "${{ github.repository_owner }}" >/dev/null \
             || echo "담당자 지정에 실패했습니다 — 이슈는 열려 있습니다"
           exit 1
