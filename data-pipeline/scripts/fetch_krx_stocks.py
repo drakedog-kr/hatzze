@@ -109,6 +109,9 @@ def main() -> None:
                 "close_price": _to_int(d.get("TDD_CLSPRC")),
                 "change_rate": _to_float(d.get("FLUC_RT")),
                 "price_date": f"{bas_dd[:4]}-{bas_dd[4:6]}-{bas_dd[6:]}",
+                # 시가총액(원). 배당 바스켓이 "시가총액 3,000억 이상" 으로 거를 때 쓴다
+                # (calculate_kr_dividend_stats.py). 같은 응답의 MKTCAP 라 호출이 늘지 않는다.
+                "market_cap": _to_int(d.get("MKTCAP")),
             }
 
     if not stocks:

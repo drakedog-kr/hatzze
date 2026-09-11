@@ -918,6 +918,14 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_kr_dividends.py
 
+      # 기록을 종목 한 줄로 접는다(12개월 합·수익률·지급월·연속 배당). 화면은 이 표만 읽는다.
+      # 위 스텝이 죽어도 돌린다 — 어제 기록으로 오늘 종가(fetch_krx_stocks)의 수익률은 낼 수 있다.
+      - name: Calculate 종목별 배당 요약 (배당주)
+        id: kr_dividend_stats
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python data-pipeline/scripts/calculate_kr_dividend_stats.py
+
 
       - name: Fetch GitHub trading bot repo count
         id: github_trading_repos
@@ -1506,8 +1514,8 @@ jobs:
         id: dividend_health
         if: always()
         run: |
-          names=("fetch_kr_dividends.py")
-          outcomes=("${{ steps.kr_dividends.outcome }}")
+          names=("fetch_kr_dividends.py" "calculate_kr_dividend_stats.py")
+          outcomes=("${{ steps.kr_dividends.outcome }}" "${{ steps.kr_dividend_stats.outcome }}")
 
           {
             echo "## 배당주"
@@ -1536,7 +1544,7 @@ jobs:
           run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           failed="${DIVIDEND_FAILED_SCRIPTS:-요약 탭에서 확인}"
           title="⚠️ 배당주 수집 중단"
-          note=$(printf '배당주 수집이 실패했습니다. 화면이 아직 없어 표만 조용히 낡습니다.\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n하루 실패는 다음 실행이 만회합니다. 며칠 연속 열리면 원천이 바뀐 것이니 `fetch_kr_dividends.py` 머리말부터 보세요.' \
+          note=$(printf '배당주 수집이 실패했습니다. 화면이 아직 없어 표만 조용히 낡습니다.\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n하루 실패는 다음 실행이 만회합니다. 며칠 연속 열리면 원천이 바뀐 것이니 `fetch_kr_dividends.py` · `calculate_kr_dividend_stats.py` 머리말부터 보세요.' \
             "$(date -u '+%Y-%m-%d %H:%M')" "$failed" "$run_url")
           existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
           if [ -n "$existing" ]; then
