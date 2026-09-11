@@ -6,7 +6,8 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { INSIDER_LISTS, INSIDER_LIST_SLUGS, insiderListHref } from "./insider/lists";
 import { PageJsonLd } from "./JsonLd";
 import { NOTE_PAGE } from "./daily/copy";
-import { DAILY_PUBLIC } from "./screen-flags";
+import { DIVIDEND_PAGE } from "./dividend/copy";
+import { DAILY_PUBLIC, DIVIDEND_PUBLIC } from "./screen-flags";
 
 import { track } from "@/lib/ga";
 import { SLOGAN } from "./brand";
@@ -237,6 +238,9 @@ const NAV: NavItem[] = [
   // DAILY_PUBLIC 한 줄이다. 안 연 동안은 아래 COMING_SOON 에 눌리지 않는 줄로 서고, 열면
   // 여기 맨 아래에 선다. 이름·부제·아이콘은 app/daily/copy.ts 한 곳에서 온다.
   ...(DAILY_PUBLIC ? [{ href: NOTE_PAGE.href, label: NOTE_PAGE.label, icon: NOTE_PAGE.icon, sub: NOTE_PAGE.sub }] : []),
+  // 배당 계산기 — ⛔ 여는 것은 `app/screen-flags.ts` 의 DIVIDEND_PUBLIC 한 줄이다. 데일리 노트와
+  // 같은 방식으로 안 연 동안은 COMING_SOON 에, 열면 여기 맨 아래에 선다.
+  ...(DIVIDEND_PUBLIC ? [{ href: DIVIDEND_PAGE.href, label: DIVIDEND_PAGE.label, icon: DIVIDEND_PAGE.icon, sub: DIVIDEND_PAGE.sub }] : []),
 ];
 
 // 외부(텔레그램) 링크라 NAV 배열이 아니라 따로 둔다 — pathname 기반 active 판정 대상이
@@ -282,6 +286,10 @@ const COMING_SOON: { label: string; badge: string; tip: string; after: string; i
   ...(DAILY_PUBLIC
     ? []
     : [{ label: NOTE_PAGE.label, badge: "준비 중", tip: NOTE_PAGE.tip, after: "/preview", icon: NOTE_PAGE.icon }]),
+  // 배당 계산기(2026-09-11 만듦, 아직 안 열었다). 데일리 노트 뒤(사이드바 맨 아래).
+  ...(DIVIDEND_PUBLIC
+    ? []
+    : [{ label: DIVIDEND_PAGE.label, badge: "준비 중", tip: DIVIDEND_PAGE.tip, after: DAILY_PUBLIC ? NOTE_PAGE.href : "/preview", icon: DIVIDEND_PAGE.icon }]),
 ];
 
 /**
@@ -444,6 +452,8 @@ const DEEP_PAGES: Record<string, { label: string; sub: string; badge?: string }>
   // 못 찾아 여기서 채운다. 배지가 있어 PageJsonLd 도 안 나간다(noindex 와 맞는다).
   // 열면 DAILY_PUBLIC 이 이 항목을 빼고, NAV 의 /daily 항목이 제목을 준다.
   ...(DAILY_PUBLIC ? {} : { [NOTE_PAGE.href]: { label: NOTE_PAGE.label, sub: NOTE_PAGE.sub, badge: "준비 중" } }),
+  // 배당 계산기 — 같은 이유로 안 연 동안만.
+  ...(DIVIDEND_PUBLIC ? {} : { [DIVIDEND_PAGE.href]: { label: DIVIDEND_PAGE.label, sub: DIVIDEND_PAGE.sub, badge: "준비 중" } }),
   ...Object.fromEntries(
     INSIDER_LIST_SLUGS.map((slug) => [
       insiderListHref(slug),

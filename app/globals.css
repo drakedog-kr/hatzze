@@ -5258,3 +5258,199 @@ main.hz-scroll { overflow-x: clip; }
   /* 손가락으로 누르는 폭이라 34px 은 좁다. 글자는 그대로 두고 상자만 키운다. */
   .hz-note-share { height: 40px; padding: 0 16px; }
 }
+
+/* ════ 배당 계산기 (/dividend) ═══════════════════════════════════════════
+   .hz-tx 결 위에 얹는다(시트·머리·타일 색은 그 스코프가 준다). 여기는 이 화면에만 있는
+   것들이다 — 결과 문장, 검색창, 칩, 담은 종목 표, 달력, 투자금 슬라이더, 바스켓 줄.
+   ⚠️ 호버·포커스가 있는 것은 전부 클래스로 둔다. 인라인 style 은 :hover 를 이긴다. */
+.dv-calc { transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+/* 끌어다 놓는 중 — 시트 전체가 받는 자리라는 걸 테두리로 말한다. */
+.hz-tx .dv-calc.dv-drop-on { border-color: var(--c-blue); box-shadow: 0 0 0 3px var(--c-blue-tint); }
+
+/* 결과 문장. 종목이 없을 때도 이 자리를 비우지 않는다. */
+.dv-hero { padding: 22px 26px 4px; }
+.dv-hero-label { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--c-sub); }
+.dv-hero-main {
+  margin: 0; font-size: 34px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.15;
+  color: var(--c-ink); font-variant-numeric: tabular-nums; word-break: keep-all;
+}
+.dv-hero-empty { font-size: 22px; font-weight: 700; color: var(--c-sub2); }
+.dv-hero-sub { margin: 6px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--c-sub); word-break: keep-all; }
+.dv-body { padding: 14px 26px 22px; display: flex; flex-direction: column; gap: 16px; }
+
+/* 세후·세전 — MDD 기간 토글과 같은 세그먼트. 고른 칸만 파란 면 + 카드색 글자. */
+.dv-seg { display: flex; gap: 2px; background: var(--c-track); border-radius: 9px; padding: 3px; }
+.dv-seg-btn {
+  padding: 6px 12px; border-radius: 6px; border: none; background: transparent; color: var(--c-label);
+  font-size: 11.5px; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap;
+}
+.dv-seg-btn[aria-pressed="true"] { background: var(--c-cold-ink); color: var(--c-card); }
+
+/* 검색 — MDD 조회 바와 같은 '파인 회색 면'. 바탕(--c-bg)이 아니라 --c-track 인 이유는 저쪽 주석. */
+.dv-search { position: relative; }
+.dv-search-box {
+  display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px;
+  background: var(--c-track); border: 1px solid transparent; border-radius: 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.dv-search-box-on { border-color: var(--c-blue); box-shadow: 0 0 0 3px var(--c-blue-tint); }
+.dv-search-box input {
+  flex: 1; min-width: 0; border: none; outline: none; background: transparent;
+  color: var(--c-ink); font-size: 15px; font-family: inherit;
+}
+.dv-search-pop {
+  position: absolute; top: 50px; left: 0; right: 0; z-index: 20; padding: 6px;
+  background: var(--c-float); border: 1px solid var(--c-line); border-radius: 12px;
+  box-shadow: 0 4px 16px var(--c-shadow-strong); max-height: 420px; overflow-y: auto;
+}
+.dv-search-pop ul { list-style: none; margin: 0; padding: 0; }
+.dv-search-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: none;
+  border-radius: 8px; cursor: pointer; color: var(--c-ink); font-size: 14px; text-align: left; font-family: inherit;
+}
+.dv-search-name { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dv-search-meta { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--c-sub); white-space: nowrap; }
+.dv-search-none { margin: 0; padding: 12px 10px; font-size: 12.5px; line-height: 1.5; color: var(--c-muted); }
+.dv-badge {
+  font-size: 11px; font-weight: 600; color: var(--c-sub); background: var(--c-chip);
+  padding: 2px 5px; border-radius: 4px; flex-shrink: 0; margin-left: 6px;
+}
+
+/* 앞에 세워 둔 칩. 끌 수 있는 것이라 손 모양 커서. */
+.dv-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.dv-chips-label { font-size: 12px; font-weight: 600; color: var(--c-muted); margin-right: 2px; }
+.dv-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px 5px 6px; border-radius: 999px;
+  border: 1px solid var(--c-line); background: var(--c-card); color: var(--c-ink);
+  font-size: 12.5px; font-weight: 600; cursor: grab; font-family: inherit; transition: background 0.12s ease;
+}
+.dv-chip:hover { background: var(--tx-btn); }
+.dv-chip:active { cursor: grabbing; }
+.dv-chip-yield { color: var(--c-sub); }
+
+/* 담은 종목 표. 열: 종목 · 주수 · 1주에 1년 · 1년에 받는 배당 · 수익률 · 빼기 */
+.dv-table { display: flex; flex-direction: column; }
+.dv-trow {
+  display: grid; grid-template-columns: minmax(0, 1fr) 132px 96px 128px 72px 32px;
+  align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--c-sheet-row);
+}
+.dv-thead { padding: 0 0 6px; border-top: none; font-size: 11.5px; font-weight: 600; color: var(--c-muted); }
+.dv-thead > span:nth-child(n + 3) { text-align: right; }
+.dv-tcell { min-width: 0; }
+.dv-tname { display: flex; align-items: center; gap: 10px; }
+.dv-tname-txt { display: flex; flex-direction: column; min-width: 0; }
+.dv-tname-main {
+  display: flex; align-items: center; min-width: 0; font-size: 14px; font-weight: 600; color: var(--c-ink);
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.dv-tnote { margin-top: 2px; font-size: 11.5px; line-height: 1.4; color: var(--c-sub); word-break: keep-all; }
+.dv-tshares { display: flex; align-items: center; gap: 4px; }
+.dv-tshares input {
+  width: 64px; height: 32px; padding: 0 8px; border: 1px solid var(--c-line); border-radius: 8px;
+  background: var(--c-card); color: var(--c-ink); font-size: 14px; font-weight: 700; text-align: right;
+  font-family: inherit; font-variant-numeric: tabular-nums; appearance: textfield; -moz-appearance: textfield;
+}
+.dv-tshares input::-webkit-outer-spin-button,
+.dv-tshares input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.dv-tshares input:focus { outline: none; border-color: var(--c-blue); box-shadow: 0 0 0 3px var(--c-blue-tint); }
+.dv-step {
+  width: 28px; height: 32px; border-radius: 8px; border: none; background: var(--tx-btn); color: var(--c-ink);
+  font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit; transition: background 0.12s ease;
+}
+.dv-step:hover { background: var(--tx-btn-hover); }
+.dv-step:disabled { opacity: 0.4; cursor: default; }
+.dv-tnum { text-align: right; font-size: 13.5px; color: var(--c-label); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dv-tstrong { font-weight: 700; color: var(--c-ink); }
+.dv-remove {
+  width: 28px; height: 28px; border-radius: 8px; border: none; background: transparent; color: var(--c-muted);
+  font-size: 18px; line-height: 1; cursor: pointer; font-family: inherit; transition: background 0.12s ease, color 0.12s ease;
+}
+.dv-remove:hover { background: var(--tx-btn); color: var(--c-ink); }
+
+/* 달마다 얼마 — 회색 타일 위 열두 칸. 막대는 그 달 금액에 비례한다. */
+.dv-cal { background: var(--tx-tile); border-radius: var(--tx-r-tile); padding: 14px 16px 12px; }
+.dv-cal-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.dv-cal-title { font-size: 13px; font-weight: 700; color: var(--c-ink); }
+.dv-cal-sub { font-size: 11.5px; color: var(--c-sub); }
+.dv-cal-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 6px; }
+.dv-cal-cell { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; min-height: 92px; }
+.dv-cal-bar { width: 100%; max-width: 28px; margin-top: auto; border-radius: 4px 4px 2px 2px; background: var(--c-blue); }
+.dv-cal-cell:not(.dv-cal-on) .dv-cal-bar { height: 3px; background: var(--c-track); }
+.dv-cal-month { font-size: 11px; color: var(--c-sub); }
+.dv-cal-amt { font-size: 11px; font-weight: 700; color: var(--c-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dv-cal-cell:not(.dv-cal-on) .dv-cal-amt { color: var(--c-hint); font-weight: 400; }
+
+.dv-foot { margin: 0; font-size: 12px; line-height: 1.55; color: var(--c-sub); word-break: keep-all; }
+.dv-note { margin: -6px 0 0; padding: 0 4px; font-size: 12px; line-height: 1.55; color: var(--c-sub); word-break: keep-all; }
+
+/* 바스켓 투자금 — 세 시트가 함께 쓰는 슬라이더 한 줄. */
+.dv-amount { padding: 18px 26px 16px; }
+.dv-amount-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.dv-amount-label { font-size: 13px; font-weight: 600; color: var(--c-sub); }
+.dv-amount-val { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: var(--c-ink); font-variant-numeric: tabular-nums; }
+.dv-amount-quick { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+.dv-quick {
+  padding: 5px 10px; border-radius: 999px; border: 1px solid var(--c-line); background: var(--c-card);
+  color: var(--c-label); font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background 0.12s ease;
+}
+.dv-quick:hover { background: var(--tx-btn); }
+.dv-quick-on, .dv-quick-on:hover { background: var(--c-cold-ink); color: var(--c-card); border-color: transparent; }
+.dv-range { width: 100%; margin: 12px 0 6px; accent-color: var(--c-cold-ink); }
+.dv-amount-note { margin: 0; font-size: 12px; color: var(--c-sub); word-break: keep-all; }
+
+/* 바스켓 시트 셋 — 나란히. 좁아지면 한 장씩. */
+.dv-baskets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.dv-basket { display: flex; flex-direction: column; }
+.dv-basket-sum { padding: 16px 26px 4px; }
+.dv-basket-main { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.02em; color: var(--c-ink); font-variant-numeric: tabular-nums; }
+.dv-basket-sub { margin: 4px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--c-sub); word-break: keep-all; }
+.dv-basket-list { list-style: none; margin: 0; padding: 8px 16px 6px; }
+.dv-basket-row {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px; border: none; border-radius: 8px;
+  cursor: grab; color: var(--c-ink); font-size: 13.5px; text-align: left; font-family: inherit;
+}
+.dv-basket-row:active { cursor: grabbing; }
+.dv-rank { width: 14px; flex-shrink: 0; font-size: 11.5px; color: var(--c-muted); font-variant-numeric: tabular-nums; }
+.dv-basket-name { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dv-basket-meta { margin-left: auto; font-size: 12px; color: var(--c-sub); white-space: nowrap; }
+.dv-basket-shares { min-width: 44px; text-align: right; font-size: 12px; font-weight: 700; color: var(--c-label); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dv-basket-foot { margin-top: auto; padding: 10px 26px 20px; display: flex; flex-direction: column; gap: 10px; }
+.dv-basket-rule { margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--c-sub); word-break: keep-all; }
+.dv-apply {
+  height: 40px; border-radius: 12px; border: none; background: var(--c-cold-ink); color: var(--c-card);
+  font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; transition: filter 0.12s ease;
+}
+.dv-apply:hover { filter: brightness(1.08); }
+.dv-basket-none { margin: 0; padding: 18px 26px 22px; font-size: 13px; color: var(--c-sub); }
+
+/* 폭. 사이드바를 뺀 본문 폭으로 잰다 — 세 장이 서려면 한 장에 360 은 있어야 한다. */
+@media (max-width: 1260px) {
+  .dv-baskets { grid-template-columns: 1fr; }
+}
+@media (max-width: 720px) {
+  /* 한 줄에 여섯 칸을 세우면 종목 이름에 30px 이 남는다(375 실측: "KB금융"이 "K"). 두 줄로
+     접는다 — 윗줄 [종목 ····· 빼기], 아랫줄 [주수 ····· 1년에 받는 배당]. '1주에 1년'·'수익률'은
+     접는다. 열 머리는 두 줄 배치에선 자리가 없어 숨긴다. */
+  .dv-thead { display: none; }
+  .dv-trow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "name remove" "shares sum";
+    gap: 8px 10px;
+  }
+  .dv-trow > :nth-child(1) { grid-area: name; }
+  .dv-trow > :nth-child(2) { grid-area: shares; }
+  .dv-trow > :nth-child(3), .dv-trow > :nth-child(5) { display: none; }
+  .dv-trow > :nth-child(4) { grid-area: sum; align-self: center; }
+  .dv-trow > :nth-child(6) { grid-area: remove; justify-self: end; }
+  .dv-tname-main { white-space: normal; }
+  .dv-cal-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); row-gap: 12px; }
+  .dv-hero-main { font-size: 28px; }
+}
+@media (max-width: 560px) {
+  .dv-hero { padding: 18px 18px 4px; }
+  .dv-body { padding: 12px 18px 18px; }
+  .dv-amount, .dv-basket-sum { padding-left: 18px; padding-right: 18px; }
+  .dv-basket-foot { padding: 10px 18px 18px; }
+  .dv-basket-list { padding: 6px 8px 4px; }
+  .dv-cal-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}

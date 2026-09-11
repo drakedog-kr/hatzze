@@ -1,7 +1,8 @@
 import { SITE_URL } from "./brand";
 import { NOTE_PAGE } from "./daily/copy";
+import { DIVIDEND_PAGE } from "./dividend/copy";
 import { INSIDER_LIST_SLUGS } from "./insider/lists";
-import { DAILY_PUBLIC } from "./screen-flags";
+import { DAILY_PUBLIC, DIVIDEND_PUBLIC } from "./screen-flags";
 
 /**
  * 사이트맵에 실을 주소 **한 벌**. `/sitemap.xml` 과 `/sitemap-pages.xml` 이 이걸 나눠 쓴다.
@@ -35,6 +36,8 @@ export const SITEMAP_ENTRIES: SitemapEntry[] = [
   // 데일리 노트. 안 연 동안은 싣지 않는다(noindex 와 어긋나면 안 된다). 날짜별 글은 표를
   // 읽어야 해서 app/sitemap-notes.xml 이 따로 펼친다.
   ...(DAILY_PUBLIC ? [{ path: NOTE_PAGE.href, changeFrequency: "daily" as const, priority: 0.7 }] : []),
+  // 배당 계산기. 안 연 동안은 싣지 않는다(noindex 와 어긋나면 안 된다). 종가·배당이 매일 갱신되므로 daily.
+  ...(DIVIDEND_PUBLIC ? [{ path: DIVIDEND_PAGE.href, changeFrequency: "daily" as const, priority: 0.7 }] : []),
   // 카드 여덟 장의 '전체보기'. 화면 안에서만 링크가 걸려 있어 크롤러가 닿기 어렵다 —
   // 목록이 매일 바뀌는 실제 콘텐츠라 사이트맵에 직접 올린다.
   // (종목·투자자 상세는 수가 많고 DB 를 읽어야 해서 아직 없다. 종목별 실주소 작업에서 다룬다.)

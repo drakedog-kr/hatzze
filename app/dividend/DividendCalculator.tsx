@@ -1,0 +1,737 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+
+import { gaSearchTerm, gaStockCode, track } from "@/lib/ga";
+import { C, Icon } from "../ui";
+import { SectionHead } from "../kadera/SectionHead";
+import { SectionIntro } from "../SectionIntro";
+import { StockLogo } from "../StockLogo";
+import type { BasketLite, StockLite } from "./types";
+
+/**
+ * 배당 계산기 본체. 서버가 내려준 종목 목록(StockLite)만 갖고 브라우저에서 전부 계산한다.
+ *
+ * ## 화면의 결
+ *
+ * 기존 배당 계산기들은 빈 폼으로 시작해 배당수익률을 사용자가 알아서 넣게 한다. 여기서는
+ * ① 종목을 담는 순간 결과가 문장으로 먼저 서고(값이 먼저, 입력은 뒤에),
+ * ② 수익률을 물어보지 않는다(최근 12개월 배당금이 표에 있다),
+ * ③ 세후가 기본이다(계좌에 실제로 찍히는 값). 세전은 토글 하나.
+ *
+ * ## 담는 길이 셋
+ *
+ *   검색      이름·코드를 치면 목록이 뜨고 누르면 담긴다
+ *   칩·바스켓 줄을 끌어다 놓아도, 눌러도 담긴다(끌기는 마우스에서만 된다 — 폰은 누르기)
+ *   바스켓    '내 종목에 담기'로 열 종목이 한꺼번에 들어온다(주수는 투자금 슬라이더로 정해진다)
+ *
+ * 담긴 종목은 이 브라우저에만 남는다(localStorage). 서버는 아무것도 기억하지 않는다.
+ */
+
+type Holding = { code: string; shares: number };
+
+/* ── 담은 종목 저장소 ─────────────────────────────────────────────────
+   localStorage 는 React 바깥의 저장소라 useSyncExternalStore 로 읽는다(AppShell 의 PcHint ·
+   insider/TapHint 와 같은 이유 — useEffect 안에서 setState 를 부르면 eslint
+   react-hooks/set-state-in-effect 에 걸린다). 서버 스냅숏은 빈 목록이라 첫 HTML 은 빈
+   채로 그려지고, 구독 직후 한 번 저장값을 읽어 다시 그린다(하이드레이션이 어긋나지 않는다).
+
+   ⚠️ getSnapshot 은 같은 배열 참조를 돌려줘야 한다. 부를 때마다 새 배열을 만들면 React 가
+      매 렌더 "바뀌었다"고 보고 무한 렌더에 빠진다. */
+const STORAGE_KEY = "hz-dividend-holdings";
+const NO_HOLDINGS: Holding[] = [];
+let current: Holding[] = NO_HOLDINGS;
+let loaded = false;
+const listeners = new Set<() => void>();
+
+function readSaved(): Holding[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+    if (!Array.isArray(parsed)) return NO_HOLDINGS;
+    const out = parsed
+      .filter((h): h is Holding => !!h && typeof h.code === "string" && typeof h.shares === "number")
+      .map((h) => ({ code: h.code, shares: Math.max(0, Math.floor(h.shares)) }));
+    return out.length ? out : NO_HOLDINGS;
+  } catch {
+    // 사파리 사생활 보호 모드 등에서 localStorage 접근이 던진다. 그때는 빈 채로 시작한다.
+    return NO_HOLDINGS;
+  }
+}
+
+const holdingsStore = {
+  subscribe(cb: () => void) {
+    listeners.add(cb);
+    // 구독 직후 한 번 저장값을 읽어 알린다. 마운트 때 반드시 불리므로 매 로드에서 한 번은 읽는다.
+    const t = setTimeout(() => {
+      if (!loaded) {
+        loaded = true;
+        current = readSaved();
+      }
+      cb();
+    }, 0);
+    return () => {
+      clearTimeout(t);
+      listeners.delete(cb);
+    };
+  },
+  getSnapshot: () => current,
+  getServerSnapshot: () => NO_HOLDINGS,
+};
+
+function writeHoldings(next: Holding[] | ((prev: Holding[]) => Holding[])) {
+  current = typeof next === "function" ? next(current) : next;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+  } catch {
+    /* 저장이 막힌 브라우저에서는 이번 방문 안에서만 산다 */
+  }
+  listeners.forEach((l) => l());
+}
+
+/** 배당소득세 14% + 지방소득세 1.4%. 증권사가 지급 때 떼고 넣어 준다. */
+const TAX_RATE = 0.154;
+/** 종목을 처음 담을 때의 주수. 0 이면 결과가 안 서고, 1 은 값이 너무 작아 감이 안 온다. */
+const DEFAULT_SHARES = 10;
+/** 바스켓 투자금 슬라이더 눈금(원). */
+const AMOUNT_MIN = 1_000_000;
+const AMOUNT_MAX = 100_000_000;
+const AMOUNT_STEP = 1_000_000;
+const AMOUNT_DEFAULT = 10_000_000;
+const AMOUNT_QUICK = [10_000_000, 30_000_000, 50_000_000, 100_000_000];
+const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+/* ── 표기 ─────────────────────────────────────────────────────────── */
+const won = (v: number) => `${Math.round(v).toLocaleString("ko-KR")}원`;
+/** 큰 금액은 억·만으로 줄인다. 슬라이더 값처럼 딱 떨어지는 수에만 쓴다. */
+function wonShort(v: number): string {
+  if (v >= 1e8) {
+    const eok = Math.floor(v / 1e8);
+    const man = Math.round((v - eok * 1e8) / 1e4);
+    return man ? `${eok}억 ${man.toLocaleString("ko-KR")}만원` : `${eok}억원`;
+  }
+  if (v >= 1e4 && v % 1e4 === 0) return `${(v / 1e4).toLocaleString("ko-KR")}만원`;
+  return won(v);
+}
+const pct = (v: number) => `${v.toFixed(2)}%`;
+/** 파이프라인이 15년치만 읽으므로 연속 배당은 15에서 멈춘다. 그 값은 "적어도 15년"이다. */
+const STREAK_CAP = 15;
+const streakLabel = (y: number) => (y >= STREAK_CAP ? `${STREAK_CAP}년 넘게` : `${y}년째`);
+const marketBadge = (m: string | null) => (m === "KOSDAQ" ? "코스닥" : null);
+
+/* ── 검색 ─────────────────────────────────────────────────────────── */
+const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
+/**
+ * 이름 앞부분 일치 → 이름 포함 → 코드 앞부분 순. 같은 등급 안에서는 **이름이 짧은 것**, 그다음
+ * **큰 회사**부터 — "삼성전" 을 치면 삼성전자가 삼성전기우보다 앞에 서야 한다(배당금 순으로
+ * 세웠더니 삼성전기우가 맨 위였다). 이름 길이가 곧 검색어와의 거리다.
+ */
+function rankMatches(stocks: StockLite[], query: string, limit = 8): StockLite[] {
+  const q = norm(query);
+  if (!q) return [];
+  const starts: StockLite[] = [];
+  const includes: StockLite[] = [];
+  const codes: StockLite[] = [];
+  for (const s of stocks) {
+    const name = norm(s.name);
+    if (name.startsWith(q)) starts.push(s);
+    else if (name.includes(q)) includes.push(s);
+    else if (s.code.startsWith(q.toUpperCase())) codes.push(s);
+  }
+  const closer = (a: StockLite, b: StockLite) => a.name.length - b.name.length || b.cap - a.cap || a.name.localeCompare(b.name, "ko");
+  const bigger = (a: StockLite, b: StockLite) => b.cap - a.cap || a.name.localeCompare(b.name, "ko");
+  return [...starts.sort(closer), ...includes.sort(bigger), ...codes.sort(bigger)].slice(0, limit);
+}
+
+/* ── 셈 ───────────────────────────────────────────────────────────── */
+type Line = {
+  stock: StockLite;
+  shares: number;
+  /** 1년 세전 배당(원). */
+  gross: number;
+  /** 투자금(원, 전일 종가 × 주수). 종가가 없으면 null. */
+  invest: number | null;
+};
+
+function computeLines(holdings: Holding[], byCode: Map<string, StockLite>): Line[] {
+  const out: Line[] = [];
+  for (const h of holdings) {
+    const stock = byCode.get(h.code);
+    if (!stock) continue;
+    out.push({
+      stock,
+      shares: h.shares,
+      gross: stock.dps * h.shares,
+      invest: stock.close ? stock.close * h.shares : null,
+    });
+  }
+  return out;
+}
+
+/** 바스켓을 이 투자금으로 같은 금액씩 나눠 담으면 종목마다 몇 주인가. */
+function basketShares(codes: string[], amount: number, byCode: Map<string, StockLite>): Holding[] {
+  if (!codes.length) return [];
+  const per = amount / codes.length;
+  return codes.map((code) => {
+    const s = byCode.get(code);
+    return { code, shares: s?.close ? Math.floor(per / s.close) : 0 };
+  });
+}
+
+/* ── 본체 ─────────────────────────────────────────────────────────── */
+export function DividendCalculator({
+  stocks,
+  baskets,
+  popular,
+  computedFor,
+  priceDate,
+}: {
+  stocks: StockLite[];
+  baskets: BasketLite[];
+  popular: string[];
+  computedFor: string | null;
+  priceDate: string | null;
+}) {
+  const byCode = useMemo(() => new Map(stocks.map((s) => [s.code, s])), [stocks]);
+  const holdings = useSyncExternalStore(holdingsStore.subscribe, holdingsStore.getSnapshot, holdingsStore.getServerSnapshot);
+  const setHoldings = writeHoldings;
+  const [afterTax, setAfterTax] = useState(true);
+  const [amount, setAmount] = useState(AMOUNT_DEFAULT);
+  // 주수 칸들. 방금 담은 종목의 칸에 포커스를 주고 값을 통째로 선택해 둔다 — 치면 덮인다.
+  // ref 가 아니라 state 에 든 Map 이다 — 렌더 중에 ref.current 를 읽으면 eslint(react-hooks/refs)에
+  // 걸리고, Map 자체는 한 번 만들어 그대로 쓰므로 state 로 들고 있어도 다시 그릴 일이 없다.
+  const [inputs] = useState(() => new Map<string, HTMLInputElement>());
+  const calcRef = useRef<HTMLElement>(null);
+  const focusShares = (code: string) =>
+    setTimeout(() => {
+      const el = inputs.get(code);
+      if (el) {
+        el.focus();
+        el.select();
+      }
+    }, 0);
+
+  const lines = useMemo(() => computeLines(holdings, byCode), [holdings, byCode]);
+  const factor = afterTax ? 1 - TAX_RATE : 1;
+  const totalGross = lines.reduce((s, l) => s + l.gross, 0);
+  const total = totalGross * factor;
+  const invest = lines.reduce((s, l) => s + (l.invest ?? 0), 0);
+  const priced = lines.filter((l) => l.invest != null);
+  const yieldPct = invest > 0 ? (priced.reduce((s, l) => s + l.gross, 0) / invest) * 100 : null;
+  const monthly = useMemo(() => {
+    const m = new Array<number>(13).fill(0);
+    for (const l of lines) for (const [month, amt] of l.stock.pays) m[month] += amt * l.shares * factor;
+    return m;
+  }, [lines, factor]);
+
+  const add = (code: string, source: string) => {
+    if (!byCode.has(code)) return;
+    track("dividend_add", { stock_code: gaStockCode(code), select_source: source });
+    setHoldings((prev) => (prev.some((h) => h.code === code) ? prev : [...prev, { code, shares: DEFAULT_SHARES }]));
+    focusShares(code);
+  };
+  const setShares = (code: string, shares: number) =>
+    setHoldings((prev) => prev.map((h) => (h.code === code ? { ...h, shares } : h)));
+  const remove = (code: string) => {
+    track("dividend_remove", { stock_code: gaStockCode(code) });
+    setHoldings((prev) => prev.filter((h) => h.code !== code));
+  };
+  const applyBasket = (b: BasketLite) => {
+    const next = basketShares(b.codes, amount, byCode);
+    track("dividend_basket_apply", { basket: b.key, amount });
+    // 이미 담긴 종목은 주수를 바스켓 값으로 바꾸고, 나머지는 뒤에 붙인다. 통째로 갈아
+    // 끼우지 않는다 — 사용자가 손으로 담아 둔 다른 종목이 사라지면 안 된다.
+    setHoldings((prev) => {
+      const map = new Map(next.map((h) => [h.code, h.shares]));
+      const kept = prev.map((h) => (map.has(h.code) ? { ...h, shares: map.get(h.code) as number } : h));
+      const seen = new Set(kept.map((h) => h.code));
+      return [...kept, ...next.filter((h) => !seen.has(h.code))];
+    });
+    // 담긴 뒤 결과가 선 자리로 올라간다. 목록이 길어지며 판이 다시 그려지는 것보다 한 박자
+    // 뒤여야 한다 — 같은 틱에 부르면 새 레이아웃 전의 자리로 가다 만다(실측).
+    setTimeout(() => calcRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  };
+
+  // ── 끌어다 놓기. 칩·바스켓 줄이 dataTransfer 에 코드를 싣고, 계산기 시트가 받는다.
+  const [dragOver, setDragOver] = useState(false);
+  const onDragOver = (e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes("text/plain")) return;
+    e.preventDefault();
+    if (!dragOver) setDragOver(true);
+  };
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const code = e.dataTransfer.getData("text/plain").trim();
+    if (byCode.has(code)) add(code, "drop");
+  };
+
+  if (!stocks.length) {
+    return (
+      <div className="hz-tx">
+        <section className="hz-sheet">
+          <SectionHead icon="calculate" title="아직 자료가 없습니다" desc="파이프라인이 종목별 배당 요약을 만들면 이 자리에 계산기가 뜹니다." level={2} />
+        </section>
+      </div>
+    );
+  }
+
+  const basis = [priceDate ? `전일 종가(${priceDate}) 기준` : null, computedFor ? `배당은 ${computedFor}에 정리한 최근 12개월 기록` : null]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <div className="hz-tx">
+      <SectionIntro n={1} title="내 종목으로 계산" />
+      <section
+        ref={calcRef}
+        className={`hz-sheet dv-calc${dragOver ? " dv-drop-on" : ""}`}
+        onDragOver={onDragOver}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={onDrop}
+        aria-label="내 종목 계산기"
+      >
+        <SectionHead
+          icon="calculate"
+          title="내 종목"
+          desc="종목을 담고 주수를 적으면 바로 계산됩니다. 담은 종목은 이 브라우저에만 남습니다."
+          right={<TaxToggle afterTax={afterTax} onChange={(v) => { track("dividend_tax_toggle", { after_tax: v }); setAfterTax(v); }} />}
+        />
+
+        {/* 결과가 먼저 선다. 종목이 없을 때도 이 자리는 비워 두지 않는다 — 무엇을 하면 되는지 적는다. */}
+        <div className="dv-hero">
+          {lines.length ? (
+            <>
+              <p className="dv-hero-label">1년에 받는 배당{afterTax ? " (세후)" : " (세전)"}</p>
+              <p className="dv-hero-main">{won(total)}</p>
+              <p className="dv-hero-sub">
+                한 달 평균 {won(total / 12)}
+                {invest > 0 && (
+                  <>
+                    {" · "}투자금 {won(invest)}
+                    {yieldPct != null && <>{" · "}수익률 {pct(yieldPct)}</>}
+                  </>
+                )}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="dv-hero-label">1년에 받는 배당</p>
+              <p className="dv-hero-main dv-hero-empty">아직 담은 종목이 없습니다</p>
+              <p className="dv-hero-sub">아래에서 종목을 찾아 담거나, 바스켓을 통째로 담아 보세요.</p>
+            </>
+          )}
+        </div>
+
+        <div className="dv-body">
+          <SearchBox stocks={stocks} onPick={(code) => add(code, "search")} />
+          <QuickChips codes={popular} byCode={byCode} holdings={holdings} onPick={(code) => add(code, "chip")} />
+          {lines.length > 0 && (
+            <HoldingsTable lines={lines} factor={factor} inputs={inputs} onShares={setShares} onRemove={remove} />
+          )}
+          {lines.length > 0 && <MonthCalendar monthly={monthly} afterTax={afterTax} />}
+        </div>
+
+        <div className="hz-sheet-foot">
+          <p className="dv-foot">
+            {afterTax ? "세금 15.4%(배당소득세 14%와 지방소득세 1.4%)를 뺀 값입니다. " : "세금을 빼기 전 값입니다. 실제로는 15.4%를 떼고 들어옵니다. "}
+            {basis && `${basis}. `}
+            배당은 회사가 바꿀 수 있고, 지난 1년과 같으리라는 보장은 없습니다. 매수·매도 신호가 아닙니다.
+          </p>
+        </div>
+      </section>
+
+      <SectionIntro n={2} title="성향별 바스켓" />
+      <AmountControl amount={amount} onChange={setAmount} />
+      <div className="dv-baskets">
+        {baskets.map((b) => (
+          <BasketSheet key={b.key} basket={b} amount={amount} byCode={byCode} factor={factor} afterTax={afterTax} onApply={() => applyBasket(b)} onPick={(code) => add(code, "basket")} />
+        ))}
+      </div>
+      <p className="dv-note">
+        바스켓은 위에 적힌 규칙으로 걸러 같은 금액씩 나눠 담은 것입니다. 추천이 아니라 분류이고, 담은 뒤 종목을 빼고 넣을 수 있습니다. 매수·매도 신호가 아닙니다.
+      </p>
+    </div>
+  );
+}
+
+/* ── 세후·세전 ────────────────────────────────────────────────────── */
+function TaxToggle({ afterTax, onChange }: { afterTax: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="dv-seg" role="group" aria-label="세금 반영">
+      {[
+        { on: true, label: "세후" },
+        { on: false, label: "세전" },
+      ].map((o) => (
+        <button key={o.label} type="button" aria-pressed={afterTax === o.on} className="dv-seg-btn" onClick={() => onChange(o.on)}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ── 검색 ─────────────────────────────────────────────────────────── */
+function SearchBox({ stocks, onPick }: { stocks: StockLite[]; onPick: (code: string) => void }) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const matches = useMemo(() => rankMatches(stocks, query), [stocks, query]);
+
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
+  // 검색어는 타이핑이 멎은 뒤 한 번만 보낸다(MDD 의 같은 자리와 같은 이유). matches=0 이
+  // 알맹이다 — 목록에 없는 종목(비상장·ETF)을 찾고 있다는 뜻.
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) return;
+    const timer = setTimeout(() => track("dividend_search", { query: gaSearchTerm(q), matches: matches.length }), 800);
+    return () => clearTimeout(timer);
+  }, [query, matches.length]);
+
+  const pick = (code: string) => {
+    onPick(code);
+    setQuery("");
+    setOpen(false);
+  };
+
+  return (
+    <div ref={boxRef} className="dv-search">
+      <div className={`dv-search-box${focused ? " dv-search-box-on" : ""}`}>
+        <Icon name="search" style={{ fontSize: 20, color: focused ? C.blue : C.sub }} />
+        <input
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => {
+            setOpen(true);
+            setFocused(true);
+          }}
+          onBlur={() => setFocused(false)}
+          onKeyDown={(e) => {
+            // 한글 입력기는 첫 Enter 를 글자 조합을 끝내는 데 쓴다(isComposing). 그때 담으면
+            // "삼성전" 까지 친 사람이 삼성전자를 담으려다 삼성전기를 담는다.
+            if (e.nativeEvent.isComposing) return;
+            if (e.key === "Enter" && matches[0]) pick(matches[0].code);
+            if (e.key === "Escape") setOpen(false);
+          }}
+          placeholder="종목 이름이나 코드로 찾아 담기"
+          aria-label="종목 검색"
+          autoComplete="off"
+        />
+      </div>
+      {open && query.trim() !== "" && (
+        <div className="dv-search-pop">
+          {matches.length ? (
+            <ul>
+              {matches.map((s) => (
+                <li key={s.code}>
+                  <button type="button" className="hz-row-link hz-pick dv-search-row" onClick={() => pick(s.code)}>
+                    <StockLogo code={s.code} name={s.name} market={s.market} />
+                    <span className="dv-search-name">{s.name}</span>
+                    {marketBadge(s.market) && <span className="dv-badge">{marketBadge(s.market)}</span>}
+                    <span className="dv-search-meta">
+                      {s.dps > 0 ? `1주에 ${won(s.dps)}${s.yieldPct != null ? ` · ${pct(s.yieldPct)}` : ""}` : "최근 1년 배당 없음"}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="dv-search-none">찾는 종목이 없습니다. 코스피·코스닥 상장 주식만 담깁니다(ETF는 아직 없습니다).</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── 앞에 세워 둔 칩 ─────────────────────────────────────────────── */
+function QuickChips({
+  codes,
+  byCode,
+  holdings,
+  onPick,
+}: {
+  codes: string[];
+  byCode: Map<string, StockLite>;
+  holdings: Holding[];
+  onPick: (code: string) => void;
+}) {
+  const held = new Set(holdings.map((h) => h.code));
+  const items = codes.map((c) => byCode.get(c)).filter((s): s is StockLite => !!s && !held.has(s.code));
+  if (!items.length) return null;
+  return (
+    <div className="dv-chips">
+      <span className="dv-chips-label">배당 주는 큰 회사</span>
+      {items.map((s) => (
+        <button
+          key={s.code}
+          type="button"
+          className="dv-chip"
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.setData("text/plain", s.code);
+            e.dataTransfer.effectAllowed = "copy";
+          }}
+          onClick={() => onPick(s.code)}
+          title={`${s.name} 담기`}
+        >
+          <StockLogo code={s.code} name={s.name} market={s.market} size={18} />
+          <span>{s.name}</span>
+          {s.yieldPct != null && <span className="dv-chip-yield">{pct(s.yieldPct)}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ── 담은 종목 표 ─────────────────────────────────────────────────── */
+function HoldingsTable({
+  lines,
+  factor,
+  inputs,
+  onShares,
+  onRemove,
+}: {
+  lines: Line[];
+  factor: number;
+  inputs: Map<string, HTMLInputElement>;
+  onShares: (code: string, shares: number) => void;
+  onRemove: (code: string) => void;
+}) {
+  return (
+    <div className="dv-table" role="table" aria-label="담은 종목">
+      <div className="dv-trow dv-thead" role="row">
+        <span role="columnheader">종목</span>
+        <span role="columnheader">주수</span>
+        <span role="columnheader">1주에 1년</span>
+        <span role="columnheader">1년에 받는 배당</span>
+        <span role="columnheader">수익률</span>
+        <span role="columnheader" aria-label="빼기" />
+      </div>
+      {lines.map((l) => (
+        <HoldingRow key={l.stock.code} line={l} factor={factor} inputs={inputs} onShares={onShares} onRemove={onRemove} />
+      ))}
+    </div>
+  );
+}
+
+function HoldingRow({
+  line,
+  factor,
+  inputs,
+  onShares,
+  onRemove,
+}: {
+  line: Line;
+  factor: number;
+  inputs: Map<string, HTMLInputElement>;
+  onShares: (code: string, shares: number) => void;
+  onRemove: (code: string) => void;
+}) {
+  const { stock: s, shares } = line;
+
+  const notes: string[] = [];
+  if (s.dps === 0) notes.push("최근 1년 현금배당이 없습니다");
+  if (s.unusual) notes.push("평소보다 큰 배당(특별·청산)이 섞여 있어 1년 뒤에도 같으리라 보기 어렵습니다");
+  if (s.close == null) notes.push("종가가 없어 투자금과 수익률을 못 냅니다");
+  if (s.nextRecord) notes.push(`다음 배당기준일 ${s.nextRecord}`);
+
+  const step = (d: number) => onShares(s.code, Math.max(0, shares + d));
+  return (
+    <div className="dv-trow" role="row">
+      <span className="dv-tcell dv-tname" role="cell">
+        <StockLogo code={s.code} name={s.name} market={s.market} />
+        <span className="dv-tname-txt">
+          <span className="dv-tname-main">
+            {s.name}
+            {marketBadge(s.market) && <span className="dv-badge">{marketBadge(s.market)}</span>}
+          </span>
+          {notes.length > 0 && <span className="dv-tnote">{notes.join(" · ")}</span>}
+        </span>
+      </span>
+      <span className="dv-tcell dv-tshares" role="cell">
+        <button type="button" className="dv-step" aria-label={`${s.name} 1주 빼기`} onClick={() => step(-1)} disabled={shares <= 0}>
+          −
+        </button>
+        <input
+          ref={(el) => {
+            if (el) inputs.set(s.code, el);
+            else inputs.delete(s.code);
+          }}
+          type="number"
+          inputMode="numeric"
+          min={0}
+          step={1}
+          value={shares}
+          aria-label={`${s.name} 주수`}
+          onChange={(e) => {
+            const v = Math.floor(Number(e.target.value));
+            onShares(s.code, Number.isFinite(v) && v > 0 ? v : 0);
+          }}
+          onFocus={(e) => e.target.select()}
+        />
+        <button type="button" className="dv-step" aria-label={`${s.name} 1주 더하기`} onClick={() => step(1)}>
+          +
+        </button>
+      </span>
+      <span className="dv-tcell dv-tnum" role="cell">{s.dps > 0 ? won(s.dps) : "없음"}</span>
+      <span className="dv-tcell dv-tnum dv-tstrong" role="cell">{won(line.gross * factor)}</span>
+      <span className="dv-tcell dv-tnum" role="cell">{s.yieldPct != null ? pct(s.yieldPct) : "·"}</span>
+      <span className="dv-tcell" role="cell">
+        <button type="button" className="dv-remove" aria-label={`${s.name} 빼기`} onClick={() => onRemove(s.code)}>
+          ×
+        </button>
+      </span>
+    </div>
+  );
+}
+
+/* ── 달마다 얼마 ─────────────────────────────────────────────────── */
+function MonthCalendar({ monthly, afterTax }: { monthly: number[]; afterTax: boolean }) {
+  const max = Math.max(...MONTHS.map((m) => monthly[m]));
+  const paidMonths = MONTHS.filter((m) => monthly[m] > 0).length;
+  return (
+    <div className="dv-cal">
+      <div className="dv-cal-head">
+        <span className="dv-cal-title">달마다 얼마 들어오나</span>
+        <span className="dv-cal-sub">
+          {paidMonths ? `1년에 ${paidMonths}달 들어옵니다` : "지급 달을 모르는 종목뿐입니다"} · 최근 12개월 지급일 기준{afterTax ? " · 세후" : " · 세전"}
+        </span>
+      </div>
+      <div className="dv-cal-grid">
+        {MONTHS.map((m) => {
+          const v = monthly[m];
+          return (
+            <div key={m} className={`dv-cal-cell${v > 0 ? " dv-cal-on" : ""}`}>
+              <span className="dv-cal-bar" style={{ height: max > 0 ? `${Math.max(v > 0 ? 6 : 0, (v / max) * 100)}%` : 0 }} aria-hidden="true" />
+              <span className="dv-cal-month">{m}월</span>
+              <span className="dv-cal-amt">{v > 0 ? won(v) : "·"}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ── 바스켓 투자금 ────────────────────────────────────────────────── */
+function AmountControl({ amount, onChange }: { amount: number; onChange: (v: number) => void }) {
+  return (
+    <div className="hz-sheet dv-amount">
+      <div className="dv-amount-head">
+        <span className="dv-amount-label">투자금</span>
+        <span className="dv-amount-val">{wonShort(amount)}</span>
+        <span className="dv-amount-quick">
+          {AMOUNT_QUICK.map((v) => (
+            <button key={v} type="button" className={`dv-quick${amount === v ? " dv-quick-on" : ""}`} onClick={() => onChange(v)} aria-pressed={amount === v}>
+              {wonShort(v)}
+            </button>
+          ))}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={AMOUNT_MIN}
+        max={AMOUNT_MAX}
+        step={AMOUNT_STEP}
+        value={amount}
+        onChange={(e) => onChange(Number(e.target.value))}
+        aria-label="바스켓 투자금"
+        aria-valuetext={wonShort(amount)}
+        className="dv-range"
+      />
+      <p className="dv-amount-note">이 돈을 열 종목에 같은 금액씩 나눠 담으면 종목마다 몇 주가 되는지로 계산합니다.</p>
+    </div>
+  );
+}
+
+/* ── 바스켓 시트 ─────────────────────────────────────────────────── */
+function BasketSheet({
+  basket,
+  amount,
+  byCode,
+  factor,
+  afterTax,
+  onApply,
+  onPick,
+}: {
+  basket: BasketLite;
+  amount: number;
+  byCode: Map<string, StockLite>;
+  factor: number;
+  afterTax: boolean;
+  onApply: () => void;
+  onPick: (code: string) => void;
+}) {
+  const holdings = basketShares(basket.codes, amount, byCode);
+  const lines = computeLines(holdings, byCode);
+  const gross = lines.reduce((s, l) => s + l.gross, 0);
+  const invest = lines.reduce((s, l) => s + (l.invest ?? 0), 0);
+  const y = invest > 0 ? (gross / invest) * 100 : null;
+  return (
+    <section className="hz-sheet dv-basket" aria-label={basket.title}>
+      <SectionHead icon={basket.icon} title={basket.title} desc={basket.desc} />
+      {lines.length ? (
+        <>
+          <div className="dv-basket-sum">
+            <p className="dv-basket-main">{won(gross * factor)}</p>
+            <p className="dv-basket-sub">
+              1년에{afterTax ? " 세후" : " 세전"} · 한 달 평균 {won((gross * factor) / 12)}
+              {y != null && ` · 수익률 ${pct(y)}`}
+            </p>
+          </div>
+          <ul className="dv-basket-list">
+            {lines.map((l, i) => (
+              <li key={l.stock.code}>
+                <button
+                  type="button"
+                  className="hz-row-link hz-pick dv-basket-row"
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("text/plain", l.stock.code);
+                    e.dataTransfer.effectAllowed = "copy";
+                  }}
+                  onClick={() => onPick(l.stock.code)}
+                  title={`${l.stock.name} 내 종목에 담기`}
+                >
+                  <span className="dv-rank">{i + 1}</span>
+                  <StockLogo code={l.stock.code} name={l.stock.name} market={l.stock.market} />
+                  <span className="dv-basket-name">{l.stock.name}</span>
+                  <span className="dv-basket-meta">
+                    {basket.key === "growth" && l.stock.growth5 != null
+                      ? `연 ${l.stock.growth5.toFixed(0)}% 성장`
+                      : basket.key === "steady"
+                        ? streakLabel(l.stock.streak)
+                        : l.stock.yieldPct != null
+                          ? pct(l.stock.yieldPct)
+                          : ""}
+                  </span>
+                  <span className="dv-basket-shares">{l.shares.toLocaleString("ko-KR")}주</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="dv-basket-foot">
+            <p className="dv-basket-rule">규칙 · {basket.rule}</p>
+            <button type="button" className="dv-apply" onClick={onApply}>
+              내 종목에 담기
+            </button>
+          </div>
+        </>
+      ) : (
+        <p className="dv-basket-none">오늘은 이 규칙에 드는 종목이 없습니다.</p>
+      )}
+    </section>
+  );
+}
