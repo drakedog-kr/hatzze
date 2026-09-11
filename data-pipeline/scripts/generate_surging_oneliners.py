@@ -59,7 +59,10 @@ from common.us_surging import top_us_surging  # noqa: E402
 import generate_telegram_narratives as KR  # noqa: E402
 import generate_us_telegram_narratives as US  # noqa: E402
 
-MODEL = KR.MODEL
+# 국장 총평(KR)에서 물려받지 않고 따로 적는다. 이 스크립트만 구독 경로로 옮겼고,
+# KR 쪽은 아직 API 키로 나가서 등급을 올리면 그대로 두 배 청구가 된다.
+# **모델 상향은 구독 경로로 옮긴 뒤에 한다.** 순서가 바뀌면 돈이 는다.
+MODEL = "claude-sonnet-5"
 CARDS = 6          # 화면이 그리는 급부상 카드 수(국장·미장 둘 다)
 LEN_MIN, LEN_MAX = 22, 30
 MAX_RETRIES = 1    # 한 번만 다시 쓴다. 못 맞추면 후보 중 목표에 가장 가까운 걸 쓴다

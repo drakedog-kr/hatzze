@@ -26,9 +26,13 @@ from common.supabase_client import get_client  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 
-# Haiku 4.5 — 2~3문장 짧은 요약엔 충분히 빠르고 저렴하다. 하루 2회 실행이라 비용은
-# 사실상 무시 가능. (thinking/effort 파라미터는 Haiku 4.5에서 불필요/미지원이라 안 쓴다.)
-MODEL = "claude-haiku-4-5"
+# Sonnet 5 — 이 호출은 구독(llm_client)으로 나가므로 등급을 올려도 청구가 안 는다.
+# 올린 까닭은 ② 갈림 문단이다. Haiku 는 초고온 개수와 상위 5개의 관계를 자주
+# 뭉갰고("감성이 2개로 시장의 3개와 함께 자리했습니다"), Sonnet 은 그 둘을 갈라 쓴다.
+# ⚠️ 분류 쪽(디시·뉴스 제목, 텔레그램 메시지)은 Haiku 그대로다 — 그 결과가 지표
+#    눈금으로 들어가는데 눈금이 지금 분류기에 맞춰 보정돼 있다(config/indicator_thresholds.py
+#    의 dcinside_post_count 주석: 분류기를 바꿨을 때 값의 스케일이 통째로 움직였다).
+MODEL = "claude-sonnet-5"
 
 # 초고온 진입선 = 진행률 ≥ 75. calculate_score.py의 HOT_ZONE과 동일하게 맞춘다.
 # 이 지점이 곧 카드에 "기준선"으로 적히는 값이라, 화면·요약·배지가 한 지점을 가리킨다.
