@@ -66,6 +66,16 @@ const DAILY = "daily-update.yml";
 const BROADCAST = "telegram-broadcast.yml";
 const SCAN = "us-dict-scan.yml";
 
+/** 채널 발송 잡. 세 크론(수 12:30 · 토 10:30 · 일 21:00 KST)이 이 하나를 같이 쓴다. */
+const BROADCAST_JOB: Job = {
+  key: "broadcast",
+  label: "채널 발송",
+  workflow: BROADCAST,
+  // KST 자정. 그날 실행이 하나라도 있으면(손으로 돌린 것 포함) 안 던진다.
+  fireUtc: "15:00",
+  inputs: (now) => ({ send: "true", format: broadcastFormat(now) }),
+};
+
 export const CRON_TO_JOB: Record<string, Job> = {
   // ── 파이프라인. 여기 적힌 시각이 이 워크플로가 도는 유일한 시각이다. ──
   "0 22 * * *": {
@@ -85,18 +95,20 @@ export const CRON_TO_JOB: Record<string, Job> = {
     inputs: (now) => ({ broadcast: isKstWeekday(now) ? "evening" : "none", slot: "evening" }),
   },
 
-  // ── 채널 발송(주중 점검 · 이번 주 미장 흐름 · 한 주 정리). 14:00 KST. ──
+  // ── 채널 발송(주중 점검 · 이번 주 미장 흐름 · 한 주 정리). 요일마다 시각이 다르다. ──
   //
-  // ⚠️ 요일이 곧 포맷이다 — 수=midweek · 토=us_weekend · 일=weekly2(broadcastFormat). 크론의 `0,3,6` 은
-  //    UTC 05:00 기준 요일이라 KST 로도 같은 날이다(05:00Z = 14:00 KST).
-  "0 5 * * 0,3,6": {
-    key: "broadcast",
-    label: "채널 발송",
-    workflow: BROADCAST,
-    // KST 자정. 그날 실행이 하나라도 있으면(손으로 돌린 것 포함) 안 던진다.
-    fireUtc: "15:00",
-    inputs: (now) => ({ send: "true", format: broadcastFormat(now) }),
-  },
+  // ⚠️ 요일이 곧 포맷이다 — 수=midweek · 토=us_weekend · 일=weekly2(broadcastFormat). 세 크론의
+  //    UTC 요일이 KST 로도 같은 날이라(03:30Z=12:30 · 01:30Z=10:30 · 12:00Z=21:00 KST) 요일 판정은 그대로다.
+  //
+  // 시각은 GA4 요일×시간 실측(2026-08-14~09-10, 스파이크 3일 제외)으로 골랐다. 셋 다 14:00 이었는데
+  // 수요일은 12~13시가 시간당 20명, 14시가 14명이고, 토요일은 12~13시가 9명으로 하루 바닥이라
+  // 오전 10~11시(15~16명)로, 일요일은 21시(18명)가 주말 통틀어 유일한 봉우리라 거기로 옮겼다.
+  // 재료는 수·토 글이 그날 아침 실행(07:00 시작 · ~08:27 완료)이 채운 것이라 당겨도 같고(이 워크플로는
+  // 수집을 안 하므로 10:30 과 14:00 이 보는 DB 는 같다 · 다음 수집은 18:00 실행), 일요일 글의 창은
+  // 월~금이라 늦춰도 그대로다.
+  "30 3 * * 3": BROADCAST_JOB,
+  "30 1 * * 6": BROADCAST_JOB,
+  "0 12 * * 0": BROADCAST_JOB,
 
   // ── 주 1회 사전 후보 스캔. 월 10:00 KST. ──
   "0 1 * * 1": {
@@ -147,7 +159,7 @@ export function isKstSunday(now: Date): boolean {
 
 /**
  * 채널 발송 포맷. 요일이 곧 포맷이다 — 수=주중 점검 · 토=이번 주 미장 흐름 · 일=한 주 정리와 다음 주 일정.
- * 크론이 0,3,6 에만 울리므로 나머지 요일은 오지 않지만, 오면 수요일 글로 둔다(값이 비면 워크플로가 기본값을 쓴다).
+ * 크론이 수·토·일에만 울리므로 나머지 요일은 오지 않지만, 오면 수요일 글로 둔다(값이 비면 워크플로가 기본값을 쓴다).
  */
 export function broadcastFormat(now: Date): "midweek" | "us_weekend" | "weekly2" {
   const day = kstDay(now);
