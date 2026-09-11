@@ -10,7 +10,7 @@ import { StockLogo } from "../StockLogo";
 import type { BasketLite, StockLite } from "./types";
 
 /**
- * 배당 계산기 본체. 서버가 내려준 종목 목록(StockLite)만 갖고 브라우저에서 전부 계산한다.
+ * 배당으로 살기(/dividend) 본체. 서버가 내려준 종목 목록(StockLite)만 갖고 브라우저에서 전부 계산한다.
  *
  * ## 화면의 결
  *

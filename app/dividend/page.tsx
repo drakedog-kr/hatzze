@@ -10,7 +10,7 @@ import { DividendCalculator } from "./DividendCalculator";
 import type { StockLite } from "./types";
 
 /**
- * 배당 계산기 — 종목과 주수를 넣으면 1년에 얼마 받는지, 어느 달에 들어오는지 바로 계산한다.
+ * 배당으로 살기(/dividend) — 종목과 주수를 넣으면 1년에 얼마 받는지, 어느 달에 들어오는지 바로 계산한다.
  * 성향별 바스켓(꾸준함·지금 수익률·성장)은 규칙으로 걸러 그대로 담을 수 있다.
  *
  * 자료는 `kr_dividend_stock` 한 표(lib/dividend.ts). 파이프라인이 매일 예탁결제원 배당

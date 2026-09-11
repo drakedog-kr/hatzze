@@ -47,7 +47,7 @@ const EXCLUDED = new Map([
   // 데일리 노트 — 아직 안 열었다. 여는 순간 사이트맵 쪽(app/sitemap-urls.ts)이 같은 플래그로
   // 켜지고 이 줄은 빠지므로, 여는 날 여기를 손댈 일이 없다.
   ...(flags.DAILY_PUBLIC ? [] : [["/daily", "아직 안 연 화면(app/screen-flags.ts DAILY_PUBLIC=false). noindex 라 사이트맵에 없어야 한다"]]),
-  // 배당 계산기 — 같은 방식. 여는 날 app/sitemap-urls.ts 가 같은 플래그로 켜지고 이 줄은 빠진다.
+  // 배당으로 살기(/dividend) — 같은 방식. 여는 날 app/sitemap-urls.ts 가 같은 플래그로 켜지고 이 줄은 빠진다.
   ...(flags.DIVIDEND_PUBLIC ? [] : [["/dividend", "아직 안 연 화면(app/screen-flags.ts DIVIDEND_PUBLIC=false). noindex 라 사이트맵에 없어야 한다"]]),
 ]);
 

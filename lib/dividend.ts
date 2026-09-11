@@ -3,7 +3,7 @@ import "server-only";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
 /**
- * 배당 계산기(/dividend)의 자료 — `kr_dividend_stock` 한 표를 읽는다.
+ * 배당으로 살기(/dividend)의 자료 — `kr_dividend_stock` 한 표를 읽는다.
  *
  * 표는 파이프라인이 매일 만든다(data-pipeline/scripts/calculate_kr_dividend_stats.py):
  * 상장 종목 전부에 한 행씩, 최근 12개월 배당금·수익률·지급 건·연속 배당. 여기서는 그걸

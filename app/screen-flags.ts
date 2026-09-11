@@ -63,7 +63,7 @@ export const PREVIEW_PUBLIC = true;
 export const DAILY_PUBLIC = true;
 
 /**
- * 배당 계산기(/dividend) — 종목과 주수를 넣으면 1년에 얼마 받는지 계산하는 화면. 2026-09-11 에
+ * 배당으로 살기(/dividend) — 종목과 주수를 넣으면 1년에 얼마 받는지 계산하는 화면. 2026-09-11 에
  * 만들었고 **아직 안 열었다.** 읽는 곳은 데일리 노트와 같다(사이드바·푸터·사이트맵·검사).
  *
  *   app/dividend/page.tsx     배포된 곳에서 404 를 낼지, noindex 를 달지
