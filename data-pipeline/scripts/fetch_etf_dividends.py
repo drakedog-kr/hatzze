@@ -1,12 +1,12 @@
-"""ETF 분배금을 `etf_dividend` 에 upsert — 미국은 stockanalysis 에서 매일, 국내는 설정 파일(손으로 옮긴 값)에서.
+"""ETF 분배금을 `etf_dividend` 에 upsert — 미국은 stockanalysis, 국내는 미래에셋 TIGER 연간 표. 둘 다 매일.
 
-국내 분배금은 매일 안 바뀐다(설정 파일이 원천이다). 미국은 stockanalysis `/etf/{티커}/dividend/` 가
-지급 건을 주므로 매일 새로 받는다(못 받으면 설정의 `pays` 로). 시세와 환율은 둘 다 매일 붙인다.
-  국내  KRX Open API `etp/etf_bydd_trd` — 최신 가용 거래일 하루치(1,168종목)에서 코드로 찾는다
-  미국  핀허브 `quote`
-  환율  FRED `DEXKOUS`
+  미국 분배금  stockanalysis `/etf/{티커}/dividend/`(config/etf_dividends.py 의 목록). 못 받으면 설정의 `pays`
+  국내 분배금  TIGER 연간 분배금 표(`distribution/annual/list.ajax`, 서버 렌더) — 232종목 전부
+  국내 시세    KRX Open API `etp/etf_bydd_trd` — 최신 가용 거래일 하루치(1,168종목)에서 코드로 찾는다
+  미국 시세    핀허브 `quote`
+  환율         FRED `DEXKOUS`
 
-'1년에 얼마' 규칙은 설정 파일 머리말에. 미국은 `pays` 의 합, 국내는 지난해 합 또는 올해를 늘린 값.
+'1년에 얼마' 규칙은 설정 파일 머리말에. 미국은 지급 건의 합, 국내는 지난해 합 또는 올해를 늘린 값.
 
 실행:
     cd data-pipeline && source .venv/bin/activate
@@ -20,6 +20,7 @@ import http.client
 import json
 import sys
 import time
+import urllib.parse
 import urllib.request
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -33,10 +34,19 @@ from common.krx_client import krx_get  # noqa: E402
 from common.stockanalysis import PageChanged, dividend_history, trailing  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
-from config.etf_dividends import AS_OF, KR_ETFS, US_ETFS  # noqa: E402
+from config.etf_dividends import US_ETFS  # noqa: E402
 
 TABLE = "etf_dividend"
 KRX_URL = "http://data-dbg.krx.co.kr/svc/apis/etp/etf_bydd_trd"
+TIGER_LIST = "https://investments.miraeasset.com/tigeretf/ko/distribution/annual/list.ajax"
+TIGER_SRC = "https://www.tigeretf.com/ko/distribution/annual/list.do"
+TIGER_UA = {
+    "User-Agent": "hatzze/1.0 (+https://hatzze.fun; contact: support@hatzze.fun)",
+    "Referer": TIGER_SRC,
+    "X-Requested-With": "XMLHttpRequest",
+}
+# TIGER 월배당은 월말 기준일·다음 달 초 지급이라, 이달 5일이 지났으면 이달치까지 지급된 것으로 센다.
+TIGER_PAY_DAY = 5
 QUOTE = "https://finnhub.io/api/v1/quote?symbol={t}&token={k}"
 ET = ZoneInfo("America/New_York")
 MAX_LOOKBACK_DAYS = 10
@@ -83,6 +93,37 @@ def usdkrw() -> tuple[float, str] | None:
     return (obs[-1][1], obs[-1][0]) if obs else None
 
 
+def tiger_list() -> list[dict]:
+    """TIGER 전 종목의 연도별 분배금(원). [{code, name, y_ytd, y_prev}]. 못 받으면 빈 목록.
+
+    표의 열은 종목명(코드·현재가 포함) · 올해 분배금 · 분배율 · 지난해 분배금 · 분배율 · … 순이다.
+    '-' 는 그해 분배가 없었다는 뜻(새 상품이거나 무분배).
+    """
+    import html as _html
+    import re
+    body = urllib.parse.urlencode({"pageIndex": 1, "firstIndex": 0, "listCnt": 400}).encode()
+    for attempt in (1, 2, 3):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(TIGER_LIST, data=body, headers=TIGER_UA), timeout=40) as r:
+                page = r.read().decode("utf-8", "ignore")
+            break
+        except (OSError, http.client.HTTPException):
+            if attempt == 3:
+                return []
+            time.sleep(3)
+    out: list[dict] = []
+    for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", page, flags=re.S):
+        cells = [_html.unescape(re.sub(r"<[^>]+>", "", c)).strip() for c in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", tr, flags=re.S)]
+        if len(cells) < 5:
+            continue
+        m = re.match(r"(.+?)\s*\(([0-9A-Z]{6})\)\s*현재가\(원\)", cells[0].replace("\n", " ").replace("\t", ""))
+        if not m:
+            continue
+        won = lambda s: float(s.replace(",", "")) if s and s != "-" else 0.0  # noqa: E731
+        out.append({"code": m.group(2), "name": m.group(1).strip(), "y_ytd": won(cells[1]), "y_prev": won(cells[3])})
+    return out
+
+
 def kr_annual(e: dict) -> tuple[float, bool]:
     """(1년 분배금, 추정인가). 지난해 합이 기본, 올해를 늘린 값이 크게 갈리면 그쪽."""
     prev = float(e.get("y_prev") or 0)
@@ -103,20 +144,28 @@ def main() -> None:
     latest = krx_latest()
     if latest is None:
         print("[ETF] KRX 시세를 못 받았습니다 — 국내 ETF 는 시세 없이 넣습니다")
-    for e in KR_ETFS:
-        annual, est = kr_annual(e)
+    tiger = tiger_list()
+    months_paid = today.month if today.day >= TIGER_PAY_DAY else today.month - 1
+    kr_count = 0
+    for e in tiger:
+        annual, est = kr_annual({"y_prev": e["y_prev"], "y_ytd": e["y_ytd"], "ytd_months": months_paid})
+        if annual <= 0:
+            continue  # 무분배 상품(레버리지·성장형)은 빼도 검색엔 KRX 종목 목록이 없으니 아예 안 뜬다
         px = latest[1].get(e["code"]) if latest else None
         close = float(px["TDD_CLSPRC"]) if px and px.get("TDD_CLSPRC") else None
+        kr_count += 1
         rows.append({
             "code": e["code"], "market": "KR", "currency": "KRW",
-            "name_ko": e["name_ko"], "name_en": e.get("name_en"),
-            "cadence": e["cadence"], "ttm_dps": annual, "estimated": est,
-            "payments": [], "pay_months": list(range(1, 13)) if e["cadence"] == "월" else [],
-            "as_of": AS_OF, "source": e["source"],
+            "name_ko": e["name"], "name_en": None,
+            # 지급 주기는 표에 없다. 달력에는 못 들지만 '월' 이라고 적지도 않는다.
+            "cadence": None, "ttm_dps": annual, "estimated": est,
+            "payments": [], "pay_months": [],
+            "as_of": today.isoformat(), "source": TIGER_SRC,
             "close": close, "price_date": latest[0] if latest and close else None,
             "ttm_yield_pct": round(annual / close * 100, 3) if close and annual else None,
             "computed_for": today.isoformat(),
         })
+    print(f"[ETF] TIGER 표 {len(tiger)}종목 중 분배 있음 {kr_count} (올해 지급 {months_paid}달로 셈)")
 
     fx = usdkrw()
     key = FINNHUB_API_KEY or ""
@@ -124,7 +173,7 @@ def main() -> None:
     for e in US_ETFS:
         # 지급 건은 stockanalysis 가 먼저다. 못 받으면 설정의 `pays`(있을 때)로.
         pays: list[tuple[str, float]] = []
-        as_of = AS_OF
+        as_of = today.isoformat()
         try:
             hist = dividend_history(e["code"], "etf")
         except PageChanged:
@@ -133,7 +182,6 @@ def main() -> None:
         if hist:
             paid, _ = trailing(hist, today)
             pays = [(p["pay"], float(p["amount"])) for p in paid]
-            as_of = today.isoformat()
         if not pays:
             pays = [(d, float(a)) for d, a in e.get("pays", [])]
         if not pays:
@@ -156,16 +204,17 @@ def main() -> None:
         r["usdkrw"] = fx[0] if fx else None
         r["usdkrw_date"] = fx[1] if fx else None
 
-    print(f"[ETF] {len(rows)}종목 (국내 {len(KR_ETFS)} · 미국 {len(US_ETFS)}, stockanalysis 실패 {sa_fail}) · 국내 분배금 기준일 {AS_OF} · 시세 국내 {latest[0] if latest else '없음'}"
+    print(f"[ETF] {len(rows)}종목 (국내 {kr_count} · 미국 {len(rows) - kr_count}, stockanalysis 실패 {sa_fail}) · 시세 국내 {latest[0] if latest else '없음'}"
           + (f" · 환율 {fx[0]:,.2f}({fx[1]})" if fx else " · 환율 없음"))
-    for r in rows:
+    for r in [x for x in rows if x["currency"] == "USD"] + [x for x in rows if x["currency"] == "KRW"][:6]:
         unit = "$" if r["currency"] == "USD" else "원"
         print(f"  {r['name_ko']:28s} 1년 {r['ttm_dps']:>9,.4f}{unit} · 시세 {r['close']} · 수익률 {r['ttm_yield_pct']}%{' · 추정' if r['estimated'] else ''}")
     if dry_run:
         print("[ETF] --dry-run: DB 에 쓰지 않았습니다")
         return
     db = get_client()
-    db.table(TABLE).upsert(rows, on_conflict="code").execute()
+    for i in range(0, len(rows), 200):
+        db.table(TABLE).upsert(rows[i : i + 200], on_conflict="code").execute()
     print(f"[Supabase] {TABLE} upsert 완료: {len(rows)}행")
 
 

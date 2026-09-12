@@ -129,9 +129,9 @@ const streakLabel = (y: number) => (y >= STREAK_CAP ? `${STREAK_CAP}년 넘게` 
    칩은 세 판으로, 검색 결과는 갈래 제목 아래 묶어서. */
 type Scope = "kr" | "us" | "etf";
 const SCOPES: { key: Scope; label: string; desc: string }[] = [
-  { key: "kr", label: "국장", desc: "코스피·코스닥 주식" },
-  { key: "us", label: "미장", desc: "미국 주식 300여 개" },
-  { key: "etf", label: "ETF", desc: "국내외 배당 ETF 15개" },
+  { key: "kr", label: "국장", desc: "요즘 채널에서 많이 오르내린 배당주 · 코스피·코스닥 전 종목 검색" },
+  { key: "us", label: "미장", desc: "요즘 채널에서 많이 오르내린 배당주 · S&P500 등 560종목 검색" },
+  { key: "etf", label: "ETF", desc: "미국은 많이 드는 순 · 국내는 최근 30일 돈이 들어온 순 · 240여 개 검색" },
 ];
 const scopeOf = (s: StockLite): Scope => (s.kind === "etf" ? "etf" : s.currency === "USD" ? "us" : "kr");
 
@@ -541,7 +541,7 @@ function SearchBox({ stocks, onPick }: { stocks: StockLite[]; onPick: (code: str
               </div>
             ))
           ) : (
-            <p className="dv-search-none">찾는 것이 없습니다. 코스피·코스닥 주식, 미국 주식 300여 개, 배당 ETF 15개가 담깁니다.</p>
+            <p className="dv-search-none">찾는 것이 없습니다. 코스피·코스닥 주식 전부, 미국 주식 560종목, ETF 240여 개(미국 33 · TIGER 213)가 담깁니다.</p>
           )}
         </div>
       )}
@@ -647,6 +647,8 @@ function HoldingRow({
   } else if (s.estimated) {
     notes.push("공시에 연간 값이 없어 마지막 배당으로 어림한 추정값입니다");
   }
+  // 일드맥스(TSLY·MSTY)류. 지난 1년 분배가 가격의 절반을 넘으면 원금을 돌려주는 상품이라 봐야 한다.
+  if ((s.yieldPct ?? 0) > 30) notes.push("분배금이 달마다 크게 흔들리고 원금을 돌려주는 몫이 섞인 상품입니다. 지난 1년과 같으리라 보기 어렵습니다");
   if (s.close == null) notes.push("종가가 없어 투자금과 수익률을 못 냅니다");
   if (s.nextRecord) notes.push(`다음 배당기준일 ${s.nextRecord}`);
   if (s.nextPay) notes.push(`다음 지급 ${s.nextPay[0]} · 1주에 ${money(s.nextPay[1], s)}`);

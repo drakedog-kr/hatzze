@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { getDividendData, type DividendStock } from "@/lib/dividend";
+import { getDividendData, getTrends, type DividendStock } from "@/lib/dividend";
 
 import { pageMetadata } from "../seo";
 import { DIVIDEND_PUBLIC } from "../screen-flags";
@@ -67,26 +67,43 @@ function toLite(s: DividendStock): StockLite {
   };
 }
 
-/** 검색창을 비워 둔 채로도 담을 수 있게 앞에 세워 두는 종목 — 배당 주는 회사 중 큰 순. */
+/** 검색창을 비워 둔 채로도 담을 수 있게 앞에 세워 두는 것 — 판마다 여덟. */
 const POPULAR = 8;
+/** 칩에 세우려면 이 정도는 줘야 한다(수익률 %). 언급이 많아도 배당이 시늉이면 이 화면의 칩이 아니다. */
+const CHIP_MIN_YIELD_KR = 2;
+const CHIP_MIN_YIELD_US = 1.5;
+const CHIP_MIN_CAP = 3_000e8;
+/** 미국 ETF 는 자료가 없어 손으로 적은 순서. 서학개미가 배당·월분배로 가장 많이 드는 것부터. */
+const US_ETF_ORDER = ["SCHD", "JEPI", "JEPQ", "QYLD", "MSTY", "TSLY", "VYM", "DIVO"];
 
 export default async function DividendPage() {
   if (!PUBLIC && DEPLOYED) notFound();
 
-  const data = await getDividendData();
+  const [data, trends] = await Promise.all([getDividendData(), getTrends()]);
   const stocks = data?.stocks ?? [];
+  const byMentions = (m: Map<string, number>) => (a: DividendStock, b: DividendStock) =>
+    (m.get(b.code) ?? 0) - (m.get(a.code) ?? 0) || (b.marketCap ?? 0) - (a.marketCap ?? 0) || (b.yieldPct ?? 0) - (a.yieldPct ?? 0);
+  // 국장 — 배당을 실제로 주는 큰 회사 중 요즘 채널에서 많이 오르내린 순.
   const popular = stocks
-    .filter((s) => s.kind === "stock" && (s.yieldPct ?? 0) >= 1.5 && !s.unusual && !s.name.includes("스팩"))
-    .sort((a, b) => (b.marketCap ?? 0) - (a.marketCap ?? 0))
+    .filter((s) => s.kind === "stock" && s.currency === "KRW" && (s.yieldPct ?? 0) >= CHIP_MIN_YIELD_KR && (s.marketCap ?? 0) >= CHIP_MIN_CAP && !s.unusual && !s.name.includes("스팩"))
+    .sort(byMentions(trends.krMentions))
     .slice(0, POPULAR)
     .map((s) => s.code);
-  // 미장 칩 — 서학개미가 배당으로 많이 드는 회사를 손으로 적는다(시가총액이 표에 없어 순위를 못 낸다).
-  const haveUs = new Set(stocks.filter((s) => s.kind === "stock" && s.currency === "USD" && s.dps > 0).map((s) => s.code));
-  const popularUs = ["KO", "O", "JNJ", "PG", "MO", "PEP", "ABBV", "T", "VZ", "MSFT"].filter((c) => haveUs.has(c)).slice(0, POPULAR);
-  // ETF 칩 — 많이 찾는 순서로 손으로 적는다(표는 코드순이라 그대로 쓰면 데일리커버드콜이 맨 앞에 선다).
-  // 표에 없는 코드는 조용히 빠진다.
-  const have = new Set(stocks.filter((s) => s.kind === "etf").map((s) => s.code));
-  const popularEtf = ["SCHD", "JEPI", "JEPQ", "QYLD", "XYLD", "458730", "441680", "329200"].filter((c) => have.has(c));
+  // 미장 — 같은 잣대. 시가총액이 없어 언급 수가 같으면 수익률 순.
+  const popularUs = stocks
+    .filter((s) => s.kind === "stock" && s.currency === "USD" && (s.yieldPct ?? 0) >= CHIP_MIN_YIELD_US && s.payments.length > 0)
+    .sort(byMentions(trends.usMentions))
+    .slice(0, POPULAR)
+    .map((s) => s.code);
+  // ETF — 국내는 최근 30일 돈이 들어온 순(설정·환매, seohak_etf_daily 에 있는 것만), 미국은 손으로 적은 순. 넷씩.
+  const etfs = stocks.filter((s) => s.kind === "etf");
+  const krEtf = etfs
+    .filter((s) => s.currency === "KRW" && trends.etfFlow.has(s.code))
+    .sort((a, b) => (trends.etfFlow.get(b.code) ?? 0) - (trends.etfFlow.get(a.code) ?? 0))
+    .slice(0, POPULAR / 2)
+    .map((s) => s.code);
+  const haveEtf = new Set(etfs.map((s) => s.code));
+  const popularEtf = [...US_ETF_ORDER.filter((c) => haveEtf.has(c)).slice(0, POPULAR - krEtf.length), ...krEtf];
 
   return (
     <DividendCalculator

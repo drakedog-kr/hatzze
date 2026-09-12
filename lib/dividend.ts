@@ -1,6 +1,7 @@
 import "server-only";
 
-import { getSupabaseServer } from "@/lib/supabase-server";
+import { getSupabaseAdmin, getSupabaseServer } from "@/lib/supabase-server";
+import { fetchAllRows } from "@/lib/telegram-data";
 
 /**
  * 배당으로 살기(/dividend)의 자료 — `kr_dividend_stock` 한 표를 읽는다.
@@ -402,3 +403,45 @@ export function pickBaskets(stocks: DividendStock[]): Basket[] {
     },
   ];
 }
+
+/* ── 앞에 세울 것 고르기 — 우리 자료로 잰 '요즘' ─────────────────────────
+   칩 여덟 개를 무엇으로 고르나. 시가총액 순은 늘 같은 얼굴이라(2026-09-12 지적) 우리가 매일 재는
+   두 가지로 바꾼다 — 텔레그램 채널 언급(국장·미장)과 국내 상장 ETF 의 설정·환매 자금(ETF).
+   둘 다 이 저장소가 이미 매일 쌓는 표라 새 원천이 없다. 미국 ETF 는 그런 자료가 없어 손으로 적은
+   순서다(SCHD·JEPI·JEPQ·QYLD). */
+export type Trends = {
+  /** 국장 종목 코드 → 최근 30일 채널 언급 수 */
+  krMentions: Map<string, number>;
+  /** 미장 티커 → 최근 30일 채널 언급 수 */
+  usMentions: Map<string, number>;
+  /** 국내 상장 ETF 코드 → 최근 30일 순유입(원). 미국 기초자산 ETF 만 있다(seohak_etf_daily). */
+  etfFlow: Map<string, number>;
+};
+
+const TREND_DAYS = 30;
+
+export async function getTrends(): Promise<Trends> {
+  const db = getSupabaseAdmin();
+  const since = new Date(Date.now() - TREND_DAYS * 86400e3).toISOString().slice(0, 10);
+  const krMentions = new Map<string, number>();
+  const usMentions = new Map<string, number>();
+  const etfFlow = new Map<string, number>();
+  // 세 표 다 하루에 수백 행이라 30일이면 1,000행을 넘는다 — 페이징 필수(lib/supabase-server.ts 머리말).
+  const [kr, us, etf] = await Promise.all([
+    fetchAllRows<{ id: string; stock_code: string; mention_count: number }>("id", () =>
+      db.from("telegram_stock_daily").select("id,stock_code,mention_count").gte("date", since),
+    ),
+    fetchAllRows<{ id: string; ticker: string; mention_count: number }>("id", () =>
+      db.from("telegram_us_stock_daily").select("id,ticker,mention_count").gte("date", since),
+    ),
+    // seohak_etf_daily 는 (trade_date, isu_cd) 가 키라 id 가 없다. 두 열을 이어 붙인 정렬로 대신한다.
+    fetchAllRows<{ trade_date: string; isu_cd: string; net_flow: number | null }>("isu_cd", () =>
+      db.from("seohak_etf_daily").select("trade_date,isu_cd,net_flow").gte("trade_date", since),
+    ),
+  ]);
+  for (const r of kr) krMentions.set(r.stock_code, (krMentions.get(r.stock_code) ?? 0) + (r.mention_count ?? 0));
+  for (const r of us) usMentions.set(r.ticker, (usMentions.get(r.ticker) ?? 0) + (r.mention_count ?? 0));
+  for (const r of etf) etfFlow.set(r.isu_cd, (etfFlow.get(r.isu_cd) ?? 0) + Number(r.net_flow ?? 0));
+  return { krMentions, usMentions, etfFlow };
+}
+

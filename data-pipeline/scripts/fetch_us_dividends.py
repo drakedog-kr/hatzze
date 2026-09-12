@@ -47,10 +47,22 @@
 ⚠️ 외국 회사(20-F, ifrs-full 태그)와 ETF 는 이 태그가 없어 0 으로 나온다. 목록에 안 넣는다
    (config/us_dividend_universe.py 머리말).
 
+## 대상과 주기
+
+대상은 셋을 합친다 — 카더라 사전(`us_stocks`, 194) + 배당주 목록(config/us_dividend_universe.py, 102) +
+S&P 500(config/us_sp500.py, 503). 겹치는 걸 빼면 560종목쯤이다. 한글 표기는 앞 둘에만 있고 S&P 목록은
+영문명이라, 없는 종목은 영문명이 화면 이름이 된다.
+
+⚠️ SEC companyfacts 는 한 회사에 2~10MB 라 560종목이면 하루 1.5GB 다. 매일 받을 값이 아니다 — 거기서
+   나오는 건 회계연도별 합·연속 배당·증가율뿐이고 그건 1년에 네 번 바뀐다. **일요일(KST)에만** 받고
+   (`--sec` 로 강제), 다른 날은 표에 있던 값을 그대로 물려받는다. stockanalysis(지급 건)와 핀허브(시세)는
+   매일이다.
+
 실행:
     cd data-pipeline && source .venv/bin/activate
     python scripts/fetch_us_dividends.py --dry-run --only KO,O,XOM   # 몇 종목만 계산·미리보기
-    python scripts/fetch_us_dividends.py
+    python scripts/fetch_us_dividends.py                             # 평일: SA·시세만, 일요일: SEC 까지
+    python scripts/fetch_us_dividends.py --sec                       # SEC 를 지금 받는다
 """
 
 from __future__ import annotations
@@ -74,6 +86,7 @@ from common.stockanalysis import PageChanged, dividend_history, trailing  # noqa
 from common.supabase_client import get_client, load_all  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 from config.us_dividend_universe import EXTRA_US_DIVIDEND  # noqa: E402
+from config.us_sp500 import SP500  # noqa: E402
 
 TABLE = "us_dividend_stock"
 SEC_UA = "hatzze.fun dividend page (hatzze@proton.me)"
@@ -288,6 +301,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--only", help="쉼표로 구분한 티커 몇 개만(시험용)")
+    ap.add_argument("--sec", action="store_true", help="SEC companyfacts 를 오늘 받는다(기본은 일요일만)")
     args = ap.parse_args()
     if not FINNHUB_API_KEY and not args.dry_run:
         raise SystemExit("[중단] FINNHUB_API_KEY 가 없습니다")
@@ -298,11 +312,22 @@ def main() -> None:
     names: dict[str, tuple[str, str | None]] = {t: (r["name_ko"] or t, r.get("name_en")) for t, r in master.items()}
     for t, ko in EXTRA_US_DIVIDEND.items():
         names.setdefault(t.upper(), (ko, None))
+    for t, en in SP500.items():
+        names.setdefault(t.upper(), (en, en))  # 한글 표기가 없으면 영문명이 이름이다
     tickers = sorted(names)
     if args.only:
         tickers = [t.strip().upper() for t in args.only.split(",") if t.strip()]
     ciks = cik_map()
-    print(f"[SEC] 대상 {len(tickers)}종목 (카더라 사전 {len(master)} + 배당 목록 {len(EXTRA_US_DIVIDEND)}) · CIK 표 {len(ciks):,}")
+    # SEC 는 일요일(KST)에만. 다른 날은 표에 있던 값을 물려받는다(머리말).
+    do_sec = args.sec or today.weekday() == 6 or bool(args.only)
+    existing: dict[str, dict] = {}
+    if not do_sec:
+        try:
+            existing = {r["ticker"]: r for r in load_all(db, TABLE, "ticker,annual,streak_years,cut_years_5,growth_5y_pct,last_period_end,sec_ttm_dps,ttm_method,ttm_dps", order_by="ticker")}
+        except Exception as exc:  # noqa: BLE001
+            print(f"[SEC] 표를 못 읽어 오늘은 SEC 를 받습니다: {type(exc).__name__}")
+            do_sec = True
+    print(f"[SEC] 대상 {len(tickers)}종목 (카더라 사전 {len(master)} + 배당 목록 {len(EXTRA_US_DIVIDEND)} + S&P500 {len(SP500)}) · CIK 표 {len(ciks):,} · SEC {'받음' if do_sec else '물려받음(일요일에 갱신)'}")
 
     rows: list[dict] = []
     missing_cik: list[str] = []
@@ -313,15 +338,29 @@ def main() -> None:
             missing_cik.append(t)
             continue
         cik, title = ck
-        try:
-            facts = sec_get(SEC_FACTS.format(cik=cik))
-        except Exception as exc:  # noqa: BLE001
-            print(f"[SEC] {t} 실패 {type(exc).__name__}")
-            failed.append(t)
-            continue
-        time.sleep(SEC_PAUSE_SEC)
-        summ = summarize(pick_rows(facts) if facts else [], today)
         ko, en = names.get(t, (t, None))
+        if do_sec:
+            try:
+                facts = sec_get(SEC_FACTS.format(cik=cik))
+            except Exception as exc:  # noqa: BLE001
+                print(f"[SEC] {t} 실패 {type(exc).__name__}")
+                failed.append(t)
+                continue
+            time.sleep(SEC_PAUSE_SEC)
+            summ = summarize(pick_rows(facts) if facts else [], today)
+            if i % 50 == 0:
+                print(f"[SEC] {i}/{len(tickers)}")
+        else:
+            old = existing.get(t)
+            summ = {
+                "ttm_dps": float(old["sec_ttm_dps"] or old["ttm_dps"] or 0) if old else 0.0,
+                "ttm_method": (old["ttm_method"] if old and old["ttm_method"] != "sa" else "none") if old else "none",
+                "annual": old["annual"] if old else {},
+                "streak_years": old["streak_years"] if old else 0,
+                "cut_years_5": old["cut_years_5"] if old else 0,
+                "growth_5y_pct": old["growth_5y_pct"] if old else None,
+                "last_period_end": old["last_period_end"] if old else None,
+            }
         rows.append({
             "ticker": t,
             "cik": cik,
@@ -330,8 +369,6 @@ def main() -> None:
             **summ,
             "computed_for": today.isoformat(),
         })
-        if i % 50 == 0:
-            print(f"[SEC] {i}/{len(tickers)}")
 
     fail_pct = (len(failed) + len(missing_cik)) / max(len(tickers), 1) * 100
     print(f"[SEC] 요약 {len(rows)}종목 · CIK 없음 {len(missing_cik)} {missing_cik[:8]} · 실패 {len(failed)} ({fail_pct:.0f}%)")

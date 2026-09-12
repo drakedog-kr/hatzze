@@ -36,8 +36,8 @@ from datetime import date
 UA = {"User-Agent": "hatzze/1.0 (+https://hatzze.fun; contact: support@hatzze.fun)"}
 BASE = {"stock": "https://stockanalysis.com/stocks/{t}/dividend/", "etf": "https://stockanalysis.com/etf/{t}/dividend/"}
 TIMEOUT_SEC = 30
-# 저쪽 서버를 두드리는 간격. fetch_us_analyst.py 는 1초다. 하루 300쪽이면 5분.
-PAUSE_SEC = 1.0
+# 저쪽 서버를 두드리는 간격. fetch_us_analyst.py 는 1초인데 여긴 하루 600쪽이라 0.7초(7분).
+PAUSE_SEC = 0.7
 MON = {m: i + 1 for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"])}
 _DATE = re.compile(r"([A-Z][a-z]{2}) (\d{1,2}), (\d{4})")
 
