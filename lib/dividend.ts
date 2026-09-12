@@ -434,9 +434,10 @@ export async function getTrends(): Promise<Trends> {
     fetchAllRows<{ id: string; ticker: string; mention_count: number }>("id", () =>
       db.from("telegram_us_stock_daily").select("id,ticker,mention_count").gte("date", since),
     ),
-    // seohak_etf_daily 는 (trade_date, isu_cd) 가 키라 id 가 없다. 두 열을 이어 붙인 정렬로 대신한다.
+    // seohak_etf_daily 는 (trade_date, isu_cd) 가 키라 id 가 없다. 헬퍼가 뒤에 isu_cd 정렬을 붙이므로
+    // 여기서 trade_date 를 먼저 걸어 (trade_date, isu_cd) 순 — 유일 키라야 페이지 경계에서 안 빠진다.
     fetchAllRows<{ trade_date: string; isu_cd: string; net_flow: number | null }>("isu_cd", () =>
-      db.from("seohak_etf_daily").select("trade_date,isu_cd,net_flow").gte("trade_date", since),
+      db.from("seohak_etf_daily").select("trade_date,isu_cd,net_flow").gte("trade_date", since).order("trade_date"),
     ),
   ]);
   for (const r of kr) krMentions.set(r.stock_code, (krMentions.get(r.stock_code) ?? 0) + (r.mention_count ?? 0));

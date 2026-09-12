@@ -7,7 +7,7 @@ import { C, Icon } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
 import { SectionIntro } from "../SectionIntro";
 import { StockLogo } from "../StockLogo";
-import type { BasketLite, StockLite } from "./types";
+import type { BasketLite, BrowseLists, StockLite } from "./types";
 
 /**
  * 배당으로 살기(/dividend) 본체. 서버가 내려준 종목 목록(StockLite)만 갖고 브라우저에서 전부 계산한다.
@@ -234,6 +234,7 @@ export function DividendCalculator({
   popular,
   popularUs,
   popularEtf,
+  browse,
   computedFor,
   priceDate,
   usPriceDate,
@@ -244,6 +245,7 @@ export function DividendCalculator({
   popular: string[];
   popularUs: string[];
   popularEtf: string[];
+  browse: BrowseLists;
   computedFor: string | null;
   priceDate: string | null;
   usPriceDate: string | null;
@@ -405,6 +407,7 @@ export function DividendCalculator({
                   <span className="dv-group-desc">{o.desc}</span>
                 </div>
                 <QuickChips codes={chipsBy[o.key]} byCode={byCode} holdings={holdings} onPick={(code) => add(code, `chip_${o.key}`)} />
+                <BrowseList scope={o.key} codes={browse[o.key]} byCode={byCode} holdings={holdings} onPick={(code) => add(code, `browse_${o.key}`)} />
               </section>
             ))}
           </div>
@@ -587,6 +590,149 @@ function QuickChips({
           {s.yieldPct != null && <span className="dv-chip-yield">{pct(s.yieldPct)}</span>}
         </button>
       ))}
+    </div>
+  );
+}
+
+/* ── 전체 보기 — 판마다 배당이 있는 종목 전부 ─────────────────────────
+   칩은 여덟뿐이라 "이게 다야?"가 됐다(2026-09-12). 판 아래 '전체 N종목 보기'를 두고, 열면 같은
+   판 안에서 거르고(이름·코드) 정렬을 바꿔(요즘·수익률·이름·국장은 시총도) 훑는다. 로고가 종목마다
+   외부 요청 하나라(StockLogo 는 lazy 가 아니다 — 저쪽 주석) 한 번에 마흔 줄씩만 그린다. */
+type BrowseSort = "trend" | "cap" | "yield" | "name";
+const BROWSE_PAGE = 40;
+const BROWSE_SORTS: { key: BrowseSort; label: string; krOnly?: boolean }[] = [
+  { key: "trend", label: "요즘순" },
+  { key: "cap", label: "시총순", krOnly: true },
+  { key: "yield", label: "수익률순" },
+  { key: "name", label: "이름순" },
+];
+/** 검색과 같은 잣대 — 이름·별칭 포함, 코드 앞부분. */
+const matches = (s: StockLite, q: string) =>
+  norm(s.name).includes(q) || (s.alias != null && norm(s.alias).includes(q)) || s.code.startsWith(q.toUpperCase());
+
+function BrowseList({
+  scope,
+  codes,
+  byCode,
+  holdings,
+  onPick,
+}: {
+  scope: Scope;
+  codes: string[];
+  byCode: Map<string, StockLite>;
+  holdings: Holding[];
+  onPick: (code: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<BrowseSort>("trend");
+  const [shown, setShown] = useState(BROWSE_PAGE);
+  const all = useMemo(() => codes.map((c) => byCode.get(c)).filter((s): s is StockLite => !!s), [codes, byCode]);
+  const held = new Set(holdings.map((h) => h.code));
+  const q = norm(query);
+  const list = useMemo(() => {
+    const picked = q ? all.filter((s) => matches(s, q)) : all.slice();
+    if (sort === "cap") picked.sort((a, b) => b.cap - a.cap || a.name.localeCompare(b.name, "ko"));
+    else if (sort === "yield") picked.sort((a, b) => (b.yieldPct ?? -1) - (a.yieldPct ?? -1) || a.name.localeCompare(b.name, "ko"));
+    else if (sort === "name") picked.sort((a, b) => a.name.localeCompare(b.name, "ko"));
+    return picked;
+  }, [all, q, sort]);
+  const visible = list.slice(0, shown);
+  const total = all.length.toLocaleString("ko-KR");
+
+  if (!open) {
+    return (
+      <div className="dv-browse">
+        <button
+          type="button"
+          className="dv-browse-toggle"
+          onClick={() => {
+            setOpen(true);
+            track("dividend_browse", { scope });
+          }}
+        >
+          전체 {total}종목 보기
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="dv-browse dv-browse-open">
+      <div className="dv-browse-tools">
+        <input
+          className="dv-browse-filter"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setShown(BROWSE_PAGE);
+          }}
+          placeholder={`${total}종목에서 이름·코드로 거르기`}
+          aria-label={`${scope === "kr" ? "국장" : scope === "us" ? "미장" : "ETF"} 전체 목록 거르기`}
+          autoComplete="off"
+        />
+        <div className="dv-browse-sort" role="group" aria-label="정렬">
+          {BROWSE_SORTS.filter((o) => !o.krOnly || scope === "kr").map((o) => (
+            <button
+              key={o.key}
+              type="button"
+              className="dv-browse-sort-btn"
+              aria-pressed={sort === o.key}
+              onClick={() => {
+                setSort(o.key);
+                setShown(BROWSE_PAGE);
+              }}
+            >
+              {o.label}
+            </button>
+          ))}
+          <button type="button" className="dv-browse-toggle dv-browse-close" onClick={() => setOpen(false)}>
+            접기
+          </button>
+        </div>
+      </div>
+      {visible.length ? (
+        <ul className="dv-browse-list">
+          {visible.map((s) => {
+            const inBag = held.has(s.code);
+            return (
+              <li key={s.code}>
+                <button
+                  type="button"
+                  className="hz-row-link hz-pick dv-browse-row"
+                  disabled={inBag}
+                  draggable={!inBag}
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("text/plain", s.code);
+                    e.dataTransfer.effectAllowed = "copy";
+                  }}
+                  onClick={() => onPick(s.code)}
+                  title={inBag ? "이미 담겼습니다" : `${s.name} 담기`}
+                >
+                  <StockLogo code={s.code} name={s.name} market={s.market} size={20} />
+                  <span className="dv-browse-name">{s.name}</span>
+                  {/* 판이 곧 갈래라 배지는 판 안에서 갈리는 것만 — 국장은 코스피·코스닥, ETF 는 국내·미국. 미장은 없다. */}
+                  {scope === "kr" && <span className="dv-badge">{s.market === "KOSDAQ" ? "코스닥" : "코스피"}</span>}
+                  {scope === "etf" && <span className="dv-badge">{s.currency === "USD" ? "미국" : "국내"}</span>}
+                  <span className="dv-browse-meta">{inBag ? "담김" : s.yieldPct != null ? pct(s.yieldPct) : money(s.dps, s)}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="dv-browse-none">이 판에는 없습니다. 위 검색창은 세 판을 한꺼번에 찾습니다.</p>
+      )}
+      <div className="dv-browse-foot">
+        <span className="dv-browse-count">
+          {q ? `${list.length.toLocaleString("ko-KR")}종목 찾음` : `${total}종목`}
+          {list.length > shown && ` · ${Math.min(shown, list.length)}까지 보임`}
+        </span>
+        {list.length > shown && (
+          <button type="button" className="dv-browse-toggle" onClick={() => setShown((n) => n + BROWSE_PAGE)}>
+            다음 {Math.min(BROWSE_PAGE, list.length - shown)}종목
+          </button>
+        )}
+      </div>
     </div>
   );
 }

@@ -49,3 +49,10 @@ export type BasketLite = {
   icon: string;
   codes: string[];
 };
+
+/**
+ * 판마다 '전체 보기'에 세우는 순서 — 배당이 있는 종목 전부의 코드. 칩(여덟)과 같은 잣대라
+ * 목록은 칩의 연장으로 읽힌다. 국장·미장은 요즘 채널 언급 순, ETF 는 미국 손순서와 국내 자금
+ * 유입 순을 번갈아. 정렬은 브라우저에서 바꿀 수 있고(수익률·이름·시총) 이건 그 기본값이다.
+ */
+export type BrowseLists = { kr: string[]; us: string[]; etf: string[] };
