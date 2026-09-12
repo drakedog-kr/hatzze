@@ -5284,7 +5284,19 @@ main.hz-scroll { overflow-x: clip; }
   padding: 6px 12px; border-radius: 6px; border: none; background: transparent; color: var(--c-label);
   font-size: 11.5px; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap;
 }
-.dv-seg-btn[aria-pressed="true"] { background: var(--c-cold-ink); color: var(--c-card); }
+.dv-seg-btn[aria-pressed="true"], .dv-seg-btn[aria-selected="true"] { background: var(--c-cold-ink); color: var(--c-card); }
+
+/* 고르는 칸 — 갈래(국장·미장·ETF) 세그먼트 + 검색창이 한 줄. 좁으면 세그먼트가 윗줄로. */
+.dv-picker { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dv-scope { flex-shrink: 0; }
+.dv-scope .dv-seg-btn { padding: 8px 14px; font-size: 12.5px; }
+.dv-picker .dv-search { flex: 1 1 260px; min-width: 0; }
+/* 다른 갈래에 있을 때 건너가는 단추. 글 줄 안에 서는 링크 모양. */
+.dv-search-jump {
+  display: block; margin-top: 6px; padding: 0; border: none; background: transparent;
+  color: var(--c-cold-ink); font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: inherit; text-align: left;
+}
+.dv-search-jump:hover { text-decoration: underline; }
 
 /* 검색 — MDD 조회 바와 같은 '파인 회색 면'. 바탕(--c-bg)이 아니라 --c-track 인 이유는 저쪽 주석. */
 .dv-search { position: relative; }

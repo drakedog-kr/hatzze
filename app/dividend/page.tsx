@@ -79,6 +79,9 @@ export default async function DividendPage() {
     .sort((a, b) => (b.marketCap ?? 0) - (a.marketCap ?? 0))
     .slice(0, POPULAR)
     .map((s) => s.code);
+  // 미장 칩 — 서학개미가 배당으로 많이 드는 회사를 손으로 적는다(시가총액이 표에 없어 순위를 못 낸다).
+  const haveUs = new Set(stocks.filter((s) => s.kind === "stock" && s.currency === "USD" && s.dps > 0).map((s) => s.code));
+  const popularUs = ["KO", "O", "JNJ", "PG", "MO", "PEP", "ABBV", "T", "VZ", "MSFT"].filter((c) => haveUs.has(c)).slice(0, POPULAR);
   // ETF 칩 — 많이 찾는 순서로 손으로 적는다(표는 코드순이라 그대로 쓰면 데일리커버드콜이 맨 앞에 선다).
   // 표에 없는 코드는 조용히 빠진다.
   const have = new Set(stocks.filter((s) => s.kind === "etf").map((s) => s.code));
@@ -89,6 +92,7 @@ export default async function DividendPage() {
       stocks={stocks.map(toLite)}
       baskets={data?.baskets ?? []}
       popular={popular}
+      popularUs={popularUs}
       popularEtf={popularEtf}
       computedFor={data?.computedFor ?? null}
       priceDate={data?.priceDate ?? null}
