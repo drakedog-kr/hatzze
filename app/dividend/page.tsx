@@ -79,9 +79,10 @@ export default async function DividendPage() {
     .sort((a, b) => (b.marketCap ?? 0) - (a.marketCap ?? 0))
     .slice(0, POPULAR)
     .map((s) => s.code);
-  // ETF 칩 — 설정 파일 순서 그대로(파이어족이 많이 찾는 것부터 적어 뒀다). 미국 다섯 + 국내 셋.
-  const etfs = stocks.filter((s) => s.kind === "etf");
-  const popularEtf = [...etfs.filter((s) => s.currency === "USD").slice(0, 5), ...etfs.filter((s) => s.currency === "KRW").slice(0, 3)].map((s) => s.code);
+  // ETF 칩 — 많이 찾는 순서로 손으로 적는다(표는 코드순이라 그대로 쓰면 데일리커버드콜이 맨 앞에 선다).
+  // 표에 없는 코드는 조용히 빠진다.
+  const have = new Set(stocks.filter((s) => s.kind === "etf").map((s) => s.code));
+  const popularEtf = ["SCHD", "JEPI", "JEPQ", "QYLD", "XYLD", "458730", "441680", "329200"].filter((c) => have.has(c));
 
   return (
     <DividendCalculator

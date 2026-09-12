@@ -266,11 +266,12 @@ export function DividendCalculator({
   const monthly = useMemo(() => {
     const m = new Array<number>(13).fill(0);
     for (const l of lines) {
-      const f = afterTax ? 1 - taxRate(l.stock) : 1;
+      // 달러 지급 건(미국 ETF)은 환율을 곱해야 원화 달력에 든다 — 빠뜨렸더니 SCHD 3월이 22원으로 찍혔다.
+      const f = (afterTax ? 1 - taxRate(l.stock) : 1) * (l.stock.currency === "USD" ? fx : 1);
       for (const [month, amt] of l.stock.pays) m[month] += amt * l.shares * f;
     }
     return m;
-  }, [lines, afterTax]);
+  }, [lines, afterTax, fx]);
 
   const add = (code: string, source: string) => {
     if (!byCode.has(code)) return;
