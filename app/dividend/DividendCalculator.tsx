@@ -123,17 +123,17 @@ const pct = (v: number) => `${v.toFixed(2)}%`;
 /** 파이프라인이 15년치만 읽으므로 연속 배당은 15에서 멈춘다. 그 값은 "적어도 15년"이다. */
 const STREAK_CAP = 15;
 const streakLabel = (y: number) => (y >= STREAK_CAP ? `${STREAK_CAP}년 넘게` : `${y}년째`);
-/* ── 고르는 칸의 세 갈래 — 국장 · 미장 · ETF ─────────────────────────────
+/* ── 세 갈래 — 국장 · 미장 · ETF ───────────────────────────────────────
    한 검색창에 섞어 두니 SCHD 가 미장인지 ETF 인지, 코카콜라가 어디 있는지 안 보였다(2026-09-12 지적).
-   갈래를 고르면 검색과 칩이 그 갈래만 보이고, 다른 갈래에 있는 걸 치면 그쪽으로 건너가는 단추가 뜬다. */
+   처음엔 탭으로 갈랐는데 "눌러야 보이는 건 별로"라 해서(같은 날) **세 갈래를 늘 나란히** 둔다 —
+   칩은 세 판으로, 검색 결과는 갈래 제목 아래 묶어서. */
 type Scope = "kr" | "us" | "etf";
-const SCOPES: { key: Scope; label: string; placeholder: string }[] = [
-  { key: "kr", label: "국장", placeholder: "국내 종목 이름이나 코드로 찾아 담기" },
-  { key: "us", label: "미장", placeholder: "미국 종목 이름이나 티커로 찾아 담기" },
-  { key: "etf", label: "ETF", placeholder: "ETF 이름이나 티커로 찾아 담기" },
+const SCOPES: { key: Scope; label: string; desc: string }[] = [
+  { key: "kr", label: "국장", desc: "코스피·코스닥 주식" },
+  { key: "us", label: "미장", desc: "미국 주식 300여 개" },
+  { key: "etf", label: "ETF", desc: "국내외 배당 ETF 15개" },
 ];
 const scopeOf = (s: StockLite): Scope => (s.kind === "etf" ? "etf" : s.currency === "USD" ? "us" : "kr");
-const scopeLabel = (k: Scope) => SCOPES.find((x) => x.key === k)?.label ?? k;
 
 /** 줄에 붙는 배지들. 국장·미장·ETF 가 한 표에 섞이므로 **모든 줄에** 어느 갈래인지 붙인다. */
 function Badges({ s }: { s: StockLite }) {
@@ -153,9 +153,9 @@ function Badges({ s }: { s: StockLite }) {
 /* ── 검색 ─────────────────────────────────────────────────────────── */
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
 /**
- * 이름 앞부분 일치 → 이름 포함 → 코드 앞부분 순. 같은 등급 안에서는 **이름이 짧은 것**, 그다음
- * **큰 회사**부터 — "삼성전" 을 치면 삼성전자가 삼성전기우보다 앞에 서야 한다(배당금 순으로
- * 세웠더니 삼성전기우가 맨 위였다). 이름 길이가 곧 검색어와의 거리다.
+ * 이름 앞부분 일치 → 이름 포함 → 코드 앞부분 순. 같은 등급 안에서는 **큰 회사**부터, 그다음 이름이
+ * 짧은 것 — "삼성전" 은 삼성전자(1,600조)가 삼성전기우보다, "KB" 는 KB금융이 KBG 보다 앞에 선다.
+ * (배당금 순으로 세웠더니 삼성전기우가, 이름 길이 순으로 세웠더니 KBG 가 맨 위였다.)
  */
 function rankMatches(stocks: StockLite[], query: string, limit = 8): StockLite[] {
   const q = norm(query);
@@ -170,7 +170,7 @@ function rankMatches(stocks: StockLite[], query: string, limit = 8): StockLite[]
     else if (name.includes(q) || (alias && alias.includes(q))) includes.push(s);
     else if (s.code.startsWith(q.toUpperCase())) codes.push(s);
   }
-  const closer = (a: StockLite, b: StockLite) => a.name.length - b.name.length || b.cap - a.cap || a.name.localeCompare(b.name, "ko");
+  const closer = (a: StockLite, b: StockLite) => b.cap - a.cap || a.name.length - b.name.length || a.name.localeCompare(b.name, "ko");
   const bigger = (a: StockLite, b: StockLite) => b.cap - a.cap || a.name.localeCompare(b.name, "ko");
   return [...starts.sort(closer), ...includes.sort(bigger), ...codes.sort(bigger)].slice(0, limit);
 }
@@ -254,9 +254,7 @@ export function DividendCalculator({
   const setHoldings = writeHoldings;
   const [afterTax, setAfterTax] = useState(true);
   const [amount, setAmount] = useState(AMOUNT_DEFAULT);
-  const [scope, setScope] = useState<Scope>("kr");
-  const scoped = useMemo(() => stocks.filter((s) => scopeOf(s) === scope), [stocks, scope]);
-  const chipCodes = scope === "kr" ? popular : scope === "us" ? popularUs : popularEtf;
+  const chipsBy: Record<Scope, string[]> = { kr: popular, us: popularUs, etf: popularEtf };
   // 주수 칸들. 방금 담은 종목의 칸에 포커스를 주고 값을 통째로 선택해 둔다 — 치면 덮인다.
   // ref 가 아니라 state 에 든 Map 이다 — 렌더 중에 ref.current 를 읽으면 eslint(react-hooks/refs)에
   // 걸리고, Map 자체는 한 번 만들어 그대로 쓰므로 state 로 들고 있어도 다시 그릴 일이 없다.
@@ -396,23 +394,19 @@ export function DividendCalculator({
         </div>
 
         <div className="dv-body">
-          <div className="dv-picker">
-            <div className="dv-seg dv-scope" role="tablist" aria-label="어느 시장에서 고를지">
-              {SCOPES.map((o) => (
-                <button key={o.key} type="button" role="tab" aria-selected={scope === o.key} className="dv-seg-btn" onClick={() => { track("dividend_scope", { scope: o.key }); setScope(o.key); }}>
-                  {o.label}
-                </button>
-              ))}
-            </div>
-            <SearchBox stocks={scoped} all={stocks} scope={scope} onScope={setScope} onPick={(code) => add(code, "search")} />
+          <SearchBox stocks={stocks} onPick={(code) => add(code, "search")} />
+          {/* 세 갈래가 늘 나란히 선다. 판마다 제목·설명·칩. 좁으면 한 판씩 쌓인다. */}
+          <div className="dv-groups">
+            {SCOPES.map((o) => (
+              <section key={o.key} className="dv-group" aria-label={o.label}>
+                <div className="dv-group-head">
+                  <span className="dv-group-title">{o.label}</span>
+                  <span className="dv-group-desc">{o.desc}</span>
+                </div>
+                <QuickChips codes={chipsBy[o.key]} byCode={byCode} holdings={holdings} onPick={(code) => add(code, `chip_${o.key}`)} />
+              </section>
+            ))}
           </div>
-          <QuickChips
-            label={scope === "kr" ? "배당 주는 큰 회사" : scope === "us" ? "많이 찾는 미국 배당주" : "많이 찾는 ETF"}
-            codes={chipCodes}
-            byCode={byCode}
-            holdings={holdings}
-            onPick={(code) => add(code, `chip_${scope}`)}
-          />
           {lines.length > 0 && (
             <HoldingsTable lines={lines} inputs={inputs} onShares={setShares} onRemove={remove} />
           )}
@@ -461,28 +455,17 @@ function TaxToggle({ afterTax, onChange }: { afterTax: boolean; onChange: (v: bo
 }
 
 /* ── 검색 ─────────────────────────────────────────────────────────── */
-function SearchBox({
-  stocks,
-  all,
-  scope,
-  onScope,
-  onPick,
-}: {
-  /** 지금 고른 갈래의 종목만. */
-  stocks: StockLite[];
-  /** 전부 — 다른 갈래에 있는지 알려 줄 때만 본다. */
-  all: StockLite[];
-  scope: Scope;
-  onScope: (s: Scope) => void;
-  onPick: (code: string) => void;
-}) {
+function SearchBox({ stocks, onPick }: { stocks: StockLite[]; onPick: (code: string) => void }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [focused, setFocused] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
-  const matches = useMemo(() => rankMatches(stocks, query), [stocks, query]);
-  // 이 갈래엔 없는데 다른 갈래엔 있는 것 — "미장에 코카콜라가 있습니다" 로 건너가게 한다.
-  const elsewhere = useMemo(() => (matches.length ? [] : rankMatches(all, query, 3).filter((s) => scopeOf(s) !== scope)), [all, matches.length, query, scope]);
+  // 갈래마다 따로 매긴다 — 결과가 국장·미장·ETF 제목 아래 묶여 뜬다. 한 갈래에 넷씩.
+  const groups = useMemo(
+    () => SCOPES.map((o) => ({ scope: o, items: rankMatches(stocks.filter((s) => scopeOf(s) === o.key), query, 4) })).filter((g) => g.items.length),
+    [stocks, query],
+  );
+  const matches = useMemo(() => groups.flatMap((g) => g.items), [groups]);
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
@@ -529,7 +512,7 @@ function SearchBox({
             if (e.key === "Enter" && matches[0]) pick(matches[0].code);
             if (e.key === "Escape") setOpen(false);
           }}
-          placeholder={SCOPES.find((x) => x.key === scope)?.placeholder}
+          placeholder="종목·ETF 이름이나 코드로 찾아 담기"
           aria-label="종목 검색"
           autoComplete="off"
         />
@@ -537,33 +520,27 @@ function SearchBox({
       {open && query.trim() !== "" && (
         <div className="dv-search-pop">
           {matches.length ? (
-            <ul>
-              {matches.map((s) => (
-                <li key={s.code}>
-                  <button type="button" className="hz-row-link hz-pick dv-search-row" onClick={() => pick(s.code)}>
-                    <StockLogo code={s.code} name={s.name} market={s.market} />
-                    <span className="dv-search-name">{s.name}</span>
-                    <Badges s={s} />
-                    <span className="dv-search-meta">
-                      {s.dps > 0 ? `1주에 ${money(s.dps, s)}${s.yieldPct != null ? ` · ${pct(s.yieldPct)}` : ""}` : s.currency === "USD" ? "공시에서 배당을 못 읽음" : "최근 1년 배당 없음"}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : elsewhere.length ? (
-            <div className="dv-search-none">
-              {scopeLabel(scope)}에는 없습니다.
-              {elsewhere.map((s) => (
-                <button key={s.code} type="button" className="dv-search-jump" onClick={() => onScope(scopeOf(s))}>
-                  {scopeLabel(scopeOf(s))}에 있습니다 · {s.name} →
-                </button>
-              ))}
-            </div>
+            groups.map((g) => (
+              <div key={g.scope.key} className="dv-search-group">
+                <div className="dv-search-group-head">{g.scope.label}</div>
+                <ul>
+                  {g.items.map((s) => (
+                    <li key={s.code}>
+                      <button type="button" className="hz-row-link hz-pick dv-search-row" onClick={() => pick(s.code)}>
+                        <StockLogo code={s.code} name={s.name} market={s.market} />
+                        <span className="dv-search-name">{s.name}</span>
+                        <Badges s={s} />
+                        <span className="dv-search-meta">
+                          {s.dps > 0 ? `1주에 ${money(s.dps, s)}${s.yieldPct != null ? ` · ${pct(s.yieldPct)}` : ""}` : s.currency === "USD" ? "공시에서 배당을 못 읽음" : "최근 1년 배당 없음"}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))
           ) : (
-            <p className="dv-search-none">
-              {scope === "kr" ? "찾는 종목이 없습니다. 코스피·코스닥 상장 주식이 담깁니다." : scope === "us" ? "찾는 종목이 없습니다. 미국 주식 300여 개가 담깁니다(외국 회사·ETF는 없습니다)." : "찾는 ETF가 없습니다. 자주 찾는 ETF 15개가 담깁니다."}
-            </p>
+            <p className="dv-search-none">찾는 것이 없습니다. 코스피·코스닥 주식, 미국 주식 300여 개, 배당 ETF 15개가 담깁니다.</p>
           )}
         </div>
       )}
@@ -579,7 +556,7 @@ function QuickChips({
   holdings,
   onPick,
 }: {
-  label: string;
+  label?: string;
   codes: string[];
   byCode: Map<string, StockLite>;
   holdings: Holding[];
@@ -587,10 +564,10 @@ function QuickChips({
 }) {
   const held = new Set(holdings.map((h) => h.code));
   const items = codes.map((c) => byCode.get(c)).filter((s): s is StockLite => !!s && !held.has(s.code));
-  if (!items.length) return null;
+  if (!items.length) return <p className="dv-chips-empty">다 담았습니다. 검색으로 더 찾을 수 있습니다.</p>;
   return (
     <div className="dv-chips">
-      <span className="dv-chips-label">{label}</span>
+      {label && <span className="dv-chips-label">{label}</span>}
       {items.map((s) => (
         <button
           key={s.code}

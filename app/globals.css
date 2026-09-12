@@ -5286,17 +5286,16 @@ main.hz-scroll { overflow-x: clip; }
 }
 .dv-seg-btn[aria-pressed="true"], .dv-seg-btn[aria-selected="true"] { background: var(--c-cold-ink); color: var(--c-card); }
 
-/* 고르는 칸 — 갈래(국장·미장·ETF) 세그먼트 + 검색창이 한 줄. 좁으면 세그먼트가 윗줄로. */
-.dv-picker { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.dv-scope { flex-shrink: 0; }
-.dv-scope .dv-seg-btn { padding: 8px 14px; font-size: 12.5px; }
-.dv-picker .dv-search { flex: 1 1 260px; min-width: 0; }
-/* 다른 갈래에 있을 때 건너가는 단추. 글 줄 안에 서는 링크 모양. */
-.dv-search-jump {
-  display: block; margin-top: 6px; padding: 0; border: none; background: transparent;
-  color: var(--c-cold-ink); font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: inherit; text-align: left;
-}
-.dv-search-jump:hover { text-decoration: underline; }
+/* 세 갈래 판 — 국장 · 미장 · ETF 가 늘 나란히. 회색 타일 안에 제목·설명·칩. 좁으면 한 판씩. */
+.dv-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.dv-group { background: var(--tx-tile); border-radius: var(--tx-r-tile); padding: 12px 14px 12px; min-width: 0; }
+.dv-group-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.dv-group-title { font-size: 13.5px; font-weight: 800; color: var(--c-ink); letter-spacing: -0.01em; }
+.dv-group-desc { font-size: 11.5px; color: var(--c-sub); }
+.dv-chips-empty { margin: 0; font-size: 12px; color: var(--c-muted); }
+/* 검색 결과의 갈래 제목. */
+.dv-search-group + .dv-search-group { margin-top: 4px; border-top: 1px solid var(--c-sheet-row); padding-top: 4px; }
+.dv-search-group-head { padding: 6px 10px 2px; font-size: 11px; font-weight: 700; color: var(--c-muted); letter-spacing: 0.02em; }
 
 /* 검색 — MDD 조회 바와 같은 '파인 회색 면'. 바탕(--c-bg)이 아니라 --c-track 인 이유는 저쪽 주석. */
 .dv-search { position: relative; }
@@ -5440,6 +5439,9 @@ main.hz-scroll { overflow-x: clip; }
 /* 폭. 사이드바를 뺀 본문 폭으로 잰다 — 세 장이 서려면 한 장에 360 은 있어야 한다. */
 @media (max-width: 1260px) {
   .dv-baskets { grid-template-columns: 1fr; }
+}
+@media (max-width: 980px) {
+  .dv-groups { grid-template-columns: 1fr; }
 }
 @media (max-width: 720px) {
   /* 한 줄에 여섯 칸을 세우면 종목 이름에 30px 이 남는다(375 실측: "KB금융"이 "K"). 두 줄로
