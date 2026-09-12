@@ -97,6 +97,8 @@ jobs:
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
       # 해설 문단 생성용. 없으면 문단만 빠지고 숫자·목록은 그대로 나간다(fail-soft).
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      # 해설 문단을 Max 구독으로 먼저 보낸다(common/llm_client.py). daily-update.yml 과 같다.
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       # 발송 전용 봇 토큰(수집용 TELEGRAM_SESSION 과 별개).
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_BROADCAST_CHAT_ID: ${{ secrets.TELEGRAM_BROADCAST_CHAT_ID }}
@@ -111,6 +113,15 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r data-pipeline/requirements.txt
+
+      # 구독 경로는 `claude` CLI 를 자식 프로세스로 부른다. 러너엔 없으니 받아 둔다.
+      # 실패해도 발송을 세우지 않는다 — 래퍼가 API 키로 되돌아간다.
+      - name: Install Claude Code CLI (LLM 구독 경로)
+        continue-on-error: true
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/claude" --version
 
       # 설치까지 끝내 놓고 기다린다 — 시각이 되면 바로 보내야 하므로, 대기 뒤에 몇 분짜리
       # 설치가 남아 있으면 그만큼 늦게 나간다(kiwipiepy 모델이 88MB 라 설치가 짧지 않다).

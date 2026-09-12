@@ -68,12 +68,20 @@ import requests  # noqa: E402
 from common import broadcast_content as bc  # noqa: E402
 from common import broadcast_digest as bd  # noqa: E402
 from common.config import ANTHROPIC_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_BROADCAST_CHAT_ID  # noqa: E402
+from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 from common.retry import backoff_delay  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.surging import load_stock_daily, top_surging  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 
-# 해설 문단을 쓰는 모델. 히어로 요약·카더라 총평과 같은 걸 쓴다(generate_daily_summary).
+# 해설 문단을 쓰는 모델. 호출은 구독(llm_client)으로 나가지만 **Haiku 를 유지한다.**
+# 2026-09-12 에 Sonnet 5 로 같은 자료·같은 규칙으로 뽑아 견줘 봤다(테스트 채널 35~39).
+# Sonnet 은 아래 _LLM_RULES 의 전언 예시("언급이 늘었습니다", "(O) 분석이 오갔습니다")를
+# 모든 문장에 적용해 뉴스까지 "~라는 이야기가 오갔습니다" 로 감싼다(글마다 7~9번, Haiku 는 0번).
+# 예시를 빼면 절반쯤 풀리는 대신 그 예시가 막던 것이 샌다 — "상승세", 특정 종목 목표가 문장.
+# Haiku 는 전언 지시는 무시하고 시세 지시는 지키는 조합이라 지금 규칙 아래서 더 직접적으로 읽힌다.
+# Haiku 가 쓴 숫자 10개는 전부 자료에 있었다(지어낸 것 아님). Sonnet 으로 가려면 규칙을
+# Sonnet 기준으로 다시 쓰고 변형마다 수십 회 재야 한다(히어로 프롬프트 때와 같은 규모).
 MODEL = "claude-haiku-4-5"
 
 SITE_URL = "https://hatzze.fun"
@@ -979,15 +987,13 @@ def main() -> None:
     # 해설 문단용 클라이언트. 키가 없으면 None 이고, compose 가 빈 문자열을 돌려줘
     # 해당 문단만 빠진다(common/broadcast_content.compose 주석 — fail-soft).
     llm = None
-    if ANTHROPIC_API_KEY:
-        from anthropic import Anthropic
-
-        llm = Anthropic(api_key=ANTHROPIC_API_KEY)
+    if HAS_LLM_CREDENTIAL:
+        llm = get_llm_client(ANTHROPIC_API_KEY)
     elif args.format in ("morning", "theme", "weekly"):
-        print("[안내] ANTHROPIC_API_KEY 가 없어 해설 문단 없이 만듭니다.")
+        print("[안내] LLM 자격(구독 토큰·API 키)이 없어 해설 문단 없이 만듭니다.")
     elif args.format in bd.FORMATS:
         # 2판은 갈래가 곧 글이라 LLM 없이는 만들 수 없다.
-        print("[중단] ANTHROPIC_API_KEY 가 없어 갈래 요약을 만들 수 없습니다.")
+        print("[중단] LLM 자격(구독 토큰·API 키)이 없어 갈래 요약을 만들 수 없습니다.")
         sys.exit(1)
 
     # 신선도 게이트는 daily_score 를 본다. 온도를 싣는 건 마감 리포트뿐이지만, 점수가

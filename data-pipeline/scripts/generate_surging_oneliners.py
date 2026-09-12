@@ -59,10 +59,14 @@ from common.us_surging import top_us_surging  # noqa: E402
 import generate_telegram_narratives as KR  # noqa: E402
 import generate_us_telegram_narratives as US  # noqa: E402
 
-# 국장 총평(KR)에서 물려받지 않고 따로 적는다. 이 스크립트만 구독 경로로 옮겼고,
-# KR 쪽은 아직 API 키로 나가서 등급을 올리면 그대로 두 배 청구가 된다.
-# **모델 상향은 구독 경로로 옮긴 뒤에 한다.** 순서가 바뀌면 돈이 는다.
-MODEL = "claude-sonnet-5"
+# 국장 총평(KR)에서 물려받지 않고 따로 적는다. 이 스크립트는 구독 경로로 나가고 KR 은 아직
+# API 키라, 모델을 따로 정해야 한다. **모델 상향은 구독 경로로 옮긴 뒤에 한다** — 순서가
+# 바뀌면 API 단가가 두 배로 그대로 청구된다.
+# 2026-09-12 Sonnet 5 를 견줬다가 Haiku 로 되돌렸다. Sonnet 은 아래 규칙의 "무엇이 화제였나"를
+# 그대로 받아 12개 중 7개를 "~가 화제였습니다"로 끝냈다. Haiku 는 규칙(숫자 금지·"체결" 금지)을
+# 더 자주 어기지만 카드에서 더 직접적으로 읽힌다(Hun 판정). 규칙 낱말을 바꾸면 되풀이가 줄지는
+# 돌려 봐야 안다 — 바꿀 거면 그것만 따로 재고 판단할 것.
+MODEL = "claude-haiku-4-5"
 CARDS = 6          # 화면이 그리는 급부상 카드 수(국장·미장 둘 다)
 LEN_MIN, LEN_MAX = 22, 30
 MAX_RETRIES = 1    # 한 번만 다시 쓴다. 못 맞추면 후보 중 목표에 가장 가까운 걸 쓴다
