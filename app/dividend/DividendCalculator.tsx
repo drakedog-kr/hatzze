@@ -89,8 +89,11 @@ function writeHoldings(next: Holding[] | ((prev: Holding[]) => Holding[])) {
   listeners.forEach((l) => l());
 }
 
-/** 배당소득세 14% + 지방소득세 1.4%. 증권사가 지급 때 떼고 넣어 준다. */
-const TAX_RATE = 0.154;
+/** 국내 배당소득세 14% + 지방소득세 1.4%. 증권사가 지급 때 떼고 넣어 준다. */
+const TAX_RATE_KR = 0.154;
+/** 미국 배당은 미국이 15%를 떼고(한미 조세조약) 국내에서 더 떼지 않는다(금융소득 2천만원 아래). */
+const TAX_RATE_US = 0.15;
+const taxRate = (s: StockLite) => (s.currency === "USD" ? TAX_RATE_US : TAX_RATE_KR);
 /** 종목을 처음 담을 때의 주수. 0 이면 결과가 안 서고, 1 은 값이 너무 작아 감이 안 온다. */
 const DEFAULT_SHARES = 10;
 /** 바스켓 투자금 슬라이더 눈금(원). */
@@ -113,11 +116,15 @@ function wonShort(v: number): string {
   if (v >= 1e4 && v % 1e4 === 0) return `${(v / 1e4).toLocaleString("ko-KR")}만원`;
   return won(v);
 }
+const usd = (v: number) => `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+/** 그 종목의 돈 단위로. 미국은 달러, 국내는 원. */
+const money = (v: number, s: StockLite) => (s.currency === "USD" ? usd(v) : won(v));
 const pct = (v: number) => `${v.toFixed(2)}%`;
 /** 파이프라인이 15년치만 읽으므로 연속 배당은 15에서 멈춘다. 그 값은 "적어도 15년"이다. */
 const STREAK_CAP = 15;
 const streakLabel = (y: number) => (y >= STREAK_CAP ? `${STREAK_CAP}년 넘게` : `${y}년째`);
-const marketBadge = (m: string | null) => (m === "KOSDAQ" ? "코스닥" : null);
+/** 코스피는 안 붙인다(대부분이라 붙이면 배경이 된다). 미국은 이름만으로 국내와 구별이 안 된다. */
+const marketBadge = (m: string | null) => (m === "KOSDAQ" ? "코스닥" : m === "US" ? "미국" : null);
 
 /* ── 검색 ─────────────────────────────────────────────────────────── */
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
@@ -134,8 +141,9 @@ function rankMatches(stocks: StockLite[], query: string, limit = 8): StockLite[]
   const codes: StockLite[] = [];
   for (const s of stocks) {
     const name = norm(s.name);
+    const alias = s.alias ? norm(s.alias) : "";
     if (name.startsWith(q)) starts.push(s);
-    else if (name.includes(q)) includes.push(s);
+    else if (name.includes(q) || (alias && alias.includes(q))) includes.push(s);
     else if (s.code.startsWith(q.toUpperCase())) codes.push(s);
   }
   const closer = (a: StockLite, b: StockLite) => a.name.length - b.name.length || b.cap - a.cap || a.name.localeCompare(b.name, "ko");
@@ -147,22 +155,39 @@ function rankMatches(stocks: StockLite[], query: string, limit = 8): StockLite[]
 type Line = {
   stock: StockLite;
   shares: number;
-  /** 1년 세전 배당(원). */
+  /** 1년 세전 배당, 그 종목의 돈 단위(원 또는 달러). */
   gross: number;
+  /** 세금을 뗀 뒤, 그 종목의 돈 단위. 미국 줄이 달러로도 보여 줄 때 쓴다. */
+  net: number;
+  /** 1년 세전 배당(원). 미국은 환율을 곱한 값. */
+  grossKrw: number;
+  /** 세금을 뗀 뒤(원). 국내 15.4%, 미국 15%. 세전 모드면 grossKrw 와 같다. */
+  netKrw: number;
   /** 투자금(원, 전일 종가 × 주수). 종가가 없으면 null. */
-  invest: number | null;
+  investKrw: number | null;
 };
 
-function computeLines(holdings: Holding[], byCode: Map<string, StockLite>): Line[] {
+/**
+ * 담은 종목 하나하나의 셈. 미국은 달러를 원으로 옮겨 국내와 한 줄에 더한다 — 환율은 FRED 의
+ * 최근 값(1~2영업일 늦다). 세금은 종목마다 다르므로(국내 15.4%·미국 15%) 줄에서 뗀다.
+ */
+function computeLines(holdings: Holding[], byCode: Map<string, StockLite>, fx: number, afterTax: boolean): Line[] {
   const out: Line[] = [];
   for (const h of holdings) {
     const stock = byCode.get(h.code);
     if (!stock) continue;
+    const rate = stock.currency === "USD" ? fx : 1;
+    const gross = stock.dps * h.shares;
+    const grossKrw = gross * rate;
+    const keep = afterTax ? 1 - taxRate(stock) : 1;
     out.push({
       stock,
       shares: h.shares,
-      gross: stock.dps * h.shares,
-      invest: stock.close ? stock.close * h.shares : null,
+      gross,
+      net: gross * keep,
+      grossKrw,
+      netKrw: grossKrw * keep,
+      investKrw: stock.close ? stock.close * h.shares * rate : null,
     });
   }
   return out;
@@ -185,12 +210,16 @@ export function DividendCalculator({
   popular,
   computedFor,
   priceDate,
+  usPriceDate,
+  usdkrw,
 }: {
   stocks: StockLite[];
   baskets: BasketLite[];
   popular: string[];
   computedFor: string | null;
   priceDate: string | null;
+  usPriceDate: string | null;
+  usdkrw: { rate: number; date: string | null } | null;
 }) {
   const byCode = useMemo(() => new Map(stocks.map((s) => [s.code, s])), [stocks]);
   const holdings = useSyncExternalStore(holdingsStore.subscribe, holdingsStore.getSnapshot, holdingsStore.getServerSnapshot);
@@ -211,18 +240,23 @@ export function DividendCalculator({
       }
     }, 0);
 
-  const lines = useMemo(() => computeLines(holdings, byCode), [holdings, byCode]);
-  const factor = afterTax ? 1 - TAX_RATE : 1;
-  const totalGross = lines.reduce((s, l) => s + l.gross, 0);
-  const total = totalGross * factor;
-  const invest = lines.reduce((s, l) => s + (l.invest ?? 0), 0);
-  const priced = lines.filter((l) => l.invest != null);
-  const yieldPct = invest > 0 ? (priced.reduce((s, l) => s + l.gross, 0) / invest) * 100 : null;
+  // 환율이 없으면(미국 표가 비었을 때) 미국 종목 자체가 목록에 없다(lib/dividend.ts). 1 은 자리값.
+  const fx = usdkrw?.rate ?? 1;
+  const lines = useMemo(() => computeLines(holdings, byCode, fx, afterTax), [holdings, byCode, fx, afterTax]);
+  const total = lines.reduce((s, l) => s + l.netKrw, 0);
+  const invest = lines.reduce((s, l) => s + (l.investKrw ?? 0), 0);
+  const priced = lines.filter((l) => l.investKrw != null);
+  const yieldPct = invest > 0 ? (priced.reduce((s, l) => s + l.grossKrw, 0) / invest) * 100 : null;
+  const usCount = lines.filter((l) => l.stock.currency === "USD").length;
+  // 달력은 지급 달을 아는 종목(국내)만. 미국은 공시에 지급일이 없다.
   const monthly = useMemo(() => {
     const m = new Array<number>(13).fill(0);
-    for (const l of lines) for (const [month, amt] of l.stock.pays) m[month] += amt * l.shares * factor;
+    for (const l of lines) {
+      const f = afterTax ? 1 - taxRate(l.stock) : 1;
+      for (const [month, amt] of l.stock.pays) m[month] += amt * l.shares * f;
+    }
     return m;
-  }, [lines, factor]);
+  }, [lines, afterTax]);
 
   const add = (code: string, source: string) => {
     if (!byCode.has(code)) return;
@@ -276,7 +310,11 @@ export function DividendCalculator({
     );
   }
 
-  const basis = [priceDate ? `전일 종가(${priceDate}) 기준` : null, computedFor ? `배당은 ${computedFor}에 정리한 최근 12개월 기록` : null]
+  const basis = [
+    priceDate ? `국내는 전일 종가(${priceDate})` : null,
+    usdkrw && usPriceDate ? `미국은 ${usPriceDate} 시세와 환율 ${Math.round(usdkrw.rate).toLocaleString("ko-KR")}원(FRED${usdkrw.date ? ` ${usdkrw.date}` : ""})` : null,
+    computedFor ? `배당은 ${computedFor}에 정리한 최근 12개월 기록` : null,
+  ]
     .filter(Boolean)
     .join(" · ");
 
@@ -327,14 +365,16 @@ export function DividendCalculator({
           <SearchBox stocks={stocks} onPick={(code) => add(code, "search")} />
           <QuickChips codes={popular} byCode={byCode} holdings={holdings} onPick={(code) => add(code, "chip")} />
           {lines.length > 0 && (
-            <HoldingsTable lines={lines} factor={factor} inputs={inputs} onShares={setShares} onRemove={remove} />
+            <HoldingsTable lines={lines} inputs={inputs} onShares={setShares} onRemove={remove} />
           )}
-          {lines.length > 0 && <MonthCalendar monthly={monthly} afterTax={afterTax} />}
+          {lines.length > 0 && <MonthCalendar monthly={monthly} afterTax={afterTax} usCount={usCount} />}
         </div>
 
         <div className="hz-sheet-foot">
           <p className="dv-foot">
-            {afterTax ? "세금 15.4%(배당소득세 14%와 지방소득세 1.4%)를 뺀 값입니다. " : "세금을 빼기 전 값입니다. 실제로는 15.4%를 떼고 들어옵니다. "}
+            {afterTax
+              ? "세금을 뺀 값입니다. 국내는 15.4%(배당소득세 14%와 지방소득세 1.4%), 미국은 미국에서 떼는 15%입니다. "
+              : "세금을 빼기 전 값입니다. 실제로는 국내 15.4%, 미국 15%를 떼고 들어옵니다. "}
             {basis && `${basis}. `}
             배당은 회사가 바꿀 수 있고, 지난 1년과 같으리라는 보장은 없습니다. 매수·매도 신호가 아닙니다.
           </p>
@@ -345,7 +385,7 @@ export function DividendCalculator({
       <AmountControl amount={amount} onChange={setAmount} />
       <div className="dv-baskets">
         {baskets.map((b) => (
-          <BasketSheet key={b.key} basket={b} amount={amount} byCode={byCode} factor={factor} afterTax={afterTax} onApply={() => applyBasket(b)} onPick={(code) => add(code, "basket")} />
+          <BasketSheet key={b.key} basket={b} amount={amount} byCode={byCode} afterTax={afterTax} onApply={() => applyBasket(b)} onPick={(code) => add(code, "basket")} />
         ))}
       </div>
       <p className="dv-note">
@@ -440,14 +480,14 @@ function SearchBox({ stocks, onPick }: { stocks: StockLite[]; onPick: (code: str
                     <span className="dv-search-name">{s.name}</span>
                     {marketBadge(s.market) && <span className="dv-badge">{marketBadge(s.market)}</span>}
                     <span className="dv-search-meta">
-                      {s.dps > 0 ? `1주에 ${won(s.dps)}${s.yieldPct != null ? ` · ${pct(s.yieldPct)}` : ""}` : "최근 1년 배당 없음"}
+                      {s.dps > 0 ? `1주에 ${money(s.dps, s)}${s.yieldPct != null ? ` · ${pct(s.yieldPct)}` : ""}` : "최근 1년 배당 없음"}
                     </span>
                   </button>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="dv-search-none">찾는 종목이 없습니다. 코스피·코스닥 상장 주식만 담깁니다(ETF는 아직 없습니다).</p>
+            <p className="dv-search-none">찾는 종목이 없습니다. 코스피·코스닥 주식과 미국 주식 300여 개가 담깁니다(ETF는 아직 없습니다).</p>
           )}
         </div>
       )}
@@ -498,13 +538,11 @@ function QuickChips({
 /* ── 담은 종목 표 ─────────────────────────────────────────────────── */
 function HoldingsTable({
   lines,
-  factor,
   inputs,
   onShares,
   onRemove,
 }: {
   lines: Line[];
-  factor: number;
   inputs: Map<string, HTMLInputElement>;
   onShares: (code: string, shares: number) => void;
   onRemove: (code: string) => void;
@@ -520,7 +558,7 @@ function HoldingsTable({
         <span role="columnheader" aria-label="빼기" />
       </div>
       {lines.map((l) => (
-        <HoldingRow key={l.stock.code} line={l} factor={factor} inputs={inputs} onShares={onShares} onRemove={onRemove} />
+        <HoldingRow key={l.stock.code} line={l} inputs={inputs} onShares={onShares} onRemove={onRemove} />
       ))}
     </div>
   );
@@ -528,13 +566,11 @@ function HoldingsTable({
 
 function HoldingRow({
   line,
-  factor,
   inputs,
   onShares,
   onRemove,
 }: {
   line: Line;
-  factor: number;
   inputs: Map<string, HTMLInputElement>;
   onShares: (code: string, shares: number) => void;
   onRemove: (code: string) => void;
@@ -544,8 +580,10 @@ function HoldingRow({
   const notes: string[] = [];
   if (s.dps === 0) notes.push("최근 1년 현금배당이 없습니다");
   if (s.unusual) notes.push("평소보다 큰 배당(특별·청산)이 섞여 있어 1년 뒤에도 같으리라 보기 어렵습니다");
+  if (s.estimated) notes.push("마지막 분기 배당을 네 배 한 추정값입니다");
   if (s.close == null) notes.push("종가가 없어 투자금과 수익률을 못 냅니다");
   if (s.nextRecord) notes.push(`다음 배당기준일 ${s.nextRecord}`);
+  if (s.currency === "USD" && s.dps > 0) notes.push("미국 공시에는 지급 달이 없어 아래 달력에는 빠집니다");
 
   const step = (d: number) => onShares(s.code, Math.max(0, shares + d));
   return (
@@ -585,8 +623,11 @@ function HoldingRow({
           +
         </button>
       </span>
-      <span className="dv-tcell dv-tnum" role="cell">{s.dps > 0 ? won(s.dps) : "없음"}</span>
-      <span className="dv-tcell dv-tnum dv-tstrong" role="cell">{won(line.gross * factor)}</span>
+      <span className="dv-tcell dv-tnum" role="cell">{s.dps > 0 ? money(s.dps, s) : "없음"}</span>
+      <span className="dv-tcell dv-tnum dv-tstrong" role="cell">
+        {won(line.netKrw)}
+        {s.currency === "USD" && s.dps > 0 && <span className="dv-tsub">{usd(line.net)}</span>}
+      </span>
       <span className="dv-tcell dv-tnum" role="cell">{s.yieldPct != null ? pct(s.yieldPct) : "·"}</span>
       <span className="dv-tcell" role="cell">
         <button type="button" className="dv-remove" aria-label={`${s.name} 빼기`} onClick={() => onRemove(s.code)}>
@@ -598,7 +639,7 @@ function HoldingRow({
 }
 
 /* ── 달마다 얼마 ─────────────────────────────────────────────────── */
-function MonthCalendar({ monthly, afterTax }: { monthly: number[]; afterTax: boolean }) {
+function MonthCalendar({ monthly, afterTax, usCount }: { monthly: number[]; afterTax: boolean; usCount: number }) {
   const max = Math.max(...MONTHS.map((m) => monthly[m]));
   const paidMonths = MONTHS.filter((m) => monthly[m] > 0).length;
   return (
@@ -606,7 +647,8 @@ function MonthCalendar({ monthly, afterTax }: { monthly: number[]; afterTax: boo
       <div className="dv-cal-head">
         <span className="dv-cal-title">달마다 얼마 들어오나</span>
         <span className="dv-cal-sub">
-          {paidMonths ? `1년에 ${paidMonths}달 들어옵니다` : "지급 달을 모르는 종목뿐입니다"} · 최근 12개월 지급일 기준{afterTax ? " · 세후" : " · 세전"}
+          {paidMonths ? `1년에 ${paidMonths}달 들어옵니다` : "지급 달을 아는 종목이 없습니다"} · 최근 12개월 지급일 기준{afterTax ? " · 세후" : " · 세전"}
+          {usCount > 0 && ` · 미국 ${usCount}종목은 지급 달을 몰라 뺐습니다`}
         </span>
       </div>
       <div className="dv-cal-grid">
@@ -661,7 +703,6 @@ function BasketSheet({
   basket,
   amount,
   byCode,
-  factor,
   afterTax,
   onApply,
   onPick,
@@ -669,15 +710,16 @@ function BasketSheet({
   basket: BasketLite;
   amount: number;
   byCode: Map<string, StockLite>;
-  factor: number;
   afterTax: boolean;
   onApply: () => void;
   onPick: (code: string) => void;
 }) {
   const holdings = basketShares(basket.codes, amount, byCode);
-  const lines = computeLines(holdings, byCode);
-  const gross = lines.reduce((s, l) => s + l.gross, 0);
-  const invest = lines.reduce((s, l) => s + (l.invest ?? 0), 0);
+  // 바스켓은 국내 종목뿐이라 환율은 1 이다.
+  const lines = computeLines(holdings, byCode, 1, afterTax);
+  const net = lines.reduce((s, l) => s + l.netKrw, 0);
+  const gross = lines.reduce((s, l) => s + l.grossKrw, 0);
+  const invest = lines.reduce((s, l) => s + (l.investKrw ?? 0), 0);
   const y = invest > 0 ? (gross / invest) * 100 : null;
   return (
     <section className="hz-sheet dv-basket" aria-label={basket.title}>
@@ -685,9 +727,9 @@ function BasketSheet({
       {lines.length ? (
         <>
           <div className="dv-basket-sum">
-            <p className="dv-basket-main">{won(gross * factor)}</p>
+            <p className="dv-basket-main">{won(net)}</p>
             <p className="dv-basket-sub">
-              1년에{afterTax ? " 세후" : " 세전"} · 한 달 평균 {won((gross * factor) / 12)}
+              1년에{afterTax ? " 세후" : " 세전"} · 한 달 평균 {won(net / 12)}
               {y != null && ` · 수익률 ${pct(y)}`}
             </p>
           </div>

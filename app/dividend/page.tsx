@@ -48,11 +48,14 @@ function toLite(s: DividendStock): StockLite {
     code: s.code,
     name: s.name,
     market: s.market,
+    currency: s.currency,
+    alias: s.alias,
     close: s.close,
     cap: Math.round((s.marketCap ?? 0) / 1e8),
     dps: s.dps,
     yieldPct: s.yieldPct,
     unusual: s.unusual,
+    estimated: s.estimated,
     // 지급일이 없는 건(아직 안 정해진 미래분)은 달을 모르니 달력에서 뺀다. 합(dps)에는 든다.
     pays: s.payments.filter((p) => p.pay).map((p) => [MONTH(p.pay as string), p.amount]),
     streak: s.streak,
@@ -82,6 +85,8 @@ export default async function DividendPage() {
       popular={popular}
       computedFor={data?.computedFor ?? null}
       priceDate={data?.priceDate ?? null}
+      usPriceDate={data?.usPriceDate ?? null}
+      usdkrw={data?.usdkrw ?? null}
     />
   );
 }

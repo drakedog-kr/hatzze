@@ -8,18 +8,26 @@
  * ⚠️ 이 파일은 `server-only` 가 아니다. 클라이언트 컴포넌트가 타입을 읽는다.
  */
 export type StockLite = {
+  /** 국내는 6자리 코드, 미국은 티커. */
   code: string;
   name: string;
+  /** KOSPI · KOSDAQ · US */
   market: string | null;
-  /** 전일 종가(원). null 이면 투자금·수익률을 못 낸다. */
+  /** 금액 단위. 미국은 달러 — close·dps 가 전부 달러다. 화면이 usdkrw 로 원화를 같이 낸다. */
+  currency: "KRW" | "USD";
+  /** 검색에만 쓰는 영문명(미국). "coca" 로도 코카콜라가 걸리게. */
+  alias: string | null;
+  /** 전일 종가(원 또는 달러). null 이면 투자금·수익률을 못 낸다. */
   close: number | null;
   /** 시가총액(억원, 정수). 검색 결과에서 큰 회사를 앞에 세우는 데만 쓴다. */
   cap: number;
   /** 최근 12개월 1주당 현금배당 합(원). 0 이면 최근 1년 배당이 없다. */
   dps: number;
   yieldPct: number | null;
-  /** 특별·청산배당이 섞였다(12개월 합이 그 전 회계연도의 두 배 초과). */
+  /** 특별·청산배당이 섞였다(12개월 합이 그 전 회계연도의 두 배 초과). 국내만. */
   unusual: boolean;
+  /** 마지막 분기를 네 배 한 추정값이다(미국, 연 행이 없는 회사). 화면이 '추정'이라 적는다. */
+  estimated: boolean;
   /** 최근 12개월 지급 건 [달, 1주당 금액]. 달력이 달마다 얼마인지 그린다. */
   pays: [number, number][];
   streak: number;

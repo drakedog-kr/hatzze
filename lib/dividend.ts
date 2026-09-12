@@ -14,9 +14,15 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 export type Payment = { record: string; pay: string | null; amount: number };
 
 export type DividendStock = {
+  /** 국내는 6자리 코드, 미국은 티커. */
   code: string;
   name: string;
+  /** KOSPI · KOSDAQ · US */
   market: string | null;
+  /** 미국은 USD. close·dps 가 달러다. */
+  currency: "KRW" | "USD";
+  /** 영문명(미국). 검색 별칭. */
+  alias: string | null;
   /** 전일 종가(원). 없으면 계산기에서 투자금·수익률이 빠진다. */
   close: number | null;
   priceDate: string | null;
@@ -25,8 +31,10 @@ export type DividendStock = {
   dps: number;
   count: number;
   yieldPct: number | null;
-  /** 특별·청산배당이 섞였다는 표시(12개월 합이 그 전 회계연도의 두 배 초과). */
+  /** 특별·청산배당이 섞였다는 표시(12개월 합이 그 전 회계연도의 두 배 초과). 국내만. */
   unusual: boolean;
+  /** 마지막 분기 × 4 추정값(미국). */
+  estimated: boolean;
   payMonths: number[];
   payments: Payment[];
   streak: number;
@@ -82,6 +90,8 @@ function toStock(r: Row): DividendStock {
     code: r.code,
     name: r.name,
     market: r.market,
+    currency: "KRW",
+    alias: null,
     close: n(r.close),
     priceDate: r.price_date,
     marketCap: n(r.market_cap),
@@ -89,6 +99,7 @@ function toStock(r: Row): DividendStock {
     count: r.ttm_count ?? 0,
     yieldPct: n(r.ttm_yield_pct),
     unusual: Boolean(r.ttm_unusual),
+    estimated: false,
     payMonths: Array.isArray(r.pay_months) ? r.pay_months.map(Number) : [],
     payments: Array.isArray(r.ttm_payments)
       ? r.ttm_payments.map((p) => ({ record: p.record, pay: p.pay ?? null, amount: Number(p.amount) }))
@@ -124,6 +135,76 @@ async function loadAll(): Promise<{ rows: Row[]; computedFor: string | null }> {
   return { rows, computedFor };
 }
 
+/* ── 미국 (us_dividend_stock, 마이그레이션 073) ───────────────────────────
+   배당은 SEC 공시, 시세는 핀허브, 환율은 FRED. 국내 표와 같은 모양으로 옮긴다. 지급 건이 없어
+   달력에는 못 들어가고, 시가총액이 없어 칩·바스켓에도 안 선다 — 계산기와 검색에서만 산다. */
+type UsRow = {
+  ticker: string;
+  name_ko: string;
+  name_en: string | null;
+  close: number | null;
+  price_date: string | null;
+  ttm_dps: number;
+  ttm_method: string;
+  ttm_yield_pct: number | null;
+  streak_years: number;
+  cut_years_5: number;
+  growth_5y_pct: number | null;
+  usdkrw: number | null;
+  usdkrw_date: string | null;
+  computed_for: string;
+};
+
+const US_COLUMNS =
+  "ticker,name_ko,name_en,close,price_date,ttm_dps,ttm_method,ttm_yield_pct,streak_years,cut_years_5,growth_5y_pct,usdkrw,usdkrw_date,computed_for";
+
+function toUsStock(r: UsRow): DividendStock {
+  return {
+    code: r.ticker,
+    name: r.name_ko,
+    market: "US",
+    currency: "USD",
+    alias: r.name_en,
+    close: n(r.close),
+    priceDate: r.price_date,
+    marketCap: null,
+    dps: Number(r.ttm_dps ?? 0),
+    count: 0,
+    yieldPct: n(r.ttm_yield_pct),
+    unusual: false,
+    estimated: r.ttm_method === "annualized",
+    payMonths: [],
+    payments: [],
+    streak: r.streak_years ?? 0,
+    cuts5: r.cut_years_5 ?? 0,
+    growth5: n(r.growth_5y_pct),
+    nextRecord: null,
+    isReit: false,
+    shareKind: null,
+  };
+}
+
+export type UsdKrw = { rate: number; date: string | null };
+
+/** 표가 없거나 실패하면 빈 목록 — 미국이 빠져도 국내 계산기는 그대로 뜬다. */
+async function loadUs(): Promise<{ stocks: DividendStock[]; fx: UsdKrw | null; priceDate: string | null }> {
+  try {
+    const { data, error } = await getSupabaseServer().from("us_dividend_stock").select(US_COLUMNS).order("ticker").limit(1000);
+    if (error) throw error;
+    const rows = (data ?? []) as unknown as UsRow[];
+    const fxRow = rows.find((r) => r.usdkrw != null);
+    const priceDate = rows.reduce<string | null>((m, r) => (r.price_date && r.price_date > (m ?? "") ? r.price_date : m), null);
+    return {
+      stocks: rows.map(toUsStock),
+      fx: fxRow?.usdkrw != null ? { rate: Number(fxRow.usdkrw), date: fxRow.usdkrw_date } : null,
+      priceDate,
+    };
+  } catch (e) {
+    console.error("[dividend] us_dividend_stock 조회 실패", e);
+    return { stocks: [], fx: null, priceDate: null };
+  }
+}
+
 export type DividendData = {
   stocks: DividendStock[];
   baskets: Basket[];
@@ -131,6 +212,10 @@ export type DividendData = {
   computedFor: string | null;
   /** 종가의 날짜(KRX 전일 종가). */
   priceDate: string | null;
+  /** 미국 시세의 날짜(미국 장 기준). 미국 표가 없으면 null. */
+  usPriceDate: string | null;
+  /** 원/달러(FRED). 미국 표가 없으면 null — 그때 화면은 미국 종목 없이 뜬다. */
+  usdkrw: UsdKrw | null;
 };
 
 /** 표가 없거나 조회가 실패하면 null — 화면은 "아직 자료가 없습니다"를 낸다. */
@@ -147,8 +232,18 @@ export async function getDividendData(): Promise<DividendData | null> {
   const priceDate = all.reduce<string | null>((m, s) => (s.priceDate && s.priceDate > (m ?? "") ? s.priceDate : m), null);
   // 종가 날짜가 최신이 아닌 종목은 상장폐지된 것이다(`stocks` 는 지우지 않는다 — fetch_krx_stocks.py).
   // 거래정지는 KRX 목록에 그대로 있어 여기 안 걸린다. 검색에 뜨면 옛 값으로 계산되니 뺀다.
-  const stocks = priceDate ? all.filter((s) => s.priceDate === priceDate) : all;
-  return { stocks, baskets: pickBaskets(stocks), computedFor: loaded.computedFor, priceDate };
+  const kr = priceDate ? all.filter((s) => s.priceDate === priceDate) : all;
+  const us = await loadUs();
+  // 환율이 없으면 미국 종목을 원화로 못 옮긴다 — 그날은 미국을 통째로 뺀다(반쪽 계산보다 낫다).
+  const usStocks = us.fx ? us.stocks : [];
+  return {
+    stocks: [...kr, ...usStocks],
+    baskets: pickBaskets(kr),
+    computedFor: loaded.computedFor,
+    priceDate,
+    usPriceDate: us.fx ? us.priceDate : null,
+    usdkrw: us.fx,
+  };
 }
 
 /* ── 성향별 바스켓 ─────────────────────────────────────────────────────
