@@ -97,8 +97,9 @@ export default async function DividendPage() {
     .map((s) => s.code);
   // ETF — 국내는 최근 30일 돈이 들어온 순(설정·환매, seohak_etf_daily 에 있는 것만), 미국은 손으로 적은 순. 넷씩.
   const etfs = stocks.filter((s) => s.kind === "etf");
+  // 돈이 몰려도 분배가 시늉이면(S&P500·나스닥100 지수 ETF 0.5%) 이 화면의 칩이 아니다 — 국장과 같은 문턱.
   const krEtf = etfs
-    .filter((s) => s.currency === "KRW" && trends.etfFlow.has(s.code))
+    .filter((s) => s.currency === "KRW" && trends.etfFlow.has(s.code) && (s.yieldPct ?? 0) >= CHIP_MIN_YIELD_KR)
     .sort((a, b) => (trends.etfFlow.get(b.code) ?? 0) - (trends.etfFlow.get(a.code) ?? 0))
     .slice(0, POPULAR / 2)
     .map((s) => s.code);

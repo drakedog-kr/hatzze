@@ -129,9 +129,9 @@ const streakLabel = (y: number) => (y >= STREAK_CAP ? `${STREAK_CAP}년 넘게` 
    칩은 세 판으로, 검색 결과는 갈래 제목 아래 묶어서. */
 type Scope = "kr" | "us" | "etf";
 const SCOPES: { key: Scope; label: string; desc: string }[] = [
-  { key: "kr", label: "국장", desc: "요즘 채널에서 많이 오르내린 배당주 · 코스피·코스닥 전 종목 검색" },
-  { key: "us", label: "미장", desc: "요즘 채널에서 많이 오르내린 배당주 · S&P500 등 560종목 검색" },
-  { key: "etf", label: "ETF", desc: "미국은 많이 드는 순 · 국내는 최근 30일 돈이 들어온 순 · 240여 개 검색" },
+  { key: "kr", label: "국장", desc: "요즘 채널에서 자주 오르내린 배당주" },
+  { key: "us", label: "미장", desc: "요즘 채널에서 자주 오르내린 배당주" },
+  { key: "etf", label: "ETF", desc: "미국은 많이 드는 순 · 국내는 돈이 들어온 순" },
 ];
 const scopeOf = (s: StockLite): Scope => (s.kind === "etf" ? "etf" : s.currency === "USD" ? "us" : "kr");
 
@@ -583,7 +583,7 @@ function QuickChips({
           title={`${s.name} 담기`}
         >
           <StockLogo code={s.code} name={s.name} market={s.market} size={18} />
-          <span>{s.name}</span>
+          <span className="dv-chip-name">{s.name}</span>
           {s.yieldPct != null && <span className="dv-chip-yield">{pct(s.yieldPct)}</span>}
         </button>
       ))}
