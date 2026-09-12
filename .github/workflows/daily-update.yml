@@ -934,6 +934,13 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_us_dividends.py
 
+      # ETF 는 분배금이 설정 파일(손으로 옮긴 운용사 공시)이고 여기서는 시세·환율만 붙인다.
+      - name: Fetch ETF 분배금에 시세 붙이기 (배당주)
+        id: etf_dividends
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_etf_dividends.py
+
 
       - name: Fetch GitHub trading bot repo count
         id: github_trading_repos
@@ -1522,8 +1529,8 @@ jobs:
         id: dividend_health
         if: always()
         run: |
-          names=("fetch_kr_dividends.py" "calculate_kr_dividend_stats.py" "fetch_us_dividends.py")
-          outcomes=("${{ steps.kr_dividends.outcome }}" "${{ steps.kr_dividend_stats.outcome }}" "${{ steps.us_dividends.outcome }}")
+          names=("fetch_kr_dividends.py" "calculate_kr_dividend_stats.py" "fetch_us_dividends.py" "fetch_etf_dividends.py")
+          outcomes=("${{ steps.kr_dividends.outcome }}" "${{ steps.kr_dividend_stats.outcome }}" "${{ steps.us_dividends.outcome }}" "${{ steps.etf_dividends.outcome }}")
 
           {
             echo "## 배당주"

@@ -19,6 +19,10 @@ export type DividendStock = {
   name: string;
   /** KOSPI · KOSDAQ · US */
   market: string | null;
+  /** 주식인가 ETF 인가. */
+  kind: "stock" | "etf";
+  /** ETF 분배금을 옮긴 날(etf_dividend.as_of). 주식은 null. */
+  asOf: string | null;
   /** 미국은 USD. close·dps 가 달러다. */
   currency: "KRW" | "USD";
   /** 영문명(미국). 검색 별칭. */
@@ -90,6 +94,8 @@ function toStock(r: Row): DividendStock {
     code: r.code,
     name: r.name,
     market: r.market,
+    kind: "stock",
+    asOf: null,
     currency: "KRW",
     alias: null,
     close: n(r.close),
@@ -163,6 +169,8 @@ function toUsStock(r: UsRow): DividendStock {
     code: r.ticker,
     name: r.name_ko,
     market: "US",
+    kind: "stock",
+    asOf: null,
     currency: "USD",
     alias: r.name_en,
     close: n(r.close),
@@ -182,6 +190,68 @@ function toUsStock(r: UsRow): DividendStock {
     isReit: false,
     shareKind: null,
   };
+}
+
+/* ── ETF (etf_dividend, 마이그레이션 074) ───────────────────────────────
+   분배금은 운용사 공시를 손으로 옮긴 설정 파일이 원천이라(data-pipeline/config/etf_dividends.py)
+   `as_of` 가 따로 있다. 화면이 그 날짜를 적는다. 국내 ETF 는 연도 합계뿐이라 달력에 못 든다. */
+type EtfRow = {
+  code: string;
+  market: string;
+  currency: string;
+  name_ko: string;
+  name_en: string | null;
+  cadence: string | null;
+  ttm_dps: number;
+  estimated: boolean;
+  payments: { pay: string; amount: number }[];
+  pay_months: number[];
+  as_of: string;
+  close: number | null;
+  price_date: string | null;
+  ttm_yield_pct: number | null;
+  usdkrw: number | null;
+  usdkrw_date: string | null;
+};
+
+function toEtfStock(r: EtfRow): DividendStock {
+  const us = r.market === "US";
+  return {
+    code: r.code,
+    name: r.name_ko,
+    market: us ? "US" : "KOSPI",
+    kind: "etf",
+    asOf: r.as_of,
+    currency: us ? "USD" : "KRW",
+    alias: r.name_en,
+    close: n(r.close),
+    priceDate: r.price_date,
+    marketCap: null,
+    dps: Number(r.ttm_dps ?? 0),
+    count: Array.isArray(r.payments) ? r.payments.length : 0,
+    yieldPct: n(r.ttm_yield_pct),
+    unusual: false,
+    estimated: Boolean(r.estimated),
+    payMonths: Array.isArray(r.pay_months) ? r.pay_months.map(Number) : [],
+    payments: Array.isArray(r.payments) ? r.payments.map((p) => ({ record: p.pay, pay: p.pay, amount: Number(p.amount) })) : [],
+    streak: 0,
+    cuts5: 0,
+    growth5: null,
+    nextRecord: null,
+    isReit: false,
+    shareKind: "ETF",
+  };
+}
+
+async function loadEtf(): Promise<DividendStock[]> {
+  try {
+    const { data, error } = await getSupabaseServer().from("etf_dividend").select("*").order("code").limit(1000);
+    if (error) throw error;
+    return ((data ?? []) as unknown as EtfRow[]).map(toEtfStock);
+  } catch (e) {
+    console.error("[dividend] etf_dividend 조회 실패", e);
+    return [];
+  }
 }
 
 export type UsdKrw = { rate: number; date: string | null };
@@ -233,11 +303,12 @@ export async function getDividendData(): Promise<DividendData | null> {
   // 종가 날짜가 최신이 아닌 종목은 상장폐지된 것이다(`stocks` 는 지우지 않는다 — fetch_krx_stocks.py).
   // 거래정지는 KRX 목록에 그대로 있어 여기 안 걸린다. 검색에 뜨면 옛 값으로 계산되니 뺀다.
   const kr = priceDate ? all.filter((s) => s.priceDate === priceDate) : all;
-  const us = await loadUs();
+  const [us, etf] = await Promise.all([loadUs(), loadEtf()]);
   // 환율이 없으면 미국 종목을 원화로 못 옮긴다 — 그날은 미국을 통째로 뺀다(반쪽 계산보다 낫다).
   const usStocks = us.fx ? us.stocks : [];
+  const etfs = etf.filter((s) => s.currency === "KRW" || us.fx);
   return {
-    stocks: [...kr, ...usStocks],
+    stocks: [...kr, ...usStocks, ...etfs],
     baskets: pickBaskets(kr),
     computedFor: loaded.computedFor,
     priceDate,

@@ -13,6 +13,10 @@ export type StockLite = {
   name: string;
   /** KOSPI · KOSDAQ · US */
   market: string | null;
+  /** 주식인가 ETF 인가. ETF 는 배지가 붙고, 분배금이 손으로 옮긴 값이라 기준일(asOf)을 적는다. */
+  kind: "stock" | "etf";
+  /** ETF 분배금을 운용사 공시에서 옮긴 날. 주식은 null. */
+  asOf: string | null;
   /** 금액 단위. 미국은 달러 — close·dps 가 전부 달러다. 화면이 usdkrw 로 원화를 같이 낸다. */
   currency: "KRW" | "USD";
   /** 검색에만 쓰는 영문명(미국). "coca" 로도 코카콜라가 걸리게. */

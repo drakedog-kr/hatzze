@@ -48,6 +48,8 @@ function toLite(s: DividendStock): StockLite {
     code: s.code,
     name: s.name,
     market: s.market,
+    kind: s.kind,
+    asOf: s.asOf,
     currency: s.currency,
     alias: s.alias,
     close: s.close,
@@ -73,16 +75,20 @@ export default async function DividendPage() {
   const data = await getDividendData();
   const stocks = data?.stocks ?? [];
   const popular = stocks
-    .filter((s) => (s.yieldPct ?? 0) >= 1.5 && !s.unusual && !s.name.includes("스팩"))
+    .filter((s) => s.kind === "stock" && (s.yieldPct ?? 0) >= 1.5 && !s.unusual && !s.name.includes("스팩"))
     .sort((a, b) => (b.marketCap ?? 0) - (a.marketCap ?? 0))
     .slice(0, POPULAR)
     .map((s) => s.code);
+  // ETF 칩 — 설정 파일 순서 그대로(파이어족이 많이 찾는 것부터 적어 뒀다). 미국 다섯 + 국내 셋.
+  const etfs = stocks.filter((s) => s.kind === "etf");
+  const popularEtf = [...etfs.filter((s) => s.currency === "USD").slice(0, 5), ...etfs.filter((s) => s.currency === "KRW").slice(0, 3)].map((s) => s.code);
 
   return (
     <DividendCalculator
       stocks={stocks.map(toLite)}
       baskets={data?.baskets ?? []}
       popular={popular}
+      popularEtf={popularEtf}
       computedFor={data?.computedFor ?? null}
       priceDate={data?.priceDate ?? null}
       usPriceDate={data?.usPriceDate ?? null}

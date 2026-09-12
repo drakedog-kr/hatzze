@@ -125,6 +125,17 @@ const STREAK_CAP = 15;
 const streakLabel = (y: number) => (y >= STREAK_CAP ? `${STREAK_CAP}년 넘게` : `${y}년째`);
 /** 코스피는 안 붙인다(대부분이라 붙이면 배경이 된다). 미국은 이름만으로 국내와 구별이 안 된다. */
 const marketBadge = (m: string | null) => (m === "KOSDAQ" ? "코스닥" : m === "US" ? "미국" : null);
+/** 줄에 붙는 배지들 — ETF 면 'ETF', 그 뒤에 시장. 국내 ETF 는 'ETF' 하나만 선다. */
+function Badges({ s }: { s: StockLite }) {
+  const items = [s.kind === "etf" ? "ETF" : null, marketBadge(s.market)].filter((x): x is string => !!x);
+  return (
+    <>
+      {items.map((b) => (
+        <span key={b} className="dv-badge">{b}</span>
+      ))}
+    </>
+  );
+}
 
 /* ── 검색 ─────────────────────────────────────────────────────────── */
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
@@ -208,6 +219,7 @@ export function DividendCalculator({
   stocks,
   baskets,
   popular,
+  popularEtf,
   computedFor,
   priceDate,
   usPriceDate,
@@ -216,6 +228,7 @@ export function DividendCalculator({
   stocks: StockLite[];
   baskets: BasketLite[];
   popular: string[];
+  popularEtf: string[];
   computedFor: string | null;
   priceDate: string | null;
   usPriceDate: string | null;
@@ -247,7 +260,8 @@ export function DividendCalculator({
   const invest = lines.reduce((s, l) => s + (l.investKrw ?? 0), 0);
   const priced = lines.filter((l) => l.investKrw != null);
   const yieldPct = invest > 0 ? (priced.reduce((s, l) => s + l.grossKrw, 0) / invest) * 100 : null;
-  const usCount = lines.filter((l) => l.stock.currency === "USD").length;
+  // 달력에 못 드는 줄 — 지급 달을 모르는 것(미국 주식, 국내 ETF). 배당이 있는 줄만 센다.
+  const noCalCount = lines.filter((l) => l.stock.dps > 0 && !l.stock.pays.length).length;
   // 달력은 지급 달을 아는 종목(국내)만. 미국은 공시에 지급일이 없다.
   const monthly = useMemo(() => {
     const m = new Array<number>(13).fill(0);
@@ -314,6 +328,7 @@ export function DividendCalculator({
     priceDate ? `국내는 전일 종가(${priceDate})` : null,
     usdkrw && usPriceDate ? `미국은 ${usPriceDate} 시세와 환율 ${Math.round(usdkrw.rate).toLocaleString("ko-KR")}원(FRED${usdkrw.date ? ` ${usdkrw.date}` : ""})` : null,
     computedFor ? `배당은 ${computedFor}에 정리한 최근 12개월 기록` : null,
+    "ETF 분배금은 운용사 공시를 옮긴 값(줄에 날짜가 있습니다)",
   ]
     .filter(Boolean)
     .join(" · ");
@@ -363,11 +378,12 @@ export function DividendCalculator({
 
         <div className="dv-body">
           <SearchBox stocks={stocks} onPick={(code) => add(code, "search")} />
-          <QuickChips codes={popular} byCode={byCode} holdings={holdings} onPick={(code) => add(code, "chip")} />
+          <QuickChips label="배당 주는 큰 회사" codes={popular} byCode={byCode} holdings={holdings} onPick={(code) => add(code, "chip")} />
+          <QuickChips label="많이 찾는 ETF" codes={popularEtf} byCode={byCode} holdings={holdings} onPick={(code) => add(code, "chip_etf")} />
           {lines.length > 0 && (
             <HoldingsTable lines={lines} inputs={inputs} onShares={setShares} onRemove={remove} />
           )}
-          {lines.length > 0 && <MonthCalendar monthly={monthly} afterTax={afterTax} usCount={usCount} />}
+          {lines.length > 0 && <MonthCalendar monthly={monthly} afterTax={afterTax} noCalCount={noCalCount} />}
         </div>
 
         <div className="hz-sheet-foot">
@@ -478,7 +494,7 @@ function SearchBox({ stocks, onPick }: { stocks: StockLite[]; onPick: (code: str
                   <button type="button" className="hz-row-link hz-pick dv-search-row" onClick={() => pick(s.code)}>
                     <StockLogo code={s.code} name={s.name} market={s.market} />
                     <span className="dv-search-name">{s.name}</span>
-                    {marketBadge(s.market) && <span className="dv-badge">{marketBadge(s.market)}</span>}
+                    <Badges s={s} />
                     <span className="dv-search-meta">
                       {s.dps > 0 ? `1주에 ${money(s.dps, s)}${s.yieldPct != null ? ` · ${pct(s.yieldPct)}` : ""}` : s.currency === "USD" ? "공시에서 배당을 못 읽음" : "최근 1년 배당 없음"}
                     </span>
@@ -487,7 +503,7 @@ function SearchBox({ stocks, onPick }: { stocks: StockLite[]; onPick: (code: str
               ))}
             </ul>
           ) : (
-            <p className="dv-search-none">찾는 종목이 없습니다. 코스피·코스닥 주식과 미국 주식 300여 개가 담깁니다(ETF는 아직 없습니다).</p>
+            <p className="dv-search-none">찾는 종목이 없습니다. 코스피·코스닥 주식, 미국 주식 300여 개, 자주 찾는 ETF 15개가 담깁니다.</p>
           )}
         </div>
       )}
@@ -497,11 +513,13 @@ function SearchBox({ stocks, onPick }: { stocks: StockLite[]; onPick: (code: str
 
 /* ── 앞에 세워 둔 칩 ─────────────────────────────────────────────── */
 function QuickChips({
+  label,
   codes,
   byCode,
   holdings,
   onPick,
 }: {
+  label: string;
   codes: string[];
   byCode: Map<string, StockLite>;
   holdings: Holding[];
@@ -512,7 +530,7 @@ function QuickChips({
   if (!items.length) return null;
   return (
     <div className="dv-chips">
-      <span className="dv-chips-label">배당 주는 큰 회사</span>
+      <span className="dv-chips-label">{label}</span>
       {items.map((s) => (
         <button
           key={s.code}
@@ -581,10 +599,16 @@ function HoldingRow({
   // 미국은 "없다"고 못 말한다 — 허쉬·디지털리얼티처럼 1주당 배당 태그를 안 다는 회사가 있다.
   if (s.dps === 0) notes.push(s.currency === "USD" ? "미국 공시에서 배당을 못 읽었습니다(안 주는 회사일 수도, 공시에 칸이 없을 수도 있습니다)" : "최근 1년 현금배당이 없습니다");
   if (s.unusual) notes.push("평소보다 큰 배당(특별·청산)이 섞여 있어 1년 뒤에도 같으리라 보기 어렵습니다");
-  if (s.estimated) notes.push("공시에 연간 값이 없어 마지막 배당으로 어림한 추정값입니다");
+  if (s.kind === "etf") {
+    // 분배금은 운용사 공시를 손으로 옮긴 값이라 날짜가 붙는다. 국내 ETF 는 연도 합계뿐이라 달력에 못 든다.
+    notes.push(`분배금은 운용사 공시를 ${s.asOf ?? "최근"}에 옮긴 값입니다${s.estimated ? " · 올해 지급분을 열두 달로 늘린 추정값" : ""}`);
+    if (!s.pays.length) notes.push("달마다 얼마인지는 공시에 없어 아래 달력에는 빠집니다");
+  } else if (s.estimated) {
+    notes.push("공시에 연간 값이 없어 마지막 배당으로 어림한 추정값입니다");
+  }
   if (s.close == null) notes.push("종가가 없어 투자금과 수익률을 못 냅니다");
   if (s.nextRecord) notes.push(`다음 배당기준일 ${s.nextRecord}`);
-  if (s.currency === "USD" && s.dps > 0) notes.push("미국 공시에는 지급 달이 없어 아래 달력에는 빠집니다");
+  if (s.kind === "stock" && s.currency === "USD" && s.dps > 0) notes.push("미국 공시에는 지급 달이 없어 아래 달력에는 빠집니다");
 
   const step = (d: number) => onShares(s.code, Math.max(0, shares + d));
   return (
@@ -594,7 +618,7 @@ function HoldingRow({
         <span className="dv-tname-txt">
           <span className="dv-tname-main">
             {s.name}
-            {marketBadge(s.market) && <span className="dv-badge">{marketBadge(s.market)}</span>}
+            <Badges s={s} />
           </span>
           {notes.length > 0 && <span className="dv-tnote">{notes.join(" · ")}</span>}
         </span>
@@ -640,7 +664,7 @@ function HoldingRow({
 }
 
 /* ── 달마다 얼마 ─────────────────────────────────────────────────── */
-function MonthCalendar({ monthly, afterTax, usCount }: { monthly: number[]; afterTax: boolean; usCount: number }) {
+function MonthCalendar({ monthly, afterTax, noCalCount }: { monthly: number[]; afterTax: boolean; noCalCount: number }) {
   const max = Math.max(...MONTHS.map((m) => monthly[m]));
   const paidMonths = MONTHS.filter((m) => monthly[m] > 0).length;
   return (
@@ -649,7 +673,7 @@ function MonthCalendar({ monthly, afterTax, usCount }: { monthly: number[]; afte
         <span className="dv-cal-title">달마다 얼마 들어오나</span>
         <span className="dv-cal-sub">
           {paidMonths ? `1년에 ${paidMonths}달 들어옵니다` : "지급 달을 아는 종목이 없습니다"} · 최근 12개월 지급일 기준{afterTax ? " · 세후" : " · 세전"}
-          {usCount > 0 && ` · 미국 ${usCount}종목은 지급 달을 몰라 뺐습니다`}
+          {noCalCount > 0 && ` · ${noCalCount}종목은 지급 달을 몰라 뺐습니다`}
         </span>
       </div>
       <div className="dv-cal-grid">
