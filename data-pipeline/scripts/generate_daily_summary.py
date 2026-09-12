@@ -26,13 +26,14 @@ from common.supabase_client import get_client  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 
-# Sonnet 5 — 이 호출은 구독(llm_client)으로 나가므로 등급을 올려도 청구가 안 는다.
-# 올린 까닭은 ② 갈림 문단이다. Haiku 는 초고온 개수와 상위 5개의 관계를 자주
-# 뭉갰고("감성이 2개로 시장의 3개와 함께 자리했습니다"), Sonnet 은 그 둘을 갈라 쓴다.
-# ⚠️ 분류 쪽(디시·뉴스 제목, 텔레그램 메시지)은 Haiku 그대로다 — 그 결과가 지표
-#    눈금으로 들어가는데 눈금이 지금 분류기에 맞춰 보정돼 있다(config/indicator_thresholds.py
-#    의 dcinside_post_count 주석: 분류기를 바꿨을 때 값의 스케일이 통째로 움직였다).
-MODEL = "claude-sonnet-5"
+# Haiku 4.5. 호출은 구독(llm_client)으로 나가지만 모델은 Haiku 를 유지한다.
+# 2026-09-12 에 Sonnet 5 를 같은 자료로 견줬다. ② 갈림 문단은 Sonnet 이 정확했지만(Haiku 는
+# 초고온 개수와 상위 5개의 관계를 뭉갠다), 발송 글·급부상 한 줄까지 세 곳을 놓고 본 판정은
+# "일단 전부 Haiku". Sonnet 은 규칙의 전언 예시를 모든 문장에 적용해 전언체가 되고, 규칙을 풀면
+# 그 규칙이 막던 시세 표현이 샌다. Sonnet 으로 가려면 프롬프트를 Sonnet 기준으로 다시 쓰고
+# 변형마다 수십 회 재야 한다(이 파일 TREND_SYSTEM 주석의 4변형×40회와 같은 규모).
+# ⚠️ 분류 쪽(디시·뉴스 제목, 텔레그램 메시지)은 눈금이 분류기에 맞춰 보정돼 있어 어차피 Haiku 다.
+MODEL = "claude-haiku-4-5"
 
 # 초고온 진입선 = 진행률 ≥ 75. calculate_score.py의 HOT_ZONE과 동일하게 맞춘다.
 # 이 지점이 곧 카드에 "기준선"으로 적히는 값이라, 화면·요약·배지가 한 지점을 가리킨다.
