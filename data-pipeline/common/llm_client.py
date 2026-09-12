@@ -39,10 +39,12 @@
 
 from __future__ import annotations
 
+import atexit
 import json
 import os
 import shutil
 import subprocess
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -138,15 +140,18 @@ def _run_cli(
     except subprocess.TimeoutExpired as exc:
         raise SubscriptionUnavailable(f"{_TIMEOUT_SEC}초 초과") from exc
 
-    if proc.returncode != 0:
-        raise SubscriptionUnavailable(
-            f"종료 코드 {proc.returncode}: {(proc.stderr or '').strip()[:200]}"
-        )
-
     try:
-        out = json.loads(proc.stdout)
-    except json.JSONDecodeError as exc:
-        raise SubscriptionUnavailable(f"JSON 아님: {proc.stdout[:200]}") from exc
+        out = json.loads(proc.stdout) if proc.stdout.strip() else {}
+    except json.JSONDecodeError:
+        out = {}
+
+    if proc.returncode != 0:
+        # 한도 초과·인증 만료 같은 실패는 stderr 가 비고 stdout 의 JSON `result` 에 이유가 온다.
+        # 그걸 버리면 "종료 코드 1" 만 남아 폴백이 왜 났는지 알 수 없다(2026-09-12 실제로 그랬다).
+        why = str(out.get("result") or (proc.stderr or "").strip() or proc.stdout.strip())[:200]
+        raise SubscriptionUnavailable(f"종료 코드 {proc.returncode}: {why}")
+    if not out:
+        raise SubscriptionUnavailable(f"JSON 아님: {proc.stdout[:200]}")
 
     # ⚠️ `subtype` 만 보면 안 된다 — 로그인이 안 된 실행도 success 로 온다.
     if out.get("is_error"):
@@ -179,6 +184,9 @@ def _run_cli(
 class _Messages:
     def __init__(self, owner: "SubscriptionClient") -> None:
         self._owner = owner
+        # 배치 API 는 구독에 없다. 호출부가 `client.messages.batches.*` 를 쓰면 그대로 API 로 간다
+        # (analyze_telegram_messages 의 지난 배치 수거가 이걸 쓴다).
+        self.batches = owner.api.messages.batches
 
     def create(self, **kw: Any) -> Any:
         owner = self._owner
@@ -194,7 +202,7 @@ class _Messages:
             except SubscriptionUnavailable as exc:
                 owner.note_failure(str(exc))
             else:
-                owner.note_success(time.time() - t0)
+                owner.note_success(time.time() - t0, resp.usage)
                 return resp
         return owner.api.messages.create(**kw)
 
@@ -208,31 +216,58 @@ class SubscriptionClient:
         self.enabled = True
         self.calls_subscription = 0
         self.calls_fallback = 0
+        self.input_tokens = 0        # 캐시 안 탄 입력
+        self.cache_read_tokens = 0   # 캐시에서 읽은 입력(한도에 덜 잡힌다)
+        self.cache_write_tokens = 0
+        self.output_tokens = 0
+        self.seconds = 0.0
         self._consecutive = 0
+        # 분류처럼 스레드 여럿이 동시에 부르는 호출부가 있다(analyze_telegram_messages).
+        self._lock = threading.Lock()
 
-    def note_success(self, elapsed: float) -> None:
-        self.calls_subscription += 1
-        self._consecutive = 0
+    def note_success(self, elapsed: float, usage: _Usage) -> None:
+        with self._lock:
+            self.calls_subscription += 1
+            self.input_tokens += usage.input_tokens
+            self.cache_read_tokens += usage.cache_read_input_tokens
+            self.cache_write_tokens += usage.cache_creation_input_tokens
+            self.output_tokens += usage.output_tokens
+            self.seconds += elapsed
+            self._consecutive = 0
 
     def note_failure(self, why: str) -> None:
-        self.calls_fallback += 1
-        self._consecutive += 1
-        print(f"[LLM] 구독 실패 → API 로 재시도: {why}")
-        if self._consecutive >= _MAX_CONSECUTIVE_FAILURES:
-            self.enabled = False
-            print(
-                f"[LLM] 구독 경로를 이 실행에서 끕니다 "
-                f"({_MAX_CONSECUTIVE_FAILURES}회 연속 실패) — 남은 호출은 API 로 갑니다."
-            )
+        with self._lock:
+            self.calls_fallback += 1
+            self._consecutive += 1
+            print(f"[LLM] 구독 실패 → API 로 재시도: {why}")
+            if self.enabled and self._consecutive >= _MAX_CONSECUTIVE_FAILURES:
+                self.enabled = False
+                print(
+                    f"[LLM] 구독 경로를 이 실행에서 끕니다 "
+                    f"({_MAX_CONSECUTIVE_FAILURES}회 연속 실패) — 남은 호출은 API 로 갑니다."
+                )
 
     def report(self) -> None:
+        """실행 끝에 한 줄. `/usage` 와 대조하는 근거가 이 줄이다."""
         total = self.calls_subscription + self.calls_fallback
         if not total:
             return
         print(
-            f"[LLM] 호출 {total}건 · 구독 {self.calls_subscription} · "
-            f"API 폴백 {self.calls_fallback}"
+            f"[LLM] 호출 {total}건 · 구독 {self.calls_subscription} · API 폴백 {self.calls_fallback} · "
+            f"구독 토큰 입력 {self.input_tokens:,} (캐시 읽기 {self.cache_read_tokens:,} · 쓰기 {self.cache_write_tokens:,}) "
+            f"출력 {self.output_tokens:,} · 구독 소요 {self.seconds:.0f}초"
         )
+
+
+def report(client: Any) -> None:
+    """호출부 끝에서 부른다. 평범한 Anthropic 클라이언트면 아무것도 안 찍는다."""
+    if isinstance(client, SubscriptionClient):
+        client.report()
+
+
+def uses_subscription(client: Any) -> bool:
+    """지금 이 클라이언트가 구독 경로를 켠 상태인가. 배치 API 를 쓸지 동기로 갈지 가르는 데 쓴다."""
+    return isinstance(client, SubscriptionClient) and client.enabled
 
 
 def _system_text(system: Any) -> str | None:
@@ -296,4 +331,8 @@ def get_llm_client(api_key: str | None) -> Any:
         print("[LLM] claude CLI 가 없어 API 로만 돕니다.")
         return api
     print("[LLM] 구독(claude -p) 우선 · 실패 시 API 폴백")
-    return SubscriptionClient(api)
+    client = SubscriptionClient(api)
+    # 호출부마다 끝에서 report() 를 부르게 하면 return 갈래마다 빠뜨린다. 프로세스가 끝날 때
+    # 한 번 찍는 게 확실하다(2026-09-12 첫 실행에서 요약 줄이 안 찍혀 폴백 여부를 못 셌다).
+    atexit.register(client.report)
+    return client

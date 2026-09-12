@@ -66,7 +66,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from anthropic import Anthropic  # noqa: E402
+from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 
 from common.broadcast_content import weekly_top_stocks  # noqa: E402
 from common.channel_breadth import channel_breadth_map  # noqa: E402
@@ -1593,8 +1593,8 @@ def build_stock_digests(
 def main() -> None:
     dry_run = "--dry-run" in sys.argv[1:]
 
-    if not ANTHROPIC_API_KEY and not dry_run:
-        print("[skip] ANTHROPIC_API_KEY가 없어 문장 생성을 건너뜁니다.")
+    if not HAS_LLM_CREDENTIAL and not dry_run:
+        print("[skip] LLM 자격(구독 토큰·API 키)이 없어 문장 생성을 건너뜁니다.")
         return
 
     db = get_client()
@@ -1640,7 +1640,7 @@ def main() -> None:
         print("[dry-run] LLM 호출·저장 없이 종료합니다.")
         return
 
-    client = Anthropic(api_key=ANTHROPIC_API_KEY)
+    client = get_llm_client(ANTHROPIC_API_KEY)
 
     def ask(system: str, digest: str, max_tokens: int = 400) -> str:
         resp = client.messages.create(

@@ -51,9 +51,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from concurrent.futures import ThreadPoolExecutor  # noqa: E402
+
 from anthropic import Anthropic  # noqa: E402
 
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
+from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client, uses_subscription  # noqa: E402
 from common.supabase_client import get_client, has_column, load_keyset  # noqa: E402
 
 # Haiku 4.5 — 분류는 대량 호출이라 속도/비용이 중요하고, 3지선다 + 명사 추출 난이도엔
@@ -66,6 +69,10 @@ MODEL = "claude-haiku-4-5"
 # = 1,095 토큰)가 분산되지만, 너무 크면 모델이 뒤쪽 항목을 성의 없이 처리하고 한 요청
 # 실패의 손실도 커진다. 40까지 올리면 13% 더 싸지는데, 뒤쪽 품질 검증 전이라 15로 둔다.
 BATCH_SIZE = 15
+# 구독 경로(동기 호출)의 동시 실행 수. 배치 API 는 구독에 없어서 요청을 하나씩 보내는데,
+# 순차면 아침 157요청 × 12초 = 32분이 얹힌다. 2026-09-12 실측(내 맥·API 키): 동시 8 은
+# 벽시계 13.4초에 여덟 개가 끝나 거의 선형이었다. 러너(2 vCPU)에서는 다시 재야 한다.
+SYNC_WORKERS = 8
 
 # 본문에서 모델에 넘길 최대 글자수.
 TEXT_CAP = 600
@@ -549,19 +556,66 @@ def submit_batch(client: Anthropic, db, reps: list[dict]) -> str | None:
     return batch.id
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 동기 분류 — 구독 경로일 때. 배치 API 가 구독에 없어서 요청을 지금 보내고 지금 받는다.
+# 수거 단계가 사라지므로 분류 결과가 그 실행 안에서 바로 붙는다(전엔 다음 실행에서야 붙었다).
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _classify_group(client, group: list[dict]) -> tuple[list[dict], int]:
+    """묶음 하나를 분류해 (결과 목록, 실패 여부) 를 돌려준다. 실패는 묶음 단위로 1 이다."""
+    try:
+        res = client.messages.create(
+            model=MODEL,
+            max_tokens=2000,
+            system=SYSTEM,
+            messages=[{"role": "user", "content": build_prompt(group)}],
+            output_config={"format": {"type": "json_schema", "schema": SCHEMA}},
+        )
+        text = "".join(b.text for b in res.content if b.type == "text")
+        parsed = json.loads(text)
+    except Exception as exc:  # noqa: BLE001 — 한 묶음의 실패가 나머지를 데려가면 안 된다
+        print(f"[동기] 묶음 실패: {type(exc).__name__}: {str(exc)[:120]}")
+        return [], 1
+    return parsed.get("results", []), 0
+
+
+def classify_sync(client, db, reps: list[dict], hash_of: dict[tuple[str, int], str]) -> int:
+    groups = [reps[i : i + BATCH_SIZE] for i in range(0, len(reps), BATCH_SIZE)]
+    print(f"[동기] 요청 {len(groups)}개 · 동시 {SYNC_WORKERS}")
+    rows: list[dict] = []
+    failed = 0
+    with ThreadPoolExecutor(max_workers=SYNC_WORKERS) as ex:
+        for group, (results, bad) in zip(groups, ex.map(lambda g: _classify_group(client, g), groups)):
+            failed += bad
+            for r in results:
+                i = int(r.get("n", 0)) - 1
+                if not (0 <= i < len(group)):
+                    continue  # 모델이 없는 번호를 냈다
+                m = group[i]
+                handle, mid = m["channel_handle"], int(m["message_id"])
+                rows.append(analysis_row(handle, mid, r, hash_of.get((handle, mid))))
+    if rows:
+        save_rows(db, rows)
+        print_tone(rows, "동기 분류 →")
+    if failed:
+        print(f"[동기] 실패한 묶음 {failed}개 — 그 메시지는 다음 실행에서 다시 후보가 된다.")
+    return len(rows)
+
+
 def main() -> None:
     args = sys.argv[1:]
     dry_run = "--dry-run" in args
     collect_only = "--collect-only" in args
     limit = int(args[args.index("--limit") + 1]) if "--limit" in args else None
 
-    if not ANTHROPIC_API_KEY and not dry_run:
-        # 키가 없으면 조용히 건너뛴다(설정 전 로컬/CI에서도 파이프라인이 안 깨지게).
-        print("[skip] ANTHROPIC_API_KEY가 없어 메시지 분류를 건너뜁니다.")
+    if not HAS_LLM_CREDENTIAL and not dry_run:
+        # 자격이 없으면 조용히 건너뛴다(설정 전 로컬/CI에서도 파이프라인이 안 깨지게).
+        print("[skip] LLM 자격(구독 토큰·API 키)이 없어 메시지 분류를 건너뜁니다.")
         return
 
     db = get_client()
-    client = Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
+    client = get_llm_client(ANTHROPIC_API_KEY) if HAS_LLM_CREDENTIAL else None
     global HAS_HASH_COLUMN
     HAS_HASH_COLUMN = has_column(db, "telegram_message_analysis", "text_hash")
     if not HAS_HASH_COLUMN:
@@ -623,6 +677,13 @@ def main() -> None:
         # 앞의 수거에서 안 끝난 배치가 남아 있으면 그 메시지는 후보에서 빠져 있다.
         print(f"[안내] 아직 처리 중인 배치 {len(inflight_rows)}개는 건너뛰었습니다.")
 
+    if uses_subscription(client):
+        # 구독 경로: 배치 API 가 없으니 지금 분류해 지금 저장한다. 구독이 도중에 꺼지면
+        # 남은 묶음은 래퍼가 API 로 넘긴다(동기, 배치 할인 없음).
+        classify_sync(client, db, reps, hash_of)
+        return
+
+    # API 키 경로: 예전 그대로 배치 API 에 제출하고 다음 실행에서 수거한다.
     submit_batch(client, db, reps)
     print(
         "[안내] 결과는 다음 실행(또는 --collect-only 호출)에서 수거됩니다. "
