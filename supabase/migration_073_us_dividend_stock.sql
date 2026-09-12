@@ -41,7 +41,7 @@ comment on table public.us_dividend_stock is
 comment on column public.us_dividend_stock.ttm_dps is
   '최근 12개월 1주당 배당(달러). 방법은 ttm_method 참고';
 comment on column public.us_dividend_stock.ttm_method is
-  'quarters(마지막 네 분기 합) · monthly(마지막 열두 달 합) · annualized(마지막 분기×4, 추정) · fy(마지막 회계연도 값) · none';
+  'quarters(마지막 네 분기 합) · monthly(마지막 열두 달 합) · annualized(마지막 분기×4, 추정) · events(날짜 하나짜리 행: 마지막 건 × 전년 건수, 추정) · fy(마지막 회계연도 값) · none(못 읽음 — 안 주는 회사일 수도, 태그가 없을 수도)';
 comment on column public.us_dividend_stock.ttm_yield_pct is
   'ttm_dps ÷ close × 100. close 는 핀허브 마지막 체결가(달러)';
 comment on column public.us_dividend_stock.annual is

@@ -480,7 +480,7 @@ function SearchBox({ stocks, onPick }: { stocks: StockLite[]; onPick: (code: str
                     <span className="dv-search-name">{s.name}</span>
                     {marketBadge(s.market) && <span className="dv-badge">{marketBadge(s.market)}</span>}
                     <span className="dv-search-meta">
-                      {s.dps > 0 ? `1주에 ${money(s.dps, s)}${s.yieldPct != null ? ` · ${pct(s.yieldPct)}` : ""}` : "최근 1년 배당 없음"}
+                      {s.dps > 0 ? `1주에 ${money(s.dps, s)}${s.yieldPct != null ? ` · ${pct(s.yieldPct)}` : ""}` : s.currency === "USD" ? "공시에서 배당을 못 읽음" : "최근 1년 배당 없음"}
                     </span>
                   </button>
                 </li>
@@ -578,9 +578,10 @@ function HoldingRow({
   const { stock: s, shares } = line;
 
   const notes: string[] = [];
-  if (s.dps === 0) notes.push("최근 1년 현금배당이 없습니다");
+  // 미국은 "없다"고 못 말한다 — 허쉬·디지털리얼티처럼 1주당 배당 태그를 안 다는 회사가 있다.
+  if (s.dps === 0) notes.push(s.currency === "USD" ? "미국 공시에서 배당을 못 읽었습니다(안 주는 회사일 수도, 공시에 칸이 없을 수도 있습니다)" : "최근 1년 현금배당이 없습니다");
   if (s.unusual) notes.push("평소보다 큰 배당(특별·청산)이 섞여 있어 1년 뒤에도 같으리라 보기 어렵습니다");
-  if (s.estimated) notes.push("마지막 분기 배당을 네 배 한 추정값입니다");
+  if (s.estimated) notes.push("공시에 연간 값이 없어 마지막 배당으로 어림한 추정값입니다");
   if (s.close == null) notes.push("종가가 없어 투자금과 수익률을 못 냅니다");
   if (s.nextRecord) notes.push(`다음 배당기준일 ${s.nextRecord}`);
   if (s.currency === "USD" && s.dps > 0) notes.push("미국 공시에는 지급 달이 없어 아래 달력에는 빠집니다");

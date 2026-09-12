@@ -26,11 +26,15 @@
   2. 기간 길이로 가른다 — 달(25~35일)·분기(80~100)·반기(170~190)·9개월(255~285)·연(350~380).
   3. 분기가 빈 자리는 누적 행의 차로 채운다(2분기 = 반기 − 1분기, 3분기 = 9개월 − 반기,
      4분기 = 연 − 9개월). 같은 회계연도 시작일을 가진 행끼리만 뺀다.
-  4. 최근 12개월 합(ttm):  월별 행이 있으면 **마지막 열두 달**의 합(`monthly`) →
-     아니면 **마지막 네 분기**의 합(`quarters`). 둘 다 마지막 행이 200일 안쪽일 때만 —
-     공시가 분기 뒤 한 달 반에 나오므로 '오늘 기준 365일 창'으로 자르면 늘 두세 달이 빈다 →
+  4. 최근 12개월 합(ttm):  **마지막 네 분기**의 합(`quarters`) → 분기가 모자라면 이어진
+     **마지막 열두 달**의 합(`monthly`, 리얼티인컴). 둘 다 마지막 행이 200일 안쪽일 때만 —
+     공시가 분기 뒤 한 달 반에 나오므로 '오늘 기준 365일 창'으로 자르면 늘 두세 달이 빈다.
+     ⚠️ 달 행이 먼저면 안 된다. 리온델바젤은 분기 배당을 지급한 달로 적어서 열두 개가 3년치다 →
      분기가 하나라도 있으면 마지막 분기 × 4(`annualized`, 화면이 '추정'이라 적는다) →
+     기간 없이 날짜 하나로 적은 행(디즈니)이면 마지막 건 × 그 전 해의 건수(`events`, 추정) →
      연 행뿐이면 그 값(`fy`, 400일 안쪽일 때만) → 없으면 0.
+  ⚠️ 허쉬·디지털리얼티처럼 1주당 배당 태그를 아예 안 다는 회사가 있다. 그건 0 으로 남고
+     화면은 "공시에서 배당을 못 읽었습니다"라 적는다 — "안 준다"와 다르다.
   5. 회계연도별 합(annual)은 연 행(10-K)에서. 6월 결산(P&G·마이크로소프트)·9월 결산(애플)은
      끝나는 해로 적는다.
 
@@ -70,7 +74,16 @@ SEC_UA = "hatzze.fun dividend page (hatzze@proton.me)"
 SEC_TICKERS = "https://www.sec.gov/files/company_tickers.json"
 SEC_FACTS = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik:010d}.json"
 SEC_PAUSE_SEC = 0.15
-TAGS = ("CommonStockDividendsPerShareDeclared", "CommonStockDividendsPerShareCashPaid")
+# 앞 둘이 보통 회사, 뒤 둘은 MLP(엔터프라이즈프로덕츠·에너지트랜스퍼·MPLX)의 '분배'. 단위는 넷 다 USD/shares.
+TAGS = (
+    "CommonStockDividendsPerShareDeclared",
+    "CommonStockDividendsPerShareCashPaid",
+    "DistributionMadeToLimitedPartnerDistributionsDeclaredPerUnit",
+    "DistributionMadeToLimitedPartnerDistributionsPaidPerUnit",
+)
+# 마지막 분기·달 행이 이만큼 안쪽이어야 '최근'으로 친다. 200일이었는데 씨티·콘에디슨처럼 10-Q 엔
+# 안 적고 10-K 에만 분기를 적는 회사가 다음 10-K 까지 빈다. 13개월이면 한 해를 건너뛰지 않는다.
+FRESH_DAYS = 400
 QUOTE = "https://finnhub.io/api/v1/quote?symbol={t}&token={k}"
 FINNHUB_BATCH = 55  # 분당 60회 한도. 여유를 둔다
 FINNHUB_WINDOW_SEC = 62
@@ -125,7 +138,8 @@ def pick_rows(facts: dict) -> list[dict]:
     gaap = (facts.get("facts") or {}).get("us-gaap") or {}
     per_tag: list[tuple[str, list[dict]]] = []
     for tag in TAGS:
-        rows = [r for r in ((gaap.get(tag) or {}).get("units") or {}).get("USD/shares", []) if r.get("start") and r.get("end")]
+        # start 가 없는 행(선언일 하나짜리, 디즈니)도 남긴다 — summarize 가 '건'으로 센다.
+        rows = [r for r in ((gaap.get(tag) or {}).get("units") or {}).get("USD/shares", []) if r.get("end")]
         if rows:
             per_tag.append((max(r["end"] for r in rows), rows))
     per_tag.sort(key=lambda x: (x[0], len(x[1])), reverse=True)
@@ -133,7 +147,7 @@ def pick_rows(facts: dict) -> list[dict]:
     for _, rows in per_tag:
         seen_here: dict[tuple[str, str], dict] = {}
         for r in rows:
-            key = (r["start"], r["end"])
+            key = (r.get("start") or "", r["end"])
             if key not in seen_here or (r.get("filed") or "") > (seen_here[key].get("filed") or ""):
                 seen_here[key] = r
         for key, r in seen_here.items():
@@ -143,10 +157,17 @@ def pick_rows(facts: dict) -> list[dict]:
 
 def summarize(rows: list[dict], today: date) -> dict:
     by_kind: dict[str, list[tuple[date, date, float]]] = defaultdict(list)
+    events: dict[date, float] = {}  # 기간 없이 날짜 하나로 적은 배당(디즈니). 분기·달 행이 없을 때만 쓴다
     for r in rows:
-        s, e = date.fromisoformat(r["start"]), date.fromisoformat(r["end"])
+        if r.get("val") is None:
+            continue
+        e = date.fromisoformat(r["end"])
+        if not r.get("start"):
+            events[e] = float(r["val"])
+            continue
+        s = date.fromisoformat(r["start"])
         k = kind_of((e - s).days)
-        if k and r.get("val") is not None:
+        if k:
             by_kind[k].append((s, e, float(r["val"])))
 
     # 분기 — 직접 행 + 누적 행의 차로 채운 것. 끝 날짜로 하나씩.
@@ -173,14 +194,24 @@ def summarize(rows: list[dict], today: date) -> dict:
     # ⚠️ '오늘 기준 365일 창'이 아니라 **마지막 열두 달·마지막 네 분기**다. 공시는 분기가 끝나고
     #    한 달 반 뒤에 나오므로 창으로 자르면 최근 두세 달이 늘 빈다 — 리얼티인컴이 10달 합
     #    2.70 으로 나왔었다(실제 연 3.24).
-    fresh = today - timedelta(days=200)
+    fresh = today - timedelta(days=FRESH_DAYS)
     ended = sorted((e, v) for e, v in quarters.items() if e <= today and v >= 0)
-    if len(months) >= 12 and months[-1][0] >= fresh:
-        ttm, method = sum(v for _, v in months[-12:]), "monthly"
-    elif len(ended) >= 4 and ended[-1][0] >= today - timedelta(days=200):
+    paid_events = sorted((e, v) for e, v in events.items() if e <= today and v > 0)
+    # ⚠️ 분기가 먼저다. '달' 길이 행은 월배당이 아닐 수 있다 — 리온델바젤은 **분기 배당을 지급한
+    #    달**로 적어서(6월·9월·12월·3월) 열두 개를 더하면 3년치가 됐다(17.77달러, 실제 4.12).
+    #    달 행은 분기가 모자랄 때만, 그것도 열두 달이 이어져 있을 때만(첫 달과 끝 달이 한 해 안) 쓴다.
+    if len(ended) >= 4 and ended[-1][0] >= fresh:
         ttm, method = sum(v for _, v in ended[-4:]), "quarters"
-    elif ended and ended[-1][0] >= today - timedelta(days=200):
+    elif len(months) >= 12 and months[-1][0] >= fresh and (months[-1][0] - months[-12][0]).days <= 380:
+        ttm, method = sum(v for _, v in months[-12:]), "monthly"
+    elif ended and ended[-1][0] >= fresh:
         ttm, method = ended[-1][1] * 4, "annualized"
+    elif paid_events and paid_events[-1][0] >= fresh:
+        # 날짜 하나짜리 행은 '그날 선언한 배당'이다. 공시가 늦어 지난 1년 안에 든 건이 모자라므로
+        # (디즈니는 반년마다 주는데 7월 건이 11월 10-K 에야 실린다) **마지막 건 × 그 전 해의 건수**로
+        # 어림한다. 화면은 이 방법을 '추정'이라 적는다.
+        per_year = sum(1 for e, _ in paid_events if today - timedelta(days=730) < e <= today - timedelta(days=365))
+        ttm, method = paid_events[-1][1] * max(1, per_year), "events"
     elif annual:
         last_end = max(e for _, e, _ in by_kind["year"])
         if last_end >= today - timedelta(days=400):
@@ -324,7 +355,7 @@ def main() -> None:
 
     priced = [r for r in paying if r.get("close")]
     print(f"[요약] 배당 있음 {len(paying)}종목 · 시세 받음 {len(priced)} · 방법: "
-          + " · ".join(f"{m} {sum(1 for r in rows if r['ttm_method'] == m)}" for m in ("quarters", "monthly", "annualized", "fy", "none")))
+          + " · ".join(f"{m} {sum(1 for r in rows if r['ttm_method'] == m)}" for m in ("quarters", "monthly", "annualized", "events", "fy", "none")))
     for r in sorted(priced, key=lambda r: -(r["ttm_yield_pct"] or 0))[:6]:
         print(f"  {r['name_ko']:12s} ${r['ttm_dps']:.2f}/yr · ${r['close']:.2f} · {r['ttm_yield_pct']:.2f}% · {r['ttm_method']} · 연속 {r['streak_years']}년 · 증가율 {r['growth_5y_pct']}%")
     for t in ("KO", "O", "XOM", "MSFT", "JNJ"):

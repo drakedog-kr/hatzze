@@ -172,7 +172,7 @@ function toUsStock(r: UsRow): DividendStock {
     count: 0,
     yieldPct: n(r.ttm_yield_pct),
     unusual: false,
-    estimated: r.ttm_method === "annualized",
+    estimated: r.ttm_method === "annualized" || r.ttm_method === "events",
     payMonths: [],
     payments: [],
     streak: r.streak_years ?? 0,
