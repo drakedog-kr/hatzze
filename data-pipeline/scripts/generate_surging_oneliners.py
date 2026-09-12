@@ -48,9 +48,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from anthropic import Anthropic  # noqa: E402
-
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
+from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 from common.prompt_style import PLAIN_PROSE_RULE_SHORT  # noqa: E402
 from common.supabase_client import get_client, load_all  # noqa: E402
 from common.surging import load_stock_daily, top_surging  # noqa: E402
@@ -60,7 +59,10 @@ from common.us_surging import top_us_surging  # noqa: E402
 import generate_telegram_narratives as KR  # noqa: E402
 import generate_us_telegram_narratives as US  # noqa: E402
 
-MODEL = KR.MODEL
+# 국장 총평(KR)에서 물려받지 않고 따로 적는다. 이 스크립트만 구독 경로로 옮겼고,
+# KR 쪽은 아직 API 키로 나가서 등급을 올리면 그대로 두 배 청구가 된다.
+# **모델 상향은 구독 경로로 옮긴 뒤에 한다.** 순서가 바뀌면 돈이 는다.
+MODEL = "claude-sonnet-5"
 CARDS = 6          # 화면이 그리는 급부상 카드 수(국장·미장 둘 다)
 LEN_MIN, LEN_MAX = 22, 30
 MAX_RETRIES = 1    # 한 번만 다시 쓴다. 못 맞추면 후보 중 목표에 가장 가까운 걸 쓴다
@@ -228,12 +230,12 @@ def main() -> None:
     dry_run = "--dry-run" in args
     kr_only, us_only = "--kr-only" in args, "--us-only" in args
 
-    if not ANTHROPIC_API_KEY and not dry_run:
-        print("[skip] ANTHROPIC_API_KEY가 없어 한 줄 요약을 건너뜁니다.")
+    if not HAS_LLM_CREDENTIAL and not dry_run:
+        print("[skip] LLM 자격(구독 토큰·API 키)이 없어 한 줄 요약을 건너뜁니다.")
         return
 
     db = get_client()
-    client = None if dry_run else Anthropic(api_key=ANTHROPIC_API_KEY)
+    client = None if dry_run else get_llm_client(ANTHROPIC_API_KEY)
 
     total = 0
     if not us_only:
