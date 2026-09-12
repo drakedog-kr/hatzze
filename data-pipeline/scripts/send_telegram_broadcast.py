@@ -68,13 +68,16 @@ import requests  # noqa: E402
 from common import broadcast_content as bc  # noqa: E402
 from common import broadcast_digest as bd  # noqa: E402
 from common.config import ANTHROPIC_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_BROADCAST_CHAT_ID  # noqa: E402
+from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 from common.retry import backoff_delay  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.surging import load_stock_daily, top_surging  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 
-# 해설 문단을 쓰는 모델. 히어로 요약·카더라 총평과 같은 걸 쓴다(generate_daily_summary).
-MODEL = "claude-haiku-4-5"
+# 해설 문단을 쓰는 모델. 호출이 구독(llm_client)으로 나가므로 등급을 올려도 청구가 안 는다.
+# 히어로 요약·급부상 한 줄과 같이 Sonnet 5 다. ⚠️ 카더라 총평(generate_telegram_narratives)은
+# 아직 API 키로 나가서 Haiku 그대로다 — 모델 상향은 구독 경로로 옮긴 뒤에 한다.
+MODEL = "claude-sonnet-5"
 
 SITE_URL = "https://hatzze.fun"
 
@@ -979,15 +982,13 @@ def main() -> None:
     # 해설 문단용 클라이언트. 키가 없으면 None 이고, compose 가 빈 문자열을 돌려줘
     # 해당 문단만 빠진다(common/broadcast_content.compose 주석 — fail-soft).
     llm = None
-    if ANTHROPIC_API_KEY:
-        from anthropic import Anthropic
-
-        llm = Anthropic(api_key=ANTHROPIC_API_KEY)
+    if HAS_LLM_CREDENTIAL:
+        llm = get_llm_client(ANTHROPIC_API_KEY)
     elif args.format in ("morning", "theme", "weekly"):
-        print("[안내] ANTHROPIC_API_KEY 가 없어 해설 문단 없이 만듭니다.")
+        print("[안내] LLM 자격(구독 토큰·API 키)이 없어 해설 문단 없이 만듭니다.")
     elif args.format in bd.FORMATS:
         # 2판은 갈래가 곧 글이라 LLM 없이는 만들 수 없다.
-        print("[중단] ANTHROPIC_API_KEY 가 없어 갈래 요약을 만들 수 없습니다.")
+        print("[중단] LLM 자격(구독 토큰·API 키)이 없어 갈래 요약을 만들 수 없습니다.")
         sys.exit(1)
 
     # 신선도 게이트는 daily_score 를 본다. 온도를 싣는 건 마감 리포트뿐이지만, 점수가
