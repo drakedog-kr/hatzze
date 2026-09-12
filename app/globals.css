@@ -5288,7 +5288,7 @@ main.hz-scroll { overflow-x: clip; }
 
 /* 세 갈래 판 — 국장 · 미장 · ETF 가 늘 나란히. 회색 타일 안에 제목·설명·칩. 좁으면 한 판씩. */
 .dv-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.dv-group { background: var(--tx-tile); border-radius: var(--tx-r-tile); padding: 12px 14px 12px; min-width: 0; }
+.dv-group { display: flex; flex-direction: column; background: var(--tx-tile); border-radius: var(--tx-r-tile); padding: 12px 14px 12px; min-width: 0; }
 /* 제목은 한 줄로 못박고 설명은 그 아래 — 나란히 두면 설명이 길 때 제목이 "국/장"으로 꺾였다. */
 .dv-group-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
 .dv-group-title { font-size: 13.5px; font-weight: 800; color: var(--c-ink); letter-spacing: -0.01em; white-space: nowrap; }
@@ -5342,48 +5342,23 @@ main.hz-scroll { overflow-x: clip; }
 .dv-chip:active { cursor: grabbing; }
 .dv-chip-yield { color: var(--c-sub); }
 
-/* 전체 보기 — 칩 아래 글자 버튼 하나. 열면 거르기 칸·정렬·목록(마흔 줄씩)이 같은 판 안에 선다. */
-.dv-browse { margin-top: 10px; }
-.dv-browse-toggle {
-  padding: 0; border: none; background: none; color: var(--c-blue); font-size: 12px; font-weight: 600;
-  cursor: pointer; font-family: inherit; white-space: nowrap;
+/* 더 보기 — 칩 아래 글자 버튼 하나. 열면 그 판의 묶음들이 세 판 아래 한 줄 전체 폭으로 펼쳐진다. */
+.dv-more-toggle {
+  align-self: flex-start; margin-top: 10px; padding: 0; border: none; background: none; color: var(--c-blue);
+  font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap;
 }
-.dv-browse-toggle:hover { text-decoration: underline; }
-.dv-browse-tools { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
-.dv-browse-filter {
-  height: 34px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--c-line); background: var(--c-card);
-  color: var(--c-ink); font-size: 13px; font-family: inherit; outline: none; min-width: 0;
-}
-.dv-browse-filter:focus { border-color: var(--c-blue); box-shadow: 0 0 0 3px var(--c-blue-tint); }
-.dv-browse-sort { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-.dv-browse-sort-btn {
-  padding: 4px 8px; border-radius: 6px; border: 1px solid var(--c-line); background: var(--c-card); color: var(--c-label);
-  font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap;
-}
-.dv-browse-sort-btn[aria-pressed="true"] { background: var(--c-cold-ink); border-color: var(--c-cold-ink); color: var(--c-card); }
-.dv-browse-close { margin-left: auto; }
-.dv-browse-list {
-  list-style: none; margin: 0; padding: 4px; max-height: 360px; overflow-y: auto;
-  background: var(--c-card); border: 1px solid var(--c-line); border-radius: 10px;
-}
-.dv-browse-row {
-  display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; border: none; border-radius: 7px;
-  cursor: pointer; color: var(--c-ink); font-size: 13px; text-align: left; font-family: inherit;
-}
-/* .hz-row-link.hz-pick 의 세로 음수 마진(-7px)은 검색 팝업의 간격에 맞춘 값이라 여기선 줄이 겹친다. */
-.hz-row-link.hz-pick.dv-browse-row { margin: 0; }
-.dv-browse-row:disabled { cursor: default; opacity: 0.5; }
-.dv-browse-row:disabled:hover { background: transparent; }
-/* 이름은 두 줄까지 — 판이 좁아 긴 ETF 이름을 한 줄로 자르면 "TIGER 미국배당다…"가 넷씩 나란히 서서 못 가른다. */
-.dv-browse-name {
-  font-weight: 600; min-width: 0; font-size: 12.5px; line-height: 1.3; overflow: hidden;
-  /* keep-all 이면 "TIGER" 한 단어가 첫 줄을 차지하고 긴 한글 덩어리가 둘째 줄에서 잘린다 — 글자 단위로 흐르게 둔다. */
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: normal; overflow-wrap: anywhere;
-}
-.dv-browse-meta { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--c-sub); white-space: nowrap; }
-.dv-browse-none { margin: 0; padding: 10px 2px; font-size: 12px; line-height: 1.5; color: var(--c-muted); }
-.dv-browse-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
-.dv-browse-count { font-size: 11.5px; color: var(--c-muted); }
+.dv-more-toggle:hover { text-decoration: underline; }
+.dv-more { grid-column: 1 / -1; background: var(--tx-tile); border-radius: var(--tx-r-tile); padding: 12px 14px; min-width: 0; }
+.dv-more-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.dv-more-head .dv-more-toggle { margin-top: 0; }
+.dv-more-title { font-size: 13.5px; font-weight: 800; color: var(--c-ink); letter-spacing: -0.01em; }
+/* 한 줄 = 라벨 + 칩. 라벨 폭을 못박아 칩이 줄마다 같은 자리에서 시작한다. */
+.dv-more-row { display: flex; align-items: flex-start; gap: 12px; padding: 8px 0; border-top: 1px solid var(--c-sheet-row); }
+.dv-more-label { flex: 0 0 96px; padding-top: 6px; font-size: 12px; font-weight: 700; color: var(--c-sub); word-break: keep-all; }
+.dv-more-row .dv-chips { min-width: 0; }
+/* 전체 폭이라 칩 이름을 판 안(180px)보다 길게 둔다 — "TIGER 미국배당다우존스타겟데일리커버드콜"이 다 보인다. */
+.dv-more .dv-chip-name { max-width: 280px; }
+.dv-more-foot { margin: 8px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--c-muted); word-break: keep-all; }
 
 /* 담은 종목 표. 열: 종목 · 주수 · 1주에 1년 · 1년에 받는 배당 · 수익률 · 빼기 */
 .dv-table { display: flex; flex-direction: column; }
@@ -5488,6 +5463,18 @@ main.hz-scroll { overflow-x: clip; }
 }
 @media (max-width: 980px) {
   .dv-groups { grid-template-columns: 1fr; }
+  /* 한 열이면 '더 보기' 묶음이 세 판 아래가 아니라 **그 판 바로 아래**에 붙어야 한다 — order 로 끼운다. */
+  .dv-group[data-scope="kr"] { order: 0; }
+  .dv-more[data-scope="kr"] { order: 1; }
+  .dv-group[data-scope="us"] { order: 2; }
+  .dv-more[data-scope="us"] { order: 3; }
+  .dv-group[data-scope="etf"] { order: 4; }
+  .dv-more[data-scope="etf"] { order: 5; }
+}
+@media (max-width: 560px) {
+  /* 라벨을 칩 위로 — 96px 라벨 옆에 칩을 두면 한 줄에 칩 하나가 남는다. */
+  .dv-more-row { flex-direction: column; gap: 6px; }
+  .dv-more-label { flex: none; padding-top: 0; }
 }
 @media (max-width: 720px) {
   /* 한 줄에 여섯 칸을 세우면 종목 이름에 30px 이 남는다(375 실측: "KB금융"이 "K"). 두 줄로

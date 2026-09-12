@@ -7,7 +7,7 @@ import { C, Icon } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
 import { SectionIntro } from "../SectionIntro";
 import { StockLogo } from "../StockLogo";
-import type { BasketLite, BrowseLists, StockLite } from "./types";
+import type { BasketLite, MoreLists, StockLite } from "./types";
 
 /**
  * 배당으로 살기(/dividend) 본체. 서버가 내려준 종목 목록(StockLite)만 갖고 브라우저에서 전부 계산한다.
@@ -234,7 +234,7 @@ export function DividendCalculator({
   popular,
   popularUs,
   popularEtf,
-  browse,
+  more,
   computedFor,
   priceDate,
   usPriceDate,
@@ -245,7 +245,7 @@ export function DividendCalculator({
   popular: string[];
   popularUs: string[];
   popularEtf: string[];
-  browse: BrowseLists;
+  more: MoreLists;
   computedFor: string | null;
   priceDate: string | null;
   usPriceDate: string | null;
@@ -257,6 +257,12 @@ export function DividendCalculator({
   const [afterTax, setAfterTax] = useState(true);
   const [amount, setAmount] = useState(AMOUNT_DEFAULT);
   const chipsBy: Record<Scope, string[]> = { kr: popular, us: popularUs, etf: popularEtf };
+  // '더 보기'는 한 판만 열린다 — 세 판이 다 펼쳐지면 칩이 백 개다.
+  const [moreOpen, setMoreOpen] = useState<Scope | null>(null);
+  const toggleMore = (k: Scope) => {
+    setMoreOpen((cur) => (cur === k ? null : k));
+    if (moreOpen !== k) track("dividend_more", { scope: k });
+  };
   // 주수 칸들. 방금 담은 종목의 칸에 포커스를 주고 값을 통째로 선택해 둔다 — 치면 덮인다.
   // ref 가 아니라 state 에 든 Map 이다 — 렌더 중에 ref.current 를 읽으면 eslint(react-hooks/refs)에
   // 걸리고, Map 자체는 한 번 만들어 그대로 쓰므로 state 로 들고 있어도 다시 그릴 일이 없다.
@@ -398,18 +404,35 @@ export function DividendCalculator({
 
         <div className="dv-body">
           <SearchBox stocks={stocks} onPick={(code) => add(code, "search")} />
-          {/* 세 갈래가 늘 나란히 선다. 판마다 제목·설명·칩. 좁으면 한 판씩 쌓인다. */}
+          {/* 세 갈래가 늘 나란히 선다. 판마다 제목·설명·칩 여덟·'더 보기'. 좁으면 한 판씩 쌓인다.
+              '더 보기'를 열면 그 판의 묶음들이 세 판 **아래에 가로로** 펼쳐진다(좁은 판 안에 여덟씩 네 줄을
+              넣으면 열 줄 넘게 늘어난다). 폰에서는 CSS order 로 그 판 바로 아래에 붙는다. */}
           <div className="dv-groups">
             {SCOPES.map((o) => (
-              <section key={o.key} className="dv-group" aria-label={o.label}>
+              <section key={o.key} className="dv-group" data-scope={o.key} aria-label={o.label}>
                 <div className="dv-group-head">
                   <span className="dv-group-title">{o.label}</span>
                   <span className="dv-group-desc">{o.desc}</span>
                 </div>
                 <QuickChips codes={chipsBy[o.key]} byCode={byCode} holdings={holdings} onPick={(code) => add(code, `chip_${o.key}`)} />
-                <BrowseList scope={o.key} codes={browse[o.key]} byCode={byCode} holdings={holdings} onPick={(code) => add(code, `browse_${o.key}`)} />
+                {more[o.key].rows.length > 0 && (
+                  <button type="button" className="dv-more-toggle" aria-expanded={moreOpen === o.key} onClick={() => toggleMore(o.key)}>
+                    {moreOpen === o.key ? "접기" : "더 보기"}
+                  </button>
+                )}
               </section>
             ))}
+            {moreOpen && (
+              <MoreRows
+                scope={moreOpen}
+                label={SCOPES.find((o) => o.key === moreOpen)?.label ?? ""}
+                lists={more[moreOpen]}
+                byCode={byCode}
+                holdings={holdings}
+                onPick={(code) => add(code, `more_${moreOpen}`)}
+                onClose={() => setMoreOpen(null)}
+              />
+            )}
           </div>
           {lines.length > 0 && (
             <HoldingsTable lines={lines} inputs={inputs} onShares={setShares} onRemove={remove} />
@@ -594,145 +617,41 @@ function QuickChips({
   );
 }
 
-/* ── 전체 보기 — 판마다 배당이 있는 종목 전부 ─────────────────────────
-   칩은 여덟뿐이라 "이게 다야?"가 됐다(2026-09-12). 판 아래 '전체 N종목 보기'를 두고, 열면 같은
-   판 안에서 거르고(이름·코드) 정렬을 바꿔(요즘·수익률·이름·국장은 시총도) 훑는다. 로고가 종목마다
-   외부 요청 하나라(StockLogo 는 lazy 가 아니다 — 저쪽 주석) 한 번에 마흔 줄씩만 그린다. */
-type BrowseSort = "trend" | "cap" | "yield" | "name";
-const BROWSE_PAGE = 40;
-const BROWSE_SORTS: { key: BrowseSort; label: string; krOnly?: boolean }[] = [
-  { key: "trend", label: "요즘순" },
-  { key: "cap", label: "시총순", krOnly: true },
-  { key: "yield", label: "수익률순" },
-  { key: "name", label: "이름순" },
-];
-/** 검색과 같은 잣대 — 이름·별칭 포함, 코드 앞부분. */
-const matches = (s: StockLite, q: string) =>
-  norm(s.name).includes(q) || (s.alias != null && norm(s.alias).includes(q)) || s.code.startsWith(q.toUpperCase());
-
-function BrowseList({
+/* ── 더 보기 — 판마다 성격으로 묶은 줄 ─────────────────────────────────
+   묶는 규칙은 서버(page.tsx)에 있고 여기는 그리기만. 한 줄은 라벨 + 칩(여덟까지). 담긴 종목은
+   QuickChips 가 알아서 뺀다. 묶음 밑 한 줄은 "여기 없는 건 검색으로" — 다 세우지 않았다는 걸 적는다. */
+function MoreRows({
   scope,
-  codes,
+  label,
+  lists,
   byCode,
   holdings,
   onPick,
+  onClose,
 }: {
   scope: Scope;
-  codes: string[];
+  label: string;
+  lists: MoreLists[Scope];
   byCode: Map<string, StockLite>;
   holdings: Holding[];
   onPick: (code: string) => void;
+  onClose: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<BrowseSort>("trend");
-  const [shown, setShown] = useState(BROWSE_PAGE);
-  const all = useMemo(() => codes.map((c) => byCode.get(c)).filter((s): s is StockLite => !!s), [codes, byCode]);
-  const held = new Set(holdings.map((h) => h.code));
-  const q = norm(query);
-  const list = useMemo(() => {
-    const picked = q ? all.filter((s) => matches(s, q)) : all.slice();
-    if (sort === "cap") picked.sort((a, b) => b.cap - a.cap || a.name.localeCompare(b.name, "ko"));
-    else if (sort === "yield") picked.sort((a, b) => (b.yieldPct ?? -1) - (a.yieldPct ?? -1) || a.name.localeCompare(b.name, "ko"));
-    else if (sort === "name") picked.sort((a, b) => a.name.localeCompare(b.name, "ko"));
-    return picked;
-  }, [all, q, sort]);
-  const visible = list.slice(0, shown);
-  const total = all.length.toLocaleString("ko-KR");
-
-  if (!open) {
-    return (
-      <div className="dv-browse">
-        <button
-          type="button"
-          className="dv-browse-toggle"
-          onClick={() => {
-            setOpen(true);
-            track("dividend_browse", { scope });
-          }}
-        >
-          전체 {total}종목 보기
+  return (
+    <div className="dv-more" data-scope={scope} role="region" aria-label={`${label} 더 보기`}>
+      <div className="dv-more-head">
+        <span className="dv-more-title">{label} 더 보기</span>
+        <button type="button" className="dv-more-toggle" onClick={onClose}>
+          접기
         </button>
       </div>
-    );
-  }
-  return (
-    <div className="dv-browse dv-browse-open">
-      <div className="dv-browse-tools">
-        <input
-          className="dv-browse-filter"
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setShown(BROWSE_PAGE);
-          }}
-          placeholder={`${total}종목에서 이름·코드로 거르기`}
-          aria-label={`${scope === "kr" ? "국장" : scope === "us" ? "미장" : "ETF"} 전체 목록 거르기`}
-          autoComplete="off"
-        />
-        <div className="dv-browse-sort" role="group" aria-label="정렬">
-          {BROWSE_SORTS.filter((o) => !o.krOnly || scope === "kr").map((o) => (
-            <button
-              key={o.key}
-              type="button"
-              className="dv-browse-sort-btn"
-              aria-pressed={sort === o.key}
-              onClick={() => {
-                setSort(o.key);
-                setShown(BROWSE_PAGE);
-              }}
-            >
-              {o.label}
-            </button>
-          ))}
-          <button type="button" className="dv-browse-toggle dv-browse-close" onClick={() => setOpen(false)}>
-            접기
-          </button>
+      {lists.rows.map((r) => (
+        <div key={r.label} className="dv-more-row">
+          <span className="dv-more-label">{r.label}</span>
+          <QuickChips codes={r.codes} byCode={byCode} holdings={holdings} onPick={onPick} />
         </div>
-      </div>
-      {visible.length ? (
-        <ul className="dv-browse-list">
-          {visible.map((s) => {
-            const inBag = held.has(s.code);
-            return (
-              <li key={s.code}>
-                <button
-                  type="button"
-                  className="hz-row-link hz-pick dv-browse-row"
-                  disabled={inBag}
-                  draggable={!inBag}
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData("text/plain", s.code);
-                    e.dataTransfer.effectAllowed = "copy";
-                  }}
-                  onClick={() => onPick(s.code)}
-                  title={inBag ? "이미 담겼습니다" : `${s.name} 담기`}
-                >
-                  <StockLogo code={s.code} name={s.name} market={s.market} size={20} />
-                  <span className="dv-browse-name">{s.name}</span>
-                  {/* 판이 곧 갈래라 배지는 판 안에서 갈리는 것만 — 국장은 코스피·코스닥, ETF 는 국내·미국. 미장은 없다. */}
-                  {scope === "kr" && <span className="dv-badge">{s.market === "KOSDAQ" ? "코스닥" : "코스피"}</span>}
-                  {scope === "etf" && <span className="dv-badge">{s.currency === "USD" ? "미국" : "국내"}</span>}
-                  <span className="dv-browse-meta">{inBag ? "담김" : s.yieldPct != null ? pct(s.yieldPct) : money(s.dps, s)}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      ) : (
-        <p className="dv-browse-none">이 판에는 없습니다. 위 검색창은 세 판을 한꺼번에 찾습니다.</p>
-      )}
-      <div className="dv-browse-foot">
-        <span className="dv-browse-count">
-          {q ? `${list.length.toLocaleString("ko-KR")}종목 찾음` : `${total}종목`}
-          {list.length > shown && ` · ${Math.min(shown, list.length)}까지 보임`}
-        </span>
-        {list.length > shown && (
-          <button type="button" className="dv-browse-toggle" onClick={() => setShown((n) => n + BROWSE_PAGE)}>
-            다음 {Math.min(BROWSE_PAGE, list.length - shown)}종목
-          </button>
-        )}
-      </div>
+      ))}
+      <p className="dv-more-foot">여기 없는 종목은 위 검색창에서 찾습니다. {lists.note}</p>
     </div>
   );
 }

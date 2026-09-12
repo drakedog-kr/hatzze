@@ -7,7 +7,7 @@ import { pageMetadata } from "../seo";
 import { DIVIDEND_PUBLIC } from "../screen-flags";
 import { DIVIDEND_PAGE } from "./copy";
 import { DividendCalculator } from "./DividendCalculator";
-import type { BrowseLists, StockLite } from "./types";
+import type { MoreLists, MoreRow, StockLite } from "./types";
 
 /**
  * 배당으로 살기(/dividend) — 종목과 주수를 넣으면 1년에 얼마 받는지, 어느 달에 들어오는지 바로 계산한다.
@@ -73,13 +73,48 @@ const POPULAR = 8;
 const CHIP_MIN_YIELD_KR = 2;
 const CHIP_MIN_YIELD_US = 1.5;
 const CHIP_MIN_CAP = 3_000e8;
-/** 미국 ETF 는 자료가 없어 손으로 적은 순서(config/etf_dividends.py 의 33개 전부). 서학개미가 배당·월분배로
- *  가장 많이 드는 것부터 — 칩은 앞에서 자르고, '전체 보기'는 이 순서 그대로 선다. */
-const US_ETF_ORDER = [
-  "SCHD", "JEPI", "JEPQ", "QYLD", "MSTY", "TSLY", "VYM", "DIVO",
-  "XYLD", "RYLD", "VIG", "DGRO", "HDV", "DVY", "SPYD", "SPHD", "SCHY", "VYMI", "NOBL", "SDY", "DGRW", "FDVV",
-  "VNQ", "PFF", "TLT", "BND", "SGOV", "VOO", "VTI", "QQQ", "SPY", "NVDY", "CONY",
-];
+/** 미국 ETF 는 자료가 없어 손으로 적은 순서. 서학개미가 배당·월분배로 가장 많이 드는 것부터. 칩은 앞에서 자른다. */
+const US_ETF_ORDER = ["SCHD", "JEPI", "JEPQ", "QYLD", "MSTY", "TSLY", "VYM", "DIVO"];
+/* '더 보기' 묶음의 미국 ETF — config/etf_dividends.py 의 33개를 성격으로 가른 것. 순서가 곧 서는 순서다. */
+const US_ETF_COVERED = ["JEPI", "JEPQ", "QYLD", "XYLD", "RYLD", "DIVO", "MSTY", "TSLY", "NVDY", "CONY"];
+const US_ETF_DIVIDEND = ["SCHD", "VYM", "VIG", "DGRO", "HDV", "DVY", "SPYD", "SPHD", "SCHY", "VYMI", "NOBL", "SDY", "DGRW", "FDVV"];
+const US_ETF_BOND = ["SGOV", "TLT", "BND"];
+const US_ETF_REIT = ["VNQ"];
+/** 리츠가 아니지만 같은 자리에 서는 인프라 펀드 — 맥쿼리인프라·KB발해인프라. 이름의 '인프라'로 걸면 NICE인프라·바이오인프라가 딸려 온다. */
+const KR_INFRA = new Set(["088980", "415640"]);
+/** 묶음 하나에 칩 여덟까지. 둘도 못 채우는 묶음은 안 세운다. */
+const ROW = 8;
+
+/**
+ * 묶음들을 순서대로 채운다. `exclude`(그 판의 칩)와 앞 묶음에 든 종목은 건너뛴다 — 한 판에 같은 종목이
+ * 두 번 서지 않게. 그래서 묶음의 순서가 뜻을 가진다: 좁은 묶음(리츠·우선주)을 먼저 두어야 넓은 묶음
+ * (큰 회사부터)이 그것들을 먼저 집어가지 않는다.
+ */
+function fillRows(specs: { label: string; pick: DividendStock[] }[], exclude: Iterable<string>): MoreRow[] {
+  const used = new Set(exclude);
+  const out: MoreRow[] = [];
+  for (const sp of specs) {
+    const codes: string[] = [];
+    for (const s of sp.pick) {
+      if (used.has(s.code)) continue;
+      used.add(s.code);
+      codes.push(s.code);
+      if (codes.length === ROW) break;
+    }
+    if (codes.length >= 2) out.push({ label: sp.label, codes });
+  }
+  return out;
+}
+
+/** 미국 손순서와 국내 목록을 하나씩 번갈아 — 한 묶음이 미국 ETF 로만 차지 않게. */
+function zip(us: DividendStock[], kr: DividendStock[]): DividendStock[] {
+  const out: DividendStock[] = [];
+  for (let i = 0; i < Math.max(us.length, kr.length); i++) {
+    if (us[i]) out.push(us[i]);
+    if (kr[i]) out.push(kr[i]);
+  }
+  return out;
+}
 
 export default async function DividendPage() {
   if (!PUBLIC && DEPLOYED) notFound();
@@ -109,41 +144,68 @@ export default async function DividendPage() {
     .slice(0, POPULAR / 2)
     .map((s) => s.code);
   const haveEtf = new Set(etfs.map((s) => s.code));
-  const usEtf = US_ETF_ORDER.filter((c) => haveEtf.has(c));
-  const popularEtf = [...usEtf.slice(0, POPULAR - krEtf.length), ...krEtf];
+  const popularEtf = [...US_ETF_ORDER.filter((c) => haveEtf.has(c)).slice(0, POPULAR - krEtf.length), ...krEtf];
 
-  // '전체 보기' — 판마다 배당이 있는 종목 전부를 칩과 같은 잣대로 세운다(칩은 문턱을 넘은 여덟, 여기는 다).
-  // 다만 배당이 시늉인 종목(수익률이 칩 문턱 미만 — 삼성전자 0.6%·SK하이닉스 0.2%)은 언급이 많아도 뒤로
-  // 보낸다. 요즘순 그대로 두면 배당 화면의 첫 줄이 카더라 순위가 된다(2026-09-12 실측). 시총순으로 바꾸면 앞에 온다.
-  const byName = (a: DividendStock, b: DividendStock) => a.name.localeCompare(b.name, "ko");
-  const dividendFirst = (minYield: number, m: Map<string, number>) => (a: DividendStock, b: DividendStock) =>
-    Number((b.yieldPct ?? 0) >= minYield) - Number((a.yieldPct ?? 0) >= minYield) || byMentions(m)(a, b);
-  const browseKr = stocks
-    .filter((s) => s.kind === "stock" && s.currency === "KRW" && s.dps > 0 && !s.name.includes("스팩"))
-    .sort(dividendFirst(CHIP_MIN_YIELD_KR, trends.krMentions))
-    .map((s) => s.code);
-  const browseUs = stocks
-    .filter((s) => s.kind === "stock" && s.currency === "USD" && s.dps > 0)
-    .sort(dividendFirst(CHIP_MIN_YIELD_US, trends.usMentions))
-    .map((s) => s.code);
-  // ETF — 미국 손순서와 국내 유입순(칩과 같이 수익률 2% 이상만)을 하나씩 번갈아(SCHD · TIGER … · JEPI · TIGER …).
-  // 나머지(유입 자료가 없는 국내 ETF — seohak_etf_daily 는 해외 투자 ETF 만 있다 — 와 분배가 시늉인 것)는
-  // 분배가 있는 쪽을 앞에, 이름순으로 뒤에.
-  const krEtfByFlow = etfs
-    .filter((s) => s.currency === "KRW" && trends.etfFlow.has(s.code) && (s.yieldPct ?? 0) >= CHIP_MIN_YIELD_KR)
-    .sort((a, b) => (trends.etfFlow.get(b.code) ?? 0) - (trends.etfFlow.get(a.code) ?? 0))
-    .map((s) => s.code);
-  const zipped: string[] = [];
-  for (let i = 0; i < Math.max(usEtf.length, krEtfByFlow.length); i++) {
-    if (usEtf[i]) zipped.push(usEtf[i]);
-    if (krEtfByFlow[i]) zipped.push(krEtfByFlow[i]);
-  }
-  const placed = new Set(zipped);
-  const restEtf = etfs
-    .filter((s) => !placed.has(s.code) && s.dps > 0)
-    .sort((a, b) => Number((b.yieldPct ?? 0) >= CHIP_MIN_YIELD_KR) - Number((a.yieldPct ?? 0) >= CHIP_MIN_YIELD_KR) || byName(a, b));
-  const browseEtf = [...zipped, ...restEtf.map((s) => s.code)];
-  const browse: BrowseLists = { kr: browseKr, us: browseUs, etf: browseEtf };
+  /* ── '더 보기' 묶음 ─────────────────────────────────────────────────
+     칩 여덟 다음이 곧장 검색창이면 "이게 다야?"가 된다(2026-09-12). 그렇다고 1,359종목을 목록으로 펼치면
+     훑을 수가 없다(같은 날 지적). 그 사이 — 판마다 성격으로 묶은 줄 서너 개, 줄마다 여덟. 바스켓(꾸준함·
+     지금 수익률·성장)과 겹치는 규칙은 안 둔다. 규칙은 전부 여기 적혀 있고 추천이 아니라 분류다. */
+  const byCap = (a: DividendStock, b: DividendStock) => (b.marketCap ?? 0) - (a.marketCap ?? 0);
+  const byYield = (a: DividendStock, b: DividendStock) => (b.yieldPct ?? 0) - (a.yieldPct ?? 0);
+  const isPref = (s: DividendStock) => s.shareKind != null && s.shareKind !== "보통주";
+  const isReit = (s: DividendStock) => s.isReit || KR_INFRA.has(s.code);
+  const kr = stocks.filter((s) => s.kind === "stock" && s.currency === "KRW" && s.dps > 0 && !s.unusual && !s.name.includes("스팩"));
+  const moreKr = fillRows(
+    [
+      // 리츠·인프라 — 청산·특별분배로 수익률이 30% 를 넘는 건(코람코더원리츠 388%) 뺀다. 큰 것부터.
+      { label: "리츠·인프라", pick: kr.filter((s) => isReit(s) && (s.yieldPct ?? 0) <= 30).sort(byCap) },
+      // 우선주 — 1,000억은 돼야 거래가 있다. 수익률 순(우선주를 찾는 까닭이 그것이라).
+      { label: "우선주", pick: kr.filter((s) => isPref(s) && (s.marketCap ?? 0) >= 1_000e8 && (s.yieldPct ?? 0) >= CHIP_MIN_YIELD_KR).sort(byYield) },
+      // 큰 회사부터 — 칩과 같은 문턱(수익률 2%·시총 3,000억)을 시총 순으로. 칩에 선 것은 빠지니 KB금융·신한지주부터.
+      { label: "큰 회사부터", pick: kr.filter((s) => !isPref(s) && !isReit(s) && (s.yieldPct ?? 0) >= CHIP_MIN_YIELD_KR && (s.marketCap ?? 0) >= CHIP_MIN_CAP).sort(byCap) },
+    ],
+    popular,
+  );
+  const us = stocks.filter((s) => s.kind === "stock" && s.currency === "USD" && s.dps > 0);
+  const usTrend = byMentions(trends.usMentions);
+  const moreUs = fillRows(
+    [
+      // 달마다 주는 — 지난 1년 지급 달이 열둘(리얼티인컴·메인스트리트·AGNC).
+      { label: "달마다 주는", pick: us.filter((s) => new Set(s.payments.filter((p) => p.pay).map((p) => MONTH(p.pay as string))).size >= 12).sort(usTrend) },
+      // 수익률 4% 넘는 — 10% 초과는 뺀다(mREIT·BDC 의 두 자릿수는 원금 위험이 섞인다). 언급 많은 순.
+      { label: "수익률 4% 넘는", pick: us.filter((s) => (s.yieldPct ?? 0) >= 4 && (s.yieldPct ?? 0) <= 10).sort(usTrend) },
+      // 오래 준 회사 — 연속 배당 연수 순. SEC 공시가 2007년쯤부터라 19~20년이 천장이고, 같으면 언급 순.
+      // 수익률은 칩 문턱(1.5%) — 마이크로소프트 0.7%·코닝 0.7% 가 배당 줄 맨 앞에 서면 이 화면이 아니다.
+      { label: "오래 준 회사", pick: us.filter((s) => s.streak >= 10 && (s.yieldPct ?? 0) >= CHIP_MIN_YIELD_US).sort((a, b) => b.streak - a.streak || usTrend(a, b)) },
+    ],
+    popularUs,
+  );
+  const etfByCode = new Map(etfs.map((s) => [s.code, s]));
+  const usEtfs = (codes: string[]) => codes.map((c) => etfByCode.get(c)).filter((s): s is DividendStock => !!s);
+  // 국내 ETF 는 돈이 들어온 순, 유입 자료가 없으면(국내 투자 ETF) 수익률 순.
+  const krEtfs = (re: RegExp, not?: RegExp) =>
+    etfs
+      .filter((s) => s.currency === "KRW" && s.dps > 0 && re.test(s.name) && !(not && not.test(s.name)))
+      .sort((a, b) => (trends.etfFlow.get(b.code) ?? 0) - (trends.etfFlow.get(a.code) ?? 0) || byYield(a, b));
+  const moreEtf = fillRows(
+    [
+      { label: "커버드콜", pick: zip(usEtfs(US_ETF_COVERED), krEtfs(/커버드콜/)) },
+      { label: "리츠", pick: zip(usEtfs(US_ETF_REIT), krEtfs(/리츠|부동산/)) },
+      // '혼합'(테슬라채권혼합·나스닥100채권혼합50)은 주식 반 채권 반이라 채권 줄이 아니다.
+      { label: "채권·단기", pick: zip(usEtfs(US_ETF_BOND), krEtfs(/채권|국채|통안채|머니마켓|CD금리|KOFR/, /커버드콜|리츠|혼합/)) },
+      { label: "배당 지수", pick: zip(usEtfs(US_ETF_DIVIDEND), krEtfs(/배당/, /커버드콜/)) },
+    ],
+    popularEtf,
+  );
+  const n = (v: number) => v.toLocaleString("ko-KR");
+  const etfUs = etfs.filter((s) => s.currency === "USD").length;
+  // 담기는 수는 묶음 후보(unusual 을 뺀 것)가 아니라 검색에 걸리는 전부 — 배당이 있는 종목 수.
+  const krAll = stocks.filter((s) => s.kind === "stock" && s.currency === "KRW" && s.dps > 0 && !s.name.includes("스팩")).length;
+  const more: MoreLists = {
+    kr: { rows: moreKr, note: `코스피·코스닥에서 배당이 있는 ${n(krAll)}종목이 다 담깁니다.` },
+    us: { rows: moreUs, note: `미국 배당주 ${n(us.length)}종목이 담깁니다.` },
+    etf: { rows: moreEtf, note: `ETF ${n(etfs.length)}개(미국 ${etfUs} · TIGER ${etfs.length - etfUs})가 담깁니다.` },
+  };
 
   return (
     <DividendCalculator
@@ -152,7 +214,7 @@ export default async function DividendPage() {
       popular={popular}
       popularUs={popularUs}
       popularEtf={popularEtf}
-      browse={browse}
+      more={more}
       computedFor={data?.computedFor ?? null}
       priceDate={data?.priceDate ?? null}
       usPriceDate={data?.usPriceDate ?? null}

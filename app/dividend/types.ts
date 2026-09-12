@@ -51,8 +51,9 @@ export type BasketLite = {
 };
 
 /**
- * 판마다 '전체 보기'에 세우는 순서 — 배당이 있는 종목 전부의 코드. 칩(여덟)과 같은 잣대라
- * 목록은 칩의 연장으로 읽힌다. 국장·미장은 요즘 채널 언급 순, ETF 는 미국 손순서와 국내 자금
- * 유입 순을 번갈아. 정렬은 브라우저에서 바꿀 수 있고(수익률·이름·시총) 이건 그 기본값이다.
+ * 판마다 '더 보기'를 열면 서는 묶음들 — 라벨 하나에 칩 여덟까지. 칩(요즘 여덟)에 이미 선 종목과
+ * 앞 묶음에 든 종목은 뒤 묶음에서 뺀다(같은 로고가 한 판에 두 번 서지 않게). 어떤 규칙으로 묶는지는
+ * page.tsx 에 있다. `note` 는 묶음 밑에 적는 한 줄 — 여기 없는 건 검색으로 찾으라는 안내와 담긴 수.
  */
-export type BrowseLists = { kr: string[]; us: string[]; etf: string[] };
+export type MoreRow = { label: string; codes: string[] };
+export type MoreLists = Record<"kr" | "us" | "etf", { rows: MoreRow[]; note: string }>;
