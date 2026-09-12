@@ -83,6 +83,10 @@ class LlmUnavailableError(Exception):
 
 
 def _client() -> Anthropic:
+    """⚠️ 여기만 구독 경로(common/llm_client)로 안 옮겼다. 아래 호출이 `temperature=0` 을 쓰는데
+    Claude Code CLI(`claude -p`)에는 온도를 정하는 플래그가 없다. 온도를 놓으면 같은 제목이 실행마다
+    다르게 분류돼(2026-07-21 실측 낙관도 36%↔48%) 보정된 눈금이 흔들린다. 디시 2,987 + 뉴스 1,400
+    제목, 하루 $0.37 은 API 에 남긴다(2026-09-12)."""
     key = os.environ.get("ANTHROPIC_API_KEY")
     if not key:
         raise LlmUnavailableError("ANTHROPIC_API_KEY 가 없습니다")
