@@ -1,29 +1,31 @@
-"""배당으로 살기(/dividend)에 넣는 ETF 의 분배금 — **운용사 공시를 손으로 옮긴 표**.
+"""배당으로 살기(/dividend)에 넣는 ETF 목록과, 국내 ETF 의 **손으로 옮긴** 분배금.
 
-## 왜 손으로 옮기나
+## 미국 ETF — 목록만 적는다. 분배금은 stockanalysis.com 에서 매일 받는다
 
-ETF 분배금은 열린 원천이 없다(2026-09-12 확인). 예탁결제원 배당 API 에 ETF 는 없고, 공공데이터포털에
-'분배금'은 0건이고, KRX 정보데이터시스템은 로그인 없이는 LOGOUT 만 돌려주고, SEC XBRL 에 ETF 는
-재무 태그가 없고, 야후·핀허브·폴리곤 무료 플랜은 공개 화면 표시가 약관에 걸린다. 남는 건
-**운용사 자기 공시**뿐인데, 슈왑은 봇을 403 으로 막고 나머지는 JS 로 그린다. 그래서 브라우저에서
-읽어 여기 적는다. 스크립트(fetch_etf_dividends.py)가 시세·환율만 매일 붙인다.
+`/etf/{티커}/dividend/` 페이지가 지급일·금액을 준다(common/stockanalysis.py, 내부자 리포트와 같은
+원천·약관). 2026-09-12 에 운용사 공시와 맞대어 같은 값임을 봤다(SCHD 2026-06-29 0.2525 ·
+JEPI 2026-09-03 0.37142). 그래서 미국은 티커와 이름만 적으면 된다. `pays` 를 적어 두면 그 페이지가
+막힌 날의 대체값이다(없어도 된다).
+
+## 국내 ETF — 손으로 옮긴다
+
+열린 원천이 없다(2026-09-12 확인). 예탁결제원 배당 API 에 ETF 는 없고, 공공데이터포털에 '분배금'은
+0건이고, KRX 정보데이터시스템은 로그인 없이는 LOGOUT 만 돌려주고, stockanalysis 는 국내를 안 다룬다.
+남는 건 **운용사 자기 공시**인데 대부분 JS 로 그린다. 그래서 브라우저에서 읽어 여기 적는다.
+스크립트(fetch_etf_dividends.py)가 시세·환율만 매일 붙인다.
 
 ⚠️ **값이 늙는다.** 커버드콜 ETF 는 달마다 분배금이 바뀐다. `as_of` 가 두 달 넘게 낡으면 화면이
    기준일을 적어 두었으니 사용자는 알지만, 갱신은 사람(에이전트 세션)이 해야 한다. 아래
    '갱신하는 법'을 따른다. 갱신 주기는 월 1회를 권한다.
 
-## 갱신하는 법
+## 갱신하는 법 (국내)
 
-  미국(운용사 페이지, 브라우저에서)
-    SCHD   schwabassetmanagement.com/products/schd → Distributions → Export Data(CSV). curl 은 403.
-    JEPI·JEPQ  am.jpmorgan.com 상품 페이지 → DIVIDENDS & CAPITAL GAINS 탭(Pay Date · Dividend Paid)
-    QYLD·XYLD  globalxetfs.com/funds/<ticker> → Distribution History 단추(연도 탭)
-    → 지급일 기준 **마지막 열두 달**(분기면 넷)의 (지급일, 금액)을 `pays` 에 적는다.
-  국내(미래에셋 TIGER)
+  미래에셋 TIGER
     investments.miraeasset.com/tigeretf/ko/distribution/annual/list.ajax (POST pageIndex=1&listCnt=400)
     가 연도별 합계(원)를 준다 — curl 로도 열린다. `y_prev`(지난해 합) · `y_ytd`(올해 합) · `ytd_months`
     (올해 지급된 달 수)를 적는다. 스크립트가 둘을 견줘 큰 쪽을 쓴다(아래 규칙).
   다른 운용사(SOL·ACE·KODEX·PLUS·RISE)는 페이지가 JS 라 아직 못 넣었다.
+  미국 ETF 의 `pays` 는 안 고쳐도 된다(stockanalysis 가 매일 준다).
 
 ## 국내 ETF 의 '1년에 얼마' 규칙
 
@@ -31,8 +33,8 @@ ETF 분배금은 열린 원천이 없다(2026-09-12 확인). 예탁결제원 배
 지난해보다 25% 넘게 크거나 작으면 그쪽을 쓰고 `estimated` 를 켠다 — 분배금을 크게 올린 ETF
 (TIGER 배당커버드콜액티브 2025 1,976 → 2026 아홉 달 3,338)를 지난해로 재면 반 토막이 난다.
 
-⚠️ 국내 ETF 는 달별 금액을 못 적었다(연도 합계만 있다). 달력에서는 빠진다. 미국 다섯은 지급일이
-   있어 달력에 든다.
+⚠️ 국내 ETF 는 달별 금액을 못 적었다(연도 합계만 있다). 달력에서는 빠진다. 미국은 지급일이 있어
+   달력에 든다.
 """
 
 # 2026-09-12 에 옮겼다. 브라우저에서 읽은 날 = as_of.
@@ -72,6 +74,15 @@ US_ETFS: list[dict] = [
                  ("2026-01-23", 0.3597), ("2026-02-26", 0.3412), ("2026-03-26", 0.3905), ("2026-04-23", 0.3522),
                  ("2026-05-21", 0.4012), ("2026-06-25", 0.3403), ("2026-07-23", 0.4088), ("2026-08-27", 0.3109)],
     },
+    # 아래는 stockanalysis 만으로 채운다(pays 없음).
+    {"code": "VYM", "name_ko": "VYM", "name_en": "Vanguard High Dividend Yield ETF", "cadence": "분기", "source": "https://investor.vanguard.com/investment-products/etfs/profile/vym"},
+    {"code": "VIG", "name_ko": "VIG", "name_en": "Vanguard Dividend Appreciation ETF", "cadence": "분기", "source": "https://investor.vanguard.com/investment-products/etfs/profile/vig"},
+    {"code": "DGRO", "name_ko": "DGRO", "name_en": "iShares Core Dividend Growth ETF", "cadence": "분기", "source": "https://www.ishares.com/us/products/264623/"},
+    {"code": "HDV", "name_ko": "HDV", "name_en": "iShares Core High Dividend ETF", "cadence": "분기", "source": "https://www.ishares.com/us/products/239563/"},
+    {"code": "DVY", "name_ko": "DVY", "name_en": "iShares Select Dividend ETF", "cadence": "분기", "source": "https://www.ishares.com/us/products/239500/"},
+    {"code": "SPYD", "name_ko": "SPYD", "name_en": "SPDR Portfolio S&P 500 High Dividend ETF", "cadence": "분기", "source": "https://www.ssga.com/us/en/intermediary/etfs/spdr-portfolio-sp-500-high-dividend-etf-spyd"},
+    {"code": "SPHD", "name_ko": "SPHD", "name_en": "Invesco S&P 500 High Dividend Low Volatility ETF", "cadence": "월", "source": "https://www.invesco.com/us/financial-products/etfs/product-detail?ticker=SPHD"},
+    {"code": "DIVO", "name_ko": "DIVO", "name_en": "Amplify CWP Enhanced Dividend Income ETF", "cadence": "월", "source": "https://amplifyetfs.com/divo/"},
 ]
 
 # 미래에셋 TIGER 연간 분배금 표(원). TIGER 월배당은 월말 기준일·다음 달 초 지급이라 2026-09-12 기준

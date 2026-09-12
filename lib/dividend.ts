@@ -45,6 +45,8 @@ export type DividendStock = {
   cuts5: number;
   growth5: number | null;
   nextRecord: string | null;
+  /** 선언됐지만 아직 안 지급된 다음 건(미국). */
+  nextPay: { date: string; amount: number } | null;
   isReit: boolean;
   shareKind: string | null;
 };
@@ -114,6 +116,7 @@ function toStock(r: Row): DividendStock {
     cuts5: r.cut_years_5 ?? 0,
     growth5: n(r.growth_5y_pct),
     nextRecord: r.next_record_date,
+    nextPay: null,
     isReit: Boolean(r.is_reit),
     shareKind: r.share_kind,
   };
@@ -156,13 +159,16 @@ type UsRow = {
   streak_years: number;
   cut_years_5: number;
   growth_5y_pct: number | null;
+  ttm_payments: { pay: string; amount: number }[];
+  next_pay_date: string | null;
+  next_pay_amount: number | null;
   usdkrw: number | null;
   usdkrw_date: string | null;
   computed_for: string;
 };
 
 const US_COLUMNS =
-  "ticker,name_ko,name_en,close,price_date,ttm_dps,ttm_method,ttm_yield_pct,streak_years,cut_years_5,growth_5y_pct,usdkrw,usdkrw_date,computed_for";
+  "ticker,name_ko,name_en,close,price_date,ttm_dps,ttm_method,ttm_yield_pct,streak_years,cut_years_5,growth_5y_pct,ttm_payments,next_pay_date,next_pay_amount,usdkrw,usdkrw_date,computed_for";
 
 function toUsStock(r: UsRow): DividendStock {
   return {
@@ -181,12 +187,14 @@ function toUsStock(r: UsRow): DividendStock {
     yieldPct: n(r.ttm_yield_pct),
     unusual: false,
     estimated: r.ttm_method === "annualized" || r.ttm_method === "events",
-    payMonths: [],
-    payments: [],
+    // 지급 건은 stockanalysis 에서(마이그레이션 075). 비어 있으면 그 페이지에 없는 종목 — 달력에서 빠진다.
+    payMonths: Array.isArray(r.ttm_payments) ? [...new Set(r.ttm_payments.map((p) => Number(p.pay.slice(5, 7))))] : [],
+    payments: Array.isArray(r.ttm_payments) ? r.ttm_payments.map((p) => ({ record: p.pay, pay: p.pay, amount: Number(p.amount) })) : [],
     streak: r.streak_years ?? 0,
     cuts5: r.cut_years_5 ?? 0,
     growth5: n(r.growth_5y_pct),
     nextRecord: null,
+    nextPay: r.next_pay_date && r.next_pay_amount != null ? { date: r.next_pay_date, amount: Number(r.next_pay_amount) } : null,
     isReit: false,
     shareKind: null,
   };
@@ -238,6 +246,7 @@ function toEtfStock(r: EtfRow): DividendStock {
     cuts5: 0,
     growth5: null,
     nextRecord: null,
+    nextPay: null,
     isReit: false,
     shareKind: "ETF",
   };

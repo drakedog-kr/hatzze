@@ -3,11 +3,15 @@
 배당으로 살기(/dividend)의 미국 쪽 재료다. 국내(`kr_dividend_stock`)와 같은 모양으로 종목
 한 줄씩 — 최근 12개월 1주당 배당(달러)·수익률·회계연도별 합·연속 배당·증가율.
 
-## 원천 셋
+## 원천 넷
 
-  배당   SEC `companyfacts` (data.sec.gov/api/xbrl/companyfacts/CIK##########.json). 미국 정부
-         저작물이라 약관 제약이 없고 키도 없다. User-Agent 만 요구한다(없으면 403).
-         초당 10회 한도라 0.15초씩 쉰다.
+  지급 건  stockanalysis.com `/stocks/{티커}/dividend/` — 지급일·금액(common/stockanalysis.py).
+           **12개월 합(`ttm_dps`)과 달력은 이걸로 낸다.** SEC 는 지급일이 없어서다(아래).
+  배당(SEC) SEC `companyfacts` (data.sec.gov/api/xbrl/companyfacts/CIK##########.json). 미국 정부
+           저작물이라 약관 제약이 없고 키도 없다. User-Agent 만 요구한다(없으면 403).
+           초당 10회 한도라 0.15초씩 쉰다. 회계연도별 합·연속 배당·증가율은 여기서 나오고,
+           12개월 합은 `sec_ttm_dps` 로 남겨 stockanalysis 값과 맞댄다(10% 넘게 갈리면 찍는다).
+           stockanalysis 에 없는 종목은 SEC 값으로 넘어간다.
   시세   핀허브 `quote`(FINNHUB_API_KEY). fetch_kr_preview.py 와 같은 창(분당 60회).
   환율   FRED `DEXKOUS`(원/달러, 뉴욕 정오). 화면이 달러를 원으로 옮길 때 쓴다. 1~2영업일 늦다.
 
@@ -38,7 +42,8 @@
   5. 회계연도별 합(annual)은 연 행(10-K)에서. 6월 결산(P&G·마이크로소프트)·9월 결산(애플)은
      끝나는 해로 적는다.
 
-⚠️ **지급 달은 못 낸다.** XBRL 은 기간만 있고 지급일이 없다. 화면 달력에서 미국 종목은 뺀다.
+⚠️ XBRL 은 기간만 있고 지급일이 없다. 8-K 본문("payable on …")을 긁어 봤더니 마흔 종목 중 열만
+   네 달이 다 나왔다(2026-09-12). 그래서 지급 건은 stockanalysis 에서 받는다.
 ⚠️ 외국 회사(20-F, ifrs-full 태그)와 ETF 는 이 태그가 없어 0 으로 나온다. 목록에 안 넣는다
    (config/us_dividend_universe.py 머리말).
 
@@ -65,6 +70,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.config import FINNHUB_API_KEY  # noqa: E402
 from common.fred_client import FredUnavailableError, observations  # noqa: E402
+from common.stockanalysis import PageChanged, dividend_history, trailing  # noqa: E402
 from common.supabase_client import get_client, load_all  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 from config.us_dividend_universe import EXTRA_US_DIVIDEND  # noqa: E402
@@ -91,6 +97,10 @@ ET = ZoneInfo("America/New_York")
 CHUNK = 200
 # 미수집이 이 비율을 넘으면 죽인다(반쪽짜리 표가 '배당 없음'으로 위장한다).
 FAIL_PCT_MAX = 25
+# stockanalysis 페이지 파싱 실패가 이 비율을 넘으면 저쪽 구조가 바뀐 것이다. 저장은 하고 나서 죽는다.
+SA_FAIL_PCT_MAX = 30
+# stockanalysis 12개월 합과 SEC 값이 이만큼 갈리면 찍는다(둘 다 있을 때).
+SEC_SA_GAP = 0.10
 
 # 기간 길이(일) → 종류
 DUR = {"month": (25, 35), "quarter": (80, 100), "half": (170, 190), "nine": (255, 285), "year": (350, 380)}
@@ -328,6 +338,47 @@ def main() -> None:
     if fail_pct > FAIL_PCT_MAX:
         raise SystemExit(f"[중단] 못 받은 종목이 {fail_pct:.0f}% 입니다")
 
+    # 지급 건 — stockanalysis. 전 종목을 부른다(SEC 가 못 읽은 허쉬·디지털리얼티도 여기엔 있다).
+    sa_fail: list[str] = []
+    sa_missing: list[str] = []
+    gaps: list[str] = []
+    if args.dry_run and not args.only:
+        print("[SA] --dry-run 이라 지급 건 페이지는 건너뜁니다(--only 로 몇 종목만 볼 수 있습니다)")
+    else:
+        for i, r in enumerate(rows, 1):
+            r["sec_ttm_dps"] = r["ttm_dps"]
+            try:
+                hist = dividend_history(r["ticker"], "stock")
+            except PageChanged:
+                sa_fail.append(r["ticker"])
+                continue
+            if hist is None:
+                sa_missing.append(r["ticker"])
+                continue
+            paid, nxt = trailing(hist, today)
+            if not paid:
+                continue
+            sa_ttm = round(sum(p["amount"] for p in paid), 4)
+            if r["ttm_dps"] > 0 and abs(sa_ttm - r["ttm_dps"]) / r["ttm_dps"] > SEC_SA_GAP:
+                gaps.append(f"{r['ticker']} SA {sa_ttm} vs SEC {r['ttm_dps']}")
+            r["ttm_dps"] = sa_ttm
+            r["ttm_method"] = "sa"
+            r["ttm_payments"] = [{"pay": p["pay"], "amount": p["amount"], "ex": p.get("ex")} for p in paid]
+            r["pay_months"] = sorted({int(p["pay"][5:7]) for p in paid})
+            if nxt:
+                r["next_pay_date"], r["next_pay_amount"] = nxt["pay"], nxt["amount"]
+            if i % 50 == 0:
+                print(f"[SA] {i}/{len(rows)}")
+        print(f"[SA] 페이지 없음 {len(sa_missing)} {sa_missing[:6]} · 파싱 실패 {len(sa_fail)} {sa_fail[:6]} · SEC 와 10% 넘게 갈린 종목 {len(gaps)}")
+        for g in gaps[:8]:
+            print("   ", g)
+    for r in rows:
+        r.setdefault("sec_ttm_dps", r["ttm_dps"])
+        r.setdefault("ttm_payments", [])
+        r.setdefault("pay_months", [])
+        r.setdefault("next_pay_date", None)
+        r.setdefault("next_pay_amount", None)
+
     # 시세. 배당이 있는 종목만 부른다 — 없는 종목은 수익률이 없어 시세가 필요 없다.
     fx = usdkrw()
     print(f"[FRED] 원/달러 {fx[0]:,.2f} ({fx[1]})" if fx else "[FRED] 환율을 못 받았습니다 — 화면이 원화 환산을 접습니다")
@@ -354,8 +405,8 @@ def main() -> None:
         r["usdkrw_date"] = fx[1] if fx else None
 
     priced = [r for r in paying if r.get("close")]
-    print(f"[요약] 배당 있음 {len(paying)}종목 · 시세 받음 {len(priced)} · 방법: "
-          + " · ".join(f"{m} {sum(1 for r in rows if r['ttm_method'] == m)}" for m in ("quarters", "monthly", "annualized", "events", "fy", "none")))
+    print(f"[요약] 배당 있음 {len(paying)}종목 · 시세 받음 {len(priced)} · 지급 달 있음 {sum(1 for r in rows if r['pay_months'])} · 방법: "
+          + " · ".join(f"{m} {sum(1 for r in rows if r['ttm_method'] == m)}" for m in ("sa", "quarters", "monthly", "annualized", "events", "fy", "none")))
     for r in sorted(priced, key=lambda r: -(r["ttm_yield_pct"] or 0))[:6]:
         print(f"  {r['name_ko']:12s} ${r['ttm_dps']:.2f}/yr · ${r['close']:.2f} · {r['ttm_yield_pct']:.2f}% · {r['ttm_method']} · 연속 {r['streak_years']}년 · 증가율 {r['growth_5y_pct']}%")
     for t in ("KO", "O", "XOM", "MSFT", "JNJ"):
@@ -369,6 +420,9 @@ def main() -> None:
     for i in range(0, len(rows), CHUNK):
         db.table(TABLE).upsert(rows[i : i + CHUNK], on_conflict="ticker").execute()
     print(f"[Supabase] {TABLE} upsert 완료: {len(rows)}행 (기준일 {today})")
+    # ⭐ 죽는 자리는 저장 다음이다(fetch_us_analyst.py 와 같은 판단). 앞에서 죽으면 그날 받은 것까지 잃는다.
+    if rows and len(sa_fail) / len(rows) * 100 > SA_FAIL_PCT_MAX:
+        raise SystemExit(f"[중단] stockanalysis 파싱 실패가 {len(sa_fail)}종목({len(sa_fail) / len(rows) * 100:.0f}%) — 페이지 구조가 바뀐 것 같습니다")
 
 
 if __name__ == "__main__":

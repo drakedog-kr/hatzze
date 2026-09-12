@@ -63,6 +63,7 @@ function toLite(s: DividendStock): StockLite {
     streak: s.streak,
     growth5: s.growth5,
     nextRecord: s.nextRecord,
+    nextPay: s.nextPay ? [s.nextPay.date, s.nextPay.amount] : null,
   };
 }
 

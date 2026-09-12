@@ -37,6 +37,8 @@ export type StockLite = {
   streak: number;
   growth5: number | null;
   nextRecord: string | null;
+  /** 선언됐지만 아직 안 지급된 다음 건(미국 주식·ETF). [지급일, 1주당 금액]. */
+  nextPay: [string, number] | null;
 };
 
 export type BasketLite = {

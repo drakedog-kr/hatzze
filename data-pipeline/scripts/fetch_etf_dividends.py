@@ -1,6 +1,7 @@
-"""ETF 분배금 표(config/etf_dividends.py, 손으로 옮긴 값)에 **시세와 환율을 붙여** `etf_dividend` 에 upsert.
+"""ETF 분배금을 `etf_dividend` 에 upsert — 미국은 stockanalysis 에서 매일, 국내는 설정 파일(손으로 옮긴 값)에서.
 
-분배금 자체는 매일 안 바뀐다(설정 파일이 원천이다). 바뀌는 건 시세와 환율이라 그것만 매일 붙인다.
+국내 분배금은 매일 안 바뀐다(설정 파일이 원천이다). 미국은 stockanalysis `/etf/{티커}/dividend/` 가
+지급 건을 주므로 매일 새로 받는다(못 받으면 설정의 `pays` 로). 시세와 환율은 둘 다 매일 붙인다.
   국내  KRX Open API `etp/etf_bydd_trd` — 최신 가용 거래일 하루치(1,168종목)에서 코드로 찾는다
   미국  핀허브 `quote`
   환율  FRED `DEXKOUS`
@@ -29,6 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from common.config import FINNHUB_API_KEY  # noqa: E402
 from common.fred_client import FredUnavailableError, observations  # noqa: E402
 from common.krx_client import krx_get  # noqa: E402
+from common.stockanalysis import PageChanged, dividend_history, trailing  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 from config.etf_dividends import AS_OF, KR_ETFS, US_ETFS  # noqa: E402
@@ -118,8 +120,25 @@ def main() -> None:
 
     fx = usdkrw()
     key = FINNHUB_API_KEY or ""
+    sa_fail = 0
     for e in US_ETFS:
-        pays = [(d, float(a)) for d, a in e["pays"]]
+        # 지급 건은 stockanalysis 가 먼저다. 못 받으면 설정의 `pays`(있을 때)로.
+        pays: list[tuple[str, float]] = []
+        as_of = AS_OF
+        try:
+            hist = dividend_history(e["code"], "etf")
+        except PageChanged:
+            hist = None
+            sa_fail += 1
+        if hist:
+            paid, _ = trailing(hist, today)
+            pays = [(p["pay"], float(p["amount"])) for p in paid]
+            as_of = today.isoformat()
+        if not pays:
+            pays = [(d, float(a)) for d, a in e.get("pays", [])]
+        if not pays:
+            print(f"  ⚠️ {e['code']}: 지급 건을 못 받았고 설정에도 없어 건너뜁니다")
+            continue
         ttm = round(sum(a for _, a in pays), 4)
         q = quote(e["code"], key) if key else None
         rows.append({
@@ -128,7 +147,7 @@ def main() -> None:
             "cadence": e["cadence"], "ttm_dps": ttm, "estimated": False,
             "payments": [{"pay": d, "amount": a} for d, a in pays],
             "pay_months": sorted({int(d[5:7]) for d, _ in pays}),
-            "as_of": AS_OF, "source": e["source"],
+            "as_of": as_of, "source": e["source"],
             "close": q[0] if q else None, "price_date": q[1] if q else None,
             "ttm_yield_pct": round(ttm / q[0] * 100, 3) if q and q[0] > 0 and ttm else None,
             "computed_for": today.isoformat(),
@@ -137,7 +156,7 @@ def main() -> None:
         r["usdkrw"] = fx[0] if fx else None
         r["usdkrw_date"] = fx[1] if fx else None
 
-    print(f"[ETF] {len(rows)}종목 (국내 {len(KR_ETFS)} · 미국 {len(US_ETFS)}) · 분배금 기준일 {AS_OF} · 시세 국내 {latest[0] if latest else '없음'}"
+    print(f"[ETF] {len(rows)}종목 (국내 {len(KR_ETFS)} · 미국 {len(US_ETFS)}, stockanalysis 실패 {sa_fail}) · 국내 분배금 기준일 {AS_OF} · 시세 국내 {latest[0] if latest else '없음'}"
           + (f" · 환율 {fx[0]:,.2f}({fx[1]})" if fx else " · 환율 없음"))
     for r in rows:
         unit = "$" if r["currency"] == "USD" else "원"
