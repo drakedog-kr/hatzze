@@ -5481,6 +5481,9 @@ main.hz-scroll { overflow-x: clip; }
   /* 라벨을 칩 위로 — 96px 라벨 옆에 칩을 두면 한 줄에 칩 하나가 남는다. */
   .dv-more-row { flex-direction: column; gap: 6px; }
   .dv-more-label { flex: none; padding-top: 0; }
+  /* 계좌 네 칸(231px)이 제목 옆에 서면 제목이 "내/종목"으로 꺾인다 — 설명 아래 줄로 내린다(머리 격자의 3행). */
+  .dv-calc .hz-sheet-head-side { grid-column: 2 / -1; grid-row: 3; margin-top: 6px; justify-self: start; }
+  .dv-calc .hz-sheet-head-txt > p { grid-row: 2; }
 }
 @media (max-width: 720px) {
   /* 한 줄에 여섯 칸을 세우면 종목 이름에 30px 이 남는다(375 실측: "KB금융"이 "K"). 두 줄로

@@ -89,13 +89,47 @@ function writeHoldings(next: Holding[] | ((prev: Holding[]) => Holding[])) {
   listeners.forEach((l) => l());
 }
 
+/* ── 세금 ─────────────────────────────────────────────────────────────
+   어느 계좌에 담느냐로 세금이 갈린다. 네 가지 — 세전 · 일반 계좌 · ISA · 연금 계좌(연금저축·IRP).
+   계좌마다 담을 수 있는 것이 다르다: ISA 는 국내 상장 주식·ETF 만(해외 주식 직접 보유 불가),
+   연금 계좌는 국내 상장 ETF 만(개별 주식 불가). 못 담는 줄은 일반 계좌 세율로 세고 줄에 그렇게 적는다.
+   2026-09 기준 수치 — 바뀌면 여기와 아래 안내문을 같이 고칠 것. */
+type TaxMode = "gross" | "general" | "isa" | "pension";
 /** 국내 배당소득세 14% + 지방소득세 1.4%. 증권사가 지급 때 떼고 넣어 준다. */
 const TAX_RATE_KR = 0.154;
 /** 미국 배당은 미국이 15%를 떼고(한미 조세조약) 국내에서 더 떼지 않는다(금융소득 2천만원 아래). */
 const TAX_RATE_US = 0.15;
-const taxRate = (s: StockLite) => (s.currency === "USD" ? TAX_RATE_US : TAX_RATE_KR);
-/** 금융소득 종합과세 문턱(원). 세전 배당이 이 근처는 돼야 분리과세 얘기가 뜻이 있다 — 그 아래선 어차피 15.4% 원천징수로 끝난다. */
-const SEP_TAX_NOTE_FROM = 15_000_000;
+/** ISA 안의 국내 배당은 만기 때 순이익에 9.9%(비과세 한도를 넘는 몫). 2026년부터 한도는 일반형 500만원·서민형 1,000만원. */
+const TAX_RATE_ISA = 0.099;
+const ISA_FREE = 5_000_000;
+const ISA_FREE_LOW = 10_000_000;
+/** 연금 계좌는 받을 때까지 안 떼고, 연금으로 받을 때 연금소득세 — 55~69세 5.5%, 70대 4.4%, 80세부터 3.3%. 가장 높은 값으로 센다. */
+const TAX_RATE_PENSION = 0.055;
+/** 금융소득 종합과세 문턱(원). 이자·배당 합이 이걸 넘으면 넘는 몫이 다른 소득과 합쳐 누진세율(6~45%)이다. */
+const COMPOSITE_FROM = 20_000_000;
+/** 문턱 안내를 히어로에 띄우기 시작하는 세전 배당. 그 아래선 어차피 원천징수로 끝나 문턱 얘기가 뜻이 없다. */
+const COMPOSITE_NOTE_FROM = 10_000_000;
+
+/** 이 계좌에 담을 수 있는 종목인가. */
+function fitsAccount(s: StockLite, mode: TaxMode): boolean {
+  if (mode === "isa") return s.currency === "KRW";
+  if (mode === "pension") return s.kind === "etf" && s.currency === "KRW";
+  return true;
+}
+/** 줄의 세율. 못 담는 줄은 일반 계좌로. */
+function taxRate(s: StockLite, mode: TaxMode): number {
+  if (mode === "gross") return 0;
+  if (mode === "isa" && fitsAccount(s, mode)) return TAX_RATE_ISA;
+  if (mode === "pension" && fitsAccount(s, mode)) return TAX_RATE_PENSION;
+  return s.currency === "USD" ? TAX_RATE_US : TAX_RATE_KR;
+}
+const TAX_MODES: { key: TaxMode; label: string; short: string }[] = [
+  { key: "general", label: "일반 계좌", short: "세후" },
+  { key: "isa", label: "ISA", short: "세후 · ISA" },
+  { key: "pension", label: "연금 계좌", short: "세후 · 연금" },
+  { key: "gross", label: "세전", short: "세전" },
+];
+const taxShort = (mode: TaxMode) => TAX_MODES.find((m) => m.key === mode)?.short ?? "";
 /** 종목을 처음 담을 때의 주수. 0 이면 결과가 안 서고, 1 은 값이 너무 작아 감이 안 온다. */
 const DEFAULT_SHARES = 10;
 /** 바스켓 투자금 슬라이더 눈금(원). */
@@ -193,13 +227,15 @@ type Line = {
   netKrw: number;
   /** 투자금(원, 전일 종가 × 주수). 종가가 없으면 null. */
   investKrw: number | null;
+  /** 고른 계좌에 못 담는 종목이라 일반 계좌 세율로 셌다(ISA 의 해외 주식, 연금 계좌의 개별 주식). */
+  outside: boolean;
 };
 
 /**
  * 담은 종목 하나하나의 셈. 미국은 달러를 원으로 옮겨 국내와 한 줄에 더한다 — 환율은 FRED 의
  * 최근 값(1~2영업일 늦다). 세금은 종목마다 다르므로(국내 15.4%·미국 15%) 줄에서 뗀다.
  */
-function computeLines(holdings: Holding[], byCode: Map<string, StockLite>, fx: number, afterTax: boolean): Line[] {
+function computeLines(holdings: Holding[], byCode: Map<string, StockLite>, fx: number, mode: TaxMode): Line[] {
   const out: Line[] = [];
   for (const h of holdings) {
     const stock = byCode.get(h.code);
@@ -207,7 +243,7 @@ function computeLines(holdings: Holding[], byCode: Map<string, StockLite>, fx: n
     const rate = stock.currency === "USD" ? fx : 1;
     const gross = stock.dps * h.shares;
     const grossKrw = gross * rate;
-    const keep = afterTax ? 1 - taxRate(stock) : 1;
+    const keep = 1 - taxRate(stock, mode);
     out.push({
       stock,
       shares: h.shares,
@@ -216,6 +252,7 @@ function computeLines(holdings: Holding[], byCode: Map<string, StockLite>, fx: n
       grossKrw,
       netKrw: grossKrw * keep,
       investKrw: stock.close ? stock.close * h.shares * rate : null,
+      outside: mode !== "gross" && !fitsAccount(stock, mode),
     });
   }
   return out;
@@ -258,7 +295,7 @@ export function DividendCalculator({
   const byCode = useMemo(() => new Map(stocks.map((s) => [s.code, s])), [stocks]);
   const holdings = useSyncExternalStore(holdingsStore.subscribe, holdingsStore.getSnapshot, holdingsStore.getServerSnapshot);
   const setHoldings = writeHoldings;
-  const [afterTax, setAfterTax] = useState(true);
+  const [taxMode, setTaxMode] = useState<TaxMode>("general");
   const [amount, setAmount] = useState(AMOUNT_DEFAULT);
   const chipsBy: Record<Scope, string[]> = { kr: popular, us: popularUs, etf: popularEtf };
   // '더 보기'는 한 판만 열린다 — 세 판이 다 펼쳐지면 칩이 백 개다.
@@ -283,14 +320,16 @@ export function DividendCalculator({
 
   // 환율이 없으면(미국 표가 비었을 때) 미국 종목 자체가 목록에 없다(lib/dividend.ts). 1 은 자리값.
   const fx = usdkrw?.rate ?? 1;
-  const lines = useMemo(() => computeLines(holdings, byCode, fx, afterTax), [holdings, byCode, fx, afterTax]);
+  const lines = useMemo(() => computeLines(holdings, byCode, fx, taxMode), [holdings, byCode, fx, taxMode]);
   const total = lines.reduce((s, l) => s + l.netKrw, 0);
   const invest = lines.reduce((s, l) => s + (l.investKrw ?? 0), 0);
   const priced = lines.filter((l) => l.investKrw != null);
   const yieldPct = invest > 0 ? (priced.reduce((s, l) => s + l.grossKrw, 0) / invest) * 100 : null;
-  // 고배당기업(분리과세 대상) 배당의 몫. 2,000만원을 넘는 사람에게만 뜻이 있는 숫자라 그때만 적는다.
+  // 금융소득 종합과세 문턱과 고배당기업(분리과세 대상) 배당의 몫. 세전 합이 문턱 근처인 사람에게만 뜻이 있어 그때만 적는다.
   const sepGross = lines.filter((l) => l.stock.highDiv).reduce((s, l) => s + l.grossKrw, 0);
   const grossAll = lines.reduce((s, l) => s + l.grossKrw, 0);
+  const outsideCount = lines.filter((l) => l.outside).length;
+  const heroNote = taxNote(taxMode, grossAll, sepGross, outsideCount);
   // 달력에 못 드는 줄 — 지급 달을 모르는 것(미국 주식, 국내 ETF). 배당이 있는 줄만 센다.
   const noCalCount = lines.filter((l) => l.stock.dps > 0 && !l.stock.pays.length).length;
   // 달력은 지급 달을 아는 종목(국내)만. 미국은 공시에 지급일이 없다.
@@ -298,11 +337,11 @@ export function DividendCalculator({
     const m = new Array<number>(13).fill(0);
     for (const l of lines) {
       // 달러 지급 건(미국 ETF)은 환율을 곱해야 원화 달력에 든다 — 빠뜨렸더니 SCHD 3월이 22원으로 찍혔다.
-      const f = (afterTax ? 1 - taxRate(l.stock) : 1) * (l.stock.currency === "USD" ? fx : 1);
+      const f = (1 - taxRate(l.stock, taxMode)) * (l.stock.currency === "USD" ? fx : 1);
       for (const [month, amt] of l.stock.pays) m[month] += amt * l.shares * f;
     }
     return m;
-  }, [lines, afterTax, fx]);
+  }, [lines, taxMode, fx]);
 
   const add = (code: string, source: string) => {
     if (!byCode.has(code)) return;
@@ -382,14 +421,14 @@ export function DividendCalculator({
           icon="calculate"
           title="내 종목"
           desc="종목을 담고 주수를 적으면 바로 계산됩니다. 담은 종목은 이 브라우저에만 남습니다."
-          right={<TaxToggle afterTax={afterTax} onChange={(v) => { track("dividend_tax_toggle", { after_tax: v }); setAfterTax(v); }} />}
+          right={<TaxToggle mode={taxMode} onChange={(v) => { track("dividend_tax_toggle", { mode: v }); setTaxMode(v); }} />}
         />
 
         {/* 결과가 먼저 선다. 종목이 없을 때도 이 자리는 비워 두지 않는다 — 무엇을 하면 되는지 적는다. */}
         <div className="dv-hero">
           {lines.length ? (
             <>
-              <p className="dv-hero-label">1년에 받는 배당{afterTax ? " (세후)" : " (세전)"}</p>
+              <p className="dv-hero-label">1년에 받는 배당 ({taxShort(taxMode)})</p>
               <p className="dv-hero-main">{won(total)}</p>
               <p className="dv-hero-sub">
                 한 달 평균 {won(total / 12)}
@@ -400,11 +439,7 @@ export function DividendCalculator({
                   </>
                 )}
               </p>
-              {sepGross > 0 && grossAll >= SEP_TAX_NOTE_FROM && (
-                <p className="dv-hero-note">
-                  세전 {won(grossAll)} 가운데 {won(sepGross)}은 고배당기업(분리과세 대상) 배당입니다. 2,000만원을 넘는 해에는 그 몫을 종합과세 대신 분리과세로 신청할 수 있습니다.
-                </p>
-              )}
+              {heroNote && <p className="dv-hero-note">{heroNote}</p>}
             </>
           ) : (
             <>
@@ -450,14 +485,12 @@ export function DividendCalculator({
           {lines.length > 0 && (
             <HoldingsTable lines={lines} inputs={inputs} onShares={setShares} onRemove={remove} />
           )}
-          {lines.length > 0 && <MonthCalendar monthly={monthly} afterTax={afterTax} noCalCount={noCalCount} />}
+          {lines.length > 0 && <MonthCalendar monthly={monthly} taxLabel={taxShort(taxMode)} noCalCount={noCalCount} />}
         </div>
 
         <div className="hz-sheet-foot">
           <p className="dv-foot">
-            {afterTax
-              ? "세금을 뺀 값입니다. 국내는 15.4%(배당소득세 14%와 지방소득세 1.4%), 미국은 미국에서 떼는 15%입니다. "
-              : "세금을 빼기 전 값입니다. 실제로는 국내 15.4%, 미국 15%를 떼고 들어옵니다. "}
+            {TAX_FOOT[taxMode]}
             {basis && `${basis}. `}
             배당은 회사가 바꿀 수 있고, 지난 1년과 같으리라는 보장은 없습니다. 매수·매도 신호가 아닙니다.
           </p>
@@ -468,7 +501,7 @@ export function DividendCalculator({
       <AmountControl amount={amount} onChange={setAmount} />
       <div className="dv-baskets">
         {baskets.map((b) => (
-          <BasketSheet key={b.key} basket={b} amount={amount} byCode={byCode} afterTax={afterTax} onApply={() => applyBasket(b)} onPick={(code) => add(code, "basket")} />
+          <BasketSheet key={b.key} basket={b} amount={amount} byCode={byCode} mode={taxMode} onApply={() => applyBasket(b)} onPick={(code) => add(code, "basket")} />
         ))}
       </div>
       <p className="dv-note">
@@ -479,18 +512,54 @@ export function DividendCalculator({
 }
 
 /* ── 세후·세전 ────────────────────────────────────────────────────── */
-function TaxToggle({ afterTax, onChange }: { afterTax: boolean; onChange: (v: boolean) => void }) {
+function TaxToggle({ mode, onChange }: { mode: TaxMode; onChange: (v: TaxMode) => void }) {
   return (
-    <div className="dv-seg" role="group" aria-label="세금 반영">
-      {[
-        { on: true, label: "세후" },
-        { on: false, label: "세전" },
-      ].map((o) => (
-        <button key={o.label} type="button" aria-pressed={afterTax === o.on} className="dv-seg-btn" onClick={() => onChange(o.on)}>
+    <div className="dv-seg" role="group" aria-label="세금 · 계좌">
+      {TAX_MODES.map((o) => (
+        <button key={o.key} type="button" aria-pressed={mode === o.key} className="dv-seg-btn" onClick={() => onChange(o.key)}>
           {o.label}
         </button>
       ))}
     </div>
+  );
+}
+
+/** 바닥글의 세금 설명 — 어떻게 셌는지를 계좌마다 글자로. */
+const TAX_FOOT: Record<TaxMode, string> = {
+  general: "일반 계좌로 셌습니다. 국내는 15.4%(배당소득세 14%와 지방소득세 1.4%), 미국은 미국에서 떼는 15%입니다. ",
+  isa: `ISA로 셌습니다. 국내 주식·ETF 배당은 9.9%인데 만기까지 ${wonShort(ISA_FREE)}(서민형 ${wonShort(ISA_FREE_LOW)})은 아예 비과세라 실제 세금은 이보다 적습니다. 해외 주식은 ISA에 못 담아 일반 계좌(15%)로 셌습니다. `,
+  pension: "연금 계좌(연금저축·IRP)로 셌습니다. 국내 ETF 분배금은 받을 때까지 세금 없이 굴러가고 연금으로 받을 때 5.5%(55~69세 · 70대 4.4% · 80세부터 3.3%)를 뗍니다. 주식은 연금 계좌에 못 담아 일반 계좌(15.4%·15%)로 셌습니다. ",
+  gross: "세금을 빼기 전 값입니다. 실제로는 국내 15.4%, 미국 15%를 떼고 들어옵니다. ",
+};
+
+/**
+ * 히어로 아래 한 줄 — 금융소득 종합과세 문턱(2,000만원)까지 얼마 남았나, 넘으면 어떻게 되나, 고배당기업 배당을
+ * 분리과세로 빼면 어떻게 되나. 세전 합이 1,000만원을 넘을 때만 적는다. 다른 이자·배당은 모르니 그 말도 적는다.
+ * ISA·연금 계좌는 문턱과 무관하다(계좌 안 소득은 금융소득에 안 합친다) — 그 계좌에 못 담은 줄이 있을 때만 적는다.
+ */
+function taxNote(mode: TaxMode, grossAll: number, sepGross: number, outsideCount: number): string | null {
+  if (mode === "isa" || mode === "pension") {
+    if (!outsideCount) return null;
+    return mode === "isa"
+      ? `${outsideCount}종목은 해외 주식이라 ISA에 못 담아 일반 계좌로 셌습니다.`
+      : `${outsideCount}종목은 주식이라 연금 계좌에 못 담아 일반 계좌로 셌습니다(연금 계좌엔 국내 ETF만 담깁니다).`;
+  }
+  if (grossAll < COMPOSITE_NOTE_FROM) return null;
+  if (grossAll < COMPOSITE_FROM) {
+    return `세전 ${won(grossAll)}입니다. 금융소득 종합과세 문턱 ${wonShort(COMPOSITE_FROM)}까지 ${won(COMPOSITE_FROM - grossAll)} 남았습니다(다른 이자·배당은 안 넣은 값).`;
+  }
+  const over = grossAll - COMPOSITE_FROM;
+  if (sepGross <= 0) {
+    return `세전 ${won(grossAll)}으로 금융소득 종합과세 문턱 ${wonShort(COMPOSITE_FROM)}을 넘습니다. 넘는 ${won(over)}은 다른 소득과 합쳐 누진세율(6~45%)로 과세됩니다.`;
+  }
+  const rest = grossAll - sepGross;
+  const restOver = rest - COMPOSITE_FROM;
+  return (
+    `세전 ${won(grossAll)}으로 금융소득 종합과세 문턱 ${wonShort(COMPOSITE_FROM)}을 넘습니다. ` +
+    `이 중 고배당기업 배당 ${won(sepGross)}을 분리과세(2,000만원까지 15.4% · 3억까지 22%)로 신청하면 ` +
+    (restOver > 0
+      ? `나머지 ${won(rest)} 가운데 문턱을 넘는 ${won(restOver)}만 다른 소득과 합쳐 과세됩니다.`
+      : `나머지 ${won(rest)}은 문턱 아래라 종합과세를 피합니다.`)
   );
 }
 
@@ -712,6 +781,7 @@ function HoldingRow({
   const { stock: s, shares } = line;
 
   const notes: string[] = [];
+  if (line.outside) notes.push(s.currency === "USD" ? "해외 주식은 ISA·연금 계좌에 못 담아 일반 계좌(15%)로 셌습니다" : "개별 주식은 연금 계좌에 못 담아 일반 계좌(15.4%)로 셌습니다");
   // 미국은 "없다"고 못 말한다 — 허쉬·디지털리얼티처럼 1주당 배당 태그를 안 다는 회사가 있다.
   if (s.dps === 0) notes.push(s.currency === "USD" ? "미국 공시에서 배당을 못 읽었습니다(안 주는 회사일 수도, 공시에 칸이 없을 수도 있습니다)" : "최근 1년 현금배당이 없습니다");
   if (s.unusual) notes.push("평소보다 큰 배당(특별·청산)이 섞여 있어 1년 뒤에도 같으리라 보기 어렵습니다");
@@ -789,7 +859,7 @@ function HoldingRow({
 }
 
 /* ── 달마다 얼마 ─────────────────────────────────────────────────── */
-function MonthCalendar({ monthly, afterTax, noCalCount }: { monthly: number[]; afterTax: boolean; noCalCount: number }) {
+function MonthCalendar({ monthly, taxLabel, noCalCount }: { monthly: number[]; taxLabel: string; noCalCount: number }) {
   const max = Math.max(...MONTHS.map((m) => monthly[m]));
   const paidMonths = MONTHS.filter((m) => monthly[m] > 0).length;
   return (
@@ -797,7 +867,7 @@ function MonthCalendar({ monthly, afterTax, noCalCount }: { monthly: number[]; a
       <div className="dv-cal-head">
         <span className="dv-cal-title">달마다 얼마 들어오나</span>
         <span className="dv-cal-sub">
-          {paidMonths ? `1년에 ${paidMonths}달 들어옵니다` : "지급 달을 아는 종목이 없습니다"} · 최근 12개월 지급일 기준{afterTax ? " · 세후" : " · 세전"}
+          {paidMonths ? `1년에 ${paidMonths}달 들어옵니다` : "지급 달을 아는 종목이 없습니다"} · 최근 12개월 지급일 기준 · {taxLabel}
           {noCalCount > 0 && ` · ${noCalCount}종목은 지급 달을 몰라 뺐습니다`}
         </span>
       </div>
@@ -853,20 +923,20 @@ function BasketSheet({
   basket,
   amount,
   byCode,
-  afterTax,
+  mode,
   onApply,
   onPick,
 }: {
   basket: BasketLite;
   amount: number;
   byCode: Map<string, StockLite>;
-  afterTax: boolean;
+  mode: TaxMode;
   onApply: () => void;
   onPick: (code: string) => void;
 }) {
   const holdings = basketShares(basket.codes, amount, byCode);
   // 바스켓은 국내 종목뿐이라 환율은 1 이다.
-  const lines = computeLines(holdings, byCode, 1, afterTax);
+  const lines = computeLines(holdings, byCode, 1, mode);
   const net = lines.reduce((s, l) => s + l.netKrw, 0);
   const gross = lines.reduce((s, l) => s + l.grossKrw, 0);
   const invest = lines.reduce((s, l) => s + (l.investKrw ?? 0), 0);
@@ -879,7 +949,7 @@ function BasketSheet({
           <div className="dv-basket-sum">
             <p className="dv-basket-main">{won(net)}</p>
             <p className="dv-basket-sub">
-              1년에{afterTax ? " 세후" : " 세전"} · 한 달 평균 {won(net / 12)}
+              1년에 · {taxShort(mode)} · 한 달 평균 {won(net / 12)}
               {y != null && ` · 수익률 ${pct(y)}`}
             </p>
           </div>
