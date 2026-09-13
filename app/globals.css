@@ -5403,7 +5403,22 @@ main.hz-scroll { overflow-x: clip; }
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 .dv-tnote { margin-top: 2px; font-size: 11.5px; line-height: 1.4; color: var(--c-sub); word-break: keep-all; }
-.dv-tshares { display: flex; align-items: center; gap: 4px; }
+/* 주수 스테퍼 위, 평단 칸 아래 — 두 줄을 감싸는 격자. */
+.dv-tshares { display: grid; grid-template-columns: auto auto auto; justify-content: start; align-items: center; gap: 4px; }
+.dv-tcost, .dv-tcost-open { grid-column: 1 / -1; }
+.dv-tcost { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--c-sub); white-space: nowrap; }
+.dv-tshares .dv-tcost input {
+  width: 84px; height: 26px; padding: 0 6px; text-align: right; border-radius: 6px; border: 1px solid var(--c-line);
+  background: var(--c-card); color: var(--c-ink); font-size: 12px; font-weight: 600; font-family: inherit; font-variant-numeric: tabular-nums;
+}
+.dv-tshares .dv-tcost input::-webkit-outer-spin-button,
+.dv-tshares .dv-tcost input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.dv-tshares .dv-tcost input:focus { outline: none; border-color: var(--c-blue); box-shadow: 0 0 0 3px var(--c-blue-tint); }
+.dv-tcost-open {
+  justify-self: start; padding: 0; border: none; background: none; color: var(--c-muted); font-size: 11px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+}
+.dv-tcost-open:hover { color: var(--c-blue); text-decoration: underline; }
 .dv-tshares input {
   width: 64px; height: 32px; padding: 0 8px; border: 1px solid var(--c-line); border-radius: 8px;
   background: var(--c-card); color: var(--c-ink); font-size: 14px; font-weight: 700; text-align: right;
@@ -5450,7 +5465,10 @@ main.hz-scroll { overflow-x: clip; }
   background: var(--c-card); color: var(--c-ink); font-size: 14px; font-weight: 700; font-family: inherit; font-variant-numeric: tabular-nums;
 }
 .dv-goal-input:focus { outline: none; border-color: var(--c-blue); box-shadow: 0 0 0 3px var(--c-blue-tint); }
+.dv-goal-input-sm { width: 52px; }
 .dv-goal-out { margin: 10px 0 0; font-size: 14px; line-height: 1.55; color: var(--c-ink); word-break: keep-all; }
+.dv-goal-path { margin: 4px 0 0; font-size: 13px; line-height: 1.55; color: var(--c-sub); word-break: keep-all; }
+.dv-goal-path b { color: var(--c-ink); font-weight: 700; }
 .dv-goal-out b { font-weight: 800; }
 .dv-goal-note { margin: 4px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--c-muted); word-break: keep-all; }
 

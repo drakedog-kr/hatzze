@@ -28,7 +28,8 @@ import type { BasketLite, MoreLists, StockLite } from "./types";
  * 담긴 종목은 이 브라우저에만 남는다(localStorage). 서버는 아무것도 기억하지 않는다.
  */
 
-type Holding = { code: string; shares: number };
+/** cost 는 내 평단(1주 매수가, 그 종목의 돈 단위). 넣으면 투자금과 수익률이 종가 대신 이걸로 선다(YOC). */
+type Holding = { code: string; shares: number; cost?: number };
 
 /* ── 담은 종목 저장소 ─────────────────────────────────────────────────
    localStorage 는 React 바깥의 저장소라 useSyncExternalStore 로 읽는다(AppShell 의 PcHint ·
@@ -51,7 +52,11 @@ function readSaved(): Holding[] {
     if (!Array.isArray(parsed)) return NO_HOLDINGS;
     const out = parsed
       .filter((h): h is Holding => !!h && typeof h.code === "string" && typeof h.shares === "number")
-      .map((h) => ({ code: h.code, shares: Math.max(0, Math.floor(h.shares)) }));
+      .map((h) => ({
+        code: h.code,
+        shares: Math.max(0, Math.floor(h.shares)),
+        ...(typeof h.cost === "number" && h.cost > 0 ? { cost: h.cost } : {}),
+      }));
     return out.length ? out : NO_HOLDINGS;
   } catch {
     // 사파리 사생활 보호 모드 등에서 localStorage 접근이 던진다. 그때는 빈 채로 시작한다.
@@ -237,8 +242,13 @@ type Line = {
   grossKrw: number;
   /** 세금을 뗀 뒤(원). 국내 15.4%, 미국 15%. 세전 모드면 grossKrw 와 같다. */
   netKrw: number;
-  /** 투자금(원, 전일 종가 × 주수). 종가가 없으면 null. */
+  /** 투자금(원). 평단을 넣었으면 평단 × 주수, 아니면 전일 종가 × 주수. 둘 다 없으면 null. */
   investKrw: number | null;
+  /** 이 줄의 수익률(%). 평단을 넣었으면 그 기준(YOC), 아니면 전일 종가 기준. */
+  yieldPct: number | null;
+  /** 평단을 넣은 줄인가. cost 는 그 값(그 종목의 돈 단위). */
+  onCost: boolean;
+  cost: number | null;
   /** 고른 계좌에 못 담는 종목이라 일반 계좌 세율로 셌다(ISA 의 해외 주식, 연금 계좌의 개별 주식). */
   outside: boolean;
 };
@@ -256,6 +266,7 @@ function computeLines(holdings: Holding[], byCode: Map<string, StockLite>, fx: n
     const gross = stock.dps * h.shares;
     const grossKrw = gross * rate;
     const keep = 1 - taxRate(stock, mode);
+    const basis = h.cost && h.cost > 0 ? h.cost : stock.close;
     out.push({
       stock,
       shares: h.shares,
@@ -263,7 +274,10 @@ function computeLines(holdings: Holding[], byCode: Map<string, StockLite>, fx: n
       net: gross * keep,
       grossKrw,
       netKrw: grossKrw * keep,
-      investKrw: stock.close ? stock.close * h.shares * rate : null,
+      investKrw: basis ? basis * h.shares * rate : null,
+      yieldPct: basis && stock.dps > 0 ? (stock.dps / basis) * 100 : basis ? 0 : null,
+      onCost: !!(h.cost && h.cost > 0),
+      cost: h.cost && h.cost > 0 ? h.cost : null,
       outside: mode !== "gross" && !fitsAccount(stock, mode),
     });
   }
@@ -315,6 +329,7 @@ export function DividendCalculator({
   // 목표 월 배당(만원)과 매달 더 넣는 돈(만원). 저장하지 않는다 — 담은 종목과 달리 한 번 보는 값이다.
   const [goalMan, setGoalMan] = useState(GOAL_DEFAULT_MAN);
   const [addMan, setAddMan] = useState(ADD_DEFAULT_MAN);
+  const [growthPct, setGrowthPct] = useState(0);
   // 달력에서 누른 달 — 그 달에 주는 종목을 아래에 세운다(빈 달 채우기).
   const [fillMonth, setFillMonth] = useState<number | null>(null);
   const [amount, setAmount] = useState(AMOUNT_DEFAULT);
@@ -393,6 +408,9 @@ export function DividendCalculator({
   };
   const setShares = (code: string, shares: number) =>
     setHoldings((prev) => prev.map((h) => (h.code === code ? { ...h, shares } : h)));
+  // 평단. 0이나 빈 값이면 지운다(종가 기준으로 돌아간다).
+  const setCost = (code: string, cost: number | null) =>
+    setHoldings((prev) => prev.map((h) => (h.code === code ? (cost && cost > 0 ? { ...h, cost } : { code: h.code, shares: h.shares }) : h)));
   const remove = (code: string) => {
     track("dividend_remove", { stock_code: gaStockCode(code) });
     setHoldings((prev) => prev.filter((h) => h.code !== code));
@@ -490,6 +508,7 @@ export function DividendCalculator({
                   <>
                     {" · "}투자금 {won(invest)}
                     {yieldPct != null && <>{" · "}수익률 {pct(yieldPct)}</>}
+                    {lines.some((l) => l.onCost) && <>{" · "}평단을 넣은 종목은 평단 기준</>}
                   </>
                 )}
               </p>
@@ -557,7 +576,7 @@ export function DividendCalculator({
             )}
           </div>
           {lines.length > 0 && (
-            <HoldingsTable lines={lines} inputs={inputs} onShares={setShares} onRemove={remove} />
+            <HoldingsTable lines={lines} inputs={inputs} onShares={setShares} onCost={setCost} onRemove={remove} />
           )}
           {lines.length > 0 && <Upcoming lines={lines} fx={fx} mode={taxMode} />}
           {lines.length > 0 && (
@@ -576,7 +595,17 @@ export function DividendCalculator({
             <MonthFill month={fillMonth} order={fillOrder} holdings={holdings} onPick={(code) => add(code, "fill_month")} onClose={() => setFillMonth(null)} />
           )}
           {lines.length > 0 && invest > 0 && total > 0 && (
-            <GoalBox invest={invest} net={total} taxLabel={taxShort(taxMode)} goalMan={goalMan} addMan={addMan} onGoal={setGoalMan} onAdd={setAddMan} />
+            <GoalBox
+              invest={invest}
+              net={total}
+              taxLabel={taxShort(taxMode)}
+              goalMan={goalMan}
+              addMan={addMan}
+              growthPct={growthPct}
+              onGoal={setGoalMan}
+              onAdd={setAddMan}
+              onGrowth={setGrowthPct}
+            />
           )}
         </div>
 
@@ -831,25 +860,27 @@ function HoldingsTable({
   lines,
   inputs,
   onShares,
+  onCost,
   onRemove,
 }: {
   lines: Line[];
   inputs: Map<string, HTMLInputElement>;
   onShares: (code: string, shares: number) => void;
+  onCost: (code: string, cost: number | null) => void;
   onRemove: (code: string) => void;
 }) {
   return (
     <div className="dv-table" role="table" aria-label="담은 종목">
       <div className="dv-trow dv-thead" role="row">
         <span role="columnheader">종목</span>
-        <span role="columnheader">주수</span>
+        <span role="columnheader">주수 · 평단</span>
         <span role="columnheader">1주에 1년</span>
         <span role="columnheader">1년에 받는 배당</span>
         <span role="columnheader">수익률</span>
         <span role="columnheader" aria-label="빼기" />
       </div>
       {lines.map((l) => (
-        <HoldingRow key={l.stock.code} line={l} inputs={inputs} onShares={onShares} onRemove={onRemove} />
+        <HoldingRow key={l.stock.code} line={l} inputs={inputs} onShares={onShares} onCost={onCost} onRemove={onRemove} />
       ))}
     </div>
   );
@@ -859,14 +890,19 @@ function HoldingRow({
   line,
   inputs,
   onShares,
+  onCost,
   onRemove,
 }: {
   line: Line;
   inputs: Map<string, HTMLInputElement>;
   onShares: (code: string, shares: number) => void;
+  onCost: (code: string, cost: number | null) => void;
   onRemove: (code: string) => void;
 }) {
   const { stock: s, shares } = line;
+  // 평단 칸은 값이 있거나 열어 둔 동안만 보인다 — 줄마다 빈 칸이 서 있으면 표가 무거워진다.
+  const [costOpen, setCostOpen] = useState(false);
+  const showCost = line.onCost || costOpen;
 
   const notes: string[] = [];
   if (line.outside) notes.push(s.currency === "USD" ? "해외 주식은 ISA·연금 계좌에 못 담아 일반 계좌(15%)로 셌습니다" : "개별 주식은 연금 계좌에 못 담아 일반 계좌(15.4%)로 셌습니다");
@@ -896,6 +932,12 @@ function HoldingRow({
   // 일드맥스(TSLY·MSTY)류. 지난 1년 분배가 가격의 절반을 넘으면 원금을 돌려주는 상품이라 봐야 한다.
   if ((s.yieldPct ?? 0) > 30) notes.push("분배금이 달마다 크게 흔들리고 원금을 돌려주는 몫이 섞인 상품입니다. 지난 1년과 같으리라 보기 어렵습니다");
   if (s.close == null) notes.push("종가가 없어 투자금과 수익률을 못 냅니다");
+  // 5년 연평균 증가율(국내는 예탁결제원 기록, 미국은 SEC 연도별 합으로 센 값). 늘린 회사만이 아니라 줄인 회사도 적는다.
+  if (s.growth5 != null && s.streak >= 5) {
+    const g = Math.round(s.growth5);
+    if (g >= 1) notes.push(`5년간 해마다 ${g}%씩 늘렸습니다`);
+    else if (g <= -1) notes.push(`5년간 해마다 ${-g}%씩 줄었습니다`);
+  }
   if (s.nextRecord) notes.push(`다음 배당기준일 ${s.nextRecord}`);
   if (s.nextPay) notes.push(`다음 지급 ${s.nextPay[0]} · 1주에 ${money(s.nextPay[1], s)}`);
   if (s.kind === "stock" && s.currency === "USD" && s.dps > 0 && !s.pays.length) notes.push("지급일 기록이 없어 아래 달력에는 빠집니다");
@@ -937,13 +979,45 @@ function HoldingRow({
         <button type="button" className="dv-step" aria-label={`${s.name} 1주 더하기`} onClick={() => step(1)}>
           +
         </button>
+        {/* 내 평단 — 넣으면 이 줄의 투자금·수익률이 종가 대신 평단으로 선다(YOC). 비우면 종가로 돌아간다. */}
+        {showCost ? (
+          <label className="dv-tcost">
+            <span>평단</span>
+            {/* 비제어 입력 — 저장값을 value 로 되돌려 주면 "45." 처럼 치는 중인 소수점이 지워진다. */}
+            <input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step={s.currency === "USD" ? 0.01 : 1}
+              placeholder={s.close != null ? String(s.currency === "USD" ? s.close : Math.round(s.close)) : ""}
+              defaultValue={line.cost ?? ""}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                onCost(s.code, Number.isFinite(v) && v > 0 ? v : null);
+              }}
+              onBlur={(e) => {
+                if (!(Number(e.target.value) > 0)) setCostOpen(false);
+              }}
+              aria-label={`${s.name} 평단(1주 매수가)`}
+              autoFocus={costOpen && !line.onCost}
+            />
+            <span>{s.currency === "USD" ? "$" : "원"}</span>
+          </label>
+        ) : (
+          <button type="button" className="dv-tcost-open" onClick={() => setCostOpen(true)}>
+            평단 넣기
+          </button>
+        )}
       </span>
       <span className="dv-tcell dv-tnum" role="cell">{s.dps > 0 ? money(s.dps, s) : "없음"}</span>
       <span className="dv-tcell dv-tnum dv-tstrong" role="cell">
         {won(line.netKrw)}
         {s.currency === "USD" && s.dps > 0 && <span className="dv-tsub">{usd(line.net)}</span>}
       </span>
-      <span className="dv-tcell dv-tnum" role="cell">{s.yieldPct != null ? pct(s.yieldPct) : "·"}</span>
+      <span className="dv-tcell dv-tnum" role="cell">
+        {line.yieldPct != null ? pct(line.yieldPct) : "·"}
+        {line.onCost && <span className="dv-tsub">내 평단 기준</span>}
+      </span>
       <span className="dv-tcell" role="cell">
         <button type="button" className="dv-remove" aria-label={`${s.name} 빼기`} onClick={() => onRemove(s.code)}>
           ×
@@ -1126,14 +1200,30 @@ function MonthFill({
    지금 담은 종목의 비율(세후 수익률 = 1년 세후 배당 ÷ 투자금)이 그대로 간다고 치고 센다. 배당은
    받는 족족 같은 비율로 다시 담고(재투자), 주가와 배당은 지금과 같다고 본다 — 그 셋을 글자로 적는다.
    달 수는 한 달씩 굴려서 센다(닫힌 식보다 읽기 쉽고 600달이면 즉시다). */
-function monthsToGoal(invest: number, yearlyRate: number, addMonthly: number, goalMonthly: number): number | null {
-  if (yearlyRate <= 0) return null;
+/**
+ * 달마다 굴린다: 이달 배당 = 자산 × 수익률 ÷ 12, 배당과 매달 넣는 돈을 자산에 더한다. 배당이 해마다 g% 늘면
+ * 수익률(자산 대비)이 그만큼 자란다고 본다 — 주가는 그대로라는 가정이라, 배당 성장은 곧 수익률 성장이다.
+ * 돌려주는 건 m달째 월 배당의 목록(0 = 지금). 60·120·240달째를 읽으면 5·10·20년 뒤다.
+ */
+function projectMonthly(invest: number, yearlyRate: number, addMonthly: number, growthPct: number, months: number): number[] {
+  const out: number[] = [];
   let p = invest;
-  for (let m = 0; m <= GOAL_MAX_MONTHS; m++) {
-    if ((p * yearlyRate) / 12 >= goalMonthly) return m;
-    p += (p * yearlyRate) / 12 + addMonthly;
+  const g = Math.pow(1 + growthPct / 100, 1 / 12);
+  let r = yearlyRate;
+  for (let m = 0; m <= months; m++) {
+    const div = (p * r) / 12;
+    out.push(div);
+    p += div + addMonthly;
+    r *= g;
   }
-  return null;
+  return out;
+}
+
+function monthsToGoal(invest: number, yearlyRate: number, addMonthly: number, growthPct: number, goalMonthly: number): number | null {
+  if (yearlyRate <= 0) return null;
+  const path = projectMonthly(invest, yearlyRate, addMonthly, growthPct, GOAL_MAX_MONTHS);
+  const m = path.findIndex((div) => div >= goalMonthly);
+  return m >= 0 ? m : null;
 }
 
 function GoalBox({
@@ -1142,22 +1232,28 @@ function GoalBox({
   taxLabel,
   goalMan,
   addMan,
+  growthPct,
   onGoal,
   onAdd,
+  onGrowth,
 }: {
   invest: number;
   net: number;
   taxLabel: string;
   goalMan: number;
   addMan: number;
+  growthPct: number;
   onGoal: (v: number) => void;
   onAdd: (v: number) => void;
+  onGrowth: (v: number) => void;
 }) {
   const rate = net / invest;
   const goal = goalMan * 1e4;
   const add = addMan * 1e4;
   const need = rate > 0 ? (goal * 12) / rate : null;
-  const months = goal > 0 ? monthsToGoal(invest, rate, add, goal) : null;
+  const months = goal > 0 ? monthsToGoal(invest, rate, add, growthPct, goal) : null;
+  // 5·10·20년 뒤 월 배당 — 같은 셈을 240달까지 돌려 읽는다.
+  const path = rate > 0 ? projectMonthly(invest, rate, add, growthPct, 240) : null;
   const years = months != null ? `${Math.floor(months / 12) ? `${Math.floor(months / 12)}년 ` : ""}${months % 12 ? `${months % 12}개월` : ""}`.trim() : null;
   const numInput = (value: number, onChange: (v: number) => void, label: string) => (
     <input
@@ -1182,7 +1278,22 @@ function GoalBox({
           한 달에 {numInput(goalMan, onGoal, "목표 월 배당(만원)")}만원 받으려면
         </label>
         <label className="dv-goal-field">
-          매달 {numInput(addMan, onAdd, "매달 더 넣는 돈(만원)")}만원씩 더 넣을 때
+          매달 {numInput(addMan, onAdd, "매달 더 넣는 돈(만원)")}만원씩 더 넣고
+        </label>
+        <label className="dv-goal-field">
+          배당이 해마다{" "}
+          <input
+            type="number"
+            inputMode="decimal"
+            min={0}
+            max={30}
+            step={1}
+            value={growthPct}
+            onChange={(e) => onGrowth(Math.min(30, Math.max(0, Number(e.target.value) || 0)))}
+            aria-label="배당 성장률(연 %)"
+            className="dv-goal-input dv-goal-input-sm"
+          />
+          % 늘면
         </label>
       </div>
       <p className="dv-goal-out">
@@ -1203,7 +1314,19 @@ function GoalBox({
           </>
         )}
       </p>
-      <p className="dv-goal-note">주가와 배당이 지금과 같고 받은 배당을 같은 비율로 다시 담는다고 본 값입니다. 물가·주가 변동은 안 넣었습니다.</p>
+      {path && (
+        <p className="dv-goal-path">
+          {[5, 10, 20].map((y, i) => (
+            <span key={y}>
+              {i > 0 && " · "}
+              {y}년 뒤 한 달에 <b>{wonShort(Math.round(path[y * 12] / 1e4) * 1e4)}</b>
+            </span>
+          ))}
+        </p>
+      )}
+      <p className="dv-goal-note">
+        주가는 지금과 같고 받은 배당을 같은 비율로 다시 담는다고 본 값입니다. 배당 성장률 0%면 배당도 지금과 같다고 봅니다. 물가는 안 넣었습니다.
+      </p>
     </div>
   );
 }
