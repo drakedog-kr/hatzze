@@ -5406,6 +5406,16 @@ main.hz-scroll { overflow-x: clip; }
 }
 .dv-remove:hover { background: var(--tx-btn); color: var(--c-ink); }
 
+/* 다가오는 일정 — 회색 타일 위 줄 목록. 날짜 · 종목 · 무엇 · 얼마. */
+.dv-upcoming { background: var(--tx-tile); border-radius: var(--tx-r-tile); padding: 14px 16px 10px; }
+.dv-upcoming-list { list-style: none; margin: 0; padding: 0; }
+.dv-upcoming-row { display: flex; align-items: baseline; gap: 10px; padding: 6px 0; border-top: 1px solid var(--c-sheet-row); font-size: 13px; }
+.dv-upcoming-row:first-child { border-top: 0; }
+.dv-upcoming-when { flex: 0 0 84px; white-space: nowrap; font-weight: 700; color: var(--c-ink); font-variant-numeric: tabular-nums; }
+.dv-upcoming-name { font-weight: 600; color: var(--c-ink); white-space: nowrap; }
+.dv-upcoming-what { color: var(--c-sub); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dv-upcoming-amt { margin-left: auto; font-weight: 700; color: var(--c-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
 /* 목표까지 — 회색 타일. 두 칸(목표 월 배당·매달 더 넣기)은 문장 안에 든 숫자 칸이다. */
 .dv-goal { background: var(--tx-tile); border-radius: var(--tx-r-tile); padding: 14px 16px 12px; }
 .dv-goal-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
@@ -5501,6 +5511,9 @@ main.hz-scroll { overflow-x: clip; }
   .dv-more[data-scope="etf"] { order: 5; }
 }
 @media (max-width: 560px) {
+  /* 일정 줄은 두 줄로 — 날짜·종목 윗줄, 무엇·얼마 아랫줄. */
+  .dv-upcoming-row { flex-wrap: wrap; row-gap: 2px; }
+  .dv-upcoming-what { flex: 1 1 100%; padding-left: 94px; white-space: normal; }
   /* 라벨을 칩 위로 — 96px 라벨 옆에 칩을 두면 한 줄에 칩 하나가 남는다. */
   .dv-more-row { flex-direction: column; gap: 6px; }
   .dv-more-label { flex: none; padding-top: 0; }

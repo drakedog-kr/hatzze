@@ -42,6 +42,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 const MONTH = (iso: string) => Number(iso.slice(5, 7));
+const DAY = (iso: string) => Number(iso.slice(8, 10));
 
 function toLite(s: DividendStock): StockLite {
   return {
@@ -59,7 +60,7 @@ function toLite(s: DividendStock): StockLite {
     unusual: s.unusual,
     estimated: s.estimated,
     // 지급일이 없는 건(아직 안 정해진 미래분)은 달을 모르니 달력에서 뺀다. 합(dps)에는 든다.
-    pays: s.payments.filter((p) => p.pay).map((p) => [MONTH(p.pay as string), p.amount]),
+    pays: s.payments.filter((p) => p.pay).map((p) => [MONTH(p.pay as string), p.amount, DAY(p.pay as string)]),
     streak: s.streak,
     growth5: s.growth5,
     nextRecord: s.nextRecord,

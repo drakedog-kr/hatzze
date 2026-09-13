@@ -137,6 +137,9 @@ const GOAL_DEFAULT_MAN = 100;
 const ADD_DEFAULT_MAN = 50;
 /** 빈 달 채우기의 줄마다 칩 수. '더 보기' 묶음과 같다. */
 const ROW_CHIPS = 8;
+/** 다가오는 일정의 줄 수 상한과, 지난해 지급일로 어림한 것을 얼마나 앞까지 보여 주나(날). */
+const UPCOMING_MAX = 6;
+const UPCOMING_DAYS = 92;
 /** 목표까지 몇 달인지 셀 때의 상한(달). 넘으면 "이 속도로는 안 닿는다"로 적는다. */
 const GOAL_MAX_MONTHS = 50 * 12;
 /** 바스켓 투자금 슬라이더 눈금(원). */
@@ -520,6 +523,7 @@ export function DividendCalculator({
           {lines.length > 0 && (
             <HoldingsTable lines={lines} inputs={inputs} onShares={setShares} onRemove={remove} />
           )}
+          {lines.length > 0 && <Upcoming lines={lines} fx={fx} mode={taxMode} />}
           {lines.length > 0 && (
             <MonthCalendar
               monthly={monthly}
@@ -955,6 +959,80 @@ function MonthCalendar({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/* ── 다가오는 일정 — 담은 종목의 다음 기준일·지급일 ─────────────────────────────────
+   아는 날짜가 먼저다: 국내 주식은 예탁결제원에 올라온 다음 배당기준일, 미국 주식·ETF 는 선언됐지만 아직
+   안 지급된 다음 건(지급일·1주당 금액). 날짜를 모르는 종목은 지난 1년 지급일을 올해로 옮겨 "이날쯤 지급 예상"을
+   적는다 — 이미 지난 날은 건너뛰고(이달 2일에 준 월배당 ETF 를 '이달 예상'이라 하지 않게), 석 달 안의 것만.
+   여섯 줄까지.
+   ⚠️ 서버 렌더에는 없다 — 담은 종목이 브라우저 저장소에서 오므로 hydration 뒤에만 그려져 오늘 날짜를 써도 안전하다. */
+type UpcomingItem = { key: string; when: string; sortKey: string; name: string; what: string; amount: string | null };
+
+function upcomingOf(lines: Line[], fx: number, mode: TaxMode): UpcomingItem[] {
+  const today = new Date();
+  const iso = today.toISOString().slice(0, 10);
+  const horizon = new Date(today.getTime() + UPCOMING_DAYS * 86400e3).toISOString().slice(0, 10);
+  const year = today.getFullYear();
+  const out: UpcomingItem[] = [];
+  const dateLabel = (d: string) => `${Number(d.slice(5, 7))}월 ${Number(d.slice(8, 10))}일`;
+  const net = (s: StockLite, v: number) => {
+    const keep = 1 - taxRate(s, mode);
+    const krw = v * keep * (s.currency === "USD" ? fx : 1);
+    return s.currency === "USD" ? `${usd(v * keep)} · ${won(krw)}` : won(krw);
+  };
+  for (const l of lines) {
+    const s = l.stock;
+    if (s.nextRecord && s.nextRecord >= iso) {
+      out.push({ key: `${s.code}-r`, when: dateLabel(s.nextRecord), sortKey: s.nextRecord, name: s.name, what: "배당기준일", amount: null });
+    }
+    if (s.nextPay && s.nextPay[0] >= iso) {
+      out.push({ key: `${s.code}-p`, when: dateLabel(s.nextPay[0]), sortKey: s.nextPay[0], name: s.name, what: `지급 · 1주에 ${money(s.nextPay[1], s)}`, amount: net(s, s.nextPay[1] * l.shares) });
+      continue;
+    }
+    // 날짜를 모르면 지난 1년 지급일을 올해(지났으면 내년)로 옮겨 가장 가까운 것 하나.
+    const expected = s.pays
+      .map(([m, v, d]) => {
+        const md = `${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+        return { date: `${year}-${md}` >= iso ? `${year}-${md}` : `${year + 1}-${md}`, v };
+      })
+      .filter((e) => e.date <= horizon)
+      .sort((a, b) => a.date.localeCompare(b.date))[0];
+    if (expected) {
+      out.push({
+        key: `${s.code}-e`,
+        when: `${dateLabel(expected.date)}쯤`,
+        sortKey: expected.date,
+        name: s.name,
+        what: `지급 예상 · 지난해 이날 1주에 ${money(expected.v, s)}`,
+        amount: net(s, expected.v * l.shares),
+      });
+    }
+  }
+  return out.sort((a, b) => a.sortKey.localeCompare(b.sortKey)).slice(0, UPCOMING_MAX);
+}
+
+function Upcoming({ lines, fx, mode }: { lines: Line[]; fx: number; mode: TaxMode }) {
+  const items = upcomingOf(lines, fx, mode);
+  if (!items.length) return null;
+  return (
+    <div className="dv-upcoming">
+      <div className="dv-cal-head">
+        <span className="dv-cal-title">다가오는 일정</span>
+        <span className="dv-cal-sub">공시된 기준일·지급일이 먼저, 모르면 지난해 지급일로 어림(석 달 안) · {taxShort(mode)}</span>
+      </div>
+      <ul className="dv-upcoming-list">
+        {items.map((it) => (
+          <li key={it.key} className="dv-upcoming-row">
+            <span className="dv-upcoming-when">{it.when}</span>
+            <span className="dv-upcoming-name">{it.name}</span>
+            <span className="dv-upcoming-what">{it.what}</span>
+            {it.amount && <span className="dv-upcoming-amt">{it.amount}</span>}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

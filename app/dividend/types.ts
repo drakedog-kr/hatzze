@@ -32,8 +32,8 @@ export type StockLite = {
   unusual: boolean;
   /** 마지막 분기를 네 배 한 추정값이다(미국, 연 행이 없는 회사). 화면이 '추정'이라 적는다. */
   estimated: boolean;
-  /** 최근 12개월 지급 건 [달, 1주당 금액]. 달력이 달마다 얼마인지 그린다. */
-  pays: [number, number][];
+  /** 최근 12개월 지급 건 [달, 1주당 금액, 날]. 달력이 달마다 얼마인지 그리고, 다가오는 일정이 '지난해 이 날' 로 다음 지급을 어림한다. */
+  pays: [number, number, number][];
   streak: number;
   growth5: number | null;
   nextRecord: string | null;
