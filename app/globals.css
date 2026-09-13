@@ -5276,6 +5276,14 @@ main.hz-scroll { overflow-x: clip; }
 }
 .dv-hero-empty { font-size: 22px; font-weight: 700; color: var(--c-sub2); }
 .dv-hero-sub { margin: 6px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--c-sub); word-break: keep-all; }
+/* 계좌 고르기 — 세후일 때 히어로 아래 작은 칸. 머리의 세후·세전보다 한 단 작다. */
+.dv-account { display: flex; align-items: center; gap: 4px; margin: 10px 0 0; flex-wrap: wrap; }
+.dv-account-label { font-size: 12px; font-weight: 600; color: var(--c-sub); margin-right: 4px; }
+.dv-account-btn {
+  padding: 4px 10px; border-radius: 999px; border: 1px solid var(--c-line); background: var(--c-card); color: var(--c-label);
+  font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap;
+}
+.dv-account-btn[aria-pressed="true"] { background: var(--c-cold-ink); border-color: var(--c-cold-ink); color: var(--c-card); }
 /* 분리과세 몫 — 2,000만원 근처인 사람에게만 뜨는 한 줄. */
 .dv-hero-note { margin: 8px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--c-sub); word-break: keep-all; }
 .dv-body { padding: 14px 26px 22px; display: flex; flex-direction: column; gap: 16px; }
@@ -5347,15 +5355,25 @@ main.hz-scroll { overflow-x: clip; }
 .dv-chip:active { cursor: grabbing; }
 .dv-chip-yield { color: var(--c-sub); }
 
-/* 더 보기 — 칩 아래 글자 버튼 하나. 열면 그 판의 묶음들이 세 판 아래 한 줄 전체 폭으로 펼쳐진다. */
+/* 더 보기 — 판 맨 아래 가로로 꽉 찬 버튼(세 판이 같은 줄에 서게 margin-top: auto). 열면 그 판의 묶음들이
+   세 판 아래 한 줄 전체 폭으로 펼쳐진다. 펼친 판의 버튼은 파란 면으로 "이게 열려 있다"를 짚는다. */
+.dv-more-btn {
+  margin-top: 12px; padding: 8px 12px; width: 100%; border-radius: 10px; border: 1px solid var(--c-line);
+  background: var(--c-card); color: var(--c-ink); font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.dv-group .dv-more-btn { margin-top: auto; }
+.dv-group .dv-chips { margin-bottom: 12px; }
+.dv-more-btn:hover { background: var(--tx-btn); }
+.dv-more-btn[aria-expanded="true"] { background: var(--c-cold-ink); border-color: var(--c-cold-ink); color: var(--c-card); }
+/* 펼친 묶음 머리의 '접기'는 글자 버튼. */
 .dv-more-toggle {
-  align-self: flex-start; margin-top: 10px; padding: 0; border: none; background: none; color: var(--c-blue);
+  padding: 0; border: none; background: none; color: var(--c-blue);
   font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap;
 }
 .dv-more-toggle:hover { text-decoration: underline; }
 .dv-more { grid-column: 1 / -1; background: var(--tx-tile); border-radius: var(--tx-r-tile); padding: 12px 14px; min-width: 0; }
 .dv-more-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
-.dv-more-head .dv-more-toggle { margin-top: 0; }
 .dv-more-title { font-size: 13.5px; font-weight: 800; color: var(--c-ink); letter-spacing: -0.01em; }
 /* 한 줄 = 라벨 + 칩. 라벨 폭을 못박아 칩이 줄마다 같은 자리에서 시작한다. */
 .dv-more-row { display: flex; align-items: flex-start; gap: 12px; padding: 8px 0; border-top: 1px solid var(--c-sheet-row); }
@@ -5517,9 +5535,6 @@ main.hz-scroll { overflow-x: clip; }
   /* 라벨을 칩 위로 — 96px 라벨 옆에 칩을 두면 한 줄에 칩 하나가 남는다. */
   .dv-more-row { flex-direction: column; gap: 6px; }
   .dv-more-label { flex: none; padding-top: 0; }
-  /* 계좌 네 칸(231px)이 제목 옆에 서면 제목이 "내/종목"으로 꺾인다 — 설명 아래 줄로 내린다(머리 격자의 3행). */
-  .dv-calc .hz-sheet-head-side { grid-column: 2 / -1; grid-row: 3; margin-top: 6px; justify-self: start; }
-  .dv-calc .hz-sheet-head-txt > p { grid-row: 2; }
 }
 @media (max-width: 720px) {
   /* 한 줄에 여섯 칸을 세우면 종목 이름에 30px 이 남는다(375 실측: "KB금융"이 "K"). 두 줄로

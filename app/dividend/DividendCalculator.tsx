@@ -94,7 +94,8 @@ function writeHoldings(next: Holding[] | ((prev: Holding[]) => Holding[])) {
    계좌마다 담을 수 있는 것이 다르다: ISA 는 국내 상장 주식·ETF 만(해외 주식 직접 보유 불가),
    연금 계좌는 국내 상장 ETF 만(개별 주식 불가). 못 담는 줄은 일반 계좌 세율로 세고 줄에 그렇게 적는다.
    2026-09 기준 수치 — 바뀌면 여기와 아래 안내문을 같이 고칠 것. */
-type TaxMode = "gross" | "general" | "isa" | "pension";
+type Account = "general" | "isa" | "pension";
+type TaxMode = "gross" | Account;
 /** 국내 배당소득세 14% + 지방소득세 1.4%. 증권사가 지급 때 떼고 넣어 준다. */
 const TAX_RATE_KR = 0.154;
 /** 미국 배당은 미국이 15%를 떼고(한미 조세조약) 국내에서 더 떼지 않는다(금융소득 2천만원 아래). */
@@ -123,13 +124,12 @@ function taxRate(s: StockLite, mode: TaxMode): number {
   if (mode === "pension" && fitsAccount(s, mode)) return TAX_RATE_PENSION;
   return s.currency === "USD" ? TAX_RATE_US : TAX_RATE_KR;
 }
-const TAX_MODES: { key: TaxMode; label: string; short: string }[] = [
+const ACCOUNTS: { key: Account; label: string; short: string }[] = [
   { key: "general", label: "일반 계좌", short: "세후" },
   { key: "isa", label: "ISA", short: "세후 · ISA" },
   { key: "pension", label: "연금 계좌", short: "세후 · 연금" },
-  { key: "gross", label: "세전", short: "세전" },
 ];
-const taxShort = (mode: TaxMode) => TAX_MODES.find((m) => m.key === mode)?.short ?? "";
+const taxShort = (mode: TaxMode) => (mode === "gross" ? "세전" : (ACCOUNTS.find((m) => m.key === mode)?.short ?? "세후"));
 /** 종목을 처음 담을 때의 주수. 0 이면 결과가 안 서고, 1 은 값이 너무 작아 감이 안 온다. */
 const DEFAULT_SHARES = 10;
 /** 목표 월 배당의 기본값(만원)과 매달 더 넣는 돈의 기본값(만원). 파이어족 글에서 가장 자주 나오는 숫자. */
@@ -307,7 +307,11 @@ export function DividendCalculator({
   const byCode = useMemo(() => new Map(stocks.map((s) => [s.code, s])), [stocks]);
   const holdings = useSyncExternalStore(holdingsStore.subscribe, holdingsStore.getSnapshot, holdingsStore.getServerSnapshot);
   const setHoldings = writeHoldings;
-  const [taxMode, setTaxMode] = useState<TaxMode>("general");
+  // 머리의 칸은 세후·세전 둘뿐이다(2026-09-13 Hun: "일반 유저에겐 세후·세전이 쉽다"). 어느 계좌로 세는지는
+  // 세후일 때만 히어로 아래 작은 칸에서 고른다 — 세전이면 계좌가 뜻이 없다.
+  const [afterTax, setAfterTax] = useState(true);
+  const [account, setAccount] = useState<Account>("general");
+  const taxMode: TaxMode = afterTax ? account : "gross";
   // 목표 월 배당(만원)과 매달 더 넣는 돈(만원). 저장하지 않는다 — 담은 종목과 달리 한 번 보는 값이다.
   const [goalMan, setGoalMan] = useState(GOAL_DEFAULT_MAN);
   const [addMan, setAddMan] = useState(ADD_DEFAULT_MAN);
@@ -459,7 +463,7 @@ export function DividendCalculator({
           icon="calculate"
           title="내 종목"
           desc="종목을 담고 주수를 적으면 바로 계산됩니다. 담은 종목은 이 브라우저에만 남습니다."
-          right={<TaxToggle mode={taxMode} onChange={(v) => { track("dividend_tax_toggle", { mode: v }); setTaxMode(v); }} />}
+          right={<TaxToggle afterTax={afterTax} onChange={(v) => { track("dividend_tax_toggle", { after_tax: v }); setAfterTax(v); }} />}
         />
 
         {/* 결과가 먼저 선다. 종목이 없을 때도 이 자리는 비워 두지 않는다 — 무엇을 하면 되는지 적는다. */}
@@ -477,6 +481,25 @@ export function DividendCalculator({
                   </>
                 )}
               </p>
+              {afterTax && (
+                <div className="dv-account" role="group" aria-label="어느 계좌로 세나">
+                  <span className="dv-account-label">계좌</span>
+                  {ACCOUNTS.map((o) => (
+                    <button
+                      key={o.key}
+                      type="button"
+                      className="dv-account-btn"
+                      aria-pressed={account === o.key}
+                      onClick={() => {
+                        track("dividend_account", { account: o.key });
+                        setAccount(o.key);
+                      }}
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+              )}
               {heroNote && <p className="dv-hero-note">{heroNote}</p>}
             </>
           ) : (
@@ -501,9 +524,10 @@ export function DividendCalculator({
                   <span className="dv-group-desc">{o.desc}</span>
                 </div>
                 <QuickChips codes={chipsBy[o.key]} byCode={byCode} holdings={holdings} onPick={(code) => add(code, `chip_${o.key}`)} />
+                {/* 판 맨 아래에 붙는 버튼 — 세 판의 높이가 달라도 같은 줄에 선다(margin-top: auto). */}
                 {more[o.key].rows.length > 0 && (
-                  <button type="button" className="dv-more-toggle" aria-expanded={moreOpen === o.key} onClick={() => toggleMore(o.key)}>
-                    {moreOpen === o.key ? "접기" : "더 보기"}
+                  <button type="button" className="dv-more-btn" aria-expanded={moreOpen === o.key} onClick={() => toggleMore(o.key)}>
+                    {moreOpen === o.key ? "접기" : `${o.label} 더 보기`}
                   </button>
                 )}
               </section>
@@ -568,11 +592,14 @@ export function DividendCalculator({
 }
 
 /* ── 세후·세전 ────────────────────────────────────────────────────── */
-function TaxToggle({ mode, onChange }: { mode: TaxMode; onChange: (v: TaxMode) => void }) {
+function TaxToggle({ afterTax, onChange }: { afterTax: boolean; onChange: (v: boolean) => void }) {
   return (
-    <div className="dv-seg" role="group" aria-label="세금 · 계좌">
-      {TAX_MODES.map((o) => (
-        <button key={o.key} type="button" aria-pressed={mode === o.key} className="dv-seg-btn" onClick={() => onChange(o.key)}>
+    <div className="dv-seg" role="group" aria-label="세금 반영">
+      {[
+        { on: true, label: "세후" },
+        { on: false, label: "세전" },
+      ].map((o) => (
+        <button key={o.label} type="button" aria-pressed={afterTax === o.on} className="dv-seg-btn" onClick={() => onChange(o.on)}>
           {o.label}
         </button>
       ))}
