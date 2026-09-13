@@ -5406,6 +5406,22 @@ main.hz-scroll { overflow-x: clip; }
 }
 .dv-remove:hover { background: var(--tx-btn); color: var(--c-ink); }
 
+/* 목표까지 — 회색 타일. 두 칸(목표 월 배당·매달 더 넣기)은 문장 안에 든 숫자 칸이다. */
+.dv-goal { background: var(--tx-tile); border-radius: var(--tx-r-tile); padding: 14px 16px 12px; }
+.dv-goal-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.dv-goal-title { font-size: 13px; font-weight: 700; color: var(--c-ink); }
+.dv-goal-sub { font-size: 11.5px; color: var(--c-sub); }
+.dv-goal-form { display: flex; gap: 8px 20px; flex-wrap: wrap; }
+.dv-goal-field { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--c-ink); white-space: nowrap; }
+.dv-goal-input {
+  width: 72px; height: 32px; padding: 0 8px; text-align: right; border-radius: 8px; border: 1px solid var(--c-line);
+  background: var(--c-card); color: var(--c-ink); font-size: 14px; font-weight: 700; font-family: inherit; font-variant-numeric: tabular-nums;
+}
+.dv-goal-input:focus { outline: none; border-color: var(--c-blue); box-shadow: 0 0 0 3px var(--c-blue-tint); }
+.dv-goal-out { margin: 10px 0 0; font-size: 14px; line-height: 1.55; color: var(--c-ink); word-break: keep-all; }
+.dv-goal-out b { font-weight: 800; }
+.dv-goal-note { margin: 4px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--c-muted); word-break: keep-all; }
+
 /* 달마다 얼마 — 회색 타일 위 열두 칸. 막대는 그 달 금액에 비례한다. */
 .dv-cal { background: var(--tx-tile); border-radius: var(--tx-r-tile); padding: 14px 16px 12px; }
 .dv-cal-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }

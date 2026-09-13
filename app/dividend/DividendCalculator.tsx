@@ -132,6 +132,11 @@ const TAX_MODES: { key: TaxMode; label: string; short: string }[] = [
 const taxShort = (mode: TaxMode) => TAX_MODES.find((m) => m.key === mode)?.short ?? "";
 /** 종목을 처음 담을 때의 주수. 0 이면 결과가 안 서고, 1 은 값이 너무 작아 감이 안 온다. */
 const DEFAULT_SHARES = 10;
+/** 목표 월 배당의 기본값(만원)과 매달 더 넣는 돈의 기본값(만원). 파이어족 글에서 가장 자주 나오는 숫자. */
+const GOAL_DEFAULT_MAN = 100;
+const ADD_DEFAULT_MAN = 50;
+/** 목표까지 몇 달인지 셀 때의 상한(달). 넘으면 "이 속도로는 안 닿는다"로 적는다. */
+const GOAL_MAX_MONTHS = 50 * 12;
 /** 바스켓 투자금 슬라이더 눈금(원). */
 const AMOUNT_MIN = 1_000_000;
 const AMOUNT_MAX = 100_000_000;
@@ -152,6 +157,8 @@ function wonShort(v: number): string {
   if (v >= 1e4 && v % 1e4 === 0) return `${(v / 1e4).toLocaleString("ko-KR")}만원`;
   return won(v);
 }
+/** 달력 칸의 금액 — 열두 칸이라 자리가 좁다. 백만 원부터는 만 단위로 줄인다(7,439,641원 → 744만원). */
+const wonCal = (v: number) => (v >= 1e8 ? `${(v / 1e8).toFixed(1)}억원` : v >= 1e6 ? `${Math.round(v / 1e4).toLocaleString("ko-KR")}만원` : won(v));
 const usd = (v: number) => `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 /** 그 종목의 돈 단위로. 미국은 달러, 국내는 원. */
 const money = (v: number, s: StockLite) => (s.currency === "USD" ? usd(v) : won(v));
@@ -296,6 +303,9 @@ export function DividendCalculator({
   const holdings = useSyncExternalStore(holdingsStore.subscribe, holdingsStore.getSnapshot, holdingsStore.getServerSnapshot);
   const setHoldings = writeHoldings;
   const [taxMode, setTaxMode] = useState<TaxMode>("general");
+  // 목표 월 배당(만원)과 매달 더 넣는 돈(만원). 저장하지 않는다 — 담은 종목과 달리 한 번 보는 값이다.
+  const [goalMan, setGoalMan] = useState(GOAL_DEFAULT_MAN);
+  const [addMan, setAddMan] = useState(ADD_DEFAULT_MAN);
   const [amount, setAmount] = useState(AMOUNT_DEFAULT);
   const chipsBy: Record<Scope, string[]> = { kr: popular, us: popularUs, etf: popularEtf };
   // '더 보기'는 한 판만 열린다 — 세 판이 다 펼쳐지면 칩이 백 개다.
@@ -486,6 +496,9 @@ export function DividendCalculator({
             <HoldingsTable lines={lines} inputs={inputs} onShares={setShares} onRemove={remove} />
           )}
           {lines.length > 0 && <MonthCalendar monthly={monthly} taxLabel={taxShort(taxMode)} noCalCount={noCalCount} />}
+          {lines.length > 0 && invest > 0 && total > 0 && (
+            <GoalBox invest={invest} net={total} taxLabel={taxShort(taxMode)} goalMan={goalMan} addMan={addMan} onGoal={setGoalMan} onAdd={setAddMan} />
+          )}
         </div>
 
         <div className="hz-sheet-foot">
@@ -878,7 +891,7 @@ function MonthCalendar({ monthly, taxLabel, noCalCount }: { monthly: number[]; t
             <div key={m} className={`dv-cal-cell${v > 0 ? " dv-cal-on" : ""}`}>
               <span className="dv-cal-bar" style={{ height: max > 0 ? `${Math.max(v > 0 ? 6 : 0, (v / max) * 100)}%` : 0 }} aria-hidden="true" />
               <span className="dv-cal-month">{m}월</span>
-              <span className="dv-cal-amt">{v > 0 ? won(v) : "·"}</span>
+              <span className="dv-cal-amt">{v > 0 ? wonCal(v) : "·"}</span>
             </div>
           );
         })}
@@ -888,6 +901,92 @@ function MonthCalendar({ monthly, taxLabel, noCalCount }: { monthly: number[]; t
 }
 
 /* ── 바스켓 투자금 ────────────────────────────────────────────────── */
+/* ── 목표까지 — 월 얼마를 받으려면 얼마가 있어야 하고, 매달 얼마씩 넣으면 언제 닿나 ─────────
+   지금 담은 종목의 비율(세후 수익률 = 1년 세후 배당 ÷ 투자금)이 그대로 간다고 치고 센다. 배당은
+   받는 족족 같은 비율로 다시 담고(재투자), 주가와 배당은 지금과 같다고 본다 — 그 셋을 글자로 적는다.
+   달 수는 한 달씩 굴려서 센다(닫힌 식보다 읽기 쉽고 600달이면 즉시다). */
+function monthsToGoal(invest: number, yearlyRate: number, addMonthly: number, goalMonthly: number): number | null {
+  if (yearlyRate <= 0) return null;
+  let p = invest;
+  for (let m = 0; m <= GOAL_MAX_MONTHS; m++) {
+    if ((p * yearlyRate) / 12 >= goalMonthly) return m;
+    p += (p * yearlyRate) / 12 + addMonthly;
+  }
+  return null;
+}
+
+function GoalBox({
+  invest,
+  net,
+  taxLabel,
+  goalMan,
+  addMan,
+  onGoal,
+  onAdd,
+}: {
+  invest: number;
+  net: number;
+  taxLabel: string;
+  goalMan: number;
+  addMan: number;
+  onGoal: (v: number) => void;
+  onAdd: (v: number) => void;
+}) {
+  const rate = net / invest;
+  const goal = goalMan * 1e4;
+  const add = addMan * 1e4;
+  const need = rate > 0 ? (goal * 12) / rate : null;
+  const months = goal > 0 ? monthsToGoal(invest, rate, add, goal) : null;
+  const years = months != null ? `${Math.floor(months / 12) ? `${Math.floor(months / 12)}년 ` : ""}${months % 12 ? `${months % 12}개월` : ""}`.trim() : null;
+  const numInput = (value: number, onChange: (v: number) => void, label: string) => (
+    <input
+      type="number"
+      inputMode="numeric"
+      min={0}
+      step={10}
+      value={value}
+      onChange={(e) => onChange(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+      aria-label={label}
+      className="dv-goal-input"
+    />
+  );
+  return (
+    <div className="dv-goal">
+      <div className="dv-goal-head">
+        <span className="dv-goal-title">목표까지</span>
+        <span className="dv-goal-sub">지금 담은 비율({taxLabel} 수익률 {pct(rate * 100)})이 그대로 간다고 칠 때</span>
+      </div>
+      <div className="dv-goal-form">
+        <label className="dv-goal-field">
+          한 달에 {numInput(goalMan, onGoal, "목표 월 배당(만원)")}만원 받으려면
+        </label>
+        <label className="dv-goal-field">
+          매달 {numInput(addMan, onAdd, "매달 더 넣는 돈(만원)")}만원씩 더 넣을 때
+        </label>
+      </div>
+      <p className="dv-goal-out">
+        {goal <= 0 ? (
+          "목표를 적으면 얼마가 필요한지 셉니다."
+        ) : need == null ? (
+          "배당이 0이라 셀 수 없습니다."
+        ) : (
+          <>
+            투자금 <b>{wonShort(Math.round(need / 1e4) * 1e4)}</b>이 있어야 합니다. 지금은 {wonShort(Math.round(invest / 1e4) * 1e4)}
+            {invest >= need
+              ? "이라 이미 넘습니다."
+              : months == null
+                ? `이고, 이 속도로는 ${GOAL_MAX_MONTHS / 12}년 안에 닿지 않습니다.`
+                : add > 0
+                  ? `이고, 배당을 다시 담으면서 매달 ${wonShort(add)}씩 넣으면 ${years} 뒤에 닿습니다.`
+                  : `이고, 더 넣지 않고 배당만 다시 담으면 ${years} 뒤에 닿습니다.`}
+          </>
+        )}
+      </p>
+      <p className="dv-goal-note">주가와 배당이 지금과 같고 받은 배당을 같은 비율로 다시 담는다고 본 값입니다. 물가·주가 변동은 안 넣었습니다.</p>
+    </div>
+  );
+}
+
 function AmountControl({ amount, onChange }: { amount: number; onChange: (v: number) => void }) {
   return (
     <div className="hz-sheet dv-amount">
