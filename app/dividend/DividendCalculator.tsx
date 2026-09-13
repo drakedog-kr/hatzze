@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { gaSearchTerm, gaStockCode, track } from "@/lib/ga";
 import { C, Icon } from "../ui";
@@ -143,6 +143,8 @@ const GOAL_DEFAULT_MAN = 100;
 /** 목표 월 배당의 빠른 선택(만원). 파이어족 글이 말하는 눈금 — 용돈 50 · 월세 100 · 생활비 200·300 · 은퇴 500. */
 const GOAL_PRESETS_MAN = [50, 100, 200, 300, 500];
 const ADD_DEFAULT_MAN = 50;
+/** 바스켓 네 줄의 이름. lib/dividend.ts 의 pickBaskets 가 이 순서(셋씩)로 돌려준다. */
+const BASKET_ROWS = ["기본", "현금흐름", "질", "세금과 업종"];
 /** 빈 달 채우기의 줄마다 칩 수. '더 보기' 묶음과 같다. */
 const ROW_CHIPS = 8;
 /** 다가오는 일정의 줄 수 상한과, 지난해 지급일로 어림한 것을 얼마나 앞까지 보여 주나(날). */
@@ -514,21 +516,22 @@ export function DividendCalculator({
               </p>
               <p className="dv-hero-main">{won(total)}</p>
               {/* 셋은 큰 숫자 다음으로 중요한 값이라 한 줄 문장이 아니라 라벨 달린 칸 셋으로(2026-09-13 지적). */}
-              <div className="dv-hero-stats">
-                <div className="dv-hero-stat">
-                  <span className="dv-hero-slabel">한 달 평균</span>
-                  <span className="dv-hero-sval">{won(total / 12)}</span>
+              {/* 카더라 히어로의 현황 타일(.hz-tx-stat)과 같은 부품 — 화면마다 딴 모양을 만들지 않는다. */}
+              <div className="hz-tx-stats dv-hero-stats">
+                <div className="hz-tx-stat">
+                  <span className="hz-tx-stat-l">한 달 평균</span>
+                  <span className="hz-tx-stat-v">{won(total / 12)}</span>
                 </div>
                 {invest > 0 && (
-                  <div className="dv-hero-stat">
-                    <span className="dv-hero-slabel">투자금{lines.some((l) => l.onCost) ? " (평단 넣은 종목은 평단 기준)" : ""}</span>
-                    <span className="dv-hero-sval">{wonShort(Math.round(invest / 1e4) * 1e4)}</span>
+                  <div className="hz-tx-stat">
+                    <span className="hz-tx-stat-l">투자금{lines.some((l) => l.onCost) ? " · 평단 넣은 종목은 평단 기준" : ""}</span>
+                    <span className="hz-tx-stat-v">{wonShort(Math.round(invest / 1e4) * 1e4)}</span>
                   </div>
                 )}
                 {yieldPct != null && (
-                  <div className="dv-hero-stat">
-                    <span className="dv-hero-slabel">배당수익률</span>
-                    <span className="dv-hero-sval">{pct(yieldPct)}</span>
+                  <div className="hz-tx-stat">
+                    <span className="hz-tx-stat-l">배당수익률</span>
+                    <span className="hz-tx-stat-v">{pct(yieldPct)}</span>
                   </div>
                 )}
               </div>
@@ -631,9 +634,16 @@ export function DividendCalculator({
 
       <SectionIntro n={2} title="성향별 바스켓" />
       <AmountControl amount={amount} onChange={setAmount} />
+      {/* 열둘을 3개씩 네 줄로. 줄마다 무엇을 묶은 줄인지 한 마디(기본 · 현금흐름 · 질 · 세금과 업종) — 셋씩 번갈아
+          읽을 때 길잡이가 된다. 서버가 주는 순서가 곧 줄 순서다. */}
       <div className="dv-baskets">
-        {baskets.map((b) => (
-          <BasketSheet key={b.key} basket={b} amount={amount} byCode={byCode} mode={taxMode} fx={fx} onApply={() => applyBasket(b)} onPick={(code) => add(code, "basket")} />
+        {BASKET_ROWS.map((cap, i) => (
+          <Fragment key={cap}>
+            <p className="dv-basket-cap">{cap}</p>
+            {baskets.slice(i * 3, i * 3 + 3).map((b) => (
+              <BasketSheet key={b.key} basket={b} amount={amount} byCode={byCode} mode={taxMode} fx={fx} onApply={() => applyBasket(b)} onPick={(code) => add(code, "basket")} />
+            ))}
+          </Fragment>
         ))}
       </div>
       <p className="dv-note">
@@ -1506,7 +1516,7 @@ function BasketSheet({
               ))}
             </div>
 
-            <button type="button" className="dv-apply" onClick={onApply}>
+            <button type="button" className="hz-tx-btn dv-apply" onClick={onApply}>
               내 종목에 담기
             </button>
           </div>
