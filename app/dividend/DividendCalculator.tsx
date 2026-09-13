@@ -846,8 +846,11 @@ function HoldingRow({
   // 배당성향 — 이익의 몇 %를 배당으로 줬나. 100% 를 넘으면 번 것보다 많이 준 것이라 따로 적는다.
   if (s.payout) {
     const [year, p] = s.payout;
-    const basis = year != null ? `${year}년 배당성향 ${p.toFixed(0)}%` : `배당성향 ${p.toFixed(0)}%(지난 12개월)`;
-    notes.push(p > 100 ? `${basis} · 번 것보다 많이 줬습니다. 이대로 계속 주기는 어려울 수 있습니다` : `${basis} · 이익의 ${p.toFixed(0)}%를 배당으로 줬습니다`);
+    const when = year != null ? `${year}년` : "지난 12개월";
+    const pctText = `${Math.round(p).toLocaleString("ko-KR")}%`;
+    if (p < 0) notes.push(`${when}엔 적자였는데 배당을 줬습니다. 이대로 계속 주기는 어려울 수 있습니다`);
+    else if (p > 100) notes.push(`${when} 배당성향 ${pctText} · 번 것보다 많이 줬습니다. 이대로 계속 주기는 어려울 수 있습니다`);
+    else notes.push(`${when} 배당성향 ${pctText} · 이익의 ${pctText}를 배당으로 줬습니다`);
   }
   if ((s.growthYears ?? 0) >= 10) notes.push(`${s.growthYears}년째 해마다 배당을 늘려 왔습니다`);
   if (s.kind === "etf") {
