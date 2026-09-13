@@ -5393,8 +5393,9 @@ main.hz-scroll { overflow-x: clip; }
 /* 담은 종목 표. 열: 종목 · 주수 · 1주에 1년 · 1년에 받는 배당 · 수익률 · 빼기 */
 .dv-table { display: flex; flex-direction: column; }
 .dv-trow {
-  display: grid; grid-template-columns: minmax(0, 1fr) 132px 96px 128px 72px 64px 32px;
-  align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--c-sheet-row);
+  /* 열 사이 16px — 배당수익률과 비중이 붙어 보였다(2026-09-13). 비중 열은 막대가 들어가 조금 넓다. */
+  display: grid; grid-template-columns: minmax(0, 1fr) 132px 96px 128px 84px 80px 36px;
+  align-items: center; gap: 16px; padding: 10px 0; border-top: 1px solid var(--c-sheet-row);
 }
 .dv-thead { padding: 0 0 6px; border-top: none; font-size: 11.5px; font-weight: 600; color: var(--c-muted); }
 .dv-thead > span:nth-child(n + 3) { text-align: right; }
@@ -5449,7 +5450,7 @@ main.hz-scroll { overflow-x: clip; }
 /* 미국 줄의 달러 표기 — 원화 아래 작은 글씨. 원화가 주인공이다(국내 줄과 한 열에서 더해지니까). */
 .dv-tsub { display: block; font-size: 11px; font-weight: 500; color: var(--c-sub); }
 /* 비중 칸 — 숫자 아래 얇은 막대. */
-.dv-tweight-bar { display: block; height: 4px; margin-top: 4px; border-radius: 2px; background: var(--c-track); overflow: hidden; }
+.dv-tweight-bar { display: block; width: 52px; height: 4px; margin: 5px 0 0 auto; border-radius: 2px; background: var(--c-track); overflow: hidden; }
 .dv-tweight-bar > span { display: block; height: 100%; border-radius: 2px; background: var(--c-blue); }
 .dv-remove {
   width: 28px; height: 28px; border-radius: 8px; border: none; background: transparent; color: var(--c-muted);
