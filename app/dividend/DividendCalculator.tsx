@@ -437,17 +437,19 @@ export function DividendCalculator({
     );
   }
 
-  // 세금·시세·출처는 히어로 라벨 옆 물음표 하나에 몰아 넣는다 — 바닥에 문단으로 두니 아무도 안 읽을 길이였다
-  // (2026-09-13 Hun). 꼭 필요한 넷만: 세금을 어떻게 뗐나 · 시세가 언제 것인가 · 배당 기록이 어디서 왔나 · 보장 없음.
+  // 세금·시세는 히어로 라벨 옆 물음표 하나에 몰아 넣는다 — 바닥에 문단으로 두니 아무도 안 읽을 길이였다
+  // (2026-09-13 Hun). 꼭 필요한 셋만: 세금을 어떻게 뗐나 · 시세와 기록이 언제 것인가 · 보장 없음.
+  // 출처 이름은 여기 안 적는다(같은 날 지적) — 사이트 바닥글의 '데이터 출처'가 그 자리다(app/Footer.tsx,
+  // stockanalysis 는 약관이 출처 표기를 조건으로 발췌를 허용하므로 거기서 지우지 말 것).
   const helpText = [
     TAX_HELP[taxMode],
     [
       priceDate ? `시세: 국내 ${priceDate} 종가` : null,
       usdkrw && usPriceDate ? `미국 ${usPriceDate} · 환율 ${Math.round(usdkrw.rate).toLocaleString("ko-KR")}원` : null,
+      computedFor ? `배당 기록은 ${computedFor} 기준 12개월` : null,
     ]
       .filter(Boolean)
       .join(" · "),
-    `출처: 예탁결제원(국내, ${computedFor ?? "최근"} 기준) · stockanalysis.com(미국·ETF) · 미래에셋 TIGER(국내 ETF) · KRX KIND(배당성향·분리과세)`,
     "배당은 회사가 바꿀 수 있습니다. 매수·매도 신호가 아닙니다.",
   ]
     .filter(Boolean)
