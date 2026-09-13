@@ -129,12 +129,13 @@ function taxRate(s: StockLite, mode: TaxMode): number {
   if (mode === "pension" && fitsAccount(s, mode)) return TAX_RATE_PENSION;
   return s.currency === "USD" ? TAX_RATE_US : TAX_RATE_KR;
 }
-const ACCOUNTS: { key: Account; label: string; short: string }[] = [
-  { key: "general", label: "일반 계좌", short: "세후" },
-  { key: "isa", label: "ISA", short: "세후 · ISA" },
-  { key: "pension", label: "연금 계좌", short: "세후 · 연금" },
+const ACCOUNTS: { key: Account; label: string }[] = [
+  { key: "general", label: "일반 계좌" },
+  { key: "isa", label: "ISA" },
+  { key: "pension", label: "연금 계좌" },
 ];
-const taxShort = (mode: TaxMode) => (mode === "gross" ? "세전" : (ACCOUNTS.find((m) => m.key === mode)?.short ?? "세후"));
+/** 히어로 라벨에 붙는 꼬리. 세후·세전은 머리의 칸이 이미 말하므로 안 적고(2026-09-13 지적), 계좌가 일반이 아닐 때만 그 이름. */
+const accountTag = (mode: TaxMode) => (mode === "isa" || mode === "pension" ? ` (${ACCOUNTS.find((m) => m.key === mode)?.label})` : "");
 /** 종목을 처음 담을 때의 주수. 0 이면 결과가 안 서고, 1 은 값이 너무 작아 감이 안 온다. */
 const DEFAULT_SHARES = 10;
 /** 목표 월 배당의 기본값(만원)과 매달 더 넣는 돈의 기본값(만원). 파이어족 글에서 가장 자주 나오는 숫자. */
@@ -493,7 +494,7 @@ export function DividendCalculator({
         <SectionHead
           icon="calculate"
           title="내 종목"
-          desc="종목을 담고 주수를 적으면 바로 계산됩니다. 담은 종목은 이 브라우저에만 남습니다."
+          desc="종목을 담고 주수를 적으면 바로 계산됩니다."
           right={<TaxToggle afterTax={afterTax} onChange={(v) => { track("dividend_tax_toggle", { after_tax: v }); setAfterTax(v); }} />}
         />
 
@@ -502,7 +503,7 @@ export function DividendCalculator({
           {lines.length ? (
             <>
               <p className="dv-hero-label">
-                1년에 받는 배당 ({taxShort(taxMode)})
+                1년에 받는 배당{accountTag(taxMode)}
                 <span className="hz-tip hz-tip-wide hz-tip-lines dv-help" data-tip={helpText} style={{ cursor: "help" }} aria-label="세금·시세·출처 설명">
                   <Icon name="help" style={{ fontSize: 14 }} />
                 </span>
@@ -587,7 +588,6 @@ export function DividendCalculator({
           {lines.length > 0 && (
             <MonthCalendar
               monthly={monthly}
-              taxLabel={taxShort(taxMode)}
               noCalCount={noCalCount}
               selected={fillMonth}
               onPick={(m) => {
@@ -604,7 +604,6 @@ export function DividendCalculator({
             <GoalBox
               invest={invest}
               net={total}
-              taxLabel={taxShort(taxMode)}
               goalMan={goalMan}
               addMan={addMan}
               growthPct={growthPct}
@@ -649,9 +648,9 @@ function TaxToggle({ afterTax, onChange }: { afterTax: boolean; onChange: (v: bo
 
 /** 물음표 툴팁의 첫 줄 — 세금을 어떻게 뗐나, 계좌마다. */
 const TAX_HELP: Record<TaxMode, string> = {
-  general: "세후: 국내 15.4%, 미국 15%를 뗀 값",
-  isa: `세후(ISA): 국내 주식·ETF 9.9%, 해외 주식은 ISA에 못 담아 15% · 만기까지 ${wonShort(ISA_FREE)}(서민형 ${wonShort(ISA_FREE_LOW)})은 비과세라 실제론 이보다 적습니다`,
-  pension: "세후(연금 계좌): 국내 ETF 는 연금으로 받을 때 5.5%(55~69세) · 주식은 못 담아 15.4%·15%",
+  general: "세금: 국내 15.4%, 미국 15%를 뗀 값",
+  isa: `세금(ISA): 국내 주식·ETF 9.9%, 해외 주식은 ISA에 못 담아 15% · 만기까지 ${wonShort(ISA_FREE)}(서민형 ${wonShort(ISA_FREE_LOW)})은 비과세라 실제론 이보다 적습니다`,
+  pension: "세금(연금 계좌): 국내 ETF 는 연금으로 받을 때 5.5%(55~69세) · 주식은 못 담아 15.4%·15%",
   gross: "세전: 세금을 빼기 전 값(국내 15.4%, 미국 15%를 뗍니다)",
 };
 
@@ -1041,13 +1040,11 @@ function HoldingRow({
 /* ── 달마다 얼마 ─────────────────────────────────────────────────── */
 function MonthCalendar({
   monthly,
-  taxLabel,
   noCalCount,
   selected,
   onPick,
 }: {
   monthly: number[];
-  taxLabel: string;
   noCalCount: number;
   selected: number | null;
   onPick: (m: number) => void;
@@ -1059,7 +1056,7 @@ function MonthCalendar({
       <div className="dv-cal-head dv-cal-head-col">
         <span className="dv-cal-title">달마다 얼마 들어오나</span>
         <span className="dv-cal-sub">
-          {paidMonths ? `1년에 ${paidMonths}달 들어옵니다` : "지급 달을 아는 종목이 없습니다"} · 최근 12개월 지급일 기준 · {taxLabel}
+          {paidMonths ? `1년에 ${paidMonths}달 들어옵니다` : "지급 달을 아는 종목이 없습니다"} · 최근 12개월 지급일 기준
           {noCalCount > 0 && ` · ${noCalCount}종목은 지급 달을 몰라 뺐습니다`}
           {" · 달을 누르면 그 달에 주는 종목이 뜹니다(빈 달은 +)"}
         </span>
@@ -1155,8 +1152,8 @@ function Upcoming({ lines, fx, mode }: { lines: Line[]; fx: number; mode: TaxMod
         <span className="dv-cal-title">
           다가오는 일정
           <span
-            className="hz-tip hz-tip-wide hz-tip-lines dv-help"
-            data-tip={`공시된 기준일·지급일이 먼저 서고, 없으면 지난해 같은 날에 준 것으로 어림합니다(석 달 안).\n금액은 ${taxShort(mode)} 값입니다.`}
+            className="hz-tip hz-tip-wide dv-help"
+            data-tip="공시된 기준일·지급일이 먼저 서고, 없으면 지난해 같은 날에 준 것으로 어림합니다(석 달 안)."
             style={{ cursor: "help" }}
             aria-label="다가오는 일정 설명"
           >
@@ -1257,7 +1254,6 @@ function monthsToGoal(invest: number, yearlyRate: number, addMonthly: number, gr
 function GoalBox({
   invest,
   net,
-  taxLabel,
   goalMan,
   addMan,
   growthPct,
@@ -1267,7 +1263,6 @@ function GoalBox({
 }: {
   invest: number;
   net: number;
-  taxLabel: string;
   goalMan: number;
   addMan: number;
   growthPct: number;
@@ -1314,7 +1309,7 @@ function GoalBox({
     <div className="dv-goal">
       <div className="dv-goal-head">
         <span className="dv-goal-title">목표까지</span>
-        <span className="dv-goal-sub">지금 담은 비율({taxLabel} 배당수익률 {pct(rate * 100)})이 그대로 간다고 볼 때</span>
+        <span className="dv-goal-sub">지금 담은 비율(배당수익률 {pct(rate * 100)})이 그대로 간다고 볼 때</span>
       </div>
       <div className="dv-goal-form">
         {field("목표 월 배당", goalMan, onGoal, "만원")}
@@ -1417,7 +1412,7 @@ function BasketSheet({
           <div className="dv-basket-sum">
             <p className="dv-basket-main">{won(net)}</p>
             <p className="dv-basket-sub">
-              1년에 · {taxShort(mode)} · 한 달 평균 {won(net / 12)}
+              1년에 받는 배당 · 한 달 평균 {won(net / 12)}
               {y != null && ` · 배당수익률 ${pct(y)}`}
             </p>
           </div>
