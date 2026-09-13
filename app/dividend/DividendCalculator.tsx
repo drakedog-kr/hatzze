@@ -184,7 +184,7 @@ type Scope = "kr" | "us" | "etf";
 const SCOPES: { key: Scope; label: string; desc: string }[] = [
   { key: "kr", label: "국장", desc: "요즘 채널에서 자주 오르내린 배당주" },
   { key: "us", label: "미장", desc: "요즘 채널에서 자주 오르내린 배당주" },
-  { key: "etf", label: "ETF", desc: "많이 드는 미국 배당·월분배 ETF · 국내 ETF는 더 보기에" },
+  { key: "etf", label: "ETF", desc: "많이 드는 미국 배당·월분배 ETF" },
 ];
 const scopeOf = (s: StockLite): Scope => (s.kind === "etf" ? "etf" : s.currency === "USD" ? "us" : "kr");
 
@@ -474,7 +474,7 @@ export function DividendCalculator({
     ]
       .filter(Boolean)
       .join(" · "),
-    "배당은 회사가 바꿀 수 있습니다. 매수·매도 신호가 아닙니다.",
+    "배당은 회사가 바꿀 수 있습니다.",
   ]
     .filter(Boolean)
     .join("\n");
@@ -1056,7 +1056,7 @@ function MonthCalendar({
   const paidMonths = MONTHS.filter((m) => monthly[m] > 0).length;
   return (
     <div className="dv-cal">
-      <div className="dv-cal-head">
+      <div className="dv-cal-head dv-cal-head-col">
         <span className="dv-cal-title">달마다 얼마 들어오나</span>
         <span className="dv-cal-sub">
           {paidMonths ? `1년에 ${paidMonths}달 들어옵니다` : "지급 달을 아는 종목이 없습니다"} · 최근 12개월 지급일 기준 · {taxLabel}
@@ -1152,8 +1152,17 @@ function Upcoming({ lines, fx, mode }: { lines: Line[]; fx: number; mode: TaxMod
   return (
     <div className="dv-upcoming">
       <div className="dv-cal-head">
-        <span className="dv-cal-title">다가오는 일정</span>
-        <span className="dv-cal-sub">공시된 기준일·지급일이 먼저, 모르면 지난해 지급일로 어림(석 달 안) · {taxShort(mode)}</span>
+        <span className="dv-cal-title">
+          다가오는 일정
+          <span
+            className="hz-tip hz-tip-wide hz-tip-lines dv-help"
+            data-tip={`공시된 기준일·지급일이 먼저 서고, 없으면 지난해 같은 날에 준 것으로 어림합니다(석 달 안).\n금액은 ${taxShort(mode)} 값입니다.`}
+            style={{ cursor: "help" }}
+            aria-label="다가오는 일정 설명"
+          >
+            <Icon name="help" style={{ fontSize: 14 }} />
+          </span>
+        </span>
       </div>
       <ul className="dv-upcoming-list">
         {items.map((it) => (
