@@ -135,6 +135,8 @@ const DEFAULT_SHARES = 10;
 /** 목표 월 배당의 기본값(만원)과 매달 더 넣는 돈의 기본값(만원). 파이어족 글에서 가장 자주 나오는 숫자. */
 const GOAL_DEFAULT_MAN = 100;
 const ADD_DEFAULT_MAN = 50;
+/** 빈 달 채우기의 줄마다 칩 수. '더 보기' 묶음과 같다. */
+const ROW_CHIPS = 8;
 /** 목표까지 몇 달인지 셀 때의 상한(달). 넘으면 "이 속도로는 안 닿는다"로 적는다. */
 const GOAL_MAX_MONTHS = 50 * 12;
 /** 바스켓 투자금 슬라이더 눈금(원). */
@@ -306,8 +308,31 @@ export function DividendCalculator({
   // 목표 월 배당(만원)과 매달 더 넣는 돈(만원). 저장하지 않는다 — 담은 종목과 달리 한 번 보는 값이다.
   const [goalMan, setGoalMan] = useState(GOAL_DEFAULT_MAN);
   const [addMan, setAddMan] = useState(ADD_DEFAULT_MAN);
+  // 달력에서 누른 달 — 그 달에 주는 종목을 아래에 세운다(빈 달 채우기).
+  const [fillMonth, setFillMonth] = useState<number | null>(null);
   const [amount, setAmount] = useState(AMOUNT_DEFAULT);
   const chipsBy: Record<Scope, string[]> = { kr: popular, us: popularUs, etf: popularEtf };
+  // 빈 달 채우기의 후보 순서 — 칩과 '더 보기' 묶음에 선 것(서버가 고른 순)이 먼저, 그다음은 나머지 전부를
+  // 국장은 시총 순, 미장·ETF 는 수익률 순(미장 10%·ETF 30% 초과는 뺀다 — 원금 반환·mREIT 두 자릿수).
+  const fillOrder = useMemo(() => {
+    const out: Record<Scope, StockLite[]> = { kr: [], us: [], etf: [] };
+    const chips: Record<Scope, string[]> = { kr: popular, us: popularUs, etf: popularEtf };
+    for (const k of ["kr", "us", "etf"] as Scope[]) {
+      const seen = new Set<string>();
+      const push = (s: StockLite | undefined) => {
+        if (s && !seen.has(s.code)) {
+          seen.add(s.code);
+          out[k].push(s);
+        }
+      };
+      for (const c of chips[k]) push(byCode.get(c));
+      for (const r of more[k].rows) for (const c of r.codes) push(byCode.get(c));
+      const rest = stocks.filter((s) => scopeOf(s) === k && s.dps > 0 && !seen.has(s.code));
+      if (k === "kr") rest.filter((s) => s.cap >= 3_000 && (s.yieldPct ?? 0) >= 2 && !s.unusual).sort((a, b) => b.cap - a.cap).forEach(push);
+      else rest.filter((s) => (s.yieldPct ?? 0) >= (k === "us" ? 1.5 : 2) && (s.yieldPct ?? 0) <= (k === "us" ? 10 : 30)).sort((a, b) => (b.yieldPct ?? 0) - (a.yieldPct ?? 0)).forEach(push);
+    }
+    return out;
+  }, [stocks, byCode, more, popular, popularUs, popularEtf]);
   // '더 보기'는 한 판만 열린다 — 세 판이 다 펼쳐지면 칩이 백 개다.
   const [moreOpen, setMoreOpen] = useState<Scope | null>(null);
   const toggleMore = (k: Scope) => {
@@ -495,7 +520,21 @@ export function DividendCalculator({
           {lines.length > 0 && (
             <HoldingsTable lines={lines} inputs={inputs} onShares={setShares} onRemove={remove} />
           )}
-          {lines.length > 0 && <MonthCalendar monthly={monthly} taxLabel={taxShort(taxMode)} noCalCount={noCalCount} />}
+          {lines.length > 0 && (
+            <MonthCalendar
+              monthly={monthly}
+              taxLabel={taxShort(taxMode)}
+              noCalCount={noCalCount}
+              selected={fillMonth}
+              onPick={(m) => {
+                setFillMonth((cur) => (cur === m ? null : m));
+                if (fillMonth !== m) track("dividend_fill_month", { month: m });
+              }}
+            />
+          )}
+          {lines.length > 0 && fillMonth != null && (
+            <MonthFill month={fillMonth} order={fillOrder} holdings={holdings} onPick={(code) => add(code, "fill_month")} onClose={() => setFillMonth(null)} />
+          )}
           {lines.length > 0 && invest > 0 && total > 0 && (
             <GoalBox invest={invest} net={total} taxLabel={taxShort(taxMode)} goalMan={goalMan} addMan={addMan} onGoal={setGoalMan} onAdd={setAddMan} />
           )}
@@ -872,7 +911,19 @@ function HoldingRow({
 }
 
 /* ── 달마다 얼마 ─────────────────────────────────────────────────── */
-function MonthCalendar({ monthly, taxLabel, noCalCount }: { monthly: number[]; taxLabel: string; noCalCount: number }) {
+function MonthCalendar({
+  monthly,
+  taxLabel,
+  noCalCount,
+  selected,
+  onPick,
+}: {
+  monthly: number[];
+  taxLabel: string;
+  noCalCount: number;
+  selected: number | null;
+  onPick: (m: number) => void;
+}) {
   const max = Math.max(...MONTHS.map((m) => monthly[m]));
   const paidMonths = MONTHS.filter((m) => monthly[m] > 0).length;
   return (
@@ -882,20 +933,73 @@ function MonthCalendar({ monthly, taxLabel, noCalCount }: { monthly: number[]; t
         <span className="dv-cal-sub">
           {paidMonths ? `1년에 ${paidMonths}달 들어옵니다` : "지급 달을 아는 종목이 없습니다"} · 최근 12개월 지급일 기준 · {taxLabel}
           {noCalCount > 0 && ` · ${noCalCount}종목은 지급 달을 몰라 뺐습니다`}
+          {" · 달을 누르면 그 달에 주는 종목이 뜹니다"}
         </span>
       </div>
       <div className="dv-cal-grid">
         {MONTHS.map((m) => {
           const v = monthly[m];
           return (
-            <div key={m} className={`dv-cal-cell${v > 0 ? " dv-cal-on" : ""}`}>
+            <button
+              key={m}
+              type="button"
+              className={`dv-cal-cell${v > 0 ? " dv-cal-on" : ""}`}
+              aria-pressed={selected === m}
+              onClick={() => onPick(m)}
+              title={`${m}월에 주는 종목 보기`}
+            >
               <span className="dv-cal-bar" style={{ height: max > 0 ? `${Math.max(v > 0 ? 6 : 0, (v / max) * 100)}%` : 0 }} aria-hidden="true" />
               <span className="dv-cal-month">{m}월</span>
               <span className="dv-cal-amt">{v > 0 ? wonCal(v) : "·"}</span>
-            </div>
+            </button>
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/* ── 빈 달 채우기 — 누른 달에 지급하는 종목을 국장·미장·ETF 줄로 ──────────────────
+   후보 순서는 fillOrder(칩·더 보기 묶음 먼저, 그다음 큰 회사·수익률 순). 줄마다 여덟. 담긴 건 QuickChips 가 뺀다.
+   국내 주식은 대개 4월(결산)·한두 달이라 국장 줄은 빈 달이 많다 — 그때는 그 줄을 안 세운다. */
+function MonthFill({
+  month,
+  order,
+  holdings,
+  onPick,
+  onClose,
+}: {
+  month: number;
+  order: Record<Scope, StockLite[]>;
+  holdings: Holding[];
+  onPick: (code: string) => void;
+  onClose: () => void;
+}) {
+  const held = new Set(holdings.map((h) => h.code));
+  const rows = SCOPES.map((o) => ({
+    label: o.label,
+    codes: order[o.key].filter((s) => !held.has(s.code) && s.pays.some(([m]) => m === month)).slice(0, ROW_CHIPS).map((s) => s.code),
+  })).filter((r) => r.codes.length);
+  const byCode = useMemo(() => new Map(Object.values(order).flat().map((s) => [s.code, s])), [order]);
+  return (
+    <div className="dv-more" role="region" aria-label={`${month}월에 주는 종목`}>
+      <div className="dv-more-head">
+        <span className="dv-more-title">{month}월에 주는 종목</span>
+        <button type="button" className="dv-more-toggle" onClick={onClose}>
+          접기
+        </button>
+      </div>
+      {rows.length ? (
+        rows.map((r) => (
+          <div key={r.label} className="dv-more-row">
+            <span className="dv-more-label">{r.label}</span>
+            <QuickChips codes={r.codes} byCode={byCode} holdings={holdings} onPick={onPick} />
+          </div>
+        ))
+      ) : (
+        <p className="dv-more-foot">{month}월에 주는 종목이 후보에 없습니다. 위 검색창에서 찾아 보세요.</p>
+      )}
+      <p className="dv-more-foot">지난 1년 지급일 기준입니다. 담으면 위 달력이 바로 바뀝니다.</p>
     </div>
   );
 }

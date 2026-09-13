@@ -5428,7 +5428,14 @@ main.hz-scroll { overflow-x: clip; }
 .dv-cal-title { font-size: 13px; font-weight: 700; color: var(--c-ink); }
 .dv-cal-sub { font-size: 11.5px; color: var(--c-sub); }
 .dv-cal-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 6px; }
-.dv-cal-cell { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; min-height: 92px; }
+/* 칸은 버튼이다 — 누르면 그 달에 주는 종목이 아래에 선다. */
+.dv-cal-cell {
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; min-height: 92px; min-width: 0;
+  padding: 4px 0 2px; border: none; border-radius: 8px; background: transparent; cursor: pointer; font-family: inherit;
+  transition: background 0.12s ease;
+}
+.dv-cal-cell:hover { background: var(--tx-btn); }
+.dv-cal-cell[aria-pressed="true"] { background: var(--c-blue-tint); box-shadow: inset 0 0 0 1px var(--c-blue); }
 .dv-cal-bar { width: 100%; max-width: 28px; margin-top: auto; border-radius: 4px 4px 2px 2px; background: var(--c-blue); }
 .dv-cal-cell:not(.dv-cal-on) .dv-cal-bar { height: 3px; background: var(--c-track); }
 .dv-cal-month { font-size: 11px; color: var(--c-sub); }
