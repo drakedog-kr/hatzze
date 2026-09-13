@@ -1359,7 +1359,7 @@ function GoalBox({
           </div>
           {path && (
             <p className="dv-goal-line-sub">
-              5년 뒤 월 <b>{roundMan(path[60])}</b> · 10년 뒤 <b>{roundMan(path[120])}</b> · 20년 뒤 <b>{roundMan(path[240])}</b>
+              이대로 가면 한 달 배당은 5년 뒤 <b>{roundMan(path[60])}</b> · 10년 뒤 <b>{roundMan(path[120])}</b> · 20년 뒤 <b>{roundMan(path[240])}</b>
               <span className="dv-goal-growth">
                 배당 성장률 {manInput(growthPct, onGrowth, "배당 성장률(연 %)", { step: 1, max: 30, width: 44 })}%/년
               </span>
