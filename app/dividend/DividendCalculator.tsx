@@ -599,7 +599,7 @@ export function DividendCalculator({
             )}
           </div>
           {lines.length > 0 && (
-            <HoldingsTable lines={lines} inputs={inputs} onShares={setShares} onCost={setCost} onRemove={remove} />
+            <HoldingsTable lines={lines} inputs={inputs} totalInvest={invest} onShares={setShares} onCost={setCost} onRemove={remove} />
           )}
           {lines.length > 0 && (
             <MonthCalendar
@@ -887,12 +887,15 @@ function MoreRows({
 function HoldingsTable({
   lines,
   inputs,
+  totalInvest,
   onShares,
   onCost,
   onRemove,
 }: {
   lines: Line[];
   inputs: Map<string, HTMLInputElement>;
+  /** 투자금 합(원). 줄마다 비중을 내는 분모. */
+  totalInvest: number;
   onShares: (code: string, shares: number) => void;
   onCost: (code: string, cost: number | null) => void;
   onRemove: (code: string) => void;
@@ -905,10 +908,11 @@ function HoldingsTable({
         <span role="columnheader">1주에 1년</span>
         <span role="columnheader">1년에 받는 배당</span>
         <span role="columnheader">배당수익률</span>
+        <span role="columnheader">비중</span>
         <span role="columnheader" aria-label="빼기" />
       </div>
       {lines.map((l) => (
-        <HoldingRow key={l.stock.code} line={l} inputs={inputs} onShares={onShares} onCost={onCost} onRemove={onRemove} />
+        <HoldingRow key={l.stock.code} line={l} inputs={inputs} weightPct={totalInvest > 0 && l.investKrw != null ? (l.investKrw / totalInvest) * 100 : null} onShares={onShares} onCost={onCost} onRemove={onRemove} />
       ))}
     </div>
   );
@@ -917,12 +921,15 @@ function HoldingsTable({
 function HoldingRow({
   line,
   inputs,
+  weightPct,
   onShares,
   onCost,
   onRemove,
 }: {
   line: Line;
   inputs: Map<string, HTMLInputElement>;
+  /** 투자금 가운데 이 줄의 몫(%). 종가가 없으면 null. */
+  weightPct: number | null;
   onShares: (code: string, shares: number) => void;
   onCost: (code: string, cost: number | null) => void;
   onRemove: (code: string) => void;
@@ -1050,6 +1057,19 @@ function HoldingRow({
       <span className="dv-tcell dv-tnum" role="cell">
         {line.yieldPct != null ? pct(line.yieldPct) : "·"}
         {line.onCost && <span className="dv-tsub">내 평단 기준</span>}
+      </span>
+      {/* 비중 — 투자금 가운데 이 줄이 몇 %인지. 숫자 옆에 얇은 막대로 한 번 더. */}
+      <span className="dv-tcell dv-tnum dv-tweight" role="cell">
+        {weightPct != null ? (
+          <>
+            {weightPct.toFixed(0)}%
+            <span className="dv-tweight-bar" aria-hidden="true">
+              <span style={{ width: `${Math.min(100, weightPct)}%` }} />
+            </span>
+          </>
+        ) : (
+          "·"
+        )}
       </span>
       <span className="dv-tcell" role="cell">
         <button type="button" className="dv-remove" aria-label={`${s.name} 빼기`} onClick={() => onRemove(s.code)}>
