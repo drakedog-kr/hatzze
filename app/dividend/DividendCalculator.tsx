@@ -179,7 +179,7 @@ type Scope = "kr" | "us" | "etf";
 const SCOPES: { key: Scope; label: string; desc: string }[] = [
   { key: "kr", label: "국장", desc: "요즘 채널에서 자주 오르내린 배당주" },
   { key: "us", label: "미장", desc: "요즘 채널에서 자주 오르내린 배당주" },
-  { key: "etf", label: "ETF", desc: "미국은 많이 드는 순 · 국내는 돈이 들어온 순" },
+  { key: "etf", label: "ETF", desc: "많이 드는 미국 배당·월분배 ETF · 국내 ETF는 더 보기에" },
 ];
 const scopeOf = (s: StockLite): Scope => (s.kind === "etf" ? "etf" : s.currency === "USD" ? "us" : "kr");
 

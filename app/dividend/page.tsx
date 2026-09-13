@@ -139,16 +139,14 @@ export default async function DividendPage() {
     .sort(byMentions(trends.usMentions))
     .slice(0, POPULAR)
     .map((s) => s.code);
-  // ETF — 국내는 최근 30일 돈이 들어온 순(설정·환매, seohak_etf_daily 에 있는 것만), 미국은 손으로 적은 순. 넷씩.
+  // ETF — 칩은 미국 ETF 여덟(손으로 적은 순). 국내 ETF 는 '더 보기' 첫 줄에 돈이 들어온 순으로(2026-09-13 지적:
+  // 칩에 섞여 있던 TIGER 셋을 더 보기로). 돈이 몰려도 분배가 시늉이면(지수 ETF 0.5%) 안 세운다 — 국장과 같은 문턱.
   const etfs = stocks.filter((s) => s.kind === "etf");
-  // 돈이 몰려도 분배가 시늉이면(S&P500·나스닥100 지수 ETF 0.5%) 이 화면의 칩이 아니다 — 국장과 같은 문턱.
-  const krEtf = etfs
-    .filter((s) => s.currency === "KRW" && trends.etfFlow.has(s.code) && (s.yieldPct ?? 0) >= CHIP_MIN_YIELD_KR)
-    .sort((a, b) => (trends.etfFlow.get(b.code) ?? 0) - (trends.etfFlow.get(a.code) ?? 0))
-    .slice(0, POPULAR / 2)
-    .map((s) => s.code);
   const haveEtf = new Set(etfs.map((s) => s.code));
-  const popularEtf = [...US_ETF_ORDER.filter((c) => haveEtf.has(c)).slice(0, POPULAR - krEtf.length), ...krEtf];
+  const popularEtf = US_ETF_ORDER.filter((c) => haveEtf.has(c)).slice(0, POPULAR);
+  const krEtfByFlow = etfs
+    .filter((s) => s.currency === "KRW" && trends.etfFlow.has(s.code) && (s.yieldPct ?? 0) >= CHIP_MIN_YIELD_KR)
+    .sort((a, b) => (trends.etfFlow.get(b.code) ?? 0) - (trends.etfFlow.get(a.code) ?? 0));
 
   /* ── '더 보기' 묶음 ─────────────────────────────────────────────────
      칩 여덟 다음이 곧장 검색창이면 "이게 다야?"가 된다(2026-09-12). 그렇다고 1,359종목을 목록으로 펼치면
@@ -193,6 +191,8 @@ export default async function DividendPage() {
       .sort((a, b) => (trends.etfFlow.get(b.code) ?? 0) - (trends.etfFlow.get(a.code) ?? 0) || byYield(a, b));
   const moreEtf = fillRows(
     [
+      // 국내 ETF — 최근 30일 설정·환매로 돈이 들어온 순(seohak_etf_daily 에 있는 해외 투자 ETF 만).
+      { label: "국내 ETF", pick: krEtfByFlow },
       { label: "커버드콜", pick: zip(usEtfs(US_ETF_COVERED), krEtfs(/커버드콜/)) },
       { label: "리츠", pick: zip(usEtfs(US_ETF_REIT), krEtfs(/리츠|부동산/)) },
       // '혼합'(테슬라채권혼합·나스닥100채권혼합50)은 주식 반 채권 반이라 채권 줄이 아니다.
