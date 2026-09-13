@@ -64,11 +64,11 @@ const SOURCE_GROUPS: { label: string; items: string }[] = [
   { label: "미국 공시·전망", items: "SEC EDGAR · 미 하원 · stockanalysis.com" },
   /* 배당으로 살기가 여기서 나온다. 화면 안에는 출처 이름이 없으므로(물음표 툴팁에서도 뺐다, 2026-09-13)
      이름이 남는 곳은 여기뿐이다. 미국 배당 지급일·배당성향은 위 stockanalysis.com 이 같이 맡는다.
-       한국예탁결제원 — 국내 배당 기록(공공데이터포털 주식배당정보)
-       미래에셋 TIGER — 국내 ETF 분배 내역
+       한국예탁결제원 — 국내 배당 기록(공공데이터포털 주식배당정보, 2유형이라 출처 표시가 조건)
        한국거래소 KIND — 고배당기업(분리과세 대상) 목록·배당성향
+     국내 ETF 분배 내역(미래에셋 TIGER)은 적지 않는다(2026-09-13 결정) — 출처 표기를 조건으로 건 약관이 없다.
      여는 날까지는 숨긴다(DIVIDEND_PUBLIC) — 안 쓰는 곳을 적으면 없는 권위를 빌리는 것이다(위 주석). */
-  ...(DIVIDEND_PUBLIC ? [{ label: "배당", items: "한국예탁결제원 · 미래에셋 TIGER · 한국거래소 KIND" }] : []),
+  ...(DIVIDEND_PUBLIC ? [{ label: "배당", items: "한국예탁결제원 · 한국거래소 KIND" }] : []),
   { label: "검색·뉴스", items: "네이버 · 유튜브" },
   { label: "커뮤니티·소비", items: "텔레그램 · 디시인사이드 · 알라딘" },
   { label: "가상자산·기타", items: "업비트 · GitHub · 앱스토어" },
