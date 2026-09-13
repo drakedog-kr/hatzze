@@ -5466,34 +5466,30 @@ main.hz-scroll { overflow-x: clip; }
 .dv-upcoming-what { color: var(--c-sub); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dv-upcoming-amt { margin-left: auto; font-weight: 700; color: var(--c-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-/* 목표까지 — 회색 타일. 위엔 라벨 달린 칸 셋, 아래엔 답 셋(필요한 투자금 · 지금 · 닿기까지)과 5·10·20년 뒤 셋.
-   문장 안에 칸을 끼워 넣었더니 읽기 어려웠다(2026-09-13) — 칸은 칸대로, 답은 숫자 타일로. */
-.dv-goal { background: var(--tx-tile); border-radius: var(--tx-r-tile); padding: 14px 16px 12px; }
-.dv-goal-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+/* 목표까지 — 회색 타일. 위에서 아래로 한 줄씩: 목표(빠른 선택) → 필요한 투자금(큰 숫자) → 지금·언제 → 앞으로.
+   칸 셋과 답 타일 여섯으로 짰더니 무엇을 묻는 카드인지가 안 보였다(2026-09-13) — 문장으로 답하고 칸은 문장 안에 작게. */
+.dv-goal { background: var(--tx-tile); border-radius: var(--tx-r-tile); padding: 14px 16px 14px; }
+.dv-goal-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
 .dv-goal-title { font-size: 13px; font-weight: 700; color: var(--c-ink); }
-.dv-goal-sub { font-size: 11.5px; color: var(--c-sub); }
-.dv-goal-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.dv-goal-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.dv-goal-flabel { font-size: 11.5px; font-weight: 600; color: var(--c-sub); white-space: nowrap; }
-.dv-goal-fbox {
-  display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border-radius: 8px;
-  border: 1px solid var(--c-line); background: var(--c-card);
+.dv-goal-sub { font-size: 11.5px; color: var(--c-sub); word-break: keep-all; }
+.dv-goal-presets { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.dv-goal-plabel { font-size: 12.5px; font-weight: 600; color: var(--c-sub); margin-right: 2px; }
+.dv-goal-custom { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--c-sub); }
+.dv-goal-inline {
+  height: 28px; padding: 0 8px; text-align: right; border-radius: 7px; border: 1px solid var(--c-line); background: var(--c-card);
+  color: var(--c-ink); font-size: 13px; font-weight: 700; font-family: inherit; font-variant-numeric: tabular-nums; vertical-align: middle;
 }
-.dv-goal-fbox:focus-within { border-color: var(--c-blue); box-shadow: 0 0 0 3px var(--c-blue-tint); }
-.dv-goal-input {
-  flex: 1; min-width: 0; width: 0; border: none; outline: none; background: transparent; text-align: right;
-  color: var(--c-ink); font-size: 14px; font-weight: 700; font-family: inherit; font-variant-numeric: tabular-nums;
-}
-.dv-goal-input::-webkit-outer-spin-button,
-.dv-goal-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.dv-goal-unit { font-size: 12px; color: var(--c-sub); white-space: nowrap; }
-.dv-goal-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
-.dv-goal-stat { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 10px; background: var(--c-card); min-width: 0; }
-.dv-goal-slabel { font-size: 11.5px; color: var(--c-sub); white-space: nowrap; }
-.dv-goal-sval { font-size: 16px; font-weight: 800; letter-spacing: -0.01em; color: var(--c-ink); font-variant-numeric: tabular-nums; word-break: keep-all; }
-.dv-goal-stats-sm .dv-goal-sval { font-size: 14px; font-weight: 700; }
+.dv-goal-inline::-webkit-outer-spin-button,
+.dv-goal-inline::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.dv-goal-inline:focus { outline: none; border-color: var(--c-blue); box-shadow: 0 0 0 3px var(--c-blue-tint); }
+.dv-goal-lead { display: flex; flex-direction: column; gap: 2px; margin-top: 14px; }
+.dv-goal-llabel { font-size: 12px; color: var(--c-sub); }
+.dv-goal-lval { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; color: var(--c-ink); font-variant-numeric: tabular-nums; }
+.dv-goal-lnote { font-size: 11.5px; color: var(--c-muted); }
+.dv-goal-line { margin: 10px 0 0; font-size: 13.5px; line-height: 1.7; color: var(--c-sub); word-break: keep-all; }
+.dv-goal-line b { color: var(--c-ink); font-weight: 700; }
+.dv-goal-line-sub { margin-top: 4px; font-size: 12.5px; }
 .dv-goal-out { margin: 10px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--c-sub); word-break: keep-all; }
-.dv-goal-note { margin: 8px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--c-muted); word-break: keep-all; }
 
 /* 달마다 얼마 — 회색 타일 위 열두 칸. 막대는 그 달 금액에 비례한다. */
 .dv-cal { background: var(--tx-tile); border-radius: var(--tx-r-tile); padding: 14px 16px 12px; }
@@ -5582,12 +5578,7 @@ main.hz-scroll { overflow-x: clip; }
   .dv-more[data-scope="etf"] { order: 5; }
 }
 @media (max-width: 560px) {
-  /* 목표 칸과 답 타일은 좁으면 한 줄에 셋이 안 선다("2억/9,038만원"이 꺾였다) — 칸도 답도 한 줄에 하나씩,
-     답은 라벨 왼쪽·값 오른쪽. */
-  .dv-goal-form { grid-template-columns: 1fr; }
-  .dv-goal-stats { grid-template-columns: 1fr; gap: 4px; }
-  .dv-goal-stat { flex-direction: row; align-items: baseline; justify-content: space-between; gap: 8px; padding: 8px 12px; }
-  .dv-goal-sval { font-size: 15px; }
+  .dv-goal-lval { font-size: 22px; }
   /* 일정 줄은 두 줄로 — 날짜·종목 윗줄, 무엇·얼마 아랫줄. */
   .dv-upcoming-row { flex-wrap: wrap; row-gap: 2px; }
   .dv-upcoming-what { flex: 1 1 100%; padding-left: 94px; white-space: normal; }

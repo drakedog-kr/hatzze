@@ -140,6 +140,8 @@ const accountTag = (mode: TaxMode) => (mode === "isa" || mode === "pension" ? ` 
 const DEFAULT_SHARES = 10;
 /** 목표 월 배당의 기본값(만원)과 매달 더 넣는 돈의 기본값(만원). 파이어족 글에서 가장 자주 나오는 숫자. */
 const GOAL_DEFAULT_MAN = 100;
+/** 목표 월 배당의 빠른 선택(만원). 파이어족 글이 말하는 눈금 — 용돈 50 · 월세 100 · 생활비 200·300 · 은퇴 500. */
+const GOAL_PRESETS_MAN = [50, 100, 200, 300, 500];
 const ADD_DEFAULT_MAN = 50;
 /** 빈 달 채우기의 줄마다 칩 수. '더 보기' 묶음과 같다. */
 const ROW_CHIPS = 8;
@@ -1289,75 +1291,71 @@ function GoalBox({
   // 5·10·20년 뒤 월 배당 — 같은 셈을 240달까지 돌려 읽는다.
   const path = rate > 0 ? projectMonthly(invest, rate, add, growthPct, 240) : null;
   const years = months != null ? `${Math.floor(months / 12) ? `${Math.floor(months / 12)}년 ` : ""}${months % 12 ? `${months % 12}개월` : ""}`.trim() : null;
-  const field = (label: string, value: number, onChange: (v: number) => void, unit: string, opts: { step?: number; max?: number } = {}) => (
-    <label className="dv-goal-field">
-      <span className="dv-goal-flabel">{label}</span>
-      <span className="dv-goal-fbox">
-        <input
-          type="number"
-          inputMode="numeric"
-          min={0}
-          max={opts.max}
-          step={opts.step ?? 10}
-          value={value}
-          onChange={(e) => onChange(Math.max(0, Math.min(opts.max ?? Infinity, Math.floor(Number(e.target.value) || 0))))}
-          aria-label={label}
-          className="dv-goal-input"
-        />
-        <span className="dv-goal-unit">{unit}</span>
-      </span>
-    </label>
+  const manInput = (value: number, onChange: (v: number) => void, label: string, opts: { step?: number; max?: number; width?: number } = {}) => (
+    <input
+      type="number"
+      inputMode="numeric"
+      min={0}
+      max={opts.max}
+      step={opts.step ?? 10}
+      value={value}
+      onChange={(e) => onChange(Math.max(0, Math.min(opts.max ?? Infinity, Math.floor(Number(e.target.value) || 0))))}
+      aria-label={label}
+      className="dv-goal-inline"
+      style={opts.width ? { width: opts.width } : undefined}
+    />
   );
-  const reach =
-    goal <= 0 || need == null
-      ? null
-      : invest >= need
-        ? "이미 넘었습니다"
-        : months == null
-          ? `${GOAL_MAX_MONTHS / 12}년 안엔 못 닿습니다`
-          : `${years} 뒤`;
+  const roundMan = (v: number) => wonShort(Math.round(v / 1e4) * 1e4);
   return (
     <div className="dv-goal">
+      {/* 위에서 아래로 한 줄씩 답한다 — 목표 → 필요한 돈 → 지금 → 언제 → 앞으로. 칸은 문장 안이 아니라 제 줄에. */}
       <div className="dv-goal-head">
         <span className="dv-goal-title">목표까지</span>
-        <span className="dv-goal-sub">지금 담은 비율(배당수익률 {pct(rate * 100)})이 그대로 간다고 볼 때</span>
+        <span className="dv-goal-sub">한 달에 얼마를 받고 싶은지 고르면, 얼마가 있어야 하고 언제 닿는지 셉니다</span>
       </div>
-      <div className="dv-goal-form">
-        {field("목표 월 배당", goalMan, onGoal, "만원")}
-        {field("매달 더 넣기", addMan, onAdd, "만원")}
-        {field("배당 성장률", growthPct, onGrowth, "%/년", { step: 1, max: 30 })}
+      <div className="dv-goal-presets" role="group" aria-label="목표 월 배당">
+        <span className="dv-goal-plabel">한 달에</span>
+        {GOAL_PRESETS_MAN.map((v) => (
+          <button key={v} type="button" className={`dv-quick${goalMan === v ? " dv-quick-on" : ""}`} aria-pressed={goalMan === v} onClick={() => onGoal(v)}>
+            {v >= 10_000 ? `${v / 10_000}억원` : `${v.toLocaleString("ko-KR")}만원`}
+          </button>
+        ))}
+        <span className="dv-goal-custom">
+          {manInput(goalMan, onGoal, "목표 월 배당(만원)", { width: 72 })}
+          <span>만원</span>
+        </span>
       </div>
       {goal > 0 && need != null ? (
         <>
-          <div className="dv-goal-stats">
-            <div className="dv-goal-stat">
-              <span className="dv-goal-slabel">필요한 투자금</span>
-              <span className="dv-goal-sval">{wonShort(Math.round(need / 1e4) * 1e4)}</span>
-            </div>
-            <div className="dv-goal-stat">
-              <span className="dv-goal-slabel">지금 투자금</span>
-              <span className="dv-goal-sval">{wonShort(Math.round(invest / 1e4) * 1e4)}</span>
-            </div>
-            <div className="dv-goal-stat">
-              <span className="dv-goal-slabel">닿기까지</span>
-              <span className="dv-goal-sval">{reach}</span>
-            </div>
+          <div className="dv-goal-lead">
+            <span className="dv-goal-llabel">받으려면 필요한 투자금</span>
+            <span className="dv-goal-lval">{roundMan(need)}</span>
+            <span className="dv-goal-lnote">지금 담은 비율(배당수익률 {pct(rate * 100)})로 셌습니다</span>
           </div>
+          <p className="dv-goal-line">
+            지금은 <b>{roundMan(invest)}</b>
+            {invest >= need ? (
+              <>
+                {" · "}
+                <b>이미 넘었습니다</b>
+              </>
+            ) : (
+              <>
+                {" · "}매달 {manInput(addMan, onAdd, "매달 더 넣는 돈(만원)", { width: 64 })}만원씩 더 넣고 배당을 다시 담으면{" "}
+                <b>{months == null ? `${GOAL_MAX_MONTHS / 12}년 안엔 못 닿습니다` : `${years} 뒤에 닿습니다`}</b>
+              </>
+            )}
+          </p>
           {path && (
-            <div className="dv-goal-stats dv-goal-stats-sm">
-              {[5, 10, 20].map((y) => (
-                <div key={y} className="dv-goal-stat">
-                  <span className="dv-goal-slabel">{y}년 뒤 한 달에</span>
-                  <span className="dv-goal-sval">{wonShort(Math.round(path[y * 12] / 1e4) * 1e4)}</span>
-                </div>
-              ))}
-            </div>
+            <p className="dv-goal-line dv-goal-line-sub">
+              그대로 가면 5년 뒤 한 달에 <b>{roundMan(path[60])}</b> · 10년 뒤 <b>{roundMan(path[120])}</b> · 20년 뒤 <b>{roundMan(path[240])}</b>
+              {" · "}배당이 해마다 {manInput(growthPct, onGrowth, "배당 성장률(연 %)", { step: 1, max: 30, width: 44 })}% 늘고 주가는 그대로라는 가정입니다
+            </p>
           )}
         </>
       ) : (
-        <p className="dv-goal-out">{goal <= 0 ? "목표를 적으면 얼마가 필요한지 셉니다." : "배당이 0이라 셀 수 없습니다."}</p>
+        <p className="dv-goal-out">{goal <= 0 ? "목표를 고르면 얼마가 필요한지 셉니다." : "배당이 0이라 셀 수 없습니다."}</p>
       )}
-      <p className="dv-goal-note">받은 배당은 다시 담고 주가는 그대로라고 본 값입니다. 물가는 안 넣었습니다.</p>
     </div>
   );
 }
