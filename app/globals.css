@@ -5296,7 +5296,8 @@ main.hz-scroll { overflow-x: clip; }
 .dv-group-title { font-size: 13.5px; font-weight: 800; color: var(--c-ink); letter-spacing: -0.01em; white-space: nowrap; }
 .dv-group-desc { font-size: 11.5px; color: var(--c-sub); word-break: keep-all; }
 /* 긴 ETF 이름은 칩 안에서 한 줄로 자른다. */
-.dv-chip-name { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dv-chip-name { max-width: 180px; min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dv-chip-yield { flex-shrink: 0; }
 .dv-chips-empty { margin: 0; font-size: 12px; color: var(--c-muted); }
 /* 검색 결과의 갈래 제목. */
 .dv-search-group + .dv-search-group { margin-top: 4px; border-top: 1px solid var(--c-sheet-row); padding-top: 4px; }
@@ -5336,6 +5337,8 @@ main.hz-scroll { overflow-x: clip; }
 .dv-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .dv-chips-label { font-size: 12px; font-weight: 600; color: var(--c-muted); margin-right: 2px; }
 .dv-chip {
+  /* 판보다 넓어질 수 없다 — 1,024px 판(안폭 204px)에서 긴 ETF 칩(275px)이 판을 뚫고 나갔다. 이름이 대신 줄어든다. */
+  max-width: 100%;
   display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px 5px 6px; border-radius: 999px;
   border: 1px solid var(--c-line); background: var(--c-card); color: var(--c-ink);
   font-size: 12.5px; font-weight: 600; cursor: grab; font-family: inherit; transition: background 0.12s ease;
@@ -5463,7 +5466,8 @@ main.hz-scroll { overflow-x: clip; }
 @media (max-width: 1260px) {
   .dv-baskets { grid-template-columns: 1fr; }
 }
-@media (max-width: 980px) {
+/* 세 판이 서려면 판 하나에 300px 은 있어야 한다(사이드바 160 을 뺀 본문 폭 기준 — 1,024px 뷰포트에서 판 안폭이 204px 였다). */
+@media (max-width: 1100px) {
   .dv-groups { grid-template-columns: 1fr; }
   /* 한 열이면 '더 보기' 묶음이 세 판 아래가 아니라 **그 판 바로 아래**에 붙어야 한다 — order 로 끼운다. */
   .dv-group[data-scope="kr"] { order: 0; }
