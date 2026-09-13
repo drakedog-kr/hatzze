@@ -56,9 +56,26 @@ export type DividendStock = {
   payout: { pct: number; year: number | null } | null;
   /** 배당을 해마다 늘려 온 햇수(stockanalysis Growth Years). 미국 주식만. */
   growthYears: number | null;
+  /** KIND 업종(금융·은행·보험·증권·통신…). 국내 주식만, 배당정보 표에 있는 회사만. */
+  sector: string | null;
 };
 
-export type BasketKey = "steady" | "yield" | "growth";
+export type BasketKey =
+  | "steady"
+  | "yield"
+  | "growth"
+  | "monthly"
+  | "covered"
+  | "reit"
+  | "aristocrat"
+  | "payout"
+  | "preferred"
+  | "septax"
+  | "finance"
+  | "account";
+
+/** 바스켓 줄 오른쪽에 무엇을 적나 — 성향마다 "왜 여기 들었나"를 말하는 숫자가 다르다. */
+export type BasketMeta = "streak" | "yield" | "growth" | "months" | "growthYears" | "payout";
 
 export type Basket = {
   key: BasketKey;
@@ -69,6 +86,11 @@ export type Basket = {
   rule: string;
   icon: string;
   codes: string[];
+  meta: BasketMeta;
+  /** '내 계좌 맞춤'만 — 연금 계좌를 골랐을 때의 목록(국내 ETF 만). codes 는 ISA 목록. */
+  altPension?: string[];
+  /** 바스켓 밑에 붙는 주의 한 줄(커버드콜·리츠·우선주). */
+  caution?: string;
 };
 
 type Row = {
@@ -129,6 +151,7 @@ function toStock(r: Row): DividendStock {
     highDiv: null,
     payout: null,
     growthYears: null,
+    sector: null,
   };
 }
 
@@ -213,6 +236,7 @@ function toUsStock(r: UsRow): DividendStock {
     highDiv: null,
     payout: r.payout_pct != null ? { pct: Number(r.payout_pct), year: null } : null,
     growthYears: r.growth_years ?? null,
+    sector: null,
   };
 }
 
@@ -272,6 +296,7 @@ function toEtfStock(r: EtfRow): DividendStock {
     highDiv: null,
     payout: null,
     growthYears: null,
+    sector: null,
   };
 }
 
@@ -340,17 +365,17 @@ async function loadHighDiv(): Promise<Map<string, DividendStock["highDiv"]>> {
 
 /* ── 배당성향 (kr_dividend_payout, 마이그레이션 078) ──────────────────────────
    KIND 배당정보 — 회사마다 지난 사업연도의 배당성향. 1,300행쯤이라 두 쪽. 없거나 실패하면 빈 Map. */
-type PayoutRow = { code: string; payout_pct: number | null; biz_year: number | null };
+type PayoutRow = { code: string; payout_pct: number | null; biz_year: number | null; sector: string | null };
 
-async function loadPayout(): Promise<Map<string, DividendStock["payout"]>> {
-  const out = new Map<string, DividendStock["payout"]>();
+async function loadPayout(): Promise<Map<string, { payout: DividendStock["payout"]; sector: string | null }>> {
+  const out = new Map<string, { payout: DividendStock["payout"]; sector: string | null }>();
   try {
     const db = getSupabaseServer();
     for (let from = 0; from < 10_000; from += 1000) {
-      const { data, error } = await db.from("kr_dividend_payout").select("code,payout_pct,biz_year").order("code").range(from, from + 999);
+      const { data, error } = await db.from("kr_dividend_payout").select("code,payout_pct,biz_year,sector").order("code").range(from, from + 999);
       if (error) throw error;
       const rows = (data ?? []) as PayoutRow[];
-      for (const r of rows) if (r.payout_pct != null) out.set(r.code, { pct: Number(r.payout_pct), year: r.biz_year });
+      for (const r of rows) out.set(r.code, { payout: r.payout_pct != null ? { pct: Number(r.payout_pct), year: r.biz_year } : null, sector: r.sector });
       if (rows.length < 1000) break;
     }
   } catch (e) {
@@ -377,14 +402,16 @@ export async function getDividendData(): Promise<DividendData | null> {
   const [us, etf, highDiv, payout] = await Promise.all([loadUs(), loadEtf(), loadHighDiv(), loadPayout()]);
   for (const s of kr) {
     s.highDiv = highDiv.get(s.code) ?? null;
-    s.payout = payout.get(s.code) ?? null;
+    const p = payout.get(s.code);
+    s.payout = p?.payout ?? null;
+    s.sector = p?.sector ?? null;
   }
   // 환율이 없으면 미국 종목을 원화로 못 옮긴다 — 그날은 미국을 통째로 뺀다(반쪽 계산보다 낫다).
   const usStocks = us.fx ? us.stocks : [];
   const etfs = etf.filter((s) => s.currency === "KRW" || us.fx);
   return {
     stocks: [...kr, ...usStocks, ...etfs],
-    baskets: pickBaskets(kr),
+    baskets: pickBaskets(kr, usStocks, etfs, highDiv.size > 0),
     computedFor: loaded.computedFor,
     priceDate,
     usPriceDate: us.fx ? us.priceDate : null,
@@ -416,55 +443,243 @@ function eligible(s: DividendStock): boolean {
   );
 }
 
-export function pickBaskets(stocks: DividendStock[]): Basket[] {
-  const pool = stocks.filter(eligible);
-  const yieldOf = (s: DividendStock) => s.yieldPct ?? 0;
+/** 미국 ETF 의 손순서 — 커버드콜·달마다 받기 바스켓이 쓴다(page.tsx 의 목록과 같은 이름들). */
+const US_ETF_COVERED = ["JEPI", "JEPQ", "QYLD", "XYLD", "RYLD", "DIVO"];
+const US_ETF_MONTHLY = ["JEPI", "JEPQ", "DIVO"];
+/** 리츠가 아닌 인프라 펀드 — 맥쿼리인프라·KB발해인프라. */
+const KR_INFRA = new Set(["088980", "415640"]);
+const FINANCE_SECTORS = new Set(["금융", "은행", "보험", "증권"]);
+/** 원금을 돌려주는 상품이 섞이는 선. 커버드콜·리츠 바스켓은 이 위를 뺀다(줄 안내도 30% 에서 켜진다). */
+const MAX_YIELD_ETF = 30;
+
+const byCap = (a: DividendStock, b: DividendStock) => (b.marketCap ?? 0) - (a.marketCap ?? 0);
+const yieldOf = (s: DividendStock) => s.yieldPct ?? 0;
+const byYield = (a: DividendStock, b: DividendStock) => yieldOf(b) - yieldOf(a);
+const months = (s: DividendStock) => new Set(s.payments.filter((p) => p.pay).map((p) => Number((p.pay as string).slice(5, 7))));
+
+/** 미국 손순서와 국내 목록을 하나씩 번갈아 — 한 바스켓이 한쪽으로만 차지 않게. */
+function zip(a: DividendStock[], b: DividendStock[]): DividendStock[] {
+  const out: DividendStock[] = [];
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    if (a[i]) out.push(a[i]);
+    if (b[i]) out.push(b[i]);
+  }
+  return out;
+}
+
+/**
+ * 달마다 받기 — 지급 달이 다른 종목을 엮어 열두 달을 채운다. 앞에서부터 "아직 빈 달을 가장 많이 채우는"
+ * 종목을 고른다(같으면 목록 순). 분기·반기 배당(지급 달 2~5개)으로 먼저 엮고 — 월배당 하나가 열두 달을 다
+ * 덮으면 '조합'이 아니다(리얼티인컴 하나로 끝났다, 2026-09-13) — 그래도 빈 달이 남으면 월배당(주식·ETF)으로
+ * 막는다. 열 종목이 차기 전에 다 채워지면 남는 자리는 목록 순으로 채운다.
+ */
+function coverMonths(kr: DividendStock[], us: DividendStock[], monthlyEtfs: DividendStock[]): DividendStock[] {
+  const picked: DividendStock[] = [];
+  const covered = new Set<number>();
+  const isPeriodic = (s: DividendStock) => months(s).size >= 2 && months(s).size <= 5;
+  // 국내로 먼저 채우고(4·5·6·8·9·11·12월이 찬다) 남는 달(1·2·3·7·10월)을 미국 분기 배당으로 — 미국을 같이 놓고
+  // 고르면 지급 달이 다섯인 낯선 미국 리츠가 맨 앞에 선다.
+  const periodic = [...kr.filter(isPeriodic), ...us.filter(isPeriodic)];
+  const monthlyStocks = [...kr, ...us].filter((s) => months(s).size >= 6);
+  const pickFrom = (pool: DividendStock[]) => {
+    while (picked.length < SIZE && covered.size < 12) {
+      let best: DividendStock | null = null;
+      let gain = 0;
+      for (const s of pool) {
+        if (picked.includes(s)) continue;
+        const g = [...months(s)].filter((m) => !covered.has(m)).length;
+        if (g > gain) {
+          gain = g;
+          best = s;
+        }
+      }
+      if (!best) return;
+      picked.push(best);
+      for (const m of months(best)) covered.add(m);
+    }
+  };
+  pickFrom(kr.filter(isPeriodic));
+  pickFrom(us.filter(isPeriodic));
+  pickFrom([...monthlyStocks, ...monthlyEtfs]);
+  for (const s of periodic) {
+    if (picked.length >= SIZE) break;
+    if (!picked.includes(s)) picked.push(s);
+  }
+  return picked;
+}
+
+export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: DividendStock[], haveHighDiv: boolean): Basket[] {
+  const pool = kr.filter(eligible);
+  const isPref = (s: DividendStock) => s.shareKind != null && s.shareKind !== "보통주";
+  const isReit = (s: DividendStock) => s.isReit || KR_INFRA.has(s.code);
+  const common = pool.filter((s) => !isPref(s) && !isReit(s));
+  const usPayers = us.filter((s) => s.dps > 0 && s.close != null && yieldOf(s) >= 1.5 && yieldOf(s) <= 10);
+  const etfByCode = new Map(etfs.map((s) => [s.code, s]));
+  const usEtfs = (codes: string[]) => codes.map((c) => etfByCode.get(c)).filter((s): s is DividendStock => !!s && s.close != null);
+  const krEtfs = (re: RegExp) => etfs.filter((s) => s.currency === "KRW" && s.dps > 0 && s.close != null && re.test(s.name) && yieldOf(s) >= 2 && yieldOf(s) <= MAX_YIELD_ETF).sort(byYield);
 
   // 꾸준함 — 5년 연속 주고 한 번도 안 줄인 회사 중 큰 회사부터. 수익률 순이 아니다 —
   // 그러면 아래 '지금 수익률'과 같은 목록이 된다. 큰 회사부터인 까닭은 이 성향이 묻는 게
   // "안 끊기겠나"이고, 그 답에 가장 가까운 사실이 규모라서다.
-  const steady = pool
-    .filter((s) => s.streak >= 5 && s.cuts5 === 0 && yieldOf(s) >= 2)
-    .sort((a, b) => (b.marketCap ?? 0) - (a.marketCap ?? 0))
-    .slice(0, SIZE);
-
-  // 지금 수익률 — 3년은 줬어야 한다. 한 해 반짝은 위 공통 문턱이 거르지만, 첫 배당인
-  // 회사도 뺀다(1년 뒤에 또 줄지 모른다).
-  const high = pool
-    .filter((s) => s.streak >= 3)
-    .sort((a, b) => yieldOf(b) - yieldOf(a))
-    .slice(0, SIZE);
-
+  const steady = common.filter((s) => s.streak >= 5 && s.cuts5 === 0 && yieldOf(s) >= 2).sort(byCap).slice(0, SIZE);
+  // 지금 수익률 — 3년은 줬어야 한다. 한 해 반짝은 위 공통 문턱이 거르지만, 첫 배당인 회사도 뺀다.
+  const high = common.filter((s) => s.streak >= 3).sort(byYield).slice(0, SIZE);
   // 성장 — 5년 연속 주면서 연평균 10% 넘게 늘려 온 회사. 수익률은 낮아도 된다(1% 이상).
-  const growth = pool
+  const growth = common
     .filter((s) => s.streak >= 5 && (s.growth5 ?? 0) >= 10 && yieldOf(s) >= 1)
     .sort((a, b) => (b.growth5 ?? 0) - (a.growth5 ?? 0))
     .slice(0, SIZE);
+  // 달마다 받기 — 국내 큰 회사(1조·2%)와 미국 배당주(오래 늘린 순)를 섞어 열두 달을 채운다.
+  const monthly = coverMonths(
+    common.filter((s) => (s.marketCap ?? 0) >= 1e12 && yieldOf(s) >= 2 && s.streak >= 3).sort(byCap),
+    usPayers.filter((s) => (s.growthYears ?? 0) >= 10).sort((a, b) => (b.growthYears ?? 0) - (a.growthYears ?? 0)),
+    usEtfs(US_ETF_MONTHLY),
+  );
+  // 커버드콜 — 미국 손순서와 TIGER 커버드콜(수익률 순)을 번갈아. 30% 초과(일드맥스류)는 뺀다.
+  const covered = zip(usEtfs(US_ETF_COVERED).filter((s) => yieldOf(s) <= MAX_YIELD_ETF), krEtfs(/커버드콜/)).slice(0, SIZE);
+  // 리츠·인프라 — 큰 것부터. 청산·특별분배로 30% 를 넘는 건 뺀다.
+  const reit = kr.filter((s) => isReit(s) && s.close != null && yieldOf(s) > 0 && yieldOf(s) <= MAX_YIELD_ETF).sort(byCap).slice(0, SIZE);
+  // 배당귀족 — 해마다 배당을 25년 넘게 늘려 온 미국 회사, 오래 늘린 순.
+  const aristocrat = usPayers
+    .filter((s) => (s.growthYears ?? 0) >= 25)
+    .sort((a, b) => (b.growthYears ?? 0) - (a.growthYears ?? 0))
+    .slice(0, SIZE);
+  // 여유 있는 회사 — 배당성향 50% 이하이면서 5년간 배당을 늘려 온 회사. 국내는 시총 1조 이상을 큰 순으로,
+  // 미국은 10년 넘게 늘려 온 회사를 오래 늘린 순으로, 번갈아. (증가율 순으로 세웠더니 작은 회사만 섰다.)
+  const roomy = (list: DividendStock[], minYield: number) =>
+    list.filter((s) => s.payout != null && s.payout.pct > 0 && s.payout.pct <= 50 && s.streak >= 5 && (s.growth5 ?? 0) >= 5 && yieldOf(s) >= minYield);
+  const payout = zip(
+    roomy(common, 2).filter((s) => (s.marketCap ?? 0) >= 1e12).sort(byCap),
+    roomy(usPayers, 1.5).filter((s) => (s.growthYears ?? 0) >= 10).sort((a, b) => (b.growthYears ?? 0) - (a.growthYears ?? 0)),
+  ).slice(0, SIZE);
+  // 우선주 — 시총 1,000억 이상, 수익률 순. 12% 초과는 공통 문턱이 거른다.
+  const preferred = pool.filter((s) => isPref(s) && (s.marketCap ?? 0) >= 1_000e8 && yieldOf(s) >= 2).sort(byYield).slice(0, SIZE);
+  // 분리과세 — 고배당기업으로 공시한 회사 중 수익률 3%·시총 1조 이상, 큰 순.
+  const septax = common.filter((s) => s.highDiv && yieldOf(s) >= 3 && (s.marketCap ?? 0) >= 1e12).sort(byCap).slice(0, SIZE);
+  // 금융주 — KIND 업종이 금융·은행·보험·증권. 큰 순.
+  const finance = common.filter((s) => s.sector != null && FINANCE_SECTORS.has(s.sector) && yieldOf(s) >= 2).sort(byCap).slice(0, SIZE);
+  // 내 계좌 맞춤 — ISA 는 국내 큰 회사 일곱(수익률 3% 이상, 시총 큰 순) + 배당 지수 ETF 셋, 연금 계좌는 국내 ETF 열
+  // (수익률 2~12%, 높은 순 — 커버드콜의 두 자릿수는 뺀다, 은퇴 계좌라).
+  const krEtfSteady = etfs.filter((s) => s.currency === "KRW" && s.dps > 0 && s.close != null && yieldOf(s) >= 2 && yieldOf(s) <= MAX_YIELD).sort(byYield);
+  const isa = [
+    ...common.filter((s) => s.streak >= 3 && yieldOf(s) >= 3 && (s.marketCap ?? 0) >= 1e12).sort(byCap).slice(0, 7),
+    ...krEtfSteady.filter((s) => /배당/.test(s.name) && !/커버드콜/.test(s.name)).slice(0, 3),
+  ];
+  const pension = krEtfSteady.filter((s) => !/커버드콜/.test(s.name)).slice(0, SIZE);
 
+  const codes = (list: DividendStock[]) => list.map((s) => s.code);
   return [
     {
       key: "steady",
       title: "꾸준함 우선",
       desc: "오래, 안 줄이고 준 회사",
-      rule: "5년 연속 현금배당 · 그 사이 한 번도 안 줄임 · 수익률 2% 이상 · 시가총액 큰 순 10개",
+      rule: "5년 연속 현금배당 · 그 사이 한 번도 안 줄임 · 배당수익률 2% 이상 · 시가총액 큰 순 10개",
       icon: "verified",
-      codes: steady.map((s) => s.code),
+      codes: codes(steady),
+      meta: "streak",
     },
     {
       key: "yield",
-      title: "지금 수익률 우선",
+      title: "지금 배당수익률 우선",
       desc: "지금 가격에 배당이 가장 큰 회사",
-      rule: "3년 연속 현금배당 · 최근 12개월 수익률 높은 순 10개 · 12% 초과와 특별배당은 뺌",
+      rule: "3년 연속 현금배당 · 최근 12개월 배당수익률 높은 순 10개 · 12% 초과와 특별배당은 뺌",
       icon: "trending_up",
-      codes: high.map((s) => s.code),
+      codes: codes(high),
+      meta: "yield",
     },
     {
       key: "growth",
       title: "성장 우선",
       desc: "배당을 해마다 늘려 온 회사",
-      rule: "5년 연속 현금배당 · 5년 연평균 증가율 10% 이상 · 증가율 높은 순 10개 · 수익률 1% 이상",
+      rule: "5년 연속 현금배당 · 5년 연평균 증가율 10% 이상 · 증가율 높은 순 10개 · 배당수익률 1% 이상",
       icon: "stairs",
-      codes: growth.map((s) => s.code),
+      codes: codes(growth),
+      meta: "growth",
+    },
+    {
+      key: "monthly",
+      title: "달마다 받기",
+      desc: "지급 달이 다른 종목을 엮어 열두 달을 채운 조합",
+      rule: "분기·반기 배당인 국내 큰 회사(시총 1조·수익률 2%·3년 연속)와 배당을 10년 넘게 늘린 미국 회사에서 빈 달을 가장 많이 채우는 종목부터 10개 · 그래도 빈 달은 월배당으로",
+      icon: "calendar_month",
+      codes: codes(monthly),
+      meta: "months",
+    },
+    {
+      key: "covered",
+      title: "커버드콜 현금흐름",
+      desc: "옵션 프리미엄으로 달마다 높은 분배금을 주는 ETF",
+      rule: "미국 커버드콜 ETF(JEPI·JEPQ·QYLD…)와 TIGER 커버드콜을 번갈아 10개 · 분배율 30% 초과는 뺌",
+      icon: "toll",
+      codes: codes(covered),
+      meta: "yield",
+      caution: "분배금의 일부는 주가가 오를 때 얻었을 몫을 미리 떼어 받는 것입니다. 목표 분배율은 약속된 수익이 아니고, 지수가 오르는 해엔 지수를 따라가지 못합니다.",
+    },
+    {
+      key: "reit",
+      title: "리츠·인프라",
+      desc: "건물과 도로가 벌어 주는 임대·통행 수입",
+      rule: "국내 상장 리츠와 인프라 펀드 · 시가총액 큰 순 10개 · 분배율 30% 초과는 뺌",
+      icon: "apartment",
+      codes: codes(reit),
+      meta: "yield",
+      caution: "리츠의 높은 분배율엔 주가 하락이 만든 숫자와 특별분배가 섞입니다. 큰 스폰서 리츠부터 세웠습니다.",
+    },
+    {
+      key: "aristocrat",
+      title: "배당귀족",
+      desc: "25년 넘게 해마다 배당을 늘려 온 미국 회사",
+      rule: "해마다 배당을 25년 이상 늘린 미국 회사 · 배당수익률 1.5% 이상 10% 이하 · 오래 늘린 순 10개",
+      icon: "workspace_premium",
+      codes: codes(aristocrat),
+      meta: "growthYears",
+    },
+    {
+      key: "payout",
+      title: "여유 있는 회사",
+      desc: "번 것의 절반 아래만 배당으로 주면서도 늘려 온 회사",
+      rule: "배당성향 50% 이하 · 5년 연속 현금배당 · 5년 연평균 증가율 5% 이상 · 국내(시총 1조·수익률 2%, 큰 순)와 미국(10년 넘게 늘린 회사, 오래 늘린 순)을 번갈아 10개",
+      icon: "shield",
+      codes: codes(payout),
+      meta: "payout",
+    },
+    {
+      key: "preferred",
+      title: "우선주",
+      desc: "같은 회사 보통주보다 배당수익률이 높은 우선주",
+      rule: "우선주 · 시가총액 1,000억 이상 · 배당수익률 2% 이상 12% 이하 · 높은 순 10개",
+      icon: "star",
+      codes: codes(preferred),
+      meta: "yield",
+      caution: "우선주의 높은 배당수익률엔 의결권이 없고 거래가 적다는 할인이 섞여 있습니다. 자주 사고파는 돈보다 오래 둘 돈에 맞습니다.",
+    },
+    {
+      key: "septax",
+      title: "분리과세",
+      desc: "배당이 2,000만원을 넘어도 종합과세에 안 합치는 회사",
+      rule: haveHighDiv ? "고배당기업(분리과세 대상)으로 공시한 회사 · 배당수익률 3% 이상 · 시가총액 1조 이상 · 큰 순 10개" : "고배당기업 목록이 아직 없습니다",
+      icon: "receipt_long",
+      codes: codes(septax),
+      meta: "yield",
+    },
+    {
+      key: "finance",
+      title: "금융주",
+      desc: "은행·보험·증권·금융지주",
+      rule: "KIND 업종이 금융·은행·보험·증권인 회사 · 배당수익률 2% 이상 · 시가총액 큰 순 10개",
+      icon: "account_balance",
+      codes: codes(finance),
+      meta: "yield",
+    },
+    {
+      key: "account",
+      title: "내 계좌 맞춤",
+      desc: "ISA엔 국내 주식·ETF, 연금 계좌엔 국내 ETF만 담긴다",
+      rule: "ISA: 3년 연속 배당·수익률 3% 이상·시총 1조 이상 국내 주식 7개(큰 순) + 국내 배당 지수 ETF 3개 · 연금 계좌: 국내 ETF 10개(수익률 2~12%, 높은 순, 커버드콜은 뺌)",
+      icon: "account_balance_wallet",
+      codes: codes(isa),
+      altPension: codes(pension),
+      meta: "yield",
     },
   ];
 }

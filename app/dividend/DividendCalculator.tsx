@@ -292,12 +292,14 @@ function computeLines(holdings: Holding[], byCode: Map<string, StockLite>, fx: n
 }
 
 /** 바스켓을 이 투자금으로 같은 금액씩 나눠 담으면 종목마다 몇 주인가. */
-function basketShares(codes: string[], amount: number, byCode: Map<string, StockLite>): Holding[] {
+/** 바스켓을 이 투자금으로 같은 금액씩 나눠 담으면 종목마다 몇 주인가. 미국 종목은 종가가 달러라 환율을 곱해 원으로 잰다. */
+function basketShares(codes: string[], amount: number, byCode: Map<string, StockLite>, fx: number): Holding[] {
   if (!codes.length) return [];
   const per = amount / codes.length;
   return codes.map((code) => {
     const s = byCode.get(code);
-    return { code, shares: s?.close ? Math.floor(per / s.close) : 0 };
+    const priceKrw = s?.close ? s.close * (s.currency === "USD" ? fx : 1) : 0;
+    return { code, shares: priceKrw > 0 ? Math.floor(per / priceKrw) : 0 };
   });
 }
 
@@ -423,7 +425,7 @@ export function DividendCalculator({
     setHoldings((prev) => prev.filter((h) => h.code !== code));
   };
   const applyBasket = (b: BasketLite) => {
-    const next = basketShares(b.codes, amount, byCode);
+    const next = basketShares(b.codes, amount, byCode, fx);
     track("dividend_basket_apply", { basket: b.key, amount });
     // 이미 담긴 종목은 주수를 바스켓 값으로 바꾸고, 나머지는 뒤에 붙인다. 통째로 갈아
     // 끼우지 않는다 — 사용자가 손으로 담아 둔 다른 종목이 사라지면 안 된다.
@@ -620,7 +622,7 @@ export function DividendCalculator({
       <AmountControl amount={amount} onChange={setAmount} />
       <div className="dv-baskets">
         {baskets.map((b) => (
-          <BasketSheet key={b.key} basket={b} amount={amount} byCode={byCode} mode={taxMode} onApply={() => applyBasket(b)} onPick={(code) => add(code, "basket")} />
+          <BasketSheet key={b.key} basket={b} amount={amount} byCode={byCode} mode={taxMode} fx={fx} onApply={() => applyBasket(b)} onPick={(code) => add(code, "basket")} />
         ))}
       </div>
       <p className="dv-note">
@@ -1382,11 +1384,30 @@ function AmountControl({ amount, onChange }: { amount: number; onChange: (v: num
 }
 
 /* ── 바스켓 시트 ─────────────────────────────────────────────────── */
+/** 바스켓 줄 오른쪽 숫자 — 성향마다 "왜 여기 들었나"를 말하는 값. */
+function basketMeta(meta: BasketLite["meta"], s: StockLite): string {
+  switch (meta) {
+    case "growth":
+      return s.growth5 != null ? `연 ${s.growth5.toFixed(0)}% 성장` : "";
+    case "streak":
+      return streakLabel(s.streak);
+    case "months":
+      return s.pays.length ? `${[...new Set(s.pays.map(([m]) => m))].sort((a, b) => a - b).join("·")}월` : "";
+    case "growthYears":
+      return s.growthYears != null ? `${s.growthYears}년 연속 늘림` : "";
+    case "payout":
+      return s.payout ? `배당성향 ${Math.round(s.payout[1])}%` : "";
+    default:
+      return s.yieldPct != null ? pct(s.yieldPct) : "";
+  }
+}
+
 function BasketSheet({
   basket,
   amount,
   byCode,
   mode,
+  fx,
   onApply,
   onPick,
 }: {
@@ -1394,19 +1415,21 @@ function BasketSheet({
   amount: number;
   byCode: Map<string, StockLite>;
   mode: TaxMode;
+  fx: number;
   onApply: () => void;
   onPick: (code: string) => void;
 }) {
-  const holdings = basketShares(basket.codes, amount, byCode);
-  // 바스켓은 국내 종목뿐이라 환율은 1 이다.
-  const lines = computeLines(holdings, byCode, 1, mode);
+  // '내 계좌 맞춤'은 연금 계좌를 골랐을 때 국내 ETF 목록으로 바뀐다. 다른 바스켓은 계좌와 무관.
+  const codes = basket.altPension && mode === "pension" ? basket.altPension : basket.codes;
+  const holdings = basketShares(codes, amount, byCode, fx);
+  const lines = computeLines(holdings, byCode, fx, mode);
   const net = lines.reduce((s, l) => s + l.netKrw, 0);
   const gross = lines.reduce((s, l) => s + l.grossKrw, 0);
   const invest = lines.reduce((s, l) => s + (l.investKrw ?? 0), 0);
   const y = invest > 0 ? (gross / invest) * 100 : null;
   return (
     <section className="hz-sheet dv-basket" aria-label={basket.title}>
-      <SectionHead icon={basket.icon} title={basket.title} desc={basket.desc} />
+      <SectionHead icon={basket.icon} title={basket.altPension && mode === "pension" ? `${basket.title} (연금 계좌)` : basket.altPension ? `${basket.title} (ISA)` : basket.title} desc={basket.desc} />
       {lines.length ? (
         <>
           <div className="dv-basket-sum">
@@ -1433,15 +1456,7 @@ function BasketSheet({
                   <span className="dv-rank">{i + 1}</span>
                   <StockLogo code={l.stock.code} name={l.stock.name} market={l.stock.market} />
                   <span className="dv-basket-name">{l.stock.name}</span>
-                  <span className="dv-basket-meta">
-                    {basket.key === "growth" && l.stock.growth5 != null
-                      ? `연 ${l.stock.growth5.toFixed(0)}% 성장`
-                      : basket.key === "steady"
-                        ? streakLabel(l.stock.streak)
-                        : l.stock.yieldPct != null
-                          ? pct(l.stock.yieldPct)
-                          : ""}
-                  </span>
+                  <span className="dv-basket-meta">{basketMeta(basket.meta, l.stock)}</span>
                   <span className="dv-basket-shares">{l.shares.toLocaleString("ko-KR")}주</span>
                 </button>
               </li>
@@ -1449,6 +1464,7 @@ function BasketSheet({
           </ul>
           <div className="dv-basket-foot">
             <p className="dv-basket-rule">규칙 · {basket.rule}</p>
+            {basket.caution && <p className="dv-basket-rule dv-basket-caution">{basket.caution}</p>}
             <button type="button" className="dv-apply" onClick={onApply}>
               내 종목에 담기
             </button>

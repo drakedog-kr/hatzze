@@ -48,12 +48,18 @@ export type StockLite = {
 };
 
 export type BasketLite = {
-  key: "steady" | "yield" | "growth";
+  key: string;
   title: string;
   desc: string;
   rule: string;
   icon: string;
   codes: string[];
+  /** 줄 오른쪽에 적는 숫자의 종류(lib/dividend.ts 의 BasketMeta). */
+  meta: "streak" | "yield" | "growth" | "months" | "growthYears" | "payout";
+  /** '내 계좌 맞춤'만 — 연금 계좌를 골랐을 때의 목록. */
+  altPension?: string[];
+  /** 바스켓 밑에 붙는 주의 한 줄. */
+  caution?: string;
 };
 
 /**
