@@ -66,6 +66,8 @@ function toLite(s: DividendStock): StockLite {
     nextRecord: s.nextRecord,
     nextPay: s.nextPay ? [s.nextPay.date, s.nextPay.amount] : null,
     highDiv: s.highDiv ? [s.highDiv.year, s.highDiv.payoutPct] : null,
+    payout: s.payout ? [s.payout.year, s.payout.pct] : null,
+    growthYears: s.growthYears,
   };
 }
 
@@ -176,9 +178,9 @@ export default async function DividendPage() {
       { label: "달마다 주는", pick: us.filter((s) => new Set(s.payments.filter((p) => p.pay).map((p) => MONTH(p.pay as string))).size >= 12).sort(usTrend) },
       // 수익률 4% 넘는 — 10% 초과는 뺀다(mREIT·BDC 의 두 자릿수는 원금 위험이 섞인다). 언급 많은 순.
       { label: "수익률 4% 넘는", pick: us.filter((s) => (s.yieldPct ?? 0) >= 4 && (s.yieldPct ?? 0) <= 10).sort(usTrend) },
-      // 오래 준 회사 — 연속 배당 연수 순. SEC 공시가 2007년쯤부터라 19~20년이 천장이고, 같으면 언급 순.
-      // 수익률은 칩 문턱(1.5%) — 마이크로소프트 0.7%·코닝 0.7% 가 배당 줄 맨 앞에 서면 이 화면이 아니다.
-      { label: "오래 준 회사", pick: us.filter((s) => s.streak >= 10 && (s.yieldPct ?? 0) >= CHIP_MIN_YIELD_US).sort((a, b) => b.streak - a.streak || usTrend(a, b)) },
+      // 오래 늘려 온 회사 — 해마다 배당을 늘린 햇수(stockanalysis Growth Years, 코카콜라 64) 순. 25년 넘게 늘린 곳을
+      // 배당 귀족이라 부른다. 수익률은 칩 문턱(1.5%) — 마이크로소프트 0.7% 가 배당 줄 맨 앞에 서면 이 화면이 아니다.
+      { label: "오래 늘려 온 회사", pick: us.filter((s) => (s.growthYears ?? 0) >= 10 && (s.yieldPct ?? 0) >= CHIP_MIN_YIELD_US).sort((a, b) => (b.growthYears ?? 0) - (a.growthYears ?? 0) || usTrend(a, b)) },
     ],
     popularUs,
   );

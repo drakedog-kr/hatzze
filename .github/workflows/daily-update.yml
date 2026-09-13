@@ -948,6 +948,13 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_kr_high_dividend.py
 
+      # 배당성향(KIND 배당정보, 지난 사업연도 한 줄씩) — POST 한 번. 위와 같은 사이트.
+      - name: Fetch 배당성향 (배당주)
+        id: kr_dividend_payout
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_kr_dividend_payout.py
+
 
       - name: Fetch GitHub trading bot repo count
         id: github_trading_repos
@@ -1536,8 +1543,8 @@ jobs:
         id: dividend_health
         if: always()
         run: |
-          names=("fetch_kr_dividends.py" "calculate_kr_dividend_stats.py" "fetch_us_dividends.py" "fetch_etf_dividends.py" "fetch_kr_high_dividend.py")
-          outcomes=("${{ steps.kr_dividends.outcome }}" "${{ steps.kr_dividend_stats.outcome }}" "${{ steps.us_dividends.outcome }}" "${{ steps.etf_dividends.outcome }}" "${{ steps.kr_high_dividend.outcome }}")
+          names=("fetch_kr_dividends.py" "calculate_kr_dividend_stats.py" "fetch_us_dividends.py" "fetch_etf_dividends.py" "fetch_kr_high_dividend.py" "fetch_kr_dividend_payout.py")
+          outcomes=("${{ steps.kr_dividends.outcome }}" "${{ steps.kr_dividend_stats.outcome }}" "${{ steps.us_dividends.outcome }}" "${{ steps.etf_dividends.outcome }}" "${{ steps.kr_high_dividend.outcome }}" "${{ steps.kr_dividend_payout.outcome }}")
 
           {
             echo "## 배당주"

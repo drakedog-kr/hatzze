@@ -112,13 +112,39 @@ def parse_dividends(page: str) -> list[dict]:
     raise PageChanged("배당 표를 못 찾았다")
 
 
-def dividend_history(ticker: str, kind: str = "stock") -> list[dict] | None:
-    """페이지를 받아 파싱한다. 페이지가 없으면 None, 배당이 없으면 [], 구조가 바뀌면 PageChanged."""
+def parse_stats(page: str) -> dict:
+    """표 위의 요약 칸 — {payout_pct, growth_years, frequency}. 없는 칸은 None.
+
+    "Payout Ratio 63.71%" 는 지난 12개월 배당 ÷ 주당순이익, "Growth Years 64" 는 배당을 해마다 늘려 온 햇수
+    (코카콜라 64). SEC 로 센 연속 배당 연수는 공시가 2007년쯤부터라 19~20에서 막히는데 이건 안 막힌다.
+    """
+    text = re.sub(r"<[^>]+>", " ", page)
+    text = re.sub(r"\s+", " ", html.unescape(text))
+    out: dict = {"payout_pct": None, "growth_years": None, "frequency": None}
+    m = re.search(r"Payout Ratio ([\d.]+)%", text)
+    if m:
+        out["payout_pct"] = float(m.group(1))
+    m = re.search(r"Growth Years (\d+)", text)
+    if m:
+        out["growth_years"] = int(m.group(1))
+    m = re.search(r"Payout Frequency (\w+)", text)
+    if m:
+        out["frequency"] = m.group(1)
+    return out
+
+
+def dividend_page(ticker: str, kind: str = "stock") -> tuple[list[dict] | None, dict]:
+    """(지급 건, 요약 칸). 페이지가 없으면 (None, 빈 칸), 배당이 없으면 ([], …), 구조가 바뀌면 PageChanged."""
     page = fetch_page(ticker, kind)
     time.sleep(PAUSE_SEC)
     if page is None:
-        return None
-    return parse_dividends(page)
+        return None, parse_stats("")
+    return parse_dividends(page), parse_stats(page)
+
+
+def dividend_history(ticker: str, kind: str = "stock") -> list[dict] | None:
+    """페이지를 받아 파싱한다. 페이지가 없으면 None, 배당이 없으면 [], 구조가 바뀌면 PageChanged."""
+    return dividend_page(ticker, kind)[0]
 
 
 def trailing(payments: list[dict], today: date, days: int = 365) -> tuple[list[dict], dict | None]:

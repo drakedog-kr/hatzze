@@ -82,7 +82,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.config import FINNHUB_API_KEY  # noqa: E402
 from common.fred_client import FredUnavailableError, observations  # noqa: E402
-from common.stockanalysis import PageChanged, dividend_history, trailing  # noqa: E402
+from common.stockanalysis import PageChanged, dividend_page, trailing  # noqa: E402
 from common.supabase_client import get_client, load_all  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 from config.us_dividend_universe import EXTRA_US_DIVIDEND  # noqa: E402
@@ -385,13 +385,16 @@ def main() -> None:
         for i, r in enumerate(rows, 1):
             r["sec_ttm_dps"] = r["ttm_dps"]
             try:
-                hist = dividend_history(r["ticker"], "stock")
+                hist, stats = dividend_page(r["ticker"], "stock")
             except PageChanged:
                 sa_fail.append(r["ticker"])
                 continue
             if hist is None:
                 sa_missing.append(r["ticker"])
                 continue
+            # 배당성향(지난 12개월 배당 ÷ 주당순이익)과 해마다 늘려 온 햇수 — 표 위 요약 칸(마이그레이션 078).
+            r["payout_pct"] = stats["payout_pct"]
+            r["growth_years"] = stats["growth_years"]
             paid, nxt = trailing(hist, today)
             if not paid:
                 continue
@@ -415,6 +418,8 @@ def main() -> None:
         r.setdefault("pay_months", [])
         r.setdefault("next_pay_date", None)
         r.setdefault("next_pay_amount", None)
+        r.setdefault("payout_pct", None)
+        r.setdefault("growth_years", None)
 
     # 시세. 배당이 있는 종목만 부른다 — 없는 종목은 수익률이 없어 시세가 필요 없다.
     fx = usdkrw()

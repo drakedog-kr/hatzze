@@ -41,6 +41,10 @@ export type StockLite = {
   nextPay: [string, number] | null;
   /** 고배당기업(배당소득 분리과세 대상, 2026~2028)으로 공시한 회사. [사업연도, 배당성향 %]. 국내 주식만. */
   highDiv: [number | null, number | null] | null;
+  /** 배당성향 [사업연도(미국은 null), %]. 국내는 KIND 배당정보, 미국은 stockanalysis. 주식만. */
+  payout: [number | null, number] | null;
+  /** 배당을 해마다 늘려 온 햇수(미국 주식, stockanalysis). */
+  growthYears: number | null;
 };
 
 export type BasketLite = {

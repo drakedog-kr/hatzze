@@ -52,6 +52,10 @@ export type DividendStock = {
   shareKind: string | null;
   /** 고배당기업(배당소득 분리과세 대상, 2026~2028)으로 공시한 회사 — KIND 목록(kr_high_dividend). 국내 주식만. */
   highDiv: { payoutPct: number | null; growthPct: number | null; year: number | null } | null;
+  /** 배당성향(%) — 국내는 KIND 배당정보의 지난 사업연도(year), 미국은 stockanalysis 의 12개월(year 는 null). 주식만. */
+  payout: { pct: number; year: number | null } | null;
+  /** 배당을 해마다 늘려 온 햇수(stockanalysis Growth Years). 미국 주식만. */
+  growthYears: number | null;
 };
 
 export type BasketKey = "steady" | "yield" | "growth";
@@ -123,6 +127,8 @@ function toStock(r: Row): DividendStock {
     isReit: Boolean(r.is_reit),
     shareKind: r.share_kind,
     highDiv: null,
+    payout: null,
+    growthYears: null,
   };
 }
 
@@ -166,13 +172,16 @@ type UsRow = {
   ttm_payments: { pay: string; amount: number }[];
   next_pay_date: string | null;
   next_pay_amount: number | null;
+  /** 마이그레이션 078 — stockanalysis 요약 칸. */
+  payout_pct: number | null;
+  growth_years: number | null;
   usdkrw: number | null;
   usdkrw_date: string | null;
   computed_for: string;
 };
 
 const US_COLUMNS =
-  "ticker,name_ko,name_en,close,price_date,ttm_dps,ttm_method,ttm_yield_pct,streak_years,cut_years_5,growth_5y_pct,ttm_payments,next_pay_date,next_pay_amount,usdkrw,usdkrw_date,computed_for";
+  "ticker,name_ko,name_en,close,price_date,ttm_dps,ttm_method,ttm_yield_pct,streak_years,cut_years_5,growth_5y_pct,ttm_payments,next_pay_date,next_pay_amount,payout_pct,growth_years,usdkrw,usdkrw_date,computed_for";
 
 function toUsStock(r: UsRow): DividendStock {
   return {
@@ -202,6 +211,8 @@ function toUsStock(r: UsRow): DividendStock {
     isReit: false,
     shareKind: null,
     highDiv: null,
+    payout: r.payout_pct != null ? { pct: Number(r.payout_pct), year: null } : null,
+    growthYears: r.growth_years ?? null,
   };
 }
 
@@ -259,6 +270,8 @@ function toEtfStock(r: EtfRow): DividendStock {
     isReit: false,
     shareKind: "ETF",
     highDiv: null,
+    payout: null,
+    growthYears: null,
   };
 }
 
@@ -325,6 +338,27 @@ async function loadHighDiv(): Promise<Map<string, DividendStock["highDiv"]>> {
   return out;
 }
 
+/* ── 배당성향 (kr_dividend_payout, 마이그레이션 078) ──────────────────────────
+   KIND 배당정보 — 회사마다 지난 사업연도의 배당성향. 1,300행쯤이라 두 쪽. 없거나 실패하면 빈 Map. */
+type PayoutRow = { code: string; payout_pct: number | null; biz_year: number | null };
+
+async function loadPayout(): Promise<Map<string, DividendStock["payout"]>> {
+  const out = new Map<string, DividendStock["payout"]>();
+  try {
+    const db = getSupabaseServer();
+    for (let from = 0; from < 10_000; from += 1000) {
+      const { data, error } = await db.from("kr_dividend_payout").select("code,payout_pct,biz_year").order("code").range(from, from + 999);
+      if (error) throw error;
+      const rows = (data ?? []) as PayoutRow[];
+      for (const r of rows) if (r.payout_pct != null) out.set(r.code, { pct: Number(r.payout_pct), year: r.biz_year });
+      if (rows.length < 1000) break;
+    }
+  } catch (e) {
+    console.error("[dividend] kr_dividend_payout 조회 실패", e);
+  }
+  return out;
+}
+
 /** 표가 없거나 조회가 실패하면 null — 화면은 "아직 자료가 없습니다"를 낸다. */
 export async function getDividendData(): Promise<DividendData | null> {
   let loaded: { rows: Row[]; computedFor: string | null };
@@ -340,8 +374,11 @@ export async function getDividendData(): Promise<DividendData | null> {
   // 종가 날짜가 최신이 아닌 종목은 상장폐지된 것이다(`stocks` 는 지우지 않는다 — fetch_krx_stocks.py).
   // 거래정지는 KRX 목록에 그대로 있어 여기 안 걸린다. 검색에 뜨면 옛 값으로 계산되니 뺀다.
   const kr = priceDate ? all.filter((s) => s.priceDate === priceDate) : all;
-  const [us, etf, highDiv] = await Promise.all([loadUs(), loadEtf(), loadHighDiv()]);
-  for (const s of kr) s.highDiv = highDiv.get(s.code) ?? null;
+  const [us, etf, highDiv, payout] = await Promise.all([loadUs(), loadEtf(), loadHighDiv(), loadPayout()]);
+  for (const s of kr) {
+    s.highDiv = highDiv.get(s.code) ?? null;
+    s.payout = payout.get(s.code) ?? null;
+  }
   // 환율이 없으면 미국 종목을 원화로 못 옮긴다 — 그날은 미국을 통째로 뺀다(반쪽 계산보다 낫다).
   const usStocks = us.fx ? us.stocks : [];
   const etfs = etf.filter((s) => s.currency === "KRW" || us.fx);

@@ -17,8 +17,7 @@
 
 서버가 표를 그려서 준다(2026-09-13 실측 635곳, 유가 286 · 코스닥 349). 열은 회사명 · 공시 제목 · 사업연도 ·
 결산월 · 배당성향(%) · 이익배당금 증가율(%). 회사명은 **법인명**이라(케이티·삼성화재해상보험·롯데칠성음료)
-종목명과 다른 곳이 스무 곳쯤 있다 — 종목명(`stocks`) → 예탁결제원 발행사명(`kr_dividend.issuer_name`) →
-손으로 적은 별칭 순으로 코드를 찾고, 못 찾으면 찍고 뺀다.
+종목명과 다른 곳이 스무 곳쯤 있다 — 코드 찾기는 common/kind.py(종목명 → 발행사명 → 별칭). 못 찾으면 찍고 뺀다.
 ⚠️ KIND 는 거래소 사이트다. KRX Open API 와 같은 상자(비상업)로 본다.
 ⚠️ 페이지라 저쪽이 바뀌면 깨진다. 표가 300곳 아래로 줄면 저쪽이 바뀐 것으로 보고 저장하지 않는다.
 
@@ -30,112 +29,52 @@
 
 from __future__ import annotations
 
-import html
-import http.client
 import re
 import sys
-import time
-import urllib.parse
-import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from common.kind import code_lookup, norm, num, post_list, rows_of  # noqa: E402
 from common.supabase_client import get_client, load_all_keyset  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 
 TABLE = "kr_high_dividend"
 URL = "https://kind.krx.co.kr/valueup/dividend.do"
 PAGE_URL = "https://kind.krx.co.kr/valueup/dividend.do?method=valueupHighDividendMain"
-UA = {
-    "User-Agent": "hatzze/1.0 (+https://hatzze.fun; contact: support@hatzze.fun)",
-    "Referer": PAGE_URL,
-    "X-Requested-With": "XMLHttpRequest",
-}
 # 이보다 적으면 페이지가 바뀐 것이다(실측 635). 저장도, 삭제도 안 한다.
 MIN_ROWS = 300
-# 법인명이 종목명·발행사명 어느 쪽과도 안 맞는 곳. 이름이 바뀐 회사다(2026-09-13).
-ALIASES = {"유진증권": "001200", "유나이티드": "033270"}
-
-
-def fetch_list() -> str | None:
-    body = urllib.parse.urlencode({
-        "method": "valueupHighDividendSub", "forward": "valueupHighDividend_sub",
-        "pageIndex": 1, "currentPageSize": 3000, "orderMode": 0, "orderStat": "D",
-        "marketType": "", "selYear": "", "searchCorpName": "", "repIsuSrtCd": "", "isurCd": "", "acntclsMm": "",
-    }).encode()
-    for attempt in (1, 2, 3):
-        try:
-            with urllib.request.urlopen(urllib.request.Request(URL, data=body, headers=UA), timeout=60) as r:
-                return r.read().decode("utf-8", "ignore")
-        except (OSError, http.client.HTTPException):
-            if attempt == 3:
-                return None
-            time.sleep(5)
-    return None
-
-
-def _num(s: str) -> float | None:
-    try:
-        return float(s.replace(",", ""))
-    except ValueError:
-        return None
 
 
 def parse_list(page: str) -> list[dict]:
     """[{corp_name, market, kind_id, disclosure_id, title, biz_year, settle_month, payout_pct, div_growth_pct}]"""
     out: list[dict] = []
-    for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", page, flags=re.S):
-        cells = [html.unescape(re.sub(r"<[^>]+>", "", c)).strip() for c in re.findall(r"<td[^>]*>(.*?)</td>", tr, flags=re.S)]
-        if len(cells) < 7:
-            continue
+    for cells, tr in rows_of(page, 7):
         kid = re.search(r"companysummary_open\('(\w+)'\)", tr)
         disc = re.search(r"openDisclsViewer\('(\d+)'", tr)
         mkt = re.search(r"alt='(유가증권|코스닥|코넥스)'", tr)
         out.append({
-            "corp_name": re.sub(r"\s+", " ", cells[1]).strip(),
+            "corp_name": cells[1],
             "market": {"유가증권": "KOSPI", "코스닥": "KOSDAQ"}.get(mkt.group(1) if mkt else "", None),
             "kind_id": kid.group(1) if kid else None,
             "disclosure_id": disc.group(1) if disc else None,
-            "disclosure_title": re.sub(r"\s+", " ", cells[2]).strip(),
+            "disclosure_title": cells[2],
             "biz_year": int(cells[3]) if cells[3].isdigit() else None,
             "settle_month": int(cells[4]) if cells[4].isdigit() else None,
-            "payout_pct": _num(cells[5]),
-            "div_growth_pct": _num(cells[6]),
+            "payout_pct": num(cells[5]),
+            "div_growth_pct": num(cells[6]),
         })
     return out
-
-
-def code_lookup(db) -> dict[str, tuple[str, str]]:
-    """법인명·종목명 → (코드, 종목명). 종목명이 먼저, 발행사명은 비어 있는 자리만 채운다."""
-    norm = lambda s: re.sub(r"\s+", "", s).lower()  # noqa: E731
-    stocks = load_all_keyset(db, "stocks", "code,name", key="code")
-    by_name: dict[str, tuple[str, str]] = {}
-    for s in stocks:
-        by_name.setdefault(norm(s["name"]), (s["code"], s["name"]))
-    name_of = {s["code"]: s["name"] for s in stocks}
-    # 예탁결제원 발행사명(보통주 행). 2년치면 상장사는 다 있다. 1,000행 캡이라 (isin, record_date) 순으로 쪽을 넘긴다.
-    recs: list[dict] = []
-    since = f"{today_kst().year - 2}-01-01"
-    for frm in range(0, 100_000, 1000):
-        chunk = db.table("kr_dividend").select("code,issuer_name,share_kind").gte("record_date", since).order("isin").order("record_date").range(frm, frm + 999).execute().data
-        recs.extend(chunk)
-        if len(chunk) < 1000:
-            break
-    for r in recs:
-        if r.get("share_kind") not in (None, "보통주") or not r.get("issuer_name") or r["code"] not in name_of:
-            continue
-        by_name.setdefault(norm(r["issuer_name"]), (r["code"], name_of[r["code"]]))
-    for corp, code in ALIASES.items():
-        if code in name_of:
-            by_name.setdefault(norm(corp), (code, name_of[code]))
-    return by_name
 
 
 def main() -> None:
     dry_run = "--dry-run" in sys.argv[1:]
     today = today_kst()
-    page = fetch_list()
+    page = post_list(URL, PAGE_URL, {
+        "method": "valueupHighDividendSub", "forward": "valueupHighDividend_sub",
+        "pageIndex": 1, "currentPageSize": 3000, "orderMode": 0, "orderStat": "D",
+        "marketType": "", "selYear": "", "searchCorpName": "", "repIsuSrtCd": "", "isurCd": "", "acntclsMm": "",
+    })
     if page is None:
         print("[고배당] KIND 목록을 못 받았습니다")
         sys.exit(1)
@@ -144,8 +83,7 @@ def main() -> None:
         print(f"[고배당] 표가 {len(items)}곳뿐 — 페이지가 바뀐 것 같아 저장하지 않습니다")
         sys.exit(1)
     db = get_client()
-    lookup = code_lookup(db)
-    norm = lambda s: re.sub(r"\s+", "", s).lower()  # noqa: E731
+    lookup = code_lookup(db, today.year)
     rows: list[dict] = []
     unmatched: list[str] = []
     for it in items:

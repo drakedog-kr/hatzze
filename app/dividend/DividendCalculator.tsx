@@ -439,7 +439,7 @@ export function DividendCalculator({
     computedFor ? `국내 배당은 ${computedFor}에 정리한 최근 12개월 기록(예탁결제원)` : null,
     "미국 주식·ETF 의 지급일과 금액은 stockanalysis.com",
     "국내 ETF 분배금은 미래에셋 TIGER 분배 내역(줄에 날짜가 있습니다)",
-    "고배당기업(분리과세 대상) 여부는 KRX KIND 의 기업가치 제고 계획 공시 목록",
+    "고배당기업(분리과세 대상) 여부와 국내 배당성향은 KRX KIND(기업가치 제고 계획 공시·배당정보), 미국 배당성향은 stockanalysis.com",
   ]
     .filter(Boolean)
     .join(" · ");
@@ -842,10 +842,14 @@ function HoldingRow({
   if (s.dps === 0) notes.push(s.currency === "USD" ? "미국 공시에서 배당을 못 읽었습니다(안 주는 회사일 수도, 공시에 칸이 없을 수도 있습니다)" : "최근 1년 현금배당이 없습니다");
   if (s.unusual) notes.push("평소보다 큰 배당(특별·청산)이 섞여 있어 1년 뒤에도 같으리라 보기 어렵습니다");
   // 고배당기업 공시(KIND 목록). 회사가 스스로 적은 것을 옮긴 것이라 '해당'이라고만 적고 판정하지 않는다.
-  if (s.highDiv)
-    notes.push(
-      `고배당기업으로 공시한 회사입니다${s.highDiv[0] != null && s.highDiv[1] != null ? `(${s.highDiv[0]}년 배당성향 ${s.highDiv[1].toFixed(1)}%)` : ""}. 2026~2028년에 받는 배당은 2,000만원을 넘어도 종합과세에 합치지 않고 분리과세(14~30%)를 신청할 수 있습니다`,
-    );
+  if (s.highDiv) notes.push("고배당기업으로 공시한 회사입니다. 2026~2028년에 받는 배당은 2,000만원을 넘어도 종합과세에 합치지 않고 분리과세(14~30%)를 신청할 수 있습니다");
+  // 배당성향 — 이익의 몇 %를 배당으로 줬나. 100% 를 넘으면 번 것보다 많이 준 것이라 따로 적는다.
+  if (s.payout) {
+    const [year, p] = s.payout;
+    const basis = year != null ? `${year}년 배당성향 ${p.toFixed(0)}%` : `배당성향 ${p.toFixed(0)}%(지난 12개월)`;
+    notes.push(p > 100 ? `${basis} · 번 것보다 많이 줬습니다. 이대로 계속 주기는 어려울 수 있습니다` : `${basis} · 이익의 ${p.toFixed(0)}%를 배당으로 줬습니다`);
+  }
+  if ((s.growthYears ?? 0) >= 10) notes.push(`${s.growthYears}년째 해마다 배당을 늘려 왔습니다`);
   if (s.kind === "etf") {
     // 미국 ETF 는 stockanalysis, 국내 ETF 는 운용사(TIGER) 분배 내역 — 둘 다 지급 건이라 달력에 든다.
     // 국내는 어느 날 받은 내역인지 적는다(원천이 공시 페이지라).
