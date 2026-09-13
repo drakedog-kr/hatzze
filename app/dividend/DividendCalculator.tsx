@@ -1311,7 +1311,7 @@ function GoalBox({
       {/* 위에서 아래로 한 줄씩 답한다 — 목표 → 필요한 돈 → 지금 → 언제 → 앞으로. 칸은 문장 안이 아니라 제 줄에. */}
       <div className="dv-goal-head">
         <span className="dv-goal-title">목표까지</span>
-        <span className="dv-goal-sub">한 달에 얼마를 받고 싶은지 고르면, 얼마가 있어야 하고 언제 닿는지 셉니다</span>
+        <span className="dv-goal-sub">한 달에 얼마를 받고 싶은지 고르면, 얼마가 있어야 하고 언제 도달하는지 셉니다</span>
       </div>
       <div className="dv-goal-presets" role="group" aria-label="목표 월 배당">
         <span className="dv-goal-plabel">한 달에</span>
@@ -1337,12 +1337,12 @@ function GoalBox({
             {invest >= need ? (
               <>
                 {" · "}
-                <b>이미 넘었습니다</b>
+                <b>이미 목표를 넘었습니다</b>
               </>
             ) : (
               <>
                 {" · "}매달 {manInput(addMan, onAdd, "매달 더 넣는 돈(만원)", { width: 64 })}만원씩 더 넣고 배당을 다시 담으면{" "}
-                <b>{months == null ? `${GOAL_MAX_MONTHS / 12}년 안엔 못 닿습니다` : `${years} 뒤에 닿습니다`}</b>
+                <b>{months == null ? `${GOAL_MAX_MONTHS / 12}년 안에는 도달하지 못합니다` : `${years} 뒤에 목표에 도달합니다`}</b>
               </>
             )}
           </p>
