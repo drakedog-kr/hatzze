@@ -199,7 +199,11 @@ function Badges({ s }: { s: StockLite }) {
   return (
     <>
       {items.map((b) => (
-        <span key={b} className="dv-badge" title={b === "분리과세" ? "고배당기업으로 공시한 회사 · 2026~2028년 배당은 2,000만원을 넘어도 종합과세 대신 분리과세(14~30%)를 신청할 수 있습니다" : undefined}>
+        <span
+          key={b}
+          className={b === "분리과세" ? "dv-badge hz-tip hz-tip-wide" : "dv-badge"}
+          data-tip={b === "분리과세" ? "고배당기업으로 공시한 회사 · 2026~2028년 배당은 2,000만원을 넘어도 종합과세 대신 분리과세(14~30%)를 신청할 수 있습니다" : undefined}
+        >
           {b}
         </span>
       ))}
@@ -951,8 +955,9 @@ function HoldingRow({
           </span>
           {facts.length > 0 && (
             <span className="dv-tfacts">
+              {/* 브라우저 기본 title 은 1초 뒤에야 뜨고 폰에선 안 뜬다 — 이 화면의 말풍선(.hz-tip)으로. */}
               {facts.map((f) => (
-                <span key={f.text} className="dv-tfact" title={f.title}>
+                <span key={f.text} className="dv-tfact hz-tip hz-tip-wide" data-tip={f.title}>
                   {f.text}
                 </span>
               ))}
