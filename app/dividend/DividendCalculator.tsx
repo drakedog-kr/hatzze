@@ -507,7 +507,7 @@ export function DividendCalculator({
                 {invest > 0 && (
                   <>
                     {" · "}투자금 {won(invest)}
-                    {yieldPct != null && <>{" · "}수익률 {pct(yieldPct)}</>}
+                    {yieldPct != null && <>{" · "}배당수익률 {pct(yieldPct)}</>}
                     {lines.some((l) => l.onCost) && <>{" · "}평단을 넣은 종목은 평단 기준</>}
                   </>
                 )}
@@ -578,7 +578,6 @@ export function DividendCalculator({
           {lines.length > 0 && (
             <HoldingsTable lines={lines} inputs={inputs} onShares={setShares} onCost={setCost} onRemove={remove} />
           )}
-          {lines.length > 0 && <Upcoming lines={lines} fx={fx} mode={taxMode} />}
           {lines.length > 0 && (
             <MonthCalendar
               monthly={monthly}
@@ -594,6 +593,7 @@ export function DividendCalculator({
           {lines.length > 0 && fillMonth != null && (
             <MonthFill month={fillMonth} order={fillOrder} holdings={holdings} onPick={(code) => add(code, "fill_month")} onClose={() => setFillMonth(null)} />
           )}
+          {lines.length > 0 && <Upcoming lines={lines} fx={fx} mode={taxMode} />}
           {lines.length > 0 && invest > 0 && total > 0 && (
             <GoalBox
               invest={invest}
@@ -876,7 +876,7 @@ function HoldingsTable({
         <span role="columnheader">주수 · 평단</span>
         <span role="columnheader">1주에 1년</span>
         <span role="columnheader">1년에 받는 배당</span>
-        <span role="columnheader">수익률</span>
+        <span role="columnheader">배당수익률</span>
         <span role="columnheader" aria-label="빼기" />
       </div>
       {lines.map((l) => (
@@ -931,7 +931,7 @@ function HoldingRow({
   }
   // 일드맥스(TSLY·MSTY)류. 지난 1년 분배가 가격의 절반을 넘으면 원금을 돌려주는 상품이라 봐야 한다.
   if ((s.yieldPct ?? 0) > 30) notes.push("분배금이 달마다 크게 흔들리고 원금을 돌려주는 몫이 섞인 상품입니다. 지난 1년과 같으리라 보기 어렵습니다");
-  if (s.close == null) notes.push("종가가 없어 투자금과 수익률을 못 냅니다");
+  if (s.close == null) notes.push("종가가 없어 투자금과 배당수익률을 못 냅니다");
   // 5년 연평균 증가율(국내는 예탁결제원 기록, 미국은 SEC 연도별 합으로 센 값). 늘린 회사만이 아니라 줄인 회사도 적는다.
   if (s.growth5 != null && s.streak >= 5) {
     const g = Math.round(s.growth5);
@@ -1255,78 +1255,75 @@ function GoalBox({
   // 5·10·20년 뒤 월 배당 — 같은 셈을 240달까지 돌려 읽는다.
   const path = rate > 0 ? projectMonthly(invest, rate, add, growthPct, 240) : null;
   const years = months != null ? `${Math.floor(months / 12) ? `${Math.floor(months / 12)}년 ` : ""}${months % 12 ? `${months % 12}개월` : ""}`.trim() : null;
-  const numInput = (value: number, onChange: (v: number) => void, label: string) => (
-    <input
-      type="number"
-      inputMode="numeric"
-      min={0}
-      step={10}
-      value={value}
-      onChange={(e) => onChange(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-      aria-label={label}
-      className="dv-goal-input"
-    />
+  const field = (label: string, value: number, onChange: (v: number) => void, unit: string, opts: { step?: number; max?: number } = {}) => (
+    <label className="dv-goal-field">
+      <span className="dv-goal-flabel">{label}</span>
+      <span className="dv-goal-fbox">
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={opts.max}
+          step={opts.step ?? 10}
+          value={value}
+          onChange={(e) => onChange(Math.max(0, Math.min(opts.max ?? Infinity, Math.floor(Number(e.target.value) || 0))))}
+          aria-label={label}
+          className="dv-goal-input"
+        />
+        <span className="dv-goal-unit">{unit}</span>
+      </span>
+    </label>
   );
+  const reach =
+    goal <= 0 || need == null
+      ? null
+      : invest >= need
+        ? "이미 넘었습니다"
+        : months == null
+          ? `${GOAL_MAX_MONTHS / 12}년 안엔 못 닿습니다`
+          : `${years} 뒤`;
   return (
     <div className="dv-goal">
       <div className="dv-goal-head">
         <span className="dv-goal-title">목표까지</span>
-        <span className="dv-goal-sub">지금 담은 비율({taxLabel} 수익률 {pct(rate * 100)})이 그대로 간다고 칠 때</span>
+        <span className="dv-goal-sub">지금 담은 비율({taxLabel} 배당수익률 {pct(rate * 100)})이 그대로 간다고 볼 때</span>
       </div>
       <div className="dv-goal-form">
-        <label className="dv-goal-field">
-          한 달에 {numInput(goalMan, onGoal, "목표 월 배당(만원)")}만원 받으려면
-        </label>
-        <label className="dv-goal-field">
-          매달 {numInput(addMan, onAdd, "매달 더 넣는 돈(만원)")}만원씩 더 넣고
-        </label>
-        <label className="dv-goal-field">
-          배당이 해마다{" "}
-          <input
-            type="number"
-            inputMode="decimal"
-            min={0}
-            max={30}
-            step={1}
-            value={growthPct}
-            onChange={(e) => onGrowth(Math.min(30, Math.max(0, Number(e.target.value) || 0)))}
-            aria-label="배당 성장률(연 %)"
-            className="dv-goal-input dv-goal-input-sm"
-          />
-          % 늘면
-        </label>
+        {field("목표 월 배당", goalMan, onGoal, "만원")}
+        {field("매달 더 넣기", addMan, onAdd, "만원")}
+        {field("배당 성장률", growthPct, onGrowth, "%/년", { step: 1, max: 30 })}
       </div>
-      <p className="dv-goal-out">
-        {goal <= 0 ? (
-          "목표를 적으면 얼마가 필요한지 셉니다."
-        ) : need == null ? (
-          "배당이 0이라 셀 수 없습니다."
-        ) : (
-          <>
-            투자금 <b>{wonShort(Math.round(need / 1e4) * 1e4)}</b>이 있어야 합니다. 지금은 {wonShort(Math.round(invest / 1e4) * 1e4)}
-            {invest >= need
-              ? "이라 이미 넘습니다."
-              : months == null
-                ? `이고, 이 속도로는 ${GOAL_MAX_MONTHS / 12}년 안에 닿지 않습니다.`
-                : add > 0
-                  ? `이고, 배당을 다시 담으면서 매달 ${wonShort(add)}씩 넣으면 ${years} 뒤에 닿습니다.`
-                  : `이고, 더 넣지 않고 배당만 다시 담으면 ${years} 뒤에 닿습니다.`}
-          </>
-        )}
-      </p>
-      {path && (
-        <p className="dv-goal-path">
-          {[5, 10, 20].map((y, i) => (
-            <span key={y}>
-              {i > 0 && " · "}
-              {y}년 뒤 한 달에 <b>{wonShort(Math.round(path[y * 12] / 1e4) * 1e4)}</b>
-            </span>
-          ))}
-        </p>
+      {goal > 0 && need != null ? (
+        <>
+          <div className="dv-goal-stats">
+            <div className="dv-goal-stat">
+              <span className="dv-goal-slabel">필요한 투자금</span>
+              <span className="dv-goal-sval">{wonShort(Math.round(need / 1e4) * 1e4)}</span>
+            </div>
+            <div className="dv-goal-stat">
+              <span className="dv-goal-slabel">지금 투자금</span>
+              <span className="dv-goal-sval">{wonShort(Math.round(invest / 1e4) * 1e4)}</span>
+            </div>
+            <div className="dv-goal-stat">
+              <span className="dv-goal-slabel">닿기까지</span>
+              <span className="dv-goal-sval">{reach}</span>
+            </div>
+          </div>
+          {path && (
+            <div className="dv-goal-stats dv-goal-stats-sm">
+              {[5, 10, 20].map((y) => (
+                <div key={y} className="dv-goal-stat">
+                  <span className="dv-goal-slabel">{y}년 뒤 한 달에</span>
+                  <span className="dv-goal-sval">{wonShort(Math.round(path[y * 12] / 1e4) * 1e4)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        <p className="dv-goal-out">{goal <= 0 ? "목표를 적으면 얼마가 필요한지 셉니다." : "배당이 0이라 셀 수 없습니다."}</p>
       )}
-      <p className="dv-goal-note">
-        주가는 지금과 같고 받은 배당을 같은 비율로 다시 담는다고 본 값입니다. 배당 성장률 0%면 배당도 지금과 같다고 봅니다. 물가는 안 넣었습니다.
-      </p>
+      <p className="dv-goal-note">받은 배당은 다시 담고 주가는 그대로라고 본 값입니다. 물가는 안 넣었습니다.</p>
     </div>
   );
 }
@@ -1393,7 +1390,7 @@ function BasketSheet({
             <p className="dv-basket-main">{won(net)}</p>
             <p className="dv-basket-sub">
               1년에 · {taxShort(mode)} · 한 달 평균 {won(net / 12)}
-              {y != null && ` · 수익률 ${pct(y)}`}
+              {y != null && ` · 배당수익률 ${pct(y)}`}
             </p>
           </div>
           <ul className="dv-basket-list">
