@@ -511,16 +511,25 @@ export function DividendCalculator({
                 </span>
               </p>
               <p className="dv-hero-main">{won(total)}</p>
-              <p className="dv-hero-sub">
-                한 달 평균 {won(total / 12)}
+              {/* 셋은 큰 숫자 다음으로 중요한 값이라 한 줄 문장이 아니라 라벨 달린 칸 셋으로(2026-09-13 지적). */}
+              <div className="dv-hero-stats">
+                <div className="dv-hero-stat">
+                  <span className="dv-hero-slabel">한 달 평균</span>
+                  <span className="dv-hero-sval">{won(total / 12)}</span>
+                </div>
                 {invest > 0 && (
-                  <>
-                    {" · "}투자금 {won(invest)}
-                    {yieldPct != null && <>{" · "}배당수익률 {pct(yieldPct)}</>}
-                    {lines.some((l) => l.onCost) && <>{" · "}평단을 넣은 종목은 평단 기준</>}
-                  </>
+                  <div className="dv-hero-stat">
+                    <span className="dv-hero-slabel">투자금{lines.some((l) => l.onCost) ? " (평단 넣은 종목은 평단 기준)" : ""}</span>
+                    <span className="dv-hero-sval">{wonShort(Math.round(invest / 1e4) * 1e4)}</span>
+                  </div>
                 )}
-              </p>
+                {yieldPct != null && (
+                  <div className="dv-hero-stat">
+                    <span className="dv-hero-slabel">배당수익률</span>
+                    <span className="dv-hero-sval">{pct(yieldPct)}</span>
+                  </div>
+                )}
+              </div>
               {afterTax && (
                 <div className="dv-account" role="group" aria-label="어느 계좌로 세나">
                   <span className="dv-account-label">계좌</span>
