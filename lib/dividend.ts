@@ -50,6 +50,8 @@ export type DividendStock = {
   nextPay: { date: string; amount: number } | null;
   isReit: boolean;
   shareKind: string | null;
+  /** 고배당기업(배당소득 분리과세 대상, 2026~2028)으로 공시한 회사 — KIND 목록(kr_high_dividend). 국내 주식만. */
+  highDiv: { payoutPct: number | null; growthPct: number | null; year: number | null } | null;
 };
 
 export type BasketKey = "steady" | "yield" | "growth";
@@ -120,6 +122,7 @@ function toStock(r: Row): DividendStock {
     nextPay: null,
     isReit: Boolean(r.is_reit),
     shareKind: r.share_kind,
+    highDiv: null,
   };
 }
 
@@ -198,6 +201,7 @@ function toUsStock(r: UsRow): DividendStock {
     nextPay: r.next_pay_date && r.next_pay_amount != null ? { date: r.next_pay_date, amount: Number(r.next_pay_amount) } : null,
     isReit: false,
     shareKind: null,
+    highDiv: null,
   };
 }
 
@@ -254,6 +258,7 @@ function toEtfStock(r: EtfRow): DividendStock {
     nextPay: r.next_pay_date && r.next_pay_amount != null ? { date: r.next_pay_date, amount: Number(r.next_pay_amount) } : null,
     isReit: false,
     shareKind: "ETF",
+    highDiv: null,
   };
 }
 
@@ -302,6 +307,24 @@ export type DividendData = {
   usdkrw: UsdKrw | null;
 };
 
+/* ── 고배당기업 (kr_high_dividend, 마이그레이션 077) ────────────────────────
+   배당소득 분리과세(2026~2028) 대상으로 공시한 회사 목록. 없거나 실패하면 빈 Map — 표시만 빠진다. */
+type HighDivRow = { code: string; payout_pct: number | null; div_growth_pct: number | null; biz_year: number | null };
+
+async function loadHighDiv(): Promise<Map<string, DividendStock["highDiv"]>> {
+  const out = new Map<string, DividendStock["highDiv"]>();
+  try {
+    const { data, error } = await getSupabaseServer().from("kr_high_dividend").select("code,payout_pct,div_growth_pct,biz_year").limit(1000);
+    if (error) throw error;
+    const rows = (data ?? []) as HighDivRow[];
+    if (rows.length >= 1000) console.error("[dividend] kr_high_dividend 가 1,000행에 닿았다 — 페이징이 필요하다");
+    for (const r of rows) out.set(r.code, { payoutPct: n(r.payout_pct), growthPct: n(r.div_growth_pct), year: r.biz_year });
+  } catch (e) {
+    console.error("[dividend] kr_high_dividend 조회 실패", e);
+  }
+  return out;
+}
+
 /** 표가 없거나 조회가 실패하면 null — 화면은 "아직 자료가 없습니다"를 낸다. */
 export async function getDividendData(): Promise<DividendData | null> {
   let loaded: { rows: Row[]; computedFor: string | null };
@@ -317,7 +340,8 @@ export async function getDividendData(): Promise<DividendData | null> {
   // 종가 날짜가 최신이 아닌 종목은 상장폐지된 것이다(`stocks` 는 지우지 않는다 — fetch_krx_stocks.py).
   // 거래정지는 KRX 목록에 그대로 있어 여기 안 걸린다. 검색에 뜨면 옛 값으로 계산되니 뺀다.
   const kr = priceDate ? all.filter((s) => s.priceDate === priceDate) : all;
-  const [us, etf] = await Promise.all([loadUs(), loadEtf()]);
+  const [us, etf, highDiv] = await Promise.all([loadUs(), loadEtf(), loadHighDiv()]);
+  for (const s of kr) s.highDiv = highDiv.get(s.code) ?? null;
   // 환율이 없으면 미국 종목을 원화로 못 옮긴다 — 그날은 미국을 통째로 뺀다(반쪽 계산보다 낫다).
   const usStocks = us.fx ? us.stocks : [];
   const etfs = etf.filter((s) => s.currency === "KRW" || us.fx);

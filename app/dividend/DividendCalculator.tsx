@@ -94,6 +94,8 @@ const TAX_RATE_KR = 0.154;
 /** 미국 배당은 미국이 15%를 떼고(한미 조세조약) 국내에서 더 떼지 않는다(금융소득 2천만원 아래). */
 const TAX_RATE_US = 0.15;
 const taxRate = (s: StockLite) => (s.currency === "USD" ? TAX_RATE_US : TAX_RATE_KR);
+/** 금융소득 종합과세 문턱(원). 세전 배당이 이 근처는 돼야 분리과세 얘기가 뜻이 있다 — 그 아래선 어차피 15.4% 원천징수로 끝난다. */
+const SEP_TAX_NOTE_FROM = 15_000_000;
 /** 종목을 처음 담을 때의 주수. 0 이면 결과가 안 서고, 1 은 값이 너무 작아 감이 안 온다. */
 const DEFAULT_SHARES = 10;
 /** 바스켓 투자금 슬라이더 눈금(원). */
@@ -141,6 +143,8 @@ function Badges({ s }: { s: StockLite }) {
     s.kind === "etf"
       ? ["ETF", s.currency === "USD" ? "미국" : "국내"]
       : [s.market === "KOSDAQ" ? "코스닥" : s.market === "US" ? "미국" : "코스피"];
+  // 고배당기업(배당소득 분리과세 대상)으로 공시한 국내 회사. 뜻은 담은 줄의 안내문에.
+  if (s.highDiv) items.push("분리과세");
   return (
     <>
       {items.map((b) => (
@@ -284,6 +288,9 @@ export function DividendCalculator({
   const invest = lines.reduce((s, l) => s + (l.investKrw ?? 0), 0);
   const priced = lines.filter((l) => l.investKrw != null);
   const yieldPct = invest > 0 ? (priced.reduce((s, l) => s + l.grossKrw, 0) / invest) * 100 : null;
+  // 고배당기업(분리과세 대상) 배당의 몫. 2,000만원을 넘는 사람에게만 뜻이 있는 숫자라 그때만 적는다.
+  const sepGross = lines.filter((l) => l.stock.highDiv).reduce((s, l) => s + l.grossKrw, 0);
+  const grossAll = lines.reduce((s, l) => s + l.grossKrw, 0);
   // 달력에 못 드는 줄 — 지급 달을 모르는 것(미국 주식, 국내 ETF). 배당이 있는 줄만 센다.
   const noCalCount = lines.filter((l) => l.stock.dps > 0 && !l.stock.pays.length).length;
   // 달력은 지급 달을 아는 종목(국내)만. 미국은 공시에 지급일이 없다.
@@ -355,6 +362,7 @@ export function DividendCalculator({
     computedFor ? `국내 배당은 ${computedFor}에 정리한 최근 12개월 기록(예탁결제원)` : null,
     "미국 주식·ETF 의 지급일과 금액은 stockanalysis.com",
     "국내 ETF 분배금은 미래에셋 TIGER 분배 내역(줄에 날짜가 있습니다)",
+    "고배당기업(분리과세 대상) 여부는 KRX KIND 의 기업가치 제고 계획 공시 목록",
   ]
     .filter(Boolean)
     .join(" · ");
@@ -392,6 +400,11 @@ export function DividendCalculator({
                   </>
                 )}
               </p>
+              {sepGross > 0 && grossAll >= SEP_TAX_NOTE_FROM && (
+                <p className="dv-hero-note">
+                  세전 {won(grossAll)} 가운데 {won(sepGross)}은 고배당기업(분리과세 대상) 배당입니다. 2,000만원을 넘는 해에는 그 몫을 종합과세 대신 분리과세로 신청할 수 있습니다.
+                </p>
+              )}
             </>
           ) : (
             <>
@@ -702,6 +715,11 @@ function HoldingRow({
   // 미국은 "없다"고 못 말한다 — 허쉬·디지털리얼티처럼 1주당 배당 태그를 안 다는 회사가 있다.
   if (s.dps === 0) notes.push(s.currency === "USD" ? "미국 공시에서 배당을 못 읽었습니다(안 주는 회사일 수도, 공시에 칸이 없을 수도 있습니다)" : "최근 1년 현금배당이 없습니다");
   if (s.unusual) notes.push("평소보다 큰 배당(특별·청산)이 섞여 있어 1년 뒤에도 같으리라 보기 어렵습니다");
+  // 고배당기업 공시(KIND 목록). 회사가 스스로 적은 것을 옮긴 것이라 '해당'이라고만 적고 판정하지 않는다.
+  if (s.highDiv)
+    notes.push(
+      `고배당기업으로 공시한 회사입니다${s.highDiv[0] != null && s.highDiv[1] != null ? `(${s.highDiv[0]}년 배당성향 ${s.highDiv[1].toFixed(1)}%)` : ""}. 2026~2028년에 받는 배당은 2,000만원을 넘어도 종합과세에 합치지 않고 분리과세(14~30%)를 신청할 수 있습니다`,
+    );
   if (s.kind === "etf") {
     // 미국 ETF 는 stockanalysis, 국내 ETF 는 운용사(TIGER) 분배 내역 — 둘 다 지급 건이라 달력에 든다.
     // 국내는 어느 날 받은 내역인지 적는다(원천이 공시 페이지라).

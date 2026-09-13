@@ -5276,6 +5276,8 @@ main.hz-scroll { overflow-x: clip; }
 }
 .dv-hero-empty { font-size: 22px; font-weight: 700; color: var(--c-sub2); }
 .dv-hero-sub { margin: 6px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--c-sub); word-break: keep-all; }
+/* 분리과세 몫 — 2,000만원 근처인 사람에게만 뜨는 한 줄. */
+.dv-hero-note { margin: 8px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--c-sub); word-break: keep-all; }
 .dv-body { padding: 14px 26px 22px; display: flex; flex-direction: column; gap: 16px; }
 
 /* 세후·세전 — MDD 기간 토글과 같은 세그먼트. 고른 칸만 파란 면 + 카드색 글자. */

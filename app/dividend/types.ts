@@ -39,6 +39,8 @@ export type StockLite = {
   nextRecord: string | null;
   /** 선언됐지만 아직 안 지급된 다음 건(미국 주식·ETF). [지급일, 1주당 금액]. */
   nextPay: [string, number] | null;
+  /** 고배당기업(배당소득 분리과세 대상, 2026~2028)으로 공시한 회사. [사업연도, 배당성향 %]. 국내 주식만. */
+  highDiv: [number | null, number | null] | null;
 };
 
 export type BasketLite = {

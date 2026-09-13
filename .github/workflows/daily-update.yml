@@ -941,6 +941,13 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_etf_dividends.py
 
+      # 고배당기업(배당소득 분리과세 대상) 목록 — KIND 페이지 POST 한 번. ⚠️ 거래소 사이트라 미국 러너에서 막힐 수 있다.
+      - name: Fetch 고배당기업 목록 (배당주)
+        id: kr_high_dividend
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_kr_high_dividend.py
+
 
       - name: Fetch GitHub trading bot repo count
         id: github_trading_repos
@@ -1529,8 +1536,8 @@ jobs:
         id: dividend_health
         if: always()
         run: |
-          names=("fetch_kr_dividends.py" "calculate_kr_dividend_stats.py" "fetch_us_dividends.py" "fetch_etf_dividends.py")
-          outcomes=("${{ steps.kr_dividends.outcome }}" "${{ steps.kr_dividend_stats.outcome }}" "${{ steps.us_dividends.outcome }}" "${{ steps.etf_dividends.outcome }}")
+          names=("fetch_kr_dividends.py" "calculate_kr_dividend_stats.py" "fetch_us_dividends.py" "fetch_etf_dividends.py" "fetch_kr_high_dividend.py")
+          outcomes=("${{ steps.kr_dividends.outcome }}" "${{ steps.kr_dividend_stats.outcome }}" "${{ steps.us_dividends.outcome }}" "${{ steps.etf_dividends.outcome }}" "${{ steps.kr_high_dividend.outcome }}")
 
           {
             echo "## 배당주"
