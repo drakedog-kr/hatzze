@@ -5482,13 +5482,18 @@ main.hz-scroll { overflow-x: clip; }
 .dv-goal-inline::-webkit-outer-spin-button,
 .dv-goal-inline::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .dv-goal-inline:focus { outline: none; border-color: var(--c-blue); box-shadow: 0 0 0 3px var(--c-blue-tint); }
-.dv-goal-lead { display: flex; flex-direction: column; gap: 2px; margin-top: 14px; }
-.dv-goal-llabel { font-size: 12px; color: var(--c-sub); }
-.dv-goal-lval { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; color: var(--c-ink); font-variant-numeric: tabular-nums; }
-.dv-goal-lnote { font-size: 11.5px; color: var(--c-muted); }
-.dv-goal-line { margin: 10px 0 0; font-size: 13.5px; line-height: 1.7; color: var(--c-sub); word-break: keep-all; }
-.dv-goal-line b { color: var(--c-ink); font-weight: 700; }
-.dv-goal-line-sub { margin-top: 4px; font-size: 12.5px; }
+/* 채움 막대 — 필요한 투자금 가운데 지금이 얼마나 차 있나. 양 끝에 지금·필요. */
+.dv-goal-bar { margin-top: 14px; height: 10px; border-radius: 999px; background: var(--c-track); overflow: hidden; }
+.dv-goal-fill { display: block; height: 100%; border-radius: 999px; background: var(--c-blue); transition: width 0.2s ease; }
+.dv-goal-ends { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 12px; color: var(--c-sub); }
+.dv-goal-ends b { color: var(--c-ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+/* 답 — 언제 도달하나. 큰 글자 하나와 조건 한 마디. */
+.dv-goal-answer { display: flex; align-items: baseline; gap: 10px 14px; flex-wrap: wrap; margin-top: 12px; }
+.dv-goal-aval { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: var(--c-ink); font-variant-numeric: tabular-nums; }
+.dv-goal-acond { font-size: 12.5px; color: var(--c-sub); white-space: nowrap; }
+.dv-goal-line-sub { margin: 10px 0 0; font-size: 12.5px; line-height: 1.8; color: var(--c-sub); word-break: keep-all; }
+.dv-goal-line-sub b { color: var(--c-ink); font-weight: 700; }
+.dv-goal-growth { margin-left: 12px; white-space: nowrap; }
 .dv-goal-out { margin: 10px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--c-sub); word-break: keep-all; }
 
 /* 달마다 얼마 — 회색 타일 위 열두 칸. 막대는 그 달 금액에 비례한다. */
@@ -5578,7 +5583,7 @@ main.hz-scroll { overflow-x: clip; }
   .dv-more[data-scope="etf"] { order: 5; }
 }
 @media (max-width: 560px) {
-  .dv-goal-lval { font-size: 22px; }
+  .dv-goal-aval { font-size: 19px; }
   /* 일정 줄은 두 줄로 — 날짜·종목 윗줄, 무엇·얼마 아랫줄. */
   .dv-upcoming-row { flex-wrap: wrap; row-gap: 2px; }
   .dv-upcoming-what { flex: 1 1 100%; padding-left: 94px; white-space: normal; }

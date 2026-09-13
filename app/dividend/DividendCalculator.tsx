@@ -1306,18 +1306,29 @@ function GoalBox({
     />
   );
   const roundMan = (v: number) => wonShort(Math.round(v / 1e4) * 1e4);
+  const progress = need != null && need > 0 ? Math.min(100, (invest / need) * 100) : 0;
+  const reached = need != null && invest >= need;
   return (
     <div className="dv-goal">
-      {/* 위에서 아래로 한 줄씩 답한다 — 목표 → 필요한 돈 → 지금 → 언제 → 앞으로. 칸은 문장 안이 아니라 제 줄에. */}
+      {/* 글자는 줄이고 그림으로 — 목표 고르기(알약) → 채움 막대(지금/필요) → 언제(큰 글자). 가정은 물음표에(2026-09-13 지적). */}
       <div className="dv-goal-head">
-        <span className="dv-goal-title">목표까지</span>
-        <span className="dv-goal-sub">한 달에 얼마를 받고 싶은지 고르면, 얼마가 있어야 하고 언제 도달하는지 셉니다</span>
+        <span className="dv-cal-title">
+          목표까지
+          <span
+            className="hz-tip hz-tip-wide dv-help"
+            data-tip="지금 담은 종목의 비율(배당수익률)이 그대로 가고, 받은 배당은 다시 담고, 주가는 그대로라고 보고 셉니다. 물가는 안 넣었습니다."
+            style={{ cursor: "help" }}
+            aria-label="목표까지 셈법"
+          >
+            <Icon name="help" style={{ fontSize: 14 }} />
+          </span>
+        </span>
       </div>
       <div className="dv-goal-presets" role="group" aria-label="목표 월 배당">
         <span className="dv-goal-plabel">한 달에</span>
         {GOAL_PRESETS_MAN.map((v) => (
           <button key={v} type="button" className={`dv-quick${goalMan === v ? " dv-quick-on" : ""}`} aria-pressed={goalMan === v} onClick={() => onGoal(v)}>
-            {v >= 10_000 ? `${v / 10_000}억원` : `${v.toLocaleString("ko-KR")}만원`}
+            {v.toLocaleString("ko-KR")}만원
           </button>
         ))}
         <span className="dv-goal-custom">
@@ -1327,29 +1338,31 @@ function GoalBox({
       </div>
       {goal > 0 && need != null ? (
         <>
-          <div className="dv-goal-lead">
-            <span className="dv-goal-llabel">받으려면 필요한 투자금</span>
-            <span className="dv-goal-lval">{roundMan(need)}</span>
-            <span className="dv-goal-lnote">지금 담은 비율(배당수익률 {pct(rate * 100)})로 셌습니다</span>
+          <div className="dv-goal-bar" role="img" aria-label={`필요한 투자금 ${roundMan(need)} 가운데 지금 ${roundMan(invest)}`}>
+            <span className="dv-goal-fill" style={{ width: `${Math.max(2, progress)}%` }} />
           </div>
-          <p className="dv-goal-line">
-            지금은 <b>{roundMan(invest)}</b>
-            {invest >= need ? (
-              <>
-                {" · "}
-                <b>이미 목표를 넘었습니다</b>
-              </>
-            ) : (
-              <>
-                {" · "}매달 {manInput(addMan, onAdd, "매달 더 넣는 돈(만원)", { width: 64 })}만원씩 더 넣고 배당을 다시 담으면{" "}
-                <b>{months == null ? `${GOAL_MAX_MONTHS / 12}년 안에는 도달하지 못합니다` : `${years} 뒤에 목표에 도달합니다`}</b>
-              </>
+          <div className="dv-goal-ends">
+            <span>
+              지금 <b>{roundMan(invest)}</b>
+            </span>
+            <span>
+              필요 <b>{roundMan(need)}</b>
+            </span>
+          </div>
+          <div className="dv-goal-answer">
+            <span className="dv-goal-aval">{reached ? "이미 목표를 넘었습니다" : months == null ? `${GOAL_MAX_MONTHS / 12}년 안에는 도달하지 못합니다` : `${years} 뒤 도달`}</span>
+            {!reached && (
+              <span className="dv-goal-acond">
+                매달 {manInput(addMan, onAdd, "매달 더 넣는 돈(만원)", { width: 60 })}만원씩 더 넣을 때
+              </span>
             )}
-          </p>
+          </div>
           {path && (
-            <p className="dv-goal-line dv-goal-line-sub">
-              그대로 가면 5년 뒤 한 달에 <b>{roundMan(path[60])}</b> · 10년 뒤 <b>{roundMan(path[120])}</b> · 20년 뒤 <b>{roundMan(path[240])}</b>
-              {" · "}배당이 해마다 {manInput(growthPct, onGrowth, "배당 성장률(연 %)", { step: 1, max: 30, width: 44 })}% 늘고 주가는 그대로라는 가정입니다
+            <p className="dv-goal-line-sub">
+              5년 뒤 월 <b>{roundMan(path[60])}</b> · 10년 뒤 <b>{roundMan(path[120])}</b> · 20년 뒤 <b>{roundMan(path[240])}</b>
+              <span className="dv-goal-growth">
+                배당 성장률 {manInput(growthPct, onGrowth, "배당 성장률(연 %)", { step: 1, max: 30, width: 44 })}%/년
+              </span>
             </p>
           )}
         </>
