@@ -201,9 +201,9 @@ function toUsStock(r: UsRow): DividendStock {
   };
 }
 
-/* ── ETF (etf_dividend, 마이그레이션 074) ───────────────────────────────
-   분배금은 운용사 공시를 손으로 옮긴 설정 파일이 원천이라(data-pipeline/config/etf_dividends.py)
-   `as_of` 가 따로 있다. 화면이 그 날짜를 적는다. 국내 ETF 는 연도 합계뿐이라 달력에 못 든다. */
+/* ── ETF (etf_dividend, 마이그레이션 074·076) ─────────────────────────────
+   미국은 stockanalysis, 국내는 미래에셋 TIGER 분배 내역 — 둘 다 지난 1년 지급 건이라 달력에 든다
+   (data-pipeline/scripts/fetch_etf_dividends.py). `as_of` 는 그 내역을 받은 날. 화면이 그 날짜를 적는다. */
 type EtfRow = {
   code: string;
   market: string;
@@ -213,7 +213,8 @@ type EtfRow = {
   cadence: string | null;
   ttm_dps: number;
   estimated: boolean;
-  payments: { pay: string; amount: number }[];
+  /** 지난 1년에 지급된 건. 국내(TIGER 분배 내역)는 record 가 있고 미국(stockanalysis)은 없다. */
+  payments: { record?: string; pay: string; amount: number }[];
   pay_months: number[];
   as_of: string;
   close: number | null;
@@ -221,6 +222,9 @@ type EtfRow = {
   ttm_yield_pct: number | null;
   usdkrw: number | null;
   usdkrw_date: string | null;
+  /** 선언됐지만 아직 안 지급된 다음 건(마이그레이션 076). 미국 ETF 만 온다. */
+  next_pay_date: string | null;
+  next_pay_amount: number | null;
 };
 
 function toEtfStock(r: EtfRow): DividendStock {
@@ -242,12 +246,12 @@ function toEtfStock(r: EtfRow): DividendStock {
     unusual: false,
     estimated: Boolean(r.estimated),
     payMonths: Array.isArray(r.pay_months) ? r.pay_months.map(Number) : [],
-    payments: Array.isArray(r.payments) ? r.payments.map((p) => ({ record: p.pay, pay: p.pay, amount: Number(p.amount) })) : [],
+    payments: Array.isArray(r.payments) ? r.payments.map((p) => ({ record: p.record ?? p.pay, pay: p.pay, amount: Number(p.amount) })) : [],
     streak: 0,
     cuts5: 0,
     growth5: null,
     nextRecord: null,
-    nextPay: null,
+    nextPay: r.next_pay_date && r.next_pay_amount != null ? { date: r.next_pay_date, amount: Number(r.next_pay_amount) } : null,
     isReit: false,
     shareKind: "ETF",
   };

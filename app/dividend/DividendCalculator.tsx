@@ -354,7 +354,7 @@ export function DividendCalculator({
     usdkrw && usPriceDate ? `미국은 ${usPriceDate} 시세와 환율 ${Math.round(usdkrw.rate).toLocaleString("ko-KR")}원(FRED${usdkrw.date ? ` ${usdkrw.date}` : ""})` : null,
     computedFor ? `국내 배당은 ${computedFor}에 정리한 최근 12개월 기록(예탁결제원)` : null,
     "미국 주식·ETF 의 지급일과 금액은 stockanalysis.com",
-    "국내 ETF 분배금은 운용사 공시를 옮긴 값(줄에 날짜가 있습니다)",
+    "국내 ETF 분배금은 미래에셋 TIGER 분배 내역(줄에 날짜가 있습니다)",
   ]
     .filter(Boolean)
     .join(" · ");
@@ -567,7 +567,7 @@ function SearchBox({ stocks, onPick }: { stocks: StockLite[]; onPick: (code: str
               </div>
             ))
           ) : (
-            <p className="dv-search-none">찾는 것이 없습니다. 코스피·코스닥 주식 전부, 미국 주식 560종목, ETF 240여 개(미국 33 · TIGER 213)가 담깁니다.</p>
+            <p className="dv-search-none">찾는 것이 없습니다. 코스피·코스닥 주식 전부, 미국 주식 560종목, ETF 240여 개(미국 33 · TIGER 212)가 담깁니다.</p>
           )}
         </div>
       )}
@@ -703,12 +703,10 @@ function HoldingRow({
   if (s.dps === 0) notes.push(s.currency === "USD" ? "미국 공시에서 배당을 못 읽었습니다(안 주는 회사일 수도, 공시에 칸이 없을 수도 있습니다)" : "최근 1년 현금배당이 없습니다");
   if (s.unusual) notes.push("평소보다 큰 배당(특별·청산)이 섞여 있어 1년 뒤에도 같으리라 보기 어렵습니다");
   if (s.kind === "etf") {
-    // 미국 ETF 는 stockanalysis 가 매일 준다. 국내 ETF 는 운용사 공시를 손으로 옮긴 값이라 날짜가 붙고,
-    // 연도 합계뿐이라 달력에 못 든다.
-    if (s.currency === "KRW") {
-      notes.push(`분배금은 운용사 공시를 ${s.asOf ?? "최근"}에 옮긴 값입니다${s.estimated ? " · 올해 지급분을 열두 달로 늘린 추정값" : ""}`);
-      if (!s.pays.length) notes.push("달마다 얼마인지는 공시에 없어 아래 달력에는 빠집니다");
-    }
+    // 미국 ETF 는 stockanalysis, 국내 ETF 는 운용사(TIGER) 분배 내역 — 둘 다 지급 건이라 달력에 든다.
+    // 국내는 어느 날 받은 내역인지 적는다(원천이 공시 페이지라).
+    if (s.currency === "KRW") notes.push(`분배금은 운용사 분배 내역(${s.asOf ?? "최근"} 기준)을 옮긴 값입니다`);
+    if (s.dps > 0 && !s.pays.length) notes.push("지급일 기록이 없어 아래 달력에는 빠집니다");
   } else if (s.estimated) {
     notes.push("공시에 연간 값이 없어 마지막 배당으로 어림한 추정값입니다");
   }
