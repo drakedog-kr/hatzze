@@ -5276,6 +5276,10 @@ main.hz-scroll { overflow-x: clip; }
 }
 .dv-hero-empty { font-size: 22px; font-weight: 700; color: var(--c-sub2); }
 .dv-hero-sub { margin: 6px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--c-sub); word-break: keep-all; }
+/* 히어로 라벨 옆 물음표 — 세금·시세·출처 넉 줄. 240px 상한이면 여덟 줄이 돼 320 으로. */
+.dv-hero-label { display: flex; align-items: center; gap: 4px; }
+.dv-help { display: inline-flex; color: var(--c-muted); }
+.dv-help::after { max-width: 320px; font-weight: 500; }
 /* 계좌 고르기 — 세후일 때 히어로 아래 작은 칸. 머리의 세후·세전보다 한 단 작다. */
 .dv-account { display: flex; align-items: center; gap: 4px; margin: 10px 0 0; flex-wrap: wrap; }
 .dv-account-label { font-size: 12px; font-weight: 600; color: var(--c-sub); margin-right: 4px; }
@@ -5470,7 +5474,6 @@ main.hz-scroll { overflow-x: clip; }
 .dv-cal-amt { font-size: 11px; font-weight: 700; color: var(--c-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .dv-cal-cell:not(.dv-cal-on) .dv-cal-amt { color: var(--c-hint); font-weight: 400; }
 
-.dv-foot { margin: 0; font-size: 12px; line-height: 1.55; color: var(--c-sub); word-break: keep-all; }
 .dv-note { margin: -6px 0 0; padding: 0 4px; font-size: 12px; line-height: 1.55; color: var(--c-sub); word-break: keep-all; }
 
 /* 바스켓 투자금 — 세 시트가 함께 쓰는 슬라이더 한 줄. */

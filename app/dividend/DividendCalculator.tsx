@@ -437,16 +437,21 @@ export function DividendCalculator({
     );
   }
 
-  const basis = [
-    priceDate ? `국내는 전일 종가(${priceDate})` : null,
-    usdkrw && usPriceDate ? `미국은 ${usPriceDate} 시세와 환율 ${Math.round(usdkrw.rate).toLocaleString("ko-KR")}원(FRED${usdkrw.date ? ` ${usdkrw.date}` : ""})` : null,
-    computedFor ? `국내 배당은 ${computedFor}에 정리한 최근 12개월 기록(예탁결제원)` : null,
-    "미국 주식·ETF 의 지급일과 금액은 stockanalysis.com",
-    "국내 ETF 분배금은 미래에셋 TIGER 분배 내역(줄에 날짜가 있습니다)",
-    "고배당기업(분리과세 대상) 여부와 국내 배당성향은 KRX KIND(기업가치 제고 계획 공시·배당정보), 미국 배당성향은 stockanalysis.com",
+  // 세금·시세·출처는 히어로 라벨 옆 물음표 하나에 몰아 넣는다 — 바닥에 문단으로 두니 아무도 안 읽을 길이였다
+  // (2026-09-13 Hun). 꼭 필요한 넷만: 세금을 어떻게 뗐나 · 시세가 언제 것인가 · 배당 기록이 어디서 왔나 · 보장 없음.
+  const helpText = [
+    TAX_HELP[taxMode],
+    [
+      priceDate ? `시세: 국내 ${priceDate} 종가` : null,
+      usdkrw && usPriceDate ? `미국 ${usPriceDate} · 환율 ${Math.round(usdkrw.rate).toLocaleString("ko-KR")}원` : null,
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    `출처: 예탁결제원(국내, ${computedFor ?? "최근"} 기준) · stockanalysis.com(미국·ETF) · 미래에셋 TIGER(국내 ETF) · KRX KIND(배당성향·분리과세)`,
+    "배당은 회사가 바꿀 수 있습니다. 매수·매도 신호가 아닙니다.",
   ]
     .filter(Boolean)
-    .join(" · ");
+    .join("\n");
 
   return (
     <div className="hz-tx">
@@ -470,7 +475,12 @@ export function DividendCalculator({
         <div className="dv-hero">
           {lines.length ? (
             <>
-              <p className="dv-hero-label">1년에 받는 배당 ({taxShort(taxMode)})</p>
+              <p className="dv-hero-label">
+                1년에 받는 배당 ({taxShort(taxMode)})
+                <span className="hz-tip hz-tip-wide hz-tip-lines dv-help" data-tip={helpText} style={{ cursor: "help" }} aria-label="세금·시세·출처 설명">
+                  <Icon name="help" style={{ fontSize: 14 }} />
+                </span>
+              </p>
               <p className="dv-hero-main">{won(total)}</p>
               <p className="dv-hero-sub">
                 한 달 평균 {won(total / 12)}
@@ -568,13 +578,6 @@ export function DividendCalculator({
           )}
         </div>
 
-        <div className="hz-sheet-foot">
-          <p className="dv-foot">
-            {TAX_FOOT[taxMode]}
-            {basis && `${basis}. `}
-            배당은 회사가 바꿀 수 있고, 지난 1년과 같으리라는 보장은 없습니다. 매수·매도 신호가 아닙니다.
-          </p>
-        </div>
       </section>
 
       <SectionIntro n={2} title="성향별 바스켓" />
@@ -607,12 +610,12 @@ function TaxToggle({ afterTax, onChange }: { afterTax: boolean; onChange: (v: bo
   );
 }
 
-/** 바닥글의 세금 설명 — 어떻게 셌는지를 계좌마다 글자로. */
-const TAX_FOOT: Record<TaxMode, string> = {
-  general: "일반 계좌로 셌습니다. 국내는 15.4%(배당소득세 14%와 지방소득세 1.4%), 미국은 미국에서 떼는 15%입니다. ",
-  isa: `ISA로 셌습니다. 국내 주식·ETF 배당은 9.9%인데 만기까지 ${wonShort(ISA_FREE)}(서민형 ${wonShort(ISA_FREE_LOW)})은 아예 비과세라 실제 세금은 이보다 적습니다. 해외 주식은 ISA에 못 담아 일반 계좌(15%)로 셌습니다. `,
-  pension: "연금 계좌(연금저축·IRP)로 셌습니다. 국내 ETF 분배금은 받을 때까지 세금 없이 굴러가고 연금으로 받을 때 5.5%(55~69세 · 70대 4.4% · 80세부터 3.3%)를 뗍니다. 주식은 연금 계좌에 못 담아 일반 계좌(15.4%·15%)로 셌습니다. ",
-  gross: "세금을 빼기 전 값입니다. 실제로는 국내 15.4%, 미국 15%를 떼고 들어옵니다. ",
+/** 물음표 툴팁의 첫 줄 — 세금을 어떻게 뗐나, 계좌마다. */
+const TAX_HELP: Record<TaxMode, string> = {
+  general: "세후: 국내 15.4%, 미국 15%를 뗀 값",
+  isa: `세후(ISA): 국내 주식·ETF 9.9%, 해외 주식은 ISA에 못 담아 15% · 만기까지 ${wonShort(ISA_FREE)}(서민형 ${wonShort(ISA_FREE_LOW)})은 비과세라 실제론 이보다 적습니다`,
+  pension: "세후(연금 계좌): 국내 ETF 는 연금으로 받을 때 5.5%(55~69세) · 주식은 못 담아 15.4%·15%",
+  gross: "세전: 세금을 빼기 전 값(국내 15.4%, 미국 15%를 뗍니다)",
 };
 
 /**
