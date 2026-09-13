@@ -1061,7 +1061,7 @@ function MonthCalendar({
         <span className="dv-cal-sub">
           {paidMonths ? `1년에 ${paidMonths}달 들어옵니다` : "지급 달을 아는 종목이 없습니다"} · 최근 12개월 지급일 기준 · {taxLabel}
           {noCalCount > 0 && ` · ${noCalCount}종목은 지급 달을 몰라 뺐습니다`}
-          {" · 달을 누르면 그 달에 주는 종목이 뜹니다"}
+          {" · 달을 누르면 그 달에 주는 종목이 뜹니다(빈 달은 +)"}
         </span>
       </div>
       <div className="dv-cal-grid">
@@ -1074,11 +1074,19 @@ function MonthCalendar({
               className={`dv-cal-cell${v > 0 ? " dv-cal-on" : ""}`}
               aria-pressed={selected === m}
               onClick={() => onPick(m)}
-              title={`${m}월에 주는 종목 보기`}
+              title={v > 0 ? `${m}월에 주는 종목 보기` : `${m}월은 비어 있습니다 · 이 달에 주는 종목 보기`}
             >
               <span className="dv-cal-bar" style={{ height: max > 0 ? `${Math.max(v > 0 ? 6 : 0, (v / max) * 100)}%` : 0 }} aria-hidden="true" />
               <span className="dv-cal-month">{m}월</span>
-              <span className="dv-cal-amt">{v > 0 ? wonCal(v) : "·"}</span>
+              {/* 빈 달은 금액 자리에 + 동그라미 — "여기 눌러 채우라"는 표시(시장 브리핑의 '새로운 지표 제보하기'와 같은 아이콘).
+                  같은 아이콘이 여러 칸에 서지만 뜻이 하나(이 달을 채운다)라 한 화면 한 아이콘 규칙의 예외로 둔다. */}
+              {v > 0 ? (
+                <span className="dv-cal-amt">{wonCal(v)}</span>
+              ) : (
+                <span className="dv-cal-amt dv-cal-add" aria-hidden="true">
+                  <Icon name="add_circle" style={{ fontSize: 18 }} />
+                </span>
+              )}
             </button>
           );
         })}

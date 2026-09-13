@@ -5509,6 +5509,10 @@ main.hz-scroll { overflow-x: clip; }
 .dv-cal-month { font-size: 11px; color: var(--c-sub); }
 .dv-cal-amt { font-size: 11px; font-weight: 700; color: var(--c-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .dv-cal-cell:not(.dv-cal-on) .dv-cal-amt { color: var(--c-hint); font-weight: 400; }
+/* 빈 달의 + 동그라미. 파란색으로 "눌러 채우라"를 말하고, 올리면 진해진다. */
+/* ⚠️ 위 :not(.dv-cal-on) 규칙(특이도 0,3,0)이 회색을 입히므로 같은 특이도로 뒤에서 덮는다. */
+.dv-cal-cell:not(.dv-cal-on) .dv-cal-add { display: inline-flex; height: 16px; align-items: center; color: var(--c-blue); opacity: 0.8; }
+.dv-cal-cell:hover .dv-cal-add, .dv-cal-cell[aria-pressed="true"] .dv-cal-add { opacity: 1; }
 
 .dv-note { margin: -6px 0 0; padding: 0 4px; font-size: 12px; line-height: 1.55; color: var(--c-sub); word-break: keep-all; }
 
