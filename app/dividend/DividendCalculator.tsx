@@ -194,12 +194,14 @@ function Badges({ s }: { s: StockLite }) {
     s.kind === "etf"
       ? ["ETF", s.currency === "USD" ? "미국" : "국내"]
       : [s.market === "KOSDAQ" ? "코스닥" : s.market === "US" ? "미국" : "코스피"];
-  // 고배당기업(배당소득 분리과세 대상)으로 공시한 국내 회사. 뜻은 담은 줄의 안내문에.
+  // 고배당기업(배당소득 분리과세 대상)으로 공시한 국내 회사. 뜻은 배지의 title 로.
   if (s.highDiv) items.push("분리과세");
   return (
     <>
       {items.map((b) => (
-        <span key={b} className="dv-badge">{b}</span>
+        <span key={b} className="dv-badge" title={b === "분리과세" ? "고배당기업으로 공시한 회사 · 2026~2028년 배당은 2,000만원을 넘어도 종합과세 대신 분리과세(14~30%)를 신청할 수 있습니다" : undefined}>
+          {b}
+        </span>
       ))}
     </>
   );
@@ -904,43 +906,38 @@ function HoldingRow({
   const [costOpen, setCostOpen] = useState(false);
   const showCost = line.onCost || costOpen;
 
-  const notes: string[] = [];
-  if (line.outside) notes.push(s.currency === "USD" ? "해외 주식은 ISA·연금 계좌에 못 담아 일반 계좌(15%)로 셌습니다" : "개별 주식은 연금 계좌에 못 담아 일반 계좌(15.4%)로 셌습니다");
-  // 미국은 "없다"고 못 말한다 — 허쉬·디지털리얼티처럼 1주당 배당 태그를 안 다는 회사가 있다.
-  if (s.dps === 0) notes.push(s.currency === "USD" ? "미국 공시에서 배당을 못 읽었습니다(안 주는 회사일 수도, 공시에 칸이 없을 수도 있습니다)" : "최근 1년 현금배당이 없습니다");
-  if (s.unusual) notes.push("평소보다 큰 배당(특별·청산)이 섞여 있어 1년 뒤에도 같으리라 보기 어렵습니다");
-  // 고배당기업 공시(KIND 목록). 회사가 스스로 적은 것을 옮긴 것이라 '해당'이라고만 적고 판정하지 않는다.
-  if (s.highDiv) notes.push("고배당기업으로 공시한 회사입니다. 2026~2028년에 받는 배당은 2,000만원을 넘어도 종합과세에 합치지 않고 분리과세(14~30%)를 신청할 수 있습니다");
-  // 배당성향 — 이익의 몇 %를 배당으로 줬나. 100% 를 넘으면 번 것보다 많이 준 것이라 따로 적는다.
+  /* 이름 아래 두 줄 — 사실 조각(짧은 알약, 뜻은 title 로)과 주의(짧은 문장). 문장을 '·' 로 이어 붙였더니 세 줄이
+     됐다(2026-09-13 지적). 알약 하나에 사실 하나, 문장은 주의만. */
+  const facts: { text: string; title: string }[] = [];
+  const warns: string[] = [];
+  const md = (iso: string) => `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}`;
   if (s.payout) {
     const [year, p] = s.payout;
     const when = year != null ? `${year}년` : "지난 12개월";
     const pctText = `${Math.round(p).toLocaleString("ko-KR")}%`;
-    if (p < 0) notes.push(`${when}엔 적자였는데 배당을 줬습니다. 이대로 계속 주기는 어려울 수 있습니다`);
-    else if (p > 100) notes.push(`${when} 배당성향 ${pctText} · 번 것보다 많이 줬습니다. 이대로 계속 주기는 어려울 수 있습니다`);
-    else notes.push(`${when} 배당성향 ${pctText} · 이익의 ${pctText}를 배당으로 줬습니다`);
+    if (p < 0) warns.push(`${when}엔 적자였는데 배당을 줬습니다`);
+    else if (p > 100) warns.push(`배당성향 ${pctText} · 번 것보다 많이 줬습니다`);
+    else facts.push({ text: `배당성향 ${pctText}`, title: `${when} 이익의 ${pctText}를 배당으로 줬습니다` });
   }
-  if ((s.growthYears ?? 0) >= 10) notes.push(`${s.growthYears}년째 해마다 배당을 늘려 왔습니다`);
-  if (s.kind === "etf") {
-    // 미국 ETF 는 stockanalysis, 국내 ETF 는 운용사(TIGER) 분배 내역 — 둘 다 지급 건이라 달력에 든다.
-    // 국내는 어느 날 받은 내역인지 적는다(원천이 공시 페이지라).
-    if (s.currency === "KRW") notes.push(`분배금은 운용사 분배 내역(${s.asOf ?? "최근"} 기준)을 옮긴 값입니다`);
-    if (s.dps > 0 && !s.pays.length) notes.push("지급일 기록이 없어 아래 달력에는 빠집니다");
-  } else if (s.estimated) {
-    notes.push("공시에 연간 값이 없어 마지막 배당으로 어림한 추정값입니다");
-  }
-  // 일드맥스(TSLY·MSTY)류. 지난 1년 분배가 가격의 절반을 넘으면 원금을 돌려주는 상품이라 봐야 한다.
-  if ((s.yieldPct ?? 0) > 30) notes.push("분배금이 달마다 크게 흔들리고 원금을 돌려주는 몫이 섞인 상품입니다. 지난 1년과 같으리라 보기 어렵습니다");
-  if (s.close == null) notes.push("종가가 없어 투자금과 배당수익률을 못 냅니다");
+  if ((s.growthYears ?? 0) >= 10) facts.push({ text: `${s.growthYears}년 연속 늘림`, title: `${s.growthYears}년째 해마다 배당을 늘려 왔습니다` });
   // 5년 연평균 증가율(국내는 예탁결제원 기록, 미국은 SEC 연도별 합으로 센 값). 늘린 회사만이 아니라 줄인 회사도 적는다.
   if (s.growth5 != null && s.streak >= 5) {
     const g = Math.round(s.growth5);
-    if (g >= 1) notes.push(`5년간 해마다 ${g}%씩 늘렸습니다`);
-    else if (g <= -1) notes.push(`5년간 해마다 ${-g}%씩 줄었습니다`);
+    if (g >= 1) facts.push({ text: `5년 연 +${g}%`, title: `최근 5년 해마다 ${g}%씩 늘렸습니다(연평균)` });
+    else if (g <= -1) facts.push({ text: `5년 연 −${-g}%`, title: `최근 5년 해마다 ${-g}%씩 줄었습니다(연평균)` });
   }
-  if (s.nextRecord) notes.push(`다음 배당기준일 ${s.nextRecord}`);
-  if (s.nextPay) notes.push(`다음 지급 ${s.nextPay[0]} · 1주에 ${money(s.nextPay[1], s)}`);
-  if (s.kind === "stock" && s.currency === "USD" && s.dps > 0 && !s.pays.length) notes.push("지급일 기록이 없어 아래 달력에는 빠집니다");
+  if (s.nextRecord) facts.push({ text: `기준일 ${md(s.nextRecord)}`, title: `다음 배당기준일 ${s.nextRecord}` });
+  if (s.nextPay) facts.push({ text: `${md(s.nextPay[0])} 지급 ${money(s.nextPay[1], s)}`, title: `다음 지급 ${s.nextPay[0]} · 1주에 ${money(s.nextPay[1], s)}` });
+
+  if (line.outside) warns.push(s.currency === "USD" ? "해외 주식은 이 계좌에 못 담아 일반 계좌(15%)로 셌습니다" : "개별 주식은 연금 계좌에 못 담아 일반 계좌(15.4%)로 셌습니다");
+  // 미국은 "없다"고 못 말한다 — 허쉬·디지털리얼티처럼 1주당 배당 태그를 안 다는 회사가 있다.
+  if (s.dps === 0) warns.push(s.currency === "USD" ? "공시에서 배당을 못 읽었습니다(안 주는 회사일 수도 있습니다)" : "최근 1년 현금배당이 없습니다");
+  if (s.unusual) warns.push("특별·청산배당이 섞여 있어 1년 뒤에도 같으리라 보기 어렵습니다");
+  if (s.kind !== "etf" && s.estimated) warns.push("연간 값이 없어 마지막 배당으로 어림한 추정값입니다");
+  // 일드맥스(TSLY·MSTY)류. 지난 1년 분배가 가격의 절반을 넘으면 원금을 돌려주는 상품이라 봐야 한다.
+  if ((s.yieldPct ?? 0) > 30) warns.push("분배금이 달마다 크게 흔들리고 원금을 돌려주는 몫이 섞여 있습니다");
+  if (s.close == null) warns.push("종가가 없어 투자금과 배당수익률을 못 냅니다");
+  if (s.dps > 0 && !s.pays.length) warns.push("지급일 기록이 없어 아래 달력에는 빠집니다");
 
   const step = (d: number) => onShares(s.code, Math.max(0, shares + d));
   return (
@@ -952,7 +949,16 @@ function HoldingRow({
             {s.name}
             <Badges s={s} />
           </span>
-          {notes.length > 0 && <span className="dv-tnote">{notes.join(" · ")}</span>}
+          {facts.length > 0 && (
+            <span className="dv-tfacts">
+              {facts.map((f) => (
+                <span key={f.text} className="dv-tfact" title={f.title}>
+                  {f.text}
+                </span>
+              ))}
+            </span>
+          )}
+          {warns.length > 0 && <span className="dv-tnote dv-twarn">{warns.join(" · ")}</span>}
         </span>
       </span>
       <span className="dv-tcell dv-tshares" role="cell">
