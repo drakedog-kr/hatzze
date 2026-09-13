@@ -1463,7 +1463,14 @@ function BasketSheet({
             ))}
           </ul>
           <div className="dv-basket-foot">
-            <p className="dv-basket-rule">규칙 · {basket.rule}</p>
+            {/* 규칙은 알약 서너 개 — 문장으로 적으니 세 줄이 됐다(2026-09-13 지적). 열 개씩이라는 건 목록이 말한다. */}
+            <div className="dv-basket-rules">
+              {basket.rules.map((r) => (
+                <span key={r} className="dv-tfact">
+                  {r}
+                </span>
+              ))}
+            </div>
             {basket.caution && <p className="dv-basket-rule dv-basket-caution">{basket.caution}</p>}
             <button type="button" className="dv-apply" onClick={onApply}>
               내 종목에 담기

@@ -51,7 +51,7 @@ export type BasketLite = {
   key: string;
   title: string;
   desc: string;
-  rule: string;
+  rules: string[];
   icon: string;
   codes: string[];
   /** 줄 오른쪽에 적는 숫자의 종류(lib/dividend.ts 의 BasketMeta). */
