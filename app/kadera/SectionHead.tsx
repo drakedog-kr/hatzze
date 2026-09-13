@@ -27,7 +27,8 @@ export function SectionHead({
   level = 3,
 }: {
   icon: string;
-  title: string;
+  /** 글자 하나가 보통이지만, 제목 옆에 물음표(툴팁)를 붙이는 화면(배당 바스켓)은 조각을 넘긴다. */
+  title: React.ReactNode;
   note?: string;
   desc?: string;
   /** 설명 아래 한 줄 더(예: "최종 업데이트 · …"). 없으면 그리지 않는다. */

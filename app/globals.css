@@ -5558,9 +5558,8 @@ main.hz-scroll { overflow-x: clip; }
 }
 .dv-apply:hover { filter: brightness(1.08); }
 .dv-basket-none { margin: 0; padding: 18px 26px 22px; font-size: 13px; color: var(--c-sub); }
-/* 바스켓 규칙 알약(담은 줄의 사실 알약과 같은 모양) + 주의 한 줄. */
+/* 바스켓 규칙 알약(담은 줄의 사실 알약과 같은 모양). 주의는 제목 옆 물음표에. */
 .dv-basket-rules { display: flex; flex-wrap: wrap; gap: 4px; }
-.dv-basket-caution { color: var(--c-label); margin-top: 8px; }
 
 /* 폭. 사이드바를 뺀 본문 폭으로 잰다 — 세 장이 서려면 한 장에 360 은 있어야 한다. */
 @media (max-width: 1260px) {
