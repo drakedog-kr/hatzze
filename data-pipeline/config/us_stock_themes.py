@@ -50,9 +50,10 @@ US_THEMES: dict[str, list[str]] = {
     "소프트웨어": [
         "CRM", "NOW", "ADBE", "SNOW", "DDOG", "NET", "PANW", "CRWD",
         "TEAM", "APP", "TTD", "RDDT", "RBLX", "SHOP", "ZBRA", "APH",
-        "OKTA", "WDAY", "INTU",
+        "OKTA", "WDAY", "INTU", "ZS", "MDB",
     ],
-    "전기차·자율주행": ["TSLA", "RIVN", "LCID", "NIO", "XPEV", "GM", "F", "APTV", "UBER", "CVNA"],
+    # ⚠️ 리오토로 11개가 됐다. 우주·방산과 같은 자리 — 열둘째부터 MDD 바스켓 맨 뒤가 잘린다.
+    "전기차·자율주행": ["TSLA", "RIVN", "LCID", "NIO", "XPEV", "GM", "F", "APTV", "UBER", "CVNA", "LI"],
     "전력·원자력": [
         "SMR", "OKLO", "CEG", "VST", "NRG", "NEE", "GEV", "PWR",
         "ETN", "CCJ", "HON", "FSLR", "ENPH", "BE",
@@ -80,7 +81,7 @@ US_THEMES: dict[str, list[str]] = {
         "KO", "WMT", "COST", "SBUX", "MCD", "NKE", "CMG", "PEP", "PM",
         "DIS", "DKNG", "ORLY", "DECK", "LUV", "DHI", "PLD", "WELL",
         "CPNG", "MELI", "URI", "ABNB", "BKNG", "CAT", "VZ",
-        "HD", "BBY", "DLTR", "EBAY",
+        "HD", "BBY", "DLTR", "EBAY", "LULU", "KR",
     ],
     "에너지·원자재": ["XOM", "CVX", "KMI", "VLO", "FCX", "NEM", "NUE", "ALB"],
     # 아직 작지만(합쳐 170회) 뜰 때 한꺼번에 뜨는 묶음이라 따로 둔다.
