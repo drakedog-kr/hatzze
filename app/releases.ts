@@ -29,6 +29,12 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 화면이 세는 종목이 늘었을 뿐 쓰는 법은 그대로다. Patch.
+    version: "1.13.2",
+    date: "2026-09-14",
+    changes: ["미장 카더라가 룰루레몬·지스케일러·몽고DB 등 미국 종목 5개를 새로 셉니다."],
+  },
+  {
     // 글이 나가는 시각만 달라진다. 글의 짜임은 그대로라 Patch.
     version: "1.13.1",
     date: "2026-09-11",
