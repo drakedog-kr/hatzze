@@ -5468,40 +5468,33 @@ main.hz-scroll { overflow-x: clip; }
 .dv-upcoming-what { color: var(--c-sub); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dv-upcoming-amt { margin-left: auto; font-weight: 700; color: var(--c-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-/* 목표까지 — 회색 타일. 위에서 아래로 한 줄씩: 목표(빠른 선택) → 필요한 투자금(큰 숫자) → 지금·언제 → 앞으로.
-   칸 셋과 답 타일 여섯으로 짰더니 무엇을 묻는 카드인지가 안 보였다(2026-09-13) — 문장으로 답하고 칸은 문장 안에 작게. */
+/* 목표까지 — 회색 타일. 세 층: 입력 한 줄(목표 알약·매달 더 넣기) → 막대 한 줄 → 같은 타일 여섯(3×2).
+   글자 크기는 라벨 11.5 · 값 16 · 칩 12 셋뿐. 크기가 들쭉날쭉하고 자리가 흩어져 복잡해 보였다(2026-09-15). */
 .dv-goal { background: var(--tx-tile); border-radius: var(--tx-r-tile); padding: 14px 16px 14px; }
 .dv-goal-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
-.dv-goal-title { font-size: 13px; font-weight: 700; color: var(--c-ink); }
-.dv-goal-sub { font-size: 11.5px; color: var(--c-sub); word-break: keep-all; }
+.dv-goal-inputs { display: flex; align-items: center; gap: 8px 20px; flex-wrap: wrap; }
 .dv-goal-presets { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.dv-goal-plabel { font-size: 12.5px; font-weight: 600; color: var(--c-sub); margin-right: 2px; }
-.dv-goal-custom { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--c-sub); }
+.dv-goal-plabel { font-size: 11.5px; font-weight: 600; color: var(--c-sub); margin-right: 2px; white-space: nowrap; }
+.dv-goal-custom { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--c-sub); }
 .dv-goal-inline {
-  height: 28px; padding: 0 8px; text-align: right; border-radius: 7px; border: 1px solid var(--c-line); background: var(--c-card);
+  height: 30px; padding: 0 8px; text-align: right; border-radius: 8px; border: 1px solid var(--c-line); background: var(--c-card);
   color: var(--c-ink); font-size: 13px; font-weight: 700; font-family: inherit; font-variant-numeric: tabular-nums; vertical-align: middle;
 }
 .dv-goal-inline::-webkit-outer-spin-button,
 .dv-goal-inline::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .dv-goal-inline:focus { outline: none; border-color: var(--c-blue); box-shadow: 0 0 0 3px var(--c-blue-tint); }
-/* 채움 막대 — 필요한 투자금 가운데 지금이 얼마나 차 있나. 양 끝에 지금·필요. */
+/* 채움 막대 — 목표 한 달 배당 가운데 지금이 얼마나. 양 끝은 라벨 크기, 값만 진하게. */
 .dv-goal-bar { margin-top: 14px; height: 10px; border-radius: 999px; background: var(--c-track); overflow: hidden; }
 .dv-goal-fill { display: block; height: 100%; border-radius: 999px; background: var(--c-blue); transition: width 0.2s ease; }
-.dv-goal-ends { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 12px; color: var(--c-sub); }
+.dv-goal-ends { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 11.5px; color: var(--c-sub); }
 .dv-goal-ends b { color: var(--c-ink); font-weight: 700; font-variant-numeric: tabular-nums; }
 .dv-goal-pct { margin-left: 6px; font-weight: 700; color: var(--c-blue); font-variant-numeric: tabular-nums; }
-.dv-goal-line { margin: 8px 0 0; font-size: 12.5px; color: var(--c-sub); word-break: keep-all; }
-.dv-goal-line b { color: var(--c-ink); font-weight: 700; font-variant-numeric: tabular-nums; }
-/* 5·10·20년 뒤 타일 셋 — 카드 안이라 흰 타일(회색 위 회색은 안 보인다). */
-.dv-goal-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 12px; max-width: 520px; }
+/* 타일 여섯 — 카드 안이라 흰 타일. '도달까지'만 값이 파랗다. */
+.dv-goal-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 12px; }
 .dv-goal-stats .hz-tx-stat { background: var(--c-card); }
-.dv-goal-stats .hz-tx-stat-v { font-size: 16px; }
-/* 답 — 언제 도달하나. 큰 글자 하나와 조건 한 마디. */
-.dv-goal-answer { display: flex; align-items: baseline; gap: 10px 14px; flex-wrap: wrap; margin-top: 12px; }
-.dv-goal-aval { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: var(--c-ink); font-variant-numeric: tabular-nums; }
-.dv-goal-acond { font-size: 12.5px; color: var(--c-sub); white-space: nowrap; }
-
-.dv-goal-out { margin: 10px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--c-sub); word-break: keep-all; }
+.dv-goal-stats .hz-tx-stat-v { font-size: 16px; font-variant-numeric: tabular-nums; }
+.dv-goal-tile-strong .hz-tx-stat-v { color: var(--c-blue); }
+.dv-goal-out { margin: 10px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--c-sub); word-break: keep-all; }
 
 /* 달마다 얼마 — 회색 타일 위 열두 칸. 막대는 그 달 금액에 비례한다. */
 .dv-cal { background: var(--tx-tile); border-radius: var(--tx-r-tile); padding: 14px 16px 12px; }
@@ -5590,7 +5583,8 @@ main.hz-scroll { overflow-x: clip; }
   .dv-more[data-scope="etf"] { order: 5; }
 }
 @media (max-width: 560px) {
-  .dv-goal-aval { font-size: 19px; }
+  /* 목표 타일 여섯은 좁으면 둘씩 세 줄. */
+  .dv-goal-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* 일정 줄은 두 줄로 — 날짜·종목 윗줄, 무엇·얼마 아랫줄. */
   .dv-upcoming-row { flex-wrap: wrap; row-gap: 2px; }
   .dv-upcoming-what { flex: 1 1 100%; padding-left: 94px; white-space: normal; }

@@ -1348,10 +1348,16 @@ function GoalBox({
   // 막대는 목표와 같은 단위(한 달 배당)로 — "투자금 12%"보다 "한 달 13만원, 목표의 12%"가 바로 읽힌다.
   const progress = goal > 0 ? Math.min(100, (monthlyNow / goal) * 100) : 0;
   const reached = need != null && invest >= need;
+  const tile = (label: string, value: string, strong = false) => (
+    <div className={`hz-tx-stat${strong ? " dv-goal-tile-strong" : ""}`}>
+      <span className="hz-tx-stat-l">{label}</span>
+      <span className="hz-tx-stat-v">{value}</span>
+    </div>
+  );
   return (
     <div className="dv-goal">
-      {/* 목표 고르기 → 채움 막대(지금 한 달 배당이 목표의 몇 %) → 필요한 투자금 → 언제(큰 글자) → 5·10·20년 뒤 타일 셋.
-          네 줄로 줄였더니 정보가 없다고 해서(2026-09-15) 타일 셋을 돌려놓았다. 배당 성장률 칸은 안 둔다. 가정은 물음표에. */}
+      {/* 글자 크기는 셋뿐 — 라벨 11.5 · 값 16 · 칩 12. 배치는 세 층: 입력 한 줄 → 막대 한 줄 → 타일 두 줄(같은 타일 여섯).
+          크기가 들쭉날쭉하고 자리가 흩어져 복잡해 보였다(2026-09-15). */}
       <div className="dv-goal-head">
         <span className="dv-cal-title">
           목표까지
@@ -1365,17 +1371,24 @@ function GoalBox({
           </span>
         </span>
       </div>
-      <div className="dv-goal-presets" role="group" aria-label="목표 월 배당">
-        <span className="dv-goal-plabel">한 달에</span>
-        {GOAL_PRESETS_MAN.map((v) => (
-          <button key={v} type="button" className={`dv-quick${goalMan === v ? " dv-quick-on" : ""}`} aria-pressed={goalMan === v} onClick={() => onGoal(v)}>
-            {v.toLocaleString("ko-KR")}만원
-          </button>
-        ))}
-        <span className="dv-goal-custom">
-          {manInput(goalMan, onGoal, "목표 월 배당(만원)", { width: 72 })}
+      <div className="dv-goal-inputs">
+        <div className="dv-goal-presets" role="group" aria-label="목표 월 배당">
+          <span className="dv-goal-plabel">한 달에</span>
+          {GOAL_PRESETS_MAN.map((v) => (
+            <button key={v} type="button" className={`dv-quick${goalMan === v ? " dv-quick-on" : ""}`} aria-pressed={goalMan === v} onClick={() => onGoal(v)}>
+              {v.toLocaleString("ko-KR")}만원
+            </button>
+          ))}
+          <span className="dv-goal-custom">
+            {manInput(goalMan, onGoal, "목표 월 배당(만원)", { width: 72 })}
+            <span>만원</span>
+          </span>
+        </div>
+        <label className="dv-goal-custom">
+          <span className="dv-goal-plabel">매달 더 넣기</span>
+          {manInput(addMan, onAdd, "매달 더 넣는 돈(만원)", { width: 64 })}
           <span>만원</span>
-        </span>
+        </label>
       </div>
       {goal > 0 && need != null ? (
         <>
@@ -1391,31 +1404,14 @@ function GoalBox({
               목표 <b>{wonShort(goal)}</b>
             </span>
           </div>
-          <p className="dv-goal-line">
-            필요한 투자금 <b>{roundMan(need)}</b> · 지금 <b>{roundMan(invest)}</b>
-          </p>
-          <div className="dv-goal-answer">
-            {reached ? (
-              <span className="dv-goal-aval">이미 목표를 넘었습니다</span>
-            ) : (
-              <>
-                <span className="dv-goal-acond">
-                  매달 {manInput(addMan, onAdd, "매달 더 넣는 돈(만원)", { width: 60 })}만원씩 더 넣으면
-                </span>
-                <span className="dv-goal-aval">{months == null ? `${GOAL_MAX_MONTHS / 12}년 안에는 도달하지 못합니다` : `${years} 뒤 도달`}</span>
-              </>
-            )}
+          <div className="hz-tx-stats dv-goal-stats">
+            {tile("필요한 투자금", roundMan(need))}
+            {tile("지금 투자금", roundMan(invest))}
+            {tile("도달까지", reached ? "이미 넘었습니다" : months == null ? `${GOAL_MAX_MONTHS / 12}년 넘게` : years ?? "", true)}
+            {path && tile("5년 뒤 한 달", roundMan(path[60]))}
+            {path && tile("10년 뒤 한 달", roundMan(path[120]))}
+            {path && tile("20년 뒤 한 달", roundMan(path[240]))}
           </div>
-          {path && (
-            <div className="hz-tx-stats dv-goal-stats">
-              {[5, 10, 20].map((y) => (
-                <div key={y} className="hz-tx-stat">
-                  <span className="hz-tx-stat-l">{y}년 뒤 한 달</span>
-                  <span className="hz-tx-stat-v">{roundMan(path[y * 12])}</span>
-                </div>
-              ))}
-            </div>
-          )}
         </>
       ) : (
         <p className="dv-goal-out">{goal <= 0 ? "목표를 고르면 얼마가 필요한지 셉니다." : "배당이 0이라 셀 수 없습니다."}</p>
