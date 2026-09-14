@@ -419,6 +419,32 @@ export async function getDividendData(): Promise<DividendData | null> {
   };
 }
 
+/* ── 종목 하나 — /stock/[code] 의 배당 카드 ───────────────────────────────
+   464장이 부르는 자리라 조회는 기본키 셋뿐(kr_dividend_stock · kr_high_dividend · kr_dividend_payout).
+   행이 없으면(비상장·ETF) null — 카드를 안 그린다. */
+export async function getStockDividend(code: string): Promise<DividendStock | null> {
+  try {
+    const db = getSupabaseServer();
+    const [row, high, payout] = await Promise.all([
+      db.from("kr_dividend_stock").select(COLUMNS).eq("code", code).maybeSingle(),
+      db.from("kr_high_dividend").select("payout_pct,div_growth_pct,biz_year").eq("code", code).maybeSingle(),
+      db.from("kr_dividend_payout").select("payout_pct,biz_year,sector").eq("code", code).maybeSingle(),
+    ]);
+    if (row.error) throw row.error;
+    if (!row.data) return null;
+    const s = toStock(row.data as unknown as Row);
+    const h = high.data as { payout_pct: number | null; div_growth_pct: number | null; biz_year: number | null } | null;
+    const p = payout.data as { payout_pct: number | null; biz_year: number | null; sector: string | null } | null;
+    s.highDiv = h ? { payoutPct: n(h.payout_pct), growthPct: n(h.div_growth_pct), year: h.biz_year } : null;
+    s.payout = p && p.payout_pct != null ? { pct: Number(p.payout_pct), year: p.biz_year } : null;
+    s.sector = p?.sector ?? null;
+    return s;
+  } catch (e) {
+    console.error("[dividend] 종목 배당 조회 실패", code, e);
+    return null;
+  }
+}
+
 /* ── 성향별 바스켓 ─────────────────────────────────────────────────────
    규칙은 전부 화면에 글자로 나간다(`rule`). 규칙이 드러난 필터라야 추천이 아니라 분류다 —
    이 화면은 매수·매도를 말하지 않는다. 사용자는 담은 뒤 종목을 빼고 넣을 수 있다.

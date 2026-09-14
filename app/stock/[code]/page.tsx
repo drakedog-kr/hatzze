@@ -14,7 +14,10 @@ import {
   type StockTrendPoint,
 } from "@/lib/stock-page";
 
+import { getStockDividend } from "@/lib/dividend";
 import { daysFromToday, eventDateLabel, getStockEvents, getStockMoveReason, type UpcomingEvent } from "@/lib/kadera-why";
+import { DIVIDEND_PUBLIC } from "../../screen-flags";
+import { DividendCard } from "./DividendCard";
 import { Pill } from "../../kadera/parts";
 import { PageJsonLd } from "../../JsonLd";
 import { SectionHead } from "../../kadera/SectionHead";
@@ -192,10 +195,12 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
   if (!d) notFound();
   if (code !== upper) permanentRedirect(stockHref(upper));
 
-  const [peers, why, events] = await Promise.all([
+  const [peers, why, events, dividend] = await Promise.all([
     themePeerStocks(d.code, d.themes),
     getStockMoveReason(d.code, d.baseDate),
     getStockEvents(d.code),
+    // 배당 카드 — 배당으로 살기가 열리기 전엔 안 그린다(링크가 404 로 간다). 기본키 조회 셋뿐이라 464장에도 가볍다.
+    DIVIDEND_PUBLIC ? getStockDividend(d.code) : Promise.resolve(null),
   ]);
   // 그날 등락률. 파이프라인이 KRX 확정값을 채웠으면 그것, 아니면 stocks 의 값이 **그 날짜일 때만** 쓴다
   // (이 화면은 야후를 안 부른다 — lib/stock-page.ts 머리말 ①). 둘 다 아니면 까닭만 보여준다.
@@ -343,6 +348,11 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
           </div>
         </div>
       </section>
+
+      {/* ── 배당 ─────────────────────────────────────────────────────
+          이 종목을 1주 들면 1년에 얼마, 어느 달에 받나. 배당으로 살기와 같은 표를 읽어 서버가 그린다.
+          "삼성전자 배당" 같은 검색이 이 화면에 닿게 하는 자리이고, 주수를 넣는 셈은 저쪽으로 잇는다. */}
+      {dividend && <DividendCard s={dividend} />}
 
       {/* ── 왜 움직였나(LLM) ────────────────────────────────────────
           그날 채널이 말한 까닭 한 줄(카더라 '급등 종목'과 같은 표. 이쪽은 **내린 날도 보여준다**).

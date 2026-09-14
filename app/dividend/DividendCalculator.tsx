@@ -85,6 +85,12 @@ const holdingsStore = {
 };
 
 function writeHoldings(next: Holding[] | ((prev: Holding[]) => Holding[])) {
+  // ⚠️ 저장값을 아직 안 읽었으면 먼저 읽는다 — 마운트 직후(`?add=` 처리)에 쓰면 빈 목록 위에 덮어써서
+  //    담아 둔 종목이 통째로 사라졌다(2026-09-14 실측). 구독의 setTimeout 보다 effect 가 먼저 돈다.
+  if (!loaded) {
+    loaded = true;
+    current = readSaved();
+  }
   current = typeof next === "function" ? next(current) : next;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
@@ -387,6 +393,22 @@ export function DividendCalculator({
         el.select();
       }
     }, 0);
+
+  // 종목 페이지의 "배당으로 살기에서 계산하기"는 `?add=코드` 로 온다 — 그 종목을 담고 주소에서 지운다.
+  // 저장소(localStorage)가 아니라 외부 스토어를 고치는 일이라 effect 안에서 해도 된다(setState 가 아니다).
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get("add");
+    if (!code || !byCode.has(code)) return;
+    writeHoldings((prev) => (prev.some((h) => h.code === code) ? prev : [...prev, { code, shares: DEFAULT_SHARES }]));
+    track("dividend_add", { stock_code: gaStockCode(code), select_source: "link" });
+    window.history.replaceState(null, "", window.location.pathname);
+    setTimeout(() => {
+      const el = inputs.get(code);
+      el?.scrollIntoView({ block: "center" });
+      el?.focus();
+      el?.select();
+    }, 50);
+  }, [byCode, inputs]);
 
   // 환율이 없으면(미국 표가 비었을 때) 미국 종목 자체가 목록에 없다(lib/dividend.ts). 1 은 자리값.
   const fx = usdkrw?.rate ?? 1;
