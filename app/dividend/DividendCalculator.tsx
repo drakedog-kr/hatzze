@@ -348,7 +348,6 @@ export function DividendCalculator({
   // 목표 월 배당(만원)과 매달 더 넣는 돈(만원). 저장하지 않는다 — 담은 종목과 달리 한 번 보는 값이다.
   const [goalMan, setGoalMan] = useState(GOAL_DEFAULT_MAN);
   const [addMan, setAddMan] = useState(ADD_DEFAULT_MAN);
-  const [growthPct, setGrowthPct] = useState(0);
   // 달력에서 누른 달 — 그 달에 주는 종목을 아래에 세운다(빈 달 채우기).
   const [fillMonth, setFillMonth] = useState<number | null>(null);
   const [amount, setAmount] = useState(AMOUNT_DEFAULT);
@@ -639,16 +638,7 @@ export function DividendCalculator({
           )}
           {lines.length > 0 && <Upcoming lines={lines} fx={fx} mode={taxMode} />}
           {lines.length > 0 && invest > 0 && total > 0 && (
-            <GoalBox
-              invest={invest}
-              net={total}
-              goalMan={goalMan}
-              addMan={addMan}
-              growthPct={growthPct}
-              onGoal={setGoalMan}
-              onAdd={setAddMan}
-              onGrowth={setGrowthPct}
-            />
+            <GoalBox invest={invest} net={total} goalMan={goalMan} addMan={addMan} onGoal={setGoalMan} onAdd={setAddMan} />
           )}
         </div>
 
@@ -1321,27 +1311,21 @@ function GoalBox({
   net,
   goalMan,
   addMan,
-  growthPct,
   onGoal,
   onAdd,
-  onGrowth,
 }: {
   invest: number;
   net: number;
   goalMan: number;
   addMan: number;
-  growthPct: number;
   onGoal: (v: number) => void;
   onAdd: (v: number) => void;
-  onGrowth: (v: number) => void;
 }) {
   const rate = net / invest;
   const goal = goalMan * 1e4;
   const add = addMan * 1e4;
   const need = rate > 0 ? (goal * 12) / rate : null;
-  const months = goal > 0 ? monthsToGoal(invest, rate, add, growthPct, goal) : null;
-  // 5·10·20년 뒤 월 배당 — 같은 셈을 240달까지 돌려 읽는다.
-  const path = rate > 0 ? projectMonthly(invest, rate, add, growthPct, 240) : null;
+  const months = goal > 0 ? monthsToGoal(invest, rate, add, 0, goal) : null;
   const years = months != null ? `${Math.floor(months / 12) ? `${Math.floor(months / 12)}년 ` : ""}${months % 12 ? `${months % 12}개월` : ""}`.trim() : null;
   const manInput = (value: number, onChange: (v: number) => void, label: string, opts: { step?: number; max?: number; width?: number } = {}) => (
     <input
@@ -1362,13 +1346,14 @@ function GoalBox({
   const reached = need != null && invest >= need;
   return (
     <div className="dv-goal">
-      {/* 글자는 줄이고 그림으로 — 목표 고르기(알약) → 채움 막대(지금/필요) → 언제(큰 글자). 가정은 물음표에(2026-09-13 지적). */}
+      {/* 네 줄이 전부다 — 목표 고르기 → 채움 막대 → 지금과 필요 → 언제(큰 글자). 배당 성장률과 5·10·20년 뒤는
+          뺐다(2026-09-14: 있어도 없어도 되는 줄이 카드를 무겁게 했다). 가정은 물음표에. */}
       <div className="dv-goal-head">
         <span className="dv-cal-title">
           목표까지
           <span
             className="hz-tip hz-tip-wide dv-help"
-            data-tip="지금 담은 종목의 비율(배당수익률)이 그대로 가고, 받은 배당은 다시 담고, 주가는 그대로라고 보고 셉니다. 물가는 안 넣었습니다."
+            data-tip="지금 담은 종목의 비율(배당수익률)이 그대로 가고, 받은 배당은 다시 담고, 주가와 배당은 지금과 같다고 보고 셉니다."
             style={{ cursor: "help" }}
             aria-label="목표까지 셈법"
           >
@@ -1390,33 +1375,30 @@ function GoalBox({
       </div>
       {goal > 0 && need != null ? (
         <>
-          <div className="dv-goal-bar" role="img" aria-label={`필요한 투자금 ${roundMan(need)} 가운데 지금 ${roundMan(invest)}`}>
+          <div className="dv-goal-bar" role="img" aria-label={`필요한 투자금 ${roundMan(need)} 가운데 지금 ${roundMan(invest)}, ${Math.round(progress)}%`}>
             <span className="dv-goal-fill" style={{ width: `${Math.max(2, progress)}%` }} />
           </div>
           <div className="dv-goal-ends">
             <span>
               지금 <b>{roundMan(invest)}</b>
+              <span className="dv-goal-pct">{Math.round(progress)}%</span>
             </span>
             <span>
               필요 <b>{roundMan(need)}</b>
             </span>
           </div>
           <div className="dv-goal-answer">
-            <span className="dv-goal-aval">{reached ? "이미 목표를 넘었습니다" : months == null ? `${GOAL_MAX_MONTHS / 12}년 안에는 도달하지 못합니다` : `${years} 뒤 도달`}</span>
-            {!reached && (
-              <span className="dv-goal-acond">
-                매달 {manInput(addMan, onAdd, "매달 더 넣는 돈(만원)", { width: 60 })}만원씩 더 넣을 때
-              </span>
+            {reached ? (
+              <span className="dv-goal-aval">이미 목표를 넘었습니다</span>
+            ) : (
+              <>
+                <span className="dv-goal-acond">
+                  매달 {manInput(addMan, onAdd, "매달 더 넣는 돈(만원)", { width: 60 })}만원씩 더 넣으면
+                </span>
+                <span className="dv-goal-aval">{months == null ? `${GOAL_MAX_MONTHS / 12}년 안에는 도달하지 못합니다` : `${years} 뒤 도달`}</span>
+              </>
             )}
           </div>
-          {path && (
-            <p className="dv-goal-line-sub">
-              이대로 가면 한 달 배당은 5년 뒤 <b>{roundMan(path[60])}</b> · 10년 뒤 <b>{roundMan(path[120])}</b> · 20년 뒤 <b>{roundMan(path[240])}</b>
-              <span className="dv-goal-growth">
-                배당 성장률 {manInput(growthPct, onGrowth, "배당 성장률(연 %)", { step: 1, max: 30, width: 44 })}%/년
-              </span>
-            </p>
-          )}
         </>
       ) : (
         <p className="dv-goal-out">{goal <= 0 ? "목표를 고르면 얼마가 필요한지 셉니다." : "배당이 0이라 셀 수 없습니다."}</p>
