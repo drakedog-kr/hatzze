@@ -1457,7 +1457,8 @@ function basketMeta(meta: BasketLite["meta"], s: StockLite): string {
     case "growth":
       return s.growth5 != null ? `연 ${s.growth5.toFixed(0)}% 성장` : "";
     case "streak":
-      return streakLabel(s.streak);
+      // 미국은 SEC 로 센 연속 연수가 19~20에서 막힌다 — 해마다 늘린 햇수(stockanalysis)가 있으면 그것.
+      return s.growthYears != null ? `${s.growthYears}년 연속 늘림` : streakLabel(s.streak);
     case "months":
       return s.pays.length ? `${[...new Set(s.pays.map(([m]) => m))].sort((a, b) => a - b).join("·")}월` : "";
     case "growthYears":

@@ -501,6 +501,8 @@ const US_ETF_COVERED = ["JEPI", "JEPQ", "QYLD", "XYLD", "RYLD", "DIVO"];
 const US_ETF_MONTHLY = ["JEPI", "JEPQ", "DIVO"];
 /** 리츠가 아닌 인프라 펀드 — 맥쿼리인프라·KB발해인프라. */
 const KR_INFRA = new Set(["088980", "415640"]);
+/** 미국 리츠·인프라 — SEC 에 업종 표시가 없어 손으로(config/us_dividend_universe.py 의 리츠 묶음과 같다). */
+const US_REITS = ["O", "VICI", "STAG", "ADC", "WPC", "SPG", "EPR", "OHI", "AMT", "CCI", "PSA", "EXR", "AGNC", "NLY"];
 const FINANCE_SECTORS = new Set(["금융", "은행", "보험", "증권"]);
 /** 원금을 돌려주는 상품이 섞이는 선. 커버드콜·리츠 바스켓은 이 위를 뺀다(줄 안내도 30% 에서 켜진다). */
 const MAX_YIELD_ETF = 30;
@@ -574,15 +576,29 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
   // 꾸준함 — 5년 연속 주고 한 번도 안 줄인 회사 중 큰 회사부터. 수익률 순이 아니다 —
   // 그러면 아래 '지금 수익률'과 같은 목록이 된다. 큰 회사부터인 까닭은 이 성향이 묻는 게
   // "안 끊기겠나"이고, 그 답에 가장 가까운 사실이 규모라서다.
-  const steady = capBySector(common.filter((s) => s.streak >= 5 && s.cuts5 === 0 && yieldOf(s) >= 2 && sustainable(s)).sort(byCap), SECTOR_CAP).slice(0, SIZE);
+  // 기본 셋은 국내와 미국을 하나씩 번갈아 담는다(2026-09-15: "왜 거의 다 국내냐"). 미국은 시가총액이 없어 '큰 순'
+  // 대신 오래 늘린 순(꾸준함)·수익률 순·증가율 순이다. 배당성향은 stockanalysis 의 12개월 값.
+  const byGrowthYears = (a: DividendStock, b: DividendStock) => (b.growthYears ?? 0) - (a.growthYears ?? 0);
+  const steady = zip(
+    capBySector(common.filter((s) => s.streak >= 5 && s.cuts5 === 0 && yieldOf(s) >= 2 && sustainable(s)).sort(byCap), SECTOR_CAP),
+    usPayers.filter((s) => (s.growthYears ?? 0) >= 10 && s.cuts5 === 0 && sustainable(s)).sort(byGrowthYears),
+  ).slice(0, SIZE);
   // 지금 수익률 — 3년은 줬어야 한다. 한 해 반짝은 위 공통 문턱이 거르지만, 첫 배당인 회사도 뺀다.
-  // 배당성향 80% 이하(함정 회피)와 업종당 셋(금융 쏠림 회피)을 건다 — 2026-09-15 리서치.
-  const high = capBySector(common.filter((s) => s.streak >= 3 && sustainable(s)).sort(byYield), SECTOR_CAP).slice(0, SIZE);
+  // 배당성향 80% 이하(함정 회피)와 업종당 셋(금융 쏠림 회피)을 건다 — 2026-09-15 리서치. 미국은 4% 이상.
+  const high = zip(
+    capBySector(common.filter((s) => s.streak >= 3 && sustainable(s)).sort(byYield), SECTOR_CAP),
+    usPayers.filter((s) => yieldOf(s) >= 4 && s.streak >= 3 && sustainable(s)).sort(byYield),
+  ).slice(0, SIZE);
   // 성장 — 5년 연속 주면서 연평균 10% 넘게 늘려 온 회사, 그 사이 줄인 해는 한 번까지. 수익률은 낮아도 된다(1% 이상).
-  const growth = common
-    .filter((s) => s.streak >= 5 && s.cuts5 <= 1 && (s.growth5 ?? 0) >= 10 && yieldOf(s) >= 1 && sustainable(s))
-    .sort((a, b) => (b.growth5 ?? 0) - (a.growth5 ?? 0))
-    .slice(0, SIZE);
+  const growthOf = (list: DividendStock[], minYield: number) =>
+    list
+      .filter((s) => s.streak >= 5 && s.cuts5 <= 1 && (s.growth5 ?? 0) >= 10 && yieldOf(s) >= minYield && sustainable(s))
+      .sort((a, b) => (b.growth5 ?? 0) - (a.growth5 ?? 0));
+  // 미국은 해마다 늘린 햇수 5년 이상도 건다 — SEC 연도별 합으로 센 5년 증가율은 바닥에서 되돌린 회사(Cigna 173%)를 앞세운다.
+  const growth = zip(
+    growthOf(common, 1),
+    growthOf(usPayers, 1.5).filter((s) => (s.growthYears ?? 0) >= 5),
+  ).slice(0, SIZE);
   // 달마다 받기 — 국내 큰 회사(1조·2%)와 미국 배당주(오래 늘린 순)를 섞어 열두 달을 채운다.
   const monthly = coverMonths(
     common.filter((s) => (s.marketCap ?? 0) >= 1e12 && yieldOf(s) >= 2 && s.streak >= 3).sort(byCap),
@@ -591,8 +607,15 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
   );
   // 커버드콜 — 미국 손순서와 TIGER 커버드콜(수익률 순)을 번갈아. 30% 초과(일드맥스류)는 뺀다.
   const covered = zip(usEtfs(US_ETF_COVERED).filter((s) => yieldOf(s) <= MAX_YIELD_ETF), krEtfs(/커버드콜/)).slice(0, SIZE);
-  // 리츠·인프라 — 큰 것부터. 청산·특별분배로 30% 를 넘는 건 뺀다.
-  const reit = kr.filter((s) => isReit(s) && s.close != null && yieldOf(s) > 0 && yieldOf(s) <= MAX_YIELD_ETF).sort(byCap).slice(0, SIZE);
+  // 리츠·인프라 — 국내는 큰 것부터(청산·특별분배로 30% 를 넘는 건 뺌), 미국은 손목록을 수익률 순으로. 번갈아.
+  const usByCode = new Map(us.map((s) => [s.code, s]));
+  const reit = zip(
+    kr.filter((s) => isReit(s) && s.close != null && yieldOf(s) > 0 && yieldOf(s) <= MAX_YIELD_ETF).sort(byCap),
+    US_REITS.map((c) => usByCode.get(c))
+      // 10% 초과(AGNC·애널리 같은 모기지 리츠 두 자릿수)는 뺀다 — 임대 수입이 아니라 금리 차익이라 다른 상품이다.
+      .filter((s): s is DividendStock => !!s && s.dps > 0 && s.close != null && yieldOf(s) <= 10)
+      .sort(byYield),
+  ).slice(0, SIZE);
   // 배당귀족 — 해마다 배당을 25년 넘게 늘려 온 미국 회사, 오래 늘린 순.
   const aristocrat = usPayers
     .filter((s) => (s.growthYears ?? 0) >= 25 && (s.payout == null || s.payout.pct <= 100))
@@ -639,8 +662,8 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
     {
       key: "steady",
       title: "꾸준함 우선",
-      desc: "오래, 안 줄이고 준 회사",
-      rules: ["5년 연속 배당", "안 줄임", "배당성향 80% 이하", "업종당 3개", "큰 회사 순"],
+      desc: "오래, 안 줄이고 준 국내·미국 회사",
+      rules: ["5년 연속 배당", "안 줄임", "배당성향 80% 이하", "국내(큰 순)·미국(오래 늘린 순) 번갈아"],
       icon: "verified",
       codes: codes(steady),
       meta: "streak",
@@ -649,7 +672,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "yield",
       title: "지금 배당수익률 우선",
       desc: "지금 가격에 배당이 가장 큰 회사",
-      rules: ["3년 연속 배당", "배당성향 80% 이하", "업종당 3개", "배당수익률 높은 순"],
+      rules: ["3년 연속 배당", "배당성향 80% 이하", "배당수익률 높은 순", "국내·미국(4%+) 번갈아"],
       icon: "trending_up",
       codes: codes(high),
       meta: "yield",
@@ -658,7 +681,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "growth",
       title: "성장 우선",
       desc: "배당을 해마다 늘려 온 회사",
-      rules: ["5년 연속 배당", "5년 연 +10% 이상", "줄인 해 1번까지", "배당성향 80% 이하"],
+      rules: ["5년 연속 배당", "5년 연 +10% 이상", "줄인 해 1번까지", "국내·미국 번갈아"],
       icon: "stairs",
       codes: codes(growth),
       meta: "growth",
@@ -686,7 +709,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "reit",
       title: "리츠·인프라",
       desc: "건물과 도로가 벌어 주는 임대·통행 수입",
-      rules: ["국내 리츠·인프라 펀드", "큰 순", "분배율 30% 이하"],
+      rules: ["국내 리츠·인프라(큰 순)", "미국 리츠(수익률 순)", "번갈아"],
       icon: "apartment",
       codes: codes(reit),
       meta: "yield",
