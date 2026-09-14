@@ -150,7 +150,7 @@ const GOAL_DEFAULT_MAN = 100;
 const GOAL_PRESETS_MAN = [50, 100, 200, 300, 500];
 const ADD_DEFAULT_MAN = 50;
 /** 바스켓 네 줄의 이름. lib/dividend.ts 의 pickBaskets 가 이 순서(셋씩)로 돌려준다. */
-const BASKET_ROWS = ["기본", "현금흐름", "질", "세금과 업종"];
+const BASKET_ROWS = ["기본", "현금흐름", "미국", "국내"];
 /** 빈 달 채우기의 줄마다 칩 수. '더 보기' 묶음과 같다. */
 const ROW_CHIPS = 8;
 /** 다가오는 일정의 줄 수 상한과, 지난해 지급일로 어림한 것을 얼마나 앞까지 보여 주나(날). */
