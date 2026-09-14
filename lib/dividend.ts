@@ -58,6 +58,8 @@ export type DividendStock = {
   growthYears: number | null;
   /** KIND 업종(금융·은행·보험·증권·통신…). 국내 주식만, 배당정보 표에 있는 회사만. */
   sector: string | null;
+  /** 우선주가 같은 회사 보통주보다 몇 % 아래에 거래되나(괴리율). 보통주·해외·ETF 는 null. */
+  prefDiscountPct: number | null;
 };
 
 export type BasketKey =
@@ -75,7 +77,7 @@ export type BasketKey =
   | "account";
 
 /** 바스켓 줄 오른쪽에 무엇을 적나 — 성향마다 "왜 여기 들었나"를 말하는 숫자가 다르다. */
-export type BasketMeta = "streak" | "yield" | "growth" | "months" | "growthYears" | "payout";
+export type BasketMeta = "streak" | "yield" | "growth" | "months" | "growthYears" | "payout" | "discount";
 
 export type Basket = {
   key: BasketKey;
@@ -152,6 +154,7 @@ function toStock(r: Row): DividendStock {
     payout: null,
     growthYears: null,
     sector: null,
+    prefDiscountPct: null,
   };
 }
 
@@ -237,6 +240,7 @@ function toUsStock(r: UsRow): DividendStock {
     payout: r.payout_pct != null ? { pct: Number(r.payout_pct), year: null } : null,
     growthYears: r.growth_years ?? null,
     sector: null,
+    prefDiscountPct: null,
   };
 }
 
@@ -297,6 +301,7 @@ function toEtfStock(r: EtfRow): DividendStock {
     payout: null,
     growthYears: null,
     sector: null,
+    prefDiscountPct: null,
   };
 }
 
@@ -400,11 +405,17 @@ export async function getDividendData(): Promise<DividendData | null> {
   // 거래정지는 KRX 목록에 그대로 있어 여기 안 걸린다. 검색에 뜨면 옛 값으로 계산되니 뺀다.
   const kr = priceDate ? all.filter((s) => s.priceDate === priceDate) : all;
   const [us, etf, highDiv, payout] = await Promise.all([loadUs(), loadEtf(), loadHighDiv(), loadPayout()]);
+  const krByCode = new Map(kr.map((s) => [s.code, s]));
   for (const s of kr) {
     s.highDiv = highDiv.get(s.code) ?? null;
     const p = payout.get(s.code);
     s.payout = p?.payout ?? null;
     s.sector = p?.sector ?? null;
+    // 우선주 괴리율 — 보통주 코드는 앞 다섯 자리 + '0'(단축코드 규칙, fetch_kr_dividends.py 머리말).
+    if (s.shareKind != null && s.shareKind !== "보통주" && s.close) {
+      const common = krByCode.get(`${s.code.slice(0, 5)}0`);
+      s.prefDiscountPct = common?.close ? Math.round((1 - s.close / common.close) * 1000) / 10 : null;
+    }
   }
   // 환율이 없으면 미국 종목을 원화로 못 옮긴다 — 그날은 미국을 통째로 뺀다(반쪽 계산보다 낫다).
   const usStocks = us.fx ? us.stocks : [];
@@ -465,9 +476,25 @@ function eligible(s: DividendStock): boolean {
     s.close != null &&
     s.close > 0 &&
     (s.marketCap ?? 0) >= MIN_CAP &&
-    !s.name.includes("스팩")
+    !s.name.includes("스팩") &&
+    // 배당 함정 — 적자인데 주거나 번 것보다 많이 준 회사는 어느 바스켓에도 안 세운다(배당성향을 모르는 회사는 통과).
+    (s.payout == null || (s.payout.pct > 0 && s.payout.pct <= 100))
   );
 }
+/** 배당을 유지할 여유 — 증권사 리포트들이 '80% 넘으면 실적이 꺾일 때 줄인다'고 잡는 선. 모르는 회사는 통과. */
+const sustainable = (s: DividendStock) => s.payout == null || s.payout.pct <= 80;
+/** 한 업종이 바스켓을 채우지 않게 — 국내 고배당 지수가 금융 66~74% 로 쏠린다는 지적(신한 배당주 전략)에서. */
+function capBySector(list: DividendStock[], perSector: number): DividendStock[] {
+  const seen = new Map<string, number>();
+  return list.filter((s) => {
+    const k = s.sector ?? "-";
+    const c = seen.get(k) ?? 0;
+    if (c >= perSector) return false;
+    seen.set(k, c + 1);
+    return true;
+  });
+}
+const SECTOR_CAP = 3;
 
 /** 미국 ETF 의 손순서 — 커버드콜·달마다 받기 바스켓이 쓴다(page.tsx 의 목록과 같은 이름들). */
 const US_ETF_COVERED = ["JEPI", "JEPQ", "QYLD", "XYLD", "RYLD", "DIVO"];
@@ -547,12 +574,13 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
   // 꾸준함 — 5년 연속 주고 한 번도 안 줄인 회사 중 큰 회사부터. 수익률 순이 아니다 —
   // 그러면 아래 '지금 수익률'과 같은 목록이 된다. 큰 회사부터인 까닭은 이 성향이 묻는 게
   // "안 끊기겠나"이고, 그 답에 가장 가까운 사실이 규모라서다.
-  const steady = common.filter((s) => s.streak >= 5 && s.cuts5 === 0 && yieldOf(s) >= 2).sort(byCap).slice(0, SIZE);
+  const steady = capBySector(common.filter((s) => s.streak >= 5 && s.cuts5 === 0 && yieldOf(s) >= 2 && sustainable(s)).sort(byCap), SECTOR_CAP).slice(0, SIZE);
   // 지금 수익률 — 3년은 줬어야 한다. 한 해 반짝은 위 공통 문턱이 거르지만, 첫 배당인 회사도 뺀다.
-  const high = common.filter((s) => s.streak >= 3).sort(byYield).slice(0, SIZE);
-  // 성장 — 5년 연속 주면서 연평균 10% 넘게 늘려 온 회사. 수익률은 낮아도 된다(1% 이상).
+  // 배당성향 80% 이하(함정 회피)와 업종당 셋(금융 쏠림 회피)을 건다 — 2026-09-15 리서치.
+  const high = capBySector(common.filter((s) => s.streak >= 3 && sustainable(s)).sort(byYield), SECTOR_CAP).slice(0, SIZE);
+  // 성장 — 5년 연속 주면서 연평균 10% 넘게 늘려 온 회사, 그 사이 줄인 해는 한 번까지. 수익률은 낮아도 된다(1% 이상).
   const growth = common
-    .filter((s) => s.streak >= 5 && (s.growth5 ?? 0) >= 10 && yieldOf(s) >= 1)
+    .filter((s) => s.streak >= 5 && s.cuts5 <= 1 && (s.growth5 ?? 0) >= 10 && yieldOf(s) >= 1 && sustainable(s))
     .sort((a, b) => (b.growth5 ?? 0) - (a.growth5 ?? 0))
     .slice(0, SIZE);
   // 달마다 받기 — 국내 큰 회사(1조·2%)와 미국 배당주(오래 늘린 순)를 섞어 열두 달을 채운다.
@@ -567,19 +595,32 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
   const reit = kr.filter((s) => isReit(s) && s.close != null && yieldOf(s) > 0 && yieldOf(s) <= MAX_YIELD_ETF).sort(byCap).slice(0, SIZE);
   // 배당귀족 — 해마다 배당을 25년 넘게 늘려 온 미국 회사, 오래 늘린 순.
   const aristocrat = usPayers
-    .filter((s) => (s.growthYears ?? 0) >= 25)
+    .filter((s) => (s.growthYears ?? 0) >= 25 && (s.payout == null || s.payout.pct <= 100))
     .sort((a, b) => (b.growthYears ?? 0) - (a.growthYears ?? 0))
     .slice(0, SIZE);
   // 여유 있는 회사 — 배당성향 50% 이하이면서 5년간 배당을 늘려 온 회사. 국내는 시총 1조 이상을 큰 순으로,
   // 미국은 10년 넘게 늘려 온 회사를 오래 늘린 순으로, 번갈아. (증가율 순으로 세웠더니 작은 회사만 섰다.)
   const roomy = (list: DividendStock[], minYield: number) =>
-    list.filter((s) => s.payout != null && s.payout.pct > 0 && s.payout.pct <= 50 && s.streak >= 5 && (s.growth5 ?? 0) >= 5 && yieldOf(s) >= minYield);
+    list.filter((s) => s.payout != null && s.payout.pct > 0 && s.payout.pct <= 50 && s.streak >= 5 && s.cuts5 === 0 && (s.growth5 ?? 0) >= 5 && yieldOf(s) >= minYield);
   const payout = zip(
     roomy(common, 2).filter((s) => (s.marketCap ?? 0) >= 1e12).sort(byCap),
     roomy(usPayers, 1.5).filter((s) => (s.growthYears ?? 0) >= 10).sort((a, b) => (b.growthYears ?? 0) - (a.growthYears ?? 0)),
   ).slice(0, SIZE);
-  // 우선주 — 시총 1,000억 이상, 수익률 순. 12% 초과는 공통 문턱이 거른다.
-  const preferred = pool.filter((s) => isPref(s) && (s.marketCap ?? 0) >= 1_000e8 && yieldOf(s) >= 2).sort(byYield).slice(0, SIZE);
+  // 우선주 — 시총 1,000억 이상, 보통주보다 20% 넘게 아래(괴리율 — 우선주 리포트가 보는 첫 숫자), 수익률 순.
+  // 공통 문턱(시총 3,000억)이 아니라 1,000억이다 — 우선주는 보통주보다 작아서 3,000억이면 LG우·NH투자증권우가 빠진다.
+  const preferred = kr
+    .filter(
+      (s) =>
+        isPref(s) &&
+        s.close != null &&
+        !s.unusual &&
+        (s.marketCap ?? 0) >= 1_000e8 &&
+        yieldOf(s) >= 2 &&
+        yieldOf(s) <= MAX_YIELD &&
+        (s.prefDiscountPct ?? 0) >= 20,
+    )
+    .sort(byYield)
+    .slice(0, SIZE);
   // 분리과세 — 고배당기업으로 공시한 회사 중 수익률 3%·시총 1조 이상, 큰 순.
   const septax = common.filter((s) => s.highDiv && yieldOf(s) >= 3 && (s.marketCap ?? 0) >= 1e12).sort(byCap).slice(0, SIZE);
   // 금융주 — KIND 업종이 금융·은행·보험·증권. 큰 순.
@@ -599,7 +640,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "steady",
       title: "꾸준함 우선",
       desc: "오래, 안 줄이고 준 회사",
-      rules: ["5년 연속 배당", "안 줄임", "배당수익률 2%+", "큰 회사 순"],
+      rules: ["5년 연속 배당", "안 줄임", "배당성향 80% 이하", "업종당 3개", "큰 회사 순"],
       icon: "verified",
       codes: codes(steady),
       meta: "streak",
@@ -608,7 +649,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "yield",
       title: "지금 배당수익률 우선",
       desc: "지금 가격에 배당이 가장 큰 회사",
-      rules: ["3년 연속 배당", "배당수익률 높은 순", "12% 초과·특별배당 제외"],
+      rules: ["3년 연속 배당", "배당성향 80% 이하", "업종당 3개", "배당수익률 높은 순"],
       icon: "trending_up",
       codes: codes(high),
       meta: "yield",
@@ -617,7 +658,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "growth",
       title: "성장 우선",
       desc: "배당을 해마다 늘려 온 회사",
-      rules: ["5년 연속 배당", "5년 연 +10% 이상", "증가율 순", "배당수익률 1%+"],
+      rules: ["5년 연속 배당", "5년 연 +10% 이상", "줄인 해 1번까지", "배당성향 80% 이하"],
       icon: "stairs",
       codes: codes(growth),
       meta: "growth",
@@ -664,7 +705,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "payout",
       title: "여유 있는 회사",
       desc: "번 것의 절반 아래만 배당으로 주면서도 늘려 온 회사",
-      rules: ["배당성향 50% 이하", "5년 연 +5% 이상", "국내(1조+)·미국(10년+ 늘림) 번갈아"],
+      rules: ["배당성향 50% 이하", "5년 연 +5% 이상", "안 줄임", "국내·미국 번갈아"],
       icon: "shield",
       codes: codes(payout),
       meta: "payout",
@@ -673,10 +714,10 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "preferred",
       title: "우선주",
       desc: "같은 회사 보통주보다 배당수익률이 높은 우선주",
-      rules: ["우선주", "시총 1,000억+", "배당수익률 2~12%", "높은 순"],
+      rules: ["우선주", "보통주보다 20%+ 아래", "시총 1,000억+", "배당수익률 순"],
       icon: "star",
       codes: codes(preferred),
-      meta: "yield",
+      meta: "discount",
       caution: "의결권이 없고 거래가 적어 배당수익률이 높아 보입니다. 오래 둘 돈에 맞습니다.",
     },
     {

@@ -45,6 +45,8 @@ export type StockLite = {
   payout: [number | null, number] | null;
   /** 배당을 해마다 늘려 온 햇수(미국 주식, stockanalysis). */
   growthYears: number | null;
+  /** 우선주가 보통주보다 몇 % 아래에 거래되나. 우선주만. */
+  discount: number | null;
 };
 
 export type BasketLite = {
@@ -55,7 +57,7 @@ export type BasketLite = {
   icon: string;
   codes: string[];
   /** 줄 오른쪽에 적는 숫자의 종류(lib/dividend.ts 의 BasketMeta). */
-  meta: "streak" | "yield" | "growth" | "months" | "growthYears" | "payout";
+  meta: "streak" | "yield" | "growth" | "months" | "growthYears" | "payout" | "discount";
   /** '내 계좌 맞춤'만 — 연금 계좌를 골랐을 때의 목록. */
   altPension?: string[];
   /** 바스켓 밑에 붙는 주의 한 줄. */

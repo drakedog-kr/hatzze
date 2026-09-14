@@ -68,6 +68,7 @@ function toLite(s: DividendStock): StockLite {
     highDiv: s.highDiv ? [s.highDiv.year, s.highDiv.payoutPct] : null,
     payout: s.payout ? [s.payout.year, s.payout.pct] : null,
     growthYears: s.growthYears,
+    discount: s.prefDiscountPct,
   };
 }
 
