@@ -1326,6 +1326,9 @@ function GoalBox({
   const add = addMan * 1e4;
   const need = rate > 0 ? (goal * 12) / rate : null;
   const months = goal > 0 ? monthsToGoal(invest, rate, add, 0, goal) : null;
+  // 5·10·20년 뒤 한 달 배당 — 같은 셈을 240달까지 돌려 읽는다(배당 성장 0%).
+  const path = rate > 0 ? projectMonthly(invest, rate, add, 0, 240) : null;
+  const monthlyNow = net / 12;
   const years = months != null ? `${Math.floor(months / 12) ? `${Math.floor(months / 12)}년 ` : ""}${months % 12 ? `${months % 12}개월` : ""}`.trim() : null;
   const manInput = (value: number, onChange: (v: number) => void, label: string, opts: { step?: number; max?: number; width?: number } = {}) => (
     <input
@@ -1342,12 +1345,13 @@ function GoalBox({
     />
   );
   const roundMan = (v: number) => wonShort(Math.round(v / 1e4) * 1e4);
-  const progress = need != null && need > 0 ? Math.min(100, (invest / need) * 100) : 0;
+  // 막대는 목표와 같은 단위(한 달 배당)로 — "투자금 12%"보다 "한 달 13만원, 목표의 12%"가 바로 읽힌다.
+  const progress = goal > 0 ? Math.min(100, (monthlyNow / goal) * 100) : 0;
   const reached = need != null && invest >= need;
   return (
     <div className="dv-goal">
-      {/* 네 줄이 전부다 — 목표 고르기 → 채움 막대 → 지금과 필요 → 언제(큰 글자). 배당 성장률과 5·10·20년 뒤는
-          뺐다(2026-09-14: 있어도 없어도 되는 줄이 카드를 무겁게 했다). 가정은 물음표에. */}
+      {/* 목표 고르기 → 채움 막대(지금 한 달 배당이 목표의 몇 %) → 필요한 투자금 → 언제(큰 글자) → 5·10·20년 뒤 타일 셋.
+          네 줄로 줄였더니 정보가 없다고 해서(2026-09-15) 타일 셋을 돌려놓았다. 배당 성장률 칸은 안 둔다. 가정은 물음표에. */}
       <div className="dv-goal-head">
         <span className="dv-cal-title">
           목표까지
@@ -1375,18 +1379,21 @@ function GoalBox({
       </div>
       {goal > 0 && need != null ? (
         <>
-          <div className="dv-goal-bar" role="img" aria-label={`필요한 투자금 ${roundMan(need)} 가운데 지금 ${roundMan(invest)}, ${Math.round(progress)}%`}>
+          <div className="dv-goal-bar" role="img" aria-label={`목표 한 달 ${wonShort(goal)} 가운데 지금 ${won(monthlyNow)}, ${Math.round(progress)}%`}>
             <span className="dv-goal-fill" style={{ width: `${Math.max(2, progress)}%` }} />
           </div>
           <div className="dv-goal-ends">
             <span>
-              지금 <b>{roundMan(invest)}</b>
+              지금 한 달 <b>{won(monthlyNow)}</b>
               <span className="dv-goal-pct">{Math.round(progress)}%</span>
             </span>
             <span>
-              필요 <b>{roundMan(need)}</b>
+              목표 <b>{wonShort(goal)}</b>
             </span>
           </div>
+          <p className="dv-goal-line">
+            필요한 투자금 <b>{roundMan(need)}</b> · 지금 <b>{roundMan(invest)}</b>
+          </p>
           <div className="dv-goal-answer">
             {reached ? (
               <span className="dv-goal-aval">이미 목표를 넘었습니다</span>
@@ -1399,6 +1406,16 @@ function GoalBox({
               </>
             )}
           </div>
+          {path && (
+            <div className="hz-tx-stats dv-goal-stats">
+              {[5, 10, 20].map((y) => (
+                <div key={y} className="hz-tx-stat">
+                  <span className="hz-tx-stat-l">{y}년 뒤 한 달</span>
+                  <span className="hz-tx-stat-v">{roundMan(path[y * 12])}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </>
       ) : (
         <p className="dv-goal-out">{goal <= 0 ? "목표를 고르면 얼마가 필요한지 셉니다." : "배당이 0이라 셀 수 없습니다."}</p>
