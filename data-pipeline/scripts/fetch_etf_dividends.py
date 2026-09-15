@@ -4,7 +4,7 @@
   국내 분배금  TIGER '전체 분배 내역'(`distribution/overall/list.ajax`, 서버 렌더) — 지급 건마다 기준일·지급일·금액
   국내 시세    KRX Open API `etp/etf_bydd_trd` — 최신 가용 거래일 하루치(1,168종목)에서 코드로 찾는다
   미국 시세    핀허브 `quote`
-  환율         FRED `DEXKOUS`
+  환율         ECB 참조환율(common/fx.py) · 안 오면 FRED
 
 '1년에 얼마'는 미국·국내 다 같다 — **지난 365일 안에 지급된 건의 합.** 지급 달은 그 건들의 달이라 달력에 든다.
 
@@ -40,7 +40,7 @@ from zoneinfo import ZoneInfo
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.config import FINNHUB_API_KEY  # noqa: E402
-from common.fred_client import FredUnavailableError, observations  # noqa: E402
+from common.fx import usdkrw  # noqa: E402
 from common.krx_client import krx_get  # noqa: E402
 from common.stockanalysis import PageChanged, dividend_history, trailing  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
@@ -101,14 +101,6 @@ def quote(ticker: str, key: str) -> tuple[float, str] | None:
     if not d.get("c") or not d.get("t"):
         return None
     return float(d["c"]), datetime.fromtimestamp(int(d["t"]), timezone.utc).astimezone(ET).strftime("%Y-%m-%d")
-
-
-def usdkrw() -> tuple[float, str] | None:
-    try:
-        obs = observations("DEXKOUS", start=(date.today() - timedelta(days=20)).isoformat())
-    except FredUnavailableError:
-        return None
-    return (obs[-1][1], obs[-1][0]) if obs else None
 
 
 def tiger_month(year: int, month: int) -> list[dict] | None:

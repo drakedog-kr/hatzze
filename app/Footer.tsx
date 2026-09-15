@@ -50,8 +50,9 @@ const SOURCE_GROUPS: { label: string; items: string }[] = [
   /* ECOS 에서 받는 건 GDP(200Y109)·소비자심리지수(511Y002)·외국인 순매수(802Y001),
      그리고 자금순환표(281Y002 · 가계 부문 금융자산) 넷이다.
      FRED 는 **원/달러 환율(DEXKOUS)만** 받는다 — 나스닥·S&P 같은 벤더 지수는 안 쓴다
-     (그쪽은 FRED 를 거쳐도 벤더 약관을 따른다. lib/seohak-external.ts 머리말 참고). */
-  { label: "거시·경제통계", items: "한국은행(ECOS) · 미 연준(FRED)" },
+     (그쪽은 FRED 를 거쳐도 벤더 약관을 따른다. lib/seohak-external.ts 머리말 참고).
+     배당 페이지의 원/달러는 ECB 참조환율(frankfurter.dev 중계)이 먼저고 FRED 는 그 뒤 — data-pipeline/common/fx.py. */
+  { label: "거시·경제통계", items: "한국은행(ECOS) · 미 연준(FRED) · 유럽중앙은행(ECB)" },
   /* 내부자 리포트가 여기서 나온다. 셋 다 이름을 적어야 하는 원천이다.
        SEC EDGAR — 임원 Form 4 · 월가 거물 13F
        미 하원    — STOCK Act 매매 신고(PTR)

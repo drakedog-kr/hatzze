@@ -13,7 +13,7 @@
            12개월 합은 `sec_ttm_dps` 로 남겨 stockanalysis 값과 맞댄다(10% 넘게 갈리면 찍는다).
            stockanalysis 에 없는 종목은 SEC 값으로 넘어간다.
   시세   핀허브 `quote`(FINNHUB_API_KEY). fetch_kr_preview.py 와 같은 창(분당 60회).
-  환율   FRED `DEXKOUS`(원/달러, 뉴욕 정오). 화면이 달러를 원으로 옮길 때 쓴다. 1~2영업일 늦다.
+  환율   ECB 참조환율(common/fx.py, 전 영업일). 화면이 달러를 원으로 옮길 때 쓴다. 안 오면 FRED.
 
 ## ⚠️⚠️ XBRL 배당 태그는 회사마다 다르게 쓴다 — 2026-09-12 에 12곳을 열어 본 결과
 
@@ -81,7 +81,7 @@ from zoneinfo import ZoneInfo
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.config import FINNHUB_API_KEY  # noqa: E402
-from common.fred_client import FredUnavailableError, observations  # noqa: E402
+from common.fx import usdkrw  # noqa: E402
 from common.stockanalysis import PageChanged, dividend_page, trailing  # noqa: E402
 from common.supabase_client import get_client, load_all  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
@@ -289,14 +289,6 @@ def quote(ticker: str, key: str) -> tuple[float, str] | None:
     return float(d["c"]), day
 
 
-def usdkrw() -> tuple[float, str] | None:
-    try:
-        obs = observations("DEXKOUS", start=(date.today() - timedelta(days=20)).isoformat())
-    except FredUnavailableError:
-        return None
-    return (obs[-1][1], obs[-1][0]) if obs else None
-
-
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
@@ -423,7 +415,7 @@ def main() -> None:
 
     # 시세. 배당이 있는 종목만 부른다 — 없는 종목은 수익률이 없어 시세가 필요 없다.
     fx = usdkrw()
-    print(f"[FRED] 원/달러 {fx[0]:,.2f} ({fx[1]})" if fx else "[FRED] 환율을 못 받았습니다 — 화면이 원화 환산을 접습니다")
+    print(f"[환율] 원/달러 {fx[0]:,.2f} ({fx[1]})" if fx else "[환율] 환율을 못 받았습니다 — 화면이 원화 환산을 접습니다")
     paying = [r for r in rows if r["ttm_dps"] > 0]
     if args.dry_run and not args.only:
         print(f"[핀허브] --dry-run 이라 시세 {len(paying)}종목은 건너뜁니다")
