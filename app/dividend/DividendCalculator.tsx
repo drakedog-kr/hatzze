@@ -112,10 +112,12 @@ type TaxMode = "gross" | Account;
 const TAX_RATE_KR = 0.154;
 /** 미국 배당은 미국이 15%를 떼고(한미 조세조약) 국내에서 더 떼지 않는다(금융소득 2천만원 아래). */
 const TAX_RATE_US = 0.15;
-/** ISA 안의 국내 배당은 만기 때 순이익에 9.9%(비과세 한도를 넘는 몫). 2026년부터 한도는 일반형 500만원·서민형 1,000만원. */
+/** ISA 안의 국내 배당은 만기 때 순이익에 9.9%(비과세 한도를 넘는 몫). 한도는 일반형 200만원·서민형(농어민형) 400만원 —
+    2026-09 현재도 이 값이다. 500/1,000만원 상향안은 2024·2025 국회에서 빠졌고(2024-12·2025-12 본회의), 비과세 한도 없는
+    '생산적금융 ISA'가 2027-01 시행 목표로 2026-09-03 국회에 제출돼 심사 중이다(삼성증권 2026-09-09). 통과하면 여기를 고칠 것. */
 const TAX_RATE_ISA = 0.099;
-const ISA_FREE = 5_000_000;
-const ISA_FREE_LOW = 10_000_000;
+const ISA_FREE = 2_000_000;
+const ISA_FREE_LOW = 4_000_000;
 /** 연금저축·IRP 는 받을 때까지 안 떼고, 연금으로 받을 때 연금소득세 — 55~69세 5.5%, 70대 4.4%, 80세부터 3.3%. 가장 높은 값으로 센다. */
 const TAX_RATE_PENSION = 0.055;
 /** IRP 위험자산 한도. 이 위면 안전자산(채권형·채권혼합형 ETF·예금)을 더 넣어야 한다. */
@@ -1237,10 +1239,11 @@ function MonthCalendar({
 type UpcomingItem = { key: string; when: string; sortKey: string; name: string; what: string; amount: string | null };
 
 function upcomingOf(lines: Line[], fx: number, mode: TaxMode): UpcomingItem[] {
-  const today = new Date();
+  // 날짜는 KST 로 — toISOString 은 UTC 라 한국 새벽 0~9시엔 어제가 '오늘'이 돼 지난 일정이 다가오는 일정에 남는다.
+  const today = new Date(Date.now() + 9 * 3600e3);
   const iso = today.toISOString().slice(0, 10);
   const horizon = new Date(today.getTime() + UPCOMING_DAYS * 86400e3).toISOString().slice(0, 10);
-  const year = today.getFullYear();
+  const year = Number(iso.slice(0, 4));
   const out: UpcomingItem[] = [];
   const dateLabel = (d: string) => `${Number(d.slice(5, 7))}월 ${Number(d.slice(8, 10))}일`;
   const net = (s: StockLite, v: number) => {

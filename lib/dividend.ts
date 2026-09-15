@@ -239,7 +239,7 @@ function toUsStock(r: UsRow): DividendStock {
     isReit: false,
     shareKind: null,
     highDiv: null,
-    payout: r.payout_pct != null ? { pct: Number(r.payout_pct), year: null } : null,
+    payout: r.payout_pct != null && !US_REITS.includes(r.ticker) ? { pct: Number(r.payout_pct), year: null } : null,
     growthYears: r.growth_years ?? null,
     sector: null,
     prefDiscountPct: null,
@@ -411,7 +411,7 @@ export async function getDividendData(): Promise<DividendData | null> {
   for (const s of kr) {
     s.highDiv = highDiv.get(s.code) ?? null;
     const p = payout.get(s.code);
-    s.payout = p?.payout ?? null;
+    s.payout = isReitLike(s) ? null : (p?.payout ?? null);
     s.sector = p?.sector ?? null;
     // 우선주 괴리율 — 보통주 코드는 앞 다섯 자리 + '0'(단축코드 규칙, fetch_kr_dividends.py 머리말).
     if (s.shareKind != null && s.shareKind !== "보통주" && s.close) {
@@ -449,7 +449,7 @@ export async function getStockDividend(code: string): Promise<DividendStock | nu
     const h = high.data as { payout_pct: number | null; div_growth_pct: number | null; biz_year: number | null } | null;
     const p = payout.data as { payout_pct: number | null; biz_year: number | null; sector: string | null } | null;
     s.highDiv = h ? { payoutPct: n(h.payout_pct), growthPct: n(h.div_growth_pct), year: h.biz_year } : null;
-    s.payout = p && p.payout_pct != null ? { pct: Number(p.payout_pct), year: p.biz_year } : null;
+    s.payout = !isReitLike(s) && p && p.payout_pct != null ? { pct: Number(p.payout_pct), year: p.biz_year } : null;
     s.sector = p?.sector ?? null;
     return s;
   } catch (e) {
@@ -505,6 +505,9 @@ const US_ETF_MONTHLY = ["JEPI", "JEPQ", "DIVO"];
 const US_ETF_MONTHLY_ALL = ["JEPI", "JEPQ", "DIVO", "SPHD", "PFF", "SGOV", "TLT", "BND", "QYLD", "XYLD", "RYLD", "DGRW"];
 /** 리츠가 아닌 인프라 펀드 — 맥쿼리인프라·KB발해인프라. */
 const KR_INFRA = new Set(["088980", "415640"]);
+/** 리츠·인프라 펀드에는 배당성향을 안 붙인다. 회계이익(EPS) 기준 성향은 감가상각 때문에 100% 를 훌쩍 넘어(리얼티인컴 237%)
+    "번 것보다 많이 줬다"로 읽히는데, 리츠는 임대수익(FFO/AFFO) 기준으로 배당하므로 그 숫자가 뜻하는 게 다르다(2026-09-15 점검). */
+const isReitLike = (s: DividendStock) => s.isReit || KR_INFRA.has(s.code) || (s.currency === "USD" && US_REITS.includes(s.code));
 /** 미국 리츠·인프라 — SEC 에 업종 표시가 없어 손으로(config/us_dividend_universe.py 의 리츠 묶음과 같다). */
 const US_REITS = ["O", "VICI", "STAG", "ADC", "WPC", "SPG", "EPR", "OHI", "AMT", "CCI", "PSA", "EXR", "AGNC", "NLY"];
 /** 원금을 돌려주는 상품이 섞이는 선. 커버드콜·리츠 바스켓은 이 위를 뺀다(줄 안내도 30% 에서 켜진다). */
@@ -575,7 +578,8 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
   const isPref = (s: DividendStock) => s.shareKind != null && s.shareKind !== "보통주";
   const isReit = (s: DividendStock) => s.isReit || KR_INFRA.has(s.code);
   const common = pool.filter((s) => !isPref(s) && !isReit(s));
-  const usPayers = us.filter((s) => s.dps > 0 && s.close != null && yieldOf(s) >= 1.5 && yieldOf(s) <= 10);
+  // 미국 리츠는 리츠·인프라 바스켓에만 — 배당성향을 안 붙이니(isReitLike) 다른 바스켓의 '성향 80% 이하' 문이 안 걸러 준다.
+  const usPayers = us.filter((s) => s.dps > 0 && s.close != null && yieldOf(s) >= 1.5 && yieldOf(s) <= 10 && !US_REITS.includes(s.code));
   const etfByCode = new Map(etfs.map((s) => [s.code, s]));
   const usEtfs = (codes: string[]) => codes.map((c) => etfByCode.get(c)).filter((s): s is DividendStock => !!s && s.close != null);
   const krEtfs = (re: RegExp) => etfs.filter((s) => s.currency === "KRW" && s.dps > 0 && s.close != null && re.test(s.name) && yieldOf(s) >= 2 && yieldOf(s) <= MAX_YIELD_ETF).sort(byYield);
