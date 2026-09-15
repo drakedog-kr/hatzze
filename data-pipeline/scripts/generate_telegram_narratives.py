@@ -690,6 +690,33 @@ _SCHED_MARK = re.compile(
 )
 
 
+def trail_line(points: list[tuple[str, int]]) -> str:
+    """[낙관도 추이] 한 줄. **숫자를 안 준다** — 요일·구간 라벨·오르내림 말만.
+
+    2026-09-15 저녁, 요일을 붙이자 모델이 추이 줄을 통째로 옮겼다("금요일 66%에서 토요일
+    73%까지 … 63%"). percent_count 로 한 번 더 시켜도 셋을 읊었다 — 숫자가 재료에 있으면
+    옮긴다. 퍼센트 대신 구간 라벨을 주던 것(tone_label 주석)과 같은 수를 여기에도 쓴다.
+    [전체] 의 퍼센트 하나가 문장에 들어갈 유일한 숫자다.
+
+    오르내림의 문턱은 뜻으로: 3 미만은 '비슷', 10 미만은 '조금', 그 위는 '크게'.
+    """
+    out = []
+    prev = None
+    for day, opt in points:
+        label = tone_label(opt)
+        if prev is None:
+            move = ""
+        else:
+            d = opt - prev
+            if abs(d) < 3:
+                move = "(비슷)"
+            else:
+                move = f"({'조금' if abs(d) < 10 else '크게'} {'올라' if d > 0 else '내려'})"
+        out.append(f"{md_with_weekday(day)} {label}{move}")
+        prev = opt
+    return "[낙관도 추이] " + " → ".join(out)
+
+
 def percent_count(text: str) -> int:
     """문단에 적힌 퍼센트 수. 첫째 대목은 [전체] 낙관도 하나만 숫자로 둔다.
 
@@ -699,6 +726,13 @@ def percent_count(text: str) -> int:
     같은 자리에서 한 번 더 시킨다.
     """
     return text.count("%") + text.count("퍼센트")
+
+
+def count_mentions(text: str) -> int:
+    """문단에 적힌 '몇 회'·'몇 건' 수. 둘째 대목은 한 문장에 건수를 하나만 둔다는 약속인데,
+    2026-09-15 저녁엔 화제어 회수를 셋 읊었다("금리인상이 203회로 AI속도조절 95회, AI인프라
+    61회보다"). percent_count 와 같은 자리에서 한 번 더 시킨다."""
+    return len(re.findall(r"\d[\d,]*\s*(?:회|건)", text))
 
 
 def schedule_like(text: str) -> bool:
@@ -1149,9 +1183,12 @@ def volume_comparison_line(themes: list[tuple[str, dict]]) -> str:
         verdict = f"나머지 {n_rest}개를 합친 것과 비슷합니다"
     else:
         verdict = f"나머지 {n_rest}개를 합친 것보다 적습니다"
+    # "둘째 대목 전용"을 줄 자체에 적는다 — 셋째 대목(오간 이야기)이 이 문장을 가져다 둘째와
+    # 같은 말을 되풀이했다(2026-09-15 저녁 실측). 재료 옆이 듣는다.
     return (
-        f"[부피 비교] {top} {tc['total']}건 · 나머지 {n_rest}개 합계 {rest_total}건 → {top} 언급이 {verdict}. "
-        "※ 부피를 견줄 땐 이 말을 그대로 쓰세요. 스스로 셈해 '훨씬'·'몇 배' 같은 말을 붙이지 마세요."
+        f"[부피 비교 — 둘째 대목 전용] {top} {tc['total']}건 · 나머지 {n_rest}개 합계 {rest_total}건 → {top} 언급이 {verdict}. "
+        "※ 둘째 대목이 부피를 견줄 땐 이 말을 그대로 쓰세요. 스스로 셈해 '훨씬'·'몇 배' 같은 말을 붙이지 마세요. "
+        "다른 대목은 이 줄을 쓰지 마세요."
     )
 
 
@@ -1220,9 +1257,9 @@ def build_brief_digest(db, latest: str, msgs: list[dict]) -> str | None:
     for r in sorted((x for x in sent if x["scope"] == "overall"), key=lambda x: x["date"])[-5:]:
         o = optimism(r["positive_count"], r["negative_count"])
         if o is not None:
-            trail.append(f"{md_with_weekday(r['date'])} {o}%")
+            trail.append((r["date"], o))
     if len(trail) > 1:
-        lines.append(f"[낙관도 추이] {' → '.join(trail)}")
+        lines.append(trail_line(trail))
         # 재료 옆에 적는다 — 요일을 안 주니 화요일 추이를 "주 후반"이라 썼다(md_with_weekday 주석).
         lines.append("  ※ 시점을 말하려면 위에 적힌 요일로만 말하세요. 적히지 않은 시점은 없는 것입니다.")
 
@@ -1825,13 +1862,31 @@ def main() -> None:
             paragraphs = []
             for key, system, length in slots:
                 text = ask_brief_sentence(system, brief_digest, length, BRIEF_SENTENCE_CAP[key], key)
-                if key == "tone" and percent_count(text) > 1:
-                    # 추이의 숫자를 읊은 것이다(percent_count 주석). 한 번 더 시키고, 그래도
-                    # 그러면 그대로 둔다 — 첫째 대목이 없는 편이 숫자 많은 것보다 나쁘다.
-                    print(f"[WARNING] 첫째 대목에 퍼센트가 {percent_count(text)}개라 다시 씁니다: {text[:50]}…")
+                if key == "tone" and percent_count(text) != 1:
+                    # 약속은 '[전체] 낙관도 하나'. 추이 숫자를 읊거나(여럿), 그 하나마저 빼먹는다(0).
+                    # 한 번 더 시키고, 그래도 그러면 그대로 둔다 — 첫째 대목이 없는 편이 더 나쁘다.
+                    n = percent_count(text)
+                    print(f"[WARNING] 첫째 대목에 퍼센트가 {n}개라 다시 씁니다: {text[:50]}…")
+                    fix = ("퍼센트가 여럿이었습니다. 숫자는 [전체] 낙관도 **하나만** 두고, [낙관도 추이]는 말로만 옮기세요."
+                           if n > 1 else "퍼센트가 없었습니다. [전체] 낙관도 퍼센트를 **한 번** 적으세요.")
                     text = ask_brief_sentence(
-                        system + "\n\n[다시 쓰기] 방금 쓴 문장에 퍼센트가 여럿이었습니다. 숫자는 [전체] 낙관도 "
-                        "**하나만** 두고, [낙관도 추이]는 숫자 없이 말로만 옮기세요.",
+                        system + f"\n\n[다시 쓰기] 방금 쓴 문장에 {fix}",
+                        brief_digest, length, BRIEF_SENTENCE_CAP[key], key,
+                    )
+                if key == "news" and "합친 것" in text:
+                    # [부피 비교] 문장을 가져다 둘째 대목을 되풀이한 것이다 — 줄에 '둘째 대목 전용'을
+                    # 적어 두고도 4번 중 1번 그랬다(2026-09-15 실측). 그 말은 코드가 만든 것이라 찾기 쉽다.
+                    print(f"[WARNING] 셋째 대목이 [부피 비교] 말을 되풀이해 다시 씁니다: {text[:50]}…")
+                    text = ask_brief_sentence(
+                        system + "\n\n[다시 쓰기] 방금 쓴 문장이 [부피 비교] 줄의 말(합친 것과 …)을 되풀이했습니다. "
+                        "그건 둘째 대목 몫입니다. 테마 부피 얘기 없이 **종목명과 사건**으로만 다시 쓰세요.",
+                        brief_digest, length, BRIEF_SENTENCE_CAP[key], key,
+                    )
+                if key == "theme" and count_mentions(text) > 1:
+                    print(f"[WARNING] 둘째 대목에 건수가 {count_mentions(text)}개라 다시 씁니다: {text[:50]}…")
+                    text = ask_brief_sentence(
+                        system + "\n\n[다시 쓰기] 방금 쓴 문장에 '몇 회'·'몇 건'이 여럿이었습니다. 건수는 **많아야 하나**만 두고 "
+                        "나머지는 [부피 비교] 줄의 말과 순서로만 견주세요.",
                         brief_digest, length, BRIEF_SENTENCE_CAP[key], key,
                     )
                 if key == "schedule" and not schedule_like(text):

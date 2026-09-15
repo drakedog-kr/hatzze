@@ -60,7 +60,7 @@ from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.supabase_client import get_client, load_all, load_window_keyset  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
-from common.timeutil import KST, md_with_weekday  # noqa: E402
+from common.timeutil import KST  # noqa: E402
 
 # 국내 스크립트에서 그대로 가져다 쓰는 기계. 길이 규칙·문장 자르기·낙관도 평활은
 # 두 화면이 같아야 하고, 손으로 베끼면 한쪽만 고쳤을 때 조용히 갈린다.
@@ -93,6 +93,7 @@ from generate_telegram_narratives import (  # noqa: E402
     schedule_hit,
     percent_count,
     schedule_like,
+    trail_line,
     schedule_lines,
     sentence_finished,
     sentiment_window,
@@ -415,9 +416,9 @@ def build_brief_digest(db, latest: str, msgs: list[dict], name_of: dict[str, str
     for r in sorted(all_sent, key=lambda x: x["date"])[-5:]:
         o = optimism(r["positive_count"], r["negative_count"])
         if o is not None:
-            trail.append(f"{md_with_weekday(r['date'])} {o}%")
+            trail.append((r["date"], o))
     if len(trail) > 1:
-        lines.append(f"[낙관도 추이] {' → '.join(trail)}")
+        lines.append(trail_line(trail))
         # 재료 옆에 적는다 — 요일을 안 주니 화요일 추이를 "주 후반 톤이 내려앉았다"고 썼다
         # (2026-09-15 저녁, md_with_weekday 주석).
         lines.append("  ※ 시점을 말하려면 위에 적힌 요일로만 말하세요. 적히지 않은 시점은 없는 것입니다.")
@@ -708,13 +709,15 @@ def main() -> None:
             paragraphs = []
             for key, system, length in slots:
                 text = ask_brief_sentence(system, brief_digest, length, BRIEF_SENTENCE_CAP[key], key)
-                if key == "tone" and percent_count(text) > 1:
+                if key == "tone" and percent_count(text) != 1:
                     # 국장과 같은 검사(generate_telegram_narratives.percent_count 주석) — 이쪽에서
-                    # 먼저 났다(09-15 "금요일 66%에서 토요일 73%까지 … 69% … 63%").
-                    print(f"[WARNING] 첫째 대목에 퍼센트가 {percent_count(text)}개라 다시 씁니다: {text[:50]}…")
+                    # 먼저 났다(09-15 "금요일 66%에서 토요일 73%까지 … 69% … 63%", 그다음엔 0개).
+                    n = percent_count(text)
+                    print(f"[WARNING] 첫째 대목에 퍼센트가 {n}개라 다시 씁니다: {text[:50]}…")
+                    fix = ("퍼센트가 여럿이었습니다. 숫자는 [전체] 낙관도 **하나만** 두고, [낙관도 추이]는 말로만 옮기세요."
+                           if n > 1 else "퍼센트가 없었습니다. [전체] 낙관도 퍼센트를 **한 번** 적으세요.")
                     text = ask_brief_sentence(
-                        system + "\n\n[다시 쓰기] 방금 쓴 문장에 퍼센트가 여럿이었습니다. 숫자는 [전체] 낙관도 "
-                        "**하나만** 두고, [낙관도 추이]는 숫자 없이 말로만 옮기세요.",
+                        system + f"\n\n[다시 쓰기] 방금 쓴 문장에 {fix}",
                         brief_digest, length, BRIEF_SENTENCE_CAP[key], key,
                     )
                 if key == "schedule" and not schedule_like(text):
