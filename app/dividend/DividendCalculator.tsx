@@ -1354,10 +1354,12 @@ function GoalBox({
       <span className="hz-tx-stat-v">{value}</span>
     </div>
   );
+  const remaining = need != null ? Math.max(0, need - invest) : 0;
   return (
     <div className="dv-goal">
-      {/* 글자 크기는 셋뿐 — 라벨 11.5 · 값 16 · 칩 12. 배치는 세 층: 입력 한 줄 → 막대 한 줄 → 타일 두 줄(같은 타일 여섯).
-          크기가 들쭉날쭉하고 자리가 흩어져 복잡해 보였다(2026-09-15). */}
+      {/* 다섯 토막, 토막마다 이름표 한 줄 — 목표 · 지금 · 필요한 돈 · 목표 달성까지 · 이대로 가면. 무엇이 무엇인지
+          이름표가 말하고(2026-09-15: "한 달에 XXX만원이 뭔지, 도달까지가 뭔지, 왜 늘어나는지 모르겠다"), 숫자는
+          타일 모양 하나로. */}
       <div className="dv-goal-head">
         <span className="dv-cal-title">
           목표까지
@@ -1371,47 +1373,71 @@ function GoalBox({
           </span>
         </span>
       </div>
-      <div className="dv-goal-inputs">
-        <div className="dv-goal-presets" role="group" aria-label="목표 월 배당">
-          <span className="dv-goal-plabel">한 달에</span>
+
+      <div className="dv-goal-block">
+        <span className="dv-goal-blabel">한 달 배당금 목표</span>
+        <div className="dv-goal-presets" role="group" aria-label="한 달 배당금 목표">
           {GOAL_PRESETS_MAN.map((v) => (
             <button key={v} type="button" className={`dv-quick${goalMan === v ? " dv-quick-on" : ""}`} aria-pressed={goalMan === v} onClick={() => onGoal(v)}>
               {v.toLocaleString("ko-KR")}만원
             </button>
           ))}
           <span className="dv-goal-custom">
-            {manInput(goalMan, onGoal, "목표 월 배당(만원)", { width: 72 })}
+            {manInput(goalMan, onGoal, "한 달 배당금 목표(만원)", { width: 72 })}
             <span>만원</span>
           </span>
         </div>
-        <label className="dv-goal-custom">
-          <span className="dv-goal-plabel">매달 더 넣기</span>
-          {manInput(addMan, onAdd, "매달 더 넣는 돈(만원)", { width: 64 })}
-          <span>만원</span>
-        </label>
       </div>
+
       {goal > 0 && need != null ? (
         <>
-          <div className="dv-goal-bar" role="img" aria-label={`목표 한 달 ${wonShort(goal)} 가운데 지금 ${won(monthlyNow)}, ${Math.round(progress)}%`}>
-            <span className="dv-goal-fill" style={{ width: `${Math.max(2, progress)}%` }} />
+          <div className="dv-goal-block">
+            <div className="dv-goal-ends">
+              <span>
+                지금 한 달 배당금 <b>{won(monthlyNow)}</b>
+              </span>
+              <span>
+                목표 <b>{wonShort(goal)}</b>
+              </span>
+            </div>
+            <div className="dv-goal-bar" role="img" aria-label={`목표 한 달 ${wonShort(goal)} 가운데 지금 ${won(monthlyNow)}, ${Math.round(progress)}%`}>
+              <span className="dv-goal-fill" style={{ width: `${Math.max(2, progress)}%` }} />
+            </div>
+            <span className="dv-goal-bnote">{reached ? "목표를 이미 넘었습니다" : `목표의 ${Math.round(progress)}%입니다`}</span>
           </div>
-          <div className="dv-goal-ends">
-            <span>
-              지금 한 달 <b>{won(monthlyNow)}</b>
-              <span className="dv-goal-pct">{Math.round(progress)}%</span>
-            </span>
-            <span>
-              목표 <b>{wonShort(goal)}</b>
-            </span>
+
+          <div className="dv-goal-block">
+            <span className="dv-goal-blabel">필요한 돈</span>
+            <div className="hz-tx-stats dv-goal-stats">
+              {tile("목표에 필요한 투자금", roundMan(need))}
+              {tile("지금 투자금", roundMan(invest))}
+              {tile("더 필요한 돈", reached ? "없음" : roundMan(remaining))}
+            </div>
           </div>
-          <div className="hz-tx-stats dv-goal-stats">
-            {tile("필요한 투자금", roundMan(need))}
-            {tile("지금 투자금", roundMan(invest))}
-            {tile("도달까지", reached ? "이미 넘었습니다" : months == null ? `${GOAL_MAX_MONTHS / 12}년 넘게` : years ?? "", true)}
-            {path && tile("5년 뒤 한 달", roundMan(path[60]))}
-            {path && tile("10년 뒤 한 달", roundMan(path[120]))}
-            {path && tile("20년 뒤 한 달", roundMan(path[240]))}
-          </div>
+
+          {!reached && (
+            <div className="dv-goal-block">
+              <span className="dv-goal-blabel">목표 달성까지</span>
+              <div className="dv-goal-answer">
+                <span className="dv-goal-aval">{months == null ? `${GOAL_MAX_MONTHS / 12}년 넘게 걸립니다` : years}</span>
+                <span className="dv-goal-acond">
+                  매달 {manInput(addMan, onAdd, "매달 더 넣는 돈(만원)", { width: 60 })}만원씩 더 넣고 받은 배당을 다시 담을 때
+                </span>
+              </div>
+            </div>
+          )}
+
+          {path && (
+            <div className="dv-goal-block">
+              <span className="dv-goal-blabel">이대로 가면 한 달 배당금</span>
+              <div className="hz-tx-stats dv-goal-stats">
+                {tile("5년 뒤", roundMan(path[60]))}
+                {tile("10년 뒤", roundMan(path[120]))}
+                {tile("20년 뒤", roundMan(path[240]))}
+              </div>
+              <span className="dv-goal-bnote">매달 더 넣는 돈과 다시 담는 배당이 쌓여 늘어납니다</span>
+            </div>
+          )}
         </>
       ) : (
         <p className="dv-goal-out">{goal <= 0 ? "목표를 고르면 얼마가 필요한지 셉니다." : "배당이 0이라 셀 수 없습니다."}</p>

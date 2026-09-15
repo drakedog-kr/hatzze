@@ -5483,17 +5483,25 @@ main.hz-scroll { overflow-x: clip; }
 .dv-goal-inline::-webkit-outer-spin-button,
 .dv-goal-inline::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .dv-goal-inline:focus { outline: none; border-color: var(--c-blue); box-shadow: 0 0 0 3px var(--c-blue-tint); }
-/* 채움 막대 — 목표 한 달 배당 가운데 지금이 얼마나. 양 끝은 라벨 크기, 값만 진하게. */
-.dv-goal-bar { margin-top: 14px; height: 10px; border-radius: 999px; background: var(--c-track); overflow: hidden; }
+/* 토막 — 이름표 한 줄 + 내용. 토막 사이 14px. */
+.dv-goal-block { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+.dv-goal-block:first-of-type { margin-top: 0; }
+.dv-goal-blabel { font-size: 11.5px; font-weight: 600; color: var(--c-sub); }
+.dv-goal-bnote { font-size: 11.5px; color: var(--c-muted); }
+/* 채움 막대 — 목표 한 달 배당금 가운데 지금이 얼마나. 위 줄 양 끝이 지금·목표, 아래 한 줄이 몇 %. */
+.dv-goal-bar { height: 10px; border-radius: 999px; background: var(--c-track); overflow: hidden; }
 .dv-goal-fill { display: block; height: 100%; border-radius: 999px; background: var(--c-blue); transition: width 0.2s ease; }
-.dv-goal-ends { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 11.5px; color: var(--c-sub); }
+.dv-goal-ends { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--c-sub); }
 .dv-goal-ends b { color: var(--c-ink); font-weight: 700; font-variant-numeric: tabular-nums; }
-.dv-goal-pct { margin-left: 6px; font-weight: 700; color: var(--c-blue); font-variant-numeric: tabular-nums; }
-/* 타일 여섯 — 카드 안이라 흰 타일. '도달까지'만 값이 파랗다. */
-.dv-goal-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 12px; }
+/* 타일 셋 — 카드 안이라 흰 타일. */
+.dv-goal-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .dv-goal-stats .hz-tx-stat { background: var(--c-card); }
 .dv-goal-stats .hz-tx-stat-v { font-size: 16px; font-variant-numeric: tabular-nums; }
 .dv-goal-tile-strong .hz-tx-stat-v { color: var(--c-blue); }
+/* 목표 달성까지 — 큰 숫자 하나와 조건 한 마디. */
+.dv-goal-answer { display: flex; align-items: baseline; gap: 6px 14px; flex-wrap: wrap; }
+.dv-goal-aval { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: var(--c-ink); font-variant-numeric: tabular-nums; }
+.dv-goal-acond { font-size: 12.5px; color: var(--c-sub); word-break: keep-all; }
 .dv-goal-out { margin: 10px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--c-sub); word-break: keep-all; }
 
 /* 달마다 얼마 — 회색 타일 위 열두 칸. 막대는 그 달 금액에 비례한다. */
