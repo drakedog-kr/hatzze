@@ -183,7 +183,8 @@ export default async function DividendPage() {
       { label: "수익률 4% 넘는", pick: us.filter((s) => (s.yieldPct ?? 0) >= 4 && (s.yieldPct ?? 0) <= 10).sort(usTrend) },
       // 오래 늘려 온 회사 — 해마다 배당을 늘린 햇수(stockanalysis Growth Years, 코카콜라 64) 순. 25년 넘게 늘린 곳을
       // 배당 귀족이라 부른다. 수익률은 칩 문턱(1.5%) — 마이크로소프트 0.7% 가 배당 줄 맨 앞에 서면 이 화면이 아니다.
-      { label: "오래 늘려 온 회사", pick: us.filter((s) => (s.growthYears ?? 0) >= 10 && (s.yieldPct ?? 0) >= CHIP_MIN_YIELD_US).sort((a, b) => (b.growthYears ?? 0) - (a.growthYears ?? 0) || usTrend(a, b)) },
+      // 라벨은 무엇을 늘렸는지가 보여야 한다("오래 늘려 온 회사"는 뭘 늘렸는지 안 보였다, 2026-09-15 지적).
+      { label: "배당 10년 넘게 늘린", pick: us.filter((s) => (s.growthYears ?? 0) >= 10 && (s.yieldPct ?? 0) >= CHIP_MIN_YIELD_US).sort((a, b) => (b.growthYears ?? 0) - (a.growthYears ?? 0) || usTrend(a, b)) },
     ],
     popularUs,
   );
