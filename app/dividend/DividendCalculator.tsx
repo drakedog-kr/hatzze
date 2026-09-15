@@ -1469,6 +1469,8 @@ function AmountControl({ amount, onChange }: { amount: number; onChange: (v: num
         aria-label="바스켓 투자금"
         aria-valuetext={wonShort(amount)}
         className="dv-range"
+        // 채운 만큼을 트랙 색으로 — 브라우저 기본 슬라이더는 옛 모양이라(2026-09-15 지적) 트랙·손잡이를 직접 그린다.
+        style={{ "--p": `${((amount - AMOUNT_MIN) / (AMOUNT_MAX - AMOUNT_MIN)) * 100}%` } as React.CSSProperties}
       />
       <p className="dv-amount-note">이 돈을 열 종목에 같은 금액씩 나눠 담으면 종목마다 몇 주가 되는지로 계산합니다.</p>
     </div>

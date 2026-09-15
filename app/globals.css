@@ -5546,7 +5546,22 @@ main.hz-scroll { overflow-x: clip; }
 }
 .dv-quick:hover { background: var(--tx-btn); }
 .dv-quick-on, .dv-quick-on:hover { background: var(--c-cold-ink); color: var(--c-card); border-color: transparent; }
-.dv-range { width: 100%; margin: 12px 0 6px; accent-color: var(--c-cold-ink); }
+/* 투자금 슬라이더 — 브라우저 기본 모양(accent-color)을 걷고 얇은 트랙 + 흰 동그라미 손잡이로. 채운 몫은 --p(인라인). */
+.dv-range { -webkit-appearance: none; appearance: none; width: 100%; height: 24px; margin: 10px 0 4px; background: transparent; cursor: pointer; }
+.dv-range::-webkit-slider-runnable-track {
+  height: 8px; border-radius: 999px;
+  background: linear-gradient(to right, var(--c-blue) var(--p, 0%), var(--c-track) var(--p, 0%));
+}
+.dv-range::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 20px; height: 20px; margin-top: -6px; border-radius: 50%;
+  background: var(--c-card); border: 2px solid var(--c-blue); box-shadow: 0 1px 4px rgba(14, 33, 54, 0.18);
+}
+.dv-range::-moz-range-track { height: 8px; border-radius: 999px; background: var(--c-track); }
+.dv-range::-moz-range-progress { height: 8px; border-radius: 999px; background: var(--c-blue); }
+.dv-range::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: var(--c-card); border: 2px solid var(--c-blue); box-shadow: 0 1px 4px rgba(14, 33, 54, 0.18); }
+.dv-range:focus-visible { outline: none; }
+.dv-range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(49, 130, 246, 0.25); }
+.dv-range:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 4px rgba(49, 130, 246, 0.25); }
 .dv-amount-note { margin: 0; font-size: 12px; color: var(--c-sub); word-break: keep-all; }
 
 /* 바스켓 시트 셋 — 나란히. 좁아지면 한 장씩. */
