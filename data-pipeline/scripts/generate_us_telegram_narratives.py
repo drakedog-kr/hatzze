@@ -60,7 +60,7 @@ from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.supabase_client import get_client, load_all, load_window_keyset  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
-from common.timeutil import KST  # noqa: E402
+from common.timeutil import KST, md_with_weekday  # noqa: E402
 
 # 국내 스크립트에서 그대로 가져다 쓰는 기계. 길이 규칙·문장 자르기·낙관도 평활은
 # 두 화면이 같아야 하고, 손으로 베끼면 한쪽만 고쳤을 때 조용히 갈린다.
@@ -91,6 +91,7 @@ from generate_telegram_narratives import (  # noqa: E402
     optimism,
     schedule_excerpt,
     schedule_hit,
+    percent_count,
     schedule_like,
     schedule_lines,
     sentence_finished,
@@ -171,7 +172,8 @@ BRIEF_TONE_SYSTEM = US_COMMON + f"""
 - ⚠️ **분석 메시지 건수는 쓰지 마세요.** 이 문단 옆 카드가 자기 건수를 찍는데 기간이
   어긋날 수 있습니다. 두 숫자가 나란히 다르면 어느 쪽도 못 믿습니다.
 - **[낙관도 추이]도 숫자로 읊지 말고 말로 옮기세요** — "83%에서 60%로 떨어졌다"가 아니라
-  "주 후반 한 차례 식었습니다"처럼.
+  "며칠 새 한 차례 식었습니다"처럼. 시점을 요일로 말하려면 [낙관도 추이]에 적힌 요일만
+  쓰세요(예문에 있던 '주 후반'을 화요일에 그대로 옮긴 적이 있습니다).
 - **길이는 {BRIEF_TONE_LEN[0]}~{BRIEF_TONE_LEN[1]}자**(공백 포함). 두 문장으로 나눠 쓰는 게
   자연스럽습니다."""
 
@@ -410,9 +412,12 @@ def build_brief_digest(db, latest: str, msgs: list[dict], name_of: dict[str, str
     for r in sorted(all_sent, key=lambda x: x["date"])[-5:]:
         o = optimism(r["positive_count"], r["negative_count"])
         if o is not None:
-            trail.append(f"{r['date'][5:]} {o}%")
+            trail.append(f"{md_with_weekday(r['date'])} {o}%")
     if len(trail) > 1:
         lines.append(f"[낙관도 추이] {' → '.join(trail)}")
+        # 재료 옆에 적는다 — 요일을 안 주니 화요일 추이를 "주 후반 톤이 내려앉았다"고 썼다
+        # (2026-09-15 저녁, md_with_weekday 주석).
+        lines.append("  ※ 요일은 위에 적힌 것이 전부입니다. '주 초'·'주 후반' 같은 시점 말은 이 요일과 맞을 때만 쓰세요.")
 
     # ── 오늘 하루 ───────────────────────────────────────────────────────────
     # **퍼센트는 일부러 안 준다.** 옆 막대가 창(사흘) 값이라, 하루 낙관도를 문장에 적으면
@@ -662,7 +667,7 @@ def main() -> None:
                 )
             elif found:
                 print(f"[WARNING] 문장을 버리고 다시 씁니다({' · '.join(found)}): {cur[:40]}…")
-                fix = f"방금 쓴 문장에 깨진 글자나 오타가 있습니다. 같은 뜻으로 **{how_many}**으로 다시 써 주세요.\n\n{digest}"
+                fix = f"방금 쓴 문장에 문제가 있습니다({' · '.join(found)}). 같은 뜻으로 **{how_many}**으로 다시 써 주세요.\n\n{digest}"
             else:
                 need = "늘려" if len(cur) < lo else "줄여"
                 fix = (
@@ -700,6 +705,15 @@ def main() -> None:
             paragraphs = []
             for key, system, length in slots:
                 text = ask_brief_sentence(system, brief_digest, length, BRIEF_SENTENCE_CAP[key], key)
+                if key == "tone" and percent_count(text) > 1:
+                    # 국장과 같은 검사(generate_telegram_narratives.percent_count 주석) — 이쪽에서
+                    # 먼저 났다(09-15 "금요일 66%에서 토요일 73%까지 … 69% … 63%").
+                    print(f"[WARNING] 첫째 대목에 퍼센트가 {percent_count(text)}개라 다시 씁니다: {text[:50]}…")
+                    text = ask_brief_sentence(
+                        system + "\n\n[다시 쓰기] 방금 쓴 문장에 퍼센트가 여럿이었습니다. 숫자는 [전체] 낙관도 "
+                        "**하나만** 두고, [낙관도 추이]는 숫자 없이 말로만 옮기세요.",
+                        brief_digest, length, BRIEF_SENTENCE_CAP[key], key,
+                    )
                 if key == "schedule" and not schedule_like(text):
                     # 일정 재료를 두고 요약을 되풀이한 것이다(schedule_like 주석). 한 번 더 시키고,
                     # 그래도 아니면 이 대목을 뺀다 — 없는 편이 틀린 것보다 낫다.
@@ -744,7 +758,7 @@ def main() -> None:
                     break
                 if found:
                     print(f"  [{name}] 문장을 버리고 다시 씁니다({' · '.join(found)}): {cur[:40]}…")
-                    fix = f"방금 쓴 문장에 깨진 글자나 오타가 있습니다. 같은 뜻으로 다시 써 주세요.\n\n{digest}"
+                    fix = f"방금 쓴 문장에 문제가 있습니다({' · '.join(found)}). 같은 뜻으로 다시 써 주세요.\n\n{digest}"
                 else:
                     need = "늘려" if len(cur) < LEN_MIN else "줄여"
                     fix = (

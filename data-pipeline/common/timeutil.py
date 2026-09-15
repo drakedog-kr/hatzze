@@ -22,6 +22,19 @@ def today_kst() -> date:
     return datetime.now(KST).date()
 
 
+WEEKDAY_KO = "월화수목금토일"
+
+
+def md_with_weekday(day: str) -> str:
+    """'2026-09-15' → '09-15(화)'. LLM 에 주는 digest 의 날짜 표기.
+
+    날짜만 주면 모델이 요일을 지어낸다 — 2026-09-15(화) 낙관도 추이를 보고 "주 후반 톤이
+    내려앉았다"고 썼다(미장 총평, 09-15 실측). 요일을 숫자 옆에 박아 두면 그 자리에서
+    읽는다. 시점을 말하는 재료 줄([낙관도 추이]·[오늘 하루])이 이걸 쓴다.
+    """
+    return f"{day[5:]}({WEEKDAY_KO[date.fromisoformat(day).weekday()]})"
+
+
 def business_days(start: date, end: date):
     """start~end(양끝 포함) 사이의 평일을 순서대로 내놓는다.
 

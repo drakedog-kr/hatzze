@@ -15,6 +15,9 @@
 
 **[2] 비문** — 체언 바로 뒤에 계사 없이 종결어미가 붙은 자리. 아래 따로 적는다.
 
+**[4] 정해진 꼴의 실수** — 글자·문법은 멀쩡한데 말이 안 되는 고정된 꼴('최근 사이'·
+'미국 미장'·한 문장에 같은 부사 둘). 코드 아래 `_FIXED_SLIPS` 주석에.
+
 **[3] 미심쩍은 어절** — 형태소 분석(Kiwi) 점수가 낮은 어절. **이것만으론 못 쓴다.**
 실측(순한글 어절 1,443개)에서 점수 최하위 15개 중 오타는 8위였고 1~7위가 전부 정상
 고유명사였다:
@@ -302,11 +305,41 @@ def _ungrammatical(text: str, kiwi) -> list[str]:
     return found
 
 
+# [4] 정해진 꼴의 실수 — 글자는 멀쩡하고 문법도 맞는데 말이 안 되는 자리.
+#
+# 2026-09-15 저녁 실행에서 셋이 저장됐다: "최근 사이 AI 라인 투자와…"(사흘이 빠졌다),
+# "미국 미장의 분위기가…"(같은 말 겹침), "이와 함께 … 말도 함께 나왔습니다"(한 문장에
+# 같은 부사 둘). 셋 다 [1]~[3] 으로는 안 잡힌다 — 낱말마다 사전에 있고 계사도 붙어 있다.
+#
+# ⚠️ 여기에 낱말을 하나씩 잇지 말 것. 자격은 "같은 실수가 실제로 저장됐고, 꼴이 고정돼
+#    정규식 하나로 오탐 없이 집힌다"는 것뿐이다. `화제를 나누고`·잘못 붙은 '다만'처럼
+#    뜻을 읽어야 갈리는 부류는 여기 안 든다(PR #201 을 닫은 그 이유).
+_FIXED_SLIPS: tuple[tuple[re.Pattern, str], ...] = (
+    (re.compile(r"최근 사이"), "'최근 사이'(기간이 빠짐)"),
+    (re.compile(r"미국 미장"), "'미국 미장'(같은 말 겹침)"),
+)
+# 한 문장에 두 번 나오면 겹말이 되는 부사. 문장은 종결어미로 가른다.
+_DUP_ADVERBS = ("함께", "또한", "역시", "다시")
+_SENTENCE_SPLIT = re.compile(r"(?<=다\.)\s+|(?<=요\.)\s+")
+
+
+def _fixed_slips(text: str) -> list[str]:
+    found = [note for pat, note in _FIXED_SLIPS if pat.search(text)]
+    for sent in _SENTENCE_SPLIT.split(text):
+        for adv in _DUP_ADVERBS:
+            if len(re.findall(rf"(?<![가-힣]){adv}(?![가-힣])", sent)) >= 2:
+                found.append(f"한 문장에 '{adv}'가 두 번")
+    return found
+
+
 def problems(text: str, source: str | None = None) -> list[str]:
     """이 문장의 문제 목록. 비어 있으면 통과다(사람이 읽는 문자열로 돌려준다)."""
     found: list[str] = []
     if not text or not text.strip():
         return ["빈 문장"]
+
+    # [4] 정해진 꼴의 실수. 사전도 원문도 필요 없어 맨 먼저 본다.
+    found.extend(_fixed_slips(text))
 
     if _REPLACEMENT in text:
         found.append("대체문자(U+FFFD)")
