@@ -101,11 +101,12 @@ function writeHoldings(next: Holding[] | ((prev: Holding[]) => Holding[])) {
 }
 
 /* ── 세금 ─────────────────────────────────────────────────────────────
-   어느 계좌에 담느냐로 세금이 갈린다. 네 가지 — 세전 · 일반 계좌 · ISA · 연금 계좌(연금저축·IRP).
+   어느 계좌에 담느냐로 세금이 갈린다. 다섯 가지 — 세전 · 일반 계좌 · ISA · 연금저축 · IRP.
    계좌마다 담을 수 있는 것이 다르다: ISA 는 국내 상장 주식·ETF 만(해외 주식 직접 보유 불가),
-   연금 계좌는 국내 상장 ETF 만(개별 주식 불가). 못 담는 줄은 일반 계좌 세율로 세고 줄에 그렇게 적는다.
-   2026-09 기준 수치 — 바뀌면 여기와 아래 안내문을 같이 고칠 것. */
-type Account = "general" | "isa" | "pension";
+   연금저축·IRP 는 국내 상장 ETF 만(개별 주식 불가). 못 담는 줄은 일반 계좌 세율로 세고 줄에 그렇게 적는다.
+   IRP 는 세금은 연금저축과 같고 위험자산 70% 한도가 더 있다(2026-09 현재 유효 · 폐지 논의 중) — 안전자산
+   30% 를 못 채우면 히어로 아래 한 줄로 적는다. 2026-09 기준 수치 — 바뀌면 여기와 아래 안내문을 같이 고칠 것. */
+type Account = "general" | "isa" | "pension" | "irp";
 type TaxMode = "gross" | Account;
 /** 국내 배당소득세 14% + 지방소득세 1.4%. 증권사가 지급 때 떼고 넣어 준다. */
 const TAX_RATE_KR = 0.154;
@@ -115,8 +116,16 @@ const TAX_RATE_US = 0.15;
 const TAX_RATE_ISA = 0.099;
 const ISA_FREE = 5_000_000;
 const ISA_FREE_LOW = 10_000_000;
-/** 연금 계좌는 받을 때까지 안 떼고, 연금으로 받을 때 연금소득세 — 55~69세 5.5%, 70대 4.4%, 80세부터 3.3%. 가장 높은 값으로 센다. */
+/** 연금저축·IRP 는 받을 때까지 안 떼고, 연금으로 받을 때 연금소득세 — 55~69세 5.5%, 70대 4.4%, 80세부터 3.3%. 가장 높은 값으로 센다. */
 const TAX_RATE_PENSION = 0.055;
+/** IRP 위험자산 한도. 이 위면 안전자산(채권형·채권혼합형 ETF·예금)을 더 넣어야 한다. */
+const IRP_RISK_MAX = 0.7;
+/** IRP 안전자산을 이름으로 가르는 규칙 — lib/dividend.ts 의 SAFE_ETF 와 같은 식(서버 코드를 클라이언트로 끌어오지 않으려고 베낀다). */
+const SAFE_ETF = /채권|국채|회사채|단기|머니마켓|CD|KOFR|금리|혼합/;
+/** IRP 의 안전자산 30% 에 드는 종목인가 — 국내 상장 채권형·채권혼합형 ETF. */
+const isSafeAsset = (s: StockLite) => s.kind === "etf" && s.currency === "KRW" && SAFE_ETF.test(s.name);
+/** 연금 계좌 둘 — 담을 수 있는 것과 세율이 같다. */
+const isPensionLike = (mode: TaxMode) => mode === "pension" || mode === "irp";
 /** 금융소득 종합과세 문턱(원). 이자·배당 합이 이걸 넘으면 넘는 몫이 다른 소득과 합쳐 누진세율(6~45%)이다. */
 const COMPOSITE_FROM = 20_000_000;
 /** 문턱 안내를 히어로에 띄우기 시작하는 세전 배당. 그 아래선 어차피 원천징수로 끝나 문턱 얘기가 뜻이 없다. */
@@ -125,26 +134,27 @@ const COMPOSITE_NOTE_FROM = 10_000_000;
 /** 이 계좌에 담을 수 있는 종목인가. */
 function fitsAccount(s: StockLite, mode: TaxMode): boolean {
   if (mode === "isa") return s.currency === "KRW";
-  if (mode === "pension") return s.kind === "etf" && s.currency === "KRW";
+  if (isPensionLike(mode)) return s.kind === "etf" && s.currency === "KRW";
   return true;
 }
 /** 줄의 세율. 못 담는 줄은 일반 계좌로. */
 function taxRate(s: StockLite, mode: TaxMode): number {
   if (mode === "gross") return 0;
   if (mode === "isa" && fitsAccount(s, mode)) return TAX_RATE_ISA;
-  if (mode === "pension" && fitsAccount(s, mode)) return TAX_RATE_PENSION;
+  if (isPensionLike(mode) && fitsAccount(s, mode)) return TAX_RATE_PENSION;
   return s.currency === "USD" ? TAX_RATE_US : TAX_RATE_KR;
 }
 const ACCOUNTS: { key: Account; label: string }[] = [
   { key: "general", label: "일반 계좌" },
   { key: "isa", label: "ISA" },
-  { key: "pension", label: "연금 계좌" },
+  { key: "pension", label: "연금저축" },
+  { key: "irp", label: "IRP" },
 ];
 /** 히어로 라벨에 붙는 꼬리. 세후·세전은 머리의 칸이 이미 말하므로 안 적고(2026-09-13 지적), 계좌가 일반이 아닐 때만 그 이름. */
 /** 이 위면 배당이 아니라 원금 반환이 섞인 ETF(일드맥스류). 바스켓의 MAX_YIELD_ETF(lib/dividend.ts)와 같은 30. 칩·줄 주의 둘 다 이 값. */
 const HOT_YIELD_PCT = 30;
 
-const accountTag = (mode: TaxMode) => (mode === "isa" || mode === "pension" ? ` (${ACCOUNTS.find((m) => m.key === mode)?.label})` : "");
+const accountTag = (mode: TaxMode) => (mode === "isa" || isPensionLike(mode) ? ` (${ACCOUNTS.find((m) => m.key === mode)?.label})` : "");
 /** 종목을 처음 담을 때의 주수. 0 이면 결과가 안 서고, 1 은 값이 너무 작아 감이 안 온다. */
 const DEFAULT_SHARES = 10;
 /** 목표 월 배당의 기본값(만원)과 매달 더 넣는 돈의 기본값(만원). 파이어족 글에서 가장 자주 나오는 숫자. */
@@ -269,7 +279,7 @@ type Line = {
   /** 평단을 넣은 줄인가. cost 는 그 값(그 종목의 돈 단위). */
   onCost: boolean;
   cost: number | null;
-  /** 고른 계좌에 못 담는 종목이라 일반 계좌 세율로 셌다(ISA 의 해외 주식, 연금 계좌의 개별 주식). */
+  /** 고른 계좌에 못 담는 종목이라 일반 계좌 세율로 셌다(ISA 의 해외 주식, 연금저축·IRP 의 개별 주식). */
   outside: boolean;
 };
 
@@ -302,6 +312,13 @@ function computeLines(holdings: Holding[], byCode: Map<string, StockLite>, fx: n
     });
   }
   return out;
+}
+
+/** '내 계좌 맞춤'은 고른 계좌에 따라 목록이 바뀐다(ISA · 연금저축 · IRP). 카드와 담기가 같은 함수를 써야 둘이 어긋나지 않는다. */
+function basketCodes(b: BasketLite, mode: TaxMode): string[] {
+  if (b.altIrp && mode === "irp") return b.altIrp;
+  if (b.altPension && mode === "pension") return b.altPension;
+  return b.codes;
 }
 
 /** 바스켓을 이 투자금으로 같은 금액씩 나눠 담으면 종목마다 몇 주인가. 미국 종목은 종가가 달러라 환율을 곱해 원으로 잰다.
@@ -424,7 +441,18 @@ export function DividendCalculator({
   const sepGross = lines.filter((l) => l.stock.highDiv).reduce((s, l) => s + l.grossKrw, 0);
   const grossAll = lines.reduce((s, l) => s + l.grossKrw, 0);
   const outsideCount = lines.filter((l) => l.outside).length;
-  const heroNote = taxNote(taxMode, grossAll, sepGross, outsideCount);
+  // IRP 위험자산 비율 — 계좌에 담긴 줄(outside 아님)의 투자금 가운데 안전자산이 아닌 몫. 30% 를 채우려면 안전자산이
+  // x 더 있어야 한다: (safe + x) / (total + x) = 0.3 → x = (0.3·total − safe) / 0.7.
+  const irpInfo = (() => {
+    if (taxMode !== "irp") return undefined;
+    const inAcct = lines.filter((l) => !l.outside && l.investKrw != null);
+    const total = inAcct.reduce((s, l) => s + (l.investKrw ?? 0), 0);
+    if (total <= 0) return undefined;
+    const safe = inAcct.filter((l) => isSafeAsset(l.stock)).reduce((s, l) => s + (l.investKrw ?? 0), 0);
+    const riskPct = ((total - safe) / total) * 100;
+    return { riskPct, needKrw: Math.max(0, ((1 - IRP_RISK_MAX) * total - safe) / IRP_RISK_MAX) };
+  })();
+  const heroNote = taxNote(taxMode, grossAll, sepGross, outsideCount, irpInfo);
   // 달력에 못 드는 줄 — 지급 달을 모르는 것(미국 주식, 국내 ETF). 배당이 있는 줄만 센다.
   const noCalCount = lines.filter((l) => l.stock.dps > 0 && !l.stock.pays.length).length;
   // 달력은 지급 달을 아는 종목(국내)만. 미국은 공시에 지급일이 없다.
@@ -454,7 +482,8 @@ export function DividendCalculator({
     setHoldings((prev) => prev.filter((h) => h.code !== code));
   };
   const applyBasket = (b: BasketLite) => {
-    const next = basketShares(b.codes, amount, byCode, fx);
+    // 카드가 보여 주는 목록과 같은 것을 담는다 — 연금저축·IRP 를 골랐으면 그 계좌 목록(2026-09-15 전엔 늘 ISA 목록을 담았다).
+    const next = basketShares(basketCodes(b, taxMode), amount, byCode, fx);
     track("dividend_basket_apply", { basket: b.key, amount });
     // 이미 담긴 종목은 주수를 바스켓 값으로 바꾸고, 나머지는 뒤에 붙인다. 통째로 갈아
     // 끼우지 않는다 — 사용자가 손으로 담아 둔 다른 종목이 사라지면 안 된다.
@@ -624,7 +653,7 @@ export function DividendCalculator({
             )}
           </div>
           {lines.length > 0 && (
-            <HoldingsTable lines={lines} inputs={inputs} totalInvest={invest} onShares={setShares} onCost={setCost} onRemove={remove} />
+            <HoldingsTable lines={lines} inputs={inputs} totalInvest={invest} mode={taxMode} onShares={setShares} onCost={setCost} onRemove={remove} />
           )}
           {lines.length > 0 && (
             <MonthCalendar
@@ -698,21 +727,31 @@ function TaxToggle({ afterTax, onChange }: { afterTax: boolean; onChange: (v: bo
 const TAX_HELP: Record<TaxMode, string> = {
   general: "세금: 국내 15.4%, 미국 15%를 뗀 값",
   isa: `세금(ISA): 국내 주식·ETF 9.9%, 해외 주식은 ISA에 못 담아 15% · 만기까지 ${wonShort(ISA_FREE)}(서민형 ${wonShort(ISA_FREE_LOW)})은 비과세라 실제론 이보다 적습니다`,
-  pension: "세금(연금 계좌): 국내 ETF 는 연금으로 받을 때 5.5%(55~69세) · 주식은 못 담아 15.4%·15%",
+  pension: "세금(연금저축): 국내 ETF 는 연금으로 받을 때 5.5%(55~69세) · 주식은 못 담아 15.4%·15%",
+  irp: "세금(IRP): 국내 ETF 는 연금으로 받을 때 5.5%(55~69세) · 주식은 못 담아 15.4%·15% · 위험자산은 70%까지, 30%는 채권·채권혼합 ETF 같은 안전자산",
   gross: "세전: 세금을 빼기 전 값(국내 15.4%, 미국 15%를 뗍니다)",
 };
 
 /**
  * 히어로 아래 한 줄 — 금융소득 종합과세 문턱(2,000만원)까지 얼마 남았나, 넘으면 어떻게 되나, 고배당기업 배당을
  * 분리과세로 빼면 어떻게 되나. 세전 합이 1,000만원을 넘을 때만 적는다. 다른 이자·배당은 모르니 그 말도 적는다.
- * ISA·연금 계좌는 문턱과 무관하다(계좌 안 소득은 금융소득에 안 합친다) — 그 계좌에 못 담은 줄이 있을 때만 적는다.
+ * ISA·연금저축·IRP 는 문턱과 무관하다(계좌 안 소득은 금융소득에 안 합친다) — 그 계좌에 못 담은 줄이 있을 때만 적는다.
+ * IRP 는 담긴 것 가운데 위험자산이 70% 를 넘으면 안전자산이 얼마 더 있어야 하는지 한 줄 더 적는다.
  */
-function taxNote(mode: TaxMode, grossAll: number, sepGross: number, outsideCount: number): string | null {
-  if (mode === "isa" || mode === "pension") {
-    if (!outsideCount) return null;
-    return mode === "isa"
-      ? `${outsideCount}종목은 해외 주식이라 ISA에 못 담아 일반 계좌로 셌습니다.`
-      : `${outsideCount}종목은 주식이라 연금 계좌에 못 담아 일반 계좌로 셌습니다(연금 계좌엔 국내 ETF만 담깁니다).`;
+function taxNote(mode: TaxMode, grossAll: number, sepGross: number, outsideCount: number, irp?: { riskPct: number; needKrw: number }): string | null {
+  if (mode === "isa" || isPensionLike(mode)) {
+    const parts: string[] = [];
+    if (outsideCount) {
+      parts.push(
+        mode === "isa"
+          ? `${outsideCount}종목은 해외 주식이라 ISA에 못 담아 일반 계좌로 셌습니다.`
+          : `${outsideCount}종목은 개별 주식이거나 해외 상장이라 ${mode === "irp" ? "IRP" : "연금저축"}에 못 담아 일반 계좌로 셌습니다(국내 ETF만 담깁니다).`,
+      );
+    }
+    if (mode === "irp" && irp && irp.riskPct > IRP_RISK_MAX * 100) {
+      parts.push(`IRP는 위험자산이 70%까지입니다. 지금 ${Math.round(irp.riskPct)}%라 채권·채권혼합 ETF 같은 안전자산이 ${wonShort(Math.ceil(irp.needKrw / 1e4) * 1e4)} 더 있어야 합니다.`);
+    }
+    return parts.length ? parts.join(" ") : null;
   }
   if (grossAll < COMPOSITE_NOTE_FROM) return null;
   if (grossAll < COMPOSITE_FROM) {
@@ -921,6 +960,7 @@ function HoldingsTable({
   lines,
   inputs,
   totalInvest,
+  mode,
   onShares,
   onCost,
   onRemove,
@@ -929,6 +969,8 @@ function HoldingsTable({
   inputs: Map<string, HTMLInputElement>;
   /** 투자금 합(원). 줄마다 비중을 내는 분모. */
   totalInvest: number;
+  /** 고른 계좌 — IRP 면 안전자산 줄에 알약을 붙인다. */
+  mode: TaxMode;
   onShares: (code: string, shares: number) => void;
   onCost: (code: string, cost: number | null) => void;
   onRemove: (code: string) => void;
@@ -945,7 +987,7 @@ function HoldingsTable({
         <span role="columnheader" aria-label="빼기" />
       </div>
       {lines.map((l) => (
-        <HoldingRow key={l.stock.code} line={l} inputs={inputs} weightPct={totalInvest > 0 && l.investKrw != null ? (l.investKrw / totalInvest) * 100 : null} onShares={onShares} onCost={onCost} onRemove={onRemove} />
+        <HoldingRow key={l.stock.code} line={l} inputs={inputs} weightPct={totalInvest > 0 && l.investKrw != null ? (l.investKrw / totalInvest) * 100 : null} mode={mode} onShares={onShares} onCost={onCost} onRemove={onRemove} />
       ))}
     </div>
   );
@@ -955,6 +997,7 @@ function HoldingRow({
   line,
   inputs,
   weightPct,
+  mode,
   onShares,
   onCost,
   onRemove,
@@ -963,6 +1006,7 @@ function HoldingRow({
   inputs: Map<string, HTMLInputElement>;
   /** 투자금 가운데 이 줄의 몫(%). 종가가 없으면 null. */
   weightPct: number | null;
+  mode: TaxMode;
   onShares: (code: string, shares: number) => void;
   onCost: (code: string, cost: number | null) => void;
   onRemove: (code: string) => void;
@@ -992,10 +1036,11 @@ function HoldingRow({
     if (g >= 1) facts.push({ text: `5년 연 +${g}%`, title: `최근 5년 해마다 ${g}%씩 늘렸습니다(연평균)` });
     else if (g <= -1) facts.push({ text: `5년 연 −${-g}%`, title: `최근 5년 해마다 ${-g}%씩 줄었습니다(연평균)` });
   }
+  if (mode === "irp" && !line.outside && isSafeAsset(s)) facts.push({ text: "안전자산", title: "IRP 안전자산 30%에 드는 채권·채권혼합 ETF 입니다" });
   if (s.nextRecord) facts.push({ text: `기준일 ${md(s.nextRecord)}`, title: `다음 배당기준일 ${s.nextRecord}` });
   if (s.nextPay) facts.push({ text: `${md(s.nextPay[0])} 지급 ${money(s.nextPay[1], s)}`, title: `다음 지급 ${s.nextPay[0]} · 1주에 ${money(s.nextPay[1], s)}` });
 
-  if (line.outside) warns.push(s.currency === "USD" ? "해외 주식은 이 계좌에 못 담아 일반 계좌(15%)로 셌습니다" : "개별 주식은 연금 계좌에 못 담아 일반 계좌(15.4%)로 셌습니다");
+  if (line.outside) warns.push(s.currency === "USD" ? "해외 주식은 이 계좌에 못 담아 일반 계좌(15%)로 셌습니다" : "개별 주식은 연금저축·IRP에 못 담아 일반 계좌(15.4%)로 셌습니다");
   // 미국은 "없다"고 못 말한다 — 허쉬·디지털리얼티처럼 1주당 배당 태그를 안 다는 회사가 있다.
   if (s.dps === 0) warns.push(s.currency === "USD" ? "공시에서 배당을 못 읽었습니다(안 주는 회사일 수도 있습니다)" : "최근 1년 현금배당이 없습니다");
   if (s.unusual) warns.push("특별·청산배당이 섞여 있어 1년 뒤에도 같으리라 보기 어렵습니다");
@@ -1549,8 +1594,8 @@ function BasketSheet({
   onApply: () => void;
   onPick: (code: string) => void;
 }) {
-  // '내 계좌 맞춤'은 연금 계좌를 골랐을 때 국내 ETF 목록으로 바뀐다. 다른 바스켓은 계좌와 무관.
-  const codes = basket.altPension && mode === "pension" ? basket.altPension : basket.codes;
+  // '내 계좌 맞춤'은 연금저축·IRP 를 골랐을 때 그 계좌 목록으로 바뀐다(IRP 는 안전자산 셋 포함). 다른 바스켓은 계좌와 무관.
+  const codes = basketCodes(basket, mode);
   const holdings = basketShares(codes, amount, byCode, fx);
   const lines = computeLines(holdings, byCode, fx, mode);
   const net = lines.reduce((s, l) => s + l.netKrw, 0);
@@ -1563,7 +1608,7 @@ function BasketSheet({
         icon={basket.icon}
         title={
           <>
-            {basket.altPension && mode === "pension" ? `${basket.title} (연금 계좌)` : basket.altPension ? `${basket.title} (ISA)` : basket.title}
+            {basket.altIrp && mode === "irp" ? `${basket.title} (IRP)` : basket.altPension && mode === "pension" ? `${basket.title} (연금저축)` : basket.altPension ? `${basket.title} (ISA)` : basket.title}
             {/* 주의는 제목 옆 물음표에(2026-09-13 지적) — 바닥에 문장으로 두면 시트가 무거워진다. */}
             {basket.caution && (
               <span className="hz-tip hz-tip-wide dv-help" data-tip={basket.caution} style={{ cursor: "help", marginLeft: 4, verticalAlign: "middle" }} aria-label={`${basket.title} 주의`}>

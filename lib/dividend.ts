@@ -89,8 +89,10 @@ export type Basket = {
   icon: string;
   codes: string[];
   meta: BasketMeta;
-  /** '내 계좌 맞춤'만 — 연금 계좌를 골랐을 때의 목록(국내 ETF 만). codes 는 ISA 목록. */
+  /** '내 계좌 맞춤'만 — 연금저축을 골랐을 때의 목록(국내 ETF 만). codes 는 ISA 목록. */
   altPension?: string[];
+  /** '내 계좌 맞춤'만 — IRP 를 골랐을 때의 목록. 연금저축 목록 일곱 + 안전자산(채권·채권혼합 ETF) 셋 = 30%. */
+  altIrp?: string[];
   /** 바스켓 밑에 붙는 주의 한 줄(커버드콜·리츠·우선주). */
   caution?: string;
 };
@@ -507,6 +509,10 @@ const KR_INFRA = new Set(["088980", "415640"]);
 const US_REITS = ["O", "VICI", "STAG", "ADC", "WPC", "SPG", "EPR", "OHI", "AMT", "CCI", "PSA", "EXR", "AGNC", "NLY"];
 /** 원금을 돌려주는 상품이 섞이는 선. 커버드콜·리츠 바스켓은 이 위를 뺀다(줄 안내도 30% 에서 켜진다). */
 const MAX_YIELD_ETF = 30;
+/** IRP 안전자산(채권형·채권혼합형 ETF)을 이름으로 가르는 규칙. 화면(DividendCalculator)의 isSafeAsset 과 같은 식. */
+export const SAFE_ETF = /채권|국채|회사채|단기|머니마켓|CD|KOFR|금리|혼합/;
+/** IRP 바스켓 열 종목 중 안전자산 수 — 같은 금액씩이라 셋이 곧 30%. */
+const IRP_SAFE_COUNT = 3;
 
 const byCap = (a: DividendStock, b: DividendStock) => (b.marketCap ?? 0) - (a.marketCap ?? 0);
 const yieldOf = (s: DividendStock) => s.yieldPct ?? 0;
@@ -666,6 +672,14 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
     overseasIncome.filter((s) => !/커버드콜/.test(s.name)),
     overseasIncome.filter((s) => /커버드콜/.test(s.name)),
   ).slice(0, SIZE);
+  // IRP 는 위험자산이 70% 까지라 30% 는 안전자산(채권형·채권혼합형 ETF·예금)이어야 한다(2026-09 현재 DC·IRP 에 유효,
+  // 연금저축엔 없다). 그래서 연금저축 목록 일곱 + 안전자산 셋. 안전자산은 이름의 채권·국채·회사채·단기·머니마켓·CD·KOFR·
+  // 금리·혼합으로 가르고, 국채 커버드콜·밸런스류는 채권형이긴 해도 옵션 상품이라 은퇴 계좌의 '안전' 몫에서는 뺀다.
+  const irpSafe = etfs
+    .filter((s) => s.currency === "KRW" && s.dps > 0 && s.close != null && SAFE_ETF.test(s.name) && !/커버드콜|밸런스/.test(s.name) && yieldOf(s) <= 15)
+    .sort(byYield)
+    .slice(0, IRP_SAFE_COUNT);
+  const irp = [...pension.slice(0, SIZE - IRP_SAFE_COUNT), ...irpSafe];
 
   const codes = (list: DividendStock[]) => list.map((s) => s.code);
   // 순서가 곧 화면의 줄이다(셋씩): 기본 · 현금흐름 · 미국 · 국내. DividendCalculator 의 BASKET_ROWS 와 맞춘다.
@@ -775,11 +789,12 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
     {
       key: "account",
       title: "내 계좌 맞춤",
-      desc: "ISA는 국내 기초, 연금 계좌는 해외 기초 ETF가 세금에 맞는다",
-      rules: ["ISA: 국내 큰 회사 6 + 국내 기초 ETF 4", "연금 계좌: 해외 기초 배당·리츠·커버드콜 번갈아 10", "분배율 15% 이하"],
+      desc: "ISA는 국내 기초, 연금저축·IRP는 해외 기초 ETF가 세금에 맞는다",
+      rules: ["ISA: 국내 큰 회사 6 + 국내 기초 ETF 4", "연금저축: 해외 기초 배당·리츠·커버드콜 번갈아 10", "IRP: 해외 기초 7 + 채권·채권혼합 3(안전자산 30%)", "분배율 15% 이하"],
       icon: "account_balance_wallet",
       codes: codes(isa),
       altPension: codes(pension),
+      altIrp: codes(irp),
       meta: "yield",
     },
   ];
