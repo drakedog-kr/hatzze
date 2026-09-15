@@ -829,7 +829,9 @@ def compose(client, model: str, task: str, digest: str, max_tokens: int = 600) -
         if hits:
             print(f"[LLM] 금지어가 섞여 문단을 뺍니다({' · '.join(hits)}): {line[:44]}…")
             continue
-        found = problems(line, digest)
+        # [4](겹말·빠진 낱말)는 끈다 — 여기는 재시도 없이 버리는 자리라, 읽히는 흠 때문에
+        # 문단이 통째로 빠지는 쪽이 더 나쁘다(text_check.problems 의 slips 주석).
+        found = problems(line, digest, slips=False)
         if found:
             print(f"[LLM] 문제가 있어 문단을 뺍니다({' · '.join(found)}): {line[:40]}…")
             continue

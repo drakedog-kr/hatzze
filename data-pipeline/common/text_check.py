@@ -315,7 +315,8 @@ def _ungrammatical(text: str, kiwi) -> list[str]:
 #    정규식 하나로 오탐 없이 집힌다"는 것뿐이다. `화제를 나누고`·잘못 붙은 '다만'처럼
 #    뜻을 읽어야 갈리는 부류는 여기 안 든다(PR #201 을 닫은 그 이유).
 _FIXED_SLIPS: tuple[tuple[re.Pattern, str], ...] = (
-    (re.compile(r"최근 사이"), "'최근 사이'(기간이 빠짐)"),
+    # 뒤 경계를 본다 — '최근 사이버 공격'은 멀쩡한 문장이다.
+    (re.compile(r"최근 사이(?![가-힣])"), "'최근 사이'(기간이 빠짐)"),
     (re.compile(r"미국 미장"), "'미국 미장'(같은 말 겹침)"),
 )
 # 한 문장에 두 번 나오면 겹말이 되는 부사. 문장은 종결어미로 가른다.
@@ -332,14 +333,21 @@ def _fixed_slips(text: str) -> list[str]:
     return found
 
 
-def problems(text: str, source: str | None = None) -> list[str]:
-    """이 문장의 문제 목록. 비어 있으면 통과다(사람이 읽는 문자열로 돌려준다)."""
+def problems(text: str, source: str | None = None, *, slips: bool = True) -> list[str]:
+    """이 문장의 문제 목록. 비어 있으면 통과다(사람이 읽는 문자열로 돌려준다).
+
+    `slips=False` 는 [4] 를 끈다. **걸린 문단을 다시 쓰지 않고 버리는 호출부**는 꺼야 한다 —
+    broadcast_content.compose() 가 그렇다. [4] 는 읽히긴 하는 흠(겹말·빠진 낱말)이라,
+    다시 쓸 수 있으면 다시 쓰고 못 쓰면 그대로 내보내는 편이 문단이 빠지는 것보다 낫다.
+    [1]~[3] 은 못 읽는 글자·비문·오타라 어디서든 건다.
+    """
     found: list[str] = []
     if not text or not text.strip():
         return ["빈 문장"]
 
     # [4] 정해진 꼴의 실수. 사전도 원문도 필요 없어 맨 먼저 본다.
-    found.extend(_fixed_slips(text))
+    if slips:
+        found.extend(_fixed_slips(text))
 
     if _REPLACEMENT in text:
         found.append("대체문자(U+FFFD)")
@@ -377,6 +385,6 @@ def problems(text: str, source: str | None = None) -> list[str]:
     return found
 
 
-def is_clean(text: str, source: str | None = None) -> bool:
+def is_clean(text: str, source: str | None = None, *, slips: bool = True) -> bool:
     """문제가 하나도 없으면 True. 호출부의 재시도 루프 합격 조건에 쓴다."""
-    return not problems(text, source)
+    return not problems(text, source, slips=slips)
