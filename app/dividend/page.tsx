@@ -44,12 +44,16 @@ export async function generateMetadata(): Promise<Metadata> {
 const MONTH = (iso: string) => Number(iso.slice(5, 7));
 const DAY = (iso: string) => Number(iso.slice(8, 10));
 
+/** 상장 인프라 펀드(맥쿼리인프라·KIND 인프라) — lib/dividend.ts 의 KR_INFRA 와 같은 둘. 리츠처럼 IRP 에 담긴다. */
+const KR_INFRA_CODES = new Set(["088980", "415640"]);
+
 function toLite(s: DividendStock): StockLite {
   return {
     code: s.code,
     name: s.name,
     market: s.market,
     kind: s.kind,
+    reit: s.isReit || KR_INFRA_CODES.has(s.code),
     asOf: s.asOf,
     currency: s.currency,
     alias: s.alias,

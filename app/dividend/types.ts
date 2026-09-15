@@ -15,6 +15,8 @@ export type StockLite = {
   market: string | null;
   /** 주식인가 ETF 인가. ETF 는 배지가 붙고, 분배금이 손으로 옮긴 값이라 기준일(asOf)을 적는다. */
   kind: "stock" | "etf";
+  /** 국내 상장 리츠·인프라 펀드. IRP 는 개별 주식은 못 담아도 상장 리츠는 담을 수 있다(2020-07부터). */
+  reit: boolean;
   /** ETF 분배금을 운용사 공시에서 옮긴 날. 주식은 null. */
   asOf: string | null;
   /** 금액 단위. 미국은 달러 — close·dps 가 전부 달러다. 화면이 usdkrw 로 원화를 같이 낸다. */
