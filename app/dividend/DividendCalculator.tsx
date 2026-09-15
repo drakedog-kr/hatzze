@@ -1465,6 +1465,8 @@ function basketMeta(meta: BasketLite["meta"], s: StockLite): string {
       return s.growthYears != null ? `${s.growthYears}년 연속 늘림` : "";
     case "payout":
       return s.payout ? `배당성향 ${Math.round(s.payout[1])}%` : "";
+    case "septax":
+      return `${s.yieldPct != null ? `${pct(s.yieldPct)} · ` : ""}배당성향 ${s.highDiv?.[1] != null ? Math.round(s.highDiv[1]) : "?"}%`;
     case "discount":
       return s.discount != null ? `${s.yieldPct != null ? `${pct(s.yieldPct)} · ` : ""}보통주보다 ${Math.round(s.discount)}% 아래` : s.yieldPct != null ? pct(s.yieldPct) : "";
     default:

@@ -77,7 +77,7 @@ export type BasketKey =
   | "account";
 
 /** 바스켓 줄 오른쪽에 무엇을 적나 — 성향마다 "왜 여기 들었나"를 말하는 숫자가 다르다. */
-export type BasketMeta = "streak" | "yield" | "growth" | "months" | "growthYears" | "payout" | "discount";
+export type BasketMeta = "streak" | "yield" | "growth" | "months" | "growthYears" | "payout" | "discount" | "septax";
 
 export type Basket = {
   key: BasketKey;
@@ -634,29 +634,38 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
   const usMonthly = zip(usMonthlyStocks, usMonthlyEtfs).slice(0, SIZE);
   // 우선주 — 시총 1,000억 이상, 보통주보다 20% 넘게 아래(괴리율 — 우선주 리포트가 보는 첫 숫자), 수익률 순.
   // 공통 문턱(시총 3,000억)이 아니라 1,000억이다 — 우선주는 보통주보다 작아서 3,000억이면 LG우·NH투자증권우가 빠진다.
+  const krByCode = new Map(kr.map((s) => [s.code, s]));
   const preferred = kr
-    .filter(
-      (s) =>
-        isPref(s) &&
-        s.close != null &&
-        !s.unusual &&
-        (s.marketCap ?? 0) >= 1_000e8 &&
-        yieldOf(s) >= 2 &&
-        yieldOf(s) <= MAX_YIELD &&
-        (s.prefDiscountPct ?? 0) >= 20,
-    )
+    .filter((s) => {
+      if (!isPref(s) || s.close == null || s.unusual || (s.marketCap ?? 0) < 1_000e8) return false;
+      if (yieldOf(s) < 2 || yieldOf(s) > MAX_YIELD || (s.prefDiscountPct ?? 0) < 20) return false;
+      // 보통주가 3년은 줬어야 한다 — 우선주 배당은 보통주 배당에 얹히는 것이라 본체가 흔들리면 같이 흔들린다.
+      const common = krByCode.get(`${s.code.slice(0, 5)}0`);
+      return !!common && common.streak >= 3 && sustainable(common);
+    })
     .sort(byYield)
     .slice(0, SIZE);
-  // 분리과세 — 고배당기업으로 공시한 회사 중 수익률 3%·시총 1조 이상, 큰 순.
-  const septax = common.filter((s) => s.highDiv && yieldOf(s) >= 3 && (s.marketCap ?? 0) >= 1e12).sort(byCap).slice(0, SIZE);
-  // 내 계좌 맞춤 — ISA 는 국내 큰 회사 일곱(수익률 3% 이상, 시총 큰 순) + 배당 지수 ETF 셋, 연금 계좌는 국내 ETF 열
-  // (수익률 2~12%, 높은 순 — 커버드콜의 두 자릿수는 뺀다, 은퇴 계좌라).
-  const krEtfSteady = etfs.filter((s) => s.currency === "KRW" && s.dps > 0 && s.close != null && yieldOf(s) >= 2 && yieldOf(s) <= MAX_YIELD).sort(byYield);
+  // 분리과세 — 고배당기업으로 공시한 회사(성향 40% 이상이든 25%+10% 늘림이든 KIND 목록이 '해당'이라 한 것) 중
+  // 수익률 3%·시총 1조 이상. 2,000만원 넘는 사람이 쓰는 바스켓이라 수익률 순이고, 금융지주 쏠림은 업종당 셋으로.
+  const septax = capBySector(
+    common.filter((s) => s.highDiv && yieldOf(s) >= 3 && (s.marketCap ?? 0) >= 1e12 && sustainable(s)).sort(byYield),
+    SECTOR_CAP,
+  ).slice(0, SIZE);
+  // 내 계좌 맞춤 — 2026-09-15 리서치(ISA·연금 배치 글들): ISA 는 미국 원천징수가 없는 **국내 기초** 상품(국내 배당주·
+  // 국내 지수 커버드콜)에서 9.9% 효과가 온전하고, 연금 계좌는 15.4% 를 미루는 효과가 큰 **해외 기초** 배당·커버드콜 ETF 가
+  // 맞는다. 그래서 ISA = 국내 큰 회사 여섯(수익률 3%+, 업종당 둘) + 국내 기초 ETF 넷, 연금 = 해외 기초 배당·커버드콜 ETF 열.
+  const OVERSEAS = /미국|나스닥|S&P|글로벌|해외|일본|유로|차이나|인도|선진|신흥|테크TOP10|엔비디아/;
+  const krEtfIncome = etfs.filter((s) => s.currency === "KRW" && s.dps > 0 && s.close != null && yieldOf(s) >= 2 && yieldOf(s) <= 15).sort(byYield);
   const isa = [
-    ...common.filter((s) => s.streak >= 3 && yieldOf(s) >= 3 && (s.marketCap ?? 0) >= 1e12).sort(byCap).slice(0, 7),
-    ...krEtfSteady.filter((s) => /배당/.test(s.name) && !/커버드콜/.test(s.name)).slice(0, 3),
+    ...capBySector(common.filter((s) => s.streak >= 3 && yieldOf(s) >= 3 && (s.marketCap ?? 0) >= 1e12 && sustainable(s)).sort(byCap), 2).slice(0, 6),
+    ...krEtfIncome.filter((s) => !OVERSEAS.test(s.name)).slice(0, 4),
   ];
-  const pension = krEtfSteady.filter((s) => !/커버드콜/.test(s.name)).slice(0, SIZE);
+  // 연금 계좌는 배당 지수·리츠(수익률 순)와 커버드콜(수익률 순)을 번갈아 — 커버드콜만 열이면 은퇴 계좌가 옵션 상품으로 찬다.
+  const overseasIncome = krEtfIncome.filter((s) => OVERSEAS.test(s.name) && /배당|커버드콜|리츠|인컴/.test(s.name));
+  const pension = zip(
+    overseasIncome.filter((s) => !/커버드콜/.test(s.name)),
+    overseasIncome.filter((s) => /커버드콜/.test(s.name)),
+  ).slice(0, SIZE);
 
   const codes = (list: DividendStock[]) => list.map((s) => s.code);
   // 순서가 곧 화면의 줄이다(셋씩): 기본 · 현금흐름 · 미국 · 국내. DividendCalculator 의 BASKET_ROWS 와 맞춘다.
@@ -748,16 +757,16 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "septax",
       title: "분리과세",
       desc: "배당이 2,000만원을 넘어도 종합과세에 안 합치는 회사",
-      rules: haveHighDiv ? ["고배당기업 공시", "배당수익률 3%+", "시총 1조+", "큰 순"] : ["고배당기업 목록이 아직 없습니다"],
+      rules: haveHighDiv ? ["고배당기업 공시", "배당수익률 3%+", "시총 1조+", "업종당 3개", "수익률 순"] : ["고배당기업 목록이 아직 없습니다"],
       icon: "receipt_long",
       codes: codes(septax),
-      meta: "yield",
+      meta: "septax",
     },
     {
       key: "preferred",
       title: "우선주",
       desc: "같은 회사 보통주보다 배당수익률이 높은 우선주",
-      rules: ["우선주", "보통주보다 20%+ 아래", "시총 1,000억+", "배당수익률 순"],
+      rules: ["우선주", "보통주보다 20%+ 아래", "보통주 3년 연속 배당", "시총 1,000억+", "배당수익률 순"],
       icon: "star",
       codes: codes(preferred),
       meta: "discount",
@@ -766,8 +775,8 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
     {
       key: "account",
       title: "내 계좌 맞춤",
-      desc: "ISA엔 국내 주식·ETF, 연금 계좌엔 국내 ETF만 담긴다",
-      rules: ["ISA: 국내 큰 회사 7 + 배당 지수 ETF 3", "연금 계좌: 국내 ETF 10", "커버드콜 제외"],
+      desc: "ISA는 국내 기초, 연금 계좌는 해외 기초 ETF가 세금에 맞는다",
+      rules: ["ISA: 국내 큰 회사 6 + 국내 기초 ETF 4", "연금 계좌: 해외 기초 배당·리츠·커버드콜 번갈아 10", "분배율 15% 이하"],
       icon: "account_balance_wallet",
       codes: codes(isa),
       altPension: codes(pension),
