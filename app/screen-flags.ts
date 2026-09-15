@@ -81,4 +81,4 @@ export const DAILY_PUBLIC = true;
  * ⛔ **여라는 말이 있기 전에는 바꾸지 말 것.** 화면이 다 만들어졌다는 것과 여는 것은
  *    다른 판단이다.
  */
-export const DIVIDEND_PUBLIC = false;
+export const DIVIDEND_PUBLIC = true;
