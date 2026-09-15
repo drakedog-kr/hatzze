@@ -89,15 +89,15 @@ from generate_telegram_narratives import (  # noqa: E402
     first_sentences,
     kst_date,
     optimism,
+    percent_count,
     schedule_excerpt,
     schedule_hit,
-    percent_count,
     schedule_like,
-    trail_line,
     schedule_lines,
     sentence_finished,
     sentiment_window,
     tone_label,
+    trail_line,
 )
 
 # ⚠️ lib/us-telegram-data.ts 의 US_WINDOW_DAYS 와 같은 값이어야 한다(파일 머리 주석).

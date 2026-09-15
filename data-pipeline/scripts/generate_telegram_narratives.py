@@ -729,10 +729,14 @@ def percent_count(text: str) -> int:
 
 
 def count_mentions(text: str) -> int:
-    """문단에 적힌 '몇 회'·'몇 건' 수. 둘째 대목은 한 문장에 건수를 하나만 둔다는 약속인데,
-    2026-09-15 저녁엔 화제어 회수를 셋 읊었다("금리인상이 203회로 AI속도조절 95회, AI인프라
-    61회보다"). percent_count 와 같은 자리에서 한 번 더 시킨다."""
-    return len(re.findall(r"\d[\d,]*\s*(?:회|건)", text))
+    """**한 문장에** 적힌 '몇 회'·'몇 건'의 최댓값. 둘째 대목은 한 문장에 건수를 하나만
+    둔다는 약속인데, 2026-09-15 저녁엔 화제어 회수를 셋 읊었다("금리인상이 203회로
+    AI속도조절 95회, AI인프라 61회보다"). percent_count 와 같은 자리에서 한 번 더 시킨다.
+
+    문단이 아니라 문장 단위다 — 약속이 그렇다. 두 문장이 하나씩 적은 문단은 정상이다.
+    """
+    sentences = re.split(r"(?<=다\.)\s+", text)
+    return max((len(re.findall(r"\d[\d,]*\s*(?:회|건)", s)) for s in sentences), default=0)
 
 
 def schedule_like(text: str) -> bool:
@@ -1883,9 +1887,9 @@ def main() -> None:
                         brief_digest, length, BRIEF_SENTENCE_CAP[key], key,
                     )
                 if key == "theme" and count_mentions(text) > 1:
-                    print(f"[WARNING] 둘째 대목에 건수가 {count_mentions(text)}개라 다시 씁니다: {text[:50]}…")
+                    print(f"[WARNING] 둘째 대목의 한 문장에 건수가 {count_mentions(text)}개라 다시 씁니다: {text[:50]}…")
                     text = ask_brief_sentence(
-                        system + "\n\n[다시 쓰기] 방금 쓴 문장에 '몇 회'·'몇 건'이 여럿이었습니다. 건수는 **많아야 하나**만 두고 "
+                        system + "\n\n[다시 쓰기] 방금 쓴 문장 하나에 '몇 회'·'몇 건'이 여럿이었습니다. 한 문장에 건수는 **많아야 하나**만 두고 "
                         "나머지는 [부피 비교] 줄의 말과 순서로만 견주세요.",
                         brief_digest, length, BRIEF_SENTENCE_CAP[key], key,
                     )
