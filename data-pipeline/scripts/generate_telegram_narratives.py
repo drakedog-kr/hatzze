@@ -77,6 +77,7 @@ from common.supabase_client import (  # noqa: E402
     get_client,
     load_all_keyset,
     load_keyset,
+    load_window_keyset,
 )
 from common.surging import load_stock_daily, top_surging  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
@@ -977,13 +978,24 @@ def load_messages_since(db, since_date: str) -> list[dict]:
 
     `text is not null` 은 서버에 맡긴다 — 호출부 두 곳 모두 본문 없는 메시지를 버리므로
     미리 걸러도 결과가 같고, 그만큼 덜 실어 온다.
+
+    ⚠️⚠️⚠️ **정렬 축을 id 에 두지 않는다.** 본문을 뺀 뒤에도 2026-09-15 저녁에 또 `57014`
+    로 죽었다 — 표가 31만 행이 됐고(8월 15만), `posted_at >= X` 를 id 순으로 끊는 조회는
+    플래너가 **기본키 인덱스를 걸으며 창 밖 행까지 거르는 계획**을 고를 수 있다. 같은
+    연결에서 잇달아 재니 페이지당 7초(천장 8초)였다가 5분 뒤 0.1초였다 — 계획이 뒤집히는
+    것이라 재현이 안 되고, 앞의 두 처방(키셋·본문 제외) 뒤에도 같은 자리에서 또 죽었다.
+    `(posted_at, id)` 복합 키셋은 그 계획을 정렬로 배제한다(load_window_keyset 의 실측).
+
+    **한 실행에 한 번만 부른다.** 총평(build_news_block)과 종목 요약(build_stock_digests)이
+    같은 창을 따로 읽고 있었다 — 같은 페이지들을 두 번. main 이 읽어 둘에 넘긴다.
     """
     since_utc = f"{(date.fromisoformat(since_date) - timedelta(days=1)).isoformat()}T00:00:00Z"
-    return load_keyset(
+    return load_window_keyset(
         db,
         "telegram_messages",
         "id,channel_handle,message_id,posted_at,views,forwards",
-        narrow=lambda q: q.gte("posted_at", since_utc).not_.is_("text", "null"),
+        since_utc,
+        narrow=lambda q: q.not_.is_("text", "null"),
     )
 
 
@@ -1085,7 +1097,7 @@ def base_day_block(
     return lines
 
 
-def build_brief_digest(db, latest: str) -> str | None:
+def build_brief_digest(db, latest: str, msgs: list[dict]) -> str | None:
     """센티먼트 총평용 digest.
 
     창은 **카드와 글자 그대로 같아야 한다** — 총평은 화면에서 낙관도 막대 바로 옆에 붙고,
@@ -1205,14 +1217,16 @@ def build_brief_digest(db, latest: str) -> str | None:
     # 오늘치는 섞지 않고 나란히 둔다 — 문장이 인용할 숫자는 위 창 것, 말할 주제는
     # 아래 오늘 것이다(BASE_DAY_MIN_MSGS 주석).
     lines += base_day_block(all_sent, kws, latest, since, end, sent_days)
-    lines += build_news_block(db, latest, since)
+    lines += build_news_block(db, latest, since, msgs)
     lines += build_schedule_block(db, latest, since)
     return "\n".join(lines)
 
 
-def build_news_block(db, latest: str, window_since: str) -> list[str]:
-    """'지금 오가는 이야기' 문장이 볼 발췌 + 화제 종목. 실패해도 총평은 살린다."""
-    msgs = load_messages_since(db, window_since)
+def build_news_block(db, latest: str, window_since: str, msgs: list[dict]) -> list[str]:
+    """'지금 오가는 이야기' 문장이 볼 발췌 + 화제 종목. 창에 글이 없으면 빈 목록(총평은 그대로 나간다).
+
+    `msgs` 는 load_messages_since 가 준 창 안 메시지(main 이 한 번 읽어 넘긴다).
+    """
     by_day: dict[str, list[dict]] = defaultdict(list)
     for m in msgs:
         d = kst_date(m["posted_at"])
@@ -1417,9 +1431,12 @@ def save_stock_breadth(db, latest: str) -> None:
 
 
 def build_stock_digests(
-    db, latest: str, codes: list[str] | None = None
+    db, latest: str, codes: list[str] | None = None, msgs: list[dict] | None = None
 ) -> tuple[list[tuple[str, str, str]], list[tuple[str, str]]]:
     """([(종목코드, 종목명, digest)], [(종목코드, 종목명)]).
+
+    `msgs` 는 load_messages_since(db, since) 결과. main 은 총평과 나눠 쓰려고 미리 읽어
+    넘기고, 안 주면(급부상 한 줄 요약 경로) 여기서 읽는다.
 
     `codes` 를 주면 **그 종목들만** digest 를 만든다(순서도 준 대로). 급부상 한 줄 요약
     (scripts/generate_surging_oneliners.py)이 쓰는 길이다 — 창·발췌·톤을 똑같이 잡아야
@@ -1525,7 +1542,9 @@ def build_stock_digests(
     # 그 docstring 이 바로 이 문제를 적어 뒀다) since-1일부터 받아 오므로, 창 안 메시지는
     # 하나도 빠지지 않는다.
     # msgs 를 쓰는 네 곳 전부 창 밖 데이터가 필요 없어 결과는 정확히 같다.
-    msgs = {(m["channel_handle"], m["message_id"]): m for m in load_messages_since(db, since)}
+    if msgs is None:
+        msgs = load_messages_since(db, since)
+    msgs = {(m["channel_handle"], m["message_id"]): m for m in msgs}
     analysis = {
         (a["channel_handle"], a["message_id"]): a["sentiment"]
         for a in load_all_keyset(
@@ -1620,8 +1639,14 @@ def main() -> None:
     # 이 값은 그것과 무관하게 저장돼야 화면이 느린 길로 안 떨어진다.
     save_stock_breadth(db, latest)
 
-    brief_digest = build_brief_digest(db, latest)
-    stock_digests, required = build_stock_digests(db, latest)
+    # 창 안 메시지는 한 번만 읽는다 — 총평과 종목 요약이 같은 창을 본다(둘 다 기준일
+    # 전날부터 WINDOW_OFFSET 일 앞). 미장(generate_us_telegram_narratives)과 같은 꼴.
+    since = (date.fromisoformat(latest) - timedelta(days=1 + WINDOW_OFFSET)).isoformat()
+    msgs = load_messages_since(db, since)
+    print(f"[재료] 메시지 {len(msgs):,}건 (창 {since}~{latest} · 하루 앞 경계 여유분 포함)")
+
+    brief_digest = build_brief_digest(db, latest, msgs)
+    stock_digests, required = build_stock_digests(db, latest, msgs=msgs)
 
     if dry_run:
         print("─" * 60)

@@ -58,7 +58,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
-from common.supabase_client import get_client, load_all, load_all_keyset  # noqa: E402
+from common.supabase_client import get_client, load_all, load_window_keyset  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 
@@ -300,25 +300,41 @@ def window_dates(latest: str) -> tuple[str, str]:
 def load_us_messages(db, since_date: str) -> list[dict]:
     """창 안의 **미국 종목을 언급한** 메시지. 본문·언급 티커·매칭 표기를 함께 준다.
 
-    ⚠️ 필터를 걸고 OFFSET 페이징을 하지 않는다(13만 행에서 statement timeout 이 났다).
-    통째로 받아 파이썬에서 자른다 — calculate_us_trending.py 와 같은 방침이다.
-    """
-    mentions = load_all_keyset(
-        db, "telegram_message_us_stocks", "id,channel_handle,message_id,ticker,match_text"
-    )
-    by_msg: dict[tuple[str, int], list[dict]] = defaultdict(list)
-    for m in mentions:
-        by_msg[(m["channel_handle"], m["message_id"])].append(m)
+    창만 받고, 언급은 서버가 붙여 준다. `telegram_message_us_stocks` 에
+    `(channel_handle, message_id)` 복합 FK 가 있어(migration_033) PostgREST 가 메시지 행마다
+    언급 목록을 임베드한다 — 언급 표를 따로 읽어 파이썬에서 맞출 일이 없다.
 
+    ⚠️ 예전엔 **두 표를 통째로** 읽었다 — 언급 84,232행(13MB) + 메시지 316,252행을
+    본문째(창 표본 850B/행이면 약 270MB). "필터를 걸고 OFFSET 페이징을 하면 statement
+    timeout 이 난다"는 이유였는데, 그건 OFFSET 과 id 정렬의 문제였지 창을 자르는 것
+    자체의 문제가 아니었다(load_window_keyset 주석). 하루 두 번, 그 대부분을 받아서 버렸다.
+
+    실측(2026-09-15, 창 4일):
+        예전  언급 전체 4.6초 + 메시지 전체(본문째) 수십 초 · 약 280MB
+        지금  13페이지 2.0초 · 페이지 최악 0.28초 · 11.4MB  — 창 12일로 늘려도 최악 0.65초
+    남는 메시지 집합(1,412건)과 메시지별 티커 목록은 예전 방식과 동일함을 대조했다.
+
+    창을 `posted_at >= since-1일(UTC)` 로 자르고 날짜 판정은 kst_date 로 한다(KST 경계가
+    UTC 보다 9시간 이르니 하루 앞에서부터 받는다 — 국장 load_messages_since 와 같은 여유분).
+    """
+    since_utc = f"{(date.fromisoformat(since_date) - timedelta(days=1)).isoformat()}T00:00:00Z"
+    rows = load_window_keyset(
+        db,
+        "telegram_messages",
+        "id,channel_handle,message_id,text,posted_at,views,telegram_message_us_stocks(ticker,match_text)",
+        since_utc,
+    )
     out = []
-    for m in load_all_keyset(db, "telegram_messages", "id,channel_handle,message_id,text,posted_at,views"):
-        key = (m["channel_handle"], m["message_id"])
-        if key not in by_msg or not m.get("posted_at") or not (m.get("text") or "").strip():
+    for m in rows:
+        # 티커순으로 못박는다 — 총평 발췌가 `mentions[0]` 의 표기를 기준으로 본문을 자르는데,
+        # 임베드 순서는 약속이 없다(예전엔 언급 표의 uuid 순이었으니 그것도 우연이었다).
+        mentions = sorted(m.pop("telegram_message_us_stocks") or [], key=lambda x: x["ticker"])
+        if not mentions or not m.get("posted_at") or not (m.get("text") or "").strip():
             continue
         d = kst_date(m["posted_at"])
         if d < since_date:
             continue
-        out.append({**m, "date": d, "mentions": by_msg[key]})
+        out.append({**m, "date": d, "mentions": mentions})
     return out
 
 
@@ -538,7 +554,9 @@ def build_stock_digests(
         for x in m["mentions"]:
             by_ticker[x["ticker"]].append({**m, "match_text": x.get("match_text")})
 
-    ranked = sorted(by_ticker.items(), key=lambda kv: -len(kv[1]))
+    # 동률은 티커로 가른다 — 안 가르면 메시지를 받은 순서가 순위를 정하고, 그 순서는
+    # 조회 방식이 바뀔 때마다 달라진다(2026-09-15 실측: GS·SPCX 124회 동률이 뒤집혔다).
+    ranked = sorted(by_ticker.items(), key=lambda kv: (-len(kv[1]), kv[0]))
     if tickers is not None:
         # 준 순서를 지킨다. 창에 언급이 없는 티커는 by_ticker 에 없어 그대로 빠진다.
         picked = [(t, by_ticker[t]) for t in tickers if t in by_ticker]
