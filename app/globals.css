@@ -5499,6 +5499,10 @@ main.hz-scroll { overflow-x: clip; }
 /* 채움 막대 — 목표 한 달 배당금 가운데 지금이 얼마나. 위 줄 양 끝이 지금·목표, 아래 한 줄이 몇 %. */
 /* 트랙은 카드색(흰) + 테두리 — 회색 타일 위에 회색 트랙(--c-track)을 두었더니 바탕과 안 갈렸다(2026-09-15). */
 .dv-goal-bar { height: 10px; border-radius: 999px; background: var(--c-card); border: 1px solid var(--c-line); overflow: hidden; box-sizing: border-box; }
+/* 다크에서는 카드색(#202027)이 타일(#2f2f39)보다 어두워 빈 트랙이 홈처럼 꺼져 보이고 테두리(--c-line)는 타일과 같은 색이라 사라진다(대비 1.17).
+   흰색을 얹어 타일보다 밝은 띠로. 비중 막대 트랙도 같은 값(--c-track 은 1.49). */
+:root[data-theme="dark"] .dv-goal-bar { background: rgba(255, 255, 255, 0.09); border-color: rgba(255, 255, 255, 0.12); }
+:root[data-theme="dark"] .dv-tweight-bar { background: rgba(255, 255, 255, 0.12); }
 .dv-goal-fill { display: block; height: 100%; border-radius: 999px; background: var(--c-blue); transition: width 0.2s ease; }
 .dv-goal-ends { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--c-sub); }
 .dv-goal-ends b { color: var(--c-ink); font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -5626,8 +5630,9 @@ main.hz-scroll { overflow-x: clip; }
   .dv-more[data-scope="etf"] { order: 5; }
 }
 @media (max-width: 560px) {
-  /* 목표 타일 여섯은 좁으면 둘씩 세 줄. */
+  /* 목표 타일은 좁으면 둘씩 — 셋째가 홀로 남으면 한 줄을 통째로 차지한다(2+1 이 빈 칸으로 보였다). */
   .dv-goal-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dv-goal-stats > :nth-child(3):last-child { grid-column: 1 / -1; }
   /* 일정 줄은 두 줄로 — 날짜·종목 윗줄, 무엇·얼마 아랫줄. */
   .dv-upcoming-row { flex-wrap: wrap; row-gap: 2px; }
   .dv-upcoming-what { flex: 1 1 100%; padding-left: 94px; white-space: normal; }
@@ -5635,10 +5640,17 @@ main.hz-scroll { overflow-x: clip; }
   .dv-more-row { flex-direction: column; gap: 6px; }
   .dv-more-label { flex: none; padding-top: 0; }
 }
-@media (max-width: 720px) {
-  /* 한 줄에 여섯 칸을 세우면 종목 이름에 30px 이 남는다(375 실측: "KB금융"이 "K"). 두 줄로
-     접는다 — 윗줄 [종목 ····· 빼기], 아랫줄 [주수 ····· 1년에 받는 배당]. '1주에 1년'·'수익률'은
-     접는다. 열 머리는 두 줄 배치에선 자리가 없어 숨긴다. */
+/* 표의 폭은 뷰포트가 아니라 **사이드바를 뺀 시트 폭**으로 잰다(시트 ≈ 뷰포트 − 256). 고정 열 여섯이 652px 라
+   이름 열은 그 나머지다 — 1,100 에서 140px, 1,024 에서 64px("신시내티파이낸셜"이 잘림), 900 에서 0px 였다(2026-09-15 실측).
+   그래서 1,100 아래는 '1주당 1년 배당'·'비중' 두 열을 접어 다섯 열(444px)로, 860 아래는 두 줄로 접는다. */
+@media (max-width: 1100px) {
+  .dv-trow { grid-template-columns: minmax(0, 1fr) 132px 128px 84px 36px; }
+  .dv-trow > :nth-child(3), .dv-trow > :nth-child(6) { display: none; }
+}
+@media (max-width: 860px) {
+  /* 한 줄에 다섯 칸도 이름에 100px 이 안 남는다(860 시트 604 − 444). 두 줄로
+     접는다 — 윗줄 [종목 ····· 빼기], 아랫줄 [주수 ····· 1년에 받는 배당]. '수익률'도 접는다.
+     열 머리는 두 줄 배치에선 자리가 없어 숨긴다. */
   .dv-thead { display: none; }
   .dv-trow {
     grid-template-columns: minmax(0, 1fr) auto;
@@ -5651,8 +5663,18 @@ main.hz-scroll { overflow-x: clip; }
   .dv-trow > :nth-child(4) { grid-area: sum; align-self: center; }
   .dv-trow > :nth-child(7) { grid-area: remove; justify-self: end; }
   .dv-tname-main { white-space: normal; }
+  /* 12칸이면 칸 하나가 46px 라 "51,896원"(11px, 48px)이 넘친다 — 여섯 칸 두 줄. */
   .dv-cal-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); row-gap: 12px; }
+}
+@media (max-width: 720px) {
   .dv-hero-main { font-size: 28px; }
+  /* iOS 사파리는 16px 미만 입력칸에 포커스가 가면 화면을 확대한다 — 손가락으로 쓰는 폭에선 입력칸을 16px 로. */
+  .dv-search-box input, .dv-tshares input, .dv-tshares .dv-tcost input, .dv-goal-inline { font-size: 16px; }
+  .dv-tshares .dv-tcost input { width: 96px; }
+  /* 손가락 과녁 — 주수 ±·빼기가 28px 였다. */
+  .dv-step { width: 34px; height: 36px; }
+  .dv-tshares input { height: 36px; }
+  .dv-remove { width: 36px; height: 36px; }
 }
 @media (max-width: 560px) {
   .dv-hero { padding: 18px 18px 4px; }
