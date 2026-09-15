@@ -8,13 +8,20 @@
 신규 상장을 반영하도록 주기적으로(예: 매일 배치) 돌려도 되고, 델리스팅된 종목은
 굳이 지우지 않는다(과거 언급과의 연결 보존).
 
+⚠️ 07:00 KST 실행은 KRX 가 가장 최근 거래일을 빈 응답으로 줘서 하루 더 물러난 날을 받는다.
+   저녁 실행이 저장해 둔 금요일 종가를 일·월요일 아침이 목요일 종가로 되돌려 쓴 게 실측됐다
+   (2026-09-13·14 07:00, 기준일 20260911 → 20260910). 그래서 표에 있는 기준일보다 오래된
+   날이 오면 시세 세 칸(close_price·change_rate·price_date)은 두고 종목 목록만 갱신한다.
+
 실행:
     cd data-pipeline && source .venv/bin/activate
     python scripts/fetch_krx_stocks.py
+    python scripts/fetch_krx_stocks.py --dry-run   # 어느 날을 받고 되돌림인지 판정만 찍는다
 """
 
 from __future__ import annotations
 
+import argparse
 import sys
 from datetime import timedelta
 from pathlib import Path
@@ -67,7 +74,20 @@ def latest_available_date() -> str | None:
     return None
 
 
+def stored_price_date(db) -> str | None:
+    """표에 이미 있는 가장 최근 기준일(YYYY-MM-DD). 비어 있으면 None."""
+    res = db.table("stocks").select("price_date").not_.is_("price_date", "null").order("price_date", desc=True).limit(1).execute()
+    return res.data[0]["price_date"] if res.data else None
+
+
+PRICE_COLS = ("close_price", "change_rate", "price_date")
+
+
 def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--dry-run", action="store_true", help="DB 에 쓰지 않고 받은 날·되돌림 판정만 찍는다")
+    args = ap.parse_args()
+
     bas_dd = latest_available_date()
     if not bas_dd:
         print(f"[오류] 최근 {MAX_LOOKBACK_DAYS}일 내 KRX 데이터를 찾지 못했습니다.")
@@ -97,12 +117,24 @@ def main() -> None:
 
     rows = list(stocks.values())
     db = get_client()
+    price_date = f"{bas_dd[:4]}-{bas_dd[4:6]}-{bas_dd[6:]}"
+    stored = stored_price_date(db)
+    regressed = bool(stored and price_date < stored)
+    if regressed:
+        # 시세 칸을 빼고 올리면 PostgREST upsert 는 그 칸을 건드리지 않는다(머리말).
+        print(f"[경고] KRX 최신 기준일 {price_date} 이 표의 {stored} 보다 오래됐습니다 — 시세는 두고 종목 목록만 갱신합니다")
+        for r in rows:
+            for col in PRICE_COLS:
+                r.pop(col, None)
+    if args.dry_run:
+        print(f"[dry-run] 기준일 {bas_dd} · 표의 최신 {stored} · 되돌림 {'예' if regressed else '아니오'} · {len(rows)}개 — DB 에 쓰지 않았습니다")
+        return
     db.table("stocks").upsert(rows, on_conflict="code").execute()
 
     by_mkt: dict[str, int] = {}
     for r in rows:
         by_mkt[r["market"] or "기타"] = by_mkt.get(r["market"] or "기타", 0) + 1
-    print(f"[Supabase] stocks upsert 완료: {len(rows)}개 (기준일 {bas_dd})")
+    print(f"[Supabase] stocks upsert 완료: {len(rows)}개 (기준일 {bas_dd}{' · 시세는 표의 ' + stored + ' 유지' if regressed else ''})")
     for mkt, n in sorted(by_mkt.items()):
         print(f"  {mkt}: {n}개")
 
