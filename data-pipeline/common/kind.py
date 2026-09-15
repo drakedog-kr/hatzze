@@ -15,26 +15,48 @@ import html
 import http.client
 import re
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
+
+from common.retry import backoff_delay
 
 UA = "hatzze/1.0 (+https://hatzze.fun; contact: support@hatzze.fun)"
 # 법인명이 종목명·발행사명 어느 쪽과도 안 맞는 곳. 이름이 바뀐 회사다(2026-09-13).
 ALIASES = {"유진증권": "001200", "유나이티드": "033270"}
 
 
+# 해외 러너에서 KRX 호스트는 403 을 일시 차단에 쓴다(2026-08-28 아홉 스크립트가 한꺼번에 맞았다).
+# common/krx_client.krx_get 과 같은 그물 — 여섯 번, 2·4·8·16·20·20초 지수 백오프.
+MAX_RETRIES = 6
+RETRY_BASE_SEC = 2
+RETRY_MAX_SEC = 20
+
+
 def post_list(url: str, referer: str, data: dict) -> str | None:
-    """검색 폼을 POST 해 표 HTML 을 받는다. 세 번 시도, 못 받으면 None."""
+    """검색 폼을 POST 해 표 HTML 을 받는다.
+
+    연결 실패·5xx·403 은 MAX_RETRIES 번 재시도하고 그래도 안 되면 None. 그 밖의 4xx 는 다시 걸어도
+    같으니 바로 None.
+    """
     body = urllib.parse.urlencode(data).encode()
     headers = {"User-Agent": UA, "Referer": referer, "X-Requested-With": "XMLHttpRequest"}
-    for attempt in (1, 2, 3):
+    name = url.rsplit("/", 1)[-1]
+    for attempt in range(1, MAX_RETRIES + 1):
         try:
             with urllib.request.urlopen(urllib.request.Request(url, data=body, headers=headers), timeout=90) as r:
                 return r.read().decode("utf-8", "ignore")
-        except (OSError, http.client.HTTPException):
-            if attempt == 3:
+        except urllib.error.HTTPError as exc:
+            if exc.code < 500 and exc.code != 403:
+                print(f"[KIND] {name} HTTP {exc.code} — 재시도하지 않습니다")
                 return None
-            time.sleep(5)
+            reason = "일시 차단 403" if exc.code == 403 else f"서버 오류 {exc.code}"
+        except (OSError, http.client.HTTPException) as exc:
+            reason = f"요청 실패 {exc}"
+        print(f"[KIND] {name} {reason} ({attempt}/{MAX_RETRIES})")
+        if attempt < MAX_RETRIES:
+            time.sleep(backoff_delay(attempt, RETRY_BASE_SEC, RETRY_MAX_SEC))
+    print(f"[KIND] {name} 요청이 {MAX_RETRIES}번 모두 실패했습니다")
     return None
 
 

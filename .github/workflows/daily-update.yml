@@ -907,8 +907,12 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_seohak_tic.py
 
-      # ── 배당주 (화면은 아직 없다 — 표부터 쌓는다) ─────────────────────────
+      # ── 배당주 (/dividend · 종목 페이지 배당 카드) ──────────────────────────
       # 배당금 쪽 재료다. 현재가는 `stocks.close_price`(위 fetch_krx_stocks)를 그대로 쓴다.
+      #
+      # ⭐ 아침·저녁 둘 다 돌린다. 슬롯마다 새로 들어오는 시장이 다르다 — 저녁(18:00 KST)은
+      #    국내 종가(전 거래일)와 예탁원 배당 기록, 아침(07:00 KST)은 막 끝난 미국 장의 종가.
+      #    실측(2026-09-15): fetch_krx_stocks 는 아침엔 두 거래일 전, 저녁엔 전 거래일을 받았다.
       #
       # ⚠️ 날짜별 증분이 아니라 **매일 스냅숏 전량**(15페이지·7만 행)이다. 금융위 API 는
       #    기준일 다음 영업일 13시 뒤에 갱신되므로 아침 실행은 이틀 전 스냅숏, 저녁 실행이
@@ -1532,8 +1536,8 @@ jobs:
           exit 1
 
       # ── 배당주 수집 전용 알림 ────────────────────────────────────────────
-      # 화면이 아직 없어 죽어도 아무 데도 티가 안 난다. 그래서 더 알려야 한다 — 표가
-      # 몇 주 낡은 채로 화면을 열면 첫날부터 옛 값을 내보인다.
+      # /dividend 는 죽어도 카드가 그대로 뜨고 히어로 툴팁의 '기준' 날짜만 안 움직인다 —
+      # 서학개미·내부자와 같은 조용한 낡음이다. 그래서 여기서 알려야 한다.
       #
       # ⚠️ 하루 실패는 다음 실행이 만회한다(전량을 다시 받는다). 며칠 연속 열리면 원천이
       #    바뀐 것이니 스크립트 머리말부터 볼 것 — 주소가 `/service/` 없이 `_V2` 다.
@@ -1573,7 +1577,7 @@ jobs:
           run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           failed="${DIVIDEND_FAILED_SCRIPTS:-요약 탭에서 확인}"
           title="⚠️ 배당주 수집 중단"
-          note=$(printf '배당주 수집이 실패했습니다. 화면이 아직 없어 표만 조용히 낡습니다.\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n하루 실패는 다음 실행이 만회합니다. 며칠 연속 열리면 원천이 바뀐 것이니 `fetch_kr_dividends.py` · `calculate_kr_dividend_stats.py` · `fetch_us_dividends.py` 머리말부터 보세요.' \
+          note=$(printf '배당주 수집이 실패했습니다. /dividend 와 종목 페이지 배당 카드는 그대로 뜨고 값만 조용히 낡습니다.\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n하루 실패는 다음 실행이 만회합니다. 며칠 연속 열리면 원천이 바뀐 것이니 `fetch_kr_dividends.py` · `calculate_kr_dividend_stats.py` · `fetch_us_dividends.py` 머리말부터 보세요.' \
             "$(date -u '+%Y-%m-%d %H:%M')" "$failed" "$run_url")
           existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
           if [ -n "$existing" ]; then
