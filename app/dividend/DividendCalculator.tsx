@@ -141,6 +141,9 @@ const ACCOUNTS: { key: Account; label: string }[] = [
   { key: "pension", label: "연금 계좌" },
 ];
 /** 히어로 라벨에 붙는 꼬리. 세후·세전은 머리의 칸이 이미 말하므로 안 적고(2026-09-13 지적), 계좌가 일반이 아닐 때만 그 이름. */
+/** 이 위면 배당이 아니라 원금 반환이 섞인 ETF(일드맥스류). 바스켓의 MAX_YIELD_ETF(lib/dividend.ts)와 같은 30. 칩·줄 주의 둘 다 이 값. */
+const HOT_YIELD_PCT = 30;
+
 const accountTag = (mode: TaxMode) => (mode === "isa" || mode === "pension" ? ` (${ACCOUNTS.find((m) => m.key === mode)?.label})` : "");
 /** 종목을 처음 담을 때의 주수. 0 이면 결과가 안 서고, 1 은 값이 너무 작아 감이 안 온다. */
 const DEFAULT_SHARES = 10;
@@ -647,12 +650,21 @@ export function DividendCalculator({
 
       <SectionIntro n={2} title="성향별 바스켓" />
       <AmountControl amount={amount} onChange={setAmount} />
+      {/* 열두 장이 세로로 길어 국내 줄까지 스크롤이 길다(2026-09-15 지적) — 줄 이름 넷을 누르면 그 줄로 내려간다. */}
+      <nav className="dv-jump" aria-label="바스켓 묶음으로 이동">
+        <span className="dv-jump-label">바로 가기</span>
+        {BASKET_ROWS.map((cap, i) => (
+          <button key={cap} type="button" className="dv-jump-btn" onClick={() => document.getElementById(`dv-basket-row-${i}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+            {cap}
+          </button>
+        ))}
+      </nav>
       {/* 열둘을 3개씩 네 줄로. 줄마다 무엇을 묶은 줄인지 한 마디(기본 · 현금흐름 · 질 · 세금과 업종) — 셋씩 번갈아
           읽을 때 길잡이가 된다. 서버가 주는 순서가 곧 줄 순서다. */}
       <div className="dv-baskets">
         {BASKET_ROWS.map((cap, i) => (
           <Fragment key={cap}>
-            <p className="dv-basket-cap">{cap}</p>
+            <p className="dv-basket-cap" id={`dv-basket-row-${i}`}>{cap}</p>
             {baskets.slice(i * 3, i * 3 + 3).map((b) => (
               <BasketSheet key={b.key} basket={b} amount={amount} byCode={byCode} mode={taxMode} fx={fx} onApply={() => applyBasket(b)} onPick={(code) => add(code, "basket")} />
             ))}
@@ -850,7 +862,15 @@ function QuickChips({
         >
           <StockLogo code={s.code} name={s.name} market={s.market} size={18} />
           <span className="dv-chip-name">{s.name}</span>
-          {s.yieldPct != null && <span className="dv-chip-yield">{pct(s.yieldPct)}</span>}
+          {s.yieldPct != null &&
+            (s.yieldPct > HOT_YIELD_PCT ? (
+              // 일드맥스류 — 칩에서 제일 큰 숫자라 제일 좋은 걸로 읽힌다(2026-09-15 지적). 흐리게 두고 뜻은 툴팁에.
+              <span className="dv-chip-yield dv-chip-yield-hot hz-tip hz-tip-wide" data-tip="분배금에 원금을 돌려주는 몫이 섞인 초고배당 ETF 입니다. 달마다 크게 흔들립니다.">
+                {pct(s.yieldPct)}
+              </span>
+            ) : (
+              <span className="dv-chip-yield">{pct(s.yieldPct)}</span>
+            ))}
         </button>
       ))}
     </div>
@@ -918,7 +938,7 @@ function HoldingsTable({
       <div className="dv-trow dv-thead" role="row">
         <span role="columnheader">종목</span>
         <span role="columnheader">주수 · 평단</span>
-        <span role="columnheader">1주에 1년</span>
+        <span role="columnheader">1주당 1년 배당</span>
         <span role="columnheader">1년에 받는 배당</span>
         <span role="columnheader">배당수익률</span>
         <span role="columnheader">비중</span>
@@ -980,8 +1000,8 @@ function HoldingRow({
   if (s.dps === 0) warns.push(s.currency === "USD" ? "공시에서 배당을 못 읽었습니다(안 주는 회사일 수도 있습니다)" : "최근 1년 현금배당이 없습니다");
   if (s.unusual) warns.push("특별·청산배당이 섞여 있어 1년 뒤에도 같으리라 보기 어렵습니다");
   if (s.kind !== "etf" && s.estimated) warns.push("연간 값이 없어 마지막 배당으로 어림한 추정값입니다");
-  // 일드맥스(TSLY·MSTY)류. 지난 1년 분배가 가격의 절반을 넘으면 원금을 돌려주는 상품이라 봐야 한다.
-  if ((s.yieldPct ?? 0) > 30) warns.push("분배금이 달마다 크게 흔들리고 원금을 돌려주는 몫이 섞여 있습니다");
+  // 일드맥스(TSLY·MSTY)류. 지난 1년 분배가 가격의 3할을 넘으면 원금을 돌려주는 상품이라 봐야 한다.
+  if ((s.yieldPct ?? 0) > HOT_YIELD_PCT) warns.push("분배금이 달마다 크게 흔들리고 원금을 돌려주는 몫이 섞여 있습니다");
   if (s.close == null) warns.push("종가가 없어 투자금과 배당수익률을 못 냅니다");
   if (s.dps > 0 && !s.pays.length) warns.push("지급일 기록이 없어 아래 달력에는 빠집니다");
 
@@ -1110,11 +1130,21 @@ function MonthCalendar({
   return (
     <div className="dv-cal">
       <div className="dv-cal-head dv-cal-head-col">
-        <span className="dv-cal-title">달마다 얼마 들어오나</span>
+        <span className="dv-cal-title">
+          달마다 얼마 들어오나
+          {/* 누르는 법은 부제에서 빼 툴팁으로 — 모바일에서 두 줄이 됐다(2026-09-15). */}
+          <span
+            className="hz-tip hz-tip-wide dv-help"
+            data-tip="최근 12개월에 실제로 지급된 달로 셉니다. 달을 누르면 그 달에 주는 종목이 뜹니다(빈 달은 +)."
+            style={{ cursor: "help" }}
+            aria-label="달력 설명"
+          >
+            <Icon name="help" style={{ fontSize: 14 }} />
+          </span>
+        </span>
         <span className="dv-cal-sub">
-          {paidMonths ? `1년에 ${paidMonths}달 들어옵니다` : "지급 달을 아는 종목이 없습니다"} · 최근 12개월 지급일 기준
+          {paidMonths ? `1년에 ${paidMonths}달 들어옵니다` : "지급 달을 아는 종목이 없습니다"} · 최근 12개월 기준
           {noCalCount > 0 && ` · ${noCalCount}종목은 지급 달을 몰라 뺐습니다`}
-          {" · 달을 누르면 그 달에 주는 종목이 뜹니다(빈 달은 +)"}
         </span>
       </div>
       <div className="dv-cal-grid">
@@ -1174,7 +1204,7 @@ function upcomingOf(lines: Line[], fx: number, mode: TaxMode): UpcomingItem[] {
       out.push({ key: `${s.code}-r`, when: dateLabel(s.nextRecord), sortKey: s.nextRecord, name: s.name, what: "배당기준일", amount: null });
     }
     if (s.nextPay && s.nextPay[0] >= iso) {
-      out.push({ key: `${s.code}-p`, when: dateLabel(s.nextPay[0]), sortKey: s.nextPay[0], name: s.name, what: `지급 · 1주에 ${money(s.nextPay[1], s)}`, amount: net(s, s.nextPay[1] * l.shares) });
+      out.push({ key: `${s.code}-p`, when: dateLabel(s.nextPay[0]), sortKey: s.nextPay[0], name: s.name, what: `1주에 ${money(s.nextPay[1], s)} · 공시된 지급일`, amount: net(s, s.nextPay[1] * l.shares) });
       continue;
     }
     // 날짜를 모르면 지난 1년 지급일을 올해(지났으면 내년)로 옮겨 가장 가까운 것 하나.
@@ -1191,7 +1221,7 @@ function upcomingOf(lines: Line[], fx: number, mode: TaxMode): UpcomingItem[] {
         when: `${dateLabel(expected.date)}쯤`,
         sortKey: expected.date,
         name: s.name,
-        what: `지급 예상 · 지난해 이날 1주에 ${money(expected.v, s)}`,
+        what: `1주에 ${money(expected.v, s)} · 지난해 이날 기준`,
         amount: net(s, expected.v * l.shares),
       });
     }

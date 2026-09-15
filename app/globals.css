@@ -5361,6 +5361,9 @@ main.hz-scroll { overflow-x: clip; }
 .dv-chip:hover { background: var(--tx-btn); }
 .dv-chip:active { cursor: grabbing; }
 .dv-chip-yield { color: var(--c-sub); }
+/* 초고배당(30% 넘는) ETF 의 숫자 — 제일 큰 숫자가 제일 좋은 걸로 읽히지 않게 점선 밑줄(뜻은 툴팁)과 가는 굵기.
+   더 흐린 회색은 없다 — --c-muted 는 --c-sub 와 거의 같고 --c-faint 는 대비 2.69 라 글자에 못 쓴다. 빨강은 온도색이라 안 쓴다. */
+.dv-chip-yield-hot { font-weight: 500; text-decoration: underline dotted; text-underline-offset: 2px; cursor: help; }
 
 /* 더 보기 — 판 맨 아래 가로로 꽉 찬 버튼(세 판이 같은 줄에 서게 margin-top: auto). 열면 그 판의 묶음들이
    세 판 아래 한 줄 전체 폭으로 펼쳐진다. 펼친 판의 버튼은 파란 면으로 "이게 열려 있다"를 짚는다. */
@@ -5431,6 +5434,11 @@ main.hz-scroll { overflow-x: clip; }
   cursor: pointer; font-family: inherit;
 }
 .dv-tcost-open:hover { color: var(--c-blue); text-decoration: underline; }
+/* 줄마다 붙으니 넷이면 네 번 반복돼 잡음이 된다(2026-09-15 지적). 마우스가 있는 기기에서는 줄에 올렸을 때만 또렷하게. */
+@media (hover: hover) {
+  .dv-tcost-open { opacity: 0.35; transition: opacity 0.15s; }
+  .dv-trow:hover .dv-tcost-open, .dv-tcost-open:focus-visible { opacity: 1; }
+}
 .dv-tshares input {
   width: 64px; height: 32px; padding: 0 8px; border: 1px solid var(--c-line); border-radius: 8px;
   background: var(--c-card); color: var(--c-ink); font-size: 14px; font-weight: 700; text-align: right;
@@ -5567,8 +5575,16 @@ main.hz-scroll { overflow-x: clip; }
 /* 바스켓 시트 셋 — 나란히. 좁아지면 한 장씩. */
 .dv-baskets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 /* 줄 이름 — 셋씩 묶인 줄 위에 한 마디. 격자 한 줄을 통째로 차지한다. */
-.dv-basket-cap { grid-column: 1 / -1; margin: 6px 0 -6px 4px; font-size: 12px; font-weight: 700; color: var(--c-sub); letter-spacing: 0.02em; }
+.dv-basket-cap { grid-column: 1 / -1; margin: 6px 0 -6px 4px; font-size: 12px; font-weight: 700; color: var(--c-sub); letter-spacing: 0.02em; scroll-margin-top: 16px; }
 .dv-basket-cap:first-child { margin-top: 0; }
+/* 투자금 카드와 격자 사이 한 줄 — 줄 이름 넷으로 바로 가기. 계좌 칩(.dv-account-btn)과 같은 알약. */
+.dv-jump { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin: -8px 0 -4px 4px; } /* 부모 .hz-tx 의 gap 18 을 위 10·아래 14 로 */
+.dv-jump-label { font-size: 12px; font-weight: 600; color: var(--c-sub); margin-right: 4px; }
+.dv-jump-btn {
+  padding: 4px 10px; border-radius: 999px; border: 1px solid var(--c-line); background: var(--c-card); color: var(--c-label);
+  font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap;
+}
+.dv-jump-btn:hover { border-color: var(--c-blue); color: var(--c-blue); }
 .dv-basket { display: flex; flex-direction: column; }
 .dv-basket-sum { padding: 16px 26px 4px; }
 .dv-basket-main { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.02em; color: var(--c-ink); font-variant-numeric: tabular-nums; }
