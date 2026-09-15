@@ -1435,7 +1435,6 @@ function GoalBox({
                 {tile("10년 뒤", roundMan(path[120]))}
                 {tile("20년 뒤", roundMan(path[240]))}
               </div>
-              <span className="dv-goal-bnote">매달 더 넣는 돈과 다시 담는 배당이 쌓여 늘어납니다</span>
             </div>
           )}
         </>
