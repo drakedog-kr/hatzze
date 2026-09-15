@@ -727,8 +727,9 @@ function TaxToggle({ afterTax, onChange }: { afterTax: boolean; onChange: (v: bo
 const TAX_HELP: Record<TaxMode, string> = {
   general: "세금: 국내 15.4%, 미국 15%를 뗀 값",
   isa: `세금(ISA): 국내 주식·ETF 9.9%, 해외 주식은 ISA에 못 담아 15% · 만기까지 ${wonShort(ISA_FREE)}(서민형 ${wonShort(ISA_FREE_LOW)})은 비과세라 실제론 이보다 적습니다`,
-  pension: "세금(연금저축): 국내 ETF 는 연금으로 받을 때 5.5%(55~69세) · 주식은 못 담아 15.4%·15%",
-  irp: "세금(IRP): 국내 ETF 는 연금으로 받을 때 5.5%(55~69세) · 주식은 못 담아 15.4%·15% · 위험자산은 70%까지, 30%는 채권·채권혼합 ETF 같은 안전자산",
+  pension: "세금(연금저축): 국내 ETF 는 연금으로 받을 때 5.5% · 주식은 못 담아 15.4%·15%",
+  // 안전자산 30% 얘기는 넘었을 때 히어로 아래 한 줄이 하니 여기엔 안 적는다(2026-09-15 지적: 툴팁이 너무 길다).
+  irp: "세금(IRP): 국내 ETF 는 연금으로 받을 때 5.5% · 주식은 못 담아 15.4%·15%",
   gross: "세전: 세금을 빼기 전 값(국내 15.4%, 미국 15%를 뗍니다)",
 };
 
