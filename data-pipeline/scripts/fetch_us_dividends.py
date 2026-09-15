@@ -289,6 +289,78 @@ def quote(ticker: str, key: str) -> tuple[float, str] | None:
     return float(d["c"]), day
 
 
+# SEC 연도 합이 SA 와 10% 넘게 갈려 버린 종목(실행마다 채워 요약에 찍는다).
+SEC_DISTRUSTED: list[str] = []
+
+
+def reconcile_years(r: dict, hist: list[dict], today: date) -> None:
+    """SEC 연도별 합(annual)을 stockanalysis 지급 건으로 바로잡는다 — 연속·줄임·5년 증가율이 여기서 나온다.
+
+    SEC companyfacts 의 연도 합은 못 믿을 때가 있다(2026-09-15 실측 428종목 중 30종목이 '해마다 늘렸다'는 햇수와
+    어긋났다): 액면분할 전후 값이 섞이고(브로드컴 2021 14.4 → 2022 1.64), 10-K 태그가 분기만 잡혀 한 해가 반토막이고
+    (J.B.헌트 2025 1.76 → 0.44), 특별배당이 한 해에 몰린다(코스트코). 지급 건 페이지는 같은 눈금(현재 주식 기준)이라
+    이쪽이 맞다. 다만 이 페이지는 5년치쯤만 보여 주니 그 밖의 해는 SEC 값을 둔다.
+
+    규칙:
+      · SA 로 셀 수 있는 **온전한 해**(첫 건이 있는 해와 올해는 뺀다)는 SA 합으로 덮는다.
+      · SA 와 SEC 가 겹치는 해에서 10% 넘게 갈리면 그 종목의 SEC 연도는 전부 못 믿는 것으로 보고 SA 해만 남긴다.
+      · 연속 연수는 남은 연도로 다시 세되 '해마다 늘린 햇수'(growth_years)보다 작을 수 없다.
+      · 줄인 해는 남은 연도로 다시 센다. 해마다 늘린 햇수가 5 이상이면 0 이다(늘렸으면 줄인 해가 없다).
+      · 5년 증가율은 6년치가 다 있고 그 해들이 믿을 만할 때만.
+    """
+    by_year: dict[int, float] = defaultdict(float)
+    for p in hist:
+        if p.get("pay") and p.get("amount") is not None:
+            by_year[int(p["pay"][:4])] += float(p["amount"])
+    if not by_year:
+        return
+    first = min(by_year)
+    complete = {y: round(v, 4) for y, v in by_year.items() if first < y < today.year}
+    if not complete:
+        return
+    sec = {int(k): float(v) for k, v in (r.get("annual") or {}).items()}
+    trust_sec = all(abs(sec[y] - v) <= 0.1 * v for y, v in complete.items() if y in sec and v > 0)
+    # 겹치지 않는 옛 해에 액면분할 전 값이 섞인 경우(브로드컴 2021 14.4 → 2022 1.64)는 겹침 검사로 못 잡는다 —
+    # 이웃한 해가 세 배 넘게 뛰거나 3분의 1 아래로 꺼지면 분할·태그 사고로 보고 SEC 연도를 통째로 버린다.
+    # 다만 최근 여섯 해 안에서만 본다 — 2009년 은행들처럼 진짜로 7분의 1 로 줄인 해까지 사고로 몰면 JP모건의 역사가 통째로 날아간다.
+    recent = today.year - 6
+    ys = sorted(y for y, v in sec.items() if v > 0 and y >= recent)
+    for a, b in zip(ys, ys[1:]):
+        if b == a + 1 and (sec[b] > 3 * sec[a] or sec[b] < sec[a] / 3):
+            trust_sec = False
+            break
+    annual = {**{y: v for y, v in sec.items() if trust_sec}, **complete}
+    r["annual"] = {str(k): round(v, 4) for k, v in sorted(annual.items())}
+    if not trust_sec:
+        SEC_DISTRUSTED.append(r["ticker"])
+
+    last_year = max(annual)
+    streak = 0
+    y = last_year
+    while annual.get(y, 0) > 0:
+        streak += 1
+        y -= 1
+    r["streak_years"] = max(streak, r.get("growth_years") or 0)
+
+    if (r.get("growth_years") or 0) >= 5:
+        cuts = 0
+    else:
+        cuts = 0
+        for yy in range(last_year - 4, last_year + 1):
+            prev, cur = annual.get(yy - 1, 0), annual.get(yy, 0)
+            if prev > 0 and cur < prev:
+                cuts += 1
+    r["cut_years_5"] = cuts
+
+    base, top = annual.get(last_year - 5, 0), annual.get(last_year, 0)
+    have_all = all(annual.get(yy, 0) > 0 for yy in range(last_year - 5, last_year + 1))
+    growth = round(((top / base) ** (1 / 5) - 1) * 100, 2) if have_all and base > 0 and top > 0 else None
+    # 5년 넘게 해마다 늘렸다는 회사의 5년 증가율이 0 이하면 옛 해가 틀린 것이다 — 적지 않는다.
+    if growth is not None and (r.get("growth_years") or 0) >= 5 and growth <= 0:
+        growth = None
+    r["growth_5y_pct"] = growth
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
@@ -399,9 +471,11 @@ def main() -> None:
             r["pay_months"] = sorted({int(p["pay"][5:7]) for p in paid})
             if nxt:
                 r["next_pay_date"], r["next_pay_amount"] = nxt["pay"], nxt["amount"]
+            reconcile_years(r, hist, today)
             if i % 50 == 0:
                 print(f"[SA] {i}/{len(rows)}")
-        print(f"[SA] 페이지 없음 {len(sa_missing)} {sa_missing[:6]} · 파싱 실패 {len(sa_fail)} {sa_fail[:6]} · SEC 와 10% 넘게 갈린 종목 {len(gaps)}")
+        print(f"[SA] 페이지 없음 {len(sa_missing)} {sa_missing[:6]} · 파싱 실패 {len(sa_fail)} {sa_fail[:6]} · SEC 와 10% 넘게 갈린 종목 {len(gaps)}"
+              f" · 연도 합을 SA 로만 센 종목 {len(SEC_DISTRUSTED)} {SEC_DISTRUSTED[:8]}")
         for g in gaps[:8]:
             print("   ", g)
     for r in rows:

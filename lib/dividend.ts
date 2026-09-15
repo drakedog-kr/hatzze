@@ -578,8 +578,10 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
   const isPref = (s: DividendStock) => s.shareKind != null && s.shareKind !== "보통주";
   const isReit = (s: DividendStock) => s.isReit || KR_INFRA.has(s.code);
   const common = pool.filter((s) => !isPref(s) && !isReit(s));
-  // 미국 리츠는 리츠·인프라 바스켓에만 — 배당성향을 안 붙이니(isReitLike) 다른 바스켓의 '성향 80% 이하' 문이 안 걸러 준다.
-  const usPayers = us.filter((s) => s.dps > 0 && s.close != null && yieldOf(s) >= 1.5 && yieldOf(s) <= 10 && !US_REITS.includes(s.code));
+  const usPayersAll = us.filter((s) => s.dps > 0 && s.close != null && yieldOf(s) >= 1.5 && yieldOf(s) <= 10);
+  // 배당성향으로 거르는 바스켓(꾸준함·수익률·성장·귀족·배당성장)에는 미국 리츠를 안 세운다 — 리츠엔 성향을 안 붙이니(isReitLike)
+  // '성향 80% 이하' 문이 안 걸러 준다. 달마다 받기·미국 월배당은 리얼티인컴 같은 월배당 리츠가 주인공이라 usPayersAll 을 쓴다.
+  const usPayers = usPayersAll.filter((s) => !US_REITS.includes(s.code));
   const etfByCode = new Map(etfs.map((s) => [s.code, s]));
   const usEtfs = (codes: string[]) => codes.map((c) => etfByCode.get(c)).filter((s): s is DividendStock => !!s && s.close != null);
   const krEtfs = (re: RegExp) => etfs.filter((s) => s.currency === "KRW" && s.dps > 0 && s.close != null && re.test(s.name) && yieldOf(s) >= 2 && yieldOf(s) <= MAX_YIELD_ETF).sort(byYield);
@@ -613,7 +615,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
   // 달마다 받기 — 국내 큰 회사(1조·2%)와 미국 배당주(오래 늘린 순)를 섞어 열두 달을 채운다.
   const monthly = coverMonths(
     common.filter((s) => (s.marketCap ?? 0) >= 1e12 && yieldOf(s) >= 2 && s.streak >= 3).sort(byCap),
-    usPayers.filter((s) => (s.growthYears ?? 0) >= 10).sort((a, b) => (b.growthYears ?? 0) - (a.growthYears ?? 0)),
+    usPayersAll.filter((s) => (s.growthYears ?? 0) >= 10).sort((a, b) => (b.growthYears ?? 0) - (a.growthYears ?? 0)),
     usEtfs(US_ETF_MONTHLY),
   );
   // 커버드콜 — 미국 손순서와 TIGER 커버드콜(수익률 순)을 번갈아. 30% 초과(일드맥스류)는 뺀다.
@@ -639,7 +641,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
     .sort((a, b) => (b.growth5 ?? 0) - (a.growth5 ?? 0))
     .slice(0, SIZE);
   // 미국 월배당 — 지난 1년 지급 달이 열한 개 이상인 주식(리얼티인컴·메인스트리트…)과 월분배 ETF 를 번갈아. 두 자릿수 분배율은 뺀다.
-  const usMonthlyStocks = usPayers.filter((s) => months(s).size >= 11 && yieldOf(s) <= 10).sort((a, b) => (b.growthYears ?? 0) - (a.growthYears ?? 0) || byYield(a, b));
+  const usMonthlyStocks = usPayersAll.filter((s) => months(s).size >= 11 && yieldOf(s) <= 10).sort((a, b) => (b.growthYears ?? 0) - (a.growthYears ?? 0) || byYield(a, b));
   const usMonthlyEtfs = usEtfs(US_ETF_MONTHLY_ALL).filter((s) => months(s).size >= 11 && yieldOf(s) <= 15);
   const usMonthly = zip(usMonthlyStocks, usMonthlyEtfs).slice(0, SIZE);
   // 우선주 — 시총 1,000억 이상, 보통주보다 20% 넘게 아래(괴리율 — 우선주 리포트가 보는 첫 숫자), 수익률 순.

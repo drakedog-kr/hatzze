@@ -136,9 +136,9 @@ const COMPOSITE_NOTE_FROM = 10_000_000;
 /** 이 계좌에 담을 수 있는 종목인가. */
 function fitsAccount(s: StockLite, mode: TaxMode): boolean {
   if (mode === "isa") return s.currency === "KRW";
-  // IRP 는 국내 상장 ETF 에 더해 상장 리츠·인프라 펀드도 담긴다(2020-07 허용, 위험자산 몫). 연금저축은 ETF 만으로 둔다.
-  if (mode === "irp") return s.currency === "KRW" && (s.kind === "etf" || s.reit);
-  if (mode === "pension") return s.kind === "etf" && s.currency === "KRW";
+  // 연금저축·IRP 는 국내 상장 ETF 에 더해 상장 리츠·인프라 펀드도 담긴다(미래에셋·한투 연금 매매 안내, 2026-09-15 확인).
+  // 개별 주식과 해외 상장은 못 담는다. IRP 에선 리츠가 위험자산 몫이다.
+  if (isPensionLike(mode)) return s.currency === "KRW" && (s.kind === "etf" || s.reit);
   return true;
 }
 /** 줄의 세율. 못 담는 줄은 일반 계좌로. */
@@ -731,7 +731,7 @@ function TaxToggle({ afterTax, onChange }: { afterTax: boolean; onChange: (v: bo
 const TAX_HELP: Record<TaxMode, string> = {
   general: "세금: 국내 15.4%, 미국 15%를 뗀 값",
   isa: `세금(ISA): 국내 주식·ETF 9.9%, 해외 주식은 ISA에 못 담아 15% · 만기까지 ${wonShort(ISA_FREE)}(서민형 ${wonShort(ISA_FREE_LOW)})은 비과세라 실제론 이보다 적습니다`,
-  pension: "세금(연금저축): 국내 ETF는 연금으로 받을 때 5.5% · 주식은 못 담아 15.4%·15%",
+  pension: "세금(연금저축): 국내 ETF·상장 리츠는 연금으로 받을 때 5.5% · 주식은 못 담아 15.4%·15%",
   // 안전자산 30% 얘기는 넘었을 때 히어로 아래 한 줄이 하니 여기엔 안 적는다(2026-09-15 지적: 툴팁이 너무 길다).
   irp: "세금(IRP): 국내 ETF·상장 리츠는 연금으로 받을 때 5.5% · 주식은 못 담아 15.4%·15%",
   gross: "세전: 세금을 빼기 전 값(국내 15.4%, 미국 15%를 뗍니다)",
@@ -750,9 +750,7 @@ function taxNote(mode: TaxMode, grossAll: number, sepGross: number, outsideCount
       parts.push(
         mode === "isa"
           ? `${outsideCount}종목은 해외 주식이라 ISA에 못 담아 일반 계좌로 셌습니다.`
-          : mode === "irp"
-            ? `${outsideCount}종목은 개별 주식이거나 해외 상장이라 IRP에 못 담아 일반 계좌로 셌습니다(국내 ETF와 상장 리츠만 담깁니다).`
-            : `${outsideCount}종목은 개별 주식이거나 해외 상장이라 연금저축에 못 담아 일반 계좌로 셌습니다(국내 ETF만 담깁니다).`,
+          : `${outsideCount}종목은 개별 주식이거나 해외 상장이라 ${mode === "irp" ? "IRP" : "연금저축"}에 못 담아 일반 계좌로 셌습니다(국내 ETF와 상장 리츠만 담깁니다).`,
       );
     }
     if (mode === "irp" && irp && irp.riskPct > IRP_RISK_MAX * 100) {
@@ -1047,7 +1045,7 @@ function HoldingRow({
   if (s.nextRecord) facts.push({ text: `기준일 ${md(s.nextRecord)}`, title: `다음 배당기준일 ${s.nextRecord}` });
   if (s.nextPay) facts.push({ text: `${md(s.nextPay[0])} 지급 ${money(s.nextPay[1], s)}`, title: `다음 지급 ${s.nextPay[0]} · 1주에 ${money(s.nextPay[1], s)}` });
 
-  if (line.outside) warns.push(s.currency === "USD" ? "해외 주식은 이 계좌에 못 담아 일반 계좌(15%)로 셌습니다" : "개별 주식은 연금저축·IRP에 못 담아 일반 계좌(15.4%)로 셌습니다");
+  if (line.outside) warns.push(s.currency === "USD" ? "해외 상장 종목은 이 계좌에 못 담아 일반 계좌(15%)로 셌습니다" : "개별 주식은 연금저축·IRP에 못 담아 일반 계좌(15.4%)로 셌습니다");
   // 미국은 "없다"고 못 말한다 — 허쉬·디지털리얼티처럼 1주당 배당 태그를 안 다는 회사가 있다.
   if (s.dps === 0) warns.push(s.currency === "USD" ? "공시에서 배당을 못 읽었습니다(안 주는 회사일 수도 있습니다)" : "최근 1년 현금배당이 없습니다");
   if (s.unusual) warns.push("특별·청산배당이 섞여 있어 1년 뒤에도 같으리라 보기 어렵습니다");
