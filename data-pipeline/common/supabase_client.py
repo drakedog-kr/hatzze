@@ -174,3 +174,73 @@ def load_keyset(db, table: str, columns: str, key: str = "id", narrow=None) -> l
 def load_all_keyset(db, table: str, columns: str, key: str = "id") -> list[dict]:
     """표 **전체**를 키셋으로 읽는다 — load_keyset 의 창 없는 판(주의사항도 그쪽에)."""
     return load_keyset(db, table, columns, key)
+
+
+def load_window_keyset(
+    db, table: str, columns: str, since: str, ts: str = "posted_at", key: str = "id", narrow=None
+) -> list[dict]:
+    """시각 열로 창을 자른 조회를 **(시각, 유일키) 복합 키셋**으로 읽는다.
+
+    load_keyset 과 결과는 같고 **정렬 축만 다르다.** 저쪽은 `order id` 인데, 창을 `posted_at >= X`
+    로 자른 조회를 id 순으로 1,000건씩 끊으면 플래너 앞에 계획이 둘 놓인다 —
+    posted_at 인덱스로 창 안 행만 모아 id 로 정렬하는 것과, **기본키 인덱스를 id 순으로
+    걸으며 창에 드는 행을 1,000건 만날 때까지 거르는 것.** 뒤쪽은 창 밖 행까지 훑는다.
+    uuid 는 시각과 무관하게 흩어져 있어 창이 표의 4% 면 한 페이지에 표의 1/13 을 힙에서
+    무작위로 읽고, 표가 커질수록(2026-08 15만 → 09-15 31만 행) 그 비용이 자란다.
+
+    어느 쪽을 고를지는 통계·연결 상태에 따라 뒤집힌다. 플랜 자체는 못 본다(PostgREST 의
+    plan 미디어 타입이 꺼져 있다) — 아래 실측이 근거다(2026-09-15 20:46 KST, 같은 연결에서
+    잇달아, 창 4일 12,842행):
+        order id  + text is not null   페이지당 7.04~7.73초   ← 천장 8초 바로 아래
+        order id  (text 조건 없음)     페이지당 0.25~1.30초
+        5분 뒤 같은 두 조회             둘 다 0.1초대
+    그날 저녁 파이프라인(19:31 KST)은 이 조회의 한 페이지가 8초를 넘겨 57014 로 죽었다 —
+    같은 모양의 조회(generate_move_reasons)가 4분 전엔 살아남은 채로. 2026-08-13·08-14
+    에도 같은 자리에서 죽었고 그때마다 다른 처방(키셋·본문 제외)을 했지만, 정렬 축이
+    id 인 한 저 계획은 후보에 남아 있었다.
+
+    정렬을 `(posted_at, id)` 로 잡으면 기본키 인덱스는 이 정렬을 못 주므로 **저 계획이
+    후보에서 빠진다.** 남는 건 posted_at 인덱스를 창의 시작점부터 걷는 것뿐이라 페이지
+    비용이 창 크기에만 묶인다. 실측(같은 날, 같은 창): 페이지 최악 0.18초 · 중앙 0.08초,
+    행 집합은 load_keyset 과 동일(12,842행 · 중복 0).
+
+    posted_at 은 유일하지 않아(같은 초에 여러 채널이 올린다) id 를 둘째 키로 쓴다.
+    다음 페이지는 `ts >= 마지막ts AND (ts > 마지막ts OR key > 마지막key)` — 첫 조건이
+    인덱스 시작점이고 괄호가 같은 초의 앞 행을 뺀다. 마지막값은 PostgREST 가 준 문자열을
+    그대로 돌려보낸다(timestamptz 는 왕복이 무손실이다).
+
+    ⚠️ **columns 에 ts 와 key 를 둘 다 넣을 것** — 다음 페이지의 시작점을 마지막 행에서 뽑는다.
+    ⚠️ narrow 에 `.or_()` 를 쓰는 조회도 된다. PostgREST 는 `or=` 를 여러 개 받아 AND 로
+       묶는다(아래 키셋 조건도 `or=` 하나를 쓴다).
+    ⚠️ 창이 아니라 표 전체를 읽는 자리엔 load_all_keyset 이 맞다 — 거기선 기본키 걷기가
+       옳은 계획이라 이 문제가 없다.
+
+    같은 축으로 먼저 옮긴 자리가 있다 — common/channel_breadth._window_message_keys
+    (2026-09-09, `gte` 로 겹쳐 읽고 집합으로 중복을 흘리는 방식). 그쪽이 본 병은 창이 클 때
+    (30일 16만 행) **첫 페이지가 창 전체를 정렬**해 2초를 쓰고 뒤로 갈수록 싸지는 것이었고,
+    여기서 본 병은 창이 작아도(4일 1.3만 행) **페이지마다 7초로 일정**한 것이라 모양이
+    다르다. id 정렬이 여는 느린 계획이 둘인 셈이고, 처방은 같다.
+    """
+    rows: list[dict] = []
+    last_ts: str | None = None
+    last_key: str | None = None
+    while True:
+        q = db.table(table).select(columns).order(ts).order(key).limit(PAGE_SIZE)
+        if narrow is not None:
+            q = narrow(q)
+        if last_ts is None:
+            q = q.gte(ts, since)
+        else:
+            q = q.gte(ts, last_ts).or_(f"{ts}.gt.{last_ts},{key}.gt.{last_key}")
+        page = execute_with_retry(q).data or []
+        if not page:
+            break
+        if ts not in page[0] or key not in page[0]:
+            raise ValueError(
+                f"복합 키셋은 select 에 두 키 컬럼이 있어야 한다: ts={ts!r} key={key!r} columns={columns!r}"
+            )
+        rows += page
+        last_ts, last_key = page[-1][ts], page[-1][key]
+        if len(page) < PAGE_SIZE:
+            break
+    return rows

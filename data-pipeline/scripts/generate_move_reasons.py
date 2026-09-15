@@ -46,7 +46,13 @@ from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.prompt_style import PLAIN_PROSE_RULE_SHORT  # noqa: E402
-from common.supabase_client import get_client, load_all, load_all_keyset, load_keyset  # noqa: E402
+from common.supabase_client import (  # noqa: E402
+    get_client,
+    load_all,
+    load_all_keyset,
+    load_keyset,
+    load_window_keyset,
+)
 from common.text_check import problems  # noqa: E402
 from common.timeutil import KST, today_kst  # noqa: E402
 
@@ -250,14 +256,19 @@ def kst_day(posted_at: str) -> str:
 def load_day_messages(db, day: str) -> dict[tuple, dict]:
     """그날(KST) 본문 있는 메시지. 본문은 안 받는다(넓은 행 수천 건은 8초 벽에 걸린다)."""
     # ⚠️ 위 경계(lt)는 걸지 않는다 — 걸었더니 첫 페이지가 statement timeout(57014)에 걸렸다
-    #    (2026-09-06 실측). generate_telegram_narratives.load_messages_since 와 같은 모양
-    #    (gte 하나 + text not null)만 인덱스를 탄다. 날짜 판정은 아래에서 파이썬이 한다.
+    #    (2026-09-06 실측). 그때는 id 순 키셋이었다 — 조건이 하나 더 붙자 계획이 기본키
+    #    걷기로 넘어간 것으로 보인다(플랜은 못 봤다). 지금은 (posted_at, id) 복합 키셋이라
+    #    그 계획이 후보에 없지만(load_window_keyset 주석), 날짜 판정은 아래에서 파이썬이
+    #    하므로 굳이 안 건다.
+    #    generate_telegram_narratives.load_messages_since 와 같은 모양 — 그쪽이 2026-09-15
+    #    저녁에 이 모양 그대로 죽었고, 여기는 4분 앞서 돌아 우연히 살았다.
     since_utc = f"{(date.fromisoformat(day) - timedelta(days=1)).isoformat()}T00:00:00Z"
-    rows = load_keyset(
+    rows = load_window_keyset(
         db,
         "telegram_messages",
         "id,channel_handle,message_id,posted_at,views,forwards",
-        narrow=lambda q: q.gte("posted_at", since_utc).not_.is_("text", "null"),
+        since_utc,
+        narrow=lambda q: q.not_.is_("text", "null"),
     )
     return {(r["channel_handle"], r["message_id"]): r for r in rows if kst_day(r["posted_at"]) == day}
 
