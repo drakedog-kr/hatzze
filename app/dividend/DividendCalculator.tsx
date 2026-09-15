@@ -344,7 +344,7 @@ export function DividendCalculator({
   const byCode = useMemo(() => new Map(stocks.map((s) => [s.code, s])), [stocks]);
   const holdings = useSyncExternalStore(holdingsStore.subscribe, holdingsStore.getSnapshot, holdingsStore.getServerSnapshot);
   const setHoldings = writeHoldings;
-  // 머리의 칸은 세후·세전 둘뿐이다(2026-09-13 Hun: "일반 유저에겐 세후·세전이 쉽다"). 어느 계좌로 세는지는
+  // 머리의 칸은 세후·세전 둘뿐이다(2026-09-13 지적: "일반 유저에겐 세후·세전이 쉽다"). 어느 계좌로 세는지는
   // 세후일 때만 히어로 아래 작은 칸에서 고른다 — 세전이면 계좌가 뜻이 없다.
   const [afterTax, setAfterTax] = useState(true);
   const [account, setAccount] = useState<Account>("general");
@@ -494,7 +494,7 @@ export function DividendCalculator({
   }
 
   // 세금·시세는 히어로 라벨 옆 물음표 하나에 몰아 넣는다 — 바닥에 문단으로 두니 아무도 안 읽을 길이였다
-  // (2026-09-13 Hun). 꼭 필요한 셋만: 세금을 어떻게 뗐나 · 시세와 기록이 언제 것인가 · 보장 없음.
+  // (2026-09-13 지적). 꼭 필요한 셋만: 세금을 어떻게 뗐나 · 시세와 기록이 언제 것인가 · 보장 없음.
   // 출처 이름은 여기 안 적는다(같은 날 지적) — 사이트 바닥글의 '데이터 출처'가 그 자리다(app/Footer.tsx,
   // stockanalysis 는 약관이 출처 표기를 조건으로 발췌를 허용하므로 거기서 지우지 말 것).
   const helpText = [
