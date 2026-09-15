@@ -212,6 +212,8 @@ def load_window_keyset(
     ⚠️ **columns 에 ts 와 key 를 둘 다 넣을 것** — 다음 페이지의 시작점을 마지막 행에서 뽑는다.
     ⚠️ narrow 에 `.or_()` 를 쓰는 조회도 된다. PostgREST 는 `or=` 를 여러 개 받아 AND 로
        묶는다(아래 키셋 조건도 `or=` 하나를 쓴다).
+    ⚠️ columns 에 임베드(`자식표(열,열)`)를 넣어도 된다 — 정렬·키셋 조건은 부모 표 열에만
+       걸린다. generate_us_telegram_narratives.load_us_messages 가 언급 표를 이렇게 붙인다.
     ⚠️ 창이 아니라 표 전체를 읽는 자리엔 load_all_keyset 이 맞다 — 거기선 기본키 걷기가
        옳은 계획이라 이 문제가 없다.
 
