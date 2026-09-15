@@ -30,6 +30,10 @@
 
     의심 = 점수가 그 길이의 하한 이하  **그리고**  원문(digest)에 없음
 
+**[4] 정해진 꼴의 실수** (2026-09-15) — 글자·문법은 멀쩡한데 말이 안 되는 고정된 꼴('최근 사이'·
+'미국 미장'·한글 낱말에 한자·한 문장에 '함께' 둘). 코드 아래 `_FIXED_SLIPS` 주석에. 다시 쓸 수
+없이 버리는 호출부에선 끈다(`slips=False`).
+
 ### 하한은 길이에 따라 내려간다 (2026-07-28)
 
 위 문장의 '그 길이의'가 뒤에 붙은 것이다. 하한을 -35.0 으로 못박아 두었더니 **긴 낱말이
@@ -302,11 +306,55 @@ def _ungrammatical(text: str, kiwi) -> list[str]:
     return found
 
 
-def problems(text: str, source: str | None = None) -> list[str]:
-    """이 문장의 문제 목록. 비어 있으면 통과다(사람이 읽는 문자열로 돌려준다)."""
+# [4] 정해진 꼴의 실수 — 글자는 멀쩡하고 문법도 맞는데 말이 안 되는 자리.
+#
+# 2026-09-15 저녁 실행에서 셋이 저장됐다: "최근 사이 AI 라인 투자와…"(사흘이 빠졌다),
+# "미국 미장의 분위기가…"(같은 말 겹침), "이와 함께 … 말도 함께 나왔습니다"(한 문장에
+# 같은 부사 둘). 셋 다 [1]~[3] 으로는 안 잡힌다 — 낱말마다 사전에 있고 계사도 붙어 있다.
+#
+# ⚠️ 여기에 낱말을 하나씩 잇지 말 것. 자격은 "같은 실수가 실제로 저장됐고, 꼴이 고정돼
+#    정규식 하나로 오탐 없이 집힌다"는 것뿐이다. `화제를 나누고`·잘못 붙은 '다만'처럼
+#    뜻을 읽어야 갈리는 부류는 여기 안 든다(PR #201 을 닫은 그 이유).
+_FIXED_SLIPS: tuple[tuple[re.Pattern, str], ...] = (
+    # 뒤 경계를 본다 — '최근 사이버 공격'은 멀쩡한 문장이다.
+    (re.compile(r"최근 사이(?![가-힣])"), "'최근 사이'(기간이 빠짐)"),
+    (re.compile(r"미국 미장"), "'미국 미장'(같은 말 겹침)"),
+    # '火요일'(2026-09-15 미장 총평) — 한 낱말 안에 한자가 끼면 깨진 것이다. 띄어 쓴 `美 상원`은
+    # 신문 표기라 두고, [1] 이 아니라 여기에 두는 이유는 발송 쪽(compose)이 [4] 를 끄기 때문이다
+    # — 거기서 이 규칙에 걸리면 재시도 없이 문단이 빠진다.
+    (re.compile(r"[가-힣][\u4e00-\u9fff]|[\u4e00-\u9fff][가-힣]"), "한글 낱말에 한자 섞임"),
+)
+# 한 문장에 두 번 나오면 겹말이 되는 부사. 문장은 종결어미로 가른다. 실제로 저장된 건
+# '함께'뿐이다(30일 1,158건에서 3건). '또한'·'역시'·'다시'도 넣어 봤지만 한 번도 안 걸려
+# 뺐다 — 위 자격("실제로 저장된 실수만")을 스스로 지킨다.
+_DUP_ADVERBS = ("함께",)
+_SENTENCE_SPLIT = re.compile(r"(?<=다\.)\s+|(?<=요\.)\s+")
+
+
+def _fixed_slips(text: str) -> list[str]:
+    found = [note for pat, note in _FIXED_SLIPS if pat.search(text)]
+    for sent in _SENTENCE_SPLIT.split(text):
+        for adv in _DUP_ADVERBS:
+            if len(re.findall(rf"(?<![가-힣]){adv}(?![가-힣])", sent)) >= 2:
+                found.append(f"한 문장에 '{adv}'가 두 번")
+    return found
+
+
+def problems(text: str, source: str | None = None, *, slips: bool = True) -> list[str]:
+    """이 문장의 문제 목록. 비어 있으면 통과다(사람이 읽는 문자열로 돌려준다).
+
+    `slips=False` 는 [4] 를 끈다. **걸린 문단을 다시 쓰지 않고 버리는 호출부**는 꺼야 한다 —
+    broadcast_content.compose() 가 그렇다. [4] 는 읽히긴 하는 흠(겹말·빠진 낱말)이라,
+    다시 쓸 수 있으면 다시 쓰고 못 쓰면 그대로 내보내는 편이 문단이 빠지는 것보다 낫다.
+    [1]~[3] 은 못 읽는 글자·비문·오타라 어디서든 건다.
+    """
     found: list[str] = []
     if not text or not text.strip():
         return ["빈 문장"]
+
+    # [4] 정해진 꼴의 실수. 사전도 원문도 필요 없어 맨 먼저 본다.
+    if slips:
+        found.extend(_fixed_slips(text))
 
     if _REPLACEMENT in text:
         found.append("대체문자(U+FFFD)")
@@ -344,6 +392,6 @@ def problems(text: str, source: str | None = None) -> list[str]:
     return found
 
 
-def is_clean(text: str, source: str | None = None) -> bool:
+def is_clean(text: str, source: str | None = None, *, slips: bool = True) -> bool:
     """문제가 하나도 없으면 True. 호출부의 재시도 루프 합격 조건에 쓴다."""
-    return not problems(text, source)
+    return not problems(text, source, slips=slips)

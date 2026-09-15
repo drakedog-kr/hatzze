@@ -81,7 +81,7 @@ from common.supabase_client import (  # noqa: E402
 )
 from common.surging import load_stock_daily, top_surging  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
-from common.timeutil import KST  # noqa: E402
+from common.timeutil import KST, md_with_weekday  # noqa: E402
 from common.supabase_client import load_all  # noqa: E402
 
 MODEL = "claude-haiku-4-5"
@@ -273,6 +273,10 @@ COMMON = """\
 
 [출력] 설명·머리말 없이, 지시된 문장만 출력하세요. 마크다운·목록·제목 금지."""
 
+# ⚠️ 예문에 시점·숫자를 적지 말 것. 예전 예문 "이번 주 중반 한 차례 식었다가"(미장은 "주 후반
+#    한 차례 식었습니다")를 모델이 재료 대신 그대로 옮겼다 — 2026-09-15(화) 미장 총평이
+#    "주 후반 톤이 내려앉은"이라고 썼다. 근거는 여기(문자열 밖)에 둔다 — 문자열 안에 적으면
+#    모델에게 전송돼 그 말을 되레 상기시킨다.
 BRIEF_TONE_SYSTEM = COMMON + f"""
 
 [이번 대목 — 오늘의 분위기]
@@ -300,7 +304,8 @@ BRIEF_TONE_SYSTEM = COMMON + f"""
   옆에 카드가 자기 건수를 찍는데, **그 카드는 화면을 여는 시점으로 기간을 다시 잡아서 이
   digest 와 하루가 어긋날 수 있습니다.** 두 숫자가 나란히 다르게 보이면 어느 쪽도 못 믿습니다.
 - **[낙관도 추이]도 숫자로 읊지 말고 말로 옮기세요** — "76%에서 52%로 떨어졌다"가 아니라
-  "이번 주 중반 한 차례 식었다가 되돌아왔습니다"처럼. 한 문장에 퍼센트가 서넛 박히면
+  "며칠 새 한 차례 식었다가 되돌아왔습니다"처럼. 시점을 요일로 말하려면 [낙관도 추이]에
+  적힌 요일만 쓰세요. 한 문장에 퍼센트가 서넛 박히면
   읽는 사람은 어느 숫자가 중요한지 못 고릅니다.
 - **숫자를 쓸 거면 digest에 적힌 '낙관도' 값만 쓰세요.** 중립까지 포함한 비율을 따로
   계산해 말하지 마세요. 화면의 막대가 낙관도 기준이라 다른 숫자를 말하면 어긋납니다.
@@ -308,6 +313,9 @@ BRIEF_TONE_SYSTEM = COMMON + f"""
   나오니 **두 문장으로 나눠 쓰는 게 자연스럽습니다** — 억지로 한 문장에 욱여넣어 만연체가
   되지 않게 하세요."""
 
+# ⚠️ 부피 비교의 셈은 모델에게 맡기지 않는다 — 아래 좋은 예의 틀에 숫자를 넣다 틀린다
+#    (2026-09-15 저녁: 548건 대 537건을 "합친 것보다 훨씬 많습니다"). 비교문은 digest 의
+#    [부피 비교] 줄이 코드로 만들어 준다(volume_comparison_line). 사고 사례는 문자열 밖에 둔다.
 BRIEF_THEME_SYSTEM = COMMON + f"""
 
 [이번 대목 — 오늘 새로 오른 이야기]
@@ -335,8 +343,10 @@ BRIEF_THEME_SYSTEM = COMMON + f"""
   어느 테마가 대화를 얼마나 끌고 있는지, 나머지와 견주면 어느 정도인지를 말하세요.
 - ⚠️ **건수는 견주는 데 쓰고, 목록으로 읊지 마세요.** 네 테마의 건수를 차례로 나열하면
   digest 를 옮겨 적은 표가 될 뿐입니다. 한 문장에 건수는 많아야 하나입니다.
-  좋은 예: "반도체 한 테마의 언급이 나머지 셋을 합친 것보다 많습니다."
+  좋은 예: "반도체 한 테마의 언급이 나머지 셋을 합친 것과 비슷합니다." ([부피 비교] 줄의 말 그대로)
   나쁜 예: "반도체 1,091건, 2차전지 233건, 지주·밸류업 173건, 인터넷·플랫폼 114건입니다."
+- 🚫 **부피의 비교는 [부피 비교] 줄에 적힌 말로만 하세요.** 건수를 스스로 견줘 '훨씬'·
+  '몇 배' 같은 말을 붙이지 마세요.
 - 🚫 **테마별 낙관도 퍼센트는 한 번도 쓰지 마세요.** digest 에 "낙관도 74%"라고 적혀
   있어도 옮기지 마세요. 그 숫자는 바로 옆 막대가 그림으로 이미 말하고 있습니다.
   기울기를 말할 땐 구간 라벨(낙관 우세·중립·비관 우세)이나 **테마끼리의 순서**로만
@@ -678,6 +688,55 @@ NEWS_SCHEDULE_NOTE = (
 _SCHED_MARK = re.compile(
     r"\d{1,2}월\s*\d{1,2}일|오는\s*\d{1,2}일|다음\s*주|내주|예정|앞두|앞둔|청약|만기|편입|리밸런싱|상장|기준일"
 )
+
+
+def trail_line(points: list[tuple[str, int]]) -> str:
+    """[낙관도 추이] 한 줄. **숫자를 안 준다** — 요일·구간 라벨·오르내림 말만.
+
+    2026-09-15 저녁, 요일을 붙이자 모델이 추이 줄을 통째로 옮겼다("금요일 66%에서 토요일
+    73%까지 … 63%"). percent_count 로 한 번 더 시켜도 셋을 읊었다 — 숫자가 재료에 있으면
+    옮긴다. 퍼센트 대신 구간 라벨을 주던 것(tone_label 주석)과 같은 수를 여기에도 쓴다.
+    [전체] 의 퍼센트 하나가 문장에 들어갈 유일한 숫자다.
+
+    오르내림의 문턱은 뜻으로: 3 미만은 '비슷', 10 미만은 '조금', 그 위는 '크게'.
+    """
+    out = []
+    prev = None
+    for day, opt in points:
+        label = tone_label(opt)
+        if prev is None:
+            move = ""
+        else:
+            d = opt - prev
+            if abs(d) < 3:
+                move = "(비슷)"
+            else:
+                move = f"({'조금' if abs(d) < 10 else '크게'} {'올라' if d > 0 else '내려'})"
+        out.append(f"{md_with_weekday(day)} {label}{move}")
+        prev = opt
+    return "[낙관도 추이] " + " → ".join(out)
+
+
+def percent_count(text: str) -> int:
+    """문단에 적힌 퍼센트 수. 첫째 대목은 [전체] 낙관도 하나만 숫자로 둔다.
+
+    프롬프트가 "퍼센트는 그 하나뿐"이라고 적어 뒀지만 코드가 안 막았다. [낙관도 추이]에
+    요일을 붙이자(2026-09-15) 모델이 그 줄을 통째로 옮겼다 — "금요일 66%에서 토요일 73%까지
+    올랐다가 … 어제 69%에서 … 전체 낙관도는 63%" 처럼 넷. 넷째 대목의 schedule_like 와
+    같은 자리에서 한 번 더 시킨다.
+    """
+    return text.count("%") + text.count("퍼센트")
+
+
+def count_mentions(text: str) -> int:
+    """**한 문장에** 적힌 '몇 회'·'몇 건'의 최댓값. 둘째 대목은 한 문장에 건수를 하나만
+    둔다는 약속인데, 2026-09-15 저녁엔 화제어 회수를 셋 읊었다("금리인상이 203회로
+    AI속도조절 95회, AI인프라 61회보다"). percent_count 와 같은 자리에서 한 번 더 시킨다.
+
+    문단이 아니라 문장 단위다 — 약속이 그렇다. 두 문장이 하나씩 적은 문단은 정상이다.
+    """
+    sentences = re.split(r"(?<=다\.)\s+", text)
+    return max((len(re.findall(r"\d[\d,]*\s*(?:회|건)", s)) for s in sentences), default=0)
 
 
 def schedule_like(text: str) -> bool:
@@ -1085,16 +1144,56 @@ def base_day_block(
         ),
         reverse=True,
     )[:BASE_DAY_SPIKE_N]
+    # 화제어는 따옴표로 묶는다 — 모델이 두 낱말을 하나로 뭉치며 뜻을 뒤집었다
+    # ('반도체급락'·'금리급등' → "반도체와 금리 약세", 2026-09-15 저녁). 따옴표 안의
+    # 토막은 글자 그대로 옮기는 편이고, 주의는 재료 옆에 적어야 듣는다(NEWS_SCHEDULE_NOTE 주석).
     if spikes:
         lines.append(
             "[오늘 새로 오른 화제어] 앞 사흘엔 거의 없던 말입니다: "
-            + " · ".join(w for _, w in spikes)
+            + " · ".join(f"'{w}'" for _, w in spikes)
         )
+        # 틀린 예("금리 약세")는 재료에 안 적는다 — 그 말을 되레 상기시킨다.
+        lines.append("  ※ 화제어는 적힌 뜻 그대로 쓰세요. 두 낱말을 하나로 합치거나 바꿔 부르지 마세요.")
     lines.append(
         "[오늘 화제어] 많이 나온 순: "
-        + " · ".join(w for w, _ in day_kw.most_common(BASE_DAY_KEYWORDS))
+        + " · ".join(f"'{w}'" for w, _ in day_kw.most_common(BASE_DAY_KEYWORDS))
     )
     return lines
+
+
+def volume_comparison_line(themes: list[tuple[str, dict]]) -> str:
+    """[테마별] 아래에 붙는 '부피 비교' 한 줄. 셈은 여기서 하고 모델은 말만 옮긴다.
+
+    둘째 대목 프롬프트의 좋은 예가 "반도체 한 테마의 언급이 나머지 셋을 합친 것보다
+    많습니다"인데, 모델이 그 틀에 숫자를 넣다 셈을 틀린다 — 2026-09-15 저녁 총평이
+    548건 대 537건(228+156+153)을 두고 "합친 것보다 **훨씬** 많습니다"라고 썼다.
+    비교의 말을 코드가 정해 주면 그 자리엔 셈이 안 남는다(퍼센트 대신 구간 라벨을
+    주는 것과 같은 이유 — 위 tone_label 주석).
+
+    문턱은 말의 뜻으로 잡았다: 2배 이상이어야 '두 배가 넘는다', 1.2배는 돼야 '많다',
+    0.8~1.2배는 '비슷하다'. 그 아래는 '적다'.
+    """
+    (top, tc), rest = themes[0], themes[1:]
+    rest_total = sum(c["total"] for _, c in rest)
+    n_rest = len(rest)
+    ratio = tc["total"] / rest_total if rest_total else None
+    if ratio is None:
+        return ""
+    if ratio >= 2:
+        verdict = f"나머지 {n_rest}개를 합친 것의 두 배가 넘습니다"
+    elif ratio >= 1.2:
+        verdict = f"나머지 {n_rest}개를 합친 것보다 많습니다"
+    elif ratio >= 0.8:
+        verdict = f"나머지 {n_rest}개를 합친 것과 비슷합니다"
+    else:
+        verdict = f"나머지 {n_rest}개를 합친 것보다 적습니다"
+    # "둘째 대목 전용"을 줄 자체에 적는다 — 셋째 대목(오간 이야기)이 이 문장을 가져다 둘째와
+    # 같은 말을 되풀이했다(2026-09-15 저녁 실측). 재료 옆이 듣는다.
+    return (
+        f"[부피 비교 — 둘째 대목 전용] {top} {tc['total']}건 · 나머지 {n_rest}개 합계 {rest_total}건 → {top} 언급이 {verdict}. "
+        "※ 둘째 대목이 부피를 견줄 땐 이 말을 그대로 쓰세요. 스스로 셈해 '훨씬'·'몇 배' 같은 말을 붙이지 마세요. "
+        "다른 대목은 이 줄을 쓰지 마세요."
+    )
 
 
 def build_brief_digest(db, latest: str, msgs: list[dict]) -> str | None:
@@ -1162,9 +1261,11 @@ def build_brief_digest(db, latest: str, msgs: list[dict]) -> str | None:
     for r in sorted((x for x in sent if x["scope"] == "overall"), key=lambda x: x["date"])[-5:]:
         o = optimism(r["positive_count"], r["negative_count"])
         if o is not None:
-            trail.append(f"{r['date'][5:]} {o}%")
+            trail.append((r["date"], o))
     if len(trail) > 1:
-        lines.append(f"[낙관도 추이] {' → '.join(trail)}")
+        lines.append(trail_line(trail))
+        # 재료 옆에 적는다 — 요일을 안 주니 화요일 추이를 "주 후반"이라 썼다(md_with_weekday 주석).
+        lines.append("  ※ 시점을 말하려면 위에 적힌 요일로만 말하세요. 적히지 않은 시점은 없는 것입니다.")
 
     lines.append("")
     # "화면에 뜨는 것과 같다"를 프롬프트에도 적어 둔다. 모델이 인용해도 되는 테마의
@@ -1199,6 +1300,8 @@ def build_brief_digest(db, latest: str, msgs: list[dict]) -> str | None:
         )
     if not themes:
         lines.append(f"- (표본 {MIN_DECIDED}건 이상인 테마가 없습니다. 테마 언급은 생략하세요)")
+    if len(themes) >= 2 and (cmp := volume_comparison_line(themes)):
+        lines.append(cmp)
 
     kws = load_all(db, "telegram_keyword_daily", "date,keyword,mention_count")
     recent = Counter()
@@ -1709,7 +1812,7 @@ def main() -> None:
                 )
             elif found:
                 print(f"[WARNING] 문장을 버리고 다시 씁니다({' · '.join(found)}): {cur[:40]}…")
-                fix = f"방금 쓴 문장에 깨진 글자나 오타가 있습니다. 같은 뜻으로 **{how_many}**으로 다시 써 주세요.\n\n{digest}"
+                fix = f"방금 쓴 문장에 문제가 있습니다({' · '.join(found)}). 같은 뜻으로 **{how_many}**으로 다시 써 주세요.\n\n{digest}"
             else:
                 need = "늘려" if len(cur) < lo else "줄여"
                 fix = (
@@ -1763,6 +1866,33 @@ def main() -> None:
             paragraphs = []
             for key, system, length in slots:
                 text = ask_brief_sentence(system, brief_digest, length, BRIEF_SENTENCE_CAP[key], key)
+                if key == "tone" and percent_count(text) != 1:
+                    # 약속은 '[전체] 낙관도 하나'. 추이 숫자를 읊거나(여럿), 그 하나마저 빼먹는다(0).
+                    # 한 번 더 시키고, 그래도 그러면 그대로 둔다 — 첫째 대목이 없는 편이 더 나쁘다.
+                    n = percent_count(text)
+                    print(f"[WARNING] 첫째 대목에 퍼센트가 {n}개라 다시 씁니다: {text[:50]}…")
+                    fix = ("퍼센트가 여럿이었습니다. 숫자는 [전체] 낙관도 **하나만** 두고, [낙관도 추이]는 말로만 옮기세요."
+                           if n > 1 else "퍼센트가 없었습니다. [전체] 낙관도 퍼센트를 **한 번** 적으세요.")
+                    text = ask_brief_sentence(
+                        system + f"\n\n[다시 쓰기] 방금 쓴 문장에 {fix}",
+                        brief_digest, length, BRIEF_SENTENCE_CAP[key], key,
+                    )
+                if key == "news" and "합친 것" in text:
+                    # [부피 비교] 문장을 가져다 둘째 대목을 되풀이한 것이다 — 줄에 '둘째 대목 전용'을
+                    # 적어 두고도 4번 중 1번 그랬다(2026-09-15 실측). 그 말은 코드가 만든 것이라 찾기 쉽다.
+                    print(f"[WARNING] 셋째 대목이 [부피 비교] 말을 되풀이해 다시 씁니다: {text[:50]}…")
+                    text = ask_brief_sentence(
+                        system + "\n\n[다시 쓰기] 방금 쓴 문장이 [부피 비교] 줄의 말(합친 것과 …)을 되풀이했습니다. "
+                        "그건 둘째 대목 몫입니다. 테마 부피 얘기 없이 **종목명과 사건**으로만 다시 쓰세요.",
+                        brief_digest, length, BRIEF_SENTENCE_CAP[key], key,
+                    )
+                if key == "theme" and count_mentions(text) > 1:
+                    print(f"[WARNING] 둘째 대목의 한 문장에 건수가 {count_mentions(text)}개라 다시 씁니다: {text[:50]}…")
+                    text = ask_brief_sentence(
+                        system + "\n\n[다시 쓰기] 방금 쓴 문장 하나에 '몇 회'·'몇 건'이 여럿이었습니다. 한 문장에 건수는 **많아야 하나**만 두고 "
+                        "나머지는 [부피 비교] 줄의 말과 순서로만 견주세요.",
+                        brief_digest, length, BRIEF_SENTENCE_CAP[key], key,
+                    )
                 if key == "schedule" and not schedule_like(text):
                     # 일정 재료를 두고 요약을 되풀이한 것이다(schedule_like 주석). 한 번 더 시키고,
                     # 그래도 아니면 이 대목을 뺀다 — 없는 편이 틀린 것보다 낫다.
@@ -1810,7 +1940,7 @@ def main() -> None:
                     break
                 if found:
                     print(f"  [{name}] 문장을 버리고 다시 씁니다({' · '.join(found)}): {cur[:40]}…")
-                    fix = f"방금 쓴 문장에 깨진 글자나 오타가 있습니다. 같은 뜻으로 다시 써 주세요.\n\n{digest}"
+                    fix = f"방금 쓴 문장에 문제가 있습니다({' · '.join(found)}). 같은 뜻으로 다시 써 주세요.\n\n{digest}"
                 else:
                     need = "늘려" if len(cur) < LEN_MIN else "줄여"
                     fix = (

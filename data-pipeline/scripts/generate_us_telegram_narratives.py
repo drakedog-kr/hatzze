@@ -89,6 +89,7 @@ from generate_telegram_narratives import (  # noqa: E402
     first_sentences,
     kst_date,
     optimism,
+    percent_count,
     schedule_excerpt,
     schedule_hit,
     schedule_like,
@@ -96,6 +97,7 @@ from generate_telegram_narratives import (  # noqa: E402
     sentence_finished,
     sentiment_window,
     tone_label,
+    trail_line,
 )
 
 # ⚠️ lib/us-telegram-data.ts 의 US_WINDOW_DAYS 와 같은 값이어야 한다(파일 머리 주석).
@@ -144,6 +146,9 @@ US_COMMON = COMMON + """
 - 발췌에 "확신의 매수 구간" 같은 표현이 있어도 **절대 옮겨 적지 마세요.**
 - 미국 기업 이름은 발췌에 적힌 한글 표기를 그대로 쓰세요(영문 병기 불필요)."""
 
+# ⚠️ 예문에 시점·숫자를 적지 말 것 — 옛 예문 "주 후반 한 차례 식었습니다"를 모델이 재료 대신
+#    그대로 옮겨 2026-09-15(화) 총평이 "주 후반 톤이 내려앉은"이 됐다. 근거는 문자열 밖에
+#    (국장 BRIEF_TONE_SYSTEM 위 주석과 같은 이유).
 BRIEF_TONE_SYSTEM = US_COMMON + f"""
 
 [이번 대목 — 전체 분위기]
@@ -171,7 +176,8 @@ BRIEF_TONE_SYSTEM = US_COMMON + f"""
 - ⚠️ **분석 메시지 건수는 쓰지 마세요.** 이 문단 옆 카드가 자기 건수를 찍는데 기간이
   어긋날 수 있습니다. 두 숫자가 나란히 다르면 어느 쪽도 못 믿습니다.
 - **[낙관도 추이]도 숫자로 읊지 말고 말로 옮기세요** — "83%에서 60%로 떨어졌다"가 아니라
-  "주 후반 한 차례 식었습니다"처럼.
+  "며칠 새 한 차례 식었습니다"처럼. 시점을 요일로 말하려면 [낙관도 추이]에 적힌 요일만
+  쓰세요.
 - **길이는 {BRIEF_TONE_LEN[0]}~{BRIEF_TONE_LEN[1]}자**(공백 포함). 두 문장으로 나눠 쓰는 게
   자연스럽습니다."""
 
@@ -410,9 +416,12 @@ def build_brief_digest(db, latest: str, msgs: list[dict], name_of: dict[str, str
     for r in sorted(all_sent, key=lambda x: x["date"])[-5:]:
         o = optimism(r["positive_count"], r["negative_count"])
         if o is not None:
-            trail.append(f"{r['date'][5:]} {o}%")
+            trail.append((r["date"], o))
     if len(trail) > 1:
-        lines.append(f"[낙관도 추이] {' → '.join(trail)}")
+        lines.append(trail_line(trail))
+        # 재료 옆에 적는다 — 요일을 안 주니 화요일 추이를 "주 후반 톤이 내려앉았다"고 썼다
+        # (2026-09-15 저녁, md_with_weekday 주석).
+        lines.append("  ※ 시점을 말하려면 위에 적힌 요일로만 말하세요. 적히지 않은 시점은 없는 것입니다.")
 
     # ── 오늘 하루 ───────────────────────────────────────────────────────────
     # **퍼센트는 일부러 안 준다.** 옆 막대가 창(사흘) 값이라, 하루 낙관도를 문장에 적으면
@@ -662,7 +671,7 @@ def main() -> None:
                 )
             elif found:
                 print(f"[WARNING] 문장을 버리고 다시 씁니다({' · '.join(found)}): {cur[:40]}…")
-                fix = f"방금 쓴 문장에 깨진 글자나 오타가 있습니다. 같은 뜻으로 **{how_many}**으로 다시 써 주세요.\n\n{digest}"
+                fix = f"방금 쓴 문장에 문제가 있습니다({' · '.join(found)}). 같은 뜻으로 **{how_many}**으로 다시 써 주세요.\n\n{digest}"
             else:
                 need = "늘려" if len(cur) < lo else "줄여"
                 fix = (
@@ -700,6 +709,17 @@ def main() -> None:
             paragraphs = []
             for key, system, length in slots:
                 text = ask_brief_sentence(system, brief_digest, length, BRIEF_SENTENCE_CAP[key], key)
+                if key == "tone" and percent_count(text) != 1:
+                    # 국장과 같은 검사(generate_telegram_narratives.percent_count 주석) — 이쪽에서
+                    # 먼저 났다(09-15 "금요일 66%에서 토요일 73%까지 … 69% … 63%", 그다음엔 0개).
+                    n = percent_count(text)
+                    print(f"[WARNING] 첫째 대목에 퍼센트가 {n}개라 다시 씁니다: {text[:50]}…")
+                    fix = ("퍼센트가 여럿이었습니다. 숫자는 [전체] 낙관도 **하나만** 두고, [낙관도 추이]는 말로만 옮기세요."
+                           if n > 1 else "퍼센트가 없었습니다. [전체] 낙관도 퍼센트를 **한 번** 적으세요.")
+                    text = ask_brief_sentence(
+                        system + f"\n\n[다시 쓰기] 방금 쓴 문장에 {fix}",
+                        brief_digest, length, BRIEF_SENTENCE_CAP[key], key,
+                    )
                 if key == "schedule" and not schedule_like(text):
                     # 일정 재료를 두고 요약을 되풀이한 것이다(schedule_like 주석). 한 번 더 시키고,
                     # 그래도 아니면 이 대목을 뺀다 — 없는 편이 틀린 것보다 낫다.
@@ -744,7 +764,7 @@ def main() -> None:
                     break
                 if found:
                     print(f"  [{name}] 문장을 버리고 다시 씁니다({' · '.join(found)}): {cur[:40]}…")
-                    fix = f"방금 쓴 문장에 깨진 글자나 오타가 있습니다. 같은 뜻으로 다시 써 주세요.\n\n{digest}"
+                    fix = f"방금 쓴 문장에 문제가 있습니다({' · '.join(found)}). 같은 뜻으로 다시 써 주세요.\n\n{digest}"
                 else:
                     need = "늘려" if len(cur) < LEN_MIN else "줄여"
                     fix = (

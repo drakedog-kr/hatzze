@@ -57,6 +57,7 @@ from config.stock_extraction import (  # noqa: E402
     JOSA,
     JOSA_HEAD,
     JOSA_TRAILING,
+    NOT_MENTION_PHRASES,
     US_TICKER_COLLISION,
 )
 
@@ -90,6 +91,15 @@ JOSA_TAIL_RE = re.compile(
 # 채널이 본문에 끼워 넣은 종목코드 주석. 이름과 뒷말 사이를 갈라 놓아 뒤 경계 검사를
 # 무력화한다(config 쪽 결 ⑦ 주석 참고).
 CODE_ANNOTATION_RE = re.compile(r"\(\d{6}\)")
+# 뉴스 봇이 글머리에 박는 자기네 종목 태그 줄 — 결 ⑦ 의 이름판. `📰 [경제] 레이, 배럴 ⏰ …`
+# 꼴로, 그 봇의 태거가 기사 본문(우리에겐 없다)에서 우리와 같은 오탐을 낸다(`레이` ←
+# 인플레이션, `이닉스` ← SK하이닉스, `배럴` ← 배럴당). 쉼표로 나열돼 경계 검사를 그대로
+# 통과한다. 실측(2026-09-15, 60일): 13건(전부 한 채널)에서 태그 37건이 나왔고 **32건이
+# 이 줄에만** 있었다 — 그날 급부상 카드의 이닉스(3/3)·레이(6/10)·DB(5/8)가 여기서 왔다.
+# 사용자가 봇 글을 인용하며 앞에 한마디 붙인 글도 있어 글머리가 아니라 어디서든 찾는다.
+# 태그 줄과 ⏰ 사이엔 줄바꿈이 있다(`레이, 배럴\n⏰ 2026-09-11`) — 공백을 뭉갠 표본으로 재고
+# 한 줄로 짜면 하나도 안 걸린다(2026-09-15 에 그렇게 한 번 헛돌았다).
+NEWSBOT_TAG_RE = re.compile(r"📰 \[[^\]\n]*\][^⏰]{0,300}⏰")
 
 
 def load_dictionary(db) -> tuple[dict[str, str], dict[str, str], set[str]]:
@@ -309,6 +319,11 @@ def extract(text: str, pattern, match_to_code, method, ambiguous, caseless) -> d
     """text에서 {code: (match_text, method)} (메시지 내 중복 제거)."""
     # URL 안의 문자열은 본문 언급이 아니다. 길이를 유지해 경계 판정을 흐트러뜨리지 않는다.
     text = URL_RE.sub(lambda m: MASK_CHAR * len(m.group(0)), text)
+    # 뉴스 봇의 종목 태그 줄(NEWSBOT_TAG_RE 주석)과 종목을 뜻한 적 없는 구절
+    # (config.NOT_MENTION_PHRASES)도 같은 방식으로 가린다 — 셋 다 '본문이 아닌 자리'다.
+    text = NEWSBOT_TAG_RE.sub(lambda m: MASK_CHAR * len(m.group(0)), text)
+    for phrase in NOT_MENTION_PHRASES:
+        text = text.replace(phrase, MASK_CHAR * len(phrase))
 
     # 미국 티커와 글자가 같은 이름(STX·GS)은 **메시지 전체**를 보고 가른다.
     # 자리로는 못 가른다 — 이 코퍼스는 국내 종목에도 달러를 붙이고($NAVER),
