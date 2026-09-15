@@ -5572,7 +5572,10 @@ main.hz-scroll { overflow-x: clip; }
 .dv-basket { display: flex; flex-direction: column; }
 .dv-basket-sum { padding: 16px 26px 4px; }
 .dv-basket-main { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.02em; color: var(--c-ink); font-variant-numeric: tabular-nums; }
-.dv-basket-sub { margin: 4px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--c-sub); word-break: keep-all; }
+/* 카드 폭이 히어로의 반이라 타일 값은 한 단계 작게. 라벨은 히어로 것(.dv-hero-label)을 그대로 쓴다. */
+.dv-basket-stats { margin-top: 10px; max-width: none; }
+.dv-basket-stats .hz-tx-stat { padding: 9px 12px 8px; }
+.dv-basket-stats .hz-tx-stat-v { font-size: 15px; }
 .dv-basket-list { list-style: none; margin: 0; padding: 8px 16px 6px; }
 .dv-basket-row {
   display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px; border: none; border-radius: 8px;

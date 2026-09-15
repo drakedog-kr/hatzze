@@ -301,15 +301,16 @@ function computeLines(holdings: Holding[], byCode: Map<string, StockLite>, fx: n
   return out;
 }
 
-/** 바스켓을 이 투자금으로 같은 금액씩 나눠 담으면 종목마다 몇 주인가. */
-/** 바스켓을 이 투자금으로 같은 금액씩 나눠 담으면 종목마다 몇 주인가. 미국 종목은 종가가 달러라 환율을 곱해 원으로 잰다. */
+/** 바스켓을 이 투자금으로 같은 금액씩 나눠 담으면 종목마다 몇 주인가. 미국 종목은 종가가 달러라 환율을 곱해 원으로 잰다.
+    한 주가 몫보다 비싸면 1주 — 0주로 두면 열 종목 바스켓이 실제로는 아홉 종목이 된다(2026-09-15 지적).
+    그래서 카드의 투자금은 슬라이더 금액이 아니라 실제 합으로 적는다. */
 function basketShares(codes: string[], amount: number, byCode: Map<string, StockLite>, fx: number): Holding[] {
   if (!codes.length) return [];
   const per = amount / codes.length;
   return codes.map((code) => {
     const s = byCode.get(code);
     const priceKrw = s?.close ? s.close * (s.currency === "USD" ? fx : 1) : 0;
-    return { code, shares: priceKrw > 0 ? Math.floor(per / priceKrw) : 0 };
+    return { code, shares: priceKrw > 0 ? Math.max(1, Math.floor(per / priceKrw)) : 0 };
   });
 }
 
@@ -1472,7 +1473,7 @@ function AmountControl({ amount, onChange }: { amount: number; onChange: (v: num
         // 채운 만큼을 트랙 색으로 — 브라우저 기본 슬라이더는 옛 모양이라(2026-09-15 지적) 트랙·손잡이를 직접 그린다.
         style={{ "--p": `${((amount - AMOUNT_MIN) / (AMOUNT_MAX - AMOUNT_MIN)) * 100}%` } as React.CSSProperties}
       />
-      <p className="dv-amount-note">이 돈을 열 종목에 같은 금액씩 나눠 담으면 종목마다 몇 주가 되는지로 계산합니다.</p>
+      <p className="dv-amount-note">이 돈을 열 종목에 같은 금액씩 나눠 담으면 종목마다 몇 주가 되는지로 계산합니다. 한 주가 몫보다 비싸면 1주로 잡아 투자금이 조금 넘을 수 있습니다.</p>
     </div>
   );
 }
@@ -1545,12 +1546,28 @@ function BasketSheet({
       />
       {lines.length ? (
         <>
+          {/* 내 종목 히어로와 같은 꼴 — 라벨·큰 숫자·타일 셋(한 달 평균 · 투자금 · 배당수익률). 한 줄 문장이던 것을 맞췄다(2026-09-15). */}
           <div className="dv-basket-sum">
+            <p className="dv-hero-label">1년에 받는 배당{accountTag(mode)}</p>
             <p className="dv-basket-main">{won(net)}</p>
-            <p className="dv-basket-sub">
-              1년에 받는 배당 · 한 달 평균 {won(net / 12)}
-              {y != null && ` · 배당수익률 ${pct(y)}`}
-            </p>
+            <div className="hz-tx-stats dv-hero-stats dv-basket-stats">
+              <div className="hz-tx-stat">
+                <span className="hz-tx-stat-l">한 달 평균</span>
+                <span className="hz-tx-stat-v">{won(net / 12)}</span>
+              </div>
+              {invest > 0 && (
+                <div className="hz-tx-stat">
+                  <span className="hz-tx-stat-l">투자금</span>
+                  <span className="hz-tx-stat-v">{wonShort(Math.round(invest / 1e4) * 1e4)}</span>
+                </div>
+              )}
+              {y != null && (
+                <div className="hz-tx-stat">
+                  <span className="hz-tx-stat-l">배당수익률</span>
+                  <span className="hz-tx-stat-v">{pct(y)}</span>
+                </div>
+              )}
+            </div>
           </div>
           <ul className="dv-basket-list">
             {lines.map((l, i) => (
