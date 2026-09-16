@@ -5570,9 +5570,10 @@ main.hz-scroll { overflow-x: clip; }
 .dv-amount-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .dv-amount-label { font-size: 13px; font-weight: 600; color: var(--c-sub); }
 .dv-amount-val { display: inline-flex; align-items: baseline; gap: 4px; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: var(--c-ink); font-variant-numeric: tabular-nums; }
-/* 큰 숫자 자체가 적는 칸이다 — 글꼴·굵기는 그대로, 밑줄 하나로 칸임을 알린다. 폭은 글자 수만큼(인라인 ch). */
+/* 큰 숫자 자체가 적는 칸이다 — 글꼴·굵기는 그대로, 밑줄 하나로 칸임을 알린다. 폭은 글자 수만큼(인라인 ch).
+   밑줄은 --c-line 이면 라이트 1.15·다크 1.22 대비라 안 보였다(2026-09-17 검사) — 라벨색을 반쯤 섞어 두 테마 다 보이게. */
 .dv-amount-input {
-  min-width: 3ch; padding: 0 2px; border: 0; border-bottom: 2px solid var(--c-line); border-radius: 0; background: transparent;
+  min-width: 3ch; padding: 0 2px; border: 0; border-bottom: 2px solid color-mix(in srgb, var(--c-label) 45%, transparent); border-radius: 0; background: transparent;
   font: inherit; color: inherit; letter-spacing: inherit; font-variant-numeric: inherit; text-align: right; outline: none;
   transition: border-color 0.12s ease;
 }
@@ -5706,6 +5707,8 @@ main.hz-scroll { overflow-x: clip; }
   .dv-step { width: 34px; height: 36px; }
   .dv-tshares input { height: 36px; }
   .dv-remove { width: 36px; height: 36px; }
+  /* 줄의 계좌 알약 — 21px 은 손가락엔 작다. 폰에선 28px 로(2026-09-17 검사). */
+  .dv-tacct { padding: 5px 18px 5px 8px; width: 88px; font-size: 12px; background-position: right 6px center; }
 }
 @media (max-width: 560px) {
   .dv-hero { padding: 18px 18px 4px; }
