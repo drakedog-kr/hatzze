@@ -29,7 +29,7 @@ import type { BasketLite, MoreLists, StockLite } from "./types";
  */
 
 /** cost 는 내 평단(1주 매수가, 그 종목의 돈 단위). 넣으면 투자금과 수익률이 종가 대신 이걸로 선다(YOC). */
-/** account 가 없으면 위의 '기본 계좌'를 따른다. 있으면 그 줄만 그 계좌로 센다(2026-09-16: 종목마다 계좌가 다른 게 보통이라). */
+/** account 가 없으면 위의 '계좌 유형' 칩을 따른다. 있으면 그 줄만 그 계좌로 센다(2026-09-16: 종목마다 계좌가 다른 게 보통이라). */
 type Holding = { code: string; shares: number; cost?: number; account?: Account };
 
 /* ── 담은 종목 저장소 ─────────────────────────────────────────────────
@@ -288,9 +288,9 @@ type Line = {
   cost: number | null;
   /** 고른 계좌에 못 담는 종목이라 일반 계좌 세율로 셌다(ISA 의 해외 주식, 연금저축·IRP 의 개별 주식). */
   outside: boolean;
-  /** 이 줄이 실제로 세는 계좌 — 줄에 따로 고른 것이 있으면 그것, 없으면 기본 계좌. 세전 모드에서도 표시용으로 든다. */
+  /** 이 줄이 실제로 세는 계좌 — 줄에 따로 고른 것이 있으면 그것, 없으면 위 칩의 계좌 유형. 세전 모드에서도 표시용으로 든다. */
   account: Account;
-  /** 기본 계좌와 다르게 줄에서 따로 고른 줄인가(태그를 진하게). */
+  /** 줄에서 따로 고른 줄인가(태그를 진하게). */
   ownAccount: boolean;
 };
 
@@ -535,10 +535,10 @@ export function DividendCalculator({
   // 평단. 0이나 빈 값이면 지운다(종가 기준으로 돌아간다).
   const setCost = (code: string, cost: number | null) =>
     setHoldings((prev) => prev.map((h) => (h.code === code ? (cost && cost > 0 ? { ...h, cost } : { code: h.code, shares: h.shares, ...(h.account ? { account: h.account } : {}) }) : h)));
-  // 줄의 계좌. null 이면 기본 계좌를 따른다.
-  const setLineAccount = (code: string, acct: Account | null) => {
-    track("dividend_row_account", { stock_code: gaStockCode(code), account: acct ?? "base" });
-    setHoldings((prev) => prev.map((h) => (h.code === code ? (acct ? { ...h, account: acct } : { code: h.code, shares: h.shares, ...(h.cost ? { cost: h.cost } : {}) }) : h)));
+  // 줄의 계좌 유형. 줄에서 고르면 그 줄만 그 계좌로 세고, 위 칩을 바꿔도 안 따라간다(따로 고른 줄이니까).
+  const setLineAccount = (code: string, acct: Account) => {
+    track("dividend_row_account", { stock_code: gaStockCode(code), account: acct });
+    setHoldings((prev) => prev.map((h) => (h.code === code ? { ...h, account: acct } : h)));
   };
   const remove = (code: string) => {
     track("dividend_remove", { stock_code: gaStockCode(code) });
@@ -662,7 +662,7 @@ export function DividendCalculator({
               </div>
               {afterTax && (
                 <div className="dv-account" role="group" aria-label="어느 계좌로 세나">
-                  <span className="dv-account-label">기본 계좌</span>
+                  <span className="dv-account-label">계좌 유형</span>
                   {ACCOUNTS.map((o) => (
                     <button
                       key={o.key}
@@ -1052,7 +1052,7 @@ function HoldingsTable({
   /** 고른 계좌 — IRP 면 안전자산 줄에 알약을 붙인다. */
   mode: TaxMode;
   onClear: () => void;
-  onAccount: (code: string, acct: Account | null) => void;
+  onAccount: (code: string, acct: Account) => void;
   onShares: (code: string, shares: number) => void;
   onCost: (code: string, cost: number | null) => void;
   onRemove: (code: string) => void;
@@ -1097,7 +1097,7 @@ function HoldingRow({
   /** 투자금 가운데 이 줄의 몫(%). 종가가 없으면 null. */
   weightPct: number | null;
   mode: TaxMode;
-  onAccount: (code: string, acct: Account | null) => void;
+  onAccount: (code: string, acct: Account) => void;
   onShares: (code: string, shares: number) => void;
   onCost: (code: string, cost: number | null) => void;
   onRemove: (code: string) => void;
@@ -1159,12 +1159,11 @@ function HoldingRow({
             {mode !== "gross" && (
               <select
                 className={`dv-tacct${line.ownAccount ? " dv-tacct-own" : ""}`}
-                value={line.ownAccount ? line.account : ""}
-                onChange={(e) => onAccount(s.code, e.target.value ? (e.target.value as Account) : null)}
-                aria-label={`${s.name} 계좌`}
-                title={line.ownAccount ? "이 줄만 이 계좌로 셉니다" : "기본 계좌를 따릅니다"}
+                value={line.account}
+                onChange={(e) => onAccount(s.code, e.target.value as Account)}
+                aria-label={`${s.name} 계좌 유형`}
+                title={line.ownAccount ? "이 줄만 따로 고른 계좌 유형입니다" : "위에서 고른 계좌 유형을 따릅니다. 이 줄만 바꿀 수 있습니다"}
               >
-                <option value="">기본 계좌</option>
                 {ACCOUNTS.map((a) => (
                   <option key={a.key} value={a.key} disabled={!fitsAccount(s, a.key)}>
                     {a.label}
