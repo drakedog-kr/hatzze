@@ -485,6 +485,12 @@ export function DividendCalculator({
     track("dividend_remove", { stock_code: gaStockCode(code) });
     setHoldings((prev) => prev.filter((h) => h.code !== code));
   };
+  const clearAll = () => {
+    // 되돌릴 길이 없으니 한 번 묻는다 — 바스켓 열 종목을 손으로 담아 둔 사람이 실수로 누르면 다 잃는다.
+    if (!window.confirm(`담은 종목 ${holdings.length}개를 모두 뺄까요?`)) return;
+    track("dividend_clear", { count: holdings.length });
+    setHoldings([]);
+  };
   const applyBasket = (b: BasketLite) => {
     // 카드가 보여 주는 목록과 같은 것을 담는다 — 연금저축·IRP 를 골랐으면 그 계좌 목록(2026-09-15 전엔 늘 ISA 목록을 담았다).
     const next = basketShares(basketCodes(b, taxMode), amount, byCode, fx);
@@ -657,7 +663,7 @@ export function DividendCalculator({
             )}
           </div>
           {lines.length > 0 && (
-            <HoldingsTable lines={lines} inputs={inputs} totalInvest={invest} mode={taxMode} onShares={setShares} onCost={setCost} onRemove={remove} />
+            <HoldingsTable lines={lines} inputs={inputs} totalInvest={invest} mode={taxMode} onClear={clearAll} onShares={setShares} onCost={setCost} onRemove={remove} />
           )}
           {lines.length > 0 && (
             <MonthCalendar
@@ -966,6 +972,7 @@ function HoldingsTable({
   inputs,
   totalInvest,
   mode,
+  onClear,
   onShares,
   onCost,
   onRemove,
@@ -976,12 +983,20 @@ function HoldingsTable({
   totalInvest: number;
   /** 고른 계좌 — IRP 면 안전자산 줄에 알약을 붙인다. */
   mode: TaxMode;
+  onClear: () => void;
   onShares: (code: string, shares: number) => void;
   onCost: (code: string, cost: number | null) => void;
   onRemove: (code: string) => void;
 }) {
   return (
     <div className="dv-table" role="table" aria-label="담은 종목">
+      {/* 표 위 한 줄 — 몇 종목인지와 '모두 빼기'. 바스켓을 통째로 담아 본 뒤 하나씩 ×로 지우던 것(2026-09-16). */}
+      <div className="dv-table-bar">
+        <span className="dv-table-count">담은 종목 {lines.length}개</span>
+        <button type="button" className="dv-table-clear" onClick={onClear}>
+          모두 빼기
+        </button>
+      </div>
       <div className="dv-trow dv-thead" role="row">
         <span role="columnheader">종목</span>
         <span role="columnheader">주수 · 평단</span>
@@ -1042,13 +1057,17 @@ function HoldingRow({
     else if (g <= -1) facts.push({ text: `5년 연 −${-g}%`, title: `최근 5년 해마다 ${-g}%씩 줄었습니다(연평균)` });
   }
   if (mode === "irp" && !line.outside && isSafeAsset(s)) facts.push({ text: "안전자산", title: "IRP 안전자산 30%에 드는 채권·채권혼합 ETF 입니다" });
-  if (s.nextRecord) facts.push({ text: `기준일 ${md(s.nextRecord)}`, title: `다음 배당기준일 ${s.nextRecord}` });
-  if (s.nextPay) facts.push({ text: `${md(s.nextPay[0])} 지급 ${money(s.nextPay[1], s)}`, title: `다음 지급 ${s.nextPay[0]} · 1주에 ${money(s.nextPay[1], s)}` });
+  // 지난 날짜는 안 붙인다 — 표가 며칠 낡으면 '다음' 기준일·지급일이 어제일 수 있다(2026-09-16 전수 검사에서 셋).
+  const todayKst = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  if (s.nextRecord && s.nextRecord >= todayKst) facts.push({ text: `기준일 ${md(s.nextRecord)}`, title: `다음 배당기준일 ${s.nextRecord}` });
+  if (s.nextPay && s.nextPay[0] >= todayKst) facts.push({ text: `${md(s.nextPay[0])} 지급 ${money(s.nextPay[1], s)}`, title: `다음 지급 ${s.nextPay[0]} · 1주에 ${money(s.nextPay[1], s)}` });
 
   if (line.outside) warns.push(s.currency === "USD" ? "해외 상장 종목은 이 계좌에 못 담아 일반 계좌(15%)로 셌습니다" : "개별 주식은 연금저축·IRP에 못 담아 일반 계좌(15.4%)로 셌습니다");
   // 미국은 "없다"고 못 말한다 — 허쉬·디지털리얼티처럼 1주당 배당 태그를 안 다는 회사가 있다.
   if (s.dps === 0) warns.push(s.currency === "USD" ? "공시에서 배당을 못 읽었습니다(안 주는 회사일 수도 있습니다)" : "최근 1년 현금배당이 없습니다");
   if (s.unusual) warns.push("특별·청산배당이 섞여 있어 1년 뒤에도 같으리라 보기 어렵습니다");
+  // 첫 배당 — 끝난 회계연도에 배당이 없었는데 지난 1년에 있다(예림당 22.8%처럼 한 번짜리일 수 있다). 국내만: 미국 연속 연수는 늘린 햇수를 물려받는다.
+  else if (s.currency === "KRW" && s.kind === "stock" && s.dps > 0 && s.streak === 0) warns.push("지난 회계연도엔 배당이 없었습니다. 이어질지는 알 수 없습니다");
   if (s.kind !== "etf" && s.estimated) warns.push("연간 값이 없어 마지막 배당으로 어림한 추정값입니다");
   // 일드맥스(TSLY·MSTY)류. 지난 1년 분배가 가격의 3할을 넘으면 원금을 돌려주는 상품이라 봐야 한다.
   if ((s.yieldPct ?? 0) > HOT_YIELD_PCT) warns.push("분배금이 달마다 크게 흔들리고 원금을 돌려주는 몫이 섞여 있습니다");
