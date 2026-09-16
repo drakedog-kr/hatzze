@@ -5565,7 +5565,17 @@ main.hz-scroll { overflow-x: clip; }
 .dv-amount { padding: 18px 26px 16px; }
 .dv-amount-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .dv-amount-label { font-size: 13px; font-weight: 600; color: var(--c-sub); }
-.dv-amount-val { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: var(--c-ink); font-variant-numeric: tabular-nums; }
+.dv-amount-val { display: inline-flex; align-items: baseline; gap: 4px; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: var(--c-ink); font-variant-numeric: tabular-nums; }
+/* 큰 숫자 자체가 적는 칸이다 — 글꼴·굵기는 그대로, 밑줄 하나로 칸임을 알린다. 폭은 글자 수만큼(인라인 ch). */
+.dv-amount-input {
+  min-width: 3ch; padding: 0 2px; border: 0; border-bottom: 2px solid var(--c-line); border-radius: 0; background: transparent;
+  font: inherit; color: inherit; letter-spacing: inherit; font-variant-numeric: inherit; text-align: right; outline: none;
+  transition: border-color 0.12s ease;
+}
+.dv-amount-input:hover { border-bottom-color: var(--c-label); }
+.dv-amount-input:focus { border-bottom-color: var(--c-blue); }
+.dv-amount-unit { font-size: 15px; font-weight: 700; color: var(--c-label); }
+.dv-amount-echo { margin-left: 6px; font-size: 13px; font-weight: 600; color: var(--c-sub); letter-spacing: 0; }
 .dv-amount-quick { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
 .dv-quick {
   padding: 5px 10px; border-radius: 999px; border: 1px solid var(--c-line); background: var(--c-card);

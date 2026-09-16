@@ -180,12 +180,21 @@ const UPCOMING_MAX = 6;
 const UPCOMING_DAYS = 92;
 /** 목표까지 몇 달인지 셀 때의 상한(달). 넘으면 "이 속도로는 안 닿는다"로 적는다. */
 const GOAL_MAX_MONTHS = 50 * 12;
-/** 바스켓 투자금 슬라이더 눈금(원). */
-const AMOUNT_MIN = 1_000_000;
-const AMOUNT_MAX = 100_000_000;
-const AMOUNT_STEP = 1_000_000;
+/** 바스켓 투자금 슬라이더 눈금(원). 1억까지는 100만원, 그 위로 10억까지는 1,000만원 간격 — 한 간격으로 10억까지 늘리면
+    1,000만원이 트랙 1% 자리에 눌려 잡을 수가 없다. 슬라이더 값은 이 배열의 자리(index)다. */
+const AMOUNT_TICKS: number[] = [];
+for (let v = 1_000_000; v < 100_000_000; v += 1_000_000) AMOUNT_TICKS.push(v);
+for (let v = 100_000_000; v <= 1_000_000_000; v += 10_000_000) AMOUNT_TICKS.push(v);
 const AMOUNT_DEFAULT = 10_000_000;
-const AMOUNT_QUICK = [10_000_000, 30_000_000, 50_000_000, 100_000_000];
+const AMOUNT_QUICK = [10_000_000, 30_000_000, 50_000_000, 100_000_000, 300_000_000, 500_000_000, 1_000_000_000];
+/** 직접 적는 칸의 상한(원). 슬라이더는 10억까지지만 적는 건 100억까지 받는다 — 그 위는 자릿수만 늘고 셈은 같다. */
+const AMOUNT_TYPED_MAX = 10_000_000_000;
+/** 금액에 가장 가까운 눈금의 자리. 직접 적은 금액(눈금 사이·눈금 밖)도 손잡이를 그 근처에 둔다. */
+function amountTick(amount: number): number {
+  let best = 0;
+  for (let i = 1; i < AMOUNT_TICKS.length; i++) if (Math.abs(AMOUNT_TICKS[i] - amount) < Math.abs(AMOUNT_TICKS[best] - amount)) best = i;
+  return best;
+}
 const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 /* ── 표기 ─────────────────────────────────────────────────────────── */
@@ -1640,15 +1649,48 @@ function GoalBox({
   );
 }
 
+/** 만원 단위 숫자를 쉼표로. 적는 칸이 이 꼴로 보인다(1억 → 10,000). */
+const manFmt = (v: number) => Math.round(v / 1e4).toLocaleString("ko-KR");
+
 function AmountControl({ amount, onChange }: { amount: number; onChange: (v: number) => void }) {
+  // 적는 칸은 만원 단위. 치는 동안의 문자열을 따로 들어야 "1,00" 같은 중간 상태에서 값이 튀지 않고,
+  // 칸을 떠나면 다시 금액에서 그린다. 치는 대로 바로 반영해서 아래 바스켓 주수가 같이 움직인다.
+  const [typed, setTyped] = useState<string | null>(null);
+  const shown = typed ?? manFmt(amount);
+  const tick = amountTick(amount);
+  const onType = (raw: string) => {
+    const digits = raw.replace(/[^\d]/g, "").replace(/^0+(?=\d)/, "").slice(0, 7);
+    const n = Math.min(AMOUNT_TYPED_MAX, Number(digits) * 1e4);
+    // 상한을 넘겨 치면 칸에도 바로 상한을 보인다 — 칸은 200,000,000 인데 옆 억 표기는 100억이면 어느 쪽이 맞는지 모른다.
+    setTyped(digits ? manFmt(n) : "");
+    if (n >= 1e4) onChange(n);
+  };
   return (
     <div className="hz-sheet dv-amount">
       <div className="dv-amount-head">
-        <span className="dv-amount-label">투자금</span>
-        <span className="dv-amount-val">{wonShort(amount)}</span>
+        <label className="dv-amount-label" htmlFor="dv-amount-input">투자금</label>
+        <span className="dv-amount-val">
+          <input
+            id="dv-amount-input"
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            className="dv-amount-input"
+            value={shown}
+            onChange={(e) => onType(e.target.value)}
+            onFocus={(e) => e.target.select()}
+            onBlur={() => setTyped(null)}
+            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+            aria-label="바스켓 투자금(만원)"
+            style={{ width: `${Math.max(3, shown.length + 1)}ch` }}
+          />
+          <span className="dv-amount-unit">만원</span>
+          {/* 1억부터는 만원 숫자만으로 자릿수를 세야 해서 억 단위로 한 번 더 적는다(50,000만원 → 5억원). */}
+          {amount >= 1e8 && <span className="dv-amount-echo">{wonShort(amount)}</span>}
+        </span>
         <span className="dv-amount-quick">
           {AMOUNT_QUICK.map((v) => (
-            <button key={v} type="button" className={`dv-quick${amount === v ? " dv-quick-on" : ""}`} onClick={() => onChange(v)} aria-pressed={amount === v}>
+            <button key={v} type="button" className={`dv-quick${amount === v ? " dv-quick-on" : ""}`} onClick={() => { setTyped(null); onChange(v); }} aria-pressed={amount === v}>
               {wonShort(v)}
             </button>
           ))}
@@ -1656,16 +1698,16 @@ function AmountControl({ amount, onChange }: { amount: number; onChange: (v: num
       </div>
       <input
         type="range"
-        min={AMOUNT_MIN}
-        max={AMOUNT_MAX}
-        step={AMOUNT_STEP}
-        value={amount}
-        onChange={(e) => onChange(Number(e.target.value))}
+        min={0}
+        max={AMOUNT_TICKS.length - 1}
+        step={1}
+        value={tick}
+        onChange={(e) => { setTyped(null); onChange(AMOUNT_TICKS[Number(e.target.value)]); }}
         aria-label="바스켓 투자금"
         aria-valuetext={wonShort(amount)}
         className="dv-range"
         // 채운 만큼을 트랙 색으로 — 브라우저 기본 슬라이더는 옛 모양이라(2026-09-15 지적) 트랙·손잡이를 직접 그린다.
-        style={{ "--p": `${((amount - AMOUNT_MIN) / (AMOUNT_MAX - AMOUNT_MIN)) * 100}%` } as React.CSSProperties}
+        style={{ "--p": `${(tick / (AMOUNT_TICKS.length - 1)) * 100}%` } as React.CSSProperties}
       />
       <p className="dv-amount-note">이 돈을 열 종목에 같은 금액씩 나눠 담으면 종목마다 몇 주가 되는지로 계산합니다. 한 주가 몫보다 비싸면 1주로 잡아 투자금이 조금 넘을 수 있습니다.</p>
     </div>
