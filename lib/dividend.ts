@@ -250,8 +250,8 @@ function toUsStock(r: UsRow): DividendStock {
 }
 
 /* ── ETF (etf_dividend, 마이그레이션 074·076) ─────────────────────────────
-   미국은 stockanalysis, 국내는 미래에셋 TIGER 분배 내역 — 둘 다 지난 1년 지급 건이라 달력에 든다
-   (data-pipeline/scripts/fetch_etf_dividends.py). `as_of` 는 그 내역을 받은 날. 화면이 그 날짜를 적는다. */
+   미국은 stockanalysis, 국내는 예탁결제원 SEIBro 분배금지급현황(전 운용사, 2026-09-16까지는 미래에셋 TIGER 사이트만) —
+   둘 다 지난 1년 지급 건이라 달력에 든다(data-pipeline/scripts/fetch_etf_dividends.py). `as_of` 는 그 내역을 받은 날. 화면이 그 날짜를 적는다. */
 type EtfRow = {
   code: string;
   market: string;
@@ -261,7 +261,7 @@ type EtfRow = {
   cadence: string | null;
   ttm_dps: number;
   estimated: boolean;
-  /** 지난 1년에 지급된 건. 국내(TIGER 분배 내역)는 record 가 있고 미국(stockanalysis)은 없다. */
+  /** 지난 1년에 지급된 건. 국내(SEIBro)는 record 가 있고 미국(stockanalysis)은 없다. */
   payments: { record?: string; pay: string; amount: number }[];
   pay_months: number[];
   as_of: string;
@@ -270,12 +270,12 @@ type EtfRow = {
   ttm_yield_pct: number | null;
   usdkrw: number | null;
   usdkrw_date: string | null;
-  /** 선언됐지만 아직 안 지급된 다음 건(마이그레이션 076). 미국 ETF 만 온다. */
+  /** 선언됐지만 아직 안 지급된 다음 건(마이그레이션 076). 미국은 선언 뒤, 국내는 기준일이 지난 뒤(SEIBro 가 기준일에 싣는다). */
   next_pay_date: string | null;
   next_pay_amount: number | null;
 };
 
-function toEtfStock(r: EtfRow): DividendStock {
+export function toEtfStock(r: EtfRow): DividendStock {
   const us = r.market === "US";
   return {
     code: r.code,
@@ -311,14 +311,11 @@ function toEtfStock(r: EtfRow): DividendStock {
 }
 
 async function loadEtf(): Promise<DividendStock[]> {
-  try {
-    const { data, error } = await getSupabaseServer().from("etf_dividend").select("*").order("code").limit(1000);
-    if (error) throw error;
-    return ((data ?? []) as unknown as EtfRow[]).map(toEtfStock);
-  } catch (e) {
-    console.error("[dividend] etf_dividend 조회 실패", e);
-    return [];
-  }
+  // 국내 953 + 미국 33(2026-09-16)이라 한 번에 물으면 1,000행 캡에 걸린다 — 쪽으로 받는다.
+  const rows = await fetchAllRows<EtfRow>("code", () => getSupabaseServer().from("etf_dividend").select("*"), {
+    onError: (e) => console.error("[dividend] etf_dividend 조회 실패", e),
+  });
+  return rows.map(toEtfStock);
 }
 
 export type UsdKrw = { rate: number; date: string | null };
@@ -500,6 +497,18 @@ function capBySector(list: DividendStock[], perSector: number): DividendStock[] 
   });
 }
 const SECTOR_CAP = 3;
+/** 국내 ETF 를 운용사(이름 첫 낱말 — TIGER·KODEX·RISE…)마다 몇까지만. 2026-09-16 에 국내 ETF 가 TIGER 210 → 전 운용사 953 이
+    되면서, 수익률 순으로 세우면 같은 지수의 운용사별 사본(미국배당다우존스 ×5)이 줄을 채운다. 규칙은 카드 알약에 적는다. */
+function capByBrand(list: DividendStock[], perBrand: number): DividendStock[] {
+  const seen = new Map<string, number>();
+  return list.filter((s) => {
+    const k = s.name.split(" ")[0];
+    const c = seen.get(k) ?? 0;
+    if (c >= perBrand) return false;
+    seen.set(k, c + 1);
+    return true;
+  });
+}
 
 /** 미국 ETF 의 손순서 — 커버드콜·달마다 받기 바스켓이 쓴다(page.tsx 의 목록과 같은 이름들). */
 const US_ETF_COVERED = ["JEPI", "JEPQ", "QYLD", "XYLD", "RYLD", "DIVO"];
@@ -517,6 +526,8 @@ const US_REITS = ["O", "VICI", "STAG", "ADC", "WPC", "SPG", "EPR", "OHI", "AMT",
 const MAX_YIELD_ETF = 30;
 /** IRP 안전자산(채권형·채권혼합형 ETF)을 이름으로 가르는 규칙. 화면(DividendCalculator)의 isSafeAsset 과 같은 식. */
 export const SAFE_ETF = /채권|국채|회사채|단기|머니마켓|CD|KOFR|금리|혼합/;
+/** 이름의 '혼합50' 처럼 주식이 절반이면 안전자산이 아니다 — IRP 안전자산은 주식 40% 이하 채권혼합까지. DividendCalculator 의 isSafeAsset 과 같은 식. */
+export const NOT_SAFE_ETF = /혼합[5-9]\d|커버드콜|밸런스/;
 /** IRP 바스켓 열 종목 중 안전자산 수 — 같은 금액씩이라 셋이 곧 30%. */
 const IRP_SAFE_COUNT = 3;
 
@@ -621,8 +632,9 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
     usPayersAll.filter((s) => (s.growthYears ?? 0) >= 10).sort((a, b) => (b.growthYears ?? 0) - (a.growthYears ?? 0)),
     usEtfs(US_ETF_MONTHLY),
   );
-  // 커버드콜 — 미국 손순서와 TIGER 커버드콜(수익률 순)을 번갈아. 30% 초과(일드맥스류)는 뺀다.
-  const covered = zip(usEtfs(US_ETF_COVERED).filter((s) => yieldOf(s) <= MAX_YIELD_ETF), krEtfs(/커버드콜/)).slice(0, SIZE);
+  // 커버드콜 — 미국 손순서와 국내 커버드콜(수익률 순)을 번갈아. 30% 초과(일드맥스류)는 뺀다.
+  // 국내는 운용사당 하나 — 같은 회사의 팔란티어 커버드콜 두 종이 나란히 서지 않게(전 운용사가 되면서, 2026-09-16).
+  const covered = zip(usEtfs(US_ETF_COVERED).filter((s) => yieldOf(s) <= MAX_YIELD_ETF), capByBrand(krEtfs(/커버드콜/), 1)).slice(0, SIZE);
   // 리츠·인프라 — 국내는 큰 것부터(청산·특별분배로 30% 를 넘는 건 뺌), 미국은 손목록을 수익률 순으로. 번갈아.
   const usByCode = new Map(us.map((s) => [s.code, s]));
   const reit = zip(
@@ -673,21 +685,25 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
   const krEtfIncome = etfs.filter((s) => s.currency === "KRW" && s.dps > 0 && s.close != null && yieldOf(s) >= 2 && yieldOf(s) <= 15).sort(byYield);
   const isa = [
     ...capBySector(common.filter((s) => s.streak >= 3 && yieldOf(s) >= 3 && (s.marketCap ?? 0) >= 1e12 && sustainable(s)).sort(byCap), 2).slice(0, 6),
-    ...krEtfIncome.filter((s) => !OVERSEAS.test(s.name)).slice(0, 4),
+    ...capByBrand(krEtfIncome.filter((s) => !OVERSEAS.test(s.name)), 2).slice(0, 4),
   ];
   // 연금 계좌는 배당 지수·리츠(수익률 순)와 커버드콜(수익률 순)을 번갈아 — 커버드콜만 열이면 은퇴 계좌가 옵션 상품으로 찬다.
   const overseasIncome = krEtfIncome.filter((s) => OVERSEAS.test(s.name) && /배당|커버드콜|리츠|인컴/.test(s.name));
-  const pension = zip(
-    overseasIncome.filter((s) => !/커버드콜/.test(s.name)),
-    overseasIncome.filter((s) => /커버드콜/.test(s.name)),
+  // 운용사당 둘 — 전 운용사가 되면서(2026-09-16) 미국배당다우존스·미국30년국채커버드콜의 운용사별 사본이 열을 채우지 않게.
+  const pension = capByBrand(
+    zip(
+      overseasIncome.filter((s) => !/커버드콜/.test(s.name)),
+      overseasIncome.filter((s) => /커버드콜/.test(s.name)),
+    ),
+    2,
   ).slice(0, SIZE);
   // IRP 는 위험자산이 70% 까지라 30% 는 안전자산(채권형·채권혼합형 ETF·예금)이어야 한다(2026-09 현재 DC·IRP 에 유효,
   // 연금저축엔 없다). 그래서 연금저축 목록 일곱 + 안전자산 셋. 안전자산은 이름의 채권·국채·회사채·단기·머니마켓·CD·KOFR·
   // 금리·혼합으로 가르고, 국채 커버드콜·밸런스류는 채권형이긴 해도 옵션 상품이라 은퇴 계좌의 '안전' 몫에서는 뺀다.
-  const irpSafe = etfs
-    .filter((s) => s.currency === "KRW" && s.dps > 0 && s.close != null && SAFE_ETF.test(s.name) && !/커버드콜|밸런스/.test(s.name) && yieldOf(s) <= 15)
-    .sort(byYield)
-    .slice(0, IRP_SAFE_COUNT);
+  const irpSafe = capByBrand(
+    etfs.filter((s) => s.currency === "KRW" && s.dps > 0 && s.close != null && SAFE_ETF.test(s.name) && !NOT_SAFE_ETF.test(s.name) && yieldOf(s) <= 15).sort(byYield),
+    1,
+  ).slice(0, IRP_SAFE_COUNT);
   const irp = [...pension.slice(0, SIZE - IRP_SAFE_COUNT), ...irpSafe];
 
   const codes = (list: DividendStock[]) => list.map((s) => s.code);
@@ -734,7 +750,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "covered",
       title: "커버드콜 현금흐름",
       desc: "옵션 프리미엄으로 달마다 높은 분배금을 주는 ETF",
-      rules: ["미국·TIGER 하나씩", "분배율 30% 이하"],
+      rules: ["미국·국내 하나씩", "분배율 30% 이하", "운용사당 하나"],
       icon: "toll",
       codes: codes(covered),
       meta: "yield",
@@ -801,9 +817,9 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       title: "내 계좌 맞춤",
       desc: "ISA는 국내 기초, 연금저축·IRP는 해외 기초 ETF가 세금에 맞는다",
       // 고른 계좌의 규칙만 보인다(rulesPension·rulesIrp) — 셋을 다 적으면 넉 줄이 됐다.
-      rules: ["국내 회사 6 + 국내 ETF 4", "분배율 15% 이하"],
-      rulesPension: ["해외 기초 ETF 10", "배당·리츠·커버드콜 섞어"],
-      rulesIrp: ["해외 ETF 7 + 채권 3", "안전자산 30%"],
+      rules: ["국내 회사 6 + 국내 ETF 4", "분배율 15% 이하", "운용사당 둘"],
+      rulesPension: ["해외 기초 ETF 10", "배당·리츠·커버드콜 섞어", "운용사당 둘"],
+      rulesIrp: ["해외 ETF 7 + 채권 3", "안전자산 30%", "운용사당 둘"],
       icon: "account_balance_wallet",
       codes: codes(isa),
       altPension: codes(pension),

@@ -29,6 +29,12 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 국내 ETF 가 한 운용사에서 전부로 — 담을 수 있는 것이 느는 것이라 Minor.
+    version: "1.15.0",
+    date: "2026-09-16",
+    changes: ["배당으로 살기에 KODEX·RISE·ACE·PLUS·SOL·KIWOOM·HANARO 등 모든 운용사의 국내 ETF 950여 개가 담깁니다. 커버드콜 ETF 는 62개입니다."],
+  },
+  {
     // 있던 조작을 넓힌 것이라 Patch.
     version: "1.14.1",
     date: "2026-09-16",

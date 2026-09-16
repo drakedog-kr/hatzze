@@ -13,7 +13,7 @@
 | **서학개미 장부** (`/seohak`) | 개인이 미국 주식을 언제 사고팔고 지금 얼마가 됐는지 | 예탁결제원 · 미 재무부 TIC |
 | **국장 미리보기** (`/preview`) | 밤사이 미국이 크게 움직인 날 국내는 보통 얼마에 열렸나 | 핀허브 · 야후 · 하이퍼리퀴드 |
 | **데일리 노트** (`/daily`) | 하루의 시장 이야기를 매일 저녁 한 편으로 정리한 글 | 위 화면들의 그날 데이터 |
-| **배당으로 살기** (`/dividend`) | 배당주를 담고 주수를 적으면 1년에 얼마 받는지 계좌별 세후로, 달마다 얼마 들어오는지 | 예탁결제원 · KIND · SEC · stockanalysis · 미래에셋 TIGER |
+| **배당으로 살기** (`/dividend`) | 배당주를 담고 주수를 적으면 1년에 얼마 받는지 계좌별 세후로, 달마다 얼마 들어오는지 | 예탁결제원(SEIBro) · KIND · SEC · stockanalysis |
 | **텔레그램 채널** ([@hatzze69](https://t.me/hatzze69)) | 채널에서 오간 이야기를 관련 종목과 함께 매일 아침·저녁, 주말에 정리 | 텔레그램 공개 채널 |
 
 2026-08-06 베타 오픈 이후로 화면이 계속 붙는 중이라 로고 옆에 베타 배지를 답니다. 가장 최근에 연 것은 **배당으로 살기**(2026-09-16)이고, 텔레그램 채널 글은 2026-09-11부터 새 형식으로 나갑니다.
@@ -32,7 +32,7 @@ flowchart LR
     T1["fetch_telegram.py<br/>채널 메시지"] --> T2["종목·테마 집계<br/>국내 · 미국"]
     U1["fetch_us_*.py<br/>SEC · 하원 · 13F"] --> D
     S1["fetch_seohak_*.py<br/>예탁원 · TIC · KRX"] --> D
-    V1["fetch_*_dividend*.py<br/>예탁원 · KIND · SEC · TIGER"] --> D
+    V1["fetch_*_dividend*.py<br/>예탁원 · KIND · SEC · stockanalysis"] --> D
     P1["fetch_kr_preview.py<br/>핀허브 · 야후"] --> D
     P2["fetch_kr_overnight.py<br/>하이퍼리퀴드 → 원화"] --> D
     B --> L["Claude Haiku<br/>요약 · 총평"]
@@ -201,6 +201,6 @@ python scripts/fetch_telegram.py           # 카더라 채널 메시지 수집
 
 ## 데이터 출처
 
-KRX Open API · 한국거래소 KIND · 한국은행 ECOS · 한국예탁결제원 · 미 재무부 TIC · SEC EDGAR · 미 하원 공시 · stockanalysis.com · 미래에셋 TIGER 분배 내역 · 유럽중앙은행 ECB(환율) · NAVER API HUB · YouTube Data API · 알라딘 · GitHub Search API · Apple App Store · DCInside · Upbit · Yahoo Finance · Finnhub · Hyperliquid · Telegram(공개 채널)
+KRX Open API · 한국거래소 KIND · 한국은행 ECOS · 한국예탁결제원 · 미 재무부 TIC · SEC EDGAR · 미 하원 공시 · stockanalysis.com · 유럽중앙은행 ECB(환율) · NAVER API HUB · YouTube Data API · 알라딘 · GitHub Search API · Apple App Store · DCInside · Upbit · Yahoo Finance · Finnhub · Hyperliquid · Telegram(공개 채널)
 
 국내 시장 데이터는 KRX에서 받되, **KRX가 종가를 다음 날 08:00에 올리는 탓에** 지수 종가와 당일 종가는 야후에서 받습니다.
