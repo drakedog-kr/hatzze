@@ -1154,6 +1154,25 @@ function HoldingRow({
           <span className="dv-tname-main">
             {s.name}
             <Badges s={s} />
+            {/* 줄의 계좌 — 시장 배지 옆 알약. 기본 계좌를 따르면 흐리게, 따로 골랐으면 진하게. 못 담는 계좌는 목록에서 흐리고 까닭을 적는다.
+                주수 칸에 두었더니 스테퍼·평단과 겹쳐 복잡해 보였다(2026-09-16 지적). */}
+            {mode !== "gross" && (
+              <select
+                className={`dv-tacct${line.ownAccount ? " dv-tacct-own" : ""}`}
+                value={line.ownAccount ? line.account : ""}
+                onChange={(e) => onAccount(s.code, e.target.value ? (e.target.value as Account) : null)}
+                aria-label={`${s.name} 계좌`}
+                title={line.ownAccount ? "이 줄만 이 계좌로 셉니다" : "기본 계좌를 따릅니다"}
+              >
+                <option value="">기본 계좌</option>
+                {ACCOUNTS.map((a) => (
+                  <option key={a.key} value={a.key} disabled={!fitsAccount(s, a.key)}>
+                    {a.label}
+                    {!fitsAccount(s, a.key) ? " (못 담음)" : ""}
+                  </option>
+                ))}
+              </select>
+            )}
           </span>
           {facts.length > 0 && (
             <span className="dv-tfacts">
@@ -1220,24 +1239,6 @@ function HoldingRow({
           <button type="button" className="dv-tcost-open" onClick={() => setCostOpen(true)}>
             평단 넣기
           </button>
-        )}
-        {/* 줄의 계좌 — 기본 계좌를 따르면 흐리게, 따로 골랐으면 진하게. 못 담는 계좌는 목록에서 흐리고 까닭을 적는다. */}
-        {mode !== "gross" && (
-          <select
-            className={`dv-tacct${line.ownAccount ? " dv-tacct-own" : ""}`}
-            value={line.ownAccount ? line.account : ""}
-            onChange={(e) => onAccount(s.code, e.target.value ? (e.target.value as Account) : null)}
-            aria-label={`${s.name} 계좌`}
-            title={line.ownAccount ? "이 줄만 이 계좌로 셉니다" : "기본 계좌를 따릅니다"}
-          >
-            <option value="">기본 계좌</option>
-            {ACCOUNTS.map((a) => (
-              <option key={a.key} value={a.key} disabled={!fitsAccount(s, a.key)}>
-                {a.label}
-                {!fitsAccount(s, a.key) ? " (못 담음)" : ""}
-              </option>
-            ))}
-          </select>
         )}
       </span>
       <span className="dv-tcell dv-tnum" role="cell">{s.dps > 0 ? money(s.dps, s) : "없음"}</span>
