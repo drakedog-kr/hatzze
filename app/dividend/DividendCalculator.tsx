@@ -1149,7 +1149,7 @@ function HoldingsTable({
         <span role="columnheader">1주당 1년 배당</span>
         <span role="columnheader">1년에 받는 배당</span>
         <span role="columnheader">배당수익률</span>
-        <span role="columnheader">비중</span>
+        <span role="columnheader">비중 · 투자금</span>
         <span role="columnheader" aria-label="빼기" />
       </div>
       {lines.map((l) => (
@@ -1226,6 +1226,8 @@ function HoldingRow({
   if (s.dps > 0 && !s.pays.length) warns.push("지급일 기록이 없어 아래 달력에는 빠집니다");
 
   const step = (d: number) => onShares(line.id, Math.max(0, shares + d));
+  // 이 줄의 투자금(원). 종가도 평단도 없거나 0주면 안 적는다.
+  const invest = line.investKrw != null && line.investKrw > 0 ? won(line.investKrw) : null;
   return (
     <div className="dv-trow" role="row">
       <span className="dv-tcell dv-tname" role="cell">
@@ -1332,12 +1334,16 @@ function HoldingRow({
       <span className="dv-tcell dv-tnum dv-tstrong" role="cell">
         {won(line.netKrw)}
         {s.currency === "USD" && s.dps > 0 && <span className="dv-tsub">{usd(line.net)}</span>}
+        {/* 1,100px 아래에선 비중 칸이 접히므로 투자금을 여기 아래에. 넓은 화면에선 CSS 가 숨긴다. */}
+        {invest && <span className="dv-tsub dv-tinvest-m">투자금 {invest}</span>}
       </span>
       <span className="dv-tcell dv-tnum" role="cell">
         {line.yieldPct != null ? pct(line.yieldPct) : "·"}
         {line.onCost && <span className="dv-tsub">내 평단 기준</span>}
       </span>
-      {/* 비중 — 투자금 가운데 이 줄이 몇 %인지. 숫자 옆에 얇은 막대로 한 번 더. */}
+      {/* 비중 — 투자금 가운데 이 줄이 몇 %인지. 숫자 옆에 얇은 막대로 한 번 더. 그 아래 이 줄의 투자금(주수 × 평단, 없으면 종가) —
+          "내가 이 종목에 얼마 넣었지"를 히어로까지 올라가 보지 않게(2026-09-17 피드백). 주수 칸에 두었더니 주수·평단·투자금 셋이
+          한 칸에 몰려 복잡해 보였다(같은 날 지적). */}
       <span className="dv-tcell dv-tnum dv-tweight" role="cell">
         {weightPct != null ? (
           <>
@@ -1349,6 +1355,7 @@ function HoldingRow({
         ) : (
           "·"
         )}
+        {invest && <span className="dv-tsub dv-tinvest">{invest}</span>}
       </span>
       <span className="dv-tcell" role="cell">
         <button type="button" className="dv-remove" aria-label={`${s.name} 빼기`} onClick={() => onRemove(line.id)}>
