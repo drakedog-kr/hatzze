@@ -90,6 +90,7 @@ from generate_telegram_narratives import (  # noqa: E402
     kst_date,
     optimism,
     percent_count,
+    schedule_digest,
     schedule_excerpt,
     schedule_hit,
     schedule_like,
@@ -708,7 +709,9 @@ def main() -> None:
                 slots.append(("schedule", BRIEF_SCHEDULE_SYSTEM, BRIEF_SCHEDULE_LEN))
             paragraphs = []
             for key, system, length in slots:
-                text = ask_brief_sentence(system, brief_digest, length, BRIEF_SENTENCE_CAP[key], key)
+                # 넷째 대목은 일정 블록만 본다(국장 schedule_digest 주석 — 미장도 같은 날 같은 꼴이었다).
+                digest_for = schedule_digest(brief_digest) if key == "schedule" else brief_digest
+                text = ask_brief_sentence(system, digest_for, length, BRIEF_SENTENCE_CAP[key], key)
                 if key == "tone" and percent_count(text) != 1:
                     # 국장과 같은 검사(generate_telegram_narratives.percent_count 주석) — 이쪽에서
                     # 먼저 났다(09-15 "금요일 66%에서 토요일 73%까지 … 69% … 63%", 그다음엔 0개).
@@ -727,7 +730,7 @@ def main() -> None:
                     text = ask_brief_sentence(
                         system + "\n\n[다시 쓰기] 방금 쓴 문장은 일정이 아니라 분위기 요약이었습니다. "
                         "[오간 앞으로의 일정] 발췌에 적힌 **날짜·예정된 일**만으로 다시 쓰세요.",
-                        brief_digest, length, BRIEF_SENTENCE_CAP[key], key,
+                        digest_for, length, BRIEF_SENTENCE_CAP[key], key,
                     )
                     if not schedule_like(text):
                         print("[WARNING] 넷째 대목이 여전히 일정이 아니라 뺍니다.")

@@ -739,6 +739,24 @@ def count_mentions(text: str) -> int:
     return max((len(re.findall(r"\d[\d,]*\s*(?:회|건)", s)) for s in sentences), default=0)
 
 
+def schedule_digest(brief_digest: str) -> str:
+    """넷째 대목에 넘길 재료 — digest 에서 [오간 앞으로의 일정] 블록만.
+
+    넷째 대목 지시문은 이 블록만 근거로 삼으라고 돼 있는데, digest 전체를 넘기니 일정
+    발췌가 약한 날엔 모델이 셋째 대목 재료([오간 이야기])에서 가장 센 이야기를 집어 길이를
+    채웠다 — 2026-09-16 아침 국장·미장 총평 둘 다 넷째 대목이 셋째 대목의 애플·삼성 메모리
+    단가 소식을 한 번 더 말하고 일정을 붙였다. 그날 일정 발췌 8건에 그 글은 없었다.
+    못 보는 재료는 못 베낀다 — 프롬프트에 "되풀이하지 마세요"를 더 적는 것보다 확실하다.
+
+    블록은 digest 의 맨 끝에 온다(build_brief_digest 가 마지막에 붙인다). 머리글이 없으면
+    빈 문자열이고, 호출부는 애초에 블록이 있을 때만 넷째 대목을 부른다.
+    """
+    at = brief_digest.find(f" {SCHEDULE_BLOCK_HEAD}]")
+    if at < 0:
+        return ""
+    return brief_digest[brief_digest.rfind("\n", 0, at) + 1 :]
+
+
 def schedule_like(text: str) -> bool:
     """넷째 대목이 일정 이야기를 담고 있나. 표지 하나면 통과 — 걸러야 할 건 아예 없는 경우다."""
     return bool(_SCHED_MARK.search(text or ""))
@@ -1865,7 +1883,9 @@ def main() -> None:
                 slots.append(("schedule", BRIEF_SCHEDULE_SYSTEM, BRIEF_SCHEDULE_LEN))
             paragraphs = []
             for key, system, length in slots:
-                text = ask_brief_sentence(system, brief_digest, length, BRIEF_SENTENCE_CAP[key], key)
+                # 넷째 대목은 일정 블록만 본다(schedule_digest 주석). 재시도도 같은 재료로.
+                digest_for = schedule_digest(brief_digest) if key == "schedule" else brief_digest
+                text = ask_brief_sentence(system, digest_for, length, BRIEF_SENTENCE_CAP[key], key)
                 if key == "tone" and percent_count(text) != 1:
                     # 약속은 '[전체] 낙관도 하나'. 추이 숫자를 읊거나(여럿), 그 하나마저 빼먹는다(0).
                     # 한 번 더 시키고, 그래도 그러면 그대로 둔다 — 첫째 대목이 없는 편이 더 나쁘다.
@@ -1900,7 +1920,7 @@ def main() -> None:
                     text = ask_brief_sentence(
                         system + "\n\n[다시 쓰기] 방금 쓴 문장은 일정이 아니라 분위기 요약이었습니다. "
                         "[오간 앞으로의 일정] 발췌에 적힌 **날짜·예정된 일**만으로 다시 쓰세요.",
-                        brief_digest, length, BRIEF_SENTENCE_CAP[key], key,
+                        digest_for, length, BRIEF_SENTENCE_CAP[key], key,
                     )
                     if not schedule_like(text):
                         print("[WARNING] 넷째 대목이 여전히 일정이 아니라 뺍니다.")
