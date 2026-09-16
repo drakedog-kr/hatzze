@@ -1676,7 +1676,7 @@ function BasketSheet({
           <div className="dv-basket-foot">
             {/* 규칙은 알약 서너 개 — 문장으로 적으니 세 줄이 됐다(2026-09-13 지적). 열 개씩이라는 건 목록이 말한다. */}
             <div className="dv-basket-rules">
-              {basket.rules.map((r) => (
+              {(mode === "irp" && basket.rulesIrp ? basket.rulesIrp : mode === "pension" && basket.rulesPension ? basket.rulesPension : basket.rules).map((r) => (
                 <span key={r} className="dv-tfact">
                   {r}
                 </span>

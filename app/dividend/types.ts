@@ -64,6 +64,9 @@ export type BasketLite = {
   altPension?: string[];
   /** '내 계좌 맞춤'만 — IRP 를 골랐을 때의 목록(안전자산 30% 포함). */
   altIrp?: string[];
+  /** '내 계좌 맞춤'만 — 연금저축·IRP 를 골랐을 때 rules 대신 보이는 알약. */
+  rulesPension?: string[];
+  rulesIrp?: string[];
   /** 바스켓 밑에 붙는 주의 한 줄. */
   caution?: string;
 };

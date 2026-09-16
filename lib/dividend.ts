@@ -93,6 +93,9 @@ export type Basket = {
   altPension?: string[];
   /** '내 계좌 맞춤'만 — IRP 를 골랐을 때의 목록. 연금저축 목록 일곱 + 안전자산(채권·채권혼합 ETF) 셋 = 30%. */
   altIrp?: string[];
+  /** '내 계좌 맞춤'만 — 연금저축·IRP 를 골랐을 때 rules 대신 보이는 알약. */
+  rulesPension?: string[];
+  rulesIrp?: string[];
   /** 바스켓 밑에 붙는 주의 한 줄(커버드콜·리츠·우선주). */
   caution?: string;
 };
@@ -694,7 +697,8 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "steady",
       title: "꾸준함 우선",
       desc: "오래, 안 줄이고 준 국내·미국 회사",
-      rules: ["5년 연속 배당", "안 줄임", "배당성향 80% 이하", "국내(큰 순)·미국(오래 늘린 순) 번갈아"],
+      // 알약은 카드 한 줄(270px)에 셋까지 — 넷이면 두 줄이 되어 복잡해 보인다(2026-09-16 지적). 중요한 순으로 셋.
+      rules: ["5년 연속 배당", "안 줄임", "성향 80% 이하"],
       icon: "verified",
       codes: codes(steady),
       meta: "streak",
@@ -703,7 +707,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "yield",
       title: "지금 배당수익률 우선",
       desc: "지금 가격에 배당이 가장 큰 회사",
-      rules: ["3년 연속 배당", "배당성향 80% 이하", "배당수익률 높은 순", "국내·미국(4%+) 번갈아"],
+      rules: ["3년 연속 배당", "성향 80% 이하", "수익률 순"],
       icon: "trending_up",
       codes: codes(high),
       meta: "yield",
@@ -712,7 +716,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "growth",
       title: "성장 우선",
       desc: "배당을 해마다 늘려 온 회사",
-      rules: ["5년 연속 배당", "5년 연 +10% 이상", "줄인 해 1번까지", "국내·미국 번갈아"],
+      rules: ["5년 연속 배당", "5년 연 +10%", "줄임 1번까지"],
       icon: "stairs",
       codes: codes(growth),
       meta: "growth",
@@ -721,7 +725,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "monthly",
       title: "달마다 받기",
       desc: "지급 달이 다른 종목을 엮어 열두 달을 채운 조합",
-      rules: ["국내 분기·반기 배당 먼저", "빈 달은 미국 분기 배당", "그래도 빈 달은 월배당", "시총 1조+"],
+      rules: ["국내 분기·반기 먼저", "빈 달은 미국 분기", "시총 1조+"],
       icon: "calendar_month",
       codes: codes(monthly),
       meta: "months",
@@ -730,7 +734,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "covered",
       title: "커버드콜 현금흐름",
       desc: "옵션 프리미엄으로 달마다 높은 분배금을 주는 ETF",
-      rules: ["미국·TIGER 커버드콜 번갈아", "분배율 30% 이하"],
+      rules: ["미국·TIGER 번갈아", "분배율 30% 이하"],
       icon: "toll",
       codes: codes(covered),
       meta: "yield",
@@ -740,7 +744,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "reit",
       title: "리츠·인프라",
       desc: "건물과 도로가 벌어 주는 임대·통행 수입",
-      rules: ["국내 리츠·인프라(큰 순)", "미국 리츠(수익률 순)", "번갈아"],
+      rules: ["국내 큰 순", "미국 수익률 순", "번갈아"],
       icon: "apartment",
       codes: codes(reit),
       meta: "yield",
@@ -750,7 +754,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "aristocrat",
       title: "배당귀족",
       desc: "25년 넘게 해마다 배당을 늘려 온 미국 회사",
-      rules: ["25년 넘게 해마다 늘림", "배당수익률 1.5~10%", "오래 늘린 순"],
+      rules: ["25년 넘게 늘림", "수익률 1.5~10%", "오래 늘린 순"],
       icon: "workspace_premium",
       codes: codes(aristocrat),
       meta: "growthYears",
@@ -759,7 +763,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "usgrowth",
       title: "미국 배당성장",
       desc: "10년 넘게 늘려 온 회사 가운데 빠르게 늘리는 곳",
-      rules: ["10년 넘게 해마다 늘림", "5년 연 +7% 이상", "배당성향 80% 이하", "증가율 순"],
+      rules: ["10년 넘게 늘림", "5년 연 +7%", "성향 80% 이하"],
       icon: "rocket_launch",
       codes: codes(usGrowth),
       meta: "growth",
@@ -768,7 +772,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "usmonthly",
       title: "미국 월배당",
       desc: "달마다 주는 미국 회사와 월분배 ETF",
-      rules: ["지급 달 11개 이상", "주식·ETF 번갈아", "분배율 10%(ETF 15%) 이하"],
+      rules: ["지급 달 11개+", "주식·ETF 번갈아", "분배율 15% 이하"],
       icon: "event_repeat",
       codes: codes(usMonthly),
       meta: "yield",
@@ -777,7 +781,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "septax",
       title: "분리과세",
       desc: "배당이 2,000만원을 넘어도 종합과세에 안 합치는 회사",
-      rules: haveHighDiv ? ["고배당기업 공시", "배당수익률 3%+", "시총 1조+", "업종당 3개", "수익률 순"] : ["고배당기업 목록이 아직 없습니다"],
+      rules: haveHighDiv ? ["고배당기업 공시", "수익률 3%+", "시총 1조+"] : ["고배당기업 목록이 아직 없습니다"],
       icon: "receipt_long",
       codes: codes(septax),
       meta: "septax",
@@ -786,7 +790,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "preferred",
       title: "우선주",
       desc: "같은 회사 보통주보다 배당수익률이 높은 우선주",
-      rules: ["우선주", "보통주보다 20%+ 아래", "보통주 3년 연속 배당", "시총 1,000억+", "배당수익률 순"],
+      rules: ["보통주보다 20%+ 아래", "시총 1,000억+", "수익률 순"],
       icon: "star",
       codes: codes(preferred),
       meta: "discount",
@@ -796,7 +800,10 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "account",
       title: "내 계좌 맞춤",
       desc: "ISA는 국내 기초, 연금저축·IRP는 해외 기초 ETF가 세금에 맞는다",
-      rules: ["ISA: 국내 큰 회사 6 + 국내 기초 ETF 4", "연금저축: 해외 기초 배당·리츠·커버드콜 번갈아 10", "IRP: 해외 기초 7 + 채권·채권혼합 3(안전자산 30%)", "분배율 15% 이하"],
+      // 고른 계좌의 규칙만 보인다(rulesPension·rulesIrp) — 셋을 다 적으면 넉 줄이 됐다.
+      rules: ["국내 회사 6 + 국내 ETF 4", "분배율 15% 이하"],
+      rulesPension: ["해외 기초 ETF 10", "배당·리츠·커버드콜 번갈아"],
+      rulesIrp: ["해외 ETF 7 + 채권 3", "안전자산 30%"],
       icon: "account_balance_wallet",
       codes: codes(isa),
       altPension: codes(pension),
