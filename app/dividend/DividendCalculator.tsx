@@ -220,13 +220,14 @@ const SCOPES: { key: Scope; label: string; desc: string }[] = [
 const scopeOf = (s: StockLite): Scope => (s.kind === "etf" ? "etf" : s.currency === "USD" ? "us" : "kr");
 
 /** 줄에 붙는 배지들. 국장·미장·ETF 가 한 표에 섞이므로 **모든 줄에** 어느 갈래인지 붙인다. */
-function Badges({ s }: { s: StockLite }) {
+function Badges({ s, sep = true }: { s: StockLite; sep?: boolean }) {
   const items =
     s.kind === "etf"
       ? ["ETF", s.currency === "USD" ? "미국" : "국내"]
       : [s.market === "KOSDAQ" ? "코스닥" : s.market === "US" ? "미국" : "코스피"];
   // 고배당기업(배당소득 분리과세 대상)으로 공시한 국내 회사. 뜻은 배지의 title 로.
-  if (s.highDiv) items.push("분리과세");
+  // sep=false 면 안 붙인다 — ISA·연금 계좌 줄엔 분리과세가 뜻이 없다(그 계좌 소득은 금융소득에 안 합친다).
+  if (s.highDiv && sep) items.push("분리과세");
   return (
     <>
       {items.map((b) => (
@@ -1153,13 +1154,14 @@ function HoldingRow({
         <span className="dv-tname-txt">
           <span className="dv-tname-main">
             {s.name}
-            <Badges s={s} />
+            <Badges s={s} sep={mode === "gross" || line.account === "general" || line.outside} />
             {/* 줄의 계좌 — 시장 배지 옆 알약. 기본 계좌를 따르면 흐리게, 따로 골랐으면 진하게. 못 담는 계좌는 목록에서 흐리고 까닭을 적는다.
                 주수 칸에 두었더니 스테퍼·평단과 겹쳐 복잡해 보였다(2026-09-16 지적). */}
             {mode !== "gross" && (
               <select
                 className={`dv-tacct${line.ownAccount ? " dv-tacct-own" : ""}`}
-                value={line.account}
+                // 못 담는 줄은 실제로 일반 계좌로 세니 태그도 그렇게 보인다(아래 주의 문구와 같은 말).
+                value={line.outside ? "general" : line.account}
                 onChange={(e) => onAccount(s.code, e.target.value as Account)}
                 aria-label={`${s.name} 계좌 유형`}
                 title={line.ownAccount ? "이 줄만 따로 고른 계좌 유형입니다" : "위에서 고른 계좌 유형을 따릅니다. 이 줄만 바꿀 수 있습니다"}
