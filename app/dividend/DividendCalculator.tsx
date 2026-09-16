@@ -160,6 +160,8 @@ const ACCOUNTS: { key: Account; label: string }[] = [
 /** 히어로 라벨에 붙는 꼬리. 세후·세전은 머리의 칸이 이미 말하므로 안 적고(2026-09-13 지적), 계좌가 일반이 아닐 때만 그 이름. */
 /** 이 위면 배당이 아니라 원금 반환이 섞인 ETF(일드맥스류). 바스켓의 MAX_YIELD_ETF(lib/dividend.ts)와 같은 30. 칩·줄 주의 둘 다 이 값. */
 const HOT_YIELD_PCT = 30;
+/** 오늘(KST, YYYY-MM-DD). 모듈이 읽힐 때 한 번 — 렌더 안에서 Date.now() 를 부르면 React 컴파일러 린트가 막는다(AppShell 의 NEWS_LIVE 와 같은 사정). */
+const TODAY_KST = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
 
 const accountTag = (mode: TaxMode) => (mode === "isa" || isPensionLike(mode) ? ` (${ACCOUNTS.find((m) => m.key === mode)?.label})` : "");
 /** 종목을 처음 담을 때의 주수. 0 이면 결과가 안 서고, 1 은 값이 너무 작아 감이 안 온다. */
@@ -1130,7 +1132,7 @@ function HoldingRow({
   }
   if (mode !== "gross" && line.account === "irp" && !line.outside && isSafeAsset(s)) facts.push({ text: "안전자산", title: "IRP 안전자산 30%에 드는 채권·채권혼합 ETF 입니다" });
   // 지난 날짜는 안 붙인다 — 표가 며칠 낡으면 '다음' 기준일·지급일이 어제일 수 있다(2026-09-16 전수 검사에서 셋).
-  const todayKst = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  const todayKst = TODAY_KST;
   if (s.nextRecord && s.nextRecord >= todayKst) facts.push({ text: `기준일 ${md(s.nextRecord)}`, title: `다음 배당기준일 ${s.nextRecord}` });
   if (s.nextPay && s.nextPay[0] >= todayKst) facts.push({ text: `${md(s.nextPay[0])} 지급 ${money(s.nextPay[1], s)}`, title: `다음 지급 ${s.nextPay[0]} · 1주에 ${money(s.nextPay[1], s)}` });
 
