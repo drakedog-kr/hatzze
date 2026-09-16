@@ -107,4 +107,6 @@ US_ETFS: list[dict] = [
     {"code": "YMAX", "name_ko": "YMAX", "name_en": "YieldMax Universe Fund of Option Income ETFs", "cadence": "주", "source": "https://www.yieldmaxetfs.com/our-etfs/ymax/"},
     {"code": "YMAG", "name_ko": "YMAG", "name_en": "YieldMax Magnificent 7 Fund of Option Income ETFs", "cadence": "주", "source": "https://www.yieldmaxetfs.com/our-etfs/ymag/"},
     {"code": "ULTY", "name_ko": "ULTY", "name_en": "YieldMax Ultra Option Income Strategy ETF", "cadence": "주", "source": "https://www.yieldmaxetfs.com/our-etfs/ulty/"},
+    # 2026-09-17 요청. 같이 온 GLDM(금)은 분배금이 없어(stockanalysis 기록 0) 배당 화면에 넣을 게 없다 — 지급이 없는 ETF 는 이 표에 안 선다.
+    {"code": "SPYM", "name_ko": "SPYM", "name_en": "SPDR Portfolio S&P 500 ETF", "cadence": "분기", "source": "https://www.ssga.com/us/en/intermediary/etfs/spdr-portfolio-sp-500-etf-spym"},
 ]

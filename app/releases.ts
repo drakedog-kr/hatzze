@@ -29,6 +29,12 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 목록에 종목이 느는 것이라 Patch.
+    version: "1.15.4",
+    date: "2026-09-17",
+    changes: ["미국 ETF 에 SPYM 이 더 담깁니다."],
+  },
+  {
     // 있던 줄에 숫자 하나가 붙는 것이라 Patch.
     version: "1.15.3",
     date: "2026-09-17",
