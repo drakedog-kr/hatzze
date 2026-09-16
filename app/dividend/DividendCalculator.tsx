@@ -1327,6 +1327,16 @@ function HoldingRow({
             평단 넣기
           </button>
         )}
+        {/* 이 줄의 투자금 — 주수 × 평단(없으면 종가). 히어로의 합을 보러 올라가지 않아도 "내가 이 종목에 얼마 넣었지"가
+            여기서 읽힌다(2026-09-17 피드백). 미국은 달러 값을 앞에, 원화는 환율로 옮긴 값. */}
+        {line.investKrw != null && line.investKrw > 0 && (
+          <span className="dv-tinvest">
+            투자금{" "}
+            {s.currency === "USD" && (line.cost ?? s.close) != null && <b>{usd((line.cost ?? (s.close as number)) * shares)}</b>}
+            {s.currency === "USD" && " · "}
+            <b>{won(line.investKrw)}</b>
+          </span>
+        )}
       </span>
       <span className="dv-tcell dv-tnum" role="cell">{s.dps > 0 ? money(s.dps, s) : "없음"}</span>
       <span className="dv-tcell dv-tnum dv-tstrong" role="cell">

@@ -5427,7 +5427,10 @@ main.hz-scroll { overflow-x: clip; }
 .dv-twarn { color: var(--c-label); }
 /* 주수 스테퍼 위, 평단 칸 아래 — 두 줄을 감싸는 격자. */
 .dv-tshares { display: grid; grid-template-columns: auto auto auto; justify-content: start; align-items: center; gap: 4px; }
-.dv-tcost, .dv-tcost-open { grid-column: 1 / -1; }
+.dv-tcost, .dv-tcost-open, .dv-tinvest { grid-column: 1 / -1; }
+/* 줄의 투자금(주수 × 평단·종가) — 평단 줄 아래 한 줄. 숫자만 진하게. */
+.dv-tinvest { font-size: 11px; color: var(--c-sub); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dv-tinvest b { font-weight: 700; color: var(--c-ink); }
 .dv-tcost { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--c-sub); white-space: nowrap; }
 .dv-tshares .dv-tcost input {
   width: 84px; height: 26px; padding: 0 6px; text-align: right; border-radius: 6px; border: 1px solid var(--c-line);

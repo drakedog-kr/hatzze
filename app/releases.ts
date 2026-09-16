@@ -29,6 +29,12 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 있던 줄에 숫자 하나가 붙는 것이라 Patch.
+    version: "1.15.3",
+    date: "2026-09-17",
+    changes: ["담은 종목 줄마다 주수 × 평단(없으면 종가)으로 센 투자금이 적힙니다."],
+  },
+  {
     // 목록에 종목이 느는 것이라 Patch.
     version: "1.15.2",
     date: "2026-09-16",
