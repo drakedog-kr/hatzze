@@ -214,7 +214,7 @@ export default async function DividendPage() {
   const more: MoreLists = {
     kr: { rows: moreKr, note: `코스피·코스닥에서 배당이 있는 ${n(krAll)}종목이 다 담깁니다.` },
     us: { rows: moreUs, note: `미국 배당주 ${n(us.length)}종목이 담깁니다.` },
-    etf: { rows: moreEtf, note: `ETF ${n(etfs.length)}개(미국 ${etfUs} · TIGER ${etfs.length - etfUs})가 담깁니다.` },
+    etf: { rows: moreEtf, note: `ETF ${n(etfs.length)}개(미국 ${etfUs} · 국내 ${n(etfs.length - etfUs)})가 담깁니다. 국내는 운용사를 가리지 않고 지난 1년 분배가 있는 전부입니다.` },
   };
 
   return (

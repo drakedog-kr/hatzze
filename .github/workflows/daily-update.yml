@@ -938,7 +938,7 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_us_dividends.py
 
-      # ETF 분배금 — 미국은 stockanalysis, 국내는 미래에셋 TIGER 분배 내역(열다섯 달치, 47회 요청). 시세·환율도 여기서.
+      # ETF 분배금 — 미국은 stockanalysis, 국내는 예탁결제원 SEIBro 분배금지급현황(전 운용사 · 열다섯 달치 · 150여 회 요청 · 2분 반). 시세·환율도 여기서.
       - name: Fetch ETF 분배금 (배당주)
         id: etf_dividends
         if: ${{ !cancelled() }}

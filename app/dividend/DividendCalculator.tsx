@@ -127,8 +127,10 @@ const TAX_RATE_PENSION = 0.055;
 const IRP_RISK_MAX = 0.7;
 /** IRP 안전자산을 이름으로 가르는 규칙 — lib/dividend.ts 의 SAFE_ETF 와 같은 식(서버 코드를 클라이언트로 끌어오지 않으려고 베낀다). */
 const SAFE_ETF = /채권|국채|회사채|단기|머니마켓|CD|KOFR|금리|혼합/;
+/** '혼합50' 처럼 주식이 절반이면 안전자산이 아니다(IRP 안전자산은 주식 40% 이하 채권혼합까지). 커버드콜·밸런스도 옵션 상품이라 뺀다. */
+const NOT_SAFE_ETF = /혼합[5-9]\d|커버드콜|밸런스/;
 /** IRP 의 안전자산 30% 에 드는 종목인가 — 국내 상장 채권형·채권혼합형 ETF. */
-const isSafeAsset = (s: StockLite) => s.kind === "etf" && s.currency === "KRW" && SAFE_ETF.test(s.name);
+const isSafeAsset = (s: StockLite) => s.kind === "etf" && s.currency === "KRW" && SAFE_ETF.test(s.name) && !NOT_SAFE_ETF.test(s.name);
 /** 연금 계좌 둘 — 담을 수 있는 것과 세율이 같다. */
 const isPensionLike = (mode: TaxMode) => mode === "pension" || mode === "irp";
 /** 금융소득 종합과세 문턱(원). 이자·배당 합이 이걸 넘으면 넘는 몫이 다른 소득과 합쳐 누진세율(6~45%)이다. */
@@ -376,7 +378,9 @@ const RULE_TIPS: Record<string, string> = {
   "국내 분기·반기 먼저": "지급 달이 2~5개인 국내 종목으로 먼저 열두 달을 채웁니다",
   "빈 달은 미국 분기": "남은 달은 미국 분기 배당주로, 그래도 비면 월분배 ETF 로 채웁니다",
   "시총 1조+": "시가총액 1조원 이상인 회사만 담았습니다",
-  "미국·TIGER 하나씩": "미국 커버드콜 ETF 와 TIGER 커버드콜 ETF 를 하나씩 번갈아 담았습니다",
+  "미국·국내 하나씩": "미국 커버드콜 ETF 와 국내 커버드콜 ETF 를 하나씩 번갈아 담았습니다",
+  "운용사당 하나": "같은 지수를 따르는 여러 운용사 상품이 줄을 채우지 않게 국내 ETF 는 운용사마다 하나만 담았습니다",
+  "운용사당 둘": "같은 지수를 따르는 여러 운용사 상품이 줄을 채우지 않게 국내 ETF 는 운용사마다 둘까지만 담았습니다",
   "분배율 30% 이하": "지난 1년 분배금이 가격의 30%를 넘는 ETF(원금 반환이 섞인 것)는 뺐습니다",
   "국내 큰 순": "국내 리츠·인프라 펀드를 시가총액 큰 순으로 세웠습니다",
   "미국 수익률 순": "미국 리츠를 배당수익률 높은 순으로 세웠습니다(10% 넘는 모기지 리츠는 뺌)",
@@ -948,7 +952,7 @@ function SearchBox({ stocks, onPick }: { stocks: StockLite[]; onPick: (code: str
               </div>
             ))
           ) : (
-            <p className="dv-search-none">찾는 것이 없습니다. 코스피·코스닥 주식 전부, 미국 주식 560종목, ETF 240여 개(미국 33 · TIGER 212)가 담깁니다.</p>
+            <p className="dv-search-none">찾는 것이 없습니다. 코스피·코스닥 주식 전부, 미국 주식 560종목, ETF 980여 개(미국 33 · 국내는 운용사 가리지 않고 지난 1년 분배가 있는 전부)가 담깁니다.</p>
           )}
         </div>
       )}
