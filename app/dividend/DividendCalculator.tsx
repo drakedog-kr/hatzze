@@ -29,7 +29,8 @@ import type { BasketLite, MoreLists, StockLite } from "./types";
  */
 
 /** cost 는 내 평단(1주 매수가, 그 종목의 돈 단위). 넣으면 투자금과 수익률이 종가 대신 이걸로 선다(YOC). */
-type Holding = { code: string; shares: number; cost?: number };
+/** account 가 없으면 위의 '기본 계좌'를 따른다. 있으면 그 줄만 그 계좌로 센다(2026-09-16: 종목마다 계좌가 다른 게 보통이라). */
+type Holding = { code: string; shares: number; cost?: number; account?: Account };
 
 /* ── 담은 종목 저장소 ─────────────────────────────────────────────────
    localStorage 는 React 바깥의 저장소라 useSyncExternalStore 로 읽는다(AppShell 의 PcHint ·
@@ -56,6 +57,7 @@ function readSaved(): Holding[] {
         code: h.code,
         shares: Math.max(0, Math.floor(h.shares)),
         ...(typeof h.cost === "number" && h.cost > 0 ? { cost: h.cost } : {}),
+        ...(isAccount((h as { account?: unknown }).account) ? { account: (h as { account: Account }).account } : {}),
       }));
     return out.length ? out : NO_HOLDINGS;
   } catch {
@@ -108,6 +110,7 @@ function writeHoldings(next: Holding[] | ((prev: Holding[]) => Holding[])) {
    30% 를 못 채우면 히어로 아래 한 줄로 적는다. 2026-09 기준 수치 — 바뀌면 여기와 아래 안내문을 같이 고칠 것. */
 type Account = "general" | "isa" | "pension" | "irp";
 type TaxMode = "gross" | Account;
+const isAccount = (v: unknown): v is Account => v === "general" || v === "isa" || v === "pension" || v === "irp";
 /** 국내 배당소득세 14% + 지방소득세 1.4%. 증권사가 지급 때 떼고 넣어 준다. */
 const TAX_RATE_KR = 0.154;
 /** 미국 배당은 미국이 15%를 떼고(한미 조세조약) 국내에서 더 떼지 않는다(금융소득 2천만원 아래). */
@@ -285,13 +288,18 @@ type Line = {
   cost: number | null;
   /** 고른 계좌에 못 담는 종목이라 일반 계좌 세율로 셌다(ISA 의 해외 주식, 연금저축·IRP 의 개별 주식). */
   outside: boolean;
+  /** 이 줄이 실제로 세는 계좌 — 줄에 따로 고른 것이 있으면 그것, 없으면 기본 계좌. 세전 모드에서도 표시용으로 든다. */
+  account: Account;
+  /** 기본 계좌와 다르게 줄에서 따로 고른 줄인가(태그를 진하게). */
+  ownAccount: boolean;
 };
 
 /**
  * 담은 종목 하나하나의 셈. 미국은 달러를 원으로 옮겨 국내와 한 줄에 더한다 — 환율은 FRED 의
  * 최근 값(1~2영업일 늦다). 세금은 종목마다 다르므로(국내 15.4%·미국 15%) 줄에서 뗀다.
  */
-function computeLines(holdings: Holding[], byCode: Map<string, StockLite>, fx: number, mode: TaxMode): Line[] {
+/** mode 는 세전이면 "gross", 아니면 기본 계좌. base 는 기본 계좌(세전이어도 줄의 계좌 표시에 쓴다). */
+function computeLines(holdings: Holding[], byCode: Map<string, StockLite>, fx: number, mode: TaxMode, base: Account): Line[] {
   const out: Line[] = [];
   for (const h of holdings) {
     const stock = byCode.get(h.code);
@@ -299,7 +307,9 @@ function computeLines(holdings: Holding[], byCode: Map<string, StockLite>, fx: n
     const rate = stock.currency === "USD" ? fx : 1;
     const gross = stock.dps * h.shares;
     const grossKrw = gross * rate;
-    const keep = 1 - taxRate(stock, mode);
+    const account: Account = h.account ?? base;
+    const lineMode: TaxMode = mode === "gross" ? "gross" : account;
+    const keep = 1 - taxRate(stock, lineMode);
     const basis = h.cost && h.cost > 0 ? h.cost : stock.close;
     out.push({
       stock,
@@ -312,7 +322,9 @@ function computeLines(holdings: Holding[], byCode: Map<string, StockLite>, fx: n
       yieldPct: basis && stock.dps > 0 ? (stock.dps / basis) * 100 : basis ? 0 : null,
       onCost: !!(h.cost && h.cost > 0),
       cost: h.cost && h.cost > 0 ? h.cost : null,
-      outside: mode !== "gross" && !fitsAccount(stock, mode),
+      outside: lineMode !== "gross" && !fitsAccount(stock, lineMode),
+      account,
+      ownAccount: h.account != null,
     });
   }
   return out;
@@ -473,27 +485,32 @@ export function DividendCalculator({
 
   // 환율이 없으면(미국 표가 비었을 때) 미국 종목 자체가 목록에 없다(lib/dividend.ts). 1 은 자리값.
   const fx = usdkrw?.rate ?? 1;
-  const lines = useMemo(() => computeLines(holdings, byCode, fx, taxMode), [holdings, byCode, fx, taxMode]);
+  const lines = useMemo(() => computeLines(holdings, byCode, fx, taxMode, account), [holdings, byCode, fx, taxMode, account]);
+  // 줄마다 계좌가 다를 수 있다 — 라벨 꼬리·툴팁·주의 문구는 줄의 계좌로 센다.
+  const mixed = afterTax && new Set(lines.map((l) => l.account)).size > 1;
+  const byAccount = (a: Account) => lines.filter((l) => l.account === a);
   const total = lines.reduce((s, l) => s + l.netKrw, 0);
   const invest = lines.reduce((s, l) => s + (l.investKrw ?? 0), 0);
   const priced = lines.filter((l) => l.investKrw != null);
   const yieldPct = invest > 0 ? (priced.reduce((s, l) => s + l.grossKrw, 0) / invest) * 100 : null;
-  // 금융소득 종합과세 문턱과 고배당기업(분리과세 대상) 배당의 몫. 세전 합이 문턱 근처인 사람에게만 뜻이 있어 그때만 적는다.
-  const sepGross = lines.filter((l) => l.stock.highDiv).reduce((s, l) => s + l.grossKrw, 0);
-  const grossAll = lines.reduce((s, l) => s + l.grossKrw, 0);
+  // 금융소득 종합과세 문턱과 고배당기업(분리과세 대상) 배당의 몫 — **일반 계좌 줄만** 합친다(ISA·연금 계좌 안 소득은 금융소득에
+  // 안 합친다). 못 담아 일반 세율로 센 줄(outside)도 실제론 일반 계좌라 넣는다. 세전 합이 문턱 근처인 사람에게만 뜻이 있어 그때만 적는다.
+  const generalLines = lines.filter((l) => l.account === "general" || l.outside);
+  const sepGross = generalLines.filter((l) => l.stock.highDiv).reduce((s, l) => s + l.grossKrw, 0);
+  const grossAll = generalLines.reduce((s, l) => s + l.grossKrw, 0);
   const outsideCount = lines.filter((l) => l.outside).length;
-  // IRP 위험자산 비율 — 계좌에 담긴 줄(outside 아님)의 투자금 가운데 안전자산이 아닌 몫. 30% 를 채우려면 안전자산이
+  // IRP 위험자산 비율 — IRP 로 세는 줄(outside 아님)의 투자금 가운데 안전자산이 아닌 몫. 30% 를 채우려면 안전자산이
   // x 더 있어야 한다: (safe + x) / (total + x) = 0.3 → x = (0.3·total − safe) / 0.7.
   const irpInfo = (() => {
-    if (taxMode !== "irp") return undefined;
-    const inAcct = lines.filter((l) => !l.outside && l.investKrw != null);
+    if (!afterTax) return undefined;
+    const inAcct = byAccount("irp").filter((l) => !l.outside && l.investKrw != null);
     const total = inAcct.reduce((s, l) => s + (l.investKrw ?? 0), 0);
     if (total <= 0) return undefined;
     const safe = inAcct.filter((l) => isSafeAsset(l.stock)).reduce((s, l) => s + (l.investKrw ?? 0), 0);
     const riskPct = ((total - safe) / total) * 100;
     return { riskPct, needKrw: Math.max(0, ((1 - IRP_RISK_MAX) * total - safe) / IRP_RISK_MAX) };
   })();
-  const heroNote = taxNote(taxMode, grossAll, sepGross, outsideCount, irpInfo);
+  const heroNote = taxNote(taxMode, grossAll, sepGross, outsideCount, irpInfo, mixed);
   // 달력에 못 드는 줄 — 지급 달을 모르는 것(미국 주식, 국내 ETF). 배당이 있는 줄만 센다.
   const noCalCount = lines.filter((l) => l.stock.dps > 0 && !l.stock.pays.length).length;
   // 달력은 지급 달을 아는 종목(국내)만. 미국은 공시에 지급일이 없다.
@@ -501,7 +518,7 @@ export function DividendCalculator({
     const m = new Array<number>(13).fill(0);
     for (const l of lines) {
       // 달러 지급 건(미국 ETF)은 환율을 곱해야 원화 달력에 든다 — 빠뜨렸더니 SCHD 3월이 22원으로 찍혔다.
-      const f = (1 - taxRate(l.stock, taxMode)) * (l.stock.currency === "USD" ? fx : 1);
+      const f = (1 - taxRate(l.stock, taxMode === "gross" ? "gross" : l.account)) * (l.stock.currency === "USD" ? fx : 1);
       for (const [month, amt] of l.stock.pays) m[month] += amt * l.shares * f;
     }
     return m;
@@ -517,7 +534,12 @@ export function DividendCalculator({
     setHoldings((prev) => prev.map((h) => (h.code === code ? { ...h, shares } : h)));
   // 평단. 0이나 빈 값이면 지운다(종가 기준으로 돌아간다).
   const setCost = (code: string, cost: number | null) =>
-    setHoldings((prev) => prev.map((h) => (h.code === code ? (cost && cost > 0 ? { ...h, cost } : { code: h.code, shares: h.shares }) : h)));
+    setHoldings((prev) => prev.map((h) => (h.code === code ? (cost && cost > 0 ? { ...h, cost } : { code: h.code, shares: h.shares, ...(h.account ? { account: h.account } : {}) }) : h)));
+  // 줄의 계좌. null 이면 기본 계좌를 따른다.
+  const setLineAccount = (code: string, acct: Account | null) => {
+    track("dividend_row_account", { stock_code: gaStockCode(code), account: acct ?? "base" });
+    setHoldings((prev) => prev.map((h) => (h.code === code ? (acct ? { ...h, account: acct } : { code: h.code, shares: h.shares, ...(h.cost ? { cost: h.cost } : {}) }) : h)));
+  };
   const remove = (code: string) => {
     track("dividend_remove", { stock_code: gaStockCode(code) });
     setHoldings((prev) => prev.filter((h) => h.code !== code));
@@ -574,7 +596,9 @@ export function DividendCalculator({
   // 출처 이름은 여기 안 적는다(같은 날 지적) — 사이트 바닥글의 '데이터 출처'가 그 자리다(app/Footer.tsx,
   // stockanalysis 는 약관이 출처 표기를 조건으로 발췌를 허용하므로 거기서 지우지 말 것).
   const helpText = [
-    TAX_HELP[taxMode],
+    mixed
+      ? `세금: 줄마다 고른 계좌로 — ${ACCOUNTS.map((a) => [a, byAccount(a.key).length] as const).filter(([, n]) => n > 0).map(([a, n]) => `${a.label} ${n}`).join(" · ")}`
+      : TAX_HELP[taxMode],
     [
       priceDate ? `시세: 국내 ${priceDate} 종가` : null,
       usdkrw && usPriceDate ? `미국 ${usPriceDate} · 환율 ${Math.round(usdkrw.rate).toLocaleString("ko-KR")}원` : null,
@@ -610,7 +634,7 @@ export function DividendCalculator({
           {lines.length ? (
             <>
               <p className="dv-hero-label">
-                1년에 받는 배당{accountTag(taxMode)}
+                1년에 받는 배당{mixed ? " (계좌별)" : accountTag(taxMode)}
                 <span className="hz-tip hz-tip-wide hz-tip-lines dv-help" data-tip={helpText} style={{ cursor: "help" }} aria-label="세금·시세·출처 설명">
                   <Icon name="help" style={{ fontSize: 14 }} />
                 </span>
@@ -638,7 +662,7 @@ export function DividendCalculator({
               </div>
               {afterTax && (
                 <div className="dv-account" role="group" aria-label="어느 계좌로 세나">
-                  <span className="dv-account-label">계좌</span>
+                  <span className="dv-account-label">기본 계좌</span>
                   {ACCOUNTS.map((o) => (
                     <button
                       key={o.key}
@@ -700,7 +724,7 @@ export function DividendCalculator({
             )}
           </div>
           {lines.length > 0 && (
-            <HoldingsTable lines={lines} inputs={inputs} totalInvest={invest} mode={taxMode} onClear={clearAll} onShares={setShares} onCost={setCost} onRemove={remove} />
+            <HoldingsTable lines={lines} inputs={inputs} totalInvest={invest} mode={taxMode} onClear={clearAll} onAccount={setLineAccount} onShares={setShares} onCost={setCost} onRemove={remove} />
           )}
           {lines.length > 0 && (
             <MonthCalendar
@@ -786,38 +810,44 @@ const TAX_HELP: Record<TaxMode, string> = {
  * ISA·연금저축·IRP 는 문턱과 무관하다(계좌 안 소득은 금융소득에 안 합친다) — 그 계좌에 못 담은 줄이 있을 때만 적는다.
  * IRP 는 담긴 것 가운데 위험자산이 70% 를 넘으면 안전자산이 얼마 더 있어야 하는지 한 줄 더 적는다.
  */
-function taxNote(mode: TaxMode, grossAll: number, sepGross: number, outsideCount: number, irp?: { riskPct: number; needKrw: number }): string | null {
-  if (mode === "isa" || isPensionLike(mode)) {
-    const parts: string[] = [];
-    if (outsideCount) {
-      parts.push(
-        mode === "isa"
+function taxNote(mode: TaxMode, grossAll: number, sepGross: number, outsideCount: number, irp?: { riskPct: number; needKrw: number }, mixed = false): string | null {
+  if (mode === "gross") return null;
+  const parts: string[] = [];
+  if (outsideCount) {
+    parts.push(
+      mixed
+        ? `${outsideCount}종목은 고른 계좌에 못 담는 종목이라 일반 계좌로 셌습니다.`
+        : mode === "isa"
           ? `${outsideCount}종목은 해외 주식이라 ISA에 못 담아 일반 계좌로 셌습니다.`
           : `${outsideCount}종목은 개별 주식이거나 해외 상장이라 ${mode === "irp" ? "IRP" : "연금저축"}에 못 담아 일반 계좌로 셌습니다(국내 ETF와 상장 리츠만 담깁니다).`,
-      );
-    }
-    if (mode === "irp" && irp && irp.riskPct > IRP_RISK_MAX * 100) {
-      parts.push(`IRP는 위험자산이 70%까지입니다. 지금 ${Math.round(irp.riskPct)}%라 채권·채권혼합 ETF 같은 안전자산이 ${wonShort(Math.ceil(irp.needKrw / 1e4) * 1e4)} 더 있어야 합니다.`);
-    }
-    return parts.length ? parts.join(" ") : null;
+    );
   }
-  if (grossAll < COMPOSITE_NOTE_FROM) return null;
+  if (irp && irp.riskPct > IRP_RISK_MAX * 100) {
+    parts.push(`IRP는 위험자산이 70%까지입니다. 지금 ${Math.round(irp.riskPct)}%라 채권·채권혼합 ETF 같은 안전자산이 ${wonShort(Math.ceil(irp.needKrw / 1e4) * 1e4)} 더 있어야 합니다.`);
+  }
+  if (mode !== "general" && !mixed) return parts.length ? parts.join(" ") : null;
+  // 여기부터는 일반 계좌 줄의 금융소득 문턱. 섞였으면 '일반 계좌 줄' 이라고 밝힌다.
+  const who = mixed ? "일반 계좌 줄 세전" : "세전";
+  if (grossAll < COMPOSITE_NOTE_FROM) return parts.length ? parts.join(" ") : null;
   if (grossAll < COMPOSITE_FROM) {
-    return `세전 ${won(grossAll)}입니다. 금융소득 종합과세 문턱 ${wonShort(COMPOSITE_FROM)}까지 ${won(COMPOSITE_FROM - grossAll)} 남았습니다(다른 이자·배당은 안 넣은 값).`;
+    parts.push(`${who} ${won(grossAll)}입니다. 금융소득 종합과세 문턱 ${wonShort(COMPOSITE_FROM)}까지 ${won(COMPOSITE_FROM - grossAll)} 남았습니다(다른 이자·배당은 안 넣은 값).`);
+    return parts.join(" ");
   }
   const over = grossAll - COMPOSITE_FROM;
   if (sepGross <= 0) {
-    return `세전 ${won(grossAll)}으로 금융소득 종합과세 문턱 ${wonShort(COMPOSITE_FROM)}을 넘습니다. 넘는 ${won(over)}은 다른 소득과 합쳐 누진세율(6~45%)로 과세됩니다.`;
+    parts.push(`${who} ${won(grossAll)}으로 금융소득 종합과세 문턱 ${wonShort(COMPOSITE_FROM)}을 넘습니다. 넘는 ${won(over)}은 다른 소득과 합쳐 누진세율(6~45%)로 과세됩니다.`);
+    return parts.join(" ");
   }
   const rest = grossAll - sepGross;
   const restOver = rest - COMPOSITE_FROM;
-  return (
-    `세전 ${won(grossAll)}으로 금융소득 종합과세 문턱 ${wonShort(COMPOSITE_FROM)}을 넘습니다. ` +
+  parts.push(
+    `${who} ${won(grossAll)}으로 금융소득 종합과세 문턱 ${wonShort(COMPOSITE_FROM)}을 넘습니다. ` +
     `이 중 고배당기업 배당 ${won(sepGross)}을 분리과세(2,000만원까지 15.4% · 3억까지 22%)로 신청하면 ` +
     (restOver > 0
       ? `나머지 ${won(rest)} 가운데 문턱을 넘는 ${won(restOver)}만 다른 소득과 합쳐 과세됩니다.`
-      : `나머지 ${won(rest)}은 문턱 아래라 종합과세를 피합니다.`)
+      : `나머지 ${won(rest)}은 문턱 아래라 종합과세를 피합니다.`),
   );
+  return parts.join(" ");
 }
 
 /* ── 검색 ─────────────────────────────────────────────────────────── */
@@ -1010,6 +1040,7 @@ function HoldingsTable({
   totalInvest,
   mode,
   onClear,
+  onAccount,
   onShares,
   onCost,
   onRemove,
@@ -1021,6 +1052,7 @@ function HoldingsTable({
   /** 고른 계좌 — IRP 면 안전자산 줄에 알약을 붙인다. */
   mode: TaxMode;
   onClear: () => void;
+  onAccount: (code: string, acct: Account | null) => void;
   onShares: (code: string, shares: number) => void;
   onCost: (code: string, cost: number | null) => void;
   onRemove: (code: string) => void;
@@ -1044,7 +1076,7 @@ function HoldingsTable({
         <span role="columnheader" aria-label="빼기" />
       </div>
       {lines.map((l) => (
-        <HoldingRow key={l.stock.code} line={l} inputs={inputs} weightPct={totalInvest > 0 && l.investKrw != null ? (l.investKrw / totalInvest) * 100 : null} mode={mode} onShares={onShares} onCost={onCost} onRemove={onRemove} />
+        <HoldingRow key={l.stock.code} line={l} inputs={inputs} weightPct={totalInvest > 0 && l.investKrw != null ? (l.investKrw / totalInvest) * 100 : null} mode={mode} onAccount={onAccount} onShares={onShares} onCost={onCost} onRemove={onRemove} />
       ))}
     </div>
   );
@@ -1055,6 +1087,7 @@ function HoldingRow({
   inputs,
   weightPct,
   mode,
+  onAccount,
   onShares,
   onCost,
   onRemove,
@@ -1064,6 +1097,7 @@ function HoldingRow({
   /** 투자금 가운데 이 줄의 몫(%). 종가가 없으면 null. */
   weightPct: number | null;
   mode: TaxMode;
+  onAccount: (code: string, acct: Account | null) => void;
   onShares: (code: string, shares: number) => void;
   onCost: (code: string, cost: number | null) => void;
   onRemove: (code: string) => void;
@@ -1093,7 +1127,7 @@ function HoldingRow({
     if (g >= 1) facts.push({ text: `5년 연 +${g}%`, title: `최근 5년 해마다 ${g}%씩 늘렸습니다(연평균)` });
     else if (g <= -1) facts.push({ text: `5년 연 −${-g}%`, title: `최근 5년 해마다 ${-g}%씩 줄었습니다(연평균)` });
   }
-  if (mode === "irp" && !line.outside && isSafeAsset(s)) facts.push({ text: "안전자산", title: "IRP 안전자산 30%에 드는 채권·채권혼합 ETF 입니다" });
+  if (mode !== "gross" && line.account === "irp" && !line.outside && isSafeAsset(s)) facts.push({ text: "안전자산", title: "IRP 안전자산 30%에 드는 채권·채권혼합 ETF 입니다" });
   // 지난 날짜는 안 붙인다 — 표가 며칠 낡으면 '다음' 기준일·지급일이 어제일 수 있다(2026-09-16 전수 검사에서 셋).
   const todayKst = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
   if (s.nextRecord && s.nextRecord >= todayKst) facts.push({ text: `기준일 ${md(s.nextRecord)}`, title: `다음 배당기준일 ${s.nextRecord}` });
@@ -1186,6 +1220,24 @@ function HoldingRow({
           <button type="button" className="dv-tcost-open" onClick={() => setCostOpen(true)}>
             평단 넣기
           </button>
+        )}
+        {/* 줄의 계좌 — 기본 계좌를 따르면 흐리게, 따로 골랐으면 진하게. 못 담는 계좌는 목록에서 흐리고 까닭을 적는다. */}
+        {mode !== "gross" && (
+          <select
+            className={`dv-tacct${line.ownAccount ? " dv-tacct-own" : ""}`}
+            value={line.ownAccount ? line.account : ""}
+            onChange={(e) => onAccount(s.code, e.target.value ? (e.target.value as Account) : null)}
+            aria-label={`${s.name} 계좌`}
+            title={line.ownAccount ? "이 줄만 이 계좌로 셉니다" : "기본 계좌를 따릅니다"}
+          >
+            <option value="">기본 계좌</option>
+            {ACCOUNTS.map((a) => (
+              <option key={a.key} value={a.key} disabled={!fitsAccount(s, a.key)}>
+                {a.label}
+                {!fitsAccount(s, a.key) ? " (못 담음)" : ""}
+              </option>
+            ))}
+          </select>
         )}
       </span>
       <span className="dv-tcell dv-tnum" role="cell">{s.dps > 0 ? money(s.dps, s) : "없음"}</span>
@@ -1300,8 +1352,9 @@ function upcomingOf(lines: Line[], fx: number, mode: TaxMode): UpcomingItem[] {
   const year = Number(iso.slice(0, 4));
   const out: UpcomingItem[] = [];
   const dateLabel = (d: string) => `${Number(d.slice(5, 7))}월 ${Number(d.slice(8, 10))}일`;
-  const net = (s: StockLite, v: number) => {
-    const keep = 1 - taxRate(s, mode);
+  const net = (l: Line, v: number) => {
+    const s = l.stock;
+    const keep = 1 - taxRate(s, mode === "gross" ? "gross" : l.account);
     const krw = v * keep * (s.currency === "USD" ? fx : 1);
     return s.currency === "USD" ? `${usd(v * keep)} · ${won(krw)}` : won(krw);
   };
@@ -1311,7 +1364,7 @@ function upcomingOf(lines: Line[], fx: number, mode: TaxMode): UpcomingItem[] {
       out.push({ key: `${s.code}-r`, when: dateLabel(s.nextRecord), sortKey: s.nextRecord, name: s.name, what: "배당기준일", amount: null });
     }
     if (s.nextPay && s.nextPay[0] >= iso) {
-      out.push({ key: `${s.code}-p`, when: dateLabel(s.nextPay[0]), sortKey: s.nextPay[0], name: s.name, what: `1주에 ${money(s.nextPay[1], s)} · 공시된 지급일`, amount: net(s, s.nextPay[1] * l.shares) });
+      out.push({ key: `${s.code}-p`, when: dateLabel(s.nextPay[0]), sortKey: s.nextPay[0], name: s.name, what: `1주에 ${money(s.nextPay[1], s)} · 공시된 지급일`, amount: net(l, s.nextPay[1] * l.shares) });
       continue;
     }
     // 날짜를 모르면 지난 1년 지급일을 올해(지났으면 내년)로 옮겨 가장 가까운 것 하나.
@@ -1329,7 +1382,7 @@ function upcomingOf(lines: Line[], fx: number, mode: TaxMode): UpcomingItem[] {
         sortKey: expected.date,
         name: s.name,
         what: `1주에 ${money(expected.v, s)} · 지난해 이날 기준`,
-        amount: net(s, expected.v * l.shares),
+        amount: net(l, expected.v * l.shares),
       });
     }
   }
@@ -1659,7 +1712,7 @@ function BasketSheet({
   // '내 계좌 맞춤'은 연금저축·IRP 를 골랐을 때 그 계좌 목록으로 바뀐다(IRP 는 안전자산 셋 포함). 다른 바스켓은 계좌와 무관.
   const codes = basketCodes(basket, mode);
   const holdings = basketShares(codes, amount, byCode, fx);
-  const lines = computeLines(holdings, byCode, fx, mode);
+  const lines = computeLines(holdings, byCode, fx, mode, mode === "gross" ? "general" : mode);
   const net = lines.reduce((s, l) => s + l.netKrw, 0);
   const gross = lines.reduce((s, l) => s + l.grossKrw, 0);
   const invest = lines.reduce((s, l) => s + (l.investKrw ?? 0), 0);
