@@ -34,7 +34,8 @@ export function DividendCard({ s }: { s: DividendStock }) {
   return (
     <section className="hz-sheet">
       <SectionHead
-        icon="paid"
+        // 'paid'(동전 더미)는 사이드바 NAV 와 오픈 소식 띠가 쓴다 — 띠가 뜨는 동안 이 카드와 한 화면에 서므로 다른 그림(payments).
+        icon="payments"
         title="배당"
         desc={s.dps > 0 ? "최근 12개월에 실제로 준 배당과 지급된 달입니다. 다음 해에도 같으리라는 보장은 없습니다." : "최근 12개월 현금배당이 없습니다."}
         level={2}
