@@ -1132,13 +1132,13 @@ function HoldingsTable({
   onCost: (id: string, cost: number | null) => void;
   onRemove: (id: string) => void;
 }) {
-  // '담은 종목'은 종목 수다 — 한 종목을 두 계좌로 나눠 두 줄이어도 하나.
+  // '담은 종목'은 종목 수다 — 한 종목을 두 계좌로 나눠 두 줄이어도 하나. 줄 수는 안 적는다(2026-09-16 지적).
   const distinct = new Set(lines.map((l) => l.stock.code)).size;
   return (
     <div className="dv-table" role="table" aria-label="담은 종목">
       {/* 표 위 한 줄 — 몇 종목인지와 '모두 빼기'. 바스켓을 통째로 담아 본 뒤 하나씩 ×로 지우던 것(2026-09-16). */}
       <div className="dv-table-bar">
-        <span className="dv-table-count">담은 종목 {distinct}개{lines.length > distinct ? ` · ${lines.length}줄` : ""}</span>
+        <span className="dv-table-count">담은 종목 {distinct}개</span>
         <button type="button" className="dv-table-clear" onClick={onClear}>
           모두 빼기
         </button>
@@ -1257,7 +1257,7 @@ function HoldingRow({
                   </option>
                 ))}
                 {/* 같은 종목을 다른 계좌에도 — 담을 수 있는 계좌가 둘 이상일 때만(미국 주식은 일반 계좌뿐이라 없다). */}
-                {canSplit && <option value={SPLIT_OPTION}>＋ 계좌 (같은 종목을 다른 계좌에도)</option>}
+                {canSplit && <option value={SPLIT_OPTION}>＋ 계좌 (같은 종목 다른 계좌)</option>}
               </select>
             )}
           </span>
