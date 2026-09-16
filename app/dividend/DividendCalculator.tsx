@@ -368,6 +368,8 @@ function basketCodes(b: BasketLite, mode: TaxMode): string[] {
   return b.codes;
 }
 
+/** 계좌 목록 맨 아래의 '＋ 계좌' 항목 값 — 고르면 계좌가 아니라 줄이 하나 더 생긴다(HoldingRow). */
+const SPLIT_OPTION = "__split";
 /** 이 종목을 담을 수 있는 계좌 가운데 `from` 다음 것(일반→ISA→연금저축→IRP 순환). 없으면 null — 미국 주식은 일반 계좌뿐이다. */
 function nextAccountFor(s: StockLite, from: Account): Account | null {
   const order = ACCOUNTS.map((a) => a.key);
@@ -567,7 +569,7 @@ export function DividendCalculator({
   const add = (code: string, source: string) => {
     if (!byCode.has(code)) return;
     track("dividend_add", { stock_code: gaStockCode(code), select_source: source });
-    // 이미 담긴 종목은 다시 안 담는다 — 두 줄로 나누는 건 줄의 '＋ 계좌'(splitLine)로만. 칩을 두 번 누른 실수로 줄이 늘면 합이 두 배가 된다.
+    // 이미 담긴 종목은 다시 안 담는다 — 두 줄로 나누는 건 줄의 계좌 목록 맨 아래 '＋ 계좌'(splitLine)로만. 칩을 두 번 누른 실수로 줄이 늘면 합이 두 배가 된다.
     setHoldings((prev) => (prev.some((h) => h.code === code) ? prev : [...prev, { id: newId(code, prev), code, shares: DEFAULT_SHARES }]));
     focusShares(code);
   };
@@ -1180,6 +1182,7 @@ function HoldingRow({
   onRemove: (id: string) => void;
 }) {
   const { stock: s, shares } = line;
+  const canSplit = nextAccountFor(s, line.outside ? "general" : line.account) != null;
   // 평단 칸은 값이 있거나 열어 둔 동안만 보인다 — 줄마다 빈 칸이 서 있으면 표가 무거워진다.
   const [costOpen, setCostOpen] = useState(false);
   const showCost = line.onCost || costOpen;
@@ -1238,9 +1241,14 @@ function HoldingRow({
                 className={`dv-tacct${line.ownAccount ? " dv-tacct-own" : ""}`}
                 // 못 담는 줄은 실제로 일반 계좌로 세니 태그도 그렇게 보인다(아래 주의 문구와 같은 말).
                 value={line.outside ? "general" : line.account}
-                onChange={(e) => onAccount(line.id, e.target.value as Account)}
+                // 맨 아래 '＋ 계좌'를 고르면 계좌를 바꾸는 게 아니라 같은 종목을 다른 계좌에 한 줄 더 만든다. 값은 줄의 계좌로
+                // 되돌아온다(controlled). 따로 단추를 두면 줄이 복잡해진다는 지적(2026-09-16)으로 목록 안에 넣었다.
+                onChange={(e) => (e.target.value === SPLIT_OPTION ? onSplit(line.id) : onAccount(line.id, e.target.value as Account))}
                 aria-label={`${s.name} 계좌 유형`}
-                title={line.ownAccount ? "이 줄만 따로 고른 계좌 유형입니다" : "위에서 고른 계좌 유형을 따릅니다. 이 줄만 바꿀 수 있습니다"}
+                title={
+                  (line.ownAccount ? "이 줄만 따로 고른 계좌 유형입니다." : "위에서 고른 계좌 유형을 따릅니다. 이 줄만 바꿀 수 있습니다.") +
+                  (canSplit ? " 맨 아래 '＋ 계좌'는 같은 종목을 다른 계좌에도 한 줄 더 담습니다" : "")
+                }
               >
                 {ACCOUNTS.map((a) => (
                   <option key={a.key} value={a.key} disabled={!fitsAccount(s, a.key)}>
@@ -1248,19 +1256,9 @@ function HoldingRow({
                     {!fitsAccount(s, a.key) ? " (못 담음)" : ""}
                   </option>
                 ))}
+                {/* 같은 종목을 다른 계좌에도 — 담을 수 있는 계좌가 둘 이상일 때만(미국 주식은 일반 계좌뿐이라 없다). */}
+                {canSplit && <option value={SPLIT_OPTION}>＋ 계좌 (같은 종목을 다른 계좌에도)</option>}
               </select>
-            )}
-            {/* 같은 종목을 다른 계좌에도 — 담을 수 있는 계좌가 둘 이상일 때만(미국 주식은 일반 계좌뿐이라 안 보인다). */}
-            {mode !== "gross" && nextAccountFor(s, line.outside ? "general" : line.account) && (
-              <button
-                type="button"
-                className="dv-tsplit hz-tip hz-tip-wide"
-                data-tip="이 종목을 다른 계좌 유형에도 한 줄 더 담습니다. 같은 종목을 ISA 와 일반 계좌에 나눠 든 때"
-                aria-label={`${s.name} 다른 계좌에도 담기`}
-                onClick={() => onSplit(line.id)}
-              >
-                ＋ 계좌
-              </button>
             )}
           </span>
           {facts.length > 0 && (

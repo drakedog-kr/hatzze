@@ -5450,17 +5450,6 @@ main.hz-scroll { overflow-x: clip; }
 }
 .dv-tacct-own { color: var(--c-cold-ink); border-color: var(--c-cold-ink); background-color: var(--c-card); font-weight: 700; }
 .dv-tacct:focus-visible { outline: none; border-color: var(--c-blue); box-shadow: 0 0 0 3px var(--c-blue-tint); }
-/* 같은 종목을 다른 계좌에도 — 계좌 알약 옆의 작은 단추. 줄마다 서니 평단 단추처럼 마우스 기기에선 줄에 올렸을 때만 또렷하게. */
-.dv-tsplit {
-  flex-shrink: 0; margin-left: 4px; padding: 2px 6px; border-radius: 4px; border: 1px dashed var(--c-line); background: transparent;
-  color: var(--c-sub); font-size: 11px; font-weight: 600; font-family: inherit; line-height: 1.4; cursor: pointer; white-space: nowrap;
-}
-.dv-tsplit:hover { color: var(--c-cold-ink); border-color: var(--c-cold-ink); }
-.dv-tsplit:focus-visible { outline: none; border-color: var(--c-blue); box-shadow: 0 0 0 3px var(--c-blue-tint); }
-@media (hover: hover) {
-  .dv-tsplit { opacity: 0.45; transition: opacity 0.15s; }
-  .dv-trow:hover .dv-tsplit, .dv-tsplit:focus-visible { opacity: 1; }
-}
 /* 줄마다 붙으니 넷이면 네 번 반복돼 잡음이 된다(2026-09-15 지적). 마우스가 있는 기기에서는 줄에 올렸을 때만 또렷하게. */
 @media (hover: hover) {
   .dv-tcost-open { opacity: 0.35; transition: opacity 0.15s; }
