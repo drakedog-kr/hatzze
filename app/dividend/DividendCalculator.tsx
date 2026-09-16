@@ -29,8 +29,17 @@ import type { BasketLite, MoreLists, StockLite } from "./types";
  */
 
 /** cost 는 내 평단(1주 매수가, 그 종목의 돈 단위). 넣으면 투자금과 수익률이 종가 대신 이걸로 선다(YOC). */
-/** account 가 없으면 위의 '계좌 유형' 칩을 따른다. 있으면 그 줄만 그 계좌로 센다(2026-09-16: 종목마다 계좌가 다른 게 보통이라). */
-type Holding = { code: string; shares: number; cost?: number; account?: Account };
+/** account 가 없으면 위의 '계좌 유형' 칩을 따른다. 있으면 그 줄만 그 계좌로 센다(2026-09-16: 종목마다 계좌가 다른 게 보통이라).
+    id 는 줄의 열쇠다 — 같은 종목이 두 줄일 수 있어서(ISA 에도 일반 계좌에도 든 종목, 2026-09-16 피드백) 코드로는 못 가른다.
+    첫 줄은 코드 그대로, 나눈 줄은 `코드#2`. 옛 저장값(id 없음)은 읽을 때 붙인다. */
+type Holding = { id: string; code: string; shares: number; cost?: number; account?: Account };
+
+/** 이 코드의 새 줄 열쇠 — 아직 없으면 코드 그대로, 있으면 #2·#3. */
+function newId(code: string, prev: Holding[]): string {
+  const used = new Set(prev.map((h) => h.id));
+  if (!used.has(code)) return code;
+  for (let n = 2; ; n++) if (!used.has(`${code}#${n}`)) return `${code}#${n}`;
+}
 
 /* ── 담은 종목 저장소 ─────────────────────────────────────────────────
    localStorage 는 React 바깥의 저장소라 useSyncExternalStore 로 읽는다(AppShell 의 PcHint ·
@@ -51,14 +60,19 @@ function readSaved(): Holding[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     const parsed = raw ? (JSON.parse(raw) as unknown) : [];
     if (!Array.isArray(parsed)) return NO_HOLDINGS;
-    const out = parsed
-      .filter((h): h is Holding => !!h && typeof h.code === "string" && typeof h.shares === "number")
-      .map((h) => ({
+    const out: Holding[] = [];
+    for (const h of parsed as { id?: unknown; code?: unknown; shares?: unknown; cost?: unknown; account?: unknown }[]) {
+      if (!h || typeof h.code !== "string" || typeof h.shares !== "number") continue;
+      // 저장된 id 가 없거나(옛 값) 겹치면 새로 붙인다.
+      const id = typeof h.id === "string" && h.id && !out.some((o) => o.id === h.id) ? h.id : newId(h.code, out);
+      out.push({
+        id,
         code: h.code,
         shares: Math.max(0, Math.floor(h.shares)),
         ...(typeof h.cost === "number" && h.cost > 0 ? { cost: h.cost } : {}),
-        ...(isAccount((h as { account?: unknown }).account) ? { account: (h as { account: Account }).account } : {}),
-      }));
+        ...(isAccount(h.account) ? { account: h.account } : {}),
+      });
+    }
     return out.length ? out : NO_HOLDINGS;
   } catch {
     // 사파리 사생활 보호 모드 등에서 localStorage 접근이 던진다. 그때는 빈 채로 시작한다.
@@ -306,6 +320,8 @@ type Line = {
   account: Account;
   /** 줄에서 따로 고른 줄인가(태그를 진하게). */
   ownAccount: boolean;
+  /** 줄의 열쇠(Holding.id). 같은 종목이 두 줄일 수 있어 코드 대신 이걸로 고친다. */
+  id: string;
 };
 
 /**
@@ -326,6 +342,7 @@ function computeLines(holdings: Holding[], byCode: Map<string, StockLite>, fx: n
     const keep = 1 - taxRate(stock, lineMode);
     const basis = h.cost && h.cost > 0 ? h.cost : stock.close;
     out.push({
+      id: h.id,
       stock,
       shares: h.shares,
       gross,
@@ -351,10 +368,19 @@ function basketCodes(b: BasketLite, mode: TaxMode): string[] {
   return b.codes;
 }
 
+/** 계좌 목록 맨 아래의 '＋ 계좌' 항목 값 — 고르면 계좌가 아니라 줄이 하나 더 생긴다(HoldingRow). */
+const SPLIT_OPTION = "__split";
+/** 이 종목을 담을 수 있는 계좌 가운데 `from` 다음 것(일반→ISA→연금저축→IRP 순환). 없으면 null — 미국 주식은 일반 계좌뿐이다. */
+function nextAccountFor(s: StockLite, from: Account): Account | null {
+  const order = ACCOUNTS.map((a) => a.key);
+  const i = order.indexOf(from);
+  return [...order.slice(i + 1), ...order.slice(0, i)].find((a) => fitsAccount(s, a)) ?? null;
+}
+
 /** 바스켓을 이 투자금으로 같은 금액씩 나눠 담으면 종목마다 몇 주인가. 미국 종목은 종가가 달러라 환율을 곱해 원으로 잰다.
     한 주가 몫보다 비싸면 1주 — 0주로 두면 열 종목 바스켓이 실제로는 아홉 종목이 된다(2026-09-15 지적).
     그래서 카드의 투자금은 슬라이더 금액이 아니라 실제 합으로 적는다. */
-function basketShares(codes: string[], amount: number, byCode: Map<string, StockLite>, fx: number): Holding[] {
+function basketShares(codes: string[], amount: number, byCode: Map<string, StockLite>, fx: number): { code: string; shares: number }[] {
   if (!codes.length) return [];
   const per = amount / codes.length;
   return codes.map((code) => {
@@ -474,9 +500,9 @@ export function DividendCalculator({
   // 걸리고, Map 자체는 한 번 만들어 그대로 쓰므로 state 로 들고 있어도 다시 그릴 일이 없다.
   const [inputs] = useState(() => new Map<string, HTMLInputElement>());
   const calcRef = useRef<HTMLElement>(null);
-  const focusShares = (code: string) =>
+  const focusShares = (id: string) =>
     setTimeout(() => {
-      const el = inputs.get(code);
+      const el = inputs.get(id);
       if (el) {
         el.focus();
         el.select();
@@ -488,7 +514,7 @@ export function DividendCalculator({
   useEffect(() => {
     const code = new URLSearchParams(window.location.search).get("add");
     if (!code || !byCode.has(code)) return;
-    writeHoldings((prev) => (prev.some((h) => h.code === code) ? prev : [...prev, { code, shares: DEFAULT_SHARES }]));
+    writeHoldings((prev) => (prev.some((h) => h.code === code) ? prev : [...prev, { id: newId(code, prev), code, shares: DEFAULT_SHARES }]));
     track("dividend_add", { stock_code: gaStockCode(code), select_source: "link" });
     window.history.replaceState(null, "", window.location.pathname);
     setTimeout(() => {
@@ -543,27 +569,50 @@ export function DividendCalculator({
   const add = (code: string, source: string) => {
     if (!byCode.has(code)) return;
     track("dividend_add", { stock_code: gaStockCode(code), select_source: source });
-    setHoldings((prev) => (prev.some((h) => h.code === code) ? prev : [...prev, { code, shares: DEFAULT_SHARES }]));
+    // 이미 담긴 종목은 다시 안 담는다 — 두 줄로 나누는 건 줄의 계좌 목록 맨 아래 '＋ 계좌'(splitLine)로만. 칩을 두 번 누른 실수로 줄이 늘면 합이 두 배가 된다.
+    setHoldings((prev) => (prev.some((h) => h.code === code) ? prev : [...prev, { id: newId(code, prev), code, shares: DEFAULT_SHARES }]));
     focusShares(code);
   };
-  const setShares = (code: string, shares: number) =>
-    setHoldings((prev) => prev.map((h) => (h.code === code ? { ...h, shares } : h)));
+  const setShares = (id: string, shares: number) =>
+    setHoldings((prev) => prev.map((h) => (h.id === id ? { ...h, shares } : h)));
   // 평단. 0이나 빈 값이면 지운다(종가 기준으로 돌아간다).
-  const setCost = (code: string, cost: number | null) =>
-    setHoldings((prev) => prev.map((h) => (h.code === code ? (cost && cost > 0 ? { ...h, cost } : { code: h.code, shares: h.shares, ...(h.account ? { account: h.account } : {}) }) : h)));
+  const setCost = (id: string, cost: number | null) =>
+    setHoldings((prev) => prev.map((h) => (h.id === id ? (cost && cost > 0 ? { ...h, cost } : { id: h.id, code: h.code, shares: h.shares, ...(h.account ? { account: h.account } : {}) }) : h)));
   // 줄의 계좌 유형. 줄에서 고르면 그 줄만 그 계좌로 세고, 위 칩을 바꿔도 안 따라간다(따로 고른 줄이니까).
-  const setLineAccount = (code: string, acct: Account) => {
-    track("dividend_row_account", { stock_code: gaStockCode(code), account: acct });
-    setHoldings((prev) => prev.map((h) => (h.code === code ? { ...h, account: acct } : h)));
+  const setLineAccount = (id: string, acct: Account) => {
+    track("dividend_row_account", { stock_code: gaStockCode(holdings.find((h) => h.id === id)?.code ?? id), account: acct });
+    setHoldings((prev) => prev.map((h) => (h.id === id ? { ...h, account: acct } : h)));
   };
-  const remove = (code: string) => {
-    track("dividend_remove", { stock_code: gaStockCode(code) });
-    setHoldings((prev) => prev.filter((h) => h.code !== code));
+  // 같은 종목을 다른 계좌 유형에 한 줄 더 — ISA 에도 일반 계좌에도 든 종목(2026-09-16 피드백). 새 줄은 이 종목을 담을 수 있는
+  // 계좌 가운데 지금 줄 다음 것(일반→ISA→연금저축→IRP 순환)이고, 원래 줄도 계좌를 못박아 둘이 위 칩에 같이 끌려가지 않게 한다.
+  const splitLine = (id: string) => {
+    const h = holdings.find((x) => x.id === id);
+    const stock = h && byCode.get(h.code);
+    if (!h || !stock) return;
+    const from: Account = h.account ?? account;
+    const next = nextAccountFor(stock, from);
+    if (!next) return;
+    track("dividend_row_split", { stock_code: gaStockCode(h.code), account: next });
+    const addedId = newId(h.code, holdings);
+    setHoldings((prev) => {
+      const at = prev.findIndex((x) => x.id === id);
+      if (at < 0) return prev;
+      const added: Holding = { id: newId(h.code, prev), code: h.code, shares: DEFAULT_SHARES, account: next };
+      const fixed: Holding = { ...prev[at], account: from };
+      return [...prev.slice(0, at), fixed, added, ...prev.slice(at + 1)];
+    });
+    focusShares(addedId);
   };
+  const remove = (id: string) => {
+    track("dividend_remove", { stock_code: gaStockCode(holdings.find((h) => h.id === id)?.code ?? id) });
+    setHoldings((prev) => prev.filter((h) => h.id !== id));
+  };
+  // '담은 종목'은 종목 수다 — 한 종목을 두 계좌로 나눠 두 줄이어도 하나.
+  const distinct = new Set(holdings.map((h) => h.code)).size;
   const clearAll = () => {
     // 되돌릴 길이 없으니 한 번 묻는다 — 바스켓 열 종목을 손으로 담아 둔 사람이 실수로 누르면 다 잃는다.
-    if (!window.confirm(`담은 종목 ${holdings.length}개를 모두 뺄까요?`)) return;
-    track("dividend_clear", { count: holdings.length });
+    if (!window.confirm(`담은 종목 ${distinct}개를 모두 뺄까요?`)) return;
+    track("dividend_clear", { count: distinct });
     setHoldings([]);
   };
   const applyBasket = (b: BasketLite) => {
@@ -574,9 +623,17 @@ export function DividendCalculator({
     // 끼우지 않는다 — 사용자가 손으로 담아 둔 다른 종목이 사라지면 안 된다.
     setHoldings((prev) => {
       const map = new Map(next.map((h) => [h.code, h.shares]));
-      const kept = prev.map((h) => (map.has(h.code) ? { ...h, shares: map.get(h.code) as number } : h));
+      // 같은 종목이 두 줄이면 첫 줄만 바스켓 주수로 — 둘 다 바꾸면 그 종목만 두 배가 된다.
+      const done = new Set<string>();
+      const kept = prev.map((h) => {
+        if (!map.has(h.code) || done.has(h.code)) return h;
+        done.add(h.code);
+        return { ...h, shares: map.get(h.code) as number };
+      });
       const seen = new Set(kept.map((h) => h.code));
-      return [...kept, ...next.filter((h) => !seen.has(h.code))];
+      const out = [...kept];
+      for (const h of next) if (!seen.has(h.code)) out.push({ id: newId(h.code, out), code: h.code, shares: h.shares });
+      return out;
     });
     // 담긴 뒤 결과가 선 자리로 올라간다. 목록이 길어지며 판이 다시 그려지는 것보다 한 박자
     // 뒤여야 한다 — 같은 틱에 부르면 새 레이아웃 전의 자리로 가다 만다(실측).
@@ -740,7 +797,7 @@ export function DividendCalculator({
             )}
           </div>
           {lines.length > 0 && (
-            <HoldingsTable lines={lines} inputs={inputs} totalInvest={invest} mode={taxMode} onClear={clearAll} onAccount={setLineAccount} onShares={setShares} onCost={setCost} onRemove={remove} />
+            <HoldingsTable lines={lines} inputs={inputs} totalInvest={invest} mode={taxMode} onClear={clearAll} onAccount={setLineAccount} onSplit={splitLine} onShares={setShares} onCost={setCost} onRemove={remove} />
           )}
           {lines.length > 0 && (
             <MonthCalendar
@@ -1057,6 +1114,7 @@ function HoldingsTable({
   mode,
   onClear,
   onAccount,
+  onSplit,
   onShares,
   onCost,
   onRemove,
@@ -1068,16 +1126,19 @@ function HoldingsTable({
   /** 고른 계좌 — IRP 면 안전자산 줄에 알약을 붙인다. */
   mode: TaxMode;
   onClear: () => void;
-  onAccount: (code: string, acct: Account) => void;
-  onShares: (code: string, shares: number) => void;
-  onCost: (code: string, cost: number | null) => void;
-  onRemove: (code: string) => void;
+  onAccount: (id: string, acct: Account) => void;
+  onSplit: (id: string) => void;
+  onShares: (id: string, shares: number) => void;
+  onCost: (id: string, cost: number | null) => void;
+  onRemove: (id: string) => void;
 }) {
+  // '담은 종목'은 종목 수다 — 한 종목을 두 계좌로 나눠 두 줄이어도 하나.
+  const distinct = new Set(lines.map((l) => l.stock.code)).size;
   return (
     <div className="dv-table" role="table" aria-label="담은 종목">
       {/* 표 위 한 줄 — 몇 종목인지와 '모두 빼기'. 바스켓을 통째로 담아 본 뒤 하나씩 ×로 지우던 것(2026-09-16). */}
       <div className="dv-table-bar">
-        <span className="dv-table-count">담은 종목 {lines.length}개</span>
+        <span className="dv-table-count">담은 종목 {distinct}개{lines.length > distinct ? ` · ${lines.length}줄` : ""}</span>
         <button type="button" className="dv-table-clear" onClick={onClear}>
           모두 빼기
         </button>
@@ -1092,7 +1153,7 @@ function HoldingsTable({
         <span role="columnheader" aria-label="빼기" />
       </div>
       {lines.map((l) => (
-        <HoldingRow key={l.stock.code} line={l} inputs={inputs} weightPct={totalInvest > 0 && l.investKrw != null ? (l.investKrw / totalInvest) * 100 : null} mode={mode} onAccount={onAccount} onShares={onShares} onCost={onCost} onRemove={onRemove} />
+        <HoldingRow key={l.id} line={l} inputs={inputs} weightPct={totalInvest > 0 && l.investKrw != null ? (l.investKrw / totalInvest) * 100 : null} mode={mode} onAccount={onAccount} onSplit={onSplit} onShares={onShares} onCost={onCost} onRemove={onRemove} />
       ))}
     </div>
   );
@@ -1104,6 +1165,7 @@ function HoldingRow({
   weightPct,
   mode,
   onAccount,
+  onSplit,
   onShares,
   onCost,
   onRemove,
@@ -1113,12 +1175,14 @@ function HoldingRow({
   /** 투자금 가운데 이 줄의 몫(%). 종가가 없으면 null. */
   weightPct: number | null;
   mode: TaxMode;
-  onAccount: (code: string, acct: Account) => void;
-  onShares: (code: string, shares: number) => void;
-  onCost: (code: string, cost: number | null) => void;
-  onRemove: (code: string) => void;
+  onAccount: (id: string, acct: Account) => void;
+  onSplit: (id: string) => void;
+  onShares: (id: string, shares: number) => void;
+  onCost: (id: string, cost: number | null) => void;
+  onRemove: (id: string) => void;
 }) {
   const { stock: s, shares } = line;
+  const canSplit = nextAccountFor(s, line.outside ? "general" : line.account) != null;
   // 평단 칸은 값이 있거나 열어 둔 동안만 보인다 — 줄마다 빈 칸이 서 있으면 표가 무거워진다.
   const [costOpen, setCostOpen] = useState(false);
   const showCost = line.onCost || costOpen;
@@ -1161,7 +1225,7 @@ function HoldingRow({
   if (s.close == null) warns.push("종가가 없어 투자금과 배당수익률을 못 냅니다");
   if (s.dps > 0 && !s.pays.length) warns.push("지급일 기록이 없어 아래 달력에는 빠집니다");
 
-  const step = (d: number) => onShares(s.code, Math.max(0, shares + d));
+  const step = (d: number) => onShares(line.id, Math.max(0, shares + d));
   return (
     <div className="dv-trow" role="row">
       <span className="dv-tcell dv-tname" role="cell">
@@ -1177,9 +1241,14 @@ function HoldingRow({
                 className={`dv-tacct${line.ownAccount ? " dv-tacct-own" : ""}`}
                 // 못 담는 줄은 실제로 일반 계좌로 세니 태그도 그렇게 보인다(아래 주의 문구와 같은 말).
                 value={line.outside ? "general" : line.account}
-                onChange={(e) => onAccount(s.code, e.target.value as Account)}
+                // 맨 아래 '＋ 계좌'를 고르면 계좌를 바꾸는 게 아니라 같은 종목을 다른 계좌에 한 줄 더 만든다. 값은 줄의 계좌로
+                // 되돌아온다(controlled). 따로 단추를 두면 줄이 복잡해진다는 지적(2026-09-16)으로 목록 안에 넣었다.
+                onChange={(e) => (e.target.value === SPLIT_OPTION ? onSplit(line.id) : onAccount(line.id, e.target.value as Account))}
                 aria-label={`${s.name} 계좌 유형`}
-                title={line.ownAccount ? "이 줄만 따로 고른 계좌 유형입니다" : "위에서 고른 계좌 유형을 따릅니다. 이 줄만 바꿀 수 있습니다"}
+                title={
+                  (line.ownAccount ? "이 줄만 따로 고른 계좌 유형입니다." : "위에서 고른 계좌 유형을 따릅니다. 이 줄만 바꿀 수 있습니다.") +
+                  (canSplit ? " 맨 아래 '＋ 계좌'는 같은 종목을 다른 계좌에도 한 줄 더 담습니다" : "")
+                }
               >
                 {ACCOUNTS.map((a) => (
                   <option key={a.key} value={a.key} disabled={!fitsAccount(s, a.key)}>
@@ -1187,6 +1256,8 @@ function HoldingRow({
                     {!fitsAccount(s, a.key) ? " (못 담음)" : ""}
                   </option>
                 ))}
+                {/* 같은 종목을 다른 계좌에도 — 담을 수 있는 계좌가 둘 이상일 때만(미국 주식은 일반 계좌뿐이라 없다). */}
+                {canSplit && <option value={SPLIT_OPTION}>＋ 계좌 (같은 종목을 다른 계좌에도)</option>}
               </select>
             )}
           </span>
@@ -1209,8 +1280,8 @@ function HoldingRow({
         </button>
         <input
           ref={(el) => {
-            if (el) inputs.set(s.code, el);
-            else inputs.delete(s.code);
+            if (el) inputs.set(line.id, el);
+            else inputs.delete(line.id);
           }}
           type="number"
           inputMode="numeric"
@@ -1220,7 +1291,7 @@ function HoldingRow({
           aria-label={`${s.name} 주수`}
           onChange={(e) => {
             const v = Math.floor(Number(e.target.value));
-            onShares(s.code, Number.isFinite(v) && v > 0 ? v : 0);
+            onShares(line.id, Number.isFinite(v) && v > 0 ? v : 0);
           }}
           onFocus={(e) => e.target.select()}
         />
@@ -1241,7 +1312,7 @@ function HoldingRow({
               defaultValue={line.cost ?? ""}
               onChange={(e) => {
                 const v = Number(e.target.value);
-                onCost(s.code, Number.isFinite(v) && v > 0 ? v : null);
+                onCost(line.id, Number.isFinite(v) && v > 0 ? v : null);
               }}
               onBlur={(e) => {
                 if (!(Number(e.target.value) > 0)) setCostOpen(false);
@@ -1280,7 +1351,7 @@ function HoldingRow({
         )}
       </span>
       <span className="dv-tcell" role="cell">
-        <button type="button" className="dv-remove" aria-label={`${s.name} 빼기`} onClick={() => onRemove(s.code)}>
+        <button type="button" className="dv-remove" aria-label={`${s.name} 빼기`} onClick={() => onRemove(line.id)}>
           ×
         </button>
       </span>
@@ -1369,19 +1440,22 @@ function upcomingOf(lines: Line[], fx: number, mode: TaxMode): UpcomingItem[] {
   const year = Number(iso.slice(0, 4));
   const out: UpcomingItem[] = [];
   const dateLabel = (d: string) => `${Number(d.slice(5, 7))}월 ${Number(d.slice(8, 10))}일`;
-  const net = (l: Line, v: number) => {
-    const s = l.stock;
-    const keep = 1 - taxRate(s, mode === "gross" ? "gross" : l.account);
-    const krw = v * keep * (s.currency === "USD" ? fx : 1);
-    return s.currency === "USD" ? `${usd(v * keep)} · ${won(krw)}` : won(krw);
+  // 같은 종목이 두 줄(ISA·일반 계좌)이면 일정은 하나로 — 세후 금액은 줄마다 세율이 달라 줄별로 떼어 더한다.
+  const groups = new Map<string, Line[]>();
+  for (const l of lines) groups.set(l.stock.code, [...(groups.get(l.stock.code) ?? []), l]);
+  const net = (ls: Line[], perShare: number) => {
+    const s = ls[0].stock;
+    const v = ls.reduce((sum, l) => sum + perShare * l.shares * (1 - taxRate(s, mode === "gross" ? "gross" : l.account)), 0);
+    const krw = v * (s.currency === "USD" ? fx : 1);
+    return s.currency === "USD" ? `${usd(v)} · ${won(krw)}` : won(krw);
   };
-  for (const l of lines) {
-    const s = l.stock;
+  for (const ls of groups.values()) {
+    const s = ls[0].stock;
     if (s.nextRecord && s.nextRecord >= iso) {
       out.push({ key: `${s.code}-r`, when: dateLabel(s.nextRecord), sortKey: s.nextRecord, name: s.name, what: "배당기준일", amount: null });
     }
     if (s.nextPay && s.nextPay[0] >= iso) {
-      out.push({ key: `${s.code}-p`, when: dateLabel(s.nextPay[0]), sortKey: s.nextPay[0], name: s.name, what: `1주에 ${money(s.nextPay[1], s)} · 공시된 지급일`, amount: net(l, s.nextPay[1] * l.shares) });
+      out.push({ key: `${s.code}-p`, when: dateLabel(s.nextPay[0]), sortKey: s.nextPay[0], name: s.name, what: `1주에 ${money(s.nextPay[1], s)} · 공시된 지급일`, amount: net(ls, s.nextPay[1]) });
       continue;
     }
     // 날짜를 모르면 지난 1년 지급일을 올해(지났으면 내년)로 옮겨 가장 가까운 것 하나.
@@ -1399,7 +1473,7 @@ function upcomingOf(lines: Line[], fx: number, mode: TaxMode): UpcomingItem[] {
         sortKey: expected.date,
         name: s.name,
         what: `1주에 ${money(expected.v, s)} · 지난해 이날 기준`,
-        amount: net(l, expected.v * l.shares),
+        amount: net(ls, expected.v),
       });
     }
   }
@@ -1761,7 +1835,7 @@ function BasketSheet({
 }) {
   // '내 계좌 맞춤'은 연금저축·IRP 를 골랐을 때 그 계좌 목록으로 바뀐다(IRP 는 안전자산 셋 포함). 다른 바스켓은 계좌와 무관.
   const codes = basketCodes(basket, mode);
-  const holdings = basketShares(codes, amount, byCode, fx);
+  const holdings = basketShares(codes, amount, byCode, fx).map((h) => ({ id: h.code, ...h }));
   const lines = computeLines(holdings, byCode, fx, mode, mode === "gross" ? "general" : mode);
   const net = lines.reduce((s, l) => s + l.netKrw, 0);
   const gross = lines.reduce((s, l) => s + l.grossKrw, 0);

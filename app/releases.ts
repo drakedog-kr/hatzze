@@ -29,6 +29,12 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 있던 줄에 조작 하나가 붙는 것이라 Patch.
+    version: "1.15.1",
+    date: "2026-09-16",
+    changes: ["담은 종목의 계좌 목록 맨 아래 '＋ 계좌'로 같은 종목을 ISA 와 일반 계좌처럼 두 계좌 유형에 나눠 담을 수 있습니다."],
+  },
+  {
     // 국내 ETF 가 한 운용사에서 전부로 — 담을 수 있는 것이 느는 것이라 Minor.
     version: "1.15.0",
     date: "2026-09-16",
