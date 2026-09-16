@@ -7,9 +7,9 @@
 JEPI 2026-09-03 0.37142). 티커와 이름만 적으면 된다. `pays` 를 적어 두면 그 페이지가 막힌 날의
 대체값이다(없어도 된다).
 
-목록은 서학개미가 배당·월분배로 드는 것 위주다 — SCHD 계열, JP모건·글로벌X 커버드콜, 뱅가드·
-아이셰어즈 배당, 리츠·우선주·채권(월배당이라 파이어족이 든다), 일드맥스(단일 종목 옵션, 분배금이
-달마다 크게 흔들려 '추정'이 아니라 '변동 큼'으로 적어야 한다 — 화면은 아직 그 표시가 없다).
+목록은 서학개미가 배당·월분배로 드는 것 위주다 — SCHD 계열, JP모건·글로벌X·NEOS·골드만 커버드콜, 뱅가드·
+아이셰어즈 배당, 리츠·우선주·채권(월배당이라 파이어족이 든다), 라운드힐 0DTE·일드맥스(단일 종목·묶음 옵션, 분배금이
+달마다 크게 흔들려 화면이 30% 넘는 분배율에 '초고배당' 표시를 단다), 지수(VOO·IVV·QQQ·QQQM·SPY·VTI).
 
 ## 국내 ETF — 전 운용사 자동(예탁결제원 SEIBro 분배금지급현황)
 
@@ -89,4 +89,22 @@ US_ETFS: list[dict] = [
     {"code": "NVDY", "name_ko": "NVDY", "name_en": "YieldMax NVDA Option Income Strategy ETF", "cadence": "월", "source": "https://www.yieldmaxetfs.com/our-etfs/nvdy/"},
     {"code": "MSTY", "name_ko": "MSTY", "name_en": "YieldMax MSTR Option Income Strategy ETF", "cadence": "월", "source": "https://www.yieldmaxetfs.com/our-etfs/msty/"},
     {"code": "CONY", "name_ko": "CONY", "name_en": "YieldMax COIN Option Income Strategy ETF", "cadence": "월", "source": "https://www.yieldmaxetfs.com/our-etfs/cony/"},
+    # ── 2026-09-16 추가. 커뮤니티 요청(QQQM·QQQI)에 서학개미가 많이 드는 월·주 분배 ETF 를 같이. stockanalysis 에서 열다섯
+    #    티커 다 지난 1년 지급 건이 있는 것을 확인했다(QQQM 4건 · 월배당 12건 · 주배당 52건). 주 분배(0DTE·일드맥스 묶음)는
+    #    cadence "주" — 화면은 지급 건으로 세니 값 자체는 표시에 안 쓰인다.
+    {"code": "QQQM", "name_ko": "QQQM", "name_en": "Invesco NASDAQ 100 ETF", "cadence": "분기", "source": "https://www.invesco.com/us/financial-products/etfs/product-detail?productId=ETF-QQQM"},
+    {"code": "IVV", "name_ko": "IVV", "name_en": "iShares Core S&P 500 ETF", "cadence": "분기", "source": "https://www.ishares.com/us/products/239726/ishares-core-sp-500-etf"},
+    {"code": "QQQI", "name_ko": "QQQI", "name_en": "NEOS Nasdaq-100 High Income ETF", "cadence": "월", "source": "https://neosfunds.com/qqqi/"},
+    {"code": "SPYI", "name_ko": "SPYI", "name_en": "NEOS S&P 500 High Income ETF", "cadence": "월", "source": "https://neosfunds.com/spyi/"},
+    {"code": "IWMI", "name_ko": "IWMI", "name_en": "NEOS Russell 2000 High Income ETF", "cadence": "월", "source": "https://neosfunds.com/iwmi/"},
+    {"code": "GPIX", "name_ko": "GPIX", "name_en": "Goldman Sachs S&P 500 Premium Income ETF", "cadence": "월", "source": "https://www.gsam.com/content/gsam/us/en/advisors/fund-center/etf-fund-finder/goldman-sachs-s-p-500-premium-income-etf.html"},
+    {"code": "GPIQ", "name_ko": "GPIQ", "name_en": "Goldman Sachs Nasdaq-100 Premium Income ETF", "cadence": "월", "source": "https://www.gsam.com/content/gsam/us/en/advisors/fund-center/etf-fund-finder/goldman-sachs-nasdaq-100-premium-income-etf.html"},
+    {"code": "FEPI", "name_ko": "FEPI", "name_en": "REX FANG & Innovation Equity Premium Income ETF", "cadence": "월", "source": "https://www.rexshares.com/fepi/"},
+    {"code": "AIPI", "name_ko": "AIPI", "name_en": "REX AI Equity Premium Income ETF", "cadence": "월", "source": "https://www.rexshares.com/aipi/"},
+    {"code": "XDTE", "name_ko": "XDTE", "name_en": "Roundhill S&P 500 0DTE Covered Call Strategy ETF", "cadence": "주", "source": "https://www.roundhillinvestments.com/etf/xdte/"},
+    {"code": "QDTE", "name_ko": "QDTE", "name_en": "Roundhill Innovation-100 0DTE Covered Call Strategy ETF", "cadence": "주", "source": "https://www.roundhillinvestments.com/etf/qdte/"},
+    {"code": "RDTE", "name_ko": "RDTE", "name_en": "Roundhill Small Cap 0DTE Covered Call Strategy ETF", "cadence": "주", "source": "https://www.roundhillinvestments.com/etf/rdte/"},
+    {"code": "YMAX", "name_ko": "YMAX", "name_en": "YieldMax Universe Fund of Option Income ETFs", "cadence": "주", "source": "https://www.yieldmaxetfs.com/our-etfs/ymax/"},
+    {"code": "YMAG", "name_ko": "YMAG", "name_en": "YieldMax Magnificent 7 Fund of Option Income ETFs", "cadence": "주", "source": "https://www.yieldmaxetfs.com/our-etfs/ymag/"},
+    {"code": "ULTY", "name_ko": "ULTY", "name_en": "YieldMax Ultra Option Income Strategy ETF", "cadence": "주", "source": "https://www.yieldmaxetfs.com/our-etfs/ulty/"},
 ]

@@ -29,6 +29,12 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 목록에 종목이 느는 것이라 Patch.
+    version: "1.15.2",
+    date: "2026-09-16",
+    changes: ["미국 ETF 에 QQQM·IVV 와 QQQI·SPYI·IWMI·GPIX·GPIQ·FEPI·AIPI·XDTE·QDTE·RDTE·YMAX·YMAG·ULTY 열다섯 개가 더 담깁니다."],
+  },
+  {
     // 있던 줄에 조작 하나가 붙는 것이라 Patch.
     version: "1.15.1",
     date: "2026-09-16",
