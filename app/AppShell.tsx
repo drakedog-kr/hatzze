@@ -234,13 +234,14 @@ const NAV: NavItem[] = [
     // ⛔ "얼마에 열릴까" 같은 미래형으로 바꾸지 말 것. 그 순간 해설이 아니라 예보가 된다.
     sub: "밤사이 미장이 크게 움직인 날 국장은 보통 얼마에 열렸나",
   },
+  // 배당으로 살기(/dividend) — ⛔ 여는 것은 `app/screen-flags.ts` 의 DIVIDEND_PUBLIC 한 줄이다. 안 연 동안은
+  // 아래 COMING_SOON 에 눌리지 않는 줄로 서고, 열면 여기(국장 미리보기 다음)에 선다. 데일리 노트보다
+  // 위에 두는 이유는 종일 열어 두고 담는 화면이라서다 — 노트는 저녁에 한 번 읽는 글이라 맨 아래(2026-09-16).
+  ...(DIVIDEND_PUBLIC ? [{ href: DIVIDEND_PAGE.href, label: DIVIDEND_PAGE.label, icon: DIVIDEND_PAGE.icon, sub: DIVIDEND_PAGE.sub }] : []),
   // 데일리 노트 — 매일 저녁 한 편의 시장 정리 글. ⛔ 여는 것은 `app/screen-flags.ts` 의
-  // DAILY_PUBLIC 한 줄이다. 안 연 동안은 아래 COMING_SOON 에 눌리지 않는 줄로 서고, 열면
+  // DAILY_PUBLIC 한 줄이다. 배당으로 살기와 같은 방식으로 안 연 동안은 COMING_SOON 에, 열면
   // 여기 맨 아래에 선다. 이름·부제·아이콘은 app/daily/copy.ts 한 곳에서 온다.
   ...(DAILY_PUBLIC ? [{ href: NOTE_PAGE.href, label: NOTE_PAGE.label, icon: NOTE_PAGE.icon, sub: NOTE_PAGE.sub }] : []),
-  // 배당으로 살기(/dividend) — ⛔ 여는 것은 `app/screen-flags.ts` 의 DIVIDEND_PUBLIC 한 줄이다. 데일리 노트와
-  // 같은 방식으로 안 연 동안은 COMING_SOON 에, 열면 여기 맨 아래에 선다.
-  ...(DIVIDEND_PUBLIC ? [{ href: DIVIDEND_PAGE.href, label: DIVIDEND_PAGE.label, icon: DIVIDEND_PAGE.icon, sub: DIVIDEND_PAGE.sub }] : []),
 ];
 
 // 외부(텔레그램) 링크라 NAV 배열이 아니라 따로 둔다 — pathname 기반 active 판정 대상이
@@ -281,15 +282,15 @@ const COMING_SOON: { label: string; badge: string; tip: string; after: string; i
   // 그냥 눌려 들어가졌다. 여기(COMING_SOON)에 두면 href 필드 자체가 없어 링크가 안 생긴다.
   // 대신 본문 헤더가 NAV 에서 경로를 못 찾으므로 DEEP_PAGES 에 제목을 따로 둬야 한다.
   //
-  // 데일리 노트(2026-09-06 만듦, 아직 안 열었다). 사이드바 맨 아래(국장 미리보기 다음)에
-  // 서는 이유는 저녁에 한 번 읽는 글이라 종일 보는 브리핑·카더라 위에 둘 자리가 아니어서다.
-  ...(DAILY_PUBLIC
-    ? []
-    : [{ label: NOTE_PAGE.label, badge: "준비 중", tip: NOTE_PAGE.tip, after: "/preview", icon: NOTE_PAGE.icon }]),
-  // 배당으로 살기(2026-09-11 만듦, 아직 안 열었다). 데일리 노트 뒤(사이드바 맨 아래).
+  // 배당으로 살기(2026-09-11 만듦, 09-16 열었다). 국장 미리보기 다음, 데일리 노트 앞 — NAV 와 같은 자리.
   ...(DIVIDEND_PUBLIC
     ? []
-    : [{ label: DIVIDEND_PAGE.label, badge: "준비 중", tip: DIVIDEND_PAGE.tip, after: DAILY_PUBLIC ? NOTE_PAGE.href : "/preview", icon: DIVIDEND_PAGE.icon }]),
+    : [{ label: DIVIDEND_PAGE.label, badge: "준비 중", tip: DIVIDEND_PAGE.tip, after: "/preview", icon: DIVIDEND_PAGE.icon }]),
+  // 데일리 노트(2026-09-06 만듦, 09-07 열었다). 사이드바 맨 아래에 서는 이유는 저녁에 한 번 읽는
+  // 글이라 종일 보는 브리핑·카더라 위에 둘 자리가 아니어서다.
+  ...(DAILY_PUBLIC
+    ? []
+    : [{ label: NOTE_PAGE.label, badge: "준비 중", tip: NOTE_PAGE.tip, after: DIVIDEND_PUBLIC ? DIVIDEND_PAGE.href : "/preview", icon: NOTE_PAGE.icon }]),
 ];
 
 /**
