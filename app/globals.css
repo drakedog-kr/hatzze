@@ -5427,10 +5427,7 @@ main.hz-scroll { overflow-x: clip; }
 .dv-twarn { color: var(--c-label); }
 /* 주수 스테퍼 위, 평단 칸 아래 — 두 줄을 감싸는 격자. */
 .dv-tshares { display: grid; grid-template-columns: auto auto auto; justify-content: start; align-items: center; gap: 4px; }
-.dv-tcost, .dv-tcost-open, .dv-tinvest { grid-column: 1 / -1; }
-/* 줄의 투자금(주수 × 평단·종가) — 평단 줄 아래 한 줄. 숫자만 진하게. */
-.dv-tinvest { font-size: 11px; color: var(--c-sub); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.dv-tinvest b { font-weight: 700; color: var(--c-ink); }
+.dv-tcost, .dv-tcost-open { grid-column: 1 / -1; }
 .dv-tcost { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--c-sub); white-space: nowrap; }
 .dv-tshares .dv-tcost input {
   width: 84px; height: 26px; padding: 0 6px; text-align: right; border-radius: 6px; border: 1px solid var(--c-line);
@@ -5479,6 +5476,9 @@ main.hz-scroll { overflow-x: clip; }
 /* 비중 칸 — 숫자 아래 얇은 막대. */
 .dv-tweight-bar { display: block; width: 52px; height: 4px; margin: 5px 0 0 auto; border-radius: 2px; background: var(--c-track); overflow: hidden; }
 .dv-tweight-bar > span { display: block; height: 100%; border-radius: 2px; background: var(--c-blue); }
+/* 줄의 투자금 — 넓은 화면은 비중 막대 아래(.dv-tinvest), 비중 칸이 접히는 1,100 아래는 1년 배당 아래(.dv-tinvest-m). */
+.dv-tinvest { margin-top: 4px; white-space: nowrap; }
+.dv-tinvest-m { display: none; }
 .dv-remove {
   width: 28px; height: 28px; border-radius: 8px; border: none; background: transparent; color: var(--c-muted);
   font-size: 18px; line-height: 1; cursor: pointer; font-family: inherit; transition: background 0.12s ease, color 0.12s ease;
@@ -5675,6 +5675,8 @@ main.hz-scroll { overflow-x: clip; }
 @media (max-width: 1100px) {
   .dv-trow { grid-template-columns: minmax(0, 1fr) 132px 128px 84px 36px; }
   .dv-trow > :nth-child(3), .dv-trow > :nth-child(6) { display: none; }
+  /* 비중 칸이 접히면 그 아래 있던 투자금은 '1년에 받는 배당' 아래로 옮겨 선다. */
+  .dv-tinvest-m { display: block; }
 }
 @media (max-width: 860px) {
   /* 한 줄에 다섯 칸도 이름에 100px 이 안 남는다(860 시트 604 − 444). 두 줄로
