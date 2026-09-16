@@ -1,7 +1,8 @@
 import Link from "next/link";
 
 import { NOTE_PAGE } from "./daily/copy";
-import { DAILY_PUBLIC, PREVIEW_PUBLIC } from "./screen-flags";
+import { DIVIDEND_PAGE } from "./dividend/copy";
+import { DAILY_PUBLIC, DIVIDEND_PUBLIC, PREVIEW_PUBLIC } from "./screen-flags";
 import { BetaBadge, GhostSymbol, Wordmark } from "./Logo";
 import { C } from "./ui";
 import { VersionLink } from "./VersionBadge";
@@ -49,8 +50,9 @@ const SOURCE_GROUPS: { label: string; items: string }[] = [
   /* ECOS 에서 받는 건 GDP(200Y109)·소비자심리지수(511Y002)·외국인 순매수(802Y001),
      그리고 자금순환표(281Y002 · 가계 부문 금융자산) 넷이다.
      FRED 는 **원/달러 환율(DEXKOUS)만** 받는다 — 나스닥·S&P 같은 벤더 지수는 안 쓴다
-     (그쪽은 FRED 를 거쳐도 벤더 약관을 따른다. lib/seohak-external.ts 머리말 참고). */
-  { label: "거시·경제통계", items: "한국은행(ECOS) · 미 연준(FRED)" },
+     (그쪽은 FRED 를 거쳐도 벤더 약관을 따른다. lib/seohak-external.ts 머리말 참고).
+     배당 페이지의 원/달러는 ECB 참조환율(frankfurter.dev 중계)이 먼저고 FRED 는 그 뒤 — data-pipeline/common/fx.py. */
+  { label: "거시·경제통계", items: "한국은행(ECOS) · 미 연준(FRED) · 유럽중앙은행(ECB)" },
   /* 내부자 리포트가 여기서 나온다. 셋 다 이름을 적어야 하는 원천이다.
        SEC EDGAR — 임원 Form 4 · 월가 거물 13F
        미 하원    — STOCK Act 매매 신고(PTR)
@@ -61,6 +63,13 @@ const SOURCE_GROUPS: { label: string; items: string }[] = [
                **받아 온 곳**이라 앞의 것만 남긴다 — S&P Global 은 그 위의 집계 주체이지
                우리가 약관을 맺은 상대가 아니고, 그 사실은 카드 물음표가 말한다. */
   { label: "미국 공시·전망", items: "SEC EDGAR · 미 하원 · stockanalysis.com" },
+  /* 배당으로 살기가 여기서 나온다. 화면 안에는 출처 이름이 없으므로(물음표 툴팁에서도 뺐다, 2026-09-13)
+     이름이 남는 곳은 여기뿐이다. 미국 배당 지급일·배당성향은 위 stockanalysis.com 이 같이 맡는다.
+       한국예탁결제원 — 국내 배당 기록(공공데이터포털 주식배당정보, 2유형이라 출처 표시가 조건)
+       한국거래소 KIND — 고배당기업(분리과세 대상) 목록·배당성향
+     국내 ETF 분배 내역(미래에셋 TIGER)은 적지 않는다(2026-09-13 결정) — 출처 표기를 조건으로 건 약관이 없다.
+     여는 날까지는 숨긴다(DIVIDEND_PUBLIC) — 안 쓰는 곳을 적으면 없는 권위를 빌리는 것이다(위 주석). */
+  ...(DIVIDEND_PUBLIC ? [{ label: "배당", items: "한국예탁결제원 · 한국거래소 KIND" }] : []),
   { label: "검색·뉴스", items: "네이버 · 유튜브" },
   { label: "커뮤니티·소비", items: "텔레그램 · 디시인사이드 · 알라딘" },
   { label: "가상자산·기타", items: "업비트 · GitHub · 앱스토어" },
@@ -213,6 +222,7 @@ export default function Footer() {
                 바꾸면 이 줄이 저절로 살아난다. */}
             {PREVIEW_PUBLIC && <FooterLink href="/preview">국장 미리보기</FooterLink>}
             {DAILY_PUBLIC && <FooterLink href={NOTE_PAGE.href}>{NOTE_PAGE.label}</FooterLink>}
+            {DIVIDEND_PUBLIC && <FooterLink href={DIVIDEND_PAGE.href}>{DIVIDEND_PAGE.label}</FooterLink>}
             {/* 사이드바가 모바일에서 숨겨져 텔레그램 링크가 사라진다 — 내부 내비게이션과
                 같은 방식으로 푸터에 두어 좁은 화면에서도 닿게 한다. 라벨과 aria 는
                 AppShell 의 TELEGRAM 상수와 같은 문구로 맞춘다(두 내비게이션이 같은

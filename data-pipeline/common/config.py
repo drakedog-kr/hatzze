@@ -13,6 +13,9 @@ FRED_API_KEY = os.environ.get("FRED_API_KEY")
 NAVER_HUB_KEY_ID = os.environ.get("NAVER_HUB_KEY_ID")
 NAVER_HUB_KEY = os.environ.get("NAVER_HUB_KEY")
 KRX_API_KEY = os.environ.get("KRX_API_KEY")
+# 핀허브 시세(무료 플랜, 분당 60회). 국장 미리보기·미국 배당주 요약이 쓴다. 배당 엔드포인트는
+# 이 플랜에서 막혀 있어(403) 배당은 SEC 에서 받는다(fetch_us_dividends.py).
+FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY")
 # 한국예탁결제원 외화증권 결제(공공데이터포털 금융위원회). 서학개미 장부의 일별 뼈대다.
 KSD_API_KEY = os.environ.get("KSD_API_KEY")
 ECOS_API_KEY = os.environ.get("ECOS_API_KEY")

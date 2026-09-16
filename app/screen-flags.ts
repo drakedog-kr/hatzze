@@ -61,3 +61,24 @@ export const PREVIEW_PUBLIC = true;
  *    다른 판단이다.
  */
 export const DAILY_PUBLIC = true;
+
+/**
+ * 배당으로 살기(/dividend) — 종목과 주수를 넣으면 1년에 얼마 받는지 계산하는 화면. 2026-09-11 에
+ * 만들었고 **아직 안 열었다.** 읽는 곳은 데일리 노트와 같다(사이드바·푸터·사이트맵·검사).
+ *
+ *   app/dividend/page.tsx     배포된 곳에서 404 를 낼지, noindex 를 달지
+ *   app/AppShell.tsx          NAV ↔ COMING_SOON · DEEP_PAGES
+ *   app/Footer.tsx            '바로가기' 목록
+ *   app/sitemap-urls.ts       사이트맵
+ *   scripts/check-routes.mjs  안 연 동안 사이트맵에 없는 것을 정상으로 볼지
+ *
+ * ## 여는 절차
+ *
+ *   1. 아래 값을 true 로 바꾼다. 위 자리가 전부 같이 켜진다.
+ *   2. `app/releases.ts` 에 한 줄 올린다(화면이 하나 느는 것이라 Minor).
+ *   3. 머지 뒤 프로덕션을 찔러 본다 — `curl -s -o /dev/null -w '%{http_code}' https://hatzze.fun/dividend` 가 200.
+ *
+ * ⛔ **여라는 말이 있기 전에는 바꾸지 말 것.** 화면이 다 만들어졌다는 것과 여는 것은
+ *    다른 판단이다.
+ */
+export const DIVIDEND_PUBLIC = true;

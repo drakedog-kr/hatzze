@@ -1,8 +1,8 @@
 # hatzze | 데이터와 여론으로 읽는 시장
 
-**v1.13.1 베타** · 🔗 **[hatzze.fun](https://hatzze.fun)**
+**v1.14.0 베타** · 🔗 **[hatzze.fun](https://hatzze.fun)**
 
-지금 시장이 어떤 상태인지를 일곱 화면과 텔레그램 채널로 보여주는 대시보드입니다.
+지금 시장이 어떤 상태인지를 여덟 화면과 텔레그램 채널로 보여주는 대시보드입니다.
 
 | 화면 | 보여주는 것 | 원천 |
 |---|---|---|
@@ -13,11 +13,12 @@
 | **서학개미 장부** (`/seohak`) | 개인이 미국 주식을 언제 사고팔고 지금 얼마가 됐는지 | 예탁결제원 · 미 재무부 TIC |
 | **국장 미리보기** (`/preview`) | 밤사이 미국이 크게 움직인 날 국내는 보통 얼마에 열렸나 | 핀허브 · 야후 · 하이퍼리퀴드 |
 | **데일리 노트** (`/daily`) | 하루의 시장 이야기를 매일 저녁 한 편으로 정리한 글 | 위 화면들의 그날 데이터 |
+| **배당으로 살기** (`/dividend`) | 배당주를 담고 주수를 적으면 1년에 얼마 받는지 계좌별 세후로, 달마다 얼마 들어오는지 | 예탁결제원 · KIND · SEC · stockanalysis · 미래에셋 TIGER |
 | **텔레그램 채널** ([@hatzze69](https://t.me/hatzze69)) | 채널에서 오간 이야기를 관련 종목과 함께 매일 아침·저녁, 주말에 정리 | 텔레그램 공개 채널 |
 
-2026-08-06 베타 오픈 이후로 화면이 계속 붙는 중이라 로고 옆에 베타 배지를 답니다. 가장 최근에 연 것은 **데일리 노트**(2026-09-07)이고, 텔레그램 채널 글은 2026-09-11부터 새 형식으로 나갑니다.
+2026-08-06 베타 오픈 이후로 화면이 계속 붙는 중이라 로고 옆에 베타 배지를 답니다. 가장 최근에 연 것은 **배당으로 살기**(2026-09-16)이고, 텔레그램 채널 글은 2026-09-11부터 새 형식으로 나갑니다.
 
-> ⚠️ 햇쩨 지수의 구간, 카더라의 집계, MDD의 과거 통계, 내부자 리포트에 실린 신고 내역은 모두 **과열 정도**·**회자되는 정도**·**지나간 기록**을 나타낸 표현일 뿐, **재미·참고용이며 매수·매도 신호가 아닙니다.**
+> ⚠️ 햇쩨 지수의 구간, 카더라의 집계, MDD의 과거 통계, 내부자 리포트에 실린 신고 내역, 배당으로 살기의 계산과 바스켓은 모두 **과열 정도**·**회자되는 정도**·**지나간 기록**을 나타낸 표현일 뿐, **재미·참고용이며 매수·매도 신호가 아닙니다.**
 
 [이용약관](https://hatzze.fun/terms) · [개인정보처리방침](https://hatzze.fun/privacy) · [변경 기록](https://hatzze.fun/changelog)
 
@@ -31,6 +32,7 @@ flowchart LR
     T1["fetch_telegram.py<br/>채널 메시지"] --> T2["종목·테마 집계<br/>국내 · 미국"]
     U1["fetch_us_*.py<br/>SEC · 하원 · 13F"] --> D
     S1["fetch_seohak_*.py<br/>예탁원 · TIC · KRX"] --> D
+    V1["fetch_*_dividend*.py<br/>예탁원 · KIND · SEC · TIGER"] --> D
     P1["fetch_kr_preview.py<br/>핀허브 · 야후"] --> D
     P2["fetch_kr_overnight.py<br/>하이퍼리퀴드 → 원화"] --> D
     B --> L["Claude Haiku<br/>요약 · 총평"]
@@ -43,6 +45,7 @@ flowchart LR
     G -.-> T1
     G -.-> U1
     G -.-> S1
+    G -.-> V1
     G -.-> P1
     G -.-> P2
 ```
@@ -108,7 +111,7 @@ data-pipeline/
   config/         지표 임계값·가중치 · 종목 별칭 · 테마 사전
   backtest/       눈금·가중치 재보정 하네스
   common/         Supabase·야후·KRX·HTTP 클라이언트 · LLM 문장 검수 · 텔레그램 글 조립
-supabase/         schema.sql + migration_001~070
+supabase/         schema.sql + migration_001~078
 .github/workflows/  daily-update · telegram-broadcast · us-dict-scan · indexnow · ci
 ```
 
@@ -145,8 +148,8 @@ python scripts/fetch_telegram.py           # 카더라 채널 메시지 수집
 | `ANTHROPIC_API_KEY` | 오늘의 요약 · 카더라 총평 (Claude Haiku) |
 | `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` / `TELEGRAM_SESSION` · `TELEGRAM_CHANNELS_SHEET_ID` | 카더라 메시지 수집 · 채널 목록 |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_BROADCAST_CHAT_ID` | 채널 발송 (수집용과 별개인 봇) |
-| `FINNHUB_API_KEY` | 미국 종목 간밤 등락 (국장 미리보기) |
-| `FRED_API_KEY` · `GITHUB_TOKEN` · `KMA_API_KEY` | 미 재무부 TIC 계열(서학개미 장부) · 깃헙 검색(없으면 비인증) · 도입 예정 |
+| `FINNHUB_API_KEY` | 미국 종목 간밤 등락 (국장 미리보기) · 미국 배당주 시세 |
+| `FRED_API_KEY` · `GITHUB_TOKEN` · `KMA_API_KEY` | 미 재무부 TIC 계열(서학개미 장부) · 원/달러 예비(ECB 가 안 올 때) · 깃헙 검색(없으면 비인증) · 도입 예정 |
 | `NEXT_PUBLIC_GA_ID` · `NEXT_PUBLIC_LOGO_DEV_KEY` · `*_SITE_VERIFICATION` | 선택. 없으면 그 기능만 빠집니다 |
 
 `NEXT_PUBLIC_` 접두어가 붙은 값은 클라이언트에 그대로 노출되는 공개값입니다.
@@ -159,8 +162,8 @@ python scripts/fetch_telegram.py           # 카더라 채널 메시지 수집
 
 | 발사(KST) | 워크플로 | 하는 일 |
 |---|---|---|
-| 07:00 | `daily-update` | 지표·카더라 갱신, 평일이면 08:30 무렵 개장 전 요약 |
-| 18:00 | `daily-update` | 그날 종가 확보 + 아침 만회 → 완료 ~19:23, 평일이면 저녁 브리핑 |
+| 07:00 | `daily-update` | 지표·카더라 갱신, 배당 표(미국 종가), 평일이면 08:30 무렵 개장 전 요약 |
+| 18:00 | `daily-update` | 그날 종가 확보 + 아침 만회, 배당 표(국내 종가·배당 기록) → 완료 ~19:23, 평일이면 저녁 브리핑 |
 | 수 12:30 · 토 10:30 · 일 21:00 | `telegram-broadcast` | 주중 점검(수) · 이번 주 미장 흐름(토) · 한 주 정리와 다음 주 일정(일) |
 | 월 10:00 | `us-dict-scan` | 미국 종목 사전 후보 스캔 |
 
@@ -198,6 +201,6 @@ python scripts/fetch_telegram.py           # 카더라 채널 메시지 수집
 
 ## 데이터 출처
 
-KRX Open API · 한국은행 ECOS · 한국예탁결제원 · 미 재무부 TIC · SEC EDGAR · 미 하원 공시 · NAVER API HUB · YouTube Data API · 알라딘 · GitHub Search API · Apple App Store · DCInside · Upbit · Yahoo Finance · Finnhub · Hyperliquid · Telegram(공개 채널)
+KRX Open API · 한국거래소 KIND · 한국은행 ECOS · 한국예탁결제원 · 미 재무부 TIC · SEC EDGAR · 미 하원 공시 · stockanalysis.com · 미래에셋 TIGER 분배 내역 · 유럽중앙은행 ECB(환율) · NAVER API HUB · YouTube Data API · 알라딘 · GitHub Search API · Apple App Store · DCInside · Upbit · Yahoo Finance · Finnhub · Hyperliquid · Telegram(공개 채널)
 
 국내 시장 데이터는 KRX에서 받되, **KRX가 종가를 다음 날 08:00에 올리는 탓에** 지수 종가와 당일 종가는 야후에서 받습니다.

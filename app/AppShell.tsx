@@ -6,7 +6,8 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { INSIDER_LISTS, INSIDER_LIST_SLUGS, insiderListHref } from "./insider/lists";
 import { PageJsonLd } from "./JsonLd";
 import { NOTE_PAGE } from "./daily/copy";
-import { DAILY_PUBLIC } from "./screen-flags";
+import { DIVIDEND_PAGE } from "./dividend/copy";
+import { DAILY_PUBLIC, DIVIDEND_PUBLIC } from "./screen-flags";
 
 import { track } from "@/lib/ga";
 import { SLOGAN } from "./brand";
@@ -237,6 +238,9 @@ const NAV: NavItem[] = [
   // DAILY_PUBLIC 한 줄이다. 안 연 동안은 아래 COMING_SOON 에 눌리지 않는 줄로 서고, 열면
   // 여기 맨 아래에 선다. 이름·부제·아이콘은 app/daily/copy.ts 한 곳에서 온다.
   ...(DAILY_PUBLIC ? [{ href: NOTE_PAGE.href, label: NOTE_PAGE.label, icon: NOTE_PAGE.icon, sub: NOTE_PAGE.sub }] : []),
+  // 배당으로 살기(/dividend) — ⛔ 여는 것은 `app/screen-flags.ts` 의 DIVIDEND_PUBLIC 한 줄이다. 데일리 노트와
+  // 같은 방식으로 안 연 동안은 COMING_SOON 에, 열면 여기 맨 아래에 선다.
+  ...(DIVIDEND_PUBLIC ? [{ href: DIVIDEND_PAGE.href, label: DIVIDEND_PAGE.label, icon: DIVIDEND_PAGE.icon, sub: DIVIDEND_PAGE.sub }] : []),
 ];
 
 // 외부(텔레그램) 링크라 NAV 배열이 아니라 따로 둔다 — pathname 기반 active 판정 대상이
@@ -282,6 +286,10 @@ const COMING_SOON: { label: string; badge: string; tip: string; after: string; i
   ...(DAILY_PUBLIC
     ? []
     : [{ label: NOTE_PAGE.label, badge: "준비 중", tip: NOTE_PAGE.tip, after: "/preview", icon: NOTE_PAGE.icon }]),
+  // 배당으로 살기(2026-09-11 만듦, 아직 안 열었다). 데일리 노트 뒤(사이드바 맨 아래).
+  ...(DIVIDEND_PUBLIC
+    ? []
+    : [{ label: DIVIDEND_PAGE.label, badge: "준비 중", tip: DIVIDEND_PAGE.tip, after: DAILY_PUBLIC ? NOTE_PAGE.href : "/preview", icon: DIVIDEND_PAGE.icon }]),
 ];
 
 /**
@@ -444,6 +452,8 @@ const DEEP_PAGES: Record<string, { label: string; sub: string; badge?: string }>
   // 못 찾아 여기서 채운다. 배지가 있어 PageJsonLd 도 안 나간다(noindex 와 맞는다).
   // 열면 DAILY_PUBLIC 이 이 항목을 빼고, NAV 의 /daily 항목이 제목을 준다.
   ...(DAILY_PUBLIC ? {} : { [NOTE_PAGE.href]: { label: NOTE_PAGE.label, sub: NOTE_PAGE.sub, badge: "준비 중" } }),
+  // 배당으로 살기 — 같은 이유로 안 연 동안만.
+  ...(DIVIDEND_PUBLIC ? {} : { [DIVIDEND_PAGE.href]: { label: DIVIDEND_PAGE.label, sub: DIVIDEND_PAGE.sub, badge: "준비 중" } }),
   ...Object.fromEntries(
     INSIDER_LIST_SLUGS.map((slug) => [
       insiderListHref(slug),
@@ -1312,22 +1322,36 @@ const NEWS_EVENT = "hz-news-change";
    조건부가 없어서, 띠만 먼저 넣으면 프로덕션에서 눌러 404 로 간다. 그래서 목적지가
    열려 있을 때만 걸리도록 플래그로 가른다 — `app/screen-flags.ts` 한 줄을 true 로
    바꾸는 순간 아래가 통째로 갈린다. 문구는 이미 정해 뒀다(2026-09-04, 48자). */
-/* 2026-09-11 · 텔레그램 채널 글 2판 소식. 목적지가 바깥(t.me)이라 새 탭으로 연다(아래 NewsStrip).
-   ⚠️ 문구에 숫자를 넣지 않는다(위 주석). 이전 소식들(내부자 → 국장 미리보기 → 데일리 노트)은
-   git 이력에 있다 — 되살릴 땐 키를 새로 딴다. */
-const NEWS = {
-  key: "hz-news-telegram-v2",
-  // 이 시각 전에는 띠를 안 그린다. 새 형식의 첫 글(9/11 아침, 08:45~09:20 도착)이 나간 뒤에
-  // 떠야 눌러 들어간 사람이 새 글을 본다 — 머지 당일 저녁에 뜨면 옛 글이 맨 위에 있다.
-  from: "2026-09-11T09:30:00+09:00",
-  href: TELEGRAM.href,
-  name: "텔레그램 채널",
-  tail: " 글의 퀄리티가 향상되었습니다. 더 종합적이고 더 자세하게 정리합니다.",
-  // 사이드바의 채널 아이콘(send)이 아니라 '올라갔다'는 그림이다 — '새 화면'이 아니라 '나아졌다'는
-  // 소식이라서. 전구(lightbulb)는 MDD 본문이 이미 써서 못 쓴다(한 화면에 같은 아이콘 두 번 금지).
-  icon: "upgrade",
-  ga: "news-telegram",
-};
+/* 2026-09-16 · 배당으로 살기 오픈 소식. 목적지가 우리 화면이라 같은 탭이고, 그 화면 안에서는 띠를 안 그린다(NewsStrip).
+   ⚠️ 문구에 숫자를 넣지 않는다(위 주석). 이전 소식들(내부자 → 국장 미리보기 → 데일리 노트 → 텔레그램 2판)은
+   git 이력에 있다 — 되살릴 땐 키를 새로 딴다.
+   ⛔ 목적지가 열려 있을 때만 건다 — DIVIDEND_PUBLIC 이 false 면 텔레그램 2판 소식이 그대로 선다(띠만 먼저 나가 404 로
+   가는 일을 막는다, 국장 미리보기 때의 규칙). */
+const NEWS = DIVIDEND_PUBLIC
+  ? {
+      key: "hz-news-dividend",
+      // 머지·배포 직후부터. 화면이 같은 배포에 실려 나가니 기다릴 글이 없다.
+      from: "2026-09-16T00:00:00+09:00",
+      href: DIVIDEND_PAGE.href,
+      name: DIVIDEND_PAGE.label,
+      tail: "를 열었습니다. 배당주로 파이어 준비하는 분들을 위한 월 배당 달력입니다.",
+      // 사이드바 NAV 의 그 화면 아이콘과 같은 것(paid) — 띠를 눌러 가면 사이드바에서 같은 그림이 켜진다.
+      icon: DIVIDEND_PAGE.icon,
+      ga: "news-dividend",
+    }
+  : {
+      key: "hz-news-telegram-v2",
+      // 이 시각 전에는 띠를 안 그린다. 새 형식의 첫 글(9/11 아침, 08:45~09:20 도착)이 나간 뒤에
+      // 떠야 눌러 들어간 사람이 새 글을 본다 — 머지 당일 저녁에 뜨면 옛 글이 맨 위에 있다.
+      from: "2026-09-11T09:30:00+09:00",
+      href: TELEGRAM.href,
+      name: "텔레그램 채널",
+      tail: " 글의 퀄리티가 향상되었습니다. 더 종합적이고 더 자세하게 정리합니다.",
+      // 사이드바의 채널 아이콘(send)이 아니라 '올라갔다'는 그림이다 — '새 화면'이 아니라 '나아졌다'는
+      // 소식이라서. 전구(lightbulb)는 MDD 본문이 이미 써서 못 쓴다(한 화면에 같은 아이콘 두 번 금지).
+      icon: "upgrade",
+      ga: "news-telegram",
+    };
 
 // 모듈이 읽힐 때 한 번만 본다(렌더 안에서 Date.now() 를 부르면 React 컴파일러 린트가 막는다).
 // 서버는 어차피 안 그리고(getServerSnapshot 이 false), 클라이언트는 페이지를 열 때마다 새로 읽는다.

@@ -5258,3 +5258,444 @@ main.hz-scroll { overflow-x: clip; }
   /* 손가락으로 누르는 폭이라 34px 은 좁다. 글자는 그대로 두고 상자만 키운다. */
   .hz-note-share { height: 40px; padding: 0 16px; }
 }
+
+/* ════ 배당 계산기 (/dividend) ═══════════════════════════════════════════
+   .hz-tx 결 위에 얹는다(시트·머리·타일 색은 그 스코프가 준다). 여기는 이 화면에만 있는
+   것들이다 — 결과 문장, 검색창, 칩, 담은 종목 표, 달력, 투자금 슬라이더, 바스켓 줄.
+   ⚠️ 호버·포커스가 있는 것은 전부 클래스로 둔다. 인라인 style 은 :hover 를 이긴다. */
+.dv-calc { transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+/* 끌어다 놓는 중 — 시트 전체가 받는 자리라는 걸 테두리로 말한다. */
+.hz-tx .dv-calc.dv-drop-on { border-color: var(--c-blue); box-shadow: 0 0 0 3px var(--c-blue-tint); }
+
+/* 결과 문장. 종목이 없을 때도 이 자리를 비우지 않는다. */
+.dv-hero { padding: 22px 26px 4px; }
+.dv-hero-label { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--c-sub); }
+.dv-hero-main {
+  margin: 0; font-size: 34px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.15;
+  color: var(--c-ink); font-variant-numeric: tabular-nums; word-break: keep-all;
+}
+.dv-hero-empty { font-size: 22px; font-weight: 700; color: var(--c-sub2); }
+.dv-hero-sub { margin: 6px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--c-sub); word-break: keep-all; }
+/* 히어로 라벨 옆 물음표 — 세금·시세·출처 넉 줄. 240px 상한이면 여덟 줄이 돼 320 으로. */
+.dv-hero-label { display: flex; align-items: center; gap: 4px; }
+.dv-help { display: inline-flex; color: var(--c-muted); }
+.dv-help::after { max-width: 320px; font-weight: 500; }
+/* 큰 숫자 아래 타일 셋 — 한 달 평균 · 투자금 · 배당수익률. 카더라 히어로의 .hz-tx-stat 을 그대로, 열만 셋. */
+.dv-hero-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 12px; max-width: 640px; }
+.dv-hero-stats .hz-tx-stat-v { font-size: 18px; font-variant-numeric: tabular-nums; }
+/* 계좌 고르기 — 세후일 때 히어로 아래 작은 칸. 머리의 세후·세전보다 한 단 작다. */
+.dv-account { display: flex; align-items: center; gap: 4px; margin: 10px 0 0; flex-wrap: wrap; }
+.dv-account-label { font-size: 12px; font-weight: 600; color: var(--c-sub); margin-right: 4px; }
+.dv-account-btn {
+  padding: 4px 10px; border-radius: 999px; border: 1px solid var(--c-line); background: var(--c-card); color: var(--c-label);
+  font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap;
+}
+.dv-account-btn[aria-pressed="true"] { background: var(--c-cold-ink); border-color: var(--c-cold-ink); color: var(--c-card); }
+/* 분리과세 몫 — 2,000만원 근처인 사람에게만 뜨는 한 줄. */
+.dv-hero-note { margin: 8px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--c-sub); word-break: keep-all; }
+.dv-body { padding: 14px 26px 22px; display: flex; flex-direction: column; gap: 16px; }
+
+/* 세후·세전 — MDD 기간 토글과 같은 세그먼트. 고른 칸만 파란 면 + 카드색 글자. */
+.dv-seg { display: flex; gap: 2px; background: var(--c-track); border-radius: 9px; padding: 3px; }
+.dv-seg-btn {
+  padding: 6px 12px; border-radius: 6px; border: none; background: transparent; color: var(--c-label);
+  font-size: 11.5px; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap;
+}
+.dv-seg-btn[aria-pressed="true"], .dv-seg-btn[aria-selected="true"] { background: var(--c-cold-ink); color: var(--c-card); }
+
+/* 세 갈래 판 — 국장 · 미장 · ETF 가 늘 나란히. 회색 타일 안에 제목·설명·칩. 좁으면 한 판씩. */
+.dv-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.dv-group { display: flex; flex-direction: column; background: var(--tx-tile); border-radius: var(--tx-r-tile); padding: 12px 14px 12px; min-width: 0; }
+/* 제목은 한 줄로 못박고 설명은 그 아래 — 나란히 두면 설명이 길 때 제목이 "국/장"으로 꺾였다. */
+.dv-group-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+.dv-group-title { font-size: 13.5px; font-weight: 800; color: var(--c-ink); letter-spacing: -0.01em; white-space: nowrap; }
+.dv-group-desc { font-size: 11.5px; color: var(--c-sub); word-break: keep-all; }
+/* 긴 ETF 이름은 칩 안에서 한 줄로 자른다. */
+.dv-chip-name { max-width: 180px; min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dv-chip-yield { flex-shrink: 0; }
+.dv-chips-empty { margin: 0; font-size: 12px; color: var(--c-muted); }
+/* 검색 결과의 갈래 제목. */
+.dv-search-group + .dv-search-group { margin-top: 4px; border-top: 1px solid var(--c-sheet-row); padding-top: 4px; }
+.dv-search-group-head { padding: 6px 10px 2px; font-size: 11px; font-weight: 700; color: var(--c-muted); letter-spacing: 0.02em; }
+
+/* 검색 — MDD 조회 바와 같은 '파인 회색 면'. 바탕(--c-bg)이 아니라 --c-track 인 이유는 저쪽 주석. */
+.dv-search { position: relative; }
+.dv-search-box {
+  display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px;
+  background: var(--c-track); border: 1px solid transparent; border-radius: 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.dv-search-box-on { border-color: var(--c-blue); box-shadow: 0 0 0 3px var(--c-blue-tint); }
+.dv-search-box input {
+  flex: 1; min-width: 0; border: none; outline: none; background: transparent;
+  color: var(--c-ink); font-size: 15px; font-family: inherit;
+}
+.dv-search-pop {
+  position: absolute; top: 50px; left: 0; right: 0; z-index: 20; padding: 6px;
+  background: var(--c-float); border: 1px solid var(--c-line); border-radius: 12px;
+  box-shadow: 0 4px 16px var(--c-shadow-strong); max-height: 420px; overflow-y: auto;
+}
+.dv-search-pop ul { list-style: none; margin: 0; padding: 0; }
+.dv-search-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: none;
+  border-radius: 8px; cursor: pointer; color: var(--c-ink); font-size: 14px; text-align: left; font-family: inherit;
+}
+.dv-search-name { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dv-search-meta { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--c-sub); white-space: nowrap; }
+.dv-search-none { margin: 0; padding: 12px 10px; font-size: 12.5px; line-height: 1.5; color: var(--c-muted); }
+.dv-badge {
+  font-size: 11px; font-weight: 600; color: var(--c-sub); background: var(--c-chip);
+  padding: 2px 5px; border-radius: 4px; flex-shrink: 0; margin-left: 6px;
+}
+
+/* 앞에 세워 둔 칩. 끌 수 있는 것이라 손 모양 커서. */
+.dv-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.dv-chips-label { font-size: 12px; font-weight: 600; color: var(--c-muted); margin-right: 2px; }
+.dv-chip {
+  /* 판보다 넓어질 수 없다 — 1,024px 판(안폭 204px)에서 긴 ETF 칩(275px)이 판을 뚫고 나갔다. 이름이 대신 줄어든다. */
+  max-width: 100%;
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px 5px 6px; border-radius: 999px;
+  border: 1px solid var(--c-line); background: var(--c-card); color: var(--c-ink);
+  font-size: 12.5px; font-weight: 600; cursor: grab; font-family: inherit; transition: background 0.12s ease;
+}
+.dv-chip:hover { background: var(--tx-btn); }
+.dv-chip:active { cursor: grabbing; }
+.dv-chip-yield { color: var(--c-sub); }
+/* 초고배당(30% 넘는) ETF 의 숫자 — 제일 큰 숫자가 제일 좋은 걸로 읽히지 않게 점선 밑줄(뜻은 툴팁)과 가는 굵기.
+   더 흐린 회색은 없다 — --c-muted 는 --c-sub 와 거의 같고 --c-faint 는 대비 2.69 라 글자에 못 쓴다. 빨강은 온도색이라 안 쓴다. */
+.dv-chip-yield-hot { font-weight: 500; text-decoration: underline dotted; text-underline-offset: 2px; cursor: help; }
+
+/* 더 보기 — 판 맨 아래 가로로 꽉 찬 버튼(세 판이 같은 줄에 서게 margin-top: auto). 열면 그 판의 묶음들이
+   세 판 아래 한 줄 전체 폭으로 펼쳐진다. 펼친 판의 버튼은 파란 면으로 "이게 열려 있다"를 짚는다. */
+.dv-more-btn {
+  margin-top: 12px; padding: 8px 12px; width: 100%; border-radius: 10px; border: 1px solid var(--c-line);
+  background: var(--c-card); color: var(--c-ink); font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.dv-group .dv-more-btn { margin-top: auto; }
+.dv-group .dv-chips { margin-bottom: 12px; }
+.dv-more-btn:hover { background: var(--tx-btn); }
+.dv-more-btn[aria-expanded="true"] { background: var(--c-cold-ink); border-color: var(--c-cold-ink); color: var(--c-card); }
+/* 펼친 묶음 머리의 '접기'는 글자 버튼. */
+.dv-more-toggle {
+  padding: 0; border: none; background: none; color: var(--c-blue);
+  font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap;
+}
+.dv-more-toggle:hover { text-decoration: underline; }
+.dv-more { grid-column: 1 / -1; background: var(--tx-tile); border-radius: var(--tx-r-tile); padding: 12px 14px; min-width: 0; }
+.dv-more-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.dv-more-title { font-size: 13.5px; font-weight: 800; color: var(--c-ink); letter-spacing: -0.01em; }
+/* 한 줄 = 라벨 + 칩. 라벨 폭을 못박아 칩이 줄마다 같은 자리에서 시작한다. */
+.dv-more-row { display: flex; align-items: flex-start; gap: 12px; padding: 8px 0; border-top: 1px solid var(--c-sheet-row); }
+/* 112px — "배당 10년 넘게 늘린"(12px 굵게 95px)이 96 에서 두 줄로 접혔다(2026-09-16). */
+.dv-more-label { flex: 0 0 112px; padding-top: 6px; font-size: 12px; font-weight: 700; color: var(--c-sub); word-break: keep-all; }
+.dv-more-row .dv-chips { min-width: 0; }
+/* 전체 폭이라 칩 이름을 판 안(180px)보다 길게 둔다 — "TIGER 미국배당다우존스타겟데일리커버드콜"이 다 보인다. */
+.dv-more .dv-chip-name { max-width: 280px; }
+.dv-more-foot { margin: 8px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--c-muted); word-break: keep-all; }
+
+/* 담은 종목 표. 열: 종목 · 주수 · 1주에 1년 · 1년에 받는 배당 · 수익률 · 빼기 */
+.dv-table { display: flex; flex-direction: column; }
+.dv-trow {
+  /* 열 사이 16px — 배당수익률과 비중이 붙어 보였다(2026-09-13). 비중 열은 막대가 들어가 조금 넓다. */
+  display: grid; grid-template-columns: minmax(0, 1fr) 132px 96px 128px 84px 80px 36px;
+  align-items: center; gap: 16px; padding: 10px 0; border-top: 1px solid var(--c-sheet-row);
+}
+.dv-thead { padding: 0 0 6px; border-top: none; font-size: 11.5px; font-weight: 600; color: var(--c-muted); }
+/* 표 위 한 줄 — 담은 수와 '모두 빼기'. */
+.dv-table-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 0 10px; }
+.dv-table-count { font-size: 12px; font-weight: 700; color: var(--c-sub); }
+.dv-table-clear { padding: 0; border: none; background: none; color: var(--c-muted); font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.dv-table-clear:hover { color: var(--c-blue); text-decoration: underline; }
+.dv-thead > span:nth-child(n + 3) { text-align: right; }
+.dv-tcell { min-width: 0; }
+.dv-tname { display: flex; align-items: center; gap: 10px; }
+.dv-tname-txt { display: flex; flex-direction: column; min-width: 0; }
+.dv-tname-main {
+  display: flex; align-items: center; min-width: 0; font-size: 14px; font-weight: 600; color: var(--c-ink);
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.dv-tnote { margin-top: 2px; font-size: 11.5px; line-height: 1.4; color: var(--c-sub); word-break: keep-all; }
+/* 사실 조각 알약 — 배당성향 · 연속 늘림 · 5년 연 +n% · 다음 지급. 뜻은 title 로. */
+.dv-tfacts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.dv-tfact {
+  font-size: 11px; font-weight: 600; color: var(--c-sub); background: var(--tx-tile); border-radius: 6px; padding: 2px 6px;
+  white-space: nowrap; cursor: default;
+}
+/* 주의는 문장 그대로, 사실 조각보다 한 단 진하게. */
+.dv-twarn { color: var(--c-label); }
+/* 주수 스테퍼 위, 평단 칸 아래 — 두 줄을 감싸는 격자. */
+.dv-tshares { display: grid; grid-template-columns: auto auto auto; justify-content: start; align-items: center; gap: 4px; }
+.dv-tcost, .dv-tcost-open { grid-column: 1 / -1; }
+.dv-tcost { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--c-sub); white-space: nowrap; }
+.dv-tshares .dv-tcost input {
+  width: 84px; height: 26px; padding: 0 6px; text-align: right; border-radius: 6px; border: 1px solid var(--c-line);
+  background: var(--c-card); color: var(--c-ink); font-size: 12px; font-weight: 600; font-family: inherit; font-variant-numeric: tabular-nums;
+}
+.dv-tshares .dv-tcost input::-webkit-outer-spin-button,
+.dv-tshares .dv-tcost input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.dv-tshares .dv-tcost input:focus { outline: none; border-color: var(--c-blue); box-shadow: 0 0 0 3px var(--c-blue-tint); }
+.dv-tcost-open {
+  justify-self: start; padding: 0; border: none; background: none; color: var(--c-muted); font-size: 11px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+}
+.dv-tcost-open:hover { color: var(--c-blue); text-decoration: underline; }
+/* 줄의 계좌 태그 — 이름 옆 시장 배지와 같은 자리·크기의 select. 기본 계좌를 따르면 흐리고, 따로 골랐으면 진하다. */
+.dv-tacct {
+  flex-shrink: 0; margin-left: 6px; width: 74px; max-width: 100%; /* select 는 가장 긴 option 폭으로 벌어진다 — "일반 계좌"가 드는 74 로 못박는다 */
+  appearance: none; -webkit-appearance: none; padding: 2px 16px 2px 6px; border-radius: 4px; border: 1px solid transparent;
+  background: var(--c-chip) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 3.5l3 3 3-3' fill='none' stroke='%235e728d' stroke-width='1.5'/></svg>") no-repeat right 4px center;
+  color: var(--c-sub); font-size: 11px; font-weight: 600; font-family: inherit; cursor: pointer; line-height: 1.4;
+}
+.dv-tacct-own { color: var(--c-cold-ink); border-color: var(--c-cold-ink); background-color: var(--c-card); font-weight: 700; }
+.dv-tacct:focus-visible { outline: none; border-color: var(--c-blue); box-shadow: 0 0 0 3px var(--c-blue-tint); }
+/* 줄마다 붙으니 넷이면 네 번 반복돼 잡음이 된다(2026-09-15 지적). 마우스가 있는 기기에서는 줄에 올렸을 때만 또렷하게. */
+@media (hover: hover) {
+  .dv-tcost-open { opacity: 0.35; transition: opacity 0.15s; }
+  .dv-trow:hover .dv-tcost-open, .dv-tcost-open:focus-visible { opacity: 1; }
+}
+.dv-tshares input {
+  width: 64px; height: 32px; padding: 0 8px; border: 1px solid var(--c-line); border-radius: 8px;
+  background: var(--c-card); color: var(--c-ink); font-size: 14px; font-weight: 700; text-align: right;
+  font-family: inherit; font-variant-numeric: tabular-nums; appearance: textfield; -moz-appearance: textfield;
+}
+.dv-tshares input::-webkit-outer-spin-button,
+.dv-tshares input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.dv-tshares input:focus { outline: none; border-color: var(--c-blue); box-shadow: 0 0 0 3px var(--c-blue-tint); }
+.dv-step {
+  width: 28px; height: 32px; border-radius: 8px; border: none; background: var(--tx-btn); color: var(--c-ink);
+  font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit; transition: background 0.12s ease;
+}
+.dv-step:hover { background: var(--tx-btn-hover); }
+.dv-step:disabled { opacity: 0.4; cursor: default; }
+.dv-tnum { text-align: right; font-size: 13.5px; color: var(--c-label); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dv-tstrong { font-weight: 700; color: var(--c-ink); }
+/* 미국 줄의 달러 표기 — 원화 아래 작은 글씨. 원화가 주인공이다(국내 줄과 한 열에서 더해지니까). */
+.dv-tsub { display: block; font-size: 11px; font-weight: 500; color: var(--c-sub); }
+/* 비중 칸 — 숫자 아래 얇은 막대. */
+.dv-tweight-bar { display: block; width: 52px; height: 4px; margin: 5px 0 0 auto; border-radius: 2px; background: var(--c-track); overflow: hidden; }
+.dv-tweight-bar > span { display: block; height: 100%; border-radius: 2px; background: var(--c-blue); }
+.dv-remove {
+  width: 28px; height: 28px; border-radius: 8px; border: none; background: transparent; color: var(--c-muted);
+  font-size: 18px; line-height: 1; cursor: pointer; font-family: inherit; transition: background 0.12s ease, color 0.12s ease;
+}
+.dv-remove:hover { background: var(--tx-btn); color: var(--c-ink); }
+
+/* 다가오는 일정 — 회색 타일 위 줄 목록. 날짜 · 종목 · 무엇 · 얼마. */
+.dv-upcoming { background: var(--tx-tile); border-radius: var(--tx-r-tile); padding: 14px 16px 10px; }
+.dv-upcoming-list { list-style: none; margin: 0; padding: 0; }
+.dv-upcoming-row { display: flex; align-items: baseline; gap: 10px; padding: 6px 0; border-top: 1px solid var(--c-sheet-row); font-size: 13px; }
+.dv-upcoming-row:first-child { border-top: 0; }
+.dv-upcoming-when { flex: 0 0 84px; white-space: nowrap; font-weight: 700; color: var(--c-ink); font-variant-numeric: tabular-nums; }
+.dv-upcoming-name { font-weight: 600; color: var(--c-ink); white-space: nowrap; }
+.dv-upcoming-what { color: var(--c-sub); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dv-upcoming-amt { margin-left: auto; font-weight: 700; color: var(--c-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* 목표까지 — 회색 타일. 세 층: 입력 한 줄(목표 알약·매달 더 넣기) → 막대 한 줄 → 같은 타일 여섯(3×2).
+   글자 크기는 라벨 11.5 · 값 16 · 칩 12 셋뿐. 크기가 들쭉날쭉하고 자리가 흩어져 복잡해 보였다(2026-09-15). */
+.dv-goal { background: var(--tx-tile); border-radius: var(--tx-r-tile); padding: 14px 16px 14px; }
+.dv-goal-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
+.dv-goal-inputs { display: flex; align-items: center; gap: 8px 20px; flex-wrap: wrap; }
+.dv-goal-presets { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.dv-goal-plabel { font-size: 11.5px; font-weight: 600; color: var(--c-sub); margin-right: 2px; white-space: nowrap; }
+.dv-goal-custom { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--c-sub); }
+.dv-goal-inline {
+  height: 30px; padding: 0 8px; text-align: right; border-radius: 8px; border: 1px solid var(--c-line); background: var(--c-card);
+  color: var(--c-ink); font-size: 13px; font-weight: 700; font-family: inherit; font-variant-numeric: tabular-nums; vertical-align: middle;
+}
+.dv-goal-inline::-webkit-outer-spin-button,
+.dv-goal-inline::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.dv-goal-inline:focus { outline: none; border-color: var(--c-blue); box-shadow: 0 0 0 3px var(--c-blue-tint); }
+/* 토막 — 이름표 한 줄 + 내용. 토막 사이 14px. */
+.dv-goal-block { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+.dv-goal-block:first-of-type { margin-top: 0; }
+.dv-goal-blabel { font-size: 11.5px; font-weight: 600; color: var(--c-sub); }
+.dv-goal-bnote { font-size: 11.5px; color: var(--c-muted); }
+/* 채움 막대 — 목표 한 달 배당금 가운데 지금이 얼마나. 위 줄 양 끝이 지금·목표, 아래 한 줄이 몇 %. */
+/* 트랙은 카드색(흰) + 테두리 — 회색 타일 위에 회색 트랙(--c-track)을 두었더니 바탕과 안 갈렸다(2026-09-15). */
+.dv-goal-bar { height: 10px; border-radius: 999px; background: var(--c-card); border: 1px solid var(--c-line); overflow: hidden; box-sizing: border-box; }
+/* 다크에서는 카드색(#202027)이 타일(#2f2f39)보다 어두워 빈 트랙이 홈처럼 꺼져 보이고 테두리(--c-line)는 타일과 같은 색이라 사라진다(대비 1.17).
+   흰색을 얹어 타일보다 밝은 띠로. 비중 막대 트랙도 같은 값(--c-track 은 1.49). */
+:root[data-theme="dark"] .dv-goal-bar { background: rgba(255, 255, 255, 0.09); border-color: rgba(255, 255, 255, 0.12); }
+:root[data-theme="dark"] .dv-tweight-bar { background: rgba(255, 255, 255, 0.12); }
+.dv-goal-fill { display: block; height: 100%; border-radius: 999px; background: var(--c-blue); transition: width 0.2s ease; }
+.dv-goal-ends { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--c-sub); }
+.dv-goal-ends b { color: var(--c-ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+/* 타일 셋 — 카드 안이라 흰 타일. */
+.dv-goal-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.dv-goal-stats .hz-tx-stat { background: var(--c-card); }
+.dv-goal-stats .hz-tx-stat-v { font-size: 16px; font-variant-numeric: tabular-nums; }
+.dv-goal-tile-strong .hz-tx-stat-v { color: var(--c-blue); }
+/* 목표 달성까지 — 큰 숫자 하나와 조건 한 마디. */
+.dv-goal-answer { display: flex; align-items: baseline; gap: 6px 14px; flex-wrap: wrap; }
+.dv-goal-aval { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: var(--c-ink); font-variant-numeric: tabular-nums; }
+.dv-goal-acond { font-size: 12.5px; color: var(--c-sub); word-break: keep-all; }
+.dv-goal-out { margin: 10px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--c-sub); word-break: keep-all; }
+
+/* 달마다 얼마 — 회색 타일 위 열두 칸. 막대는 그 달 금액에 비례한다. */
+.dv-cal { background: var(--tx-tile); border-radius: var(--tx-r-tile); padding: 14px 16px 12px; }
+.dv-cal-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.dv-cal-title { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; color: var(--c-ink); }
+/* 제목 아래 한 줄 설명(달력) — 오른쪽에 붙이면 좁은 폭에서 제목과 섞였다. */
+.dv-cal-head-col { flex-direction: column; align-items: flex-start; gap: 2px; }
+.dv-cal-sub { font-size: 11.5px; color: var(--c-sub); }
+.dv-cal-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 6px; }
+/* 칸은 버튼이다 — 누르면 그 달에 주는 종목이 아래에 선다. */
+.dv-cal-cell {
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; min-height: 100px; min-width: 0;
+  /* 아래 여백을 넉넉히 — + 동그라미가 칸 바닥에 붙고, 누른 칸의 하늘색 면이 아이콘에 닿았다(2026-09-13). */
+  padding: 6px 2px 8px; border: none; border-radius: 8px; background: transparent; cursor: pointer; font-family: inherit;
+  transition: background 0.12s ease;
+}
+.dv-cal-cell:hover { background: var(--tx-btn); }
+.dv-cal-cell[aria-pressed="true"] { background: var(--c-blue-tint); box-shadow: inset 0 0 0 1px var(--c-blue); }
+.dv-cal-bar { width: 100%; max-width: 28px; margin-top: auto; border-radius: 4px 4px 2px 2px; background: var(--c-blue); }
+.dv-cal-cell:not(.dv-cal-on) .dv-cal-bar { height: 3px; background: var(--c-track); }
+.dv-cal-month { font-size: 11px; color: var(--c-sub); }
+.dv-cal-amt { font-size: 11px; font-weight: 700; color: var(--c-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dv-cal-cell:not(.dv-cal-on) .dv-cal-amt { color: var(--c-hint); font-weight: 400; }
+/* 빈 달의 + 동그라미. 파란색으로 "눌러 채우라"를 말하고, 올리면 진해진다. */
+/* ⚠️ 위 :not(.dv-cal-on) 규칙(특이도 0,3,0)이 회색을 입히므로 같은 특이도로 뒤에서 덮는다. */
+.dv-cal-cell:not(.dv-cal-on) .dv-cal-add { display: inline-flex; height: 18px; margin-top: 2px; align-items: center; color: var(--c-blue); opacity: 0.8; }
+.dv-cal-cell:hover .dv-cal-add, .dv-cal-cell[aria-pressed="true"] .dv-cal-add { opacity: 1; }
+
+.dv-note { margin: -6px 0 0; padding: 0 4px; font-size: 12px; line-height: 1.55; color: var(--c-sub); word-break: keep-all; }
+
+/* 바스켓 투자금 — 세 시트가 함께 쓰는 슬라이더 한 줄. */
+.dv-amount { padding: 18px 26px 16px; }
+.dv-amount-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.dv-amount-label { font-size: 13px; font-weight: 600; color: var(--c-sub); }
+.dv-amount-val { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: var(--c-ink); font-variant-numeric: tabular-nums; }
+.dv-amount-quick { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+.dv-quick {
+  padding: 5px 10px; border-radius: 999px; border: 1px solid var(--c-line); background: var(--c-card);
+  color: var(--c-label); font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background 0.12s ease;
+}
+.dv-quick:hover { background: var(--tx-btn); }
+.dv-quick-on, .dv-quick-on:hover { background: var(--c-cold-ink); color: var(--c-card); border-color: transparent; }
+/* 투자금 슬라이더 — 브라우저 기본 모양(accent-color)을 걷고 얇은 트랙 + 흰 동그라미 손잡이로. 채운 몫은 --p(인라인). */
+.dv-range { -webkit-appearance: none; appearance: none; width: 100%; height: 24px; margin: 10px 0 4px; background: transparent; cursor: pointer; }
+.dv-range::-webkit-slider-runnable-track {
+  height: 8px; border-radius: 999px;
+  background: linear-gradient(to right, var(--c-blue) var(--p, 0%), var(--c-track) var(--p, 0%));
+}
+.dv-range::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 20px; height: 20px; margin-top: -6px; border-radius: 50%;
+  background: var(--c-card); border: 2px solid var(--c-blue); box-shadow: 0 1px 4px rgba(14, 33, 54, 0.18);
+}
+.dv-range::-moz-range-track { height: 8px; border-radius: 999px; background: var(--c-track); }
+.dv-range::-moz-range-progress { height: 8px; border-radius: 999px; background: var(--c-blue); }
+.dv-range::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: var(--c-card); border: 2px solid var(--c-blue); box-shadow: 0 1px 4px rgba(14, 33, 54, 0.18); }
+.dv-range:focus-visible { outline: none; }
+.dv-range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(49, 130, 246, 0.25); }
+.dv-range:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 4px rgba(49, 130, 246, 0.25); }
+.dv-amount-note { margin: 0; font-size: 12px; color: var(--c-sub); word-break: keep-all; }
+
+/* 바스켓 시트 셋 — 나란히. 좁아지면 한 장씩. */
+.dv-baskets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+/* 줄 이름 — 셋씩 묶인 줄 위에 한 마디. 격자 한 줄을 통째로 차지한다. */
+.dv-basket-cap { grid-column: 1 / -1; margin: 6px 0 -6px 4px; font-size: 12px; font-weight: 700; color: var(--c-sub); letter-spacing: 0.02em; scroll-margin-top: 16px; }
+.dv-basket-cap:first-child { margin-top: 0; }
+/* 투자금 카드와 격자 사이 한 줄 — 줄 이름 넷으로 바로 가기. 계좌 칩(.dv-account-btn)과 같은 알약. */
+.dv-jump { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin: -8px 0 -4px 4px; } /* 부모 .hz-tx 의 gap 18 을 위 10·아래 14 로 */
+.dv-jump-label { font-size: 12px; font-weight: 600; color: var(--c-sub); margin-right: 4px; }
+.dv-jump-btn {
+  padding: 4px 10px; border-radius: 999px; border: 1px solid var(--c-line); background: var(--c-card); color: var(--c-label);
+  font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap;
+}
+.dv-jump-btn:hover { border-color: var(--c-blue); color: var(--c-blue); }
+.dv-basket { display: flex; flex-direction: column; }
+.dv-basket-sum { padding: 16px 26px 4px; }
+.dv-basket-main { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.02em; color: var(--c-ink); font-variant-numeric: tabular-nums; }
+/* 카드 폭이 히어로의 반이라 타일 값은 한 단계 작게. 라벨은 히어로 것(.dv-hero-label)을 그대로 쓴다. */
+.dv-basket-stats { margin-top: 10px; max-width: none; }
+.dv-basket-stats .hz-tx-stat { padding: 9px 12px 8px; }
+.dv-basket-stats .hz-tx-stat-v { font-size: 15px; }
+.dv-basket-list { list-style: none; margin: 0; padding: 8px 16px 6px; }
+.dv-basket-row {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px; border: none; border-radius: 8px;
+  cursor: grab; color: var(--c-ink); font-size: 13.5px; text-align: left; font-family: inherit;
+}
+.dv-basket-row:active { cursor: grabbing; }
+.dv-rank { width: 14px; flex-shrink: 0; font-size: 11.5px; color: var(--c-muted); font-variant-numeric: tabular-nums; }
+.dv-basket-name { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dv-basket-meta { margin-left: auto; font-size: 12px; color: var(--c-sub); white-space: nowrap; }
+.dv-basket-shares { min-width: 44px; text-align: right; font-size: 12px; font-weight: 700; color: var(--c-label); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dv-basket-foot { margin-top: auto; padding: 10px 26px 20px; display: flex; flex-direction: column; gap: 10px; }
+.dv-basket-rule { margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--c-sub); word-break: keep-all; }
+/* 담기 단추는 이 리디자인의 공용 단추(.hz-tx-btn, 카더라 히어로의 '미장 카더라 보기'와 같은 부품). 여기선 폭만 꽉. */
+.dv-apply { width: 100%; border: none; cursor: pointer; font-family: inherit; }
+.dv-basket-none { margin: 0; padding: 18px 26px 22px; font-size: 13px; color: var(--c-sub); }
+/* 바스켓 규칙 알약(담은 줄의 사실 알약과 같은 모양). 주의는 제목 옆 물음표에. */
+.dv-basket-rules { display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* 폭. 사이드바를 뺀 본문 폭으로 잰다 — 세 장이 서려면 한 장에 360 은 있어야 한다. */
+@media (max-width: 1260px) {
+  .dv-baskets { grid-template-columns: 1fr; }
+}
+/* 세 판이 서려면 판 하나에 300px 은 있어야 한다(사이드바 160 을 뺀 본문 폭 기준 — 1,024px 뷰포트에서 판 안폭이 204px 였다). */
+@media (max-width: 1100px) {
+  .dv-groups { grid-template-columns: 1fr; }
+  /* 한 열이면 '더 보기' 묶음이 세 판 아래가 아니라 **그 판 바로 아래**에 붙어야 한다 — order 로 끼운다. */
+  .dv-group[data-scope="kr"] { order: 0; }
+  .dv-more[data-scope="kr"] { order: 1; }
+  .dv-group[data-scope="us"] { order: 2; }
+  .dv-more[data-scope="us"] { order: 3; }
+  .dv-group[data-scope="etf"] { order: 4; }
+  .dv-more[data-scope="etf"] { order: 5; }
+}
+@media (max-width: 560px) {
+  /* 목표 타일은 좁으면 둘씩 — 셋째가 홀로 남으면 한 줄을 통째로 차지한다(2+1 이 빈 칸으로 보였다). */
+  .dv-goal-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dv-goal-stats > :nth-child(3):last-child { grid-column: 1 / -1; }
+  /* 일정 줄은 두 줄로 — 날짜·종목 윗줄, 무엇·얼마 아랫줄. */
+  .dv-upcoming-row { flex-wrap: wrap; row-gap: 2px; }
+  .dv-upcoming-what { flex: 1 1 100%; padding-left: 94px; white-space: normal; }
+  /* 라벨을 칩 위로 — 96px 라벨 옆에 칩을 두면 한 줄에 칩 하나가 남는다. */
+  .dv-more-row { flex-direction: column; gap: 6px; }
+  .dv-more-label { flex: none; padding-top: 0; }
+}
+/* 표의 폭은 뷰포트가 아니라 **사이드바를 뺀 시트 폭**으로 잰다(시트 ≈ 뷰포트 − 256). 고정 열 여섯이 652px 라
+   이름 열은 그 나머지다 — 1,100 에서 140px, 1,024 에서 64px("신시내티파이낸셜"이 잘림), 900 에서 0px 였다(2026-09-15 실측).
+   그래서 1,100 아래는 '1주당 1년 배당'·'비중' 두 열을 접어 다섯 열(444px)로, 860 아래는 두 줄로 접는다. */
+@media (max-width: 1100px) {
+  .dv-trow { grid-template-columns: minmax(0, 1fr) 132px 128px 84px 36px; }
+  .dv-trow > :nth-child(3), .dv-trow > :nth-child(6) { display: none; }
+}
+@media (max-width: 860px) {
+  /* 한 줄에 다섯 칸도 이름에 100px 이 안 남는다(860 시트 604 − 444). 두 줄로
+     접는다 — 윗줄 [종목 ····· 빼기], 아랫줄 [주수 ····· 1년에 받는 배당]. '수익률'도 접는다.
+     열 머리는 두 줄 배치에선 자리가 없어 숨긴다. */
+  .dv-thead { display: none; }
+  .dv-trow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "name remove" "shares sum";
+    gap: 8px 10px;
+  }
+  .dv-trow > :nth-child(1) { grid-area: name; }
+  .dv-trow > :nth-child(2) { grid-area: shares; }
+  .dv-trow > :nth-child(3), .dv-trow > :nth-child(5), .dv-trow > :nth-child(6) { display: none; }
+  .dv-trow > :nth-child(4) { grid-area: sum; align-self: center; }
+  .dv-trow > :nth-child(7) { grid-area: remove; justify-self: end; }
+  .dv-tname-main { white-space: normal; }
+  /* 12칸이면 칸 하나가 46px 라 "51,896원"(11px, 48px)이 넘친다 — 여섯 칸 두 줄. */
+  .dv-cal-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); row-gap: 12px; }
+}
+@media (max-width: 720px) {
+  .dv-hero-main { font-size: 28px; }
+  /* iOS 사파리는 16px 미만 입력칸에 포커스가 가면 화면을 확대한다 — 손가락으로 쓰는 폭에선 입력칸을 16px 로. */
+  .dv-search-box input, .dv-tshares input, .dv-tshares .dv-tcost input, .dv-goal-inline { font-size: 16px; }
+  .dv-tshares .dv-tcost input { width: 96px; }
+  /* 손가락 과녁 — 주수 ±·빼기가 28px 였다. */
+  .dv-step { width: 34px; height: 36px; }
+  .dv-tshares input { height: 36px; }
+  .dv-remove { width: 36px; height: 36px; }
+}
+@media (max-width: 560px) {
+  .dv-hero { padding: 18px 18px 4px; }
+  .dv-body { padding: 12px 18px 18px; }
+  .dv-amount, .dv-basket-sum { padding-left: 18px; padding-right: 18px; }
+  .dv-basket-foot { padding: 10px 18px 18px; }
+  .dv-basket-list { padding: 6px 8px 4px; }
+  .dv-cal-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
