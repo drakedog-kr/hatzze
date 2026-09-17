@@ -32,7 +32,7 @@ export const RELEASES: Release[] = [
     // 목록에 종목이 느는 것이라 Patch.
     version: "1.15.4",
     date: "2026-09-17",
-    changes: ["미국 ETF 에 SPYM 이 더 담깁니다."],
+    changes: ["미국 ETF에 SPYM이 더 담깁니다."],
   },
   {
     // 있던 줄에 숫자 하나가 붙는 것이라 Patch.
@@ -44,19 +44,19 @@ export const RELEASES: Release[] = [
     // 목록에 종목이 느는 것이라 Patch.
     version: "1.15.2",
     date: "2026-09-16",
-    changes: ["미국 ETF 에 QQQM·IVV 와 QQQI·SPYI·IWMI·GPIX·GPIQ·FEPI·AIPI·XDTE·QDTE·RDTE·YMAX·YMAG·ULTY 열다섯 개가 더 담깁니다."],
+    changes: ["미국 ETF에 QQQM·IVV와 QQQI·SPYI·IWMI·GPIX·GPIQ·FEPI·AIPI·XDTE·QDTE·RDTE·YMAX·YMAG·ULTY 열다섯 개가 더 담깁니다."],
   },
   {
     // 있던 줄에 조작 하나가 붙는 것이라 Patch.
     version: "1.15.1",
     date: "2026-09-16",
-    changes: ["담은 종목의 계좌 목록 맨 아래 '＋ 계좌'로 같은 종목을 ISA 와 일반 계좌처럼 두 계좌 유형에 나눠 담을 수 있습니다."],
+    changes: ["담은 종목의 계좌 목록 맨 아래 '＋ 계좌'로 같은 종목을 ISA와 일반 계좌처럼 두 계좌 유형에 나눠 담을 수 있습니다."],
   },
   {
     // 국내 ETF 가 한 운용사에서 전부로 — 담을 수 있는 것이 느는 것이라 Minor.
     version: "1.15.0",
     date: "2026-09-16",
-    changes: ["배당으로 살기에 KODEX·RISE·ACE·PLUS·SOL·KIWOOM·HANARO 등 모든 운용사의 국내 ETF 950여 개가 담깁니다. 커버드콜 ETF 는 62개입니다."],
+    changes: ["배당으로 살기에 KODEX·RISE·ACE·PLUS·SOL·KIWOOM·HANARO 등 모든 운용사의 국내 ETF 950여 개가 담깁니다. 커버드콜 ETF는 62개입니다."],
   },
   {
     // 있던 조작을 넓힌 것이라 Patch.
