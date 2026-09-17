@@ -58,12 +58,43 @@ const nextConfig: NextConfig = {
   async headers() {
     const noindex = { key: "X-Robots-Tag", value: "noindex" };
     return [
-      "/opengraph-image",
-      "/kadera/opengraph-image",
-      "/kadera/us/opengraph-image",
-      "/mdd/opengraph-image",
-      "/seohak/opengraph-image",
-    ].map((source) => ({ source, headers: [noindex] }));
+      /**
+       * 모든 응답에 붙는 보안 헤더. 2026-09-09 전수조사 때 프로덕션에 HSTS(Vercel 이
+       * 준다) 말고는 하나도 없었다.
+       *
+       * 넷 다 **화면이 부르는 자원에는 손대지 않는** 것만 골랐다. script-src·img-src 같은
+       * 자원 제한은 GA4·구글 폰트·logo.dev·인라인 스크립트를 하나하나 열어 줘야 해서
+       * 빠뜨리면 화면이 조용히 깨진다. 그건 nonce 를 붙일 수 있을 때 따로 한다.
+       *
+       * - nosniff: 응답의 Content-Type 을 브라우저가 추측하지 않게 한다. API 셋
+       *   (channel-photo·ticker·mdd)과 공유 카드는 전부 타입을 명시해 낸다(확인했다).
+       * - frame-ancestors 'none' + X-Frame-Options DENY: 다른 사이트의 iframe 에 못 담는다
+       *   (클릭재킹). 우리가 어디에 끼워 넣는 화면은 없다. 앱인토스 같은 입점은 정책상
+       *   막혀 있어(2026-08-27 검토) 잃는 것도 없다. 옛 브라우저용으로 XFO 를 같이 둔다.
+       * - object-src 'none' · base-uri 'self': 플러그인 임베드와 <base> 주입을 막는다.
+       *   둘 다 이 화면이 쓰지 않는 것이다.
+       * - Referrer-Policy: 밖으로 나가는 링크에 우리 주소의 경로를 안 흘린다. 브라우저
+       *   기본값과 같지만, 명시해 두면 기본값이 바뀌어도 그대로다.
+       * - Permissions-Policy: 카메라·마이크·위치·결제를 쓰지 않는다고 못박는다.
+       */
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'none'; object-src 'none'; base-uri 'self'" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
+        ],
+      },
+      ...[
+        "/opengraph-image",
+        "/kadera/opengraph-image",
+        "/kadera/us/opengraph-image",
+        "/mdd/opengraph-image",
+        "/seohak/opengraph-image",
+      ].map((source) => ({ source, headers: [noindex] })),
+    ];
   },
 };
 
