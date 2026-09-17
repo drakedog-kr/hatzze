@@ -1106,7 +1106,7 @@ function QuickChips({
           onClick={() => onPick(s.code)}
           title={`${s.name} 담기`}
         >
-          <StockLogo code={s.code} name={s.name} market={s.market} size={18} />
+          <StockLogo code={s.code} name={s.name} market={s.market} size={18} lazy />
           <span className="dv-chip-name">{s.name}</span>
           {s.yieldPct != null &&
             (s.yieldPct > HOT_YIELD_PCT ? (
@@ -2030,7 +2030,7 @@ function BasketSheet({
                   title={`${l.stock.name} 내 종목에 담기`}
                 >
                   <span className="dv-rank">{i + 1}</span>
-                  <StockLogo code={l.stock.code} name={l.stock.name} market={l.stock.market} />
+                  <StockLogo code={l.stock.code} name={l.stock.name} market={l.stock.market} lazy />
                   <span className="dv-basket-name">{l.stock.name}</span>
                   <span className="dv-basket-meta">{basketMeta(basket.meta, l.stock)}</span>
                   <span className="dv-basket-shares">{l.shares.toLocaleString("ko-KR")}주</span>

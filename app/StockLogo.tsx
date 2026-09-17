@@ -95,11 +95,18 @@ export function StockLogo({
   name,
   market,
   size,
+  lazy = false,
 }: {
   code: string;
   name: string;
   market: string | null;
   size?: number;
+  /**
+   * 화면 아래쪽에 수십 장이 줄지어 서는 목록(배당 바스켓 96줄·칩 48개)에서만 켠다.
+   * 켜면 보이는 자리에 올 때 받는다. 기본은 꺼짐 — 아래 img 주석의 드롭다운 사고 때문에
+   * 드롭다운·보유 종목 줄처럼 몇 장 안 되는 자리는 그대로 즉시 받는다.
+   */
+  lazy?: boolean;
 }) {
   // 미국 상장은 접미사 없이 티커만 준다(logo.dev 가 NVDA·AAPL·TSM 을 그대로 받는 걸 실측).
   // ⚠️ null 과 빈 문자열을 구분해야 한다 — null 은 "시장을 몰라 요청하지 않는다"는 뜻이고,
@@ -149,13 +156,16 @@ export function StockLogo({
       src={`https://img.logo.dev/ticker/${code}${suffix ? `.${suffix}` : ""}?token=${LOGO_KEY}&size=${px}&format=webp&fallback=404`}
       alt=""
       aria-hidden="true"
-      // loading="lazy" 를 뺐다. crossOrigin 과 같이 쓰면 드롭다운 안의 이미지가 아예
-      // 로드되지 않았다(complete 가 계속 false, onError 도 안 뜸 — 실측). 아이콘 한 장이
-      // 몇 KB 이고 한 화면에 많아야 열 장이라 지연 로드로 얻는 것도 없다.
+      // loading="lazy" 는 기본으로 안 켠다. crossOrigin 과 같이 쓰면 드롭다운 안의 이미지가
+      // 아예 로드되지 않은 적이 있고(complete 가 계속 false, onError 도 안 뜸 — 실측. 위
+      // effect 주석의 ref 콜백 churn 이 원인이었다), 몇 장짜리 자리는 지연 로드로 얻는 것도
+      // 없다. 다만 배당 페이지는 첫 화면에 144장을 한꺼번에 요청해서(2026-09-17 실측), 그런
+      // 긴 목록만 `lazy` 로 켠다.
       // 픽셀을 읽으려면 CORS 로 받아야 한다. logo.dev 는 허용하지만, 정책이 바뀌어도
       // 로고가 통째로 사라지면 안 되므로 실패하면 CORS 없이 한 번 더 시도한다
       // (그때는 캔버스가 오염돼 색은 못 뽑고 기본 회색 타일로 간다).
       crossOrigin={noCors ? undefined : "anonymous"}
+      loading={lazy ? "lazy" : undefined}
       ref={imgRef}
       onLoad={(e) => setTile(readBandColor(e.currentTarget))}
       onError={() => (noCors ? setFailed(true) : setNoCors(true))}
