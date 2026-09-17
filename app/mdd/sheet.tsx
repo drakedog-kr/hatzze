@@ -46,7 +46,7 @@ export function Foot({ children }: { children: React.ReactNode }) {
           한 줄 각주가 41 → 60px 이 된다(이 페이지의 바닥 띠만 다른 화면보다 18px 두꺼웠다).
           여기에 9px 이 있었던 건 띠가 `padding: 0 22px` 이던 시절의 잔재다 — 그때는 띠 자신에게
           세로 여백이 없어 안쪽이 그 일을 대신했다. */}
-      <span style={{ fontSize: 12, lineHeight: 1.6, color: C.sub, wordBreak: "keep-all" }}>{children}</span>
+      <span style={{ fontSize: "var(--fs-12)", lineHeight: 1.6, color: C.sub, wordBreak: "keep-all" }}>{children}</span>
     </div>
   );
 }
@@ -64,8 +64,8 @@ export function AbsentSheet({ icon, title, sub, body }: { icon: string; title: s
     <Sheet>
       <SectionHead level={2} icon={icon} title={title} desc={sub} />
       <div style={{ padding: PAD }}>
-        <p style={{ margin: 0, color: C.muted, fontSize: 12, lineHeight: 1.7, wordBreak: "keep-all" }}>
-          <Icon name="info" style={{ fontSize: 14, verticalAlign: -2, marginRight: 4 }} />
+        <p style={{ margin: 0, color: C.muted, fontSize: "var(--fs-12)", lineHeight: 1.7, wordBreak: "keep-all" }}>
+          <Icon name="info" style={{ fontSize: "var(--fs-14)", verticalAlign: -2, marginRight: 4 }} />
           {body}
         </p>
       </div>
@@ -77,11 +77,11 @@ export function AbsentSheet({ icon, title, sub, body }: { icon: string; title: s
 export function StatCell({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", color: C.sub, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+      <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, letterSpacing: ".06em", color: C.sub, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
         {label}
       </span>
-      <strong style={{ fontSize: 15, fontWeight: 800, color: tone ?? C.ink, letterSpacing: "-.02em" }}>{value}</strong>
-      {sub && <span style={{ fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</span>}
+      <strong style={{ fontSize: "var(--fs-15)", fontWeight: 800, color: tone ?? C.ink, letterSpacing: "-.02em" }}>{value}</strong>
+      {sub && <span style={{ fontSize: "var(--fs-11)", color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</span>}
     </div>
   );
 }
@@ -91,7 +91,7 @@ export function Pill({ children, tone }: { children: React.ReactNode; tone?: str
   return (
     <span
       style={{
-        fontSize: 11,
+        fontSize: "var(--fs-11)",
         fontWeight: 700,
         padding: "2px 8px",
         borderRadius: R.pill,
@@ -139,7 +139,7 @@ export function MeterRow({
       <span style={{ width: labelWidth, flex: "none", display: "flex", alignItems: "center", gap: 3, minWidth: 0 }}>
         <span
           style={{
-            fontSize: 11.5,
+            fontSize: "var(--fs-11-5)",
             fontWeight: strong ? 800 : 600,
             color: strong ? C.ink : C.sub,
             overflow: "hidden",
@@ -154,7 +154,7 @@ export function MeterRow({
             다크 2.3 이다. 툴팁이 있다는 유일한 표시라 SectionHead 와 같은 muted 로 맞춘다. */}
         {help && (
           <span className="hz-tip hz-tip-wide" data-tip={help} style={{ flexShrink: 0, display: "inline-flex", cursor: "help", color: C.muted }}>
-            <Icon name="help" style={{ fontSize: 13 }} />
+            <Icon name="help" style={{ fontSize: "var(--fs-13)" }} />
           </span>
         )}
       </span>
@@ -167,7 +167,7 @@ export function MeterRow({
           flex: "none",
           textAlign: "right",
           fontFamily: MONO,
-          fontSize: 11.5,
+          fontSize: "var(--fs-11-5)",
           fontWeight: strong ? 800 : 700,
           /* 막대색을 글자에 그대로 쓰면 안 된다. 램프의 --c-blue-1(#1b7fd4)은 흰 위
              명암비 4.17 이라 11.5px 값이 안 읽힌다 — 채우는 색과 읽는 색은 다른 물건이다
@@ -213,10 +213,10 @@ export function MirrorRow({
   const bar: React.CSSProperties = { position: "absolute", top: 3, height: 8, minWidth: 5 };
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <span style={{ width: MIRROR_LABEL_W, flex: "none", fontFamily: MONO, fontSize: 11, fontWeight: 700, color: C.sub2, whiteSpace: "nowrap" }}>
+      <span style={{ width: MIRROR_LABEL_W, flex: "none", fontFamily: MONO, fontSize: "var(--fs-11)", fontWeight: 700, color: C.sub2, whiteSpace: "nowrap" }}>
         {label}
       </span>
-      <span style={{ width: MIRROR_LEFT_W, flex: "none", textAlign: "right", fontFamily: MONO, fontSize: 11, fontWeight: 800, color: left.ink }}>
+      <span style={{ width: MIRROR_LEFT_W, flex: "none", textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-11)", fontWeight: 800, color: left.ink }}>
         {left.value}
       </span>
       <div style={{ position: "relative", flex: 1, minWidth: 0, height: 14 }}>
@@ -224,14 +224,14 @@ export function MirrorRow({
         <span style={{ ...bar, right: "50%", width: `${left.pct}%`, borderRadius: "3px 0 0 3px", background: left.color }} />
         <span style={{ ...bar, left: "50%", width: `${right.pct}%`, borderRadius: "0 3px 3px 0", background: right.dashed ? UNRECOVERED : right.color }} />
       </div>
-      <span style={{ width: MIRROR_RIGHT_W, flex: "none", fontFamily: MONO, fontSize: 11, fontWeight: 800, color: right.ink }}>{right.value}</span>
+      <span style={{ width: MIRROR_RIGHT_W, flex: "none", fontFamily: MONO, fontSize: "var(--fs-11)", fontWeight: 800, color: right.ink }}>{right.value}</span>
     </div>
   );
 }
 
 /** 거울 막대 위의 축 라벨. **값 열에 맞춘다** — 막대 위가 아니라 숫자 위에 서야 읽힌다. */
 export function MirrorAxis({ left, right }: { left: string; right: string }) {
-  const s: React.CSSProperties = { flex: "none", fontSize: 11, fontWeight: 700, letterSpacing: ".06em", color: C.sub };
+  const s: React.CSSProperties = { flex: "none", fontSize: "var(--fs-11)", fontWeight: 700, letterSpacing: ".06em", color: C.sub };
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <span style={{ width: MIRROR_LABEL_W, flex: "none" }} />
@@ -247,7 +247,7 @@ export function Legend({ items }: { items: { label: string; background: string }
   return (
     <div style={{ display: "flex", gap: 11, flexWrap: "wrap" }}>
       {items.map((it) => (
-        <span key={it.label} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, color: C.sub2 }}>
+        <span key={it.label} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: "var(--fs-11)", fontWeight: 700, color: C.sub2 }}>
           <span style={{ width: 8, height: 8, borderRadius: 2, background: it.background, flex: "none" }} />
           {it.label}
         </span>
@@ -341,8 +341,8 @@ export function Skeleton({ periodOnly }: { periodOnly: boolean }) {
 export function ErrorCard({ message }: { message: string }) {
   return (
     <Sheet>
-      <div style={{ padding: PAD, display: "flex", alignItems: "center", gap: 10, color: C.sub, fontSize: 13 }}>
-        <Icon name="error_outline" style={{ fontSize: 20, color: C.mania }} />
+      <div style={{ padding: PAD, display: "flex", alignItems: "center", gap: 10, color: C.sub, fontSize: "var(--fs-13)" }}>
+        <Icon name="error_outline" style={{ fontSize: "var(--fs-20)", color: C.mania }} />
         {message}
       </div>
     </Sheet>

@@ -251,7 +251,7 @@ function HitBadge({ label = "초고온" }: { label?: string }) {
           /* tint 위에 C.mania 를 그대로 얹으면 명암비 4.21 이라 배지 글자가 안 읽힌다. */
           color: "var(--c-hot-ink)",
           fontWeight: 800,
-          fontSize: 11,
+          fontSize: "var(--fs-11)",
           lineHeight: 1.2,
           padding: "5px 10px",
           borderRadius: R.pill,
@@ -330,13 +330,13 @@ export function TitleRow({
             justifyContent: right ? "space-between" : undefined,
           }}
         >
-          <span className="hz-clamp2" style={{ fontSize: 13.5, fontWeight: 800, color: C.ink, lineHeight: 1.3, letterSpacing: "-.01em", wordBreak: "keep-all" }}>
+          <span className="hz-clamp2" style={{ fontSize: "var(--fs-13-5)", fontWeight: 800, color: C.ink, lineHeight: 1.3, letterSpacing: "-.01em", wordBreak: "keep-all" }}>
             {name}
           </span>
           {badge && (
             <span
               style={{
-                fontSize: 11,
+                fontSize: "var(--fs-11)",
                 fontWeight: 700,
                 color: C.sub,
                 background: C.chip,
@@ -351,7 +351,7 @@ export function TitleRow({
           {right && <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>{right}</div>}
         </div>
         {desc && (
-          <p className="hz-clamp2" style={{ margin: 0, fontSize: 12.5, lineHeight: 1.45, color: C.sub2, wordBreak: "keep-all" }}>{desc}</p>
+          <p className="hz-clamp2" style={{ margin: 0, fontSize: "var(--fs-12-5)", lineHeight: 1.45, color: C.sub2, wordBreak: "keep-all" }}>{desc}</p>
         )}
       </div>
     </div>
@@ -393,7 +393,7 @@ export function Big({
       </span>
       {/* 곁말은 목업에서 **강조색이 아니라 회색**이다(12.5 / --c-sub2). 큰 수치와 같은
           색이면 둘이 한 덩어리로 읽혀 어느 쪽이 결론인지 흐려진다. */}
-      {sub && <span style={{ fontSize: 12.5, fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>{sub}</span>}
+      {sub && <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>{sub}</span>}
     </div>
   );
 }
@@ -408,7 +408,7 @@ export function Foot({ text, color = C.sub }: { text: string; color?: string }) 
         style={{
           margin: 0,
           paddingTop: 14,
-          fontSize: 12,
+          fontSize: "var(--fs-12)",
           color,
           /* 500 → 400. 카더라·MDD 의 같은 자리(시트 각주)가 400 이다. 세 페이지에서
              한 문장만 굵기가 달라 보이면 그 자리가 더 중요한 말처럼 읽힌다. */
@@ -485,19 +485,19 @@ export function HeatBar({ v, hideThreshold = false }: { v: Pick; hideThreshold?:
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 11.5, fontWeight: 700, color: C.muted }}>과열도</span>
-        <span style={{ fontFamily: MONO, fontSize: 12.5, fontWeight: 800, color: v.color }}>
+        <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 700, color: C.muted }}>과열도</span>
+        <span style={{ fontFamily: MONO, fontSize: "var(--fs-12-5)", fontWeight: 800, color: v.color }}>
           {Math.round(v.capped)}
           <span style={{ color: C.sub, fontWeight: 600 }}>/100</span>
         </span>
       </div>
       <HeatFill pct={v.capped} />
       <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 11, color: C.sub }}>안심</span>
-        <span style={{ fontSize: 11, color: C.sub }}>과열 100</span>
+        <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>안심</span>
+        <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>과열 100</span>
       </div>
       {v.hotDisp && !hideThreshold && (
-        <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub2, background: C.soft, borderRadius: R.control, padding: "8px 10px" }}>
+        <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub2, background: C.soft, borderRadius: R.control, padding: "8px 10px" }}>
           초고온 기준선 {v.hotDisp} {v.dirLabel}
         </span>
       )}

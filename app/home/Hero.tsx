@@ -125,7 +125,7 @@ export function Hero({
           {/* 기준 시각. 목업은 본문 헤더 부제로 올렸는데 헤더(AppShell)는 공유 셸이라 브리핑
               전용 데이터를 못 집는다 — 눈썹 줄 오른쪽에 둔다(카더라와 같은 자리). */}
           <span className="hz-tx-eyebrow-r">
-            <Icon name="schedule" style={{ fontSize: 14, color: C.muted }} />
+            <Icon name="schedule" style={{ fontSize: "var(--fs-14)", color: C.muted }} />
             최종 업데이트 · {formatKstUpdate(dailyScore.updated_at)}
           </span>
         </div>
@@ -172,7 +172,7 @@ export function Hero({
                 data-ga-tip="hatzze_index"
                 style={{ display: "inline-flex", cursor: "help" }}
               >
-                <Icon name="help" style={{ fontSize: 14, color: C.muted }} />
+                <Icon name="help" style={{ fontSize: "var(--fs-14)", color: C.muted }} />
               </span>
             </span>
             {/* 구간 알약 — 카더라 센티먼트 타일의 '낙관 우세' 알약과 같은 꼴. */}
@@ -190,8 +190,8 @@ export function Hero({
               <span>℃</span>
             </strong>
             <div className="hz-figrow-aside">
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub }}>0~100 과열도 환산</span>
-              <span style={{ fontSize: 11.5, fontWeight: 700, color: C.sub }}>
+              <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub }}>0~100 과열도 환산</span>
+              <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 700, color: C.sub }}>
                 {deltaLabel} <span style={{ color: deltaColor, fontWeight: 800 }}>{deltaText}</span>
               </span>
             </div>
@@ -245,7 +245,7 @@ export function Hero({
                     top: 0,
                     ...(n === 0 ? { left: 0 } : n === 100 ? { right: 0 } : { left: `${n}%`, transform: "translateX(-50%)" }),
                     fontFamily: MONO,
-                    fontSize: 11,
+                    fontSize: "var(--fs-11)",
                     fontWeight: 600,
                     color: C.sub,
                   }}
@@ -262,7 +262,7 @@ export function Hero({
                   style={{
                     flex: 1,
                     textAlign: "center",
-                    fontSize: 11,
+                    fontSize: "var(--fs-11)",
                     fontWeight: l === stageLabel ? 800 : 600,
                     color: l === stageLabel ? stage.color : C.label,
                   }}
@@ -304,11 +304,11 @@ export function Hero({
                 tabIndex={0}
                 style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4, minWidth: 0 }}
               >
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 600, color: C.label, whiteSpace: "nowrap" }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.label, whiteSpace: "nowrap" }}>
                   <span style={{ width: 7, height: 7, borderRadius: "50%", background: b.fill, flexShrink: 0 }} />
                   {b.label}
                 </span>
-                <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, lineHeight: 1, color: C.ink }}>{b.count}</strong>
+                <strong style={{ fontFamily: MONO, fontSize: "var(--fs-17)", fontWeight: 800, lineHeight: 1, color: C.ink }}>{b.count}</strong>
                 {b.count > 0 ? (
                   <div className="hz-dist-pop hz-scroll">
                     <div className="hz-dist-pop-head">
@@ -330,7 +330,7 @@ export function Hero({
             ))}
           </div>
           {bandCounts[3].count > 0 && (
-            <span style={{ fontSize: 12, lineHeight: 1.5, color: C.sub, textWrap: "pretty" }}>
+            <span style={{ fontSize: "var(--fs-12)", lineHeight: 1.5, color: C.sub, textWrap: "pretty" }}>
               초고온 {bandCounts[3].count}개가 온도를 끌어올렸습니다
             </span>
           )}

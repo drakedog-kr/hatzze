@@ -96,7 +96,7 @@ export function GoalBox({
             style={{ cursor: "help" }}
             aria-label="목표까지 셈법"
           >
-            <Icon name="help" style={{ fontSize: 14 }} />
+            <Icon name="help" style={{ fontSize: "var(--fs-14)" }} />
           </span>
         </span>
       </div>

@@ -502,9 +502,9 @@ function Sidebar() {
           </Link>
           {/* 배지 크기는 '준비 중' 배지와 맞춘다(10px / padding 3-7). 서로 다른 크기면
               같은 사이드바 안에서 배지가 두 종류로 보인다. */}
-          <BetaBadge logoSize={30} style={{ height: "auto", fontSize: 10, padding: "3px 7px", lineHeight: 1.4 }} />
+          <BetaBadge logoSize={30} style={{ height: "auto", fontSize: "var(--fs-10)", padding: "3px 7px", lineHeight: 1.4 }} />
         </LogoTag>
-        <p style={{ margin: "8px 0 0", fontSize: 11, fontWeight: 600, color: C.sub, letterSpacing: "0.02em", lineHeight: 1.5 }}>
+        <p style={{ margin: "8px 0 0", fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub, letterSpacing: "0.02em", lineHeight: 1.5 }}>
           {SLOGAN}
         </p>
       </div>
@@ -531,14 +531,14 @@ function Sidebar() {
                 {/* 배지를 라벨 '우측 상단'에 위첨자로 띄운다(로고 옆 베타 배지와 같은 어법).
                     absolute 라 배지가 행 폭 계산에서 빠져 라벨이 눌리지도, 항목이 넘치지도 않는다. */}
                 <span style={{ position: "relative", display: "inline-flex" }}>
-                  <span style={{ fontSize: 14, whiteSpace: "nowrap" }}>{soon.label}</span>
+                  <span style={{ fontSize: "var(--fs-14)", whiteSpace: "nowrap" }}>{soon.label}</span>
                   <span
                     style={{
                       position: "absolute",
                       left: "100%",
                       top: -6,
                       marginLeft: 3,
-                      fontSize: 10,
+                      fontSize: "var(--fs-10)",
                       fontWeight: 700,
                       lineHeight: 1.4,
                       whiteSpace: "nowrap",
@@ -578,14 +578,14 @@ function Sidebar() {
                 >
                   <child.Glyph size={18} dimmed />
                   <span style={{ position: "relative", display: "inline-flex" }}>
-                    <span style={{ fontSize: 13, whiteSpace: "nowrap" }}>{child.label}</span>
+                    <span style={{ fontSize: "var(--fs-13)", whiteSpace: "nowrap" }}>{child.label}</span>
                     <span
                       style={{
                         position: "absolute",
                         left: "100%",
                         top: -6,
                         marginLeft: 3,
-                        fontSize: 10,
+                        fontSize: "var(--fs-10)",
                         fontWeight: 700,
                         lineHeight: 1.4,
                         whiteSpace: "nowrap",
@@ -615,7 +615,7 @@ function Sidebar() {
                 }}
               >
                 <child.Glyph size={18} />
-                <span style={{ fontSize: 13 }}>{child.label}</span>
+                <span style={{ fontSize: "var(--fs-13)" }}>{child.label}</span>
               </Link>
             );
           }
@@ -648,7 +648,7 @@ function Sidebar() {
               }}
             >
               <NavGlyph item={item} size={20} />
-              <span style={{ fontSize: 14 }}>{item.label}</span>
+              <span style={{ fontSize: "var(--fs-14)" }}>{item.label}</span>
             </Link>
           );
         })}
@@ -693,12 +693,12 @@ function Sidebar() {
             // 높이 44 · 모서리 12 — 카더라 히어로의 '미장 카더라 보기' 버튼과 같은 눈금이다.
             padding: 12,
             borderRadius: R.nav,
-            fontSize: 14,
+            fontSize: "var(--fs-14)",
             fontWeight: 700,
             textDecoration: "none",
           }}
         >
-          <Icon name={TELEGRAM.icon} style={{ fontSize: 19 }} />
+          <Icon name={TELEGRAM.icon} style={{ fontSize: "var(--fs-19)" }} />
           {TELEGRAM.label}
         </a>
       </div>
@@ -753,10 +753,10 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
                 style={{ ...rowStyle(false), color: C.faint }}
               >
                 <NavGlyph item={soon} size={20} />
-                <span style={{ fontSize: 15 }}>{soon.label}</span>
+                <span style={{ fontSize: "var(--fs-15)" }}>{soon.label}</span>
                 <span
                   style={{
-                    fontSize: 9,
+                    fontSize: "var(--fs-9)",
                     fontWeight: 700,
                     lineHeight: 1.4,
                     whiteSpace: "nowrap",
@@ -787,10 +787,10 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
                   style={{ ...indented, color: C.faint }}
                 >
                   <child.Glyph size={18} dimmed />
-                  <span style={{ fontSize: 14 }}>{child.label}</span>
+                  <span style={{ fontSize: "var(--fs-14)" }}>{child.label}</span>
                   <span
                     style={{
-                      fontSize: 9,
+                      fontSize: "var(--fs-9)",
                       fontWeight: 700,
                       lineHeight: 1.4,
                       whiteSpace: "nowrap",
@@ -815,7 +815,7 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
                 style={{ ...indented, color: on ? C.blueInk : C.sub, fontWeight: on ? 700 : 600 }}
               >
                 <child.Glyph size={18} />
-                <span style={{ fontSize: 14 }}>{child.label}</span>
+                <span style={{ fontSize: "var(--fs-14)" }}>{child.label}</span>
               </Link>
             );
           }
@@ -831,7 +831,7 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
               style={rowStyle(active)}
             >
               <NavGlyph item={item} size={20} />
-              <span style={{ fontSize: 15 }}>{item.label}</span>
+              <span style={{ fontSize: "var(--fs-15)" }}>{item.label}</span>
             </Link>
           );
         })}
@@ -850,8 +850,8 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
           data-ga-surface="menu"
           style={rowStyle(false)}
         >
-          <Icon name={TELEGRAM.icon} style={{ fontSize: 20 }} />
-          <span style={{ fontSize: 15 }}>{TELEGRAM.label}</span>
+          <Icon name={TELEGRAM.icon} style={{ fontSize: "var(--fs-20)" }} />
+          <span style={{ fontSize: "var(--fs-15)" }}>{TELEGRAM.label}</span>
         </a>
       </nav>
     </>
@@ -947,7 +947,7 @@ function ChannelRequest() {
       data-ga-cta="register_channel"
       data-ga-surface="topbar"
     >
-      <Icon name="add_circle" style={{ fontSize: 15 }} />
+      <Icon name="add_circle" style={{ fontSize: "var(--fs-15)" }} />
       <span className="hz-topbar-cta-label">채널 등록 신청</span>
     </a>
   );
@@ -1019,8 +1019,8 @@ function ThemeToggle({ initial, variant = "icon" }: { initial: "light" | "dark";
           font: "inherit",
         }}
       >
-        <span style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13, fontWeight: 600 }}>
-          <Icon name={theme === "dark" ? "light_mode" : "dark_mode"} style={{ fontSize: 19 }} />
+        <span style={{ display: "flex", alignItems: "center", gap: 9, fontSize: "var(--fs-13)", fontWeight: 600 }}>
+          <Icon name={theme === "dark" ? "light_mode" : "dark_mode"} style={{ fontSize: "var(--fs-19)" }} />
           다크 모드
         </span>
         {/* 스위치는 장식이다(aria-pressed 가 상태를 말한다). 켜지면 손잡이가 오른쪽으로. */}
@@ -1062,7 +1062,7 @@ function ThemeToggle({ initial, variant = "icon" }: { initial: "light" | "dark";
         flexShrink: 0,
       }}
     >
-      <Icon name={theme === "dark" ? "light_mode" : "dark_mode"} style={{ fontSize: 20 }} />
+      <Icon name={theme === "dark" ? "light_mode" : "dark_mode"} style={{ fontSize: "var(--fs-20)" }} />
     </button>
   );
 }
@@ -1166,7 +1166,7 @@ function PageHeader({ theme, currency }: { theme: "light" | "dark"; currency: "k
             {badge && (
               <span
                 style={{
-                  fontSize: 11,
+                  fontSize: "var(--fs-11)",
                   fontWeight: 700,
                   color: C.sub,
                   /* 회색 알약이니 --c-chip 이다. --c-track(막대의 빈 트랙)을 쓰고 있었는데,
@@ -1184,7 +1184,7 @@ function PageHeader({ theme, currency }: { theme: "light" | "dark"; currency: "k
               </span>
             )}
           </div>
-          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: C.sub, wordBreak: "keep-all" }}>{sub}</p>
+          <p style={{ margin: 0, fontSize: "var(--fs-14)", lineHeight: 1.5, color: C.sub, wordBreak: "keep-all" }}>{sub}</p>
         </div>
       )}
       {/* 제목이 없을 때 도구가 왼쪽으로 붙지 않도록. justify-content:space-between 은
@@ -1274,7 +1274,7 @@ function TopBar({
             flexShrink: 0,
           }}
         >
-          <Icon name={menuOpen ? "close" : "menu"} style={{ fontSize: 20 }} />
+          <Icon name={menuOpen ? "close" : "menu"} style={{ fontSize: "var(--fs-20)" }} />
         </button>
       </div>
     </header>
@@ -1408,7 +1408,7 @@ function NewsStrip() {
         // 바깥 주소(t.me)면 새 탭. 사이드바의 채널 링크와 같은 규칙이다.
         {...(NEWS.href.startsWith("http") ? { target: "_blank", rel: "noopener noreferrer" } : {})}
       >
-        <Icon name={NEWS.icon} style={{ fontSize: 17, flexShrink: 0 }} />
+        <Icon name={NEWS.icon} style={{ fontSize: "var(--fs-17)", flexShrink: 0 }} />
         <span className="hz-news-text">
           {/* ⚠️ <a> 안에 <a> 를 넣을 수 없다. 바깥 링크가 이미 같은 곳으로 가므로
               여기서는 **밑줄만** 긋는다 — 눌리는 건 띠 전체다. */}
@@ -1417,11 +1417,11 @@ function NewsStrip() {
         </span>
         <span className="hz-news-go">
           <span className="hz-news-go-label">보러 가기</span>
-          <Icon name="arrow_forward" style={{ fontSize: 15 }} />
+          <Icon name="arrow_forward" style={{ fontSize: "var(--fs-15)" }} />
         </span>
       </Link>
       <button type="button" onClick={dismiss} aria-label="알림 닫기" className="hz-news-x">
-        <Icon name="close" style={{ fontSize: 17 }} />
+        <Icon name="close" style={{ fontSize: "var(--fs-17)" }} />
       </button>
     </div>
   );
@@ -1480,7 +1480,7 @@ function PcHint() {
 
   return (
     <div className="hz-pc-hint" role="status">
-      <Icon name="desktop_windows" style={{ fontSize: 18, flexShrink: 0 }} />
+      <Icon name="desktop_windows" style={{ fontSize: "var(--fs-18)", flexShrink: 0 }} />
       <span style={{ flex: 1, wordBreak: "keep-all" }}>지표를 한눈에 보시려면 PC를 권해 드립니다.</span>
       <button
         type="button"
@@ -1501,7 +1501,7 @@ function PcHint() {
           cursor: "pointer",
         }}
       >
-        <Icon name="close" style={{ fontSize: 17 }} />
+        <Icon name="close" style={{ fontSize: "var(--fs-17)" }} />
       </button>
     </div>
   );
@@ -1599,7 +1599,7 @@ function ToTop({
       aria-label="맨 위로"
       onClick={() => scroller.current?.scrollTo({ top: 0 })}
     >
-      <Icon name="arrow_upward" style={{ fontSize: 20 }} />
+      <Icon name="arrow_upward" style={{ fontSize: "var(--fs-20)" }} />
     </button>
   );
 }

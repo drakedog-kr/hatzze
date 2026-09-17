@@ -39,7 +39,7 @@ export function MonthCalendar({
             style={{ cursor: "help" }}
             aria-label="달력 설명"
           >
-            <Icon name="help" style={{ fontSize: 14 }} />
+            <Icon name="help" style={{ fontSize: "var(--fs-14)" }} />
           </span>
         </span>
         <span className="dv-cal-sub">
@@ -67,7 +67,7 @@ export function MonthCalendar({
                 <span className="dv-cal-amt">{wonCal(v)}</span>
               ) : (
                 <span className="dv-cal-amt dv-cal-add" aria-hidden="true">
-                  <Icon name="add_circle" style={{ fontSize: 18 }} />
+                  <Icon name="add_circle" style={{ fontSize: "var(--fs-18)" }} />
                 </span>
               )}
             </button>
@@ -172,7 +172,7 @@ export function Upcoming({ lines, fx, mode }: { lines: Line[]; fx: number; mode:
             style={{ cursor: "help" }}
             aria-label="다가오는 일정 설명"
           >
-            <Icon name="help" style={{ fontSize: 14 }} />
+            <Icon name="help" style={{ fontSize: "var(--fs-14)" }} />
           </span>
         </span>
         {/* 확정·예상 합 — 표에 못 든 줄까지 석 달 안 전부. 둘 다 0 이면(기준일만 있을 때) 안 적는다. */}

@@ -105,7 +105,7 @@ function UsMddLink({ ticker, label = "MDD" }: { ticker: string; label?: string }
   return (
     <Link href={`/mdd?code=${ticker}&market=US`} className="hz-mdd-link">
       {label}
-      <Icon name="arrow_outward" style={{ fontSize: 13 }} />
+      <Icon name="arrow_outward" style={{ fontSize: "var(--fs-13)" }} />
     </Link>
   );
 }
@@ -123,7 +123,7 @@ function UsInsiderLink({ ticker, label = "공시" }: { ticker: string; label?: s
   return (
     <Link href={`/insider/stock/${encodeURIComponent(ticker)}`} className="hz-mdd-link">
       {label}
-      <Icon name="arrow_outward" style={{ fontSize: 13 }} />
+      <Icon name="arrow_outward" style={{ fontSize: "var(--fs-13)" }} />
     </Link>
   );
 }
@@ -192,7 +192,7 @@ function UsTrendingList({ items }: { items: UsTrendingMessage[] }) {
             <span
               style={{
                 ...clip,
-                fontSize: 12.5,
+                fontSize: "var(--fs-12-5)",
                 fontWeight: 800,
                 letterSpacing: "-.01em",
                 color: "var(--c-cold-ink)",
@@ -201,13 +201,13 @@ function UsTrendingList({ items }: { items: UsTrendingMessage[] }) {
             >
               {m.channelTitle}
             </span>
-            <span style={{ fontSize: 11, fontFamily: MONO, color: C.sub2 }}>
+            <span style={{ fontSize: "var(--fs-11)", fontFamily: MONO, color: C.sub2 }}>
               {timeAgo(m.postedAt)}
             </span>
             <span style={{ flex: 1 }} />
             <span
               style={{
-                fontSize: 11,
+                fontSize: "var(--fs-11)",
                 fontFamily: MONO,
                 fontWeight: 800,
                 color: C.sub,
@@ -222,7 +222,7 @@ function UsTrendingList({ items }: { items: UsTrendingMessage[] }) {
             <p
               style={{
                 margin: 0,
-                fontSize: 13,
+                fontSize: "var(--fs-13)",
                 lineHeight: 1.7,
                 color: "var(--c-ink-soft)",
                 overflowWrap: "anywhere",
@@ -245,7 +245,7 @@ function UsTrendingList({ items }: { items: UsTrendingMessage[] }) {
                   <span
                     key={t}
                     style={{
-                      fontSize: 11,
+                      fontSize: "var(--fs-11)",
                       fontWeight: 700,
                       color: C.label,
                       background: C.chip,
@@ -265,7 +265,7 @@ function UsTrendingList({ items }: { items: UsTrendingMessage[] }) {
                 alignItems: "center",
                 gap: 14,
                 paddingTop: 2,
-                fontSize: 11,
+                fontSize: "var(--fs-11)",
                 fontFamily: MONO,
                 fontWeight: 700,
                 color: C.sub,
@@ -276,7 +276,7 @@ function UsTrendingList({ items }: { items: UsTrendingMessage[] }) {
               >
                 <Icon
                   name="visibility"
-                  style={{ fontSize: 14, color: C.muted }}
+                  style={{ fontSize: "var(--fs-14)", color: C.muted }}
                 />
                 {compact(m.views)}
               </span>
@@ -285,7 +285,7 @@ function UsTrendingList({ items }: { items: UsTrendingMessage[] }) {
               >
                 <Icon
                   name="shortcut"
-                  style={{ fontSize: 14, color: C.muted }}
+                  style={{ fontSize: "var(--fs-14)", color: C.muted }}
                 />
                 {compact(m.forwards)}
               </span>
@@ -299,7 +299,7 @@ function UsTrendingList({ items }: { items: UsTrendingMessage[] }) {
                 >
                   <Icon
                     name="chat_bubble"
-                    style={{ fontSize: 12, color: C.muted }}
+                    style={{ fontSize: "var(--fs-12)", color: C.muted }}
                   />
                   {m.replies}
                 </span>
@@ -498,7 +498,7 @@ export default async function UsKaderaPage() {
             {/* 기준 시각. formatKstUpdate 가 이미 "… 기준"으로 끝난다 — 또 붙이면 "기준 기준". */}
             {summary.lastUpdated && (
               <span className="hz-tx-eyebrow-r">
-                <Icon name="schedule" style={{ fontSize: 14, color: C.muted }} />
+                <Icon name="schedule" style={{ fontSize: "var(--fs-14)", color: C.muted }} />
                 최종 업데이트 · {formatKstUpdate(summary.lastUpdated)}
               </span>
             )}
@@ -567,7 +567,7 @@ export default async function UsKaderaPage() {
               )}
             </div>
             {!sentiment ? (
-              <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 분석된 메시지가 없습니다.</p>
+              <p style={{ margin: 0, color: C.sub, fontSize: "var(--fs-13)" }}>아직 분석된 메시지가 없습니다.</p>
             ) : (
               <>
                 {/* 밑선 맞춤은 CSS 가 한다(.hz-figrow) — 곁줄에 padding 을 얹어 흉내 내지 말 것. */}
@@ -577,7 +577,7 @@ export default async function UsKaderaPage() {
                     <span>%</span>
                   </strong>
                   <div className="hz-figrow-aside">
-                    <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub }}>
+                    <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub }}>
                       최근 {sentiment.windowDays}일 · {sentiment.messageCount.toLocaleString("ko-KR")}건 분석
                     </span>
                     {/* 툴팁은 문장이 아니라 물음표에 건다(국장 히어로와 같은 규칙). */}
@@ -585,7 +585,7 @@ export default async function UsKaderaPage() {
                         마지막 줄이라 그 밑선이 옆의 큰 숫자와 한 선에 서야 하는데(.hz-figrow),
                         center 로 두면 글자가 물음표와 함께 가운데로 밀려 **밑선이 2.6px 뜬다.**
                         물음표만 alignSelf 로 가운데에 둔다 — 그림이라 글줄 밑선에 앉히면 낮다. */}
-                    <span style={{ fontSize: 11.5, fontWeight: 700, color: C.sub, display: "inline-flex", alignItems: "baseline", gap: 4, width: "fit-content" }}>
+                    <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 700, color: C.sub, display: "inline-flex", alignItems: "baseline", gap: 4, width: "fit-content" }}>
                       중립 {sentiment.neutral}% 제외 후 환산
                       <span
                         className="hz-tip hz-tip-wide"
@@ -593,7 +593,7 @@ export default async function UsKaderaPage() {
                         data-ga-tip="us_sentiment_ratio"
                         style={{ display: "inline-flex", cursor: "help", flexShrink: 0, alignSelf: "center" }}
                       >
-                        <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
+                        <Icon name="help" style={{ fontSize: "var(--fs-12)", color: C.muted }} />
                       </span>
                     </span>
                   </div>
@@ -604,14 +604,14 @@ export default async function UsKaderaPage() {
                     <span style={{ width: `${sentiment.score}%`, background: "var(--c-warm-2)" }} />
                   </div>
                   {/* 두 라벨을 막대의 양 끝에 붙여 어느 쪽이 어느 색인지 위치로 읽히게 한다. */}
-                  <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 11.5, fontWeight: 700 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: "var(--fs-11-5)", fontWeight: 700 }}>
                     <span style={{ color: "var(--c-cold-ink)" }}>비관 {100 - sentiment.score}</span>
                     <span style={{ color: "var(--c-hot-ink)" }}>낙관 {sentiment.score}</span>
                   </div>
                 </div>
                 {sentiment.byTheme.length > 0 && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 2 }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".04em", color: C.sub }}>인기 테마별 비관 ↔ 낙관</span>
+                    <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, letterSpacing: ".04em", color: C.sub }}>인기 테마별 비관 ↔ 낙관</span>
                     {sentiment.byTheme.map((t) => (
                       <div
                         key={t.name}
@@ -623,7 +623,7 @@ export default async function UsKaderaPage() {
                         {/* 96 은 실측이다 — 78 에서 "AI 인프라·클라우드"가 잘렸다. 국장(62)보다 넓은 이유는
                             미장 테마명이 길기 때문이다. 폭을 고정하는 이유는 그대로다: flex 로 두면
                             막대 시작점이 행마다 어긋나 눈이 세로로 훑질 못한다. */}
-                        <span style={{ ...clip, width: 96, flexShrink: 0, fontSize: 11, fontWeight: 700, color: C.label }}>{t.name}</span>
+                        <span style={{ ...clip, width: 96, flexShrink: 0, fontSize: "var(--fs-11)", fontWeight: 700, color: C.label }}>{t.name}</span>
                         <span style={{ flex: 1, minWidth: 0, display: "flex", height: 7, borderRadius: 999, overflow: "hidden" }}>
                           <span style={{ width: `${100 - t.pos}%`, background: "var(--c-blue-3)" }} />
                           <span style={{ width: `${t.pos}%`, background: "var(--c-warm-3)" }} />
@@ -645,7 +645,7 @@ export default async function UsKaderaPage() {
                   {s.note && <span style={{ color: C.sub2, fontWeight: 500 }}>{s.note}</span>}
                   {s.help && (
                     <span className="hz-tip hz-tip-wide" data-tip={s.help} data-ga-tip={s.label} style={{ display: "inline-flex", cursor: "help", flexShrink: 0 }}>
-                      <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
+                      <Icon name="help" style={{ fontSize: "var(--fs-12)", color: C.muted }} />
                     </span>
                   )}
                 </span>
@@ -659,7 +659,7 @@ export default async function UsKaderaPage() {
 
           {/* ③ 국장으로 건너가는 통로. 두 화면은 형제라 서로 오가는 길이 히어로에 있어야 한다. */}
           <Link href="/kadera" className="hz-tx-btn" data-ga="cta_click" data-ga-cta="to_kr_kadera" data-ga-surface="us_hero">
-            <Icon name="swap_horiz" style={{ fontSize: 17 }} />
+            <Icon name="swap_horiz" style={{ fontSize: "var(--fs-17)" }} />
             국장 카더라 보기
           </Link>
         </aside>
@@ -681,7 +681,7 @@ export default async function UsKaderaPage() {
               margin: 0,
               padding: "20px 22px",
               color: C.sub,
-              fontSize: 13,
+              fontSize: "var(--fs-13)",
             }}
           >
             아직 급부상 신호가 뚜렷한 종목이 없습니다. 데이터가 쌓일수록
@@ -710,7 +710,7 @@ export default async function UsKaderaPage() {
                       style={{
                         ...clip,
                         minWidth: 0,
-                        fontSize: 14,
+                        fontSize: "var(--fs-14)",
                         fontWeight: 800,
                         letterSpacing: "-.01em",
                         color: C.ink,
@@ -724,7 +724,7 @@ export default async function UsKaderaPage() {
                       <span
                         style={{
                           fontFamily: MONO,
-                          fontSize: 11,
+                          fontSize: "var(--fs-11)",
                           color: C.sub2,
                           flexShrink: 0,
                         }}
@@ -747,7 +747,7 @@ export default async function UsKaderaPage() {
                       {s.channelCount !== null && (
                         <span
                           style={{
-                            fontSize: 11.5,
+                            fontSize: "var(--fs-11-5)",
                             color: C.sub2,
                             whiteSpace: "nowrap",
                           }}
@@ -758,7 +758,7 @@ export default async function UsKaderaPage() {
                       <span
                         style={{
                           fontFamily: MONO,
-                          fontSize: 11.5,
+                          fontSize: "var(--fs-11-5)",
                           fontWeight: 700,
                           color: C.label,
                           whiteSpace: "nowrap",
@@ -781,7 +781,7 @@ export default async function UsKaderaPage() {
                     <strong
                       style={{
                         fontFamily: MONO,
-                        fontSize: 30,
+                        fontSize: "var(--fs-30)",
                         fontWeight: 800,
                         letterSpacing: "-.035em",
                         lineHeight: 1,
@@ -793,7 +793,7 @@ export default async function UsKaderaPage() {
                         : s.multiple.toFixed(1)}
                       <span
                         style={{
-                          fontSize: 18,
+                          fontSize: "var(--fs-18)",
                           fontWeight: 700,
                           letterSpacing: "-.02em",
                         }}
@@ -801,7 +801,7 @@ export default async function UsKaderaPage() {
                         배
                       </span>
                     </strong>
-                    <span style={{ fontSize: 11.5, color: C.sub2 }}>
+                    <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2 }}>
                       평소 대비
                     </span>
                   </div>
@@ -831,7 +831,7 @@ export default async function UsKaderaPage() {
                       <p
                         style={{
                           margin: 0,
-                          fontSize: 13,
+                          fontSize: "var(--fs-13)",
                           lineHeight: 1.7,
                           color: "var(--c-ink-soft)",
                           textWrap: "pretty",
@@ -855,7 +855,7 @@ export default async function UsKaderaPage() {
                       <p
                         style={{
                           margin: 0,
-                          fontSize: 13,
+                          fontSize: "var(--fs-13)",
                           lineHeight: 1.7,
                           color: C.sub2,
                           wordBreak: "keep-all",
@@ -885,7 +885,7 @@ export default async function UsKaderaPage() {
                         <span
                           style={{
                             fontFamily: MONO,
-                            fontSize: 11,
+                            fontSize: "var(--fs-11)",
                             fontWeight: 700,
                             color: C.label,
                             whiteSpace: "nowrap",
@@ -896,11 +896,11 @@ export default async function UsKaderaPage() {
                         </span>
                         <ChangeRate
                           rate={s.changeRate}
-                          style={{ fontSize: 11.5, fontWeight: 800 }}
+                          style={{ fontSize: "var(--fs-11-5)", fontWeight: 800 }}
                         />
                       </>
                     ) : (
-                      <span style={{ fontSize: 11.5, color: C.sub2 }}>
+                      <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2 }}>
                         시세를 못 받았습니다
                       </span>
                     )}
@@ -914,7 +914,7 @@ export default async function UsKaderaPage() {
           </div>
         )}
         <div className="hz-sheet-foot">
-          <span style={{ fontSize: 11.5, lineHeight: 1.6, color: C.sub }}>
+          <span style={{ fontSize: "var(--fs-11-5)", lineHeight: 1.6, color: C.sub }}>
             막대는 최근 7일 일별 언급량이고, 붉은 칸이 배수를 낸 최근 기간입니다 ·
             배수는 언급 횟수가 아니라 그날 전체 대화에서 차지한 몫을 견준
             값입니다
@@ -940,9 +940,9 @@ export default async function UsKaderaPage() {
           noteHelp="커뮤니티가 미국 종목을 두고 한 말에서 이유를 한 줄로 옮깁니다. 확인된 사실이 아니라 오간 이야기입니다. 등락률은 직전 미국장 종가 기준입니다."
         />
         {whyFailed ? (
-          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>까닭을 불러오지 못했습니다.</p>
+          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>까닭을 불러오지 못했습니다.</p>
         ) : !why || why.rows.length === 0 ? (
-          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>
+          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>
             오늘 집계가 끝나면 채워집니다. 저녁 실행 뒤에 그날 것이 붙습니다.
           </p>
         ) : (
@@ -952,19 +952,19 @@ export default async function UsKaderaPage() {
                 {/* 머리줄은 급부상 셀과 글자까지 같다(그쪽 baseline 주석 참고). */}
                 <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
                   <RankBadge n={i + 1} />
-                  <strong style={{ ...clip, minWidth: 0, fontSize: 14, fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>
+                  <strong style={{ ...clip, minWidth: 0, fontSize: "var(--fs-14)", fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>
                     {r.name}
                   </strong>
-                  <span style={{ fontFamily: MONO, fontSize: 11, color: C.sub2, flexShrink: 0 }}>{r.ticker}</span>
+                  <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", color: C.sub2, flexShrink: 0 }}>{r.ticker}</span>
                   <span style={{ flex: 1 }} />
                   <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
                     {r.changeRate !== null ? (
-                      <ChangeRate rate={r.changeRate} style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-.02em" }} />
+                      <ChangeRate rate={r.changeRate} style={{ fontSize: "var(--fs-15)", fontWeight: 800, letterSpacing: "-.02em" }} />
                     ) : (
-                      <span style={{ fontSize: 11.5, color: C.sub2, whiteSpace: "nowrap" }}>등락 준비 중</span>
+                      <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2, whiteSpace: "nowrap" }}>등락 준비 중</span>
                     )}
                     {r.closePrice != null && (
-                      <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 600, color: C.sub, whiteSpace: "nowrap" }}>
+                      <span style={{ fontFamily: MONO, fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub, whiteSpace: "nowrap" }}>
                         ${r.closePrice.toFixed(2)}
                       </span>
                     )}
@@ -975,7 +975,7 @@ export default async function UsKaderaPage() {
                   <p
                     style={{
                       margin: 0,
-                      fontSize: 13,
+                      fontSize: "var(--fs-13)",
                       lineHeight: 1.7,
                       color: "var(--c-ink-soft)",
                       wordBreak: "keep-all",
@@ -1017,7 +1017,7 @@ export default async function UsKaderaPage() {
                 margin: 0,
                 padding: "20px 22px",
                 color: C.sub,
-                fontSize: 13,
+                fontSize: "var(--fs-13)",
               }}
             >
               아직 집계된 테마가 없습니다.
@@ -1110,7 +1110,7 @@ export default async function UsKaderaPage() {
                         style={{
                           ...clip,
                           minWidth: 0,
-                          fontSize: 13.5,
+                          fontSize: "var(--fs-13-5)",
                           fontWeight: 700,
                           color: C.ink,
                         }}
@@ -1118,7 +1118,7 @@ export default async function UsKaderaPage() {
                         {t.theme}
                       </span>
                       <span style={{ flex: 1 }} />
-                      <DeltaPp value={t.shareDelta} style={{ fontSize: 12 }} />
+                      <DeltaPp value={t.shareDelta} style={{ fontSize: "var(--fs-12)" }} />
                     </span>
                     {/* 막대는 이름 아래에 깐다. 옆 칸으로 빼면 이름 칸이 좁아져 '반도체 장비·소재'가
                       잘리는데, 이 카드에서 가장 먼저 읽히는 건 테마 이름이다. */}
@@ -1142,7 +1142,7 @@ export default async function UsKaderaPage() {
                   <span
                     style={{
                       fontFamily: MONO,
-                      fontSize: 13,
+                      fontSize: "var(--fs-13)",
                       fontWeight: 800,
                       color: C.ink,
                       textAlign: "right",
@@ -1165,7 +1165,7 @@ export default async function UsKaderaPage() {
                       <span
                         style={{
                           fontFamily: MONO,
-                          fontSize: 11,
+                          fontSize: "var(--fs-11)",
                           color: C.sub2,
                         }}
                       >
@@ -1174,7 +1174,7 @@ export default async function UsKaderaPage() {
                     ) : t.rankChange === 0 ? (
                       <span
                         style={{
-                          fontSize: 11,
+                          fontSize: "var(--fs-11)",
                           fontWeight: 700,
                           color: C.sub2,
                           whiteSpace: "nowrap",
@@ -1217,7 +1217,7 @@ export default async function UsKaderaPage() {
                           <span className="hz-theme-pop-go">
                             <Icon
                               name="arrow_outward"
-                              style={{ fontSize: 13 }}
+                              style={{ fontSize: "var(--fs-13)" }}
                             />
                           </span>
                         </Link>
@@ -1254,7 +1254,7 @@ export default async function UsKaderaPage() {
                 margin: 0,
                 padding: "20px 22px",
                 color: C.sub,
-                fontSize: 13,
+                fontSize: "var(--fs-13)",
               }}
             >
               {/* ⚠️ 숫자는 calculate_us_telegram_sentiment.py 의
@@ -1362,7 +1362,7 @@ export default async function UsKaderaPage() {
                       style={{
                         ...clip,
                         minWidth: 0,
-                        fontSize: 13,
+                        fontSize: "var(--fs-13)",
                         fontWeight: 700,
                         color: C.ink,
                       }}
@@ -1373,7 +1373,7 @@ export default async function UsKaderaPage() {
                     {/* shareDelta 는 몫이라 ×100 해서 넘긴다(DeltaPp 는 %p 를 받는다). */}
                     <DeltaPp
                       value={k.shareDelta === null ? null : k.shareDelta * 100}
-                      style={{ fontSize: 12 }}
+                      style={{ fontSize: "var(--fs-12)" }}
                     />
                   </span>
                   {/* 막대는 **이 열 낱말 안에서 차지하는 몫**이다(국장과 같은 규칙).
@@ -1397,7 +1397,7 @@ export default async function UsKaderaPage() {
                   <span
                     style={{
                       fontFamily: MONO,
-                      fontSize: 12,
+                      fontSize: "var(--fs-12)",
                       fontWeight: 800,
                       color: C.ink,
                       textAlign: "right",
@@ -1411,7 +1411,7 @@ export default async function UsKaderaPage() {
                   <span
                     style={{
                       fontFamily: MONO,
-                      fontSize: 12,
+                      fontSize: "var(--fs-12)",
                       fontWeight: 800,
                       textAlign: "right",
                       whiteSpace: "nowrap",
@@ -1448,7 +1448,7 @@ export default async function UsKaderaPage() {
               margin: 0,
               padding: "20px 22px",
               color: C.sub,
-              fontSize: 13,
+              fontSize: "var(--fs-13)",
             }}
           >
             아직 집계된 종목이 없습니다.
@@ -1482,7 +1482,7 @@ export default async function UsKaderaPage() {
                       style={{
                         ...clip,
                         minWidth: 0,
-                        fontSize: 17,
+                        fontSize: "var(--fs-17)",
                         fontWeight: 800,
                         letterSpacing: "-.02em",
                         color: C.ink,
@@ -1494,7 +1494,7 @@ export default async function UsKaderaPage() {
                       <span
                         style={{
                           fontFamily: MONO,
-                          fontSize: 11,
+                          fontSize: "var(--fs-11)",
                           color: C.sub2,
                           flexShrink: 0,
                         }}
@@ -1516,14 +1516,14 @@ export default async function UsKaderaPage() {
                       }}
                     >
                       {r.channelCount !== null && (
-                        <span style={{ fontSize: 11.5, color: C.sub2, whiteSpace: "nowrap" }}>
+                        <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2, whiteSpace: "nowrap" }}>
                           {r.channelCount}개 채널
                         </span>
                       )}
                       <span
                         style={{
                           fontFamily: MONO,
-                          fontSize: 11.5,
+                          fontSize: "var(--fs-11-5)",
                           fontWeight: 700,
                           color: C.label,
                           whiteSpace: "nowrap",
@@ -1567,7 +1567,7 @@ export default async function UsKaderaPage() {
                       <p
                         style={{
                           margin: 0,
-                          fontSize: 13,
+                          fontSize: "var(--fs-13)",
                           lineHeight: 1.7,
                           color: "var(--c-ink-soft)",
                           textWrap: "pretty",
@@ -1594,7 +1594,7 @@ export default async function UsKaderaPage() {
                       <p
                         style={{
                           margin: 0,
-                          fontSize: 13,
+                          fontSize: "var(--fs-13)",
                           lineHeight: 1.7,
                           color: C.sub2,
                           wordBreak: "keep-all",
@@ -1623,13 +1623,13 @@ export default async function UsKaderaPage() {
                   >
                     {r.price != null ? (
                       <span style={{ display: "flex", alignItems: "baseline", gap: 7, whiteSpace: "nowrap", minWidth: 0 }}>
-                        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: C.label }}>
+                        <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", fontWeight: 700, color: C.label }}>
                           {fmtPrice(r.price, "US")}
                         </span>
-                        <ChangeRate rate={r.changeRate} style={{ fontSize: 11.5, fontWeight: 800 }} />
+                        <ChangeRate rate={r.changeRate} style={{ fontSize: "var(--fs-11-5)", fontWeight: 800 }} />
                       </span>
                     ) : (
-                      <span style={{ fontSize: 11.5, color: C.sub2 }}>가격 정보 준비 중</span>
+                      <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2 }}>가격 정보 준비 중</span>
                     )}
                     <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <UsMddLink ticker={r.ticker} />
@@ -1692,9 +1692,9 @@ export default async function UsKaderaPage() {
           noteHelp="커뮤니티 글에서 '언제 무엇이 있다'고 적힌 것을 모았습니다. 확정 일정은 공시로 확인하십시오."
         />
         {eventsFailed ? (
-          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>일정을 불러오지 못했습니다.</p>
+          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>일정을 불러오지 못했습니다.</p>
         ) : events.length === 0 ? (
-          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>
+          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>
             앞으로 5주 안에 날짜가 짚인 일정이 아직 없습니다. 커뮤니티 글이 쌓이면 채워집니다.
           </p>
         ) : (
@@ -1730,7 +1730,7 @@ export default async function UsKaderaPage() {
                 margin: 0,
                 padding: "20px 22px",
                 color: C.sub,
-                fontSize: 13,
+                fontSize: "var(--fs-13)",
               }}
             >
               아직 채널별 집계가 없습니다.
@@ -1753,7 +1753,7 @@ export default async function UsKaderaPage() {
                   <span
                     style={{
                       fontFamily: MONO,
-                      fontSize: 12,
+                      fontSize: "var(--fs-12)",
                       color: C.sub2,
                       textAlign: "right",
                     }}
@@ -1772,7 +1772,7 @@ export default async function UsKaderaPage() {
                     <span
                       style={{
                         ...clip,
-                        fontSize: 13,
+                        fontSize: "var(--fs-13)",
                         fontWeight: 700,
                         color: C.ink,
                       }}
@@ -1787,7 +1787,7 @@ export default async function UsKaderaPage() {
                   <span
                     style={{
                       fontFamily: MONO,
-                      fontSize: 12,
+                      fontSize: "var(--fs-12)",
                       fontWeight: 700,
                       color: C.label,
                       textAlign: "right",
@@ -1798,7 +1798,7 @@ export default async function UsKaderaPage() {
                   <span
                     style={{
                       fontFamily: MONO,
-                      fontSize: 11,
+                      fontSize: "var(--fs-11)",
                       color: C.sub2,
                       textAlign: "right",
                       whiteSpace: "nowrap",
@@ -1841,7 +1841,7 @@ export default async function UsKaderaPage() {
                 margin: 0,
                 padding: "20px 22px",
                 color: C.sub,
-                fontSize: 13,
+                fontSize: "var(--fs-13)",
               }}
             >
               아직 채널 집계가 없습니다.
@@ -1852,7 +1852,7 @@ export default async function UsKaderaPage() {
                 <span
                   style={{
                     fontFamily: MONO,
-                    fontSize: 12,
+                    fontSize: "var(--fs-12)",
                     color: C.sub2,
                     textAlign: "right",
                   }}
@@ -1879,7 +1879,7 @@ export default async function UsKaderaPage() {
                   <span
                     style={{
                       ...clip,
-                      fontSize: 13,
+                      fontSize: "var(--fs-13)",
                       fontWeight: 700,
                       color: C.ink,
                     }}
@@ -1901,7 +1901,7 @@ export default async function UsKaderaPage() {
                 <span
                   style={{
                     fontFamily: MONO,
-                    fontSize: 13,
+                    fontSize: "var(--fs-13)",
                     fontWeight: 800,
                     color: C.ink,
                     textAlign: "right",
@@ -1910,7 +1910,7 @@ export default async function UsKaderaPage() {
                 >
                   {b.channelCount}
                   <span
-                    style={{ fontSize: 11, fontWeight: 700, color: C.sub2 }}
+                    style={{ fontSize: "var(--fs-11)", fontWeight: 700, color: C.sub2 }}
                   >
                     곳
                   </span>
@@ -1918,7 +1918,7 @@ export default async function UsKaderaPage() {
                 <span
                   style={{
                     fontFamily: MONO,
-                    fontSize: 11,
+                    fontSize: "var(--fs-11)",
                     color: C.sub2,
                     textAlign: "right",
                     whiteSpace: "nowrap",
@@ -1930,7 +1930,7 @@ export default async function UsKaderaPage() {
             ))
           )}
           <div className="hz-sheet-foot" style={{ marginTop: "auto" }}>
-            <span style={{ fontSize: 11.5, lineHeight: 1.6, color: C.sub }}>
+            <span style={{ fontSize: "var(--fs-11-5)", lineHeight: 1.6, color: C.sub }}>
               막대는 모니터링 채널 {breadth.totalChannels}곳 중 몇 곳이
               말했는지입니다 · 같은 채널이 며칠에 걸쳐 말해도 한 곳으로 셉니다
             </span>

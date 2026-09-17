@@ -42,7 +42,7 @@ export function ChartZoom({ label, children }: { label: string; children: React.
         aria-label={`${label} 확대해서 보기`}
         onClick={() => setZoom(true)}
       >
-        <Icon name="open_in_full" style={{ fontSize: 15 }} />
+        <Icon name="open_in_full" style={{ fontSize: "var(--fs-15)" }} />
       </button>
       {zoom && (
         <div
@@ -55,7 +55,7 @@ export function ChartZoom({ label, children }: { label: string; children: React.
           }}
         >
           <button type="button" className="hz-zoom-close" aria-label="닫기" onClick={() => setZoom(false)}>
-            <Icon name="close" style={{ fontSize: 20 }} />
+            <Icon name="close" style={{ fontSize: "var(--fs-20)" }} />
           </button>
           <div className="hz-zoom-stage">{children}</div>
         </div>

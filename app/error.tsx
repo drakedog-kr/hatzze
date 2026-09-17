@@ -27,25 +27,25 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
 
   return (
     <div style={{ maxWidth: DOC_WIDTH }}>
-      <p style={{ margin: 0, fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: "var(--c-muted)" }}>오류</p>
-      <h1 style={{ margin: "8px 0 0", fontSize: 24, fontWeight: 700, color: C.ink, letterSpacing: "-0.01em" }}>
+      <p style={{ margin: 0, fontSize: "var(--fs-12)", fontWeight: 700, letterSpacing: "0.08em", color: "var(--c-muted)" }}>오류</p>
+      <h1 style={{ margin: "8px 0 0", fontSize: "var(--fs-24)", fontWeight: 700, color: C.ink, letterSpacing: "-0.01em" }}>
         화면을 그리다 멈췄습니다
       </h1>
-      <p style={{ margin: "14px 0 0", fontSize: 14, lineHeight: 1.85, color: C.sub }}>
+      <p style={{ margin: "14px 0 0", fontSize: "var(--fs-14)", lineHeight: 1.85, color: C.sub }}>
         잠시 뒤 다시 시도하면 대개 그대로 열립니다. 계속 그러면 아래 코드를 문의에 적어 보내 주십시오.
       </p>
       {error.digest && (
-        <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--c-muted)", fontVariantNumeric: "tabular-nums" }}>
+        <p style={{ margin: "8px 0 0", fontSize: "var(--fs-12)", color: "var(--c-muted)", fontVariantNumeric: "tabular-nums" }}>
           코드 · {error.digest}
         </p>
       )}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 22 }}>
         <button type="button" onClick={reset} className="hz-btn-soft" style={{ padding: "0 14px", cursor: "pointer" }}>
-          <Icon name="refresh" style={{ fontSize: 18 }} />
+          <Icon name="refresh" style={{ fontSize: "var(--fs-18)" }} />
           다시 시도
         </button>
         <Link href="/" className="hz-btn-soft" style={{ padding: "0 14px" }}>
-          <Icon name="home" style={{ fontSize: 18 }} />
+          <Icon name="home" style={{ fontSize: "var(--fs-18)" }} />
           시장 브리핑
         </Link>
       </div>

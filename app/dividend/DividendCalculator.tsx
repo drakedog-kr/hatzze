@@ -351,7 +351,7 @@ export function DividendCalculator({
               <p className="dv-hero-label">
                 1년에 받는 배당{mixed ? " (계좌별)" : accountTag(taxMode)}
                 <span className="hz-tip hz-tip-wide hz-tip-lines dv-help" data-tip={helpText} style={{ cursor: "help" }} aria-label="세금·시세·출처 설명">
-                  <Icon name="help" style={{ fontSize: 14 }} />
+                  <Icon name="help" style={{ fontSize: "var(--fs-14)" }} />
                 </span>
               </p>
               <p className="dv-hero-main">{won(total)}</p>

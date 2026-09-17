@@ -255,13 +255,13 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
           display: "inline-flex",
           alignItems: "center",
           gap: 4,
-          fontSize: 12,
+          fontSize: "var(--fs-12)",
           fontWeight: 700,
           color: C.sub,
           textDecoration: "none",
         }}
       >
-        <Icon name="chevron_left" style={{ fontSize: 16 }} />
+        <Icon name="chevron_left" style={{ fontSize: "var(--fs-16)" }} />
         내부자 리포트
       </Link>
 

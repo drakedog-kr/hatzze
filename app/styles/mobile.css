@@ -190,7 +190,7 @@
   background: transparent;
   color: var(--c-sub);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--fs-13);
   font-weight: 700;
   line-height: 1;
   cursor: pointer;

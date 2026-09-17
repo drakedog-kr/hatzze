@@ -13,26 +13,26 @@ export const DOC_WIDTH = "68ch";
 export function DocTitle({ title, effectiveDate }: { title: string; effectiveDate: string }) {
   return (
     <>
-      <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: C.ink, letterSpacing: "-0.01em" }}>
+      <h1 style={{ margin: 0, fontSize: "var(--fs-24)", fontWeight: 700, color: C.ink, letterSpacing: "-0.01em" }}>
         {title}
       </h1>
-      <p style={{ margin: "10px 0 0", fontSize: 13, color: "var(--c-muted)" }}>시행일 · {effectiveDate}</p>
+      <p style={{ margin: "10px 0 0", fontSize: "var(--fs-13)", color: "var(--c-muted)" }}>시행일 · {effectiveDate}</p>
     </>
   );
 }
 
 /** 제목 아래 들어가는 머리말. 조항이 아니라 문서 전체의 전제를 적는 자리다. */
 export function Lead({ children }: { children: React.ReactNode }) {
-  return <div style={{ marginTop: 24, fontSize: 14, lineHeight: 1.85, color: C.sub }}>{children}</div>;
+  return <div style={{ marginTop: 24, fontSize: "var(--fs-14)", lineHeight: 1.85, color: C.sub }}>{children}</div>;
 }
 
 export function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section style={{ marginTop: 36 }}>
-      <h2 style={{ margin: "0 0 12px", fontSize: 17, fontWeight: 700, color: C.ink, letterSpacing: "-0.01em" }}>
+      <h2 style={{ margin: "0 0 12px", fontSize: "var(--fs-17)", fontWeight: 700, color: C.ink, letterSpacing: "-0.01em" }}>
         {title}
       </h2>
-      <div style={{ fontSize: 14, lineHeight: 1.85, color: C.sub }}>{children}</div>
+      <div style={{ fontSize: "var(--fs-14)", lineHeight: 1.85, color: C.sub }}>{children}</div>
     </section>
   );
 }
@@ -64,15 +64,15 @@ export function Ul({ children }: { children: React.ReactNode }) {
 export function InfoBlock({ heading, rows }: { heading: string; rows: [string, React.ReactNode][] }) {
   return (
     <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: R.card, padding: "16px 18px", marginBottom: 12 }}>
-      <div style={{ fontSize: 14, fontWeight: 700, color: C.ink, marginBottom: 10 }}>{heading}</div>
+      <div style={{ fontSize: "var(--fs-14)", fontWeight: 700, color: C.ink, marginBottom: 10 }}>{heading}</div>
       <dl style={{ margin: 0, display: "grid", gridTemplateColumns: "auto 1fr", gap: "7px 16px" }}>
         {rows.map(([label, value]) => (
           <div key={label} style={{ display: "contents" }}>
-            <dt style={{ fontSize: 12, fontWeight: 600, color: "var(--c-muted)", whiteSpace: "nowrap" }}>{label}</dt>
+            <dt style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: "var(--c-muted)", whiteSpace: "nowrap" }}>{label}</dt>
             {/* 값 칸에는 끊을 자리가 없는 긴 문자열이 들어온다(처리방침 URL
                 "policies.google.com/privacy"). 기본값이면 그 한 덩어리가 최소 폭을 밀어올려
                 375px 화면에서 표가 7px 넘쳤다. 이 칸만 중간에서 끊게 둔다. */}
-            <dd style={{ margin: 0, fontSize: 13, lineHeight: 1.7, color: C.sub, overflowWrap: "anywhere" }}>{value}</dd>
+            <dd style={{ margin: 0, fontSize: "var(--fs-13)", lineHeight: 1.7, color: C.sub, overflowWrap: "anywhere" }}>{value}</dd>
           </div>
         ))}
       </dl>

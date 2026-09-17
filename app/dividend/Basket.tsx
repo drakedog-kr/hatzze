@@ -69,7 +69,7 @@ export function BasketSheet({
             {/* 주의는 제목 옆 물음표에(2026-09-13 지적) — 바닥에 문장으로 두면 시트가 무거워진다. */}
             {basket.caution && (
               <span className="hz-tip hz-tip-wide dv-help" data-tip={basket.caution} style={{ cursor: "help", marginLeft: 4, verticalAlign: "middle" }} aria-label={`${basket.title} 주의`}>
-                <Icon name="help" style={{ fontSize: 14 }} />
+                <Icon name="help" style={{ fontSize: "var(--fs-14)" }} />
               </span>
             )}
           </>

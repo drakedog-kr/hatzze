@@ -27,7 +27,7 @@
  * ⚠️ 시트 머리(18 · 14 · 12.5)는 `SectionHead` 의 자다. 다섯 화면이 공유하는 값이라
  * 이 페이지 혼자 바꾸면 안 된다.
  */
-export const T = { big: 22, lead: 15, body: 12, small: 11 } as const;
+export const T = { big: "var(--fs-22)", lead: "var(--fs-15)", body: "var(--fs-12)", small: "var(--fs-11)" } as const;
 
 /** 간격도 4의 배수 넷으로만. */
 export const S = { xs: 4, sm: 8, md: 12, lg: 16 } as const;

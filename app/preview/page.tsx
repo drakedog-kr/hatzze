@@ -143,8 +143,8 @@ function euro(word: string): string {
 function CellHead({ title, note }: { title: string; note?: string }) {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-      <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>{title}</h2>
-      {note && <span style={{ fontSize: 11.5, color: C.muted, whiteSpace: "nowrap" }}>{note}</span>}
+      <h2 style={{ margin: 0, fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>{title}</h2>
+      {note && <span style={{ fontSize: "var(--fs-11-5)", color: C.muted, whiteSpace: "nowrap" }}>{note}</span>}
     </div>
   );
 }
@@ -243,7 +243,7 @@ function OvernightPanel({ r }: { r: OvernightRow }) {
       <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
         <StockLogo code={r.code} name={r.name} market="KOSPI" size={30} />
         <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
-          <strong style={{ fontSize: 14, fontWeight: 700, color: C.ink, letterSpacing: "-.01em" }}>{r.name}</strong>
+          <strong style={{ fontSize: "var(--fs-14)", fontWeight: 700, color: C.ink, letterSpacing: "-.01em" }}>{r.name}</strong>
           {/* 심볼이 곧 출처 링크다. 이 값이 어디서 온 것인지 화면 어디에도 안 적혀
               있었는데, 심볼은 이미 그 시장의 주소 노릇을 한다 — 따로 '출처' 줄을
               만들지 않고 이걸 누를 수 있게 한다.
@@ -265,12 +265,12 @@ function OvernightPanel({ r }: { r: OvernightRow }) {
             rel="noopener noreferrer"
             data-ga="preview_perp_click"
             data-ga-symbol={r.symbol}
-            style={{ fontFamily: MONO, fontSize: 11, display: "inline-flex", alignItems: "center", gap: 2, width: "fit-content" }}
+            style={{ fontFamily: MONO, fontSize: "var(--fs-11)", display: "inline-flex", alignItems: "center", gap: 2, width: "fit-content" }}
           >
             {r.symbol.replace(`${HL_DEX}:`, "Hyperliquid:")}
             {/* 11px 글자 옆이라 아이콘도 11px 이다. 12 로 두면 글자보다 커서 화살표가
                 먼저 눈에 든다 — 여기서 주인공은 심볼이다. */}
-            <Icon name="north_east" style={{ fontSize: 11 }} />
+            <Icon name="north_east" style={{ fontSize: "var(--fs-11)" }} />
           </a>
         </span>
       </div>
@@ -283,22 +283,22 @@ function OvernightPanel({ r }: { r: OvernightRow }) {
           어제 국장 종가와 견준 값이다. 아래 '09/02 국장 종가' 줄과 짝이다. */}
       <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingTop: 12 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-          <strong style={{ fontFamily: MONO, fontSize: 27, fontWeight: 800, letterSpacing: "-.03em",
+          <strong style={{ fontFamily: MONO, fontSize: "var(--fs-27)", fontWeight: 800, letterSpacing: "-.03em",
                            lineHeight: 1.1, color: C.ink }}>
             {r.krw.toLocaleString("ko-KR")}
           </strong>
-          <span style={{ fontSize: 13, color: C.sub }}>원</span>
+          <span style={{ fontSize: "var(--fs-13)", color: C.sub }}>원</span>
         </div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 11, color: C.muted }}>국장 종가 대비</span>
+          <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>국장 종가 대비</span>
           {/* ⚠️ 아래 퍼센트와 **같은 크기·같은 굵기**다. 한때 12.5/700 과 14/800 로 갈라 뒀는데
               둘은 한 쌍(얼마 · 몇 %)이라 크기가 다르면 하나가 딸린 것처럼 읽힌다. */}
-          <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 800, color: ink, letterSpacing: "-.02em" }}>
+          <span style={{ fontFamily: MONO, fontSize: "var(--fs-14)", fontWeight: 800, color: ink, letterSpacing: "-.02em" }}>
             {/* 단위를 붙인다. 옆의 퍼센트와 나란히 서면 숫자 둘이 같은 종류로 보이는데,
                 하나는 원이고 하나는 %다. 아래 '1,613,000원' 과도 표기가 맞는다. */}
             {up ? "+" : ""}{won.toLocaleString("ko-KR")}원
           </span>
-          <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 800, color: ink, letterSpacing: "-.02em" }}>
+          <span style={{ fontFamily: MONO, fontSize: "var(--fs-14)", fontWeight: 800, color: ink, letterSpacing: "-.02em" }}>
             {PCT(r.diffPct)}
           </span>
         </div>
@@ -315,8 +315,8 @@ function OvernightPanel({ r }: { r: OvernightRow }) {
           ["24시간 거래대금", VOL(r.volumeUsd)],
         ] as const).map(([k, v]) => (
           <div key={k} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
-            <span style={{ fontSize: 11, color: C.muted }}>{k}</span>
-            <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 600, color: C.sub, whiteSpace: "nowrap" }}>{v}</span>
+            <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>{k}</span>
+            <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub, whiteSpace: "nowrap" }}>{v}</span>
           </div>
         ))}
       </div>
@@ -353,25 +353,25 @@ function MoverPanel({ m }: { m: PreviewMover }) {
         <StockLogo code={m.ticker} name={m.usName} market="US" size={30} />
         <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
           <span style={{ display: "flex", alignItems: "baseline", gap: 7, minWidth: 0 }}>
-            <strong style={{ fontFamily: MONO, fontSize: 15, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
+            <strong style={{ fontFamily: MONO, fontSize: "var(--fs-15)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
               {m.ticker}
             </strong>
-            <span className="hz-cellname" style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>{m.usName}</span>
+            <span className="hz-cellname" style={{ fontSize: "var(--fs-13)", fontWeight: 600, color: C.sub }}>{m.usName}</span>
           </span>
-          <span style={{ fontSize: 11, color: C.muted }}>{m.sector}</span>
+          <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>{m.sector}</span>
         </span>
         <span style={{ flex: 1 }} />
         <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1, flexShrink: 0 }}>
           {/* ⭐ "간밤" 을 붙인다. 밑에도 퍼센트가 줄줄이 있어서, 라벨이 없으면 위아래가
               같은 종류로 읽힌다 — 위는 **어젯밤 실제로 일어난 일**이고 아래는 **과거 평균**이다. */}
           <span style={{ display: "inline-flex", alignItems: "baseline", gap: 5, whiteSpace: "nowrap" }}>
-            <span style={{ fontSize: 11, color: C.muted }}>밤사이</span>
-            <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: ink, letterSpacing: "-.02em" }}>
+            <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>밤사이</span>
+            <strong style={{ fontFamily: MONO, fontSize: "var(--fs-17)", fontWeight: 800, color: ink, letterSpacing: "-.02em" }}>
               {PCT(m.dp)}
             </strong>
           </span>
           {/* ⭐ 등락률만으로는 큰 움직임인지 알 수 없다 — 종목마다 평소 폭이 다르다. */}
-          <span style={{ fontSize: 11, fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>
             평소보다 {m.z.toFixed(1)}배
           </span>
         </span>
@@ -396,7 +396,7 @@ function MoverPanel({ m }: { m: PreviewMover }) {
         {/* ⚠️ "국내 개장은" 이었다(2026-09-04 고침). 밑에 붙는 숫자는 **셋**인데(개장·장 중·
             종가) 머리가 개장 하나만 가리켜, 뒤의 둘이 무엇에 대한 값인지 안 서 있었다.
             '국장에서는' 은 그 셋을 다 받는다. */}
-        <div style={{ paddingBottom: 2, fontSize: 11.5, color: C.sub, wordBreak: "keep-all" }}>
+        <div style={{ paddingBottom: 2, fontSize: "var(--fs-11-5)", color: C.sub, wordBreak: "keep-all" }}>
           최근 5년, 이렇게 {m.dp > 0 ? "오른" : "내린"} 날 국장에서는
         </div>
         {m.links.map((l) => {
@@ -408,9 +408,9 @@ function MoverPanel({ m }: { m: PreviewMover }) {
             <div key={l.stock} style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
                 <StockLogo code={l.code} name={l.stock} market={l.market} size={18} />
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: C.ink, whiteSpace: "nowrap" }}>{l.stock}</span>
+                <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.ink, whiteSpace: "nowrap" }}>{l.stock}</span>
                 {/* 관계는 한 낱말짜리 꼬리표다. 자리가 모자라면 이것만 줄어든다. */}
-                <span style={{ fontSize: 11, color: C.sub2, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: "var(--fs-11)", color: C.sub2, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {l.why}
                 </span>
               </div>
@@ -421,8 +421,8 @@ function MoverPanel({ m }: { m: PreviewMover }) {
               <div style={{ display: "flex", alignItems: "baseline", gap: 12, paddingLeft: 25, flexWrap: "wrap" }}>
                 {([["개장", l.krOpen], ["장 중", l.krIntra], ["종가", day]] as const).map(([label, v]) => (
                   <span key={label} style={{ display: "inline-flex", alignItems: "baseline", gap: 4, whiteSpace: "nowrap" }}>
-                    <span style={{ fontSize: 11, color: C.muted }}>{label}</span>
-                    <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700,
+                    <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>{label}</span>
+                    <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700,
                                    color: v == null ? C.sub2 : v > 0 ? HOT : COLD }}>
                       {v == null ? "—" : PCT(v)}
                     </span>
@@ -505,7 +505,7 @@ export default async function PreviewPage() {
               물음이 아니다 — 개장 전에 사람이 궁금한 건 **"간밤 미국이 이랬는데 우리 장은
               어떻게 열리나"** 하나다(2026-09-02 지적). 섹터는 타일마다 라벨로 이미 있다. */}
           <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-            <strong style={{ fontFamily: MONO, fontSize: 38, fontWeight: 800, letterSpacing: "-.04em", lineHeight: 1,
+            <strong style={{ fontFamily: MONO, fontSize: "var(--fs-38)", fontWeight: 800, letterSpacing: "-.04em", lineHeight: 1,
                              color: spx == null ? C.ink : spx > 0 ? HOT : COLD }}>
               {spx == null ? "—" : PCT(spx)}
             </strong>
@@ -515,7 +515,7 @@ export default async function PreviewPage() {
                 앞 절은 바로 위 'S&P 500' 을 되풀이한 것이고 뒷 절은 셋째 칸 브리핑의 첫
                 문장("간밤에는 N곳이 평소보다 크게 움직였습니다")과 같은 말이었다
                 (2026-09-03 지적). 한 화면에서 같은 사실을 두 번 적으면 둘 다 값이 떨어진다. */}
-            <span style={{ fontSize: 12, color: C.sub, lineHeight: 1.6, textAlign: "right", wordBreak: "keep-all" }}>
+            <span style={{ fontSize: "var(--fs-12)", color: C.sub, lineHeight: 1.6, textAlign: "right", wordBreak: "keep-all" }}>
               밤사이 S&amp;P 500
             </span>
           </div>
@@ -541,7 +541,7 @@ export default async function PreviewPage() {
               칸 하나만 덩그러니 비어 고장처럼 보인다. 그래서 그 자리를 한 줄로 메운다. */}
           {!after && (
             <span style={{ marginTop: "auto", paddingTop: 10, borderTop: "1px solid var(--c-hairline)",
-                           fontSize: 12, lineHeight: 1.6, color: C.sub }}>
+                           fontSize: "var(--fs-12)", lineHeight: 1.6, color: C.sub }}>
               과거 같은 구간을 고를 자료를 아직 못 받았습니다
             </span>
           )}
@@ -559,7 +559,7 @@ export default async function PreviewPage() {
               {/* ⚠️ paddingBottom 을 되살리지 말 것. 6 이 붙어 있어서 머리글과 첫 줄 사이가
                   22px 였는데 줄과 줄 사이가 27px 이라 **머리글이 목록의 넷째 줄처럼** 보였다.
                   머리글은 목록보다 확실히 붙어 있어야 목록의 머리로 읽힌다(지금 16 대 27). */}
-              <span style={{ fontSize: 11.5, color: C.sub, wordBreak: "keep-all" }}>
+              <span style={{ fontSize: "var(--fs-11-5)", color: C.sub, wordBreak: "keep-all" }}>
                 최근 5년, 미장이 이만큼 {spx != null && spx > 0 ? "오른" : "내린"} 아침에 코스피는
               </span>
               {/* ⭐ 라벨은 **개장 · 장 중 · 종가** 로 못박는다(2026-09-02 확정).
@@ -604,8 +604,8 @@ export default async function PreviewPage() {
                   {/* ⚠️ 가운데 줄만 작게·흐리게 두지 말 것. "개장 뒤는 거의 0" 이라는 걸
                       크기로 말하려 했는데, 세 줄이 같은 종류라 가운데만 작으면 그냥 어긋나
                       보인다(2026-09-02 지적). **그 말은 숫자가 이미 하고 있다.** */}
-                  <span style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>{label}</span>
-                  <strong style={{ fontFamily: MONO, fontSize: 15, fontWeight: 800,
+                  <span style={{ fontSize: "var(--fs-12)", color: C.sub, fontWeight: 600 }}>{label}</span>
+                  <strong style={{ fontFamily: MONO, fontSize: "var(--fs-15)", fontWeight: 800,
                                    letterSpacing: "-.02em", whiteSpace: "nowrap",
                                    color: v > 0 ? HOT : COLD }}>
                     {PCT(v)}
@@ -631,7 +631,7 @@ export default async function PreviewPage() {
                  ("고장이 아니라 조용한 밤이었습니다")과 정면으로 부딪쳤다(2026-09-04).
                  `date` 가 있으면 파이프라인이 **돌았고** 걸린 종목이 없었다는 뜻이다
                  (마이그레이션 063 의 그날치 한 줄이 그 사실을 남긴다). */
-              <span style={{ fontSize: 12.5, color: C.sub, lineHeight: 1.7 }}>
+              <span style={{ fontSize: "var(--fs-12-5)", color: C.sub, lineHeight: 1.7 }}>
                 {date ? "평소 폭을 크게 넘어선 곳이 없었습니다" : "아직 채울 자료가 없습니다."}
               </span>
             ) : (
@@ -650,15 +650,15 @@ export default async function PreviewPage() {
                 >
                   <StockLogo code={m.ticker} name={m.usName} market="US" size={24} />
                   <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
-                    <strong style={{ fontFamily: MONO, fontSize: 12.5, fontWeight: 800, color: C.ink }}>{m.ticker}</strong>
-                    <span className="hz-cellname" style={{ fontSize: 11, color: C.sub2 }}>{m.usName}</span>
+                    <strong style={{ fontFamily: MONO, fontSize: "var(--fs-12-5)", fontWeight: 800, color: C.ink }}>{m.ticker}</strong>
+                    <span className="hz-cellname" style={{ fontSize: "var(--fs-11)", color: C.sub2 }}>{m.usName}</span>
                   </span>
                   <span style={{ flex: 1 }} />
                   <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1, flexShrink: 0 }}>
-                    <strong style={{ fontFamily: MONO, fontSize: 13.5, fontWeight: 800, whiteSpace: "nowrap", color: m.dp > 0 ? HOT : COLD }}>
+                    <strong style={{ fontFamily: MONO, fontSize: "var(--fs-13-5)", fontWeight: 800, whiteSpace: "nowrap", color: m.dp > 0 ? HOT : COLD }}>
                       {PCT(m.dp)}
                     </strong>
-                    <span style={{ fontSize: 11, color: C.sub2, whiteSpace: "nowrap" }}>평소보다 {m.z.toFixed(1)}배</span>
+                    <span style={{ fontSize: "var(--fs-11)", color: C.sub2, whiteSpace: "nowrap" }}>평소보다 {m.z.toFixed(1)}배</span>
                   </span>
                 </a>
               ))
@@ -678,7 +678,7 @@ export default async function PreviewPage() {
                  이 칸만 바닥이 비면 판이 어긋나 보인다 — 이 칸이 비어 보이던 옛 문제가
                  정확히 바닥 줄이 없어서였다(위 ② 칸 머리 주석). */}
           <span style={{ marginTop: "auto", paddingTop: 10, borderTop: "1px solid var(--c-hairline)",
-                         fontSize: 12, color: C.sub, lineHeight: 1.6, whiteSpace: "nowrap",
+                         fontSize: "var(--fs-12)", color: C.sub, lineHeight: 1.6, whiteSpace: "nowrap",
                          overflow: "hidden", textOverflow: "ellipsis" }}>
             {loudest.length === 0
               ? "평소 하루 폭을 넘어선 곳이 기준입니다"
@@ -766,11 +766,11 @@ export default async function PreviewPage() {
               놀아 칸 바닥까지 안 밀리고, 옆 칸과 높이가 어긋난다(2026-09-02 실측). */}
           <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 7,
                         paddingTop: 10, borderTop: "1px solid var(--c-sheet-row)" }}>
-            <Icon name="schedule" style={{ fontSize: 14, color: C.muted }} />
+            <Icon name="schedule" style={{ fontSize: "var(--fs-14)", color: C.muted }} />
             {/* ⚠️ lineHeight 를 빼지 말 것. 이 줄만 아이콘과 나란히 서는 flex 라 줄 상자가
                 작아지고, 그러면 기준선이 옆 두 칸보다 3px 내려앉는다(2026-09-03 실측).
                 옆 칸 설명과 같은 1.6 을 줘야 셋이 같은 줄에 앉는다. */}
-            <span style={{ fontSize: 11.5, lineHeight: 1.6, color: C.sub }}>
+            <span style={{ fontSize: "var(--fs-11-5)", lineHeight: 1.6, color: C.sub }}>
               최종 업데이트 · {updatedAt ? formatKstUpdate(updatedAt, HERO_HOURS) : "—"}
             </span>
           </div>
@@ -839,7 +839,7 @@ export default async function PreviewPage() {
           desc="밤사이 미장에서 크게 움직인 종목과 그 종목에 사업으로 엮인 국장 종목입니다"
         />
         {wall.length === 0 ? (
-          <p style={{ margin: 0, padding: "20px 22px", fontSize: 13, lineHeight: 1.75, color: C.sub, wordBreak: "keep-all" }}>
+          <p style={{ margin: 0, padding: "20px 22px", fontSize: "var(--fs-13)", lineHeight: 1.75, color: C.sub, wordBreak: "keep-all" }}>
             밤사이 크게 움직인 종목이 없어 이어 붙일 자리도 없습니다
           </p>
         ) : (
@@ -868,7 +868,7 @@ export default async function PreviewPage() {
                   (실측 2026-09-04). 지금 문구는 53자 447px 이라 폰에서 두 줄이고 띠가 44 → 63px 이
                   된다 — 알고 쓰는 것이다. 한 줄로 되돌리려면 37자 아래로 줄여야 한다.
                   ⚠️ 처음 쓴 98자짜리는 폰에서 세 줄(83px)이었다. 거기까지 늘리지 말 것. */}
-              <span style={{ fontSize: 12, lineHeight: 1.6, color: C.sub, wordBreak: "keep-all" }}>
+              <span style={{ fontSize: "var(--fs-12)", lineHeight: 1.6, color: C.sub, wordBreak: "keep-all" }}>
                 고정된 목록이 아닙니다. 그날 평소보다 크게 움직인 종목만 남고 목록이 매일 아침마다 바뀝니다.
               </span>
             </div>

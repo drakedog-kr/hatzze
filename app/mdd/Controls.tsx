@@ -128,8 +128,8 @@ function SuggestSection({
   return (
     <section>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, padding: "0 10px 6px" }}>
-        <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: C.ink }}>{title}</h3>
-        <span style={{ fontSize: 11, fontWeight: 600, color: C.muted, whiteSpace: "nowrap" }}>{hint}</span>
+        <h3 style={{ margin: 0, fontSize: "var(--fs-13)", fontWeight: 700, color: C.ink }}>{title}</h3>
+        <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.muted, whiteSpace: "nowrap" }}>{hint}</span>
       </div>
       <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
         {items.map((s, i) => (
@@ -147,11 +147,11 @@ function SuggestSection({
                 borderRadius: 8,
                 cursor: "pointer",
                 color: C.ink,
-                fontSize: 14,
+                fontSize: "var(--fs-14)",
                 textAlign: "left",
               }}
             >
-              <span style={{ fontFamily: MONO, fontSize: 12, color: C.muted, width: 12, flexShrink: 0 }}>{i + 1}</span>
+              <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", color: C.muted, width: 12, flexShrink: 0 }}>{i + 1}</span>
               <StockLogo code={s.code} name={s.name} market={s.market} />
               <span style={{ fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {s.name}
@@ -166,11 +166,11 @@ function SuggestSection({
                   (다크에서 판보다 한 단 밝다). 글자도 같이 --c-sub 로 올린다 — chip 위
                   4.55/4.98 로 AA 를 넘고, muted 였으면 3.8 로 떨어졌다. */}
               {marketBadge(s.market) && (
-                <span style={{ fontSize: 11, fontWeight: 600, color: C.sub, background: C.chip, padding: "2px 5px", borderRadius: 4, flexShrink: 0 }}>
+                <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub, background: C.chip, padding: "2px 5px", borderRadius: 4, flexShrink: 0 }}>
                   {marketBadge(s.market)}
                 </span>
               )}
-              <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 600, color: C.sub, whiteSpace: "nowrap" }}>{s.note}</span>
+              <span style={{ marginLeft: "auto", fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub, whiteSpace: "nowrap" }}>{s.note}</span>
             </button>
           </li>
         ))}
@@ -267,7 +267,7 @@ export function Controls({
             transition: "border-color .15s, box-shadow .15s",
           }}
         >
-          <Icon name="search" style={{ fontSize: 20, color: focused ? C.blue : C.sub }} />
+          <Icon name="search" style={{ fontSize: "var(--fs-20)", color: focused ? C.blue : C.sub }} />
           <input
             value={query}
             onChange={(e) => {
@@ -280,7 +280,7 @@ export function Controls({
             }}
             onBlur={() => setFocused(false)}
             placeholder={`${selected.name} · 다른 종목 검색`}
-            style={{ flex: 1, border: "none", outline: "none", background: "transparent", color: C.ink, fontSize: 15, minWidth: 0 }}
+            style={{ flex: 1, border: "none", outline: "none", background: "transparent", color: C.ink, fontSize: "var(--fs-15)", minWidth: 0 }}
           />
         </div>
         {/* 드롭다운은 두 얼굴이다.
@@ -320,7 +320,7 @@ export function Controls({
                   <SuggestSection title="급부상 종목" hint="평소 대비 언급 급증" items={suggest.surging} onPick={(s) => pick(s, "suggest")} />
                   <SuggestSection title="주요 종목" hint="최근 주목도 상위" items={suggest.report} onPick={(s) => pick(s, "suggest")} />
                 </div>
-                <p style={{ margin: "10px 10px 2px", fontSize: 11, color: C.muted, lineHeight: 1.5 }}>
+                <p style={{ margin: "10px 10px 2px", fontSize: "var(--fs-11)", color: C.muted, lineHeight: 1.5 }}>
                   텔레그램에서 많이 언급된 종목입니다. 매수·매도 신호가 아닙니다.
                 </p>
               </>
@@ -331,19 +331,19 @@ export function Controls({
                     <button
                       onClick={() => pick(s, "search")}
                       className="hz-row-link hz-pick"
-                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "9px 10px", border: "none", borderRadius: 8, cursor: "pointer", color: C.ink, fontSize: 14, textAlign: "left" }}
+                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "9px 10px", border: "none", borderRadius: 8, cursor: "pointer", color: C.ink, fontSize: "var(--fs-14)", textAlign: "left" }}
                     >
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 7, minWidth: 0 }}>
                         <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {s.name}
                         </span>
                         {marketBadge(s.market) && (
-                          <span style={{ fontSize: 11, fontWeight: 600, color: C.sub, background: C.chip, padding: "2px 5px", borderRadius: 4, flexShrink: 0 }}>
+                          <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub, background: C.chip, padding: "2px 5px", borderRadius: 4, flexShrink: 0 }}>
                             {marketBadge(s.market)}
                           </span>
                         )}
                       </span>
-                      <span style={{ fontFamily: MONO, fontSize: 12, color: C.muted, flexShrink: 0 }}>{s.code}</span>
+                      <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", color: C.muted, flexShrink: 0 }}>{s.code}</span>
                     </button>
                   </li>
                 ))}
@@ -377,7 +377,7 @@ export function Controls({
                    (#1b6fb8)이지만 다크에서는 **밝은** 파랑(#6bb6f8)이라, 흰 글자가 그 위에서
                    명암비 2.17 이 된다. 카드색을 쓰면 두 테마가 저절로 반대로 간다. */
                 color: on ? C.card : C.label,
-                fontSize: 11.5,
+                fontSize: "var(--fs-11-5)",
                 fontWeight: 700,
                 cursor: "pointer",
                 whiteSpace: "nowrap",

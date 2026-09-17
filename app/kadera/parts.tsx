@@ -38,7 +38,7 @@ export const rankNum: React.CSSProperties = {
   textAlign: "right",
   fontFamily: MONO,
   fontWeight: 700,
-  fontSize: 13,
+  fontSize: "var(--fs-13)",
   color: C.sub2,
   flexShrink: 0,
 };
@@ -101,7 +101,7 @@ export function Pill({
         display: "inline-flex",
         alignItems: "center",
         gap: 3,
-        fontSize: 11,
+        fontSize: "var(--fs-11)",
         fontWeight: 600,
         lineHeight: 1.45,
         color: fg,
@@ -120,7 +120,7 @@ export function Pill({
 export function RankDelta({ change, unit = "계단" }: { change: number | null; unit?: string }) {
   if (change === null || change === 0) return null;
   return (
-    <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: change > 0 ? "var(--c-hot-ink)" : "var(--c-cold-ink)", whiteSpace: "nowrap" }}>
+    <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", fontWeight: 700, color: change > 0 ? "var(--c-hot-ink)" : "var(--c-cold-ink)", whiteSpace: "nowrap" }}>
       {change > 0 ? "▲" : "▼"}
       {Math.abs(change)}
       {unit}
@@ -240,7 +240,7 @@ export function RankBadge({ n }: { n: number }) {
         borderRadius: 6,
         background: "var(--c-plate)",
         color: "var(--c-cold-ink)",
-        fontSize: 11,
+        fontSize: "var(--fs-11)",
         fontWeight: 800,
         display: "flex",
         alignItems: "center",
@@ -331,7 +331,7 @@ export function DayBars({
               left: `${((peak + 0.5) / n) * 100}%`,
               transform: "translateX(-50%)",
               whiteSpace: "nowrap",
-              fontSize: 11,
+              fontSize: "var(--fs-11)",
               fontWeight: 700,
               color: tone === "warm" ? "var(--c-hot-ink)" : "var(--c-cold-ink)",
             }}
@@ -373,7 +373,7 @@ export function DayBars({
                 flex: 1,
                 minWidth: 0,
                 textAlign: "center",
-                fontSize: 11,
+                fontSize: "var(--fs-11)",
                 fontFamily: MONO,
                 fontWeight: mark ? 700 : 500,
                 color: mark ? (tone === "warm" ? "var(--c-hot-ink)" : "var(--c-cold-ink)") : C.sub2,
@@ -574,12 +574,12 @@ export function Highlight({ cap, name, value, valueColor, sub, divide }: {
         boxShadow: divide ? "inset -1px 0 0 var(--c-sheet-row)" : undefined,
       }}
     >
-      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>{cap}</span>
+      <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>{cap}</span>
       <div style={{ display: "flex", alignItems: "baseline", gap: 7, minWidth: 0 }}>
-        <strong style={{ ...clip, fontSize: 16, fontWeight: 800, letterSpacing: "-.02em", color: C.ink }}>{name}</strong>
-        {value && <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: valueColor, flexShrink: 0 }}>{value}</span>}
+        <strong style={{ ...clip, fontSize: "var(--fs-16)", fontWeight: 800, letterSpacing: "-.02em", color: C.ink }}>{name}</strong>
+        {value && <span style={{ fontFamily: MONO, fontSize: "var(--fs-13)", fontWeight: 800, color: valueColor, flexShrink: 0 }}>{value}</span>}
       </div>
-      <span style={{ ...clip, fontSize: 11.5, color: C.sub }}>{sub}</span>
+      <span style={{ ...clip, fontSize: "var(--fs-11-5)", color: C.sub }}>{sub}</span>
     </div>
   );
 }

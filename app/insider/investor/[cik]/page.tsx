@@ -157,13 +157,13 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
           display: "inline-flex",
           alignItems: "center",
           gap: 4,
-          fontSize: 12,
+          fontSize: "var(--fs-12)",
           fontWeight: 700,
           color: C.sub,
           textDecoration: "none",
         }}
       >
-        <Icon name="chevron_left" style={{ fontSize: 16 }} />
+        <Icon name="chevron_left" style={{ fontSize: "var(--fs-16)" }} />
         내부자 리포트
       </Link>
 
@@ -171,7 +171,7 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
         <div className="hz-kd-hero">
           <div className="hz-kd-hero-q">
             <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-              <strong style={{ fontSize: 20, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>{d.person}</strong>
+              <strong style={{ fontSize: "var(--fs-20)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>{d.person}</strong>
               <span style={{ fontSize: T.body, color: C.sub }}>{d.firm}</span>
             </div>
             {/* ⭐ **라벨 → 값 → 끝.** 예전엔 값 아래에 회색 두 줄("신고한 미국 상장주 합계 ·
@@ -193,11 +193,11 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
                   data-tip="미국 상장주만 셉니다. 채권·현금·해외 주식은 빠집니다."
                   style={{ display: "inline-flex", cursor: "help" }}
                 >
-                  <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
+                  <Icon name="help" style={{ fontSize: "var(--fs-12)", color: C.muted }} />
                 </span>
               </span>
               <span style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                <strong style={{ fontFamily: MONO, fontSize: 24, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
+                <strong style={{ fontFamily: MONO, fontSize: "var(--fs-24)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
                   <Money usd={d.aum} rate={d.usdKrw} />
                 </strong>
                 {aumChange != null && (
@@ -206,7 +206,7 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
                     data-tip="직전 분기 대비입니다. 주가와 매매가 섞여 수익률은 아닙니다."
                     style={{
                       fontFamily: MONO,
-                      fontSize: 13,
+                      fontSize: "var(--fs-13)",
                       fontWeight: 700,
                       whiteSpace: "nowrap",
                       cursor: "help",
@@ -234,7 +234,7 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
 
           <div className="hz-kd-hero-q">
             <div className="hz-kd-hero-title">
-              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>
+              <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>
                 이번 분기에 한 것
               </span>
             </div>
@@ -247,10 +247,10 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
                   { label: "전량 정리", n: counts.exit },
                 ].map((s) => (
                   <div key={s.label} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
-                    <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub }}>{s.label}</span>
-                    <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: s.n ? C.ink : C.muted }}>
+                    <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub }}>{s.label}</span>
+                    <strong style={{ fontFamily: MONO, fontSize: "var(--fs-17)", fontWeight: 800, color: s.n ? C.ink : C.muted }}>
                       {s.n}
-                      <span style={{ fontSize: 11, fontWeight: 700, color: C.sub2, marginLeft: 2 }}>종목</span>
+                      <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, color: C.sub2, marginLeft: 2 }}>종목</span>
                     </strong>
                   </div>
                 ))}
@@ -264,7 +264,7 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
 
           <div className="hz-kd-hero-h">
             <div className="hz-kd-hero-title">
-              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>한눈에</span>
+              <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>한눈에</span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div style={{ display: "flex", gap: 26, flexWrap: "wrap" }}>
@@ -275,7 +275,7 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
                 ].map((s) => (
                   <div key={s.label} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                     <span style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
-                      <strong style={{ fontFamily: MONO, fontSize: 21, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
+                      <strong style={{ fontFamily: MONO, fontSize: "var(--fs-21)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
                         {s.n}
                       </strong>
                       {s.unit && <span style={{ fontSize: T.small, fontWeight: 700, color: C.sub2 }}>{s.unit}</span>}

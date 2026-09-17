@@ -91,7 +91,7 @@ function MddLink({ code, market, label = "MDD 정밀분석" }: { code: string; m
   return (
     <Link href={mddHref(code, market)} className="hz-mdd-link">
       {label}
-      <Icon name="arrow_outward" style={{ fontSize: 13 }} />
+      <Icon name="arrow_outward" style={{ fontSize: "var(--fs-13)" }} />
     </Link>
   );
 }
@@ -166,12 +166,12 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
                 떨어져 옆 카드와 머리 높이가 어긋났다(2026-09-04 실측). 줄어드는 건 채널명뿐이고
                 (minWidth 0 + 말줄임), 시각·순번은 안 줄어든다. */}
             <div style={{ display: "flex", alignItems: "baseline", gap: 7, minWidth: 0 }}>
-              <span style={{ ...clip, fontSize: 12.5, fontWeight: 800, letterSpacing: "-.01em", color: "var(--c-cold-ink)", maxWidth: 220, minWidth: 0 }}>
+              <span style={{ ...clip, fontSize: "var(--fs-12-5)", fontWeight: 800, letterSpacing: "-.01em", color: "var(--c-cold-ink)", maxWidth: 220, minWidth: 0 }}>
                 {m.channelTitle}
               </span>
-              <span style={{ fontSize: 11, fontFamily: MONO, color: C.sub2, flexShrink: 0 }}>{timeAgo(m.postedAt)}</span>
+              <span style={{ fontSize: "var(--fs-11)", fontFamily: MONO, color: C.sub2, flexShrink: 0 }}>{timeAgo(m.postedAt)}</span>
               <span style={{ flex: 1 }} />
-              <span style={{ fontSize: 11, fontFamily: MONO, fontWeight: 800, color: C.sub, flexShrink: 0 }}>#{i + 1}</span>
+              <span style={{ fontSize: "var(--fs-11)", fontFamily: MONO, fontWeight: 800, color: C.sub, flexShrink: 0 }}>#{i + 1}</span>
             </div>
 
             <div className="hz-bubble">
@@ -180,7 +180,7 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
               <p
                 style={{
                   margin: 0,
-                  fontSize: 13,
+                  fontSize: "var(--fs-13)",
                   lineHeight: 1.7,
                   color: "var(--c-ink-soft)",
                   overflowWrap: "anywhere",
@@ -201,7 +201,7 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
                     <span
                       key={t}
                       style={{
-                        fontSize: 11,
+                        fontSize: "var(--fs-11)",
                         fontWeight: 700,
                         color: C.label,
                         /* 이번 리디자인(2026-09): 말풍선이 카드색이 됐으니 칩은 회색 칩으로 갈린다. */
@@ -216,18 +216,18 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
                   ))}
                 </div>
               )}
-              <div style={{ display: "flex", alignItems: "center", gap: 14, paddingTop: 2, fontSize: 11, fontFamily: MONO, fontWeight: 700, color: C.sub }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 14, paddingTop: 2, fontSize: "var(--fs-11)", fontFamily: MONO, fontWeight: 700, color: C.sub }}>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  <Icon name="visibility" style={{ fontSize: 14, color: C.muted }} />
+                  <Icon name="visibility" style={{ fontSize: "var(--fs-14)", color: C.muted }} />
                   {compact(m.views)}
                 </span>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  <Icon name="shortcut" style={{ fontSize: 14, color: C.muted }} />
+                  <Icon name="shortcut" style={{ fontSize: "var(--fs-14)", color: C.muted }} />
                   {compact(m.forwards)}
                 </span>
                 {m.replies > 0 && (
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                    <Icon name="chat_bubble" style={{ fontSize: 12, color: C.muted }} />
+                    <Icon name="chat_bubble" style={{ fontSize: "var(--fs-12)", color: C.muted }} />
                     {m.replies}
                   </span>
                 )}
@@ -235,7 +235,7 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
                     hint). 오른쪽 끝에 작게 — 새 탭으로 나간다는 화살표는 MDD 링크와 같은 것. */}
                 <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 2, color: C.sub2, fontWeight: 600 }}>
                   원문
-                  <Icon name="arrow_outward" style={{ fontSize: 13 }} />
+                  <Icon name="arrow_outward" style={{ fontSize: "var(--fs-13)" }} />
                 </span>
               </div>
             </div>
@@ -467,9 +467,9 @@ export default async function KaderaPage() {
         <span style={{ display: "flex", flexDirection: "column", gap: 5, minWidth: 0 }}>
           <span style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
             {/* 이름은 반드시 minWidth:0 + 말줄임이다. flex 로 두면 긴 테마명이 배지를 칸 밖으로 민다. */}
-            <span style={{ ...clip, minWidth: 0, fontSize: 13.5, fontWeight: 700, color: C.ink }}>{t.theme}</span>
+            <span style={{ ...clip, minWidth: 0, fontSize: "var(--fs-13-5)", fontWeight: 700, color: C.ink }}>{t.theme}</span>
             <span style={{ flex: 1 }} />
-            <DeltaPp value={t.shareDelta} style={{ fontSize: 12 }} />
+            <DeltaPp value={t.shareDelta} style={{ fontSize: "var(--fs-12)" }} />
           </span>
           {/* 막대는 **절대 점유율**이다. 길이가 점유율, 색이 변화 방향 — 눈금이 둘이지만
               바로 위 칸이 그 방향을 부호 붙은 숫자로 적고 있어 색은 되풀이일 뿐이다. */}
@@ -482,7 +482,7 @@ export default async function KaderaPage() {
             />
           </span>
         </span>
-        <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: C.ink, textAlign: "right" }}>
+        <span style={{ fontFamily: MONO, fontSize: "var(--fs-13)", fontWeight: 800, color: C.ink, textAlign: "right" }}>
           {t.sharePct.toFixed(1)}%
         </span>
         {/* ⚠️ Sparkline 을 그리드 자식으로 직접 넣지 말 것 — 뿌리에 인라인 display:flex 가
@@ -494,9 +494,9 @@ export default async function KaderaPage() {
             창을 견주므로 빈칸이면 "자료가 없나?"로 읽힌다 — 변동 없음은 글자로 적는다. */}
         <span style={{ textAlign: "right" }}>
           {t.rankChange === null ? (
-            <span style={{ fontFamily: MONO, fontSize: 11, color: C.sub2 }}>—</span>
+            <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", color: C.sub2 }}>—</span>
           ) : t.rankChange === 0 ? (
-            <span style={{ fontSize: 11, fontWeight: 700, color: C.sub2, whiteSpace: "nowrap" }}>그대로</span>
+            <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, color: C.sub2, whiteSpace: "nowrap" }}>그대로</span>
           ) : (
             <RankDelta change={t.rankChange} />
           )}
@@ -514,7 +514,7 @@ export default async function KaderaPage() {
                 <span className="hz-theme-pop-name">{s.name}</span>
                 <span className="hz-theme-pop-cnt">{s.mentions}회</span>
                 <span className="hz-theme-pop-go">
-                  <Icon name="arrow_outward" style={{ fontSize: 13 }} />
+                  <Icon name="arrow_outward" style={{ fontSize: "var(--fs-13)" }} />
                 </span>
               </Link>
             ))}
@@ -541,12 +541,12 @@ export default async function KaderaPage() {
         data-ga-surface="power_rank"
         data-ga-rank={i + 1}
       >
-        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 800, color: C.sub2 }}>{i + 1}</span>
+        <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", fontWeight: 800, color: C.sub2 }}>{i + 1}</span>
         <span style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
           <Avatar photoUrl={c.photoUrl} title={c.title} size={26} />
           <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
-            <span style={{ ...clip, fontSize: 12, fontWeight: 700, color: C.ink }}>{c.title}</span>
-            <span style={{ ...clip, fontSize: 11, fontFamily: MONO, color: C.sub2 }}>
+            <span style={{ ...clip, fontSize: "var(--fs-12)", fontWeight: 700, color: C.ink }}>{c.title}</span>
+            <span style={{ ...clip, fontSize: "var(--fs-11)", fontFamily: MONO, color: C.sub2 }}>
               구독자 {c.subscriberCount ? compact(c.subscriberCount) : "-"}
               {/* 폰에서 접히는 조회율·순위 변동을 여기로 되살린다(.hz-ch-meta 는 기본 숨김).
                   값을 버리지 않으려는 것이다 — 폰에서 열을 접는 건 자리가 없어서지
@@ -563,13 +563,13 @@ export default async function KaderaPage() {
             </span>
           </span>
         </span>
-        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: C.label, textAlign: "right" }}>
+        <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", fontWeight: 700, color: C.label, textAlign: "right" }}>
           {c.viewRate != null ? `${c.viewRate.toFixed(1)}%` : "—"}
         </span>
-        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, textAlign: "right", color: c.rankChange ? (c.rankChange > 0 ? "var(--c-hot-ink)" : "var(--c-cold-ink)") : C.sub2 }}>
+        <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", fontWeight: 700, textAlign: "right", color: c.rankChange ? (c.rankChange > 0 ? "var(--c-hot-ink)" : "var(--c-cold-ink)") : C.sub2 }}>
           {c.rankChange ? `${c.rankChange > 0 ? "▲" : "▼"}${Math.abs(c.rankChange)}` : "—"}
         </span>
-        <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: C.ink, textAlign: "right" }}>
+        <span style={{ fontFamily: MONO, fontSize: "var(--fs-13)", fontWeight: 800, color: C.ink, textAlign: "right" }}>
           {c.influenceScore.toFixed(0)}
         </span>
       </a>
@@ -619,7 +619,7 @@ export default async function KaderaPage() {
             {/* 기준 시각. formatKstUpdate 가 이미 "… 기준"으로 끝난다 — 또 붙이면 "기준 기준". */}
             {summary.lastUpdated && (
               <span className="hz-tx-eyebrow-r">
-                <Icon name="schedule" style={{ fontSize: 14, color: C.muted }} />
+                <Icon name="schedule" style={{ fontSize: "var(--fs-14)", color: C.muted }} />
                 최종 업데이트 · {formatKstUpdate(summary.lastUpdated)}
               </span>
             )}
@@ -681,7 +681,7 @@ export default async function KaderaPage() {
               )}
             </div>
             {!sentiment ? (
-              <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>
+              <p style={{ margin: 0, color: C.sub, fontSize: "var(--fs-13)" }}>
                 {sentimentFailed ? "감성 집계를 불러오지 못했습니다." : "아직 분석된 메시지가 없습니다."}
               </p>
             ) : (
@@ -693,7 +693,7 @@ export default async function KaderaPage() {
                     <span>%</span>
                   </strong>
                   <div className="hz-figrow-aside">
-                    <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub }}>
+                    <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub }}>
                       최근 {sentiment.windowDays}일 · {sentiment.messageCount.toLocaleString("ko-KR")}건 분석
                     </span>
                     {/* 툴팁은 문장이 아니라 물음표에 건다(옛 히어로 주석과 같은 이유). */}
@@ -701,7 +701,7 @@ export default async function KaderaPage() {
                         마지막 줄이라 그 밑선이 옆의 큰 숫자와 한 선에 서야 하는데(.hz-figrow),
                         center 로 두면 글자가 물음표와 함께 가운데로 밀려 **밑선이 2.6px 뜬다.**
                         물음표만 alignSelf 로 가운데에 둔다 — 그림이라 글줄 밑선에 앉히면 낮다. */}
-                    <span style={{ fontSize: 11.5, fontWeight: 700, color: C.sub, display: "inline-flex", alignItems: "baseline", gap: 4, width: "fit-content" }}>
+                    <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 700, color: C.sub, display: "inline-flex", alignItems: "baseline", gap: 4, width: "fit-content" }}>
                       중립 {sentiment.neutral}% 제외 후 환산
                       <span
                         className="hz-tip hz-tip-wide"
@@ -709,7 +709,7 @@ export default async function KaderaPage() {
                         data-ga-tip="sentiment_ratio"
                         style={{ display: "inline-flex", cursor: "help", flexShrink: 0, alignSelf: "center" }}
                       >
-                        <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
+                        <Icon name="help" style={{ fontSize: "var(--fs-12)", color: C.muted }} />
                       </span>
                     </span>
                   </div>
@@ -720,14 +720,14 @@ export default async function KaderaPage() {
                     <span style={{ width: `${sentiment.score}%`, background: "var(--c-warm-2)" }} />
                   </div>
                   {/* 두 라벨을 막대의 양 끝에 붙여 어느 쪽이 어느 색인지 위치로 읽히게 한다. */}
-                  <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 11.5, fontWeight: 700 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: "var(--fs-11-5)", fontWeight: 700 }}>
                     <span style={{ color: "var(--c-cold-ink)" }}>비관 {100 - sentiment.score}</span>
                     <span style={{ color: "var(--c-hot-ink)" }}>낙관 {sentiment.score}</span>
                   </div>
                 </div>
                 {sentiment.byTheme.length > 0 && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 2 }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".04em", color: C.sub }}>인기 테마별 비관 ↔ 낙관</span>
+                    <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, letterSpacing: ".04em", color: C.sub }}>인기 테마별 비관 ↔ 낙관</span>
                     {sentiment.byTheme.map((t) => (
                       <div
                         key={t.name}
@@ -736,7 +736,7 @@ export default async function KaderaPage() {
                         style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}
                       >
                         {/* 이름 칸 폭을 고정한다 — flex 로 두면 막대 시작점이 행마다 어긋난다. */}
-                        <span style={{ ...clip, width: 62, flexShrink: 0, fontSize: 11, fontWeight: 700, color: C.label }}>{t.name}</span>
+                        <span style={{ ...clip, width: 62, flexShrink: 0, fontSize: "var(--fs-11)", fontWeight: 700, color: C.label }}>{t.name}</span>
                         <span style={{ flex: 1, minWidth: 0, display: "flex", height: 7, borderRadius: 999, overflow: "hidden" }}>
                           <span style={{ width: `${100 - t.pos}%`, background: "var(--c-blue-3)" }} />
                           <span style={{ width: `${t.pos}%`, background: "var(--c-warm-3)" }} />
@@ -758,7 +758,7 @@ export default async function KaderaPage() {
                   {s.note && <span style={{ color: C.sub2, fontWeight: 500 }}>{s.note}</span>}
                   {s.help && (
                     <span className="hz-tip hz-tip-wide" data-tip={s.help} data-ga-tip={s.label} style={{ display: "inline-flex", cursor: "help", flexShrink: 0 }}>
-                      <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
+                      <Icon name="help" style={{ fontSize: "var(--fs-12)", color: C.muted }} />
                     </span>
                   )}
                 </span>
@@ -772,7 +772,7 @@ export default async function KaderaPage() {
 
           {/* ③ 미장으로 건너가는 통로. 토스 버튼 실측(radius 12 · 회색 5% 바탕)을 따랐다. */}
           <Link href="/kadera/us" className="hz-tx-btn" data-ga="cta_click" data-ga-cta="to_us_kadera" data-ga-surface="kr_hero">
-            <Icon name="swap_horiz" style={{ fontSize: 17 }} />
+            <Icon name="swap_horiz" style={{ fontSize: "var(--fs-17)" }} />
             미장 카더라 보기
           </Link>
         </aside>
@@ -790,7 +790,7 @@ export default async function KaderaPage() {
           desc="평소보다 언급이 갑자기 뛴 종목 · 배수가 클수록 갑작스러운 관심"
         />
         {surging.length === 0 ? (
-          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>
+          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>
             아직 급부상 신호가 뚜렷한 종목이 없습니다. 데이터가 쌓일수록 또렷해집니다.
           </p>
         ) : (
@@ -822,11 +822,11 @@ export default async function KaderaPage() {
                       <Link
                         href={stockHref(s.code)}
                         className="hz-stock-link"
-                        style={{ ...clip, minWidth: 0, fontSize: 14, fontWeight: 800, letterSpacing: "-.01em" }}
+                        style={{ ...clip, minWidth: 0, fontSize: "var(--fs-14)", fontWeight: 800, letterSpacing: "-.01em" }}
                       >
                         <strong style={{ fontWeight: "inherit" }}>{s.name}</strong>
                       </Link>
-                      <span style={{ fontFamily: MONO, fontSize: 11, color: C.sub2, flexShrink: 0 }}>{s.code}</span>
+                      <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", color: C.sub2, flexShrink: 0 }}>{s.code}</span>
                       <span style={{ flex: 1 }} />
                       {/* '몇 개 채널'과 '며칠에 몇 회'는 둘 다 이 배수의 표본 크기를 말한다 —
                           한 덩어리로 오른쪽 위에 모아 두면 아래 그래픽이 배수와 막대만 남는다.
@@ -838,9 +838,9 @@ export default async function KaderaPage() {
                             0 을 찍으면 "이 종목을 다룬 채널이 없다"는 거짓이 되는데, 바로
                             아래 '최근 N일 기준 M회'가 그 말과 대놓고 어긋난다. */}
                         {s.channelCount !== null && (
-                          <span style={{ fontSize: 11.5, color: C.sub2, whiteSpace: "nowrap" }}>{s.channelCount}개 채널</span>
+                          <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2, whiteSpace: "nowrap" }}>{s.channelCount}개 채널</span>
                         )}
-                        <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: C.label, whiteSpace: "nowrap" }}>
+                        <span style={{ fontFamily: MONO, fontSize: "var(--fs-11-5)", fontWeight: 700, color: C.label, whiteSpace: "nowrap" }}>
                           최근 {s.recentDays}일 기준 {s.recentMentions}회
                         </span>
                       </span>
@@ -848,11 +848,11 @@ export default async function KaderaPage() {
 
                     {/* 이 셀이 말하려는 건 시세가 아니라 이 배수다 — 30px 로 올려 주인공을 못박는다. */}
                     <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
-                      <strong style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, letterSpacing: "-.035em", lineHeight: 1, color: C.hot }}>
+                      <strong style={{ fontFamily: MONO, fontSize: "var(--fs-30)", fontWeight: 800, letterSpacing: "-.035em", lineHeight: 1, color: C.hot }}>
                         {s.ratio.toFixed(1)}
-                        <span style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-.02em" }}>배</span>
+                        <span style={{ fontSize: "var(--fs-18)", fontWeight: 700, letterSpacing: "-.02em" }}>배</span>
                       </strong>
-                      <span style={{ fontSize: 11.5, color: C.sub2 }}>평소 대비</span>
+                      <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2 }}>평소 대비</span>
                       {s.isNew && <Pill tone="blue">신규 등장</Pill>}
                     </div>
 
@@ -876,14 +876,14 @@ export default async function KaderaPage() {
                     {surgeLines[s.code] ? (
                       <div style={{ display: "flex", gap: 9, background: C.card, borderRadius: 12, padding: "12px 13px" }}>
                         <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-                        <p style={{ margin: 0, fontSize: 13, lineHeight: 1.7, color: "var(--c-ink-soft)", textWrap: "pretty", wordBreak: "keep-all" }}>
+                        <p style={{ margin: 0, fontSize: "var(--fs-13)", lineHeight: 1.7, color: "var(--c-ink-soft)", textWrap: "pretty", wordBreak: "keep-all" }}>
                           {surgeLines[s.code]}
                         </p>
                       </div>
                     ) : (
                       <div style={{ display: "flex", gap: 9, background: C.card, borderRadius: 12, padding: "12px 13px" }}>
                         <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-                        <p style={{ margin: 0, fontSize: 13, lineHeight: 1.7, color: C.sub2, wordBreak: "keep-all" }}>
+                        <p style={{ margin: 0, fontSize: "var(--fs-13)", lineHeight: 1.7, color: C.sub2, wordBreak: "keep-all" }}>
                           한 줄 요약은 오늘 집계가 끝나면 붙습니다.
                         </p>
                       </div>
@@ -892,20 +892,20 @@ export default async function KaderaPage() {
                     <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 8, paddingTop: 2, flexWrap: "wrap" }}>
                       {s.closePrice != null ? (
                         <>
-                          <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: C.label, whiteSpace: "nowrap", flexShrink: 0 }}>
+                          <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", fontWeight: 700, color: C.label, whiteSpace: "nowrap", flexShrink: 0 }}>
                             {s.closePrice.toLocaleString("ko-KR")}원
                           </span>
                           {/* 야후 실시간이 아니면(KRX 저장 종가 폴백) 등락률 대신 기준일을 단다.
                               폴백이면 등락률도 그날 것이라, 화살표를 그대로 두면 가격뿐 아니라
                               방향까지 뒤집혀 보인다(QuoteDate 주석). */}
                           {s.isLive ? (
-                            <ChangeRate rate={s.changeRate} style={{ fontSize: 11.5, fontWeight: 800 }} />
+                            <ChangeRate rate={s.changeRate} style={{ fontSize: "var(--fs-11-5)", fontWeight: 800 }} />
                           ) : (
-                            <QuoteDate date={s.priceDate} style={{ fontSize: 11.5 }} />
+                            <QuoteDate date={s.priceDate} style={{ fontSize: "var(--fs-11-5)" }} />
                           )}
                         </>
                       ) : (
-                        <span style={{ fontSize: 11.5, color: C.sub2 }}>가격 정보 준비 중</span>
+                        <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2 }}>가격 정보 준비 중</span>
                       )}
                       <span style={{ flex: 1 }} />
                       <MddLink code={s.code} market={s.market} />
@@ -915,7 +915,7 @@ export default async function KaderaPage() {
               })}
             </div>
             <div className="hz-sheet-foot">
-              <span style={{ fontSize: 12, lineHeight: 1.6, color: C.sub }}>
+              <span style={{ fontSize: "var(--fs-12)", lineHeight: 1.6, color: C.sub }}>
                 막대는 최근 7일 일별 언급량이고, 붉은 칸이 배수를 낸 최근 기간입니다 · 배수는 언급 횟수가 아니라 그날 전체 대화에서 차지한 몫을 견준 값입니다
               </span>
             </div>
@@ -946,9 +946,9 @@ export default async function KaderaPage() {
           noteHelp="그날 오른 종목에 커뮤니티가 말한 이유를 한 줄로 옮깁니다. 확인된 사실이 아니라 오간 이야기입니다. 등락률은 그날 종가 기준입니다."
         />
         {whyFailed ? (
-          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>까닭을 불러오지 못했습니다.</p>
+          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>까닭을 불러오지 못했습니다.</p>
         ) : !why || why.rows.length === 0 ? (
-          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>
+          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>
             오늘 집계가 끝나면 채워집니다. 저녁 실행 뒤에 그날 것이 붙습니다.
           </p>
         ) : (
@@ -975,20 +975,20 @@ export default async function KaderaPage() {
                     <Link
                       href={stockHref(r.code)}
                       className="hz-stock-link"
-                      style={{ ...clip, minWidth: 0, fontSize: 14, fontWeight: 800, letterSpacing: "-.01em" }}
+                      style={{ ...clip, minWidth: 0, fontSize: "var(--fs-14)", fontWeight: 800, letterSpacing: "-.01em" }}
                     >
                       <strong style={{ fontWeight: "inherit" }}>{r.name}</strong>
                     </Link>
-                    <span style={{ fontFamily: MONO, fontSize: 11, color: C.sub2, flexShrink: 0 }}>{r.code}</span>
+                    <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", color: C.sub2, flexShrink: 0 }}>{r.code}</span>
                     <span style={{ flex: 1 }} />
                     <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
                       {r.changeRate !== null ? (
-                        <ChangeRate rate={r.changeRate} style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-.02em" }} />
+                        <ChangeRate rate={r.changeRate} style={{ fontSize: "var(--fs-15)", fontWeight: 800, letterSpacing: "-.02em" }} />
                       ) : (
-                        <span style={{ fontSize: 11.5, color: C.sub2, whiteSpace: "nowrap" }}>등락 준비 중</span>
+                        <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2, whiteSpace: "nowrap" }}>등락 준비 중</span>
                       )}
                       {r.closePrice != null && (
-                        <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 600, color: C.sub, whiteSpace: "nowrap" }}>
+                        <span style={{ fontFamily: MONO, fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub, whiteSpace: "nowrap" }}>
                           {r.closePrice.toLocaleString("ko-KR")}원
                         </span>
                       )}
@@ -1002,7 +1002,7 @@ export default async function KaderaPage() {
                     <p
                       style={{
                         margin: 0,
-                        fontSize: 13,
+                        fontSize: "var(--fs-13)",
                         lineHeight: 1.7,
                         color: "var(--c-ink-soft)",
                         wordBreak: "keep-all",
@@ -1030,7 +1030,7 @@ export default async function KaderaPage() {
             noteHelp="최근 3일 평균 점유율을 그 이전과 비교합니다. 하루치끼리 재면 표본 얇은 날에 크게 요동쳐서, 며칠씩 묶어서 봅니다. 점유율의 분모는 테마 사전에 든 종목의 언급이라 열 줄 밖까지 다 더하면 100%가 됩니다."
           />
           {themes.length === 0 ? (
-            <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>
+            <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>
               {themesFailed ? "테마를 불러오지 못했습니다." : "아직 집계된 테마가 없습니다."}
             </p>
           ) : (
@@ -1079,7 +1079,7 @@ export default async function KaderaPage() {
         <section className="hz-sheet" id="keywords" style={{ flex: "1 1 calc(50% - 8px)", minWidth: SHEET_PAIR_MIN, display: "flex", flexDirection: "column" }}>
           <SectionHead level={3} icon="tag" title="이슈 키워드" note="최근 3일" desc="종목명이 아닌 화제어 · 언급 횟수 기준" />
           {keywords.length === 0 ? (
-            <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>아직 뽑을 화제어가 없습니다.</p>
+            <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>아직 뽑을 화제어가 없습니다.</p>
           ) : (
             <>
               {(() => {
@@ -1143,7 +1143,7 @@ export default async function KaderaPage() {
                   >
                     <RankBadge n={k.rank} />
                     <span style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
-                      <span style={{ ...clip, minWidth: 0, fontSize: 13, fontWeight: 700, color: C.ink }}>{k.word}</span>
+                      <span style={{ ...clip, minWidth: 0, fontSize: "var(--fs-13)", fontWeight: 700, color: C.ink }}>{k.word}</span>
                       <span style={{ flex: 1 }} />
                       {/* 옆 테마 표는 %p 를 이름 줄 오른끝(막대 바로 위)에 둔다. 이 표는
                           이름과 막대가 다른 칸이라 그 자리가 없어 **이름 칸의 오른끝**에
@@ -1151,7 +1151,7 @@ export default async function KaderaPage() {
                           세로선 위에 선다. shareDelta 는 몫이라 ×100 해서 넘긴다. */}
                       <DeltaPp
                         value={k.shareDelta === null ? null : k.shareDelta * 100}
-                        style={{ fontSize: 12 }}
+                        style={{ fontSize: "var(--fs-12)" }}
                       />
                     </span>
                     {/* 막대는 **이 열 낱말 안에서 차지하는 몫**이다. 색은 관심 점유율의 방향.
@@ -1173,7 +1173,7 @@ export default async function KaderaPage() {
                     <span
                       style={{
                         fontFamily: MONO,
-                        fontSize: 12,
+                        fontSize: "var(--fs-12)",
                         fontWeight: 800,
                         color: C.ink,
                         textAlign: "right",
@@ -1186,7 +1186,7 @@ export default async function KaderaPage() {
                     <span
                       style={{
                         fontFamily: MONO,
-                        fontSize: 12,
+                        fontSize: "var(--fs-12)",
                         fontWeight: 800,
                         textAlign: "right",
                         whiteSpace: "nowrap",
@@ -1194,7 +1194,7 @@ export default async function KaderaPage() {
                       }}
                     >
                       {k.count.toLocaleString("ko-KR")}
-                      <span style={{ fontSize: 11, fontWeight: 700, color: C.sub2, marginLeft: 1 }}>회</span>
+                      <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, color: C.sub2, marginLeft: 1 }}>회</span>
                     </span>
                   </div>
                 ))}
@@ -1215,7 +1215,7 @@ export default async function KaderaPage() {
           desc="가장 많이 회자된 종목의 언급 추이와 흐름"
         />
         {stockReports.length === 0 ? (
-          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>아직 리포트를 만들 종목이 없습니다.</p>
+          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>아직 리포트를 만들 종목이 없습니다.</p>
         ) : (
           <div className="hz-panelgrid hz-panelgrid-2">
             {stockReports.map((r, i) => {
@@ -1244,11 +1244,11 @@ export default async function KaderaPage() {
                     <Link
                       href={stockHref(r.code)}
                       className="hz-stock-link"
-                      style={{ ...clip, minWidth: 0, fontSize: 17, fontWeight: 800, letterSpacing: "-.02em" }}
+                      style={{ ...clip, minWidth: 0, fontSize: "var(--fs-17)", fontWeight: 800, letterSpacing: "-.02em" }}
                     >
                       <strong style={{ fontWeight: "inherit" }}>{r.name}</strong>
                     </Link>
-                    <span style={{ fontFamily: MONO, fontSize: 11, color: C.sub2, flexShrink: 0 }}>{r.code}</span>
+                    <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", color: C.sub2, flexShrink: 0 }}>{r.code}</span>
                     <span style={{ flex: 1 }} />
                     {/* ⭐ 급부상 셀과 **같은 포맷**이다(2026-09-05 ): 표본은 오른쪽 위,
                         시세는 왼쪽 아래. 예전엔 반대였는데 두 시트가 나란히 서는 화면에서
@@ -1256,9 +1256,9 @@ export default async function KaderaPage() {
                         채널 수를 못 셌으면(null) 그 줄만 뺀다 — 0 을 찍으면 거짓이 된다. */}
                     <span className="hz-stock-price" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
                       {r.channelCount !== null && (
-                        <span style={{ fontSize: 11.5, color: C.sub2, whiteSpace: "nowrap" }}>{r.channelCount}개 채널</span>
+                        <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2, whiteSpace: "nowrap" }}>{r.channelCount}개 채널</span>
                       )}
-                      <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: C.label, whiteSpace: "nowrap" }}>
+                      <span style={{ fontFamily: MONO, fontSize: "var(--fs-11-5)", fontWeight: 700, color: C.label, whiteSpace: "nowrap" }}>
                         최근 {KADERA_WINDOW_DAYS}일 기준 {r.totalMentions.toLocaleString("ko-KR")}회
                       </span>
                     </span>
@@ -1280,14 +1280,14 @@ export default async function KaderaPage() {
                   {narratives[r.code] ? (
                     <div style={{ display: "flex", gap: 9, background: C.card, borderRadius: 12, padding: "12px 13px" }}>
                       <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-                      <p style={{ margin: 0, fontSize: 13, lineHeight: 1.7, color: "var(--c-ink-soft)", textWrap: "pretty", wordBreak: "keep-all" }}>
+                      <p style={{ margin: 0, fontSize: "var(--fs-13)", lineHeight: 1.7, color: "var(--c-ink-soft)", textWrap: "pretty", wordBreak: "keep-all" }}>
                         {narratives[r.code]}
                       </p>
                     </div>
                   ) : (
                     <div style={{ display: "flex", gap: 9, background: C.card, borderRadius: 12, padding: "12px 13px" }}>
                       <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-                      <p style={{ margin: 0, fontSize: 13, lineHeight: 1.7, color: C.sub2, wordBreak: "keep-all" }}>
+                      <p style={{ margin: 0, fontSize: "var(--fs-13)", lineHeight: 1.7, color: C.sub2, wordBreak: "keep-all" }}>
                         흐름 요약은 오늘 집계가 끝나면 붙습니다.
                       </p>
                     </div>
@@ -1296,13 +1296,13 @@ export default async function KaderaPage() {
                   <div style={{ marginTop: "auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, paddingTop: 2 }}>
                     {r.price != null ? (
                       <span style={{ display: "flex", alignItems: "baseline", gap: 7, whiteSpace: "nowrap", minWidth: 0 }}>
-                        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: C.label }}>
+                        <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", fontWeight: 700, color: C.label }}>
                           {r.price.toLocaleString("ko-KR")}원
                         </span>
-                        <ChangeRate rate={r.changeRate} style={{ fontSize: 11.5, fontWeight: 800 }} />
+                        <ChangeRate rate={r.changeRate} style={{ fontSize: "var(--fs-11-5)", fontWeight: 800 }} />
                       </span>
                     ) : (
-                      <span style={{ fontSize: 11.5, color: C.sub2 }}>가격 정보 준비 중</span>
+                      <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2 }}>가격 정보 준비 중</span>
                     )}
                     <MddLink code={r.code} market={r.market} />
                   </div>
@@ -1336,9 +1336,9 @@ export default async function KaderaPage() {
           noteHelp="커뮤니티 글에서 '언제 무엇이 있다'고 적힌 것을 모았습니다. 확정 일정은 공시로 확인하십시오."
         />
         {eventsFailed ? (
-          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>일정을 불러오지 못했습니다.</p>
+          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>일정을 불러오지 못했습니다.</p>
         ) : events.length === 0 ? (
-          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>
+          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>
             앞으로 5주 안에 날짜가 짚인 일정이 아직 없습니다. 커뮤니티 글이 쌓이면 채워집니다.
           </p>
         ) : (
@@ -1358,7 +1358,7 @@ export default async function KaderaPage() {
         <section className="hz-sheet" style={{ flex: "1 1 calc(50% - 8px)", minWidth: SHEET_PAIR_MIN, display: "flex", flexDirection: "column" }}>
           <SectionHead level={3} icon="military_tech" title="채널 파워 랭킹" desc="조회율·확산력까지 반영한 채널 영향력" />
           {channels.length === 0 ? (
-            <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>아직 채널 점수가 없습니다.</p>
+            <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>아직 채널 점수가 없습니다.</p>
           ) : (
             <>
               <div className="hz-thead hz-cols-ch">
@@ -1376,7 +1376,7 @@ export default async function KaderaPage() {
                   영향력
                   {/* ⚠️ hint 는 점선·비활성 아이콘용이다(라이트 1.49·다크 2.3). 툴팁이
                       있다는 유일한 표시라 보여야 한다 — SectionHead 와 같은 muted. */}
-                  <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
+                  <Icon name="help" style={{ fontSize: "var(--fs-12)", color: C.muted }} />
                 </span>
               </div>
               <ExpandableList
@@ -1404,7 +1404,7 @@ export default async function KaderaPage() {
             const real = rising.filter((r) => !r.isPlaceholder);
             const topDelta = Math.max(1, ...real.map((r) => Math.abs(r.delta7d)));
             if (real.length === 0) {
-              return <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 13 }}>아직 구독자 변화를 잴 만큼 스냅샷이 쌓이지 않았습니다.</p>;
+              return <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>아직 구독자 변화를 잴 만큼 스냅샷이 쌓이지 않았습니다.</p>;
             }
             return (
               <>
@@ -1420,12 +1420,12 @@ export default async function KaderaPage() {
                 {real.map((r, i) => {
                   const row = (
                     <>
-                      <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 800, color: C.sub2 }}>{i + 1}</span>
+                      <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", fontWeight: 800, color: C.sub2 }}>{i + 1}</span>
                       <span style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
                         <Avatar photoUrl={r.photoUrl} title={r.title} size={26} />
                         <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
-                          <span style={{ ...clip, fontSize: 12, fontWeight: 700, color: C.ink }}>{r.title}</span>
-                          <span style={{ ...clip, fontSize: 11, fontFamily: MONO, color: C.sub2 }}>구독자 {compact(r.subscriberCount)}</span>
+                          <span style={{ ...clip, fontSize: "var(--fs-12)", fontWeight: 700, color: C.ink }}>{r.title}</span>
+                          <span style={{ ...clip, fontSize: "var(--fs-11)", fontFamily: MONO, color: C.sub2 }}>구독자 {compact(r.subscriberCount)}</span>
                         </span>
                       </span>
                       <span style={{ height: 7, borderRadius: 999, background: C.track, overflow: "hidden" }}>
@@ -1442,7 +1442,7 @@ export default async function KaderaPage() {
                       <span
                         style={{
                           fontFamily: MONO,
-                          fontSize: 11,
+                          fontSize: "var(--fs-11)",
                           fontWeight: 800,
                           textAlign: "right",
                           whiteSpace: "nowrap",
@@ -1480,7 +1480,7 @@ export default async function KaderaPage() {
                 {/* 폰에서는 막대 열을 접으므로(.hz-cols-rise) 이 각주도 같이 접는다 —
                     화면에 없는 것을 설명하는 문장만 남으면 안 된다. */}
                 <div className="hz-sheet-foot hz-rise-barnote" style={{ marginTop: "auto" }}>
-                  <span style={{ fontSize: 12, color: C.sub }}>
+                  <span style={{ fontSize: "var(--fs-12)", color: C.sub }}>
                     막대는 1위({real[0] ? Math.abs(real[0].delta7d).toLocaleString("ko-KR") : "-"}명) 기준 상대 증가폭입니다
                   </span>
                 </div>

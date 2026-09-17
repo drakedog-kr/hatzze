@@ -69,7 +69,7 @@ export function SectionHead({
         {/* 설명은 이 페이지에서 가장 자주 읽히는 작은 글씨다(시트마다 한 줄).
             11.5/sub2(명암비 2.7)로는 큰 화면에서 안 읽혔다. */}
         {desc && <p className="hz-sheet-head-desc">{desc}</p>}
-        {meta && <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.5, color: C.sub2 }}>{meta}</p>}
+        {meta && <p style={{ margin: 0, fontSize: "var(--fs-11-5)", lineHeight: 1.5, color: C.sub2 }}>{meta}</p>}
       </div>
       {right && <div className="hz-sheet-head-side" style={{ flexShrink: 0, marginLeft: "auto" }}>{right}</div>}
       {/* 기간 표기는 알약으로. 회색 맨글씨로 두면 제목 오른쪽에 떠 있는 부스러기처럼
@@ -87,7 +87,7 @@ export function SectionHead({
             display: "inline-flex",
             alignItems: "center",
             gap: 4,
-            fontSize: 11,
+            fontSize: "var(--fs-11)",
             fontWeight: 700,
             color: C.sub,
             borderRadius: R.pill,
@@ -103,7 +103,7 @@ export function SectionHead({
               {/* ⚠️ `C.hint`(#c7d5e3) 였다. 그 토큰은 **점선·비활성 아이콘**용이라 흰 카드
                   위 명암비가 1.49 다 — 그림에 요구되는 3:1 에도 한참 못 미친다. 누를 수
                   있는 표시가 안 보이면 툴팁이 있다는 걸 알 길이 없다. muted 는 4.79. */}
-              <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
+              <Icon name="help" style={{ fontSize: "var(--fs-12)", color: C.muted }} />
             </span>
           )}
         </span>

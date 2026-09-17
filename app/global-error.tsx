@@ -23,15 +23,15 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
         }}
       >
         <main style={{ maxWidth: "68ch", margin: "0 auto", padding: "64px 20px" }}>
-          <p style={{ margin: 0, fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: "#6b7684" }}>오류</p>
-          <h1 style={{ margin: "8px 0 0", fontSize: 24, fontWeight: 700, letterSpacing: "-0.01em" }}>
+          <p style={{ margin: 0, fontSize: "var(--fs-12)", fontWeight: 700, letterSpacing: "0.08em", color: "#6b7684" }}>오류</p>
+          <h1 style={{ margin: "8px 0 0", fontSize: "var(--fs-24)", fontWeight: 700, letterSpacing: "-0.01em" }}>
             화면을 그리다 멈췄습니다
           </h1>
-          <p style={{ margin: "14px 0 0", fontSize: 14, lineHeight: 1.85, color: "#4e5968" }}>
+          <p style={{ margin: "14px 0 0", fontSize: "var(--fs-14)", lineHeight: 1.85, color: "#4e5968" }}>
             잠시 뒤 다시 시도하면 대개 그대로 열립니다. 계속 그러면 아래 코드를 문의에 적어 보내 주십시오.
           </p>
           {error.digest && (
-            <p style={{ margin: "8px 0 0", fontSize: 12, color: "#6b7684" }}>코드 · {error.digest}</p>
+            <p style={{ margin: "8px 0 0", fontSize: "var(--fs-12)", color: "#6b7684" }}>코드 · {error.digest}</p>
           )}
           <div style={{ display: "flex", gap: 8, marginTop: 22 }}>
             <button
@@ -44,7 +44,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
                 border: "1px solid #d5dbe3",
                 background: "#fff",
                 color: "#1b64da",
-                fontSize: 13,
+                fontSize: "var(--fs-13)",
                 fontWeight: 600,
                 cursor: "pointer",
               }}
@@ -62,7 +62,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
                 border: "1px solid #d5dbe3",
                 background: "#fff",
                 color: "#1b64da",
-                fontSize: 13,
+                fontSize: "var(--fs-13)",
                 fontWeight: 600,
                 textDecoration: "none",
               }}

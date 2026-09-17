@@ -67,12 +67,12 @@ export function Attribution({
             온도색은 아래 막대와 각주가 맡는다. */}
         {gap !== null && (
           <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
-            <strong style={{ fontFamily: MONO, fontSize: 34, fontWeight: 800, letterSpacing: "-.035em", lineHeight: 1, color: C.ink }}>
-              <span style={{ fontSize: 17, fontWeight: 700 }}>{excess ? "종목 탓 " : "덜 빠진 폭 "}</span>
+            <strong style={{ fontFamily: MONO, fontSize: "var(--fs-34)", fontWeight: 800, letterSpacing: "-.035em", lineHeight: 1, color: C.ink }}>
+              <span style={{ fontSize: "var(--fs-17)", fontWeight: 700 }}>{excess ? "종목 탓 " : "덜 빠진 폭 "}</span>
               {Math.abs(gap).toFixed(1)}
-              <span style={{ fontSize: 17, fontWeight: 700 }}>%p</span>
+              <span style={{ fontSize: "var(--fs-17)", fontWeight: 700 }}>%p</span>
             </strong>
-            <span style={{ fontSize: 11.5, color: C.sub2 }}>{benchLabel} 평균보다 {excess ? "깊은" : "얕은"} 하락</span>
+            <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2 }}>{benchLabel} 평균보다 {excess ? "깊은" : "얕은"} 하락</span>
           </div>
         )}
         {/* 옆 시트(이 하락의 성격)에 맞춰 늘어나는데 여긴 막대 셋뿐이라 가운데가 빈다.
@@ -102,8 +102,8 @@ export function Attribution({
             {/* ⚠️ bolt 였다. 짝으로 나란히 서는 오른쪽 시트('이 하락의 성격')의 제목 아이콘이
                 같은 번개라, 한 줄에 같은 그림이 둘이었다. 이 상자는 시트의 **결론**이라
                 전구를 쓴다 — 이 파일의 info 는 '자료가 부족하다'는 안내 쪽이다. */}
-            <Icon name="lightbulb" style={{ fontSize: 15, color: C.muted, flex: "none", marginTop: 1 }} />
-            <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.7, color: C.inkSoft, wordBreak: "keep-all" }}>
+            <Icon name="lightbulb" style={{ fontSize: "var(--fs-15)", color: C.muted, flex: "none", marginTop: 1 }} />
+            <p style={{ margin: 0, fontSize: "var(--fs-11-5)", lineHeight: 1.7, color: C.inkSoft, wordBreak: "keep-all" }}>
               {excess ? (
                 <>
                   시장·업종으로 설명되지 않는 <b style={{ fontWeight: 800, color: DOWN }}>{fmtPct(gap)}p</b>가 이 종목 고유의 낙폭입니다.
@@ -159,10 +159,10 @@ export function Recovery({ a, periodLabel }: { a: MddAnalysis; periodLabel: stri
 
       <div style={{ padding: "20px 22px", display: "flex", flexDirection: "column", gap: 16, borderBottom: `1px solid ${C.line}` }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
-          <strong style={{ fontFamily: MONO, fontSize: 34, fontWeight: 800, letterSpacing: "-.035em", lineHeight: 1, color: r.recoveredCount > 0 ? C.ink : DOWN }}>
+          <strong style={{ fontFamily: MONO, fontSize: "var(--fs-34)", fontWeight: 800, letterSpacing: "-.035em", lineHeight: 1, color: r.recoveredCount > 0 ? C.ink : DOWN }}>
             {r.recoveredCount > 0 ? fmtDur(r.medianDays!) : fmtDayCount(sincePeak)}
           </strong>
-          <span style={{ fontSize: 11.5, color: C.sub2, wordBreak: "keep-all" }}>
+          <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2, wordBreak: "keep-all" }}>
             {r.recoveredCount === 0
               ? "째 회복 못 함 · 이만큼 깊게 빠진 뒤 되찾은 전례가 없습니다"
               : hasRange
@@ -177,7 +177,7 @@ export function Recovery({ a, periodLabel }: { a: MddAnalysis; periodLabel: stri
           늘어나는데 여긴 네 줄뿐이다. 줄 간격을 벌려 채우지는 않는다(길이를 견주는 막대라
           서로 멀어지면 비교가 어려워진다). 묶음을 붙여 둔 채 남는 공간을 위아래로 가른다. */}
       <div style={{ flex: 1, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 12, justifyContent: "center" }}>
-        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>낙폭 구간별 발생 횟수 · {periodLabel}</span>
+        <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>낙폭 구간별 발생 횟수 · {periodLabel}</span>
         {buckets.map((b) => {
           const on = inBucket(b);
           return (
@@ -228,7 +228,7 @@ function RecoveryRange({ min, median, max }: { min: number; median: number; max:
       {/* 라벨은 양 끝을 안쪽으로 붙인다 — 중앙값이 끝에 가까우면 겹치지만, 셋 다 값이
           숫자로 적혀 있어 읽는 데 지장이 없다. */}
       <div style={{ position: "relative", height: 14 }}>
-        <span style={{ position: "absolute", left: 0, top: 0, fontFamily: MONO, fontSize: 11, fontWeight: 700, color: C.muted }}>{fmtDur(min)}</span>
+        <span style={{ position: "absolute", left: 0, top: 0, fontFamily: MONO, fontSize: "var(--fs-11)", fontWeight: 700, color: C.muted }}>{fmtDur(min)}</span>
         <span
           style={{
             position: "absolute",
@@ -236,7 +236,7 @@ function RecoveryRange({ min, median, max }: { min: number; median: number; max:
             top: 0,
             transform: "translateX(-50%)",
             fontFamily: MONO,
-            fontSize: 11,
+            fontSize: "var(--fs-11)",
             fontWeight: 800,
             color: UP,
             whiteSpace: "nowrap",
@@ -244,7 +244,7 @@ function RecoveryRange({ min, median, max }: { min: number; median: number; max:
         >
           중앙값 {fmtDur(median)}
         </span>
-        <span style={{ position: "absolute", right: 0, top: 0, fontFamily: MONO, fontSize: 11, fontWeight: 700, color: C.muted }}>{fmtDur(max)}</span>
+        <span style={{ position: "absolute", right: 0, top: 0, fontFamily: MONO, fontSize: "var(--fs-11)", fontWeight: 700, color: C.muted }}>{fmtDur(max)}</span>
       </div>
     </div>
   );
@@ -303,25 +303,25 @@ export function Character({ ch, currentDd }: { ch: DrawdownCharacter | null; cur
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                     {/* 틴트 위에는 강조색(--c-blue)을 쓰지 않는다 — 명암비 2.2 라 안 읽힌다. */}
-                    <span style={{ fontSize: 12.5, fontWeight: 800, color: t.on ? DOWN : C.ink }}>{t.label}</span>
-                    <span style={{ fontSize: 11, color: t.on ? C.sub : C.muted }}>· {t.b.count}회</span>
+                    <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 800, color: t.on ? DOWN : C.ink }}>{t.label}</span>
+                    <span style={{ fontSize: "var(--fs-11)", color: t.on ? C.sub : C.muted }}>· {t.b.count}회</span>
                   </div>
-                  <span style={{ fontSize: 11, color: t.on ? C.sub : C.sub2 }}>{t.sub}</span>
-                  <strong style={{ fontFamily: MONO, fontSize: 21, fontWeight: 800, letterSpacing: "-.03em", color: C.ink, marginTop: 2 }}>
+                  <span style={{ fontSize: "var(--fs-11)", color: t.on ? C.sub : C.sub2 }}>{t.sub}</span>
+                  <strong style={{ fontFamily: MONO, fontSize: "var(--fs-21)", fontWeight: 800, letterSpacing: "-.03em", color: C.ink, marginTop: 2 }}>
                     {fmtDur(t.b.medianRecovery)}
                   </strong>
-                  <span style={{ fontSize: 11, color: t.on ? C.sub : C.sub2 }}>회복 중앙값</span>
+                  <span style={{ fontSize: "var(--fs-11)", color: t.on ? C.sub : C.sub2 }}>회복 중앙값</span>
                 </div>
               ) : null,
             )}
           </div>
         ) : (
-          <p style={{ margin: 0, color: C.muted, fontSize: 11.5, lineHeight: 1.6, wordBreak: "keep-all" }}>
-            <Icon name="info" style={{ fontSize: 14, verticalAlign: -2, marginRight: 4 }} />
+          <p style={{ margin: 0, color: C.muted, fontSize: "var(--fs-11-5)", lineHeight: 1.6, wordBreak: "keep-all" }}>
+            <Icon name="info" style={{ fontSize: "var(--fs-14)", verticalAlign: -2, marginRight: 4 }} />
             이 기간엔 비교할 과거 하락이 부족합니다. 기간을 넓히면 급락형·완만형 회복을 비교할 수 있습니다.
           </p>
         )}
-        <span style={{ fontSize: 11.5, color: C.inkSoft, lineHeight: 1.7, wordBreak: "keep-all" }}>
+        <span style={{ fontSize: "var(--fs-11-5)", color: C.inkSoft, lineHeight: 1.7, wordBreak: "keep-all" }}>
           지금은 <b style={{ fontWeight: 800, color: DOWN }}>{curLabel}</b>입니다. {fmtDayCount(ch.currentTroughDays)}에 걸쳐 {fmtPct(ch.currentTroughDepth)}
           {perDay !== null && <>, 하루 평균 {fmtPct(perDay)}</>}입니다.
           {compare && ` ${compare}`}
@@ -419,12 +419,12 @@ export function TopDrawdowns({ eps }: { eps: Episode[] }) {
       {eps.map((e, i) => (
         <div key={i} className="hz-trow mdd-top-row" style={{ padding: "11px 22px", background: e.recovered ? undefined : C.soft }}>
           <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
-            <span style={{ fontSize: 12, fontWeight: e.recovered ? 700 : 800, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            <span style={{ fontSize: "var(--fs-12)", fontWeight: e.recovered ? 700 : 800, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {fmtYm(e.peakDate)} ~ {e.recovered ? fmtYm(e.recoveryDate!) : "진행 중"}
             </span>
             {/* 이 줄도 말줄임을 걸어야 한다 — 안 걸면 "저점 2026-07-30"이 열보다 넓어
                 부모를 밀어낸다(위 형제만 자르면 소용없다). */}
-            <span style={{ fontFamily: MONO, fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               저점 {e.troughDate}
             </span>
           </span>
@@ -440,14 +440,14 @@ export function TopDrawdowns({ eps }: { eps: Episode[] }) {
                 }}
               />
             </span>
-            <span style={{ width: 44, flex: "none", fontFamily: MONO, fontSize: 11.5, fontWeight: 800, color: e.recovered ? C.ink : DOWN }}>
+            <span style={{ width: 44, flex: "none", fontFamily: MONO, fontSize: "var(--fs-11-5)", fontWeight: 800, color: e.recovered ? C.ink : DOWN }}>
               {fmtPct(e.depth)}
             </span>
           </span>
-          <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: e.recovered ? C.sub : C.muted, textAlign: "right" }}>
+          <span style={{ fontFamily: MONO, fontSize: "var(--fs-11-5)", fontWeight: 700, color: e.recovered ? C.sub : C.muted, textAlign: "right" }}>
             {e.recovered ? fmtDayCount(e.days) : "—"}
           </span>
-          <span className="mdd-top-status" style={{ fontSize: 11, fontWeight: e.recovered ? 700 : 800, color: e.recovered ? C.sub : DOWN, textAlign: "right" }}>
+          <span className="mdd-top-status" style={{ fontSize: "var(--fs-11)", fontWeight: e.recovered ? 700 : 800, color: e.recovered ? C.sub : DOWN, textAlign: "right" }}>
             {e.recovered ? "회복" : "진행 중"}
           </span>
         </div>

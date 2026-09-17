@@ -330,7 +330,7 @@
 .hz-evcal-month {
   display: flex;
   align-items: baseline;
-  font-size: 13.5px;
+  font-size: var(--fs-13-5);
   font-weight: 800;
   color: var(--c-ink);
   letter-spacing: -0.01em;
@@ -342,7 +342,7 @@
   gap: 4px;
 }
 .hz-evcal-wd {
-  font-size: 10.5px;
+  font-size: var(--fs-10-5);
   font-weight: 700;
   color: var(--c-sub2);
   text-align: center;
@@ -368,12 +368,12 @@
   transition: background 0.12s ease;
 }
 .hz-evcal-day .num {
-  font-size: 12.5px;
+  font-size: var(--fs-12-5);
   font-weight: 700;
   line-height: 1;
 }
 .hz-evcal-day .cnt {
-  font-size: 10.5px;
+  font-size: var(--fs-10-5);
   font-weight: 800;
   line-height: 1;
   color: var(--c-cold-ink);
@@ -385,7 +385,7 @@
   background: var(--c-chip);
   color: var(--c-label);
   font: inherit;
-  font-size: 11.5px;
+  font-size: var(--fs-11-5);
   font-weight: 700;
   padding: 4px 10px;
   border-radius: 999px;
@@ -443,7 +443,7 @@
   background: transparent;
   padding: 9px 0 0;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 700;
   color: var(--c-cold-ink);
   cursor: pointer;
@@ -461,7 +461,7 @@
   background: var(--c-chip);
   color: var(--c-label);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 700;
   padding: 7px 12px;
   border-radius: 999px;
@@ -529,7 +529,7 @@
    작은 글씨에서 굵기는 또렷함이 아니라 **뭉갬**으로 나온다. 크기를 올리고 굵기를 한 단
    내리는 편이 같은 자리에서 훨씬 잘 읽힌다(기준으로 삼은 화면은 12px/500 에 자간 없음). */
 .hz-thead > * {
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--c-sub);
