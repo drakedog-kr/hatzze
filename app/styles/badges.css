@@ -1,0 +1,305 @@
+/* 구간 배지·종목 머리글자 배지·스퀘어클·MDD 리스크 팝오버. app/globals.css 에서 줄 그대로 옮겨 왔다(그쪽 머리말 참고). */
+
+/* ── 히어로 구간 배지(저온/상온/고온/초고온) ────────────────────────
+   알약에 옅은 틴트만 깔려 있어 히어로에서 제일 심심한 자리였다. 장식을 얹는 대신
+   정보를 얹는다 — 왼쪽 4칸 막대가 "지금 네 구간 중 몇 번째인지"를 직접 말한다.
+   히어로에는 이미 게이지가 있지만 그건 0~100 연속값이고, 이 배지는 '구간'이 단위다.
+
+   막대 높이가 왼쪽부터 커지는 건 온도가 오르는 방향과 같다. 켜진 칸은 구간 색을
+   그대로 쓰고(currentColor), 꺼진 칸은 같은 색을 옅게 남긴다 — 회색으로 두면
+   칸이 '비활성'이 아니라 '다른 것'으로 보인다. */
+.hz-stage {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 15px 5px 13px;
+  border-radius: 999px;
+  font-size: 22px;
+  font-weight: 700;
+  white-space: nowrap;
+  background: var(--stage-tint);
+  color: var(--stage);
+}
+
+.hz-stage-meter {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2.5px;
+  height: 17px;
+  flex-shrink: 0;
+}
+.hz-stage-meter i {
+  width: 3.5px;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.24;
+}
+.hz-stage-meter i.on { opacity: 1; }
+.hz-stage-meter i:nth-child(1) { height: 7px; }
+.hz-stage-meter i:nth-child(2) { height: 11px; }
+.hz-stage-meter i:nth-child(3) { height: 14px; }
+.hz-stage-meter i:nth-child(4) { height: 17px; }
+
+/* 채운 아이콘. layout.tsx 가 FILL 축을 0..1 로 받아 오므로 여기서 1로 민다 —
+   윤곽선만 있는 글리프는 22px 에서 선이 얇아 배지 안에서 존재감이 없었다. */
+.ms-fill { font-variation-settings: "FILL" 1; }
+
+/* 좁은 화면에서는 배지가 "햇쩨 지수" 제목과 한 줄에 들어가야 해서 미터를 접는다.
+   구간 이름은 글자로 남으니 정보가 사라지지는 않는다. */
+@media (max-width: 420px) {
+  .hz-stage-meter { display: none; }
+  .hz-stage { padding-left: 15px; gap: 7px; }
+}
+
+/* ── 종목 머리글자 배지 ───────────────────────────────────────────
+   진짜 로고를 쓰려면 회사별로 이미지를 구해 우리 쪽에 올려야 한다(남의 CDN 을
+   가져다 쓰는 건 대역폭도 경로도 남의 것이라 안 된다). 그때까지는 이름 첫 글자로
+   자리를 채운다 — 카더라의 채널 아바타(parts.tsx 의 Avatar)가 쓰는 것과 같은 방식이라
+   서비스 안에서 낯설지 않다.
+
+   색은 종목코드에서 뽑은 색상값(--h)을 인라인으로 받는다. 코드가 같으면 언제나 같은
+   색이라 목록이 다시 그려져도 안 흔들리고, 채도·명도는 여기서 고정하니 어떤 색이
+   걸려도 팔레트 밖으로 튀지 않는다. */
+.hz-stock-badge {
+  width: var(--hz-logo, 24px);
+  height: var(--hz-logo, 24px);
+  /* 원이 아니라 스퀘어클(iOS 앱 아이콘 모양)이다. 로고 아이콘이 대개 '브랜드 색 타일'로
+     그려져 있어서 원으로 자르면 네 귀퉁이가 통째로 날아간다.
+     반지름 30% 는 corner-shape 를 모르는 브라우저용 폴백이다 — 여기에 50% 를 주면
+     그런 브라우저에서 그냥 원이 되어 버린다(아래 @supports 참고). */
+  border-radius: 30%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  /* 이니셜은 타일의 42% — 크기를 바꿔도 비율이 유지된다. */
+  font-size: calc(var(--hz-logo, 24px) * 0.42);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: hsl(var(--h) 44% 91%);
+  /* 명도 30%. 34% 였을 때 노란색 계열(h≈60)만 3.72:1 로 떨어졌다 — HSL 은 같은 L 이라도
+     노랑이 눈에 훨씬 밝게 보여서, 색상값 전체를 한 번에 만족시키려면 이만큼 내려야
+     한다(전 색상 최저 4.59:1). */
+  color: hsl(var(--h) 46% 30%);
+}
+/* 로고 이미지. 머리글자 배지와 **크기·모양이 정확히 같아야 한다** — 로고를 못 불러와
+   폴백될 때 줄이 밀리면 목록 전체가 한 번 움찔한다.
+   크기는 --hz-logo 로 받는다(자리마다 다르게 쓰려고). */
+.hz-stock-logo {
+  width: var(--hz-logo, 24px);
+  height: var(--hz-logo, 24px);
+  border-radius: 30%; /* 머리글자 배지와 같은 실루엣 — 폴백해도 모양이 안 바뀐다 */
+  flex-shrink: 0;
+  /* contain 이다. cover 로 두면 SK 처럼 가로로 긴 워드마크의 양옆이 잘려 글자가
+     날아간다. 정사각형 아이콘(NAVER·삼성전자 등)은 contain 에서도 상자를 정확히
+     꽉 채우므로 잃는 게 없다 — 손해 보는 쪽이 한쪽뿐이라 contain 이 맞다. */
+  object-fit: contain;
+  /* 타일 바탕. 두 가지를 동시에 해결한다.
+     (1) SK텔레콤처럼 배경이 투명한 로고에 깔 면을 준다 — 없으면 로고만 허공에 뜬다.
+     (2) 흰 패널 위에서도 타일 경계가 보인다.
+     흰색이 아니라 아주 옅은 회색인 이유: 흰 배경 로고(SK·현대차)를 contain 으로
+     넣으면 위아래에 이 색이 띠로 남는데, 흰색 대비 1.1:1 이라 그 이음매가 눈에
+     안 띈다. 두 테마 같은 값을 쓴다 — 로고는 대개 밝은 바탕에 그려져 있어서
+     다크에서도 밝은 타일 위에 얹혀야 읽힌다(토스 다크도 타일은 밝다). */
+  background: #f2f4f6;
+}
+
+/* ── 스퀘어클 마스크 ─────────────────────────────────────────────
+   네 변이 고르게 부푼 iOS 앱 아이콘 모양. 종목 아이콘이 '브랜드 색 타일'이라
+   모서리만 살짝 깎은 사각형보다 이 모양이 타일에 훨씬 잘 맞는다.
+
+   corner-shape:squircle 로 먼저 시도했다가 걷어냈다 — Lightning CSS(Tailwind v4)가
+   모르는 속성이라 선언을 버리고, 그러면 @supports 블록이 통째로 사라진다(컴파일된
+   CSS 에 corner-shape 가 0건이었다). mask-image 는 아는 속성이라 살아남고,
+   지원 범위도 훨씬 넓다.
+
+   경로는 100x100 기준 superellipse 근사다. mask-size 로 늘려 쓰므로 크기가 바뀌어도
+   모양이 유지된다. border-radius 는 마스크를 못 쓰는 아주 옛 브라우저용으로 남긴다. */
+.hz-stock-badge,
+.hz-stock-logo {
+  mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M0,50 C0,11.5 11.5,0 50,0 C88.5,0 100,11.5 100,50 C100,88.5 88.5,100 50,100 C11.5,100 0,88.5 0,50 Z" fill="black"/></svg>');
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+}
+
+:root[data-theme="dark"] .hz-stock-badge {
+  /* 다크에서 라이트와 같은 명도를 쓰면 배지만 허옇게 뜬다. 배경은 낮추고 글자는 올린다. */
+  background: hsl(var(--h) 24% 26%);
+  color: hsl(var(--h) 55% 76%);
+}
+
+/* ── MDD 리스크 프로필 '전체보기' 팝오버 ──────────────────────────────────
+   '낙폭 대비 보상' 타일의 막대는 자리 때문에 최근 몇 줄뿐인데 제목·요약은 조회 기간
+   전체를 말한다. 나머지 해를 여기서 펼쳐 그 기간에 실제로 닿게 한다.
+
+   여는 장치는 CSS 뿐이다 — PC 는 :hover, 모바일은 버튼을 탭했을 때 잡히는 :focus-within.
+   카더라 테마 로테이션(.hz-theme-pop)과 같은 어법이라 새 언어를 만들지 않는다.
+   ⚠️ .hz-tip 은 :hover 전용이라 여기 못 쓴다(모바일에서 안 열린다). */
+.hz-yrpop-host {
+  position: relative;
+  flex-shrink: 0;
+  /* 버튼을 이 칸 **밑선**에 붙인다. span 이라 글자 줄상자가 생기는데, 그러면 버튼이
+     베이스라인에 앉아 아래로 디센더만큼 빈틈이 남아 옆 요약 문장보다 떠 보인다. */
+  display: inline-flex;
+  align-items: flex-end;
+}
+.hz-yrpop-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  /* 오른쪽 패딩만큼 밖으로 뺀다 — 그래야 **아이콘의 오른쪽 끝**이 위 막대들의 값 칸
+     (`+95%`·`−55%`)과 같은 세로선에 선다. 그 값 칸은 오른쪽 끝이 타일 콘텐츠 경계에
+     딱 붙어 있어(실측 차이 0px), 패딩을 그대로 두면 아이콘만 4px 안쪽으로 들어간다.
+     패딩 자체는 남긴다 — 호버 알약이 글자에 붙지 않게 하는 건 그쪽 몫이다. */
+  margin-right: -4px;
+  /* 사방 4px — 아이콘만 남아 23×23 이 된다. 오른쪽 4px 는 위 margin-right 가 상쇄한다. */
+  padding: 4px;
+  border: 0;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--c-sub);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.hz-yrpop-btn:hover,
+.hz-yrpop-host:focus-within .hz-yrpop-btn {
+  background: var(--c-blue-tint);
+  /* 원색이 아니라 잉크다 — 파란 tint 위에서 --c-blue 는 3.30/3.59 로 떨어진다.
+     옆의 .hz-more-btn:hover · .mdd-period-btn 과 같은 값이다. */
+  color: var(--c-cold-ink);
+}
+.hz-yrpop-btn:focus-visible {
+  outline: 2px solid var(--c-blue);
+  outline-offset: 1px;
+}
+
+.hz-yrpop {
+  position: absolute;
+  /* 위로 편다 — 타일 맨 아래라 아래로 열면 카드 밖으로 나가 다음 카드를 덮는다.
+     버튼과 4px 겹쳐 둔다. 틈이 있으면 마우스가 건너는 동안 :hover 가 끊긴다. */
+  bottom: calc(100% - 4px);
+  /* 오른쪽 끝에 맞춘다. 세 번째 타일에서 왼쪽 정렬로 두면 카드 밖으로 넘쳐
+     페이지에 가로 스크롤이 생긴다(예전에 툴팁으로 같은 사고가 있었다). */
+  right: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: min(280px, 78vw);
+  /* 조회 기간이 10년이면 10줄인데, 그걸 스크롤로 나눠 보면 '전체보기'라는 이름값을 못 한다.
+     내용만큼 자라게 두고 뷰포트에 걸릴 때만 스크롤한다 — '전체' 조회(상장 이후 20년 넘는
+     종목)에서만 걸린다. 화면 밖으로 자라 위가 잘리는 걸 72vh 가 막는다. */
+  max-height: min(600px, 72vh);
+  overflow-y: auto;
+  padding: 10px;
+  background: var(--c-float);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-card);
+  box-shadow: 0 4px 16px var(--c-shadow-strong);
+  opacity: 0;
+  /* opacity 만 0 이면 안 보이는 내용이 스크롤 영역과 Tab 순서에 그대로 남는다. */
+  visibility: hidden;
+  transform: translateY(4px);
+  transition: opacity 0.13s ease, transform 0.13s ease, visibility 0.13s;
+}
+.hz-yrpop-host:hover .hz-yrpop,
+.hz-yrpop-host:focus-within .hz-yrpop {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+/* 잘림 해결 — 툴팁(.hz-tip)과 같은 앵커 위치지정.
+   위 규칙은 position:absolute 라 조상 판의 overflow 에 갇힌다. '낙폭 대비 보상' 타일은
+   시트 맨 아래에 붙어 있고 그 시트(.hz-sheet)가 overflow:hidden 이라, 위로 펼친 팝오버의
+   윗부분이 잘려 나갔다(실측 2026-08-04, 10년 조회에서 425px 중 50px). 조회 기간이 길수록
+   더 잘린다.
+
+   position:fixed 로 바꾸면 기준이 조상 판이 아니라 **뷰포트**가 되어 시트 밖으로 온전히
+   열린다. 자리는 앵커가 잡아 준다.
+
+   ⚠️ 앵커 이름은 host 에 붙인다 — ::after 가 아니라 진짜 형제 요소라 '암묵 앵커'가 없다.
+   anchor-scope 도 같이 건다(.hz-tip 주석 참고): 이름은 하나뿐이라 범위를 안 막으면
+   문서의 마지막 host 에 달라붙는다. 지금은 페이지에 하나뿐이지만 타일이 늘면 바로 는다. */
+@supports (anchor-scope: --a) and (position-area: top center) {
+  .hz-yrpop-host {
+    anchor-name: --hz-yrpop;
+    anchor-scope: --hz-yrpop;
+  }
+  .hz-yrpop {
+    position: fixed;
+    position-anchor: --hz-yrpop;
+    /* 위 규칙의 bottom/right 를 걷어낸다. 남겨 두면 position-area 가 잡은 자리를 다시 민다. */
+    inset: auto;
+    /* 위로, 오른쪽 끝을 앵커에 맞춰 — absolute 판(bottom/right:0)과 같은 그림이다. */
+    position-area: top span-left;
+    position-try-fallbacks:
+      top span-right,
+      bottom span-left,
+      bottom span-right;
+    /* 버튼과 4px 겹친다. 틈이 있으면 마우스가 건너는 동안 :hover 가 끊긴다.
+       transform 은 여닫는 애니메이션이 쓰므로 margin 으로 준다. */
+    margin-bottom: -4px;
+    /* 뷰포트가 기준이 되었으니 화면 높이에 맞춰 스스로 줄어들게 둔다. */
+    max-height: min(600px, calc(100vh - 24px));
+  }
+}
+
+.hz-yrpop-head {
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--c-hairline);
+  color: var(--c-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.hz-yrpop-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 62px;
+  align-items: center;
+  gap: 7px;
+}
+.hz-yrpop-year {
+  /* app/ui.tsx 의 MONO 와 같은 값. 이 레포는 모노 서체를 쓰지 않고 Pretendard 에
+     body 의 tabular-nums 로 자릿수만 고정한다(한글 글리프가 갈리지 않게). */
+  font-family: var(--font-pretendard), sans-serif;
+  font-size: 11px;
+  color: var(--c-sub);
+}
+/* 한 해가 두 줄(수익 / 그 해 최악 낙폭)인 건 타일 막대와 같은 문법이다. */
+.hz-yrpop-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.hz-yrpop-bar {
+  display: block;
+  height: 5px;
+  border-radius: 999px;
+}
+.hz-yrpop-val {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  /* app/ui.tsx 의 MONO 와 같은 값. 이 레포는 모노 서체를 쓰지 않고 Pretendard 에
+     body 의 tabular-nums 로 자릿수만 고정한다(한글 글리프가 갈리지 않게). */
+  font-family: var(--font-pretendard), sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: right;
+}
+
+/* 푸터 링크 호버 — 목업이 파랑으로 밝힌다. 인라인 color 를 이겨야 하므로 여기서 !important
+   없이 쓰려면 :hover 가 더 구체적이어야 한다(클래스 + 의사클래스). */
+.hz-foot-link:hover { color: var(--c-blue) !important; }
+/* 푸터 목록 링크(2026-09-04 리디자인). 색은 인라인이 아니라 여기 — 인라인이면 :hover 가 죽는다.
+   호버는 파랑이 아니라 **잉크**다. 토스 푸터는 링크가 회색이고 올리면 진해질 뿐, 파랑을
+   푸터에 쓰지 않는다(본문의 파랑은 '지금 여기'와 CTA 몫이다). */
+.hz-footer-link {
+  color: var(--c-sub);
+  text-decoration: none;
+  transition: color 0.12s ease;
+}
+.hz-footer-link:hover { color: var(--c-ink); }

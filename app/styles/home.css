@@ -1,0 +1,441 @@
+/* 홈(시장 브리핑) 대시보드 — 지표 격자·지표 분포·스크롤 목적지·접히는 자리·잉크 램프. app/globals.css 에서 줄 그대로 옮겨 왔다(그쪽 머리말 참고). */
+
+/* ── HATZZE 대시보드 (Claude Design 목업 이식) ──────────────────────
+   목업은 인라인 스타일 위주라, 여기에는 (1) 인라인으로 표현 불가능한
+   Material Symbols 아이콘 폰트, (2) 키프레임 애니메이션, (3) 스크롤바,
+   (4) 미디어쿼리가 필요한 반응형 그리드/사이드바만 둔다. */
+.ms {
+  /* Rounded 로 바꿨다(2026-08 리디자인). layout.tsx 의 CDN 링크와 반드시 같은 이름이어야
+     한다 — 다르면 글리프 대신 "vertical_align_top" 같은 리거처 원문이 그대로 찍힌다. */
+  font-family: "Material Symbols Rounded";
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  direction: ltr;
+  -webkit-font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 4열 → 3열 → 2열 → 1열. span-2 카드는 최소 폭 아래에서 1열로 접힌다. */
+/* minmax(0, 1fr) — 1fr은 minmax(auto, 1fr)이라 그리드 항목의 기본 min-width:auto가
+   살아 있고, 줄바꿈 안 되는 긴 내용(예: 채널명 "주식 급등일보🚀…| Korean Stocks")이
+   트랙을 밀어 4등분이 깨진다. 실제로 122/0/466/166px까지 벌어졌다.
+   최소값을 0으로 눌러야 칸 비율이 내용과 무관하게 고정된다. */
+/* 시장 브리핑 지표 **시트** (2026-08 콘솔 리디자인).
+   카드 25장이 각자 그림자를 지고 떠 있던 것을 **한 판(sheet) 안의 셀**로 바꿨다.
+   25개가 저마다 떠 있으면 눈이 카드 경계를 25번 넘어야 해서, 정작 비교해야 할
+   '지표끼리의 온도 차이'가 안 읽혔다. 한 판에 담으면 표처럼 훑힌다.
+
+   **격자선은 gap 배경이 아니라 셀이 직접 그린다**(.hz-cards > * 의 inset 그림자).
+   gap 에 배경색을 깔아 선을 내는 흔한 방법은 마지막 줄이 덜 찼을 때 **빈 슬롯이
+   회색 사각형으로 남는다** — auto-fill 이라 칸 수가 폭마다 달라서 늘 생긴다.
+   셀이 자기 오른쪽·아래에만 선을 그으면 빈 자리에는 아무것도 안 그려진다.
+   시트가 overflow:hidden 이라 맨 오른쪽 열·맨 아랫줄의 남는 선은 잘려 나간다.
+
+   최소 칸 304px 은 카드 안쪽 220px 하한(--hz-card-pad 22×2 = 44 을 뺀 260)을 넘는다.
+   ⚠️ 아래 .hz-grid 는 카더라가 쓴다 — 그쪽은 flex-wrap 구조라 같이 바꾸면 안 된다. */
+.hz-cards {
+  display: grid;
+  /* **4열 고정.** auto-fill(minmax 304) 이었는데, 그러면 칸 수가 폭에 따라 4→3→2 로
+     제멋대로 바뀐다. 위 히어로는 늘 3칸이라(지수·분포·브리핑) 칸 수가 어긋나는 순간
+     히어로 세로선과 시트 격자선이 따로 놀고, 화면이 두 판으로 갈라 보인다.
+     둘 다 못박아 **히어로 3 / 시트 4 를 항상 유지**한다 — 넓은 화면에서 히어로의
+     1:1:2 경계가 시트의 4열 격자선과 정확히 겹친다. */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  background: var(--c-card);
+  border-radius: var(--r-card);
+  overflow: hidden;
+  /* ⚠️ **테두리가 아니라 안쪽 링**이다. border 로 두면 마지막 줄·마지막 열의 셀이 긋는
+     선이 그 테두리 **바로 옆**에 나란히 서서 2px 가 되고, 정작 칸이 빈 자리는 테두리
+     1px 만 남는다 — 지표가 있는 쪽만 굵어 보이던 것이 이것이다(실측: 마지막 셀 아래끝과
+     컨테이너 안쪽 바닥의 거리가 0px = 완전히 맞붙음).
+
+     링은 padding 상자 **안쪽 1px** 을 칠하므로 셀이 긋는 선과 **같은 픽셀**에 겹친다.
+     그래서 셀이 있든 없든 어느 가장자리나 1px 로 똑같다.
+
+     ⭐ 이 방식의 값어치는 셀 개수를 안 세도 된다는 것이다. :nth-child 로 마지막 줄을
+     집으려면 칸 수가 열 수의 배수여야 하는데 여기는 15·11 처럼 늘 어긋난다
+     (.hz-cellgrid 가 margin-bottom:-1px 을 쓰는 것과 같은 동기다 — 저긴 격자가 시트
+     안에 들어 있어 음수 여백이 통하지만, 여긴 격자 자신이 테두리를 진 상자라 안 통한다).
+
+     네 변을 따로 그어야 가로·세로가 각자 제 토큰을 쓴다(폰에서 가로만 반 칸 진하다).
+
+     ⚠️ 맨 끝 바닥 그림자 두 겹은 **안쪽 링과 한 선언에 같이 있어야 한다.** 다른 규칙으로
+     떼어 내면 나중에 오는 쪽이 box-shadow 를 통째로 이겨서 링 네 겹이 사라진다
+     (box-shadow 는 층을 합치지 않고 목록을 대체한다). 그래서 여기만 두 겹을 손으로
+     적는다 — 통째 토큰(var(--sh-card))으로 두면 미니파이어가 지운다(--c-sh-card 주석). */
+  box-shadow:
+    inset 0 1px 0 var(--c-sep-h),
+    inset 0 -1px 0 var(--c-sep-h),
+    inset 1px 0 0 var(--c-sheet-line),
+    inset -1px 0 0 var(--c-sheet-line),
+    0 1px 3px 0 var(--c-sh-card),
+    0 1px 2px -1px var(--c-sh-card);
+}
+/* 셀 = 예전의 카드 한 장. 그림자·라운드·테두리를 걷고 격자선만 남긴다.
+   min-height 로 모든 셀의 키를 맞춰야 격자가 표로 읽힌다(안 맞으면 줄마다 높이가
+   달라져 오른쪽 열이 계단처럼 어긋난다). */
+.hz-cards > * {
+  min-height: 274px;
+  border: 0;
+  border-radius: 0;
+  box-shadow:
+    inset -1px 0 0 var(--c-sheet-line),
+    inset 0 -1px 0 var(--c-sep-h);
+}
+/* 초고온 셀 — 상단 2px 레드 라인 + 아주 옅은 바탕. 테두리를 두르지 않는 건 시트 안에서
+   셀끼리 붙어 있어 테두리가 격자선과 겹쳐 두 겹이 되기 때문이다. 라인이 격자선보다
+   **먼저** 와야 위쪽에서 이긴다. */
+.hz-cards > .hz-cell-hot {
+  background: var(--c-sheet-hot-bg);
+  box-shadow:
+    inset 0 2px 0 var(--c-sheet-hot),
+    inset -1px 0 0 var(--c-sheet-line),
+    inset 0 -1px 0 var(--c-sep-h);
+}
+/* ① 머리 슬롯의 **높이를 고정한다.** min-height 로는 부족했다 — 칸이 좁아지면 제목이나
+   설명이 한 줄 더 접히면서 그 카드만 머리가 자라고, 아래 큰 수치가 같은 줄의 다른
+   카드보다 내려앉는다. **같은 줄의 메인 지수는 같은 높이에 선다**가 이 화면의 제1규칙이라
+   머리는 자라면 안 된다.
+   74 = 제목 2줄(13.5 × 1.3 × 2 = 35) + gap 3 + 설명 2줄(12.5 × 1.45 × 2 = 36).
+   안쪽 제목·설명도 각각 2줄로 묶어 둔다(.hz-clamp2) — 상자만 고정하고 내용이 넘치면
+   글자가 상자 밖으로 새어 아래 슬롯을 덮는다. */
+.hz-cell-head {
+  height: 74px;
+}
+/* 두 줄까지만. 넘치면 말줄임 — 제목이 세 줄까지 가는 카드는 '레버리지 ETF·선물 미결제약정
+   종합 지수' 하나뿐이고, 그마저 4열이 유지되는 폭에서는 두 줄에 들어간다. */
+.hz-clamp2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+/* 초고온 셀만 머리 오른쪽을 비운다 — 그 자리에 '초고온' 배지가 절대배치로 앉는다.
+   모든 셀에 주면 제목이 접히는 자리가 카드마다 달라져 시트의 가로 리듬이 깨진다. */
+.hz-cell-hot .hz-cell-head {
+  padding-right: 62px;
+}
+
+/* 그래픽 존의 마지막 자식만 위아래 auto — 그래픽이 하나뿐인 셀은 그 하나가 존
+   한가운데 서고, 여럿인 셀은 위에서부터 쌓이고 남는 높이가 맨 아래 그래픽 주위로 간다.
+   존 전체를 center 로 두면 그래픽이 둘 이상일 때 묶음째 떠서 머리와 사이가 벌어진다. */
+.hz-cell-graphic > :last-child {
+  margin-block: auto;
+}
+/* 히어로 — 아래 지표 시트와 같은 어법(흰 판 하나 + 헤어라인)이다. 셀 셋을 1:1:2 로
+   나눠 한 줄에 세운다.
+
+   auto-fill 로 두지 않은 이유: 3열이 되는 폭에서 [지수][분포]가 한 줄, [브리핑 span 2]가
+   다음 줄로 가면서 **두 줄 모두 오른쪽 한 칸이 빈다.** 칸 수를 폭 구간마다 못박으면
+   어느 폭에서도 줄이 꽉 찬다(4단위 → 2+2 → 1). 아래 지표 시트의 칸과 세로선이 맞지
+   않는 건 감수한다 — 빈 칸이 생기는 쪽이 훨씬 눈에 띈다.
+
+   경계 1100·700 은 화면 폭이 아니라 이 판이 실제로 좁아지는 자리에서 잡았다:
+   1100 아래에서 2fr 짜리 브리핑 셀 안쪽이 300px 밑으로 내려가 문단이 세로로 흐른다. */
+.hz-hero-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr 2fr;
+  background: var(--c-card);
+  border: 1px solid var(--c-sheet-line);
+  border-radius: var(--r-card);
+  overflow: hidden;
+  box-shadow:
+    0 1px 3px 0 var(--c-sh-card),
+    0 1px 2px -1px var(--c-sh-card);
+}
+.hz-hero-cell {
+  min-width: 0;
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+/* 셀 사이 세로 헤어라인. 시트와 달리 셀이 셋뿐이고 자리가 고정이라, inset 그림자 대신
+   왼쪽 테두리로 둔다(첫 셀만 빼면 되니 규칙이 더 짧다).
+
+   색은 카더라 히어로(.hz-kd-hero-q 의 inset)와 같은 --c-sheet-line 이다. 예전엔 한 톤
+   옅은 --c-divider 였는데, 그러면 같은 자리의 같은 선이 두 화면에서 다른 세기로 보였다
+   (흰 카드 위 명암비 1.10 대 1.18 — 브리핑 쪽은 셀이 갈린다는 게 거의 안 읽혔다). */
+.hz-hero-divide {
+  border-left: 1px solid var(--c-sheet-line);
+}
+/* ⚠️ span 을 주지 않는다. 세 칸짜리 격자의 **셋째 칸이 이미 2fr** 이라 브리핑은 그 한 칸에
+   그대로 앉으면 된다. span 2 를 얹으면 1+1+2 = 네 칸을 요구하는 셈이라 세 칸 격자에 못
+   들어가서 다음 줄로 내려가고, 두 줄 모두 오른쪽 칸이 빈다(목업이 실제로 그렇다). */
+.hz-hero-wide {
+  gap: 12px;
+}
+
+/* ── 지표 분포 셀의 구간별 목록 ─────────────────────────────────────
+   구간 줄에 마우스를 올리면 그 구간에 든 지표가 목록으로 열리고, 이름을 누르면 아래
+   시트의 그 셀(`#ind-<slug>`)로 내려간다. 카더라 테마 줄(.hz-theme-pop)과 같은 어법이라
+   새 언어를 안 만든다 — 목록에 **링크**가 들어가야 해서 data-tip 툴팁을 못 쓰고(그건
+   attr() 로 뽑은 문자열이다), 진짜 요소를 두고 :hover / :focus-within 으로 여닫는다.
+   JS 가 없으므로 히어로는 서버 컴포넌트로 남는다.
+
+   ⭐ 팝오버는 **셀에 걸어 위아래를 못박는다**(top/bottom 12). 줄마다 다른 높이에서 열면
+   네 줄이 30px 씩 어긋나 목록이 위아래로 튀는데, 자리를 고정하면 내용만 바뀐다. 덤으로
+   높이가 셀 안에 갇혀 히어로 판(.hz-hero-panel 은 overflow:hidden) 밖으로 안 나간다 —
+   가장 긴 구간이 12줄까지 가므로 그대로 두면 판을 뚫는다. 넘치면 안에서 스크롤한다. */
+.hz-dist {
+  position: relative;
+}
+.hz-dist-bar {
+  display: flex;
+  height: 9px;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.hz-dist-seg {
+  transition: opacity 0.13s ease;
+}
+/* 호버한 구간만 남기고 띠를 흐린다. 줄과 띠 칸은 형제가 아니라 짝을 못 짓는데,
+   :has() 로 "이 구간 줄이 호버된 분포 셀"을 집으면 그 안에서 같은 data-band 를 고를 수
+   있다. 미지원 브라우저는 띠가 안 흐려질 뿐, 목록은 그대로 열린다.
+   ⚠️ 0개인 구간(.hz-dist-row-none)은 뺀다. 그 구간은 띠에 칸이 아예 없어서, 흐리는
+   규칙만 걸리고 되살릴 칸이 없어 **띠 전체가 흐려진다** — 고장으로 보인다. */
+.hz-dist:has(.hz-dist-row:not(.hz-dist-row-none):hover) .hz-dist-seg,
+.hz-dist:has(.hz-dist-row:not(.hz-dist-row-none):focus-within) .hz-dist-seg {
+  opacity: 0.22;
+}
+.hz-dist:has(.hz-dist-row[data-band="0"]:hover) .hz-dist-seg[data-band="0"],
+.hz-dist:has(.hz-dist-row[data-band="0"]:focus-within) .hz-dist-seg[data-band="0"],
+.hz-dist:has(.hz-dist-row[data-band="1"]:hover) .hz-dist-seg[data-band="1"],
+.hz-dist:has(.hz-dist-row[data-band="1"]:focus-within) .hz-dist-seg[data-band="1"],
+.hz-dist:has(.hz-dist-row[data-band="2"]:hover) .hz-dist-seg[data-band="2"],
+.hz-dist:has(.hz-dist-row[data-band="2"]:focus-within) .hz-dist-seg[data-band="2"],
+.hz-dist:has(.hz-dist-row[data-band="3"]:hover) .hz-dist-seg[data-band="3"],
+.hz-dist:has(.hz-dist-row[data-band="3"]:focus-within) .hz-dist-seg[data-band="3"] {
+  opacity: 1;
+}
+
+/* 배경만 셀 안쪽 여백까지 번지게 한다. 음수 마진을 패딩과 같은 값으로 둬 줄의 바깥
+   치수는 그대로 남긴다(.hz-theme-row 와 같은 수법) — 네 줄의 간격이 안 흔들린다. */
+.hz-dist-row {
+  /* ⚠️ position 을 주지 않는다. 카더라 테마 줄(.hz-theme-row)은 팝오버가 **줄에** 붙어서
+     relative 가 필요했지만, 여기 팝오버는 셀(.hz-dist)에 붙어 자리를 못박는다 — 줄에
+     relative 를 주면 그 순간 기준이 줄로 바뀌어 팝오버가 줄 높이(24px)로 눌린다. */
+  margin: -4px -10px;
+  padding: 4px 10px;
+  border-radius: var(--r-control);
+  cursor: pointer;
+  transition: background 0.13s ease;
+}
+.hz-dist-row:hover,
+.hz-dist-row:focus-within {
+  background: var(--c-blue-tint);
+}
+/* 마우스 없이도 열려야 한다(줄에 tabindex 를 준다). 터치에서도 이 경로로 열린다. */
+.hz-dist-row:focus-visible {
+  outline: 2px solid var(--c-blue);
+  outline-offset: -2px;
+}
+
+.hz-dist-pop {
+  position: absolute;
+  /* 기준은 줄이 아니라 셀(.hz-dist)이다 — 위 ⭐ 참고.
+     ⚠️ 100% 에서 **18px 을 뺀다.** 줄은 좌우 10px 씩 넓힌 상자라 오른쪽 끝이 셀 안쪽
+     경계보다 14px 바깥에 있는데, 팝오버를 셀 바깥(100% + n)에 두면 그 사이가 빈다.
+     마우스가 그 틈을 건너는 동안 :hover 가 끊겨 목록이 닫혀서 **링크를 누를 수가 없다**
+     (카더라 .hz-theme-pop 이 top 을 5px 겹쳐 두는 것과 같은 이유). 4px 겹쳐 둔다.
+     겹치는 14~18px 은 셀 여백이라 줄의 글자·숫자는 안 가린다. */
+  left: calc(100% - 18px);
+  top: 12px;
+  bottom: 12px;
+  width: 252px;
+  z-index: 40;
+  padding: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--c-float);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-card);
+  /* 시트엔 그림자를 안 쓰지만 오버레이는 예외다 — 옆 셀의 글을 실제로 가리고 떠 있어야
+     해서, 경계선만으로는 "위에 있다"가 안 읽힌다(.hz-theme-pop 과 같은 값). */
+  box-shadow: 0 4px 16px var(--c-shadow-strong);
+  opacity: 0;
+  /* opacity 만 0 으로 두면 안 보이는 링크가 Tab 순서에 그대로 남는다. */
+  visibility: hidden;
+  transform: translateX(-4px);
+  transition: opacity 0.13s ease, transform 0.13s ease, visibility 0.13s;
+}
+.hz-dist-row:hover .hz-dist-pop,
+.hz-dist-row:focus-within .hz-dist-pop {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0);
+}
+/* 붙박이 머리 — 목록이 여덟 줄쯤에서 잘려 스크롤되므로, 안내가 따라 올라가면 안 된다.
+   top 은 팝오버 padding(8) 만큼 음수로 당겨 위 여백에 흰 틈이 안 생기게 한다. */
+.hz-dist-pop-head {
+  position: sticky;
+  top: -8px;
+  margin: -8px -8px 0;
+  padding: 10px 15px 7px;
+  background: var(--c-float);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--c-sub);
+  white-space: nowrap;
+}
+.hz-dist-pop-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px;
+  border-radius: var(--r-control);
+  text-decoration: none;
+  transition: background 0.12s ease;
+}
+.hz-dist-pop-item:hover {
+  background: var(--c-blue-tint);
+}
+.hz-dist-pop-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.12s ease;
+}
+.hz-dist-pop-item:hover .hz-dist-pop-name {
+  color: var(--c-blue);
+}
+/* 과열도. 자릿수는 body 의 tabular-nums 가 이미 고정해 줘서, 열두 줄이 오른쪽에서
+   한 줄로 선다(page.tsx 의 MONO 도 별도 서체가 아니라 같은 Pretendard 다). */
+.hz-dist-pop-heat {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--c-sub);
+}
+
+/* ── 지표가 0개인 구간 ────────────────────────────────────────────
+   줄은 그대로 열리되(반응이 없으면 고장으로 읽힌다) 목록 대신 한 줄만 띄운다.
+   상자는 내용 높이만큼만 — 위아래를 못박은 기본값이면 한 줄짜리가 258px 빈 판이 된다. */
+.hz-dist-pop-slim {
+  bottom: auto;
+  padding: 10px 12px;
+}
+.hz-dist-pop-none {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--c-sub);
+  text-wrap: pretty;
+}
+/* 누를 것이 없는 줄이라 손가락 커서를 주지 않는다. 하이라이트는 그대로 걸린다 —
+   "이 줄을 보고 있다"는 표시는 내용이 없어도 필요하다. */
+.hz-dist-row-none {
+  cursor: default;
+}
+
+/* ── 스크롤 목적지 ────────────────────────────────────────────────
+   위 목록에서 건너온 셀. 본문 맨 위에 딱 붙지 않게 숨을 두고, 도착한 칸을 1초 동안
+   테두리로 짚었다가 서서히 지운다 — 25칸이 똑같이 생겨서 표시가 없으면 어디로 왔는지
+   모르고, 계속 남아 있으면 그 칸만 특별한 것처럼 읽힌다.
+
+   ⚠️ 셀 자체의 box-shadow 가 아니라 **덧대는 ::after** 로 그린다. 셀의 그림자는
+   격자선(오른쪽·아래 1px)과 초고온 윗줄 2px 을 이미 지고 있어서, 거기에 테두리를
+   섞으면 사라질 때 그 선들까지 같이 흐려진다. 별개 레이어면 테두리만 혼자 사라진다.
+   색을 transparent 로 보내지 않고 opacity 를 쓰는 이유도 같다 — 색 보간은 중간에
+   탁한 회색을 지난다. */
+.hz-cards > *[id] {
+  scroll-margin: 14px;
+}
+.hz-cards > *:target::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* 셀이 자기 온도로 이미 정해 둔 강조색을 그대로 쓴다(Shell 의 --card-accent):
+     저온·상온은 파랑, 고온·초고온은 빨강. 경계가 warm(과열도 ≥ 50)이라 구간 이름과
+     정확히 같이 간다 — 여기서 색을 다시 고르면 카드 머리의 아이콘·배지와 갈린다. */
+  border: 2px solid var(--card-accent);
+  /* 2.5초. 1초로 뒀더니 스크롤이 멎기도 전에 표시가 사라져, 눈이 도착한 칸을 찾기 전에
+     단서가 없어졌다. 여기서 중요한 건 '깜빡임'이 아니라 **눈이 따라올 시간**이다.
+     ease-out 이라 앞 절반에서 대부분 옅어지고 끝자락이 길게 남는다 — 갑자기 끊기지
+     않으면서도 오래 붙어 있다는 인상은 안 준다. */
+  animation: hz-target-fade 2.5s ease-out forwards;
+}
+@keyframes hz-target-fade {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* ── 접히는 자리 ───────────────────────────────────────────────────
+   히어로 3 / 시트 4 는 **데스크톱에서 절대 안 바뀐다.** 아래 두 경계는 그 배치가
+   물리적으로 불가능해지는 폭에서만 켠다.
+
+   경계 1400: 4열일 때 칸 안쪽이 239px 이라 제목·설명이 각각 두 줄 안에 들어간다(머리 74).
+   1280 까지 내려가면 안쪽이 207 이 되어 세 줄짜리 머리가 생기고, 고정 높이 74 안에서
+   말줄임으로 잘린다 — 자르기 전에 열을 줄이는 편이 낫다. 3열은 쓰지 않는다: 위 히어로가
+   늘 3칸(1:1:2 = 4단위)이라 시트가 3열이면 세로선이 서로 어긋난다.
+   경계 620: 2열도 칸이 268(안쪽 232)이라 하한(220)에 닿는다. 여기서 1열.
+   ⚠️ 두 숫자는 화면 폭이 아니라 '남는 폭'에서 나왔다 — 사이드바(210)나 여백을
+   건드리면 다시 재야 한다. */
+@media (max-width: 1399px) {
+  .hz-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* 히어로도 같이 2칸으로. 브리핑만 아랫줄에서 폭을 다 쓴다 — 이때야 span 이 필요하다.
+     아랫줄 첫 셀이라 왼쪽 선이 허공에 뜨므로 윗선으로 바꾼다.
+     세로선과 달리 **가로 전용 토큰**을 쓴다 — 폰에서 반 칸 진해져야 하는 선이라서다
+     (카더라의 접힘선 .hz-kd-hero-q @1200 과 같다. 이유는 --c-sep-h 주석). */
+  .hz-hero-panel { grid-template-columns: 1fr 1fr; }
+  .hz-hero-wide { grid-column: span 2; border-left: 0; border-top: 1px solid var(--c-sep-h); }
+  /* 2칸이 되면 분포 셀이 **판의 오른쪽 끝**이라 오른쪽으로 열 자리가 없다. 왼쪽(햇쩨
+     지수 셀 위)으로 튼다 — 판 안이라 잘리지 않는다. 줄과 겹치는 18px 은 위와 같다. */
+  .hz-dist-pop {
+    left: auto;
+    right: calc(100% - 18px);
+    transform: translateX(4px);
+  }
+  .hz-dist-row:hover .hz-dist-pop,
+  .hz-dist-row:focus-within .hz-dist-pop { transform: translateX(0); }
+}
+@media (max-width: 620px) {
+  .hz-cards { grid-template-columns: minmax(0, 1fr); }
+  .hz-hero-panel { grid-template-columns: 1fr; }
+  .hz-hero-wide { grid-column: span 1; }
+  .hz-hero-divide { border-left: 0; border-top: 1px solid var(--c-sep-h); }
+  /* 1칸이면 좌우 어느 쪽에도 자리가 없다. 셀 위에 그대로 덮는다 — 목록을 보는 동안
+     가려지는 건 방금 누른 그 넉 줄뿐이라 잃는 게 없다. */
+  .hz-dist-pop {
+    left: 10px;
+    right: 10px;
+    width: auto;
+    transform: translateY(-4px);
+  }
+  .hz-dist-row:hover .hz-dist-pop,
+  .hz-dist-row:focus-within .hz-dist-pop { transform: translateY(0); }
+}
+/* ── 읽히는 잉크 램프 (라이트) ─────────────────────────────────────
+   ⬆ 실제 값은 위 :root 에 있다. 여기 남긴 것은 **왜 그 값인가**에 대한 기록이다.
+
+   문제는 크기보다 색이었다. 라이트 램프의 아랫단을 실측하면 흰 카드 위 명암비가
+   sub 4.07 · sub2 2.69 · muted 2.50 · faint 2.01 이다. WCAG AA 가 4.5 인데 **본문성
+   작은 글씨가 전부 그 아래**였고, 표 열 머리(9.5px)는 sub2 라 2.69 였다. 팔레트
+   주석이 적어 둔 "5.0 / 3.5 / 2.7"은 실제 값과 달랐다.
+
+   토스증권을 재 보면 라이트의 글자색이 딱 세 단이다 — 11.0 / 7.1 / **4.6**. 4.6 이
+   바닥이고 그 아래로는 글자를 내려보내지 않는다. 크기도 정보성 텍스트는 12px 이
+   바닥이다(10~11px 은 차트 축 눈금뿐). 우리는 반대로 **작아질수록 흐려지게** 램프를
+   타고 내려갔다 — 작은 글씨가 안 읽히는 건 그래서다.
+
+   그래서 아랫단을 끌어올려 **읽는 단 셋을 전부 4.5 위로** 올린다. 그 아래 둘은
+   이름값대로 글자에 쓰지 않는다(아이콘·눈금·점선 전용).
+     label  #42586e  7.36  (그대로)
+     sub    #5a7089  5.10  ← 4.07
+     sub2   #617792  4.60  ← 2.69   토스의 바닥과 같은 자리
+     muted  #70869e  3.75  ← 2.50   아이콘·캡션
+     faint  #8ba0b6  2.69  ← 2.01   눈금·구분(옛 sub2 값이 여기로 내려왔다)
+   다크는 안 건드린다. 재 보니 카드(#202027) 위에서 label 7.85 · sub 6.07 · sub2 5.36
+   으로 이미 넉넉하고, --c-sub(#9e9ea4)는 토스 다크의 '흐림'과 hex 까지 같다. */
