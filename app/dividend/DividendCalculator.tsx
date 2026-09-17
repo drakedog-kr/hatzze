@@ -541,6 +541,19 @@ export function DividendCalculator({
       }
     }, 0);
 
+  // 이 페이지가 어떻게 열렸나를 한 번 보낸다 — 새로고침·뒤로가기·브라우저가 죽였다 되살린 것(iOS 27 사파리에서 멈추고
+  // 다시 열린다는 제보, 2026-09-17). GA 에서 기기별 새로고침 비율을 보면 고친 뒤 줄었는지 알 수 있다. 값은 짧은 낱말뿐.
+  useEffect(() => {
+    try {
+      const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+      const ua = navigator.userAgent;
+      const os = /iPhone|iPad/.test(ua) ? `ios${(ua.match(/OS (\d+)_/) || [])[1] ?? ""}` : /Android/.test(ua) ? "android" : "desktop";
+      track("dividend_open", { nav_type: nav?.type ?? "unknown", discarded: (document as { wasDiscarded?: boolean }).wasDiscarded ? "yes" : "no", os });
+    } catch {
+      /* 못 재면 안 보낸다 */
+    }
+  }, []);
+
   // 종목 페이지의 "배당으로 살기에서 계산하기"는 `?add=코드` 로 온다 — 그 종목을 담고 주소에서 지운다.
   // 저장소(localStorage)가 아니라 외부 스토어를 고치는 일이라 effect 안에서 해도 된다(setState 가 아니다).
   useEffect(() => {
