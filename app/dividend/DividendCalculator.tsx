@@ -260,28 +260,20 @@ const SCOPES: { key: Scope; label: string; desc: string }[] = [
 ];
 const scopeOf = (s: StockLite): Scope => (s.kind === "etf" ? "etf" : s.currency === "USD" ? "us" : "kr");
 
-/** 줄에 붙는 배지들. 국장·미장·ETF 가 한 표에 섞이므로 **모든 줄에** 어느 갈래인지 붙인다. */
-function Badges({ s, sep = true }: { s: StockLite; sep?: boolean }) {
+/** 이름 줄의 배지 — 이게 무엇인가만(코스피·코스닥·미국, ETF·국내). 국장·미장·ETF 가 한 표에 섞이므로 **모든 줄에** 붙인다.
+    분리과세 같은 세금 성질은 여기 안 두고 아래 알약 줄에(2026-09-17 지적: 이름 줄은 정체만, 성질은 알약 줄에). */
+function Badges({ s }: { s: StockLite }) {
   const items =
     s.kind === "etf"
       ? ["ETF", s.currency === "USD" ? "미국" : "국내"]
       : [s.market === "KOSDAQ" ? "코스닥" : s.market === "US" ? "미국" : "코스피"];
-  // 고배당기업(배당소득 분리과세 대상)으로 공시한 국내 회사. 뜻은 배지의 title 로.
-  // sep=false 면 안 붙인다 — ISA·연금 계좌 줄엔 분리과세가 뜻이 없다(그 계좌 소득은 금융소득에 안 합친다).
-  if (s.highDiv && sep) items.push("분리과세");
   return (
     <>
       {items.map((b) => (
         <span
           key={b}
-          className={b === "분리과세" || b === "ETF" ? "dv-badge hz-tip hz-tip-wide" : "dv-badge"}
-          data-tip={
-            b === "분리과세"
-              ? "고배당기업입니다. 배당이 2,000만원을 넘어도 종합과세 대신 분리과세(14~30%)를 고를 수 있습니다."
-              : b === "ETF"
-                ? "ETF가 주는 돈은 분배금이라 부릅니다. 세금은 배당금과 같습니다."
-                : undefined
-          }
+          className={b === "ETF" ? "dv-badge hz-tip hz-tip-wide" : "dv-badge"}
+          data-tip={b === "ETF" ? "ETF가 주는 돈은 분배금이라 부릅니다. 세금은 배당금과 같습니다." : undefined}
         >
           {b}
         </span>
@@ -1275,6 +1267,8 @@ function HoldingRow({
       });
     }
   }
+  // 고배당기업(배당소득 분리과세 대상). 일반 계좌로 세는 줄에만 — ISA·연금 계좌 소득은 금융소득에 안 합친다.
+  if (s.highDiv && (mode === "gross" || line.account === "general" || line.outside)) facts.push({ text: "분리과세", title: "고배당기업입니다. 배당이 2,000만원을 넘어도 종합과세 대신 분리과세(14~30%)를 고를 수 있습니다." });
   // 지난 날짜는 안 붙인다 — 표가 며칠 낡으면 '다음' 기준일·지급일이 어제일 수 있다.
   const todayKst = TODAY_KST;
   if (s.nextRecord && s.nextRecord >= todayKst) facts.push({ text: `기준일 ${md(s.nextRecord)}`, title: `${s.nextRecord}에 주주면 다음 배당을 받습니다.` });
@@ -1309,7 +1303,7 @@ function HoldingRow({
         <span className="dv-tname-txt">
           <span className="dv-tname-main">
             {s.name}
-            <Badges s={s} sep={mode === "gross" || line.account === "general" || line.outside} />
+            <Badges s={s} />
             {/* 줄의 계좌 — 시장 배지 옆 알약. 기본 계좌를 따르면 흐리게, 따로 골랐으면 진하게. 못 담는 계좌는 목록에서 흐리고 까닭을 적는다.
                 주수 칸에 두었더니 스테퍼·평단과 겹쳐 복잡해 보였다(2026-09-16 지적). */}
             {mode !== "gross" && (
