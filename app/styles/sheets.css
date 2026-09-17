@@ -1,0 +1,725 @@
+/* MDD 시트·내부자 차트·반쪽 카드·애널리스트 줄·52주 막대·전체보기·마커·툴팁·테마 로테이션. app/globals.css 에서 줄 그대로 옮겨 왔다(그쪽 머리말 참고). */
+
+/* MDD 정밀분석 — 시트 두 장이 나란히 서는 줄(역대 낙폭 ↔ 회복 · 시장탓 ↔ 성격).
+   align-items:stretch(기본)로 같은 줄 두 시트의 높이를 맞춘다 — 짧은 쪽에 아래 여백이
+   생기더라도 세로 길이를 맞추는 게 낫다. 안쪽이 답답해지는 폭에서는 1열로 접는다.
+
+   ⚠️ flex-basis 를 calc(50% - 8px) 로 두면 gap 과 합이 어긋나 좁은 폭에서 넘친다.
+   grid 로 두면 minmax(0,1fr) 이 그 계산을 대신 해 준다. */
+.mdd-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+@media (max-width: 1024px) {
+  .mdd-pair { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* 기간 토글 — 배경·글자색은 선택 여부에 따라 인라인으로 정하고, 호버만 여기서 맡는다.
+   ⚠️ 호버 배경을 인라인에 두면 :hover 를 이겨서 아예 안 먹는다(카더라 '더 보기'가
+   그래서 한 번도 호버가 안 보였다). */
+.mdd-period-btn { transition: background 0.13s ease, color 0.13s ease; }
+.mdd-period-btn[aria-pressed="false"]:hover {
+  background: var(--c-blue-tint);
+  color: var(--c-cold-ink);
+}
+
+/* 역대 낙폭 Top 5 의 열 —— **인라인이 아니라 여기 둔다**. 인라인 grid-template-columns 는
+   아래 미디어쿼리를 이겨서 좁은 폭에서 열이 안 줄어든다.
+   375px 실측: 구간 열이 73px 로 눌려 "2021-02 ~ 2024-02"(118px)가 넘쳤다. */
+.mdd-top-row {
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.3fr) 56px 62px;
+  gap: 11px;
+}
+@media (max-width: 640px) {
+  /* 상태 열('회복'/'진행 중')을 접는다 — 회복 열이 '—' 면 진행 중이라 같은 말이고,
+     진행 중 행은 배경·파란 잉크로 이미 갈린다. 그 62px 을 구간 열이 가져간다. */
+  .mdd-top-row { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.1fr) 52px; }
+  .mdd-top-status { display: none; }
+}
+
+/* 언더워터 차트의 크로스헤어(호버 기준선 + 툴팁) 띠.
+   ⚠️ 좁은 폭에서는 끈다. 툴팁(.hz-tip::after)은 opacity:0 이어도 absolute 라 **스크롤
+   영역을 넓히고**(375px 실측: 시트 scrollWidth 349 → 끄면 331), 시트의 overflow:hidden 에
+   잘려 어차피 안 읽힌다. 터치 기기엔 호버 자체가 없어 잃는 것도 없다. */
+.mdd-crosshair { display: flex; }
+@media (max-width: 640px) {
+  .mdd-crosshair { display: none; }
+}
+/* 확대 보기 안에서는 좁은 폭이어도 켠다. 끄기로 한 이유가 "폰에선 툴팁이 시트에 잘려
+   어차피 안 읽힌다"였는데, 확대 보기는 시트 밖 전체 화면이라 그 전제가 사라진다.
+   여는 것은 탭이 맡는다(app/TipTap.tsx — 터치엔 호버가 없다). */
+.mdd-crosshair-zoom { display: flex !important; }
+
+/* ── 내부자 리포트 차트: 호버 띠와 마커 필터 ────────────────────────
+   호버 띠는 MDD 크로스헤어와 같은 어법이다(.hz-vline 이 실제 선을 그린다).
+   여기서는 띠를 가로로 펴 놓기만 한다. 폰에서는 끈다 — 툴팁이 시트에 잘려 안 읽힌다. */
+.hz-xhair { display: flex; }
+@media (max-width: 640px) {
+  .hz-xhair { display: none; }
+}
+
+/* 마커 필터 — **라디오 + CSS 만으로** 만든다. 리액트 상태로 두면 차트가 클라이언트
+   컴포넌트가 되고 일봉 130개가 통째로 번들을 탄다.
+
+   ## ⚠️⚠️ `:has()` 를 쓰지 말 것 — 규칙이 통째로 사라진다
+
+   처음엔 `.hz-mkfilter:has(#…:checked) .hz-mk:not(…)` 였다. 셀렉터는 맞고
+   `querySelectorAll` 로 17개가 잡히는데 **opacity 가 안 바뀌었다.** 원인은
+   **Lightning CSS 가 같은 선언을 가진 셀렉터 셋을 `:is(A, B, C)` 로 합치는 것**이고,
+   브라우저는 `:is()` 안의 `:has()` 를 거부해 규칙 전체를 버린다. 서빙되는 .css 파일에는
+   멀쩡히 들어 있어서 파일만 봐서는 안 보인다 — `document.styleSheets` 를 뒤져야 없는 게
+   보인다. (같은 도구가 box-shadow 의 var() 층도 조용히 지운 적이 있다.)
+
+   그래서 **형제 선택자(`~`)** 로 간다. 라디오가 차트 상자보다 앞에 있으면 된다.
+
+   ⚠️ 안 고른 축을 **지우지 않고 흐린다.** 지우면 남은 점의 자리가 그대로라 "이 종목엔
+      이것뿐"으로 읽힌다. 흐리면 전체 안에서의 몫이 보인다.
+   ⚠️ 라디오는 숨기되 **display:none 은 쓰지 않는다** — 키보드 초점을 잃어 탭으로 못 고른다. */
+.hz-mkfilter > input[type="radio"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.hz-mkfilter-set { display: inline-flex; gap: 4px; }
+.hz-mkfilter-set label {
+  display: inline-flex;
+  align-items: center;
+  /* 색 점과 글자 사이. 배지가 곧 범례라 점이 안에 들어온다. */
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--c-line);
+  background: var(--c-card);
+  color: var(--c-sub);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.hz-mkfilter-set label:hover { background: var(--c-chip); }
+
+/* ── 반쪽 카드의 세 칸 줄 ──────────────────────────────────────────
+   이름 · 한 줄 설명 · 값. 넓은 표(.hz-wide)와 같은 문법을 폭만 줄여 쓴다.
+
+   ⚠️ 두 칸으로 두면 사실이 오른쪽에 쌓인다. 실제로 그렇게 갔다가 금액·주식 수·날짜
+      셋이 오른쪽 끝에 붙어 **해독해야 읽히는 덩어리**가 됐다. 칸을 하나 더 내주고
+      칸마다 하나씩만 두는 편이 같은 정보를 훨씬 빨리 읽힌다.
+
+   ⚠️ 값 칸의 폭을 못박지 말 것 — 원화로 바꾸면 "$1K~$15K" 가 "142만원~2,121만원" 으로
+      두 배가 된다. 하한만 주고 위는 열어 둔다. */
+.hz-halfrow {
+  /* ⚠️⚠️ **설명 칸을 fr 로 두지 말 것.** 이름이 73~165px 로 들쭉날쭉해서, 이름 칸을
+     fr 로 잡으면 짧은 이름 뒤에 빈 자리가 남고 설명이 **양옆이 빈 채 가운데에 떠 보인다.**
+     실제로 그렇게 뒀다가 "가운데 위치가 안 어울린다"는 말을 들었다.
+
+     대신 설명을 auto 로 두고 오른쪽으로 붙인다. 그러면 빈 자리가 **이름 뒤 한 군데로
+     모이고**, 설명의 오른쪽 끝과 값의 오른쪽 끝이 각각 세로로 선다. 줄이 "이름 …
+     무엇을 언제 · 얼마"로 읽힌다.
+
+     ⚠️ 이름이 넘치면 이름이 잘린다(블랙스톤의 51자짜리 펀드 이름). 그게 맞는 순서다 —
+        설명·금액을 지키고 이름을 줄여야지, 반대로 가면 무슨 거래인지가 사라진다.
+
+     ⚠️ 값 칸에 96px 하한을 둔다. 한 줄은 저마다 독립된 격자라, 하한이 없으면 "$27K"
+        줄과 "673,200주" 줄의 칸 폭이 달라져 **설명의 오른쪽 끝이 줄마다 어긋난다.**
+        실측 대부분의 값이 96px 안에 들어와 이 하한 하나로 카드 전체가 나란히 선다. */
+  grid-template-columns: minmax(0, 1fr) auto minmax(96px, auto);
+}
+.hz-halfrow > *:nth-child(2) {
+  text-align: right;
+  /* 값과 사이를 한 칸 더 벌린다. 격자 간격 12px 만으로는 "8/11 접수 673,200주" 가
+     한 덩이로 붙어 읽힌다. */
+  padding-right: 14px;
+}
+
+/* 카드가 한 폭을 다 쓰는 좁은 화면에서는 가운데 칸이 뭉개진다. 설명을 이름 아래로
+   내리고 값만 오른쪽에 남긴다(.hz-wide 가 980 아래에서 하는 것과 같은 접기다). */
+@media (max-width: 560px) {
+  .hz-halfrow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 3px;
+  }
+  .hz-halfrow > *:nth-child(2) {
+    grid-column: 1;
+    /* 이름 아래로 내려오면 이름과 왼쪽 끝을 맞춘다 — 오른쪽 정렬이면 허공에 뜬다. */
+    text-align: left;
+    padding-right: 0;
+  }
+}
+
+/* ── 애널리스트 의견 한 줄 ────────────────────────────────────────
+   증권사·애널리스트 | 행동·등급 | 목표가. 반쪽 카드 줄(.hz-halfrow)과 같은 문법인데,
+   여기는 왼쪽이 두 줄이다 — 증권사와 애널리스트 이름을 한 줄에 이으면 40자를 넘긴다
+   ("Bank of America Securities · Wamsi Mohan"). 이름이 주인공이 아니라 **증권사**가
+   주인공이라 그쪽을 위에 세운다.
+   ⚠️ 마지막 줄의 밑선은 지운다 — 그 아래가 출처 문구라 선이 두 겹으로 보인다. */
+.hz-actionrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) auto minmax(96px, auto);
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--c-hairline);
+}
+.hz-actionrow:last-child { border-bottom: 0; }
+/* ⚠️ 아주 좁은 화면에서는 **이름 칸이 먼저 무너진다.** 목표가 칸이 96px 고정이고 등급
+   칸이 내용 폭이라, 줄어들 수 있는 건 이름 칸뿐이다. 320px 에서 65px 까지 내려가
+   증권사 이름이 세 줄로 접혔다(2026-08-25 실측).
+   ⭐ 문턱 344 는 재서 잡았다 — 이름 한 줄에 필요한 90px 을 주려면 줄 폭이 257 이어야 하고,
+     이 표의 줄 폭은 화면 폭 − 88 이라 345 부터 여유가 생긴다. **360·375 는 이미 이름이
+     한 줄이라 건드리지 않는다**(안드로이드 다수가 360 이다).
+   ⭐ 접는 방식은 '이름 한 줄 + 등급·목표가 한 줄'이다. 등급과 목표가는 짧아서 둘이
+     한 줄에 마주 보면 오히려 읽기 쉽다. */
+@media (max-width: 344px) {
+  .hz-actionrow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 3px;
+  }
+  .hz-actionrow > :first-child {
+    grid-column: 1 / -1;
+  }
+  .hz-actionrow > :nth-child(2) {
+    justify-content: flex-start;
+  }
+}
+
+/* ── 52주 위치 막대 ────────────────────────────────────────────────
+   ⚠️ **채우는 막대가 아니라 노브 하나다.** 저점부터 채우면 "얼마나 올랐나"로 읽히는데
+   이 값은 그게 아니라 **1년 범위 안 어디에 서 있나**다. 트랙은 회색으로 두고 점만 찍는다. */
+.hz-range {
+  position: relative;
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--c-track), var(--c-bar));
+}
+.hz-range-knob {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  border-radius: 50%;
+  background: var(--c-blue);
+  /* 카드색 링 — 트랙 위에 얹혀도 점의 경계가 산다. */
+  box-shadow: 0 0 0 2px var(--c-card);
+  transform: translateY(-50%);
+}
+
+/* ── 전체보기의 넓은 줄 ────────────────────────────────────────────
+   ⚠️ 전체보기는 시트가 페이지 폭을 다 쓴다(1440px 에서 1,164). 메인 카드의 두 칸짜리
+   줄(왼쪽 종목 · 오른쪽 값)을 그대로 쓰면 **가운데가 통째로 빈다** — 실측 68~75%가
+   흰 여백이었다. 그래서 같은 내용을 여러 칸으로 편다.
+
+   ⚠️ 열 머리(.hz-thead)와 데이터 행(.hz-trow)이 **같은 grid-template-columns** 를
+      인라인으로 받는다. 한쪽만 고치면 칸이 어긋난다.
+
+   ## ⚠️ 좁아지면 칸을 접는다
+
+   980 아래에서는 다섯 칸이 뭉개진다(종목 이름과 사람 이름이 같은 줄에 있어 먼저
+   잘린다). 그 폭에서는 **열 머리를 감추고** 줄을 두 칸으로 되돌린다 — 가운데 칸들은
+   줄바꿈되어 종목 아래로 흐른다. 메인 카드의 줄과 같은 모양이 된다. */
+@media (max-width: 979px) {
+  .hz-wide-head { display: none; }
+  .hz-wide {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    row-gap: 4px;
+  }
+  /* 가운데 칸들은 왼쪽 아래로 내려 붙는다. 오른쪽 정렬을 풀지 않으면 허공에 뜬다. */
+  .hz-wide > *:not(:first-child):not(:last-child) {
+    grid-column: 1;
+    text-align: left !important;
+    justify-content: flex-start !important;
+  }
+}
+
+/* 기간 선택 — 축 필터와 **같은 생김새**다. 한 줄에 나란히 서는 두 조작부가 서로 다르게
+   보이면 무엇이 무엇인지 매번 확인해야 한다. 다만 이쪽은 라디오가 아니라 **링크**다
+   (주소에 담아 서버가 그린다). */
+.hz-periodset { display: inline-flex; gap: 4px; }
+.hz-periodset a {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--c-line);
+  background: var(--c-card);
+  color: var(--c-sub);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.hz-periodset a:hover { background: var(--c-chip); }
+.hz-periodset a.is-on {
+  background: var(--c-blue-tint);
+  border-color: transparent;
+  color: var(--c-cold-ink);
+}
+
+.hz-mk { transition: opacity 0.15s ease; }
+
+/* ── 마커 호버 자리 ────────────────────────────────────────────────
+   차트 마커 위에 얹는 **HTML 점**. SVG 요소는 `::after` 를 안 그려서 이 화면의 말풍선을
+   못 붙이는데, 그렇다고 차트를 클라이언트 컴포넌트로 만들 수는 없다(일봉이 통째로 번들을
+   탄다). 그래서 자리마다 투명한 점을 하나 얹고 그게 호버와 말풍선을 받는다.
+
+   ⚠️ 눈에 보이는 고리는 SVG 쪽이다. 여기서는 **테두리 한 겹으로 불만 켠다** — 크기를
+      바꾸면 중심이 그대로여도 고리가 커졌다 작아졌다 해서 선에서 떠 보인다. */
+.hz-mkspot {
+  /* ⛔⛔ transform 을 쓰지 말 것. transform 이 걸린 요소는 `position: fixed` 자손의
+     **컨테이닝 블록**이 되는데, 이 화면의 말풍선은 시트의 overflow:hidden 을 피하려고
+     fixed 로 서 있다(아래 앵커 위치지정 블록). translate 로 가운데를 맞췄더니 말풍선이
+     다시 카드 경계에서 잘렸다 — 가운데 맞추기는 left/top 에서 절반을 빼서 한다. */
+  border-radius: 50%;
+  cursor: default;
+  /* 켜지기 전에는 아무것도 안 그린다 — 마커 위에 얇은 막이 하나 더 있으면 안 된다. */
+  box-shadow: 0 0 0 0 transparent;
+  transition: box-shadow 0.12s ease, background 0.12s ease;
+}
+/* 켜진 마커 — 카드색 틈 한 겹을 두고 축 색 고리를 두른다. 옅은 그림자 하나로는 겹친
+   마커 사이에서 어느 것이 켜졌는지 안 보인다. */
+.hz-mkspot:hover {
+  box-shadow:
+    0 0 0 2px var(--c-card),
+    0 0 0 4px color-mix(in srgb, var(--mk) 60%, transparent);
+}
+
+/* 고른 배지에 불을 켜고, 그 축이 아닌 마커를 흐린다. 축마다 두 줄씩 — 셀렉터가 서로
+   달라 Lightning CSS 가 합칠 수 없고, 합쳐도 `~` 는 `:is()` 안에서 멀쩡하다. */
+#hz-mkf-insider:checked ~ * .hz-mkfilter-set label[data-k="insider"],
+#hz-mkf-manager:checked ~ * .hz-mkfilter-set label[data-k="manager"],
+#hz-mkf-congress:checked ~ * .hz-mkfilter-set label[data-k="congress"],
+#hz-mkf-all:checked ~ * .hz-mkfilter-set label[data-k="all"] {
+  background: var(--c-blue-tint);
+  border-color: transparent;
+  color: var(--c-cold-ink);
+}
+#hz-mkf-insider:checked ~ .hz-mkfilter-chart .hz-mk:not(.hz-mk-insider) { opacity: 0.12; }
+#hz-mkf-manager:checked ~ .hz-mkfilter-chart .hz-mk:not(.hz-mk-manager) { opacity: 0.12; }
+#hz-mkf-congress:checked ~ .hz-mkfilter-chart .hz-mk:not(.hz-mk-congress) { opacity: 0.12; }
+
+/* 초점 링 — 라디오를 숨겼으니 라벨이 대신 받는다. 안 그리면 키보드로 어디 있는지 모른다. */
+.hz-mkfilter > input[type="radio"]:focus-visible ~ * .hz-mkfilter-set label { outline: 1px dashed var(--c-blue); }
+
+/* 로딩 자리표시자 — 결과와 같은 골격으로 은은하게 깜빡인다(레이아웃이 튀지 않게). */
+@keyframes hz-shimmer {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.hz-shimmer { animation: hz-shimmer 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .hz-shimmer { animation: none; }
+}
+
+/* 로딩 스피너 — 자리표시자와 **함께** 쓴다. 블록이 은은하게 깜빡이는 것만으로는
+   "멈춘 건지 오는 중인지"가 덜 분명해서, 도는 표시를 하나 얹는다.
+   GIF 가 아니라 CSS 인 이유: 테마 변수를 그대로 타서 라이트·다크가 자동으로 맞고
+   (회색 GIF 는 다크에서 뜬다), 로딩 화면에서 이미지 요청이 하나 더 나가지 않는다. */
+@keyframes hz-spin { to { transform: rotate(360deg); } }
+.hz-spinner {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid var(--c-line);
+  border-top-color: var(--c-blue);
+  animation: hz-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* shimmer 처럼 아예 멈추면 테두리 한쪽만 파란 원이 남아 고장으로 보인다 — 늦춘다. */
+  .hz-spinner { animation-duration: 2.4s; }
+}
+
+/* 로딩 표시를 **보이는 자리표시자의 한가운데**에 띄운다.
+   제목 옆에 두니 눈에 잘 안 띄어서 옮겼다.
+
+   기준이 창(viewport)이 아니라 **자리표시자 자신**인 게 핵심이다. 예전엔 fixed + top:50%
+   라 배지가 늘 '창의 한가운데'였고, 그러면 창 높이에 따라 자리표시자의 어디쯤에 얹힐지가
+   매번 달라진다. 큰 모니터(2560×1400 실측)에서 두 가지로 어긋났다.
+     - 카더라: 창이 높으면 배지가 1행(생태계 센티먼트)이 아니라 그 아래 **전폭** 카드 위로
+       내려앉는데, 가로 보정은 1행 카드 중앙(62.5%)에 맞춘 값이라 전폭 카드 위에서 혼자
+       오른쪽으로 155px 밀려 보였다.
+     - MDD: 자리표시자가 창보다 짧아(≈810px) 창 한가운데가 자리표시자 아래쪽 끝, 푸터
+       코앞이었다.
+
+   그래서 자리표시자를 감싸는 상자(loading.tsx 의 바깥 div — 그래서 position:relative 다)
+   를 덮고 그 안에서 가운데 정렬한다. 덮개 높이 min() 의 두 항이 위 두 경우다.
+     - 100%       — 자리표시자가 창보다 짧을 때(MDD). 자리표시자의 한가운데가 된다.
+     - 보이는 높이 — 자리표시자가 창보다 길 때(카더라). 첫 화면의 한가운데가 된다. 스크롤해야
+                    보이는 수천 px 아래에 배지가 박히는 것을 막는 항이다.
+   '보이는 높이' = 창 − 탑바(54, AppShell 인라인) − 본문 위아래 여백. 사이드바 폭(210)과
+   560px 분기를 이제 안 세도 되는 건 기준이 창에서 콘텐츠 상자로 바뀌었기 때문이다. */
+.hz-loading-float {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: min(100%, calc(100dvh - 54px - var(--hz-main-pad) * 2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 5;
+}
+/* 카드 위에 뜨므로 카드와 같은 배경·테두리를 줘야 글자가 묻히지 않는다.
+   두 페이지가 같은 모양이라 인라인이 아니라 여기 한 벌만 둔다. */
+.hz-loading-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 18px;
+  border: 1px solid var(--c-line);
+  border-radius: 999px;
+  background: var(--c-card);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.07);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--c-sub);
+  white-space: nowrap;
+}
+
+/* 본문은 세로로만 스크롤한다. overflow-y 만 auto 로 주면 overflow-x 는 visible 이
+   auto 로 계산돼(한 축이 auto 면 다른 축의 visible 은 auto 가 된다) 가로 스크롤바가
+   생길 수 있다. 실제로 그걸 만드는 건 **투명한 툴팁**이다 — .hz-tip::after 는
+   position:absolute 라 opacity:0 이어도 스크롤 영역에 잡힌다(아래 hz-tip 주석 참고).
+   MDD 낙폭 차트에서 오른쪽 25% 바로 안쪽 지점(at≈0.744)의 툴팁이 3px 넘쳐
+   페이지 전체가 좌우로 밀렸다.
+
+   방향 전환(hz-tip-start/end)과 폭 제한(58vw)이 1차 방어이고, 이건 그 그물을 빠져나간
+   몇 px 때문에 몸통이 밀리는 일만 막는 안전망이다.
+
+   clip 이라고 적었지만 다른 축이 auto 라 **계산값은 hidden 이 된다**(한 축이 스크롤
+   컨테이너면 clip 은 hidden 으로 떨어진다). 둘 다 넘치는 부분을 자르고 가로 스크롤바를
+   없애므로 결과는 같다 — clip 으로 적어 두는 건 의도가 "자른다"이지 "숨긴 채 스크롤은
+   된다"가 아님을 남기기 위해서다.
+
+   가로로 스크롤해서 봐야 하는 내용이 생기면 그건 이 규칙이 아니라 그 요소 안에서
+   (자체 overflow-x:auto 로) 해결한다. */
+main.hz-scroll { overflow-x: clip; }
+
+/* 히어로 '지표 분포'의 목록에서 지표 이름을 누르면 이 컨테이너가 스크롤된다(#ind-<slug>).
+   그냥 두면 순간이동이라 스물다섯 칸 중 어디로 왔는지 눈이 못 따라간다 — 흘러가야
+   '내려갔다'가 읽힌다. 동작을 줄여 달라는 설정에서는 켜지 않는다. */
+@media (prefers-reduced-motion: no-preference) {
+  main.hz-scroll { scroll-behavior: smooth; }
+}
+
+.hz-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+.hz-scroll::-webkit-scrollbar-thumb {
+  background: var(--c-scrollbar);
+  border-radius: 999px;
+  border: 3px solid var(--c-scrollbar-border);
+}
+
+/* 탑바 시세 티커 — 항목이 넘치므로 가로로 천천히 흐르게(마퀴) 하고, 마우스를
+   올리면 멈춰 읽을 수 있게 한다. 트랙에 항목을 두 벌 넣고 -50% 이동해 이어붙인다. */
+@keyframes hz-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.hz-ticker-wrap {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.hz-ticker-track {
+  display: flex;
+  width: max-content;
+  animation: hz-marquee 42s linear infinite;
+}
+.hz-ticker-wrap:hover .hz-ticker-track {
+  animation-play-state: paused;
+}
+
+/* 마우스오버 툴팁 — data-tip 속성의 문구를 요소 위에 띄운다. 카더라 리포트의
+   언급 추이 막대(며칠 몇 회인지)와 영향력 점수 설명(?)에 쓴다. JS 없이 CSS만. */
+.hz-tip {
+  position: relative;
+  /* 커서 규칙을 여기 한 줄로 못박는다: 툴팁이 달렸다고 "?" 커서를 주지 않는다.
+     "?" 는 물음표 아이콘이 실제로 붙어 있는 자리에만 쓰고(그 자리들은 인라인
+     style 의 cursor:help 가 이 규칙을 이긴다), 그래프·막대·라벨처럼 요소 자체가
+     hover 영역인 곳은 기본 화살표로 둔다.
+     auto 에 맡기지 않는 이유: 안에 글자가 있는 hover 영역(막대 밑 날짜 라벨 등)에서
+     auto 는 I 빔(텍스트 커서)으로 풀린다 — 60곳 가까이가 그 상태였다. */
+  cursor: default;
+}
+.hz-tip::after {
+  /* ⚠️ 숨어 있는 동안엔 상자 자체를 안 만든다(content: none). 전엔 opacity:0 으로만 숨겨서 페이지의 툴팁 수십~백여 개가
+     늘 레이아웃에 있었고, 앵커 위치지정을 켠 브라우저(아래 @supports 블록)에선 그 하나하나가 position:fixed 앵커 상자라
+     스크롤할 때마다 전부 다시 자리를 잡았다. iOS 27 사파리에서 배당 페이지가 멈추고 다시 열린다는 제보 둘(2026-09-17)의
+     유력한 원인. 크롬 흉내론 재현이 안 됐다(엔진이 다르다). 부작용 하나 더 사라진다 — 투명 툴팁이 스크롤 영역을
+     넓히던 것(아래 main 주석·MDD 크로스헤어 주석). 보이는 상태(:hover · .hz-tip-open)에서만 content 를 준다. */
+  content: none;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-6px);
+  background: var(--c-ink);
+  color: var(--c-bg);
+  /* 툴팁도 읽는 글이다. 11 은 이 서비스가 정한 바닥(정보성 텍스트 12) 아래였다. */
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  padding: 6px 9px;
+  border-radius: var(--r-control);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  z-index: 30;
+}
+.hz-tip:hover::after {
+  content: attr(data-tip);
+  opacity: 1;
+}
+/* 터치 기기에서 탭으로 연 상태(app/TipTap.tsx 가 붙인다). 호버가 없는 기기에서는
+   위 :hover 규칙이 영영 안 걸려서, 이것이 없으면 설명이 아예 안 열린다.
+   ⚠️ 클래스는 호버가 **없는** 기기에서만 붙으므로 미디어쿼리로 또 가둘 필요가 없다.
+   폭이 아니라 기기 성질로 갈라야 맞다 — 창을 좁힌 데스크톱은 여전히 호버가 된다. */
+.hz-tip.hz-tip-open::after {
+  content: attr(data-tip);
+  opacity: 1;
+}
+/* 스파크라인 지점 띠 — 마우스를 올리면 그 지점에 세로 기준선을 긋는다.
+   차트 어디를 가리키고 있는지 툴팁만으론 알기 어려워서(선 위 어디쯤인지 안 보임)
+   차트류 UI가 흔히 쓰는 crosshair 를 CSS만으로 흉내낸다. */
+.hz-vline::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--c-sub);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+.hz-vline:hover::before {
+  opacity: 0.6;
+}
+/* 터치로 연 상태에서도 선을 긋는다. `:hover` 만 두면 **폰에서는 값만 뜨고 선이 안 그려져**
+   그 값이 곡선의 어느 지점 것인지 알 수 없다 — 확대 보기를 켜 준 뒤 실제로 그랬다.
+   여는 클래스는 호버가 없는 기기에서만 붙으므로(app/TipTap.tsx) 겹쳐 켜질 일이 없다. */
+.hz-vline.hz-tip-open::before {
+  opacity: 0.6;
+}
+
+/* 가장자리에서 툴팁이 여는 방향을 튼다. 기본은 가운데 정렬(left:50% + translateX(-50%))
+   이라, 폭이 넓은 툴팁(MDD 차트의 "날짜 · 가격 · 낙폭")이 양 끝 지점에서 컨테이너 밖으로
+   나간다. 특히 오른쪽으로 나가면 투명한 상태여도 스크롤 영역에 잡혀 페이지에 가로
+   스크롤이 생긴다. 끝쪽 지점엔 이 클래스를 붙여 안쪽으로 열리게 한다. */
+.hz-tip-start::after {
+  left: 0;
+  right: auto;
+  transform: translateX(0) translateY(-6px);
+}
+.hz-tip-end::after {
+  left: auto;
+  right: 0;
+  transform: translateX(0) translateY(-6px);
+}
+
+/* 긴 설명용 — 줄바꿈 허용 + 너비 제한 */
+.hz-tip-wide::after {
+  white-space: normal;
+  /* ⚠️ `width: 240px` 고정이었다. 그러면 글이 짧아도 상자가 안 줄어들어 **오른쪽에
+     빈 자리가 남는다** — "오늘 주식 텔레그램에서 언급된 종목입니다"(글자 198px)가
+     240px 상자에 들어가 24px 이 비었다(2026-08-26 실측).
+     ⭐ 아래 좁은 화면 규칙이 이미 쓰던 어법으로 맞춘다: 짧으면 글자만큼, 길면
+       상한에 걸려 줄바꿈. `max-content` 는 nowrap 이 아니라 **줄바꿈 없이 필요한 폭**
+       이라, white-space:normal 과 함께 두면 max-width 가 실제 상한이 된다. */
+  width: max-content;
+  max-width: 240px;
+  text-align: left;
+}
+/* 좁은 화면에선 240px 가 카드보다 넓어, 안쪽으로 열어도(start/end) 화면을 넘는다.
+   폭을 화면에 비례해 줄여야 어느 자리에 붙어도 안에 들어온다(줄 수만 늘어난다). */
+@media (max-width: 560px) {
+  /* wide 가 아닌 기본 툴팁도 마찬가지다 — MDD 낙폭 차트의 "날짜 · 가격 · 낙폭"은
+     nowrap 이라 130px 쯤 되는데, 카드 오른쪽에 붙은 지점에서 화면을 넘었다(실측 17px).
+     끝쪽 15%만 방향을 트는 규칙으론 가운데~오른쪽 구간이 안 걸린다. max-content 라
+     짧은 툴팁은 그대로 짧고, 긴 것만 max-width 에 걸려 줄바꿈된다. */
+  .hz-tip::after {
+    white-space: normal;
+    width: max-content;
+    max-width: 58vw;
+  }
+  .hz-tip-wide::after {
+    /* 위 .hz-tip::after 가 이미 width:max-content 라 상한만 좁히면 된다. */
+    max-width: min(240px, 58vw);
+  }
+}
+
+/* data-tip 안의 줄바꿈(\n)을 그대로 살린다. 여러 항목을 나열하는 툴팁에 쓴다 —
+   한 줄로 이으면 항목의 개수와 경계가 눈에 안 들어온다. hz-tip-wide 와 같이 쓴다.
+   ⚠️ 위치가 중요하다. .hz-tip-wide 와 좁은 화면 미디어쿼리가 둘 다 white-space 를
+   normal 로 되돌리므로, 특이도가 같은 이 규칙은 **그 둘보다 뒤에** 있어야 이긴다. */
+.hz-tip-lines::after {
+  white-space: pre-line;
+  text-align: left;
+}
+
+/* 아래로 펼치는 변형 — 스크롤 컨테이너(main, overflow:auto) 최상단에 있는 요소는
+   기본값(위로 펼침)이면 툴팁이 컨테이너 경계에서 잘린다(햇쩨 지수 도움말이 그랬다).
+   위 공간이 없고 아래가 넉넉한 자리에서 쓴다. */
+.hz-tip-below::after {
+  bottom: auto;
+  top: 100%;
+  transform: translateX(-50%) translateY(6px);
+}
+
+/* ── 툴팁을 판 밖으로 꺼낸다 ────────────────────────────────────────
+   위 규칙들은 전부 position:absolute 라 **조상의 overflow:hidden 에 잘린다.** 그 조상은
+   우연이 아니라 구조다: 히어로 판(.hz-hero-panel)·지표 시트(.hz-cards)·카더라/MDD
+   시트(.hz-sheet)가 셋 다 overflow:hidden 으로 격자선의 남는 끝과 둥근 모서리를 자른다.
+   그래서 셀 맨 윗줄에 붙은 툴팁은 세 화면 어디서나 판 경계에서 잘려 나갔다
+   (2026-08-04, ✨ 고지 툴팁이 히어로 판 위쪽에서 잘린 게 신고된 자리).
+
+   position:fixed 는 그 clip 을 안 받는다 — fixed 가 잘리려면 그 조상이 fixed 의
+   컨테이닝 블록이어야 하는데, transform·filter·contain 이 없으면 컨테이닝 블록은
+   뷰포트다(위 세 판 모두 없는 것을 실측으로 확인).
+
+   자리는 CSS 앵커 위치지정이 잡는다. 앵커는 아래 규칙이 클래스 하나로 걸어 주므로,
+   data-tip 이 붙은 60여 곳의 마크업은 하나도 안 건드린다.
+
+   덤이 둘이다.
+   ① 가장자리에서 여는 방향을 브라우저가 알아서 튼다(position-try-fallbacks). 지금까지
+      손으로 붙이던 hz-tip-start/end 는 지원 브라우저에서 하는 일이 없어진다 — 클래스는
+      미지원 브라우저를 위해 그대로 둔다.
+   ② 기준이 '조상 판'이 아니라 **뷰포트**로 바뀐다. 카드 안에서 넘치는지를 재던 것이
+      화면 안에서 넘치는지가 되므로, 좁은 칸에 든 툴팁도 옆 칸을 덮으며 온전히 열린다.
+
+   @supports 로 감싸는 이유: 미지원 브라우저는 위 absolute 규칙 그대로다. 지금보다
+   나빠지는 자리가 없다.
+   ⚠️ 이 블록은 hz-tip-start/end/below 보다 **뒤에** 있어야 한다. 특이도가 같아서
+   (@supports 는 특이도를 안 올린다) 순서로만 이긴다.
+
+   ⚠️ anchor-scope 를 조건에 같이 건다. anchor-name 만 되고 anchor-scope 가 안 되는
+   브라우저가 있으면 **한 페이지의 툴팁 158개가 전부 같은 이름을 갖게 돼**, 각자 자기
+   요소가 아니라 문서의 마지막 .hz-tip 에 달라붙는다. 지금보다 훨씬 나쁜 그림이라
+   둘 다 되는 곳에서만 켠다. */
+@supports (anchor-scope: --a) and (position-area: top center) {
+  /* ::after 의 '암묵 앵커'(자기를 만든 요소)에 기대면 안 된다 — 실측하니 position-anchor
+     가 none 으로 풀려 position-area 가 통째로 무시되고, 툴팁이 자기 정적 위치에 그냥
+     떠 있었다(잘리지만 않을 뿐 자리가 안 맞는다). 이름을 명시적으로 붙인다.
+
+     이름은 하나뿐인데 페이지엔 .hz-tip 이 158개다. anchor-scope 가 그 이름을 **자기
+     서브트리 안에서만** 보이게 막아 주므로, 각 ::after 는 자기를 만든 요소만 앵커로
+     찾는다(이게 없으면 전부 마지막 .hz-tip 을 가리킨다). */
+  .hz-tip {
+    anchor-name: --hz-tip;
+    anchor-scope: --hz-tip;
+  }
+  .hz-tip::after {
+    position: fixed;
+    position-anchor: --hz-tip;
+    /* 위 규칙들이 깔아 둔 bottom/left/right 와 transform 을 걷어낸다. 남겨 두면
+       position-area 가 잡아 준 자리를 그 값들이 다시 밀어낸다. */
+    inset: auto;
+    transform: none;
+    position-area: top center;
+    /* 순서대로 시도해 처음 들어맞는 것을 쓴다. 좌우로 넘칠 때가 위로 넘칠 때보다
+       흔해서(칸이 폭 240 남짓) 좌우 보정을 먼저 둔다. */
+    position-try-fallbacks:
+      top span-right,
+      top span-left,
+      bottom center,
+      bottom span-right,
+      bottom span-left;
+    /* 앵커와의 간격. translateY(-6px) 를 대신한다 — transform 으로 두면 아래로 뒤집힌
+       fallback 에서 6px 이 앵커 쪽으로 붙어 버린다. margin 은 어느 방향이든 바깥이다. */
+    margin: 6px;
+  }
+  /* 아래로 여는 자리는 그대로 아래가 기본이다. 뒤집기는 '위에 자리가 없을 때' 켜지는데
+     그 판정 기준이 이제 뷰포트라, 이 자리들(본문 맨 윗줄)은 위가 비어 있는 것으로
+     계산돼 헤더를 덮으며 위로 열린다. */
+  .hz-tip-below::after {
+    position-area: bottom center;
+    position-try-fallbacks:
+      bottom span-right,
+      bottom span-left,
+      top center;
+  }
+}
+
+/* 사이드바 CTA 말풍선 — 버튼과 왼쪽 끝을 맞춘다.
+   `top span-right` 는 앵커의 왼쪽 끝에서 오른쪽으로 펼치라는 뜻이라 두 왼쪽이 만난다.
+   ⚠️ 여백을 `margin: 6px` 으로 두면 **왼쪽에도 6px 이 붙어** 버튼보다 그만큼 밀린다
+      (실측으로 그렇게 어긋나 있었다). 위아래만 띄운다.
+   자리가 없을 때만 아래로 뒤집고, 그때도 왼쪽 맞춤은 유지한다. */
+@supports (anchor-scope: --a) and (position-area: top center) {
+  .hz-tg-cta::after {
+    position-area: top span-right;
+    position-try-fallbacks: bottom span-right;
+    margin: 6px 0;
+  }
+}
+
+/* 탭으로도 여는 변형 — PC 는 :hover, 모바일은 눌렀을 때 잡히는 :focus-within.
+   기본 .hz-tip 은 :hover 전용이라 모바일에서 아예 안 열린다. 도움말이라면 그래도
+   되지만(옆의 숫자가 이미 다 말하고 있다) 법정 고지 문구는 닿지 못하면 표시를 안 한
+   것과 같아서, 그런 자리에만 이걸 덧붙인다.
+   여닫는 어법은 MDD '전체보기' 팝오버(.hz-yrpop)와 같다.
+   ⚠️ 안에 포커스를 받는 요소(<button>)가 실제로 있어야 동작한다. 그냥 <span> 에
+   붙이면 탭해도 포커스가 안 잡혀 PC 전용 툴팁 그대로다. */
+.hz-tip-tap:focus-within::after {
+  opacity: 1;
+}
+
+/* 생성형 AI 표시(✨)의 눌리는 자리.
+   아이콘이 13~22px 뿐이라 그대로 두면 손가락으로 못 누른다. padding 으로 누를 곳을
+   키우고 같은 크기의 음수 margin 으로 되돌려, 주변 배치는 아이콘 크기 그대로 두면서
+   hit 영역만 넓힌다(.hz-yrpop-btn 과 같은 수법). */
+.hz-ai-mark {
+  display: block;
+  padding: 9px;
+  margin: -9px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  /* 기본 화살표로 둔다. 위 .hz-tip 규칙이 정한 대로 "?" 커서는 물음표 아이콘이 실제로
+     붙어 있는 자리에만 쓰는데, 여기 서 있는 건 ✨ 라 그 자리가 아니다(cursor:help 인
+     채로 남아 있던 예외였다). 버튼이라 브라우저 기본값에 맡기면 화살표가 나오지만,
+     cursor 는 상속되는 속성이라 부모가 바뀌면 딸려 움직이므로 못박아 둔다. */
+  cursor: default;
+}
+.hz-ai-mark:focus-visible {
+  outline: 2px solid var(--c-blue);
+  outline-offset: -6px;
+  border-radius: 999px;
+}
+
+/* ── 테마 로테이션 줄의 호버 카드 ──────────────────────────────────
+   줄 어디에든 마우스를 올리면 그 줄 전체가 하늘색으로 물들고, 그 테마의 점유율을
+   만든 종목이 목록으로 열린다. 목록의 종목마다 링크가 붙는다 — 목적지는 화면마다 다르다
+   (국장은 그 종목 화면, 미장은 내부자 공시).
+   그래서 위의 data-tip 툴팁을 못 쓴다 — 그건 attr() 로 뽑은 문자열이라 링크를 담지
+   못한다. 대신 실제 요소를 두고 :hover 로 여닫는다(카드는 서버 컴포넌트로 남는다).
+
+   목록이 줄에 붙어 있어서 마우스를 목록으로 옮겨도 :hover 가 유지된다 —
+   :hover 는 조상까지 함께 걸리고, 목록은 줄의 자식이다. */
+
+/* 배경만 카드 안쪽 여백까지 번지게 한다. 음수 마진을 패딩과 같은 값으로 둬 margin box
+   치수는 그대로 남긴다 — 이 목록은 space-between 으로 남는 높이를 줄들이 나눠 갖는
+   구조라, 줄의 외곽 치수가 바뀌면 그 배분이 흔들린다. 줄 사이 간격만 10px 좁아 보인다. */
+.hz-theme-row {
+  position: relative;
+  margin: -5px -12px;
+  padding: 5px 12px;
+  border-radius: var(--r-control);
+  transition: background 0.13s ease;
+}
+.hz-theme-row:hover,
+.hz-theme-row:focus-within {
+  background: var(--c-blue-tint);
+}
+/* 마우스 없이도 열 수 있어야 한다(줄에 tabindex 를 준다). 터치에서도 이 경로로 열린다. */
+.hz-theme-row:focus-visible {
+  outline: 2px solid var(--c-blue);
+  outline-offset: -1px;
+}
