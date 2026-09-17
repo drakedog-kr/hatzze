@@ -5443,7 +5443,7 @@ main.hz-scroll { overflow-x: clip; }
 .dv-tcost-open:hover { color: var(--c-blue); text-decoration: underline; }
 /* 줄의 계좌 태그 — 이름 옆 시장 배지와 같은 자리·크기의 select. 기본 계좌를 따르면 흐리고, 따로 골랐으면 진하다. */
 .dv-tacct {
-  flex-shrink: 0; margin-left: 6px; width: 74px; max-width: 100%; /* select 는 가장 긴 option 폭으로 벌어진다 — "일반 계좌"가 드는 74 로 못박는다 */
+  flex-shrink: 0; margin-left: 6px; width: 80px; max-width: 100%; /* select 는 가장 긴 option 폭으로 벌어진다 — "비과세저축"이 드는 80 으로 못박는다 */
   appearance: none; -webkit-appearance: none; padding: 2px 16px 2px 6px; border-radius: 4px; border: 1px solid transparent;
   background: var(--c-chip) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 3.5l3 3 3-3' fill='none' stroke='%235e728d' stroke-width='1.5'/></svg>") no-repeat right 4px center;
   color: var(--c-sub); font-size: 11px; font-weight: 600; font-family: inherit; cursor: pointer; line-height: 1.4;
@@ -5494,6 +5494,9 @@ main.hz-scroll { overflow-x: clip; }
 .dv-upcoming-name { font-weight: 600; color: var(--c-ink); white-space: nowrap; }
 .dv-upcoming-what { color: var(--c-sub); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dv-upcoming-amt { margin-left: auto; font-weight: 700; color: var(--c-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* 확정·예상 — 공시된 값이면 파랗게, 지난해로 어림한 값이면 흐리게. 줄마다 붙지만 두 글자라 무겁지 않다. */
+.dv-upcoming-tag { flex-shrink: 0; padding: 1px 6px; border-radius: 4px; font-size: 10.5px; font-weight: 700; line-height: 1.5; color: var(--c-sub); background: var(--c-chip); }
+.dv-upcoming-tag-sure { color: var(--c-cold-ink); background: var(--c-blue-tint); }
 
 /* 목표까지 — 회색 타일. 세 층: 입력 한 줄(목표 알약·매달 더 넣기) → 막대 한 줄 → 같은 타일 여섯(3×2).
    글자 크기는 라벨 11.5 · 값 16 · 칩 12 셋뿐. 크기가 들쭉날쭉하고 자리가 흩어져 복잡해 보였다(2026-09-15). */
@@ -5708,7 +5711,7 @@ main.hz-scroll { overflow-x: clip; }
   .dv-tshares input { height: 36px; }
   .dv-remove { width: 36px; height: 36px; }
   /* 줄의 계좌 알약 — 21px 은 손가락엔 작다. 폰에선 28px 로(2026-09-17 검사). */
-  .dv-tacct { padding: 5px 18px 5px 8px; width: 88px; font-size: 12px; background-position: right 6px center; }
+  .dv-tacct { padding: 5px 18px 5px 8px; width: 96px; font-size: 12px; background-position: right 6px center; }
 }
 @media (max-width: 560px) {
   .dv-hero { padding: 18px 18px 4px; }

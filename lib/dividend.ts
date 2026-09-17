@@ -46,8 +46,15 @@ export type DividendStock = {
   cuts5: number;
   growth5: number | null;
   nextRecord: string | null;
-  /** 선언됐지만 아직 안 지급된 다음 건(미국). */
-  nextPay: { date: string; amount: number } | null;
+  /** 선언됐지만 아직 안 지급된 다음 건 — 확정값. 미국 주식·ETF 는 stockanalysis, 국내 ETF 는 SEIBro, 국내 주식은 거래소 배당 결정
+      공시(kr_dividend_notice → kr_dividend_stock.next_pay_*). 국내 주식은 공시가 지급일을 안 적기도 해서 date 가 null 일 수 있다. */
+  nextPay: { date: string | null; amount: number } | null;
+  /** 지난 1년 배당·분배금(dps) 가운데 실제로 과세되는 몫. null 이면 모른다(전액 과세로 센다).
+      국내 ETF 는 운용사 공시 과표 합(etf_dividend.taxable_dps, 지금은 TIGER 만), 국내 주식은 dps − 감액배당 몫(kr_dividend_stock.taxfree_dps).
+      미국은 전액이라 null. 2026-09-17 피드백 셋(과표·감액배당·확정 배당)에 답하는 자리다. */
+  taxable: number | null;
+  /** 감액배당(자본준비금 재원, 소액주주 비과세)이라고 공시한 문장. 국내 주식만, 있을 때만. 화면 툴팁. */
+  taxFreeNote: string | null;
   isReit: boolean;
   shareKind: string | null;
   /** 고배당기업(배당소득 분리과세 대상, 2026~2028)으로 공시한 회사 — KIND 목록(kr_high_dividend). 국내 주식만. */
@@ -120,10 +127,16 @@ type Row = {
   is_reit: boolean;
   share_kind: string | null;
   computed_for: string;
+  /** 마이그레이션 079 — 거래소 배당 결정 공시에서. 표에 열이 아직 없으면 undefined 로 온다. */
+  taxfree_dps?: number | null;
+  taxfree_note?: string | null;
+  next_pay_date?: string | null;
+  next_pay_amount?: number | null;
 };
 
-const COLUMNS =
-  "code,name,market,close,price_date,market_cap,ttm_dps,ttm_count,ttm_yield_pct,ttm_unusual,pay_months,ttm_payments,streak_years,cut_years_5,growth_5y_pct,next_record_date,is_reit,share_kind,computed_for";
+// 열 이름을 나열하지 않고 전부 받는다 — 마이그레이션 079 의 새 열(taxfree_*, next_pay_*)이 아직 없는 DB 에서도 조회가 죽지 않게.
+// 없는 열은 undefined 로 오고 toStock 이 null 로 다룬다. annual(jsonb) 이 딸려 오지만 작다.
+const COLUMNS = "*";
 
 const n = (v: unknown): number | null => (v == null ? null : Number(v));
 
@@ -152,7 +165,10 @@ function toStock(r: Row): DividendStock {
     cuts5: r.cut_years_5 ?? 0,
     growth5: n(r.growth_5y_pct),
     nextRecord: r.next_record_date,
-    nextPay: null,
+    nextPay: r.next_pay_amount != null && Number(r.next_pay_amount) > 0 ? { date: r.next_pay_date ?? null, amount: Number(r.next_pay_amount) } : null,
+    // 감액배당 몫이 있으면 나머지가 과세 대상. 없으면 null(전액).
+    taxable: r.taxfree_dps != null && Number(r.taxfree_dps) > 0 ? Math.max(0, Number(r.ttm_dps ?? 0) - Number(r.taxfree_dps)) : null,
+    taxFreeNote: r.taxfree_dps != null && Number(r.taxfree_dps) > 0 ? (r.taxfree_note ?? null) : null,
     isReit: Boolean(r.is_reit),
     shareKind: r.share_kind,
     highDiv: null,
@@ -239,6 +255,8 @@ function toUsStock(r: UsRow): DividendStock {
     growth5: n(r.growth_5y_pct),
     nextRecord: null,
     nextPay: r.next_pay_date && r.next_pay_amount != null ? { date: r.next_pay_date, amount: Number(r.next_pay_amount) } : null,
+    taxable: null,
+    taxFreeNote: null,
     isReit: false,
     shareKind: null,
     highDiv: null,
@@ -273,6 +291,8 @@ type EtfRow = {
   /** 선언됐지만 아직 안 지급된 다음 건(마이그레이션 076). 미국은 선언 뒤, 국내는 기준일이 지난 뒤(SEIBro 가 기준일에 싣는다). */
   next_pay_date: string | null;
   next_pay_amount: number | null;
+  /** 지난 1년 지급 건의 과표 합(마이그레이션 079). 운용사 공시를 받은 국내 ETF(TIGER)만, 나머지는 null. */
+  taxable_dps?: number | null;
 };
 
 export function toEtfStock(r: EtfRow): DividendStock {
@@ -300,6 +320,8 @@ export function toEtfStock(r: EtfRow): DividendStock {
     growth5: null,
     nextRecord: null,
     nextPay: r.next_pay_date && r.next_pay_amount != null ? { date: r.next_pay_date, amount: Number(r.next_pay_amount) } : null,
+    taxable: !us && r.taxable_dps != null ? Number(r.taxable_dps) : null,
+    taxFreeNote: null,
     isReit: false,
     shareKind: "ETF",
     highDiv: null,

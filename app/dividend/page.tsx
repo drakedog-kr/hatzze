@@ -69,6 +69,8 @@ function toLite(s: DividendStock): StockLite {
     growth5: s.growth5,
     nextRecord: s.nextRecord,
     nextPay: s.nextPay ? [s.nextPay.date, s.nextPay.amount] : null,
+    taxable: s.taxable,
+    taxFreeNote: s.taxFreeNote,
     highDiv: s.highDiv ? [s.highDiv.year, s.highDiv.payoutPct] : null,
     payout: s.payout ? [s.payout.year, s.payout.pct] : null,
     growthYears: s.growthYears,

@@ -39,8 +39,13 @@ export type StockLite = {
   streak: number;
   growth5: number | null;
   nextRecord: string | null;
-  /** 선언됐지만 아직 안 지급된 다음 건(미국 주식·ETF). [지급일, 1주당 금액]. */
-  nextPay: [string, number] | null;
+  /** 선언됐지만 아직 안 지급된 다음 건 — 확정값. [지급일, 1주당 금액]. 국내 주식은 배당 결정 공시에서 오고 지급일이 null 일 수 있다
+      (그때는 nextRecord 가 기준일). */
+  nextPay: [string | null, number] | null;
+  /** dps 가운데 실제로 과세되는 몫. null 이면 모름(전액 과세로 센다). 국내 ETF 는 운용사 공시 과표 합, 국내 주식은 감액배당을 뺀 값. */
+  taxable: number | null;
+  /** 감액배당(비과세)이라고 공시한 문장. 국내 주식만. */
+  taxFreeNote: string | null;
   /** 고배당기업(배당소득 분리과세 대상, 2026~2028)으로 공시한 회사. [사업연도, 배당성향 %]. 국내 주식만. */
   highDiv: [number | null, number | null] | null;
   /** 배당성향 [사업연도(미국은 null), %]. 국내는 KIND 배당정보, 미국은 stockanalysis. 주식만. */

@@ -48,6 +48,10 @@ FY2024 결산(2025-02-28 기준)은 빠진다. 세 가지를 차례로 재 봤�
                    화면은 이 종목의 수익률 옆에 "평소보다 큰 배당이 섞였습니다"를 적고,
                    바스켓은 이 종목을 거른다
     next_record_date  오늘 뒤의 가장 가까운 배당기준일(원천이 미리 준다). 없으면 null
+    next_pay_amount   거래소 배당 결정 공시(kr_dividend_notice)에 적힌 다음 배당의 1주당 금액 — 확정값. next_pay_date 는
+                      그 지급예정일(공시가 안 적었으면 null). 2026-09-17 추가(마이그레이션 079)
+    taxfree_dps       지난 12개월 배당 가운데 감액배당(자본준비금 재원, 소액주주 비과세)으로 공시된 몫. taxfree_note 는 그 문장.
+                      공시에 비과세라고 적은 회사만 잡힌다(DB증권·세아제강지주처럼 안 적는 회사는 못 잡는다 — 실측)
 
 ⚠️ 금액은 전부 `cash_per_share`(액면분할 소급값)다. 명목값(`cash_per_share_nominal`)을
    쓰면 분할 전 해가 50배로 부풀어 증가율이 거짓이 된다(fetch_kr_dividends.py 머리말).
@@ -116,6 +120,68 @@ def load_records(db, since: date) -> list[dict]:
         if len(page) < PAGE:
             return rows
         start += PAGE
+
+
+def load_notices(db, since: date) -> dict[str, list[dict]]:
+    """KIND 배당 결정 공시(fetch_kr_dividend_notices.py) — 회사 코드 앞 5자리 → 공시들(접수번호 순). 표가 아직 없으면 빈 dict."""
+    out: dict[str, list[dict]] = defaultdict(list)
+    try:
+        for frm in range(0, 100_000, 1000):
+            chunk = execute_with_retry(
+                db.table("kr_dividend_notice")
+                .select("acptno,corp_prefix,dps_common,dps_pref,record_date,pay_date,taxfree,taxfree_amount,taxfree_note")
+                .gte("filed_at", since.isoformat())
+                .order("acptno")
+                .range(frm, frm + 999)
+            ).data or []
+            for r in chunk:
+                out[r["corp_prefix"]].append(r)
+            if len(chunk) < 1000:
+                break
+    except Exception as e:  # noqa: BLE001 — 표가 없거나 막힌 날. 공시 없이도 요약은 나온다.
+        print(f"[배당 요약] kr_dividend_notice 를 못 읽었습니다({e}) — 확정 배당·감액배당 없이 갑니다")
+        return {}
+    return out
+
+
+def notice_bits(code: str, notices: list[dict], payments: list[dict], today: date) -> dict:
+    """공시에서 오는 종목별 값 — 지난 1년 배당 중 감액배당(비과세) 몫, 다음 확정 배당.
+
+    같은 기준일에 여러 공시([정정])면 접수번호가 큰 것을 쓴다. 우선주(코드 끝이 0 이 아님)는 종류주식 금액.
+    감액배당 금액은 공시가 "일부"라고 적으며 금액을 준 때만 그 값, 아니면 그 기준일 배당 전액.
+    """
+    pref = code[-1] != "0"
+    latest: dict[str, dict] = {}
+    for n in notices:  # acptno 순이라 뒤가 최신
+        if n.get("record_date"):
+            latest[n["record_date"]] = n
+    taxfree = 0.0
+    note = None
+    for p in payments:
+        n = latest.get(p["record"])
+        if not n or not n.get("taxfree"):
+            continue
+        cap = float(n["taxfree_amount"]) if n.get("taxfree_amount") is not None else p["amount"]
+        taxfree += min(p["amount"], cap)
+        note = n.get("taxfree_note") or note
+    # 다음 확정 배당 — 기준일이 아직 안 지났거나 지급예정일이 남은 공시 가운데 가장 가까운 것.
+    upcoming = []
+    for n in latest.values():
+        rd, pd = n.get("record_date"), n.get("pay_date")
+        amt = n.get("dps_pref") if pref else n.get("dps_common")
+        if not amt or float(amt) <= 0:
+            continue
+        when = pd if (pd and pd >= today.isoformat()) else (rd if rd >= today.isoformat() else None)
+        if when:
+            upcoming.append((when, pd if (pd and pd >= today.isoformat()) else None, float(amt)))
+    upcoming.sort()
+    nxt = upcoming[0] if upcoming else None
+    return {
+        "taxfree_dps": round(taxfree, 2) if taxfree > 0 else None,
+        "taxfree_note": note if taxfree > 0 else None,
+        "next_pay_date": nxt[1] if nxt else None,
+        "next_pay_amount": nxt[2] if nxt else None,
+    }
 
 
 def summarize(code: str, recs: list[dict], today: date, close: float | None) -> dict:
@@ -203,6 +269,7 @@ EMPTY = {
     "pay_months": [], "ttm_payments": [], "annual": {}, "streak_years": 0, "cut_years_5": 0, "growth_5y_pct": None,
     "ttm_unusual": False, "last_record_date": None, "last_pay_date": None, "next_record_date": None,
 }
+NO_NOTICE = {"taxfree_dps": None, "taxfree_note": None, "next_pay_date": None, "next_pay_amount": None}
 
 
 def main() -> None:
@@ -219,14 +286,19 @@ def main() -> None:
     for r in recs:
         by_code[r["code"]].append(r)
     print(f"[배당 요약] 상장 {len(stocks):,}종목 · {since} 이후 기록 {len(recs):,}행 · 기록 있는 코드 {len(by_code):,}")
+    # 공시(확정 배당·감액배당)는 열다섯 달치면 된다 — 지난 1년 지급 건의 기준일과 다음 배당을 다 덮는다.
+    notices = load_notices(db, today - timedelta(days=460))
+    print(f"[배당 요약] 배당 결정 공시 {sum(len(v) for v in notices.values()):,}건 · 회사 {len(notices):,}")
 
     rows: list[dict] = []
     for s in stocks:
         close = float(s["close_price"]) if s.get("close_price") else None
         code = s["code"]
         base = summarize(code, by_code[code], today, close) if code in by_code else {"code": code, **EMPTY}
+        bits = notice_bits(code, notices.get(code[:5], []), base["ttm_payments"], today) if code[:5] in notices else NO_NOTICE
         rows.append({
             **base,
+            **bits,
             "name": s["name"],
             "market": s.get("market"),
             "close": close,
@@ -241,6 +313,7 @@ def main() -> None:
         f"[배당 요약] 최근 12개월 배당 있음 {len(paying):,}종목 · 5년 연속 {sum(1 for r in rows if r['streak_years'] >= 5):,}"
         f" · 그중 안 줄임 {sum(1 for r in rows if r['streak_years'] >= 5 and r['cut_years_5'] == 0):,}"
         f" · 다가오는 기준일 있음 {sum(1 for r in rows if r['next_record_date']):,}"
+        f" · 확정 배당 있음 {sum(1 for r in rows if r['next_pay_amount']):,} · 감액배당 {sum(1 for r in rows if r['taxfree_dps']):,}"
         f" · 평소보다 큰 배당 섞임 {sum(1 for r in rows if r['ttm_unusual']):,}"
     )
     for r in sorted(with_yield, key=lambda r: -r["ttm_yield_pct"])[:5]:
