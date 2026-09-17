@@ -970,6 +970,11 @@ function Reading({ data, periodLabel }: { data: MddResult; periodLabel: string }
   const paras: React.ReactNode[] = [];
 
   // 1 — 얼마나 드문 깊이인가.
+  //
+  // ⚠️ 두 수는 모집단이 다르다. bigDrops 는 −20% 보다 깊은 사건만(depthHistogram), similarCount 는
+  //    깊이와 상관없이 **지금보다 깊었던** 사건 전부(recoveryStats)다. 지금 낙폭이 −20% 보다
+  //    얕으면 뒤가 앞보다 커진다(NVDA −2.3% 일 때 7 vs 64, 2026-09-09 실측). 그래서 뒤 문장을
+  //    "그중" 으로 앞에 묶지 않고, 지금 낙폭을 적어 자기 모집단을 스스로 말하게 한다.
   const bigDrops = a.depthBuckets.reduce((s, d) => s + d.count, 0);
   if (bigDrops > 0) {
     paras.push(
@@ -977,7 +982,10 @@ function Reading({ data, periodLabel }: { data: MddResult; periodLabel: string }
         {periodLabel} 동안 <b style={b()}>−20%보다 깊이</b> 잠긴 구간은 {bigDrops}번이었고, 가장 깊었던 때는{" "}
         <b style={b()}>{fmtPct(a.mdd)}</b>였습니다.
         {a.recovery && a.recovery.similarCount > 0 && (
-          <> 지금만큼 깊었던 적은 그중 {a.recovery.similarCount}번입니다.</>
+          <>
+            {" "}
+            지금({fmtPct(a.currentDd)})보다 깊이 잠긴 적은 같은 기간에 {a.recovery.similarCount}번입니다.
+          </>
         )}
       </p>,
     );
@@ -2151,7 +2159,7 @@ function Recovery({ a, periodLabel }: { a: MddAnalysis; periodLabel: string }) {
       <Foot>
         {here && here.count > 0
           ? `지금 낙폭(${fmtPct(a.currentDd)})은 ${periodLabel} ${here.count}번이던 구간에 들어 있습니다`
-          : `구간별 횟수는 −20% 이상 하락 ${buckets.reduce((s, b) => s + b.count, 0)}건 전부를 세지만, 위 중앙값은 지금보다 깊었던 ${r.similarCount}건만 씁니다`}
+          : `구간별 횟수는 −20% 이상 하락 ${buckets.reduce((s, b) => s + b.count, 0)}건을 세고, 위 중앙값은 문턱과 상관없이 지금(${fmtPct(a.currentDd)})보다 깊었던 ${r.similarCount}건으로 냅니다`}
       </Foot>
     </Sheet>
   );
