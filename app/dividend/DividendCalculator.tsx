@@ -7,6 +7,7 @@ import { C, Icon } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
 import { SectionIntro } from "../SectionIntro";
 import { StockLogo } from "../StockLogo";
+import { LoadFailedNote } from "../LoadFailedNote";
 import { inflate, type BasketLite, type MoreLists, type StockLite, type StockWire } from "./types";
 
 /**
@@ -471,6 +472,7 @@ export function DividendCalculator({
   priceDate,
   usPriceDate,
   usdkrw,
+  failedSources,
 }: {
   stocks: StockWire[];
   baskets: BasketLite[];
@@ -482,6 +484,8 @@ export function DividendCalculator({
   priceDate: string | null;
   usPriceDate: string | null;
   usdkrw: { rate: number; date: string | null } | null;
+  /** 조회에 실패한 자료의 이름(lib/dividend.ts 의 DividendData.failedSources). 비면 안 그린다. */
+  failedSources: string[];
 }) {
   // 서버는 null 칸을 뺀 꼴(StockWire)로 보낸다 — 4,366개라 HTML 이 2.2MB 였다. 여기서 한 번 채워 두면 아래는 전부 StockLite.
   const stocks = useMemo(() => wire.map(inflate), [wire]);
@@ -703,10 +707,15 @@ export function DividendCalculator({
   };
 
   if (!stocks.length) {
+    // 표가 빈 것과 못 읽은 것을 갈라 말한다 — 못 읽은 날 "아직 자료가 없습니다"라 적으면 파이프라인 탓으로 읽힌다.
     return (
       <div className="hz-tx">
         <section className="hz-sheet">
-          <SectionHead icon="calculate" title="아직 자료가 없습니다" desc="파이프라인이 종목별 배당 요약을 만들면 이 자리에 계산기가 뜹니다." level={2} />
+          {failedSources.length ? (
+            <SectionHead icon="calculate" title="자료를 불러오지 못했습니다" desc="잠시 뒤 다시 열어 주십시오. 저장된 배당 기록은 그대로 있습니다." level={2} />
+          ) : (
+            <SectionHead icon="calculate" title="아직 자료가 없습니다" desc="파이프라인이 종목별 배당 요약을 만들면 이 자리에 계산기가 뜹니다." level={2} />
+          )}
         </section>
       </div>
     );
@@ -734,6 +743,7 @@ export function DividendCalculator({
 
   return (
     <div className="hz-tx">
+      <LoadFailedNote sources={failedSources} />
       <SectionIntro n={1} title="내 종목으로 계산" />
       <section
         ref={calcRef}
