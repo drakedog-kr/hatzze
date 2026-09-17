@@ -109,4 +109,29 @@ US_ETFS: list[dict] = [
     {"code": "ULTY", "name_ko": "ULTY", "name_en": "YieldMax Ultra Option Income Strategy ETF", "cadence": "주", "source": "https://www.yieldmaxetfs.com/our-etfs/ulty/"},
     # 2026-09-17 요청. 같이 온 GLDM(금)은 분배금이 없어(stockanalysis 기록 0) 배당 화면에 넣을 게 없다 — 지급이 없는 ETF 는 이 표에 안 선다.
     {"code": "SPYM", "name_ko": "SPYM", "name_en": "SPDR Portfolio S&P 500 ETF", "cadence": "분기", "source": "https://www.ssga.com/us/en/intermediary/etfs/spdr-portfolio-sp-500-etf-spym"},
+    # ── 2026-09-17 요청(CHPY · "라운드힐·앰플리파이가 다 안 들어 있다"). 일드맥스 포트폴리오·단일 종목 옵션, 앰플리파이 커버드콜·CEF, 라운드힐
+    #    비트코인·이더·매그니피센트7 커버드콜과 주분배 국채. 스톡애널리시스에 스물둘 다 지난 1년 지급 건이 있는 것을 확인했다. 앰플리파이
+    #    사이트는 curl 에 403 이지만 원천은 스톡애널리시스라 상관없다(source 는 사람이 여는 주소). 이름은 스톡애널리시스 메타에서.
+    {"code": "CHPY", "name_ko": "CHPY", "name_en": "YieldMax Semiconductor Portfolio Option Income ETF", "cadence": "주", "source": "https://www.yieldmaxetfs.com/our-etfs/chpy/"},
+    {"code": "PLTY", "name_ko": "PLTY", "name_en": "YieldMax PLTR Option Income Strategy ETF", "cadence": "주", "source": "https://www.yieldmaxetfs.com/our-etfs/plty/"},
+    {"code": "LFGY", "name_ko": "LFGY", "name_en": "YieldMax Crypto Industry & Tech Portfolio Option Income ETF", "cadence": "주", "source": "https://www.yieldmaxetfs.com/our-etfs/lfgy/"},
+    {"code": "GPTY", "name_ko": "GPTY", "name_en": "YieldMax AI & Tech Portfolio Option Income ETF", "cadence": "주", "source": "https://www.yieldmaxetfs.com/our-etfs/gpty/"},
+    {"code": "FIAT", "name_ko": "FIAT", "name_en": "YieldMax Short COIN Option Income Strategy ETF", "cadence": "주", "source": "https://www.yieldmaxetfs.com/our-etfs/fiat/"},
+    {"code": "BIGY", "name_ko": "BIGY", "name_en": "YieldMax Target 12 Big 50 Option Income ETF", "cadence": "월", "source": "https://www.yieldmaxetfs.com/our-etfs/bigy/"},
+    {"code": "QDTY", "name_ko": "QDTY", "name_en": "YieldMax Nasdaq 100 0DTE Covered Call Strategy ETF", "cadence": "주", "source": "https://www.yieldmaxetfs.com/our-etfs/qdty/"},
+    {"code": "SDTY", "name_ko": "SDTY", "name_en": "YieldMax S&P 500 0DTE Covered Call Strategy ETF", "cadence": "주", "source": "https://www.yieldmaxetfs.com/our-etfs/sdty/"},
+    {"code": "RDTY", "name_ko": "RDTY", "name_en": "YieldMax R2000 0DTE Covered Strategy ETF", "cadence": "주", "source": "https://www.yieldmaxetfs.com/our-etfs/rdty/"},
+    {"code": "AMZY", "name_ko": "AMZY", "name_en": "YieldMax AMZN Option Income Strategy ETF", "cadence": "주", "source": "https://www.yieldmaxetfs.com/our-etfs/amzy/"},
+    {"code": "APLY", "name_ko": "APLY", "name_en": "YieldMax AAPL Option Income Strategy ETF", "cadence": "주", "source": "https://www.yieldmaxetfs.com/our-etfs/aply/"},
+    {"code": "GOOY", "name_ko": "GOOY", "name_en": "YieldMax GOOGL Option Income Strategy ETF", "cadence": "주", "source": "https://www.yieldmaxetfs.com/our-etfs/gooy/"},
+    {"code": "MSFO", "name_ko": "MSFO", "name_en": "YieldMax MSFT Option Income Strategy ETF", "cadence": "주", "source": "https://www.yieldmaxetfs.com/our-etfs/msfo/"},
+    {"code": "NFLY", "name_ko": "NFLY", "name_en": "YieldMax NFLX Option Income Strategy ETF", "cadence": "주", "source": "https://www.yieldmaxetfs.com/our-etfs/nfly/"},
+    {"code": "IDVO", "name_ko": "IDVO", "name_en": "Amplify CWP International Enhanced Dividend Income ETF", "cadence": "월", "source": "https://amplifyetfs.com/idvo/"},
+    {"code": "QDVO", "name_ko": "QDVO", "name_en": "Amplify CWP Growth & Income ETF", "cadence": "월", "source": "https://amplifyetfs.com/qdvo/"},
+    {"code": "YYY", "name_ko": "YYY", "name_en": "Amplify CEF High Income ETF", "cadence": "월", "source": "https://amplifyetfs.com/yyy/"},
+    {"code": "XPAY", "name_ko": "XPAY", "name_en": "Roundhill S&P 500 Target 20 Managed Distribution ETF", "cadence": "월", "source": "https://www.roundhillinvestments.com/etf/xpay/"},
+    {"code": "YBTC", "name_ko": "YBTC", "name_en": "Roundhill Bitcoin Covered Call Strategy ETF", "cadence": "주", "source": "https://www.roundhillinvestments.com/etf/ybtc/"},
+    {"code": "YETH", "name_ko": "YETH", "name_en": "Roundhill Ether Covered Call Strategy ETF", "cadence": "주", "source": "https://www.roundhillinvestments.com/etf/yeth/"},
+    {"code": "WEEK", "name_ko": "WEEK", "name_en": "Roundhill Weekly T-Bill ETF", "cadence": "주", "source": "https://www.roundhillinvestments.com/etf/week/"},
+    {"code": "MAGY", "name_ko": "MAGY", "name_en": "Roundhill Magnificent Seven Covered Call ETF", "cadence": "주", "source": "https://www.roundhillinvestments.com/etf/magy/"},
 ]

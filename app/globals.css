@@ -5425,6 +5425,8 @@ main.hz-scroll { overflow-x: clip; }
 }
 /* 주의는 문장 그대로, 사실 조각보다 한 단 진하게. */
 .dv-twarn { color: var(--c-label); }
+/* 주의 알약 — 붉은 기. 온도 빨강(--c-hot)이 아니라 '조심' 표시라 연한 바탕에 진한 글자로만. */
+.dv-tfact-warn { color: var(--c-hot-ink); background: var(--c-hot-tint); } /* --c-hot 은 tint 위에서 4.31 이라 잉크 값으로(4.9) */
 /* 주수 스테퍼 위, 평단 칸 아래 — 두 줄을 감싸는 격자. */
 .dv-tshares { display: grid; grid-template-columns: auto auto auto; justify-content: start; align-items: center; gap: 4px; }
 .dv-tcost, .dv-tcost-open { grid-column: 1 / -1; }

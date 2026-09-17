@@ -13,9 +13,10 @@
 세 번 요청이다. ① 공시 목록 검색(`disclosure/details.do`, reportNm=현금ㆍ현물배당 결정, 날짜 범위 · 100건씩)에서
 접수번호(acptno)와 회사 코드 앞 5자리를 얻고, ② 뷰어(`common/disclsviewer.do?method=search&acptno=`)에서 본문
 문서번호(docNo)를, ③ `method=searchContents&docNo=` 에서 본문 HTML 주소(`/external/…/61500.htm`)를 얻어 받는다.
-올해 1~9월 1,871건. 매일은 최근 열흘(수십 건), 처음 한 번은 `--since 2025-06-01`(열다섯 달, 3,000건 안팎 · 한 시간).
+올해 1~9월 1,871건. 매일은 최근 열흘 목록에서 **아직 없는 접수번호만** 받는다(하루 몇 건~결산 시즌 수십 건, 1~2분).
+처음 한 번은 `--since 2025-06-01`(열다섯 달, 3,000건 안팎 · 한 시간, 로컬에서).
 
-⚠️ 회사 코드는 KIND 가 앞 5자리만 준다('02182'). 보통주 = 그 값 + '0', 우선주는 같은 5자리에 5·7·9 — 그래서
+⚠️ 회사 코드는 KIND 가 앞 5자리만 준다('02182', 새 형식은 '0039P'). 보통주 = 그 값 + '0', 우선주는 같은 5자리에 5·7·9 — 그래서
    표의 키는 5자리(corp_prefix)이고 계산 쪽(calculate_kr_dividend_stats.py)이 앞 5자리로 맞춘다.
 ⚠️ [정정] 공시는 제목 앞에 붙는다. 같은 회사·같은 기준일에 여러 건이면 접수번호가 큰 것이 최신이다 — 계산 쪽 규칙.
 ⚠️ KIND 는 거래소 사이트다(비상업 상자, common/kind.py). 페이지가 바뀌면 깨지므로 목록 행 수·본문 항목 수를 검사한다.
@@ -88,10 +89,12 @@ def list_filings(frm: date, to: date) -> list[dict] | None:
         if page is None:
             return None
         rows = re.findall(r"<tr[^>]*>(.*?)</tr>", page, flags=re.S)
-        got = 0
+        # 쪽이 찼는지는 뷰어 링크가 든 행 수로 본다 — 못 읽은 행(회사 코드가 없는 기타법인 등)을 빼고 세면 쪽이 덜 차 보여
+        # 첫 쪽에서 멈춘다(2026-09-17 실측: 100건 중 99건만 읽혀 열다섯 달이 99건으로 끝났다).
+        listed = sum(1 for tr in rows if "openDisclsViewer(" in tr)
         for tr in rows:
             a = re.search(r"openDisclsViewer\('(\d{14})'", tr)
-            c = re.search(r"companysummary_open\('(\d{5})'", tr)
+            c = re.search(r"companysummary_open\('([0-9A-Z]{5})'", tr)  # 새 형식 코드(0039P0)는 글자가 든다
             cells = [re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", "", x))).strip() for x in re.findall(r"<td[^>]*>(.*?)</td>", tr, flags=re.S)]
             if not a or not c or len(cells) < 5:
                 continue
@@ -99,10 +102,13 @@ def list_filings(frm: date, to: date) -> list[dict] | None:
                 filed = datetime.strptime(cells[1], "%Y-%m-%d %H:%M")
             except ValueError:
                 continue
+            # '(자회사의 주요경영사항)'은 지주회사가 올린 **자회사** 배당(메리츠금융지주 → 메리츠화재)이다. 지주 자신의 배당이 아니라
+            # 받지 않는다 — 받으면 지주 줄에 자회사 금액이 확정값으로 붙는다(2026-09-17 실측 309건).
+            if "자회사" in cells[3]:
+                continue
             out.append({"acptno": a.group(1), "prefix": c.group(1), "corp_name": cells[2], "filed_at": filed, "title": cells[3]})
-            got += 1
         time.sleep(PAUSE_SEC)
-        if got < PAGE:
+        if listed < PAGE:
             break
     return out
 
@@ -187,15 +193,18 @@ def main() -> None:
 
     db = None if dry_run else get_client()
     known: set[str] = set()
-    if db and backfill:
-        # 백필은 이미 받은 접수번호를 건너뛴다 — 끊겼다 다시 돌려도 처음부터 안 한다.
+    if db:
+        # 이미 받은 접수번호는 건너뛴다 — 공시는 안 바뀌니(정정은 새 접수번호) 매일 새 건만 세 번씩 요청하면 된다. 열흘치 목록이
+        # 결산 시즌(2~3월)엔 수백 건이라 다 다시 받으면 10분이 넘는다. 백필도 끊겼다 다시 돌리면 이어 간다.
         for frm in range(0, 100_000, 1000):
-            chunk = db.table(TABLE).select("acptno").order("acptno").range(frm, frm + 999).execute().data
+            chunk = db.table(TABLE).select("acptno").gte("filed_at", since.isoformat()).order("acptno").range(frm, frm + 999).execute().data
             known.update(r["acptno"] for r in chunk)
             if len(chunk) < 1000:
                 break
     rows: list[dict] = []
     failed = 0
+    read = 0
+    taxfree_rows: list[dict] = []
     for i, f in enumerate(filings, 1):
         if f["acptno"] in known:
             continue
@@ -207,18 +216,22 @@ def main() -> None:
             failed += 1
             print(f"  ⚠️ {f['acptno']} {f['corp_name']} {f['title']}: {'주소 못 찾음' if not url else '본문 못 읽음'}")
             continue
-        rows.append({
+        row = {
             "acptno": f["acptno"], "corp_prefix": f["prefix"], "corp_name": f["corp_name"], "filed_at": f["filed_at"].isoformat(),
             "title": f["title"], "corrected": f["title"].startswith("[정정]"), "doc_url": url, **parsed,
-        })
+        }
+        rows.append(row)
+        read += 1
+        if row["taxfree"]:
+            taxfree_rows.append(row)
         if i % 50 == 0:
             print(f"  … {i}/{len(filings)}")
         time.sleep(PAUSE_SEC)
         if db and len(rows) >= 100:
             db.table(TABLE).upsert(rows, on_conflict="acptno").execute()
             rows = []
-    tf = [r for r in rows if r["taxfree"]]
-    print(f"[KIND 배당공시] 읽음 {len(rows)}건(이미 있던 것 {len(known & {f['acptno'] for f in filings})} 건너뜀) · 못 읽음 {failed} · 감액배당 문장 {len(tf)}건")
+    tf = taxfree_rows
+    print(f"[KIND 배당공시] 읽음 {read}건(이미 있던 것 {len(known & {f['acptno'] for f in filings})} 건너뜀) · 못 읽음 {failed} · 감액배당 문장 {len(tf)}건")
     for r in tf[:8]:
         print(f"  {r['corp_name']:12s} 기준일 {r['record_date']} 1주 {r['dps_common']} · {(r['taxfree_note'] or '')[:70]}")
     for r in rows[:5]:

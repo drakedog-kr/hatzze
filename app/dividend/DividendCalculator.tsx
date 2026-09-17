@@ -68,7 +68,7 @@ function readSaved(): Holding[] {
       out.push({
         id,
         code: h.code,
-        shares: Math.max(0, Math.floor(h.shares)),
+        shares: Math.max(0, Math.round(h.shares * 1e6) / 1e6),  // 소수점 주식(미국)은 소수 여섯 자리까지
         ...(typeof h.cost === "number" && h.cost > 0 ? { cost: h.cost } : {}),
         ...(isAccount(h.account) ? { account: h.account } : {}),
       });
@@ -277,9 +277,9 @@ function Badges({ s, sep = true }: { s: StockLite; sep?: boolean }) {
           className={b === "분리과세" || b === "ETF" ? "dv-badge hz-tip hz-tip-wide" : "dv-badge"}
           data-tip={
             b === "분리과세"
-              ? "고배당기업으로 공시한 회사 · 2026~2028년 배당은 2,000만원을 넘어도 종합과세 대신 분리과세(14~30%)를 신청할 수 있습니다"
+              ? "고배당기업입니다. 배당이 2,000만원을 넘어도 종합과세 대신 분리과세(14~30%)를 고를 수 있습니다."
               : b === "ETF"
-                ? "ETF가 주는 돈은 배당금이 아니라 분배금이라 부릅니다. 세법상 둘 다 배당소득이라 세율은 같습니다"
+                ? "ETF가 주는 돈은 분배금이라 부릅니다. 세금은 배당금과 같습니다."
                 : undefined
           }
         >
@@ -443,8 +443,8 @@ const RULE_TIPS: Record<string, string> = {
   "빈 달은 미국 분기": "남은 달은 미국 분기 배당주로, 그래도 비면 월분배 ETF 로 채웁니다",
   "시총 1조+": "시가총액 1조원 이상인 회사만 담았습니다",
   "미국·국내 하나씩": "미국 커버드콜 ETF 와 국내 커버드콜 ETF 를 하나씩 번갈아 담았습니다",
-  "운용사당 하나": "같은 지수를 따르는 여러 운용사 상품이 줄을 채우지 않게 국내 ETF 는 운용사마다 하나만 담았습니다",
-  "운용사당 둘": "같은 지수를 따르는 여러 운용사 상품이 줄을 채우지 않게 국내 ETF 는 운용사마다 둘까지만 담았습니다",
+  "운용사당 하나": "국내 ETF 는 운용사마다 하나만 담았습니다. 같은 지수 상품으로 줄이 차지 않게 했습니다.",
+  "운용사당 둘": "국내 ETF 는 운용사마다 둘까지만 담았습니다. 같은 지수 상품으로 줄이 차지 않게 했습니다.",
   "분배율 30% 이하": "지난 1년 분배금이 가격의 30%를 넘는 ETF(원금 반환이 섞인 것)는 뺐습니다",
   "국내 큰 순": "국내 리츠·인프라 펀드를 시가총액 큰 순으로 세웠습니다",
   "미국 수익률 순": "미국 리츠를 배당수익률 높은 순으로 세웠습니다(10% 넘는 모기지 리츠는 뺌)",
@@ -949,7 +949,8 @@ function taxNote(mode: TaxMode, grossAll: number, taxableAll: number, sepGross: 
   const who = mixed ? "일반 계좌 줄 " : "";
   const exempt = grossAll - taxableAll;
   const base = `${who}과세 대상 배당 ${won(taxableAll)}` + (exempt >= 1 ? `(세전 ${won(grossAll)}에서 ETF 과표·감액배당의 비과세 몫 ${won(exempt)}을 뺀 값)` : "");
-  if (taxableAll < COMPOSITE_NOTE_FROM) return parts.length ? parts.join(" ") : null;
+  // 세전이 1,000만원을 넘으면 적는다 — 과세 대상이 그보다 훨씬 적은 사람(감액배당·국내 커버드콜)에게 그 사실이 곧 답이다.
+  if (grossAll < COMPOSITE_NOTE_FROM) return parts.length ? parts.join(" ") : null;
   if (taxableAll < COMPOSITE_FROM) {
     parts.push(`${base}입니다. 금융소득 종합과세 문턱 ${wonShort(COMPOSITE_FROM)}까지 ${won(COMPOSITE_FROM - taxableAll)} 남았습니다(다른 이자·배당은 안 넣은 값).`);
     return parts.join(" ");
@@ -1194,7 +1195,7 @@ function HoldingsTable({
       <div className="dv-trow dv-thead" role="row">
         <span role="columnheader">종목</span>
         <span role="columnheader">주수 · 평단</span>
-        <span role="columnheader">1주당 1년 배당·분배금</span>
+        <span role="columnheader">1주당 1년 배당</span>
         <span role="columnheader">1년에 받는 배당</span>
         <span role="columnheader">배당수익률</span>
         <span role="columnheader">비중 · 투자금</span>
@@ -1237,59 +1238,68 @@ function HoldingRow({
 
   /* 이름 아래 두 줄 — 사실 조각(짧은 알약, 뜻은 title 로)과 주의(짧은 문장). 문장을 '·' 로 이어 붙였더니 세 줄이
      됐다(2026-09-13 지적). 알약 하나에 사실 하나, 문장은 주의만. */
-  const facts: { text: string; title: string }[] = [];
-  const warns: string[] = [];
+  /* 이름 아래 알약들. 사실(회색)과 주의(붉은 기)가 한 줄에 선다 — 주의를 문장 줄로 따로 두었더니 줄이 지저분했다(2026-09-17 지적).
+     툴팁은 초보자도 읽는 한두 문장 — 숫자 하나, 뜻 하나. 원천·계산법·조항은 안 적는다(같은 날 지적). */
+  const facts: { text: string; title: string; warn?: boolean }[] = [];
   const md = (iso: string) => `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}`;
   if (s.payout) {
     const [year, p] = s.payout;
-    const when = year != null ? `${year}년` : "지난 12개월";
+    const when = year != null ? `${year}년` : "지난 1년";
     const pctText = `${Math.round(p).toLocaleString("ko-KR")}%`;
-    if (p < 0) warns.push(`${when}엔 적자였는데 배당을 줬습니다`);
-    else if (p > 100) warns.push(`배당성향 ${pctText} · 번 것보다 많이 줬습니다`);
-    else facts.push({ text: `배당성향 ${pctText}`, title: `${when} 이익의 ${pctText}를 배당으로 줬습니다` });
+    if (p < 0) facts.push({ text: "적자 배당", title: `${when}엔 적자였는데도 배당을 줬습니다.`, warn: true });
+    else if (p > 100) facts.push({ text: `배당성향 ${pctText}`, title: `${when} 번 돈보다 많이 줬습니다. 오래 가기 어렵습니다.`, warn: true });
+    else facts.push({ text: `배당성향 ${pctText}`, title: `${when} 번 돈의 ${pctText}를 배당으로 줬습니다.` });
   }
-  if ((s.growthYears ?? 0) >= 10) facts.push({ text: `${s.growthYears}년 연속 늘림`, title: `${s.growthYears}년째 해마다 배당을 늘려 왔습니다` });
-  // 5년 연평균 증가율(국내는 예탁결제원 기록, 미국은 SEC 연도별 합으로 센 값). 늘린 회사만이 아니라 줄인 회사도 적는다.
+  if ((s.growthYears ?? 0) >= 10) facts.push({ text: `${s.growthYears}년 연속 늘림`, title: `${s.growthYears}년째 해마다 배당을 늘렸습니다.` });
+  // 5년 연평균 증가율. 늘린 회사만이 아니라 줄인 회사도 적는다.
   if (s.growth5 != null && s.streak >= 5) {
     const g = Math.round(s.growth5);
-    if (g >= 1) facts.push({ text: `5년 연 +${g}%`, title: `최근 5년 해마다 ${g}%씩 늘렸습니다(연평균)` });
-    else if (g <= -1) facts.push({ text: `5년 연 −${-g}%`, title: `최근 5년 해마다 ${-g}%씩 줄었습니다(연평균)` });
+    if (g >= 1) facts.push({ text: `5년 연 +${g}%`, title: `최근 5년 동안 해마다 ${g}%씩 늘었습니다.` });
+    else if (g <= -1) facts.push({ text: `5년 연 −${-g}%`, title: `최근 5년 동안 해마다 ${-g}%씩 줄었습니다.` });
   }
-  if (mode !== "gross" && line.account === "irp" && !line.outside && isSafeAsset(s)) facts.push({ text: "안전자산", title: "IRP 안전자산 30%에 드는 채권·채권혼합 ETF 입니다" });
-  // 세금이 붙는 몫 — 돈이 달라지는 줄에만 붙인다(전액 과세면 아무것도 안 붙는다, 2026-09-17). 국내 주식은 감액배당, 국내 ETF 는 운용사 공시 과표.
+  if (mode !== "gross" && line.account === "irp" && !line.outside && isSafeAsset(s)) facts.push({ text: "안전자산", title: "IRP 에서 안전자산(30% 몫)으로 칩니다." });
+  // 세금이 붙는 몫 — 돈이 달라지는 줄에만(전액 과세면 안 붙는다). 국내 주식은 감액배당, 국내 ETF 는 운용사가 공시한 과표.
   if (s.taxable != null && s.dps > 0 && s.taxable < s.dps * 0.99) {
     const pct = Math.round((s.taxable / s.dps) * 100);
     if (s.kind === "stock") {
       facts.push({
         text: pct <= 0 ? "비과세" : `비과세 ${100 - pct}%`,
-        title: (s.taxFreeNote ? `${s.taxFreeNote} ` : "") + `자본준비금을 줄여 주는 감액배당이라 소액주주는 배당소득세가 없고 금융소득에도 안 들어갑니다. 지난 1년 배당 ${won(s.dps)} 중 ${won(s.dps - s.taxable)}.`,
+        title: pct <= 0
+          ? "감액배당이라 세금이 없습니다. 회사가 쌓아 둔 자본을 돌려주는 배당이라 그렇습니다."
+          : `배당 ${won(s.dps)} 중 ${won(s.dps - s.taxable)}은 감액배당이라 세금이 없습니다.`,
       });
     } else {
       facts.push({
         text: `과세 ${pct}%`,
-        title: `지난 1년 분배금 ${won(s.dps)} 중 세금이 붙는 몫은 ${won(s.taxable)}입니다(운용사가 공시한 과표). 나머지는 국내 주식·옵션 수익이라 비과세라 세후와 금융소득 문턱을 그만큼 덜 셉니다.`,
+        title: pct <= 0 ? `분배금 ${won(s.dps)}에 세금이 안 붙습니다.` : `분배금 ${won(s.dps)} 중 ${won(s.taxable)}에만 세금이 붙습니다.`,
       });
     }
   }
-  // 지난 날짜는 안 붙인다 — 표가 며칠 낡으면 '다음' 기준일·지급일이 어제일 수 있다(2026-09-16 전수 검사에서 셋).
+  // 지난 날짜는 안 붙인다 — 표가 며칠 낡으면 '다음' 기준일·지급일이 어제일 수 있다.
   const todayKst = TODAY_KST;
-  if (s.nextRecord && s.nextRecord >= todayKst) facts.push({ text: `기준일 ${md(s.nextRecord)}`, title: `다음 배당기준일 ${s.nextRecord}` });
-  if (s.nextPay && s.nextPay[0] && s.nextPay[0] >= todayKst) facts.push({ text: `${md(s.nextPay[0])} 지급 ${money(s.nextPay[1], s)}`, title: `다음 지급 ${s.nextPay[0]} · 1주에 ${money(s.nextPay[1], s)} · 공시된 확정값` });
-  else if (s.nextPay && !s.nextPay[0] && s.nextRecord && s.nextRecord >= todayKst) facts.push({ text: `확정 ${money(s.nextPay[1], s)}`, title: `기준일 ${s.nextRecord} 배당 1주에 ${money(s.nextPay[1], s)} · 공시된 확정값(지급일은 아직)` });
+  if (s.nextRecord && s.nextRecord >= todayKst) facts.push({ text: `기준일 ${md(s.nextRecord)}`, title: `${s.nextRecord}에 주주면 다음 배당을 받습니다.` });
+  if (s.nextPay && s.nextPay[0] && s.nextPay[0] >= todayKst) facts.push({ text: `${md(s.nextPay[0])} 지급 ${money(s.nextPay[1], s)}`, title: `${s.nextPay[0]}에 1주당 ${money(s.nextPay[1], s)}을 줍니다. 회사가 정해 공시한 값입니다.` });
+  else if (s.nextPay && !s.nextPay[0] && s.nextRecord && s.nextRecord >= todayKst) facts.push({ text: `확정 ${money(s.nextPay[1], s)}`, title: `다음 배당은 1주당 ${money(s.nextPay[1], s)}으로 정해졌습니다. 지급일은 아직입니다.` });
 
-  if (line.outside) warns.push(s.currency === "USD" ? "해외 상장 종목은 이 계좌에 못 담아 일반 계좌(15%)로 셌습니다" : "개별 주식은 연금저축·IRP에 못 담아 일반 계좌(15.4%)로 셌습니다");
+  // ── 주의(붉은 기 알약)
+  if (line.outside) facts.push({ text: "일반 계좌로 셈", title: s.currency === "USD" ? "해외 종목은 이 계좌에 못 담아 일반 계좌 세율로 셌습니다." : "개별 주식은 연금 계좌에 못 담아 일반 계좌 세율로 셌습니다.", warn: true });
   // 미국은 "없다"고 못 말한다 — 허쉬·디지털리얼티처럼 1주당 배당 태그를 안 다는 회사가 있다.
-  if (s.dps === 0) warns.push(s.currency === "USD" ? "공시에서 배당을 못 읽었습니다(안 주는 회사일 수도 있습니다)" : "최근 1년 현금배당이 없습니다");
-  if (s.unusual) warns.push("특별·청산배당이 섞여 있어 1년 뒤에도 같으리라 보기 어렵습니다");
-  // 첫 배당 — 끝난 회계연도에 배당이 없었는데 지난 1년에 있다(예림당 22.8%처럼 한 번짜리일 수 있다). 국내만: 미국 연속 연수는 늘린 햇수를 물려받는다.
-  else if (s.currency === "KRW" && s.kind === "stock" && s.dps > 0 && s.streak === 0) warns.push("지난 회계연도엔 배당이 없었습니다. 이어질지는 알 수 없습니다");
-  if (s.kind !== "etf" && s.estimated) warns.push("연간 값이 없어 마지막 배당으로 어림한 추정값입니다");
+  if (s.dps === 0) facts.push({ text: "배당 없음", title: s.currency === "USD" ? "공시에서 배당을 못 읽었습니다. 안 주는 회사일 수 있습니다." : "최근 1년 현금배당이 없습니다.", warn: true });
+  if (s.unusual) facts.push({ text: "특별배당 섞임", title: "지난 1년에 특별·청산배당이 섞였습니다. 내년에도 이만큼 준다고 보긴 어렵습니다.", warn: true });
+  // 첫 배당 — 끝난 회계연도에 배당이 없었는데 지난 1년에 있다. 국내만: 미국 연속 연수는 늘린 햇수를 물려받는다.
+  else if (s.currency === "KRW" && s.kind === "stock" && s.dps > 0 && s.streak === 0) facts.push({ text: "작년 무배당", title: "지난 회계연도엔 배당이 없었습니다. 이어질지는 알 수 없습니다.", warn: true });
+  if (s.kind !== "etf" && s.estimated) facts.push({ text: "추정", title: "1년치 기록이 없어 마지막 배당으로 어림한 값입니다.", warn: true });
   // 일드맥스(TSLY·MSTY)류. 지난 1년 분배가 가격의 3할을 넘으면 원금을 돌려주는 상품이라 봐야 한다.
-  if ((s.yieldPct ?? 0) > HOT_YIELD_PCT) warns.push("분배금이 달마다 크게 흔들리고 원금을 돌려주는 몫이 섞여 있습니다");
-  if (s.close == null) warns.push("종가가 없어 투자금과 배당수익률을 못 냅니다");
-  if (s.dps > 0 && !s.pays.length) warns.push("지급일 기록이 없어 아래 달력에는 빠집니다");
+  if ((s.yieldPct ?? 0) > HOT_YIELD_PCT) facts.push({ text: "초고배당", title: "분배금이 달마다 크게 흔들립니다. 원금을 돌려주는 몫이 섞여 있습니다.", warn: true });
+  if (s.close == null) facts.push({ text: "종가 없음", title: "종가가 없어 투자금과 수익률을 못 냅니다.", warn: true });
+  if (s.dps > 0 && !s.pays.length) facts.push({ text: "달력엔 없음", title: "지급일 기록이 없어 아래 달력에는 안 들어갑니다.", warn: true });
 
-  const step = (d: number) => onShares(line.id, Math.max(0, shares + d));
+  const fractional = s.currency === "USD";
+  const [sharesTyped, setSharesTyped] = useState<string | null>(null);
+  const step = (d: number) => {
+    setSharesTyped(null);
+    onShares(line.id, Math.max(0, Math.round((shares + d) * 1e6) / 1e6));
+  };
   // 이 줄의 투자금(원). 종가도 평단도 없거나 0주면 안 적는다.
   const invest = line.investKrw != null && line.investKrw > 0 ? won(line.investKrw) : null;
   return (
@@ -1312,8 +1322,8 @@ function HoldingRow({
                 onChange={(e) => (e.target.value === SPLIT_OPTION ? onSplit(line.id) : onAccount(line.id, e.target.value as Account))}
                 aria-label={`${s.name} 계좌 유형`}
                 title={
-                  (line.ownAccount ? "이 줄만 따로 고른 계좌 유형입니다." : "위에서 고른 계좌 유형을 따릅니다. 이 줄만 바꿀 수 있습니다.") +
-                  (canSplit ? " 맨 아래 '＋ 계좌'는 같은 종목을 다른 계좌에도 한 줄 더 담습니다" : "")
+                  (line.ownAccount ? "이 줄만 따로 고른 계좌입니다." : "위에서 고른 계좌를 따릅니다. 이 줄만 바꿀 수 있습니다.") +
+                  (canSplit ? " 맨 아래 '＋ 계좌'로 같은 종목을 다른 계좌에도 담습니다." : "")
                 }
               >
                 {ACCOUNTS.map((a) => (
@@ -1331,13 +1341,12 @@ function HoldingRow({
             <span className="dv-tfacts">
               {/* 브라우저 기본 title 은 1초 뒤에야 뜨고 폰에선 안 뜬다 — 이 화면의 말풍선(.hz-tip)으로. */}
               {facts.map((f) => (
-                <span key={f.text} className="dv-tfact hz-tip hz-tip-wide" data-tip={f.title}>
+                <span key={f.text} className={`dv-tfact${f.warn ? " dv-tfact-warn" : ""} hz-tip hz-tip-wide`} data-tip={f.title}>
                   {f.text}
                 </span>
               ))}
             </span>
           )}
-          {warns.length > 0 && <span className="dv-tnote dv-twarn">{warns.join(" · ")}</span>}
         </span>
       </span>
       <span className="dv-tcell dv-tshares" role="cell">
@@ -1350,15 +1359,20 @@ function HoldingRow({
             else inputs.delete(line.id);
           }}
           type="number"
-          inputMode="numeric"
+          inputMode={fractional ? "decimal" : "numeric"}
           min={0}
-          step={1}
-          value={shares}
+          step={fractional ? 0.000001 : 1}
+          value={sharesTyped ?? String(shares)}
           aria-label={`${s.name} 주수`}
           onChange={(e) => {
-            const v = Math.floor(Number(e.target.value));
+            // 미국 주식은 소수점 매매(증권사 소수 여섯 자리)라 소수를 받는다(2026-09-17 피드백). 치는 동안의 "0." 이 지워지지 않게
+            // 문자열을 따로 들고, 칸을 떠나면 값에서 다시 그린다. 국내는 정수.
+            setSharesTyped(e.target.value);
+            const raw = Number(e.target.value);
+            const v = fractional ? Math.round(raw * 1e6) / 1e6 : Math.floor(raw);
             onShares(line.id, Number.isFinite(v) && v > 0 ? v : 0);
           }}
+          onBlur={() => setSharesTyped(null)}
           onFocus={(e) => e.target.select()}
         />
         <button type="button" className="dv-step" aria-label={`${s.name} 1주 더하기`} onClick={() => step(1)}>
@@ -1394,7 +1408,11 @@ function HoldingRow({
           </button>
         )}
       </span>
-      <span className="dv-tcell dv-tnum" role="cell">{s.dps > 0 ? money(s.dps, s) : "없음"}</span>
+      <span className="dv-tcell dv-tnum" role="cell">
+        {s.dps > 0 ? money(s.dps, s) : "없음"}
+        {/* ETF 가 주는 돈은 분배금 — 배당인지 분배금인지 묻는 피드백(2026-09-17). 주식 줄은 배당이라 아무것도 안 적는다. */}
+        {s.kind === "etf" && s.dps > 0 && <span className="dv-tsub">분배금</span>}
+      </span>
       <span className="dv-tcell dv-tnum dv-tstrong" role="cell">
         {won(line.netKrw)}
         {s.currency === "USD" && s.dps > 0 && <span className="dv-tsub">{usd(line.net)}</span>}
@@ -1584,7 +1602,7 @@ function Upcoming({ lines, fx, mode }: { lines: Line[]; fx: number; mode: TaxMod
           다가오는 일정
           <span
             className="hz-tip hz-tip-wide dv-help"
-            data-tip="확정은 회사·운용사가 공시한 다음 배당(1주당 금액·기준일·지급일)이고, 예상은 지난해 같은 날에 준 것으로 어림한 값입니다(석 달 안)."
+            data-tip="확정은 회사가 정해 공시한 다음 배당이고, 예상은 지난해 같은 날에 준 만큼으로 어림한 값입니다. 석 달 안만 보입니다."
             style={{ cursor: "help" }}
             aria-label="다가오는 일정 설명"
           >
@@ -1950,7 +1968,7 @@ function BasketSheet({
         icon={basket.icon}
         title={
           <>
-            {basket.altIrp && mode === "irp" ? `${basket.title} (IRP)` : basket.altPension && mode === "pension" ? `${basket.title} (연금저축)` : basket.altPension ? `${basket.title} (ISA)` : basket.title}
+            {basket.altIrp && mode === "irp" ? `${basket.title} (IRP)` : basket.altPension && mode === "pension" ? `${basket.title} (연금저축)` : basket.altPension && mode === "exempt" ? `${basket.title} (비과세 종합저축)` : basket.altPension ? `${basket.title} (ISA)` : basket.title}
             {/* 주의는 제목 옆 물음표에(2026-09-13 지적) — 바닥에 문장으로 두면 시트가 무거워진다. */}
             {basket.caution && (
               <span className="hz-tip hz-tip-wide dv-help" data-tip={basket.caution} style={{ cursor: "help", marginLeft: 4, verticalAlign: "middle" }} aria-label={`${basket.title} 주의`}>

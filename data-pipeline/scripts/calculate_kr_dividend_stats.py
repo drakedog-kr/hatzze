@@ -129,8 +129,9 @@ def load_notices(db, since: date) -> dict[str, list[dict]]:
         for frm in range(0, 100_000, 1000):
             chunk = execute_with_retry(
                 db.table("kr_dividend_notice")
-                .select("acptno,corp_prefix,dps_common,dps_pref,record_date,pay_date,taxfree,taxfree_amount,taxfree_note")
+                .select("acptno,corp_prefix,dps_common,dps_pref,record_date,pay_date,taxfree,taxfree_amount,taxfree_note,title")
                 .gte("filed_at", since.isoformat())
+                .not_.ilike("title", "%자회사%")  # 지주회사가 올린 자회사 배당은 지주의 배당이 아니다(수집기도 거르지만 옛 행이 남아 있을 수 있다)
                 .order("acptno")
                 .range(frm, frm + 999)
             ).data or []

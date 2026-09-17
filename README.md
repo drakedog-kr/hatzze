@@ -13,7 +13,7 @@
 | **서학개미 장부** (`/seohak`) | 개인이 미국 주식을 언제 사고팔고 지금 얼마가 됐는지 | 예탁결제원 · 미 재무부 TIC |
 | **국장 미리보기** (`/preview`) | 밤사이 미국이 크게 움직인 날 국내는 보통 얼마에 열렸나 | 핀허브 · 야후 · 하이퍼리퀴드 |
 | **데일리 노트** (`/daily`) | 하루의 시장 이야기를 매일 저녁 한 편으로 정리한 글 | 위 화면들의 그날 데이터 |
-| **배당으로 살기** (`/dividend`) | 배당주를 담고 주수를 적으면 1년에 얼마 받는지 계좌별 세후로, 달마다 얼마 들어오는지 | 예탁결제원(SEIBro) · KIND · SEC · stockanalysis |
+| **배당으로 살기** (`/dividend`) | 배당주를 담고 주수를 적으면 1년에 얼마 받는지 계좌별 세후로, 달마다 얼마 들어오는지 | 예탁결제원(SEIBro) · KIND(배당 결정 공시·고배당기업·배당성향) · 미래에셋 TIGER(과표) · SEC · stockanalysis |
 | **텔레그램 채널** ([@hatzze69](https://t.me/hatzze69)) | 채널에서 오간 이야기를 관련 종목과 함께 매일 아침·저녁, 주말에 정리 | 텔레그램 공개 채널 |
 
 2026-08-06 베타 오픈 이후로 화면이 계속 붙는 중이라 로고 옆에 베타 배지를 답니다. 가장 최근에 연 것은 **배당으로 살기**(2026-09-16)이고, 텔레그램 채널 글은 2026-09-11부터 새 형식으로 나갑니다.
@@ -111,7 +111,7 @@ data-pipeline/
   config/         지표 임계값·가중치 · 종목 별칭 · 테마 사전
   backtest/       눈금·가중치 재보정 하네스
   common/         Supabase·야후·KRX·HTTP 클라이언트 · LLM 문장 검수 · 텔레그램 글 조립
-supabase/         schema.sql + migration_001~078
+supabase/         schema.sql + migration_001~079
 .github/workflows/  daily-update · telegram-broadcast · us-dict-scan · indexnow · ci
 ```
 
