@@ -29,6 +29,12 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 없는 주소·오류에 안내 화면이 생기는 것이라 Patch.
+    version: "1.16.2",
+    date: "2026-09-17",
+    changes: ["없는 주소로 들어오면 빈 화면이나 영문 안내 대신 돌아갈 곳을 적은 안내 화면이 뜹니다."],
+  },
+  {
     // 고장 수정이라 Patch.
     version: "1.16.1",
     date: "2026-09-17",
