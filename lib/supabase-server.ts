@@ -2,6 +2,51 @@ import "server-only";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+/**
+ * 조회 응답을 Next 데이터 캐시에 두는 시간(초).
+ *
+ * ## 왜 캐시하나
+ *
+ * 화면은 전부 force-dynamic 이고 HTML 은 no-store 라, **방문 한 번이 곧 Supabase 조회 한
+ * 벌**이었다. /kadera 한 번에 `.from()` 이 최대 35번, TTFB 는 /kadera 1.65초 · /dividend
+ * 1.47초 · /insider 1.35초(2026-09-17 프로덕션 실측). 그런데 자료는 파이프라인이 하루 두 번
+ * 바꿀 뿐이다. 같은 조회를 5분 안에 다시 하면 결과가 같은데 매번 DB 를 친 셈이다.
+ *
+ * ## 어디서 캐시하나 — 함수가 아니라 **fetch**
+ *
+ * `unstable_cache` 로 조회 함수를 감싸는 길도 있는데, 그러면 함수마다 돌려주는 값이
+ * JSON 으로 오갈 수 있는지(Map·Set·Date 는 깨진다) 하나하나 봐야 하고, 실패한 결과(빈
+ * 목록·LOAD_FAILED)도 그대로 굳는다. 대신 supabase-js 가 PostgREST 를 부르는 fetch 에
+ * `next.revalidate` 를 붙인다. 그러면
+ *   - 조회 하나하나(URL·헤더가 키)가 따로 캐시돼 페이징(`offset`·`limit` 쿼리)도 안 섞이고,
+ *   - 200 이 아닌 응답은 Next 가 애초에 안 담아 실패는 굳지 않으며,
+ *   - 응답이 JSON 텍스트라 값의 꼴을 안 따진다.
+ * 야후·FRED 조회가 이미 같은 방식이다(lib/yahoo-quote.ts · lib/seohak-external.ts).
+ *
+ * ## 무엇이 달라지나
+ *
+ * 파이프라인이 끝난 뒤 최대 5분까지 옛 값이 보일 수 있다. 화면의 '최종 업데이트' 시각은
+ * 자료에서 나오므로 보이는 값과 어긋나지 않는다. 데일리 노트를 손으로 올린 직후에도 같은
+ * 5분이 걸린다. 캐시 기한이 지나면 **먼저 옛 값을 주고 뒤에서 새로 받는다**(Next 데이터
+ * 캐시의 stale-while-revalidate) — 기한이 지난 첫 방문자가 느려지지 않는다.
+ *
+ * ⚠️ GET·HEAD 만 붙인다. RPC(POST)는 그대로 매번 부른다. 2MB 를 넘는 응답은 Next 가
+ *    담지 않는다(PostgREST 한 쪽은 1,000행이라 거기 닿는 조회는 없다).
+ * ⚠️ 이 상수를 0 으로 두면 캐시가 통째로 꺼진다 — 파이프라인 직후 확인이 급할 때의 탈출구.
+ */
+export const READ_CACHE_SECONDS = 300;
+
+/** Next 의 fetch 확장(next.revalidate)까지 받는 init 타입(lib/yahoo-quote.ts 와 같은 꼴). */
+type FetchInit = RequestInit & { next?: { revalidate?: number } };
+
+/** supabase-js 에 넘기는 fetch. 읽기 요청에만 데이터 캐시를 건다(위 주석). */
+function cachedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const method = (init?.method ?? "GET").toUpperCase();
+  if (READ_CACHE_SECONDS <= 0 || (method !== "GET" && method !== "HEAD")) return fetch(input, init);
+  const withCache: FetchInit = { ...init, next: { revalidate: READ_CACHE_SECONDS } };
+  return fetch(input, withCache);
+}
+
 let client: SupabaseClient | null = null;
 
 /**
@@ -29,6 +74,7 @@ export function getSupabaseServer(): SupabaseClient {
   // indicators/indicator_values/daily_score 테이블은 RLS에 공개 SELECT 정책이 있다.
   client = createClient(supabaseUrl, supabaseKey, {
     auth: { persistSession: false },
+    global: { fetch: cachedFetch },
   });
 
   return client;
@@ -58,6 +104,7 @@ export function getSupabaseAdmin(): SupabaseClient {
 
   adminClient = createClient(supabaseUrl, secretKey, {
     auth: { persistSession: false },
+    global: { fetch: cachedFetch },
   });
 
   return adminClient;
