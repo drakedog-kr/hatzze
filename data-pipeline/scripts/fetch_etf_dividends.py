@@ -8,6 +8,16 @@
 
 '1년에 얼마'는 미국·국내 다 같다 — **지난 365일 안에 지급된 건의 합.** 지급 달은 그 건들의 달이라 달력에 든다.
 
+## 국내 과표 — 운용사 공시(지금은 TIGER 만)
+
+국내 ETF 분배금은 전액이 과세되지 않는다. 운용사가 지급 건마다 '과표'(과세되는 1주당 금액)를 공시한다 — TIGER 200 커버드콜
+88원 중 5원, 배당커버드콜액티브 413원 중 6원, 미국배당다우존스 30원 중 30원(2026-09-17 실측 118건: 국내 커버드콜 0~9%,
+국내 주식형 0~100% 들쭉날쭉, 해외·채권형 대부분 100% 인데 예외 있음). SEIBro 는 과표기준가만 주고 과표는 안 준다
+(기준가 차이로 계산하면 공시값과 안 맞았다 — 미국배당다우존스 8월 계산 0원, 공시 30원). 그래서 TIGER '전체 분배 내역'
+(`distribution/overall/list.ajax`, 열다섯 달 47회)의 '과표기준' 열을 받아 SEIBro 지급 건에 (코드, 기준일)로 붙인다.
+payments[].taxable · taxable_dps. 못 붙인 운용사는 taxable_dps 가 null — 화면이 전액 과세로 센다.
+다른 운용사 사이트(KODEX·RISE·ACE·PLUS·SOL)는 아직 안 찔러 봤다.
+
 ## 국내 분배금지급현황(SEIBro)
 
 WebSquare 화면이라 서비스 호출 하나로 온다 — `callServletService.jsp` 에 XML 을 POST 하면 XML 로 답한다(로그인·세션
@@ -55,6 +65,11 @@ from config.etf_dividends import US_ETFS  # noqa: E402
 
 TABLE = "etf_dividend"
 KRX_URL = "http://data-dbg.krx.co.kr/svc/apis/etp/etf_bydd_trd"
+TIGER_LIST = "https://investments.miraeasset.com/tigeretf/ko/distribution/overall/list.ajax"
+TIGER_SRC = "https://investments.miraeasset.com/tigeretf/ko/distribution/overall/list.do"
+TIGER_UA = {"User-Agent": "hatzze/1.0 (+https://hatzze.fun; contact: support@hatzze.fun)", "Referer": TIGER_SRC, "X-Requested-With": "XMLHttpRequest"}
+TIGER_PAGE = 20
+TIGER_PAUSE_SEC = 0.7
 SEIBRO_URL = "https://seibro.or.kr/websquare/engine/proworks/callServletService.jsp"
 SEIBRO_SRC = "https://seibro.or.kr/websquare/control.jsp?w2xPath=/IPORTAL/user/etf/BIP_CNTS06030V.xml&menuNo=179"
 SEIBRO_HEADERS = {
@@ -204,6 +219,49 @@ def seibro_history(today: date) -> list[dict] | None:
     return out
 
 
+def tiger_taxable(today: date, months: int = SEIBRO_MONTHS) -> dict[tuple[str, str], float]:
+    """TIGER 지급 건의 과표 — (코드, 기준일) → 과세되는 1주당 금액. 못 받은 달은 건너뛴다(그 달 건은 과표 없음 = 전액 과세)."""
+    out: dict[tuple[str, str], float] = {}
+    y, m = today.year, today.month
+    for _ in range(months):
+        idx = 1
+        while True:
+            q = urllib.parse.urlencode({"pageIndex": idx, "firstIndex": (idx - 1) * TIGER_PAGE, "listCnt": TIGER_PAGE, "selectYear": y, "selectMonth": m})
+            page = None
+            for attempt in (1, 2, 3):
+                try:
+                    with urllib.request.urlopen(urllib.request.Request(f"{TIGER_LIST}?{q}", headers=TIGER_UA), timeout=40) as r:
+                        page = r.read().decode("utf-8", "ignore")
+                    break
+                except (OSError, http.client.HTTPException):
+                    if attempt == 3:
+                        break
+                    time.sleep(3)
+            time.sleep(TIGER_PAUSE_SEC)
+            if page is None:
+                print(f"  ⚠️ TIGER 과표 {y}-{m:02d} 못 받음 — 그 달은 전액 과세로 둡니다")
+                break
+            rows = re.findall(r"<tr[^>]*>(.*?)</tr>", page, flags=re.S)
+            tot = re.search(r'data-tot-cnt="(\d+)"', page)
+            for tr in rows:
+                cells = [html.unescape(re.sub(r"<[^>]+>", "", c)).strip() for c in re.findall(r"<td[^>]*>(.*?)</td>", tr, flags=re.S)]
+                code = re.search(r'<p class="code">\((.*?)\)</p>', tr, flags=re.S)
+                if not code or len(cells) < 7:
+                    continue
+                try:
+                    date.fromisoformat(cells[2])
+                    out[(code.group(1).strip(), cells[2])] = float(cells[5].replace(",", "") or 0)
+                except ValueError:
+                    continue
+            if not rows or tot is None or idx * TIGER_PAGE >= int(tot.group(1)):
+                break
+            idx += 1
+        m -= 1
+        if m == 0:
+            y, m = y - 1, 12
+    return out
+
+
 def cadence_of(n: int) -> str | None:
     """지난 1년 지급 건수 → 주기. 열한 번도 월(빠진 달 하나는 상장 첫해거나 지급일이 밀린 것)."""
     if n >= 11:
@@ -226,6 +284,8 @@ def main() -> None:
     if latest is None:
         print("[ETF] KRX 시세를 못 받았습니다 — 국내 ETF 는 시세 없이 넣습니다")
     kr_hist = seibro_history(today)
+    taxable = tiger_taxable(today) if kr_hist is not None else {}
+    print(f"[ETF] TIGER 과표 {len(taxable)}건")
     kr_count = 0
     if kr_hist is not None:
         by_code: dict[str, list[dict]] = {}
@@ -243,11 +303,15 @@ def main() -> None:
             close = float(px["TDD_CLSPRC"]) if px and px.get("TDD_CLSPRC") else None
             ttm = round(sum(p["amount"] for p in paid), 2)
             kr_count += 1
+            # 과표는 지급 건마다. 하나라도 있으면 없는 건은 분배금 전액으로 쳐서 합을 낸다(그 달 페이지를 못 받은 것).
+            tx = [taxable.get((code, p["record"])) for p in paid]
+            has_tx = any(t is not None for t in tx)
             rows.append({
                 "code": code, "market": "KR", "currency": "KRW",
                 "name_ko": max(recs, key=lambda p: p["record"])["name"], "name_en": None,  # 이름이 바뀐 ETF 는 최근 건의 이름
                 "cadence": cadence_of(len(paid)), "ttm_dps": ttm, "estimated": False,
-                "payments": [{"record": p["record"], "pay": p["pay"], "amount": p["amount"]} for p in paid],
+                "payments": [{"record": p["record"], "pay": p["pay"], "amount": p["amount"], **({"taxable": t} if t is not None else {})} for p, t in zip(paid, tx)],
+                "taxable_dps": round(sum(min(p["amount"], t) if t is not None else p["amount"] for p, t in zip(paid, tx)), 2) if has_tx else None,
                 "pay_months": sorted({int(p["pay"][5:7]) for p in paid}),
                 "next_pay_date": nxt["pay"] if nxt else None, "next_pay_amount": nxt["amount"] if nxt else None,
                 "as_of": today.isoformat(), "source": SEIBRO_SRC,
@@ -256,7 +320,12 @@ def main() -> None:
                 "computed_for": today.isoformat(),
             })
         issuers = sorted({r["issuer"] for r in kr_hist})
+        with_tx = [r for r in rows if r["market"] == "KR" and r["taxable_dps"] is not None]
+        partial = [r for r in with_tx if r["taxable_dps"] < r["ttm_dps"] * 0.99]
         print(f"[ETF] SEIBro 분배 내역 {len(kr_hist)}건 · {len(by_code)}종목 중 지난 1년 지급 있음 {kr_count} · 운용사 {len(issuers)}곳" + (f" · 시세 없어 뺀 것 {no_price}" if no_price else ""))
+        print(f"[ETF] 과표 붙은 국내 ETF {len(with_tx)} · 그중 일부만 과세 {len(partial)}")
+        for r in sorted(partial, key=lambda r: r["taxable_dps"] / r["ttm_dps"])[:6]:
+            print(f"  {r['name_ko']:34s} 분배금 {r['ttm_dps']:>8,.0f} 과표 {r['taxable_dps']:>8,.0f} ({r['taxable_dps'] / r['ttm_dps'] * 100:.0f}%)")
 
     fx = usdkrw()
     key = FINNHUB_API_KEY or ""
@@ -286,6 +355,7 @@ def main() -> None:
             "name_ko": e["name_ko"], "name_en": e.get("name_en"),
             "cadence": e["cadence"], "ttm_dps": ttm, "estimated": False,
             "payments": [{"pay": d, "amount": a} for d, a in pays],
+            "taxable_dps": None,
             "pay_months": sorted({int(d[5:7]) for d, _ in pays}),
             "next_pay_date": nxt["pay"] if nxt else None, "next_pay_amount": float(nxt["amount"]) if nxt else None,
             "as_of": as_of, "source": e["source"],

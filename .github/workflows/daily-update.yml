@@ -907,59 +907,6 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_seohak_tic.py
 
-      # ── 배당주 (/dividend · 종목 페이지 배당 카드) ──────────────────────────
-      # 배당금 쪽 재료다. 현재가는 `stocks.close_price`(위 fetch_krx_stocks)를 그대로 쓴다.
-      #
-      # ⭐ 아침·저녁 둘 다 돌린다. 슬롯마다 새로 들어오는 시장이 다르다 — 저녁(18:00 KST)은
-      #    국내 종가(전 거래일)와 예탁원 배당 기록, 아침(07:00 KST)은 막 끝난 미국 장의 종가.
-      #    실측(2026-09-15): fetch_krx_stocks 는 아침엔 두 거래일 전, 저녁엔 전 거래일을 받았다.
-      #
-      # ⚠️ 날짜별 증분이 아니라 **매일 스냅숏 전량**(15페이지·7만 행)이다. 금융위 API 는
-      #    기준일 다음 영업일 13시 뒤에 갱신되므로 아침 실행은 이틀 전 스냅숏, 저녁 실행이
-      #    어제 것을 받는다. 둘 다 돌려도 같은 행을 다시 쓸 뿐이다.
-      - name: Fetch 예탁원 배당 기록 (배당주)
-        id: kr_dividends
-        continue-on-error: true
-        run: python data-pipeline/scripts/fetch_kr_dividends.py
-
-      # 기록을 종목 한 줄로 접는다(12개월 합·수익률·지급월·연속 배당). 화면은 이 표만 읽는다.
-      # 위 스텝이 죽어도 돌린다 — 어제 기록으로 오늘 종가(fetch_krx_stocks)의 수익률은 낼 수 있다.
-      - name: Calculate 종목별 배당 요약 (배당주)
-        id: kr_dividend_stats
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        run: python data-pipeline/scripts/calculate_kr_dividend_stats.py
-
-      # 미국 배당주. SEC 공시(키 없음, 초당 10회) 300종목 3분 + 핀허브 시세 180종목 4분쯤.
-      # 미국 러너에서 SEC·핀허브는 잘 열린다(KRX·data.go.kr 와 반대다).
-      - name: Fetch 미국 배당주 요약 (배당주)
-        id: us_dividends
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        run: python data-pipeline/scripts/fetch_us_dividends.py
-
-      # ETF 분배금 — 미국은 stockanalysis, 국내는 예탁결제원 SEIBro 분배금지급현황(전 운용사 · 열다섯 달치 · 150여 회 요청 · 2분 반). 시세·환율도 여기서.
-      - name: Fetch ETF 분배금 (배당주)
-        id: etf_dividends
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        run: python data-pipeline/scripts/fetch_etf_dividends.py
-
-      # 고배당기업(배당소득 분리과세 대상) 목록 — KIND 페이지 POST 한 번. ⚠️ 거래소 사이트라 미국 러너에서 막힐 수 있다.
-      - name: Fetch 고배당기업 목록 (배당주)
-        id: kr_high_dividend
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        run: python data-pipeline/scripts/fetch_kr_high_dividend.py
-
-      # 배당성향(KIND 배당정보, 지난 사업연도 한 줄씩) — POST 한 번. 위와 같은 사이트.
-      - name: Fetch 배당성향 (배당주)
-        id: kr_dividend_payout
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        run: python data-pipeline/scripts/fetch_kr_dividend_payout.py
-
-
       - name: Fetch GitHub trading bot repo count
         id: github_trading_repos
         continue-on-error: true
@@ -1078,7 +1025,8 @@ jobs:
       # [5] 완료 후 5분 — `sleep 300`
       #   요청받은 사항이다. 발송 스텝이 파이프라인 **안**에 있어서 엄밀히는 '완료 직전'이지만,
       #   여기 오기까지 자료 수집·점수 계산·카더라 집계가 전부 끝나 있고 뒤에 남은 건
-      #   결과 집계와 알림뿐이다. 즉 실질적으로 '완료 후'가 맞다. 이 저장소는 public 이라
+      #   배당주 일곱 스텝(이 발송이 안 읽는 표들, 2026-09-17 에 뒤로 뺐다)과 결과 집계·알림뿐이다.
+      #   즉 실질적으로 '완료 후'가 맞다. 이 저장소는 public 이라
       #   Actions 분이 무료여서 러너를 5분 재우는 비용은 없다.
       - name: (텔레그램) B 마감 리포트 발송 (평일 저녁)
         id: telegram_broadcast
@@ -1096,6 +1044,70 @@ jobs:
           python data-pipeline/scripts/send_telegram_broadcast.py --send --format evening2
 
 
+
+      # ── 배당주 (/dividend · 종목 페이지 배당 카드) ──────────────────────────
+      # 배당금 쪽 재료다. 현재가는 `stocks.close_price`(위 fetch_krx_stocks)를 그대로 쓴다.
+      #
+      # ⭐ 잡의 맨 뒤(저녁 발송 다음)에 둔다(2026-09-17). 일곱 스텝이 10분 넘게 걸리는데(미국 배당주 7분 · ETF 3분 · 공시 1~2분)
+      #    점수·히어로 요약·저녁 발송은 이 표들을 안 읽는다 — 앞에 있으면 발송만 그만큼 늦어졌다. 뒤에서 죽어도 위엔 영향 없고,
+      #    아래 '배당주 수집' 요약·알림이 always() 라 여기서도 잡힌다.
+      #
+      # ⭐ 아침·저녁 둘 다 돌린다. 슬롯마다 새로 들어오는 시장이 다르다 — 저녁(18:00 KST)은
+      #    국내 종가(전 거래일)와 예탁원 배당 기록, 아침(07:00 KST)은 막 끝난 미국 장의 종가.
+      #    실측(2026-09-15): fetch_krx_stocks 는 아침엔 두 거래일 전, 저녁엔 전 거래일을 받았다.
+      #
+      # ⚠️ 날짜별 증분이 아니라 **매일 스냅숏 전량**(15페이지·7만 행)이다. 금융위 API 는
+      #    기준일 다음 영업일 13시 뒤에 갱신되므로 아침 실행은 이틀 전 스냅숏, 저녁 실행이
+      #    어제 것을 받는다. 둘 다 돌려도 같은 행을 다시 쓸 뿐이다.
+      - name: Fetch 예탁원 배당 기록 (배당주)
+        id: kr_dividends
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_kr_dividends.py
+
+      # 거래소 '현금·현물배당 결정' 공시 최근 열흘치 — 확정 배당(1주당 금액·기준일·지급예정일)과 감액배당(비과세) 문장.
+      # KIND 세 번 요청씩 수십 건, 1분 안. 아래 요약 스텝이 이 표를 읽어 next_pay_*·taxfree_* 를 채운다(마이그레이션 079).
+      - name: Fetch 배당 결정 공시 (배당주)
+        id: kr_dividend_notices
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_kr_dividend_notices.py
+
+      # 기록을 종목 한 줄로 접는다(12개월 합·수익률·지급월·연속 배당·확정 배당·감액배당). 화면은 이 표만 읽는다.
+      # 위 스텝들이 죽어도 돌린다 — 어제 기록으로 오늘 종가(fetch_krx_stocks)의 수익률은 낼 수 있다.
+      - name: Calculate 종목별 배당 요약 (배당주)
+        id: kr_dividend_stats
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python data-pipeline/scripts/calculate_kr_dividend_stats.py
+
+      # 미국 배당주. SEC 공시(키 없음, 초당 10회) 300종목 3분 + 핀허브 시세 180종목 4분쯤.
+      # 미국 러너에서 SEC·핀허브는 잘 열린다(KRX·data.go.kr 와 반대다).
+      - name: Fetch 미국 배당주 요약 (배당주)
+        id: us_dividends
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_us_dividends.py
+
+      # ETF 분배금 — 미국은 stockanalysis, 국내는 예탁결제원 SEIBro 분배금지급현황(전 운용사 · 열다섯 달치 · 150여 회 요청 · 2분 반). 시세·환율도 여기서.
+      - name: Fetch ETF 분배금 (배당주)
+        id: etf_dividends
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_etf_dividends.py
+
+      # 고배당기업(배당소득 분리과세 대상) 목록 — KIND 페이지 POST 한 번. ⚠️ 거래소 사이트라 미국 러너에서 막힐 수 있다.
+      - name: Fetch 고배당기업 목록 (배당주)
+        id: kr_high_dividend
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_kr_high_dividend.py
+
+      # 배당성향(KIND 배당정보, 지난 사업연도 한 줄씩) — POST 한 번. 위와 같은 사이트.
+      - name: Fetch 배당성향 (배당주)
+        id: kr_dividend_payout
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_kr_dividend_payout.py
 
       # ⚠️ 국장 미리보기(`kr_preview`)를 이 목록 맨 앞에 넣어 뒀다. 그 스텝은
       #    continue-on-error 라 실패해도 잡이 흐르는데, 여기에 안 들어 있으면 **아무도
@@ -1547,8 +1559,8 @@ jobs:
         id: dividend_health
         if: always()
         run: |
-          names=("fetch_kr_dividends.py" "calculate_kr_dividend_stats.py" "fetch_us_dividends.py" "fetch_etf_dividends.py" "fetch_kr_high_dividend.py" "fetch_kr_dividend_payout.py")
-          outcomes=("${{ steps.kr_dividends.outcome }}" "${{ steps.kr_dividend_stats.outcome }}" "${{ steps.us_dividends.outcome }}" "${{ steps.etf_dividends.outcome }}" "${{ steps.kr_high_dividend.outcome }}" "${{ steps.kr_dividend_payout.outcome }}")
+          names=("fetch_kr_dividends.py" "fetch_kr_dividend_notices.py" "calculate_kr_dividend_stats.py" "fetch_us_dividends.py" "fetch_etf_dividends.py" "fetch_kr_high_dividend.py" "fetch_kr_dividend_payout.py")
+          outcomes=("${{ steps.kr_dividends.outcome }}" "${{ steps.kr_dividend_notices.outcome }}" "${{ steps.kr_dividend_stats.outcome }}" "${{ steps.us_dividends.outcome }}" "${{ steps.etf_dividends.outcome }}" "${{ steps.kr_high_dividend.outcome }}" "${{ steps.kr_dividend_payout.outcome }}")
 
           {
             echo "## 배당주"
