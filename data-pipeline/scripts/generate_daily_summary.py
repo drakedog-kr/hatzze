@@ -13,7 +13,9 @@ LLM 호출이 실패하거나 키가 없어도 파이프라인 본체(점수 계
 
 from __future__ import annotations
 
+import re
 import sys
+from collections.abc import Callable
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -332,6 +334,72 @@ BALANCE_KINDS = ("시장", "감성")
 BALANCE_TOP_N = 5
 
 
+def balance_counts(rows: list[dict]) -> tuple[dict[str, int], dict[str, int]]:
+    """종류별 (초고온에 든 개수, 상위 BALANCE_TOP_N 안의 개수). rows 는 과열도 내림차순."""
+    hot = {k: sum(1 for r in rows if r["hot"] and r["category"] == k) for k in BALANCE_KINDS}
+    top = {k: sum(1 for r in rows[:BALANCE_TOP_N] if r["category"] == k) for k in BALANCE_KINDS}
+    return hot, top
+
+
+# 갈림 문장이 개수를 적는 꼴. "시장 지표 3개" · "감성지표가 2개" · "시장 지표는 0개" · "감성 지표만 1개".
+BALANCE_COUNT_RE = re.compile(r"(시장|감성)\s*지표(?:\s*(?:는|이|가|도|만|의|를|은))?\s*(\d+)\s*개")
+# "두 종류가 각각 1개씩" — 종류 이름 없이 둘을 한꺼번에 세는 꼴.
+BALANCE_EACH_RE = re.compile(r"각각\s*(\d+)\s*개")
+
+
+def balance_count_problems(text: str, hot: dict[str, int], top: dict[str, int]) -> list[str]:
+    """갈림 문장에 적힌 개수가 [갈림] 줄의 것과 다르면 그 자리를 돌려준다(비면 통과).
+
+    프롬프트가 "근거 숫자도 [갈림] 줄의 것만 쓰세요"라고 못박아도 모델이 상위 5개 자리의 3을
+    초고온 자리에 옮겨 적었다(2026-09-08 프로덕션, 같은 화면의 코드 문단은 2개·타일은 2장).
+    글자로 지시한 것은 글자로 뚫리니, 개수는 코드가 다시 세어 대조한다.
+
+    자리 판정: 개수가 든 **절**(쉼표·마침표 사이)에서 '상위'와 '초고온' 중 어느 쪽이 있나 본다.
+    하나만 있으면 그것, 둘 다 있으면 개수 **앞**에서 가장 가까운 것(우리말은 틀을 먼저 말한다 —
+    "초고온 구간에 N개", "상위 5개 안에 N개"), 절에 없으면 앞 절에서 이어 온 마지막 낱말, 그것도
+    없으면 초고온. 저장된 62문장의 꼴로 맞췄다 — "초고온 구간에는 두 종류가 각각 1개씩 들었으나
+    상위 5개 안에는 시장 지표 3개, 감성 지표 2개로" 에서 '각각 1개'는 초고온, '시장 지표 3개'는
+    상위, 쉼표 뒤 '감성 지표 2개'는 앞에서 이어 온 상위로 갈린다.
+
+    ⚠️ 검사는 좁게만 한다. 여기서 못 잡는 꼴(개수를 아예 안 적은 문장·"시장 지표는 없으며")은
+    그냥 통과다. 잡는 것은 **적힌 개수가 틀린 것**뿐이다.
+    """
+    words = (("상위", "top"), ("초고온", "hot"))
+
+    def scope(pos: int) -> str:
+        left = max(text.rfind(",", 0, pos), text.rfind(".", 0, pos)) + 1
+        stops = [i for i in (text.find(",", pos), text.find(".", pos)) if i >= 0]
+        right = min(stops) if stops else len(text)
+        clause = text[left:right]
+        inside = {kind: [m.start() + left for m in re.finditer(word, clause)] for word, kind in words}
+        present = [k for k, hits in inside.items() if hits]
+        if len(present) == 1:
+            return present[0]
+        if len(present) == 2:
+            before = [(pos - i, k) for k, hits in inside.items() for i in hits if i < pos]
+            if before:
+                return min(before)[1]
+        # 절에 없다(또는 둘 다 뒤에 있다) — 앞에서 마지막으로 나온 틀을 이어받는다.
+        carried = [(text.rfind(word, 0, pos), kind) for word, kind in words]
+        carried = [(i, k) for i, k in carried if i >= 0]
+        return max(carried)[1] if carried else "hot"
+
+    found: list[str] = []
+    for m in BALANCE_COUNT_RE.finditer(text):
+        kind, n = m.group(1), int(m.group(2))
+        where = scope(m.start())
+        expect = (top if where == "top" else hot)[kind]
+        if n != expect:
+            found.append(f"{'상위' if where == 'top' else '초고온'} {kind} {n}개")
+    for m in BALANCE_EACH_RE.finditer(text):
+        n = int(m.group(1))
+        where = scope(m.start())
+        ref = top if where == "top" else hot
+        if not all(ref[k] == n for k in BALANCE_KINDS):
+            found.append(f"{'상위' if where == 'top' else '초고온'} 각각 {n}개")
+    return found
+
+
 def balance_verdict_lines(rows: list[dict]) -> list[str]:
     """[갈림] 블록 — **어느 종류가 더 뜨거운지를 파이썬이 정해 적어 준다.**
 
@@ -343,8 +411,7 @@ def balance_verdict_lines(rows: list[dict]) -> list[str]:
     기준: 초고온(과열도 75 이상)에 든 개수가 많은 쪽 → 같으면 상위 BALANCE_TOP_N 안의 개수가
     많은 쪽 → 그것도 같으면 '비슷하다'. rows 는 과열도 내림차순으로 정렬돼 들어온다.
     """
-    hot = {k: sum(1 for r in rows if r["hot"] and r["category"] == k) for k in BALANCE_KINDS}
-    top = {k: sum(1 for r in rows[:BALANCE_TOP_N] if r["category"] == k) for k in BALANCE_KINDS}
+    hot, top = balance_counts(rows)
     m, s = BALANCE_KINDS
     if hot[m] != hot[s]:
         hotter = m if hot[m] > hot[s] else s
@@ -517,29 +584,46 @@ def main() -> None:
         return "".join(b.text for b in resp.content if b.type == "text").strip()
 
     def sized_sentence(
-        system: str, length: tuple[int, int], source: str | None = None, how: str = "한 문장"
+        system: str,
+        length: tuple[int, int],
+        source: str | None = None,
+        how: str = "한 문장",
+        facts: Callable[[str], list[str]] | None = None,
     ) -> str:
         """한 문장 — 길이가 목표를 벗어나면 다시 쓰게 한다.
 
         카더라 총평의 ask_brief_sentence 와 같은 방식이다. 후보를 모아 두고 목표 범위
         안의 첫 번째를, 없으면 한가운데에 가장 가까운 걸 고른다. **빈 문장은 절대 안 낸다** —
         요약이 통째로 저장되지 않는 것보다 길이가 몇 자 어긋나는 게 낫다.
+
+        facts 는 문단별 사실 대조(갈림 문단의 개수, balance_count_problems). 어긋난 자리를
+        돌려주면 그 문장을 버리고 다시 쓰게 하고, 고를 때도 어긋난 후보는 뒤로 민다.
         """
         lo, hi = length
         # 문단마다 모델에게 준 자료가 다르다(갈림 문단은 ℃ 블록이 빠진다). 오타 검사의
         # '원문에 있는가' 대조도 **그 문단이 실제로 본 자료**로 해야 한다 — 안 그러면
         # 못 본 낱말을 근거로 통과시키거나 반대로 멀쩡한 말을 오타로 버린다.
         src = digest if source is None else source
+        wrong = facts or (lambda _t: [])
         candidates = [one_sentence(system, src)]
         for _ in range(HERO_RETRIES):
             cur = candidates[-1]
             # 길이가 맞아도 글자가 깨졌거나 오타가 있으면 다시 쓴다(common/text_check.py).
             found = problems(cur, src)
-            if lo <= len(cur) <= hi and not found:
+            off = wrong(cur)
+            if lo <= len(cur) <= hi and not found and not off:
                 break
             if found:
                 print(f"[WARNING] 문장을 버리고 다시 씁니다({' · '.join(found)}): {cur[:40]}…")
                 retry = system + f"\n\n[다시 쓰기] 방금 쓴 문장에 깨진 글자나 오타가 있습니다. 같은 뜻으로 **{how}**으로 다시 쓰세요."
+            elif off:
+                # 틀린 숫자는 되풀이하지 않는다(적어 주면 그 숫자를 다시 쓴다). 맞는 줄만 다시 가리킨다.
+                print(f"[WARNING] 개수가 자료와 달라 다시 씁니다({' · '.join(off)}): {cur[:40]}…")
+                retry = (
+                    system
+                    + f"\n\n[다시 쓰기] 방금 쓴 문장의 개수가 자료의 [갈림] 줄과 다릅니다. 개수는 [갈림] 줄에 적힌 "
+                    f"것만 그대로 쓰고, 같은 뜻으로 **{how}**으로 다시 쓰세요."
+                )
             else:
                 need = "늘려" if len(cur) < lo else "줄여"
                 retry = (
@@ -550,9 +634,12 @@ def main() -> None:
                 )
             candidates.append(one_sentence(retry, src))
         # 깨진 후보는 길이가 맞아도 안 쓴다 — 길이는 어긋나도 읽히지만 깨진 글자는 못 읽는다.
-        usable = [t for t in candidates if t.strip() and is_clean(t, src)] or [
-            t for t in candidates if t.strip()
-        ]
+        # 개수가 어긋난 후보도 같은 취급이다. 다만 전부 어긋나면 그중에서 고른다(빈 문장보다 낫다).
+        usable = (
+            [t for t in candidates if t.strip() and is_clean(t, src) and not wrong(t)]
+            or [t for t in candidates if t.strip() and is_clean(t, src)]
+            or [t for t in candidates if t.strip()]
+        )
         if not usable:
             return ""
         in_goal = [t for t in usable if lo <= len(t) <= hi]
@@ -564,7 +651,14 @@ def main() -> None:
     spotlight = sized_sentence(SPOTLIGHT_SYSTEM, SPOTLIGHT_LEN)
     # 갈림 문단만 두 문장을 허용한다 — 80자를 한 문장에 넣으면 만연체가 되고, '한 문장만' 이라
     # 다시 시키면 모델이 근거를 버리고 60자대로 되돌아간다(2026-09-06 실측 4/4).
-    balance = sized_sentence(BALANCE_SYSTEM, BALANCE_LEN, balance_digest, how="한두 문장")
+    hot, top = balance_counts(rows)
+    balance = sized_sentence(
+        BALANCE_SYSTEM,
+        BALANCE_LEN,
+        balance_digest,
+        how="한두 문장",
+        facts=lambda t: balance_count_problems(t, hot, top),
+    )
     trend = sized_sentence(TREND_SYSTEM, TREND_LEN)
     if not spotlight or not trend:
         print("[WARNING] LLM 응답이 비어 요약을 저장하지 않습니다.")
