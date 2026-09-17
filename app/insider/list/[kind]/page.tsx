@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { getInsiderOverview } from "@/lib/insider-data";
 
 import { SectionHead } from "../../../kadera/SectionHead";
+import { INSIDER_CARD } from "../../../og-copy";
 import { pageMetadata } from "../../../seo";
 import { C, Icon } from "../../../ui";
 import { ExpandableList } from "../../../kadera/ExpandableList";
@@ -52,11 +53,14 @@ function specOf(kind: string) {
 export async function generateMetadata({ params }: { params: Promise<{ kind: string }> }): Promise<Metadata> {
   const { kind } = await params;
   const spec = specOf(kind);
-  if (!spec) return pageMetadata({ title: "내부자 리포트 | hatzze", description: "", path: "/insider" });
+  if (!spec) return pageMetadata({ title: "내부자 리포트 | hatzze", description: "", path: "/insider", ownImage: INSIDER_CARD.alt });
   return pageMetadata({
     title: `${spec.title} | 내부자 리포트 | hatzze`,
     description: spec.sub,
     path: `/insider/list/${kind}`,
+    // 자기 폴더에 카드가 없어 구역(/insider)의 카드를 쓴다(app/seo.ts 의 imagePath).
+    ownImage: INSIDER_CARD.alt,
+    imagePath: "/insider",
   });
 }
 

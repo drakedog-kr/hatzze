@@ -14,6 +14,7 @@ import {
 import { SectionHead } from "../../../kadera/SectionHead";
 import { ChartZoom } from "../../ChartZoom";
 import { StockLogo } from "../../../StockLogo";
+import { INSIDER_CARD } from "../../../og-copy";
 import { pageMetadata } from "../../../seo";
 import { C, Icon, MONO } from "../../../ui";
 import { ExpandableList } from "../../../kadera/ExpandableList";
@@ -104,13 +105,16 @@ function HalfSheet({ children }: { children: React.ReactNode }) {
 export async function generateMetadata({ params }: { params: Promise<{ ticker: string }> }): Promise<Metadata> {
   const { ticker } = await params;
   const d = await getStockDetail(ticker);
-  if (!d) return pageMetadata({ title: "내부자 리포트 | hatzze", description: "", path: "/insider" });
+  if (!d) return pageMetadata({ title: "내부자 리포트 | hatzze", description: "", path: "/insider", ownImage: INSIDER_CARD.alt });
   return pageMetadata({
     title: `${d.name || d.ticker}(${d.ticker}) 내부자 공시 | hatzze`,
     description: `${withObjectParticle(d.name || d.ticker)} 월가 거물 ${d.holders.length}명이 보유하고, 미 하원의원 ${
       new Set(d.congress.map((c) => c.member)).size
     }명이 신고했습니다. 주식 텔레그램 언급 추이와 함께 봅니다.`,
     path: `/insider/stock/${d.ticker}`,
+    // 자기 폴더에 카드가 없어 구역(/insider)의 카드를 쓴다(app/seo.ts 의 imagePath).
+    ownImage: INSIDER_CARD.alt,
+    imagePath: "/insider",
   });
 }
 

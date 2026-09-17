@@ -7,6 +7,7 @@ import { SectionHead } from "../kadera/SectionHead";
 import { TapHint } from "./TapHint";
 import { insiderListHref } from "./lists";
 import { Empty, GroupTitle, Money, T, addRows, congressRows, execRows, fmtDate, holderRowsView, hotRowsView, analystTopRows, insiderNote, managerAumRows, quarterLabel, trimRows } from "./parts";
+import { INSIDER_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { C, Icon, MONO } from "../ui";
 
@@ -16,6 +17,8 @@ export async function generateMetadata(): Promise<Metadata> {
     description:
       "미국 기업 임원, 미 하원의원, 월가 거물이 무엇을 사고팔았는지 공시 그대로 봅니다. 주식 텔레그램에서 회자되는 종목과 나란히 놓습니다.",
     path: "/insider",
+    // ⚠️ `ownImage` 를 안 주면 옆의 opengraph-image.tsx 가 그린 카드가 아예 안 쓰인다(app/seo.ts).
+    ownImage: INSIDER_CARD.alt,
   });
 }
 

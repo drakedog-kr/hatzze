@@ -6,6 +6,7 @@ import { getPreview, type PreviewLink, type PreviewMover } from "@/lib/kr-previe
 
 import { SectionIntro } from "../SectionIntro";
 import { SectionHead } from "../kadera/SectionHead";
+import { PREVIEW_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { PREVIEW_PUBLIC } from "../screen-flags";
 import { StockLogo } from "../StockLogo";
@@ -86,10 +87,11 @@ export async function generateMetadata(): Promise<Metadata> {
   // 타입은 통과한다(Metadata 의 필드가 다 선택이라 `{}` 도 맞는 값이다). 2026-09-03 에
   // 실제로 그 상태였고, robots 만 붙어 있어서 겉으로는 멀쩡해 보였다.
   const meta = await pageMetadata({
-    title: "국장 미리보기",
+    title: "국장 미리보기 | hatzze",
     description:
       "밤사이 미장에서 크게 움직인 종목과 사업으로 엮인 국장 종목을 개장 전에 잇습니다. 최근 5년, 그런 날 국장이 몇 %에 열려 몇 %로 닫았는지를 함께 봅니다.",
     path: "/preview",
+    ownImage: PREVIEW_CARD.alt,
   });
   // 안 연 동안은 색인도 막는다. 아래에서 404 를 내므로 사실상 덤이지만, 사이드바에
   // 링크가 있던 동안 크롤러가 주소를 이미 봤을 수 있다.

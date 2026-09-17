@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { getDividendData, getTrends, type DividendStock } from "@/lib/dividend";
 
+import { DIVIDEND_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { DIVIDEND_PUBLIC } from "../screen-flags";
 import { DIVIDEND_PAGE } from "./copy";
@@ -37,6 +38,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: `${DIVIDEND_PAGE.label} | hatzze`,
     description: DIVIDEND_PAGE.description,
     path: DIVIDEND_PAGE.href,
+    ownImage: DIVIDEND_CARD.alt,
   });
   return PUBLIC ? meta : { ...meta, robots: { index: false, follow: false } };
 }

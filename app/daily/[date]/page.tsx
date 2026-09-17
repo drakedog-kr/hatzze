@@ -5,6 +5,7 @@ import { EMPTY_STOCKS, getNote, getNoteStocks, isNoteDate, listNotes, noteHref, 
 import { noteDescription } from "@/lib/daily-note-md";
 
 import { SITE_NAME, SITE_URL } from "../../brand";
+import { NOTE_CARD } from "../../og-copy";
 import { pageMetadata } from "../../seo";
 import { DAILY_PUBLIC } from "../../screen-flags";
 import { NOTE_PAGE } from "../copy";
@@ -42,6 +43,9 @@ export async function generateMetadata({ params }: { params: Promise<{ date: str
     title: `${r.note.title} | hatzze`,
     description: noteDescription(r.note.bodyMd) || NOTE_PAGE.description,
     path: noteHref(date),
+    // 날짜별 글은 자기 카드가 없어 목록(/daily)의 카드를 쓴다(app/seo.ts 의 imagePath).
+    ownImage: NOTE_CARD.alt,
+    imagePath: "/daily",
   });
   return PUBLIC ? meta : { ...meta, robots: { index: false, follow: false } };
 }

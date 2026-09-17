@@ -93,6 +93,11 @@ const nextConfig: NextConfig = {
         "/kadera/us/opengraph-image",
         "/mdd/opengraph-image",
         "/seohak/opengraph-image",
+        "/insider/opengraph-image",
+        "/dividend/opengraph-image",
+        "/daily/opengraph-image",
+        "/preview/opengraph-image",
+        "/changelog/opengraph-image",
       ].map((source) => ({ source, headers: [noindex] })),
     ];
   },

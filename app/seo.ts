@@ -79,19 +79,26 @@ export async function pageMetadata({
   description,
   path,
   ownImage,
+  imagePath,
 }: {
   title: string;
   description: string;
   /** 사이트 루트 기준 경로. 예: "/kadera" */
   path: string;
   /**
-   * 이 폴더에 opengraph-image.tsx 가 있을 때, 그 카드의 alt(=og-copy.ts 의 alt).
-   * URL 은 path 에서 만들어지므로 따로 안 받는다.
+   * 이 폴더(또는 imagePath 폴더)에 opengraph-image.tsx 가 있을 때, 그 카드의 alt(=og-copy.ts 의 alt).
+   * URL 은 path(또는 imagePath)에서 만들어지므로 따로 안 받는다.
    */
   ownImage?: string;
+  /**
+   * 카드가 놓인 폴더가 path 와 다를 때. 종목·인물 상세(`/insider/stock/NVDA`)와 날짜별 글
+   * (`/daily/2026-09-16`)은 자기 폴더에 카드가 없어 **구역의 카드**를 쓴다 — 안 주면 홈의
+   * 과열도 카드로 떨어져서, 내부자 종목을 공유했는데 온도 카드가 떴다(2026-09-17 지적).
+   */
+  imagePath?: string;
 }): Promise<Metadata> {
   const images = [
-    ownImage ? { url: `${path}/opengraph-image`, ...OG_SIZE, alt: ownImage } : await ogImage(),
+    ownImage ? { url: `${imagePath ?? path}/opengraph-image`, ...OG_SIZE, alt: ownImage } : await ogImage(),
   ];
   return {
     title,

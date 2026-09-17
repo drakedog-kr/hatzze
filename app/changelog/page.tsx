@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { DOC_WIDTH } from "../legal";
 import { RELEASES } from "../releases";
+import { CHANGELOG_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { C, MONO, R } from "../ui";
 import { ChangelogSeen } from "../VersionBadge";
@@ -13,6 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: "업데이트 기록 | hatzze",
     description: "hatzze의 버전별 변경 사항과 배포일을 모아 둔 기록입니다.",
     path: "/changelog",
+    ownImage: CHANGELOG_CARD.alt,
   });
 }
 
