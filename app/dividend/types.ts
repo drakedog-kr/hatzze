@@ -56,6 +56,41 @@ export type StockLite = {
   discount: number | null;
 };
 
+/** 서버가 클라이언트로 보내는 꼴 — StockLite 에서 값이 없는 칸(null·false·0)을 뺀 것. 종목 4,366개를 HTML 에 통째로 싣는데
+    null 칸이 절반이라 2.2MB 였다(2026-09-17, 모바일에서 페이지가 재시작된다는 제보). 클라이언트가 inflate() 로 다시 채운다. */
+export type StockWire = Pick<StockLite, "code" | "name" | "kind" | "currency" | "pays"> & Partial<Omit<StockLite, "code" | "name" | "kind" | "currency" | "pays">>;
+
+/** 뺀 칸을 기본값으로 채운다. 화면 코드는 전부 StockLite(null 이 있는 꼴)를 본다. */
+export function inflate(w: StockWire): StockLite {
+  return {
+    code: w.code,
+    name: w.name,
+    market: w.market ?? null,
+    kind: w.kind,
+    reit: w.reit ?? false,
+    asOf: w.asOf ?? null,
+    currency: w.currency,
+    alias: w.alias ?? null,
+    close: w.close ?? null,
+    cap: w.cap ?? 0,
+    dps: w.dps ?? 0,
+    yieldPct: w.yieldPct ?? null,
+    unusual: w.unusual ?? false,
+    estimated: w.estimated ?? false,
+    pays: w.pays,
+    streak: w.streak ?? 0,
+    growth5: w.growth5 ?? null,
+    nextRecord: w.nextRecord ?? null,
+    nextPay: w.nextPay ?? null,
+    taxable: w.taxable ?? null,
+    taxFreeNote: w.taxFreeNote ?? null,
+    highDiv: w.highDiv ?? null,
+    payout: w.payout ?? null,
+    growthYears: w.growthYears ?? null,
+    discount: w.discount ?? null,
+  };
+}
+
 export type BasketLite = {
   key: string;
   title: string;
