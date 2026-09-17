@@ -332,10 +332,13 @@ export function toEtfStock(r: EtfRow): DividendStock {
   };
 }
 
-async function loadEtf(): Promise<DividendStock[]> {
+/** 조회 실패를 호출부에 알리는 통로. 라벨은 화면에 그대로 적힌다(DividendData.failedSources). */
+type ReportFailure = (label: string, e: unknown) => void;
+
+async function loadEtf(report: ReportFailure): Promise<DividendStock[]> {
   // 국내 953 + 미국 33(2026-09-16)이라 한 번에 물으면 1,000행 캡에 걸린다 — 쪽으로 받는다.
   const rows = await fetchAllRows<EtfRow>("code", () => getSupabaseServer().from("etf_dividend").select("*"), {
-    onError: (e) => console.error("[dividend] etf_dividend 조회 실패", e),
+    onError: (e) => report("ETF 분배 기록", e),
   });
   return rows.map(toEtfStock);
 }
@@ -343,7 +346,7 @@ async function loadEtf(): Promise<DividendStock[]> {
 export type UsdKrw = { rate: number; date: string | null };
 
 /** 표가 없거나 실패하면 빈 목록 — 미국이 빠져도 국내 계산기는 그대로 뜬다. */
-async function loadUs(): Promise<{ stocks: DividendStock[]; fx: UsdKrw | null; priceDate: string | null }> {
+async function loadUs(report: ReportFailure): Promise<{ stocks: DividendStock[]; fx: UsdKrw | null; priceDate: string | null }> {
   try {
     const { data, error } = await getSupabaseServer().from("us_dividend_stock").select(US_COLUMNS).order("ticker").limit(1000);
     if (error) throw error;
@@ -356,7 +359,7 @@ async function loadUs(): Promise<{ stocks: DividendStock[]; fx: UsdKrw | null; p
       priceDate,
     };
   } catch (e) {
-    console.error("[dividend] us_dividend_stock 조회 실패", e);
+    report("미국 배당 기록", e);
     return { stocks: [], fx: null, priceDate: null };
   }
 }
@@ -372,13 +375,21 @@ export type DividendData = {
   usPriceDate: string | null;
   /** 원/달러(FRED). 미국 표가 없으면 null — 그때 화면은 미국 종목 없이 뜬다. */
   usdkrw: UsdKrw | null;
+  /**
+   * 조회에 실패한 자료의 이름. 비어 있으면 전부 제대로 받은 것이다.
+   *
+   * 미국·ETF·고배당·배당성향은 실패해도 빈 값으로 물러나 국내 계산기는 뜬다 — 그 자체는 맞는
+   * 설계인데, 그러면 "오늘은 미국 종목이 없네"로 읽힌다. 화면은 이 목록이 비어 있지 않으면
+   * 무엇이 빠졌는지 적는다. 국내 기록 자체를 못 읽으면 stocks 가 비고 여기에 그 이름이 든다.
+   */
+  failedSources: string[];
 };
 
 /* ── 고배당기업 (kr_high_dividend, 마이그레이션 077) ────────────────────────
    배당소득 분리과세(2026~2028) 대상으로 공시한 회사 목록. 없거나 실패하면 빈 Map — 표시만 빠진다. */
 type HighDivRow = { code: string; payout_pct: number | null; div_growth_pct: number | null; biz_year: number | null };
 
-async function loadHighDiv(): Promise<Map<string, DividendStock["highDiv"]>> {
+async function loadHighDiv(report: ReportFailure): Promise<Map<string, DividendStock["highDiv"]>> {
   const out = new Map<string, DividendStock["highDiv"]>();
   try {
     const { data, error } = await getSupabaseServer().from("kr_high_dividend").select("code,payout_pct,div_growth_pct,biz_year").limit(1000);
@@ -387,7 +398,7 @@ async function loadHighDiv(): Promise<Map<string, DividendStock["highDiv"]>> {
     if (rows.length >= 1000) console.error("[dividend] kr_high_dividend 가 1,000행에 닿았다 — 페이징이 필요하다");
     for (const r of rows) out.set(r.code, { payoutPct: n(r.payout_pct), growthPct: n(r.div_growth_pct), year: r.biz_year });
   } catch (e) {
-    console.error("[dividend] kr_high_dividend 조회 실패", e);
+    report("고배당기업 공시", e);
   }
   return out;
 }
@@ -396,7 +407,7 @@ async function loadHighDiv(): Promise<Map<string, DividendStock["highDiv"]>> {
    KIND 배당정보 — 회사마다 지난 사업연도의 배당성향. 1,300행쯤이라 두 쪽. 없거나 실패하면 빈 Map. */
 type PayoutRow = { code: string; payout_pct: number | null; biz_year: number | null; sector: string | null };
 
-async function loadPayout(): Promise<Map<string, { payout: DividendStock["payout"]; sector: string | null }>> {
+async function loadPayout(report: ReportFailure): Promise<Map<string, { payout: DividendStock["payout"]; sector: string | null }>> {
   const out = new Map<string, { payout: DividendStock["payout"]; sector: string | null }>();
   try {
     const db = getSupabaseServer();
@@ -408,19 +419,28 @@ async function loadPayout(): Promise<Map<string, { payout: DividendStock["payout
       if (rows.length < 1000) break;
     }
   } catch (e) {
-    console.error("[dividend] kr_dividend_payout 조회 실패", e);
+    report("배당성향", e);
   }
   return out;
 }
 
-/** 표가 없거나 조회가 실패하면 null — 화면은 "아직 자료가 없습니다"를 낸다. */
+/**
+ * 표가 비어 있으면 null — 화면은 "아직 자료가 없습니다"를 낸다.
+ * 조회가 **실패**하면 null 이 아니라 종목 없는 DividendData 에 failedSources 를 채워 돌려준다 —
+ * 화면이 "자료가 없다"와 "못 읽었다"를 갈라 말하게(lib/load-state.ts 의 원칙).
+ */
 export async function getDividendData(): Promise<DividendData | null> {
+  const failedSources: string[] = [];
+  const report: ReportFailure = (label, e) => {
+    failedSources.push(label);
+    console.error(`[dividend] ${label} 조회 실패`, e);
+  };
   let loaded: { rows: Row[]; computedFor: string | null };
   try {
     loaded = await loadAll();
   } catch (e) {
-    console.error("[dividend] kr_dividend_stock 조회 실패", e);
-    return null;
+    report("국내 배당 기록", e);
+    return { stocks: [], baskets: [], computedFor: null, priceDate: null, usPriceDate: null, usdkrw: null, failedSources };
   }
   if (!loaded.rows.length) return null;
   const all = loaded.rows.map(toStock);
@@ -428,7 +448,7 @@ export async function getDividendData(): Promise<DividendData | null> {
   // 종가 날짜가 최신이 아닌 종목은 상장폐지된 것이다(`stocks` 는 지우지 않는다 — fetch_krx_stocks.py).
   // 거래정지는 KRX 목록에 그대로 있어 여기 안 걸린다. 검색에 뜨면 옛 값으로 계산되니 뺀다.
   const kr = priceDate ? all.filter((s) => s.priceDate === priceDate) : all;
-  const [us, etf, highDiv, payout] = await Promise.all([loadUs(), loadEtf(), loadHighDiv(), loadPayout()]);
+  const [us, etf, highDiv, payout] = await Promise.all([loadUs(report), loadEtf(report), loadHighDiv(report), loadPayout(report)]);
   const krByCode = new Map(kr.map((s) => [s.code, s]));
   for (const s of kr) {
     s.highDiv = highDiv.get(s.code) ?? null;
@@ -451,6 +471,7 @@ export async function getDividendData(): Promise<DividendData | null> {
     priceDate,
     usPriceDate: us.fx ? us.priceDate : null,
     usdkrw: us.fx,
+    failedSources,
   };
 }
 

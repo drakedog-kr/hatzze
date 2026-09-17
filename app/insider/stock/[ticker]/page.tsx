@@ -17,6 +17,7 @@ import { StockLogo } from "../../../StockLogo";
 import { INSIDER_CARD } from "../../../og-copy";
 import { pageMetadata } from "../../../seo";
 import { C, Icon, MONO } from "../../../ui";
+import { LoadFailedNote } from "../../../LoadFailedNote";
 import { ExpandableList } from "../../../kadera/ExpandableList";
 import {
   CODE_LABEL,
@@ -264,6 +265,7 @@ export default async function StockDetailPage({
     // 원화는 크기를 가늠하라고 얹은 것이다. 쿠키로 한 번이라도 고르면 그 선택이 이긴다
     // (규칙은 globals.css 의 `[data-cur-default]`).
     <div className="hz-tx" data-cur-default="usd">
+      <LoadFailedNote sources={d.failedSources} />
       <Link
         href="/insider"
         style={{

@@ -36,6 +36,7 @@ import { cache } from "react";
 
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { getUsdKrw } from "@/lib/seohak-external";
+import { LOAD_FAILED, type MaybeFailed, isLoadFailed } from "@/lib/load-state";
 import { fetchAllRows } from "@/lib/telegram-data";
 import { usQuotes } from "@/lib/us-telegram-data";
 import { displayName } from "@/lib/us-ticker-names";
@@ -260,6 +261,15 @@ export type InsiderOverview = {
   latestCongressFilings: { date: string | null; count: number };
   /** 추적 중인 거물 수. 화면의 "N명 중" 분모다. */
   managerCount: number;
+  /**
+   * 조회에 실패한 축의 이름. 비어 있으면 전부 제대로 받은 것이다.
+   *
+   * 조회가 깨져도 화면을 죽이지 않으려고 각 축은 빈 목록으로 물러나는데(fetchAllRows [3]),
+   * 그러면 실패가 "신고 0건"과 같은 얼굴이 된다. 홈·카더라는 LOAD_FAILED(lib/load-state.ts)로
+   * 가르는데 여기는 안 갈라, DB 가 잠깐 죽은 아침에 내부자 화면이 텅 빈 채 멀쩡한 척했다.
+   * 화면은 이 목록이 비어 있지 않으면 머리에 "불러오지 못했습니다"를 적는다.
+   */
+  failedSources: string[];
   /** 거물들이 낸 13F 의 기준 분기. 섞여 있으면 여럿이다. */
   managerQuarters: string[];
   /**
@@ -382,6 +392,7 @@ const EMPTY: InsiderOverview = {
   latestInsiderFilings: { date: null, count: 0 },
   latestCongressFilings: { date: null, count: 0 },
   managerCount: 0,
+  failedSources: [],
   managerQuarters: [],
   usdKrw: null,
   congressWindowDays: CONGRESS_WINDOW_DAYS,
@@ -398,14 +409,15 @@ const EMPTY: InsiderOverview = {
 };
 
 /** 표의 가장 최근 날짜 한 개. 없으면 null(표가 비었거나 조회가 실패했다). */
-async function latestDate(table: string, column: string): Promise<string | null> {
+async function latestDate(table: string, column: string): Promise<MaybeFailed<string | null>> {
   const db = getSupabaseAdmin();
   const { data, error } = await db.from(table).select(column).order(column, { ascending: false }).limit(1);
   // ⚠️ error 를 안 받으면 조회 실패가 조용히 '데이터 없음'이 된다(telegram-data.ts 가
-  //    같은 함정에 13곳 중 12곳이 걸려 있었다). 실패는 실패로 남긴다.
+  //    같은 함정에 13곳 중 12곳이 걸려 있었다). 실패는 실패로 남긴다 — null(표가 빔)과
+  //    LOAD_FAILED(못 읽음)를 갈라 돌려준다.
   if (error) {
     console.error(`[insider] ${table}.${column} 최신 날짜 조회 실패`, error);
-    return null;
+    return LOAD_FAILED;
   }
   const row = data?.[0] as unknown as Record<string, string> | undefined;
   return row?.[column] ?? null;
@@ -415,11 +427,22 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
   const db = getSupabaseAdmin();
 
   // 두 축의 최신 날짜를 따로 잡는다. 하나로 묶으면 한쪽이 하루 늦은 날 표가 통째로 빈다.
-  const [asOf, mentionDate] = await Promise.all([
+  // 실패한 축을 모아 화면에 알린다. 각 축이 빈 목록으로 물러나는 건 그대로다(InsiderOverview.failedSources).
+  const failedSources: string[] = [];
+  const failed = (label: string) => (e: unknown) => {
+    failedSources.push(label);
+    console.error(`[insider] ${label} 조회 실패`, e);
+  };
+
+  const [rawAsOf, rawMentionDate] = await Promise.all([
     latestDate("us_insider_daily", "as_of_date"),
     latestDate("telegram_us_stock_daily", "date"),
   ]);
+  if (isLoadFailed(rawMentionDate)) return { ...EMPTY, failedSources: ["언급 기준일"] };
+  const mentionDate = rawMentionDate;
   if (!mentionDate) return EMPTY;
+  if (isLoadFailed(rawAsOf)) failedSources.push("공시 기준일");
+  const asOf = isLoadFailed(rawAsOf) ? null : rawAsOf;
 
   const congressFrom = (() => {
     const d = new Date(`${mentionDate}T00:00:00Z`);
@@ -432,7 +455,7 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
     fetchAllRows<{ ticker: string; mention_count: number | null; channel_count: number | null }>(
       "ticker",
       () => db.from("telegram_us_stock_daily").select("ticker,mention_count,channel_count").eq("date", mentionDate),
-      { onError: (e) => console.error("[insider] 언급 조회 실패", e) },
+      { onError: failed("언급") },
     ),
     asOf
       ? fetchAllRows<Record<string, number | string | null>>(
@@ -448,7 +471,7 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
               // 따로 걸어 us_insider_txn 에서 세므로 여기 영향을 안 받는다.
               // (한때 창 없이 표 전체를 세어 30% 부풀었다 — officerCount 주석 참고.)
               .eq("window_days", INSIDER_RECENT_DAYS),
-          { onError: (e) => console.error("[insider] 공시 집계 조회 실패", e) },
+          { onError: failed("공시 집계") },
         )
       : Promise.resolve([]),
     // ⚠️ 열 이름이 `name` 이 아니라 `name_ko`/`name_en` 이다. `name` 으로 고르면
@@ -456,12 +479,12 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
     fetchAllRows<{ ticker: string; name_ko: string | null; name_en: string | null }>(
       "ticker",
       () => db.from("us_stocks").select("ticker,name_ko,name_en"),
-      { onError: (e) => console.error("[insider] 종목 사전 조회 실패", e) },
+      { onError: failed("종목 사전") },
     ),
     fetchAllRows<{ cik: number; person: string; firm: string; report_date: string | null }>(
       "cik",
       () => db.from("us_manager").select("cik,person,firm,report_date"),
-      { onError: (e) => console.error("[insider] 거물 명단 조회 실패", e) },
+      { onError: failed("거물 명단") },
     ),
     // ⚠️ 이 표는 **현재 보유만** 담는다(파이프라인이 분기마다 갈아 끼운다). 그래서
     //    날짜로 거르지 않는다. 362행이라 한 번에 들어오지만 명단이 늘 수 있어 페이징한다.
@@ -471,7 +494,7 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
     fetchAllRows<{ cik: number; ticker: string; value: number | null; shares: number | null; report_date: string }>(
       "ticker",
       () => db.from("us_manager_holding").select("cik,ticker,value,shares,report_date"),
-      { onError: (e) => console.error("[insider] 거물 보유 조회 실패", e) },
+      { onError: failed("거물 보유") },
     ),
     // 의원 신고. 창이 90일이라 행이 늘 수 있어 페이징한다(정렬 키는 유일해야 하므로 doc_id).
     fetchAllRows<{
@@ -491,7 +514,7 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
           .from("us_congress_trade")
           .select("doc_id,ticker,member,state_dst,transaction_type,transaction_date,filed_date,amount_low,amount_high")
           .gte("filed_date", congressFrom),
-      { onError: (e) => console.error("[insider] 의원 신고 조회 실패", e) },
+      { onError: failed("의원 신고") },
     ),
     // 애널리스트 컨센서스. ⚠️ 종목마다 **날짜별로 쌓이므로** 최신 한 줄만 골라야 한다 —
     //    안 고르면 같은 종목이 여러 번 세어져 비중이 부풀어 오른다.
@@ -504,7 +527,7 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
     }>(
       "ticker",
       () => db.from("us_analyst_consensus").select("ticker,as_of_date,consensus,analyst_count,strong_buy"),
-      { onError: (e) => console.error("[insider] 애널리스트 컨센서스 조회 실패", e) },
+      { onError: failed("애널리스트 컨센서스") },
     ),
   ]);
 
@@ -761,7 +784,7 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
     const names = await fetchAllRows<{ accession_no: string; seq: number; owner_name: string | null }>(
       "accession_no",
       () => db.from("us_insider_txn").select("accession_no,seq,owner_name").gte("filed_date", fromIso),
-      { onError: (e) => console.error("[insider] 임원 수 조회 실패", e) },
+      { onError: failed("임원 수") },
     );
     officerCount = new Set(names.map((n) => n.owner_name).filter(Boolean)).size;
   }
@@ -795,7 +818,7 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
           .gte("filed_date", from.toISOString().slice(0, 10))
           .lte("filed_date", asOf)
           .order("accession_no"),
-      { onError: (e) => console.error("[insider] 임원 신고 조회 실패", e) },
+      { onError: failed("임원 신고") },
     );
 
     // 마지막 접수일과 그날 들어온 **신고서** 수. 위 조회를 다시 쓰므로 왕복이 늘지 않는다.
@@ -926,6 +949,7 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
 
   return {
     asOf,
+    failedSources,
     // 블록이 "최근 N일"로 적는 값이라 짧은 창을 내보낸다. 규모의 90일과 다르다.
     windowDays: INSIDER_RECENT_DAYS,
     mentionDate,

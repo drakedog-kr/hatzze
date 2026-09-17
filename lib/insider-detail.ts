@@ -207,6 +207,8 @@ export type AnalystAction = {
 };
 
 export type StockDetail = {
+  /** 조회에 실패한 축의 이름. 비어 있으면 전부 제대로 받은 것이다(InsiderOverview.failedSources 와 같은 뜻). */
+  failedSources: string[];
   ticker: string;
   name: string;
   price: number | null;
@@ -257,6 +259,8 @@ export type ManagerHolding = {
 };
 
 export type ManagerDetail = {
+  /** 조회에 실패한 축의 이름. 비어 있으면 전부 제대로 받은 것이다. */
+  failedSources: string[];
   cik: number;
   person: string;
   firm: string;
@@ -319,23 +323,30 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
   const db = getSupabaseAdmin();
   if (!db) return null;
 
+  // 실패한 축을 모아 화면에 알린다(StockDetail.failedSources). 축은 빈 목록으로 물러난다.
+  const failedSources: string[] = [];
+  const failed = (label: string) => (e: unknown) => {
+    failedSources.push(label);
+    console.error(`[insider/stock] ${label} 조회 실패`, e);
+  };
+
   const [stockRows, mentionRows, holdingRows, managerRows, congressRows, insiderRows, consensusRows, actionRows] =
     await Promise.all([
     db.from("us_stocks").select("ticker,name_ko,name_en").in("ticker", spellings).limit(1),
     fetchAllRows<{ date: string; mention_count: number | null; channel_count: number | null }>(
       "date",
       () => db.from("telegram_us_stock_daily").select("date,mention_count,channel_count").in("ticker", spellings),
-      { onError: (e) => console.error("[insider/stock] 언급 추이 조회 실패", e) },
+      { onError: failed("언급 추이") },
     ),
     fetchAllRows<{ cik: number; shares: number | null; value: number | null; report_date: string }>(
       "cik",
       () => db.from("us_manager_holding").select("cik,shares,value,report_date").in("ticker", spellings),
-      { onError: (e) => console.error("[insider/stock] 거물 보유 조회 실패", e) },
+      { onError: failed("거물 보유") },
     ),
     fetchAllRows<{ cik: number; person: string; firm: string }>(
       "cik",
       () => db.from("us_manager").select("cik,person,firm"),
-      { onError: (e) => console.error("[insider/stock] 거물 명단 조회 실패", e) },
+      { onError: failed("거물 명단") },
     ),
     fetchAllRows<{
       member: string;
@@ -352,7 +363,7 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
           .from("us_congress_trade")
           .select("doc_id,member,state_dst,transaction_type,transaction_date,filed_date,amount_low,amount_high")
           .in("ticker", spellings),
-      { onError: (e) => console.error("[insider/stock] 의원 신고 조회 실패", e) },
+      { onError: failed("의원 신고") },
     ),
     fetchAllRows<{
       owner_name: string | null;
@@ -372,7 +383,7 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
           .select("accession_no,seq,owner_name,owner_title,transaction_code,acquired_disposed,shares,price,transaction_date,filed_date,source_url")
           .in("ticker", spellings)
           .order("accession_no"),
-      { onError: (e) => console.error("[insider/stock] 임원 신고 조회 실패", e) },
+      { onError: failed("임원 신고") },
     ),
     // ⚠️ 가장 최근에 받은 한 줄만 쓴다. 추이는 쌓이고 있지만 지금 카드는 현재만 낸다 —
     //    받은 날짜별로 여러 줄이 있으므로 정렬 없이 집으면 옛날 값이 걸린다.
@@ -400,14 +411,24 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
       .limit(30),
   ]);
 
+  // 한 번에 받는 표 셋은 fetchAllRows 를 안 거쳐 error 를 여기서 본다.
+  if (stockRows.error) failed("종목 사전")(stockRows.error);
+  if (consensusRows.error) failed("애널리스트 컨센서스")(consensusRows.error);
+  if (actionRows.error) failed("애널리스트 의견")(actionRows.error);
+
   // 어느 축에도 흔적이 없으면 우리가 아는 종목이 아니다. 빈 화면 대신 404 를 준다.
+  // ⚠️ 단, 조회가 깨져서 비어 보이는 것이면 404 가 아니라 오류다 — 멀쩡한 종목 주소를
+  //    "없는 종목"이라 답하면 크롤러가 그대로 믿는다. 던져서 error.tsx 로 보낸다.
   const known =
     (stockRows.data?.length ?? 0) > 0 ||
     mentionRows.length > 0 ||
     holdingRows.length > 0 ||
     congressRows.length > 0 ||
     insiderRows.length > 0;
-  if (!known) return null;
+  if (!known) {
+    if (failedSources.length) throw new Error(`[insider/stock] ${ticker} 조회 실패: ${failedSources.join("·")}`);
+    return null;
+  }
 
   const s = stockRows.data?.[0];
   const name = displayName(ticker, s?.name_ko || s?.name_en || null);
@@ -430,7 +451,7 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
   const totals = await fetchAllRows<{ cik: number; value: number | null; report_date: string }>(
     "cik",
     () => db.from("us_manager_holding").select("cik,value,report_date"),
-    { onError: (e) => console.error("[insider/stock] 비중 분모 조회 실패", e) },
+    { onError: failed("비중 분모") },
   );
   const aumOf = new Map<string, number>();
   for (const t of totals) aumOf.set(`${t.cik}|${t.report_date}`, (aumOf.get(`${t.cik}|${t.report_date}`) ?? 0) + (t.value ?? 0));
@@ -637,6 +658,7 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
   }));
 
   return {
+    failedSources,
     ticker,
     name,
     price: q?.price ?? null,
@@ -686,20 +708,29 @@ export const getManagerDetail = cache(async (cik: number): Promise<ManagerDetail
   const db = getSupabaseAdmin();
   if (!db) return null;
 
+  // 실패한 축을 모아 화면에 알린다(ManagerDetail.failedSources).
+  const failedSources: string[] = [];
+  const failed = (label: string) => (e: unknown) => {
+    failedSources.push(label);
+    console.error(`[insider/investor] ${label} 조회 실패`, e);
+  };
+
   const [managerRows, holdingRows, mentionRows] = await Promise.all([
     db.from("us_manager").select("cik,person,firm").eq("cik", cik).limit(1),
     fetchAllRows<{ ticker: string; shares: number | null; value: number | null; report_date: string }>(
       "ticker",
       () => db.from("us_manager_holding").select("ticker,shares,value,report_date").eq("cik", cik),
-      { onError: (e) => console.error("[insider/investor] 보유 조회 실패", e) },
+      { onError: failed("보유") },
     ),
     fetchAllRows<{ ticker: string; date: string }>(
       "ticker",
       () => db.from("telegram_us_stock_daily").select("ticker,date"),
-      { onError: (e) => console.error("[insider/investor] 카더라 종목 조회 실패", e) },
+      { onError: failed("카더라 종목") },
     ),
   ]);
 
+  // 명단 조회가 깨진 것은 "없는 인물"이 아니라 오류다. 404 대신 error.tsx 로 보낸다.
+  if (managerRows.error) throw new Error(`[insider/investor] ${cik} 명단 조회 실패: ${managerRows.error.message}`);
   const m = managerRows.data?.[0];
   if (!m) return null;
 
@@ -750,6 +781,7 @@ export const getManagerDetail = cache(async (cik: number): Promise<ManagerDetail
   const fx = await getUsdKrw();
 
   return {
+    failedSources,
     cik,
     person: m.person,
     firm: m.firm,

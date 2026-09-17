@@ -10,6 +10,7 @@ import { Empty, GroupTitle, Money, T, addRows, congressRows, execRows, fmtDate, 
 import { INSIDER_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { C, Icon, MONO } from "../ui";
+import { LoadFailedNote } from "../LoadFailedNote";
 
 export async function generateMetadata(): Promise<Metadata> {
   return pageMetadata({
@@ -247,6 +248,7 @@ export default async function InsiderPage() {
     // 원화는 크기를 가늠하라고 얹은 것이다. 쿠키로 한 번이라도 고르면 그 선택이 이긴다
     // (규칙은 globals.css 의 `[data-cur-default]`).
     <div className="hz-tx" data-cur-default="usd">
+      <LoadFailedNote sources={ov.failedSources} />
       {/* ── 히어로 ──────────────────────────────────────────────────
           세 칸이다 — **규모 · 네 축 교집합 · 오늘 새로 들어온 것.**
 

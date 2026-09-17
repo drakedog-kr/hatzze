@@ -250,6 +250,7 @@ export default async function DividendPage() {
       priceDate={data?.priceDate ?? null}
       usPriceDate={data?.usPriceDate ?? null}
       usdkrw={data?.usdkrw ?? null}
+      failedSources={data?.failedSources ?? []}
     />
   );
 }
