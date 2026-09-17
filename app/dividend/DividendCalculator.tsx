@@ -7,7 +7,7 @@ import { C, Icon } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
 import { SectionIntro } from "../SectionIntro";
 import { StockLogo } from "../StockLogo";
-import type { BasketLite, MoreLists, StockLite } from "./types";
+import { inflate, type BasketLite, type MoreLists, type StockLite, type StockWire } from "./types";
 
 /**
  * 배당으로 살기(/dividend) 본체. 서버가 내려준 종목 목록(StockLite)만 갖고 브라우저에서 전부 계산한다.
@@ -461,7 +461,7 @@ const RULE_TIPS: Record<string, string> = {
 
 /* ── 본체 ─────────────────────────────────────────────────────────── */
 export function DividendCalculator({
-  stocks,
+  stocks: wire,
   baskets,
   popular,
   popularUs,
@@ -472,7 +472,7 @@ export function DividendCalculator({
   usPriceDate,
   usdkrw,
 }: {
-  stocks: StockLite[];
+  stocks: StockWire[];
   baskets: BasketLite[];
   popular: string[];
   popularUs: string[];
@@ -483,6 +483,8 @@ export function DividendCalculator({
   usPriceDate: string | null;
   usdkrw: { rate: number; date: string | null } | null;
 }) {
+  // 서버는 null 칸을 뺀 꼴(StockWire)로 보낸다 — 4,366개라 HTML 이 2.2MB 였다. 여기서 한 번 채워 두면 아래는 전부 StockLite.
+  const stocks = useMemo(() => wire.map(inflate), [wire]);
   const byCode = useMemo(() => new Map(stocks.map((s) => [s.code, s])), [stocks]);
   const holdings = useSyncExternalStore(holdingsStore.subscribe, holdingsStore.getSnapshot, holdingsStore.getServerSnapshot);
   const setHoldings = writeHoldings;

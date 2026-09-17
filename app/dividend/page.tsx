@@ -7,7 +7,7 @@ import { pageMetadata } from "../seo";
 import { DIVIDEND_PUBLIC } from "../screen-flags";
 import { DIVIDEND_PAGE } from "./copy";
 import { DividendCalculator } from "./DividendCalculator";
-import type { MoreLists, MoreRow, StockLite } from "./types";
+import type { MoreLists, MoreRow, StockLite, StockWire } from "./types";
 
 /**
  * 배당으로 살기(/dividend) — 종목과 주수를 넣으면 1년에 얼마 받는지, 어느 달에 들어오는지 바로 계산한다.
@@ -76,6 +76,21 @@ function toLite(s: DividendStock): StockLite {
     growthYears: s.growthYears,
     discount: s.prefDiscountPct,
   };
+}
+
+/** 클라이언트로 보내는 꼴 — null·false·0 칸을 뺀다(app/dividend/types.ts 의 StockWire). 4,366개 × 430자가 2.2MB 였다. */
+function toWire(s: DividendStock): StockWire {
+  const l = toLite(s);
+  const w: StockWire = { code: l.code, name: l.name, kind: l.kind, currency: l.currency, pays: l.pays };
+  for (const k of Object.keys(l) as (keyof StockLite)[]) {
+    if (k in w) continue;
+    const v = l[k];
+    // 0 은 기본값이 0 인 칸(cap·dps·streak)에서만 뺀다 — taxable 0 은 '전액 비과세'라는 값이지 빈칸이 아니다(첫 판에서 이걸 빼서
+    // 한국콜마의 비과세가 사라졌다).
+    if (v === null || v === false || (v === 0 && (k === "cap" || k === "dps" || k === "streak"))) continue;
+    (w as Record<string, unknown>)[k] = v;
+  }
+  return w;
 }
 
 /** 검색창을 비워 둔 채로도 담을 수 있게 앞에 세워 두는 것 — 판마다 여덟. */
@@ -223,7 +238,7 @@ export default async function DividendPage() {
 
   return (
     <DividendCalculator
-      stocks={stocks.map(toLite)}
+      stocks={stocks.map(toWire)}
       baskets={data?.baskets ?? []}
       popular={popular}
       popularUs={popularUs}
