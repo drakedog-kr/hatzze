@@ -1,0 +1,408 @@
+/* 좁은 화면 — 차트 확대 보기·통화 스위치·서학 달력 색·≤560·≤360 손질·시트 머리. app/globals.css 에서 줄 그대로 옮겨 왔다(그쪽 머리말 참고). */
+
+/* ── 차트 확대 보기 (폰 전용) ───────────────────────────────────────
+   폰에서 이 차트들은 뷰박스 720 units 가 화면 폭(≈350)으로 눌려 절반 축척이 된다. 연도·
+   퍼센트 라벨이 11 units 라 실제 5~6px 로 찍혀 안 읽힌다(실기기 피드백 2026-08-05).
+   무대를 90도 돌려 화면의 **긴 변**을 쓰면 393×830 폰에서 350 → 830 으로 2배 남짓 커진다.
+
+   ⭐ MDD 언더워터 차트가 먼저 쓰던 것을 **공용으로 뺐다**(2026-08-26, 이름도 mdd- →
+     hz-). 지금은 종목 상세의 '주가와 매매 시점' 차트(app/insider/ChartZoom.tsx)도 같은
+     것을 쓴다. 두 차트가 뷰박스 720 폭에 퍼센트로 얹은 오버레이라는 구조가 같아서,
+     무대만 돌려 주면 곡선·눈금·말풍선이 그대로 따라온다. */
+.hz-zoom-btn {
+  position: absolute;
+  /* 감싸는 상자의 오른쪽 아래. MDD 는 카드 padding(22) 안쪽이고 종목 상세는 차트 상자
+     기준이라, 둘 다 곡선 끝과 안 겹치는 자리가 된다. */
+  right: 10px;
+  bottom: 6px;
+  display: none; /* 폰에서만 (아래 미디어쿼리) — 넓은 화면은 이미 크다 */
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  background: var(--c-card);
+  color: var(--c-sub);
+  cursor: pointer;
+}
+.hz-zoom-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 불투명이어야 한다. 반투명으로 뒀더니 뒤 카드의 글자가 곡선 사이로 비쳐 확대한
+     보람이 없었다 — 확대 보기는 '겹쳐 띄운 창'이 아니라 '이 차트만 보는 화면'이다. */
+  background: var(--c-page);
+}
+.hz-zoom-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  background: var(--c-card);
+  color: var(--c-ink);
+  cursor: pointer;
+}
+/* ⚠️ **세로일 때만 돌린다.** 무조건 돌려 두면, 이용자가 크게 보려고 폰을 가로로
+   눕히는 순간 OS 가 뷰포트를 돌리고 그 위에 이 rotate 가 또 얹혀서 차트가 도로 세로로
+   선다 — 크게 보려는 행동이 오히려 화면을 망친다.
+   세로: 폭을 100vh 로 두고 90도 돌리면 그 폭이 화면의 긴 변을 타고 눕는다(393×830 폰에서
+   350 → 830, 2배 남짓). 가로: 이미 긴 변이 가로라 돌릴 것 없이 폭만 채운다. */
+.hz-zoom-stage {
+  width: 100%;
+  padding: 0 24px;
+  /* ⚠️ flex 자식은 기본이 flex-shrink:1 이다. 아래 세로 규칙에서 폭을 100vh(=830) 로
+     줘도 스크림(393 폭)이 그대로 830 → 393 으로 눌러 버려서, 돌려 놓고 보면 확대가
+     아니라 오히려 작았다. 눌리지 않게 못박는다. */
+  flex: none;
+}
+@media (orientation: portrait) {
+  .hz-zoom-stage {
+    /* ⚠️ `100vh` 였다. 폰 브라우저의 `vh` 는 **주소창이 없다고 치고 잰 높이**라, 주소창이
+       떠 있는 실제 화면보다 크다. 돌려 놓으면 그 초과분이 곧 차트의 **양 끝**이라 가격
+       라벨이 통째로 잘렸다(실기기 실측 2026-08-26, 종목 상세 확대). `dvh` 는 지금 보이는
+       높이라 어느 상태에서도 안 넘친다. 확대 보기는 스크롤이 없으니 값이 흔들릴 일도 없다. */
+    width: 100dvh;
+    transform: rotate(90deg);
+    transform-origin: center;
+  }
+}
+
+/* 확대 보기 안에서는 좁은 폭이어도 호버 띠를 켠다. 끄기로 한 이유가 "폰에선 툴팁이 시트에
+   잘려 어차피 안 읽힌다" 였는데, 확대 보기는 시트 밖 전체 화면이라 그 전제가 사라진다.
+   MDD 는 같은 일을 클래스(.mdd-crosshair-zoom)로 하는데, 여기는 감싸는 쪽이 자식 클래스를
+   못 바꾸는 구조(children 을 그대로 두 번 그린다)라 자손 선택자로 켠다.
+   여는 것은 탭이 맡는다(app/TipTap.tsx — 터치엔 호버가 없다). */
+.hz-zoom-stage .hz-xhair {
+  display: flex !important;
+}
+@media (max-width: 560px) {
+  .hz-zoom-btn { display: flex; }
+}
+
+/* 시트 머리의 2단 요약(테마 로테이션의 유입↔이탈 · 이슈 키워드의 1위↔비중).
+   격자를 인라인에 두면 미디어쿼리가 못 이겨서 클래스로 뺀다(이 저장소의 반복된 함정). */
+.hz-kd-duo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 560px) {
+  /* 폰에서는 한 칸씩 세로로. 393px 화면에서 두 칸이면 한 칸이 175px 밖에 안 돼,
+     "한 키워드에 관심이 쏠린 상태"(185px) 같은 부제가 잘렸다 — 두 값을 나란히
+     견주자고 만든 자리인데 정작 설명이 안 읽히면 견줄 것이 없다. */
+  .hz-kd-duo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* 세로로 서면 칸 사이를 가르던 세로선이 할 일이 없어진다 — 가로선으로 바꾼다. */
+  .hz-kd-duo > *:first-child {
+    box-shadow: inset 0 -1px 0 var(--c-sep-h) !important;
+  }
+}
+
+/* 리스크 프로필 타일의 요약 줄(+ 있으면 '전체보기').
+   ⚠️ 인라인 style 로 두면 미디어쿼리가 못 이겨서 폭에 따라 못 가른다(이 저장소의 반복된 함정). */
+.mdd-tile-foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+}
+/* 요약은 **폭을 가리지 않고 왼쪽**이다. space-between 은 자식이 요약 하나뿐일 때
+   그것을 왼쪽 끝에 두므로 따로 규칙이 필요 없다.
+   한때 폰에서만 가운데로 뒀다가 되돌렸다(2026-08-05) — 세 타일의 요약이 같은 왼쪽 축에
+   서야 읽는 눈이 한 줄로 내려온다. 그중 하나에는 '전체보기'가 붙는데, 그 타일만 왼쪽이고
+   나머지가 가운데면 폰에서 세 줄이 지그재그로 보인다. */
+
+/* 푸터의 버전 표기. 눌러서 업데이트 기록(/changelog)으로 간다.
+   ⚠️ 색·밑줄을 Footer.tsx 인라인에 두면 아래 :hover 를 이겨서 호버가 아예 안 먹는다.
+   평소엔 밑줄을 긋지 않는다 — 로고 옆이라 줄이 하나 더 생기면 lockup 이 지저분해진다. */
+.hz-version-link {
+  color: var(--c-muted);
+  text-decoration: none;
+}
+.hz-version-link:hover {
+  color: var(--c-blue);
+}
+/* ⚠️⚠️ 밑줄은 링크가 아니라 **버전 글자에만** 건다. 링크에 걸면 그 안의 빨간 N 배지까지
+   같이 그어진다 — 배지는 링크의 flex 항목이라 '원자 인라인'이 아니고, 자식 쪽에서
+   `text-decoration: none` 으로 끌 수도 없다(밑줄은 조상이 정하면 자손이 못 끈다).
+   글자를 감싼 스팬에 걸면 그을 곳이 글자뿐이라 이 문제가 아예 생기지 않고, 덤으로
+   글자와 배지 사이 빈틈에도 줄이 안 그어진다. */
+.hz-version-link:hover .hz-version-num {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ── 서학개미 장부의 통화 스위치 ─────────────────────────────────────────
+   달러와 원을 **둘 다 그려 두고** 여기서 하나만 보여 준다. 그 화면의 카드가 거의 다
+   서버 컴포넌트라, 통화를 리액트 상태로 두면 그 전부를 클라이언트로 끌어와야 한다.
+   테마와 같은 수다 — 뿌리의 data-* 하나로 전역이 바뀐다.
+
+   ⚠️ 속성 값이 **세 가지**다 — 없음(아직 안 고름) · krw · usd. "안 고름"을 원화와
+   갈라 두는 이유는 **화면마다 기본 통화가 다르기 때문**이다(서학개미는 원화, 내부자
+   리포트는 달러). 안 가르면 달러 기본 화면에서 ₩ 를 눌러도 달러로 돌아간다.
+   ⚠️ display 를 none 으로 둔다(visibility 가 아니라). 자리를 먹으면 표 칸이 두 배가 된다. */
+:root[data-cur="usd"] .hz-krw,
+:root:not([data-cur="usd"]) .hz-usd {
+  display: none;
+}
+
+/* 화면이 정하는 기본 통화. **쿠키로 고른 게 없을 때만** 걸린다(`:not([data-cur])`).
+   한 번이라도 스위치를 누르면 그 선택이 온 사이트에 걸리고 이 규칙은 비켜난다.
+
+   ⚠️ 특이도로 위 규칙을 이겨야 한다 — 위가 (0,2,1), 여기는 클래스가 하나 더 붙어
+      (0,3,1) 이다. 순서가 아니라 특이도로 이기는 것이라 위아래를 바꿔도 안전하다.
+   ⚠️ `display: revert` 다. `inline` 으로 못박으면 SVG `<text>` 축 라벨이 깨진다 —
+      같은 클래스를 span 과 SVG text 가 함께 쓴다. */
+:root:not([data-cur]) [data-cur-default="usd"] .hz-krw { display: none; }
+:root:not([data-cur]) [data-cur-default="usd"] .hz-usd { display: revert; }
+
+/* 스위치 자체 — 두 칸짜리 알약. 테마 단추와 높이(38)를 맞춘다. */
+.hz-cur-switch {
+  display: inline-flex;
+  align-items: center;
+  height: 38px;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-pill);
+  background: var(--c-bg);
+  flex-shrink: 0;
+}
+.hz-cur-switch > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--c-sub);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.hz-cur-switch > button:hover {
+  color: var(--c-ink);
+}
+.hz-cur-switch > button[aria-pressed="true"] {
+  background: var(--c-card);
+  color: var(--c-ink);
+  box-shadow: 0 1px 2px var(--c-shadow);
+}
+
+/* ── 서학개미 달력 칸의 바탕색 ────────────────────────────────────────────
+   진하기(--hz-cal-s, 0~1)와 색(--hz-cal-tone)을 TSX 가 주고, **위쪽 한계는 테마가
+   정한다.** 날짜 숫자가 그 위에 얹히므로 진해질수록 글자가 안 읽히는데, 그 한계가
+   테마마다 다르기 때문이다(실측, 잉크 대 바탕 명암비 4.5 기준).
+
+     라이트  빨강 잉크 4.71 @78%  ·  82%면 4.41 로 떨어진다   → 16~78%
+     다크    빨강 잉크 4.99 @56%  ·  64%면 4.28 로 떨어진다   → 16~60%
+
+   ⚠️ 한 값으로 통일하면(60%) 라이트가 가진 여유를 버린다. 색의 폭이 곧 이 달력이
+   말하는 세기라 아깝다. 그래서 폭만 테마별로 둔다.
+   ⚠️⚠️ 예전엔 진해지면 날짜를 **흰 글자로 뒤집었다.** 재 보니 어느 진하기에서도
+   잉크가 이겨서(라이트 빨강 12.87→3.93 대 흰 1.27→4.15) 그 규칙을 걷었다.
+   ⚠️ TSX 인라인으로 두면 테마를 못 가른다 — 서버에서 그릴 때는 테마를 모른다. */
+:root {
+  --hz-cal-span: 62%; /* 16 + 62 = 78 */
+}
+:root[data-theme="dark"] {
+  --hz-cal-span: 44%; /* 16 + 44 = 60 */
+}
+.hz-cal-cell {
+  background: color-mix(
+    in srgb,
+    var(--hz-cal-tone) calc(16% + var(--hz-cal-s) * var(--hz-cal-span)),
+    var(--c-card)
+  );
+}
+
+/* ── 서학개미 좁은 화면(≤560) 손질 ───────────────────────────────────────
+   ⚠️ 인라인 style 은 미디어쿼리를 **이긴다.** 그래서 폭에 따라 달라져야 하는 값은
+   TSX 에서 빼 여기로 옮겼다(이 저장소가 여백에서 네 번 밟은 함정이다). */
+
+/* ① 순위표 한 줄. 좁아지면 **막대 칸을 통째로 접는다** — 이름이 그만큼 살아난다.
+      막대는 크기를 말하는데 그 크기는 바로 옆 숫자가 이미 말한다. */
+.hz-rank-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 48px 58px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+}
+@media (max-width: 560px) {
+  .hz-rank-row {
+    grid-template-columns: 18px minmax(0, 1fr) 58px;
+  }
+  .hz-rank-row > .hz-rank-bar {
+    display: none;
+  }
+}
+
+/* ② '해마다 되풀이되는 때' 한 줄. 넓을 땐 이름·문장·횟수가 한 줄인데, 좁아지면
+      **문장이 긴 줄만** 횟수를 다음 줄로 밀어내 넷은 한 줄 둘은 두 줄이 된다.
+      좁으면 여섯 줄 전부 두 줄로 통일한다 — 이름과 횟수가 위, 문장이 아래다.
+
+   ## ⚠️⚠️ 미디어쿼리가 아니라 **컨테이너 쿼리**다
+   기준은 뷰포트가 아니라 **이 칸의 폭**이다. 처음에 `@media (max-width: 560px)` 로
+   뒀더니 600px 에서 다시 들쭉날쭉했다(24/24/24/24/49/49) — 그 폭에서도 칸은 266px 라
+   좁은 쪽인데 뷰포트만 보면 넓은 쪽으로 잡힌다. 이 칸은 히어로가 1:1:1 로 나누므로
+   뷰포트와 폭이 따로 논다.
+
+   ⭐⭐ 문턱 280px 는 **양쪽을 다 재서** 잡았다. 줄마다 필요한 폭이 232~**269px** 라 그
+   위면 여섯 줄이 다 들어가는데, 데스크톱(1,280px)에서 이 칸이 **287px** 밖에 안 된다.
+   처음에 290 으로 뒀더니 데스크톱까지 두 줄로 접혀서 히어로가 쓸데없이 길어졌다.
+   269 와 287 사이가 쓸 수 있는 전부다. */
+.hz-win-list {
+  container-type: inline-size;
+}
+@container (max-width: 280px) {
+  .hz-win-line {
+    flex-wrap: wrap;
+  }
+  .hz-win-line > .hz-win-phrase {
+    order: 3;
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+}
+
+/* ── 아주 좁은 화면(≤360)의 탑바 ────────────────────────────────────────────
+   ⚠️⚠️ **320px 에서 햄버거가 화면 밖으로 14px 나가 눌리지 않았다**(2026-08-25 실측).
+   본문(.hz-main)이 overflow-x:hidden 이라 가로 스크롤도 안 생겨서, 페이지 넘침 검사에는
+   0건으로 잡힌다 — **잘린 채 조용히 못 쓰게 된다.** 메뉴가 안 열리므로 미관이 아니라
+   기능 결함이다.
+
+   실측한 셈: 320 − 좌우 패딩 32 = 288 이 전부인데, 로고 묶음이 124(hatzze 96 + 5 + 배지
+   30·min-content 라 더 못 준다), 오른쪽 묶음이 162(통화 70 + 8 + 테마 38 + 8 + 메뉴 38)
+   이라 사이 gap 16 까지 334 를 요구했다.
+
+   ⭐ 배지를 숨기면 35 가 한 번에 빠지지만, ≤560 에서는 사이드바가 없어 **'베타'가 화면
+     어디에도 안 남는다.** 대신 여백만 줄인다 — 좌우 패딩 8 + gap 8 = 16. 글자는 하나도
+     안 줄인다. 320 에서 통화 스위치까지 있는 /insider 가 6px, 없는 화면이 12px 남는다.
+   ⚠️ 통화 칩(.hz-cur-switch > button)의 좌우 패딩을 줄이는 건 **효과가 없다** — 글자가
+     한 자라 `min-width:30px` 이 이미 이기고 있어서, 패딩을 4 로 낮춰도 폭이 70 그대로다.
+     한 번 넣었다가 실측하고 뺐다.
+   ⭐ 문턱이 360 인 것은 그 아래가 실제로 쓰이는 폭이라서다 — 갤럭시 폴드 커버(280),
+     아이폰 SE 1세대(320). 360·375 는 이미 여유가 16px 이상이라 손대지 않는다. */
+@media (max-width: 360px) {
+  .hz-topbar {
+    padding: 0 12px;
+    gap: 8px;
+  }
+}
+
+/* 푸터 '데이터 출처' 두 칸. 넓을 땐 내용에 맞춰 두 칸(auto), 좁으면 한 칸으로 접는다.
+   ⚠️ 칸마다 min-width:140 이 있어야 출처 이름이 낱말 단위로 안 부서진다. 그런데 그
+   최소값 둘과 gap 32 를 더하면 312 라, 320px 화면(쓸 수 있는 폭 278)에서 넘쳤다.
+   ⭐ 문턱을 360 으로 둔 건 375 에서 이미 두 칸이 150.5px 씩 들어가기 때문이다 —
+     경계를 그 아래에 둬야 멀쩡한 폭을 건드리지 않는다. */
+.hz-foot-sources {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 12px 32px;
+}
+.hz-foot-sources > * {
+  min-width: 140px;
+}
+@media (max-width: 360px) {
+  .hz-foot-sources {
+    grid-template-columns: 1fr;
+  }
+  .hz-foot-sources > * {
+    min-width: 0;
+  }
+}
+
+/* 탑바의 '채널 등록 신청'. `hz-btn-soft` 를 그대로 쓰되 좌우 여백만 준다.
+   ⚠️ **좁은 화면에서는 글자를 뺀다.** 탑바는 320px 에서 여유가 6px 밖에 안 남는
+   자리라(햄버거가 잘려 못 누르던 것을 오늘 고쳤다), 90px 짜리 글자를 달고 있으면
+   그 수리가 그대로 무효가 된다. 아이콘만 남기고 정사각으로 줄인다 — 접근성 이름은
+   `title` 이 들고 있어 스크린리더에서는 그대로 읽힌다. */
+.hz-topbar-cta {
+  padding: 0 12px;
+  flex-shrink: 0;
+}
+@media (max-width: 560px) {
+  .hz-topbar-cta {
+    width: 38px;
+    padding: 0;
+  }
+  /* ⚠️ `> span` 으로 잡으면 **아이콘까지 사라진다** — Icon 도 span 이라 형제로 걸린다.
+     빈 네모만 남았다(2026-08-25 실측). 라벨만 골라야 한다. */
+  .hz-topbar-cta-label {
+    display: none;
+  }
+}
+
+/* 다크에서 종목 로고 타일의 **경계를 살린다.**
+   타일 색은 그림 가장자리에서 뽑아 쓰는데(StockLogo 의 readBandColor), 스페이스X·디웨이브
+   처럼 바탕이 검은 로고는 그 색이 다크 페이지와 거의 같아진다 — 실측 대비 1.1 로, 타일이
+   있는지 없는지 분간이 안 되고 한 줄에 선 로고들의 크기가 들쭉날쭉해 보인다(35개 중 3개).
+   ⚠️ 마스크(squircle)가 border 를 잘라내므로 **inset box-shadow** 로 준다. 마스크 안쪽을
+   따라 그려져서 모서리 모양이 그대로 유지된다.
+   ⚠️ var() 를 쓰지 않는다 — Lightning CSS 가 box-shadow 안의 var() 층을 지운 전례가 있다. */
+:root[data-theme="dark"] .hz-stock-logo,
+:root[data-theme="dark"] .hz-stock-badge {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
+/* ── 좁은 화면의 시트 머리: 설명을 배지 아래까지 편다 ────────────────────────
+   ⚠️⚠️ 설명이 배지 **옆 좁은 칸**에 갇혀 네 줄로 접혔다(375px 의 '주가와 매매 시점',
+   2026-08-26). 배지는 한 줄이라 그 아래가 통째로 비는데 설명은 그 자리를 못 썼다.
+
+   ⭐ 머리를 격자로 바꾸고 글 칸에 `display: contents` 를 걸어 제목·설명을 **부모 격자의
+     칸으로 끌어올린다.** 그러면 제목은 배지와 한 줄에 서고, 설명은 아랫줄에서 폭을 다 쓴다.
+     마크업을 바꾸지 않고 좁은 화면에서만 배치가 달라진다.
+   ⚠️ 자동 배치에 맡기면 안 된다 — DOM 순서가 아이콘·제목·설명·배지라, 설명이 배지 자리로
+     들어간다. 넷 다 칸을 손으로 지정한다.
+   ⚠️ 넓은 화면은 그대로 flex 다. 거기선 설명이 한 줄에 들어가고, 격자로 바꾸면 알약이
+     아랫줄로 내려가던 규칙(hz-sheet-head-txt 의 basis)이 함께 죽는다. */
+@media (max-width: 560px) {
+  .hz-sheet-head {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: start;
+    column-gap: 10px;
+    row-gap: 3px;
+  }
+  .hz-sheet-head-txt {
+    display: contents;
+  }
+  .hz-sheet-head > .ms {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  /* ⚠️ **태그 이름으로 잡지 말 것.** 시트 제목은 화면에 따라 h2 이기도 h3 이기도 하다
+     (SectionHead 의 level — 구간 제목이 없는 화면은 h2 다). h3 만 적어 두면 h2 인
+     화면에서 이 규칙이 안 걸려 제목이 자동 배치로 떨어지는데, 그건 바로 위 주석이
+     경고하는 사고다(DOM 순서상 설명이 배지 자리로 들어간다). */
+  .hz-sheet-head-txt > :is(h2, h3) {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .hz-sheet-head-side {
+    grid-column: 3;
+    grid-row: 1;
+    margin-left: 0;
+  }
+  /* 설명과 보조 줄은 제목 칸에서 시작해 배지 아래까지 편다. */
+  .hz-sheet-head-txt > p {
+    grid-column: 2 / -1;
+  }
+}
