@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { EMPTY_STOCKS, getLatestNote, getNoteStocks, listNotes, noteNeighbors, type NoteNeighbors } from "@/lib/daily-note";
 
+import { NOTE_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { DAILY_PUBLIC } from "../screen-flags";
 import { NOTE_PAGE } from "./copy";
@@ -34,6 +35,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: `${NOTE_PAGE.label} | hatzze`,
     description: NOTE_PAGE.description,
     path: NOTE_PAGE.href,
+    ownImage: NOTE_CARD.alt,
   });
   return PUBLIC ? meta : { ...meta, robots: { index: false, follow: false } };
 }

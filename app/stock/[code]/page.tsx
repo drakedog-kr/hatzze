@@ -22,6 +22,7 @@ import { Pill } from "../../kadera/parts";
 import { PageJsonLd } from "../../JsonLd";
 import { SectionHead } from "../../kadera/SectionHead";
 import { StockLogo } from "../../StockLogo";
+import { KADERA_CARD } from "../../og-copy";
 import { pageMetadata } from "../../seo";
 import { AiMark, C, Icon, MONO, R } from "../../ui";
 
@@ -77,6 +78,9 @@ export async function generateMetadata({
     title: `${d.name}(${d.code}) 텔레그램 언급 | hatzze`,
     description: `${withSubjectParticle(d.name)} 주식 텔레그램에서 얼마나 회자되는지 봅니다. 최근 ${STOCK_STAT_DAYS}일 언급 ${d.totalMentions.toLocaleString("ko-KR")}회, 언급된 날 ${d.activeDays}일. 일별 추이와 가장 많이 언급된 날을 함께 봅니다.`,
     path: stockHref(d.code),
+    // 종목 화면은 국장 카더라 구역이라 그 카드를 쓴다(app/seo.ts 의 imagePath).
+    ownImage: KADERA_CARD.alt,
+    imagePath: "/kadera",
   });
   // ⛔ 집계를 **못 읽은 날에는 아무 말도 하지 않는다.** 그때는 언급이 0 으로 보여 문턱
   //    미달이 되는데, 그 사이 크롤러가 오면 멀쩡한 화면에 noindex 를 내주게 된다.

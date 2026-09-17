@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { getManagerDetail } from "@/lib/insider-detail";
 
 import { SectionHead } from "../../../kadera/SectionHead";
+import { INSIDER_CARD } from "../../../og-copy";
 import { pageMetadata } from "../../../seo";
 import { C, Icon, MONO } from "../../../ui";
 import { ExpandableList } from "../../../kadera/ExpandableList";
@@ -92,11 +93,14 @@ function Rows({ items, name }: { items: React.ReactNode[]; name: string }) {
 export async function generateMetadata({ params }: { params: Promise<{ cik: string }> }): Promise<Metadata> {
   const { cik } = await params;
   const d = await getManagerDetail(Number(cik));
-  if (!d) return pageMetadata({ title: "내부자 리포트 | hatzze", description: "", path: "/insider" });
+  if (!d) return pageMetadata({ title: "내부자 리포트 | hatzze", description: "", path: "/insider", ownImage: INSIDER_CARD.alt });
   return pageMetadata({
     title: `${d.person} 포트폴리오 · ${d.firm} 13F | hatzze`,
     description: `${d.person}(${d.firm})이 신고한 미국 상장주 ${d.holdings.length}종목. SEC 13F 공시 기준이며 직전 분기와 견준 변화를 함께 봅니다.`,
     path: `/insider/investor/${d.cik}`,
+    // 자기 폴더에 카드가 없어 구역(/insider)의 카드를 쓴다(app/seo.ts 의 imagePath).
+    ownImage: INSIDER_CARD.alt,
+    imagePath: "/insider",
   });
 }
 
