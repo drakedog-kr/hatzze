@@ -2,17 +2,34 @@ name: 검사
 
 # PR 과 main 푸시에서 도는 가벼운 검사. **빌드는 하지 않는다** — 그건 Vercel 이 PR 마다
 # 이미 하고 있고, 여기서 또 하면 같은 일을 두 번 하면서 몇 분을 쓴다.
+#
+# 2026-09-17 안정화 주간에 둘을 더했다. 그전엔 타입·lint·테스트가 어디서도 강제되지 않았다
+# (Next 16 은 빌드에서 lint 를 안 돌리고, 파이썬은 검사가 아예 없었다).
+#   - web: npm ci → 타입(next typegen + tsc) → lint → 단위 테스트(tests/*.test.ts)
+#   - pipeline: requirements + pytest → data-pipeline/tests (순수 함수만. DB·LLM 안 부른다)
 on:
   pull_request:
     paths:
       - "app/**"
+      - "lib/**"
+      - "tests/**"
       - "scripts/**"
+      - "data-pipeline/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.json"
       - ".github/workflows/ci.yml"
   push:
     branches: [main]
     paths:
       - "app/**"
+      - "lib/**"
+      - "tests/**"
       - "scripts/**"
+      - "data-pipeline/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.json"
 
 jobs:
   routes:
@@ -28,3 +45,38 @@ jobs:
         with:
           node-version: "22"
       - run: npm run check:routes
+
+  web:
+    name: 타입 · lint · 단위 테스트
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      # `next typegen` 이 .next/types 를 만들어야 라우트 핸들러의 RouteContext 같은 생성 타입이
+      # 풀린다. 빌드 없이 타입만 만든다(몇 초).
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+
+  pipeline:
+    name: 파이프라인 단위 테스트
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: data-pipeline/requirements.txt
+      # pytest 는 파이프라인 런타임에 안 쓰여 requirements.txt 에 없다. 여기서만 깐다.
+      - run: pip install -r data-pipeline/requirements.txt pytest
+      - run: python -m pytest data-pipeline/tests -q
+        working-directory: .
