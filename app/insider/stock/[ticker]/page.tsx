@@ -273,13 +273,13 @@ export default async function StockDetailPage({
           display: "inline-flex",
           alignItems: "center",
           gap: 4,
-          fontSize: 12,
+          fontSize: "var(--fs-12)",
           fontWeight: 700,
           color: C.sub,
           textDecoration: "none",
         }}
       >
-        <Icon name="chevron_left" style={{ fontSize: 16 }} />
+        <Icon name="chevron_left" style={{ fontSize: "var(--fs-16)" }} />
         내부자 리포트
       </Link>
 
@@ -297,7 +297,7 @@ export default async function StockDetailPage({
             <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
               <StockLogo code={d.ticker} name={d.name} market="US" size={40} />
               <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-                <strong style={{ fontFamily: MONO, fontSize: 20, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
+                <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
                   {d.ticker}
                 </strong>
                 <span style={{ fontSize: T.body, fontWeight: 500, color: C.sub, overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -361,7 +361,7 @@ export default async function StockDetailPage({
 
           <div className="hz-kd-hero-q">
             <div className="hz-kd-hero-title">
-              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>공시에 남은 것</span>
+              <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>공시에 남은 것</span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {[
@@ -387,7 +387,7 @@ export default async function StockDetailPage({
                 <div key={s.label} style={{ display: "flex", flexDirection: "column", gap: 1 }}>
                   <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
                     <span style={{ fontSize: T.small, fontWeight: 600, color: C.sub }}>{s.label}</span>
-                    <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: s.n ? C.ink : C.muted }}>
+                    <strong style={{ fontFamily: MONO, fontSize: "var(--fs-17)", fontWeight: 800, color: s.n ? C.ink : C.muted }}>
                       {s.n.toLocaleString("ko-KR")}
                       {/* 단위는 값보다 **한 단 아래**다 — 이 저장소가 `num()` 주석에 적어 둔
                           규칙이고, 그 자리는 값 13 옆에 단위 12/600 이다(한 포인트 차이에
@@ -397,7 +397,7 @@ export default async function StockDetailPage({
                              그대로 "17"과 "/63명"이 두 덩이로 읽힌다(2026-08-26 에 해 보고
                              되돌렸다). 크기는 붙이고 굵기·색으로 가르는 게 답이다.
                           ⚠️ `<strong>` 안이라 굵기를 안 적으면 800 을 물려받는다. */}
-                      <span style={{ fontSize: 15, fontWeight: 600, color: C.sub2, marginLeft: 2 }}>{s.unit}</span>
+                      <span style={{ fontSize: "var(--fs-15)", fontWeight: 600, color: C.sub2, marginLeft: 2 }}>{s.unit}</span>
                     </strong>
                   </div>
                   {/* ⭐ 수 하나보다 **방향**이 말이 많다. 같은 222건이어도 무엇이었는지가 다르다. */}
@@ -411,7 +411,7 @@ export default async function StockDetailPage({
           <div className="hz-kd-hero-h" style={{ padding: 0 }}>
             <div style={{ padding: "22px 22px 0" }}>
               <div className="hz-kd-hero-title">
-                <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>
+                <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>
                   커뮤니티 관심 추이
                 </span>
               </div>
@@ -435,15 +435,15 @@ export default async function StockDetailPage({
                   }}
                 >
                   <span style={{ display: "inline-flex", alignItems: "baseline", gap: 7 }}>
-                    <strong style={{ fontFamily: MONO, fontSize: 24, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
+                    <strong style={{ fontFamily: MONO, fontSize: "var(--fs-24)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
                       {d.mentionsToday}
                     </strong>
                     {/* 위 '공시에 남은 것'의 단위와 같은 규칙 — 값보다 한 단 아래(24 → 22),
                         굵기와 색으로 가른다. */}
-                    <span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 600, color: C.sub }}>회</span>
+                    <span style={{ fontFamily: MONO, fontSize: "var(--fs-22)", fontWeight: 600, color: C.sub }}>회</span>
                     {/* '회' 는 숫자에 붙는 단위라 MONO 지만 '언급' 은 낱말이라 본문 글꼴이다.
                         한 덩이로 묶어 MONO 로 두면 낱말이 숫자처럼 보인다. */}
-                    <span style={{ fontSize: 17, fontWeight: 600, color: C.sub }}>언급</span>
+                    <span style={{ fontSize: "var(--fs-17)", fontWeight: 600, color: C.sub }}>언급</span>
                   </span>
                   <span
                     style={{

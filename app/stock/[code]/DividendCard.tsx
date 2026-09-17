@@ -74,8 +74,8 @@ export function DividendCard({ s }: { s: DividendStock }) {
                         background: v > 0 ? C.blue : C.track,
                       }}
                     />
-                    <span style={{ fontSize: 11, color: C.sub }}>{m}월</span>
-                    <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: v > 0 ? C.ink : C.muted, whiteSpace: "nowrap" }}>{v > 0 ? won(v) : "·"}</span>
+                    <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>{m}월</span>
+                    <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", fontWeight: 700, color: v > 0 ? C.ink : C.muted, whiteSpace: "nowrap" }}>{v > 0 ? won(v) : "·"}</span>
                   </div>
                 );
               })}
@@ -89,7 +89,7 @@ export function DividendCard({ s }: { s: DividendStock }) {
                   {f}
                 </span>
               ))}
-              {s.unusual && <span style={{ fontSize: 11.5, color: C.label }}>특별·청산배당이 섞여 있어 1년 뒤에도 같으리라 보기 어렵습니다</span>}
+              {s.unusual && <span style={{ fontSize: "var(--fs-11-5)", color: C.label }}>특별·청산배당이 섞여 있어 1년 뒤에도 같으리라 보기 어렵습니다</span>}
             </div>
           )}
 

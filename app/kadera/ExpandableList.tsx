@@ -54,7 +54,7 @@ export function ExpandableList({
     minHeight: 32,
     borderRadius: 0,
     border: 0,
-    fontSize: 11.5,
+    fontSize: "var(--fs-11-5)",
     fontWeight: 700,
     cursor: "pointer",
     // ⚠️ background·color 는 여기 두지 않는다 — 인라인은 :hover 규칙을 이겨서

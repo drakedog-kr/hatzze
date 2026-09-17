@@ -22,7 +22,7 @@ import { StockLogo } from "../StockLogo";
 import { C, Icon, MONO } from "../ui";
 
 /** 이 화면의 자. 서학개미(scale.ts)와 같은 네 단이다. */
-export const T = { big: 22, lead: 15, body: 12, small: 11 } as const;
+export const T = { big: "var(--fs-22)", lead: "var(--fs-15)", body: "var(--fs-12)", small: "var(--fs-11)" } as const;
 
 /**
  * 목록 한 줄의 **글자 단**. 카드·전체보기·상세가 전부 이 셋만 쓴다.
@@ -43,11 +43,11 @@ export const T = { big: 22, lead: 15, body: 12, small: 11 } as const;
  */
 export const ROW = {
   /** 주인공 — 종목 이름이나 사람 이름. */
-  lead: { fontSize: 13.5, fontWeight: 700, color: C.ink } as const,
+  lead: { fontSize: "var(--fs-13-5)", fontWeight: 700, color: C.ink } as const,
   /** 값 — 숫자. 주인공과 같은 무게로 두어 눈이 좌우를 함께 짚는다. */
-  value: { fontFamily: MONO, fontSize: 13, fontWeight: 700, color: C.ink } as const,
+  value: { fontFamily: MONO, fontSize: "var(--fs-13)", fontWeight: 700, color: C.ink } as const,
   /** 보조 — **한 종류뿐이다.** 여기에 또 단을 만들지 말 것. */
-  sub: { fontSize: 12, fontWeight: 500, color: C.sub2 } as const,
+  sub: { fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 } as const,
 } as const;
 
 export function fmtDate(iso: string | null): string {
@@ -1169,12 +1169,12 @@ export function ChartLegend() {
         { el: dot(true), text: "채운 점은 매수" },
         { el: dot(false), text: "빈 고리는 매도" },
       ].map((i) => (
-        <span key={i.text} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: C.sub2 }}>
+        <span key={i.text} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "var(--fs-11)", color: C.sub2 }}>
           {i.el}
           {i.text}
         </span>
       ))}
-      <span style={{ fontSize: 11, color: C.sub2, lineHeight: 1.55, wordBreak: "keep-all" }}>
+      <span style={{ fontSize: "var(--fs-11)", color: C.sub2, lineHeight: 1.55, wordBreak: "keep-all" }}>
         옵션 행사와 세금 원천징수는 매매가 아니라 찍지 않았습니다. 거물 표시는 13F에 매매일이 없어 분기말에 찍은
         것이라, 그 분기 사이 어느 날인지는 공시에 없습니다.
       </span>
@@ -1261,7 +1261,7 @@ function congressSideRows(rows: CongressTicker[], side: "buy" | "sell") {
               <span
                 style={{
                   fontFamily: MONO,
-                  fontSize: 12,
+                  fontSize: "var(--fs-12)",
                   fontWeight: 800,
                   color: side === "buy" ? "var(--c-cold-ink)" : C.ink,
                 }}
@@ -1814,7 +1814,7 @@ export function AnalystActions({ rows, rate }: { rows: AnalystAction[]; rate: nu
             (2026-08-26). 다른 목록은 `.hz-trow` 가 `padding: 9px 22px` 로 이미 이 방식이다. */}
         <div className="hz-trow hz-actionrow" style={{ padding: "7px 22px" }}>
           <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
-            <strong className="hz-cellsub" style={{ ...ROW.lead, fontSize: 13 }}>
+            <strong className="hz-cellsub" style={{ ...ROW.lead, fontSize: "var(--fs-13)" }}>
               {r.firm}
             </strong>
             <SubLine text={`${r.analyst === "Unknown Analyst" ? "이름 없음" : r.analyst} · ${fmtDate(r.date)}`} />
@@ -1906,7 +1906,7 @@ export function ConsensusBody({
           <div style={{ flex: "1 1 260px", display: "flex", flexDirection: "column", gap: 9, minWidth: 0 }}>
             <span style={{ ...ROW.sub, fontWeight: 600 }}>증권가 종합</span>
             <span style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
-              <strong style={{ fontSize: 22, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
+              <strong style={{ fontSize: "var(--fs-22)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
                 {(c.consensus && CONSENSUS_KO[c.consensus]) ?? c.consensus ?? "등급 미상"}
               </strong>
               <span style={{ ...ROW.sub }} title={c.consensus ? `원문 등급 ${c.consensus}` : undefined}>
@@ -1940,7 +1940,7 @@ export function ConsensusBody({
               1년 목표가 평균{c.targetCount != null ? ` · 애널리스트 ${c.targetCount}명` : ""}
             </span>
             <span style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
-              <strong style={{ fontFamily: MONO, fontSize: 22, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
+              <strong style={{ fontFamily: MONO, fontSize: "var(--fs-22)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
                 <ExactMoney usd={c.targetAvg} rate={rate} />
               </strong>
               {upside != null && (
@@ -2056,7 +2056,7 @@ export function EmptyCard({ icon, children }: { icon: string; children: React.Re
         textAlign: "center",
       }}
     >
-      <Icon name={icon} style={{ fontSize: 26, color: C.hint }} />
+      <Icon name={icon} style={{ fontSize: "var(--fs-26)", color: C.hint }} />
       {/* ⭐ **문장마다 줄을 바꾼다.** 흘려 두면 "…없습니다. 임원이" 처럼 두 문장이 한 줄에
           걸쳐 이어져, 빈 상태를 알리는 첫 문장과 그 이유를 대는 둘째 문장이 한 덩이로
           읽힌다. 자리는 어차피 남으니 문장 경계에서 끊는 편이 낫다.

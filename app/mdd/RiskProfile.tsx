@@ -19,10 +19,10 @@ function TileHead({ items }: { items: { value: string; label: string; tone: stri
     <div style={{ display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
       {items.map((it) => (
         <div key={it.label} style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-          <strong style={{ fontFamily: MONO, fontSize: 19, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1, color: it.tone }}>
+          <strong style={{ fontFamily: MONO, fontSize: "var(--fs-19)", fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1, color: it.tone }}>
             {it.value}
           </strong>
-          <span style={{ fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{it.label}</span>
+          <span style={{ fontSize: "var(--fs-11)", color: C.muted, whiteSpace: "nowrap" }}>{it.label}</span>
         </div>
       ))}
     </div>
@@ -48,7 +48,7 @@ function YearsPopover({ years, label }: { years: YearStat[]; label: string }) {
       {/* 글자 없이 아이콘만. 제목 줄에 "전체보기" 넉 자를 얹으면 부제와 부딪혀 제목이
           좁아진다. 뜻은 aria-label 이 지고, 커서·호버 색이 누를 수 있음을 알린다. */}
       <button type="button" className="hz-yrpop-btn" aria-label={`${label} 연도별 성적 보기`}>
-        <Icon name="open_in_full" style={{ fontSize: 15 }} />
+        <Icon name="open_in_full" style={{ fontSize: "var(--fs-15)" }} />
       </button>
       <span className="hz-yrpop" role="group">
         <span className="hz-yrpop-head">
@@ -121,9 +121,9 @@ export function RiskProfile({ r, periodLabel, market }: { r: RiskProfileData; pe
   const yearScope = yearly.length ? ` (최근 ${yrs}년)` : "";
   const eventScope = events.length ? ` (최근 ${events.length}건)` : "";
 
-  const empty = (text: string) => <p style={{ margin: 0, fontSize: 11.5, color: C.muted, lineHeight: 1.6 }}>{text}</p>;
+  const empty = (text: string) => <p style={{ margin: 0, fontSize: "var(--fs-11-5)", color: C.muted, lineHeight: 1.6 }}>{text}</p>;
   const rows = (children: React.ReactNode) => <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{children}</div>;
-  const summary = (text: string) => <p style={{ margin: 0, fontSize: 11, color: C.sub2, lineHeight: 1.55, wordBreak: "keep-all" }}>{text}</p>;
+  const summary = (text: string) => <p style={{ margin: 0, fontSize: "var(--fs-11)", color: C.sub2, lineHeight: 1.55, wordBreak: "keep-all" }}>{text}</p>;
   /** 거울 막대의 반쪽 폭 — 최댓값이 반폭(50%)을 꽉 채운다. */
   const half = (v: number, max: number) => (Math.abs(v) / max) * 50;
   /**
@@ -399,10 +399,10 @@ export function RiskProfile({ r, periodLabel, market }: { r: RiskProfileData; pe
             }}
           >
             <div style={{ display: "flex", alignItems: "flex-start", gap: 9, marginBottom: 13 }}>
-              <Icon name={t.icon} style={{ fontSize: 17, color: C.muted, marginTop: 1, flexShrink: 0 }} />
+              <Icon name={t.icon} style={{ fontSize: "var(--fs-17)", color: C.muted, marginTop: 1, flexShrink: 0 }} />
               <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: "-.01em", color: C.ink, wordBreak: "keep-all" }}>{t.label}</span>
-                <span style={{ fontSize: 11, lineHeight: 1.5, color: C.muted, wordBreak: "keep-all" }}>{t.sub}</span>
+                <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 800, letterSpacing: "-.01em", color: C.ink, wordBreak: "keep-all" }}>{t.label}</span>
+                <span style={{ fontSize: "var(--fs-11)", lineHeight: 1.5, color: C.muted, wordBreak: "keep-all" }}>{t.sub}</span>
               </div>
             </div>
             <div style={{ marginBottom: 13 }}>{t.body.head}</div>

@@ -109,7 +109,7 @@ export function ShareButton({ path, title }: { path: string; title: string }) {
     // 안 주면 단추 이름이 "share 공유" 로 읽히고 누른 뒤에는 "share 주소를 복사했습니다"
     // 가 된다 — 단추 이름은 눌러도 안 변해야 한다. 결과 알림은 아래 live 영역이 따로 낸다.
     <button type="button" className="hz-note-share" aria-label="공유" data-done={state === "copied"} onClick={onClick}>
-      <Icon name={state === "copied" ? "check" : "share"} style={{ fontSize: 17 }} />
+      <Icon name={state === "copied" ? "check" : "share"} style={{ fontSize: "var(--fs-17)" }} />
       {/* 글자가 바뀌는 자리라 스크린 리더에도 바뀐 것을 알린다. */}
       <span aria-live="polite">{LABEL[state]}</span>
     </button>

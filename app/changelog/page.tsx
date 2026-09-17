@@ -34,10 +34,10 @@ export default function ChangelogPage() {
           사람은 누르는 순간 이미 꺼지지만, 사이드바·검색·주소 직접 입력으로 닿은 사람은
           이 줄이 없으면 다 읽고 나가도 배지가 그대로 켜져 있다. 그리는 것은 없다. */}
       <ChangelogSeen />
-      <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: C.ink, letterSpacing: "-0.01em" }}>
+      <h1 style={{ margin: 0, fontSize: "var(--fs-24)", fontWeight: 700, color: C.ink, letterSpacing: "-0.01em" }}>
         업데이트 기록
       </h1>
-      <p style={{ margin: "10px 0 0", fontSize: 13, color: "var(--c-muted)" }}>
+      <p style={{ margin: "10px 0 0", fontSize: "var(--fs-13)", color: "var(--c-muted)" }}>
         무엇이 언제 바뀌었는지 적어 둡니다.
       </p>
 
@@ -55,7 +55,7 @@ export default function ChangelogPage() {
             {/* 버전과 날짜를 한 줄에 마주 보게 둔다. 버전은 등고선처럼 훑는 값이라
                 고정폭으로 두어야 자릿수가 달라져도 세로로 정렬돼 보인다. */}
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-              <span style={{ fontFamily: MONO, fontSize: 15, fontWeight: 700, color: C.ink, letterSpacing: "0.01em" }}>
+              <span style={{ fontFamily: MONO, fontSize: "var(--fs-15)", fontWeight: 700, color: C.ink, letterSpacing: "0.01em" }}>
                 v{rel.version}
               </span>
               {/* 맨 앞이 곧 지금 쓰이는 버전이다. 눌러 들어온 사람이 푸터에서 본 숫자를
@@ -63,7 +63,7 @@ export default function ChangelogPage() {
               {i === 0 && (
                 <span
                   style={{
-                    fontSize: 11,
+                    fontSize: "var(--fs-11)",
                     fontWeight: 700,
                     // ⚠️ C.blue 는 **면**에 쓰는 원색이라 파란 tint 위 글자로는 3.3 이다.
                     //    파란 글자 전용 값(blueInk)은 같은 tint 위에서 4.66 이다.
@@ -77,7 +77,7 @@ export default function ChangelogPage() {
                 </span>
               )}
               <span style={{ flex: 1 }} />
-              <time dateTime={rel.date} style={{ fontFamily: MONO, fontSize: 12, color: "var(--c-muted)" }}>
+              <time dateTime={rel.date} style={{ fontFamily: MONO, fontSize: "var(--fs-12)", color: "var(--c-muted)" }}>
                 {rel.date}
               </time>
             </div>
@@ -92,7 +92,7 @@ export default function ChangelogPage() {
                 display: "flex",
                 flexDirection: "column",
                 gap: 6,
-                fontSize: 14,
+                fontSize: "var(--fs-14)",
                 lineHeight: 1.75,
                 color: C.sub,
               }}

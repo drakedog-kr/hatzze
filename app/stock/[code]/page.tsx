@@ -141,10 +141,10 @@ function Trend({ points }: { points: StockTrendPoint[] }) {
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
-      <span style={{ fontSize: 11, fontWeight: 600, color: C.sub, whiteSpace: "nowrap" }}>{label}</span>
+      <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub, whiteSpace: "nowrap" }}>{label}</span>
       <span style={{ textAlign: "right", minWidth: 0 }}>
-        <strong style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: C.ink }}>{value}</strong>
-        {sub && <span style={{ fontSize: 11, color: C.muted, marginLeft: 5 }}>{sub}</span>}
+        <strong style={{ fontFamily: MONO, fontSize: "var(--fs-13)", fontWeight: 800, color: C.ink }}>{value}</strong>
+        {sub && <span style={{ fontSize: "var(--fs-11)", color: C.muted, marginLeft: 5 }}>{sub}</span>}
       </span>
     </div>
   );
@@ -164,15 +164,15 @@ function Quote({ d }: { d: StockPageData }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
-        <strong style={{ fontFamily: MONO, fontSize: 20, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
+        <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
           {d.price.toLocaleString("ko-KR")}
         </strong>
-        <span style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>원</span>
+        <span style={{ fontSize: "var(--fs-13)", fontWeight: 600, color: C.sub }}>원</span>
         {chg != null && (
           <span
             style={{
               fontFamily: MONO,
-              fontSize: 13,
+              fontSize: "var(--fs-13)",
               fontWeight: 700,
               whiteSpace: "nowrap",
               color: chg > 0 ? "var(--c-hot-ink)" : chg < 0 ? "var(--c-cold-ink)" : C.sub2,
@@ -183,7 +183,7 @@ function Quote({ d }: { d: StockPageData }) {
           </span>
         )}
       </span>
-      {d.priceDate && <span style={{ fontSize: 11, color: C.muted }}>{fmtKoDate(d.priceDate)} 종가</span>}
+      {d.priceDate && <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>{fmtKoDate(d.priceDate)} 종가</span>}
     </div>
   );
 }
@@ -233,13 +233,13 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
           display: "inline-flex",
           alignItems: "center",
           gap: 4,
-          fontSize: 12,
+          fontSize: "var(--fs-12)",
           fontWeight: 700,
           color: C.sub,
           textDecoration: "none",
         }}
       >
-        <Icon name="chevron_left" style={{ fontSize: 16 }} />
+        <Icon name="chevron_left" style={{ fontSize: "var(--fs-16)" }} />
         {PARENT.name}
       </Link>
 
@@ -256,7 +256,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
                 <h1
                   style={{
                     margin: 0,
-                    fontSize: 20,
+                    fontSize: "var(--fs-20)",
                     fontWeight: 800,
                     color: C.ink,
                     letterSpacing: "-.02em",
@@ -265,7 +265,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
                 >
                   {d.name}
                 </h1>
-                <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 600, color: C.sub }}>
+                <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub }}>
                   {d.code}
                   {marketLabel && <span style={{ fontFamily: "inherit", marginLeft: 6 }}>{marketLabel}</span>}
                 </span>
@@ -276,7 +276,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
 
           <div className="hz-kd-hero-q">
             <div className="hz-kd-hero-title">
-              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>
+              <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>
                 최근 {STOCK_STAT_DAYS}일
               </span>
             </div>
@@ -284,19 +284,19 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
                 "0회 언급 · 언급된 날 0일" 이면 한 화면이 서로 다른 두 말을 하고, 그중 하나는
                 거짓이다. 고장은 고장이라고 적는다. */}
             {d.loadFailed ? (
-              <p style={{ margin: 0, fontSize: 12, fontWeight: 500, color: C.sub, lineHeight: 1.7 }}>
+              <p style={{ margin: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub, lineHeight: 1.7 }}>
                 집계를 지금 불러오지 못했습니다.
               </p>
             ) : (
               <>
                 <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
                 <strong
-                  style={{ fontFamily: MONO, fontSize: 24, fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}
+                  style={{ fontFamily: MONO, fontSize: "var(--fs-24)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}
                 >
                   {d.totalMentions.toLocaleString("ko-KR")}
                 </strong>
-                <span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 600, color: C.sub }}>회</span>
-                <span style={{ fontSize: 17, fontWeight: 600, color: C.sub }}>언급</span>
+                <span style={{ fontFamily: MONO, fontSize: "var(--fs-22)", fontWeight: 600, color: C.sub }}>회</span>
+                <span style={{ fontSize: "var(--fs-17)", fontWeight: 600, color: C.sub }}>언급</span>
               </span>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <Stat label="언급된 날" value={`${d.activeDays}일`} />
@@ -320,29 +320,29 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
 
           <div className="hz-kd-hero-h">
             <div className="hz-kd-hero-title">
-              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>
+              <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>
                 일별 언급 추이
               </span>
             </div>
             {d.loadFailed ? (
               /* ⛔ "잡힌 적이 없습니다" 로 적으면 안 된다. 못 읽은 것과 없는 것은 다르고,
                  그 둘이 화면에서 같아지면 고장이 자료로 위장된다. */
-              <p style={{ margin: 0, fontSize: 12, fontWeight: 500, color: C.sub, lineHeight: 1.7 }}>
+              <p style={{ margin: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub, lineHeight: 1.7 }}>
                 언급 자료를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오.
               </p>
             ) : d.totalMentions === 0 ? (
-              <p style={{ margin: 0, fontSize: 12, fontWeight: 500, color: C.sub, lineHeight: 1.7 }}>
+              <p style={{ margin: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub, lineHeight: 1.7 }}>
                 {withTopicParticle(d.name)} 최근 {STOCK_STAT_DAYS}일 사이 주식 텔레그램에서 잡힌 적이 없습니다.
               </p>
             ) : (
               <>
                 <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
-                  <span style={{ fontSize: 12, color: C.sub }}>
+                  <span style={{ fontSize: "var(--fs-12)", color: C.sub }}>
                     최근 사흘 {d.recentMentions.toLocaleString("ko-KR")}회
                   </span>
                   {/* ⚠️ "8월 2일부터 30일" 로 적었더니 끝날짜("8월 30일")로 읽혔다.
                       기간은 양끝을 다 적어야 한 가지로만 읽힌다. */}
-                  <span style={{ fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>
+                  <span style={{ fontSize: "var(--fs-11)", color: C.muted, whiteSpace: "nowrap" }}>
                     {fmtKoDate(d.trend[0].date)} ~ {fmtKoDate(d.trend[d.trend.length - 1].date)}
                   </span>
                 </div>
@@ -376,7 +376,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
                 <p
                   style={{
                     margin: 0,
-                    fontSize: 13,
+                    fontSize: "var(--fs-13)",
                     lineHeight: 1.7,
                     color: why.reason ? C.inkSoft : C.sub2,
                     textWrap: "pretty",
@@ -385,7 +385,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
                 >
                   {why.reason ?? "커뮤니티에서 이유를 말한 곳이 없습니다."}
                 </p>
-                <span style={{ fontSize: 11.5, color: C.sub2 }}>
+                <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2 }}>
                   {whyRate != null && (
                     <>
                       <span
@@ -433,14 +433,14 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
               return [...groups.values()].map((items) => (
                 <div key={`${items[0].date}-${items[0].precision}`}>
                   <div className="hz-agenda-day">
-                    <span style={{ fontSize: 13.5, fontWeight: 800, color: C.ink, letterSpacing: "-.01em" }}>{eventDateLabel(items[0])}</span>
+                    <span style={{ fontSize: "var(--fs-13-5)", fontWeight: 800, color: C.ink, letterSpacing: "-.01em" }}>{eventDateLabel(items[0])}</span>
                     {items[0].precision === "day" && (
                       <Pill tone={["오늘", "내일"].includes(daysFromToday(items[0].date)) ? "blue" : "plain"}>{daysFromToday(items[0].date)}</Pill>
                     )}
                   </div>
                   {items.map((e) => (
                     <div key={e.event} className="hz-trow hz-cols-cal-one">
-                      <span style={{ minWidth: 0, fontSize: 13.5, lineHeight: 1.6, color: C.inkSoft, wordBreak: "keep-all", textWrap: "pretty" }}>
+                      <span style={{ minWidth: 0, fontSize: "var(--fs-13-5)", lineHeight: 1.6, color: C.inkSoft, wordBreak: "keep-all", textWrap: "pretty" }}>
                         {e.event}
                       </span>
                       {e.channels >= 2 ? <Pill tone="blue">{e.channels}곳이 말함</Pill> : <span />}
@@ -478,7 +478,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
               <p
                 style={{
                   margin: 0,
-                  fontSize: 13,
+                  fontSize: "var(--fs-13)",
                   lineHeight: 1.7,
                   color: C.inkSoft,
                   textWrap: "pretty",
@@ -517,7 +517,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
                   padding: "6px 11px",
                   borderRadius: R.pill,
                   background: C.chip,
-                  fontSize: 12,
+                  fontSize: "var(--fs-12)",
                   fontWeight: 600,
                   color: C.label,
                   textDecoration: "none",
@@ -553,19 +553,19 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
           }}
         >
           <span style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: C.ink, letterSpacing: "-.01em" }}>
+            <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, color: C.ink, letterSpacing: "-.01em" }}>
               MDD 정밀분석에서 보기
             </span>
-            <span style={{ fontSize: 12, color: C.sub, wordBreak: "keep-all" }}>
+            <span style={{ fontSize: "var(--fs-12)", color: C.sub, wordBreak: "keep-all" }}>
               {withTopicParticle(d.name)} 고점에서 얼마나 내려와 있는지, 이만큼 빠졌던 적이 과거에 몇 번이었는지 봅니다.
             </span>
           </span>
-          <Icon name="arrow_forward" style={{ fontSize: 20, color: C.sub, flexShrink: 0 }} />
+          <Icon name="arrow_forward" style={{ fontSize: "var(--fs-20)", color: C.sub, flexShrink: 0 }} />
         </Link>
       </section>
 
       {/* 자료가 어디까지 찬 날인지. 카드마다 날짜를 적는 대신 바닥에 한 줄로 둔다. */}
-      <p style={{ margin: 0, fontSize: 11, color: C.muted, textAlign: "right" }}>
+      <p style={{ margin: 0, fontSize: "var(--fs-11)", color: C.muted, textAlign: "right" }}>
         집계 기준일 {fmtKoDate(d.baseDate)}. 언급은 주식 텔레그램 채널에서 셉니다.
       </p>
     </div>

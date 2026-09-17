@@ -22,7 +22,7 @@ export function LoadFailedNote({ sources }: { sources: string[] }) {
         borderLeft: "3px solid var(--c-hot)",
         background: "var(--c-hot-tint)",
         color: "var(--c-hot-ink)",
-        fontSize: 13,
+        fontSize: "var(--fs-13)",
         lineHeight: 1.6,
         wordBreak: "keep-all",
       }}

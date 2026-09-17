@@ -129,7 +129,7 @@ function NoteNav({ neighbors }: { neighbors: NoteNeighbors }) {
     <nav className="hz-note-nav" aria-label="앞뒤 글">
       {prev ? (
         <Link href={noteHref(prev.date)} className="hz-note-nav-prev">
-          <Icon name="arrow_back" style={{ fontSize: 16 }} />
+          <Icon name="arrow_back" style={{ fontSize: "var(--fs-16)" }} />
           <span>
             <small>{fmtNoteDateShort(prev.date)}</small>
             {prev.title}
@@ -144,7 +144,7 @@ function NoteNav({ neighbors }: { neighbors: NoteNeighbors }) {
             <small>{fmtNoteDateShort(next.date)}</small>
             {next.title}
           </span>
-          <Icon name="arrow_forward" style={{ fontSize: 16 }} />
+          <Icon name="arrow_forward" style={{ fontSize: "var(--fs-16)" }} />
         </Link>
       ) : (
         <span />
@@ -263,7 +263,7 @@ function NoteArchive({ notes, current }: { notes: NoteStub[]; current: string | 
 function NoteEmpty({ failed }: { failed: boolean }) {
   return (
     <div className="hz-note hz-sheet hz-note-empty">
-      <Icon name={failed ? "cloud_off" : "edit_note"} style={{ fontSize: 28 }} />
+      <Icon name={failed ? "cloud_off" : "edit_note"} style={{ fontSize: "var(--fs-28)" }} />
       <p>{failed ? "글을 불러오지 못했습니다. 잠시 뒤 다시 열어 주십시오." : "아직 올라온 글이 없습니다. 매일 저녁 한 편씩 올라옵니다."}</p>
     </div>
   );

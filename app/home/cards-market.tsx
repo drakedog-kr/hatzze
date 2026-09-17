@@ -20,7 +20,7 @@ export function CardBuffett({ v }: { v: Pick }) {
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={v.disp} unit={v.unit} color={v.color} size={32} />
         {ratio !== null && (
-          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+          <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
             {ratio.toFixed(1)}배
           </span>
         )}
@@ -28,10 +28,10 @@ export function CardBuffett({ v }: { v: Pick }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: C.sub2 }}>
+            <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>
               나라 경제 (GDP){dt && dt.gdp_year ? ` · ${String(dt.gdp_year).slice(2)}년 ${dt.gdp_q}분기` : ""}
             </span>
-            <span style={{ fontFamily: MONO, fontSize: 12.5, fontWeight: 700, color: C.label, whiteSpace: "nowrap" }}>
+            <span style={{ fontFamily: MONO, fontSize: "var(--fs-12-5)", fontWeight: 700, color: C.label, whiteSpace: "nowrap" }}>
               {dt && dt.gdp ? `약 ${jo(dt.gdp)}조원` : "기준 100"}
             </span>
           </div>
@@ -41,8 +41,8 @@ export function CardBuffett({ v }: { v: Pick }) {
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: C.sub2 }}>증시 시가총액</span>
-            <span style={{ fontFamily: MONO, fontSize: 12.5, fontWeight: 700, color: C.ink, whiteSpace: "nowrap" }}>
+            <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>증시 시가총액</span>
+            <span style={{ fontFamily: MONO, fontSize: "var(--fs-12-5)", fontWeight: 700, color: C.ink, whiteSpace: "nowrap" }}>
               {dt && dt.market_cap ? `약 ${jo(dt.market_cap)}조원` : `${v.disp}${v.unit}`}
             </span>
           </div>
@@ -50,7 +50,7 @@ export function CardBuffett({ v }: { v: Pick }) {
             <div style={{ width: "100%", height: "100%", borderRadius: R.pill, background: C.blue }} />
           </div>
         </div>
-        <span style={{ fontSize: 12, fontWeight: 600, color: C.label, background: C.soft, borderRadius: R.control, padding: "9px 11px" }}>
+        <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.label, background: C.soft, borderRadius: R.control, padding: "9px 11px" }}>
           증시가 실물 경제보다 {ratio !== null ? `${ratio.toFixed(1)}배 커진` : "커진"} 상태입니다
         </span>
       </div>
@@ -94,17 +94,17 @@ export function CardLeverage({ v }: { v: Pick }) {
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="rocket_launch" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-        <strong style={{ fontFamily: MONO, fontSize: 32, fontWeight: 800, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
+        <strong style={{ fontFamily: MONO, fontSize: "var(--fs-32)", fontWeight: 800, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
           {heat ?? "-"}
-          <span style={{ fontSize: 17, fontWeight: 700, color: C.sub }}>/100</span>
+          <span style={{ fontSize: "var(--fs-17)", fontWeight: 700, color: C.sub }}>/100</span>
         </strong>
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: C.sub2 }}>종합 과열도</span>
+        <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.sub2 }}>종합 과열도</span>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <HeatFill pct={heat ?? 0} />
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ fontSize: 11, color: C.sub }}>안심</span>
-          <span style={{ fontSize: 11, color: C.sub }}>과열</span>
+          <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>안심</span>
+          <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>과열</span>
         </div>
       </div>
       {dt && (
@@ -112,14 +112,14 @@ export function CardLeverage({ v }: { v: Pick }) {
           {/* 서브바 두 개는 각자 '자기 기준 대비 달성률'이라 큰 숫자와 다른 눈금이다.
               라벨을 '기준 대비'로 갈라 둔 것이 그 표시다(같은 이름으로 부르면 안 된다). */}
           <div style={{ background: C.soft, borderRadius: R.control, padding: 13, display: "flex", flexDirection: "column", gap: 5 }}>
-            <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub2 }}>ETF 거래대금</span>
-            <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: C.ink }}>{etfAmount ?? "-"}</strong>
-            <span style={{ fontSize: 11, color: C.muted }}>{etfBaseLabel} 대비 {Math.round(dt.etf_progress ?? 0)}%</span>
+            <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub2 }}>ETF 거래대금</span>
+            <strong style={{ fontFamily: MONO, fontSize: "var(--fs-17)", fontWeight: 800, color: C.ink }}>{etfAmount ?? "-"}</strong>
+            <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>{etfBaseLabel} 대비 {Math.round(dt.etf_progress ?? 0)}%</span>
           </div>
           <div style={{ background: C.soft, borderRadius: R.control, padding: 13, display: "flex", flexDirection: "column", gap: 5 }}>
-            <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub2 }}>선물 미결제약정</span>
-            <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: C.ink }}>{oiAmount ?? "-"}</strong>
-            <span style={{ fontSize: 11, color: C.muted }}>1년 평균 대비 {oiVsAvg !== null ? Math.round(oiVsAvg) : "-"}%</span>
+            <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub2 }}>선물 미결제약정</span>
+            <strong style={{ fontFamily: MONO, fontSize: "var(--fs-17)", fontWeight: 800, color: C.ink }}>{oiAmount ?? "-"}</strong>
+            <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>1년 평균 대비 {oiVsAvg !== null ? Math.round(oiVsAvg) : "-"}%</span>
           </div>
         </div>
       )}
@@ -178,17 +178,17 @@ export function CardMarketActions({ v }: { v: Pick }) {
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
         {/* 한글은 같은 font-size 라도 숫자보다 글리프가 커 보인다 — 다른 카드의 32px 숫자와
             '눈에 보이는 크기'를 맞춘 값이 30 이다. */}
-        <strong style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-.03em", color: dir.color, lineHeight: 1 }}>{dir.label}</strong>
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>{dir.hint}</span>
+        <strong style={{ fontSize: "var(--fs-30)", fontWeight: 800, letterSpacing: "-.03em", color: dir.color, lineHeight: 1 }}>{dir.label}</strong>
+        <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>{dir.hint}</span>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {rows.map((r) => (
           <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ width: 34, flexShrink: 0, fontSize: 11.5, fontWeight: 600, color: C.sub2 }}>{r.label}</span>
+            <span style={{ width: 34, flexShrink: 0, fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub2 }}>{r.label}</span>
             <div style={{ flex: 1, minWidth: 0, height: 14, borderRadius: 4, background: C.track, overflow: "hidden" }}>
               <div style={{ width: `${(r.n / maxN) * 100}%`, height: "100%", borderRadius: 4, background: r.fill }} />
             </div>
-            <span style={{ width: 30, flexShrink: 0, textAlign: "right", fontFamily: MONO, fontSize: 12.5, fontWeight: 800, color: r.ink }}>
+            <span style={{ width: 30, flexShrink: 0, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12-5)", fontWeight: 800, color: r.ink }}>
               {r.n}건
             </span>
           </div>
@@ -238,10 +238,10 @@ export function CardTurnover({ v }: { v: Pick }) {
             s2.pct <= 0 ? null : (
               <div key={s2.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ width: 8, height: 8, borderRadius: 3, background: s2.fill, flexShrink: 0 }} />
-                <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 600, color: C.label, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span style={{ flex: 1, minWidth: 0, fontSize: "var(--fs-12)", fontWeight: 600, color: C.label, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {s2.label}
                 </span>
-                <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color: s2.ink }}>{s2.pct.toFixed(1)}%</span>
+                <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 800, color: s2.ink }}>{s2.pct.toFixed(1)}%</span>
               </div>
             ),
           )}
@@ -279,14 +279,14 @@ export function CardHighGap({ v, tops, failed = false }: { v: Pick; tops: StockH
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={`${gap > 0 ? "+" : ""}${v.disp}`} unit={v.unit} color={v.color} size={32} sub={gap > 0 ? "이전 전고점 돌파" : "전고점으로부터"} />
         {typeof priorHigh === "number" && (
-          <span style={{ fontSize: 12, fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
             전고점 {num(priorHigh)}
           </span>
         )}
       </div>
       {/* 조회가 깨졌을 때. 목록을 그냥 빼면 "오늘은 그런 종목이 없나 보다" 로 읽힌다. */}
       {failed && (
-        <p style={{ margin: 0, fontSize: 12, color: C.sub }}>
+        <p style={{ margin: 0, fontSize: "var(--fs-12)", color: C.sub }}>
           고점 근접 종목을 불러오지 못했습니다.
         </p>
       )}
@@ -299,13 +299,13 @@ export function CardHighGap({ v, tops, failed = false }: { v: Pick; tops: StockH
             className="hz-tip hz-tip-wide hz-tip-start"
             data-tip={`현재가와 52주 고점 모두 야후 파이낸스 종가 기준입니다${tops[0]?.priceDate ? ` (${tops[0].priceDate} 종가)` : ""}. 막대가 꽉 찰수록 고점에 가깝습니다.`}
             data-ga-tip="high_gap_source"
-            style={{ fontSize: 11.5, fontWeight: 700, color: C.muted }}
+            style={{ fontSize: "var(--fs-11-5)", fontWeight: 700, color: C.muted }}
           >
             거래대금 상위 종목의 52주 고점 근접도
           </span>
           {tops.map((st, i) => (
             <div key={st.code} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ width: 76, flexShrink: 0, fontSize: 12.5, fontWeight: 600, color: C.label, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              <span style={{ width: 76, flexShrink: 0, fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.label, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {st.name}
               </span>
               <div style={{ flex: 1, height: 7, borderRadius: R.pill, background: C.track, overflow: "hidden", minWidth: 0 }}>
@@ -323,7 +323,7 @@ export function CardHighGap({ v, tops, failed = false }: { v: Pick; tops: StockH
                     없다(같은 값이 52.5 · 64.0 · 48.9 로 갈린다). */}
                 <div style={{ width: `${Math.max(0, Math.min(100, 100 + st.gapPct))}%`, height: "100%", borderRadius: R.pill, background: rankColor[i] ?? "var(--c-blue-4)" }} />
               </div>
-              <span style={{ width: 50, textAlign: "right", fontFamily: MONO, fontSize: 12, fontWeight: 700, color: C.ink }}>
+              <span style={{ width: 50, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: C.ink }}>
                 {st.gapPct >= 0 ? "+" : ""}{st.gapPct.toFixed(1)}%
               </span>
             </div>
@@ -372,9 +372,9 @@ export function CardSpeed({ v, path = [], failed = false }: { v: Pick; path?: Cl
             tip={(x) => `${shortDate(x.key)} · ${x.value >= 0 ? "+" : ""}${x.value.toFixed(1)}%`}
           />
           <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 11, color: C.sub }}>3개월 전 = 0%</span>
+            <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>3개월 전 = 0%</span>
             {hi !== null && lo !== null && (
-              <span style={{ fontSize: 11, color: C.sub }}>
+              <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>
                 최고 {hi >= 0 ? "+" : ""}{hi.toFixed(1)}% · 최저 {lo.toFixed(1)}%
               </span>
             )}
@@ -388,7 +388,7 @@ export function CardSpeed({ v, path = [], failed = false }: { v: Pick; path?: Cl
         failed ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <HeatBar v={v} hideThreshold />
-            <span style={{ fontSize: 11, color: C.sub }}>60일 궤적을 불러오지 못했습니다.</span>
+            <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>60일 궤적을 불러오지 못했습니다.</span>
           </div>
         ) : (
           <HeatBar v={v} hideThreshold />
@@ -421,7 +421,7 @@ export function CardVkospi({ v }: { v: Pick }) {
       <TitleRow desc={v.headline} icon="monitor_heart" name={v.name} />
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={v.disp} color={v.color} size={32} sub="변동성지수" />
-        <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
           {verdict}
         </span>
       </div>
@@ -437,9 +437,9 @@ export function CardVkospi({ v }: { v: Pick }) {
             적히면 무엇을 잰 값인지가 흐려졌다(2026-08-04). 낮은 쪽이 왜 과열 신호인지는
             셀 맨 아래 설명 한 줄이 맡는다. */}
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ fontSize: 11.5, fontWeight: 600, color: C.muted }}>잔잔 {lo !== null ? Math.round(lo) : "-"}</span>
-          <span style={{ fontSize: 11, color: C.sub }}>최근 30일 범위</span>
-          <span style={{ fontSize: 11.5, fontWeight: 600, color: C.muted }}>출렁 {hi !== null ? Math.round(hi) : "-"}</span>
+          <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.muted }}>잔잔 {lo !== null ? Math.round(lo) : "-"}</span>
+          <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>최근 30일 범위</span>
+          <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.muted }}>출렁 {hi !== null ? Math.round(hi) : "-"}</span>
         </div>
       </div>
       <Foot text={v.desc} />
@@ -513,10 +513,10 @@ export function CardAsia({ v }: { v: Pick }) {
           {bars.map((b) => (
             <div key={b.label} style={{ display: "flex", alignItems: "center", gap: ROW_GAP }}>
               <span style={{ width: LABEL_W, flexShrink: 0, display: "flex", flexDirection: "column", gap: 1 }}>
-                <span style={{ fontSize: 11, fontWeight: b.self ? 800 : 700, color: b.self ? C.ink : C.label, whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: "var(--fs-11)", fontWeight: b.self ? 800 : 700, color: b.self ? C.ink : C.label, whiteSpace: "nowrap" }}>
                   {b.label}
                 </span>
-                <span style={{ fontSize: 11, fontWeight: 600, color: C.sub }}>{b.sub}</span>
+                <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub }}>{b.sub}</span>
               </span>
               <div style={{ position: "relative", flex: 1, minWidth: 0, height: 16 }}>
                 <div style={{ position: "absolute", inset: 0, borderRadius: 4, background: C.track }} />
@@ -540,7 +540,7 @@ export function CardAsia({ v }: { v: Pick }) {
                   flexShrink: 0,
                   textAlign: "right",
                   fontFamily: MONO,
-                  fontSize: 12,
+                  fontSize: "var(--fs-12)",
                   fontWeight: 800,
                   color: b.self ? C.ink : C.label,
                 }}
@@ -560,7 +560,7 @@ export function CardAsia({ v }: { v: Pick }) {
                   right: `calc(100% - ${kospiPct})`,
                   top: 0,
                   transform: "translateX(50%)",
-                  fontSize: 11,
+                  fontSize: "var(--fs-11)",
                   fontWeight: 700,
                   color: "var(--c-cold-ink)",
                   whiteSpace: "nowrap",
@@ -625,11 +625,11 @@ export function CardVolume({ v }: { v: Pick }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {rows.map((r) => (
           <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ width: 60, flexShrink: 0, fontSize: 12, fontWeight: 600, color: C.sub2 }}>{r.label}</span>
+            <span style={{ width: 60, flexShrink: 0, fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>{r.label}</span>
             <div style={{ flex: 1, height: 9, borderRadius: R.pill, background: C.track, overflow: "hidden", minWidth: 0 }}>
               <div style={{ width: `${((r.value ?? 0) / max) * 100}%`, height: "100%", borderRadius: R.pill, background: r.fill }} />
             </div>
-            <span style={{ width: 58, textAlign: "right", fontFamily: MONO, fontSize: 12.5, fontWeight: 700, color: r.strong ? C.ink : C.label }}>
+            <span style={{ width: 58, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12-5)", fontWeight: 700, color: r.strong ? C.ink : C.label }}>
               {r.value !== null ? fmt(r.value) : "-"}
             </span>
           </div>
@@ -655,7 +655,7 @@ export function CardFx({ v }: { v: Pick }) {
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={`±${v.disp}`} unit={v.unit} color={v.color} size={32} />
         {typeof close === "number" && (
-          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+          <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
             {close.toLocaleString("ko-KR", { maximumFractionDigits: 0 })}원
           </span>
         )}
@@ -667,7 +667,7 @@ export function CardFx({ v }: { v: Pick }) {
             큰 수치 옆을 비워 주는 덤도 있다: 곁말이 있으면 4열 하한(칸 안쪽 237px)에서
             164+12+65=241 이라 배지가 아랫줄로 내려갔는데, 빼면 99+12+65=176 으로
             한 줄에 붙어 배지가 오른쪽 끝에 선다. */}
-        <span style={{ alignSelf: "flex-end", fontSize: 11, color: C.sub }}>최근 30일</span>
+        <span style={{ alignSelf: "flex-end", fontSize: "var(--fs-11)", color: C.sub }}>최근 30일</span>
       </div>
       <Foot text={v.desc} />
     </Shell>
@@ -721,7 +721,7 @@ export function CardNetBuy({ v }: { v: Pick }) {
           <span
             style={{
               alignSelf: "flex-start",
-              fontSize: 11.5,
+              fontSize: "var(--fs-11-5)",
               fontWeight: 700,
               padding: "4px 10px",
               borderRadius: R.pill,
@@ -768,7 +768,7 @@ export function CardNetBuy({ v }: { v: Pick }) {
           {dates.length > 0 && (
             <div style={{ display: "flex", gap: 8 }}>
               {daily.map((_, i) => (
-                <span key={i} style={{ flex: 1, textAlign: "center", fontFamily: MONO, fontSize: 11, color: C.sub }}>
+                <span key={i} style={{ flex: 1, textAlign: "center", fontFamily: MONO, fontSize: "var(--fs-11)", color: C.sub }}>
                   {dates[i] ? ymdShort(dates[i]) : ""}
                 </span>
               ))}
@@ -832,18 +832,18 @@ export function CardLimitUp({ v }: { v: Pick }) {
       />
       <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
         {rank.length === 0 ? (
-          <span style={{ fontSize: 12.5, color: C.sub }}>10% 넘게 오른 종목이 없습니다</span>
+          <span style={{ fontSize: "var(--fs-12-5)", color: C.sub }}>10% 넘게 오른 종목이 없습니다</span>
         ) : (
           rank.map((r, i) => (
             <div key={`${r.n}-${i}`} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, minWidth: 0 }}>
-              <span style={{ fontSize: 12.5, fontWeight: 600, color: C.label, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.label, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {r.n}
               </span>
               <span
                 style={{
                   flexShrink: 0,
                   fontFamily: MONO,
-                  fontSize: 12,
+                  fontSize: "var(--fs-12)",
                   fontWeight: 800,
                   color: "var(--card-accent-ink, var(--c-cold-ink))",
                   background: "var(--card-accent-tint, var(--c-blue-tint))",
@@ -863,7 +863,7 @@ export function CardLimitUp({ v }: { v: Pick }) {
               buckets.map((b) => `${b.label}: ${b.n}종목`).join("\n") +
               (listed ? `\n전체: ${listed.toLocaleString("ko-KR")}종목` : "")
             }
-            style={{ fontSize: 11.5, color: C.sub }}
+            style={{ fontSize: "var(--fs-11-5)", color: C.sub }}
           >
             외 {rest}개
           </span>
@@ -900,7 +900,7 @@ export function CardPutCall({ v }: { v: Pick }) {
       <TitleRow desc={v.headline} icon="casino" name={v.name} />
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={ratio.toFixed(2)} color={v.color} size={32} sub="풋/콜" />
-        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
           {greedy ? "콜 우세" : "풋 우세"}
         </span>
       </div>
@@ -911,12 +911,12 @@ export function CardPutCall({ v }: { v: Pick }) {
           <div className="hz-tip" data-tip={tip("put")} style={{ width: `${100 - callShare}%`, borderRadius: "0 99px 99px 0", background: C.cold }} />
         </div>
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: C.mania }}>콜 {Math.round(callShare)}%</span>
-          <span style={{ fontSize: 12, fontWeight: 700, color: C.cold }}>풋 {Math.round(100 - callShare)}%</span>
+          <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: C.mania }}>콜 {Math.round(callShare)}%</span>
+          <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: C.cold }}>풋 {Math.round(100 - callShare)}%</span>
         </div>
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ fontSize: 11, color: C.sub }}>콜 = 상승 베팅</span>
-          <span style={{ fontSize: 11, color: C.sub }}>풋 = 하락 대비</span>
+          <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>콜 = 상승 베팅</span>
+          <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>풋 = 하락 대비</span>
         </div>
       </div>
       <Foot text={v.desc} />

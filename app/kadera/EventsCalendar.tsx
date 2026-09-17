@@ -120,7 +120,7 @@ export function EventsCalendar({ events, today, weeks = 5 }: { events: CalEvent[
       <div className="hz-evcal">
         <div className="hz-evcal-month">
           {months.map((m) => `${m}월`).join(" · ")}
-          <span style={{ fontWeight: 600, color: C.sub2, marginLeft: 8, fontSize: 11.5 }}>
+          <span style={{ fontWeight: 600, color: C.sub2, marginLeft: 8, fontSize: "var(--fs-11-5)" }}>
             {label(today).slice(0, -4)}부터 {weeks}주
           </span>
           <span style={{ flex: 1 }} />
@@ -172,15 +172,15 @@ export function EventsCalendar({ events, today, weeks = 5 }: { events: CalEvent[
 
       <div className="hz-evday">
         <div className="hz-evday-head">
-          <span style={{ fontSize: 15, fontWeight: 800, color: C.ink, letterSpacing: "-.01em" }}>{label(sel)}</span>
+          <span style={{ fontSize: "var(--fs-15)", fontWeight: 800, color: C.ink, letterSpacing: "-.01em" }}>{label(sel)}</span>
           <Pill tone={rel(today, sel) === "오늘" || rel(today, sel) === "내일" ? "blue" : "plain"}>{rel(today, sel)}</Pill>
           <span style={{ flex: 1 }} />
-          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: C.sub }}>
+          <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: C.sub }}>
             {items.length ? `${items.length}건` : ""}
           </span>
         </div>
         {items.length === 0 ? (
-          <p style={{ margin: 0, padding: "18px 0", fontSize: 13, color: C.sub, lineHeight: 1.6 }}>
+          <p style={{ margin: 0, padding: "18px 0", fontSize: "var(--fs-13)", color: C.sub, lineHeight: 1.6 }}>
             이날 커뮤니티가 짚은 일정이 없습니다.
             {nextDate && (
               <>
@@ -195,12 +195,12 @@ export function EventsCalendar({ events, today, weeks = 5 }: { events: CalEvent[
               <div key={`${e.code}-${e.event}`} className="hz-evday-row">
                 <StockLogo code={e.code} name={e.name} market={e.market} size={28} />
                 <span
-                  style={{ minWidth: 0, fontSize: 13.5, lineHeight: 1.6, color: "var(--c-ink-soft)", wordBreak: "keep-all", textWrap: "pretty" }}
+                  style={{ minWidth: 0, fontSize: "var(--fs-13-5)", lineHeight: 1.6, color: "var(--c-ink-soft)", wordBreak: "keep-all", textWrap: "pretty" }}
                 >
                   <Link
                     href={stockHrefOf(e)}
                     className="hz-stock-link"
-                    style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", marginRight: 7 }}
+                    style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", marginRight: 7 }}
                   >
                     {e.name}
                   </Link>
@@ -220,12 +220,12 @@ export function EventsCalendar({ events, today, weeks = 5 }: { events: CalEvent[
         {nextDate && nextItems.length > 0 && (
           <div className="hz-evday-next">
             <div className="hz-evday-head hz-evday-head-next">
-              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>다음으로 짚인 날</span>
-              <span style={{ fontSize: 13.5, fontWeight: 800, color: C.ink, letterSpacing: "-.01em" }}>{label(nextDate)}</span>
+              <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>다음으로 짚인 날</span>
+              <span style={{ fontSize: "var(--fs-13-5)", fontWeight: 800, color: C.ink, letterSpacing: "-.01em" }}>{label(nextDate)}</span>
               <Pill tone={rel(today, nextDate) === "내일" ? "blue" : "plain"}>{rel(today, nextDate)}</Pill>
               <span style={{ flex: 1 }} />
               {/* 그날 전체 건수. 미리보기는 세 줄뿐이라 여기 안 적으면 몇 건인지 알 길이 없다. */}
-              <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: C.sub }}>
+              <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: C.sub }}>
                 {byDate.get(nextDate)?.length ?? 0}건
               </span>
             </div>
@@ -233,12 +233,12 @@ export function EventsCalendar({ events, today, weeks = 5 }: { events: CalEvent[
               <div key={`${e.code}-${e.event}`} className="hz-evday-row">
                 <StockLogo code={e.code} name={e.name} market={e.market} size={28} />
                 <span
-                  style={{ minWidth: 0, fontSize: 13.5, lineHeight: 1.6, color: "var(--c-ink-soft)", wordBreak: "keep-all", textWrap: "pretty" }}
+                  style={{ minWidth: 0, fontSize: "var(--fs-13-5)", lineHeight: 1.6, color: "var(--c-ink-soft)", wordBreak: "keep-all", textWrap: "pretty" }}
                 >
                   <Link
                     href={stockHrefOf(e)}
                     className="hz-stock-link"
-                    style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", marginRight: 7 }}
+                    style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", marginRight: 7 }}
                   >
                     {e.name}
                   </Link>

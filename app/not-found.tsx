@@ -29,24 +29,24 @@ import { C, Icon } from "./ui";
 export default function NotFound() {
   return (
     <div style={{ maxWidth: DOC_WIDTH }}>
-      <p style={{ margin: 0, fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: "var(--c-muted)" }}>404</p>
-      <h1 style={{ margin: "8px 0 0", fontSize: 24, fontWeight: 700, color: C.ink, letterSpacing: "-0.01em" }}>
+      <p style={{ margin: 0, fontSize: "var(--fs-12)", fontWeight: 700, letterSpacing: "0.08em", color: "var(--c-muted)" }}>404</p>
+      <h1 style={{ margin: "8px 0 0", fontSize: "var(--fs-24)", fontWeight: 700, color: C.ink, letterSpacing: "-0.01em" }}>
         찾을 수 없는 주소입니다
       </h1>
-      <p style={{ margin: "14px 0 0", fontSize: 14, lineHeight: 1.85, color: C.sub }}>
+      <p style={{ margin: "14px 0 0", fontSize: "var(--fs-14)", lineHeight: 1.85, color: C.sub }}>
         주소가 바뀌었거나 잘못 적혔거나, 아직 없는 종목·날짜일 수 있습니다. 아래에서 다시 시작하십시오.
       </p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 22 }}>
         <Link href="/" className="hz-btn-soft" style={{ padding: "0 14px" }}>
-          <Icon name="home" style={{ fontSize: 18 }} />
+          <Icon name="home" style={{ fontSize: "var(--fs-18)" }} />
           시장 브리핑
         </Link>
         <Link href="/kadera" className="hz-btn-soft" style={{ padding: "0 14px" }}>
-          <Icon name="forum" style={{ fontSize: 18 }} />
+          <Icon name="forum" style={{ fontSize: "var(--fs-18)" }} />
           국장 카더라
         </Link>
         <Link href="/insider" className="hz-btn-soft" style={{ padding: "0 14px" }}>
-          <Icon name="contact_page" style={{ fontSize: 18 }} />
+          <Icon name="contact_page" style={{ fontSize: "var(--fs-18)" }} />
           내부자 리포트
         </Link>
       </div>

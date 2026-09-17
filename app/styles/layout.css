@@ -129,11 +129,11 @@
 /* 화면 제목(h1). 2026-09-04 리디자인의 눈금 — 제목 30 > 히어로 28 > 구간 21 > 시트 머리 17
    > 본문 14.5. 토스는 60/40/16 인데 사이드바 안 본문이라 반으로 접었다. */
 .hz-page-title {
-  font-size: 30px;
+  font-size: var(--fs-30);
   line-height: 1.2;
 }
 @media (max-width: 560px) {
-  .hz-page-title { font-size: 24px; }
+  .hz-page-title { font-size: var(--fs-24); }
 }
 .hz-page-tools {
   display: flex;
@@ -203,7 +203,7 @@
   background: var(--c-ink);
   color: var(--c-bg);
   border-radius: var(--r-control);
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 600;
   line-height: 1.45;
 }
@@ -321,7 +321,7 @@
     color: var(--c-bg);
     border-radius: var(--r-card);
     box-shadow: 0 10px 28px var(--c-shadow);
-    font-size: 13px;
+    font-size: var(--fs-13);
     font-weight: 600;
     line-height: 1.5;
   }

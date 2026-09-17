@@ -51,7 +51,7 @@ export function SearchBox({ stocks, onPick }: { stocks: StockLite[]; onPick: (co
   return (
     <div ref={boxRef} className="dv-search">
       <div className={`dv-search-box${focused ? " dv-search-box-on" : ""}`}>
-        <Icon name="search" style={{ fontSize: 20, color: focused ? C.blue : C.sub }} />
+        <Icon name="search" style={{ fontSize: "var(--fs-20)", color: focused ? C.blue : C.sub }} />
         <input
           value={query}
           onChange={(e) => {

@@ -146,7 +146,7 @@ export function VersionLink() {
            규칙). 여기는 링크라 손가락이어야 하므로 인라인으로 되돌린다. */
         cursor: "pointer",
         fontFamily: MONO,
-        fontSize: 11,
+        fontSize: "var(--fs-11)",
         fontWeight: 600,
         lineHeight: 1,
         letterSpacing: "0.02em",

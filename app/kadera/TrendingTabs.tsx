@@ -96,7 +96,7 @@ export function TrendingTabs({
       {current?.count === 0 ? (
         // 시트 안이라 여백은 셀과 같은 자리에서 낸다(머리가 자기 padding 을 갖고 있어
         // 문단이 시트 왼쪽 끝에 붙어 버린다).
-        <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: 12.5 }}>
+        <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-12-5)" }}>
           {current.label} 기준으로는 아직 화제 메시지가 없습니다.
         </p>
       ) : (

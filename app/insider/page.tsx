@@ -122,7 +122,7 @@ function RowList({ items, href }: { items: React.ReactNode[]; href: string }) {
             gap: 4,
             padding: "0 12px",
             minHeight: 32,
-            fontSize: 11.5,
+            fontSize: "var(--fs-11-5)",
             fontWeight: 700,
             textDecoration: "none",
           }}
@@ -132,7 +132,7 @@ function RowList({ items, href }: { items: React.ReactNode[]; href: string }) {
           전체보기
           {/* 화살표는 남긴다 — 카더라의 '더 보기'는 그 자리에서 펴지만 이건 **다른
               페이지로 간다.** 같은 생김새에 다른 동작이면 눌러 보기 전엔 알 수 없다. */}
-          <Icon name="chevron_right" style={{ fontSize: 15 }} />
+          <Icon name="chevron_right" style={{ fontSize: "var(--fs-15)" }} />
         </Link>
       </div>
     </>
@@ -266,7 +266,7 @@ export default async function InsiderPage() {
             <div className="hz-kd-hero-title">
               {/* ⭐ 이름은 카더라 두 화면과 같다. 같은 자리에 같은 것이 서 있으므로 같은
                   이름이라야 한다 — 화면마다 달리 부르면 독자가 매번 다시 읽는다. */}
-              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>
+              <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>
                 모니터링 현황
               </span>
               {/* ⚠️ 규모는 90일, 아래 블록들은 7일이다. 한 화면에 두 창이 있으므로
@@ -303,13 +303,13 @@ export default async function InsiderPage() {
                     borderBottom: i === arr.length - 1 ? "none" : "1px solid var(--c-hairline)",
                   }}
                 >
-                  <span style={{ fontSize: 11.5, color: C.sub, fontWeight: 600, wordBreak: "keep-all", minWidth: 0 }}>
+                  <span style={{ fontSize: "var(--fs-11-5)", color: C.sub, fontWeight: 600, wordBreak: "keep-all", minWidth: 0 }}>
                     {s.label}
                   </span>
                   <strong
                     style={{
                       fontFamily: MONO,
-                      fontSize: 17,
+                      fontSize: "var(--fs-17)",
                       fontWeight: 800,
                       color: C.ink,
                       letterSpacing: "-.02em",
@@ -328,7 +328,7 @@ export default async function InsiderPage() {
           {/* ② 오늘의 업데이트 — 신선도 */}
           <div className="hz-kd-hero-q">
             <div className="hz-kd-hero-title">
-              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>
+              <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>
                 오늘의 업데이트
               </span>
             </div>
@@ -350,7 +350,7 @@ export default async function InsiderPage() {
                       display: "inline-flex",
                       alignItems: "baseline",
                       gap: 4,
-                      fontSize: 11.5,
+                      fontSize: "var(--fs-11-5)",
                       fontWeight: 600,
                       color: C.sub,
                       wordBreak: "keep-all",
@@ -365,16 +365,16 @@ export default async function InsiderPage() {
                         data-ga-tip={u.label}
                         style={{ display: "inline-flex", alignSelf: "center", cursor: "help", flexShrink: 0 }}
                       >
-                        <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
+                        <Icon name="help" style={{ fontSize: "var(--fs-12)", color: C.muted }} />
                       </span>
                     )}
                   </span>
                   <span style={{ display: "flex", alignItems: "baseline", gap: 6, flexShrink: 0 }}>
-                    <strong style={{ fontFamily: MONO, fontSize: 17, fontWeight: 800, color: u.n ? C.ink : C.muted }}>
+                    <strong style={{ fontFamily: MONO, fontSize: "var(--fs-17)", fontWeight: 800, color: u.n ? C.ink : C.muted }}>
                       {u.n.toLocaleString("ko-KR")}
-                      <span style={{ fontSize: 11, fontWeight: 700, color: C.sub2, marginLeft: 2 }}>{u.unit}</span>
+                      <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, color: C.sub2, marginLeft: 2 }}>{u.unit}</span>
                     </strong>
-                    <span style={{ fontFamily: MONO, fontSize: 10.5, color: C.muted, minWidth: 30, textAlign: "right" }}>
+                    <span style={{ fontFamily: MONO, fontSize: "var(--fs-10-5)", color: C.muted, minWidth: 30, textAlign: "right" }}>
                       {u.when}
                     </span>
                   </span>
@@ -394,7 +394,7 @@ export default async function InsiderPage() {
                  좁혀야 한다. 그냥 되돌리지 말 것. */}
           <div className="hz-kd-hero-h">
             <div className="hz-kd-hero-title">
-              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>오늘의 브리핑</span>
+              <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>오늘의 브리핑</span>
             </div>
             {highlights.length === 0 ? (
               <p style={{ margin: 0, fontSize: T.body, color: C.sub, lineHeight: 1.7 }}>아직 채울 자료가 없습니다.</p>
@@ -419,9 +419,9 @@ export default async function InsiderPage() {
                       minWidth: 0,
                     }}
                   >
-                    <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub, whiteSpace: "nowrap" }}>{h.label}</span>
+                    <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub, whiteSpace: "nowrap" }}>{h.label}</span>
                     <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                      <strong style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color: C.ink }}>{h.ticker}</strong>
+                      <strong style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 800, color: C.ink }}>{h.ticker}</strong>
                       <span
                         style={{ fontSize: T.body, color: C.sub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                       >
@@ -432,7 +432,7 @@ export default async function InsiderPage() {
                       style={{
                         marginLeft: "auto",
                         fontFamily: MONO,
-                        fontSize: 12,
+                        fontSize: "var(--fs-12)",
                         fontWeight: 800,
                         color: C.ink,
                         whiteSpace: "nowrap",

@@ -121,7 +121,7 @@ export function TapHint({ id, text }: { id: string; text: string }) {
     //    밀려 내려가 화면이 덜컹인다. 실제 쪽지는 안쪽 상자가 띄워서 그린다.
     <li ref={ref} className="hz-tap-hint-slot" hidden={!show}>
       <div className="hz-tap-hint">
-        <Icon name="arrow_upward" style={{ fontSize: 16, flexShrink: 0 }} />
+        <Icon name="arrow_upward" style={{ fontSize: "var(--fs-16)", flexShrink: 0 }} />
         <span style={{ flex: 1, wordBreak: "keep-all" }}>{text}</span>
         <button
           type="button"
@@ -143,7 +143,7 @@ export function TapHint({ id, text }: { id: string; text: string }) {
             cursor: "pointer",
           }}
         >
-          <Icon name="close" style={{ fontSize: 16 }} />
+          <Icon name="close" style={{ fontSize: "var(--fs-16)" }} />
         </button>
       </div>
     </li>

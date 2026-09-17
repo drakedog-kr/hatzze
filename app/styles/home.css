@@ -281,7 +281,7 @@
   margin: -8px -8px 0;
   padding: 10px 15px 7px;
   background: var(--c-float);
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 600;
   color: var(--c-sub);
   white-space: nowrap;
@@ -300,7 +300,7 @@
   background: var(--c-blue-tint);
 }
 .hz-dist-pop-name {
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 600;
   color: var(--c-ink);
   white-space: nowrap;
@@ -314,7 +314,7 @@
 /* 과열도. 자릿수는 body 의 tabular-nums 가 이미 고정해 줘서, 열두 줄이 오른쪽에서
    한 줄로 선다(page.tsx 의 MONO 도 별도 서체가 아니라 같은 Pretendard 다). */
 .hz-dist-pop-heat {
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 800;
   color: var(--c-sub);
 }
@@ -328,7 +328,7 @@
 }
 .hz-dist-pop-none {
   margin: 0;
-  font-size: 11.5px;
+  font-size: var(--fs-11-5);
   line-height: 1.6;
   color: var(--c-sub);
   text-wrap: pretty;

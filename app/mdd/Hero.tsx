@@ -13,7 +13,7 @@ import { Sheet, Foot, StatCell, Pill } from "./sheet";
 
 function Reading({ data, periodLabel }: { data: MddResult; periodLabel: string }) {
   const a = data.analysis;
-  const p: React.CSSProperties = { margin: 0, fontSize: 14, lineHeight: 1.7, color: C.inkSoft, wordBreak: "keep-all" };
+  const p: React.CSSProperties = { margin: 0, fontSize: "var(--fs-14)", lineHeight: 1.7, color: C.inkSoft, wordBreak: "keep-all" };
   const b = (color?: string) => ({ fontWeight: 800, color: color ?? C.ink });
   const paras: React.ReactNode[] = [];
 
@@ -107,8 +107,8 @@ function Reading({ data, periodLabel }: { data: MddResult; periodLabel: string }
     <>
       {paras}
       {caution && (
-        <p style={{ ...p, fontSize: 11, color: C.muted, marginTop: "auto" }}>
-          <Icon name="info" style={{ fontSize: 13, verticalAlign: -2, marginRight: 4 }} />
+        <p style={{ ...p, fontSize: "var(--fs-11)", color: C.muted, marginTop: "auto" }}>
+          <Icon name="info" style={{ fontSize: "var(--fs-13)", verticalAlign: -2, marginRight: 4 }} />
           {caution}
         </p>
       )}
@@ -149,7 +149,7 @@ export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel:
       {/* 1 — 분석 종목 */}
       <div style={{ ...cell, flex: "1 1 290px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-          <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>분석 종목</span>
+          <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>분석 종목</span>
           {data.market && <Pill>{data.market}</Pill>}
         </div>
         {/* 로고는 글자 기준선이 아니라 가운데에 맞아야 한다 — baseline 이면 정사각형
@@ -157,14 +157,14 @@ export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel:
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", minWidth: 0 }}>
           <StockLogo code={data.code} name={data.name} market={data.market} size={30} />
           <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", minWidth: 0 }}>
-            <strong style={{ fontSize: 21, fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>{data.name}</strong>
-            <span style={{ fontFamily: MONO, fontSize: 11, color: C.muted }}>{data.code}</span>
+            <strong style={{ fontSize: "var(--fs-21)", fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>{data.name}</strong>
+            <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", color: C.muted }}>{data.code}</span>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
-          <strong style={{ fontFamily: MONO, fontSize: 20, fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>{fmtPrice(a.price, data.market)}</strong>
+          <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>{fmtPrice(a.price, data.market)}</strong>
           {a.changePct !== null && (
-            <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color: a.changePct >= 0 ? UP : DOWN }}>{fmtPct(a.changePct)}</span>
+            <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 800, color: a.changePct >= 0 ? UP : DOWN }}>{fmtPct(a.changePct)}</span>
           )}
         </div>
         <div style={{ display: "flex", flexDirection: "column", marginTop: "auto" }}>
@@ -177,13 +177,13 @@ export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel:
       <div style={{ ...cell, flex: "1.05 1 300px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-            <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>지금 낙폭</span>
+            <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>지금 낙폭</span>
             <span
               className="hz-tip hz-tip-wide hz-tip-start"
               data-tip={`전고점(${fmtPrice(a.ath, data.market)}) 대비 현재가가 얼마나 내려와 있는지입니다`}
               style={{ display: "inline-flex", cursor: "help" }}
             >
-              <Icon name="help" style={{ fontSize: 14, color: C.muted }} />
+              <Icon name="help" style={{ fontSize: "var(--fs-14)", color: C.muted }} />
             </span>
           </span>
           {/* 오른쪽 위에 있던 '상위 11%' 배지는 걷었다(2026-08-04). 바로 아래 타일이 같은
@@ -194,14 +194,14 @@ export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel:
             밑선으로 맞추면 필요 없을 뿐 아니라 밑선 자체를 밀어 도로 어긋난다. */}
         <div className="hz-figrow">
           <strong
-            style={{ fontFamily: MONO, fontSize: 40, fontWeight: 800, lineHeight: 1, letterSpacing: "-.04em", color: atHigh ? C.ink : DOWN }}
+            style={{ fontFamily: MONO, fontSize: "var(--fs-40)", fontWeight: 800, lineHeight: 1, letterSpacing: "-.04em", color: atHigh ? C.ink : DOWN }}
           >
             {atHigh ? "신고가 부근" : fmtPct(a.currentDd)}
           </strong>
           {!atHigh && (
             <div className="hz-figrow-aside">
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub }}>전고점 대비</span>
-              <span style={{ fontSize: 11.5, fontWeight: 700, color: C.sub }}>
+              <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub }}>전고점 대비</span>
+              <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 700, color: C.sub }}>
                 저점 대비 <b style={{ color: fromLow >= 0 ? UP : DOWN, fontWeight: 800 }}>{fmtPct(fromLow)}</b>
               </span>
             </div>
@@ -240,9 +240,9 @@ export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel:
               flex: "none",
             }}
           >
-            <Icon name="insights" style={{ fontSize: 14 }} />
+            <Icon name="insights" style={{ fontSize: "var(--fs-14)" }} />
           </span>
-          <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>이 하락의 맥락</span>
+          <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>이 하락의 맥락</span>
         </div>
         <Reading data={data} periodLabel={periodLabel} />
       </div>
@@ -255,10 +255,10 @@ export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel:
 function PriceRow({ label, date, value }: { label: string; date: string; value: string }) {
   return (
     <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, padding: "10px 0", borderTop: `1px solid ${C.sheetRow}` }}>
-      <span style={{ fontSize: 11.5, fontWeight: 600, color: C.sub, minWidth: 0 }}>
-        {label} <span style={{ fontFamily: MONO, fontSize: 11, color: C.muted }}>{date}</span>
+      <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub, minWidth: 0 }}>
+        {label} <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", color: C.muted }}>{date}</span>
       </span>
-      <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: C.ink, flex: "none" }}>{value}</span>
+      <span style={{ fontFamily: MONO, fontSize: "var(--fs-13)", fontWeight: 800, color: C.ink, flex: "none" }}>{value}</span>
     </div>
   );
 }
@@ -394,7 +394,7 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
       <div ref={rowRef} style={{ position: "relative", height: 13 }}>
         <span
           ref={startRef}
-          style={{ position: "absolute", left: 0, top: 0, fontSize: 11, fontWeight: 600, color: C.sub, visibility: fit.showStart ? "visible" : "hidden" }}
+          style={{ position: "absolute", left: 0, top: 0, fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub, visibility: fit.showStart ? "visible" : "hidden" }}
         >
           0%
         </span>
@@ -406,7 +406,7 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
               left: fit.left ?? `${worst}%`,
               top: 0,
               transform: "translateX(-50%)",
-              fontSize: 11,
+              fontSize: "var(--fs-11)",
               fontWeight: 600,
               color: C.sub,
               whiteSpace: "nowrap",
@@ -417,7 +417,7 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
         )}
         <span
           ref={endRef}
-          style={{ position: "absolute", right: 0, top: 0, fontSize: 11, fontWeight: 600, color: C.sub, visibility: fit.showEnd ? "visible" : "hidden" }}
+          style={{ position: "absolute", right: 0, top: 0, fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub, visibility: fit.showEnd ? "visible" : "hidden" }}
         >
           −100%
         </span>
@@ -576,7 +576,7 @@ export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodL
         aria-label="언더워터 차트 확대해서 보기"
         onClick={() => setZoom(true)}
       >
-        <Icon name="open_in_full" style={{ fontSize: 15 }} />
+        <Icon name="open_in_full" style={{ fontSize: "var(--fs-15)" }} />
       </button>
       </div>
       <Foot>0%가 전고점입니다. 아래로 갈수록 그 고점에서 멀어져 있다는 뜻이며, 선이 0에 닿은 날이 고점을 되찾은 날입니다.</Foot>
@@ -587,7 +587,7 @@ export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodL
            설명이 안 뜬다 — 확대해 놓고 정작 값을 못 보는 꼴이 된다. */
         <div className="hz-zoom-scrim" role="dialog" aria-modal="true" aria-label="언더워터 차트 확대" onClick={(e) => { if (e.target === e.currentTarget) setZoom(false); }}>
           <button type="button" className="hz-zoom-close" aria-label="닫기" onClick={() => setZoom(false)}>
-            <Icon name="close" style={{ fontSize: 20 }} />
+            <Icon name="close" style={{ fontSize: "var(--fs-20)" }} />
           </button>
           <div className="hz-zoom-stage">
             {chartWith(" mdd-crosshair-zoom")}

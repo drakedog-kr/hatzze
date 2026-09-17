@@ -412,7 +412,7 @@ export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
                   }}
                 >
                   {/* 글자가 아니라 그림이라 자 밖이다. 24px 단추에 맞춘 광학 크기. */}
-                  <Icon name={by < 0 ? "chevron_left" : "chevron_right"} style={{ fontSize: 20 }} />
+                  <Icon name={by < 0 ? "chevron_left" : "chevron_right"} style={{ fontSize: "var(--fs-20)" }} />
                 </button>
               );
             })}
@@ -655,7 +655,7 @@ export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
                             style={{ display: "inline-flex", cursor: "help" }}>
                         {/* ⚠️ `C.hint` 였다. 그건 점선·비활성용(명암비 1.49)이라 **누를 수
                             있는 표시**에 쓰면 안 된다. 그림도 3:1 은 넘어야 한다. */}
-                        <Icon name="help" style={{ fontSize: 12, color: C.muted }} />
+                        <Icon name="help" style={{ fontSize: "var(--fs-12)", color: C.muted }} />
                       </span>
                     </span>
                     {/* ⚠️ `.hz-win-list` 는 **컨테이너 쿼리의 기준**이다(globals.css).

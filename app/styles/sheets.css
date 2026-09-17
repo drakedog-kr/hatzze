@@ -95,7 +95,7 @@
   border: 1px solid var(--c-line);
   background: var(--c-card);
   color: var(--c-sub);
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 700;
   cursor: pointer;
   transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
@@ -247,7 +247,7 @@
   border: 1px solid var(--c-line);
   background: var(--c-card);
   color: var(--c-sub);
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 700;
   text-decoration: none;
   transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
@@ -375,7 +375,7 @@
   border-radius: 999px;
   background: var(--c-card);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.07);
-  font-size: 13.5px;
+  font-size: var(--fs-13-5);
   font-weight: 600;
   color: var(--c-sub);
   white-space: nowrap;
@@ -460,7 +460,7 @@ main.hz-scroll { overflow-x: clip; }
   background: var(--c-ink);
   color: var(--c-bg);
   /* 툴팁도 읽는 글이다. 11 은 이 서비스가 정한 바닥(정보성 텍스트 12) 아래였다. */
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 600;
   line-height: 1.5;
   padding: 6px 9px;

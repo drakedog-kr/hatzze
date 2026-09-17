@@ -201,10 +201,10 @@ export default async function Home() {
                   }}
                 >
                   <div style={{ width: 44, height: 44, borderRadius: R.control, background: "var(--c-card)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Icon name="add_circle" style={{ fontSize: 23, color: "var(--c-blue)" }} />
+                    <Icon name="add_circle" style={{ fontSize: "var(--fs-23)", color: "var(--c-blue)" }} />
                   </div>
-                  <strong style={{ fontSize: 15, fontWeight: 800, color: "var(--c-ink)" }}>새로운 지표 제보하기</strong>
-                  <span style={{ fontSize: 12.5, color: "var(--c-sub)" }}>아이디어가 있다면 알려주세요</span>
+                  <strong style={{ fontSize: "var(--fs-15)", fontWeight: 800, color: "var(--c-ink)" }}>새로운 지표 제보하기</strong>
+                  <span style={{ fontSize: "var(--fs-12-5)", color: "var(--c-sub)" }}>아이디어가 있다면 알려주세요</span>
                 </a>
               </div>
             </section>
