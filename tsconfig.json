@@ -10,6 +10,9 @@
     "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
+    // 단위 테스트(tests/*.test.ts)가 node --experimental-strip-types 로 돈다. 그 로더는 확장자 없는 import 를
+    // 못 풀어서 테스트가 `../lib/format.ts` 처럼 확장자를 적는다. noEmit 이라 이 옵션을 켤 수 있다.
+    "allowImportingTsExtensions": true,
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "bundler",
