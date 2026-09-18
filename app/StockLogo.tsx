@@ -2,12 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { logoSize, logoTicker, stockLogoPath } from "@/lib/stock-logo";
+
 /**
- * 종목 로고. MDD·카더라가 같이 쓴다.
+ * 종목 로고. MDD·카더라·배당·내부자가 같이 쓴다.
  *
  * 크기는 CSS 변수 --hz-logo 로 받는다(기본 24px). 자리마다 크기가 다른데 클래스를
  * 여러 벌 만들 이유가 없어서, 쓰는 쪽에서 size 만 넘기면 되게 했다. 모양·마스크·
  * 타일 바탕은 globals.css 의 .hz-stock-logo / .hz-stock-badge 가 맡는다.
+ *
+ * 그림은 우리 라우트(/api/logo)에서 온다. logo.dev 로 직접 가지 않는 까닭과 캐시 정책은
+ * lib/stock-logo.ts 주석에 있다. 같은 출처라 CORS 가 없고, 캔버스로 픽셀도 그냥 읽힌다.
  */
 
 /**
@@ -32,8 +37,6 @@ function InitialBadge({ code, name, size }: { code: string; name: string; size?:
   );
 }
 
-const LOGO_KEY = process.env.NEXT_PUBLIC_LOGO_DEV_KEY;
-
 /**
  * 로고가 '가로 띠' 형태일 때 그 띠의 색을 뽑는다.
  *
@@ -45,7 +48,7 @@ const LOGO_KEY = process.env.NEXT_PUBLIC_LOGO_DEV_KEY;
  * 가장자리 픽셀이 곧 띠 색이다(모서리를 찍으면 SK 는 투명이 나온다 — 실측).
  * 양쪽이 서로 다르면 띠가 아니라 그림이 가장자리까지 찬 것이므로 건드리지 않는다.
  *
- * 못 읽는 경우(캔버스 오염·투명 배경)는 null 을 돌려 기본 회색 타일에 맡긴다.
+ * 못 읽는 경우(투명 배경)는 null 을 돌려 기본 회색 타일에 맡긴다.
  */
 function readBandColor(img: HTMLImageElement): string | null {
   const w = img.naturalWidth;
@@ -68,24 +71,12 @@ function readBandColor(img: HTMLImageElement): string | null {
     if (far > 24) return null;
     return `rgb(${left[0]},${left[1]},${left[2]})`;
   } catch {
-    // CORS 로 못 받아 캔버스가 오염된 경우. 색만 포기하고 로고는 그대로 띄운다.
+    // 같은 출처라 캔버스가 오염될 일은 없지만, 못 읽으면 색만 포기하고 로고는 그대로 띄운다.
     return null;
   }
 }
 
 /**
- * logo.dev 가 KRX 티커를 그대로 받아서 도메인 매핑이 필요 없다 — 우리가 이미 가진
- * 6자리 코드와 market 만으로 끝난다.
- *
- * **접미사가 거래소와 맞아야 한다**(KOSPI=.KS / KOSDAQ=.KQ). 틀리면 에러가 아니라
- * 조용히 폴백 이미지가 온다 — 에코프로비엠에 .KS 를 주면 "2" 가 그려진다. 그래서
- * market 을 모르면 아예 요청하지 않고 머리글자로 간다(찍어서 틀리면 숫자 레터마크가
- * 나오는데, 그건 머리글자보다 나쁘다).
- *
- * 같은 이유로 fallback=404 를 붙인다. 기본 폴백은 티커 숫자로 만든 레터마크("4")라
- * 우리 한글 머리글자보다 못하다. 404 로 받아야 onError 가 떠서 InitialBadge 로
- * 되돌릴 수 있고, 덤으로 접미사를 잘못 준 경우까지 막아 준다.
- *
  * 어트리뷰션: logo.dev 무료 플랜은 **상업용** 프로젝트에만 링크백을 요구한다.
  * personal project 로 보고 넣지 않기로 했다(2026-07-27 판단). 광고·구독·유료
  * 기능이 붙는 시점에는 다시 봐야 한다.
@@ -108,13 +99,9 @@ export function StockLogo({
    */
   lazy?: boolean;
 }) {
-  // 미국 상장은 접미사 없이 티커만 준다(logo.dev 가 NVDA·AAPL·TSM 을 그대로 받는 걸 실측).
-  // ⚠️ null 과 빈 문자열을 구분해야 한다 — null 은 "시장을 몰라 요청하지 않는다"는 뜻이고,
-  //    빈 문자열은 "접미사가 없는 게 정답"이라는 뜻이다. 아래 요청 조건이 이걸 가른다.
-  const suffix = market === "KOSPI" ? "KS" : market === "KOSDAQ" ? "KQ" : market === "US" ? "" : null;
+  // ⚠️ null 이면 "시장을 몰라 요청하지 않는다"는 뜻이다(lib/stock-logo.ts 의 접미사 규칙).
+  const ticker = logoTicker(code, market);
   const [failed, setFailed] = useState(false);
-  // CORS 로 못 받으면 픽셀은 포기하고 그림만 띄운다(아래 onError 참고).
-  const [noCors, setNoCors] = useState(false);
   const [tile, setTile] = useState<string | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
 
@@ -127,7 +114,8 @@ export function StockLogo({
   // 브라우저 기본 '깨진 이미지' 아이콘이 그대로 남는다. 로고가 아예 없는 종목
   // (지엔씨에너지 119850.KQ 는 logo.dev 에 없다)에서 재방문 때만 나는 레이스였고,
   // 첫 방문은 네트워크가 느려 error 가 하이드레이션 뒤에 떠서 멀쩡했다. 그래서
-  // 하드 리프레시로 보면 늘 정상으로 보인다 — 재방문으로 재현할 것.
+  // 하드 리프레시로 보면 늘 정상으로 보인다 — 재방문으로 재현할 것. 없는 로고의 404 를
+  // 이제 브라우저가 7일 캐시하므로 이 레이스는 전보다 흔하다.
   // 여기서 complete 로 두 경우를 같이 받아 onError 와 같은 전이를 태운다.
   //
   // 이 확인을 인라인 ref 콜백으로 했다가 되돌렸다 — 콜백 신원이 매 렌더마다 바뀌어
@@ -140,35 +128,26 @@ export function StockLogo({
     // (0 이면 받다 실패한 것이다. 아직 안 끝났으면 complete 가 false 다).
     if (!node?.complete) return;
     if (node.naturalWidth) setTile(readBandColor(node));
-    else if (noCors) setFailed(true);
-    else setNoCors(true);
-  }, [noCors]);
+    else setFailed(true);
+  }, []);
 
-  // ⚠️ `!suffix` 로 두면 안 된다 — 미국은 접미사가 **빈 문자열**이라 falsy 로 걸려
-  //    로고를 아예 요청하지 않는다. "모른다(null)"만 걸러야 한다.
-  if (!LOGO_KEY || suffix === null || failed) return <InitialBadge code={code} name={name} size={size} />;
+  if (ticker === null || failed) return <InitialBadge code={code} name={name} size={size} />;
 
-  // 레티나에서 안 뭉개도록 표시 크기의 2배로 받는다.
-  const px = (size ?? 24) * 2;
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- 외부 CDN 이라 next/image 최적화 대상이 아니다
+    // eslint-disable-next-line @next/next/no-img-element -- 우리 라우트가 이미 크기·형식을 맞춰 준다. next/image 는 업스트림 404 를 캐시하지 않아 쓰지 않는다(lib/stock-logo.ts)
     <img
-      src={`https://img.logo.dev/ticker/${code}${suffix ? `.${suffix}` : ""}?token=${LOGO_KEY}&size=${px}&format=webp&fallback=404`}
+      // 레티나에서 안 뭉개도록 표시 크기의 2배를 눈금으로 올림해 받는다.
+      src={stockLogoPath(ticker, logoSize(size ?? 24))}
       alt=""
       aria-hidden="true"
-      // loading="lazy" 는 기본으로 안 켠다. crossOrigin 과 같이 쓰면 드롭다운 안의 이미지가
-      // 아예 로드되지 않은 적이 있고(complete 가 계속 false, onError 도 안 뜸 — 실측. 위
-      // effect 주석의 ref 콜백 churn 이 원인이었다), 몇 장짜리 자리는 지연 로드로 얻는 것도
-      // 없다. 다만 배당 페이지는 첫 화면에 144장을 한꺼번에 요청해서(2026-09-17 실측), 그런
-      // 긴 목록만 `lazy` 로 켠다.
-      // 픽셀을 읽으려면 CORS 로 받아야 한다. logo.dev 는 허용하지만, 정책이 바뀌어도
-      // 로고가 통째로 사라지면 안 되므로 실패하면 CORS 없이 한 번 더 시도한다
-      // (그때는 캔버스가 오염돼 색은 못 뽑고 기본 회색 타일로 간다).
-      crossOrigin={noCors ? undefined : "anonymous"}
+      // loading="lazy" 는 기본으로 안 켠다. 드롭다운 안의 이미지가 아예 로드되지 않은 적이
+      // 있고(complete 가 계속 false, onError 도 안 뜸 — 실측. 위 effect 주석의 ref 콜백 churn 이
+      // 원인이었다), 몇 장짜리 자리는 지연 로드로 얻는 것도 없다. 다만 배당 페이지는 첫
+      // 화면에 144장을 한꺼번에 요청해서(2026-09-17 실측), 그런 긴 목록만 `lazy` 로 켠다.
       loading={lazy ? "lazy" : undefined}
       ref={imgRef}
       onLoad={(e) => setTile(readBandColor(e.currentTarget))}
-      onError={() => (noCors ? setFailed(true) : setNoCors(true))}
+      onError={() => setFailed(true)}
       className="hz-stock-logo"
       style={
         {
