@@ -410,8 +410,9 @@ function AntIcon({ size = 16 }: { size?: number }) {
  * **쉬는 값은 `false` 다 — `undefined`(=Next 기본값) 가 아니다.** 기본값으로 두면
  * 링크가 화면에 들어오는 순간 자동으로 프리페치가 나간다. 사이드바와 모바일 메뉴가
  * 같은 목록을 두 벌 그리는 탓에 홈 한 번 여는 데 그 요청이 **9건** 붙었다.
- * 이 사이트는 루트 레이아웃이 cookies() 를 읽어 전 라우트가 동적이라, 9건이 전부
- * CDN 을 못 타고 함수를 깨운다(x-vercel-cache: MISS). 방문 1회에 함수 10회였다.
+ * 이 사이트는 전 라우트가 force-dynamic 이라(그전에는 루트 레이아웃의 cookies() 가
+ * 원인이었다), 9건이 전부 CDN 을 못 타고 함수를 깨운다(x-vercel-cache: MISS). 방문
+ * 1회에 함수 10회였다.
  *
  * 그 9건이 사 오던 건 loading 껍데기뿐이고(3.7~3.9KB), `/seohak` 과 `/` 는 loading.tsx
  * 가 없어 본문이 `[null,null]` 인 빈 응답이었다. 끄면서 잃는 건 hover 없이 곧바로 누른
@@ -864,8 +865,8 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
  * ⚠️ 컴포넌트 **밖**에 둔다. 리액트 컴파일러 규칙이 컴포넌트 안에서 바깥 값(여기서는
  * `document.cookie`)에 대입하는 것을 막는다 — 함수로 감싸면 그 대입이 이 모듈의 일이
  * 되어 통과한다. 테마 토글이 먼저 쓰던 줄도 여기로 모았다.
- * ⚠️ 쿠키가 없으면 새로고침마다 기본값으로 돌아간다. 서버는 첫 렌더에서 쿠키 말고는
- * 이용자의 선택을 알 길이 없다(layout.tsx 가 둘 다 읽는다).
+ * ⚠️ 쿠키가 없으면 새로고침마다 기본값으로 돌아간다. 다음 방문 때는 layout.tsx 의
+ * PREF_SCRIPT 가 이 쿠키를 읽어 페인트 전에 <html> 에 붙인다(서버는 쿠키를 안 읽는다).
  */
 function remember(name: string, value: string) {
   document.cookie = `${name}=${value}; path=/; max-age=31536000; SameSite=Lax`;
@@ -889,21 +890,47 @@ function remember(name: string, value: string) {
  * 페이지의 로더 결과를 볼 수 없어서다. 드문 고장 경로이고, 그날은 페이지가 어차피
  * 성한 모습이 아니라 여기서 가리지 않는다.
  */
-function CurrencyToggle({ initial }: { initial: "krw" | "usd" }) {
-  const [cur, setCur] = useState<"krw" | "usd">(initial);
+const CUR_EVENT = "hz-cur-change";
+
+/**
+ * 지금 고른 통화. 뿌리의 `data-cur` 가 유일한 정의라(layout.tsx 의 PREF_SCRIPT 가 페인트
+ * 전에 쿠키 값을 붙인다) 리액트 상태를 따로 두지 않고 그 속성을 저장소로 읽는다.
+ * PcHint 와 같은 수(useSyncExternalStore) — 서버 스냅샷은 null(안 고름)이라 SSR 과
+ * 하이드레이션이 어긋나지 않고, 깨어난 직후 진짜 값으로 한 번 다시 그린다.
+ */
+const curStore = {
+  subscribe(cb: () => void) {
+    window.addEventListener(CUR_EVENT, cb);
+    return () => window.removeEventListener(CUR_EVENT, cb);
+  },
+  getSnapshot(): "krw" | "usd" | null {
+    const v = document.documentElement.getAttribute("data-cur");
+    return v === "krw" || v === "usd" ? v : null;
+  },
+};
+
+function CurrencyToggle({ fallback }: { fallback: "krw" | "usd" }) {
+  // 뿌리 속성이 없으면(아직 안 고름) 화면의 기본값이 눌린 칸이다. 이 값은 aria-pressed
+  // 에만 쓴다 — **눌린 칸의 모양은 CSS 가 뿌리 속성을 보고 고른다**(mobile.css
+  // .hz-cur-switch). 모양까지 리액트가 그리면 쿠키가 기본값과 다른 사람에게 첫 페인트에서
+  // 엉뚱한 칸이 눌려 보였다가 하이드레이션 뒤에 옮겨 가며 깜빡인다.
+  const picked = useSyncExternalStore(curStore.subscribe, curStore.getSnapshot, () => null);
+  const cur = picked ?? fallback;
   const pick = (next: "krw" | "usd") => {
     if (next === cur) return;
     track("currency_toggle", { to: next });
-    setCur(next);
     // ⚠️ 원화도 **값을 적는다**(예전엔 속성을 지웠다). 지우면 "안 고름"과 같아져서,
     //    달러가 기본인 화면(내부자 리포트)에서 ₩ 를 눌러도 달러로 돌아간다.
     document.documentElement.setAttribute("data-cur", next);
     remember("hz-cur", next);
+    window.dispatchEvent(new Event(CUR_EVENT));
   };
   return (
-    <span className="hz-cur-switch" role="group" aria-label="통화 바꾸기">
+    // data-cur-default: 쿠키로 고른 게 없을 때 CSS 가 눌린 칸으로 그릴 쪽. 화면 본문의
+    // `[data-cur-default]`(insider 페이지들)와 같은 값이어야 눌린 칸과 보이는 금액이 맞는다.
+    <span className="hz-cur-switch" role="group" aria-label="통화 바꾸기" data-cur-default={fallback}>
       {([["krw", "₩"], ["usd", "$"]] as const).map(([k, glyph]) => (
-        <button key={k} type="button" onClick={() => pick(k)} aria-pressed={cur === k}
+        <button key={k} type="button" onClick={() => pick(k)} aria-pressed={cur === k} data-cur={k}
                 aria-label={k === "krw" ? "원화로 보기" : "달러로 보기"}>
           {glyph}
         </button>
@@ -959,90 +986,46 @@ function ChannelRequest() {
  * ⚠️ 통화는 **달러 금액을 내는 화면에만** 있는 개념이라 경로로 가린다. 국장 화면에
  * 두면 눌러도 아무것도 안 바뀌는 단추가 된다.
  */
-function PageTools({ theme, currency }: {
-  theme: "light" | "dark";
-  /** null = 아직 아무것도 안 골랐다. 그때는 화면의 기본값을 쓴다. */
-  currency: "krw" | "usd" | null;
-}) {
+function PageTools() {
   const pathname = usePathname();
   return (
     <>
-      {/* 쿠키로 고른 게 없으면(null) 그 화면의 기본값을 눌린 칸으로 쓴다. */}
+      {/* 쿠키로 고른 게 없으면 그 화면의 기본값을 눌린 칸으로 쓴다. */}
       {(() => {
         const page = CURRENCY_PAGES.find((p) => pathname.startsWith(p.prefix));
-        return page ? <CurrencyToggle key={page.prefix} initial={currency ?? page.fallback} /> : null;
+        return page ? <CurrencyToggle key={page.prefix} fallback={page.fallback} /> : null;
       })()}
       {pathname.startsWith("/kadera") && <ChannelRequest />}
-      <ThemeToggle initial={theme} />
+      <ThemeToggle />
     </>
   );
 }
 
-function ThemeToggle({ initial, variant = "icon" }: { initial: "light" | "dark"; variant?: "icon" | "row" }) {
-  // 초기값은 서버가 쿠키로 SSR한 값(prop)이라 아이콘도 첫 렌더부터 정확하다.
-  const [theme, setTheme] = useState<"light" | "dark">(initial);
-
+function ThemeToggle() {
+  // 상태를 두지 않는다. 지금 테마는 뿌리의 data-theme 이 유일한 정의고(layout.tsx 의
+  // PREF_SCRIPT 가 페인트 전에 붙인다), 아이콘은 CSS 가 그 속성을 보고 고른다
+  // (mobile.css .hz-if-light/.hz-if-dark). 리액트 상태로 아이콘을 고르면 서버가 쿠키를
+  // 몰라 라이트 아이콘을 내보내고, 다크 이용자에게 하이드레이션 뒤 아이콘이 바뀌어
+  // 보인다. 속성을 직접 읽으면 그 깜빡임이 없다.
   const toggle = () => {
-    const next = theme === "dark" ? "light" : "dark";
+    const root = document.documentElement;
+    const next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
     // 기본이 라이트라, 이 이벤트는 "다크로 바꾼 사람"이 얼마나 되는지를 재는 쪽이
     // 주된 쓸모다. 전환 방향(to)이 있어야 양쪽이 구분된다.
     track("theme_toggle", { to: next });
-    setTheme(next);
-    document.documentElement.setAttribute("data-theme", next);
+    // 라이트는 속성을 **지운다**(값 "light" 를 적지 않는다). CSS 가 `:root` = 라이트,
+    // `[data-theme="dark"]` = 다크로 갈라 둬서 둘 다 라이트로 보이지만, PREF_SCRIPT 도
+    // 라이트면 안 붙이므로 "쿠키 없음"과 "라이트 고름"의 DOM 을 같게 둔다.
+    if (next === "dark") root.setAttribute("data-theme", "dark");
+    else root.removeAttribute("data-theme");
     remember("hz-theme", next);
-    // 모바일 주소창 색도 같이 돌린다. 이 메타는 layout.tsx 가 쿠키를 보고 SSR 하므로,
-    // 여기서 안 고치면 다음 페이지 로드까지 주소창만 이전 테마로 남는다.
+    // 모바일 주소창 색도 같이 돌린다. 이 메타는 layout.tsx 가 라이트 값으로 내보내고
+    // PREF_SCRIPT 가 다크 쿠키면 바꾸므로, 여기서 안 고치면 다음 페이지 로드까지
+    // 주소창만 이전 테마로 남는다.
     // 값을 또 적지 않고 방금 바뀐 data-theme 의 --c-bg 를 읽어 globals.css 를 따라간다.
-    const bg = getComputedStyle(document.documentElement).getPropertyValue("--c-bg").trim();
+    const bg = getComputedStyle(root).getPropertyValue("--c-bg").trim();
     if (bg) document.querySelector('meta[name="theme-color"]')?.setAttribute("content", bg);
   };
-
-  // 모양이 둘이다. 사이드바(row)는 목업의 **라벨 + 스위치 행**이고, 모바일 탑바(icon)는
-  // 자리가 없어 아이콘 버튼 하나로 둔다. 동작은 같은 toggle 을 쓴다.
-  if (variant === "row") {
-    return (
-      <button
-        onClick={toggle}
-        aria-label="다크 모드 전환"
-        aria-pressed={theme === "dark"}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 8,
-          padding: "10px 14px",
-          borderRadius: R.control,
-          border: 0,
-          background: C.soft,
-          color: C.sub,
-          cursor: "pointer",
-          font: "inherit",
-        }}
-      >
-        <span style={{ display: "flex", alignItems: "center", gap: 9, fontSize: "var(--fs-13)", fontWeight: 600 }}>
-          <Icon name={theme === "dark" ? "light_mode" : "dark_mode"} style={{ fontSize: "var(--fs-19)" }} />
-          다크 모드
-        </span>
-        {/* 스위치는 장식이다(aria-pressed 가 상태를 말한다). 켜지면 손잡이가 오른쪽으로. */}
-        <span
-          aria-hidden="true"
-          style={{
-            width: 34,
-            height: 19,
-            borderRadius: R.pill,
-            background: theme === "dark" ? C.blue : C.line,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: theme === "dark" ? "flex-end" : "flex-start",
-            padding: 2,
-            flexShrink: 0,
-          }}
-        >
-          <span style={{ width: 15, height: 15, borderRadius: "50%", background: C.card, boxShadow: "0 1px 3px rgba(20,70,130,.25)" }} />
-        </span>
-      </button>
-    );
-  }
 
   return (
     <button
@@ -1062,7 +1045,10 @@ function ThemeToggle({ initial, variant = "icon" }: { initial: "light" | "dark";
         flexShrink: 0,
       }}
     >
-      <Icon name={theme === "dark" ? "light_mode" : "dark_mode"} style={{ fontSize: "var(--fs-20)" }} />
+      {/* 둘 다 그려 두고 CSS 가 테마에 맞는 하나만 보인다(display:none 이라 접근성
+          트리에도 하나만 남는다). 라이트에서는 달(다크로 가기), 다크에서는 해. */}
+      <Icon name="dark_mode" className="hz-if-light" style={{ fontSize: "var(--fs-20)" }} />
+      <Icon name="light_mode" className="hz-if-dark" style={{ fontSize: "var(--fs-20)" }} />
     </button>
   );
 }
@@ -1083,7 +1069,7 @@ function ThemeToggle({ initial, variant = "icon" }: { initial: "light" | "dark";
  * 자기 제목(legal.tsx 의 DocTitle)을 갖고 있으니 여기서 보탤 것이 없다. 도구 묶음은
  * 남긴다 — 테마 토글은 어느 화면에서나 같은 자리에 있어야 한다.
  */
-function PageHeader({ theme, currency }: { theme: "light" | "dark"; currency: "krw" | "usd" | null }) {
+function PageHeader() {
   const pathname = usePathname();
   const page = NAV.find((n) => isActive(n.href, pathname));
   // 서브 페이지에서는 서브의 이름을 h1 으로 쓴다. 부모(구역)의 이름을 그대로 두면
@@ -1194,21 +1180,17 @@ function PageHeader({ theme, currency }: { theme: "light" | "dark"; currency: "k
           셋 다 기능이 없어 모양만 있는 자리였고(2026-08-03), 로그인이 없는
           서비스라 프로필 칩은 앞으로도 가리킬 대상이 없다. */}
       <div className="hz-page-tools">
-        <PageTools theme={theme} currency={currency} />
+        <PageTools />
       </div>
     </header>
   );
 }
 
 function TopBar({
-  theme,
-  currency,
   scrolledDown,
   menuOpen,
   onMenuToggle,
 }: {
-  theme: "light" | "dark";
-  currency: "krw" | "usd" | null;
   scrolledDown: boolean;
   menuOpen: boolean;
   onMenuToggle: () => void;
@@ -1253,7 +1235,7 @@ function TopBar({
           데스크톱에서는 햄버거가 display:none 이라 flex 에서 아예 빠지고, 남는 건
           예전과 같은 토글 하나다 — 순서를 바꿔도 데스크톱은 그대로다. */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-        <PageTools theme={theme} currency={currency} />
+        <PageTools />
         <button
           type="button"
           className="hz-menu-btn"
@@ -1604,16 +1586,7 @@ function ToTop({
   );
 }
 
-export default function AppShell({
-  theme,
-  currency,
-  children,
-}: {
-  theme: "light" | "dark";
-  /** 통화 스위치의 초기값(쿠키). 서학개미 장부에서만 화면에 뜬다. */
-  currency: "krw" | "usd" | null;
-  children: React.ReactNode;
-}) {
+export default function AppShell({ children }: { children: React.ReactNode }) {
   const mainRef = useRef<HTMLElement>(null);
   const scrolledDown = useScrolledDown(mainRef);
   const pastFold = useScrolledPastFold(mainRef);
@@ -1685,8 +1658,6 @@ export default function AppShell({
       <Sidebar />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, background: C.bg }}>
         <TopBar
-          theme={theme}
-          currency={currency}
           scrolledDown={scrolledDown}
           menuOpen={menuOpen}
           onMenuToggle={() => setMenuOpen((v) => !v)}
@@ -1724,7 +1695,7 @@ export default function AppShell({
             }}
           >
             <NewsStrip />
-            <PageHeader theme={theme} currency={currency} />
+            <PageHeader />
             {children}
             <Footer />
           </div>

@@ -199,10 +199,28 @@
 .hz-cur-switch > button:hover {
   color: var(--c-ink);
 }
-.hz-cur-switch > button[aria-pressed="true"] {
+/* 눌린 칸. aria-pressed 가 아니라 **뿌리의 data-cur** 로 고른다. 서버는 쿠키를 몰라
+   aria-pressed 를 화면 기본값으로 내보내는데, 쿠키가 기본값과 다른 사람에게 그걸로
+   그리면 첫 페인트에서 엉뚱한 칸이 눌려 보였다가 하이드레이션 뒤에 옮겨 간다. 뿌리
+   속성은 layout.tsx 의 PREF_SCRIPT 가 페인트 전에 붙이므로 처음부터 맞다.
+   쿠키로 고른 게 없으면(:not([data-cur])) 스위치 자신의 data-cur-default 가 정한다 —
+   본문의 `[data-cur-default]` 규칙(위)과 같은 값이라 보이는 금액과 눌린 칸이 맞는다. */
+:root[data-cur="krw"] .hz-cur-switch > button[data-cur="krw"],
+:root[data-cur="usd"] .hz-cur-switch > button[data-cur="usd"],
+:root:not([data-cur]) .hz-cur-switch[data-cur-default="krw"] > button[data-cur="krw"],
+:root:not([data-cur]) .hz-cur-switch[data-cur-default="usd"] > button[data-cur="usd"] {
   background: var(--c-card);
   color: var(--c-ink);
   box-shadow: 0 1px 2px var(--c-shadow);
+}
+
+/* ── 테마 단추의 아이콘 ──────────────────────────────────────────────────
+   해·달을 둘 다 그려 두고 뿌리의 data-theme 으로 하나만 보인다. 통화 스위치와 같은
+   이유다 — 서버는 쿠키를 몰라 리액트 상태로 고르면 다크 이용자에게 첫 페인트 뒤
+   아이콘이 바뀌어 보인다. 라이트(속성 없음)는 달(다크로 가기), 다크는 해. */
+:root[data-theme="dark"] .hz-if-light,
+:root:not([data-theme="dark"]) .hz-if-dark {
+  display: none;
 }
 
 /* ── 서학개미 달력 칸의 바탕색 ────────────────────────────────────────────
