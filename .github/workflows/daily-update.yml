@@ -1759,7 +1759,9 @@ jobs:
           code=$(curl -sS -o /tmp/revalidate.json -w '%{http_code}' -X POST \
             -H "Authorization: Bearer $REVALIDATE_SECRET" \
             https://hatzze.fun/api/revalidate || echo "000")
-          cat /tmp/revalidate.json 2>/dev/null; echo
+          # 접속 자체가 안 되면(DNS·TCP 실패) curl 이 파일을 안 만들어 cat 이 1 을 돌려주는데,
+          # 러너 셸이 bash -e 라 그 자리에서 스텝이 붉게 끝난다. 본문은 참고용이니 없어도 지나간다.
+          cat /tmp/revalidate.json 2>/dev/null || true; echo
           if [ "$code" != "200" ]; then
             echo "::warning::화면 사본 비우기가 $code 로 끝났습니다 — 5분 안에 스스로 새로 그립니다"
             exit 0
