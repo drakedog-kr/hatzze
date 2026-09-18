@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import { cookies } from "next/headers";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
 import AppShell from "./AppShell";
@@ -60,54 +59,62 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-// 사이드바/탑바는 모든 페이지가 공유하므로 레이아웃에서 점수를 받아 셸에 넘긴다.
+// 화면들이 각자 force-dynamic 을 걸고 있어 지금은 이 줄이 있으나 없으나 같다. 캐시로
+// 돌리는 일(다음 PR)에서 화면 쪽과 함께 걷는다.
 export const dynamic = "force-dynamic";
 
-export default async function RootLayout({
+/**
+ * 모바일 브라우저의 주소창·상태바 색. 안 주면 다크에서 어두운 화면 위에 흰 주소창이
+ * 얹혀 페이지가 잘린 것처럼 보인다.
+ * 값은 globals.css 의 --c-bg 와 **같아야 한다**(메타 태그에는 var() 를 못 쓴다).
+ * 팔레트를 갈면서 여기가 옛 값(#0e131c / #d4daea)으로 남아 주소창만 이전 팔레트를
+ * 띠고 있었다 — --c-bg 를 바꿀 땐 이 줄을 같이 볼 것.
+ */
+const THEME_COLOR = { light: "#e8f0fa", dark: "#101013" } as const;
+
+/**
+ * 테마·통화 쿠키를 **브라우저가** 페인트 전에 읽어 <html> 에 붙이는 스크립트.
+ *
+ * 예전에는 서버가 `cookies()` 로 읽어 `<html data-theme data-cur>` 를 SSR 했다. 그러면
+ * 루트 레이아웃이 요청마다 달라져 **전 라우트가 동적**이 되고(캐시 불가), 방문마다 함수가
+ * 페이지를 새로 그린다. 같은 값을 이 동기 스크립트가 붙이면 결과는 같고 HTML 은 모두에게
+ * 같아진다 — 캐시에 넣어도 남의 다크 화면이 나에게 올 일이 없다.
+ *
+ * ⚠️ `<head>` 의 **동기** 스크립트여야 한다. 지연시키면 라이트로 한 번 그린 뒤 다크로
+ *    바뀌어 첫 페인트가 깜빡인다. gtag 의 ga-disable 스위치와 같은 자리·같은 방식이다.
+ * ⚠️ 셸의 토글은 이 속성을 **읽어서** 시작한다(AppShell.tsx 의 ThemeToggle·CurrencyToggle).
+ *    아이콘과 눌린 칸은 CSS 가 뿌리 속성을 보고 고르므로 리액트가 깨기 전에도 맞다.
+ *
+ * 기본값은 라이트다(2026-07-27 원복). 쿠키가 없거나 "light" 면 속성을 안 붙이고, 그러면
+ * theme.css 의 :root 가 라이트다. 다크는 이용자가 토글을 눌러 쿠키를 남긴 경우에만 나온다.
+ * 한동안 다크가 기본이었는데, 팔레트를 새로 잡으면서(흰 카드 + 옅은 회색 바탕) 라이트 쪽
+ * 가독성이 올라가 되돌렸다. 기본값을 뒤집으려면 여기의 비교와 theme.css 의 :root 블록을
+ * 같이 뒤집어야 한다.
+ *
+ * 통화(`hz-cur`)는 값이 **세 가지**다 — 없음(아직 안 고름) · krw · usd. "안 고름"이면
+ * 속성을 안 붙여서 **화면이 자기 기본값을 쓴다**(서학개미는 원화, 내부자 리포트는 달러,
+ * mobile.css 의 `[data-cur-default]`). "안 고름"과 "원화 고름"을 반드시 갈라야 한다 —
+ * 안 가르면 /insider 에서 ₩ 를 눌러도 다시 달러로 돌아간다.
+ */
+const PREF_SCRIPT = `(function(){try{var c=document.cookie.split("; "),t,u;for(var i=0;i<c.length;i++){var p=c[i].split("=");if(p[0]==="hz-theme")t=p[1];else if(p[0]==="hz-cur")u=p[1];}var d=document.documentElement;if(t==="dark"){d.setAttribute("data-theme","dark");var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",${JSON.stringify(THEME_COLOR.dark)});}if(u==="usd"||u==="krw")d.setAttribute("data-cur",u);}catch(e){}})();`;
+
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // 테마는 쿠키로 관리한다 — 서버가 여기서 읽어 <html data-theme>를 SSR하면
-  // 클라이언트와 값이 일치해 hydration 불일치도, 첫 페인트 깜빡임도 없다.
-  //
-  // 기본값은 라이트다(2026-07-27 원복). 쿠키가 없으면 라이트로 열리고, 다크는 이용자가
-  // 토글을 눌러 쿠키를 남긴 경우에만 나온다. 한동안 다크가 기본이었는데, 팔레트를
-  // 새로 잡으면서(흰 카드 + 옅은 회색 바탕) 라이트 쪽 가독성이 올라가 되돌렸다.
-  //
-  // 이 한 줄이 기본 테마의 유일한 정의다 — 셸의 토글도 여기서 내려준 값을 초기값으로
-  // 받으므로, 기본값을 다시 뒤집으려면 비교 대상만 바꾸면 된다.
-  // 다만 아래 theme-color 메타는 이 값을 따라가야 한다(globals.css 의 color-scheme 은
-  // :root=light / [data-theme=dark]=dark 로 갈라 둬서 기본값과 무관하게 맞는다).
-  const jar = await cookies();
-  const theme = jar.get("hz-theme")?.value === "dark" ? "dark" : "light";
-  /**
-   * 통화 스위치(달러/원). 값이 **세 가지**다.
-   *
-   *   undefined  아직 아무것도 안 골랐다 → **화면이 자기 기본값을 쓴다**
-   *   "krw"      원화를 골랐다
-   *   "usd"      달러를 골랐다
-   *
-   * ⚠️⚠️ "안 고름"과 "원화 고름"을 반드시 갈라야 한다. 예전엔 둘 다 속성 없음이라
-   *      구별이 안 됐는데, 그러면 **화면마다 기본 통화를 달리 둘 수 없다** — 내부자
-   *      리포트는 달러가 기본이고 서학개미는 원화가 기본이라 이 구분이 필요하다.
-   *      (안 가르면 /insider 에서 ₩ 를 눌러도 다시 달러로 돌아간다.)
-   * ⚠️ 이 한 줄이 없으면 새로고침 때마다 기본값으로 돌아간다(쿠키만으로는 서버가 못 안다).
-   */
-  const picked = jar.get("hz-cur")?.value;
-  const cur = picked === "usd" ? "usd" : picked === "krw" ? "krw" : undefined;
-
   return (
-    <html lang="ko" data-theme={theme} data-cur={cur}
+    // suppressHydrationWarning: 위 스크립트가 하이드레이션 전에 <html> 에 data-theme·
+    // data-cur 를 붙인다. 리액트가 그린 속성 목록과 어긋나지만 리액트는 자기가 안 그린
+    // 속성을 지우지 않으므로 값은 남고, 개발 모드의 불일치 경고만 이 요소에서 끈다.
+    // 자식 트리의 하이드레이션 검사에는 영향이 없다(body 의 것과 같은 범위).
+    <html lang="ko" suppressHydrationWarning
           className={`${pretendard.variable} h-full antialiased`}>
       <head>
-        {/* 모바일 브라우저의 주소창·상태바 색. 안 주면 다크에서 어두운 화면 위에 흰
-            주소창이 얹혀 페이지가 잘린 것처럼 보인다. 쿠키로 정한 theme 을 그대로
-            따르므로 토글과 어긋나지 않는다.
-            값은 globals.css 의 --c-bg 와 **같아야 한다**(메타 태그에는 var() 를 못 쓴다).
-            팔레트를 갈면서 여기가 옛 값(#0e131c / #d4daea)으로 남아 주소창만 이전
-            팔레트를 띠고 있었다 — --c-bg 를 바꿀 땐 이 줄을 같이 볼 것. */}
-        <meta name="theme-color" content={theme === "dark" ? "#101013" : "#e8f0fa"} />
+        {/* 라이트 값으로 내보내고, 다크 쿠키면 아래 PREF_SCRIPT 가 페인트 전에 바꾼다.
+            토글을 누를 때는 AppShell 의 ThemeToggle 이 --c-bg 를 읽어 다시 맞춘다. */}
+        <meta name="theme-color" content={THEME_COLOR.light} />
+        <script dangerouslySetInnerHTML={{ __html: PREF_SCRIPT }} />
         {/* 본문·숫자는 전부 Pretendard(위에서 next/font/local로 자체 호스팅)라 CDN에서
             받아오는 건 두 가지뿐이다: 워드마크 전용 Bricolage Grotesque와 Material Symbols
             아이콘. 둘 다 빌드 시점 폰트 페치 실패를 피하려고 런타임 CDN 링크로 둔다.
@@ -173,9 +180,7 @@ export default async function RootLayout({
           <body>에 속성을 주입해 불일치 경고를 낸다. body 자신의 속성 불일치만
           무시한다 — 내부 컴포넌트 hydration 검사에는 영향 없다. */}
       <body className="font-sans" suppressHydrationWarning>
-        {/* ⚠️ 여기서 "krw" 로 떨어뜨리면 안 된다 — 셸이 "안 고름"을 못 알아채고
-            화면별 기본 통화가 죽는다. undefined 를 그대로 넘긴다. */}
-        <AppShell theme={theme} currency={cur ?? null}>
+        <AppShell>
           {children}
         </AppShell>
       </body>
