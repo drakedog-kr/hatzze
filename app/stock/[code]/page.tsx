@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { assertLoaded } from "@/lib/load-state";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 
@@ -56,7 +57,15 @@ import { AiMark, C, Icon, MONO, R } from "../../ui";
  * 없다 — 셸은 클라이언트 컴포넌트라 DB 를 못 읽는다). 그래서 h1 과 구조화 데이터를
  * 이 파일이 직접 낸다. 다른 화면처럼 셸에 맡기면 464장이 전부 같은 h1 을 갖는다.
  */
-export const dynamic = "force-dynamic";
+// 캐시 주기는 루트 레이아웃의 `revalidate` 가 정한다(app/layout.tsx). 예전엔 여기가
+// force-dynamic 이라 방문마다 서버가 새로 그렸다.
+//
+// 동적 구간([...])은 generateStaticParams 가 없으면 캐시 없이 요청마다 그린다(Next 문서:
+// "빈 배열을 돌려줘야 런타임에 ISR 이 된다"). 빈 배열 = 빌드 때는 아무것도 안 만들고,
+// 처음 방문한 주소를 그때 그려 사본에 담는다. 없는 주소의 notFound() 도 그대로 동작한다.
+export async function generateStaticParams() {
+  return [];
+}
 
 /** 이동 경로의 부모. 사이드바 NAV 의 라벨과 **같은 문자열**이어야 한다(JsonLd 머리말). */
 const PARENT = { name: "국장 카더라", path: "/kadera" };
@@ -194,6 +203,10 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
   // 사이트맵에도 실린다. 소문자로 적힌 바깥 링크가 404 가 되지 않게 정본으로 넘긴다.
   const upper = code.toUpperCase();
   const d = await getStockPage(upper);
+  // ⚠️ notFound() **앞에서** 던진다. 조회가 5xx 로 죽으면 getStockPage 는 null 을 돌려주는데,
+  //    그걸 "없는 종목"으로 읽어 404 를 내면 그 404 가 사본(ISR)에 5분 담긴다 — DB 가 잠깐
+  //    아픈 동안 멀쩡한 종목이 404 로 굳는다(로컬 스텁으로 실제로 그렇게 됐다).
+  assertLoaded("/stock/[code]");
   // 없는 종목은 **넘기기 전에** 404 를 낸다. 순서를 바꾸면 `/stock/abcdef` 같은 쓰레기
   // 주소가 308 을 한 번 거친 뒤에야 404 가 되어 크롤러에 헛걸음을 두 번 시킨다.
   if (!d) notFound();

@@ -470,7 +470,9 @@ function isActive(href: string, pathname: string) {
 
 function Sidebar() {
   const intentPrefetch = useIntentPrefetch();
-  const pathname = usePathname();
+  // `?? "/"` 는 타입 때문이다 — pages/500.tsx 가 있어 usePathname 의 타입이 string | null 이
+  // 되는데(그 파일 주석 참고), app 트리에서는 null 이 안 온다. 아래 여섯 자리 모두 같다.
+  const pathname = usePathname() ?? "/";
   // 로고를 감싸는 태그는 어느 페이지에서도 h1이 아니다. 사이드바는 모든 페이지가
   // 공유하는데, 검색엔진은 h1을 그 페이지의 주제로 읽는다 — 늘 h1이면 카더라·MDD가
   // 자기 제목이 아니라 "로고"를 주제로 선언하는 셈이다.
@@ -719,7 +721,7 @@ function Sidebar() {
 // 채로 창을 넓히는 경우가 있어 패널·백드롭의 display 는 미디어쿼리가 최종적으로 막는다.
 function MobileMenu({ onClose }: { onClose: () => void }) {
   const intentPrefetch = useIntentPrefetch();
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "/";
 
   const rowStyle = (active: boolean): React.CSSProperties => ({
     display: "flex",
@@ -987,7 +989,7 @@ function ChannelRequest() {
  * 두면 눌러도 아무것도 안 바뀌는 단추가 된다.
  */
 function PageTools() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "/";
   return (
     <>
       {/* 쿠키로 고른 게 없으면 그 화면의 기본값을 눌린 칸으로 쓴다. */}
@@ -1070,7 +1072,7 @@ function ThemeToggle() {
  * 남긴다 — 테마 토글은 어느 화면에서나 같은 자리에 있어야 한다.
  */
 function PageHeader() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "/";
   const page = NAV.find((n) => isActive(n.href, pathname));
   // 서브 페이지에서는 서브의 이름을 h1 으로 쓴다. 부모(구역)의 이름을 그대로 두면
   // /kadera 와 /kadera/us 두 페이지가 **같은 h1** 을 갖는다.
@@ -1359,7 +1361,7 @@ const newsStore = {
 };
 
 function NewsStrip() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "/";
   const show = useSyncExternalStore(newsStore.subscribe, newsStore.getSnapshot, () => false);
 
   if (!show || pathname.startsWith(NEWS.href)) return null;
@@ -1591,7 +1593,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const scrolledDown = useScrolledDown(mainRef);
   const pastFold = useScrolledPastFold(mainRef);
   const [menuOpen, setMenuOpen] = useState(false);
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "/";
 
   // 페이지를 옮기면 닫는다. 패널은 셸에 얹혀 있어 라우팅만으로는 사라지지 않는다.
   //

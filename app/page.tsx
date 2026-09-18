@@ -1,5 +1,5 @@
 import { getKospiCloseSeries, getLatestDailyScore, getPublicIndicators, getTopStockHighGaps } from "@/lib/data";
-import { isLoadFailed } from "@/lib/load-state";
+import { assertLoaded, isLoadFailed } from "@/lib/load-state";
 import { SectionIntro } from "./SectionIntro";
 import type { IndicatorCategory } from "@/lib/data";
 import { C, Icon, R, stageForScore } from "./ui";
@@ -9,9 +9,8 @@ import type { BandItem } from "./home/Hero";
 import { CardBuffett, CardLeverage, CardMarketActions, CardTurnover, CardHighGap, CardSpeed, CardVkospi, CardAsia, CardGoldRatio, CardVolume, CardFx, CardNetBuy, CardLimitUp, CardPutCall } from "./home/cards-market";
 import { CardComingSoon, CardDivergence, CardTrend, CardSentiment, CardYoutube, CardSpending, CardUpbit, CardBrokerage } from "./home/cards-sentiment";
 
-// 지표는 하루 단위(GitHub Actions 배치)로 갱신되므로, 빌드 시점에 정적으로
-// 굳어버리지 않도록 매 요청마다 서버에서 새로 조회한다.
-export const dynamic = "force-dynamic";
+// 캐시 주기는 루트 레이아웃의 `revalidate` 가 정한다(app/layout.tsx). 예전엔 여기가
+// force-dynamic 이라 방문마다 서버가 새로 그렸다.
 
 /**
  * 섹션 머리 — [제목 + 카드 수] ... [초고온 N].
@@ -58,6 +57,10 @@ export default async function Home() {
      상승 속도 스파크라인이 안 그려졌는데, 카드는 멀쩡해 보였다.
      ⭐ 이 저장소의 규칙은 "카드는 숨기지 말고 이유를 적을 것" 이다. 그래서 값을 감추는
      대신 실패했다는 사실을 카드 안에 한 줄로 남긴다. */
+  // 실패한 조회가 있으면 던진다 — 사본(ISR)에 실패한 화면을 담지 않는다(lib/load-state.ts).
+  // 아래의 "실패했다는 사실을 카드에 남기는" 길은 그래서 실제로는 안 탄다. 남겨 두는 건
+  // 던지지 않기로 되돌릴 때 그대로 살아나게 하려는 것이다.
+  assertLoaded("/", { topGaps: rawTopGaps, kospiPath: rawKospiPath });
   const topGapsFailed = isLoadFailed(rawTopGaps);
   const topGaps = topGapsFailed ? [] : rawTopGaps;
   const kospiPathFailed = isLoadFailed(rawKospiPath);

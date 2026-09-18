@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { assertLoaded } from "@/lib/load-state";
 import { notFound } from "next/navigation";
 
 import { EMPTY_STOCKS, getLatestNote, getNoteStocks, listNotes, noteNeighbors, type NoteNeighbors } from "@/lib/daily-note";
@@ -27,7 +28,8 @@ const PUBLIC = DAILY_PUBLIC;
  *  false 여도 그대로 보인다(만드는 중에 봐야 하니까). */
 const DEPLOYED = Boolean(process.env.VERCEL_ENV);
 
-export const dynamic = "force-dynamic";
+// 캐시 주기는 루트 레이아웃의 `revalidate` 가 정한다(app/layout.tsx). 예전엔 여기가
+// force-dynamic 이라 방문마다 서버가 새로 그렸다.
 
 export async function generateMetadata(): Promise<Metadata> {
   // ⚠️ await 를 빼지 말 것 — robots 를 얹으려고 펼친다(app/preview/page.tsx 의 같은 자리 주석).
@@ -51,6 +53,7 @@ export default async function DailyPage() {
     latest.note ? noteNeighbors(latest.note.date) : Promise.resolve(NO_NEIGHBORS),
     latest.note ? getNoteStocks(latest.note.stocks, latest.note.date) : Promise.resolve(EMPTY_STOCKS),
   ]);
+  assertLoaded("/daily");
 
   return <NoteView note={latest.note} failed={latest.failed} neighbors={neighbors} archive={archive.notes} stocks={stocks} />;
 }

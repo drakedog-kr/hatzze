@@ -11,9 +11,12 @@ import { C, Icon } from "./ui";
  * 자리에만 이게 뜬다.
  *
  * 이 파일이 없으면 Next 의 영문 기본 오류 화면이 뜬다(개발 중엔 스택, 배포에선
- * "Application error: a client-side exception has occurred"). 데이터 함수들은 조회가
- * 깨져도 폴백을 돌려주도록 되어 있어(lib/load-state.ts) 여기까지 오는 일은 드물지만,
- * 드문 날에 영문 화면을 내는 것보다 다시 시도할 길을 주는 편이 낫다.
+ * "Application error: a client-side exception has occurred").
+ *
+ * ⚠️ 여기가 받는 건 **요청마다 그리는 화면**(/mdd · /insider/stock/[ticker])과 클라이언트
+ *    렌더의 예외뿐이다. 캐시(ISR)로 도는 화면이 조회 실패로 던지면(lib/load-state.ts 의
+ *    assertLoaded) 그 던짐은 오류 경계로 안 오고 서버의 500 응답이 된다 — 그쪽 화면은
+ *    pages/500.tsx 다. 사본이 이미 있으면 Next 가 그 사본을 계속 내보내 어느 쪽도 안 뜬다.
  *
  * 오류 경계는 클라이언트 컴포넌트여야 한다(Next 규칙). 그래서 `metadata` 를 못 내고,
  * 셸이 주소로 고른 제목이 위에 그대로 남는다.

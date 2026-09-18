@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { assertLoaded } from "@/lib/load-state";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -64,7 +65,15 @@ import {
  *    (`fetch_us_13f.py`)가 신고서 단위로 하며, 한쪽 분기만 보정되던 시절에는 이 증감이
  *    **+161,142%** 였다. 이 숫자가 터무니없으면 화면이 아니라 거기를 볼 것.
  */
-export const dynamic = "force-dynamic";
+// 캐시 주기는 루트 레이아웃의 `revalidate` 가 정한다(app/layout.tsx). 예전엔 여기가
+// force-dynamic 이라 방문마다 서버가 새로 그렸다.
+//
+// 동적 구간([...])은 generateStaticParams 가 없으면 캐시 없이 요청마다 그린다(Next 문서:
+// "빈 배열을 돌려줘야 런타임에 ISR 이 된다"). 빈 배열 = 빌드 때는 아무것도 안 만들고,
+// 처음 방문한 주소를 그때 그려 사본에 담는다. 없는 주소의 notFound() 도 그대로 동작한다.
+export async function generateStaticParams() {
+  return [];
+}
 
 /**
  * 처음 펴는 줄 수 · '더 보기' 증가분 · 실어 보내는 상한.
@@ -110,6 +119,9 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
   const n = Number(cik);
   if (!Number.isFinite(n)) notFound();
   const d = await getManagerDetail(n);
+  // notFound() 앞에서 던진다 — 조회가 죽어 null 이 온 것을 "없는 투자자"로 읽어 404 를
+  // 사본에 담지 않도록(app/stock/[code]/page.tsx 와 같은 이유).
+  assertLoaded("/insider/investor/[cik]");
   if (!d) notFound();
 
   const counts = {
