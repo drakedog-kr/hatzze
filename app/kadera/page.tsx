@@ -34,6 +34,8 @@ import { StockLogo } from "../StockLogo";
 import { SectionHead } from "./SectionHead";
 import { SectionIntro } from "../SectionIntro";
 import { TrendingTabs } from "./TrendingTabs";
+import TimeAgo from "./TimeAgo";
+import { timeAgo } from "./time-ago";
 
 // 미리보기 이미지는 옆의 opengraph-image.tsx 가 그린다(ownImage). 자세한 건 app/seo.ts 주석 참고.
 export async function generateMetadata(): Promise<Metadata> {
@@ -60,15 +62,6 @@ function formatKR(n: number): string {
   if (n >= 1e8) return `${(n / 1e8).toFixed(1).replace(/\.0$/, "")}억`;
   if (n >= 1e4) return `${(n / 1e4).toFixed(1).replace(/\.0$/, "")}만`;
   return n.toLocaleString("ko-KR");
-}
-
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const min = Math.floor(diff / 60000);
-  if (min < 60) return `${Math.max(1, min)}분 전`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}시간 전`;
-  return `${Math.floor(hr / 24)}일 전`;
 }
 
 /**
@@ -169,7 +162,7 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
               <span style={{ ...clip, fontSize: "var(--fs-12-5)", fontWeight: 800, letterSpacing: "-.01em", color: "var(--c-cold-ink)", maxWidth: 220, minWidth: 0 }}>
                 {m.channelTitle}
               </span>
-              <span style={{ fontSize: "var(--fs-11)", fontFamily: MONO, color: C.sub2, flexShrink: 0 }}>{timeAgo(m.postedAt)}</span>
+              <span style={{ fontSize: "var(--fs-11)", fontFamily: MONO, color: C.sub2, flexShrink: 0 }}><TimeAgo iso={m.postedAt} initial={timeAgo(m.postedAt)} /></span>
               <span style={{ flex: 1 }} />
               <span style={{ fontSize: "var(--fs-11)", fontFamily: MONO, fontWeight: 800, color: C.sub, flexShrink: 0 }}>#{i + 1}</span>
             </div>

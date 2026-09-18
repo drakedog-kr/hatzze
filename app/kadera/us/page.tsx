@@ -42,6 +42,8 @@ import {
   termsFor,
 } from "../parts";
 import { TrendingTabs } from "../TrendingTabs";
+import TimeAgo from "../TimeAgo";
+import { timeAgo } from "../time-ago";
 import { SectionHead } from "../SectionHead";
 import { SectionIntro } from "../../SectionIntro";
 
@@ -135,15 +137,6 @@ function compact(n: number): string {
   return `${n}`;
 }
 
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const min = Math.floor(diff / 60000);
-  if (min < 60) return `${Math.max(1, min)}분 전`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}시간 전`;
-  return `${Math.floor(hr / 24)}일 전`;
-}
-
 /**
  * 트렌딩 메시지 목록. 국장 TrendingList 와 같은 마크업이다 — 다른 건 태그가
  * 국내 종목명이 아니라 **미국 종목의 한글 표기**라는 것뿐이고, 국장 쪽의 topics(주제 태그)는
@@ -202,7 +195,7 @@ function UsTrendingList({ items }: { items: UsTrendingMessage[] }) {
               {m.channelTitle}
             </span>
             <span style={{ fontSize: "var(--fs-11)", fontFamily: MONO, color: C.sub2 }}>
-              {timeAgo(m.postedAt)}
+              <TimeAgo iso={m.postedAt} initial={timeAgo(m.postedAt)} />
             </span>
             <span style={{ flex: 1 }} />
             <span
