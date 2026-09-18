@@ -4,7 +4,9 @@
 import { isAccount } from "./tax";
 import type { Account } from "./tax";
 
-export type Holding = { id: string; code: string; shares: number; cost?: number; account?: Account };
+/** off 는 줄을 계산에서 뺀 것 — 종목·주수·평단은 그대로 두고 합계·달력·일정·목표에서만 빠진다("이걸 빼면 얼마지"를
+    ×로 빼고 다시 담지 않고 보게, 2026-09-18 피드백). 없거나 false 면 센다. */
+export type Holding = { id: string; code: string; shares: number; cost?: number; account?: Account; off?: boolean };
 
 /** 이 코드의 새 줄 열쇠 — 아직 없으면 코드 그대로, 있으면 #2·#3. */
 export function newId(code: string, prev: Holding[]): string {
@@ -36,7 +38,7 @@ function readSaved(): Holding[] {
     const parsed = raw ? (JSON.parse(raw) as unknown) : [];
     if (!Array.isArray(parsed)) return NO_HOLDINGS;
     const out: Holding[] = [];
-    for (const h of parsed as { id?: unknown; code?: unknown; shares?: unknown; cost?: unknown; account?: unknown }[]) {
+    for (const h of parsed as { id?: unknown; code?: unknown; shares?: unknown; cost?: unknown; account?: unknown; off?: unknown }[]) {
       if (!h || typeof h.code !== "string" || typeof h.shares !== "number") continue;
       // 저장된 id 가 없거나(옛 값) 겹치면 새로 붙인다.
       const id = typeof h.id === "string" && h.id && !out.some((o) => o.id === h.id) ? h.id : newId(h.code, out);
@@ -46,6 +48,7 @@ function readSaved(): Holding[] {
         shares: Math.max(0, Math.round(h.shares * 1e6) / 1e6),  // 소수점 주식(미국)은 소수 여섯 자리까지
         ...(typeof h.cost === "number" && h.cost > 0 ? { cost: h.cost } : {}),
         ...(isAccount(h.account) ? { account: h.account } : {}),
+        ...(h.off === true ? { off: true } : {}),
       });
     }
     return out.length ? out : NO_HOLDINGS;
