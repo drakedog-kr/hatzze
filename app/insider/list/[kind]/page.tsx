@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { assertLoaded } from "@/lib/load-state";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -44,7 +45,15 @@ import {
  * `getInsiderOverview` 가 시세를 상위 몇 종목만 받아 온다(야후 호출을 아끼려고).
  * 그 아래는 값이 비고, `Quote` 가 "-" 를 그린다 — 틀린 숫자보다 낫다.
  */
-export const dynamic = "force-dynamic";
+// 캐시 주기는 루트 레이아웃의 `revalidate` 가 정한다(app/layout.tsx). 예전엔 여기가
+// force-dynamic 이라 방문마다 서버가 새로 그렸다.
+//
+// 동적 구간([...])은 generateStaticParams 가 없으면 캐시 없이 요청마다 그린다(Next 문서:
+// "빈 배열을 돌려줘야 런타임에 ISR 이 된다"). 빈 배열 = 빌드 때는 아무것도 안 만들고,
+// 처음 방문한 주소를 그때 그려 사본에 담는다. 없는 주소의 notFound() 도 그대로 동작한다.
+export async function generateStaticParams() {
+  return [];
+}
 
 function specOf(kind: string) {
   return INSIDER_LIST_SLUGS.includes(kind as InsiderListSlug) ? INSIDER_LISTS[kind as InsiderListSlug] : null;
@@ -70,6 +79,7 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
   if (!spec) notFound();
 
   const ov = await getInsiderOverview();
+  assertLoaded("/insider/list/[kind]");
 
   // ⚠️ 메인 화면과 **같은 정렬·같은 빌더**를 쓴다. 여기서 다시 sort 하지 말 것.
   // ⚠️ 자르는 것도 여기서 한다 — 안 그릴 줄까지 만들 이유가 없다.

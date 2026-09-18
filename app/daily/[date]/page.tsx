@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LOAD_FAILED, assertLoaded } from "@/lib/load-state";
 import { notFound } from "next/navigation";
 
 import { EMPTY_STOCKS, getNote, getNoteStocks, isNoteDate, listNotes, noteHref, noteNeighbors } from "@/lib/daily-note";
@@ -30,7 +31,15 @@ import { NoteView } from "../NoteView";
 const PUBLIC = DAILY_PUBLIC;
 const DEPLOYED = Boolean(process.env.VERCEL_ENV);
 
-export const dynamic = "force-dynamic";
+// 캐시 주기는 루트 레이아웃의 `revalidate` 가 정한다(app/layout.tsx). 예전엔 여기가
+// force-dynamic 이라 방문마다 서버가 새로 그렸다.
+//
+// 동적 구간([...])은 generateStaticParams 가 없으면 캐시 없이 요청마다 그린다(Next 문서:
+// "빈 배열을 돌려줘야 런타임에 ISR 이 된다"). 빈 배열 = 빌드 때는 아무것도 안 만들고,
+// 처음 방문한 주소를 그때 그려 사본에 담는다. 없는 주소의 notFound() 도 그대로 동작한다.
+export async function generateStaticParams() {
+  return [];
+}
 
 const MISSING: Metadata = { title: "글을 찾을 수 없습니다 | hatzze", robots: { index: false, follow: false } };
 
@@ -81,8 +90,10 @@ export default async function DailyDatePage({ params }: { params: Promise<{ date
   if (!isNoteDate(date)) notFound();
 
   const r = await getNote(date);
-  // 못 읽은 것과 없는 것을 가른다. 없으면 404, 못 읽었으면 그 말을 하는 화면.
-  if (!r.note && !r.failed) notFound();
+  // 못 읽은 것과 없는 것을 가른다. 못 읽었으면 던져서 사본(ISR)에 안 담고(에러 화면),
+  // 없으면 404. `failed` 는 getNote 가 던지지 않고 실어 주는 실패 표시라 여기서 이름을 단다.
+  assertLoaded("/daily/[date]", { note: r.failed ? LOAD_FAILED : r.note });
+  if (!r.note) notFound();
 
   const [archive, neighbors, stocks] = await Promise.all([
     listNotes(),

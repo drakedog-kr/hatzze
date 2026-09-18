@@ -59,9 +59,26 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-// 화면들이 각자 force-dynamic 을 걸고 있어 지금은 이 줄이 있으나 없으나 같다. 캐시로
-// 돌리는 일(다음 PR)에서 화면 쪽과 함께 걷는다.
-export const dynamic = "force-dynamic";
+/**
+ * 화면 사본(ISR)의 수명. 루트 레이아웃에 두면 아래 모든 화면의 기본값이 된다.
+ *
+ * 한 번 그린 HTML 을 이 시간 동안 캐시에서 내보내고, 지나면 **먼저 옛 사본을 주고 뒤에서
+ * 새로 그린다**(stale-while-revalidate). 그래서 방문마다 함수가 페이지를 새로 그리던 것이
+ * 라우트마다 5분에 한 번이 된다. 예전엔 여기가 force-dynamic 이었고, 그 전엔 위의
+ * cookies() 가 전 라우트를 동적으로 만들고 있었다.
+ *
+ * 자료가 바뀌는 때는 파이프라인(아침·저녁)과 발송·스캔이라 5분이면 충분하고, 파이프라인은
+ * 끝나면서 /api/revalidate 를 불러 사본을 바로 비운다(.github/workflows/daily-update.yml).
+ * 이 숫자는 그 호출이 안 왔을 때의 안전장치다. Supabase 조회 쪽 데이터 캐시도 같은
+ * 300초라(lib/supabase-server.ts READ_CACHE_SECONDS) 최악의 묵음은 둘을 더한 10분이다.
+ *
+ * ⚠️ 정적으로 읽히는 리터럴이어야 한다(`60 * 5` 는 안 된다 — Next 문서).
+ * ⚠️ 요청마다 그려야 하는 화면은 자기 파일에서 force-dynamic 을 건다(/mdd ·
+ *    /insider/stock/[ticker] — searchParams 를 읽어 어차피 동적이다).
+ * ⚠️ 실패한 조회가 든 렌더는 사본에 담기면 안 된다. 페이지가 자료를 다 받은 뒤
+ *    assertLoaded 로 던진다(lib/load-state.ts). 던지면 마지막 성공본이 남는다.
+ */
+export const revalidate = 300;
 
 /**
  * 모바일 브라우저의 주소창·상태바 색. 안 주면 다크에서 어두운 화면 위에 흰 주소창이

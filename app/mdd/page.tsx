@@ -18,6 +18,8 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
+// searchParams(?code=) 를 읽으므로 어차피 요청마다 그린다. 다른 화면이 캐시(ISR)로 간 뒤에도
+// 이 화면은 그대로 동적이다 — 초기 종목을 클라이언트에서 읽게 바꾸면 그때 걷는다.
 export const dynamic = "force-dynamic";
 
 /**

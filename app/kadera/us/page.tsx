@@ -19,7 +19,7 @@ import type { UsTrendingMessage } from "@/lib/us-telegram-data";
 import { US_BOARD_TILES, getUsMoveReasons, getUsUpcomingEvents } from "@/lib/kadera-us-why";
 import { todayKst } from "@/lib/kadera-why";
 import { fmtKoDate } from "@/lib/stock-page";
-import { isLoadFailed } from "@/lib/load-state";
+import { assertLoaded, isLoadFailed } from "@/lib/load-state";
 import { EventsCalendar } from "../EventsCalendar";
 
 import { formatKstUpdate } from "@/lib/format";
@@ -57,7 +57,8 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
-export const dynamic = "force-dynamic";
+// 캐시 주기는 루트 레이아웃의 `revalidate` 가 정한다(app/layout.tsx). 예전엔 여기가
+// force-dynamic 이라 방문마다 서버가 새로 그렸다.
 
 /** 옆에 나란히 두는 시트의 최소 폭. 국내 페이지와 같은 값이라 두 화면의 접히는 지점이 같다. */
 const SHEET_PAIR_MIN = "min(460px, 100%)";
@@ -356,6 +357,8 @@ export default async function UsKaderaPage() {
   ]);
 
   /* 국장과 같은 규칙 — 조회 실패와 자료 없음을 갈라 빈 자리의 문구를 바꾼다(lib/load-state.ts). */
+  // 실패한 조회가 있으면 던진다 — 사본(ISR)에 실패한 화면을 담지 않는다(lib/load-state.ts).
+  assertLoaded("/kadera/us", { why: rawWhy, events: rawEvents });
   const whyFailed = isLoadFailed(rawWhy);
   const why = whyFailed ? null : rawWhy;
   const eventsFailed = isLoadFailed(rawEvents);

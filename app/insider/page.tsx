@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { assertLoaded } from "@/lib/load-state";
 import { RANK_MIN_ANALYSTS, getInsiderOverview } from "@/lib/insider-data";
 import Link from "next/link";
 
@@ -23,7 +24,8 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
-export const dynamic = "force-dynamic";
+// 캐시 주기는 루트 레이아웃의 `revalidate` 가 정한다(app/layout.tsx). 예전엔 여기가
+// force-dynamic 이라 방문마다 서버가 새로 그렸다.
 
 /**
  * 블록 하나가 펴는 줄 수.
@@ -141,6 +143,7 @@ function RowList({ items, href }: { items: React.ReactNode[]; href: string }) {
 
 export default async function InsiderPage() {
   const ov = await getInsiderOverview();
+  assertLoaded("/insider");
 
   
   // 전체보기 페이지가 같은 순서를 써야 해서 자르지 않고 통째로 만든다. 메인 화면은

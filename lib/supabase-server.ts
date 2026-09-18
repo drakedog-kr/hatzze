@@ -2,13 +2,15 @@ import "server-only";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { clearLoadFailure, noteLoadFailure } from "@/lib/load-state";
+
 /**
  * 조회 응답을 Next 데이터 캐시에 두는 시간(초).
  *
  * ## 왜 캐시하나
  *
- * 화면은 전부 force-dynamic 이고 HTML 은 no-store 라, **방문 한 번이 곧 Supabase 조회 한
- * 벌**이었다. /kadera 한 번에 `.from()` 이 최대 35번, TTFB 는 /kadera 1.65초 · /dividend
+ * 이 캐시를 붙일 때(2026-09-17)는 화면이 전부 force-dynamic 이고 HTML 이 no-store 라,
+ * **방문 한 번이 곧 Supabase 조회 한 벌**이었다. /kadera 한 번에 `.from()` 이 최대 35번, TTFB 는 /kadera 1.65초 · /dividend
  * 1.47초 · /insider 1.35초(2026-09-17 프로덕션 실측). 그런데 자료는 파이프라인이 하루 두 번
  * 바꿀 뿐이다. 같은 조회를 5분 안에 다시 하면 결과가 같은데 매번 DB 를 친 셈이다.
  *
@@ -39,12 +41,43 @@ export const READ_CACHE_SECONDS = 300;
 /** Next 의 fetch 확장(next.revalidate)까지 받는 init 타입(lib/yahoo-quote.ts 와 같은 꼴). */
 type FetchInit = RequestInit & { next?: { revalidate?: number } };
 
-/** supabase-js 에 넘기는 fetch. 읽기 요청에만 데이터 캐시를 건다(위 주석). */
+/**
+ * 조회 실패를 이번 렌더의 목록에 적는다(lib/load-state.ts 의 noteLoadFailure).
+ *
+ * supabase-js 는 fetch 가 던지거나 5xx 를 받아도 `{ error }` 로 바꿔 돌려주고, 그걸 받은
+ * 코드는 대개 로그만 남기고 폴백을 돌려준다(빈 목록·LOAD_FAILED). 화면이 캐시(ISR)라면
+ * 그 폴백이 담긴 페이지가 몇 분 동안 모두에게 간다. 그래서 **모든 Supabase 조회가 지나는
+ * 이 자리**에서 실패를 적어 두고, 페이지 끝의 `assertLoaded` 가 던진다. 조회를 감싼 코드는
+ * 하나도 안 고쳐도 된다.
+ *
+ * 5xx 와 끊김(fetch 가 던짐)만 센다. 4xx 는 다시 해도 같은 답이라(없는 행 406 · 잘못된
+ * 질의 400) 사본에 담겨도 해가 없고, notFound() 로 가야 하는 경로가 여기 걸리면 안 된다.
+ */
+function noteIfFailed(input: RequestInfo | URL, method: string, res: Promise<Response>): Promise<Response> {
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  // 같은 조회의 재시도는 같은 키다. supabase-js 가 끊김·503 을 다시 시도해 성공하면 지운다.
+  const key = `${method} ${url}`;
+  // 로그에 남길 자리 이름. 호스트와 쿼리를 뗀 경로(rest/v1/표이름)만.
+  const where = url.replace(/^https?:\/\/[^/]+\//, "").replace(/\?.*$/, "");
+  return res.then(
+    (r) => {
+      if (r.status >= 500) noteLoadFailure(key, `${where} ${r.status}`);
+      else clearLoadFailure(key);
+      return r;
+    },
+    (e: unknown) => {
+      noteLoadFailure(key, `${where} ${e instanceof Error ? e.name : "fetch"}`);
+      throw e;
+    },
+  );
+}
+
+/** supabase-js 에 넘기는 fetch. 읽기 요청에만 데이터 캐시를 걸고(위 주석), 실패는 적어 둔다. */
 function cachedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const method = (init?.method ?? "GET").toUpperCase();
-  if (READ_CACHE_SECONDS <= 0 || (method !== "GET" && method !== "HEAD")) return fetch(input, init);
+  if (READ_CACHE_SECONDS <= 0 || (method !== "GET" && method !== "HEAD")) return noteIfFailed(input, method, fetch(input, init));
   const withCache: FetchInit = { ...init, next: { revalidate: READ_CACHE_SECONDS } };
-  return fetch(input, withCache);
+  return noteIfFailed(input, method, fetch(input, withCache));
 }
 
 let client: SupabaseClient | null = null;

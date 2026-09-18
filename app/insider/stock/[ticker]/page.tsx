@@ -54,6 +54,8 @@ import {
  * 섹터·시가총액·직원수는 원천이 없다. "-" 로 자리를 채우거나 그럴듯한 문장을 만들지 말 것.
  * (애널리스트 컨센서스는 2026-08-22 에 원천을 찾아 붙였다 — stockanalysis.com.)
  */
+// 기간(?p=)을 주소로 받아 서버가 차트를 그리므로 요청마다 그린다(searchParams 가 있으면
+// 어차피 동적이다). 다른 화면이 캐시(ISR)로 간 뒤에도 이 화면은 그대로다.
 export const dynamic = "force-dynamic";
 
 const SHEET_PAIR_MIN = "min(460px, 100%)";

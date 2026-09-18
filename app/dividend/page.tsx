@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { assertLoaded } from "@/lib/load-state";
 import { notFound } from "next/navigation";
 
 import { getDividendData, getTrends, type DividendStock } from "@/lib/dividend";
@@ -30,7 +31,8 @@ const PUBLIC = DIVIDEND_PUBLIC;
  *  false 여도 그대로 보인다(만드는 중에 봐야 하니까). */
 const DEPLOYED = Boolean(process.env.VERCEL_ENV);
 
-export const dynamic = "force-dynamic";
+// 캐시 주기는 루트 레이아웃의 `revalidate` 가 정한다(app/layout.tsx). 예전엔 여기가
+// force-dynamic 이라 방문마다 서버가 새로 그렸다.
 
 export async function generateMetadata(): Promise<Metadata> {
   // ⚠️ await 를 빼지 말 것 — robots 를 얹으려고 펼친다(app/preview/page.tsx 의 같은 자리 주석).
@@ -150,6 +152,7 @@ export default async function DividendPage() {
   if (!PUBLIC && DEPLOYED) notFound();
 
   const [data, trends] = await Promise.all([getDividendData(), getTrends()]);
+  assertLoaded("/dividend");
   const stocks = data?.stocks ?? [];
   const byMentions = (m: Map<string, number>) => (a: DividendStock, b: DividendStock) =>
     (m.get(b.code) ?? 0) - (m.get(a.code) ?? 0) || (b.marketCap ?? 0) - (a.marketCap ?? 0) || (b.yieldPct ?? 0) - (a.yieldPct ?? 0);
