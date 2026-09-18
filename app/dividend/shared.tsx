@@ -160,6 +160,8 @@ export type Line = {
   id: string;
   /** 세전(원) 가운데 과세되는 몫(원). 금융소득 문턱은 이걸로 센다. 모르면 세전과 같다. */
   taxableKrw: number;
+  /** 계산에서 뺀 줄(Holding.off). 표에는 흐리게 남고 합계·달력·일정·목표에는 안 든다. */
+  off: boolean;
 };
 
 /**
@@ -197,11 +199,13 @@ export function computeLines(holdings: Holding[], byCode: Map<string, StockLite>
       outside: lineMode !== "gross" && !fitsAccount(stock, lineMode),
       account,
       ownAccount: h.account != null,
+      off: h.off === true,
     });
   }
   // 비과세 종합저축은 원금 5,000만원까지다. 넘으면 넘는 비율만큼의 배당은 일반 계좌 세율(국내 15.4%)로 뗀다 — 줄마다 같은 비율.
+  // 계산에서 뺀 줄은 원금에도 안 든다.
   if (mode !== "gross") {
-    const ex = out.filter((l) => l.account === "exempt" && !l.outside);
+    const ex = out.filter((l) => l.account === "exempt" && !l.outside && !l.off);
     const invested = ex.reduce((t, l) => t + (l.investKrw ?? 0), 0);
     if (invested > EXEMPT_LIMIT) {
       const over = (invested - EXEMPT_LIMIT) / invested;

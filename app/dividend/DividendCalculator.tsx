@@ -161,21 +161,23 @@ export function DividendCalculator({
   // 환율이 없으면(미국 표가 비었을 때) 미국 종목 자체가 목록에 없다(lib/dividend.ts). 1 은 자리값.
   const fx = usdkrw?.rate ?? 1;
   const lines = useMemo(() => computeLines(holdings, byCode, fx, taxMode, account), [holdings, byCode, fx, taxMode, account]);
+  // 체크를 푼 줄은 표에만 남고 셈에서 빠진다 — 아래 합계·달력·일정·목표·세금 안내는 전부 이 목록으로. 표만 lines 를 본다.
+  const active = useMemo(() => lines.filter((l) => !l.off), [lines]);
   // 줄마다 계좌가 다를 수 있다 — 라벨 꼬리·툴팁·주의 문구는 줄의 계좌로 센다.
-  const mixed = afterTax && new Set(lines.map((l) => l.account)).size > 1;
-  const byAccount = (a: Account) => lines.filter((l) => l.account === a);
-  const total = lines.reduce((s, l) => s + l.netKrw, 0);
-  const invest = lines.reduce((s, l) => s + (l.investKrw ?? 0), 0);
-  const priced = lines.filter((l) => l.investKrw != null);
+  const mixed = afterTax && new Set(active.map((l) => l.account)).size > 1;
+  const byAccount = (a: Account) => active.filter((l) => l.account === a);
+  const total = active.reduce((s, l) => s + l.netKrw, 0);
+  const invest = active.reduce((s, l) => s + (l.investKrw ?? 0), 0);
+  const priced = active.filter((l) => l.investKrw != null);
   const yieldPct = invest > 0 ? (priced.reduce((s, l) => s + l.grossKrw, 0) / invest) * 100 : null;
   // 금융소득 종합과세 문턱과 고배당기업(분리과세 대상) 배당의 몫 — **일반 계좌 줄만** 합친다(ISA·연금 계좌 안 소득은 금융소득에
   // 안 합친다). 못 담아 일반 세율로 센 줄(outside)도 실제론 일반 계좌라 넣는다. 세전 합이 문턱 근처인 사람에게만 뜻이 있어 그때만 적는다.
-  const generalLines = lines.filter((l) => l.account === "general" || l.outside);
+  const generalLines = active.filter((l) => l.account === "general" || l.outside);
   // 문턱은 과세되는 몫으로 — ETF 과표·감액배당을 뺀 값. 세전 합은 문장에서 그 차이를 밝히는 데 쓴다.
   const sepGross = generalLines.filter((l) => l.stock.highDiv).reduce((s, l) => s + l.taxableKrw, 0);
   const grossAll = generalLines.reduce((s, l) => s + l.grossKrw, 0);
   const taxableAll = generalLines.reduce((s, l) => s + l.taxableKrw, 0);
-  const outsideCount = lines.filter((l) => l.outside).length;
+  const outsideCount = active.filter((l) => l.outside).length;
   // IRP 위험자산 비율 — IRP 로 세는 줄(outside 아님)의 투자금 가운데 안전자산이 아닌 몫. 30% 를 채우려면 안전자산이
   // x 더 있어야 한다: (safe + x) / (total + x) = 0.3 → x = (0.3·total − safe) / 0.7.
   const irpInfo = (() => {
@@ -190,30 +192,39 @@ export function DividendCalculator({
   const exemptInvested = afterTax ? byAccount("exempt").filter((l) => !l.outside).reduce((s, l) => s + (l.investKrw ?? 0), 0) : 0;
   const heroNote = taxNote(taxMode, grossAll, taxableAll, sepGross, outsideCount, irpInfo, mixed, { invested: exemptInvested });
   // 달력에 못 드는 줄 — 지급 달을 모르는 것(미국 주식, 국내 ETF). 배당이 있는 줄만 센다.
-  const noCalCount = lines.filter((l) => l.stock.dps > 0 && !l.stock.pays.length).length;
+  const noCalCount = active.filter((l) => l.stock.dps > 0 && !l.stock.pays.length).length;
   // 달력은 지급 달을 아는 종목(국내)만. 미국은 공시에 지급일이 없다.
   const monthly = useMemo(() => {
     const m = new Array<number>(13).fill(0);
-    for (const l of lines) {
+    for (const l of active) {
       // 달러 지급 건(미국 ETF)은 환율을 곱해야 원화 달력에 든다 — 빠뜨렸더니 SCHD 3월이 22원으로 찍혔다.
       const f = (1 - taxRate(l.stock, taxMode === "gross" ? "gross" : l.account)) * (l.stock.currency === "USD" ? fx : 1);
       for (const [month, amt] of l.stock.pays) m[month] += amt * l.shares * f;
     }
     return m;
-  }, [lines, taxMode, fx]);
+  }, [active, taxMode, fx]);
 
   const add = (code: string, source: string) => {
     if (!byCode.has(code)) return;
     track("dividend_add", { stock_code: gaStockCode(code), select_source: source });
     // 이미 담긴 종목은 다시 안 담는다 — 두 줄로 나누는 건 줄의 계좌 목록 맨 아래 '＋ 계좌'(splitLine)로만. 칩을 두 번 누른 실수로 줄이 늘면 합이 두 배가 된다.
-    setHoldings((prev) => (prev.some((h) => h.code === code) ? prev : [...prev, { id: newId(code, prev), code, shares: DEFAULT_SHARES }]));
+    // 담겨 있는데 체크를 풀어 둔 줄이면 다시 켠다 — "담기"를 눌렀는데 합계가 안 움직이면 고장으로 읽힌다.
+    setHoldings((prev) =>
+      prev.some((h) => h.code === code) ? prev.map((h) => (h.code === code && h.off ? { ...h, off: undefined } : h)) : [...prev, { id: newId(code, prev), code, shares: DEFAULT_SHARES }],
+    );
     focusShares(code);
   };
   const setShares = (id: string, shares: number) =>
     setHoldings((prev) => prev.map((h) => (h.id === id ? { ...h, shares } : h)));
   // 평단. 0이나 빈 값이면 지운다(종가 기준으로 돌아간다).
   const setCost = (id: string, cost: number | null) =>
-    setHoldings((prev) => prev.map((h) => (h.id === id ? (cost && cost > 0 ? { ...h, cost } : { id: h.id, code: h.code, shares: h.shares, ...(h.account ? { account: h.account } : {}) }) : h)));
+    setHoldings((prev) => prev.map((h) => (h.id === id ? (cost && cost > 0 ? { ...h, cost } : { id: h.id, code: h.code, shares: h.shares, ...(h.account ? { account: h.account } : {}), ...(h.off ? { off: true } : {}) }) : h)));
+  // 줄을 계산에 넣고 빼기 — 종목 앞 체크. 끄면 줄은 그대로 두고 합계·달력·일정·목표에서만 빠진다("이거에 이거 더하면 얼마"를
+  // ×로 빼고 다시 담지 않고 보게, 2026-09-18 피드백). 켠 줄은 off 를 안 남긴다(저장값을 짧게).
+  const setLineOn = (id: string, on: boolean) => {
+    track("dividend_row_toggle", { stock_code: gaStockCode(holdings.find((h) => h.id === id)?.code ?? id), on });
+    setHoldings((prev) => prev.map((h) => (h.id === id ? (on ? { ...h, off: undefined } : { ...h, off: true }) : h)));
+  };
   // 줄의 계좌 유형. 줄에서 고르면 그 줄만 그 계좌로 세고, 위 칩을 바꿔도 안 따라간다(따로 고른 줄이니까).
   const setLineAccount = (id: string, acct: Account) => {
     track("dividend_row_account", { stock_code: gaStockCode(holdings.find((h) => h.id === id)?.code ?? id), account: acct });
@@ -264,7 +275,8 @@ export function DividendCalculator({
       const kept = prev.map((h) => {
         if (!map.has(h.code) || done.has(h.code)) return h;
         done.add(h.code);
-        return { ...h, shares: map.get(h.code) as number };
+        // 체크를 풀어 둔 줄이면 켠다 — 바스켓 카드가 약속한 합이 표에 서야 한다.
+        return { ...h, shares: map.get(h.code) as number, off: undefined };
       });
       const seen = new Set(kept.map((h) => h.code));
       const out = [...kept];
@@ -439,7 +451,7 @@ export function DividendCalculator({
             )}
           </div>
           {lines.length > 0 && (
-            <HoldingsTable lines={lines} inputs={inputs} totalInvest={invest} mode={taxMode} onClear={clearAll} onAccount={setLineAccount} onSplit={splitLine} onShares={setShares} onCost={setCost} onRemove={remove} />
+            <HoldingsTable lines={lines} inputs={inputs} totalInvest={invest} mode={taxMode} onClear={clearAll} onToggle={setLineOn} onAccount={setLineAccount} onSplit={splitLine} onShares={setShares} onCost={setCost} onRemove={remove} />
           )}
           {lines.length > 0 && (
             <MonthCalendar
@@ -455,7 +467,7 @@ export function DividendCalculator({
           {lines.length > 0 && fillMonth != null && (
             <MonthFill month={fillMonth} order={fillOrder} holdings={holdings} onPick={(code) => add(code, "fill_month")} onClose={() => setFillMonth(null)} />
           )}
-          {lines.length > 0 && <Upcoming lines={lines} fx={fx} mode={taxMode} />}
+          {lines.length > 0 && <Upcoming lines={active} fx={fx} mode={taxMode} />}
           {lines.length > 0 && invest > 0 && total > 0 && (
             <GoalBox invest={invest} net={total} goalMan={goalMan} addMan={addMan} onGoal={setGoalMan} onAdd={setAddMan} />
           )}

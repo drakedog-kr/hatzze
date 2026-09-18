@@ -1246,6 +1246,22 @@
 .dv-thead > span:nth-child(n + 3) { text-align: right; }
 .dv-tcell { min-width: 0; }
 .dv-tname { display: flex; align-items: center; gap: 10px; }
+/* 종목 앞 체크 — 줄을 계산에 넣고 빼기(2026-09-18 피드백). 끈 줄(.dv-trow-off)은 체크와 × 만 또렷하고 나머지는 흐리다 —
+   종목·주수·평단은 그대로라 켜면 바로 되돌아온다. 라벨이 로고까지 감싸 로고를 눌러도 토글된다(폰 과녁). */
+.dv-tcheck { display: flex; flex-shrink: 0; align-items: center; gap: 10px; cursor: pointer; }
+.dv-tcheck input {
+  appearance: none; -webkit-appearance: none; width: 18px; height: 18px; margin: 0; border-radius: 5px; border: 1.5px solid var(--c-line);
+  background: var(--c-card) center / 12px no-repeat; cursor: pointer; transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+.dv-tcheck:hover input { border-color: var(--c-blue); }
+.dv-tcheck input:checked {
+  border-color: var(--c-blue); background-color: var(--c-blue);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2.5 6.3l2.4 2.4 4.6-5' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+}
+.dv-tcheck input:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--c-blue-tint); }
+.dv-trow-off .hz-stock-logo, .dv-trow-off .hz-stock-badge, .dv-trow-off .dv-tname-txt, .dv-trow-off .dv-tshares, .dv-trow-off .dv-tnum { opacity: 0.4; }
+/* 표 위 "· 계산에 N개" — 체크를 푼 줄이 있을 때만 붙는다. */
+.dv-table-counted { font-weight: 500; color: var(--c-muted); }
 .dv-tname-txt { display: flex; flex-direction: column; min-width: 0; }
 .dv-tname-main {
   display: flex; align-items: center; flex-wrap: wrap; row-gap: 3px; min-width: 0; font-size: var(--fs-14); font-weight: 600; color: var(--c-ink);
@@ -1314,7 +1330,7 @@
 /* 비중 칸 — 숫자 아래 얇은 막대. */
 .dv-tweight-bar { display: block; width: 52px; height: 4px; margin: 5px 0 0 auto; border-radius: 2px; background: var(--c-track); overflow: hidden; }
 .dv-tweight-bar > span { display: block; height: 100%; border-radius: 2px; background: var(--c-blue); }
-/* 줄의 투자금 — 넓은 화면은 비중 막대 아래(.dv-tinvest), 비중 칸이 접히는 1,100 아래는 1년 배당 아래(.dv-tinvest-m). */
+/* 줄의 투자금 — 넓은 화면은 비중 막대 아래(.dv-tinvest), 비중 칸이 접히는 1,128 아래는 1년 배당 아래(.dv-tinvest-m). */
 .dv-tinvest { margin-top: 4px; white-space: nowrap; }
 .dv-tinvest-m { display: none; }
 .dv-remove {
@@ -1513,8 +1529,9 @@
 }
 /* 표의 폭은 뷰포트가 아니라 **사이드바를 뺀 시트 폭**으로 잰다(시트 ≈ 뷰포트 − 256). 고정 열 여섯이 652px 라
    이름 열은 그 나머지다 — 1,100 에서 140px, 1,024 에서 64px("신시내티파이낸셜"이 잘림), 900 에서 0px 였다(2026-09-15 실측).
-   그래서 1,100 아래는 '1주당 1년 배당'·'비중' 두 열을 접어 다섯 열(444px)로, 860 아래는 두 줄로 접는다. */
-@media (max-width: 1100px) {
+   그래서 1,100 아래는 '1주당 1년 배당'·'비중' 두 열을 접어 다섯 열(444px)로, 860 아래는 두 줄로 접는다.
+   종목 앞 체크(18px + 간격 10)가 붙어 문턱을 1,128 로 올렸다(2026-09-18) — 글자 몫이 1,100 때와 같은 107px 로 남는다. */
+@media (max-width: 1128px) {
   .dv-trow { grid-template-columns: minmax(0, 1fr) 132px 128px 84px 36px; }
   .dv-trow > :nth-child(3), .dv-trow > :nth-child(6) { display: none; }
   /* 비중 칸이 접히면 그 아래 있던 투자금은 '1년에 받는 배당' 아래로 옮겨 선다. */
@@ -1548,6 +1565,9 @@
   .dv-step { width: 34px; height: 36px; }
   .dv-tshares input { height: 36px; }
   .dv-remove { width: 36px; height: 36px; }
+  /* 체크 22px. 이름 칸이 223px 뿐이라 사이 간격은 8px 로 — 10px 이면 알약 둘("배당성향 25%"·"5년 연 +27%")이 한 줄에 안 든다. */
+  .dv-tname, .dv-tcheck { gap: 8px; }
+  .dv-tcheck input { width: 22px; height: 22px; border-radius: 6px; background-size: 14px; }
   /* 줄의 계좌 알약 — 21px 은 손가락엔 작다. 폰에선 28px 로(2026-09-17 검사). */
   .dv-tacct { padding: 5px 18px 5px 8px; width: 96px; font-size: var(--fs-12); background-position: right 6px center; }
 }

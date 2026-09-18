@@ -17,6 +17,7 @@ export function HoldingsTable({
   totalInvest,
   mode,
   onClear,
+  onToggle,
   onAccount,
   onSplit,
   onShares,
@@ -25,11 +26,13 @@ export function HoldingsTable({
 }: {
   lines: Line[];
   inputs: Map<string, HTMLInputElement>;
-  /** 투자금 합(원). 줄마다 비중을 내는 분모. */
+  /** 투자금 합(원). 줄마다 비중을 내는 분모. 계산에 든 줄만의 합이다. */
   totalInvest: number;
   /** 고른 계좌 — IRP 면 안전자산 줄에 알약을 붙인다. */
   mode: TaxMode;
   onClear: () => void;
+  /** 줄을 계산에 넣고(true) 빼기(false). */
+  onToggle: (id: string, on: boolean) => void;
   onAccount: (id: string, acct: Account) => void;
   onSplit: (id: string) => void;
   onShares: (id: string, shares: number) => void;
@@ -38,11 +41,15 @@ export function HoldingsTable({
 }) {
   // '담은 종목'은 종목 수다 — 한 종목을 두 계좌로 나눠 두 줄이어도 하나. 줄 수는 안 적는다(2026-09-16 지적).
   const distinct = new Set(lines.map((l) => l.stock.code)).size;
+  // 체크를 푼 종목이 있으면 몇 개를 뺐는지도 — 합계가 표와 다른 까닭이 이 한 마디다. "계산에 4개"는 어색하다는 지적(2026-09-18).
+  const excluded = distinct - new Set(lines.filter((l) => !l.off).map((l) => l.stock.code)).size;
   return (
     <div className="dv-table" role="table" aria-label="담은 종목">
       {/* 표 위 한 줄 — 몇 종목인지와 '모두 빼기'. 바스켓을 통째로 담아 본 뒤 하나씩 ×로 지우던 것(2026-09-16). */}
       <div className="dv-table-bar">
-        <span className="dv-table-count">담은 종목 {distinct}개</span>
+        <span className="dv-table-count">
+          담은 종목 {distinct}개{excluded > 0 && <span className="dv-table-counted"> · {excluded}개 제외</span>}
+        </span>
         <button type="button" className="dv-table-clear" onClick={onClear}>
           모두 빼기
         </button>
@@ -57,7 +64,7 @@ export function HoldingsTable({
         <span role="columnheader" aria-label="빼기" />
       </div>
       {lines.map((l) => (
-        <HoldingRow key={l.id} line={l} inputs={inputs} weightPct={totalInvest > 0 && l.investKrw != null ? (l.investKrw / totalInvest) * 100 : null} mode={mode} onAccount={onAccount} onSplit={onSplit} onShares={onShares} onCost={onCost} onRemove={onRemove} />
+        <HoldingRow key={l.id} line={l} inputs={inputs} weightPct={!l.off && totalInvest > 0 && l.investKrw != null ? (l.investKrw / totalInvest) * 100 : null} mode={mode} onToggle={onToggle} onAccount={onAccount} onSplit={onSplit} onShares={onShares} onCost={onCost} onRemove={onRemove} />
       ))}
     </div>
   );
@@ -68,6 +75,7 @@ function HoldingRow({
   inputs,
   weightPct,
   mode,
+  onToggle,
   onAccount,
   onSplit,
   onShares,
@@ -76,9 +84,10 @@ function HoldingRow({
 }: {
   line: Line;
   inputs: Map<string, HTMLInputElement>;
-  /** 투자금 가운데 이 줄의 몫(%). 종가가 없으면 null. */
+  /** 투자금 가운데 이 줄의 몫(%). 종가가 없거나 계산에서 뺀 줄이면 null. */
   weightPct: number | null;
   mode: TaxMode;
+  onToggle: (id: string, on: boolean) => void;
   onAccount: (id: string, acct: Account) => void;
   onSplit: (id: string) => void;
   onShares: (id: string, shares: number) => void;
@@ -162,9 +171,14 @@ function HoldingRow({
   // 이 줄의 투자금(원). 종가도 평단도 없거나 0주면 안 적는다.
   const invest = line.investKrw != null && line.investKrw > 0 ? won(line.investKrw) : null;
   return (
-    <div className="dv-trow" role="row">
+    <div className={`dv-trow${line.off ? " dv-trow-off" : ""}`} role="row">
       <span className="dv-tcell dv-tname" role="cell">
-        <StockLogo code={s.code} name={s.name} market={s.market} />
+        {/* 계산에 넣고 빼는 체크 — 종목 앞. 끄면 줄은 흐려지고 합계에서 빠진다. 주수·평단·계좌는 그대로라 켜면 바로 되돌아온다.
+            로고까지 한 라벨에 넣어 로고를 눌러도 켜지고 꺼진다 — 폰에서 체크 22px 만으로는 과녁이 좁다. */}
+        <label className="dv-tcheck">
+          <input type="checkbox" checked={!line.off} onChange={(e) => onToggle(line.id, e.target.checked)} aria-label={`${s.name} 계산에 넣기`} />
+          <StockLogo code={s.code} name={s.name} market={s.market} />
+        </label>
         <span className="dv-tname-txt">
           <span className="dv-tname-main">
             {s.name}
@@ -275,7 +289,7 @@ function HoldingRow({
       <span className="dv-tcell dv-tnum dv-tstrong" role="cell">
         {won(line.netKrw)}
         {s.currency === "USD" && s.dps > 0 && <span className="dv-tsub">{usd(line.net)}</span>}
-        {/* 1,100px 아래에선 비중 칸이 접히므로 투자금을 여기 아래에. 넓은 화면에선 CSS 가 숨긴다. */}
+        {/* 1,128px 아래에선 비중 칸이 접히므로 투자금을 여기 아래에. 넓은 화면에선 CSS 가 숨긴다. */}
         {invest && <span className="dv-tsub dv-tinvest-m">투자금 {invest}</span>}
       </span>
       <span className="dv-tcell dv-tnum" role="cell">
