@@ -470,9 +470,17 @@
 /* 이 줄은 baseline 으로 맞춘다(page.tsx). 17px 종목명·11px 코드·15px 시세가 한 줄에
    섞여 있어 center 로 두면 눈에 보이는 밑선이 2.5px 어긋난다.
    로고만 빼 준다 — 그림에는 baseline 이 없어 상자 밑변이 baseline 에 걸리고, 그러면
-   로고가 글자 위로 떠오른다. 이 하나는 광학 중심이 맞다. */
+   로고가 글자 위로 떠오른다. 이 하나는 광학 중심이 맞다.
+
+   ⚠️ 그 중심은 **줄 전체가 아니라 종목명 줄**의 중심이다. 오른쪽 시세 묶음이 두 줄
+   (N개 채널 · 최근 N일 N회, 37px)이라 줄이 종목명(26px)보다 키가 크고, `align-self: center`
+   로 두면 로고가 줄 한가운데(21px)로 내려가 종목명 중심(13px)보다 8px 아래에 앉았다
+   (2026-09-18 지적, 09-05 리디자인 때 시세가 두 줄이 되면서 생긴 것). baseline 묶음은
+   줄 위(cross-start)에 붙으므로 로고도 위에 붙이고, 종목명 줄(17px × 1.5 = 25.5px)과
+   로고(--hz-logo)의 키 차이 절반만큼 끌어올려 두 중심을 맞춘다. 로고 30px 이면 −2px. */
 .hz-stock-head > :first-child {
-  align-self: center;
+  align-self: flex-start;
+  margin-top: calc((25.5px - var(--hz-logo, 24px)) / 2);
 }
 @media (max-width: 560px) {
   .hz-stock-head {
