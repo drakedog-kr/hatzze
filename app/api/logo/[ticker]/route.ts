@@ -27,8 +27,9 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/logo/[ticker
   // 길을 좁히는 것이기도 하다(티커 12자 · 크기 여섯 눈금).
   if (!LOGO_TICKER_RE.test(ticker) || !isLogoSize(size)) return new Response(null, { status: 400 });
 
-  // 키는 이제 서버만 본다. 이름은 Vercel 에 이미 있는 값과 맞추려 그대로 둔다(.env.example 참고).
-  const key = process.env.NEXT_PUBLIC_LOGO_DEV_KEY;
+  // 키는 이제 서버만 본다. 새 이름 LOGO_DEV_KEY 를 먼저 보고, 없으면 처음부터 있던
+  // NEXT_PUBLIC_ 이름을 읽는다(.env.example 참고). 둘 다 없으면 배지로 간다.
+  const key = process.env.LOGO_DEV_KEY ?? process.env.NEXT_PUBLIC_LOGO_DEV_KEY;
   if (!key) return reply("error");
 
   let upstream: Response;

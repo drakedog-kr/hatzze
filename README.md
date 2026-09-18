@@ -150,7 +150,7 @@ python scripts/fetch_telegram.py           # 카더라 채널 메시지 수집
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_BROADCAST_CHAT_ID` | 채널 발송 (수집용과 별개인 봇) |
 | `FINNHUB_API_KEY` | 미국 종목 간밤 등락 (국장 미리보기) · 미국 배당주 시세 |
 | `FRED_API_KEY` · `GITHUB_TOKEN` · `KMA_API_KEY` | 미 재무부 TIC 계열(서학개미 장부) · 원/달러 예비(ECB 가 안 올 때) · 깃헙 검색(없으면 비인증) · 도입 예정 |
-| `NEXT_PUBLIC_GA_ID` · `NEXT_PUBLIC_LOGO_DEV_KEY` · `*_SITE_VERIFICATION` | 선택. 없으면 그 기능만 빠집니다 |
+| `NEXT_PUBLIC_GA_ID` · `LOGO_DEV_KEY`(옛 이름 `NEXT_PUBLIC_LOGO_DEV_KEY` 도 읽음) · `*_SITE_VERIFICATION` | 선택. 없으면 그 기능만 빠집니다 |
 
 `NEXT_PUBLIC_` 접두어가 붙은 값은 클라이언트에 그대로 노출되는 공개값입니다.
 
