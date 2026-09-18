@@ -639,6 +639,14 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
   .hz-cellbody-wrap {
     align-items: flex-start;
   }
+  /* 위 맞춤이면 로고 윗변이 첫 줄 윗변에 붙는데, 로고(26px)가 글줄(13.5px × 1.5 = 20.25px)
+     보다 커서 중심이 티커보다 3px 아래에 앉는다(2026-09-18 375px 실측, 35줄 전부).
+     키 차이의 절반만큼 끌어올려 로고 중심을 첫 줄 중심에 맞춘다(.hz-stock-head 와 같은 셈).
+     --hz-logo 는 StockLogo 가 img 자신에 인라인으로 박아 두므로 여기서 읽힌다. */
+  .hz-cellbody-wrap > .hz-stock-logo,
+  .hz-cellbody-wrap > .hz-stock-badge {
+    margin-top: calc((var(--fs-13-5) * 1.5 - var(--hz-logo, 24px)) / 2);
+  }
 }
 
 /* 목록 맨 아랫줄의 '더 보기 / 접기'. 테두리 없는 줄이라 눌리는 자리라는 걸 호버가 말한다
