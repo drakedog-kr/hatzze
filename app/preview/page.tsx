@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { assertLoaded } from "@/lib/load-state";
 import { notFound } from "next/navigation";
 
 import { getOvernightLive, type OvernightRow } from "@/lib/kr-overnight";
@@ -450,6 +451,7 @@ export default async function PreviewPage() {
     getPreview(),
     getOvernightLive(),
   ]);
+  assertLoaded("/preview");
   const stamp = date ? `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))} 아침 기준` : undefined;
 
   // 장이 몇 개인지 — 두 번째 장('개장 전 지금')은 밤사이 표가 없으면 통째로 안 그려진다.

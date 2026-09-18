@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { assertLoaded } from "@/lib/load-state";
 import { getSeohakDaily } from "@/lib/seohak-daily";
 import { getSeohakOverview } from "@/lib/seohak-data";
 import { getSeohakCalendar } from "@/lib/seohak-calendar";
@@ -30,7 +31,8 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
-export const dynamic = "force-dynamic";
+// 캐시 주기는 루트 레이아웃의 `revalidate` 가 정한다(app/layout.tsx). 예전엔 여기가
+// force-dynamic 이라 방문마다 서버가 새로 그렸다.
 
 export default async function SeohakPage() {
   const ov = await getSeohakOverview();
@@ -45,6 +47,7 @@ export default async function SeohakPage() {
     getUsdKrw(),
     getHouseholdAssets(),
   ]);
+  assertLoaded("/seohak");
   /* 통화 스위치의 재료. 카드는 금액을 **두 벌 다 그려 두고**(`money.tsx`) 뿌리의
      `data-cur` 를 보고 globals.css 가 한쪽을 숨긴다. `Map` 을 맨 객체로 펴는 건
      달력이 클라이언트 컴포넌트라 직렬화를 타기 때문이다. */

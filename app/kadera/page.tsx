@@ -20,7 +20,7 @@ import {
 import type { ThemeRotation, TrendingMessage } from "@/lib/telegram-data";
 
 import { formatKstUpdate } from "@/lib/format";
-import { isLoadFailed } from "@/lib/load-state";
+import { assertLoaded, isLoadFailed } from "@/lib/load-state";
 
 import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
@@ -34,6 +34,8 @@ import { StockLogo } from "../StockLogo";
 import { SectionHead } from "./SectionHead";
 import { SectionIntro } from "../SectionIntro";
 import { TrendingTabs } from "./TrendingTabs";
+import TimeAgo from "./TimeAgo";
+import { timeAgo } from "./time-ago";
 
 // 미리보기 이미지는 옆의 opengraph-image.tsx 가 그린다(ownImage). 자세한 건 app/seo.ts 주석 참고.
 export async function generateMetadata(): Promise<Metadata> {
@@ -45,7 +47,8 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
-export const dynamic = "force-dynamic";
+// 캐시 주기는 루트 레이아웃의 `revalidate` 가 정한다(app/layout.tsx). 예전엔 여기가
+// force-dynamic 이라 방문마다 서버가 새로 그렸다.
 
 function compact(n: number): string {
   if (n >= 10000) return `${Math.round(n / 1000)}K`;
@@ -60,15 +63,6 @@ function formatKR(n: number): string {
   if (n >= 1e8) return `${(n / 1e8).toFixed(1).replace(/\.0$/, "")}억`;
   if (n >= 1e4) return `${(n / 1e4).toFixed(1).replace(/\.0$/, "")}만`;
   return n.toLocaleString("ko-KR");
-}
-
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const min = Math.floor(diff / 60000);
-  if (min < 60) return `${Math.max(1, min)}분 전`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}시간 전`;
-  return `${Math.floor(hr / 24)}일 전`;
 }
 
 /**
@@ -169,7 +163,7 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
               <span style={{ ...clip, fontSize: "var(--fs-12-5)", fontWeight: 800, letterSpacing: "-.01em", color: "var(--c-cold-ink)", maxWidth: 220, minWidth: 0 }}>
                 {m.channelTitle}
               </span>
-              <span style={{ fontSize: "var(--fs-11)", fontFamily: MONO, color: C.sub2, flexShrink: 0 }}>{timeAgo(m.postedAt)}</span>
+              <span style={{ fontSize: "var(--fs-11)", fontFamily: MONO, color: C.sub2, flexShrink: 0 }}><TimeAgo iso={m.postedAt} initial={timeAgo(m.postedAt)} /></span>
               <span style={{ flex: 1 }} />
               <span style={{ fontSize: "var(--fs-11)", fontFamily: MONO, fontWeight: 800, color: C.sub, flexShrink: 0 }}>#{i + 1}</span>
             </div>
@@ -284,6 +278,8 @@ async function TrendingSection() {
     getTrendingMessages(7, 36),
     getTrendingMessages(30, 36),
   ]);
+  // 이 구간은 Suspense 로 따로 흐르므로 페이지 본문의 assertLoaded 가 못 본다. 여기서 따로.
+  assertLoaded("/kadera trending");
   return (
     <section className="hz-sheet">
       {/* 머리(SectionHead)는 TrendingTabs 안에서 그린다 — 기간 탭이 머리 우측에
@@ -384,6 +380,13 @@ export default async function KaderaPage() {
      ⭐ 폴백 값은 예전과 같다(`[]` · `null` · `{}`). 달라지는 건 **화면이 그 빈 값을 뭐라고
      설명하느냐**뿐이다 — "아직 없습니다" 는 사실이 아닐 수 있고, 실패했을 때 그렇게 적으면
      화면이 거짓말을 한다(2026-08-06 "언급 1,002회 · 0개 채널"). */
+  // 실패한 조회가 있으면 던진다 — 사본(ISR)에 실패한 화면을 담지 않는다(lib/load-state.ts).
+  // 아래의 "실패와 부재를 갈라 문구를 바꾸는" 길은 그래서 실제로는 안 탄다. 던지지 않기로
+  // 되돌릴 때 그대로 살아나게 남겨 둔다.
+  assertLoaded("/kadera", {
+    themes: rawThemes, sentiment: rawSentiment, narratives: rawNarratives,
+    surgeLines: rawSurgeLines, why: rawWhy, events: rawEvents,
+  });
   const themesFailed = isLoadFailed(rawThemes);
   const themes = themesFailed ? [] : rawThemes;
   const sentimentFailed = isLoadFailed(rawSentiment);

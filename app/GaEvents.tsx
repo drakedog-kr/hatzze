@@ -18,7 +18,7 @@ import { track } from "@/lib/ga";
  * 거치지 말고 track() 을 직접 부른다 — state 를 함께 실어야 해서 속성으로는 부족하다.
  */
 export default function GaEvents() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "/";
 
   // ── 클릭 위임 ────────────────────────────────────────────────
   // capture 단계에서 받는다. 링크가 새 탭을 열거나 페이지를 떠나는 경우에도

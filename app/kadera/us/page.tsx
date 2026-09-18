@@ -19,7 +19,7 @@ import type { UsTrendingMessage } from "@/lib/us-telegram-data";
 import { US_BOARD_TILES, getUsMoveReasons, getUsUpcomingEvents } from "@/lib/kadera-us-why";
 import { todayKst } from "@/lib/kadera-why";
 import { fmtKoDate } from "@/lib/stock-page";
-import { isLoadFailed } from "@/lib/load-state";
+import { assertLoaded, isLoadFailed } from "@/lib/load-state";
 import { EventsCalendar } from "../EventsCalendar";
 
 import { formatKstUpdate } from "@/lib/format";
@@ -42,6 +42,8 @@ import {
   termsFor,
 } from "../parts";
 import { TrendingTabs } from "../TrendingTabs";
+import TimeAgo from "../TimeAgo";
+import { timeAgo } from "../time-ago";
 import { SectionHead } from "../SectionHead";
 import { SectionIntro } from "../../SectionIntro";
 
@@ -55,7 +57,8 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
-export const dynamic = "force-dynamic";
+// 캐시 주기는 루트 레이아웃의 `revalidate` 가 정한다(app/layout.tsx). 예전엔 여기가
+// force-dynamic 이라 방문마다 서버가 새로 그렸다.
 
 /** 옆에 나란히 두는 시트의 최소 폭. 국내 페이지와 같은 값이라 두 화면의 접히는 지점이 같다. */
 const SHEET_PAIR_MIN = "min(460px, 100%)";
@@ -135,15 +138,6 @@ function compact(n: number): string {
   return `${n}`;
 }
 
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const min = Math.floor(diff / 60000);
-  if (min < 60) return `${Math.max(1, min)}분 전`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}시간 전`;
-  return `${Math.floor(hr / 24)}일 전`;
-}
-
 /**
  * 트렌딩 메시지 목록. 국장 TrendingList 와 같은 마크업이다 — 다른 건 태그가
  * 국내 종목명이 아니라 **미국 종목의 한글 표기**라는 것뿐이고, 국장 쪽의 topics(주제 태그)는
@@ -202,7 +196,7 @@ function UsTrendingList({ items }: { items: UsTrendingMessage[] }) {
               {m.channelTitle}
             </span>
             <span style={{ fontSize: "var(--fs-11)", fontFamily: MONO, color: C.sub2 }}>
-              {timeAgo(m.postedAt)}
+              <TimeAgo iso={m.postedAt} initial={timeAgo(m.postedAt)} />
             </span>
             <span style={{ flex: 1 }} />
             <span
@@ -363,6 +357,8 @@ export default async function UsKaderaPage() {
   ]);
 
   /* 국장과 같은 규칙 — 조회 실패와 자료 없음을 갈라 빈 자리의 문구를 바꾼다(lib/load-state.ts). */
+  // 실패한 조회가 있으면 던진다 — 사본(ISR)에 실패한 화면을 담지 않는다(lib/load-state.ts).
+  assertLoaded("/kadera/us", { why: rawWhy, events: rawEvents });
   const whyFailed = isLoadFailed(rawWhy);
   const why = whyFailed ? null : rawWhy;
   const eventsFailed = isLoadFailed(rawEvents);
