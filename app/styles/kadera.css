@@ -335,51 +335,32 @@
    열은 넷뿐이다. 처음엔 다섯(라벨 칸이 따로)이었고 줄 높이 8px 에 띠마다 순위 숫자까지 있어
    "복잡하고 안 깔끔하고 좁다"는 지적을 받았다(2026-09-19). 띠에서 숫자를 빼고 라벨을 띠 아래로
    붙여 열을 줄이고, 줄에 숨을 준다. */
+/* 윗층 네 칸(순위 · 이름 · 점유율 · 열흘 한 조각) + 아랫층 문장(2/-1 로 줄 폭 전부). 세 번 다듬은 끝의 모양이다:
+   ① 순위 숫자 띠 + 라벨 칸(다섯 열) ② 색 띠 + 글 ③ 종목 이름 + 스파크라인 + 잘린 문장 — 전부 "복잡하고 빈 공간이
+   크다". 이름 칸에 문장을 가두지 않고 아랫층으로 내리니 오른쪽 칸이 비어 보일 일이 없다. */
 .hz-cols-theme-list {
-  grid-template-columns: 28px minmax(0, 1fr) 84px 110px;
-  gap: 18px;
-}
-/* 둘째 줄 — '요즘 무슨 얘기' 첫 문장. 한 줄로 자른다(폰은 두 줄). 본문색보다 한 단 흐린 --c-sub 이 아니라
-   --c-ink-soft: 이 줄이 표의 본론이라 곁말 색이면 안 된다. */
-.hz-flow-brief {
-  font-size: var(--fs-12-5);
-  line-height: 1.55;
-  color: var(--c-ink-soft);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  word-break: keep-all;
+  grid-template-columns: 28px minmax(0, 1fr) 72px 132px;
+  gap: 7px 16px;
+  align-items: center;
 }
 .hz-trow.hz-cols-theme-list {
-  padding-top: 13px;
-  padding-bottom: 13px;
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+/* 아랫층 — '요즘 무슨 얘기' 첫 문장. 줄 폭을 다 쓰고 두 줄까지. 곁말 색(--c-sub)이 아니라 --c-ink-soft: 이 줄이 표의 본론이다. */
+.hz-theme-row-brief {
+  grid-column: 2 / -1;
+  font-size: var(--fs-13);
+  line-height: 1.6;
+  color: var(--c-ink-soft);
+  word-break: keep-all;
+  text-wrap: pretty;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 /* <li> 로 싸인 목록(ExpandableList)이라 마지막 줄 밑선 규칙은 .hz-trow 쪽 li:last-child 가 맡는다. */
-.hz-flow-col {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  min-width: 0;
-}
-.hz-flow-cap {
-  font-size: var(--fs-11);
-  font-weight: 700;
-  white-space: nowrap;
-}
-/* 점유율 칸 — 숫자 아래 얇은 막대. 막대는 **1위 대비**다(반도체 39% 가 한 칸을 다 채우고 나머지가
-   그 비율로 선다). 절대 점유율로 그리면 2위부터 전부 10% 아래라 막대가 구별이 안 된다. 절대값은 숫자가 말한다. */
-.hz-flow-share {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 5px;
-  min-width: 0;
-}
-.hz-flow-share .hz-bar {
-  width: 100%;
-  height: 4px;
-}
 /* ── 테마 점유율 지도(트리맵, app/theme/Treemap.tsx) ──────────────────────
    칸은 퍼센트 좌표의 절대 배치. 상자의 종횡비는 서버가 배치를 계산한 값(2:1)과 같아야 칸이
    정사각형에 가깝다. 폰에서는 세로로 세운다(layout.css ≤560) — 상대 위치는 그대로라 안 겹친다.
@@ -531,9 +512,7 @@
 .hz-tm-sw.is-down-2 { background: color-mix(in srgb, var(--c-blue-2) 55%, var(--c-card)); }
 .hz-tm-sw.is-down-3 { background: color-mix(in srgb, var(--c-blue-2) 88%, var(--c-card)); }
 
-/* 열흘 흐름은 이제 카더라 테마 카드와 같은 스파크라인(app/kadera/parts.tsx Sparkline)이다. 순위 칸 띠
-   (.hz-flow, 숫자 있는 판 → 색만 있는 판)는 두 번 다듬고도 "별로다"라 걷었다(2026-09-19). 위 .hz-flow-col 과
-   .hz-flow-cap(막대 아래 한 줄 글)만 남는다. */
+/* 열흘 흐름은 이제 글 한 조각(Pill)이다. 순위 칸 띠 → 색 띠 → 스파크라인 세 판을 거쳐 걷었다(2026-09-19). */
 
 /* ── 카더라 '다가오는 일정': 달력(1/3) + 그날 일정(2/3) ─────────────────────
    왼쪽 달력은 오늘이 든 주부터 다섯 주. 일정 있는 날은 파란 바탕에 건수, 고른 날은 진한
