@@ -54,19 +54,26 @@ function FlowLabel({ t }: { t: ThemeOverview }) {
   return <span style={{ fontSize: "var(--fs-11)", color: C.sub2 }}>상위 밖</span>;
 }
 
-/** 열흘 흐름 칸. 상위면 파란 칸에 순위, 아니면 옅은 칸에 순위, 집계가 없던 날은 빈 테두리. */
+/**
+ * 열흘 흐름 띠. 칸 하나가 하루, 안의 숫자가 그날 순위. 세 단(상위 5위 안 · 6~10위 · 그 밖)과 빈 칸(집계 없음),
+ * 맨 오른쪽 칸은 가장 최근 날이라 테두리로 짚는다. 색 뜻은 kadera.css 의 .hz-flow 주석.
+ */
 function Flow({ t }: { t: ThemeOverview }) {
+  const last = t.flow.length - 1;
   return (
     <span className="hz-flow" aria-label={`최근 ${t.flow.length}일 순위 ${t.flow.map((r) => (r == null ? "없음" : `${r}위`)).join(", ")}`}>
-      {t.flow.map((r, i) => (
-        <span
-          key={t.flowDates[i]}
-          className={r == null ? "is-none" : r <= THEME_FLOW_TOP ? "is-top" : undefined}
-          title={`${fmtKoDate(t.flowDates[i])}${r == null ? "" : ` · ${r}위`}`}
-        >
-          {r == null ? "" : r}
-        </span>
-      ))}
+      {t.flow.map((r, i) => {
+        const tone = r == null ? "is-none" : r <= THEME_FLOW_TOP ? "is-top" : r <= THEME_FLOW_TOP * 2 ? "is-mid" : "";
+        return (
+          <span
+            key={t.flowDates[i]}
+            className={`${tone}${i === last ? " is-last" : ""}`.trim() || undefined}
+            title={`${fmtKoDate(t.flowDates[i])}${r == null ? " · 집계 없음" : ` · ${r}위`}${i === last ? " (가장 최근)" : ""}`}
+          >
+            {r == null ? "" : r}
+          </span>
+        );
+      })}
     </span>
   );
 }
@@ -80,6 +87,8 @@ export default async function ThemeIndexPage() {
   const top = themes?.slice(0, 3) ?? [];
   // 흐름 표 위의 두 칸 — 새로 상위에 오른 테마와 가장 오래 상위인 테마. 표를 다 읽지 않아도 오늘 무엇이
   // 달라졌는지 보인다. 카더라 테마 로테이션의 하이라이트 두 칸(유입·이탈)과 같은 자리·같은 꼴.
+  // 점유율 막대는 1위 대비다(kadera.css .hz-flow-share 주석). 절대값은 옆 숫자가 말한다.
+  const maxShare = Math.max(0.1, ...(themes ?? []).map((t) => t.sharePct));
   const fresh = (themes ?? []).filter((t) => t.label === "new").sort((a, b) => a.rank - b.rank);
   // '계속'은 사흘 이상. 하루 이틀은 표의 알약이 말한다.
   const lasting = (themes ?? []).filter((t) => t.label === "streak" && t.streak >= 3).sort((a, b) => b.streak - a.streak || a.rank - b.rank);
@@ -175,7 +184,7 @@ export default async function ThemeIndexPage() {
               <span>#</span>
               <span>테마 · 최근 {KADERA_WINDOW_DAYS}일 말 많은 종목</span>
               <span style={{ textAlign: "right" }}>점유율</span>
-              <span>최근 {flowDates.length || THEME_FLOW_DAYS}일 순위</span>
+              <span>날마다의 순위 · 오른쪽이 최근</span>
               <span>흐름</span>
             </div>
             <div>
@@ -193,7 +202,13 @@ export default async function ThemeIndexPage() {
                         : `최근 ${KADERA_WINDOW_DAYS}일 언급된 종목이 없습니다`}
                     </span>
                   </span>
-                  <span style={{ fontFamily: MONO, fontSize: "var(--fs-13)", fontWeight: 800, color: C.ink, textAlign: "right" }}>{t.sharePct.toFixed(1)}%</span>
+                  <span className="hz-flow-share">
+                    <span style={{ fontFamily: MONO, fontSize: "var(--fs-13)", fontWeight: 800, color: C.ink }}>{t.sharePct.toFixed(1)}%</span>
+                    {/* 막대 채움만 인라인 — 폭은 값이다. 색·트랙은 .hz-bar(kadera.css). */}
+                    <span className="hz-bar">
+                      <span style={{ width: `${Math.max(2, (t.sharePct / maxShare) * 100)}%` }} />
+                    </span>
+                  </span>
                   <span>
                     <Flow t={t} />
                   </span>
