@@ -335,6 +335,112 @@
 .hz-cols-theme-list {
   grid-template-columns: 24px minmax(0, 1fr) 56px 148px 84px;
 }
+/* ── 테마 점유율 지도(트리맵, app/theme/Treemap.tsx) ──────────────────────
+   칸은 퍼센트 좌표의 절대 배치. 상자의 종횡비는 서버가 배치를 계산한 값(2:1)과 같아야 칸이
+   정사각형에 가깝다. 폰에서는 세로로 세운다(layout.css ≤560) — 상대 위치는 그대로라 안 겹친다.
+   시트 바탕 토큰은 --c-card 다(--c-sheet 라는 토큰은 없다. 선은 --c-sheet-line). */
+.hz-treemap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  /* 칸 사이 틈은 칸의 테두리(시트와 같은 --c-card)로 낸다. 상자 바탕도 같은 색이라 틈이 시트에 녹는다. */
+  background: var(--c-card);
+  border-radius: var(--r-control);
+  overflow: hidden;
+}
+/* ⚠️ 선택자를 `.hz-treemap .hz-tm-tile` 로 두는 이유: 칸에는 툴팁용 .hz-tip 도 붙는데 그 규칙이
+   `position: relative` 를 갖고 있고 나중에 읽히는 파일(sheets.css)에 있어, 한 클래스로만 적으면
+   absolute 가 relative 에 진다 — 실제로 칸이 전부 한 줄로 쌓여 지도가 비어 보였다(2026-09-19). */
+.hz-treemap .hz-tm-tile {
+  position: absolute;
+  box-sizing: border-box;
+  /* 틈 2px. 칸 안쪽 여백은 크기 단계별로 아래에서. */
+  border: 2px solid var(--c-card);
+  border-radius: 6px;
+  text-decoration: none;
+  color: var(--c-ink);
+  overflow: hidden;
+  /* .hz-tip 이 cursor:default 를 못박는다 — 이 칸은 누르면 테마 화면으로 가는 링크다. */
+  cursor: pointer;
+  transition: filter 0.12s ease;
+}
+.hz-tm-tile:hover,
+.hz-tm-tile:focus-visible {
+  filter: brightness(0.93);
+  outline: none;
+}
+/* 색 단계. 온도색 두 가지(--c-warm-2 · --c-blue-2)를 시트 바탕에 섞는다 — 라이트·다크 모두
+   자기 토큰으로 섞이므로 따로 안 적는다. 맨 진한 단은 흰 글자. */
+.hz-tm-tile.is-flat { background: var(--c-chip); }
+.hz-tm-tile.is-up-1 { background: color-mix(in srgb, var(--c-warm-2) 28%, var(--c-card)); }
+.hz-tm-tile.is-up-2 { background: color-mix(in srgb, var(--c-warm-2) 55%, var(--c-card)); }
+.hz-tm-tile.is-up-3 { background: color-mix(in srgb, var(--c-warm-2) 88%, var(--c-card)); color: #fff; }
+.hz-tm-tile.is-down-1 { background: color-mix(in srgb, var(--c-blue-2) 28%, var(--c-card)); }
+.hz-tm-tile.is-down-2 { background: color-mix(in srgb, var(--c-blue-2) 55%, var(--c-card)); }
+.hz-tm-tile.is-down-3 { background: color-mix(in srgb, var(--c-blue-2) 88%, var(--c-card)); color: #fff; }
+.hz-tm-in {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  min-width: 0;
+  max-width: 100%;
+}
+/* 이름은 **줄바꿈**한다(말줄임이 아니라). 폭이 모자란 칸에서 "인터…"·"건…"보다 두 줄 "인터넷·
+   플랫폼"이 낫고, 칸이 대개 세로로 여유가 있다. 낱말 가운데서 끊기지 않게 keep-all. 그래도
+   안 들어가면 칸의 overflow:hidden 이 자른다. */
+.hz-tm-name {
+  font-size: var(--fs-13);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  white-space: normal;
+  word-break: keep-all;
+  line-height: 1.25;
+}
+.hz-tm-val {
+  font-size: var(--fs-12);
+  font-weight: 700;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+.hz-tm-delta {
+  margin-left: 6px;
+  font-size: var(--fs-11);
+  font-weight: 700;
+}
+.hz-tm-tile.is-lg .hz-tm-name { font-size: var(--fs-15); }
+.hz-tm-tile.is-lg .hz-tm-val { font-size: var(--fs-13); }
+.hz-tm-tile.is-sm .hz-tm-in { padding: 5px 7px; }
+.hz-tm-tile.is-sm .hz-tm-name { font-size: var(--fs-11); font-weight: 700; }
+/* 범례 — 색만으로 방향을 말하지 않는다. */
+.hz-tm-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  padding: 12px 22px 16px;
+  font-size: var(--fs-11);
+  font-weight: 600;
+  color: var(--c-sub);
+}
+.hz-tm-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.hz-tm-sw {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  display: inline-block;
+}
+.hz-tm-sw.is-flat { background: var(--c-chip); box-shadow: inset 0 0 0 1px var(--c-hairline); }
+.hz-tm-sw.is-up-1 { background: color-mix(in srgb, var(--c-warm-2) 28%, var(--c-card)); }
+.hz-tm-sw.is-up-2 { background: color-mix(in srgb, var(--c-warm-2) 55%, var(--c-card)); }
+.hz-tm-sw.is-up-3 { background: color-mix(in srgb, var(--c-warm-2) 88%, var(--c-card)); }
+.hz-tm-sw.is-down-1 { background: color-mix(in srgb, var(--c-blue-2) 28%, var(--c-card)); }
+.hz-tm-sw.is-down-2 { background: color-mix(in srgb, var(--c-blue-2) 55%, var(--c-card)); }
+.hz-tm-sw.is-down-3 { background: color-mix(in srgb, var(--c-blue-2) 88%, var(--c-card)); }
+
 /* 열흘 흐름의 칸 하나. 상위(5위 안)면 파란 바탕에 흰 순위, 아니면 옅은 칸. */
 .hz-flow {
   display: inline-flex;

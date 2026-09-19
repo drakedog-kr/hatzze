@@ -482,6 +482,21 @@
     display: none;
   }
 
+  /* 테마 점유율 지도: 폰에서는 세로로 세운다. 배치는 2:1 로 계산됐지만 상대 위치가 그대로라 안 겹친다.
+     작은 칸의 글자는 더 작게 — 폭이 반이 되면 이름이 잘린다. */
+  .hz-treemap {
+    aspect-ratio: 1 / 1.15;
+  }
+  /* 폰에서는 변화(%p)는 자리가 없어 접고, 글자는 한 단계 작게(줄바꿈 규칙은 kadera.css 기본값). */
+  .hz-tm-tile .hz-tm-in { padding: 6px 7px; gap: 1px; }
+  .hz-tm-tile .hz-tm-name { font-size: var(--fs-12); }
+  .hz-tm-tile.is-lg .hz-tm-name { font-size: var(--fs-13); }
+  .hz-tm-tile .hz-tm-val { font-size: var(--fs-11); }
+  .hz-tm-tile.is-lg .hz-tm-val { font-size: var(--fs-12); }
+  .hz-tm-delta { display: none; }
+  .hz-tm-tile.is-sm .hz-tm-in { display: none; }
+  .hz-tm-legend { padding-left: 16px; padding-right: 16px; }
+
   /* 테마 화면의 표 세 벌 + 목록. 곁다리 열을 접고 긴 글은 아랫줄로 내린다(kadera.css 정의). */
   .hz-cols-theme-stock {
     grid-template-columns: 20px minmax(0, 1fr) 56px;

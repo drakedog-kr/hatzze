@@ -10,17 +10,20 @@ import { THEME_FLOW_DAYS, THEME_FLOW_TOP, listThemeOverview, themeHref, type The
 import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { THEME_PUBLIC } from "../screen-flags";
-import { DeltaPp, Pill, RankBadge } from "../kadera/parts";
+import { DeltaPp, Highlight, Pill, RankBadge } from "../kadera/parts";
 import { SectionHead } from "../kadera/SectionHead";
 import { C, MONO } from "../ui";
 import { THEME_PAGE } from "./copy";
+import { Treemap, TreemapLegend } from "./Treemap";
 
 /**
- * 테마 목록(`/theme`) — 26테마를 점유율 순으로 세우고, 테마마다 **열흘 흐름**을 붙인다.
+ * 테마 목록(`/theme`) — 위에 **점유율 지도**(트리맵), 아래에 **열흘 흐름** 표.
  *
- * 흐름 칸은 다른 테마 사이트의 '테마 흐름' 표에서 형식을 가져왔다(칸마다 그날 순위, 라벨은
- * 지속·첫 등장·간헐). 그쪽은 급등 종목 수를 세고 우리는 언급 점유율을 센다. 카더라의
- * 테마 로테이션 카드가 '3일 vs 이전'을 숫자로 말한다면 여기는 열흘을 눈으로 보인다.
+ * 지도는 "지금 관심이 어디에 몰려 있나"를 한 번에 보인다 — 칸 크기가 최근 사흘 언급 점유율, 색이
+ * 닷새 넘게 이전과 견준 변화다(app/theme/Treemap.tsx). 흐름 표는 다른 테마 사이트의 '테마 흐름'
+ * 표에서 형식을 가져왔다(칸마다 그날 순위, 라벨은 지속·첫 등장·간헐). 그쪽은 급등 종목 수를
+ * 세고 우리는 언급 점유율을 센다. 카더라의 테마 로테이션 카드가 '3일 vs 이전'을 숫자로
+ * 말한다면 여기는 그것을 넓이와 색으로, 열흘을 칸으로 보인다.
  *
  * 제목은 셸이 그린다(안 연 동안은 DEEP_PAGES, 열면 NAV). 이 파일은 본문만 낸다.
  */
@@ -44,7 +47,8 @@ const clip: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", te
 
 /** 흐름 라벨. 판정 규칙은 lib/theme-page.ts listThemeOverview 에 있다. */
 function FlowLabel({ t }: { t: ThemeOverview }) {
-  if (t.label === "streak") return <Pill tone="hot">{t.streak}일째 상위</Pill>;
+  // 연속 하루째인데 열흘 안에 상위였던 날이 더 있으면 "돌아온" 것이다 — "1일째 상위"는 어색하다.
+  if (t.label === "streak") return <Pill tone="hot">{t.streak === 1 ? "다시 상위" : `${t.streak}일째 상위`}</Pill>;
   if (t.label === "new") return <Pill tone="blue">{t.streak === 1 ? "첫 등장" : "이틀째"}</Pill>;
   if (t.label === "intermittent") return <Pill tone="plain">열흘 중 {t.topDays}일</Pill>;
   return <span style={{ fontSize: "var(--fs-11)", color: C.sub2 }}>상위 밖</span>;
@@ -73,9 +77,49 @@ export default async function ThemeIndexPage() {
   assertLoaded("/theme");
 
   const flowDates = themes?.[0]?.flowDates ?? [];
+  const top = themes?.slice(0, 3) ?? [];
+  // 흐름 표 위의 두 칸 — 새로 상위에 오른 테마와 가장 오래 상위인 테마. 표를 다 읽지 않아도 오늘 무엇이
+  // 달라졌는지 보인다. 카더라 테마 로테이션의 하이라이트 두 칸(유입·이탈)과 같은 자리·같은 꼴.
+  const fresh = (themes ?? []).filter((t) => t.label === "new").sort((a, b) => a.rank - b.rank);
+  // '계속'은 사흘 이상. 하루 이틀은 표의 알약이 말한다.
+  const lasting = (themes ?? []).filter((t) => t.label === "streak" && t.streak >= 3).sort((a, b) => b.streak - a.streak || a.rank - b.rank);
+  // 지도 머리의 한 줄 — 가장 큰 칸이 무엇이고 얼마인지 글자로도 적는다(넓이만으로 말하지 않는다).
+  const lead =
+    top.length >= 2
+      ? `최근 ${KADERA_WINDOW_DAYS}일 언급의 ${top[0].sharePct.toFixed(1)}%가 ${top[0].theme}입니다. 그다음은 ${top
+          .slice(1)
+          .map((t) => `${t.theme} ${t.sharePct.toFixed(1)}%`)
+          .join(", ")}입니다.`
+      : "칸의 크기는 최근 사흘 언급 점유율, 색은 그 변화입니다.";
 
   return (
     <div className="hz-tx">
+      {/* ── 점유율 지도 ── 칸 크기 = 점유율, 색 = 변화. 누르면 그 테마 화면으로. */}
+      <section className="hz-sheet">
+        <SectionHead
+          icon="grid_view"
+          title="테마 점유율 지도"
+          note={`최근 ${KADERA_WINDOW_DAYS}일`}
+          desc={lead}
+          noteHelp="칸의 넓이는 최근 사흘 언급 점유율입니다. 색은 닷새 넘게 이전과 견준 변화로, 따뜻한 색이 늘어난 테마, 파랑이 줄어든 테마입니다. 사전 밖 종목(기타)은 지도에 없습니다."
+          level={2}
+        />
+        {themes === null ? (
+          <p style={{ margin: 0, padding: "16px 22px 20px", fontSize: "var(--fs-12)", color: C.sub, lineHeight: 1.7 }}>
+            테마 집계를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오.
+          </p>
+        ) : themes.length === 0 ? (
+          <p style={{ margin: 0, padding: "16px 22px 20px", fontSize: "var(--fs-12)", color: C.sub, lineHeight: 1.7 }}>아직 집계된 테마가 없습니다.</p>
+        ) : (
+          <>
+            <div style={{ padding: "16px 22px 0" }}>
+              <Treemap themes={themes} />
+            </div>
+            <TreemapLegend />
+          </>
+        )}
+      </section>
+
       <section className="hz-sheet">
         <SectionHead
           icon="donut_small"
@@ -93,6 +137,35 @@ export default async function ThemeIndexPage() {
           <p style={{ margin: 0, padding: "16px 22px 20px", fontSize: "var(--fs-12)", color: C.sub, lineHeight: 1.7 }}>아직 집계된 테마가 없습니다.</p>
         ) : (
           <>
+            <div className="hz-kd-duo">
+              <Highlight
+                cap="새로 상위에 오른 테마"
+                name={fresh[0]?.theme ?? "—"}
+                value={fresh[0] ? (fresh[0].streak === 1 ? "첫 등장" : "이틀째") : undefined}
+                valueColor="var(--c-hot-ink)"
+                sub={
+                  fresh.length > 1
+                    ? `그 밖에 ${fresh.slice(1).map((t) => t.theme).join(" · ")}`
+                    : fresh.length === 1
+                      ? `${fresh[0].rank}위 · 점유율 ${fresh[0].sharePct.toFixed(1)}%`
+                      : `열흘 사이 ${THEME_FLOW_TOP}위 안에 새로 든 테마가 없습니다`
+                }
+                divide
+              />
+              <Highlight
+                cap="계속 상위인 테마"
+                name={lasting[0]?.theme ?? "—"}
+                value={lasting[0] ? `${lasting[0].streak}일째` : undefined}
+                valueColor="var(--c-cold-ink)"
+                sub={
+                  lasting.length > 1
+                    ? `그 밖에 ${lasting.slice(1).map((t) => `${t.theme} ${t.streak}일째`).join(" · ")}`
+                    : lasting.length === 1
+                      ? `${lasting[0].rank}위 · 점유율 ${lasting[0].sharePct.toFixed(1)}%`
+                      : `사흘 넘게 ${THEME_FLOW_TOP}위 안에 이어진 테마가 없습니다`
+                }
+              />
+            </div>
             <div className="hz-thead hz-cols-theme-list">
               <span>#</span>
               <span>테마 · 최근 {KADERA_WINDOW_DAYS}일 말 많은 종목</span>
