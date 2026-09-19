@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useSyncExternalStore } from "react";
 
+import { createHintStore } from "../hint-store";
 import { Icon, R } from "../ui";
 
 /**
@@ -49,51 +50,11 @@ import { Icon, R } from "../ui";
  * 카드마다 표시를 따로 남긴다. 세 카드가 가리키는 곳이 다르고(종목 상세 · 인물 상세)
  * 하는 말도 달라서, 하나를 닫았다고 나머지를 안 알려 주면 그 카드는 영영 못 배운다.
  * ⚠️ 값을 바꾸면 이미 닫은 사람에게 다시 뜬다. 문구만 고칠 때는 건드리지 말 것.
+ *
+ * 기계(스토어·구독 직후 알림·id 당 하나)는 app/hint-store.ts 로 옮겼다 — 테마 지도의 MapHint 가
+ * 같은 것을 쓴다. 위 머리 주석의 '하나'·'둘'은 그 파일에도 그대로 적용된다.
  */
-const KEY_PREFIX = "hz-insider-taphint-";
-const EVENT = "hz-insider-tap-hint-change";
-
-function makeStore(key: string) {
-  return {
-  subscribe(cb: () => void) {
-    // ⭐ 구독 직후 한 번 알린다. 이유는 파일 머리 주석의 '둘'. 지우면 쪽지가 뜨다 말다 한다.
-    const t = setTimeout(cb, 0);
-    window.addEventListener(EVENT, cb);
-    return () => {
-      clearTimeout(t);
-      window.removeEventListener(EVENT, cb);
-    };
-  },
-  // 사파리 사생활 보호 모드 등에서 localStorage 접근이 던진다. 그때는 안 띄운다 —
-  // 껐다는 걸 기억할 수 없으니 띄우면 올 때마다 다시 뜬다.
-  getSnapshot() {
-    try {
-      return localStorage.getItem(key) === null;
-    } catch {
-      return false;
-    }
-  },
-  };
-}
-
-// 스토어는 id 마다 하나씩만 만든다. 매 렌더 새로 만들면 subscribe 가 매번 다시 걸려
-// 무한 루프가 된다(useSyncExternalStore 가 함수 동일성을 본다).
-const stores = new Map<string, ReturnType<typeof makeStore>>();
-function storeFor(id: string) {
-  let st = stores.get(id);
-  if (!st) {
-    st = makeStore(KEY_PREFIX + id);
-    stores.set(id, st);
-  }
-  return st;
-}
-
-function markSeen(id: string) {
-  try {
-    localStorage.setItem(KEY_PREFIX + id, "1");
-  } catch {}
-  window.dispatchEvent(new Event(EVENT));
-}
+const { storeFor, markSeen } = createHintStore("hz-insider-taphint-", "hz-insider-tap-hint-change");
 
 export function TapHint({ id, text }: { id: string; text: string }) {
   const store = storeFor(id);

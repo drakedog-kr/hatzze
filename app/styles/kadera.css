@@ -415,6 +415,48 @@
 /* 가늘고 긴 칸: 글자를 한 자씩 세로로. keep-all 을 풀어야 낱말 안에서 끊긴다. */
 .hz-tm-tile.is-tall .hz-tm-in { padding: 5px 4px; align-items: center; }
 .hz-tm-tile.is-tall .hz-tm-name { font-size: var(--fs-11); font-weight: 700; word-break: break-all; text-align: center; line-height: 1.2; }
+/* 처음 온 사람에게 한 번 띄우는 쪽지(app/theme/MapHint.tsx). 내부자 리포트의 .hz-tap-hint 와 같은
+   생김새(ink 바탕 · bg 글자)를 지도 안에 옮긴 것이다 — 새 어법을 만들지 않는다. 자리표시자는 손가락을
+   통과시켜 가려진 칸이 그대로 눌리고, 닫기 ✕ 만 되돌려 받는다. */
+.hz-treemap .hz-map-hint-slot {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  /* 칸 안에서 오른쪽으로 넘치지 않게. 폰에서 가장 큰 칸이 45% 폭이라 그보다 조금 넓게 잡아도 되지만
+     지도 밖으로는 못 나가야 한다. */
+  max-width: calc(100% - 20px);
+}
+.hz-treemap .hz-map-hint-slot[hidden] {
+  display: none;
+}
+.hz-map-hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: max-content;
+  max-width: min(320px, 100%);
+  padding: 8px 6px 8px 10px;
+  background: var(--c-ink);
+  color: var(--c-bg);
+  border-radius: var(--r-control);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  line-height: 1.45;
+  box-shadow: 0 4px 16px var(--c-shadow-strong);
+}
+/* 위쪽 칸 이름을 가리키는 삼각 꼭지. */
+.hz-map-hint::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: 14px;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 5px solid var(--c-ink);
+}
+.hz-map-hint-x {
+  pointer-events: auto;
+}
 /* 범례 — 색만으로 방향을 말하지 않는다. */
 .hz-tm-legend {
   display: flex;

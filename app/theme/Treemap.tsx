@@ -6,6 +6,7 @@ import { squarify } from "@/lib/treemap";
 import { stockHref } from "@/lib/stock-page";
 
 import { MONO } from "../ui";
+import { MapHint } from "./MapHint";
 
 /**
  * 점유율 지도(트리맵). **칸의 크기가 최근 사흘 언급, 색이 변화 방향과 크기**다. 테마 목록은 테마를
@@ -115,13 +116,27 @@ export function stockTiles(stocks: ThemeHotStock[]): TreemapTile[] {
   }));
 }
 
-export function Treemap({ tiles, ariaLabel }: { tiles: TreemapTile[]; ariaLabel: string }) {
+export function Treemap({
+  tiles,
+  ariaLabel,
+  hint,
+}: {
+  tiles: TreemapTile[];
+  ariaLabel: string;
+  /**
+   * 처음 온 사람에게 한 번 띄우는 쪽지(MapHint). 가장 큰 칸 안, 이름 아래에 선다. `text` 는 그 칸의
+   * 이름을 받아 문장을 만든다. id 는 localStorage 키의 꼬리라 지도마다 달라야 한다.
+   */
+  hint?: { id: string; text: (label: string) => string };
+}) {
   const rects = squarify(
     tiles.map((t) => ({ key: t.key, value: t.value })),
     W,
     H,
   );
   const byKey = new Map(tiles.map((t) => [t.key, t]));
+  // squarify 는 값이 큰 순서로 놓으므로 첫 칸이 가장 크다.
+  const biggest = rects[0];
 
   return (
     <div className="hz-treemap" role="list" aria-label={ariaLabel}>
@@ -167,6 +182,15 @@ export function Treemap({ tiles, ariaLabel }: { tiles: TreemapTile[]; ariaLabel:
           </Link>
         );
       })}
+      {hint && biggest && (
+        // 가장 큰 칸의 이름·값 두 줄(약 48px) 아래. 좌표는 칸과 같은 퍼센트라 폰에서도 같이 움직인다.
+        <MapHint
+          id={hint.id}
+          text={hint.text(byKey.get(biggest.key)!.label)}
+          left={`calc(${biggest.x}% + 10px)`}
+          top={`calc(${(biggest.y / H) * 100}% + 56px)`}
+        />
+      )}
     </div>
   );
 }

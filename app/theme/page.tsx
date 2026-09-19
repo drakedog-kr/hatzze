@@ -113,7 +113,12 @@ export default async function ThemeIndexPage() {
         ) : (
           <>
             <div style={{ padding: "16px 22px 0" }}>
-              <Treemap tiles={themeTiles(themes)} ariaLabel="테마별 최근 3일 언급 점유율" />
+              {/* 처음 온 사람에게 가장 큰 칸 안에서 한 번: 칸이 눌리는 곳이라는 것. 내부자 리포트의 쪽지와 같은 기계. */}
+              <Treemap
+                tiles={themeTiles(themes)}
+                ariaLabel="테마별 최근 3일 언급 점유율"
+                hint={{ id: "themes", text: (label) => `${label} 칸을 누르면 이 테마의 상세 정보가 열립니다` }}
+              />
             </div>
             <TreemapLegend up="관심이 늘어난 테마" flat="변화 ±0.3%p 안" down="줄어든 테마" />
           </>
