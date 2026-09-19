@@ -726,6 +726,13 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/generate_telegram_narratives.py
 
+      # 테마 리포트(/theme/[테마])의 '요즘 무슨 얘기' · 함께 언급된 테마 · 발췌. 테마 26개에 Haiku 한 번씩.
+      # 기준일을 telegram_sentiment_daily 에서 집으므로 센티먼트 집계 뒤여야 한다(위 급부상 한 줄과 같은 이유).
+      - name: (텔레그램) 테마 요약 생성
+        id: telegram_theme_briefs
+        continue-on-error: true
+        run: python data-pipeline/scripts/generate_theme_briefs.py
+
       # ── KRX 공표 대기 게이트 ─────────────────────────────────────────────
       # **KRX Open API 는 전 영업일 자료를 08:00 KST 정각에 올린다**(2026-08-14 실측:
       # 07:54:52 엔 7개 서비스 전부 0행, 08:00:00 에 전부 채워짐. 5분 간격 30회 폴링).
