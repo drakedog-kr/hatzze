@@ -335,34 +335,15 @@
    열은 넷뿐이다. 처음엔 다섯(라벨 칸이 따로)이었고 줄 높이 8px 에 띠마다 순위 숫자까지 있어
    "복잡하고 안 깔끔하고 좁다"는 지적을 받았다(2026-09-19). 띠에서 숫자를 빼고 라벨을 띠 아래로
    붙여 열을 줄이고, 줄에 숨을 준다. */
-/* 다섯 칸 한 줄: 순위 · 이름(고정 폭) · **문장(남는 폭 전부)** · 점유율 · 열흘 한 조각. 네 번 다듬은 끝의 모양이다:
-   ① 순위 숫자 띠 + 라벨 칸 ② 색 띠 + 글 ③ 종목 이름 + 스파크라인 + 잘린 문장 ④ 문장을 아랫층에 — ④는 넓은
-   화면에서 윗층의 이름과 점유율 사이가 통째로 비었다("공간 낭비"). 문장이 그 자리를 차지하면 넓은 화면은
-   한 줄, 보통 화면은 두 줄이다. 이름 칸 176 은 "전력기기·전선 ▲5.4%p"(14px 이름 + 11px 변화)가 한 줄에 서는 폭. */
-.hz-cols-theme-list {
-  grid-template-columns: 28px 176px minmax(0, 1fr) 72px 132px;
-  gap: 18px;
-  align-items: center;
+/* 테마 목록의 흐름 카드는 **타일**(.hz-panelgrid-3)이다. 표로 다섯 판을 다듬었다 — ① 순위 숫자 띠 + 라벨 칸
+   ② 색 띠 + 글 ③ 종목 이름 + 스파크라인 + 잘린 문장 ④ 문장을 아랫층에 ⑤ 문장을 가운데 칸에 — 전부 "복잡하다"
+   아니면 "빈 공간"이었다(2026-09-19). 카더라 급등 종목이 같은 이유로 표에서 타일로 갔었다(hz-why-tile 주석).
+   타일은 .hz-panel-pad 를 그대로 쓰고 여백만 급등 종목 타일과 같게 맞춘다. */
+.hz-tx .hz-theme-tile {
+  padding: 15px 18px 14px;
+  gap: 10px;
+  list-style: none;
 }
-.hz-trow.hz-cols-theme-list {
-  padding-top: 13px;
-  padding-bottom: 13px;
-}
-/* '요즘 무슨 얘기' 첫 문장. 넓은 화면은 한 줄, 좁으면 세 줄까지(두 줄로 자르면 1000px 에서 문장 끝이 잘렸다).
-   곁말 색(--c-sub)이 아니라 --c-ink-soft: 이 칸이 표의 본론이다. */
-.hz-theme-row-brief {
-  min-width: 0;
-  font-size: var(--fs-13);
-  line-height: 1.55;
-  color: var(--c-ink-soft);
-  word-break: keep-all;
-  text-wrap: pretty;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-/* <li> 로 싸인 목록(ExpandableList)이라 마지막 줄 밑선 규칙은 .hz-trow 쪽 li:last-child 가 맡는다. */
 /* ── 테마 점유율 지도(트리맵, app/theme/Treemap.tsx) ──────────────────────
    칸은 퍼센트 좌표의 절대 배치. 상자의 종횡비는 서버가 배치를 계산한 값(2:1)과 같아야 칸이
    정사각형에 가깝다. 폰에서는 세로로 세운다(layout.css ≤560) — 상대 위치는 그대로라 안 겹친다.

@@ -13,7 +13,7 @@ import { THEME_PUBLIC } from "../screen-flags";
 import { ExpandableList } from "../kadera/ExpandableList";
 import { DeltaPp, Highlight, Pill, RankBadge } from "../kadera/parts";
 import { SectionHead } from "../kadera/SectionHead";
-import { C, MONO } from "../ui";
+import { AiMark, C, MONO } from "../ui";
 import { THEME_PAGE } from "./copy";
 import { Treemap, TreemapLegend, themeTiles } from "./Treemap";
 
@@ -70,8 +70,8 @@ function Flow({ t }: { t: ThemeOverview }) {
   );
 }
 
-/** 처음 보이는 줄 수. 상위 열 줄이면 '지금 화제인 테마'가 다 들어오고, 나머지 열여섯은 펼쳐서 본다. */
-const FLOW_ROWS_SHOWN = 10;
+/** 처음 보이는 타일 수. 3열 격자라 3의 배수 — 네 줄이면 '지금 화제인 테마'가 다 들어오고, 나머지는 펼쳐서 본다. */
+const FLOW_TILES_SHOWN = 12;
 
 export default async function ThemeIndexPage() {
   if (!PUBLIC && DEPLOYED) notFound();
@@ -173,53 +173,50 @@ export default async function ThemeIndexPage() {
                 }
               />
             </div>
-            <div className="hz-thead hz-cols-theme-list">
-              <span>#</span>
-              <span>테마</span>
-              <span>요즘 무슨 얘기</span>
-              <span style={{ textAlign: "right" }}>점유율</span>
-              <span>최근 {flowDates.length || THEME_FLOW_DAYS}일</span>
-            </div>
-            {/* 다섯 칸 한 줄: 순위 · 이름과 변화 · **문장(남는 폭 전부)** · 점유율 · 열흘 한 조각. 문장을 이름 아래
-                둘째 층에 뒀더니 넓은 화면에서 윗층의 이름과 점유율 사이가 통째로 비었다(2026-09-19 "공간 낭비").
-                문장이 그 자리를 차지하면 넓은 화면은 한 줄, 보통 화면은 두 줄로 접힌다. 폰은 층으로(layout.css).
-                말 많은 종목·점유율 막대·스파크라인은 걷었다 — 종목은 문장이 이름을 부르고, 점유율은 위 지도가
-                넓이로, 열흘은 글 한 조각이 말한다. 열 줄만 먼저 보이고 나머지는 '더 보기'로 펼친다. */}
+            {/* 표가 아니라 **타일**이다 — 카더라 '급등 종목'과 같은 3열 패널 격자. 표는 다섯 번을 다듬어도
+                "복잡하다 · 빈 공간"이었다(2026-09-19). 타일이면 테마 하나가 한 덩어리로 읽히고, 문장이 반 폭을
+                채워 빈 자리가 없고, 넓은 화면도 열 수로 받는다(3 → 2 → 1 열은 kadera.css 가 정한다).
+                타일 안은 두 층뿐이다: 머리줄(순위 · 이름 · 변화 / 점유율 · 열흘 한 조각)과 문장 상자. */}
             <ExpandableList
               name="theme_flow"
-              initial={FLOW_ROWS_SHOWN}
-              step={themes.length - FLOW_ROWS_SHOWN}
-              listStyle={{ display: "block" }}
+              initial={FLOW_TILES_SHOWN}
+              step={themes.length - FLOW_TILES_SHOWN}
+              listClassName="hz-panelgrid hz-panelgrid-3"
               footerClassName="hz-sheet-foot-row"
               items={themes.map((t) => (
-                <li key={t.theme}>
-                  <Link href={themeHref(t.theme)} className="hz-trow hz-cols-theme-list" style={{ textDecoration: "none" }}>
+                <li key={t.theme} className="hz-panel-pad hz-theme-tile">
+                  {/* 머리줄. 급등 종목 타일과 글자까지 같은 꼴 — 순위 배지 · 이름 · 변화, 오른쪽에 값 묶음. */}
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
                     <RankBadge n={t.rank} />
-                    <span style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
-                      <span style={{ ...clip, minWidth: 0, fontSize: "var(--fs-14)", fontWeight: 700, color: C.ink }}>{t.theme}</span>
-                      <DeltaPp value={t.shareDelta} style={{ fontSize: "var(--fs-11)", flexShrink: 0 }} />
+                    <Link href={themeHref(t.theme)} className="hz-stock-link" style={{ ...clip, minWidth: 0, fontSize: "var(--fs-14)", fontWeight: 800, letterSpacing: "-.01em" }}>
+                      <strong style={{ fontWeight: "inherit" }}>{t.theme}</strong>
+                    </Link>
+                    <DeltaPp value={t.shareDelta} style={{ fontSize: "var(--fs-11)", flexShrink: 0 }} />
+                    <span style={{ flex: 1 }} />
+                    <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
+                      <span style={{ fontFamily: MONO, fontSize: "var(--fs-15)", fontWeight: 800, letterSpacing: "-.02em", color: C.ink, whiteSpace: "nowrap" }}>
+                        {t.sharePct.toFixed(1)}%
+                      </span>
+                      <Flow t={t} />
                     </span>
-                    {/* 요약이 없으면 그 사정을 적는다(빈 칸을 두면 줄 높이가 흔들린다). */}
-                    <span className="hz-theme-row-brief">
+                  </div>
+                  {/* 문장 상자. 급등 종목·주요 종목 리포트의 AI 상자와 같은 꼴(트레이 위 카드색 상자, ✨ 고지).
+                      marginTop:auto — 머리줄이 두 줄이 된 타일에서도 문장 줄이 옆 타일과 나란히 선다. */}
+                  <div style={{ marginTop: "auto", display: "flex", gap: 9, background: C.card, borderRadius: 12, padding: "12px 13px" }}>
+                    {t.briefLine && <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />}
+                    <p style={{ margin: 0, fontSize: "var(--fs-13)", lineHeight: 1.7, color: t.briefLine ? "var(--c-ink-soft)" : C.sub2, wordBreak: "keep-all", textWrap: "pretty" }}>
                       {t.briefLine ??
                         (t.topStocks.length
                           ? `최근 ${KADERA_WINDOW_DAYS}일 ${t.topStocks.map((s) => `${s.name} ${s.mentions}회`).join(" · ")}가 언급되었습니다.`
                           : `최근 ${KADERA_WINDOW_DAYS}일 사이 이 테마 종목이 채널에서 언급되지 않았습니다.`)}
-                    </span>
-                    <span style={{ fontFamily: MONO, fontSize: "var(--fs-14)", fontWeight: 800, color: C.ink, textAlign: "right", whiteSpace: "nowrap" }}>
-                      {t.sharePct.toFixed(1)}%
-                    </span>
-                    <Flow t={t} />
-                  </Link>
+                    </p>
+                  </div>
                 </li>
               ))}
             />
           </>
         )}
       </section>
-      <p style={{ margin: 0, fontSize: "var(--fs-11)", color: C.muted, textAlign: "right" }}>
-        테마는 손으로 고른 대표 종목 묶음입니다. 언급은 주식 텔레그램 채널에서 셉니다.
-      </p>
     </div>
   );
 }
