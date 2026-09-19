@@ -108,7 +108,12 @@ export type ThemeExcerpt = {
 
 export type ThemeBrief = {
   date: string;
-  brief: string;
+  /**
+   * LLM 두세 문장. null 이면 둘 중 하나다 — messageCount 가 0 이면 그 기간에 글이 없었던 것이고,
+   * 0 이 아니면 만든 문장이 전부 검사(깨진 글자·매수·매도 표현)에 걸려 싣지 않은 것이다.
+   */
+  brief: string | null;
+  messageCount: number;
   related: ThemeRelated[];
   /** 파이프라인이 고른 발췌. 채널 제목·사진은 렌더 때 붙인다. */
   excerpts: ThemeExcerpt[];
@@ -185,7 +190,7 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
   type StockDailyRow = { date: string; stock_code: string; mention_count: number | null; channel_count: number | null; weighted_score: number | string | null };
   type ReasonRow = { date: string; stock_code: string; reason: string | null; change_rate: number | string | null; channel_count: number | null };
   type BriefExcerptRow = { channel_handle: string; message_id: number; posted_at: string; views?: number | null; forwards?: number | null; text: string; stocks?: string[] | null };
-  type BriefRow = { date: string; brief: string; related: ThemeRelated[] | null; excerpts: BriefExcerptRow[] | null };
+  type BriefRow = { date: string; brief: string | null; related: ThemeRelated[] | null; excerpts: BriefExcerptRow[] | null; message_count: number | null };
 
   const [themeDaily, stockDaily, reasonRows, events, rotation, briefRow, meta] = await Promise.all([
     db.from("telegram_theme_daily").select("date,share_pct,rank,mention_count").eq("theme", theme).gte("date", first).lte("date", last).order("date"),
@@ -209,7 +214,7 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
     // 기준일분이 아직 없으면 하루까지 거슬러 가장 최근 것을 쓴다(LLM_TEXT_CARRY_DAYS).
     db
       .from("telegram_theme_brief")
-      .select("date,brief,related,excerpts")
+      .select("date,brief,related,excerpts,message_count")
       .eq("theme", theme)
       .gte("date", addDaysISO(baseDate, -LLM_TEXT_CARRY_DAYS))
       .lte("date", baseDate)
@@ -322,10 +327,11 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
       text: r.text.trim(),
       stocks: Array.isArray(r.stocks) ? r.stocks : [],
     }));
-  const brief: ThemeBrief | null = b?.brief
+  const brief: ThemeBrief | null = b
     ? {
         date: b.date,
-        brief: b.brief,
+        brief: b.brief?.trim() ? b.brief : null,
+        messageCount: b.message_count ?? 0,
         related: Array.isArray(b.related) ? b.related.filter((x) => x && typeof x.theme === "string" && x.theme in THEMES) : [],
         excerpts,
       }

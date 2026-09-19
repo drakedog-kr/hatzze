@@ -326,7 +326,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
       {/* ── 요즘 무슨 얘기(LLM) ── 이 화면의 본론. 파이프라인이 테마마다 하루 한 번 써 둔다(generate_theme_briefs.py). */}
       <section className="hz-sheet">
         <SectionHead icon="forum" title="요즘 무슨 얘기" note={d.brief ? `${fmtKoDate(d.brief.date)} 기준` : undefined} desc="최근 사흘 채널 글을 읽고 정리한 것입니다. 확인된 사실이 아니라 오간 이야기입니다." level={2} />
-        {d.brief ? (
+        {d.brief?.brief ? (
           <div style={{ padding: "16px 22px 20px" }}>
             <div style={{ display: "flex", gap: 9, background: C.soft, borderRadius: R.control, padding: "12px 13px" }}>
               <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
@@ -334,7 +334,14 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
             </div>
           </div>
         ) : (
-          <Empty>이 테마의 요약이 아직 없습니다. 매일 저녁 실행 뒤에 채워집니다.</Empty>
+          /* 세 경우를 갈라 적는다 — 아직 안 만들었다 · 글이 없었다 · 만들었지만 검사에 걸려 안 실었다. */
+          <Empty>
+            {!d.brief
+              ? "이 테마의 요약이 아직 없습니다. 매일 저녁 실행 뒤에 채워집니다."
+              : d.brief.messageCount === 0
+                ? "최근 사흘 사이 이 테마 종목이 언급된 글이 없어 요약할 것이 없습니다."
+                : "이번 요약은 검사에 걸려 싣지 않았습니다. 다음 실행에서 다시 만듭니다."}
+          </Empty>
         )}
       </section>
 
