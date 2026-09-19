@@ -35,7 +35,7 @@ import { SectionHead } from "./SectionHead";
 import { SectionIntro } from "../SectionIntro";
 import { TrendingTabs } from "./TrendingTabs";
 import TimeAgo from "./TimeAgo";
-import { timeAgo } from "./time-ago";
+import { timeAgoInitial } from "./time-ago";
 
 // 미리보기 이미지는 옆의 opengraph-image.tsx 가 그린다(ownImage). 자세한 건 app/seo.ts 주석 참고.
 export async function generateMetadata(): Promise<Metadata> {
@@ -47,8 +47,16 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
-// 캐시 주기는 루트 레이아웃의 `revalidate` 가 정한다(app/layout.tsx). 예전엔 여기가
-// force-dynamic 이라 방문마다 서버가 새로 그렸다.
+/**
+ * 화면 사본(ISR)의 수명. 루트 레이아웃 기본값(1시간)보다 짧게 두는 건 종목 카드의 시세
+ * 때문이다 — 야후 시세는 10분 캐시라 장중엔 페이지가 스스로 낡는다. 30분이면 장중 시세가
+ * 최대 30분 묵고, 다시 그리는 값(원천 전송·CPU·ISR 쓰기)은 5분 때의 6분의 1 이다(2026-09-19
+ * 셈: 1시간 $0.15 · 30분 $0.21 · 10분 $0.35 / 하루, 전 화면 합). 파이프라인이 끝나면
+ * /api/revalidate 가 바로 비우므로 자료 쪽 지연은 이 숫자와 무관하다.
+ * 예전엔 여기가 force-dynamic 이라 방문마다 서버가 새로 그렸다.
+ * ⚠️ 리터럴이어야 한다. 국장·미장이 같은 값이다.
+ */
+export const revalidate = 1800;
 
 function compact(n: number): string {
   if (n >= 10000) return `${Math.round(n / 1000)}K`;
@@ -163,7 +171,7 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
               <span style={{ ...clip, fontSize: "var(--fs-12-5)", fontWeight: 800, letterSpacing: "-.01em", color: "var(--c-cold-ink)", maxWidth: 220, minWidth: 0 }}>
                 {m.channelTitle}
               </span>
-              <span style={{ fontSize: "var(--fs-11)", fontFamily: MONO, color: C.sub2, flexShrink: 0 }}><TimeAgo iso={m.postedAt} initial={timeAgo(m.postedAt)} /></span>
+              <span style={{ fontSize: "var(--fs-11)", fontFamily: MONO, color: C.sub2, flexShrink: 0 }}><TimeAgo iso={m.postedAt} initial={timeAgoInitial(m.postedAt)} /></span>
               <span style={{ flex: 1 }} />
               <span style={{ fontSize: "var(--fs-11)", fontFamily: MONO, fontWeight: 800, color: C.sub, flexShrink: 0 }}>#{i + 1}</span>
             </div>

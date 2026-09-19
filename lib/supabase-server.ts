@@ -12,7 +12,7 @@ import { clearLoadFailure, noteLoadFailure } from "@/lib/load-state";
  * 이 캐시를 붙일 때(2026-09-17)는 화면이 전부 force-dynamic 이고 HTML 이 no-store 라,
  * **방문 한 번이 곧 Supabase 조회 한 벌**이었다. /kadera 한 번에 `.from()` 이 최대 35번, TTFB 는 /kadera 1.65초 · /dividend
  * 1.47초 · /insider 1.35초(2026-09-17 프로덕션 실측). 그런데 자료는 파이프라인이 하루 두 번
- * 바꿀 뿐이다. 같은 조회를 5분 안에 다시 하면 결과가 같은데 매번 DB 를 친 셈이다.
+ * 바꿀 뿐이다. 같은 조회를 한 시간 안에 다시 하면 결과가 같은데 매번 DB 를 친 셈이다.
  *
  * ## 어디서 캐시하나 — 함수가 아니라 **fetch**
  *
@@ -27,16 +27,28 @@ import { clearLoadFailure, noteLoadFailure } from "@/lib/load-state";
  *
  * ## 무엇이 달라지나
  *
- * 파이프라인이 끝난 뒤 최대 5분까지 옛 값이 보일 수 있다. 화면의 '최종 업데이트' 시각은
- * 자료에서 나오므로 보이는 값과 어긋나지 않는다. 데일리 노트를 손으로 올린 직후에도 같은
- * 5분이 걸린다. 캐시 기한이 지나면 **먼저 옛 값을 주고 뒤에서 새로 받는다**(Next 데이터
- * 캐시의 stale-while-revalidate) — 기한이 지난 첫 방문자가 느려지지 않는다.
+ * 이 캐시만 보면 파이프라인이 끝난 뒤 최대 한 시간까지 옛 값이 보일 수 있다. 실제로는 화면
+ * 사본(ISR · app/layout.tsx revalidate)이 그 위에 있고, 파이프라인이 /api/revalidate 로
+ * 둘을 함께 비우므로 자료 쪽 지연은 그 호출에 달렸다. 화면의 '최종 업데이트' 시각은
+ * 자료에서 나오므로 보이는 값과 어긋나지 않는다. 캐시 기한이 지나면 **먼저 옛 값을 주고
+ * 뒤에서 새로 받는다**(Next 데이터 캐시의 stale-while-revalidate) — 기한이 지난 첫 방문자가
+ * 느려지지 않는다.
  *
  * ⚠️ GET·HEAD 만 붙인다. RPC(POST)는 그대로 매번 부른다. 2MB 를 넘는 응답은 Next 가
  *    담지 않는다(PostgREST 한 쪽은 1,000행이라 거기 닿는 조회는 없다).
  * ⚠️ 이 상수를 0 으로 두면 캐시가 통째로 꺼진다 — 파이프라인 직후 확인이 급할 때의 탈출구.
+ *
+ * ## 이 값이 화면 사본(ISR)의 주기도 정한다
+ *
+ * Next 는 프리렌더되는 라우트 안의 fetch 들 중 **가장 짧은 revalidate 를 그 라우트의 ISR
+ * 주기로 쓴다**(docs/incremental-static-regeneration.md). 300 이던 때는 루트 레이아웃이 뭐라
+ * 적혀 있든 모든 화면이 5분마다 다시 그려졌다(빌드 매니페스트로 확인, 2026-09-19). 그래서
+ * 레이아웃의 1시간과 같은 3600 이다 — 더 짧게 두려면 그 화면이 5분마다 다시 그려져도 되는지
+ * 먼저 볼 것(app/layout.tsx 의 셈). 자료는 파이프라인이 끝날 때 /api/revalidate 가 비우므로
+ * 이 기한은 그 호출이 안 왔을 때의 상한이고, 동적 화면(/mdd · 종목 상세)과 API 도 그 호출로
+ * 같이 비워진다(revalidatePath("/", "layout") 은 그 아래 fetch 데이터 캐시까지 비운다).
  */
-export const READ_CACHE_SECONDS = 300;
+export const READ_CACHE_SECONDS = 3600;
 
 /** Next 의 fetch 확장(next.revalidate)까지 받는 init 타입(lib/yahoo-quote.ts 와 같은 꼴). */
 type FetchInit = RequestInit & { next?: { revalidate?: number } };

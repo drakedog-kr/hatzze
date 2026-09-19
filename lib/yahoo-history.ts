@@ -117,8 +117,11 @@ export async function fetchDailyHistory(
     const res = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0" },
       // 일봉은 하루 한 번 바뀐다. 라우트가 CDN s-maxage 로도 감싸지만, 데이터
-      // 캐시로도 15분 재검증을 걸어 같은 심볼 반복 조회의 야후 왕복을 줄인다.
-      next: { revalidate: 900 },
+      // 캐시로도 30분 재검증을 걸어 같은 심볼 반복 조회의 야후 왕복을 줄인다.
+      // ⚠️ 900 이면 안 된다 — 카더라 '왜 올랐나'가 이 함수를 쓰는데, 라우트 안의 가장 짧은
+      //    fetch revalidate 가 그 라우트의 ISR 주기가 돼서 /kadera 사본이 15분마다 다시
+      //    그려진다(빌드 매니페스트로 확인, 2026-09-19). app/kadera/page.tsx 의 1800 과 맞춘다.
+      next: { revalidate: 1800 },
     });
     if (!res.ok) return null;
 
