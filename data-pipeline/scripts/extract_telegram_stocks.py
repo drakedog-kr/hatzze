@@ -315,8 +315,15 @@ def publisher_context(text: str, start: int, end: int) -> bool:
     return bool(nxt_word and HANGUL_OR_ALNUM.match(nxt_word.group(1)))
 
 
-def extract(text: str, pattern, match_to_code, method, ambiguous, caseless) -> dict[str, tuple[str, str]]:
-    """text에서 {code: (match_text, method)} (메시지 내 중복 제거)."""
+def extract(
+    text: str, pattern, match_to_code, method, ambiguous, caseless, positions: dict | None = None
+) -> dict[str, tuple[str, str]]:
+    """text에서 {code: (match_text, method)} (메시지 내 중복 제거).
+
+    positions 를 주면 종목마다 **인정된 첫 자리**(start, end)를 거기 적는다. 마스킹이 길이를
+    지키므로 원문 좌표 그대로다. 점검 스크립트(scan_phantom_week)가 문맥을 보일 때 쓴다 —
+    본문에서 이름을 다시 찾으면 거부된 자리(GS건설의 GS)를 인정된 자리로 잘못 보인다.
+    """
     # URL 안의 문자열은 본문 언급이 아니다. 길이를 유지해 경계 판정을 흐트러뜨리지 않는다.
     text = URL_RE.sub(lambda m: MASK_CHAR * len(m.group(0)), text)
     # 뉴스 봇의 종목 태그 줄(NEWSBOT_TAG_RE 주석)과 종목을 뜻한 적 없는 구절
@@ -376,6 +383,8 @@ def extract(text: str, pattern, match_to_code, method, ambiguous, caseless) -> d
         code = match_to_code[key]
         if code not in found:
             found[code] = (matched, method[key])
+            if positions is not None:
+                positions[code] = (m.start(), m.end())
     return found
 
 
