@@ -331,16 +331,30 @@
 .hz-cols-theme-event {
   grid-template-columns: 150px minmax(0, 1fr) auto;
 }
-/* 테마 목록(/theme)의 흐름 표: # · 테마(+대표 종목) · 점유율(숫자+막대) · 열흘 흐름 띠 · 라벨.
-   흐름 띠(200)와 점유율(96)을 고정하고 이름이 남는 폭을 다 갖는다. */
+/* 테마 목록(/theme)의 흐름 표: # · 테마(+대표 종목) · 점유율(숫자+막대) · 열흘 흐름(띠+한 줄 글).
+   열은 넷뿐이다. 처음엔 다섯(라벨 칸이 따로)이었고 줄 높이 8px 에 띠마다 순위 숫자까지 있어
+   "복잡하고 안 깔끔하고 좁다"는 지적을 받았다(2026-09-19). 띠에서 숫자를 빼고 라벨을 띠 아래로
+   붙여 열을 줄이고, 줄에 숨을 준다. */
 .hz-cols-theme-list {
-  grid-template-columns: 24px minmax(0, 1fr) 96px 200px 92px;
-  gap: 14px;
+  grid-template-columns: 28px minmax(0, 1fr) 88px 168px;
+  gap: 18px;
 }
-/* 줄이 26개라 기본(9px)보다 살짝 낮춰 한 화면에 더 들어오게. 이름·종목 두 줄이 있어 더 낮추면 답답하다. */
 .hz-trow.hz-cols-theme-list {
-  padding-top: 8px;
-  padding-bottom: 8px;
+  padding-top: 13px;
+  padding-bottom: 13px;
+}
+/* <li> 로 싸인 목록(ExpandableList)이라 마지막 줄 밑선 규칙은 .hz-trow 쪽 li:last-child 가 맡는다. */
+.hz-flow-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+.hz-flow-cap {
+  font-size: var(--fs-11);
+  font-weight: 700;
+  white-space: nowrap;
 }
 /* 점유율 칸 — 숫자 아래 얇은 막대. 막대는 **1위 대비**다(반도체 39% 가 한 칸을 다 채우고 나머지가
    그 비율로 선다). 절대 점유율로 그리면 2위부터 전부 10% 아래라 막대가 구별이 안 된다. 절대값은 숫자가 말한다. */
@@ -506,48 +520,34 @@
 .hz-tm-sw.is-down-2 { background: color-mix(in srgb, var(--c-blue-2) 55%, var(--c-card)); }
 .hz-tm-sw.is-down-3 { background: color-mix(in srgb, var(--c-blue-2) 88%, var(--c-card)); }
 
-/* 열흘 흐름 띠 — 칸 하나가 하루, 안의 숫자가 그날 순위. 세 단이다:
-     상위(5위 안)   파란 바탕에 흰 숫자     "그날 화제였다"
-     중간(6~10위)   파란 틴트에 파란 잉크    "가까웠다"
-     그 밖          트랙 위 흐린 숫자        "상위 밖"
-   집계가 없던 날(주말)은 점선 빈 칸. 맨 오른쪽(가장 최근)은 테두리로 짚어 "오늘"이 어디인지 보인다.
-   예전 12×18 칸의 9px 숫자는 읽기보다 세기에 가까웠다 — 칸을 키우고(18×22) 숫자를 10px 로. */
+/* 열흘 흐름 띠 — 칸 하나가 하루, **숫자 없이 색만**. 세 단이다:
+     상위(5위 안)   파랑          "그날 화제였다"
+     중간(6~10위)   옅은 파랑     "가까웠다"
+     그 밖          트랙          "상위 밖"
+   집계가 없던 날(주말)은 빈 칸. 순위 숫자는 title 툴팁에만 있다. 칸에 숫자를 적었던 판은
+   26줄 × 10칸 = 숫자 260개가 표를 어지럽혀 걷었다. 가장 최근 날의 테두리도 같이 걷었다 —
+   열 머리가 "오른쪽이 최근"이라고 말하면 충분하다. */
 .hz-flow {
   display: inline-flex;
-  gap: 2px;
+  gap: 3px;
 }
 .hz-flow > span {
-  width: 18px;
-  height: 22px;
+  width: 14px;
+  height: 14px;
   border-radius: 4px;
   background: var(--c-track);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--fs-10);
-  font-weight: 700;
-  color: var(--c-sub2);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
+  display: inline-block;
 }
+/* 중간 단은 틴트(--c-blue-tint)로는 트랙과 구별이 안 됐다 — 파랑을 35% 섞어 세 단이 한눈에 갈리게. */
 .hz-flow > .is-mid {
-  background: var(--c-blue-tint);
-  color: var(--c-cold-ink);
+  background: color-mix(in srgb, var(--c-blue) 35%, var(--c-card));
 }
 .hz-flow > .is-top {
   background: var(--c-blue);
-  color: #fff;
-  font-weight: 800;
 }
 .hz-flow > .is-none {
   background: transparent;
   box-shadow: inset 0 0 0 1px var(--c-hairline);
-}
-/* 가장 최근 날. 안쪽 테두리로 짚는다 — 파란 칸이면 흰 테두리가, 트랙 칸이면 잉크 테두리가 보이도록 두 겹. */
-.hz-flow > .is-last {
-  box-shadow:
-    inset 0 0 0 2px var(--c-card),
-    inset 0 0 0 3px var(--c-ink);
 }
 
 /* ── 카더라 '다가오는 일정': 달력(1/3) + 그날 일정(2/3) ─────────────────────

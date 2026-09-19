@@ -10,7 +10,8 @@ import { THEME_FLOW_DAYS, THEME_FLOW_TOP, listThemeOverview, themeHref, type The
 import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { THEME_PUBLIC } from "../screen-flags";
-import { DeltaPp, Highlight, Pill, RankBadge } from "../kadera/parts";
+import { ExpandableList } from "../kadera/ExpandableList";
+import { DeltaPp, Highlight, RankBadge } from "../kadera/parts";
 import { SectionHead } from "../kadera/SectionHead";
 import { C, MONO } from "../ui";
 import { THEME_PAGE } from "./copy";
@@ -45,38 +46,40 @@ export async function generateMetadata(): Promise<Metadata> {
 
 const clip: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
 
-/** 흐름 라벨. 판정 규칙은 lib/theme-page.ts listThemeOverview 에 있다. */
-function FlowLabel({ t }: { t: ThemeOverview }) {
+/** 흐름 한 줄 글. 판정 규칙은 lib/theme-page.ts listThemeOverview 에 있다. */
+function flowCaption(t: ThemeOverview): { text: string; on: boolean } {
   // 연속 하루째인데 열흘 안에 상위였던 날이 더 있으면 "돌아온" 것이다 — "1일째 상위"는 어색하다.
-  if (t.label === "streak") return <Pill tone="hot">{t.streak === 1 ? "다시 상위" : `${t.streak}일째 상위`}</Pill>;
-  if (t.label === "new") return <Pill tone="blue">{t.streak === 1 ? "첫 등장" : "이틀째"}</Pill>;
-  if (t.label === "intermittent") return <Pill tone="plain">열흘 중 {t.topDays}일</Pill>;
-  return <span style={{ fontSize: "var(--fs-11)", color: C.sub2 }}>상위 밖</span>;
+  if (t.label === "streak") return { text: t.streak === 1 ? "다시 상위" : `${t.streak}일째 상위`, on: true };
+  if (t.label === "new") return { text: t.streak === 1 ? "첫 등장" : "이틀째 상위", on: true };
+  if (t.label === "intermittent") return { text: `열흘 중 ${t.topDays}일 상위`, on: false };
+  return { text: "상위 밖", on: false };
 }
 
 /**
- * 열흘 흐름 띠. 칸 하나가 하루, 안의 숫자가 그날 순위. 세 단(상위 5위 안 · 6~10위 · 그 밖)과 빈 칸(집계 없음),
- * 맨 오른쪽 칸은 가장 최근 날이라 테두리로 짚는다. 색 뜻은 kadera.css 의 .hz-flow 주석.
+ * 열흘 흐름 띠 — 칸 하나가 하루. **숫자는 없다.** 5위 안이면 파란 칸, 6~10위면 옅은 파랑, 그 밖은 흐린 칸,
+ * 집계 없는 날은 빈 칸. 순위 숫자는 툴팁(title)에만 둔다. 처음엔 칸마다 순위를 적었는데 26줄 × 10칸의
+ * 숫자 260개가 표를 통째로 어지럽혔다(2026-09-19 지적). 띠 아래 한 줄 글(flowCaption)이 무슨 뜻인지 말한다.
  */
 function Flow({ t }: { t: ThemeOverview }) {
-  const last = t.flow.length - 1;
+  const cap = flowCaption(t);
   return (
-    <span className="hz-flow" aria-label={`최근 ${t.flow.length}일 순위 ${t.flow.map((r) => (r == null ? "없음" : `${r}위`)).join(", ")}`}>
-      {t.flow.map((r, i) => {
-        const tone = r == null ? "is-none" : r <= THEME_FLOW_TOP ? "is-top" : r <= THEME_FLOW_TOP * 2 ? "is-mid" : "";
-        return (
+    <span className="hz-flow-col">
+      <span className="hz-flow" aria-label={`최근 ${t.flow.length}일 순위 ${t.flow.map((r) => (r == null ? "없음" : `${r}위`)).join(", ")}`}>
+        {t.flow.map((r, i) => (
           <span
             key={t.flowDates[i]}
-            className={`${tone}${i === last ? " is-last" : ""}`.trim() || undefined}
-            title={`${fmtKoDate(t.flowDates[i])}${r == null ? " · 집계 없음" : ` · ${r}위`}${i === last ? " (가장 최근)" : ""}`}
-          >
-            {r == null ? "" : r}
-          </span>
-        );
-      })}
+            className={r == null ? "is-none" : r <= THEME_FLOW_TOP ? "is-top" : r <= THEME_FLOW_TOP * 2 ? "is-mid" : undefined}
+            title={`${fmtKoDate(t.flowDates[i])}${r == null ? " · 집계 없음" : ` · ${r}위`}`}
+          />
+        ))}
+      </span>
+      <span className="hz-flow-cap" style={{ color: cap.on ? "var(--c-cold-ink)" : C.sub2 }}>{cap.text}</span>
     </span>
   );
 }
+
+/** 처음 보이는 줄 수. 상위 열 줄이면 '지금 화제인 테마'가 다 들어오고, 나머지 열여섯은 펼쳐서 본다. */
+const FLOW_ROWS_SHOWN = 10;
 
 export default async function ThemeIndexPage() {
   if (!PUBLIC && DEPLOYED) notFound();
@@ -184,40 +187,43 @@ export default async function ThemeIndexPage() {
               <span>#</span>
               <span>테마 · 최근 {KADERA_WINDOW_DAYS}일 말 많은 종목</span>
               <span style={{ textAlign: "right" }}>점유율</span>
-              <span>날마다의 순위 · 오른쪽이 최근</span>
-              <span>흐름</span>
+              <span>최근 {flowDates.length || THEME_FLOW_DAYS}일 · 오른쪽이 최근</span>
             </div>
-            <div>
-              {themes.map((t) => (
-                <Link key={t.theme} href={themeHref(t.theme)} className="hz-trow hz-cols-theme-list" style={{ textDecoration: "none" }}>
-                  <RankBadge n={t.rank} />
-                  <span style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-                    <span style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
-                      <span style={{ ...clip, minWidth: 0, fontSize: "var(--fs-13-5)", fontWeight: 700, color: C.ink }}>{t.theme}</span>
-                      <DeltaPp value={t.shareDelta} style={{ fontSize: "var(--fs-11)" }} />
+            {/* 줄은 넷뿐이다 — 순위 · 테마 · 점유율 · 흐름. 라벨은 흐름 띠 아래 한 줄 글로 붙어 열이 하나 줄었다.
+                열 줄만 먼저 보이고 나머지는 '더 보기'로 펼친다(26줄을 한 번에 세우면 벽이 된다). */}
+            <ExpandableList
+              name="theme_flow"
+              initial={FLOW_ROWS_SHOWN}
+              step={themes.length - FLOW_ROWS_SHOWN}
+              listStyle={{ display: "block" }}
+              footerClassName="hz-sheet-foot-row"
+              items={themes.map((t) => (
+                <li key={t.theme}>
+                  <Link href={themeHref(t.theme)} className="hz-trow hz-cols-theme-list" style={{ textDecoration: "none" }}>
+                    <RankBadge n={t.rank} />
+                    <span style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+                      <span style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+                        <span style={{ ...clip, minWidth: 0, fontSize: "var(--fs-14)", fontWeight: 700, color: C.ink }}>{t.theme}</span>
+                        <DeltaPp value={t.shareDelta} style={{ fontSize: "var(--fs-11)" }} />
+                      </span>
+                      <span style={{ ...clip, fontSize: "var(--fs-12)", color: C.sub }}>
+                        {t.topStocks.length
+                          ? t.topStocks.map((s) => `${s.name} ${s.mentions}회`).join(" · ")
+                          : `최근 ${KADERA_WINDOW_DAYS}일 언급된 종목이 없습니다`}
+                      </span>
                     </span>
-                    <span style={{ ...clip, fontSize: "var(--fs-11-5)", color: C.sub }}>
-                      {t.topStocks.length
-                        ? t.topStocks.map((s) => `${s.name} ${s.mentions}회`).join(" · ")
-                        : `최근 ${KADERA_WINDOW_DAYS}일 언급된 종목이 없습니다`}
+                    <span className="hz-flow-share">
+                      <span style={{ fontFamily: MONO, fontSize: "var(--fs-14)", fontWeight: 800, color: C.ink }}>{t.sharePct.toFixed(1)}%</span>
+                      {/* 막대 채움만 인라인 — 폭은 값이다. 색·트랙은 .hz-bar(kadera.css). */}
+                      <span className="hz-bar">
+                        <span style={{ width: `${Math.max(2, (t.sharePct / maxShare) * 100)}%` }} />
+                      </span>
                     </span>
-                  </span>
-                  <span className="hz-flow-share">
-                    <span style={{ fontFamily: MONO, fontSize: "var(--fs-13)", fontWeight: 800, color: C.ink }}>{t.sharePct.toFixed(1)}%</span>
-                    {/* 막대 채움만 인라인 — 폭은 값이다. 색·트랙은 .hz-bar(kadera.css). */}
-                    <span className="hz-bar">
-                      <span style={{ width: `${Math.max(2, (t.sharePct / maxShare) * 100)}%` }} />
-                    </span>
-                  </span>
-                  <span>
                     <Flow t={t} />
-                  </span>
-                  <span>
-                    <FlowLabel t={t} />
-                  </span>
-                </Link>
+                  </Link>
+                </li>
               ))}
-            </div>
+            />
           </>
         )}
       </section>

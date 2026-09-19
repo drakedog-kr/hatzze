@@ -525,21 +525,20 @@
   .hz-cols-theme-event > :nth-child(2) {
     grid-column: 1 / -1;
   }
-  /* 폰: 라벨 칸을 접고 흐름 띠는 **둘째 줄**로 내린다 — 이 표의 이름이 '흐름'이라 띠가 정체인데, 한 줄에
-     같이 두면 이름이 "전력기…"로 잘리고 띠는 11px 칸이 되어 최근 날 테두리가 숫자를 가렸다(2026-09-19 실측).
-     둘째 줄이면 이름은 한 줄을 다 갖고 띠는 데스크톱과 같은 칸 크기를 유지한다. 라벨(다시 상위·n일째)은
-     띠가 그림으로 말한다. */
+  /* 폰: 흐름(띠+한 줄 글)을 **둘째 줄**로 내린다 — 한 줄에 같이 두면 이름이 "전력기…"로 잘린다.
+     둘째 줄이면 이름은 한 줄을 다 갖고 띠는 데스크톱과 같은 칸 크기다. 띠와 글은 가로로 나란히. */
   .hz-cols-theme-list {
-    grid-template-columns: 20px minmax(0, 1fr) 48px;
-    gap: 6px 8px;
-    padding-left: 16px;
-    padding-right: 16px;
+    grid-template-columns: 24px minmax(0, 1fr) 52px;
+    gap: 8px 10px;
+    padding: 12px 16px;
   }
   .hz-cols-theme-list > :nth-child(4) {
     grid-column: 2 / -1;
   }
-  .hz-cols-theme-list > :nth-child(5) {
-    display: none;
+  .hz-flow-col {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
   }
   .hz-flow-share .hz-bar {
     display: none;
