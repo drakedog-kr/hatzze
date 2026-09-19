@@ -14,7 +14,7 @@ import { DeltaPp, Highlight, Pill, RankBadge } from "../kadera/parts";
 import { SectionHead } from "../kadera/SectionHead";
 import { C, MONO } from "../ui";
 import { THEME_PAGE } from "./copy";
-import { Treemap, TreemapLegend } from "./Treemap";
+import { Treemap, TreemapLegend, themeTiles } from "./Treemap";
 
 /**
  * 테마 목록(`/theme`) — 위에 **점유율 지도**(트리맵), 아래에 **열흘 흐름** 표.
@@ -113,9 +113,9 @@ export default async function ThemeIndexPage() {
         ) : (
           <>
             <div style={{ padding: "16px 22px 0" }}>
-              <Treemap themes={themes} />
+              <Treemap tiles={themeTiles(themes)} ariaLabel="테마별 최근 3일 언급 점유율" />
             </div>
-            <TreemapLegend />
+            <TreemapLegend up="관심이 늘어난 테마" flat="변화 ±0.3%p 안" down="줄어든 테마" />
           </>
         )}
       </section>

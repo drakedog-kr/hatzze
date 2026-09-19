@@ -27,6 +27,7 @@ import TimeAgo from "../../kadera/TimeAgo";
 import { timeAgoInitial } from "../../kadera/time-ago";
 import { AiMark, C, Icon, MONO, R } from "../../ui";
 import { THEME_PAGE } from "../copy";
+import { Treemap, TreemapLegend, stockTiles } from "../Treemap";
 
 /**
  * 테마 하나의 실주소(`/theme/반도체`).
@@ -345,13 +346,15 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
         )}
       </section>
 
-      {/* ── 말 많은 종목 ── 최근 사흘 언급, 주목도순. 까닭이 붙은 종목은 그 한 줄을 같이 보인다. */}
+      {/* ── 말 많은 종목 ── 위에 종목 지도(칸 = 언급 수, 색 = 앞 사흘과 견준 배수), 아래에 표.
+          지도는 "이 테마 안에서 말이 어디 몰렸나"를 한 번에, 표는 까닭 한 줄까지. 테마 목록의 지도와 같은 그림이다. */}
       <section className="hz-sheet">
         <SectionHead
           icon="leaderboard"
           title="지금 말 많은 종목"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
-          desc="이 테마 종목 중 채널에서 많이 언급된 순서입니다. 까닭은 그날 채널이 말한 이유입니다."
+          desc="칸의 크기는 최근 사흘 언급 수, 색은 그 앞 사흘과 견준 변화입니다. 아래 표의 까닭은 그날 채널이 말한 이유입니다."
+          noteHelp="색은 최근 사흘 언급을 바로 앞 사흘과 나눈 배수입니다. 1.5배 이상이면 따뜻한 색, 1.5분의 1 이하면 파랑이고, 앞 사흘에 없던 종목은 새로 등장으로 칩니다."
           level={2}
         />
         {d.loadFailed ? (
@@ -360,6 +363,10 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
           <Empty>최근 {KADERA_WINDOW_DAYS}일 사이 이 테마 종목이 채널에서 언급되지 않았습니다.</Empty>
         ) : (
           <div style={{ paddingBottom: 6 }}>
+            <div style={{ padding: "16px 22px 0" }}>
+              <Treemap tiles={stockTiles(d.hotStocks)} ariaLabel={`${theme} 테마 종목별 최근 ${KADERA_WINDOW_DAYS}일 언급`} />
+            </div>
+            <TreemapLegend up="앞 사흘보다 말이 늘어난 종목" flat="비슷함" down="줄어든 종목" />
             {d.hotStocks.slice(0, 12).map((s, i) => (
               <div key={s.code} className="hz-trow hz-cols-theme-stock">
                 <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", fontWeight: 800, color: C.sub2 }}>{i + 1}</span>

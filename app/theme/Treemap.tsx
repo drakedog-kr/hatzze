@@ -1,13 +1,15 @@
 import Link from "next/link";
 
 import { themeHref } from "@/lib/theme-href";
-import type { ThemeOverview } from "@/lib/theme-page";
+import type { ThemeHotStock, ThemeOverview } from "@/lib/theme-page";
 import { squarify } from "@/lib/treemap";
+import { stockHref } from "@/lib/stock-page";
 
 import { MONO } from "../ui";
 
 /**
- * 테마 점유율 지도(트리맵). **칸의 크기가 최근 사흘 언급 점유율, 색이 변화 방향과 크기**다.
+ * 점유율 지도(트리맵). **칸의 크기가 최근 사흘 언급, 색이 변화 방향과 크기**다. 테마 목록은 테마를
+ * 칸으로(themeTiles), 테마 화면은 그 테마의 종목을 칸으로(stockTiles) 그린다 — 그림은 한 벌이다.
  *
  * 서버 컴포넌트다 — squarify 는 순수 함수라 서버에서 돌고, 칸은 퍼센트 좌표의 절대 배치 div 라
  * 자바스크립트 없이 그려진다. 크롤러도 테마 이름과 점유율을 첫 HTML 에서 읽는다.
@@ -49,33 +51,99 @@ function fmtDelta(delta: number | null): string {
   return `${delta > 0 ? "▲" : "▼"}${Math.abs(delta).toFixed(1)}%p`;
 }
 
-export function Treemap({ themes }: { themes: ThemeOverview[] }) {
+/** 지도 한 칸의 재료. 테마(목록)와 종목(테마 화면)이 같은 그림을 쓴다. */
+export type TreemapTile = {
+  key: string;
+  label: string;
+  /** 칸의 넓이. 점유율(%)이든 언급 수든 비율만 뜻이 있다. */
+  value: number;
+  /** kadera.css 의 .is-up-N · .is-down-N · .is-flat. */
+  tone: string;
+  href: string;
+  /** 툴팁·aria-label. */
+  tip: string;
+  valueText: string;
+  deltaText?: string;
+};
+
+/** 테마 목록의 칸 — 넓이는 점유율, 색은 닷새 넘게 이전과 견준 변화(%p). */
+export function themeTiles(themes: ThemeOverview[]): TreemapTile[] {
+  return themes.map((t) => ({
+    key: t.theme,
+    label: t.theme,
+    value: t.sharePct,
+    tone: toneOf(t.shareDelta),
+    href: themeHref(t.theme),
+    tip: `${t.theme} · 점유율 ${t.sharePct.toFixed(1)}% · ${fmtDelta(t.shareDelta)} · ${t.rank}위`,
+    valueText: `${t.sharePct.toFixed(1)}%`,
+    deltaText: fmtDelta(t.shareDelta),
+  }));
+}
+
+/**
+ * 테마 화면의 칸 — 넓이는 최근 사흘 언급 수, 색은 **그 앞 사흘과 견준 배수**. 점유율 %p 가 아니라
+ * 배수인 이유: 종목 하나의 언급은 몇 회에서 몇백 회까지 폭이 넓어 차이(회)로 단을 나누면 큰 종목만
+ * 색이 들고, 배수로 나눠야 "평소보다 말이 늘었나"가 종목 크기와 무관하게 읽힌다.
+ * 문턱: 1.5배 이상·2.5배 이상·5배 이상(또는 앞 사흘 0회에서 새로 등장). 줄어든 쪽도 같은 비율.
+ */
+export function stockTiles(stocks: ThemeHotStock[]): TreemapTile[] {
+  const tone = (m: number, prior: number): string => {
+    if (prior === 0) return m >= 5 ? "is-up-3" : m >= 2 ? "is-up-2" : "is-up-1";
+    const ratio = m / prior;
+    if (ratio >= 5) return "is-up-3";
+    if (ratio >= 2.5) return "is-up-2";
+    if (ratio >= 1.5) return "is-up-1";
+    if (ratio <= 1 / 5) return "is-down-3";
+    if (ratio <= 1 / 2.5) return "is-down-2";
+    if (ratio <= 1 / 1.5) return "is-down-1";
+    return "is-flat";
+  };
+  const delta = (m: number, prior: number): string => {
+    if (prior === 0) return "앞 사흘 0회";
+    const r = m / prior;
+    return r >= 1 ? `앞 사흘의 ${r.toFixed(1)}배` : `앞 사흘의 ${Math.round(r * 100)}%`;
+  };
+  return stocks.map((s) => ({
+    key: s.code,
+    label: s.name,
+    value: s.mentions,
+    tone: tone(s.mentions, s.priorMentions),
+    href: stockHref(s.code),
+    tip: `${s.name} · 최근 사흘 ${s.mentions.toLocaleString("ko-KR")}회 · ${delta(s.mentions, s.priorMentions)} · 하루 최다 ${s.channels}곳`,
+    valueText: `${s.mentions.toLocaleString("ko-KR")}회`,
+    deltaText: s.priorMentions === 0 ? "새로 등장" : `${(s.mentions / s.priorMentions).toFixed(1)}배`,
+  }));
+}
+
+export function Treemap({ tiles, ariaLabel }: { tiles: TreemapTile[]; ariaLabel: string }) {
   const rects = squarify(
-    themes.map((t) => ({ key: t.theme, value: t.sharePct })),
+    tiles.map((t) => ({ key: t.key, value: t.value })),
     W,
     H,
   );
-  const byTheme = new Map(themes.map((t) => [t.theme, t]));
+  const byKey = new Map(tiles.map((t) => [t.key, t]));
 
   return (
-    <div className="hz-treemap" role="list" aria-label="테마별 최근 3일 언급 점유율">
+    <div className="hz-treemap" role="list" aria-label={ariaLabel}>
       {rects.map((r) => {
-        const t = byTheme.get(r.key)!;
+        const t = byKey.get(r.key)!;
         // 글자 단계는 넓이가 아니라 **폭과 높이**로 가른다. 넓이만 보면 가늘고 긴 칸에 이름이 들어가
         // "인터…"·"건…"처럼 두 글자만 남는다(2026-09-19 실측). 폭 9% 는 컨테이너 900px 에서 81px 로
         // 다섯 글자 이름(13px, 약 65px)이 들어가는 폭이고, 7% 는 11px 이름의 자리다.
         const wp = r.w; // 폭 %
         const hp = (r.h / H) * 100; // 높이 %
-        const size = wp >= 16 && hp >= 16 ? "lg" : wp >= 9 && hp >= 10 ? "md" : wp >= 7 && hp >= 6 ? "sm" : "xs";
-        const tip = `${t.theme} · 점유율 ${t.sharePct.toFixed(1)}% · ${fmtDelta(t.shareDelta)} · ${t.rank}위`;
+        // 가늘고 긴 칸(폭 4~7% · 높이 20% 이상)은 이름을 글자 단위로 세로로 쌓는다(is-tall) —
+        // 그냥 두면 이름이 안 들어가 빈 칸이 되는데, 세로로 다섯 글자면 들어간다.
+        const size =
+          wp >= 16 && hp >= 16 ? "lg" : wp >= 9 && hp >= 10 ? "md" : wp >= 7 && hp >= 6 ? "sm" : wp >= 4 && hp >= 20 ? "tall" : "xs";
         return (
           <Link
             key={r.key}
-            href={themeHref(t.theme)}
+            href={t.href}
             role="listitem"
-            aria-label={tip}
-            className={`hz-tm-tile hz-tip ${toneOf(t.shareDelta)} is-${size}`}
-            data-tip={tip}
+            aria-label={t.tip}
+            className={`hz-tm-tile hz-tip ${t.tone} is-${size}`}
+            data-tip={t.tip}
             style={{
               left: `${r.x}%`,
               top: `${(r.y / H) * 100}%`,
@@ -87,11 +155,11 @@ export function Treemap({ themes }: { themes: ThemeOverview[] }) {
               <span className="hz-tm-in">
                 {/* 가운뎃점 앞에 단어 결합자(U+2060)를 둬 폰에서 줄바꿈할 때 점이 앞 낱말에 붙는다 —
                     안 두면 "전자 / · / 부품" 처럼 점이 혼자 한 줄을 차지한다(2026-09-19 실측). */}
-                <span className="hz-tm-name">{t.theme.replace(/·/g, "\u2060·")}</span>
-                {size !== "sm" && (
+                <span className="hz-tm-name">{t.label.replace(/·/g, "\u2060·")}</span>
+                {size !== "sm" && size !== "tall" && (
                   <span className="hz-tm-val" style={{ fontFamily: MONO }}>
-                    {t.sharePct.toFixed(1)}%
-                    {size === "lg" && <span className="hz-tm-delta">{fmtDelta(t.shareDelta)}</span>}
+                    {t.valueText}
+                    {size === "lg" && t.deltaText && <span className="hz-tm-delta">{t.deltaText}</span>}
                   </span>
                 )}
               </span>
@@ -104,13 +172,13 @@ export function Treemap({ themes }: { themes: ThemeOverview[] }) {
 }
 
 /** 지도 아래 범례. 색이 무엇을 뜻하는지 글자로 한 번 적는다(색만으로 방향을 말하지 않는다). */
-export function TreemapLegend() {
+export function TreemapLegend({ up, flat, down }: { up: string; flat: string; down: string }) {
   const sw = (cls: string) => <span className={`hz-tm-sw ${cls}`} aria-hidden="true" />;
   return (
     <div className="hz-tm-legend">
-      <span>{sw("is-up-3")}{sw("is-up-2")}{sw("is-up-1")} 관심이 늘어난 테마</span>
-      <span>{sw("is-flat")} 변화 ±0.3%p 안</span>
-      <span>{sw("is-down-1")}{sw("is-down-2")}{sw("is-down-3")} 줄어든 테마</span>
+      <span>{sw("is-up-3")}{sw("is-up-2")}{sw("is-up-1")} {up}</span>
+      <span>{sw("is-flat")} {flat}</span>
+      <span>{sw("is-down-1")}{sw("is-down-2")}{sw("is-down-3")} {down}</span>
     </div>
   );
 }

@@ -78,6 +78,8 @@ export type ThemeTrendPoint = {
 export type ThemeHotStock = ThemeMember & {
   /** 최근 사흘 언급 합. */
   mentions: number;
+  /** 그 앞 사흘 언급 합. 종목 지도의 색(배수)이 쓴다. */
+  priorMentions: number;
   /** 최근 사흘 중 하루 최다 채널 수. **기간 합집합이 아니다**(lib/stock-page.ts 머리말 ②). */
   channels: number;
   /** 최근 사흘 안의 가장 최근 까닭 한 줄. 없으면 null(정상). */
@@ -183,6 +185,9 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
 
   const trendDays = windowBefore(baseDate, THEME_TREND_DAYS);
   const recentDays = trendDays.slice(-KADERA_WINDOW_DAYS);
+  // 종목 지도의 색이 견줄 '앞 사흘'. 테마 점유율의 변화(닷새 넘게 이전)와 창이 다르다 — 종목은 하루 언급이
+  // 몇 회뿐인 것이 많아 닷새 뒤 평균과 견주면 배수가 요동친다. 바로 앞 사흘이면 "그제까지보다 늘었나"로 읽힌다.
+  const priorDays = trendDays.slice(-KADERA_WINDOW_DAYS * 2, -KADERA_WINDOW_DAYS);
   const first = trendDays[0];
   const last = trendDays[trendDays.length - 1];
 
@@ -195,7 +200,7 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
   const [themeDaily, stockDaily, reasonRows, events, rotation, briefRow, meta] = await Promise.all([
     db.from("telegram_theme_daily").select("date,share_pct,rank,mention_count").eq("theme", theme).gte("date", first).lte("date", last).order("date"),
     codes.length
-      ? db.from("telegram_stock_daily").select("date,stock_code,mention_count,channel_count,weighted_score").in("stock_code", codes).in("date", recentDays)
+      ? db.from("telegram_stock_daily").select("date,stock_code,mention_count,channel_count,weighted_score").in("stock_code", codes).in("date", [...priorDays, ...recentDays])
       : Promise.resolve({ data: [] as StockDailyRow[], error: null }),
     // 까닭은 종목·날짜당 한 행이고 하루 상한이 40이라, 한 테마 30일치는 몇백 행을 넘지 않는다.
     codes.length
@@ -268,28 +273,34 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
 
   // ── 말 많은 종목 ── 최근 사흘 언급 합 순. 머리가 "많이 언급된 순서"라고 말하니 잣대도 언급 수다
   // (테마 로테이션 팝오버는 주목도순인데, 그쪽은 "점유율을 만든 종목"이라 잣대가 다르다). 동률은 주목도.
-  const agg = new Map<string, { m: number; c: number; w: number }>();
+  const recentSet = new Set(recentDays);
+  const agg = new Map<string, { m: number; c: number; w: number; p: number }>();
   for (const r of (stockDaily.data ?? []) as StockDailyRow[]) {
-    const a = agg.get(r.stock_code) ?? { m: 0, c: 0, w: 0 };
-    a.m += r.mention_count || 0;
-    a.c = Math.max(a.c, r.channel_count || 0);
-    a.w += Number(r.weighted_score) || 0;
+    const a = agg.get(r.stock_code) ?? { m: 0, c: 0, w: 0, p: 0 };
+    if (recentSet.has(r.date)) {
+      a.m += r.mention_count || 0;
+      a.c = Math.max(a.c, r.channel_count || 0);
+      a.w += Number(r.weighted_score) || 0;
+    } else {
+      a.p += r.mention_count || 0; // 앞 사흘
+    }
     agg.set(r.stock_code, a);
   }
-  const recentSet = new Set(recentDays);
   const latestReasonOf = new Map<string, ThemeReasonRow>();
   for (const r of reasons) {
     // 최근 사흘 안의 것만, 종목마다 가장 최근 하나(목록이 최신순이라 처음 만난 것이 그것이다).
     if (recentSet.has(r.date) && !latestReasonOf.has(r.code)) latestReasonOf.set(r.code, r);
   }
   const hotStocks: ThemeHotStock[] = [...agg.entries()]
-    .filter(([code]) => byCode.has(code))
+    // 앞 사흘에만 언급되고 최근 사흘엔 없는 종목은 '말 많은 종목'이 아니다.
+    .filter(([code, a]) => byCode.has(code) && a.m > 0)
     .sort((x, y) => y[1].m - x[1].m || y[1].w - x[1].w || x[0].localeCompare(y[0]))
     .map(([code, a]) => {
       const why = latestReasonOf.get(code);
       return {
         ...byCode.get(code)!,
         mentions: a.m,
+        priorMentions: a.p,
         channels: a.c,
         reason: why ? { date: why.date, reason: why.reason, changeRate: why.changeRate } : null,
       };

@@ -412,6 +412,9 @@
 .hz-tm-tile.is-lg .hz-tm-val { font-size: var(--fs-13); }
 .hz-tm-tile.is-sm .hz-tm-in { padding: 5px 7px; }
 .hz-tm-tile.is-sm .hz-tm-name { font-size: var(--fs-11); font-weight: 700; }
+/* 가늘고 긴 칸: 글자를 한 자씩 세로로. keep-all 을 풀어야 낱말 안에서 끊긴다. */
+.hz-tm-tile.is-tall .hz-tm-in { padding: 5px 4px; align-items: center; }
+.hz-tm-tile.is-tall .hz-tm-name { font-size: var(--fs-11); font-weight: 700; word-break: break-all; text-align: center; line-height: 1.2; }
 /* 범례 — 색만으로 방향을 말하지 않는다. */
 .hz-tm-legend {
   display: flex;
