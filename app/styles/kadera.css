@@ -336,8 +336,19 @@
    "복잡하고 안 깔끔하고 좁다"는 지적을 받았다(2026-09-19). 띠에서 숫자를 빼고 라벨을 띠 아래로
    붙여 열을 줄이고, 줄에 숨을 준다. */
 .hz-cols-theme-list {
-  grid-template-columns: 28px minmax(0, 1fr) 88px 168px;
+  grid-template-columns: 28px minmax(0, 1fr) 84px 110px;
   gap: 18px;
+}
+/* 둘째 줄 — '요즘 무슨 얘기' 첫 문장. 한 줄로 자른다(폰은 두 줄). 본문색보다 한 단 흐린 --c-sub 이 아니라
+   --c-ink-soft: 이 줄이 표의 본론이라 곁말 색이면 안 된다. */
+.hz-flow-brief {
+  font-size: var(--fs-12-5);
+  line-height: 1.55;
+  color: var(--c-ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: keep-all;
 }
 .hz-trow.hz-cols-theme-list {
   padding-top: 13px;
@@ -520,35 +531,9 @@
 .hz-tm-sw.is-down-2 { background: color-mix(in srgb, var(--c-blue-2) 55%, var(--c-card)); }
 .hz-tm-sw.is-down-3 { background: color-mix(in srgb, var(--c-blue-2) 88%, var(--c-card)); }
 
-/* 열흘 흐름 띠 — 칸 하나가 하루, **숫자 없이 색만**. 세 단이다:
-     상위(5위 안)   파랑          "그날 화제였다"
-     중간(6~10위)   옅은 파랑     "가까웠다"
-     그 밖          트랙          "상위 밖"
-   집계가 없던 날(주말)은 빈 칸. 순위 숫자는 title 툴팁에만 있다. 칸에 숫자를 적었던 판은
-   26줄 × 10칸 = 숫자 260개가 표를 어지럽혀 걷었다. 가장 최근 날의 테두리도 같이 걷었다 —
-   열 머리가 "오른쪽이 최근"이라고 말하면 충분하다. */
-.hz-flow {
-  display: inline-flex;
-  gap: 3px;
-}
-.hz-flow > span {
-  width: 14px;
-  height: 14px;
-  border-radius: 4px;
-  background: var(--c-track);
-  display: inline-block;
-}
-/* 중간 단은 틴트(--c-blue-tint)로는 트랙과 구별이 안 됐다 — 파랑을 35% 섞어 세 단이 한눈에 갈리게. */
-.hz-flow > .is-mid {
-  background: color-mix(in srgb, var(--c-blue) 35%, var(--c-card));
-}
-.hz-flow > .is-top {
-  background: var(--c-blue);
-}
-.hz-flow > .is-none {
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--c-hairline);
-}
+/* 열흘 흐름은 이제 카더라 테마 카드와 같은 스파크라인(app/kadera/parts.tsx Sparkline)이다. 순위 칸 띠
+   (.hz-flow, 숫자 있는 판 → 색만 있는 판)는 두 번 다듬고도 "별로다"라 걷었다(2026-09-19). 위 .hz-flow-col 과
+   .hz-flow-cap(막대 아래 한 줄 글)만 남는다. */
 
 /* ── 카더라 '다가오는 일정': 달력(1/3) + 그날 일정(2/3) ─────────────────────
    왼쪽 달력은 오늘이 든 주부터 다섯 주. 일정 있는 날은 파란 바탕에 건수, 고른 날은 진한

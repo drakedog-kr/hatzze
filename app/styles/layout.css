@@ -543,6 +543,13 @@
   .hz-flow-share .hz-bar {
     display: none;
   }
+  /* 폰은 요약 문장을 두 줄까지. 한 줄이면 열 자에서 잘려 무슨 얘기인지 안 읽힌다. */
+  .hz-flow-brief {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
 
   /* 종목 화면의 일정 아젠다: 좌우 여백만 폰 값으로. */
   .hz-cols-cal-one {

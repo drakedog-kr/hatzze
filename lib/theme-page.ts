@@ -383,6 +383,8 @@ export type ThemeOverview = {
   rankChange: number | null;
   /** 최근 THEME_FLOW_DAYS 일 각 날의 순위(오래된→최신). 집계가 없는 날은 null. */
   flow: (number | null)[];
+  /** 같은 날들의 점유율(%). 집계가 없는 날은 0. 목록의 작은 막대가 그린다. */
+  shareFlow: number[];
   /** flow 의 날짜(오래된→최신). */
   flowDates: string[];
   /** 최신일부터 거슬러 며칠 연속 상위였나. */
@@ -393,7 +395,22 @@ export type ThemeOverview = {
   /** 최근 사흘에 언급된 종목 중 주목도 상위 셋. */
   topStocks: { code: string; name: string; mentions: number }[];
   stockCount: number;
+  /** '요즘 무슨 얘기'(telegram_theme_brief)의 첫 문장. 아직 없으면 null. */
+  briefLine: string | null;
 };
+
+/**
+ * 요약의 첫 문장. 목록 한 줄에 실을 만큼만 — "SK하이닉스가 인텔과 … 소식이 화제였습니다."
+ * 문장 끝은 '다.' 뒤의 공백으로 가른다. 첫 문장이 너무 짧으면(20자 미만) 둘째까지 잇는다.
+ */
+export function briefFirstSentence(brief: string | null | undefined): string | null {
+  const text = (brief ?? "").trim();
+  if (!text) return null;
+  const parts = text.split(/(?<=다\.)\s+/);
+  let out = parts[0] ?? text;
+  if (out.length < 20 && parts[1]) out = `${out} ${parts[1]}`;
+  return out;
+}
 
 /**
  * 테마 목록 — 로테이션(점유율·순위·변화)에 **열흘 흐름**을 더한 것.
@@ -424,15 +441,33 @@ export async function listThemeOverview(): Promise<ThemeOverview[] | null> {
   const rows = (data ?? []) as { date: string; theme: string; share_pct: number | string }[];
   const dates = [...new Set(rows.map((r) => r.date))].sort().slice(-THEME_FLOW_DAYS);
   const rankOn = new Map<string, Map<string, number>>();
+  const shareOn = new Map<string, Map<string, number>>();
   for (const d of dates) {
     const day = rows.filter((r) => r.date === d && r.theme in THEMES).sort((a, b) => Number(b.share_pct) - Number(a.share_pct));
     rankOn.set(d, new Map(day.map((r, i) => [r.theme, i + 1])));
+    shareOn.set(d, new Map(day.map((r) => [r.theme, Number(r.share_pct) || 0])));
+  }
+
+  // '요즘 무슨 얘기' 첫 문장 — 테마마다 가장 최근 것 하나. 기준일분이 없으면 하루 거슬러 간다(LLM_TEXT_CARRY_DAYS).
+  // 표가 아직 없거나 조회가 실패해도 목록은 그린다(그 줄만 종목 이름으로 대신한다).
+  const briefOf = new Map<string, string>();
+  const briefs = await db
+    .from("telegram_theme_brief")
+    .select("theme,date,brief")
+    .gte("date", addDaysISO(baseDate, -LLM_TEXT_CARRY_DAYS))
+    .lte("date", baseDate)
+    .order("date", { ascending: false })
+    .limit(200);
+  if (briefs.error) console.error("[listThemeOverview] 테마 요약을 못 읽었습니다", briefs.error);
+  for (const r of (briefs.data ?? []) as { theme: string; date: string; brief: string | null }[]) {
+    if (!briefOf.has(r.theme) && r.brief?.trim()) briefOf.set(r.theme, r.brief);
   }
 
   return rotation
     .filter((r) => r.theme in THEMES)
     .map((r) => {
       const flow = dates.map((d) => rankOn.get(d)?.get(r.theme) ?? null);
+      const shareFlow = dates.map((d) => shareOn.get(d)?.get(r.theme) ?? 0);
       const isTop = (v: number | null) => v != null && v <= THEME_FLOW_TOP;
       let streak = 0;
       for (let i = flow.length - 1; i >= 0 && isTop(flow[i]); i--) streak += 1;
@@ -448,12 +483,14 @@ export async function listThemeOverview(): Promise<ThemeOverview[] | null> {
         shareDelta: r.shareDelta,
         rankChange: r.rankChange,
         flow,
+        shareFlow,
         flowDates: dates,
         streak,
         topDays,
         label,
         topStocks: r.stocks.slice(0, 3).map((s) => ({ code: s.code, name: s.name, mentions: s.mentions })),
         stockCount: r.stockCount,
+        briefLine: briefFirstSentence(briefOf.get(r.theme)),
       };
     })
     .sort((a, b) => a.rank - b.rank);

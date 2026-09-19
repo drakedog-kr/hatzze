@@ -11,7 +11,7 @@ import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { THEME_PUBLIC } from "../screen-flags";
 import { ExpandableList } from "../kadera/ExpandableList";
-import { DeltaPp, Highlight, RankBadge } from "../kadera/parts";
+import { DeltaPp, Highlight, RankBadge, Sparkline } from "../kadera/parts";
 import { SectionHead } from "../kadera/SectionHead";
 import { C, MONO } from "../ui";
 import { THEME_PAGE } from "./copy";
@@ -56,23 +56,16 @@ function flowCaption(t: ThemeOverview): { text: string; on: boolean } {
 }
 
 /**
- * 열흘 흐름 띠 — 칸 하나가 하루. **숫자는 없다.** 5위 안이면 파란 칸, 6~10위면 옅은 파랑, 그 밖은 흐린 칸,
- * 집계 없는 날은 빈 칸. 순위 숫자는 툴팁(title)에만 둔다. 처음엔 칸마다 순위를 적었는데 26줄 × 10칸의
- * 숫자 260개가 표를 통째로 어지럽혔다(2026-09-19 지적). 띠 아래 한 줄 글(flowCaption)이 무슨 뜻인지 말한다.
+ * 열흘 흐름 — 작은 막대(점유율)와 그 아래 한 줄 글(flowCaption). 순위 칸 띠였던 것을 카더라 테마 카드와
+ * 같은 스파크라인으로 바꿨다(2026-09-19 "저 열흘 순위 자체가 별로다, 다른 형태로"). 막대는 날마다의 점유율이라
+ * "커지고 있나 식고 있나"가 모양으로 읽히고, 글이 "며칠째 상위인가"를 말한다. 날짜·순위는 aria-label 에.
  */
 function Flow({ t }: { t: ThemeOverview }) {
   const cap = flowCaption(t);
+  const label = `최근 ${t.flowDates.length}일 점유율 ${t.shareFlow.map((v, i) => `${fmtKoDate(t.flowDates[i])} ${v.toFixed(1)}%`).join(", ")}`;
   return (
-    <span className="hz-flow-col">
-      <span className="hz-flow" aria-label={`최근 ${t.flow.length}일 순위 ${t.flow.map((r) => (r == null ? "없음" : `${r}위`)).join(", ")}`}>
-        {t.flow.map((r, i) => (
-          <span
-            key={t.flowDates[i]}
-            className={r == null ? "is-none" : r <= THEME_FLOW_TOP ? "is-top" : r <= THEME_FLOW_TOP * 2 ? "is-mid" : undefined}
-            title={`${fmtKoDate(t.flowDates[i])}${r == null ? " · 집계 없음" : ` · ${r}위`}`}
-          />
-        ))}
-      </span>
+    <span className="hz-flow-col" aria-label={label}>
+      <Sparkline data={t.shareFlow} width={80} height={24} />
       <span className="hz-flow-cap" style={{ color: cap.on ? "var(--c-cold-ink)" : C.sub2 }}>{cap.text}</span>
     </span>
   );
@@ -142,8 +135,8 @@ export default async function ThemeIndexPage() {
           icon="donut_small"
           title="테마 흐름"
           note={flowDates.length ? `${fmtKoDate(flowDates[0])} ~ ${fmtKoDate(flowDates[flowDates.length - 1])}` : `최근 ${THEME_FLOW_DAYS}일`}
-          desc={`점유율은 최근 ${KADERA_WINDOW_DAYS}일 평균, 흐름 칸은 날마다의 순위입니다. ${THEME_FLOW_TOP}위 안에 든 날은 파랗게 칠합니다.`}
-          noteHelp="점유율의 분모는 테마 사전에 든 종목의 언급이라 열 줄 밖까지 다 더하면 100%가 됩니다. 흐름은 집계가 있는 날만 세어 주말이 빠질 수 있습니다."
+          desc={`테마마다 요즘 무슨 얘기가 도는지 한 줄, 그리고 최근 ${THEME_FLOW_DAYS}일 점유율의 흐름입니다.`}
+          noteHelp={`점유율은 최근 ${KADERA_WINDOW_DAYS}일 평균이고 분모는 테마 사전에 든 종목의 언급이라 스물여섯 줄을 다 더하면 100%가 됩니다. 막대는 날마다의 점유율이고 그 아래 글은 ${THEME_FLOW_TOP}위 안에 며칠째 드는지입니다. 집계가 있는 날만 세어 주말이 빠질 수 있습니다.`}
           level={2}
         />
         {themes === null ? (
@@ -185,11 +178,13 @@ export default async function ThemeIndexPage() {
             </div>
             <div className="hz-thead hz-cols-theme-list">
               <span>#</span>
-              <span>테마 · 최근 {KADERA_WINDOW_DAYS}일 말 많은 종목</span>
+              <span>테마 · 말 많은 종목 · 요즘 무슨 얘기</span>
               <span style={{ textAlign: "right" }}>점유율</span>
-              <span>최근 {flowDates.length || THEME_FLOW_DAYS}일 · 오른쪽이 최근</span>
+              <span>최근 {flowDates.length || THEME_FLOW_DAYS}일</span>
             </div>
-            {/* 줄은 넷뿐이다 — 순위 · 테마 · 점유율 · 흐름. 라벨은 흐름 띠 아래 한 줄 글로 붙어 열이 하나 줄었다.
+            {/* 줄은 넷 — 순위 · 테마(이름 + 말 많은 종목 / 요즘 무슨 얘기 첫 문장) · 점유율 · 열흘 흐름.
+                둘째 줄이 이 표의 본론이다: 순위·점유율은 "얼마나"만 말하는데 독자의 질문은 "무슨 얘기냐"라서,
+                테마 화면의 요약(telegram_theme_brief) 첫 문장을 여기 끌어온다. 요약이 아직 없으면 종목 이름만.
                 열 줄만 먼저 보이고 나머지는 '더 보기'로 펼친다(26줄을 한 번에 세우면 벽이 된다). */}
             <ExpandableList
               name="theme_flow"
@@ -202,14 +197,23 @@ export default async function ThemeIndexPage() {
                   <Link href={themeHref(t.theme)} className="hz-trow hz-cols-theme-list" style={{ textDecoration: "none" }}>
                     <RankBadge n={t.rank} />
                     <span style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+                      {/* 첫 줄: 이름 · 변화 · 말 많은 종목 셋(이름만). 종목은 이름 뒤에 흐리게 — 이름이 먼저 읽히고
+                          종목은 "누가 만든 점유율인가"의 곁말이다. 좁으면 종목부터 줄임표로 잘린다. */}
                       <span style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
-                        <span style={{ ...clip, minWidth: 0, fontSize: "var(--fs-14)", fontWeight: 700, color: C.ink }}>{t.theme}</span>
-                        <DeltaPp value={t.shareDelta} style={{ fontSize: "var(--fs-11)" }} />
+                        <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, color: C.ink, whiteSpace: "nowrap" }}>{t.theme}</span>
+                        <DeltaPp value={t.shareDelta} style={{ fontSize: "var(--fs-11)", flexShrink: 0 }} />
+                        {t.topStocks.length > 0 && (
+                          <span style={{ ...clip, minWidth: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>
+                            {t.topStocks.map((s) => s.name).join(" · ")}
+                          </span>
+                        )}
                       </span>
-                      <span style={{ ...clip, fontSize: "var(--fs-12)", color: C.sub }}>
-                        {t.topStocks.length
-                          ? t.topStocks.map((s) => `${s.name} ${s.mentions}회`).join(" · ")
-                          : `최근 ${KADERA_WINDOW_DAYS}일 언급된 종목이 없습니다`}
+                      {/* 둘째 줄: 요즘 무슨 얘기 첫 문장. 없으면 그 사정을 적는다(빈 줄을 두면 줄 높이가 흔들린다). */}
+                      <span className="hz-flow-brief">
+                        {t.briefLine ??
+                          (t.topStocks.length
+                            ? `최근 ${KADERA_WINDOW_DAYS}일 ${t.topStocks.map((s) => `${s.name} ${s.mentions}회`).join(" · ")}`
+                            : `최근 ${KADERA_WINDOW_DAYS}일 언급된 종목이 없습니다`)}
                       </span>
                     </span>
                     <span className="hz-flow-share">
