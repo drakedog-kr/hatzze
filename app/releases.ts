@@ -29,6 +29,13 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    version: "1.17.4",
+    date: "2026-09-19",
+    changes: [
+      "배당으로 살기에 미국 채권 ETF 18개가 더해집니다(JNK·HYG·LQD·AGG·BIL·SHV·IEF·TLTW·LQDW·HYGW·EMB·SRLN 등).",
+    ],
+  },
+  {
     // 주간 유령 종목 점검(data-pipeline/scripts/scan_phantom_week.py) 첫 회에서 확인한 오탐을
     // 추출 규칙으로 막았다. 화면 구성은 그대로고 카더라의 종목 태그만 정확해져 Patch.
     version: "1.17.3",
