@@ -2,7 +2,8 @@ import Link from "next/link";
 
 import { NOTE_PAGE } from "./daily/copy";
 import { DIVIDEND_PAGE } from "./dividend/copy";
-import { DAILY_PUBLIC, DIVIDEND_PUBLIC, PREVIEW_PUBLIC } from "./screen-flags";
+import { THEME_PAGE } from "./theme/copy";
+import { DAILY_PUBLIC, DIVIDEND_PUBLIC, PREVIEW_PUBLIC, THEME_PUBLIC } from "./screen-flags";
 import { BetaBadge, GhostSymbol, Wordmark } from "./Logo";
 import { C } from "./ui";
 import { VersionLink } from "./VersionBadge";
@@ -221,6 +222,7 @@ export default function Footer() {
                 날 다시 넣는 걸 잊는다 — 내부자 리포트가 정확히 그랬다(위 주석).
                 그래서 **플래그를 읽어 조건부로** 둔다. 여는 날 `app/screen-flags.ts` 한 줄만
                 바꾸면 이 줄이 저절로 살아난다. */}
+            {THEME_PUBLIC && <FooterLink href={THEME_PAGE.href}>{THEME_PAGE.label}</FooterLink>}
             {PREVIEW_PUBLIC && <FooterLink href="/preview">국장 미리보기</FooterLink>}
             {DIVIDEND_PUBLIC && <FooterLink href={DIVIDEND_PAGE.href}>{DIVIDEND_PAGE.label}</FooterLink>}
             {DAILY_PUBLIC && <FooterLink href={NOTE_PAGE.href}>{NOTE_PAGE.label}</FooterLink>}

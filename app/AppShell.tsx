@@ -7,7 +7,9 @@ import { INSIDER_LISTS, INSIDER_LIST_SLUGS, insiderListHref } from "./insider/li
 import { PageJsonLd } from "./JsonLd";
 import { NOTE_PAGE } from "./daily/copy";
 import { DIVIDEND_PAGE } from "./dividend/copy";
-import { DAILY_PUBLIC, DIVIDEND_PUBLIC } from "./screen-flags";
+import { THEME_PAGE } from "./theme/copy";
+import { DAILY_PUBLIC, DIVIDEND_PUBLIC, THEME_PUBLIC } from "./screen-flags";
+import { THEME_NAMES, themeHref } from "@/lib/theme-href";
 
 import { track } from "@/lib/ga";
 import { SLOGAN } from "./brand";
@@ -174,6 +176,9 @@ const NAV: NavItem[] = [
       },
     ],
   },
+  // 테마 리포트(/theme) — 카더라 바로 아래. 카더라 재료를 테마 단위로 다시 읽는 화면이라 그 옆이다.
+  // ⛔ 여는 것은 `app/screen-flags.ts` 의 THEME_PUBLIC 한 줄이다. 안 연 동안은 COMING_SOON 에 선다.
+  ...(THEME_PUBLIC ? [{ href: THEME_PAGE.href, label: THEME_PAGE.label, icon: THEME_PAGE.icon, sub: THEME_PAGE.sub }] : []),
   // ⚠️ COMING_SOON 에 두지 말 것 — 본문 헤더(PageHeader)가 NAV 에서 경로를 못 찾아
   // **제목 칸을 통째로 비운다.** 예고 시절에도 배지만 달아 NAV 에 뒀던 이유다.
   {
@@ -282,6 +287,10 @@ const COMING_SOON: { label: string; badge: string; tip: string; after: string; i
   // 그냥 눌려 들어가졌다. 여기(COMING_SOON)에 두면 href 필드 자체가 없어 링크가 안 생긴다.
   // 대신 본문 헤더가 NAV 에서 경로를 못 찾으므로 DEEP_PAGES 에 제목을 따로 둬야 한다.
   //
+  // 테마 리포트(2026-09-19 만듦). 카더라 리포트(와 그 서브) 바로 다음 — NAV 와 같은 자리.
+  ...(THEME_PUBLIC
+    ? []
+    : [{ label: THEME_PAGE.label, badge: "준비 중", tip: THEME_PAGE.tip, after: "/kadera", icon: THEME_PAGE.icon }]),
   // 배당으로 살기(2026-09-11 만듦, 09-16 열었다). 국장 미리보기 다음, 데일리 노트 앞 — NAV 와 같은 자리.
   ...(DIVIDEND_PUBLIC
     ? []
@@ -456,6 +465,17 @@ const DEEP_PAGES: Record<string, { label: string; sub: string; badge?: string }>
   ...(DAILY_PUBLIC ? {} : { [NOTE_PAGE.href]: { label: NOTE_PAGE.label, sub: NOTE_PAGE.sub, badge: "준비 중" } }),
   // 배당으로 살기 — 같은 이유로 안 연 동안만.
   ...(DIVIDEND_PUBLIC ? {} : { [DIVIDEND_PAGE.href]: { label: DIVIDEND_PAGE.label, sub: DIVIDEND_PAGE.sub, badge: "준비 중" } }),
+  // 테마 리포트 목록 — 안 연 동안만.
+  ...(THEME_PUBLIC ? {} : { [THEME_PAGE.href]: { label: THEME_PAGE.label, sub: THEME_PAGE.sub, badge: "준비 중" } }),
+  // 테마 26장(/theme/반도체 …). 테마 이름이 곧 제목이라 셸이 h1 을 그린다 — 종목 화면(464장)은
+  // 셸이 이름을 알 길이 없어 자기 h1 을 그리지만, 테마는 사전(lib/stock-themes.ts)이 정적이라
+  // 여기서 안다. 안 연 동안은 '준비 중' 배지가 붙어 구조화 데이터도 안 나간다(noindex 와 맞는다).
+  ...Object.fromEntries(
+    THEME_NAMES.map((t) => [
+      themeHref(t),
+      { label: t, sub: `${t} 테마를 두고 채널에서 요즘 무슨 얘기가 도는지 봅니다`, ...(THEME_PUBLIC ? {} : { badge: "준비 중" }) },
+    ]),
+  ),
   ...Object.fromEntries(
     INSIDER_LIST_SLUGS.map((slug) => [
       insiderListHref(slug),
@@ -1071,6 +1091,20 @@ function ThemeToggle() {
  * 자기 제목(legal.tsx 의 DocTitle)을 갖고 있으니 여기서 보탤 것이 없다. 도구 묶음은
  * 남긴다 — 테마 토글은 어느 화면에서나 같은 자리에 있어야 한다.
  */
+/** 경로의 각 조각을 encodeURIComponent 꼴로 맞춘다(이미 부호화된 조각은 한 번 풀고 다시 묶는다). */
+function encodedPath(pathname: string): string {
+  return pathname
+    .split("/")
+    .map((seg) => {
+      try {
+        return encodeURIComponent(decodeURIComponent(seg));
+      } catch {
+        return seg;
+      }
+    })
+    .join("/");
+}
+
 function PageHeader() {
   const pathname = usePathname() ?? "/";
   const page = NAV.find((n) => isActive(n.href, pathname));
@@ -1086,7 +1120,10 @@ function PageHeader() {
   // 같은 h1 이 된다.
   // 날짜별 글(/daily/2026-09-05)은 안 연 동안 NAV 에 부모가 없어 /daily 의 것을 빌린다.
   // 열고 나면 NAV 의 /daily 가 startsWith 로 잡으므로 이 가지는 안 탄다.
-  const deep = DEEP_PAGES[pathname] ?? (pathname.startsWith(`${NOTE_PAGE.href}/`) ? DEEP_PAGES[NOTE_PAGE.href] : undefined);
+  // 테마 주소(/theme/반도체)는 브라우저에 따라 퍼센트 부호화된 채로도 온다. DEEP_PAGES 의 키는
+  // themeHref 가 부호화한 꼴이라, 들어온 경로를 같은 꼴로 맞춘 뒤 찾는다.
+  const deepKey = encodedPath(pathname);
+  const deep = DEEP_PAGES[deepKey] ?? DEEP_PAGES[pathname] ?? (pathname.startsWith(`${NOTE_PAGE.href}/`) ? DEEP_PAGES[NOTE_PAGE.href] : undefined);
   const title = deep?.label ?? child?.label ?? page?.label;
   const sub = deep?.sub ?? child?.sub ?? page?.sub;
   // 배지는 부모 것이다. 서브가 물려받으면 "25개 지표" 같은 남의 표찰이 따라 붙는다.

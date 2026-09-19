@@ -482,6 +482,44 @@
     display: none;
   }
 
+  /* 테마 화면의 표 세 벌 + 목록. 곁다리 열을 접고 긴 글은 아랫줄로 내린다(kadera.css 정의). */
+  .hz-cols-theme-stock {
+    grid-template-columns: 20px minmax(0, 1fr) 56px;
+    gap: 8px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .hz-cols-theme-stock > :nth-child(4) {
+    display: none;
+  }
+  .hz-cols-theme-reason {
+    grid-template-columns: minmax(0, 1fr) 56px;
+    gap: 6px 8px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .hz-cols-theme-reason > :nth-child(3) {
+    grid-column: 1 / -1;
+  }
+  .hz-cols-theme-event {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 8px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .hz-cols-theme-event > :nth-child(2) {
+    grid-column: 1 / -1;
+  }
+  .hz-cols-theme-list {
+    grid-template-columns: 20px minmax(0, 1fr) 48px 84px;
+    gap: 6px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .hz-cols-theme-list > :nth-child(4) {
+    display: none;
+  }
+
   /* 종목 화면의 일정 아젠다: 좌우 여백만 폰 값으로. */
   .hz-cols-cal-one {
     gap: 10px;

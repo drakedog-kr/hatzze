@@ -82,3 +82,26 @@ export const DAILY_PUBLIC = true;
  *    다른 판단이다.
  */
 export const DIVIDEND_PUBLIC = true;
+
+/**
+ * 테마 리포트(/theme · /theme/[테마]) — 테마 하나를 두고 채널에서 무슨 얘기가 도는지 보는 화면.
+ * 2026-09-19 에 만들었고 **아직 안 열었다.** 읽는 곳은 배당으로 살기와 같다(사이드바·푸터·사이트맵·검사).
+ *
+ *   app/theme/page.tsx · app/theme/[theme]/page.tsx   배포된 곳에서 404 를 낼지, noindex 를 달지
+ *   app/AppShell.tsx                                   NAV ↔ COMING_SOON · DEEP_PAGES
+ *   app/Footer.tsx                                     '바로가기' 목록
+ *   app/sitemap-urls.ts                                사이트맵(목록 + 테마별 실주소)
+ *   scripts/check-routes.mjs                           안 연 동안 사이트맵에 없는 것을 정상으로 볼지
+ *
+ * ## 여는 절차
+ *
+ *   1. 아래 값을 true 로 바꾼다. 위 자리가 전부 같이 켜진다.
+ *   2. `app/releases.ts` 에 한 줄 올린다(화면이 하나 느는 것이라 Minor).
+ *   3. 머지 뒤 프로덕션을 찔러 본다 — `curl -s -o /dev/null -w '%{http_code}' https://hatzze.fun/theme` 가 200.
+ *
+ * ⛔ **여라는 말이 있기 전에는 바꾸지 말 것.** 화면이 다 만들어졌다는 것과 여는 것은
+ *    다른 판단이다.
+ */
+export const THEME_PUBLIC = false;
+// 여는 날 하나 더: .github/workflows/daily-update.yml 의 '화면 캐시 비우고 다시 데우기' 스텝이 여는
+// 주소 목록(for path in …)에 /theme 을 넣는다. 안 연 동안은 404 라 데울 것이 없다.
