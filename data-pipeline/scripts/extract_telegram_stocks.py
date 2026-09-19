@@ -58,6 +58,7 @@ from config.stock_extraction import (  # noqa: E402
     JOSA_HEAD,
     JOSA_TRAILING,
     NOT_MENTION_PHRASES,
+    PUBLISHER_SHORT_NAMES,
     US_TICKER_COLLISION,
 )
 
@@ -67,6 +68,7 @@ HANGUL_OR_ALNUM = re.compile(r"[가-힣0-9A-Za-z]")
 HANGUL = re.compile(r"[가-힣]")
 HAN = re.compile(r"[一-鿿]")  # SK海力士(=SK하이닉스) 같은 중국어 기사 제목용
 LATIN = re.compile(r"[A-Za-z]")
+LATIN_OR_DIGIT = re.compile(r"[A-Za-z0-9]")
 LATIN_ACRONYM = re.compile(r"^[A-Za-z][A-Za-z0-9&]*$")  # SK, LG, E1 … (한글 종목명 제외)
 URL_RE = re.compile(r"(?:https?://|www\.)\S+")
 # 이름을 합성어 안에 붙들어 매는 이음표("구독·플랫폼·디바이스", "X-레이", "다이렉트-투-
@@ -160,6 +162,12 @@ def boundary_ok(text: str, start: int, end: int, is_ambiguous: bool) -> bool:
     # 앞 경계: 한글/영숫자/한자면 다른 단어의 일부 → 거부.
     if start > 0 and (HANGUL_OR_ALNUM.match(text[start - 1]) or HAN.match(text[start - 1])):
         return False
+    # 라틴·숫자로 끝나는 이름 뒤에 라틴·숫자가 붙으면 더 긴 낱말이다 — 위험군이 아니어도
+    # 거부한다(2026-09-19). 비위험군은 뒤를 안 보는 게 규칙이라 `HRSG`(배열회수보일러)가
+    # HRS(036640) 16건 중 15건, `OCIO`·`DGIST`·`GRTS` 가 그대로 통과했다. 한글로 끝나는 이름은
+    # 그대로 둔다(`SK하이닉스ADR` 은 진짜 언급이다). 한 주 전수에서 잃는 진짜는 `SBS W` 1건.
+    if end < len(text) and LATIN_OR_DIGIT.match(text[end - 1]) and LATIN_OR_DIGIT.match(text[end]):
+        return False
     if not is_ambiguous:
         return True
     # 원천이 본문에 끼워 넣은 종목코드 주석은 걷어 내고 그 뒤를 본다(결 ⑦).
@@ -185,6 +193,10 @@ def boundary_ok(text: str, start: int, end: int, is_ambiguous: bool) -> bool:
         # 스킴 없는 URL("a.co/x?db=1&SK=") 대비 — 쿼리스트링 파라미터명 꼴은 거부.
         if nxt in "=&" or (start > 0 and text[start - 1] in "&?"):
             return False
+        # ⚠️ 붙임표(`나노-MRI`·`DL-메티오닌`)는 여기서 거부하지 않는다. 2026-09-19 전량 재현으로
+        #    재 봤더니 짝 표기가 같은 자리를 쓴다 — `한화-EDGE`·`본느-최대주주 변경`·`아스트-거래재개`·
+        #    `LG-엔비디아`·`피노-CNGR`(진짜 25건). 그 둘은 이름별 단서(config.HOMONYM_CUES 의
+        #    DL·나노)로 막았다.
     return True
 
 
@@ -270,7 +282,7 @@ def is_publisher_name(key: str) -> bool:
     목록이 아니라 stocks 에서 나오는 조건이라 새 증권사가 상장하거나 사명이 바뀌어도
     따라온다. '…제11호스팩'처럼 증권사가 세운 SPAC 은 '스팩'으로 끝나 여기 안 걸린다.
     """
-    return key.endswith("증권")
+    return key.endswith("증권") or key in PUBLISHER_SHORT_NAMES
 
 
 def publisher_context(text: str, start: int, end: int) -> bool:
@@ -358,6 +370,11 @@ def extract(
         # 최소 한 글자는 대문자라는 점으로 한 겹 더 막는다. 현재 코퍼스에선 마스킹이
         # 먼저 걸러 실측 변화는 0건이고, 대소문자를 푼 데 대한 예방적 방어다.
         if matched != key and matched.islower():
+            continue
+        # 3글자 이하 라틴 약자는 표기가 사전과 다르면 다른 뜻이다(2026-09-19). `SbS`(패키징
+        # 사이드바이사이드)가 SBS 39건 중 14건, `New!!` 가 NEW 9건 중 4건이었다. 긴 이름은
+        # 그대로 둔다 — `Naver`·`LS Electric` 은 진짜 언급이다.
+        if matched != key and len(key) <= 3 and not HANGUL.search(key):
             continue
         is_ambiguous = key in ambiguous
         if not boundary_ok(text, m.start(), m.end(), is_ambiguous):
