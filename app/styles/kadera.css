@@ -335,28 +335,30 @@
    열은 넷뿐이다. 처음엔 다섯(라벨 칸이 따로)이었고 줄 높이 8px 에 띠마다 순위 숫자까지 있어
    "복잡하고 안 깔끔하고 좁다"는 지적을 받았다(2026-09-19). 띠에서 숫자를 빼고 라벨을 띠 아래로
    붙여 열을 줄이고, 줄에 숨을 준다. */
-/* 윗층 네 칸(순위 · 이름 · 점유율 · 열흘 한 조각) + 아랫층 문장(2/-1 로 줄 폭 전부). 세 번 다듬은 끝의 모양이다:
-   ① 순위 숫자 띠 + 라벨 칸(다섯 열) ② 색 띠 + 글 ③ 종목 이름 + 스파크라인 + 잘린 문장 — 전부 "복잡하고 빈 공간이
-   크다". 이름 칸에 문장을 가두지 않고 아랫층으로 내리니 오른쪽 칸이 비어 보일 일이 없다. */
+/* 다섯 칸 한 줄: 순위 · 이름(고정 폭) · **문장(남는 폭 전부)** · 점유율 · 열흘 한 조각. 네 번 다듬은 끝의 모양이다:
+   ① 순위 숫자 띠 + 라벨 칸 ② 색 띠 + 글 ③ 종목 이름 + 스파크라인 + 잘린 문장 ④ 문장을 아랫층에 — ④는 넓은
+   화면에서 윗층의 이름과 점유율 사이가 통째로 비었다("공간 낭비"). 문장이 그 자리를 차지하면 넓은 화면은
+   한 줄, 보통 화면은 두 줄이다. 이름 칸 176 은 "전력기기·전선 ▲5.4%p"(14px 이름 + 11px 변화)가 한 줄에 서는 폭. */
 .hz-cols-theme-list {
-  grid-template-columns: 28px minmax(0, 1fr) 72px 132px;
-  gap: 7px 16px;
+  grid-template-columns: 28px 176px minmax(0, 1fr) 72px 132px;
+  gap: 18px;
   align-items: center;
 }
 .hz-trow.hz-cols-theme-list {
-  padding-top: 14px;
-  padding-bottom: 14px;
+  padding-top: 13px;
+  padding-bottom: 13px;
 }
-/* 아랫층 — '요즘 무슨 얘기' 첫 문장. 줄 폭을 다 쓰고 두 줄까지. 곁말 색(--c-sub)이 아니라 --c-ink-soft: 이 줄이 표의 본론이다. */
+/* '요즘 무슨 얘기' 첫 문장. 넓은 화면은 한 줄, 좁으면 세 줄까지(두 줄로 자르면 1000px 에서 문장 끝이 잘렸다).
+   곁말 색(--c-sub)이 아니라 --c-ink-soft: 이 칸이 표의 본론이다. */
 .hz-theme-row-brief {
-  grid-column: 2 / -1;
+  min-width: 0;
   font-size: var(--fs-13);
-  line-height: 1.6;
+  line-height: 1.55;
   color: var(--c-ink-soft);
   word-break: keep-all;
   text-wrap: pretty;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }

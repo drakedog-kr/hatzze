@@ -175,15 +175,16 @@ export default async function ThemeIndexPage() {
             </div>
             <div className="hz-thead hz-cols-theme-list">
               <span>#</span>
-              <span>테마 · 요즘 무슨 얘기</span>
+              <span>테마</span>
+              <span>요즘 무슨 얘기</span>
               <span style={{ textAlign: "right" }}>점유율</span>
               <span>최근 {flowDates.length || THEME_FLOW_DAYS}일</span>
             </div>
-            {/* 한 줄은 두 층이다. 윗층: 순위 · 이름과 변화 · 점유율 · 열흘 한 조각. 아랫층: '요즘 무슨 얘기' 첫 문장이
-                **줄 폭을 다 쓴다**(grid-column 2/-1). 문장을 이름 칸에 가두면 줄임표로 잘리고 오른쪽 칸들 사이가 비어
-                보였다(2026-09-19 "열 중간에 빈 공간"). 말 많은 종목·점유율 막대·스파크라인은 걷었다 — 종목은 문장이
-                이름을 부르고, 점유율은 위 지도가 넓이로, 열흘은 글 한 조각이 말한다.
-                열 줄만 먼저 보이고 나머지는 '더 보기'로 펼친다(26줄을 한 번에 세우면 벽이 된다). */}
+            {/* 다섯 칸 한 줄: 순위 · 이름과 변화 · **문장(남는 폭 전부)** · 점유율 · 열흘 한 조각. 문장을 이름 아래
+                둘째 층에 뒀더니 넓은 화면에서 윗층의 이름과 점유율 사이가 통째로 비었다(2026-09-19 "공간 낭비").
+                문장이 그 자리를 차지하면 넓은 화면은 한 줄, 보통 화면은 두 줄로 접힌다. 폰은 층으로(layout.css).
+                말 많은 종목·점유율 막대·스파크라인은 걷었다 — 종목은 문장이 이름을 부르고, 점유율은 위 지도가
+                넓이로, 열흘은 글 한 조각이 말한다. 열 줄만 먼저 보이고 나머지는 '더 보기'로 펼친다. */}
             <ExpandableList
               name="theme_flow"
               initial={FLOW_ROWS_SHOWN}
@@ -198,17 +199,17 @@ export default async function ThemeIndexPage() {
                       <span style={{ ...clip, minWidth: 0, fontSize: "var(--fs-14)", fontWeight: 700, color: C.ink }}>{t.theme}</span>
                       <DeltaPp value={t.shareDelta} style={{ fontSize: "var(--fs-11)", flexShrink: 0 }} />
                     </span>
-                    <span style={{ fontFamily: MONO, fontSize: "var(--fs-14)", fontWeight: 800, color: C.ink, textAlign: "right", whiteSpace: "nowrap" }}>
-                      {t.sharePct.toFixed(1)}%
-                    </span>
-                    <Flow t={t} />
-                    {/* 아랫층. 요약이 없으면 그 사정을 적는다(빈 줄을 두면 줄 높이가 흔들린다). */}
+                    {/* 요약이 없으면 그 사정을 적는다(빈 칸을 두면 줄 높이가 흔들린다). */}
                     <span className="hz-theme-row-brief">
                       {t.briefLine ??
                         (t.topStocks.length
                           ? `최근 ${KADERA_WINDOW_DAYS}일 ${t.topStocks.map((s) => `${s.name} ${s.mentions}회`).join(" · ")}가 언급되었습니다.`
                           : `최근 ${KADERA_WINDOW_DAYS}일 사이 이 테마 종목이 채널에서 언급되지 않았습니다.`)}
                     </span>
+                    <span style={{ fontFamily: MONO, fontSize: "var(--fs-14)", fontWeight: 800, color: C.ink, textAlign: "right", whiteSpace: "nowrap" }}>
+                      {t.sharePct.toFixed(1)}%
+                    </span>
+                    <Flow t={t} />
                   </Link>
                 </li>
               ))}
