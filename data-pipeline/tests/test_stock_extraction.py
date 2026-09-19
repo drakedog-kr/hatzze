@@ -7,7 +7,7 @@ config/stock_extraction.py 의 AMBIGUOUS_NAMES 에 든 이름은 뒤에 붙은 �
 import pytest
 
 from config.stock_extraction import AMBIGUOUS_NAMES
-from extract_telegram_stocks import boundary_ok
+from extract_telegram_stocks import boundary_ok, build_pattern, extract
 
 
 def _ok(text: str, name: str, ambiguous: bool = True) -> bool:
@@ -58,3 +58,38 @@ def test_code_annotation_inside_a_word_does_not_fool_the_boundary():
 def test_front_boundary_rejects_mid_word_even_for_plain_names():
     assert _ok("삼성전자우", "삼성전자", ambiguous=False) is True  # 뒤는 안 본다(오탐 위험군 아님)
     assert _ok("신삼성전자", "삼성전자", ambiguous=False) is False  # 앞이 한글이면 남의 낱말
+
+
+# ── 2026-09-19 주간 유령 점검 첫 회에서 막은 자리 ─────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "text,name",
+    [
+        ("대산 LNG 발전소에 HRSG 공급", "HRS"),  # 배열회수보일러
+        ("미래대응기금 OCIO 위탁", "OCI"),
+        ("UNIST·DGIST 지원자", "DGI"),
+    ],
+)
+def test_latin_name_followed_by_latin_is_rejected_even_when_not_ambiguous(text, name):
+    assert _ok(text, name, ambiguous=False) is False
+
+
+def test_hangul_name_followed_by_latin_is_still_accepted():
+    assert _ok("SK하이닉스ADR 강세", "SK하이닉스", ambiguous=False) is True
+
+
+def test_hyphen_pairs_survive():
+    # 붙임표 뒤를 거부하는 규칙은 접었다 — 짝 표기가 같은 자리를 쓴다.
+    assert _ok("한화-EDGE 통합대공망", "한화") is True
+    assert _ok("아스트-거래재개", "아스트") is True
+
+
+def test_short_acronym_must_match_dictionary_case():
+    # 3글자 이하 라틴 약자는 표기가 사전과 다르면 다른 뜻(`SbS` 패키징, `New`). 긴 이름은 그대로.
+    match_to_code = {"SBS": "034120", "NEW": "160550", "NAVER": "035420"}
+    method = {k: "dict" for k in match_to_code}
+    pattern, caseless = build_pattern(list(match_to_code))
+    text = "엑시노스 SbS 구조 (New!!) Naver 제휴, SBS Biz"
+    found = extract(text, pattern, match_to_code, method, {"NEW"}, caseless)
+    assert set(found) == {"035420", "034120"}
