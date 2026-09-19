@@ -75,6 +75,13 @@ import { formatKstUpdate } from "@/lib/format";
  * '바로가기' 목록도 같은 값을 읽으므로, 여는 날 고칠 곳이 흩어지지 않는다.
  * 여는 절차와 왜 그렇게 모았는지는 그 파일 머리말에 있다.
  */
+/**
+ * 화면 사본(ISR)의 수명. 루트 기본값(1시간)보다 짧은 건 밤사이 시세가 10분마다 새로 오기
+ * 때문이다(lib/kr-overnight.ts REVALIDATE_SEC). 페이지가 194KB 라 10분마다 새로 적어도
+ * 하루 $0.02 안팎이다(2026-09-19 셈). ⚠️ 리터럴이어야 한다.
+ */
+export const revalidate = 600;
+
 const PUBLIC = PREVIEW_PUBLIC;
 
 /** 배포된 곳인가. Vercel 에서만 `VERCEL_ENV` 가 있고 로컬에는 없다 — 그래서 로컬에서는

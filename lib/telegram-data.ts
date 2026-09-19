@@ -616,9 +616,12 @@ type StockRow = {
  * KRX Open API는 며칠 지연돼 티커의 실시간 값과 크게 어긋나므로 표시용은 여기서 먼저
  * 가져오고, 실패하면 호출부가 KRX 저장 종가로 폴백한다.
  * 등락률을 못 내면 null을 준다 — 가격만 보여주면 변동을 오해할 수 있다.
+ * 캐시 30분: 이 fetch 의 revalidate 가 /kadera 사본의 주기를 정한다(가장 짧은 fetch 가
+ * 라우트 주기 — lib/supabase-server.ts). 600 이면 1.3MB 페이지가 10분마다 다시 그려진다.
+ * app/kadera/page.tsx 의 revalidate 1800 과 같은 값이어야 한다.
  */
 async function stockQuote(symbol: string): Promise<{ price: number; changeRate: number } | null> {
-  const q = await fetchYahooQuote(symbol, { next: { revalidate: 600 } });
+  const q = await fetchYahooQuote(symbol, { next: { revalidate: 1800 } });
   if (!q) return null;
   const changeRate = changeRateOf(q);
   return changeRate === null ? null : { price: q.price, changeRate };

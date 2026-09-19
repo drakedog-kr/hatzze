@@ -127,12 +127,14 @@ export type UsSurgingStock = {
  *
  * ⚠️ 내부자 리포트(lib/insider-data.ts)도 이 함수를 쓴다. 두 화면이 **같은 심볼 규칙과
  * 같은 캐시**를 타야 한 종목이 한쪽에서만 시세가 뜨는 일이 없다. 고칠 때 둘 다 볼 것.
+ * 캐시 30분: 이 fetch 의 revalidate 가 /kadera/us 와 /insider 사본의 주기를 정한다(가장 짧은
+ * fetch 가 라우트 주기 — lib/supabase-server.ts). app/kadera/us/page.tsx 의 1800 과 같은 값.
  */
 export async function usQuotes(tickers: string[]): Promise<Map<string, { price: number; changeRate: number | null }>> {
   const out = new Map<string, { price: number; changeRate: number | null }>();
   const got = await Promise.all(
     tickers.map(async (t) => {
-      const q = await fetchYahooQuote(yahooSymbol(t, "US"), { next: { revalidate: 900 } });
+      const q = await fetchYahooQuote(yahooSymbol(t, "US"), { next: { revalidate: 1800 } });
       return [t, q] as const;
     }),
   );

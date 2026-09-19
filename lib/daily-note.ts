@@ -251,7 +251,10 @@ function todayKst(now: Date): string {
 }
 
 /**
- * 야후 실시간 — 카더라 카드(lib/telegram-data stockQuote)와 같은 심볼 규칙·같은 캐시.
+ * 야후 실시간 — 카더라 카드(lib/telegram-data stockQuote)와 같은 심볼 규칙. 캐시는 10분으로
+ * 따로 둔다(카더라는 30분): 이 값이 /daily 와 오늘 노트 사본의 주기가 되는데(가장 짧은 fetch 가
+ * 라우트 주기 — lib/supabase-server.ts) 노트 페이지는 100KB 안팎이라 10분마다 다시 그려도 값이
+ * 미미하고, 오늘 글의 종목 카드는 당일가라 짧을수록 낫다.
  * 등락률을 못 내면 null 을 줘 호출부가 KRX 저장값을 그대로 쓰게 한다.
  */
 async function liveQuote(code: string, market: string | null): Promise<{ price: number; changeRate: number } | null> {

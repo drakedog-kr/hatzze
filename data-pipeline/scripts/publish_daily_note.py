@@ -60,8 +60,12 @@ date 가 기본 키라 upsert 다. 고친 원고를 반영하는 길이 이것�
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import re
 import sys
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -249,6 +253,33 @@ def main() -> None:
         print("[warning] daily_note.stocks 열이 없어 종목 없이 올립니다(마이그레이션 068). 돌린 뒤 다시 올리면 채워집니다.")
     db.table(TABLE).upsert(row, on_conflict="date").execute()
     print(f"[Supabase] {TABLE} {date_iso} 저장 — /daily/{date_iso}")
+    revalidate_site()
+
+
+REVALIDATE_URL = "https://hatzze.fun/api/revalidate"
+
+
+def revalidate_site() -> None:
+    """화면 사본(ISR)을 비운다. 안 비우면 올린 글이 최대 한 시간 뒤에 보인다.
+
+    화면은 자료가 바뀔 때만 새로 그리도록 돼 있고(app/layout.tsx revalidate 3600), 그 신호가
+    이 호출이다 — 파이프라인 워크플로의 마지막 스텝과 같은 문을 두드린다. 값은 .env.local 의
+    REVALIDATE_SECRET(Vercel 환경변수와 같은 값). 없거나 실패해도 올린 글은 그대로고, 한 시간
+    안에 스스로 새로 그리므로 여기서는 알리기만 한다.
+    """
+    secret = os.environ.get("REVALIDATE_SECRET", "").strip()
+    if not secret:
+        print("[revalidate] REVALIDATE_SECRET 이 없어 화면 사본을 못 비웁니다 — 한 시간 안에 스스로 새로 그립니다")
+        return
+    req = urllib.request.Request(REVALIDATE_URL, method="POST", headers={"Authorization": f"Bearer {secret}"})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as res:
+            body = json.loads(res.read().decode("utf-8") or "{}")
+        print(f"[revalidate] 화면 사본을 비웠습니다 — {body.get('revalidated', '')}")
+    except urllib.error.HTTPError as e:
+        print(f"[revalidate] 화면 사본 비우기가 {e.code} 로 끝났습니다 — 한 시간 안에 스스로 새로 그립니다")
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        print(f"[revalidate] 접속 실패({e}) — 한 시간 안에 스스로 새로 그립니다")
 
 
 if __name__ == "__main__":
