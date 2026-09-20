@@ -31,6 +31,9 @@
   --tx-tile: var(--c-soft);
   --tx-btn: rgba(255, 255, 255, 0.07);
   --tx-btn-hover: rgba(255, 255, 255, 0.12);
+  /* 끌고 있는 줄 — 다크는 그림자가 안 보여 한 단 밝은 면(backgroundLevel02) + 헤어라인으로 띄운다(2026-09-20 다크 검사). */
+  --tx-drag-bg: var(--c-float);
+  --tx-drag-shadow: 0 8px 22px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--c-line);
 }
 
 /* 시트: 모서리 12 → 20, 그림자는 더 넓고 옅게(토스 카드의 부유감). 헤어라인은 남긴다 —
@@ -1268,7 +1271,7 @@
 /* 떠 있는 줄의 판은 여백 쪽으로 넓혀 손잡이까지 안에 든다(음수 margin + 같은 padding — 칸 폭은 그대로). */
 .dv-trow-drag {
   position: relative; z-index: 2; transition: none; margin: 0 -10px 0 -30px; padding-left: 30px; padding-right: 10px;
-  background: var(--c-card); box-shadow: 0 6px 18px rgba(19, 66, 122, 0.14); border-radius: 8px; border-top-color: transparent; cursor: grabbing;
+  background: var(--tx-drag-bg, var(--c-card)); box-shadow: var(--tx-drag-shadow, 0 6px 18px rgba(19, 66, 122, 0.14)); border-radius: 8px; border-top-color: transparent; cursor: grabbing;
 }
 .dv-trow-drag .dv-tgrip { cursor: grabbing; }
 .dv-thead > span:nth-child(n + 3) { text-align: right; }
@@ -1278,7 +1281,8 @@
    종목·주수·평단은 그대로라 켜면 바로 되돌아온다. 라벨이 로고까지 감싸 로고를 눌러도 토글된다(폰 과녁). */
 .dv-tcheck { display: flex; flex-shrink: 0; align-items: center; gap: 10px; cursor: pointer; }
 .dv-tcheck input {
-  appearance: none; -webkit-appearance: none; width: 18px; height: 18px; margin: 0; border-radius: 5px; border: 1.5px solid var(--c-line);
+  /* 테두리는 --c-line 이 아니라 --c-muted 를 섞은 값 — --c-line 은 카드 위에서 1.15(다크 1.22)라 빈 상자가 안 보였다(2026-09-20 검사). */
+  appearance: none; -webkit-appearance: none; width: 18px; height: 18px; margin: 0; border-radius: 5px; border: 1.5px solid color-mix(in srgb, var(--c-muted) 70%, var(--c-card));
   background: var(--c-card) center / 12px no-repeat; cursor: pointer; transition: background-color 0.12s ease, border-color 0.12s ease;
 }
 .dv-tcheck:hover input { border-color: var(--c-blue); }
@@ -1596,8 +1600,8 @@
   /* 체크 22px. 이름 칸이 223px 뿐이라 사이 간격은 8px 로 — 10px 이면 알약 둘("배당성향 25%"·"5년 연 +27%")이 한 줄에 안 든다. */
   .dv-tname, .dv-tcheck { gap: 8px; }
   .dv-tcheck input { width: 22px; height: 22px; border-radius: 6px; background-size: 14px; }
-  /* 손잡이 — 폰 여백(18px) 안에 12px. 과녁은 세로로 길게(36px). */
-  .dv-tgrip { width: 12px; height: 36px; margin-left: -17px; background-size: 6px 7px; }
+  /* 손잡이 — 폰 여백(18px) 안에 12px. 과녁은 세로로 길게(36px)지만 점은 데스크톱처럼 세 줄만(padding + content-box). */
+  .dv-tgrip { width: 12px; height: 36px; margin-left: -17px; padding: 7.5px 0; background-size: 6px 7px; background-clip: content-box; }
   .dv-trow-drag { margin: 0 -6px 0 -18px; padding-left: 18px; padding-right: 6px; }
   /* 줄의 계좌 알약 — 21px 은 손가락엔 작다. 폰에선 28px 로(2026-09-17 검사). */
   .dv-tacct { padding: 5px 18px 5px 8px; width: 96px; font-size: var(--fs-12); background-position: right 6px center; }
