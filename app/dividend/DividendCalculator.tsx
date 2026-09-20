@@ -16,6 +16,7 @@ import { accountTag, DEFAULT_SHARES, GOAL_DEFAULT_MAN, ADD_DEFAULT_MAN, BASKET_R
 import type { Scope } from "./shared";
 import { SearchBox, QuickChips, MoreRows } from "./Search";
 import { HoldingsTable } from "./Holdings";
+import type { SortKey } from "./Holdings";
 import { MonthCalendar, Upcoming, MonthFill } from "./Calendar";
 import { GoalBox, AmountControl } from "./Goal";
 import { BasketSheet } from "./Basket";
@@ -254,6 +255,36 @@ export function DividendCalculator({
     track("dividend_remove", { stock_code: gaStockCode(holdings.find((h) => h.id === id)?.code ?? id) });
     setHoldings((prev) => prev.filter((h) => h.id !== id));
   };
+  // 순서 — 저장 순서가 곧 표 순서다. 줄 왼쪽 손잡이를 끌거나(마우스·터치) 손잡이에서 ↑↓ 로 옮긴다(2026-09-20 피드백 "목록 순서를 수정할 수 있게").
+  // 자리는 index 가 아니라 **그 자리에 있던 줄의 id** 로 받는다 — 표(lines)는 목록에 없는 종목의 줄을 건너뛰어 holdings 와 index 가 어긋날 수 있다.
+  // 빼서 그 id 자리에 끼우면 위로는 그 앞, 아래로는 그 뒤가 된다(빼면서 한 칸 당겨지니까).
+  const moveLine = (id: string, targetId: string, method: "drag" | "key") => {
+    if (id === targetId || !holdings.some((h) => h.id === id) || !holdings.some((h) => h.id === targetId)) return;
+    track("dividend_row_move", { method });
+    setHoldings((prev) => {
+      const from = prev.findIndex((h) => h.id === id);
+      const to = prev.findIndex((h) => h.id === targetId);
+      if (from < 0 || to < 0 || from === to) return prev;
+      const out = prev.slice();
+      const [h] = out.splice(from, 1);
+      out.splice(to, 0, h);
+      return out;
+    });
+  };
+  // 정렬 — 보기 모드가 아니라 순서 자체를 한 번 바꿔 저장한다. 그 뒤 손으로 옮기면 그 위에 이어진다. 값이 없는 줄(종가 없음 등)은 뒤로.
+  const sortLines = (key: SortKey) => {
+    track("dividend_sort", { key });
+    const by = new Map(lines.map((l) => [l.id, l]));
+    const num = (h: Holding) => {
+      const l = by.get(h.id);
+      if (!l) return -Infinity;
+      const v = key === "net" ? l.netKrw : key === "invest" ? l.investKrw : l.yieldPct;
+      return v ?? -Infinity;
+    };
+    setHoldings((prev) =>
+      prev.slice().sort((a, b) => (key === "name" ? (by.get(a.id)?.stock.name ?? a.code).localeCompare(by.get(b.id)?.stock.name ?? b.code, "ko") : num(b) - num(a))),
+    );
+  };
   // '담은 종목'은 종목 수다 — 한 종목을 두 계좌로 나눠 두 줄이어도 하나.
   const distinct = new Set(holdings.map((h) => h.code)).size;
   const clearAll = () => {
@@ -451,7 +482,7 @@ export function DividendCalculator({
             )}
           </div>
           {lines.length > 0 && (
-            <HoldingsTable lines={lines} inputs={inputs} totalInvest={invest} mode={taxMode} onClear={clearAll} onToggle={setLineOn} onAccount={setLineAccount} onSplit={splitLine} onShares={setShares} onCost={setCost} onRemove={remove} />
+            <HoldingsTable lines={lines} inputs={inputs} totalInvest={invest} mode={taxMode} onClear={clearAll} onToggle={setLineOn} onMove={moveLine} onSort={sortLines} onAccount={setLineAccount} onSplit={splitLine} onShares={setShares} onCost={setCost} onRemove={remove} />
           )}
           {lines.length > 0 && (
             <MonthCalendar
