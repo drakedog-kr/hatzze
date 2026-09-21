@@ -111,10 +111,20 @@ export function ReasonWeeks({
                     <StockLogo code={r.code} name={r.name} market={r.market} size={26} />
                     <span className="hz-theme-namerow">
                       <span className="hz-theme-name" style={{ ...clip, fontSize: "var(--fs-13-5)", fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>{r.name}</span>
+                      {/* 등락은 태그가 아니라 보통의 등락 글자(온도 잉크, 종목·카더라 화면과 같은 꼴). 태그는 '주인공' 표의 언급 변화 몫이다. */}
                       {r.changeRate == null ? (
-                        <span className="hz-theme-tag">{date === newestDate ? "종가 전" : "등락 없음"}</span>
+                        <span style={{ marginLeft: 8, fontSize: "var(--fs-11)", color: C.muted, whiteSpace: "nowrap" }}>{date === newestDate ? "종가 전" : "—"}</span>
                       ) : (
-                        <span className={`hz-theme-tag ${r.changeRate > 0 ? "is-up-2" : r.changeRate < 0 ? "is-down-2" : ""}`}>
+                        <span
+                          style={{
+                            marginLeft: 8,
+                            fontFamily: MONO,
+                            fontSize: "var(--fs-12-5)",
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                            color: r.changeRate > 0 ? "var(--c-hot-ink)" : r.changeRate < 0 ? "var(--c-cold-ink)" : C.sub2,
+                          }}
+                        >
                           {r.changeRate > 0 ? "▲" : r.changeRate < 0 ? "▼" : ""}
                           {Math.abs(r.changeRate).toFixed(2)}%
                         </span>
