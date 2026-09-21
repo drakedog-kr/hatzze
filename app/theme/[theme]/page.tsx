@@ -259,7 +259,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
               </span>
               {!d.loadFailed && (
                 <span style={{ fontSize: "var(--fs-12)", color: C.sub }}>
-                  최근 {KADERA_WINDOW_DAYS}일 채널에 오른 종목 <strong style={{ fontFamily: MONO, fontWeight: 800, color: C.ink }}>{mentionedCount}</strong>
+                  최근 {KADERA_WINDOW_DAYS}일 채널에 오른 종목 <strong style={{ fontFamily: MONO, fontWeight: 800, color: C.ink }}>{mentionedCount}</strong>개
                 </span>
               )}
             </div>
