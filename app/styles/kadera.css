@@ -375,12 +375,20 @@
 .hz-theme-tag.is-down-1 { background: color-mix(in srgb, var(--c-blue-2) 24%, var(--c-card)); color: var(--c-ink); }
 .hz-theme-tag.is-down-2 { background: color-mix(in srgb, var(--c-blue-2) 45%, var(--c-card)); color: var(--c-ink); }
 .hz-theme-tag.is-down-3 { background: color-mix(in srgb, var(--c-blue-2) 66%, var(--c-card)); color: var(--c-ink); }
-/* '등락의 이유' 표. 열 머리 위에 선(위 주간 캡션과 가른다), 마지막 줄 밑선 없음(아래는 지난주 단추). */
-.hz-reason-table > .hz-thead { border-top: 1px solid var(--c-hairline); }
-.hz-reason-table > :last-child { border-bottom: 0; }
-/* 등락의 이유: 날짜(9/21·요일) · 종목(로고 · 이름 + 등락 태그, 폭 고정이라 까닭이 세로로 나란하다) · 까닭(남는 폭) · 채널 수. */
+/* '등락의 이유' 날짜 묶음. 머리는 날짜 · 오늘 알약 · 건수. 머리 아래 선 하나로 그날 줄을 받치고, 묶음의 마지막 줄은 밑선 없이
+   다음 머리의 위 여백(20px)이 가른다 — 선과 여백을 둘 다 두면 경계가 두 겹이다. 첫 머리는 위 주간 캡션과 이미 떨어져 있어 여백이 작다. */
+.hz-reason-day-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 26px 9px;
+  border-bottom: 1px solid var(--c-hairline);
+}
+.hz-reason-day:first-child > .hz-reason-day-head { padding-top: 12px; }
+.hz-reason-day > .hz-trow:last-child { border-bottom: 0; }
+/* 등락의 이유: 종목(로고 · 이름 + 등락 태그, 폭 고정이라 까닭이 세로로 나란하다) · 까닭(남는 폭) · 채널 수(오른쪽 끝). */
 .hz-cols-theme-reason {
-  grid-template-columns: 40px 230px minmax(0, 1fr) 44px;
+  grid-template-columns: 240px minmax(0, 1fr) 76px;
   gap: 16px;
   align-items: center;
 }

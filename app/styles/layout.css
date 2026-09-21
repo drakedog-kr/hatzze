@@ -87,16 +87,15 @@
   .hz-theme-stock-cols > :nth-child(6):not(:last-child) { border-bottom: 1px solid var(--c-hairline); }
   /* 한 열에선 둘째 열 머리(7번째)가 목록 한가운데 서니 감춘다. */
   .hz-theme-stock-cols > .hz-thead:nth-child(7) { display: none; }
-  /* '등락의 이유' 표: 종목 칸 230px 이 남는 폭을 먹어 까닭이 좁아지니, 까닭을 둘째 줄로 내려 줄 폭을 다 준다. */
+  /* '등락의 이유': 종목 칸 240px 이 남는 폭을 먹어 까닭이 좁아지니, 까닭을 둘째 줄로 내려 줄 폭을 다 준다. */
   .hz-cols-theme-reason {
-    grid-template-columns: 40px minmax(0, 1fr) 44px;
-    gap: 6px 14px;
+    grid-template-columns: minmax(0, 1fr) 76px;
+    gap: 5px 14px;
   }
-  .hz-cols-theme-reason > :nth-child(3) {
-    grid-column: 2 / -1;
+  .hz-cols-theme-reason > :nth-child(2) {
+    grid-column: 1 / -1;
     order: 4;
   }
-  .hz-thead.hz-cols-theme-reason > :nth-child(3) { display: none; }
   /* 2열 이하부터 여백을 깎는다(위 '반응형 여백' 주석 참고).
      커스텀 속성은 반드시 셀렉터 안에 둔다 — @media 바로 밑에 쓰면 선언이 통째로 버려진다. */
   :root { --hz-main-pad: 22px; --hz-card-pad: 18px; }
@@ -595,7 +594,8 @@
     padding-left: 16px;
     padding-right: 16px;
   }
-  .hz-agenda-day {
+  .hz-agenda-day,
+  .hz-reason-day-head {
     padding-left: 16px;
     padding-right: 16px;
   }
