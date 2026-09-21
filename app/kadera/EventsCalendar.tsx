@@ -72,8 +72,10 @@ export function EventsCalendar({ events, today, weeks = 5 }: { events: CalEvent[
     return m;
   }, [events]);
   const dates = useMemo(() => [...byDate.keys()].sort(), [byDate]);
-  // 처음 고른 날 = 오늘 이후 일정이 있는 첫날. 없으면 오늘.
-  const [sel, setSel] = useState<string>(() => dates.find((d) => d >= today) ?? today);
+  // 처음 고른 날 = **오늘**. 예전엔 오늘 이후 일정이 있는 첫날을 골라 두었는데, 그러면 진한 파랑이 열흘 뒤 날짜에 앉고
+  // 오늘은 테두리만 남아 "오늘이 어디지"부터 찾게 됐다(2026-09-21 지적). 오늘 일정이 없어도 오른쪽은 비지 않는다 —
+  // 가장 가까운 일정 안내와 '다음으로 짚인 날' 미리보기가 선다.
+  const [sel, setSel] = useState<string>(today);
   // 고른 날의 줄은 SHOW 개까지만 펴 둔다. 열한 건짜리 날이 판을 세 배로 늘리던 것을 막는다(2026-09-06).
   // 펼침은 날짜에 묶어 둔다 — 다른 날로 옮기면 저절로 접힌다.
   const SHOW = 4;
