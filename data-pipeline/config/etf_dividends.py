@@ -154,4 +154,17 @@ US_ETFS: list[dict] = [
     {"code": "TLTW", "name_ko": "TLTW", "name_en": "iShares 20+ Year Treasury Bond BuyWrite Strategy ETF", "cadence": "월", "source": "https://www.ishares.com/us/products/329118/"},
     {"code": "LQDW", "name_ko": "LQDW", "name_en": "iShares Investment Grade Corporate Bond BuyWrite Strategy ETF", "cadence": "월", "source": "https://www.ishares.com/us/products/329120/"},
     {"code": "HYGW", "name_ko": "HYGW", "name_en": "iShares High Yield Corporate Bond BuyWrite Strategy ETF", "cadence": "월", "source": "https://www.ishares.com/us/products/329119/"},
+    # BTCI 요청(2026-09-21)에 같은 결의 인컴 ETF 를 함께 — NEOS 비트코인·현금·채권, 프로셰어즈 비트코인 선물·데일리 커버드콜, 디파이언스 주분배·목표분배.
+    # JEPY 는 2026년에 WDTE 로 이름을 바꿨다(stockanalysis 도 WDTE 로 넘어간다). 전부 지난 1년 지급 건·Finnhub 시세 확인.
+    {"code": "BTCI", "name_ko": "BTCI", "name_en": "NEOS Bitcoin High Income ETF", "cadence": "월", "source": "https://neosfunds.com/btci/"},
+    {"code": "CSHI", "name_ko": "CSHI", "name_en": "NEOS Enhanced Income 1-3 Month T-Bill ETF", "cadence": "월", "source": "https://neosfunds.com/cshi/"},
+    {"code": "BNDI", "name_ko": "BNDI", "name_en": "NEOS Enhanced Income Aggregate Bond ETF", "cadence": "월", "source": "https://neosfunds.com/bndi/"},
+    {"code": "BITO", "name_ko": "BITO", "name_en": "ProShares Bitcoin ETF", "cadence": "월", "source": "https://www.proshares.com/our-etfs/strategic/bito"},
+    {"code": "ISPY", "name_ko": "ISPY", "name_en": "ProShares S&P 500 High Income ETF", "cadence": "월", "source": "https://www.proshares.com/our-etfs/strategic/ispy"},
+    {"code": "IQQQ", "name_ko": "IQQQ", "name_en": "ProShares Nasdaq-100 High Income ETF", "cadence": "월", "source": "https://www.proshares.com/our-etfs/strategic/iqqq"},
+    {"code": "SPYT", "name_ko": "SPYT", "name_en": "Defiance S&P 500 Income Target ETF", "cadence": "월", "source": "https://www.defianceetfs.com/spyt/"},
+    {"code": "QQQT", "name_ko": "QQQT", "name_en": "Defiance Nasdaq 100 Income Target ETF", "cadence": "월", "source": "https://www.defianceetfs.com/qqqt/"},
+    {"code": "QQQY", "name_ko": "QQQY", "name_en": "Defiance Nasdaq 100 Weekly Distribution ETF", "cadence": "주", "source": "https://www.defianceetfs.com/qqqy/"},
+    {"code": "WDTE", "name_ko": "WDTE", "name_en": "Defiance S&P 500 Weekly Distribution ETF", "cadence": "주", "source": "https://www.defianceetfs.com/jepy/"},
+    {"code": "IWMY", "name_ko": "IWMY", "name_en": "Defiance R2000 Weekly Distribution ETF", "cadence": "주", "source": "https://www.defianceetfs.com/iwmy/"},
 ]
