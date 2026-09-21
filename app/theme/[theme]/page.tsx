@@ -196,9 +196,10 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
   const counted = d.trend.filter((p) => p.rank != null);
   const peak = counted.reduce<ThemeTrendPoint | null>((best, p) => (best == null || p.share > best.share ? p : best), null);
   const avgShare = counted.length ? counted.reduce((sum, p) => sum + p.share, 0) / counted.length : null;
-  // 평소 대비 — 최근 사흘 점유율을 30일 평균으로 나눈 것. 1 미만은 '배'로 적으면 손해로 읽혀 %로 적는다(feedback_ratio_copy_reads_as_loss).
-  const vsUsual = d.recentShare != null && avgShare ? d.recentShare / avgShare : null;
-  const vsUsualText = vsUsual == null ? "—" : vsUsual >= 1 ? `평소의 ${vsUsual.toFixed(1)}배` : `평소의 ${Math.round(vsUsual * 100)}%`;
+  // 평소 대비 — 최근 사흘 점유율을 30일 평균으로 나눈 것을 "+20%"·"−30%"로. 표의 태그("평소 대비 −35% 언급")와 같은 꼴이고,
+  // 숫자만 두어야 옆의 53.6%·36.5% 와 같은 크기로 읽힌다("평소의 1.2배"는 같은 15px 인데 한글이 커 보였다, 2026-09-21).
+  const vsUsual = d.recentShare != null && avgShare ? Math.round((d.recentShare / avgShare - 1) * 100) : null;
+  const vsUsualText = vsUsual == null ? "—" : vsUsual === 0 ? "±0%" : `${vsUsual > 0 ? "+" : "−"}${Math.abs(vsUsual)}%`;
   const recentSet = new Set(d.recentDays);
   // 칸 1 의 종목 알약 — 최근 사흘 말이 많은 순. 집계가 없으면 사전 순서.
   const chipStocks = (d.hotStocks.length ? d.hotStocks : d.members).slice(0, HERO_CHIPS);
