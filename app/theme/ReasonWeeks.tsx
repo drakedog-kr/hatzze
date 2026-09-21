@@ -55,6 +55,9 @@ export function ReasonWeeks({ rows, latest, earliest }: { rows: ThemeReasonRow[]
     return [...m.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1)).map(([date, list]) => [date, list.sort((a, b) => b.channelCount - a.channelCount)] as const);
   }, [rows, start, end]);
   const total = days.reduce((n, [, list]) => n + list.length, 0);
+  // 가장 최근 날의 등락률은 다음 날 낮에 채워진다(KRX 가 그날 종가를 이튿날 준다 — generate_move_reasons.fill_krx).
+  // 빈칸으로 두면 "왜 없지"가 되니 그날 줄엔 '종가 전'이라고 적는다. 그보다 옛날의 빈칸은 시세가 없는 종목이라 "—".
+  const newestDate = rows.reduce((m, r) => (r.date > m ? r.date : m), "");
 
   return (
     <div>
@@ -83,7 +86,11 @@ export function ReasonWeeks({ rows, latest, earliest }: { rows: ThemeReasonRow[]
                   <span style={{ ...clip, fontSize: "var(--fs-12-5)", fontWeight: 700, color: C.ink }}>{r.name}</span>
                 </Link>
                 <span style={{ fontSize: "var(--fs-12)", textAlign: "right" }}>
-                  <Rate rate={r.changeRate} />
+                  {r.changeRate == null ? (
+                    <span style={{ fontSize: "var(--fs-11)", color: C.muted, whiteSpace: "nowrap" }}>{date === newestDate ? "종가 전" : "—"}</span>
+                  ) : (
+                    <Rate rate={r.changeRate} />
+                  )}
                 </span>
                 <span style={{ minWidth: 0, fontSize: "var(--fs-13)", lineHeight: 1.6, color: C.inkSoft, wordBreak: "keep-all", textWrap: "pretty" }}>
                   {r.reason}
