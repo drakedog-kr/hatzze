@@ -62,12 +62,12 @@ TABLE = "telegram_theme_brief"
 
 # 화면에 싣는 발췌 수와, digest 로 모델에 주는 발췌 수. 화면은 다섯이면 한 화면에 들어오고,
 # 모델은 조금 더 봐야 한 종목 얘기에 쏠리지 않는다.
-# 화면은 여섯 — 카더라 트렌딩과 같은 패널 격자(3열·2열)라 여섯이면 어느 폭에서도 줄이 찬다(2026-09-21).
-# 모델은 열을 본다 — 두 문단을 쓰려면 한 종목 얘기만으론 모자란다.
-EXCERPTS_SHOWN = 6
+# 화면은 처음 여섯을 보이고 '더 보기'로 여섯씩 편다(카더라 트렌딩과 같은 패널 격자·같은 단추, 2026-09-21).
+# 세 번 펼칠 만큼 저장한다 — 글 하나 600자라 18건이면 행당 11KB 안팎이다.
+EXCERPTS_SHOWN = 18
 EXCERPTS_DIGEST = 10
 # 본문 후보를 넉넉히 받는 이유는 공백뿐인 본문과 복붙(같은 글이 여러 채널에)이 섞여서다.
-EXCERPT_CANDIDATES = 24
+EXCERPT_CANDIDATES = 48
 # 저장하는 본문 길이. 화면은 네 줄로 자르지만 원문 링크 전엔 조금 더 읽힌다.
 # 긴 글(공시 정리·특징주 정리)은 이 테마 종목이 뒤쪽에 있어 머리만 저장하면 화면에 그 종목이
 # 안 보인다(첫 실행에서 로봇 #5 가 그랬다). 그래서 머리 + 줄임표 + 종목이 적힌 자리 주변을 담는다.
@@ -331,7 +331,7 @@ def build_theme_bundle(
             continue
         seen.add(dk)
         picked.append((k, m))
-        if len(picked) >= EXCERPTS_DIGEST:
+        if len(picked) >= max(EXCERPTS_DIGEST, EXCERPTS_SHOWN):
             break
 
     def needle_for(k: tuple) -> str | None:
@@ -367,7 +367,7 @@ def build_theme_bundle(
     # 한 줄로 되돌아온다(THEME_SYSTEM 의 같은 항목). 표에는 그대로 저장한다.
     lines.append("")
     lines.append("[대표 메시지 발췌]")
-    for k, m in picked:
+    for k, m in picked[:EXCERPTS_DIGEST]:
         lines.append(f"- {KR.excerpt(m['text'], needle_for(k))}")
 
     return {

@@ -21,6 +21,7 @@ import { pageMetadata } from "../../seo";
 import { THEME_PUBLIC } from "../../screen-flags";
 import { StockLogo } from "../../StockLogo";
 import { EventsCalendar } from "../../kadera/EventsCalendar";
+import { ExpandableList } from "../../kadera/ExpandableList";
 import { Avatar, DeltaPp, Pill, RankDelta } from "../../kadera/parts";
 import { SectionHead } from "../../kadera/SectionHead";
 import TimeAgo from "../../kadera/TimeAgo";
@@ -88,21 +89,22 @@ export async function generateMetadata({ params }: { params: Promise<{ theme: st
  * 점으로 얹는다. 다른 테마 사이트의 차트가 이유가 있는 날에 원을 찍는 형식을 가져온 것이다.
  * 점을 누르면 아래 까닭 이력의 그 날짜로 간다.
  */
-function Trend({ points }: { points: ThemeTrendPoint[] }) {
+function Trend({ points, recent }: { points: ThemeTrendPoint[]; recent: Set<string> }) {
   const max = Math.max(0.1, ...points.map((p) => p.share));
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 96, padding: "10px 0 0" }}>
+    <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 104, padding: "10px 0 0" }}>
       {points.map((p, i) => {
         const at = i / Math.max(1, points.length - 1);
         const edge = at > 0.72 ? " hz-tip-end" : at < 0.28 ? " hz-tip-start" : "";
         const tip = `${fmtKoDate(p.date)} · 점유율 ${p.share.toFixed(1)}%${p.rank ? ` · ${p.rank}위` : ""}${p.hasReason ? " · 까닭 있음" : ""}`;
+        // 최근 사흘(위 점유율 칸이 재는 날들)만 진한 파랑, 그 전은 옅은 파랑 — 히어로의 두 칸이 같은 날을 가리킨다.
         const bar = (
           <span
             style={{
               width: "100%",
               height: `${Math.max(p.share ? 3 : 1, (p.share / max) * 100)}%`,
-              borderRadius: 2,
-              background: p.share ? C.blue : C.track,
+              borderRadius: 3,
+              background: !p.share ? C.track : recent.has(p.date) ? C.blue : "var(--c-blue-3)",
             }}
           />
         );
@@ -143,16 +145,25 @@ function Trend({ points }: { points: ThemeTrendPoint[] }) {
   );
 }
 
-/** 히어로 둘째 칸의 한 줄(종목 화면의 Stat 과 같은 꼴). */
-function Stat({ label, value, sub }: { label: string; value: React.ReactNode; sub?: string }) {
+/** 히어로의 작은 숫자 하나 — 값 위, 이름 아래(내부자 리포트 히어로의 기간 수익률과 같은 꼴). */
+function Fig({ label, value, sub }: { label: string; value: React.ReactNode; sub?: React.ReactNode }) {
   return (
-    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
-      <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub, whiteSpace: "nowrap" }}>{label}</span>
-      <span style={{ textAlign: "right", minWidth: 0 }}>
-        <strong style={{ fontFamily: MONO, fontSize: "var(--fs-13)", fontWeight: 800, color: C.ink }}>{value}</strong>
-        {sub && <span style={{ fontSize: "var(--fs-11)", color: C.muted, marginLeft: 5 }}>{sub}</span>}
+    <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+      <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+        <strong style={{ fontFamily: MONO, fontSize: "var(--fs-15)", fontWeight: 800, color: C.ink, letterSpacing: "-.01em", whiteSpace: "nowrap" }}>{value}</strong>
+        {sub}
       </span>
-    </div>
+      <span style={{ fontSize: "var(--fs-11)", color: C.muted, whiteSpace: "nowrap" }}>{label}</span>
+    </span>
+  );
+}
+
+/** 히어로 칸 제목 옆 물음표(SectionHead 의 noteHelp 와 같은 툴팁). 긴 설명을 칸 안에 문단으로 두지 않는다. */
+function HelpTip({ text, ga }: { text: string; ga: string }) {
+  return (
+    <span className="hz-tip hz-tip-wide hz-tip-start" data-tip={text} data-ga-tip={ga} style={{ display: "inline-flex", cursor: "help" }}>
+      <Icon name="help" style={{ fontSize: "var(--fs-12)", color: C.muted }} />
+    </span>
   );
 }
 
@@ -168,12 +179,17 @@ function Empty({ children }: { children: React.ReactNode }) {
 
 const clip: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
 
+/** 히어로 첫 칸의 종목 알약 수. 여섯이면 230px 칸에서 두 줄이다. */
+const HERO_CHIPS = 6;
 /** '지금 말 많은 종목' 표의 줄 수. 지도가 전체를 보이니 표는 상위 다섯이면 된다(2026-09-21). */
 const HOT_ROWS = 5;
 /** 달력이 보이는 날수. 카더라 '다가오는 일정'과 같은 5주. */
 const CALENDAR_DAYS = 35;
 /** 달력 아래 '달·분기만 짚인 일정'의 최대 줄 수. 더 보기는 두지 않는다. */
 const VAGUE_ROWS = 6;
+/** 발췌는 처음 여섯, '더 보기'로 여섯씩(카더라 트렌딩과 같은 단추). 파이프라인이 18건까지 저장한다(EXCERPTS_SHOWN). */
+const EXCERPTS_INITIAL = 6;
+const EXCERPTS_STEP = 6;
 
 /** 조회·전달 수의 짧은 꼴. 카더라 트렌딩(app/kadera/page.tsx compact)과 같은 규칙이다. */
 function compact(n: number): string {
@@ -197,6 +213,14 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
   const totalMentions = d.hotStocks.reduce((s, x) => s + x.mentions, 0);
   const trendFrom = d.trend[0]?.date;
   const trendTo = d.trend[d.trend.length - 1]?.date;
+  // 추이 위 작은 숫자 셋 — 최고인 날 · 집계가 있는 날의 평균 · 까닭이 붙은 날 수.
+  const counted = d.trend.filter((p) => p.rank != null);
+  const peak = counted.reduce<ThemeTrendPoint | null>((best, p) => (best == null || p.share > best.share ? p : best), null);
+  const avgShare = counted.length ? counted.reduce((sum, p) => sum + p.share, 0) / counted.length : null;
+  const reasonDayCount = d.trend.filter((p) => p.hasReason).length;
+  const recentSet = new Set(d.recentDays);
+  // 칸 1 의 종목 알약 — 최근 사흘 말이 많은 순. 집계가 없으면 사전 순서.
+  const chipStocks = (d.hotStocks.length ? d.hotStocks : d.members).slice(0, HERO_CHIPS);
 
   // 일정은 카더라와 같은 달력이다(2026-09-21 "달력 형태로"). 달력엔 **날짜가 적혀 있던 것(day)**만, 앞으로 5주.
   // 달·분기·연 단위는 놓을 칸이 없고 모델이 "연말"을 12-31 로 굳혀 쓴 값이라 칸에 두면 거짓이 된다(카더라와 같은 규칙).
@@ -237,39 +261,44 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
       {/* ── 히어로 ── 세 칸. 테마 정체 · 최근 사흘 점유율 · 30일 추이. 제목(h1)은 셸이 위에 그린다. */}
       <section className="hz-sheet">
         <div className="hz-kd-hero">
+          {/* 칸 1 — 테마 정체. 큰 수(종목 수) · 최근 사흘 채널에 오른 종목 수 · 말이 많은 순 종목 알약(로고 포함).
+              ⚠️ 알약은 회색 칩(--c-chip)이 아니라 **카드색 + 테두리**다. 회색 타일 위에 회색 칩을 두면 경계가 안 보인다
+              (2026-09-21 지적). 긴 설명("손으로 고른 대표 종목 묶음")은 제목 옆 물음표로 내렸다. */}
           <div className="hz-kd-hero-q">
             <div className="hz-kd-hero-title">
               <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>이 테마는</span>
+              <HelpTip
+                ga="theme_members"
+                text={`${withTopicParticle(theme)} 손으로 고른 대표 종목 묶음입니다. 업종 전체가 아니라 채널에서 이 테마로 불리는 종목들입니다. 알약은 최근 ${KADERA_WINDOW_DAYS}일 말이 많은 순입니다.`}
+              />
             </div>
-            <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
-              <strong style={{ fontFamily: MONO, fontSize: "var(--fs-24)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>{d.members.length}</strong>
-              <span style={{ fontSize: "var(--fs-17)", fontWeight: 600, color: C.sub }}>종목</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
+                <strong style={{ fontFamily: MONO, fontSize: "var(--fs-24)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>{d.members.length}</strong>
+                <span style={{ fontSize: "var(--fs-17)", fontWeight: 600, color: C.sub }}>종목</span>
+              </span>
               {!d.loadFailed && (
                 <span style={{ fontSize: "var(--fs-12)", color: C.sub }}>
-                  중 최근 {KADERA_WINDOW_DAYS}일 언급 {mentionedCount}종목
+                  최근 {KADERA_WINDOW_DAYS}일 채널에 오른 종목 <strong style={{ fontFamily: MONO, fontWeight: 800, color: C.ink }}>{mentionedCount}</strong>
                 </span>
               )}
-            </span>
-            <p style={{ margin: 0, fontSize: "var(--fs-12)", color: C.sub, lineHeight: 1.7, wordBreak: "keep-all", textWrap: "pretty" }}>
-              {withTopicParticle(theme)} 손으로 고른 대표 종목 묶음입니다. 업종 전체가 아니라 채널에서 이 테마로 불리는 종목들입니다.
-            </p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {d.members.slice(0, 8).map((m) => (
-                <Link
-                  key={m.code}
-                  href={stockHref(m.code)}
-                  style={{ display: "inline-flex", alignItems: "center", padding: "4px 9px", borderRadius: R.pill, background: C.chip, fontSize: "var(--fs-11)", fontWeight: 600, color: C.label, textDecoration: "none", whiteSpace: "nowrap" }}
-                >
+            </div>
+            <div className="hz-theme-chips">
+              {chipStocks.map((m) => (
+                <Link key={m.code} href={stockHref(m.code)} className="hz-theme-chip">
+                  <StockLogo code={m.code} name={m.name} market={m.market} size={16} />
                   {m.name}
                 </Link>
               ))}
-              {d.members.length > 8 && <span style={{ fontSize: "var(--fs-11)", color: C.muted, alignSelf: "center" }}>외 {d.members.length - 8}종목</span>}
+              {d.members.length > chipStocks.length && <span className="hz-theme-chip hz-theme-chip-more">+{d.members.length - chipStocks.length}</span>}
             </div>
           </div>
 
+          {/* 칸 2 — 최근 사흘 점유율. 큰 수 + 변화 알약, 그 아래 순위·언급 합 두 숫자. 정의는 물음표로. */}
           <div className="hz-kd-hero-q">
             <div className="hz-kd-hero-title">
               <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>최근 {KADERA_WINDOW_DAYS}일 점유율</span>
+              <HelpTip ga="theme_share" text="점유율은 그날 언급된 전 종목의 주목도 중 이 테마 종목의 몫입니다. 스물여섯 테마를 다 더하면 100%입니다. 변화는 닷새 넘게 이전과 견준 값입니다." />
             </div>
             {d.loadFailed || d.recentShare == null ? (
               <p style={{ margin: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub, lineHeight: 1.7 }}>
@@ -284,29 +313,34 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
                   </strong>
                   <DeltaPp value={d.shareDelta} style={{ fontSize: "var(--fs-12)" }} />
                 </span>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <Stat
+                <div className="hz-theme-figs">
+                  <Fig
                     label="테마 순위"
                     value={d.recentRank ? `${d.recentRank}위` : "—"}
-                    sub={d.rankChange === null ? undefined : d.rankChange === 0 ? "그대로" : undefined}
+                    sub={
+                      d.rankChange === null ? undefined : d.rankChange === 0 ? (
+                        <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>그대로</span>
+                      ) : (
+                        <RankDelta change={d.rankChange} />
+                      )
+                    }
                   />
-                  {d.rankChange !== null && d.rankChange !== 0 && (
-                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                      <RankDelta change={d.rankChange} />
-                    </div>
-                  )}
-                  <Stat label="언급 합" value={`${totalMentions.toLocaleString("ko-KR")}회`} />
+                  <Fig label="언급 합" value={`${totalMentions.toLocaleString("ko-KR")}회`} />
                 </div>
-                <span style={{ fontSize: "var(--fs-11)", color: C.muted, lineHeight: 1.6, wordBreak: "keep-all" }}>
-                  점유율은 그날 언급된 전 종목의 주목도 중 이 테마 종목의 몫입니다. 변화는 닷새 넘게 이전과 견준 값입니다.
-                </span>
               </>
             )}
           </div>
 
+          {/* 칸 3(넓은 칸) — 30일 추이. 위에 작은 숫자 셋(최고·평균·까닭 붙은 날), 막대는 최근 사흘만 진하게, 아래 범례. */}
           <div className="hz-kd-hero-h">
             <div className="hz-kd-hero-title">
               <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>{THEME_TREND_DAYS}일 점유율 추이</span>
+              <span style={{ flex: 1 }} />
+              {trendFrom && trendTo && (
+                <span style={{ fontSize: "var(--fs-11)", color: C.muted, whiteSpace: "nowrap" }}>
+                  {fmtKoDate(trendFrom)} ~ {fmtKoDate(trendTo)}
+                </span>
+              )}
             </div>
             {d.loadFailed ? (
               <p style={{ margin: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub, lineHeight: 1.7 }}>
@@ -314,18 +348,26 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
               </p>
             ) : (
               <>
-                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
-                  <span style={{ fontSize: "var(--fs-12)", color: C.sub, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                    <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 999, background: "var(--c-hot-ink)", display: "inline-block" }} />
-                    점은 종목에 까닭 한 줄이 붙은 날입니다
-                  </span>
-                  {trendFrom && trendTo && (
-                    <span style={{ fontSize: "var(--fs-11)", color: C.muted, whiteSpace: "nowrap" }}>
-                      {fmtKoDate(trendFrom)} ~ {fmtKoDate(trendTo)}
-                    </span>
-                  )}
+                <div className="hz-theme-figs hz-theme-figs-row">
+                  <Fig label={peak ? `최고 · ${fmtKoDate(peak.date)}` : "최고"} value={peak ? `${peak.share.toFixed(1)}%` : "—"} />
+                  <Fig label={`${THEME_TREND_DAYS}일 평균`} value={avgShare == null ? "—" : `${avgShare.toFixed(1)}%`} />
+                  <Fig label="까닭이 붙은 날" value={`${reasonDayCount}일`} />
                 </div>
-                <Trend points={d.trend} />
+                <Trend points={d.trend} recent={recentSet} />
+                <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", fontSize: "var(--fs-11)", color: C.sub }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                    <span aria-hidden="true" style={{ width: 10, height: 10, borderRadius: 3, background: C.blue, display: "inline-block" }} />
+                    최근 {KADERA_WINDOW_DAYS}일
+                  </span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                    <span aria-hidden="true" style={{ width: 10, height: 10, borderRadius: 3, background: "var(--c-blue-3)", display: "inline-block" }} />
+                    그 전
+                  </span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                    <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 999, background: "var(--c-hot-ink)", display: "inline-block" }} />
+                    종목에 까닭 한 줄이 붙은 날. 누르면 그 주로 갑니다
+                  </span>
+                </div>
               </>
             )}
           </div>
@@ -484,8 +526,13 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
         {!d.brief || d.brief.excerpts.length === 0 ? (
           <Empty>{d.brief ? "최근 사흘 사이 이 테마 종목이 언급된 글을 찾지 못했습니다." : "요약과 함께 매일 저녁 실행 뒤에 채워집니다."}</Empty>
         ) : (
-          <ul className="hz-panelgrid hz-panelgrid-auto" style={{ listStyle: "none", margin: 0 }}>
-            {d.brief.excerpts.map((m, i) => (
+          <ExpandableList
+            name="theme_excerpts"
+            initial={EXCERPTS_INITIAL}
+            step={EXCERPTS_STEP}
+            listClassName="hz-panelgrid hz-panelgrid-auto"
+            footerClassName="hz-sheet-foot-row"
+            items={d.brief.excerpts.map((m, i) => (
               <li key={`${m.channelHandle}-${m.messageId}`} className="hz-lift" style={{ display: "flex", padding: "16px 18px", gap: 12, minWidth: 0 }}>
                 <a
                   href={`https://t.me/${m.channelHandle}/${m.messageId}`}
@@ -550,7 +597,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
                 </a>
               </li>
             ))}
-          </ul>
+          />
         )}
       </section>
 
