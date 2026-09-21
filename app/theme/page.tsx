@@ -2,9 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { assertLoaded } from "@/lib/load-state";
-import { KADERA_WINDOW_DAYS, getSurgingOneliners } from "@/lib/telegram-data";
-import { isLoadFailed } from "@/lib/load-state";
+import { KADERA_WINDOW_DAYS } from "@/lib/telegram-data";
 import { fmtKoDate, stockHref } from "@/lib/stock-page";
 import {
   RISER_MAX,
@@ -93,10 +91,7 @@ function riserDelta(r: ThemeRiser): string {
 
 export default async function ThemeIndexPage() {
   if (!PUBLIC && DEPLOYED) notFound();
-  const [themes, risers, oneliners] = await Promise.all([listThemeOverview(), listThemeRisers(), getSurgingOneliners()]);
-  assertLoaded("/theme", { oneliners });
-  // 말이 는 종목의 한 줄 까닭. 급부상 한 줄 요약과 같은 표에 파이프라인(generate_theme_briefs)이 써 둔다.
-  const reasonOf = isLoadFailed(oneliners) ? {} : oneliners;
+  const [themes, risers] = await Promise.all([listThemeOverview(), listThemeRisers()]);
 
   const flowDates = themes?.[0]?.flowDates ?? [];
   const top = themes?.slice(0, 3) ?? [];
@@ -147,8 +142,9 @@ export default async function ThemeIndexPage() {
         )}
       </section>
 
-      {/* ── 테마 안에서 말이 는 종목 ── 테마마다 앞 사흘보다 언급이 가장 많이 는 종목 하나. 종목 지도(테마 화면)가
-          색으로 보이는 것을 한 줄씩 모았다. 카더라의 급부상(시장 전체 상위 여섯)과 대상이 다르다. */}
+      {/* ── 갑자기 많이 언급된 종목 ── 테마마다 앞 사흘보다 언급이 가장 많이 는 종목 하나와 까닭. 종목 지도(테마 화면)가
+          색으로 보이는 것을 한 줄씩 모았다. 카더라의 급부상(시장 전체 상위 여섯)과 대상이 다르다. 고르는 것도
+          까닭을 쓰는 것도 파이프라인이고(generate_theme_briefs.py) 화면은 요약 행의 riser 를 읽는다. */}
       <section className="hz-sheet">
         <SectionHead
           icon="trending_up"
@@ -161,7 +157,7 @@ export default async function ThemeIndexPage() {
         />
         {risers === null ? (
           <p style={{ margin: 0, padding: "16px 22px 20px", fontSize: "var(--fs-12)", color: C.sub, lineHeight: 1.7 }}>
-            종목 집계를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오.
+            테마 요약을 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오.
           </p>
         ) : risers.length === 0 ? (
           <p style={{ margin: 0, padding: "16px 22px 20px", fontSize: "var(--fs-12)", color: C.sub, lineHeight: 1.7 }}>
@@ -186,11 +182,12 @@ export default async function ThemeIndexPage() {
                       <StockLogo code={r.code} name={r.name} market={r.market} size={22} />
                       <span style={{ ...clip, fontSize: "var(--fs-13-5)", fontWeight: 800, letterSpacing: "-.01em" }}>{r.name}</span>
                     </Link>
-                    {/* 까닭 한 줄(LLM, ✨ 고지). 없으면 그 사정을 적는다 — 빈 칸을 두면 줄 높이가 흔들린다. */}
+                    {/* 까닭(LLM 50~90자, ✨ 고지). 카더라 카드의 한 줄(22~30자)보다 길다 — 이 칸은 줄 폭을 다
+                        가져서 넓은 화면은 한 줄, 1000px 는 두 줄이다. 없으면 그 사정을 적는다(빈 칸은 줄 높이가 흔들린다). */}
                     <span className="hz-theme-row-brief">
-                      {reasonOf[r.code] && <AiMark size={14} style={{ flexShrink: 0, marginTop: 3 }} />}
-                      <span style={{ minWidth: 0, color: reasonOf[r.code] ? "var(--c-ink-soft)" : C.sub2 }}>
-                        {reasonOf[r.code] ?? "채널에서 까닭을 말한 곳이 없습니다."}
+                      {r.reason && <AiMark size={14} style={{ flexShrink: 0, marginTop: 3 }} />}
+                      <span style={{ minWidth: 0, color: r.reason ? "var(--c-ink-soft)" : C.sub2 }}>
+                        {r.reason ?? "채널에서 까닭을 말한 곳이 없습니다."}
                       </span>
                     </span>
                     <span style={{ textAlign: "right" }}>

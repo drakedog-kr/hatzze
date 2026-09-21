@@ -8,7 +8,6 @@ import {
   LLM_TEXT_CARRY_DAYS,
   addDaysISO,
   channelMeta,
-  fetchAllRows,
   getThemeRotation,
   kaderaBaseDate,
   windowBefore,
@@ -34,6 +33,7 @@ import { isLoadFailed } from "./load-state";
  *   telegram_stock_move_reason  종목이 움직인 날의 한 줄 까닭(까닭 이력)
  *   telegram_stock_event        앞날의 일정
  *   telegram_theme_brief        요즘 무슨 얘기(LLM 두세 문장)·함께 언급된 테마·발췌 — 마이그레이션 080
+ *                               + 갑자기 많이 언급된 종목과 까닭(riser jsonb) — 마이그레이션 081
  *
  * ⚠️ **발췌를 렌더 때 telegram_messages 에서 고르지 않는다.** 처음엔 "최근 사흘 · 이 테마 종목이
  *    태그된 글 · 조회순 15건"을 조인 한 번으로 받았는데, 반도체는 50ms 인 그 조회가 로봇에서는
@@ -497,7 +497,7 @@ export async function listThemeOverview(): Promise<ThemeOverview[] | null> {
     .sort((a, b) => a.rank - b.rank);
 }
 
-// ─── 테마 안에서 말이 는 종목(/theme 카드) ───────────────────────────────
+// ─── 갑자기 많이 언급된 종목(/theme 카드) ───────────────────────────────
 
 /** 후보가 되려면 최근 사흘에 이만큼은 언급돼야 한다. 두세 번 스친 작은 종목이 "10배"로 오르는 걸 막는다. */
 export const RISER_MIN_MENTIONS = 5;
@@ -517,79 +517,63 @@ export type ThemeRiser = {
   prior: number;
   /** recent / prior. prior 가 0 이면 null(새로 등장). */
   ratio: number | null;
+  /** 채널이 말한 까닭(LLM, 50~90자). 파이프라인이 못 썼으면 null. */
+  reason: string | null;
 };
 
 /**
- * 테마마다 **앞 사흘보다 언급이 가장 많이 는 종목** 하나. 종목 지도(테마 화면)가 색으로 보이는 것을
+ * 테마마다 **앞 사흘보다 언급이 가장 많이 는 종목** 하나와 까닭. 종목 지도(테마 화면)가 색으로 보이는 것을
  * 목록에 한 줄로 모은 것이다. 카더라 급부상은 시장 전체 상위 여섯이고 이건 테마마다 하나라 대상이 다르다.
  *
- * 줄 세우기: 새로 등장(앞 사흘 0회)이 맨 앞, 그다음 배수 순. 같은 배수면 언급이 많은 쪽. 최대 RISER_MAX 줄.
- * 최근 사흘 언급이 RISER_MIN_MENTIONS 미만이거나 배수가 RISER_MIN_RATIO 미만인 종목은 후보에서 뺀다.
- * 후보가 하나도 없는 테마는 줄이 없다 — 변화가 큰 테마가 여덟이면 여덟 줄만 선다.
+ * **고르는 것도 쓰는 것도 파이프라인이다**(data-pipeline/common/theme_risers.py → generate_theme_briefs.py).
+ * 화면은 요약 행(telegram_theme_brief.riser, 마이그레이션 081)에 적힌 것을 읽어 줄만 세운다. 처음엔 여기서
+ * 종목 집계를 받아 같은 규칙으로 골랐는데, 그러면 규칙이 TS·Python 두 벌이라 하나만 손봐도 까닭 없는
+ * 줄이 나간다(급부상 한 줄 요약이 겪은 사고). 문턱 상수는 문서(noteHelp)에 쓰려고 남겨 뒀고 값은
+ * theme_risers.py 와 같아야 한다.
  *
- * 조회는 날짜 여섯 개로 전 종목을 받아(하루 600행 안팎 × 6, 페이징) 사전 종목만 남긴다 — 코드 366개를
- * `.in()` 에 넣는 것보다 URL 이 짧고, 테마 로테이션의 themeStocks 와 같은 모양이다.
+ * 줄 세우기: 새로 등장(앞 사흘 0회)이 맨 앞, 그다음 배수 순. 같은 배수면 언급이 많은 쪽. 최대 RISER_MAX 줄.
+ * 후보가 하나도 없는 테마는 줄이 없다 — 변화가 큰 테마가 여덟이면 여덟 줄만 선다.
+ * 기준일분이 없으면 하루 거슬러 간다(LLM_TEXT_CARRY_DAYS) — 요약과 같은 규칙.
  */
 export async function listThemeRisers(): Promise<ThemeRiser[] | null> {
   const db = getSupabaseAdmin();
   const baseDate = await kaderaBaseDate();
-  const days = windowBefore(baseDate, KADERA_WINDOW_DAYS * 2);
-  const recentDays = new Set(days.slice(-KADERA_WINDOW_DAYS));
-
-  // 사전 → 코드. 이름 366개를 80개씩 끊어 묻는다(telegram-data.ts themeStocks 의 같은 규칙).
-  const names = [...new Set(Object.values(THEMES).flat())];
-  const info = new Map<string, { code: string; name: string; market: string | null }>();
-  for (let i = 0; i < names.length; i += 80) {
-    const { data, error } = await db.from("stocks").select("code,name,market").in("name", names.slice(i, i + 80));
-    if (error) {
-      console.error("[listThemeRisers] 종목 코드를 못 읽었습니다", error);
-      return null;
-    }
-    for (const r of data ?? []) info.set(r.name as string, { code: r.code as string, name: r.name as string, market: (r.market as string) ?? null });
+  const { data, error } = await db
+    .from("telegram_theme_brief")
+    .select("theme,date,riser")
+    .gte("date", addDaysISO(baseDate, -LLM_TEXT_CARRY_DAYS))
+    .lte("date", baseDate)
+    .not("riser", "is", null)
+    .order("date", { ascending: false })
+    .limit(200);
+  if (error) {
+    // 표에 riser 열이 아직 없으면(마이그레이션 081 전) 42703. 카드는 비고 나머지는 그린다.
+    console.error("[listThemeRisers] 테마 요약의 종목 칸을 못 읽었습니다", error);
+    return null;
   }
-  const themesOf = new Map<string, string[]>();
-  for (const [theme, members] of Object.entries(THEMES)) {
-    for (const n of members) {
-      const c = info.get(n)?.code;
-      if (c) themesOf.set(c, [...(themesOf.get(c) ?? []), theme]);
-    }
+  type Stored = { code: string; name: string; market: string | null; recent: number; prior: number; ratio: number | null; reason: string | null };
+  const seen = new Set<string>();
+  const out: ThemeRiser[] = [];
+  for (const r of (data ?? []) as { theme: string; date: string; riser: Stored | null }[]) {
+    if (!(r.theme in THEMES) || seen.has(r.theme) || !r.riser?.code) continue;
+    seen.add(r.theme);
+    const s = r.riser;
+    out.push({
+      theme: r.theme,
+      code: s.code,
+      name: s.name,
+      market: s.market ?? null,
+      recent: Number(s.recent) || 0,
+      prior: Number(s.prior) || 0,
+      ratio: s.ratio == null ? null : Number(s.ratio),
+      reason: s.reason?.trim() || null,
+    });
   }
-
-  let failed = false;
-  const rows = await fetchAllRows<{ date: string; stock_code: string; mention_count: number | null }>(
-    "id",
-    () => db.from("telegram_stock_daily").select("id,date,stock_code,mention_count").in("date", days),
-    { onError: (e) => { failed = true; console.error("[listThemeRisers] 종목 집계를 못 읽었습니다", e); } },
-  );
-  if (failed) return null;
-
-  const agg = new Map<string, { recent: number; prior: number }>();
-  for (const r of rows) {
-    if (!themesOf.has(r.stock_code)) continue;
-    const a = agg.get(r.stock_code) ?? { recent: 0, prior: 0 };
-    if (recentDays.has(r.date)) a.recent += r.mention_count || 0;
-    else a.prior += r.mention_count || 0;
-    agg.set(r.stock_code, a);
-  }
-
-  const byName = new Map([...info.values()].map((s) => [s.code, s]));
-  const best = new Map<string, ThemeRiser>();
   const better = (a: ThemeRiser, b: ThemeRiser) => {
     // 새로 등장 > 배수 > 언급 수.
     if ((a.ratio === null) !== (b.ratio === null)) return a.ratio === null;
     if (a.ratio !== null && b.ratio !== null && a.ratio !== b.ratio) return a.ratio > b.ratio;
     return a.recent > b.recent;
   };
-  for (const [code, a] of agg) {
-    if (a.recent < RISER_MIN_MENTIONS) continue;
-    const s = byName.get(code)!;
-    for (const theme of themesOf.get(code) ?? []) {
-      const cand: ThemeRiser = { theme, code, name: s.name, market: s.market, recent: a.recent, prior: a.prior, ratio: a.prior ? a.recent / a.prior : null };
-      // 배수가 문턱 아래면 '말이 는 종목'이 아니다(요동).
-      if (cand.ratio !== null && cand.ratio < RISER_MIN_RATIO) continue;
-      const cur = best.get(theme);
-      if (!cur || better(cand, cur)) best.set(theme, cand);
-    }
-  }
-  return [...best.values()].sort((a, b) => (better(a, b) ? -1 : better(b, a) ? 1 : 0)).slice(0, RISER_MAX);
+  return out.sort((a, b) => (better(a, b) ? -1 : better(b, a) ? 1 : 0)).slice(0, RISER_MAX);
 }

@@ -1,9 +1,10 @@
-"""테마마다 '앞 사흘보다 언급이 가장 많이 는 종목' 하나 — 테마 목록(/theme)의 그 카드가 세우는 종목.
+"""테마마다 '앞 사흘보다 언급이 가장 많이 는 종목' 하나 — 테마 목록(/theme)의 '갑자기 많이 언급된 종목' 카드.
 
-⚠️ **프론트 lib/theme-page.ts listThemeRisers 와 같은 규칙이어야 한다.** 화면이 세우는 종목과
-파이프라인이 한 줄 까닭을 만드는 종목이 갈리면 카드가 까닭 없이 나간다(급부상 한 줄 요약이 겪은
-그 사고 — generate_surging_oneliners.py 머리 주석). Python 과 TS 라 import 로 공유할 수 없어
-손으로 맞춘 사본이다. 규칙:
+여기서 고른 것을 generate_theme_briefs.py 가 까닭과 함께 telegram_theme_brief.riser 에 넣고, 화면
+(lib/theme-page.ts listThemeRisers)은 그 행을 읽어 줄만 세운다. 처음엔 TS 에도 같은 규칙이 있어 화면이
+따로 골랐는데, 두 벌이 갈리면 까닭 없는 줄이 나간다(급부상 한 줄 요약이 겪은 사고 —
+generate_surging_oneliners.py 머리 주석). 지금은 **고르는 규칙이 여기 한 벌**이다. 문턱 상수는 화면의
+도움말 글에도 적혀 있으니(lib/theme-page.ts RISER_*) 값을 바꾸면 거기도 맞춘다. 규칙:
 
   창      기준일을 뺀 앞 여섯 날. 뒤 사흘이 '최근', 앞 사흘이 '앞'.
   후보    최근 사흘 언급 ≥ RISER_MIN_MENTIONS. 앞 사흘 0회면 '새로 등장'(배수 없음), 아니면 배수 = 최근/앞.
