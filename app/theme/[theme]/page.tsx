@@ -39,8 +39,8 @@ import { Treemap, TreemapLegend, stockTiles } from "../Treemap";
  *
  * "이 테마를 두고 채널에서 요즘 무슨 얘기가 도나." 종목 화면은 종목 하나, 카더라는 시장
  * 전체를 말하는데 그 사이 테마 단위가 비어 있었다. 위에서부터 요즘 무슨 얘기(LLM) →
- * 말 많은 종목과 한 줄 까닭 → 까닭 이력 → 일정 → 함께 언급되는 테마 → 발췌. 전부
- * 서술이고 판단·예측·점수는 없다.
+ * 말 많은 종목과 한 줄 까닭 → 까닭 이력(한 주씩) → 일정(달력) → 발췌 → 함께 거론되는 테마 한 줄.
+ * 전부 서술이고 판단·예측·점수는 없다.
  *
  * ## ⭐ 서버가 그린다
  *
@@ -241,7 +241,9 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
   }
   const vagueTotal = d.events.filter((e) => e.precision !== "day").length;
 
-  // 이웃 테마 — 사전 순서에서 앞뒤 둘씩. 26장이 서로 이어져야 크롤러가 닿는다(종목 화면의 '같은 테마 종목'과 같은 이유).
+  // 함께 거론되는 테마(요약 행의 related, 많이 같이 나온 순). 사전에 있는 이름만.
+  const relatedThemes = (d.brief?.related ?? []).map((r) => r.theme).filter((t) => t !== theme && THEME_NAMES.includes(t));
+  // 이웃 테마 — 사전 순서에서 앞뒤 둘씩. 위가 비었을 때의 대신이다. 26장이 서로 이어져야 크롤러가 닿는다.
   const idx = THEME_NAMES.indexOf(theme);
   const neighbors = [-2, -1, 1, 2]
     .map((k) => THEME_NAMES[(idx + k + THEME_NAMES.length) % THEME_NAMES.length])
@@ -601,32 +603,12 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
         )}
       </section>
 
-      {/* ── 함께 언급되는 테마 ── 같은 글에 같이 나온 테마. 가격이 아니라 언급으로 묶인 이웃이다. 발췌 아래에 둔다(2026-09-21). */}
-      <section className="hz-sheet">
-        <SectionHead icon="hub" title="함께 언급되는 테마" note="최근 사흘" desc="이 테마 종목과 같은 글에 함께 나온 다른 테마입니다. 숫자는 그런 글의 수입니다." level={2} />
-        {d.brief && d.brief.related.length > 0 ? (
-          <div style={{ padding: "16px 22px 20px", display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {d.brief.related.map((r) => (
-              <Link
-                key={r.theme}
-                href={themeHref(r.theme)}
-                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 11px", borderRadius: R.pill, background: C.chip, fontSize: "var(--fs-12)", fontWeight: 600, color: C.label, textDecoration: "none", whiteSpace: "nowrap" }}
-              >
-                {r.theme}
-                <span style={{ fontFamily: MONO, fontWeight: 700, color: C.sub2 }}>{r.messages}</span>
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <Empty>{d.brief ? "최근 사흘 사이 다른 테마와 같은 글에 오른 적이 없습니다." : "요약과 함께 매일 저녁 실행 뒤에 채워집니다."}</Empty>
-        )}
-      </section>
-
-      {/* ── 이웃 테마 ── 26장이 서로 이어지게 사전 순서의 앞뒤를 잇는다. */}
+      {/* ── 함께 거론되는 테마 ── 같은 글에 같이 나온 테마(많이 같이 나온 순). 머리·설명 없이 한 줄이다(2026-09-21 "심플하게").
+          요약이 아직 없어 같이 나온 테마를 모르면 사전 순서의 앞뒤 넷을 '다른 테마'로 세운다 — 26장이 서로 이어져야 크롤러가 닿는다. */}
       <section className="hz-sheet">
         <div style={{ padding: "16px 22px 18px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: C.sub, whiteSpace: "nowrap" }}>다른 테마</span>
-          {neighbors.map((t) => (
+          <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: C.sub, whiteSpace: "nowrap" }}>{relatedThemes.length ? "함께 거론되는 테마" : "다른 테마"}</span>
+          {(relatedThemes.length ? relatedThemes : neighbors).map((t) => (
             <Link
               key={t}
               href={themeHref(t)}
