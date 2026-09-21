@@ -348,10 +348,12 @@
   padding-top: 13px;
   padding-bottom: 13px;
 }
-/* '테마 안에서 말이 는 종목' 표: 테마 · 종목 · 배수 알약 · 최근 사흘 언급(앞 사흘 곁말). */
+/* '테마 안에서 말이 는 종목' 표: 테마 · 종목 · ✨ 까닭(남는 폭 전부) · 배수 알약 · 최근 사흘 언급(앞 사흘 곁말).
+   흐름 표와 같은 원칙 — 문장이 가운데 폭을 다 갖는다. */
 .hz-cols-theme-riser {
-  grid-template-columns: 160px minmax(0, 1fr) 96px 190px;
+  grid-template-columns: 150px 180px minmax(0, 1fr) 88px 180px;
   gap: 18px;
+  align-items: center;
 }
 .hz-trow.hz-cols-theme-riser {
   padding-top: 11px;

@@ -9,6 +9,12 @@
   excerpts  조회가 많은 글 다섯의 본문 사본. 렌더 때 조인하지 않으려고 여기 둔다
             (lib/theme-page.ts 머리말 — 태그가 드문 테마에서 그 조인이 8초 벽에 걸렸다).
 
+그리고 둘째 몫: 테마 목록의 **'테마 안에서 말이 는 종목'** 카드에 붙는 한 줄 까닭. 대상은
+common/theme_risers.py(화면과 같은 규칙)가 고르고, 문장은 급부상 한 줄 요약과 같은 프롬프트·표
+(generate_surging_oneliners.ask_oneline → telegram_surging_oneliner)다. 같은 뜻의 글("왜 갑자기
+회자되나")이라 표를 나누지 않았다 — 읽는 쪽(getSurgingOneliners)은 날짜로 받아 코드로 집으므로
+행이 더 있어도 급부상 카드에는 영향이 없다. 테마당 하나, 하루 최대 26건.
+
 ## 창은 종목 요약과 같다
 
 generate_telegram_narratives 의 종목 요약과 같은 사흘(기준일 전날부터 앞 WINDOW_DAYS 일,
@@ -47,6 +53,9 @@ from common.text_check import is_clean, problems  # noqa: E402
 from config.stock_themes import THEMES  # noqa: E402
 
 import generate_telegram_narratives as KR  # noqa: E402
+import generate_surging_oneliners as SO  # noqa: E402
+
+from common.theme_risers import theme_risers  # noqa: E402
 
 MODEL = KR.MODEL
 TABLE = "telegram_theme_brief"
@@ -79,6 +88,13 @@ RELATED_MAX_TAGS = 6
 EXTRA_BANNED = (
     "매수 기회", "매도 기회", "매수 타이밍", "매도 타이밍", "저가 매수", "추격 매수",
     "매수 관점", "매도 관점", "비중 확대", "비중 축소", "매수 전략", "매도 전략",
+    # 증권사 보고서의 추천 어휘. "SK텔레콤을 섹터 내 최우선 투자 대상으로 보는 의견"(2026-09-21 통신)처럼
+    # 전언으로 옮겨도 화면에선 그 종목을 사라는 말이 된다.
+    # 통신 요약을 세 번 다시 써도 "최우선 투자 대상" → "최우선 추천 종목" → "최우선주 · 투자 매력도"로 낱말만 바꿔
+    # 되돌아왔다. 증권사 추천을 전언으로 옮기는 버릇이라, 낱말이 아니라 **뜻**을 막는다(아래 프롬프트 규칙)하고
+    # 그물도 그 뜻의 낱말 전부로 넓힌다.
+    "최선호", "최우선", "투자 대상", "추천 종목", "추천주", "톱픽", "Top pick", "top pick",
+    "투자 매력", "매력도", "투자의견", "목표주가", "목표가",
 )
 
 
@@ -123,6 +139,9 @@ THEME_SYSTEM = KR.COMMON + f"""
 - **주가 얘기는 쓰지 마세요.** "강세를 보였다", "상승세 속에서", "급등했다" 같은 시세 표현은 채널이
   그렇게 적었어도 옮기지 않습니다. 등락은 화면의 다른 칸이 숫자로 적습니다. 이 문장은 무엇이
   화제였는지만 맡습니다.
+- **증권사가 어느 종목을 좋게 봤다는 말은 옮기지 마세요.** 최선호·추천 종목·투자 매력·투자의견·
+  목표주가처럼 "이 종목을 사라"로 읽히는 평가는 전언("증권사가 ~로 평가했습니다")으로 바꿔도 안 됩니다.
+  그 보고서가 **무엇을 다뤘는지**(데이터센터 확충 계획, 실적 전망의 근거)만 적으세요.
 - 발췌는 여러 소재를 한 글에 몰아 담은 것일 수 있습니다. **이 테마 종목과 상관있는 대목만** 근거로
   쓰고, 이름만 비슷한 다른 회사(예: 해외 동명 기업) 이야기는 쓰지 마세요. 그런 대목이 안 보이면
   무엇이 화제였는지 단정하지 말고 발췌에 실제로 있는 이야기만 적으세요.
@@ -334,6 +353,13 @@ def main() -> None:
             tags_by_key[k].append(m)
     print(f"[재료] 창 안 종목 태그 {sum(len(v) for v in tags_by_key.values()):,}건 · 글 {len(tags_by_key):,}건")
 
+    # ── 둘째 몫: 말이 는 종목의 한 줄 까닭 ──
+    # 창은 종목 요약(build_stock_digests)과 같은 사흘이라 digest 도 그 함수로 만든다.
+    risers = theme_risers(db, latest)
+    riser_codes = [r["code"] for r in risers]
+    riser_digests, _ = KR.build_stock_digests(db, latest, codes=riser_codes, msgs=msgs_list) if riser_codes else ([], [])
+    print(f"[말이 는 종목] {len(risers)}테마 · " + " · ".join(f"{r['theme']}:{r['name']}" for r in risers[:8]) + (" …" if len(risers) > 8 else ""))
+
     targets = [t for t in THEMES if only is None or t in only]
     bundles: dict[str, dict | None] = {}
     for theme in targets:
@@ -350,6 +376,9 @@ def main() -> None:
             print(b["digest"])
             print(f"  · 글 {b['message_count']}건 · 종목 {b['stock_count']}개 · 발췌 {len(b['excerpts'])}건 · 함께 {b['related']}")
         print("─" * 60)
+        for _c, _n, d in riser_digests[:3]:
+            print(d)
+            print("─" * 60)
         print("[dry-run] LLM 호출·저장 없이 종료합니다.")
         return
 
@@ -408,6 +437,10 @@ def main() -> None:
             print(f"  [{theme}] 실패: {type(exc).__name__}: {exc}")
 
     print(f"[Supabase] {TABLE} {saved}/{len(targets)}테마 저장")
+
+    # ── 말이 는 종목의 한 줄 까닭 ── --theme 로 몇 개만 돌릴 때는 건너뛴다(그건 요약을 손보는 길이다).
+    if only is None and riser_digests and not no_save:
+        SO._generate(db, client, False, "telegram_surging_oneliner", "stock_code", latest, riser_digests)
 
 
 if __name__ == "__main__":

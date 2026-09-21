@@ -3,7 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { assertLoaded } from "@/lib/load-state";
-import { KADERA_WINDOW_DAYS } from "@/lib/telegram-data";
+import { KADERA_WINDOW_DAYS, getSurgingOneliners } from "@/lib/telegram-data";
+import { isLoadFailed } from "@/lib/load-state";
 import { fmtKoDate, stockHref } from "@/lib/stock-page";
 import {
   RISER_MIN_MENTIONS,
@@ -93,8 +94,10 @@ function riserDelta(r: ThemeRiser): string {
 
 export default async function ThemeIndexPage() {
   if (!PUBLIC && DEPLOYED) notFound();
-  const [themes, risers] = await Promise.all([listThemeOverview(), listThemeRisers()]);
-  assertLoaded("/theme");
+  const [themes, risers, oneliners] = await Promise.all([listThemeOverview(), listThemeRisers(), getSurgingOneliners()]);
+  assertLoaded("/theme", { oneliners });
+  // 말이 는 종목의 한 줄 까닭. 급부상 한 줄 요약과 같은 표에 파이프라인(generate_theme_briefs)이 써 둔다.
+  const reasonOf = isLoadFailed(oneliners) ? {} : oneliners;
 
   const flowDates = themes?.[0]?.flowDates ?? [];
   const top = themes?.slice(0, 3) ?? [];
@@ -152,7 +155,7 @@ export default async function ThemeIndexPage() {
           icon="trending_up"
           title="테마 안에서 말이 는 종목"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
-          desc="테마마다 앞 사흘보다 언급이 가장 많이 는 종목입니다. 숫자는 최근 사흘 언급을 앞 사흘로 나눈 배수입니다."
+          desc="테마마다 앞 사흘보다 언급이 가장 많이 는 종목과 채널이 말한 까닭입니다. 배수는 최근 사흘 언급을 앞 사흘로 나눈 값입니다."
           noteHelp={`최근 ${KADERA_WINDOW_DAYS}일 언급이 ${RISER_MIN_MENTIONS}회 미만인 종목은 세지 않습니다. 앞 사흘에 한 번도 언급되지 않았던 종목은 '새로 등장'으로 맨 앞에 섭니다. 언급이 늘지 않은 테마는 줄이 없습니다.`}
           level={2}
         />
@@ -169,6 +172,7 @@ export default async function ThemeIndexPage() {
             <div className="hz-thead hz-cols-theme-riser">
               <span>테마</span>
               <span>종목</span>
+              <span>채널이 말한 까닭</span>
               <span style={{ textAlign: "right" }}>앞 사흘 대비</span>
               <span style={{ textAlign: "right" }}>최근 {KADERA_WINDOW_DAYS}일 언급</span>
             </div>
@@ -188,6 +192,13 @@ export default async function ThemeIndexPage() {
                       <StockLogo code={r.code} name={r.name} market={r.market} size={22} />
                       <span style={{ ...clip, fontSize: "var(--fs-13-5)", fontWeight: 800, letterSpacing: "-.01em" }}>{r.name}</span>
                     </Link>
+                    {/* 까닭 한 줄(LLM, ✨ 고지). 없으면 그 사정을 적는다 — 빈 칸을 두면 줄 높이가 흔들린다. */}
+                    <span className="hz-theme-row-brief">
+                      {reasonOf[r.code] && <AiMark size={14} style={{ flexShrink: 0, marginTop: 3 }} />}
+                      <span style={{ minWidth: 0, color: reasonOf[r.code] ? "var(--c-ink-soft)" : C.sub2 }}>
+                        {reasonOf[r.code] ?? "채널에서 까닭을 말한 곳이 없습니다."}
+                      </span>
+                    </span>
                     <span style={{ textAlign: "right" }}>
                       <Pill tone={r.ratio === null ? "hot" : "blue"}>{riserDelta(r)}</Pill>
                     </span>
@@ -285,7 +296,7 @@ export default async function ThemeIndexPage() {
                       <span style={{ minWidth: 0, color: t.briefLine ? "var(--c-ink-soft)" : C.sub2 }}>
                         {t.briefLine ??
                           (t.topStocks.length
-                            ? `최근 ${KADERA_WINDOW_DAYS}일 ${t.topStocks.map((x) => `${x.name} ${x.mentions}회`).join(" · ")}가 언급되었습니다. 요약은 매일 저녁 실행 뒤에 채워집니다.`
+                            ? `최근 ${KADERA_WINDOW_DAYS}일 ${t.topStocks.map((x) => `${x.name} ${x.mentions}회`).join(" · ")}가 언급되었습니다. 요약은 아직 없습니다.`
                             : `최근 ${KADERA_WINDOW_DAYS}일 사이 이 테마 종목이 채널에서 언급되지 않았습니다.`)}
                       </span>
                     </span>

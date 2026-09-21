@@ -540,14 +540,19 @@
   .hz-thead.hz-cols-theme-list > :nth-child(3) {
     display: none;
   }
-  /* '말이 는 종목' 표: 폰은 테마 · 종목 · 배수 세 칸. 언급 수(넷째)는 접는다 — 배수가 뜻을 말한다. */
+  /* '말이 는 종목' 표: 폰은 테마 · 종목 · 배수 한 줄, 그 아래 까닭. 언급 수(다섯째)는 접는다 — 배수가 뜻을 말한다. */
   .hz-cols-theme-riser {
     grid-template-columns: 88px minmax(0, 1fr) auto;
-    gap: 10px;
+    gap: 6px 10px;
     padding-left: 16px;
     padding-right: 16px;
   }
-  .hz-cols-theme-riser > :nth-child(4) {
+  .hz-cols-theme-riser > :nth-child(3) {
+    grid-column: 1 / -1;
+    order: 4;
+  }
+  .hz-cols-theme-riser > :nth-child(5),
+  .hz-thead.hz-cols-theme-riser > :nth-child(3) {
     display: none;
   }
 
