@@ -77,44 +77,39 @@ export function ReasonWeeks({ rows, latest, earliest }: { rows: ThemeReasonRow[]
           이 주에는 이 테마 종목에 붙은 까닭이 없습니다. 까닭은 등락이 큰 날에만 만듭니다.
         </p>
       ) : (
-        /* 두 열(1149 아래는 한 열). 열마다 열 머리, 줄은 왼쪽·오른쪽 차례로(1·2 / 3·4 …). '이 테마의 주인공' 표와 같은 얼개다.
-           세로 헤어라인은 **오른쪽 열 줄의 왼편**에 긋는다 — 줄이 홀수라 마지막 줄이 왼쪽뿐이면 그 옆엔 선이 없어야 한다. */
-        <div className={`hz-reason-grid${list.length > 1 ? "" : " is-single"}`}>
-          {[0, 1].slice(0, list.length > 1 ? 2 : 1).map((col) => (
-            <div key={`head-${col}`} className="hz-thead hz-cols-theme-reason">
-              <span>날짜</span>
-              <span>종목 · 채널이 말한 까닭</span>
-              <span style={{ textAlign: "right" }}>언급</span>
-            </div>
-          ))}
+        /* 한 열 표 — 날짜 · 종목(로고·이름·등락 태그) · 까닭(남는 폭 전부) · 채널 수. 두 열로 눌러 담았더니 까닭이 좁은 칸에서
+           접혀 읽기 어려웠다(2026-09-21 "가독성이 떨어졌다"). 종목 칸 폭을 못박아 까닭이 세로로 나란히 서고, 채널 수를
+           오른쪽 끝에 두어 줄이 폭을 다 쓴다. 1149 아래는 까닭이 둘째 줄로(layout.css). */
+        <div className="hz-reason-table">
+          <div className="hz-thead hz-cols-theme-reason">
+            <span>날짜</span>
+            <span>종목</span>
+            <span>채널이 말한 까닭</span>
+            <span style={{ textAlign: "right" }}>채널</span>
+          </div>
           {list.map((r) => (
             <div key={`${r.date}-${r.code}`} className="hz-trow hz-cols-theme-reason">
-              <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+              <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
                 <span style={{ fontFamily: MONO, fontSize: "var(--fs-12-5)", fontWeight: 800, letterSpacing: "-.01em", color: C.ink, whiteSpace: "nowrap" }}>{fmtMd(r.date)}</span>
                 <span style={{ fontSize: "var(--fs-11)", color: C.sub2 }}>{WEEKDAY[dow(r.date)]}</span>
               </span>
-              <Link href={`/stock/${r.code}`} style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, textDecoration: "none" }}>
-                <StockLogo code={r.code} name={r.name} market={r.market} size={28} />
-                <span style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-                  <span className="hz-theme-namerow">
-                    <span className="hz-theme-name" style={{ ...clip, fontSize: "var(--fs-13-5)", fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>{r.name}</span>
-                    {r.changeRate == null ? (
-                      <span className="hz-theme-tag">{r.date === newestDate ? "종가 전" : "등락 없음"}</span>
-                    ) : (
-                      <span className={`hz-theme-tag ${r.changeRate > 0 ? "is-up-2" : r.changeRate < 0 ? "is-down-2" : ""}`}>
-                        {r.changeRate > 0 ? "▲" : r.changeRate < 0 ? "▼" : ""}
-                        {Math.abs(r.changeRate).toFixed(2)}%
-                      </span>
-                    )}
-                  </span>
-                  <span style={{ fontSize: "var(--fs-12)", lineHeight: 1.55, color: C.inkSoft, wordBreak: "keep-all", textWrap: "pretty" }}>{r.reason}</span>
+              <Link href={`/stock/${r.code}`} style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0, textDecoration: "none" }}>
+                <StockLogo code={r.code} name={r.name} market={r.market} size={26} />
+                <span className="hz-theme-namerow">
+                  <span className="hz-theme-name" style={{ ...clip, fontSize: "var(--fs-13-5)", fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>{r.name}</span>
+                  {r.changeRate == null ? (
+                    <span className="hz-theme-tag">{r.date === newestDate ? "종가 전" : "등락 없음"}</span>
+                  ) : (
+                    <span className={`hz-theme-tag ${r.changeRate > 0 ? "is-up-2" : r.changeRate < 0 ? "is-down-2" : ""}`}>
+                      {r.changeRate > 0 ? "▲" : r.changeRate < 0 ? "▼" : ""}
+                      {Math.abs(r.changeRate).toFixed(2)}%
+                    </span>
+                  )}
                 </span>
               </Link>
-              <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
-                <span style={{ fontFamily: MONO, fontSize: "var(--fs-14)", fontWeight: 800, letterSpacing: "-.02em", color: C.ink, whiteSpace: "nowrap" }}>
-                  {r.channelCount}곳
-                </span>
-                <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>채널</span>
+              <span style={{ minWidth: 0, fontSize: "var(--fs-13)", lineHeight: 1.6, color: C.inkSoft, wordBreak: "keep-all", textWrap: "pretty" }}>{r.reason}</span>
+              <span style={{ textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-13)", fontWeight: 800, letterSpacing: "-.01em", color: C.ink, whiteSpace: "nowrap" }}>
+                {r.channelCount}곳
               </span>
             </div>
           ))}
