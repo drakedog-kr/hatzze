@@ -156,6 +156,8 @@ function Empty({ children }: { children: React.ReactNode }) {
 
 const clip: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
 
+/** 점유율 칸 아래 시세 묶음의 이름표. 후보를 Hun 이 고르는 중이라 임시(2026-09-21). */
+const QUOTES_LABEL = "값은 어땠나";
 /** 히어로 첫 칸의 종목 알약 수. 여섯이면 230px 칸에서 두 줄이다. */
 const HERO_CHIPS = 6;
 /** '지금 말 많은 종목' 표의 줄 수. 지도가 전체를 보이니 표는 상위 다섯이면 된다(2026-09-21). */
@@ -190,11 +192,13 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
   const totalMentions = d.hotStocks.reduce((s, x) => s + x.mentions, 0);
   const trendFrom = d.trend[0]?.date;
   const trendTo = d.trend[d.trend.length - 1]?.date;
-  // 추이 위 작은 숫자 셋 — 최고인 날 · 집계가 있는 날의 평균 · 까닭이 붙은 날 수.
+  // 추이 위 작은 숫자 셋 — 최고인 날 · 집계가 있는 날의 평균 · 평소 대비.
   const counted = d.trend.filter((p) => p.rank != null);
   const peak = counted.reduce<ThemeTrendPoint | null>((best, p) => (best == null || p.share > best.share ? p : best), null);
   const avgShare = counted.length ? counted.reduce((sum, p) => sum + p.share, 0) / counted.length : null;
-  const reasonDayCount = d.trend.filter((p) => p.hasReason).length;
+  // 평소 대비 — 최근 사흘 점유율을 30일 평균으로 나눈 것. 1 미만은 '배'로 적으면 손해로 읽혀 %로 적는다(feedback_ratio_copy_reads_as_loss).
+  const vsUsual = d.recentShare != null && avgShare ? d.recentShare / avgShare : null;
+  const vsUsualText = vsUsual == null ? "—" : vsUsual >= 1 ? `평소의 ${vsUsual.toFixed(1)}배` : `평소의 ${Math.round(vsUsual * 100)}%`;
   const recentSet = new Set(d.recentDays);
   // 칸 1 의 종목 알약 — 최근 사흘 말이 많은 순. 집계가 없으면 사전 순서.
   const chipStocks = (d.hotStocks.length ? d.hotStocks : d.members).slice(0, HERO_CHIPS);
@@ -307,11 +311,42 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
                   />
                   <Fig label="언급 합" value={`${totalMentions.toLocaleString("ko-KR")}회`} />
                 </div>
+                {/* 값은 어땠나 — 최근 거래일 테마 종목의 평균 등락과 오른·내린 종목 수. 언급(말) 옆에 시세(값)를 두면 값이
+                    말을 따라왔는지가 보인다(2026-09-21 Hun 선택). 오른·내린 수만 적고 권유는 없다. */}
+                {d.quotes.date && d.quotes.avgChange != null && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingTop: 12, borderTop: "1px solid var(--c-hairline)" }}>
+                    <span style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                      <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, color: C.sub }}>{QUOTES_LABEL}</span>
+                      <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>{fmtKoDate(d.quotes.date)} 종가</span>
+                    </span>
+                    <span style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+                      <strong
+                        style={{
+                          fontFamily: MONO,
+                          fontSize: "var(--fs-15)",
+                          fontWeight: 800,
+                          letterSpacing: "-.01em",
+                          whiteSpace: "nowrap",
+                          color: d.quotes.avgChange > 0 ? "var(--c-hot-ink)" : d.quotes.avgChange < 0 ? "var(--c-cold-ink)" : C.ink,
+                        }}
+                      >
+                        {d.quotes.avgChange > 0 ? "+" : d.quotes.avgChange < 0 ? "−" : ""}
+                        {Math.abs(d.quotes.avgChange).toFixed(2)}%
+                        <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.muted, marginLeft: 4 }}>평균</span>
+                      </strong>
+                      <span style={{ fontSize: "var(--fs-11-5)", color: C.sub, whiteSpace: "nowrap" }}>
+                        오른 종목 <strong style={{ fontFamily: MONO, fontWeight: 800, color: "var(--c-hot-ink)" }}>{d.quotes.up}</strong>
+                        <span style={{ margin: "0 5px", color: C.muted }}>·</span>
+                        내린 종목 <strong style={{ fontFamily: MONO, fontWeight: 800, color: "var(--c-cold-ink)" }}>{d.quotes.down}</strong>
+                      </span>
+                    </span>
+                  </div>
+                )}
               </>
             )}
           </div>
 
-          {/* 칸 3(넓은 칸) — 30일 추이. 위에 작은 숫자 셋(최고·평균·까닭 붙은 날), 막대는 최근 사흘만 진하게, 아래 범례. */}
+          {/* 칸 3(넓은 칸) — 30일 추이. 위에 작은 숫자 셋(최고·평균·평소 대비), 막대는 최근 사흘만 진하게, 아래 범례. */}
           <div className="hz-kd-hero-h">
             <div className="hz-kd-hero-title">
               <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>{THEME_TREND_DAYS}일 점유율 추이</span>
@@ -331,7 +366,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
                 <div className="hz-theme-figs hz-theme-figs-row">
                   <Fig label={peak ? `최고 · ${fmtKoDate(peak.date)}` : "최고"} value={peak ? `${peak.share.toFixed(1)}%` : "—"} />
                   <Fig label={`${THEME_TREND_DAYS}일 평균`} value={avgShare == null ? "—" : `${avgShare.toFixed(1)}%`} />
-                  <Fig label="까닭이 붙은 날" value={`${reasonDayCount}일`} />
+                  <Fig label="평소 대비" value={vsUsualText} />
                 </div>
                 <Trend points={d.trend} recent={recentSet} />
                 <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", fontSize: "var(--fs-11)", color: C.sub }}>

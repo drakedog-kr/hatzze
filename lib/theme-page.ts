@@ -65,6 +65,22 @@ export { THEME_NAMES, themeFromParam, themeHref } from "./theme-href";
 
 export type ThemeMember = { code: string; name: string; market: string | null };
 
+/**
+ * 최근 거래일 테마 종목의 등락 묶음 — 히어로 '점유율' 칸의 "값은 어땠나". 언급(말) 옆에 시세(값)를 두어
+ * 값이 말을 따라왔는지 보인다. 시세는 stocks 표의 KRX 최근 종가라 날마다 아침에 전날 것으로 바뀐다
+ * (project_daily_content: KRX 는 그날 종가를 다음 날 아침에 준다). 오른 종목·내린 종목 수만 적고 사고팔라는
+ * 말은 두지 않는다.
+ */
+export type ThemeQuotes = {
+  /** 종가 날짜(가장 많은 종목이 가진 날짜). 등락이 하나도 없으면 null. */
+  date: string | null;
+  /** 등락이 있는 종목의 단순 평균(%). */
+  avgChange: number | null;
+  up: number;
+  down: number;
+  flat: number;
+};
+
 export type ThemeTrendPoint = {
   date: string;
   /** 그날 전체 주목도 중 이 테마 비중(%). 집계가 없는 날은 0. */
@@ -126,6 +142,8 @@ export type ThemePageData = {
   theme: string;
   /** 사전의 종목(사전 순서). 시세는 stocks 표의 KRX 값이다. */
   members: ThemeMember[];
+  /** 최근 거래일 테마 종목의 등락 묶음(위 ThemeQuotes). */
+  quotes: ThemeQuotes;
   baseDate: string;
   /** 최근 사흘(기준일 제외). 카더라와 같은 창이다. */
   recentDays: string[];
@@ -144,24 +162,54 @@ export type ThemePageData = {
   loadFailed: boolean;
 };
 
-/** 테마의 종목 사전을 stocks 표의 코드로 옮긴다. 사전에 있어도 stocks 에 없는 이름은 빠진다(파이프라인도 같다). */
-async function themeMembers(theme: string): Promise<ThemeMember[] | null> {
+type MemberRow = ThemeMember & { changeRate: number | null; priceDate: string | null };
+
+/** 테마의 종목 사전을 stocks 표의 코드로 옮긴다. 사전에 있어도 stocks 에 없는 이름은 빠진다(파이프라인도 같다). 등락도 같이 든다. */
+async function themeMembers(theme: string): Promise<MemberRow[] | null> {
   const names = THEMES[theme] ?? [];
   if (!names.length) return [];
   const db = getSupabaseAdmin();
   // 테마 하나는 최대 55종목이라 한 번에 물어도 URL 이 짧다. 그래도 80씩 끊는다 —
   // 사전이 더 커져도 안 깨지게(telegram-data.ts themeStocks 의 같은 규칙).
-  const out = new Map<string, ThemeMember>();
+  const out = new Map<string, MemberRow>();
   for (let i = 0; i < names.length; i += 80) {
-    const { data, error } = await db.from("stocks").select("code,name,market").in("name", names.slice(i, i + 80));
+    // 등락(change_rate·price_date)도 같은 조회로 받는다 — 히어로의 '값은 어땠나'가 쓴다(ThemeQuotes).
+    const { data, error } = await db.from("stocks").select("code,name,market,change_rate,price_date").in("name", names.slice(i, i + 80));
     if (error) {
       console.error(`[themeMembers] ${theme} 종목 코드를 못 읽었습니다`, error);
       return null;
     }
-    for (const r of data ?? []) out.set(r.name as string, { code: r.code as string, name: r.name as string, market: (r.market as string) ?? null });
+    for (const r of data ?? []) {
+      out.set(r.name as string, {
+        code: r.code as string,
+        name: r.name as string,
+        market: (r.market as string) ?? null,
+        changeRate: r.change_rate == null ? null : Number(r.change_rate),
+        priceDate: (r.price_date as string | null) ?? null,
+      });
+    }
   }
   // 사전 순서를 지킨다 — 앞쪽이 대표 종목이다(lib/stock-themes.ts 머리말).
-  return names.map((n) => out.get(n)).filter((m): m is ThemeMember => Boolean(m));
+  return names.map((n) => out.get(n)).filter((m): m is MemberRow => Boolean(m));
+}
+
+/** 종목 등락을 테마 하나의 묶음으로. 날짜는 가장 많은 종목이 가진 것 — 상장 직후 종목의 옛 날짜 하나에 끌려가지 않게. */
+function themeQuotes(rows: { changeRate: number | null; priceDate: string | null }[]): ThemeQuotes {
+  const have = rows.filter((r) => r.changeRate != null && r.priceDate);
+  if (!have.length) return { date: null, avgChange: null, up: 0, down: 0, flat: 0 };
+  const byDate = new Map<string, number>();
+  for (const r of have) byDate.set(r.priceDate!, (byDate.get(r.priceDate!) ?? 0) + 1);
+  const date = [...byDate.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? 1 : -1))[0][0];
+  const onDate = have.filter((r) => r.priceDate === date);
+  const up = onDate.filter((r) => r.changeRate! > 0).length;
+  const down = onDate.filter((r) => r.changeRate! < 0).length;
+  return {
+    date,
+    avgChange: onDate.reduce((sum, r) => sum + r.changeRate!, 0) / onDate.length,
+    up,
+    down,
+    flat: onDate.length - up - down,
+  };
 }
 
 /**
@@ -178,12 +226,13 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
   if (members === null) {
     // 종목 코드를 못 읽으면 아래 조회를 하나도 못 만든다. 빈 화면을 사본에 담지 않게 실패로 표시한다.
     return {
-      theme, members: [], baseDate, recentDays: [], recentShare: null, recentRank: null, shareDelta: null, rankChange: null,
+      theme, members: [], quotes: themeQuotes([]), baseDate, recentDays: [], recentShare: null, recentRank: null, shareDelta: null, rankChange: null,
       trend: [], hotStocks: [], reasons: [], events: [], brief: null, loadFailed: true,
     };
   }
   const codes = members.map((m) => m.code);
-  const byCode = new Map(members.map((m) => [m.code, m]));
+  const byCode = new Map<string, ThemeMember>(members.map((m) => [m.code, { code: m.code, name: m.name, market: m.market }]));
+  const quotes = themeQuotes(members);
 
   const trendDays = windowBefore(baseDate, THEME_TREND_DAYS);
   const recentDays = trendDays.slice(-KADERA_WINDOW_DAYS);
@@ -353,7 +402,8 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
 
   return {
     theme,
-    members,
+    members: members.map((m) => ({ code: m.code, name: m.name, market: m.market })),
+    quotes,
     baseDate,
     recentDays,
     recentShare,
