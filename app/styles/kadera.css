@@ -414,14 +414,17 @@
   outline: none;
 }
 /* 색 단계. 온도색 두 가지(--c-warm-2 · --c-blue-2)를 시트 바탕에 섞는다 — 라이트·다크 모두
-   자기 토큰으로 섞이므로 따로 안 적는다. 맨 진한 단은 흰 글자. */
+   자기 토큰으로 섞이므로 따로 안 적는다.
+   ⚠️ 글자는 **모든 칸이 잉크색**이다. 처음엔 맨 진한 단(88%)만 흰 글자였는데 "흰 글자와 검정 글자의 차이가
+   뭐냐"는 물음이 나왔다(2026-09-21) — 가독성 때문에 갈린 것이 뜻처럼 읽혔다. 그래서 맨 진한 단을 66% 로
+   내려 잉크 글자가 서게 하고, 등락은 글자색(온도 잉크)이 말한다(.hz-tm-delta). */
 .hz-tm-tile.is-flat { background: var(--c-chip); }
-.hz-tm-tile.is-up-1 { background: color-mix(in srgb, var(--c-warm-2) 28%, var(--c-card)); }
-.hz-tm-tile.is-up-2 { background: color-mix(in srgb, var(--c-warm-2) 55%, var(--c-card)); }
-.hz-tm-tile.is-up-3 { background: color-mix(in srgb, var(--c-warm-2) 88%, var(--c-card)); color: #fff; }
-.hz-tm-tile.is-down-1 { background: color-mix(in srgb, var(--c-blue-2) 28%, var(--c-card)); }
-.hz-tm-tile.is-down-2 { background: color-mix(in srgb, var(--c-blue-2) 55%, var(--c-card)); }
-.hz-tm-tile.is-down-3 { background: color-mix(in srgb, var(--c-blue-2) 88%, var(--c-card)); color: #fff; }
+.hz-tm-tile.is-up-1 { background: color-mix(in srgb, var(--c-warm-2) 24%, var(--c-card)); }
+.hz-tm-tile.is-up-2 { background: color-mix(in srgb, var(--c-warm-2) 45%, var(--c-card)); }
+.hz-tm-tile.is-up-3 { background: color-mix(in srgb, var(--c-warm-2) 66%, var(--c-card)); }
+.hz-tm-tile.is-down-1 { background: color-mix(in srgb, var(--c-blue-2) 24%, var(--c-card)); }
+.hz-tm-tile.is-down-2 { background: color-mix(in srgb, var(--c-blue-2) 45%, var(--c-card)); }
+.hz-tm-tile.is-down-3 { background: color-mix(in srgb, var(--c-blue-2) 66%, var(--c-card)); }
 .hz-tm-in {
   display: flex;
   flex-direction: column;
@@ -447,11 +450,20 @@
   white-space: nowrap;
   opacity: 0.85;
 }
+/* 등락은 글자색으로 — 늘면 따뜻한 잉크, 줄면 찬 잉크(카더라 DeltaPp 와 같은 색). 칸 바탕과 같은 계열이라
+   방향이 두 번 말해지지만, 글자가 잉크 한 색으로 통일된 뒤엔 이 색이 등락을 말하는 유일한 글자다. */
 .hz-tm-delta {
   margin-left: 6px;
   font-size: var(--fs-11);
-  font-weight: 700;
+  font-weight: 800;
 }
+.hz-tm-tile.is-up-1 .hz-tm-delta,
+.hz-tm-tile.is-up-2 .hz-tm-delta,
+.hz-tm-tile.is-up-3 .hz-tm-delta { color: var(--c-hot-ink); }
+.hz-tm-tile.is-down-1 .hz-tm-delta,
+.hz-tm-tile.is-down-2 .hz-tm-delta,
+.hz-tm-tile.is-down-3 .hz-tm-delta { color: var(--c-cold-ink); }
+.hz-tm-tile.is-flat .hz-tm-delta { color: var(--c-sub2); }
 .hz-tm-tile.is-lg .hz-tm-name { font-size: var(--fs-15); }
 .hz-tm-tile.is-lg .hz-tm-val { font-size: var(--fs-13); }
 .hz-tm-tile.is-sm .hz-tm-in { padding: 5px 7px; }
@@ -523,12 +535,12 @@
   display: inline-block;
 }
 .hz-tm-sw.is-flat { background: var(--c-chip); box-shadow: inset 0 0 0 1px var(--c-hairline); }
-.hz-tm-sw.is-up-1 { background: color-mix(in srgb, var(--c-warm-2) 28%, var(--c-card)); }
-.hz-tm-sw.is-up-2 { background: color-mix(in srgb, var(--c-warm-2) 55%, var(--c-card)); }
-.hz-tm-sw.is-up-3 { background: color-mix(in srgb, var(--c-warm-2) 88%, var(--c-card)); }
-.hz-tm-sw.is-down-1 { background: color-mix(in srgb, var(--c-blue-2) 28%, var(--c-card)); }
-.hz-tm-sw.is-down-2 { background: color-mix(in srgb, var(--c-blue-2) 55%, var(--c-card)); }
-.hz-tm-sw.is-down-3 { background: color-mix(in srgb, var(--c-blue-2) 88%, var(--c-card)); }
+.hz-tm-sw.is-up-1 { background: color-mix(in srgb, var(--c-warm-2) 24%, var(--c-card)); }
+.hz-tm-sw.is-up-2 { background: color-mix(in srgb, var(--c-warm-2) 45%, var(--c-card)); }
+.hz-tm-sw.is-up-3 { background: color-mix(in srgb, var(--c-warm-2) 66%, var(--c-card)); }
+.hz-tm-sw.is-down-1 { background: color-mix(in srgb, var(--c-blue-2) 24%, var(--c-card)); }
+.hz-tm-sw.is-down-2 { background: color-mix(in srgb, var(--c-blue-2) 45%, var(--c-card)); }
+.hz-tm-sw.is-down-3 { background: color-mix(in srgb, var(--c-blue-2) 66%, var(--c-card)); }
 
 /* 열흘 흐름은 이제 글 한 조각(Pill)이다. 순위 칸 띠 → 색 띠 → 스파크라인 세 판을 거쳐 걷었다(2026-09-19). */
 
