@@ -207,7 +207,7 @@ export function EventsCalendar({ events, today, weeks = 5 }: { events: CalEvent[
                   {e.event}
                 </span>
                 {/* 여럿이 말한 것만 알린다. 한 곳뿐인 줄에 "1곳"을 찍으면 그 숫자가 목록을 덮는다. */}
-                {e.channels >= 2 ? <Pill tone="blue">{e.channels}곳이 말함</Pill> : <span />}
+                {e.channels >= 2 ? <Pill tone="blue">{e.channels}곳이 언급</Pill> : <span />}
               </div>
             ))}
             {items.length > daySlots && (
@@ -244,7 +244,7 @@ export function EventsCalendar({ events, today, weeks = 5 }: { events: CalEvent[
                   </Link>
                   {e.event}
                 </span>
-                {e.channels >= 2 ? <Pill tone="blue">{e.channels}곳이 말함</Pill> : <span />}
+                {e.channels >= 2 ? <Pill tone="blue">{e.channels}곳이 언급</Pill> : <span />}
               </div>
             ))}
             {nextMore > 0 && (

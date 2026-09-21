@@ -487,7 +487,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
                       <span style={{ ...clip, fontSize: "var(--fs-12-5)", fontWeight: 700, color: C.ink }}>{e.name}</span>
                     </Link>
                     <span style={{ minWidth: 0, fontSize: "var(--fs-13)", lineHeight: 1.6, color: C.inkSoft, wordBreak: "keep-all", textWrap: "pretty" }}>{e.event}</span>
-                    {e.channels >= 2 ? <Pill tone="blue">{e.channels}곳이 말함</Pill> : <span />}
+                    {e.channels >= 2 ? <Pill tone="blue">{e.channels}곳이 언급</Pill> : <span />}
                   </div>
                 ))}
               </div>
@@ -595,10 +595,6 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
           </Link>
         </div>
       </section>
-
-      <p style={{ margin: 0, fontSize: "var(--fs-11)", color: C.muted, textAlign: "right" }}>
-        집계 기준일 {fmtKoDate(d.baseDate)}. 언급은 주식 텔레그램 채널에서 셉니다.
-      </p>
     </div>
   );
 }

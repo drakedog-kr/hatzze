@@ -456,7 +456,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
                       <span style={{ minWidth: 0, fontSize: "var(--fs-13-5)", lineHeight: 1.6, color: C.inkSoft, wordBreak: "keep-all", textWrap: "pretty" }}>
                         {e.event}
                       </span>
-                      {e.channels >= 2 ? <Pill tone="blue">{e.channels}곳이 말함</Pill> : <span />}
+                      {e.channels >= 2 ? <Pill tone="blue">{e.channels}곳이 언급</Pill> : <span />}
                     </div>
                   ))}
                 </div>

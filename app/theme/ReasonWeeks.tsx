@@ -87,7 +87,7 @@ export function ReasonWeeks({ rows, latest, earliest }: { rows: ThemeReasonRow[]
                 </span>
                 <span style={{ minWidth: 0, fontSize: "var(--fs-13)", lineHeight: 1.6, color: C.inkSoft, wordBreak: "keep-all", textWrap: "pretty" }}>
                   {r.reason}
-                  {r.channelCount >= 2 && <span style={{ color: C.muted, marginLeft: 6, whiteSpace: "nowrap", fontSize: "var(--fs-11)" }}>{r.channelCount}곳이 말함</span>}
+                  {r.channelCount >= 2 && <span style={{ color: C.muted, marginLeft: 6, whiteSpace: "nowrap", fontSize: "var(--fs-11)" }}>{r.channelCount}곳이 언급</span>}
                 </span>
               </div>
             ))}
