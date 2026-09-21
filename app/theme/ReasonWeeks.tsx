@@ -57,7 +57,7 @@ export function ReasonWeeks({ rows, latest, earliest }: { rows: ThemeReasonRow[]
   const total = days.reduce((n, [, list]) => n + list.length, 0);
 
   return (
-    <div style={{ paddingBottom: 4 }}>
+    <div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "14px 22px 0" }}>
         <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 700, color: C.sub }}>
           {fmtKo(start)} ~ {fmtKo(end)}

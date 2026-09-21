@@ -406,6 +406,9 @@ a.hz-theme-chip:hover { background: var(--tx-btn); }
   border-style: dashed;
   color: var(--c-sub);
 }
+/* 글자 링크(‹ 테마 리포트 · 테마 전체 보기 →). 올리면 글자가 진해진다 — 인라인 color 는 :hover 를 이겨서 클래스가 색을 쥔다. */
+.hz-theme-textlink { color: var(--c-sub); transition: color 0.12s ease; }
+.hz-theme-textlink:hover { color: var(--c-ink); }
 /* 맨 아래 '함께 거론되는 테마' 알약. 링크라 올리면 색이 바뀌어야 알약끼리 갈린다 — 인라인 background 는 :hover 를 이겨서 클래스로. */
 .hz-theme-pill {
   display: inline-flex;
@@ -680,9 +683,8 @@ a.hz-theme-chip:hover { background: var(--tx-btn); }
   padding: 4px 10px;
   border-radius: 999px;
   cursor: pointer;
-  transition: background 0.12s ease;
+  transition: background 0.12s ease, color 0.12s ease;
 }
-.hz-evcal-today:hover:not(:disabled) { background: var(--c-hover); }
 .hz-evcal-today:disabled { color: var(--c-muted); cursor: default; }
 .hz-evcal-day.other { color: var(--c-sub2); }
 .hz-evcal-day.has { background: var(--c-blue-tint); }
@@ -756,12 +758,15 @@ a.hz-theme-chip:hover { background: var(--tx-btn); }
   padding: 7px 12px;
   border-radius: 999px;
   cursor: pointer;
-  transition: background 0.12s ease;
+  transition: background 0.12s ease, color 0.12s ease;
 }
-.hz-evday-nav button:hover { background: var(--c-hover); }
-/* 테마 화면 '까닭 이력'의 지난주·다음주. 끝에 닿은 단추는 흐리게 두고 자리는 남긴다. */
+/* ⚠️ --c-hover(#f2f7fc)는 알약 바탕 --c-chip(#f2f6fb)과 한 톤이라 올려도 안 바뀌어 보였다(2026-09-21 지적).
+   행 호버와 같은 하늘색 틴트 + 파란 글자로 — 화면 전체의 "지금 이것" 색이다. '오늘' 단추도 같은 알약이라 같이. */
+.hz-evday-nav button:hover,
+.hz-evcal-today:hover:not(:disabled) { background: var(--c-blue-tint); color: var(--c-cold-ink); }
+/* 테마 화면 '등락의 이유'의 지난주·다음주. 끝에 닿은 단추는 흐리게 두고 자리는 남긴다. */
 .hz-reason-nav button:disabled { color: var(--c-muted); background: transparent; cursor: default; }
-.hz-reason-nav button:disabled:hover { background: transparent; }
+.hz-reason-nav button:disabled:hover { background: transparent; color: var(--c-muted); }
 @media (max-width: 760px) {
   .hz-evsplit { grid-template-columns: minmax(0, 1fr); }
   .hz-evcal {

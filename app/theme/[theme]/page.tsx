@@ -231,7 +231,8 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
       {/* 목록으로 돌아가는 줄. 내부자 리포트 상세(app/insider/stock)와 같은 자리·같은 꼴(2026-09-21). */}
       <Link
         href={THEME_PAGE.href}
-        style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 4, fontSize: "var(--fs-12)", fontWeight: 700, color: C.sub, textDecoration: "none" }}
+        className="hz-theme-textlink"
+        style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 4, fontSize: "var(--fs-12)", fontWeight: 700, textDecoration: "none" }}
       >
         <Icon name="chevron_left" style={{ fontSize: "var(--fs-16)" }} />
         {THEME_PAGE.label}
@@ -394,7 +395,8 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
         ) : d.hotStocks.length === 0 ? (
           <Empty>최근 {KADERA_WINDOW_DAYS}일 사이 이 테마 종목이 채널에서 언급되지 않았습니다.</Empty>
         ) : (
-          <div style={{ paddingBottom: 6 }}>
+          // 아래 여백을 두지 않는다 — 마지막 줄의 호버 바탕이 시트 바닥까지 닿아야 잘린 것처럼 안 보인다(2026-09-21 지적).
+          <div>
             <div style={{ padding: "16px 22px 0" }}>
               <Treemap tiles={stockTiles(d.hotStocks)} ariaLabel={`${theme} 테마 종목별 최근 ${KADERA_WINDOW_DAYS}일 언급`} />
             </div>
@@ -466,7 +468,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
           />
         )}
         {vagueGroups.size > 0 && (
-          <div style={{ borderTop: "1px solid var(--c-sheet-line)", paddingBottom: 8 }}>
+          <div style={{ borderTop: "1px solid var(--c-sheet-line)" }}>
             <div style={{ padding: "16px 22px 2px", display: "flex", alignItems: "baseline", gap: 8 }}>
               <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: C.sub }}>날짜 없이 달·분기만 짚인 일정</span>
               {vagueTotal > vagueRows && (
@@ -579,7 +581,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
       {/* ── 함께 거론되는 테마 ── 같은 글에 같이 나온 테마(많이 같이 나온 순). 머리·설명 없이 한 줄이다(2026-09-21 "심플하게").
           요약이 아직 없어 같이 나온 테마를 모르면 사전 순서의 앞뒤 넷을 '다른 테마'로 세운다 — 26장이 서로 이어져야 크롤러가 닿는다. */}
       <section className="hz-sheet">
-        <div style={{ padding: "16px 22px 18px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ padding: "16px 22px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: C.sub, whiteSpace: "nowrap" }}>{relatedThemes.length ? "함께 거론되는 테마" : "다른 테마"}</span>
           {(relatedThemes.length ? relatedThemes : neighbors).map((t) => (
             <Link key={t} href={themeHref(t)} className="hz-theme-pill">
@@ -587,7 +589,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
             </Link>
           ))}
           <span style={{ flex: 1 }} />
-          <Link href={THEME_PAGE.href} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: "var(--fs-12)", fontWeight: 700, color: C.sub, textDecoration: "none", whiteSpace: "nowrap" }}>
+          <Link href={THEME_PAGE.href} className="hz-theme-textlink" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: "var(--fs-12)", fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}>
             테마 전체 보기
             <Icon name="arrow_forward" style={{ fontSize: "var(--fs-16)" }} />
           </Link>
