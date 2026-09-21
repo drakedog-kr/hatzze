@@ -13,7 +13,6 @@ import {
   getThemePage,
   themeFromParam,
   themeHref,
-  type ThemePageData,
   type ThemeTrendPoint,
 } from "@/lib/theme-page";
 
@@ -28,6 +27,8 @@ import TimeAgo from "../../kadera/TimeAgo";
 import { timeAgoInitial } from "../../kadera/time-ago";
 import { AiMark, C, Icon, MONO, R } from "../../ui";
 import { THEME_PAGE } from "../copy";
+import { Rate } from "../Rate";
+import { ReasonWeeks } from "../ReasonWeeks";
 import { Treemap, TreemapLegend, stockTiles } from "../Treemap";
 
 /**
@@ -156,23 +157,6 @@ function Stat({ label, value, sub }: { label: string; value: React.ReactNode; su
 }
 
 /** 등락률 한 조각. 온도색 두 가지와 화살표(종목 화면 Quote 와 같은 규칙). */
-function Rate({ rate }: { rate: number | null }) {
-  if (rate == null) return null;
-  return (
-    <span
-      style={{
-        fontFamily: MONO,
-        fontWeight: 700,
-        whiteSpace: "nowrap",
-        color: rate > 0 ? "var(--c-hot-ink)" : rate < 0 ? "var(--c-cold-ink)" : C.sub2,
-      }}
-    >
-      {rate > 0 ? "▲" : rate < 0 ? "▼" : ""}
-      {Math.abs(rate).toFixed(2)}%
-    </span>
-  );
-}
-
 /** 빈 칸의 한 줄. 카드는 숨기지 않고 왜 비었는지 적는다. */
 function Empty({ children }: { children: React.ReactNode }) {
   return (
@@ -214,15 +198,6 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
   const trendFrom = d.trend[0]?.date;
   const trendTo = d.trend[d.trend.length - 1]?.date;
 
-  // 까닭 이력을 날짜로 묶는다(최신순). 같은 날 여러 종목이면 채널 수가 많은 것이 먼저.
-  const reasonDays = new Map<string, ThemePageData["reasons"]>();
-  for (const r of d.reasons) {
-    const g = reasonDays.get(r.date);
-    if (g) g.push(r);
-    else reasonDays.set(r.date, [r]);
-  }
-  for (const g of reasonDays.values()) g.sort((a, b) => b.channelCount - a.channelCount);
-
   // 일정은 카더라와 같은 달력이다(2026-09-21 "달력 형태로"). 달력엔 **날짜가 적혀 있던 것(day)**만, 앞으로 5주.
   // 달·분기·연 단위는 놓을 칸이 없고 모델이 "연말"을 12-31 로 굳혀 쓴 값이라 칸에 두면 거짓이 된다(카더라와 같은 규칙).
   // 카더라는 그것들을 버리지만 여기는 종목이 여럿이라 "10월 중 실적 발표" 같은 것이 제법 있어, 달력 아래에 몇 줄 적는다.
@@ -250,6 +225,15 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
 
   return (
     <div className="hz-tx">
+      {/* 목록으로 돌아가는 줄. 내부자 리포트 상세(app/insider/stock)와 같은 자리·같은 꼴(2026-09-21). */}
+      <Link
+        href={THEME_PAGE.href}
+        style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 4, fontSize: "var(--fs-12)", fontWeight: 700, color: C.sub, textDecoration: "none" }}
+      >
+        <Icon name="chevron_left" style={{ fontSize: "var(--fs-16)" }} />
+        {THEME_PAGE.label}
+      </Link>
+
       {/* ── 히어로 ── 세 칸. 테마 정체 · 최근 사흘 점유율 · 30일 추이. 제목(h1)은 셸이 위에 그린다. */}
       <section className="hz-sheet">
         <div className="hz-kd-hero">
@@ -427,42 +411,21 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
         )}
       </section>
 
-      {/* ── 까닭 이력 ── 이 테마 종목이 움직인 날마다 채널이 말한 이유. 위 추이의 점과 같은 날들이다. */}
+      {/* ── 까닭 이력 ── 이 테마 종목이 움직인 날마다 채널이 말한 이유. 위 추이의 점과 같은 날들이다.
+          한 주씩 넘겨 본다(ReasonWeeks) — 30일치를 다 세우면 카드가 너무 길다(2026-09-21). */}
       <section className="hz-sheet">
         <SectionHead
           icon="history"
           title="까닭 이력"
-          note={`최근 ${THEME_TREND_DAYS}일`}
-          desc="이 테마 종목이 크게 움직인 날, 그날 채널이 말한 이유를 날짜순으로 모았습니다."
+          note="한 주씩"
+          desc="이 테마 종목이 크게 움직인 날, 그날 채널이 말한 이유입니다. 아래 단추로 지난주를 봅니다."
+          noteHelp={`최근 ${THEME_TREND_DAYS}일까지 거슬러 갑니다. 위 추이의 점을 누르면 그날이 든 주로 옮겨 갑니다.`}
           level={2}
         />
         {d.reasons.length === 0 ? (
           <Empty>최근 {THEME_TREND_DAYS}일 사이 이 테마 종목에 붙은 까닭이 없습니다. 까닭은 등락이 큰 날에만 만듭니다.</Empty>
         ) : (
-          <div style={{ paddingBottom: 6 }}>
-            {[...reasonDays.entries()].map(([date, rows]) => (
-              <div key={date} id={`reason-${date}`}>
-                <div className="hz-agenda-day">
-                  <span style={{ fontSize: "var(--fs-13-5)", fontWeight: 800, color: C.ink, letterSpacing: "-.01em" }}>{fmtKoDate(date)}</span>
-                </div>
-                {rows.map((r) => (
-                  <div key={`${date}-${r.code}`} className="hz-trow hz-cols-theme-reason">
-                    <Link href={stockHref(r.code)} style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, textDecoration: "none" }}>
-                      <StockLogo code={r.code} name={r.name} market={r.market} size={22} />
-                      <span style={{ ...clip, fontSize: "var(--fs-12-5)", fontWeight: 700, color: C.ink }}>{r.name}</span>
-                    </Link>
-                    <span style={{ fontSize: "var(--fs-12)", textAlign: "right" }}>
-                      <Rate rate={r.changeRate} />
-                    </span>
-                    <span style={{ minWidth: 0, fontSize: "var(--fs-13)", lineHeight: 1.6, color: C.inkSoft, wordBreak: "keep-all", textWrap: "pretty" }}>
-                      {r.reason}
-                      {r.channelCount >= 2 && <span style={{ color: C.muted, marginLeft: 6, whiteSpace: "nowrap", fontSize: "var(--fs-11)" }}>{r.channelCount}곳이 말함</span>}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
+          <ReasonWeeks rows={d.reasons} latest={d.baseDate} earliest={trendFrom ?? addDaysISO(d.baseDate, -THEME_TREND_DAYS)} />
         )}
       </section>
 

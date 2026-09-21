@@ -698,6 +698,9 @@
   transition: background 0.12s ease;
 }
 .hz-evday-nav button:hover { background: var(--c-hover); }
+/* 테마 화면 '까닭 이력'의 지난주·다음주. 끝에 닿은 단추는 흐리게 두고 자리는 남긴다. */
+.hz-reason-nav button:disabled { color: var(--c-muted); background: transparent; cursor: default; }
+.hz-reason-nav button:disabled:hover { background: transparent; }
 @media (max-width: 760px) {
   .hz-evsplit { grid-template-columns: minmax(0, 1fr); }
   .hz-evcal {
