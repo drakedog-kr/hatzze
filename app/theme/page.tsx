@@ -152,10 +152,11 @@ export default async function ThemeIndexPage() {
       <section className="hz-sheet">
         <SectionHead
           icon="trending_up"
-          title="테마 안에서 말이 는 종목"
+          /* 제목·설명은 짧고 글자 그대로(2026-09-21 "더 직관적이고 심플하게"). 셈법은 물음표 도움말로 내렸다. */
+          title="갑자기 많이 언급된 종목"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
-          desc="테마마다 앞 사흘보다 언급이 가장 많이 는 종목과 채널이 말한 까닭입니다. 배수는 최근 사흘 언급을 앞 사흘로 나눈 값입니다."
-          noteHelp={`최근 ${KADERA_WINDOW_DAYS}일 언급이 ${RISER_MIN_MENTIONS}회 미만이거나 앞 사흘의 ${RISER_MIN_RATIO}배에 못 미치는 종목은 세지 않습니다. 앞 사흘에 한 번도 언급되지 않았던 종목은 '새로 등장'으로 맨 앞에 섭니다. 많아야 ${RISER_MAX}줄이고, 말이 크게 는 테마가 적으면 그만큼만 보입니다.`}
+          desc="테마마다 사흘 전보다 언급이 크게 늘어난 종목 하나와 채널이 말한 까닭입니다."
+          noteHelp={`배수는 최근 ${KADERA_WINDOW_DAYS}일 언급을 그 앞 사흘로 나눈 값입니다. 최근 사흘 언급이 ${RISER_MIN_MENTIONS}회 미만이거나 ${RISER_MIN_RATIO}배에 못 미치는 종목은 세지 않고, 앞 사흘에 한 번도 언급되지 않았던 종목은 '새로 등장'으로 맨 앞에 섭니다. 많아야 ${RISER_MAX}줄이고 크게 늘어난 테마가 적으면 그만큼만 보입니다.`}
           level={2}
         />
         {risers === null ? (
@@ -211,7 +212,7 @@ export default async function ThemeIndexPage() {
           icon="donut_small"
           title="테마 흐름"
           note={flowDates.length ? `${fmtKoDate(flowDates[0])} ~ ${fmtKoDate(flowDates[flowDates.length - 1])}` : `최근 ${THEME_FLOW_DAYS}일`}
-          desc={`테마마다 요즘 무슨 얘기가 도는지 한 줄, 그리고 최근 ${THEME_FLOW_DAYS}일 점유율의 흐름입니다.`}
+          desc="점유율 상위 10개 테마와 각 테마에서 요즘 도는 얘기입니다."
           noteHelp={`점유율은 최근 ${KADERA_WINDOW_DAYS}일 평균이고 분모는 테마 사전에 든 종목의 언급이라 스물여섯 줄을 다 더하면 100%가 됩니다. 막대는 날마다의 점유율이고 그 아래 글은 ${THEME_FLOW_TOP}위 안에 며칠째 드는지입니다. 집계가 있는 날만 세어 주말이 빠질 수 있습니다.`}
           level={2}
         />
