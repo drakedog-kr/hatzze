@@ -4,9 +4,9 @@ import { notFound } from "next/navigation";
 
 import { assertLoaded } from "@/lib/load-state";
 import { withSubjectParticle, withTopicParticle } from "@/lib/format";
-import { daysFromToday, eventDateLabel, type UpcomingEvent } from "@/lib/kadera-why";
+import { eventDateLabel, todayKst, type UpcomingEvent } from "@/lib/kadera-why";
 import { fmtKoDate, stockHref } from "@/lib/stock-page";
-import { KADERA_WINDOW_DAYS } from "@/lib/telegram-data";
+import { KADERA_WINDOW_DAYS, addDaysISO } from "@/lib/telegram-data";
 import {
   THEME_NAMES,
   THEME_TREND_DAYS,
@@ -21,6 +21,7 @@ import { KADERA_CARD } from "../../og-copy";
 import { pageMetadata } from "../../seo";
 import { THEME_PUBLIC } from "../../screen-flags";
 import { StockLogo } from "../../StockLogo";
+import { EventsCalendar } from "../../kadera/EventsCalendar";
 import { Avatar, DeltaPp, Pill, RankDelta } from "../../kadera/parts";
 import { SectionHead } from "../../kadera/SectionHead";
 import TimeAgo from "../../kadera/TimeAgo";
@@ -183,6 +184,20 @@ function Empty({ children }: { children: React.ReactNode }) {
 
 const clip: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
 
+/** '지금 말 많은 종목' 표의 줄 수. 지도가 전체를 보이니 표는 상위 다섯이면 된다(2026-09-21). */
+const HOT_ROWS = 5;
+/** 달력이 보이는 날수. 카더라 '다가오는 일정'과 같은 5주. */
+const CALENDAR_DAYS = 35;
+/** 달력 아래 '달·분기만 짚인 일정'의 최대 줄 수. 더 보기는 두지 않는다. */
+const VAGUE_ROWS = 6;
+
+/** 조회·전달 수의 짧은 꼴. 카더라 트렌딩(app/kadera/page.tsx compact)과 같은 규칙이다. */
+function compact(n: number): string {
+  if (n >= 10000) return `${Math.round(n / 1000)}K`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
+  return `${n}`;
+}
+
 export default async function ThemePage({ params }: { params: Promise<{ theme: string }> }) {
   if (!PUBLIC && DEPLOYED) notFound();
   const { theme: raw } = await params;
@@ -208,15 +223,24 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
   }
   for (const g of reasonDays.values()) g.sort((a, b) => b.channelCount - a.channelCount);
 
-  // 일정을 머리글(날짜 라벨)로 묶는다. 달·분기·연 단위는 날짜가 달라도 라벨이 같아서("10월 중"),
-  // (날짜, 정밀도)로 묶으면 같은 머리글이 두 번 선다 — 종목 화면과 달리 여기는 종목이 여럿이라 실제로 그랬다.
-  const eventGroups = new Map<string, UpcomingEvent[]>();
+  // 일정은 카더라와 같은 달력이다(2026-09-21 "달력 형태로"). 달력엔 **날짜가 적혀 있던 것(day)**만, 앞으로 5주.
+  // 달·분기·연 단위는 놓을 칸이 없고 모델이 "연말"을 12-31 로 굳혀 쓴 값이라 칸에 두면 거짓이 된다(카더라와 같은 규칙).
+  // 카더라는 그것들을 버리지만 여기는 종목이 여럿이라 "10월 중 실적 발표" 같은 것이 제법 있어, 달력 아래에 몇 줄 적는다.
+  const today = todayKst();
+  const calendarEnd = addDaysISO(today, CALENDAR_DAYS);
+  const dayEvents = d.events.filter((e) => e.precision === "day" && e.date <= calendarEnd);
+  // 머리글(라벨)로 묶는다 — 달·분기·연은 날짜가 달라도 라벨이 같아서("10월 중") (날짜, 정밀도)로 묶으면 같은 머리글이 두 번 선다.
+  const vagueGroups = new Map<string, UpcomingEvent[]>();
+  let vagueRows = 0;
   for (const e of d.events) {
-    const k = e.precision === "day" ? e.date : eventDateLabel(e);
-    const g = eventGroups.get(k);
+    if (e.precision === "day" || vagueRows >= VAGUE_ROWS) continue;
+    const k = eventDateLabel(e);
+    const g = vagueGroups.get(k);
     if (g) g.push(e);
-    else eventGroups.set(k, [e]);
+    else vagueGroups.set(k, [e]);
+    vagueRows += 1;
   }
+  const vagueTotal = d.events.filter((e) => e.precision !== "day").length;
 
   // 이웃 테마 — 사전 순서에서 앞뒤 둘씩. 26장이 서로 이어져야 크롤러가 닿는다(종목 화면의 '같은 테마 종목'과 같은 이유).
   const idx = THEME_NAMES.indexOf(theme);
@@ -329,9 +353,16 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
         <SectionHead icon="forum" title="요즘 무슨 얘기" note={d.brief ? `${fmtKoDate(d.brief.date)} 기준` : undefined} desc="최근 사흘 채널 글을 읽고 정리한 것입니다. 확인된 사실이 아니라 오간 이야기입니다." level={2} />
         {d.brief?.brief ? (
           <div style={{ padding: "16px 22px 20px" }}>
-            <div style={{ display: "flex", gap: 9, background: C.soft, borderRadius: R.control, padding: "12px 13px" }}>
-              <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-              <p style={{ margin: 0, fontSize: "var(--fs-13)", lineHeight: 1.7, color: C.inkSoft, textWrap: "pretty", wordBreak: "keep-all" }}>{d.brief.brief}</p>
+            {/* 두 문단(파이프라인이 빈 줄로 가른다). 첫 문단은 가장 크게 오간 이야기, 둘째는 그 밖의 이야기. */}
+            <div style={{ display: "flex", gap: 10, background: C.soft, borderRadius: R.control, padding: "14px 16px" }}>
+              <AiMark size={15} style={{ flexShrink: 0, marginTop: 2 }} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
+                {d.brief.brief.split(/\n\s*\n/).map((para, i) => (
+                  <p key={i} style={{ margin: 0, fontSize: "var(--fs-13-5)", lineHeight: 1.75, color: C.inkSoft, textWrap: "pretty", wordBreak: "keep-all" }}>
+                    {para}
+                  </p>
+                ))}
+              </div>
             </div>
           </div>
         ) : (
@@ -353,7 +384,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
           icon="leaderboard"
           title="지금 말 많은 종목"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
-          desc="칸의 크기는 최근 사흘 언급 수, 색은 그 앞 사흘과 견준 변화입니다. 아래 표의 까닭은 그날 채널이 말한 이유입니다."
+          desc="칸의 크기는 최근 사흘 언급 수, 색은 그 앞 사흘과 견준 변화입니다. 아래 표는 상위 다섯 종목과 그날 채널이 말한 까닭입니다."
           noteHelp="색은 최근 사흘 언급을 바로 앞 사흘과 나눈 배수입니다. 1.5배 이상이면 따뜻한 색, 1.5분의 1 이하면 파랑이고, 앞 사흘에 없던 종목은 새로 등장으로 칩니다."
           level={2}
         />
@@ -367,7 +398,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
               <Treemap tiles={stockTiles(d.hotStocks)} ariaLabel={`${theme} 테마 종목별 최근 ${KADERA_WINDOW_DAYS}일 언급`} />
             </div>
             <TreemapLegend up="앞 사흘보다 말이 늘어난 종목" flat="비슷함" down="줄어든 종목" />
-            {d.hotStocks.slice(0, 12).map((s, i) => (
+            {d.hotStocks.slice(0, HOT_ROWS).map((s, i) => (
               <div key={s.code} className="hz-trow hz-cols-theme-stock">
                 <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", fontWeight: 800, color: C.sub2 }}>{i + 1}</span>
                 <Link href={stockHref(s.code)} style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0, textDecoration: "none" }}>
@@ -392,11 +423,6 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
                 </span>
               </div>
             ))}
-            {d.hotStocks.length > 12 && (
-              <p style={{ margin: 0, padding: "10px 22px 6px", fontSize: "var(--fs-11)", color: C.muted }}>
-                상위 12종목만 보입니다. 나머지 {d.hotStocks.length - 12}종목은 언급이 더 적습니다.
-              </p>
-            )}
           </div>
         )}
       </section>
@@ -440,20 +466,37 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
         )}
       </section>
 
-      {/* ── 다가오는 일정 ── 테마 종목들의 앞날. 종목 화면과 같은 아젠다 꼴에 종목 이름이 붙는다. */}
+      {/* ── 다가오는 일정 ── 카더라와 같은 달력(1/3) + 고른 날(2/3). 날짜가 적혀 있던 것만 칸에 놓고,
+          달·분기만 짚인 것은 아래에 몇 줄 적는다(위 vagueGroups 주석). */}
       <section className="hz-sheet">
-        <SectionHead icon="calendar_month" title="다가오는 일정" desc="채널이 짚은 날입니다. 같은 일정을 두고 날짜가 갈리기도 합니다." level={2} />
-        {d.events.length === 0 ? (
-          <Empty>채널이 짚은 이 테마 종목의 앞날 일정이 아직 없습니다.</Empty>
+        <SectionHead
+          icon="calendar_month"
+          title="다가오는 일정"
+          note="앞으로 5주"
+          desc="채널이 날짜를 짚어 말한 이 테마 종목의 일정입니다. 확정 일정은 공시로 확인하십시오."
+          noteHelp="같은 일정을 두고 채널마다 날짜가 갈리기도 합니다. 날짜 없이 달이나 분기만 짚인 것은 달력에 놓을 칸이 없어 아래에 따로 적습니다."
+          level={2}
+        />
+        {dayEvents.length === 0 ? (
+          <Empty>앞으로 5주 안에 날짜가 짚인 이 테마 종목의 일정이 아직 없습니다.</Empty>
         ) : (
-          <div style={{ paddingBottom: 6 }}>
-            {[...eventGroups.values()].map((items) => (
-              <div key={`${items[0].date}-${items[0].precision}`}>
+          <EventsCalendar
+            today={today}
+            events={dayEvents.map((e) => ({ code: e.code, name: e.name, market: e.market, date: e.date, event: e.event, channels: e.channels }))}
+          />
+        )}
+        {vagueGroups.size > 0 && (
+          <div style={{ borderTop: "1px solid var(--c-sheet-line)", paddingBottom: 8 }}>
+            <div style={{ padding: "16px 22px 2px", display: "flex", alignItems: "baseline", gap: 8 }}>
+              <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: C.sub }}>날짜 없이 달·분기만 짚인 일정</span>
+              {vagueTotal > vagueRows && (
+                <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>{vagueTotal}건 중 가까운 {vagueRows}건</span>
+              )}
+            </div>
+            {[...vagueGroups.entries()].map(([label, items]) => (
+              <div key={label}>
                 <div className="hz-agenda-day">
-                  <span style={{ fontSize: "var(--fs-13-5)", fontWeight: 800, color: C.ink, letterSpacing: "-.01em" }}>{eventDateLabel(items[0])}</span>
-                  {items[0].precision === "day" && (
-                    <Pill tone={["오늘", "내일"].includes(daysFromToday(items[0].date)) ? "blue" : "plain"}>{daysFromToday(items[0].date)}</Pill>
-                  )}
+                  <span style={{ fontSize: "var(--fs-13-5)", fontWeight: 800, color: C.ink, letterSpacing: "-.01em" }}>{label}</span>
                 </div>
                 {items.map((e) => (
                   <div key={`${e.code}-${e.event}`} className="hz-trow hz-cols-theme-event">
@@ -471,36 +514,16 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
         )}
       </section>
 
-      {/* ── 함께 언급되는 테마 ── 같은 글에 같이 나온 테마. 가격이 아니라 언급으로 묶인 이웃이다. */}
-      <section className="hz-sheet">
-        <SectionHead icon="hub" title="함께 언급되는 테마" note="최근 사흘" desc="이 테마 종목과 같은 글에 함께 나온 다른 테마입니다. 숫자는 그런 글의 수입니다." level={2} />
-        {d.brief && d.brief.related.length > 0 ? (
-          <div style={{ padding: "16px 22px 20px", display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {d.brief.related.map((r) => (
-              <Link
-                key={r.theme}
-                href={themeHref(r.theme)}
-                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 11px", borderRadius: R.pill, background: C.chip, fontSize: "var(--fs-12)", fontWeight: 600, color: C.label, textDecoration: "none", whiteSpace: "nowrap" }}
-              >
-                {r.theme}
-                <span style={{ fontFamily: MONO, fontWeight: 700, color: C.sub2 }}>{r.messages}</span>
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <Empty>{d.brief ? "최근 사흘 사이 다른 테마와 같은 글에 오른 적이 없습니다." : "요약과 함께 매일 저녁 실행 뒤에 채워집니다."}</Empty>
-        )}
-      </section>
-
-      {/* ── 발췌 ── 최근 사흘 조회가 많은 글. 원본이 텔레그램 메시지라 말풍선으로 둔다(카더라 트렌딩과 같은 형태). */}
+      {/* ── 발췌 ── 최근 사흘 조회가 많은 글. 카더라 트렌딩 메시지와 같은 패널 격자·말풍선(2026-09-21 "카더라 포맷 따오기") —
+          원본이 텔레그램 메시지라 그 매체의 형태를 유지하면 "우리가 센 수치가 아니라 누가 한 말"이 형태만으로 읽힌다. */}
       <section className="hz-sheet">
         <SectionHead icon="format_quote" title="채널에서 오간 글" note="최근 사흘 · 조회순" desc="이 테마 종목이 언급된 글 중 많이 읽힌 것입니다. 같은 글이 여러 채널에 실린 것은 한 번만 보입니다." level={2} />
         {!d.brief || d.brief.excerpts.length === 0 ? (
           <Empty>{d.brief ? "최근 사흘 사이 이 테마 종목이 언급된 글을 찾지 못했습니다." : "요약과 함께 매일 저녁 실행 뒤에 채워집니다."}</Empty>
         ) : (
-          <ul style={{ listStyle: "none", margin: 0, padding: "10px 8px 12px", display: "flex", flexDirection: "column", gap: 4 }}>
+          <ul className="hz-panelgrid hz-panelgrid-auto" style={{ listStyle: "none", margin: 0 }}>
             {d.brief.excerpts.map((m, i) => (
-              <li key={`${m.channelHandle}-${m.messageId}`} className="hz-lift" style={{ display: "flex", padding: "12px 14px", gap: 12, minWidth: 0 }}>
+              <li key={`${m.channelHandle}-${m.messageId}`} className="hz-lift" style={{ display: "flex", padding: "16px 18px", gap: 12, minWidth: 0 }}>
                 <a
                   href={`https://t.me/${m.channelHandle}/${m.messageId}`}
                   target="_blank"
@@ -545,12 +568,47 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
                           ))}
                         </div>
                       )}
+                      <div style={{ display: "flex", alignItems: "center", gap: 14, paddingTop: 2, fontSize: "var(--fs-11)", fontFamily: MONO, fontWeight: 700, color: C.sub }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                          <Icon name="visibility" style={{ fontSize: "var(--fs-14)", color: C.muted }} />
+                          {compact(m.views)}
+                        </span>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                          <Icon name="shortcut" style={{ fontSize: "var(--fs-14)", color: C.muted }} />
+                          {compact(m.forwards)}
+                        </span>
+                        <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 2, color: C.sub2, fontWeight: 600 }}>
+                          원문
+                          <Icon name="arrow_outward" style={{ fontSize: "var(--fs-13)" }} />
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </a>
               </li>
             ))}
           </ul>
+        )}
+      </section>
+
+      {/* ── 함께 언급되는 테마 ── 같은 글에 같이 나온 테마. 가격이 아니라 언급으로 묶인 이웃이다. 발췌 아래에 둔다(2026-09-21). */}
+      <section className="hz-sheet">
+        <SectionHead icon="hub" title="함께 언급되는 테마" note="최근 사흘" desc="이 테마 종목과 같은 글에 함께 나온 다른 테마입니다. 숫자는 그런 글의 수입니다." level={2} />
+        {d.brief && d.brief.related.length > 0 ? (
+          <div style={{ padding: "16px 22px 20px", display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {d.brief.related.map((r) => (
+              <Link
+                key={r.theme}
+                href={themeHref(r.theme)}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 11px", borderRadius: R.pill, background: C.chip, fontSize: "var(--fs-12)", fontWeight: 600, color: C.label, textDecoration: "none", whiteSpace: "nowrap" }}
+              >
+                {r.theme}
+                <span style={{ fontFamily: MONO, fontWeight: 700, color: C.sub2 }}>{r.messages}</span>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <Empty>{d.brief ? "최근 사흘 사이 다른 테마와 같은 글에 오른 적이 없습니다." : "요약과 함께 매일 저녁 실행 뒤에 채워집니다."}</Empty>
         )}
       </section>
 

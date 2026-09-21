@@ -137,6 +137,7 @@ export type ThemePageData = {
   trend: ThemeTrendPoint[];
   hotStocks: ThemeHotStock[];
   reasons: ThemeReasonRow[];
+  /** 오늘 이후 일정 전부(정밀도 무관, 가까운 날부터). 화면이 날짜 있는 것은 달력에, 달·분기만 짚인 것은 그 아래에 가른다. */
   events: UpcomingEvent[];
   brief: ThemeBrief | null;
   /** 집계(추이·말 많은 종목)를 못 읽었나. 실패를 '언급 없음'으로 위장하지 않으려는 표시. */
@@ -215,7 +216,8 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
           .order("date", { ascending: false })
           .limit(400)
       : Promise.resolve({ data: [] as ReasonRow[], error: null }),
-    getEventsForCodes(codes, 12),
+    // 종목 55개면 앞으로 몇 달치가 50건 안팎(2026-09-21 반도체 46건). 달력이 5주로 거르니 넉넉히 받는다.
+    getEventsForCodes(codes, 200),
     getThemeRotation(100),
     // 기준일분이 아직 없으면 하루까지 거슬러 가장 최근 것을 쓴다(LLM_TEXT_CARRY_DAYS).
     db

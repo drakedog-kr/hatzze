@@ -62,8 +62,10 @@ TABLE = "telegram_theme_brief"
 
 # 화면에 싣는 발췌 수와, digest 로 모델에 주는 발췌 수. 화면은 다섯이면 한 화면에 들어오고,
 # 모델은 조금 더 봐야 한 종목 얘기에 쏠리지 않는다.
-EXCERPTS_SHOWN = 5
-EXCERPTS_DIGEST = 8
+# 화면은 여섯 — 카더라 트렌딩과 같은 패널 격자(3열·2열)라 여섯이면 어느 폭에서도 줄이 찬다(2026-09-21).
+# 모델은 열을 본다 — 두 문단을 쓰려면 한 종목 얘기만으론 모자란다.
+EXCERPTS_SHOWN = 6
+EXCERPTS_DIGEST = 10
 # 본문 후보를 넉넉히 받는 이유는 공백뿐인 본문과 복붙(같은 글이 여러 채널에)이 섞여서다.
 EXCERPT_CANDIDATES = 24
 # 저장하는 본문 길이. 화면은 네 줄로 자르지만 원문 링크 전엔 조금 더 읽힌다.
@@ -118,17 +120,23 @@ def has_trade_framing(text: str) -> bool:
     return bool(banned_hits(text) or any(w in text for w in EXTRA_BANNED))
 
 
-# 문장 길이. 두세 문장이 한 문단으로 서는 자리라 종목 요약(75~80)보다 길다.
-LEN_MIN, LEN_MAX = 130, 180
-LEN_HARD_MIN, LEN_HARD_MAX = 100, 220
+# 글 길이. **두 문단**(문단마다 두세 문장)이 한 시트에 서는 자리다. 처음엔 한 문단 130~180자였는데
+# 테마 화면의 본론치고 짧았다(2026-09-21 "문단 2개 정도로 길이 늘리기"). 문단 사이 빈 줄도 글자 수에 든다.
+LEN_MIN, LEN_MAX = 260, 380
+LEN_HARD_MIN, LEN_HARD_MAX = 200, 460
+PARAGRAPHS = 2
 MAX_RETRIES = 3
 
 THEME_SYSTEM = KR.COMMON + f"""
 
 [이번 문장 — 테마 요약]
 한 테마(예: 반도체·로봇·원전)에 대해, 최근 {KR.WINDOW_DAYS}일 텔레그램에서 그 테마 종목들을 두고
-**무슨 얘기가 돌았는지**를 두세 문장으로 씁니다. 화면 제목이 테마 이름이라 그 이름으로 문장을
+**무슨 얘기가 돌았는지**를 **두 문단**으로 씁니다. 화면 제목이 테마 이름이라 그 이름으로 문장을
 시작하지 마세요. 바로 본론으로 들어갑니다.
+
+- **문단은 정확히 둘**이고 사이에 빈 줄 하나를 둡니다. 첫 문단은 가장 크게 오간 이야기([상위 종목]의
+  앞쪽 종목을 두고 무슨 소식이 돌았는지), 둘째 문단은 그 밖에 오간 이야기(다른 종목·다른 소재)입니다.
+  둘째 문단이 첫 문단을 되풀이하면 안 됩니다. 문단마다 두세 문장.
 
 - **종목 이름을 붙이세요.** "반도체가 화제였습니다"처럼 뭉뚱그리면 아무 말도 아닙니다. 어느
   종목을 두고 무슨 이야기가 돌았는지가 본론입니다. 종목 이름은 아래 [상위 종목]과 발췌 안에
@@ -153,8 +161,19 @@ THEME_SYSTEM = KR.COMMON + f"""
 - [함께 언급된 테마]는 문장에 옮기지 마세요. 화면이 따로 보여줍니다. 첫 실행(2026-09-19)에서 이걸
   허용했더니 방산·화장품·지주 요약 끝에 "지주·밸류업 관련 논의와 함께", "바이오 테마 종목들도 함께
   언급되는 추세" 같은 겉도는 문장이 붙었습니다. 이 테마 종목 이야기만 씁니다.
-- **반드시 {LEN_MIN}자 이상 {LEN_MAX}자 이하**로 쓰세요(공백 포함). 두 문장 또는 세 문장으로
+- **반드시 {LEN_MIN}자 이상 {LEN_MAX}자 이하**로 쓰세요(공백 포함). 문단마다 두 문장 또는 세 문장으로
   자연스럽게 맞추세요."""
+
+
+def normalize_paragraphs(text: str) -> str:
+    """문단 사이를 빈 줄 하나로 고른다. 모델이 줄바꿈 하나로 문단을 가르거나 빈 줄을 둘 두기도 해서,
+    저장 형식을 '\n\n' 하나로 못박는다(화면은 이걸로 <p> 를 가른다)."""
+    paras = [p.strip() for p in re.split(r"\n\s*\n|\n", text.strip()) if p.strip()]
+    return "\n\n".join(paras)
+
+
+def paragraph_count(text: str) -> int:
+    return len([p for p in text.split("\n\n") if p.strip()])
 
 
 # 갑자기 많이 언급된 종목의 까닭. 종목 요약(75~80자)보다 조금 길다 — 이 칸은 줄 폭을 다 가져서 넓은 화면은
@@ -372,6 +391,8 @@ def pick_text(candidates: list[str], digest: str) -> str | None:
     # 시세 낱말이 없는 후보가 하나라도 있으면 그쪽만 본다.
     candidates = [t for t in candidates if not any(w in t for w in PRICE_WORDS)] or candidates
     clean = [t for t in candidates if is_clean(t, digest)] or candidates
+    # 두 문단인 후보가 있으면 그쪽만. 한 문단짜리도 읽히긴 하니 전부 그러면 그대로 간다.
+    clean = [t for t in clean if paragraph_count(t) == PARAGRAPHS] or clean
     mid = (LEN_MIN + LEN_MAX) / 2
     in_goal = [t for t in clean if LEN_MIN <= len(t) <= LEN_MAX]
     in_ok = [t for t in clean if LEN_HARD_MIN <= len(t) <= LEN_HARD_MAX]
@@ -505,22 +526,24 @@ def main() -> None:
         row = {"date": latest, "theme": theme, "brief": None, "related": [], "excerpts": [], "message_count": 0, "stock_count": 0, "model": None, "riser": None}
         try:
             if b is not None:
-                candidates = [ask(b["digest"])]
+                candidates = [normalize_paragraphs(ask(b["digest"]))]
                 for _attempt in range(MAX_RETRIES):
                     cur = candidates[-1]
                     found = brief_problems(cur, b["digest"])
+                    if paragraph_count(cur) != PARAGRAPHS:
+                        found.append(f"문단이 {paragraph_count(cur)}개(둘이어야 함)")
                     if LEN_MIN <= len(cur) <= LEN_MAX and not found:
                         break
                     if found:
                         print(f"  [{theme}] 문장을 버리고 다시 씁니다({' · '.join(found)}): {cur[:40]}…")
-                        fix = f"방금 쓴 문장에 문제가 있습니다({' · '.join(found)}). 같은 뜻으로 다시 써 주세요.\n\n{b['digest']}"
+                        fix = f"방금 쓴 글에 문제가 있습니다({' · '.join(found)}). 같은 뜻으로 두 문단으로 다시 써 주세요.\n\n{b['digest']}"
                     else:
                         need = "늘려" if len(cur) < LEN_MIN else "줄여"
                         fix = (
                             f"방금 쓴 문장은 {len(cur)}자입니다. 뜻은 유지하면서 {need} "
                             f"{LEN_MIN}~{LEN_MAX}자로 다시 써 주세요.\n\n{b['digest']}\n\n[방금 쓴 문장]\n{cur}"
                         )
-                    candidates.append(ask(fix))
+                    candidates.append(normalize_paragraphs(ask(fix)))
                 text = pick_text(candidates, b["digest"])
                 if text is None:
                     print(f"  [{theme}] 쓸 수 있는 문장이 없어(빈 응답이거나 전부 매수·매도 표현) 요약 없이 저장합니다.")
