@@ -192,14 +192,15 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
   const totalMentions = d.hotStocks.reduce((s, x) => s + x.mentions, 0);
   const trendFrom = d.trend[0]?.date;
   const trendTo = d.trend[d.trend.length - 1]?.date;
-  // 추이 위 작은 숫자 셋 — 최고인 날 · 집계가 있는 날의 평균 · 평소 대비.
+  // 추이 위 작은 숫자 셋 — 최고인 날 · 집계가 있는 날의 평균 · 고점 대비.
   const counted = d.trend.filter((p) => p.rank != null);
   const peak = counted.reduce<ThemeTrendPoint | null>((best, p) => (best == null || p.share > best.share ? p : best), null);
   const avgShare = counted.length ? counted.reduce((sum, p) => sum + p.share, 0) / counted.length : null;
-  // 평소 대비 — 최근 사흘 점유율을 30일 평균으로 나눈 것을 "+20%"·"−30%"로. 표의 태그("평소 대비 −35% 언급")와 같은 꼴이고,
-  // 숫자만 두어야 옆의 53.6%·36.5% 와 같은 크기로 읽힌다("평소의 1.2배"는 같은 15px 인데 한글이 커 보였다, 2026-09-21).
-  const vsUsual = d.recentShare != null && avgShare ? Math.round((d.recentShare / avgShare - 1) * 100) : null;
-  const vsUsualText = vsUsual == null ? "—" : vsUsual === 0 ? "±0%" : `${vsUsual > 0 ? "+" : "−"}${Math.abs(vsUsual)}%`;
+  // 고점 대비 — 최근 사흘 점유율이 30일 최고에서 얼마나 내려와 있나("−22%"). 0% 면 지금이 고점. 관심이 초입인지 식는 중인지를
+  // 한 숫자로(2026-09-21 Hun, '평소 대비'에서 바꿈). 사흘 평균은 그 사흘의 최고를 못 넘으니 값은 0 이하다.
+  // 숫자만 두어야 옆의 53.6%·36.5% 와 같은 크기로 읽힌다(한글이 섞이면 같은 15px 인데 커 보인다).
+  const vsPeak = d.recentShare != null && peak && peak.share > 0 ? Math.min(0, Math.round((d.recentShare / peak.share - 1) * 100)) : null;
+  const vsPeakText = vsPeak == null ? "—" : vsPeak === 0 ? "0%" : `−${Math.abs(vsPeak)}%`;
   const recentSet = new Set(d.recentDays);
   // 칸 1 의 종목 알약 — 최근 사흘 말이 많은 순. 집계가 없으면 사전 순서.
   const chipStocks = (d.hotStocks.length ? d.hotStocks : d.members).slice(0, HERO_CHIPS);
@@ -347,7 +348,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
             )}
           </div>
 
-          {/* 칸 3(넓은 칸) — 30일 추이. 위에 작은 숫자 셋(최고·평균·평소 대비), 막대는 최근 사흘만 진하게, 아래 범례. */}
+          {/* 칸 3(넓은 칸) — 30일 추이. 위에 작은 숫자 셋(최고·평균·고점 대비), 막대는 최근 사흘만 진하게, 아래 범례. */}
           <div className="hz-kd-hero-h">
             <div className="hz-kd-hero-title">
               <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>{THEME_TREND_DAYS}일 점유율 추이</span>
@@ -367,7 +368,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
                 <div className="hz-theme-figs hz-theme-figs-row">
                   <Fig label={peak ? `최고 · ${fmtKoDate(peak.date)}` : "최고"} value={peak ? `${peak.share.toFixed(1)}%` : "—"} />
                   <Fig label={`${THEME_TREND_DAYS}일 평균`} value={avgShare == null ? "—" : `${avgShare.toFixed(1)}%`} />
-                  <Fig label="평소 대비" value={vsUsualText} />
+                  <Fig label="고점 대비" value={vsPeakText} />
                 </div>
                 <Trend points={d.trend} recent={recentSet} />
                 <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", fontSize: "var(--fs-11)", color: C.sub }}>
