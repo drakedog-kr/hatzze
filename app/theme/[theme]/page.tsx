@@ -192,15 +192,25 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
   const totalMentions = d.hotStocks.reduce((s, x) => s + x.mentions, 0);
   const trendFrom = d.trend[0]?.date;
   const trendTo = d.trend[d.trend.length - 1]?.date;
-  // 추이 위 작은 숫자 셋 — 최고인 날 · 집계가 있는 날의 평균 · 고점 대비.
+  // 추이 위 작은 숫자 셋 — 최고인 날 · 집계가 있는 날의 평균 · 연속 오른(내린) 날.
   const counted = d.trend.filter((p) => p.rank != null);
   const peak = counted.reduce<ThemeTrendPoint | null>((best, p) => (best == null || p.share > best.share ? p : best), null);
   const avgShare = counted.length ? counted.reduce((sum, p) => sum + p.share, 0) / counted.length : null;
-  // 고점 대비 — 최근 사흘 점유율이 30일 최고에서 얼마나 내려와 있나("−22%"). 0% 면 지금이 고점. 관심이 초입인지 식는 중인지를
-  // 한 숫자로(2026-09-21 Hun, '평소 대비'에서 바꿈). 사흘 평균은 그 사흘의 최고를 못 넘으니 값은 0 이하다.
-  // 숫자만 두어야 옆의 53.6%·36.5% 와 같은 크기로 읽힌다(한글이 섞이면 같은 15px 인데 커 보인다).
-  const vsPeak = d.recentShare != null && peak && peak.share > 0 ? Math.min(0, Math.round((d.recentShare / peak.share - 1) * 100)) : null;
-  const vsPeakText = vsPeak == null ? "—" : vsPeak === 0 ? "0%" : `−${Math.abs(vsPeak)}%`;
+  // 연속 오른(내린) 날 — 집계가 있는 날만 이어 보며 마지막 날부터 거슬러 같은 방향이 며칠째인지. 관심의 방향과 속도
+  // (2026-09-21 Hun, '고점 대비'에서 바꿈). 마지막 변화가 0 이거나 날이 둘 미만이면 0일. 숫자만 두어야 옆의 53.6%·36.5% 와
+  // 같은 크기로 읽힌다(한글이 섞이면 같은 15px 인데 커 보인다) — 방향은 이름표가 말한다.
+  let streakDir: 1 | -1 | 0 = 0;
+  let streakDays = 0;
+  for (let i = counted.length - 1; i > 0; i--) {
+    const diff = counted[i].share - counted[i - 1].share;
+    const dir = diff > 0 ? 1 : diff < 0 ? -1 : 0;
+    if (streakDir === 0) {
+      if (dir === 0) break;
+      streakDir = dir;
+    }
+    if (dir !== streakDir) break;
+    streakDays += 1;
+  }
   const recentSet = new Set(d.recentDays);
   // 칸 1 의 종목 알약 — 최근 사흘 말이 많은 순. 집계가 없으면 사전 순서.
   const chipStocks = (d.hotStocks.length ? d.hotStocks : d.members).slice(0, HERO_CHIPS);
@@ -348,7 +358,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
             )}
           </div>
 
-          {/* 칸 3(넓은 칸) — 30일 추이. 위에 작은 숫자 셋(최고·평균·고점 대비), 막대는 최근 사흘만 진하게, 아래 범례. */}
+          {/* 칸 3(넓은 칸) — 30일 추이. 위에 작은 숫자 셋(최고·평균·연속 오른 날), 막대는 최근 사흘만 진하게, 아래 범례. */}
           <div className="hz-kd-hero-h">
             <div className="hz-kd-hero-title">
               <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>{THEME_TREND_DAYS}일 점유율 추이</span>
@@ -368,7 +378,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
                 <div className="hz-theme-figs hz-theme-figs-row">
                   <Fig label={peak ? `최고 · ${fmtKoDate(peak.date)}` : "최고"} value={peak ? `${peak.share.toFixed(1)}%` : "—"} />
                   <Fig label={`${THEME_TREND_DAYS}일 평균`} value={avgShare == null ? "—" : `${avgShare.toFixed(1)}%`} />
-                  <Fig label="고점 대비" value={vsPeakText} />
+                  <Fig label={streakDir < 0 ? "연속 내린 날" : "연속 오른 날"} value={`${streakDays}일`} />
                 </div>
                 <Trend points={d.trend} recent={recentSet} />
                 <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", fontSize: "var(--fs-11)", color: C.sub }}>
