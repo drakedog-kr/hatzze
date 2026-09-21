@@ -375,18 +375,23 @@
 .hz-theme-tag.is-down-1 { background: color-mix(in srgb, var(--c-blue-2) 24%, var(--c-card)); color: var(--c-ink); }
 .hz-theme-tag.is-down-2 { background: color-mix(in srgb, var(--c-blue-2) 45%, var(--c-card)); color: var(--c-ink); }
 .hz-theme-tag.is-down-3 { background: color-mix(in srgb, var(--c-blue-2) 66%, var(--c-card)); color: var(--c-ink); }
-/* '등락의 이유' 하루치 두 열. 왼쪽 열 오른편에 세로 헤어라인, 마지막 줄(짝수면 둘, 홀수면 하나)의 밑선은 지운다 —
-   다음 날 머리나 지난주 단추가 바로 온다. 1149 아래는 layout.css 가 한 열로. */
+/* '등락의 이유' 한 주 두 열. DOM 은 [머리, 머리, 1, 2, 3 …] 이고 줄은 왼쪽·오른쪽 차례(row flow). 세로 헤어라인은
+   **오른쪽 열(짝수 번째)의 왼편**에 — 홀수라 마지막 줄이 왼쪽뿐이면 그 옆엔 선이 없다. 마지막 줄(짝수면 둘, 홀수면 하나)의
+   밑선은 지운다(아래는 지난주 단추). 머리 위에도 선. 1149 아래는 layout.css 가 한 열로. */
 .hz-reason-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-.hz-reason-grid > :nth-child(odd) { box-shadow: inset -1px 0 0 var(--c-hairline); }
+.hz-reason-grid > .hz-thead { border-top: 1px solid var(--c-hairline); }
+.hz-reason-grid > :nth-child(even) { box-shadow: inset 1px 0 0 var(--c-hairline); }
 .hz-reason-grid > :last-child,
 .hz-reason-grid > :nth-last-child(2):nth-child(odd) { border-bottom: 0; }
+.hz-reason-grid.is-single { grid-template-columns: minmax(0, 1fr); }
+.hz-reason-grid.is-single > :nth-child(even) { box-shadow: none; }
 /* 까닭 이력: 종목 · 등락 · 까닭. 종목 칸은 로고+이름이 한 줄에 서는 폭이다. */
+/* 등락의 이유: 날짜(9/21·요일) · 종목(로고 · 이름+등락 태그 · 까닭) · 채널 수. */
 .hz-cols-theme-reason {
-  grid-template-columns: minmax(0, 1fr) 56px;
+  grid-template-columns: 40px minmax(0, 1fr) 48px;
   gap: 14px;
   align-items: center;
 }
@@ -394,8 +399,6 @@
   padding-top: 11px;
   padding-bottom: 11px;
 }
-/* 두 열의 첫 줄 위에도 선 — 날짜 머리와 줄 사이가 비어 있으면 줄이 허공에 뜬다(주인공 표의 열 머리와 같은 이유). */
-.hz-reason-grid { border-top: 1px solid var(--c-hairline); }
 /* 다가오는 일정: 종목 · 무슨 일 · (채널 알약). */
 .hz-cols-theme-event {
   grid-template-columns: 150px minmax(0, 1fr) auto;
