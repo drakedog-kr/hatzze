@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 
 import type { ThemeReasonRow } from "@/lib/theme-page";
 
@@ -15,9 +15,7 @@ import { Rate } from "./Rate";
  *
  * 자료는 서버가 30일치를 다 넘긴다(lib/theme-page.ts reasons). 여기서는 어느 주를 보일지만 상태로 갖는다 —
  * 카더라 달력(EventsCalendar)과 같은 원칙이다.
- *
- * 추이의 점(`#reason-날짜`)에서 오면 그 날이 든 주로 연다. 처음 그린 주에 그 날짜가 없으면 앵커가 없어
- * 브라우저가 제자리에 머무니, 마운트 뒤 해시를 읽어 주를 옮기고 스크롤한다.
+
  */
 const WEEK_DAYS = 7;
 const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
@@ -26,9 +24,6 @@ function addDays(iso: string, n: number): string {
   const d = new Date(`${iso}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
-}
-function daysBetween(a: string, b: string): number {
-  return Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
 }
 function fmtKo(iso: string): string {
   const [, m, d] = iso.split("-");
@@ -61,29 +56,6 @@ export function ReasonWeeks({ rows, latest, earliest }: { rows: ThemeReasonRow[]
   }, [rows, start, end]);
   const total = days.reduce((n, [, list]) => n + list.length, 0);
 
-  // 해시로 온 날짜. 주를 옮긴 **뒤에** 앵커가 생기므로 스크롤은 back 이 바뀐 다음 효과에서 한다.
-  const pendingDate = useRef<string | null>(null);
-  useEffect(() => {
-    const m = /^#reason-(\d{4}-\d{2}-\d{2})$/.exec(window.location.hash);
-    if (!m) return;
-    const date = m[1];
-    if (date < earliest || date > latest) return;
-    pendingDate.current = date;
-    // 효과 안에서 바로 setState 하지 않는다(react-hooks 규칙). 한 틱 뒤에 주를 옮긴다.
-    // ⚠️ requestAnimationFrame 이 아니라 setTimeout — 숨은 탭에선 rAF 가 안 돌아 주가 영영 안 옮겨진다
-    //    (project_hidden_browser_pane_no_raf 와 같은 함정, 2026-09-21 실측).
-    const id = window.setTimeout(() => setBack(Math.floor(daysBetween(date, latest) / WEEK_DAYS)), 0);
-    return () => window.clearTimeout(id);
-  }, [earliest, latest]);
-  useEffect(() => {
-    const date = pendingDate.current;
-    if (!date) return;
-    const el = document.getElementById(`reason-${date}`);
-    if (!el) return;
-    pendingDate.current = null;
-    el.scrollIntoView({ block: "start", behavior: "smooth" });
-  }, [back]);
-
   return (
     <div style={{ paddingBottom: 4 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "14px 22px 0" }}>
@@ -100,7 +72,7 @@ export function ReasonWeeks({ rows, latest, earliest }: { rows: ThemeReasonRow[]
         </p>
       ) : (
         days.map(([date, list]) => (
-          <div key={date} id={`reason-${date}`}>
+          <div key={date}>
             <div className="hz-agenda-day">
               <span style={{ fontSize: "var(--fs-13-5)", fontWeight: 800, color: C.ink, letterSpacing: "-.01em" }}>{fmtKoWd(date)}</span>
             </div>

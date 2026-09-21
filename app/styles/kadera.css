@@ -383,29 +383,46 @@
   flex-wrap: wrap;
   gap: 6px;
 }
+/* 배당으로 살기의 종목 칩(.dv-chip, tx.css)과 같은 치수·색이다 — 그림자는 두지 않는다(2026-09-21 "그라데이션이 과하다"). */
 .hz-theme-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px 4px 5px;
+  padding: 5px 10px 5px 6px;
   border-radius: 999px;
   background: var(--c-card);
-  border: 1px solid var(--c-panel-line);
-  box-shadow: 0 1px 2px 0 var(--c-sh-card);
-  font-size: var(--fs-11-5);
-  font-weight: 700;
+  border: 1px solid var(--c-line);
+  font-size: var(--fs-12-5);
+  font-weight: 600;
   color: var(--c-ink);
   text-decoration: none;
   white-space: nowrap;
-  transition: border-color 0.12s ease, background 0.12s ease;
+  transition: background 0.12s ease;
 }
-a.hz-theme-chip:hover { border-color: var(--c-blue); }
+a.hz-theme-chip:hover { background: var(--tx-btn); }
 .hz-theme-chip-more {
-  padding: 4px 10px;
+  padding: 5px 10px;
   background: transparent;
   border-style: dashed;
-  box-shadow: none;
   color: var(--c-sub);
+}
+/* 맨 아래 '함께 거론되는 테마' 알약. 링크라 올리면 색이 바뀌어야 알약끼리 갈린다 — 인라인 background 는 :hover 를 이겨서 클래스로. */
+.hz-theme-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 11px;
+  border-radius: 999px;
+  background: var(--c-chip);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--c-label);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.hz-theme-pill:hover {
+  background: var(--c-blue-tint);
+  color: var(--c-cold-ink);
 }
 /* 작은 숫자들(Fig) — 둘째 칸은 두 칸 격자, 넓은 칸은 한 줄에 셋. */
 .hz-theme-figs {

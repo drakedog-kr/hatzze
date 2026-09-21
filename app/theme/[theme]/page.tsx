@@ -85,9 +85,8 @@ export async function generateMetadata({ params }: { params: Promise<{ theme: st
 }
 
 /**
- * 30일 점유율 막대. 종목 화면의 언급 막대와 같은 꼴(div 만, 라이브러리 없음)에 **까닭이 붙은 날**을
- * 점으로 얹는다. 다른 테마 사이트의 차트가 이유가 있는 날에 원을 찍는 형식을 가져온 것이다.
- * 점을 누르면 아래 까닭 이력의 그 날짜로 간다.
+ * 30일 점유율 막대. 종목 화면의 언급 막대와 같은 꼴(div 만, 라이브러리 없음). 처음엔 까닭이 붙은 날에
+ * 붉은 점을 얹고 누르면 그 주로 가게 했는데 걷었다(2026-09-21 "빨간 점 없애는 게 낫다") — 툴팁에 '까닭 있음'만 남는다.
  */
 function Trend({ points, recent }: { points: ThemeTrendPoint[]; recent: Set<string> }) {
   const max = Math.max(0.1, ...points.map((p) => p.share));
@@ -115,29 +114,7 @@ function Trend({ points, recent }: { points: ThemeTrendPoint[]; recent: Set<stri
             data-tip={tip}
             style={{ position: "relative", flex: 1, minWidth: 0, height: "100%", display: "flex", alignItems: "flex-end" }}
           >
-            {p.hasReason && (
-              // 막대 위 6px 점. 막대와 같은 파랑을 쓰면 묻히니 온도색(따뜻한 잉크)으로 띄운다.
-              <span
-                aria-hidden="true"
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: "50%",
-                  width: 6,
-                  height: 6,
-                  marginLeft: -3,
-                  borderRadius: 999,
-                  background: "var(--c-hot-ink)",
-                }}
-              />
-            )}
-            {p.hasReason ? (
-              <a href={`#reason-${p.date}`} aria-label={tip} style={{ display: "flex", alignItems: "flex-end", width: "100%", height: "100%" }}>
-                {bar}
-              </a>
-            ) : (
-              bar
-            )}
+            {bar}
           </span>
         );
       })}
@@ -288,7 +265,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
             <div className="hz-theme-chips">
               {chipStocks.map((m) => (
                 <Link key={m.code} href={stockHref(m.code)} className="hz-theme-chip">
-                  <StockLogo code={m.code} name={m.name} market={m.market} size={16} />
+                  <StockLogo code={m.code} name={m.name} market={m.market} size={18} />
                   {m.name}
                 </Link>
               ))}
@@ -365,10 +342,6 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
                     <span aria-hidden="true" style={{ width: 10, height: 10, borderRadius: 3, background: "var(--c-blue-3)", display: "inline-block" }} />
                     그 전
                   </span>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                    <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 999, background: "var(--c-hot-ink)", display: "inline-block" }} />
-                    종목에 까닭 한 줄이 붙은 날. 누르면 그 주로 갑니다
-                  </span>
                 </div>
               </>
             )}
@@ -378,7 +351,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
 
       {/* ── 요즘 무슨 얘기(LLM) ── 이 화면의 본론. 파이프라인이 테마마다 하루 한 번 써 둔다(generate_theme_briefs.py). */}
       <section className="hz-sheet">
-        <SectionHead icon="forum" title="요즘 무슨 얘기" note={d.brief ? `${fmtKoDate(d.brief.date)} 기준` : undefined} desc="최근 사흘 채널 글을 읽고 정리한 것입니다. 확인된 사실이 아니라 오간 이야기입니다." level={2} />
+        <SectionHead icon="forum" title="요즘 무슨 얘기" note={d.brief ? `${fmtKoDate(d.brief.date)} 기준` : undefined} desc="최근 사흘 채널 글을 읽고 정리한 것입니다." level={2} />
         {d.brief?.brief ? (
           <div style={{ padding: "16px 22px 20px" }}>
             {/* 두 문단(파이프라인이 빈 줄로 가른다). 첫 문단은 가장 크게 오간 이야기, 둘째는 그 밖의 이야기. */}
@@ -412,8 +385,8 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
           icon="leaderboard"
           title="지금 말 많은 종목"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
-          desc="칸의 크기는 최근 사흘 언급 수, 색은 그 앞 사흘과 견준 변화입니다. 아래 표는 상위 다섯 종목과 그날 채널이 말한 까닭입니다."
-          noteHelp="색은 최근 사흘 언급을 바로 앞 사흘과 나눈 배수입니다. 1.5배 이상이면 따뜻한 색, 1.5분의 1 이하면 파랑이고, 앞 사흘에 없던 종목은 새로 등장으로 칩니다."
+          desc="상위 다섯 종목과 채널이 말한 까닭입니다."
+          noteHelp="칸의 크기는 최근 사흘 언급 수이고 색은 그 앞 사흘과 나눈 배수입니다. 1.5배 이상이면 따뜻한 색, 1.5분의 1 이하면 파랑이고, 앞 사흘에 없던 종목은 새로 등장으로 칩니다."
           level={2}
         />
         {d.loadFailed ? (
@@ -462,8 +435,8 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
           icon="history"
           title="까닭 이력"
           note="한 주씩"
-          desc="이 테마 종목이 크게 움직인 날, 그날 채널이 말한 이유입니다. 아래 단추로 지난주를 봅니다."
-          noteHelp={`최근 ${THEME_TREND_DAYS}일까지 거슬러 갑니다. 위 추이의 점을 누르면 그날이 든 주로 옮겨 갑니다.`}
+          desc="이 테마 종목이 크게 움직인 날, 그날 채널이 말한 이유입니다."
+          noteHelp={`최근 ${THEME_TREND_DAYS}일까지 거슬러 갑니다.`}
           level={2}
         />
         {d.reasons.length === 0 ? (
@@ -524,7 +497,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
       {/* ── 발췌 ── 최근 사흘 조회가 많은 글. 카더라 트렌딩 메시지와 같은 패널 격자·말풍선(2026-09-21 "카더라 포맷 따오기") —
           원본이 텔레그램 메시지라 그 매체의 형태를 유지하면 "우리가 센 수치가 아니라 누가 한 말"이 형태만으로 읽힌다. */}
       <section className="hz-sheet">
-        <SectionHead icon="format_quote" title="채널에서 오간 글" note="최근 사흘 · 조회순" desc="이 테마 종목이 언급된 글 중 많이 읽힌 것입니다. 같은 글이 여러 채널에 실린 것은 한 번만 보입니다." level={2} />
+        <SectionHead icon="format_quote" title="채널에서 오간 글" note="최근 사흘 · 조회순" desc="이 테마 종목이 언급된 글 중 많이 읽힌 것입니다." level={2} />
         {!d.brief || d.brief.excerpts.length === 0 ? (
           <Empty>{d.brief ? "최근 사흘 사이 이 테마 종목이 언급된 글을 찾지 못했습니다." : "요약과 함께 매일 저녁 실행 뒤에 채워집니다."}</Empty>
         ) : (
@@ -609,11 +582,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
         <div style={{ padding: "16px 22px 18px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: C.sub, whiteSpace: "nowrap" }}>{relatedThemes.length ? "함께 거론되는 테마" : "다른 테마"}</span>
           {(relatedThemes.length ? relatedThemes : neighbors).map((t) => (
-            <Link
-              key={t}
-              href={themeHref(t)}
-              style={{ display: "inline-flex", alignItems: "center", padding: "6px 11px", borderRadius: R.pill, background: C.chip, fontSize: "var(--fs-12)", fontWeight: 600, color: C.label, textDecoration: "none", whiteSpace: "nowrap" }}
-            >
+            <Link key={t} href={themeHref(t)} className="hz-theme-pill">
               {t}
             </Link>
           ))}
