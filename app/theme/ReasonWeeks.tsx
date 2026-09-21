@@ -79,6 +79,8 @@ export function ReasonWeeks({ rows, latest, earliest }: { rows: ThemeReasonRow[]
             <div className="hz-agenda-day">
               <span style={{ fontSize: "var(--fs-13-5)", fontWeight: 800, color: C.ink, letterSpacing: "-.01em" }}>{fmtKoWd(date)}</span>
             </div>
+            {/* 하루의 줄을 두 열로. 까닭이 짧아 오른쪽 반이 비었다(2026-09-21 지적). 1149 아래는 한 열(layout.css). */}
+            <div className="hz-reason-grid">
             {list.map((r) => (
               <div key={`${date}-${r.code}`} className="hz-trow hz-cols-theme-reason">
                 <Link href={`/stock/${r.code}`} style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, textDecoration: "none" }}>
@@ -98,6 +100,7 @@ export function ReasonWeeks({ rows, latest, earliest }: { rows: ThemeReasonRow[]
                 </span>
               </div>
             ))}
+            </div>
           </div>
         ))
       )}

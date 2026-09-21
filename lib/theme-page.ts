@@ -14,8 +14,9 @@ import {
   windowBefore,
 } from "./telegram-data";
 import { THEMES } from "./stock-themes";
-import { getEventsForCodes, type UpcomingEvent } from "./kadera-why";
+import { getEventsForCodes, todayKst, type UpcomingEvent } from "./kadera-why";
 import { isLoadFailed } from "./load-state";
+import { changeRateOf, fetchYahooQuote } from "./yahoo-quote";
 
 /**
  * 테마 실주소 화면(`/theme/반도체`)과 테마 목록(`/theme`)이 쓰는 자료.
@@ -198,6 +199,32 @@ async function themeMembers(theme: string): Promise<MemberRow[] | null> {
   return names.map((n) => out.get(n)).filter((m): m is MemberRow => Boolean(m));
 }
 
+/**
+ * **오늘 날짜의 까닭 줄**에만 야후 등락률을 채운다. 까닭은 저녁에 만들어지는데 KRX 종가는 이튿날 낮에야 와서
+ * (generate_move_reasons.fill_krx) 오늘 줄은 하루 동안 등락률이 비어 있었다. 데일리 노트가 오늘 글에만 야후를
+ * 보는 규칙(lib/daily-note.ts getNoteStocks)을 그대로 따른다:
+ *   - 오늘(KST)이고 change_rate 가 비어 있는 줄만. 어제 줄은 안 본다 — 야후의 등락률은 늘 '지금 세션'이라
+ *     이튿날 장이 열리면 어제 줄에 오늘 값이 앉는다. 어제 줄은 KRX 가 낮에 채울 때까지 '종가 전'으로 둔다.
+ *   - 못 구하면 null 그대로(화면이 '종가 전'을 적는다). 캐시는 데일리 노트와 같은 600초.
+ * 오늘 까닭은 하루 몇 줄이라(테마 하나 5줄 안팎) 요청 수가 작다.
+ */
+async function fillTodayRates(reasons: ThemeReasonRow[]): Promise<void> {
+  const today = todayKst();
+  const todo = reasons.filter((r) => r.date === today && r.changeRate == null);
+  if (!todo.length) return;
+  await Promise.all(
+    todo.map(async (r) => {
+      try {
+        const q = await fetchYahooQuote(`${r.code}.${r.market === "KOSDAQ" ? "KQ" : "KS"}`, { next: { revalidate: 600 } });
+        const rate = q ? changeRateOf(q) : null;
+        if (rate != null) r.changeRate = rate;
+      } catch (e) {
+        console.error(`[getThemePage] ${r.code} 오늘 등락을 야후에서 못 받았습니다`, e);
+      }
+    }),
+  );
+}
+
 /** 종목 등락을 테마 하나의 묶음으로. 날짜는 가장 많은 종목이 가진 것 — 상장 직후 종목의 옛 날짜 하나에 끌려가지 않게. */
 function themeQuotes(rows: { changeRate: number | null; priceDate: string | null }[]): ThemeQuotes {
   const have = rows.filter((r) => r.changeRate != null && r.priceDate);
@@ -314,6 +341,7 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
       channelCount: r.channel_count ?? 0,
     });
   }
+  await fillTodayRates(reasons);
   const reasonDates = new Set(reasons.map((r) => r.date));
 
   // ── 추이 ── 언급이 0인 날은 표에 행이 없다. 빈 날을 0으로 메워야 막대 개수가 늘 같다.

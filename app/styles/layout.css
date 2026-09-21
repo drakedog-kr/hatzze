@@ -87,6 +87,10 @@
   .hz-theme-stock-cols > :nth-child(6):not(:last-child) { border-bottom: 1px solid var(--c-hairline); }
   /* 한 열에선 둘째 열 머리(7번째)가 목록 한가운데 서니 감춘다. */
   .hz-theme-stock-cols > .hz-thead:nth-child(7) { display: none; }
+  /* '등락의 이유' 두 열도 한 열로. */
+  .hz-reason-grid { grid-template-columns: minmax(0, 1fr); }
+  .hz-reason-grid > :nth-child(odd) { box-shadow: none; }
+  .hz-reason-grid > :nth-last-child(2):nth-child(odd) { border-bottom: 1px solid var(--c-hairline); }
   /* 2열 이하부터 여백을 깎는다(위 '반응형 여백' 주석 참고).
      커스텀 속성은 반드시 셀렉터 안에 둔다 — @media 바로 밑에 쓰면 선언이 통째로 버려진다. */
   :root { --hz-main-pad: 22px; --hz-card-pad: 18px; }
