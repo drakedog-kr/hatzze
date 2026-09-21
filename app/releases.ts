@@ -29,6 +29,13 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    version: "1.18.2",
+    date: "2026-09-21",
+    changes: [
+      "배당으로 살기에 미국 인컴 ETF 11개가 더해집니다(BTCI·BITO·QQQY·WDTE·IWMY·SPYT·QQQT·ISPY·IQQQ·CSHI·BNDI).",
+    ],
+  },
+  {
     // 화면이 세는 종목이 하나 늘었을 뿐 쓰는 법은 그대로다. Patch.
     version: "1.18.1",
     date: "2026-09-21",
