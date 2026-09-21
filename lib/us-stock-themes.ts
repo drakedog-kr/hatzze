@@ -36,7 +36,7 @@ export const US_THEMES: Record<string, string[]> = {
   "빅테크": ["GOOGL", "AMZN", "AAPL", "META", "MSFT", "NFLX"],
   "AI 인프라·클라우드": ["ORCL", "PLTR", "CRWV", "NBIS", "SMCI", "DELL", "ANET", "VRT", "IREN", "WULF", "EQIX", "DLR", "IBM", "CSCO", "NOK"],
   "소프트웨어": ["CRM", "NOW", "ADBE", "SNOW", "DDOG", "NET", "PANW", "CRWD", "TEAM", "APP", "TTD", "RDDT", "RBLX", "SHOP", "ZBRA", "APH", "OKTA", "WDAY", "INTU", "ZS", "MDB"],
-  "전기차·자율주행": ["TSLA", "RIVN", "LCID", "NIO", "XPEV", "GM", "F", "APTV", "UBER", "CVNA", "LI"],
+  "전기차·자율주행": ["TSLA", "RIVN", "LCID", "NIO", "XPEV", "GM", "F", "STLA", "UBER", "CVNA", "LI", "APTV"],
   "전력·원자력": ["SMR", "OKLO", "CEG", "VST", "NRG", "NEE", "GEV", "PWR", "ETN", "CCJ", "HON", "FSLR", "ENPH", "BE"],
   "우주·방산": ["SPCX", "RKLB", "ASTS", "RDW", "LMT", "RTX", "NOC", "GD", "HII", "BA", "AXON"],
   "바이오·헬스케어": ["LLY", "MRNA", "NVO", "MRK", "PFE", "ABBV", "AZN", "NVS", "JNJ", "UNH", "ISRG", "MDGL", "CVS", "CAH", "AMGN", "MDT", "EVMN"],
