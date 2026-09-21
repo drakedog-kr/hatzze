@@ -505,18 +505,14 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
       {/* ── 까닭 이력 ── 이 테마 종목이 움직인 날마다 채널이 말한 이유. 위 추이의 점과 같은 날들이다.
           한 주씩 넘겨 본다(ReasonWeeks) — 30일치를 다 세우면 카드가 너무 길다(2026-09-21). */}
       <section className="hz-sheet">
-        <SectionHead
-          icon="history"
-          title="등락의 이유"
-          note="한 주씩"
-          desc="이 테마 종목이 크게 움직인 날, 그날 채널이 말한 이유입니다."
-          noteHelp={`최근 ${THEME_TREND_DAYS}일까지 거슬러 갑니다.`}
-          level={2}
-        />
         {d.reasons.length === 0 ? (
-          <Empty>최근 {THEME_TREND_DAYS}일 사이 이 테마 종목에 붙은 까닭이 없습니다. 까닭은 등락이 큰 날에만 만듭니다.</Empty>
+          <>
+            <SectionHead icon="history" title="등락의 이유" desc="이 테마 종목이 크게 움직인 날, 그날 채널이 말한 이유입니다." level={2} />
+            <Empty>최근 {THEME_TREND_DAYS}일 사이 이 테마 종목에 붙은 까닭이 없습니다. 까닭은 등락이 큰 날에만 만듭니다.</Empty>
+          </>
         ) : (
-          <ReasonWeeks rows={d.reasons} latest={d.baseDate} earliest={trendFrom ?? addDaysISO(d.baseDate, -THEME_TREND_DAYS)} today={today} />
+          /* 머리는 ReasonWeeks 안에서 그린다 — 오른쪽 알약이 보고 있는 주의 날짜다. */
+          <ReasonWeeks rows={d.reasons} latest={d.baseDate} earliest={trendFrom ?? addDaysISO(d.baseDate, -THEME_TREND_DAYS)} today={today} trendDays={THEME_TREND_DAYS} />
         )}
       </section>
 

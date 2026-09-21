@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import type { ThemeReasonRow } from "@/lib/theme-page";
 
 import { Pill } from "../kadera/parts";
+import { SectionHead } from "../kadera/SectionHead";
 import { StockLogo } from "../StockLogo";
 import { C, MONO } from "../ui";
 
@@ -38,7 +39,20 @@ function fmtKoWd(iso: string): string {
 
 const clip: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
 
-export function ReasonWeeks({ rows, latest, earliest, today }: { rows: ThemeReasonRow[]; latest: string; earliest: string; today: string }) {
+export function ReasonWeeks({
+  rows,
+  latest,
+  earliest,
+  today,
+  trendDays,
+}: {
+  rows: ThemeReasonRow[];
+  latest: string;
+  earliest: string;
+  today: string;
+  /** 도움말에 적는 "최근 n일". lib/theme-page.ts THEME_TREND_DAYS. */
+  trendDays: number;
+}) {
   // 몇 주 전을 보고 있나. 0 = 기준일까지의 이레.
   const [back, setBack] = useState(0);
   const end = addDays(latest, -back * WEEK_DAYS);
@@ -58,21 +72,22 @@ export function ReasonWeeks({ rows, latest, earliest, today }: { rows: ThemeReas
     }
     return [...m.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1)).map(([date, list]) => [date, list.sort((a, b) => b.channelCount - a.channelCount)] as const);
   }, [rows, start, end]);
-  const total = days.reduce((n, [, list]) => n + list.length, 0);
   // 가장 최근 날의 등락률은 다음 날 낮에 채워진다(KRX 가 그날 종가를 이튿날 준다 — generate_move_reasons.fill_krx).
   // 빈칸으로 두면 "왜 없지"가 되니 그날 줄엔 '종가 전'이라고 적는다. 그보다 옛날의 빈칸은 시세가 없는 종목이라 "—".
   const newestDate = rows.reduce((m, r) => (r.date > m ? r.date : m), "");
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "14px 22px 0" }}>
-        <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 700, color: C.sub }}>
-          {fmtKo(start)} ~ {fmtKo(end)}
-        </span>
-        {back === 0 && <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>이번 주</span>}
-        <span style={{ flex: 1 }} />
-        <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: C.sub }}>{total ? `${total}건` : ""}</span>
-      </div>
+      {/* 머리(SectionHead)를 여기서 그린다 — 오른쪽 알약이 보고 있는 주의 날짜라 주를 넘길 때 같이 바뀌어야 한다
+          (TrendingTabs 가 기간 탭 때문에 머리를 안에서 그리는 것과 같은 사정). 총 건수는 안 적는다(2026-09-21 Hun). */}
+      <SectionHead
+        icon="history"
+        title="등락의 이유"
+        note={`${fmtKo(start)} ~ ${fmtKo(end)}`}
+        desc="이 테마 종목이 크게 움직인 날, 그날 채널이 말한 이유입니다."
+        noteHelp={`아래 단추로 한 주씩 넘깁니다. 최근 ${trendDays}일까지 거슬러 갑니다.`}
+        level={2}
+      />
       {days.length === 0 ? (
         <p style={{ margin: 0, padding: "14px 22px 8px", fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub, lineHeight: 1.7 }}>
           이 주에는 이 테마 종목에 붙은 까닭이 없습니다. 까닭은 등락이 큰 날에만 만듭니다.
