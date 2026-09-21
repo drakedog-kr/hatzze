@@ -321,7 +321,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
                       )
                     }
                   />
-                  <Fig label="언급 합" value={`${totalMentions.toLocaleString("ko-KR")}회`} />
+                  <Fig label="총 언급 횟수" value={`${totalMentions.toLocaleString("ko-KR")}회`} />
                 </div>
                 {/* 시세 반응 — 최근 거래일 테마 종목의 평균 등락과 오른·내린 종목 수. 언급(말) 옆에 시세(값)를 두면 값이
                     말을 따라왔는지가 보인다(2026-09-21). 오른·내린 수만 적고 권유는 없다. */}
