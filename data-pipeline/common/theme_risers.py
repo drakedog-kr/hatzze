@@ -7,8 +7,8 @@
 
   창      기준일을 뺀 앞 여섯 날. 뒤 사흘이 '최근', 앞 사흘이 '앞'.
   후보    최근 사흘 언급 ≥ RISER_MIN_MENTIONS. 앞 사흘 0회면 '새로 등장'(배수 없음), 아니면 배수 = 최근/앞.
-          배수 ≤ 1 은 '말이 는 종목'이 아니다.
-  줄 세우기  새로 등장 > 배수 > 최근 언급 수. 테마마다 하나. 테마 사이도 같은 잣대로.
+          배수 < RISER_MIN_RATIO(1.5) 는 '말이 는 종목'이 아니다(요동).
+  줄 세우기  새로 등장 > 배수 > 최근 언급 수. 테마마다 하나. 테마 사이도 같은 잣대로. 최대 RISER_MAX(10).
 """
 
 from __future__ import annotations
@@ -20,6 +20,8 @@ from config.stock_themes import THEMES
 
 WINDOW_DAYS = 3
 RISER_MIN_MENTIONS = 5
+RISER_MIN_RATIO = 1.5
+RISER_MAX = 10
 
 
 def _better(a: dict, b: dict) -> bool:
@@ -63,7 +65,7 @@ def theme_risers(db, base_date: str) -> list[dict]:
         if a["recent"] < RISER_MIN_MENTIONS:
             continue
         ratio = None if a["prior"] == 0 else a["recent"] / a["prior"]
-        if ratio is not None and ratio <= 1:
+        if ratio is not None and ratio < RISER_MIN_RATIO:
             continue
         for theme in themes_of[c]:
             cand = {"theme": theme, "code": c, "name": name_of.get(c, c), "recent": a["recent"], "prior": a["prior"], "ratio": ratio}
@@ -76,4 +78,4 @@ def theme_risers(db, base_date: str) -> list[dict]:
     from functools import cmp_to_key
 
     out.sort(key=cmp_to_key(lambda a, b: -1 if _better(a, b) else (1 if _better(b, a) else 0)))
-    return out
+    return out[:RISER_MAX]

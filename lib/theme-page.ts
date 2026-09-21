@@ -501,6 +501,10 @@ export async function listThemeOverview(): Promise<ThemeOverview[] | null> {
 
 /** 후보가 되려면 최근 사흘에 이만큼은 언급돼야 한다. 두세 번 스친 작은 종목이 "10배"로 오르는 걸 막는다. */
 export const RISER_MIN_MENTIONS = 5;
+/** '말이 늘었다'고 칠 최소 배수. 종목 지도의 첫 색 단(1.5배)과 같다. 그 아래는 늘었다기보다 요동이다. */
+export const RISER_MIN_RATIO = 1.5;
+/** 카드에 세우는 최대 줄 수. 후보가 적으면 적은 대로 보인다 — '더 보기'는 두지 않는다(2026-09-21). */
+export const RISER_MAX = 10;
 
 export type ThemeRiser = {
   theme: string;
@@ -519,8 +523,9 @@ export type ThemeRiser = {
  * 테마마다 **앞 사흘보다 언급이 가장 많이 는 종목** 하나. 종목 지도(테마 화면)가 색으로 보이는 것을
  * 목록에 한 줄로 모은 것이다. 카더라 급부상은 시장 전체 상위 여섯이고 이건 테마마다 하나라 대상이 다르다.
  *
- * 줄 세우기: 새로 등장(앞 사흘 0회)이 맨 앞, 그다음 배수 순. 같은 배수면 언급이 많은 쪽.
- * 최근 사흘 언급이 RISER_MIN_MENTIONS 미만인 종목은 후보에서 뺀다. 후보가 하나도 없는 테마는 줄이 없다.
+ * 줄 세우기: 새로 등장(앞 사흘 0회)이 맨 앞, 그다음 배수 순. 같은 배수면 언급이 많은 쪽. 최대 RISER_MAX 줄.
+ * 최근 사흘 언급이 RISER_MIN_MENTIONS 미만이거나 배수가 RISER_MIN_RATIO 미만인 종목은 후보에서 뺀다.
+ * 후보가 하나도 없는 테마는 줄이 없다 — 변화가 큰 테마가 여덟이면 여덟 줄만 선다.
  *
  * 조회는 날짜 여섯 개로 전 종목을 받아(하루 600행 안팎 × 6, 페이징) 사전 종목만 남긴다 — 코드 366개를
  * `.in()` 에 넣는 것보다 URL 이 짧고, 테마 로테이션의 themeStocks 와 같은 모양이다.
@@ -580,11 +585,11 @@ export async function listThemeRisers(): Promise<ThemeRiser[] | null> {
     const s = byName.get(code)!;
     for (const theme of themesOf.get(code) ?? []) {
       const cand: ThemeRiser = { theme, code, name: s.name, market: s.market, recent: a.recent, prior: a.prior, ratio: a.prior ? a.recent / a.prior : null };
-      // 늘지 않은 종목(배수 1 이하)은 '말이 는 종목'이 아니다.
-      if (cand.ratio !== null && cand.ratio <= 1) continue;
+      // 배수가 문턱 아래면 '말이 는 종목'이 아니다(요동).
+      if (cand.ratio !== null && cand.ratio < RISER_MIN_RATIO) continue;
       const cur = best.get(theme);
       if (!cur || better(cand, cur)) best.set(theme, cand);
     }
   }
-  return [...best.values()].sort((a, b) => (better(a, b) ? -1 : better(b, a) ? 1 : 0));
+  return [...best.values()].sort((a, b) => (better(a, b) ? -1 : better(b, a) ? 1 : 0)).slice(0, RISER_MAX);
 }

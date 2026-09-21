@@ -61,6 +61,19 @@
 @media (max-width: 1149px) {
   .hz-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hz-c2, .hz-c3, .hz-c4 { grid-column: span 2; }
+  /* 테마 목록 '말이 는 종목' 표: 고정 칸 넷(598px)이 남는 폭을 다 먹어 까닭 칸이 낱말 하나 폭이 됐다(800 화면 실측).
+     여기부터는 까닭을 둘째 줄로 내려 줄 폭을 다 준다. 폰(≤560)은 layout.css 아래 규칙이 언급 칸까지 접는다. */
+  .hz-cols-theme-riser {
+    grid-template-columns: 130px minmax(0, 1fr) 84px 160px;
+    gap: 6px 16px;
+  }
+  .hz-cols-theme-riser > :nth-child(3) {
+    grid-column: 1 / -1;
+    order: 4;
+  }
+  .hz-thead.hz-cols-theme-riser > :nth-child(3) {
+    display: none;
+  }
   /* 2열 이하부터 여백을 깎는다(위 '반응형 여백' 주석 참고).
      커스텀 속성은 반드시 셀렉터 안에 둔다 — @media 바로 밑에 쓰면 선언이 통째로 버려진다. */
   :root { --hz-main-pad: 22px; --hz-card-pad: 18px; }

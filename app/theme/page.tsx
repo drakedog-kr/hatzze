@@ -7,7 +7,9 @@ import { KADERA_WINDOW_DAYS, getSurgingOneliners } from "@/lib/telegram-data";
 import { isLoadFailed } from "@/lib/load-state";
 import { fmtKoDate, stockHref } from "@/lib/stock-page";
 import {
+  RISER_MAX,
   RISER_MIN_MENTIONS,
+  RISER_MIN_RATIO,
   THEME_FLOW_DAYS,
   THEME_FLOW_TOP,
   listThemeOverview,
@@ -20,7 +22,6 @@ import {
 import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { THEME_PUBLIC } from "../screen-flags";
-import { ExpandableList } from "../kadera/ExpandableList";
 import { StockLogo } from "../StockLogo";
 import { DeltaPp, Highlight, Pill, RankBadge } from "../kadera/parts";
 import { SectionHead } from "../kadera/SectionHead";
@@ -81,11 +82,9 @@ function Flow({ t }: { t: ThemeOverview }) {
   );
 }
 
-/** 처음 보이는 줄 수. 상위 열 줄이면 '지금 화제인 테마'가 다 들어오고, 나머지 열여섯은 펼쳐서 본다. */
-const FLOW_ROWS_SHOWN = 10;
+/** 흐름 표의 줄 수. 상위 열 줄이면 '지금 화제인 테마'가 다 들어온다. 더 보기는 두지 않는다(2026-09-21) — 나머지는 지도에 있다. */
+const FLOW_ROWS = 10;
 
-/** 처음 보이는 '말이 는 종목' 줄 수. 테마 26개 중 후보가 있는 테마만 서므로 대개 스물 남짓이고, 그중 여덟이면 눈에 띄는 것은 다 든다. */
-const RISER_ROWS_SHOWN = 8;
 
 /** 배수 글자. 새로 등장이면 그 말을, 아니면 "2.1배". */
 function riserDelta(r: ThemeRiser): string {
@@ -156,7 +155,7 @@ export default async function ThemeIndexPage() {
           title="테마 안에서 말이 는 종목"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
           desc="테마마다 앞 사흘보다 언급이 가장 많이 는 종목과 채널이 말한 까닭입니다. 배수는 최근 사흘 언급을 앞 사흘로 나눈 값입니다."
-          noteHelp={`최근 ${KADERA_WINDOW_DAYS}일 언급이 ${RISER_MIN_MENTIONS}회 미만인 종목은 세지 않습니다. 앞 사흘에 한 번도 언급되지 않았던 종목은 '새로 등장'으로 맨 앞에 섭니다. 언급이 늘지 않은 테마는 줄이 없습니다.`}
+          noteHelp={`최근 ${KADERA_WINDOW_DAYS}일 언급이 ${RISER_MIN_MENTIONS}회 미만이거나 앞 사흘의 ${RISER_MIN_RATIO}배에 못 미치는 종목은 세지 않습니다. 앞 사흘에 한 번도 언급되지 않았던 종목은 '새로 등장'으로 맨 앞에 섭니다. 많아야 ${RISER_MAX}줄이고, 말이 크게 는 테마가 적으면 그만큼만 보입니다.`}
           level={2}
         />
         {risers === null ? (
@@ -176,15 +175,9 @@ export default async function ThemeIndexPage() {
               <span style={{ textAlign: "right" }}>앞 사흘 대비</span>
               <span style={{ textAlign: "right" }}>최근 {KADERA_WINDOW_DAYS}일 언급</span>
             </div>
-            <ExpandableList
-              name="theme_risers"
-              initial={RISER_ROWS_SHOWN}
-              step={Math.max(1, risers.length - RISER_ROWS_SHOWN)}
-              listStyle={{ display: "block" }}
-              footerClassName="hz-sheet-foot-row"
-              items={risers.map((r) => (
-                <li key={r.theme}>
-                  <div className="hz-trow hz-cols-theme-riser">
+            <div>
+              {risers.map((r) => (
+                  <div key={r.theme} className="hz-trow hz-cols-theme-riser">
                     <Link href={themeHref(r.theme)} className="hz-stock-link" style={{ ...clip, minWidth: 0, fontSize: "var(--fs-13)", fontWeight: 700 }}>
                       {r.theme}
                     </Link>
@@ -207,9 +200,8 @@ export default async function ThemeIndexPage() {
                       <span style={{ fontWeight: 600, color: C.sub2, marginLeft: 6 }}>앞 사흘 {r.prior.toLocaleString("ko-KR")}회</span>
                     </span>
                   </div>
-                </li>
               ))}
-            />
+            </div>
           </>
         )}
       </section>
@@ -270,15 +262,9 @@ export default async function ThemeIndexPage() {
                 ✨ 문장(남는 폭 전부) · 점유율과 열흘 한 조각(세로로). 왼쪽 두 줄(이름/종목)과 오른쪽 두 줄(점유율/조각)이
                 같은 키라 줄이 반듯하고, 문장이 가운데 폭을 다 써서 넓은 화면에서도 빈 자리가 없다.
                 열 줄만 먼저 보이고 나머지는 '더 보기'로 펼친다(26줄을 한 번에 세우면 벽이 된다). */}
-            <ExpandableList
-              name="theme_flow"
-              initial={FLOW_ROWS_SHOWN}
-              step={themes.length - FLOW_ROWS_SHOWN}
-              listStyle={{ display: "block" }}
-              footerClassName="hz-sheet-foot-row"
-              items={themes.map((t) => (
-                <li key={t.theme}>
-                  <Link href={themeHref(t.theme)} className="hz-trow hz-cols-theme-list" style={{ textDecoration: "none" }}>
+            <div>
+              {themes.slice(0, FLOW_ROWS).map((t) => (
+                  <Link key={t.theme} href={themeHref(t.theme)} className="hz-trow hz-cols-theme-list" style={{ textDecoration: "none" }}>
                     <RankBadge n={t.rank} />
                     <span style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
                       <span style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
@@ -307,9 +293,8 @@ export default async function ThemeIndexPage() {
                       <Flow t={t} />
                     </span>
                   </Link>
-                </li>
               ))}
-            />
+            </div>
           </>
         )}
       </section>
