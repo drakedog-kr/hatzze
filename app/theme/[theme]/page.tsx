@@ -156,8 +156,8 @@ function Empty({ children }: { children: React.ReactNode }) {
 
 const clip: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
 
-/** 점유율 칸 아래 시세 묶음의 이름표. 후보를 Hun 이 고르는 중이라 임시(2026-09-21). */
-const QUOTES_LABEL = "값은 어땠나";
+/** 점유율 칸 아래 시세 묶음의 이름표(2026-09-21 확정). */
+const QUOTES_LABEL = "시세 반응";
 /** 히어로 첫 칸의 종목 알약 수. 여섯이면 230px 칸에서 두 줄이다. */
 const HERO_CHIPS = 6;
 /** '지금 말 많은 종목' 표의 줄 수. 지도가 전체를 보이니 표는 상위 다섯이면 된다(2026-09-21). */
@@ -311,8 +311,8 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
                   />
                   <Fig label="언급 합" value={`${totalMentions.toLocaleString("ko-KR")}회`} />
                 </div>
-                {/* 값은 어땠나 — 최근 거래일 테마 종목의 평균 등락과 오른·내린 종목 수. 언급(말) 옆에 시세(값)를 두면 값이
-                    말을 따라왔는지가 보인다(2026-09-21 Hun 선택). 오른·내린 수만 적고 권유는 없다. */}
+                {/* 시세 반응 — 최근 거래일 테마 종목의 평균 등락과 오른·내린 종목 수. 언급(말) 옆에 시세(값)를 두면 값이
+                    말을 따라왔는지가 보인다(2026-09-21). 오른·내린 수만 적고 권유는 없다. */}
                 {d.quotes.date && d.quotes.avgChange != null && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingTop: 12, borderTop: "1px solid var(--c-hairline)" }}>
                     <span style={{ display: "flex", alignItems: "baseline", gap: 6 }}>

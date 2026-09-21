@@ -66,7 +66,7 @@ export { THEME_NAMES, themeFromParam, themeHref } from "./theme-href";
 export type ThemeMember = { code: string; name: string; market: string | null };
 
 /**
- * 최근 거래일 테마 종목의 등락 묶음 — 히어로 '점유율' 칸의 "값은 어땠나". 언급(말) 옆에 시세(값)를 두어
+ * 최근 거래일 테마 종목의 등락 묶음 — 히어로 '점유율' 칸의 '시세 반응'. 언급(말) 옆에 시세(값)를 두어
  * 값이 말을 따라왔는지 보인다. 시세는 stocks 표의 KRX 최근 종가라 날마다 아침에 전날 것으로 바뀐다
  * (project_daily_content: KRX 는 그날 종가를 다음 날 아침에 준다). 오른 종목·내린 종목 수만 적고 사고팔라는
  * 말은 두지 않는다.
@@ -173,7 +173,7 @@ async function themeMembers(theme: string): Promise<MemberRow[] | null> {
   // 사전이 더 커져도 안 깨지게(telegram-data.ts themeStocks 의 같은 규칙).
   const out = new Map<string, MemberRow>();
   for (let i = 0; i < names.length; i += 80) {
-    // 등락(change_rate·price_date)도 같은 조회로 받는다 — 히어로의 '값은 어땠나'가 쓴다(ThemeQuotes).
+    // 등락(change_rate·price_date)도 같은 조회로 받는다 — 히어로의 '시세 반응'이 쓴다(ThemeQuotes).
     const { data, error } = await db.from("stocks").select("code,name,market,change_rate,price_date").in("name", names.slice(i, i + 80));
     if (error) {
       console.error(`[themeMembers] ${theme} 종목 코드를 못 읽었습니다`, error);
