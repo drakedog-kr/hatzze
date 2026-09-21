@@ -540,6 +540,16 @@
   .hz-thead.hz-cols-theme-list > :nth-child(3) {
     display: none;
   }
+  /* '말이 는 종목' 표: 폰은 테마 · 종목 · 배수 세 칸. 언급 수(넷째)는 접는다 — 배수가 뜻을 말한다. */
+  .hz-cols-theme-riser {
+    grid-template-columns: 88px minmax(0, 1fr) auto;
+    gap: 10px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .hz-cols-theme-riser > :nth-child(4) {
+    display: none;
+  }
 
   /* 종목 화면의 일정 아젠다: 좌우 여백만 폰 값으로. */
   .hz-cols-cal-one {

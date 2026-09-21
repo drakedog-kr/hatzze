@@ -8,6 +8,7 @@ import {
   LLM_TEXT_CARRY_DAYS,
   addDaysISO,
   channelMeta,
+  fetchAllRows,
   getThemeRotation,
   kaderaBaseDate,
   windowBefore,
@@ -494,4 +495,96 @@ export async function listThemeOverview(): Promise<ThemeOverview[] | null> {
       };
     })
     .sort((a, b) => a.rank - b.rank);
+}
+
+// ─── 테마 안에서 말이 는 종목(/theme 카드) ───────────────────────────────
+
+/** 후보가 되려면 최근 사흘에 이만큼은 언급돼야 한다. 두세 번 스친 작은 종목이 "10배"로 오르는 걸 막는다. */
+export const RISER_MIN_MENTIONS = 5;
+
+export type ThemeRiser = {
+  theme: string;
+  code: string;
+  name: string;
+  market: string | null;
+  /** 최근 사흘 언급. */
+  recent: number;
+  /** 그 앞 사흘 언급. 0 이면 새로 등장. */
+  prior: number;
+  /** recent / prior. prior 가 0 이면 null(새로 등장). */
+  ratio: number | null;
+};
+
+/**
+ * 테마마다 **앞 사흘보다 언급이 가장 많이 는 종목** 하나. 종목 지도(테마 화면)가 색으로 보이는 것을
+ * 목록에 한 줄로 모은 것이다. 카더라 급부상은 시장 전체 상위 여섯이고 이건 테마마다 하나라 대상이 다르다.
+ *
+ * 줄 세우기: 새로 등장(앞 사흘 0회)이 맨 앞, 그다음 배수 순. 같은 배수면 언급이 많은 쪽.
+ * 최근 사흘 언급이 RISER_MIN_MENTIONS 미만인 종목은 후보에서 뺀다. 후보가 하나도 없는 테마는 줄이 없다.
+ *
+ * 조회는 날짜 여섯 개로 전 종목을 받아(하루 600행 안팎 × 6, 페이징) 사전 종목만 남긴다 — 코드 366개를
+ * `.in()` 에 넣는 것보다 URL 이 짧고, 테마 로테이션의 themeStocks 와 같은 모양이다.
+ */
+export async function listThemeRisers(): Promise<ThemeRiser[] | null> {
+  const db = getSupabaseAdmin();
+  const baseDate = await kaderaBaseDate();
+  const days = windowBefore(baseDate, KADERA_WINDOW_DAYS * 2);
+  const recentDays = new Set(days.slice(-KADERA_WINDOW_DAYS));
+
+  // 사전 → 코드. 이름 366개를 80개씩 끊어 묻는다(telegram-data.ts themeStocks 의 같은 규칙).
+  const names = [...new Set(Object.values(THEMES).flat())];
+  const info = new Map<string, { code: string; name: string; market: string | null }>();
+  for (let i = 0; i < names.length; i += 80) {
+    const { data, error } = await db.from("stocks").select("code,name,market").in("name", names.slice(i, i + 80));
+    if (error) {
+      console.error("[listThemeRisers] 종목 코드를 못 읽었습니다", error);
+      return null;
+    }
+    for (const r of data ?? []) info.set(r.name as string, { code: r.code as string, name: r.name as string, market: (r.market as string) ?? null });
+  }
+  const themesOf = new Map<string, string[]>();
+  for (const [theme, members] of Object.entries(THEMES)) {
+    for (const n of members) {
+      const c = info.get(n)?.code;
+      if (c) themesOf.set(c, [...(themesOf.get(c) ?? []), theme]);
+    }
+  }
+
+  let failed = false;
+  const rows = await fetchAllRows<{ date: string; stock_code: string; mention_count: number | null }>(
+    "id",
+    () => db.from("telegram_stock_daily").select("id,date,stock_code,mention_count").in("date", days),
+    { onError: (e) => { failed = true; console.error("[listThemeRisers] 종목 집계를 못 읽었습니다", e); } },
+  );
+  if (failed) return null;
+
+  const agg = new Map<string, { recent: number; prior: number }>();
+  for (const r of rows) {
+    if (!themesOf.has(r.stock_code)) continue;
+    const a = agg.get(r.stock_code) ?? { recent: 0, prior: 0 };
+    if (recentDays.has(r.date)) a.recent += r.mention_count || 0;
+    else a.prior += r.mention_count || 0;
+    agg.set(r.stock_code, a);
+  }
+
+  const byName = new Map([...info.values()].map((s) => [s.code, s]));
+  const best = new Map<string, ThemeRiser>();
+  const better = (a: ThemeRiser, b: ThemeRiser) => {
+    // 새로 등장 > 배수 > 언급 수.
+    if ((a.ratio === null) !== (b.ratio === null)) return a.ratio === null;
+    if (a.ratio !== null && b.ratio !== null && a.ratio !== b.ratio) return a.ratio > b.ratio;
+    return a.recent > b.recent;
+  };
+  for (const [code, a] of agg) {
+    if (a.recent < RISER_MIN_MENTIONS) continue;
+    const s = byName.get(code)!;
+    for (const theme of themesOf.get(code) ?? []) {
+      const cand: ThemeRiser = { theme, code, name: s.name, market: s.market, recent: a.recent, prior: a.prior, ratio: a.prior ? a.recent / a.prior : null };
+      // 늘지 않은 종목(배수 1 이하)은 '말이 는 종목'이 아니다.
+      if (cand.ratio !== null && cand.ratio <= 1) continue;
+      const cur = best.get(theme);
+      if (!cur || better(cand, cur)) best.set(theme, cand);
+    }
+  }
+  return [...best.values()].sort((a, b) => (better(a, b) ? -1 : better(b, a) ? 1 : 0));
 }

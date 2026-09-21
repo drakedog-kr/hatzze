@@ -348,6 +348,15 @@
   padding-top: 13px;
   padding-bottom: 13px;
 }
+/* '테마 안에서 말이 는 종목' 표: 테마 · 종목 · 배수 알약 · 최근 사흘 언급(앞 사흘 곁말). */
+.hz-cols-theme-riser {
+  grid-template-columns: 160px minmax(0, 1fr) 96px 190px;
+  gap: 18px;
+}
+.hz-trow.hz-cols-theme-riser {
+  padding-top: 11px;
+  padding-bottom: 11px;
+}
 /* ✨ + 문장. 넓은 화면은 한 줄, 좁으면 세 줄까지. 곁말 색(--c-sub)이 아니라 --c-ink-soft: 이 칸이 표의 본론이다. */
 .hz-theme-row-brief {
   display: flex;
@@ -391,11 +400,15 @@
   overflow: hidden;
   /* .hz-tip 이 cursor:default 를 못박는다 — 이 칸은 누르면 테마 화면으로 가는 링크다. */
   cursor: pointer;
-  transition: filter 0.12s ease;
+  transition: box-shadow 0.12s ease;
 }
+/* ⚠️ 호버를 `filter: brightness()` 로 하면 안 된다. filter 는 fixed 자손의 containing block 을
+   만들어서, 앵커 위치지정으로 시트 밖까지 뜨던 툴팁(.hz-tip::after 는 position:fixed)이 칸 안에
+   갇히고 overflow:hidden 에 잘린다 — 바이오 칸에서 "…▼3.5%" 뒤가 잘려 보였다(2026-09-21).
+   안쪽 그림자로 살짝 어둡게 한다. 그림자는 containing block 을 안 만든다. */
 .hz-tm-tile:hover,
 .hz-tm-tile:focus-visible {
-  filter: brightness(0.93);
+  box-shadow: inset 0 0 0 100vmax rgba(14, 33, 54, 0.07);
   outline: none;
 }
 /* 색 단계. 온도색 두 가지(--c-warm-2 · --c-blue-2)를 시트 바탕에 섞는다 — 라이트·다크 모두

@@ -3,14 +3,24 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { assertLoaded } from "@/lib/load-state";
-import { fmtKoDate } from "@/lib/stock-page";
 import { KADERA_WINDOW_DAYS } from "@/lib/telegram-data";
-import { THEME_FLOW_DAYS, THEME_FLOW_TOP, listThemeOverview, themeHref, type ThemeOverview } from "@/lib/theme-page";
+import { fmtKoDate, stockHref } from "@/lib/stock-page";
+import {
+  RISER_MIN_MENTIONS,
+  THEME_FLOW_DAYS,
+  THEME_FLOW_TOP,
+  listThemeOverview,
+  listThemeRisers,
+  themeHref,
+  type ThemeOverview,
+  type ThemeRiser,
+} from "@/lib/theme-page";
 
 import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { THEME_PUBLIC } from "../screen-flags";
 import { ExpandableList } from "../kadera/ExpandableList";
+import { StockLogo } from "../StockLogo";
 import { DeltaPp, Highlight, Pill, RankBadge } from "../kadera/parts";
 import { SectionHead } from "../kadera/SectionHead";
 import { AiMark, C, MONO } from "../ui";
@@ -73,9 +83,17 @@ function Flow({ t }: { t: ThemeOverview }) {
 /** 처음 보이는 줄 수. 상위 열 줄이면 '지금 화제인 테마'가 다 들어오고, 나머지 열여섯은 펼쳐서 본다. */
 const FLOW_ROWS_SHOWN = 10;
 
+/** 처음 보이는 '말이 는 종목' 줄 수. 테마 26개 중 후보가 있는 테마만 서므로 대개 스물 남짓이고, 그중 여덟이면 눈에 띄는 것은 다 든다. */
+const RISER_ROWS_SHOWN = 8;
+
+/** 배수 글자. 새로 등장이면 그 말을, 아니면 "2.1배". */
+function riserDelta(r: ThemeRiser): string {
+  return r.ratio === null ? "새로 등장" : `${r.ratio.toFixed(1)}배`;
+}
+
 export default async function ThemeIndexPage() {
   if (!PUBLIC && DEPLOYED) notFound();
-  const themes = await listThemeOverview();
+  const [themes, risers] = await Promise.all([listThemeOverview(), listThemeRisers()]);
   assertLoaded("/theme");
 
   const flowDates = themes?.[0]?.flowDates ?? [];
@@ -123,6 +141,64 @@ export default async function ThemeIndexPage() {
               />
             </div>
             <TreemapLegend up="관심이 늘어난 테마" flat="변화 ±0.3%p 안" down="줄어든 테마" />
+          </>
+        )}
+      </section>
+
+      {/* ── 테마 안에서 말이 는 종목 ── 테마마다 앞 사흘보다 언급이 가장 많이 는 종목 하나. 종목 지도(테마 화면)가
+          색으로 보이는 것을 한 줄씩 모았다. 카더라의 급부상(시장 전체 상위 여섯)과 대상이 다르다. */}
+      <section className="hz-sheet">
+        <SectionHead
+          icon="trending_up"
+          title="테마 안에서 말이 는 종목"
+          note={`최근 ${KADERA_WINDOW_DAYS}일`}
+          desc="테마마다 앞 사흘보다 언급이 가장 많이 는 종목입니다. 숫자는 최근 사흘 언급을 앞 사흘로 나눈 배수입니다."
+          noteHelp={`최근 ${KADERA_WINDOW_DAYS}일 언급이 ${RISER_MIN_MENTIONS}회 미만인 종목은 세지 않습니다. 앞 사흘에 한 번도 언급되지 않았던 종목은 '새로 등장'으로 맨 앞에 섭니다. 언급이 늘지 않은 테마는 줄이 없습니다.`}
+          level={2}
+        />
+        {risers === null ? (
+          <p style={{ margin: 0, padding: "16px 22px 20px", fontSize: "var(--fs-12)", color: C.sub, lineHeight: 1.7 }}>
+            종목 집계를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오.
+          </p>
+        ) : risers.length === 0 ? (
+          <p style={{ margin: 0, padding: "16px 22px 20px", fontSize: "var(--fs-12)", color: C.sub, lineHeight: 1.7 }}>
+            앞 사흘보다 언급이 는 종목이 없습니다.
+          </p>
+        ) : (
+          <>
+            <div className="hz-thead hz-cols-theme-riser">
+              <span>테마</span>
+              <span>종목</span>
+              <span style={{ textAlign: "right" }}>앞 사흘 대비</span>
+              <span style={{ textAlign: "right" }}>최근 {KADERA_WINDOW_DAYS}일 언급</span>
+            </div>
+            <ExpandableList
+              name="theme_risers"
+              initial={RISER_ROWS_SHOWN}
+              step={Math.max(1, risers.length - RISER_ROWS_SHOWN)}
+              listStyle={{ display: "block" }}
+              footerClassName="hz-sheet-foot-row"
+              items={risers.map((r) => (
+                <li key={r.theme}>
+                  <div className="hz-trow hz-cols-theme-riser">
+                    <Link href={themeHref(r.theme)} className="hz-stock-link" style={{ ...clip, minWidth: 0, fontSize: "var(--fs-13)", fontWeight: 700 }}>
+                      {r.theme}
+                    </Link>
+                    <Link href={stockHref(r.code)} className="hz-stock-link" style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                      <StockLogo code={r.code} name={r.name} market={r.market} size={22} />
+                      <span style={{ ...clip, fontSize: "var(--fs-13-5)", fontWeight: 800, letterSpacing: "-.01em" }}>{r.name}</span>
+                    </Link>
+                    <span style={{ textAlign: "right" }}>
+                      <Pill tone={r.ratio === null ? "hot" : "blue"}>{riserDelta(r)}</Pill>
+                    </span>
+                    <span style={{ textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-13)", fontWeight: 800, color: C.ink, whiteSpace: "nowrap" }}>
+                      {r.recent.toLocaleString("ko-KR")}회
+                      <span style={{ fontWeight: 600, color: C.sub2, marginLeft: 6 }}>앞 사흘 {r.prior.toLocaleString("ko-KR")}회</span>
+                    </span>
+                  </div>
+                </li>
+              ))}
+            />
           </>
         )}
       </section>
