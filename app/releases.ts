@@ -29,6 +29,12 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 화면이 세는 종목이 하나 늘었을 뿐 쓰는 법은 그대로다. Patch.
+    version: "1.18.1",
+    date: "2026-09-21",
+    changes: ["미장 카더라가 스텔란티스를 새로 셉니다."],
+  },
+  {
     version: "1.18.0",
     date: "2026-09-20",
     changes: [
