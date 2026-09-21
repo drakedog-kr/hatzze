@@ -8,6 +8,7 @@ import {
   LLM_TEXT_CARRY_DAYS,
   addDaysISO,
   channelMeta,
+  fetchAllRows,
   getThemeRotation,
   kaderaBaseDate,
   windowBefore,
@@ -95,8 +96,12 @@ export type ThemeTrendPoint = {
 export type ThemeHotStock = ThemeMember & {
   /** 최근 사흘 언급 합. */
   mentions: number;
-  /** 그 앞 사흘 언급 합. 종목 지도의 색(배수)이 쓴다. */
-  priorMentions: number;
+  /**
+   * 평소의 사흘치 언급 — 30일 기간에서 최근 사흘을 뺀 27일의 하루 평균 × 3. 종목 지도의 색과 표의 "평소 대비 +60%"가
+   * 이것과 견준다. 0 이면 지난 한 달 언급이 없던 종목(새로 등장). 처음엔 '바로 앞 사흘'과 견줬는데 "앞 사흘의 58%"가
+   * 직관적이지 않았다(2026-09-21 Hun) — 히어로의 '평소 대비'와 같은 잣대로 맞춘다.
+   */
+  usualMentions: number;
   /** 최근 사흘 중 하루 최다 채널 수. **기간 합집합이 아니다**(lib/stock-page.ts 머리말 ②). */
   channels: number;
   /** 최근 사흘 안의 가장 최근 까닭 한 줄. 없으면 null(정상). */
@@ -236,23 +241,27 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
 
   const trendDays = windowBefore(baseDate, THEME_TREND_DAYS);
   const recentDays = trendDays.slice(-KADERA_WINDOW_DAYS);
-  // 종목 지도의 색이 견줄 '앞 사흘'. 테마 점유율의 변화(닷새 넘게 이전)와 창이 다르다 — 종목은 하루 언급이
-  // 몇 회뿐인 것이 많아 닷새 뒤 평균과 견주면 배수가 요동친다. 바로 앞 사흘이면 "그제까지보다 늘었나"로 읽힌다.
-  const priorDays = trendDays.slice(-KADERA_WINDOW_DAYS * 2, -KADERA_WINDOW_DAYS);
+  // 종목의 '평소' = 최근 사흘을 뺀 나머지 27일. 종목 집계는 이 30일을 다 받는다(테마 55종목 × 30일 ≤ 1,650행, 페이징).
+  const usualDayCount = trendDays.length - KADERA_WINDOW_DAYS;
   const first = trendDays[0];
   const last = trendDays[trendDays.length - 1];
 
   type ThemeDailyRow = { date: string; share_pct: number | string; rank: number | null; mention_count: number | null };
-  type StockDailyRow = { date: string; stock_code: string; mention_count: number | null; channel_count: number | null; weighted_score: number | string | null };
+  type StockDailyRow = { id: number; date: string; stock_code: string; mention_count: number | null; channel_count: number | null; weighted_score: number | string | null };
   type ReasonRow = { date: string; stock_code: string; reason: string | null; change_rate: number | string | null; channel_count: number | null };
   type BriefExcerptRow = { channel_handle: string; message_id: number; posted_at: string; views?: number | null; forwards?: number | null; text: string; stocks?: string[] | null };
   type BriefRow = { date: string; brief: string | null; related: ThemeRelated[] | null; excerpts: BriefExcerptRow[] | null; message_count: number | null };
 
+  let stockDailyFailed = false;
   const [themeDaily, stockDaily, reasonRows, events, rotation, briefRow, meta] = await Promise.all([
     db.from("telegram_theme_daily").select("date,share_pct,rank,mention_count").eq("theme", theme).gte("date", first).lte("date", last).order("date"),
     codes.length
-      ? db.from("telegram_stock_daily").select("date,stock_code,mention_count,channel_count,weighted_score").in("stock_code", codes).in("date", [...priorDays, ...recentDays])
-      : Promise.resolve({ data: [] as StockDailyRow[], error: null }),
+      ? fetchAllRows<StockDailyRow>(
+          "id",
+          () => db.from("telegram_stock_daily").select("id,date,stock_code,mention_count,channel_count,weighted_score").in("stock_code", codes).gte("date", first).lte("date", last),
+          { onError: (e) => { stockDailyFailed = true; console.error(`[getThemePage] ${theme} 종목 집계를 못 읽었습니다`, e); } },
+        )
+      : Promise.resolve([] as StockDailyRow[]),
     // 까닭은 종목·날짜당 한 행이고 하루 상한이 40이라, 한 테마 30일치는 몇백 행을 넘지 않는다.
     codes.length
       ? db
@@ -286,10 +295,7 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
     console.error(`[getThemePage] ${theme} 테마 집계를 못 읽었습니다`, themeDaily.error);
     loadFailed = true;
   }
-  if (stockDaily.error) {
-    console.error(`[getThemePage] ${theme} 종목 집계를 못 읽었습니다`, stockDaily.error);
-    loadFailed = true;
-  }
+  if (stockDailyFailed) loadFailed = true; // 로그는 fetchAllRows 의 onError 가 남겼다.
   // 까닭·발췌·요약은 곁다리다. 못 읽으면 그 칸만 비우고 로그에 남긴다.
   if (reasonRows.error) console.error(`[getThemePage] ${theme} 까닭을 못 읽었습니다`, reasonRows.error);
   // 표가 아직 없으면(마이그레이션 080 전) 42P01 로 온다. 그것도 여기 걸리지만 화면은 빈 칸으로 넘어간다.
@@ -326,15 +332,15 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
   // ── 말 많은 종목 ── 최근 사흘 언급 합 순. 머리가 "많이 언급된 순서"라고 말하니 잣대도 언급 수다
   // (테마 로테이션 팝오버는 주목도순인데, 그쪽은 "점유율을 만든 종목"이라 잣대가 다르다). 동률은 주목도.
   const recentSet = new Set(recentDays);
-  const agg = new Map<string, { m: number; c: number; w: number; p: number }>();
-  for (const r of (stockDaily.data ?? []) as StockDailyRow[]) {
-    const a = agg.get(r.stock_code) ?? { m: 0, c: 0, w: 0, p: 0 };
+  const agg = new Map<string, { m: number; c: number; w: number; u: number }>();
+  for (const r of stockDaily) {
+    const a = agg.get(r.stock_code) ?? { m: 0, c: 0, w: 0, u: 0 };
     if (recentSet.has(r.date)) {
       a.m += r.mention_count || 0;
       a.c = Math.max(a.c, r.channel_count || 0);
       a.w += Number(r.weighted_score) || 0;
     } else {
-      a.p += r.mention_count || 0; // 앞 사흘
+      a.u += r.mention_count || 0; // 평소(앞 27일) 합. 행이 없는 날은 0회라 날수는 27로 고정해 나눈다.
     }
     agg.set(r.stock_code, a);
   }
@@ -352,7 +358,7 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
       return {
         ...byCode.get(code)!,
         mentions: a.m,
-        priorMentions: a.p,
+        usualMentions: usualDayCount > 0 ? (a.u / usualDayCount) * KADERA_WINDOW_DAYS : 0,
         channels: a.c,
         reason: why ? { date: why.date, reason: why.reason, changeRate: why.changeRate } : null,
       };

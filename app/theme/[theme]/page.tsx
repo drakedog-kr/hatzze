@@ -29,9 +29,8 @@ import TimeAgo from "../../kadera/TimeAgo";
 import { timeAgoInitial } from "../../kadera/time-ago";
 import { AiMark, C, Icon, MONO, R } from "../../ui";
 import { THEME_PAGE } from "../copy";
-import { Rate } from "../Rate";
 import { ReasonWeeks } from "../ReasonWeeks";
-import { Treemap, TreemapLegend, stockTiles } from "../Treemap";
+import { Treemap, TreemapLegend, stockTiles, usualDeltaText } from "../Treemap";
 
 /**
  * 테마 하나의 실주소(`/theme/반도체`).
@@ -170,13 +169,6 @@ const VAGUE_ROWS = 6;
 /** 발췌는 처음 여섯, '더 보기'로 여섯씩(카더라 트렌딩과 같은 단추). 파이프라인이 18건까지 저장한다(EXCERPTS_SHOWN). */
 const EXCERPTS_INITIAL = 6;
 const EXCERPTS_STEP = 6;
-
-/** 앞 사흘과 견준 언급 변화 한 마디(종목 지도 stockTiles 의 deltaText 와 같은 규칙). */
-function priorDeltaText(mentions: number, prior: number): string {
-  if (prior === 0) return "앞 사흘엔 언급 없음 · 새로 등장";
-  const r = mentions / prior;
-  return r >= 1 ? `앞 사흘의 ${r.toFixed(1)}배` : `앞 사흘의 ${Math.round(r * 100)}%`;
-}
 
 /** 조회·전달 수의 짧은 꼴. 카더라 트렌딩(app/kadera/page.tsx compact)과 같은 규칙이다. */
 function compact(n: number): string {
@@ -422,7 +414,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
         )}
       </section>
 
-      {/* ── 말 많은 종목 ── 위에 종목 지도(칸 = 언급 수, 색 = 앞 사흘과 견준 배수), 아래에 표.
+      {/* ── 말 많은 종목 ── 위에 종목 지도(칸 = 언급 수, 색 = 평소와 견준 배수), 아래에 표.
           지도는 "이 테마 안에서 말이 어디 몰렸나"를 한 번에, 표는 까닭 한 줄까지. 테마 목록의 지도와 같은 그림이다. */}
       <section className="hz-sheet">
         <SectionHead
@@ -430,7 +422,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
           title="이 테마의 주인공"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
           desc="상위 열 종목과 채널이 말한 까닭입니다."
-          noteHelp="칸의 크기는 최근 사흘 언급 수이고 색은 그 앞 사흘과 나눈 배수입니다. 1.5배 이상이면 따뜻한 색, 1.5분의 1 이하면 파랑이고, 앞 사흘에 없던 종목은 새로 등장으로 칩니다."
+          noteHelp="칸의 크기는 최근 사흘 언급 수이고 색은 평소와 견준 것입니다. 평소는 지난 한 달 하루 평균 언급의 사흘치이고, 평소의 1.5배 이상이면 따뜻한 색, 1.5분의 1 이하면 파랑, 지난 한 달 언급이 없던 종목은 새로 등장으로 칩니다."
           level={2}
         />
         {d.loadFailed ? (
@@ -443,7 +435,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
             <div style={{ padding: "16px 22px 0" }}>
               <Treemap tiles={stockTiles(d.hotStocks)} ariaLabel={`${theme} 테마 종목별 최근 ${KADERA_WINDOW_DAYS}일 언급`} />
             </div>
-            <TreemapLegend up="앞 사흘보다 말이 늘어난 종목" flat="비슷함" down="줄어든 종목" />
+            <TreemapLegend up="평소보다 말이 늘어난 종목" flat="비슷함" down="줄어든 종목" />
             {/* 두 열 × (머리 + 다섯 줄). 1~5 가 왼쪽, 6~10 이 오른쪽(grid-auto-flow: column). 열마다 열 머리를 두어 1위·6위 위에
                 선이 서고, 같은 줄은 높이를 나눠 가로선이 두 열에서 이어진다. 여섯 미만이면 한 열. 1149 아래도 한 열(layout.css). */}
             <div className={`hz-theme-stock-cols${d.hotStocks.length > HOT_COL_ROWS ? "" : " is-single"}`}>
@@ -465,16 +457,15 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
                           <span style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
                             <span style={{ ...clip, fontSize: "var(--fs-13-5)", fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>{s.name}</span>
                             {s.reason ? (
+                              /* 까닭 한 줄과 날짜. 그날 등락률은 여기 안 적는다 — 시세는 '등락의 이유'의 몫(2026-09-21 Hun). */
                               <span style={{ fontSize: "var(--fs-12)", color: C.inkSoft, lineHeight: 1.55, wordBreak: "keep-all", textWrap: "pretty" }}>
-                                <Rate rate={s.reason.changeRate} />
-                                {s.reason.changeRate != null && " "}
                                 {s.reason.reason}
                                 <span style={{ color: C.muted, marginLeft: 6, whiteSpace: "nowrap", fontSize: "var(--fs-11)" }}>{fmtKoDate(s.reason.date)}</span>
                               </span>
                             ) : (
-                              /* 까닭이 없는 줄은 앞 사흘과 견준 변화를 적는다 — 지도의 색과 같은 잣대라 "왜 이 색인가"도 답한다.
-                                 "까닭 없음"을 일곱 줄에 되풀이하면 채우기 글로 보인다(2026-09-21). 1 미만은 %로(ratio 규칙). */
-                              <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2 }}>{priorDeltaText(s.mentions, s.priorMentions)}</span>
+                              /* 까닭이 없는 줄은 평소와 견준 변화를 적는다 — 지도의 색과 같은 잣대라 "왜 이 색인가"도 답한다.
+                                 "까닭 없음"을 일곱 줄에 되풀이하면 채우기 글로 보인다(2026-09-21). */
+                              <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2 }}>{usualDeltaText(s.mentions, s.usualMentions)}</span>
                             )}
                           </span>
                         </Link>

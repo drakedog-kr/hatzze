@@ -82,15 +82,16 @@ export function themeTiles(themes: ThemeOverview[]): TreemapTile[] {
 }
 
 /**
- * 테마 화면의 칸 — 넓이는 최근 사흘 언급 수, 색은 **그 앞 사흘과 견준 배수**. 점유율 %p 가 아니라
- * 배수인 이유: 종목 하나의 언급은 몇 회에서 몇백 회까지 폭이 넓어 차이(회)로 단을 나누면 큰 종목만
- * 색이 들고, 배수로 나눠야 "평소보다 말이 늘었나"가 종목 크기와 무관하게 읽힌다.
- * 문턱: 1.5배 이상·2.5배 이상·5배 이상(또는 앞 사흘 0회에서 새로 등장). 줄어든 쪽도 같은 비율.
+ * 테마 화면의 칸 — 넓이는 최근 사흘 언급 수, 색은 **평소와 견준 배수**(평소 = 지난 한 달 하루 평균의 사흘치,
+ * lib/theme-page.ts usualMentions). 점유율 %p 가 아니라 배수인 이유: 종목 하나의 언급은 몇 회에서 몇백 회까지 폭이
+ * 넓어 차이(회)로 단을 나누면 큰 종목만 색이 들고, 배수로 나눠야 "평소보다 말이 늘었나"가 종목 크기와 무관하게 읽힌다.
+ * 문턱: 1.5배 이상·2.5배 이상·5배 이상(또는 지난 한 달 0회에서 새로 등장). 줄어든 쪽도 같은 비율.
+ * 글자는 배수가 아니라 **평소 대비 +60% / −42%** 다 — "앞 사흘의 58%"는 직관적이지 않았다(2026-09-21 Hun).
  */
 export function stockTiles(stocks: ThemeHotStock[]): TreemapTile[] {
-  const tone = (m: number, prior: number): string => {
-    if (prior === 0) return m >= 5 ? "is-up-3" : m >= 2 ? "is-up-2" : "is-up-1";
-    const ratio = m / prior;
+  const tone = (m: number, usual: number): string => {
+    if (usual === 0) return m >= 5 ? "is-up-3" : m >= 2 ? "is-up-2" : "is-up-1";
+    const ratio = m / usual;
     if (ratio >= 5) return "is-up-3";
     if (ratio >= 2.5) return "is-up-2";
     if (ratio >= 1.5) return "is-up-1";
@@ -99,21 +100,24 @@ export function stockTiles(stocks: ThemeHotStock[]): TreemapTile[] {
     if (ratio <= 1 / 1.5) return "is-down-1";
     return "is-flat";
   };
-  const delta = (m: number, prior: number): string => {
-    if (prior === 0) return "앞 사흘 0회";
-    const r = m / prior;
-    return r >= 1 ? `앞 사흘의 ${r.toFixed(1)}배` : `앞 사흘의 ${Math.round(r * 100)}%`;
-  };
   return stocks.map((s) => ({
     key: s.code,
     label: s.name,
     value: s.mentions,
-    tone: tone(s.mentions, s.priorMentions),
+    tone: tone(s.mentions, s.usualMentions),
     href: stockHref(s.code),
-    tip: `${s.name} · 최근 사흘 ${s.mentions.toLocaleString("ko-KR")}회 · ${delta(s.mentions, s.priorMentions)} · 하루 최다 ${s.channels}곳`,
+    tip: `${s.name} · 최근 사흘 ${s.mentions.toLocaleString("ko-KR")}회 · ${usualDeltaText(s.mentions, s.usualMentions)} · 하루 최다 ${s.channels}곳`,
     valueText: `${s.mentions.toLocaleString("ko-KR")}회`,
-    deltaText: s.priorMentions === 0 ? "새로 등장" : `${(s.mentions / s.priorMentions).toFixed(1)}배`,
+    deltaText: s.usualMentions === 0 ? "새로 등장" : usualDeltaText(s.mentions, s.usualMentions).replace("평소 대비 ", ""),
   }));
+}
+
+/** 평소와 견준 언급 변화 한 마디 — "평소 대비 +60%" · "평소 대비 −42%" · "새로 등장". 표의 둘째 줄과 지도 툴팁이 같이 쓴다. */
+export function usualDeltaText(mentions: number, usual: number): string {
+  if (usual === 0) return "새로 등장 · 지난 한 달 언급 없음";
+  const pct = Math.round((mentions / usual - 1) * 100);
+  if (pct === 0) return "평소와 같음";
+  return `평소 대비 ${pct > 0 ? "+" : "−"}${Math.abs(pct)}%`;
 }
 
 export function Treemap({
