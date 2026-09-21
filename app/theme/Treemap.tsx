@@ -88,36 +88,38 @@ export function themeTiles(themes: ThemeOverview[]): TreemapTile[] {
  * 문턱: 1.5배 이상·2.5배 이상·5배 이상(또는 지난 한 달 0회에서 새로 등장). 줄어든 쪽도 같은 비율.
  * 글자는 배수가 아니라 **평소 대비 +60% / −42%** 다 — "앞 사흘의 58%"는 직관적이지 않았다(2026-09-21 Hun).
  */
+/** 종목의 색 단계(kadera.css 의 .is-up-N · .is-down-N · .is-flat). 지도 칸과 표의 이름 옆 태그가 같은 색을 쓴다. */
+export function stockTone(m: number, usual: number): string {
+  if (usual === 0) return m >= 5 ? "is-up-3" : m >= 2 ? "is-up-2" : "is-up-1";
+  const ratio = m / usual;
+  if (ratio >= 5) return "is-up-3";
+  if (ratio >= 2.5) return "is-up-2";
+  if (ratio >= 1.5) return "is-up-1";
+  if (ratio <= 1 / 5) return "is-down-3";
+  if (ratio <= 1 / 2.5) return "is-down-2";
+  if (ratio <= 1 / 1.5) return "is-down-1";
+  return "is-flat";
+}
+
 export function stockTiles(stocks: ThemeHotStock[]): TreemapTile[] {
-  const tone = (m: number, usual: number): string => {
-    if (usual === 0) return m >= 5 ? "is-up-3" : m >= 2 ? "is-up-2" : "is-up-1";
-    const ratio = m / usual;
-    if (ratio >= 5) return "is-up-3";
-    if (ratio >= 2.5) return "is-up-2";
-    if (ratio >= 1.5) return "is-up-1";
-    if (ratio <= 1 / 5) return "is-down-3";
-    if (ratio <= 1 / 2.5) return "is-down-2";
-    if (ratio <= 1 / 1.5) return "is-down-1";
-    return "is-flat";
-  };
   return stocks.map((s) => ({
     key: s.code,
     label: s.name,
     value: s.mentions,
-    tone: tone(s.mentions, s.usualMentions),
+    tone: stockTone(s.mentions, s.usualMentions),
     href: stockHref(s.code),
     tip: `${s.name} · 최근 사흘 ${s.mentions.toLocaleString("ko-KR")}회 · ${usualDeltaText(s.mentions, s.usualMentions)} · 하루 최다 ${s.channels}곳`,
     valueText: `${s.mentions.toLocaleString("ko-KR")}회`,
-    deltaText: s.usualMentions === 0 ? "새로 등장" : usualDeltaText(s.mentions, s.usualMentions).replace("평소 대비 ", ""),
+    deltaText: s.usualMentions === 0 ? "새로 등장" : usualDeltaText(s.mentions, s.usualMentions).replace("평소 대비 ", "").replace(" 언급", ""),
   }));
 }
 
-/** 평소와 견준 언급 변화 한 마디 — "평소 대비 +60%" · "평소 대비 −42%" · "새로 등장". 표의 둘째 줄과 지도 툴팁이 같이 쓴다. */
+/** 평소와 견준 언급 변화 한 마디 — "평소 대비 +60% 언급" · "평소 대비 −42% 언급" · "새로 등장". 표의 이름 옆 태그와 지도 툴팁이 같이 쓴다. */
 export function usualDeltaText(mentions: number, usual: number): string {
-  if (usual === 0) return "새로 등장 · 지난 한 달 언급 없음";
+  if (usual === 0) return "새로 등장";
   const pct = Math.round((mentions / usual - 1) * 100);
-  if (pct === 0) return "평소와 같음";
-  return `평소 대비 ${pct > 0 ? "+" : "−"}${Math.abs(pct)}%`;
+  if (pct === 0) return "평소만큼 언급";
+  return `평소 대비 ${pct > 0 ? "+" : "−"}${Math.abs(pct)}% 언급`;
 }
 
 export function Treemap({

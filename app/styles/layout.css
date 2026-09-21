@@ -530,6 +530,10 @@
     padding-left: 16px;
     padding-right: 16px;
   }
+  /* 이름은 안 줄이고 태그를 아랫줄로 보낸다. */
+  .hz-theme-namerow { flex-wrap: wrap; gap: 3px 0; }
+  .hz-theme-namerow .hz-theme-name { flex-shrink: 0; }
+  .hz-theme-namerow .hz-theme-tag { margin-left: 0; }
   .hz-cols-theme-reason {
     grid-template-columns: minmax(0, 1fr) 56px;
     gap: 6px 8px;

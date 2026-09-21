@@ -30,7 +30,7 @@ import { timeAgoInitial } from "../../kadera/time-ago";
 import { AiMark, C, Icon, MONO, R } from "../../ui";
 import { THEME_PAGE } from "../copy";
 import { ReasonWeeks } from "../ReasonWeeks";
-import { Treemap, TreemapLegend, stockTiles, usualDeltaText } from "../Treemap";
+import { Treemap, TreemapLegend, stockTiles, stockTone, usualDeltaText } from "../Treemap";
 
 /**
  * 테마 하나의 실주소(`/theme/반도체`).
@@ -455,17 +455,17 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
                         <Link href={stockHref(s.code)} style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, textDecoration: "none" }}>
                           <StockLogo code={s.code} name={s.name} market={s.market} size={28} />
                           <span style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-                            <span style={{ ...clip, fontSize: "var(--fs-13-5)", fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>{s.name}</span>
-                            {s.reason ? (
-                              /* 까닭 한 줄과 날짜. 그날 등락률은 여기 안 적는다 — 시세는 '등락의 이유'의 몫(2026-09-21 Hun). */
+                            <span className="hz-theme-namerow">
+                              <span className="hz-theme-name" style={{ ...clip, fontSize: "var(--fs-13-5)", fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>{s.name}</span>
+                              {/* 평소와 견준 언급 변화 — 이름 옆 작은 태그(배당 페이지 .dv-badge 와 같은 꼴). 색은 위 지도의 칸과 같은 단계(stockTone). */}
+                              <span className={`hz-theme-tag ${stockTone(s.mentions, s.usualMentions)}`}>{usualDeltaText(s.mentions, s.usualMentions)}</span>
+                            </span>
+                            {s.reason && (
+                              /* 까닭 한 줄과 날짜. 그날 등락률은 여기 안 적는다 — 시세는 '등락의 이유'의 몫(2026-09-21). */
                               <span style={{ fontSize: "var(--fs-12)", color: C.inkSoft, lineHeight: 1.55, wordBreak: "keep-all", textWrap: "pretty" }}>
                                 {s.reason.reason}
                                 <span style={{ color: C.muted, marginLeft: 6, whiteSpace: "nowrap", fontSize: "var(--fs-11)" }}>{fmtKoDate(s.reason.date)}</span>
                               </span>
-                            ) : (
-                              /* 까닭이 없는 줄은 평소와 견준 변화를 적는다 — 지도의 색과 같은 잣대라 "왜 이 색인가"도 답한다.
-                                 "까닭 없음"을 일곱 줄에 되풀이하면 채우기 글로 보인다(2026-09-21). */
-                              <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2 }}>{usualDeltaText(s.mentions, s.usualMentions)}</span>
                             )}
                           </span>
                         </Link>

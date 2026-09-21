@@ -348,6 +348,33 @@
 }
 .hz-theme-stock-cols.is-single > :nth-child(-n + 6) { box-shadow: none; }
 .hz-theme-stock-cols.is-single > :nth-child(6):not(:last-child) { border-bottom: 1px solid var(--c-hairline); }
+/* 이름 + 태그 한 줄. 폰에서는 태그가 이름 아래로 접힌다(layout.css ≤560) — 안 접으면 이름이 잘린다(375 실측: 이수페타시스·RF머트리얼즈). */
+.hz-theme-namerow {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+/* 이름 옆 작은 태그("평소 대비 −35% 언급"). 배당으로 살기의 .dv-badge(tx.css)와 같은 치수·색. */
+.hz-theme-tag {
+  flex-shrink: 0;
+  margin-left: 6px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: var(--fs-11);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--c-sub);
+  background: var(--c-chip);
+  white-space: nowrap;
+}
+/* 태그 색 = 지도 칸 색(위 .hz-tm-tile.is-* 와 같은 섞임). 글자는 지도 칸 이름과 같은 잉크(검정) — 온도 잉크를 얹으면 45%·66% 단에서
+   명암비가 2.6~3.8 로 11px 글자엔 모자란다(2026-09-21 실측). 색은 바탕이 말한다. */
+.hz-theme-tag.is-up-1 { background: color-mix(in srgb, var(--c-warm-2) 24%, var(--c-card)); color: var(--c-ink); }
+.hz-theme-tag.is-up-2 { background: color-mix(in srgb, var(--c-warm-2) 45%, var(--c-card)); color: var(--c-ink); }
+.hz-theme-tag.is-up-3 { background: color-mix(in srgb, var(--c-warm-2) 66%, var(--c-card)); color: var(--c-ink); }
+.hz-theme-tag.is-down-1 { background: color-mix(in srgb, var(--c-blue-2) 24%, var(--c-card)); color: var(--c-ink); }
+.hz-theme-tag.is-down-2 { background: color-mix(in srgb, var(--c-blue-2) 45%, var(--c-card)); color: var(--c-ink); }
+.hz-theme-tag.is-down-3 { background: color-mix(in srgb, var(--c-blue-2) 66%, var(--c-card)); color: var(--c-ink); }
 /* 까닭 이력: 종목 · 등락 · 까닭. 종목 칸은 로고+이름이 한 줄에 서는 폭이다. */
 .hz-cols-theme-reason {
   grid-template-columns: 150px 64px minmax(0, 1fr);
