@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Fragment } from "react";
 import { notFound } from "next/navigation";
 
 import { assertLoaded } from "@/lib/load-state";
@@ -22,7 +23,7 @@ import { THEME_PUBLIC } from "../../screen-flags";
 import { StockLogo } from "../../StockLogo";
 import { EventsCalendar } from "../../kadera/EventsCalendar";
 import { ExpandableList } from "../../kadera/ExpandableList";
-import { Avatar, DeltaPp, Pill, RankDelta } from "../../kadera/parts";
+import { Avatar, DeltaPp, Pill, RankBadge, RankDelta } from "../../kadera/parts";
 import { SectionHead } from "../../kadera/SectionHead";
 import TimeAgo from "../../kadera/TimeAgo";
 import { timeAgoInitial } from "../../kadera/time-ago";
@@ -160,8 +161,7 @@ const clip: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", te
 const QUOTES_LABEL = "시세 반응";
 /** 히어로 첫 칸의 종목 알약 수. 여섯이면 230px 칸에서 두 줄이다. */
 const HERO_CHIPS = 6;
-/** '이 테마의 주인공' 표의 줄 수. 열(5줄)로 세로를 안 늘리고 두 열로 열 종목(2026-09-21). */
-const HOT_ROWS = 10;
+/** '이 테마의 주인공' 표 — 한 열에 다섯 줄, 두 열이라 열 종목. 세로를 안 늘리고 열을 더한 것(2026-09-21). */
 const HOT_COL_ROWS = 5;
 /** 달력이 보이는 날수. 카더라 '다가오는 일정'과 같은 5주. */
 const CALENDAR_DAYS = 35;
@@ -170,6 +170,13 @@ const VAGUE_ROWS = 6;
 /** 발췌는 처음 여섯, '더 보기'로 여섯씩(카더라 트렌딩과 같은 단추). 파이프라인이 18건까지 저장한다(EXCERPTS_SHOWN). */
 const EXCERPTS_INITIAL = 6;
 const EXCERPTS_STEP = 6;
+
+/** 앞 사흘과 견준 언급 변화 한 마디(종목 지도 stockTiles 의 deltaText 와 같은 규칙). */
+function priorDeltaText(mentions: number, prior: number): string {
+  if (prior === 0) return "앞 사흘엔 언급 없음 · 새로 등장";
+  const r = mentions / prior;
+  return r >= 1 ? `앞 사흘의 ${r.toFixed(1)}배` : `앞 사흘의 ${Math.round(r * 100)}%`;
+}
 
 /** 조회·전달 수의 짧은 꼴. 카더라 트렌딩(app/kadera/page.tsx compact)과 같은 규칙이다. */
 function compact(n: number): string {
@@ -437,34 +444,52 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
               <Treemap tiles={stockTiles(d.hotStocks)} ariaLabel={`${theme} 테마 종목별 최근 ${KADERA_WINDOW_DAYS}일 언급`} />
             </div>
             <TreemapLegend up="앞 사흘보다 말이 늘어난 종목" flat="비슷함" down="줄어든 종목" />
-            {/* 두 열 × 다섯 줄. 1~5 가 왼쪽, 6~10 이 오른쪽(grid-auto-flow: column). 같은 줄끼리 높이가 맞아 가로선이 이어진다.
-                여섯 미만이면 한 열 — 오른쪽이 비어 보인다. 1149 아래도 한 열(layout.css). */}
+            {/* 두 열 × (머리 + 다섯 줄). 1~5 가 왼쪽, 6~10 이 오른쪽(grid-auto-flow: column). 열마다 열 머리를 두어 1위·6위 위에
+                선이 서고, 같은 줄은 높이를 나눠 가로선이 두 열에서 이어진다. 여섯 미만이면 한 열. 1149 아래도 한 열(layout.css). */}
             <div className={`hz-theme-stock-cols${d.hotStocks.length > HOT_COL_ROWS ? "" : " is-single"}`}>
-            {d.hotStocks.slice(0, HOT_ROWS).map((s, i) => (
-              <div key={s.code} className="hz-trow hz-cols-theme-stock">
-                <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", fontWeight: 800, color: C.sub2 }}>{i + 1}</span>
-                <Link href={stockHref(s.code)} style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0, textDecoration: "none" }}>
-                  <StockLogo code={s.code} name={s.name} market={s.market} size={26} />
-                  <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-                    <span style={{ ...clip, fontSize: "var(--fs-13)", fontWeight: 700, color: C.ink }}>{s.name}</span>
-                    {s.reason && (
-                      <span style={{ fontSize: "var(--fs-12)", color: C.inkSoft, lineHeight: 1.55, wordBreak: "keep-all", textWrap: "pretty" }}>
-                        <Rate rate={s.reason.changeRate} />
-                        {s.reason.changeRate != null && " "}
-                        {s.reason.reason}
-                        <span style={{ color: C.muted, marginLeft: 6, whiteSpace: "nowrap" }}>{fmtKoDate(s.reason.date)}</span>
-                      </span>
-                    )}
-                  </span>
-                </Link>
-                <span style={{ textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-13)", fontWeight: 800, color: C.ink, whiteSpace: "nowrap" }}>
-                  {s.mentions.toLocaleString("ko-KR")}회
-                </span>
-                <span style={{ textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-11)", color: C.sub2, whiteSpace: "nowrap" }}>
-                  {s.channels}곳
-                </span>
-              </div>
-            ))}
+              {[0, 1].map((col) => {
+                const items = d.hotStocks.slice(col * HOT_COL_ROWS, (col + 1) * HOT_COL_ROWS);
+                if (!items.length) return null;
+                return (
+                  <Fragment key={col}>
+                    <div className="hz-thead hz-cols-theme-stock">
+                      <span>#</span>
+                      <span>종목</span>
+                      <span style={{ textAlign: "right" }}>언급 · 채널</span>
+                    </div>
+                    {items.map((s, i) => (
+                      <div key={s.code} className="hz-trow hz-cols-theme-stock">
+                        <RankBadge n={col * HOT_COL_ROWS + i + 1} />
+                        <Link href={stockHref(s.code)} style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, textDecoration: "none" }}>
+                          <StockLogo code={s.code} name={s.name} market={s.market} size={28} />
+                          <span style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
+                            <span style={{ ...clip, fontSize: "var(--fs-13-5)", fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>{s.name}</span>
+                            {s.reason ? (
+                              <span style={{ fontSize: "var(--fs-12)", color: C.inkSoft, lineHeight: 1.55, wordBreak: "keep-all", textWrap: "pretty" }}>
+                                <Rate rate={s.reason.changeRate} />
+                                {s.reason.changeRate != null && " "}
+                                {s.reason.reason}
+                                <span style={{ color: C.muted, marginLeft: 6, whiteSpace: "nowrap", fontSize: "var(--fs-11)" }}>{fmtKoDate(s.reason.date)}</span>
+                              </span>
+                            ) : (
+                              /* 까닭이 없는 줄은 앞 사흘과 견준 변화를 적는다 — 지도의 색과 같은 잣대라 "왜 이 색인가"도 답한다.
+                                 "까닭 없음"을 일곱 줄에 되풀이하면 채우기 글로 보인다(2026-09-21). 1 미만은 %로(ratio 규칙). */
+                              <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2 }}>{priorDeltaText(s.mentions, s.priorMentions)}</span>
+                            )}
+                          </span>
+                        </Link>
+                        {/* 언급 수 위, 채널 수 아래 — 흐름 표의 오른쪽 두 줄(점유율/조각)과 같은 꼴. */}
+                        <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
+                          <span style={{ fontFamily: MONO, fontSize: "var(--fs-14)", fontWeight: 800, letterSpacing: "-.02em", color: C.ink, whiteSpace: "nowrap" }}>
+                            {s.mentions.toLocaleString("ko-KR")}회
+                          </span>
+                          <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>{s.channels}곳</span>
+                        </span>
+                      </div>
+                    ))}
+                  </Fragment>
+                );
+              })}
             </div>
           </div>
         )}

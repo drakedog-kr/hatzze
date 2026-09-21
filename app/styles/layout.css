@@ -83,8 +83,10 @@
     grid-template-rows: none;
     grid-auto-flow: row;
   }
-  .hz-theme-stock-cols > :nth-child(-n + 5) { box-shadow: none; }
-  .hz-theme-stock-cols > :nth-child(5):not(:last-child) { border-bottom: 1px solid var(--c-hairline); }
+  .hz-theme-stock-cols > :nth-child(-n + 6) { box-shadow: none; }
+  .hz-theme-stock-cols > :nth-child(6):not(:last-child) { border-bottom: 1px solid var(--c-hairline); }
+  /* 한 열에선 둘째 열 머리(7번째)가 목록 한가운데 서니 감춘다. */
+  .hz-theme-stock-cols > .hz-thead:nth-child(7) { display: none; }
   /* 2열 이하부터 여백을 깎는다(위 '반응형 여백' 주석 참고).
      커스텀 속성은 반드시 셀렉터 안에 둔다 — @media 바로 밑에 쓰면 선언이 통째로 버려진다. */
   :root { --hz-main-pad: 22px; --hz-card-pad: 18px; }
@@ -523,13 +525,10 @@
 
   /* 테마 화면의 표 세 벌 + 목록. 곁다리 열을 접고 긴 글은 아랫줄로 내린다(kadera.css 정의). */
   .hz-cols-theme-stock {
-    grid-template-columns: 20px minmax(0, 1fr) 56px;
-    gap: 8px;
+    grid-template-columns: 24px minmax(0, 1fr) 60px;
+    gap: 10px;
     padding-left: 16px;
     padding-right: 16px;
-  }
-  .hz-cols-theme-stock > :nth-child(4) {
-    display: none;
   }
   .hz-cols-theme-reason {
     grid-template-columns: minmax(0, 1fr) 56px;
