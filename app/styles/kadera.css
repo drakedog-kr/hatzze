@@ -833,9 +833,7 @@ a.hz-theme-chip:hover { background: var(--tx-btn); }
    행 호버와 같은 하늘색 틴트 + 파란 글자로 — 화면 전체의 "지금 이것" 색이다. '오늘' 단추도 같은 알약이라 같이. */
 .hz-evday-nav button:hover,
 .hz-evcal-today:hover:not(:disabled) { background: var(--c-blue-tint); color: var(--c-cold-ink); }
-/* 테마 화면 '등락의 이유'의 지난주·다음주. 끝에 닿은 단추는 흐리게 두고 자리는 남긴다. */
-.hz-reason-nav button:disabled { color: var(--c-muted); background: transparent; cursor: default; }
-.hz-reason-nav button:disabled:hover { background: transparent; color: var(--c-muted); }
+/* 테마 화면 '등락의 이유'의 이전·다음 7일. 갈 데가 없는 단추는 아예 안 그린다(ReasonWeeks). */
 @media (max-width: 760px) {
   .hz-evsplit { grid-template-columns: minmax(0, 1fr); }
   .hz-evcal {

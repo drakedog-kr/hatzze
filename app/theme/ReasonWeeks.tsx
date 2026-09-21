@@ -143,15 +143,20 @@ export function ReasonWeeks({
           ))}
         </div>
       )}
-      {/* 카더라 달력의 날짜 이동 단추와 같은 알약. 끝에 닿은 쪽은 흐리게 두되 자리는 남긴다 — 사라지면 다른 쪽이 옮겨 앉는다. */}
+      {/* 카더라 달력의 날짜 이동 단추와 같은 알약. 갈 데가 없는 쪽은 그리지 않는다 — 흐린 '다음 7일'이 남아 있으면
+          없는 것이 있는 듯 읽힌다(2026-09-22 Hun). 사이의 빈 칸(flex:1)이 자리를 지켜 남은 단추는 제 쪽에 선다. */}
       <div className="hz-evday-nav hz-reason-nav" style={{ padding: "14px 22px 16px" }}>
-        <button type="button" disabled={!canPrev} onClick={() => setBack((b) => b + 1)}>
-          ← 이전 7일
-        </button>
+        {canPrev && (
+          <button type="button" onClick={() => setBack((b) => b + 1)}>
+            ← 이전 7일
+          </button>
+        )}
         <span style={{ flex: 1 }} />
-        <button type="button" disabled={!canNext} onClick={() => setBack((b) => b - 1)}>
-          다음 7일 →
-        </button>
+        {canNext && (
+          <button type="button" onClick={() => setBack((b) => b - 1)}>
+            다음 7일 →
+          </button>
+        )}
       </div>
     </div>
   );
