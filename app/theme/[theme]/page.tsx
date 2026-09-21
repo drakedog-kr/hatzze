@@ -160,8 +160,9 @@ const clip: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", te
 const QUOTES_LABEL = "시세 반응";
 /** 히어로 첫 칸의 종목 알약 수. 여섯이면 230px 칸에서 두 줄이다. */
 const HERO_CHIPS = 6;
-/** '지금 말 많은 종목' 표의 줄 수. 지도가 전체를 보이니 표는 상위 다섯이면 된다(2026-09-21). */
-const HOT_ROWS = 5;
+/** '이 테마의 주인공' 표의 줄 수. 열(5줄)로 세로를 안 늘리고 두 열로 열 종목(2026-09-21). */
+const HOT_ROWS = 10;
+const HOT_COL_ROWS = 5;
 /** 달력이 보이는 날수. 카더라 '다가오는 일정'과 같은 5주. */
 const CALENDAR_DAYS = 35;
 /** 달력 아래 '달·분기만 짚인 일정'의 최대 줄 수. 더 보기는 두지 않는다. */
@@ -421,7 +422,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
           icon="leaderboard"
           title="이 테마의 주인공"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
-          desc="상위 다섯 종목과 채널이 말한 까닭입니다."
+          desc="상위 열 종목과 채널이 말한 까닭입니다."
           noteHelp="칸의 크기는 최근 사흘 언급 수이고 색은 그 앞 사흘과 나눈 배수입니다. 1.5배 이상이면 따뜻한 색, 1.5분의 1 이하면 파랑이고, 앞 사흘에 없던 종목은 새로 등장으로 칩니다."
           level={2}
         />
@@ -436,6 +437,9 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
               <Treemap tiles={stockTiles(d.hotStocks)} ariaLabel={`${theme} 테마 종목별 최근 ${KADERA_WINDOW_DAYS}일 언급`} />
             </div>
             <TreemapLegend up="앞 사흘보다 말이 늘어난 종목" flat="비슷함" down="줄어든 종목" />
+            {/* 두 열 × 다섯 줄. 1~5 가 왼쪽, 6~10 이 오른쪽(grid-auto-flow: column). 같은 줄끼리 높이가 맞아 가로선이 이어진다.
+                여섯 미만이면 한 열 — 오른쪽이 비어 보인다. 1149 아래도 한 열(layout.css). */}
+            <div className={`hz-theme-stock-cols${d.hotStocks.length > HOT_COL_ROWS ? "" : " is-single"}`}>
             {d.hotStocks.slice(0, HOT_ROWS).map((s, i) => (
               <div key={s.code} className="hz-trow hz-cols-theme-stock">
                 <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", fontWeight: 800, color: C.sub2 }}>{i + 1}</span>
@@ -461,6 +465,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
                 </span>
               </div>
             ))}
+            </div>
           </div>
         )}
       </section>

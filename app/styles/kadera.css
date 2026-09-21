@@ -322,6 +322,24 @@
 .hz-cols-theme-stock {
   grid-template-columns: 24px minmax(0, 1fr) 64px 44px;
 }
+/* '이 테마의 주인공' 두 열 — 열 종목을 다섯 줄 × 두 열로. 세로로 늘리지 않으면서 한 줄의 빈 가운데를 없앤다(2026-09-21).
+   grid-auto-flow: column 이라 1~5 가 왼쪽, 6~10 이 오른쪽이고, 같은 줄은 높이를 나눠 가로선이 두 열에서 이어진다.
+   왼쪽 열 오른편에 세로 헤어라인, 왼쪽 열 막내(5번째)의 밑선은 지운다(시트 바닥). 1149 아래는 layout.css 가 한 열로 돌린다. */
+.hz-theme-stock-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(5, auto);
+  grid-auto-flow: column;
+}
+.hz-theme-stock-cols > :nth-child(-n + 5) { box-shadow: inset -1px 0 0 var(--c-hairline); }
+.hz-theme-stock-cols > :nth-child(5) { border-bottom: 0; }
+.hz-theme-stock-cols.is-single {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: none;
+  grid-auto-flow: row;
+}
+.hz-theme-stock-cols.is-single > :nth-child(-n + 5) { box-shadow: none; }
+.hz-theme-stock-cols.is-single > :nth-child(5):not(:last-child) { border-bottom: 1px solid var(--c-hairline); }
 /* 까닭 이력: 종목 · 등락 · 까닭. 종목 칸은 로고+이름이 한 줄에 서는 폭이다. */
 .hz-cols-theme-reason {
   grid-template-columns: 150px 64px minmax(0, 1fr);

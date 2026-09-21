@@ -76,6 +76,15 @@
 @media (max-width: 1149px) {
   .hz-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hz-c2, .hz-c3, .hz-c4 { grid-column: span 2; }
+  /* 테마 화면 '이 테마의 주인공' 두 열 → 한 열(1~10 차례로). 900 화면에서 반쪽이 322px 라 까닭이 여섯 줄로 늘어져
+     한 줄이 158px 였다(2026-09-21 실측). 세로선과 5번째 밑선 규칙도 되돌린다. */
+  .hz-theme-stock-cols {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-auto-flow: row;
+  }
+  .hz-theme-stock-cols > :nth-child(-n + 5) { box-shadow: none; }
+  .hz-theme-stock-cols > :nth-child(5):not(:last-child) { border-bottom: 1px solid var(--c-hairline); }
   /* 2열 이하부터 여백을 깎는다(위 '반응형 여백' 주석 참고).
      커스텀 속성은 반드시 셀렉터 안에 둔다 — @media 바로 밑에 쓰면 선언이 통째로 버려진다. */
   :root { --hz-main-pad: 22px; --hz-card-pad: 18px; }
