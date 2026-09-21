@@ -7,7 +7,6 @@ import type { ThemeReasonRow } from "@/lib/theme-page";
 
 import { StockLogo } from "../StockLogo";
 import { C, MONO } from "../ui";
-import { Rate } from "./Rate";
 
 /**
  * '까닭 이력'을 **한 주씩** 넘겨 본다. 30일치를 한 번에 세우면 반도체는 1,830px 로 화면에서 가장 긴 카드였다
@@ -78,25 +77,38 @@ export function ReasonWeeks({ rows, latest, earliest }: { rows: ThemeReasonRow[]
           <div key={date}>
             <div className="hz-agenda-day">
               <span style={{ fontSize: "var(--fs-13-5)", fontWeight: 800, color: C.ink, letterSpacing: "-.01em" }}>{fmtKoWd(date)}</span>
+              <span style={{ flex: 1 }} />
+              <span style={{ fontFamily: MONO, fontSize: "var(--fs-11-5)", fontWeight: 700, color: C.sub2 }}>{list.length}건</span>
             </div>
             {/* 하루의 줄을 두 열로. 까닭이 짧아 오른쪽 반이 비었다(2026-09-21 지적). 1149 아래는 한 열(layout.css). */}
             <div className="hz-reason-grid">
             {list.map((r) => (
+              /* '이 테마의 주인공' 표와 같은 얼개 — 로고 · [이름 + 등락 태그] 위, 까닭 아래 · 오른쪽에 채널 수 세로 두 줄.
+                 등락은 이름 옆 태그로(색은 오른·내린 틴트). 예전엔 이름·등락·까닭이 한 줄에 세 칸이라 반쪽 폭에서
+                 까닭이 두 줄로 접히고 "n곳이 언급"이 문장 끝에 매달려 대충 놓인 듯 보였다(2026-09-21). */
               <div key={`${date}-${r.code}`} className="hz-trow hz-cols-theme-reason">
-                <Link href={`/stock/${r.code}`} style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, textDecoration: "none" }}>
-                  <StockLogo code={r.code} name={r.name} market={r.market} size={22} />
-                  <span style={{ ...clip, fontSize: "var(--fs-12-5)", fontWeight: 700, color: C.ink }}>{r.name}</span>
+                <Link href={`/stock/${r.code}`} style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, textDecoration: "none" }}>
+                  <StockLogo code={r.code} name={r.name} market={r.market} size={28} />
+                  <span style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
+                    <span className="hz-theme-namerow">
+                      <span className="hz-theme-name" style={{ ...clip, fontSize: "var(--fs-13-5)", fontWeight: 800, letterSpacing: "-.01em", color: C.ink }}>{r.name}</span>
+                      {r.changeRate == null ? (
+                        <span className="hz-theme-tag">{date === newestDate ? "종가 전" : "등락 없음"}</span>
+                      ) : (
+                        <span className={`hz-theme-tag ${r.changeRate > 0 ? "is-up-2" : r.changeRate < 0 ? "is-down-2" : ""}`}>
+                          {r.changeRate > 0 ? "▲" : r.changeRate < 0 ? "▼" : ""}
+                          {Math.abs(r.changeRate).toFixed(2)}%
+                        </span>
+                      )}
+                    </span>
+                    <span style={{ fontSize: "var(--fs-12)", lineHeight: 1.55, color: C.inkSoft, wordBreak: "keep-all", textWrap: "pretty" }}>{r.reason}</span>
+                  </span>
                 </Link>
-                <span style={{ fontSize: "var(--fs-12)", textAlign: "right" }}>
-                  {r.changeRate == null ? (
-                    <span style={{ fontSize: "var(--fs-11)", color: C.muted, whiteSpace: "nowrap" }}>{date === newestDate ? "종가 전" : "—"}</span>
-                  ) : (
-                    <Rate rate={r.changeRate} />
-                  )}
-                </span>
-                <span style={{ minWidth: 0, fontSize: "var(--fs-13)", lineHeight: 1.6, color: C.inkSoft, wordBreak: "keep-all", textWrap: "pretty" }}>
-                  {r.reason}
-                  {r.channelCount >= 2 && <span style={{ color: C.muted, marginLeft: 6, whiteSpace: "nowrap", fontSize: "var(--fs-11)" }}>{r.channelCount}곳이 언급</span>}
+                <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
+                  <span style={{ fontFamily: MONO, fontSize: "var(--fs-14)", fontWeight: 800, letterSpacing: "-.02em", color: C.ink, whiteSpace: "nowrap" }}>
+                    {r.channelCount}곳
+                  </span>
+                  <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>언급</span>
                 </span>
               </div>
             ))}

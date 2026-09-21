@@ -539,13 +539,9 @@
   .hz-theme-namerow .hz-theme-name { flex-shrink: 0; }
   .hz-theme-namerow .hz-theme-tag { margin-left: 0; }
   .hz-cols-theme-reason {
-    grid-template-columns: minmax(0, 1fr) 56px;
-    gap: 6px 8px;
+    gap: 10px;
     padding-left: 16px;
     padding-right: 16px;
-  }
-  .hz-cols-theme-reason > :nth-child(3) {
-    grid-column: 1 / -1;
   }
   .hz-cols-theme-event {
     grid-template-columns: minmax(0, 1fr) auto;

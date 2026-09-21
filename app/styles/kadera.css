@@ -386,9 +386,16 @@
 .hz-reason-grid > :nth-last-child(2):nth-child(odd) { border-bottom: 0; }
 /* 까닭 이력: 종목 · 등락 · 까닭. 종목 칸은 로고+이름이 한 줄에 서는 폭이다. */
 .hz-cols-theme-reason {
-  grid-template-columns: 150px 64px minmax(0, 1fr);
-  align-items: start;
+  grid-template-columns: minmax(0, 1fr) 56px;
+  gap: 14px;
+  align-items: center;
 }
+.hz-trow.hz-cols-theme-reason {
+  padding-top: 11px;
+  padding-bottom: 11px;
+}
+/* 두 열의 첫 줄 위에도 선 — 날짜 머리와 줄 사이가 비어 있으면 줄이 허공에 뜬다(주인공 표의 열 머리와 같은 이유). */
+.hz-reason-grid { border-top: 1px solid var(--c-hairline); }
 /* 다가오는 일정: 종목 · 무슨 일 · (채널 알약). */
 .hz-cols-theme-event {
   grid-template-columns: 150px minmax(0, 1fr) auto;
