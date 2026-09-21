@@ -11,8 +11,9 @@ import { StockLogo } from "../StockLogo";
 import { C, MONO } from "../ui";
 
 /**
- * '까닭 이력'을 **한 주씩** 넘겨 본다. 30일치를 한 번에 세우면 반도체는 1,830px 로 화면에서 가장 긴 카드였다
- * (2026-09-21 실측). 처음 보이는 주는 기준일까지의 이레이고, 아래 '지난주'·'다음주'로 옮긴다.
+ * '등락의 이유'를 **7일씩** 넘겨 본다. 30일치를 한 번에 세우면 반도체는 1,830px 로 화면에서 가장 긴 카드였다
+ * (2026-09-21 실측). 처음 보이는 창은 기준일까지의 이레이고, 아래 '이전 7일'·'다음 7일'로 옮긴다. 달력의 주(월~일)가
+ * 아니다 — 월요일에 열면 이번 주가 하루뿐이라 비어 보인다. 단추 이름이 '지난주'였을 땐 달력 주로 읽혔다(2026-09-22 Hun).
  *
  * 자료는 서버가 30일치를 다 넘긴다(lib/theme-page.ts reasons). 여기서는 어느 주를 보일지만 상태로 갖는다 —
  * 카더라 달력(EventsCalendar)과 같은 원칙이다.
@@ -86,7 +87,7 @@ export function ReasonWeeks({
         title="등락의 이유"
         note={`${fmtKo(start)} ~ ${fmtKo(end)}`}
         desc="이 테마 종목이 크게 움직인 날, 그날 채널이 말한 이유입니다."
-        noteHelp={`아래 단추로 한 주씩 넘깁니다. 최근 ${trendDays}일까지 거슬러 갑니다.`}
+        noteHelp={`기준일에서 거슬러 7일씩 봅니다(달력의 주가 아닙니다). 아래 단추로 7일씩 넘기고 최근 ${trendDays}일까지 거슬러 갑니다.`}
         level={2}
       />
       {days.length === 0 ? (
@@ -145,11 +146,11 @@ export function ReasonWeeks({
       {/* 카더라 달력의 날짜 이동 단추와 같은 알약. 끝에 닿은 쪽은 흐리게 두되 자리는 남긴다 — 사라지면 다른 쪽이 옮겨 앉는다. */}
       <div className="hz-evday-nav hz-reason-nav" style={{ padding: "14px 22px 16px" }}>
         <button type="button" disabled={!canPrev} onClick={() => setBack((b) => b + 1)}>
-          ← 지난주
+          ← 이전 7일
         </button>
         <span style={{ flex: 1 }} />
         <button type="button" disabled={!canNext} onClick={() => setBack((b) => b - 1)}>
-          다음주 →
+          다음 7일 →
         </button>
       </div>
     </div>
