@@ -60,7 +60,8 @@ export function ReasonWeeks({
   const canPrev = start > earliest;
   const canNext = back > 0;
 
-  // 이 주의 줄을 날짜로 묶는다(최신 날이 위, 같은 날은 여러 채널이 말한 것이 먼저). 기본 꼴은 **날짜 머리 하나 아래 그날 종목들**이다
+  // 이 주의 줄을 날짜로 묶는다(오래된 날이 위, 최신 날이 아래 — 달력 순서. 최신을 위에 두니 거꾸로 읽혀 헷갈렸다, 2026-09-22 Hun.
+  // 같은 날은 여러 채널이 말한 것이 먼저). 기본 꼴은 **날짜 머리 하나 아래 그날 종목들**이다
   // (2026-09-21 Hun). 두 열 격자(선이 층계)와 날짜 칸을 둔 한 표(같은 날짜가 세 줄) 둘 다 이보다 못했다.
   const days = useMemo(() => {
     const m = new Map<string, ThemeReasonRow[]>();
@@ -70,7 +71,7 @@ export function ReasonWeeks({
       if (g) g.push(r);
       else m.set(r.date, [r]);
     }
-    return [...m.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1)).map(([date, list]) => [date, list.sort((a, b) => b.channelCount - a.channelCount)] as const);
+    return [...m.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([date, list]) => [date, list.sort((a, b) => b.channelCount - a.channelCount)] as const);
   }, [rows, start, end]);
   // 가장 최근 날의 등락률은 다음 날 낮에 채워진다(KRX 가 그날 종가를 이튿날 준다 — generate_move_reasons.fill_krx).
   // 빈칸으로 두면 "왜 없지"가 되니 그날 줄엔 '종가 전'이라고 적는다. 그보다 옛날의 빈칸은 시세가 없는 종목이라 "—".
