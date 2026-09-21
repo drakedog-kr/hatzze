@@ -378,7 +378,11 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
                 <div className="hz-theme-figs hz-theme-figs-row">
                   <Fig label={peak ? `최고 · ${fmtKoDate(peak.date)}` : "최고"} value={peak ? `${peak.share.toFixed(1)}%` : "—"} />
                   <Fig label={`${THEME_TREND_DAYS}일 평균`} value={avgShare == null ? "—" : `${avgShare.toFixed(1)}%`} />
-                  <Fig label={streakDir < 0 ? "연속 내린 날" : "연속 오른 날"} value={`${streakDays}일`} />
+                  {/* "1일 · 연속 내린 날"은 30일 중 하루가 그랬다는 말로 읽혔다(2026-09-21). "1일째 · 내리는 중"이면 지금 진행형이다. */}
+                  <Fig
+                    label={streakDir < 0 ? "내리는 중" : streakDir > 0 ? "오르는 중" : "어제와 같음"}
+                    value={streakDays ? `${streakDays}일째` : "—"}
+                  />
                 </div>
                 <Trend points={d.trend} recent={recentSet} />
                 <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", fontSize: "var(--fs-11)", color: C.sub }}>
