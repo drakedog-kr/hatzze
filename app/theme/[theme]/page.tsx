@@ -351,7 +351,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
 
       {/* ── 요즘 무슨 얘기(LLM) ── 이 화면의 본론. 파이프라인이 테마마다 하루 한 번 써 둔다(generate_theme_briefs.py). */}
       <section className="hz-sheet">
-        <SectionHead icon="forum" title="요즘 무슨 얘기" note={d.brief ? `${fmtKoDate(d.brief.date)} 기준` : undefined} desc="최근 사흘 채널 글을 읽고 정리한 것입니다." level={2} />
+        <SectionHead icon="forum" title="요즘 도는 얘기" note={d.brief ? `${fmtKoDate(d.brief.date)} 기준` : undefined} desc="최근 사흘 채널 글을 읽고 정리한 것입니다." level={2} />
         {d.brief?.brief ? (
           <div style={{ padding: "16px 22px 20px" }}>
             {/* 두 문단(파이프라인이 빈 줄로 가른다). 첫 문단은 가장 크게 오간 이야기, 둘째는 그 밖의 이야기. */}
@@ -383,7 +383,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
       <section className="hz-sheet">
         <SectionHead
           icon="leaderboard"
-          title="지금 말 많은 종목"
+          title="이 테마의 주인공"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
           desc="상위 다섯 종목과 채널이 말한 까닭입니다."
           noteHelp="칸의 크기는 최근 사흘 언급 수이고 색은 그 앞 사흘과 나눈 배수입니다. 1.5배 이상이면 따뜻한 색, 1.5분의 1 이하면 파랑이고, 앞 사흘에 없던 종목은 새로 등장으로 칩니다."
@@ -433,7 +433,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
       <section className="hz-sheet">
         <SectionHead
           icon="history"
-          title="까닭 이력"
+          title="등락의 이유"
           note="한 주씩"
           desc="이 테마 종목이 크게 움직인 날, 그날 채널이 말한 이유입니다."
           noteHelp={`최근 ${THEME_TREND_DAYS}일까지 거슬러 갑니다.`}

@@ -253,7 +253,7 @@ export default async function ThemeIndexPage() {
             <div className="hz-thead hz-cols-theme-list">
               <span>#</span>
               <span>테마 · 말 많은 종목</span>
-              <span>요즘 무슨 얘기</span>
+              <span>요즘 도는 얘기</span>
               <span style={{ textAlign: "right" }}>점유율 · 최근 {flowDates.length || THEME_FLOW_DAYS}일</span>
             </div>
             {/* 한 줄에 테마 하나(2026-09-19 "한 열에 한 테마씩"). 네 칸 — 순위 · 이름과 변화(아래 말 많은 종목 셋) ·
