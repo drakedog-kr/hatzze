@@ -103,6 +103,15 @@ export const DIVIDEND_PUBLIC = true;
  *    다른 판단이다.
  */
 export const THEME_PUBLIC = false;
+
+/**
+ * 사이드바의 '테마 리포트' 옆 **빨간 N 배지**. 새로 생긴 화면이라는 표시다(푸터 버전 옆에 붙는 것과 같은 표식).
+ *
+ * ⚠️ **기한이 없다.** 푸터 배지는 방문자가 업데이트 기록을 보면 꺼지고 열나흘이 지나면 저절로 꺼지는데
+ *    (app/VersionBadge.tsx), 이 배지는 그런 판정을 하지 않는다 — 켜 두기로 한 동안 모두에게 늘 보인다.
+ *    뗄 때는 **이 줄을 false 로 바꾸는 것이 아니라 지운다**(읽는 곳은 app/AppShell.tsx 의 NAV 한 줄뿐이다).
+ */
+export const THEME_NAV_NEW = true;
 // 화면 캐시를 비우고 데우는 자리는 손댈 것이 없다 — `scripts/revalidate.sh` 의 DEFAULT_WARM 에 /theme·/theme/us 가 이미 있고,
 // 파이프라인의 '테마 리포트 화면만 먼저 비우고 데우기' 스텝도 그대로다(안 연 동안은 404 라 아무 일이 없다).
 

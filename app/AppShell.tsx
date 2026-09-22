@@ -8,7 +8,7 @@ import { PageJsonLd } from "./JsonLd";
 import { NOTE_PAGE } from "./daily/copy";
 import { DIVIDEND_PAGE } from "./dividend/copy";
 import { KR_THEME_SHORT, THEME_PAGE, US_THEME_PAGE } from "./theme/copy";
-import { DAILY_PUBLIC, DIVIDEND_PUBLIC, SEOHAK_PUBLIC, THEME_PUBLIC } from "./screen-flags";
+import { DAILY_PUBLIC, DIVIDEND_PUBLIC, SEOHAK_PUBLIC, THEME_NAV_NEW, THEME_PUBLIC } from "./screen-flags";
 import { THEME_NAMES, US_THEME_NAMES, themeHref, usThemeHref } from "@/lib/theme-href";
 import { ShellEnvContext, useShellEnv, type ShellEnv } from "./shell-env";
 
@@ -17,6 +17,7 @@ import { SLOGAN } from "./brand";
 import { C, Icon, R } from "./ui";
 import { BetaBadge, LogoLockup } from "./Logo";
 import Footer from "./Footer";
+import { NewBadge } from "./VersionBadge";
 import GaEvents from "./GaEvents";
 import { TipTap } from "./TipTap";
 
@@ -203,6 +204,8 @@ type NavItem = {
   Glyph?: Glyph;
   sub: string;
   badge?: string;
+  /** 라벨 옆 빨간 N — 새로 생긴 화면이라는 표식(app/screen-flags.ts 의 THEME_NAV_NEW). 기한이 없어 뗄 때 그 줄을 지운다. */
+  isNew?: boolean;
   children?: NavChild[];
 };
 
@@ -244,6 +247,8 @@ function buildNav(themeNav: boolean): NavItem[] {
           label: THEME_PAGE.label,
           icon: THEME_PAGE.icon,
           sub: THEME_PAGE.sub,
+          // 새로 생긴 화면 표식(빨간 N). 기한 없이 켜 두고, 뗄 때 screen-flags.ts 의 THEME_NAV_NEW 를 지운다.
+          isNew: THEME_NAV_NEW,
           children: [
             { label: KR_THEME_SHORT, href: THEME_PAGE.href, Glyph: KrTrigramsIcon },
             { label: US_THEME_PAGE.short, href: US_THEME_PAGE.href, Glyph: UsEmpireIcon, sub: US_THEME_PAGE.sub },
@@ -761,6 +766,9 @@ function Sidebar() {
               href={item.href}
               {...intentPrefetch(item.href)}
               className={`hz-nav-item${active ? " hz-nav-active" : ""}`}
+              /* 빨간 N 은 보는 사람에게만 뜻이 통하는 표식이라(aria-hidden) 읽어 주는 기계에는 말로 적는다.
+                 ⚠️ 보이는 글자로 시작해야 음성으로 조작하는 사람이 본 대로 부를 수 있다(WCAG 2.5.3). */
+              aria-label={item.isNew ? `${item.label} · 새로 생긴 화면` : undefined}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -782,7 +790,19 @@ function Sidebar() {
               }}
             >
               <NavGlyph item={item} size={20} />
-              <span style={{ fontSize: "var(--fs-14)" }}>{item.label}</span>
+              {/* 새 화면 표식은 '준비 중' 배지와 같은 자리다 — 라벨 우측 상단 위첨자. absolute 라 배지가
+                  행 폭 계산에서 빠져 210px 사이드바에서 라벨이 눌리지 않는다. */}
+              <span style={{ position: "relative", display: "inline-flex", fontSize: "var(--fs-14)" }}>
+                {item.label}
+                {item.isNew && (
+                  /* top −1 은 눈대중이 아니다. 14px 라벨이 21px 줄상자 안에 서면 잉크 꼭대기가 상자 위에서
+                     4.31px 이고(실측 · Pretendard 600), 위첨자로 보이려면 지름 11 짜리 동그라미의 **가운데**가
+                     그 자리에 와야 한다 — 4.31 − 5.5 = −1.19 → −1. 푸터 배지가 쓰는 셈과 같다(VersionBadge 의 BADGE_LIFT). */
+                  <span style={{ position: "absolute", left: "100%", top: -1, marginLeft: 3 }}>
+                    <NewBadge />
+                  </span>
+                )}
+              </span>
             </Link>
           );
         })}
@@ -963,10 +983,15 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
               {...intentPrefetch(item.href)}
               className={`hz-nav-item${active ? " hz-nav-active" : ""}`}
               aria-current={active ? "page" : undefined}
+              aria-label={item.isNew ? `${item.label} · 새로 생긴 화면` : undefined}
               style={rowStyle(active)}
             >
               <NavGlyph item={item} size={20} />
-              <span style={{ fontSize: "var(--fs-15)" }}>{item.label}</span>
+              {/* 여기는 행 간격이 12 라 배지를 그냥 두면 라벨에서 떨어져 보인다 — 라벨과 한 묶음으로 5px 만 띄운다. */}
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "var(--fs-15)" }}>
+                {item.label}
+                {item.isNew && <NewBadge />}
+              </span>
             </Link>
           );
         })}
