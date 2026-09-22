@@ -691,11 +691,7 @@ export default async function UsKaderaPage() {
             ))}
           </div>
 
-          {/* ③ 국장으로 건너가는 통로. 두 화면은 형제라 서로 오가는 길이 히어로에 있어야 한다. */}
-          <Link href="/kadera" className="hz-tx-btn" data-ga="cta_click" data-ga-cta="to_kr_kadera" data-ga-surface="us_hero">
-            <Icon name="swap_horiz" style={{ fontSize: "var(--fs-17)" }} />
-            국장 카더라 보기
-          </Link>
+          {/* ③ 국장으로 건너가는 통로는 **머리 오른쪽 도구**로 옮겼다(2026-09-22, AppShell 의 MarketSwap). */}
         </aside>
       </section>
 

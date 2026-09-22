@@ -12,7 +12,7 @@ import { DAILY_PUBLIC, DIVIDEND_PUBLIC, SEOHAK_PUBLIC, THEME_PUBLIC } from "./sc
 import { THEME_NAMES, US_THEME_NAMES, themeHref, usThemeHref } from "@/lib/theme-href";
 
 import { track } from "@/lib/ga";
-import { SLOGAN } from "./brand";
+import { CHANNEL_FORM, SLOGAN } from "./brand";
 import { C, Icon, R } from "./ui";
 import { BetaBadge, LogoLockup } from "./Logo";
 import Footer from "./Footer";
@@ -1107,7 +1107,7 @@ const CURRENCY_PAGES: { prefix: string; fallback: "krw" | "usd" }[] = [
 function ChannelRequest() {
   return (
     <a
-      href="https://forms.gle/PRapNH9rz8YuF2zu9"
+      href={CHANNEL_FORM}
       target="_blank"
       rel="noopener noreferrer"
       className="hz-btn-soft hz-topbar-cta"
@@ -1123,16 +1123,25 @@ function ChannelRequest() {
 }
 
 /**
- * 테마 판세의 **시장 건너가기** — 머리 오른쪽, 다크 모드 단추 왼쪽(2026-09-22). 카더라는 히어로 안에 큰 단추를 두는데
- * 테마 목록은 히어로 넓은 칸이 절반이라 거기 두니 배너처럼 무거웠다. 도구 자리로 올리면 국장·미장 어느 화면에서나 같은 자리다.
- * 부품은 카더라의 '채널 등록 신청'과 같은 것(.hz-btn-soft.hz-topbar-cta) — 폰(≤560)에서는 라벨이 접히고 아이콘만 남는다.
- * 테마 상세(/theme/semiconductor)에서도 보인다. 건너가는 곳은 반대 시장의 **목록**이다 — 반도체의 짝이 미장에 따로 없다.
+ * **시장 건너가기** — 머리 오른쪽, 다크 모드 단추 왼쪽(2026-09-22). 국장↔미장 짝이 있는 두 구역(카더라·테마 판세)이 같이 쓴다.
+ *
+ * 예전엔 두 화면 다 히어로 안에 큰 단추(.hz-tx-btn)를 뒀다. 테마 목록은 히어로 넓은 칸이 절반이라 거기 두니 배너처럼 무거웠고,
+ * 도구 자리로 올리면 **어느 화면에서나 같은 자리**라 오가는 손이 자리를 다시 익히지 않는다. 카더라도 같이 옮겼다.
+ * 부품은 카더라의 '채널 등록 신청'과 같은 것(.hz-btn-soft.hz-topbar-cta) — 폰(≤560)에서는 라벨이 접히고 아이콘만,
+ * ≤900 에서는 도구 줄 자체가 접히므로 그 폭에서는 사이드바 메뉴로 오간다.
+ *
+ * 상세 화면(/theme/semiconductor)에서도 보이고, 건너가는 곳은 반대 시장의 **목록**이다 — 반도체의 짝이 미장에 따로 없다.
  */
-function ThemeMarketSwap({ pathname }: { pathname: string }) {
-  const onUs = pathname === US_THEME_PAGE.href || pathname.startsWith(`${US_THEME_PAGE.href}/`);
-  const to = onUs
-    ? { href: THEME_PAGE.href, label: KR_THEME_SHORT, ga: "to_kr_theme" }
-    : { href: US_THEME_PAGE.href, label: US_THEME_PAGE.short, ga: "to_us_theme" };
+const MARKET_PAIRS: { root: string; us: string; kr: { label: string; ga: string }; usSide: { label: string; ga: string } }[] = [
+  { root: "/kadera", us: "/kadera/us", kr: { label: "국장 카더라", ga: "to_kr_kadera" }, usSide: { label: "미장 카더라", ga: "to_us_kadera" } },
+  { root: THEME_PAGE.href, us: US_THEME_PAGE.href, kr: { label: KR_THEME_SHORT, ga: "to_kr_theme" }, usSide: { label: US_THEME_PAGE.short, ga: "to_us_theme" } },
+];
+
+function MarketSwap({ pathname }: { pathname: string }) {
+  const pair = MARKET_PAIRS.find((m) => pathname === m.root || pathname.startsWith(`${m.root}/`));
+  if (!pair) return null;
+  const onUs = pathname === pair.us || pathname.startsWith(`${pair.us}/`);
+  const to = onUs ? { href: pair.root, ...pair.kr } : { href: pair.us, ...pair.usSide };
   return (
     <Link
       href={to.href}
@@ -1164,9 +1173,12 @@ function PageTools() {
         const page = CURRENCY_PAGES.find((p) => pathname.startsWith(p.prefix));
         return page ? <CurrencyToggle key={page.prefix} fallback={page.fallback} /> : null;
       })()}
-      {pathname.startsWith("/kadera") && <ChannelRequest />}
+      {/* 채널 등록 신청은 **미장 카더라에만** 남는다(2026-09-22). 국장에서는 '채널 파워 랭킹' 카드 머리로 내렸다 —
+          그 카드가 채널을 세는 자리라 신청 단추가 거기 있는 편이 뜻이 맞고, 머리 도구는 건너가기와 다크 모드 둘로 단출해진다.
+          미장 카더라에는 그 카드가 없어 도구 자리에 그대로 둔다. */}
+      {pathname.startsWith("/kadera/us") && <ChannelRequest />}
       {/* 안 연 동안 배포에서는 /theme 가 404 라 단추도 내지 않는다(themeNav — ShellEnv 주석). */}
-      {themeNav && pathname.startsWith(THEME_PAGE.href) && <ThemeMarketSwap pathname={pathname} />}
+      {(themeNav || !pathname.startsWith(THEME_PAGE.href)) && <MarketSwap pathname={pathname} />}
       <ThemeToggle />
     </>
   );

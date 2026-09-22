@@ -34,6 +34,7 @@ import { THEME_PUBLIC } from "../screen-flags";
 import { BOARD_TILES, getMoveReasons, getUpcomingEvents, todayKst } from "@/lib/kadera-why";
 import { EventsCalendar } from "./EventsCalendar";
 import { StockLogo } from "../StockLogo";
+import { CHANNEL_FORM } from "../brand";
 import { SectionHead } from "./SectionHead";
 import { SectionIntro } from "../SectionIntro";
 import { TrendingTabs } from "./TrendingTabs";
@@ -797,11 +798,8 @@ export default async function KaderaPage() {
             ))}
           </div>
 
-          {/* ③ 미장으로 건너가는 통로. 토스 버튼 실측(radius 12 · 회색 5% 바탕)을 따랐다. */}
-          <Link href="/kadera/us" className="hz-tx-btn" data-ga="cta_click" data-ga-cta="to_us_kadera" data-ga-surface="kr_hero">
-            <Icon name="swap_horiz" style={{ fontSize: "var(--fs-17)" }} />
-            미장 카더라 보기
-          </Link>
+          {/* ③ 미장으로 건너가는 통로는 **머리 오른쪽 도구**로 옮겼다(2026-09-22, AppShell 의 MarketSwap).
+              히어로 안의 큰 단추보다 어느 화면에서나 같은 자리인 편이 낫다. */}
         </aside>
       </section>
 
@@ -1405,7 +1403,28 @@ export default async function KaderaPage() {
       {/* ── 채널 파워 랭킹 · 뜨는 채널 (50:50) ───────────────────────── */}
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
         <section className="hz-sheet" style={{ flex: "1 1 calc(50% - 8px)", minWidth: SHEET_PAIR_MIN, display: "flex", flexDirection: "column" }}>
-          <SectionHead level={3} icon="military_tech" title="채널 파워 랭킹" desc="조회율·확산력까지 반영한 채널 영향력" />
+          <SectionHead
+            level={3}
+            icon="military_tech"
+            title="채널 파워 랭킹"
+            desc="조회율·확산력까지 반영한 채널 영향력"
+            /* 채널 등록 신청을 머리 도구에서 여기로 내렸다(2026-09-22) — 채널을 세는 카드가 신청을 받는 자리이기도 하다.
+               알약 꼴은 테마 로테이션 머리의 '테마 자세히 보기'와 같다(.hz-sheet-head-note hz-theme-headpill). */
+            right={
+              <a
+                href={CHANNEL_FORM}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hz-sheet-head-note hz-theme-headpill"
+                data-ga="cta_click"
+                data-ga-cta="register_channel"
+                data-ga-surface="power_rank"
+              >
+                <Icon name="add_circle" style={{ fontSize: "var(--fs-13)" }} />
+                채널 등록 신청
+              </a>
+            }
+          />
           {channels.length === 0 ? (
             <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>아직 채널 점수가 없습니다.</p>
           ) : (

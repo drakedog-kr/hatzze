@@ -23,3 +23,9 @@ export const SLOGAN = "데이터와 여론으로 읽는 시장";
  */
 export const SITE_URL = "https://hatzze.fun";
 export const SITE_NAME = "hatzze";
+
+/**
+ * 채널 등록 신청 폼. 셸의 머리 도구(미장 카더라)와 국장 카더라의 '채널 파워 랭킹' 카드 머리가 같이 쓴다 —
+ * 주소를 두 곳에 손으로 적어 두면 폼을 옮길 때 한쪽만 남는다(2026-09-22).
+ */
+export const CHANNEL_FORM = "https://forms.gle/PRapNH9rz8YuF2zu9";
