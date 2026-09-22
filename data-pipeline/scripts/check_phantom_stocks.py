@@ -73,7 +73,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common import surging  # noqa: E402
-from common.supabase_client import execute_with_retry, get_client  # noqa: E402
+from common.supabase_client import execute_with_retry, get_client, load_window_keyset  # noqa: E402
 from common.timeutil import KST, today_kst  # noqa: E402
 from config.stock_extraction import (  # noqa: E402
     AMBIGUOUS_NAMES,
@@ -108,41 +108,43 @@ def recent_dates(dates: list[str]) -> list[str]:
 
 
 def load_mentions(db, codes: list[str], since: str, until: str) -> dict[str, list[dict]]:
-    """창 안에서 그 종목들이 붙은 메시지(본문 포함). {code: [{channel, text, match}]}"""
+    """창 안에서 그 종목들이 붙은 메시지(본문 포함). {code: [{channel, text, match}]}
+
+    창(posted_at)으로 자른 메시지에 태그를 **inner 임베드**로 붙여 받는다 — 태그가 그 종목들
+    중 하나인 메시지만 오고, 임베드 안도 그 종목들로 좁혀진다. 창 3일에 90행 안팎이라 한 페이지다.
+
+    ⚠️ 전엔 종목의 **전체 기간** 태그를 `in_(코드들)` 로 한 번에 받고 본문을 따로 붙였다.
+       페이징이 없어 PostgREST 1,000행 캡에 걸렸다 — 2026-09-22 카드 6종목의 태그 1,626행 중
+       1,000행만 와서 보령이 창 안 10건인데 5건으로, 동아쏘시오홀딩스·안트로젠은 0건으로 잡혔다
+       (이슈 #541 본문의 "5건 · 복붙 80%"가 그 숫자다. 실제는 10건 · 80%). 잘린 쪽이 유령이면
+       경보가 조용히 안 뜬다. 태그 표는 매일 자라므로 전체 기간 조회는 어느 날이든 다시 잘린다.
+    """
     if not codes:
         return {}
-    tags = execute_with_retry(
-        db.table("telegram_message_stocks")
-        .select("channel_handle,message_id,stock_code,match_text")
-        .in_("stock_code", codes)
-    ).data
-    ids = sorted({t["message_id"] for t in tags})
-    texts: dict[tuple[str, int], dict] = {}
-    for i in range(0, len(ids), 50):
-        rows = execute_with_retry(
-            db.table("telegram_messages")
-            .select("channel_handle,message_id,posted_at,text")
-            .in_("message_id", ids[i : i + 50])
-        ).data
-        for r in rows:
-            texts[(r["channel_handle"], r["message_id"])] = r
-
+    day_after = (datetime.fromisoformat(until) + timedelta(days=1)).date().isoformat()
+    rows = load_window_keyset(
+        db,
+        "telegram_messages",
+        "id,channel_handle,message_id,posted_at,text,telegram_message_stocks!inner(stock_code,match_text)",
+        f"{since}T00:00:00+09:00",
+        narrow=lambda q: q.in_("telegram_message_stocks.stock_code", codes).lt(
+            "posted_at", f"{day_after}T00:00:00+09:00"
+        ),
+    )
     out: dict[str, list[dict]] = defaultdict(list)
-    for t in tags:
-        msg = texts.get((t["channel_handle"], t["message_id"]))
-        if not msg:
-            continue
+    for msg in rows:
         day = datetime.fromisoformat(msg["posted_at"]).astimezone(KST).date().isoformat()
         if not (since <= day <= until):
             continue
-        out[t["stock_code"]].append(
-            {
-                "channel": t["channel_handle"],
-                "match": t["match_text"],
-                "text": msg["text"] or "",
-                "date": day,
-            }
-        )
+        for t in msg.get("telegram_message_stocks") or []:
+            out[t["stock_code"]].append(
+                {
+                    "channel": msg["channel_handle"],
+                    "match": t["match_text"],
+                    "text": msg["text"] or "",
+                    "date": day,
+                }
+            )
     return out
 
 
