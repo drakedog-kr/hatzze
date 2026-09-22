@@ -478,6 +478,24 @@ a.hz-theme-chip:hover { background: var(--tx-btn); }
 /* 글자 링크(‹ 테마 리포트 · 테마 전체 보기 →). 올리면 글자가 진해진다 — 인라인 color 는 :hover 를 이겨서 클래스가 색을 쥔다. */
 .hz-theme-textlink { color: var(--c-sub); transition: color 0.12s ease; }
 .hz-theme-textlink:hover { color: var(--c-ink); }
+/* 카더라 급등 종목·종목 리포트 머리줄의 테마 칩. 14~17px 이름 옆이라 태그보다 한 단 작고, 줄어들지 않는다. */
+.hz-kd-theme-chip {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  font-size: var(--fs-11);
+  font-weight: 600;
+  margin-left: 0;
+}
+/* 오늘의 브리핑 문장 속 테마 이름 — 굵힘과 같은 무게에 점선 밑줄로 눌린다는 것만 더한다. 올리면 파란 잉크. */
+.hz-kd-termlink {
+  font-weight: 800;
+  color: var(--c-ink);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--c-muted);
+  transition: color 0.12s ease;
+}
+.hz-kd-termlink:hover { color: var(--c-cold-ink); text-decoration-color: var(--c-cold-ink); }
 /* 히어로 본문 안의 태그 링크(급부상 종목 · 오르는 테마). 눌리는 태그라 올리면 하늘색. 본문 글줄(14px) 사이라 여백을 조금 키운다. */
 .hz-theme-tag-link {
   margin-left: 0;
