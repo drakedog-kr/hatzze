@@ -203,6 +203,9 @@ export default function Footer() {
         <div style={{ display: "flex", flexWrap: "wrap", gap: "28px 56px" }}>
           <nav aria-label="바로가기">
             <GroupLabel>바로가기</GroupLabel>
+            {/* 두 단(CSS columns). 열 줄을 한 줄로 세우면 오른쪽 묶음이 브랜드 칸 아래로 밀리고 세로로 길었다(2026-09-22).
+                columns 라 위→아래 차례가 사이드바 순서 그대로고, 항목 수가 플래그로 바뀌어도 반씩 나뉜다(mobile.css .hz-foot-nav). */}
+            <div className="hz-foot-nav">
             <FooterLink href="/">시장 브리핑</FooterLink>
             {/* 카더라는 국장·미장 둘로 갈린다. 여기서는 구역 이름("카더라 리포트")이
                 아니라 **갈 수 있는 페이지**를 적는다 — 푸터는 목적지 목록이라, 구역
@@ -235,6 +238,7 @@ export default function Footer() {
             <FooterExternalLink href="https://t.me/hatzze69" cta="community" aria="오늘 뭐래? 텔레그램 채널 열기(새 탭)">
               오늘 뭐래?
             </FooterExternalLink>
+            </div>
           </nav>
           <div>
             <GroupLabel>데이터 출처</GroupLabel>
@@ -247,7 +251,8 @@ export default function Footer() {
               {SOURCE_GROUPS.map((g) => (
                 <div key={g.label}>
                   <div style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: C.label, marginBottom: 3 }}>{g.label}</div>
-                  <div style={{ fontSize: "var(--fs-12)", lineHeight: 1.65, color: C.sub }}>{g.items}</div>
+                  {/* 칸 폭을 180 으로 못박아 긴 목록(증시·시세 넷)은 두 줄로 접힌다 — 한 줄로 두면 출처 묶음이 577px 였다. */}
+                  <div style={{ fontSize: "var(--fs-12)", lineHeight: 1.65, color: C.sub, wordBreak: "keep-all" }}>{g.items}</div>
                 </div>
               ))}
             </div>
