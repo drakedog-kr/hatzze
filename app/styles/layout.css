@@ -560,8 +560,10 @@
     padding-left: 16px;
     padding-right: 16px;
   }
-  /* 이름은 안 줄이고 태그를 아랫줄로 보낸다. */
-  .hz-theme-namerow { flex-wrap: wrap; gap: 3px 0; }
+  /* 이름은 안 줄이고 태그를 아랫줄로 보낸다.
+     ⚠️ 가로 간격을 0 으로 두면 **같은 줄에 남았을 때 태그가 이름에 붙는다**(2026-09-23 지적).
+     태그의 margin-left 를 여기서 걷으므로 간격은 gap 이 맡아야 한다 — 가로 6px 은 넓은 화면과 같은 값이다. */
+  .hz-theme-namerow { flex-wrap: wrap; gap: 3px 6px; }
   .hz-theme-namerow .hz-theme-name { flex-shrink: 0; }
   .hz-theme-namerow .hz-theme-tag { margin-left: 0; }
   .hz-cols-theme-reason {
@@ -569,6 +571,9 @@
     padding-left: 16px;
     padding-right: 16px;
   }
+  /* 일정 줄: 종목과 '몇 곳이 언급'을 첫 줄에 두고 일정 글만 아랫줄로 내린다.
+     ⚠️ 글을 order 없이 두 칸에 걸치면 알약이 셋째 줄로 밀리고, 격자 칸이라 **줄 폭 전부로 늘어난다**
+     (네 글자 알약이 309px 였다, 2026-09-23 지적). 알약은 곁말이라 제 글자 폭만 차지해야 한다. */
   .hz-cols-theme-event {
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 6px 8px;
@@ -577,6 +582,10 @@
   }
   .hz-cols-theme-event > :nth-child(2) {
     grid-column: 1 / -1;
+    order: 3;
+  }
+  .hz-cols-theme-event > :nth-child(3) {
+    justify-self: end;
   }
   /* 폰: 층으로 — 순위 · 이름(종목) · 점유율(조각) / 문장. 한 줄 네 칸을 그대로 두면 이름이 "전력기…"로 잘린다.
      DOM 은 순위·이름·문장·값 순이라 문장(셋째)을 order 로 맨 뒤에 보내고 줄 폭 전부를 준다. */
@@ -632,6 +641,10 @@
   }
   .hz-agenda-day,
   .hz-reason-day-head {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .hz-theme-related {
     padding-left: 16px;
     padding-right: 16px;
   }

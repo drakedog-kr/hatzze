@@ -569,6 +569,40 @@ a.hz-theme-chip:hover { background: var(--tx-btn); }
   background: var(--c-blue-tint);
   color: var(--c-cold-ink);
 }
+/* 그 알약이 서는 칸(테마 화면 맨 아래). 머리 한 줄과 알약 한 묶음, 두 층이다 — 한 줄에 이름표·알약·전체 보기를
+   같이 두면 폰에서 접히는 자리가 제각각이라 배치가 흐트러져 보였다(2026-09-23 지적). */
+.hz-theme-related {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 22px 18px;
+}
+.hz-theme-related-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.hz-theme-related-cap {
+  font-size: var(--fs-12);
+  font-weight: 700;
+  color: var(--c-sub);
+  white-space: nowrap;
+}
+.hz-theme-related-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-12);
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.hz-theme-related-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 /* 작은 숫자들(Fig) — 둘째 칸은 두 칸 격자, 넓은 칸은 한 줄에 셋. */
 .hz-theme-figs {
   display: grid;

@@ -596,21 +596,26 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
         )}
       </section>
 
-      {/* ── 함께 거론되는 테마 ── 같은 글에 같이 나온 테마(많이 같이 나온 순). 머리·설명 없이 한 줄이다(2026-09-21 "심플하게").
+      {/* ── 함께 거론되는 테마 ── 같은 글에 같이 나온 테마(많이 같이 나온 순).
+          이름표·알약·전체 보기를 한 줄에 늘어놓던 때는 폰에서 셋이 제각각 접혀 자리가 흐트러졌다(2026-09-23 지적).
+          머리 한 줄(이름표 · 전체 보기)과 알약 한 묶음, 두 층이다 — 위 '날짜 없이 달·분기만 짚인 일정'과 같은 꼴.
           요약이 아직 없어 같이 나온 테마를 모르면 사전 순서의 앞뒤 넷을 '다른 테마'로 세운다 — 26장이 서로 이어져야 크롤러가 닿는다. */}
       <section className="hz-sheet">
-        <div style={{ padding: "16px 22px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: C.sub, whiteSpace: "nowrap" }}>{relatedThemes.length ? "함께 거론되는 테마" : "다른 테마"}</span>
-          {(relatedThemes.length ? relatedThemes : neighbors).map((t) => (
-            <Link key={t} href={market.themeHref(t)} className="hz-theme-pill">
-              {t}
+        <div className="hz-theme-related">
+          <div className="hz-theme-related-head">
+            <span className="hz-theme-related-cap">{relatedThemes.length ? "함께 거론되는 테마" : "다른 테마"}</span>
+            <Link href={market.indexHref} className="hz-theme-textlink hz-theme-related-all">
+              테마 전체 보기
+              <Icon name="arrow_forward" style={{ fontSize: "var(--fs-16)" }} />
             </Link>
-          ))}
-          <span style={{ flex: 1 }} />
-          <Link href={market.indexHref} className="hz-theme-textlink" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: "var(--fs-12)", fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}>
-            테마 전체 보기
-            <Icon name="arrow_forward" style={{ fontSize: "var(--fs-16)" }} />
-          </Link>
+          </div>
+          <div className="hz-theme-related-pills">
+            {(relatedThemes.length ? relatedThemes : neighbors).map((t) => (
+              <Link key={t} href={market.themeHref(t)} className="hz-theme-pill">
+                {t}
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
     </div>
