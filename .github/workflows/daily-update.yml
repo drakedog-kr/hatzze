@@ -801,15 +801,18 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/generate_us_theme_briefs.py
 
-      # ⭐ 테마 리포트 두 화면도 자료가 쓰인 직후에 비운다(PR #543 의 규칙 그대로). 요약·급부상 이유가 방금 들어갔고,
-      #    이 화면이 읽는 표는 전부 이 앞에서 끝난다. 안 연 동안은 404 라 비워도 데워도 아무 일이 없다 — 여는 날
-      #    이 스텝을 손댈 일이 없게 미리 둔다(app/screen-flags.ts THEME_PUBLIC).
+      # ⭐ 테마 리포트도 자료가 쓰인 직후에 비운다(PR #543 의 규칙 그대로). 요약·급부상 이유가 방금 들어갔고,
+      #    이 화면들이 읽는 표는 전부 이 앞에서 끝난다.
+      # ⭐⭐ **목록 둘만이 아니라 테마 상세 42장까지**다(따옴표 친 두 패턴 = API 의 routes). 목록만 찍던 첫 판은 상세가
+      #    요약을 가장 많이 보여 주는데도 잡 끝 전체 비우기까지 옛 사본이 나갔다(2026-09-23). 패턴은 데우지 않는다 —
+      #    주소가 마흔둘이라 비운 뒤 첫 방문자가 새로 그린다(잡 끝 전체 비우기 때도 상세는 원래 그랬다).
+      # ⚠️ 대괄호는 셸 글롭이라 따옴표를 벗기지 말 것.
       - name: 테마 리포트 화면만 먼저 비우고 데우기
         if: ${{ !cancelled() }}
         continue-on-error: true
         env:
           REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
-        run: bash scripts/revalidate.sh /theme /theme/us
+        run: bash scripts/revalidate.sh /theme /theme/us '/theme/[theme]' '/theme/us/[theme]'
 
 
       # ── KRX 공표 대기 게이트 ─────────────────────────────────────────────
