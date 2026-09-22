@@ -11,6 +11,7 @@ import {
   fetchAllRows,
   getThemeRotation,
   kaderaBaseDate,
+  lastKaderaUpdatedAt,
   windowBefore,
 } from "./telegram-data";
 import { THEMES } from "./stock-themes";
@@ -539,24 +540,16 @@ export function flowStats(flow: (number | null)[]): { streak: number; topDays: n
 }
 
 /**
- * 테마 목록 히어로 '테마 브리핑'의 **최종 업데이트** 시각 — 그 화면 머리 글(테마 요약)이 마지막으로 쓰인 때다.
- * 카더라 히어로와 같은 규칙이다(lib/telegram-data.ts lastKaderaUpdatedAt 주석): 집계 표는 created_at 뿐이라 다시 써도
- * 시각이 안 오르고, 요약 표는 upsert 마다 updated_at 이 오른다. 한 실행이 스물여섯(미장 열여섯) 줄을 쓰므로 최신 날짜
- * 안에서 가장 늦은 줄을 고른다. 요약이 실패한 날은 전 실행 시각에 머문다 — 머리 글이 실제로 낡았다는 뜻이라 감추지 않는다.
- * 국장·미장이 표 이름만 바꿔 같이 쓴다.
+ * 테마 목록 히어로 '테마 브리핑'의 **최종 업데이트** 시각 — 카더라 히어로와 **같은 값**이다(lastKaderaUpdatedAt).
+ *
+ * 테마는 같은 실행에서 카더라 바로 뒤에 쓰이고 같은 수집 자료를 읽는다 — 히어로의 숫자(점유율·순위·변화)는 카더라
+ * 앞 스텝의 집계이고, 급부상 종목은 카더라 총평 뒤 7분쯤에 들어간다. 그러니 두 화면이 한 실행에 다른 시각을 말할
+ * 까닭이 없다. 처음엔 테마 요약 표의 updated_at 을 따로 읽었는데, 요약을 손으로 다시 돌린 날 "오전 3시경 기준"처럼
+ * 정기 실행과 다른 시각이 떠서 다른 화면과 어긋났다(2026-09-23 "다른 페이지들 동일하게"). 국장은 국장 총평,
+ * 미장은 미장 총평의 시각을 쓴다 — 두 카더라 화면이 쓰는 그대로다.
  */
-export async function lastThemeBriefAt(
-  table: "telegram_theme_brief" | "telegram_us_theme_brief" = "telegram_theme_brief",
-): Promise<string | null> {
-  const db = getSupabaseAdmin();
-  const { data, error } = await db
-    .from(table)
-    .select("updated_at")
-    .order("date", { ascending: false })
-    .order("updated_at", { ascending: false })
-    .limit(1);
-  if (error) console.error(`[lastThemeBriefAt] ${table} 의 갱신 시각을 못 읽었습니다`, error);
-  return (data?.[0]?.updated_at as string | undefined) ?? null;
+export function themeUpdatedAt(market: "kr" | "us"): Promise<string | null> {
+  return lastKaderaUpdatedAt(getSupabaseAdmin(), market === "us" ? "telegram_us_daily_brief" : "telegram_daily_brief");
 }
 
 /**

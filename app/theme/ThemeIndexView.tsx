@@ -124,7 +124,7 @@ export function ThemeIndexView({
   themes: ThemeOverview[] | null;
   /** null = 요약 행을 못 읽었다. 이유 없는 줄은 부르는 쪽이 이미 걸렀다. */
   risers: ThemeRiser[] | null;
-  /** 테마 요약이 마지막으로 쓰인 시각(lastThemeBriefAt). null 이면 '최종 업데이트' 줄을 안 그린다. */
+  /** 카더라 화면과 같은 기준 시각(themeUpdatedAt → lastKaderaUpdatedAt). null 이면 '최종 업데이트' 줄을 안 그린다. */
   updatedAt: string | null;
 }) {
   const flowDates = themes?.[0]?.flowDates ?? [];
