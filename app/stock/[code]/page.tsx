@@ -351,7 +351,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
               <>
                 <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
                   <span style={{ fontSize: "var(--fs-12)", color: C.sub }}>
-                    최근 사흘 {d.recentMentions.toLocaleString("ko-KR")}회
+                    최근 3일 {d.recentMentions.toLocaleString("ko-KR")}회
                   </span>
                   {/* ⚠️ "8월 2일부터 30일" 로 적었더니 끝날짜("8월 30일")로 읽혔다.
                       기간은 양끝을 다 적어야 한 가지로만 읽힌다. */}
@@ -368,7 +368,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
 
       {/* ── 왜 움직였나(LLM) ────────────────────────────────────────
           그날 채널이 말한 까닭 한 줄(카더라 '급등 종목'과 같은 표. 이쪽은 **내린 날도 보여준다**).
-          사흘 안의 것만 보여준다 —
+          3일 안의 것만 보여준다 —
           지난주 까닭을 오늘 시세 옆에 두면 다른 날 이야기가 된다. 없는 게 정상이라 없으면 안 그린다. */}
       {why && (
         <section className="hz-sheet">
@@ -474,7 +474,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
               글리프라 머리와 본문에 같은 그림이 두 번 섰고, 무엇보다 ✨ 는 "생성형 AI가 썼다"는
               **고지 표시**다(app/ui.tsx AiMark 머리말). 장식으로 같이 쓰면 그 뜻이 흐려진다.
               확성기는 카더라의 '트렌딩 메시지'와 같은 뜻으로 쓴다 — 채널에서 떠들썩했던 것. */}
-          <SectionHead icon="campaign" title="무엇이 화제였습니까" note="최근 사흘" level={2} />
+          <SectionHead icon="campaign" title="무엇이 화제였습니까" note="최근 3일" level={2} />
           {/* ⚠️ 고지 문구를 **글자로 깔지 않는다.** ✨ 하나가 고지를 품는 것이 이 저장소의
               방식이다(app/ui.tsx AiMark 머리말: 문장마다 한 줄씩 깔면 정작 읽어야 할
               요약보다 고지가 길어진다). 누르거나 마우스를 올리면 문구가 뜨고, 같은

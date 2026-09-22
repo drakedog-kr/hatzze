@@ -108,7 +108,7 @@ export function stockTiles(stocks: ThemeHotStock[]): TreemapTile[] {
     value: s.mentions,
     tone: stockTone(s.mentions, s.usualMentions),
     href: stockHref(s.code),
-    tip: `${s.name} · 최근 사흘 ${s.mentions.toLocaleString("ko-KR")}회 · ${usualDeltaText(s.mentions, s.usualMentions)} · 하루 최다 ${s.channels}곳`,
+    tip: `${s.name} · 최근 3일 ${s.mentions.toLocaleString("ko-KR")}회 · ${usualDeltaText(s.mentions, s.usualMentions)} · 하루 최다 ${s.channels}곳`,
     valueText: `${s.mentions.toLocaleString("ko-KR")}회`,
     deltaText: s.usualMentions === 0 ? "새로 등장" : usualDeltaText(s.mentions, s.usualMentions).replace("평소 대비 ", "").replace(" 언급", ""),
   }));

@@ -75,7 +75,7 @@ export async function generateMetadata({ params }: { params: Promise<{ theme: st
   const meta = await pageMetadata({
     title: `${theme} 테마 텔레그램 언급 | hatzze`,
     description: `${withSubjectParticle(theme)} 주식 텔레그램에서 요즘 어떻게 회자되는지 봅니다.${
-      hot.length ? ` 최근 사흘 말 많은 종목은 ${hot.join("·")}입니다.` : ""
+      hot.length ? ` 최근 3일 말 많은 종목은 ${hot.join("·")}입니다.` : ""
     } 말 많은 종목과 그 이유, 앞으로의 일정을 테마 단위로 읽습니다.`,
     path: themeHref(theme),
     ownImage: KADERA_CARD.alt,
@@ -294,7 +294,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
           <div className="hz-kd-hero-q">
             <div className="hz-kd-hero-title">
               <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>최근 {KADERA_WINDOW_DAYS}일 점유율</span>
-              <HelpTip ga="theme_share" text="점유율은 그날 언급된 전 종목의 주목도 중 이 테마 종목의 몫입니다. 스물여섯 테마를 다 더하면 100%입니다. 변화는 닷새 넘게 이전과 견준 값입니다." />
+              <HelpTip ga="theme_share" text="점유율은 그날 언급된 전 종목의 주목도 중 이 테마 종목의 몫입니다. 스물여섯 테마를 다 더하면 100%입니다. 변화는 5일 넘게 이전과 견준 값입니다." />
             </div>
             {d.loadFailed || d.recentShare == null ? (
               <p style={{ margin: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub, lineHeight: 1.7 }}>
@@ -403,7 +403,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
 
       {/* ── 요즘 무슨 얘기(LLM) ── 이 화면의 본론. 파이프라인이 테마마다 하루 한 번 써 둔다(generate_theme_briefs.py). */}
       <section className="hz-sheet">
-        <SectionHead icon="forum" title="요즘 도는 얘기" note={d.brief ? `${fmtKoDate(d.brief.date)} 기준` : undefined} desc="최근 사흘 채널 글을 읽고 정리한 것입니다." level={2} />
+        <SectionHead icon="forum" title="요즘 도는 얘기" note={d.brief ? `${fmtKoDate(d.brief.date)} 기준` : undefined} desc="최근 3일 채널 글을 읽고 정리한 것입니다." level={2} />
         {d.brief?.brief ? (
           <div style={{ padding: "16px 22px 20px" }}>
             {/* 두 문단(파이프라인이 빈 줄로 가른다). 첫 문단은 가장 크게 오간 이야기, 둘째는 그 밖의 이야기. */}
@@ -424,7 +424,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
             {!d.brief
               ? "이 테마의 요약이 아직 없습니다. 매일 저녁 실행 뒤에 채워집니다."
               : d.brief.messageCount === 0
-                ? "최근 사흘 사이 이 테마 종목이 언급된 글이 없어 요약할 것이 없습니다."
+                ? "최근 3일 사이 이 테마 종목이 언급된 글이 없어 요약할 것이 없습니다."
                 : "이번 요약은 검사에 걸려 싣지 않았습니다. 다음 실행에서 다시 만듭니다."}
           </Empty>
         )}
@@ -438,7 +438,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
           title="이 테마의 주인공"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
           desc="상위 열 종목과 채널이 말한 이유입니다."
-          noteHelp="칸의 크기는 최근 사흘 언급 수이고 색은 평소와 견준 것입니다. 평소는 지난 한 달 하루 평균 언급의 사흘치이고, 평소의 1.5배 이상이면 따뜻한 색, 1.5분의 1 이하면 파랑, 지난 한 달 언급이 없던 종목은 새로 등장으로 칩니다."
+          noteHelp="칸의 크기는 최근 3일 언급 수이고 색은 평소와 견준 것입니다. 평소는 지난 한 달 하루 평균 언급의 3일치이고, 평소의 1.5배 이상이면 따뜻한 색, 1.5분의 1 이하면 파랑, 지난 한 달 언급이 없던 종목은 새로 등장으로 칩니다."
           level={2}
         />
         {d.loadFailed ? (
@@ -567,9 +567,9 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
       {/* ── 발췌 ── 최근 사흘 조회가 많은 글. 카더라 트렌딩 메시지와 같은 패널 격자·말풍선(2026-09-21 "카더라 포맷 따오기") —
           원본이 텔레그램 메시지라 그 매체의 형태를 유지하면 "우리가 센 수치가 아니라 누가 한 말"이 형태만으로 읽힌다. */}
       <section className="hz-sheet">
-        <SectionHead icon="format_quote" title="채널에서 오간 글" note="최근 사흘 · 조회순" desc="이 테마 종목이 언급된 글 중 많이 읽힌 것입니다." level={2} />
+        <SectionHead icon="format_quote" title="채널에서 오간 글" note="최근 3일 · 조회순" desc="이 테마 종목이 언급된 글 중 많이 읽힌 것입니다." level={2} />
         {!d.brief || d.brief.excerpts.length === 0 ? (
-          <Empty>{d.brief ? "최근 사흘 사이 이 테마 종목이 언급된 글을 찾지 못했습니다." : "요약과 함께 매일 저녁 실행 뒤에 채워집니다."}</Empty>
+          <Empty>{d.brief ? "최근 3일 사이 이 테마 종목이 언급된 글을 찾지 못했습니다." : "요약과 함께 매일 저녁 실행 뒤에 채워집니다."}</Empty>
         ) : (
           <ExpandableList
             name="theme_excerpts"

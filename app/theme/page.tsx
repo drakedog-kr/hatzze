@@ -61,8 +61,8 @@ const clip: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", te
 function flowCaption(t: ThemeOverview): { text: string; on: boolean } {
   // 연속 하루째인데 열흘 안에 상위였던 날이 더 있으면 "돌아온" 것이다 — "1일째 상위"는 어색하다.
   if (t.label === "streak") return { text: t.streak === 1 ? "다시 상위" : `${t.streak}일째 상위`, on: true };
-  if (t.label === "new") return { text: t.streak === 1 ? "첫 등장" : "이틀째 상위", on: true };
-  if (t.label === "intermittent") return { text: `열흘 중 ${t.topDays}일 상위`, on: false };
+  if (t.label === "new") return { text: t.streak === 1 ? "첫 등장" : "2일째 상위", on: true };
+  if (t.label === "intermittent") return { text: `10일 중 ${t.topDays}일 상위`, on: false };
   return { text: "상위 밖", on: false };
 }
 
@@ -170,7 +170,7 @@ export default async function ThemeIndexPage() {
   const rising = all.filter((t) => { const st = shareStreak(t); return st.dir > 0 && st.days >= 2; }).sort((a, b) => a.rank - b.rank).slice(0, 4);
   // 타일 셋째·넷째의 대체 잣대까지 정리한 것.
   const tileC = fresh[0]
-    ? { cap: "새로 상위에 오른 테마", t: fresh[0], value: fresh[0].streak === 1 ? "첫 등장" : "이틀째", tone: "var(--c-hot-ink)", sub: fresh.length > 1 ? `그 밖에 ${fresh.slice(1).map((x) => x.theme).join(" · ")}` : `${fresh[0].rank}위 · 점유율 ${fresh[0].sharePct.toFixed(1)}%` }
+    ? { cap: "새로 상위에 오른 테마", t: fresh[0], value: fresh[0].streak === 1 ? "첫 등장" : "2일째", tone: "var(--c-hot-ink)", sub: fresh.length > 1 ? `그 밖에 ${fresh.slice(1).map((x) => x.theme).join(" · ")}` : `${fresh[0].rank}위 · 점유율 ${fresh[0].sharePct.toFixed(1)}%` }
     : dropped[0]
       ? { cap: "상위에서 내려간 테마", t: dropped[0], value: `${dropped[0].rank}위`, tone: "var(--c-cold-ink)", sub: dropped.length > 1 ? `그 밖에 ${dropped.slice(1).map((x) => x.theme).join(" · ")}` : `어제까지 ${THEME_FLOW_TOP}위 안` }
       : climber
@@ -179,7 +179,7 @@ export default async function ThemeIndexPage() {
   const tileD = lasting[0]
     ? { cap: "계속 상위인 테마", t: lasting[0], value: `${lasting[0].streak}일째`, tone: "var(--c-cold-ink)", sub: lasting.length > 1 ? `그 밖에 ${lasting.slice(1).map((x) => `${x.theme} ${x.streak}일째`).join(" · ")}` : `${lasting[0].rank}위 · 점유율 ${lasting[0].sharePct.toFixed(1)}%` }
     : mostTopDays && mostTopDays.topDays > 0
-      ? { cap: `열흘 중 ${THEME_FLOW_TOP}위 안 최다`, t: mostTopDays, value: `${mostTopDays.topDays}일`, tone: "var(--c-cold-ink)", sub: `${mostTopDays.rank}위 · 점유율 ${mostTopDays.sharePct.toFixed(1)}%` }
+      ? { cap: `10일 중 ${THEME_FLOW_TOP}위 안 최다`, t: mostTopDays, value: `${mostTopDays.topDays}일`, tone: "var(--c-cold-ink)", sub: `${mostTopDays.rank}위 · 점유율 ${mostTopDays.sharePct.toFixed(1)}%` }
       : null;
   const tilesA = [
     gainer ? { cap: "가장 늘어난 테마", t: gainer, value: pctp(gainer.shareDelta as number), tone: "var(--c-hot-ink)", sub: `${gainer.rank}위 · 점유율 ${gainer.sharePct.toFixed(1)}%` } : null,
@@ -226,16 +226,16 @@ export default async function ThemeIndexPage() {
             <div className="hz-kd-hero-q">
               <div className="hz-kd-hero-title">
                 <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>관심 변화</span>
-                <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>닷새 전 대비</span>
+                <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>5일 전 대비</span>
               </div>
-              {tilesA.length ? tilesA.map((x) => <HeroFig key={x.cap} x={x} />) : <span style={{ fontSize: "var(--fs-12)", color: C.sub }}>견줄 닷새 전 자료가 없습니다.</span>}
+              {tilesA.length ? tilesA.map((x) => <HeroFig key={x.cap} x={x} />) : <span style={{ fontSize: "var(--fs-12)", color: C.sub }}>견줄 5일 전 자료가 없습니다.</span>}
             </div>
             <div className="hz-kd-hero-q">
               <div className="hz-kd-hero-title">
                 <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>상위권</span>
                 <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>{THEME_FLOW_TOP}위 안 · 최근 {THEME_FLOW_DAYS}일</span>
               </div>
-              {tilesB.length ? tilesB.map((x) => <HeroFig key={x.cap} x={x} />) : <span style={{ fontSize: "var(--fs-12)", color: C.sub }}>열흘 흐름 자료가 없습니다.</span>}
+              {tilesB.length ? tilesB.map((x) => <HeroFig key={x.cap} x={x} />) : <span style={{ fontSize: "var(--fs-12)", color: C.sub }}>10일 흐름 자료가 없습니다.</span>}
             </div>
             <div className="hz-kd-hero-h">
               <div className="hz-kd-hero-title">
@@ -249,7 +249,7 @@ export default async function ThemeIndexPage() {
                     <Link href={themeHref(mover.t.theme)} style={{ color: "inherit", textDecoration: "none" }}>
                       {mover.t.theme}
                     </Link>{" "}
-                    관심이 닷새 전의{" "}
+                    관심이 5일 전의{" "}
                     <em style={{ color: mover.dir > 0 ? "var(--c-hot-ink)" : "var(--c-cold-ink)" }}>
                       {mover.dir > 0 ? `${mover.ratio.toFixed(1)}배` : `${Math.round(mover.ratio * 100)}%`}
                     </em>
@@ -276,7 +276,7 @@ export default async function ThemeIndexPage() {
                   {top[0].shareDelta != null && top[0].shareDelta !== 0 && (
                     <>
                       {" "}
-                      {top[0].theme}는 닷새 전보다 {Math.abs(top[0].shareDelta).toFixed(1)}%p {top[0].shareDelta > 0 ? "늘었고" : "줄었고"}
+                      {top[0].theme}는 5일 전보다 {Math.abs(top[0].shareDelta).toFixed(1)}%p {top[0].shareDelta > 0 ? "늘었고" : "줄었고"}
                       {leadTopDays >= 2 ? ` ${leadTopDays}일째 1위입니다.` : " 1위입니다."}
                     </>
                   )}
@@ -299,7 +299,7 @@ export default async function ThemeIndexPage() {
                 )}
                 {rising.length > 0 && (
                   <p style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 6px" }}>
-                    <span>점유율이 이틀 넘게 오르는 중인 테마는</span>
+                    <span>점유율이 2일 넘게 오르는 중인 테마는</span>
                     {rising.map((t) => (
                       <Link key={t.theme} href={themeHref(t.theme)} className="hz-theme-tag hz-theme-tag-link is-up-1">
                         {t.theme}
@@ -320,8 +320,8 @@ export default async function ThemeIndexPage() {
           icon="grid_view"
           title="테마 점유율 지도"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
-          desc="칸이 클수록 최근 사흘 언급이 많은 테마입니다. 누르면 그 테마 화면으로 갑니다."
-          noteHelp="칸의 넓이는 최근 사흘 언급 점유율입니다. 색은 닷새 넘게 이전과 견준 변화로, 따뜻한 색이 늘어난 테마, 파랑이 줄어든 테마입니다. 사전 밖 종목(기타)은 지도에 없습니다."
+          desc="칸이 클수록 최근 3일 언급이 많은 테마입니다. 누르면 해당 테마 상세 페이지로 갑니다."
+          noteHelp="칸의 넓이는 최근 3일 언급 점유율입니다. 색은 5일 넘게 이전과 견준 변화로, 따뜻한 색이 늘어난 테마, 파랑이 줄어든 테마입니다. 사전 밖 종목(기타)은 지도에 없습니다."
           level={2}
         />
         {themes === null ? (
@@ -433,7 +433,7 @@ export default async function ThemeIndexPage() {
               <span style={{ textAlign: "right" }}>점유율 · 최근 {flowDates.length || THEME_FLOW_DAYS}일</span>
             </div>
             {/* 한 줄에 테마 하나(2026-09-19 "한 열에 한 테마씩"). 네 칸 — 순위 · 이름과 변화(아래 말 많은 종목 셋) ·
-                ✨ 문장(남는 폭 전부) · 점유율과 열흘 한 조각(세로로). 왼쪽 두 줄(이름/종목)과 오른쪽 두 줄(점유율/조각)이
+                ✨ 문장(남는 폭 전부) · 점유율과 10일 한 조각(세로로). 왼쪽 두 줄(이름/종목)과 오른쪽 두 줄(점유율/조각)이
                 같은 키라 줄이 반듯하고, 문장이 가운데 폭을 다 써서 넓은 화면에서도 빈 자리가 없다.
                 열 줄만 먼저 보이고 나머지는 '더 보기'로 펼친다(26줄을 한 번에 세우면 벽이 된다). */}
             <div>
