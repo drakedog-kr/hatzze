@@ -61,7 +61,7 @@
      처음엔 1149 에서 끊었는데(까닭이 22~30자일 때 800 화면 실측), 까닭이 50~90자가 되자 1150~1300 에서
      칸이 174~324px 라 세 줄 클램프에 잘렸다(2026-09-21 실측). 1440 이면 칸이 464px 라 두 줄에 들어간다. */
   .hz-cols-theme-riser {
-    grid-template-columns: 130px minmax(0, 1fr) 84px 160px;
+    grid-template-columns: 130px minmax(0, 1fr) 96px;
     gap: 6px 16px;
   }
   .hz-cols-theme-riser > :nth-child(3) {
@@ -583,7 +583,6 @@
     grid-column: 1 / -1;
     order: 4;
   }
-  .hz-cols-theme-riser > :nth-child(5),
   .hz-thead.hz-cols-theme-riser > :nth-child(3) {
     display: none;
   }

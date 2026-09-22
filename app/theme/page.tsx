@@ -25,7 +25,7 @@ import { DeltaPp, Highlight, Pill, RankBadge } from "../kadera/parts";
 import { SectionHead } from "../kadera/SectionHead";
 import { AiMark, C, MONO } from "../ui";
 import { THEME_PAGE } from "./copy";
-import { Treemap, TreemapLegend, themeTiles } from "./Treemap";
+import { Treemap, TreemapLegend, stockTone, themeTiles } from "./Treemap";
 
 /**
  * 테마 목록(`/theme`) — 위에 **점유율 지도**(트리맵), 아래에 **열흘 흐름** 표.
@@ -84,9 +84,9 @@ function Flow({ t }: { t: ThemeOverview }) {
 const FLOW_ROWS = 10;
 
 
-/** 배수 글자. 새로 등장이면 그 말을, 아니면 "2.1배". */
+/** 태그 글자. 새로 등장이면 그 말을, 아니면 "앞 사흘 대비 2.1배"(후보는 1.5배 이상뿐이라 '배'가 손해로 읽힐 일이 없다). */
 function riserDelta(r: ThemeRiser): string {
-  return r.ratio === null ? "새로 등장" : `${r.ratio.toFixed(1)}배`;
+  return r.ratio === null ? "새로 등장" : `앞 사흘 대비 ${r.ratio.toFixed(1)}배`;
 }
 
 export default async function ThemeIndexPage() {
@@ -169,7 +169,6 @@ export default async function ThemeIndexPage() {
               <span>테마</span>
               <span>종목</span>
               <span>채널이 말한 까닭</span>
-              <span style={{ textAlign: "right" }}>앞 사흘 대비</span>
               <span style={{ textAlign: "right" }}>최근 {KADERA_WINDOW_DAYS}일 언급</span>
             </div>
             <div>
@@ -178,9 +177,14 @@ export default async function ThemeIndexPage() {
                     <Link href={themeHref(r.theme)} className="hz-stock-link" style={{ ...clip, minWidth: 0, fontSize: "var(--fs-13)", fontWeight: 700 }}>
                       {r.theme}
                     </Link>
-                    <Link href={stockHref(r.code)} className="hz-stock-link" style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                      <StockLogo code={r.code} name={r.name} market={r.market} size={22} />
-                      <span style={{ ...clip, fontSize: "var(--fs-13-5)", fontWeight: 800, letterSpacing: "-.01em" }}>{r.name}</span>
+                    {/* 종목 + 앞 사흘 대비 태그(테마 화면 '이 테마의 주인공'과 같은 태그·같은 색 단계). 예전엔 배수를 파란 알약으로
+                        따로 세웠는데, 이 저장소에서 파랑은 '줄었다'라 늘어난 종목에 파란 알약이 어긋났다(2026-09-22). */}
+                    <Link href={stockHref(r.code)} className="hz-stock-link" style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
+                      <StockLogo code={r.code} name={r.name} market={r.market} size={26} />
+                      <span className="hz-theme-namerow">
+                        <span className="hz-theme-name" style={{ ...clip, fontSize: "var(--fs-13-5)", fontWeight: 800, letterSpacing: "-.01em" }}>{r.name}</span>
+                        <span className={`hz-theme-tag ${stockTone(r.recent, r.prior)}`}>{riserDelta(r)}</span>
+                      </span>
                     </Link>
                     {/* 까닭(LLM 50~90자, ✨ 고지). 카더라 카드의 한 줄(22~30자)보다 길다 — 이 칸은 줄 폭을 다
                         가져서 넓은 화면은 한 줄, 1000px 는 두 줄이다. 없으면 그 사정을 적는다(빈 칸은 줄 높이가 흔들린다). */}
@@ -190,12 +194,12 @@ export default async function ThemeIndexPage() {
                         {r.reason ?? "채널에서 까닭을 말한 곳이 없습니다."}
                       </span>
                     </span>
-                    <span style={{ textAlign: "right" }}>
-                      <Pill tone={r.ratio === null ? "hot" : "blue"}>{riserDelta(r)}</Pill>
-                    </span>
-                    <span style={{ textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-13)", fontWeight: 800, color: C.ink, whiteSpace: "nowrap" }}>
-                      {r.recent.toLocaleString("ko-KR")}회
-                      <span style={{ fontWeight: 600, color: C.sub2, marginLeft: 6 }}>앞 사흘 {r.prior.toLocaleString("ko-KR")}회</span>
+                    {/* 언급 수 위, 앞 사흘 수 아래 — 테마 흐름·주인공 표의 오른쪽 두 줄과 같은 꼴. */}
+                    <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
+                      <span style={{ fontFamily: MONO, fontSize: "var(--fs-14)", fontWeight: 800, letterSpacing: "-.02em", color: C.ink, whiteSpace: "nowrap" }}>
+                        {r.recent.toLocaleString("ko-KR")}회
+                      </span>
+                      <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>앞 사흘 {r.prior.toLocaleString("ko-KR")}회</span>
                     </span>
                   </div>
               ))}
