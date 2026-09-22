@@ -292,7 +292,8 @@ export function ThemeIndexView({
                     {risers.slice(0, 3).map((r) => (
                       <a key={r.code} href={`#riser-${r.code}`} className="hz-theme-tag hz-theme-tag-link">
                         {r.name}
-                        <span style={{ fontWeight: 500, color: C.sub2, marginLeft: 4 }}>{r.theme}</span>
+                        {/* 곁말(테마)은 종목 이름보다 흐리되 C.sub2 는 다크에서 태그 바탕 위 4.01 이라 AA 미달이었다(2026-09-22 실측) — 한 단 진한 C.label. */}
+                        <span style={{ fontWeight: 500, color: C.label, marginLeft: 4 }}>{r.theme}</span>
                       </a>
                     ))}
                     <span>{risers.length > 3 ? `등 ${risers.length}종목입니다.` : "입니다."}</span>
