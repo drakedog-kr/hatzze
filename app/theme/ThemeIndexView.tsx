@@ -83,7 +83,9 @@ function Flow({ t }: { t: ThemeOverview }) {
   );
 }
 
-/** 히어로 회색 타일 안의 한 항목 — 이름표 · 테마(링크) + 값 · 곁말. 테마 화면 히어로의 Fig 와 같은 눈금(값 15/800, 이름표 11). */
+/** 히어로 회색 타일 안의 한 항목 — 이름표 · 테마(링크) + 값 · 곁말. 테마 화면 히어로의 Fig 와 같은 눈금(값 15/800, 이름표 11).
+ *  이름표는 "가장 늘어난"이 아니라 **"가장 많이 늘어난"** 이다 — '가장' 뒤에 동사만 오면 한국어로 어색하다(2026-09-22).
+ *  카더라의 '가장 많이 유입'·'가장 많이 이탈'과 같은 말투다. 11자까지는 230px 타일에서 한 줄에 선다. */
 type HeroFigData = { cap: string; t: ThemeOverview; value: string; tone: string; sub: string };
 function HeroFig({ x, market }: { x: HeroFigData; market: ThemeMarket }) {
   return (
@@ -168,7 +170,7 @@ export function ThemeIndexView({
   const tileC = freshPick
     ? { cap: "새로 상위에 오른 테마", t: freshPick, value: freshPick.streak === 1 ? "첫 등장" : "2일째", tone: "var(--c-hot-ink)", sub: fresh.length > 1 ? `그 밖에 ${fresh.filter((x) => x !== freshPick).map((x) => x.theme).join(" · ")}` : `${freshPick.rank}위 · 점유율 ${freshPick.sharePct.toFixed(1)}%` }
     : climberPick
-      ? { cap: "순위가 가장 오른 테마", t: climberPick, value: `▲${climberPick.rankChange}계단`, tone: "var(--c-hot-ink)", sub: `${climberPick.rank}위 · 점유율 ${climberPick.sharePct.toFixed(1)}%` }
+      ? { cap: "순위가 가장 많이 오른 테마", t: climberPick, value: `▲${climberPick.rankChange}계단`, tone: "var(--c-hot-ink)", sub: `${climberPick.rank}위 · 점유율 ${climberPick.sharePct.toFixed(1)}%` }
       : null;
   // 둘째 줄은 첫째 줄과 **같은 테마를 안 쓴다** — 한 칸에 같은 이름이 두 번 서면 둘 중 하나는 빈 줄과 같다.
   const usedTheme = tileC?.t.theme;
@@ -181,8 +183,8 @@ export function ThemeIndexView({
       ? { cap: "가장 많이 오르내린 테마", t: swinger.t, value: `${swinger.span}계단`, tone: "var(--c-cold-ink)", sub: `최고 ${swinger.best}위 · 최저 ${swinger.worst}위` }
       : null;
   const tilesA = [
-    gainer ? { cap: "가장 늘어난 테마", t: gainer, value: pctp(gainer.shareDelta as number), tone: "var(--c-hot-ink)", sub: `${gainer.rank}위 · 점유율 ${gainer.sharePct.toFixed(1)}%` } : null,
-    loser ? { cap: "가장 줄어든 테마", t: loser, value: pctp(loser.shareDelta as number), tone: "var(--c-cold-ink)", sub: `${loser.rank}위 · 점유율 ${loser.sharePct.toFixed(1)}%` } : null,
+    gainer ? { cap: "가장 많이 늘어난 테마", t: gainer, value: pctp(gainer.shareDelta as number), tone: "var(--c-hot-ink)", sub: `${gainer.rank}위 · 점유율 ${gainer.sharePct.toFixed(1)}%` } : null,
+    loser ? { cap: "가장 많이 줄어든 테마", t: loser, value: pctp(loser.shareDelta as number), tone: "var(--c-cold-ink)", sub: `${loser.rank}위 · 점유율 ${loser.sharePct.toFixed(1)}%` } : null,
   ].filter((x): x is NonNullable<typeof x> => x !== null);
   const tilesB = [tileC, tileD].filter((x): x is NonNullable<typeof x> => x !== null);
   // 1위 테마가 며칠째 1위인가(집계 있는 날만, 마지막 날부터). 히어로 문장의 곁말.
@@ -216,7 +218,7 @@ export function ThemeIndexView({
   return (
     <div className="hz-tx">
       {/* ── 히어로 ── 다른 화면(테마 상세·내부자·미리보기)과 같은 1:1:2 판(.hz-kd-hero): 회색 타일 둘 + 넓은 흰 칸.
-          타일 하나는 관심 변화(가장 늘어난·가장 줄어든), 다른 하나는 상위권의 문(들어온 테마·밀려난 테마, 없으면 대체 잣대),
+          타일 하나는 관심 변화(가장 많이 늘어난·가장 많이 줄어든), 다른 하나는 상위권의 문(들어온 테마·밀려난 테마, 없으면 대체 잣대),
           넓은 칸은 이 화면의 첫 문장과 아래 세 카드의 요약 한 줄씩. 처음엔 지도 머리의 설명 자리에 작게 있었고,
           그다음 카더라식 2열 판이었다(2026-09-22 "다른 히어로 포맷과 같게"). */}
       {top.length >= 2 && (
