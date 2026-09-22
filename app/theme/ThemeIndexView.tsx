@@ -65,17 +65,20 @@ function shareStreak(t: ThemeOverview): { dir: 1 | -1 | 0; days: number } {
 function Flow({ t }: { t: ThemeOverview }) {
   const cap = flowCaption(t);
   const streak = shareStreak(t);
-  const title = `최근 ${t.flowDates.length}일 순위 ${t.flow.map((r, i) => `${fmtKoDate(t.flowDates[i])} ${r == null ? "집계 없음" : `${r}위`}`).join(" · ")}`;
+  // 방향(며칠째 오르는·내리는 중)은 줄에 글자로 적지 않고 **알약 앞 화살표 한 자**로 준다. 글자로 적던 때는 오른쪽 칸이
+  // 점유율 · 방향 · 지속 알약 세 줄이 되어 "복잡해 보인다"였고(2026-09-22), 그 전엔 한 줄에 붙여 두느라 왼쪽 칸 글자와 겹쳤다.
+  // 며칠째인지는 줄 전체 툴팁이 말한다. 이틀 이상 이어질 때만 — 하루짜리까지 찍으면 열 줄이 다 화살표다.
+  const dirOn = streak.days >= 2 && streak.dir !== 0;
+  const dirText = dirOn ? `점유율 ${streak.days}일째 ${streak.dir > 0 ? "오르는 중" : "내리는 중"}` : "";
+  const title = `${dirOn ? `${dirText} · ` : ""}최근 ${t.flowDates.length}일 순위 ${t.flow.map((r, i) => `${fmtKoDate(t.flowDates[i])} ${r == null ? "집계 없음" : `${r}위`}`).join(" · ")}`;
   return (
-    /* 칸(124px)보다 넓어지면 줄을 바꿔 오른쪽에 쌓는다 — nowrap 이던 때는 "2일째 오르는 중"과 알약이 한 줄로 171px 이 되어
-       **왼쪽 칸(요즘 도는 얘기)의 글자 위로 넘쳤다**(2026-09-22 지적). 칸을 넓히는 대신 접는 이유는 열 줄이 다 같은 폭이어야
-       오른쪽 끝이 반듯해서다. */
     <span title={title} className="hz-theme-flow">
-      {/* 상위권 지속(알약) 옆에 점유율 방향 — 테마 화면의 "n일째 · 오르는 중"과 같은 말(2026-09-22). 이틀 이상 이어질 때만 —
-          하루짜리까지 적으면 열 줄이 다 "1일째"라 말이 안 된다. */}
-      {streak.days >= 2 && (
-        <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, whiteSpace: "nowrap", color: streak.dir > 0 ? "var(--c-hot-ink)" : "var(--c-cold-ink)" }}>
-          {streak.days}일째 {streak.dir > 0 ? "오르는 중" : "내리는 중"}
+      {dirOn && (
+        <span
+          aria-label={dirText}
+          style={{ fontSize: "var(--fs-11)", fontWeight: 800, lineHeight: 1, whiteSpace: "nowrap", color: streak.dir > 0 ? "var(--c-hot-ink)" : "var(--c-cold-ink)" }}
+        >
+          {streak.dir > 0 ? "▲" : "▼"}
         </span>
       )}
       <Pill tone={cap.on ? "blue" : "plain"}>{cap.text}</Pill>
