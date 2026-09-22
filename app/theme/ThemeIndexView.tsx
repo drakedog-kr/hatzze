@@ -65,13 +65,19 @@ function shareStreak(t: ThemeOverview): { dir: 1 | -1 | 0; days: number } {
 function Flow({ t }: { t: ThemeOverview }) {
   const cap = flowCaption(t);
   const streak = shareStreak(t);
-  // 점유율이 며칠째 같은 방향인지는 **줄에 안 적는다**(2026-09-22). 세 판을 거쳤다 — "2일째 오르는 중"을 알약 옆에 두니
-  // 칸(124px)을 넘어 왼쪽 글자와 겹쳤고, 접으니 오른쪽 칸이 세 줄이라 복잡했고, 화살표 한 자로 줄이니 무슨 뜻인지 알 수 없었다.
-  // 방향은 이미 이름 옆 ▲n.n%p 가 말하고(5일 전 대비), 며칠째인지는 이 줄의 툴팁과 테마 화면 히어로에 있다.
-  const dirText = streak.days >= 2 && streak.dir !== 0 ? `점유율 ${streak.days}일째 ${streak.dir > 0 ? "오르는 중" : "내리는 중"} · ` : "";
-  const title = `${dirText}최근 ${t.flowDates.length}일 순위 ${t.flow.map((r, i) => `${fmtKoDate(t.flowDates[i])} ${r == null ? "집계 없음" : `${r}위`}`).join(" · ")}`;
+  // 점유율 방향("2일째 오르는 중")과 지속 알약을 **한 줄에** 둔다. 칸이 좁던 때는 이 둘이 172px 이라 124px 칸을 넘어
+  // 왼쪽 글자와 겹쳤고(2026-09-22), 접으면 세 줄, 화살표로 줄이면 뜻이 안 읽혔다. 그래서 칸을 176px 로 넓혔다 —
+  // 그만큼 가운데 문장 칸이 줄지만(minmax(0,1fr)) 세 판을 거쳐 고른 답이다(kadera.css .hz-cols-theme-list).
+  // 이틀 이상 이어질 때만 적는다 — 하루짜리까지 적으면 열 줄이 다 "1일째"라 말이 안 된다.
+  const dirOn = streak.days >= 2 && streak.dir !== 0;
+  const title = `${dirOn ? `점유율 ${streak.days}일째 ${streak.dir > 0 ? "오르는 중" : "내리는 중"} · ` : ""}최근 ${t.flowDates.length}일 순위 ${t.flow.map((r, i) => `${fmtKoDate(t.flowDates[i])} ${r == null ? "집계 없음" : `${r}위`}`).join(" · ")}`;
   return (
     <span title={title} className="hz-theme-flow">
+      {dirOn && (
+        <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, whiteSpace: "nowrap", color: streak.dir > 0 ? "var(--c-hot-ink)" : "var(--c-cold-ink)" }}>
+          {streak.days}일째 {streak.dir > 0 ? "오르는 중" : "내리는 중"}
+        </span>
+      )}
       <Pill tone={cap.on ? "blue" : "plain"}>{cap.text}</Pill>
     </span>
   );
