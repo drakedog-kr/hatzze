@@ -168,7 +168,7 @@ export function Hero({
               햇쩨 지수
               <span
                 className="hz-tip hz-tip-wide hz-tip-below"
-                data-tip="시장·감성 지표 25개의 과열도를 가중 평균한 값입니다. 지표마다 신호의 무게가 달라 다른 가중치로 합산합니다. 25·50·75를 경계로 저온·상온·고온·초고온이 나뉩니다."
+                data-tip="지표 25개 가중 평균"
                 data-ga-tip="hatzze_index"
                 style={{ display: "inline-flex", cursor: "help" }}
               >

@@ -478,14 +478,37 @@ a.hz-theme-chip:hover { background: var(--tx-btn); }
 /* 글자 링크(‹ 테마 리포트 · 테마 전체 보기 →). 올리면 글자가 진해진다 — 인라인 color 는 :hover 를 이겨서 클래스가 색을 쥔다. */
 .hz-theme-textlink { color: var(--c-sub); transition: color 0.12s ease; }
 .hz-theme-textlink:hover { color: var(--c-ink); }
-/* 카더라 급등 종목·종목 리포트 머리줄의 테마 칩. 14~17px 이름 옆이라 태그보다 한 단 작고, 줄어들지 않는다. */
-.hz-kd-theme-chip {
+/* 카더라 급등 종목·종목 리포트 머리줄의 테마 칩. 14~17px 이름 옆이라 태그보다 한 단 작고, 줄어들지 않는다.
+   ⚠️ 회색 타일(--tx-tile) 위라 회색 칩 바탕(--c-chip)은 안 보인다(2026-09-22 "디자인이 없다") — 하늘색 틴트 + 파란 글자로,
+   이 화면에서 '누르면 다른 곳으로'를 뜻하는 색이다. 올리면 한 단 진하게. */
+.hz-theme-tag.hz-kd-theme-chip {
   flex-shrink: 0;
-  padding: 2px 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
   font-size: var(--fs-11);
-  font-weight: 600;
+  font-weight: 700;
   margin-left: 0;
+  background: var(--c-blue-tint);
+  color: var(--c-cold-ink); /* ⚠️ 특이도를 둘로 — 아래 .hz-theme-tag-link 의 잉크색이 뒤에서 이겼다. */
 }
+.hz-theme-tag.hz-kd-theme-chip:hover { background: var(--c-blue-5); color: var(--c-cold-ink); }
+/* 테마 로테이션 머리의 '테마 리포트 →' 알약 — 기간 알약(.hz-sheet-head-note)과 같은 꼴, 링크라 올리면 하늘색. */
+.hz-theme-headpill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--fs-11);
+  font-weight: 700;
+  color: var(--c-sub);
+  border-radius: 999px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.hz-theme-headpill:hover { background: var(--c-blue-tint); color: var(--c-cold-ink); }
+/* 테마 로테이션 줄을 올리면 바탕이 하늘색(--c-blue-tint)이 되는데 막대의 빈 트랙(--c-track #eef3f9)이 그 색과 한 톤이라 막대가
+   사라져 보였다(2026-09-22 지적). 올린 줄에서는 트랙을 잉크 8% 로 — 어느 바탕에서든 한 단 어둡다. */
+.hz-trow:hover .hz-bar { background: color-mix(in srgb, var(--c-ink) 8%, transparent); }
 /* 오늘의 브리핑 문장 속 테마 이름 — 굵힘과 같은 무게에 점선 밑줄로 눌린다는 것만 더한다. 올리면 파란 잉크. */
 .hz-kd-termlink {
   font-weight: 800;

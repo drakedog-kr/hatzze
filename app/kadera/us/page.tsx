@@ -593,7 +593,7 @@ export default async function UsKaderaPage() {
                       중립 {sentiment.neutral}% 제외 후 환산
                       <span
                         className="hz-tip hz-tip-wide"
-                        data-tip="메시지를 비관/중립/낙관으로 나눈 뒤, 중립을 뺀 비관↔낙관 비율입니다. 시황·공시 같은 담담한 글이 절반이라, 같이 세면 늘 비관으로 기웁니다."
+                        data-tip="중립 뺀 낙관·비관 비율"
                         data-ga-tip="us_sentiment_ratio"
                         style={{ display: "inline-flex", cursor: "help", flexShrink: 0, alignSelf: "center" }}
                       >
@@ -941,7 +941,7 @@ export default async function UsKaderaPage() {
           title="급등 종목"
           note={why?.rows[0]?.sessionDate ? fmtKoDate(why.rows[0].sessionDate) : undefined}
           desc="직전 미국장에서 오른 종목과 커뮤니티가 말한 이유"
-          noteHelp="커뮤니티가 미국 종목을 두고 한 말에서 이유를 한 줄로 옮깁니다. 확인된 사실이 아니라 오간 이야기입니다. 등락률은 직전 미국장 종가 기준입니다."
+          noteHelp="채널이 말한 이유"
         />
         {whyFailed ? (
           <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>이유를 불러오지 못했습니다.</p>
@@ -1009,7 +1009,7 @@ export default async function UsKaderaPage() {
             icon="donut_small"
             title="테마 로테이션"
             note="3일 vs 이전"
-            noteHelp="최근 3일 평균 점유율을 그 이전과 비교합니다. 하루치끼리 재면 표본 얇은 날에 크게 요동쳐서, 며칠씩 묶어서 봅니다. 점유율의 분모는 테마 사전에 든 종목의 언급이라 열 줄 밖까지 다 더하면 100%가 됩니다."
+            noteHelp="최근 3일과 그 전 비교"
             /* ⚠️ 짧게 둔다. 옆 이슈 키워드의 설명(20자)보다 길면 좁은 폭에서 이쪽만
                두 줄이 되고, 그 순간 머리가 18.8px 커져 **아래 열 줄이 통째로 밀린다**
                (실측 1280·1366). 자세한 설명은 위 noteHelp 툴팁이 맡는다. */
@@ -1693,7 +1693,7 @@ export default async function UsKaderaPage() {
           title="다가오는 일정"
           note="앞으로 5주"
           desc="커뮤니티에서 날짜를 짚어 말한 미국 종목 일정"
-          noteHelp="커뮤니티 글에서 '언제 무엇이 있다'고 적힌 것을 모았습니다. 확정 일정은 공시로 확인하십시오."
+          noteHelp="확정은 공시로 확인"
         />
         {eventsFailed ? (
           <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>일정을 불러오지 못했습니다.</p>
@@ -1725,7 +1725,7 @@ export default async function UsKaderaPage() {
             icon="podcasts"
             title="미장을 많이 다루는 채널"
             note="최근 30일"
-            noteHelp="30일에 100건 넘게 쓴 채널만 셉니다. 글이 몇 건뿐인 채널은 비중이 크게 흔들립니다."
+            noteHelp="30일 100건 이상 채널만"
             desc="그 채널이 쓴 글 중 미장 종목을 말한 글의 비중"
           />
           {channels.length === 0 ? (

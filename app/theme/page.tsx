@@ -5,9 +5,6 @@ import { notFound } from "next/navigation";
 import { KADERA_WINDOW_DAYS } from "@/lib/telegram-data";
 import { fmtKoDate, stockHref } from "@/lib/stock-page";
 import {
-  RISER_MAX,
-  RISER_MIN_MENTIONS,
-  RISER_MIN_RATIO,
   THEME_FLOW_DAYS,
   THEME_FLOW_TOP,
   THEME_NAMES,
@@ -321,7 +318,7 @@ export default async function ThemeIndexPage() {
           title="테마 점유율 지도"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
           desc="칸이 클수록 최근 3일 언급이 많은 테마입니다. 누르면 해당 테마 상세 페이지로 갑니다."
-          noteHelp="칸의 넓이는 최근 3일 언급 점유율입니다. 색은 5일 넘게 이전과 견준 변화로, 따뜻한 색이 늘어난 테마, 파랑이 줄어든 테마입니다. 사전 밖 종목(기타)은 지도에 없습니다."
+          noteHelp="넓이는 점유율 · 색은 변화"
           level={2}
         />
         {themes === null ? (
@@ -355,7 +352,7 @@ export default async function ThemeIndexPage() {
           title="테마별 급부상 종목"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
           desc="테마마다 3일 전 대비 언급이 크게 늘어난 종목 하나와 요즘 도는 얘기입니다."
-          noteHelp={`배수는 최근 ${KADERA_WINDOW_DAYS}일 언급을 그 전 ${KADERA_WINDOW_DAYS}일 언급으로 나눈 값입니다. 최근 ${KADERA_WINDOW_DAYS}일 언급이 ${RISER_MIN_MENTIONS}회 미만이거나 ${RISER_MIN_RATIO}배에 못 미치는 종목은 세지 않고, 그 전 ${KADERA_WINDOW_DAYS}일에 한 번도 언급되지 않았던 종목은 '새로 등장'으로 맨 앞에 섭니다. 채널이 이유를 말하지 않은 종목(등락률 목록에만 오른 것)은 싣지 않습니다. 많아야 ${RISER_MAX}줄입니다.`}
+          noteHelp="최근 3일 ÷ 그 전 3일"
           level={2}
         />
         {risers === null ? (
@@ -415,7 +412,7 @@ export default async function ThemeIndexPage() {
           title="테마 흐름"
           note={flowDates.length ? `${fmtKoDate(flowDates[0])} ~ ${fmtKoDate(flowDates[flowDates.length - 1])}` : `최근 ${THEME_FLOW_DAYS}일`}
           desc="점유율 상위 10개 테마와 각 테마에서 요즘 도는 얘기입니다."
-          noteHelp={`점유율은 최근 ${KADERA_WINDOW_DAYS}일 평균이고 분모는 테마 사전에 든 종목의 언급이라 스물여섯 줄을 다 더하면 100%가 됩니다. 막대는 날마다의 점유율이고 그 아래 글은 ${THEME_FLOW_TOP}위 안에 며칠째 드는지입니다. 집계가 있는 날만 세어 주말이 빠질 수 있습니다.`}
+          noteHelp="최근 3일 평균 점유율"
           level={2}
         />
         {themes === null ? (

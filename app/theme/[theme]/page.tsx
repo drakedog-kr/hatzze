@@ -438,7 +438,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
           title="이 테마의 주인공"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
           desc="상위 열 종목과 채널이 말한 이유입니다."
-          noteHelp="칸의 크기는 최근 3일 언급 수이고 색은 평소와 견준 것입니다. 평소는 지난 한 달 하루 평균 언급의 3일치이고, 평소의 1.5배 이상이면 따뜻한 색, 1.5분의 1 이하면 파랑, 지난 한 달 언급이 없던 종목은 새로 등장으로 칩니다."
+          noteHelp="넓이는 언급 · 색은 평소"
           level={2}
         />
         {d.loadFailed ? (
@@ -512,7 +512,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
           </>
         ) : (
           /* 머리는 ReasonWeeks 안에서 그린다 — 오른쪽 알약이 보고 있는 주의 날짜다. */
-          <ReasonWeeks rows={d.reasons} latest={d.baseDate} earliest={trendFrom ?? addDaysISO(d.baseDate, -THEME_TREND_DAYS)} today={today} trendDays={THEME_TREND_DAYS} />
+          <ReasonWeeks rows={d.reasons} latest={d.baseDate} earliest={trendFrom ?? addDaysISO(d.baseDate, -THEME_TREND_DAYS)} today={today} />
         )}
       </section>
 
@@ -524,7 +524,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
           title="다가오는 일정"
           note="앞으로 5주"
           desc="채널이 날짜를 짚어 말한 이 테마 종목의 일정입니다. 확정 일정은 공시로 확인하십시오."
-          noteHelp="같은 일정을 두고 채널마다 날짜가 갈리기도 합니다. 날짜 없이 달이나 분기만 짚인 것은 달력에 놓을 칸이 없어 아래에 따로 적습니다."
+          noteHelp="확정은 공시로 확인"
           level={2}
         />
         {dayEvents.length === 0 ? (

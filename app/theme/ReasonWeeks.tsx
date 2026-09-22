@@ -45,14 +45,11 @@ export function ReasonWeeks({
   latest,
   earliest,
   today,
-  trendDays,
 }: {
   rows: ThemeReasonRow[];
   latest: string;
   earliest: string;
   today: string;
-  /** 도움말에 적는 "최근 n일". lib/theme-page.ts THEME_TREND_DAYS. */
-  trendDays: number;
 }) {
   // 몇 주 전을 보고 있나. 0 = 기준일까지의 이레.
   const [back, setBack] = useState(0);
@@ -87,7 +84,7 @@ export function ReasonWeeks({
         title="등락의 이유"
         note={`${fmtKo(start)} ~ ${fmtKo(end)}`}
         desc="이 테마 종목이 크게 움직인 날, 그날 채널이 말한 이유입니다."
-        noteHelp={`기준일에서 거슬러 7일씩 봅니다(달력의 주가 아닙니다). 아래 단추로 7일씩 넘기고 최근 ${trendDays}일까지 거슬러 갑니다.`}
+        noteHelp="7일씩 · 최근 30일까지"
         level={2}
       />
       {days.length === 0 ? (

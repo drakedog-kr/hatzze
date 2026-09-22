@@ -92,7 +92,7 @@ export function GoalBox({
           목표까지
           <span
             className="hz-tip hz-tip-wide dv-help"
-            data-tip="지금 담은 종목의 비율(배당수익률)이 그대로 가고, 받은 배당은 다시 담고, 주가와 배당은 지금과 같다고 보고 셉니다."
+            data-tip="지금 비율·재투자 가정"
             style={{ cursor: "help" }}
             aria-label="목표까지 셈법"
           >

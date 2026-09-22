@@ -732,7 +732,7 @@ export default async function KaderaPage() {
                       중립 {sentiment.neutral}% 제외 후 환산
                       <span
                         className="hz-tip hz-tip-wide"
-                        data-tip="메시지를 비관/중립/낙관으로 나눈 뒤, 중립을 뺀 비관↔낙관 비율입니다. 시황·공시 같은 담담한 글이 절반이라, 같이 세면 늘 비관으로 기웁니다."
+                        data-tip="중립 뺀 낙관·비관 비율"
                         data-ga-tip="sentiment_ratio"
                         style={{ display: "inline-flex", cursor: "help", flexShrink: 0, alignSelf: "center" }}
                       >
@@ -970,7 +970,7 @@ export default async function KaderaPage() {
           title="급등 종목"
           note={why ? fmtKoDate(why.date) : undefined}
           desc="그날 오른 종목과 커뮤니티가 말한 이유"
-          noteHelp="그날 오른 종목에 커뮤니티가 말한 이유를 한 줄로 옮깁니다. 확인된 사실이 아니라 오간 이야기입니다. 등락률은 그날 종가 기준입니다."
+          noteHelp="채널이 말한 이유"
         />
         {whyFailed ? (
           <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>이유를 불러오지 못했습니다.</p>
@@ -1058,7 +1058,7 @@ export default async function KaderaPage() {
             title={
               <>
                 테마 로테이션
-                <span className="hz-tip hz-tip-wide hz-kd-title-help" data-tip="최근 3일 평균 점유율을 그 이전과 비교합니다. 하루치끼리 재면 표본 얇은 날에 크게 요동쳐서, 며칠씩 묶어서 봅니다. 점유율의 분모는 테마 사전에 든 종목의 언급이라 열 줄 밖까지 다 더하면 100%가 됩니다. 줄을 누르면 그 테마 리포트로 갑니다." data-ga-tip="테마 로테이션" style={{ cursor: "help", marginLeft: 5, verticalAlign: "middle" }} aria-label="테마 로테이션 셈법">
+                <span className="hz-tip hz-tip-wide hz-kd-title-help" data-tip="최근 3일과 그 전 비교" data-ga-tip="테마 로테이션" style={{ cursor: "help", marginLeft: 5, verticalAlign: "middle" }} aria-label="테마 로테이션 셈법">
                   <Icon name="help" style={{ fontSize: "var(--fs-13)", color: C.muted }} />
                 </span>
               </>
@@ -1067,9 +1067,10 @@ export default async function KaderaPage() {
             desc="관심이 어느 테마로 옮겨가는지 · 점유율 변화 기준"
             right={
               THEME_LINKS ? (
-                <Link href="/theme" className="hz-theme-textlink" style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: "var(--fs-12)", fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}>
+                /* 기간 알약과 같은 자리·같은 꼴의 알약(2026-09-22 Hun). 눌리는 것이라 올리면 하늘색(.hz-theme-headpill). */
+                <Link href="/theme" className="hz-sheet-head-note hz-theme-headpill">
                   테마 리포트
-                  <Icon name="arrow_forward" style={{ fontSize: "var(--fs-15)" }} />
+                  <Icon name="arrow_forward" style={{ fontSize: "var(--fs-13)" }} />
                 </Link>
               ) : undefined
             }
@@ -1381,7 +1382,7 @@ export default async function KaderaPage() {
           title="다가오는 일정"
           note="앞으로 5주"
           desc="커뮤니티에서 날짜를 짚어 말한 일정"
-          noteHelp="커뮤니티 글에서 '언제 무엇이 있다'고 적힌 것을 모았습니다. 확정 일정은 공시로 확인하십시오."
+          noteHelp="확정은 공시로 확인"
         />
         {eventsFailed ? (
           <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>일정을 불러오지 못했습니다.</p>
@@ -1417,7 +1418,7 @@ export default async function KaderaPage() {
                 <span style={{ textAlign: "right" }}>순위 변동</span>
                 <span
                   className="hz-tip hz-tip-wide hz-tip-end"
-                  data-tip="조회율·포워드율·구독자 규모·게시 빈도를 합쳐 52~100으로 낸 점수입니다. 구독자만 많고 안 읽히는 채널은 낮게 나옵니다. ▲▼ 는 3일 전 순위와 견준 것입니다."
+                  data-tip="조회·전달·규모 합산"
                   data-ga-tip="influence_score"
                   style={{ display: "inline-flex", alignItems: "center", justifyContent: "flex-end", gap: 3, cursor: "help" }}
                 >

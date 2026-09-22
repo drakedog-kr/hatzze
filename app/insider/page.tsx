@@ -7,7 +7,7 @@ import Link from "next/link";
 import { SectionHead } from "../kadera/SectionHead";
 import { TapHint } from "./TapHint";
 import { insiderListHref } from "./lists";
-import { Empty, GroupTitle, Money, T, addRows, congressRows, execRows, fmtDate, holderRowsView, hotRowsView, analystTopRows, insiderNote, managerAumRows, quarterLabel, trimRows } from "./parts";
+import { Empty, GroupTitle, Money, T, addRows, congressRows, execRows, fmtDate, holderRowsView, hotRowsView, analystTopRows, insiderNote, managerAumRows, trimRows } from "./parts";
 import { INSIDER_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { C, Icon, MONO } from "../ui";
@@ -514,7 +514,7 @@ export default async function InsiderPage() {
           icon="groups"
           title="운용자산이 큰 순"
           note={insiderNote("managers", ov)}
-          noteHelp="13F가 신고하는 미국 상장주만 셉니다. 채권·현금·해외 주식은 빠집니다."
+          noteHelp="미국 상장주만 집계"
           desc="이름을 누르면 그 사람이 무엇을 들고 있는지 봅니다."
         />
         {ov.managerRanks.length === 0 ? (
@@ -538,7 +538,7 @@ export default async function InsiderPage() {
           icon="reviews"
           title="증권가가 긍정적으로 보는 종목"
           note={insiderNote("analyst", ov)}
-          noteHelp="stockanalysis.com이 싣는 S&P Global 집계입니다. 적극 매수를 낸 애널리스트가 많은 순입니다."
+          noteHelp="S&P Global 집계"
           desc={`등급을 낸 애널리스트가 ${RANK_MIN_ANALYSTS}명 이상인 종목만 세웁니다.`}
         />
         {ov.analystTop.length === 0 ? (
@@ -559,7 +559,7 @@ export default async function InsiderPage() {
           icon="account_balance_wallet"
           title="임원이 신고한 매매"
           note={insiderNote("exec", ov)}
-          noteHelp="옵션 행사에 딸린 매도가 섞입니다. 금액은 처분만 더한 값입니다."
+          noteHelp="옵션 행사 매도 포함"
           desc="종목으로 묶어 금액이 큰 순입니다. 장내 매수는 파랗게 적었습니다."
         />
         {ov.buys.length === 0 ? (
@@ -578,7 +578,7 @@ export default async function InsiderPage() {
           icon="account_balance"
           title="미 하원의원이 사고판 것"
           note={insiderNote("congress", ov)}
-          noteHelp="금액은 구간으로만 신고돼 건수로 적었습니다. 신고까지 최대 45일 걸립니다."
+          noteHelp="금액은 구간 신고"
           desc="카더라 밖 종목까지 보고, 여러 의원이 건드린 순입니다."
         />
         {ov.congressTickers.length === 0 ? (
@@ -602,7 +602,7 @@ export default async function InsiderPage() {
           icon="local_fire_department"
           title="커뮤니티에서 뜨거운 종목"
           note={insiderNote("hot", ov)}
-          noteHelp={`언급은 하루치, 임원 신고는 최근 ${ov.windowDays}일입니다. 시점이 다릅니다.`}
+          noteHelp="언급·신고 시점 다름"
           desc="주식 텔레그램에서 가장 많이 회자된 미장 종목입니다."
         />
         {ov.rows.length === 0 ? (
@@ -623,9 +623,7 @@ export default async function InsiderPage() {
           icon="inventory_2"
           title="월가 거물이 들고 있는 종목"
           note={insiderNote("holders", ov)}
-          noteHelp={`분기말 기준이라 지금과 다를 수 있습니다${
-            ov.managerQuarters.length > 0 ? ` (기준 ${ov.managerQuarters.map(quarterLabel).join(" · ")})` : ""
-          }.`}
+          noteHelp="분기말 기준"
           desc="카더라에 오른 종목을 거물 몇 명이 들고 있는지 봅니다."
         />
         {holderAll.length === 0 ? (
