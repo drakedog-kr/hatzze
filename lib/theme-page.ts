@@ -63,7 +63,7 @@ export const THEME_TREND_DAYS = 30;
 export const THEME_REASON_DAYS = THEME_TREND_DAYS;
 
 // 주소 만들기·되돌리기는 lib/theme-href.ts 에 있다(셸도 읽어야 해서 server-only 밖이다).
-export { THEME_NAMES, themeFromParam, themeHref } from "./theme-href";
+export { THEME_NAMES, themeFromParam, themeHref, themeSlug } from "./theme-href";
 
 export type ThemeMember = { code: string; name: string; market: string | null };
 

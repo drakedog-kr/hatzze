@@ -1069,7 +1069,7 @@ export default async function KaderaPage() {
               THEME_LINKS ? (
                 /* 기간 알약과 같은 자리·같은 꼴의 알약(2026-09-22 Hun). 눌리는 것이라 올리면 하늘색(.hz-theme-headpill). */
                 <Link href="/theme" className="hz-sheet-head-note hz-theme-headpill">
-                  테마 리포트
+                  테마 자세히 보기
                   <Icon name="arrow_forward" style={{ fontSize: "var(--fs-13)" }} />
                 </Link>
               ) : undefined

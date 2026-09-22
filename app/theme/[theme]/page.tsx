@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Fragment } from "react";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 
 import { assertLoaded } from "@/lib/load-state";
 import { withSubjectParticle, withTopicParticle } from "@/lib/format";
@@ -14,6 +14,7 @@ import {
   getThemePage,
   themeFromParam,
   themeHref,
+  themeSlug,
   type ThemeTrendPoint,
 } from "@/lib/theme-page";
 
@@ -183,6 +184,8 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
   const theme = themeFromParam(raw);
   // 사전에 없는 이름은 조회 없이 404 다. 조회 실패와 섞이지 않는다.
   if (!theme) notFound();
+  // 옛 꼴(한글 이름)로 들어오면 슬러그 주소로 영구 이동 — 주소는 하나여야 한다(lib/theme-href.ts).
+  if (raw !== themeSlug(theme)) permanentRedirect(themeHref(theme));
   const d = await getThemePage(theme);
   // ⚠️ notFound() 앞에서 던진다 — 조회가 5xx 로 죽은 것을 404 로 굳히지 않는다(종목 화면과 같다).
   assertLoaded("/theme/[theme]");
