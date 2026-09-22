@@ -7,7 +7,7 @@ import { THEME_FLOW_DAYS, THEME_FLOW_TOP, type ThemeOverview, type ThemeRiser } 
 import { StockLogo } from "../StockLogo";
 import { DeltaPp, Pill, RankBadge } from "../kadera/parts";
 import { SectionHead } from "../kadera/SectionHead";
-import { AiMark, C, MONO } from "../ui";
+import { AiMark, C, Icon, MONO } from "../ui";
 import type { ThemeMarket } from "./market";
 import { Treemap, TreemapLegend, stockTone, themeTiles } from "./Treemap";
 
@@ -393,7 +393,9 @@ export function ThemeIndexView({
           title="테마 흐름"
           note={flowDates.length ? `${fmtKoDate(flowDates[0])} ~ ${fmtKoDate(flowDates[flowDates.length - 1])}` : `최근 ${THEME_FLOW_DAYS}일`}
           desc="점유율 상위 10개 테마와 각 테마에서 요즘 도는 얘기입니다."
-          noteHelp="최근 3일 평균 점유율"
+          /* 알약이 든 날짜는 **오른쪽 칸 알약이 세는 열흘**이다. 도움말이 "최근 3일 평균 점유율"이라 날짜와 딴 말을 하고 있었다
+             (2026-09-22 지적) — 점유율 셈법은 그 숫자가 선 열 머리로 옮겼다. */
+          noteHelp="순위를 센 10일"
           level={2}
         />
         {themes === null ? (
@@ -408,7 +410,16 @@ export function ThemeIndexView({
               <span>#</span>
               <span>테마 · 말 많은 종목</span>
               <span>요즘 도는 얘기</span>
-              <span style={{ textAlign: "right" }}>점유율 · 최근 {flowDates.length || THEME_FLOW_DAYS}일</span>
+              {/* 이 칸에 두 값이 선다 — 점유율(최근 3일 평균)과 열흘 한 조각. 셈법은 여기서 한 번 말한다(머리 알약은 날짜만). */}
+              <span
+                className="hz-tip hz-tip-wide hz-tip-end"
+                data-tip="점유율은 최근 3일 평균"
+                data-ga-tip="theme_flow_share"
+                style={{ display: "inline-flex", alignItems: "center", justifyContent: "flex-end", gap: 3, cursor: "help" }}
+              >
+                점유율 · 최근 {flowDates.length || THEME_FLOW_DAYS}일
+                <Icon name="help" style={{ fontSize: "var(--fs-12)", color: C.muted }} />
+              </span>
             </div>
             {/* 한 줄에 테마 하나(2026-09-19 "한 열에 한 테마씩"). 네 칸 — 순위 · 이름과 변화(아래 말 많은 종목 셋) ·
                 ✨ 문장(남는 폭 전부) · 점유율과 10일 한 조각(세로로). 왼쪽 두 줄(이름/종목)과 오른쪽 두 줄(점유율/조각)이
