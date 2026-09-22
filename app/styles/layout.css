@@ -561,8 +561,12 @@
      DOM 은 순위·이름·문장·값 순이라 문장(셋째)을 order 로 맨 뒤에 보내고 줄 폭 전부를 준다. */
   .hz-cols-theme-list {
     grid-template-columns: 24px minmax(0, 1fr) auto;
-    gap: 8px 10px;
     padding: 13px 16px;
+  }
+  /* 넓은 화면의 36px(kadera.css, 같은 겹 선택자)을 폰에서 되돌린다 — 선택자 특이도를 맞춰야 이긴다. */
+  .hz-trow.hz-cols-theme-list,
+  .hz-thead.hz-cols-theme-list {
+    gap: 8px 10px;
   }
   .hz-cols-theme-list > :nth-child(3) {
     grid-column: 2 / -1;
