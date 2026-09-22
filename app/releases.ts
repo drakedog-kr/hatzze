@@ -29,6 +29,12 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 추출 규칙 하나가 늘어 카드 구성이 달라질 뿐 쓰는 법은 그대로다. Patch.
+    version: "1.18.3",
+    date: "2026-09-22",
+    changes: ["카더라 급부상이 지명으로 쓰인 보령(LNG 터미널 소재지)을 종목 보령으로 세지 않습니다."],
+  },
+  {
     version: "1.18.2",
     date: "2026-09-21",
     changes: [
