@@ -237,6 +237,28 @@
   gap: 7px;
   min-width: 0;
 }
+/* 테마 목록 히어로 '테마 브리핑' 머리: 제목 · 기준 시각. 카더라 '오늘의 브리핑' 눈썹 줄과 같은 꼴이고, 폭이 모자라면 같은 식으로
+   기준 시각을 **아랫줄로** 내린다(tx.css ≤560 의 .hz-tx-eyebrow). ⚠️ 한 줄에 묶어 두면 320px 에서 기준 시각(261px)이 줄을
+   15px 넘고 제목이 12px 로 눌렸다(2026-09-23 실측). 공용 .hz-kd-hero-title 의 height 24 는 여기서만 min-height 로 푼다 —
+   안 풀면 접힌 둘째 줄이 상자 밖으로 샌다. 한 줄로 서는 넓은 화면에선 24 그대로라 옆 두 칸의 머리와 높이가 맞는다. */
+.hz-kd-hero-title.hz-theme-brief-head {
+  height: auto;
+  min-height: 24px;
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+.hz-theme-brief-head > :first-child {
+  flex-shrink: 0;
+}
+.hz-theme-brief-when {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--fs-12);
+  font-weight: 500;
+  color: var(--c-sub);
+  white-space: nowrap;
+}
 
 /* 채널 표 두 벌의 열 너비. **인라인이 아니라 여기 두는 이유**는 폰에서 열을 접어야
    하기 때문이다 — 인라인 style 은 미디어쿼리를 이겨서, 인라인으로 두면 아래 @media 가

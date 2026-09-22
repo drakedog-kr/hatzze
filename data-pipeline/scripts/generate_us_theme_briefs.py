@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import sys
 from collections import Counter, defaultdict
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -34,6 +35,7 @@ from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.supabase_client import get_client, load_all  # noqa: E402
+from common.timeutil import KST  # noqa: E402
 from common.us_theme_risers import us_theme_risers  # noqa: E402
 from config.us_stock_themes import US_THEMES  # noqa: E402
 
@@ -218,6 +220,8 @@ def main() -> None:
                                 "reason": TB.write_riser_reason(ask_with, US_RISER_SYSTEM, digest_of.get(r["code"]), r["name"])}
                 print(f"  [{theme} · {r['name']}] {row['riser']['reason'] or '(이유 없음)'}")
             if not no_save:
+                # updated_at 을 직접 넣는다 — 국장 짝(generate_theme_briefs.py)의 같은 자리 주석.
+                row["updated_at"] = datetime.now(KST).isoformat()
                 db.table(TABLE).upsert(row, on_conflict="date,theme").execute()
                 saved += 1
             if row["brief"]:

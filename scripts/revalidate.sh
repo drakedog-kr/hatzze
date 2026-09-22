@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 #
 # 화면 사본(ISR)과 그 아래 fetch 데이터 캐시를 비우고, 비운 곳을 한 번씩 열어 데운다.
-# 파이프라인(.github/workflows/daily-update.yml)이 여섯 자리에서 부른다 — 화면마다 자료가
+# 파이프라인(.github/workflows/daily-update.yml)이 일곱 자리에서 부른다 — 화면마다 자료가
 # 쓰인 직후에 그 화면만, 그리고 맨 끝에 전부.
 #
 #   bash scripts/revalidate.sh                    전체 — 루트 레이아웃 아래 전부
 #   bash scripts/revalidate.sh /kadera /kadera/us 찍은 경로만
+#   bash scripts/revalidate.sh /theme '/theme/[theme]'
+#                                                 대괄호가 든 인자는 라우트 패턴이다 — 그 꼴의 화면 전부를 비운다
+#                                                 (API 의 routes). ⚠️ 셸이 글롭으로 풀지 않게 따옴표로 감쌀 것.
+#                                                 패턴은 데우지 않는다 — 주소가 수십이라 다음 방문자가 그린다.
 #
 # 왜 비우나. 안 부르면 루트 레이아웃의 revalidate(3600초 · 카더라 1800)가 스스로 새로
 # 그릴 때까지 최대 한 시간 옛 사본이 나가고, 그 사이 아무도 안 온 화면은 다음 첫
@@ -36,14 +40,17 @@ fi
 
 body=""
 if [ "$#" -gt 0 ]; then
-  warm=("$@")
+  warm=()
   # 경로는 이 저장소가 적는 문자열뿐이라 따옴표 섞일 일이 없다. jq 없이 만든다.
-  sep=""
+  # 대괄호가 든 인자는 라우트 패턴(routes), 나머지는 literal 경로(paths)다. 패턴은 데울 주소가 아니다.
+  paths_json=""; routes_json=""; psep=""; rsep=""
   for p in "$@"; do
-    body="${body}${sep}\"${p}\""
-    sep=","
+    case "$p" in
+      *"["*) routes_json="${routes_json}${rsep}\"${p}\""; rsep="," ;;
+      *)     paths_json="${paths_json}${psep}\"${p}\""; psep=","; warm+=("$p") ;;
+    esac
   done
-  body="{\"paths\":[${body}]}"
+  body="{\"paths\":[${paths_json}],\"routes\":[${routes_json}]}"
 else
   warm=("${DEFAULT_WARM[@]}")
 fi
@@ -61,10 +68,11 @@ if [ "$code" != "200" ]; then
   echo "::warning::화면 사본 비우기가 $code 로 끝났습니다 — 한 시간 안에 스스로 새로 그립니다(카더라 30분)"
   exit 0
 fi
-echo "화면 사본을 비웠습니다: ${warm[*]}"
+echo "화면 사본을 비웠습니다: ${*:-전체}"
 
 # 비운 직후 첫 방문자가 서버 렌더를 기다리지 않도록 여기서 한 번씩 연다. 5xx 면 10초 뒤 두 번 더.
-for path in "${warm[@]}"; do
+# 패턴만 넘기면 warm 이 비어 있다. `${warm[@]+…}` 는 빈 배열을 set -u 에 걸리지 않게 푼다(macOS 의 bash 3.2).
+for path in ${warm[@]+"${warm[@]}"}; do
   for attempt in 1 2 3; do
     status=$(curl -sS -o /dev/null -w '%{http_code}' "$BASE$path" || echo "000")
     echo "$path → $status (시도 $attempt)"

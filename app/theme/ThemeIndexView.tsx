@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { KADERA_WINDOW_DAYS } from "@/lib/telegram-data";
+import { formatKstUpdate } from "@/lib/format";
 import { fmtKoDate } from "@/lib/stock-page";
 import { THEME_FLOW_DAYS, THEME_FLOW_TOP, type ThemeOverview, type ThemeRiser } from "@/lib/theme-page";
 
@@ -116,12 +117,15 @@ export function ThemeIndexView({
   market,
   themes,
   risers,
+  updatedAt,
 }: {
   market: ThemeMarket;
   /** null = 집계를 못 읽었다. */
   themes: ThemeOverview[] | null;
   /** null = 요약 행을 못 읽었다. 이유 없는 줄은 부르는 쪽이 이미 걸렀다. */
   risers: ThemeRiser[] | null;
+  /** 테마 요약이 마지막으로 쓰인 시각(lastThemeBriefAt). null 이면 '최종 업데이트' 줄을 안 그린다. */
+  updatedAt: string | null;
 }) {
   const flowDates = themes?.[0]?.flowDates ?? [];
   const top = themes?.slice(0, 3) ?? [];
@@ -239,10 +243,19 @@ export function ThemeIndexView({
               {tilesB.length ? tilesB.map((x) => <HeroFig key={x.cap} x={x} market={market} />) : <span style={{ fontSize: "var(--fs-12)", color: C.sub }}>10일 흐름 자료가 없습니다.</span>}
             </div>
             <div className="hz-kd-hero-h">
-              <div className="hz-kd-hero-title">
+              <div className="hz-kd-hero-title hz-theme-brief-head">
                 <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>테마 브리핑</span>
                 <span style={{ flex: 1 }} />
-                <span style={{ fontSize: "var(--fs-11)", color: C.muted, whiteSpace: "nowrap" }}>최근 {KADERA_WINDOW_DAYS}일 · {market.themeNames.length}개 테마</span>
+                {/* 기준 시각 — 카더라 '오늘의 브리핑' 눈썹 줄과 같은 꼴(아이콘 · 글자 크기 · 굵기). "최근 3일 · 26개 테마"였는데
+                    기간은 지도·표 머리가 이미 적고 있어 이 자리를 언제 쓰인 글인지로 바꿨다(2026-09-23).
+                    formatKstUpdate 가 "… 기준"으로 끝난다 — 또 붙이면 "기준 기준".
+                    생김새는 클래스에 둔다(kadera.css .hz-theme-brief-when) — 폰에서 글자를 줄여야 하는데 인라인은 미디어쿼리를 이긴다. */}
+                {updatedAt && (
+                  <span className="hz-theme-brief-when">
+                    <Icon name="schedule" style={{ fontSize: "var(--fs-14)", color: C.muted }} />
+                    최종 업데이트 · {formatKstUpdate(updatedAt)}
+                  </span>
+                )}
               </div>
               <h2 className="hz-tx-hero-title" style={{ margin: 0 }}>
                 {mover ? (
