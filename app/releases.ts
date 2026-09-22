@@ -29,6 +29,12 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 보이는 글은 그대로고 닿는 시각만 당긴다. Patch.
+    version: "1.18.4",
+    date: "2026-09-22",
+    changes: ["시장 브리핑과 카더라의 새 내용이 제때 올라옵니다."],
+  },
+  {
     // 추출 규칙 하나가 늘어 카드 구성이 달라질 뿐 쓰는 법은 그대로다. Patch.
     version: "1.18.3",
     date: "2026-09-22",
