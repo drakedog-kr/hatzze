@@ -136,28 +136,67 @@ function LibertyIcon({ size = 20 }: { size?: number }) {
 }
 
 /**
- * 테마 리포트의 국장·미장 서브 아이콘 — 원화·달러 기호. 카더라 서브(태극·여신상)와 같은 그림을 쓰면 사이드바에 같은
- * 짝이 두 번 서서 어느 구역인지 안 갈렸다(2026-09-22). 통화 기호는 시장을 한 글자로 말하고, 국기 문양과 결이 달라
- * 두 짝이 한눈에 갈린다. Material Symbols 엔 원 기호가 없어(달러는 attach_money 가 있다) 둘 다 같은 굵기로 직접 그린다 —
- * 한쪽만 폰트에서 가져오면 굵기·끝처리가 어긋난다. 획 1.8 · 둥근 끝, 사이드바의 다른 Material 아이콘(weight 400)과 같은 무게다.
- * ⚠️ 원 기호의 가로줄 둘은 18px 에서 사이가 2px 남짓이라 더 붙이면 한 줄로 뭉친다(y 10 · 14.5). 줄은 W 안쪽에 둬야 잉크가
- * 달러와 비슷하다 — W 밖까지 뻗으면 18px 에서 원화만 검은 덩어리로 보였다(첫 시안).
+ * 테마 리포트의 국장·미장 서브 아이콘 — **태극기의 건곤감리**와 **엠파이어 스테이트 빌딩**(2026-09-22).
+ * 카더라 서브(태극·여신상)와 같은 '나라 상징' 결이지만 그림이 다르다. 첫 시안은 원화·달러 기호였고, 그 앞 후보
+ * (지도·무궁화/별·한옥/돔·글자 타일·해/달)는 scratchpad 시안 페이지에서 18px 로 견줘 보고 접었다.
+ *
+ * 건곤감리는 **태극기 자리 그대로**다 — 건(☰) 왼쪽 위 · 감(☵) 오른쪽 위 · 리(☲) 왼쪽 아래 · 곤(☷) 오른쪽 아래.
+ * 막대는 국기처럼 가운데를 향한 대각선에 **직각**으로 기울였다(건·곤 −45° · 감·리 +45°). 2×2 로 바로 세운 변형은
+ * 18px 에서 '메뉴' 아이콘 넷을 쌓은 것처럼 보였고, 기울인 쪽이 태극기 귀퉁이로 읽혔다. 태극(가운데)은 없다 —
+ * 그건 국장 카더라의 몫이고, 여기 넣으면 그 크기에서 회색 얼룩이 된다(KrTaegukIcon 주석).
+ *
+ * 둘 다 여신상과 같은 BLEED 장치로 1.2배 크게 그린다(LibertyIcon 주석의 이유) — 막대 셋과 좁은 첨탑은 잉크가
+ * 얇아 같은 상자에 그리면 옆 아이콘보다 작아 보였다(시안 A vs C). 막대 굵기 1.5 · 피치 2.7 · 끊긴 막대 틈 1.3 —
+ * 더 굵히면(1.9) 막대가 아니라 점이 된다(시안 D).
  */
-function KrWonIcon({ size = 20 }: { size?: number }) {
+const THEME_GLYPH_BLEED = 1.2;
+
+function KrTrigramsIcon({ size = 20 }: { size?: number }) {
+  const draw = Math.round(size * THEME_GLYPH_BLEED);
+  const pull = (draw - size) / 2;
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ display: "block", flexShrink: 0 }}>
-      <path d="M4.5 5 L8 19.5 L12 9 L16 19.5 L19.5 5" />
-      <path d="M5 10 H19" />
-      <path d="M5.8 14.5 H18.2" />
+    <svg width={draw} height={draw} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" style={{ display: "block", flexShrink: 0, margin: -pull }}>
+      {/* 건 ☰ · 왼쪽 위 */}
+      <g transform="rotate(-45 5.7 5.7)">
+        <path d="M2.00 3.00 H9.40" />
+        <path d="M2.00 5.70 H9.40" />
+        <path d="M2.00 8.40 H9.40" />
+      </g>
+      {/* 감 ☵ · 오른쪽 위 */}
+      <g transform="rotate(45 18.3 5.7)">
+        <path d="M14.60 3.00 H17.65" />
+        <path d="M18.95 3.00 H22.00" />
+        <path d="M14.60 5.70 H22.00" />
+        <path d="M14.60 8.40 H17.65" />
+        <path d="M18.95 8.40 H22.00" />
+      </g>
+      {/* 리 ☲ · 왼쪽 아래 */}
+      <g transform="rotate(45 5.7 18.3)">
+        <path d="M2.00 15.60 H9.40" />
+        <path d="M2.00 18.30 H5.05" />
+        <path d="M6.35 18.30 H9.40" />
+        <path d="M2.00 21.00 H9.40" />
+      </g>
+      {/* 곤 ☷ · 오른쪽 아래 */}
+      <g transform="rotate(-45 18.3 18.3)">
+        <path d="M14.60 15.60 H17.65" />
+        <path d="M18.95 15.60 H22.00" />
+        <path d="M14.60 18.30 H17.65" />
+        <path d="M18.95 18.30 H22.00" />
+        <path d="M14.60 21.00 H17.65" />
+        <path d="M18.95 21.00 H22.00" />
+      </g>
     </svg>
   );
 }
 
-function UsDollarIcon({ size = 20 }: { size?: number }) {
+/** 엠파이어 스테이트 빌딩 — 좌우 대칭 실루엣(첨탑 · 관 · 몸통 · 두 번의 후퇴 · 기단). 창은 18px 에서 안 보여 안 그린다. */
+function UsEmpireIcon({ size = 20 }: { size?: number }) {
+  const draw = Math.round(size * THEME_GLYPH_BLEED);
+  const pull = (draw - size) / 2;
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ display: "block", flexShrink: 0 }}>
-      <path d="M12 2.5 V21.5" />
-      <path d="M16.6 7.6 C16.6 5.6 14.6 4.6 12 4.6 C9.3 4.6 7.4 6 7.4 8.1 C7.4 10.1 9.4 10.9 12 11.5 C14.7 12.1 16.7 13 16.7 15.2 C16.7 17.4 14.7 18.8 12 18.8 C9.2 18.8 7.3 17.5 7.3 15.5" />
+    <svg width={draw} height={draw} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{ display: "block", flexShrink: 0, margin: -pull }}>
+      <path d="M12 0.8 L12.5 0.8 L12.5 3.2 L13.2 3.2 L13.6 6 L14.3 6 L14.3 7.8 L14.9 7.8 L14.9 13.6 L16.1 13.6 L16.1 16.2 L17.3 16.2 L17.3 18.8 L19 18.8 L19 22.6 L5 22.6 L5 18.8 L6.7 18.8 L6.7 16.2 L7.9 16.2 L7.9 13.6 L9.1 13.6 L9.1 7.8 L9.7 7.8 L9.7 6 L10.4 6 L10.8 3.2 L11.5 3.2 L11.5 0.8 L12 0.8 Z" />
     </svg>
   );
 }
@@ -227,8 +266,8 @@ function buildNav(themeNav: boolean): NavItem[] {
           icon: THEME_PAGE.icon,
           sub: THEME_PAGE.sub,
           children: [
-            { label: KR_THEME_SHORT, href: THEME_PAGE.href, Glyph: KrWonIcon },
-            { label: US_THEME_PAGE.short, href: US_THEME_PAGE.href, Glyph: UsDollarIcon, sub: US_THEME_PAGE.sub },
+            { label: KR_THEME_SHORT, href: THEME_PAGE.href, Glyph: KrTrigramsIcon },
+            { label: US_THEME_PAGE.short, href: US_THEME_PAGE.href, Glyph: UsEmpireIcon, sub: US_THEME_PAGE.sub },
           ],
         },
       ]
