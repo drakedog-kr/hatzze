@@ -1,9 +1,10 @@
 import Link from "next/link";
 
+import { useShellEnv } from "./shell-env";
 import { NOTE_PAGE } from "./daily/copy";
 import { DIVIDEND_PAGE } from "./dividend/copy";
 import { KR_THEME_SHORT, THEME_PAGE, US_THEME_PAGE } from "./theme/copy";
-import { DAILY_PUBLIC, DIVIDEND_PUBLIC, PREVIEW_PUBLIC, SEOHAK_PUBLIC, THEME_PUBLIC } from "./screen-flags";
+import { DAILY_PUBLIC, DIVIDEND_PUBLIC, PREVIEW_PUBLIC, SEOHAK_PUBLIC } from "./screen-flags";
 import { BetaBadge, GhostSymbol, Wordmark } from "./Logo";
 import { C } from "./ui";
 import { VersionLink } from "./VersionBadge";
@@ -120,6 +121,10 @@ function GroupLabel({ children }: { children: React.ReactNode }) {
 }
 
 export default function Footer() {
+  /* 테마 리포트 줄을 낼지는 **서버가 정한 값**을 받는다(app/shell-env.tsx). 예전엔 여기서 `!process.env.VERCEL_ENV` 를
+     읽었는데, 푸터는 셸(클라이언트 컴포넌트) 안에 있어 브라우저에서는 그 값이 늘 undefined 다 — 서버 HTML 엔 없던 줄이
+     하이드레이션 뒤에 나타나고, 안 연 화면이면 눌러서 404 로 간다(2026-09-22에 고쳤다). */
+  const { themeNav } = useShellEnv();
   const year = new Date().getFullYear();
   return (
     /* 2026-09-04 리디자인: 위 여백 64 · 윗선 아래 40. 토스 푸터의 어법은 '조용한 회색 글 +
@@ -215,8 +220,8 @@ export default function Footer() {
             <FooterLink href="/kadera/us">미장 카더라</FooterLink>
             {/* 테마 리포트 — 사이드바에서 카더라 다음 자리라 여기서도 같은 자리(아래 '안 연 화면' 규칙은 그대로다).
                 로컬(배포 아님)에서는 열기 전에도 보인다 — 만드는 중에 푸터까지 같이 봐야 해서(2026-09-22). */}
-            {(THEME_PUBLIC || !process.env.VERCEL_ENV) && <FooterLink href={THEME_PAGE.href}>{KR_THEME_SHORT}</FooterLink>}
-            {(THEME_PUBLIC || !process.env.VERCEL_ENV) && <FooterLink href={US_THEME_PAGE.href}>{US_THEME_PAGE.short}</FooterLink>}
+            {themeNav && <FooterLink href={THEME_PAGE.href}>{KR_THEME_SHORT}</FooterLink>}
+            {themeNav && <FooterLink href={US_THEME_PAGE.href}>{US_THEME_PAGE.short}</FooterLink>}
             {/* ⚠️ 이 줄이 빠져 있었다. 화면을 여는 날(2026-08-26)에야 드러났는데, 예고
                 시절엔 '준비 중'이라 없는 게 맞았고 그 뒤로 아무도 다시 안 봤다.
                 ⭐ **여는 순간 고칠 곳이 NAV 의 badge 한 줄만은 아니다** — 푸터의 이

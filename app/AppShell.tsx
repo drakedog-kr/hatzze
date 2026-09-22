@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { INSIDER_LISTS, INSIDER_LIST_SLUGS, insiderListHref } from "./insider/lists";
 import { PageJsonLd } from "./JsonLd";
 import { NOTE_PAGE } from "./daily/copy";
@@ -10,6 +10,7 @@ import { DIVIDEND_PAGE } from "./dividend/copy";
 import { KR_THEME_SHORT, THEME_PAGE, US_THEME_PAGE } from "./theme/copy";
 import { DAILY_PUBLIC, DIVIDEND_PUBLIC, SEOHAK_PUBLIC, THEME_PUBLIC } from "./screen-flags";
 import { THEME_NAMES, US_THEME_NAMES, themeHref, usThemeHref } from "@/lib/theme-href";
+import { ShellEnvContext, useShellEnv, type ShellEnv } from "./shell-env";
 
 import { track } from "@/lib/ga";
 import { SLOGAN } from "./brand";
@@ -205,17 +206,8 @@ type NavItem = {
   children?: NavChild[];
 };
 
-/**
- * 테마 리포트를 사이드바에 **링크로** 낼 것인가. 열면(THEME_PUBLIC) 늘 그렇고, 안 연 동안은 로컬(배포 아님)에서만 —
- * 만드는 중에 사이드바에서 눌러 봐야 해서다(2026-09-22). 배포에서는 COMING_SOON 의 눌리지 않는 '준비 중' 줄로 남는다
- * (2026-08-30 에 안 연 화면이 사이드바에서 눌려 404 가 났다 — COMING_SOON 머리 주석).
- *
- * 값은 서버가 정한다 — 이 파일은 클라이언트 컴포넌트라 `process.env.VERCEL_ENV` 를 직접 읽으면 서버 렌더와 브라우저가
- * 다른 값을 봐 hydration 이 어긋난다. layout.tsx 가 AppShell 의 prop 으로 넘기고 ShellEnv 컨텍스트로 내려온다.
- */
-type ShellEnv = { themeNav: boolean };
-const ShellEnvContext = createContext<ShellEnv>({ themeNav: THEME_PUBLIC });
-const useShellEnv = () => useContext(ShellEnvContext);
+/* themeNav 가 무엇이고 왜 서버가 정하는지는 app/shell-env.tsx 에. 배포에서 안 연 화면은 COMING_SOON 의
+   눌리지 않는 '준비 중' 줄로 남는다(2026-08-30 에 그 줄이 눌려 404 가 났다 — COMING_SOON 머리 주석). */
 
 function buildNav(themeNav: boolean): NavItem[] {
   return [
@@ -1482,77 +1474,98 @@ const NEWS_EVENT = "hz-news-change";
    git 이력에 있다 — 되살릴 땐 키를 새로 딴다.
    ⛔ 목적지가 열려 있을 때만 건다 — DIVIDEND_PUBLIC 이 false 면 텔레그램 2판 소식이 그대로 선다(띠만 먼저 나가 404 로
    가는 일을 막는다, 국장 미리보기 때의 규칙). */
-/* 2026-09-23 · 테마 리포트 오픈 소식. 목적지가 /theme 라 그 구역(국장·미장 판세와 테마 상세) 안에서는 안 그린다(NewsStrip 의 startsWith).
-   ⛔ THEME_PUBLIC 이 false 면 배당 소식이 그대로 선다 — 띠만 먼저 나가 404 로 가는 일을 막는다(국장 미리보기 때의 규칙). */
-const NEWS = THEME_PUBLIC
-  ? {
-      key: "hz-news-theme",
-      // 여는 날 아침. 머지·배포가 이 시각 뒤라 바로 뜬다(그 전엔 플래그가 false 라 아예 안 걸린다).
-      from: "2026-09-23T00:00:00+09:00",
-      href: THEME_PAGE.href,
-      name: THEME_PAGE.label,
-      tail: "를 열었습니다. 국장·미장 테마마다 어디에 관심이 쏠리고 무슨 얘기가 도는지 봅니다.",
-      // 사이드바 NAV 의 그 화면 아이콘(category)과 같은 것.
-      icon: THEME_PAGE.icon,
-      ga: "news-theme",
-    }
-  : DIVIDEND_PUBLIC
-  ? {
-      key: "hz-news-dividend",
-      // 머지·배포 직후부터. 화면이 같은 배포에 실려 나가니 기다릴 글이 없다.
-      from: "2026-09-16T00:00:00+09:00",
-      href: DIVIDEND_PAGE.href,
-      name: DIVIDEND_PAGE.label,
-      tail: "를 열었습니다. 배당주로 파이어 준비하는 분들을 위한 월 배당 달력입니다.",
-      // 사이드바 NAV 의 그 화면 아이콘과 같은 것(paid) — 띠를 눌러 가면 사이드바에서 같은 그림이 켜진다.
-      icon: DIVIDEND_PAGE.icon,
-      ga: "news-dividend",
-    }
-  : {
-      key: "hz-news-telegram-v2",
-      // 이 시각 전에는 띠를 안 그린다. 새 형식의 첫 글(9/11 아침, 08:45~09:20 도착)이 나간 뒤에
-      // 떠야 눌러 들어간 사람이 새 글을 본다 — 머지 당일 저녁에 뜨면 옛 글이 맨 위에 있다.
-      from: "2026-09-11T09:30:00+09:00",
-      href: TELEGRAM.href,
-      name: "텔레그램 채널",
-      tail: " 글의 퀄리티가 향상되었습니다. 더 종합적이고 더 자세하게 정리합니다.",
-      // 사이드바의 채널 아이콘(send)이 아니라 '올라갔다'는 그림이다 — '새 화면'이 아니라 '나아졌다'는
-      // 소식이라서. 전구(lightbulb)는 MDD 본문이 이미 써서 못 쓴다(한 화면에 같은 아이콘 두 번 금지).
-      icon: "upgrade",
-      ga: "news-telegram",
-    };
+/* 소식 셋을 세워 두고 newsFor 가 하나를 고른다. 목적지가 우리 화면이면 **그 구역 안에서는 안 그린다**(NewsStrip 의 startsWith).
+   ⛔ 안 연 화면의 소식은 **열려 있을 때만** 건다 — 띠만 먼저 나가면 눌러서 404 로 간다(국장 미리보기 때의 규칙).
+   테마 리포트는 themeNav 를 따르므로 로컬 개발 서버에서는 문구·아이콘을 눈으로 볼 수 있고, 배포에서는 THEME_PUBLIC 을 켠 뒤에야 뜬다. */
+type NewsItem = { key: string; from: string; href: string; name: string; tail: string; icon: string; ga: string };
+
+const THEME_NEWS: NewsItem = {
+  key: "hz-news-theme",
+  // 여는 날 아침. 머지·배포가 이 시각 뒤라 바로 뜬다(그 전엔 플래그가 false 라 아예 안 걸린다).
+  from: "2026-09-23T00:00:00+09:00",
+  href: THEME_PAGE.href,
+  name: THEME_PAGE.label,
+  tail: "를 열었습니다. 국장·미장 테마마다 어디에 관심이 쏠리고 무슨 얘기가 도는지 봅니다.",
+  // 사이드바 NAV 의 그 화면 아이콘(category)과 같은 것.
+  icon: THEME_PAGE.icon,
+  ga: "news-theme",
+};
+
+const DIVIDEND_NEWS: NewsItem = {
+  key: "hz-news-dividend",
+  // 머지·배포 직후부터. 화면이 같은 배포에 실려 나가니 기다릴 글이 없다.
+  from: "2026-09-16T00:00:00+09:00",
+  href: DIVIDEND_PAGE.href,
+  name: DIVIDEND_PAGE.label,
+  tail: "를 열었습니다. 배당주로 파이어 준비하는 분들을 위한 월 배당 달력입니다.",
+  // 사이드바 NAV 의 그 화면 아이콘과 같은 것(paid) — 띠를 눌러 가면 사이드바에서 같은 그림이 켜진다.
+  icon: DIVIDEND_PAGE.icon,
+  ga: "news-dividend",
+};
+
+const TELEGRAM_NEWS: NewsItem = {
+  key: "hz-news-telegram-v2",
+  // 이 시각 전에는 띠를 안 그린다. 새 형식의 첫 글(9/11 아침, 08:45~09:20 도착)이 나간 뒤에
+  // 떠야 눌러 들어간 사람이 새 글을 본다 — 머지 당일 저녁에 뜨면 옛 글이 맨 위에 있다.
+  from: "2026-09-11T09:30:00+09:00",
+  href: TELEGRAM.href,
+  name: "텔레그램 채널",
+  tail: " 글의 퀄리티가 향상되었습니다. 더 종합적이고 더 자세하게 정리합니다.",
+  // 사이드바의 채널 아이콘(send)이 아니라 '올라갔다'는 그림이다 — '새 화면'이 아니라 '나아졌다'는
+  // 소식이라서. 전구(lightbulb)는 MDD 본문이 이미 써서 못 쓴다(한 화면에 같은 아이콘 두 번 금지).
+  icon: "upgrade",
+  ga: "news-telegram",
+};
+
+/** 지금 걸 소식 하나. 테마 리포트는 **themeNav** 를 따른다 — 열면 프로덕션에서도, 안 연 동안은 로컬에서만(문구를 눈으로 보려고). */
+function newsFor(themeNav: boolean): NewsItem {
+  if (themeNav) return THEME_NEWS;
+  return DIVIDEND_PUBLIC ? DIVIDEND_NEWS : TELEGRAM_NEWS;
+}
 
 // 모듈이 읽힐 때 한 번만 본다(렌더 안에서 Date.now() 를 부르면 React 컴파일러 린트가 막는다).
 // 서버는 어차피 안 그리고(getServerSnapshot 이 false), 클라이언트는 페이지를 열 때마다 새로 읽는다.
 // 개발 서버에서는 시각과 무관하게 띄운다 — 문구·아이콘을 로컬에서 보려면 날짜를 기다릴 수 없다.
-const NEWS_LIVE = process.env.NODE_ENV !== "production" || Date.now() >= Date.parse(NEWS.from);
+const NEWS_NOW = Date.now();
+const newsLive = (news: NewsItem) => process.env.NODE_ENV !== "production" || NEWS_NOW >= Date.parse(news.from);
 
-const newsStore = {
-  subscribe(cb: () => void) {
-    window.addEventListener(NEWS_EVENT, cb);
-    return () => window.removeEventListener(NEWS_EVENT, cb);
-  },
-  getSnapshot() {
-    if (!NEWS_LIVE) return false;
-    try {
-      return localStorage.getItem(NEWS.key) === null;
-    } catch {
-      // 사생활 보호 모드 등에서 접근이 던진다. 닫은 걸 기억 못 하면 갈 때마다 다시
-      // 뜨므로, 그때는 아예 안 띄운다(PcHint 와 같은 판단).
-      return false;
-    }
-  },
-};
+/** 소식마다 저장소 하나. 훅에 넘기는 객체가 렌더마다 새것이면 useSyncExternalStore 가 계속 다시 구독한다 — 키로 캐시한다. */
+const newsStores = new Map<string, { subscribe: (cb: () => void) => () => void; getSnapshot: () => boolean }>();
+function newsStoreFor(news: NewsItem) {
+  const cached = newsStores.get(news.key);
+  if (cached) return cached;
+  const store = {
+    subscribe(cb: () => void) {
+      window.addEventListener(NEWS_EVENT, cb);
+      return () => window.removeEventListener(NEWS_EVENT, cb);
+    },
+    getSnapshot() {
+      if (!newsLive(news)) return false;
+      try {
+        return localStorage.getItem(news.key) === null;
+      } catch {
+        // 사생활 보호 모드 등에서 접근이 던진다. 닫은 걸 기억 못 하면 갈 때마다 다시
+        // 뜨므로, 그때는 아예 안 띄운다(PcHint 와 같은 판단).
+        return false;
+      }
+    },
+  };
+  newsStores.set(news.key, store);
+  return store;
+}
 
 function NewsStrip() {
   const pathname = usePathname() ?? "/";
-  const show = useSyncExternalStore(newsStore.subscribe, newsStore.getSnapshot, () => false);
+  const { themeNav } = useShellEnv();
+  const news = newsFor(themeNav);
+  const store = newsStoreFor(news);
+  const show = useSyncExternalStore(store.subscribe, store.getSnapshot, () => false);
 
-  if (!show || pathname.startsWith(NEWS.href)) return null;
+  if (!show || pathname.startsWith(news.href)) return null;
 
   const dismiss = () => {
     try {
-      localStorage.setItem(NEWS.key, "1");
+      localStorage.setItem(news.key, "1");
     } catch {}
     window.dispatchEvent(new Event(NEWS_EVENT));
   };
@@ -1569,19 +1582,19 @@ function NewsStrip() {
           상태 변경을 핸들러가 끝난 뒤로 미룬다. 그래서 이 줄이 링크를 먼저 언마운트해
           이동을 막지 않는다(브라우저에서 눌러 확인했다). */}
       <Link
-        href={NEWS.href}
+        href={news.href}
         className="hz-news-link"
-        data-ga-cta={NEWS.ga}
+        data-ga-cta={news.ga}
         onClick={dismiss}
         // 바깥 주소(t.me)면 새 탭. 사이드바의 채널 링크와 같은 규칙이다.
-        {...(NEWS.href.startsWith("http") ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+        {...(news.href.startsWith("http") ? { target: "_blank", rel: "noopener noreferrer" } : {})}
       >
-        <Icon name={NEWS.icon} style={{ fontSize: "var(--fs-17)", flexShrink: 0 }} />
+        <Icon name={news.icon} style={{ fontSize: "var(--fs-17)", flexShrink: 0 }} />
         <span className="hz-news-text">
           {/* ⚠️ <a> 안에 <a> 를 넣을 수 없다. 바깥 링크가 이미 같은 곳으로 가므로
               여기서는 **밑줄만** 긋는다 — 눌리는 건 띠 전체다. */}
-          <span className="hz-news-em">{NEWS.name}</span>
-          {NEWS.tail}
+          <span className="hz-news-em">{news.name}</span>
+          {news.tail}
         </span>
         <span className="hz-news-go">
           <span className="hz-news-go-label">보러 가기</span>
