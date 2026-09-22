@@ -12,7 +12,7 @@ import { DAILY_PUBLIC, DIVIDEND_PUBLIC, SEOHAK_PUBLIC, THEME_PUBLIC } from "./sc
 import { THEME_NAMES, US_THEME_NAMES, themeHref, usThemeHref } from "@/lib/theme-href";
 
 import { track } from "@/lib/ga";
-import { CHANNEL_FORM, SLOGAN } from "./brand";
+import { SLOGAN } from "./brand";
 import { C, Icon, R } from "./ui";
 import { BetaBadge, LogoLockup } from "./Logo";
 import Footer from "./Footer";
@@ -1094,33 +1094,9 @@ const CURRENCY_PAGES: { prefix: string; fallback: "krw" | "usd" }[] = [
   { prefix: "/insider", fallback: "usd" },
 ];
 
-/**
- * 채널 등록 신청. 국장 카더라 히어로의 큰 버튼이었는데 탑바로 옮겼다 — 그 자리에는
- * 미장으로 건너가는 통로가 서는 편이 낫다는 판단이다(kadera/page.tsx 주석 참고).
- *
- * ⚠️ 카더라 두 화면에서만 뜬다. 채널을 늘리는 일은 그 두 화면의 재료를 늘리는 것이라,
- *    브리핑이나 내부자에서 권하면 맥락이 없다.
- * ⚠️ **좁은 화면에서는 글자가 빠지고 아이콘만 남는다**(globals.css 의 .hz-topbar-cta).
- *    글자를 단 채로 두면 320px 탑바에 90px 이 더 붙어 햄버거가 도로 밀려난다 —
- *    그 잘림을 오늘 고쳤다.
- */
-function ChannelRequest() {
-  return (
-    <a
-      href={CHANNEL_FORM}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="hz-btn-soft hz-topbar-cta"
-      title="채널 등록 신청"
-      data-ga="cta_click"
-      data-ga-cta="register_channel"
-      data-ga-surface="topbar"
-    >
-      <Icon name="add_circle" style={{ fontSize: "var(--fs-15)" }} />
-      <span className="hz-topbar-cta-label">채널 등록 신청</span>
-    </a>
-  );
-}
+/* 채널 등록 신청(.hz-btn-soft, 탑바)이 여기 있었다. 국장 카더라 히어로의 큰 단추 → 탑바 → **국장 '채널 파워 랭킹' 카드 머리**로
+   옮겨 갔고(2026-09-22), 미장 카더라에서는 아예 뺐다 — 미장 채널은 우리가 고른 목록이라 신청을 받는 자리가 아니다.
+   지금 이 단추를 그리는 곳은 app/kadera/page.tsx 한 곳이고 폼 주소는 app/brand.ts 의 CHANNEL_FORM 이다. */
 
 /**
  * **시장 건너가기** — 머리 오른쪽, 다크 모드 단추 왼쪽(2026-09-22). 국장↔미장 짝이 있는 두 구역(카더라·테마 판세)이 같이 쓴다.
@@ -1173,10 +1149,6 @@ function PageTools() {
         const page = CURRENCY_PAGES.find((p) => pathname.startsWith(p.prefix));
         return page ? <CurrencyToggle key={page.prefix} fallback={page.fallback} /> : null;
       })()}
-      {/* 채널 등록 신청은 **미장 카더라에만** 남는다(2026-09-22). 국장에서는 '채널 파워 랭킹' 카드 머리로 내렸다 —
-          그 카드가 채널을 세는 자리라 신청 단추가 거기 있는 편이 뜻이 맞고, 머리 도구는 건너가기와 다크 모드 둘로 단출해진다.
-          미장 카더라에는 그 카드가 없어 도구 자리에 그대로 둔다. */}
-      {pathname.startsWith("/kadera/us") && <ChannelRequest />}
       {/* 안 연 동안 배포에서는 /theme 가 404 라 단추도 내지 않는다(themeNav — ShellEnv 주석). */}
       {(themeNav || !pathname.startsWith(THEME_PAGE.href)) && <MarketSwap pathname={pathname} />}
       <ThemeToggle />
