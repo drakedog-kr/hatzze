@@ -2,13 +2,26 @@
 
 // 담은 종목 표와 한 줄. DividendCalculator.tsx 에서 그대로 옮겨 왔다(store.ts 머리말 참고).
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { StockLogo } from "../StockLogo";
 import { won, usd, money, pct } from "./format";
 import { isSafeAsset, fitsAccount, ACCOUNTS, ACCOUNT_SHORT } from "./tax";
 import type { Account, TaxMode } from "./tax";
 import { HOT_YIELD_PCT, TODAY_KST, Badges, SPLIT_OPTION, nextAccountFor } from "./shared";
 import type { Line } from "./shared";
+
+/** 표 위 '정렬' 목록의 열쇠. 고르면 순서 자체가 바뀌어 저장된다(DividendCalculator.sortLines). */
+export type SortKey = "net" | "invest" | "yield" | "name";
+
+const SORTS: { key: SortKey; label: string }[] = [
+  { key: "net", label: "배당 많은 순" },
+  { key: "invest", label: "투자금 많은 순" },
+  { key: "yield", label: "수익률 높은 순" },
+  { key: "name", label: "이름순" },
+];
+
+/** 끄는 동안의 상태. 줄 위치는 시작할 때 한 번 재고(rows), 포인터가 어느 줄 위에 있는지로 자리(to)를 정한다. */
+type Drag = { id: string; from: number; to: number; dy: number; height: number };
 
 /* ── 담은 종목 표 ─────────────────────────────────────────────────── */
 export function HoldingsTable({
@@ -18,6 +31,8 @@ export function HoldingsTable({
   mode,
   onClear,
   onToggle,
+  onMove,
+  onSort,
   onAccount,
   onSplit,
   onShares,
@@ -33,6 +48,9 @@ export function HoldingsTable({
   onClear: () => void;
   /** 줄을 계산에 넣고(true) 빼기(false). */
   onToggle: (id: string, on: boolean) => void;
+  /** 줄 id 를 targetId 가 있던 자리로 옮긴다(위로는 그 앞, 아래로는 그 뒤). */
+  onMove: (id: string, targetId: string, method: "drag" | "key") => void;
+  onSort: (key: SortKey) => void;
   onAccount: (id: string, acct: Account) => void;
   onSplit: (id: string) => void;
   onShares: (id: string, shares: number) => void;
@@ -43,16 +61,95 @@ export function HoldingsTable({
   const distinct = new Set(lines.map((l) => l.stock.code)).size;
   // 체크를 푼 종목이 있으면 몇 개를 뺐는지도 — 합계가 표와 다른 까닭이 이 한 마디다. "계산에 4개"는 어색하다는 지적(2026-09-18).
   const excluded = distinct - new Set(lines.filter((l) => !l.off).map((l) => l.stock.code)).size;
+
+  /* ── 끌어서 순서 바꾸기 ──────────────────────────────────────────
+     HTML5 drag 이 아니라 포인터 이벤트다 — 칩 끌기(HTML5)는 폰에서 안 되는데, 순서 바꾸기는 폰에서도 돼야 한다. 손잡이에
+     touch-action: none 을 주고 포인터를 잡으면(setPointerCapture) 손가락이 손잡이를 벗어나도 move·up 이 손잡이로 온다.
+     줄 자리는 누른 순간 한 번 재고(스크롤 좌표), 포인터가 어느 줄 위에 있느냐로 갈 자리를 정한다. 끄는 줄은 포인터를 따라가고
+     그 사이 줄들은 끄는 줄의 높이만큼 비켜선다(줄마다 높이가 달라 — 알약 수 — 자기 높이가 아니라 끄는 줄 높이로). */
+  const rowEls = useRef(new Map<string, HTMLDivElement>());
+  const measured = useRef<{ tops: number[]; heights: number[]; startY: number } | null>(null);
+  const [drag, setDrag] = useState<Drag | null>(null);
+  const scroller = () => document.querySelector("main.hz-scroll") as HTMLElement | null;
+  const pageY = (e: React.PointerEvent) => e.clientY + (scroller()?.scrollTop ?? window.scrollY);
+  const gripDown = (id: string) => (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    const from = lines.findIndex((l) => l.id === id);
+    if (from < 0) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const off = scroller()?.scrollTop ?? window.scrollY;
+    const rects = lines.map((l) => rowEls.current.get(l.id)?.getBoundingClientRect());
+    measured.current = { tops: rects.map((r) => (r?.top ?? 0) + off), heights: rects.map((r) => r?.height ?? 0), startY: pageY(e) };
+    setDrag({ id, from, to: from, dy: 0, height: rects[from]?.height ?? 0 });
+  };
+  const gripMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const m = measured.current;
+    if (!drag || !m) return;
+    const y = pageY(e);
+    const dy = y - m.startY;
+    // 끄는 줄의 가운데가 어느 줄 칸(원래 자리 기준)에 있나.
+    const center = m.tops[drag.from] + m.heights[drag.from] / 2 + dy;
+    let to = drag.from;
+    for (let i = 0; i < lines.length; i++) if (center >= m.tops[i] && center < m.tops[i] + m.heights[i]) to = i;
+    if (center < m.tops[0]) to = 0;
+    if (center >= m.tops[lines.length - 1] + m.heights[lines.length - 1]) to = lines.length - 1;
+    // 화면 위·아래 끝에 닿으면 조금씩 밀어 준다 — 긴 목록의 끝으로 옮길 때.
+    const sc = scroller();
+    if (sc) {
+      if (e.clientY < 90) sc.scrollTop -= Math.ceil((90 - e.clientY) / 4);
+      else if (e.clientY > window.innerHeight - 90) sc.scrollTop += Math.ceil((e.clientY - (window.innerHeight - 90)) / 4);
+    }
+    if (dy !== drag.dy || to !== drag.to) setDrag({ ...drag, dy, to });
+  };
+  const gripUp = () => {
+    if (!drag) return;
+    if (drag.to !== drag.from) onMove(drag.id, lines[drag.to].id, "drag");
+    setDrag(null);
+    measured.current = null;
+  };
+  // 손잡이에 초점을 두고 ↑↓ — 끌 수 없는 사람(키보드)도 옮길 수 있게. 줄이 옮겨져도 같은 DOM 이라(id 열쇠) 초점은 남는다.
+  const gripKey = (id: string) => (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    e.preventDefault();
+    const i = lines.findIndex((l) => l.id === id);
+    const j = e.key === "ArrowUp" ? i - 1 : i + 1;
+    if (i < 0 || j < 0 || j >= lines.length) return;
+    onMove(id, lines[j].id, "key");
+  };
+  // 줄마다 비켜설 거리(px). 끄는 줄은 포인터를 따라가고, 원래 자리와 갈 자리 사이의 줄은 끄는 줄 높이만큼 반대로.
+  const shiftOf = (i: number) => {
+    if (!drag) return 0;
+    if (i === drag.from) return drag.dy;
+    if (drag.from < drag.to && i > drag.from && i <= drag.to) return -drag.height;
+    if (drag.from > drag.to && i >= drag.to && i < drag.from) return drag.height;
+    return 0;
+  };
   return (
-    <div className="dv-table" role="table" aria-label="담은 종목">
-      {/* 표 위 한 줄 — 몇 종목인지와 '모두 빼기'. 바스켓을 통째로 담아 본 뒤 하나씩 ×로 지우던 것(2026-09-16). */}
+    <div className={`dv-table${drag ? " dv-table-dragging" : ""}`} role="table" aria-label="담은 종목">
+      {/* 표 위 한 줄 — 몇 종목인지, '정렬', '모두 빼기'. 바스켓을 통째로 담아 본 뒤 하나씩 ×로 지우던 것(2026-09-16). */}
       <div className="dv-table-bar">
         <span className="dv-table-count">
           담은 종목 {distinct}개{excluded > 0 && <span className="dv-table-counted"> · {excluded}개 제외</span>}
         </span>
-        <button type="button" className="dv-table-clear" onClick={onClear}>
-          모두 빼기
-        </button>
+        <span className="dv-table-tools">
+          {/* 정렬은 한 번 세우는 동작이라 값이 남지 않는 select 다('＋ 계좌'와 같은 꼴). 손으로 끈 순서는 그 뒤에 이어진다. */}
+          {lines.length > 1 && (
+            <select className="dv-tsort" value="" onChange={(e) => e.target.value && onSort(e.target.value as SortKey)} aria-label="담은 종목 정렬">
+              <option value="" disabled hidden>
+                정렬
+              </option>
+              {SORTS.map((o) => (
+                <option key={o.key} value={o.key}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          )}
+          <button type="button" className="dv-table-clear" onClick={onClear}>
+            모두 빼기
+          </button>
+        </span>
       </div>
       <div className="dv-trow dv-thead" role="row">
         <span role="columnheader">종목</span>
@@ -63,8 +160,28 @@ export function HoldingsTable({
         <span role="columnheader">비중 · 투자금</span>
         <span role="columnheader" aria-label="빼기" />
       </div>
-      {lines.map((l) => (
-        <HoldingRow key={l.id} line={l} inputs={inputs} weightPct={!l.off && totalInvest > 0 && l.investKrw != null ? (l.investKrw / totalInvest) * 100 : null} mode={mode} onToggle={onToggle} onAccount={onAccount} onSplit={onSplit} onShares={onShares} onCost={onCost} onRemove={onRemove} />
+      {lines.map((l, i) => (
+        <HoldingRow
+          key={l.id}
+          line={l}
+          inputs={inputs}
+          weightPct={!l.off && totalInvest > 0 && l.investKrw != null ? (l.investKrw / totalInvest) * 100 : null}
+          mode={mode}
+          rowRef={(el) => {
+            if (el) rowEls.current.set(l.id, el);
+            else rowEls.current.delete(l.id);
+          }}
+          dragging={drag?.id === l.id}
+          shift={shiftOf(i)}
+          canMove={lines.length > 1}
+          grip={{ onPointerDown: gripDown(l.id), onPointerMove: gripMove, onPointerUp: gripUp, onPointerCancel: gripUp, onKeyDown: gripKey(l.id) }}
+          onToggle={onToggle}
+          onAccount={onAccount}
+          onSplit={onSplit}
+          onShares={onShares}
+          onCost={onCost}
+          onRemove={onRemove}
+        />
       ))}
     </div>
   );
@@ -75,6 +192,11 @@ function HoldingRow({
   inputs,
   weightPct,
   mode,
+  rowRef,
+  dragging,
+  shift,
+  canMove,
+  grip,
   onToggle,
   onAccount,
   onSplit,
@@ -87,6 +209,15 @@ function HoldingRow({
   /** 투자금 가운데 이 줄의 몫(%). 종가가 없거나 계산에서 뺀 줄이면 null. */
   weightPct: number | null;
   mode: TaxMode;
+  rowRef: (el: HTMLDivElement | null) => void;
+  /** 지금 끌고 있는 줄인가. */
+  dragging: boolean;
+  /** 끄는 동안 이 줄이 비켜설 거리(px). 0 이면 제자리. */
+  shift: number;
+  /** 줄이 둘 이상이라 옮길 수 있나. 하나뿐이면 손잡이를 안 그린다. */
+  canMove: boolean;
+  /** 순서 손잡이의 포인터·키보드 핸들러(HoldingsTable 이 든다). */
+  grip: Pick<React.ButtonHTMLAttributes<HTMLButtonElement>, "onPointerDown" | "onPointerMove" | "onPointerUp" | "onPointerCancel" | "onKeyDown">;
   onToggle: (id: string, on: boolean) => void;
   onAccount: (id: string, acct: Account) => void;
   onSplit: (id: string) => void;
@@ -171,8 +302,15 @@ function HoldingRow({
   // 이 줄의 투자금(원). 종가도 평단도 없거나 0주면 안 적는다.
   const invest = line.investKrw != null && line.investKrw > 0 ? won(line.investKrw) : null;
   return (
-    <div className={`dv-trow${line.off ? " dv-trow-off" : ""}`} role="row">
+    <div
+      ref={rowRef}
+      className={`dv-trow${line.off ? " dv-trow-off" : ""}${dragging ? " dv-trow-drag" : ""}`}
+      role="row"
+      style={shift ? { transform: `translateY(${shift}px)` } : undefined}
+    >
       <span className="dv-tcell dv-tname" role="cell">
+        {/* 순서 손잡이 — 줄 맨 왼쪽 여백에 점 여섯. 끌거나(마우스·터치) 초점을 두고 ↑↓. 줄이 하나뿐이면 없다. */}
+        {canMove && <button type="button" className="dv-tgrip" aria-label={`${s.name} 순서 바꾸기. 끌거나 위아래 화살표`} {...grip} />}
         {/* 계산에 넣고 빼는 체크 — 종목 앞. 끄면 줄은 흐려지고 합계에서 빠진다. 주수·평단·계좌는 그대로라 켜면 바로 되돌아온다.
             로고까지 한 라벨에 넣어 로고를 눌러도 켜지고 꺼진다 — 폰에서 체크 22px 만으로는 과녁이 좁다. */}
         <label className="dv-tcheck">

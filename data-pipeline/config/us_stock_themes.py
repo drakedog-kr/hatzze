@@ -52,8 +52,10 @@ US_THEMES: dict[str, list[str]] = {
         "TEAM", "APP", "TTD", "RDDT", "RBLX", "SHOP", "ZBRA", "APH",
         "OKTA", "WDAY", "INTU", "ZS", "MDB",
     ],
-    # ⚠️ 리오토로 11개가 됐다. 우주·방산과 같은 자리 — 열둘째부터 MDD 바스켓 맨 뒤가 잘린다.
-    "전기차·자율주행": ["TSLA", "RIVN", "LCID", "NIO", "XPEV", "GM", "F", "APTV", "UBER", "CVNA", "LI"],
+    # ⚠️ 스텔란티스로 12개가 됐다. MDD 바스켓은 자기 자신을 빼고 앞에서 열까지라
+    #    (US_MDD_PEER_MAX) 맨 뒤 하나가 빠진다. 그래서 30일 언급이 가장 적은 앱티브(4건·
+    #    3채널)를 맨 뒤로 옮겼다 — 빠지는 게 리오토(63건)나 스텔란티스(102건)면 안 된다.
+    "전기차·자율주행": ["TSLA", "RIVN", "LCID", "NIO", "XPEV", "GM", "F", "STLA", "UBER", "CVNA", "LI", "APTV"],
     "전력·원자력": [
         "SMR", "OKLO", "CEG", "VST", "NRG", "NEE", "GEV", "PWR",
         "ETN", "CCJ", "HON", "FSLR", "ENPH", "BE",

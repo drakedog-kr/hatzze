@@ -352,6 +352,21 @@ jobs:
           || github.event.inputs.broadcast == 'none'
         run: python data-pipeline/scripts/fetch_kr_preview.py
 
+      # ⭐ **미리보기 화면만 바로 비운다.** 이 표는 발사 70초 만에 채워지는데 화면 캐시를
+      #    비우는 자리가 맨 끝뿐이라, 아침 실행에서 자료 07:02 · 화면 09:27 로 2시간 25분이
+      #    떴다(2026-09-21 실측). 개장 전에 보라고 만든 화면이라 그 격차가 곧 기능의 실패다.
+      # ⚠️ 사본만 비우는 게 아니라 그 아래 조회 캐시(1시간)도 같이 비운다. 2026-09-22 저녁에
+      #    사본은 21:02 에 새로 그려졌는데 조회가 캐시에서 읽혀 아침 글이 그대로 나갔다.
+      #    경로를 찍어 부를 때 두 겹이 같이 비워지는 건 프로덕션 빌드로 확인했다.
+      # ⚠️ 주말 저녁에는 위 스텝이 돌긴 하되 스크립트가 시각을 보고 스스로 건너뛴다.
+      #    그때 여기도 한 번 도는데, 같은 값으로 한 장 다시 그리는 것뿐이라 둔다.
+      - name: 미리보기 화면만 먼저 비우고 데우기
+        if: ${{ !cancelled() && steps.kr_preview.outcome == 'success' }}
+        continue-on-error: true
+        env:
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: bash scripts/revalidate.sh /preview
+
       # ── 카더라 리포트(텔레그램) 파이프라인 ──────────────────────────────
       # 위 지표 파이프라인과 독립적이며, 자기들끼리는 순서 의존이 있다:
       #   상장사 사전 → 채널 동기화/구독자 스냅샷 → 메시지 수집 → 채널 영향력
@@ -639,6 +654,17 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_kr_overnight.py
 
+      # ⭐ 미리보기 화면을 **한 번 더** 비운다. 그 화면이 읽는 게 둘인데 쓰이는 시각이
+      #    멀다 — 쌍 표는 발사 70초 만에(위 미리보기 스텝), 개장 전 지금 값은 KRX 게이트
+      #    뒤인 여기서다. 앞에서 한 번만 비우면 지금 값 카드가 지난 실행 것으로 굳는다.
+      # ⚠️ 이 화면만 이 표를 읽는다(app/preview/page.tsx 의 getOvernightLive).
+      - name: 미리보기 화면 다시 비우고 데우기 (지금 값 반영)
+        if: ${{ !cancelled() && steps.kr_overnight.outcome == 'success' }}
+        continue-on-error: true
+        env:
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: bash scripts/revalidate.sh /preview
+
       - name: (텔레그램) 미국×국내 동시 언급
         id: telegram_us_comention
         continue-on-error: true
@@ -721,6 +747,16 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/generate_us_telegram_narratives.py
 
+      # ⭐ 미장 카더라를 국장과 갈라 낸다. 미장 총평이 국장보다 5~8분 먼저 들어가는데
+      #    (2026-09-15~21 아침 6회 실측, 평균 7분) 한 자리에서 같이 비우면 그 7분을
+      #    미장이 그냥 기다린다. 이 화면이 읽는 표는 전부 이 앞에서 끝난다.
+      - name: 미장 카더라 화면만 먼저 비우고 데우기
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        env:
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: bash scripts/revalidate.sh /kadera/us
+
       - name: (텔레그램) 총평·종목 요약 생성
         id: telegram_narratives
         continue-on-error: true
@@ -739,6 +775,38 @@ jobs:
         id: telegram_us_theme_briefs
         continue-on-error: true
         run: python data-pipeline/scripts/generate_us_theme_briefs.py
+
+      # ⭐ 테마 리포트 두 화면도 자료가 쓰인 직후에 비운다(PR #543 의 규칙 그대로). 요약·급부상 이유가 방금 들어갔고,
+      #    이 화면이 읽는 표는 전부 이 앞에서 끝난다. 안 연 동안은 404 라 비워도 데워도 아무 일이 없다 — 여는 날
+      #    이 스텝을 손댈 일이 없게 미리 둔다(app/screen-flags.ts THEME_PUBLIC).
+      - name: 테마 리포트 화면만 먼저 비우고 데우기
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        env:
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: bash scripts/revalidate.sh /theme /theme/us
+
+      # ⭐ **카더라 두 화면만 여기서 먼저 비운다.** 위에서 국장 총평이 막 들어갔는데 화면
+      #    사본은 30분짜리라, 다음 만료까지 옛 글이 나간다. 2026-09-22 저녁이 그랬다 —
+      #    미장 총평이 20:26:56, 국장 총평이 20:35:17 에 들어갔고 두 화면의 사본이 하필
+      #    그 사이 20:29:48 에 구워져, 21시에 잡이 끝날 때까지 미장만 새 글이고 국장은
+      #    그날 아침 글이었다(화면 낙관도 70%, 표 74%). 사본이 30분마다 갈리니 이 8분
+      #    틈에 떨어질 확률이 3할쯤이고, 저녁 8~9시는 방문이 둘째로 많은 시간대다.
+      #
+      #    총평만 사는 게 아니다. 급부상 한 줄·등락 까닭·트렌딩·테마도 전부 이 앞에서
+      #    끝나므로, 여기서 비우면 카더라 면이 통째로 제 시각에 맞는다.
+      #
+      # ⚠️ **여기서 전체를 비우면 안 된다.** 지표는 아래 KRX 게이트 뒤에 받으므로 이
+      #    시점엔 이 실행의 값이 없다. 전부 비우면 그 화면들까지 사본과 데이터 캐시를
+      #    버리고 다시 그려, 하루 두 번이던 전량 재생성이 네 번이 된다. 그래서 경로를
+      #    찍어 부른다 — 경로를 주면 그 경로가 쓴 데이터 캐시도 같이 비워진다.
+      # ⚠️ 맨 끝의 전체 비우기는 그대로 둔다. 지표는 그때 비워져야 한다.
+      - name: 국장 카더라 화면만 먼저 비우고 데우기
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        env:
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: bash scripts/revalidate.sh /kadera
 
       # ── KRX 공표 대기 게이트 ─────────────────────────────────────────────
       # **KRX Open API 는 전 영업일 자료를 08:00 KST 정각에 올린다**(2026-08-14 실측:
@@ -971,6 +1039,19 @@ jobs:
         id: generate_daily_summary
         continue-on-error: true
         run: python data-pipeline/scripts/generate_daily_summary.py
+
+      # ⭐ **시장 브리핑 화면만 바로 비운다.** 히어로 요약이 이 화면의 마지막 조각이라
+      #    여기서부터 / 는 보여 줄 게 다 갖춰져 있다. 맨 끝까지 기다리면 뒤에 남은 발송·배당
+      #    30분이 그대로 화면 지연이 된다(2026-09-21 실측: 자료 20:31 · 화면 21:02).
+      # ⭐ 발송 **앞**에 둔다. 마감 리포트를 보고 들어오는 사람이 새 화면을 받아야 한다.
+      # ⚠️ 여기서 전체를 비우면 안 된다. 배당은 아직 쓰는 중이라 쓰다 만 값으로 사본이
+      #    떠 버린다. 그래서 / 만 찍는다(맨 끝의 전체 비우기가 나머지를 맡는다).
+      - name: 브리핑 화면만 먼저 비우고 데우기
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        env:
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: bash scripts/revalidate.sh /
 
       # ── 채널 발송 ────────────────────────────────────────────────────────
       # 유일하게 밖으로 나가는 스텝이다. 구독자 전원에게 한 번 나간 숫자는 되돌릴 수
@@ -1770,31 +1851,4 @@ jobs:
         if: always()
         env:
           REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
-        run: |
-          if [ -z "$REVALIDATE_SECRET" ]; then
-            echo "REVALIDATE_SECRET 이 없어 건너뜁니다 — 화면은 한 시간 안에 스스로 새로 그립니다(카더라 30분)"
-            exit 0
-          fi
-          code=$(curl -sS -o /tmp/revalidate.json -w '%{http_code}' -X POST \
-            -H "Authorization: Bearer $REVALIDATE_SECRET" \
-            https://hatzze.fun/api/revalidate || echo "000")
-          # 접속 자체가 안 되면(DNS·TCP 실패) curl 이 파일을 안 만들어 cat 이 1 을 돌려주는데,
-          # 러너 셸이 bash -e 라 그 자리에서 스텝이 붉게 끝난다. 본문은 참고용이니 없어도 지나간다.
-          cat /tmp/revalidate.json 2>/dev/null || true; echo
-          if [ "$code" != "200" ]; then
-            echo "::warning::화면 사본 비우기가 $code 로 끝났습니다 — 한 시간 안에 스스로 새로 그립니다(카더라 30분)"
-            exit 0
-          fi
-          echo "화면 사본을 비웠습니다"
-
-          # 비운 직후 첫 방문자가 서버 렌더를 기다리지 않도록(그리고 그 순간 DB 가 아프면
-          # 500 을 보지 않도록) 주요 화면을 여기서 한 번씩 연다. 5xx 면 10초 뒤 두 번 더.
-          # 종목·투자자 상세는 주소가 수백이라 못 데운다 — 처음 여는 사람이 그린다.
-          for path in / /kadera /kadera/us /dividend /daily /insider /preview; do
-            for attempt in 1 2 3; do
-              status=$(curl -sS -o /dev/null -w '%{http_code}' "https://hatzze.fun$path" || echo "000")
-              echo "$path → $status (시도 $attempt)"
-              [ "$status" -lt 500 ] && break
-              sleep 10
-            done
-          done
+        run: bash scripts/revalidate.sh

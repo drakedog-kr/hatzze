@@ -29,6 +29,46 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 보이는 글은 그대로고 닿는 시각만 당긴다. Patch.
+    version: "1.18.4",
+    date: "2026-09-22",
+    changes: ["시장 브리핑과 카더라의 새 내용이 제때 올라옵니다."],
+  },
+  {
+    // 추출 규칙 하나가 늘어 카드 구성이 달라질 뿐 쓰는 법은 그대로다. Patch.
+    version: "1.18.3",
+    date: "2026-09-22",
+    changes: ["카더라 급부상이 지명으로 쓰인 보령(LNG 터미널 소재지)을 종목 보령으로 세지 않습니다."],
+  },
+  {
+    version: "1.18.2",
+    date: "2026-09-21",
+    changes: [
+      "배당으로 살기에 미국 인컴 ETF 11개가 더해집니다(BTCI·BITO·QQQY·WDTE·IWMY·SPYT·QQQT·ISPY·IQQQ·CSHI·BNDI).",
+    ],
+  },
+  {
+    // 화면이 세는 종목이 하나 늘었을 뿐 쓰는 법은 그대로다. Patch.
+    version: "1.18.1",
+    date: "2026-09-21",
+    changes: ["미장 카더라가 스텔란티스를 새로 셉니다."],
+  },
+  {
+    version: "1.18.0",
+    date: "2026-09-20",
+    changes: [
+      "배당으로 살기의 담은 종목 순서를 바꿀 수 있습니다. 줄 왼쪽 손잡이를 끌어 옮깁니다(폰에서도 됩니다).",
+      "담은 종목 표 위에 정렬이 생겼습니다. 배당·투자금·수익률·이름순으로 한 번에 세웁니다.",
+    ],
+  },
+  {
+    version: "1.17.4",
+    date: "2026-09-19",
+    changes: [
+      "배당으로 살기에 미국 채권 ETF 18개가 더해집니다(JNK·HYG·LQD·AGG·BIL·SHV·IEF·TLTW·LQDW·HYGW·EMB·SRLN 등).",
+    ],
+  },
+  {
     // 주간 유령 종목 점검(data-pipeline/scripts/scan_phantom_week.py) 첫 회에서 확인한 오탐을
     // 추출 규칙으로 막았다. 화면 구성은 그대로고 카더라의 종목 태그만 정확해져 Patch.
     version: "1.17.3",

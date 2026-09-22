@@ -8,7 +8,7 @@ JEPI 2026-09-03 0.37142). 티커와 이름만 적으면 된다. `pays` 를 적�
 대체값이다(없어도 된다).
 
 목록은 서학개미가 배당·월분배로 드는 것 위주다 — SCHD 계열, JP모건·글로벌X·NEOS·골드만 커버드콜, 뱅가드·
-아이셰어즈 배당, 리츠·우선주·채권(월배당이라 파이어족이 든다), 라운드힐 0DTE·일드맥스(단일 종목·묶음 옵션, 분배금이
+아이셰어즈 배당, 리츠·우선주·채권(월배당이라 파이어족이 든다 — 하이일드·투자등급·국채·채권 커버드콜까지), 라운드힐 0DTE·일드맥스(단일 종목·묶음 옵션, 분배금이
 달마다 크게 흔들려 화면이 30% 넘는 분배율에 '초고배당' 표시를 단다), 지수(VOO·IVV·QQQ·QQQM·SPY·VTI).
 
 ## 국내 ETF — 전 운용사 자동(예탁결제원 SEIBro 분배금지급현황)
@@ -134,4 +134,37 @@ US_ETFS: list[dict] = [
     {"code": "YETH", "name_ko": "YETH", "name_en": "Roundhill Ether Covered Call Strategy ETF", "cadence": "주", "source": "https://www.roundhillinvestments.com/etf/yeth/"},
     {"code": "WEEK", "name_ko": "WEEK", "name_en": "Roundhill Weekly T-Bill ETF", "cadence": "주", "source": "https://www.roundhillinvestments.com/etf/week/"},
     {"code": "MAGY", "name_ko": "MAGY", "name_en": "Roundhill Magnificent Seven Covered Call ETF", "cadence": "주", "source": "https://www.roundhillinvestments.com/etf/magy/"},
+    # 채권·단기·채권 커버드콜(월분배). JNK·TLTW 요청(2026-09-19)에 같은 성격의 것을 함께 — 하이일드·투자등급·종합채권·초단기·중장기 국채·
+    # 해외채권·신흥국채·시니어론, 그리고 아이셰어즈 BuyWrite 셋. 전부 stockanalysis 에서 지난 1년 12건을 확인했다.
+    {"code": "JNK", "name_ko": "JNK", "name_en": "SPDR Bloomberg High Yield Bond ETF", "cadence": "월", "source": "https://www.ssga.com/us/en/intermediary/etfs/spdr-bloomberg-high-yield-bond-etf-jnk"},
+    {"code": "HYG", "name_ko": "HYG", "name_en": "iShares iBoxx $ High Yield Corporate Bond ETF", "cadence": "월", "source": "https://www.ishares.com/us/products/239565/"},
+    {"code": "USHY", "name_ko": "USHY", "name_en": "iShares Broad USD High Yield Corporate Bond ETF", "cadence": "월", "source": "https://www.ishares.com/us/products/291299/"},
+    {"code": "LQD", "name_ko": "LQD", "name_en": "iShares iBoxx $ Investment Grade Corporate Bond ETF", "cadence": "월", "source": "https://www.ishares.com/us/products/239566/"},
+    {"code": "AGG", "name_ko": "AGG", "name_en": "iShares Core U.S. Aggregate Bond ETF", "cadence": "월", "source": "https://www.ishares.com/us/products/239458/"},
+    {"code": "BIL", "name_ko": "BIL", "name_en": "SPDR Bloomberg 1-3 Month T-Bill ETF", "cadence": "월", "source": "https://www.ssga.com/us/en/intermediary/etfs/spdr-bloomberg-1-3-month-t-bill-etf-bil"},
+    {"code": "SHV", "name_ko": "SHV", "name_en": "iShares 0-1 Year Treasury Bond ETF", "cadence": "월", "source": "https://www.ishares.com/us/products/239466/"},
+    {"code": "USFR", "name_ko": "USFR", "name_en": "WisdomTree Floating Rate Treasury Fund", "cadence": "월", "source": "https://www.wisdomtree.com/investments/etfs/fixed-income/usfr"},
+    {"code": "IEF", "name_ko": "IEF", "name_en": "iShares 7-10 Year Treasury Bond ETF", "cadence": "월", "source": "https://www.ishares.com/us/products/239456/"},
+    {"code": "VGLT", "name_ko": "VGLT", "name_en": "Vanguard Long-Term Treasury ETF", "cadence": "월", "source": "https://investor.vanguard.com/investment-products/etfs/profile/vglt"},
+    {"code": "VCIT", "name_ko": "VCIT", "name_en": "Vanguard Intermediate-Term Corporate Bond ETF", "cadence": "월", "source": "https://investor.vanguard.com/investment-products/etfs/profile/vcit"},
+    {"code": "VCLT", "name_ko": "VCLT", "name_en": "Vanguard Long-Term Corporate Bond ETF", "cadence": "월", "source": "https://investor.vanguard.com/investment-products/etfs/profile/vclt"},
+    {"code": "BNDX", "name_ko": "BNDX", "name_en": "Vanguard Total International Bond ETF", "cadence": "월", "source": "https://investor.vanguard.com/investment-products/etfs/profile/bndx"},
+    {"code": "EMB", "name_ko": "EMB", "name_en": "iShares J.P. Morgan USD Emerging Markets Bond ETF", "cadence": "월", "source": "https://www.ishares.com/us/products/239572/"},
+    {"code": "SRLN", "name_ko": "SRLN", "name_en": "SPDR Blackstone Senior Loan ETF", "cadence": "월", "source": "https://www.ssga.com/us/en/intermediary/etfs/spdr-blackstone-senior-loan-etf-srln"},
+    {"code": "TLTW", "name_ko": "TLTW", "name_en": "iShares 20+ Year Treasury Bond BuyWrite Strategy ETF", "cadence": "월", "source": "https://www.ishares.com/us/products/329118/"},
+    {"code": "LQDW", "name_ko": "LQDW", "name_en": "iShares Investment Grade Corporate Bond BuyWrite Strategy ETF", "cadence": "월", "source": "https://www.ishares.com/us/products/329120/"},
+    {"code": "HYGW", "name_ko": "HYGW", "name_en": "iShares High Yield Corporate Bond BuyWrite Strategy ETF", "cadence": "월", "source": "https://www.ishares.com/us/products/329119/"},
+    # BTCI 요청(2026-09-21)에 같은 결의 인컴 ETF 를 함께 — NEOS 비트코인·현금·채권, 프로셰어즈 비트코인 선물·데일리 커버드콜, 디파이언스 주분배·목표분배.
+    # JEPY 는 2026년에 WDTE 로 이름을 바꿨다(stockanalysis 도 WDTE 로 넘어간다). 전부 지난 1년 지급 건·Finnhub 시세 확인.
+    {"code": "BTCI", "name_ko": "BTCI", "name_en": "NEOS Bitcoin High Income ETF", "cadence": "월", "source": "https://neosfunds.com/btci/"},
+    {"code": "CSHI", "name_ko": "CSHI", "name_en": "NEOS Enhanced Income 1-3 Month T-Bill ETF", "cadence": "월", "source": "https://neosfunds.com/cshi/"},
+    {"code": "BNDI", "name_ko": "BNDI", "name_en": "NEOS Enhanced Income Aggregate Bond ETF", "cadence": "월", "source": "https://neosfunds.com/bndi/"},
+    {"code": "BITO", "name_ko": "BITO", "name_en": "ProShares Bitcoin ETF", "cadence": "월", "source": "https://www.proshares.com/our-etfs/strategic/bito"},
+    {"code": "ISPY", "name_ko": "ISPY", "name_en": "ProShares S&P 500 High Income ETF", "cadence": "월", "source": "https://www.proshares.com/our-etfs/strategic/ispy"},
+    {"code": "IQQQ", "name_ko": "IQQQ", "name_en": "ProShares Nasdaq-100 High Income ETF", "cadence": "월", "source": "https://www.proshares.com/our-etfs/strategic/iqqq"},
+    {"code": "SPYT", "name_ko": "SPYT", "name_en": "Defiance S&P 500 Income Target ETF", "cadence": "월", "source": "https://www.defianceetfs.com/spyt/"},
+    {"code": "QQQT", "name_ko": "QQQT", "name_en": "Defiance Nasdaq 100 Income Target ETF", "cadence": "월", "source": "https://www.defianceetfs.com/qqqt/"},
+    {"code": "QQQY", "name_ko": "QQQY", "name_en": "Defiance Nasdaq 100 Weekly Distribution ETF", "cadence": "주", "source": "https://www.defianceetfs.com/qqqy/"},
+    {"code": "WDTE", "name_ko": "WDTE", "name_en": "Defiance S&P 500 Weekly Distribution ETF", "cadence": "주", "source": "https://www.defianceetfs.com/jepy/"},
+    {"code": "IWMY", "name_ko": "IWMY", "name_en": "Defiance R2000 Weekly Distribution ETF", "cadence": "주", "source": "https://www.defianceetfs.com/iwmy/"},
 ]

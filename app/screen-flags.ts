@@ -103,8 +103,8 @@ export const DIVIDEND_PUBLIC = true;
  *    다른 판단이다.
  */
 export const THEME_PUBLIC = false;
-// 여는 날 하나 더: .github/workflows/daily-update.yml 의 '화면 캐시 비우고 다시 데우기' 스텝이 여는
-// 주소 목록(for path in …)에 /theme 을 넣는다. 안 연 동안은 404 라 데울 것이 없다.
+// 화면 캐시를 비우고 데우는 자리는 손댈 것이 없다 — `scripts/revalidate.sh` 의 DEFAULT_WARM 에 /theme·/theme/us 가 이미 있고,
+// 파이프라인의 '테마 리포트 화면만 먼저 비우고 데우기' 스텝도 그대로다(안 연 동안은 404 라 아무 일이 없다).
 
 /**
  * 서학개미 장부(/seohak) — **끄는 스위치**(여는 스위치가 아니다). 2026-09-22: 테마 리포트를 머지하면서 이 화면은

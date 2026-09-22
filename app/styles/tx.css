@@ -31,6 +31,9 @@
   --tx-tile: var(--c-soft);
   --tx-btn: rgba(255, 255, 255, 0.07);
   --tx-btn-hover: rgba(255, 255, 255, 0.12);
+  /* 끌고 있는 줄 — 다크는 그림자가 안 보여 한 단 밝은 면(backgroundLevel02) + 헤어라인으로 띄운다(2026-09-20 다크 검사). */
+  --tx-drag-bg: var(--c-float);
+  --tx-drag-shadow: 0 8px 22px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--c-line);
 }
 
 /* 시트: 모서리 12 → 20, 그림자는 더 넓고 옅게(토스 카드의 부유감). 헤어라인은 남긴다 —
@@ -1243,6 +1246,34 @@
 .dv-table-count { font-size: var(--fs-12); font-weight: 700; color: var(--c-sub); }
 .dv-table-clear { padding: 0; border: none; background: none; color: var(--c-muted); font-size: var(--fs-12); font-weight: 600; cursor: pointer; font-family: inherit; }
 .dv-table-clear:hover { color: var(--c-blue); text-decoration: underline; }
+.dv-table-tools { display: flex; align-items: center; gap: 14px; }
+/* 표 위 '정렬' — 줄의 계좌 알약과 같은 생김새의 select. 고르면 순서가 한 번 바뀌고 값은 '정렬'로 돌아온다. */
+.dv-tsort {
+  appearance: none; -webkit-appearance: none; padding: 2px 16px 2px 8px; border-radius: 4px; border: 1px solid transparent;
+  background: var(--c-chip) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 3.5l3 3 3-3' fill='none' stroke='%235e728d' stroke-width='1.5'/></svg>") no-repeat right 4px center;
+  color: var(--c-sub); font-size: var(--fs-11); font-weight: 600; font-family: inherit; cursor: pointer; line-height: 1.4;
+}
+.dv-tsort:focus-visible { outline: none; border-color: var(--c-blue); box-shadow: 0 0 0 3px var(--c-blue-tint); }
+/* 순서 손잡이 — 줄 맨 왼쪽, 시트 여백(.dv-body 의 26px) 안에 점 여섯(2×3). 이름 칸 폭을 안 먹는다. 끌기는 포인터 이벤트라
+   touch-action: none 이 있어야 폰에서 스크롤 대신 끌린다. 마우스 기기에선 줄에 올렸을 때만 또렷하다(평단 넣기와 같은 규칙). */
+.dv-tgrip {
+  flex-shrink: 0; width: 14px; height: 21px; margin: 0 -2px 0 -22px; padding: 0; border: none; border-radius: 3px; cursor: grab; touch-action: none;
+  background: radial-gradient(circle at center, var(--c-muted) 1.3px, transparent 1.6px) center / 7px 7px; opacity: 0.55;
+}
+.dv-tgrip:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--c-blue-tint); opacity: 1; }
+@media (hover: hover) {
+  .dv-tgrip { opacity: 0.18; transition: opacity 0.15s; }
+  .dv-trow:hover .dv-tgrip, .dv-tgrip:focus-visible, .dv-trow-drag .dv-tgrip { opacity: 0.7; }
+}
+/* 끄는 동안 — 끄는 줄은 떠서 포인터를 따라가고, 나머지는 비켜선다(transform 은 인라인). 글자가 끌려 선택되지 않게. */
+.dv-table-dragging { user-select: none; -webkit-user-select: none; }
+.dv-table-dragging .dv-trow { transition: transform 0.12s ease; }
+/* 떠 있는 줄의 판은 여백 쪽으로 넓혀 손잡이까지 안에 든다(음수 margin + 같은 padding — 칸 폭은 그대로). */
+.dv-trow-drag {
+  position: relative; z-index: 2; transition: none; margin: 0 -10px 0 -30px; padding-left: 30px; padding-right: 10px;
+  background: var(--tx-drag-bg, var(--c-card)); box-shadow: var(--tx-drag-shadow, 0 6px 18px rgba(19, 66, 122, 0.14)); border-radius: 8px; border-top-color: transparent; cursor: grabbing;
+}
+.dv-trow-drag .dv-tgrip { cursor: grabbing; }
 .dv-thead > span:nth-child(n + 3) { text-align: right; }
 .dv-tcell { min-width: 0; }
 .dv-tname { display: flex; align-items: center; gap: 10px; }
@@ -1250,7 +1281,8 @@
    종목·주수·평단은 그대로라 켜면 바로 되돌아온다. 라벨이 로고까지 감싸 로고를 눌러도 토글된다(폰 과녁). */
 .dv-tcheck { display: flex; flex-shrink: 0; align-items: center; gap: 10px; cursor: pointer; }
 .dv-tcheck input {
-  appearance: none; -webkit-appearance: none; width: 18px; height: 18px; margin: 0; border-radius: 5px; border: 1.5px solid var(--c-line);
+  /* 테두리는 --c-line 이 아니라 --c-muted 를 섞은 값 — --c-line 은 카드 위에서 1.15(다크 1.22)라 빈 상자가 안 보였다(2026-09-20 검사). */
+  appearance: none; -webkit-appearance: none; width: 18px; height: 18px; margin: 0; border-radius: 5px; border: 1.5px solid color-mix(in srgb, var(--c-muted) 70%, var(--c-card));
   background: var(--c-card) center / 12px no-repeat; cursor: pointer; transition: background-color 0.12s ease, border-color 0.12s ease;
 }
 .dv-tcheck:hover input { border-color: var(--c-blue); }
@@ -1568,6 +1600,9 @@
   /* 체크 22px. 이름 칸이 223px 뿐이라 사이 간격은 8px 로 — 10px 이면 알약 둘("배당성향 25%"·"5년 연 +27%")이 한 줄에 안 든다. */
   .dv-tname, .dv-tcheck { gap: 8px; }
   .dv-tcheck input { width: 22px; height: 22px; border-radius: 6px; background-size: 14px; }
+  /* 손잡이 — 폰 여백(18px) 안에 12px. 과녁은 세로로 길게(36px)지만 점은 데스크톱처럼 세 줄만(padding + content-box). */
+  .dv-tgrip { width: 12px; height: 36px; margin-left: -17px; padding: 7.5px 0; background-size: 6px 7px; background-clip: content-box; }
+  .dv-trow-drag { margin: 0 -6px 0 -18px; padding-left: 18px; padding-right: 6px; }
   /* 줄의 계좌 알약 — 21px 은 손가락엔 작다. 폰에선 28px 로(2026-09-17 검사). */
   .dv-tacct { padding: 5px 18px 5px 8px; width: 96px; font-size: var(--fs-12); background-position: right 6px center; }
 }
