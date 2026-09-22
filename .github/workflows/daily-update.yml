@@ -899,18 +899,22 @@ jobs:
       # ⚠️ 매일 돌려도 된다. 재무부가 **앞 달을 수정**하므로 전 기간을 통째로 다시
       #    쓰는 게 맞고(실측: 2026-05 잔고가 다음 발표에서 +961 바뀌었다), 9MB 내려받아
       #    3,500행 upsert 라 비용이 없다.
+      # ⛔ 2026-09-22 서학개미 장부는 폐기 예정이라 꺼 두었다(app/screen-flags.ts SEOHAK_PUBLIC). 스텝은 남기고 if: false.
       - name: Fetch 예탁원 외화증권 결제 (서학개미)
         id: seohak_settlement
+        if: false
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_seohak_settlement.py
 
       - name: Fetch 국내 상장 미국 ETF (서학개미)
         id: seohak_etf
+        if: false
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_seohak_etf.py
 
       - name: Fetch TIC 나라별 미국 증권 보유·순매수 (서학개미)
         id: seohak_tic
+        if: false
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_seohak_tic.py
 
@@ -1501,7 +1505,7 @@ jobs:
       #      TIC     계열 키(source_id)를 못 찾으면 일부러 죽게 해 뒀다.
       - name: Summarize 서학개미 수집
         id: seohak_health
-        if: always()
+        if: false # 2026-09-22 수집을 껐다(위 세 스텝). 켜면 always() 로 되돌린다.
         run: |
           names=("fetch_seohak_settlement.py" "fetch_seohak_etf.py" "fetch_seohak_tic.py")
           outcomes=("${{ steps.seohak_settlement.outcome }}" "${{ steps.seohak_etf.outcome }}" "${{ steps.seohak_tic.outcome }}")
@@ -1779,7 +1783,7 @@ jobs:
           # 비운 직후 첫 방문자가 서버 렌더를 기다리지 않도록(그리고 그 순간 DB 가 아프면
           # 500 을 보지 않도록) 주요 화면을 여기서 한 번씩 연다. 5xx 면 10초 뒤 두 번 더.
           # 종목·투자자 상세는 주소가 수백이라 못 데운다 — 처음 여는 사람이 그린다.
-          for path in / /kadera /kadera/us /dividend /daily /insider /seohak /preview; do
+          for path in / /kadera /kadera/us /dividend /daily /insider /preview; do
             for attempt in 1 2 3; do
               status=$(curl -sS -o /dev/null -w '%{http_code}' "https://hatzze.fun$path" || echo "000")
               echo "$path → $status (시도 $attempt)"

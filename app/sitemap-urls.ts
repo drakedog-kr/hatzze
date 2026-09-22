@@ -2,7 +2,7 @@ import { SITE_URL } from "./brand";
 import { NOTE_PAGE } from "./daily/copy";
 import { DIVIDEND_PAGE } from "./dividend/copy";
 import { INSIDER_LIST_SLUGS } from "./insider/lists";
-import { DAILY_PUBLIC, DIVIDEND_PUBLIC, THEME_PUBLIC } from "./screen-flags";
+import { DAILY_PUBLIC, DIVIDEND_PUBLIC, SEOHAK_PUBLIC, THEME_PUBLIC } from "./screen-flags";
 import { THEME_PAGE } from "./theme/copy";
 // ⚠️ 상대 경로다 — scripts/check-routes.mjs 가 이 파일을 맨 node 로 읽어서 `@/` 별칭을 못 푼다.
 import { THEME_NAMES, themeHref } from "../lib/theme-href";
@@ -30,7 +30,7 @@ export const SITEMAP_ENTRIES: SitemapEntry[] = [
   { path: "/kadera", changeFrequency: "daily", priority: 0.8 },
   { path: "/kadera/us", changeFrequency: "daily", priority: 0.8 },
   { path: "/mdd", changeFrequency: "daily", priority: 0.7 },
-  { path: "/seohak", changeFrequency: "daily", priority: 0.7 },
+  ...(SEOHAK_PUBLIC ? [{ path: "/seohak", changeFrequency: "daily" as const, priority: 0.7 }] : []),
   // 내부자 리포트는 2026-08-26 에 열렸는데 이 줄이 없어 색인이 0건이었다.
   { path: "/insider", changeFrequency: "daily", priority: 0.7 },
   // 국장 미리보기(2026-09-04 오픈). 07~09시에만 쓸모가 있는 화면이지만 내용은 매일

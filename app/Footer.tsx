@@ -3,7 +3,7 @@ import Link from "next/link";
 import { NOTE_PAGE } from "./daily/copy";
 import { DIVIDEND_PAGE } from "./dividend/copy";
 import { THEME_PAGE } from "./theme/copy";
-import { DAILY_PUBLIC, DIVIDEND_PUBLIC, PREVIEW_PUBLIC, THEME_PUBLIC } from "./screen-flags";
+import { DAILY_PUBLIC, DIVIDEND_PUBLIC, PREVIEW_PUBLIC, SEOHAK_PUBLIC, THEME_PUBLIC } from "./screen-flags";
 import { BetaBadge, GhostSymbol, Wordmark } from "./Logo";
 import { C } from "./ui";
 import { VersionLink } from "./VersionBadge";
@@ -47,7 +47,7 @@ const SOURCE_GROUPS: { label: string; items: string }[] = [
        미 재무부 TIC  — 한국인이 든 미국 주식 잔고·순매수(월별, 1985~)
        한국예탁결제원 — 국내 증권사를 거친 외화증권 결제(일별, 1994~)
        ⚠️ SEC 13F 는 '개인과 기관' 카드를 빼면서 화면에서 안 쓰게 됐다(표는 남아 있다). */
-  { label: "해외투자", items: "미 재무부(TIC) · 한국예탁결제원" },
+  ...(SEOHAK_PUBLIC ? [{ label: "해외투자", items: "미 재무부(TIC) · 한국예탁결제원" }] : []),
   /* ECOS 에서 받는 건 GDP(200Y109)·소비자심리지수(511Y002)·외국인 순매수(802Y001),
      그리고 자금순환표(281Y002 · 가계 부문 금융자산) 넷이다.
      FRED 는 **원/달러 환율(DEXKOUS)만** 받는다 — 나스닥·S&P 같은 벤더 지수는 안 쓴다
@@ -219,7 +219,7 @@ export default function Footer() {
                 목록도 사이드바를 그대로 따라야 한다(바로 위 주석의 규칙). */}
             <FooterLink href="/insider">내부자 리포트</FooterLink>
             <FooterLink href="/mdd">MDD 정밀분석</FooterLink>
-            <FooterLink href="/seohak">서학개미 장부</FooterLink>
+            {SEOHAK_PUBLIC && <FooterLink href="/seohak">서학개미 장부</FooterLink>}
             {/* ⚠️⚠️ **안 연 화면은 여기 링크를 내지 않는다.** 눌리는데 404 가 되어서다
                 (2026-08-30 에 사이드바에서 그 일이 났다). 그렇다고 줄을 아예 빼 두면 여는
                 날 다시 넣는 걸 잊는다 — 내부자 리포트가 정확히 그랬다(위 주석).

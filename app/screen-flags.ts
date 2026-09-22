@@ -105,3 +105,18 @@ export const DIVIDEND_PUBLIC = true;
 export const THEME_PUBLIC = false;
 // 여는 날 하나 더: .github/workflows/daily-update.yml 의 '화면 캐시 비우고 다시 데우기' 스텝이 여는
 // 주소 목록(for path in …)에 /theme 을 넣는다. 안 연 동안은 404 라 데울 것이 없다.
+
+/**
+ * 서학개미 장부(/seohak) — **끄는 스위치**(여는 스위치가 아니다). 2026-09-22 Hun: 테마 리포트를 머지하면서 이 화면은
+ * 폐기하기로 했다. 일단 끈다 — 코드와 표는 남기고 화면·사이드바·푸터·사이트맵·수집 파이프라인만 멈춘다.
+ *
+ * false 면
+ *   app/seohak/page.tsx     배포에선 404(로컬은 그대로 보인다), noindex
+ *   app/AppShell.tsx        사이드바 항목이 빠진다
+ *   app/Footer.tsx          바로가기와 '해외투자' 출처 묶음이 빠진다(그 원천은 이 화면만 썼다)
+ *   app/sitemap-urls.ts     사이트맵에서 빠진다
+ *   scripts/check-routes.mjs 색인 목록 검사에서 예외
+ *   .github/workflows/daily-update.yml 의 서학개미 수집 세 스텝과 캐시 데우기는 손으로 끈 상태(if: false) — yml 은 이 파일을 못 읽는다.
+ * 되살릴 일이 있으면 위 자리들과 yml 의 if: false 를 함께 되돌린다.
+ */
+export const SEOHAK_PUBLIC = false;

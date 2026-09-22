@@ -16,9 +16,14 @@ import { SEOHAK_CARD } from "../og-copy";
 import { toFx } from "./money";
 
 import { pageMetadata } from "../seo";
+import { SEOHAK_PUBLIC } from "../screen-flags";
+import { notFound } from "next/navigation";
+
+/** 배포된 곳인가. 로컬에서는 꺼 두어도 그대로 보인다(app/screen-flags.ts SEOHAK_PUBLIC). */
+const DEPLOYED = Boolean(process.env.VERCEL_ENV);
 
 export async function generateMetadata(): Promise<Metadata> {
-  return pageMetadata({
+  const meta = pageMetadata({
     title: "서학개미 장부 | hatzze",
     // ⚠️ 앞 문장은 '원화로 보면' 카드 하나만 설명했고 원천도 둘만 적었다. 화면이
     // 매매 습관·보유기간·가계 자리·ETF 까지 담게 됐으므로 둘 다 넓힌다.
@@ -29,12 +34,16 @@ export async function generateMetadata(): Promise<Metadata> {
     //    (페이지가 openGraph 를 선언하는 순간 컨벤션 이미지가 무시된다 — app/seo.ts 주석).
     ownImage: SEOHAK_CARD.alt,
   });
+  // 꺼 둔 동안은 색인하지 않는다(테마 리포트가 안 연 동안 하는 것과 같은 처방).
+  return SEOHAK_PUBLIC ? meta : { ...meta, robots: { index: false, follow: false } };
 }
 
 // 캐시 주기는 루트 레이아웃의 `revalidate` 가 정한다(app/layout.tsx). 예전엔 여기가
 // force-dynamic 이라 방문마다 서버가 새로 그렸다.
 
 export default async function SeohakPage() {
+  // 꺼 둔 화면(2026-09-22, 폐기 예정). 배포에선 404, 로컬에선 그대로 — 표와 코드는 남아 있다.
+  if (!SEOHAK_PUBLIC && DEPLOYED) notFound();
   const ov = await getSeohakOverview();
   // 아래 셋은 서로 의존이 없다. 순서대로 await 하면 왕복이 앞뒤로 붙으므로 함께 띄운다.
   // ⚠️ 분기·ETF 두 층은 표가 아직 없을 수 있어 null 을 돌려준다(마이그레이션 043·042).
