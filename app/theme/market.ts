@@ -3,7 +3,7 @@ import "server-only";
 import { fmtKoDate } from "@/lib/stock-page";
 import { THEME_NAMES, US_THEME_NAMES, marketThemeHref, themeStockHref, type ThemeMarketKey } from "@/lib/theme-href";
 
-import { THEME_PAGE, US_THEME_PAGE } from "./copy";
+import { KR_THEME_SHORT, THEME_PAGE, US_THEME_PAGE } from "./copy";
 
 /**
  * 테마 리포트의 **시장 한 벌** — 국장·미장이 같은 뷰(ThemeIndexView · ThemeDetailView)를 그리고, 다른 것은 여기 든 것뿐이다.
@@ -25,6 +25,8 @@ export type ThemeMarket = {
   reasonRateNote: string;
   /** '이 테마는' 도움말에 드는 시장 낱말. */
   marketWord: string;
+  /** 반대 시장으로 건너가는 통로(목록 히어로의 단추). 카더라 히어로의 '미장 카더라 보기'와 같은 부품·같은 자리다. */
+  swap: { href: string; label: string; ga: string };
 };
 
 export const KR_MARKET: ThemeMarket = {
@@ -37,6 +39,7 @@ export const KR_MARKET: ThemeMarket = {
   quotesCaption: (date) => (date ? `${fmtKoDate(date)} 종가` : "종가"),
   reasonRateNote: "그날 종가 등락률",
   marketWord: "국내",
+  swap: { href: US_THEME_PAGE.href, label: `${US_THEME_PAGE.short} 보기`, ga: "to_us_theme" },
 };
 
 export const US_MARKET: ThemeMarket = {
@@ -49,4 +52,5 @@ export const US_MARKET: ThemeMarket = {
   quotesCaption: () => "미국장 최근 시세",
   reasonRateNote: "채널이 적은 등락률",
   marketWord: "미국",
+  swap: { href: THEME_PAGE.href, label: `${KR_THEME_SHORT} 보기`, ga: "to_kr_theme" },
 };

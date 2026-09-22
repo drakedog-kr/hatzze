@@ -7,7 +7,7 @@ import { THEME_FLOW_DAYS, THEME_FLOW_TOP, type ThemeOverview, type ThemeRiser } 
 import { StockLogo } from "../StockLogo";
 import { DeltaPp, Pill, RankBadge } from "../kadera/parts";
 import { SectionHead } from "../kadera/SectionHead";
-import { AiMark, C, MONO } from "../ui";
+import { AiMark, C, Icon, MONO } from "../ui";
 import type { ThemeMarket } from "./market";
 import { Treemap, TreemapLegend, stockTone, themeTiles } from "./Treemap";
 
@@ -287,6 +287,18 @@ export function ThemeIndexView({
                   </p>
                 )}
               </div>
+              {/* 반대 시장으로 건너가는 통로. **카더라 히어로의 '미장 카더라 보기'와 같은 부품(.hz-tx-btn)·같은 자리**(히어로 넓은 칸 바닥)라
+                  두 구역을 오가는 손이 자리를 다시 익히지 않는다(2026-09-22). 테마 상세에는 두지 않는다 — 국장 반도체의 짝이 미장에 없다. */}
+              <Link
+                href={market.swap.href}
+                className="hz-tx-btn hz-theme-swap"
+                data-ga="cta_click"
+                data-ga-cta={market.swap.ga}
+                data-ga-surface="theme_hero"
+              >
+                <Icon name="swap_horiz" style={{ fontSize: "var(--fs-17)" }} />
+                {market.swap.label}
+              </Link>
             </div>
           </div>
         </section>
