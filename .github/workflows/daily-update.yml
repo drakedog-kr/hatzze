@@ -762,6 +762,31 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/generate_telegram_narratives.py
 
+      # ⚠️ **이 스텝은 테마 요약 두 스텝보다 앞에 있어야 한다.** 뒤에 두면 카더라 화면이 테마 요약 42회(국장 26 · 미장 16)를
+      #    기다린 뒤에야 갈린다 — 카더라가 읽는 표는 여기서 이미 끝났고, 테마 요약 표(telegram_theme_brief 둘)를 읽는 것은
+      #    테마 화면뿐이다(lib/theme-page.ts · lib/us-theme-page.ts).
+      # ⭐ **카더라 두 화면만 여기서 먼저 비운다.** 위에서 국장 총평이 막 들어갔는데 화면
+      #    사본은 30분짜리라, 다음 만료까지 옛 글이 나간다. 2026-09-22 저녁이 그랬다 —
+      #    미장 총평이 20:26:56, 국장 총평이 20:35:17 에 들어갔고 두 화면의 사본이 하필
+      #    그 사이 20:29:48 에 구워져, 21시에 잡이 끝날 때까지 미장만 새 글이고 국장은
+      #    그날 아침 글이었다(화면 낙관도 70%, 표 74%). 사본이 30분마다 갈리니 이 8분
+      #    틈에 떨어질 확률이 3할쯤이고, 저녁 8~9시는 방문이 둘째로 많은 시간대다.
+      #
+      #    총평만 사는 게 아니다. 급부상 한 줄·등락 까닭·트렌딩·테마도 전부 이 앞에서
+      #    끝나므로, 여기서 비우면 카더라 면이 통째로 제 시각에 맞는다.
+      #
+      # ⚠️ **여기서 전체를 비우면 안 된다.** 지표는 아래 KRX 게이트 뒤에 받으므로 이
+      #    시점엔 이 실행의 값이 없다. 전부 비우면 그 화면들까지 사본과 데이터 캐시를
+      #    버리고 다시 그려, 하루 두 번이던 전량 재생성이 네 번이 된다. 그래서 경로를
+      #    찍어 부른다 — 경로를 주면 그 경로가 쓴 데이터 캐시도 같이 비워진다.
+      # ⚠️ 맨 끝의 전체 비우기는 그대로 둔다. 지표는 그때 비워져야 한다.
+      - name: 국장 카더라 화면만 먼저 비우고 데우기
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        env:
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: bash scripts/revalidate.sh /kadera
+
       # 테마 리포트(/theme/[테마])의 '요즘 무슨 얘기' · 함께 언급된 테마 · 발췌. 테마 26개에 Haiku 한 번씩.
       # 기준일을 telegram_sentiment_daily 에서 집으므로 센티먼트 집계 뒤여야 한다(위 급부상 한 줄과 같은 이유).
       - name: (텔레그램) 테마 요약 생성
@@ -786,27 +811,6 @@ jobs:
           REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
         run: bash scripts/revalidate.sh /theme /theme/us
 
-      # ⭐ **카더라 두 화면만 여기서 먼저 비운다.** 위에서 국장 총평이 막 들어갔는데 화면
-      #    사본은 30분짜리라, 다음 만료까지 옛 글이 나간다. 2026-09-22 저녁이 그랬다 —
-      #    미장 총평이 20:26:56, 국장 총평이 20:35:17 에 들어갔고 두 화면의 사본이 하필
-      #    그 사이 20:29:48 에 구워져, 21시에 잡이 끝날 때까지 미장만 새 글이고 국장은
-      #    그날 아침 글이었다(화면 낙관도 70%, 표 74%). 사본이 30분마다 갈리니 이 8분
-      #    틈에 떨어질 확률이 3할쯤이고, 저녁 8~9시는 방문이 둘째로 많은 시간대다.
-      #
-      #    총평만 사는 게 아니다. 급부상 한 줄·등락 까닭·트렌딩·테마도 전부 이 앞에서
-      #    끝나므로, 여기서 비우면 카더라 면이 통째로 제 시각에 맞는다.
-      #
-      # ⚠️ **여기서 전체를 비우면 안 된다.** 지표는 아래 KRX 게이트 뒤에 받으므로 이
-      #    시점엔 이 실행의 값이 없다. 전부 비우면 그 화면들까지 사본과 데이터 캐시를
-      #    버리고 다시 그려, 하루 두 번이던 전량 재생성이 네 번이 된다. 그래서 경로를
-      #    찍어 부른다 — 경로를 주면 그 경로가 쓴 데이터 캐시도 같이 비워진다.
-      # ⚠️ 맨 끝의 전체 비우기는 그대로 둔다. 지표는 그때 비워져야 한다.
-      - name: 국장 카더라 화면만 먼저 비우고 데우기
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        env:
-          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
-        run: bash scripts/revalidate.sh /kadera
 
       # ── KRX 공표 대기 게이트 ─────────────────────────────────────────────
       # **KRX Open API 는 전 영업일 자료를 08:00 KST 정각에 올린다**(2026-08-14 실측:
@@ -1422,8 +1426,8 @@ jobs:
         id: telegram_calc_health
         if: always()
         run: |
-          names=("extract_telegram_stocks.py" "calculate_channel_influence.py" "calculate_stock_daily.py" "calculate_telegram_trending.py" "calculate_theme_daily.py" "calculate_telegram_sentiment.py" "generate_telegram_narratives.py" "generate_move_reasons.py" "extract_telegram_events.py")
-          outcomes=("${{ steps.telegram_extract.outcome }}" "${{ steps.telegram_influence.outcome }}" "${{ steps.telegram_stock_daily.outcome }}" "${{ steps.telegram_trending.outcome }}" "${{ steps.telegram_theme_daily.outcome }}" "${{ steps.telegram_sentiment.outcome }}" "${{ steps.telegram_narratives.outcome }}" "${{ steps.telegram_move_reasons.outcome }}" "${{ steps.telegram_events.outcome }}")
+          names=("extract_telegram_stocks.py" "calculate_channel_influence.py" "calculate_stock_daily.py" "calculate_telegram_trending.py" "calculate_theme_daily.py" "calculate_telegram_sentiment.py" "generate_telegram_narratives.py" "generate_theme_briefs.py" "generate_move_reasons.py" "extract_telegram_events.py")
+          outcomes=("${{ steps.telegram_extract.outcome }}" "${{ steps.telegram_influence.outcome }}" "${{ steps.telegram_stock_daily.outcome }}" "${{ steps.telegram_trending.outcome }}" "${{ steps.telegram_theme_daily.outcome }}" "${{ steps.telegram_sentiment.outcome }}" "${{ steps.telegram_narratives.outcome }}" "${{ steps.telegram_theme_briefs.outcome }}" "${{ steps.telegram_move_reasons.outcome }}" "${{ steps.telegram_events.outcome }}")
 
           {
             echo "## 국장 집계"
