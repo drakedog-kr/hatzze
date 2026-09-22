@@ -444,29 +444,6 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-/* ── 테마 목록 히어로 옆 칸(app/theme/page.tsx) — 2×2 타일. 타일은 링크라 올리면 살짝 진해진다. ── */
-.hz-theme-hero-tiles {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-.hz-theme-hero-tile {
-  padding: 13px 15px 12px;
-  gap: 5px;
-  text-decoration: none;
-  transition: background 0.12s ease;
-}
-.hz-theme-hero-tile:hover { background: var(--c-blue-tint); }
-.hz-theme-hero-cap {
-  font-size: var(--fs-11);
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--c-sub);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 /* ── 테마 화면 히어로(app/theme/[theme]/page.tsx) ──
    종목 알약: 회색 타일(--tx-tile) 위라 회색 칩은 경계가 안 보인다(2026-09-21 지적). 카드색 + 판 테두리 + 로고.
    더 있는 종목은 점선 알약 하나("+47"). */

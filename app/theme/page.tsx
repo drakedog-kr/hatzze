@@ -24,7 +24,7 @@ import { THEME_PUBLIC } from "../screen-flags";
 import { StockLogo } from "../StockLogo";
 import { DeltaPp, Pill, RankBadge } from "../kadera/parts";
 import { SectionHead } from "../kadera/SectionHead";
-import { AiMark, C, Icon, MONO } from "../ui";
+import { AiMark, C, MONO } from "../ui";
 import { THEME_PAGE } from "./copy";
 import { Treemap, TreemapLegend, stockTone, themeTiles } from "./Treemap";
 
@@ -110,6 +110,23 @@ function Flow({ t }: { t: ThemeOverview }) {
   );
 }
 
+/** 히어로 회색 타일 안의 한 항목 — 이름표 · 테마(링크) + 값 · 곁말. 테마 화면 히어로의 Fig 와 같은 눈금(값 15/800, 이름표 11). */
+type HeroFigData = { cap: string; t: ThemeOverview; value: string; tone: string; sub: string };
+function HeroFig({ x }: { x: HeroFigData }) {
+  return (
+    <span style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
+      <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, letterSpacing: ".02em", color: C.sub, whiteSpace: "nowrap" }}>{x.cap}</span>
+      <span style={{ display: "flex", alignItems: "baseline", gap: 7, minWidth: 0 }}>
+        <Link href={themeHref(x.t.theme)} className="hz-stock-link" style={{ ...clip, fontSize: "var(--fs-15)", fontWeight: 800, letterSpacing: "-.02em" }}>
+          {x.t.theme}
+        </Link>
+        <span style={{ fontFamily: MONO, fontSize: "var(--fs-12-5)", fontWeight: 800, color: x.tone, flexShrink: 0, whiteSpace: "nowrap" }}>{x.value}</span>
+      </span>
+      <span style={{ ...clip, fontSize: "var(--fs-11)", color: C.muted }}>{x.sub}</span>
+    </span>
+  );
+}
+
 /** 흐름 표의 줄 수. 상위 열 줄이면 '지금 화제인 테마'가 다 들어온다. 더 보기는 두지 않는다(2026-09-21) — 나머지는 지도에 있다. */
 const FLOW_ROWS = 10;
 
@@ -117,7 +134,7 @@ const FLOW_ROWS = 10;
 /** 태그 글자. 새로 등장이면 그 말을, 아니면 "3일 전보다 2.1배"(후보는 1.5배 이상뿐이라 '배'가 손해로 읽힐 일이 없다).
  *  '앞 사흘'은 보통 사람이 안 쓰는 말이다(2026-09-22 Hun) — 견주는 창은 그 전 3일이지만 말은 "3일 전보다"로. */
 function riserDelta(r: ThemeRiser): string {
-  return r.ratio === null ? "새로 등장" : `3일 전보다 ${r.ratio.toFixed(1)}배`;
+  return r.ratio === null ? "새로 등장" : `3일 전 대비 ${r.ratio.toFixed(1)}배`;
 }
 
 export default async function ThemeIndexPage() {
@@ -164,12 +181,11 @@ export default async function ThemeIndexPage() {
     : mostTopDays && mostTopDays.topDays > 0
       ? { cap: `열흘 중 ${THEME_FLOW_TOP}위 안 최다`, t: mostTopDays, value: `${mostTopDays.topDays}일`, tone: "var(--c-cold-ink)", sub: `${mostTopDays.rank}위 · 점유율 ${mostTopDays.sharePct.toFixed(1)}%` }
       : null;
-  const tiles = [
-    gainer ? { cap: "관심이 가장 늘어난 테마", t: gainer, value: pctp(gainer.shareDelta as number), tone: "var(--c-hot-ink)", sub: `${gainer.rank}위 · 점유율 ${gainer.sharePct.toFixed(1)}%` } : null,
-    loser ? { cap: "관심이 가장 줄어든 테마", t: loser, value: pctp(loser.shareDelta as number), tone: "var(--c-cold-ink)", sub: `${loser.rank}위 · 점유율 ${loser.sharePct.toFixed(1)}%` } : null,
-    tileC,
-    tileD,
+  const tilesA = [
+    gainer ? { cap: "가장 늘어난 테마", t: gainer, value: pctp(gainer.shareDelta as number), tone: "var(--c-hot-ink)", sub: `${gainer.rank}위 · 점유율 ${gainer.sharePct.toFixed(1)}%` } : null,
+    loser ? { cap: "가장 줄어든 테마", t: loser, value: pctp(loser.shareDelta as number), tone: "var(--c-cold-ink)", sub: `${loser.rank}위 · 점유율 ${loser.sharePct.toFixed(1)}%` } : null,
   ].filter((x): x is NonNullable<typeof x> => x !== null);
+  const tilesB = [tileC, tileD].filter((x): x is NonNullable<typeof x> => x !== null);
   // 1위 테마가 며칠째 1위인가(집계 있는 날만, 마지막 날부터). 히어로 문장의 곁말.
   const leadTopDays = (() => {
     const t = top[0];
@@ -186,87 +202,85 @@ export default async function ThemeIndexPage() {
 
   return (
     <div className="hz-tx">
-      {/* ── 히어로 ── 이 화면의 첫 문장: 언급의 몇 %가 어느 테마인가. 카더라 히어로와 같은 눈썹·제목·본문 눈금(tx.css)이고
-          옆 칸은 없다. 처음엔 지도 머리의 설명 자리에 작게 있었는데 첫 문장치고 약했다(2026-09-22). */}
+      {/* ── 히어로 ── 다른 화면(테마 상세·내부자·미리보기)과 같은 1:1:2 판(.hz-kd-hero): 회색 타일 둘 + 넓은 흰 칸.
+          타일 하나는 관심 변화(가장 늘어난·가장 줄어든), 다른 하나는 상위권(새로 상위·계속 상위, 없으면 대체 잣대),
+          넓은 칸은 이 화면의 첫 문장과 아래 세 카드의 요약 한 줄씩. 처음엔 지도 머리의 설명 자리에 작게 있었고,
+          그다음 카더라식 2열 판이었다(2026-09-22 "다른 히어로 포맷과 같게"). */}
       {top.length >= 2 && (
-        <section className="hz-sheet hz-tx-hero">
-          <div className="hz-tx-hero-main">
-            <div className="hz-tx-eyebrow">
-              <span>
-                <Icon name="category" style={{ fontSize: "var(--fs-15)", color: C.muted }} />
-                테마 점유율 · 최근 {KADERA_WINDOW_DAYS}일
-              </span>
-              <span className="hz-tx-eyebrow-r">{THEME_NAMES.length}개 테마</span>
+        <section className="hz-sheet">
+          <div className="hz-kd-hero">
+            <div className="hz-kd-hero-q">
+              <div className="hz-kd-hero-title">
+                <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>관심 변화</span>
+                <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>닷새 전 대비</span>
+              </div>
+              {tilesA.length ? tilesA.map((x) => <HeroFig key={x.cap} x={x} />) : <span style={{ fontSize: "var(--fs-12)", color: C.sub }}>견줄 닷새 전 자료가 없습니다.</span>}
             </div>
-            <h2 className="hz-tx-hero-title">
-              언급의 <em style={{ color: leadDeltaInk }}>{top[0].sharePct.toFixed(1)}%</em>가{" "}
-              <Link href={themeHref(top[0].theme)} style={{ color: "inherit", textDecoration: "none" }}>
-                {top[0].theme}
-              </Link>
-              입니다.
-            </h2>
-            <div className="hz-tx-hero-body">
-              <p>
-                그다음은 {top.slice(1).map((t) => `${t.theme} ${t.sharePct.toFixed(1)}%`).join(", ")}입니다.
-                {top[0].shareDelta != null && top[0].shareDelta !== 0 && (
-                  <>
-                    {" "}
-                    {top[0].theme}는 닷새 전보다 {Math.abs(top[0].shareDelta).toFixed(1)}%p {top[0].shareDelta > 0 ? "늘었고" : "줄었고"}
-                    {leadTopDays >= 2 ? ` ${leadTopDays}일째 1위입니다.` : " 1위입니다."}
-                  </>
+            <div className="hz-kd-hero-q">
+              <div className="hz-kd-hero-title">
+                <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>상위권</span>
+                <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>{THEME_FLOW_TOP}위 안 · 최근 {THEME_FLOW_DAYS}일</span>
+              </div>
+              {tilesB.length ? tilesB.map((x) => <HeroFig key={x.cap} x={x} />) : <span style={{ fontSize: "var(--fs-12)", color: C.sub }}>열흘 흐름 자료가 없습니다.</span>}
+            </div>
+            <div className="hz-kd-hero-h">
+              <div className="hz-kd-hero-title">
+                <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>테마 점유율</span>
+                <span style={{ flex: 1 }} />
+                <span style={{ fontSize: "var(--fs-11)", color: C.muted, whiteSpace: "nowrap" }}>최근 {KADERA_WINDOW_DAYS}일 · {THEME_NAMES.length}개 테마</span>
+              </div>
+              <h2 className="hz-tx-hero-title" style={{ margin: 0 }}>
+                언급의 <em style={{ color: leadDeltaInk }}>{top[0].sharePct.toFixed(1)}%</em>가{" "}
+                <Link href={themeHref(top[0].theme)} style={{ color: "inherit", textDecoration: "none" }}>
+                  {top[0].theme}
+                </Link>
+                입니다.
+              </h2>
+              <div className="hz-tx-hero-body">
+                <p>
+                  그다음은 {top.slice(1).map((t) => `${t.theme} ${t.sharePct.toFixed(1)}%`).join(", ")}입니다.
+                  {top[0].shareDelta != null && top[0].shareDelta !== 0 && (
+                    <>
+                      {" "}
+                      {top[0].theme}는 닷새 전보다 {Math.abs(top[0].shareDelta).toFixed(1)}%p {top[0].shareDelta > 0 ? "늘었고" : "줄었고"}
+                      {leadTopDays >= 2 ? ` ${leadTopDays}일째 1위입니다.` : " 1위입니다."}
+                    </>
+                  )}
+                </p>
+                {/* 아래 두 카드의 요약 한 줄씩 — 히어로가 이 화면의 요약본이 되려면 지도만이 아니라 세 카드를 다 말해야 한다(2026-09-22 Hun).
+                    종목 이름은 그 종목 화면으로, 테마 이름은 테마 화면으로 간다. */}
+                {risers && risers.length > 0 && (
+                  <p>
+                    3일 전 대비 언급이 갑자기 늘어난 종목은{" "}
+                    {risers.slice(0, 3).map((r, i) => (
+                      <span key={r.code}>
+                        {i > 0 && ", "}
+                        <Link href={stockHref(r.code)} className="hz-theme-bodylink">
+                          {r.name}
+                        </Link>
+                        ({r.theme})
+                      </span>
+                    ))}
+                    {risers.length > 3 ? ` 등 ${risers.length}종목입니다.` : "입니다."}
+                  </p>
                 )}
-              </p>
-              {/* 아래 두 카드의 요약 한 줄씩 — 히어로가 이 화면의 요약본이 되려면 지도만이 아니라 세 카드를 다 말해야 한다(2026-09-22 Hun).
-                  종목 이름은 그 종목 화면으로, 테마 이름은 테마 화면으로 간다. */}
-              {risers && risers.length > 0 && (
-                <p>
-                  3일 전보다 갑자기 많이 언급된 종목은{" "}
-                  {risers.slice(0, 3).map((r, i) => (
-                    <span key={r.code}>
-                      {i > 0 && ", "}
-                      <Link href={stockHref(r.code)} className="hz-theme-bodylink">
-                        {r.name}
-                      </Link>
-                      ({r.theme})
-                    </span>
-                  ))}
-                  {risers.length > 3 ? ` 등 ${risers.length}종목입니다.` : "입니다."}
-                </p>
-              )}
-              {rising.length > 0 && (
-                <p>
-                  점유율이 이틀 넘게 오르는 중인 테마는{" "}
-                  {rising.map((t, i) => (
-                    <span key={t.theme}>
-                      {i > 0 && ", "}
-                      <Link href={themeHref(t.theme)} className="hz-theme-bodylink">
-                        {t.theme}
-                      </Link>
-                    </span>
-                  ))}
-                  입니다.
-                </p>
-              )}
-            </div>
-          </div>
-          {/* 옆 칸 — 오늘 달라진 것 네 타일(가장 늘어난·가장 줄어든·새로 상위·계속 상위). 흐름 표 위에 있던 두 칸을 여기로 올리고
-              둘을 더했다. 사흘 뒤·열흘 흐름을 표를 안 읽어도 알 수 있어야 히어로가 요약이다. */}
-          {tiles.length > 0 && (
-            <div className="hz-tx-hero-side">
-              <div className="hz-theme-hero-tiles">
-                {tiles.map((x) => (
-                  <Link key={x.cap} href={themeHref(x.t.theme)} className="hz-tx-tile hz-theme-hero-tile">
-                    <span className="hz-theme-hero-cap">{x.cap}</span>
-                    <span style={{ display: "flex", alignItems: "baseline", gap: 7, minWidth: 0 }}>
-                      <strong style={{ ...clip, fontSize: "var(--fs-15)", fontWeight: 800, letterSpacing: "-.02em", color: C.ink }}>{x.t.theme}</strong>
-                      <span style={{ fontFamily: MONO, fontSize: "var(--fs-12-5)", fontWeight: 800, color: x.tone, flexShrink: 0, whiteSpace: "nowrap" }}>{x.value}</span>
-                    </span>
-                    <span style={{ ...clip, fontSize: "var(--fs-11)", color: C.sub }}>{x.sub}</span>
-                  </Link>
-                ))}
+                {rising.length > 0 && (
+                  <p>
+                    점유율이 이틀 넘게 오르는 중인 테마는{" "}
+                    {rising.map((t, i) => (
+                      <span key={t.theme}>
+                        {i > 0 && ", "}
+                        <Link href={themeHref(t.theme)} className="hz-theme-bodylink">
+                          {t.theme}
+                        </Link>
+                      </span>
+                    ))}
+                    입니다.
+                  </p>
+                )}
               </div>
             </div>
-          )}
+          </div>
         </section>
       )}
 
@@ -310,7 +324,7 @@ export default async function ThemeIndexPage() {
           /* 제목·설명은 짧고 글자 그대로(2026-09-21 "더 직관적이고 심플하게"). 셈법은 물음표 도움말로 내렸다. */
           title="갑자기 많이 언급된 종목"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
-          desc="테마마다 3일 전보다 언급이 크게 늘어난 종목 하나와 채널이 말한 까닭입니다."
+          desc="테마마다 3일 전 대비 언급이 크게 늘어난 종목 하나와 요즘 도는 얘기입니다."
           noteHelp={`배수는 최근 ${KADERA_WINDOW_DAYS}일 언급을 그 전 ${KADERA_WINDOW_DAYS}일 언급으로 나눈 값입니다. 최근 ${KADERA_WINDOW_DAYS}일 언급이 ${RISER_MIN_MENTIONS}회 미만이거나 ${RISER_MIN_RATIO}배에 못 미치는 종목은 세지 않고, 그 전 ${KADERA_WINDOW_DAYS}일에 한 번도 언급되지 않았던 종목은 '새로 등장'으로 맨 앞에 섭니다. 채널이 까닭을 말하지 않은 종목(등락률 목록에만 오른 것)은 싣지 않습니다. 많아야 ${RISER_MAX}줄입니다.`}
           level={2}
         />
@@ -320,14 +334,14 @@ export default async function ThemeIndexPage() {
           </p>
         ) : risers.length === 0 ? (
           <p style={{ margin: 0, padding: "16px 22px 20px", fontSize: "var(--fs-12)", color: C.sub, lineHeight: 1.7 }}>
-            3일 전보다 언급이 늘고 채널이 까닭을 말한 종목이 없습니다.
+            3일 전 대비 언급이 늘고 채널이 까닭을 말한 종목이 없습니다.
           </p>
         ) : (
           <>
             <div className="hz-thead hz-cols-theme-riser">
               <span>테마</span>
               <span>종목</span>
-              <span>채널이 말한 까닭</span>
+              <span>요즘 도는 얘기</span>
               <span style={{ textAlign: "right" }}>최근 {KADERA_WINDOW_DAYS}일 언급</span>
             </div>
             <div>
