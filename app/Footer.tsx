@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { NOTE_PAGE } from "./daily/copy";
 import { DIVIDEND_PAGE } from "./dividend/copy";
-import { THEME_PAGE } from "./theme/copy";
+import { KR_THEME_SHORT, THEME_PAGE, US_THEME_PAGE } from "./theme/copy";
 import { DAILY_PUBLIC, DIVIDEND_PUBLIC, PREVIEW_PUBLIC, SEOHAK_PUBLIC, THEME_PUBLIC } from "./screen-flags";
 import { BetaBadge, GhostSymbol, Wordmark } from "./Logo";
 import { C } from "./ui";
@@ -215,7 +215,8 @@ export default function Footer() {
             <FooterLink href="/kadera/us">미장 카더라</FooterLink>
             {/* 테마 리포트 — 사이드바에서 카더라 다음 자리라 여기서도 같은 자리(아래 '안 연 화면' 규칙은 그대로다).
                 로컬(배포 아님)에서는 열기 전에도 보인다 — 만드는 중에 푸터까지 같이 봐야 해서(2026-09-22). */}
-            {(THEME_PUBLIC || !process.env.VERCEL_ENV) && <FooterLink href={THEME_PAGE.href}>{THEME_PAGE.label}</FooterLink>}
+            {(THEME_PUBLIC || !process.env.VERCEL_ENV) && <FooterLink href={THEME_PAGE.href}>{KR_THEME_SHORT}</FooterLink>}
+            {(THEME_PUBLIC || !process.env.VERCEL_ENV) && <FooterLink href={US_THEME_PAGE.href}>{US_THEME_PAGE.short}</FooterLink>}
             {/* ⚠️ 이 줄이 빠져 있었다. 화면을 여는 날(2026-08-26)에야 드러났는데, 예고
                 시절엔 '준비 중'이라 없는 게 맞았고 그 뒤로 아무도 다시 안 봤다.
                 ⭐ **여는 순간 고칠 곳이 NAV 의 badge 한 줄만은 아니다** — 푸터의 이

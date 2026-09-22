@@ -733,6 +733,13 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/generate_theme_briefs.py
 
+      # 미장 테마 리포트(/theme/us/[테마]) — 위와 같은 것을 미장 테마 16개에. 기준일은 telegram_us_sentiment_daily 라
+      # 미장 센티먼트 집계 뒤여야 한다(미장 총평과 같은 자리).
+      - name: (텔레그램) 미장 테마 요약 생성
+        id: telegram_us_theme_briefs
+        continue-on-error: true
+        run: python data-pipeline/scripts/generate_us_theme_briefs.py
+
       # ── KRX 공표 대기 게이트 ─────────────────────────────────────────────
       # **KRX Open API 는 전 영업일 자료를 08:00 KST 정각에 올린다**(2026-08-14 실측:
       # 07:54:52 엔 7개 서비스 전부 0행, 08:00:00 에 전부 채워짐. 5분 간격 30회 폴링).
@@ -1702,8 +1709,8 @@ jobs:
         id: us_health
         if: always()
         run: |
-          names=("extract_telegram_us_stocks.py" "calculate_us_stock_daily.py" "calculate_us_comention.py" "calculate_us_trending.py" "calculate_us_theme_daily.py" "calculate_us_telegram_sentiment.py" "generate_us_telegram_narratives.py")
-          outcomes=("${{ steps.telegram_us_extract.outcome }}" "${{ steps.telegram_us_daily.outcome }}" "${{ steps.telegram_us_comention.outcome }}" "${{ steps.telegram_us_trending.outcome }}" "${{ steps.telegram_us_theme.outcome }}" "${{ steps.telegram_us_sentiment.outcome }}" "${{ steps.telegram_us_narratives.outcome }}")
+          names=("extract_telegram_us_stocks.py" "calculate_us_stock_daily.py" "calculate_us_comention.py" "calculate_us_trending.py" "calculate_us_theme_daily.py" "calculate_us_telegram_sentiment.py" "generate_us_telegram_narratives.py" "generate_us_theme_briefs.py")
+          outcomes=("${{ steps.telegram_us_extract.outcome }}" "${{ steps.telegram_us_daily.outcome }}" "${{ steps.telegram_us_comention.outcome }}" "${{ steps.telegram_us_trending.outcome }}" "${{ steps.telegram_us_theme.outcome }}" "${{ steps.telegram_us_sentiment.outcome }}" "${{ steps.telegram_us_narratives.outcome }}" "${{ steps.telegram_us_theme_briefs.outcome }}")
 
           {
             echo "## 미장 카더라"

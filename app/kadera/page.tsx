@@ -1067,7 +1067,7 @@ export default async function KaderaPage() {
             desc="관심이 어느 테마로 옮겨가는지 · 점유율 변화 기준"
             right={
               THEME_LINKS ? (
-                /* 기간 알약과 같은 자리·같은 꼴의 알약(2026-09-22 Hun). 눌리는 것이라 올리면 하늘색(.hz-theme-headpill). */
+                /* 기간 알약과 같은 자리·같은 꼴의 알약(2026-09-22). 눌리는 것이라 올리면 하늘색(.hz-theme-headpill). */
                 <Link href="/theme" className="hz-sheet-head-note hz-theme-headpill">
                   테마 자세히 보기
                   <Icon name="arrow_forward" style={{ fontSize: "var(--fs-13)" }} />

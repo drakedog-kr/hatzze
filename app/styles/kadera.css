@@ -525,7 +525,7 @@ a.hz-theme-chip:hover { background: var(--tx-btn); }
   padding: 3px 7px;
   font-size: var(--fs-12);
   font-weight: 700;
-  color: var(--c-ink); /* 회색(--c-sub)이었다 — 이름이 흐려 안 눌리는 것으로 보였다(2026-09-22 Hun "종목명 색은 좀 더 진하게"). 곁말(테마)만 sub2. */
+  color: var(--c-ink); /* 회색(--c-sub)이었다 — 이름이 흐려 안 눌리는 것으로 보였다(2026-09-22 "종목명 색은 좀 더 진하게"). 곁말(테마)만 sub2. */
   cursor: pointer;
   transition: background 0.12s ease, color 0.12s ease;
 }

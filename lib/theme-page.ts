@@ -100,7 +100,7 @@ export type ThemeHotStock = ThemeMember & {
   /**
    * 평소의 사흘치 언급 — 30일 기간에서 최근 사흘을 뺀 27일의 하루 평균 × 3. 종목 지도의 색과 표의 "평소 대비 +60%"가
    * 이것과 견준다. 0 이면 지난 한 달 언급이 없던 종목(새로 등장). 처음엔 '바로 앞 사흘'과 견줬는데 "앞 사흘의 58%"가
-   * 직관적이지 않았다(2026-09-21 Hun) — 히어로의 '평소 대비'와 같은 잣대로 맞춘다.
+   * 직관적이지 않았다(2026-09-21) — 히어로의 '평소 대비'와 같은 잣대로 맞춘다.
    */
   usualMentions: number;
   /** 최근 사흘 중 하루 최다 채널 수. **기간 합집합이 아니다**(lib/stock-page.ts 머리말 ②). */
@@ -225,8 +225,8 @@ async function fillTodayRates(reasons: ThemeReasonRow[]): Promise<void> {
   );
 }
 
-/** 종목 등락을 테마 하나의 묶음으로. 날짜는 가장 많은 종목이 가진 것 — 상장 직후 종목의 옛 날짜 하나에 끌려가지 않게. */
-function themeQuotes(rows: { changeRate: number | null; priceDate: string | null }[]): ThemeQuotes {
+/** 종목 등락을 테마 하나의 묶음으로. 날짜는 가장 많은 종목이 가진 것 — 상장 직후 종목의 옛 날짜 하나에 끌려가지 않게. 미장(lib/us-theme-page.ts)도 쓴다. */
+export function themeQuotes(rows: { changeRate: number | null; priceDate: string | null }[]): ThemeQuotes {
   const have = rows.filter((r) => r.changeRate != null && r.priceDate);
   if (!have.length) return { date: null, avgChange: null, up: 0, down: 0, flat: 0 };
   const byDate = new Map<string, number>();
@@ -242,6 +242,82 @@ function themeQuotes(rows: { changeRate: number | null; priceDate: string | null
     down,
     flat: onDate.length - up - down,
   };
+}
+
+/** telegram_theme_brief · telegram_us_theme_brief 의 한 행(둘이 같은 열이다 — 마이그레이션 082). */
+export type BriefExcerptRow = { channel_handle: string; message_id: number; posted_at: string; views?: number | null; forwards?: number | null; text: string; stocks?: string[] | null };
+export type BriefRow = { date: string; brief: string | null; related: ThemeRelated[] | null; excerpts: BriefExcerptRow[] | null; message_count: number | null };
+
+/** 요약 행을 화면 타입으로. 채널 제목·사진은 여기서 붙인다. related 는 사전에 있는 이름만 남긴다. */
+export function parseBriefRow(b: BriefRow | null, meta: Awaited<ReturnType<typeof channelMeta>>, known: (theme: string) => boolean): ThemeBrief | null {
+  if (!b) return null;
+  const excerpts: ThemeExcerpt[] = (Array.isArray(b.excerpts) ? b.excerpts : [])
+    .filter((r) => r && typeof r.text === "string" && r.text.trim())
+    .map((r) => ({
+      channelHandle: r.channel_handle,
+      messageId: r.message_id,
+      channelTitle: meta.titleOf.get(r.channel_handle) ?? r.channel_handle,
+      channelPhotoUrl: meta.photoUrlOf.get(r.channel_handle) ?? null,
+      postedAt: r.posted_at,
+      views: r.views ?? 0,
+      forwards: r.forwards ?? 0,
+      text: r.text.trim(),
+      stocks: Array.isArray(r.stocks) ? r.stocks : [],
+    }));
+  return {
+    date: b.date,
+    brief: b.brief?.trim() ? b.brief : null,
+    messageCount: b.message_count ?? 0,
+    related: Array.isArray(b.related) ? b.related.filter((x) => x && typeof x.theme === "string" && known(x.theme)) : [],
+    excerpts,
+  };
+}
+
+/** 종목 일별 집계 한 행 — 국장(telegram_stock_daily)·미장(telegram_us_stock_daily)을 같은 꼴로 받는다. */
+export type StockDailyLike = { date: string; code: string; mentions: number | null; channels: number | null; weight: number | string | null };
+
+/**
+ * '이 테마의 주인공' — 최근 창 언급 합 순. 평소(usualDayCount 일)의 하루 평균 × 창 길이가 usualMentions.
+ * 국장·미장이 같은 규칙으로 줄을 세운다(lib/us-theme-page.ts). reasons 는 최신순이어야 종목마다 처음 만난 것이 가장 최근 까닭이다.
+ */
+export function buildHotStocks(
+  rows: StockDailyLike[],
+  recentSet: Set<string>,
+  usualDayCount: number,
+  byCode: Map<string, ThemeMember>,
+  reasons: ThemeReasonRow[],
+): ThemeHotStock[] {
+  const agg = new Map<string, { m: number; c: number; w: number; u: number }>();
+  for (const r of rows) {
+    const a = agg.get(r.code) ?? { m: 0, c: 0, w: 0, u: 0 };
+    if (recentSet.has(r.date)) {
+      a.m += r.mentions || 0;
+      a.c = Math.max(a.c, r.channels || 0);
+      a.w += Number(r.weight) || 0;
+    } else {
+      a.u += r.mentions || 0; // 평소(앞 27일) 합. 행이 없는 날은 0회라 날수는 27로 고정해 나눈다.
+    }
+    agg.set(r.code, a);
+  }
+  const latestReasonOf = new Map<string, ThemeReasonRow>();
+  for (const r of reasons) {
+    // 최근 창 안의 것만, 종목마다 가장 최근 하나(목록이 최신순이라 처음 만난 것이 그것이다).
+    if (recentSet.has(r.date) && !latestReasonOf.has(r.code)) latestReasonOf.set(r.code, r);
+  }
+  return [...agg.entries()]
+    // 앞 사흘에만 언급되고 최근 사흘엔 없는 종목은 '말 많은 종목'이 아니다.
+    .filter(([code, a]) => byCode.has(code) && a.m > 0)
+    .sort((x, y) => y[1].m - x[1].m || y[1].w - x[1].w || x[0].localeCompare(y[0]))
+    .map(([code, a]) => {
+      const why = latestReasonOf.get(code);
+      return {
+        ...byCode.get(code)!,
+        mentions: a.m,
+        usualMentions: usualDayCount > 0 ? (a.u / usualDayCount) * recentSet.size : 0,
+        channels: a.c,
+        reason: why ? { date: why.date, reason: why.reason, changeRate: why.changeRate } : null,
+      };
+    });
 }
 
 /**
@@ -276,8 +352,6 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
   type ThemeDailyRow = { date: string; share_pct: number | string; rank: number | null; mention_count: number | null };
   type StockDailyRow = { id: number; date: string; stock_code: string; mention_count: number | null; channel_count: number | null; weighted_score: number | string | null };
   type ReasonRow = { date: string; stock_code: string; reason: string | null; change_rate: number | string | null; channel_count: number | null };
-  type BriefExcerptRow = { channel_handle: string; message_id: number; posted_at: string; views?: number | null; forwards?: number | null; text: string; stocks?: string[] | null };
-  type BriefRow = { date: string; brief: string | null; related: ThemeRelated[] | null; excerpts: BriefExcerptRow[] | null; message_count: number | null };
 
   let stockDailyFailed = false;
   const [themeDaily, stockDaily, reasonRows, events, rotation, briefRow, meta] = await Promise.all([
@@ -359,38 +433,13 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
 
   // ── 말 많은 종목 ── 최근 사흘 언급 합 순. 머리가 "많이 언급된 순서"라고 말하니 잣대도 언급 수다
   // (테마 로테이션 팝오버는 주목도순인데, 그쪽은 "점유율을 만든 종목"이라 잣대가 다르다). 동률은 주목도.
-  const recentSet = new Set(recentDays);
-  const agg = new Map<string, { m: number; c: number; w: number; u: number }>();
-  for (const r of stockDaily) {
-    const a = agg.get(r.stock_code) ?? { m: 0, c: 0, w: 0, u: 0 };
-    if (recentSet.has(r.date)) {
-      a.m += r.mention_count || 0;
-      a.c = Math.max(a.c, r.channel_count || 0);
-      a.w += Number(r.weighted_score) || 0;
-    } else {
-      a.u += r.mention_count || 0; // 평소(앞 27일) 합. 행이 없는 날은 0회라 날수는 27로 고정해 나눈다.
-    }
-    agg.set(r.stock_code, a);
-  }
-  const latestReasonOf = new Map<string, ThemeReasonRow>();
-  for (const r of reasons) {
-    // 최근 사흘 안의 것만, 종목마다 가장 최근 하나(목록이 최신순이라 처음 만난 것이 그것이다).
-    if (recentSet.has(r.date) && !latestReasonOf.has(r.code)) latestReasonOf.set(r.code, r);
-  }
-  const hotStocks: ThemeHotStock[] = [...agg.entries()]
-    // 앞 사흘에만 언급되고 최근 사흘엔 없는 종목은 '말 많은 종목'이 아니다.
-    .filter(([code, a]) => byCode.has(code) && a.m > 0)
-    .sort((x, y) => y[1].m - x[1].m || y[1].w - x[1].w || x[0].localeCompare(y[0]))
-    .map(([code, a]) => {
-      const why = latestReasonOf.get(code);
-      return {
-        ...byCode.get(code)!,
-        mentions: a.m,
-        usualMentions: usualDayCount > 0 ? (a.u / usualDayCount) * KADERA_WINDOW_DAYS : 0,
-        channels: a.c,
-        reason: why ? { date: why.date, reason: why.reason, changeRate: why.changeRate } : null,
-      };
-    });
+  const hotStocks = buildHotStocks(
+    stockDaily.map((r) => ({ date: r.date, code: r.stock_code, mentions: r.mention_count, channels: r.channel_count, weight: r.weighted_score })),
+    new Set(recentDays),
+    usualDayCount,
+    byCode,
+    reasons,
+  );
 
   // ── 점유율·순위 ── 테마 로테이션과 같은 값이어야 카드에서 이 화면으로 넘어와도 숫자가 같다.
   let recentShare: number | null = null;
@@ -410,29 +459,7 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
   }
 
   // ── 요약·함께 언급된 테마·발췌 ── 전부 파이프라인이 써 둔 한 행에서 온다.
-  const b = (briefRow.data ?? null) as BriefRow | null;
-  const excerpts: ThemeExcerpt[] = (Array.isArray(b?.excerpts) ? b.excerpts : [])
-    .filter((r) => r && typeof r.text === "string" && r.text.trim())
-    .map((r) => ({
-      channelHandle: r.channel_handle,
-      messageId: r.message_id,
-      channelTitle: meta.titleOf.get(r.channel_handle) ?? r.channel_handle,
-      channelPhotoUrl: meta.photoUrlOf.get(r.channel_handle) ?? null,
-      postedAt: r.posted_at,
-      views: r.views ?? 0,
-      forwards: r.forwards ?? 0,
-      text: r.text.trim(),
-      stocks: Array.isArray(r.stocks) ? r.stocks : [],
-    }));
-  const brief: ThemeBrief | null = b
-    ? {
-        date: b.date,
-        brief: b.brief?.trim() ? b.brief : null,
-        messageCount: b.message_count ?? 0,
-        related: Array.isArray(b.related) ? b.related.filter((x) => x && typeof x.theme === "string" && x.theme in THEMES) : [],
-        excerpts,
-      }
-    : null;
+  const brief = parseBriefRow((briefRow.data ?? null) as BriefRow | null, meta, (t) => t in THEMES);
 
   return {
     theme,
@@ -499,6 +526,18 @@ export function briefFirstSentence(brief: string | null | undefined): string | n
   return out;
 }
 
+/** 열흘 순위 목록의 지속·첫 등장·간헐 판정. 미장 목록(lib/us-theme-page.ts)도 같은 규칙이다. */
+export function flowStats(flow: (number | null)[]): { streak: number; topDays: number; label: ThemeFlowLabel } {
+  const isTop = (v: number | null) => v != null && v <= THEME_FLOW_TOP;
+  let streak = 0;
+  for (let i = flow.length - 1; i >= 0 && isTop(flow[i]); i--) streak += 1;
+  const topDays = flow.filter(isTop).length;
+  // 지금 상위이고 그 전 열흘엔 없었으면 첫 등장(이틀까지), 지금 상위면 며칠째인지, 지금은 아니지만
+  // 열흘 안에 상위였던 날이 있으면 간헐, 열흘 내내 상위 밖이면 조용.
+  const label: ThemeFlowLabel = streak > 0 && topDays === streak && streak <= 2 ? "new" : streak > 0 ? "streak" : topDays > 0 ? "intermittent" : "quiet";
+  return { streak, topDays, label };
+}
+
 /**
  * 테마 목록 — 로테이션(점유율·순위·변화)에 **열흘 흐름**을 더한 것.
  *
@@ -555,14 +594,7 @@ export async function listThemeOverview(): Promise<ThemeOverview[] | null> {
     .map((r) => {
       const flow = dates.map((d) => rankOn.get(d)?.get(r.theme) ?? null);
       const shareFlow = dates.map((d) => shareOn.get(d)?.get(r.theme) ?? 0);
-      const isTop = (v: number | null) => v != null && v <= THEME_FLOW_TOP;
-      let streak = 0;
-      for (let i = flow.length - 1; i >= 0 && isTop(flow[i]); i--) streak += 1;
-      const topDays = flow.filter(isTop).length;
-      // 지금 상위이고 그 전 열흘엔 없었으면 첫 등장(이틀까지), 지금 상위면 며칠째인지, 지금은 아니지만
-      // 열흘 안에 상위였던 날이 있으면 간헐, 열흘 내내 상위 밖이면 조용.
-      const label: ThemeFlowLabel =
-        streak > 0 && topDays === streak && streak <= 2 ? "new" : streak > 0 ? "streak" : topDays > 0 ? "intermittent" : "quiet";
+      const { streak, topDays, label } = flowStats(flow);
       return {
         theme: r.theme,
         rank: r.rank,
@@ -607,6 +639,37 @@ export type ThemeRiser = {
   reason: string | null;
 };
 
+/** 요약 행의 riser 칸(파이프라인이 쓴 그대로). code 는 국장이면 6자리 코드, 미장이면 티커. */
+export type RiserRow = { theme: string; date: string; riser: { code: string; name: string; market: string | null; recent: number; prior: number; ratio: number | null; reason: string | null } | null };
+
+/** 최신순 행에서 테마마다 첫 것만 골라 줄을 세운다(새로 등장 > 배수 > 언급 수, 최대 RISER_MAX). 미장도 같은 규칙. */
+export function parseRisers(rows: RiserRow[], known: (theme: string) => boolean): ThemeRiser[] {
+  const seen = new Set<string>();
+  const out: ThemeRiser[] = [];
+  for (const r of rows) {
+    if (!known(r.theme) || seen.has(r.theme) || !r.riser?.code) continue;
+    seen.add(r.theme);
+    const s = r.riser;
+    out.push({
+      theme: r.theme,
+      code: s.code,
+      name: s.name,
+      market: s.market ?? null,
+      recent: Number(s.recent) || 0,
+      prior: Number(s.prior) || 0,
+      ratio: s.ratio == null ? null : Number(s.ratio),
+      reason: s.reason?.trim() || null,
+    });
+  }
+  const better = (a: ThemeRiser, b: ThemeRiser) => {
+    // 새로 등장 > 배수 > 언급 수.
+    if ((a.ratio === null) !== (b.ratio === null)) return a.ratio === null;
+    if (a.ratio !== null && b.ratio !== null && a.ratio !== b.ratio) return a.ratio > b.ratio;
+    return a.recent > b.recent;
+  };
+  return out.sort((a, b) => (better(a, b) ? -1 : better(b, a) ? 1 : 0)).slice(0, RISER_MAX);
+}
+
 /**
  * 테마마다 **앞 사흘보다 언급이 가장 많이 는 종목** 하나와 까닭. 종목 지도(테마 화면)가 색으로 보이는 것을
  * 목록에 한 줄로 모은 것이다. 카더라 급부상은 시장 전체 상위 여섯이고 이건 테마마다 하나라 대상이 다르다.
@@ -637,29 +700,5 @@ export async function listThemeRisers(): Promise<ThemeRiser[] | null> {
     console.error("[listThemeRisers] 테마 요약의 종목 칸을 못 읽었습니다", error);
     return null;
   }
-  type Stored = { code: string; name: string; market: string | null; recent: number; prior: number; ratio: number | null; reason: string | null };
-  const seen = new Set<string>();
-  const out: ThemeRiser[] = [];
-  for (const r of (data ?? []) as { theme: string; date: string; riser: Stored | null }[]) {
-    if (!(r.theme in THEMES) || seen.has(r.theme) || !r.riser?.code) continue;
-    seen.add(r.theme);
-    const s = r.riser;
-    out.push({
-      theme: r.theme,
-      code: s.code,
-      name: s.name,
-      market: s.market ?? null,
-      recent: Number(s.recent) || 0,
-      prior: Number(s.prior) || 0,
-      ratio: s.ratio == null ? null : Number(s.ratio),
-      reason: s.reason?.trim() || null,
-    });
-  }
-  const better = (a: ThemeRiser, b: ThemeRiser) => {
-    // 새로 등장 > 배수 > 언급 수.
-    if ((a.ratio === null) !== (b.ratio === null)) return a.ratio === null;
-    if (a.ratio !== null && b.ratio !== null && a.ratio !== b.ratio) return a.ratio > b.ratio;
-    return a.recent > b.recent;
-  };
-  return out.sort((a, b) => (better(a, b) ? -1 : better(b, a) ? 1 : 0)).slice(0, RISER_MAX);
+  return parseRisers((data ?? []) as RiserRow[], (t) => t in THEMES);
 }

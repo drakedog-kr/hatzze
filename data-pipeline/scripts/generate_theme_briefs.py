@@ -127,7 +127,9 @@ LEN_HARD_MIN, LEN_HARD_MAX = 200, 460
 PARAGRAPHS = 2
 MAX_RETRIES = 3
 
-THEME_SYSTEM = KR.COMMON + f"""
+# 프롬프트 본문은 COMMON(공통 규칙)과 떼어 둔다 — 미장 테마 요약(generate_us_theme_briefs.py)이 US_COMMON 에
+# 같은 본문을 붙여 쓴다. 본문을 고치면 두 시장이 같이 바뀐다.
+THEME_RULES = f"""
 
 [이번 문장 — 테마 요약]
 한 테마(예: 반도체·로봇·원전)에 대해, 최근 {KR.WINDOW_DAYS}일 텔레그램에서 그 테마 종목들을 두고
@@ -164,6 +166,8 @@ THEME_SYSTEM = KR.COMMON + f"""
 - **반드시 {LEN_MIN}자 이상 {LEN_MAX}자 이하**로 쓰세요(공백 포함). 문단마다 두 문장 또는 세 문장으로
   자연스럽게 맞추세요."""
 
+THEME_SYSTEM = KR.COMMON + THEME_RULES
+
 
 def normalize_paragraphs(text: str) -> str:
     """문단 사이를 빈 줄 하나로 고른다. 모델이 줄바꿈 하나로 문단을 가르거나 빈 줄을 둘 두기도 해서,
@@ -186,7 +190,7 @@ RISER_LEN_HARD_MIN, RISER_LEN_HARD_MAX = 40, 110
 # "관련 종목들의 주가 움직임이 … 주목받았습니다"로 채웠다).
 NO_NEWS_MARK = "뚜렷한 소식 없이"
 
-RISER_SYSTEM = KR.COMMON + f"""
+RISER_RULES = f"""
 
 [이번 문장 — 갑자기 많이 언급된 종목의 까닭]
 한 종목이 최근 {KR.WINDOW_DAYS}일 텔레그램에서 그 앞보다 부쩍 많이 회자됐습니다. **무엇 때문에 갑자기
@@ -205,6 +209,8 @@ RISER_SYSTEM = KR.COMMON + f"""
 - 발췌가 등락률 목록·시장 정리표뿐이고 **이 종목에 관한 소식이 없으면** 까닭을 지어내지 말고 정확히
   "{NO_NEWS_MARK} 언급만 늘었습니다."라고만 쓰세요. 목록의 다른 종목이나 섹터 제목을 까닭으로 삼지 마세요.
 - 그 밖에는 **{RISER_LEN_MIN}자 이상 {RISER_LEN_MAX}자 이하**로 쓰세요(공백 포함). 한 문장 또는 두 문장."""
+
+RISER_SYSTEM = KR.COMMON + RISER_RULES
 
 
 # 발췌 한 줄에 등락률이 이만큼 있으면 소식이 아니라 **등락률 목록**(오늘 시장 한눈에 보기 · 주도 섹터 현황)이다.
@@ -406,6 +412,51 @@ def pick_text(candidates: list[str], digest: str) -> str | None:
     return None
 
 
+def write_brief(ask_with, system: str, digest: str, label: str) -> str | None:
+    """테마 요약 두 문단. 검사(매수·매도·시세 낱말·문단 수·길이)에 걸리면 MAX_RETRIES 번 다시 쓰게 하고 pick_text 로 고른다.
+    `ask_with(system, user)` 는 모델을 한 번 부르는 함수 — 국장·미장이 각자 자기 클라이언트를 넘긴다."""
+    candidates = [normalize_paragraphs(ask_with(system, digest))]
+    for _attempt in range(MAX_RETRIES):
+        cur = candidates[-1]
+        found = brief_problems(cur, digest)
+        if paragraph_count(cur) != PARAGRAPHS:
+            found.append(f"문단이 {paragraph_count(cur)}개(둘이어야 함)")
+        if LEN_MIN <= len(cur) <= LEN_MAX and not found:
+            break
+        if found:
+            print(f"  [{label}] 문장을 버리고 다시 씁니다({' · '.join(found)}): {cur[:40]}…")
+            fix = f"방금 쓴 글에 문제가 있습니다({' · '.join(found)}). 같은 뜻으로 두 문단으로 다시 써 주세요.\n\n{digest}"
+        else:
+            need = "늘려" if len(cur) < LEN_MIN else "줄여"
+            fix = (
+                f"방금 쓴 문장은 {len(cur)}자입니다. 뜻은 유지하면서 {need} "
+                f"{LEN_MIN}~{LEN_MAX}자로 다시 써 주세요.\n\n{digest}\n\n[방금 쓴 문장]\n{cur}"
+            )
+        candidates.append(normalize_paragraphs(ask_with(system, fix)))
+    return pick_text(candidates, digest)
+
+
+def write_riser_reason(ask_with, system: str, digest: str | None, name: str) -> str | None:
+    """갑자기 많이 언급된 종목의 까닭(50~90자). 재료가 없거나 등락률 목록뿐이면 묻지 않고 None."""
+    if not digest or digest_is_list_only(digest):
+        return None
+    candidates = [ask_with(system, digest)]
+    for _attempt in range(MAX_RETRIES):
+        cur = candidates[-1]
+        if NO_NEWS_MARK in cur:
+            break
+        found = riser_problems(cur, digest, name)
+        if RISER_LEN_MIN <= len(cur) <= RISER_LEN_MAX and not found:
+            break
+        if found:
+            fix = f"방금 쓴 문장에 문제가 있습니다({' · '.join(found)}). 같은 뜻으로 다시 써 주세요.\n\n{digest}"
+        else:
+            need = "늘려" if len(cur) < RISER_LEN_MIN else "줄여"
+            fix = f"방금 쓴 문장은 {len(cur)}자입니다. 뜻은 유지하면서 {need} {RISER_LEN_MIN}~{RISER_LEN_MAX}자로 다시 써 주세요.\n\n{digest}\n\n[방금 쓴 문장]\n{cur}"
+        candidates.append(ask_with(system, fix))
+    return riser_pick(candidates, digest)
+
+
 def main() -> None:
     args = sys.argv[1:]
     dry_run = "--dry-run" in args
@@ -491,33 +542,13 @@ def main() -> None:
         )
         return "".join(b.text for b in resp.content if b.type == "text").strip()
 
-    def ask(digest: str) -> str:
-        return ask_with(THEME_SYSTEM, digest)
-
     def riser_reason(theme: str) -> dict | None:
         """이 테마의 '갑자기 많이 언급된 종목' 한 건(까닭 포함). 후보가 없으면 None."""
         r = riser_of.get(theme)
         if r is None:
             return None
-        digest = digest_of.get(r["code"])
         out = {"code": r["code"], "name": r["name"], "market": market_of.get(r["code"]), "recent": r["recent"], "prior": r["prior"], "ratio": r["ratio"], "reason": None}
-        if not digest or digest_is_list_only(digest):
-            return out
-        candidates = [ask_with(RISER_SYSTEM, digest)]
-        for _attempt in range(MAX_RETRIES):
-            cur = candidates[-1]
-            if NO_NEWS_MARK in cur:
-                break
-            found = riser_problems(cur, digest, r["name"])
-            if RISER_LEN_MIN <= len(cur) <= RISER_LEN_MAX and not found:
-                break
-            if found:
-                fix = f"방금 쓴 문장에 문제가 있습니다({' · '.join(found)}). 같은 뜻으로 다시 써 주세요.\n\n{digest}"
-            else:
-                need = "늘려" if len(cur) < RISER_LEN_MIN else "줄여"
-                fix = f"방금 쓴 문장은 {len(cur)}자입니다. 뜻은 유지하면서 {need} {RISER_LEN_MIN}~{RISER_LEN_MAX}자로 다시 써 주세요.\n\n{digest}\n\n[방금 쓴 문장]\n{cur}"
-            candidates.append(ask_with(RISER_SYSTEM, fix))
-        out["reason"] = riser_pick(candidates, digest)
+        out["reason"] = write_riser_reason(ask_with, RISER_SYSTEM, digest_of.get(r["code"]), r["name"])
         return out
 
     saved = 0
@@ -526,27 +557,7 @@ def main() -> None:
         row = {"date": latest, "theme": theme, "brief": None, "related": [], "excerpts": [], "message_count": 0, "stock_count": 0, "model": None, "riser": None}
         try:
             if b is not None:
-                candidates = [normalize_paragraphs(ask(b["digest"]))]
-                for _attempt in range(MAX_RETRIES):
-                    cur = candidates[-1]
-                    found = brief_problems(cur, b["digest"])
-                    if paragraph_count(cur) != PARAGRAPHS:
-                        found.append(f"문단이 {paragraph_count(cur)}개(둘이어야 함)")
-                    if LEN_MIN <= len(cur) <= LEN_MAX and not found:
-                        break
-                    if found:
-                        print(f"  [{theme}] 문장을 버리고 다시 씁니다({' · '.join(found)}): {cur[:40]}…")
-                        fix = f"방금 쓴 글에 문제가 있습니다({' · '.join(found)}). 같은 뜻으로 두 문단으로 다시 써 주세요.\n\n{b['digest']}"
-                    else:
-                        need = "늘려" if len(cur) < LEN_MIN else "줄여"
-                        fix = (
-                            f"방금 쓴 문장은 {len(cur)}자입니다. 뜻은 유지하면서 {need} "
-                            f"{LEN_MIN}~{LEN_MAX}자로 다시 써 주세요.\n\n{b['digest']}\n\n[방금 쓴 문장]\n{cur}"
-                        )
-                    candidates.append(normalize_paragraphs(ask(fix)))
-                text = pick_text(candidates, b["digest"])
-                if text is None:
-                    print(f"  [{theme}] 쓸 수 있는 문장이 없어(빈 응답이거나 전부 매수·매도 표현) 요약 없이 저장합니다.")
+                text = write_brief(ask_with, THEME_SYSTEM, b["digest"], theme)
                 row.update(
                     brief=text,
                     related=b["related"],

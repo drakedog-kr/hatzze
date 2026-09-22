@@ -17,6 +17,10 @@ import {
 } from "@/lib/us-telegram-data";
 import type { UsTrendingMessage } from "@/lib/us-telegram-data";
 import { US_BOARD_TILES, getUsMoveReasons, getUsUpcomingEvents } from "@/lib/kadera-us-why";
+import { US_THEME_NAMES, usThemeHref } from "@/lib/theme-href";
+import { themesForTicker } from "@/lib/us-stock-themes";
+import { THEME_PUBLIC } from "../../screen-flags";
+import { US_THEME_PAGE } from "../../theme/copy";
 import { todayKst } from "@/lib/kadera-why";
 import { fmtKoDate } from "@/lib/stock-page";
 import { assertLoaded, isLoadFailed } from "@/lib/load-state";
@@ -70,6 +74,32 @@ export const revalidate = 1800;
 
 /** 옆에 나란히 두는 시트의 최소 폭. 국내 페이지와 같은 값이라 두 화면의 접히는 지점이 같다. */
 const SHEET_PAIR_MIN = "min(460px, 100%)";
+
+/**
+ * 미장 테마 리포트(/theme/us)로 가는 길을 낼 것인가. 국장 카더라(app/kadera/page.tsx THEME_LINKS)와 같은 규칙 —
+ * 안 연 화면으로 링크를 내면 배포에서 404 라 여는 날까지 감추고, 로컬에서는 만드는 중에 봐야 하니 켠다.
+ * 테마 로테이션 줄·유입/이탈 두 칸·급부상 종목/종목 리포트의 테마 칩·오늘의 브리핑 문장 속 테마 이름이 이 값을 본다.
+ */
+const THEME_LINKS = THEME_PUBLIC || !process.env.VERCEL_ENV;
+
+/** 오늘의 브리핑 문장 속 테마 이름 → 미장 테마 리포트 주소(highlightTerms 의 linkTerms). 사전의 16개 이름 그대로다. */
+const THEME_LINK_MAP = new Map(US_THEME_NAMES.map((t) => [t, usThemeHref(t)]));
+
+/** 티커 옆 테마 칩. 누르면 그 미장 테마 리포트로. 국장 카더라의 ThemeChips 와 같은 꼴(둘까지). */
+function ThemeChips({ ticker }: { ticker: string }) {
+  if (!THEME_LINKS) return null;
+  const themes = themesForTicker(ticker).slice(0, 2);
+  if (!themes.length) return null;
+  return (
+    <>
+      {themes.map((t) => (
+        <Link key={t} href={usThemeHref(t)} className="hz-theme-tag hz-theme-tag-link hz-kd-theme-chip" title={`미장 ${t} 테마 리포트`}>
+          {t}
+        </Link>
+      ))}
+    </>
+  );
+}
 
 /**
  * 테마 로테이션·이슈 키워드가 세우는 줄 수. **둘이 같아야** 나란히 선 두 표의 줄이
@@ -529,7 +559,7 @@ export default async function UsKaderaPage() {
                   /* particleAfterLatin — "TSMC의 7월 매출"의 TSMC 를 굵힌다. 미장은 라틴
                      이름 + 조사가 흔해서, 뒤가 한글이면 무조건 막는 기본 규칙을 그대로 두면
                      영문 종목이 하나도 안 굵어진다(highlightTerms 주석). */
-                  <p key={i}>{highlightTerms(para, summaryTerms, used, { particleAfterLatin: true })}</p>
+                  <p key={i}>{highlightTerms(para, summaryTerms, used, { particleAfterLatin: true, linkTerms: THEME_LINKS ? THEME_LINK_MAP : undefined })}</p>
                 ));
               })()
             )}
@@ -736,6 +766,8 @@ export default async function UsKaderaPage() {
                         {s.ticker}
                       </span>
                     )}
+                    {/* 속한 테마 칩(미장 테마 리포트로). 종목 하나에서 테마 전체로 넓혀 보는 길 — 국장과 같은 자리. */}
+                    <ThemeChips ticker={s.ticker} />
                     <span style={{ flex: 1 }} />
                     {/* '몇 개 채널'과 '며칠에 몇 회'는 둘 다 이 배수의 표본 크기를 말한다 —
                         한 덩어리로 오른쪽 위에 모아 두면 아래 그래픽이 배수와 막대만 남는다. */}
@@ -1007,13 +1039,28 @@ export default async function UsKaderaPage() {
         >
           <SectionHead level={3}
             icon="donut_small"
-            title="테마 로테이션"
-            note="3일 vs 이전"
-            noteHelp="최근 3일과 그 전 비교"
+            /* 셈법은 제목 옆 물음표로(국장 카더라와 같은 자리). '3일 vs 이전' 알약 자리엔 테마 리포트로 가는 알약이 선다. */
+            title={
+              <>
+                테마 로테이션
+                <span className="hz-tip hz-tip-wide hz-kd-title-help" data-tip="최근 3일과 그 전 비교" data-ga-tip="미장 테마 로테이션" style={{ cursor: "help", marginLeft: 5, verticalAlign: "middle" }} aria-label="테마 로테이션 셈법">
+                  <Icon name="help" style={{ fontSize: "var(--fs-13)", color: C.muted }} />
+                </span>
+              </>
+            }
+            note={THEME_LINKS ? undefined : "3일 vs 이전"}
             /* ⚠️ 짧게 둔다. 옆 이슈 키워드의 설명(20자)보다 길면 좁은 폭에서 이쪽만
                두 줄이 되고, 그 순간 머리가 18.8px 커져 **아래 열 줄이 통째로 밀린다**
-               (실측 1280·1366). 자세한 설명은 위 noteHelp 툴팁이 맡는다. */
+               (실측 1280·1366). 자세한 설명은 위 물음표 툴팁이 맡는다. */
             desc="관심이 어느 미장 테마로 옮겨가는지 · 점유율 변화 기준"
+            right={
+              THEME_LINKS ? (
+                <Link href={US_THEME_PAGE.href} className="hz-sheet-head-note hz-theme-headpill">
+                  테마 자세히 보기
+                  <Icon name="arrow_forward" style={{ fontSize: "var(--fs-13)" }} />
+                </Link>
+              ) : undefined
+            }
           />
           {themes.rows.length === 0 ? (
             <p
@@ -1035,6 +1082,7 @@ export default async function UsKaderaPage() {
                 <Highlight
                   cap="가장 많이 유입"
                   name={themeIn?.theme ?? "—"}
+                  href={themeIn && THEME_LINKS ? usThemeHref(themeIn.theme) : undefined}
                   value={themeIn ? `▲${themeIn.shareDelta!.toFixed(1)}%p` : undefined}
                   valueColor="var(--c-hot-ink)"
                   sub={
@@ -1047,6 +1095,7 @@ export default async function UsKaderaPage() {
                 <Highlight
                   cap="가장 많이 이탈"
                   name={themeOut?.theme ?? "—"}
+                  href={themeOut && THEME_LINKS ? usThemeHref(themeOut.theme) : undefined}
                   value={
                     themeOut
                       ? `▼${Math.abs(themeOut.shareDelta!).toFixed(1)}%p`
@@ -1071,168 +1120,129 @@ export default async function UsKaderaPage() {
                 <span style={{ textAlign: "right" }}>순위 변화</span>
               </div>
               <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-              {themes.rows.map((t, i) => (
-                <div
-                  key={t.theme}
-                  className="hz-trow hz-cols-theme hz-theme-host"
-                  style={{ flex: 1 }}
-                  /* 마우스가 없어도(키보드·터치) 종목 목록을 열 수 있게 초점을 받는다.
-                     언급된 종목이 없는 테마는 열 것도 없으니 초점도 주지 않는다. */
-                  tabIndex={t.stocks.length ? 0 : undefined}
-                  aria-label={
-                    t.stocks.length
-                      ? `${t.theme} 테마를 이룬 종목 ${t.stockCount}개 보기`
-                      : undefined
-                  }
-                >
-                  <RankBadge n={t.rank} />
-                  <span
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 5,
-                      minWidth: 0,
-                    }}
-                  >
-                    {/* 국장 테마 줄과 같은 조판이다.
-                        [이름 · ▲n계단] ……………… [▲7.7%p]
-                        막대가 칸 폭을 꽉 채우므로 이 줄의 오른끝이 곧 **막대의 오른쪽 위**다
-                        — 점유율이 얼마나 찼는지와 그게 얼마나 움직였는지가 한 덩어리로 읽힌다.
-                        순위 변동은 이름 바로 옆이다. 그 값은 이름에 붙은 꼬리표지 막대와는
-                        다른 눈금이라, 떨어뜨려 두면 어느 쪽을 가리키는지 헷갈린다.
-                        ⚠️ 이름은 반드시 minWidth:0 + 말줄임이다. flex 로 두면 '반도체 장비·소재'
-                        같은 긴 이름이 배지를 칸 밖으로 밀어낸다. */}
-                    <span
-                      style={{
-                        display: "flex",
-                        alignItems: "baseline",
-                        gap: 8,
-                        minWidth: 0,
-                      }}
-                    >
+              {themes.rows.map((t) => {
+                const inner = (
+                  <>
+                      <RankBadge n={t.rank} />
                       <span
                         style={{
-                          ...clip,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 5,
                           minWidth: 0,
-                          fontSize: "var(--fs-13-5)",
-                          fontWeight: 700,
-                          color: C.ink,
                         }}
                       >
-                        {t.theme}
+                        {/* 국장 테마 줄과 같은 조판이다.
+                            [이름 · ▲n계단] ……………… [▲7.7%p]
+                            막대가 칸 폭을 꽉 채우므로 이 줄의 오른끝이 곧 **막대의 오른쪽 위**다
+                            — 점유율이 얼마나 찼는지와 그게 얼마나 움직였는지가 한 덩어리로 읽힌다.
+                            순위 변동은 이름 바로 옆이다. 그 값은 이름에 붙은 꼬리표지 막대와는
+                            다른 눈금이라, 떨어뜨려 두면 어느 쪽을 가리키는지 헷갈린다.
+                            ⚠️ 이름은 반드시 minWidth:0 + 말줄임이다. flex 로 두면 '반도체 장비·소재'
+                            같은 긴 이름이 배지를 칸 밖으로 밀어낸다. */}
+                        <span
+                          style={{
+                            display: "flex",
+                            alignItems: "baseline",
+                            gap: 8,
+                            minWidth: 0,
+                          }}
+                        >
+                          <span
+                            style={{
+                              ...clip,
+                              minWidth: 0,
+                              fontSize: "var(--fs-13-5)",
+                              fontWeight: 700,
+                              color: C.ink,
+                            }}
+                          >
+                            {t.theme}
+                          </span>
+                          <span style={{ flex: 1 }} />
+                          <DeltaPp value={t.shareDelta} style={{ fontSize: "var(--fs-12)" }} />
+                        </span>
+                        {/* 막대는 이름 아래에 깐다. 옆 칸으로 빼면 이름 칸이 좁아져 '반도체 장비·소재'가
+                          잘리는데, 이 카드에서 가장 먼저 읽히는 건 테마 이름이다. */}
+                        <span className="hz-bar">
+                          <span
+                            style={{
+                              width: `${Math.min(100, t.sharePct)}%`,
+                              // 길이는 점유율, 색은 **변화 방향**이다(옆 이슈 키워드와 같은
+                              // 규칙). 눈금이 둘이라 헷갈릴 자리인데, 바로 옆 칸이 그 방향을
+                              // 부호 붙은 숫자로 적고 있어 색은 그 되풀이일 뿐이다.
+                              background:
+                                t.shareDelta === null || t.shareDelta === 0
+                                  ? C.hint
+                                  : t.shareDelta > 0
+                                    ? "var(--c-warm-2)"
+                                    : "var(--c-blue-2)",
+                            }}
+                          />
+                        </span>
                       </span>
-                      <span style={{ flex: 1 }} />
-                      <DeltaPp value={t.shareDelta} style={{ fontSize: "var(--fs-12)" }} />
-                    </span>
-                    {/* 막대는 이름 아래에 깐다. 옆 칸으로 빼면 이름 칸이 좁아져 '반도체 장비·소재'가
-                      잘리는데, 이 카드에서 가장 먼저 읽히는 건 테마 이름이다. */}
-                    <span className="hz-bar">
-                      <span
-                        style={{
-                          width: `${Math.min(100, t.sharePct)}%`,
-                          // 길이는 점유율, 색은 **변화 방향**이다(옆 이슈 키워드와 같은
-                          // 규칙). 눈금이 둘이라 헷갈릴 자리인데, 바로 옆 칸이 그 방향을
-                          // 부호 붙은 숫자로 적고 있어 색은 그 되풀이일 뿐이다.
-                          background:
-                            t.shareDelta === null || t.shareDelta === 0
-                              ? C.hint
-                              : t.shareDelta > 0
-                                ? "var(--c-warm-2)"
-                                : "var(--c-blue-2)",
-                        }}
-                      />
-                    </span>
-                  </span>
-                  <span
-                    style={{
-                      fontFamily: MONO,
-                      fontSize: "var(--fs-13)",
-                      fontWeight: 800,
-                      color: C.ink,
-                      textAlign: "right",
-                    }}
-                  >
-                    {t.sharePct.toFixed(1)}%
-                  </span>
-                  {/* ⚠️ Sparkline 을 그리드 자식으로 **직접** 넣지 말 것. 그 컴포넌트는
-                    자기 뿌리에 인라인 `display:flex` 를 달고 있어서, 좁은 화면에서 이 칸을
-                    접는 미디어쿼리를 인라인이 이긴다(막대 트랙에서 이미 한 번 당했다).
-                    display 가 없는 span 으로 한 겹 싸면 접는 쪽이 이긴다. */}
-                  <span>
-                    <Sparkline data={t.series} width={78} height={24} />
-                  </span>
-                  {/* RankDelta 는 0 과 null 을 똑같이 '아무것도 안 그림'으로 낸다. 이 표는
-                      모든 줄이 같은 두 창을 견주므로 빈칸이면 "자료가 없나?"로 읽힌다 —
-                      변동 없음은 글자로 적고, 비교할 과거가 없을 때만 —로 둔다. */}
-                  <span style={{ textAlign: "right" }}>
-                    {t.rankChange === null ? (
                       <span
                         style={{
                           fontFamily: MONO,
-                          fontSize: "var(--fs-11)",
-                          color: C.sub2,
+                          fontSize: "var(--fs-13)",
+                          fontWeight: 800,
+                          color: C.ink,
+                          textAlign: "right",
                         }}
                       >
-                        —
+                        {t.sharePct.toFixed(1)}%
                       </span>
-                    ) : t.rankChange === 0 ? (
-                      <span
-                        style={{
-                          fontSize: "var(--fs-11)",
-                          fontWeight: 700,
-                          color: C.sub2,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        그대로
+                      {/* ⚠️ Sparkline 을 그리드 자식으로 **직접** 넣지 말 것. 그 컴포넌트는
+                        자기 뿌리에 인라인 `display:flex` 를 달고 있어서, 좁은 화면에서 이 칸을
+                        접는 미디어쿼리를 인라인이 이긴다(막대 트랙에서 이미 한 번 당했다).
+                        display 가 없는 span 으로 한 겹 싸면 접는 쪽이 이긴다. */}
+                      <span>
+                        <Sparkline data={t.series} width={78} height={24} />
                       </span>
-                    ) : (
-                      <RankDelta change={t.rankChange} />
-                    )}
-                  </span>
-
-                  {/* 이 테마의 점유율을 만든 종목 목록. 마우스를 올리거나 초점이 가면
-                      열린다(CSS 만 — globals.css 의 .hz-theme-pop). 국장 테마 줄과 **같은
-                      클래스·같은 어법**이라 두 화면의 같은 자리가 같게 움직인다.
-                      아래쪽 줄은 위로 펼친다 — 아래로 열면 시트를 벗어나 다음 구간을 덮는다. */}
-                  {t.stocks.length > 0 && (
-                    <div
-                      className={`hz-theme-pop${i >= themes.rows.length - 4 ? " hz-theme-pop-up" : ""}`}
-                    >
-                      <div className="hz-theme-pop-head">
-                        최근 {US_WINDOW_DAYS}일 언급 {t.stockCount}종목 · 총{" "}
-                        {t.mentionCount.toLocaleString("ko-KR")}회 · 주목도순
-                      </div>
-                      {/* ⭐ 목적지가 MDD 가 아니라 **내부자 리포트의 그 종목 공시**다
-                          (2026-09-06 요청). 이 화면이 이미 쓰는 목적지이기도 하다 — 급부상
-                          종목·주요 종목 리포트 줄의 "공시" 알약(UsInsiderLink)과 같은 곳으로
-                          간다. 404 걱정은 없다: 테마 줄에 오른 종목은 telegram_us_stock_daily
-                          에 언급 기록이 있어 getStockDetail 의 `known` 을 반드시 통과한다.
-                          ⚠️ 국장 테마 줄(app/kadera/page.tsx)은 그대로 `/stock/[code]` 로
-                             간다. 클래스는 같이 쓰지만 목적지는 화면마다 따로다. */}
-                      {t.stocks.map((st) => (
-                        <Link
-                          key={st.ticker}
-                          href={`/insider/stock/${encodeURIComponent(st.ticker)}`}
-                          className="hz-theme-pop-item"
-                        >
-                          <span className="hz-theme-pop-name">{st.name}</span>
-                          <span className="hz-theme-pop-cnt">{st.mentions}회</span>
-                          <span className="hz-theme-pop-go">
-                            <Icon
-                              name="arrow_outward"
-                              style={{ fontSize: "var(--fs-13)" }}
-                            />
+                      {/* RankDelta 는 0 과 null 을 똑같이 '아무것도 안 그림'으로 낸다. 이 표는
+                          모든 줄이 같은 두 창을 견주므로 빈칸이면 "자료가 없나?"로 읽힌다 —
+                          변동 없음은 글자로 적고, 비교할 과거가 없을 때만 —로 둔다. */}
+                      <span style={{ textAlign: "right" }}>
+                        {t.rankChange === null ? (
+                          <span
+                            style={{
+                              fontFamily: MONO,
+                              fontSize: "var(--fs-11)",
+                              color: C.sub2,
+                            }}
+                          >
+                            —
                           </span>
-                        </Link>
-                      ))}
-                      <div className="hz-theme-pop-foot">
-                        종목을 누르면 그 종목의 내부자 공시가 열립니다.
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+                        ) : t.rankChange === 0 ? (
+                          <span
+                            style={{
+                              fontSize: "var(--fs-11)",
+                              fontWeight: 700,
+                              color: C.sub2,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            그대로
+                          </span>
+                        ) : (
+                          <RankDelta change={t.rankChange} />
+                        )}
+                      </span>
+                  </>
+                );
+                /* 줄이 곧 **그 미장 테마 리포트로 가는 링크**다(국장과 같은 자리·같은 이유, 2026-09-22). 예전엔 올리면
+                   종목 목록 팝오버가 열렸는데, 테마 리포트가 그 목록과 요약·이유·일정을 다 갖고 있어 팝오버를 걷었다.
+                   종목은 테마 리포트 안에서 내부자 리포트(/insider/stock)로 간다 — 팝오버가 가던 곳과 같다. */
+                return THEME_LINKS ? (
+                  <Link key={t.theme} href={usThemeHref(t.theme)} className="hz-trow hz-cols-theme" style={{ flex: 1, textDecoration: "none" }} aria-label={`${t.theme} 미장 테마 리포트 보기`}>
+                    {inner}
+                  </Link>
+                ) : (
+                  <div key={t.theme} className="hz-trow hz-cols-theme" style={{ flex: 1 }}>
+                    {inner}
+                  </div>
+                );
+              })}
               </div>
             </>
           )}
@@ -1506,6 +1516,7 @@ export default async function UsKaderaPage() {
                         {r.ticker}
                       </span>
                     )}
+                    <ThemeChips ticker={r.ticker} />
                     <span style={{ flex: 1 }} />
                     {/* ⭐ 급부상 셀과 같은 포맷 — 표본은 오른쪽 위, 시세는 왼쪽 아래
                         (국장 같은 자리의 주석 참고). 두 화면이 한 벌이라 같이 바꾼다. */}

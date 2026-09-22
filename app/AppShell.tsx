@@ -7,9 +7,9 @@ import { INSIDER_LISTS, INSIDER_LIST_SLUGS, insiderListHref } from "./insider/li
 import { PageJsonLd } from "./JsonLd";
 import { NOTE_PAGE } from "./daily/copy";
 import { DIVIDEND_PAGE } from "./dividend/copy";
-import { THEME_PAGE } from "./theme/copy";
+import { KR_THEME_SHORT, THEME_PAGE, US_THEME_PAGE } from "./theme/copy";
 import { DAILY_PUBLIC, DIVIDEND_PUBLIC, SEOHAK_PUBLIC, THEME_PUBLIC } from "./screen-flags";
-import { THEME_NAMES, themeHref } from "@/lib/theme-href";
+import { THEME_NAMES, US_THEME_NAMES, themeHref, usThemeHref } from "@/lib/theme-href";
 
 import { track } from "@/lib/ga";
 import { SLOGAN } from "./brand";
@@ -178,7 +178,21 @@ const NAV: NavItem[] = [
   },
   // 테마 리포트(/theme) — 카더라 바로 아래. 카더라 재료를 테마 단위로 다시 읽는 화면이라 그 옆이다.
   // ⛔ 여는 것은 `app/screen-flags.ts` 의 THEME_PUBLIC 한 줄이다. 안 연 동안은 COMING_SOON 에 선다.
-  ...(THEME_PUBLIC ? [{ href: THEME_PAGE.href, label: THEME_PAGE.label, icon: THEME_PAGE.icon, sub: THEME_PAGE.sub }] : []),
+  // 카더라처럼 국장·미장 서브 항목이 달린다(국장은 부모와 같은 /theme, 미장은 /theme/us — 카더라와 같은 이유).
+  ...(THEME_PUBLIC
+    ? [
+        {
+          href: THEME_PAGE.href,
+          label: THEME_PAGE.label,
+          icon: THEME_PAGE.icon,
+          sub: THEME_PAGE.sub,
+          children: [
+            { label: KR_THEME_SHORT, href: THEME_PAGE.href, Glyph: KrTaegukIcon },
+            { label: US_THEME_PAGE.short, href: US_THEME_PAGE.href, Glyph: LibertyIcon, sub: US_THEME_PAGE.sub },
+          ],
+        },
+      ]
+    : []),
   // ⚠️ COMING_SOON 에 두지 말 것 — 본문 헤더(PageHeader)가 NAV 에서 경로를 못 찾아
   // **제목 칸을 통째로 비운다.** 예고 시절에도 배지만 달아 NAV 에 뒀던 이유다.
   {
@@ -470,8 +484,13 @@ const DEEP_PAGES: Record<string, { label: string; sub: string; badge?: string }>
   ...(DAILY_PUBLIC ? {} : { [NOTE_PAGE.href]: { label: NOTE_PAGE.label, sub: NOTE_PAGE.sub, badge: "준비 중" } }),
   // 배당으로 살기 — 같은 이유로 안 연 동안만.
   ...(DIVIDEND_PUBLIC ? {} : { [DIVIDEND_PAGE.href]: { label: DIVIDEND_PAGE.label, sub: DIVIDEND_PAGE.sub, badge: "준비 중" } }),
-  // 테마 리포트 목록 — 안 연 동안만.
-  ...(THEME_PUBLIC ? {} : { [THEME_PAGE.href]: { label: THEME_PAGE.label, sub: THEME_PAGE.sub, badge: "준비 중" } }),
+  // 테마 리포트 목록(국장·미장) — 안 연 동안만. 제목은 열린 뒤 NAV 서브 항목이 줄 것과 같게(국장 테마 · 미장 테마).
+  ...(THEME_PUBLIC
+    ? {}
+    : {
+        [THEME_PAGE.href]: { label: KR_THEME_SHORT, sub: THEME_PAGE.sub, badge: "준비 중" },
+        [US_THEME_PAGE.href]: { label: US_THEME_PAGE.short, sub: US_THEME_PAGE.sub, badge: "준비 중" },
+      }),
   // 테마 26장(/theme/반도체 …). 테마 이름이 곧 제목이라 셸이 h1 을 그린다 — 종목 화면(464장)은
   // 셸이 이름을 알 길이 없어 자기 h1 을 그리지만, 테마는 사전(lib/stock-themes.ts)이 정적이라
   // 여기서 안다. 안 연 동안은 '준비 중' 배지가 붙어 구조화 데이터도 안 나간다(noindex 와 맞는다).
@@ -479,6 +498,13 @@ const DEEP_PAGES: Record<string, { label: string; sub: string; badge?: string }>
     THEME_NAMES.map((t) => [
       themeHref(t),
       { label: t, sub: `${t} 테마를 두고 채널에서 요즘 무슨 얘기가 도는지 봅니다`, ...(THEME_PUBLIC ? {} : { badge: "준비 중" }) },
+    ]),
+  ),
+  // 미장 테마 16장(/theme/us/ai-semiconductor …). 국장과 이름이 겹치는 테마(금융)가 있어 부제에 시장을 적는다.
+  ...Object.fromEntries(
+    US_THEME_NAMES.map((t) => [
+      usThemeHref(t),
+      { label: t, sub: `미장 ${t} 테마를 두고 채널에서 요즘 무슨 얘기가 도는지 봅니다`, ...(THEME_PUBLIC ? {} : { badge: "준비 중" }) },
     ]),
   ),
   ...Object.fromEntries(

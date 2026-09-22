@@ -19,3 +19,22 @@ export const THEME_PAGE = {
   /** Material Symbols 이름. 여러 종목을 하나로 묶은 모양이라 '테마'가 한눈에 선다. */
   icon: "category",
 } as const;
+
+/**
+ * 미장 테마 리포트(/theme/us). 카더라가 국장·미장으로 갈리는 것과 같은 꼴 — 사이드바에서는 테마 리포트 아래 서브 항목이고,
+ * 주소도 `/kadera` · `/kadera/us` 처럼 `/theme` · `/theme/us` 다(2026-09-22). 사전은 lib/us-stock-themes.ts(16개).
+ */
+export const US_THEME_PAGE = {
+  href: "/theme/us",
+  label: "미장 테마 리포트",
+  /** 사이드바 서브 항목·본문 제목의 짧은 이름(국장 카더라·미장 카더라와 같은 꼴). */
+  short: "미장 테마",
+  sub: "미장에서 어느 테마에 관심이 쏠리고 어느 종목이 뜨는지",
+  description:
+    "AI반도체·빅테크·전력·원자력 같은 미장 테마마다 주식 텔레그램 채널에서 무슨 얘기가 도는지 봅니다. 말 많은 미국 종목과 그 이유, 앞으로의 일정을 테마 단위로 읽습니다.",
+  tip: "미장 테마마다 채널에서 무슨 얘기가 도는지, 어느 미국 종목이 말 많은지 봅니다. 준비 중입니다.",
+  icon: "category",
+} as const;
+
+/** 국장 테마 리포트의 짧은 이름 — 사이드바 서브 항목·본문 제목(미장 짝은 US_THEME_PAGE.short). */
+export const KR_THEME_SHORT = "국장 테마";

@@ -1,9 +1,8 @@
 import Link from "next/link";
 
-import { themeHref } from "@/lib/theme-href";
+import { marketThemeHref, themeStockHref, type ThemeMarketKey } from "@/lib/theme-href";
 import type { ThemeHotStock, ThemeOverview } from "@/lib/theme-page";
 import { squarify } from "@/lib/treemap";
-import { stockHref } from "@/lib/stock-page";
 
 import { MONO } from "../ui";
 import { MapHint } from "./MapHint";
@@ -67,14 +66,14 @@ export type TreemapTile = {
   deltaText?: string;
 };
 
-/** 테마 목록의 칸 — 넓이는 점유율, 색은 닷새 넘게 이전과 견준 변화(%p). */
-export function themeTiles(themes: ThemeOverview[]): TreemapTile[] {
+/** 테마 목록의 칸 — 넓이는 점유율, 색은 5일 넘게 이전과 견준 변화(%p). 시장 키로 주소를 가른다(/theme/… · /theme/us/…). */
+export function themeTiles(themes: ThemeOverview[], market: ThemeMarketKey = "kr"): TreemapTile[] {
   return themes.map((t) => ({
     key: t.theme,
     label: t.theme,
     value: t.sharePct,
     tone: toneOf(t.shareDelta),
-    href: themeHref(t.theme),
+    href: marketThemeHref(market, t.theme),
     tip: `${t.theme} · 점유율 ${t.sharePct.toFixed(1)}% · ${fmtDelta(t.shareDelta)} · ${t.rank}위`,
     valueText: `${t.sharePct.toFixed(1)}%`,
     deltaText: fmtDelta(t.shareDelta),
@@ -86,7 +85,7 @@ export function themeTiles(themes: ThemeOverview[]): TreemapTile[] {
  * lib/theme-page.ts usualMentions). 점유율 %p 가 아니라 배수인 이유: 종목 하나의 언급은 몇 회에서 몇백 회까지 폭이
  * 넓어 차이(회)로 단을 나누면 큰 종목만 색이 들고, 배수로 나눠야 "평소보다 말이 늘었나"가 종목 크기와 무관하게 읽힌다.
  * 문턱: 1.5배 이상·2.5배 이상·5배 이상(또는 지난 한 달 0회에서 새로 등장). 줄어든 쪽도 같은 비율.
- * 글자는 배수가 아니라 **평소 대비 +60% / −42%** 다 — "앞 사흘의 58%"는 직관적이지 않았다(2026-09-21 Hun).
+ * 글자는 배수가 아니라 **평소 대비 +60% / −42%** 다 — "앞 사흘의 58%"는 직관적이지 않았다(2026-09-21).
  */
 /** 종목의 색 단계(kadera.css 의 .is-up-N · .is-down-N · .is-flat). 지도 칸과 표의 이름 옆 태그가 같은 색을 쓴다. */
 export function stockTone(m: number, usual: number): string {
@@ -101,13 +100,13 @@ export function stockTone(m: number, usual: number): string {
   return "is-flat";
 }
 
-export function stockTiles(stocks: ThemeHotStock[]): TreemapTile[] {
+export function stockTiles(stocks: ThemeHotStock[], market: ThemeMarketKey = "kr"): TreemapTile[] {
   return stocks.map((s) => ({
     key: s.code,
     label: s.name,
     value: s.mentions,
     tone: stockTone(s.mentions, s.usualMentions),
-    href: stockHref(s.code),
+    href: themeStockHref(market, s.code),
     tip: `${s.name} · 최근 3일 ${s.mentions.toLocaleString("ko-KR")}회 · ${usualDeltaText(s.mentions, s.usualMentions)} · 하루 최다 ${s.channels}곳`,
     valueText: `${s.mentions.toLocaleString("ko-KR")}회`,
     deltaText: s.usualMentions === 0 ? "새로 등장" : usualDeltaText(s.mentions, s.usualMentions).replace("평소 대비 ", "").replace(" 언급", ""),

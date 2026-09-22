@@ -255,6 +255,39 @@ type UsEventRow = {
 const EVENTS_PER_DATE = 30;
 
 /**
+ * (티커, 날짜, 정밀도)로 묶는다. 행사 문구는 채널마다 조금씩 달라 가장 많이 쓰인 표기를 대표로 삼는다.
+ * 국내 groupEvents(lib/kadera-why.ts)와 같은 규칙이다.
+ */
+function groupUsEvents(rows: UsEventRow[]): Omit<UpcomingEvent, "name">[] {
+  const groups = new Map<string, UsEventRow[]>();
+  for (const r of rows) {
+    const k = `${r.ticker}|${r.event_date}|${r.date_precision}`;
+    const g = groups.get(k);
+    if (g) g.push(r);
+    else groups.set(k, [r]);
+  }
+  return [...groups.values()].map((g) => {
+    const texts = new Map<string, { text: string; n: number }>();
+    for (const r of g) {
+      const key = r.event.replace(/[\s·,.()]/g, "");
+      const cur = texts.get(key);
+      if (cur) cur.n += 1;
+      else texts.set(key, { text: r.event, n: 1 });
+    }
+    const top = [...texts.values()].sort((a, b) => b.n - a.n)[0];
+    return {
+      code: g[0].ticker,
+      market: "US" as const,
+      date: g[0].event_date,
+      precision: g[0].date_precision,
+      event: top.text,
+      channels: new Set(g.map((r) => r.channel_handle)).size,
+      firstSeen: g.map((r) => r.posted_at).sort()[0],
+    };
+  });
+}
+
+/**
  * 미장 카드용 — 오늘부터 `days` 일 안, **날짜가 적혀 있던 것(day)만.**
  * 국내와 같은 규칙이다(lib/kadera-why.ts getUpcomingEvents): 달·분기·연 단위는 달력에 놓을
  * 자리가 없고, 모델이 "연말"을 12-31 로 굳혀 쓴 값이라 그 자리에 두면 거짓이 된다.
@@ -277,34 +310,7 @@ export const getUsUpcomingEvents = cache(async (days = 35, limit = 400): Promise
     console.error("[getUsUpcomingEvents] 일정을 못 읽었습니다", error);
     return LOAD_FAILED;
   }
-  const rows = (data ?? []) as UsEventRow[];
-  // (티커, 날짜)로 묶는다. 행사 문구는 채널마다 조금씩 달라 가장 많이 쓰인 표기를 대표로 삼는다.
-  const groups = new Map<string, UsEventRow[]>();
-  for (const r of rows) {
-    const k = `${r.ticker}|${r.event_date}`;
-    const g = groups.get(k);
-    if (g) g.push(r);
-    else groups.set(k, [r]);
-  }
-  const grouped = [...groups.values()].map((g) => {
-    const texts = new Map<string, { text: string; n: number }>();
-    for (const r of g) {
-      const key = r.event.replace(/[\s·,.()]/g, "");
-      const cur = texts.get(key);
-      if (cur) cur.n += 1;
-      else texts.set(key, { text: r.event, n: 1 });
-    }
-    const top = [...texts.values()].sort((a, b) => b.n - a.n)[0];
-    return {
-      code: g[0].ticker,
-      market: "US" as const,
-      date: g[0].event_date,
-      precision: g[0].date_precision,
-      event: top.text,
-      channels: new Set(g.map((r) => r.channel_handle)).size,
-      firstSeen: g.map((r) => r.posted_at).sort()[0],
-    };
-  });
+  const grouped = groupUsEvents((data ?? []) as UsEventRow[]);
   grouped.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : b.channels - a.channels));
   const perDate = new Map<string, number>();
   const capped = grouped.filter((e) => {
@@ -316,6 +322,32 @@ export const getUsUpcomingEvents = cache(async (days = 35, limit = 400): Promise
   const names = await usNames([...new Set(capped.map((e) => e.code))]);
   return capped.slice(0, limit).map((e) => ({ ...e, name: names.get(e.code) ?? e.code }));
 });
+
+
+/**
+ * 미장 테마 화면용 — 준 티커들의 **오늘 이후 일정 전부**(정밀도 무관, 가까운 날부터). 화면이 day 는 달력에,
+ * 달·분기만 짚인 것은 그 아래에 가른다. 국내 짝은 lib/kadera-why.ts getEventsForCodes.
+ */
+export async function getUsEventsForTickers(tickers: string[], limit = 12): Promise<UpcomingEvent[]> {
+  if (!tickers.length) return [];
+  const db = getSupabaseAdmin();
+  const from = todayKst();
+  const { data, error } = await db
+    .from("telegram_us_stock_event")
+    .select("channel_handle,ticker,event_date,date_precision,event,posted_at")
+    .in("ticker", tickers)
+    .gte("event_date", from)
+    .limit(1000);
+  if (error) {
+    console.error(`[getUsEventsForTickers] 일정을 못 읽었습니다`, error);
+    return [];
+  }
+  const grouped = groupUsEvents((data ?? []) as UsEventRow[]);
+  grouped.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : b.channels - a.channels));
+  const picked = grouped.slice(0, limit);
+  const names = await usNames([...new Set(picked.map((e) => e.code))]);
+  return picked.map((e) => ({ ...e, name: names.get(e.code) ?? e.code }));
+}
 
 /** 미장 카드가 문장을 하루 늦게까지 물려받는 규칙은 국내와 같다. */
 export const US_LLM_TEXT_CARRY_DAYS = LLM_TEXT_CARRY_DAYS;
