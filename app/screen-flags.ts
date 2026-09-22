@@ -120,7 +120,9 @@ export const THEME_NAV_NEW = true;
  * 폐기하기로 했다. 일단 끈다 — 코드와 표는 남기고 화면·사이드바·푸터·사이트맵·수집 파이프라인만 멈춘다.
  *
  * false 면
- *   app/seohak/page.tsx     배포에선 404(로컬은 그대로 보인다), noindex
+ *   app/seohak/layout.tsx   배포에선 404(로컬은 그대로 보인다). ⚠️ page.tsx 가 아니라 레이아웃에서 막는다 — loading.tsx 때문에
+ *                           page 에서 부르면 200 으로 굳는다(2026-09-23 소프트 404)
+ *   app/seohak/page.tsx     noindex
  *   app/AppShell.tsx        사이드바 항목이 빠진다
  *   app/Footer.tsx          바로가기와 '해외투자' 출처 묶음이 빠진다(그 원천은 이 화면만 썼다)
  *   app/sitemap-urls.ts     사이트맵에서 빠진다

@@ -17,10 +17,6 @@ import { toFx } from "./money";
 
 import { pageMetadata } from "../seo";
 import { SEOHAK_PUBLIC } from "../screen-flags";
-import { notFound } from "next/navigation";
-
-/** 배포된 곳인가. 로컬에서는 꺼 두어도 그대로 보인다(app/screen-flags.ts SEOHAK_PUBLIC). */
-const DEPLOYED = Boolean(process.env.VERCEL_ENV);
 
 export async function generateMetadata(): Promise<Metadata> {
   const meta = pageMetadata({
@@ -42,8 +38,8 @@ export async function generateMetadata(): Promise<Metadata> {
 // force-dynamic 이라 방문마다 서버가 새로 그렸다.
 
 export default async function SeohakPage() {
-  // 꺼 둔 화면(2026-09-22, 폐기 예정). 배포에선 404, 로컬에선 그대로 — 표와 코드는 남아 있다.
-  if (!SEOHAK_PUBLIC && DEPLOYED) notFound();
+  // 꺼 둔 화면(2026-09-22, 폐기 예정)의 404 는 여기가 아니라 layout.tsx 가 낸다 — 이 구간엔 loading.tsx 가 있어
+  //   여기서 notFound() 를 부르면 응답이 이미 200 으로 나간 뒤라 상태 코드가 안 바뀐다(그 파일 주석).
   const ov = await getSeohakOverview();
   // 아래 셋은 서로 의존이 없다. 순서대로 await 하면 왕복이 앞뒤로 붙으므로 함께 띄운다.
   // ⚠️ 분기·ETF 두 층은 표가 아직 없을 수 있어 null 을 돌려준다(마이그레이션 043·042).
