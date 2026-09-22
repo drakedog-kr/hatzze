@@ -434,6 +434,16 @@
   padding-top: 11px;
   padding-bottom: 11px;
 }
+/* 흐름 표 오른쪽 칸의 '열흘 한 조각'(n일째 오르는 중 + 지속 알약). 칸이 124px 이라 둘이 한 줄에 다 안 들어가는 줄이 있는데,
+   nowrap 이던 때는 그만큼 **왼쪽 칸의 글자 위로 넘쳤다**. 접어서 오른쪽에 쌓는다. */
+.hz-theme-flow {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px 7px;
+  max-width: 100%;
+}
 /* ✨ + 문장. 넓은 화면은 한 줄, 좁으면 세 줄까지. 곁말 색(--c-sub)이 아니라 --c-ink-soft: 이 칸이 표의 본론이다. */
 .hz-theme-row-brief {
   display: flex;
