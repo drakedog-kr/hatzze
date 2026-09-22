@@ -2,7 +2,10 @@ import { SITE_URL } from "./brand";
 import { NOTE_PAGE } from "./daily/copy";
 import { DIVIDEND_PAGE } from "./dividend/copy";
 import { INSIDER_LIST_SLUGS } from "./insider/lists";
-import { DAILY_PUBLIC, DIVIDEND_PUBLIC } from "./screen-flags";
+import { DAILY_PUBLIC, DIVIDEND_PUBLIC, SEOHAK_PUBLIC, THEME_PUBLIC } from "./screen-flags";
+import { THEME_PAGE, US_THEME_PAGE } from "./theme/copy";
+// ⚠️ 상대 경로다 — scripts/check-routes.mjs 가 이 파일을 맨 node 로 읽어서 `@/` 별칭을 못 푼다.
+import { THEME_NAMES, US_THEME_NAMES, themeHref, usThemeHref } from "../lib/theme-href";
 
 /**
  * 사이트맵에 실을 주소 **한 벌**. `/sitemap.xml` 과 `/sitemap-pages.xml` 이 이걸 나눠 쓴다.
@@ -27,7 +30,7 @@ export const SITEMAP_ENTRIES: SitemapEntry[] = [
   { path: "/kadera", changeFrequency: "daily", priority: 0.8 },
   { path: "/kadera/us", changeFrequency: "daily", priority: 0.8 },
   { path: "/mdd", changeFrequency: "daily", priority: 0.7 },
-  { path: "/seohak", changeFrequency: "daily", priority: 0.7 },
+  ...(SEOHAK_PUBLIC ? [{ path: "/seohak", changeFrequency: "daily" as const, priority: 0.7 }] : []),
   // 내부자 리포트는 2026-08-26 에 열렸는데 이 줄이 없어 색인이 0건이었다.
   { path: "/insider", changeFrequency: "daily", priority: 0.7 },
   // 국장 미리보기(2026-09-04 오픈). 07~09시에만 쓸모가 있는 화면이지만 내용은 매일
@@ -38,6 +41,17 @@ export const SITEMAP_ENTRIES: SitemapEntry[] = [
   ...(DAILY_PUBLIC ? [{ path: NOTE_PAGE.href, changeFrequency: "daily" as const, priority: 0.7 }] : []),
   // 배당 계산기. 안 연 동안은 싣지 않는다(noindex 와 어긋나면 안 된다). 종가·배당이 매일 갱신되므로 daily.
   ...(DIVIDEND_PUBLIC ? [{ path: DIVIDEND_PAGE.href, changeFrequency: "daily" as const, priority: 0.7 }] : []),
+  // 테마 리포트 — 목록 한 장 + 테마 26장. 안 연 동안은 싣지 않는다(noindex 와 어긋나면 안 된다).
+  // 테마 목록은 사전(lib/stock-themes.ts)이라 정적이고 DB 없이 펼친다. 언급이 매일 쌓이므로 daily.
+  ...(THEME_PUBLIC
+    ? [
+        { path: THEME_PAGE.href, changeFrequency: "daily" as const, priority: 0.7 },
+        ...THEME_NAMES.map((t) => ({ path: themeHref(t), changeFrequency: "daily" as const, priority: 0.6 })),
+        // 미장 — 목록 한 장 + 테마 16장(lib/us-stock-themes.ts). 같은 플래그로 같이 열린다.
+        { path: US_THEME_PAGE.href, changeFrequency: "daily" as const, priority: 0.7 },
+        ...US_THEME_NAMES.map((t) => ({ path: usThemeHref(t), changeFrequency: "daily" as const, priority: 0.6 })),
+      ]
+    : []),
   // 카드 여덟 장의 '전체보기'. 화면 안에서만 링크가 걸려 있어 크롤러가 닿기 어렵다 —
   // 목록이 매일 바뀌는 실제 콘텐츠라 사이트맵에 직접 올린다.
   // (종목·투자자 상세는 수가 많고 DB 를 읽어야 해서 아직 없다. 종목별 실주소 작업에서 다룬다.)

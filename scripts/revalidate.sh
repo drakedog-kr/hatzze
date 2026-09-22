@@ -25,7 +25,9 @@ set -uo pipefail
 BASE="${REVALIDATE_BASE:-https://hatzze.fun}"
 # 비운 직후 데울 곳. 인자를 주면 그 경로들만 비우고 그 경로들만 데운다.
 # 종목·투자자 상세는 주소가 수백이라 못 데운다 — 처음 여는 사람이 그린다.
-DEFAULT_WARM=(/ /kadera /kadera/us /dividend /daily /insider /seohak /preview)
+# ⚠️ 꺼 둔 화면(/seohak)은 뺐다 — 배포에선 404 라 데울 것이 없다(app/screen-flags.ts SEOHAK_PUBLIC).
+#    테마 두 장은 안 연 동안도 그냥 둔다. 404 는 500 이 아니라 한 번에 지나가고, 여는 날 이 목록을 손댈 일이 없다.
+DEFAULT_WARM=(/ /kadera /kadera/us /theme /theme/us /dividend /daily /insider /preview)
 
 if [ -z "${REVALIDATE_SECRET:-}" ]; then
   echo "REVALIDATE_SECRET 이 없어 건너뜁니다 — 화면은 한 시간 안에 스스로 새로 그립니다(카더라 30분)"

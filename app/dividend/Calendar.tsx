@@ -35,7 +35,7 @@ export function MonthCalendar({
           {/* 누르는 법은 부제에서 빼 툴팁으로 — 모바일에서 두 줄이 됐다(2026-09-15). */}
           <span
             className="hz-tip hz-tip-wide dv-help"
-            data-tip="최근 12개월에 실제로 지급된 달로 셉니다. 달을 누르면 그 달에 주는 종목이 뜹니다(빈 달은 +)."
+            data-tip="최근 12개월 지급 달"
             style={{ cursor: "help" }}
             aria-label="달력 설명"
           >
@@ -168,7 +168,7 @@ export function Upcoming({ lines, fx, mode }: { lines: Line[]; fx: number; mode:
           다가오는 일정
           <span
             className="hz-tip hz-tip-wide dv-help"
-            data-tip="확정은 회사가 정해 공시한 다음 배당이고, 예상은 지난해 같은 날에 준 만큼으로 어림한 값입니다. 석 달 안만 보입니다."
+            data-tip="확정은 공시 · 예상은 작년"
             style={{ cursor: "help" }}
             aria-label="다가오는 일정 설명"
           >

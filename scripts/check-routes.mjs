@@ -49,6 +49,12 @@ const EXCLUDED = new Map([
   ...(flags.DAILY_PUBLIC ? [] : [["/daily", "아직 안 연 화면(app/screen-flags.ts DAILY_PUBLIC=false). noindex 라 사이트맵에 없어야 한다"]]),
   // 배당으로 살기(/dividend) — 같은 방식. 여는 날 app/sitemap-urls.ts 가 같은 플래그로 켜지고 이 줄은 빠진다.
   ...(flags.DIVIDEND_PUBLIC ? [] : [["/dividend", "아직 안 연 화면(app/screen-flags.ts DIVIDEND_PUBLIC=false). noindex 라 사이트맵에 없어야 한다"]]),
+  // 테마 리포트(/theme) — 같은 방식. 테마별 실주소(/theme/[theme])는 아래 DYNAMIC 에 있다.
+  ...(flags.THEME_PUBLIC ? [] : [["/theme", "아직 안 연 화면(app/screen-flags.ts THEME_PUBLIC=false). noindex 라 사이트맵에 없어야 한다"]]),
+  // 미장 테마 리포트(/theme/us) — 같은 플래그. 테마별 실주소(/theme/us/[theme])는 아래 DYNAMIC 에 있다.
+  ...(flags.THEME_PUBLIC ? [] : [["/theme/us", "아직 안 연 화면(app/screen-flags.ts THEME_PUBLIC=false). noindex 라 사이트맵에 없어야 한다"]]),
+  // 서학개미 장부(/seohak) — 꺼 둔 화면(SEOHAK_PUBLIC=false, 폐기 예정). 배포에선 404 라 사이트맵에 없어야 한다.
+  ...(flags.SEOHAK_PUBLIC ? [] : [["/seohak", "꺼 둔 화면(app/screen-flags.ts SEOHAK_PUBLIC=false). 배포에선 404"]]),
 ]);
 
 /**
@@ -58,6 +64,8 @@ const EXCLUDED = new Map([
 const DYNAMIC = new Map([
   ["/insider/list/[kind]", "슬러그 여덟 개를 sitemap.ts 가 INSIDER_LIST_SLUGS 로 펼친다"],
   ["/stock/[code]", "sitemap-stocks.xml 이 DB 를 읽어 펼친다(lib/stock-page.ts listIndexableStocks)"],
+  ["/theme/[theme]", "사전의 테마 26개를 app/sitemap-urls.ts 가 THEME_NAMES 로 펼친다(열린 뒤에만)"],
+  ["/theme/us/[theme]", "미장 사전의 테마 16개를 app/sitemap-urls.ts 가 US_THEME_NAMES 로 펼친다(열린 뒤에만)"],
   ["/insider/stock/[ticker]", "수가 많고 DB 를 읽어야 한다. 사이트맵 동적 생성 때 다룬다"],
   ["/insider/investor/[cik]", "위와 같다"],
   ["/daily/[date]", "날짜가 표에서 온다. app/sitemap-notes.xml 이 읽어 펼친다(lib/daily-note.ts listAllNoteDates)"],

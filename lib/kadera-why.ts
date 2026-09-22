@@ -456,6 +456,29 @@ export async function getStockEvents(code: string, limit = 8): Promise<UpcomingE
   return attachNames(grouped.slice(0, limit));
 }
 
+/**
+ * 테마 화면용 — 여러 종목의 오늘 이후 일정, 가까운 날부터. getStockEvents 와 같은 묶음 규칙이다.
+ * 종목 목록은 테마 하나의 사전(최대 55)이라 `.in()` URL 이 짧다.
+ */
+export async function getEventsForCodes(codes: string[], limit = 12): Promise<UpcomingEvent[]> {
+  if (!codes.length) return [];
+  const db = getSupabaseAdmin();
+  const from = todayKst();
+  const { data, error } = await db
+    .from("telegram_stock_event")
+    .select("channel_handle,stock_code,event_date,date_precision,event,posted_at")
+    .in("stock_code", codes)
+    .gte("event_date", from)
+    .limit(1000);
+  if (error) {
+    console.error(`[getEventsForCodes] 일정을 못 읽었습니다`, error);
+    return [];
+  }
+  const grouped = groupEvents((data ?? []) as EventRow[]);
+  grouped.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : b.channels - a.channels));
+  return attachNames(grouped.slice(0, limit));
+}
+
 const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
 
 /**

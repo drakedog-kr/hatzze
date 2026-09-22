@@ -302,7 +302,7 @@ export function WealthCards({ ch, fx, household }: {
                  이 카드가 말하는 건 환율이 수익의 얼마를 만들었나이므로 그렇게 적는다. */
               desc="환율까지 더하면 실제로 얼마를 벌었는지"
               note={`${ymEnd(ch.asOf)} · 환율 ${md(fx.nowDate)}`}
-              noteHelp="넣은 돈은 실측이고, 지금 값은 그 돈이 시장을 따라갔다고 볼 때의 추정입니다."
+              noteHelp="지금 값은 추정"
               foot="환율이 평균으로 돌아가면 원화 수익도 그만큼 줄어듭니다.">
           <InWon ch={ch} fx={fx} />
         </Card>

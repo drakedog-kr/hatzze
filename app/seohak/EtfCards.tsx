@@ -342,7 +342,7 @@ export function EtfSection({ e, fx }: { e: SeohakEtf; fx: Fx | null }) {
             note={`${md(e.asOf)} 기준`}
             /* 부제에서 밀려난 '채권형 제외' 가 여기로 온다. 짝도 같은 자리에 표본을
                밝히고 있어 두 카드가 같은 꼴이다. */
-            noteHelp="상장좌수 변화 × 순자산가치로 재고, 채권형은 뺐습니다.">
+            noteHelp="상장좌수 × 순자산가치">
         <Flows e={e} fx={fx} />
       </Card>
 
@@ -357,7 +357,7 @@ export function EtfSection({ e, fx }: { e: SeohakEtf; fx: Fx | null }) {
       <Card icon="grid_view" title="주간 등락"
             desc="미국 ETF가 5영업일 동안 얼마나 오르내렸는지"
             note={`${md(e.weekFrom)} ~ ${md(e.asOf)}`}
-            noteHelp={`거래대금 1억 이상 ${e.week.length}종목을 셉니다.`}>
+            noteHelp="거래대금 1억 이상만">
         <WeekGrid e={e} />
       </Card>
     </div>

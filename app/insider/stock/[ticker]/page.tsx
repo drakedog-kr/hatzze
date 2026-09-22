@@ -247,10 +247,8 @@ export default async function StockDetailPage({
   //    다 있어서 코드만 보면 틀린다. 장내 매도뿐 아니라 세금 원천징수·증여도 손을
   //    떠난 것이라 함께 담는다 — S 만 넣으면 카드가 실제보다 훨씬 작아 보인다.
   const execSells = d.insiders.filter((t) => t.acquiredDisposed === "D");
-  const execOther = d.insiders.length - execBuys.length - execSells.length;
   const cgBuys = d.congress.filter((c) => c.kind === "P");
   const cgSells = d.congress.filter((c) => c.kind === "S");
-  const cgOther = d.congress.length - cgBuys.length - cgSells.length;
 
   // 거물의 이번 분기 방향. 비교할 직전 분기가 없는 곳은 move 가 null 이라 안 센다.
   const added = d.holders.filter((h) => h.move === "new" || h.move === "add").length;
@@ -485,7 +483,7 @@ export default async function StockDetailPage({
             icon="show_chart"
             title="주가와 매매 시점"
             note={`${PRICE_RANGES.find((r) => r.key === range)?.label} · ${d.marks.length}곳`}
-            noteHelp="야후 일봉에 임원·의원의 매매 시점을 얹었습니다."
+            noteHelp="일봉에 매매 시점 표시"
             /* ⚠️ "마우스를 올리면" 이었다. 폰에는 마우스가 없고 탭으로 여는데(TipTap),
                  그 말이 폰에서는 통째로 거짓이 된다. 둘 다 되는 말로 바꾼다.
                ⚠️ 점에 올리면 **누가** 사고팔았는지 나온다는 걸 아무 데서도 안 알려 주고
@@ -554,7 +552,7 @@ export default async function StockDetailPage({
             icon="reviews"
             title="월가 애널리스트의 시선"
             note={fmtDate(d.consensus.asOf)}
-            noteHelp="stockanalysis.com이 싣는 S&P Global 집계입니다. 등급과 목표가는 낸 사람이 다릅니다."
+            noteHelp="S&P Global 집계"
             desc="증권사들이 이 종목을 어떻게 보고 있는지입니다."
           />
           <ConsensusBody c={d.consensus} price={d.price} rate={d.usdKrw}>
@@ -571,7 +569,7 @@ export default async function StockDetailPage({
           icon="groups"
           title="이 종목을 든 월가 거물"
           note={`${d.holders.length}/${d.managerCount}명`}
-          noteHelp="분기말 기준이라 지금과 다를 수 있습니다. 증감은 주식 수 기준입니다."
+          noteHelp="분기말 기준"
           desc="금액이 큰 순입니다. 이름 옆에 직전 분기보다 주식 수를 얼마나 늘리고 줄였는지 적었습니다."
         />
         {d.holders.length === 0 ? (
@@ -604,9 +602,7 @@ export default async function StockDetailPage({
             icon="trending_up"
             title="임원이 장내에서 산 것"
             note={`${execBuys.length}건`}
-            noteHelp={`장내 매수(P)만입니다. 전체 신고의 1%뿐이라 드뭅니다.${
-              execOther > 0 ? ` 매매가 아닌 ${execOther}건은 뺐습니다.` : ""
-            }`}
+            noteHelp="장내 매수(P)만"
             desc="드물게 나옵니다. 없는 것이 정상입니다."
           />
           {execBuys.length === 0 ? (
@@ -621,9 +617,7 @@ export default async function StockDetailPage({
             icon="trending_down"
             title="임원이 내놓은 것"
             note={`${execSells.length}건`}
-            noteHelp={`장내 매도에 세금 원천징수·증여가 섞여 있습니다.${
-              execOther > 0 ? ` 매매가 아닌 ${execOther}건은 뺐습니다.` : ""
-            }`}
+            noteHelp="세금·증여 매도 포함"
             desc="접수일 최신 순입니다. 무엇으로 내놓았는지 옆에 적었습니다."
           />
           {execSells.length === 0 ? (
@@ -641,9 +635,7 @@ export default async function StockDetailPage({
             icon="trending_up"
             title="의원이 산 것"
             note={`${cgBuys.length}건`}
-            noteHelp={`STOCK Act 신고 중 매수(P)입니다. 금액은 구간으로만 신고됩니다.${
-              cgOther > 0 ? ` 교환(E) ${cgOther}건은 어느 쪽도 아니라 뺐습니다.` : ""
-            }`}
+            noteHelp="STOCK Act 매수 신고"
             desc="실제 매매일 기준 최신 순입니다."
           />
           {cgBuys.length === 0 ? <EmptyCard icon="inbox">최근 매수 신고가 없습니다.</EmptyCard> : <Rows name="stock_cg_buy" items={cgBuys.slice(0, ROWS_MAX).map((c, i) => congressRow(c, i, d.usdKrw))} />}
@@ -654,9 +646,7 @@ export default async function StockDetailPage({
             icon="trending_down"
             title="의원이 판 것"
             note={`${cgSells.length}건`}
-            noteHelp={`STOCK Act 신고 중 매도(S)입니다. 금액은 구간으로만 신고됩니다.${
-              cgOther > 0 ? ` 교환(E) ${cgOther}건은 어느 쪽도 아니라 뺐습니다.` : ""
-            }`}
+            noteHelp="STOCK Act 매도 신고"
             desc="실제 매매일 기준 최신 순입니다."
           />
           {cgSells.length === 0 ? <EmptyCard icon="inbox">최근 매도 신고가 없습니다.</EmptyCard> : <Rows name="stock_cg_sell" items={cgSells.slice(0, ROWS_MAX).map((c, i) => congressRow(c, i, d.usdKrw))} />}

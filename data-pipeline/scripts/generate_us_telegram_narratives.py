@@ -328,7 +328,8 @@ def load_us_messages(db, since_date: str) -> list[dict]:
     rows = load_window_keyset(
         db,
         "telegram_messages",
-        "id,channel_handle,message_id,text,posted_at,views,telegram_message_us_stocks(ticker,match_text)",
+        # forwards 는 미장 테마 요약(generate_us_theme_briefs.py)이 발췌를 줄 세울 때 쓴다(views + forwards×3 — 국장 종목 요약과 같은 잣대).
+        "id,channel_handle,message_id,text,posted_at,views,forwards,telegram_message_us_stocks(ticker,match_text)",
         since_utc,
     )
     out = []

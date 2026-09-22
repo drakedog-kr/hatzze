@@ -56,11 +56,64 @@
   .hz-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .hz-c3, .hz-c4 { grid-column: span 3; }
   .hz-selfstretch-lg { align-self: start; }
+  /* 테마 목록 '갑자기 많이 언급된 종목' 표: 고정 칸 넷(598px)이 남는 폭을 다 먹어 까닭 칸이 좁아진다.
+     여기부터는 까닭을 둘째 줄로 내려 줄 폭을 다 준다. 폰(≤560)은 layout.css 아래 규칙이 언급 칸까지 접는다.
+     처음엔 1149 에서 끊었는데(까닭이 22~30자일 때 800 화면 실측), 까닭이 50~90자가 되자 1150~1300 에서
+     칸이 174~324px 라 세 줄 클램프에 잘렸다(2026-09-21 실측). 1440 이면 칸이 464px 라 두 줄에 들어간다. */
+  .hz-cols-theme-riser {
+    grid-template-columns: 130px minmax(0, 1fr) 96px;
+    gap: 6px 16px;
+  }
+  .hz-cols-theme-riser > :nth-child(3) {
+    grid-column: 1 / -1;
+    order: 4;
+  }
+  .hz-thead.hz-cols-theme-riser > :nth-child(3) {
+    display: none;
+  }
 }
 
 @media (max-width: 1149px) {
   .hz-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hz-c2, .hz-c3, .hz-c4 { grid-column: span 2; }
+  /* 테마 화면 '이 테마의 주인공' 두 열 → 한 열(1~10 차례로). 900 화면에서 반쪽이 322px 라 까닭이 여섯 줄로 늘어져
+     한 줄이 158px 였다(2026-09-21 실측). 세로선과 5번째 밑선 규칙도 되돌린다. */
+  .hz-theme-stock-cols {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-auto-flow: row;
+  }
+  .hz-theme-stock-cols > :nth-child(-n + 6) { box-shadow: none; }
+  .hz-theme-stock-cols > :nth-child(6):not(:last-child) { border-bottom: 1px solid var(--c-hairline); }
+  /* 한 열에선 둘째 열 머리(7번째)가 목록 한가운데 서니 감춘다. */
+  .hz-theme-stock-cols > .hz-thead:nth-child(7) { display: none; }
+  /* 테마 흐름 표: 문장을 **둘째 줄로 내려** 줄 폭을 다 준다. 한 줄 네 칸을 유지하면 순위 28 + 이름 200 + 조각 176 + 틈 108 을
+     빼고 남는 폭이 문장 몫인데, 1024 에서 204px · 940 에서 120px · 820 에서 20px 로 쪼그라든다(2026-09-22 실측).
+     아래 폰 규칙(≤560)과 같은 꼴이고, 넓은 화면에서만 네 칸 한 줄이다. */
+  .hz-cols-theme-list {
+    grid-template-columns: 28px minmax(0, 1fr) 176px;
+  }
+  .hz-trow.hz-cols-theme-list,
+  .hz-thead.hz-cols-theme-list {
+    gap: 8px 20px;
+  }
+  .hz-cols-theme-list > :nth-child(3) {
+    grid-column: 2 / -1;
+    order: 3;
+  }
+  /* 열 머리의 셋째 칸("요즘 도는 얘기")은 홀로 다음 줄에 서므로 접는다(폰 규칙과 같다). */
+  .hz-thead.hz-cols-theme-list > :nth-child(3) {
+    display: none;
+  }
+  /* '등락의 이유': 종목 칸 240px 이 남는 폭을 먹어 까닭이 좁아지니, 까닭을 둘째 줄로 내려 줄 폭을 다 준다. */
+  .hz-cols-theme-reason {
+    grid-template-columns: minmax(0, 1fr) 76px;
+    gap: 5px 14px;
+  }
+  .hz-cols-theme-reason > :nth-child(2) {
+    grid-column: 1 / -1;
+    order: 4;
+  }
   /* 2열 이하부터 여백을 깎는다(위 '반응형 여백' 주석 참고).
      커스텀 속성은 반드시 셀렉터 안에 둔다 — @media 바로 밑에 쓰면 선언이 통째로 버려진다. */
   :root { --hz-main-pad: 22px; --hz-card-pad: 18px; }
@@ -482,13 +535,116 @@
     display: none;
   }
 
+  /* 테마 점유율 지도: 폰에서는 세로로 세운다. 배치는 2:1 로 계산됐지만 상대 위치가 그대로라 안 겹친다.
+     작은 칸의 글자는 더 작게 — 폭이 반이 되면 이름이 잘린다. */
+  .hz-treemap {
+    aspect-ratio: 1 / 1.15;
+  }
+  /* 폰에서는 변화(%p)는 자리가 없어 접고, 글자는 한 단계 작게(줄바꿈 규칙은 kadera.css 기본값). */
+  .hz-tm-tile .hz-tm-in { padding: 6px 7px; gap: 1px; }
+  .hz-tm-tile .hz-tm-name { font-size: var(--fs-12); }
+  .hz-tm-tile.is-lg .hz-tm-name { font-size: var(--fs-13); }
+  .hz-tm-tile .hz-tm-val { font-size: var(--fs-11); }
+  .hz-tm-tile.is-lg .hz-tm-val { font-size: var(--fs-12); }
+  .hz-tm-delta { display: none; }
+  /* 작은 칸과 세로쓰기 칸은 폰에서 글자를 뺀다. 세로쓰기 칸은 320px 에서 폭 16px · 높이 74px 이라 여섯 자가
+     78px 을 넘어 마지막 자가 잘렸다(2026-09-22 실측). 이름은 툴팁과 aria-label 에 그대로 있다. */
+  .hz-tm-tile.is-sm .hz-tm-in,
+  .hz-tm-tile.is-tall .hz-tm-in { display: none; }
+  .hz-tm-legend { padding-left: 16px; padding-right: 16px; }
+
+  /* 테마 화면의 표 세 벌 + 목록. 곁다리 열을 접고 긴 글은 아랫줄로 내린다(kadera.css 정의). */
+  .hz-cols-theme-stock {
+    grid-template-columns: 24px minmax(0, 1fr) 60px;
+    gap: 10px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  /* 이름은 안 줄이고 태그를 아랫줄로 보낸다.
+     ⚠️ 가로 간격을 0 으로 두면 **같은 줄에 남았을 때 태그가 이름에 붙는다**(2026-09-23 지적).
+     태그의 margin-left 를 여기서 걷으므로 간격은 gap 이 맡아야 한다 — 가로 6px 은 넓은 화면과 같은 값이다. */
+  .hz-theme-namerow { flex-wrap: wrap; gap: 3px 6px; }
+  .hz-theme-namerow .hz-theme-name { flex-shrink: 0; }
+  .hz-theme-namerow .hz-theme-tag { margin-left: 0; }
+  .hz-cols-theme-reason {
+    gap: 6px 10px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  /* 일정 줄: 종목과 '몇 곳이 언급'을 첫 줄에 두고 일정 글만 아랫줄로 내린다.
+     ⚠️ 글을 order 없이 두 칸에 걸치면 알약이 셋째 줄로 밀리고, 격자 칸이라 **줄 폭 전부로 늘어난다**
+     (네 글자 알약이 309px 였다, 2026-09-23 지적). 알약은 곁말이라 제 글자 폭만 차지해야 한다. */
+  .hz-cols-theme-event {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 8px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .hz-cols-theme-event > :nth-child(2) {
+    grid-column: 1 / -1;
+    order: 3;
+  }
+  .hz-cols-theme-event > :nth-child(3) {
+    justify-self: end;
+  }
+  /* 폰: 층으로 — 순위 · 이름(종목) · 점유율(조각) / 문장. 한 줄 네 칸을 그대로 두면 이름이 "전력기…"로 잘린다.
+     DOM 은 순위·이름·문장·값 순이라 문장(셋째)을 order 로 맨 뒤에 보내고 줄 폭 전부를 준다. */
+  .hz-cols-theme-list {
+    /* ⚠️ 오른쪽 칸을 auto 로 두면 "3일째 오르는 중"과 지속 알약이 한 줄로 펴지며 149px 을 가져가, 320px 에서 테마 이름
+       칸이 47px 까지 눌려 변화(▲2.2%p)가 밖으로 7px 넘쳤다(2026-09-22 실측 · 미장 4줄). 폭을 108px 로 묶어
+       그 둘을 세로로 쌓게 하고, 남는 폭은 이름이 갖는다. */
+    grid-template-columns: 24px minmax(0, 1fr) minmax(0, 108px);
+    padding: 13px 16px;
+  }
+  /* 넓은 화면의 36px(kadera.css, 같은 겹 선택자)을 폰에서 되돌린다 — 선택자 특이도를 맞춰야 이긴다. */
+  .hz-trow.hz-cols-theme-list,
+  .hz-thead.hz-cols-theme-list {
+    gap: 8px 10px;
+  }
+  .hz-cols-theme-list > :nth-child(3) {
+    grid-column: 2 / -1;
+    order: 3;
+  }
+  /* 열 머리의 셋째 칸("요즘 무슨 얘기")은 폰에서 접는다 — 남기면 홀로 다음 줄에 선다. */
+  .hz-thead.hz-cols-theme-list > :nth-child(3) {
+    display: none;
+  }
+  /* '말이 는 종목' 표: 폰은 층으로 — 테마 · 언급 수 / 종목(줄 폭 전부) / 까닭.
+     ⚠️ 셋을 한 줄에 두던 때는 320px 에서 종목 칸이 120px 라, 이름 아래로 접힌 태그("3일 전 대비 5.0배",
+     약 130px)가 오른쪽 칸 글자 위로 10~45px 넘쳤다(2026-09-22 실측 · 국장 5줄 · 미장 13줄). 칸을 더 좁히는 대신
+     종목에 줄 폭을 통째로 준다 — 테마 목록 표(.hz-cols-theme-list)가 쓰는 방식 그대로다. */
+  .hz-cols-theme-riser {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 10px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .hz-cols-theme-riser > :nth-child(2) {
+    grid-column: 1 / -1;
+    order: 3;
+  }
+  .hz-cols-theme-riser > :nth-child(3) {
+    grid-column: 1 / -1;
+    order: 4;
+  }
+  /* 열 머리는 테마와 언급 수만 남긴다 — 종목·까닭은 아랫줄로 내려가 머리와 짝이 안 맞는다. */
+  .hz-thead.hz-cols-theme-riser > :nth-child(2),
+  .hz-thead.hz-cols-theme-riser > :nth-child(3) {
+    display: none;
+  }
+
   /* 종목 화면의 일정 아젠다: 좌우 여백만 폰 값으로. */
   .hz-cols-cal-one {
     gap: 10px;
     padding-left: 16px;
     padding-right: 16px;
   }
-  .hz-agenda-day {
+  .hz-agenda-day,
+  .hz-reason-day-head {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .hz-theme-related {
     padding-left: 16px;
     padding-right: 16px;
   }

@@ -28,9 +28,13 @@ import { AiMark, C, Icon, MONO } from "../ui";
 import { ExpandableList } from "./ExpandableList";
 import { Avatar, ChangeRate, DayBars, DeltaPp, Highlight, Pill, QuoteDate, RankBadge, RankDelta, Sparkline, highlightTerms, termsFor } from "./parts";
 import { fmtKoDate, stockHref } from "@/lib/stock-page";
+import { THEME_NAMES, themeHref } from "@/lib/theme-href";
+import { THEMES } from "@/lib/stock-themes";
+import { THEME_PUBLIC } from "../screen-flags";
 import { BOARD_TILES, getMoveReasons, getUpcomingEvents, todayKst } from "@/lib/kadera-why";
 import { EventsCalendar } from "./EventsCalendar";
 import { StockLogo } from "../StockLogo";
+import { CHANNEL_FORM } from "../brand";
 import { SectionHead } from "./SectionHead";
 import { SectionIntro } from "../SectionIntro";
 import { TrendingTabs } from "./TrendingTabs";
@@ -126,6 +130,38 @@ const SHEET_PAIR_MIN = "min(460px, 100%)";
  *    두 값이 갈리면 화면 끝자리가 다시 '등락 준비 중' 으로 뜬다. 바꿀 땐 그쪽 한 곳만 고친다.
  */
 const WHY_TILES = BOARD_TILES;
+
+/**
+ * 테마 리포트로 가는 길을 낼 것인가. 안 연 화면(app/screen-flags.ts THEME_PUBLIC)으로 링크를 내면 배포에서 404 라
+ * 여는 날까지는 감춘다 — 로컬(배포 아님)에서는 만드는 중에 봐야 하니 켠다. 푸터 바로가기와 같은 규칙.
+ * 테마 로테이션 줄·유입/이탈 두 칸·급등 종목/종목 리포트의 테마 칩·오늘의 브리핑 문장 속 테마 이름이 이 값을 본다(2026-09-22).
+ */
+const THEME_LINKS = THEME_PUBLIC || !process.env.VERCEL_ENV;
+
+/** 오늘의 브리핑 문장 속 테마 이름 → 테마 리포트 주소(highlightTerms 의 linkTerms). 사전의 26개 이름 그대로다. */
+const THEME_LINK_MAP = new Map(THEME_NAMES.map((t) => [t, themeHref(t)]));
+
+/** 종목 이름 → 속한 테마들(사전 순서). 급등 종목·종목 리포트 타일의 테마 칩이 쓴다. 한 종목이 여러 테마에 들 수 있다. */
+const THEMES_OF_NAME = new Map<string, string[]>();
+for (const [theme, names] of Object.entries(THEMES)) {
+  for (const n of names) THEMES_OF_NAME.set(n, [...(THEMES_OF_NAME.get(n) ?? []), theme]);
+}
+
+/** 종목 이름 옆 테마 칩. 누르면 그 테마 리포트로. 사전에 없는 종목이면 아무것도 안 그린다. 둘까지만 — 셋이면 머리줄이 넘친다. */
+function ThemeChips({ name }: { name: string }) {
+  if (!THEME_LINKS) return null;
+  const themes = (THEMES_OF_NAME.get(name) ?? []).slice(0, 2);
+  if (!themes.length) return null;
+  return (
+    <>
+      {themes.map((t) => (
+        <Link key={t} href={themeHref(t)} className="hz-theme-tag hz-theme-tag-link hz-kd-theme-chip" title={`${t} 테마 리포트`}>
+          {t}
+        </Link>
+      ))}
+    </>
+  );
+}
 /* 채널 표 두 벌(파워 랭킹·뜨는 채널)의 격자는 여기 없다 — globals.css 의 .hz-cols-ch /
    .hz-cols-rise 다. 폰에서 열을 접어야 하는데 인라인 style 은 미디어쿼리를 이겨서,
    여기 두면 @media 가 아무 일도 못 한다. 이유는 그 클래스 주석에 적어 뒀다. */
@@ -463,18 +499,10 @@ export default async function KaderaPage() {
    * 막대가 칸 폭을 꽉 채우므로 이름 줄의 오른끝이 곧 **막대의 오른쪽 위**다 —
    * 얼마나 찼는지와 얼마나 움직였는지가 한 덩어리로 읽힌다.
    */
-  const themeRow = (t: ThemeRotation, i: number, total: number) => {
+  const themeRow = (t: ThemeRotation) => {
     const d = delta(t);
-    return (
-      <div
-        key={t.theme}
-        className="hz-trow hz-cols-theme hz-theme-host"
-        style={{ flex: 1 }}
-        /* 마우스가 없어도(키보드·터치) 종목 목록을 열 수 있게 초점을 받는다.
-           언급된 종목이 없는 테마는 열 것도 없으니 초점도 주지 않는다. */
-        tabIndex={t.stocks.length ? 0 : undefined}
-        aria-label={t.stocks.length ? `${t.theme} 테마를 이룬 종목 ${t.stockCount}개 보기` : undefined}
-      >
+    const inner = (
+      <>
         <RankBadge n={t.rank} />
         <span style={{ display: "flex", flexDirection: "column", gap: 5, minWidth: 0 }}>
           <span style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
@@ -513,28 +541,17 @@ export default async function KaderaPage() {
             <RankDelta change={t.rankChange} />
           )}
         </span>
-
-        {/* 이 테마의 점유율을 만든 종목 목록. 마우스를 올리거나 초점이 가면 열린다(CSS 만).
-            아래쪽 줄은 위로 펼친다 — 아래로 열면 시트를 벗어나 다음 구간을 덮는다. */}
-        {t.stocks.length > 0 && (
-          <div className={`hz-theme-pop${i >= total - 4 ? " hz-theme-pop-up" : ""}`}>
-            <div className="hz-theme-pop-head">
-              최근 {KADERA_WINDOW_DAYS}일 언급 {t.stockCount}종목 · 총 {t.mentions.toLocaleString("ko-KR")}회 · 주목도순
-            </div>
-            {t.stocks.map((s) => (
-              <Link key={s.code} href={stockHref(s.code)} className="hz-theme-pop-item">
-                <span className="hz-theme-pop-name">{s.name}</span>
-                <span className="hz-theme-pop-cnt">{s.mentions}회</span>
-                <span className="hz-theme-pop-go">
-                  <Icon name="arrow_outward" style={{ fontSize: "var(--fs-13)" }} />
-                </span>
-              </Link>
-            ))}
-            {/* stockHref 는 그 종목의 화면(/stock/코드)으로 간다. 'MDD 정밀분석이 열립니다' 라고
-                적혀 있던 것은 옛 목적지라 틀린 안내였다(2026-09-04). */}
-            <div className="hz-theme-pop-foot">종목을 누르면 그 종목 화면이 열립니다.</div>
-          </div>
-        )}
+      </>
+    );
+    /* 줄이 곧 **그 테마 리포트로 가는 링크**다(2026-09-22). 예전엔 올리면 종목 목록 팝오버가 열렸는데, 테마 리포트가
+       그 목록과 요약·이유·일정을 다 갖고 있어 팝오버를 걷고 줄을 눌러 가게 했다. 테마 리포트가 안 열린 동안은 그냥 줄. */
+    return THEME_LINKS ? (
+      <Link key={t.theme} href={themeHref(t.theme)} className="hz-trow hz-cols-theme" style={{ flex: 1, textDecoration: "none" }} aria-label={`${t.theme} 테마 리포트 보기`}>
+        {inner}
+      </Link>
+    ) : (
+      <div key={t.theme} className="hz-trow hz-cols-theme" style={{ flex: 1 }}>
+        {inner}
       </div>
     );
   };
@@ -649,7 +666,7 @@ export default async function KaderaPage() {
               const used = new Set<string>();
               return (sentiment?.summary ?? "오늘의 브리핑을 준비하고 있습니다.")
                 .split(/\n{2,}/)
-                .map((para, i) => <p key={i}>{highlightTerms(para, summaryTerms, used)}</p>);
+                .map((para, i) => <p key={i}>{highlightTerms(para, summaryTerms, used, { linkTerms: THEME_LINKS ? THEME_LINK_MAP : undefined })}</p>);
             })()}
           </div>
         </div>
@@ -717,7 +734,7 @@ export default async function KaderaPage() {
                       중립 {sentiment.neutral}% 제외 후 환산
                       <span
                         className="hz-tip hz-tip-wide"
-                        data-tip="메시지를 비관/중립/낙관으로 나눈 뒤, 중립을 뺀 비관↔낙관 비율입니다. 시황·공시 같은 담담한 글이 절반이라, 같이 세면 늘 비관으로 기웁니다."
+                        data-tip="중립 뺀 낙관·비관 비율"
                         data-ga-tip="sentiment_ratio"
                         style={{ display: "inline-flex", cursor: "help", flexShrink: 0, alignSelf: "center" }}
                       >
@@ -782,11 +799,8 @@ export default async function KaderaPage() {
             ))}
           </div>
 
-          {/* ③ 미장으로 건너가는 통로. 토스 버튼 실측(radius 12 · 회색 5% 바탕)을 따랐다. */}
-          <Link href="/kadera/us" className="hz-tx-btn" data-ga="cta_click" data-ga-cta="to_us_kadera" data-ga-surface="kr_hero">
-            <Icon name="swap_horiz" style={{ fontSize: "var(--fs-17)" }} />
-            미장 카더라 보기
-          </Link>
+          {/* ③ 미장으로 건너가는 통로는 **머리 오른쪽 도구**로 옮겼다(2026-09-22, AppShell 의 MarketSwap).
+              히어로 안의 큰 단추보다 어느 화면에서나 같은 자리인 편이 낫다. */}
         </aside>
       </section>
 
@@ -955,10 +969,10 @@ export default async function KaderaPage() {
           title="급등 종목"
           note={why ? fmtKoDate(why.date) : undefined}
           desc="그날 오른 종목과 커뮤니티가 말한 이유"
-          noteHelp="그날 오른 종목에 커뮤니티가 말한 이유를 한 줄로 옮깁니다. 확인된 사실이 아니라 오간 이야기입니다. 등락률은 그날 종가 기준입니다."
+          noteHelp="채널이 말한 이유"
         />
         {whyFailed ? (
-          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>까닭을 불러오지 못했습니다.</p>
+          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>이유를 불러오지 못했습니다.</p>
         ) : !why || why.rows.length === 0 ? (
           <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>
             오늘 집계가 끝나면 채워집니다. 저녁 실행 뒤에 그날 것이 붙습니다.
@@ -992,6 +1006,8 @@ export default async function KaderaPage() {
                       <strong style={{ fontWeight: "inherit" }}>{r.name}</strong>
                     </Link>
                     <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", color: C.sub2, flexShrink: 0 }}>{r.code}</span>
+                    {/* 속한 테마 칩(테마 리포트로). 종목 하나에서 테마 전체로 넓혀 보는 길(2026-09-22). */}
+                    <ThemeChips name={r.name} />
                     <span style={{ flex: 1 }} />
                     <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
                       {r.changeRate !== null ? (
@@ -1034,12 +1050,29 @@ export default async function KaderaPage() {
       {/* ── 테마 로테이션 · 이슈 키워드 (50:50) ──────────────────────── */}
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
         <section className="hz-sheet" id="themes" style={{ flex: "1 1 calc(50% - 8px)", minWidth: SHEET_PAIR_MIN, display: "flex", flexDirection: "column" }}>
+          {/* 머리 오른쪽은 '테마 리포트 →'(이 카드가 그 화면의 축약본이다). 기간 알약 '3일 vs 이전'은 제목 옆 물음표로 옮겼다(2026-09-22).
+              테마 리포트가 안 열린 동안은 알약이 그대로 선다. */}
           <SectionHead level={3}
             icon="donut_small"
-            title="테마 로테이션"
-            note="3일 vs 이전"
+            title={
+              <>
+                테마 로테이션
+                <span className="hz-tip hz-tip-wide hz-kd-title-help" data-tip="최근 3일과 그 전 비교" data-ga-tip="테마 로테이션" style={{ cursor: "help", marginLeft: 5, verticalAlign: "middle" }} aria-label="테마 로테이션 셈법">
+                  <Icon name="help" style={{ fontSize: "var(--fs-13)", color: C.muted }} />
+                </span>
+              </>
+            }
+            note={THEME_LINKS ? undefined : "3일 vs 이전"}
             desc="관심이 어느 테마로 옮겨가는지 · 점유율 변화 기준"
-            noteHelp="최근 3일 평균 점유율을 그 이전과 비교합니다. 하루치끼리 재면 표본 얇은 날에 크게 요동쳐서, 며칠씩 묶어서 봅니다. 점유율의 분모는 테마 사전에 든 종목의 언급이라 열 줄 밖까지 다 더하면 100%가 됩니다."
+            right={
+              THEME_LINKS ? (
+                /* 기간 알약과 같은 자리·같은 꼴의 알약(2026-09-22). 눌리는 것이라 올리면 하늘색(.hz-theme-headpill). */
+                <Link href="/theme" className="hz-sheet-head-note hz-theme-headpill">
+                  테마 자세히 보기
+                  <Icon name="arrow_forward" style={{ fontSize: "var(--fs-13)" }} />
+                </Link>
+              ) : undefined
+            }
           />
           {themes.length === 0 ? (
             <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>
@@ -1051,6 +1084,7 @@ export default async function KaderaPage() {
                 <Highlight
                   cap="가장 많이 유입"
                   name={topIn?.theme ?? "—"}
+                  href={topIn && THEME_LINKS ? themeHref(topIn.theme) : undefined}
                   value={topIn ? `▲${Math.abs(delta(topIn)).toFixed(1)}%p` : undefined}
                   valueColor="var(--c-hot-ink)"
                   sub={topIn ? `점유율 ${topIn.sharePct.toFixed(1)}% · ${topIn.rank}위` : "관심이 새로 몰린 테마가 없습니다"}
@@ -1059,6 +1093,7 @@ export default async function KaderaPage() {
                 <Highlight
                   cap="가장 많이 이탈"
                   name={topOut?.theme ?? "—"}
+                  href={topOut && THEME_LINKS ? themeHref(topOut.theme) : undefined}
                   value={topOut ? `▼${Math.abs(delta(topOut)).toFixed(1)}%p` : undefined}
                   valueColor="var(--c-cold-ink)"
                   sub={
@@ -1082,7 +1117,7 @@ export default async function KaderaPage() {
                   머리·하이라이트·열머리 높이가 같으므로 행 높이도 자동으로 같아진다 —
                   손으로 px 을 맞추면 한쪽 글이 바뀔 때마다 어긋난다. */}
               <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-                {themes.map((t, i) => themeRow(t, i, themes.length))}
+                {themes.map((t) => themeRow(t))}
               </div>
             </>
           )}
@@ -1261,6 +1296,7 @@ export default async function KaderaPage() {
                       <strong style={{ fontWeight: "inherit" }}>{r.name}</strong>
                     </Link>
                     <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", color: C.sub2, flexShrink: 0 }}>{r.code}</span>
+                    <ThemeChips name={r.name} />
                     <span style={{ flex: 1 }} />
                     {/* ⭐ 급부상 셀과 **같은 포맷**이다(2026-09-05 ): 표본은 오른쪽 위,
                         시세는 왼쪽 아래. 예전엔 반대였는데 두 시트가 나란히 서는 화면에서
@@ -1345,7 +1381,7 @@ export default async function KaderaPage() {
           title="다가오는 일정"
           note="앞으로 5주"
           desc="커뮤니티에서 날짜를 짚어 말한 일정"
-          noteHelp="커뮤니티 글에서 '언제 무엇이 있다'고 적힌 것을 모았습니다. 확정 일정은 공시로 확인하십시오."
+          noteHelp="확정은 공시로 확인"
         />
         {eventsFailed ? (
           <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>일정을 불러오지 못했습니다.</p>
@@ -1368,7 +1404,28 @@ export default async function KaderaPage() {
       {/* ── 채널 파워 랭킹 · 뜨는 채널 (50:50) ───────────────────────── */}
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
         <section className="hz-sheet" style={{ flex: "1 1 calc(50% - 8px)", minWidth: SHEET_PAIR_MIN, display: "flex", flexDirection: "column" }}>
-          <SectionHead level={3} icon="military_tech" title="채널 파워 랭킹" desc="조회율·확산력까지 반영한 채널 영향력" />
+          <SectionHead
+            level={3}
+            icon="military_tech"
+            title="채널 파워 랭킹"
+            desc="조회율·확산력까지 반영한 채널 영향력"
+            /* 채널 등록 신청을 머리 도구에서 여기로 내렸다(2026-09-22) — 채널을 세는 카드가 신청을 받는 자리이기도 하다.
+               알약 꼴은 테마 로테이션 머리의 '테마 자세히 보기'와 같다(.hz-sheet-head-note hz-theme-headpill). */
+            right={
+              <a
+                href={CHANNEL_FORM}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hz-sheet-head-note hz-theme-headpill"
+                data-ga="cta_click"
+                data-ga-cta="register_channel"
+                data-ga-surface="power_rank"
+              >
+                <Icon name="add_circle" style={{ fontSize: "var(--fs-13)" }} />
+                채널 등록 신청
+              </a>
+            }
+          />
           {channels.length === 0 ? (
             <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>아직 채널 점수가 없습니다.</p>
           ) : (
@@ -1381,7 +1438,7 @@ export default async function KaderaPage() {
                 <span style={{ textAlign: "right" }}>순위 변동</span>
                 <span
                   className="hz-tip hz-tip-wide hz-tip-end"
-                  data-tip="조회율·포워드율·구독자 규모·게시 빈도를 합쳐 52~100으로 낸 점수입니다. 구독자만 많고 안 읽히는 채널은 낮게 나옵니다. ▲▼ 는 3일 전 순위와 견준 것입니다."
+                  data-tip="조회·전달·규모 합산"
                   data-ga-tip="influence_score"
                   style={{ display: "inline-flex", alignItems: "center", justifyContent: "flex-end", gap: 3, cursor: "help" }}
                 >

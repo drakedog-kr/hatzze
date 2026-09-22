@@ -1,8 +1,10 @@
 import Link from "next/link";
 
+import { useShellEnv } from "./shell-env";
 import { NOTE_PAGE } from "./daily/copy";
 import { DIVIDEND_PAGE } from "./dividend/copy";
-import { DAILY_PUBLIC, DIVIDEND_PUBLIC, PREVIEW_PUBLIC } from "./screen-flags";
+import { KR_THEME_SHORT, THEME_PAGE, US_THEME_PAGE } from "./theme/copy";
+import { DAILY_PUBLIC, DIVIDEND_PUBLIC, PREVIEW_PUBLIC, SEOHAK_PUBLIC } from "./screen-flags";
 import { BetaBadge, GhostSymbol, Wordmark } from "./Logo";
 import { C } from "./ui";
 import { VersionLink } from "./VersionBadge";
@@ -46,7 +48,7 @@ const SOURCE_GROUPS: { label: string; items: string }[] = [
        미 재무부 TIC  — 한국인이 든 미국 주식 잔고·순매수(월별, 1985~)
        한국예탁결제원 — 국내 증권사를 거친 외화증권 결제(일별, 1994~)
        ⚠️ SEC 13F 는 '개인과 기관' 카드를 빼면서 화면에서 안 쓰게 됐다(표는 남아 있다). */
-  { label: "해외투자", items: "미 재무부(TIC) · 한국예탁결제원" },
+  ...(SEOHAK_PUBLIC ? [{ label: "해외투자", items: "미 재무부(TIC) · 한국예탁결제원" }] : []),
   /* ECOS 에서 받는 건 GDP(200Y109)·소비자심리지수(511Y002)·외국인 순매수(802Y001),
      그리고 자금순환표(281Y002 · 가계 부문 금융자산) 넷이다.
      FRED 는 **원/달러 환율(DEXKOUS)만** 받는다 — 나스닥·S&P 같은 벤더 지수는 안 쓴다
@@ -119,6 +121,10 @@ function GroupLabel({ children }: { children: React.ReactNode }) {
 }
 
 export default function Footer() {
+  /* 테마 리포트 줄을 낼지는 **서버가 정한 값**을 받는다(app/shell-env.tsx). 예전엔 여기서 `!process.env.VERCEL_ENV` 를
+     읽었는데, 푸터는 셸(클라이언트 컴포넌트) 안에 있어 브라우저에서는 그 값이 늘 undefined 다 — 서버 HTML 엔 없던 줄이
+     하이드레이션 뒤에 나타나고, 안 연 화면이면 눌러서 404 로 간다(2026-09-22에 고쳤다). */
+  const { themeNav } = useShellEnv();
   const year = new Date().getFullYear();
   return (
     /* 2026-09-04 리디자인: 위 여백 64 · 윗선 아래 40. 토스 푸터의 어법은 '조용한 회색 글 +
@@ -202,6 +208,9 @@ export default function Footer() {
         <div style={{ display: "flex", flexWrap: "wrap", gap: "28px 56px" }}>
           <nav aria-label="바로가기">
             <GroupLabel>바로가기</GroupLabel>
+            {/* 두 단(CSS columns). 열 줄을 한 줄로 세우면 오른쪽 묶음이 브랜드 칸 아래로 밀리고 세로로 길었다(2026-09-22).
+                columns 라 위→아래 차례가 사이드바 순서 그대로고, 항목 수가 플래그로 바뀌어도 반씩 나뉜다(mobile.css .hz-foot-nav). */}
+            <div className="hz-foot-nav">
             <FooterLink href="/">시장 브리핑</FooterLink>
             {/* 카더라는 국장·미장 둘로 갈린다. 여기서는 구역 이름("카더라 리포트")이
                 아니라 **갈 수 있는 페이지**를 적는다 — 푸터는 목적지 목록이라, 구역
@@ -209,13 +218,17 @@ export default function Footer() {
                 사이드바(AppShell 의 NAV)와 같게 둔다. */}
             <FooterLink href="/kadera">국장 카더라</FooterLink>
             <FooterLink href="/kadera/us">미장 카더라</FooterLink>
+            {/* 테마 리포트 — 사이드바에서 카더라 다음 자리라 여기서도 같은 자리(아래 '안 연 화면' 규칙은 그대로다).
+                로컬(배포 아님)에서는 열기 전에도 보인다 — 만드는 중에 푸터까지 같이 봐야 해서(2026-09-22). */}
+            {themeNav && <FooterLink href={THEME_PAGE.href}>{KR_THEME_SHORT}</FooterLink>}
+            {themeNav && <FooterLink href={US_THEME_PAGE.href}>{US_THEME_PAGE.short}</FooterLink>}
             {/* ⚠️ 이 줄이 빠져 있었다. 화면을 여는 날(2026-08-26)에야 드러났는데, 예고
                 시절엔 '준비 중'이라 없는 게 맞았고 그 뒤로 아무도 다시 안 봤다.
                 ⭐ **여는 순간 고칠 곳이 NAV 의 badge 한 줄만은 아니다** — 푸터의 이
                 목록도 사이드바를 그대로 따라야 한다(바로 위 주석의 규칙). */}
             <FooterLink href="/insider">내부자 리포트</FooterLink>
             <FooterLink href="/mdd">MDD 정밀분석</FooterLink>
-            <FooterLink href="/seohak">서학개미 장부</FooterLink>
+            {SEOHAK_PUBLIC && <FooterLink href="/seohak">서학개미 장부</FooterLink>}
             {/* ⚠️⚠️ **안 연 화면은 여기 링크를 내지 않는다.** 눌리는데 404 가 되어서다
                 (2026-08-30 에 사이드바에서 그 일이 났다). 그렇다고 줄을 아예 빼 두면 여는
                 날 다시 넣는 걸 잊는다 — 내부자 리포트가 정확히 그랬다(위 주석).
@@ -231,6 +244,7 @@ export default function Footer() {
             <FooterExternalLink href="https://t.me/hatzze69" cta="community" aria="오늘 뭐래? 텔레그램 채널 열기(새 탭)">
               오늘 뭐래?
             </FooterExternalLink>
+            </div>
           </nav>
           <div>
             <GroupLabel>데이터 출처</GroupLabel>
@@ -243,7 +257,8 @@ export default function Footer() {
               {SOURCE_GROUPS.map((g) => (
                 <div key={g.label}>
                   <div style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: C.label, marginBottom: 3 }}>{g.label}</div>
-                  <div style={{ fontSize: "var(--fs-12)", lineHeight: 1.65, color: C.sub }}>{g.items}</div>
+                  {/* 칸 폭을 180 으로 못박아 긴 목록(증시·시세 넷)은 두 줄로 접힌다 — 한 줄로 두면 출처 묶음이 577px 였다. */}
+                  <div style={{ fontSize: "var(--fs-12)", lineHeight: 1.65, color: C.sub, wordBreak: "keep-all" }}>{g.items}</div>
                 </div>
               ))}
             </div>

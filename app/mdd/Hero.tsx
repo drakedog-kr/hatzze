@@ -180,7 +180,7 @@ export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel:
             <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>지금 낙폭</span>
             <span
               className="hz-tip hz-tip-wide hz-tip-start"
-              data-tip={`전고점(${fmtPrice(a.ath, data.market)}) 대비 현재가가 얼마나 내려와 있는지입니다`}
+              data-tip="전고점 대비 하락폭"
               style={{ display: "inline-flex", cursor: "help" }}
             >
               <Icon name="help" style={{ fontSize: "var(--fs-14)", color: C.muted }} />

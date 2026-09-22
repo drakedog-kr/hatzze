@@ -82,3 +82,50 @@ export const DAILY_PUBLIC = true;
  *    다른 판단이다.
  */
 export const DIVIDEND_PUBLIC = true;
+
+/**
+ * 테마 리포트(/theme · /theme/[테마]) — 테마 하나를 두고 채널에서 무슨 얘기가 도는지 보는 화면.
+ * 2026-09-19 에 만들었고 **아직 안 열었다.** 읽는 곳은 배당으로 살기와 같다(사이드바·푸터·사이트맵·검사).
+ *
+ *   app/theme/page.tsx · app/theme/[theme]/page.tsx   배포된 곳에서 404 를 낼지, noindex 를 달지
+ *   app/AppShell.tsx                                   NAV ↔ COMING_SOON · DEEP_PAGES · 소식 띠(NEWS) · 머리 도구의 건너가기 단추
+ *   app/Footer.tsx                                     '바로가기' 목록
+ *   app/sitemap-urls.ts                                사이트맵(목록 + 테마별 실주소)
+ *   scripts/check-routes.mjs                           안 연 동안 사이트맵에 없는 것을 정상으로 볼지
+ *
+ * ## 여는 절차
+ *
+ *   1. 아래 값을 true 로 바꾼다. 위 자리가 전부 같이 켜진다(소식 띠 문구·키·아이콘은 정해 뒀다 — AppShell 의 NEWS).
+ *   2. `app/releases.ts` 에 한 줄 올린다(화면이 하나 느는 것이라 Minor).
+ *   3. 머지 뒤 프로덕션을 찔러 본다 — `curl -s -o /dev/null -w '%{http_code}' https://hatzze.fun/theme` 가 200.
+ *
+ * ⛔ **여라는 말이 있기 전에는 바꾸지 말 것.** 화면이 다 만들어졌다는 것과 여는 것은
+ *    다른 판단이다.
+ */
+export const THEME_PUBLIC = false;
+
+/**
+ * 사이드바의 '테마 리포트' 옆 **빨간 N 배지**. 새로 생긴 화면이라는 표시다(푸터 버전 옆에 붙는 것과 같은 표식).
+ *
+ * ⚠️ **기한이 없다.** 푸터 배지는 방문자가 업데이트 기록을 보면 꺼지고 열나흘이 지나면 저절로 꺼지는데
+ *    (app/VersionBadge.tsx), 이 배지는 그런 판정을 하지 않는다 — 켜 두기로 한 동안 모두에게 늘 보인다.
+ *    뗄 때는 **이 줄을 false 로 바꾸는 것이 아니라 지운다**(읽는 곳은 app/AppShell.tsx 의 NAV 한 줄뿐이다).
+ */
+export const THEME_NAV_NEW = true;
+// 화면 캐시를 비우고 데우는 자리는 손댈 것이 없다 — `scripts/revalidate.sh` 의 DEFAULT_WARM 에 /theme·/theme/us 가 이미 있고,
+// 파이프라인의 '테마 리포트 화면만 먼저 비우고 데우기' 스텝도 그대로다(안 연 동안은 404 라 아무 일이 없다).
+
+/**
+ * 서학개미 장부(/seohak) — **끄는 스위치**(여는 스위치가 아니다). 2026-09-22: 테마 리포트를 머지하면서 이 화면은
+ * 폐기하기로 했다. 일단 끈다 — 코드와 표는 남기고 화면·사이드바·푸터·사이트맵·수집 파이프라인만 멈춘다.
+ *
+ * false 면
+ *   app/seohak/page.tsx     배포에선 404(로컬은 그대로 보인다), noindex
+ *   app/AppShell.tsx        사이드바 항목이 빠진다
+ *   app/Footer.tsx          바로가기와 '해외투자' 출처 묶음이 빠진다(그 원천은 이 화면만 썼다)
+ *   app/sitemap-urls.ts     사이트맵에서 빠진다
+ *   scripts/check-routes.mjs 색인 목록 검사에서 예외
+ *   .github/workflows/daily-update.yml 의 서학개미 수집 세 스텝과 캐시 데우기는 손으로 끈 상태(if: false) — yml 은 이 파일을 못 읽는다.
+ * 되살릴 일이 있으면 위 자리들과 yml 의 if: false 를 함께 되돌린다.
+ */
+export const SEOHAK_PUBLIC = false;

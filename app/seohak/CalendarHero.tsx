@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 import type { CalendarDay, SeohakCalendar } from "@/lib/seohak-calendar";
-import { CALENDAR_WINDOWS, CHANCE_BASELINE, windowDates, windowsInMonth } from "@/lib/seohak-windows";
+import { CALENDAR_WINDOWS, windowDates, windowsInMonth } from "@/lib/seohak-windows";
 import { SectionHead } from "../kadera/SectionHead";
 import { BUY, SELL, signInk } from "./tone";
 import { S, T } from "./scale";
@@ -382,7 +382,7 @@ export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
            ⭐ 세 문장 중 남길 건 하나뿐이었다. 결제일 하루 지연과 구간 표본 기간은
            화면에 이미 있거나(달력 날짜 · 카드) 읽는 데 걸림돌이 아니다. 대형 기관이
            빠진다는 것만 숫자를 바꿔 읽게 만든다. */
-        noteHelp="국내 증권사를 거친 결제만 잡혀서, 수탁은행을 직접 쓰는 대형 기관은 빠져 있습니다."
+        noteHelp="증권사 결제만 집계"
       />
 
       {/* 달력 1칸 · 설명 2칸.
@@ -651,7 +651,7 @@ export function CalendarHero({ c, fx }: { c: SeohakCalendar; fx: Fx | null }) {
                       해마다 되풀이되는 때
                       {/* 기준선은 이 표를 읽는 데 꼭 필요한데, 각주로 깔아 두면 여섯 줄
                           아래 잉크만 한 겹 더 얹는 꼴이었다. 찾을 때만 열리게 옮긴다. */}
-                      <span className="hz-tip hz-tip-wide" data-tip={`2010~2026년, 해마다 같은 방향이었는지를 셉니다. 우연이라도 ${CHANCE_BASELINE.of}번 중 ${CHANCE_BASELINE.hit}번쯤은 같은 방향이라, 12번은 동전 던지기에 가깝고 17번은 분명히 다릅니다.`}
+                      <span className="hz-tip hz-tip-wide" data-tip="해마다 같은 방향인지"
                             style={{ display: "inline-flex", cursor: "help" }}>
                         {/* ⚠️ `C.hint` 였다. 그건 점선·비활성용(명암비 1.49)이라 **누를 수
                             있는 표시**에 쓰면 안 된다. 그림도 3:1 은 넘어야 한다. */}

@@ -315,6 +315,500 @@
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
+/* ── 테마 화면(/theme/[테마])의 표 세 벌 ──────────────────────────────
+   인라인이 아니라 여기 두는 이유는 .hz-cols-ch 주석과 같다 — 폰에서 열을 접어야 하는데
+   인라인 style 은 미디어쿼리를 이긴다(layout.css 의 ≤560 규칙). */
+/* 이 테마의 주인공: 순위 배지 · 종목(+까닭 한 줄) · 언급/채널(세로 두 줄). 흐름 표(.hz-cols-theme-list)와 같은 배지·같은 오른쪽 꼴. */
+.hz-cols-theme-stock {
+  grid-template-columns: 28px minmax(0, 1fr) 72px;
+  gap: 14px;
+}
+.hz-trow.hz-cols-theme-stock {
+  padding-top: 11px;
+  padding-bottom: 11px;
+}
+/* '이 테마의 주인공' 두 열 — 열 종목을 다섯 줄 × 두 열로. 세로로 늘리지 않으면서 한 줄의 빈 가운데를 없앤다(2026-09-21).
+   grid-auto-flow: column 이라 1~5 가 왼쪽, 6~10 이 오른쪽이고, 같은 줄은 높이를 나눠 가로선이 두 열에서 이어진다.
+   왼쪽 열 오른편에 세로 헤어라인, 왼쪽 열 막내(5번째)의 밑선은 지운다(시트 바닥). 1149 아래는 layout.css 가 한 열로 돌린다. */
+.hz-theme-stock-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* 여섯 줄 = 열 머리 하나 + 다섯 줄. DOM 차례가 [머리, 1~5, 머리, 6~10] 이라 열마다 머리가 맨 위에 선다. */
+  grid-template-rows: repeat(6, auto);
+  grid-auto-flow: column;
+}
+/* 열 머리 위에도 선을 긋는다 — 지도 범례와 표 사이가 비어 1위·6위가 허공에 떠 보였다(2026-09-21 지적). */
+.hz-theme-stock-cols > .hz-thead { border-top: 1px solid var(--c-hairline); }
+.hz-theme-stock-cols > :nth-child(-n + 6) { box-shadow: inset -1px 0 0 var(--c-hairline); }
+.hz-theme-stock-cols > :nth-child(6) { border-bottom: 0; }
+.hz-theme-stock-cols.is-single {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: none;
+  grid-auto-flow: row;
+}
+.hz-theme-stock-cols.is-single > :nth-child(-n + 6) { box-shadow: none; }
+.hz-theme-stock-cols.is-single > :nth-child(6):not(:last-child) { border-bottom: 1px solid var(--c-hairline); }
+/* 이름 + 태그 한 줄. 폰에서는 태그가 이름 아래로 접힌다(layout.css ≤560) — 안 접으면 이름이 잘린다(375 실측: 이수페타시스·RF머트리얼즈). */
+.hz-theme-namerow {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+/* 이름 옆 작은 태그("평소 대비 −35% 언급"). 배당으로 살기의 .dv-badge(tx.css)와 같은 치수·색. */
+.hz-theme-tag {
+  flex-shrink: 0;
+  margin-left: 6px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: var(--fs-11);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--c-sub);
+  background: var(--c-chip);
+  white-space: nowrap;
+}
+/* 태그 색 = 지도 칸 색(위 .hz-tm-tile.is-* 와 같은 섞임). 글자는 지도 칸 이름과 같은 잉크(검정) — 온도 잉크를 얹으면 45%·58% 단에서
+   명암비가 2.6~3.8 로 11px 글자엔 모자란다(2026-09-21 실측). 색은 바탕이 말한다. */
+.hz-theme-tag.is-up-1 { background: color-mix(in srgb, var(--c-warm-2) 24%, var(--c-card)); color: var(--c-ink); }
+.hz-theme-tag.is-up-2 { background: color-mix(in srgb, var(--c-warm-2) 45%, var(--c-card)); color: var(--c-ink); }
+.hz-theme-tag.is-up-3 { background: color-mix(in srgb, var(--c-warm-2) 58%, var(--c-card)); color: var(--c-ink); }
+.hz-theme-tag.is-down-1 { background: color-mix(in srgb, var(--c-blue-2) 24%, var(--c-card)); color: var(--c-ink); }
+.hz-theme-tag.is-down-2 { background: color-mix(in srgb, var(--c-blue-2) 45%, var(--c-card)); color: var(--c-ink); }
+.hz-theme-tag.is-down-3 { background: color-mix(in srgb, var(--c-blue-2) 58%, var(--c-card)); color: var(--c-ink); }
+/* '등락의 이유' 날짜 묶음. 머리는 날짜 · 오늘 알약 · 건수. 머리 아래 선 하나로 그날 줄을 받치고, 묶음의 마지막 줄은 밑선 없이
+   다음 머리의 위 여백(20px)이 가른다 — 선과 여백을 둘 다 두면 경계가 두 겹이다. 첫 머리는 위 주간 캡션과 이미 떨어져 있어 여백이 작다. */
+.hz-reason-day-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 26px 9px;
+  border-bottom: 1px solid var(--c-hairline);
+}
+.hz-reason-day:first-child > .hz-reason-day-head { padding-top: 12px; }
+.hz-reason-day > .hz-trow:last-child { border-bottom: 0; }
+/* 등락의 이유: 종목(로고 · 이름 + 등락 태그, 폭 고정이라 까닭이 세로로 나란하다) · 까닭(남는 폭) · 채널 수(오른쪽 끝). */
+.hz-cols-theme-reason {
+  grid-template-columns: 240px minmax(0, 1fr) 76px;
+  gap: 16px;
+  align-items: center;
+}
+.hz-trow.hz-cols-theme-reason {
+  padding-top: 11px;
+  padding-bottom: 11px;
+}
+/* 다가오는 일정: 종목 · 무슨 일 · (채널 알약). */
+.hz-cols-theme-event {
+  grid-template-columns: 150px minmax(0, 1fr) auto;
+}
+/* 테마 목록(/theme)의 흐름 표: # · 테마(+대표 종목) · 점유율(숫자+막대) · 열흘 흐름(띠+한 줄 글).
+   열은 넷뿐이다. 처음엔 다섯(라벨 칸이 따로)이었고 줄 높이 8px 에 띠마다 순위 숫자까지 있어
+   "복잡하고 안 깔끔하고 좁다"는 지적을 받았다(2026-09-19). 띠에서 숫자를 빼고 라벨을 띠 아래로
+   붙여 열을 줄이고, 줄에 숨을 준다. */
+/* 테마 목록의 흐름 표 — 한 줄에 테마 하나, 네 칸: 순위 · 이름과 변화(아래 말 많은 종목) · ✨ 문장(남는 폭 전부) ·
+   점유율과 열흘 한 조각(세로). 2026-09-19 에 여섯 판을 거쳤다(순위 숫자 띠 → 색 띠 → 스파크라인 → 아랫층 문장 →
+   가운데 문장 → 3열 타일) 끝에 "한 열에 한 테마씩"으로 돌아왔다. 남은 원칙: 그림은 두지 않는다(숫자 하나 + 글 한 조각 +
+   문장 한 줄), 문장은 칸에 가두지 말고 남는 폭을 다 준다, 왼쪽·오른쪽 칸을 두 줄씩으로 맞춰 줄이 반듯하게. */
+.hz-cols-theme-list {
+  /* 오른쪽 칸 176px — 점유율 아래 "2일째 오르는 중"과 지속 알약이 **한 줄에** 서는 폭이다(둘이 172px). 124px 이던 때는
+     그 둘이 칸을 넘어 왼쪽 문장 글자와 겹쳤다(2026-09-22). 넓힌 만큼 문장 칸(1fr)이 줄어든다. */
+  grid-template-columns: 28px 200px minmax(0, 1fr) 176px;
+  align-items: center;
+}
+/* 칸 사이 36px. ⚠️ `.hz-cols-theme-list { gap }` 만으로는 안 먹는다 — 뒤에 오는 `.hz-trow { gap: 12px }` 가 같은 특이도로 이겨서
+   예전 20px 도 실제론 12px 이었다. 이름 칸(200px)은 '말 많은 종목' 줄이 늘 끝까지 차서 12px 이면 문장과 붙어 보였고
+   (급부상 표는 종목 칸이 넓어 저절로 여백이 남는다), 2026-09-22 "테마 흐름에 맞게 적절한 간격". */
+.hz-trow.hz-cols-theme-list,
+.hz-thead.hz-cols-theme-list {
+  gap: 36px;
+}
+.hz-trow.hz-cols-theme-list {
+  padding-top: 13px;
+  padding-bottom: 13px;
+}
+/* '테마 안에서 말이 는 종목' 표: 테마 · 종목 · ✨ 까닭(남는 폭 전부) · 배수 알약 · 최근 사흘 언급(앞 사흘 곁말).
+   흐름 표와 같은 원칙 — 문장이 가운데 폭을 다 갖는다. */
+.hz-cols-theme-riser {
+  grid-template-columns: 150px 280px minmax(0, 1fr) 96px;
+  gap: 18px;
+  align-items: center;
+}
+.hz-trow.hz-cols-theme-riser {
+  padding-top: 11px;
+  padding-bottom: 11px;
+}
+/* 흐름 표 오른쪽 칸의 '열흘 한 조각'(방향 화살표 + 지속 알약). 화살표 한 자라 늘 한 줄에 들어가지만, 알약 글이 길어지면
+   접어서 오른쪽에 쌓는다 — nowrap 이던 때는 그만큼 **왼쪽 칸의 글자 위로 넘쳤다**(2026-09-22). */
+.hz-theme-flow {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px 7px;
+  max-width: 100%;
+}
+/* ✨ + 문장. 넓은 화면은 한 줄, 좁으면 세 줄까지. 곁말 색(--c-sub)이 아니라 --c-ink-soft: 이 칸이 표의 본론이다. */
+.hz-theme-row-brief {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--fs-13);
+  line-height: 1.6;
+  word-break: keep-all;
+  text-wrap: pretty;
+}
+.hz-theme-row-brief > span {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* ── 테마 화면 히어로(app/theme/[theme]/page.tsx) ──
+   종목 알약: 회색 타일(--tx-tile) 위라 회색 칩은 경계가 안 보인다(2026-09-21 지적). 카드색 + 판 테두리 + 로고.
+   더 있는 종목은 점선 알약 하나("+47"). */
+.hz-theme-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+/* 배당으로 살기의 종목 칩(.dv-chip, tx.css)과 같은 치수·색이다 — 그림자는 두지 않는다(2026-09-21 "그라데이션이 과하다"). */
+.hz-theme-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 6px;
+  border-radius: 999px;
+  background: var(--c-card);
+  border: 1px solid var(--c-line);
+  font-size: var(--fs-12-5);
+  font-weight: 600;
+  color: var(--c-ink);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.12s ease;
+}
+a.hz-theme-chip:hover { background: var(--tx-btn); }
+.hz-theme-chip-more {
+  padding: 5px 10px;
+  background: transparent;
+  border-style: dashed;
+  color: var(--c-sub);
+}
+/* 글자 링크(‹ 테마 리포트 · 테마 전체 보기 →). 올리면 글자가 진해진다 — 인라인 color 는 :hover 를 이겨서 클래스가 색을 쥔다. */
+.hz-theme-textlink { color: var(--c-sub); transition: color 0.12s ease; }
+.hz-theme-textlink:hover { color: var(--c-ink); }
+/* 카더라 급등 종목·종목 리포트 머리줄의 테마 칩. 14~17px 이름 옆이라 태그보다 한 단 작고, 줄어들지 않는다.
+   ⚠️ 회색 타일(--tx-tile) 위라 회색 칩 바탕(--c-chip)은 안 보인다(2026-09-22 "디자인이 없다") — 하늘색 틴트 + 파란 글자로,
+   이 화면에서 '누르면 다른 곳으로'를 뜻하는 색이다. 올리면 한 단 진하게. */
+.hz-theme-tag.hz-kd-theme-chip {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: var(--fs-11);
+  font-weight: 700;
+  margin-left: 0;
+  background: var(--c-blue-tint);
+  color: var(--c-cold-ink); /* ⚠️ 특이도를 둘로 — 아래 .hz-theme-tag-link 의 잉크색이 뒤에서 이겼다. */
+}
+.hz-theme-tag.hz-kd-theme-chip:hover { background: var(--c-blue-5); color: var(--c-cold-ink); }
+/* 테마 로테이션 머리의 '테마 리포트 →' 알약 — 기간 알약(.hz-sheet-head-note)과 같은 꼴, 링크라 올리면 하늘색. */
+.hz-theme-headpill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--fs-11);
+  font-weight: 700;
+  color: var(--c-sub);
+  border-radius: 999px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.hz-theme-headpill:hover { background: var(--c-blue-tint); color: var(--c-cold-ink); }
+/* 테마 로테이션 줄을 올리면 바탕이 하늘색(--c-blue-tint)이 되는데 막대의 빈 트랙(--c-track #eef3f9)이 그 색과 한 톤이라 막대가
+   사라져 보였다(2026-09-22 지적). 올린 줄에서는 트랙을 잉크 8% 로 — 어느 바탕에서든 한 단 어둡다. */
+.hz-trow:hover .hz-bar { background: color-mix(in srgb, var(--c-ink) 8%, transparent); }
+/* 오늘의 브리핑 문장 속 테마 이름 — 굵힘과 같은 무게에 점선 밑줄로 눌린다는 것만 더한다. 올리면 파란 잉크. */
+.hz-kd-termlink {
+  font-weight: 800;
+  color: var(--c-ink);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--c-muted);
+  transition: color 0.12s ease;
+}
+.hz-kd-termlink:hover { color: var(--c-cold-ink); text-decoration-color: var(--c-cold-ink); }
+/* 히어로 본문 안의 태그 링크(급부상 종목 · 오르는 테마). 눌리는 태그라 올리면 하늘색. 본문 글줄(14px) 사이라 여백을 조금 키운다. */
+.hz-theme-tag-link {
+  margin-left: 0;
+  padding: 3px 7px;
+  font-size: var(--fs-12);
+  font-weight: 700;
+  color: var(--c-ink); /* 회색(--c-sub)이었다 — 이름이 흐려 안 눌리는 것으로 보였다(2026-09-22 "종목명 색은 좀 더 진하게"). 곁말(테마)만 한 단 흐린 --c-label. */
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.hz-theme-tag-link:hover { background: var(--c-blue-tint); color: var(--c-cold-ink); }
+/* 히어로 태그에서 온 줄(#riser-코드). 고정 머리(탑바) 아래로 들어가지 않게 위 여백을 두고, 도착한 줄은 하늘색으로 밝힌다. */
+.hz-trow[id^="riser-"] { scroll-margin-top: 96px; }
+.hz-trow:target { background: var(--c-blue-tint); }
+/* 맨 아래 '함께 거론되는 테마' 알약. 링크라 올리면 색이 바뀌어야 알약끼리 갈린다 — 인라인 background 는 :hover 를 이겨서 클래스로. */
+.hz-theme-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 11px;
+  border-radius: 999px;
+  background: var(--c-chip);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--c-label);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.hz-theme-pill:hover {
+  background: var(--c-blue-tint);
+  color: var(--c-cold-ink);
+}
+/* 그 알약이 서는 칸(테마 화면 맨 아래). 머리 한 줄과 알약 한 묶음, 두 층이다 — 한 줄에 이름표·알약·전체 보기를
+   같이 두면 폰에서 접히는 자리가 제각각이라 배치가 흐트러져 보였다(2026-09-23 지적). */
+.hz-theme-related {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 22px 18px;
+}
+.hz-theme-related-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.hz-theme-related-cap {
+  font-size: var(--fs-12);
+  font-weight: 700;
+  color: var(--c-sub);
+  white-space: nowrap;
+}
+.hz-theme-related-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-12);
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.hz-theme-related-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+/* 작은 숫자들(Fig) — 둘째 칸은 두 칸 격자, 넓은 칸은 한 줄에 셋. */
+.hz-theme-figs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+.hz-theme-figs-row {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+/* ── 테마 점유율 지도(트리맵, app/theme/Treemap.tsx) ──────────────────────
+   칸은 퍼센트 좌표의 절대 배치. 상자의 종횡비는 서버가 배치를 계산한 값(2:1)과 같아야 칸이
+   정사각형에 가깝다. 폰에서는 세로로 세운다(layout.css ≤560) — 상대 위치는 그대로라 안 겹친다.
+   시트 바탕 토큰은 --c-card 다(--c-sheet 라는 토큰은 없다. 선은 --c-sheet-line). */
+.hz-treemap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  /* 칸 사이 틈은 칸의 테두리(시트와 같은 --c-card)로 낸다. 상자 바탕도 같은 색이라 틈이 시트에 녹는다. */
+  background: var(--c-card);
+  border-radius: var(--r-control);
+  overflow: hidden;
+}
+/* ⚠️ 선택자를 `.hz-treemap .hz-tm-tile` 로 두는 이유: 칸에는 툴팁용 .hz-tip 도 붙는데 그 규칙이
+   `position: relative` 를 갖고 있고 나중에 읽히는 파일(sheets.css)에 있어, 한 클래스로만 적으면
+   absolute 가 relative 에 진다 — 실제로 칸이 전부 한 줄로 쌓여 지도가 비어 보였다(2026-09-19). */
+.hz-treemap .hz-tm-tile {
+  position: absolute;
+  box-sizing: border-box;
+  /* 틈 2px. 칸 안쪽 여백은 크기 단계별로 아래에서. */
+  border: 2px solid var(--c-card);
+  border-radius: 6px;
+  text-decoration: none;
+  color: var(--c-ink);
+  overflow: hidden;
+  /* .hz-tip 이 cursor:default 를 못박는다 — 이 칸은 누르면 테마 화면으로 가는 링크다. */
+  cursor: pointer;
+  transition: box-shadow 0.12s ease;
+}
+/* ⚠️ 호버를 `filter: brightness()` 로 하면 안 된다. filter 는 fixed 자손의 containing block 을
+   만들어서, 앵커 위치지정으로 시트 밖까지 뜨던 툴팁(.hz-tip::after 는 position:fixed)이 칸 안에
+   갇히고 overflow:hidden 에 잘린다 — 바이오 칸에서 "…▼3.5%" 뒤가 잘려 보였다(2026-09-21).
+   안쪽 그림자로 살짝 어둡게 한다. 그림자는 containing block 을 안 만든다. */
+.hz-tm-tile:hover,
+.hz-tm-tile:focus-visible {
+  box-shadow: inset 0 0 0 100vmax rgba(14, 33, 54, 0.07);
+  outline: none;
+}
+/* 색 단계. 온도색 두 가지(--c-warm-2 · --c-blue-2)를 시트 바탕에 섞는다 — 라이트·다크 모두
+   자기 토큰으로 섞이므로 따로 안 적는다.
+   ⚠️ 글자는 **모든 칸이 잉크색**이다. 처음엔 맨 진한 단(88%)만 흰 글자였는데 "흰 글자와 검정 글자의 차이가
+   뭐냐"는 물음이 나왔다(2026-09-21) — 가독성 때문에 갈린 것이 뜻처럼 읽혔다. 그래서 맨 진한 단을 내려 잉크 글자가 서게 했다.
+   ⚠️ 그 단이 66% 였을 때 **다크에서 파랑 3단 위 잉크가 4.37** 이었다(15px/800 이라 4.5 가 필요하다). 58% 로 한 단 더
+   내려 4.99 가 됐다(2026-09-22 실측). 태그(.hz-theme-tag.is-*)와 범례(.hz-tm-sw.is-*)가 같은 섞임을 쓰므로 세 곳을 함께 옮긴다. */
+.hz-tm-tile.is-flat { background: var(--c-chip); }
+.hz-tm-tile.is-up-1 { background: color-mix(in srgb, var(--c-warm-2) 24%, var(--c-card)); }
+.hz-tm-tile.is-up-2 { background: color-mix(in srgb, var(--c-warm-2) 45%, var(--c-card)); }
+.hz-tm-tile.is-up-3 { background: color-mix(in srgb, var(--c-warm-2) 58%, var(--c-card)); }
+.hz-tm-tile.is-down-1 { background: color-mix(in srgb, var(--c-blue-2) 24%, var(--c-card)); }
+.hz-tm-tile.is-down-2 { background: color-mix(in srgb, var(--c-blue-2) 45%, var(--c-card)); }
+.hz-tm-tile.is-down-3 { background: color-mix(in srgb, var(--c-blue-2) 58%, var(--c-card)); }
+.hz-tm-in {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  min-width: 0;
+  max-width: 100%;
+}
+/* 이름은 **줄바꿈**한다(말줄임이 아니라). 폭이 모자란 칸에서 "인터…"·"건…"보다 두 줄 "인터넷·
+   플랫폼"이 낫고, 칸이 대개 세로로 여유가 있다. 낱말 가운데서 끊기지 않게 keep-all. 그래도
+   안 들어가면 칸의 overflow:hidden 이 자른다. */
+.hz-tm-name {
+  font-size: var(--fs-13);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  white-space: normal;
+  word-break: keep-all;
+  line-height: 1.25;
+  /* 두 줄까지. 세 줄이 되면 값과 여백까지 더해 칸 높이를 넘어 마지막 줄이 **가로로 잘렸다**(2026-09-22 실측).
+     넘치는 이름은 말줄임표로 끊긴 것을 보이고, 온전한 이름은 툴팁과 aria-label 에 있다. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+/* ⚠️ opacity 0.85 를 걷었다 — 잉크를 그만큼 바탕에 섞는 셈이라 다크 3단 칸에서 4.37 을 3.64 로 떨어뜨렸다(2026-09-22 실측).
+   이름과 값은 크기(15/13 · 13/12)와 굵기가 이미 가른다. */
+.hz-tm-val {
+  font-size: var(--fs-12);
+  font-weight: 700;
+  white-space: nowrap;
+}
+/* 등락도 칸 이름과 같은 잉크다. 온도 잉크(--c-hot-ink · --c-cold-ink)를 얹었더니 같은 계열 틴트 위라 명암비가
+   2.56~4.13 이었다(2026-09-22 실측 · 11px 라 4.5 가 필요하다) — 태그가 먼저 겪은 것과 같은 일이다(위 .hz-theme-tag).
+   방향은 칸 바탕과 ▲▼ 가 말한다. 변화가 작은 칸(is-flat)만 바탕이 회색이라 곁말 색으로 흐리다. */
+.hz-tm-delta {
+  margin-left: 6px;
+  font-size: var(--fs-11);
+  font-weight: 800;
+}
+/* 변화가 작은 칸만 흐리게. --c-sub2 는 다크에서 회색 칸 위 4.01 이라 11px 글자엔 모자랐다(2026-09-22 실측) — 한 단 진한 --c-label. */
+.hz-tm-tile.is-flat .hz-tm-delta { color: var(--c-label); }
+.hz-tm-tile.is-lg .hz-tm-name { font-size: var(--fs-15); }
+.hz-tm-tile.is-lg .hz-tm-val { font-size: var(--fs-13); }
+.hz-tm-tile.is-sm .hz-tm-in { padding: 5px 7px; }
+.hz-tm-tile.is-sm .hz-tm-name { font-size: var(--fs-11); font-weight: 700; }
+/* 가늘고 긴 칸: 글자를 한 자씩 세로로. keep-all 을 풀어야 낱말 안에서 끊긴다. */
+.hz-tm-tile.is-tall .hz-tm-in { padding: 5px 4px; align-items: center; }
+/* 세로쓰기는 한 자가 한 줄이라 두 줄 제한을 풀어야 한다(풀지 않으면 두 자만 선다). 높이가 모자란 칸은 아래 ③ 이 통째로 뺀다. */
+.hz-tm-tile.is-tall .hz-tm-name { display: block; font-size: var(--fs-11); font-weight: 700; word-break: break-all; text-align: center; line-height: 1.2; }
+/* 글자 단계는 **칸 자신의 크기**가 마무리한다. 서버는 폭·높이를 %로만 알고 2:1 · 900px 을 셈의 바탕으로 두는데,
+   실제 칸은 화면마다 다른 px 이 된다 — 768px 에서 미장 칸 여덟이 이름을 5~22px 잘라 먹었고(2026-09-22 실측),
+   320px 에서는 38px 칸에 "소프트웨어"가 세 줄로 들어찼다. 칸을 직접 재서 세 단으로 접는다.
+   ① 아주 작은 칸 — 글자를 아예 뺀다(이름은 툴팁과 aria-label 에 그대로 있다)
+   ② 작은 칸 — 값을 빼고 이름만 한 단 작게, 여백도 좁게
+   ③ 세로쓰기 칸 — 높이가 모자라면 뺀다(한 자씩 쌓다 마지막 자가 잘리면 다른 이름으로 읽힌다) */
+.hz-treemap .hz-tm-tile { container-type: size; }
+@container (max-width: 40px) or (max-height: 38px) {
+  .hz-tm-tile .hz-tm-in { display: none; }
+}
+@container (max-width: 88px) or (max-height: 76px) {
+  .hz-tm-tile .hz-tm-val { display: none; }
+  /* 작은 칸에서만 낱말 가운데를 끊는다(keep-all 해제) — 46px 칸에서 "전자·부품"은 한 덩이라 안 끊으면 줄을 통째로
+     넘겨 가로로 잘린다. 끊으면 "전자· / 부품"이 되고, 그래도 넘치면 두 줄 끝에서 말줄임표로 끊긴다. */
+  .hz-tm-tile .hz-tm-name { font-size: var(--fs-11); font-weight: 700; line-height: 1.2; word-break: break-word; overflow-wrap: anywhere; }
+  .hz-tm-tile .hz-tm-in { padding: 5px 6px; }
+}
+@container (max-height: 84px) {
+  .hz-tm-tile.is-tall .hz-tm-in { display: none; }
+}
+/* 처음 온 사람에게 한 번 띄우는 쪽지(app/theme/MapHint.tsx). 내부자 리포트의 .hz-tap-hint 와 같은
+   생김새(ink 바탕 · bg 글자)를 지도 안에 옮긴 것이다 — 새 어법을 만들지 않는다. 자리표시자는 손가락을
+   통과시켜 가려진 칸이 그대로 눌리고, 닫기 ✕ 만 되돌려 받는다. */
+.hz-treemap .hz-map-hint-slot {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  /* 칸 안에서 오른쪽으로 넘치지 않게. 폰에서 가장 큰 칸이 45% 폭이라 그보다 조금 넓게 잡아도 되지만
+     지도 밖으로는 못 나가야 한다. */
+  max-width: calc(100% - 20px);
+}
+.hz-treemap .hz-map-hint-slot[hidden] {
+  display: none;
+}
+.hz-map-hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: max-content;
+  max-width: min(320px, 100%);
+  padding: 8px 6px 8px 10px;
+  background: var(--c-ink);
+  color: var(--c-bg);
+  border-radius: var(--r-control);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  line-height: 1.45;
+  box-shadow: 0 4px 16px var(--c-shadow-strong);
+}
+/* 위쪽 칸 이름을 가리키는 삼각 꼭지. */
+.hz-map-hint::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: 14px;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 5px solid var(--c-ink);
+}
+.hz-map-hint-x {
+  pointer-events: auto;
+}
+/* 범례 — 색만으로 방향을 말하지 않는다. */
+.hz-tm-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  padding: 12px 22px 16px;
+  font-size: var(--fs-11);
+  font-weight: 600;
+  color: var(--c-sub);
+}
+.hz-tm-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.hz-tm-sw {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  display: inline-block;
+}
+.hz-tm-sw.is-flat { background: var(--c-chip); box-shadow: inset 0 0 0 1px var(--c-hairline); }
+.hz-tm-sw.is-up-1 { background: color-mix(in srgb, var(--c-warm-2) 24%, var(--c-card)); }
+.hz-tm-sw.is-up-2 { background: color-mix(in srgb, var(--c-warm-2) 45%, var(--c-card)); }
+.hz-tm-sw.is-up-3 { background: color-mix(in srgb, var(--c-warm-2) 58%, var(--c-card)); }
+.hz-tm-sw.is-down-1 { background: color-mix(in srgb, var(--c-blue-2) 24%, var(--c-card)); }
+.hz-tm-sw.is-down-2 { background: color-mix(in srgb, var(--c-blue-2) 45%, var(--c-card)); }
+.hz-tm-sw.is-down-3 { background: color-mix(in srgb, var(--c-blue-2) 58%, var(--c-card)); }
+
+/* 열흘 흐름은 이제 글 한 조각(Pill)이다. 순위 칸 띠 → 색 띠 → 스파크라인 세 판을 거쳐 걷었다(2026-09-19). */
+
 /* ── 카더라 '다가오는 일정': 달력(1/3) + 그날 일정(2/3) ─────────────────────
    왼쪽 달력은 오늘이 든 주부터 다섯 주. 일정 있는 날은 파란 바탕에 건수, 고른 날은 진한
    파랑, 지난 날은 흐리고 못 누른다. 오른쪽은 고른 날의 줄(로고 · "종목명 무슨 일" · 알약). */
@@ -390,19 +884,21 @@
   padding: 4px 10px;
   border-radius: 999px;
   cursor: pointer;
-  transition: background 0.12s ease;
+  transition: background 0.12s ease, color 0.12s ease;
 }
-.hz-evcal-today:hover:not(:disabled) { background: var(--c-hover); }
 .hz-evcal-today:disabled { color: var(--c-muted); cursor: default; }
-.hz-evcal-day.other { color: var(--c-sub2); }
+/* 다른 달 날짜. --c-sub2 는 다크에서 일정 있는 날 바탕(하늘색 틴트) 위 4.25 라 모자랐다(2026-09-22 실측) — --c-sub 로 한 단 올린다(4.81). */
+.hz-evcal-day.other { color: var(--c-sub); }
 .hz-evcal-day.has { background: var(--c-blue-tint); }
 .hz-evcal-day:hover:not(:disabled) { background: var(--c-hover); }
 .hz-evcal-day.has:hover:not(:disabled) { background: var(--c-blue-5); }
 /* 오늘: 파란 테두리. 고른 날과 겹치면 바탕이 이긴다. */
 .hz-evcal-day.today { box-shadow: inset 0 0 0 1.5px var(--c-blue); }
+/* ⚠️ --c-blue 를 바탕으로 두면 흰 글자가 3.71(다크 3.57)로 AA 를 못 넘는다(2026-09-22 실측). 사이드바 알약이
+   2026-08-25 에 겪은 그 자리라, 흰 글자를 받으라고 만들어 둔 --c-nav-active 를 쓴다 — 같은 색상을 명도만 내린 값이다. */
 .hz-evcal-day.sel,
 .hz-evcal-day.sel:hover {
-  background: var(--c-blue);
+  background: var(--c-nav-active);
   color: #fff;
   box-shadow: none;
 }
@@ -466,9 +962,13 @@
   padding: 7px 12px;
   border-radius: 999px;
   cursor: pointer;
-  transition: background 0.12s ease;
+  transition: background 0.12s ease, color 0.12s ease;
 }
-.hz-evday-nav button:hover { background: var(--c-hover); }
+/* ⚠️ --c-hover(#f2f7fc)는 알약 바탕 --c-chip(#f2f6fb)과 한 톤이라 올려도 안 바뀌어 보였다(2026-09-21 지적).
+   행 호버와 같은 하늘색 틴트 + 파란 글자로 — 화면 전체의 "지금 이것" 색이다. '오늘' 단추도 같은 알약이라 같이. */
+.hz-evday-nav button:hover,
+.hz-evcal-today:hover:not(:disabled) { background: var(--c-blue-tint); color: var(--c-cold-ink); }
+/* 테마 화면 '등락의 이유'의 이전·다음 7일. 갈 데가 없는 단추는 아예 안 그린다(ReasonWeeks). */
 @media (max-width: 760px) {
   .hz-evsplit { grid-template-columns: minmax(0, 1fr); }
   .hz-evcal {

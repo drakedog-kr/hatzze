@@ -7,13 +7,17 @@ import { INSIDER_LISTS, INSIDER_LIST_SLUGS, insiderListHref } from "./insider/li
 import { PageJsonLd } from "./JsonLd";
 import { NOTE_PAGE } from "./daily/copy";
 import { DIVIDEND_PAGE } from "./dividend/copy";
-import { DAILY_PUBLIC, DIVIDEND_PUBLIC } from "./screen-flags";
+import { KR_THEME_SHORT, THEME_PAGE, US_THEME_PAGE } from "./theme/copy";
+import { DAILY_PUBLIC, DIVIDEND_PUBLIC, SEOHAK_PUBLIC, THEME_NAV_NEW, THEME_PUBLIC } from "./screen-flags";
+import { THEME_NAMES, US_THEME_NAMES, themeHref, usThemeHref } from "@/lib/theme-href";
+import { ShellEnvContext, useShellEnv, type ShellEnv } from "./shell-env";
 
 import { track } from "@/lib/ga";
 import { SLOGAN } from "./brand";
 import { C, Icon, R } from "./ui";
 import { BetaBadge, LogoLockup } from "./Logo";
 import Footer from "./Footer";
+import { NewBadge } from "./VersionBadge";
 import GaEvents from "./GaEvents";
 import { TipTap } from "./TipTap";
 
@@ -133,6 +137,59 @@ function LibertyIcon({ size = 20 }: { size?: number }) {
   );
 }
 
+/**
+ * 테마 리포트의 국장·미장 서브 아이콘 — **태극기의 건곤감리**(마름모 배치)와 **엠파이어 스테이트 빌딩 상층부**.
+ * 2026-09-22 에 받은 참고 이미지 둘을 **potrace 로 그대로 떴다**(카더라 여신상과 같은 방법 — 손으로 옮긴 두 시안이 "완전 다르다"였다).
+ * 카더라 서브(태극·여신상)와 같은 '나라 상징' 결이지만 그림이 다르다.
+ *
+ * 건곤감리: 참고는 빨강(위 둘 · 건 왼쪽 위 · 감 오른쪽 위)·파랑(아래 둘 · 리 왼쪽 아래 · 곤 오른쪽 아래) 두 색이다. 색이 하나뿐이라
+ * **빨강은 테두리만, 파랑은 채운다** — 국장 카더라의 태극이 파랑(아래)만 채우는 규칙 그대로. 두 색을 따로 마스크로 떠서 경로가 둘이다.
+ * 테두리 굵기는 0.45(24 박스 기준) — 막대 굵기가 1.3 이라 그 이상이면 속이 찬다. 18px 에선 테두리가 옅은 막대로 보이고 36px 부터 속이 보인다.
+ *
+ * 엠파이어 스테이트: 처음엔 같은 방법으로 떴는데 손그림 선의 울퉁불퉁함까지 따라와, 참고의 원소를 하나씩 재어 직선으로 다시 놓았다(UsEmpireIcon 주석).
+ *
+ * 재현: 저장소 밖 hatzze-icons 폴더의 trace.mjs(potrace + jimp) — 색 마스크를 회색 점수로 적고 potrace 가 문턱을 나눈다(불리언으로
+ * 자르면 경계가 톱니가 되어 경로가 두 배로 길어진다). transform 은 원본 좌표를 24 박스로 옮기는 것(여백 1, 가운데 맞춤).
+ * 둘 다 여신상과 같은 BLEED 장치로 크게 그린다(LibertyIcon 주석의 이유).
+ */
+const THEME_GLYPH_BLEED = 1.2;
+
+function KrTrigramsIcon({ size = 20 }: { size?: number }) {
+  const draw = Math.round(size * THEME_GLYPH_BLEED);
+  const pull = (draw - size) / 2;
+  return (
+    <svg width={draw} height={draw} viewBox="0 0 24 24" aria-hidden="true" style={{ display: "block", flexShrink: 0, margin: -pull }}>
+      <g transform="translate(-0.018 0.255) scale(0.05992)">
+        {/* 건·감(참고의 빨강) — 테두리만. 굵기는 원본 좌표계라 24 박스의 0.45 에 해당한다. */}
+        <path d="M 192.1 20.5 C 188.2 24.6 185 28.5 185 29.2 C 185 31 230.3 76 232.1 76 C 233 76 237 72.9 240.9 69 L 248 62.1 248 59.8 L 248 57.6 225.7 35.3 L 203.3 13 201.3 13 L 199.3 13 192.1 20.5 M 166.4 46.2 C 162.3 50.3 159 54.5 159 55.6 L 159 57.5 209.8 108.3 C 238.4 137 261.5 159.3 262.9 159.7 L 265.3 160.3 272.6 152.8 C 276.7 148.6 280 144.7 280 144 C 280 142.3 180.3 42.3 176.7 40.4 L 173.8 38.8 166.4 46.2 M 139.5 73.5 C 135.4 77.6 132 81.5 132 82.2 C 132 84.2 177.3 129 179.3 129 C 181.5 129 196 115.1 196 113 C 196 111 150.7 66 148.6 66 C 147.7 66 143.6 69.4 139.5 73.5 M 250.3 77.3 C 246.3 81.4 243 85.5 243 86.5 L 243 88.4 265.9 111.2 C 278.5 123.8 289.3 134 290.1 134 C 292.1 134 306 119.6 306 117.4 L 306 115.5 283.2 92.8 C 270.7 80.2 259.8 70 259 70 C 258.3 70 254.4 73.3 250.3 77.3 M 68.2 144.3 L 17 195.5 17 197.6 L 17 199.7 24 206.4 L 31 213.1 33 212.8 C 35.1 212.5 138 110.5 138 108.7 C 138 108.2 134.8 104.5 130.8 100.4 L 123.7 93 121.6 93 L 119.5 93 68.2 144.3 M 94.8 170.7 C 66.3 199.2 43 223.1 43 223.8 C 43 225.8 57 240 58.9 240 C 61.1 240 164 137.5 164 135.4 C 164 133.4 149.9 119 147.9 119 C 147.2 119 123.2 142.3 94.8 170.7 M 198.2 129.6 C 194.2 133.2 190.7 137.3 190.4 138.7 L 189.7 141.2 212.6 164.1 C 225.2 176.7 236.2 187 237.1 187 C 239.2 187 253 172.7 253 170.5 C 253 168.7 208.2 123 206.4 123 C 205.9 123 202.2 126 198.2 129.6 M 122.4 196.1 C 94 224.4 70.4 248.3 69.8 249.3 L 68.8 251.2 76.7 259.1 C 81.1 263.4 85.1 267 85.8 267 C 87.5 267 191 163.7 191 161.9 C 191 160.6 180.3 149.5 175.7 146 L 173.9 144.7 122.4 196.1" fill="none" stroke="currentColor" strokeWidth="7.5" strokeLinejoin="round" />
+        {/* 리·곤(참고의 파랑) — 채움 */}
+        <path d="M 314 132.8 C 312.6 133.7 307.7 138.5 303 143.4 C 291.7 155.2 291.7 155.2 281.2 165.4 C 269.7 176.5 269.7 175.7 280.3 184.5 L 286.1 189.3 294.2 181.4 C 334.6 142.2 332.6 145.1 323.9 136.8 C 317 130.2 317.4 130.4 314 132.8 M 334.4 165.1 C 330.1 169.6 325.7 174 324.8 174.9 C 321.5 178 320.7 178.8 313.6 185.8 C 301.5 197.8 300 199.4 299.4 201.3 L 298.8 203.2 302.2 206.5 C 304 208.3 306.9 211.2 308.5 212.9 C 312.6 217.1 312.3 217.3 323.1 206.3 C 328.4 200.9 333.5 195.8 334.4 195 C 335.3 194.2 340 189.3 344.9 184.3 C 349.9 179.2 354.3 175 354.9 175 C 358.7 175 356 166.4 351.5 164 C 350 163.2 347.9 161.3 346.8 159.8 C 344 155.8 343.2 156.1 334.4 165.1 M 364.2 188.3 C 361.4 191.1 358.2 194.7 357 196.3 C 355.8 197.8 354.4 199 353.8 199 C 352.2 199 342 209.8 342 211.5 C 342 212.3 340.8 213.6 339.2 214.2 C 335.8 215.8 325 227.1 325 229.2 C 325 230 328 233.4 331.6 236.9 L 338.2 243.1 340.4 241.3 C 341.5 240.3 351.9 230.1 363.3 218.7 L 384.1 197.9 383.8 196.2 C 383.6 195.3 382.5 194.1 381.4 193.5 C 380.2 192.9 377.2 190.3 374.7 187.7 C 369.1 182 370.2 181.9 364.2 188.3 M 249 197.3 C 244.9 201.7 239.3 207.5 236.6 210 C 233.9 212.5 230.1 216.2 228.1 218.4 C 226.1 220.5 222.4 224.3 219.8 226.8 C 217.1 229.3 215 232.1 215 233 C 215 234.8 226.2 247 227.9 247 C 228.5 247 239.2 236.9 251.6 224.5 L 274.2 201.9 272.4 199.7 C 271.3 198.5 269.8 197.1 269 196.6 C 268.2 196 266.2 194.1 264.6 192.3 L 261.6 189 259.1 189.1 L 256.5 189.1 249 197.3 M 160.7 215.6 C 157.6 218.1 154.4 221.3 153.5 222.7 L 151.8 225.2 171.7 245.2 C 182.6 256.2 192.1 265.7 192.8 266.3 C 193.5 267 197.8 271.1 202.4 275.5 C 206.9 279.9 211.2 284 211.7 284.5 C 212.3 285.1 215.6 288.5 219.1 292.3 C 222.5 296 225.9 299 226.6 299 C 227.4 299 228.6 300.2 229.4 301.8 C 231 304.8 237.8 311.5 242.5 314.8 C 244.2 315.9 246.2 317.9 246.9 319.2 C 247.6 320.5 249.7 322.7 251.4 324.2 L 254.6 326.9 259.1 323 C 261.5 320.8 264.5 318.2 265.8 317.1 C 268.4 314.7 268.7 311.6 266.4 309.8 C 264.1 307.9 260 304 255.8 299.5 C 249.8 293 248.8 292.1 242.5 286 C 239.2 282.8 235.4 279.1 234 277.7 C 232.6 276.3 221.6 265.3 209.6 253.3 C 197.5 241.3 184.7 228.5 181.2 224.8 C 177.7 221.1 172.9 216.5 170.5 214.5 L 166.2 211 160.7 215.6 M 281.3 218.2 C 279.7 219.9 277.7 222.1 276.8 222.9 C 273.4 226.1 245.6 254 245.1 254.8 C 244.7 255.3 243.7 255.9 242.8 256.3 C 239.8 257.4 240.8 259.6 247.8 267 L 254.5 274.2 277.3 251.7 C 289.8 239.4 300 228.9 300 228.4 C 300 227 286.8 215 285.3 215 C 284.6 215 282.8 216.4 281.3 218.2 M 131.7 244 C 123.7 252.1 123.3 250.9 137.2 264 C 143.3 269.8 150.9 277.2 154.1 280.5 C 157.3 283.8 160.6 287.2 161.5 288 C 162.4 288.8 164.4 290.7 166 292.3 C 167.6 293.8 169.9 295 171.4 295 L 174 295 175.2 292.5 C 175.8 291.1 176.7 290 177.1 290 C 177.5 290 179.5 288 181.6 285.5 L 185.3 280.9 179.4 275.6 C 168.2 265.3 145.3 242.5 143.6 239.8 C 141 235.8 139.3 236.4 131.7 244 M 309.4 243 C 308.4 244.1 304.8 247.6 301.4 250.8 C 298 253.9 294.5 258 293.6 259.8 C 292.7 261.5 291.4 263 290.8 263 C 290.2 263 284.8 267.9 278.9 273.9 L 268.1 284.8 268.6 286.8 C 268.9 287.8 271.6 291.1 274.5 294 L 279.8 299.3 282.4 298.6 C 283.9 298.2 286.3 296.5 287.8 294.8 C 289.3 293.1 298.5 283.7 308.3 273.9 C 328.8 253.3 327.7 255.8 319.6 247.5 C 312.6 240.3 312.2 240.1 309.4 243 M 108.9 267.6 C 107 269.5 104.5 271.5 103.3 272 C 102.1 272.5 100.8 274.1 100.4 275.5 L 99.8 278.1 102.4 280.9 C 103.8 282.4 105 284.1 105 284.6 C 105 285.2 106.9 287.2 109.1 289 C 111.4 290.8 119.4 298.6 126.9 306.3 C 134.4 314 143.2 322.8 146.4 325.9 C 149.6 329 162.9 342.2 176 355.3 C 189.9 369.2 200.4 379 201.5 379 C 203.2 379 215 367.6 215 366 C 215 365.4 198.7 347.8 194.4 343.7 C 193.4 342.8 174.8 324.4 153.1 303 C 131.5 281.5 113.4 264 113 264 C 112.6 264 110.8 265.6 108.9 267.6 M 189.3 301.1 C 182.1 309.4 181.4 308 205.5 332 C 228.8 355.3 228.9 355.4 231.5 351.3 C 232.5 349.8 235.3 346.5 237.6 344.2 C 242.9 338.9 243 338.2 238.3 333.8 C 236.2 331.9 233.7 329.5 232.8 328.4 C 231.8 327.4 229 324.7 226.5 322.5 C 220.3 316.9 210.5 307.4 204.2 300.7 L 198.8 295 196.7 295 L 194.5 295 189.3 301.1" fill="currentColor" />
+      </g>
+    </svg>
+  );
+}
+
+/**
+ * 엠파이어 스테이트 상층부 — **참고 그림의 모양 그대로, 선만 곧게.** potrace 로 뜬 것은 손그림 선의 울퉁불퉁함까지 따라왔고,
+ * 구조를 단순화해 다시 그린 첫 판은 "형태가 달라졌다"(날개 두 단 · 빗살 여덟)였다. 그래서 참고 이미지(1024)에서 원소마다 자리를
+ * 재어(가로 막대·세로 선의 위치와 굵기, measure.mjs) 그 자리에 직사각형을 놓았다: 끝이 뾰족한 안테나 · 벽 두꺼운 고리 셋 ·
+ * 첨탑(벽은 아래로 벌어지고 안쪽 세로줄 둘은 거의 곧다) · 관 기단 슬래브 넷(둘째는 속 빈 상자) · 빗살 일곱의 윗단 · 몸통(양 벽 +
+ * 세로줄 다섯, 아래는 참고처럼 열림) · **날개 세 단**(바깥으로 갈수록 낮다 — 안쪽 세로줄 둘·넷·넷). 획 9(참고 실측 9~10).
+ * 가운데는 안테나의 x 이고 오른쪽은 왼쪽의 거울이다(참고는 오른쪽이 어긋나 있다). transform 이 24 박스로 옮긴다.
+ * 만든 스크립트: 저장소 밖 hatzze-icons/trace/esb_clean2.py — 손으로 좌표를 고치지 말고 거기서 다시 뽑을 것.
+ */
+function UsEmpireIcon({ size = 20 }: { size?: number }) {
+  const draw = Math.round(size * LIBERTY_BLEED);
+  const pull = (draw - size) / 2;
+  return (
+    <svg width={draw} height={draw} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{ display: "block", flexShrink: 0, margin: -pull }}>
+      <g transform="translate(-7.812 -7.676) scale(0.03873)">
+        <path d="M511.5 224 L517 246 L517 372 L506 372 L506 246 Z M497 372 L526 372 L526 380 L497 380 Z M497 384 L526 384 L526 392 L497 392 Z M497 372 L505 372 L505 392 L497 392 Z M518 372 L526 372 L526 392 L518 392 Z M493.5 392 L529.5 392 L529.5 400 L493.5 400 Z M493.5 400 L529.5 400 L529.5 408 L493.5 408 Z M493.5 392 L501.5 392 L501.5 408 L493.5 408 Z M521.5 392 L529.5 392 L529.5 408 L521.5 408 Z M490.5 404 L532.5 404 L532.5 412 L490.5 412 Z M490.5 412 L532.5 412 L532.5 420 L490.5 420 Z M490.5 404 L498.5 404 L498.5 420 L490.5 420 Z M524.5 404 L532.5 404 L532.5 420 L524.5 420 Z M491.5 420 L501.5 420 L489.5 522 L479.5 522 Z M521.5 420 L531.5 420 L543.5 522 L533.5 522 Z M502.5 424 L510.5 424 L509 522 L501 522 Z M512.5 424 L520.5 424 L522 522 L514 522 Z M471 522 L552 522 L552 533 L471 533 Z M462 536 L561 536 L561 542 L462 542 Z M462 546 L561 546 L561 552 L462 552 Z M462 536 L480 536 L480 552 L462 552 Z M543 536 L561 536 L561 552 L543 552 Z M450 553 L573 553 L573 563 L450 563 Z M441 566 L582 566 L582 577 L441 577 Z M441 577 L450 577 L450 596 L441 596 Z M573 577 L582 577 L582 596 L573 596 Z M457.5 577 L466.5 577 L466.5 596 L457.5 596 Z M556.5 577 L565.5 577 L565.5 596 L556.5 596 Z M471.5 577 L480.5 577 L480.5 596 L471.5 596 Z M542.5 577 L551.5 577 L551.5 596 L542.5 596 Z M488.5 577 L497.5 577 L497.5 596 L488.5 596 Z M525.5 577 L534.5 577 L534.5 596 L525.5 596 Z M507 577 L516 577 L516 596 L507 596 Z M470 596 L479 596 L479 792 L470 792 Z M544 596 L553 596 L553 792 L544 792 Z M485.3 611 L494.3 611 L494.3 792 L485.3 792 Z M496.2 611 L505.2 611 L505.2 792 L496.2 792 Z M507 611 L516 611 L516 792 L507 792 Z M517.8 611 L526.8 611 L526.8 792 L517.8 792 Z M528.7 611 L537.7 611 L537.7 792 L528.7 792 Z M432 592 L470 592 L470 601 L432 601 Z M553 592 L591 592 L591 601 L553 601 Z M432 592 L441 592 L441 636 L432 636 Z M582 592 L591 592 L591 636 L582 636 Z M446.2 612 L455.2 612 L455.2 636 L446.2 636 Z M567.8 612 L576.8 612 L576.8 636 L567.8 636 Z M455.8 612 L464.8 612 L464.8 636 L455.8 636 Z M558.2 612 L567.2 612 L567.2 636 L558.2 636 Z M408 636 L470 636 L470 645 L408 645 Z M553 636 L615 636 L615 645 L553 645 Z M408 636 L417 636 L417 736 L408 736 Z M606 636 L615 636 L615 736 L606 736 Z M423.1 652 L432.1 652 L432.1 736 L423.1 736 Z M590.9 652 L599.9 652 L599.9 736 L590.9 736 Z M433.7 652 L442.7 652 L442.7 736 L433.7 736 Z M580.3 652 L589.3 652 L589.3 736 L580.3 736 Z M444.3 652 L453.3 652 L453.3 736 L444.3 736 Z M569.7 652 L578.7 652 L578.7 736 L569.7 736 Z M454.9 652 L463.9 652 L463.9 736 L454.9 736 Z M559.1 652 L568.1 652 L568.1 736 L559.1 736 Z M399 736 L470 736 L470 745 L399 745 Z M553 736 L624 736 L624 745 L553 745 Z M399 736 L408 736 L408 792 L399 792 Z M615 736 L624 736 L624 792 L615 792 Z M415.9 752 L424.9 752 L424.9 792 L415.9 792 Z M598.1 752 L607.1 752 L607.1 792 L598.1 792 Z M428.3 752 L437.3 752 L437.3 792 L428.3 792 Z M585.7 752 L594.7 752 L594.7 792 L585.7 792 Z M440.7 752 L449.7 752 L449.7 792 L440.7 792 Z M573.3 752 L582.3 752 L582.3 792 L573.3 792 Z M453.1 752 L462.1 752 L462.1 792 L453.1 792 Z M560.9 752 L569.9 752 L569.9 792 L560.9 792 Z" />
+      </g>
+    </svg>
+  );
+}
+
 // 서브 항목. href 가 없으면 아직 페이지가 없는 예고 항목이라 링크가 아니라 <div> 로 그린다.
 // sub 는 그 서브 페이지의 본문 머리(PageHeader)가 쓸 한 줄이다. 부모와 주소가 같은
 // 서브(국장 → /kadera)에는 두지 않는다 — 부모가 이미 자기 문장을 갖고 있다.
@@ -147,10 +204,16 @@ type NavItem = {
   Glyph?: Glyph;
   sub: string;
   badge?: string;
+  /** 라벨 옆 빨간 N — 새로 생긴 화면이라는 표식(app/screen-flags.ts 의 THEME_NAV_NEW). 기한이 없어 뗄 때 그 줄을 지운다. */
+  isNew?: boolean;
   children?: NavChild[];
 };
 
-const NAV: NavItem[] = [
+/* themeNav 가 무엇이고 왜 서버가 정하는지는 app/shell-env.tsx 에. 배포에서 안 연 화면은 COMING_SOON 의
+   눌리지 않는 '준비 중' 줄로 남는다(2026-08-30 에 그 줄이 눌려 404 가 났다 — COMING_SOON 머리 주석). */
+
+function buildNav(themeNav: boolean): NavItem[] {
+  return [
   { href: "/", label: "시장 브리핑", icon: "monitoring", sub: "지표 25개로 잰 오늘의 시장 온도" },
   // 카더라가 국장·미장 둘로 갈린다. **부모는 그대로 두고 밑에 서브 항목을 단다** —
   // 부모를 국장으로 바꿔 버리면 카더라라는 이름이 사이드바에서 사라지고, 나중에 시장을
@@ -174,6 +237,25 @@ const NAV: NavItem[] = [
       },
     ],
   },
+  // 테마 리포트(/theme) — 카더라 바로 아래. 카더라 재료를 테마 단위로 다시 읽는 화면이라 그 옆이다.
+  // ⛔ 여는 것은 `app/screen-flags.ts` 의 THEME_PUBLIC 한 줄이다. 안 연 동안 배포에서는 COMING_SOON 에 선다(themeNav 주석).
+  // 카더라처럼 국장·미장 서브 항목이 달린다(국장은 부모와 같은 /theme, 미장은 /theme/us — 카더라와 같은 이유).
+  ...(themeNav
+    ? [
+        {
+          href: THEME_PAGE.href,
+          label: THEME_PAGE.label,
+          icon: THEME_PAGE.icon,
+          sub: THEME_PAGE.sub,
+          // 새로 생긴 화면 표식(빨간 N). 기한 없이 켜 두고, 뗄 때 screen-flags.ts 의 THEME_NAV_NEW 를 지운다.
+          isNew: THEME_NAV_NEW,
+          children: [
+            { label: KR_THEME_SHORT, href: THEME_PAGE.href, Glyph: KrTrigramsIcon },
+            { label: US_THEME_PAGE.short, href: US_THEME_PAGE.href, Glyph: UsEmpireIcon, sub: US_THEME_PAGE.sub },
+          ],
+        },
+      ]
+    : []),
   // ⚠️ COMING_SOON 에 두지 말 것 — 본문 헤더(PageHeader)가 NAV 에서 경로를 못 찾아
   // **제목 칸을 통째로 비운다.** 예고 시절에도 배지만 달아 NAV 에 뒀던 이유다.
   {
@@ -195,23 +277,28 @@ const NAV: NavItem[] = [
   // COMING_SOON 에 두면 본문 헤더(PageHeader)가 NAV 에서 경로를 못 찾아 **제목 칸을
   // 통째로 비운다** — 그래서 이 화면만 제목도 부제도 없이 카드부터 시작했다.
   // 열 때는 이 줄의 badge 만 지우면 된다.
-  {
-    href: "/seohak",
-    // ⚠️ "서학개미 해부도" 였다(2026-08-27 개명). '해부'는 갈라서 안을 보여 준다는 약속인데,
-    //    정작 가르던 카드(종류별 구성 · 개인과 기관 · 시작 연도별 성과)는 근거가 틀려 다 뺐다.
-    //    남은 여섯 장은 언제 얼마가 나갔고 얼마나 머물렀고 지금 얼마가 됐나 하는 **기록**이라,
-    //    이름을 그쪽으로 옮겼다. 주소(/seohak)는 색인이 이미 끝나 있어 그대로 둔다.
-    label: "서학개미 장부",
-    Glyph: AntIcon,
-    // ⚠️ "한국인이…" 였다. 이 화면은 **개인**을 재는데 그 부제는 국민연금까지 포함한
-    // 전 국민을 가리켰다. 화면의 모집단이 부제와 갈리면 카드 숫자를 통째로 다르게 읽는다.
-    // ⚠️ 그다음엔 "얼마를 넣었고 지금 얼마가 됐나" 였는데, 그건 **카드 한 장**('원화로
-    // 보면')만 가리켰다. 화면이 자라면서 매매 습관·보유기간·가계 자리·ETF 까지 들어왔다.
-    // 두 축(어떻게 사고파나 · 그래서 얼마가 됐나)으로 줄여 적는다.
-    sub: "개인이 미국 주식을 어떻게 사고팔고 얼마가 됐나",
-    // ⚠️ `badge: "준비 중"` 이 여기 있었다. 이 줄을 지우는 것이 곧 **화면을 여는 것**이다
-    //    (사이드바에 예고로 걸어 두고 만들었다). 2026-08-19 에 뗐다.
-  },
+  // 서학개미 장부 — 2026-09-22 부터 꺼 두었다(폐기 예정, app/screen-flags.ts SEOHAK_PUBLIC). 항목은 남긴다.
+  ...(SEOHAK_PUBLIC
+    ? [
+      {
+        href: "/seohak",
+        // ⚠️ "서학개미 해부도" 였다(2026-08-27 개명). '해부'는 갈라서 안을 보여 준다는 약속인데,
+        //    정작 가르던 카드(종류별 구성 · 개인과 기관 · 시작 연도별 성과)는 근거가 틀려 다 뺐다.
+        //    남은 여섯 장은 언제 얼마가 나갔고 얼마나 머물렀고 지금 얼마가 됐나 하는 **기록**이라,
+        //    이름을 그쪽으로 옮겼다. 주소(/seohak)는 색인이 이미 끝나 있어 그대로 둔다.
+        label: "서학개미 장부",
+        Glyph: AntIcon,
+        // ⚠️ "한국인이…" 였다. 이 화면은 **개인**을 재는데 그 부제는 국민연금까지 포함한
+        // 전 국민을 가리켰다. 화면의 모집단이 부제와 갈리면 카드 숫자를 통째로 다르게 읽는다.
+        // ⚠️ 그다음엔 "얼마를 넣었고 지금 얼마가 됐나" 였는데, 그건 **카드 한 장**('원화로
+        // 보면')만 가리켰다. 화면이 자라면서 매매 습관·보유기간·가계 자리·ETF 까지 들어왔다.
+        // 두 축(어떻게 사고파나 · 그래서 얼마가 됐나)으로 줄여 적는다.
+        sub: "개인이 미국 주식을 어떻게 사고팔고 얼마가 됐나",
+        // ⚠️ `badge: "준비 중"` 이 여기 있었다. 이 줄을 지우는 것이 곧 **화면을 여는 것**이다
+        //    (사이드바에 예고로 걸어 두고 만들었다). 2026-08-19 에 뗐다.
+      },
+      ]
+    : []),
   // 2026-09-04 에 열었다. COMING_SOON 에서 옮겨 온 항목이다.
   //
   // 맨 아래에 두는 이유는 이 화면이 하루 중 07~09시에만 쓸모가 있어서다 — 종일 보는
@@ -242,7 +329,13 @@ const NAV: NavItem[] = [
   // DAILY_PUBLIC 한 줄이다. 배당으로 살기와 같은 방식으로 안 연 동안은 COMING_SOON 에, 열면
   // 여기 맨 아래에 선다. 이름·부제·아이콘은 app/daily/copy.ts 한 곳에서 온다.
   ...(DAILY_PUBLIC ? [{ href: NOTE_PAGE.href, label: NOTE_PAGE.label, icon: NOTE_PAGE.icon, sub: NOTE_PAGE.sub }] : []),
-];
+  ];
+}
+
+// 두 값뿐이라 미리 만들어 둔다 — 렌더마다 새 배열을 만들면 useMemo 없이 참조가 흔들린다.
+const NAV_ON = buildNav(true);
+const NAV_OFF = buildNav(false);
+const navFor = (env: ShellEnv) => (env.themeNav ? NAV_ON : NAV_OFF);
 
 // 외부(텔레그램) 링크라 NAV 배열이 아니라 따로 둔다 — pathname 기반 active 판정 대상이
 // 아니고, 새 탭으로 열려야 해서 next/link 가 아닌 <a> 를 쓴다. 사이드바와 모바일 탭바가
@@ -273,7 +366,8 @@ const TELEGRAM = {
 // 예고 항목을 전부 목록 끝에 몰면 짝인 둘이 MDD 를 사이에 두고 떨어진다.
 // 아이콘은 NAV 항목과 같은 규칙이다 — 직접 그린 Glyph 든 Material Symbols 이름(icon)이든
 // 하나만 있으면 되고, NavGlyph 가 골라 그린다.
-const COMING_SOON: { label: string; badge: string; tip: string; after: string; icon?: string; Glyph?: Glyph }[] = [
+type SoonItem = { label: string; badge: string; tip: string; after: string; icon?: string; Glyph?: Glyph };
+const COMING_SOON: SoonItem[] = [
   // ⭐ 국장 미리보기가 2026-09-04 에 NAV 로 옮겨 가 비었다가, 2026-09-06 에 데일리 노트가
   // 들어왔다. 그 항목은 손으로 옮기지 않는다 — DAILY_PUBLIC 하나가 여기서 빼고 NAV 에 넣는다.
   //
@@ -282,6 +376,7 @@ const COMING_SOON: { label: string; badge: string; tip: string; after: string; i
   // 그냥 눌려 들어가졌다. 여기(COMING_SOON)에 두면 href 필드 자체가 없어 링크가 안 생긴다.
   // 대신 본문 헤더가 NAV 에서 경로를 못 찾으므로 DEEP_PAGES 에 제목을 따로 둬야 한다.
   //
+  // 테마 리포트(2026-09-19 만듦)는 여기 없다 — themeNav 가 꺼진 곳(배포)에서만 서므로 comingSoonFor 가 끼운다.
   // 배당으로 살기(2026-09-11 만듦, 09-16 열었다). 국장 미리보기 다음, 데일리 노트 앞 — NAV 와 같은 자리.
   ...(DIVIDEND_PUBLIC
     ? []
@@ -293,6 +388,10 @@ const COMING_SOON: { label: string; badge: string; tip: string; after: string; i
     : [{ label: NOTE_PAGE.label, badge: "준비 중", tip: NOTE_PAGE.tip, after: DIVIDEND_PUBLIC ? DIVIDEND_PAGE.href : "/preview", icon: NOTE_PAGE.icon }]),
 ];
 
+/** 테마 리포트의 예고 줄. 카더라 리포트(와 그 서브) 바로 다음 — NAV 와 같은 자리. 링크로 낼 수 있는 곳(themeNav)에선 안 선다. */
+const THEME_SOON: SoonItem = { label: THEME_PAGE.label, badge: "준비 중", tip: THEME_PAGE.tip, after: "/kadera", icon: THEME_PAGE.icon };
+const comingSoonFor = (env: ShellEnv): SoonItem[] => (env.themeNav ? COMING_SOON : [THEME_SOON, ...COMING_SOON]);
+
 /**
  * 사이드바·모바일 메뉴가 그리는 순서. NAV 항목 사이사이에 예고 항목을 끼운다.
  *
@@ -302,24 +401,25 @@ const COMING_SOON: { label: string; badge: string; tip: string; after: string; i
  *
  * `after` 가 어느 NAV 항목과도 안 맞으면 조용히 사라지지 않도록 끝에 붙인다.
  */
-function sidebarItems() {
+function sidebarItems(env: ShellEnv) {
   const placed = new Set<string>();
   const rows: (
     | { kind: "nav"; item: NavItem }
-    | { kind: "child"; item: NavChild }
-    | { kind: "soon"; item: (typeof COMING_SOON)[number] }
+    | { kind: "child"; item: NavChild; siblings: NavChild[] }
+    | { kind: "soon"; item: SoonItem }
   )[] = [];
-  for (const item of NAV) {
+  const soons = comingSoonFor(env);
+  for (const item of navFor(env)) {
     rows.push({ kind: "nav", item });
-    for (const child of item.children ?? []) rows.push({ kind: "child", item: child });
-    for (const soon of COMING_SOON) {
+    for (const child of item.children ?? []) rows.push({ kind: "child", item: child, siblings: item.children ?? [] });
+    for (const soon of soons) {
       if (soon.after === item.href) {
         rows.push({ kind: "soon", item: soon });
         placed.add(soon.label);
       }
     }
   }
-  for (const soon of COMING_SOON) {
+  for (const soon of soons) {
     if (!placed.has(soon.label)) rows.push({ kind: "soon", item: soon });
   }
   return rows;
@@ -438,6 +538,18 @@ function useIntentPrefetch() {
   });
 }
 
+/**
+ * 서브 항목의 현재 페이지 판정. 주소가 같거나 **그 아래**(테마 리포트의 테마 26장 · 미장 16장)면 켜진다 — 형제 중 가장 긴
+ * 접두가 이기므로 /theme/us/memory 는 국장 테마(/theme)가 아니라 미장 테마(/theme/us)다. 예전엔 같은 주소일 때만 켜져서
+ * 테마 한 장에 들어가면 어느 시장인지 사이드바가 말하지 않았다(2026-09-22).
+ */
+function childActive(siblings: NavChild[], child: NavChild, pathname: string): boolean {
+  if (!child.href) return false;
+  const covers = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const best = siblings.filter((c) => c.href && covers(c.href)).sort((a, b) => b.href!.length - a.href!.length)[0];
+  return best === child;
+}
+
 /** NAV 항목의 현재 페이지 판정. 사이드바와 모바일 탭바가 같은 규칙을 써야 한다. */
 /**
  * **사이드바에 안 나오지만 자기 제목이 있어야 하는** 하위 페이지.
@@ -456,6 +568,25 @@ const DEEP_PAGES: Record<string, { label: string; sub: string; badge?: string }>
   ...(DAILY_PUBLIC ? {} : { [NOTE_PAGE.href]: { label: NOTE_PAGE.label, sub: NOTE_PAGE.sub, badge: "준비 중" } }),
   // 배당으로 살기 — 같은 이유로 안 연 동안만.
   ...(DIVIDEND_PUBLIC ? {} : { [DIVIDEND_PAGE.href]: { label: DIVIDEND_PAGE.label, sub: DIVIDEND_PAGE.sub, badge: "준비 중" } }),
+  // 테마 리포트 목록(국장·미장) — 안 연 동안만. 제목은 열린 뒤 NAV 서브 항목이 줄 것과 같게(국장 테마 판세 · 미장 테마 판세).
+  // ⚠️ '준비 중' 배지는 뗐다(2026-09-23). 여는 날 제목 줄이 달라지지 않게 하려는 것이고, **잠금이 아니라 표시**라
+  //    떼어도 새는 것이 없다 — 배포에서 안 연 동안은 화면 자체가 404 다(app/theme/page.tsx 의 `!PUBLIC && DEPLOYED`).
+  ...(THEME_PUBLIC
+    ? {}
+    : {
+        [THEME_PAGE.href]: { label: KR_THEME_SHORT, sub: THEME_PAGE.sub },
+        [US_THEME_PAGE.href]: { label: US_THEME_PAGE.short, sub: US_THEME_PAGE.sub },
+      }),
+  // 테마 26장(/theme/반도체 …). 테마 이름이 곧 제목이라 셸이 h1 을 그린다 — 종목 화면(464장)은
+  // 셸이 이름을 알 길이 없어 자기 h1 을 그리지만, 테마는 사전(lib/stock-themes.ts)이 정적이라
+  // 여기서 안다. 여기도 '준비 중' 배지를 뗐다(위 목록과 같은 줄에서 뗀다).
+  ...Object.fromEntries(
+    THEME_NAMES.map((t) => [themeHref(t), { label: t, sub: `${t} 테마를 두고 채널에서 요즘 무슨 얘기가 도는지 봅니다` }]),
+  ),
+  // 미장 테마 16장(/theme/us/ai-semiconductor …). 국장과 이름이 겹치는 테마(금융)가 있어 부제에 시장을 적는다.
+  ...Object.fromEntries(
+    US_THEME_NAMES.map((t) => [usThemeHref(t), { label: t, sub: `미장 ${t} 테마를 두고 채널에서 요즘 무슨 얘기가 도는지 봅니다` }]),
+  ),
   ...Object.fromEntries(
     INSIDER_LIST_SLUGS.map((slug) => [
       insiderListHref(slug),
@@ -470,6 +601,7 @@ function isActive(href: string, pathname: string) {
 
 function Sidebar() {
   const intentPrefetch = useIntentPrefetch();
+  const env = useShellEnv();
   // `?? "/"` 는 타입 때문이다 — pages/500.tsx 가 있어 usePathname 의 타입이 string | null 이
   // 되는데(그 파일 주석 참고), app 트리에서는 null 이 안 온다. 아래 여섯 자리 모두 같다.
   const pathname = usePathname() ?? "/";
@@ -512,7 +644,7 @@ function Sidebar() {
         </p>
       </div>
       <nav style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {sidebarItems().map((row) => {
+        {sidebarItems(env).map((row) => {
           if (row.kind === "soon") {
             const soon = row.item;
             return (
@@ -561,7 +693,7 @@ function Sidebar() {
             const child = row.item;
             // 서브 행은 알약을 주지 않는다. 부모가 이미 알약을 쓰고 있어서 둘 다 칠하면
             // 한 구역에 강조가 둘이 된다 — 부모는 "여기 구역", 서브는 "이 페이지"다.
-            const on = !!child.href && pathname === child.href;
+            const on = childActive(row.siblings, child, pathname);
             const rowStyle = {
               display: "flex",
               alignItems: "center",
@@ -630,6 +762,9 @@ function Sidebar() {
               href={item.href}
               {...intentPrefetch(item.href)}
               className={`hz-nav-item${active ? " hz-nav-active" : ""}`}
+              /* 빨간 N 은 보는 사람에게만 뜻이 통하는 표식이라(aria-hidden) 읽어 주는 기계에는 말로 적는다.
+                 ⚠️ 보이는 글자로 시작해야 음성으로 조작하는 사람이 본 대로 부를 수 있다(WCAG 2.5.3). */
+              aria-label={item.isNew ? `${item.label} · 새로 생긴 화면` : undefined}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -651,7 +786,19 @@ function Sidebar() {
               }}
             >
               <NavGlyph item={item} size={20} />
-              <span style={{ fontSize: "var(--fs-14)" }}>{item.label}</span>
+              {/* 새 화면 표식은 '준비 중' 배지와 같은 자리다 — 라벨 우측 상단 위첨자. absolute 라 배지가
+                  행 폭 계산에서 빠져 210px 사이드바에서 라벨이 눌리지 않는다. */}
+              <span style={{ position: "relative", display: "inline-flex", fontSize: "var(--fs-14)" }}>
+                {item.label}
+                {item.isNew && (
+                  /* top −1 은 눈대중이 아니다. 14px 라벨이 21px 줄상자 안에 서면 잉크 꼭대기가 상자 위에서
+                     4.31px 이고(실측 · Pretendard 600), 위첨자로 보이려면 지름 11 짜리 동그라미의 **가운데**가
+                     그 자리에 와야 한다 — 4.31 − 5.5 = −1.19 → −1. 푸터 배지가 쓰는 셈과 같다(VersionBadge 의 BADGE_LIFT). */
+                  <span style={{ position: "absolute", left: "100%", top: -1, marginLeft: 3 }}>
+                    <NewBadge />
+                  </span>
+                )}
+              </span>
             </Link>
           );
         })}
@@ -720,6 +867,7 @@ function Sidebar() {
 // 열려 있는 동안에만 DOM 에 올린다. 데스크톱에서는 여는 버튼 자체가 없지만, 열어 둔
 // 채로 창을 넓히는 경우가 있어 패널·백드롭의 display 는 미디어쿼리가 최종적으로 막는다.
 function MobileMenu({ onClose }: { onClose: () => void }) {
+  const env = useShellEnv();
   const intentPrefetch = useIntentPrefetch();
   const pathname = usePathname() ?? "/";
 
@@ -745,7 +893,7 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
             다만 배지는 위첨자가 아니라 라벨 옆에 나란히 둔다. 여기는 폭이 사이드바처럼
             210px 로 묶여 있지 않아 자리가 남고, 툴팁이 안 뜨는 화면이라 배지가 유일한
             설명이므로 겹쳐 두지 않고 또렷하게 보여야 한다. */}
-        {sidebarItems().map((row) => {
+        {sidebarItems(env).map((row) => {
           if (row.kind === "soon") {
             const soon = row.item;
             return (
@@ -777,7 +925,7 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
           }
           if (row.kind === "child") {
             const child = row.item;
-            const on = !!child.href && pathname === child.href;
+            const on = childActive(row.siblings, child, pathname);
             // 들여쓰기는 사이드바와 같은 뜻(부모 라벨 자리에 서브 아이콘이 선다)이지만
             // 여기는 행 높이·글자 크기가 달라서 값을 그대로 못 쓴다. rowStyle 위에 얹는다.
             const indented = { ...rowStyle(false), paddingLeft: 40, gap: 10 };
@@ -831,10 +979,15 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
               {...intentPrefetch(item.href)}
               className={`hz-nav-item${active ? " hz-nav-active" : ""}`}
               aria-current={active ? "page" : undefined}
+              aria-label={item.isNew ? `${item.label} · 새로 생긴 화면` : undefined}
               style={rowStyle(active)}
             >
               <NavGlyph item={item} size={20} />
-              <span style={{ fontSize: "var(--fs-15)" }}>{item.label}</span>
+              {/* 여기는 행 간격이 12 라 배지를 그냥 두면 라벨에서 떨어져 보인다 — 라벨과 한 묶음으로 5px 만 띄운다. */}
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "var(--fs-15)" }}>
+                {item.label}
+                {item.isNew && <NewBadge />}
+              </span>
             </Link>
           );
         })}
@@ -954,31 +1107,42 @@ const CURRENCY_PAGES: { prefix: string; fallback: "krw" | "usd" }[] = [
   { prefix: "/insider", fallback: "usd" },
 ];
 
+/* 채널 등록 신청(.hz-btn-soft, 탑바)이 여기 있었다. 국장 카더라 히어로의 큰 단추 → 탑바 → **국장 '채널 파워 랭킹' 카드 머리**로
+   옮겨 갔고(2026-09-22), 미장 카더라에서는 아예 뺐다 — 미장 채널은 우리가 고른 목록이라 신청을 받는 자리가 아니다.
+   지금 이 단추를 그리는 곳은 app/kadera/page.tsx 한 곳이고 폼 주소는 app/brand.ts 의 CHANNEL_FORM 이다. */
+
 /**
- * 채널 등록 신청. 국장 카더라 히어로의 큰 버튼이었는데 탑바로 옮겼다 — 그 자리에는
- * 미장으로 건너가는 통로가 서는 편이 낫다는 판단이다(kadera/page.tsx 주석 참고).
+ * **시장 건너가기** — 머리 오른쪽, 다크 모드 단추 왼쪽(2026-09-22). 국장↔미장 짝이 있는 두 구역(카더라·테마 판세)이 같이 쓴다.
  *
- * ⚠️ 카더라 두 화면에서만 뜬다. 채널을 늘리는 일은 그 두 화면의 재료를 늘리는 것이라,
- *    브리핑이나 내부자에서 권하면 맥락이 없다.
- * ⚠️ **좁은 화면에서는 글자가 빠지고 아이콘만 남는다**(globals.css 의 .hz-topbar-cta).
- *    글자를 단 채로 두면 320px 탑바에 90px 이 더 붙어 햄버거가 도로 밀려난다 —
- *    그 잘림을 오늘 고쳤다.
+ * 예전엔 두 화면 다 히어로 안에 큰 단추(.hz-tx-btn)를 뒀다. 테마 목록은 히어로 넓은 칸이 절반이라 거기 두니 배너처럼 무거웠고,
+ * 도구 자리로 올리면 **어느 화면에서나 같은 자리**라 오가는 손이 자리를 다시 익히지 않는다. 카더라도 같이 옮겼다.
+ * 부품은 카더라의 '채널 등록 신청'과 같은 것(.hz-btn-soft.hz-topbar-cta) — 폰(≤560)에서는 라벨이 접히고 아이콘만,
+ * ≤900 에서는 도구 줄 자체가 접히므로 그 폭에서는 사이드바 메뉴로 오간다.
+ *
+ * 상세 화면(/theme/semiconductor)에서도 보이고, 건너가는 곳은 반대 시장의 **목록**이다 — 반도체의 짝이 미장에 따로 없다.
  */
-function ChannelRequest() {
+const MARKET_PAIRS: { root: string; us: string; kr: { label: string; ga: string }; usSide: { label: string; ga: string } }[] = [
+  { root: "/kadera", us: "/kadera/us", kr: { label: "국장 카더라", ga: "to_kr_kadera" }, usSide: { label: "미장 카더라", ga: "to_us_kadera" } },
+  { root: THEME_PAGE.href, us: US_THEME_PAGE.href, kr: { label: KR_THEME_SHORT, ga: "to_kr_theme" }, usSide: { label: US_THEME_PAGE.short, ga: "to_us_theme" } },
+];
+
+function MarketSwap({ pathname }: { pathname: string }) {
+  const pair = MARKET_PAIRS.find((m) => pathname === m.root || pathname.startsWith(`${m.root}/`));
+  if (!pair) return null;
+  const onUs = pathname === pair.us || pathname.startsWith(`${pair.us}/`);
+  const to = onUs ? { href: pair.root, ...pair.kr } : { href: pair.us, ...pair.usSide };
   return (
-    <a
-      href="https://forms.gle/PRapNH9rz8YuF2zu9"
-      target="_blank"
-      rel="noopener noreferrer"
+    <Link
+      href={to.href}
       className="hz-btn-soft hz-topbar-cta"
-      title="채널 등록 신청"
+      title={`${to.label} 보기`}
       data-ga="cta_click"
-      data-ga-cta="register_channel"
-      data-ga-surface="topbar"
+      data-ga-cta={to.ga}
+      data-ga-surface="page_tools"
     >
-      <Icon name="add_circle" style={{ fontSize: "var(--fs-15)" }} />
-      <span className="hz-topbar-cta-label">채널 등록 신청</span>
-    </a>
+      <Icon name="swap_horiz" style={{ fontSize: "var(--fs-15)" }} />
+      <span className="hz-topbar-cta-label">{to.label}</span>
+    </Link>
   );
 }
 
@@ -990,6 +1154,7 @@ function ChannelRequest() {
  */
 function PageTools() {
   const pathname = usePathname() ?? "/";
+  const { themeNav } = useShellEnv();
   return (
     <>
       {/* 쿠키로 고른 게 없으면 그 화면의 기본값을 눌린 칸으로 쓴다. */}
@@ -997,7 +1162,8 @@ function PageTools() {
         const page = CURRENCY_PAGES.find((p) => pathname.startsWith(p.prefix));
         return page ? <CurrencyToggle key={page.prefix} fallback={page.fallback} /> : null;
       })()}
-      {pathname.startsWith("/kadera") && <ChannelRequest />}
+      {/* 안 연 동안 배포에서는 /theme 가 404 라 단추도 내지 않는다(themeNav — ShellEnv 주석). */}
+      {(themeNav || !pathname.startsWith(THEME_PAGE.href)) && <MarketSwap pathname={pathname} />}
       <ThemeToggle />
     </>
   );
@@ -1071,9 +1237,23 @@ function ThemeToggle() {
  * 자기 제목(legal.tsx 의 DocTitle)을 갖고 있으니 여기서 보탤 것이 없다. 도구 묶음은
  * 남긴다 — 테마 토글은 어느 화면에서나 같은 자리에 있어야 한다.
  */
+/** 경로의 각 조각을 encodeURIComponent 꼴로 맞춘다(이미 부호화된 조각은 한 번 풀고 다시 묶는다). */
+function encodedPath(pathname: string): string {
+  return pathname
+    .split("/")
+    .map((seg) => {
+      try {
+        return encodeURIComponent(decodeURIComponent(seg));
+      } catch {
+        return seg;
+      }
+    })
+    .join("/");
+}
+
 function PageHeader() {
   const pathname = usePathname() ?? "/";
-  const page = NAV.find((n) => isActive(n.href, pathname));
+  const page = navFor(useShellEnv()).find((n) => isActive(n.href, pathname));
   // 서브 페이지에서는 서브의 이름을 h1 으로 쓴다. 부모(구역)의 이름을 그대로 두면
   // /kadera 와 /kadera/us 두 페이지가 **같은 h1** 을 갖는다.
   //
@@ -1086,7 +1266,10 @@ function PageHeader() {
   // 같은 h1 이 된다.
   // 날짜별 글(/daily/2026-09-05)은 안 연 동안 NAV 에 부모가 없어 /daily 의 것을 빌린다.
   // 열고 나면 NAV 의 /daily 가 startsWith 로 잡으므로 이 가지는 안 탄다.
-  const deep = DEEP_PAGES[pathname] ?? (pathname.startsWith(`${NOTE_PAGE.href}/`) ? DEEP_PAGES[NOTE_PAGE.href] : undefined);
+  // 테마 주소(/theme/반도체)는 브라우저에 따라 퍼센트 부호화된 채로도 온다. DEEP_PAGES 의 키는
+  // themeHref 가 부호화한 꼴이라, 들어온 경로를 같은 꼴로 맞춘 뒤 찾는다.
+  const deepKey = encodedPath(pathname);
+  const deep = DEEP_PAGES[deepKey] ?? DEEP_PAGES[pathname] ?? (pathname.startsWith(`${NOTE_PAGE.href}/`) ? DEEP_PAGES[NOTE_PAGE.href] : undefined);
   const title = deep?.label ?? child?.label ?? page?.label;
   const sub = deep?.sub ?? child?.sub ?? page?.sub;
   // 배지는 부모 것이다. 서브가 물려받으면 "25개 지표" 같은 남의 표찰이 따라 붙는다.
@@ -1307,17 +1490,34 @@ const NEWS_EVENT = "hz-news-change";
    ⛔⛔ **아직 안 연 화면을 알리는 띠는 화면을 여는 날 함께 켜진다.** 이 띠에는 푸터
    바로가기 같은 조건부가 없어서, 띠만 먼저 넣으면 프로덕션에서 눌러 404 로 간다. 그때는
    `app/screen-flags.ts` 의 플래그로 갈라 목적지가 열려 있을 때만 걸리게 한다(국장
-   미리보기·배당으로 살기 때 그렇게 했다 — git 이력). 지금 소식은 이미 열린 채널이라 조건부가 없다. */
-/* 2026-09-19 · 텔레그램 구독 권유. 배당으로 살기 띠(키 hz-news-dividend)를 내리고 되쓴다.
+   미리보기·배당으로 살기 때 그렇게 했고, 지금 테마 리포트가 그렇다 — 아래 newsFor). */
+/* 소식 둘을 세워 두고 newsFor 가 하나를 고른다. 목적지가 우리 화면이면 **그 구역 안에서는 안 그린다**(NewsStrip 의 startsWith).
    이전 소식들(내부자 → 국장 미리보기 → 데일리 노트 → 텔레그램 2판 → 배당으로 살기)은 git 이력에 있다 — 되살릴 땐 키를 새로 딴다.
-   ⚠️ 문구에 숫자를 넣지 않는다(위 주석).
+   ⚠️ 문구에 숫자를 넣지 않는다(위 주석). */
+type NewsItem = { key: string; from: string; href: string; head?: string; name: string; tail: string; aria?: string; icon: string; ga: string };
 
+/* 2026-09-23 · 테마 리포트 오픈 소식.
+   ⛔ 목적지가 안 연 화면이라 **themeNav 를 따른다** — 배포에서는 THEME_PUBLIC 을 켠 뒤에야 걸리고, 그 전에는 아래 텔레그램 소식이
+   그대로 선다. 로컬 개발 서버에서는 늘 이쪽이라 문구·아이콘을 눈으로 볼 수 있다. */
+const THEME_NEWS: NewsItem = {
+  key: "hz-news-theme",
+  // 여는 날 아침. 머지·배포가 이 시각 뒤라 바로 뜬다(그 전엔 플래그가 false 라 아예 안 걸린다).
+  from: "2026-09-23T00:00:00+09:00",
+  href: THEME_PAGE.href,
+  name: THEME_PAGE.label,
+  tail: "를 열었습니다. 국장·미장 테마마다 어디에 관심이 쏠리고 무슨 얘기가 도는지 봅니다.",
+  // 사이드바 NAV 의 그 화면 아이콘(category)과 같은 것.
+  icon: THEME_PAGE.icon,
+  ga: "news-theme",
+};
+
+/* 2026-09-19 · 텔레그램 구독 권유(PR #534·#535).
    ⭐ 이 소식은 **문장이 먼저 오고 밑줄 이름이 뒤에 선다**(head → name → tail). 앞 소식들은 화면 이름이 문장 첫머리였는데,
    이번엔 내용(개장 전과 마감 뒤)이 주인공이고 텔레그램은 뒤로 뺐다 — 텔레그램 채널이라는 말을 앞세우면 리딩방 류로 읽혀
    반감이 먼저 온다(2026-09-19 결정). 그래서 문장 어디에도 '텔레그램'이 없고, 어디로 가는지는 아이콘(사이드바 채널과 같은
    send)과 링크의 aria-label 이 말한다 — 사이드바의 "오늘 뭐래?" 와 같은 방식이다.
    ⚠️ 둘째 문장은 해요체다. 서비스 말투는 합쇼체지만 이 띠의 권유 한 줄만 예외로 정했다(2026-09-19). 다른 곳에 번지지 말 것. */
-const NEWS = {
+const TELEGRAM_NEWS: NewsItem = {
   key: "hz-news-telegram-v3",
   // 머지·배포 직후부터. 채널은 이미 열려 있으니 기다릴 글이 없다.
   from: "2026-09-19T00:00:00+09:00",
@@ -1333,37 +1533,54 @@ const NEWS = {
   ga: "news-telegram",
 };
 
+/** 지금 걸 소식 하나. 테마 리포트가 열려 있으면(로컬은 늘) 그 소식을, 아니면 텔레그램 구독 권유를 세운다. */
+function newsFor(themeNav: boolean): NewsItem {
+  return themeNav ? THEME_NEWS : TELEGRAM_NEWS;
+}
+
 // 모듈이 읽힐 때 한 번만 본다(렌더 안에서 Date.now() 를 부르면 React 컴파일러 린트가 막는다).
 // 서버는 어차피 안 그리고(getServerSnapshot 이 false), 클라이언트는 페이지를 열 때마다 새로 읽는다.
 // 개발 서버에서는 시각과 무관하게 띄운다 — 문구·아이콘을 로컬에서 보려면 날짜를 기다릴 수 없다.
-const NEWS_LIVE = process.env.NODE_ENV !== "production" || Date.now() >= Date.parse(NEWS.from);
+const NEWS_NOW = Date.now();
+const newsLive = (news: NewsItem) => process.env.NODE_ENV !== "production" || NEWS_NOW >= Date.parse(news.from);
 
-const newsStore = {
-  subscribe(cb: () => void) {
-    window.addEventListener(NEWS_EVENT, cb);
-    return () => window.removeEventListener(NEWS_EVENT, cb);
-  },
-  getSnapshot() {
-    if (!NEWS_LIVE) return false;
-    try {
-      return localStorage.getItem(NEWS.key) === null;
-    } catch {
-      // 사생활 보호 모드 등에서 접근이 던진다. 닫은 걸 기억 못 하면 갈 때마다 다시
-      // 뜨므로, 그때는 아예 안 띄운다(PcHint 와 같은 판단).
-      return false;
-    }
-  },
-};
+/** 소식마다 저장소 하나. 훅에 넘기는 객체가 렌더마다 새것이면 useSyncExternalStore 가 계속 다시 구독한다 — 키로 캐시한다. */
+const newsStores = new Map<string, { subscribe: (cb: () => void) => () => void; getSnapshot: () => boolean }>();
+function newsStoreFor(news: NewsItem) {
+  const cached = newsStores.get(news.key);
+  if (cached) return cached;
+  const store = {
+    subscribe(cb: () => void) {
+      window.addEventListener(NEWS_EVENT, cb);
+      return () => window.removeEventListener(NEWS_EVENT, cb);
+    },
+    getSnapshot() {
+      if (!newsLive(news)) return false;
+      try {
+        return localStorage.getItem(news.key) === null;
+      } catch {
+        // 사생활 보호 모드 등에서 접근이 던진다. 닫은 걸 기억 못 하면 갈 때마다 다시
+        // 뜨므로, 그때는 아예 안 띄운다(PcHint 와 같은 판단).
+        return false;
+      }
+    },
+  };
+  newsStores.set(news.key, store);
+  return store;
+}
 
 function NewsStrip() {
   const pathname = usePathname() ?? "/";
-  const show = useSyncExternalStore(newsStore.subscribe, newsStore.getSnapshot, () => false);
+  const { themeNav } = useShellEnv();
+  const news = newsFor(themeNav);
+  const store = newsStoreFor(news);
+  const show = useSyncExternalStore(store.subscribe, store.getSnapshot, () => false);
 
-  if (!show || pathname.startsWith(NEWS.href)) return null;
+  if (!show || pathname.startsWith(news.href)) return null;
 
   const dismiss = () => {
     try {
-      localStorage.setItem(NEWS.key, "1");
+      localStorage.setItem(news.key, "1");
     } catch {}
     window.dispatchEvent(new Event(NEWS_EVENT));
   };
@@ -1380,21 +1597,21 @@ function NewsStrip() {
           상태 변경을 핸들러가 끝난 뒤로 미룬다. 그래서 이 줄이 링크를 먼저 언마운트해
           이동을 막지 않는다(브라우저에서 눌러 확인했다). */}
       <Link
-        href={NEWS.href}
+        href={news.href}
         className="hz-news-link"
-        data-ga-cta={NEWS.ga}
-        aria-label={NEWS.aria}
+        data-ga-cta={news.ga}
+        aria-label={news.aria}
         onClick={dismiss}
         // 바깥 주소(t.me)면 새 탭. 사이드바의 채널 링크와 같은 규칙이다.
-        {...(NEWS.href.startsWith("http") ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+        {...(news.href.startsWith("http") ? { target: "_blank", rel: "noopener noreferrer" } : {})}
       >
-        <Icon name={NEWS.icon} style={{ fontSize: "var(--fs-17)", flexShrink: 0 }} />
+        <Icon name={news.icon} style={{ fontSize: "var(--fs-17)", flexShrink: 0 }} />
         <span className="hz-news-text">
           {/* ⚠️ <a> 안에 <a> 를 넣을 수 없다. 바깥 링크가 이미 같은 곳으로 가므로
               여기서는 **밑줄만** 긋는다 — 눌리는 건 띠 전체다. */}
-          {NEWS.head}
-          <span className="hz-news-em">{NEWS.name}</span>
-          {NEWS.tail}
+          {news.head}
+          <span className="hz-news-em">{news.name}</span>
+          {news.tail}
         </span>
         <span className="hz-news-go">
           <span className="hz-news-go-label">보러 가기</span>
@@ -1585,7 +1802,8 @@ function ToTop({
   );
 }
 
-export default function AppShell({ children }: { children: React.ReactNode }) {
+export default function AppShell({ children, themeNav = THEME_PUBLIC }: { children: React.ReactNode; themeNav?: boolean }) {
+  const env: ShellEnv = { themeNav };
   const mainRef = useRef<HTMLElement>(null);
   const scrolledDown = useScrolledDown(mainRef);
   const pastFold = useScrolledPastFold(mainRef);
@@ -1614,6 +1832,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [menuOpen]);
 
   return (
+    <ShellEnvContext.Provider value={env}>
     <div
       className="hz-shell"
       style={{
@@ -1706,5 +1925,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
       </div>
     </div>
+    </ShellEnvContext.Provider>
   );
 }

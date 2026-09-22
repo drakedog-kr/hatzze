@@ -202,7 +202,7 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
                     말해야 한다** — 이 툴팁을 지우면 화면이 거짓말이 된다. */}
                 <span
                   className="hz-tip hz-tip-wide"
-                  data-tip="미국 상장주만 셉니다. 채권·현금·해외 주식은 빠집니다."
+                  data-tip="미국 상장주만 집계"
                   style={{ display: "inline-flex", cursor: "help" }}
                 >
                   <Icon name="help" style={{ fontSize: "var(--fs-12)", color: C.muted }} />
@@ -215,7 +215,7 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
                 {aumChange != null && (
                   <span
                     className="hz-tip hz-tip-wide"
-                    data-tip="직전 분기 대비입니다. 주가와 매매가 섞여 수익률은 아닙니다."
+                    data-tip="직전 분기 대비"
                     style={{
                       fontFamily: MONO,
                       fontSize: "var(--fs-13)",
@@ -360,7 +360,7 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
           icon="donut_large"
           title="보유 종목"
           note={`${d.holdings.length}종목 · ${quarterLabel(d.reportDate)}`}
-          noteHelp="비중은 운용자산에서의 몫, 증감은 주식 수 기준입니다."
+          noteHelp="비중은 운용자산 기준"
           desc="비중이 큰 순입니다. 종목을 누르면 그 종목의 공시로 갑니다."
         />
         {d.holdings.length === 0 ? (
@@ -386,7 +386,7 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
             icon="remove_circle_outline"
             title="이번 분기에 전량 정리한 종목"
             note={`${d.exited.length}종목`}
-            noteHelp={`${quarterLabel(d.priorDate)}에 있었는데 ${quarterLabel(d.reportDate)} 신고에서 빠진 종목입니다.`}
+            noteHelp="직전 분기엔 있던 종목"
             desc={`${quarterLabel(d.priorDate)} 기준 금액이 큰 순입니다.`}
           />
           <WideHead cols={WIDE_COLS.managerExited} labels={["종목", "정리 전 포트폴리오 비중", "정리 전 금액"]} />

@@ -94,7 +94,7 @@ type Pick =
  * 자리로만 끼워 둔 것이다.
  */
 export const CALENDAR_WINDOWS: CalendarWindow[] = [
-  { key: "newyear", label: "새해 첫 사흘", phrase: "평소보다 33% 덜 삽니다",
+  { key: "newyear", label: "새해 첫 3일", phrase: "평소보다 33% 덜 삽니다",
     hit: 17, of: 17, marks: "11111111111111111",
     pick: { at: "yearStart" } },
   { key: "seol", label: "설날 기간", phrase: "평소보다 19% 덜 팝니다",
@@ -112,7 +112,7 @@ export const CALENDAR_WINDOWS: CalendarWindow[] = [
   { key: "blackfriday", label: "블랙프라이데이", phrase: "평소보다 17% 덜 삽니다",
     hit: 14, of: 16, marks: "1101111111011111-",
     pick: { at: "after", on: "blackFriday" } },
-  { key: "yearend", label: "그해 마지막 사흘", phrase: "평소보다 29% 더 팝니다",
+  { key: "yearend", label: "그해 마지막 3일", phrase: "평소보다 29% 더 팝니다",
     hit: 14, of: 16, marks: "1011011111111111-",
     pick: { at: "yearEnd" } },
 ];

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { shortDate } from "@/lib/format";
 
 import { C, MONO, R } from "../ui";
@@ -487,8 +488,9 @@ export function highlightTerms(
   text: string,
   terms: string[],
   used: Set<string>,
-  /** particleAfterLatin: 영문 낱말 뒤가 조사면 굵힘을 허용한다(미장 히어로만 켠다). */
-  opts?: { particleAfterLatin?: boolean },
+  /** particleAfterLatin: 영문 낱말 뒤가 조사면 굵힘을 허용한다(미장 히어로만 켠다).
+   *  linkTerms: 이 낱말이 테마 이름이면 굵힘 대신 **링크**(테마 리포트, 2026-09-22). 굵힘 상한·한 번만 규칙은 그대로 탄다. */
+  opts?: { particleAfterLatin?: boolean; linkTerms?: Map<string, string> },
 ): React.ReactNode[] {
   if (terms.length === 0) return [text];
   const out: React.ReactNode[] = [];
@@ -515,10 +517,17 @@ export function highlightTerms(
         out.push(buf);
         buf = "";
       }
+      const href = opts?.linkTerms?.get(term);
       out.push(
-        <b key={key++} style={{ fontWeight: 800, color: C.ink }}>
-          {term}
-        </b>,
+        href ? (
+          <Link key={key++} href={href} className="hz-kd-termlink" title={`${term} 테마 리포트`}>
+            {term}
+          </Link>
+        ) : (
+          <b key={key++} style={{ fontWeight: 800, color: C.ink }}>
+            {term}
+          </b>
+        ),
       );
       used.add(term);
       inThisParagraph += 1;
@@ -555,13 +564,15 @@ export function termsFor(...groups: (string | null | undefined)[][]): string[] {
  * divide 는 왼쪽 칸에만 준다 — 칸 사이 세로선이다. 폰(≤560)에서는 두 칸이 세로로
  * 서면서 globals.css 의 .hz-kd-duo 규칙이 이 선을 가로선으로 바꾼다.
  */
-export function Highlight({ cap, name, value, valueColor, sub, divide }: {
+export function Highlight({ cap, name, value, valueColor, sub, divide, href }: {
   cap: string;
   name: string;
   value?: string;
   valueColor?: string;
   sub: string;
   divide?: boolean;
+  /** 이름을 링크로(국장 테마 로테이션의 유입·이탈 → 테마 리포트, 2026-09-22). 없으면 글자만. */
+  href?: string;
 }) {
   return (
     <div
@@ -576,7 +587,13 @@ export function Highlight({ cap, name, value, valueColor, sub, divide }: {
     >
       <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>{cap}</span>
       <div style={{ display: "flex", alignItems: "baseline", gap: 7, minWidth: 0 }}>
-        <strong style={{ ...clip, fontSize: "var(--fs-16)", fontWeight: 800, letterSpacing: "-.02em", color: C.ink }}>{name}</strong>
+        {href ? (
+          <Link href={href} className="hz-stock-link" style={{ ...clip, fontSize: "var(--fs-16)", fontWeight: 800, letterSpacing: "-.02em" }}>
+            {name}
+          </Link>
+        ) : (
+          <strong style={{ ...clip, fontSize: "var(--fs-16)", fontWeight: 800, letterSpacing: "-.02em", color: C.ink }}>{name}</strong>
+        )}
         {value && <span style={{ fontFamily: MONO, fontSize: "var(--fs-13)", fontWeight: 800, color: valueColor, flexShrink: 0 }}>{value}</span>}
       </div>
       <span style={{ ...clip, fontSize: "var(--fs-11-5)", color: C.sub }}>{sub}</span>

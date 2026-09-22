@@ -762,6 +762,9 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/generate_telegram_narratives.py
 
+      # ⚠️ **이 스텝은 테마 요약 두 스텝보다 앞에 있어야 한다.** 뒤에 두면 카더라 화면이 테마 요약 42회(국장 26 · 미장 16)를
+      #    기다린 뒤에야 갈린다 — 카더라가 읽는 표는 여기서 이미 끝났고, 테마 요약 표(telegram_theme_brief 둘)를 읽는 것은
+      #    테마 화면뿐이다(lib/theme-page.ts · lib/us-theme-page.ts).
       # ⭐ **카더라 두 화면만 여기서 먼저 비운다.** 위에서 국장 총평이 막 들어갔는데 화면
       #    사본은 30분짜리라, 다음 만료까지 옛 글이 나간다. 2026-09-22 저녁이 그랬다 —
       #    미장 총평이 20:26:56, 국장 총평이 20:35:17 에 들어갔고 두 화면의 사본이 하필
@@ -783,6 +786,31 @@ jobs:
         env:
           REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
         run: bash scripts/revalidate.sh /kadera
+
+      # 테마 리포트(/theme/[테마])의 '요즘 무슨 얘기' · 함께 언급된 테마 · 발췌. 테마 26개에 Haiku 한 번씩.
+      # 기준일을 telegram_sentiment_daily 에서 집으므로 센티먼트 집계 뒤여야 한다(위 급부상 한 줄과 같은 이유).
+      - name: (텔레그램) 테마 요약 생성
+        id: telegram_theme_briefs
+        continue-on-error: true
+        run: python data-pipeline/scripts/generate_theme_briefs.py
+
+      # 미장 테마 리포트(/theme/us/[테마]) — 위와 같은 것을 미장 테마 16개에. 기준일은 telegram_us_sentiment_daily 라
+      # 미장 센티먼트 집계 뒤여야 한다(미장 총평과 같은 자리).
+      - name: (텔레그램) 미장 테마 요약 생성
+        id: telegram_us_theme_briefs
+        continue-on-error: true
+        run: python data-pipeline/scripts/generate_us_theme_briefs.py
+
+      # ⭐ 테마 리포트 두 화면도 자료가 쓰인 직후에 비운다(PR #543 의 규칙 그대로). 요약·급부상 이유가 방금 들어갔고,
+      #    이 화면이 읽는 표는 전부 이 앞에서 끝난다. 안 연 동안은 404 라 비워도 데워도 아무 일이 없다 — 여는 날
+      #    이 스텝을 손댈 일이 없게 미리 둔다(app/screen-flags.ts THEME_PUBLIC).
+      - name: 테마 리포트 화면만 먼저 비우고 데우기
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        env:
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: bash scripts/revalidate.sh /theme /theme/us
+
 
       # ── KRX 공표 대기 게이트 ─────────────────────────────────────────────
       # **KRX Open API 는 전 영업일 자료를 08:00 KST 정각에 올린다**(2026-08-14 실측:
@@ -950,18 +978,22 @@ jobs:
       # ⚠️ 매일 돌려도 된다. 재무부가 **앞 달을 수정**하므로 전 기간을 통째로 다시
       #    쓰는 게 맞고(실측: 2026-05 잔고가 다음 발표에서 +961 바뀌었다), 9MB 내려받아
       #    3,500행 upsert 라 비용이 없다.
+      # ⛔ 2026-09-22 서학개미 장부는 폐기 예정이라 꺼 두었다(app/screen-flags.ts SEOHAK_PUBLIC). 스텝은 남기고 if: false.
       - name: Fetch 예탁원 외화증권 결제 (서학개미)
         id: seohak_settlement
+        if: false
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_seohak_settlement.py
 
       - name: Fetch 국내 상장 미국 ETF (서학개미)
         id: seohak_etf
+        if: false
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_seohak_etf.py
 
       - name: Fetch TIC 나라별 미국 증권 보유·순매수 (서학개미)
         id: seohak_tic
+        if: false
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_seohak_tic.py
 
@@ -1394,8 +1426,8 @@ jobs:
         id: telegram_calc_health
         if: always()
         run: |
-          names=("extract_telegram_stocks.py" "calculate_channel_influence.py" "calculate_stock_daily.py" "calculate_telegram_trending.py" "calculate_theme_daily.py" "calculate_telegram_sentiment.py" "generate_telegram_narratives.py" "generate_move_reasons.py" "extract_telegram_events.py")
-          outcomes=("${{ steps.telegram_extract.outcome }}" "${{ steps.telegram_influence.outcome }}" "${{ steps.telegram_stock_daily.outcome }}" "${{ steps.telegram_trending.outcome }}" "${{ steps.telegram_theme_daily.outcome }}" "${{ steps.telegram_sentiment.outcome }}" "${{ steps.telegram_narratives.outcome }}" "${{ steps.telegram_move_reasons.outcome }}" "${{ steps.telegram_events.outcome }}")
+          names=("extract_telegram_stocks.py" "calculate_channel_influence.py" "calculate_stock_daily.py" "calculate_telegram_trending.py" "calculate_theme_daily.py" "calculate_telegram_sentiment.py" "generate_telegram_narratives.py" "generate_theme_briefs.py" "generate_move_reasons.py" "extract_telegram_events.py")
+          outcomes=("${{ steps.telegram_extract.outcome }}" "${{ steps.telegram_influence.outcome }}" "${{ steps.telegram_stock_daily.outcome }}" "${{ steps.telegram_trending.outcome }}" "${{ steps.telegram_theme_daily.outcome }}" "${{ steps.telegram_sentiment.outcome }}" "${{ steps.telegram_narratives.outcome }}" "${{ steps.telegram_theme_briefs.outcome }}" "${{ steps.telegram_move_reasons.outcome }}" "${{ steps.telegram_events.outcome }}")
 
           {
             echo "## 국장 집계"
@@ -1565,7 +1597,7 @@ jobs:
       #      TIC     계열 키(source_id)를 못 찾으면 일부러 죽게 해 뒀다.
       - name: Summarize 서학개미 수집
         id: seohak_health
-        if: always()
+        if: false # 2026-09-22 수집을 껐다(위 세 스텝). 켜면 always() 로 되돌린다.
         run: |
           names=("fetch_seohak_settlement.py" "fetch_seohak_etf.py" "fetch_seohak_tic.py")
           outcomes=("${{ steps.seohak_settlement.outcome }}" "${{ steps.seohak_etf.outcome }}" "${{ steps.seohak_tic.outcome }}")
@@ -1762,8 +1794,8 @@ jobs:
         id: us_health
         if: always()
         run: |
-          names=("extract_telegram_us_stocks.py" "calculate_us_stock_daily.py" "calculate_us_comention.py" "calculate_us_trending.py" "calculate_us_theme_daily.py" "calculate_us_telegram_sentiment.py" "generate_us_telegram_narratives.py")
-          outcomes=("${{ steps.telegram_us_extract.outcome }}" "${{ steps.telegram_us_daily.outcome }}" "${{ steps.telegram_us_comention.outcome }}" "${{ steps.telegram_us_trending.outcome }}" "${{ steps.telegram_us_theme.outcome }}" "${{ steps.telegram_us_sentiment.outcome }}" "${{ steps.telegram_us_narratives.outcome }}")
+          names=("extract_telegram_us_stocks.py" "calculate_us_stock_daily.py" "calculate_us_comention.py" "calculate_us_trending.py" "calculate_us_theme_daily.py" "calculate_us_telegram_sentiment.py" "generate_us_telegram_narratives.py" "generate_us_theme_briefs.py")
+          outcomes=("${{ steps.telegram_us_extract.outcome }}" "${{ steps.telegram_us_daily.outcome }}" "${{ steps.telegram_us_comention.outcome }}" "${{ steps.telegram_us_trending.outcome }}" "${{ steps.telegram_us_theme.outcome }}" "${{ steps.telegram_us_sentiment.outcome }}" "${{ steps.telegram_us_narratives.outcome }}" "${{ steps.telegram_us_theme_briefs.outcome }}")
 
           {
             echo "## 미장 카더라"
