@@ -478,9 +478,18 @@ a.hz-theme-chip:hover { background: var(--tx-btn); }
 /* 글자 링크(‹ 테마 리포트 · 테마 전체 보기 →). 올리면 글자가 진해진다 — 인라인 color 는 :hover 를 이겨서 클래스가 색을 쥔다. */
 .hz-theme-textlink { color: var(--c-sub); transition: color 0.12s ease; }
 .hz-theme-textlink:hover { color: var(--c-ink); }
-/* 히어로 본문 안의 이름 링크 — 본문(ink-soft) 위에 굵은 잉크, 올리면 파란 잉크. */
-.hz-theme-bodylink { font-weight: 700; color: var(--c-ink); text-decoration: none; transition: color 0.12s ease; }
-.hz-theme-bodylink:hover { color: var(--c-cold-ink); }
+/* 히어로 본문 안의 태그 링크(급부상 종목 · 오르는 테마). 눌리는 태그라 올리면 하늘색. 본문 글줄(14px) 사이라 여백을 조금 키운다. */
+.hz-theme-tag-link {
+  margin-left: 0;
+  padding: 3px 7px;
+  font-size: var(--fs-12);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.hz-theme-tag-link:hover { background: var(--c-blue-tint); color: var(--c-cold-ink); }
+/* 히어로 태그에서 온 줄(#riser-코드). 고정 머리(탑바) 아래로 들어가지 않게 위 여백을 두고, 도착한 줄은 하늘색으로 밝힌다. */
+.hz-trow[id^="riser-"] { scroll-margin-top: 96px; }
+.hz-trow:target { background: var(--c-blue-tint); }
 /* 맨 아래 '함께 거론되는 테마' 알약. 링크라 올리면 색이 바뀌어야 알약끼리 갈린다 — 인라인 background 는 :hover 를 이겨서 클래스로. */
 .hz-theme-pill {
   display: inline-flex;

@@ -283,33 +283,29 @@ export default async function ThemeIndexPage() {
                 </p>
                 {/* 아래 두 카드의 요약 한 줄씩 — 히어로가 이 화면의 요약본이 되려면 지도만이 아니라 세 카드를 다 말해야 한다(2026-09-22 Hun).
                     종목 이름은 그 종목 화면으로, 테마 이름은 테마 화면으로 간다. */}
+                {/* 종목은 태그로, 누르면 종목 화면이 아니라 **이 화면의 급부상 카드 그 줄**로 간다(2026-09-22 Hun) — 까닭이 거기 있다.
+                    줄에는 id(riser-코드)가 있고 :target 이 그 줄을 잠깐 밝힌다(kadera.css). */}
                 {risers && risers.length > 0 && (
-                  <p>
-                    테마별 급부상 종목은{" "}
-                    {risers.slice(0, 3).map((r, i) => (
-                      <span key={r.code}>
-                        {i > 0 && ", "}
-                        <Link href={stockHref(r.code)} className="hz-theme-bodylink">
-                          {r.name}
-                        </Link>
-                        ({r.theme})
-                      </span>
+                  <p style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 6px" }}>
+                    <span>테마별 급부상 종목은</span>
+                    {risers.slice(0, 3).map((r) => (
+                      <a key={r.code} href={`#riser-${r.code}`} className="hz-theme-tag hz-theme-tag-link">
+                        {r.name}
+                        <span style={{ fontWeight: 500, color: C.sub2, marginLeft: 4 }}>{r.theme}</span>
+                      </a>
                     ))}
-                    {risers.length > 3 ? ` 등 ${risers.length}종목입니다.` : "입니다."}
+                    <span>{risers.length > 3 ? `등 ${risers.length}종목입니다.` : "입니다."}</span>
                   </p>
                 )}
                 {rising.length > 0 && (
-                  <p>
-                    점유율이 이틀 넘게 오르는 중인 테마는{" "}
-                    {rising.map((t, i) => (
-                      <span key={t.theme}>
-                        {i > 0 && ", "}
-                        <Link href={themeHref(t.theme)} className="hz-theme-bodylink">
-                          {t.theme}
-                        </Link>
-                      </span>
+                  <p style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 6px" }}>
+                    <span>점유율이 이틀 넘게 오르는 중인 테마는</span>
+                    {rising.map((t) => (
+                      <Link key={t.theme} href={themeHref(t.theme)} className="hz-theme-tag hz-theme-tag-link is-up-1">
+                        {t.theme}
+                      </Link>
                     ))}
-                    입니다.
+                    <span>입니다.</span>
                   </p>
                 )}
               </div>
@@ -380,7 +376,7 @@ export default async function ThemeIndexPage() {
             </div>
             <div>
               {risers.map((r) => (
-                  <div key={r.theme} className="hz-trow hz-cols-theme-riser">
+                  <div key={r.theme} id={`riser-${r.code}`} className="hz-trow hz-cols-theme-riser">
                     <Link href={themeHref(r.theme)} className="hz-stock-link" style={{ ...clip, minWidth: 0, fontSize: "var(--fs-13)", fontWeight: 700 }}>
                       {r.theme}
                     </Link>
