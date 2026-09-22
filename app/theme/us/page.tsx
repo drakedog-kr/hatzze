@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { lastThemeBriefAt } from "@/lib/theme-page";
+import { themeUpdatedAt } from "@/lib/theme-page";
 import { listUsThemeOverview, listUsThemeRisers } from "@/lib/us-theme-page";
 
 import { KADERA_CARD } from "../../og-copy";
@@ -33,7 +33,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function UsThemeIndexPage() {
   if (!PUBLIC && DEPLOYED) notFound();
-  const [themes, risersAll, updatedAt] = await Promise.all([listUsThemeOverview(), listUsThemeRisers(), lastThemeBriefAt("telegram_us_theme_brief")]);
+  const [themes, risersAll, updatedAt] = await Promise.all([listUsThemeOverview(), listUsThemeRisers(), themeUpdatedAt("us")]);
   const risers = risersAll === null ? null : risersAll.filter((r) => r.reason);
   return <ThemeIndexView market={US_MARKET} themes={themes} risers={risers} updatedAt={updatedAt} />;
 }

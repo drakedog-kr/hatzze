@@ -594,8 +594,8 @@ def main() -> None:
                 print(f"  [{theme} · {row['riser']['name']}] {row['riser']['reason'] or '(까닭 없음)'}")
             if not no_save:
                 # ⚠️ updated_at 을 직접 넣는다. 열의 default now() 는 **처음 넣을 때만** 돈다 — upsert 가 같은 (날짜, 테마)를
-                #    다시 쓰면 글은 바뀌어도 시각은 첫 실행에 머문다. 화면 '최종 업데이트'(lib/theme-page.ts lastThemeBriefAt)가
-                #    이 값을 읽어, 저녁 실행 뒤에도 아침 시각을 말하게 된다. 카더라 총평 스크립트가 같은 이유로 직접 넣는다.
+                #    다시 쓰면 글은 바뀌어도 시각은 첫 실행에 머물러, 표가 언제 마지막으로 쓰였는지를 거짓으로 말한다
+                #    (2026-09-23 저녁 재료로 다시 쓴 줄이 오후 4시로 남아 있었다). 카더라 총평 스크립트가 같은 이유로 직접 넣는다.
                 row["updated_at"] = datetime.now(KST).isoformat()
                 db.table(TABLE).upsert(row, on_conflict="date,theme").execute()
                 saved += 1
