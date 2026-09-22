@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { listThemeOverview, listThemeRisers } from "@/lib/theme-page";
+import { lastThemeBriefAt, listThemeOverview, listThemeRisers } from "@/lib/theme-page";
 
 import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
@@ -32,8 +32,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function ThemeIndexPage() {
   if (!PUBLIC && DEPLOYED) notFound();
-  const [themes, risersAll] = await Promise.all([listThemeOverview(), listThemeRisers()]);
+  const [themes, risersAll, updatedAt] = await Promise.all([listThemeOverview(), listThemeRisers(), lastThemeBriefAt()]);
   // 이유를 못 쓴 종목(등락률 목록에만 있던 것)은 싣지 않는다 — "이유를 말한 곳이 없습니다"가 줄을 차지했다(2026-09-22).
   const risers = risersAll === null ? null : risersAll.filter((r) => r.reason);
-  return <ThemeIndexView market={KR_MARKET} themes={themes} risers={risers} />;
+  return <ThemeIndexView market={KR_MARKET} themes={themes} risers={risers} updatedAt={updatedAt} />;
 }

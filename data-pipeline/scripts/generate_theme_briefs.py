@@ -39,7 +39,7 @@ from __future__ import annotations
 import re
 import sys
 from collections import Counter, defaultdict
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -51,6 +51,7 @@ from common.broadcast_content import banned_hits  # noqa: E402
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.supabase_client import get_client, load_all, load_all_keyset  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
+from common.timeutil import KST  # noqa: E402
 from config.stock_themes import THEMES  # noqa: E402
 
 import generate_telegram_narratives as KR  # noqa: E402
@@ -592,6 +593,10 @@ def main() -> None:
             if row["riser"]:
                 print(f"  [{theme} · {row['riser']['name']}] {row['riser']['reason'] or '(까닭 없음)'}")
             if not no_save:
+                # ⚠️ updated_at 을 직접 넣는다. 열의 default now() 는 **처음 넣을 때만** 돈다 — upsert 가 같은 (날짜, 테마)를
+                #    다시 쓰면 글은 바뀌어도 시각은 첫 실행에 머문다. 화면 '최종 업데이트'(lib/theme-page.ts lastThemeBriefAt)가
+                #    이 값을 읽어, 저녁 실행 뒤에도 아침 시각을 말하게 된다. 카더라 총평 스크립트가 같은 이유로 직접 넣는다.
+                row["updated_at"] = datetime.now(KST).isoformat()
                 db.table(TABLE).upsert(row, on_conflict="date,theme").execute()
                 saved += 1
             if row["brief"]:

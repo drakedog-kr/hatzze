@@ -539,6 +539,27 @@ export function flowStats(flow: (number | null)[]): { streak: number; topDays: n
 }
 
 /**
+ * 테마 목록 히어로 '테마 브리핑'의 **최종 업데이트** 시각 — 그 화면 머리 글(테마 요약)이 마지막으로 쓰인 때다.
+ * 카더라 히어로와 같은 규칙이다(lib/telegram-data.ts lastKaderaUpdatedAt 주석): 집계 표는 created_at 뿐이라 다시 써도
+ * 시각이 안 오르고, 요약 표는 upsert 마다 updated_at 이 오른다. 한 실행이 스물여섯(미장 열여섯) 줄을 쓰므로 최신 날짜
+ * 안에서 가장 늦은 줄을 고른다. 요약이 실패한 날은 전 실행 시각에 머문다 — 머리 글이 실제로 낡았다는 뜻이라 감추지 않는다.
+ * 국장·미장이 표 이름만 바꿔 같이 쓴다.
+ */
+export async function lastThemeBriefAt(
+  table: "telegram_theme_brief" | "telegram_us_theme_brief" = "telegram_theme_brief",
+): Promise<string | null> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db
+    .from(table)
+    .select("updated_at")
+    .order("date", { ascending: false })
+    .order("updated_at", { ascending: false })
+    .limit(1);
+  if (error) console.error(`[lastThemeBriefAt] ${table} 의 갱신 시각을 못 읽었습니다`, error);
+  return (data?.[0]?.updated_at as string | undefined) ?? null;
+}
+
+/**
  * 테마 목록 — 로테이션(점유율·순위·변화)에 **열흘 흐름**을 더한 것.
  *
  * 흐름은 다른 테마 사이트의 '테마 흐름' 표에서 형식을 가져왔다: 칸마다 그날 순위, 라벨은
