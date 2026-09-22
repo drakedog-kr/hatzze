@@ -198,7 +198,21 @@ export default async function ThemeIndexPage() {
     }
     return n;
   })();
-  const leadDeltaInk = top[0]?.shareDelta != null && top[0].shareDelta < 0 ? "var(--c-cold-ink)" : "var(--c-hot-ink)";
+  // 첫 문장은 **오늘 가장 크게 달라진 테마**다. "언급의 46.5%가 반도체입니다"는 거의 늘 반도체라 문장이 굳는다(2026-09-22 Hun).
+  // 절대 %p 로 고르면 그것도 늘 반도체(바탕이 커서)라 **닷새 전 대비 상대 변화**로 고른다 — 1%→2.5% 의 자동차가 36%→46% 의
+  // 반도체보다 앞선다. 점유율 1% 미만 테마는 뺀다(0.2→0.6 같은 요동). 늘어난 테마가 없으면 가장 많이 줄어든 테마를.
+  const mover = (() => {
+    const cands = all
+      .filter((t) => t.shareDelta != null && t.sharePct >= 1)
+      .map((t) => {
+        const before = Math.max(0.5, t.sharePct - (t.shareDelta as number));
+        return { t, ratio: t.sharePct / before };
+      });
+    const up = cands.filter((c) => c.ratio > 1).sort((a, b) => b.ratio - a.ratio)[0];
+    if (up) return { ...up, dir: 1 as const };
+    const down = cands.filter((c) => c.ratio < 1).sort((a, b) => a.ratio - b.ratio)[0];
+    return down ? { ...down, dir: -1 as const } : null;
+  })();
 
   return (
     <div className="hz-tx">
@@ -225,20 +239,40 @@ export default async function ThemeIndexPage() {
             </div>
             <div className="hz-kd-hero-h">
               <div className="hz-kd-hero-title">
-                <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>테마 점유율</span>
+                <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>테마 브리핑</span>
                 <span style={{ flex: 1 }} />
                 <span style={{ fontSize: "var(--fs-11)", color: C.muted, whiteSpace: "nowrap" }}>최근 {KADERA_WINDOW_DAYS}일 · {THEME_NAMES.length}개 테마</span>
               </div>
               <h2 className="hz-tx-hero-title" style={{ margin: 0 }}>
-                언급의 <em style={{ color: leadDeltaInk }}>{top[0].sharePct.toFixed(1)}%</em>가{" "}
-                <Link href={themeHref(top[0].theme)} style={{ color: "inherit", textDecoration: "none" }}>
-                  {top[0].theme}
-                </Link>
-                입니다.
+                {mover ? (
+                  <>
+                    <Link href={themeHref(mover.t.theme)} style={{ color: "inherit", textDecoration: "none" }}>
+                      {mover.t.theme}
+                    </Link>{" "}
+                    관심이 닷새 전의{" "}
+                    <em style={{ color: mover.dir > 0 ? "var(--c-hot-ink)" : "var(--c-cold-ink)" }}>
+                      {mover.dir > 0 ? `${mover.ratio.toFixed(1)}배` : `${Math.round(mover.ratio * 100)}%`}
+                    </em>
+                    입니다.
+                  </>
+                ) : (
+                  <>
+                    언급의 <em>{top[0].sharePct.toFixed(1)}%</em>가{" "}
+                    <Link href={themeHref(top[0].theme)} style={{ color: "inherit", textDecoration: "none" }}>
+                      {top[0].theme}
+                    </Link>
+                    입니다.
+                  </>
+                )}
               </h2>
               <div className="hz-tx-hero-body">
                 <p>
-                  그다음은 {top.slice(1).map((t) => `${t.theme} ${t.sharePct.toFixed(1)}%`).join(", ")}입니다.
+                  {mover && mover.t.theme !== top[0].theme && (
+                    <>
+                      점유율 {mover.t.sharePct.toFixed(1)}%로 {mover.t.rank}위입니다.{" "}
+                    </>
+                  )}
+                  언급의 {top[0].sharePct.toFixed(1)}%는 {top[0].theme}, 그다음은 {top.slice(1).map((t) => `${t.theme} ${t.sharePct.toFixed(1)}%`).join(", ")}입니다.
                   {top[0].shareDelta != null && top[0].shareDelta !== 0 && (
                     <>
                       {" "}
@@ -251,7 +285,7 @@ export default async function ThemeIndexPage() {
                     종목 이름은 그 종목 화면으로, 테마 이름은 테마 화면으로 간다. */}
                 {risers && risers.length > 0 && (
                   <p>
-                    3일 전 대비 언급이 갑자기 늘어난 종목은{" "}
+                    테마별 급부상 종목은{" "}
                     {risers.slice(0, 3).map((r, i) => (
                       <span key={r.code}>
                         {i > 0 && ", "}
@@ -315,14 +349,14 @@ export default async function ThemeIndexPage() {
         )}
       </section>
 
-      {/* ── 갑자기 많이 언급된 종목 ── 테마마다 앞 사흘보다 언급이 가장 많이 는 종목 하나와 까닭. 종목 지도(테마 화면)가
+      {/* ── 테마별 급부상 종목 ── 테마마다 앞 사흘보다 언급이 가장 많이 는 종목 하나와 까닭. 종목 지도(테마 화면)가
           색으로 보이는 것을 한 줄씩 모았다. 카더라의 급부상(시장 전체 상위 여섯)과 대상이 다르다. 고르는 것도
           까닭을 쓰는 것도 파이프라인이고(generate_theme_briefs.py) 화면은 요약 행의 riser 를 읽는다. */}
       <section className="hz-sheet">
         <SectionHead
           icon="trending_up"
           /* 제목·설명은 짧고 글자 그대로(2026-09-21 "더 직관적이고 심플하게"). 셈법은 물음표 도움말로 내렸다. */
-          title="갑자기 많이 언급된 종목"
+          title="테마별 급부상 종목"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
           desc="테마마다 3일 전 대비 언급이 크게 늘어난 종목 하나와 요즘 도는 얘기입니다."
           noteHelp={`배수는 최근 ${KADERA_WINDOW_DAYS}일 언급을 그 전 ${KADERA_WINDOW_DAYS}일 언급으로 나눈 값입니다. 최근 ${KADERA_WINDOW_DAYS}일 언급이 ${RISER_MIN_MENTIONS}회 미만이거나 ${RISER_MIN_RATIO}배에 못 미치는 종목은 세지 않고, 그 전 ${KADERA_WINDOW_DAYS}일에 한 번도 언급되지 않았던 종목은 '새로 등장'으로 맨 앞에 섭니다. 채널이 까닭을 말하지 않은 종목(등락률 목록에만 오른 것)은 싣지 않습니다. 많아야 ${RISER_MAX}줄입니다.`}
