@@ -109,11 +109,26 @@ EXTRA_BANNED = (
 PRICE_WORDS = ("강세", "약세", "상승세", "하락세", "급등", "급락", "저평가", "고평가")
 
 
+# 기간·매체를 가리키는 말. 화면이 머리에서 이미 "최근 3일 채널 글"이라 적으므로 문장이 되풀이할 자리가 아니다.
+# 2026-09-22 실측: 국장 26건 중 17건이 "최근 3일"로 시작했고 목록 화면(테마 흐름)이 그 첫 문장을 한 줄씩 세워
+# 같은 말이 열 줄 내리 반복됐다. 프롬프트만으로는 모델이 되돌아오므로 검사로 막는다(약속은 코드가 쥔다).
+WINDOW_WORDS = ("최근 3일", "최근 사흘", "요 며칠", "지난 3일", "지난 사흘", "텔레그램", "커뮤니티", "채널에서", "채널에는", "채널들에서")
+
+
+def window_hits(text: str) -> list[str]:
+    return [w for w in WINDOW_WORDS if w in text]
+
+
 def brief_problems(text: str, digest: str) -> list[str]:
-    """종목 요약의 problems() 에 매수·매도 표현·시세 낱말 검사를 더한 것. 비어 있으면 통과."""
+    """종목 요약의 problems() 에 매수·매도 표현·시세 낱말·기간/매체 표현 검사를 더한 것. 비어 있으면 통과."""
     hits = banned_hits(text) + [w for w in EXTRA_BANNED if w in text]
     price = [w for w in PRICE_WORDS if w in text]
-    return problems(text, digest) + [f"매수·매도 표현({w})" for w in hits] + [f"시세 표현({w})" for w in price]
+    return (
+        problems(text, digest)
+        + [f"매수·매도 표현({w})" for w in hits]
+        + [f"시세 표현({w})" for w in price]
+        + [f"기간·매체 표현({w})" for w in window_hits(text)]
+    )
 
 
 def has_trade_framing(text: str) -> bool:
@@ -145,7 +160,9 @@ THEME_RULES = f"""
   적힌 것만 씁니다. 두세 종목이면 충분합니다.
 - **숫자를 옮기지 마세요.** 언급 횟수·건수·퍼센트·날짜는 화면이 따로 찍습니다. 큰 것이 무엇인지
   아는 데만 쓰세요.
-- 흐름을 말할 땐 "최근 3일", "요 며칠"처럼 가까운 며칠로 범위를 못박으세요. 날수는 '사흘'이 아니라 '3일'처럼 숫자로.
+- **기간과 매체는 쓰지 마세요.** "최근 3일", "요 며칠", "텔레그램에서", "채널에서는", "커뮤니티에서"로 글을 시작하거나 끼워 넣지
+  마세요. 화면이 이미 "최근 3일 채널 글을 읽고 정리한 것입니다"라고 적고 있어, 스물여섯 줄이 같은 말로 시작하면 읽는 사람은
+  그 대목을 건너뜁니다. 바로 종목과 소식부터 씁니다. 날수를 꼭 적어야 하면 '사흘'이 아니라 '3일'처럼 숫자로.
 - '무슨 일이 있었나'가 아니라 '무엇이 화제였나'를 씁니다. 확인된 사실이 아니라 오간 말이므로
   "~소식이 화제였습니다", "~라는 이야기가 돌았습니다"처럼 적으세요.
 - **주가 얘기는 쓰지 마세요.** "강세를 보였다", "상승세 속에서", "급등했다" 같은 시세 표현은 채널이
@@ -199,6 +216,7 @@ RISER_RULES = f"""
 - 까닭이 본론입니다. "~소식이 돌면서", "~라는 이야기가 퍼지면서"처럼 **무슨 소식이** 말을 늘렸는지
   적고, 발췌에 근거가 있으면 그 소식의 알맹이(누구와 무엇을, 어떤 계약·행사·발표)를 한 마디 더 붙이세요.
 - **숫자를 쓰지 마세요.** 언급 횟수·배수·날짜·금액은 화면이 따로 찍거나 이 문장의 몫이 아닙니다.
+- **기간과 매체도 쓰지 마세요**("최근 3일", "텔레그램에서", "채널에서는"). 화면이 이미 적고 있어 줄마다 되풀이됩니다.
 - '무슨 일이 있었나'가 아니라 '무엇이 화제였나'입니다. 확인된 사실이 아니라 오간 말이므로 "~소식",
   "~이야기"로 적으세요. 주가 얘기(강세·급등·상승세)는 쓰지 않습니다.
 - 증권사가 어느 종목을 좋게 봤다는 말(최선호·추천·투자 매력·목표주가)은 옮기지 마세요. 보고서가
@@ -240,6 +258,7 @@ def riser_pick(candidates: list[str], digest: str) -> str | None:
     if not candidates or any(NO_NEWS_MARK in t for t in candidates):
         return None
     candidates = [t for t in candidates if not any(w in t for w in PRICE_WORDS)] or candidates
+    candidates = [t for t in candidates if not window_hits(t)] or candidates
     clean = [t for t in candidates if is_clean(t, digest)] or candidates
     mid = (RISER_LEN_MIN + RISER_LEN_MAX) / 2
     in_goal = [t for t in clean if RISER_LEN_MIN <= len(t) <= RISER_LEN_MAX]
@@ -394,8 +413,9 @@ def pick_text(candidates: list[str], digest: str) -> str | None:
     candidates = [t for t in candidates if not has_trade_framing(t)]
     if not candidates:
         return None
-    # 시세 낱말이 없는 후보가 하나라도 있으면 그쪽만 본다.
+    # 시세 낱말·기간/매체 표현이 없는 후보가 하나라도 있으면 그쪽만 본다.
     candidates = [t for t in candidates if not any(w in t for w in PRICE_WORDS)] or candidates
+    candidates = [t for t in candidates if not window_hits(t)] or candidates
     clean = [t for t in candidates if is_clean(t, digest)] or candidates
     # 두 문단인 후보가 있으면 그쪽만. 한 문단짜리도 읽히긴 하니 전부 그러면 그대로 간다.
     clean = [t for t in clean if paragraph_count(t) == PARAGRAPHS] or clean

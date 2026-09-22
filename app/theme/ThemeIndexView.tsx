@@ -429,10 +429,11 @@ export function ThemeIndexView({
                     <span className="hz-theme-row-brief">
                       {t.briefLine && <AiMark size={14} style={{ flexShrink: 0, marginTop: 3 }} />}
                       <span style={{ minWidth: 0, color: t.briefLine ? "var(--c-ink-soft)" : C.sub2 }}>
+                        {/* 요약이 없을 때의 대신. 머리가 이미 기간을 적고 있어 여기선 "최근 3일"을 되풀이하지 않는다(2026-09-22). */}
                         {t.briefLine ??
                           (t.topStocks.length
-                            ? `최근 ${KADERA_WINDOW_DAYS}일 ${t.topStocks.map((x) => `${x.name} ${x.mentions}회`).join(" · ")}가 언급되었습니다. 요약은 아직 없습니다.`
-                            : `최근 ${KADERA_WINDOW_DAYS}일 사이 이 테마 종목이 채널에서 언급되지 않았습니다.`)}
+                            ? `${t.topStocks.map((x) => `${x.name} ${x.mentions}회`).join(" · ")}가 언급되었습니다. 요약은 아직 없습니다.`
+                            : "이 테마 종목이 아직 언급되지 않았습니다.")}
                       </span>
                     </span>
                     <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
