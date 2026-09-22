@@ -10,6 +10,7 @@ import {
   RISER_MIN_RATIO,
   THEME_FLOW_DAYS,
   THEME_FLOW_TOP,
+  THEME_NAMES,
   listThemeOverview,
   listThemeRisers,
   themeHref,
@@ -23,7 +24,7 @@ import { THEME_PUBLIC } from "../screen-flags";
 import { StockLogo } from "../StockLogo";
 import { DeltaPp, Highlight, Pill, RankBadge } from "../kadera/parts";
 import { SectionHead } from "../kadera/SectionHead";
-import { AiMark, C, MONO } from "../ui";
+import { AiMark, C, Icon, MONO } from "../ui";
 import { THEME_PAGE } from "./copy";
 import { Treemap, TreemapLegend, stockTone, themeTiles } from "./Treemap";
 
@@ -70,11 +71,40 @@ function flowCaption(t: ThemeOverview): { text: string; on: boolean } {
  * 스파크라인까지 세 번 그림으로 그렸는데 전부 "복잡하다"였다(2026-09-19). 열흘의 뜻은 결국 이 한 줄이고,
  * 날마다의 값은 툴팁(title)에 남긴다.
  */
+/**
+ * 점유율이 며칠째 같은 방향인가 — 테마 화면 히어로의 "n일째 · 오르는 중"과 같은 셈(집계 있는 날만, 마지막 날부터 거슬러).
+ * 마지막 변화가 0 이거나 날이 둘 미만이면 0.
+ */
+function shareStreak(t: ThemeOverview): { dir: 1 | -1 | 0; days: number } {
+  const pts = t.flow.map((r, i) => (r == null ? null : t.shareFlow[i])).filter((v): v is number => v != null);
+  let dir: 1 | -1 | 0 = 0;
+  let days = 0;
+  for (let i = pts.length - 1; i > 0; i--) {
+    const diff = pts[i] - pts[i - 1];
+    const d = diff > 0 ? 1 : diff < 0 ? -1 : 0;
+    if (dir === 0) {
+      if (d === 0) break;
+      dir = d;
+    }
+    if (d !== dir) break;
+    days += 1;
+  }
+  return { dir, days };
+}
+
 function Flow({ t }: { t: ThemeOverview }) {
   const cap = flowCaption(t);
+  const streak = shareStreak(t);
   const title = `최근 ${t.flowDates.length}일 순위 ${t.flow.map((r, i) => `${fmtKoDate(t.flowDates[i])} ${r == null ? "집계 없음" : `${r}위`}`).join(" · ")}`;
   return (
-    <span title={title} style={{ display: "inline-flex" }}>
+    <span title={title} style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+      {/* 상위권 지속(알약) 옆에 점유율 방향 — 테마 화면의 "n일째 · 오르는 중"과 같은 말(2026-09-22). 이틀 이상 이어질 때만 —
+          하루짜리까지 적으면 열 줄이 다 "1일째"라 말이 안 된다. */}
+      {streak.days >= 2 && (
+        <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, whiteSpace: "nowrap", color: streak.dir > 0 ? "var(--c-hot-ink)" : "var(--c-cold-ink)" }}>
+          {streak.days}일째 {streak.dir > 0 ? "오르는 중" : "내리는 중"}
+        </span>
+      )}
       <Pill tone={cap.on ? "blue" : "plain"}>{cap.text}</Pill>
     </span>
   );
@@ -91,7 +121,9 @@ function riserDelta(r: ThemeRiser): string {
 
 export default async function ThemeIndexPage() {
   if (!PUBLIC && DEPLOYED) notFound();
-  const [themes, risers] = await Promise.all([listThemeOverview(), listThemeRisers()]);
+  const [themes, risersAll] = await Promise.all([listThemeOverview(), listThemeRisers()]);
+  // 까닭을 못 쓴 종목(등락률 목록에만 있던 것)은 싣지 않는다 — "까닭을 말한 곳이 없습니다"가 줄을 차지했다(2026-09-22 Hun).
+  const risers = risersAll === null ? null : risersAll.filter((r) => r.reason);
 
   const flowDates = themes?.[0]?.flowDates ?? [];
   const top = themes?.slice(0, 3) ?? [];
@@ -100,24 +132,64 @@ export default async function ThemeIndexPage() {
   const fresh = (themes ?? []).filter((t) => t.label === "new").sort((a, b) => a.rank - b.rank);
   // '계속'은 사흘 이상. 하루 이틀은 표의 알약이 말한다.
   const lasting = (themes ?? []).filter((t) => t.label === "streak" && t.streak >= 3).sort((a, b) => b.streak - a.streak || a.rank - b.rank);
-  // 지도 머리의 한 줄 — 가장 큰 칸이 무엇이고 얼마인지 글자로도 적는다(넓이만으로 말하지 않는다).
-  const lead =
-    top.length >= 2
-      ? `최근 ${KADERA_WINDOW_DAYS}일 언급의 ${top[0].sharePct.toFixed(1)}%가 ${top[0].theme}입니다. 그다음은 ${top
-          .slice(1)
-          .map((t) => `${t.theme} ${t.sharePct.toFixed(1)}%`)
-          .join(", ")}입니다.`
-      : "칸의 크기는 최근 사흘 언급 점유율, 색은 그 변화입니다.";
+  // 1위 테마가 며칠째 1위인가(집계 있는 날만, 마지막 날부터). 히어로 문장의 곁말.
+  const leadTopDays = (() => {
+    const t = top[0];
+    if (!t) return 0;
+    let n = 0;
+    for (let i = t.flow.length - 1; i >= 0; i--) {
+      if (t.flow[i] == null) continue;
+      if (t.flow[i] !== 1) break;
+      n += 1;
+    }
+    return n;
+  })();
+  const leadDeltaInk = top[0]?.shareDelta != null && top[0].shareDelta < 0 ? "var(--c-cold-ink)" : "var(--c-hot-ink)";
 
   return (
     <div className="hz-tx">
+      {/* ── 히어로 ── 이 화면의 첫 문장: 언급의 몇 %가 어느 테마인가. 카더라 히어로와 같은 눈썹·제목·본문 눈금(tx.css)이고
+          옆 칸은 없다. 처음엔 지도 머리의 설명 자리에 작게 있었는데 첫 문장치고 약했다(2026-09-22). */}
+      {top.length >= 2 && (
+        <section className="hz-sheet">
+          <div className="hz-tx-hero-main">
+            <div className="hz-tx-eyebrow">
+              <span>
+                <Icon name="category" style={{ fontSize: "var(--fs-15)", color: C.muted }} />
+                테마 점유율 · 최근 {KADERA_WINDOW_DAYS}일
+              </span>
+              <span className="hz-tx-eyebrow-r">{THEME_NAMES.length}개 테마</span>
+            </div>
+            <h2 className="hz-tx-hero-title">
+              언급의 <em style={{ color: leadDeltaInk }}>{top[0].sharePct.toFixed(1)}%</em>가{" "}
+              <Link href={themeHref(top[0].theme)} style={{ color: "inherit", textDecoration: "none" }}>
+                {top[0].theme}
+              </Link>
+              입니다.
+            </h2>
+            <div className="hz-tx-hero-body">
+              <p>
+                그다음은 {top.slice(1).map((t) => `${t.theme} ${t.sharePct.toFixed(1)}%`).join(", ")}입니다.
+                {top[0].shareDelta != null && top[0].shareDelta !== 0 && (
+                  <>
+                    {" "}
+                    {top[0].theme}는 닷새 전보다 {Math.abs(top[0].shareDelta).toFixed(1)}%p {top[0].shareDelta > 0 ? "늘었고" : "줄었고"}
+                    {leadTopDays >= 2 ? ` ${leadTopDays}일째 1위입니다.` : " 1위입니다."}
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ── 점유율 지도 ── 칸 크기 = 점유율, 색 = 변화. 누르면 그 테마 화면으로. */}
       <section className="hz-sheet">
         <SectionHead
           icon="grid_view"
           title="테마 점유율 지도"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
-          desc={lead}
+          desc="칸이 클수록 최근 사흘 언급이 많은 테마입니다. 누르면 그 테마 화면으로 갑니다."
           noteHelp="칸의 넓이는 최근 사흘 언급 점유율입니다. 색은 닷새 넘게 이전과 견준 변화로, 따뜻한 색이 늘어난 테마, 파랑이 줄어든 테마입니다. 사전 밖 종목(기타)은 지도에 없습니다."
           level={2}
         />
@@ -152,7 +224,7 @@ export default async function ThemeIndexPage() {
           title="갑자기 많이 언급된 종목"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
           desc="테마마다 사흘 전보다 언급이 크게 늘어난 종목 하나와 채널이 말한 까닭입니다."
-          noteHelp={`배수는 최근 ${KADERA_WINDOW_DAYS}일 언급을 그 앞 사흘로 나눈 값입니다. 최근 사흘 언급이 ${RISER_MIN_MENTIONS}회 미만이거나 ${RISER_MIN_RATIO}배에 못 미치는 종목은 세지 않고, 앞 사흘에 한 번도 언급되지 않았던 종목은 '새로 등장'으로 맨 앞에 섭니다. 많아야 ${RISER_MAX}줄이고 크게 늘어난 테마가 적으면 그만큼만 보입니다.`}
+          noteHelp={`배수는 최근 ${KADERA_WINDOW_DAYS}일 언급을 그 앞 사흘로 나눈 값입니다. 최근 사흘 언급이 ${RISER_MIN_MENTIONS}회 미만이거나 ${RISER_MIN_RATIO}배에 못 미치는 종목은 세지 않고, 앞 사흘에 한 번도 언급되지 않았던 종목은 '새로 등장'으로 맨 앞에 섭니다. 채널이 까닭을 말하지 않은 종목(등락률 목록에만 오른 것)은 싣지 않습니다. 많아야 ${RISER_MAX}줄입니다.`}
           level={2}
         />
         {risers === null ? (
@@ -161,7 +233,7 @@ export default async function ThemeIndexPage() {
           </p>
         ) : risers.length === 0 ? (
           <p style={{ margin: 0, padding: "16px 22px 20px", fontSize: "var(--fs-12)", color: C.sub, lineHeight: 1.7 }}>
-            앞 사흘보다 언급이 는 종목이 없습니다.
+            앞 사흘보다 언급이 늘고 채널이 까닭을 말한 종목이 없습니다.
           </p>
         ) : (
           <>
@@ -189,10 +261,8 @@ export default async function ThemeIndexPage() {
                     {/* 까닭(LLM 50~90자, ✨ 고지). 카더라 카드의 한 줄(22~30자)보다 길다 — 이 칸은 줄 폭을 다
                         가져서 넓은 화면은 한 줄, 1000px 는 두 줄이다. 없으면 그 사정을 적는다(빈 칸은 줄 높이가 흔들린다). */}
                     <span className="hz-theme-row-brief">
-                      {r.reason && <AiMark size={14} style={{ flexShrink: 0, marginTop: 3 }} />}
-                      <span style={{ minWidth: 0, color: r.reason ? "var(--c-ink-soft)" : C.sub2 }}>
-                        {r.reason ?? "채널에서 까닭을 말한 곳이 없습니다."}
-                      </span>
+                      <AiMark size={14} style={{ flexShrink: 0, marginTop: 3 }} />
+                      <span style={{ minWidth: 0, color: "var(--c-ink-soft)" }}>{r.reason}</span>
                     </span>
                     {/* 언급 수 위, 앞 사흘 수 아래 — 테마 흐름·주인공 표의 오른쪽 두 줄과 같은 꼴. */}
                     <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
