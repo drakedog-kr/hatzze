@@ -85,7 +85,7 @@ export const DIVIDEND_PUBLIC = true;
 
 /**
  * 테마 리포트(/theme · /theme/[테마]) — 테마 하나를 두고 채널에서 무슨 얘기가 도는지 보는 화면.
- * 2026-09-19 에 만들었고 **아직 안 열었다.** 읽는 곳은 배당으로 살기와 같다(사이드바·푸터·사이트맵·검사).
+ * 2026-09-19 에 만들어 **2026-09-23 에 열었다.** 읽는 곳은 배당으로 살기와 같다(사이드바·푸터·사이트맵·검사).
  *
  *   app/theme/page.tsx · app/theme/[theme]/page.tsx   배포된 곳에서 404 를 낼지, noindex 를 달지
  *   app/AppShell.tsx                                   NAV ↔ COMING_SOON · DEEP_PAGES · 소식 띠(NEWS) · 머리 도구의 건너가기 단추
@@ -102,7 +102,7 @@ export const DIVIDEND_PUBLIC = true;
  * ⛔ **여라는 말이 있기 전에는 바꾸지 말 것.** 화면이 다 만들어졌다는 것과 여는 것은
  *    다른 판단이다.
  */
-export const THEME_PUBLIC = false;
+export const THEME_PUBLIC = true;
 
 /**
  * 사이드바의 '테마 리포트' 옆 **빨간 N 배지**. 새로 생긴 화면이라는 표시다(푸터 버전 옆에 붙는 것과 같은 표식).
