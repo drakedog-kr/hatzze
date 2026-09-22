@@ -92,7 +92,7 @@ export function ReasonWeeks({
       />
       {days.length === 0 ? (
         <p style={{ margin: 0, padding: "14px 22px 8px", fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub, lineHeight: 1.7 }}>
-          이 주에는 이 테마 종목에 붙은 까닭이 없습니다. 까닭은 등락이 큰 날에만 만듭니다.
+          이 주에는 이 테마 종목에 붙은 이유가 없습니다. 이유는 등락이 큰 날에만 만듭니다.
         </p>
       ) : (
         <div className="hz-reason-days">

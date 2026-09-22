@@ -76,7 +76,7 @@ export async function generateMetadata({ params }: { params: Promise<{ theme: st
     title: `${theme} 테마 텔레그램 언급 | hatzze`,
     description: `${withSubjectParticle(theme)} 주식 텔레그램에서 요즘 어떻게 회자되는지 봅니다.${
       hot.length ? ` 최근 사흘 말 많은 종목은 ${hot.join("·")}입니다.` : ""
-    } 말 많은 종목과 그 까닭, 앞으로의 일정을 테마 단위로 읽습니다.`,
+    } 말 많은 종목과 그 이유, 앞으로의 일정을 테마 단위로 읽습니다.`,
     path: themeHref(theme),
     ownImage: KADERA_CARD.alt,
     imagePath: "/kadera",
@@ -95,7 +95,7 @@ function Trend({ points, recent }: { points: ThemeTrendPoint[]; recent: Set<stri
       {points.map((p, i) => {
         const at = i / Math.max(1, points.length - 1);
         const edge = at > 0.72 ? " hz-tip-end" : at < 0.28 ? " hz-tip-start" : "";
-        const tip = `${fmtKoDate(p.date)} · 점유율 ${p.share.toFixed(1)}%${p.rank ? ` · ${p.rank}위` : ""}${p.hasReason ? " · 까닭 있음" : ""}`;
+        const tip = `${fmtKoDate(p.date)} · 점유율 ${p.share.toFixed(1)}%${p.rank ? ` · ${p.rank}위` : ""}${p.hasReason ? " · 이유 있음" : ""}`;
         // 최근 사흘(위 점유율 칸이 재는 날들)만 진한 파랑, 그 전은 옅은 파랑 — 히어로의 두 칸이 같은 날을 가리킨다.
         const bar = (
           <span
@@ -437,7 +437,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
           icon="leaderboard"
           title="이 테마의 주인공"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
-          desc="상위 열 종목과 채널이 말한 까닭입니다."
+          desc="상위 열 종목과 채널이 말한 이유입니다."
           noteHelp="칸의 크기는 최근 사흘 언급 수이고 색은 평소와 견준 것입니다. 평소는 지난 한 달 하루 평균 언급의 사흘치이고, 평소의 1.5배 이상이면 따뜻한 색, 1.5분의 1 이하면 파랑, 지난 한 달 언급이 없던 종목은 새로 등장으로 칩니다."
           level={2}
         />
@@ -508,7 +508,7 @@ export default async function ThemePage({ params }: { params: Promise<{ theme: s
         {d.reasons.length === 0 ? (
           <>
             <SectionHead icon="history" title="등락의 이유" desc="이 테마 종목이 크게 움직인 날, 그날 채널이 말한 이유입니다." level={2} />
-            <Empty>최근 {THEME_TREND_DAYS}일 사이 이 테마 종목에 붙은 까닭이 없습니다. 까닭은 등락이 큰 날에만 만듭니다.</Empty>
+            <Empty>최근 {THEME_TREND_DAYS}일 사이 이 테마 종목에 붙은 이유가 없습니다. 이유는 등락이 큰 날에만 만듭니다.</Empty>
           </>
         ) : (
           /* 머리는 ReasonWeeks 안에서 그린다 — 오른쪽 알약이 보고 있는 주의 날짜다. */

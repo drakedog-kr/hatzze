@@ -957,7 +957,7 @@ export default async function KaderaPage() {
           noteHelp="그날 오른 종목에 커뮤니티가 말한 이유를 한 줄로 옮깁니다. 확인된 사실이 아니라 오간 이야기입니다. 등락률은 그날 종가 기준입니다."
         />
         {whyFailed ? (
-          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>까닭을 불러오지 못했습니다.</p>
+          <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>이유를 불러오지 못했습니다.</p>
         ) : !why || why.rows.length === 0 ? (
           <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>
             오늘 집계가 끝나면 채워집니다. 저녁 실행 뒤에 그날 것이 붙습니다.
