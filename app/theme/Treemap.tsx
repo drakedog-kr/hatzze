@@ -107,7 +107,8 @@ export function stockTiles(stocks: ThemeHotStock[], market: ThemeMarketKey = "kr
     value: s.mentions,
     tone: stockTone(s.mentions, s.usualMentions),
     href: themeStockHref(market, s.code),
-    tip: `${s.name} · 최근 3일 ${s.mentions.toLocaleString("ko-KR")}회 · ${usualDeltaText(s.mentions, s.usualMentions)} · 하루 최다 ${s.channels}곳`,
+    // 채널 수(하루 최다 n곳)는 뺐다(2026-09-22) — 이 지도가 말하는 것은 언급의 크기와 평소와의 차이 둘이고, 셋째 값은 칸마다 다른 잣대를 하나 더 얹는다.
+    tip: `${s.name} · 최근 3일 ${s.mentions.toLocaleString("ko-KR")}회 · ${usualDeltaText(s.mentions, s.usualMentions)}`,
     valueText: `${s.mentions.toLocaleString("ko-KR")}회`,
     deltaText: s.usualMentions === 0 ? "새로 등장" : usualDeltaText(s.mentions, s.usualMentions).replace("평소 대비 ", "").replace(" 언급", ""),
   }));
