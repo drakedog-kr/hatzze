@@ -139,25 +139,46 @@ export function ThemeIndexView({
       return prev != null && prev <= THEME_FLOW_TOP && (cur == null || cur > THEME_FLOW_TOP);
     })
     .sort((a, b) => a.rank - b.rank);
-  const climber = all.filter((t) => (t.rankChange ?? 0) > 0).sort((a, b) => (b.rankChange as number) - (a.rankChange as number))[0] ?? null;
-  // '계속'은 사흘 이상. 하루 이틀은 표의 알약이 말한다.
-  const lasting = all.filter((t) => t.label === "streak" && t.streak >= 3).sort((a, b) => b.streak - a.streak || a.rank - b.rank);
-  const mostTopDays = [...all].sort((a, b) => b.topDays - a.topDays || a.rank - b.rank)[0] ?? null;
+  const climbers = all.filter((t) => (t.rankChange ?? 0) > 0).sort((a, b) => (b.rankChange as number) - (a.rankChange as number));
   const pctp = (v: number) => `${v > 0 ? "▲" : "▼"}${Math.abs(v).toFixed(1)}%p`;
   // 이틀 넘게 점유율이 오르는 중인 테마(흐름 표의 "n일째 오르는 중"과 같은 셈). 히어로 본문 셋째 줄.
   const rising = all.filter((t) => { const st = shareStreak(t); return st.dir > 0 && st.days >= 2; }).sort((a, b) => a.rank - b.rank).slice(0, 4);
   // 타일 셋째·넷째의 대체 잣대까지 정리한 것.
-  const tileC = fresh[0]
-    ? { cap: "새로 상위에 오른 테마", t: fresh[0], value: fresh[0].streak === 1 ? "첫 등장" : "2일째", tone: "var(--c-hot-ink)", sub: fresh.length > 1 ? `그 밖에 ${fresh.slice(1).map((x) => x.theme).join(" · ")}` : `${fresh[0].rank}위 · 점유율 ${fresh[0].sharePct.toFixed(1)}%` }
-    : dropped[0]
-      ? { cap: "상위에서 내려간 테마", t: dropped[0], value: `${dropped[0].rank}위`, tone: "var(--c-cold-ink)", sub: dropped.length > 1 ? `그 밖에 ${dropped.slice(1).map((x) => x.theme).join(" · ")}` : `어제까지 ${THEME_FLOW_TOP}위 안` }
-      : climber
-        ? { cap: "순위가 가장 오른 테마", t: climber, value: `▲${climber.rankChange}계단`, tone: "var(--c-hot-ink)", sub: `${climber.rank}위 · 점유율 ${climber.sharePct.toFixed(1)}%` }
-        : null;
-  const tileD = lasting[0]
-    ? { cap: "계속 상위인 테마", t: lasting[0], value: `${lasting[0].streak}일째`, tone: "var(--c-cold-ink)", sub: lasting.length > 1 ? `그 밖에 ${lasting.slice(1).map((x) => `${x.theme} ${x.streak}일째`).join(" · ")}` : `${lasting[0].rank}위 · 점유율 ${lasting[0].sharePct.toFixed(1)}%` }
-    : mostTopDays && mostTopDays.topDays > 0
-      ? { cap: `10일 중 ${THEME_FLOW_TOP}위 안 최다`, t: mostTopDays, value: `${mostTopDays.topDays}일`, tone: "var(--c-cold-ink)", sub: `${mostTopDays.rank}위 · 점유율 ${mostTopDays.sharePct.toFixed(1)}%` }
+  // 열흘 안에서 순위가 가장 크게 오르내린 폭(최고 − 최저). 집계가 없는 날은 빼고 센다. 밀려난 테마가 없는 날의 대신이다.
+  const swing = all
+    .map((t) => {
+      const seen = t.flow.filter((r): r is number => r != null);
+      return { t, span: seen.length >= 2 ? Math.max(...seen) - Math.min(...seen) : 0, best: seen.length ? Math.min(...seen) : 0, worst: seen.length ? Math.max(...seen) : 0 };
+    })
+    .filter((x) => x.span > 0)
+    .sort((a, b) => b.span - a.span || a.t.rank - b.t.rank);
+
+  /* 히어로에 **같은 테마를 두 번 세우지 않는다**. 왼쪽 칸(관심 변화)이 이미 쓴 이름은 오른쪽 칸(상위권) 후보에서 뒤로 민다 —
+     %p 가 가장 는 테마는 순위도 오르기 쉬워, 안 거르면 판 하나에 같은 이름이 두 번 선다(2026-09-22 미장에서 실제로 그랬다).
+     거른 뒤 아무것도 안 남으면 그냥 쓴다 — 칸을 비우느니 겹치는 편이 낫다. */
+  const usedByA = new Set([gainer?.theme, loser?.theme].filter((x): x is string => Boolean(x)));
+  const notUsed = <T,>(list: T[], nameOf: (x: T) => string) => list.find((x) => !usedByA.has(nameOf(x))) ?? list[0] ?? null;
+
+  // 상위권 칸의 두 줄은 **상위권의 문이다** — 들어온 테마와 밀려난 테마. 예전 둘째 줄은 '계속 상위인 테마'였는데
+  // 25일을 되짚어 보니 국장은 25일 내내 반도체, 미장은 내내 AI반도체였다(2026-09-22 실측). 1위가 오래 버티는 건
+  // 이 화면의 상수라 칸 하나를 줄 값이 아니다 — 며칠째 상위인지는 흐름 표의 줄마다 알약이 말하고, 1위가 며칠째인지는
+  // 아래 브리핑 문장이 적는다. 새 두 줄은 같은 25일에 각각 서로 다른 값 12개(미장 9·10)가 나온다.
+  const freshPick = notUsed(fresh, (t) => t.theme);
+  const climberPick = notUsed(climbers, (t) => t.theme);
+  const tileC = freshPick
+    ? { cap: "새로 상위에 오른 테마", t: freshPick, value: freshPick.streak === 1 ? "첫 등장" : "2일째", tone: "var(--c-hot-ink)", sub: fresh.length > 1 ? `그 밖에 ${fresh.filter((x) => x !== freshPick).map((x) => x.theme).join(" · ")}` : `${freshPick.rank}위 · 점유율 ${freshPick.sharePct.toFixed(1)}%` }
+    : climberPick
+      ? { cap: "순위가 가장 오른 테마", t: climberPick, value: `▲${climberPick.rankChange}계단`, tone: "var(--c-hot-ink)", sub: `${climberPick.rank}위 · 점유율 ${climberPick.sharePct.toFixed(1)}%` }
+      : null;
+  // 둘째 줄은 첫째 줄과 **같은 테마를 안 쓴다** — 한 칸에 같은 이름이 두 번 서면 둘 중 하나는 빈 줄과 같다.
+  const usedTheme = tileC?.t.theme;
+  const droppedOut = dropped.filter((t) => t.theme !== usedTheme);
+  const dropPick = notUsed(droppedOut, (t) => t.theme);
+  const swinger = notUsed(swing.filter((x) => x.t.theme !== usedTheme), (x) => x.t.theme);
+  const tileD = dropPick
+    ? { cap: "상위에서 내려간 테마", t: dropPick, value: `${dropPick.rank}위`, tone: "var(--c-cold-ink)", sub: droppedOut.length > 1 ? `그 밖에 ${droppedOut.filter((x) => x !== dropPick).map((x) => x.theme).join(" · ")}` : `어제까지 ${THEME_FLOW_TOP}위 안` }
+    : swinger
+      ? { cap: "가장 많이 오르내린 테마", t: swinger.t, value: `${swinger.span}계단`, tone: "var(--c-cold-ink)", sub: `최고 ${swinger.best}위 · 최저 ${swinger.worst}위` }
       : null;
   const tilesA = [
     gainer ? { cap: "가장 늘어난 테마", t: gainer, value: pctp(gainer.shareDelta as number), tone: "var(--c-hot-ink)", sub: `${gainer.rank}위 · 점유율 ${gainer.sharePct.toFixed(1)}%` } : null,
@@ -195,7 +216,7 @@ export function ThemeIndexView({
   return (
     <div className="hz-tx">
       {/* ── 히어로 ── 다른 화면(테마 상세·내부자·미리보기)과 같은 1:1:2 판(.hz-kd-hero): 회색 타일 둘 + 넓은 흰 칸.
-          타일 하나는 관심 변화(가장 늘어난·가장 줄어든), 다른 하나는 상위권(새로 상위·계속 상위, 없으면 대체 잣대),
+          타일 하나는 관심 변화(가장 늘어난·가장 줄어든), 다른 하나는 상위권의 문(들어온 테마·밀려난 테마, 없으면 대체 잣대),
           넓은 칸은 이 화면의 첫 문장과 아래 세 카드의 요약 한 줄씩. 처음엔 지도 머리의 설명 자리에 작게 있었고,
           그다음 카더라식 2열 판이었다(2026-09-22 "다른 히어로 포맷과 같게"). */}
       {top.length >= 2 && (
