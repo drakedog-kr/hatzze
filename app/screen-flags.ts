@@ -88,14 +88,14 @@ export const DIVIDEND_PUBLIC = true;
  * 2026-09-19 에 만들었고 **아직 안 열었다.** 읽는 곳은 배당으로 살기와 같다(사이드바·푸터·사이트맵·검사).
  *
  *   app/theme/page.tsx · app/theme/[theme]/page.tsx   배포된 곳에서 404 를 낼지, noindex 를 달지
- *   app/AppShell.tsx                                   NAV ↔ COMING_SOON · DEEP_PAGES
+ *   app/AppShell.tsx                                   NAV ↔ COMING_SOON · DEEP_PAGES · 소식 띠(NEWS) · 머리 도구의 건너가기 단추
  *   app/Footer.tsx                                     '바로가기' 목록
  *   app/sitemap-urls.ts                                사이트맵(목록 + 테마별 실주소)
  *   scripts/check-routes.mjs                           안 연 동안 사이트맵에 없는 것을 정상으로 볼지
  *
  * ## 여는 절차
  *
- *   1. 아래 값을 true 로 바꾼다. 위 자리가 전부 같이 켜진다.
+ *   1. 아래 값을 true 로 바꾼다. 위 자리가 전부 같이 켜진다(소식 띠 문구·키·아이콘은 정해 뒀다 — AppShell 의 NEWS).
  *   2. `app/releases.ts` 에 한 줄 올린다(화면이 하나 느는 것이라 Minor).
  *   3. 머지 뒤 프로덕션을 찔러 본다 — `curl -s -o /dev/null -w '%{http_code}' https://hatzze.fun/theme` 가 200.
  *

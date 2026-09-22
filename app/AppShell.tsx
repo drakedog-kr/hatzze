@@ -1482,7 +1482,21 @@ const NEWS_EVENT = "hz-news-change";
    git 이력에 있다 — 되살릴 땐 키를 새로 딴다.
    ⛔ 목적지가 열려 있을 때만 건다 — DIVIDEND_PUBLIC 이 false 면 텔레그램 2판 소식이 그대로 선다(띠만 먼저 나가 404 로
    가는 일을 막는다, 국장 미리보기 때의 규칙). */
-const NEWS = DIVIDEND_PUBLIC
+/* 2026-09-23 · 테마 리포트 오픈 소식. 목적지가 /theme 라 그 구역(국장·미장 판세와 테마 상세) 안에서는 안 그린다(NewsStrip 의 startsWith).
+   ⛔ THEME_PUBLIC 이 false 면 배당 소식이 그대로 선다 — 띠만 먼저 나가 404 로 가는 일을 막는다(국장 미리보기 때의 규칙). */
+const NEWS = THEME_PUBLIC
+  ? {
+      key: "hz-news-theme",
+      // 여는 날 아침. 머지·배포가 이 시각 뒤라 바로 뜬다(그 전엔 플래그가 false 라 아예 안 걸린다).
+      from: "2026-09-23T00:00:00+09:00",
+      href: THEME_PAGE.href,
+      name: THEME_PAGE.label,
+      tail: "를 열었습니다. 국장·미장 테마마다 어디에 관심이 쏠리고 무슨 얘기가 도는지 봅니다.",
+      // 사이드바 NAV 의 그 화면 아이콘(category)과 같은 것.
+      icon: THEME_PAGE.icon,
+      ga: "news-theme",
+    }
+  : DIVIDEND_PUBLIC
   ? {
       key: "hz-news-dividend",
       // 머지·배포 직후부터. 화면이 같은 배포에 실려 나가니 기다릴 글이 없다.
