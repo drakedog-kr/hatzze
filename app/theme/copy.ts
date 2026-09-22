@@ -27,8 +27,8 @@ export const THEME_PAGE = {
 export const US_THEME_PAGE = {
   href: "/theme/us",
   label: "미장 테마 리포트",
-  /** 사이드바 서브 항목·본문 제목의 짧은 이름(국장 카더라·미장 카더라와 같은 꼴). */
-  short: "미장 테마",
+  /** 사이드바 서브 항목·본문 제목의 이름(국장 카더라·미장 카더라와 같은 자리). '테마'만으로는 심심해 '판세'를 붙였다(2026-09-22, 후보 열 중). */
+  short: "미장 테마 판세",
   sub: "미장에서 어느 테마에 관심이 쏠리고 어느 종목이 뜨는지",
   description:
     "AI반도체·빅테크·전력·원자력 같은 미장 테마마다 주식 텔레그램 채널에서 무슨 얘기가 도는지 봅니다. 말 많은 미국 종목과 그 이유, 앞으로의 일정을 테마 단위로 읽습니다.",
@@ -36,5 +36,5 @@ export const US_THEME_PAGE = {
   icon: "category",
 } as const;
 
-/** 국장 테마 리포트의 짧은 이름 — 사이드바 서브 항목·본문 제목(미장 짝은 US_THEME_PAGE.short). */
-export const KR_THEME_SHORT = "국장 테마";
+/** 국장 테마 리포트의 서브 항목·본문 제목 이름(미장 짝은 US_THEME_PAGE.short). */
+export const KR_THEME_SHORT = "국장 테마 판세";
