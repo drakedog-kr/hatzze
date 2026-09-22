@@ -436,13 +436,6 @@
   padding-top: 11px;
   padding-bottom: 11px;
 }
-/* 테마 목록 히어로의 '건너가는 단추'. 넓은 칸 바닥에 붙이고(margin-top:auto) 글자만큼만 — 카더라는 옆 칸이 좁아 꽉 채우지만
-   여기는 칸이 절반이라 꽉 채우면 배너처럼 무겁다. 위 여백 4px 은 문단과 붙지 않을 만큼만. */
-.hz-theme-swap {
-  margin-top: auto;
-  align-self: flex-start;
-  padding: 0 18px;
-}
 /* 흐름 표 오른쪽 칸의 '열흘 한 조각'(방향 화살표 + 지속 알약). 화살표 한 자라 늘 한 줄에 들어가지만, 알약 글이 길어지면
    접어서 오른쪽에 쌓는다 — nowrap 이던 때는 그만큼 **왼쪽 칸의 글자 위로 넘쳤다**(2026-09-22). */
 .hz-theme-flow {

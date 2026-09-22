@@ -1123,6 +1123,32 @@ function ChannelRequest() {
 }
 
 /**
+ * 테마 판세의 **시장 건너가기** — 머리 오른쪽, 다크 모드 단추 왼쪽(2026-09-22). 카더라는 히어로 안에 큰 단추를 두는데
+ * 테마 목록은 히어로 넓은 칸이 절반이라 거기 두니 배너처럼 무거웠다. 도구 자리로 올리면 국장·미장 어느 화면에서나 같은 자리다.
+ * 부품은 카더라의 '채널 등록 신청'과 같은 것(.hz-btn-soft.hz-topbar-cta) — 폰(≤560)에서는 라벨이 접히고 아이콘만 남는다.
+ * 테마 상세(/theme/semiconductor)에서도 보인다. 건너가는 곳은 반대 시장의 **목록**이다 — 반도체의 짝이 미장에 따로 없다.
+ */
+function ThemeMarketSwap({ pathname }: { pathname: string }) {
+  const onUs = pathname === US_THEME_PAGE.href || pathname.startsWith(`${US_THEME_PAGE.href}/`);
+  const to = onUs
+    ? { href: THEME_PAGE.href, label: KR_THEME_SHORT, ga: "to_kr_theme" }
+    : { href: US_THEME_PAGE.href, label: US_THEME_PAGE.short, ga: "to_us_theme" };
+  return (
+    <Link
+      href={to.href}
+      className="hz-btn-soft hz-topbar-cta"
+      title={`${to.label} 보기`}
+      data-ga="cta_click"
+      data-ga-cta={to.ga}
+      data-ga-surface="page_tools"
+    >
+      <Icon name="swap_horiz" style={{ fontSize: "var(--fs-15)" }} />
+      <span className="hz-topbar-cta-label">{to.label}</span>
+    </Link>
+  );
+}
+
+/**
  * 머리 오른쪽 도구 묶음. 통화 스위치와 채널 등록 신청이 **테마 단추 왼쪽**이다.
  *
  * ⚠️ 통화는 **달러 금액을 내는 화면에만** 있는 개념이라 경로로 가린다. 국장 화면에
@@ -1130,6 +1156,7 @@ function ChannelRequest() {
  */
 function PageTools() {
   const pathname = usePathname() ?? "/";
+  const { themeNav } = useShellEnv();
   return (
     <>
       {/* 쿠키로 고른 게 없으면 그 화면의 기본값을 눌린 칸으로 쓴다. */}
@@ -1138,6 +1165,8 @@ function PageTools() {
         return page ? <CurrencyToggle key={page.prefix} fallback={page.fallback} /> : null;
       })()}
       {pathname.startsWith("/kadera") && <ChannelRequest />}
+      {/* 안 연 동안 배포에서는 /theme 가 404 라 단추도 내지 않는다(themeNav — ShellEnv 주석). */}
+      {themeNav && pathname.startsWith(THEME_PAGE.href) && <ThemeMarketSwap pathname={pathname} />}
       <ThemeToggle />
     </>
   );
