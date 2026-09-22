@@ -568,28 +568,24 @@ const DEEP_PAGES: Record<string, { label: string; sub: string; badge?: string }>
   ...(DAILY_PUBLIC ? {} : { [NOTE_PAGE.href]: { label: NOTE_PAGE.label, sub: NOTE_PAGE.sub, badge: "준비 중" } }),
   // 배당으로 살기 — 같은 이유로 안 연 동안만.
   ...(DIVIDEND_PUBLIC ? {} : { [DIVIDEND_PAGE.href]: { label: DIVIDEND_PAGE.label, sub: DIVIDEND_PAGE.sub, badge: "준비 중" } }),
-  // 테마 리포트 목록(국장·미장) — 안 연 동안만. 제목은 열린 뒤 NAV 서브 항목이 줄 것과 같게(국장 테마 · 미장 테마).
+  // 테마 리포트 목록(국장·미장) — 안 연 동안만. 제목은 열린 뒤 NAV 서브 항목이 줄 것과 같게(국장 테마 판세 · 미장 테마 판세).
+  // ⚠️ '준비 중' 배지는 뗐다(2026-09-23). 여는 날 제목 줄이 달라지지 않게 하려는 것이고, **잠금이 아니라 표시**라
+  //    떼어도 새는 것이 없다 — 배포에서 안 연 동안은 화면 자체가 404 다(app/theme/page.tsx 의 `!PUBLIC && DEPLOYED`).
   ...(THEME_PUBLIC
     ? {}
     : {
-        [THEME_PAGE.href]: { label: KR_THEME_SHORT, sub: THEME_PAGE.sub, badge: "준비 중" },
-        [US_THEME_PAGE.href]: { label: US_THEME_PAGE.short, sub: US_THEME_PAGE.sub, badge: "준비 중" },
+        [THEME_PAGE.href]: { label: KR_THEME_SHORT, sub: THEME_PAGE.sub },
+        [US_THEME_PAGE.href]: { label: US_THEME_PAGE.short, sub: US_THEME_PAGE.sub },
       }),
   // 테마 26장(/theme/반도체 …). 테마 이름이 곧 제목이라 셸이 h1 을 그린다 — 종목 화면(464장)은
   // 셸이 이름을 알 길이 없어 자기 h1 을 그리지만, 테마는 사전(lib/stock-themes.ts)이 정적이라
-  // 여기서 안다. 안 연 동안은 '준비 중' 배지가 붙어 구조화 데이터도 안 나간다(noindex 와 맞는다).
+  // 여기서 안다. 여기도 '준비 중' 배지를 뗐다(위 목록과 같은 줄에서 뗀다).
   ...Object.fromEntries(
-    THEME_NAMES.map((t) => [
-      themeHref(t),
-      { label: t, sub: `${t} 테마를 두고 채널에서 요즘 무슨 얘기가 도는지 봅니다`, ...(THEME_PUBLIC ? {} : { badge: "준비 중" }) },
-    ]),
+    THEME_NAMES.map((t) => [themeHref(t), { label: t, sub: `${t} 테마를 두고 채널에서 요즘 무슨 얘기가 도는지 봅니다` }]),
   ),
   // 미장 테마 16장(/theme/us/ai-semiconductor …). 국장과 이름이 겹치는 테마(금융)가 있어 부제에 시장을 적는다.
   ...Object.fromEntries(
-    US_THEME_NAMES.map((t) => [
-      usThemeHref(t),
-      { label: t, sub: `미장 ${t} 테마를 두고 채널에서 요즘 무슨 얘기가 도는지 봅니다`, ...(THEME_PUBLIC ? {} : { badge: "준비 중" }) },
-    ]),
+    US_THEME_NAMES.map((t) => [usThemeHref(t), { label: t, sub: `미장 ${t} 테마를 두고 채널에서 요즘 무슨 얘기가 도는지 봅니다` }]),
   ),
   ...Object.fromEntries(
     INSIDER_LIST_SLUGS.map((slug) => [
