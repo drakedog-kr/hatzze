@@ -135,6 +135,33 @@ function LibertyIcon({ size = 20 }: { size?: number }) {
   );
 }
 
+/**
+ * 테마 리포트의 국장·미장 서브 아이콘 — 원화·달러 기호. 카더라 서브(태극·여신상)와 같은 그림을 쓰면 사이드바에 같은
+ * 짝이 두 번 서서 어느 구역인지 안 갈렸다(2026-09-22). 통화 기호는 시장을 한 글자로 말하고, 국기 문양과 결이 달라
+ * 두 짝이 한눈에 갈린다. Material Symbols 엔 원 기호가 없어(달러는 attach_money 가 있다) 둘 다 같은 굵기로 직접 그린다 —
+ * 한쪽만 폰트에서 가져오면 굵기·끝처리가 어긋난다. 획 1.8 · 둥근 끝, 사이드바의 다른 Material 아이콘(weight 400)과 같은 무게다.
+ * ⚠️ 원 기호의 가로줄 둘은 18px 에서 사이가 2px 남짓이라 더 붙이면 한 줄로 뭉친다(y 10 · 14.5). 줄은 W 안쪽에 둬야 잉크가
+ * 달러와 비슷하다 — W 밖까지 뻗으면 18px 에서 원화만 검은 덩어리로 보였다(첫 시안).
+ */
+function KrWonIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ display: "block", flexShrink: 0 }}>
+      <path d="M4.5 5 L8 19.5 L12 9 L16 19.5 L19.5 5" />
+      <path d="M5 10 H19" />
+      <path d="M5.8 14.5 H18.2" />
+    </svg>
+  );
+}
+
+function UsDollarIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ display: "block", flexShrink: 0 }}>
+      <path d="M12 2.5 V21.5" />
+      <path d="M16.6 7.6 C16.6 5.6 14.6 4.6 12 4.6 C9.3 4.6 7.4 6 7.4 8.1 C7.4 10.1 9.4 10.9 12 11.5 C14.7 12.1 16.7 13 16.7 15.2 C16.7 17.4 14.7 18.8 12 18.8 C9.2 18.8 7.3 17.5 7.3 15.5" />
+    </svg>
+  );
+}
+
 // 서브 항목. href 가 없으면 아직 페이지가 없는 예고 항목이라 링크가 아니라 <div> 로 그린다.
 // sub 는 그 서브 페이지의 본문 머리(PageHeader)가 쓸 한 줄이다. 부모와 주소가 같은
 // 서브(국장 → /kadera)에는 두지 않는다 — 부모가 이미 자기 문장을 갖고 있다.
@@ -200,8 +227,8 @@ function buildNav(themeNav: boolean): NavItem[] {
           icon: THEME_PAGE.icon,
           sub: THEME_PAGE.sub,
           children: [
-            { label: KR_THEME_SHORT, href: THEME_PAGE.href, Glyph: KrTaegukIcon },
-            { label: US_THEME_PAGE.short, href: US_THEME_PAGE.href, Glyph: LibertyIcon, sub: US_THEME_PAGE.sub },
+            { label: KR_THEME_SHORT, href: THEME_PAGE.href, Glyph: KrWonIcon },
+            { label: US_THEME_PAGE.short, href: US_THEME_PAGE.href, Glyph: UsDollarIcon, sub: US_THEME_PAGE.sub },
           ],
         },
       ]
