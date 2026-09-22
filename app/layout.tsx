@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
 import AppShell from "./AppShell";
+import { THEME_PUBLIC } from "./screen-flags";
 import { SLOGAN } from "./brand";
 import { SITE_NAME, SITE_URL, pageMetadata } from "./seo";
 
@@ -211,7 +212,8 @@ export default function RootLayout({
           <body>에 속성을 주입해 불일치 경고를 낸다. body 자신의 속성 불일치만
           무시한다 — 내부 컴포넌트 hydration 검사에는 영향 없다. */}
       <body className="font-sans" suppressHydrationWarning>
-        <AppShell>
+        {/* 테마 리포트를 사이드바 링크로 낼지는 서버가 정한다(AppShell 의 ShellEnv 주석) — 열었거나, 배포가 아닌 로컬. */}
+        <AppShell themeNav={THEME_PUBLIC || !process.env.VERCEL_ENV}>
           {children}
         </AppShell>
       </body>

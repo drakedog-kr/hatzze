@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { INSIDER_LISTS, INSIDER_LIST_SLUGS, insiderListHref } from "./insider/lists";
 import { PageJsonLd } from "./JsonLd";
 import { NOTE_PAGE } from "./daily/copy";
@@ -152,7 +152,20 @@ type NavItem = {
   children?: NavChild[];
 };
 
-const NAV: NavItem[] = [
+/**
+ * 테마 리포트를 사이드바에 **링크로** 낼 것인가. 열면(THEME_PUBLIC) 늘 그렇고, 안 연 동안은 로컬(배포 아님)에서만 —
+ * 만드는 중에 사이드바에서 눌러 봐야 해서다(2026-09-22). 배포에서는 COMING_SOON 의 눌리지 않는 '준비 중' 줄로 남는다
+ * (2026-08-30 에 안 연 화면이 사이드바에서 눌려 404 가 났다 — COMING_SOON 머리 주석).
+ *
+ * 값은 서버가 정한다 — 이 파일은 클라이언트 컴포넌트라 `process.env.VERCEL_ENV` 를 직접 읽으면 서버 렌더와 브라우저가
+ * 다른 값을 봐 hydration 이 어긋난다. layout.tsx 가 AppShell 의 prop 으로 넘기고 ShellEnv 컨텍스트로 내려온다.
+ */
+type ShellEnv = { themeNav: boolean };
+const ShellEnvContext = createContext<ShellEnv>({ themeNav: THEME_PUBLIC });
+const useShellEnv = () => useContext(ShellEnvContext);
+
+function buildNav(themeNav: boolean): NavItem[] {
+  return [
   { href: "/", label: "시장 브리핑", icon: "monitoring", sub: "지표 25개로 잰 오늘의 시장 온도" },
   // 카더라가 국장·미장 둘로 갈린다. **부모는 그대로 두고 밑에 서브 항목을 단다** —
   // 부모를 국장으로 바꿔 버리면 카더라라는 이름이 사이드바에서 사라지고, 나중에 시장을
@@ -177,9 +190,9 @@ const NAV: NavItem[] = [
     ],
   },
   // 테마 리포트(/theme) — 카더라 바로 아래. 카더라 재료를 테마 단위로 다시 읽는 화면이라 그 옆이다.
-  // ⛔ 여는 것은 `app/screen-flags.ts` 의 THEME_PUBLIC 한 줄이다. 안 연 동안은 COMING_SOON 에 선다.
+  // ⛔ 여는 것은 `app/screen-flags.ts` 의 THEME_PUBLIC 한 줄이다. 안 연 동안 배포에서는 COMING_SOON 에 선다(themeNav 주석).
   // 카더라처럼 국장·미장 서브 항목이 달린다(국장은 부모와 같은 /theme, 미장은 /theme/us — 카더라와 같은 이유).
-  ...(THEME_PUBLIC
+  ...(themeNav
     ? [
         {
           href: THEME_PAGE.href,
@@ -266,7 +279,13 @@ const NAV: NavItem[] = [
   // DAILY_PUBLIC 한 줄이다. 배당으로 살기와 같은 방식으로 안 연 동안은 COMING_SOON 에, 열면
   // 여기 맨 아래에 선다. 이름·부제·아이콘은 app/daily/copy.ts 한 곳에서 온다.
   ...(DAILY_PUBLIC ? [{ href: NOTE_PAGE.href, label: NOTE_PAGE.label, icon: NOTE_PAGE.icon, sub: NOTE_PAGE.sub }] : []),
-];
+  ];
+}
+
+// 두 값뿐이라 미리 만들어 둔다 — 렌더마다 새 배열을 만들면 useMemo 없이 참조가 흔들린다.
+const NAV_ON = buildNav(true);
+const NAV_OFF = buildNav(false);
+const navFor = (env: ShellEnv) => (env.themeNav ? NAV_ON : NAV_OFF);
 
 // 외부(텔레그램) 링크라 NAV 배열이 아니라 따로 둔다 — pathname 기반 active 판정 대상이
 // 아니고, 새 탭으로 열려야 해서 next/link 가 아닌 <a> 를 쓴다. 사이드바와 모바일 탭바가
@@ -297,7 +316,8 @@ const TELEGRAM = {
 // 예고 항목을 전부 목록 끝에 몰면 짝인 둘이 MDD 를 사이에 두고 떨어진다.
 // 아이콘은 NAV 항목과 같은 규칙이다 — 직접 그린 Glyph 든 Material Symbols 이름(icon)이든
 // 하나만 있으면 되고, NavGlyph 가 골라 그린다.
-const COMING_SOON: { label: string; badge: string; tip: string; after: string; icon?: string; Glyph?: Glyph }[] = [
+type SoonItem = { label: string; badge: string; tip: string; after: string; icon?: string; Glyph?: Glyph };
+const COMING_SOON: SoonItem[] = [
   // ⭐ 국장 미리보기가 2026-09-04 에 NAV 로 옮겨 가 비었다가, 2026-09-06 에 데일리 노트가
   // 들어왔다. 그 항목은 손으로 옮기지 않는다 — DAILY_PUBLIC 하나가 여기서 빼고 NAV 에 넣는다.
   //
@@ -306,10 +326,7 @@ const COMING_SOON: { label: string; badge: string; tip: string; after: string; i
   // 그냥 눌려 들어가졌다. 여기(COMING_SOON)에 두면 href 필드 자체가 없어 링크가 안 생긴다.
   // 대신 본문 헤더가 NAV 에서 경로를 못 찾으므로 DEEP_PAGES 에 제목을 따로 둬야 한다.
   //
-  // 테마 리포트(2026-09-19 만듦). 카더라 리포트(와 그 서브) 바로 다음 — NAV 와 같은 자리.
-  ...(THEME_PUBLIC
-    ? []
-    : [{ label: THEME_PAGE.label, badge: "준비 중", tip: THEME_PAGE.tip, after: "/kadera", icon: THEME_PAGE.icon }]),
+  // 테마 리포트(2026-09-19 만듦)는 여기 없다 — themeNav 가 꺼진 곳(배포)에서만 서므로 comingSoonFor 가 끼운다.
   // 배당으로 살기(2026-09-11 만듦, 09-16 열었다). 국장 미리보기 다음, 데일리 노트 앞 — NAV 와 같은 자리.
   ...(DIVIDEND_PUBLIC
     ? []
@@ -321,6 +338,10 @@ const COMING_SOON: { label: string; badge: string; tip: string; after: string; i
     : [{ label: NOTE_PAGE.label, badge: "준비 중", tip: NOTE_PAGE.tip, after: DIVIDEND_PUBLIC ? DIVIDEND_PAGE.href : "/preview", icon: NOTE_PAGE.icon }]),
 ];
 
+/** 테마 리포트의 예고 줄. 카더라 리포트(와 그 서브) 바로 다음 — NAV 와 같은 자리. 링크로 낼 수 있는 곳(themeNav)에선 안 선다. */
+const THEME_SOON: SoonItem = { label: THEME_PAGE.label, badge: "준비 중", tip: THEME_PAGE.tip, after: "/kadera", icon: THEME_PAGE.icon };
+const comingSoonFor = (env: ShellEnv): SoonItem[] => (env.themeNav ? COMING_SOON : [THEME_SOON, ...COMING_SOON]);
+
 /**
  * 사이드바·모바일 메뉴가 그리는 순서. NAV 항목 사이사이에 예고 항목을 끼운다.
  *
@@ -330,24 +351,25 @@ const COMING_SOON: { label: string; badge: string; tip: string; after: string; i
  *
  * `after` 가 어느 NAV 항목과도 안 맞으면 조용히 사라지지 않도록 끝에 붙인다.
  */
-function sidebarItems() {
+function sidebarItems(env: ShellEnv) {
   const placed = new Set<string>();
   const rows: (
     | { kind: "nav"; item: NavItem }
-    | { kind: "child"; item: NavChild }
-    | { kind: "soon"; item: (typeof COMING_SOON)[number] }
+    | { kind: "child"; item: NavChild; siblings: NavChild[] }
+    | { kind: "soon"; item: SoonItem }
   )[] = [];
-  for (const item of NAV) {
+  const soons = comingSoonFor(env);
+  for (const item of navFor(env)) {
     rows.push({ kind: "nav", item });
-    for (const child of item.children ?? []) rows.push({ kind: "child", item: child });
-    for (const soon of COMING_SOON) {
+    for (const child of item.children ?? []) rows.push({ kind: "child", item: child, siblings: item.children ?? [] });
+    for (const soon of soons) {
       if (soon.after === item.href) {
         rows.push({ kind: "soon", item: soon });
         placed.add(soon.label);
       }
     }
   }
-  for (const soon of COMING_SOON) {
+  for (const soon of soons) {
     if (!placed.has(soon.label)) rows.push({ kind: "soon", item: soon });
   }
   return rows;
@@ -466,6 +488,18 @@ function useIntentPrefetch() {
   });
 }
 
+/**
+ * 서브 항목의 현재 페이지 판정. 주소가 같거나 **그 아래**(테마 리포트의 테마 26장 · 미장 16장)면 켜진다 — 형제 중 가장 긴
+ * 접두가 이기므로 /theme/us/memory 는 국장 테마(/theme)가 아니라 미장 테마(/theme/us)다. 예전엔 같은 주소일 때만 켜져서
+ * 테마 한 장에 들어가면 어느 시장인지 사이드바가 말하지 않았다(2026-09-22).
+ */
+function childActive(siblings: NavChild[], child: NavChild, pathname: string): boolean {
+  if (!child.href) return false;
+  const covers = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const best = siblings.filter((c) => c.href && covers(c.href)).sort((a, b) => b.href!.length - a.href!.length)[0];
+  return best === child;
+}
+
 /** NAV 항목의 현재 페이지 판정. 사이드바와 모바일 탭바가 같은 규칙을 써야 한다. */
 /**
  * **사이드바에 안 나오지만 자기 제목이 있어야 하는** 하위 페이지.
@@ -521,6 +555,7 @@ function isActive(href: string, pathname: string) {
 
 function Sidebar() {
   const intentPrefetch = useIntentPrefetch();
+  const env = useShellEnv();
   // `?? "/"` 는 타입 때문이다 — pages/500.tsx 가 있어 usePathname 의 타입이 string | null 이
   // 되는데(그 파일 주석 참고), app 트리에서는 null 이 안 온다. 아래 여섯 자리 모두 같다.
   const pathname = usePathname() ?? "/";
@@ -563,7 +598,7 @@ function Sidebar() {
         </p>
       </div>
       <nav style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {sidebarItems().map((row) => {
+        {sidebarItems(env).map((row) => {
           if (row.kind === "soon") {
             const soon = row.item;
             return (
@@ -612,7 +647,7 @@ function Sidebar() {
             const child = row.item;
             // 서브 행은 알약을 주지 않는다. 부모가 이미 알약을 쓰고 있어서 둘 다 칠하면
             // 한 구역에 강조가 둘이 된다 — 부모는 "여기 구역", 서브는 "이 페이지"다.
-            const on = !!child.href && pathname === child.href;
+            const on = childActive(row.siblings, child, pathname);
             const rowStyle = {
               display: "flex",
               alignItems: "center",
@@ -771,6 +806,7 @@ function Sidebar() {
 // 열려 있는 동안에만 DOM 에 올린다. 데스크톱에서는 여는 버튼 자체가 없지만, 열어 둔
 // 채로 창을 넓히는 경우가 있어 패널·백드롭의 display 는 미디어쿼리가 최종적으로 막는다.
 function MobileMenu({ onClose }: { onClose: () => void }) {
+  const env = useShellEnv();
   const intentPrefetch = useIntentPrefetch();
   const pathname = usePathname() ?? "/";
 
@@ -796,7 +832,7 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
             다만 배지는 위첨자가 아니라 라벨 옆에 나란히 둔다. 여기는 폭이 사이드바처럼
             210px 로 묶여 있지 않아 자리가 남고, 툴팁이 안 뜨는 화면이라 배지가 유일한
             설명이므로 겹쳐 두지 않고 또렷하게 보여야 한다. */}
-        {sidebarItems().map((row) => {
+        {sidebarItems(env).map((row) => {
           if (row.kind === "soon") {
             const soon = row.item;
             return (
@@ -828,7 +864,7 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
           }
           if (row.kind === "child") {
             const child = row.item;
-            const on = !!child.href && pathname === child.href;
+            const on = childActive(row.siblings, child, pathname);
             // 들여쓰기는 사이드바와 같은 뜻(부모 라벨 자리에 서브 아이콘이 선다)이지만
             // 여기는 행 높이·글자 크기가 달라서 값을 그대로 못 쓴다. rowStyle 위에 얹는다.
             const indented = { ...rowStyle(false), paddingLeft: 40, gap: 10 };
@@ -1138,7 +1174,7 @@ function encodedPath(pathname: string): string {
 
 function PageHeader() {
   const pathname = usePathname() ?? "/";
-  const page = NAV.find((n) => isActive(n.href, pathname));
+  const page = navFor(useShellEnv()).find((n) => isActive(n.href, pathname));
   // 서브 페이지에서는 서브의 이름을 h1 으로 쓴다. 부모(구역)의 이름을 그대로 두면
   // /kadera 와 /kadera/us 두 페이지가 **같은 h1** 을 갖는다.
   //
@@ -1656,7 +1692,8 @@ function ToTop({
   );
 }
 
-export default function AppShell({ children }: { children: React.ReactNode }) {
+export default function AppShell({ children, themeNav = THEME_PUBLIC }: { children: React.ReactNode; themeNav?: boolean }) {
+  const env: ShellEnv = { themeNav };
   const mainRef = useRef<HTMLElement>(null);
   const scrolledDown = useScrolledDown(mainRef);
   const pastFold = useScrolledPastFold(mainRef);
@@ -1685,6 +1722,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [menuOpen]);
 
   return (
+    <ShellEnvContext.Provider value={env}>
     <div
       className="hz-shell"
       style={{
@@ -1777,5 +1815,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
       </div>
     </div>
+    </ShellEnvContext.Provider>
   );
 }
