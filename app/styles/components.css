@@ -37,6 +37,8 @@
   text-decoration-thickness: 1px;
 }
 .hz-news-link:hover .hz-news-em { text-decoration-thickness: 2px; }
+/* 폰 전용 짧은 꼬리(AppShell 의 NewsItem.tailShort). 넓은 화면에서는 긴 꼬리를 쓴다. */
+.hz-news-tail-short { display: none; }
 .hz-news-go {
   display: inline-flex;
   align-items: center;
@@ -74,6 +76,9 @@
   .hz-news-link { padding: 8px 0; }
   .hz-news-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
   .hz-news-namefirst .hz-news-text { -webkit-line-clamp: 1; }
+  /* 한 줄로 자르면 긴 꼬리는 문장 중간에서 끊긴다. 짧은 꼬리가 있는 소식은 그걸로 바꿔 끼운다. */
+  .hz-news-tail-full { display: none; }
+  .hz-news-tail-short { display: inline; }
 }
 
 /* ── 명절 인사 팝업 (app/HolidayGreeting.tsx) ─────────────────────────────
