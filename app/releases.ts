@@ -29,6 +29,12 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 쓰는 법은 그대로고 갱신이 30분 이르다. Patch.
+    version: "1.19.3",
+    date: "2026-09-23",
+    changes: ["아침·저녁 새 내용이 30분 일찍 올라옵니다."],
+  },
+  {
     // 채널 글이 휴장 때문에 멈추지 않을 뿐 쓰는 법은 그대로다. Patch.
     version: "1.19.2",
     date: "2026-09-23",
