@@ -33,6 +33,14 @@ KRX 를 안 쓰므로 08시 공표를 기다릴 이유가 없다. 지표 블록 
 전날 개장에서 끝났다. 그래서 그날치 한 줄에 휴장 이름만 남기고 종목 줄은 쓰지 않는다
 (`night_state` · 마이그레이션 083).
 
+## ⚠️ 받은 종가는 전부 남긴다(마이그레이션 084)
+
+국장이 쉬는 동안 미장이 여러 번 열리면(추석·설·징검다리 휴일) 연휴 뒤 첫 아침 카드는 그
+세션들의 **누적** 등락이어야 한다. 백테스트가 그렇게 쟀다. 그런데 quote 의 `dp` 는 마지막
+하루치뿐이고, 핀허브 무료는 과거 시세를 안 줘서 나중에 되받을 수 없다. 그래서 매일 아침
+받은 종가(`c`)·전일 종가(`pc`)·세션 날짜를 문턱과 상관없이 전부 그날치 한 줄(`quotes`)에
+남긴다. 연휴 뒤 누적은 "마지막 종가 ÷ 연휴 첫 세션의 전일 종가" 로 이 기록에서 만든다.
+
 ## 평소 폭은 왜 사전에 박혀 있나
 
 핀허브 무료는 과거 캔들을 안 줘서 표준편차를 실시간으로 못 구한다. 그래서 `US_VOL` 에
@@ -144,8 +152,11 @@ FAIL_PCT_MAX = 20
 SECTOR = US_SECTORS | {t: k for k, v in US_THEMES.items() for t in v}
 
 
-def quote(ticker: str, key: str) -> tuple[float, str] | None:
-    """(간밤 등락률 %, 그 값이 속한 미국 장 날짜). 못 받으면 None.
+def quote(ticker: str, key: str) -> tuple[float, str, float, float | None] | None:
+    """(간밤 등락률 %, 그 값이 속한 미국 장 날짜, 종가 c, 전일 종가 pc). 못 받으면 None.
+
+    ⭐ `dp` 는 정확히 `c / pc − 1` 이다(2026-09-23 SPY·NVDA 실측). 종가 둘은 `quotes` 에 남겨
+    연휴 뒤 누적 등락을 만드는 데 쓴다(머리말 '받은 종가는 전부 남긴다').
 
     ⭐ 날짜를 함께 돌려주는 이유는 **지수와 종목이 같은 날인지 맞춰 보기 위해서**다.
     아래 `spx_change` 주석 참고 — 다른 날끼리 빼면 초과분이 아니라 잡음이 된다.
@@ -174,11 +185,12 @@ def quote(ticker: str, key: str) -> tuple[float, str] | None:
         return None
     # `t` 는 마지막 체결의 UTC 초. 미 동부로 옮겨 날짜만 본다(정규장은 한 날짜 안에 있다).
     day = datetime.fromtimestamp(int(d["t"]), timezone.utc).astimezone(ET).strftime("%Y-%m-%d")
-    return float(d["dp"]), day
+    pc = float(d["pc"]) if d.get("pc") else None
+    return float(d["dp"]), day, float(d["c"]), pc
 
 
-def spx_change(key: str) -> tuple[float, str]:
-    """S&P500 간밤 등락률(%)과 그 날짜. 종목의 초과분을 내는 데 쓴다.
+def spx_change(key: str) -> tuple[float, str, float, float | None]:
+    """S&P500 간밤 등락률(%)과 그 날짜(+ 종가·전일 종가). 종목의 초과분을 내는 데 쓴다.
 
     ⚠️⚠️ **야후(^GSPC)로 되돌리지 말 것.** 2026-08-30 에 두 가지로 틀렸다.
 
@@ -319,25 +331,29 @@ def night_state(today: date, session_day: str, holidays: Callable[[], list[dict]
     return "holiday", ko
 
 
-def write_day(db, row: dict) -> None:
+def write_day(db, row: dict) -> tuple[str, ...] | None:
     """그날치 한 줄을 쓴다. ⭐ 종목이 0개인 날에도, 미장이 쉰 날에도 반드시 쓴다(아래 main 주석).
 
-    ⚠️ 마이그레이션 083 전에는 `us_session`·`us_holiday` 칸이 없다. 그때는 둘을 빼고 한 번 더
-    쓴다. 휴장 표기는 빠지지만 날짜와 지수는 남아 화면이 어제 줄을 집지 않는다.
+    ⚠️ 칸이 없는 옛 표에도 쓸 수 있게 **새 칸부터 하나씩 빼며** 다시 쓴다.
+         084 전  `quotes` 가 없다 → 그것만 빼고 쓴다(종가 기록만 빠진다)
+         083 전  `us_session`·`us_holiday` 도 없다 → 셋 다 빼고 쓴다(휴장 표기도 빠진다)
+       어느 경우든 날짜와 지수는 남아 화면이 어제 줄을 집지 않는다.
+    돌려주는 값은 빼고 쓴 칸들(다 썼으면 빈 튜플), 아예 못 썼으면 None 이다.
+    ⚠️ 083 이 있는데 084 만 없을 때 셋을 한꺼번에 빼면 휴장 표기까지 잃는다. 그래서 한 칸씩이다.
     """
-    try:
-        db.table("kr_preview_day").upsert(row, on_conflict="date").execute()
-        return
-    except Exception as e:  # noqa: BLE001
-        first = e
-    legacy = {k: v for k, v in row.items() if k not in ("us_session", "us_holiday")}
-    try:
-        db.table("kr_preview_day").upsert(legacy, on_conflict="date").execute()
-        print(f"[경고] 휴장 칸 없이 썼습니다: {first} (마이그레이션 083 을 아직 안 돌렸다면 정상)")
-    except Exception as e:  # noqa: BLE001
-        # 마이그레이션 063 전에는 표가 없다. 그때는 종목 줄이 예전처럼 지수를 들고 있고
-        # 화면도 거기서 꺼내므로, 이것 때문에 스텝을 실패로 떨어뜨리지 않는다.
-        print(f"[경고] kr_preview_day 저장 실패: {e} (마이그레이션 063 을 아직 안 돌렸다면 정상)")
+    errors = []
+    for drop in ((), ("quotes",), ("quotes", "us_session", "us_holiday")):
+        try:
+            db.table("kr_preview_day").upsert({k: v for k, v in row.items() if k not in drop}, on_conflict="date").execute()
+            if drop:
+                print(f"[경고] {'·'.join(drop)} 칸 없이 썼습니다: {errors[0]} (마이그레이션 083·084 를 아직 안 돌렸다면 정상)")
+            return drop
+        except Exception as e:  # noqa: BLE001
+            errors.append(e)
+    # 마이그레이션 063 전에는 표가 없다. 그때는 종목 줄이 예전처럼 지수를 들고 있고
+    # 화면도 거기서 꺼내므로, 이것 때문에 스텝을 실패로 떨어뜨리지 않는다.
+    print(f"[경고] kr_preview_day 저장 실패: {errors[-1]} (마이그레이션 063 을 아직 안 돌렸다면 정상)")
+    return None
 
 
 def main() -> None:
@@ -364,7 +380,7 @@ def main() -> None:
     if not key:
         raise SystemExit("[중단] FINNHUB_API_KEY 가 없습니다")
 
-    spx, spx_day = spx_change(key)
+    spx, spx_day, spx_c, spx_pc = spx_change(key)
     # ⚠️ 둘을 헷갈리지 말 것. `spx` 는 초과분을 내는 **계산용**(SPY)이고 `shown` 은
     # 히어로가 내보이는 **화면용**(지수)이다. 표에는 화면용이 들어간다.
     shown = index_change(spx_day)
@@ -397,6 +413,9 @@ def main() -> None:
 
     dps: dict[str, float] = {}
     days: dict[str, int] = {}
+    # ⭐ 받은 것은 문턱과 상관없이 전부 남긴다(머리말). SPY 도 넣는다 — 연휴 뒤 초과분을 낼 때
+    #    지수 몫도 누적이어야 한다.
+    quotes: dict[str, dict] = {SPX_PROXY: {"session": spx_day, "c": spx_c, "pc": spx_pc}}
     # 지수까지 세어 한 창에 담는다 — 71번째가 되면 429 가 난다.
     for i, t in enumerate(TICKERS, start=1):
         if i % BATCH == 0:
@@ -405,6 +424,7 @@ def main() -> None:
         v = quote(t, key)
         if v is not None:
             dps[t], day = v[0], v[1]
+            quotes[t] = {"session": day, "c": v[2], "pc": v[3]}
             days[day] = days.get(day, 0) + 1
 
     fail_pct = (len(TICKERS) - len(dps)) / len(TICKERS) * 100
@@ -549,9 +569,11 @@ def main() -> None:
     day_row = {"date": today.isoformat(), "spx_dp": round(shown, 2), "movers": len({r["ticker"] for r in kept}),
                # ⚠️ us_holiday 를 None 으로 **적어서** 보낸다. 같은 날 앞선 실행이 휴장으로 썼다면
                #    upsert 가 빠진 칸은 그대로 두므로, 안 적으면 휴장 표기가 남는다.
-               "us_session": spx_day, "us_holiday": None}
-    write_day(db, day_row)
-    print(f"[저장] 그날치 한 줄 · S&P {shown:+.2f}% · 미국 {day_row['movers']}종목 · 세션 {spx_day}")
+               "us_session": spx_day, "us_holiday": None, "quotes": quotes}
+    dropped = write_day(db, day_row)
+    if dropped is not None:
+        kept_quotes = "빠짐" if "quotes" in dropped else f"{len(quotes)}개"
+        print(f"[저장] 그날치 한 줄 · S&P {shown:+.2f}% · 미국 {day_row['movers']}종목 · 세션 {spx_day} · 종가 {kept_quotes}")
 
 
 if __name__ == "__main__":
