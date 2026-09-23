@@ -11,6 +11,7 @@ import { EventsCalendar } from "../kadera/EventsCalendar";
 import { ExpandableList } from "../kadera/ExpandableList";
 import { Avatar, DeltaPp, Pill, RankBadge, RankDelta } from "../kadera/parts";
 import { SectionHead } from "../kadera/SectionHead";
+import { SectionIntro } from "../SectionIntro";
 import TimeAgo from "../kadera/TimeAgo";
 import { timeAgoInitial } from "../kadera/time-ago";
 import { AiMark, C, Icon, MONO, R } from "../ui";
@@ -337,9 +338,14 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
         </div>
       </section>
 
+      {/* 구간 제목 셋(01·02·03) — 내부자 리포트·카더라와 같은 박자. 시트 여섯 장이 한 줄로 이어지면 어디까지가
+          한 이야기인지 안 보인다(2026-09-24 지적). 카드 순서는 그대로 두고 이웃한 두 장씩 묶었다.
+          ⚠️ 구간 제목이 h2 라 아래 시트 머리는 h3(SectionHead 기본값)다. 2층으로 도로 올리지 말 것. */}
+      <SectionIntro n={1} title="무엇이 화제인가" />
+
       {/* ── 요즘 무슨 얘기(LLM) ── 이 화면의 본론. 파이프라인이 테마마다 하루 한 번 써 둔다(generate_theme_briefs.py). */}
       <section className="hz-sheet">
-        <SectionHead icon="forum" title="요즘 도는 얘기" note={d.brief ? `${fmtKoDate(d.brief.date)} 기준` : undefined} desc="최근 3일 채널 글을 읽고 정리한 것입니다." level={2} />
+        <SectionHead icon="forum" title="요즘 도는 얘기" note={d.brief ? `${fmtKoDate(d.brief.date)} 기준` : undefined} desc="최근 3일 채널 글을 읽고 정리한 것입니다." />
         {d.brief?.brief ? (
           <div style={{ padding: "16px 22px 20px" }}>
             {/* 두 문단(파이프라인이 빈 줄로 가른다). 첫 문단은 가장 크게 오간 이야기, 둘째는 그 밖의 이야기. */}
@@ -375,7 +381,6 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
           title="이 테마의 주인공"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
           desc="상위 열 종목과 채널이 말한 이유입니다."
-          level={2}
         />
         {d.loadFailed ? (
           <Empty>집계를 지금 불러오지 못했습니다.</Empty>
@@ -437,12 +442,14 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
         )}
       </section>
 
+      <SectionIntro n={2} title="지나간 일과 다가올 일" />
+
       {/* ── 까닭 이력 ── 이 테마 종목이 움직인 날마다 채널이 말한 이유. 위 추이의 점과 같은 날들이다.
           한 주씩 넘겨 본다(ReasonWeeks) — 30일치를 다 세우면 카드가 너무 길다(2026-09-21). */}
       <section className="hz-sheet">
         {d.reasons.length === 0 ? (
           <>
-            <SectionHead icon="history" title="등락의 이유" desc="이 테마 종목이 크게 움직인 날, 그날 채널이 말한 이유입니다." level={2} />
+            <SectionHead icon="history" title="등락의 이유" desc="이 테마 종목이 크게 움직인 날, 그날 채널이 말한 이유입니다." />
             <Empty>최근 {THEME_TREND_DAYS}일 사이 이 테마 종목에 붙은 이유가 없습니다. 이유는 등락이 큰 날에만 만듭니다.</Empty>
           </>
         ) : (
@@ -459,7 +466,6 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
           title="다가오는 일정"
           note="앞으로 5주"
           desc="채널이 날짜를 짚어 말한 이 테마 종목의 일정입니다. 확정 일정은 공시로 확인하십시오."
-          level={2}
         />
         {dayEvents.length === 0 ? (
           <Empty>앞으로 5주 안에 날짜가 짚인 이 테마 종목의 일정이 아직 없습니다.</Empty>
@@ -498,10 +504,12 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
         )}
       </section>
 
+      <SectionIntro n={3} title="채널 글과 다른 테마" />
+
       {/* ── 발췌 ── 최근 사흘 조회가 많은 글. 카더라 트렌딩 메시지와 같은 패널 격자·말풍선(2026-09-21 "카더라 포맷 따오기") —
           원본이 텔레그램 메시지라 그 매체의 형태를 유지하면 "우리가 센 수치가 아니라 누가 한 말"이 형태만으로 읽힌다. */}
       <section className="hz-sheet">
-        <SectionHead icon="format_quote" title="채널에서 오간 글" note="최근 3일 · 조회순" desc="이 테마 종목이 언급된 글 중 많이 읽힌 것입니다." level={2} />
+        <SectionHead icon="format_quote" title="채널에서 오간 글" note="최근 3일 · 조회순" desc="이 테마 종목이 언급된 글 중 많이 읽힌 것입니다." />
         {!d.brief || d.brief.excerpts.length === 0 ? (
           <Empty>{d.brief ? "최근 3일 사이 이 테마 종목이 언급된 글을 찾지 못했습니다." : "요약과 함께 매일 저녁 실행 뒤에 채워집니다."}</Empty>
         ) : (
