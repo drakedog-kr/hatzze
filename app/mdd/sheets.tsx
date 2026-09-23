@@ -8,7 +8,7 @@ import { C, Icon, MONO, R } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
 import { fmtPct, benchName, fmtDur, fmtDayCount, fmtYm, DOWN, UP, DOWN_BAR, UP_BAR, UP_BAR_SOFT } from "./shared";
 import type { ThemeCmp, AttributionData } from "./shared";
-import { Sheet, Foot, AbsentSheet, StatCell, MeterRow } from "./sheet";
+import { Sheet, AbsentSheet, StatCell, MeterRow } from "./sheet";
 
 /* ── 원인 분해 ─────────────────────────────────────────────────── */
 export function Attribution({
@@ -110,7 +110,9 @@ export function Attribution({
  * 사건만)이고 아래는 `analysis.depthBuckets`(−20% 이상 전부)다. 낙폭이 깊은 종목일수록
  * 위쪽 표본이 급격히 줄어드는데(SK하이닉스 −46%면 13건 중 2건), 아래쪽 분포까지 같이
  * 줄면 "이 정도 하락이 얼마나 흔한가"를 아예 못 그린다. 그래서 아래는 서버가 따로
- * 세어 보낸다(lib/mdd.ts 의 depthHistogram 주석 참고). 창이 다르니 화면에도 밝힌다.
+ * 세어 보낸다(lib/mdd.ts 의 depthHistogram 주석 참고). 창이 다른 것을 바닥 각주로 밝혔었는데, 바닥 각주는
+ * 두 시트 다 걷었다(2026-09-24 지적 — 설명이 많아 복잡해 보인다). 남긴 한 줄은 '지금 낙폭이 어느 구간인가'뿐이고
+ * 중앙값 바로 아래에 둔다.
  */
 export function Recovery({ a, periodLabel }: { a: MddAnalysis; periodLabel: string }) {
   const r = a.recovery!;
@@ -139,17 +141,27 @@ export function Recovery({ a, periodLabel }: { a: MddAnalysis; periodLabel: stri
       />
 
       <div style={{ padding: "20px 22px", display: "flex", flexDirection: "column", gap: 16, borderBottom: `1px solid ${C.line}` }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
-          <strong style={{ fontFamily: MONO, fontSize: "var(--fs-34)", fontWeight: 800, letterSpacing: "-.035em", lineHeight: 1, color: r.recoveredCount > 0 ? C.ink : DOWN }}>
-            {r.recoveredCount > 0 ? fmtDur(r.medianDays!) : fmtDayCount(sincePeak)}
-          </strong>
-          <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2, wordBreak: "keep-all" }}>
-            {r.recoveredCount === 0
-              ? "째 회복 못 함 · 이만큼 깊게 빠진 뒤 되찾은 전례가 없습니다"
-              : hasRange
-                ? "중앙값" // 범위(최소~최대)는 바로 아래 막대 양 끝이 적는다(2026-09-23 — 같은 말이 두 번이었다)
-                : "고점을 되찾은 전례는 이 한 번뿐입니다"}
-          </span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
+            <strong style={{ fontFamily: MONO, fontSize: "var(--fs-34)", fontWeight: 800, letterSpacing: "-.035em", lineHeight: 1, color: r.recoveredCount > 0 ? C.ink : DOWN }}>
+              {r.recoveredCount > 0 ? fmtDur(r.medianDays!) : fmtDayCount(sincePeak)}
+            </strong>
+            <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2, wordBreak: "keep-all" }}>
+              {r.recoveredCount === 0
+                ? "째 회복 못 함 · 이만큼 깊게 빠진 뒤 되찾은 전례가 없습니다"
+                : hasRange
+                  ? "중앙값" // 범위(최소~최대)는 바로 아래 막대 양 끝이 적는다(2026-09-23 — 같은 말이 두 번이었다)
+                  : "고점을 되찾은 전례는 이 한 번뿐입니다"}
+            </span>
+          </div>
+          {/* 바닥 각주였던 한 줄을 여기로 올렸다(2026-09-24). 글꼴은 리스크 프로필 타일의 머리 문장
+              ("큰 하락 5번 모두 코스피도 함께 빠졌습니다")과 같다 — 13px · inkSoft · 숫자만 굵게. */}
+          {here && here.count > 0 && (
+            <p style={{ margin: 0, fontSize: "var(--fs-13)", lineHeight: 1.7, color: C.inkSoft, wordBreak: "keep-all" }}>
+              지금 낙폭(<b style={{ fontWeight: 800, color: C.ink }}>{fmtPct(a.currentDd)}</b>)은 {periodLabel}{" "}
+              <b style={{ fontWeight: 800, color: C.ink }}>{here.count}번</b>이던 구간에 들어 있습니다
+            </p>
+          )}
         </div>
         {hasRange && <RecoveryRange min={r.minDays!} median={r.medianDays!} max={r.maxDays!} />}
       </div>
@@ -176,11 +188,6 @@ export function Recovery({ a, periodLabel }: { a: MddAnalysis; periodLabel: stri
           );
         })}
       </div>
-      <Foot>
-        {here && here.count > 0
-          ? `지금 낙폭(${fmtPct(a.currentDd)})은 ${periodLabel} ${here.count}번이던 구간에 들어 있습니다`
-          : `구간별 횟수는 −20% 이상 하락 ${buckets.reduce((s, b) => s + b.count, 0)}건을 세고, 위 중앙값은 문턱과 상관없이 지금(${fmtPct(a.currentDd)})보다 깊었던 ${r.similarCount}건으로 냅니다`}
-      </Foot>
     </Sheet>
   );
 }
@@ -393,7 +400,8 @@ export function TopDrawdowns({ eps }: { eps: Episode[] }) {
       <div className="hz-thead mdd-top-row">
         <span>구간</span>
         <span>낙폭</span>
-        <span style={{ textAlign: "right" }}>회복</span>
+        {/* '회복까지' — 이 열이 고점에서 되찾기까지 걸린 날수라는 걸 머리가 말한다. 그 말을 하던 바닥 각주는 걷었다(2026-09-24). */}
+        <span style={{ textAlign: "right" }}>회복까지</span>
         <span className="mdd-top-status" style={{ textAlign: "right" }}>
           상태
         </span>
@@ -434,11 +442,6 @@ export function TopDrawdowns({ eps }: { eps: Episode[] }) {
           </span>
         </div>
       ))}
-      {/* 각주는 **한 줄 안에** 둔다 — 두 줄이 되면 이 시트의 바닥 띠만 두꺼워져 옆
-          시트(회복까지 걸린 기간)와 밑단이 어긋난다. 지금 낙폭은 히어로가 이미 크게 적는다. */}
-      <Foot>
-        막대는 {eps.length}개 구간 공통 눈금(최대 {fmtPct(-worst)}) · 회복은 고점에서 되찾기까지 걸린 날수입니다
-      </Foot>
     </Sheet>
   );
 }
