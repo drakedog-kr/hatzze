@@ -1,5 +1,6 @@
 /**
- * "한 번만 보여 주는 안내 쪽지"의 기억 장치. 내부자 리포트의 TapHint 와 테마 지도의 MapHint 가 같이 쓴다.
+ * "한 번만 보여 주는 안내 쪽지"의 기억 장치. 내부자 리포트의 TapHint 와 테마 지도의 MapHint,
+ * 명절 인사 팝업(app/HolidayGreeting.tsx)이 같이 쓴다.
  *
  * localStorage 에 `prefix + id` 로 '봤음'을 적고, useSyncExternalStore 가 읽을 스토어를 id 마다 하나씩
  * 만든다. 왜 이 모양인지(서버는 늘 '감춤', 구독 직후 스스로 한 번 알림, 스토어는 id 당 하나)는

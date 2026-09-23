@@ -20,6 +20,7 @@ import Footer from "./Footer";
 import { NewBadge } from "./VersionBadge";
 import GaEvents from "./GaEvents";
 import { TipTap } from "./TipTap";
+import { HolidayGreeting } from "./HolidayGreeting";
 
 // sub 는 본문 헤더의 페이지 부제다(목업이 사이드바 로고 밑에 있던 문장을 여기로 옮겼다).
 // 사이드바 항목에는 안 쓰이고 PageHeader 만 읽는다.
@@ -1922,6 +1923,8 @@ export default function AppShell({ children, themeNav = THEME_PUBLIC }: { childr
             두었으므로(버튼 33 · 띠 34) 여기 순서는 읽기 좋은 대로 둔다. */}
         <ToTop scroller={mainRef} show={pastFold} />
         <PcHint />
+        {/* 명절 인사 팝업. 네이티브 <dialog> 의 맨 위 층에 뜨므로 자리·z-index 와 무관하다. 기간 밖이면 아무것도 안 그린다. */}
+        <HolidayGreeting />
       </div>
       </div>
     </div>
