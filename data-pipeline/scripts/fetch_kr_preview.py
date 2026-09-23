@@ -39,7 +39,8 @@ KRX 를 안 쓰므로 08시 공표를 기다릴 이유가 없다. 지표 블록 
 세션들의 **누적** 등락이어야 한다. 백테스트가 그렇게 쟀다. 그런데 quote 의 `dp` 는 마지막
 하루치뿐이고, 핀허브 무료는 과거 시세를 안 줘서 나중에 되받을 수 없다. 그래서 매일 아침
 받은 종가(`c`)·전일 종가(`pc`)·세션 날짜를 문턱과 상관없이 전부 그날치 한 줄(`quotes`)에
-남긴다. 연휴 뒤 누적은 "마지막 종가 ÷ 연휴 첫 세션의 전일 종가" 로 이 기록에서 만든다.
+남긴다. 연휴 뒤 누적은 "마지막 종가 ÷ 연휴 첫 세션의 전일 종가" 로 이 기록에서 만든다
+(`accumulate` · 첫 세션은 그날치 한 줄의 `us_from` 에 남아 화면이 "연휴 동안" 으로 적는다).
 
 ## 평소 폭은 왜 사전에 박혀 있나
 
@@ -211,8 +212,11 @@ def spx_change(key: str) -> tuple[float, str, float, float | None]:
     return q
 
 
-def index_change(session_day: str) -> float | None:
+def index_change(session_day: str, from_day: str | None = None) -> float | None:
     """**화면에 내보일** S&P500 지수(^GSPC) 등락률(%). 못 믿을 값이면 None.
+
+    `from_day` 를 주면 그 세션부터 `session_day` 까지의 **누적**이다(연휴 뒤 · `accumulate`).
+    안 주면 `session_day` 하루치다. 어느 쪽이든 기준은 "첫 세션 바로 앞 칸의 종가" 다.
 
     ⚠️⚠️ **왜 SPY 로 안 되나 — 계산과 화면은 쓰임이 다르다.**
 
@@ -235,7 +239,8 @@ def index_change(session_day: str) -> float | None:
     둘 중 하나라도 어긋나면 None 을 돌려주고 호출한 쪽이 SPY 로 간다. 이 화면의 정확도는
     소수점 둘째 자리에서 갈리므로, **틀린 값보다 0.02%p 덜 정확한 값이 낫다.**
     """
-    url = "https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?range=10d&interval=1d"
+    # ⚠️ 1mo 다. 10d 는 설 연휴(평일 사흘 + 주말)처럼 창이 길면 첫 세션 앞 칸이 잘릴 수 있다.
+    url = "https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?range=1mo&interval=1d"
     try:
         # ⚠️ User-Agent 가 없으면 야후가 429 를 준다.
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -255,14 +260,17 @@ def index_change(session_day: str) -> float | None:
     if len(valid) < 2:
         print("[경고] 지수 종가가 두 개도 안 됩니다 — 화면 숫자는 " + SPX_PROXY + " 로 갑니다")
         return None
-    last, prev = valid[-1], valid[-2]
+    last = valid[-1]
     if rows[last][0] != session_day:
         print(f"[경고] 지수는 {rows[last][0]} 인데 종목은 {session_day} 입니다 — 화면 숫자는 {SPX_PROXY} 로 갑니다")
         return None
-    if last - prev != 1:
-        print(f"[경고] 지수 {rows[last][0]} 바로 앞 칸이 비었습니다 — 이틀치가 됩니다. 화면 숫자는 {SPX_PROXY} 로 갑니다")
+    # 기준 칸은 첫 세션의 **바로 앞 칸**이다. 비어 있으면 그 앞 날까지 세는 셈이라 버린다.
+    # (하루치면 첫 세션 = session_day 라 예전의 "바로 앞 칸이 비었나" 검사와 같다.)
+    first = next((i for i, (d, _) in enumerate(rows) if d == (from_day or session_day)), None)
+    if first is None or first == 0 or rows[first - 1][1] is None:
+        print(f"[경고] 지수 {from_day or session_day} 바로 앞 칸이 없거나 비었습니다 — 화면 숫자는 {SPX_PROXY} 로 갑니다")
         return None
-    return (rows[last][1] / rows[prev][1] - 1) * 100
+    return (rows[last][1] / rows[first - 1][1] - 1) * 100
 
 
 def us_holidays(key: str) -> list[dict] | None:
@@ -289,6 +297,11 @@ def us_holidays(key: str) -> list[dict] | None:
     return data
 
 
+def last_open_day(today: date) -> date:
+    """오늘 전의 마지막 국장 개장일. 미장 세션의 창([이날, 어제])이 여기서 시작한다."""
+    return max(krx_trading_days(today - timedelta(days=14), today - timedelta(days=1)))
+
+
 def night_state(today: date, session_day: str, holidays: Callable[[], list[dict] | None]) -> tuple[str, str | None]:
     """오늘 아침 카드가 볼 미장 세션이 있었나.
 
@@ -311,7 +324,7 @@ def night_state(today: date, session_day: str, holidays: Callable[[], list[dict]
     ⚠️ KRX_HOLIDAYS 가 틀려도 거짓 휴장은 안 나온다. 표에 없는 국장 휴일은 P 를 늦출 뿐이고
        (그러면 세션이 있다고 보기 쉬워진다), 휴장이 되려면 그 사이 미장 휴일까지 있어야 한다.
     """
-    prev = max(krx_trading_days(today - timedelta(days=14), today - timedelta(days=1)))
+    prev = last_open_day(today)
     if session_day >= prev.isoformat():
         return "open", None
     got = holidays()
@@ -331,22 +344,65 @@ def night_state(today: date, session_day: str, holidays: Callable[[], list[dict]
     return "holiday", ko
 
 
+def accumulate(prev: date, quotes: dict[str, dict], stored: list[dict]) -> tuple[str, dict[str, float], list[str]] | None:
+    """연휴 뒤 누적 등락. 창 안 세션이 하나뿐이면(평소) None.
+
+    (첫 세션, {티커: 누적 등락 %}, 뺀 티커) 를 돌려준다. SPY 도 결과에 들어 있다.
+
+      quotes  오늘 아침 받은 것 {티커: {session, c, pc}}
+      stored  마지막 개장일 **다음 날부터 어제까지**의 그날치 줄들(각 줄의 `quotes`)
+
+    ⭐ 기준은 백테스트와 같다. 창은 [마지막 개장일, 어제](미 동부)이고, 누적은
+       "오늘 받은 종가 ÷ 창 첫 세션의 전일 종가 − 1" 이다. 중간 기록이 빠져도 양 끝만 있으면 맞다.
+
+      월 09-28  창 [09-23, 09-27] · 09-24 줄에 세션 09-23 → 09-23·24·25 누적
+      월 09-07  창 [09-04, 09-06] · 토·일 줄의 세션도 09-04 = 오늘 세션 → None(하루치)
+      화 09-22  창 [09-21, 09-21] · 사이 줄이 없다 → None
+
+    ⚠️ 첫 세션은 **SPY 로** 정한다. 종목마다 따로 정하면 창이 서로 달라져 초과분(종목 − β×지수)이
+       어긋난다. 그래서 SPY 와 첫 세션이 다르거나(그날 못 받았다) 오늘 세션이 다른 종목은 뺀다.
+       하루치로 섞어 넣으면 누적 지수와 빼게 되어 틀린 카드가 선다.
+    """
+    firsts: dict[str, dict] = {}
+    for row in stored:
+        for t, q in (row.get("quotes") or {}).items():
+            ses = str(q.get("session") or "")
+            if ses < prev.isoformat() or not q.get("pc"):
+                continue
+            if t not in firsts or ses < firsts[t]["session"]:
+                firsts[t] = q
+    spy_first, spy_now = firsts.get(SPX_PROXY), quotes.get(SPX_PROXY)
+    if not spy_first or not spy_now or spy_first["session"] >= spy_now["session"]:
+        return None
+    start, last = spy_first["session"], spy_now["session"]
+    out: dict[str, float] = {}
+    skipped: list[str] = []
+    for t, q in quotes.items():
+        f = firsts.get(t)
+        if not f or f["session"] != start or q.get("session") != last or not q.get("c"):
+            skipped.append(t)
+            continue
+        out[t] = (float(q["c"]) / float(f["pc"]) - 1) * 100
+    return start, out, skipped
+
+
 def write_day(db, row: dict) -> tuple[str, ...] | None:
     """그날치 한 줄을 쓴다. ⭐ 종목이 0개인 날에도, 미장이 쉰 날에도 반드시 쓴다(아래 main 주석).
 
     ⚠️ 칸이 없는 옛 표에도 쓸 수 있게 **새 칸부터 하나씩 빼며** 다시 쓴다.
-         084 전  `quotes` 가 없다 → 그것만 빼고 쓴다(종가 기록만 빠진다)
+         085 전  `us_from` 이 없다 → 그것만 빼고 쓴다(연휴 표기만 빠진다)
+         084 전  `quotes` 도 없다 → 그것까지 빼고 쓴다(종가 기록도 빠진다)
          083 전  `us_session`·`us_holiday` 도 없다 → 셋 다 빼고 쓴다(휴장 표기도 빠진다)
        어느 경우든 날짜와 지수는 남아 화면이 어제 줄을 집지 않는다.
     돌려주는 값은 빼고 쓴 칸들(다 썼으면 빈 튜플), 아예 못 썼으면 None 이다.
-    ⚠️ 083 이 있는데 084 만 없을 때 셋을 한꺼번에 빼면 휴장 표기까지 잃는다. 그래서 한 칸씩이다.
+    ⚠️ 083 이 있는데 084·085 만 없을 때 한꺼번에 빼면 휴장 표기까지 잃는다. 그래서 새 칸부터 차례로다.
     """
     errors = []
-    for drop in ((), ("quotes",), ("quotes", "us_session", "us_holiday")):
+    for drop in ((), ("us_from",), ("us_from", "quotes"), ("us_from", "quotes", "us_session", "us_holiday")):
         try:
             db.table("kr_preview_day").upsert({k: v for k, v in row.items() if k not in drop}, on_conflict="date").execute()
             if drop:
-                print(f"[경고] {'·'.join(drop)} 칸 없이 썼습니다: {errors[0]} (마이그레이션 083·084 를 아직 안 돌렸다면 정상)")
+                print(f"[경고] {'·'.join(drop)} 칸 없이 썼습니다: {errors[0]} (마이그레이션 083~085 를 아직 안 돌렸다면 정상)")
             return drop
         except Exception as e:  # noqa: BLE001
             errors.append(e)
@@ -445,6 +501,42 @@ def main() -> None:
         odd = {d: n for d, n in days.items() if d != stock_day}
         print(f"[경고] 날짜가 다른 종목이 섞였습니다: {odd} (다수 {stock_day} 기준으로 갑니다)")
 
+    # ── 연휴 뒤 누적 ───────────────────────────────────────────────────────
+    #
+    # ⭐ 국장이 쉬는 동안 미장이 여러 번 열렸으면 그 세션들을 누적한다(accumulate 주석).
+    #    평소엔 사이 줄이 없거나 같은 세션이라 아무것도 안 바뀐다. `us_from` 이 `spx_day` 보다
+    #    앞이면 화면이 "연휴 동안" 으로 적는다.
+    db = get_client()
+    prev = last_open_day(today)
+    us_from = spx_day
+    try:
+        stored = (
+            db.table("kr_preview_day").select("date,quotes")
+            .gt("date", prev.isoformat()).lt("date", today.isoformat()).execute().data
+        ) or []
+    except Exception as e:  # noqa: BLE001
+        # 084 전에는 quotes 칸이 없다. 그러면 예전처럼 하루치로 간다.
+        print(f"[경고] 지난 종가를 못 읽었습니다({e}) — 하루치로 갑니다")
+        stored = []
+    acc = accumulate(prev, quotes, stored)
+    if acc:
+        us_from, cum, skipped = acc
+        spx = cum.pop(SPX_PROXY)
+        shown = index_change(spx_day, us_from)
+        if shown is None:
+            shown = spx
+        dps = {t: cum[t] for t in dps if t in cum}
+        print(f"[연휴] {us_from}~{spx_day} 세션 누적 · {SPX_PROXY} {spx:+.2f}% (계산용) · 화면 숫자 {shown:+.2f}% · {len(dps)}종목")
+        if skipped:
+            print(f"[경고] 창 첫 세션 기록이 없어 뺀 종목: {', '.join(sorted(skipped))}")
+        if us_from > prev.isoformat():
+            # 첫 세션이 마지막 개장일보다 늦다. 그날 미장이 쉬었거나, 그 아침 실행이 실패해
+            # 기록이 빠진 것이다. 뒤쪽이면 누적이 연휴 일부만 덮는다.
+            print(f"[경고] 창 첫 세션이 {us_from} 인데 마지막 개장일은 {prev} 입니다 — 그 사이 기록이 빠졌을 수 있습니다")
+        miss_pct = (len(TICKERS) - len(dps)) / len(TICKERS) * 100
+        if miss_pct > FAIL_PCT_MAX:
+            raise SystemExit(f"[중단] 누적을 낼 수 없는 종목이 {miss_pct:.0f}% 입니다 — 반쪽짜리 카드는 '조용한 날'과 구별이 안 됩니다")
+
     # 문턱을 넘은 종목만 남긴다.
     #
     # ⚠️⚠️ **방향은 등락률이 아니라 초과분의 부호로 정한다.** 사전의 up/down 이 그렇게
@@ -515,7 +607,6 @@ def main() -> None:
     if not rows:
         print("[결과] 간밤 크게 움직인 종목이 없습니다 — 오늘은 빈 화면입니다")
 
-    db = get_client()
     # 종목 코드와 한글 표기는 우리 표에서 채운다. 사전은 이름만 갖고 있다.
     names = sorted({r["stock_name"] for r in rows})
     codes: dict[str, str] = {}
@@ -569,7 +660,9 @@ def main() -> None:
     day_row = {"date": today.isoformat(), "spx_dp": round(shown, 2), "movers": len({r["ticker"] for r in kept}),
                # ⚠️ us_holiday 를 None 으로 **적어서** 보낸다. 같은 날 앞선 실행이 휴장으로 썼다면
                #    upsert 가 빠진 칸은 그대로 두므로, 안 적으면 휴장 표기가 남는다.
-               "us_session": spx_day, "us_holiday": None, "quotes": quotes}
+               "us_session": spx_day, "us_holiday": None, "quotes": quotes,
+               # 누적이 시작된 세션. us_session 과 같으면 하루치, 앞이면 화면이 "연휴 동안" 이다.
+               "us_from": us_from}
     dropped = write_day(db, day_row)
     if dropped is not None:
         kept_quotes = "빠짐" if "quotes" in dropped else f"{len(quotes)}개"

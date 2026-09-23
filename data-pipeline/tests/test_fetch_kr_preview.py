@@ -6,7 +6,7 @@ from datetime import date
 
 import pytest
 
-from fetch_kr_preview import night_state
+from fetch_kr_preview import accumulate, night_state
 
 HOLIDAYS = [
     {"eventName": "Labor Day", "atDate": "2026-09-07", "tradingHour": ""},
@@ -71,3 +71,65 @@ def test_unknown_holiday_name_still_marks_holiday():
     got = night_state(date(2026, 9, 8), "2026-09-04",
                       lambda: [{"eventName": "Something New", "atDate": "2026-09-07", "tradingHour": ""}])
     assert got == ("holiday", "미국 공휴일")
+
+
+# ── accumulate: 연휴 뒤 누적 ─────────────────────────────────────────────
+
+def q(session, c, pc):
+    return {"session": session, "c": c, "pc": pc}
+
+
+def test_chuseok_accumulates_three_sessions():
+    # 09-24 줄의 pc 가 09-22 종가 — 추석 누적의 기준점이다.
+    stored = [
+        {"date": "2026-09-24", "quotes": {"SPY": q("2026-09-23", 100, 98), "NVDA": q("2026-09-23", 50, 49)}},
+        {"date": "2026-09-25", "quotes": {"SPY": q("2026-09-24", 101, 100), "NVDA": q("2026-09-24", 52, 50)}},
+        {"date": "2026-09-26", "quotes": {"SPY": q("2026-09-25", 103, 101), "NVDA": q("2026-09-25", 55, 52)}},
+        {"date": "2026-09-27", "quotes": {"SPY": q("2026-09-25", 103, 101), "NVDA": q("2026-09-25", 55, 52)}},
+    ]
+    today = {"SPY": q("2026-09-25", 103, 101), "NVDA": q("2026-09-25", 55, 52)}
+    start, cum, skipped = accumulate(date(2026, 9, 23), today, stored)
+    assert start == "2026-09-23" and skipped == []
+    assert cum["SPY"] == pytest.approx((103 / 98 - 1) * 100)
+    assert cum["NVDA"] == pytest.approx((55 / 49 - 1) * 100)
+
+
+def test_middle_run_missing_still_exact():
+    # 09-25 아침 실행이 실패해도 양 끝(09-24 줄의 pc · 오늘 c)만 있으면 같은 값이다.
+    stored = [{"date": "2026-09-24", "quotes": {"SPY": q("2026-09-23", 100, 98)}}]
+    start, cum, _ = accumulate(date(2026, 9, 23), {"SPY": q("2026-09-25", 103, 101)}, stored)
+    assert start == "2026-09-23" and cum["SPY"] == pytest.approx((103 / 98 - 1) * 100)
+
+
+def test_monday_after_holiday_accumulates_friday_and_monday():
+    # 10-05(월) 대체공휴일 뒤 10-06: 창 [10-02, 10-05] 에 금·월 두 세션.
+    stored = [{"date": d, "quotes": {"SPY": q("2026-10-02", 100, 99)}} for d in ("2026-10-03", "2026-10-04", "2026-10-05")]
+    start, _, _ = accumulate(date(2026, 10, 2), {"SPY": q("2026-10-05", 102, 100)}, stored)
+    assert start == "2026-10-02"
+
+
+@pytest.mark.parametrize(
+    "prev, stored, today",
+    [
+        # 평범한 월요일: 토·일 줄도 세션이 금요일이라 하루치다.
+        ("2026-09-18", [{"date": "2026-09-19", "quotes": {"SPY": q("2026-09-18", 100, 99)}}], q("2026-09-18", 100, 99)),
+        # 평범한 화요일: 사이 줄이 없다.
+        ("2026-09-21", [], q("2026-09-22", 100, 99)),
+        # 084 전 줄이나 미장 휴장 줄은 quotes 가 비어 있다.
+        ("2026-09-23", [{"date": "2026-09-24", "quotes": None}], q("2026-09-24", 100, 99)),
+    ],
+)
+def test_single_session_returns_none(prev, stored, today):
+    assert accumulate(date.fromisoformat(prev), {"SPY": today}, stored) is None
+
+
+def test_ticker_without_matching_window_is_dropped():
+    # NVDA 는 09-24 아침에 못 받아 첫 세션이 09-24 다. SPY 창(09-23~)과 어긋나니 뺀다.
+    # AMD 는 오늘 받은 값이 옛 세션이다. 역시 뺀다.
+    stored = [
+        {"date": "2026-09-24", "quotes": {"SPY": q("2026-09-23", 100, 98), "AMD": q("2026-09-23", 10, 9)}},
+        {"date": "2026-09-25", "quotes": {"SPY": q("2026-09-24", 101, 100), "NVDA": q("2026-09-24", 52, 50)}},
+    ]
+    today = {"SPY": q("2026-09-25", 103, 101), "NVDA": q("2026-09-25", 55, 52), "AMD": q("2026-09-24", 11, 10)}
+    _, cum, skipped = accumulate(date(2026, 9, 23), today, stored)
+    assert set(cum) == {"SPY"} and sorted(skipped) == ["AMD", "NVDA"]
