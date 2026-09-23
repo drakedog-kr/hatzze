@@ -171,11 +171,14 @@ const sessionDay = (iso: string) =>
 
 /**
  * 화면 곳곳의 "밤사이" 자리에 들어갈 말. 카드의 미장 세션이 **어젯밤** 것이면 "밤사이",
- * 그보다 앞이면 그 세션의 요일("금요일")이다.
+ * 그보다 앞이면 그 세션의 요일("금요일")이고, 세션이 여럿 쌓였으면 "연휴 동안" 이다.
  *
  *   토 아침  세션 금 = 어제      → 밤사이(금요일 미장이 정말 그 밤사이에 닫혔다)
  *   일·월 아침 세션 금 < 어제    → 금요일(그 밤에는 미장이 없었다)
- *   추석 뒤 월 09-28 세션 금 09-25 → 금요일
+ *   추석 뒤 월 09-28 세션 09-23~25 → 연휴 동안(수집기가 세 세션을 누적했다 · usFrom 09-23)
+ *
+ * ⚠️ "연휴 동안" 을 요일보다 먼저 본다. 09-28 의 마지막 세션은 금요일이지만 숫자는 수·목·금
+ *    누적이라 "금요일" 로 적으면 틀린다.
  *
  * ⚠️ 카드를 비우지 않고 말만 바꾼다. 월요일 개장이 반응하는 게 바로 금요일 미장이고
  *    백테스트도 월요일을 금요일 세션과 짝지어 쟀다. 주말 방문이 몰리는 일요일 저녁도
@@ -184,8 +187,9 @@ const sessionDay = (iso: string) =>
  *    어제 줄을 보여 줄 때도 그 줄 기준으로 맞아야 한다.
  * `usSession` 이 없는 줄(마이그레이션 083 전·수집기 배포 전)은 예전처럼 "밤사이" 다.
  */
-function sessionWord(date: string | null, usSession: string | null): string {
+function sessionWord(date: string | null, usSession: string | null, usFrom: string | null): string {
   if (!date || !usSession) return "밤사이";
+  if (usFrom && usFrom < usSession) return "연휴 동안";
   const lastNight = new Date(Date.parse(`${date}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
   if (usSession >= lastNight) return "밤사이";
   return `${"일월화수목금토"[new Date(`${usSession}T00:00:00Z`).getUTCDay()]}요일`;
@@ -488,7 +492,7 @@ export default async function PreviewPage() {
 
   // ⚠️ 둘을 나란히 부른다. 표가 서로 달라 한쪽이 비어도 다른 쪽은 그린다 —
   // 하이퍼리퀴드 표가 아직 없던 날에도 아래 시트는 멀쩡해야 한다.
-  const [{ date, updatedAt, spx, sectors, moverCount, usHoliday, usSession }, overnight] = await Promise.all([
+  const [{ date, updatedAt, spx, sectors, moverCount, usHoliday, usSession, usFrom }, overnight] = await Promise.all([
     getPreview(),
     getOvernightLive(),
   ]);
@@ -502,7 +506,7 @@ export default async function PreviewPage() {
 
   // "밤사이" 자리에 들어갈 말(sessionWord 주석). ⚠️ 휴장한 날은 늘 "밤사이" 다 — 그날 세션은
   // 휴장 전 마지막 거래일이라 요일로 바꾸면 "금요일 뉴욕 · 휴장" 처럼 금요일이 쉰 것으로 읽힌다.
-  const when = usHoliday ? "밤사이" : sessionWord(date, usSession);
+  const when = usHoliday ? "밤사이" : sessionWord(date, usSession, usFrom);
 
   const movers = sectors.flatMap((s) => s.movers);
 
