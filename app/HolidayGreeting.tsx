@@ -78,7 +78,12 @@ function GreetingDialog() {
   useEffect(() => {
     const d = ref.current;
     // 이미 열려 있으면 다시 부르지 않는다. 옛 브라우저는 열린 창에 showModal() 을 부르면 던진다.
-    if (d && !d.open) d.showModal();
+    if (!d || d.open) return;
+    d.showModal();
+    // showModal() 은 첫 버튼(닫기)에 포커스를 준다. 방금 연 페이지에서는 그 포커스가 키보드 포커스로
+    // 쳐져 파란 링이 그려지고, 폰·PC 모두에서 버튼이 눌린 것처럼 보였다(2026-09-24 지적). 포커스를
+    // 창 자체로 옮긴다 — 스크린리더는 제목을 읽고, Esc 는 그대로 닫히고, Tab 을 누르면 그때 버튼에 링이 선다.
+    d.focus();
   }, []);
 
   return (
@@ -86,6 +91,8 @@ function GreetingDialog() {
       ref={ref}
       className="hz-greet"
       aria-labelledby="hz-greet-title"
+      // 창이 포커스를 받으려면 필요하다(위 effect 의 d.focus()). Tab 순서에는 안 들어간다.
+      tabIndex={-1}
       // 닫는 길 셋(버튼 · Esc · 바깥 누르기)이 모두 close 이벤트로 모인다. '닫았음'은 여기서 한 번만 적는다.
       onClose={() => markSeen(GREETING.id)}
       // 바깥을 누르면 이벤트 대상이 <dialog> 자신이다. 안쪽 상자가 창을 꽉 채우므로
