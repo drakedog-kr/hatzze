@@ -1495,7 +1495,9 @@ const NEWS_EVENT = "hz-news-change";
 /* 소식 둘을 세워 두고 newsFor 가 하나를 고른다. 목적지가 우리 화면이면 **그 구역 안에서는 안 그린다**(NewsStrip 의 startsWith).
    이전 소식들(내부자 → 국장 미리보기 → 데일리 노트 → 텔레그램 2판 → 배당으로 살기)은 git 이력에 있다 — 되살릴 땐 키를 새로 딴다.
    ⚠️ 문구에 숫자를 넣지 않는다(위 주석). */
-type NewsItem = { key: string; from: string; href: string; head?: string; name: string; tail: string; aria?: string; icon: string; ga: string };
+/* tailShort: 폰(≤560)에서 tail 대신 쓰는 짧은 꼬리. 이름이 앞에 서는 소식은 폰에서 한 줄로 잘리므로(components.css 의
+   .hz-news-namefirst) 긴 tail 은 문장 중간에서 '…'로 끊긴다. 한 줄(360px 폰에서 글자 칸 238px)에 들어가는 문장을 따로 둔다. */
+type NewsItem = { key: string; from: string; href: string; head?: string; name: string; tail: string; tailShort?: string; aria?: string; icon: string; ga: string };
 
 /* 2026-09-23 · 테마 리포트 오픈 소식.
    ⛔ 목적지가 안 연 화면이라 **themeNav 를 따른다** — 배포에서는 THEME_PUBLIC 을 켠 뒤에야 걸리고, 그 전에는 아래 텔레그램 소식이
@@ -1507,6 +1509,8 @@ const THEME_NEWS: NewsItem = {
   href: THEME_PAGE.href,
   name: THEME_PAGE.label,
   tail: "를 열었습니다. 국장·미장 테마마다 어디에 관심이 쏠리고 무슨 얘기가 도는지 봅니다.",
+  // 폰에서는 첫 문장만. 전체 문장은 360px 폰에서 세 줄이라 한 줄로 자르면 "국장·미장 테마마다…"에서 끊겼다(2026-09-24 지적).
+  tailShort: "를 열었습니다.",
   // 사이드바 NAV 의 그 화면 아이콘(category)과 같은 것.
   icon: THEME_PAGE.icon,
   ga: "news-theme",
@@ -1612,7 +1616,14 @@ function NewsStrip() {
               여기서는 **밑줄만** 긋는다 — 눌리는 건 띠 전체다. */}
           {news.head}
           <span className="hz-news-em">{news.name}</span>
-          {news.tail}
+          {news.tailShort ? (
+            <>
+              <span className="hz-news-tail-full">{news.tail}</span>
+              <span className="hz-news-tail-short">{news.tailShort}</span>
+            </>
+          ) : (
+            news.tail
+          )}
         </span>
         <span className="hz-news-go">
           <span className="hz-news-go-label">보러 가기</span>
