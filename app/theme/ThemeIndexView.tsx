@@ -244,7 +244,7 @@ export function ThemeIndexView({
             </div>
             <div className="hz-kd-hero-h">
               <div className="hz-kd-hero-title hz-theme-brief-head">
-                <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>테마 브리핑</span>
+                <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>오늘의 브리핑</span>
                 <span style={{ flex: 1 }} />
                 {/* 기준 시각 — 카더라 '오늘의 브리핑' 눈썹 줄과 같은 꼴(아이콘 · 글자 크기 · 굵기). "최근 3일 · 26개 테마"였는데
                     기간은 지도·표 머리가 이미 적고 있어 이 자리를 언제 쓰인 글인지로 바꿨다(2026-09-23).

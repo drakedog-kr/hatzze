@@ -648,7 +648,7 @@
     padding-left: 16px;
     padding-right: 16px;
   }
-  /* 테마 브리핑 기준 시각 — 카더라 눈썹 줄의 폰 값(tx.css .hz-tx-eyebrow-r)과 같다. */
+  /* 테마 목록 '오늘의 브리핑' 기준 시각 — 카더라 눈썹 줄의 폰 값(tx.css .hz-tx-eyebrow-r)과 같다. */
   .hz-theme-brief-when { font-size: var(--fs-11-5); }
 
   /* ── 손가락으로 누르는 줄은 40px 이상 ──────────────────────────────
