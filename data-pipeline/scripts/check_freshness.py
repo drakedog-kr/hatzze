@@ -19,6 +19,13 @@ KRX가 멈춘 걸 가장 먼저 드러내는 건 원본 쪽이다.
 따로 적어 둔다(아래 ALLOWANCE). 오탐을 허용치로 흡수하고 진짜 멈춤만 잡는 게 목적이라,
 애매하면 넉넉한 쪽으로 둔다.
 
+**영업일은 KRX 개장일로 센다**(common/timeutil.KRX_HOLIDAYS). 처음엔 평일을 셌는데, 그러면
+휴장일도 '자료가 안 온 날'로 쌓인다. 2026-09-28(추석 연휴 뒤 첫 개장일)에 KRX 지표가
+전부 09-23 자료라 평일로는 3일 늦은 것이 되고, 허용 2를 넘겨 파이프라인 알림과 저녁
+발송 차단이 한꺼번에 날 참이었다. 개장일로 세면 1일이다.
+네이버·유튜브처럼 휴장과 무관하게 매일 오는 자료도 같은 잣대로 센다. 휴장일 하루만큼
+늦게 잡힐 뿐이고, 주말을 안 세던 것과 같은 양보다.
+
 실행:
     cd data-pipeline && python scripts/check_freshness.py
 """
@@ -32,7 +39,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client  # noqa: E402
-from common.timeutil import business_days, today_kst  # noqa: E402
+from common.timeutil import KRX_HOLIDAY_YEARS, krx_trading_days, today_kst  # noqa: E402
 from config.indicator_weights import INDICATOR_WEIGHTS  # noqa: E402
 
 DEFAULT_ALLOWANCE = 2  # 영업일. 국내 지표는 전일치가 정상이라 1 + 여유 1.
@@ -48,6 +55,15 @@ ALLOWANCE = {
     "consumer_sentiment_index": 45,
     # 알라딘 베스트셀러는 주 단위로 갱신돼 같은 값이 며칠 이어진다.
     "bestseller_finance_ratio": 5,
+    # 한국·일본·홍콩·대만이 **모두 연 날**에만 값이 생긴다(fetch_asia_relative_strength 의
+    # 교집합). 한 곳만 쉬어도 그날은 비고, 네 나라 휴장이 번갈아 겹치면 며칠씩 빈다.
+    # 2026-09-23 에 일본 연휴(09-21~23)로 09-18 자료가 3일 늦은 것이 되어 아침 파이프라인
+    # (#549)과 수요일 채널 발송(#550)이 함께 멈췄다.
+    # 야후 종가와 KRX 휴장일 표로 2015-01~2026-09 의 아침·저녁 실행을 재현해 보니 KRX
+    # 개장일 기준 최대 지연이 7이었다(2023·2026 설, 대만이 한 주 넘게 쉰다). 6이면 11.7년에
+    # 이틀, 5면 한 해 하루꼴로 걸린다. 가중치 2.5/43 짜리 한 장이 늦게 알려지는 값이 채널
+    # 발송이 통째로 멈추는 값보다 작아서 7로 둔다.
+    "kospi_asia_relative_strength": 7,
 }
 
 # 점수에 안 들어가지만 상태를 봐야 하는 내부용 원본. 파생 지표가 매일 행을 쓰는 탓에
@@ -63,11 +79,11 @@ INTERNAL_SLUGS = [
 
 
 def business_day_lag(data_date: str, today: date) -> int:
-    """자료 기준일부터 오늘까지 지난 영업일 수. 오늘치면 0, 어제(평일)치면 1."""
+    """자료 기준일부터 오늘까지 지난 KRX 개장일 수. 오늘치면 0, 직전 개장일치면 1."""
     d = date.fromisoformat(data_date)
     if d >= today:
         return 0
-    return sum(1 for x in business_days(d, today) if x > d)
+    return sum(1 for x in krx_trading_days(d, today) if x > d)
 
 
 def latest_data_date(client, indicator_id: str) -> str | None:
@@ -130,6 +146,11 @@ def main() -> None:
     rows.sort(key=lambda r: (-(r["lag"] - r["allowance"]), -(r["weight"] or 0)))
 
     print(f"[신선도] 기준 오늘(KST) = {today}")
+    if today.year not in KRX_HOLIDAY_YEARS:
+        print(
+            f"[WARNING] KRX 휴장일 표에 {today.year}년이 없어 평일을 전부 개장일로 셉니다. "
+            "연휴 뒤에 헛알림이 날 수 있습니다 — common/timeutil.KRX_HOLIDAYS 에 올해 휴장일을 넣을 것."
+        )
     print(f"{'지연':>4} {'허용':>4}  {'자료일':11} {'가중':>5}  지표")
     print("-" * 72)
     for r in rows:
