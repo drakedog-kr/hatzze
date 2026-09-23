@@ -60,6 +60,25 @@ _MAX_CONSECUTIVE_FAILURES = 3
 # 한 호출의 상한. 실측 중앙값이 12초라 넉넉히 잡았다(재시도가 CLI 안에서 도는 경우 포함).
 _TIMEOUT_SEC = 180
 
+# ── Opus 를 부를 때만 달라지는 것 ──────────────────────────────────────────────
+# 2026-09-23 부터 사람이 가장 먼저 읽는 글 세 자리(카더라 총평 대목 · 히어로 요약 · 채널 발송
+# 글)만 Opus 5.5 로 쓴다. 나머지는 Haiku 그대로다(분류·감성은 과열지수 눈금이 Haiku 출력에
+# 맞춰져 있어 바꾸면 안 된다).
+#
+# ⚠️ Opus 5.5 는 thinking 을 끌 수 없다. Haiku 에 주는 MAX_THINKING_TOKENS=0 을 줘도 오류는
+#    안 나지만 thinking 은 그대로 돈다(09-23 실측: 짧은 과제에 출력 934토큰, 답은 80토큰
+#    남짓). 양을 정하는 건 effort 다 — low 733 · medium 961. 길이를 코드가 따로 붙잡는
+#    글이라 low 로 둔다.
+OPUS_EFFORT = "low"
+# 구독이 막혀 API 로 넘어갈 때 Opus 대신 쓰는 모델. API 로 Opus 를 부르면 토큰당 4배가
+# 청구된다. 폴백은 한도가 모자란 날의 비상구라, 그날 글은 예전(Haiku) 글로 나가고 청구는
+# 지금 수준에 머무는 편이 낫다.
+API_FALLBACK_MODEL = "claude-haiku-4-5"
+
+
+def _is_opus(model: str) -> bool:
+    return model.startswith("claude-opus")
+
 
 @dataclass
 class _Usage:
@@ -88,14 +107,21 @@ class SubscriptionUnavailable(RuntimeError):
     """구독 경로로 답을 못 받았다 — 호출부가 아니라 이 모듈이 잡아 API 로 넘긴다."""
 
 
-def _cli_env() -> dict[str, str]:
+def _cli_env(model: str) -> dict[str, str]:
     env = dict(os.environ)
     # 우선순위상 API 키·베어러 토큰이 OAuth 토큰을 이긴다. 지우지 않으면 구독으로
     # 보낸 줄 알았던 호출이 그대로 API 청구가 된다.
     for k in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL"):
         env.pop(k, None)
+    # 자동 메모리도 --setting-sources 로는 안 막힌다. 로컬에서 돌리면 이 저장소 폴더의 메모리가
+    # 호출마다 붙어, 모델이 문장 끝에 사람 이름을 부르며 인사했다(2026-09-23 실측). 러너엔
+    # 메모리가 없지만 로컬 검증이 러너와 같은 조건이 되게 끈다.
+    env["CLAUDE_CODE_DISABLE_AUTO_MEMORY"] = "1"
     # Haiku 도 기본으로 생각을 한다. 분류·문장화에는 필요 없고 출력 토큰만 는다.
-    env["MAX_THINKING_TOKENS"] = "0"
+    # Opus 5.5 는 thinking 을 끌 수 없는 모델이라 이 값을 안 준다 — 줘도 무시되지만, CLI 가
+    # 언젠가 이걸 '끔'으로 API 에 옮기면 400 이 난다. 양은 --effort 로 정한다(_run_cli).
+    if not _is_opus(model):
+        env["MAX_THINKING_TOKENS"] = "0"
     return env
 
 
@@ -114,6 +140,10 @@ def _run_cli(
         # 이 기계의 훅·플러그인·CLAUDE.md 가 끼어들지 않게 한다.
         "--setting-sources",
         "",
+        # ⚠️ 위 한 줄로는 claude.ai 커넥터(MCP)가 안 막힌다. 로그인한 계정의 커넥터 도구 정의가
+        #    호출마다 붙는다(2026-09-23 로컬 실측: 입력 7,900토큰 남짓 · 막으면 730). --mcp-config
+        #    없이 이 플래그만 주면 MCP 를 하나도 안 싣는다.
+        "--strict-mcp-config",
         "--no-session-persistence",
         # 구조화 출력이 도구 호출 한 턴을 더 쓴다. 1 이면 무조건 실패한다.
         "--max-turns",
@@ -121,6 +151,8 @@ def _run_cli(
         "--output-format",
         "json",
     ]
+    if _is_opus(model):
+        argv += ["--effort", OPUS_EFFORT]
     if system:
         argv += ["--system-prompt", system]
     if schema:
@@ -132,7 +164,7 @@ def _run_cli(
             input=user,
             capture_output=True,
             text=True,
-            env=_cli_env(),
+            env=_cli_env(model),
             timeout=_TIMEOUT_SEC,
         )
     except FileNotFoundError as exc:
@@ -204,6 +236,10 @@ class _Messages:
             else:
                 owner.note_success(time.time() - t0, resp.usage)
                 return resp
+        if _is_opus(kw.get("model", "")):
+            # 구독이 막힌 날엔 예전 모델로 쓴다(API_FALLBACK_MODEL 주석).
+            print(f"[LLM] API 로 넘어가며 {kw['model']} 대신 {API_FALLBACK_MODEL} 로 씁니다.")
+            kw = {**kw, "model": API_FALLBACK_MODEL}
         return owner.api.messages.create(**kw)
 
 
