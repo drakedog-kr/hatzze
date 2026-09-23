@@ -80,6 +80,7 @@ from generate_telegram_narratives import (  # noqa: E402
     LEN_MIN,
     MAX_RETRIES,
     BRIEF_MODEL,
+    BRIEF_NEWS_COMMON,
     MODEL,
     NEWS_SCHEDULE_NOTE,
     SCHEDULE_BLOCK_HEAD,
@@ -140,13 +141,25 @@ KEYWORD_TOP_N = 8
 # ⚠️ '목표주가'를 따로 적는 이유: COMMON 은 "목표가"라고만 쓰는데 모델이 **"목표주가"**로
 #    빠져나갔다("UBS가 목표주가를 유지했다는 분석이 화제였습니다"). 미국 종목 발췌에는
 #    증권사 리포트 인용이 국내보다 훨씬 잦아 이 구멍이 자주 열린다.
-US_COMMON = COMMON + """
+_US_EXTRA = """
 
 [미장에서 특히 조심할 것]
 - **'목표주가'·'목표가'·'상승 여력'·'비중확대'·'투자의견' 같은 증권사 리포트 용어를 쓰지
   마세요.** 발췌에 그런 말이 자주 섞여 있지만, 그건 인용할 사실이 아니라 걸러낼 것입니다.
 - 발췌에 "확신의 매수 구간" 같은 표현이 있어도 **절대 옮겨 적지 마세요.**
 - 미국 기업 이름은 발췌에 적힌 한글 표기를 그대로 쓰세요(영문 병기 불필요)."""
+US_COMMON = COMMON + _US_EXTRA
+# 총평 셋째 대목만 목표주가 '소식'을 숫자 없이 허용한다(국장 BRIEF_NEWS_COMMON 주석 · 2026-09-24).
+_US_TARGET_OLD = (
+    "- **'목표주가'·'목표가'·'상승 여력'·'비중확대'·'투자의견' 같은 증권사 리포트 용어를 쓰지\n"
+    "  마세요.** 발췌에 그런 말이 자주 섞여 있지만, 그건 인용할 사실이 아니라 걸러낼 것입니다."
+)
+_US_TARGET_NEW = (
+    "- **'상승 여력'·'비중확대'·'투자의견' 같은 증권사 리포트 용어와 목표주가 숫자를 쓰지\n"
+    "  마세요.** 목표주가는 위 [전망과 목표주가]대로 올렸다·내렸다는 소식까지만 씁니다."
+)
+assert _US_EXTRA.count(_US_TARGET_OLD) == 1
+US_BRIEF_NEWS_COMMON = BRIEF_NEWS_COMMON + _US_EXTRA.replace(_US_TARGET_OLD, _US_TARGET_NEW)
 
 # ⚠️ 예문에 시점·숫자를 적지 말 것 — 옛 예문 "주 후반 한 차례 식었습니다"를 모델이 재료 대신
 #    그대로 옮겨 2026-09-15(화) 총평이 "주 후반 톤이 내려앉은"이 됐다. 근거는 문자열 밖에
@@ -203,7 +216,7 @@ BRIEF_THEME_SYSTEM = US_COMMON + f"""
 - 종목명·구체적 사건은 셋째 대목 몫이니 여기서 미리 쓰지 마세요.
 - **길이는 {BRIEF_THEME_LEN[0]}~{BRIEF_THEME_LEN[1]}자**(공백 포함) · **두 문장.**"""
 
-BRIEF_NEWS_SYSTEM = US_COMMON + f"""
+BRIEF_NEWS_SYSTEM = US_BRIEF_NEWS_COMMON + f"""
 
 [이번 대목 — 지금 오가는 이야기]
 [오간 이야기] 발췌와 [화제 종목]을 근거로, 이 채널들에서 **무슨
