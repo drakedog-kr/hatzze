@@ -291,7 +291,8 @@ export function RiskProfile({ r, periodLabel, market }: { r: RiskProfileData; pe
                 {t.scope && (
                   <>
                     {" "}
-                    <span style={{ fontWeight: 400, whiteSpace: "nowrap" }}>({t.scope})</span>
+                    {/* 크기는 아래 머리 문장("보통 8개월 빠지고 …")과 같은 13px, 굵기는 뺀다(2026-09-24). */}
+                    <span style={{ fontSize: "var(--fs-13)", fontWeight: 400, whiteSpace: "nowrap" }}>({t.scope})</span>
                   </>
                 )}
               </span>

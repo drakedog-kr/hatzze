@@ -155,11 +155,14 @@ export function Recovery({ a, periodLabel }: { a: MddAnalysis; periodLabel: stri
             </span>
           </div>
           {/* 바닥 각주였던 한 줄을 여기로 올렸다(2026-09-24). 글꼴은 리스크 프로필 타일의 머리 문장
-              ("큰 하락 5번 모두 코스피도 함께 빠졌습니다")과 같다 — 13px · inkSoft · 숫자만 굵게. */}
+              ("큰 하락 5번 모두 코스피도 함께 빠졌습니다")과 같다 — 13px · inkSoft · 숫자만 굵게.
+              문장은 "…1번이던 구간에 들어 있습니다"가 어색하다는 지적으로 후보 다섯 중에서 골랐다(2026-09-24).
+              ⚠️ here.count 에는 진행 중인 하락도 **그 저점 깊이로** 들어간다(depthHistogram). 지금 낙폭과 저점이 같은
+                 구간이면 그 '1번'이 지금 자신이다(알테오젠 −77.3% · 저점 −82.4% → −50% 이하 1번). */}
           {here && here.count > 0 && (
             <p style={{ margin: 0, fontSize: "var(--fs-13)", lineHeight: 1.7, color: C.inkSoft, wordBreak: "keep-all" }}>
-              지금 낙폭(<b style={{ fontWeight: 800, color: C.ink }}>{fmtPct(a.currentDd)}</b>)은 {periodLabel}{" "}
-              <b style={{ fontWeight: 800, color: C.ink }}>{here.count}번</b>이던 구간에 들어 있습니다
+              지금 낙폭(<b style={{ fontWeight: 800, color: C.ink }}>{fmtPct(a.currentDd)}</b>)은 {periodLabel}에{" "}
+              <b style={{ fontWeight: 800, color: C.ink }}>{here.count}번</b> 나왔던 깊이입니다
             </p>
           )}
         </div>
