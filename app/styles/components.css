@@ -93,6 +93,8 @@
   background: var(--c-card);
   color: var(--c-ink);
   box-shadow: 0 16px 40px var(--c-shadow-strong);
+  /* 열 때 포커스를 창 자체로 옮긴다(HolidayGreeting.tsx). 창 테두리에는 링을 그리지 않는다. */
+  outline: none;
 }
 .hz-greet::backdrop { background: rgba(14, 33, 54, 0.42); }
 :root[data-theme="dark"] .hz-greet::backdrop { background: rgba(0, 0, 0, 0.62); }
