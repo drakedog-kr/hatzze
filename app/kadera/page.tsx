@@ -968,7 +968,6 @@ export default async function KaderaPage() {
           title="급등 종목"
           note={why ? fmtKoDate(why.date) : undefined}
           desc="그날 오른 종목과 커뮤니티가 말한 이유"
-          noteHelp="채널이 말한 이유"
         />
         {whyFailed ? (
           <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>이유를 불러오지 못했습니다.</p>
@@ -1382,7 +1381,6 @@ export default async function KaderaPage() {
           title="다가오는 일정"
           note="앞으로 5주"
           desc="커뮤니티에서 날짜를 짚어 말한 일정"
-          noteHelp="확정은 공시로 확인"
         />
         {eventsFailed ? (
           <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>일정을 불러오지 못했습니다.</p>
