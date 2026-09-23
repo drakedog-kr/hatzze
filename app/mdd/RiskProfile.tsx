@@ -17,6 +17,12 @@
 //   · 글자는 다른 화면의 회색 타일과 같은 눈금이다 — 타일 제목 14 · 문장 13 · 설명 12 · 막대 11.
 //     (12 이상으로 키운 판을 로컬에서 보고, 다른 화면에 맞추라는 지적으로 되돌렸다.)
 //   · 전체보기 아이콘 버튼 → "10년 전체 ›" 글자 버튼. 무엇을 여는지 눌러 보기 전에 보인다.
+//
+// ## 2026-09-24
+//
+//   · 타일 부제("감수한 위험만큼 돌려받았나" 등)를 걷었다. 제목과 머리 문장이 이미 같은 말을 한다.
+//   · 부제 끝에 붙어 있던 "(최근 5건)"은 제목 옆으로 — 굵기만 빼고 같은 크기로 붙인다.
+//   · "10년 전체" 버튼을 타일 바닥 오른쪽에서 **제목 줄 오른쪽**으로 올렸다. 팝오버는 그래서 아래로 편다.
 
 import type { RiskProfile as RiskProfileData, YearStat } from "@/lib/mdd";
 import { C, Icon } from "../ui";
@@ -26,7 +32,7 @@ import { Sheet, MirrorRow, MirrorAxis, TwinRow, TwinAxis } from "./sheet";
 
 const RISK_ROWS = 5; // 모든 타일이 쓰는 고정 줄 수(연도 5개 · 사건 5건)
 
-/** 타일 본문 — 머리 문장(lead) · 막대 영역(viz) · 맨 아래 '전체' 버튼(more). */
+/** 타일 본문 — 머리 문장(lead) · 막대 영역(viz) · 제목 줄 오른쪽 '전체' 버튼(more). */
 type TileBody = { lead: React.ReactNode; viz: React.ReactNode; more?: React.ReactNode };
 
 /** 머리 문장 안의 숫자. 문장이 곧 이 타일의 결론이라 숫자는 그 안에서만 굵게 선다. */
@@ -93,10 +99,11 @@ export function RiskProfile({ r, periodLabel, market }: { r: RiskProfileData; pe
   for (const e of events) eventYearCount.set(e.year, (eventYearCount.get(e.year) ?? 0) + 1);
   const eventLabels = events.map((e) => ((eventYearCount.get(e.year) ?? 0) > 1 ? `${e.year}.${e.month}` : `${e.year}`));
 
-  /* 타일 부제 괄호. 뒤 두 타일(속도·동반성)은 막대 RISK_ROWS 줄이 전부라 **실제 줄 수**를 적는다
+  /* 제목 옆 괄호. 뒤 두 타일(속도·동반성)은 막대 RISK_ROWS 줄이 전부라 **실제 줄 수**를 적는다
      (전체 건수를 적었더니 "7건"인데 5줄만 깔려 두 줄을 찾게 됐다). 앞 타일은 조회 기간 전체에
-     닿는데, 그 기간은 시트 머리 딱지가 이미 말한다 — 여기 또 적으면 한 시트에 "최근 10년"이 셋이었다. */
-  const eventScope = events.length ? ` (최근 ${events.length}건)` : "";
+     닿는데, 그 기간은 시트 머리 딱지가 이미 말한다 — 여기 또 적으면 한 시트에 "최근 10년"이 셋이었다.
+     부제 끝에 있다가 부제를 걷으며 제목 옆으로 왔다(2026-09-24). 괄호는 그리는 쪽이 친다. */
+  const eventScope = events.length ? `최근 ${events.length}건` : "";
 
   const empty = (text: string) => <p style={{ margin: 0, fontSize: "var(--fs-11-5)", color: C.muted, lineHeight: 1.6 }}>{text}</p>;
   const rows = (children: React.ReactNode) => <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{children}</div>;
@@ -245,10 +252,10 @@ export function RiskProfile({ r, periodLabel, market }: { r: RiskProfileData; pe
             ),
           };
 
-  const tiles: { label: string; sub: string; body: TileBody }[] = [
-    { label: "낙폭 대비 보상", sub: "감수한 위험만큼 돌려받았나", body: tile1 },
-    { label: "하락 vs 회복 속도", sub: `빠지는 데 vs 되돌아오는 데${eventScope}`, body: tile2 },
-    { label: "혼자 빠지나, 같이 빠지나", sub: `큰 하락 때 ${bench}도 같이 빠졌나${eventScope}`, body: tile3 },
+  const tiles: { label: string; scope: string; body: TileBody }[] = [
+    { label: "낙폭 대비 보상", scope: "", body: tile1 },
+    { label: "하락 vs 회복 속도", scope: eventScope, body: tile2 },
+    { label: "혼자 빠지나, 같이 빠지나", scope: eventScope, body: tile3 },
   ];
 
   return (
@@ -259,30 +266,39 @@ export function RiskProfile({ r, periodLabel, market }: { r: RiskProfileData; pe
         desc="이 종목을 들고 있으면 어떤 위험을 감수하게 되는지, 세 가지 각도로 봅니다"
         note={periodLabel}
       />
-      {/* 세 타일이 [제목][문장][막대][전체] 네 행을 공유한다(subgrid). 문장 길이가 타일마다 달라
+      {/* 세 타일이 [제목][문장][막대] 세 행을 공유한다(subgrid). 문장 길이가 타일마다 달라
           어떤 폭에서는 두 줄, 어떤 폭에서는 한 줄이 되는데, 타일마다 제 높이를 쓰면 막대 시작
-          줄이 어긋난다. 행을 공유해 구조로 맞춘다. 타일 모양은 .hz-tx .hz-panelgrid 가 준다. */}
-      <div className="hz-panelgrid hz-panelgrid-3" style={{ gridTemplateRows: "auto auto 1fr auto" }}>
+          줄이 어긋난다. 행을 공유해 구조로 맞춘다. 타일 모양은 .hz-tx .hz-panelgrid 가 준다.
+          '전체' 버튼 몫이던 넷째 행은 버튼이 제목 줄로 올라가며 없앴다(2026-09-24). */}
+      <div className="hz-panelgrid hz-panelgrid-3" style={{ gridTemplateRows: "auto auto 1fr" }}>
         {tiles.map((t) => (
           <div
             key={t.label}
             style={{
               display: "grid",
               gridTemplateRows: "subgrid",
-              gridRow: "span 4",
+              gridRow: "span 3",
               rowGap: 0,
               padding: "18px 20px",
               minWidth: 0,
             }}
           >
-            <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0, marginBottom: 10 }}>
-              <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>{t.label}</span>
-              <span style={{ fontSize: "var(--fs-12)", lineHeight: 1.5, color: C.muted, wordBreak: "keep-all" }}>{t.sub}</span>
+            {/* 제목 줄 — 왼쪽 제목(+ 굵지 않은 괄호), 오른쪽 '전체' 버튼. 가운데 맞춤이라 버튼(23px)이 줄 높이를
+                키워도 세 타일의 제목이 같은 선에 선다(첫 행을 subgrid 로 공유한다). */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, marginBottom: 10 }}>
+              <span style={{ flex: 1, minWidth: 0, fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink, wordBreak: "keep-all" }}>
+                {t.label}
+                {t.scope && (
+                  <>
+                    {" "}
+                    <span style={{ fontWeight: 400, whiteSpace: "nowrap" }}>({t.scope})</span>
+                  </>
+                )}
+              </span>
+              {t.body.more}
             </div>
             <p style={{ margin: "0 0 14px", fontSize: "var(--fs-13)", lineHeight: 1.7, color: C.inkSoft, wordBreak: "keep-all" }}>{t.body.lead}</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{t.body.viz}</div>
-            {/* '전체'는 오른쪽 끝. 팝오버가 이 칸 기준으로 위로 펴지므로 relative 가 여기 있어야 한다. */}
-            <div style={{ position: "relative", display: "flex", justifyContent: "flex-end", marginTop: t.body.more ? 12 : 0 }}>{t.body.more}</div>
           </div>
         ))}
       </div>

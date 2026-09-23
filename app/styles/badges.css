@@ -138,10 +138,11 @@
 .hz-yrpop-host {
   position: relative;
   flex-shrink: 0;
-  /* 버튼을 이 칸 **밑선**에 붙인다. span 이라 글자 줄상자가 생기는데, 그러면 버튼이
-     베이스라인에 앉아 아래로 디센더만큼 빈틈이 남아 옆 요약 문장보다 떠 보인다. */
+  /* span 이라 글자 줄상자가 생기는데, 그러면 버튼이 베이스라인에 앉아 아래로 디센더만큼
+     빈틈이 남는다. flex 로 줄상자를 없앤다. 자리는 타일 **제목 줄 오른쪽**이다(2026-09-24,
+     예전엔 타일 바닥 오른쪽이었다). */
   display: inline-flex;
-  align-items: flex-end;
+  align-items: center;
 }
 .hz-yrpop-btn {
   display: inline-flex;
@@ -178,9 +179,9 @@
 
 .hz-yrpop {
   position: absolute;
-  /* 위로 편다 — 타일 맨 아래라 아래로 열면 카드 밖으로 나가 다음 카드를 덮는다.
-     버튼과 4px 겹쳐 둔다. 틈이 있으면 마우스가 건너는 동안 :hover 가 끊긴다. */
-  bottom: calc(100% - 4px);
+  /* 아래로 편다 — 버튼이 타일 제목 줄에 있어서 위로 열면 시트 머리를 덮는다(2026-09-24, 예전엔
+     타일 바닥이라 위로 폈다). 버튼과 4px 겹쳐 둔다. 틈이 있으면 마우스가 건너는 동안 :hover 가 끊긴다. */
+  top: calc(100% - 4px);
   /* 오른쪽 끝에 맞춘다. 세 번째 타일에서 왼쪽 정렬로 두면 카드 밖으로 넘쳐
      페이지에 가로 스크롤이 생긴다(예전에 툴팁으로 같은 사고가 있었다). */
   right: 0;
@@ -202,7 +203,7 @@
   opacity: 0;
   /* opacity 만 0 이면 안 보이는 내용이 스크롤 영역과 Tab 순서에 그대로 남는다. */
   visibility: hidden;
-  transform: translateY(4px);
+  transform: translateY(-4px);
   transition: opacity 0.13s ease, transform 0.13s ease, visibility 0.13s;
 }
 .hz-yrpop-host:hover .hz-yrpop,
@@ -232,20 +233,36 @@
   .hz-yrpop {
     position: fixed;
     position-anchor: --hz-yrpop;
-    /* 위 규칙의 bottom/right 를 걷어낸다. 남겨 두면 position-area 가 잡은 자리를 다시 민다. */
+    /* 위 규칙의 top/right 를 걷어낸다. 남겨 두면 position-area 가 잡은 자리를 다시 민다. */
     inset: auto;
-    /* 위로, 오른쪽 끝을 앵커에 맞춰 — absolute 판(bottom/right:0)과 같은 그림이다. */
-    position-area: top span-left;
-    position-try-fallbacks:
-      top span-right,
-      bottom span-left,
-      bottom span-right;
+    /* 아래로, 오른쪽 끝을 앵커에 맞춰 — absolute 판(top/right:0)과 같은 그림이다.
+       화면 아래에 자리가 모자라면(버튼이 뷰포트 아래쪽) 위로 뒤집는다. */
+    position-area: bottom span-left;
+    position-try-fallbacks: --hz-yrpop-down-right, --hz-yrpop-up, --hz-yrpop-up-right;
     /* 버튼과 4px 겹친다. 틈이 있으면 마우스가 건너는 동안 :hover 가 끊긴다.
        transform 은 여닫는 애니메이션이 쓰므로 margin 으로 준다. */
-    margin-bottom: -4px;
-    /* 뷰포트가 기준이 되었으니 화면 높이에 맞춰 스스로 줄어들게 둔다. */
+    margin-top: -4px;
+    /* 뷰포트가 기준이 되었으니 화면 높이에 맞춰 스스로 줄어들게 둔다.
+       ⛔ `max-height: 100%`(버튼에서 화면 끝까지) + `position-try-order: most-height` 로 '넓은 쪽으로 열고
+          모자라면 스크롤'을 해 봤다가 되돌렸다(2026-09-24 실측). 높이를 자리에 맞추면 어느 자리도 넘치지
+          않아서, 크롬이 **처음 고른 자리**(버튼이 화면 밖 아래에 있던 첫 배치의 '위')를 계속 쓴다 —
+          버튼을 어디 두든 위로 182px 짜리 스크롤 상자가 열렸다. 넘쳐야 다시 고른다. */
     max-height: min(600px, calc(100vh - 24px));
   }
+}
+/* 위로 뒤집을 때는 겹침 여백도 뒤집는다(아래쪽이 버튼과 겹쳐야 한다). 이름 붙인 규칙이라야 margin 을 바꿀 수 있다. */
+@position-try --hz-yrpop-down-right {
+  position-area: bottom span-right;
+}
+@position-try --hz-yrpop-up {
+  position-area: top span-left;
+  margin-top: 0;
+  margin-bottom: -4px;
+}
+@position-try --hz-yrpop-up-right {
+  position-area: top span-right;
+  margin-top: 0;
+  margin-bottom: -4px;
 }
 
 .hz-yrpop-head {
