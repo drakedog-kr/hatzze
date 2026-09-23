@@ -37,6 +37,7 @@ import { StockLogo } from "../StockLogo";
 import { CHANNEL_FORM } from "../brand";
 import { SectionHead } from "./SectionHead";
 import { SectionIntro } from "../SectionIntro";
+import { PhoneFold } from "./PhoneFold";
 import { TrendingTabs } from "./TrendingTabs";
 import TimeAgo from "./TimeAgo";
 import { timeAgoInitial } from "./time-ago";
@@ -93,12 +94,12 @@ function mddHref(code: string, market: string | null): string {
 
 /** 셀 → 그 종목의 MDD 정밀분석으로 잇는 작은 링크. */
 /* 라벨은 'MDD' 한 낱말이었다. 어디로 가는지 미리 말해야(토스 Predictable hint) 눌러 보기 전에
-   안다 — 사이드바의 이름 그대로 적는다. */
+   안다 — 사이드바의 이름 그대로 적는다. 화살표는 › 다 — 사이트 안 이동이라 바깥 링크의 ↗ 와 가른다(2026-09-23). */
 function MddLink({ code, market, label = "MDD 정밀분석" }: { code: string; market: string | null; label?: string }) {
   return (
     <Link href={mddHref(code, market)} className="hz-mdd-link">
       {label}
-      <Icon name="arrow_outward" style={{ fontSize: "var(--fs-13)" }} />
+      <Icon name="chevron_right" style={{ fontSize: "var(--fs-13)" }} />
     </Link>
   );
 }
@@ -189,7 +190,7 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
       // hz-lift — 호버에 살짝 떠오르고(translateY −2) 테두리가 파랗게 든다. 패널이라
       // 이미 테두리가 있어 색만 바뀌면 되고, 트레이 여백 14 안에서 움직여 시트를 안 넘는다.
       // 레포가 이미 쓰던 클래스라 다른 카드와 감이 같다.
-      <li key={`${m.channelHandle}-${m.messageId}`} className="hz-lift" style={{ display: "flex", padding: "16px 18px", gap: 12, minWidth: 0 }}>
+      <li key={`${m.channelHandle}-${m.messageId}`} className="hz-lift hz-msg-card">
         {/* 원문 메시지로 이동 — 텔레그램 공개 채널은 t.me/핸들/메시지ID 로 열린다 */}
         <a
           href={`https://t.me/${m.channelHandle}/${m.messageId}`}
@@ -197,10 +198,10 @@ function TrendingList({ items }: { items: TrendingMessage[] }) {
           rel="noopener noreferrer"
           data-ga="kadera_message_click"
           data-ga-channel={m.channelHandle}
-          style={{ display: "flex", gap: 12, minWidth: 0, width: "100%", textDecoration: "none" }}
+          className="hz-msg"
         >
           <Avatar photoUrl={m.channelPhotoUrl} title={m.channelTitle} size={34} />
-          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 7 }}>
+          <div className="hz-msg-body">
             {/* 줄바꿈을 막는다(nowrap). wrap 이면 채널명이 긴 카드에서만 순번(#4)이 아랫줄로
                 떨어져 옆 카드와 머리 높이가 어긋났다(2026-09-04 실측). 줄어드는 건 채널명뿐이고
                 (minWidth 0 + 말줄임), 시각·순번은 안 줄어든다. */}
@@ -821,6 +822,8 @@ export default async function KaderaPage() {
           </p>
         ) : (
           <>
+            {/* 폰에서만 셋까지 보이고 '더 보기'로 편다(PhoneFold 머리말). 넓은 화면은 3×2 그대로다. */}
+            <PhoneFold total={surging.length} name="kadera_surging">
             <div className="hz-panelgrid hz-panelgrid-3">
               {surging.map((s, i) => {
                 const values = s.series.slice(-7);
@@ -900,16 +903,16 @@ export default async function KaderaPage() {
                         ⚠️ 급부상은 명단이 매일 갈려 **어제 문장을 물려받지 못한다** — 주요
                         종목 리포트가 쓰는 소급(LLM_TEXT_CARRY_DAYS)이 여기선 거의 안 듣는다. */}
                     {surgeLines[s.code] ? (
-                      <div style={{ display: "flex", gap: 9, background: C.card, borderRadius: 12, padding: "12px 13px" }}>
-                        <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-                        <p style={{ margin: 0, fontSize: "var(--fs-13)", lineHeight: 1.7, color: "var(--c-ink-soft)", textWrap: "pretty", wordBreak: "keep-all" }}>
+                      <div style={{ fontSize: "var(--fs-13)", lineHeight: 1.7, display: "flex", gap: 9, background: C.card, borderRadius: 12, padding: "12px 13px" }}>
+                        <AiMark size={15} style={{ flexShrink: 0 }} />
+                        <p style={{ margin: 0, color: "var(--c-ink-soft)", textWrap: "pretty", wordBreak: "keep-all" }}>
                           {surgeLines[s.code]}
                         </p>
                       </div>
                     ) : (
-                      <div style={{ display: "flex", gap: 9, background: C.card, borderRadius: 12, padding: "12px 13px" }}>
-                        <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-                        <p style={{ margin: 0, fontSize: "var(--fs-13)", lineHeight: 1.7, color: C.sub2, wordBreak: "keep-all" }}>
+                      <div style={{ fontSize: "var(--fs-13)", lineHeight: 1.7, display: "flex", gap: 9, background: C.card, borderRadius: 12, padding: "12px 13px" }}>
+                        <AiMark size={15} style={{ flexShrink: 0 }} />
+                        <p style={{ margin: 0, color: C.sub2, wordBreak: "keep-all" }}>
                           한 줄 요약은 오늘 집계가 끝나면 붙습니다.
                         </p>
                       </div>
@@ -940,11 +943,7 @@ export default async function KaderaPage() {
                 );
               })}
             </div>
-            <div className="hz-sheet-foot">
-              <span style={{ fontSize: "var(--fs-12)", lineHeight: 1.6, color: C.sub }}>
-                막대는 최근 7일 일별 언급량이고, 붉은 칸이 배수를 낸 최근 기간입니다 · 배수는 언급 횟수가 아니라 그날 전체 대화에서 차지한 몫을 견준 값입니다
-              </span>
-            </div>
+            </PhoneFold>
           </>
         )}
       </section>
@@ -980,11 +979,13 @@ export default async function KaderaPage() {
         ) : (
           <>
             {/* ⭐ **3열 × 3행, 아홉 장 고정이다**(2026-09-06). 바로 위 급부상 카드와 같은 판이라
-                두 시트를 이어서 훑을 때 눈이 자리를 다시 찾지 않는다. '더 보기'는 안 단다 — LLM
+                두 시트를 이어서 훑을 때 눈이 자리를 다시 찾지 않는다. 폰에서만 셋까지 보이고 '더 보기'로
+                편다(PhoneFold, 2026-09-23 — 한 줄로 쌓이면 아홉 장이 너무 길다). 넓은 화면엔 '더 보기'를 안 단다 — LLM
                 비용과는 무관하지만(문장은 파이프라인이 미리 만들어 둔 것을 읽을 뿐이다) 카드가
                 길어지고, 열 번째부터는 등락이 잦아들어 이 카드의 값어치가 떨어진다.
                 만들어 둔 나머지 줄은 표에 남아 **종목 화면**(/stock/[code] 의 '왜 움직였나')이
                 쓴다 — 그쪽이 검색으로 오는 자리다. */}
+            <PhoneFold total={Math.min(why.rows.length, WHY_TILES)} name="kadera_why">
             <div className="hz-panelgrid hz-panelgrid-3">
               {why.rows.slice(0, WHY_TILES).map((r, i) => (
                 /* 2열 타일. 한 줄짜리 목록은 문장이 칸의 4할에서 끝나고 오른쪽 등락까지 빈 자리가
@@ -995,8 +996,9 @@ export default async function KaderaPage() {
                   {/* 머리줄은 **급부상 셀과 글자까지 같다** — 순위 배지 · 이름 · 코드, 오른쪽에 값 묶음.
                       로고를 쓰다가 숫자로 바꿨다(2026-09-06): 두 카드가 나란히 서는데 한쪽만
                       로고면 같은 자리가 다른 것으로 읽히고, 오름폭 순이라는 것도 배지가 말해 준다.
-                      baseline 정렬인 까닭은 급부상 셀 주석 참고(상자를 맞추면 글자 밑선이 어긋난다). */}
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+                      baseline 정렬인 까닭은 급부상 셀 주석 참고(상자를 맞추면 글자 밑선이 어긋난다).
+                      hz-tile-head — 폰에서 테마 칩이 이름보다 먼저 줄어드는 한 줄 머리(kadera.css). */}
+                  <div className="hz-tile-head" style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
                     <RankBadge n={i + 1} />
                     <Link
                       href={stockHref(r.code)}
@@ -1025,13 +1027,11 @@ export default async function KaderaPage() {
                   {/* 까닭. 상자·아이콘은 급부상·주요 종목 리포트의 AI 상자와 같다(회색 타일 위 카드색 상자).
                       marginTop:auto — 선을 못 그린 종목(상장 직후라 봉이 없다)은 위가 비는데, 그때
                       문장이 바닥에 붙어야 3열 격자에서 세 장의 문장 줄이 나란히 선다(급부상 셀과 같은 수). */}
-                  <div style={{ marginTop: "auto", display: "flex", gap: 9, background: C.card, borderRadius: 12, padding: "12px 13px" }}>
-                    <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                  <div style={{ marginTop: "auto", fontSize: "var(--fs-13)", lineHeight: 1.7, display: "flex", gap: 9, background: C.card, borderRadius: 12, padding: "12px 13px" }}>
+                    <AiMark size={15} style={{ flexShrink: 0 }} />
                     <p
                       style={{
                         margin: 0,
-                        fontSize: "var(--fs-13)",
-                        lineHeight: 1.7,
                         color: "var(--c-ink-soft)",
                         wordBreak: "keep-all",
                         textWrap: "pretty",
@@ -1043,6 +1043,7 @@ export default async function KaderaPage() {
                 </div>
               ))}
             </div>
+            </PhoneFold>
           </>
         )}
       </section>
@@ -1066,10 +1067,10 @@ export default async function KaderaPage() {
             desc="관심이 어느 테마로 옮겨가는지 · 점유율 변화 기준"
             right={
               THEME_LINKS ? (
-                /* 기간 알약과 같은 자리·같은 꼴의 알약(2026-09-22). 눌리는 것이라 올리면 하늘색(.hz-theme-headpill). */
+                /* 기간 알약과 같은 자리·같은 꼴의 알약(2026-09-22). 눌리는 것이라 올리면 하늘색(.hz-theme-headpill). 화살표는 › 다 — 사이트 안 이동(2026-09-23). */
                 <Link href="/theme" className="hz-sheet-head-note hz-theme-headpill">
                   테마 자세히 보기
-                  <Icon name="arrow_forward" style={{ fontSize: "var(--fs-13)" }} />
+                  <Icon name="chevron_right" style={{ fontSize: "var(--fs-13)" }} />
                 </Link>
               ) : undefined
             }
@@ -1326,16 +1327,16 @@ export default async function KaderaPage() {
                       ⭐ 문장이 없어도 **상자와 아이콘은 그대로** 두고 까닭만 적는다
                       (2026-09-05 지적). 급부상 셀과 같은 규칙이다 — 그 블록 주석 참고. */}
                   {narratives[r.code] ? (
-                    <div style={{ display: "flex", gap: 9, background: C.card, borderRadius: 12, padding: "12px 13px" }}>
-                      <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-                      <p style={{ margin: 0, fontSize: "var(--fs-13)", lineHeight: 1.7, color: "var(--c-ink-soft)", textWrap: "pretty", wordBreak: "keep-all" }}>
+                    <div style={{ fontSize: "var(--fs-13)", lineHeight: 1.7, display: "flex", gap: 9, background: C.card, borderRadius: 12, padding: "12px 13px" }}>
+                      <AiMark size={15} style={{ flexShrink: 0 }} />
+                      <p style={{ margin: 0, color: "var(--c-ink-soft)", textWrap: "pretty", wordBreak: "keep-all" }}>
                         {narratives[r.code]}
                       </p>
                     </div>
                   ) : (
-                    <div style={{ display: "flex", gap: 9, background: C.card, borderRadius: 12, padding: "12px 13px" }}>
-                      <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-                      <p style={{ margin: 0, fontSize: "var(--fs-13)", lineHeight: 1.7, color: C.sub2, wordBreak: "keep-all" }}>
+                    <div style={{ fontSize: "var(--fs-13)", lineHeight: 1.7, display: "flex", gap: 9, background: C.card, borderRadius: 12, padding: "12px 13px" }}>
+                      <AiMark size={15} style={{ flexShrink: 0 }} />
+                      <p style={{ margin: 0, color: C.sub2, wordBreak: "keep-all" }}>
                         흐름 요약은 오늘 집계가 끝나면 붙습니다.
                       </p>
                     </div>

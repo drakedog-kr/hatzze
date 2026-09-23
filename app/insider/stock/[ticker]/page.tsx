@@ -266,7 +266,7 @@ export default async function StockDetailPage({
     // (규칙은 globals.css 의 `[data-cur-default]`).
     <div className="hz-tx" data-cur-default="usd">
       <LoadFailedNote sources={d.failedSources} />
-      <Link
+      <Link className="hz-back-link"
         href="/insider"
         style={{
           alignSelf: "flex-start",

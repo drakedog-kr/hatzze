@@ -280,7 +280,8 @@ export function Controls({
             }}
             onBlur={() => setFocused(false)}
             placeholder={`${selected.name} · 다른 종목 검색`}
-            style={{ flex: 1, border: "none", outline: "none", background: "transparent", color: C.ink, fontSize: "var(--fs-15)", minWidth: 0 }}
+            className="mdd-search-input"
+            style={{ flex: 1, alignSelf: "stretch", border: "none", outline: "none", background: "transparent", color: C.ink, minWidth: 0 }}
           />
         </div>
         {/* 드롭다운은 두 얼굴이다.
@@ -353,10 +354,10 @@ export function Controls({
         )}
       </div>
 
-      {/* 기간 토글 — 낱개 알약 5개 대신 하나의 세그먼티드 컨트롤로 묶는다(한 덩어리로 읽힘).
-          선택된 칸만 파란 면 + 흰 글자다. 예전엔 흰 면 + 파란 글자였는데, 검색창과 이
-          컨트롤이 둘 다 회색 면이라 '지금 고른 것'이 면이 아니라 글자색으로만 갈렸다. */}
-      <div style={{ display: "flex", gap: 2, background: C.track, borderRadius: 9, padding: 3 }}>
+      {/* 기간 토글 — 다른 화면의 기간 탭과 같은 .hz-seg(회색 트랙 + 고른 칸만 흰 칩)다(2026-09-23).
+          예전엔 고른 칸을 파랗게 채웠다. 흰 칩은 면(흰색 vs 회색)으로 '지금 고른 것'을 가르므로
+          예전 흰 면 + 파란 글자 시절의 문제(글자색으로만 갈림)는 생기지 않는다. 호버는 .mdd-period(sheets.css). */}
+      <div className="hz-seg mdd-period" role="group" aria-label="조회 기간">
         {PERIODS.map((p) => {
           const on = p.key === years;
           return (
@@ -367,22 +368,6 @@ export function Controls({
                 onYears(p.key);
               }}
               aria-pressed={on}
-              className="mdd-period-btn"
-              style={{
-                padding: "7px 13px",
-                borderRadius: 6,
-                border: "none",
-                background: on ? "var(--c-cold-ink)" : "transparent",
-                /* 글자를 #ffffff 로 박으면 안 된다. --c-cold-ink 는 라이트에서 진한 파랑
-                   (#1b6fb8)이지만 다크에서는 **밝은** 파랑(#6bb6f8)이라, 흰 글자가 그 위에서
-                   명암비 2.17 이 된다. 카드색을 쓰면 두 테마가 저절로 반대로 간다. */
-                color: on ? C.card : C.label,
-                fontSize: "var(--fs-11-5)",
-                fontWeight: 700,
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-                fontFamily: "inherit",
-              }}
             >
               {p.label}
             </button>

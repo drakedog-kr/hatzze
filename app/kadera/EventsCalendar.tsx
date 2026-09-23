@@ -165,7 +165,7 @@ export function EventsCalendar({ events, today, weeks = 5 }: { events: CalEvent[
               >
                 <span className="num">{num}</span>
                 {/* 일정이 있는 날만 건수를 단다. 없는 날에 0 을 찍으면 달력이 숫자로 덮인다. */}
-                {n > 0 && <span className="cnt">{n}</span>}
+                {n > 0 && <span className="cnt">{n}건</span>}
               </button>
             );
           })}
@@ -251,7 +251,7 @@ export function EventsCalendar({ events, today, weeks = 5 }: { events: CalEvent[
             ))}
             {nextMore > 0 && (
               <button type="button" className="hz-evday-more" onClick={() => pick(nextDate)}>
-                {nextMore}건 더 있습니다 · 그날로 가기 →
+                이날 일정 {nextMore}건 보기 ›
               </button>
             )}
           </div>

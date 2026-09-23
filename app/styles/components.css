@@ -68,6 +68,12 @@
   .hz-news { padding-left: 12px; }
   .hz-news-link { font-size: var(--fs-13); gap: 8px; }
   .hz-news-go-label { display: none; }
+  /* 폰에서 띠가 세 줄 81px 였다 — 첫 방문자의 첫 화면에서 제목이 167px 아래로 밀렸다(2026-09-23 실측).
+     이름이 앞에 서는 소식("테마 리포트를 열었습니다. …")은 한 줄로 자르고, 문장이 앞에 서는 소식(텔레그램 권유)은
+     밑줄 이름이 끝에 있어 한 줄로 자르면 그게 잘리므로 두 줄까지 둔다. 띠 전체가 링크라 잘린 뒷말은 눌러서 본다. */
+  .hz-news-link { padding: 8px 0; }
+  .hz-news-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+  .hz-news-namefirst .hz-news-text { -webkit-line-clamp: 1; }
 }
 
 

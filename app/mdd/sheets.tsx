@@ -77,8 +77,7 @@ export function Attribution({
         )}
         {/* 옆 시트(이 하락의 성격)에 맞춰 늘어나는데 여긴 막대 셋뿐이라 가운데가 빈다.
             줄 간격을 벌려 채우지는 않는다 — 길이를 견주는 차트라 막대끼리 멀어지면
-            비교가 어려워진다. 묶음을 붙여 둔 채 남는 공간을 위아래로 가른다.
-            (아래 결론 노트는 margin-top:auto 라 그대로 바닥에 붙는다.) */}
+            비교가 어려워진다. 묶음을 붙여 둔 채 남는 공간을 위아래로 가른다. */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 11, justifyContent: "center" }}>
           {rows.map((r) => (
             // 고점 이후 수익률이라 시장·업종은 상승(+)일 수도 있다 — 그때만 빨강으로 가른다.
@@ -95,27 +94,9 @@ export function Attribution({
             />
           ))}
         </div>
-        {/* 결론 노트는 **항상 시트 바닥**에 붙는다. 위 컨테이너에 flex:1 이 있어야
-            margin-top:auto 가 먹는다(옆 시트에 맞춰 늘어난 만큼 아래가 비기 때문). */}
-        {gap !== null && (
-          <div style={{ marginTop: "auto", display: "flex", gap: 9, background: C.soft, borderRadius: 10, padding: "12px 13px" }}>
-            {/* ⚠️ bolt 였다. 짝으로 나란히 서는 오른쪽 시트('이 하락의 성격')의 제목 아이콘이
-                같은 번개라, 한 줄에 같은 그림이 둘이었다. 이 상자는 시트의 **결론**이라
-                전구를 쓴다 — 이 파일의 info 는 '자료가 부족하다'는 안내 쪽이다. */}
-            <Icon name="lightbulb" style={{ fontSize: "var(--fs-15)", color: C.muted, flex: "none", marginTop: 1 }} />
-            <p style={{ margin: 0, fontSize: "var(--fs-11-5)", lineHeight: 1.7, color: C.inkSoft, wordBreak: "keep-all" }}>
-              {excess ? (
-                <>
-                  시장·업종으로 설명되지 않는 <b style={{ fontWeight: 800, color: DOWN }}>{fmtPct(gap)}p</b>가 이 종목 고유의 낙폭입니다.
-                </>
-              ) : (
-                <>
-                  이 종목은 {benchLabel} 평균보다 <b style={{ fontWeight: 800, color: UP }}>{fmtPct(gap)}p</b> 덜 빠졌습니다. 하락은 대체로 {benchLabel} 전체가 함께 겪은 것입니다.
-                </>
-              )}
-            </p>
-          </div>
-        )}
+        {/* 결론 상자("시장·업종으로 설명되지 않는 −4.8%p가 이 종목 고유의 낙폭입니다")가 여기 있었다.
+            같은 문장이 히어로 '이 하락의 맥락'에 그대로 있고, 바로 위 큰 숫자("종목 탓 4.8%p")도
+            같은 말이라 한 화면에 세 번이었다(2026-09-23). 숫자와 막대가 결론을 말한다. */}
       </div>
     </Sheet>
   );
@@ -166,7 +147,7 @@ export function Recovery({ a, periodLabel }: { a: MddAnalysis; periodLabel: stri
             {r.recoveredCount === 0
               ? "째 회복 못 함 · 이만큼 깊게 빠진 뒤 되찾은 전례가 없습니다"
               : hasRange
-                ? `중앙값 · 범위 ${fmtDur(r.minDays!)}~${fmtDur(r.maxDays!)}`
+                ? "중앙값" // 범위(최소~최대)는 바로 아래 막대 양 끝이 적는다(2026-09-23 — 같은 말이 두 번이었다)
                 : "고점을 되찾은 전례는 이 한 번뿐입니다"}
           </span>
         </div>
@@ -321,9 +302,10 @@ export function Character({ ch, currentDd }: { ch: DrawdownCharacter | null; cur
             이 기간엔 비교할 과거 하락이 부족합니다. 기간을 넓히면 급락형·완만형 회복을 비교할 수 있습니다.
           </p>
         )}
+        {/* 문장은 유형과 비교만 말한다. 기간·깊이 숫자는 바로 아래 통계 칸이 적는다 — 예전엔 문장이
+            "33일에 걸쳐 −21.2%"를 적고 칸이 같은 두 값을 또 적었다(2026-09-23). */}
         <span style={{ fontSize: "var(--fs-11-5)", color: C.inkSoft, lineHeight: 1.7, wordBreak: "keep-all" }}>
-          지금은 <b style={{ fontWeight: 800, color: DOWN }}>{curLabel}</b>입니다. {fmtDayCount(ch.currentTroughDays)}에 걸쳐 {fmtPct(ch.currentTroughDepth)}
-          {perDay !== null && <>, 하루 평균 {fmtPct(perDay)}</>}입니다.
+          지금은 <b style={{ fontWeight: 800, color: DOWN }}>{curLabel}</b>입니다.
           {compare && ` ${compare}`}
         </span>
         <div style={{ marginTop: "auto", display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 10, paddingTop: 14, borderTop: `1px solid ${C.sheetRow}` }}>
@@ -333,7 +315,7 @@ export function Character({ ch, currentDd }: { ch: DrawdownCharacter | null; cur
             value={ch.currentDownDayRatio !== null ? `${Math.round(ch.currentDownDayRatio)}%` : "—"}
             sub={ch.currentDownDayRatio !== null ? `10일 중 ${(ch.currentDownDayRatio / 10).toFixed(1)}일` : "표본 부족"}
           />
-          <StatCell label="저점 깊이" value={fmtPct(ch.currentTroughDepth)} sub="고점 대비" tone={DOWN} />
+          <StatCell label="저점 깊이" value={fmtPct(ch.currentTroughDepth)} sub={perDay !== null ? `하루 평균 ${fmtPct(perDay)}` : "고점 대비"} tone={DOWN} />
         </div>
       </div>
       <Foot>고점→저점이 {CHARACTER_SPLIT_DAYS}일 이하면 급락형, 넘으면 완만형입니다. 비교 막대는 과거 −15% 이상 하락만 셉니다.</Foot>
@@ -371,7 +353,7 @@ export function Theme({ theme }: { theme: ThemeCmp }) {
         : `테마 ${theme.peers.length}종목 중 낙폭 ${rank}위입니다.`;
   return (
     <Sheet>
-      <SectionHead level={2}
+      <SectionHead level={3}
         icon="hub"
         title={`${theme.name} 대표 ${theme.peers.length}종목 안에서`}
         desc={`${self.name}, ${lead}`}
@@ -440,7 +422,7 @@ export function TopDrawdowns({ eps }: { eps: Episode[] }) {
                 }}
               />
             </span>
-            <span style={{ width: 44, flex: "none", fontFamily: MONO, fontSize: "var(--fs-11-5)", fontWeight: 800, color: e.recovered ? C.ink : DOWN }}>
+            <span style={{ width: "var(--mdd-top-depth, 44px)", flex: "none", fontFamily: MONO, fontSize: "var(--fs-11-5)", fontWeight: 800, color: e.recovered ? C.ink : DOWN }}>
               {fmtPct(e.depth)}
             </span>
           </span>

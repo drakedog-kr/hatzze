@@ -16,13 +16,22 @@
   .mdd-pair { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* 기간 토글 — 배경·글자색은 선택 여부에 따라 인라인으로 정하고, 호버만 여기서 맡는다.
-   ⚠️ 호버 배경을 인라인에 두면 :hover 를 이겨서 아예 안 먹는다(카더라 '더 보기'가
-   그래서 한 번도 호버가 안 보였다). */
-.mdd-period-btn { transition: background 0.13s ease, color 0.13s ease; }
-.mdd-period-btn[aria-pressed="false"]:hover {
-  background: var(--c-blue-tint);
-  color: var(--c-cold-ink);
+/* MDD 검색창 글자. 폰에서는 16 — 아이폰 사파리는 16px 미만 입력칸을 누르면 화면을 확대한다(배당 입력칸과 같은 규칙).
+   크기를 인라인에 두면 이 폰 규칙을 이기므로 클래스로 둔다. */
+.mdd-search-input { font-size: var(--fs-15); }
+@media (max-width: 560px) {
+  .mdd-search-input { font-size: 16px; }
+  /* 폰에선 11px대 글자가 12 가 된다(mobile.css 폰 최적화). 막대 줄의 고정 칸이 그만큼 넓어야 "2021.11"(12px/700 약 50px) ·
+     "+280%" · "11개월" 이 칸을 안 넘는다. 역대 낙폭 Top 5 의 깊이 칸("−66.4%")도 같다. */
+  :root { --mdd-mirror-label: 52px; --mdd-mirror-left: 44px; --mdd-mirror-right: 48px; --mdd-top-depth: 48px; }
+}
+
+/* MDD 기간 토글 — 생김새는 .hz-seg(흰 칩)가 쥐고, 호버만 여기서 맡는다(2026-09-23).
+   고르지 않은 칸은 글자만 진해진다. 카더라 탭(.hz-seg)에는 걸지 않으려고 .mdd-period 로 좁힌다.
+   ⚠️ 호버를 인라인에 두면 :hover 를 이겨서 아예 안 먹는다(카더라 '더 보기'가 그래서 한 번도
+   호버가 안 보였다). */
+.mdd-period > button[aria-pressed="false"]:hover {
+  color: var(--c-ink);
 }
 
 /* 역대 낙폭 Top 5 의 열 —— **인라인이 아니라 여기 둔다**. 인라인 grid-template-columns 는

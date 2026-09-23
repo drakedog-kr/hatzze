@@ -1614,3 +1614,36 @@
   .dv-basket-list { padding: 6px 8px 4px; }
   .dv-cal-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+/* ── 폰: 담은 종목 한 줄을 세 줄로(2026-09-23) ──
+   860 아래 두 줄 배치는 오른쪽 칸 폭을 '1년에 받는 배당'(95px)이 정하는데 × 가 그 칸 위에 서서 이름 칸이 130px 로 눌렸다.
+   알약 셋이 한 줄에 하나씩 쌓여 줄 하나가 163~212px(폰 한 화면의 1/4)였고, 체크·로고·× 는 줄 가운데에 서서 이름보다
+   53px 아래였다(360 실측). 폰에서는
+     윗줄   [체크 · 로고 · 이름 · 배지 · 계좌 ▾ ····················· ×]
+     가운데 [배당성향 25% · 5년 연 +27% · 지급일] — 알약 대신 가운뎃점으로 이은 회색 글
+     아랫줄 [− 10 + · 평단 넣기 ············· 1년 배당 / 투자금]
+   × 는 줄의 오른쪽 위에 따로 띄운다(absolute) — 격자 칸에 두면 그 칸 폭을 합계가 정해 이름 칸을 또 누른다.
+   이름 줄은 display:contents 로 풀어 이름·배지·계좌·사실 조각이 한 흐름(flex-wrap)에 서고, ::after 가 이름 줄 뒤에서
+   줄을 바꾼다(order 1). 계좌 선택은 배지 오른쪽(이름이 길면 저절로 아랫줄), 사실 조각은 order 2 라 늘 그 아래다.
+   순서 손잡이(점 여섯)는 폰에서 없앤다(2026-09-23 지적 — 폰 여백 18px 에 넣기엔 너무 좁다). 순서는 '정렬'로 바꾼다. */
+@media (max-width: 560px) {
+  .dv-trow { position: relative; grid-template-areas: "name name" "shares sum"; }
+  .dv-trow > :nth-child(7) { position: absolute; top: 4px; right: -8px; }
+  .dv-tname { align-items: flex-start; padding-right: 30px; }
+  .dv-tgrip { display: none; }
+  .dv-tname-txt { flex: 1 1 auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px 6px; }
+  .dv-tname-txt::after { content: ""; flex-basis: 100%; order: 1; }
+  .dv-tname-main { display: contents; }
+  .dv-tacct { margin-left: 0; }
+  .dv-tfacts { display: contents; }
+  .dv-tfact { order: 2; padding: 0; background: none; font-size: var(--fs-12); font-weight: 500; }
+  .dv-tfact + .dv-tfact::before { content: "·"; margin-right: 6px; color: var(--c-hint); }
+  .dv-tfact-warn { background: none; }
+  /* 평단 넣기는 스테퍼 옆. 좁아서 못 들면 저절로 아랫줄로 간다(flex-wrap). 연 평단 칸은 늘 제 줄. */
+  .dv-tshares { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+  .dv-tcost-open { margin-left: 6px; }
+  .dv-tcost { flex-basis: 100%; }
+  /* 작은 글자 단추의 누르는 범위(18px → 26px). 겉모양은 그대로 — mobile.css 폰 최적화의 여백 방식과 같다.
+     '정렬'은 바탕이 있는 select 라 여백으로 키운다(계좌 알약과 같은 28px). */
+  .dv-tcost-open, .dv-table-clear { padding-block: 4px; margin-block: -4px; }
+  .dv-tsort { padding-top: 5px; padding-bottom: 5px; }
+}

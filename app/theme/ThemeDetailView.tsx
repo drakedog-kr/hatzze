@@ -17,7 +17,8 @@ import { timeAgoInitial } from "../kadera/time-ago";
 import { AiMark, C, Icon, MONO, R } from "../ui";
 import type { ThemeMarket } from "./market";
 import { ReasonWeeks } from "./ReasonWeeks";
-import { Treemap, TreemapLegend, stockTiles, stockTone, usualDeltaText } from "./Treemap";
+import { stockTone, usualDeltaText } from "./Treemap";
+import { ShareBar } from "./ShareBar";
 
 /**
  * 테마 하나의 화면 본문 — **국장(/theme/[테마])과 미장(/theme/us/[테마])이 같이 쓴다.** 자료는 각자 읽어(lib/theme-page.ts ·
@@ -357,11 +358,11 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
         {d.brief?.brief ? (
           <div style={{ padding: "16px 22px 20px" }}>
             {/* 두 문단(파이프라인이 빈 줄로 가른다). 첫 문단은 가장 크게 오간 이야기, 둘째는 그 밖의 이야기. */}
-            <div style={{ display: "flex", gap: 10, background: C.soft, borderRadius: R.control, padding: "14px 16px" }}>
-              <AiMark size={15} style={{ flexShrink: 0, marginTop: 2 }} />
+            <div style={{ fontSize: "var(--fs-13-5)", lineHeight: 1.75, display: "flex", gap: 10, background: C.soft, borderRadius: R.control, padding: "14px 16px" }}>
+              <AiMark size={15} style={{ flexShrink: 0 }} />
               <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
                 {d.brief.brief.split(/\n\s*\n/).map((para, i) => (
-                  <p key={i} style={{ margin: 0, fontSize: "var(--fs-13-5)", lineHeight: 1.75, color: C.inkSoft, textWrap: "pretty", wordBreak: "keep-all" }}>
+                  <p key={i} style={{ margin: 0, color: C.inkSoft, textWrap: "pretty", wordBreak: "keep-all" }}>
                     {para}
                   </p>
                 ))}
@@ -380,15 +381,16 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
         )}
       </section>
 
-      {/* ── 말 많은 종목 ── 위에 종목 지도(칸 = 언급 수, 색 = 평소와 견준 배수), 아래에 표.
-          지도는 "이 테마 안에서 말이 어디 몰렸나"를 한 번에, 표는 까닭 한 줄까지. 테마 목록의 지도와 같은 그림이다. */}
+      {/* ── 말 많은 종목 ── 위에 몫 막대 하나(앞 다섯 종목 + 나머지), 아래에 표.
+          막대는 "이 테마 안에서 말이 어디 몰렸나"를, 표는 평소 대비와 까닭 한 줄까지. 종목 지도(트리맵)는
+          2026-09-23 에 걷었다 — 표와 같은 열 종목을 두 번 그렸고 폰에서는 칸 대부분이 이름 없는 색 조각이었다(ShareBar 머리말). */}
       <section className="hz-sheet">
         <SectionHead
           icon="leaderboard"
           title="이 테마의 주인공"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
           desc="상위 열 종목과 채널이 말한 이유입니다."
-          noteHelp="넓이는 언급 · 색은 평소"
+          noteHelp="막대는 언급의 몫"
           level={2}
         />
         {d.loadFailed ? (
@@ -398,10 +400,9 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
         ) : (
           // 아래 여백을 두지 않는다 — 마지막 줄의 호버 바탕이 시트 바닥까지 닿아야 잘린 것처럼 안 보인다(2026-09-21 지적).
           <div>
-            <div style={{ padding: "16px 22px 0" }}>
-              <Treemap tiles={stockTiles(d.hotStocks, market.key)} ariaLabel={`${theme} 테마 종목별 최근 ${KADERA_WINDOW_DAYS}일 언급`} />
+            <div style={{ padding: "16px 22px 16px" }}>
+              <ShareBar stocks={d.hotStocks} ariaLabel={`${theme} 테마 종목별 최근 ${KADERA_WINDOW_DAYS}일 언급의 몫`} />
             </div>
-            <TreemapLegend up="평소보다 말이 늘어난 종목" flat="비슷함" down="줄어든 종목" />
             {/* 두 열 × (머리 + 다섯 줄). 1~5 가 왼쪽, 6~10 이 오른쪽(grid-auto-flow: column). 열마다 열 머리를 두어 1위·6위 위에
                 선이 서고, 같은 줄은 높이를 나눠 가로선이 두 열에서 이어진다. 여섯 미만이면 한 열. 1149 아래도 한 열(layout.css). */}
             <div className={`hz-theme-stock-cols${d.hotStocks.length > HOT_COL_ROWS ? "" : " is-single"}`}>
@@ -418,7 +419,7 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
                     {items.map((s, i) => (
                       <div key={s.code} className="hz-trow hz-cols-theme-stock">
                         <RankBadge n={col * HOT_COL_ROWS + i + 1} />
-                        <Link href={market.stockHref(s.code)} style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, textDecoration: "none" }}>
+                        <Link href={market.stockHref(s.code)} className="hz-theme-stock-link">
                           <StockLogo code={s.code} name={s.name} market={s.market} size={28} />
                           <span style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
                             <span className="hz-theme-namerow">
@@ -528,17 +529,17 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
             listClassName="hz-panelgrid hz-panelgrid-auto"
             footerClassName="hz-sheet-foot-row"
             items={d.brief.excerpts.map((m, i) => (
-              <li key={`${m.channelHandle}-${m.messageId}`} className="hz-lift" style={{ display: "flex", padding: "16px 18px", gap: 12, minWidth: 0 }}>
+              <li key={`${m.channelHandle}-${m.messageId}`} className="hz-lift hz-msg-card">
                 <a
                   href={`https://t.me/${m.channelHandle}/${m.messageId}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   data-ga="kadera_message_click"
                   data-ga-channel={m.channelHandle}
-                  style={{ display: "flex", gap: 12, minWidth: 0, width: "100%", textDecoration: "none" }}
+                  className="hz-msg"
                 >
                   <Avatar photoUrl={m.channelPhotoUrl} title={m.channelTitle} size={34} />
-                  <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 7 }}>
+                  <div className="hz-msg-body">
                     <div style={{ display: "flex", alignItems: "baseline", gap: 7, minWidth: 0 }}>
                       <span style={{ ...clip, fontSize: "var(--fs-12-5)", fontWeight: 800, letterSpacing: "-.01em", color: "var(--c-cold-ink)", maxWidth: 220, minWidth: 0 }}>{m.channelTitle}</span>
                       <span style={{ fontSize: "var(--fs-11)", fontFamily: MONO, color: C.sub2, flexShrink: 0 }}>

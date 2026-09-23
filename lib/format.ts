@@ -151,7 +151,9 @@ export function formatKstUpdate(
       ? `${scheduled < 12 ? "오전" : "오후"} ${scheduled % 12 || 12}시`
       : `${hour < 12 ? "오전" : "오후"} ${hour % 12 || 12}시경`;
 
-  return `${get("year")}-${get("month")}-${get("day")}(${weekday}) ${time} 기준`;
+  // 화면의 다른 날짜("9월 22일 종가"·"9월 23일 기준")와 같은 꼴로 적는다(2026-09-23). 예전엔
+  // "2026-09-23(수)" 라 한 화면에 날짜 표기가 둘이었다. 연도는 뺀다 — 이 줄은 늘 오늘·어제다.
+  return `${Number(get("month"))}월 ${Number(get("day"))}일(${weekday}) ${time} 기준`;
 }
 
 /**

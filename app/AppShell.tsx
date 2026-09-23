@@ -1586,7 +1586,7 @@ function NewsStrip() {
   };
 
   return (
-    <div className="hz-news" role="status">
+    <div className={`hz-news${news.head ? "" : " hz-news-namefirst"}`} role="status">
       {/* 링크와 닫기 버튼은 **형제**로 둔다. 버튼을 링크 안에 넣으면 유효하지 않은
           마크업이고, 닫으려다 페이지가 넘어간다.
 

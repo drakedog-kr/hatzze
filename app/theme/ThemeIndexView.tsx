@@ -407,7 +407,7 @@ export function ThemeIndexView({
                     {/* 까닭(LLM 50~90자, ✨ 고지). 카더라 카드의 한 줄(22~30자)보다 길다 — 이 칸은 줄 폭을 다
                         가져서 넓은 화면은 한 줄, 1000px 는 두 줄이다. 없으면 그 사정을 적는다(빈 칸은 줄 높이가 흔들린다). */}
                     <span className="hz-theme-row-brief">
-                      <AiMark size={14} style={{ flexShrink: 0, marginTop: 3 }} />
+                      <AiMark size={14} style={{ flexShrink: 0 }} />
                       <span style={{ minWidth: 0, color: "var(--c-ink-soft)" }}>{r.reason}</span>
                     </span>
                     {/* 언급 수 위, 그 전 3일 수 아래 — 테마 흐름·주인공 표의 오른쪽 두 줄과 같은 꼴. */}
@@ -478,7 +478,7 @@ export function ThemeIndexView({
                     </span>
                     {/* 문장. ✨ 는 생성형 AI 고지(app/ui.tsx AiMark). 요약이 아직 없으면 그 사정을 적고 ✨ 는 안 단다. */}
                     <span className="hz-theme-row-brief">
-                      {t.briefLine && <AiMark size={14} style={{ flexShrink: 0, marginTop: 3 }} />}
+                      {t.briefLine && <AiMark size={14} style={{ flexShrink: 0 }} />}
                       <span style={{ minWidth: 0, color: t.briefLine ? "var(--c-ink-soft)" : C.sub2 }}>
                         {/* 요약이 없을 때의 대신. 머리가 이미 기간을 적고 있어 여기선 "최근 3일"을 되풀이하지 않는다(2026-09-22). */}
                         {t.briefLine ??

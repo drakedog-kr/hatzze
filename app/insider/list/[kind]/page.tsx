@@ -258,7 +258,7 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
     <div className="hz-tx" data-cur-default="usd">
       {/* 돌아갈 길. 사이드바가 /insider 를 켠 채로 두지만(주소가 그 아래라), 어느 카드에서
           왔는지는 사이드바가 못 말한다. */}
-      <Link
+      <Link className="hz-back-link"
         href="/insider"
         style={{
           alignSelf: "flex-start",
