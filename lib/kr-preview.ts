@@ -73,13 +73,33 @@ export type PreviewData = {
   usHoliday: string | null;
   /** spx 가 나온 미장 세션 날짜(미 동부). 083 전 줄은 null 이다. */
   usSession: string | null;
+  /**
+   * ⭐ 누적이 시작된 미장 세션(마이그레이션 085). `usSession` 보다 앞이면 국장이 쉬는 동안
+   * 미장이 여러 번 열린 날이고, `spx`·종목 등락이 그 세션들의 **누적**이다. 화면이 "연휴 동안" 으로 적는다.
+   */
+  usFrom: string | null;
 };
 
 const EMPTY: PreviewData = {
-  date: null, updatedAt: null, spx: null, sectors: [], moverCount: 0, pairCount: 0, usHoliday: null, usSession: null,
+  date: null, updatedAt: null, spx: null, sectors: [], moverCount: 0, pairCount: 0, usHoliday: null, usSession: null, usFrom: null,
 };
 
-type DayRow = { date: string; spx_dp: number | null; created_at: string; us_session?: string | null; us_holiday?: string | null };
+type DayRow = {
+  date: string; spx_dp: number | null; created_at: string;
+  us_session?: string | null; us_holiday?: string | null; us_from?: string | null;
+};
+
+/**
+ * 그날치 한 줄에서 읽을 칸. **새 칸부터 하나씩 빼며** 다시 읽는다 — 칸이 없는 표(마이그레이션
+ * 083·085 전)에는 조회가 400 으로 오기 때문이다. 한꺼번에 빼면 085 만 없을 때 휴장 칸까지 잃는다.
+ * (4xx 라 load-state 의 실패로 세지 않는다. lib/supabase-server.ts noteIfFailed 주석)
+ * ⚠️ 이게 다 실패해 줄이 없으면 아래가 종목 표로 물러서서 063 이 고친 '조용한 밤' 문제가 되살아난다.
+ */
+const DAY_COLS = [
+  "date,spx_dp,created_at,us_session,us_holiday,us_from",
+  "date,spx_dp,created_at,us_session,us_holiday",
+  "date,spx_dp,created_at",
+];
 
 type Row = {
   date: string;
@@ -121,24 +141,25 @@ export async function getPreview(): Promise<PreviewData> {
    * ⚠️ 그 표가 아직 없으면(마이그레이션 전) 예전처럼 종목 표에서 고른다. 그때는 조용한
    *    날 문제가 그대로지만 화면이 죽지는 않는다.
    */
-  const withHoliday = await db
-    .from("kr_preview_day")
-    .select("date,spx_dp,created_at,us_session,us_holiday")
-    .order("date", { ascending: false })
-    .limit(1);
-  // ⚠️ 마이그레이션 083 전에는 휴장 두 칸이 없어 이 조회가 400 으로 온다. 그때는 예전 칸만
-  //    다시 읽는다 — 안 그러면 아래가 종목 표로 물러서서 063 이 고친 '조용한 밤' 문제가 되살아난다.
-  //    (4xx 라 load-state 의 실패로 세지 않는다. lib/supabase-server.ts noteIfFailed 주석)
-  const day = withHoliday.error
-    ? await db.from("kr_preview_day").select("date,spx_dp,created_at").order("date", { ascending: false }).limit(1)
-    : withHoliday;
-  let dayRow = (day.data?.[0] ?? null) as DayRow | null;
+  let dayRow: DayRow | null = null;
+  for (const cols of DAY_COLS) {
+    const day = await db.from("kr_preview_day").select(cols).order("date", { ascending: false }).limit(1);
+    if (day.error) continue;
+    dayRow = (day.data?.[0] ?? null) as unknown as DayRow | null;
+    break;
+  }
   // 로컬에서만 세션·휴장을 얹어 본다(lib/dev-overrides.ts · 운영 빌드에선 늘 비어 있다).
   const devDay = getDevOverrides().previewDay;
   if (devDay && dayRow) {
-    dayRow = { ...dayRow, us_session: devDay.usSession ?? dayRow.us_session, us_holiday: devDay.usHoliday ?? dayRow.us_holiday };
+    dayRow = {
+      ...dayRow,
+      us_session: devDay.usSession ?? dayRow.us_session,
+      us_holiday: devDay.usHoliday ?? dayRow.us_holiday,
+      us_from: devDay.usFrom ?? dayRow.us_from,
+    };
   }
   const usSession = dayRow?.us_session ?? null;
+  const usFrom = dayRow?.us_from ?? null;
 
   /**
    * ⭐⭐ **미장이 쉰 밤에는 종목 표를 읽지 않는다.** 수집기가 그날 종목 줄을 안 쓰고 지우지만,
@@ -154,6 +175,7 @@ export async function getPreview(): Promise<PreviewData> {
       spx: dayRow.spx_dp == null ? null : Number(dayRow.spx_dp),
       usHoliday: dayRow.us_holiday,
       usSession,
+      usFrom,
     };
   }
 
@@ -250,5 +272,6 @@ export async function getPreview(): Promise<PreviewData> {
     pairCount: rows.length,
     usHoliday: null,
     usSession,
+    usFrom,
   };
 }

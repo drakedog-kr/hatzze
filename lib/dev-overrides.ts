@@ -41,7 +41,8 @@ export type DevOverrides = {
   // 주말 표기를 고칠 때 볼 길이 이것뿐이다.
   //   휴장  {"usHoliday":"노동절","usSession":"2026-09-04"}
   //   주말  {"usSession":"2026-09-18"}  → 세션이 어젯밤보다 앞이라 "금요일" 로 그린다
-  previewDay?: { usSession?: string; usHoliday?: string };
+  //   연휴  {"usSession":"2026-09-25","usFrom":"2026-09-23"}  → "연휴 동안" 으로 그린다
+  previewDay?: { usSession?: string; usHoliday?: string; usFrom?: string };
 };
 
 const EMPTY: DevOverrides = {};
