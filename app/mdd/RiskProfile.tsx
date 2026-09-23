@@ -291,8 +291,9 @@ export function RiskProfile({ r, periodLabel, market }: { r: RiskProfileData; pe
                 {t.scope && (
                   <>
                     {" "}
-                    {/* 크기는 아래 머리 문장("보통 8개월 빠지고 …")과 같은 13px, 굵기는 뺀다(2026-09-24). */}
-                    <span style={{ fontSize: "var(--fs-13)", fontWeight: 400, whiteSpace: "nowrap" }}>({t.scope})</span>
+                    {/* 크기·색은 첫 타일 제목 줄의 '10년 전체' 버튼(.hz-yrpop-btn: fs-11-5 · --c-sub)과 같다 —
+                        한 줄에 선 두 부가 글자가 같은 생김새여야 한다(2026-09-24). 굵기는 뺀다(버튼은 600). */}
+                    <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 400, color: C.sub, whiteSpace: "nowrap" }}>({t.scope})</span>
                   </>
                 )}
               </span>
