@@ -29,12 +29,6 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
-    // 연휴 며칠만 뜨는 인사라 기능 추가로 보지 않는다. Patch.
-    version: "1.20.2",
-    date: "2026-09-24",
-    changes: ["추석 연휴 동안 처음 들어오시면 명절 인사가 한 번 뜹니다."],
-  },
-  {
     // 제목 옆 물음표 도움말을 걷는다. 기능은 그대로라 Patch.
     version: "1.20.1",
     date: "2026-09-24",
