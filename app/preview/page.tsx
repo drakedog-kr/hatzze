@@ -162,6 +162,14 @@ function CellHead({ title, note }: { title: string; note?: string }) {
 const PCT = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(2)}%`;
 
 /**
+ * 미장 세션 날짜를 "9/4(금)" 으로. 미장이 쉰 날 '마지막 거래일' 에만 쓴다.
+ * ⚠️ 이 날짜는 **미 동부 달력의 날**(YYYY-MM-DD)이라 시각이 없다. `new Date(iso)` 를 KST 로
+ *    옮기지 말 것 — 그 자리에서 요일을 뽑아야 하루가 안 밀린다(UTC 자정으로 읽고 UTC 요일).
+ */
+const sessionDay = (iso: string) =>
+  `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}(${"일월화수목금토"[new Date(`${iso}T00:00:00Z`).getUTCDay()]})`;
+
+/**
  * 24시간 거래대금($). 백만 달러 단위로 적되 **1M 이 안 되는 마켓을 0M 으로 뭉개지 않는다.**
  *
  * ⚠️ 반올림 하나만 쓰면 얇은 마켓이 통째로 사라진다. 2026-09-06 현대차가 실제로
@@ -458,7 +466,7 @@ export default async function PreviewPage() {
 
   // ⚠️ 둘을 나란히 부른다. 표가 서로 달라 한쪽이 비어도 다른 쪽은 그린다 —
   // 하이퍼리퀴드 표가 아직 없던 날에도 아래 시트는 멀쩡해야 한다.
-  const [{ date, updatedAt, spx, sectors, moverCount }, overnight] = await Promise.all([
+  const [{ date, updatedAt, spx, sectors, moverCount, usHoliday, usSession }, overnight] = await Promise.all([
     getPreview(),
     getOvernightLive(),
   ]);
@@ -495,7 +503,9 @@ export default async function PreviewPage() {
   const crowded = [...linkCount.entries()].sort((a, b) => b[1] - a[1])[0];
   const stockCount = linkCount.size;
   // 간밤 S&P 가 든 구간의 과거 코스피 성적. 사전의 정적 표에서 고른다.
-  const after = spx == null ? null : KOSPI_AFTER.find(([lo, hi]) => spx >= lo && spx < hi) ?? null;
+  // ⚠️ 미장이 쉰 날에는 고르지 않는다. 그날 spx 는 마지막 거래일 것이고, 그 움직임은 전날
+  //    개장에서 이미 끝났다 — "이만큼 오른 아침에 코스피는" 이 오늘 아침 얘기가 아니게 된다.
+  const after = spx == null || usHoliday ? null : KOSPI_AFTER.find(([lo, hi]) => spx >= lo && spx < hi) ?? null;
 
   /**
    * 타일을 세울 차례. **평소 대비 큰 순**이다.
@@ -518,9 +528,12 @@ export default async function PreviewPage() {
               물음이 아니다 — 개장 전에 사람이 궁금한 건 **"간밤 미국이 이랬는데 우리 장은
               어떻게 열리나"** 하나다(2026-09-02 지적). 섹터는 타일마다 라벨로 이미 있다. */}
           <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-            <strong style={{ fontFamily: MONO, fontSize: "var(--fs-38)", fontWeight: 800, letterSpacing: "-.04em", lineHeight: 1,
-                             color: spx == null ? C.ink : spx > 0 ? HOT : COLD }}>
-              {spx == null ? "—" : PCT(spx)}
+            {/* ⭐ 미장이 쉰 날은 숫자 대신 "휴장" 이다(마이그레이션 083). 그날 spx 는 마지막
+                거래일 것이라 여기 크게 두면 밤사이 움직임으로 읽힌다 — 그 값은 바닥 줄로 내린다.
+                한글이라 MONO 를 빼고 본문 글꼴로 적는다. */}
+            <strong style={{ fontFamily: usHoliday ? undefined : MONO, fontSize: "var(--fs-38)", fontWeight: 800, letterSpacing: "-.04em", lineHeight: 1,
+                             color: usHoliday || spx == null ? C.ink : spx > 0 ? HOT : COLD }}>
+              {usHoliday ? "휴장" : spx == null ? "—" : PCT(spx)}
             </strong>
             <span style={{ flex: 1 }} />
             {/* ⚠️⚠️ **이 라벨 밑에 풀이를 달지 말 것.** "미국 대표 500개 기업 평균입니다 ·
@@ -529,7 +542,7 @@ export default async function PreviewPage() {
                 문장("간밤에는 N곳이 평소보다 크게 움직였습니다")과 같은 말이었다
                 (2026-09-03 지적). 한 화면에서 같은 사실을 두 번 적으면 둘 다 값이 떨어진다. */}
             <span style={{ fontSize: "var(--fs-12)", color: C.sub, lineHeight: 1.6, textAlign: "right", wordBreak: "keep-all" }}>
-              밤사이 S&amp;P 500
+              {usHoliday ?? <>밤사이 S&amp;P 500</>}
             </span>
           </div>
 
@@ -555,7 +568,17 @@ export default async function PreviewPage() {
           {!after && (
             <span style={{ marginTop: "auto", paddingTop: 10, borderTop: "1px solid var(--c-hairline)",
                            fontSize: "var(--fs-12)", lineHeight: 1.6, color: C.sub }}>
-              과거 같은 구간을 고를 자료를 아직 못 받았습니다
+              {/* 미장이 쉰 날은 이 자리가 마지막 거래일의 S&P 다. 칸 바닥을 채우는 역할은 같다. */}
+              {usHoliday ? (
+                <>
+                  마지막 거래일{usSession ? ` ${sessionDay(usSession)}` : ""} S&amp;P 500{" "}
+                  {spx == null ? "—" : (
+                    <strong style={{ fontFamily: MONO, fontWeight: 800, color: spx > 0 ? HOT : COLD }}>{PCT(spx)}</strong>
+                  )}
+                </>
+              ) : (
+                "과거 같은 구간을 고를 자료를 아직 못 받았습니다"
+              )}
             </span>
           )}
           {after && (
@@ -645,7 +668,11 @@ export default async function PreviewPage() {
                  `date` 가 있으면 파이프라인이 **돌았고** 걸린 종목이 없었다는 뜻이다
                  (마이그레이션 063 의 그날치 한 줄이 그 사실을 남긴다). */
               <span style={{ fontSize: "var(--fs-12-5)", color: C.sub, lineHeight: 1.7 }}>
-                {date ? "평소 폭을 크게 넘어선 곳이 없었습니다" : "아직 채울 자료가 없습니다."}
+                {usHoliday
+                  ? "미장이 쉬어 새로 움직인 종목이 없습니다"
+                  : date
+                    ? "평소 폭을 크게 넘어선 곳이 없었습니다"
+                    : "아직 채울 자료가 없습니다."}
               </span>
             ) : (
               /* ⭐ 누르면 아래 그 종목 타일로 내려간다(2026-09-05 ). 히어로가 이름만
@@ -693,9 +720,11 @@ export default async function PreviewPage() {
           <span style={{ marginTop: "auto", paddingTop: 10, borderTop: "1px solid var(--c-hairline)",
                          fontSize: "var(--fs-12)", color: C.sub, lineHeight: 1.6, whiteSpace: "nowrap",
                          overflow: "hidden", textOverflow: "ellipsis" }}>
-            {loudest.length === 0
-              ? "평소 하루 폭을 넘어선 곳이 기준입니다"
-              : "그 종목이 평소 하루에 움직이던 폭과 견준 순서"}
+            {usHoliday
+              ? "미장이 다시 열린 다음 아침에 채웁니다"
+              : loudest.length === 0
+                ? "평소 하루 폭을 넘어선 곳이 기준입니다"
+                : "그 종목이 평소 하루에 움직이던 폭과 견준 순서"}
           </span>
         </div>
 
@@ -708,7 +737,14 @@ export default async function PreviewPage() {
             도는 화면에 모델 값을 태울 이유가 없다. 이름 뒤 조사만 josa() 로 받침에 맞춘다. */}
         <div className="hz-hero-cell hz-hero-divide hz-hero-wide">
           <CellHead title="오늘의 브리핑" />
-          {moverCount === 0 ? (
+          {usHoliday ? (
+            /* ⚠️ '조용한 밤' 문구와 섞지 말 것. 그건 미장이 열렸는데 크게 움직인 곳이 없던 밤이고
+               ("한 해에 두세 번"), 이건 미장이 아예 안 열린 밤이다. */
+            <p style={{ margin: 0, color: C.sub, wordBreak: "keep-all" }}>
+              밤사이 미장은 {usHoliday}
+              {euro(usHoliday)} 열리지 않았습니다. 새로 움직인 종목이 없어 오늘은 이어 붙일 국장 종목도 없습니다.
+            </p>
+          ) : moverCount === 0 ? (
             <p style={{ margin: 0, color: C.sub, wordBreak: "keep-all" }}>
               밤사이 크게 움직인 종목이 없습니다. 눈여겨보는 미국 종목 가운데 평소 폭을 크게 넘어선 곳이 없었다는
               뜻이고, 고장이 아니라 조용한 밤이었습니다. 한 해에 두세 번 있는 밤입니다.
@@ -853,7 +889,7 @@ export default async function PreviewPage() {
         />
         {wall.length === 0 ? (
           <p style={{ margin: 0, padding: "20px 22px", fontSize: "var(--fs-13)", lineHeight: 1.75, color: C.sub, wordBreak: "keep-all" }}>
-            밤사이 크게 움직인 종목이 없어 이어 붙일 자리도 없습니다
+            {usHoliday ? "밤사이 미장이 쉬어 이어 붙일 자리가 없습니다" : "밤사이 크게 움직인 종목이 없어 이어 붙일 자리도 없습니다"}
           </p>
         ) : (
           <>

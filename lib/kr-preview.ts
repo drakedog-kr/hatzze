@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getDevOverrides } from "./dev-overrides";
 import { getSupabaseServer } from "./supabase-server";
 
 /**
@@ -64,9 +65,21 @@ export type PreviewData = {
   sectors: PreviewSector[];
   moverCount: number;
   pairCount: number;
+  /**
+   * ⭐ 밤사이 미장이 쉬었으면 그 휴장 이름(노동절 등), 열렸으면 null(마이그레이션 083).
+   * 이 값이 있으면 종목 줄은 없고, `spx` 는 **마지막 거래일**(`usSession`)의 등락이다.
+   * ⚠️ 그날 spx 로 구간표(KOSPI_AFTER)를 고르지 말 것. 그 움직임은 전날 개장에서 이미 끝났다.
+   */
+  usHoliday: string | null;
+  /** spx 가 나온 미장 세션 날짜(미 동부). 083 전 줄은 null 이다. */
+  usSession: string | null;
 };
 
-const EMPTY: PreviewData = { date: null, updatedAt: null, spx: null, sectors: [], moverCount: 0, pairCount: 0 };
+const EMPTY: PreviewData = {
+  date: null, updatedAt: null, spx: null, sectors: [], moverCount: 0, pairCount: 0, usHoliday: null, usSession: null,
+};
+
+type DayRow = { date: string; spx_dp: number | null; created_at: string; us_session?: string | null; us_holiday?: string | null };
 
 type Row = {
   date: string;
@@ -108,12 +121,39 @@ export async function getPreview(): Promise<PreviewData> {
    * ⚠️ 그 표가 아직 없으면(마이그레이션 전) 예전처럼 종목 표에서 고른다. 그때는 조용한
    *    날 문제가 그대로지만 화면이 죽지는 않는다.
    */
-  const day = await db
+  const withHoliday = await db
     .from("kr_preview_day")
-    .select("date,spx_dp,created_at")
+    .select("date,spx_dp,created_at,us_session,us_holiday")
     .order("date", { ascending: false })
     .limit(1);
-  const dayRow = (day.data?.[0] ?? null) as { date: string; spx_dp: number | null; created_at: string } | null;
+  // ⚠️ 마이그레이션 083 전에는 휴장 두 칸이 없어 이 조회가 400 으로 온다. 그때는 예전 칸만
+  //    다시 읽는다 — 안 그러면 아래가 종목 표로 물러서서 063 이 고친 '조용한 밤' 문제가 되살아난다.
+  //    (4xx 라 load-state 의 실패로 세지 않는다. lib/supabase-server.ts noteIfFailed 주석)
+  const day = withHoliday.error
+    ? await db.from("kr_preview_day").select("date,spx_dp,created_at").order("date", { ascending: false }).limit(1)
+    : withHoliday;
+  let dayRow = (day.data?.[0] ?? null) as DayRow | null;
+  // 로컬에서만 휴장 화면을 얹어 본다(lib/dev-overrides.ts · 운영 빌드에선 늘 비어 있다).
+  const devHoliday = getDevOverrides().previewHoliday;
+  if (devHoliday && dayRow) dayRow = { ...dayRow, us_holiday: devHoliday.name, us_session: devHoliday.session };
+  const usSession = dayRow?.us_session ?? null;
+
+  /**
+   * ⭐⭐ **미장이 쉰 밤에는 종목 표를 읽지 않는다.** 수집기가 그날 종목 줄을 안 쓰고 지우지만,
+   * 혹시 남아 있어도 그리면 안 된다 — 지난 세션의 카드이고, 카드 수치를 낸 백테스트는 이런
+   * 날을 건너뛴다. 예전엔 이 구별이 없어 노동절 다음 날(2026-09-08)에 09-04 카드 14장이
+   * "밤사이" 로 다시 떴다(fetch_kr_preview.py night_state 주석).
+   */
+  if (dayRow?.us_holiday) {
+    return {
+      ...EMPTY,
+      date: dayRow.date,
+      updatedAt: dayRow.created_at,
+      spx: dayRow.spx_dp == null ? null : Number(dayRow.spx_dp),
+      usHoliday: dayRow.us_holiday,
+      usSession,
+    };
+  }
 
   let date: string;
   if (dayRow) {
@@ -206,5 +246,7 @@ export async function getPreview(): Promise<PreviewData> {
     sectors,
     moverCount: byTicker.size,
     pairCount: rows.length,
+    usHoliday: null,
+    usSession,
   };
 }

@@ -37,6 +37,9 @@ export type DevOverrides = {
   summary?: string;
   // 데일리 노트(/daily). 비어 있으면 DB 를 읽는다.
   dailyNotes?: DevDailyNote[];
+  // 국장 미리보기(/preview)의 미장 휴장 화면. 있으면 가장 최근 날을 휴장으로 그린다.
+  // 휴장은 한 해 열 번 남짓이라 문구를 고칠 때 볼 길이 이것뿐이다. 예: {"name":"노동절","session":"2026-09-04"}
+  previewHoliday?: { name: string; session: string };
 };
 
 const EMPTY: DevOverrides = {};
