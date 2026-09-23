@@ -155,11 +155,16 @@ export function AiMark({ size, style }: { size: number; style?: React.CSSPropert
       data-tip={AI_NOTICE}
       // alignSelf 로 제 높이만 차지하게 못박는다. flex 기본값(stretch)이면 이 칸이 옆
       // 문단 높이만큼 늘어나, 위로 펴지는 툴팁이 아이콘이 아니라 문단 꼭대기에서 열린다.
-      // 글리프 위치는 그대로다(.ms 는 line-height:1 이라 어느 쪽이든 칸 맨 위에 그려진다).
-      style={{ display: "inline-flex", alignSelf: "flex-start", ...style }}
+      // 높이는 1lh(옆 문장의 한 줄 높이)이고 ✨ 는 그 안에서 가운데 선다 — 그래서 첫 줄
+      // 가운데에 맞는다. 예전엔 자리마다 marginTop 1·2·3 을 손으로 맞춰서 ✨ 가 글자보다
+      // 1.9px 위에 떠 있었다(2026-09-23 지적). 글자 크기가 바뀌면 그 숫자도 다시 어긋난다.
+      // ⚠️ 1lh 는 이 칸이 물려받은 줄 높이다. 옆 문장의 fontSize·lineHeight 는 <p> 가 아니라
+      // 부모 flex 줄에 둘 것(카더라·종목·테마 상자 · .hz-theme-row-brief · .hz-tx-eyebrow 가 그렇다).
+      style={{ display: "inline-flex", alignSelf: "flex-start", height: "1lh", alignItems: "center", ...style }}
     >
       <button type="button" className="hz-ai-mark" aria-label={AI_NOTICE}>
-        <Icon name="auto_awesome" style={{ fontSize: size, color: C.blue, display: "block" }} />
+        {/* −0.03em: 반짝이 글리프는 제 칸 가운데보다 반 픽셀쯤 아래에 그려진다(큰 별이 왼쪽 아래). */}
+        <Icon name="auto_awesome" style={{ fontSize: size, color: C.blue, display: "block", transform: "translateY(-0.03em)" }} />
       </button>
     </span>
   );

@@ -48,6 +48,7 @@ import {
 import { TrendingTabs } from "../TrendingTabs";
 import TimeAgo from "../TimeAgo";
 import { timeAgoInitial } from "../time-ago";
+import { PhoneFold } from "../PhoneFold";
 import { SectionHead } from "../SectionHead";
 import { SectionIntro } from "../../SectionIntro";
 
@@ -147,7 +148,7 @@ function UsMddLink({ ticker, label = "MDD" }: { ticker: string; label?: string }
   return (
     <Link href={`/mdd?code=${ticker}&market=US`} className="hz-mdd-link">
       {label}
-      <Icon name="arrow_outward" style={{ fontSize: "var(--fs-13)" }} />
+      <Icon name="chevron_right" style={{ fontSize: "var(--fs-13)" }} />
     </Link>
   );
 }
@@ -165,7 +166,7 @@ function UsInsiderLink({ ticker, label = "공시" }: { ticker: string; label?: s
   return (
     <Link href={`/insider/stock/${encodeURIComponent(ticker)}`} className="hz-mdd-link">
       {label}
-      <Icon name="arrow_outward" style={{ fontSize: "var(--fs-13)" }} />
+      <Icon name="chevron_right" style={{ fontSize: "var(--fs-13)" }} />
     </Link>
   );
 }
@@ -186,8 +187,7 @@ function UsTrendingList({ items }: { items: UsTrendingMessage[] }) {
   const nodes = items.map((m, i) => (
     <li
       key={`${m.channelHandle}-${m.messageId}`}
-      className="hz-lift"
-      style={{ display: "flex", padding: "16px 18px", gap: 12, minWidth: 0 }}
+      className="hz-lift hz-msg-card"
     >
       <a
         href={`https://t.me/${m.channelHandle}/${m.messageId}`}
@@ -195,24 +195,10 @@ function UsTrendingList({ items }: { items: UsTrendingMessage[] }) {
         rel="noopener noreferrer"
         data-ga="kadera_us_message_click"
         data-ga-channel={m.channelHandle}
-        style={{
-          display: "flex",
-          gap: 12,
-          minWidth: 0,
-          width: "100%",
-          textDecoration: "none",
-        }}
+        className="hz-msg"
       >
         <Avatar photoUrl={m.channelPhotoUrl} title={m.channelTitle} size={34} />
-        <div
-          style={{
-            flex: 1,
-            minWidth: 0,
-            display: "flex",
-            flexDirection: "column",
-            gap: 7,
-          }}
-        >
+        <div className="hz-msg-body">
           <div
             style={{
               display: "flex",
@@ -719,6 +705,8 @@ export default async function UsKaderaPage() {
             또렷해집니다.
           </p>
         ) : (
+          /* 폰에서만 셋까지 보이고 '더 보기'로 편다(PhoneFold 머리말). 넓은 화면은 3×2 그대로다. */
+          <PhoneFold total={surging.length} name="kadera_us_surging">
           <div className="hz-panelgrid hz-panelgrid-3">
             {surging.map((s, i) => {
               return (
@@ -727,6 +715,7 @@ export default async function UsKaderaPage() {
                       14px 종목명과 11px 티커·11.5px 표본이 섞여 있어 상자를 맞추면 정작
                       눈에 보이는 글자 밑선이 어긋난다(국장에서 실측 3.8px). */}
                   <div
+                    className="hz-tile-head"
                     style={{
                       display: "flex",
                       alignItems: "baseline",
@@ -853,6 +842,8 @@ export default async function UsKaderaPage() {
                   {surgeLines[s.ticker] ? (
                     <div
                       style={{
+                        fontSize: "var(--fs-13)",
+                        lineHeight: 1.7,
                         display: "flex",
                         gap: 9,
                         background: C.card,
@@ -860,12 +851,10 @@ export default async function UsKaderaPage() {
                         padding: "12px 13px",
                       }}
                     >
-                      <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                      <AiMark size={15} style={{ flexShrink: 0 }} />
                       <p
                         style={{
                           margin: 0,
-                          fontSize: "var(--fs-13)",
-                          lineHeight: 1.7,
                           color: "var(--c-ink-soft)",
                           textWrap: "pretty",
                           wordBreak: "keep-all",
@@ -877,6 +866,8 @@ export default async function UsKaderaPage() {
                   ) : (
                     <div
                       style={{
+                        fontSize: "var(--fs-13)",
+                        lineHeight: 1.7,
                         display: "flex",
                         gap: 9,
                         background: C.card,
@@ -884,12 +875,10 @@ export default async function UsKaderaPage() {
                         padding: "12px 13px",
                       }}
                     >
-                      <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                      <AiMark size={15} style={{ flexShrink: 0 }} />
                       <p
                         style={{
                           margin: 0,
-                          fontSize: "var(--fs-13)",
-                          lineHeight: 1.7,
                           color: C.sub2,
                           wordBreak: "keep-all",
                         }}
@@ -945,14 +934,8 @@ export default async function UsKaderaPage() {
               );
             })}
           </div>
+          </PhoneFold>
         )}
-        <div className="hz-sheet-foot">
-          <span style={{ fontSize: "var(--fs-11-5)", lineHeight: 1.6, color: C.sub }}>
-            막대는 최근 7일 일별 언급량이고, 붉은 칸이 배수를 낸 최근 기간입니다 ·
-            배수는 언급 횟수가 아니라 그날 전체 대화에서 차지한 몫을 견준
-            값입니다
-          </span>
-        </div>
       </section>
 
       {/* ── 급등 종목: 3열 × 3행 ────────────────────────────────────────
@@ -979,6 +962,8 @@ export default async function UsKaderaPage() {
             오늘 집계가 끝나면 채워집니다. 저녁 실행 뒤에 그날 것이 붙습니다.
           </p>
         ) : (
+          /* 폰에서만 셋까지 보이고 '더 보기'로 편다(PhoneFold 머리말). 넓은 화면은 3×3 그대로다. */
+          <PhoneFold total={Math.min(why.rows.length, US_WHY_TILES)} name="kadera_us_why">
           <div className="hz-panelgrid hz-panelgrid-3">
             {why.rows.slice(0, US_WHY_TILES).map((r, i) => (
               <div key={r.ticker} className="hz-panel-pad hz-why-tile">
@@ -1003,13 +988,11 @@ export default async function UsKaderaPage() {
                     )}
                   </span>
                 </div>
-                <div style={{ marginTop: "auto", display: "flex", gap: 9, background: C.card, borderRadius: 12, padding: "12px 13px" }}>
-                  <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                <div style={{ marginTop: "auto", fontSize: "var(--fs-13)", lineHeight: 1.7, display: "flex", gap: 9, background: C.card, borderRadius: 12, padding: "12px 13px" }}>
+                  <AiMark size={15} style={{ flexShrink: 0 }} />
                   <p
                     style={{
                       margin: 0,
-                      fontSize: "var(--fs-13)",
-                      lineHeight: 1.7,
                       color: "var(--c-ink-soft)",
                       wordBreak: "keep-all",
                       textWrap: "pretty",
@@ -1021,6 +1004,7 @@ export default async function UsKaderaPage() {
               </div>
             ))}
           </div>
+          </PhoneFold>
         )}
       </section>
 
@@ -1054,7 +1038,7 @@ export default async function UsKaderaPage() {
               THEME_LINKS ? (
                 <Link href={US_THEME_PAGE.href} className="hz-sheet-head-note hz-theme-headpill">
                   테마 자세히 보기
-                  <Icon name="arrow_forward" style={{ fontSize: "var(--fs-13)" }} />
+                  <Icon name="chevron_right" style={{ fontSize: "var(--fs-13)" }} />
                 </Link>
               ) : undefined
             }
@@ -1565,6 +1549,8 @@ export default async function UsKaderaPage() {
                   {r.narrative ? (
                     <div
                       style={{
+                        fontSize: "var(--fs-13)",
+                        lineHeight: 1.7,
                         display: "flex",
                         gap: 9,
                         background: C.card,
@@ -1572,15 +1558,10 @@ export default async function UsKaderaPage() {
                         padding: "12px 13px",
                       }}
                     >
-                      <AiMark
-                        size={15}
-                        style={{ flexShrink: 0, marginTop: 1 }}
-                      />
+                      <AiMark size={15} style={{ flexShrink: 0 }} />
                       <p
                         style={{
                           margin: 0,
-                          fontSize: "var(--fs-13)",
-                          lineHeight: 1.7,
                           color: "var(--c-ink-soft)",
                           textWrap: "pretty",
                           wordBreak: "keep-all",
@@ -1595,6 +1576,8 @@ export default async function UsKaderaPage() {
                        흐리게(sub2) 두어 아직 내용이 아니라는 것을 말한다. */
                     <div
                       style={{
+                        fontSize: "var(--fs-13)",
+                        lineHeight: 1.7,
                         display: "flex",
                         gap: 9,
                         background: C.card,
@@ -1602,12 +1585,10 @@ export default async function UsKaderaPage() {
                         padding: "12px 13px",
                       }}
                     >
-                      <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                      <AiMark size={15} style={{ flexShrink: 0 }} />
                       <p
                         style={{
                           margin: 0,
-                          fontSize: "var(--fs-13)",
-                          lineHeight: 1.7,
                           color: C.sub2,
                           wordBreak: "keep-all",
                         }}

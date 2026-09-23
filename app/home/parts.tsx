@@ -208,7 +208,7 @@ export function Shell({
       {/* ② 그래픽 존. flex:1 로 남는 높이를 받되 내용은 위에서부터 쌓는다.
           마지막 자식에만 margin-block:auto 를 줘, 그래픽이 하나뿐인 카드는 그 하나가
           존 한가운데 서고 여럿인 카드는 위에서부터 줄줄이 선다. */}
-      <div className="hz-cell-graphic" style={{ flex: 1, display: "flex", flexDirection: "column", gap: 16, minHeight: 140 }}>
+      <div className="hz-cell-graphic" style={{ flex: 1, display: "flex", flexDirection: "column", gap: 16 }}>
         {body}
       </div>
       {foot}

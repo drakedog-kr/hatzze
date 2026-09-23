@@ -104,6 +104,16 @@ export const fmtDayCount = (d: number) => `${Math.round(d).toLocaleString("ko-KR
  *  연도를 두 자리로 줄이면("17-11") 연-월인지 월-일인지 분간이 안 된다. */
 export const fmtYm = (date: string) => date.slice(0, 7);
 
+/**
+ * 하루 날짜를 화면 말투로. 기준일(보통 분석 기준일 asOf)과 **같은 해면 "6월 18일"**, 다른 해면
+ * **"2021년 1월"**(2026-09-23). 예전엔 "2026-06-18" 이라 사이트의 다른 날짜("9월 22일 종가")와
+ * 표기가 갈렸다. 여러 해 전의 전고점은 날까지 적어도 읽는 데 보탬이 없고 칸만 넓힌다.
+ */
+export const fmtDay = (iso: string, refIso: string) => {
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+  return y === Number(refIso.slice(0, 4)) ? `${m}월 ${d}일` : `${y}년 ${m}월`;
+};
+
 /* ── 색 축 ─────────────────────────────────────────────────────────
    이 페이지만 온도축을 **낙폭축**으로 다시 매핑한다.
      파랑 = 하락 · 낙폭 · 초과낙폭      빨강 = 회복 · 수익 · 상승

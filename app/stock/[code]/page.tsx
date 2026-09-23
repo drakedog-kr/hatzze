@@ -239,7 +239,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
         trail={[PARENT]}
       />
 
-      <Link
+      <Link className="hz-back-link"
         href={PARENT.path}
         style={{
           alignSelf: "flex-start",
@@ -383,14 +383,12 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
             level={2}
           />
           <div style={{ padding: "16px 22px 20px" }}>
-            <div style={{ display: "flex", gap: 9, background: C.soft, borderRadius: R.control, padding: "12px 13px" }}>
-              <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+            <div style={{ fontSize: "var(--fs-13)", lineHeight: 1.7, display: "flex", gap: 9, background: C.soft, borderRadius: R.control, padding: "12px 13px" }}>
+              <AiMark size={15} style={{ flexShrink: 0 }} />
               <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
                 <p
                   style={{
                     margin: 0,
-                    fontSize: "var(--fs-13)",
-                    lineHeight: 1.7,
                     color: why.reason ? C.inkSoft : C.sub2,
                     textWrap: "pretty",
                     wordBreak: "keep-all",
@@ -398,7 +396,8 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
                 >
                   {why.reason ?? "커뮤니티에서 이유를 말한 곳이 없습니다."}
                 </p>
-                <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2 }}>
+                {/* lineHeight 1.5: 상자가 ✨ 줄 맞춤 때문에 문장의 1.7 을 들고 있어 이 줄까지 물려받는다. */}
+                <span style={{ fontSize: "var(--fs-11-5)", lineHeight: 1.5, color: C.sub2 }}>
                   {whyRate != null && (
                     <>
                       <span
@@ -485,14 +484,12 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
               같은 값이라 화면을 오갈 때 같은 자리에서 같은 간격을 만난다. */}
           <div style={{ padding: "16px 22px 20px" }}>
             <div
-              style={{ display: "flex", gap: 9, background: C.soft, borderRadius: R.control, padding: "12px 13px" }}
+              style={{ fontSize: "var(--fs-13)", lineHeight: 1.7, display: "flex", gap: 9, background: C.soft, borderRadius: R.control, padding: "12px 13px" }}
             >
-              <AiMark size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+              <AiMark size={15} style={{ flexShrink: 0 }} />
               <p
                 style={{
                   margin: 0,
-                  fontSize: "var(--fs-13)",
-                  lineHeight: 1.7,
                   color: C.inkSoft,
                   textWrap: "pretty",
                   wordBreak: "keep-all",

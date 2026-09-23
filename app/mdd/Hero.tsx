@@ -7,9 +7,9 @@ import type { MddAnalysis } from "@/lib/mdd";
 import { C, Icon, MONO } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
 import { StockLogo } from "../StockLogo";
-import { fmtPct, fmtPrice, benchName, benchParticle, benchVerb, fmtDur, fmtDayCount, DOWN, UP, DOWN_BAR } from "./shared";
+import { fmtPct, fmtPrice, benchName, benchParticle, benchVerb, fmtDur, fmtDayCount, fmtDay, DOWN, UP, DOWN_BAR } from "./shared";
 import type { MddResult } from "./shared";
-import { Sheet, Foot, StatCell, Pill } from "./sheet";
+import { Sheet, Foot, StatCell } from "./sheet";
 
 function Reading({ data, periodLabel }: { data: MddResult; periodLabel: string }) {
   const a = data.analysis;
@@ -116,145 +116,109 @@ function Reading({ data, periodLabel }: { data: MddResult; periodLabel: string }
   );
 }
 
-/* ── 히어로 스트립 ─────────────────────────────────────────────────
-   시트 하나를 flex-wrap 으로 3분할한다. **고정 3열 그리드를 쓰면 안 된다** — 좁은 폭에서
-   세 칸이 합쳐 컨테이너를 넘긴다. 셀마다 flex-basis 를 주고 알아서 접히게 둔다. */
+/* ── 히어로 ──────────────────────────────────────────────────────
+   다른 화면(내부자·종목·테마·미리보기)과 같은 3칸 틀(.hz-kd-hero)이다(2026-09-23). 예전엔 이
+   화면만 칸을 인라인 헤어라인으로 갈랐고, 첫 칸에 "분석 종목" 라벨 + 테두리 알약(KOSPI),
+   셋째 칸에 작은 아이콘 타일이 따로 있었다. 이제 왼쪽 두 칸은 회색 타일, 오른쪽 넓은 칸은
+   흰 문장 칸이다 — 다른 화면 히어로와 같은 짜임이라 어디를 먼저 읽을지가 같은 자리에 선다.
+
+   칸 폭은 flex 값만 인라인으로 준다. 둘째 칸(게이지 + 통계 셋)이 가장 넓어야 통계 칸 라벨이 안
+   잘리고, 셋째 칸(문단)은 50% 틀보다 조금 좁아도 된다. 접힘(flex-wrap)은 틀이 한다. */
 
 export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel: string }) {
   const a = data.analysis;
   const atHigh = a.currentDd > -1;
   const sincePeak = Math.round((Date.parse(a.asOf) - Date.parse(a.athDate)) / 86_400_000);
   const fromLow = a.low > 0 ? (a.price / a.low - 1) * 100 : 0;
-
-  /* 셀 경계는 셀이 자기 **오른쪽·아래** 두 곳에 inset 으로 긋는다(globals.css 의
-     .hz-cellgrid 와 같은 방식). 오른쪽만 그으면 좁은 폭에서 세 셀이 세로로 쌓일 때
-     경계가 통째로 사라지고(실측 820px: 셀 셋이 각각 554px 전폭), 그 선은 시트
-     오른쪽 테두리와 겹쳐 버린다.
-
-     아래 감싸는 div 의 margin-bottom:-1px 이 짝이다 — 모든 셀이 아랫선을 그으면
-     마지막 줄의 선이 시트 바닥 테두리와 겹쳐 2px 로 두꺼워지는데, 1px 짧게 잡아
-     시트 밖으로 밀면 overflow:hidden 이 잘라 준다. 셀 개수를 안 세도 된다. */
-  const cell: React.CSSProperties = {
-    minWidth: 0,
-    padding: "20px 22px",
-    display: "flex",
-    flexDirection: "column",
-    gap: 14,
-    boxShadow: `inset -1px 0 0 ${C.line}, inset 0 -1px 0 ${C.line}`,
-  };
+  const title: React.CSSProperties = { fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink };
 
   return (
     <section className="hz-sheet">
-      <div style={{ display: "flex", flexWrap: "wrap", marginBottom: -1 }}>
-      {/* 1 — 분석 종목 */}
-      <div style={{ ...cell, flex: "1 1 290px" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-          <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>분석 종목</span>
-          {data.market && <Pill>{data.market}</Pill>}
-        </div>
-        {/* 로고는 글자 기준선이 아니라 가운데에 맞아야 한다 — baseline 이면 정사각형
-            타일이 글자 밑선에 걸려 위로 떠 보인다. */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", minWidth: 0 }}>
-          <StockLogo code={data.code} name={data.name} market={data.market} size={30} />
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", minWidth: 0 }}>
-            <strong style={{ fontSize: "var(--fs-21)", fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>{data.name}</strong>
-            <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", color: C.muted }}>{data.code}</span>
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
-          <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>{fmtPrice(a.price, data.market)}</strong>
-          {a.changePct !== null && (
-            <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 800, color: a.changePct >= 0 ? UP : DOWN }}>{fmtPct(a.changePct)}</span>
-          )}
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", marginTop: "auto" }}>
-          <PriceRow label="전고점" date={a.athDate} value={fmtPrice(a.ath, data.market)} />
-          <PriceRow label="저점" date={a.lowDate} value={fmtPrice(a.low, data.market)} />
-        </div>
-      </div>
-
-      {/* 2 — 지금 낙폭 */}
-      <div style={{ ...cell, flex: "1.05 1 300px" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-            <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>지금 낙폭</span>
-            <span
-              className="hz-tip hz-tip-wide hz-tip-start"
-              data-tip="전고점 대비 하락폭"
-              style={{ display: "inline-flex", cursor: "help" }}
-            >
-              <Icon name="help" style={{ fontSize: "var(--fs-14)", color: C.muted }} />
-            </span>
-          </span>
-          {/* 오른쪽 위에 있던 '상위 11%' 배지는 걷었다(2026-08-04). 바로 아래 타일이 같은
-              것을 이미 말하는데다, '상위 N%' 자체가 무엇의 상위인지 한 번 더 생각하게 했다. */}
-        </div>
-        {/* 밑선 맞춤은 CSS 가 한다(.hz-figrow) — 히어로 셋과 같은 짝이다.
-            ⚠️ 줄간이 0.78 이었다. 가운데 맞춤에서 숫자를 억지로 끌어올리던 값인데,
-            밑선으로 맞추면 필요 없을 뿐 아니라 밑선 자체를 밀어 도로 어긋난다. */}
-        <div className="hz-figrow">
-          <strong
-            style={{ fontFamily: MONO, fontSize: "var(--fs-40)", fontWeight: 800, lineHeight: 1, letterSpacing: "-.04em", color: atHigh ? C.ink : DOWN }}
-          >
-            {atHigh ? "신고가 부근" : fmtPct(a.currentDd)}
-          </strong>
-          {!atHigh && (
-            <div className="hz-figrow-aside">
-              <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub }}>전고점 대비</span>
-              <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 700, color: C.sub }}>
-                저점 대비 <b style={{ color: fromLow >= 0 ? UP : DOWN, fontWeight: 800 }}>{fmtPct(fromLow)}</b>
+      <div className="hz-kd-hero">
+        {/* 1 — 종목. 제목 줄 자리에 종목 자체가 선다(라벨 "분석 종목"은 위 검색창이 이미 말한다). */}
+        <div className="hz-kd-hero-q" style={{ flex: "1 1 260px" }}>
+          {/* 로고는 글자 기준선이 아니라 가운데에 맞아야 한다 — baseline 이면 정사각형
+              타일이 글자 밑선에 걸려 위로 떠 보인다. */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+            <StockLogo code={data.code} name={data.name} market={data.market} size={30} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
+              <strong style={{ fontSize: "var(--fs-21)", fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>{data.name}</strong>
+              <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", color: C.muted }}>
+                {data.code}
+                {data.market && ` · ${data.market}`}
               </span>
             </div>
-          )}
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
+            <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>{fmtPrice(a.price, data.market)}</strong>
+            {a.changePct !== null && (
+              <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 800, color: a.changePct >= 0 ? UP : DOWN }}>{fmtPct(a.changePct)}</span>
+            )}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", marginTop: "auto" }}>
+            <PriceRow label="전고점" date={fmtDay(a.athDate, a.asOf)} value={fmtPrice(a.ath, data.market)} />
+            <PriceRow label="저점" date={fmtDay(a.lowDate, a.asOf)} value={fmtPrice(a.low, data.market)} />
+          </div>
         </div>
-        {!atHigh && <DrawdownGauge current={a.currentDd} mdd={a.mdd} periodLabel={periodLabel} />}
-        {/* 위 여백이 14 가 아니라 18.5 인 것은 **옆 칸과 선을 맞추기 위해서**다. 이 블록과
-            왼쪽 칸의 전고점·저점 두 줄은 둘 다 marginTop:auto 로 칸 바닥에 붙으므로, 두
-            블록의 높이가 같아야 위 경계선이 한 줄에 선다. 왼쪽은 줄마다 1 + 10 + 글줄 19.5
-            + 10 = 40.5, 두 줄이라 81 이다. 이 칸은 1 + 여백 + 통계칸 61.5 라 여백이 18.5.
-            14 로 두면 4.5px 어긋나는데, 거의 맞아서 오히려 더 틀려 보인다.
-            ⚠️ 글자 크기를 건드리면 이 숫자를 다시 재야 한다(둘 중 한쪽만 바뀌어도 어긋난다). */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 10, marginTop: "auto", paddingTop: 18.5, borderTop: `1px solid ${C.sheetRow}` }}>
-          {/* 보조 줄에 조회 기간 이름("최근 10년")은 안 붙인다 — '전체' 조회에서
-              "상장 이후·약 27년 6,646일 중"이 되어 칸을 넘겼다(실측 121 > 115px).
-              옆 칸 '기간 최저점'도 기간을 안 적고, 기간은 바로 위 토글이 말한다. */}
-          <StatCell label="이보다 깊었던 날" value={deeperLabel(a)} sub={`${fmtDayCount(a.tradingDays)} 중`} />
-          <StatCell label="기간 최저점" value={fmtPct(a.mdd)} sub={a.mddDate} tone={DOWN} />
-          <StatCell label="고점 이후" value={fmtDayCount(sincePeak)} sub={`${a.athDate}부터`} />
-        </div>
-      </div>
 
-      {/* 3 — 이 하락의 맥락. LLM 을 쓰지 않는다(반짝 아이콘·AI 고지 없음). */}
-      <div style={{ ...cell, flex: "1.3 1 300px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-          <span
-            style={{
-              width: 22,
-              height: 22,
-              borderRadius: 6,
-              background: C.blueTint,
-              color: DOWN,
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flex: "none",
-            }}
-          >
-            <Icon name="insights" style={{ fontSize: "var(--fs-14)" }} />
-          </span>
-          <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>이 하락의 맥락</span>
+        {/* 2 — 지금 낙폭 */}
+        <div className="hz-kd-hero-q" style={{ flex: "1.2 1 300px" }}>
+          <div className="hz-kd-hero-title">
+            <span style={title}>지금 낙폭</span>
+            <span className="hz-tip hz-tip-wide hz-tip-start" data-tip="전고점 대비 하락폭" style={{ display: "inline-flex", cursor: "help" }}>
+              <Icon name="help" style={{ fontSize: "var(--fs-14)", color: C.muted }} />
+            </span>
+          </div>
+          {/* 밑선 맞춤은 CSS 가 한다(.hz-figrow). */}
+          <div className="hz-figrow">
+            <strong
+              style={{ fontFamily: MONO, fontSize: "var(--fs-40)", fontWeight: 800, lineHeight: 1, letterSpacing: "-.04em", color: atHigh ? C.ink : DOWN }}
+            >
+              {atHigh ? "신고가 부근" : fmtPct(a.currentDd)}
+            </strong>
+            {!atHigh && (
+              <div className="hz-figrow-aside">
+                <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub }}>전고점 대비</span>
+                <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 700, color: C.sub }}>
+                  저점 대비 <b style={{ color: fromLow >= 0 ? UP : DOWN, fontWeight: 800 }}>{fmtPct(fromLow)}</b>
+                </span>
+              </div>
+            )}
+          </div>
+          {!atHigh && <DrawdownGauge current={a.currentDd} mdd={a.mdd} periodLabel={periodLabel} />}
+          {/* 통계 셋은 칸 바닥에 붙는다(marginTop:auto). 윗선은 알파 헤어라인이다 — 회색 타일 위에서도
+              흰 판 위와 같은 세기로 보인다(theme.css 의 --c-hairline 주석).
+              위 여백이 14 가 아니라 18.5 인 것은 **옆 칸과 선을 맞추기 위해서**다. 이 블록과 왼쪽 칸의
+              전고점·저점 두 줄은 둘 다 marginTop:auto 로 칸 바닥에 붙으므로, 두 블록의 높이가 같아야 위
+              경계선이 한 줄에 선다. 왼쪽은 줄마다 1 + 10 + 글줄 19.5 + 10 = 40.5, 두 줄이라 81 이다.
+              이 칸은 1 + 여백 + 통계칸 61.5 라 여백이 18.5.
+              ⚠️ 글자 크기를 건드리면 이 숫자를 다시 재야 한다(둘 중 한쪽만 바뀌어도 어긋난다). */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 10, marginTop: "auto", paddingTop: 18.5, borderTop: "1px solid var(--c-hairline)" }}>
+            {/* 보조 줄에 조회 기간 이름("최근 10년")은 안 붙인다 — '전체' 조회에서
+                "상장 이후·약 27년 6,646일 중"이 되어 칸을 넘겼다(실측 121 > 115px). */}
+            <StatCell label="이보다 깊었던 날" value={deeperLabel(a)} sub={`${fmtDayCount(a.tradingDays)} 중`} />
+            <StatCell label="기간 최저점" value={fmtPct(a.mdd)} sub={fmtDay(a.mddDate, a.asOf)} tone={DOWN} />
+            <StatCell label="고점 이후" value={fmtDayCount(sincePeak)} sub={`${fmtDay(a.athDate, a.asOf)}부터`} />
+          </div>
         </div>
-        <Reading data={data} periodLabel={periodLabel} />
-      </div>
+
+        {/* 3 — 이 하락의 맥락. 흰 문장 칸(다른 화면 히어로의 '브리핑' 자리). LLM 을 쓰지 않는다
+            (반짝 아이콘·AI 고지 없음) — 이 화면이 이미 가진 수치를 문장으로 옮긴 것이다. */}
+        <div className="hz-kd-hero-h" style={{ flex: "1.4 1 320px" }}>
+          <div className="hz-kd-hero-title">
+            <span style={title}>이 하락의 맥락</span>
+          </div>
+          <Reading data={data} periodLabel={periodLabel} />
+        </div>
       </div>
     </section>
   );
 }
 
-/** 히어로 1번 셀의 전고점·저점 두 줄. 위 칸부터 선을 그어 값이 표처럼 읽히게 한다. */
+/** 히어로 1번 칸의 전고점·저점 두 줄. 윗선은 알파 헤어라인이라 회색 타일 위에서도 보인다. */
 function PriceRow({ label, date, value }: { label: string; date: string; value: string }) {
   return (
-    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, padding: "10px 0", borderTop: `1px solid ${C.sheetRow}` }}>
+    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, padding: "10px 0", borderTop: "1px solid var(--c-hairline)" }}>
       <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub, minWidth: 0 }}>
         {label} <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", color: C.muted }}>{date}</span>
       </span>
@@ -556,7 +520,7 @@ export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodL
 
   return (
     <Sheet>
-      <SectionHead level={2}
+      <SectionHead level={3}
         icon="show_chart"
         title="언더워터 차트"
         desc="전고점을 0으로 두고 그 아래로 얼마나 잠겼는지"

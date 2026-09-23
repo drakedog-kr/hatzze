@@ -116,6 +116,13 @@
      블록 부모(전폭 시트)에서는 auto 가 0 이라 아무 일도 안 한다. */
   margin-top: auto;
 }
+/* 폰에서만 셀 격자를 셋까지(PhoneFold). 넓은 화면에선 버튼 줄도 숨는다. ⚠️ 셋(n+4)은 PhoneFold.tsx 의 PHONE_SHOWN 과 한 쌍.
+   바닥 줄 규칙(.hz-sheet-foot-row 의 display:flex)을 이기려고 두 클래스로 잡는다. */
+.hz-sheet-foot-row.hz-phonefold-foot { display: none; }
+@media (max-width: 560px) {
+  .hz-phonefold:not(.is-open) > .hz-panelgrid > :nth-child(n+4) { display: none; }
+  .hz-sheet-foot-row.hz-phonefold-foot { display: flex; }
+}
 
 /* ── 셀 격자 ───────────────────────────────────────────────────────
    격자선은 셀이 자기 오른쪽·아래에 inset 으로 긋는다(.hz-cards 와 같은 이유 —
@@ -199,9 +206,11 @@
 }
 /* calc 의 1px·2px 은 아래 세로선(inset)이 먹는 폭이다 — 안 빼면 셋이 100% 를 넘겨
    마지막 칸이 혼자 아랫줄로 떨어진다. */
+/* 최소 폭은 min(…, 100%) 로 — 틀이 그보다 좁으면(320px 폰 · 사이드바가 붙는 561px 부근) 칸이 틀 밖으로 나가
+   시트(overflow:hidden)가 오른쪽을 잘랐다(2026-09-23 머지 전 점검: 320 에서 넓은 칸 300 > 틀 278). 틀이 넉넉하면 값은 그대로다. */
 .hz-kd-hero-q {
   flex: 1 1 calc(25% - 1px);
-  min-width: 230px;
+  min-width: min(230px, 100%);
   box-shadow: inset -1px 0 0 var(--c-sheet-line);
 }
 /* 칸이 줄바꿈되면 세로선은 아무것도 안 가른다 — 오른쪽 끝에 붙어 시트 테두리에 묻힌다.
@@ -223,7 +232,7 @@
 }
 .hz-kd-hero-h {
   flex: 1 1 calc(50% - 2px);
-  min-width: 300px;
+  min-width: min(300px, 100%);
 }
 /* 세 칸의 **제목 슬롯 높이를 못박는다.** 안 그러면 칸마다 제목 줄에 든 것이 달라
    (센티먼트는 점 라벨 11px, 요약은 AiMark 버튼 22px) 줄 높이가 어긋나고, 그만큼 아래
@@ -348,6 +357,14 @@
 .hz-trow.hz-cols-theme-stock {
   padding-top: 11px;
   padding-bottom: 11px;
+}
+/* 줄 안의 종목 링크 — 로고 + [이름·태그 / 까닭]. 배치를 인라인에 두면 아래 폰 규칙이 못 이겨 클래스로 옮겼다(값은 그대로). */
+.hz-theme-stock-link { display: flex; align-items: center; gap: 10px; min-width: 0; text-decoration: none; }
+/* 폰: 순위·로고·언급 수를 이름 줄에 맞춘다(2026-09-23). 까닭이 두세 줄로 늘면 가운데 정렬된 로고가 이름보다 41px 아래로
+   내려가 옆 줄의 이름과 엇갈려 보였다(360 실측, 배당 담은 종목 줄과 같은 꼴). */
+@media (max-width: 560px) {
+  .hz-trow.hz-cols-theme-stock { align-items: start; }
+  .hz-theme-stock-link { align-items: flex-start; }
 }
 /* '이 테마의 주인공' 두 열 — 열 종목을 다섯 줄 × 두 열로. 세로로 늘리지 않으면서 한 줄의 빈 가운데를 없앤다(2026-09-21).
    grid-auto-flow: column 이라 1~5 가 왼쪽, 6~10 이 오른쪽이고, 같은 줄은 높이를 나눠 가로선이 두 열에서 이어진다.
@@ -532,6 +549,13 @@ a.hz-theme-chip:hover { background: var(--tx-btn); }
   color: var(--c-cold-ink); /* ⚠️ 특이도를 둘로 — 아래 .hz-theme-tag-link 의 잉크색이 뒤에서 이겼다. */
 }
 .hz-theme-tag.hz-kd-theme-chip:hover { background: var(--c-blue-5); color: var(--c-cold-ink); }
+/* 폰: 한 줄 고정 머리(국장 급등 · 미장 급부상, .hz-tile-head)에서는 테마 칩을 숨긴다(2026-09-23). 순위 · 이름 · 코드 ·
+   칩 · 채널 수가 278px 한 줄에 서는데, 폰에서 글자가 12 가 되자 이름이 34px 로 눌려("레메디" 22px) 잘렸다(360 실측).
+   칩을 줄여 봤더니 이름도 칩도 둘 다 잘린 채 남았다 — 칩이 가장 덜 중요한 조각이라 뺀다. 테마로 가는 길은 종목 화면과
+   테마 표에 그대로 있다. 줄바꿈 되는 머리(주요 종목 리포트)는 자리가 나므로 칩을 둔다. */
+@media (max-width: 560px) {
+  .hz-tile-head .hz-kd-theme-chip { display: none; }
+}
 /* 테마 로테이션 머리의 '테마 리포트 →' 알약 — 기간 알약(.hz-sheet-head-note)과 같은 꼴, 링크라 올리면 하늘색. */
 .hz-theme-headpill {
   display: inline-flex;
@@ -1189,6 +1213,22 @@ li:last-child > .hz-trow { /* <li> 로 싸인 목록의 마지막 줄 — 파워
 
 /* ── 말풍선 (트렌딩 메시지) ────────────────────────────────────────
    좌상단만 각지게 둬서 아바타 쪽을 가리킨다 — 텔레그램 원본 매체의 형태다. */
+/* 채널 글 카드(국장·미장 트렌딩 · 테마 상세 '채널에서 오간 글') — [아바타] [채널명 줄 / 말풍선].
+   배치를 인라인에 두었더니 폰 규칙이 못 이겨 클래스로 옮겼다(값은 그대로). */
+.hz-lift.hz-msg-card { display: flex; padding: 16px 18px; gap: 12px; min-width: 0; }
+.hz-msg { display: flex; gap: 12px; min-width: 0; width: 100%; text-decoration: none; }
+.hz-msg-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+/* 폰: 아바타를 채널명 줄 앞으로 올리고 말풍선을 카드 폭 전체로 편다(2026-09-23). 아바타 칸(34 + 12)과 여백 네 겹
+   (화면 12 · 격자 12 · 카드 18 · 아바타 46) 때문에 말풍선 글 폭이 화면의 56% 였다(360 실측 200px).
+   본문 칸을 display:contents 로 풀어 채널명 줄은 아바타 옆, 말풍선은 아랫줄 두 칸을 다 쓴다. */
+@media (max-width: 560px) {
+  .hz-lift.hz-msg-card { padding: 14px; }
+  .hz-msg { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; }
+  .hz-msg-body { display: contents; }
+  .hz-msg-body > .hz-bubble { grid-column: 1 / -1; }
+  /* 아바타 크기는 인라인(width·height·글자)이라 여기만 !important 로 줄인다 — 채널명 줄(약 19px)과 한 높이. */
+  .hz-msg > :first-child { width: 22px !important; height: 22px !important; font-size: 10px !important; }
+}
 .hz-bubble {
   background: var(--c-soft);
   border-radius: 3px var(--r-card) var(--r-card) var(--r-card);
