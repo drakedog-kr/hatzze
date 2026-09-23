@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Fragment } from "react";
 
-import { withTopicParticle } from "@/lib/format";
 import { eventDateLabel, todayKst, type UpcomingEvent } from "@/lib/kadera-why";
 import { fmtKoDate } from "@/lib/stock-page";
 import { KADERA_WINDOW_DAYS, addDaysISO } from "@/lib/telegram-data";
@@ -90,15 +89,6 @@ function Fig({ label, value, sub }: { label: string; value: React.ReactNode; sub
         {sub}
       </span>
       <span style={{ fontSize: "var(--fs-11)", color: C.muted, whiteSpace: "nowrap" }}>{label}</span>
-    </span>
-  );
-}
-
-/** 히어로 칸 제목 옆 물음표(SectionHead 의 noteHelp 와 같은 툴팁). 긴 설명을 칸 안에 문단으로 두지 않는다. */
-function HelpTip({ text, ga }: { text: string; ga: string }) {
-  return (
-    <span className="hz-tip hz-tip-wide hz-tip-start" data-tip={text} data-ga-tip={ga} style={{ display: "inline-flex", cursor: "help" }}>
-      <Icon name="help" style={{ fontSize: "var(--fs-12)", color: C.muted }} />
     </span>
   );
 }
@@ -210,14 +200,10 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
         <div className="hz-kd-hero">
           {/* 칸 1 — 테마 정체. 큰 수(종목 수) · 최근 사흘 채널에 오른 종목 수 · 말이 많은 순 종목 알약(로고 포함).
               ⚠️ 알약은 회색 칩(--c-chip)이 아니라 **카드색 + 테두리**다. 회색 타일 위에 회색 칩을 두면 경계가 안 보인다
-              (2026-09-21 지적). 긴 설명("손으로 고른 대표 종목 묶음")은 제목 옆 물음표로 내렸다. */}
+              (2026-09-21 지적). 제목 옆 물음표(긴 설명)는 걷었다(2026-09-24). */}
           <div className="hz-kd-hero-q">
             <div className="hz-kd-hero-title">
               <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>이 테마는</span>
-              <HelpTip
-                ga="theme_members"
-                text={`${withTopicParticle(theme)} 손으로 고른 ${market.marketWord} 대표 종목 묶음입니다. 업종 전체가 아니라 채널에서 이 테마로 불리는 종목들입니다. 알약은 최근 ${KADERA_WINDOW_DAYS}일 말이 많은 순입니다.`}
-              />
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
               <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
@@ -241,11 +227,10 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
             </div>
           </div>
 
-          {/* 칸 2 — 최근 사흘 점유율. 큰 수 + 변화 알약, 그 아래 순위·언급 합 두 숫자. 정의는 물음표로. */}
+          {/* 칸 2 — 최근 사흘 점유율. 큰 수 + 변화 알약, 그 아래 순위·언급 합 두 숫자. */}
           <div className="hz-kd-hero-q">
             <div className="hz-kd-hero-title">
               <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>최근 {KADERA_WINDOW_DAYS}일 점유율</span>
-              <HelpTip ga="theme_share" text="점유율은 그날 언급된 전 종목의 주목도 중 이 테마 종목의 몫입니다. 변화는 5일 넘게 이전과 견준 값입니다." />
             </div>
             {d.loadFailed || d.recentShare == null ? (
               <p style={{ margin: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub, lineHeight: 1.7 }}>
@@ -390,7 +375,6 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
           title="이 테마의 주인공"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
           desc="상위 열 종목과 채널이 말한 이유입니다."
-          noteHelp="막대는 언급의 몫"
           level={2}
         />
         {d.loadFailed ? (
@@ -475,7 +459,6 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
           title="다가오는 일정"
           note="앞으로 5주"
           desc="채널이 날짜를 짚어 말한 이 테마 종목의 일정입니다. 확정 일정은 공시로 확인하십시오."
-          noteHelp="확정은 공시로 확인"
           level={2}
         />
         {dayEvents.length === 0 ? (

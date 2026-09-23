@@ -3,7 +3,6 @@
 // 목표 배당과 투자금 조절. DividendCalculator.tsx 에서 그대로 옮겨 왔다(store.ts 머리말 참고).
 
 import { useState } from "react";
-import { Icon } from "../ui";
 import { won, wonShort } from "./format";
 import { GOAL_PRESETS_MAN, GOAL_MAX_MONTHS, AMOUNT_TICKS, AMOUNT_QUICK, AMOUNT_TYPED_MAX, amountTick } from "./shared";
 
@@ -90,14 +89,6 @@ export function GoalBox({
       <div className="dv-goal-head">
         <span className="dv-cal-title">
           목표까지
-          <span
-            className="hz-tip hz-tip-wide dv-help"
-            data-tip="지금 비율·재투자 가정"
-            style={{ cursor: "help" }}
-            aria-label="목표까지 셈법"
-          >
-            <Icon name="help" style={{ fontSize: "var(--fs-14)" }} />
-          </span>
         </span>
       </div>
 

@@ -69,7 +69,7 @@ function HalfSheet({ children }: { children: React.ReactNode }) {
 /**
  * 시트의 행 목록 + 바닥의 '전체보기' 줄.
  *
- * 예전엔 이 자리가 **각주 띠**였다. 각주는 알약의 물음표(noteHelp)로 옮겼다 — 시트마다
+ * 예전엔 이 자리가 **각주 띠**였다. 각주는 알약의 물음표(noteHelp)로 옮겼다가 그 물음표도 걷었다(2026-09-24) — 시트마다
  * 한 줄씩 깔려 있으니 여섯 장이 모이면 화면 아래쪽이 잔글씨로 덮였고, 정작 "더 있나"를
  * 물을 자리가 없었다.
  *
@@ -173,13 +173,6 @@ export default async function InsiderPage() {
    * ⚠️ 창을 보는 카드는 **끝점과 길이**를 같이 적는다. "최근 7일"만으로는 그 7일이
    *    언제 끝나는지 모른다 — 공시는 접수까지 며칠 걸려서 오늘까지가 아니다.
    */
-  // 두 카드가 같은 각주를 쓴다. 짝지어 놓았으니 서로 다른 말을 적을 이유가 없다.
-  // ⭐ 각주 띠를 걷고 그 자리를 '더 보기' 줄에 내줬다. 단서는 전부 알약의 물음표로
-  //    옮긴다 — 지우면 라벨이 거짓이 되는 것들이다(제출이 늦은 곳·반대로 움직인 곳).
-  const moveHelp =
-    "분기말 두 시점의 차이입니다. 중간에 샀다 판 것은 안 보입니다." +
-    (ov.offQuarter > 0 ? ` 늦게 낸 ${ov.offQuarter}곳은 직전 분기와 견줬습니다.` : "");
-
   // 히어로 오른쪽의 "오늘의 업데이트". ⚠️ 0 인 줄도 지우지 않는다 — 장내 매수가 0 인
   // 날이 흔한데, 그 줄이 사라지면 독자는 "오늘은 아무것도 없었다"가 아니라 "그런 걸
   // 안 보는 화면"으로 읽는다.
@@ -461,7 +454,6 @@ export default async function InsiderPage() {
           icon="trending_up"
           title="월가 거물이 늘린 종목"
           note={insiderNote("adds", ov)}
-          noteHelp={moveHelp}
           desc="새로 담았거나 주식 수를 늘린 곳입니다."
         />
         {ov.managerAdds.length === 0 ? (
@@ -486,7 +478,6 @@ export default async function InsiderPage() {
           icon="trending_down"
           title="월가 거물이 줄인 종목"
           note={insiderNote("trims", ov)}
-          noteHelp={moveHelp}
           desc="주식 수를 줄였거나 전량 정리한 곳입니다."
         />
         {ov.managerTrims.length === 0 ? (
@@ -514,7 +505,6 @@ export default async function InsiderPage() {
           icon="groups"
           title="운용자산이 큰 순"
           note={insiderNote("managers", ov)}
-          noteHelp="미국 상장주만 집계"
           desc="이름을 누르면 그 사람이 무엇을 들고 있는지 봅니다."
         />
         {ov.managerRanks.length === 0 ? (
@@ -538,7 +528,6 @@ export default async function InsiderPage() {
           icon="reviews"
           title="증권가가 긍정적으로 보는 종목"
           note={insiderNote("analyst", ov)}
-          noteHelp="S&P Global 집계"
           desc={`등급을 낸 애널리스트가 ${RANK_MIN_ANALYSTS}명 이상인 종목만 세웁니다.`}
         />
         {ov.analystTop.length === 0 ? (
@@ -559,7 +548,6 @@ export default async function InsiderPage() {
           icon="account_balance_wallet"
           title="임원이 신고한 매매"
           note={insiderNote("exec", ov)}
-          noteHelp="옵션 행사 매도 포함"
           desc="종목으로 묶어 금액이 큰 순입니다. 장내 매수는 파랗게 적었습니다."
         />
         {ov.buys.length === 0 ? (
@@ -578,7 +566,6 @@ export default async function InsiderPage() {
           icon="account_balance"
           title="미 하원의원이 사고판 것"
           note={insiderNote("congress", ov)}
-          noteHelp="금액은 구간 신고"
           desc="카더라 밖 종목까지 보고, 여러 의원이 건드린 순입니다."
         />
         {ov.congressTickers.length === 0 ? (
@@ -602,7 +589,6 @@ export default async function InsiderPage() {
           icon="local_fire_department"
           title="커뮤니티에서 뜨거운 종목"
           note={insiderNote("hot", ov)}
-          noteHelp="언급·신고 시점 다름"
           desc="주식 텔레그램에서 가장 많이 회자된 미장 종목입니다."
         />
         {ov.rows.length === 0 ? (
@@ -623,7 +609,6 @@ export default async function InsiderPage() {
           icon="inventory_2"
           title="월가 거물이 들고 있는 종목"
           note={insiderNote("holders", ov)}
-          noteHelp="분기말 기준"
           desc="카더라에 오른 종목을 거물 몇 명이 들고 있는지 봅니다."
         />
         {holderAll.length === 0 ? (

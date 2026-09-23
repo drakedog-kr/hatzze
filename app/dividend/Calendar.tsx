@@ -32,15 +32,6 @@ export function MonthCalendar({
       <div className="dv-cal-head dv-cal-head-col">
         <span className="dv-cal-title">
           달마다 얼마 들어오나
-          {/* 누르는 법은 부제에서 빼 툴팁으로 — 모바일에서 두 줄이 됐다(2026-09-15). */}
-          <span
-            className="hz-tip hz-tip-wide dv-help"
-            data-tip="최근 12개월 지급 달"
-            style={{ cursor: "help" }}
-            aria-label="달력 설명"
-          >
-            <Icon name="help" style={{ fontSize: "var(--fs-14)" }} />
-          </span>
         </span>
         <span className="dv-cal-sub">
           {paidMonths ? `1년에 ${paidMonths}달 들어옵니다` : "지급 달을 아는 종목이 없습니다"} · 최근 12개월 기준
@@ -166,14 +157,6 @@ export function Upcoming({ lines, fx, mode }: { lines: Line[]; fx: number; mode:
       <div className="dv-cal-head dv-cal-head-col">
         <span className="dv-cal-title">
           다가오는 일정
-          <span
-            className="hz-tip hz-tip-wide dv-help"
-            data-tip="확정은 공시 · 예상은 작년"
-            style={{ cursor: "help" }}
-            aria-label="다가오는 일정 설명"
-          >
-            <Icon name="help" style={{ fontSize: "var(--fs-14)" }} />
-          </span>
         </span>
         {/* 확정·예상 합 — 표에 못 든 줄까지 석 달 안 전부. 둘 다 0 이면(기준일만 있을 때) 안 적는다. */}
         {sureKrw + expectedKrw > 0 && (

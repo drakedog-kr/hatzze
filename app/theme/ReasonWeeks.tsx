@@ -91,7 +91,6 @@ export function ReasonWeeks({
         title="등락의 이유"
         note={`${fmtKo(start)} ~ ${fmtKo(end)}`}
         desc="이 테마 종목이 크게 움직인 날, 그날 채널이 말한 이유입니다."
-        noteHelp="7일씩 · 최근 30일까지"
         level={2}
       />
       {days.length === 0 ? (

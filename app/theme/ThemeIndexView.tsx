@@ -336,7 +336,6 @@ export function ThemeIndexView({
           title="테마 점유율 지도"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
           desc="칸이 클수록 최근 3일 언급이 많은 테마입니다. 누르면 해당 테마 상세 페이지로 갑니다."
-          noteHelp="넓이는 점유율 · 색은 변화"
           level={2}
         />
         {themes === null ? (
@@ -370,7 +369,6 @@ export function ThemeIndexView({
           title="테마별 급부상 종목"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
           desc="테마마다 3일 전 대비 언급이 크게 늘어난 종목 하나와 요즘 도는 얘기입니다."
-          noteHelp="최근 3일 ÷ 그 전 3일"
           level={2}
         />
         {risers === null ? (
@@ -430,9 +428,8 @@ export function ThemeIndexView({
           title="테마 흐름"
           note={flowDates.length ? `${fmtKoDate(flowDates[0])} ~ ${fmtKoDate(flowDates[flowDates.length - 1])}` : `최근 ${THEME_FLOW_DAYS}일`}
           desc="점유율 상위 10개 테마와 각 테마에서 요즘 도는 얘기입니다."
-          /* 알약이 든 날짜는 **오른쪽 칸 알약이 세는 열흘**이다. 도움말이 "최근 3일 평균 점유율"이라 날짜와 딴 말을 하고 있었다
-             (2026-09-22 지적) — 점유율 셈법은 그 숫자가 선 열 머리로 옮겼다. */
-          noteHelp="순위를 센 10일"
+          /* 알약이 든 날짜는 **오른쪽 칸 알약이 세는 열흘**이다. 점유율 셈법(최근 3일 평균)은 그 숫자가 선 열 머리에 있다.
+             알약 옆 물음표는 걷었다(2026-09-24). */
           level={2}
         />
         {themes === null ? (

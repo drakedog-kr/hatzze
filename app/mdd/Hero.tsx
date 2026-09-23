@@ -165,9 +165,6 @@ export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel:
         <div className="hz-kd-hero-q" style={{ flex: "1.2 1 300px" }}>
           <div className="hz-kd-hero-title">
             <span style={title}>지금 낙폭</span>
-            <span className="hz-tip hz-tip-wide hz-tip-start" data-tip="전고점 대비 하락폭" style={{ display: "inline-flex", cursor: "help" }}>
-              <Icon name="help" style={{ fontSize: "var(--fs-14)", color: C.muted }} />
-            </span>
           </div>
           {/* 밑선 맞춤은 CSS 가 한다(.hz-figrow). */}
           <div className="hz-figrow">
