@@ -6,6 +6,8 @@
   "details": {
     "buffett_index": { "gdp": 2600000000000000, "market_cap": 2700000000000000 }
   },
+  "_previewDay": "국장 미리보기(/preview)의 휴장·주말 화면을 볼 때 씁니다. 키 이름에서 밑줄을 떼고 previewDay 로 두면 가장 최근 날에 얹습니다. 휴장은 usHoliday 까지, 주말은 usSession 만 적습니다.",
+  "_previewDay_value": { "usHoliday": "노동절", "usSession": "2026-09-04" },
   "_dailyNotes": "데일리 노트(/daily) 원고를 표에 올리기 전에 로컬에서 조판을 볼 때 씁니다. 목록이 비어 있지 않으면 화면이 DB 대신 이 목록을 읽습니다. body_md 는 원고에서 '# 제목'·'## 날짜' 두 줄을 뗀 본문입니다.",
   "dailyNotes": [
     {

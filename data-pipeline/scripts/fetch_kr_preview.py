@@ -25,6 +25,14 @@ KRX 를 안 쓰므로 08시 공표를 기다릴 이유가 없다. 지표 블록 
 간밤 미장은 전날 세션이라 미국 날짜와 하루 어긋난다. 표의 `date` 는 이 카드를 보는
 **국내 거래일**이고, 화면에서 "그날 미장"이라고 쓰면 안 된다.
 
+## ⚠️ 미장이 쉰 밤에는 종목 카드를 만들지 않는다
+
+핀허브 quote 는 휴장 다음 날에도 **마지막 세션 값**을 그대로 준다. 예전엔 그걸 가리지 않아
+노동절(2026-09-07) 다음 날 09-08 아침에 09-04(금) 카드 14장이 "밤사이" 로 다시 떴다.
+카드 수치를 낸 백테스트는 이런 날을 건너뛰므로 근거가 없고, 카드가 말하는 개장 갭은 이미
+전날 개장에서 끝났다. 그래서 그날치 한 줄에 휴장 이름만 남기고 종목 줄은 쓰지 않는다
+(`night_state` · 마이그레이션 083).
+
 ## 평소 폭은 왜 사전에 박혀 있나
 
 핀허브 무료는 과거 캔들을 안 줘서 표준편차를 실시간으로 못 구한다. 그래서 `US_VOL` 에
@@ -41,17 +49,39 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timedelta, timezone
+from collections.abc import Callable
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client  # noqa: E402
-from common.timeutil import KST, today_kst  # noqa: E402
+from common.timeutil import KST, krx_trading_days, today_kst  # noqa: E402
 from config.us_kr_pairs import PAIRS, TICKERS, US_NAMES, US_SECTORS, US_VOL  # noqa: E402
 from config.us_stock_themes import US_THEMES  # noqa: E402
 
 QUOTE = "https://finnhub.io/api/v1/quote?symbol={t}&token={k}"
+# 미국 휴장 달력. 무료 티어에서 받힌다(2026-09-23 확인 · 2023~2027 62건 · 반일장도 들어 있다).
+MARKET_HOLIDAY = "https://finnhub.io/api/v1/stock/market-holiday?exchange=US&token={k}"
+
+# 핀허브 휴장 이름 → 화면에 적을 이름. 2026-09-23 에 받은 62건의 이름이 이 열두 가지였다.
+# 표에 없는 이름이 오면 "미국 공휴일" 로 적고 경고를 찍는다 — 이름 하나 때문에 휴장 표기를
+# 놓칠 이유는 없다.
+HOLIDAY_KO = {
+    "New Year's Day": "새해 첫날",
+    "Birthday of Martin Luther King, Jr": "마틴 루서 킹 데이",
+    "Washington's Birthday": "대통령의 날",
+    "Good Friday": "성금요일",
+    "Memorial Day": "메모리얼 데이",
+    "Juneteenth": "준틴스",
+    "Independence Day": "독립기념일",
+    "Labor Day": "노동절",
+    "Thanksgiving Day": "추수감사절",
+    "Christmas": "성탄절",
+    "Christmas Day": "성탄절",
+    # 전직 대통령 장례 같은 임시 휴장(2025-01-09 카터).
+    "National Mourning Day": "국가 애도일",
+}
 
 # 계산용 지수 대용. 핀허브 무료는 지수를 안 준다("Market data subscription required for
 # CFD indices" — SPX·^SPX·US500 다 막혔다). **화면에 내는 숫자는 이게 아니다** —
@@ -223,6 +253,93 @@ def index_change(session_day: str) -> float | None:
     return (rows[last][1] / rows[prev][1] - 1) * 100
 
 
+def us_holidays(key: str) -> list[dict] | None:
+    """핀허브의 미국 휴장 달력. 못 받으면 None.
+
+    미장이 쉰 것 같은 아침에만 부른다(`night_state`). 평소엔 한 번도 안 불러서 분당 한도에
+    안 걸린다.
+    """
+    for attempt in (1, 2):
+        try:
+            with urllib.request.urlopen(MARKET_HOLIDAY.format(k=key), timeout=15) as r:
+                d = json.load(r)
+            break
+        except (OSError, http.client.HTTPException, json.JSONDecodeError) as e:
+            if attempt == 1:
+                time.sleep(2)
+                continue
+            print(f"[경고] 휴장 달력: {type(e).__name__}")
+            return None
+    data = d.get("data") if isinstance(d, dict) else None
+    if not isinstance(data, list):
+        print(f"[경고] 휴장 달력: {str(d)[:60]}")
+        return None
+    return data
+
+
+def night_state(today: date, session_day: str, holidays: Callable[[], list[dict] | None]) -> tuple[str, str | None]:
+    """오늘 아침 카드가 볼 미장 세션이 있었나.
+
+    ("open", None)       평소. 우리 장이 아직 못 본 세션이 있다.
+    ("holiday", 이름)     그 사이 미장이 한 번도 안 열렸다. 이름은 화면에 적을 휴장 이름이다.
+    ("stale", 까닭)       세션이 없는데 휴장일도 없다. 휴장이 아니라 시세가 낡은 것이다.
+
+    ⭐ 기준은 백테스트와 같다. 우리 **마지막 개장일 P 부터 어제까지**(미 동부 날짜) 열린 미장
+    세션이다. 핀허브가 준 가장 최근 세션이 P 보다 앞이면 그 사이 미장은 안 열렸고, 백테스트는
+    이런 날을 건너뛴다(backtest/kr_preview_pairs.py 의 `if w.empty: continue`).
+
+      화 09-08  P=월 09-07 · 미장 09-07 노동절          → 휴장
+      월 09-07  P=금 09-04 · 미장 09-04 열림            → 평소(주말은 휴장이 아니다)
+      월 12-28  P=목 12-24 · 미장 12-24 반일장           → 평소(12-25 는 국장도 쉬었다)
+
+    ⚠️ "어제가 미국 휴일인가" 로 판정하지 말 것. 그러면 월 12-28 이 휴장이 되는데, 12-24 세션은
+       국장이 아직 못 본 움직임이다. 국장 달력(P)을 끼워야 맞는다.
+    ⚠️ 휴장 달력은 **판정에 쓰지 않고 이름을 붙이는 데만** 쓴다. 판정은 핀허브가 실제로 준
+       세션 날짜로 한다. 달력은 세션이 없을 때만 부른다.
+    ⚠️ KRX_HOLIDAYS 가 틀려도 거짓 휴장은 안 나온다. 표에 없는 국장 휴일은 P 를 늦출 뿐이고
+       (그러면 세션이 있다고 보기 쉬워진다), 휴장이 되려면 그 사이 미장 휴일까지 있어야 한다.
+    """
+    prev = max(krx_trading_days(today - timedelta(days=14), today - timedelta(days=1)))
+    if session_day >= prev.isoformat():
+        return "open", None
+    got = holidays()
+    if got is None:
+        return "stale", f"미장 최근 세션이 {session_day} 인데 휴장 달력을 못 받아 휴장인지 가릴 수 없습니다"
+    closed = sorted(
+        (h for h in got if prev.isoformat() <= str(h.get("atDate", "")) < today.isoformat() and not h.get("tradingHour")),
+        key=lambda h: h["atDate"],
+    )
+    if not closed:
+        return "stale", f"미장 최근 세션이 {session_day} 인데 {prev} 이후 미장 휴일이 없습니다"
+    name = str(closed[-1].get("eventName", ""))
+    ko = HOLIDAY_KO.get(name)
+    if ko is None:
+        print(f"[경고] 모르는 휴장 이름: {name!r} — '미국 공휴일' 로 적습니다(HOLIDAY_KO 에 더할 것)")
+        ko = "미국 공휴일"
+    return "holiday", ko
+
+
+def write_day(db, row: dict) -> None:
+    """그날치 한 줄을 쓴다. ⭐ 종목이 0개인 날에도, 미장이 쉰 날에도 반드시 쓴다(아래 main 주석).
+
+    ⚠️ 마이그레이션 083 전에는 `us_session`·`us_holiday` 칸이 없다. 그때는 둘을 빼고 한 번 더
+    쓴다. 휴장 표기는 빠지지만 날짜와 지수는 남아 화면이 어제 줄을 집지 않는다.
+    """
+    try:
+        db.table("kr_preview_day").upsert(row, on_conflict="date").execute()
+        return
+    except Exception as e:  # noqa: BLE001
+        first = e
+    legacy = {k: v for k, v in row.items() if k not in ("us_session", "us_holiday")}
+    try:
+        db.table("kr_preview_day").upsert(legacy, on_conflict="date").execute()
+        print(f"[경고] 휴장 칸 없이 썼습니다: {first} (마이그레이션 083 을 아직 안 돌렸다면 정상)")
+    except Exception as e:  # noqa: BLE001
+        # 마이그레이션 063 전에는 표가 없다. 그때는 종목 줄이 예전처럼 지수를 들고 있고
+        # 화면도 거기서 꺼내므로, 이것 때문에 스텝을 실패로 떨어뜨리지 않는다.
+        print(f"[경고] kr_preview_day 저장 실패: {e} (마이그레이션 063 을 아직 안 돌렸다면 정상)")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true", help="저장하지 않고 무엇이 뽑히는지만 찍는다")
@@ -254,6 +371,29 @@ def main() -> None:
     if shown is None:
         shown = spx
     print(f"[기준] {SPX_PROXY} {spx_day} 종가 {spx:+.2f}% (계산용) · 화면 숫자 {shown:+.2f}%")
+
+    today = today_kst()
+    # ⚠️⚠️ **밤사이 미장이 열렸는지부터 본다.** 핀허브는 휴장 다음 날에도 마지막 세션 값을
+    # 주므로, 이걸 안 보면 지난 세션 카드가 오늘 날짜로 다시 뜬다(2026-09-08 실측). 종목 80개를
+    # 부르기 전에 가른다 — 쉰 밤이면 부를 이유가 없다.
+    state, note = night_state(today, spx_day, lambda: us_holidays(key))
+    if state == "stale":
+        # 휴장이 아닌데 세션이 낡았다. 옛 세션을 오늘 카드로 쓰느니 스텝을 떨어뜨린다 —
+        # 그러면 화면은 어제 줄을 어제 날짜로 보이므로 적어도 날짜가 거짓말을 안 한다.
+        raise SystemExit(f"[중단] {note} — 옛 세션을 오늘 카드로 쓸 수 없습니다")
+    if state == "holiday":
+        print(f"[휴장] 밤사이 미장이 쉬었습니다({note}) · 마지막 세션 {spx_day} — 종목 카드를 만들지 않습니다")
+        if args.dry_run:
+            print("[건너뜀] --dry-run 이라 저장하지 않습니다")
+            return
+        db = get_client()
+        # 같은 날 앞선 실행이 쓴 종목 줄이 있으면 지운다. 화면은 휴장 이름을 보면 종목 줄을
+        # 안 읽지만, 표에 남겨 두면 그날이 휴장인지 표만 보고 알 수 없다.
+        db.table("kr_preview_daily").delete().eq("date", today.isoformat()).execute()
+        write_day(db, {"date": today.isoformat(), "spx_dp": round(shown, 2), "movers": 0,
+                       "us_session": spx_day, "us_holiday": note})
+        print(f"[저장] {today} · 휴장({note}) · 마지막 세션 {spx_day} S&P {shown:+.2f}%")
+        return
 
     dps: dict[str, float] = {}
     days: dict[str, int] = {}
@@ -313,7 +453,6 @@ def main() -> None:
     print(f"[사전] 깊은 쌍 {sum(len(v) for v in by_ticker.values())}개 · 미국 {len(by_ticker)}종목"
           f" (전체 {len(PAIRS)}쌍 중)")
 
-    today = today_kst()
     rows = []
     for t, dp, z, up in movers:
         ps = sorted(by_ticker.get(t, []), key=lambda p: -p.corr)[:LINKS_MAX]
@@ -407,14 +546,12 @@ def main() -> None:
     # ⚠️ 날짜만으로는 못 가른다. 아침 실행 전에 어제 것을 보여 주는 건 의도한 동작이라
     #    "아직 안 돌았다" 와 "돌았는데 없었다" 가 구별되지 않는다. **돌았다는 기록**이
     #    남아야 갈린다. 이 줄이 그 기록이다.
-    day_row = {"date": today.isoformat(), "spx_dp": round(shown, 2), "movers": len({r["ticker"] for r in kept})}
-    try:
-        db.table("kr_preview_day").upsert(day_row, on_conflict="date").execute()
-        print(f"[저장] 그날치 한 줄 · S&P {shown:+.2f}% · 미국 {day_row['movers']}종목")
-    except Exception as e:  # noqa: BLE001
-        # 마이그레이션 063 전에는 표가 없다. 그때는 종목 줄이 예전처럼 지수를 들고 있고
-        # 화면도 거기서 꺼내므로, 이것 때문에 스텝을 실패로 떨어뜨리지 않는다.
-        print(f"[경고] kr_preview_day 저장 실패: {e} (마이그레이션 063 을 아직 안 돌렸다면 정상)")
+    day_row = {"date": today.isoformat(), "spx_dp": round(shown, 2), "movers": len({r["ticker"] for r in kept}),
+               # ⚠️ us_holiday 를 None 으로 **적어서** 보낸다. 같은 날 앞선 실행이 휴장으로 썼다면
+               #    upsert 가 빠진 칸은 그대로 두므로, 안 적으면 휴장 표기가 남는다.
+               "us_session": spx_day, "us_holiday": None}
+    write_day(db, day_row)
+    print(f"[저장] 그날치 한 줄 · S&P {shown:+.2f}% · 미국 {day_row['movers']}종목 · 세션 {spx_day}")
 
 
 if __name__ == "__main__":
