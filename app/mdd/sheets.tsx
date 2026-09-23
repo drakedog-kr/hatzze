@@ -2,7 +2,7 @@
 
 // 원인 분해·회복·하락 성격·테마·큰 하락 시트들. MddExplorer.tsx 에서 그대로 옮겨 왔다(shared.ts 머리말 참고).
 
-import { CHARACTER_MIN_DD, CHARACTER_SPLIT_DAYS } from "@/lib/mdd";
+import { CHARACTER_MIN_DD } from "@/lib/mdd";
 import type { DepthBucket, DrawdownCharacter, Episode, MddAnalysis } from "@/lib/mdd";
 import { C, Icon, MONO, R } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
@@ -318,7 +318,7 @@ export function Character({ ch, currentDd }: { ch: DrawdownCharacter | null; cur
           <StatCell label="저점 깊이" value={fmtPct(ch.currentTroughDepth)} sub={perDay !== null ? `하루 평균 ${fmtPct(perDay)}` : "고점 대비"} tone={DOWN} />
         </div>
       </div>
-      <Foot>고점→저점이 {CHARACTER_SPLIT_DAYS}일 이하면 급락형, 넘으면 완만형입니다. 비교 막대는 과거 −15% 이상 하락만 셉니다.</Foot>
+      {/* 셈법 각주("고점→저점이 N일 이하면 급락형 …")는 걷었다(2026-09-23 지적). 기준 일수는 lib/mdd.ts 의 CHARACTER_SPLIT_DAYS. */}
     </Sheet>
   );
 }
