@@ -170,6 +170,28 @@ const sessionDay = (iso: string) =>
   `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}(${"일월화수목금토"[new Date(`${iso}T00:00:00Z`).getUTCDay()]})`;
 
 /**
+ * 화면 곳곳의 "밤사이" 자리에 들어갈 말. 카드의 미장 세션이 **어젯밤** 것이면 "밤사이",
+ * 그보다 앞이면 그 세션의 요일("금요일")이다.
+ *
+ *   토 아침  세션 금 = 어제      → 밤사이(금요일 미장이 정말 그 밤사이에 닫혔다)
+ *   일·월 아침 세션 금 < 어제    → 금요일(그 밤에는 미장이 없었다)
+ *   추석 뒤 월 09-28 세션 금 09-25 → 금요일
+ *
+ * ⚠️ 카드를 비우지 않고 말만 바꾼다. 월요일 개장이 반응하는 게 바로 금요일 미장이고
+ *    백테스트도 월요일을 금요일 세션과 짝지어 쟀다. 주말 방문이 몰리는 일요일 저녁도
+ *    월요일을 준비하는 때라 그 카드가 필요하다(휴장 다음 날과 다른 점이다).
+ * ⚠️ 비교 잣대는 달력의 오늘이 아니라 그 줄의 국내 날짜(`date`)다. 아침 실행 전 새벽에
+ *    어제 줄을 보여 줄 때도 그 줄 기준으로 맞아야 한다.
+ * `usSession` 이 없는 줄(마이그레이션 083 전·수집기 배포 전)은 예전처럼 "밤사이" 다.
+ */
+function sessionWord(date: string | null, usSession: string | null): string {
+  if (!date || !usSession) return "밤사이";
+  const lastNight = new Date(Date.parse(`${date}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+  if (usSession >= lastNight) return "밤사이";
+  return `${"일월화수목금토"[new Date(`${usSession}T00:00:00Z`).getUTCDay()]}요일`;
+}
+
+/**
  * 24시간 거래대금($). 백만 달러 단위로 적되 **1M 이 안 되는 마켓을 0M 으로 뭉개지 않는다.**
  *
  * ⚠️ 반올림 하나만 쓰면 얇은 마켓이 통째로 사라진다. 2026-09-06 현대차가 실제로
@@ -365,7 +387,7 @@ function moverAnchor(ticker: string) {
   return `mv-${ticker}`;
 }
 
-function MoverPanel({ m }: { m: PreviewMover }) {
+function MoverPanel({ m, when }: { m: PreviewMover; when: string }) {
   const ink = m.dp > 0 ? HOT : COLD;
   return (
     <div className="hz-panel-pad hz-mover-tile" id={moverAnchor(m.ticker)}>
@@ -385,7 +407,7 @@ function MoverPanel({ m }: { m: PreviewMover }) {
           {/* ⭐ "간밤" 을 붙인다. 밑에도 퍼센트가 줄줄이 있어서, 라벨이 없으면 위아래가
               같은 종류로 읽힌다 — 위는 **어젯밤 실제로 일어난 일**이고 아래는 **과거 평균**이다. */}
           <span style={{ display: "inline-flex", alignItems: "baseline", gap: 5, whiteSpace: "nowrap" }}>
-            <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>밤사이</span>
+            <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>{when}</span>
             <strong style={{ fontFamily: MONO, fontSize: "var(--fs-17)", fontWeight: 800, color: ink, letterSpacing: "-.02em" }}>
               {PCT(m.dp)}
             </strong>
@@ -478,6 +500,10 @@ export default async function PreviewPage() {
   //    약속해 놓고 안 지키는 꼴이라, 독자는 없는 02 를 찾아 아래로 내려간다.
   const hasOvernight = overnight.rows.length > 0;
 
+  // "밤사이" 자리에 들어갈 말(sessionWord 주석). ⚠️ 휴장한 날은 늘 "밤사이" 다 — 그날 세션은
+  // 휴장 전 마지막 거래일이라 요일로 바꾸면 "금요일 뉴욕 · 휴장" 처럼 금요일이 쉰 것으로 읽힌다.
+  const when = usHoliday ? "밤사이" : sessionWord(date, usSession);
+
   const movers = sectors.flatMap((s) => s.movers);
 
   // 평소 대비 가장 크게 움직인 넷. z 로 세운다 — 등락률로 세우면 늘 변동성 큰 종목만
@@ -523,7 +549,7 @@ export default async function PreviewPage() {
       <section className="hz-hero-panel">
         {/* ① 간밤 뉴욕 — 이 밤이 얼마나 시끄러웠나 */}
         <div className="hz-hero-cell">
-          <CellHead title="밤사이 뉴욕" note={stamp} />
+          <CellHead title={`${when} 뉴욕`} note={stamp} />
           {/* ⚠️⚠️ 여기에 섹터 분포를 두지 말 것. "그날 어디가 움직였나" 는 이 화면이 답할
               물음이 아니다 — 개장 전에 사람이 궁금한 건 **"간밤 미국이 이랬는데 우리 장은
               어떻게 열리나"** 하나다(2026-09-02 지적). 섹터는 타일마다 라벨로 이미 있다. */}
@@ -542,7 +568,7 @@ export default async function PreviewPage() {
                 문장("간밤에는 N곳이 평소보다 크게 움직였습니다")과 같은 말이었다
                 (2026-09-03 지적). 한 화면에서 같은 사실을 두 번 적으면 둘 다 값이 떨어진다. */}
             <span style={{ fontSize: "var(--fs-12)", color: C.sub, lineHeight: 1.6, textAlign: "right", wordBreak: "keep-all" }}>
-              {usHoliday ?? <>밤사이 S&amp;P 500</>}
+              {usHoliday ?? <>{when} S&amp;P 500</>}
             </span>
           </div>
 
@@ -659,7 +685,7 @@ export default async function PreviewPage() {
             없다. 이 화면만 다른 뼈대를 쓸 이유가 없다(2026-09-02 지적).
             칸이 비어 보이던 건 칸 수 탓이 아니라 **바닥 줄이 없어서**였다. */}
         <div className="hz-hero-cell hz-hero-divide">
-          <CellHead title="밤사이 가장 크게 움직인 곳" />
+          <CellHead title={`${when} 가장 크게 움직인 곳`} />
           <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
             {loudest.length === 0 ? (
               /* ⚠️⚠️ **조용한 밤과 자료 없음을 가른다.** 예전엔 둘 다 "아직 채울 자료가
@@ -746,7 +772,7 @@ export default async function PreviewPage() {
             </p>
           ) : moverCount === 0 ? (
             <p style={{ margin: 0, color: C.sub, wordBreak: "keep-all" }}>
-              밤사이 크게 움직인 종목이 없습니다. 눈여겨보는 미국 종목 가운데 평소 폭을 크게 넘어선 곳이 없었다는
+              {when} 크게 움직인 종목이 없습니다. 눈여겨보는 미국 종목 가운데 평소 폭을 크게 넘어선 곳이 없었다는
               뜻이고, 고장이 아니라 조용한 밤이었습니다. 한 해에 두세 번 있는 밤입니다.
             </p>
           ) : (
@@ -763,7 +789,7 @@ export default async function PreviewPage() {
               </p>
               {biggest && (
                 <p style={{ margin: 0, color: C.sub, wordBreak: "keep-all" }}>
-                  밤사이 {moverCount}곳이 평소보다 크게 움직였습니다. 그중 제일 큰 것은{" "}
+                  {when} {moverCount}곳이 평소보다 크게 움직였습니다. 그중 제일 큰 것은{" "}
                   <strong style={{ color: C.ink, fontWeight: 700 }}>{biggest.usName}</strong>
                   {josa(biggest.usName, "으로", "로")},{" "}
                   {/* ⚠️ 여기에 {" "} 를 넣지 말 것. 조사는 앞말에 붙는다 — "+2.89% 로" 가 아니라
@@ -794,7 +820,7 @@ export default async function PreviewPage() {
               {crowded && crowded[1] > 1 && (
                 <p style={{ margin: 0, color: C.sub, wordBreak: "keep-all" }}>
                   <strong style={{ color: C.ink, fontWeight: 700 }}>{crowded[0]}</strong>
-                  {josa(crowded[0], "은", "는")} 밤사이 크게 움직인 미장 종목 {crowded[1]}곳과 한꺼번에 엮입니다.
+                  {josa(crowded[0], "은", "는")} {when} 크게 움직인 미장 종목 {crowded[1]}곳과 한꺼번에 엮입니다.
                 </p>
               )}
             </div>
@@ -885,17 +911,17 @@ export default async function PreviewPage() {
           icon="call_split"
           title="그런 아침 국장에서는"
           note={moverCount ? `미장 ${moverCount}종목 · 국장 ${stockCount}종목` : undefined}
-          desc="밤사이 미장에서 크게 움직인 종목과 그 종목에 사업으로 엮인 국장 종목입니다"
+          desc={`${when} 미장에서 크게 움직인 종목과 그 종목에 사업으로 엮인 국장 종목입니다`}
         />
         {wall.length === 0 ? (
           <p style={{ margin: 0, padding: "20px 22px", fontSize: "var(--fs-13)", lineHeight: 1.75, color: C.sub, wordBreak: "keep-all" }}>
-            {usHoliday ? "밤사이 미장이 쉬어 이어 붙일 자리가 없습니다" : "밤사이 크게 움직인 종목이 없어 이어 붙일 자리도 없습니다"}
+            {usHoliday ? "밤사이 미장이 쉬어 이어 붙일 자리가 없습니다" : `${when} 크게 움직인 종목이 없어 이어 붙일 자리도 없습니다`}
           </p>
         ) : (
           <>
             <div className="hz-panelgrid hz-panelgrid-2">
               {wall.map((m) => (
-                <MoverPanel key={m.ticker} m={m} />
+                <MoverPanel key={m.ticker} m={m} when={when} />
               ))}
             </div>
             {/* ⭐ **이 목록이 날마다 바뀐다는 것**만 각주로 낸다.

@@ -133,9 +133,11 @@ export async function getPreview(): Promise<PreviewData> {
     ? await db.from("kr_preview_day").select("date,spx_dp,created_at").order("date", { ascending: false }).limit(1)
     : withHoliday;
   let dayRow = (day.data?.[0] ?? null) as DayRow | null;
-  // 로컬에서만 휴장 화면을 얹어 본다(lib/dev-overrides.ts · 운영 빌드에선 늘 비어 있다).
-  const devHoliday = getDevOverrides().previewHoliday;
-  if (devHoliday && dayRow) dayRow = { ...dayRow, us_holiday: devHoliday.name, us_session: devHoliday.session };
+  // 로컬에서만 세션·휴장을 얹어 본다(lib/dev-overrides.ts · 운영 빌드에선 늘 비어 있다).
+  const devDay = getDevOverrides().previewDay;
+  if (devDay && dayRow) {
+    dayRow = { ...dayRow, us_session: devDay.usSession ?? dayRow.us_session, us_holiday: devDay.usHoliday ?? dayRow.us_holiday };
+  }
   const usSession = dayRow?.us_session ?? null;
 
   /**

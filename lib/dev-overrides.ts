@@ -37,9 +37,11 @@ export type DevOverrides = {
   summary?: string;
   // 데일리 노트(/daily). 비어 있으면 DB 를 읽는다.
   dailyNotes?: DevDailyNote[];
-  // 국장 미리보기(/preview)의 미장 휴장 화면. 있으면 가장 최근 날을 휴장으로 그린다.
-  // 휴장은 한 해 열 번 남짓이라 문구를 고칠 때 볼 길이 이것뿐이다. 예: {"name":"노동절","session":"2026-09-04"}
-  previewHoliday?: { name: string; session: string };
+  // 국장 미리보기(/preview)의 가장 최근 날에 미장 세션·휴장을 얹는다. 휴장(한 해 열 번 남짓)이나
+  // 주말 표기를 고칠 때 볼 길이 이것뿐이다.
+  //   휴장  {"usHoliday":"노동절","usSession":"2026-09-04"}
+  //   주말  {"usSession":"2026-09-18"}  → 세션이 어젯밤보다 앞이라 "금요일" 로 그린다
+  previewDay?: { usSession?: string; usHoliday?: string };
 };
 
 const EMPTY: DevOverrides = {};
