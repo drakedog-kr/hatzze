@@ -2,8 +2,8 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["icn1"],
   "crons": [
-    { "path": "/api/cron/pipeline", "schedule": "0 22 * * *" },
-    { "path": "/api/cron/pipeline", "schedule": "0 9 * * *" },
+    { "path": "/api/cron/pipeline", "schedule": "30 21 * * *" },
+    { "path": "/api/cron/pipeline", "schedule": "30 8 * * *" },
     { "path": "/api/cron/pipeline", "schedule": "30 3 * * 3" },
     { "path": "/api/cron/pipeline", "schedule": "30 1 * * 6" },
     { "path": "/api/cron/pipeline", "schedule": "0 12 * * 0" },

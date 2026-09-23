@@ -3,7 +3,7 @@ name: Daily Indicator Update
 on:
   # ⛔ **깃헙 예약을 껐다(2026-08-29).** 이 워크플로를 도는 유일한 길은 아래
   #    `workflow_dispatch` 이고, 시각은 Vercel Cron 이 지킨다(`vercel.json` 의 crons →
-  #    app/api/cron/pipeline). 아침 07:00 · 저녁 18:00 KST 에 던진다.
+  #    app/api/cron/pipeline). 아침 06:30 · 저녁 17:30 KST 에 던진다(2026-09-23 에 30분 당겼다).
   #
   #    왜 껐나. 2026-08-26~28 에 깃헙 예약이 무너졌다 — 실행이 3시간 27분·10시간 41분씩
   #    늦게 생기다가, 08-28 에는 네 발화 중 둘이 8시간 늦게 오고 둘은 아예 오지 않아 하루
