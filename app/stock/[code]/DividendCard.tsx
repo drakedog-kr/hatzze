@@ -74,7 +74,10 @@ export function DividendCard({ s }: { s: DividendStock }) {
                         background: v > 0 ? C.blue : C.track,
                       }}
                     />
-                    <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>{m}월</span>
+                    <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>
+                      {m}
+                      <span className="hz-mon-unit">월</span>
+                    </span>
                     <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", fontWeight: 700, color: v > 0 ? C.ink : C.muted, whiteSpace: "nowrap" }}>{v > 0 ? won(v) : "·"}</span>
                   </div>
                 );

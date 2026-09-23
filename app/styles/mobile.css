@@ -449,3 +449,12 @@
   .hz-theme-tag-link { position: relative; }
   .hz-theme-tag-link::before { content: ""; position: absolute; inset: -3px -2px; }
 }
+/* 아주 좁은 폰(≤360). 머리 오른쪽 조작부(기간 탭 등)가 194px 라 320 에서 제목 칸이 14px 로 눌려 "트렌딩 메시지"가
+   한 글자씩 여섯 줄이 됐다(2026-09-23 머지 전 점검) — ≤340 에선 조작부를 설명 아랫줄로 내린다.
+   종목 배당 달력의 월 이름은 칸(15px)보다 "11월"(12px 18px)이 넓어 옆 칸과 겹쳤다 — ≤360 에선 "월"을 뗀다. */
+@media (max-width: 360px) {
+  .hz-mon-unit { display: none; }
+}
+@media (max-width: 340px) {
+  .hz-sheet-head-side { grid-column: 2 / -1; grid-row: 3; justify-self: start; }
+}

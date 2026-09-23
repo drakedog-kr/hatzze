@@ -77,11 +77,12 @@ export function AbsentSheet({ icon, title, sub, body }: { icon: string; title: s
 export function StatCell({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-      <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, letterSpacing: ".06em", color: C.sub, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+      {/* 한 줄 고정·말줄임은 클래스(.mdd-stat-clip)가 쥔다 — 폰에선 접어야 해서(sheets.css). */}
+      <span className="mdd-stat-clip" style={{ fontSize: "var(--fs-11)", fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>
         {label}
       </span>
       <strong style={{ fontSize: "var(--fs-15)", fontWeight: 800, color: tone ?? C.ink, letterSpacing: "-.02em" }}>{value}</strong>
-      {sub && <span style={{ fontSize: "var(--fs-11)", color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</span>}
+      {sub && <span className="mdd-stat-clip" style={{ fontSize: "var(--fs-11)", color: C.muted }}>{sub}</span>}
     </div>
   );
 }
