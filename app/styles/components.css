@@ -76,6 +76,88 @@
   .hz-news-namefirst .hz-news-text { -webkit-line-clamp: 1; }
 }
 
+/* ── 명절 인사 팝업 (app/HolidayGreeting.tsx) ─────────────────────────────
+   네이티브 <dialog> 를 showModal() 로 띄운다. 맨 위 층이라 z-index 가 필요 없다.
+
+   ⚠️ margin: auto 를 다시 적는다. 브라우저 기본 스타일이 이것으로 창을 가운데 두는데,
+      Tailwind 의 preflight 가 모든 요소의 margin 을 0 으로 지워서 안 적으면 왼쪽 위에 붙는다.
+   ⚠️ 버튼 바탕은 --c-blue 가 아니라 --c-nav-active 다. 흰 글자가 --c-blue 위에서는 AA(4.5)를
+      못 넘는다(.hz-tg-cta 주석과 같은 이유). */
+.hz-greet {
+  width: min(320px, calc(100vw - 32px));
+  max-width: none;
+  margin: auto;
+  padding: 0;
+  border: none;
+  border-radius: 16px;
+  background: var(--c-card);
+  color: var(--c-ink);
+  box-shadow: 0 16px 40px var(--c-shadow-strong);
+}
+.hz-greet::backdrop { background: rgba(14, 33, 54, 0.42); }
+:root[data-theme="dark"] .hz-greet::backdrop { background: rgba(0, 0, 0, 0.62); }
+.hz-greet-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 24px 20px;
+  text-align: center;
+}
+/* 맨 위 이모지. 칸을 64px 로 못박아 두어 기기마다 이모지 글꼴이 달라도 아래 제목의 자리가 안 흔들린다. */
+.hz-greet-emoji {
+  display: block;
+  height: 64px;
+  margin-bottom: 12px;
+  font-size: 58px;
+  line-height: 64px;
+}
+.hz-greet-title {
+  margin: 0;
+  font-size: var(--fs-17);
+  font-weight: 700;
+  line-height: 1.45;
+  letter-spacing: -0.02em;
+  word-break: keep-all;
+  color: var(--c-ink);
+}
+/* 한 줄에 한 문단이다. 두 줄로 접히는 문단은 balance 가 두 줄 길이를 맞춰 끝말만 홀로 남지 않게 한다. */
+.hz-greet-text {
+  margin: 6px 0 0;
+  font-size: var(--fs-14);
+  line-height: 1.6;
+  word-break: keep-all;
+  text-wrap: balance;
+  color: var(--c-sub);
+}
+.hz-greet-text + .hz-greet-text { margin-top: 8px; }
+.hz-greet-ok {
+  width: 100%;
+  height: 44px;
+  margin-top: 22px;
+  border: none;
+  border-radius: var(--r-control);
+  background: var(--c-nav-active);
+  color: #ffffff;
+  font-size: var(--fs-14-5);
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.12s ease;
+}
+.hz-greet-ok:hover { filter: brightness(0.93); }
+.hz-greet-ok:focus-visible { outline: 2px solid var(--c-blue); outline-offset: 2px; }
+@media (prefers-reduced-motion: no-preference) {
+  .hz-greet[open] { animation: hz-greet-in 0.2s ease-out; }
+  .hz-greet[open]::backdrop { animation: hz-greet-fade 0.2s ease-out; }
+}
+@keyframes hz-greet-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes hz-greet-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 
 /* 테마 줄의 종목 팝오버(.hz-theme-host · .hz-theme-pop*)가 여기 있었다. 2026-09-22 에 국장·미장 카더라의 테마 줄이
    **테마 리포트로 가는 링크**가 되면서 걷었다 — 팝오버가 보이던 종목 목록은 테마 리포트의 '이 테마의 주인공'이 요약·이유·
