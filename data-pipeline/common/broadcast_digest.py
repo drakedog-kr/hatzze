@@ -14,8 +14,8 @@
 
     갈래 제목 한 줄 → 문장 두세 개 → 얽힌 종목 한 줄(인용 박스)
 
-    morning2    월~금 개장 전   '개장 전 요약' — 밤사이(어제 18시~오늘 8시) + 오늘 일정
-    evening2    월~금 마감 뒤   '저녁 브리핑' — 온도 + 오늘(8시~18시) + 처음 회자된 종목 + 내일 일정
+    morning2    월~금 개장 전   '개장 전 요약' — 밤사이(어제 18시~오늘 7시) + 오늘 일정
+    evening2    월~금 마감 뒤   '저녁 브리핑' — 온도 + 오늘(7시~18시) + 처음 회자된 종목 + 내일 일정
     midweek     수 12:30        '주중 점검' — 월~수 이야기의 흐름 + 이번 주 새 얼굴 + 남은 주 일정
     us_weekend  토 10:30        '이번 주 미장 흐름' — 금요일 세션 포함 + 다음 주 미장 일정
     weekly2     일 21:00        '한 주 정리와 다음 주 일정' — 온도 흐름 + 한 주 네 갈래 + 새 얼굴 + 다음 주 일정
@@ -89,7 +89,7 @@ CTA = {
 
 # ─── 창 경계(KST) ─────────────────────────────────────────────────────────────
 NIGHT_FROM_HOUR = bc.NIGHT_FROM_HOUR   # 18
-NIGHT_TO_HOUR = bc.NIGHT_TO_HOUR       # 8
+NIGHT_TO_HOUR = bc.NIGHT_TO_HOUR       # 7
 DAY_TO_HOUR = 18
 
 # ─── 발췌 ────────────────────────────────────────────────────────────────────
@@ -202,12 +202,12 @@ def at(d: date, hour: int) -> datetime:
 
 
 def night_window(d: date) -> tuple[datetime, datetime]:
-    """d 아침 8시에 끝나는 밤. (d-1 18:00, d 08:00)"""
+    """d 아침 7시에 끝나는 밤. (d-1 18:00, d 07:00)"""
     return at(d - timedelta(days=1), NIGHT_FROM_HOUR), at(d, NIGHT_TO_HOUR)
 
 
 def day_window(d: date, now: datetime) -> tuple[datetime, datetime]:
-    """d 의 낮. (d 08:00, min(d 18:00, now)). now 가 8시 전이면 빈 창."""
+    """d 의 낮. (d 07:00, min(d 18:00, now)). now 가 7시 전이면 빈 창."""
     lo = at(d, NIGHT_TO_HOUR)
     return lo, max(lo, min(at(d, DAY_TO_HOUR), now))
 
@@ -231,9 +231,9 @@ def span_label(lo: datetime, hi: datetime, drop_month: int | None = None) -> str
     """창의 날짜. `drop_month` 와 두 날짜의 달이 모두 같으면 '월'을 뺀다.
 
     머리줄이 이미 "9월 10일(목) 개장 전" 이라 뒤에 "9월" 을 또 적으면 군더더기다
-    (2026-09-10 지적). → "9일 18시 ~ 10일 8시".
-    ⚠️ 달을 넘는 창(8월 31일 18시 ~ 9월 1일 8시)에서는 **둘 다 적는다.** 한쪽만 빼면
-    "8월 31일 18시 ~ 1일 8시" 가 되어 어느 달인지 흐려진다.
+    (2026-09-10 지적). → "9일 18시 ~ 10일 7시".
+    ⚠️ 달을 넘는 창(8월 31일 18시 ~ 9월 1일 7시)에서는 **둘 다 적는다.** 한쪽만 빼면
+    "8월 31일 18시 ~ 1일 7시" 가 되어 어느 달인지 흐려진다.
     """
     if drop_month is not None and lo.month == hi.month == drop_month:
         return f"{lo.day}일 {lo.hour}시 ~ {hi.day}일 {hi.hour}시"
@@ -798,9 +798,10 @@ DIGEST_FORMAT = """\
 - 대괄호 라벨([갈래] 같은 것)은 출력하지 마세요."""
 
 TASKS = {
-    "morning2": """\
+    # 시각은 상수에서 받는다 — 글자로 박아 두면 경계를 옮길 때 글만 옛 시각을 말한다.
+    "morning2": f"""\
 [이번 글 — 밤사이 채널 요약]
-어젯밤 18시부터 오늘 아침 8시까지 채널에 오간 이야기를 {n} 갈래로 정리합니다. 개장 전에
+어젯밤 {NIGHT_FROM_HOUR}시부터 오늘 아침 {NIGHT_TO_HOUR}시까지 채널에 오간 이야기를 {{n}} 갈래로 정리합니다. 개장 전에
 읽는 글입니다. 미국 시장이 열려 있던 시간이라 미국 종목·지표 이야기가 많습니다. 그
 이야기에 국내 종목이 엮여 있으면(공급사·같은 업종) 종목 줄에 함께 적으세요.""",
     "evening2": """\
