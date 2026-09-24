@@ -534,11 +534,12 @@ const SHARE_SMOOTHING = 0.002;
 // 열이라 안 받는 편이 낫다. 파이프라인 집계에는 그대로 남아 있다.
 type DailyRow = { stock_code: string; date: string; weighted_score: number; mention_count: number };
 
-async function loadStockDaily(days: number): Promise<{ rows: DailyRow[]; dates: string[] }> {
+async function loadStockDaily(days: number, end?: string): Promise<{ rows: DailyRow[]; dates: string[] }> {
   const db = getSupabaseAdmin();
   // 기준일 앞 days 일. 위아래 경계를 둘 다 쿼리에 건다 — 예전엔 하한만 걸고 오늘을
   // 코드에서 걸러 냈는데, 그 '오늘'이 벽시계라 자정마다 창이 굴렀다(windowBefore 주석).
-  const window = windowBefore(await kaderaBaseDate(), days);
+  // `end` 를 주면 그날로 끝나는 days 일이다(그날 포함). 급부상 카드만 쓴다(surgingWindowEnd).
+  const window = windowBefore(end ? addDaysISO(end, 1) : await kaderaBaseDate(), days);
   const rows = await fetchAllRows<DailyRow>("id", () =>
     db
       .from("telegram_stock_daily")
@@ -709,8 +710,41 @@ export type SurgingStock = {
 };
 
 /**
+ * 급부상 창의 끝날 — 기준일(저녁 실행 뒤) 또는 그 전날(아침 실행 뒤).
+ *
+ * 다른 카드처럼 기준일을 늘 빼면 **저녁 화면이 하루 전 목록**이다. 기준일은 아침 실행이 세우므로
+ * 저녁 실행이 그날 글을 다 모아 와도 창이 그대로였다. 2026-09-24 HLB 가 미국 허가를 받은 날
+ * 저녁 카드에 없었다. 09-04~09-23 을 되돌려 재 보니 저녁 카드와 그날이 다 찬 뒤의 목록이
+ * 6개 중 평균 2.80개 겹쳤고, 그날 17:45 까지 글을 넣으면 5.35개였다.
+ *
+ * **여기서 판정하지 않는다.** 파이프라인이 정해(data-pipeline/common/surging.window_end_for)
+ * 한 줄 요약을 다 만든 뒤 telegram_surging_window 에 적은 값을 읽는다. 화면이 따로 판정하면
+ * 수집과 종목 집계 사이 40분쯤 그날 행이 아침치뿐인 틈에 반쪽 하루로 순위를 내고, 그 여섯의
+ * 한 줄 요약도 아직 없다.
+ *
+ * 적힌 값이 없으면(마이그레이션 086 전 · 그날 한 줄 요약 실패 · 아침 실행 도중) 예전처럼 전날이다.
+ * 적힌 값이 기준일과 다른 날의 것이면 쓰지 않는다 — 기준일 행과 짝이 맞아야 옆 카드들과 같은
+ * 날을 말한다. 조회는 기준일과 나란히 띄운다(기준일을 기다린 뒤 물으면 왕복이 하나 더 붙는다).
+ */
+export const surgingWindowEnd = cache(async (): Promise<string> => {
+  const db = getSupabaseAdmin();
+  const [base, { data, error }] = await Promise.all([
+    kaderaBaseDate(),
+    db.from("telegram_surging_window").select("date,window_end").order("date", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  const before = addDaysISO(base, -1);
+  // PGRST205 = 표가 없다(마이그레이션 086 전). 그땐 예전 규칙이 정답이라 로그를 남기지 않는다.
+  if (error && error.code !== "PGRST205") {
+    console.error("[surgingWindowEnd] 급부상 창 끝날을 못 읽었습니다 — 전날 끝 창으로 그립니다", error);
+  }
+  if (!data || data.date !== base) return before;
+  return data.window_end === base ? base : before;
+});
+
+/**
  * 급부상 종목 — 각 종목의 최근 활동이 평소 대비 얼마나 튀었나(momentum).
- * 최근 3일(완료된 날 기준) 일평균 weighted 를 그 이전 일평균과 비교한다.
+ * 최근 3일 일평균 weighted 를 그 이전 일평균과 비교한다. 창의 끝날은 surgingWindowEnd 가
+ * 정한다(저녁 실행 뒤엔 오늘까지).
  * 이전 기록이 없으면 신규 등장(🆕).
  */
 export async function getSurgingStocks(
@@ -719,7 +753,7 @@ export async function getSurgingStocks(
   // 기본값은 켜 둔 채라 기존 호출부는 그대로다.
   opts: { withQuotes?: boolean } = {},
 ): Promise<SurgingStock[]> {
-  const { rows, dates } = await loadStockDaily(14);
+  const { rows, dates } = await loadStockDaily(14, await surgingWindowEnd());
   if (!rows.length) return [];
 
   const recentN = Math.min(3, Math.max(1, dates.length - 1));
