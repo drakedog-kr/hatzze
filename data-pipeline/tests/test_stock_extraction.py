@@ -131,3 +131,49 @@ def test_cape_before_spaced_foreign_place_is_not_the_stock(text):
 )
 def test_cape_stock_mentions_survive(text):
     assert _cape(text) == {"064820"}
+
+
+# ── 2026-09-25: 오로라(039830) ← 오로라 이노베이션(AUR)·영문 병기·붙여 쓴 남의 이름 ──────────
+
+
+def _aurora(text: str) -> set[str]:
+    match_to_code = {"오로라": "039830"}
+    pattern, caseless = build_pattern(list(match_to_code))
+    ambiguous = {"오로라"} & AMBIGUOUS_NAMES  # 실제 목록을 따른다 — 빠지면 붙여 쓴 꼴이 샌다
+    return set(extract(text, pattern, match_to_code, {"오로라": "dict"}, ambiguous, caseless))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "제목 : 오로라 이노베이션, '2030 비전' 발표…무인 트럭 3만 대 운영 목표 *이데일리FX*",
+        "• 오로라 이노베이션 (AUR) — 2030년까지 무인 트럭 3만 대 이상과 수십억 달러 규모 매출을 목표로 제시.",
+        "제목 : [AI시그널] 오로라, 과매수 주의 속 상승세 지속 가능 *이데일리FX*",
+        "올드 세컨드 뱅코프는 미국 일리노이주 오로라(Aurora)에 본사를 두고 있다.",
+        "반면 자율주행 기업 오로라(Aurora) 지분 가치는 12억 5200만 달러에서 17억 6300만 달러로 증가했다.",
+        "쿨링(방열) 부품 업계인 AVC(奇鋐), 오로라스(雙鴻), 젠텍(健策)을 비롯해",
+        "전문가들의 평가는 엇갈린다. 오로라매크로스트래티지스는 “이번 지진이",
+        "개발하는 기업이다.   오로라(039830)이노베이션 AUR 자율주행 무인트럭 하드웨어",
+    ],
+)
+def test_aurora_innovation_and_other_auroras_are_not_the_stock(text):
+    assert _aurora(text) == set()
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "오로라 (2,249억) +19.4%\n- 글로벌 시장에서 캐릭터 완구 수요 증가에 따른 매출 성장 기대감",
+        "13. 오로라 (11.76%) : 레저용품관련주, 시총2100억대, 완구사업",
+        "[+13.5%] 오로라/ 2,362억",
+        "[실적속보]오로라, 올해 2Q 매출액 912억(+18%) 영업이익 122억(+39%) (연결)",
+        "기업명: 오로라(시가총액: 2,481억) A039830\n보고서명: 반기보고서 (2026.06)",
+        "(코스닥)오로라 - 기업설명회(IR)개최",
+        "오로라의 2분기 영업이익은 122억원으로 컨센서스 147.9억원을 하회했으나",
+        "실적관련주\n매드업, 오로라 등 (2)",
+        "❤️ [알고리즘 관심주] 오로라 (2026년8월5일)",
+        "✅  Amazon에서 판매중인 Palm Pals 인형 (2026년8월5일)\n\n\n#오로라\n#팜팔스",
+    ],
+)
+def test_aurora_stock_mentions_survive(text):
+    assert _aurora(text) == {"039830"}
