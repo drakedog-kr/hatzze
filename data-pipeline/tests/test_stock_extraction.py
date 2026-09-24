@@ -93,3 +93,41 @@ def test_short_acronym_must_match_dictionary_case():
     text = "엑시노스 SbS 구조 (New!!) Naver 제휴, SBS Biz"
     found = extract(text, pattern, match_to_code, method, {"NEW"}, caseless)
     assert set(found) == {"035420", "034120"}
+
+
+# ── 2026-09-24: 띄어 쓴 외국 지명·선박명 뒤의 케이프(064820) ──────────────────────
+
+
+def _cape(text: str) -> set[str]:
+    match_to_code = {"케이프": "064820"}
+    pattern, caseless = build_pattern(list(match_to_code))
+    return set(extract(text, pattern, match_to_code, {"케이프": "dict"}, {"케이프"}, caseless))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "발사 장소: 플로리다주 케이프 커내버럴 우주군 기지 40번 발사대",
+        "그들은 자신들만의 '케이프 커내버럴'을 건설하고 있다",
+        "아랍에미리트 소유 화물선 MV 케이프 다오가 이날 오전 호르무즈 해협을",
+        "퍼보 에너지의 케이프 스테이션 1단계 연내 가동",
+        "아일랜드 빌리지, 로어 케이프 피어 수자원공사 등이다.",
+    ],
+)
+def test_cape_before_spaced_foreign_place_is_not_the_stock(text):
+    assert _cape(text) == set()
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "· 한화오션·현대힘스·케이프 등 조선·기자재주 강세",
+        "케이프(064820) 상한가",
+        "케이프 +5%",
+        "(코스닥)케이프 - 반기보고서 (2026.06)",
+        "#삼성중공업 #한화오션 #케이프 #동성화인텍",
+        "[실적속보]케이프, 올해 2Q 매출액 16억",
+    ],
+)
+def test_cape_stock_mentions_survive(text):
+    assert _cape(text) == {"064820"}
