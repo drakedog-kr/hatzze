@@ -174,8 +174,17 @@ def assess(code: str, name: str, mentions: list[dict]) -> dict:
     }
 
 
-def run_once(db, base: str, quiet: bool = False) -> list[dict]:
-    rows, dates = surging.load_stock_daily(db, base_date=base)
+def run_once(db, base: str, quiet: bool = False, end: str | None = None) -> list[dict]:
+    """`end` 를 주면 그날로 끝나는 창(그날 포함), 안 주면 기준일 앞 창이다.
+
+    매일 도는 검사(main)는 화면과 같은 끝날(surging.window_end_for)을 넘긴다 — 저녁 실행 뒤
+    카드는 오늘까지 넣어 그린다. 되돌려 재기(--backtest)는 기준일 앞 창 그대로 둔다. 날마다
+    한 칸씩 물러나며 재므로 오늘을 넣은 창도 다음 날 기준일의 창으로 한 번씩 지나간다.
+    """
+    if end:
+        rows, dates = surging.load_stock_daily(db, end_date=end)
+    else:
+        rows, dates = surging.load_stock_daily(db, base_date=base)
     if not rows or not dates:
         if not quiet:
             print(f"[유령감시] {base}: 집계가 비어 있어 건너뜁니다.")
@@ -210,11 +219,14 @@ def main() -> None:
         print(f"\n[되돌려 재기] {days}일 중 {fired}일에 경보가 떴습니다.")
         return
 
+    # 기준일은 벽시계 오늘이다 — 이 스텝은 센티먼트 집계(기준일을 세우는 스텝)보다 앞에 돈다.
+    # 창 끝날은 이 실행이 끝난 뒤 화면이 그릴 날이다(아침 실행이면 어제, 저녁 실행이면 오늘).
     base = today_kst().isoformat()
-    res = run_once(db, base)
+    end = surging.window_end_for(db, base)
+    res = run_once(db, base, end=end)
     if not res:
         return
-    print(f"[유령감시] 기준일 {base} · 급부상 카드 {len(res)}개")
+    print(f"[유령감시] 기준일 {base} · 창 끝 {end} · 급부상 카드 {len(res)}개")
     print(f"{'언급':>4} {'복붙':>5} {'코드':>4}  {'위험이름':<14} 종목")
     print("-" * 68)
     for r in res:

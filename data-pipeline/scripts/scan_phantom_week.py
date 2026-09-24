@@ -187,6 +187,16 @@ def exposure_map(db, dates: list[str], names: dict[str, dict]) -> dict[str, list
         for code, _ in sorted(w.items(), key=lambda kv: (-kv[1], kv[0]))[:CARD_N]:
             exp[code].append(f"많이언급 {d[5:]}")
 
+    # 급부상 카드는 저녁 실행 뒤 그날까지 넣어 그린다(common/surging.window_end_for). 그날로 끝나는
+    # 창은 다음 날 기준일의 창과 같아 위 고리가 이미 지나가는데, **마지막 날의 것만** 아직이다.
+    # 마지막 날 글이 저녁까지 모였을 때만(= 그 저녁 카드가 실제로 섰을 때만) 더한다.
+    last = dates[-1]
+    if surging.window_end_for(db, last) == last:
+        rows, ds = surging.load_stock_daily(db, end_date=last)
+        if rows and ds:
+            for s in surging.top_surging(db, limit=CARD_N, preloaded=(rows, ds), cap=CARD_N):
+                exp[s["code"]].append(f"급부상 {last[5:]} 저녁")
+
     # 까닭 보드 — 까닭이 있고 오른 줄을 등락 순으로 아홉(lib/kadera-why.ts boardOf).
     reasons = execute_with_retry(
         db.table("telegram_stock_move_reason")

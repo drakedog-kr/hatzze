@@ -27,6 +27,13 @@
 `common/surging` 의 정원은 5(화면은 6)이고, 창은 '벽시계 오늘 제외'라 기준일을 창에
 **넣는다**(화면은 뺀다). 그대로 부르면 여섯 중 둘만 겹친다(2026-09-05 실측).
 
+## 국장 창의 끝날은 여기서 정해 적는다
+
+국장 급부상 창은 저녁 실행 뒤 오늘까지 들어간다(common/surging.window_end_for). 이 스크립트가
+그 끝날로 여섯을 고르고 문장을 만든 **뒤에** telegram_surging_window 에 적고, 화면은 그 값을
+읽는다. 문장이 다 만들어진 다음에 적으므로 화면은 새 목록과 그 문장을 함께 바꾼다.
+문장을 하나도 못 만든 실행은 적지 않는다 — 화면은 전날 끝 창(예전 규칙)으로 남는다.
+
 ## 길이
 
 22~30자. 카드 한 줄이 26자라 30을 넘기면 두 줄이 되고 카드 높이가 어긋난다.
@@ -43,6 +50,7 @@
 from __future__ import annotations
 
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -52,7 +60,7 @@ from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 from common.prompt_style import PLAIN_PROSE_RULE_SHORT  # noqa: E402
 from common.supabase_client import get_client, load_all  # noqa: E402
-from common.surging import load_stock_daily, top_surging  # noqa: E402
+from common.surging import load_stock_daily, top_surging, window_end_for  # noqa: E402
 from common.text_check import is_clean  # noqa: E402
 from common.us_surging import top_us_surging  # noqa: E402
 
@@ -164,17 +172,37 @@ def run_kr(db, client, dry_run: bool) -> int:
         return 0
     latest = rows[0]["date"]
 
-    # ⚠️ 화면과 같은 창·같은 정원으로 부른다(위 머리 주석의 ⚠️⚠️).
-    pre = load_stock_daily(db, base_date=latest)
+    # ⚠️ 화면과 같은 창·같은 정원으로 부른다(위 머리 주석의 ⚠️⚠️). 창의 끝날도 여기서 정한다.
+    end = window_end_for(db, latest)
+    pre = load_stock_daily(db, end_date=end)
     codes = [s["code"] for s in top_surging(db, CARDS, preloaded=pre, cap=CARDS)]
     if not codes:
         print("[국장] 급부상 종목이 없습니다.")
         return 0
-    digests, _ = KR.build_stock_digests(db, latest, codes=codes)
+    digests, _ = KR.build_stock_digests(db, latest, codes=codes, end=end)
     name_of = {s["code"]: s["name"] for s in load_all(db, "stocks", "code,name", order_by="code")}
-    print(f"[국장] 기준일 {latest} · 대상 "
+    print(f"[국장] 기준일 {latest} · 창 끝 {end}{'(오늘 포함)' if end == latest else ''} · 대상 "
           + " · ".join(f"{name_of.get(c, c)}({c})" for c in codes))
-    return _generate(db, client, dry_run, "telegram_surging_oneliner", "stock_code", latest, digests)
+    saved = _generate(db, client, dry_run, "telegram_surging_oneliner", "stock_code", latest, digests)
+    if saved:
+        save_window(db, latest, end)
+    return saved
+
+
+def save_window(db, latest: str, end: str) -> None:
+    """화면이 읽을 창의 끝날을 적는다(머리 주석 '국장 창의 끝날'). 못 적어도 문장은 남긴다.
+
+    못 적으면 화면은 전날 끝 창으로 그린다 — 오늘 문장이 붙은 종목이 카드에 안 올라올 뿐
+    틀린 숫자가 나가지는 않는다. 표가 없을 때(마이그레이션 086 전)도 같은 길이다.
+    """
+    try:
+        db.table("telegram_surging_window").upsert(
+            {"date": latest, "window_end": end, "updated_at": datetime.now(timezone.utc).isoformat()},
+            on_conflict="date",
+        ).execute()
+        print(f"[Supabase] telegram_surging_window {latest} → 창 끝 {end}")
+    except Exception as exc:  # noqa: BLE001 — 문장은 이미 저장됐다. 이 한 줄 때문에 스텝을 죽이지 않는다
+        print(f"[경고] 급부상 창 끝날을 못 적었습니다({type(exc).__name__}: {exc}). 화면은 전날 끝 창으로 그립니다.")
 
 
 def run_us(db, client, dry_run: bool) -> int:

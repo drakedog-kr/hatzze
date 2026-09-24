@@ -1601,7 +1601,11 @@ def save_stock_breadth(db, latest: str) -> None:
 
 
 def build_stock_digests(
-    db, latest: str, codes: list[str] | None = None, msgs: list[dict] | None = None
+    db,
+    latest: str,
+    codes: list[str] | None = None,
+    msgs: list[dict] | None = None,
+    end: str | None = None,
 ) -> tuple[list[tuple[str, str, str]], list[tuple[str, str]]]:
     """([(종목코드, 종목명, digest)], [(종목코드, 종목명)]).
 
@@ -1623,10 +1627,16 @@ def build_stock_digests(
     실제로 어긋났다(2026-07-26 실측): SK하이닉스를 카드는 1,828회(07-19~25)로 찍는데
     요약문은 1,727회(07-20~26)라고 말했다. 문장 바로 아래 다른 숫자가 찍히는 셈이다.
     [일별 추이]도 같은 이유로 어긋나 '정점이 며칠'이 차트와 달라질 수 있었다.
+
+    `end` 를 주면 창이 그날로 끝난다(그날 포함). 급부상 한 줄 요약만 쓴다 — 그 카드는 저녁
+    실행 뒤 오늘까지 넣어 그리므로(common/surging.window_end_for) 문장도 같은 사흘을 봐야 한다.
     """
-    end = datetime.fromisoformat(latest).date() - timedelta(days=1)  # 오늘 제외
-    since = (end - timedelta(days=WINDOW_OFFSET)).isoformat()
-    until = end.isoformat()
+    if end:
+        end_d = date.fromisoformat(end)
+    else:
+        end_d = datetime.fromisoformat(latest).date() - timedelta(days=1)  # 오늘 제외
+    since = (end_d - timedelta(days=WINDOW_OFFSET)).isoformat()
+    until = end_d.isoformat()
 
     daily = [
         r
