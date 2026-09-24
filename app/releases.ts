@@ -31,7 +31,7 @@ export const RELEASES: Release[] = [
   {
     // 쓰는 법은 그대로고 저녁 목록이 그날을 담는다. Patch.
     version: "1.20.2",
-    date: "2026-09-25",
+    date: "2026-09-24",
     changes: ["저녁에는 급부상 종목에 그날 대화까지 반영됩니다."],
   },
   {
