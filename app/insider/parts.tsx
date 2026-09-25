@@ -21,6 +21,7 @@ import { Pill, type Tone } from "../kadera/parts";
 import { StockLogo } from "../StockLogo";
 import { C, Icon, MONO } from "../ui";
 import type { IconName } from "@/lib/icon-names";
+import { Empty as EmptyState, EmptyDescription, EmptyHeader, EmptyMedia } from "@/components/ui/empty";
 
 /** 이 화면의 자. 서학개미(scale.ts)와 같은 네 단이다. */
 export const T = { big: "var(--fs-22)", lead: "var(--fs-15)", body: "var(--fs-12)", small: "var(--fs-11)" } as const;
@@ -2046,35 +2047,26 @@ export function HalfRow({
 
 /** 자료가 없는 카드. 빈 칸으로 두지 않고 **왜 없는지**를 적는다. */
 export function EmptyCard({ icon, children }: { icon: IconName; children: React.ReactNode }) {
+  // shadcn Empty 꼴(아이콘을 회색 둥근 칸에 담고 설명을 회색 글로). 안쪽 여백만 rhea 기본(48)보다 줄여 예전 자리(34)에 맞춘다.
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 8,
-        padding: "34px 26px",
-        textAlign: "center",
-      }}
-    >
-      <Icon name={icon} style={{ fontSize: "var(--fs-26)", color: C.hint }} />
-      {/* ⭐ **문장마다 줄을 바꾼다.** 흘려 두면 "…없습니다. 임원이" 처럼 두 문장이 한 줄에
-          걸쳐 이어져, 빈 상태를 알리는 첫 문장과 그 이유를 대는 둘째 문장이 한 덩이로
-          읽힌다. 자리는 어차피 남으니 문장 경계에서 끊는 편이 낫다.
-          ⚠️ 마침표 뒤 공백이 아니라 **한글 뒤 마침표**로 가른다. 그냥 `. ` 로 자르면
-             `stockanalysis.com ` 이나 소수점이 문장 끝으로 잡힌다.
-          ⚠️ 한 문장짜리는 그대로 한 덩이다 — 넷 중 셋이 그렇다. */}
-      <p style={{ margin: 0, fontSize: T.body, color: C.sub, lineHeight: 1.7, wordBreak: "keep-all", maxWidth: 300 }}>
-        {typeof children === "string"
-          ? children
-              .split(/(?<=[가-힣]\.)\s+/)
-              .map((line, i) => (
+    <EmptyState className="px-6 py-8">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <Icon name={icon} style={{ fontSize: 20 }} />
+        </EmptyMedia>
+        {/* ⭐ **문장마다 줄을 바꾼다.** 흘려 두면 "…없습니다. 임원이" 처럼 두 문장이 한 줄에 걸쳐 이어져, 빈 상태를 알리는
+            첫 문장과 그 이유를 대는 둘째 문장이 한 덩이로 읽힌다. ⚠️ 마침표 뒤 공백이 아니라 **한글 뒤 마침표**로 가른다 —
+            그냥 `. ` 로 자르면 `stockanalysis.com ` 이나 소수점이 문장 끝으로 잡힌다. */}
+        <EmptyDescription style={{ wordBreak: "keep-all", maxWidth: 300 }}>
+          {typeof children === "string"
+            ? children.split(/(?<=[가-힣]\.)\s+/).map((line, i) => (
                 <span key={i} style={{ display: "block" }}>
                   {line}
                 </span>
               ))
-          : children}
-      </p>
-    </div>
+            : children}
+        </EmptyDescription>
+      </EmptyHeader>
+    </EmptyState>
   );
 }

@@ -132,6 +132,29 @@
     @apply inline-flex items-center;
   }
 
+  /* ── Empty ── */
+  .cn-empty {
+    @apply gap-4 rounded-3xl p-12;
+  }
+  .cn-empty-header {
+    @apply gap-2;
+  }
+  .cn-empty-media {
+    @apply mb-2;
+  }
+  .cn-empty-media-default {
+    @apply bg-transparent;
+  }
+  .cn-empty-media-icon {
+    @apply bg-muted text-foreground flex size-10 shrink-0 items-center justify-center rounded-xl;
+  }
+  .cn-empty-title {
+    @apply text-lg font-medium tracking-tight;
+  }
+  .cn-empty-description {
+    @apply text-sm/relaxed;
+  }
+
   /* ── Kbd ── */
   .cn-kbd {
     @apply bg-muted text-muted-foreground h-5 w-fit min-w-5 gap-1 rounded-lg px-1 font-sans text-xs font-medium;
