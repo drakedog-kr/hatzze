@@ -304,6 +304,9 @@ jobs:
   #    전부 돈다. update 잡에 있던 '열려야 한다' 규칙을 그대로 옮겼다.
   # ⚠️ krx_master 가 실패해도 뒤 잡은 돈다(`!cancelled()`). 예전 그 스텝의 continue-on-error 와
   #    같은 뜻이다. 사전·종가는 어제 저장분으로 이어 간다.
+  # ⭐ 떼면서 더한 스텝 셋(2026-09-26). ① dividend 맨 앞 'KRX 공표(08:00 KST) 대기 — 배당 전용' — 아침엔 08:00 까지
+  #    기다린다(예전엔 update 의 같은 대기 뒤에 있었다). ② insider · dividend 끝의 '화면만 먼저 비우고 데우기' — 두 잡이
+  #    update 보다 한참 먼저 끝나서, finalize 의 전체 비우기까지 옛 사본이 나가지 않게.
   krx_master:
     needs: guard
     if: ${{ !cancelled() && needs.guard.outputs.skip != 'true' }}
@@ -1715,6 +1718,17 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_us_analyst.py
 
+      # ⭐ 내부자 표가 다 바뀐 직후 **이 화면들만** 먼저 비운다(배당 잡과 같은 까닭). 이 잡은 10분 안에 끝나는데
+      #    finalize 의 전체 비우기는 update 끝(두세 시간 뒤)을 기다린다. 이 표들을 읽는 화면은 /insider 와 그 아래
+      #    상세 셋(종목·투자자·전체보기)뿐이다(lib/insider-data.ts · lib/insider-detail.ts). 상세는 패턴이라 데우지 않는다.
+      # ⚠️ 대괄호는 셸 글롭이라 따옴표를 벗기지 말 것.
+      - name: 내부자 리포트 화면만 먼저 비우고 데우기
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        env:
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: bash scripts/revalidate.sh /insider '/insider/stock/[ticker]' '/insider/investor/[cik]' '/insider/list/[kind]'
+
       # ── 내부자 리포트 전용 알림 ──────────────────────────────────────────
       # 위 알림들과 **합치지 않았다.** 제목이 곧 진단이라는 같은 이유다.
       #
@@ -1817,6 +1831,29 @@ jobs:
       #    국내 종가(전 거래일)와 예탁원 배당 기록, 아침(07:00 KST)은 막 끝난 미국 장의 종가.
       #    실측(2026-09-15): fetch_krx_stocks 는 아침엔 두 거래일 전, 저녁엔 전 거래일을 받았다.
       #
+      # ⭐ 아침 실행은 **KRX 공표(08:00 KST)를 기다렸다** 시작한다(2026-09-26). 한 잡이던 때 배당은 update 의 같은
+      #    대기 뒤(09:26~09:53)에 돌았는데, 잡을 떼니 06:3x 에 바로 돌아 ETF 분배금의 국내 시세(KRX `etf_bydd_trd`
+      #    최신 가용일)가 하루 더 옛 값이 됐다 — 09-23 실측으로 옛 아침은 10:24 에 09-22 시세, 08:00 전이면 09-21 이다.
+      #    그 값이 저녁 실행까지 남는다. 저녁은 이미 08:00 을 지나 기다리지 않는다.
+      #    본문은 update 의 'KRX 공표(08:00 KST) 대기' 와 글자까지 같다. 이름만 다르다 — 두 잡에 같은 이름이 있으면
+      #    옛 파일과의 대조 검사가 어느 쪽인지 가를 수 없다.
+      - name: KRX 공표(08:00 KST) 대기 — 배당 전용
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: |
+          # `date -d 'today 08:00'` 대신 날짜를 명시적으로 넣는다 — 러너(GNU date)와 손으로
+          # 돌리는 맥(BSD date)의 파싱이 갈리는 자리라, 애매한 표현을 쓰지 않는다.
+          today=$(TZ=Asia/Seoul date +%Y-%m-%d)
+          target=$(TZ=Asia/Seoul date -d "$today 08:00" +%s 2>/dev/null || TZ=Asia/Seoul date -j -f '%Y-%m-%d %H:%M' "$today 08:00" +%s)
+          now=$(date +%s)
+          wait=$(( target - now ))
+          if [ "$wait" -gt 0 ]; then
+            echo "KRX 공표까지 $((wait / 60))분 대기합니다 (현재 $(TZ=Asia/Seoul date '+%H:%M') KST)"
+            sleep "$wait"
+          else
+            echo "이미 08:00 KST 를 지났습니다 (현재 $(TZ=Asia/Seoul date '+%H:%M') KST) — 대기 없음"
+          fi
+
       # ⚠️ 날짜별 증분이 아니라 **매일 스냅숏 전량**(15페이지·7만 행)이다. 금융위 API 는
       #    기준일 다음 영업일 13시 뒤에 갱신되므로 아침 실행은 이틀 전 스냅숏, 저녁 실행이
       #    어제 것을 받는다. 둘 다 돌려도 같은 행을 다시 쓸 뿐이다.
@@ -1869,6 +1906,19 @@ jobs:
         if: ${{ !cancelled() }}
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_kr_dividend_payout.py
+
+      # ⭐ 배당 표가 다 바뀐 직후 **이 화면들만** 먼저 비운다(PR #543 의 규칙 — 자료가 쓰인 직후에 그 화면만).
+      #    한 잡이던 때는 배당이 맨 끝이라 잡 끝 전체 비우기가 이 몫을 했다. 떼고 나니 배당은 update 보다 한두 시간
+      #    먼저 끝나서, 여기서 안 비우면 그동안 옛 사본이 나간다(finalize 의 전체 비우기는 update 끝을 기다린다).
+      #    종목 화면(/stock/[code])의 배당 카드도 같은 표(lib/dividend.ts)를 읽어 패턴으로 같이 비운다 — 패턴은
+      #    데우지 않는다(주소가 수천이라 다음 방문자가 그린다).
+      # ⚠️ 대괄호는 셸 글롭이라 따옴표를 벗기지 말 것.
+      - name: 배당 화면만 먼저 비우고 데우기
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        env:
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: bash scripts/revalidate.sh /dividend '/stock/[code]'
 
       # ── 배당주 수집 전용 알림 ────────────────────────────────────────────
       # /dividend 는 죽어도 카드가 그대로 뜨고 히어로 툴팁의 '기준' 날짜만 안 움직인다 —
