@@ -5,6 +5,7 @@ import { Fragment, useState } from "react";
 import { track } from "@/lib/ga";
 import { C } from "../ui";
 import { SectionHead } from "./SectionHead";
+import type { IconName } from "@/lib/icon-names";
 
 /**
  * 트렌딩 메시지의 기간 탭(오늘 / 최근 7일 / 최근 30일).
@@ -37,7 +38,7 @@ export function TrendingTabs({
   panels,
   level = 2,
 }: {
-  icon: string;
+  icon: IconName;
   title: string;
   desc?: string;
   panels: TrendingPanel[];

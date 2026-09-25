@@ -24,6 +24,7 @@ import {
   wideManagerRows,
   wideMoveRows,
 } from "../../parts";
+import type { IconName } from "@/lib/icon-names";
 
 /**
  * 카드 하나의 **전체보기**. 여섯 장이 이 한 파일을 나눠 쓴다.
@@ -96,7 +97,7 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
    */
   type Card = {
     title: string;
-    icon: string;
+    icon: IconName;
     desc: string;
     items: React.ReactNode[];
     total: number;

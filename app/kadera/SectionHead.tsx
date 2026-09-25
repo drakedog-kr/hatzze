@@ -1,4 +1,5 @@
 import { C, Icon, R } from "../ui";
+import type { IconName } from "@/lib/icon-names";
 
 /**
  * 시트의 머리(아이콘 + 제목 + 우측 보조 + 설명). **여섯 화면이 함께 쓴다** —
@@ -26,7 +27,7 @@ export function SectionHead({
   right,
   level = 3,
 }: {
-  icon: string;
+  icon: IconName;
   /** 글자 하나가 보통이지만, 제목 옆에 물음표(툴팁)를 붙이는 화면(배당 바스켓)은 조각을 넘긴다. */
   title: React.ReactNode;
   note?: string;

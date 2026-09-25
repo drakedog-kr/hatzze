@@ -2,6 +2,7 @@ import "server-only";
 
 import { getSupabaseAdmin, getSupabaseServer } from "@/lib/supabase-server";
 import { fetchAllRows } from "@/lib/telegram-data";
+import type { IconName } from "@/lib/icon-names";
 
 /**
  * 배당으로 살기(/dividend)의 자료 — `kr_dividend_stock` 한 표를 읽는다.
@@ -93,7 +94,7 @@ export type Basket = {
   desc: string;
   /** 어떤 규칙으로 걸렀나 — 짧은 조각 서너 개. 화면에 알약으로 선다("우리가 골라 줬다"가 아니라 "이 조건으로 걸렀다"). */
   rules: string[];
-  icon: string;
+  icon: IconName;
   codes: string[];
   meta: BasketMeta;
   /** '내 계좌 맞춤'만 — 연금저축을 골랐을 때의 목록(국내 ETF 만). codes 는 ISA 목록. */

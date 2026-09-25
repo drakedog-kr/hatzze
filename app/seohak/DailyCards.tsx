@@ -4,6 +4,7 @@ import { BUY, SELL, signInk } from "./tone";
 import { S, T } from "./scale";
 import { type Fx, Money, rateOverMonths } from "./money";
 import { C, MONO, R } from "../ui";
+import type { IconName } from "@/lib/icon-names";
 
 /**
  * 일별 층.
@@ -60,7 +61,7 @@ export function Card({
   foot,
   children,
 }: {
-  icon: string;
+  icon: IconName;
   /**
    * 제목 아래 한 줄.
    *

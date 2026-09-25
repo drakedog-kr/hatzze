@@ -6,6 +6,7 @@ import React from "react";
 import type { IndicatorWithLatestValue } from "@/lib/data";
 import { formatIndicatorValue, shortDate } from "@/lib/format";
 import { C, Icon, MONO, R } from "../ui";
+import type { IconName } from "@/lib/icon-names";
 
 /**
  * 과열도(0~100) → 색. **화면 전체가 이 함수 하나만 쓴다.**
@@ -280,7 +281,7 @@ export function TitleRow({
   badge,
   right,
 }: {
-  icon: string;
+  icon: IconName;
   name: React.ReactNode;
   /** 제목 아래 한 줄 설명. 카드 하단에 자세한 설명이 따로 있으므로 짧게 둔다. */
   desc?: string | null;
@@ -511,7 +512,7 @@ export function HeatBar({ v, hideThreshold = false }: { v: Pick; hideThreshold?:
 // 따로 놀고, (3) 글리프 높이가 제각각이라 알약 높이가 저 혼자 달라졌다.
 // tint 는 반드시 변수로 둔다. `${stage.color}24` 처럼 알파를 이어붙이면 "var(--c-hot)24" 가
 // 되어 CSS 가 통째로 버린다 — 실제로 히어로의 구간 알약이 배경 없이 글자만 떠 있었다.
-export const STAGE_META: Record<string, { icon: string; color: string; tint: string; zone: string }> = {
+export const STAGE_META: Record<string, { icon: IconName; color: string; tint: string; zone: string }> = {
   저온: { icon: "ac_unit", color: C.cold, tint: "var(--c-cold-tint)", zone: "저온 구간" },
   상온: { icon: "sunny", color: C.neutral, tint: "var(--c-neutral-tint)", zone: "상온 구간" },
   고온: { icon: "local_fire_department", color: C.hot, tint: "var(--c-hot-tint)", zone: "고온 구간" },
@@ -626,7 +627,7 @@ export function AreaChart({
    가로축은 세로보다 3배 길어서 축을 왜곡하지 않아도 차이가 보인다 — 왜곡을 안 하는
    편이 낫다(늘린 축은 "일본이 한국의 1.5배"처럼 읽힌다). */
 
-export function GenericCard({ v, icon }: { v: Pick; icon: string }) {
+export function GenericCard({ v, icon }: { v: Pick; icon: IconName }) {
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={210}>
       <TitleRow desc={v.headline} icon={icon} name={v.name} />

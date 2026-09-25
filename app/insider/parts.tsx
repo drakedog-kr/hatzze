@@ -20,6 +20,7 @@ import type { InsiderListSlug } from "./lists";
 import { Pill, type Tone } from "../kadera/parts";
 import { StockLogo } from "../StockLogo";
 import { C, Icon, MONO } from "../ui";
+import type { IconName } from "@/lib/icon-names";
 
 /** 이 화면의 자. 서학개미(scale.ts)와 같은 네 단이다. */
 export const T = { big: "var(--fs-22)", lead: "var(--fs-15)", body: "var(--fs-12)", small: "var(--fs-11)" } as const;
@@ -2044,7 +2045,7 @@ export function HalfRow({
 }
 
 /** 자료가 없는 카드. 빈 칸으로 두지 않고 **왜 없는지**를 적는다. */
-export function EmptyCard({ icon, children }: { icon: string; children: React.ReactNode }) {
+export function EmptyCard({ icon, children }: { icon: IconName; children: React.ReactNode }) {
   return (
     <div
       style={{

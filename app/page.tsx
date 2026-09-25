@@ -8,6 +8,7 @@ import { BAND_LABELS, DIST_FILL, Hero } from "./home/Hero";
 import type { BandItem } from "./home/Hero";
 import { CardBuffett, CardLeverage, CardMarketActions, CardTurnover, CardHighGap, CardSpeed, CardVkospi, CardAsia, CardGoldRatio, CardVolume, CardFx, CardNetBuy, CardLimitUp, CardPutCall } from "./home/cards-market";
 import { CardComingSoon, CardDivergence, CardTrend, CardSentiment, CardYoutube, CardSpending, CardUpbit, CardBrokerage } from "./home/cards-sentiment";
+import type { IconName } from "@/lib/icon-names";
 
 // 캐시 주기는 루트 레이아웃의 `revalidate` 가 정한다(app/layout.tsx). 예전엔 여기가
 // force-dynamic 이라 방문마다 서버가 새로 그렸다.
@@ -38,7 +39,7 @@ const LAID_OUT = new Set([
   "small_business_crisis_index",
 ]);
 
-const FALLBACK_ICONS: Record<string, string> = {
+const FALLBACK_ICONS: Record<string, IconName> = {
   시장: "insights",
   감성: "tag",
 };

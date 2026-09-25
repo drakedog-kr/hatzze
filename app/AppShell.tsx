@@ -21,6 +21,7 @@ import { NewBadge } from "./VersionBadge";
 import GaEvents from "./GaEvents";
 import { TipTap } from "./TipTap";
 import { HolidayGreeting } from "./HolidayGreeting";
+import type { IconName } from "@/lib/icon-names";
 
 // sub 는 본문 헤더의 페이지 부제다(목업이 사이드바 로고 밑에 있던 문장을 여기로 옮겼다).
 // 사이드바 항목에는 안 쓰이고 PageHeader 만 읽는다.
@@ -201,7 +202,7 @@ type NavChild = { label: string; href?: string; Glyph: Glyph; badge?: string; ti
 type NavItem = {
   href: string;
   label: string;
-  icon?: string;
+  icon?: IconName;
   Glyph?: Glyph;
   sub: string;
   badge?: string;
@@ -348,7 +349,7 @@ const navFor = (env: ShellEnv) => (env.themeNav ? NAV_ON : NAV_OFF);
 //
 // aria-label 은 라벨과 따로 둔다. "오늘 뭐래?"만 읽히면 스크린리더 사용자는 이게 외부
 // 텔레그램으로 나가는 링크라는 걸 알 수 없다.
-const TELEGRAM = {
+const TELEGRAM: { href: string; label: string; aria: string; icon: IconName } = {
   href: "https://t.me/hatzze69",
   label: "오늘 뭐래?",
   aria: "오늘 뭐래? 텔레그램 채널 열기(새 탭)",
@@ -367,7 +368,7 @@ const TELEGRAM = {
 // 예고 항목을 전부 목록 끝에 몰면 짝인 둘이 MDD 를 사이에 두고 떨어진다.
 // 아이콘은 NAV 항목과 같은 규칙이다 — 직접 그린 Glyph 든 Material Symbols 이름(icon)이든
 // 하나만 있으면 되고, NavGlyph 가 골라 그린다.
-type SoonItem = { label: string; badge: string; tip: string; after: string; icon?: string; Glyph?: Glyph };
+type SoonItem = { label: string; badge: string; tip: string; after: string; icon?: IconName; Glyph?: Glyph };
 const COMING_SOON: SoonItem[] = [
   // ⭐ 국장 미리보기가 2026-09-04 에 NAV 로 옮겨 가 비었다가, 2026-09-06 에 데일리 노트가
   // 들어왔다. 그 항목은 손으로 옮기지 않는다 — DAILY_PUBLIC 하나가 여기서 빼고 NAV 에 넣는다.
@@ -427,9 +428,11 @@ function sidebarItems(env: ShellEnv) {
 }
 
 /** NAV 아이콘. 직접 그린 SVG(Glyph)가 있으면 그걸, 없으면 Material Symbols 이름을 쓴다. */
-function NavGlyph({ item, size }: { item: { icon?: string; Glyph?: (p: { size?: number }) => React.ReactElement }; size: number }) {
+function NavGlyph({ item, size }: { item: { icon?: IconName; Glyph?: (p: { size?: number }) => React.ReactElement }; size: number }) {
   if (item.Glyph) return <item.Glyph size={size} />;
-  return <Icon name={item.icon ?? ""} style={{ fontSize: size }} />;
+  // 이름이 없으면 예전처럼 빈 아이콘 칸을 그대로 둔다(칸이 빠지면 gap 이 달라진다).
+  if (!item.icon) return <span className="ms" style={{ fontSize: size }} />;
+  return <Icon name={item.icon} style={{ fontSize: size }} />;
 }
 
 /**
@@ -1497,7 +1500,7 @@ const NEWS_EVENT = "hz-news-change";
    ⚠️ 문구에 숫자를 넣지 않는다(위 주석). */
 /* tailShort: 폰(≤560)에서 tail 대신 쓰는 짧은 꼬리. 이름이 앞에 서는 소식은 폰에서 한 줄로 잘리므로(components.css 의
    .hz-news-namefirst) 긴 tail 은 문장 중간에서 '…'로 끊긴다. 한 줄(360px 폰에서 글자 칸 238px)에 들어가는 문장을 따로 둔다. */
-type NewsItem = { key: string; from: string; href: string; head?: string; name: string; tail: string; tailShort?: string; aria?: string; icon: string; ga: string };
+type NewsItem = { key: string; from: string; href: string; head?: string; name: string; tail: string; tailShort?: string; aria?: string; icon: IconName; ga: string };
 
 /* 2026-09-23 · 테마 리포트 오픈 소식.
    ⛔ 목적지가 안 연 화면이라 **themeNav 를 따른다** — 배포에서는 THEME_PUBLIC 을 켠 뒤에야 걸리고, 그 전에는 아래 텔레그램 소식이

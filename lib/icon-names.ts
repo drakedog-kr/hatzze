@@ -1,0 +1,130 @@
+/**
+ * 이 사이트가 쓰는 Material Symbols 아이콘 이름 전부. layout.tsx 는 이 목록에 든 글리프만
+ * 받는다(구글 폰트 `icon_names`).
+ *
+ * 왜 자르나. 전체 폰트는 542,544바이트(woff2)라 홈이 받는 JS 전부(gzip 161,900바이트)의
+ * 3.4배였고, `display=block` 이라 그게 다 올 때까지 아이콘 자리가 비어 있었다. 이 목록만
+ * 받으면 17,948바이트다(2026-09-25 실측). 채운 아이콘(.ms-fill)이 쓰는 FILL 축(0~1)은
+ * 잘린 폰트에도 그대로 있다.
+ *
+ * ⛔ **목록에 없는 이름을 쓰면 글리프 대신 "trending_up" 같은 글자가 그대로 찍힌다.**
+ *    그래서 `Icon` 의 name 과 아이콘 이름을 넘기는 모든 속성을 `IconName` 으로 묶었다 —
+ *    목록에 없는 이름을 쓰면 타입 검사(CI 의 typecheck)가 먼저 실패한다.
+ *    새 아이콘을 쓰려면 여기에 이름을 넣으면 된다(가나다가 아니라 알파벳 순).
+ * ⛔ `"x" as IconName` 처럼 캐스팅하지 말 것. 검사를 건너뛰어 목록에서 빠진다(실제로 한 번
+ *    그렇게 빠졌다). 객체에 담을 땐 필드 타입을 `IconName` 으로 적는다.
+ */
+export const ICON_NAMES = [
+  "ac_unit",
+  "account_balance",
+  "account_balance_wallet",
+  "add_circle",
+  "align_horizontal_left",
+  "apartment",
+  "arrow_back",
+  "arrow_forward",
+  "arrow_outward",
+  "arrow_upward",
+  "article",
+  "auto_awesome",
+  "balance",
+  "bolt",
+  "calculate",
+  "calendar_month",
+  "call_split",
+  "campaign",
+  "casino",
+  "category",
+  "chat_bubble",
+  "check",
+  "chevron_left",
+  "chevron_right",
+  "close",
+  "cloud_off",
+  "compare_arrows",
+  "contact_page",
+  "credit_score",
+  "currency_bitcoin",
+  "currency_exchange",
+  "dark_mode",
+  "desktop_windows",
+  "donut_large",
+  "donut_small",
+  "edit_note",
+  "error_outline",
+  "event_repeat",
+  "format_quote",
+  "forum",
+  "grid_view",
+  "groups",
+  "help",
+  "history",
+  "home",
+  "hourglass_empty",
+  "hub",
+  "inbox",
+  "info",
+  "input",
+  "insights",
+  "inventory_2",
+  "leaderboard",
+  "light_mode",
+  "local_fire_department",
+  "local_mall",
+  "menu",
+  "menu_book",
+  "military_tech",
+  "monitor_heart",
+  "monitoring",
+  "newspaper",
+  "north_east",
+  "open_in_full",
+  "paid",
+  "payments",
+  "pie_chart",
+  "play_circle",
+  "podcasts",
+  "preview",
+  "public",
+  "query_stats",
+  "receipt_long",
+  "refresh",
+  "remove_circle_outline",
+  "restaurant",
+  "reviews",
+  "rocket_launch",
+  "savings",
+  "schedule",
+  "search",
+  "send",
+  "share",
+  "shield",
+  "shopping_bag",
+  "shortcut",
+  "show_chart",
+  "stairs",
+  "star",
+  "sunny",
+  "swap_horiz",
+  "swap_vert",
+  "tag",
+  "terminal",
+  "timer",
+  "toll",
+  "touch_app",
+  "trending_down",
+  "trending_up",
+  "verified",
+  "vertical_align_top",
+  "visibility",
+  "waves",
+  "whatshot",
+  "workspace_premium",
+] as const;
+
+export type IconName = (typeof ICON_NAMES)[number];
+
+/** layout.tsx 의 아이콘 폰트 스타일시트 주소. 축 값은 자르기 전과 같다. */
+export const ICON_FONT_HREF =
+  "https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0..1,0" +
+  `&icon_names=${ICON_NAMES.join(",")}&display=block`;

@@ -6,6 +6,7 @@ import { C, Icon, MONO } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
 import { UNRECOVERED, PAD } from "./shared";
 import type { MddResult } from "./shared";
+import type { IconName } from "@/lib/icon-names";
 
 /**
  * "최근 10년" / "상장 이후·약 6년" — 화면 곳곳이 같은 말을 써야 해서 한곳에서 만든다.
@@ -59,7 +60,7 @@ export function Foot({ children }: { children: React.ReactNode }) {
  * KB금융(−7.9%)이 0.1%p 차이로 사라져, 하루 사이 생겼다 없어지면 "어제 있던 게 왜 없지"가
  * 된다. 자리를 지키고 왜 못 보여주는지를 적는다.
  */
-export function AbsentSheet({ icon, title, sub, body }: { icon: string; title: string; sub: string; body: string }) {
+export function AbsentSheet({ icon, title, sub, body }: { icon: IconName; title: string; sub: string; body: string }) {
   return (
     <Sheet>
       <SectionHead level={3} icon={icon} title={title} desc={sub} />
