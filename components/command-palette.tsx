@@ -24,7 +24,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
-import { MONO } from "@/app/ui";
+import { C, MONO } from "@/app/ui";
 import {
   Command,
   CommandDialog,
@@ -225,11 +225,16 @@ function PaletteBody({
 /** 3일 언급 수. 못 셌으면(null) 아무것도 안 적는다 — 0 은 "아무도 말 안 했다"는 뜻이라 대신 쓸 수 없다. */
 const mentionNote = (m: number | null) => (m === null ? null : `${m.toLocaleString("ko-KR")}회`);
 
-/** 묶음 머리글 — 왼쪽은 이름, 오른쪽은 줄 끝 숫자가 무엇인지. */
+/**
+ * 묶음 머리글 — 왼쪽은 이름, 오른쪽은 줄 끝 숫자가 무엇인지.
+ * 이름은 사이드바 묶음 머리(NavGroupLabel)와 같은 꼴이다(진한 글자 · 700 · 12px). rhea 기본(회색 · 500)이면
+ * 줄 글자보다 흐려서 '최근 본 종목'·'지금 뜨는 종목'이 어디서 갈리는지 안 보였다(2026-09-26).
+ * 단위 설명은 회색 그대로 둔다 — 둘 다 진하면 머리글 한 줄이 제목 두 개로 읽힌다.
+ */
 function Heading({ title, unit }: { title: string; unit?: string }) {
   return (
     <span className="flex items-baseline justify-between gap-3">
-      <span>{title}</span>
+      <span style={{ color: C.ink, fontWeight: 700 }}>{title}</span>
       {unit && <span className="font-normal">{unit}</span>}
     </span>
   );
