@@ -115,6 +115,23 @@
     @apply pl-2;
   }
 
+  /* ── Breadcrumb ── */
+  .cn-breadcrumb-list {
+    @apply text-muted-foreground gap-1.5 text-sm sm:gap-2.5;
+  }
+  .cn-breadcrumb-item {
+    @apply gap-1.5;
+  }
+  .cn-breadcrumb-link {
+    @apply hover:text-foreground transition-colors;
+  }
+  .cn-breadcrumb-page {
+    @apply text-foreground font-normal;
+  }
+  .cn-breadcrumb-separator {
+    @apply inline-flex items-center;
+  }
+
   /* ── Kbd ── */
   .cn-kbd {
     @apply bg-muted text-muted-foreground h-5 w-fit min-w-5 gap-1 rounded-lg px-1 font-sans text-xs font-medium;

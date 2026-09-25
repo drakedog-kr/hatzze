@@ -16,7 +16,7 @@ import { ChartZoom } from "../../ChartZoom";
 import { StockLogo } from "../../../StockLogo";
 import { INSIDER_CARD } from "../../../og-copy";
 import { pageMetadata } from "../../../seo";
-import { C, Icon, MONO } from "../../../ui";
+import { C, MONO } from "../../../ui";
 import { LoadFailedNote } from "../../../LoadFailedNote";
 import { ExpandableList } from "../../../kadera/ExpandableList";
 import {
@@ -39,6 +39,7 @@ import {
   fmtDate,
   wideStockHolderRows,
 } from "../../parts";
+import { BackTrail } from "@/components/back-trail";
 
 /**
  * 종목 하나의 상세.
@@ -266,22 +267,7 @@ export default async function StockDetailPage({
     // (규칙은 globals.css 의 `[data-cur-default]`).
     <div className="hz-tx" data-cur-default="usd">
       <LoadFailedNote sources={d.failedSources} />
-      <Link className="hz-back-link"
-        href="/insider"
-        style={{
-          alignSelf: "flex-start",
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 4,
-          fontSize: "var(--fs-12)",
-          fontWeight: 700,
-          color: C.sub,
-          textDecoration: "none",
-        }}
-      >
-        <Icon name="chevron_left" style={{ fontSize: "var(--fs-16)" }} />
-        내부자 리포트
-      </Link>
+      <BackTrail parent={{ name: "내부자 리포트", href: "/insider" }} current={d.name} />
 
       {/* ── 히어로 ──────────────────────────────────────────────────
           세 칸 — **종목 정체 · 공시에 남은 것 · 커뮤니티 관심 추이.**

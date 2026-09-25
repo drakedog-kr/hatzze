@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { assertLoaded } from "@/lib/load-state";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { getInsiderOverview } from "@/lib/insider-data";
@@ -8,7 +7,6 @@ import { getInsiderOverview } from "@/lib/insider-data";
 import { SectionHead } from "../../../kadera/SectionHead";
 import { INSIDER_CARD } from "../../../og-copy";
 import { pageMetadata } from "../../../seo";
-import { C, Icon } from "../../../ui";
 import { ExpandableList } from "../../../kadera/ExpandableList";
 import { INSIDER_LISTS, INSIDER_LIST_MAX, INSIDER_LIST_SLUGS, type InsiderListSlug } from "../../lists";
 import {
@@ -25,6 +23,7 @@ import {
   wideMoveRows,
 } from "../../parts";
 import type { IconName } from "@/lib/icon-names";
+import { BackTrail } from "@/components/back-trail";
 
 /**
  * 카드 하나의 **전체보기**. 여섯 장이 이 한 파일을 나눠 쓴다.
@@ -259,22 +258,7 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
     <div className="hz-tx" data-cur-default="usd">
       {/* 돌아갈 길. 사이드바가 /insider 를 켠 채로 두지만(주소가 그 아래라), 어느 카드에서
           왔는지는 사이드바가 못 말한다. */}
-      <Link className="hz-back-link"
-        href="/insider"
-        style={{
-          alignSelf: "flex-start",
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 4,
-          fontSize: "var(--fs-12)",
-          fontWeight: 700,
-          color: C.sub,
-          textDecoration: "none",
-        }}
-      >
-        <Icon name="chevron_left" style={{ fontSize: "var(--fs-16)" }} />
-        내부자 리포트
-      </Link>
+      <BackTrail parent={{ name: "내부자 리포트", href: "/insider" }} current={spec.title} />
 
       {cards.map((card) => (
         <section className="hz-sheet" key={card.title}>

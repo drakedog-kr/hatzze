@@ -26,6 +26,7 @@ import { StockLogo } from "../../StockLogo";
 import { KADERA_CARD } from "../../og-copy";
 import { pageMetadata } from "../../seo";
 import { AiMark, C, Icon, MONO, R } from "../../ui";
+import { BackTrail } from "@/components/back-trail";
 
 /**
  * 종목 하나의 실주소(`/stock/005930`).
@@ -239,22 +240,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
         trail={[PARENT]}
       />
 
-      <Link className="hz-back-link"
-        href={PARENT.path}
-        style={{
-          alignSelf: "flex-start",
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 4,
-          fontSize: "var(--fs-12)",
-          fontWeight: 700,
-          color: C.sub,
-          textDecoration: "none",
-        }}
-      >
-        <Icon name="chevron_left" style={{ fontSize: "var(--fs-16)" }} />
-        {PARENT.name}
-      </Link>
+      <BackTrail parent={{ name: PARENT.name, href: PARENT.path }} current={d.name} />
 
       {/* ── 히어로 ──────────────────────────────────────────────────
           세 칸. **종목 정체 · 얼마나 회자됐나 · 일별 추이.**
