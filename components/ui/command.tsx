@@ -22,7 +22,7 @@ function Command({ className, ...props }: React.ComponentProps<typeof CommandPri
 
 function CommandDialog({
   title = "검색",
-  description = "찾을 테마·종목을 입력하세요",
+  description = "찾을 종목·테마를 입력하세요",
   children,
   className,
   showCloseButton = false,

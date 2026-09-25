@@ -482,7 +482,7 @@ function NavGroupLabel({ label, first, inset }: { label: string; first: boolean;
       style={{
         margin: first ? "0 0 -2px" : "8px 0 -2px",
         padding: `0 ${inset}px`,
-        // 진하게(2026-09-25 Hun) — 회색(--c-muted)·600 이던 머리가 항목 이름보다 흐려 묶음이 안 읽혔다.
+        // 진하게(2026-09-25) — 회색(--c-muted)·600 이던 머리가 항목 이름보다 흐려 묶음이 안 읽혔다.
         fontSize: "var(--fs-12)",
         fontWeight: 700,
         color: C.ink,
@@ -675,7 +675,7 @@ const subscribeSide = (cb: () => void) => {
 /**
  * 사이드바를 아이콘 막대로 접는 단추(shadcn 사이드바 블록 sidebar-07 의 collapsible="icon"). **로고 줄 오른쪽 끝**에 둔다.
  * 자리를 네 번 옮겼다(2026-09-25) — 로고·베타 배지 옆(어수선) → 페이지 제목 왼쪽(이상) → 사이드바 맨 아래(이상) →
- * 베타 배지를 빼고 로고 오른쪽(Hun 이 고른 자리). 접히면 로고 심볼 아래로 내려간다.
+ * 베타 배지를 빼고 로고 오른쪽. 접히면 로고 심볼 아래로 내려간다.
  *
  * 접힘은 `<html data-sidebar="icon">` 하나가 쥐고, 모양은 전부 CSS 가 바꾼다(app/styles/shadcn.css). 상태는
  * 쿠키 `hz-side` 에 남기고 layout.tsx 의 PREF_SCRIPT 가 그림 그리기 전에 속성을 붙인다 — 테마 스위치와 같은 길이라
@@ -688,7 +688,7 @@ function SidebarToggle() {
     <button
       type="button"
       // 오른쪽 끝을 메뉴 줄의 파란 알약 오른쪽 끝에 맞춘다 — 로고 칸의 안쪽 여백(6px)만큼 밀어 낸다.
-      // 칸은 24px(마우스를 올렸을 때 칠해지는 면). 32px 이던 때 면이 크고 아이콘이 안쪽에 앉아 보였다(2026-09-25 Hun).
+      // 칸은 24px(마우스를 올렸을 때 칠해지는 면). 32px 이던 때 면이 크고 아이콘이 안쪽에 앉아 보였다(2026-09-25).
       // 모서리 6px · 칠하는 색 --c-pressed: 끝 좌표가 알약과 같아도(195px) 모서리 9.6px 에 --c-hover(흰 바탕 대비 1.08)면
       // 오른쪽 변이 곡선인 데다 흐려서 칸 끝이 안 보이고 아이콘 끝이 끝처럼 읽혀, 알약보다 안쪽에 선 것처럼 보였다.
       className="hz-side-toggle text-muted-foreground hover:text-foreground ml-auto -mr-1.5 inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-[6px] hover:bg-(--c-pressed)"
@@ -712,7 +712,7 @@ function SidebarToggle() {
 
 /**
  * 사이드바 로고 아래의 검색 단추(PC). shadcn 사이드바 블록의 검색칸 꼴이다(누르면 ⌘K 창이 열린다).
- * 페이지 머리 오른쪽에 뒀다가 사이드바로 되돌렸다(2026-09-26 Hun). 폰은 탑바 돋보기다.
+ * 페이지 머리 오른쪽에 뒀다가 사이드바로 되돌렸다(2026-09-26). 폰은 탑바 돋보기다.
  * 단축키 표시는 맥이면 ⌘K, 아니면 Ctrl K. 서버는 맥 표기로 그리고 붙은 뒤 고친다.
  */
 function SearchTrigger() {
@@ -727,7 +727,7 @@ function SearchTrigger() {
       onClick={openCommandMenu}
       onPointerEnter={preloadCommandMenu}
       onFocus={preloadCommandMenu}
-      aria-label="테마·종목 검색"
+      aria-label="종목·테마 검색"
       data-label="검색"
       className="hz-side-search border-border text-muted-foreground hover:bg-accent flex h-9 w-full shrink-0 cursor-pointer items-center gap-2 rounded-xl border bg-transparent px-3 text-[13px] transition-colors"
       // 사이드바 바깥 간격(28)을 위아래로 덜어 쓴다 — 로고와 16 · 메뉴와 20. 늘어난 높이를 44px 로 묶어 사이드바가
@@ -735,7 +735,7 @@ function SearchTrigger() {
       style={{ margin: "-12px 0 -8px" }}
     >
       <Icon name="search" style={{ fontSize: 17 }} />
-      <span className="hz-side-text">테마·종목 검색</span>
+      <span className="hz-side-text">종목·테마 검색</span>
       <Kbd className="hz-side-text ml-auto">{mac ? "⌘K" : "Ctrl K"}</Kbd>
     </button>
   );
@@ -782,7 +782,7 @@ function Sidebar() {
         {/* 베타 배지는 로고 우측 상단에 붙인다 — 서비스 전체가 베타라는 표시라서,
             페이지마다(예전엔 카더라 제목 옆) 다는 것보다 여기 한 곳이 맞다.
             alignItems:flex-start 로 로고 윗선에 맞춰 위첨자처럼 올린다. */}
-        {/* 로고 오른쪽 끝에 사이드바 접기 아이콘. 베타 배지는 사이드바에서 뺐다(2026-09-25 Hun) — 베타 표시는
+        {/* 로고 오른쪽 끝에 사이드바 접기 아이콘. 베타 배지는 사이드바에서 뺐다(2026-09-25) — 베타 표시는
             푸터와 폰 탑바에 남는다. 배지가 있을 땐 로고 · 배지 · 접기 셋이 한 줄에 붙어 어수선했다. */}
         <LogoTag className="hz-side-logo" style={{ margin: 0, display: "flex", alignItems: "center", gap: 5 }}>
           {/* 로고는 메인(시장 브리핑)으로 가는 링크 — 어느 페이지에서든 홈으로 돌아올 수 있게. */}

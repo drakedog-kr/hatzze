@@ -241,7 +241,12 @@ export async function getUsSurgingOneliners(): Promise<Record<string, string>> {
   return Object.fromEntries((data ?? []).map((r) => [r.ticker as string, r.oneliner as string]));
 }
 
-export async function getUsSurgingStocks(limit = 6): Promise<UsSurgingStock[]> {
+export async function getUsSurgingStocks(
+  limit = 6,
+  // 시세를 안 쓰는 호출부(⌘K 검색의 '지금 뜨는 종목'은 이름과 배수만 쓴다)가 야후 왕복을 건너뛰게 한다.
+  // 국장 짝(getSurgingStocks)과 같은 꼴이고, 기본값은 켜 둔 채라 기존 호출부는 그대로다.
+  opts: { withQuotes?: boolean } = {},
+): Promise<UsSurgingStock[]> {
   const { rows, dates } = await loadUsStockDaily(14);
   if (!rows.length) return [];
 
@@ -302,7 +307,7 @@ export async function getUsSurgingStocks(limit = 6): Promise<UsSurgingStock[]> {
 
   // 시세는 **고른 것만** 받는다. 후보 전부를 물으면 카드에 못 오를 종목까지 왕복한다.
   const [quotes, chOf] = await Promise.all([
-    usQuotes(ranked.map((s) => s.ticker)),
+    opts.withQuotes === false ? Promise.resolve(new Map<string, { price: number; changeRate: number | null }>()) : usQuotes(ranked.map((s) => s.ticker)),
     breadthChannelsIfSameWindow("getUsSurgingStocks"),
   ]);
   return ranked.map((s) => ({
