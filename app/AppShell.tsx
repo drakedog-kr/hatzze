@@ -13,7 +13,6 @@ import { THEME_NAMES, US_THEME_NAMES, themeHref, usThemeHref } from "@/lib/theme
 import { ShellEnvContext, useShellEnv, type ShellEnv } from "./shell-env";
 
 import { track } from "@/lib/ga";
-import { SLOGAN } from "./brand";
 import { C, Icon, R } from "./ui";
 import { BetaBadge, LogoLockup } from "./Logo";
 import Footer from "./Footer";
@@ -771,7 +770,7 @@ function Sidebar() {
         padding: "28px 14px 20px",
         // 28: 묶음 머리를 넣으며 사이드바가 782 → 930px 로 늘어 노트북에서 스크롤이 생겼다(2026-09-25). 줄 여백과 함께 줄였다.
         gap: 28,
-        // 내용 높이는 746px 다(2026-09-25 실측, 프로덕션 782). 창이 그보다 낮을 때만(1366×768 노트북 등) 사이드바
+        // 내용 높이는 745px 다(2026-09-26 실측 · 로고 아래 슬로건을 뺀 뒤 · 프로덕션 782). 창이 그보다 낮을 때만(1366×768 노트북 등) 사이드바
         // 안에서 스크롤한다 — 예전엔 맨 아래 텔레그램 칸이 잘렸다. 막대는 숨긴다(보이면 어수선하다는 지적).
         overflowY: "auto",
         overscrollBehavior: "contain",
@@ -793,9 +792,6 @@ function Sidebar() {
               같은 사이드바 안에서 배지가 두 종류로 보인다. */}
           <SidebarToggle />
         </LogoTag>
-        <p className="hz-side-text" style={{ margin: "8px 0 0", fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub, letterSpacing: "0.02em", lineHeight: 1.5 }}>
-          {SLOGAN}
-        </p>
       </div>
       <SearchTrigger />
       <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
