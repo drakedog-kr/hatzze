@@ -21,6 +21,8 @@ import { NewBadge } from "./VersionBadge";
 import GaEvents from "./GaEvents";
 import { TipTap } from "./TipTap";
 import { HolidayGreeting } from "./HolidayGreeting";
+import { CommandMenu, openCommandMenu, type CommandPage } from "@/components/command-menu";
+import { Kbd } from "@/components/ui/kbd";
 import type { IconName } from "@/lib/icon-names";
 
 // sub 는 본문 헤더의 페이지 부제다(목업이 사이드바 로고 밑에 있던 문장을 여기로 옮겼다).
@@ -599,6 +601,39 @@ const DEEP_PAGES: Record<string, { label: string; sub: string; badge?: string }>
   ),
 };
 
+/** ⌘K 검색에 올릴 화면. 하위 항목이 있으면 하위(국장·미장 카더라 등)를, 없으면 그 항목을 올린다. */
+function commandPages(env: ShellEnv): CommandPage[] {
+  return navFor(env).flatMap((n) =>
+    n.children?.some((c) => c.href)
+      ? n.children.filter((c): c is NavChild & { href: string } => Boolean(c.href)).map((c) => ({ label: c.label, href: c.href }))
+      : [{ label: n.label, href: n.href }],
+  );
+}
+
+/**
+ * 사이드바의 검색 단추. shadcn 사이드바 블록의 검색칸 꼴이다(누르면 ⌘K 창이 열린다).
+ * 단축키 표시는 맥이면 ⌘K, 아니면 Ctrl K. 서버는 맥 표기로 그리고 붙은 뒤 고친다.
+ */
+function SearchTrigger() {
+  const mac = useSyncExternalStore(
+    () => () => {},
+    () => /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent),
+    () => true,
+  );
+  return (
+    <button
+      type="button"
+      onClick={openCommandMenu}
+      className="border-border bg-muted text-muted-foreground hover:bg-accent flex h-9 w-full shrink-0 cursor-pointer items-center gap-2 rounded-xl border px-3 text-[13px] transition-colors"
+      style={{ margin: "-18px 0 -14px" }}
+    >
+      <Icon name="search" style={{ fontSize: 17 }} />
+      <span>검색</span>
+      <Kbd className="ml-auto">{mac ? "⌘K" : "Ctrl K"}</Kbd>
+    </button>
+  );
+}
+
 function isActive(href: string, pathname: string) {
   return href === "/" ? pathname === "/" : pathname.startsWith(href);
 }
@@ -628,6 +663,11 @@ function Sidebar() {
         borderRight: `1px solid var(--c-divider)`,
         padding: "28px 14px 20px",
         gap: 34,
+        // 창 높이가 사이드바보다 낮으면(1366×768 노트북에서 이미 14px 넘쳐 맨 아래 텔레그램 칸이
+        // 잘렸다) 사이드바 안에서 스크롤한다. shadcn 사이드바와 같은 처리다. 높으면 아무 일도 없다.
+        overflowY: "auto",
+        overscrollBehavior: "contain",
+        scrollbarWidth: "thin",
       }}
     >
       <div style={{ padding: "0 6px" }}>
@@ -647,6 +687,7 @@ function Sidebar() {
           {SLOGAN}
         </p>
       </div>
+      <SearchTrigger />
       <nav style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {sidebarItems(env).map((row) => {
           if (row.kind === "soon") {
@@ -1424,6 +1465,26 @@ function TopBar({
           데스크톱에서는 햄버거가 display:none 이라 flex 에서 아예 빠지고, 남는 건
           예전과 같은 토글 하나다 — 순서를 바꿔도 데스크톱은 그대로다. */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+        <button
+          type="button"
+          className="hz-menu-btn"
+          onClick={openCommandMenu}
+          aria-label="검색"
+          style={{
+            alignItems: "center",
+            justifyContent: "center",
+            width: 38,
+            height: 38,
+            borderRadius: R.control,
+            border: `1px solid ${C.line}`,
+            background: C.bg,
+            color: C.sub,
+            cursor: "pointer",
+            flexShrink: 0,
+          }}
+        >
+          <Icon name="search" style={{ fontSize: "var(--fs-20)" }} />
+        </button>
         <PageTools />
         <button
           type="button"
@@ -1875,6 +1936,8 @@ export default function AppShell({ children, themeNav = THEME_PUBLIC }: { childr
       <GaEvents />
       {/* 터치 기기에서 툴팁을 탭으로 여는 리스너. 호버가 되는 기기에서는 아무것도 안 건다. */}
       <TipTap />
+      {/* ⌘K 검색. 사이드바 단추·탑바 돋보기도 이 창을 연다(components/command-menu.tsx). */}
+      <CommandMenu pages={commandPages(env)} themes={env.themeNav} />
       <div
         className="hz-frame"
         style={{

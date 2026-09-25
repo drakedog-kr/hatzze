@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* shadcn 부품의 열고 닫는 움직임(animate-in · fade-in-0 · zoom-in-95). CSS 한 벌뿐이다. */
+@import "tw-animate-css";
 
 /* ── 이 파일은 차례만 잡는다 ────────────────────────────────────────────
    5,732줄짜리 한 파일이었다(2026-09-17 안정화 점검 25번). 줄 범위를 그대로 잘라 아홉 파일로
@@ -14,3 +16,5 @@
 @import "./styles/badges.css";
 @import "./styles/mobile.css";
 @import "./styles/tx.css";
+/* shadcn 부품 모양. 레이어(components) 안이라 위 차례와 상관없다(그 파일 머리말). */
+@import "./styles/shadcn.css";
