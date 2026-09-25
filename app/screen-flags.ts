@@ -127,7 +127,10 @@ export const THEME_NAV_NEW = true;
  *   app/Footer.tsx          바로가기와 '해외투자' 출처 묶음이 빠진다(그 원천은 이 화면만 썼다)
  *   app/sitemap-urls.ts     사이트맵에서 빠진다
  *   scripts/check-routes.mjs 색인 목록 검사에서 예외
- *   .github/workflows/daily-update.yml 의 서학개미 수집 세 스텝과 캐시 데우기는 손으로 끈 상태(if: false) — yml 은 이 파일을 못 읽는다.
- * 되살릴 일이 있으면 위 자리들과 yml 의 if: false 를 함께 되돌린다.
+ *   scripts/revalidate.sh   데우는 목록에서 빠져 있다
+ *   .github/workflows/daily-update.yml  수집 세 스텝(예탁원·ETF·TIC)과 전용 요약·알림을 뺐다(2026-09-26, 09-22 부터 if: false 로
+ *                           꺼져 있던 것). 스크립트 fetch_seohak_*.py 와 표는 남아 있다.
+ * 되살릴 일이 있으면 위 자리들을 되돌리고, 뺀 스텝은 지우기 전 yml 에서 가져온다
+ * (`git log -S seohak_health -- .github/workflows/daily-update.yml` 이 그 커밋을 찾는다).
  */
 export const SEOHAK_PUBLIC = false;
