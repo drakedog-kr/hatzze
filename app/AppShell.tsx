@@ -696,7 +696,8 @@ function SidebarToggle() {
   return (
     <button
       type="button"
-      className="hz-side-toggle text-muted-foreground hover:bg-accent hover:text-foreground ml-auto inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg"
+      // 오른쪽 끝을 메뉴 줄의 파란 알약 오른쪽 끝에 맞춘다 — 로고 칸의 안쪽 여백(6px)만큼 밀어 낸다.
+      className="hz-side-toggle text-muted-foreground hover:bg-accent hover:text-foreground ml-auto -mr-1.5 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg"
       aria-label={label}
       aria-pressed={icon}
       title={label}

@@ -221,9 +221,11 @@ html[data-sidebar="icon"] .hz-sidebar {
 html[data-sidebar="icon"] .hz-sidebar .hz-side-text {
   display: none !important;
 }
-/* 로고는 유령 심볼만 남긴다(워드마크는 LogoLockup 의 둘째 칸). 접기 단추는 심볼 아래로 내린다(한 줄에 둘이 안 들어간다). */
+/* 로고는 유령 심볼만 남긴다(워드마크는 LogoLockup 의 둘째 칸). 접기 단추는 심볼 아래로 내린다(한 줄에 둘이 안 들어간다).
+   ⚠️ !important 가 필요하다 — 워드마크 칸이 인라인 display 를 들고 있어 그냥 두면 인라인이 이긴다. 안 먹으면 124px 로고가
+      64px 막대 가운데 놓여 심볼은 왼쪽 밖으로 밀리고 "hatz" 만 보인다(2026-09-25 실제로 그랬다). */
 html[data-sidebar="icon"] .hz-sidebar .hz-logo-link > span > :nth-child(2) {
-  display: none;
+  display: none !important;
 }
 html[data-sidebar="icon"] .hz-sidebar .hz-side-logo {
   flex-direction: column;
@@ -231,6 +233,7 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-logo {
 }
 html[data-sidebar="icon"] .hz-sidebar .hz-side-toggle {
   margin-left: 0;
+  margin-right: 0;
   position: relative;
 }
 html[data-sidebar="icon"] .hz-sidebar .hz-nav-item,
