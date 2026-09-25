@@ -177,3 +177,79 @@ def test_aurora_innovation_and_other_auroras_are_not_the_stock(text):
 )
 def test_aurora_stock_mentions_survive(text):
     assert _aurora(text) == {"039830"}
+
+
+# ── 2026-09-25: 디바이스(187870) ← 무라타 사업부 이름 · GS(078930) ← 골드만삭스 출처 표기 ──────
+# 이슈 #572. 같은 골드만 리포트 요약 한 편(`무라타 컨퍼런스콜 후기 … (GS)`)이 여섯 채널에 복붙돼
+# 급부상 카드의 디바이스(2위)와 GS(3위)를 함께 띄웠다.
+
+
+def _device(text: str) -> set[str]:
+    match_to_code = {"디바이스": "187870"}
+    pattern, caseless = build_pattern(list(match_to_code))
+    ambiguous = {"디바이스"} & AMBIGUOUS_NAMES
+    return set(extract(text, pattern, match_to_code, {"디바이스": "dict"}, ambiguous, caseless))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "• BBU/AI 전원 사업은 계획대로 순항 중\n\n• 디바이스/모듈 부문의 28년 실적 개선 가시성이 높아지고 있다는 인상",
+        "손실 30억 엔이 계상되었고, 디바이스 모듈은 실적이 악화되어 연간 손익분기점 달성을 목표로 하고 있습니다.",
+    ],
+)
+def test_murata_device_module_segment_is_not_the_stock(text):
+    assert _device(text) == set()
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "미래산업/ 단일판매ㆍ공급계약/  상세보기 \n디바이스/ 단일판매ㆍ공급계약/  상세보기 ",
+        "(코스닥)디바이스 - 단일판매ㆍ공급계약체결",
+        "기업명: 디바이스(시가총액: 1,238억) A187870\n보고서명: 단일판매ㆍ공급계약체결",
+        "[실적속보]디바이스, 올해 2Q 매출액 233억(+153%) 영업이익 77.5억(+251%)",
+        "디바이스 수주공시 - 반도체 세정장비 86.7억원 (매출액대비  10.31 %)",
+        "첫 번째, 디바이스는 반도체 및 OLED 세정 장비 전문기업입니다.",
+        "• 디바이스 8.05 → 6.26 (8/4)",
+    ],
+)
+def test_device_stock_mentions_survive(text):
+    assert _device(text) == {"187870"}
+
+
+def _gs(text: str) -> set[str]:
+    match_to_code = {"GS": "078930", "GS건설": "006360"}
+    pattern, caseless = build_pattern(list(match_to_code))
+    ambiguous = {"GS"} & AMBIGUOUS_NAMES
+    return set(extract(text, pattern, match_to_code, {k: "dict" for k in match_to_code}, ambiguous, caseless))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "무라타 컨퍼런스콜 후기 : MLCC 단기·장기 강세 및 경쟁력 재확인, Buy 유지 (GS)\n\n1. MLCC 수주 상황",
+        "2026년 이후 5대 하이퍼스케일러 Capex 전망치 상향 추이 (GS)\n\n1. Capex 상향 규모",
+        "· Eric Sheridan(GS) : 인프라 투자 회수 시점에 대한 질문",
+        "① 가계 주식자산 = GDP 대비 급팽창 (GS)\n연말 대비 약 +15%p 뛴 것으로 GS가 추정함",
+    ],
+)
+def test_goldman_attribution_is_not_gs(text):
+    assert _gs(text) == set()
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "(유가)GS - 현금ㆍ현물배당결정",
+        "LS / 10.2조원(+1.2%) / 20.6조원(+1.1%)\nGS / 10.3조원(-2.4%) / 4.4조원(+0.2%)",
+        "GS(078930) 강세",
+    ],
+)
+def test_gs_stock_mentions_survive(text):
+    assert _gs(text) == {"078930"}
+
+
+def test_gs_affiliate_survives_goldman_attribution():
+    # 단서는 '승격 뒤에' 본다 — `GS 건설`은 GS건설이지 지주사 GS 가 아니라 단서와 무관하다.
+    assert _gs("GS 건설 수주 전망 (GS)") == {"006360"}
