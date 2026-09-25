@@ -268,9 +268,3 @@ html[data-sidebar="icon"] .hz-sidebar [data-label]:hover::after {
   z-index: 40;
 }
 
-/* 폰(≤560)에선 사이드바가 없고 탑바에 돋보기가 있다 — 머리의 검색 단추는 숨긴다. */
-@media (max-width: 560px) {
-  .hz-head-search {
-    display: none !important;
-  }
-}

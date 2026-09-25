@@ -711,8 +711,8 @@ function SidebarToggle() {
 }
 
 /**
- * 페이지 머리 오른쪽의 검색 단추. shadcn 사이트 머리의 검색 단추 꼴이다(누르면 ⌘K 창이 열린다).
- * 처음엔 사이드바에 뒀는데 사이드바가 노트북 높이를 넘겨 스크롤이 생겨 옮겼다(2026-09-25).
+ * 사이드바 로고 아래의 검색 단추(PC). shadcn 사이드바 블록의 검색칸 꼴이다(누르면 ⌘K 창이 열린다).
+ * 페이지 머리 오른쪽에 뒀다가 사이드바로 되돌렸다(2026-09-26 Hun). 폰은 탑바 돋보기다.
  * 단축키 표시는 맥이면 ⌘K, 아니면 Ctrl K. 서버는 맥 표기로 그리고 붙은 뒤 고친다.
  */
 function SearchTrigger() {
@@ -727,12 +727,16 @@ function SearchTrigger() {
       onClick={openCommandMenu}
       onPointerEnter={preloadCommandMenu}
       onFocus={preloadCommandMenu}
-      aria-label="검색"
-      className="hz-head-search border-border text-muted-foreground hover:bg-accent flex h-9 w-52 shrink-0 cursor-pointer items-center gap-2 rounded-xl border bg-transparent px-3 text-[13px] transition-colors"
+      aria-label="테마·종목 검색"
+      data-label="검색"
+      className="hz-side-search border-border text-muted-foreground hover:bg-accent flex h-9 w-full shrink-0 cursor-pointer items-center gap-2 rounded-xl border bg-transparent px-3 text-[13px] transition-colors"
+      // 사이드바 바깥 간격(28)을 위아래로 덜어 쓴다 — 로고와 16 · 메뉴와 20. 늘어난 높이를 44px 로 묶어 사이드바가
+      // 프로덕션 높이(782) 안에 들게 한다(노트북에서 스크롤이 생기면 안 된다).
+      style={{ margin: "-12px 0 -8px" }}
     >
       <Icon name="search" style={{ fontSize: 17 }} />
-      <span>테마·종목 검색</span>
-      <Kbd className="ml-auto">{mac ? "⌘K" : "Ctrl K"}</Kbd>
+      <span className="hz-side-text">테마·종목 검색</span>
+      <Kbd className="hz-side-text ml-auto">{mac ? "⌘K" : "Ctrl K"}</Kbd>
     </button>
   );
 }
@@ -793,6 +797,7 @@ function Sidebar() {
           {SLOGAN}
         </p>
       </div>
+      <SearchTrigger />
       <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {sidebarItems(env).map((row) => {
           if (row.kind === "group") return <NavGroupLabel key={`g-${row.label}`} label={row.label} first={row.first} inset={12} />;
@@ -1534,13 +1539,10 @@ function PageHeader() {
         </div>
       )}
       </div>
-      {/* 오른쪽: 검색 단추(⌘K) + 도구. 2026-08-03 에 모양만 있던 검색창·알림 벨·프로필 칩을 걷었는데,
-          검색은 ⌘K 창이 생겨 실제로 동작하는 단추로 돌아왔다(2026-09-25). 알림 벨·프로필 칩은 여전히 없다. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <SearchTrigger />
-        <div className="hz-page-tools">
-          <PageTools />
-        </div>
+      {/* 오른쪽 도구는 테마 토글 하나다. 검색은 PC 에선 사이드바 로고 아래, 폰에선 탑바 돋보기다(2026-09-26).
+          알림 벨·프로필 칩은 기능이 없어 걷었다(2026-08-03). */}
+      <div className="hz-page-tools">
+        <PageTools />
       </div>
     </header>
   );
