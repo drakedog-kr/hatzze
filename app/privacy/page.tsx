@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { DOC_WIDTH, Ext, InfoBlock, Lead, P, PRIVACY_EFFECTIVE, Section, Ul } from "../legal";
+import { DOC_WIDTH, Ext, InfoBlock, Lead, P, PREV_EFFECTIVE, PRIVACY_EFFECTIVE, Revision, Section, Ul } from "../legal";
 import { C } from "../ui";
 import { pageMetadata } from "../seo";
 
@@ -15,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
-/** 방침 시행일. 베타 오픈일과 맞춘다. 내용을 고치면 이 날짜도 같이 올려야 한다. */
+/** 방침 시행일. 내용을 고치면 이 날짜도 같이 올려야 한다(배포일 + 7일 이후 — app/legal.tsx 주석). */
 // 시행일은 app/legal.tsx 에 둔다 — 셸의 제목 아래 줄(DOC_PAGES)과 본문 마지막 조항이 같은 값을 본다.
 const EFFECTIVE_DATE = PRIVACY_EFFECTIVE;
 /** 문의 창구. Footer 와 같은 주소를 쓴다(두 곳이 갈리면 이용자가 어디로 보낼지 헷갈린다). */
@@ -24,15 +24,26 @@ const CONTACT_EMAIL = "hatzze@proton.me";
 export default function PrivacyPage() {
   return (
     <div style={{ maxWidth: DOC_WIDTH }}>
+      <Revision effective={EFFECTIVE_DATE} prev={PREV_EFFECTIVE}>
+        <li>1·2·3항에 채널 등록 신청과 지표 제보 때 받는 이메일 주소와 그 이용 목적·보유 기간을 적었습니다</li>
+        <li>1항에 이용자의 기기에만 저장되는 정보를 적었습니다</li>
+        <li>5항 처리위탁·국외 이전에 양식을 받는 Google Forms를 더했습니다</li>
+        <li>6항에 통화 선택과 사이드바 접기를 기억하는 쿠키를 더했습니다</li>
+        <li>7항과 9항의 문장을 위 내용에 맞췄습니다</li>
+      </Revision>
+
       <Lead>
         <P>
           hatzze(이하 &quot;서비스&quot;)는 「개인정보 보호법」 등 관련 법령을 준수하며, 이용자의 정보를
           최소한으로만 처리합니다.
         </P>
         <P>
-          <b style={{ color: C.ink }}>서비스에는 회원가입 절차가 없습니다.</b> 이름·연락처·계좌 등 이용자를
-          직접 식별하는 정보를 입력받는 화면 자체가 없으며, 아래에 적힌 항목은 모두 웹사이트를 이용하는
-          과정에서 자동으로 생성되는 정보입니다.
+          {/* ⚠️ 예전엔 "입력받는 화면 자체가 없다 · 모두 자동으로 생성되는 정보"라고 적었다. 채널 등록 신청
+              (app/brand.ts CHANNEL_FORM)과 지표 제보(app/page.tsx) 구글 폼이 이메일을 필수로 받아 사실과
+              달랐다(2026-09-26 폼을 열어 확인). 폼에 칸을 더하면 1항 목록도 같이 고칠 것. */}
+          <b style={{ color: C.ink }}>서비스에는 회원가입 절차가 없습니다.</b> 이용자가 직접 적어 보내시는
+          정보는 채널 등록 신청과 지표 제보 때의 이메일 주소와 신청 내용뿐이며, 그 밖의 항목은 모두
+          웹사이트를 이용하는 과정에서 자동으로 생성되는 정보입니다.
         </P>
       </Lead>
 
@@ -50,6 +61,20 @@ export default function PrivacyPage() {
           웹사이트가 동작하려면 접속 요청이 오가야 하므로, 호스팅 사업자와 글꼴 제공자의 서버 기록에는
           IP 주소가 일시적으로 남을 수 있습니다.
         </P>
+        <P>이용자가 직접 보내 주시는 정보는 아래 두 양식에서만 받습니다. 두 양식은 Google Forms로 운영합니다.</P>
+        <Ul>
+          <li>채널 등록 신청: 채널 주소, 신청 유형, 채널의 형태와 주제, 이메일 주소</li>
+          <li>지표 제보: 제보하시는 지표와 그 이유, 이메일 주소</li>
+        </Ul>
+        {/* 배당 보유 목록은 app/dividend/store.ts(hz-dividend-holdings), 최근 본 종목은 lib/recent-stocks.ts
+            (hz-recent-stocks) — 둘 다 localStorage 이고 서버로 보내는 호출이 없다. GA 로는 track() 이
+            종목 코드·계좌 유형·바스켓 금액을 보낸다(app/dividend/DividendCalculator.tsx). 주수·평단을 GA 에
+            싣게 되면 마지막 문장을 고칠 것. */}
+        <P>
+          배당으로 살기에 담으신 종목·주수·평단·계좌 유형과 최근 본 종목 목록은 이용자의 브라우저에만
+          저장되고 서비스로 전송되지 않습니다. 다만 어떤 종목을 담거나 뺐는지와 고르신 계좌 유형·바스켓
+          금액은 위 조작 기록에 포함되어 분석 도구로 전송됩니다. 주수와 평단은 전송하지 않습니다.
+        </P>
       </Section>
 
       <Section title="2. 이용 목적">
@@ -57,8 +82,13 @@ export default function PrivacyPage() {
           <li>어떤 지표와 화면이 실제로 이용되는지 파악해 서비스를 개선하기 위해</li>
           <li>방문 규모와 유입 경로를 파악하기 위해</li>
           <li>오류를 확인하고 안정적으로 운영하기 위해</li>
+          <li>
+            채널 등록 신청과 지표 제보를 검토하고, 그 결과(선정된 제보에 드리는 선물 안내 포함)를
+            이메일로 알려 드리기 위해
+          </li>
         </Ul>
         <P>서비스는 수집한 정보를 광고 노출이나 이용자 개인을 겨냥한 목적으로 사용하지 않습니다.</P>
+        <P>선물을 보내 드리는 데 연락처 등 다른 정보가 더 필요하면 그때 따로 알려 드리고 동의를 받습니다.</P>
       </Section>
 
       <Section title="3. 보유 및 이용 기간">
@@ -66,6 +96,10 @@ export default function PrivacyPage() {
           <li>방문자 단위 분석 데이터: 수집일로부터 14개월이 지나면 자동 삭제됩니다</li>
           <li>개인을 식별할 수 없는 형태로 집계된 통계: 기간 제한 없이 보관합니다</li>
           <li>호스팅 접속 기록: 해당 사업자의 정책에 따릅니다</li>
+          <li>
+            채널 등록 신청·지표 제보의 이메일 주소: 처리를 마친 뒤(선정된 제보는 선물을 보내 드린 뒤)
+            바로 파기합니다
+          </li>
         </Ul>
       </Section>
 
@@ -110,6 +144,17 @@ export default function PrivacyPage() {
             ["처리방침", <Ext key="vc" href="https://vercel.com/legal/privacy-policy">vercel.com/legal/privacy-policy</Ext>],
           ]}
         />
+        <InfoBlock
+          heading="Google LLC (신청·제보 양식)"
+          rows={[
+            ["이전 항목", "1항의 양식 입력 정보(이메일 주소 포함)"],
+            ["이전 국가", "미국"],
+            ["이전 일시·방법", "양식을 제출하실 때 네트워크를 통해 전송"],
+            ["이용 목적", "Google Forms를 통한 채널 등록 신청·지표 제보 접수"],
+            ["보유 기간", "이메일 주소는 처리를 마친 뒤 바로 파기(3항)"],
+            ["처리방침", <Ext key="gfm" href="https://policies.google.com/privacy">policies.google.com/privacy</Ext>],
+          ]}
+        />
       </Section>
 
       <Section title="6. 쿠키의 설치·운영 및 거부">
@@ -119,6 +164,24 @@ export default function PrivacyPage() {
           rows={[
             ["설정 주체", "서비스"],
             ["용도", "밝은 화면·어두운 화면 선택을 기억"],
+            ["보관 기간", "1년"],
+          ]}
+        />
+        {/* hz-cur·hz-side 는 app/AppShell.tsx 가 심는다(remember() · 사이드바 접기 단추). 셋 다 누를 때만 생기고
+            layout.tsx PREF_SCRIPT 가 읽는다. 서비스가 쿠키를 새로 심으면 여기에 한 칸 더할 것. */}
+        <InfoBlock
+          heading="hz-cur (필수)"
+          rows={[
+            ["설정 주체", "서비스"],
+            ["용도", "원화·달러 표시 선택을 기억"],
+            ["보관 기간", "1년"],
+          ]}
+        />
+        <InfoBlock
+          heading="hz-side (필수)"
+          rows={[
+            ["설정 주체", "서비스"],
+            ["용도", "사이드바를 접어 둔 상태를 기억"],
             ["보관 기간", "1년"],
           ]}
         />
@@ -135,8 +198,8 @@ export default function PrivacyPage() {
         </P>
         <Ul>
           <li>
-            사용하시는 브라우저의 설정에서 쿠키를 차단하실 수 있습니다. 이 경우 화면 테마 선택이
-            저장되지 않습니다.
+            사용하시는 브라우저의 설정에서 쿠키를 차단하실 수 있습니다. 이 경우 화면 테마·통화·
+            사이드바 선택이 저장되지 않습니다.
           </li>
           <li>
             <Ext href="https://tools.google.com/dlpage/gaoptout">Google 애널리틱스 차단 부가기능</Ext>을
@@ -157,9 +220,12 @@ export default function PrivacyPage() {
           연락 주시면 지체 없이 처리해 드립니다.
         </P>
         <P>
-          다만 서비스는 이용자를 식별할 수 있는 정보를 보관하지 않으므로, 특정 개인의 기록을 찾아
+          다만 방문 통계는 이름이나 연락처와 연결되지 않은 채로 모이므로, 특정 개인의 기록을 찾아
           삭제하는 것이 기술적으로 어려울 수 있습니다. 이 경우 6항의 거부 방법으로 이후 수집을 중단하시는
           편이 확실합니다.
+        </P>
+        <P>
+          신청·제보 때 보내신 이메일 주소는 처리를 마치기 전이라도 요청하시면 바로 삭제해 드립니다.
         </P>
       </Section>
 
@@ -173,8 +239,11 @@ export default function PrivacyPage() {
       <Section title="9. 안전성 확보 조치">
         <Ul>
           <li>모든 통신 구간을 HTTPS로 암호화하여 전송합니다</li>
-          <li>서비스는 이용자 개인정보를 담는 별도의 데이터베이스를 운영하지 않습니다</li>
-          <li>분석 도구 접근 권한은 운영자로 한정합니다</li>
+          <li>
+            서비스의 데이터베이스에는 이용자의 개인정보를 담지 않습니다. 신청·제보 때 받은 이메일
+            주소는 양식 응답에만 남고 처리를 마친 뒤 바로 파기합니다
+          </li>
+          <li>분석 도구와 양식 응답에 접근할 권한은 운영자로 한정합니다</li>
         </Ul>
       </Section>
 
