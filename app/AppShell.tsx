@@ -197,7 +197,7 @@ function UsEmpireIcon({ size = 20 }: { size?: number }) {
 // 서브 항목. href 가 없으면 아직 페이지가 없는 예고 항목이라 링크가 아니라 <div> 로 그린다.
 // sub 는 그 서브 페이지의 본문 머리(PageHeader)가 쓸 한 줄이다. 부모와 주소가 같은
 // 서브(국장 → /kadera)에는 두지 않는다 — 부모가 이미 자기 문장을 갖고 있다.
-type NavChild = { label: string; href?: string; Glyph: Glyph; badge?: string; tip?: string; sub?: string };
+type NavChild = { label: string; href?: string; Glyph: Glyph; badge?: string; tip?: string; sub?: string; isNew?: boolean };
 
 // icon 은 Material Symbols 이름, Glyph 는 직접 그린 SVG 다(폰트에 없는 것 — 태극·성조·개미).
 // 둘 중 하나만 있으면 된다. NavGlyph 가 Glyph 를 우선한다.
@@ -428,8 +428,15 @@ function sidebarItems(env: ShellEnv): SidebarRow[] {
   // 항목 하나 = NAV 줄 + 그 하위 줄 + 그 뒤에 붙는 '준비 중' 줄.
   const blocks = new Map<string, SidebarRow[]>();
   for (const item of navFor(env)) {
-    const block: SidebarRow[] = [{ kind: "nav", item }];
-    for (const child of item.children ?? []) block.push({ kind: "child", item: child, siblings: item.children ?? [] });
+    // 하위 항목(국장·미장)이 있는 부모 줄은 그리지 않고 하위 줄을 묶음 바로 아래로 올린다(2026-09-25). 묶음 머리 →
+    // 부모 → 하위의 세 층이 "복잡해 보인다"는 지적이었다. 부모 줄이 가던 곳은 첫 하위 줄(국장)과 같은 주소라 잃는 길이 없다.
+    // 부모의 '새 화면' N 은 첫 하위 줄로 옮긴다(둘 다 달면 같은 표식이 두 번 나온다).
+    const kids = item.children ?? [];
+    const flat = kids.some((c) => c.href);
+    const block: SidebarRow[] = flat ? [] : [{ kind: "nav", item }];
+    kids.forEach((child, i) =>
+      block.push({ kind: "child", item: flat && i === 0 && item.isNew ? { ...child, isNew: true } : child, siblings: kids }),
+    );
     for (const soon of soons) {
       if (soon.after === item.href) {
         block.push({ kind: "soon", item: soon });
@@ -609,7 +616,8 @@ function childActive(siblings: NavChild[], child: NavChild, pathname: string): b
   if (!child.href) return false;
   const covers = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   const best = siblings.filter((c) => c.href && covers(c.href)).sort((a, b) => b.href!.length - a.href!.length)[0];
-  return best === child;
+  // 객체가 아니라 주소로 견준다 — 사이드바가 'N' 을 붙이려고 하위 항목의 사본을 만든다(sidebarItems).
+  return best?.href === child.href;
 }
 
 /** NAV 항목의 현재 페이지 판정. 사이드바와 모바일 탭바가 같은 규칙을 써야 한다. */
@@ -673,7 +681,8 @@ const subscribeSide = (cb: () => void) => {
 };
 
 /**
- * 사이드바를 아이콘 막대로 접는 단추(shadcn 사이드바 블록 sidebar-07 의 collapsible="icon").
+ * 사이드바를 아이콘 막대로 접는 단추(shadcn 사이드바 블록 sidebar-07 의 collapsible="icon"). 사이드바 **맨 아래**에 둔다 —
+ * 로고 옆·페이지 제목 옆은 둘 다 어색하다는 지적이었다(2026-09-25). 접히면 아이콘만 남고 이름은 마우스를 올리면 뜬다.
  *
  * 접힘은 `<html data-sidebar="icon">` 하나가 쥐고, 모양은 전부 CSS 가 바꾼다(app/styles/shadcn.css). 상태는
  * 쿠키 `hz-side` 에 남기고 layout.tsx 의 PREF_SCRIPT 가 그림 그리기 전에 속성을 붙인다 — 테마 스위치와 같은 길이라
@@ -681,13 +690,14 @@ const subscribeSide = (cb: () => void) => {
  */
 function SidebarToggle() {
   const icon = useSyncExternalStore(subscribeSide, () => document.documentElement.getAttribute("data-sidebar") === "icon", () => false);
+  const label = icon ? "사이드바 펼치기" : "사이드바 접기";
   return (
     <button
       type="button"
-      className="hz-side-toggle text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg"
-      title={icon ? "사이드바 펼치기" : "사이드바 접기"}
-      aria-label={icon ? "사이드바 펼치기" : "사이드바 접기"}
+      className="hz-side-toggle text-muted-foreground hover:bg-accent hover:text-foreground flex h-8 w-full shrink-0 cursor-pointer items-center gap-2 rounded-lg px-3 text-[13px] font-semibold"
+      aria-label={label}
       aria-pressed={icon}
+      data-label={label}
       onClick={() => {
         const next = !icon;
         const d = document.documentElement;
@@ -697,7 +707,8 @@ function SidebarToggle() {
         window.dispatchEvent(new Event(SIDE_EVENT));
       }}
     >
-      <Icon name={icon ? "left_panel_open" : "left_panel_close"} style={{ fontSize: 20 }} />
+      <Icon name={icon ? "left_panel_open" : "left_panel_close"} style={{ fontSize: 18 }} />
+      <span className="hz-side-text">{label}</span>
     </button>
   );
 }
@@ -799,7 +810,7 @@ function Sidebar() {
                   display: "flex",
                   alignItems: "center",
                   gap: 12,
-                  padding: "8px 12px",
+                  padding: "10px 12px",
                   color: C.disabled,
                   fontWeight: 600,
                   borderRadius: R.nav,
@@ -833,30 +844,27 @@ function Sidebar() {
             );
           }
           if (row.kind === "child") {
+            // 부모 줄을 없앤 뒤로 하위 줄이 곧 윗줄이다 — 윗줄과 같은 여백·아이콘 크기·알약을 쓴다.
             const child = row.item;
-            // 서브 행은 알약을 주지 않는다. 부모가 이미 알약을 쓰고 있어서 둘 다 칠하면
-            // 한 구역에 강조가 둘이 된다 — 부모는 "여기 구역", 서브는 "이 페이지"다.
             const on = childActive(row.siblings, child, pathname);
             const rowStyle = {
               display: "flex",
               alignItems: "center",
-              gap: 10,
-              // 좌패딩(12) + 아이콘(20) + 간격(12) = 44 → 서브 아이콘이 **부모 라벨의 x** 에서
-              // 시작한다. 예전 34 는 부모 아이콘과 라벨 사이 어중간한 자리였다(2026-09-04).
-              padding: "6px 12px 6px 44px",
+              gap: 12,
+              padding: "10px 12px",
               borderRadius: R.nav,
             } as const;
             if (!child.href) {
               return (
                 <div
                   key={child.label}
-                  className="hz-tip hz-nav-item hz-nav-child"
+                  className="hz-tip hz-nav-item"
                   data-tip={child.tip}
                   style={{ ...rowStyle, color: C.disabled, fontWeight: 600 }}
                 >
-                  <child.Glyph size={18} dimmed />
+                  <child.Glyph size={20} dimmed />
                   <span className="hz-side-text" style={{ position: "relative", display: "inline-flex" }}>
-                    <span style={{ fontSize: "var(--fs-13)", whiteSpace: "nowrap" }}>{child.label}</span>
+                    <span style={{ fontSize: "var(--fs-14)", whiteSpace: "nowrap" }}>{child.label}</span>
                     <span
                       style={{
                         position: "absolute",
@@ -885,16 +893,25 @@ function Sidebar() {
                 href={child.href}
                 data-label={child.label}
                 {...intentPrefetch(child.href)}
-                className="hz-nav-item hz-nav-child"
+                className={`hz-nav-item${on ? " hz-nav-active" : ""}`}
+                aria-current={on ? "page" : undefined}
+                aria-label={child.isNew ? `${child.label} · 새로 생긴 화면` : undefined}
                 style={{
                   ...rowStyle,
-                  color: on ? C.blueInk : C.sub,
+                  color: on ? undefined : C.sub,
                   fontWeight: on ? 700 : 600,
                   textDecoration: "none",
                 }}
               >
-                <child.Glyph size={18} />
-                <span className="hz-side-text" style={{ fontSize: "var(--fs-13)" }}>{child.label}</span>
+                <child.Glyph size={20} />
+                <span className="hz-side-text" style={{ position: "relative", display: "inline-flex", fontSize: "var(--fs-14)" }}>
+                  {child.label}
+                  {child.isNew && (
+                    <span style={{ position: "absolute", left: "100%", top: -1, marginLeft: 3 }}>
+                      <NewBadge />
+                    </span>
+                  )}
+                </span>
               </Link>
             );
           }
@@ -914,7 +931,7 @@ function Sidebar() {
                 display: "flex",
                 alignItems: "center",
                 gap: 12,
-                padding: "8px 12px",
+                padding: "10px 12px",
                 // 활성 항목의 바탕·글자색은 여기 없다 — globals.css 의 .hz-nav-active 가 든다
                 // (옅은 하늘색 타일 + 파란 잉크, 2026-09-04 리디자인. 8월 목업의 꽉 찬 파랑
                 // 알약은 그 칸만 무거워 배너처럼 읽혔다).
@@ -996,6 +1013,7 @@ function Sidebar() {
           <Icon name={TELEGRAM.icon} style={{ fontSize: "var(--fs-19)" }} />
           <span className="hz-side-text">{TELEGRAM.label}</span>
         </a>
+        <SidebarToggle />
       </div>
     </aside>
   );
@@ -1083,17 +1101,18 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
             const on = childActive(row.siblings, child, pathname);
             // 들여쓰기는 사이드바와 같은 뜻(부모 라벨 자리에 서브 아이콘이 선다)이지만
             // 여기는 행 높이·글자 크기가 달라서 값을 그대로 못 쓴다. rowStyle 위에 얹는다.
-            const indented = { ...rowStyle(false), paddingLeft: 40, gap: 10 };
+            // 사이드바와 같다 — 부모 줄 없이 하위 줄이 곧 윗줄이다(들여쓰기·작은 아이콘 없음).
+            const indented = rowStyle(on);
             if (!child.href) {
               return (
                 <div
                   key={child.label}
                   className="hz-tip"
                   data-tip={child.tip}
-                  style={{ ...indented, color: C.faint }}
+                  style={{ ...rowStyle(false), color: C.faint }}
                 >
-                  <child.Glyph size={18} dimmed />
-                  <span style={{ fontSize: "var(--fs-14)" }}>{child.label}</span>
+                  <child.Glyph size={20} dimmed />
+                  <span style={{ fontSize: "var(--fs-15)" }}>{child.label}</span>
                   <span
                     style={{
                       fontSize: "var(--fs-9)",
@@ -1117,11 +1136,15 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
                 key={child.label}
                 href={child.href}
                 {...intentPrefetch(child.href)}
-                className="hz-nav-item"
-                style={{ ...indented, color: on ? C.blueInk : C.sub, fontWeight: on ? 700 : 600 }}
+                className={`hz-nav-item${on ? " hz-nav-active" : ""}`}
+                aria-current={on ? "page" : undefined}
+                style={indented}
               >
-                <child.Glyph size={18} />
-                <span style={{ fontSize: "var(--fs-14)" }}>{child.label}</span>
+                <child.Glyph size={20} />
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "var(--fs-15)" }}>
+                  {child.label}
+                  {child.isNew && <NewBadge />}
+                </span>
               </Link>
             );
           }
@@ -1477,11 +1500,7 @@ function PageHeader() {
           그 안에 콘솔 리디자인의 배지를 넣는다 — 둘은 서로 독립이다. */}
       {/* ⚠️ `page` 만으로는 부족하다 — NAV 에 없고 DEEP_PAGES 에만 있는 화면
           (아직 안 연 /preview)이 제목 칸을 통째로 비운다. */}
-      {/* 왼쪽: 사이드바 접기 단추 + 제목. shadcn 대시보드 머리(SidebarTrigger 다음 제목)와 같은 자리다. */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12, minWidth: 0, flex: 1 }}>
-      <span className="hz-side-toggle-slot" style={{ marginTop: 2 }}>
-        <SidebarToggle />
-      </span>
       {(page || deep) && (
         <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
           {/* 배지는 제목과 같은 줄, 세로 가운데 정렬. baseline 으로 두면 알약의 **글자**

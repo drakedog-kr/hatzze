@@ -226,6 +226,7 @@ html[data-sidebar="icon"] .hz-sidebar .hz-logo-link > span > :nth-child(2) {
   display: none;
 }
 html[data-sidebar="icon"] .hz-sidebar .hz-nav-item,
+html[data-sidebar="icon"] .hz-sidebar .hz-side-toggle,
 html[data-sidebar="icon"] .hz-sidebar .hz-tg-cta {
   position: relative;
   justify-content: center;
@@ -233,13 +234,8 @@ html[data-sidebar="icon"] .hz-sidebar .hz-tg-cta {
   padding-right: 0 !important;
   gap: 0 !important;
 }
-/* 하위 항목(국장·미장 카더라 등)은 접힌 막대에서 숨긴다 — shadcn 아이콘 모드에서 접히는 하위 메뉴와 같다.
-   부모 아이콘이 대표하고, 하위 화면은 ⌘K 로도 간다. 줄은 40px 로 맞춘다(펼친 줄은 42). */
-html[data-sidebar="icon"] .hz-sidebar .hz-nav-child {
-  display: none !important;
-}
 html[data-sidebar="icon"] .hz-sidebar .hz-nav-item {
-  height: 38px;
+  height: 40px;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
 }
@@ -261,9 +257,8 @@ html[data-sidebar="icon"] .hz-sidebar [data-label]:hover::after {
   z-index: 40;
 }
 
-/* 폰(≤560)에선 사이드바가 없고 탑바에 돋보기가 있다 — 머리의 접기·검색 단추는 숨긴다. */
+/* 폰(≤560)에선 사이드바가 없고 탑바에 돋보기가 있다 — 머리의 검색 단추는 숨긴다. */
 @media (max-width: 560px) {
-  .hz-side-toggle-slot,
   .hz-head-search {
     display: none !important;
   }
