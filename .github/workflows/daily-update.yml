@@ -52,6 +52,42 @@ on:
           - evening
           - morning
 
+# 비밀값은 워크플로 머리에 둔다(2026-09-25). 잡을 나누며 잡마다 env 를 따로 두면
+# 한 잡에서 줄이 빠지기 쉽다(아래 예탁원 키 주석이 바로 그 사고다). 게이트 잡도 받지만
+# 그 잡은 gh api 만 부른다.
+env:
+  FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+  # NAVER API HUB 키 하나로 뉴스·검색어트렌드를 모두 호출한다.
+  NAVER_HUB_KEY_ID: ${{ secrets.NAVER_HUB_KEY_ID }}
+  NAVER_HUB_KEY: ${{ secrets.NAVER_HUB_KEY }}
+  KRX_API_KEY: ${{ secrets.KRX_API_KEY }}
+  # 국장 미리보기의 간밤 등락(핀허브 무료 티어 quote). ⚠️ 여기 줄이 없으면 시크릿이
+  # 등록돼 있어도 스텝까지 안 내려간다 — 바로 아래 예탁원 키에서 실제로 겪었다.
+  FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+  # ⚠️ 예탁원(서학개미 결제). 시크릿은 2026-08-10 에 등록돼 있었는데 **여기 줄이 없어서
+  #    스텝까지 안 내려갔다.** 그대로 뒀으면 첫 실행에서 예탁원 스텝이 키 없음으로
+  #    죽고 알림만 열렸을 것이다 — 로컬에서는 .env.local 로 잘 돌아서 안 보인다.
+  KSD_API_KEY: ${{ secrets.KSD_API_KEY }}
+  ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
+  ALADIN_TTB_KEY: ${{ secrets.ALADIN_TTB_KEY }}
+  YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+  KMA_API_KEY: ${{ secrets.KMA_API_KEY }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  # LLM 호출을 Max 구독으로 먼저 보낸다(common/llm_client.py). 이 줄이나 아래
+  # CLI 설치 스텝이 없으면 래퍼가 조용히 API 키로만 돈다 — 예전과 같은 동작이라
+  # 티가 안 난다. 실행 로그의 `[LLM]` 줄로 어느 경로였는지 확인한다.
+  CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+  TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+  TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+  TELEGRAM_SESSION: ${{ secrets.TELEGRAM_SESSION }}
+  TELEGRAM_CHANNELS_SHEET_ID: ${{ secrets.TELEGRAM_CHANNELS_SHEET_ID }}
+  # 채널 발송 전용(수집용 TELEGRAM_SESSION 과 별개인 봇 토큰). 아래 발송 스텝만 쓴다.
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TELEGRAM_BROADCAST_CHAT_ID: ${{ secrets.TELEGRAM_BROADCAST_CHAT_ID }}
+
 jobs:
   # ── 예약 실행 건너뛰기 게이트 ──────────────────────────────────────────────
   #
@@ -244,49 +280,64 @@ jobs:
           fi
           echo "skip=$skip" >> "$GITHUB_OUTPUT"
 
-  update:
+
+  # ── 잡 나누기(2026-09-25) ──────────────────────────────────────────────
+  #
+  # 예전엔 update 잡 하나에 스텝 108개가 줄 서 있었다. 스텝이 4주 사이 81 → 108개로 늘며
+  # 한 번 실행이 78~130분(08-29~09-05)에서 146~205분(09-19~09-24)이 됐다. 그중 서로 표를
+  # 안 주고받는 두 블록을 떼어 나란히 돌린다.
+  #
+  #   guard ─┬─ krx_master ─┬─ update(미리보기·카더라·지표·점수·발송) ─┐
+  #          │              └─ dividend(배당 일곱 스텝) ─────────────┼─ finalize(전체 캐시 비우기)
+  #          └─ insider(내부자 네 스텝) ───────────────────────────────┘
+  #
+  # ⭐ 떼어 낸 기준은 **표**다. 내부자는 자기 표에만 쓰고 us_stocks 를 읽기만 한다. 배당은
+  #    자기 표에만 쓰고 stocks 를 읽는데, 그 종가(close_price)를 KRX 마스터 스텝이 쓴다.
+  #    그래서 그 한 스텝을 krx_master 로 떼어 update 와 dividend 가 둘 다 기다리게 했다.
+  #    카더라의 종목 추출도 그 표를 읽으니 update 안의 순서는 예전과 같다.
+  # ⭐ 기대(최근 여섯 번 실측으로 셈): 내부자 8.5~9.5분 + 배당 22.8~27.4분이 잡 전체에서 빠지고
+  #    krx_master 가 앞에 1~2분 붙는다. 카더라·지표·저녁 발송은 내부자만큼(약 8분) 당겨진다.
+  # ⛔ 미장 사슬·지표 블록은 아직 update 에 둔다. 둘 다 떼면 더 빨라지지만 막는 게 셋 있다.
+  #    디시 표본이 '실행 직전 두 시간'이라 지표를 앞당기면 표본 시간대가 바뀐다(눈금이 흔들린다).
+  #    저녁 발송이 카더라와 지표를 함께 읽는다. LLM 스텝이 동시에 돌면 구독 한도에 걸릴 수 있다.
+  # ⚠️ 모든 잡이 게이트를 본다. 게이트가 막으면 전부 건너뛰고, 게이트 잡이 죽어도(출력이 비어도)
+  #    전부 돈다. update 잡에 있던 '열려야 한다' 규칙을 그대로 옮겼다.
+  # ⚠️ krx_master 가 실패해도 뒤 잡은 돈다(`!cancelled()`). 예전 그 스텝의 continue-on-error 와
+  #    같은 뜻이다. 사전·종가는 어제 저장분으로 이어 간다.
+  krx_master:
     needs: guard
+    if: ${{ !cancelled() && needs.guard.outputs.skip != 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r data-pipeline/requirements.txt
+
+      - name: (텔레그램) KRX 상장종목 마스터 갱신
+        id: telegram_krx_stocks
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_krx_stocks.py
+
+  update:
+    needs: [guard, krx_master]
     # 게이트가 막았을 때만 건너뛴다. `!cancelled()` 로 두는 건 게이트 잡 자체가
     # 죽어도(needs 가 실패하면 기본적으로 뒤가 통째로 skip 된다) 파이프라인은
-    # 돌게 하기 위해서다 — 위 '열려야 한다' 주석 참고.
+    # 돌게 하기 위해서다 — 위 '열려야 한다' 주석 참고. krx_master 가 실패해도 같은 식으로 돈다.
     if: ${{ !cancelled() && needs.guard.outputs.skip != 'true' }}
     runs-on: ubuntu-latest
     # 실패 시 알림 이슈를 열 수 있도록 issues 쓰기 권한 부여(감지 레이어).
     permissions:
       contents: read
       issues: write
-    env:
-      FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-      # NAVER API HUB 키 하나로 뉴스·검색어트렌드를 모두 호출한다.
-      NAVER_HUB_KEY_ID: ${{ secrets.NAVER_HUB_KEY_ID }}
-      NAVER_HUB_KEY: ${{ secrets.NAVER_HUB_KEY }}
-      KRX_API_KEY: ${{ secrets.KRX_API_KEY }}
-      # 국장 미리보기의 간밤 등락(핀허브 무료 티어 quote). ⚠️ 여기 줄이 없으면 시크릿이
-      # 등록돼 있어도 스텝까지 안 내려간다 — 바로 아래 예탁원 키에서 실제로 겪었다.
-      FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
-      # ⚠️ 예탁원(서학개미 결제). 시크릿은 2026-08-10 에 등록돼 있었는데 **여기 줄이 없어서
-      #    스텝까지 안 내려갔다.** 그대로 뒀으면 첫 실행에서 예탁원 스텝이 키 없음으로
-      #    죽고 알림만 열렸을 것이다 — 로컬에서는 .env.local 로 잘 돌아서 안 보인다.
-      KSD_API_KEY: ${{ secrets.KSD_API_KEY }}
-      ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
-      ALADIN_TTB_KEY: ${{ secrets.ALADIN_TTB_KEY }}
-      YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-      KMA_API_KEY: ${{ secrets.KMA_API_KEY }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      # LLM 호출을 Max 구독으로 먼저 보낸다(common/llm_client.py). 이 줄이나 아래
-      # CLI 설치 스텝이 없으면 래퍼가 조용히 API 키로만 돈다 — 예전과 같은 동작이라
-      # 티가 안 난다. 실행 로그의 `[LLM]` 줄로 어느 경로였는지 확인한다.
-      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
-      TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
-      TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
-      TELEGRAM_SESSION: ${{ secrets.TELEGRAM_SESSION }}
-      TELEGRAM_CHANNELS_SHEET_ID: ${{ secrets.TELEGRAM_CHANNELS_SHEET_ID }}
-      # 채널 발송 전용(수집용 TELEGRAM_SESSION 과 별개인 봇 토큰). 아래 발송 스텝만 쓴다.
-      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      TELEGRAM_BROADCAST_CHAT_ID: ${{ secrets.TELEGRAM_BROADCAST_CHAT_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -322,9 +373,7 @@ jobs:
       # ⛔ 아래 'KRX 공표(08:00 KST) 대기' 게이트 **뒤로는 절대 두지 말 것.** 거기 두면
       #    완료가 08:18~08:30 뒤로 밀린다.
       #
-      # ⚠️ 바로 아래 내부자 블록의 "맨 앞에 둔다"를 어기는 게 아니다. 그 블록이 앞에 선
-      #    이유는 '아무것도 안 기다려서'인데 이 스텝도 같고, 다만 이쪽만 개장이라는 마감이
-      #    있다. 내부자 시작은 70초 늦어진다.
+      # ⚠️ 내부자 블록은 2026-09-25 에 별도 잡(insider)으로 뺐다. 이 스텝과 나란히 돈다.
       #
       # ⏳ 핀허브 무료가 분당 60건이라 70종목을 두 창에 나눠 받는다 — 스텝 하나가 70초쯤
       #    걸린다. 이 대기는 지울 수 없다(막히면 그날 카드가 반쪽이 되는데, 부분 실패는
@@ -371,97 +420,12 @@ jobs:
       # 위 지표 파이프라인과 독립적이며, 자기들끼리는 순서 의존이 있다:
       #   상장사 사전 → 채널 동기화/구독자 스냅샷 → 메시지 수집 → 채널 영향력
       #   → 종목 추출 → 종목 일별 집계.
+      #   (상장사 사전은 이 잡 앞의 krx_master 잡이 돌린다. 이 잡은 그 잡을 기다린다.)
       # 각 스텝은 DB에서 읽어 이어가므로 하나가 실패해도 다음 스텝은 직전까지의
       # 저장분으로 동작한다(graceful degradation). 지표용 실패 알림/요약과는
       # 분리하려고 아래 Summarize results 집계 배열에는 넣지 않는다.
       # 대신 이 파이프라인의 '재료' 두 스텝(sync·fetch)만 따로 재는 집계·알림이
       # 잡 끝에 붙어 있다(Summarize 카더라 collection).
-      # ── 내부자 리포트 ───────────────────────────────────────────────────
-      # ⚠️⚠️ **맨 앞에 둔다. 뒤로 옮기지 말 것.**
-      #
-      # 이 넷은 SEC·미 하원·stockanalysis 를 읽고 자기 표(us_insider_*·us_manager_*·
-      # us_congress_trade·us_analyst_*)에만 쓴다. KRX 도 카더라 표도 안 본다(us_stocks
-      # 만 읽는데 그건 종목 사전이라 이 흐름에서 안 바뀐다). **아무것도 안 기다려도 된다.**
-      #
-      # 한때 지표 블록 **뒤**(47번째)에 있었다. 그러면 중간의 'KRX 공표(08:00 KST) 대기'
-      # 게이트에 같이 걸린다 — KRX 와 무관한데 줄만 뒤에 서 있어서다. 2026-08-25 밤
-      # 22:55 에 리허설을 돌렸더니 자정을 넘겨 게이트가 **7시간 반**을 자기 시작했고,
-      # 잡의 6시간 제한이 먼저 와서 내부자 스텝은 시작조차 못 하고 잘렸다.
-      # 잡 하나에 스텝을 줄로 세운 구조라, 가운데 sleep 은 뒤의 모든 것을 멈춘다.
-      #
-      # ⭐ 앞에 두면 덤이 둘이다. 아무 시각에 dispatch 해도 바로 검증되고, 평소 실행에서도
-      #   내부자 화면이 카더라·지표보다 먼저 새로워진다.
-      # ⚠️ 대가는 카더라 시작이 그만큼 늦어지는 것이다 — 평소 5~6분(임원+의원+애널리스트),
-      #   13F 가 도는 달의 열엿새는 15분 안팎. 카더라 완료가 08:45~09:05 라 출근 시간대
-      #   반영에는 영향이 없다고 봤다.
-      # ⚠️⚠️ 이 화면도 **파이프라인에 안 붙어 있었다**(2026-08-21 까지). 지금 들어 있는
-      #    데이터는 전부 손으로 돌려 채운 것이라, 안 붙이면 하루 만에 낡는다.
-      #
-      # ⭐ 임원 축은 **최근 5영업일만** 훑는다. 집계(us_insider_daily)는 저장한 뒤
-      #    **DB 의 창을 읽어** 만들기 때문에 조금씩 받아도 90일 창이 제대로 나온다.
-      #    예전처럼 매 실행 90일을 훑으면 인덱스 65일 × 공시 수백 건이라 20분이 넘는다.
-      # ⚠️ EDGAR 일별 인덱스는 그날 접수가 끝난 뒤(미 동부 22:00 ≈ 11:00 KST) 만들어진다.
-      #    **아침 실행(07:30 KST)엔 전날 미국분이 아직 없고 오후 실행에서 잡힌다.**
-      #    5영업일을 되돌아보므로 어느 실행이 놓쳐도 다음이 만회한다.
-      - name: Fetch 미국 임원 공시 Form 4 (내부자 리포트)
-        id: us_insider
-        continue-on-error: true
-        run: python data-pipeline/scripts/fetch_us_insider.py
-
-      # ⭐ 하원은 증분이다 — 이미 읽은 doc_id 와 `최근 신고일 − 7일` 기준선으로 건너뛴다
-      #    (5~8분 → 3.5초). 토요일만 전량 다시 읽어 뒤늦게 고쳐진 신고를 줍는다.
-      - name: Fetch 미 하원의원 매매 신고 (내부자 리포트)
-        id: us_congress
-        continue-on-error: true
-        run: |
-          if [ "$(date -u +%u)" = "6" ]; then
-            echo "토요일 — 전량 다시 읽는다"
-            python data-pipeline/scripts/fetch_us_congress.py --full
-          else
-            python data-pipeline/scripts/fetch_us_congress.py
-          fi
-
-      # ⚠️ 13F 는 **분기 자료라 매일 돌릴 이유가 없다.** 값이 안 바뀐다. 마감이
-      #    분기말+45일(2/14 · 5/15 · 8/14 · 11/14)이고 그 며칠 전부터 제출이 몰리므로
-      #    그 창에서만 돌린다. 한 번에 62곳 × 두 분기 + fails 파일 6개라 10분 안팎이다.
-      # ⚠️ 마감이 주말이면 다음 영업일로 밀리므로 25일까지 넉넉히 열어 둔다.
-      - name: Fetch 월가 거물 13F (내부자 리포트)
-        id: us_13f
-        continue-on-error: true
-        run: |
-          m=$(date -u +%m); d=$(date -u +%d)
-          case "$m" in
-            02|05|08|11)
-              if [ "$d" -ge 10 ] && [ "$d" -le 25 ]; then
-                python data-pipeline/scripts/fetch_us_13f.py
-              else
-                echo "13F 제출 창 밖($m/$d). 건너뛴다."
-              fi
-              ;;
-            *) echo "13F 마감 달이 아니다($m). 건너뛴다." ;;
-          esac
-
-      # ⚠️⚠️ 이건 API 가 아니라 **웹페이지**다(stockanalysis.com). 저쪽이 화면을 바꾸면
-      #    파싱이 깨진다. 못 받은 비율이 30% 를 넘거나 한 종목도 못 받으면 **스크립트가
-      #    스스로 죽어** 아래 요약이 실패로 잡고 알림 이슈가 열린다.
-      #    ⛔ 그 가드를 경고 출력으로 되돌리지 말 것 — 한동안 찍기만 하고 0 으로 끝나서
-      #       "성공했는데 0건"을 알아챌 방법이 아예 없었다(2026-08-25 에 고쳤다).
-      #    ⭐ 죽는 자리는 **저장 다음**이다. 앞에서 죽으면 그날 받아 둔 것까지 잃는다.
-      # ⚠️ 하루 한 번이면 충분하다. 애널리스트 의견은 하루에 몇 건씩만 바뀐다. 179종목을
-      #    1초 간격으로 받아 3분쯤 걸린다.
-      # ⭐ 원천이 기준 시점을 안 줘서 **받은 날짜로 쌓는다.** 그래서 매일 돌리는 것이
-      #    곧 추이를 만드는 일이다 — 건너뛴 날은 영영 못 메운다.
-      - name: Fetch 애널리스트 컨센서스 (내부자 리포트)
-        id: us_analyst
-        continue-on-error: true
-        run: python data-pipeline/scripts/fetch_us_analyst.py
-
-      - name: (텔레그램) KRX 상장종목 마스터 갱신
-        id: telegram_krx_stocks
-        continue-on-error: true
-        run: python data-pipeline/scripts/fetch_krx_stocks.py
-
-
       - name: (텔레그램) 채널 동기화 + 구독자 스냅샷
         id: telegram_sync
         continue-on-error: true
@@ -779,7 +743,7 @@ jobs:
       #    시점엔 이 실행의 값이 없다. 전부 비우면 그 화면들까지 사본과 데이터 캐시를
       #    버리고 다시 그려, 하루 두 번이던 전량 재생성이 네 번이 된다. 그래서 경로를
       #    찍어 부른다 — 경로를 주면 그 경로가 쓴 데이터 캐시도 같이 비워진다.
-      # ⚠️ 맨 끝의 전체 비우기는 그대로 둔다. 지표는 그때 비워져야 한다.
+      # ⚠️ 맨 끝(finalize 잡)의 전체 비우기는 그대로 둔다. 지표는 그때 비워져야 한다.
       - name: 국장 카더라 화면만 먼저 비우고 데우기
         if: ${{ !cancelled() }}
         continue-on-error: true
@@ -1051,8 +1015,8 @@ jobs:
       #    여기서부터 / 는 보여 줄 게 다 갖춰져 있다. 맨 끝까지 기다리면 뒤에 남은 발송·배당
       #    30분이 그대로 화면 지연이 된다(2026-09-21 실측: 자료 20:31 · 화면 21:02).
       # ⭐ 발송 **앞**에 둔다. 마감 리포트를 보고 들어오는 사람이 새 화면을 받아야 한다.
-      # ⚠️ 여기서 전체를 비우면 안 된다. 배당은 아직 쓰는 중이라 쓰다 만 값으로 사본이
-      #    떠 버린다. 그래서 / 만 찍는다(맨 끝의 전체 비우기가 나머지를 맡는다).
+      # ⚠️ 여기서 전체를 비우면 안 된다. 다른 잡(배당·내부자)이 아직 쓰는 중일 수 있어 쓰다 만 값으로
+      #    사본이 떠 버린다. 그래서 / 만 찍는다(finalize 잡의 전체 비우기가 나머지를 맡는다).
       - name: 브리핑 화면만 먼저 비우고 데우기
         if: ${{ !cancelled() }}
         continue-on-error: true
@@ -1131,7 +1095,8 @@ jobs:
       # [5] 완료 후 5분 — `sleep 300`
       #   요청받은 사항이다. 발송 스텝이 파이프라인 **안**에 있어서 엄밀히는 '완료 직전'이지만,
       #   여기 오기까지 자료 수집·점수 계산·카더라 집계가 전부 끝나 있고 뒤에 남은 건
-      #   배당주 일곱 스텝(이 발송이 안 읽는 표들, 2026-09-17 에 뒤로 뺐다)과 결과 집계·알림뿐이다.
+      #   결과 집계·알림뿐이다. 배당주(이 발송이 안 읽는 표들)는 2026-09-25 에 별도 잡으로 뺐고,
+      #   20~27분이면 끝나 이 발송보다 먼저 끝난다.
       #   즉 실질적으로 '완료 후'가 맞다. 이 저장소는 public 이라
       #   Actions 분이 무료여서 러너를 5분 재우는 비용은 없다.
       - name: (텔레그램) B 마감 리포트 발송 (평일 저녁)
@@ -1150,70 +1115,6 @@ jobs:
           python data-pipeline/scripts/send_telegram_broadcast.py --send --format evening2
 
 
-
-      # ── 배당주 (/dividend · 종목 페이지 배당 카드) ──────────────────────────
-      # 배당금 쪽 재료다. 현재가는 `stocks.close_price`(위 fetch_krx_stocks)를 그대로 쓴다.
-      #
-      # ⭐ 잡의 맨 뒤(저녁 발송 다음)에 둔다(2026-09-17). 일곱 스텝이 10분 넘게 걸리는데(미국 배당주 7분 · ETF 3분 · 공시 1~2분)
-      #    점수·히어로 요약·저녁 발송은 이 표들을 안 읽는다 — 앞에 있으면 발송만 그만큼 늦어졌다. 뒤에서 죽어도 위엔 영향 없고,
-      #    아래 '배당주 수집' 요약·알림이 always() 라 여기서도 잡힌다.
-      #
-      # ⭐ 아침·저녁 둘 다 돌린다. 슬롯마다 새로 들어오는 시장이 다르다 — 저녁(18:00 KST)은
-      #    국내 종가(전 거래일)와 예탁원 배당 기록, 아침(07:00 KST)은 막 끝난 미국 장의 종가.
-      #    실측(2026-09-15): fetch_krx_stocks 는 아침엔 두 거래일 전, 저녁엔 전 거래일을 받았다.
-      #
-      # ⚠️ 날짜별 증분이 아니라 **매일 스냅숏 전량**(15페이지·7만 행)이다. 금융위 API 는
-      #    기준일 다음 영업일 13시 뒤에 갱신되므로 아침 실행은 이틀 전 스냅숏, 저녁 실행이
-      #    어제 것을 받는다. 둘 다 돌려도 같은 행을 다시 쓸 뿐이다.
-      - name: Fetch 예탁원 배당 기록 (배당주)
-        id: kr_dividends
-        continue-on-error: true
-        run: python data-pipeline/scripts/fetch_kr_dividends.py
-
-      # 거래소 '현금·현물배당 결정' 공시 최근 열흘치 — 확정 배당(1주당 금액·기준일·지급예정일)과 감액배당(비과세) 문장.
-      # KIND 세 번 요청씩 수십 건, 1분 안. 아래 요약 스텝이 이 표를 읽어 next_pay_*·taxfree_* 를 채운다(마이그레이션 079).
-      - name: Fetch 배당 결정 공시 (배당주)
-        id: kr_dividend_notices
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        run: python data-pipeline/scripts/fetch_kr_dividend_notices.py
-
-      # 기록을 종목 한 줄로 접는다(12개월 합·수익률·지급월·연속 배당·확정 배당·감액배당). 화면은 이 표만 읽는다.
-      # 위 스텝들이 죽어도 돌린다 — 어제 기록으로 오늘 종가(fetch_krx_stocks)의 수익률은 낼 수 있다.
-      - name: Calculate 종목별 배당 요약 (배당주)
-        id: kr_dividend_stats
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        run: python data-pipeline/scripts/calculate_kr_dividend_stats.py
-
-      # 미국 배당주. SEC 공시(키 없음, 초당 10회) 300종목 3분 + 핀허브 시세 180종목 4분쯤.
-      # 미국 러너에서 SEC·핀허브는 잘 열린다(KRX·data.go.kr 와 반대다).
-      - name: Fetch 미국 배당주 요약 (배당주)
-        id: us_dividends
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        run: python data-pipeline/scripts/fetch_us_dividends.py
-
-      # ETF 분배금 — 미국은 stockanalysis, 국내는 예탁결제원 SEIBro 분배금지급현황(전 운용사 · 열다섯 달치 · 150여 회 요청 · 2분 반). 시세·환율도 여기서.
-      - name: Fetch ETF 분배금 (배당주)
-        id: etf_dividends
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        run: python data-pipeline/scripts/fetch_etf_dividends.py
-
-      # 고배당기업(배당소득 분리과세 대상) 목록 — KIND 페이지 POST 한 번. ⚠️ 거래소 사이트라 미국 러너에서 막힐 수 있다.
-      - name: Fetch 고배당기업 목록 (배당주)
-        id: kr_high_dividend
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        run: python data-pipeline/scripts/fetch_kr_high_dividend.py
-
-      # 배당성향(KIND 배당정보, 지난 사업연도 한 줄씩) — POST 한 번. 위와 같은 사이트.
-      - name: Fetch 배당성향 (배당주)
-        id: kr_dividend_payout
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        run: python data-pipeline/scripts/fetch_kr_dividend_payout.py
 
       # ⚠️ 국장 미리보기(`kr_preview`)를 이 목록 맨 앞에 넣어 뒀다. 그 스텝은
       #    continue-on-error 라 실패해도 잡이 흐르는데, 여기에 안 들어 있으면 **아무도
@@ -1653,23 +1554,28 @@ jobs:
             || echo "담당자 지정에 실패했습니다 — 이슈는 열려 있습니다"
           exit 1
 
-      # ── 배당주 수집 전용 알림 ────────────────────────────────────────────
-      # /dividend 는 죽어도 카드가 그대로 뜨고 히어로 툴팁의 '기준' 날짜만 안 움직인다 —
-      # 서학개미·내부자와 같은 조용한 낡음이다. 그래서 여기서 알려야 한다.
+      # ── 미장 카더라 전용 알림 ────────────────────────────────────────────
+      # 위 알림들과 **합치지 않았다.** 제목이 곧 진단이라는 같은 이유다.
       #
-      # ⚠️ 하루 실패는 다음 실행이 만회한다(전량을 다시 받는다). 며칠 연속 열리면 원천이
-      #    바뀐 것이니 스크립트 머리말부터 볼 것 — 주소가 `/service/` 없이 `_V2` 다.
-      #    "등록되지 않은 서비스키"는 활용신청이 풀린 것이지 키가 잘못된 게 아니다
-      #    (스크립트가 그 메시지를 그대로 찍는다).
-      - name: Summarize 배당주 수집
-        id: dividend_health
+      # ⚠️ 이 알림을 붙인 계기: 2026-08-11 첫 정기 실행에서 미국 종목 추출이
+      #    statement timeout 으로 죽었는데 **워크플로가 초록으로 끝났다**.
+      #    continue-on-error 스텝은 conclusion 이 success 로 뜨고 `gh run view` 의
+      #    outcome 은 null 로 온다 — 로그의 ##[error] 줄 말고는 볼 방법이 없었다.
+      #    그 하루의 미장 데이터가 통째로 비었는데(미국 언급 0건) 아무도 몰랐다.
+      #
+      # 위 '수집 중단' 배열에 미장 스텝을 더하지 않은 이유: 그 배열의 기준은
+      # "그날치가 영영 빈다"인데 미장 스텝은 전부 **전량 재계산**이라 다음 실행이
+      # 만회한다. 대신 여러 날 연속으로 죽으면 화면이 계속 낡으므로 자기 제목으로 연다.
+      # (다음 실행이 성공하면 이 이슈는 더 이상 코멘트가 안 붙는다.)
+      - name: Summarize 미장 collection (미국 종목 전용)
+        id: us_health
         if: always()
         run: |
-          names=("fetch_kr_dividends.py" "fetch_kr_dividend_notices.py" "calculate_kr_dividend_stats.py" "fetch_us_dividends.py" "fetch_etf_dividends.py" "fetch_kr_high_dividend.py" "fetch_kr_dividend_payout.py")
-          outcomes=("${{ steps.kr_dividends.outcome }}" "${{ steps.kr_dividend_notices.outcome }}" "${{ steps.kr_dividend_stats.outcome }}" "${{ steps.us_dividends.outcome }}" "${{ steps.etf_dividends.outcome }}" "${{ steps.kr_high_dividend.outcome }}" "${{ steps.kr_dividend_payout.outcome }}")
+          names=("extract_telegram_us_stocks.py" "calculate_us_stock_daily.py" "calculate_us_comention.py" "calculate_us_trending.py" "calculate_us_theme_daily.py" "calculate_us_telegram_sentiment.py" "generate_us_telegram_narratives.py" "generate_us_theme_briefs.py")
+          outcomes=("${{ steps.telegram_us_extract.outcome }}" "${{ steps.telegram_us_daily.outcome }}" "${{ steps.telegram_us_comention.outcome }}" "${{ steps.telegram_us_trending.outcome }}" "${{ steps.telegram_us_theme.outcome }}" "${{ steps.telegram_us_sentiment.outcome }}" "${{ steps.telegram_us_narratives.outcome }}" "${{ steps.telegram_us_theme_briefs.outcome }}")
 
           {
-            echo "## 배당주"
+            echo "## 미장 카더라"
             echo "| Script | Result |"
             echo "|---|---|"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -1685,17 +1591,17 @@ jobs:
           done
 
           echo "failed=$failed" >> "$GITHUB_OUTPUT"
-          echo "DIVIDEND_FAILED_SCRIPTS=$failed_list" >> "$GITHUB_ENV"
+          echo "US_FAILED_SCRIPTS=$failed_list" >> "$GITHUB_ENV"
 
-      - name: Alert on 배당주 failure (open/update GitHub issue)
-        if: ${{ !cancelled() && steps.dividend_health.outputs.failed == '1' }}
+      - name: Alert on 미장 failure (open/update GitHub issue)
+        if: ${{ !cancelled() && steps.us_health.outputs.failed == '1' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          failed="${DIVIDEND_FAILED_SCRIPTS:-요약 탭에서 확인}"
-          title="⚠️ 배당주 수집 중단"
-          note=$(printf '배당주 수집이 실패했습니다. /dividend 와 종목 페이지 배당 카드는 그대로 뜨고 값만 조용히 낡습니다.\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n하루 실패는 다음 실행이 만회합니다. 며칠 연속 열리면 원천이 바뀐 것이니 `fetch_kr_dividends.py` · `calculate_kr_dividend_stats.py` · `fetch_us_dividends.py` 머리말부터 보세요.' \
+          failed="${US_FAILED_SCRIPTS:-요약 탭에서 확인}"
+          title="⚠️ 미장 카더라 집계 중단"
+          note=$(printf '미장 스텝이 실패했습니다. 미국 종목 언급·집계가 그 시점에 멈춰 있습니다(국내는 영향 없습니다).\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n먼저 볼 것: job 로그의 해당 스텝 traceback. 지금까지 나온 고장은 `statement timeout(57014)` 하나이고, 원인은 전량 조회의 페이징이었다(load_messages 주석 참고).\n\n모든 스텝이 전량 재계산이라 **다음 실행이 성공하면 과거분까지 저절로 복구**됩니다. 며칠 연속 열리면 그때는 조회가 표 크기를 못 버티는 것이니 페이징·창을 볼 것.' \
             "$(date -u '+%Y-%m-%d %H:%M')" "$failed" "$run_url")
           existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
           if [ -n "$existing" ]; then
@@ -1705,9 +1611,109 @@ jobs:
             number=$(gh issue create --title "$title" --body "$note" | sed 's#.*/##')
             echo "새 알림 이슈 #$number 생성"
           fi
+          # 담당자를 붙인다. 저장소 watch 설정과 무관하게 '나에게 할당됨'으로 뜨고 알림이
+          # 간다 — 여기 이슈는 봇이 열고 라벨도 멘션도 없어서, 안 붙이면 닿는지 여부가
+          # 전적으로 그 설정에 달린다.
+          # ⚠️ 실패해도 이슈는 남긴다. 알림 통로를 넓히려다 이슈 자체를 잃으면 본말이 뒤집힌다.
           gh issue edit "${number:-$existing}" --add-assignee "${{ github.repository_owner }}" >/dev/null \
             || echo "담당자 지정에 실패했습니다 — 이슈는 열려 있습니다"
           exit 1
+
+  insider:
+    needs: guard
+    if: ${{ !cancelled() && needs.guard.outputs.skip != 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r data-pipeline/requirements.txt
+
+      # ── 내부자 리포트 ───────────────────────────────────────────────────
+      # ⚠️⚠️ **별도 잡으로 돈다(2026-09-25). update 잡에 다시 넣지 말 것.**
+      #
+      # 이 넷은 SEC·미 하원·stockanalysis 를 읽고 자기 표(us_insider_*·us_manager_*·
+      # us_congress_trade·us_analyst_*)에만 쓴다. KRX 도 카더라 표도 안 본다(us_stocks
+      # 만 읽는데 그건 종목 사전이라 이 흐름에서 안 바뀐다). **아무것도 안 기다려도 된다.**
+      #
+      # 한때 지표 블록 **뒤**(47번째)에 있었다. 그러면 중간의 'KRX 공표(08:00 KST) 대기'
+      # 게이트에 같이 걸린다 — KRX 와 무관한데 줄만 뒤에 서 있어서다. 2026-08-25 밤
+      # 22:55 에 리허설을 돌렸더니 자정을 넘겨 게이트가 **7시간 반**을 자기 시작했고,
+      # 잡의 6시간 제한이 먼저 와서 내부자 스텝은 시작조차 못 하고 잘렸다.
+      # 잡 하나에 스텝을 줄로 세운 구조라, 가운데 sleep 은 뒤의 모든 것을 멈춘다.
+      #
+      # ⭐ 그래서 한때 update 잡 맨 앞에 뒀고, 그 대가로 카더라 시작이 5~15분 늦었다
+      #   (임원+의원+애널리스트, 13F 가 도는 달은 15분 안팎). 별도 잡이 되며 그 대가가 없어졌다.
+      # ⚠️⚠️ 이 화면도 **파이프라인에 안 붙어 있었다**(2026-08-21 까지). 지금 들어 있는
+      #    데이터는 전부 손으로 돌려 채운 것이라, 안 붙이면 하루 만에 낡는다.
+      #
+      # ⭐ 임원 축은 **최근 5영업일만** 훑는다. 집계(us_insider_daily)는 저장한 뒤
+      #    **DB 의 창을 읽어** 만들기 때문에 조금씩 받아도 90일 창이 제대로 나온다.
+      #    예전처럼 매 실행 90일을 훑으면 인덱스 65일 × 공시 수백 건이라 20분이 넘는다.
+      # ⚠️ EDGAR 일별 인덱스는 그날 접수가 끝난 뒤(미 동부 22:00 ≈ 11:00 KST) 만들어진다.
+      #    **아침 실행(07:30 KST)엔 전날 미국분이 아직 없고 오후 실행에서 잡힌다.**
+      #    5영업일을 되돌아보므로 어느 실행이 놓쳐도 다음이 만회한다.
+      - name: Fetch 미국 임원 공시 Form 4 (내부자 리포트)
+        id: us_insider
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_us_insider.py
+
+      # ⭐ 하원은 증분이다 — 이미 읽은 doc_id 와 `최근 신고일 − 7일` 기준선으로 건너뛴다
+      #    (5~8분 → 3.5초). 토요일만 전량 다시 읽어 뒤늦게 고쳐진 신고를 줍는다.
+      - name: Fetch 미 하원의원 매매 신고 (내부자 리포트)
+        id: us_congress
+        continue-on-error: true
+        run: |
+          if [ "$(date -u +%u)" = "6" ]; then
+            echo "토요일 — 전량 다시 읽는다"
+            python data-pipeline/scripts/fetch_us_congress.py --full
+          else
+            python data-pipeline/scripts/fetch_us_congress.py
+          fi
+
+      # ⚠️ 13F 는 **분기 자료라 매일 돌릴 이유가 없다.** 값이 안 바뀐다. 마감이
+      #    분기말+45일(2/14 · 5/15 · 8/14 · 11/14)이고 그 며칠 전부터 제출이 몰리므로
+      #    그 창에서만 돌린다. 한 번에 62곳 × 두 분기 + fails 파일 6개라 10분 안팎이다.
+      # ⚠️ 마감이 주말이면 다음 영업일로 밀리므로 25일까지 넉넉히 열어 둔다.
+      - name: Fetch 월가 거물 13F (내부자 리포트)
+        id: us_13f
+        continue-on-error: true
+        run: |
+          m=$(date -u +%m); d=$(date -u +%d)
+          case "$m" in
+            02|05|08|11)
+              if [ "$d" -ge 10 ] && [ "$d" -le 25 ]; then
+                python data-pipeline/scripts/fetch_us_13f.py
+              else
+                echo "13F 제출 창 밖($m/$d). 건너뛴다."
+              fi
+              ;;
+            *) echo "13F 마감 달이 아니다($m). 건너뛴다." ;;
+          esac
+
+      # ⚠️⚠️ 이건 API 가 아니라 **웹페이지**다(stockanalysis.com). 저쪽이 화면을 바꾸면
+      #    파싱이 깨진다. 못 받은 비율이 30% 를 넘거나 한 종목도 못 받으면 **스크립트가
+      #    스스로 죽어** 아래 요약이 실패로 잡고 알림 이슈가 열린다.
+      #    ⛔ 그 가드를 경고 출력으로 되돌리지 말 것 — 한동안 찍기만 하고 0 으로 끝나서
+      #       "성공했는데 0건"을 알아챌 방법이 아예 없었다(2026-08-25 에 고쳤다).
+      #    ⭐ 죽는 자리는 **저장 다음**이다. 앞에서 죽으면 그날 받아 둔 것까지 잃는다.
+      # ⚠️ 하루 한 번이면 충분하다. 애널리스트 의견은 하루에 몇 건씩만 바뀐다. 179종목을
+      #    1초 간격으로 받아 3분쯤 걸린다.
+      # ⭐ 원천이 기준 시점을 안 줘서 **받은 날짜로 쌓는다.** 그래서 매일 돌리는 것이
+      #    곧 추이를 만드는 일이다 — 건너뛴 날은 영영 못 메운다.
+      - name: Fetch 애널리스트 컨센서스 (내부자 리포트)
+        id: us_analyst
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_us_analyst.py
 
       # ── 내부자 리포트 전용 알림 ──────────────────────────────────────────
       # 위 알림들과 **합치지 않았다.** 제목이 곧 진단이라는 같은 이유다.
@@ -1780,28 +1786,107 @@ jobs:
             || echo "담당자 지정에 실패했습니다 — 이슈는 열려 있습니다"
           exit 1
 
-      # ── 미장 카더라 전용 알림 ────────────────────────────────────────────
-      # 위 알림들과 **합치지 않았다.** 제목이 곧 진단이라는 같은 이유다.
+  dividend:
+    needs: [guard, krx_master]
+    if: ${{ !cancelled() && needs.guard.outputs.skip != 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r data-pipeline/requirements.txt
+
+      # ── 배당주 (/dividend · 종목 페이지 배당 카드) ──────────────────────────
+      # 배당금 쪽 재료다. 현재가는 `stocks.close_price`(krx_master 잡의 fetch_krx_stocks)를 그대로 쓴다.
+      # 그래서 이 잡은 krx_master 잡을 기다린다(needs).
       #
-      # ⚠️ 이 알림을 붙인 계기: 2026-08-11 첫 정기 실행에서 미국 종목 추출이
-      #    statement timeout 으로 죽었는데 **워크플로가 초록으로 끝났다**.
-      #    continue-on-error 스텝은 conclusion 이 success 로 뜨고 `gh run view` 의
-      #    outcome 은 null 로 온다 — 로그의 ##[error] 줄 말고는 볼 방법이 없었다.
-      #    그 하루의 미장 데이터가 통째로 비었는데(미국 언급 0건) 아무도 몰랐다.
+      # ⭐ 별도 잡으로 돈다(2026-09-25). 점수·히어로 요약·저녁 발송은 이 표들을 안 읽는다 — 그래서 2026-09-17 에
+      #    update 잡 맨 뒤(저녁 발송 다음)로 옮겼고, 거기서도 일곱 스텝(20~27분)이 잡 전체를 그만큼 늘리고 있었다.
+      #    여기서 죽어도 다른 잡엔 영향 없고, 아래 '배당주 수집' 요약·알림이 always() 라 여기서 잡힌다.
       #
-      # 위 '수집 중단' 배열에 미장 스텝을 더하지 않은 이유: 그 배열의 기준은
-      # "그날치가 영영 빈다"인데 미장 스텝은 전부 **전량 재계산**이라 다음 실행이
-      # 만회한다. 대신 여러 날 연속으로 죽으면 화면이 계속 낡으므로 자기 제목으로 연다.
-      # (다음 실행이 성공하면 이 이슈는 더 이상 코멘트가 안 붙는다.)
-      - name: Summarize 미장 collection (미국 종목 전용)
-        id: us_health
+      # ⭐ 아침·저녁 둘 다 돌린다. 슬롯마다 새로 들어오는 시장이 다르다 — 저녁(18:00 KST)은
+      #    국내 종가(전 거래일)와 예탁원 배당 기록, 아침(07:00 KST)은 막 끝난 미국 장의 종가.
+      #    실측(2026-09-15): fetch_krx_stocks 는 아침엔 두 거래일 전, 저녁엔 전 거래일을 받았다.
+      #
+      # ⚠️ 날짜별 증분이 아니라 **매일 스냅숏 전량**(15페이지·7만 행)이다. 금융위 API 는
+      #    기준일 다음 영업일 13시 뒤에 갱신되므로 아침 실행은 이틀 전 스냅숏, 저녁 실행이
+      #    어제 것을 받는다. 둘 다 돌려도 같은 행을 다시 쓸 뿐이다.
+      - name: Fetch 예탁원 배당 기록 (배당주)
+        id: kr_dividends
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_kr_dividends.py
+
+      # 거래소 '현금·현물배당 결정' 공시 최근 열흘치 — 확정 배당(1주당 금액·기준일·지급예정일)과 감액배당(비과세) 문장.
+      # KIND 세 번 요청씩 수십 건, 1분 안. 아래 요약 스텝이 이 표를 읽어 next_pay_*·taxfree_* 를 채운다(마이그레이션 079).
+      - name: Fetch 배당 결정 공시 (배당주)
+        id: kr_dividend_notices
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_kr_dividend_notices.py
+
+      # 기록을 종목 한 줄로 접는다(12개월 합·수익률·지급월·연속 배당·확정 배당·감액배당). 화면은 이 표만 읽는다.
+      # 위 스텝들이 죽어도 돌린다 — 어제 기록으로 오늘 종가(fetch_krx_stocks)의 수익률은 낼 수 있다.
+      - name: Calculate 종목별 배당 요약 (배당주)
+        id: kr_dividend_stats
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python data-pipeline/scripts/calculate_kr_dividend_stats.py
+
+      # 미국 배당주. SEC 공시(키 없음, 초당 10회) 300종목 3분 + 핀허브 시세 180종목 4분쯤.
+      # 미국 러너에서 SEC·핀허브는 잘 열린다(KRX·data.go.kr 와 반대다).
+      - name: Fetch 미국 배당주 요약 (배당주)
+        id: us_dividends
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_us_dividends.py
+
+      # ETF 분배금 — 미국은 stockanalysis, 국내는 예탁결제원 SEIBro 분배금지급현황(전 운용사 · 열다섯 달치 · 150여 회 요청 · 2분 반). 시세·환율도 여기서.
+      - name: Fetch ETF 분배금 (배당주)
+        id: etf_dividends
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_etf_dividends.py
+
+      # 고배당기업(배당소득 분리과세 대상) 목록 — KIND 페이지 POST 한 번. ⚠️ 거래소 사이트라 미국 러너에서 막힐 수 있다.
+      - name: Fetch 고배당기업 목록 (배당주)
+        id: kr_high_dividend
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_kr_high_dividend.py
+
+      # 배당성향(KIND 배당정보, 지난 사업연도 한 줄씩) — POST 한 번. 위와 같은 사이트.
+      - name: Fetch 배당성향 (배당주)
+        id: kr_dividend_payout
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_kr_dividend_payout.py
+
+      # ── 배당주 수집 전용 알림 ────────────────────────────────────────────
+      # /dividend 는 죽어도 카드가 그대로 뜨고 히어로 툴팁의 '기준' 날짜만 안 움직인다 —
+      # 서학개미·내부자와 같은 조용한 낡음이다. 그래서 여기서 알려야 한다.
+      #
+      # ⚠️ 하루 실패는 다음 실행이 만회한다(전량을 다시 받는다). 며칠 연속 열리면 원천이
+      #    바뀐 것이니 스크립트 머리말부터 볼 것 — 주소가 `/service/` 없이 `_V2` 다.
+      #    "등록되지 않은 서비스키"는 활용신청이 풀린 것이지 키가 잘못된 게 아니다
+      #    (스크립트가 그 메시지를 그대로 찍는다).
+      - name: Summarize 배당주 수집
+        id: dividend_health
         if: always()
         run: |
-          names=("extract_telegram_us_stocks.py" "calculate_us_stock_daily.py" "calculate_us_comention.py" "calculate_us_trending.py" "calculate_us_theme_daily.py" "calculate_us_telegram_sentiment.py" "generate_us_telegram_narratives.py" "generate_us_theme_briefs.py")
-          outcomes=("${{ steps.telegram_us_extract.outcome }}" "${{ steps.telegram_us_daily.outcome }}" "${{ steps.telegram_us_comention.outcome }}" "${{ steps.telegram_us_trending.outcome }}" "${{ steps.telegram_us_theme.outcome }}" "${{ steps.telegram_us_sentiment.outcome }}" "${{ steps.telegram_us_narratives.outcome }}" "${{ steps.telegram_us_theme_briefs.outcome }}")
+          names=("fetch_kr_dividends.py" "fetch_kr_dividend_notices.py" "calculate_kr_dividend_stats.py" "fetch_us_dividends.py" "fetch_etf_dividends.py" "fetch_kr_high_dividend.py" "fetch_kr_dividend_payout.py")
+          outcomes=("${{ steps.kr_dividends.outcome }}" "${{ steps.kr_dividend_notices.outcome }}" "${{ steps.kr_dividend_stats.outcome }}" "${{ steps.us_dividends.outcome }}" "${{ steps.etf_dividends.outcome }}" "${{ steps.kr_high_dividend.outcome }}" "${{ steps.kr_dividend_payout.outcome }}")
 
           {
-            echo "## 미장 카더라"
+            echo "## 배당주"
             echo "| Script | Result |"
             echo "|---|---|"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -1817,17 +1902,17 @@ jobs:
           done
 
           echo "failed=$failed" >> "$GITHUB_OUTPUT"
-          echo "US_FAILED_SCRIPTS=$failed_list" >> "$GITHUB_ENV"
+          echo "DIVIDEND_FAILED_SCRIPTS=$failed_list" >> "$GITHUB_ENV"
 
-      - name: Alert on 미장 failure (open/update GitHub issue)
-        if: ${{ !cancelled() && steps.us_health.outputs.failed == '1' }}
+      - name: Alert on 배당주 failure (open/update GitHub issue)
+        if: ${{ !cancelled() && steps.dividend_health.outputs.failed == '1' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          failed="${US_FAILED_SCRIPTS:-요약 탭에서 확인}"
-          title="⚠️ 미장 카더라 집계 중단"
-          note=$(printf '미장 스텝이 실패했습니다. 미국 종목 언급·집계가 그 시점에 멈춰 있습니다(국내는 영향 없습니다).\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n먼저 볼 것: job 로그의 해당 스텝 traceback. 지금까지 나온 고장은 `statement timeout(57014)` 하나이고, 원인은 전량 조회의 페이징이었다(load_messages 주석 참고).\n\n모든 스텝이 전량 재계산이라 **다음 실행이 성공하면 과거분까지 저절로 복구**됩니다. 며칠 연속 열리면 그때는 조회가 표 크기를 못 버티는 것이니 페이징·창을 볼 것.' \
+          failed="${DIVIDEND_FAILED_SCRIPTS:-요약 탭에서 확인}"
+          title="⚠️ 배당주 수집 중단"
+          note=$(printf '배당주 수집이 실패했습니다. /dividend 와 종목 페이지 배당 카드는 그대로 뜨고 값만 조용히 낡습니다.\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n하루 실패는 다음 실행이 만회합니다. 며칠 연속 열리면 원천이 바뀐 것이니 `fetch_kr_dividends.py` · `calculate_kr_dividend_stats.py` · `fetch_us_dividends.py` 머리말부터 보세요.' \
             "$(date -u '+%Y-%m-%d %H:%M')" "$failed" "$run_url")
           existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
           if [ -n "$existing" ]; then
@@ -1837,15 +1922,23 @@ jobs:
             number=$(gh issue create --title "$title" --body "$note" | sed 's#.*/##')
             echo "새 알림 이슈 #$number 생성"
           fi
-          # 담당자를 붙인다. 저장소 watch 설정과 무관하게 '나에게 할당됨'으로 뜨고 알림이
-          # 간다 — 여기 이슈는 봇이 열고 라벨도 멘션도 없어서, 안 붙이면 닿는지 여부가
-          # 전적으로 그 설정에 달린다.
-          # ⚠️ 실패해도 이슈는 남긴다. 알림 통로를 넓히려다 이슈 자체를 잃으면 본말이 뒤집힌다.
           gh issue edit "${number:-$existing}" --add-assignee "${{ github.repository_owner }}" >/dev/null \
             || echo "담당자 지정에 실패했습니다 — 이슈는 열려 있습니다"
           exit 1
 
-      # 화면 사본(ISR)을 비운다. 위 스텝들이 표를 다 바꾼 뒤에 불러야 새 값이 바로 보인다.
+  finalize:
+    needs: [guard, update, insider, dividend]
+    # 예전 update 잡 마지막 스텝의 `if: always()` 를 잡으로 옮긴 것이다. 앞 잡이 실패해도
+    # 나머지가 쓴 값은 화면에 나가야 한다. 게이트가 막은 날만 건너뛴다.
+    if: ${{ always() && needs.guard.outputs.skip != 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # 화면 사본(ISR)을 비운다. 세 잡(update·insider·dividend)이 표를 다 바꾼 뒤에 불러야 새 값이 바로 보인다.
       # 안 부르면 루트 레이아웃의 revalidate(3600초 · 카더라 1800)가 안전장치라 최대 한 시간
       # 뒤에 스스로 새로 그리는데, 그 사이 아무도 안 온 화면은 다음 첫 방문자가 옛 사본을 받는다.
       # 2026-09-19 부터 시계 주기가 5분→1시간이라 이 스텝이 새 자료를 바로 보이게 하는 본선이다.
