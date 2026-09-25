@@ -405,28 +405,83 @@ const comingSoonFor = (env: ShellEnv): SoonItem[] => (env.themeNav ? COMING_SOON
  *
  * `after` 가 어느 NAV 항목과도 안 맞으면 조용히 사라지지 않도록 끝에 붙인다.
  */
-function sidebarItems(env: ShellEnv) {
+/**
+ * 사이드바·폰 메뉴의 묶음(shadcn 사이드바 블록의 SidebarGroupLabel). 항목을 성격대로 셋으로 나누고 묶음마다
+ * 작은 머리 글을 단다. 묶음 순서가 곧 메뉴 순서다 — NAV 배열 순서는 묶음 **안에서만** 지켜진다.
+ * 여기 없는 주소는 맨 뒤에 머리 없이 붙는다(새 화면을 NAV 에만 넣어도 사라지지 않는다).
+ */
+const NAV_GROUPS: { label: string; hrefs: string[] }[] = [
+  { label: "오늘 시장", hrefs: ["/", "/preview", NOTE_PAGE.href] },
+  { label: "텔레그램 여론", hrefs: ["/kadera", THEME_PAGE.href] },
+  { label: "분석과 기록", hrefs: ["/insider", "/mdd", "/seohak", DIVIDEND_PAGE.href] },
+];
+
+type SidebarRow =
+  | { kind: "group"; label: string; first: boolean }
+  | { kind: "nav"; item: NavItem }
+  | { kind: "child"; item: NavChild; siblings: NavChild[] }
+  | { kind: "soon"; item: SoonItem };
+
+function sidebarItems(env: ShellEnv): SidebarRow[] {
   const placed = new Set<string>();
-  const rows: (
-    | { kind: "nav"; item: NavItem }
-    | { kind: "child"; item: NavChild; siblings: NavChild[] }
-    | { kind: "soon"; item: SoonItem }
-  )[] = [];
   const soons = comingSoonFor(env);
+  // 항목 하나 = NAV 줄 + 그 하위 줄 + 그 뒤에 붙는 '준비 중' 줄.
+  const blocks = new Map<string, SidebarRow[]>();
   for (const item of navFor(env)) {
-    rows.push({ kind: "nav", item });
-    for (const child of item.children ?? []) rows.push({ kind: "child", item: child, siblings: item.children ?? [] });
+    const block: SidebarRow[] = [{ kind: "nav", item }];
+    for (const child of item.children ?? []) block.push({ kind: "child", item: child, siblings: item.children ?? [] });
     for (const soon of soons) {
       if (soon.after === item.href) {
-        rows.push({ kind: "soon", item: soon });
+        block.push({ kind: "soon", item: soon });
         placed.add(soon.label);
       }
     }
+    blocks.set(item.href, block);
   }
+  // '준비 중' 항목은 NAV 에 없으니 자기 자리를 주소가 아니라 이름으로 찾는다(예고 항목도 묶음에 들어가야 한다).
+  const soonHref = (soon: SoonItem) => [NOTE_PAGE, DIVIDEND_PAGE, THEME_PAGE].find((p) => p.label === soon.label)?.href;
+  const rows: SidebarRow[] = [];
+  const used = new Set<string>();
+  NAV_GROUPS.forEach((g) => {
+    const inGroup: SidebarRow[] = [];
+    for (const href of g.hrefs) {
+      const block = blocks.get(href);
+      if (block) {
+        inGroup.push(...block);
+        used.add(href);
+      }
+      for (const soon of soons) {
+        if (!placed.has(soon.label) && soonHref(soon) === href) {
+          inGroup.push({ kind: "soon", item: soon });
+          placed.add(soon.label);
+        }
+      }
+    }
+    if (inGroup.length) rows.push({ kind: "group", label: g.label, first: rows.length === 0 }, ...inGroup);
+  });
+  for (const [href, block] of blocks) if (!used.has(href)) rows.push(...block);
   for (const soon of soons) {
     if (!placed.has(soon.label)) rows.push({ kind: "soon", item: soon });
   }
   return rows;
+}
+
+/** 묶음 머리 글. shadcn 의 SidebarGroupLabel 꼴(작은 회색 글)이고, 첫 묶음이 아니면 위를 띄워 묶음을 가른다. */
+function NavGroupLabel({ label, first, inset }: { label: string; first: boolean; inset: number }) {
+  return (
+    <div
+      role="presentation"
+      style={{
+        margin: first ? "0 0 -2px" : "12px 0 -2px",
+        padding: `0 ${inset}px`,
+        fontSize: "var(--fs-12)",
+        fontWeight: 600,
+        color: C.muted,
+      }}
+    >
+      {label}
+    </div>
+  );
 }
 
 /** NAV 아이콘. 직접 그린 SVG(Glyph)가 있으면 그걸, 없으면 Material Symbols 이름을 쓴다. */
@@ -690,6 +745,7 @@ function Sidebar() {
       <SearchTrigger />
       <nav style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {sidebarItems(env).map((row) => {
+          if (row.kind === "group") return <NavGroupLabel key={`g-${row.label}`} label={row.label} first={row.first} inset={12} />;
           if (row.kind === "soon") {
             const soon = row.item;
             return (
@@ -939,6 +995,7 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
             210px 로 묶여 있지 않아 자리가 남고, 툴팁이 안 뜨는 화면이라 배지가 유일한
             설명이므로 겹쳐 두지 않고 또렷하게 보여야 한다. */}
         {sidebarItems(env).map((row) => {
+          if (row.kind === "group") return <NavGroupLabel key={`g-${row.label}`} label={row.label} first={row.first} inset={14} />;
           if (row.kind === "soon") {
             const soon = row.item;
             return (
