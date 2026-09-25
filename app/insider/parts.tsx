@@ -1050,8 +1050,11 @@ export function PriceChart({
               key={b.date}
               className={`hz-tip hz-vline${edge}`}
               data-tip={`${b.date} · $${b.close.toLocaleString("en-US", { maximumFractionDigits: 2 })}${won}`}
-              style={{ flex: 1, position: "relative" }}
-            />
+              // 선·호버 점을 칸 가운데가 아니라 실제 점 자리(칸 폭의 i/(n−1))에 세운다(app/home/parts.tsx AreaChart 와 같은 셈).
+              style={{ flex: 1, position: "relative", ["--hz-x" as string]: `${at2 * 100}%` }}
+            >
+              <span className="hz-vdot" style={{ top: `${(1 - (b.close - min) / (max - min)) * 100}%`, background: "var(--c-blue)" }} />
+            </div>
           );
         })}
       </div>
