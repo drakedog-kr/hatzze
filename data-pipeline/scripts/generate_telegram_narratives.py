@@ -73,6 +73,7 @@ from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 from common.broadcast_content import weekly_top_stocks  # noqa: E402
 from common.channel_breadth import channel_breadth_map  # noqa: E402
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
+from common.market_tags import is_kr_led, is_us_only, market_counts  # noqa: E402
 from common.prompt_style import PLAIN_PROSE_RULE  # noqa: E402
 from common.supabase_client import (  # noqa: E402
     PAGE_SIZE,
@@ -658,9 +659,31 @@ def tone_label(optimism_pct: int) -> str:
 # 지어내지 않게 한다(평일이면 대개 하루로 끝난다).
 NEWS_MIN_MSGS = 1000
 NEWS_EXCERPTS = 6  # 발췌 건수. 3건이면 한 사건에 쏠려 '공통 화제'가 안 보인다
-# 본문을 받아 볼 후보 수. 이 중 공백뿐인 것을 버리고 앞에서 NEWS_EXCERPTS 건을 쓴다.
+# 본문을 받아 볼 후보 수(아래 두 갈래 각각). 이 중 공백뿐인 것을 버리고 NEWS_EXCERPTS 건을 쓴다.
 NEWS_EXCERPT_CANDIDATES = 30
 NEWS_TOP_STOCKS = 6
+# ── 국장 발췌는 국내 종목 글을 먼저 싣는다 ────────────────────────────────────
+#
+# 국장·미장은 같은 채널을 읽는다(common/market_tags 머리 주석). 예전엔 창 안 전체 글에서
+# 도달 순으로 6건을 골라, 미장 이야기가 크게 퍼진 날엔 국장 총평이 미장 얘기가 됐다.
+# 실측(09-12~09-25 재구성 84건): 국내 종목 글 20 · 미국 종목만 17 · 태그 없음 47.
+# 추석 연휴(09-24·25)엔 6건 중 국내 종목 글 0건 · 메타·뮤즈 글 4건이었고, 같은 기간
+# 후보에 있던 '이비덴 급등, 국내에서는 삼성전기 주목'과 HLB 신약 FDA 허가 글은 밀렸다.
+#
+# ⚠️ **미국 종목만 붙은 글을 빼는 것으로는 안 고쳐진다.** 미국 사전은 한글 '메타'만 잡고
+#    영어 'Meta' 는 안 잡으며, 일본 이비덴은 어느 사전에도 없다. 그 규칙만 걸어 다시 뽑아도
+#    두 날 모두 6건이 전부 태그 없는 글이었고 그중 넷 이상이 뮤즈 이야기였다.
+#    그래서 **국내 종목 글에 자리를 먼저 준다.**
+# 나머지 자리는 태그 없는 글(금리·유가·정책 같은 시장 전반 이야기)이 도달 순으로 다툰다.
+#
+# 같은 재료로 셋째 대목을 날짜 셋(09-22·24·25) × 5회 써 보니: 해외 기업만 다룬 문장
+# 25/45 → 9/44, 09-22 첫 문장이 메타인 편 5/5 → 0/5(드러켄밀러·원익IPS 가 앞에 섰다).
+# ⚠️ 남는 것: 국내 글이 적은 연휴엔 남은 두 자리를 태그 없는 해외 글(영어 Meta·이비덴)이
+#    차지해, 09-24 는 5회 모두 셋째 문장에 메타·이비덴이 남았다(첫 문장은 HLB FDA 허가).
+NEWS_KR_SLOTS = 4
+# 태그를 확인할 후보 수. 도달 순 상위만 본다 — 창 안 전체(평일 7~8천 건)의 태그를 받으면
+# 왕복이 수백 번이다. 연휴 이틀에도 이 안에 국내 종목 글이 먼저 실을 만큼 있었다.
+NEWS_TAG_CANDIDATES = 200
 
 
 # ── 넷째 대목 '앞으로 예정된 일' 이 쓰는 재료 ────────────────────────────────
@@ -1392,8 +1415,41 @@ def build_brief_digest(db, latest: str, msgs: list[dict]) -> str | None:
     return "\n".join(lines)
 
 
+def reach(m: dict) -> int:
+    """널리 퍼진 정도 = 조회 + 확산×3."""
+    return (m.get("views") or 0) + (m.get("forwards") or 0) * 3
+
+
+def choose_excerpts(first: list[dict], rest: list[dict], n: int, first_slots: int) -> list[dict]:
+    """`first` 에서 `first_slots` 건을 먼저 싣고 남은 자리를 `rest` 로 채운다. 도달 순으로 돌려준다.
+
+    두 목록은 이미 도달 순이고 본문(text)이 붙어 있다. 공백뿐인 본문은 버리고, 여러 채널이
+    그대로 복붙한 같은 글은 한 번만 싣는다(build_schedule_block 과 같은 앞 60자 기준) —
+    안 거르면 같은 뮤즈 글이 두 자리를 차지했다. `rest` 가 모자라면 `first` 의 남은 것으로 채운다.
+    """
+    seen: set[str] = set()
+    out: list[dict] = []
+
+    def take(pool: list[dict], upto: int) -> None:
+        for m in pool:
+            if len(out) >= upto:
+                return
+            body = " ".join((m.get("text") or "").split())
+            if not body or body[:60] in seen:
+                continue
+            seen.add(body[:60])
+            out.append(m)
+
+    take(first, first_slots)
+    take(rest, n)
+    take(first, n)
+    return sorted(out, key=reach, reverse=True)
+
+
 def build_news_block(db, latest: str, window_since: str, msgs: list[dict]) -> list[str]:
     """'지금 오가는 이야기' 문장이 볼 발췌 + 화제 종목. 창에 글이 없으면 빈 목록(총평은 그대로 나간다).
+
+    발췌는 국내 종목 글을 NEWS_KR_SLOTS 건 먼저 싣고, 미국 종목만 다룬 글은 뺀다(그 주석).
 
     `msgs` 는 load_messages_since 가 준 창 안 메시지(main 이 한 번 읽어 넘긴다).
     """
@@ -1420,12 +1476,35 @@ def build_news_block(db, latest: str, window_since: str, msgs: list[dict]) -> li
 
     # 널리 퍼진 순 = 조회 + 확산×3. 종목 리포트의 [대표 메시지 발췌]와 같은 가중치라
     # 두 문장이 같은 기준으로 '화제'를 고른다.
-    picked.sort(key=lambda m: (m.get("views") or 0) + (m.get("forwards") or 0) * 3, reverse=True)
+    picked.sort(key=reach, reverse=True)
+    # 국내 종목 글을 먼저 싣고 미국 종목만 다룬 글은 뺀다(NEWS_KR_SLOTS 주석). 태그를 못 읽으면
+    # 예전처럼 도달 순으로만 고른다.
+    ranked = picked[:NEWS_TAG_CANDIDATES]
+    counts = market_counts(db, [(m["channel_handle"], m["message_id"]) for m in ranked])
+    if counts:
+        kr_n, us_n = counts
+
+        def tags(m: dict) -> tuple[int, int]:
+            key = (m["channel_handle"], m["message_id"])
+            return kr_n.get(key, 0), us_n.get(key, 0)
+
+        dropped = sum(1 for m in ranked if is_us_only(*tags(m)))
+        ranked = [m for m in ranked if not is_us_only(*tags(m))]
+        first = [m for m in ranked if is_kr_led(*tags(m))]
+        rest = [m for m in ranked if not is_kr_led(*tags(m))]
+    else:
+        dropped, first, rest = 0, [], ranked
     # 본문은 이긴 것만 받는다(load_messages_since 주석 참고). 6건이 아니라 넉넉히 부르는
-    # 이유는 공백뿐인 본문이 섞일 수 있어서다 — 예전엔 그걸 정렬 전에 걸렀다.
-    head = picked[:NEWS_EXCERPT_CANDIDATES]
-    attach_texts(db, head)
-    excerpts = [m for m in head if (m.get("text") or "").strip()][:NEWS_EXCERPTS]
+    # 이유는 공백뿐인 본문과 복붙한 같은 글이 섞일 수 있어서다.
+    first, rest = first[:NEWS_EXCERPT_CANDIDATES], rest[:NEWS_EXCERPT_CANDIDATES]
+    attach_texts(db, first + rest)
+    excerpts = choose_excerpts(first, rest, NEWS_EXCERPTS, NEWS_KR_SLOTS)
+    first_ids = {id(m) for m in first}
+    print(
+        f"[오간 이야기] 발췌 {len(excerpts)}건 중 국내 종목 글 "
+        f"{sum(1 for m in excerpts if id(m) in first_ids)}건 "
+        f"(도달 상위 {len(picked[:NEWS_TAG_CANDIDATES])}건에서 미국 종목만 다룬 글 {dropped}건 제외)"
+    )
     out = ["", f"[{span} 오간 이야기] 조회·확산 상위 {NEWS_EXCERPTS}건 (표본 {len(picked)}건)"]
     for m in excerpts:
         out.append(f"- {readable_counts(' '.join((m.get('text') or '').split()))[:200]}")
@@ -1462,7 +1541,7 @@ def build_schedule_block(db, latest: str, window_since: str) -> list[str]:
         rows = load_keyset(
             db,
             "telegram_messages",
-            "id,posted_at,text,views,forwards",
+            "id,channel_handle,message_id,posted_at,text,views,forwards",
             narrow=lambda q: q.gte(
                 "posted_at",
                 f"{(date.fromisoformat(window_since) - timedelta(days=1)).isoformat()}T00:00:00Z",
@@ -1481,11 +1560,18 @@ def build_schedule_block(db, latest: str, window_since: str) -> list[str]:
             continue
         hits.append(
             {
+                "key": (r["channel_handle"], r["message_id"]),
                 "dart": bool(_SCHED_DART.search(text)),
-                "reach": (r.get("views") or 0) + (r.get("forwards") or 0) * 3,
+                "reach": reach(r),
                 "text": schedule_excerpt(text, base),
             }
         )
+    # 미국 종목만 다룬 일정은 뺀다(common/market_tags). 2026-09-24·25 국장 총평 넷째 대목이
+    # 네비우스 GPU 렌탈가 인상·메타 레이밴 출시였다. 태그 없는 일정(FOMC·CPI)은 남는다.
+    counts = market_counts(db, [h["key"] for h in hits])
+    if counts:
+        kr_n, us_n = counts
+        hits = [h for h in hits if not is_us_only(kr_n.get(h["key"], 0), us_n.get(h["key"], 0))]
     if not hits:
         return []
 
