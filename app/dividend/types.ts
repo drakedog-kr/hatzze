@@ -1,3 +1,4 @@
+import type { IconName } from "@/lib/icon-names";
 /**
  * 서버(page.tsx)가 브라우저(DividendCalculator)로 내려보내는 종목 한 줄.
  *
@@ -96,7 +97,7 @@ export type BasketLite = {
   title: string;
   desc: string;
   rules: string[];
-  icon: string;
+  icon: IconName;
   codes: string[];
   /** 줄 오른쪽에 적는 숫자의 종류(lib/dividend.ts 의 BasketMeta). */
   meta: "streak" | "yield" | "growth" | "months" | "growthYears" | "payout" | "discount" | "septax";

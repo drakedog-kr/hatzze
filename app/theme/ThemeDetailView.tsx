@@ -19,6 +19,7 @@ import type { ThemeMarket } from "./market";
 import { ReasonWeeks } from "./ReasonWeeks";
 import { stockTone, usualDeltaText } from "./Treemap";
 import { ShareBar } from "./ShareBar";
+import { BackTrail } from "@/components/back-trail";
 
 /**
  * 테마 하나의 화면 본문 — **국장(/theme/[테마])과 미장(/theme/us/[테마])이 같이 쓴다.** 자료는 각자 읽어(lib/theme-page.ts ·
@@ -187,14 +188,7 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
   return (
     <div className="hz-tx">
       {/* 목록으로 돌아가는 줄. 내부자 리포트 상세(app/insider/stock)와 같은 자리·같은 꼴(2026-09-21). */}
-      <Link
-        href={market.indexHref}
-        className="hz-theme-textlink"
-        style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 4, fontSize: "var(--fs-12)", fontWeight: 700, textDecoration: "none" }}
-      >
-        <Icon name="chevron_left" style={{ fontSize: "var(--fs-16)" }} />
-        {market.indexLabel}
-      </Link>
+      <BackTrail parent={{ name: market.indexLabel, href: market.indexHref }} current={theme} />
 
       {/* ── 히어로 ── 세 칸. 테마 정체 · 최근 사흘 점유율 · 30일 추이. 제목(h1)은 셸이 위에 그린다. */}
       <section className="hz-sheet">

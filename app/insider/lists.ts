@@ -1,3 +1,4 @@
+import type { IconName } from "@/lib/icon-names";
 /**
  * 내부자 리포트의 **전체보기 페이지 명단** — 카드 여섯 장과 1:1 이다.
  *
@@ -26,7 +27,7 @@ export type InsiderListSpec = {
   /** 알약 물음표의 툴팁. 카드의 noteHelp 와 같다. */
   help: string;
   /** 목록 아이콘. 카드의 것과 같다. */
-  icon: string;
+  icon: IconName;
 };
 
 export const INSIDER_LIST_SLUGS: InsiderListSlug[] = ["exec", "congress", "adds", "trims", "hot", "holders", "managers", "analyst"];

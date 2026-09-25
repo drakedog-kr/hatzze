@@ -1,6 +1,8 @@
 // 대시보드와 셸(사이드바/탑바)이 공유하는 UI 프리미티브.
 // 색은 전부 CSS 변수(app/globals.css)를 참조하므로, data-theme 전환 시 사용처를
 // 하나도 안 건드리고 라이트/다크가 함께 바뀐다.
+import type { IconName } from "@/lib/icon-names";
+
 export const C = {
   cold: "var(--c-cold)", // 저온
   neutral: "var(--c-neutral)", // 상온
@@ -109,7 +111,7 @@ export function Icon({
   style,
   className,
 }: {
-  name: string;
+  name: IconName;
   style?: React.CSSProperties;
   className?: string;
 }) {

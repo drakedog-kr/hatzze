@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { assertLoaded } from "@/lib/load-state";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { getManagerDetail } from "@/lib/insider-detail";
@@ -22,6 +21,7 @@ import {
   wideManagerExitedRows,
   wideManagerHoldingRows,
 } from "../../parts";
+import { BackTrail } from "@/components/back-trail";
 
 /**
  * 거물 한 명의 상세 — 무엇을 들고 있고, 이번 분기에 무엇을 바꿨나.
@@ -162,22 +162,7 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
     // (규칙은 globals.css 의 `[data-cur-default]`).
     <div className="hz-tx" data-cur-default="usd">
       <LoadFailedNote sources={d.failedSources} />
-      <Link className="hz-back-link"
-        href="/insider"
-        style={{
-          alignSelf: "flex-start",
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 4,
-          fontSize: "var(--fs-12)",
-          fontWeight: 700,
-          color: C.sub,
-          textDecoration: "none",
-        }}
-      >
-        <Icon name="chevron_left" style={{ fontSize: "var(--fs-16)" }} />
-        내부자 리포트
-      </Link>
+      <BackTrail parent={{ name: "내부자 리포트", href: "/insider" }} current={d.person} />
 
       <section className="hz-sheet">
         <div className="hz-kd-hero">

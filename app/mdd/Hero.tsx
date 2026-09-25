@@ -470,8 +470,11 @@ export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodL
             key={i}
             className={`hz-tip hz-vline${edge}`}
             data-tip={`${p.date} · ${fmtPrice(p.close, market)} · 고점 대비 ${fmtPct(p.dd)}`}
-            style={{ flex: 1, position: "relative" }}
-          />
+            // 선·호버 점을 실제 점 자리(칸 폭의 i/(n−1))에 세운다(app/home/parts.tsx AreaChart 와 같은 셈).
+            style={{ flex: 1, position: "relative", ["--hz-x" as string]: `${at * 100}%` }}
+          >
+            <span className="hz-vdot" style={{ top: `${(p.dd / floor) * 100}%`, background: DOWN_BAR[1] }} />
+          </div>
         );
       })}
     </div>

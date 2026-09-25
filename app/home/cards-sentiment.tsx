@@ -4,6 +4,7 @@ import { formatIndicatorValue, formatSampleCount, sentimentTone, shortDate } fro
 import { C, Icon, MONO, R } from "../ui";
 import { overheatColor, Shell, TitleRow, Big, Foot, HeatFill, AreaChart } from "./parts";
 import type { Pick } from "./parts";
+import type { IconName } from "@/lib/icon-names";
 
 // 신용융자 잔고 — DB 미보유 placeholder ("준비 중").
 // 목업은 점선 상승 곡선이 아니라 **점선 상자 + 모래시계**다. 곡선은 "이런 모양일 것"이라는
@@ -200,7 +201,7 @@ export function CardDivergence({ v }: { v: Pick }) {
 //  · 없으면 값 + 초고온 기준선까지의 진행 막대
 // 목업이 스파크라인을 걷어냈다. 30일 선은 "언제 뛰었나"를 말하는데, 이 셋의 질문은
 // "지금 얼마나 뜨거운가" 하나뿐이라 기준선까지의 거리가 그 답을 그대로 그린다.
-export function CardTrend({ v, icon }: { v: Pick; icon: string }) {
+export function CardTrend({ v, icon }: { v: Pick; icon: IconName }) {
   const vsAvg = v.details?.vs_avg ?? null;
   const arrow = vsAvg === null || vsAvg === 1 ? "" : vsAvg > 1 ? "↑" : "↓";
   // 진행 막대는 0 ~ 초고온 진입선을 축으로 쓴다. 카드가 "기준선 N"이라고 적는 그 값이다.
@@ -306,7 +307,7 @@ export function CardSentiment({
   countNoun,
 }: {
   v: Pick;
-  icon: string;
+  icon: IconName;
   countNoun: string;
 }) {
   const raw = v.raw ?? 0;
@@ -436,7 +437,7 @@ export function CardYoutube({ v }: { v: Pick }) {
 // 여윳돈이 향하는 곳 — 명품·수입차 + 오마카세·파인다이닝. 지표 둘이 한 카드에 들어가는
 // 유일한 카드다. 목업은 세로 구분선으로 반 가르지 않고 **두 줄을 위아래로** 쌓고,
 // 눈금 라벨(적음·평소·많음)은 아래쪽 한 번만 적는다.
-function SubSpend({ v, icon, showScale }: { v: Pick; icon: string; showScale: boolean }) {
+function SubSpend({ v, icon, showScale }: { v: Pick; icon: IconName; showScale: boolean }) {
   const ratio = v.details?.vs_avg ?? null;
   // 화살표와 색이 **같은 경계**를 써야 한다. 예전엔 화살표가 `ratio === 1` 로만 갈려서,
   // 0.98배(화면엔 "1.0배")가 색은 중립인데 화살표만 ↓ 로 떴다 — 한 줄이 두 말을 했다.

@@ -1,0 +1,270 @@
+/* shadcn/ui 부품의 모양 — components/ui/* 가 붙이는 `cn-*` 클래스를 여기서 입힌다.
+
+   shadcn 2026 판은 부품 소스(동작)와 스타일 CSS(모양)를 나눠 둔다. 모양은 rhea 스타일(2026-05,
+   "촘촘한 Luma, 집중형 제품 화면용")에서 이 사이트가 쓰는 부품 규칙만 옮겼다. 색은 전부 역할 이름
+   (bg-popover · text-muted-foreground …)이라 theme.css 의 이름표를 거쳐 우리 색으로 그려진다.
+
+   ⭐ `@layer components` 안에 둔다. 부품이 className 으로 넘기는 유틸리티(layer utilities)가 이 규칙을
+      덮어야 shadcn 의 의도대로 된다 — 예: CommandDialog 가 넘기는 `top-1/3` 이 대화상자의 `top-1/2` 를 덮는다.
+      이 사이트의 hz-* 규칙은 레이어 밖이라 여기와 부딪히지 않는다(클래스 이름도 겹치지 않는다).
+   ⚠️ 새 부품을 들일 땐 그 부품의 cn-* 규칙을 rhea 스타일에서 같이 옮길 것. 없으면 틀만 있고 모양이 빈다. */
+
+/* Base UI 상태 속성용 변형 — shadcn 이 `shadcn/tailwind.css` 에 따로 두는 것을 그대로 옮겼다. */
+@custom-variant data-open {
+  &:where([data-state="open"]),
+  &:where([data-open]:not([data-open="false"])) {
+    @slot;
+  }
+}
+@custom-variant data-closed {
+  &:where([data-state="closed"]),
+  &:where([data-closed]:not([data-closed="false"])) {
+    @slot;
+  }
+}
+@custom-variant data-selected {
+  &:where([data-selected="true"]) {
+    @slot;
+  }
+}
+@custom-variant data-disabled {
+  &:where([data-disabled="true"]),
+  &:where([data-disabled]:not([data-disabled="false"])) {
+    @slot;
+  }
+}
+
+@utility no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer components {
+  /* ── Dialog ── */
+  .cn-dialog-overlay {
+    @apply data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 bg-black/30 duration-100 supports-backdrop-filter:backdrop-blur-sm;
+  }
+  .cn-dialog-content {
+    @apply bg-popover text-popover-foreground data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/5 dark:ring-foreground/10 grid max-w-[calc(100%-2rem)] gap-6 rounded-[min(var(--radius-4xl),24px)] p-6 text-sm shadow-xl ring-1 duration-100 sm:max-w-md;
+  }
+  .cn-dialog-close {
+    @apply text-muted-foreground hover:bg-muted hover:text-foreground absolute top-3 right-3 inline-flex size-8 cursor-pointer items-center justify-center rounded-xl;
+  }
+  .cn-dialog-header {
+    @apply gap-1.5;
+  }
+  .cn-dialog-title {
+    @apply text-base leading-none font-medium;
+  }
+  .cn-dialog-description {
+    @apply text-muted-foreground text-sm;
+  }
+
+  /* ── Command ── */
+  .cn-command {
+    @apply bg-popover text-popover-foreground rounded-3xl p-1;
+  }
+  .cn-command-dialog {
+    @apply rounded-3xl! p-0;
+  }
+  .cn-command-input-wrapper {
+    @apply p-1 pb-0;
+  }
+  .cn-command-input-group {
+    @apply bg-input/50 h-8!;
+  }
+  .cn-command-input {
+    @apply w-full text-sm;
+  }
+  .cn-command-input-icon {
+    @apply size-4 shrink-0 opacity-50;
+  }
+  .cn-command-list {
+    @apply no-scrollbar max-h-72 scroll-py-1 outline-none;
+  }
+  .cn-command-empty {
+    @apply py-6 text-center text-sm;
+  }
+  .cn-command-group {
+    @apply text-foreground **:[[cmdk-group-heading]]:text-muted-foreground overflow-hidden p-1 **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-1.5 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:font-medium;
+  }
+  .cn-command-separator {
+    @apply bg-border/50 my-1 h-px;
+  }
+  /* 고른 줄은 rhea 의 bg-muted 가 아니라 사이드바 '지금 보는 항목'과 같은 파란 틴트다. muted(--c-soft)는
+     흰 창 위에서 1.06 이라 Enter 로 열릴 줄이 거의 안 보였다(실측). */
+  .cn-command-item {
+    @apply data-selected:bg-(--c-blue-tint) data-selected:text-(--c-cold-ink) relative flex min-h-7 cursor-default items-center gap-2 rounded-xl px-2 py-1.5 text-sm outline-hidden select-none in-data-[slot=dialog-content]:rounded-2xl;
+  }
+  .cn-command-shortcut {
+    @apply text-muted-foreground group-data-selected/command-item:text-(--c-cold-ink) ml-auto text-xs tracking-widest;
+  }
+
+  /* ── InputGroup(검색칸 틀) ── */
+  .cn-input-group {
+    @apply bg-input/50 h-8 rounded-2xl border border-transparent transition-[color,box-shadow] duration-200 has-[>[data-align=inline-start]]:[&>input]:pl-1.5;
+  }
+  .cn-input-group-addon {
+    @apply text-muted-foreground h-auto gap-2 py-1.5 text-sm font-medium;
+  }
+  .cn-input-group-addon-align-inline-start {
+    @apply pl-2;
+  }
+
+  /* ── Breadcrumb ── */
+  .cn-breadcrumb-list {
+    @apply text-muted-foreground gap-1.5 text-sm sm:gap-2.5;
+  }
+  .cn-breadcrumb-item {
+    @apply gap-1.5;
+  }
+  .cn-breadcrumb-link {
+    @apply hover:text-foreground transition-colors;
+  }
+  .cn-breadcrumb-page {
+    @apply text-foreground font-normal;
+  }
+  .cn-breadcrumb-separator {
+    @apply inline-flex items-center;
+  }
+
+  /* ── Empty ── */
+  .cn-empty {
+    @apply gap-4 rounded-3xl p-12;
+  }
+  .cn-empty-header {
+    @apply gap-2;
+  }
+  .cn-empty-media {
+    @apply mb-2;
+  }
+  .cn-empty-media-default {
+    @apply bg-transparent;
+  }
+  .cn-empty-media-icon {
+    @apply bg-muted text-foreground flex size-10 shrink-0 items-center justify-center rounded-xl;
+  }
+  .cn-empty-title {
+    @apply text-lg font-medium tracking-tight;
+  }
+  .cn-empty-description {
+    @apply text-sm/relaxed;
+  }
+
+  /* ── Kbd ── */
+  .cn-kbd {
+    @apply bg-muted text-muted-foreground h-5 w-fit min-w-5 gap-1 rounded-lg px-1 font-sans text-xs font-medium;
+  }
+  .cn-kbd-group {
+    @apply gap-1;
+  }
+}
+
+/* ── 이 사이트의 툴팁에 shadcn 을 입히는 자리 ─────────────────────────────────
+   아래는 레이어 **밖**이다 — 덮을 상대(.hz-tip::after, sheets.css)가 레이어 밖이라 여기도 밖이어야 이긴다.
+   이 파일이 globals.css 맨 끝에서 불리므로 같은 세기의 선택자면 여기가 뒤다. */
+
+/* 차트 크로스헤어 툴팁은 shadcn ChartTooltip 꼴 — 흰 카드 · 옅은 테두리 · 큰 그림자 · 숫자 폭 고정.
+   도움말 툴팁(진한 알약 = shadcn Tooltip 꼴, 원래 모양 그대로)과 한눈에 갈린다. 일곱 차트가 이 한 규칙을 쓴다. */
+.hz-vline::after {
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid color-mix(in oklab, var(--foreground) 10%, transparent);
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  border-radius: 10px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+/* 크로스헤어 선의 자리. 칸 가운데(50%)가 기본이고, 점 자리를 아는 차트(홈 영역 차트)는 --hz-x 로 점 위에 세운다. */
+.hz-vline::before {
+  left: var(--hz-x, 50%);
+}
+/* 크로스헤어의 호버 점(shadcn 영역 차트의 activeDot). 칸에 마우스가 올라가면 그 점이 뜬다. */
+.hz-vdot {
+  position: absolute;
+  left: var(--hz-x, 50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  border: 2px solid var(--card);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+.hz-vline:hover > .hz-vdot,
+.hz-vline.hz-tip-open > .hz-vdot {
+  opacity: 1;
+}
+/* 키보드로 포커스한 툴팁 대상도 연다(마우스 호버와 같은 글). 포커스를 받는 링크·단추에만 걸린다. */
+.hz-tip:focus-visible::after {
+  content: attr(data-tip);
+  opacity: 1;
+}
+
+
+/* ── 사이드바 접기(shadcn sidebar-07, collapsible="icon") ─────────────────────────
+   `<html data-sidebar="icon">` 일 때 사이드바를 64px 아이콘 막대로 줄인다(단추: AppShell.tsx SidebarToggle).
+   사이드바는 인라인 style 로 폭·여백을 쥐고 있어 여기서 !important 로 덮는다 — 인라인이 CSS 를 이긴다.
+   글자 칸은 .hz-side-text 로 표시해 두고 통째로 숨기며, 항목 이름은 마우스를 올리면 오른쪽에 띄운다(data-label).
+   ⚠️ 접힌 막대는 짧아서 넘칠 일이 없으니 overflow 를 풀어 준다 — 스크롤 영역이면 오른쪽 이름표가 잘린다. */
+html[data-sidebar="icon"] .hz-sidebar {
+  width: 64px !important;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+  overflow: visible !important;
+}
+html[data-sidebar="icon"] .hz-sidebar .hz-side-text {
+  display: none !important;
+}
+/* 로고는 유령 심볼만 남긴다(워드마크는 LogoLockup 의 둘째 칸). 접기 단추는 심볼 아래로 내린다(한 줄에 둘이 안 들어간다).
+   ⚠️ !important 가 필요하다 — 워드마크 칸이 인라인 display 를 들고 있어 그냥 두면 인라인이 이긴다. 안 먹으면 124px 로고가
+      64px 막대 가운데 놓여 심볼은 왼쪽 밖으로 밀리고 "hatz" 만 보인다(2026-09-25 실제로 그랬다). */
+html[data-sidebar="icon"] .hz-sidebar .hz-logo-link > span > :nth-child(2) {
+  display: none !important;
+}
+html[data-sidebar="icon"] .hz-sidebar .hz-side-logo {
+  flex-direction: column;
+  gap: 14px !important;
+}
+html[data-sidebar="icon"] .hz-sidebar .hz-side-toggle {
+  margin-left: 0;
+  margin-right: 0;
+  position: relative;
+}
+html[data-sidebar="icon"] .hz-sidebar .hz-nav-item,
+html[data-sidebar="icon"] .hz-sidebar .hz-side-toggle,
+html[data-sidebar="icon"] .hz-sidebar .hz-tg-cta {
+  position: relative;
+  justify-content: center;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  gap: 0 !important;
+}
+html[data-sidebar="icon"] .hz-sidebar .hz-nav-item {
+  height: 40px;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+html[data-sidebar="icon"] .hz-sidebar [data-label]:hover::after {
+  content: attr(data-label);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--c-ink);
+  color: var(--c-bg);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  line-height: 1.5;
+  padding: 6px 9px;
+  border-radius: var(--r-control);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 40;
+}
+

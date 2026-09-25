@@ -6,6 +6,7 @@ import AppShell from "./AppShell";
 import { THEME_PUBLIC } from "./screen-flags";
 import { SLOGAN } from "./brand";
 import { SITE_NAME, SITE_URL, pageMetadata } from "./seo";
+import { ICON_FONT_HREF } from "@/lib/icon-names";
 
 const pretendard = localFont({
   src: "../node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2",
@@ -128,7 +129,7 @@ const THEME_COLOR = { light: "#e8f0fa", dark: "#101013" } as const;
  * mobile.css 의 `[data-cur-default]`). "안 고름"과 "원화 고름"을 반드시 갈라야 한다 —
  * 안 가르면 /insider 에서 ₩ 를 눌러도 다시 달러로 돌아간다.
  */
-const PREF_SCRIPT = `(function(){try{var c=document.cookie.split("; "),t,u;for(var i=0;i<c.length;i++){var p=c[i].split("=");if(p[0]==="hz-theme")t=p[1];else if(p[0]==="hz-cur")u=p[1];}var d=document.documentElement;if(t==="dark"){d.setAttribute("data-theme","dark");var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",${JSON.stringify(THEME_COLOR.dark)});}if(u==="usd"||u==="krw")d.setAttribute("data-cur",u);}catch(e){}})();`;
+const PREF_SCRIPT = `(function(){try{var c=document.cookie.split("; "),t,u,s;for(var i=0;i<c.length;i++){var p=c[i].split("=");if(p[0]==="hz-theme")t=p[1];else if(p[0]==="hz-cur")u=p[1];else if(p[0]==="hz-side")s=p[1];}var d=document.documentElement;if(s==="icon")d.setAttribute("data-sidebar","icon");if(t==="dark"){d.setAttribute("data-theme","dark");var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",${JSON.stringify(THEME_COLOR.dark)});}if(u==="usd"||u==="krw")d.setAttribute("data-cur",u);}catch(e){}})();`;
 
 export default function RootLayout({
   children,
@@ -162,10 +163,8 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&display=swap"
           rel="stylesheet"
         />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0..1,0&display=block"
-          rel="stylesheet"
-        />
+        {/* 아이콘은 쓰는 것만 잘라 받는다(lib/icon-names.ts). */}
+        <link href={ICON_FONT_HREF} rel="stylesheet" />
         {/* 기기별 수집 제외 스위치. ?ga=off 로 한 번 들어온 기기는 gtag 의 공식
             무력화 플래그(ga-disable-<측정ID>)가 켜져 히트를 아예 보내지 않는다.
             ?ga=on 이면 해제. 상태를 localStorage 에 남기므로 IP 가 매번 바뀌는
