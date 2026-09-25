@@ -304,3 +304,42 @@ def test_gs_stock_mentions_survive(text):
 def test_gs_affiliate_survives_goldman_attribution():
     # 단서는 '승격 뒤에' 본다 — `GS 건설`은 GS건설이지 지주사 GS 가 아니라 단서와 무관하다.
     assert _gs("GS 건설 수주 전망 (GS)") == {"006360"}
+
+
+# ── 2026-09-25 저녁: `(GS)` 뒤에도 남은 골드만 표기 ─────────────────────────────────────
+# GS 태그 전량 863건 중 `(GS)` 가 78건을 막고 남은 785건을 다 읽어 골드만 85건을 찾았다. 여러 채널에
+# 복붙된 묶음 자리를 그대로 둔다(근거는 config.US_TICKER_COLLISION 주석).
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "순이익 528억 (est. 303억)\n※단위 : 위안\n※est는 GS의 추정치(26.08.24)",
+        "GS 8월 APAC Conviction buy list에 삼성전자 신규편입",
+        "자사주 매입/소각 발표에 대한 글로벌 5대 IB(JPM, 노무라, Citi, BofA, GS)의 보고서.",
+        "Sandisk 인베스터 데이 주요 포인트 (GS, 미즈호, 에버코어 종합)\n\n1. 장기 재무 목표",
+        "HBM Sell side 컨센서스 (vs. GSe)\n\n1. 2026년 전망\n• GS의 HBM 출하량 성장률 전망치는",
+        "GS DRAM 센티먼트 지표: 강세/약세 논쟁 지속\n• 3분기 15~20% 성장이라는 컨센서스가 GS 전망치와 부합",
+        "삼성전자, 메모리 리더십과 주주환원 기대 (GS, JPM)\n\n1. 실적 부합 및 견조한 메모리 업황",
+        "AI 시대(2023년 1월 이후) 통틀어 가장 낮은 수준. <차트 출처: GS, Bloomberg>",
+        "한국 주주환원\n\n골드만\n\nGS는 한국 이익 성장을 올해 +350%, 2027년 +35%로 재차 상향",
+        "골드만 투자의견: Buy (Conviction List) 유지\nS-Oil은 GS 아시아 커버리지 내 정유 플레이 중 하나.",
+    ],
+)
+def test_goldman_residual_forms_are_not_gs(text):
+    assert _gs(text) == set()
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # IB 이름을 혼자 단서로 쓰면 죽는 진짜 언급 — 국내 다이제스트에 IB 전망이 같이 실린다.
+        "뱅크오브아메리카(BofA)는 하이퍼스케일러 자본지출 전망을 올렸다.\n"
+        "1단계 8.4GW는 SK, GS, 네이버가 참여할 예정(SK 5GW, GS 2.4GW, 네이버 1GW)",
+        "• Interactive Brokers(IBKR) +5.52% — 금융주 신고가\n• 현대해상, GS +6.28%",
+        # `GS 컨퍼런스` 를 단서로 못 쓰는 까닭 — 지주사 실적 발표.
+        "GS 컨퍼런스콜 주요 내용: 동해 AIDC 1.2GW",
+    ],
+)
+def test_gs_mentions_beside_ib_names_survive(text):
+    assert _gs(text) == {"078930"}
