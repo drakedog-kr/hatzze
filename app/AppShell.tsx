@@ -473,7 +473,7 @@ function NavGroupLabel({ label, first, inset }: { label: string; first: boolean;
       role="presentation"
       className="hz-side-text"
       style={{
-        margin: first ? "0 0 -2px" : "12px 0 -2px",
+        margin: first ? "0 0 -2px" : "8px 0 -2px",
         padding: `0 ${inset}px`,
         fontSize: "var(--fs-12)",
         fontWeight: 600,
@@ -684,10 +684,10 @@ function SidebarToggle() {
   return (
     <button
       type="button"
-      className="hz-side-toggle text-muted-foreground hover:bg-accent hover:text-foreground ml-auto inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg"
+      className="hz-side-toggle text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg"
+      title={icon ? "사이드바 펼치기" : "사이드바 접기"}
       aria-label={icon ? "사이드바 펼치기" : "사이드바 접기"}
       aria-pressed={icon}
-      data-label={icon ? "펼치기" : "접기"}
       onClick={() => {
         const next = !icon;
         const d = document.documentElement;
@@ -703,7 +703,8 @@ function SidebarToggle() {
 }
 
 /**
- * 사이드바의 검색 단추. shadcn 사이드바 블록의 검색칸 꼴이다(누르면 ⌘K 창이 열린다).
+ * 페이지 머리 오른쪽의 검색 단추. shadcn 사이트 머리의 검색 단추 꼴이다(누르면 ⌘K 창이 열린다).
+ * 처음엔 사이드바에 뒀는데 사이드바가 노트북 높이를 넘겨 스크롤이 생겨 옮겼다(2026-09-25).
  * 단축키 표시는 맥이면 ⌘K, 아니면 Ctrl K. 서버는 맥 표기로 그리고 붙은 뒤 고친다.
  */
 function SearchTrigger() {
@@ -719,13 +720,11 @@ function SearchTrigger() {
       onPointerEnter={preloadCommandMenu}
       onFocus={preloadCommandMenu}
       aria-label="검색"
-      data-label="검색"
-      className="hz-side-search border-border text-muted-foreground hover:bg-accent flex h-9 w-full shrink-0 bg-transparent cursor-pointer items-center gap-2 rounded-xl border px-3 text-[13px] transition-colors"
-      style={{ margin: "-18px 0 -14px" }}
+      className="hz-head-search border-border text-muted-foreground hover:bg-accent flex h-9 w-52 shrink-0 cursor-pointer items-center gap-2 rounded-xl border bg-transparent px-3 text-[13px] transition-colors"
     >
       <Icon name="search" style={{ fontSize: 17 }} />
-      <span className="hz-side-text">검색</span>
-      <Kbd className="hz-side-text ml-auto">{mac ? "⌘K" : "Ctrl K"}</Kbd>
+      <span>화면·테마·종목 검색</span>
+      <Kbd className="ml-auto">{mac ? "⌘K" : "Ctrl K"}</Kbd>
     </button>
   );
 }
@@ -758,12 +757,13 @@ function Sidebar() {
         background: C.card,
         borderRight: `1px solid var(--c-divider)`,
         padding: "28px 14px 20px",
-        gap: 34,
-        // 창 높이가 사이드바보다 낮으면(1366×768 노트북에서 이미 14px 넘쳐 맨 아래 텔레그램 칸이
-        // 잘렸다) 사이드바 안에서 스크롤한다. shadcn 사이드바와 같은 처리다. 높으면 아무 일도 없다.
+        // 28: 묶음 머리를 넣으며 사이드바가 782 → 930px 로 늘어 노트북에서 스크롤이 생겼다(2026-09-25). 줄 여백과 함께 줄였다.
+        gap: 28,
+        // 내용 높이는 746px 다(2026-09-25 실측, 프로덕션 782). 창이 그보다 낮을 때만(1366×768 노트북 등) 사이드바
+        // 안에서 스크롤한다 — 예전엔 맨 아래 텔레그램 칸이 잘렸다. 막대는 숨긴다(보이면 어수선하다는 지적).
         overflowY: "auto",
         overscrollBehavior: "contain",
-        scrollbarWidth: "thin",
+        scrollbarWidth: "none",
       }}
     >
       <div style={{ padding: "0 6px" }}>
@@ -780,14 +780,12 @@ function Sidebar() {
           <span className="hz-side-text" style={{ display: "inline-flex" }}>
             <BetaBadge logoSize={30} style={{ height: "auto", fontSize: "var(--fs-10)", padding: "3px 7px", lineHeight: 1.4 }} />
           </span>
-          <SidebarToggle />
         </LogoTag>
         <p className="hz-side-text" style={{ margin: "8px 0 0", fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub, letterSpacing: "0.02em", lineHeight: 1.5 }}>
           {SLOGAN}
         </p>
       </div>
-      <SearchTrigger />
-      <nav style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {sidebarItems(env).map((row) => {
           if (row.kind === "group") return <NavGroupLabel key={`g-${row.label}`} label={row.label} first={row.first} inset={12} />;
           if (row.kind === "soon") {
@@ -801,7 +799,7 @@ function Sidebar() {
                   display: "flex",
                   alignItems: "center",
                   gap: 12,
-                  padding: "11px 12px",
+                  padding: "8px 12px",
                   color: C.disabled,
                   fontWeight: 600,
                   borderRadius: R.nav,
@@ -845,7 +843,7 @@ function Sidebar() {
               gap: 10,
               // 좌패딩(12) + 아이콘(20) + 간격(12) = 44 → 서브 아이콘이 **부모 라벨의 x** 에서
               // 시작한다. 예전 34 는 부모 아이콘과 라벨 사이 어중간한 자리였다(2026-09-04).
-              padding: "8px 12px 8px 44px",
+              padding: "6px 12px 6px 44px",
               borderRadius: R.nav,
             } as const;
             if (!child.href) {
@@ -916,7 +914,7 @@ function Sidebar() {
                 display: "flex",
                 alignItems: "center",
                 gap: 12,
-                padding: "11px 12px",
+                padding: "8px 12px",
                 // 활성 항목의 바탕·글자색은 여기 없다 — globals.css 의 .hz-nav-active 가 든다
                 // (옅은 하늘색 타일 + 파란 잉크, 2026-09-04 리디자인. 8월 목업의 꽉 찬 파랑
                 // 알약은 그 칸만 무거워 배너처럼 읽혔다).
@@ -958,9 +956,9 @@ function Sidebar() {
           색은 C.sub(다른 항목) 보다 한 단 흐린 C.disabled 로. 호버해 보기 전에도
           "지금은 아닌 것"이 보여야 한다. */}
 
-      <div style={{ flex: 1 }} />
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {/* 바닥에 붙인다(margin-top:auto). 예전엔 flex:1 빈 칸을 끼웠는데 그 칸도 간격(28)을 하나 더 먹었다. */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: "auto" }}>
         {/* 라벨은 바뀌었어도 data-ga-cta 는 "community" 그대로 둔다 — 값을 같이 바꾸면
             이름 변경 전후의 클릭수를 한 줄로 비교할 수 없다. 탭바·푸터도 같은 값이다. */}
         <a
@@ -1479,6 +1477,11 @@ function PageHeader() {
           그 안에 콘솔 리디자인의 배지를 넣는다 — 둘은 서로 독립이다. */}
       {/* ⚠️ `page` 만으로는 부족하다 — NAV 에 없고 DEEP_PAGES 에만 있는 화면
           (아직 안 연 /preview)이 제목 칸을 통째로 비운다. */}
+      {/* 왼쪽: 사이드바 접기 단추 + 제목. shadcn 대시보드 머리(SidebarTrigger 다음 제목)와 같은 자리다. */}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12, minWidth: 0, flex: 1 }}>
+      <span className="hz-side-toggle-slot" style={{ marginTop: 2 }}>
+        <SidebarToggle />
+      </span>
       {(page || deep) && (
         <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
           {/* 배지는 제목과 같은 줄, 세로 가운데 정렬. baseline 으로 두면 알약의 **글자**
@@ -1515,14 +1518,14 @@ function PageHeader() {
           <p style={{ margin: 0, fontSize: "var(--fs-14)", lineHeight: 1.5, color: C.sub, wordBreak: "keep-all" }}>{sub}</p>
         </div>
       )}
-      {/* 제목이 없을 때 도구가 왼쪽으로 붙지 않도록. justify-content:space-between 은
-          자식이 하나면 그 하나를 왼쪽 끝에 둔다. */}
-      {!page && <div style={{ flex: 1 }} />}
-      {/* 오른쪽 도구는 테마 토글 하나다. 검색창·알림 벨·프로필 칩은 걷었다 —
-          셋 다 기능이 없어 모양만 있는 자리였고(2026-08-03), 로그인이 없는
-          서비스라 프로필 칩은 앞으로도 가리킬 대상이 없다. */}
-      <div className="hz-page-tools">
-        <PageTools />
+      </div>
+      {/* 오른쪽: 검색 단추(⌘K) + 도구. 2026-08-03 에 모양만 있던 검색창·알림 벨·프로필 칩을 걷었는데,
+          검색은 ⌘K 창이 생겨 실제로 동작하는 단추로 돌아왔다(2026-09-25). 알림 벨·프로필 칩은 여전히 없다. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <SearchTrigger />
+        <div className="hz-page-tools">
+          <PageTools />
+        </div>
       </div>
     </header>
   );
