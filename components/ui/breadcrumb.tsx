@@ -9,7 +9,7 @@
 import * as React from "react";
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
-import { cn } from "cn";
+import { cx as cn } from "@/lib/cx";
 
 import { Icon } from "@/app/ui";
 

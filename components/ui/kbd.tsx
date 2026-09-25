@@ -1,6 +1,6 @@
 /** shadcn/ui Kbd 를 옮긴 것이다. 모양은 app/styles/shadcn.css 의 `cn-kbd`. */
 import * as React from "react";
-import { cn } from "cn";
+import { cx as cn } from "@/lib/cx";
 
 function Kbd({ className, ...props }: React.ComponentProps<"kbd">) {
   return (

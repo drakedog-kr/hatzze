@@ -21,7 +21,7 @@ import { NewBadge } from "./VersionBadge";
 import GaEvents from "./GaEvents";
 import { TipTap } from "./TipTap";
 import { HolidayGreeting } from "./HolidayGreeting";
-import { CommandMenu, openCommandMenu, type CommandPage } from "@/components/command-menu";
+import { CommandMenu, openCommandMenu, preloadCommandMenu, type CommandPage } from "@/components/command-menu";
 import { Kbd } from "@/components/ui/kbd";
 import type { IconName } from "@/lib/icon-names";
 
@@ -679,6 +679,8 @@ function SearchTrigger() {
     <button
       type="button"
       onClick={openCommandMenu}
+      onPointerEnter={preloadCommandMenu}
+      onFocus={preloadCommandMenu}
       className="border-border text-muted-foreground hover:bg-accent flex h-9 w-full shrink-0 bg-transparent cursor-pointer items-center gap-2 rounded-xl border px-3 text-[13px] transition-colors"
       style={{ margin: "-18px 0 -14px" }}
     >
