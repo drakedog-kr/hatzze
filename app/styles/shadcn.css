@@ -140,3 +140,46 @@
     @apply gap-1;
   }
 }
+
+/* ── 이 사이트의 툴팁에 shadcn 을 입히는 자리 ─────────────────────────────────
+   아래는 레이어 **밖**이다 — 덮을 상대(.hz-tip::after, sheets.css)가 레이어 밖이라 여기도 밖이어야 이긴다.
+   이 파일이 globals.css 맨 끝에서 불리므로 같은 세기의 선택자면 여기가 뒤다. */
+
+/* 차트 크로스헤어 툴팁은 shadcn ChartTooltip 꼴 — 흰 카드 · 옅은 테두리 · 큰 그림자 · 숫자 폭 고정.
+   도움말 툴팁(진한 알약 = shadcn Tooltip 꼴, 원래 모양 그대로)과 한눈에 갈린다. 일곱 차트가 이 한 규칙을 쓴다. */
+.hz-vline::after {
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid color-mix(in oklab, var(--foreground) 10%, transparent);
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  border-radius: 10px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+/* 크로스헤어 선의 자리. 칸 가운데(50%)가 기본이고, 점 자리를 아는 차트(홈 영역 차트)는 --hz-x 로 점 위에 세운다. */
+.hz-vline::before {
+  left: var(--hz-x, 50%);
+}
+/* 크로스헤어의 호버 점(shadcn 영역 차트의 activeDot). 칸에 마우스가 올라가면 그 점이 뜬다. */
+.hz-vdot {
+  position: absolute;
+  left: var(--hz-x, 50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  border: 2px solid var(--card);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+.hz-vline:hover > .hz-vdot,
+.hz-vline.hz-tip-open > .hz-vdot {
+  opacity: 1;
+}
+/* 키보드로 포커스한 툴팁 대상도 연다(마우스 호버와 같은 글). 포커스를 받는 링크·단추에만 걸린다. */
+.hz-tip:focus-visible::after {
+  content: attr(data-tip);
+  opacity: 1;
+}
+

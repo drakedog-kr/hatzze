@@ -613,7 +613,21 @@ export function AreaChart({
           {points.map((pt, i) => {
             const at = i / (points.length - 1);
             const edge = at < 0.25 ? " hz-tip-start" : at > 0.75 ? " hz-tip-end" : "";
-            return <div key={pt.key} className={`hz-tip hz-vline${edge}`} data-tip={tip(pt)} style={{ flex: 1, position: "relative" }} />;
+            // 칸은 n 등분인데 점은 0~100% 를 n−1 등분한 자리에 있다. 칸 안에서 점의 가로 자리는 칸 폭의 i/(n−1) 이다
+            // (첫 칸은 왼쪽 끝, 마지막 칸은 오른쪽 끝). 선(::before)과 호버 점을 그 자리에 세운다 — 예전엔 선이 칸 가운데라
+            // 점과 반 칸쯤 어긋났다.
+            const x = `${at * 100}%`;
+            const dot = baseline === "zero" ? (pt.value >= 0 ? "var(--c-hot)" : "var(--c-blue)") : color;
+            return (
+              <div
+                key={pt.key}
+                className={`hz-tip hz-vline${edge}`}
+                data-tip={tip(pt)}
+                style={{ flex: 1, position: "relative", ["--hz-x" as string]: x }}
+              >
+                <span className="hz-vdot" style={{ top: `${(y(pt.value) / H) * 100}%`, background: dot }} />
+              </div>
+            );
           })}
         </div>
       )}
