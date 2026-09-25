@@ -9,6 +9,7 @@ import { NOTE_PAGE } from "./daily/copy";
 import { DIVIDEND_PAGE } from "./dividend/copy";
 import { KR_THEME_SHORT, THEME_PAGE, US_THEME_PAGE } from "./theme/copy";
 import { DAILY_PUBLIC, DIVIDEND_PUBLIC, SEOHAK_PUBLIC, THEME_NAV_NEW, THEME_PUBLIC } from "./screen-flags";
+import { DOC_PAGES } from "./legal";
 import { THEME_NAMES, US_THEME_NAMES, themeHref, usThemeHref } from "@/lib/theme-href";
 import { ShellEnvContext, useShellEnv, type ShellEnv } from "./shell-env";
 
@@ -639,7 +640,9 @@ function childActive(siblings: NavChild[], child: NavChild, pathname: string): b
  * 명단·문구의 원본은 `app/insider/lists.ts` 다 — 여기서 베끼지 말고 그걸 읽는다.
  * 카드와 전체보기가 같은 말을 해야 독자가 같은 자료로 읽는다.
  */
-const DEEP_PAGES: Record<string, { label: string; sub: string; badge?: string }> = {
+const DEEP_PAGES: Record<string, { label: string; sub: string; badge?: string; ld?: "WebPage" | "none" }> = {
+  // 문서 화면 셋(업데이트 기록·이용약관·개인정보처리방침). 제목을 본문이 아니라 여기서 그려 다른 화면과 자리를 맞춘다(app/legal.tsx).
+  ...DOC_PAGES,
   // 데일리 노트 — 안 연 동안만. NAV 에 없으니(COMING_SOON 은 href 가 없다) 본문 헤더가 제목을
   // 못 찾아 여기서 채운다. 배지가 있어 PageJsonLd 도 안 나간다(noindex 와 맞는다).
   // 열면 DAILY_PUBLIC 이 이 항목을 빼고, NAV 의 /daily 항목이 제목을 준다.
@@ -1472,8 +1475,8 @@ function PageHeader() {
    *
    * ⛔ **아직 안 연 화면('준비 중' 배지)에는 내지 않는다.** 그 화면들은 noindex 라
    *    색인 대상이 아닌데 구조화 데이터만 내면 서로 어긋난 신호가 된다.
-   * ⛔ 제목이 없는 경로(법률 문서)에도 내지 않는다. 저 화면들은 자기 h1 을 따로 갖고
-   *    있고 검색 대상도 아니다.
+   * ⛔ 법률 문서(이용약관·개인정보처리방침)에도 내지 않는다. 검색 대상이 아니다 — DEEP_PAGES 에
+   *    `ld: "none"` 으로 들어 있다(app/legal.tsx DOC_PAGES). 제목은 이제 셸이 그린다(2026-09-26).
    */
   const parent = page && page.href !== pathname ? { name: page.label, path: page.href } : null;
   /**
@@ -1492,16 +1495,16 @@ function PageHeader() {
   const named = Boolean(deep) || child?.href === pathname || page?.href === pathname;
   return (
     <header className="hz-page-head">
-      {named && title && sub && !badge && (
+      {named && title && sub && !badge && deep?.ld !== "none" && (
         <PageJsonLd
           title={title}
           description={sub}
           path={pathname}
           trail={parent ? [parent] : []}
-          kind={deep || pathname.startsWith("/kadera") || pathname === "/insider" ? "CollectionPage" : "WebPage"}
+          kind={deep?.ld === "WebPage" ? "WebPage" : deep || pathname.startsWith("/kadera") || pathname === "/insider" ? "CollectionPage" : "WebPage"}
         />
       )}
-{/* #267 의 가드: NAV 에 없는 경로(법률 문서)에서는 제목 칸을 통째로 비운다.
+{/* #267 의 가드: NAV·DEEP_PAGES 에 없는 경로(종목 상세 등)에서는 제목 칸을 통째로 비운다.
           그 안에 콘솔 리디자인의 배지를 넣는다 — 둘은 서로 독립이다. */}
       {/* ⚠️ `page` 만으로는 부족하다 — NAV 에 없고 DEEP_PAGES 에만 있는 화면
           (아직 안 연 /preview)이 제목 칸을 통째로 비운다. */}

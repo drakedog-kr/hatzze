@@ -10,20 +10,30 @@ import { C, R } from "./ui";
 // 지표 카드와 달리 문장이 길어서, 줄이 길면 다음 줄 첫 글자를 찾기 어려워진다.
 export const DOC_WIDTH = "68ch";
 
-export function DocTitle({ title, effectiveDate }: { title: string; effectiveDate: string }) {
-  return (
-    <>
-      <h1 style={{ margin: 0, fontSize: "var(--fs-24)", fontWeight: 700, color: C.ink, letterSpacing: "-0.01em" }}>
-        {title}
-      </h1>
-      <p style={{ margin: "10px 0 0", fontSize: "var(--fs-13)", color: "var(--c-muted)" }}>시행일 · {effectiveDate}</p>
-    </>
-  );
-}
+/** 이용약관·개인정보처리방침 시행일. 본문 마지막 조항과 셸의 제목 아래 줄(DOC_PAGES)이 같이 쓴다. */
+export const TERMS_EFFECTIVE = "2026년 8월 6일";
+export const PRIVACY_EFFECTIVE = "2026년 8월 6일";
 
-/** 제목 아래 들어가는 머리말. 조항이 아니라 문서 전체의 전제를 적는 자리다. */
+/**
+ * 문서 화면 셋(업데이트 기록·이용약관·개인정보처리방침)의 제목과 그 아래 한 줄. **셸(AppShell)의 페이지 머리가 그린다** —
+ * 다른 화면과 같은 자리·같은 크기다(DEEP_PAGES 에 섞인다).
+ *
+ * 예전엔 문서마다 본문 안에 24px 제목을 따로 그렸다(DocTitle). 셸은 NAV·DEEP_PAGES 에 없는 주소라 제목 칸을 비워 두는데
+ * 그 빈 머리(38px)는 그대로 남아서, 제목이 다른 화면보다 58px 아래(148 vs 90)에 작게(24/700 vs 30/800) 섰다(2026-09-26).
+ *
+ * `ld` 는 구조화 데이터를 어떻게 낼지다. 법정 고지는 검색 대상이 아니라 안 낸다(none) — 셸이 원래 지키던 규칙이다.
+ * 업데이트 기록은 사이트맵에 있으니 보통 웹페이지로 낸다.
+ */
+export const DOC_PAGES: Record<string, { label: string; sub: string; ld: "WebPage" | "none" }> = {
+  "/changelog": { label: "업데이트 기록", sub: "무엇이 언제 바뀌었는지 적어 둡니다", ld: "WebPage" },
+  "/terms": { label: "이용약관", sub: `시행일 · ${TERMS_EFFECTIVE}`, ld: "none" },
+  "/privacy": { label: "개인정보처리방침", sub: `시행일 · ${PRIVACY_EFFECTIVE}`, ld: "none" },
+};
+
+/** 문서 맨 앞 머리말. 조항이 아니라 문서 전체의 전제를 적는 자리다. */
 export function Lead({ children }: { children: React.ReactNode }) {
-  return <div style={{ marginTop: 24, fontSize: "var(--fs-14)", lineHeight: 1.85, color: C.sub }}>{children}</div>;
+  // 문서의 첫 덩어리라 위 여백이 없다 — 제목은 셸의 페이지 머리가 그리고, 머리와 본문 사이는 셸이 띄운다.
+  return <div style={{ fontSize: "var(--fs-14)", lineHeight: 1.85, color: C.sub }}>{children}</div>;
 }
 
 export function Section({ title, children }: { title: string; children: React.ReactNode }) {
