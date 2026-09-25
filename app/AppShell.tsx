@@ -412,7 +412,7 @@ const comingSoonFor = (env: ShellEnv): SoonItem[] => (env.themeNav ? COMING_SOON
  */
 const NAV_GROUPS: { label: string; hrefs: string[] }[] = [
   { label: "오늘 시장", hrefs: ["/", "/preview", NOTE_PAGE.href] },
-  { label: "커뮤니티 여론", hrefs: ["/kadera", THEME_PAGE.href] },
+  { label: "시장 여론", hrefs: ["/kadera", THEME_PAGE.href] },
   // 배당 → MDD → 내부자(2026-09-26). 서학개미 장부는 내려 둔 화면이라(SEOHAK_PUBLIC) 다시 열면 맨 끝에 선다.
   { label: "분석과 기록", hrefs: [DIVIDEND_PAGE.href, "/mdd", "/insider", "/seohak"] },
 ];
