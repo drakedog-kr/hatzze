@@ -129,7 +129,7 @@ const THEME_COLOR = { light: "#e8f0fa", dark: "#101013" } as const;
  * mobile.css 의 `[data-cur-default]`). "안 고름"과 "원화 고름"을 반드시 갈라야 한다 —
  * 안 가르면 /insider 에서 ₩ 를 눌러도 다시 달러로 돌아간다.
  */
-const PREF_SCRIPT = `(function(){try{var c=document.cookie.split("; "),t,u;for(var i=0;i<c.length;i++){var p=c[i].split("=");if(p[0]==="hz-theme")t=p[1];else if(p[0]==="hz-cur")u=p[1];}var d=document.documentElement;if(t==="dark"){d.setAttribute("data-theme","dark");var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",${JSON.stringify(THEME_COLOR.dark)});}if(u==="usd"||u==="krw")d.setAttribute("data-cur",u);}catch(e){}})();`;
+const PREF_SCRIPT = `(function(){try{var c=document.cookie.split("; "),t,u,s;for(var i=0;i<c.length;i++){var p=c[i].split("=");if(p[0]==="hz-theme")t=p[1];else if(p[0]==="hz-cur")u=p[1];else if(p[0]==="hz-side")s=p[1];}var d=document.documentElement;if(s==="icon")d.setAttribute("data-sidebar","icon");if(t==="dark"){d.setAttribute("data-theme","dark");var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",${JSON.stringify(THEME_COLOR.dark)});}if(u==="usd"||u==="krw")d.setAttribute("data-cur",u);}catch(e){}})();`;
 
 export default function RootLayout({
   children,

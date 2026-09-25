@@ -206,3 +206,66 @@
   opacity: 1;
 }
 
+
+/* ── 사이드바 접기(shadcn sidebar-07, collapsible="icon") ─────────────────────────
+   `<html data-sidebar="icon">` 일 때 사이드바를 64px 아이콘 막대로 줄인다(단추: AppShell.tsx SidebarToggle).
+   사이드바는 인라인 style 로 폭·여백을 쥐고 있어 여기서 !important 로 덮는다 — 인라인이 CSS 를 이긴다.
+   글자 칸은 .hz-side-text 로 표시해 두고 통째로 숨기며, 항목 이름은 마우스를 올리면 오른쪽에 띄운다(data-label).
+   ⚠️ 접힌 막대는 짧아서 넘칠 일이 없으니 overflow 를 풀어 준다 — 스크롤 영역이면 오른쪽 이름표가 잘린다. */
+html[data-sidebar="icon"] .hz-sidebar {
+  width: 64px !important;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+  overflow: visible !important;
+}
+html[data-sidebar="icon"] .hz-sidebar .hz-side-text {
+  display: none !important;
+}
+/* 로고는 유령 심볼만 남긴다(워드마크는 LogoLockup 의 둘째 칸). 로고와 접기 단추는 세로로 쌓는다. */
+html[data-sidebar="icon"] .hz-sidebar .hz-logo-link > span > :nth-child(2) {
+  display: none;
+}
+html[data-sidebar="icon"] .hz-sidebar .hz-side-logo {
+  flex-direction: column;
+  align-items: center !important;
+  gap: 14px !important;
+}
+html[data-sidebar="icon"] .hz-sidebar .hz-side-toggle {
+  margin-left: 0;
+}
+html[data-sidebar="icon"] .hz-sidebar .hz-nav-item,
+html[data-sidebar="icon"] .hz-sidebar .hz-side-search,
+html[data-sidebar="icon"] .hz-sidebar .hz-tg-cta {
+  position: relative;
+  justify-content: center;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  gap: 0 !important;
+}
+/* 하위 항목(국장·미장 카더라 등)은 접힌 막대에서 숨긴다 — shadcn 아이콘 모드에서 접히는 하위 메뉴와 같다.
+   부모 아이콘이 대표하고, 하위 화면은 ⌘K 로도 간다. 줄은 40px 로 맞춘다(펼친 줄은 42). */
+html[data-sidebar="icon"] .hz-sidebar .hz-nav-child {
+  display: none !important;
+}
+html[data-sidebar="icon"] .hz-sidebar .hz-nav-item {
+  height: 40px;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+html[data-sidebar="icon"] .hz-sidebar [data-label]:hover::after {
+  content: attr(data-label);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--c-ink);
+  color: var(--c-bg);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  line-height: 1.5;
+  padding: 6px 9px;
+  border-radius: var(--r-control);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 40;
+}

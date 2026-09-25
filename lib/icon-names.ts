@@ -68,6 +68,8 @@ export const ICON_NAMES = [
   "insights",
   "inventory_2",
   "leaderboard",
+  "left_panel_close",
+  "left_panel_open",
   "light_mode",
   "local_fire_department",
   "local_mall",

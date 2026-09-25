@@ -471,6 +471,7 @@ function NavGroupLabel({ label, first, inset }: { label: string; first: boolean;
   return (
     <div
       role="presentation"
+      className="hz-side-text"
       style={{
         margin: first ? "0 0 -2px" : "12px 0 -2px",
         padding: `0 ${inset}px`,
@@ -665,6 +666,42 @@ function commandPages(env: ShellEnv): CommandPage[] {
   );
 }
 
+const SIDE_EVENT = "hz-side-change";
+const subscribeSide = (cb: () => void) => {
+  window.addEventListener(SIDE_EVENT, cb);
+  return () => window.removeEventListener(SIDE_EVENT, cb);
+};
+
+/**
+ * 사이드바를 아이콘 막대로 접는 단추(shadcn 사이드바 블록 sidebar-07 의 collapsible="icon").
+ *
+ * 접힘은 `<html data-sidebar="icon">` 하나가 쥐고, 모양은 전부 CSS 가 바꾼다(app/styles/shadcn.css). 상태는
+ * 쿠키 `hz-side` 에 남기고 layout.tsx 의 PREF_SCRIPT 가 그림 그리기 전에 속성을 붙인다 — 테마 스위치와 같은 길이라
+ * 새로고침해도 펼쳤다 접히는 깜빡임이 없다.
+ */
+function SidebarToggle() {
+  const icon = useSyncExternalStore(subscribeSide, () => document.documentElement.getAttribute("data-sidebar") === "icon", () => false);
+  return (
+    <button
+      type="button"
+      className="hz-side-toggle text-muted-foreground hover:bg-accent hover:text-foreground ml-auto inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg"
+      aria-label={icon ? "사이드바 펼치기" : "사이드바 접기"}
+      aria-pressed={icon}
+      data-label={icon ? "펼치기" : "접기"}
+      onClick={() => {
+        const next = !icon;
+        const d = document.documentElement;
+        if (next) d.setAttribute("data-sidebar", "icon");
+        else d.removeAttribute("data-sidebar");
+        document.cookie = `hz-side=${next ? "icon" : "full"}; path=/; max-age=31536000; samesite=lax`;
+        window.dispatchEvent(new Event(SIDE_EVENT));
+      }}
+    >
+      <Icon name={icon ? "left_panel_open" : "left_panel_close"} style={{ fontSize: 20 }} />
+    </button>
+  );
+}
+
 /**
  * 사이드바의 검색 단추. shadcn 사이드바 블록의 검색칸 꼴이다(누르면 ⌘K 창이 열린다).
  * 단축키 표시는 맥이면 ⌘K, 아니면 Ctrl K. 서버는 맥 표기로 그리고 붙은 뒤 고친다.
@@ -681,12 +718,14 @@ function SearchTrigger() {
       onClick={openCommandMenu}
       onPointerEnter={preloadCommandMenu}
       onFocus={preloadCommandMenu}
-      className="border-border text-muted-foreground hover:bg-accent flex h-9 w-full shrink-0 bg-transparent cursor-pointer items-center gap-2 rounded-xl border px-3 text-[13px] transition-colors"
+      aria-label="검색"
+      data-label="검색"
+      className="hz-side-search border-border text-muted-foreground hover:bg-accent flex h-9 w-full shrink-0 bg-transparent cursor-pointer items-center gap-2 rounded-xl border px-3 text-[13px] transition-colors"
       style={{ margin: "-18px 0 -14px" }}
     >
       <Icon name="search" style={{ fontSize: 17 }} />
-      <span>검색</span>
-      <Kbd className="ml-auto">{mac ? "⌘K" : "Ctrl K"}</Kbd>
+      <span className="hz-side-text">검색</span>
+      <Kbd className="hz-side-text ml-auto">{mac ? "⌘K" : "Ctrl K"}</Kbd>
     </button>
   );
 }
@@ -731,16 +770,19 @@ function Sidebar() {
         {/* 베타 배지는 로고 우측 상단에 붙인다 — 서비스 전체가 베타라는 표시라서,
             페이지마다(예전엔 카더라 제목 옆) 다는 것보다 여기 한 곳이 맞다.
             alignItems:flex-start 로 로고 윗선에 맞춰 위첨자처럼 올린다. */}
-        <LogoTag style={{ margin: 0, display: "flex", alignItems: "flex-start", gap: 5 }}>
+        <LogoTag className="hz-side-logo" style={{ margin: 0, display: "flex", alignItems: "flex-start", gap: 5 }}>
           {/* 로고는 메인(시장 브리핑)으로 가는 링크 — 어느 페이지에서든 홈으로 돌아올 수 있게. */}
           <Link href="/" aria-label="hatzze 홈" className="hz-logo-link" style={{ display: "inline-flex" }}>
             <LogoLockup symbolSize={29} wordmarkSize={30} gap={7} />
           </Link>
           {/* 배지 크기는 '준비 중' 배지와 맞춘다(10px / padding 3-7). 서로 다른 크기면
               같은 사이드바 안에서 배지가 두 종류로 보인다. */}
-          <BetaBadge logoSize={30} style={{ height: "auto", fontSize: "var(--fs-10)", padding: "3px 7px", lineHeight: 1.4 }} />
+          <span className="hz-side-text" style={{ display: "inline-flex" }}>
+            <BetaBadge logoSize={30} style={{ height: "auto", fontSize: "var(--fs-10)", padding: "3px 7px", lineHeight: 1.4 }} />
+          </span>
+          <SidebarToggle />
         </LogoTag>
-        <p style={{ margin: "8px 0 0", fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub, letterSpacing: "0.02em", lineHeight: 1.5 }}>
+        <p className="hz-side-text" style={{ margin: "8px 0 0", fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub, letterSpacing: "0.02em", lineHeight: 1.5 }}>
           {SLOGAN}
         </p>
       </div>
@@ -768,7 +810,7 @@ function Sidebar() {
                 <NavGlyph item={soon} size={20} />
                 {/* 배지를 라벨 '우측 상단'에 위첨자로 띄운다(로고 옆 베타 배지와 같은 어법).
                     absolute 라 배지가 행 폭 계산에서 빠져 라벨이 눌리지도, 항목이 넘치지도 않는다. */}
-                <span style={{ position: "relative", display: "inline-flex" }}>
+                <span className="hz-side-text" style={{ position: "relative", display: "inline-flex" }}>
                   <span style={{ fontSize: "var(--fs-14)", whiteSpace: "nowrap" }}>{soon.label}</span>
                   <span
                     style={{
@@ -810,12 +852,12 @@ function Sidebar() {
               return (
                 <div
                   key={child.label}
-                  className="hz-tip hz-nav-item"
+                  className="hz-tip hz-nav-item hz-nav-child"
                   data-tip={child.tip}
                   style={{ ...rowStyle, color: C.disabled, fontWeight: 600 }}
                 >
                   <child.Glyph size={18} dimmed />
-                  <span style={{ position: "relative", display: "inline-flex" }}>
+                  <span className="hz-side-text" style={{ position: "relative", display: "inline-flex" }}>
                     <span style={{ fontSize: "var(--fs-13)", whiteSpace: "nowrap" }}>{child.label}</span>
                     <span
                       style={{
@@ -843,8 +885,9 @@ function Sidebar() {
               <Link
                 key={child.label}
                 href={child.href}
+                data-label={child.label}
                 {...intentPrefetch(child.href)}
-                className="hz-nav-item"
+                className="hz-nav-item hz-nav-child"
                 style={{
                   ...rowStyle,
                   color: on ? C.blueInk : C.sub,
@@ -853,7 +896,7 @@ function Sidebar() {
                 }}
               >
                 <child.Glyph size={18} />
-                <span style={{ fontSize: "var(--fs-13)" }}>{child.label}</span>
+                <span className="hz-side-text" style={{ fontSize: "var(--fs-13)" }}>{child.label}</span>
               </Link>
             );
           }
@@ -863,6 +906,7 @@ function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              data-label={item.label}
               {...intentPrefetch(item.href)}
               className={`hz-nav-item${active ? " hz-nav-active" : ""}`}
               /* 빨간 N 은 보는 사람에게만 뜻이 통하는 표식이라(aria-hidden) 읽어 주는 기계에는 말로 적는다.
@@ -891,7 +935,7 @@ function Sidebar() {
               <NavGlyph item={item} size={20} />
               {/* 새 화면 표식은 '준비 중' 배지와 같은 자리다 — 라벨 우측 상단 위첨자. absolute 라 배지가
                   행 폭 계산에서 빠져 210px 사이드바에서 라벨이 눌리지 않는다. */}
-              <span style={{ position: "relative", display: "inline-flex", fontSize: "var(--fs-14)" }}>
+              <span className="hz-side-text" style={{ position: "relative", display: "inline-flex", fontSize: "var(--fs-14)" }}>
                 {item.label}
                 {item.isNew && (
                   /* top −1 은 눈대중이 아니다. 14px 라벨이 21px 줄상자 안에 서면 잉크 꼭대기가 상자 위에서
@@ -952,7 +996,7 @@ function Sidebar() {
           }}
         >
           <Icon name={TELEGRAM.icon} style={{ fontSize: "var(--fs-19)" }} />
-          {TELEGRAM.label}
+          <span className="hz-side-text">{TELEGRAM.label}</span>
         </a>
       </div>
     </aside>
