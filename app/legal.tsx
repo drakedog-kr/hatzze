@@ -10,9 +10,17 @@ import { C, R } from "./ui";
 // 지표 카드와 달리 문장이 길어서, 줄이 길면 다음 줄 첫 글자를 찾기 어려워진다.
 export const DOC_WIDTH = "68ch";
 
-/** 이용약관·개인정보처리방침 시행일. 본문 마지막 조항과 셸의 제목 아래 줄(DOC_PAGES)이 같이 쓴다. */
-export const TERMS_EFFECTIVE = "2026년 8월 6일";
-export const PRIVACY_EFFECTIVE = "2026년 8월 6일";
+/**
+ * 이용약관·개인정보처리방침 시행일. 본문 조항(약관 1조 · 방침 12조), 셸의 제목 아래 줄(DOC_PAGES),
+ * 문서 맨 위의 개정 안내(Revision)가 같이 쓴다.
+ *
+ * ⚠️ 두 문서가 스스로 "시행 7일 전부터 이 페이지를 통해 알려 드린다"고 적었다. 고친 판은 **배포일 + 7일
+ *    이후**를 시행일로 잡는다. 머지가 늦어지면 이 날짜도 같이 뒤로 민다.
+ */
+export const TERMS_EFFECTIVE = "2026년 10월 5일";
+export const PRIVACY_EFFECTIVE = "2026년 10월 5일";
+/** 바로 앞 판의 시행일(베타 오픈일). 개정 안내 상자가 "이전 판"으로 가리킨다. */
+export const PREV_EFFECTIVE = "2026년 8월 6일";
 
 /**
  * 문서 화면 셋(업데이트 기록·이용약관·개인정보처리방침)의 제목과 그 아래 한 줄. **셸(AppShell)의 페이지 머리가 그린다** —
@@ -29,6 +37,29 @@ export const DOC_PAGES: Record<string, { label: string; sub: string; ld: "WebPag
   "/terms": { label: "이용약관", sub: `시행일 · ${TERMS_EFFECTIVE}`, ld: "none" },
   "/privacy": { label: "개인정보처리방침", sub: `시행일 · ${PRIVACY_EFFECTIVE}`, ld: "none" },
 };
+
+/**
+ * 개정 안내. 문서 맨 위(머리말 앞)에 둔다.
+ *
+ * 고친 판은 시행일보다 먼저 올라가므로(위 ⚠️), 시행 전 7일 동안 이 상자가 두 문서가 약속한 '이 페이지를 통한
+ * 알림'이 된다. 시행 뒤에도 문장이 그대로 맞도록 "바뀐 곳입니다"처럼 시제를 두지 않는다. 다음 개정 때는
+ * 상자 안 목록을 그 판의 것으로 갈아 끼운다.
+ */
+export function Revision({ effective, prev, children }: { effective: string; prev: string; children: React.ReactNode }) {
+  return (
+    <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: R.card, padding: "16px 18px", marginBottom: 24 }}>
+      <div style={{ fontSize: "var(--fs-14)", fontWeight: 700, color: C.ink, marginBottom: 6 }}>{effective} 시행 개정</div>
+      <div style={{ fontSize: "var(--fs-13)", lineHeight: 1.7, color: C.sub }}>
+        <p style={{ margin: "0 0 8px" }}>
+          {prev}부터 시행한 이전 판에서 바뀐 곳입니다. {effective} 전까지는 이전 판이 적용됩니다.
+        </p>
+        <ul style={{ margin: 0, paddingLeft: 20, listStyle: "disc outside", display: "flex", flexDirection: "column", gap: 4 }}>
+          {children}
+        </ul>
+      </div>
+    </div>
+  );
+}
 
 /** 문서 맨 앞 머리말. 조항이 아니라 문서 전체의 전제를 적는 자리다. */
 export function Lead({ children }: { children: React.ReactNode }) {
