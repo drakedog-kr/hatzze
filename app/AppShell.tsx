@@ -969,6 +969,15 @@ function Sidebar() {
 // 채로 창을 넓히는 경우가 있어 패널·백드롭의 display 는 미디어쿼리가 최종적으로 막는다.
 function MobileMenu({ onClose }: { onClose: () => void }) {
   const env = useShellEnv();
+  const panelRef = useRef<HTMLElement>(null);
+  // 열리면 첫 항목으로 포커스를 옮기고, 닫히면 메뉴 단추로 돌려준다(shadcn Sheet 가 해 주는 일).
+  // 뒤 본문은 셸이 inert 로 막는다 — Tab 이 메뉴 뒤 화면으로 새지 않는다.
+  useEffect(() => {
+    panelRef.current?.querySelector<HTMLElement>("a, button")?.focus();
+    return () => {
+      document.querySelector<HTMLElement>('[aria-controls="hz-mobile-menu"]')?.focus();
+    };
+  }, []);
   const intentPrefetch = useIntentPrefetch();
   const pathname = useAppPathname();
 
@@ -989,7 +998,7 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
   return (
     <>
       <div className="hz-menu-backdrop" onClick={onClose} />
-      <nav className="hz-menu-panel" id="hz-mobile-menu" aria-label="주요 메뉴">
+      <nav ref={panelRef} className="hz-menu-panel" id="hz-mobile-menu" aria-label="주요 메뉴">
         {/* 예고 항목은 사이드바와 같은 이유로 <div> 다(링크가 아니고 포커스도 안 받는다).
             다만 배지는 위첨자가 아니라 라벨 옆에 나란히 둔다. 여기는 폭이 사이드바처럼
             210px 로 묶여 있지 않아 자리가 남고, 툴팁이 안 뜨는 화면이라 배지가 유일한
@@ -1990,6 +1999,18 @@ export default function AppShell({ children, themeNav = THEME_PUBLIC }: { childr
     >
       {/* 위임 리스너(클릭·툴팁·스크롤). 렌더 결과가 없으므로 어디에 두어도 되지만,
           셸 최상단에 두어 "모든 페이지에 걸린다"는 게 눈에 보이게 한다. */}
+      {/* 본문 건너뛰기. 키보드로 첫 Tab 을 누르면 왼쪽 위에 뜨고, 누르면 사이드바를 건너 본문으로 간다.
+          주소에 #이 붙지 않게 링크 대신 포커스를 직접 옮긴다. */}
+      <a
+        href="#hz-main"
+        onClick={(e) => {
+          e.preventDefault();
+          document.getElementById("hz-main")?.focus();
+        }}
+        className="bg-primary text-primary-foreground sr-only z-[100] rounded-xl px-4 py-2 text-sm font-semibold focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
+      >
+        본문으로 건너뛰기
+      </a>
       <GaEvents />
       {/* 터치 기기에서 툴팁을 탭으로 여는 리스너. 호버가 되는 기기에서는 아무것도 안 건다. */}
       <TipTap />
@@ -2031,7 +2052,7 @@ export default function AppShell({ children, themeNav = THEME_PUBLIC }: { childr
             푸터가 화면 끝까지 늘어나 격자와 안 맞는다.
 
             세로 flex + gap 20 도 여기 둔다(목업 main 의 값). */}
-        <main ref={mainRef} className="hz-scroll hz-main" style={{ flex: 1, overflowY: "auto" }}>
+        <main ref={mainRef} id="hz-main" tabIndex={-1} inert={menuOpen} className="hz-scroll hz-main" style={{ flex: 1, overflowY: "auto", outline: "none" }}>
           <div
             style={{
               width: "100%",
