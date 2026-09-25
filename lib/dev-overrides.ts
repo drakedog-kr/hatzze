@@ -43,11 +43,6 @@ export type DevOverrides = {
   //   주말  {"usSession":"2026-09-18"}  → 세션이 어젯밤보다 앞이라 "금요일" 로 그린다
   //   연휴  {"usSession":"2026-09-25","usFrom":"2026-09-23"}  → "연휴 동안" 으로 그린다
   previewDay?: { usSession?: string; usHoliday?: string; usFrom?: string };
-  /**
-   * 과열도 추이 그래프(홈)에 얹을 점수. 같은 날짜의 DB 값을 덮는다. daily_score 를 다시 계산해 **표에 쓰기 전에**
-   * 로컬에서 그래프를 보는 용도다(data-pipeline/scripts/recompute_score_history.py 가 이 꼴로 뽑아 준다).
-   */
-  scoreHistory?: { date: string; score: number }[];
 };
 
 const EMPTY: DevOverrides = {};

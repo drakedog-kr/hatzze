@@ -99,24 +99,6 @@ export type IndicatorWithLatestValue = {
   historyPoints: { date: string; value: number }[];
 };
 
-export type ScorePoint = { date: string; score: number };
-
-/**
- * 과열도 추이(홈 그래프) — daily_score 전부를 날짜 오름차순으로.
- *
- * ⚠️ 이 표는 한동안 **그날의 눈금**으로 쓰여 쌓였다. 가중치·눈금을 바꾼 날 앞뒤로 값이 이어지지 않아
- *    시장에 없던 급락·반등이 그려진다(2026-08 검사). 그래서 눈금을 바꾸면 recompute_score_history.py 로
- *    지난 행을 지금 눈금으로 다시 써야 이 그래프가 정직하다. 한 줄(오늘)만 읽는 히어로와 다르다.
- * 로컬에서는 dev-overrides.json 의 `scoreHistory` 가 같은 날짜의 값을 덮는다(표에 쓰기 전 미리보기).
- */
-export const getScoreHistory = cache(async function getScoreHistory(): Promise<ScorePoint[]> {
-  const { data, error } = await getSupabaseServer().from("daily_score").select("date,score").order("date", { ascending: true }).limit(1000);
-  if (error) throw error;
-  const rows = new Map<string, number>((data ?? []).map((r) => [r.date as string, Number(r.score)]));
-  for (const o of getDevOverrides().scoreHistory ?? []) rows.set(o.date, o.score);
-  return [...rows.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([date, score]) => ({ date, score }));
-});
-
 /**
  * 최신 daily_score 한 줄.
  *

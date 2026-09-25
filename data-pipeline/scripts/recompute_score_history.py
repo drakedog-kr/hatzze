@@ -1,4 +1,6 @@
-"""지난 daily_score 를 지금의 계산 코드로 다시 낸다 — 홈 '과열도 추이' 그래프가 이어지게.
+"""지난 daily_score 를 지금의 계산 코드로 다시 낸다 — 점수 추이를 그릴 때 선이 이어지게.
+
+(2026-09-25 홈 '과열도 추이' 그래프를 만들며 짰는데 그래프는 아직 안 넣기로 했다. 스크립트는 기본이 미리보기라 둔다.)
 
 **왜 필요한가.** daily_score 는 매일 **그날의 눈금**으로 한 줄씩 쌓인다. 가중치·눈금·표시 앵커를 바꾸면
 그 앞뒤 행이 다른 잣대로 잰 값이 돼, 그래프에 시장에 없던 급락·반등이 그려진다(2026-08 검사: 07-30 36 →
@@ -25,7 +27,7 @@ generate_daily_summary) · 채널 발송 요약(broadcast_digest). 셋 다 '같�
 
 실행:
     python scripts/recompute_score_history.py                      # 미리보기(표만 찍는다)
-    python scripts/recompute_score_history.py --json out.json      # 로컬 미리보기용(dev-overrides.json 의 scoreHistory)
+    python scripts/recompute_score_history.py --json out.json      # 날짜·재계산 점수를 파일로
     python scripts/recompute_score_history.py --apply              # 어제까지 전부 다시 쓴다
     python scripts/recompute_score_history.py --from 2026-07-09 --apply
 """
@@ -130,7 +132,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--from", dest="since", help="이 날짜부터(YYYY-MM-DD). 없으면 daily_score 첫 행부터")
     ap.add_argument("--apply", action="store_true", help="daily_score 에 쓴다(없으면 미리보기)")
-    ap.add_argument("--json", help="날짜·재계산 점수를 이 파일로 낸다(dev-overrides.json 의 scoreHistory 꼴)")
+    ap.add_argument("--json", help="날짜·재계산 점수를 이 파일로 낸다")
     args = ap.parse_args()
 
     db = get_client()
