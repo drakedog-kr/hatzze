@@ -8,11 +8,12 @@
  * ## 무엇을 보여 주나 (2026-09-26 개편)
  *
  * 검색어가 비면 목록을 통째로 늘어놓지 않는다(예전엔 테마 42개 + 종목 750개가 그대로 떴다 — 사이드바와 같은 것).
- * 대신 세 묶음이다: **최근 본 종목**(이 기기) · **지금 뜨는 종목**(카더라 급부상) · **지금 뜨는 테마**(점유율 증감).
+ * 대신 세 묶음이다: **최근 본 종목**(이 기기) · **지금 뜨는 테마**(점유율 증감) · **지금 뜨는 종목**(카더라 급부상).
+ * 테마가 종목보다 위다 — 테마 상세 화면이 종목 화면보다 볼 거리가 많다(2026-09-26).
  * 토스증권 웹 검색이 빈 칸에 '인기 주식'·'지금 뜨는 산업'을 두는 것과 같은 자리다.
  *
  * 검색어가 있으면 종목 8줄 · 테마 4줄까지. 순위는 lib/search-rank.ts(MDD 검색창 등급표 + 초성·별명). 두 묶음 중
- * 더 잘 맞는 쪽이 위다("반도체" → 테마가 먼저, "삼성" → 종목이 먼저). cmdk 의 자체 거르기는 끈다(shouldFilter).
+ * 더 잘 맞는 쪽이 위고 똑같이 맞으면 테마가 위다("반도체" → 테마, "삼성" → 종목). cmdk 의 자체 거르기는 끈다(shouldFilter).
  *
  * 줄 오른쪽 숫자는 우리 자료 하나다 — 종목은 **최근 3일 언급**(종목 화면 히어로의 "최근 3일"과 같은 값), 뜨는
  * 종목은 **평소 대비 배수**, 뜨는 테마는 **점유율 증감**. 무엇을 세는지는 묶음 머리글 오른쪽에 한 번만 적는다.
@@ -167,6 +168,14 @@ function PaletteBody({
             ))}
           </CommandGroup>
         )}
+        {/* 테마가 종목보다 먼저다 — 테마 상세 화면이 종목 화면보다 볼 거리가 많다(2026-09-26). */}
+        {themes && index.themes.length > 0 && (
+          <CommandGroup heading={<Heading title="지금 뜨는 테마" unit="점유율 변화" />}>
+            {index.themes.map((t) => (
+              <ThemeRow key={`tt:${t.market}:${t.name}`} value={`tt:${t.market}:${t.name}`} t={t} note={`+${t.delta.toFixed(1)}%p`} go={go} />
+            ))}
+          </CommandGroup>
+        )}
         {index.trend.length > 0 && (
           <CommandGroup heading={<Heading title="지금 뜨는 종목" unit="평소 대비" />}>
             {index.trend.map((t) => (
@@ -180,19 +189,13 @@ function PaletteBody({
             ))}
           </CommandGroup>
         )}
-        {themes && index.themes.length > 0 && (
-          <CommandGroup heading={<Heading title="지금 뜨는 테마" unit="점유율 변화" />}>
-            {index.themes.map((t) => (
-              <ThemeRow key={`tt:${t.market}:${t.name}`} value={`tt:${t.market}:${t.name}`} t={t} note={`+${t.delta.toFixed(1)}%p`} go={go} />
-            ))}
-          </CommandGroup>
-        )}
       </>
     );
   } else {
     const stockHits = rankStocks(prepared, query, 8);
     const themeHits = themes ? rankThemes(ALL_THEMES, query, 4) : [];
-    const themesFirst = themeHits.length > 0 && (stockHits.length === 0 || themeHits[0].tier < stockHits[0].tier);
+    // 더 잘 맞는 쪽이 위고, 똑같이 맞으면 테마가 위다(빈 검색창 순서와 같은 까닭).
+    const themesFirst = themeHits.length > 0 && (stockHits.length === 0 || themeHits[0].tier <= stockHits[0].tier);
     const stockGroup = stockHits.length > 0 && (
       <CommandGroup key="stocks" heading={<Heading title="종목" unit="최근 3일 언급" />}>
         {stockHits.map(({ item: s }) => (
