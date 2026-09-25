@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * ⌘K(윈도우는 Ctrl+K) 검색의 가벼운 앞단. 셸에 늘 붙어 단축키와 '열어라' 신호만 듣고, 창 본체
+ * ⌘K(윈도우는 Ctrl+K) 테마·종목 검색의 가벼운 앞단. 셸에 늘 붙어 단축키와 '열어라' 신호만 듣고, 창 본체
  * (components/command-palette.tsx — Base UI 대화상자·cmdk)는 **처음 열 때** 받는다.
  *
  * 사이드바의 '검색' 단추와 폰 탑바의 돋보기는 `openCommandMenu()` 로 창에 이벤트를 던진다.
@@ -9,8 +9,6 @@
  */
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
-
-export type CommandPage = { label: string; href: string };
 
 const OPEN_EVENT = "hz-command-open";
 const loadPalette = () => import("@/components/command-palette");
@@ -26,7 +24,7 @@ export function preloadCommandMenu() {
   void loadPalette();
 }
 
-export function CommandMenu({ pages, themes }: { pages: CommandPage[]; themes: boolean }) {
+export function CommandMenu({ themes }: { themes: boolean }) {
   const [open, setOpen] = useState(false);
   // 한 번이라도 열었으면 본체를 계속 둔다(닫는 움직임이 끝까지 보이고, 다시 열 때 받지 않는다).
   const [used, setUsed] = useState(false);
@@ -53,5 +51,5 @@ export function CommandMenu({ pages, themes }: { pages: CommandPage[]; themes: b
   }, []);
 
   if (!used) return null;
-  return <CommandPalette open={open} setOpen={setOpen} pages={pages} themes={themes} />;
+  return <CommandPalette open={open} setOpen={setOpen} themes={themes} />;
 }

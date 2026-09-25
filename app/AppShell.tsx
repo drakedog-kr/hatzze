@@ -21,7 +21,7 @@ import { NewBadge } from "./VersionBadge";
 import GaEvents from "./GaEvents";
 import { TipTap } from "./TipTap";
 import { HolidayGreeting } from "./HolidayGreeting";
-import { CommandMenu, openCommandMenu, preloadCommandMenu, type CommandPage } from "@/components/command-menu";
+import { CommandMenu, openCommandMenu, preloadCommandMenu } from "@/components/command-menu";
 import { Kbd } from "@/components/ui/kbd";
 import type { IconName } from "@/lib/icon-names";
 
@@ -666,15 +666,6 @@ const DEEP_PAGES: Record<string, { label: string; sub: string; badge?: string }>
   ),
 };
 
-/** ⌘K 검색에 올릴 화면. 하위 항목이 있으면 하위(국장·미장 카더라 등)를, 없으면 그 항목을 올린다. */
-function commandPages(env: ShellEnv): CommandPage[] {
-  return navFor(env).flatMap((n) =>
-    n.children?.some((c) => c.href)
-      ? n.children.filter((c): c is NavChild & { href: string } => Boolean(c.href)).map((c) => ({ label: c.label, href: c.href }))
-      : [{ label: n.label, href: n.href }],
-  );
-}
-
 const SIDE_EVENT = "hz-side-change";
 const subscribeSide = (cb: () => void) => {
   window.addEventListener(SIDE_EVENT, cb);
@@ -697,7 +688,8 @@ function SidebarToggle() {
     <button
       type="button"
       // 오른쪽 끝을 메뉴 줄의 파란 알약 오른쪽 끝에 맞춘다 — 로고 칸의 안쪽 여백(6px)만큼 밀어 낸다.
-      className="hz-side-toggle text-muted-foreground hover:bg-accent hover:text-foreground ml-auto -mr-1.5 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg"
+      // 칸은 24px(마우스를 올렸을 때 칠해지는 면). 32px 이던 때 면이 크고 아이콘이 안쪽에 앉아 보였다(2026-09-25 Hun).
+      className="hz-side-toggle text-muted-foreground hover:bg-accent hover:text-foreground ml-auto -mr-1.5 inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md"
       aria-label={label}
       aria-pressed={icon}
       title={label}
@@ -737,7 +729,7 @@ function SearchTrigger() {
       className="hz-head-search border-border text-muted-foreground hover:bg-accent flex h-9 w-52 shrink-0 cursor-pointer items-center gap-2 rounded-xl border bg-transparent px-3 text-[13px] transition-colors"
     >
       <Icon name="search" style={{ fontSize: 17 }} />
-      <span>화면·테마·종목 검색</span>
+      <span>테마·종목 검색</span>
       <Kbd className="ml-auto">{mac ? "⌘K" : "Ctrl K"}</Kbd>
     </button>
   );
@@ -2085,7 +2077,7 @@ export default function AppShell({ children, themeNav = THEME_PUBLIC }: { childr
       {/* 터치 기기에서 툴팁을 탭으로 여는 리스너. 호버가 되는 기기에서는 아무것도 안 건다. */}
       <TipTap />
       {/* ⌘K 검색. 사이드바 단추·탑바 돋보기도 이 창을 연다(components/command-menu.tsx). */}
-      <CommandMenu pages={commandPages(env)} themes={env.themeNav} />
+      <CommandMenu themes={env.themeNav} />
       <div
         className="hz-frame"
         style={{

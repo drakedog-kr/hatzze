@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * ⌘K 검색 창의 본체(shadcn Command + Dialog). **처음 열 때만 받는다** — components/command-menu.tsx 가
+ * ⌘K 검색 창의 본체(shadcn Command + Dialog). 테마·종목을 찾는다 — 화면 목록은 사이드바에 다 있어 뺐다(2026-09-25 Hun). **처음 열 때만 받는다** — components/command-menu.tsx 가
  * next/dynamic 으로 부른다. Base UI 대화상자·cmdk 를 셸에 바로 실으면 모든 화면의 JS 가 gzip 51KB(+23%) 늘었다
  * (2026-09-25 프로덕션 빌드 실측, 홈 222 → 273KB).
  *
@@ -22,19 +22,16 @@ import {
   CommandShortcut,
 } from "@/components/ui/command";
 import { THEME_NAMES, US_THEME_NAMES, themeHref, usThemeHref } from "@/lib/theme-href";
-import type { CommandPage } from "@/components/command-menu";
 
 type Stock = { code: string; name: string; market: string | null };
 
 export default function CommandPalette({
   open,
   setOpen,
-  pages,
   themes,
 }: {
   open: boolean;
   setOpen: (open: boolean) => void;
-  pages: CommandPage[];
   themes: boolean;
 }) {
   const [stocks, setStocks] = useState<Stock[] | null>(null);
@@ -67,16 +64,9 @@ export default function CommandPalette({
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
       <Command>
-        <CommandInput placeholder="화면·테마·종목 검색" />
+        <CommandInput placeholder="테마·종목 검색" />
         <CommandList>
           <CommandEmpty>찾는 결과가 없습니다.</CommandEmpty>
-          <CommandGroup heading="화면">
-            {pages.map((p) => (
-              <CommandItem key={p.href} value={`화면 ${p.label}`} onSelect={() => go(p.href)}>
-                {p.label}
-              </CommandItem>
-            ))}
-          </CommandGroup>
           {themes && (
           <CommandGroup heading="국장 테마">
             {THEME_NAMES.map((t) => (
