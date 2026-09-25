@@ -471,10 +471,102 @@
   --c-scrollbar-border: #101013;
 }
 
+/* ── shadcn/ui 이름표 (2026-09-25) ─────────────────────────────────────
+   shadcn 부품은 색을 `--card` `--muted-foreground` 같은 **역할 이름**으로 읽는다. 여기서 그
+   이름을 우리 변수에 이어 두면, 부품을 들여올 때 우리 색으로 그려진다. **새 색은 하나도 없다.**
+   이 층만으로는 화면이 안 바뀐다 — 지금 이 이름을 읽는 규칙이 없고(Tailwind 유틸리티는
+   `font-sans` 하나만 쓰인다), 아래 @theme inline 은 쓰인 유틸리티만 CSS 로 낸다.
+
+   ⭐ 값은 전부 var() 라 라이트·다크가 저절로 따라간다(data-theme 가 붙는 곳이 여기 :root 와
+      같은 html 이다). --background·--foreground 두 이름은 이미 있었다(위 라이트 블록, body 가 읽는다).
+   ⚠️ 별칭은 :root 에서 한 번 풀린다. 어떤 구역 안에서 --c-* 를 따로 바꾸면 이 이름들은 따라가지
+      않는다. 지금 구역에서 바뀌는 건 --c-sep-h(layout.css)·--c-plate(tx.css) 둘뿐이고 여기서 안 읽는다.
+   ⚠️ 짝을 고른 까닭
+      primary        --c-nav-active. 흰 글자가 얹히는 파랑이라 --c-blue(흰 글자 3.71, AA 미달)가 아니다.
+      muted          --c-soft(카드 안 회색 타일). secondary 는 누르는 칩 바탕 --c-chip.
+      accent         --c-hover. shadcn 에서 메뉴·항목 위에 마우스를 올렸을 때의 바탕이다.
+      destructive    --c-hot. 불러오기 실패 안내(LoadFailedNote)가 이미 hot 계열을 쓴다.
+      chart-1~5      파랑 램프. 같은 종류 여럿을 순서로 칠하는 이 사이트의 규칙을 따른다.
+                     온도(차가움·뜨거움)를 칠하는 자리에는 쓰지 말 것 — 그건 --c-cold~--c-mania 다.
+      sidebar        지금 사이드바 그대로(바탕 --c-card · 테두리 --c-divider · 활성 알약 --c-nav-active).
+      radius         --r-card(12px). 아래 배수는 shadcn 규칙 그대로라 sm 7.2 · md 9.6 · lg 12 · xl 16.8px. */
+:root {
+  --card: var(--c-card);
+  --card-foreground: var(--c-ink);
+  --popover: var(--c-float);
+  --popover-foreground: var(--c-ink);
+  --primary: var(--c-nav-active);
+  --primary-foreground: #ffffff;
+  --secondary: var(--c-chip);
+  --secondary-foreground: var(--c-ink);
+  --muted: var(--c-soft);
+  --muted-foreground: var(--c-sub);
+  --accent: var(--c-hover);
+  --accent-foreground: var(--c-ink);
+  --destructive: var(--c-hot);
+  --border: var(--c-line);
+  --input: var(--c-line);
+  --ring: var(--c-blue);
+  --chart-1: var(--c-blue-1);
+  --chart-2: var(--c-blue-2);
+  --chart-3: var(--c-blue-3);
+  --chart-4: var(--c-blue-4);
+  --chart-5: var(--c-blue-5);
+  --sidebar: var(--c-card);
+  --sidebar-foreground: var(--c-sub);
+  --sidebar-primary: var(--c-nav-active);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--c-hover);
+  --sidebar-accent-foreground: var(--c-ink);
+  --sidebar-border: var(--c-divider);
+  --sidebar-ring: var(--c-blue);
+  --radius: var(--r-card);
+}
+
+/* shadcn 부품의 `dark:` 는 이 사이트의 테마 스위치(html[data-theme="dark"])를 따른다.
+   Tailwind 기본은 운영체제 설정(prefers-color-scheme)이라, 두면 스위치와 어긋난다. */
+@custom-variant dark (&:is([data-theme="dark"] *));
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-pretendard);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
 body {
