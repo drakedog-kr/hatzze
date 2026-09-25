@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { DOC_WIDTH, DocTitle, Ext, InfoBlock, Lead, P, Section, Ul } from "../legal";
+import { DOC_WIDTH, Ext, InfoBlock, Lead, P, PRIVACY_EFFECTIVE, Section, Ul } from "../legal";
 import { C } from "../ui";
 import { pageMetadata } from "../seo";
 
@@ -16,15 +16,14 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /** 방침 시행일. 베타 오픈일과 맞춘다. 내용을 고치면 이 날짜도 같이 올려야 한다. */
-const EFFECTIVE_DATE = "2026년 8월 6일";
+// 시행일은 app/legal.tsx 에 둔다 — 셸의 제목 아래 줄(DOC_PAGES)과 본문 마지막 조항이 같은 값을 본다.
+const EFFECTIVE_DATE = PRIVACY_EFFECTIVE;
 /** 문의 창구. Footer 와 같은 주소를 쓴다(두 곳이 갈리면 이용자가 어디로 보낼지 헷갈린다). */
 const CONTACT_EMAIL = "hatzze@proton.me";
 
 export default function PrivacyPage() {
   return (
     <div style={{ maxWidth: DOC_WIDTH }}>
-      <DocTitle title="개인정보처리방침" effectiveDate={EFFECTIVE_DATE} />
-
       <Lead>
         <P>
           hatzze(이하 &quot;서비스&quot;)는 「개인정보 보호법」 등 관련 법령을 준수하며, 이용자의 정보를

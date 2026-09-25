@@ -34,14 +34,8 @@ export default function ChangelogPage() {
           사람은 누르는 순간 이미 꺼지지만, 사이드바·검색·주소 직접 입력으로 닿은 사람은
           이 줄이 없으면 다 읽고 나가도 배지가 그대로 켜져 있다. 그리는 것은 없다. */}
       <ChangelogSeen />
-      <h1 style={{ margin: 0, fontSize: "var(--fs-24)", fontWeight: 700, color: C.ink, letterSpacing: "-0.01em" }}>
-        업데이트 기록
-      </h1>
-      <p style={{ margin: "10px 0 0", fontSize: "var(--fs-13)", color: "var(--c-muted)" }}>
-        무엇이 언제 바뀌었는지 적어 둡니다.
-      </p>
-
-      <div style={{ marginTop: 32, display: "flex", flexDirection: "column", gap: 12 }}>
+      {/* 제목과 그 아래 한 줄은 셸의 페이지 머리가 그린다(app/legal.tsx DOC_PAGES) — 다른 화면과 같은 자리·같은 크기다. */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {RELEASES.map((rel, i) => (
           <section
             key={rel.version}

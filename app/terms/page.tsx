@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { B, DOC_WIDTH, DocTitle, Lead, P, Section, Ul } from "../legal";
+import { B, DOC_WIDTH, Lead, P, Section, TERMS_EFFECTIVE, Ul } from "../legal";
 import { C } from "../ui";
 import { pageMetadata } from "../seo";
 
@@ -17,7 +17,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /** 약관 시행일. 개인정보처리방침과 같은 날(베타 오픈일)로 맞춘다. */
-const EFFECTIVE_DATE = "2026년 8월 6일";
+// 시행일은 app/legal.tsx 에 둔다 — 셸의 제목 아래 줄(DOC_PAGES)과 본문 마지막 조항이 같은 값을 본다.
+const EFFECTIVE_DATE = TERMS_EFFECTIVE;
 /** 문의 창구. Footer·개인정보처리방침과 같은 주소를 쓴다. */
 const CONTACT_EMAIL = "hatzze@proton.me";
 
@@ -40,8 +41,6 @@ function Inner({ href, children }: { href: string; children: React.ReactNode }) 
 export default function TermsPage() {
   return (
     <div style={{ maxWidth: DOC_WIDTH }}>
-      <DocTitle title="이용약관" effectiveDate={EFFECTIVE_DATE} />
-
       <Lead>
         <P>
           이 약관은 hatzze(이하 <B>서비스</B>)를 이용하실 때 적용되는 조건과, 서비스가 보여
