@@ -1,4 +1,4 @@
-import { getKospiCloseSeries, getLatestDailyScore, getPublicIndicators, getTopStockHighGaps } from "@/lib/data";
+import { getKospiCloseSeries, getLatestDailyScore, getPublicIndicators, getScoreHistory, getTopStockHighGaps } from "@/lib/data";
 import { assertLoaded, isLoadFailed } from "@/lib/load-state";
 import { SectionIntro } from "./SectionIntro";
 import type { IndicatorCategory } from "@/lib/data";
@@ -9,6 +9,7 @@ import type { BandItem } from "./home/Hero";
 import { CardBuffett, CardLeverage, CardMarketActions, CardTurnover, CardHighGap, CardSpeed, CardVkospi, CardAsia, CardGoldRatio, CardVolume, CardFx, CardNetBuy, CardLimitUp, CardPutCall } from "./home/cards-market";
 import { CardComingSoon, CardDivergence, CardTrend, CardSentiment, CardYoutube, CardSpending, CardUpbit, CardBrokerage } from "./home/cards-sentiment";
 import type { IconName } from "@/lib/icon-names";
+import { ScoreTrend } from "./home/ScoreTrend";
 
 // 캐시 주기는 루트 레이아웃의 `revalidate` 가 정한다(app/layout.tsx). 예전엔 여기가
 // force-dynamic 이라 방문마다 서버가 새로 그렸다.
@@ -45,12 +46,13 @@ const FALLBACK_ICONS: Record<string, IconName> = {
 };
 
 export default async function Home() {
-  const [dailyScore, indicators, rawTopGaps, rawKospiPath] = await Promise.all([
+  const [dailyScore, indicators, rawTopGaps, rawKospiPath, scoreHistory] = await Promise.all([
     getLatestDailyScore(),
     getPublicIndicators(),
     getTopStockHighGaps(3),
     // 상승 속도 카드의 60일 궤적. 내부용 지표라 getPublicIndicators 에 안 잡힌다.
     getKospiCloseSeries(61),
+    getScoreHistory().catch(() => []),
   ]);
 
   /* 조회 실패를 "자료 없음" 과 가른다(lib/load-state.ts). 두 값 다 카드의 **곁가지**라,
@@ -118,6 +120,9 @@ export default async function Home() {
                 아직 계산된 스코어가 없습니다.
               </section>
             )}
+
+            {/* 과열도 추이 — 히어로의 오늘 한 점이 어떤 흐름 위에 있는지(app/home/ScoreTrend.tsx). */}
+            <ScoreTrend points={scoreHistory} />
 
             {/* 시장 지표 (category=시장) */}
             <section style={{ display: "flex", flexDirection: "column", gap: 16 }}>

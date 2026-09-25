@@ -236,6 +236,12 @@ def main() -> None:
             f"이후 구간과 같은 잣대가 아닙니다."
         )
 
+    if do_daily:
+        # ⛔ 2026-09-25: 여기 종합점수는 표시 앵커(calculate_score.SCORE_DISPLAY_ANCHORS)를 안 거친 가중평균이다.
+        #    2026-07-23 부터 daily_score 는 앵커를 거친 값이라, 이대로 쓰면 틀린 값이 들어간다.
+        #    지난 daily_score 는 recompute_score_history.py 로 다시 쓴다(라이브 계산을 날짜별로 재현한다).
+        print("\n[중단] daily_score 는 recompute_score_history.py 로 다시 쓰세요(이 스크립트는 표시 앵커를 안 거칩니다).")
+        return
     if do_daily and apply:
         now = datetime.now(timezone.utc).isoformat()
         rows = [
