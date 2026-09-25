@@ -23,6 +23,8 @@
 ("남성"은 여성이 나오는 글이면 종목이 아니다 — config.HOMONYM_CUES).
 합성어의 꼬리로 쓰이는 이름은 **앞**에 띄어쓴 낱말까지 본다("뷰티 디바이스" → 거부).
 위 경계 규칙이 앞은 붙어 있는 한 글자만 보므로 이 자리가 비어 있었다(modifier_context 참고).
+거꾸로 합성어의 앞자리로 쓰이는 이름은 **뒤**에 띄어쓴 낱말까지 본다("나노 바나나" → 거부,
+prefix_context 참고).
 우선주(…우) 등 파생 종목은 사전에서 제외해 잡음을 줄인다.
 
 상장 증권사 이름은 종목보다 **리포트 발행처 표기**로 훨씬 자주 나와 따로 본다
@@ -58,6 +60,7 @@ from config.stock_extraction import (  # noqa: E402
     JOSA_HEAD,
     JOSA_TRAILING,
     NOT_MENTION_PHRASES,
+    PREFIX_NAMES,
     PUBLISHER_SHORT_NAMES,
     US_TICKER_COLLISION,
 )
@@ -276,6 +279,27 @@ def modifier_context(text: str, start: int) -> bool:
     return bool(HANGUL_OR_ALNUM.match(prev) or HAN.match(prev))
 
 
+def prefix_context(text: str, end: int) -> bool:
+    """이 자리의 이름이 뒤에 띄어 쓴 낱말을 꾸미는 **앞자리**인가(= 종목이 아니다).
+
+    modifier_context 의 거울상이다. 그쪽은 이름 앞에 띄어 쓴 수식어가 있는지 보고(`뷰티
+    디바이스`), 이쪽은 이름 뒤에 띄어 쓴 한글 낱말이 있는지 본다(`나노 바나나` `나노 디멘션`).
+    boundary_ok 의 뒤 검사는 **붙어 있는** 글자만 보므로 `나노가공`은 막아도 띄어 쓰면 뒤가
+    공백이라 그대로 통과했다.
+
+    종목코드 주석은 건너뛰고 본다(boundary_ok 와 같은 이유, 결 ⑦). kwtok 태거가 기사 끝
+    키워드 줄에 `나노(187790) 디멘션(ADR) NNDM` 을 박는다. 줄바꿈은 건너뛰지 않는다
+    (compound_key 와 같은 이유 — 다음 줄 첫 낱말은 이름과 한 낱말이 아니다).
+
+    ⚠️ **PREFIX_NAMES 에만 건다.** 종목명 뒤에 띄어 쓴 한글 낱말이 오는 진짜 언급은 흔하다
+    (`케이프 등 조선·기자재주 강세`). 어느 이름에 걸어도 되는지는 config 쪽 목록 주석에 적었다.
+    """
+    annotation = CODE_ANNOTATION_RE.match(text, end)
+    if annotation:
+        end = annotation.end()
+    return bool(re.match(r"[ \t]+[가-힣]", text[end:]))
+
+
 def is_publisher_name(key: str) -> bool:
     """리포트 발행처로 더 자주 등장하는 이름인가(= 상장 증권사).
 
@@ -393,6 +417,11 @@ def extract(
                 continue
             # "SK 하이닉스"처럼 더 긴 종목명으로 승격됐으면 그 이름을 기록한다.
             matched = key
+        # 합성어의 앞자리로 쓰이는 이름은 뒤 자리도 본다("나노 바나나"). 위 머리 명사 검사와 달리
+        # **승격 뒤에** 본다 — 띄어 쓴 뒷말을 붙여 더 긴 종목명이 되면(`나노 신소재`→나노신소재)
+        # 그 종목 언급이고, 승격된 이름은 이 목록에 없다.
+        if key in PREFIX_NAMES and prefix_context(text, m.end()):
+            continue
         # ⚠️ **승격 뒤에** 본다. 승격 전에 보면 "GS 건설"(→GS건설)까지 같이 죽는다 —
         #    골드만삭스가 나온 글에서도 GS건설은 국내 종목 그대로다.
         if key in us_collision:

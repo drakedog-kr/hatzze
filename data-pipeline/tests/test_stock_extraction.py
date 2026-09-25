@@ -179,6 +179,57 @@ def test_aurora_stock_mentions_survive(text):
     assert _aurora(text) == {"039830"}
 
 
+# ── 2026-09-25: 나노(187790) ← 띄어 쓴 합성어의 앞자리(결 ⑧) ──────────────────────────────
+# 급부상 카드 3~4위에 오른 사흘 창(09-10~14)의 유령이 `나노 바나나`·`‘나노 장벽’`·`‘나노 숫자’`였다.
+
+
+def _nano(text: str, extra: dict[str, str] | None = None) -> set[str]:
+    match_to_code = {"나노": "187790", **(extra or {})}
+    pattern, caseless = build_pattern(list(match_to_code))
+    ambiguous = set(match_to_code) & AMBIGUOUS_NAMES
+    return set(extract(text, pattern, match_to_code, {k: "dict" for k in match_to_code}, ambiguous, caseless))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "✅ Google Pics 간략 정리\n- 나노 바나나 기반의 생성 모델의 편집 도구로의 전환",
+        "65조 쏟아 팹 골조 세운 TSMC, 1.4나노 ‘나노 장벽’ 앞엔 멈춰 섰다",
+        "📉 TSMC (-20)\n1.4나노 '나노 장벽'에 직면, 생산 멈춤 우려",
+        "선단공정 경쟁의 축이 ‘나노 숫자’에서 ‘설계 최적화 능력’으로 이동 중",
+        "현대차그룹, 경찰버스에 온도 낮춰주는 ‘나노 쿨링 필름’ 시범 적용",
+        "뉴스케일파워(+15.26%), 나노 뉴클리어 에너지(+9.20%), 오클로(+4.94%) 등 美 원자력발전 관련주가",
+        "제목 : 나노 디멘션, 본사 임대 조기 해지 합의…2500만 달러 순절감 예상 *이데일리FX*",
+        # kwtok 태거가 박은 종목코드 주석(결 ⑦)은 건너뛰고 본다.
+        "경영 사무소를 둔 기업이다.   나노(187790) 디멘션 NNDM 나다브 키드론",
+    ],
+)
+def test_nano_as_front_of_a_spaced_compound_is_not_the_stock(text):
+    assert _nano(text) == set()
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "✅ 나노, 신공장 기반 발전설비 시장 확대 수요 대응",
+        "• 한솔제지\n• 양지사\n• 인터지스\n• 나노\n• 미래에셋증권우",
+        "나노(187790) | +29.97% | 3,730원\n→ KOSDAQ 장중 상한가입니다.",
+        "6. 나노 (29.97%) : 화학관련주, 시총1100억대, SCR탈질촉매사업",
+        "✅️ 나노 : +30.0% 상승 중",
+        "(코스닥)나노 - 반기보고서 (2026.06)",
+        "· 지난 4월 16일 리포트 발간했던 SCR 촉매 기업 '나노' 입니다.",
+        "[나노/소재/대기오염방지]\n제목: SCR 탈질촉매 기술 통합을 통한 대기환경 전문기업으로",
+    ],
+)
+def test_nano_stock_mentions_survive(text):
+    assert _nano(text) == {"187790"}
+
+
+def test_nano_promotion_to_a_longer_name_comes_first():
+    # 뒷말을 붙여 더 긴 종목명이 되면 그 종목이다. 승격 뒤에 거르므로 나노신소재는 산다.
+    assert _nano("나노 신소재 강세", {"나노신소재": "121600"}) == {"121600"}
+
+
 # ── 2026-09-25: 디바이스(187870) ← 무라타 사업부 이름 · GS(078930) ← 골드만삭스 출처 표기 ──────
 # 이슈 #572. 같은 골드만 리포트 요약 한 편(`무라타 컨퍼런스콜 후기 … (GS)`)이 여섯 채널에 복붙돼
 # 급부상 카드의 디바이스(2위)와 GS(3위)를 함께 띄웠다.
