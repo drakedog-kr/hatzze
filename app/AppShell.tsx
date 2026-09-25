@@ -689,7 +689,9 @@ function SidebarToggle() {
       type="button"
       // 오른쪽 끝을 메뉴 줄의 파란 알약 오른쪽 끝에 맞춘다 — 로고 칸의 안쪽 여백(6px)만큼 밀어 낸다.
       // 칸은 24px(마우스를 올렸을 때 칠해지는 면). 32px 이던 때 면이 크고 아이콘이 안쪽에 앉아 보였다(2026-09-25 Hun).
-      className="hz-side-toggle text-muted-foreground hover:bg-accent hover:text-foreground ml-auto -mr-1.5 inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md"
+      // 모서리 6px · 칠하는 색 --c-pressed: 끝 좌표가 알약과 같아도(195px) 모서리 9.6px 에 --c-hover(흰 바탕 대비 1.08)면
+      // 오른쪽 변이 곡선인 데다 흐려서 칸 끝이 안 보이고 아이콘 끝이 끝처럼 읽혀, 알약보다 안쪽에 선 것처럼 보였다.
+      className="hz-side-toggle text-muted-foreground hover:text-foreground ml-auto -mr-1.5 inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-[6px] hover:bg-(--c-pressed)"
       aria-label={label}
       aria-pressed={icon}
       title={label}
