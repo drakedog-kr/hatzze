@@ -412,7 +412,7 @@ const comingSoonFor = (env: ShellEnv): SoonItem[] => (env.themeNav ? COMING_SOON
  */
 const NAV_GROUPS: { label: string; hrefs: string[] }[] = [
   { label: "오늘 시장", hrefs: ["/", "/preview", NOTE_PAGE.href] },
-  { label: "텔레그램 여론", hrefs: ["/kadera", THEME_PAGE.href] },
+  { label: "커뮤니티 여론", hrefs: ["/kadera", THEME_PAGE.href] },
   { label: "분석과 기록", hrefs: ["/insider", "/mdd", "/seohak", DIVIDEND_PAGE.href] },
 ];
 
@@ -482,9 +482,10 @@ function NavGroupLabel({ label, first, inset }: { label: string; first: boolean;
       style={{
         margin: first ? "0 0 -2px" : "8px 0 -2px",
         padding: `0 ${inset}px`,
+        // 진하게(2026-09-25 Hun) — 회색(--c-muted)·600 이던 머리가 항목 이름보다 흐려 묶음이 안 읽혔다.
         fontSize: "var(--fs-12)",
-        fontWeight: 600,
-        color: C.muted,
+        fontWeight: 700,
+        color: C.ink,
       }}
     >
       {label}
@@ -681,8 +682,9 @@ const subscribeSide = (cb: () => void) => {
 };
 
 /**
- * 사이드바를 아이콘 막대로 접는 단추(shadcn 사이드바 블록 sidebar-07 의 collapsible="icon"). 사이드바 **맨 아래**에 둔다 —
- * 로고 옆·페이지 제목 옆은 둘 다 어색하다는 지적이었다(2026-09-25). 접히면 아이콘만 남고 이름은 마우스를 올리면 뜬다.
+ * 사이드바를 아이콘 막대로 접는 단추(shadcn 사이드바 블록 sidebar-07 의 collapsible="icon"). **로고 줄 오른쪽 끝**에 둔다.
+ * 자리를 네 번 옮겼다(2026-09-25) — 로고·베타 배지 옆(어수선) → 페이지 제목 왼쪽(이상) → 사이드바 맨 아래(이상) →
+ * 베타 배지를 빼고 로고 오른쪽(Hun 이 고른 자리). 접히면 로고 심볼 아래로 내려간다.
  *
  * 접힘은 `<html data-sidebar="icon">` 하나가 쥐고, 모양은 전부 CSS 가 바꾼다(app/styles/shadcn.css). 상태는
  * 쿠키 `hz-side` 에 남기고 layout.tsx 의 PREF_SCRIPT 가 그림 그리기 전에 속성을 붙인다 — 테마 스위치와 같은 길이라
@@ -694,9 +696,10 @@ function SidebarToggle() {
   return (
     <button
       type="button"
-      className="hz-side-toggle text-muted-foreground hover:bg-accent hover:text-foreground flex h-8 w-full shrink-0 cursor-pointer items-center gap-2 rounded-lg px-3 text-[13px] font-semibold"
+      className="hz-side-toggle text-muted-foreground hover:bg-accent hover:text-foreground ml-auto inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg"
       aria-label={label}
       aria-pressed={icon}
+      title={label}
       data-label={label}
       onClick={() => {
         const next = !icon;
@@ -707,8 +710,7 @@ function SidebarToggle() {
         window.dispatchEvent(new Event(SIDE_EVENT));
       }}
     >
-      <Icon name={icon ? "left_panel_open" : "left_panel_close"} style={{ fontSize: 18 }} />
-      <span className="hz-side-text">{label}</span>
+      <Icon name={icon ? "left_panel_open" : "left_panel_close"} style={{ fontSize: 20 }} />
     </button>
   );
 }
@@ -781,16 +783,16 @@ function Sidebar() {
         {/* 베타 배지는 로고 우측 상단에 붙인다 — 서비스 전체가 베타라는 표시라서,
             페이지마다(예전엔 카더라 제목 옆) 다는 것보다 여기 한 곳이 맞다.
             alignItems:flex-start 로 로고 윗선에 맞춰 위첨자처럼 올린다. */}
-        <LogoTag className="hz-side-logo" style={{ margin: 0, display: "flex", alignItems: "flex-start", gap: 5 }}>
+        {/* 로고 오른쪽 끝에 사이드바 접기 아이콘. 베타 배지는 사이드바에서 뺐다(2026-09-25 Hun) — 베타 표시는
+            푸터와 폰 탑바에 남는다. 배지가 있을 땐 로고 · 배지 · 접기 셋이 한 줄에 붙어 어수선했다. */}
+        <LogoTag className="hz-side-logo" style={{ margin: 0, display: "flex", alignItems: "center", gap: 5 }}>
           {/* 로고는 메인(시장 브리핑)으로 가는 링크 — 어느 페이지에서든 홈으로 돌아올 수 있게. */}
           <Link href="/" aria-label="hatzze 홈" className="hz-logo-link" style={{ display: "inline-flex" }}>
             <LogoLockup symbolSize={29} wordmarkSize={30} gap={7} />
           </Link>
           {/* 배지 크기는 '준비 중' 배지와 맞춘다(10px / padding 3-7). 서로 다른 크기면
               같은 사이드바 안에서 배지가 두 종류로 보인다. */}
-          <span className="hz-side-text" style={{ display: "inline-flex" }}>
-            <BetaBadge logoSize={30} style={{ height: "auto", fontSize: "var(--fs-10)", padding: "3px 7px", lineHeight: 1.4 }} />
-          </span>
+          <SidebarToggle />
         </LogoTag>
         <p className="hz-side-text" style={{ margin: "8px 0 0", fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub, letterSpacing: "0.02em", lineHeight: 1.5 }}>
           {SLOGAN}
@@ -1013,7 +1015,6 @@ function Sidebar() {
           <Icon name={TELEGRAM.icon} style={{ fontSize: "var(--fs-19)" }} />
           <span className="hz-side-text">{TELEGRAM.label}</span>
         </a>
-        <SidebarToggle />
       </div>
     </aside>
   );

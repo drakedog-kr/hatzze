@@ -221,9 +221,17 @@ html[data-sidebar="icon"] .hz-sidebar {
 html[data-sidebar="icon"] .hz-sidebar .hz-side-text {
   display: none !important;
 }
-/* 로고는 유령 심볼만 남긴다(워드마크는 LogoLockup 의 둘째 칸). */
+/* 로고는 유령 심볼만 남긴다(워드마크는 LogoLockup 의 둘째 칸). 접기 단추는 심볼 아래로 내린다(한 줄에 둘이 안 들어간다). */
 html[data-sidebar="icon"] .hz-sidebar .hz-logo-link > span > :nth-child(2) {
   display: none;
+}
+html[data-sidebar="icon"] .hz-sidebar .hz-side-logo {
+  flex-direction: column;
+  gap: 14px !important;
+}
+html[data-sidebar="icon"] .hz-sidebar .hz-side-toggle {
+  margin-left: 0;
+  position: relative;
 }
 html[data-sidebar="icon"] .hz-sidebar .hz-nav-item,
 html[data-sidebar="icon"] .hz-sidebar .hz-side-toggle,
