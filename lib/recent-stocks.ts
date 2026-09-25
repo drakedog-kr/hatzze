@@ -16,9 +16,9 @@ import type { SearchMarket } from "./search-rank";
 export type RecentRef = { market: SearchMarket; code: string };
 
 const KEY = "hz-recent-stocks";
-/** 보여 주는 줄 수. 적어 두는 건 조금 더(목록에서 빠진 종목이 있어도 다섯 줄이 차게). */
-export const RECENT_SHOW = 5;
-const RECENT_KEEP = 8;
+/** 보여 주는 줄 수(2026-09-26 5 → 3). 적어 두는 건 조금 더(목록에서 빠진 종목이 있어도 세 줄이 차게). */
+export const RECENT_SHOW = 3;
+const RECENT_KEEP = 6;
 
 /** 종목 화면 주소면 그 종목을, 아니면 null. 국장 `/stock/005930` · 미장 `/insider/stock/NVDA`. */
 export function refFromPath(path: string): RecentRef | null {

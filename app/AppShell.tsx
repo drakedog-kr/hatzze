@@ -472,19 +472,26 @@ function sidebarItems(env: ShellEnv): SidebarRow[] {
   return rows;
 }
 
-/** 묶음 머리 글. shadcn 의 SidebarGroupLabel 꼴(작은 회색 글)이고, 첫 묶음이 아니면 위를 띄워 묶음을 가른다. */
+/**
+ * 묶음 머리 글. 첫 묶음이 아니면 위를 띄워 묶음을 가른다.
+ *
+ * 색은 **항목보다 한 단만 진하게**(--c-label · 흰 바탕 7.1, 항목은 --c-sub 5.55).
+ *   - 회색(--c-muted 5.0)·600 일 땐 항목보다 흐려 묶음이 안 읽혔다(2026-09-25).
+ *   - 그래서 가장 진한 --c-ink(15.4)로 올렸더니 항목보다 세 단 진해 작은 꼬리표처럼 따로 놀았다(2026-09-26).
+ * 간격은 '앞 묶음과는 멀게, 제 항목과는 붙게'다 — 앞 항목 칸과 18px(4 + 14), 제 첫 항목 칸과 2px.
+ * 예전 12px 이면 위아래 차이가 작아 머리가 어느 쪽 묶음인지 덜 붙어 보였다.
+ */
 function NavGroupLabel({ label, first, inset }: { label: string; first: boolean; inset: number }) {
   return (
     <div
       role="presentation"
       className="hz-side-text"
       style={{
-        margin: first ? "0 0 -2px" : "8px 0 -2px",
+        margin: first ? "0 0 -2px" : "14px 0 -2px",
         padding: `0 ${inset}px`,
-        // 진하게(2026-09-25) — 회색(--c-muted)·600 이던 머리가 항목 이름보다 흐려 묶음이 안 읽혔다.
         fontSize: "var(--fs-12)",
         fontWeight: 700,
-        color: C.ink,
+        color: C.label,
       }}
     >
       {label}
