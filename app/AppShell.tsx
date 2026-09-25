@@ -679,7 +679,7 @@ function SearchTrigger() {
     <button
       type="button"
       onClick={openCommandMenu}
-      className="border-border bg-muted text-muted-foreground hover:bg-accent flex h-9 w-full shrink-0 cursor-pointer items-center gap-2 rounded-xl border px-3 text-[13px] transition-colors"
+      className="border-border text-muted-foreground hover:bg-accent flex h-9 w-full shrink-0 bg-transparent cursor-pointer items-center gap-2 rounded-xl border px-3 text-[13px] transition-colors"
       style={{ margin: "-18px 0 -14px" }}
     >
       <Icon name="search" style={{ fontSize: 17 }} />
