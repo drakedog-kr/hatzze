@@ -11,6 +11,9 @@
 - **날짜는 KST 기준**(calculate_stock_daily.py 와 동일). 러너가 UTC라 그냥 쓰면 하루 어긋난다.
 - **테마 매핑**: 메시지 → telegram_message_stocks → stocks → config/stock_themes.py.
   테마 로테이션 카드와 같은 사전을 공유해야 두 카드가 어긋나지 않는다.
+- **미국 종목만 다룬 글은 톤에서 뺀다**(2026-09-26). 국장·미장이 같은 채널을 읽어서 빼지
+  않으면 국장 낙관도에 미장 분위기가 섞인다. 기준은 트렌딩 카드와 같다(common/market_tags).
+  화제어는 그대로 다 센다 — 막대만 시장을 가른다.
 - **메시지 톤을 그 메시지가 언급한 모든 종목/테마에 동일하게 적용한다.** 한 메시지가 두
   종목을 서로 다른 톤으로 말하는 경우는 v1에서 감수한다 — 종목별로 나누려면 호출이 종목
   수만큼 늘어나는데, 실측상 대부분의 메시지는 단일 종목을 중심으로 쓰인다.
@@ -37,6 +40,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from common.market_tags import US_TAGS, is_us_only  # noqa: E402
 from common.supabase_client import has_column, get_client  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 from common.supabase_client import load_all, load_all_keyset  # noqa: E402
@@ -238,6 +242,22 @@ def main() -> None:
     for m in mentions:
         codes_of_msg[(m["channel_handle"], m["message_id"])].add(m["stock_code"])
 
+    # 미국 종목만 다룬 글 — 톤에서 뺀다(머리 주석). 미국 태그 표는 extract_telegram_us_stocks
+    # 가 이 스텝보다 먼저 채운다(워크플로 순서). 비었거나 못 읽으면 빼지 않고 예전처럼 센다 —
+    # 그날 막대에 미장 글이 섞일 뿐 막대가 비지는 않는다.
+    try:
+        us_rows = load_all_keyset(db, US_TAGS[0], "id,channel_handle,message_id")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[경고] 미국 종목 태그를 못 읽어 미장 글을 빼지 않고 셉니다: {exc}")
+        us_rows = []
+    if not us_rows:
+        print("[안내] 미국 종목 태그가 비어 있어 미장 글을 빼지 않고 셉니다.")
+    us_only = {
+        key
+        for key in {(r["channel_handle"], r["message_id"]) for r in us_rows}
+        if is_us_only(len(codes_of_msg.get(key, ())), 1)
+    }
+
     # 화제어에서 제외할 종목명 집합(정규화 키). 종목은 telegram_message_stocks 가
     # 담당하므로 화제어에 끼면 중복이다. 코스닥이 적재되면 자동으로 따라 늘어난다.
     stock_words = {norm(s["name"]) for s in stocks} | {norm(a) for a in STOCK_ALIASES}
@@ -258,6 +278,7 @@ def main() -> None:
     # ⚠️ 해시가 null 인 행(migration_065 이전 · backfill 전)은 중복 판정 없이 그대로 센다.
     seen_body: set[tuple[str, str]] = set()
     folded_dup = 0
+    dropped_us_only = 0
 
     for a in analysis:
         key = (a["channel_handle"], a["message_id"])
@@ -269,11 +290,15 @@ def main() -> None:
         sentiment = a["sentiment"]
         h = a.get("text_hash")
         dup = bool(h) and (date, h) in seen_body
-        if h:
-            seen_body.add((date, h))
-        if dup:
+        if key in us_only:
+            # 톤에서만 뺀다. 본문 해시도 남기지 않는다 — 같은 본문이 국내 태그를 달고 다시
+            # 나오면 그쪽이 첫 건으로 세어져야 한다. 화제어는 아래에서 그대로 센다.
+            dropped_us_only += 1
+        elif dup:
             folded_dup += 1
         else:
+            if h:
+                seen_body.add((date, h))
             tone[(date, OVERALL)][sentiment] += 1
             # 이 메시지가 언급한 종목들이 속한 테마 전부에 같은 톤을 반영(중복 제거).
             msg_themes = {t for code in codes_of_msg.get(key, ()) for t in themes_of_code.get(code, ())}
@@ -292,6 +317,7 @@ def main() -> None:
 
     if folded_dup:
         print(f"[집계] 같은 날 같은 본문이라 톤에서 접은 글 {folded_dup:,}건")
+    print(f"[집계] 미국 종목만 다뤄 톤에서 뺀 글 {dropped_us_only:,}건 (화제어는 그대로 셉니다)")
 
     sentiment_rows = [
         {
