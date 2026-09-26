@@ -162,6 +162,61 @@
   .cn-kbd-group {
     @apply gap-1;
   }
+
+  /* ── Button ── (rhea 그대로, 굵기만 700 — 이 사이트의 단추·세그먼트가 전부 700 이다) */
+  .cn-button {
+    @apply inline-flex shrink-0 cursor-pointer items-center justify-center rounded-2xl border border-transparent bg-clip-padding text-sm font-bold whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 active:translate-y-px disabled:pointer-events-none disabled:opacity-50;
+  }
+  .cn-button-default {
+    @apply bg-primary text-primary-foreground hover:bg-primary/85;
+  }
+  /* 바탕은 rhea 의 bg-background 가 아니라 카드색이다. 이 사이트의 --background 는 페이지 회색(--c-page)이라, 흰 판 위에서
+     '취소'가 회색 단추로 떴다(rhea 의 background 는 흰색이다). */
+  .cn-button-outline {
+    @apply border-border bg-card hover:bg-muted hover:text-foreground aria-expanded:bg-muted dark:bg-transparent dark:hover:bg-input/30;
+  }
+  .cn-button-secondary {
+    @apply bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)];
+  }
+  .cn-button-ghost {
+    @apply hover:bg-muted hover:text-foreground aria-expanded:bg-muted;
+  }
+  /* 글자는 --destructive(--c-hot) 대신 --c-hot-ink — 옅은 붉은 면 위에서 hot 은 4.5:1 에 못 미친다. */
+  .cn-button-destructive {
+    @apply bg-destructive/10 text-(--c-hot-ink) hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30;
+  }
+  .cn-button-size-default {
+    @apply h-8 gap-1.5 px-3;
+  }
+  .cn-button-size-sm {
+    @apply h-7 gap-1 px-3;
+  }
+  .cn-button-size-lg {
+    @apply h-9 gap-1.5 px-4;
+  }
+  .cn-button-size-icon {
+    @apply size-8;
+  }
+
+  /* ── AlertDialog ── */
+  .cn-alert-dialog-overlay {
+    @apply data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 bg-black/30 duration-100 supports-backdrop-filter:backdrop-blur-sm;
+  }
+  .cn-alert-dialog-content {
+    @apply bg-popover text-popover-foreground data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/5 dark:ring-foreground/10 max-w-[calc(100%-2rem)] gap-6 rounded-[min(var(--radius-4xl),24px)] p-6 shadow-xl ring-1 duration-100 sm:max-w-md;
+  }
+  .cn-alert-dialog-header {
+    @apply gap-1.5 text-left;
+  }
+  .cn-alert-dialog-title {
+    @apply text-lg font-bold;
+  }
+  .cn-alert-dialog-description {
+    @apply text-muted-foreground text-sm text-pretty break-keep;
+  }
+  .cn-alert-dialog-footer {
+    @apply flex-col-reverse gap-2 sm:flex-row sm:justify-end;
+  }
 }
 
 /* ── 이 사이트의 툴팁에 shadcn 을 입히는 자리 ─────────────────────────────────

@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { gaStockCode, track } from "@/lib/ga";
 import { Icon } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
@@ -112,6 +113,8 @@ export function DividendCalculator({
   }, [stocks, byCode, more, popular, popularUs, popularEtf]);
   // '더 보기'는 한 판만 열린다 — 세 판이 다 펼쳐지면 칩이 백 개다.
   const [moreOpen, setMoreOpen] = useState<Scope | null>(null);
+  // '모두 빼기' 확인 판(shadcn AlertDialog)이 열렸나.
+  const [clearAsk, setClearAsk] = useState(false);
   const toggleMore = (k: Scope) => {
     setMoreOpen((cur) => (cur === k ? null : k));
     if (moreOpen !== k) track("dividend_more", { scope: k });
@@ -287,11 +290,13 @@ export function DividendCalculator({
   };
   // '담은 종목'은 종목 수다 — 한 종목을 두 계좌로 나눠 두 줄이어도 하나.
   const distinct = new Set(holdings.map((h) => h.code)).size;
-  const clearAll = () => {
-    // 되돌릴 길이 없으니 한 번 묻는다 — 바스켓 열 종목을 손으로 담아 둔 사람이 실수로 누르면 다 잃는다.
-    if (!window.confirm(`담은 종목 ${distinct}개를 모두 뺄까요?`)) return;
+  // 되돌릴 길이 없으니 한 번 묻는다 — 바스켓 열 종목을 손으로 담아 둔 사람이 실수로 누르면 다 잃는다.
+  // 예전엔 브라우저 기본 확인창(window.confirm)이었다. 사이트 글꼴·색이 아니고, 폰에선 주소가 제목처럼 붙었다.
+  const clearAll = () => setClearAsk(true);
+  const clearConfirmed = () => {
     track("dividend_clear", { count: distinct });
     setHoldings([]);
+    setClearAsk(false);
   };
   const applyBasket = (b: BasketLite) => {
     // 카드가 보여 주는 목록과 같은 것을 담는다 — 연금저축·IRP 를 골랐으면 그 계좌 목록(2026-09-15 전엔 늘 ISA 목록을 담았다).
@@ -486,6 +491,20 @@ export function DividendCalculator({
           {lines.length > 0 && (
             <HoldingsTable lines={lines} inputs={inputs} totalInvest={invest} mode={taxMode} onClear={clearAll} onToggle={setLineOn} onMove={moveLine} onSort={sortLines} onAccount={setLineAccount} onSplit={splitLine} onShares={setShares} onCost={setCost} onRemove={remove} />
           )}
+          <AlertDialog open={clearAsk} onOpenChange={setClearAsk}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>담은 종목 {distinct}개를 모두 빼겠습니까?</AlertDialogTitle>
+                <AlertDialogDescription>적어 둔 주수·평단·계좌도 함께 지워지고 되돌릴 수 없습니다.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>취소</AlertDialogCancel>
+                <AlertDialogAction variant="destructive" onClick={clearConfirmed}>
+                  모두 빼기
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           {lines.length > 0 && (
             <MonthCalendar
               monthly={monthly}
