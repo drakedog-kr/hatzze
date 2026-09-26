@@ -119,7 +119,7 @@ export function MeterRow({
   valueWidth?: number;
 }) {
   return (
-    <div className="hz-bar-row" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+    <div className="hz-hbar-row" style={{ display: "flex", alignItems: "center", gap: 10 }}>
       <span style={{ width: labelWidth, flex: "none", display: "flex", alignItems: "center", gap: 3, minWidth: 0 }}>
         <span
           style={{
@@ -147,12 +147,12 @@ export function MeterRow({
           회색 바탕에서 글자가 흐려져서, 값은 예전처럼 오른쪽 칸에 모은다.
           막대엔 툴팁을 달지 않는다 — 값이 이미 오른쪽에 적혀 있고, 예전에도 없었다(한때 달았다가 Hun 지적으로 걷음, 09-27). */}
       <span style={{ flex: 1, minWidth: 0, display: "flex" }}>
-        <span className="hz-bar-track">
-          <span className="hz-bar" style={{ width: `${Math.max(2, Math.min(100, pct))}%`, background: color }} />
+        <span className="hz-hbar-track">
+          <span className="hz-hbar-fill" style={{ width: `${Math.max(2, Math.min(100, pct))}%`, background: color }} />
         </span>
       </span>
       <span
-        className="hz-bar-value"
+        className="hz-hbar-value"
         style={{
           width: valueWidth,
           textAlign: "right",
@@ -260,7 +260,7 @@ export function TwinRow({
   b: { pct: number; value: string; color: string; ink: string };
 }) {
   // shadcn 막대 차트(Multiple) 꼴로 두툼하게(6 → 8) · 데이터 끝만 둥글고 기준선 쪽은 각지게 · 두 막대 사이 2px(2026-09-26).
-  const bar = (pct: number, color: string): React.CSSProperties => ({ display: "block", height: 8, width: `${pct}%`, minWidth: pct > 0 ? 4 : 0, borderRadius: "0 4px 4px 0", background: color, transition: "filter .12s ease" });
+  const bar = (pct: number, color: string): React.CSSProperties => ({ display: "block", height: 8, width: `${pct}%`, minWidth: pct > 0 ? 4 : 0, borderRadius: "0 4px 4px 0", background: color });
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <span style={{ ...ROW_TEXT, width: MIRROR_LABEL_W, fontWeight: 700, color: C.sub2 }}>{label}</span>
