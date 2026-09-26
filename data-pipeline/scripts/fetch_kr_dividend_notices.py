@@ -53,8 +53,13 @@ REPORT_NM = "현금ㆍ현물배당 결정"
 PAGE = 100
 PAUSE_SEC = 0.4
 DEFAULT_DAYS = 10
-# 목록이 이보다 적으면(열흘에 보통 20~80건, 12~3월엔 수백) 페이지가 바뀐 것으로 보고 저장하지 않는다. 처음 백필은 예외.
+# 목록이 이보다 적으면(열흘에 보통 20~80건, 12~3월엔 수백) 페이지가 바뀐 것을 의심한다. 처음 백필은 예외.
 MIN_ROWS_DAILY = 3
+# ⚠️ **적다고 곧 페이지가 바뀐 것은 아니다.** 2026-09-26 아침 실행이 이 검사에 걸려 실패로 끝났는데, 09-16~09-25 에
+#    배당 결정 공시가 실제로 0건이었다(추석 연휴를 끼고 · 로컬 조회도 0건 · 텔레그램 DART 알림도 09-15 가 마지막).
+#    직전 실행들은 5 → 4 → 4건으로 겨우 넘기던 중이었다(전부 09-14·15 공시). 그래서 적으면 더 긴 기간을 한 번 더 본다 —
+#    거기서 행이 읽히면 페이지는 멀쩡한 것이다. 조용한 달에도 90일이면 분기배당 결정이 한 번은 지나간다.
+PROBE_DAYS = 90
 
 # 감액배당 문장 — 재원(자본준비금·감액)과 결과(비과세·과세소득 아님)가 같은 본문에 다 있어야 한다. 한쪽만이면 안 잡는다.
 SOURCE_RE = re.compile(r"자본준비금|자본 준비금|감액")
@@ -187,9 +192,21 @@ def main() -> None:
         print("[KIND 배당공시] 목록을 못 받았습니다")
         sys.exit(1)
     if not backfill and len(filings) < MIN_ROWS_DAILY:
-        print(f"[KIND 배당공시] {since}~{today} 목록이 {len(filings)}건뿐 — 페이지가 바뀐 것 같아 저장하지 않습니다")
-        sys.exit(1)
-    print(f"[KIND 배당공시] {since}~{today} 목록 {len(filings)}건")
+        # 공시가 뜸한 때인지 페이지가 바뀐 것인지는 더 긴 기간으로 가른다(PROBE_DAYS 주석).
+        probe = list_filings(today - timedelta(days=PROBE_DAYS), today)
+        if probe is None or len(probe) < MIN_ROWS_DAILY:
+            got = "못 받음" if probe is None else f"{len(probe)}건"
+            print(
+                f"[KIND 배당공시] {since}~{today} 목록이 {len(filings)}건뿐이고 최근 {PROBE_DAYS}일도 {got}"
+                " — 페이지가 바뀐 것 같아 저장하지 않습니다"
+            )
+            sys.exit(1)
+        print(
+            f"[KIND 배당공시] {since}~{today} 목록 {len(filings)}건 — 최근 {PROBE_DAYS}일은 {len(probe)}건이 읽혀"
+            " 페이지는 멀쩡합니다(공시가 뜸한 때)"
+        )
+    else:
+        print(f"[KIND 배당공시] {since}~{today} 목록 {len(filings)}건")
 
     db = None if dry_run else get_client()
     known: set[str] = set()
