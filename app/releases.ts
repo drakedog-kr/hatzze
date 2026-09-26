@@ -29,6 +29,12 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 빈 카드 대신 가장 최근 날짜를 세울 뿐 쓰는 법은 그대로다. Patch.
+    version: "1.21.9",
+    date: "2026-09-27",
+    changes: ["카더라 급등 종목이 연휴에도 비지 않고 가장 최근 날짜 것을 보여 줍니다."],
+  },
+  {
     // 두 선택의 자리만 바뀌고 쓰는 법은 그대로다. Patch.
     version: "1.21.8",
     date: "2026-09-27",

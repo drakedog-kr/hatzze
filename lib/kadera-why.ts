@@ -75,8 +75,17 @@ const QUOTE_ROWS = 24;
  * 화면 쪽에 숫자를 따로 두면 둘이 갈리는 순간 2차 조회가 엉뚱한 줄을 채운다.
  */
 export const BOARD_TILES = 9;
-/** 기준일에서 이보다 오래된 까닭은 '오늘' 카드에 안 올린다(주말·연휴는 사흘까지 거슬러 본다) */
+/** 종목 화면의 '왜 움직였나'는 기준일에서 사흘 안의 까닭만 쓴다(주말이 끼어도 사흘이면 닿는다) */
 const BOARD_STALE_DAYS = 3;
+/**
+ * '급등 종목' 카드는 이보다 오래된 판만 안 올린다. 빈 카드보다 날짜를 단 가장 최근 판이 낫다.
+ *
+ * 한때 카드도 사흘(BOARD_STALE_DAYS)에서 잘랐다. 연휴엔 장이 닫혀 판이 안 생기므로, 연휴 뒤
+ * 첫 거래일 아침에 기준일이 서면 사흘을 넘겨 저녁 실행까지 카드가 통째로 빈다(2026-09 추석:
+ * 마지막 판 09-23, 09-28 아침 기준일. 미장 짝은 09-27 에 실제로 비었다). 열흘 연휴(2025 추석)
+ * 까지 덮는 값이다. 미장 짝과 같다.
+ */
+const BOARD_MAX_DAYS = 14;
 
 type ReasonRow = {
   date: string;
@@ -159,7 +168,7 @@ export const getMoveReasons = cache(async (): Promise<MaybeFailed<MoveReasonBoar
     return LOAD_FAILED;
   }
   const date = latest?.date as string | undefined;
-  if (!date || date < addDaysISO(base, -BOARD_STALE_DAYS)) return null;
+  if (!date || date < addDaysISO(base, -BOARD_MAX_DAYS)) return null;
 
   const { data, error } = await db
     .from("telegram_stock_move_reason")

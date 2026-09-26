@@ -946,13 +946,15 @@ export default async function UsKaderaPage() {
              집는 규칙은 lib/kadera-us-why.ts 머리말에. 그래서 머리의 날짜 알약도 세션 날짜다.
           ⭐ 오른 종목만 담는다. 내린 종목의 까닭은 표에 남지만 이 구간이 '최근 뜨는 것'이다.
           ⭐ **까닭이 없는 줄도 안 올린다**(2026-09-10, 국장 짝과 같다). 뺀 자리엔 다음 줄이
-             올라온다 — 미장은 하루 줄 수가 적어 아홉이 안 찰 수도 있다(lib/kadera-us-why.ts). */}
+             올라온다 — 미장은 하루 줄 수가 적어 아홉이 안 찰 수도 있다(lib/kadera-us-why.ts).
+          ⭐ 연휴처럼 판이 사흘 넘게 안 생기면 가장 최근 판을 그대로 세운다(2026-09-27). 그때는
+             '직전' 이 거짓이라 설명을 '그날'로 바꾸고, 날짜는 알약이 맡는다(why.stale). */}
       <section className="hz-sheet" id="why">
         <SectionHead level={3}
           icon="trending_up"
           title="급등 종목"
           note={why?.rows[0]?.sessionDate ? fmtKoDate(why.rows[0].sessionDate) : undefined}
-          desc="직전 미국장에서 오른 종목과 커뮤니티가 말한 이유"
+          desc={why?.stale ? "그날 미국장에서 오른 종목과 커뮤니티가 말한 이유" : "직전 미국장에서 오른 종목과 커뮤니티가 말한 이유"}
         />
         {whyFailed ? (
           <p style={{ margin: 0, padding: "20px 22px", color: C.sub, fontSize: "var(--fs-13)" }}>이유를 불러오지 못했습니다.</p>

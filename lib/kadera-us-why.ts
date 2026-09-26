@@ -45,7 +45,12 @@ export type UsMoveReasonRow = {
   quotedChange: number | null;
 };
 
-export type UsMoveReasonBoard = { date: string; rows: UsMoveReasonRow[] };
+export type UsMoveReasonBoard = {
+  date: string;
+  rows: UsMoveReasonRow[];
+  /** 평소 거슬러 보는 사흘(BOARD_STALE_DAYS)보다 오래된 판. 화면이 '직전 미국장'이라 적지 않는다 */
+  stale: boolean;
+};
 
 /** 표에서 읽어 오는 최대 줄 수. 파이프라인 상한(generate_move_reasons.CAP)과 같다 */
 const BOARD_MAX = 40;
@@ -63,8 +68,16 @@ const QUOTE_ROWS = 24;
  * 화면 쪽에 숫자를 따로 두면 둘이 갈리는 순간 2차 조회가 엉뚱한 줄을 채운다.
  */
 export const US_BOARD_TILES = 9;
-/** 기준일에서 이보다 오래된 까닭은 카드에 안 올린다(주말·연휴는 사흘까지 거슬러 본다) */
+/** 기준일에서 이 안이면 평소 판이다(주말이 끼어도 사흘이면 닿는다). 넘으면 board.stale */
 const BOARD_STALE_DAYS = 3;
+/**
+ * 이보다 오래된 판만 안 올린다. 빈 카드보다 날짜를 단 가장 최근 판이 낫다.
+ *
+ * 한때 사흘(BOARD_STALE_DAYS)에서 잘랐는데, 연휴엔 채널 글이 적어 파이프라인이 까닭을 안
+ * 만들고(generate_move_reasons.MIN_DAY_MSGS) 그 사흘을 넘겨 카드가 통째로 비었다
+ * (2026-09-27 추석, 마지막 판 09-23). 열흘 연휴(2025 추석)까지 덮는 값이다.
+ */
+const BOARD_MAX_DAYS = 14;
 
 type UsReasonRow = {
   date: string;
@@ -142,7 +155,8 @@ export const getUsMoveReasons = cache(async (): Promise<MaybeFailed<UsMoveReason
     return LOAD_FAILED;
   }
   const date = latest?.date as string | undefined;
-  if (!date || date < addDaysISO(base, -BOARD_STALE_DAYS)) return null;
+  if (!date || date < addDaysISO(base, -BOARD_MAX_DAYS)) return null;
+  const stale = date < addDaysISO(base, -BOARD_STALE_DAYS);
 
   const { data, error } = await db
     .from("telegram_us_stock_move_reason")
@@ -164,7 +178,7 @@ export const getUsMoveReasons = cache(async (): Promise<MaybeFailed<UsMoveReason
   const rows = ((data ?? []) as UsReasonRow[])
     .map((r) => ({ ...r, reason: (r.reason ?? "").trim() }))
     .filter((r) => r.reason !== "");
-  if (!rows.length) return { date, rows: [] };
+  if (!rows.length) return { date, rows: [], stale };
 
   const names = await usNames(rows.map((r) => r.ticker));
   // 야후를 부를 줄 고르기 — 채널 글의 표기로 어림한다. 부호를 살려 많이 오른 줄부터.
@@ -237,7 +251,7 @@ export const getUsMoveReasons = cache(async (): Promise<MaybeFailed<UsMoveReason
     if (!(await fillFromYahoo(boardOf().slice(0, US_BOARD_TILES)))) break;
   }
 
-  return { date, rows: boardOf() };
+  return { date, rows: boardOf(), stale };
 });
 
 // ─── 다가오는 일정 ─────────────────────────────────────────────────────────
