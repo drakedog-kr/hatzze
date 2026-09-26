@@ -20,7 +20,7 @@ KRX 오픈API 는 그날 시세를 **다음 날 낮**에 준다(5회 실측: 18:
 
 종목 요약(3일)·급부상 한 줄(3일)과 다르다. "왜 올랐나"는 그날의 질문이라 어제 말을
 섞으면 답이 어긋난다. 저녁 18:00 실행 시점에 그날 메시지의 8할이 들어와 있다.
-아침 실행은 그날 메시지가 몇백 건뿐이라 **만들지 않는다**(MIN_DAY_MSGS). KRX 채우기만 한다.
+아침 실행(`--slot morning`)은 그날 메시지가 몇백 건뿐이라 **만들지 않는다**. KRX 채우기만 한다.
 
 실행:
     cd data-pipeline && source .venv/bin/activate
@@ -28,6 +28,7 @@ KRX 오픈API 는 그날 시세를 **다음 날 낮**에 준다(5회 실측: 18:
     python scripts/generate_move_reasons.py                    # 생성 + 저장
     python scripts/generate_move_reasons.py --date 2026-09-04  # 지난 날을 다시
     python scripts/generate_move_reasons.py --kr-only          # 한쪽만(--us-only)
+    python scripts/generate_move_reasons.py --slot morning     # 까닭은 안 만들고 KRX 확정값만 채운다
 """
 
 from __future__ import annotations
@@ -61,7 +62,21 @@ import generate_telegram_narratives as KR  # noqa: E402
 MODEL = KR.MODEL
 TABLE = "telegram_stock_move_reason"
 
-MIN_DAY_MSGS = 1500   # 그날 본문 있는 메시지가 이 아래면(아침 실행) 만들지 않는다
+# ⛔ **아침·저녁 실행은 글 수가 아니라 슬롯으로 가른다**(`--slot morning` 이면 안 만든다).
+#
+# 한때 "그날 글이 1,500건 미만이면 아침 실행"으로 봤다. 평일엔 맞았다(아침 400~670 · 저녁
+# 3,800~4,600건). 그런데 주말·연휴엔 **저녁에도** 790~1,070건이라 같이 걸렸다. 그래서
+#   · 2026-09-24~26 추석엔 미국장이 열렸는데(3채널 이상 미국 종목 40~66개) 미장 판이 안 생겨
+#     09-27 에 미장 '급등 종목' 카드가 통째로 비었다.
+#   · 토요일 10:30 발송 직전 스텝은 문턱을 400 으로 낮췄는데도 그 시각 DB 엔 06:30 아침 수집분
+#     120~190건뿐이라 09-12·19·26 세 번 다 건너뛰었다. 그 글은 토요일 판이 있을 때만 '종목별
+#     까닭'을 싣는다(broadcast_digest 의 us_fresh) — 세 번 다 그 재료가 빠졌다.
+# 글 수로는 '연휴 저녁'과 '평일 아침'이 안 갈린다. 워크플로는 이미 어느 슬롯인지 알고 있다
+# (daily-update.yml 의 slot 입력 · 디시 감성·뉴스 감성 스텝도 그걸로 아침을 건너뛴다).
+#
+# 슬롯을 안 넘기면 만든다 — 손으로 돌릴 때·`--date` 로 지난 날을 다시 만들 때·토요일 발송 스텝.
+# 표본이 얇은 날(토요일 10:30)도 MIN_CHANNELS 가 후보를 거르고, 발췌에 까닭이 없으면 모델이
+# 빈 문자열을 낸다. 같은 날짜를 저녁 실행이 더 많은 글로 다시 만들어 덮는다(아래 저장부 주석).
 
 # ⛔⛔ **장이 안 열린 날은 국장 까닭을 만들지 않는다.**
 #
@@ -78,10 +93,12 @@ MIN_DAY_MSGS = 1500   # 그날 본문 있는 메시지가 이 아래면(아침 �
 #    잘 안 적어서 **평일에도 2** 다 — 같은 문턱을 걸면 미장이 매일 사라진다. 그리고 미장 화면은
 #    `lastUsSession` 이 하루 전까지 거슬러 마지막 세션을 찾으므로 쉬는 날도 스스로 맞는다.
 KR_MIN_QUOTED = 10
-# ⭐ `--min-msgs N` 으로 이 문턱을 낮출 수 있다. 쓰는 곳은 **토요일 10:30 채널 발송** 하나다 —
-#    그 글('이번 주 미장 흐름')이 금요일 미국장을 다루는데, 미국장은 토요일 새벽 05:00 KST 에
-#    이미 끝나 있어 아침 수집 시점의 700~1,200건이 얇은 표본이 아니라 **그 세션의 재료 전부**다.
-#    문턱을 그대로 두면 토요일 몫은 그날 18:00 실행에서야 만들어져 10:30 글이 못 쓴다.
+#
+# ⭐ 주말은 표기 수를 세기 **전에** 건너뛴다(`weekdays_only`). 결과는 같다(토요일 표기 1).
+#    다만 표기를 세려면 언급 표 전체(24만 행)를 훑어야 하는데, 한때는 주말 저녁도 위 글 수
+#    문턱에 먼저 걸려 그 훑기가 없었다. 문턱을 걷으며 주말에 새로 생기는 몇 분을 막는 자리다.
+#    공휴일은 요일로 안 걸리므로 여전히 표기 수가 가른다.
+
 # 이 채널 수 미만은 후보가 아니다. 복붙 코퍼스라 한두 채널은 근거가 아니다.
 #
 # ⚠️ 2 였다가 3 으로 올렸다(2026-09-07 실전). 채널 2곳짜리 종목은 그날 글이 **상승률 순위
@@ -478,6 +495,7 @@ MARKETS = {
         "names": ("stocks", "code,name", "code", "name"),
         "fill_krx": True,
         "min_quoted": KR_MIN_QUOTED,
+        "weekdays_only": True,
     },
     "us": {
         "label": "미장",
@@ -491,9 +509,13 @@ MARKETS = {
 }
 
 
-def run_market(db, client, cfg: dict, day: str, dry_run: bool, min_msgs: int = MIN_DAY_MSGS) -> int:
+def run_market(db, client, cfg: dict, day: str, dry_run: bool) -> int:
     """한 시장의 그날치 까닭을 만들어 저장한다. 저장한 행 수를 돌려준다."""
     tag, key = cfg["label"], cfg["key"]
+
+    if cfg.get("weekdays_only") and date.fromisoformat(day).weekday() >= 5:
+        print(f"[{tag} {day}] 주말이라 만들지 않습니다 — 화면은 직전 거래일 자료를 그대로 씁니다.")
+        return 0
 
     # 1) 그날 집계(종목별 언급 폭). 앞 스텝(calculate_(us_)stock_daily)이 만든다.
     daily = load_keyset(
@@ -511,9 +533,6 @@ def run_market(db, client, cfg: dict, day: str, dry_run: bool, min_msgs: int = M
     #    한 번씩 부르는 편이 호출부가 단순하다(키셋이라 몇 초다).
     msgs = load_day_messages(db, day)
     print(f"[{tag} {day}] 본문 있는 메시지 {len(msgs):,}건")
-    if len(msgs) < min_msgs:
-        print(f"[skip] 그날 메시지가 {min_msgs}건 미만이라 까닭을 만들지 않습니다(아침 실행).")
-        return 0
 
     # 3) 종목 ↔ 메시지 연결. 표 전체를 키셋으로 읽는다(집계 스크립트와 같은 길 —
     #    날짜로 좁히는 서버 조인은 8초 벽에 걸린다, 2026-09-06 실측).
@@ -654,25 +673,28 @@ def main() -> None:
     day = today_kst().isoformat()
     if "--date" in args:
         day = args[args.index("--date") + 1]
-    min_msgs = MIN_DAY_MSGS
-    if "--min-msgs" in args:
-        min_msgs = int(args[args.index("--min-msgs") + 1])
+    # 슬롯 규칙은 파일 머리 KR_MIN_QUOTED 위 주석. 아침만 안 만든다 — 빈 값(손으로 돌림)은 만든다.
+    slot = args[args.index("--slot") + 1] if "--slot" in args else ""
+    make = slot != "morning"
 
     if not HAS_LLM_CREDENTIAL and not dry_run:
         print("[skip] LLM 자격(구독 토큰·API 키)이 없어 까닭 생성을 건너뜁니다.")
         return
     db = get_client()
-    client = None if dry_run else get_llm_client(ANTHROPIC_API_KEY)
+    client = None if dry_run or not make else get_llm_client(ANTHROPIC_API_KEY)
+    if not make:
+        print("[skip] 아침 실행이라 까닭을 만들지 않습니다 — KRX 확정값만 채웁니다.")
 
     total = 0
     for market, cfg in MARKETS.items():
         if (market == "kr" and us_only) or (market == "us" and kr_only):
             continue
-        try:
-            total += run_market(db, client, cfg, day, dry_run, min_msgs)
-        except Exception as exc:  # noqa: BLE001
-            # 한쪽이 죽어도 다른 쪽은 나가야 한다(미장 표가 아직 없는 환경 포함).
-            print(f"[{cfg['label']}] 실패: {type(exc).__name__}: {exc}")
+        if make:
+            try:
+                total += run_market(db, client, cfg, day, dry_run)
+            except Exception as exc:  # noqa: BLE001
+                # 한쪽이 죽어도 다른 쪽은 나가야 한다(미장 표가 아직 없는 환경 포함).
+                print(f"[{cfg['label']}] 실패: {type(exc).__name__}: {exc}")
         if cfg["fill_krx"]:
             try:
                 fill_krx(db, dry_run)
