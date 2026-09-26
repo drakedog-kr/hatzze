@@ -422,16 +422,13 @@ export function TopDrawdowns({ eps }: { eps: Episode[] }) {
             </span>
           </span>
           <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-            <span style={{ flex: 1, minWidth: 20, height: 8, borderRadius: 99, background: C.track, overflow: "hidden" }}>
-              <span
-                style={{
-                  display: "block",
-                  width: `${(Math.abs(e.depth) / worst) * 100}%`,
-                  height: "100%",
-                  borderRadius: 99,
-                  background: e.recovered ? DOWN_BAR[2] : DOWN_BAR[0],
-                }}
-              />
+            {/* shadcn 가로 막대 꼴 — 트랙 없이 두툼한 둥근 막대(hz-bar, shadcn.css). */}
+            <span
+              className="hz-tip hz-bar-hit"
+              data-tip={`${fmtPct(e.depth)} · ${fmtYm(e.peakDate)} ~ ${e.recovered ? fmtYm(e.recoveryDate!) : "진행 중"}`}
+              style={{ flex: 1, minWidth: 20, height: 14, display: "flex", alignItems: "center" }}
+            >
+              <span className="hz-bar" style={{ width: `${(Math.abs(e.depth) / worst) * 100}%`, background: e.recovered ? DOWN_BAR[2] : DOWN_BAR[0] }} />
             </span>
             <span style={{ width: "var(--mdd-top-depth, 44px)", flex: "none", fontFamily: MONO, fontSize: "var(--fs-11-5)", fontWeight: 800, color: e.recovered ? C.ink : DOWN }}>
               {fmtPct(e.depth)}

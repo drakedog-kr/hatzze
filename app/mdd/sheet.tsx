@@ -119,7 +119,7 @@ export function MeterRow({
   valueWidth?: number;
 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+    <div className="hz-bar-row" style={{ display: "flex", alignItems: "center", gap: 10 }}>
       <span style={{ width: labelWidth, flex: "none", display: "flex", alignItems: "center", gap: 3, minWidth: 0 }}>
         <span
           style={{
@@ -142,24 +142,24 @@ export function MeterRow({
           </span>
         )}
       </span>
-      <span style={{ flex: 1, minWidth: 0, height: 11, background: C.track, borderRadius: 4, overflow: "hidden" }}>
-        <span style={{ display: "block", height: "100%", width: `${Math.max(2, Math.min(100, pct))}%`, background: color, borderRadius: 4 }} />
-      </span>
-      <span
-        style={{
-          width: valueWidth,
-          flex: "none",
-          textAlign: "right",
-          fontFamily: MONO,
-          fontSize: "var(--fs-11-5)",
-          fontWeight: strong ? 800 : 700,
-          /* 막대색을 글자에 그대로 쓰면 안 된다. 램프의 --c-blue-1(#1b7fd4)은 흰 위
-             명암비 4.17 이라 11.5px 값이 안 읽힌다 — 채우는 색과 읽는 색은 다른 물건이다
-             (시장 브리핑의 --card-accent-ink 와 같은 규칙). */
-          color: strong ? (ink ?? color) : C.sub,
-        }}
-      >
-        {value}
+      {/* shadcn 가로 막대 차트 꼴(Bar Chart · Horizontal / Custom Label, 2026-09-26) — 회색 트랙 없이 두툼한 둥근 막대,
+          값은 막대 끝에 붙는다. 막대는 '칸 − 값 자리(valueWidth + 간격 8)' 안에서만 자란다 — 비율(82%)로 잡았더니
+          폰 폭(칸 221px)에서 가장 긴 막대의 값이 줄 끝을 9px 넘었다. */}
+      {/* 툴팁은 값이 먼저, 이름이 뒤(차트 지침). 값은 막대 끝에도 적혀 있어 툴팁은 거들기만 한다. */}
+      <span className="hz-bar-track hz-tip" data-tip={`${value} · ${label}`} style={{ ["--hz-bar-val" as string]: `${valueWidth}px` }}>
+        <span className="hz-bar" style={{ width: `calc((100% - var(--hz-bar-val) - 8px) * ${Math.max(2, Math.min(100, pct)) / 100})`, background: color }} />
+        <span
+          className="hz-bar-value"
+          style={{
+            fontWeight: strong ? 800 : 700,
+            /* 막대색을 글자에 그대로 쓰면 안 된다. 램프의 --c-blue-1(#1b7fd4)은 흰 위
+               명암비 4.17 이라 11.5px 값이 안 읽힌다 — 채우는 색과 읽는 색은 다른 물건이다
+               (시장 브리핑의 --card-accent-ink 와 같은 규칙). */
+            color: strong ? (ink ?? color) : C.sub,
+          }}
+        >
+          {value}
+        </span>
       </span>
     </div>
   );
@@ -194,20 +194,24 @@ export function MirrorRow({
   label,
   left,
   right,
+  tip,
 }: {
   label: string;
+  /** 막대 칸에 올리면 뜨는 글(값이 먼저). 두 값을 한 툴팁에 — 한쪽 막대를 짚지 않아도 둘 다 읽힌다. */
+  tip?: string;
   left: { pct: number; value: string; color: string; ink: string };
   right: { pct: number; value: string; color: string; ink: string; dashed?: boolean };
 }) {
-  const bar: React.CSSProperties = { position: "absolute", top: 3, height: 8, minWidth: 5 };
+  // 막대는 shadcn 막대 차트 꼴로 두툼하게(8 → 12) · 바깥 끝만 둥글게(2026-09-26).
+  const bar: React.CSSProperties = { position: "absolute", top: 1, height: 12, minWidth: 5 };
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <span style={{ ...ROW_TEXT, width: MIRROR_LABEL_W, fontWeight: 700, color: C.sub2 }}>{label}</span>
       <span style={{ ...ROW_TEXT, width: MIRROR_LEFT_W, textAlign: "right", fontWeight: 800, color: left.ink }}>{left.value}</span>
-      <div style={{ position: "relative", flex: 1, minWidth: 0, height: 14 }}>
+      <div className={tip ? "hz-tip hz-bar-hit" : undefined} data-tip={tip} style={{ position: "relative", flex: 1, minWidth: 0, height: 14 }}>
         <span style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1.5, background: C.line }} />
-        <span style={{ ...bar, right: "50%", width: `${left.pct}%`, borderRadius: "3px 0 0 3px", background: left.color }} />
-        <span style={{ ...bar, left: "50%", width: `${right.pct}%`, borderRadius: "0 3px 3px 0", background: right.dashed ? UNRECOVERED : right.color }} />
+        <span style={{ ...bar, right: "50%", width: `${left.pct}%`, borderRadius: "4px 0 0 4px", background: left.color }} />
+        <span style={{ ...bar, left: "50%", width: `${right.pct}%`, borderRadius: "0 4px 4px 0", background: right.dashed ? UNRECOVERED : right.color }} />
       </div>
       <span style={{ ...ROW_TEXT, width: MIRROR_RIGHT_W, fontWeight: 800, color: right.ink }}>{right.value}</span>
     </div>
@@ -249,16 +253,20 @@ export function TwinRow({
   label,
   a,
   b,
+  tip,
 }: {
   label: string;
+  /** 막대 칸에 올리면 뜨는 글(값이 먼저). */
+  tip?: string;
   a: { pct: number; value: string; color: string; ink: string };
   b: { pct: number; value: string; color: string; ink: string };
 }) {
-  const bar = (pct: number, color: string): React.CSSProperties => ({ display: "block", height: 6, width: `${pct}%`, minWidth: pct > 0 ? 4 : 0, borderRadius: 3, background: color });
+  // shadcn 막대 차트(Multiple) 꼴로 두툼하게(6 → 8) · 데이터 끝만 둥글고 기준선 쪽은 각지게 · 두 막대 사이 2px(2026-09-26).
+  const bar = (pct: number, color: string): React.CSSProperties => ({ display: "block", height: 8, width: `${pct}%`, minWidth: pct > 0 ? 4 : 0, borderRadius: "0 4px 4px 0", background: color, transition: "filter .12s ease" });
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <span style={{ ...ROW_TEXT, width: MIRROR_LABEL_W, fontWeight: 700, color: C.sub2 }}>{label}</span>
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+      <div className={tip ? "hz-tip hz-bar-hit" : undefined} data-tip={tip} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
         <span style={bar(a.pct, a.color)} />
         <span style={bar(b.pct, b.color)} />
       </div>

@@ -496,11 +496,19 @@ export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodL
       role="img"
       aria-label={`고점 대비 낙폭 곡선. 현재 ${fmtPct(series[n - 1].dd)}, 기간 최저 ${fmtPct(mdd)}`}
     >
-      <line x1={PAD_L} y1="0" x2={W} y2="0" stroke={C.line} strokeWidth="1" />
-      {rows.slice(1).map((dd, i) => (
-        <line key={i} x1={PAD_L} y1={y(dd)} x2={W} y2={y(dd)} stroke={C.line} strokeWidth="1" strokeDasharray="2 5" />
+      {/* shadcn 영역 차트 꼴(Area Chart · Gradient, 2026-09-26) — 격자는 가로 실선만 옅게, 면은 그라데이션.
+          shadcn 은 선에서 진하고 바닥으로 옅어지는데, 이 차트는 0% 가 위이고 선이 아래라 **깊을수록 진하게** 뒤집었다.
+          아래 두 줄을 한 번만 그리는 곳이 아니라 확대 보기에서도 그리므로 id 가 두 번 선다 — 모양이 같아 어느 쪽을 집어도 같다. */}
+      <defs>
+        <linearGradient id="mdd-uw-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={DOWN_BAR[1]} stopOpacity="0.06" />
+          <stop offset="100%" stopColor={DOWN_BAR[1]} stopOpacity="0.42" />
+        </linearGradient>
+      </defs>
+      {rows.map((dd, i) => (
+        <line key={i} x1={PAD_L} y1={y(dd)} x2={W} y2={y(dd)} stroke="var(--c-line)" strokeWidth="1" />
       ))}
-      <path d={area} fill={DOWN_BAR[1]} fillOpacity="0.14" />
+      <path d={area} fill="url(#mdd-uw-fill)" />
       <path d={line} fill="none" stroke={DOWN_BAR[1]} strokeWidth="1.6" strokeLinejoin="round" />
       {/* 기간 최저점 표시 — **빈 동그라미만**. 현재 지점에도 속 찬 점을 찍었었는데 뺐다:
           선이 끝나는 자리가 곧 현재이고, 그 값은 히어로가 이미 크게 말한다. */}
