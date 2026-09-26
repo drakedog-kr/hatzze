@@ -3,7 +3,10 @@
   "version": "1.0.1",
   "private": true,
   "scripts": {
+    "postinstall": "node scripts/copy-pretendard.mjs",
+    "predev": "node scripts/copy-pretendard.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/copy-pretendard.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

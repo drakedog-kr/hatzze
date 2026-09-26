@@ -92,6 +92,15 @@ const nextConfig: NextConfig = {
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
         ],
       },
+      /**
+       * 본문 글꼴 조각(scripts/copy-pretendard.mjs 가 복사한 것). 경로에 버전이 들어 있어(`/fonts/pretendard-1.3.9/…`)
+       * 파일이 바뀌면 주소가 바뀐다 — 그래서 1년 불변 캐시를 걸어도 된다. `public/` 의 기본값(max-age=0, 매번 확인)이면
+       * 화면을 열 때마다 조각 스무 개 남짓을 서버에 다시 묻는다.
+       */
+      {
+        source: "/fonts/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
       ...[
         "/opengraph-image",
         "/kadera/opengraph-image",

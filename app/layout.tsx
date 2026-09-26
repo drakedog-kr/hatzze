@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
 import AppShell from "./AppShell";
@@ -7,13 +6,8 @@ import { THEME_PUBLIC } from "./screen-flags";
 import { SLOGAN } from "./brand";
 import { SITE_NAME, SITE_URL, pageMetadata } from "./seo";
 import { ICON_FONT_HREF } from "@/lib/icon-names";
+import { PRETENDARD_CSS, PRETENDARD_PRELOAD } from "@/lib/fonts";
 
-const pretendard = localFont({
-  src: "../node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2",
-  variable: "--font-pretendard",
-  display: "swap",
-  weight: "45 920",
-});
 
 // 서치콘솔·서치어드바이저 소유확인 토큰. 값이 없으면 메타 태그 자체를 만들지 않는다
 // (content가 빈 태그는 두 콘솔 모두 '소유확인 실패'로 처리한다).
@@ -142,14 +136,21 @@ export default function RootLayout({
     // 속성을 지우지 않으므로 값은 남고, 개발 모드의 불일치 경고만 이 요소에서 끈다.
     // 자식 트리의 하이드레이션 검사에는 영향이 없다(body 의 것과 같은 범위).
     <html lang="ko" suppressHydrationWarning
-          className={`${pretendard.variable} h-full antialiased`}>
+          className="h-full antialiased">
       <head>
         {/* 라이트 값으로 내보내고, 다크 쿠키면 아래 PREF_SCRIPT 가 페인트 전에 바꾼다.
             토글을 누를 때는 AppShell 의 ThemeToggle 이 --c-bg 를 읽어 다시 맞춘다. */}
         <meta name="theme-color" content={THEME_COLOR.light} />
         <script dangerouslySetInnerHTML={{ __html: PREF_SCRIPT }} />
-        {/* 본문·숫자는 전부 Pretendard(위에서 next/font/local로 자체 호스팅)라 CDN에서
-            받아오는 건 두 가지뿐이다: 워드마크 전용 Bricolage Grotesque와 Material Symbols
+        {/* 본문·숫자는 전부 Pretendard 쪼갠 판(자체 호스팅, lib/fonts.ts)이다. 화면에 나온 글자가 든 조각만 받는다.
+            예전엔 전체판 2MB 를 next/font 로 모든 화면이 미리 받았고, 주소에 배포마다 바뀌는 ?dpl= 가 붙어
+            재방문자도 배포마다 다시 받았다(2026-09-26). 미리 받는 건 모든 화면이 쓰는 12조각뿐이다.
+            ⚠️ 미리 받기에는 crossOrigin 이 있어야 한다 — 글꼴은 CORS 모드로 받으므로, 없으면 같은 파일을 두 번 받는다. */}
+        <link rel="stylesheet" href={PRETENDARD_CSS} />
+        {PRETENDARD_PRELOAD.map((href) => (
+          <link key={href} rel="preload" href={href} as="font" type="font/woff2" crossOrigin="anonymous" />
+        ))}
+        {/* CDN 에서 받아오는 건 두 가지뿐이다: 워드마크 전용 Bricolage Grotesque와 Material Symbols
             아이콘. 둘 다 빌드 시점 폰트 페치 실패를 피하려고 런타임 CDN 링크로 둔다.
             (예전엔 Plus Jakarta Sans·JetBrains Mono도 받았는데, 한글 글리프가 없어 서체가
              갈리는 원인이라 Pretendard로 통일하며 걷어냈다.) */}
