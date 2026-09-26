@@ -61,6 +61,7 @@ from config.stock_extraction import (  # noqa: E402
     JOSA_TRAILING,
     NOT_MENTION_PHRASES,
     PREFIX_NAMES,
+    MEDIA_NAMES,
     PUBLISHER_SHORT_NAMES,
     US_TICKER_COLLISION,
 )
@@ -306,10 +307,10 @@ def is_publisher_name(key: str) -> bool:
     목록이 아니라 stocks 에서 나오는 조건이라 새 증권사가 상장하거나 사명이 바뀌어도
     따라온다. '…제11호스팩'처럼 증권사가 세운 SPAC 은 '스팩'으로 끝나 여기 안 걸린다.
     """
-    return key.endswith("증권") or key in PUBLISHER_SHORT_NAMES
+    return key.endswith("증권") or key in PUBLISHER_SHORT_NAMES or key in MEDIA_NAMES
 
 
-def publisher_context(text: str, start: int, end: int) -> bool:
+def publisher_context(text: str, start: int, end: int, trailing_word: bool = True) -> bool:
     """이 자리의 증권사 이름이 '종목'이 아니라 리포트 **발행처** 표기인가.
 
     이 코퍼스는 증권사 리서치 배포가 큰 몫이라, 증권사 이름은 종목보다 리포트를 낸
@@ -342,11 +343,18 @@ def publisher_context(text: str, start: int, end: int) -> bool:
     #    같은 날짜가 끼기도 해서 같은 줄에 [링크]가 있는지로 본다).
     if re.match(r"[^\n]*\[링크\]", after):
         return True
+    # ⑥ "작성자: 홍진현, 삼성증권 [입법 …]" · "출처 : 한국경제TV | 네이버" — 머리표가 이름을
+    #    이끄는 귀속. 뒤가 `[`·`|`·줄끝이라 ⑤ 가 못 본다(2026-09-26 주간 점검).
+    if re.search(r"(작성자|출처)\s*:[^\n:]{0,40}$", line_before):
+        return True
     # ⑤ "삼성증권 리서치센터", "키움증권 신민수", "SK증권 Global Carbon Market Daily"
     #    — 뒤에 부서·애널리스트·리포트 제목이 이어진다. AMBIGUOUS_NAMES 의 뒤 경계
     #    규칙("조사 아닌 한글이 붙으면 거부")과 같은 잣대인데, 발행처 표기는 한 칸
     #    띄우고 오므로 띄어쓴 뒤 낱말까지 본다. 진짜 언급은 뒤가 조사이거나 구두점
     #    (쉼표 나열·괄호 종목코드·공시의 " - ")이라 이 규칙에 걸리지 않는다.
+    #    매체 이름(config.MEDIA_NAMES)은 이 꼴을 안 본다(trailing_word=False) — 뒤에 그 회사 소식이 온다.
+    if not trailing_word:
+        return False
     nxt_word = re.match(r"[ \t]+(\S)", after)
     return bool(nxt_word and HANGUL_OR_ALNUM.match(nxt_word.group(1)))
 
@@ -405,7 +413,9 @@ def extract(
             continue
         # 증권사 이름은 한 메시지에 여러 번 나오는 일이 흔하다(머리글의 발행처 표기 +
         # 본문의 진짜 언급). 자리마다 따로 보고, 발행처 자리면 이 자리만 건너뛴다.
-        if is_publisher_name(key) and publisher_context(text, m.start(), m.end()):
+        if is_publisher_name(key) and publisher_context(
+            text, m.start(), m.end(), trailing_word=key not in MEDIA_NAMES
+        ):
             continue
         # 합성어의 꼬리로 쓰이는 이름은 앞 자리도 본다("뷰티 디바이스"). 승격(compound_key)
         # 전에 판정해야 한다 — 걸러야 할 건 사전 키가 놓인 자리이지 승격된 이름이 아니다.

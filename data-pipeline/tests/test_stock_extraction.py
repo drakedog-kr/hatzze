@@ -90,7 +90,7 @@ def test_short_acronym_must_match_dictionary_case():
     match_to_code = {"SBS": "034120", "NEW": "160550", "NAVER": "035420"}
     method = {k: "dict" for k in match_to_code}
     pattern, caseless = build_pattern(list(match_to_code))
-    text = "엑시노스 SbS 구조 (New!!) Naver 제휴, SBS Biz"
+    text = "엑시노스 SbS 구조 (New!!) Naver 제휴, SBS(034120)"  # `SBS Biz` 는 2026-09-26 부터 매체 귀속이다
     found = extract(text, pattern, match_to_code, method, {"NEW"}, caseless)
     assert set(found) == {"035420", "034120"}
 
@@ -343,3 +343,94 @@ def test_goldman_residual_forms_are_not_gs(text):
 )
 def test_gs_mentions_beside_ib_names_survive(text):
     assert _gs(text) == {"078930"}
+
+
+# ── 2026-09-26 주간 점검 2회차(09-20~26) ─────────────────────────────────────────────
+# 사례는 그 주 코퍼스의 실제 문장이다. 근거와 전량 재현 수치는 config/stock_extraction.py 주석.
+
+WEEK2_DICT = {
+    "캐리": "313760", "DB": "012030", "제우스": "079370", "KD": "044180", "이지스": "261520",
+    "선진": "136490", "오스템": "031510", "에이전트AI": "060900", "한화": "000880",
+    "STX": "011810", "제이오": "418550", "삼성생명": "032830", "HDC": "012630",
+    "IPARK현대산업개발": "294870", "한국콜마": "161890", "콜마홀딩스": "024720",
+    "KG모빌리티": "003620", "케이카": "381970", "뉴트리": "270870", "덱스터": "206560",
+    "SBS": "034120", "아시아경제": "127710", "한국경제TV": "039340", "KNN": "058400",
+    "에프앤가이드": "064850", "삼성증권": "016360",
+}
+
+
+def _week2(text: str) -> set[str]:
+    from config.stock_extraction import ALIASES
+
+    match_to_code = dict(WEEK2_DICT)
+    method = {k: "dict" for k in match_to_code}
+    for alias, official in ALIASES.items():
+        if official in WEEK2_DICT and alias not in match_to_code:
+            match_to_code[alias] = WEEK2_DICT[official]
+            method[alias] = "alias"
+    pattern, caseless = build_pattern(list(match_to_code))
+    ambiguous = set(match_to_code) & AMBIGUOUS_NAMES
+    return set(extract(text, pattern, match_to_code, method, ambiguous, caseless))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "[FI Weekly] 캐리 관점에서 본 미 국채  ▶ 미 국채, 캐리만 보면 OK",
+        "미국 4.782% 한국 4.350%  차 0.432%p  일본 2.918%  캐리 청산 3.00%",
+        "-유통시장: 캐리 수요 견조. 운용사 적극 순매수 유입 -회사채 금리",
+        "기존 컨트롤러 겸 최고회계책임자인 리처드 C. 캐리(Richard C. Cary, 63세)의 은퇴",
+        "AI 에이전트는 외부 툴 호출, DB 접근, 재추론 등 복잡한 연산 과정을 거치며",
+        "▶️ 국내 게임 매출 순위(구글)  1위 제우스(컴투스, 유지) 2위 이클립스(스마일게이트, 유지)",
+        "“멈출 수가 없다” 컴투스 신작 ‘제우스’ 얼마나 재밌길래…목표주가도 40% 뛰었다",
+        "계획 물량의 80% 이상이 중국에서 부품을 수출해서 현지 조립하는 KD 방식으로",
+        "연내 출시 예정인 [프로젝트 이지스]가 아직 베일 속에 있기에",
+        ">>TSMC, 선진 패키징 검증센터 설립…AI 칩 빠른 세대교체 대응",
+        "돌아온 임플란트 1위 오스템, 상반기 영업이익 두 배 '껑충'",
+        "미국 증시는 혼조세로 마감했네요.  에이전트AI 시장 성장 기대감에 따른 마이크론(+5.0%)",
+        "에이전트AI 흥행에 메타 뿐만 아니라 CPU관련주인 인텔/AMD도 급등",
+        "약 22억 달러(한화 약 3조 원) 투자 계획 발표",
+        "▶️한수위: 헝리중공업, 옛 STX대련의 역습",
+        "제이오션중공업, 탱커 6척 수주 https://www.hankyung.com/",
+        "이엔셀, 삼성생명공익재단과 줄기세포 배양기술 美 특허 등록",
+        "인트레피드 포타시($IPI)는 4.5%, 뉴트리엔($NTR)은 4%",
+        "유니트리는 신형 덱스터러스 핸드 Dex5-S 출시",
+        "[SBS Biz] 고려아연, '프로젝트 크루서블' 美 환경평가 최종 통과",
+        "파키스탄, 사우디 군사개입 시사 출처 : SBS | 네이버 https://naver.me/50BDJ1iY",
+        "원료망·제련 기술로 뚫는다(아시아경제) https://han.gl/DpURE",
+        "[한국경제TV] 대한항공, 세계 10대 항공사 선정…14개 부문 수상",
+        "① 에프앤가이드 집계 기준 삼성전자의 3분기 컨센서스는 매출 204조원",
+        "제목: 반도체 업종 중심으로 상승 작성자: 서정훈, 삼성증권 [입법 불확실성]",
+    ],
+)
+def test_week2_phantoms_are_not_stocks(text):
+    assert _week2(text) == set()
+
+
+@pytest.mark.parametrize(
+    "text, code",
+    [
+        ("(코스닥)캐리 - 반기보고서 (2026.06)", "313760"),
+        ("[실적속보]캐리, 올해 2Q 매출액 2300만(-99%) 영업이익 -5.3억(적자지속)", "313760"),
+        ("(코스닥)에이전트AI - 단일판매ㆍ공급계약체결", "060900"),
+        ("18. 에이전트AI 추가상장(유상증자) 19. 코퍼스코리아", "060900"),
+        ("제우스 (3,970억) +14.8% - AI 시대에 필수적인 보안 기술로 양자암호 수요 확대 전망", "079370"),
+        ("한화, 美 아칸소 탄약공장 사업 구체화…방산 공급망 확대 속도", "000880"),
+        ("(유가)STX - 최대주주변경 보고자:STX", "011810"),
+        ("(코스닥)아시아경제 - 최대주주변경을수반하는주식양수도계약체결", "127710"),
+        ("[경제] 코리아써키트, LG전자, 삼성증권, SBS, 아모텍, 티엘비", "034120"),
+        ("덱스터 수주공시 - 드라마 <L(가제)> VFX 계약 85억원", "206560"),
+        ("[DOC_POOL] [HDC현대산업개발] 제목: 자체도 좋고 도급도 좋고", "294870"),
+        ("한국콜마홀딩스(콜마홀딩스)와 KDB인베스트먼트 컨소시엄", "024720"),
+        ("케이카 상호변경(KG모빌리티플랫폼)", "381970"),
+        # 매체 이름은 발행처 자리 ⑤(뒤에 띄어 쓴 낱말)를 안 탄다 — 뒤에 그 회사 소식이 온다.
+        ("사들의 구조조정으로 턴어라운드 기반을 마련함. · CJ ENM과 SBS 등 주요 방송사", "034120"),
+        ("SBS 기상캐스터 AI 캐릭터 도입", "034120"),
+        ("YTN을 비롯해 iMBC, CJ ENM, 아시아경제 등 일부 미디어주", "127710"),
+        ("20. 소룩스 상호변경(아리바이오홀딩스) 21. KNN 변경상장", "058400"),
+        ("ETF 시장 확대로 최대 실적 기대…에프앤가이드 10%↑[특징주]", "064850"),
+        ("[에프앤가이드(064850,KQ) / 유진투자증권 코스닥벤처팀 박종선]", "064850"),
+    ],
+)
+def test_week2_real_mentions_survive(text, code):
+    assert code in _week2(text)
