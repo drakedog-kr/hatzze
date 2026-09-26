@@ -138,9 +138,18 @@ export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel:
         {/* 1 — 종목. 제목 줄 자리에 종목 자체가 선다(라벨 "분석 종목"은 위 검색창이 이미 말한다). */}
         <div className="hz-kd-hero-q" style={{ flex: "1 1 260px" }}>
           {/* 로고는 글자 기준선이 아니라 가운데에 맞아야 한다 — baseline 이면 정사각형
-              타일이 글자 밑선에 걸려 위로 떠 보인다. */}
+              타일이 글자 밑선에 걸려 위로 떠 보인다.
+              크기 40 은 두 줄 글자의 높이에 맞춘 것이다. 종목명 윗변에서 코드 줄 밑변까지가
+              PC 38px · 폰 40px(코드가 12px 로 커진다)이다(2026-09-26 픽셀 실측). 30 일 땐 가운데만
+              맞고 위아래가 5px 씩 글자 안쪽에 떠 있었다.
+              38 이 아닌 까닭: 로고 그림마다 **안쪽 여백**이 다르다. 현대차처럼 꽉 찬 로고는 상자가
+              곧 보이는 크기지만, 삼성전자는 그림 가장자리가 투명해 파란 면이 상자의 91% 뿐이다
+              (로고 바탕 #f2f4f6 이 이 타일 #f3f6fa 와 거의 같아 여백이 안 보인다). 38 이면 삼성전자가
+              위 1.5 · 아래 1px 짧게 보였다. 40 에서 삼성전자 PC 0.5 · 0, 꽉 찬 로고는 PC 1px 씩 크고
+              폰에서 딱 맞는다. 종목 상세 히어로도 40 이다.
+              ⚠️ 두 줄의 글자 크기를 바꾸면 이 값도 다시 잴 것. */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-            <StockLogo code={data.code} name={data.name} market={data.market} size={30} />
+            <StockLogo code={data.code} name={data.name} market={data.market} size={40} />
             <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
               <strong style={{ fontSize: "var(--fs-21)", fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>{data.name}</strong>
               <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", color: C.muted }}>
