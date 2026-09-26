@@ -420,3 +420,28 @@ html[data-sidebar="icon"] .hz-sidebar [data-label]:hover::after {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* ── shadcn 차트 범례(ChartLegendContent) ── 차트 아래 가운데, 면·막대를 나타내는 8px 네모 + 이름.
+   글자는 계열 색이 아니라 글자색(--c-sub)이다 — 색은 네모가 맡는다(차트 지침). 쓰는 곳: MDD 언더워터(두 겹일 때). */
+.hz-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 16px;
+  padding-top: 10px;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--c-sub);
+}
+.hz-chart-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.hz-chart-legend i {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}

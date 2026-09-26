@@ -34,6 +34,11 @@ export type MddResult = {
   attribution: AttributionData | null;
   theme: ThemeCmp | null;
   risk: RiskProfileData | null;
+  /**
+   * 언더워터 차트의 둘째 겹 — `analysis.underwater` 와 같은 순서·같은 날짜의 시장(코스피·S&P500) 낙폭(%).
+   * 시장 시세를 못 받았으면 null. 캐시에 남은 옛 응답엔 이 칸이 없어서 undefined 일 수 있다.
+   */
+  benchDd?: (number | null)[] | null;
 };
 
 export const PERIODS: { key: string; label: string }[] = [

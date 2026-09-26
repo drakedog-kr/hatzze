@@ -399,7 +399,7 @@ export function Results({ data }: { data: MddResult }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <HeroStrip data={data} periodLabel={periodLabel} />
-      <Underwater a={a} periodLabel={periodLabel} market={data.market} />
+      <Underwater a={a} periodLabel={periodLabel} market={data.market} name={data.name} benchDd={data.benchDd} />
 
       {data.risk ? (
         <RiskProfile r={data.risk} periodLabel={periodLabel} market={data.market} />
