@@ -2,8 +2,8 @@
 
 // 담은 종목 표와 한 줄. DividendCalculator.tsx 에서 그대로 옮겨 왔다(store.ts 머리말 참고).
 
+import dynamic from "next/dynamic";
 import { useRef, useState } from "react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { StockLogo } from "../StockLogo";
 import { won, usd, money, pct } from "./format";
 import { isSafeAsset, fitsAccount, ACCOUNTS, ACCOUNT_SHORT } from "./tax";
@@ -14,12 +14,15 @@ import type { Line } from "./shared";
 /** 표 위 '정렬' 목록의 열쇠. 고르면 순서 자체가 바뀌어 저장된다(DividendCalculator.sortLines). */
 export type SortKey = "net" | "invest" | "yield" | "name";
 
-const SORTS: { key: SortKey; label: string }[] = [
-  { key: "net", label: "배당 많은 순" },
-  { key: "invest", label: "투자금 많은 순" },
-  { key: "yield", label: "수익률 높은 순" },
-  { key: "name", label: "이름순" },
-];
+// '정렬' 메뉴(Base UI Menu)는 표가 설 때 따로 받아 온다(SortMenu.tsx 머리말). 받는 동안은 같은 모양의 멈춘 단추.
+const SortMenu = dynamic(() => import("./SortMenu").then((m) => m.SortMenu), {
+  ssr: false,
+  loading: () => (
+    <button type="button" className="dv-tsort" disabled aria-label="담은 종목 정렬">
+      정렬
+    </button>
+  ),
+});
 
 /** 끄는 동안의 상태. 줄 위치는 시작할 때 한 번 재고(rows), 포인터가 어느 줄 위에 있는지로 자리(to)를 정한다. */
 type Drag = { id: string; from: number; to: number; dy: number; height: number };
@@ -137,18 +140,7 @@ export function HoldingsTable({
           {/* 정렬은 한 번 세우는 동작이라 값이 남지 않는다 — 고르는 칸(select)이 아니라 메뉴다(shadcn DropdownMenu, 2026-09-26).
               예전엔 값이 늘 '정렬'로 돌아오는 select 를 썼다. 손으로 끈 순서는 그 뒤에 이어진다. */}
           {lines.length > 1 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger className="dv-tsort" aria-label="담은 종목 정렬">
-                정렬
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {SORTS.map((o) => (
-                  <DropdownMenuItem key={o.key} onClick={() => onSort(o.key)}>
-                    {o.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <SortMenu onSort={onSort} />
           )}
           <button type="button" className="dv-table-clear" onClick={onClear}>
             모두 빼기

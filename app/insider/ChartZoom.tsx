@@ -1,9 +1,12 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState } from "react";
 
 import { Icon } from "../ui";
-import { ZoomDialog } from "../ZoomDialog";
+
+// 판(Base UI Dialog, gzip 약 20KB)은 폰에서 확대 단추를 처음 누를 때 받는다 — 넓은 화면은 단추조차 안 보인다.
+const ZoomDialog = dynamic(() => import("../ZoomDialog").then((m) => m.ZoomDialog), { ssr: false });
 
 /**
  * 폰에서 차트를 화면 긴 변으로 눕혀 크게 보는 껍데기.
@@ -22,6 +25,8 @@ import { ZoomDialog } from "../ZoomDialog";
  */
 export function ChartZoom({ label, children }: { label: string; children: React.ReactNode }) {
   const [zoom, setZoom] = useState(false);
+  // 한 번 열면 붙여 둔다 — 닫을 때 떼면 Base UI 가 초점을 확대 단추로 돌려놓기 전에 사라진다.
+  const [used, setUsed] = useState(false);
 
   return (
     <div style={{ position: "relative" }}>
@@ -30,13 +35,18 @@ export function ChartZoom({ label, children }: { label: string; children: React.
         type="button"
         className="hz-zoom-btn"
         aria-label={`${label} 확대해서 보기`}
-        onClick={() => setZoom(true)}
+        onClick={() => {
+          setUsed(true);
+          setZoom(true);
+        }}
       >
         <Icon name="open_in_full" style={{ fontSize: "var(--fs-15)" }} />
       </button>
-      <ZoomDialog open={zoom} onOpenChange={setZoom} label={`${label} 확대`}>
-        {children}
-      </ZoomDialog>
+      {used && (
+        <ZoomDialog open={zoom} onOpenChange={setZoom} label={`${label} 확대`}>
+          {children}
+        </ZoomDialog>
+      )}
     </div>
   );
 }

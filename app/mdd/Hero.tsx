@@ -2,6 +2,7 @@
 
 // 히어로 — 낙폭 게이지·물속 차트·해설 문단. MddExplorer.tsx 에서 그대로 옮겨 왔다(shared.ts 머리말 참고).
 
+import dynamic from "next/dynamic";
 import { useLayoutEffect, useRef, useState } from "react";
 import type { MddAnalysis } from "@/lib/mdd";
 import { C, Icon, MONO } from "../ui";
@@ -10,7 +11,9 @@ import { StockLogo } from "../StockLogo";
 import { fmtPct, fmtPrice, benchName, benchParticle, benchVerb, fmtDur, fmtDayCount, fmtDay, DOWN, UP, DOWN_BAR } from "./shared";
 import type { MddResult } from "./shared";
 import { Sheet, Foot, StatCell } from "./sheet";
-import { ZoomDialog } from "../ZoomDialog";
+
+// 확대 판(Base UI Dialog, gzip 약 20KB)은 폰에서 확대 단추를 처음 누를 때 받는다(app/insider/ChartZoom.tsx 와 같다).
+const ZoomDialog = dynamic(() => import("../ZoomDialog").then((m) => m.ZoomDialog), { ssr: false });
 
 function Reading({ data, periodLabel }: { data: MddResult; periodLabel: string }) {
   const a = data.analysis;
@@ -450,6 +453,7 @@ export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodL
      2배 남짓 커진다(393×830 기준 350 → 830). 같은 SVG 를 그대로 다시 그리므로
      곡선·눈금·라벨이 갈릴 일이 없다. */
   const [zoom, setZoom] = useState(false);
+  const [zoomUsed, setZoomUsed] = useState(false);
 
   /* 크로스헤어 띠 — 보이지 않는 세로 띠가 눌리면 기준선(hz-vline)과 툴팁(hz-tip)을 낸다.
      위치를 **뷰박스 비율(%)**로 잡는다. 예전엔 카드 padding(22/20/42 px)을 기준으로 잡아
@@ -542,7 +546,10 @@ export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodL
         type="button"
         className="hz-zoom-btn"
         aria-label="언더워터 차트 확대해서 보기"
-        onClick={() => setZoom(true)}
+        onClick={() => {
+          setZoomUsed(true);
+          setZoom(true);
+        }}
       >
         <Icon name="open_in_full" style={{ fontSize: "var(--fs-15)" }} />
       </button>
@@ -550,9 +557,11 @@ export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodL
       <Foot>0%가 전고점입니다. 아래로 갈수록 그 고점에서 멀어져 있다는 뜻이며, 선이 0에 닿은 날이 고점을 되찾은 날입니다.</Foot>
       {/* 판은 app/ZoomDialog.tsx(Base UI Dialog)가 그린다 — 여백을 누르거나 Esc 로 닫히고, 초점이 판 안에 갇혔다가
           닫으면 확대 단추로 돌아온다. 무대는 90도 돌려 화면의 긴 변을 쓴다. */}
-      <ZoomDialog open={zoom} onOpenChange={setZoom} label="언더워터 차트 확대">
-        {chartWith(" mdd-crosshair-zoom")}
-      </ZoomDialog>
+      {zoomUsed && (
+        <ZoomDialog open={zoom} onOpenChange={setZoom} label="언더워터 차트 확대">
+          {chartWith(" mdd-crosshair-zoom")}
+        </ZoomDialog>
+      )}
     </Sheet>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { gaStockCode, track } from "@/lib/ga";
 import { Icon } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
@@ -21,6 +21,9 @@ import type { SortKey } from "./Holdings";
 import { MonthCalendar, Upcoming, MonthFill } from "./Calendar";
 import { GoalBox, AmountControl } from "./Goal";
 import { BasketSheet } from "./Basket";
+
+// '모두 빼기' 확인 판(Base UI 대화상자, gzip 약 20KB)은 처음 누를 때 받아 온다(ClearDialog.tsx).
+const ClearDialog = dynamic(() => import("./ClearDialog").then((m) => m.ClearDialog), { ssr: false });
 
 /**
  * 배당으로 살기(/dividend) 본체. 서버가 내려준 종목 목록(StockLite)만 갖고 브라우저에서 전부 계산한다.
@@ -113,8 +116,10 @@ export function DividendCalculator({
   }, [stocks, byCode, more, popular, popularUs, popularEtf]);
   // '더 보기'는 한 판만 열린다 — 세 판이 다 펼쳐지면 칩이 백 개다.
   const [moreOpen, setMoreOpen] = useState<Scope | null>(null);
-  // '모두 빼기' 확인 판(shadcn AlertDialog)이 열렸나.
+  // '모두 빼기' 확인 판(shadcn AlertDialog)이 열렸나. clearUsed 는 판을 한 번이라도 받아 왔나 — 한 번 붙이면 떼지 않는다
+  // (닫을 때 떼면 Base UI 가 초점을 '모두 빼기'로 돌려놓기 전에 사라진다).
   const [clearAsk, setClearAsk] = useState(false);
+  const [clearUsed, setClearUsed] = useState(false);
   const toggleMore = (k: Scope) => {
     setMoreOpen((cur) => (cur === k ? null : k));
     if (moreOpen !== k) track("dividend_more", { scope: k });
@@ -292,7 +297,10 @@ export function DividendCalculator({
   const distinct = new Set(holdings.map((h) => h.code)).size;
   // 되돌릴 길이 없으니 한 번 묻는다 — 바스켓 열 종목을 손으로 담아 둔 사람이 실수로 누르면 다 잃는다.
   // 예전엔 브라우저 기본 확인창(window.confirm)이었다. 사이트 글꼴·색이 아니고, 폰에선 주소가 제목처럼 붙었다.
-  const clearAll = () => setClearAsk(true);
+  const clearAll = () => {
+    setClearUsed(true);
+    setClearAsk(true);
+  };
   const clearConfirmed = () => {
     track("dividend_clear", { count: distinct });
     setHoldings([]);
@@ -491,20 +499,7 @@ export function DividendCalculator({
           {lines.length > 0 && (
             <HoldingsTable lines={lines} inputs={inputs} totalInvest={invest} mode={taxMode} onClear={clearAll} onToggle={setLineOn} onMove={moveLine} onSort={sortLines} onAccount={setLineAccount} onSplit={splitLine} onShares={setShares} onCost={setCost} onRemove={remove} />
           )}
-          <AlertDialog open={clearAsk} onOpenChange={setClearAsk}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>담은 종목 {distinct}개를 모두 빼겠습니까?</AlertDialogTitle>
-                <AlertDialogDescription>적어 둔 주수·평단·계좌도 함께 지워지고 되돌릴 수 없습니다.</AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>취소</AlertDialogCancel>
-                <AlertDialogAction variant="destructive" onClick={clearConfirmed}>
-                  모두 빼기
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          {clearUsed && <ClearDialog open={clearAsk} onOpenChange={setClearAsk} count={distinct} onConfirm={clearConfirmed} />}
           {lines.length > 0 && (
             <MonthCalendar
               monthly={monthly}
