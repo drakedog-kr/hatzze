@@ -446,12 +446,12 @@ html[data-sidebar="icon"] .hz-sidebar [data-label]:hover::after {
   border-radius: 2px;
 }
 
-/* ── MDD 언더워터 축 — 그림 밖 HTML 칸의 축 글자(늘 11px · 옅은 색, shadcn 축 text-xs 자리) ─────────────
-   왼쪽 칸(34px)에 퍼센트, 그림 아래 줄에 연도. 칸 위치는 TSX 가 뷰박스 비율(%)로 준다.
+/* ── MDD 언더워터 축 — 그림 밖 HTML 칸의 축 글자(늘 12px, shadcn 축 text-xs 자리) ─────────────
+   왼쪽 칸(38px)에 퍼센트, 그림 아래 줄에 연도. 칸 위치는 TSX 가 뷰박스 비율(%)로 준다.
    좁은 폭(차트 480px 이하)에선 연도를 하나씩 걸러 서로 붙지 않게 한다(data-minor). */
 .mdd-uw {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
+  grid-template-columns: 38px minmax(0, 1fr);
   column-gap: 8px;
   container-type: inline-size;
 }
@@ -461,9 +461,11 @@ html[data-sidebar="icon"] .hz-sidebar [data-label]:hover::after {
 .mdd-uw-y > span,
 .mdd-uw-x > span {
   position: absolute;
-  font-size: var(--fs-11);
+  /* 11px · 400 · --c-muted 는 너무 흐렸다(Hun, 09-27) — shadcn 축 글자 크기(12px)에 굵기 600, 한 단 진한 --c-sub(5.55:1). */
+  font-size: var(--fs-12);
+  font-weight: 600;
   line-height: 1;
-  color: var(--c-muted);
+  color: var(--c-sub);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
