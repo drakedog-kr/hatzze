@@ -755,10 +755,33 @@
   background: var(--c-chip);
 }
 .hz-tx .hz-seg > button { padding: 5px 12px; border-radius: 8px; font-size: var(--fs-12); }
-.hz-tx .hz-seg > button[aria-pressed="true"] {
+/* 세그먼트 한 벌(2026-09-26) — 한 줄에 붙은 선택지(기간·모드·탭)는 단추든 링크든 전부 이 모양이다.
+   예전엔 배당 세금 토글(.dv-seg · 고른 칸이 짙은 남색으로 꽉 참)과 미장 종목 기간(.hz-periodset · 떨어진 알약 +
+   파란 틴트)이 따로 놀아, 같은 '고르기'가 화면마다 세 가지 말로 보였다. 링크로 된 것(미장 종목 기간은 주소가
+   바뀐다)은 aria-current 로, 탭은 aria-selected 로 고른 칸을 표시한다. */
+.hz-tx .hz-seg > a {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: 8px;
+  color: var(--c-sub);
+  font-size: var(--fs-12);
+  font-weight: 700;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.hz-tx .hz-seg > button[aria-pressed="true"],
+.hz-tx .hz-seg > button[aria-selected="true"],
+.hz-tx .hz-seg > a[aria-current] {
   background: var(--c-card);
   color: var(--c-ink);
   box-shadow: 0 1px 2px rgba(19, 66, 122, 0.12);
+}
+/* 고르지 않은 칸은 글자만 진해진다(MDD 기간의 호버와 같다). 카더라 탭은 호버를 안 거는 자리라 여기 안 넣는다. */
+.hz-tx .hz-seg-hover > button[aria-pressed="false"]:hover,
+.hz-tx .hz-seg-hover > a:not([aria-current]):hover {
+  color: var(--c-ink);
 }
 
 @media (max-width: 900px) {
@@ -1135,12 +1158,7 @@
 .dv-body { padding: 14px 26px 22px; display: flex; flex-direction: column; gap: 16px; }
 
 /* 세후·세전 — MDD 기간 토글과 같은 세그먼트. 고른 칸만 파란 면 + 카드색 글자. */
-.dv-seg { display: flex; gap: 2px; background: var(--c-track); border-radius: 9px; padding: 3px; }
-.dv-seg-btn {
-  padding: 6px 12px; border-radius: 6px; border: none; background: transparent; color: var(--c-label);
-  font-size: var(--fs-11-5); font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap;
-}
-.dv-seg-btn[aria-pressed="true"], .dv-seg-btn[aria-selected="true"] { background: var(--c-cold-ink); color: var(--c-card); }
+/* 세금 토글(세후·세전)은 세그먼트 한 벌(.hz-seg)을 쓴다 — 전용 모양(.dv-seg)은 2026-09-26 에 걷었다. */
 
 /* 세 갈래 판 — 국장 · 미장 · ETF 가 늘 나란히. 회색 타일 안에 제목·설명·칩. 좁으면 한 판씩. */
 .dv-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }

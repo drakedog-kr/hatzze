@@ -495,7 +495,7 @@ export default async function StockDetailPage({
                 padding: "0 22px 12px",
               }}
             >
-              <span className="hz-periodset">
+              <span className="hz-seg hz-seg-hover hz-periodset">
                 {PRICE_RANGES.map((r) => (
                   <Link
                     key={r.key}
@@ -503,7 +503,6 @@ export default async function StockDetailPage({
                     // ⚠️ 스크롤을 위로 튕기지 않는다 — 차트를 보다 기간만 바꾸는 것이라
                     //    맨 위로 올라가면 방금 보던 자리를 잃는다.
                     scroll={false}
-                    className={r.key === range ? "is-on" : undefined}
                     aria-current={r.key === range ? "true" : undefined}
                   >
                     {r.label}

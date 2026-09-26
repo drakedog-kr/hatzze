@@ -539,12 +539,12 @@ export function DividendCalculator({
 /* ── 세후·세전 ────────────────────────────────────────────────────── */
 function TaxToggle({ afterTax, onChange }: { afterTax: boolean; onChange: (v: boolean) => void }) {
   return (
-    <div className="dv-seg" role="group" aria-label="세금 반영">
+    <div className="hz-seg hz-seg-hover" role="group" aria-label="세금 반영">
       {[
         { on: true, label: "세후" },
         { on: false, label: "세전" },
       ].map((o) => (
-        <button key={o.label} type="button" aria-pressed={afterTax === o.on} className="dv-seg-btn" onClick={() => onChange(o.on)}>
+        <button key={o.label} type="button" aria-pressed={afterTax === o.on} onClick={() => onChange(o.on)}>
           {o.label}
         </button>
       ))}
