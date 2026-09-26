@@ -506,6 +506,8 @@ export function Underwater({
   const ticks = yearMarks.filter((t) => t.year % yearStep === 0);
   // 그리드 라인(0/절반/바닥) 라벨.
   const rows = [0, floor / 2, floor];
+  // 격자는 넷으로 나눈 다섯 줄(shadcn 차트처럼 옅게 촘촘히), 라벨은 위 셋에만.
+  const gridRows = [0, floor / 4, floor / 2, (floor * 3) / 4, floor];
   // 기간 최저점 — 곡선에서 가장 깊은 지점에 표시를 남긴다.
   let ti = 0;
   for (let i = 1; i < n; i++) if (series[i].dd < series[ti].dd) ti = i;
@@ -565,29 +567,31 @@ export function Underwater({
       aria-label={`고점 대비 낙폭 곡선. 현재 ${fmtPct(series[n - 1].dd)}, 기간 최저 ${fmtPct(mdd)}`}
     >
       {/* shadcn 영역 차트 꼴(Area Chart · Interactive, 2026-09-27) — 두 겹(종목 · 시장)을 겹쳐 그리고, 면은 그라데이션,
-          격자는 가로 실선만 옅게. shadcn 은 선에서 진하고 바닥으로 옅어지는데, 이 차트는 0% 가 위이고 선이 아래라
+          격자는 가로 실선만 옅게, 선은 1px. shadcn 은 선에서 진하고 바닥으로 옅어지는데, 이 차트는 0% 가 위이고 선이 아래라
           **깊을수록 진하게** 뒤집었다. 시장 겹을 먼저(뒤에) 그려 종목 겹이 위에 선다.
           이 그림은 확대 보기에서도 한 번 더 그려져 id 가 두 번 선다 — 모양이 같아 어느 쪽을 집어도 같다. */}
       <defs>
         <linearGradient id="mdd-uw-fill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={DOWN_BAR[1]} stopOpacity="0.08" />
-          <stop offset="100%" stopColor={DOWN_BAR[1]} stopOpacity="0.55" />
+          <stop offset="0%" stopColor={DOWN_BAR[1]} stopOpacity="0.04" />
+          <stop offset="100%" stopColor={DOWN_BAR[1]} stopOpacity="0.4" />
         </linearGradient>
         <linearGradient id="mdd-uw-bench" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={BENCH_UW} stopOpacity="0.06" />
-          <stop offset="100%" stopColor={BENCH_UW} stopOpacity="0.3" />
+          <stop offset="0%" stopColor={BENCH_UW} stopOpacity="0.04" />
+          <stop offset="100%" stopColor={BENCH_UW} stopOpacity="0.28" />
         </linearGradient>
       </defs>
-      {rows.map((dd, i) => (
-        <line key={i} x1={PAD_L} y1={y(dd)} x2={W} y2={y(dd)} stroke="var(--c-line)" strokeWidth="1" />
+      {/* 선·격자는 화면에서 늘 1px — 그림이 가로 720 단위를 화면 폭에 맞춰 늘이고 줄여서, 그대로 두면 PC 에선 1.4px 로
+          굵어지고 폰에선 0.4px 로 흐려진다(vectorEffect non-scaling-stroke). shadcn 차트처럼 선은 가늘게(Hun, 09-27). */}
+      {gridRows.map((dd, i) => (
+        <line key={i} x1={PAD_L} y1={y(dd)} x2={W} y2={y(dd)} stroke="var(--c-line)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
       ))}
       {benchArea && <path d={benchArea} fill="url(#mdd-uw-bench)" />}
-      {benchLine && <path d={benchLine} fill="none" stroke={BENCH_UW} strokeWidth="1.5" strokeLinejoin="round" />}
+      {benchLine && <path d={benchLine} fill="none" stroke={BENCH_UW} strokeWidth="1" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
       <path d={area} fill="url(#mdd-uw-fill)" />
-      <path d={line} fill="none" stroke={DOWN_BAR[1]} strokeWidth="2" strokeLinejoin="round" />
+      <path d={line} fill="none" stroke={DOWN_BAR[1]} strokeWidth="1" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
       {/* 기간 최저점 표시 — **빈 동그라미만**. 현재 지점에도 속 찬 점을 찍었었는데 뺐다:
           선이 끝나는 자리가 곧 현재이고, 그 값은 히어로가 이미 크게 말한다. */}
-      <circle cx={x(ti)} cy={y(series[ti].dd)} r="3.5" fill={C.card} stroke={DOWN} strokeWidth="1.6" />
+      <circle cx={x(ti)} cy={y(series[ti].dd)} r="3" fill={C.card} stroke={DOWN} strokeWidth="1.2" vectorEffect="non-scaling-stroke" />
       {rows.map((dd, i) => (
         <text key={i} x={PAD_L - LABEL_GAP} y={y(dd) + 4} fontSize="11" fill={C.muted} textAnchor="end">
           {Math.round(dd)}%
