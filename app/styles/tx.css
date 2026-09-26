@@ -1264,7 +1264,7 @@
 .dv-table-clear { padding: 0; border: none; background: none; color: var(--c-muted); font-size: var(--fs-12); font-weight: 600; cursor: pointer; font-family: inherit; }
 .dv-table-clear:hover { color: var(--c-blue); text-decoration: underline; }
 .dv-table-tools { display: flex; align-items: center; gap: 14px; }
-/* 표 위 '정렬' — 줄의 계좌 알약과 같은 생김새의 select. 고르면 순서가 한 번 바뀌고 값은 '정렬'로 돌아온다. */
+/* 표 위 '정렬' — 줄의 계좌 알약과 같은 생김새의 메뉴 단추(shadcn DropdownMenu 의 단추). 고르면 순서가 한 번 바뀐다. */
 .dv-tsort {
   appearance: none; -webkit-appearance: none; padding: 2px 16px 2px 8px; border-radius: 4px; border: 1px solid transparent;
   background: var(--c-chip) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 3.5l3 3 3-3' fill='none' stroke='%235e728d' stroke-width='1.5'/></svg>") no-repeat right 4px center;

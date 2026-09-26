@@ -3,6 +3,7 @@
 // 담은 종목 표와 한 줄. DividendCalculator.tsx 에서 그대로 옮겨 왔다(store.ts 머리말 참고).
 
 import { useRef, useState } from "react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { StockLogo } from "../StockLogo";
 import { won, usd, money, pct } from "./format";
 import { isSafeAsset, fitsAccount, ACCOUNTS, ACCOUNT_SHORT } from "./tax";
@@ -133,18 +134,21 @@ export function HoldingsTable({
           담은 종목 {distinct}개{excluded > 0 && <span className="dv-table-counted"> · {excluded}개 제외</span>}
         </span>
         <span className="dv-table-tools">
-          {/* 정렬은 한 번 세우는 동작이라 값이 남지 않는 select 다('＋ 계좌'와 같은 꼴). 손으로 끈 순서는 그 뒤에 이어진다. */}
+          {/* 정렬은 한 번 세우는 동작이라 값이 남지 않는다 — 고르는 칸(select)이 아니라 메뉴다(shadcn DropdownMenu, 2026-09-26).
+              예전엔 값이 늘 '정렬'로 돌아오는 select 를 썼다. 손으로 끈 순서는 그 뒤에 이어진다. */}
           {lines.length > 1 && (
-            <select className="dv-tsort" value="" onChange={(e) => e.target.value && onSort(e.target.value as SortKey)} aria-label="담은 종목 정렬">
-              <option value="" disabled hidden>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="dv-tsort" aria-label="담은 종목 정렬">
                 정렬
-              </option>
-              {SORTS.map((o) => (
-                <option key={o.key} value={o.key}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {SORTS.map((o) => (
+                  <DropdownMenuItem key={o.key} onClick={() => onSort(o.key)}>
+                    {o.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           <button type="button" className="dv-table-clear" onClick={onClear}>
             모두 빼기

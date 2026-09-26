@@ -217,6 +217,18 @@
   .cn-alert-dialog-footer {
     @apply flex-col-reverse gap-2 sm:flex-row sm:justify-end;
   }
+
+  /* ── DropdownMenu ── */
+  .cn-menu-content {
+    @apply bg-popover text-popover-foreground data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/5 dark:ring-foreground/10 z-50 max-h-(--available-height) min-w-32 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-2xl p-1 shadow-lg ring-1 duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2;
+  }
+  .cn-menu-label {
+    @apply text-muted-foreground px-2 py-1 text-xs;
+  }
+  /* 짚은 항목은 파란 틴트(.cn-command-item 과 같다). accent(--c-hover)는 흰 판 위에서 1.06 이라 안 보인다. */
+  .cn-menu-item {
+    @apply data-highlighted:bg-(--c-blue-tint) data-highlighted:text-(--c-cold-ink) min-h-7 cursor-default gap-2 rounded-xl px-2 py-1.5 text-sm outline-hidden data-disabled:pointer-events-none data-disabled:opacity-50;
+  }
 }
 
 /* ── 이 사이트의 툴팁에 shadcn 을 입히는 자리 ─────────────────────────────────
