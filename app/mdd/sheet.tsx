@@ -142,24 +142,28 @@ export function MeterRow({
           </span>
         )}
       </span>
-      {/* shadcn 가로 막대 차트 꼴(Bar Chart · Horizontal / Custom Label, 2026-09-26) — 회색 트랙 없이 두툼한 둥근 막대,
-          값은 막대 끝에 붙는다. 막대는 '칸 − 값 자리(valueWidth + 간격 8)' 안에서만 자란다 — 비율(82%)로 잡았더니
-          폰 폭(칸 221px)에서 가장 긴 막대의 값이 줄 끝을 9px 넘었다. */}
-      {/* 툴팁은 값이 먼저, 이름이 뒤(차트 지침). 값은 막대 끝에도 적혀 있어 툴팁은 거들기만 한다. */}
-      <span className="hz-bar-track hz-tip" data-tip={`${value} · ${label}`} style={{ ["--hz-bar-val" as string]: `${valueWidth}px` }}>
-        <span className="hz-bar" style={{ width: `calc((100% - var(--hz-bar-val) - 8px) * ${Math.max(2, Math.min(100, pct)) / 100})`, background: color }} />
-        <span
-          className="hz-bar-value"
-          style={{
-            fontWeight: strong ? 800 : 700,
-            /* 막대색을 글자에 그대로 쓰면 안 된다. 램프의 --c-blue-1(#1b7fd4)은 흰 위
-               명암비 4.17 이라 11.5px 값이 안 읽힌다 — 채우는 색과 읽는 색은 다른 물건이다
-               (시장 브리핑의 --card-accent-ink 와 같은 규칙). */
-            color: strong ? (ink ?? color) : C.sub,
-          }}
-        >
-          {value}
+      {/* shadcn 가로 막대 차트 꼴(2026-09-26) — 두툼한 막대(22px), 데이터 끝만 둥글고 기준선 쪽은 각지다.
+          빈칸(회색 트랙)은 깐다 — 막대가 최댓값에 견줘 얼마나 찼는지가 보여야 한다(Hun, 09-27). 트랙 위에 값을 얹으면
+          회색 바탕에서 글자가 흐려져서, 값은 예전처럼 오른쪽 칸에 모은다.
+          툴팁은 값이 먼저, 이름이 뒤(차트 지침). 트랙이 넘침을 자르므로 툴팁은 바깥 칸(hz-tip)에 단다. */}
+      <span className="hz-tip hz-bar-hit" data-tip={`${value} · ${label}`} style={{ flex: 1, minWidth: 0, display: "flex" }}>
+        <span className="hz-bar-track">
+          <span className="hz-bar" style={{ width: `${Math.max(2, Math.min(100, pct))}%`, background: color }} />
         </span>
+      </span>
+      <span
+        className="hz-bar-value"
+        style={{
+          width: valueWidth,
+          textAlign: "right",
+          fontWeight: strong ? 800 : 700,
+          /* 막대색을 글자에 그대로 쓰면 안 된다. 램프의 --c-blue-1(#1b7fd4)은 흰 위
+             명암비 4.17 이라 11.5px 값이 안 읽힌다 — 채우는 색과 읽는 색은 다른 물건이다
+             (시장 브리핑의 --card-accent-ink 와 같은 규칙). */
+          color: strong ? (ink ?? color) : C.sub,
+        }}
+      >
+        {value}
       </span>
     </div>
   );

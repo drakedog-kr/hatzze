@@ -378,7 +378,7 @@ html[data-sidebar="icon"] .hz-sidebar [data-label]:hover::after {
 
 /* ── shadcn 차트 모양 — 가로 막대(Bar Chart · Horizontal / Custom Label) ─────────────────────
    Recharts 는 들이지 않는다(차트 화면마다 100KB 넘게 늘어난다). 우리 div 막대에 모양만 옮긴다(2026-09-26).
-   · 회색 트랙 없이 두툼한 막대(높이 22 ≤ 24), 값은 막대 끝에 붙는다.
+   · 두툼한 막대(높이 22 ≤ 24) 뒤에 빈칸(회색 트랙)을 깐다 — 최댓값에 견줘 얼마나 찼는지가 보여야 한다(09-27). 값은 오른쪽 칸.
    · **데이터 끝만 4px 둥글고 기준선 쪽은 각지다** — 막대가 한 기준선에서 자라는 것이 보여야 한다(차트 지침).
    · 마우스를 올린 줄에 옅은 띠가 깔리고(shadcn 툴팁 커서 fill-muted 자리) 막대가 살짝 밝아진다. 값·이름은 툴팁(data-tip)에도.
    쓰는 곳: MDD MeterRow(시장 탓·회복 분포·같은 테마 종목). */
@@ -397,8 +397,9 @@ html[data-sidebar="icon"] .hz-sidebar [data-label]:hover::after {
   min-width: 0;
   height: 22px;
   display: flex;
-  align-items: center;
-  gap: 8px;
+  border-radius: 4px;
+  background: var(--c-track);
+  overflow: hidden;
 }
 .hz-bar {
   display: block;
