@@ -2,7 +2,7 @@
 
 // 히어로 — 낙폭 게이지·물속 차트·해설 문단. MddExplorer.tsx 에서 그대로 옮겨 왔다(shared.ts 머리말 참고).
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import type { MddAnalysis } from "@/lib/mdd";
 import { C, Icon, MONO } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
@@ -10,6 +10,7 @@ import { StockLogo } from "../StockLogo";
 import { fmtPct, fmtPrice, benchName, benchParticle, benchVerb, fmtDur, fmtDayCount, fmtDay, DOWN, UP, DOWN_BAR } from "./shared";
 import type { MddResult } from "./shared";
 import { Sheet, Foot, StatCell } from "./sheet";
+import { ZoomDialog } from "../ZoomDialog";
 
 function Reading({ data, periodLabel }: { data: MddResult; periodLabel: string }) {
   const a = data.analysis;
@@ -449,12 +450,6 @@ export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodL
      2배 남짓 커진다(393×830 기준 350 → 830). 같은 SVG 를 그대로 다시 그리므로
      곡선·눈금·라벨이 갈릴 일이 없다. */
   const [zoom, setZoom] = useState(false);
-  useEffect(() => {
-    if (!zoom) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setZoom(false); };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [zoom]);
 
   /* 크로스헤어 띠 — 보이지 않는 세로 띠가 눌리면 기준선(hz-vline)과 툴팁(hz-tip)을 낸다.
      위치를 **뷰박스 비율(%)**로 잡는다. 예전엔 카드 padding(22/20/42 px)을 기준으로 잡아
@@ -553,20 +548,11 @@ export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodL
       </button>
       </div>
       <Foot>0%가 전고점입니다. 아래로 갈수록 그 고점에서 멀어져 있다는 뜻이며, 선이 0에 닿은 날이 고점을 되찾은 날입니다.</Foot>
-      {zoom && (
-        /* 스크림을 눌러도 닫힌다. 무대는 90도 돌려 화면의 긴 변을 쓴다. */
-        /* ⚠️ 닫기 판정은 target 으로 한다. 무대에 stopPropagation 을 걸면 편하지만, 그러면
-           document 에 걸린 툴팁 탭 리스너(app/TipTap.tsx)까지 막혀서 곡선을 짚어도
-           설명이 안 뜬다 — 확대해 놓고 정작 값을 못 보는 꼴이 된다. */
-        <div className="hz-zoom-scrim" role="dialog" aria-modal="true" aria-label="언더워터 차트 확대" onClick={(e) => { if (e.target === e.currentTarget) setZoom(false); }}>
-          <button type="button" className="hz-zoom-close" aria-label="닫기" onClick={() => setZoom(false)}>
-            <Icon name="close" style={{ fontSize: "var(--fs-20)" }} />
-          </button>
-          <div className="hz-zoom-stage">
-            {chartWith(" mdd-crosshair-zoom")}
-          </div>
-        </div>
-      )}
+      {/* 판은 app/ZoomDialog.tsx(Base UI Dialog)가 그린다 — 여백을 누르거나 Esc 로 닫히고, 초점이 판 안에 갇혔다가
+          닫으면 확대 단추로 돌아온다. 무대는 90도 돌려 화면의 긴 변을 쓴다. */}
+      <ZoomDialog open={zoom} onOpenChange={setZoom} label="언더워터 차트 확대">
+        {chartWith(" mdd-crosshair-zoom")}
+      </ZoomDialog>
     </Sheet>
   );
 }
