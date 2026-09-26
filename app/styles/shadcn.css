@@ -445,3 +445,43 @@ html[data-sidebar="icon"] .hz-sidebar [data-label]:hover::after {
   height: 8px;
   border-radius: 2px;
 }
+
+/* ── MDD 언더워터 축 — 그림 밖 HTML 칸의 축 글자(늘 11px · 옅은 색, shadcn 축 text-xs 자리) ─────────────
+   왼쪽 칸(34px)에 퍼센트, 그림 아래 줄에 연도. 칸 위치는 TSX 가 뷰박스 비율(%)로 준다.
+   좁은 폭(차트 480px 이하)에선 연도를 하나씩 걸러 서로 붙지 않게 한다(data-minor). */
+.mdd-uw {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  column-gap: 8px;
+  container-type: inline-size;
+}
+.mdd-uw-y {
+  position: relative;
+}
+.mdd-uw-y > span,
+.mdd-uw-x > span {
+  position: absolute;
+  font-size: var(--fs-11);
+  line-height: 1;
+  color: var(--c-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.mdd-uw-y > span {
+  right: 0;
+  transform: translateY(-50%);
+}
+.mdd-uw-x {
+  position: relative;
+  grid-column: 2;
+  height: 18px;
+}
+.mdd-uw-x > span {
+  top: 6px;
+  transform: translateX(-50%);
+}
+@container (max-width: 480px) {
+  .mdd-uw-x > span[data-minor] {
+    display: none;
+  }
+}
