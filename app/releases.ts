@@ -29,6 +29,12 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 다크 막대 빈칸 색만 바뀌고 쓰는 법은 그대로다. Patch.
+    version: "1.21.7",
+    date: "2026-09-27",
+    changes: ["다크 모드에서 MDD·홈 카드의 옅은 막대가 빈칸에 묻히지 않습니다."],
+  },
+  {
     // 차트·막대 모양만 바뀌고 쓰는 법은 그대로다. Patch.
     version: "1.21.6",
     date: "2026-09-27",
