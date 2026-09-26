@@ -423,11 +423,7 @@ export function TopDrawdowns({ eps }: { eps: Episode[] }) {
           </span>
           <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
             {/* shadcn 가로 막대 꼴 — 트랙 없이 두툼한 둥근 막대(hz-bar, shadcn.css). */}
-            <span
-              className="hz-tip hz-bar-hit"
-              data-tip={`${fmtPct(e.depth)} · ${fmtYm(e.peakDate)} ~ ${e.recovered ? fmtYm(e.recoveryDate!) : "진행 중"}`}
-              style={{ flex: 1, minWidth: 20, display: "flex" }}
-            >
+            <span style={{ flex: 1, minWidth: 20, display: "flex" }}>
               {/* 빈칸(트랙)을 깐다 — 가장 깊은 낙폭에 견줘 얼마나 깊었나(09-27). */}
               <span className="hz-bar-track" style={{ height: 14 }}>
                 <span className="hz-bar" style={{ width: `${(Math.abs(e.depth) / worst) * 100}%`, background: e.recovered ? DOWN_BAR[2] : DOWN_BAR[0] }} />

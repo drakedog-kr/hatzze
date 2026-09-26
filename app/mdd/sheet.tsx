@@ -145,8 +145,8 @@ export function MeterRow({
       {/* shadcn 가로 막대 차트 꼴(2026-09-26) — 두툼한 막대(22px), 데이터 끝만 둥글고 기준선 쪽은 각지다.
           빈칸(회색 트랙)은 깐다 — 막대가 최댓값에 견줘 얼마나 찼는지가 보여야 한다(Hun, 09-27). 트랙 위에 값을 얹으면
           회색 바탕에서 글자가 흐려져서, 값은 예전처럼 오른쪽 칸에 모은다.
-          툴팁은 값이 먼저, 이름이 뒤(차트 지침). 트랙이 넘침을 자르므로 툴팁은 바깥 칸(hz-tip)에 단다. */}
-      <span className="hz-tip hz-bar-hit" data-tip={`${value} · ${label}`} style={{ flex: 1, minWidth: 0, display: "flex" }}>
+          막대엔 툴팁을 달지 않는다 — 값이 이미 오른쪽에 적혀 있고, 예전에도 없었다(한때 달았다가 Hun 지적으로 걷음, 09-27). */}
+      <span style={{ flex: 1, minWidth: 0, display: "flex" }}>
         <span className="hz-bar-track">
           <span className="hz-bar" style={{ width: `${Math.max(2, Math.min(100, pct))}%`, background: color }} />
         </span>
@@ -198,11 +198,8 @@ export function MirrorRow({
   label,
   left,
   right,
-  tip,
 }: {
   label: string;
-  /** 막대 칸에 올리면 뜨는 글(값이 먼저). 두 값을 한 툴팁에 — 한쪽 막대를 짚지 않아도 둘 다 읽힌다. */
-  tip?: string;
   left: { pct: number; value: string; color: string; ink: string };
   right: { pct: number; value: string; color: string; ink: string; dashed?: boolean };
 }) {
@@ -212,7 +209,7 @@ export function MirrorRow({
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <span style={{ ...ROW_TEXT, width: MIRROR_LABEL_W, fontWeight: 700, color: C.sub2 }}>{label}</span>
       <span style={{ ...ROW_TEXT, width: MIRROR_LEFT_W, textAlign: "right", fontWeight: 800, color: left.ink }}>{left.value}</span>
-      <div className={tip ? "hz-tip hz-bar-hit" : undefined} data-tip={tip} style={{ position: "relative", flex: 1, minWidth: 0, height: 14 }}>
+      <div style={{ position: "relative", flex: 1, minWidth: 0, height: 14 }}>
         <span style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1.5, background: C.line }} />
         <span style={{ ...bar, right: "50%", width: `${left.pct}%`, borderRadius: "4px 0 0 4px", background: left.color }} />
         <span style={{ ...bar, left: "50%", width: `${right.pct}%`, borderRadius: "0 4px 4px 0", background: right.dashed ? UNRECOVERED : right.color }} />
@@ -257,11 +254,8 @@ export function TwinRow({
   label,
   a,
   b,
-  tip,
 }: {
   label: string;
-  /** 막대 칸에 올리면 뜨는 글(값이 먼저). */
-  tip?: string;
   a: { pct: number; value: string; color: string; ink: string };
   b: { pct: number; value: string; color: string; ink: string };
 }) {
@@ -270,7 +264,7 @@ export function TwinRow({
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <span style={{ ...ROW_TEXT, width: MIRROR_LABEL_W, fontWeight: 700, color: C.sub2 }}>{label}</span>
-      <div className={tip ? "hz-tip hz-bar-hit" : undefined} data-tip={tip} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
         <span style={bar(a.pct, a.color)} />
         <span style={bar(b.pct, b.color)} />
       </div>

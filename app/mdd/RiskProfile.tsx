@@ -133,7 +133,6 @@ export function RiskProfile({ r, periodLabel, market }: { r: RiskProfileData; pe
                     <MirrorRow
                       key={y.year}
                       label={`${y.year}`}
-                      tip={`${y.year}년 · ${Math.round(y.mdd)}% 그 해 낙폭 · ${y.ret >= 0 ? "+" : "−"}${Math.abs(Math.round(y.ret))}% 그 해 수익`}
                       left={{ pct: halfSqrt(y.mdd, max), value: `${Math.round(y.mdd)}%`, color: DOWN_BAR[2], ink: DOWN }}
                       right={{
                         pct: halfSqrt(y.ret, max),
@@ -176,7 +175,6 @@ export function RiskProfile({ r, periodLabel, market }: { r: RiskProfileData; pe
                     <MirrorRow
                       key={i}
                       label={eventLabels[i]}
-                      tip={`${eventLabels[i]} · ${fmtDur(e.dropDays)} 빠지는 데 · ${e.recoverDays === null ? "미회복" : `${fmtDur(e.recoverDays)} 되찾는 데`}`}
                       left={{ pct: halfSqrt(e.dropDays, max), value: fmtDur(e.dropDays), color: DOWN_BAR[2], ink: DOWN }}
                       right={{
                         // 미회복은 '지금까지 걸린 시간'이 아직 안 끝났다는 뜻이라 짧은 점선만 둔다.
@@ -224,7 +222,6 @@ export function RiskProfile({ r, periodLabel, market }: { r: RiskProfileData; pe
                       <TwinRow
                         key={i}
                         label={eventLabels[i]}
-                        tip={`${eventLabels[i]} · ${Math.round(e.stock)}% 이 종목 · ${e.market === null ? "—" : `${Math.round(e.market)}%`} ${bench}`}
                         a={{ pct: half(e.stock, max) * 2, value: `${Math.round(e.stock)}%`, color: DOWN_BAR[0], ink: DOWN }}
                         b={{
                           pct: e.market === null ? 0 : half(e.market, max) * 2,
