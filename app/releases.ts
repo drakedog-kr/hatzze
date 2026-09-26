@@ -29,6 +29,12 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 로고 크기만 바뀌고 쓰는 법은 그대로다. Patch.
+    version: "1.21.4",
+    date: "2026-09-26",
+    changes: ["MDD 정밀분석 첫 화면의 종목 로고가 종목명·코드 두 줄과 위아래 높이가 맞습니다."],
+  },
+  {
     // 추출 규칙이 늘어 카드 구성이 달라질 뿐 쓰는 법은 그대로다. Patch.
     version: "1.21.3",
     date: "2026-09-26",

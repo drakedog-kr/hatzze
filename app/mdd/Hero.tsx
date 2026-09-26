@@ -138,9 +138,13 @@ export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel:
         {/* 1 — 종목. 제목 줄 자리에 종목 자체가 선다(라벨 "분석 종목"은 위 검색창이 이미 말한다). */}
         <div className="hz-kd-hero-q" style={{ flex: "1 1 260px" }}>
           {/* 로고는 글자 기준선이 아니라 가운데에 맞아야 한다 — baseline 이면 정사각형
-              타일이 글자 밑선에 걸려 위로 떠 보인다. */}
+              타일이 글자 밑선에 걸려 위로 떠 보인다.
+              크기 38 은 두 줄 글자의 높이다. 종목명 글자 윗변에서 코드 줄 밑변까지가 37.5px
+              (1440 실측, 폰은 코드가 12px 로 커져 39.5)이라, 이 크기여야 로고 위아래가 두 줄
+              끝에 맞는다. 30 일 땐 가운데만 맞고 위 3.4 · 아래 4.1px 씩 안쪽에 떠 있었다.
+              ⚠️ 두 줄의 글자 크기를 바꾸면 이 값도 다시 잴 것. */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-            <StockLogo code={data.code} name={data.name} market={data.market} size={30} />
+            <StockLogo code={data.code} name={data.name} market={data.market} size={38} />
             <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
               <strong style={{ fontSize: "var(--fs-21)", fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>{data.name}</strong>
               <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", color: C.muted }}>
