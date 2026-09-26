@@ -419,22 +419,24 @@ export function DividendCalculator({
                 )}
               </div>
               {afterTax && (
-                <div className="dv-account" role="group" aria-label="어느 계좌로 세나">
+                <div className="dv-account">
                   <span className="dv-account-label">계좌 유형</span>
-                  {ACCOUNTS.map((o) => (
-                    <button
-                      key={o.key}
-                      type="button"
-                      className="dv-account-btn"
-                      aria-pressed={account === o.key}
-                      onClick={() => {
-                        track("dividend_account", { account: o.key });
-                        setAccount(o.key);
-                      }}
-                    >
-                      {o.label}
-                    </button>
-                  ))}
+                  {/* 바로 위 세후·세전과 같은 세그먼트. 좁으면 트랙 안에서 두 줄로 접힌다. */}
+                  <div className="hz-seg hz-seg-hover dv-account-seg" role="group" aria-label="어느 계좌로 세나">
+                    {ACCOUNTS.map((o) => (
+                      <button
+                        key={o.key}
+                        type="button"
+                        aria-pressed={account === o.key}
+                        onClick={() => {
+                          track("dividend_account", { account: o.key });
+                          setAccount(o.key);
+                        }}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
               {heroNote && <p className="dv-hero-note">{heroNote}</p>}
