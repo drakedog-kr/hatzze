@@ -226,6 +226,27 @@
     @apply text-muted-foreground px-2 py-1 text-xs;
   }
   /* 짚은 항목은 파란 틴트(.cn-command-item 과 같다). accent(--c-hover)는 흰 판 위에서 1.06 이라 안 보인다. */
+  /* ── Alert ── */
+  .cn-alert {
+    @apply gap-0.5 rounded-2xl border px-4 py-3 text-sm;
+  }
+  .cn-alert-default {
+    @apply bg-card text-card-foreground;
+  }
+  /* 이 사이트가 먼저 쓰던 실패 알림 모양(예전 LoadFailedNote 인라인) — rhea 의 흰 판 + 붉은 글자가 아니다. */
+  .cn-alert-destructive {
+    @apply rounded-[10px] border-0 border-l-3 border-l-(--c-hot) bg-(--c-hot-tint) px-3.5 py-2.5 text-(length:--fs-13) leading-[1.6] break-keep text-(--c-hot-ink);
+  }
+  .cn-alert-title {
+    @apply font-bold;
+  }
+  .cn-alert-description {
+    @apply text-pretty;
+  }
+  .cn-alert-default .cn-alert-description {
+    @apply text-muted-foreground;
+  }
+
   /* ── Skeleton ── (모양은 이 사이트의 .hz-shimmer — components/ui/skeleton.tsx 머리말) */
   .cn-skeleton {
     @apply max-w-full rounded-[8px] bg-(--c-bg);
