@@ -16,6 +16,7 @@
 (기준가 차이로 계산하면 공시값과 안 맞았다 — 미국배당다우존스 8월 계산 0원, 공시 30원). 그래서 TIGER '전체 분배 내역'
 (`distribution/overall/list.ajax`, 열다섯 달 47회)의 '과표기준' 열을 받아 SEIBro 지급 건에 (코드, 기준일)로 붙인다.
 payments[].taxable · taxable_dps. 못 붙인 운용사는 taxable_dps 가 null — 화면이 전액 과세로 센다.
+⚠️ TIGER 사이트는 GitHub 러너(미국 IP)에서 안 열린다 — 못 받은 지급 건은 저장된 과표를 이어 쓴다(stored_taxable).
 다른 운용사 사이트(KODEX·RISE·ACE·PLUS·SOL)는 아직 안 찔러 봤다.
 
 ## 국내 분배금지급현황(SEIBro)
@@ -59,7 +60,7 @@ from common.config import FINNHUB_API_KEY  # noqa: E402
 from common.fx import usdkrw  # noqa: E402
 from common.krx_client import krx_get  # noqa: E402
 from common.stockanalysis import PageChanged, dividend_history, trailing  # noqa: E402
-from common.supabase_client import get_client  # noqa: E402
+from common.supabase_client import get_client, load_all  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 from config.etf_dividends import US_ETFS  # noqa: E402
 
@@ -228,18 +229,22 @@ def tiger_taxable(today: date, months: int = SEIBRO_MONTHS) -> dict[tuple[str, s
         while True:
             q = urllib.parse.urlencode({"pageIndex": idx, "firstIndex": (idx - 1) * TIGER_PAGE, "listCnt": TIGER_PAGE, "selectYear": y, "selectMonth": m})
             page = None
+            err = None
             for attempt in (1, 2, 3):
                 try:
                     with urllib.request.urlopen(urllib.request.Request(f"{TIGER_LIST}?{q}", headers=TIGER_UA), timeout=40) as r:
                         page = r.read().decode("utf-8", "ignore")
                     break
-                except (OSError, http.client.HTTPException):
+                except (OSError, http.client.HTTPException) as exc:
+                    err = exc
                     if attempt == 3:
                         break
                     time.sleep(3)
             time.sleep(TIGER_PAUSE_SEC)
             if page is None:
-                print(f"  ⚠️ TIGER 과표 {y}-{m:02d} 못 받음 — 그 달은 전액 과세로 둡니다")
+                # 이유를 남긴다 — 러너에서 막힌 것이 403(차단)인지 시간 초과인지에 따라 다음 처방(국내 리전 중계 등)이 갈린다.
+                why = f"{type(err).__name__}: {str(err)[:80]}" if err else "?"
+                print(f"  ⚠️ TIGER 과표 {y}-{m:02d} 못 받음({why}) — 그 달은 이전에 받은 과표를 쓰고, 없으면 전액 과세로 둡니다")
                 break
             rows = re.findall(r"<tr[^>]*>(.*?)</tr>", page, flags=re.S)
             tot = re.search(r'data-tot-cnt="(\d+)"', page)
@@ -259,6 +264,31 @@ def tiger_taxable(today: date, months: int = SEIBRO_MONTHS) -> dict[tuple[str, s
         m -= 1
         if m == 0:
             y, m = y - 1, 12
+    return out
+
+
+def stored_taxable(db) -> dict[tuple[str, str], float]:
+    """이미 저장된 국내 ETF 지급 건의 과표 — (코드, 기준일) → 과세되는 1주당 금액. 못 읽으면 빈 dict.
+
+    ⚠️ **TIGER 사이트는 GitHub 러너(미국 IP)에서 한 번도 안 열렸다.** 과표를 넣은 09-17 첫 CI 실행부터 09-26 까지
+    매번 "TIGER 과표 0건"이었고(국내 IP 에선 200 · 827건), 이 스크립트가 그때마다 과표 칸을 빈 값으로 덮어써 로컬에서
+    채운 값까지 지웠다. 그 사이 TIGER 212개가 전액 과세로 세어져 일부만 과세되는 73개의 세후가 중앙 13.8%·최대 18.2%
+    낮게 나갔다(과세 0% 인 것 31개).
+    한 지급 건의 과표는 공시된 뒤 바뀌지 않으므로 **이번에 못 받은 건은 저장된 값을 쓴다.** 새로 생긴 지급 건은
+    다음에 국내 IP 에서 받을 때까지 과표 없이(전액 과세로) 남는다 — 모자라게 세는 쪽이지 없는 비과세를 만들지는 않는다.
+    """
+    try:
+        rows = load_all(db, TABLE, "code,market,payments", order_by="code")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[ETF] 저장된 과표를 못 읽었습니다 — 이번에 받은 것만 씁니다: {exc}")
+        return {}
+    out: dict[tuple[str, str], float] = {}
+    for r in rows:
+        if r.get("market") != "KR":
+            continue
+        for p in r.get("payments") or []:
+            if p.get("taxable") is not None and p.get("record"):
+                out[(r["code"], p["record"])] = float(p["taxable"])
     return out
 
 
@@ -284,8 +314,12 @@ def main() -> None:
     if latest is None:
         print("[ETF] KRX 시세를 못 받았습니다 — 국내 ETF 는 시세 없이 넣습니다")
     kr_hist = seibro_history(today)
-    taxable = tiger_taxable(today) if kr_hist is not None else {}
-    print(f"[ETF] TIGER 과표 {len(taxable)}건")
+    # 이번에 받은 과표가 먼저고, 못 받은 지급 건은 저장된 값으로 채운다(stored_taxable 주석). 읽기만 하므로 --dry-run 에서도 부른다.
+    db = get_client()
+    fresh = tiger_taxable(today) if kr_hist is not None else {}
+    kept = stored_taxable(db) if kr_hist is not None else {}
+    taxable = {**kept, **fresh}
+    print(f"[ETF] TIGER 과표 이번에 받은 것 {len(fresh)}건 · 저장된 값으로 채운 것 {len(taxable) - len(fresh)}건")
     kr_count = 0
     if kr_hist is not None:
         by_code: dict[str, list[dict]] = {}
@@ -380,7 +414,6 @@ def main() -> None:
     if dry_run:
         print("[ETF] --dry-run: DB 에 쓰지 않았습니다")
         return
-    db = get_client()
     for i in range(0, len(rows), 200):
         db.table(TABLE).upsert(rows[i : i + 200], on_conflict="code").execute()
     print(f"[Supabase] {TABLE} upsert 완료: {len(rows)}행")
