@@ -484,7 +484,7 @@ export default async function StockDetailPage({
             <MarkRadios id="hz-mkf" />
             {/* ⚠️ 배지를 SectionHead 의 `right` 에 넣으면 note 알약이 통째로 안 그려진다 —
                 물음표 툴팁이 거기 붙어 있어 단서가 같이 사라진다. 차트 바로 위에 둔다. */}
-            {/* 왼쪽이 기간(주소), 오른쪽이 축 필터(CSS). 둘 다 서버 컴포넌트로 남는다. */}
+            {/* 왼쪽이 매매자 필터(CSS), 오른쪽이 기간(주소)(2026-09-27 자리 바꿈). 둘 다 서버 컴포넌트로 남는다. */}
             <div
               style={{
                 display: "flex",
@@ -495,6 +495,7 @@ export default async function StockDetailPage({
                 padding: "0 22px 12px",
               }}
             >
+              <MarkBadges id="hz-mkf" />
               <span className="hz-seg hz-seg-hover hz-periodset">
                 {PRICE_RANGES.map((r) => (
                   <Link
@@ -509,7 +510,6 @@ export default async function StockDetailPage({
                   </Link>
                 ))}
               </span>
-              <MarkBadges id="hz-mkf" />
             </div>
             <div className="hz-mkfilter-chart">
               {/* 폰에서는 뷰박스 720 이 화면 폭으로 눌려 축 라벨이 안 읽힌다. MDD 언더워터
