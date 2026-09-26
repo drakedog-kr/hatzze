@@ -226,6 +226,11 @@
     @apply text-muted-foreground px-2 py-1 text-xs;
   }
   /* 짚은 항목은 파란 틴트(.cn-command-item 과 같다). accent(--c-hover)는 흰 판 위에서 1.06 이라 안 보인다. */
+  /* ── Skeleton ── (모양은 이 사이트의 .hz-shimmer — components/ui/skeleton.tsx 머리말) */
+  .cn-skeleton {
+    @apply max-w-full rounded-[8px] bg-(--c-bg);
+  }
+
   /* ── Progress ── */
   .cn-progress-track {
     @apply bg-muted h-2 rounded-2xl;

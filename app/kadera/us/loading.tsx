@@ -1,4 +1,5 @@
-import { C } from "../../ui";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 
 /**
  * `/kadera/us` 의 자리표시자.
@@ -11,9 +12,9 @@ import { C } from "../../ui";
  * 자세한 배경(왜 loading.tsx 가 필요한지, 프리페치 경계 이야기)은 ../loading.tsx 주석에.
  */
 
-/** 결과와 같은 골격으로 은은하게 깜빡이는 블록. globals.css 의 hz-shimmer 를 쓴다. */
+/** 결과와 같은 골격으로 은은하게 깜빡이는 블록. shadcn Skeleton(components/ui/skeleton.tsx)이다. */
 function Block({ h, w = "100%", r = 8 }: { h: number; w?: number | string; r?: number }) {
-  return <div className="hz-shimmer" style={{ height: h, width: w, maxWidth: "100%", borderRadius: r, background: C.bg }} />;
+  return <Skeleton style={{ height: h, width: w, borderRadius: r }} />;
 }
 
 function SheetHead() {
@@ -89,7 +90,7 @@ export default function Loading() {
 
       <div className="hz-loading-float">
         <span className="hz-loading-badge">
-          <span className="hz-spinner" />
+          <Spinner />
           미장 종목 얘기를 모으는 중
         </span>
       </div>

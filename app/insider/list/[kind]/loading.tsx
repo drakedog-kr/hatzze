@@ -1,4 +1,5 @@
-import { C } from "../../../ui";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 
 /**
  * 전체보기(`/insider/list/[kind]`)의 자리표시자.
@@ -19,7 +20,7 @@ import { C } from "../../../ui";
  */
 
 function Block({ h, w = "100%", r = 8 }: { h: number; w?: number | string; r?: number }) {
-  return <div className="hz-shimmer" style={{ height: h, width: w, maxWidth: "100%", borderRadius: r, background: C.bg }} />;
+  return <Skeleton style={{ height: h, width: w, borderRadius: r }} />;
 }
 
 function Sheet() {
@@ -64,7 +65,7 @@ export default function Loading() {
 
       <div className="hz-loading-float">
         <span className="hz-loading-badge">
-          <span className="hz-spinner" />
+          <Spinner />
           목록을 불러오는 중
         </span>
       </div>

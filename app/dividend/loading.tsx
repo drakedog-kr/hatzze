@@ -1,4 +1,5 @@
-import { C } from "../ui";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 
 /**
  * `/dividend` 의 자리표시자. 없으면 서버가 표 셋(국내 2,777 · 미국 579 · ETF 243행)을 다 읽을 때까지
@@ -7,7 +8,7 @@ import { C } from "../ui";
  */
 
 function Block({ h, w = "100%", r = 8 }: { h: number; w?: number | string; r?: number }) {
-  return <div className="hz-shimmer" style={{ height: h, width: w, maxWidth: "100%", borderRadius: r, background: C.bg }} />;
+  return <Skeleton style={{ height: h, width: w, borderRadius: r }} />;
 }
 
 function SheetHead() {
@@ -80,7 +81,7 @@ export default function Loading() {
 
       <div className="hz-loading-float">
         <span className="hz-loading-badge">
-          <span className="hz-spinner" />
+          <Spinner />
           배당 기록을 모으는 중
         </span>
       </div>
