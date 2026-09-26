@@ -527,6 +527,22 @@
    Tailwind 기본은 운영체제 설정(prefers-color-scheme)이라, 두면 스위치와 어긋난다. */
 @custom-variant dark (&:is([data-theme="dark"] *));
 
+/* ── 본문 글꼴 ──────────────────────────────────────────────────────────
+   Pretendard 쪼갠 판(app/layout.tsx 가 링크하는 CSS 가 'Pretendard Variable' 을 정의한다)과, 글꼴이 오기 전에 쓰는
+   대체 글꼴. 대체 글꼴의 보정값은 예전 next/font 가 같은 글꼴로 계산해 두던 값 그대로다(2026-09-26 프로덕션 CSS) —
+   Arial 을 Pretendard 의 높이·폭에 맞춰, 글꼴이 들어올 때 줄이 덜 흔들린다. */
+@font-face {
+  font-family: "pretendard Fallback";
+  src: local("Arial");
+  ascent-override: 93.76%;
+  descent-override: 23.75%;
+  line-gap-override: 0%;
+  size-adjust: 101.55%;
+}
+:root {
+  --font-pretendard: "Pretendard Variable", "pretendard Fallback";
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
