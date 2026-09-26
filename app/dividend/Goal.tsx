@@ -3,6 +3,7 @@
 // 목표 배당과 투자금 조절. DividendCalculator.tsx 에서 그대로 옮겨 왔다(store.ts 머리말 참고).
 
 import { useState } from "react";
+import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import { won, wonShort } from "./format";
 import { GOAL_PRESETS_MAN, GOAL_MAX_MONTHS, AMOUNT_TICKS, AMOUNT_QUICK, AMOUNT_TYPED_MAX, amountTick } from "./shared";
 
@@ -118,9 +119,17 @@ export function GoalBox({
                 목표 <b>{wonShort(goal)}</b>
               </span>
             </div>
-            <div className="dv-goal-bar" role="img" aria-label={`목표 한 달 ${wonShort(goal)} 가운데 지금 ${won(monthlyNow)}, ${Math.round(progress)}%`}>
-              <span className="dv-goal-fill" style={{ width: `${Math.max(2, progress)}%` }} />
-            </div>
+            {/* shadcn Progress(Base UI) — '진행률 막대, 12%'로 읽힌다. 예전엔 role="img" 그림이라 값이 이름 글자에만 있었다.
+                아주 적어도 막대 끝이 보이게 하는 최소 폭(2%)은 CSS(.dv-goal-fill 의 min-width)가 맡는다. */}
+            <Progress
+              value={progress}
+              aria-label="한 달 배당금 목표 달성"
+              getAriaValueText={() => `목표 한 달 ${wonShort(goal)} 가운데 지금 ${won(monthlyNow)}, ${Math.round(progress)}%`}
+            >
+              <ProgressTrack className="dv-goal-bar">
+                <ProgressIndicator className="dv-goal-fill" />
+              </ProgressTrack>
+            </Progress>
             <span className="dv-goal-bnote">{reached ? "목표를 이미 넘었습니다" : `목표의 ${Math.round(progress)}%입니다`}</span>
           </div>
 

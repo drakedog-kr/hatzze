@@ -1,3 +1,5 @@
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { C } from "../ui";
 
 /**
@@ -27,7 +29,7 @@ import { C } from "../ui";
  * 아예 안 보인다. 그 자리는 실제 검색창과 같은 `--c-track` 을 쓴다.
  */
 function Block({ h, w = "100%", r = 8, bg = C.bg }: { h: number; w?: number | string; r?: number; bg?: string }) {
-  return <div className="hz-shimmer" style={{ height: h, width: w, maxWidth: "100%", borderRadius: r, background: bg }} />;
+  return <Skeleton style={{ height: h, width: w, borderRadius: r, background: bg }} />;
 }
 
 /** 시트 안쪽 본문 — MddExplorer 의 PAD 와 같은 값. */
@@ -77,7 +79,7 @@ export default function Loading() {
           자리표시자가 창보다 짧아서, 예전의 '창 한가운데'는 푸터 코앞에 찍혔다. */}
       <div className="hz-loading-float" aria-hidden>
         <span className="hz-loading-badge">
-          <span className="hz-spinner" />
+          <Spinner />
           10년치 들춰보는 중
         </span>
       </div>

@@ -1,3 +1,5 @@
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
 /**
  * 조회가 깨진 자료의 이름을 화면 머리에 적는 한 줄.
  *
@@ -12,22 +14,10 @@
 export function LoadFailedNote({ sources }: { sources: string[] }) {
   if (sources.length === 0) return null;
   const names = [...new Set(sources)].join("·");
+  // shadcn Alert(destructive). 급한 알림이 아니라 화면을 읽는 중에 끼어들지 않게 role 은 status 다.
   return (
-    <p
-      role="status"
-      style={{
-        margin: 0,
-        padding: "10px 14px",
-        borderRadius: 10,
-        borderLeft: "3px solid var(--c-hot)",
-        background: "var(--c-hot-tint)",
-        color: "var(--c-hot-ink)",
-        fontSize: "var(--fs-13)",
-        lineHeight: 1.6,
-        wordBreak: "keep-all",
-      }}
-    >
-      {names} 자료를 불러오지 못했습니다. 그 몫은 빈 채로 보입니다. 잠시 뒤 다시 열어 주십시오.
-    </p>
+    <Alert variant="destructive" role="status">
+      <AlertDescription>{names} 자료를 불러오지 못했습니다. 그 몫은 빈 채로 보입니다. 잠시 뒤 다시 열어 주십시오.</AlertDescription>
+    </Alert>
   );
 }

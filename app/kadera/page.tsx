@@ -1,3 +1,4 @@
+import { Skeleton } from "@/components/ui/skeleton";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -359,7 +360,7 @@ const TRENDING_SKELETON_BODY = 719;
 
 function TrendingSkeleton() {
   const block = (h: number, w: number | string = "100%", r = 8) => (
-    <div className="hz-shimmer" style={{ height: h, width: w, maxWidth: "100%", borderRadius: r, background: C.bg }} />
+    <Skeleton style={{ height: h, width: w, borderRadius: r }} />
   );
   return (
     <section className="hz-sheet" aria-hidden>

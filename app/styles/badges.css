@@ -132,9 +132,10 @@
    '낙폭 대비 보상' 타일의 막대는 자리 때문에 최근 몇 줄뿐인데 제목·요약은 조회 기간
    전체를 말한다. 나머지 해를 여기서 펼쳐 그 기간에 실제로 닿게 한다.
 
-   여는 장치는 CSS 뿐이다 — PC 는 :hover, 모바일은 버튼을 탭했을 때 잡히는 :focus-within.
-   카더라 테마 로테이션(.hz-theme-pop)과 같은 어법이라 새 언어를 만들지 않는다.
-   ⚠️ .hz-tip 은 :hover 전용이라 여기 못 쓴다(모바일에서 안 열린다). */
+   여닫기와 자리는 shadcn Popover(Base UI, app/mdd/RiskProfile.tsx 의 YearsPopover)가 맡는다(2026-09-26).
+   마우스를 올리거나 누르면 열리고 Esc·바깥 누르기로 닫히며, 단추에 aria-expanded 가 붙는다. 자리는 Floating UI 가
+   잡는다 — 아래로 펴되 오른쪽 끝을 단추에 맞추고, 화면 아래가 모자라면 위로 뒤집는다.
+   예전엔 CSS 뿐이었다(:hover · :focus-within + 앵커 위치지정). 모양은 여기 규칙 그대로다. */
 .hz-yrpop-host {
   position: relative;
   flex-shrink: 0;
@@ -166,7 +167,7 @@
   white-space: nowrap;
 }
 .hz-yrpop-btn:hover,
-.hz-yrpop-host:focus-within .hz-yrpop-btn {
+.hz-yrpop-btn[data-popup-open] {
   background: var(--c-blue-tint);
   /* 원색이 아니라 잉크다 — 파란 tint 위에서 --c-blue 는 3.30/3.59 로 떨어진다.
      옆의 .hz-more-btn:hover · .mdd-period-btn 과 같은 값이다. */
@@ -178,91 +179,30 @@
 }
 
 .hz-yrpop {
-  position: absolute;
-  /* 아래로 편다 — 버튼이 타일 제목 줄에 있어서 위로 열면 시트 머리를 덮는다(2026-09-24, 예전엔
-     타일 바닥이라 위로 폈다). 버튼과 4px 겹쳐 둔다. 틈이 있으면 마우스가 건너는 동안 :hover 가 끊긴다. */
-  top: calc(100% - 4px);
-  /* 오른쪽 끝에 맞춘다. 세 번째 타일에서 왼쪽 정렬로 두면 카드 밖으로 넘쳐
-     페이지에 가로 스크롤이 생긴다(예전에 툴팁으로 같은 사고가 있었다). */
-  right: 0;
-  z-index: 40;
+  /* 자리(아래로 · 오른쪽 끝 맞춤 · 단추와 4px 겹침)는 Positioner 가 잡는다(side="bottom" align="end" sideOffset={-4}).
+     겹쳐 두는 까닭은 예전과 같다 — 틈이 있으면 마우스가 단추에서 판으로 건너는 동안 끊긴다. */
   display: flex;
   flex-direction: column;
   gap: 5px;
   width: min(280px, 78vw);
   /* 조회 기간이 10년이면 10줄인데, 그걸 스크롤로 나눠 보면 '전체보기'라는 이름값을 못 한다.
-     내용만큼 자라게 두고 뷰포트에 걸릴 때만 스크롤한다 — '전체' 조회(상장 이후 20년 넘는
-     종목)에서만 걸린다. 화면 밖으로 자라 위가 잘리는 걸 72vh 가 막는다. */
-  max-height: min(600px, 72vh);
+     내용만큼 자라게 두고 화면에 걸릴 때만 스크롤한다 — '전체' 조회(상장 이후 20년 넘는 종목)에서만 걸린다.
+     --available-height 는 Positioner 가 주는 '판이 쓸 수 있는 높이'다. */
+  max-height: min(600px, var(--available-height, 72vh));
   overflow-y: auto;
   padding: 10px;
   background: var(--c-float);
   border: 1px solid var(--c-line);
   border-radius: var(--r-card);
   box-shadow: 0 4px 16px var(--c-shadow-strong);
+  outline: none;
+  transition: opacity 0.13s ease, transform 0.13s ease;
+}
+/* 여닫을 때 살짝 내려앉는다(예전 CSS 판과 같은 값). Base UI 가 열리는 첫 프레임·닫히는 동안 이 속성을 붙인다. */
+.hz-yrpop[data-starting-style],
+.hz-yrpop[data-ending-style] {
   opacity: 0;
-  /* opacity 만 0 이면 안 보이는 내용이 스크롤 영역과 Tab 순서에 그대로 남는다. */
-  visibility: hidden;
   transform: translateY(-4px);
-  transition: opacity 0.13s ease, transform 0.13s ease, visibility 0.13s;
-}
-.hz-yrpop-host:hover .hz-yrpop,
-.hz-yrpop-host:focus-within .hz-yrpop {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
-}
-
-/* 잘림 해결 — 툴팁(.hz-tip)과 같은 앵커 위치지정.
-   위 규칙은 position:absolute 라 조상 판의 overflow 에 갇힌다. '낙폭 대비 보상' 타일은
-   시트 맨 아래에 붙어 있고 그 시트(.hz-sheet)가 overflow:hidden 이라, 위로 펼친 팝오버의
-   윗부분이 잘려 나갔다(실측 2026-08-04, 10년 조회에서 425px 중 50px). 조회 기간이 길수록
-   더 잘린다.
-
-   position:fixed 로 바꾸면 기준이 조상 판이 아니라 **뷰포트**가 되어 시트 밖으로 온전히
-   열린다. 자리는 앵커가 잡아 준다.
-
-   ⚠️ 앵커 이름은 host 에 붙인다 — ::after 가 아니라 진짜 형제 요소라 '암묵 앵커'가 없다.
-   anchor-scope 도 같이 건다(.hz-tip 주석 참고): 이름은 하나뿐이라 범위를 안 막으면
-   문서의 마지막 host 에 달라붙는다. 지금은 페이지에 하나뿐이지만 타일이 늘면 바로 는다. */
-@supports (anchor-scope: --a) and (position-area: top center) {
-  .hz-yrpop-host {
-    anchor-name: --hz-yrpop;
-    anchor-scope: --hz-yrpop;
-  }
-  .hz-yrpop {
-    position: fixed;
-    position-anchor: --hz-yrpop;
-    /* 위 규칙의 top/right 를 걷어낸다. 남겨 두면 position-area 가 잡은 자리를 다시 민다. */
-    inset: auto;
-    /* 아래로, 오른쪽 끝을 앵커에 맞춰 — absolute 판(top/right:0)과 같은 그림이다.
-       화면 아래에 자리가 모자라면(버튼이 뷰포트 아래쪽) 위로 뒤집는다. */
-    position-area: bottom span-left;
-    position-try-fallbacks: --hz-yrpop-down-right, --hz-yrpop-up, --hz-yrpop-up-right;
-    /* 버튼과 4px 겹친다. 틈이 있으면 마우스가 건너는 동안 :hover 가 끊긴다.
-       transform 은 여닫는 애니메이션이 쓰므로 margin 으로 준다. */
-    margin-top: -4px;
-    /* 뷰포트가 기준이 되었으니 화면 높이에 맞춰 스스로 줄어들게 둔다.
-       ⛔ `max-height: 100%`(버튼에서 화면 끝까지) + `position-try-order: most-height` 로 '넓은 쪽으로 열고
-          모자라면 스크롤'을 해 봤다가 되돌렸다(2026-09-24 실측). 높이를 자리에 맞추면 어느 자리도 넘치지
-          않아서, 크롬이 **처음 고른 자리**(버튼이 화면 밖 아래에 있던 첫 배치의 '위')를 계속 쓴다 —
-          버튼을 어디 두든 위로 182px 짜리 스크롤 상자가 열렸다. 넘쳐야 다시 고른다. */
-    max-height: min(600px, calc(100vh - 24px));
-  }
-}
-/* 위로 뒤집을 때는 겹침 여백도 뒤집는다(아래쪽이 버튼과 겹쳐야 한다). 이름 붙인 규칙이라야 margin 을 바꿀 수 있다. */
-@position-try --hz-yrpop-down-right {
-  position-area: bottom span-right;
-}
-@position-try --hz-yrpop-up {
-  position-area: top span-left;
-  margin-top: 0;
-  margin-bottom: -4px;
-}
-@position-try --hz-yrpop-up-right {
-  position-area: top span-right;
-  margin-top: 0;
-  margin-bottom: -4px;
 }
 
 .hz-yrpop-head {

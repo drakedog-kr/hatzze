@@ -755,10 +755,33 @@
   background: var(--c-chip);
 }
 .hz-tx .hz-seg > button { padding: 5px 12px; border-radius: 8px; font-size: var(--fs-12); }
-.hz-tx .hz-seg > button[aria-pressed="true"] {
+/* 세그먼트 한 벌(2026-09-26) — 한 줄에 붙은 선택지(기간·모드·탭)는 단추든 링크든 전부 이 모양이다.
+   예전엔 배당 세금 토글(.dv-seg · 고른 칸이 짙은 남색으로 꽉 참)과 미장 종목 기간(.hz-periodset · 떨어진 알약 +
+   파란 틴트)이 따로 놀아, 같은 '고르기'가 화면마다 세 가지 말로 보였다. 링크로 된 것(미장 종목 기간은 주소가
+   바뀐다)은 aria-current 로, 탭은 aria-selected 로 고른 칸을 표시한다. */
+.hz-tx .hz-seg > a {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: 8px;
+  color: var(--c-sub);
+  font-size: var(--fs-12);
+  font-weight: 700;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.hz-tx .hz-seg > button[aria-pressed="true"],
+.hz-tx .hz-seg > button[aria-selected="true"],
+.hz-tx .hz-seg > a[aria-current] {
   background: var(--c-card);
   color: var(--c-ink);
   box-shadow: 0 1px 2px rgba(19, 66, 122, 0.12);
+}
+/* 고르지 않은 칸은 글자만 진해진다(MDD 기간의 호버와 같다). 카더라 탭은 호버를 안 거는 자리라 여기 안 넣는다. */
+.hz-tx .hz-seg-hover > button[aria-pressed="false"]:hover,
+.hz-tx .hz-seg-hover > a:not([aria-current]):hover {
+  color: var(--c-ink);
 }
 
 @media (max-width: 900px) {
@@ -892,7 +915,7 @@
 
 /* 앵커를 쓸 수 있으면 **카드 위에 딱 붙여** 연다 — 셀을 통째로 덮지 않아도 되고, 좁은
    폭에서 어느 쪽으로 펼칠지는 브라우저가 고른다(position-try-fallbacks).
-   집의 다른 오버레이 셋(.hz-tip · .hz-theme-pop · .hz-yrpop)과 같은 어법이다. */
+   툴팁(.hz-tip)과 같은 어법이다(카더라 .hz-theme-pop 은 09-22 에 걷었고, MDD .hz-yrpop 은 09-26 에 shadcn Popover 로 옮겼다). */
 @supports (anchor-scope: --a) and (position-area: top center) {
   /* 이름은 **카드마다** 붙이고 anchor-scope 로 그 카드 안에 가둔다 — 안 가두면 네 팝오버가
      전부 마지막 카드에 달라붙는다(.hz-tip 주석의 그 함정). */
@@ -1125,22 +1148,16 @@
 /* 계좌 고르기 — 세후일 때 히어로 아래 작은 칸. 머리의 세후·세전보다 한 단 작다. */
 .dv-account { display: flex; align-items: center; gap: 4px; margin: 10px 0 0; flex-wrap: wrap; }
 .dv-account-label { font-size: var(--fs-12); font-weight: 600; color: var(--c-sub); margin-right: 4px; }
-.dv-account-btn {
-  padding: 4px 10px; border-radius: 999px; border: 1px solid var(--c-line); background: var(--c-card); color: var(--c-label);
-  font-size: var(--fs-12); font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap;
-}
-.dv-account-btn[aria-pressed="true"] { background: var(--c-cold-ink); border-color: var(--c-cold-ink); color: var(--c-card); }
+/* 모양은 세그먼트 한 벌(.hz-seg). 다섯 칸이라 폰 폭(375)엔 한 줄에 안 들어 트랙 안에서 두 줄로 접는다.
+   접힌 줄은 칸이 늘어나 트랙을 채운다 — 안 그러면 둘째 줄의 '비과세 종합저축' 옆 210px 가 빈 회색으로 남는다.
+   한 줄에 다 드는 넓은 화면에선 트랙이 내용 폭이라 늘어날 자리가 없다(2026-09-26). */
+.hz-tx .hz-seg.dv-account-seg { display: inline-flex; flex-wrap: wrap; }
+.hz-tx .hz-seg.dv-account-seg > button { flex: 1 1 auto; }
 /* 분리과세 몫 — 2,000만원 근처인 사람에게만 뜨는 한 줄. */
 .dv-hero-note { margin: 8px 0 0; font-size: var(--fs-12-5); line-height: 1.5; color: var(--c-sub); word-break: keep-all; }
 .dv-body { padding: 14px 26px 22px; display: flex; flex-direction: column; gap: 16px; }
 
-/* 세후·세전 — MDD 기간 토글과 같은 세그먼트. 고른 칸만 파란 면 + 카드색 글자. */
-.dv-seg { display: flex; gap: 2px; background: var(--c-track); border-radius: 9px; padding: 3px; }
-.dv-seg-btn {
-  padding: 6px 12px; border-radius: 6px; border: none; background: transparent; color: var(--c-label);
-  font-size: var(--fs-11-5); font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap;
-}
-.dv-seg-btn[aria-pressed="true"], .dv-seg-btn[aria-selected="true"] { background: var(--c-cold-ink); color: var(--c-card); }
+/* 세금 토글(세후·세전)은 세그먼트 한 벌(.hz-seg)을 쓴다 — 전용 모양(.dv-seg)은 2026-09-26 에 걷었다. */
 
 /* 세 갈래 판 — 국장 · 미장 · ETF 가 늘 나란히. 회색 타일 안에 제목·설명·칩. 좁으면 한 판씩. */
 .dv-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
@@ -1247,7 +1264,7 @@
 .dv-table-clear { padding: 0; border: none; background: none; color: var(--c-muted); font-size: var(--fs-12); font-weight: 600; cursor: pointer; font-family: inherit; }
 .dv-table-clear:hover { color: var(--c-blue); text-decoration: underline; }
 .dv-table-tools { display: flex; align-items: center; gap: 14px; }
-/* 표 위 '정렬' — 줄의 계좌 알약과 같은 생김새의 select. 고르면 순서가 한 번 바뀌고 값은 '정렬'로 돌아온다. */
+/* 표 위 '정렬' — 줄의 계좌 알약과 같은 생김새의 메뉴 단추(shadcn DropdownMenu 의 단추). 고르면 순서가 한 번 바뀐다. */
 .dv-tsort {
   appearance: none; -webkit-appearance: none; padding: 2px 16px 2px 8px; border-radius: 4px; border: 1px solid transparent;
   background: var(--c-chip) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 3.5l3 3 3-3' fill='none' stroke='%235e728d' stroke-width='1.5'/></svg>") no-repeat right 4px center;
@@ -1411,7 +1428,7 @@
    흰색을 얹어 타일보다 밝은 띠로. 비중 막대 트랙도 같은 값(--c-track 은 1.49). */
 :root[data-theme="dark"] .dv-goal-bar { background: rgba(255, 255, 255, 0.09); border-color: rgba(255, 255, 255, 0.12); }
 :root[data-theme="dark"] .dv-tweight-bar { background: rgba(255, 255, 255, 0.12); }
-.dv-goal-fill { display: block; height: 100%; border-radius: 999px; background: var(--c-blue); transition: width 0.2s ease; }
+.dv-goal-fill { display: block; height: 100%; min-width: 2%; border-radius: 999px; background: var(--c-blue); transition: width 0.2s ease; }
 .dv-goal-ends { display: flex; justify-content: space-between; gap: 8px; font-size: var(--fs-11-5); color: var(--c-sub); }
 .dv-goal-ends b { color: var(--c-ink); font-weight: 700; font-variant-numeric: tabular-nums; }
 /* 타일 셋 — 카드 안이라 흰 타일. */
@@ -1500,7 +1517,7 @@
 /* 줄 이름 — 셋씩 묶인 줄 위에 한 마디. 격자 한 줄을 통째로 차지한다. */
 .dv-basket-cap { grid-column: 1 / -1; margin: 6px 0 -6px 4px; font-size: var(--fs-12); font-weight: 700; color: var(--c-sub); letter-spacing: 0.02em; scroll-margin-top: 16px; }
 .dv-basket-cap:first-child { margin-top: 0; }
-/* 투자금 카드와 격자 사이 한 줄 — 줄 이름 넷으로 바로 가기. 계좌 칩(.dv-account-btn)과 같은 알약. */
+/* 투자금 카드와 격자 사이 한 줄 — 줄 이름 넷으로 바로 가기. 테두리 알약. */
 .dv-jump { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin: -8px 0 -4px 4px; } /* 부모 .hz-tx 의 gap 18 을 위 10·아래 14 로 */
 .dv-jump-label { font-size: var(--fs-12); font-weight: 600; color: var(--c-sub); margin-right: 4px; }
 .dv-jump-btn {

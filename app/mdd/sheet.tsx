@@ -2,6 +2,8 @@
 
 // 시트 틀·통계 칸·막대 줄·범례·골격·오류 카드. MddExplorer.tsx 에서 그대로 옮겨 왔다(shared.ts 머리말 참고).
 
+import { Skeleton as SkeletonBlock } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { C, Icon, MONO } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
 import { UNRECOVERED, PAD } from "./shared";
@@ -315,7 +317,7 @@ export function TwinAxis({ a, b }: { a: { label: string; color: string }; b: { l
 export function Skeleton({ periodOnly }: { periodOnly: boolean }) {
   // 실제 결과와 같은 골격(히어로 스트립 + 전폭 차트 + 50:50 짝)으로 깜빡여, 로딩 뒤
   // 레이아웃이 튀지 않는다.
-  const block = (h: number) => <div className="hz-shimmer" style={{ height: h, borderRadius: 8, background: C.bg }} />;
+  const block = (h: number) => <SkeletonBlock style={{ height: h }} />;
   const body = (children: React.ReactNode) => (
     <div style={{ padding: PAD, display: "flex", flexDirection: "column", gap: 12 }}>{children}</div>
   );
@@ -349,7 +351,7 @@ export function Skeleton({ periodOnly }: { periodOnly: boolean }) {
 
       <div className="hz-loading-float" aria-hidden>
         <span className="hz-loading-badge">
-          <span className="hz-spinner" />
+          <Spinner />
           {periodOnly ? "고점부터 되짚는 중" : "10년치 들춰보는 중"}
         </span>
       </div>

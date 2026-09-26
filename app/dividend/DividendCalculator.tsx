@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { gaStockCode, track } from "@/lib/ga";
 import { Icon } from "../ui";
@@ -20,6 +21,9 @@ import type { SortKey } from "./Holdings";
 import { MonthCalendar, Upcoming, MonthFill } from "./Calendar";
 import { GoalBox, AmountControl } from "./Goal";
 import { BasketSheet } from "./Basket";
+
+// '모두 빼기' 확인 판(Base UI 대화상자, gzip 약 20KB)은 처음 누를 때 받아 온다(ClearDialog.tsx).
+const ClearDialog = dynamic(() => import("./ClearDialog").then((m) => m.ClearDialog), { ssr: false });
 
 /**
  * 배당으로 살기(/dividend) 본체. 서버가 내려준 종목 목록(StockLite)만 갖고 브라우저에서 전부 계산한다.
@@ -112,6 +116,10 @@ export function DividendCalculator({
   }, [stocks, byCode, more, popular, popularUs, popularEtf]);
   // '더 보기'는 한 판만 열린다 — 세 판이 다 펼쳐지면 칩이 백 개다.
   const [moreOpen, setMoreOpen] = useState<Scope | null>(null);
+  // '모두 빼기' 확인 판(shadcn AlertDialog)이 열렸나. clearUsed 는 판을 한 번이라도 받아 왔나 — 한 번 붙이면 떼지 않는다
+  // (닫을 때 떼면 Base UI 가 초점을 '모두 빼기'로 돌려놓기 전에 사라진다).
+  const [clearAsk, setClearAsk] = useState(false);
+  const [clearUsed, setClearUsed] = useState(false);
   const toggleMore = (k: Scope) => {
     setMoreOpen((cur) => (cur === k ? null : k));
     if (moreOpen !== k) track("dividend_more", { scope: k });
@@ -287,11 +295,16 @@ export function DividendCalculator({
   };
   // '담은 종목'은 종목 수다 — 한 종목을 두 계좌로 나눠 두 줄이어도 하나.
   const distinct = new Set(holdings.map((h) => h.code)).size;
+  // 되돌릴 길이 없으니 한 번 묻는다 — 바스켓 열 종목을 손으로 담아 둔 사람이 실수로 누르면 다 잃는다.
+  // 예전엔 브라우저 기본 확인창(window.confirm)이었다. 사이트 글꼴·색이 아니고, 폰에선 주소가 제목처럼 붙었다.
   const clearAll = () => {
-    // 되돌릴 길이 없으니 한 번 묻는다 — 바스켓 열 종목을 손으로 담아 둔 사람이 실수로 누르면 다 잃는다.
-    if (!window.confirm(`담은 종목 ${distinct}개를 모두 뺄까요?`)) return;
+    setClearUsed(true);
+    setClearAsk(true);
+  };
+  const clearConfirmed = () => {
     track("dividend_clear", { count: distinct });
     setHoldings([]);
+    setClearAsk(false);
   };
   const applyBasket = (b: BasketLite) => {
     // 카드가 보여 주는 목록과 같은 것을 담는다 — 연금저축·IRP 를 골랐으면 그 계좌 목록(2026-09-15 전엔 늘 ISA 목록을 담았다).
@@ -419,22 +432,24 @@ export function DividendCalculator({
                 )}
               </div>
               {afterTax && (
-                <div className="dv-account" role="group" aria-label="어느 계좌로 세나">
+                <div className="dv-account">
                   <span className="dv-account-label">계좌 유형</span>
-                  {ACCOUNTS.map((o) => (
-                    <button
-                      key={o.key}
-                      type="button"
-                      className="dv-account-btn"
-                      aria-pressed={account === o.key}
-                      onClick={() => {
-                        track("dividend_account", { account: o.key });
-                        setAccount(o.key);
-                      }}
-                    >
-                      {o.label}
-                    </button>
-                  ))}
+                  {/* 바로 위 세후·세전과 같은 세그먼트. 좁으면 트랙 안에서 두 줄로 접힌다. */}
+                  <div className="hz-seg hz-seg-hover dv-account-seg" role="group" aria-label="어느 계좌로 세나">
+                    {ACCOUNTS.map((o) => (
+                      <button
+                        key={o.key}
+                        type="button"
+                        aria-pressed={account === o.key}
+                        onClick={() => {
+                          track("dividend_account", { account: o.key });
+                          setAccount(o.key);
+                        }}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
               {heroNote && <p className="dv-hero-note">{heroNote}</p>}
@@ -484,6 +499,7 @@ export function DividendCalculator({
           {lines.length > 0 && (
             <HoldingsTable lines={lines} inputs={inputs} totalInvest={invest} mode={taxMode} onClear={clearAll} onToggle={setLineOn} onMove={moveLine} onSort={sortLines} onAccount={setLineAccount} onSplit={splitLine} onShares={setShares} onCost={setCost} onRemove={remove} />
           )}
+          {clearUsed && <ClearDialog open={clearAsk} onOpenChange={setClearAsk} count={distinct} onConfirm={clearConfirmed} />}
           {lines.length > 0 && (
             <MonthCalendar
               monthly={monthly}
@@ -539,12 +555,12 @@ export function DividendCalculator({
 /* ── 세후·세전 ────────────────────────────────────────────────────── */
 function TaxToggle({ afterTax, onChange }: { afterTax: boolean; onChange: (v: boolean) => void }) {
   return (
-    <div className="dv-seg" role="group" aria-label="세금 반영">
+    <div className="hz-seg hz-seg-hover" role="group" aria-label="세금 반영">
       {[
         { on: true, label: "세후" },
         { on: false, label: "세전" },
       ].map((o) => (
-        <button key={o.label} type="button" aria-pressed={afterTax === o.on} className="dv-seg-btn" onClick={() => onChange(o.on)}>
+        <button key={o.label} type="button" aria-pressed={afterTax === o.on} onClick={() => onChange(o.on)}>
           {o.label}
         </button>
       ))}

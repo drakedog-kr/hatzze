@@ -356,8 +356,8 @@ export function Controls({
 
       {/* 기간 토글 — 다른 화면의 기간 탭과 같은 .hz-seg(회색 트랙 + 고른 칸만 흰 칩)다(2026-09-23).
           예전엔 고른 칸을 파랗게 채웠다. 흰 칩은 면(흰색 vs 회색)으로 '지금 고른 것'을 가르므로
-          예전 흰 면 + 파란 글자 시절의 문제(글자색으로만 갈림)는 생기지 않는다. 호버는 .mdd-period(sheets.css). */}
-      <div className="hz-seg mdd-period" role="group" aria-label="조회 기간">
+          예전 흰 면 + 파란 글자 시절의 문제(글자색으로만 갈림)는 생기지 않는다. 호버는 .hz-seg-hover(tx.css). */}
+      <div className="hz-seg hz-seg-hover mdd-period" role="group" aria-label="조회 기간">
         {PERIODS.map((p) => {
           const on = p.key === years;
           return (

@@ -24,6 +24,7 @@
 //   · 부제 끝에 붙어 있던 "(최근 5건)"은 제목 옆으로 — 굵기만 빼고 같은 크기로 붙인다.
 //   · "10년 전체" 버튼을 타일 바닥 오른쪽에서 **제목 줄 오른쪽**으로 올렸다. 팝오버는 그래서 아래로 편다.
 
+import { useEffect, useState } from "react";
 import type { RiskProfile as RiskProfileData, YearStat } from "@/lib/mdd";
 import { C, Icon } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
@@ -41,41 +42,25 @@ function Num({ children, color }: { children: React.ReactNode; color?: string })
 }
 
 /**
- * '10년 전체' — 막대에 안 깔린 해까지 조회 기간 전체를 펼친다.
- *
- * PC 는 마우스오버, 모바일은 탭으로 열린다. 여는 장치는 CSS 하나뿐이라(:hover 와
- * :focus-within, badges.css 의 .hz-yrpop) 상태도 이벤트 핸들러도 없다. 버튼이라 탭하면
- * 포커스가 잡혀 열리고, 딴 데를 누르면 포커스가 빠져 닫힌다.
- *
- * 예전엔 아이콘(open_in_full)만 있었다. 머리 줄에 글자를 얹을 자리가 없어서였는데, 바닥 요약
- * 줄이 빠지면서 자리가 생겼다 — 무엇을 여는지 글자로 적는다(토스 Predictable hint).
+ * '10년 전체' — 판(Base UI Popover · 위치 잡기)은 이 시트가 설 때 따로 받아 온다(YearsPopover.tsx 머리말).
+ * 받는 동안은 같은 글자·모양의 멈춘 단추가 선다. next/dynamic 의 `loading` 은 기간 글자('10년')를 못 받아 폭이 달라져서 손으로 부른다.
  */
 function YearsPopover({ years, label }: { years: YearStat[]; label: string }) {
-  const max = Math.max(...years.flatMap((y) => [Math.abs(y.ret), Math.abs(y.mdd)]), 1);
+  const [Real, setReal] = useState<null | typeof import("./YearsPopover").YearsPopover>(null);
+  useEffect(() => {
+    let alive = true;
+    import("./YearsPopover").then((m) => alive && setReal(() => m.YearsPopover));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  if (Real) return <Real years={years} label={label} />;
   return (
     <span className="hz-yrpop-host">
-      <button type="button" className="hz-yrpop-btn" aria-label={`${label} 연도별 성적 보기`}>
+      <button type="button" className="hz-yrpop-btn" disabled aria-label={`${label} 연도별 성적 보기`}>
         {label} 전체
         <Icon name="chevron_right" style={{ fontSize: "var(--fs-15)" }} />
       </button>
-      <span className="hz-yrpop" role="group">
-        <span className="hz-yrpop-head">{label} 연도별 성적</span>
-        {/* 오래된 해가 위, 올해가 맨 아래. 타일 막대와 같은 순서다. 한 해의 두 줄도 타일과 같은
-            순서로 **낙폭이 먼저, 수익이 두 번째**다(2026-08-04 에 바로잡음). */}
-        {years.map((y) => (
-          <span key={y.year} className="hz-yrpop-row">
-            <span className="hz-yrpop-year">{y.year}</span>
-            <span className="hz-yrpop-bars">
-              <span className="hz-yrpop-bar" style={{ width: `${Math.max(2, (Math.abs(y.mdd) / max) * 100)}%`, background: C.cold, opacity: 0.45 }} />
-              <span className="hz-yrpop-bar" style={{ width: `${Math.max(2, (Math.abs(y.ret) / max) * 100)}%`, background: y.ret >= 0 ? C.mania : C.cold }} />
-            </span>
-            <span className="hz-yrpop-val">
-              <span style={{ color: C.cold, opacity: 0.75 }}>{`${Math.round(y.mdd)}%`}</span>
-              <span style={{ color: y.ret >= 0 ? C.mania : C.cold }}>{`${y.ret >= 0 ? "+" : "−"}${Math.abs(Math.round(y.ret))}%`}</span>
-            </span>
-          </span>
-        ))}
-      </span>
     </span>
   );
 }

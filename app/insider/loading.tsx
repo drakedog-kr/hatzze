@@ -1,4 +1,5 @@
-import { C } from "../ui";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 
 /**
  * `/insider` 의 자리표시자.
@@ -17,9 +18,9 @@ import { C } from "../ui";
  *   그 폴더에 자기 loading.tsx 를 따로 뒀다(카더라 국장↔미장과 같은 이유).
  */
 
-/** 결과와 같은 골격으로 은은하게 깜빡이는 블록. globals.css 의 hz-shimmer 를 쓴다. */
+/** 결과와 같은 골격으로 은은하게 깜빡이는 블록. shadcn Skeleton(components/ui/skeleton.tsx)이다. */
 function Block({ h, w = "100%", r = 8 }: { h: number; w?: number | string; r?: number }) {
-  return <div className="hz-shimmer" style={{ height: h, width: w, maxWidth: "100%", borderRadius: r, background: C.bg }} />;
+  return <Skeleton style={{ height: h, width: w, borderRadius: r }} />;
 }
 
 function HeroPane({ lines }: { lines: number }) {
@@ -109,7 +110,7 @@ export default function Loading() {
 
       <div className="hz-loading-float">
         <span className="hz-loading-badge">
-          <span className="hz-spinner" />
+          <Spinner />
           공시에 남은 기록을 모으는 중
         </span>
       </div>
