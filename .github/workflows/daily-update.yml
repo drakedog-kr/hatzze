@@ -703,12 +703,16 @@ jobs:
         run: python data-pipeline/scripts/generate_surging_oneliners.py
 
       # '왜 올랐나' — 그날 크게 움직인 종목에 채널이 말한 까닭. 저녁 실행에서만 만든다
-      # (아침엔 그날 메시지가 몇백 건뿐이라 스크립트가 스스로 건너뛰고 KRX 확정값만 채운다).
+      # (아침 슬롯은 `--slot morning` 을 받아 만들지 않고 KRX 확정값만 채운다).
       # 입력은 telegram_stock_daily(그날) + 메시지 본문이라 stock_daily 뒤면 어디든 된다.
+      # ⚠️ 슬롯을 꼭 넘길 것. 한때 스크립트가 그날 글 수(1,500건)로 아침을 짐작했는데, 주말·연휴
+      #    저녁도 그 아래라 2026-09-24~26 추석에 미장 판이 안 생겼다(스크립트 머리 주석).
       - name: (텔레그램) 등락 종목 까닭 생성
         id: telegram_move_reasons
         continue-on-error: true
-        run: python data-pipeline/scripts/generate_move_reasons.py
+        env:
+          SLOT: ${{ github.event.inputs.slot }}
+        run: python data-pipeline/scripts/generate_move_reasons.py --slot "$SLOT"
 
       - name: (텔레그램) 미장 총평·종목 요약 생성
         id: telegram_us_narratives
