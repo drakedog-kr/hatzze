@@ -137,24 +137,6 @@ export function drawdownSeries(bars: Bar[]): DrawdownPoint[] {
 }
 
 /**
- * 시장(코스피·S&P500)의 고점 대비 낙폭을 **종목 언더워터 차트의 날짜들**에 맞춰 뽑는다(2026-09-26).
- * 언더워터 차트가 종목과 시장 두 겹을 겹쳐 그린다(shadcn Area Chart · Interactive 꼴) — 두 계열의 점이 같은 x 에 서야
- * 툴팁 한 줄에 두 값이 함께 나온다. 시장 고점도 **같은 조회 기간의 첫날부터** 센다(종목 쪽 drawdownSeries 와 같은 잣대).
- * 그 날짜에 시장 종가가 없으면(휴장이 갈리는 날) 그 앞 가장 가까운 거래일 값을 쓰고, 시장 시계열이 시작하기 전이면 null.
- */
-export function benchDrawdownAt(marketBars: Bar[], dates: readonly string[]): (number | null)[] {
-  const series = drawdownSeries(marketBars);
-  const out: (number | null)[] = [];
-  let j = -1;
-  for (const d of dates) {
-    // 두 목록 다 날짜순이라 한 번 훑기로 충분하다.
-    while (j + 1 < series.length && series[j + 1].date <= d) j++;
-    out.push(j >= 0 ? Math.round(series[j].dd * 100) / 100 : null);
-  }
-  return out;
-}
-
-/**
  * 고점에서 시작해 그 고점을 되찾을 때까지를 한 에피소드로 끊는다.
  *
  * 새 고점을 만나면 직전 하락 국면을 '회복됨'으로 종료하고, 마지막까지 고점을 못

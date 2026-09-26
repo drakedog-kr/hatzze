@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { analyzeDrawdown, benchDrawdownAt, drawdownSeries, riskProfile, type Bar } from "@/lib/mdd";
+import { analyzeDrawdown, drawdownSeries, riskProfile, type Bar } from "@/lib/mdd";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { MDD_PEER_MAX, themesForName, THEMES } from "@/lib/stock-themes";
 import { US_MDD_PEER_MAX, US_THEMES, themesForTicker } from "@/lib/us-stock-themes";
@@ -88,11 +88,8 @@ export async function GET(request: Request) {
         }
       : null;
 
-  // 언더워터 차트의 둘째 겹 — 같은 날짜들의 시장 낙폭(점 250개 안팎, 숫자만).
-  const benchDd = marketBars ? benchDrawdownAt(marketBars, analysis.underwater.map((p) => p.date)) : null;
-
   return NextResponse.json(
-    { ok: true, code, name, market, symbol, years: yearsKey, analysis, attribution, theme, risk, benchDd },
+    { ok: true, code, name, market, symbol, years: yearsKey, analysis, attribution, theme, risk },
     { headers: { "Cache-Control": "public, s-maxage=900, stale-while-revalidate=600" } },
   );
 }

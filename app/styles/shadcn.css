@@ -433,31 +433,6 @@ html[data-sidebar="icon"] .hz-sidebar [data-label]:hover::after {
   white-space: nowrap;
 }
 
-/* ── shadcn 차트 범례(ChartLegendContent) ── 차트 아래 가운데, 면·막대를 나타내는 8px 네모 + 이름.
-   글자는 계열 색이 아니라 글자색(--c-sub)이다 — 색은 네모가 맡는다(차트 지침). 쓰는 곳: MDD 언더워터(두 겹일 때). */
-.hz-chart-legend {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px 16px;
-  padding-top: 10px;
-  font-size: var(--fs-12);
-  font-weight: 600;
-  color: var(--c-sub);
-}
-.hz-chart-legend > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.hz-chart-legend i {
-  display: inline-block;
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-}
-
 /* ── 차트 축 — 그림 밖 HTML 칸의 축 글자(늘 12px, shadcn 축 text-xs 자리) ─────────────
    왼쪽 칸(--hz-chart-y, 기본 38px)에 세로축 값, 그림 아래 줄에 가로축 눈금. 칸 위치는 TSX 가 뷰박스 비율(%)로 준다.
    그림 안 <text> 는 그림이 폭에 맞춰 늘어나는 만큼 같이 커져 PC 에서 15px 남짓으로 투박했다(09-27).

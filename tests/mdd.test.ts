@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { analyzeDrawdown, benchDrawdownAt, drawdownSeries, episodes } from "../lib/mdd.ts";
+import { analyzeDrawdown, drawdownSeries, episodes } from "../lib/mdd.ts";
 
 /** 하루 간격의 종가 열. */
 function bars(closes: number[]) {
@@ -62,17 +62,5 @@ describe("analyzeDrawdown 의 모집단", () => {
     const b = analyzeDrawdown(bars([100, 90, 100, 99.5]));
     assert.ok(b);
     assert.equal(b.recovery, null);
-  });
-});
-
-describe("benchDrawdownAt", () => {
-  it("종목 차트 날짜마다 그날(없으면 그 앞 거래일)의 시장 낙폭, 시장 시작 전이면 null", () => {
-    // 시장: 1/1 100 · 1/2 80 · 1/4 90 (1/3 휴장)
-    const market = [
-      { date: "2024-01-01", close: 100 },
-      { date: "2024-01-02", close: 80 },
-      { date: "2024-01-04", close: 90 },
-    ];
-    assert.deepEqual(benchDrawdownAt(market, ["2023-12-31", "2024-01-01", "2024-01-03", "2024-01-04"]), [null, 0, -20, -10]);
   });
 });

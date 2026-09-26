@@ -401,8 +401,6 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
 }
 
 /* 고점 대비 낙폭 곡선(언더워터). dd 는 0 이하이고 아래로 갈수록 깊다. */
-/** 언더워터 둘째 겹(시장)의 색 — 리스크 프로필 '혼자 빠지나, 같이 빠지나'의 시장 막대와 같은 옅은 파랑. */
-const BENCH_UW = DOWN_BAR[3];
 
 /**
  * 점들을 단조 3차 곡선(Fritsch–Carlson, d3 curveMonotoneX 와 같은 셈)으로 잇는 SVG path.
@@ -439,21 +437,7 @@ function smoothPath(pts: [number, number][]): string {
   return d;
 }
 
-export function Underwater({
-  a,
-  periodLabel,
-  market,
-  name,
-  benchDd,
-}: {
-  a: MddAnalysis;
-  periodLabel: string;
-  market: string | null;
-  /** 범례·툴팁에 적을 종목 이름. */
-  name: string;
-  /** `a.underwater` 와 같은 날짜들의 시장 낙폭(둘째 겹). 없으면 종목 한 겹만 그린다. */
-  benchDd?: (number | null)[] | null;
-}) {
+export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodLabel: string; market: string | null }) {
   const series = a.underwater;
   const mdd = a.mdd;
   const W = 720;
@@ -465,12 +449,7 @@ export function Underwater({
   const VB_PAD = 6;
   const VBH = H + VB_PAD * 2;
   const n = series.length;
-  // 둘째 겹(시장)은 점 수가 같을 때만 쓴다 — 캐시에 남은 옛 응답·시장 시세 실패면 종목 한 겹.
-  const bench = benchDd && benchDd.length === n && benchDd.some((v) => v !== null) ? benchDd : null;
-  const benchLabel = benchName(market);
-  // 바닥은 두 겹 중 더 깊은 쪽 — 시장이 종목보다 깊게 빠진 기간(드물다)에 시장 면이 잘리지 않게.
-  const benchMin = bench ? Math.min(...bench.filter((v): v is number => v !== null)) : 0;
-  const floor = Math.min(mdd, benchMin, -1); // 0 나눗셈·완전 평평 방지
+  const floor = Math.min(mdd, -1); // 0 나눗셈·완전 평평 방지
   const x = (i: number) => (n <= 1 ? PAD_L : PAD_L + (i / (n - 1)) * (W - PAD_L));
   const y = (dd: number) => (dd / floor) * H;
 
@@ -479,9 +458,6 @@ export function Underwater({
   // 늘 이웃 두 점 사이에 머문다. 최저점·0% 선이 곡선 때문에 거짓말하지 않는다.
   const line = smoothPath(series.map((p, i) => [x(i), y(p.dd)]));
   const area = `${line} L${x(n - 1).toFixed(1)},0 L${x(0).toFixed(1)},0 Z`;
-  const benchPts = bench ? bench.map((v, i) => (v === null ? null : ([x(i), y(v)] as [number, number]))).filter((q): q is [number, number] => q !== null) : [];
-  const benchLine = benchPts.length > 1 ? smoothPath(benchPts) : "";
-  const benchArea = benchLine ? `${benchLine} L${benchPts[benchPts.length - 1][0].toFixed(1)},0 L${benchPts[0][0].toFixed(1)},0 Z` : "";
 
   // 연도 경계(1월로 처음 넘어가는 지점)를 눈금으로. 첫 데이터 지점은 연중(예: 2016-07)에
   // 시작해 완전한 연도가 아니고, x=0 이라 라벨이 왼쪽으로 잘린다("2016"→"16"). 그래서
@@ -539,16 +515,11 @@ export function Underwater({
         return (
           <div
             key={i}
-            className={`hz-tip hz-vline hz-tip-lines${edge}`}
-            // 한 툴팁에 두 겹 — 값이 먼저, 이름이 뒤(차트 지침 · shadcn ChartTooltip 과 같은 순서).
-            data-tip={
-              `${p.date}\n${fmtPct(p.dd)}  ${name} · ${fmtPrice(p.close, market)}` +
-              (bench && bench[i] !== null ? `\n${fmtPct(bench[i]!)}  ${benchLabel}` : "")
-            }
+            className={`hz-tip hz-vline${edge}`}
+            data-tip={`${p.date} · ${fmtPrice(p.close, market)} · 고점 대비 ${fmtPct(p.dd)}`}
             // 선·호버 점을 실제 점 자리(칸 폭의 i/(n−1))에 세운다(app/home/parts.tsx AreaChart 와 같은 셈).
             style={{ flex: 1, position: "relative", ["--hz-x" as string]: `${at * 100}%` }}
           >
-            {bench && bench[i] !== null && <span className="hz-vdot" style={{ top: `${(bench[i]! / floor) * 100}%`, background: BENCH_UW }} />}
             <span className="hz-vdot" style={{ top: `${(p.dd / floor) * 100}%`, background: DOWN_BAR[1] }} />
           </div>
         );
@@ -564,18 +535,15 @@ export function Underwater({
       role="img"
       aria-label={`고점 대비 낙폭 곡선. 현재 ${fmtPct(series[n - 1].dd)}, 기간 최저 ${fmtPct(mdd)}`}
     >
-      {/* shadcn 영역 차트 꼴(Area Chart · Interactive, 2026-09-27) — 두 겹(종목 · 시장)을 겹쳐 그리고, 면은 그라데이션,
-          격자는 가로 실선만 옅게, 선은 1px. shadcn 은 선에서 진하고 바닥으로 옅어지는데, 이 차트는 0% 가 위이고 선이 아래라
-          **깊을수록 진하게** 뒤집었다. 시장 겹을 먼저(뒤에) 그려 종목 겹이 위에 선다.
+      {/* shadcn 영역 차트 꼴(Area Chart · Interactive, 2026-09-27) — 면은 그라데이션, 격자는 가로 실선만 옅게, 선은 1px.
+          shadcn 은 선에서 진하고 바닥으로 옅어지는데, 이 차트는 0% 가 위이고 선이 아래라 **깊을수록 진하게** 뒤집었다.
+          종목 한 겹만 그린다 — 시장(코스피) 낙폭을 뒤에 한 겹 더 깔았더니 두 면이 겹쳐 이중으로 보였다(09-27 걷음).
+          시장과의 견줌은 아래 '시장 탓' 구간이 맡는다.
           이 그림은 확대 보기에서도 한 번 더 그려져 id 가 두 번 선다 — 모양이 같아 어느 쪽을 집어도 같다. */}
       <defs>
         <linearGradient id="mdd-uw-fill" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={DOWN_BAR[1]} stopOpacity="0.04" />
           <stop offset="100%" stopColor={DOWN_BAR[1]} stopOpacity="0.4" />
-        </linearGradient>
-        <linearGradient id="mdd-uw-bench" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={BENCH_UW} stopOpacity="0.04" />
-          <stop offset="100%" stopColor={BENCH_UW} stopOpacity="0.28" />
         </linearGradient>
       </defs>
       {/* 선·격자는 화면에서 늘 1px — 그림이 가로 720 단위를 화면 폭에 맞춰 늘이고 줄여서, 그대로 두면 PC 에선 1.4px 로
@@ -583,8 +551,6 @@ export function Underwater({
       {gridRows.map((dd, i) => (
         <line key={i} x1={PAD_L} y1={y(dd)} x2={W} y2={y(dd)} stroke="var(--c-line)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
       ))}
-      {benchArea && <path d={benchArea} fill="url(#mdd-uw-bench)" />}
-      {benchLine && <path d={benchLine} fill="none" stroke={BENCH_UW} strokeWidth="1" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
       <path d={area} fill="url(#mdd-uw-fill)" />
       <path d={line} fill="none" stroke={DOWN_BAR[1]} strokeWidth="1" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
       {/* 기간 최저점 표시 — **빈 동그라미만**. 현재 지점에도 속 찬 점을 찍었었는데 뺐다:
@@ -634,19 +600,6 @@ export function Underwater({
           넓히는 대신 넘침만 허용한다 — 넓히면 아래 크로스헤어 띠(퍼센트로 잡은 위치)가
           곡선과 어긋난다. */}
       {chartWith("")}
-      {/* 범례 — shadcn ChartLegendContent 꼴(차트 아래 가운데, 면을 나타내는 작은 네모 + 이름). 두 겹일 때만. */}
-      {bench && (
-        <div className="hz-chart-legend" aria-hidden>
-          <span>
-            <i style={{ background: DOWN_BAR[1] }} />
-            {name}
-          </span>
-          <span>
-            <i style={{ background: BENCH_UW }} />
-            {benchLabel}
-          </span>
-        </div>
-      )}
       {/* 확대 버튼 — 차트 오른쪽 아래. 리스크 프로필의 '전체보기'(.hz-yrpop-btn)와 같은
           아이콘·같은 자리 어법이라 새 언어를 안 만든다. 폰에서만 뜬다(CSS). */}
       <button
