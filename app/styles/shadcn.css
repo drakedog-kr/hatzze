@@ -406,6 +406,13 @@ html[data-sidebar="icon"] .hz-sidebar [data-label]:hover::after {
   background: var(--c-track);
   overflow: hidden;
 }
+/* 다크에선 빈칸을 한 단 어둡게. 다크의 --c-track(#3c3c47)은 가장 옅은 파랑(--c-blue-5 #2a4257)과 밝기가 같아(1.04)
+   반도체 11종목·시장 탓·홈 카드의 옅은 막대가 빈칸 속으로 사라졌다(09-27 프로덕션 실측). 라이트처럼 빈칸을 카드와 옅은
+   파랑 **사이**에 둔다 — 카드 대비 1.11 · 행 호버(--c-soft) 대비 1.06 · 옅은 파랑 대비 1.40(라이트 1.12 · 1.06 · 1.15).
+   --c-track 자체는 검색 칸·범위 막대 등 다른 자리도 쓰고 있어 여기만 바꾼다. */
+:root[data-theme="dark"] .hz-hbar-track {
+  background: #28282f;
+}
 /* 두께 — 시트 목록 12(기본) · 카드 안 목록·표 안 10(-md) · 더 작은 자리 8(-sm). 모양 규칙은 같다. */
 .hz-hbar-md {
   height: 10px;
