@@ -1503,6 +1503,7 @@ export default async function KaderaPage() {
                             display: "block",
                             width: `${Math.max(2, (Math.abs(r.delta7d) / topDelta) * 100)}%`,
                             height: "100%",
+                            borderRadius: "0 3px 3px 0", // 데이터 끝만 둥글게(shadcn 막대 꼴 · 표 안 막대 .hz-bar 와 같다, 2026-09-27)
                             background: r.delta7d >= 0 ? "var(--c-warm-2)" : "var(--c-blue-3)",
                           }}
                         />

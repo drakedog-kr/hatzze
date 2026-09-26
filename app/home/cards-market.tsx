@@ -35,8 +35,9 @@ export function CardBuffett({ v }: { v: Pick }) {
               {dt && dt.gdp ? `약 ${jo(dt.gdp)}조원` : "기준 100"}
             </span>
           </div>
-          <div style={{ height: 9, borderRadius: R.pill, background: C.track, overflow: "hidden" }}>
-            <div style={{ width: `${gdpWidth}%`, height: "100%", borderRadius: R.pill, background: "var(--c-blue-5)" }} />
+          {/* shadcn 막대 꼴(빈칸 위, 데이터 끝만 둥근 14px 막대 · shadcn.css .hz-hbar-*) — MDD 와 같은 방식(2026-09-27). */}
+          <div className="hz-hbar-track hz-hbar-md">
+            <div className="hz-hbar-fill" style={{ width: `${gdpWidth}%`, background: "var(--c-blue-5)" }} />
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -46,8 +47,8 @@ export function CardBuffett({ v }: { v: Pick }) {
               {dt && dt.market_cap ? `약 ${jo(dt.market_cap)}조원` : `${v.disp}${v.unit}`}
             </span>
           </div>
-          <div style={{ height: 9, borderRadius: R.pill, background: C.track, overflow: "hidden" }}>
-            <div style={{ width: "100%", height: "100%", borderRadius: R.pill, background: C.blue }} />
+          <div className="hz-hbar-track hz-hbar-md">
+            <div className="hz-hbar-fill" style={{ width: "100%", background: C.blue }} />
           </div>
         </div>
         <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.label, background: C.soft, borderRadius: R.control, padding: "9px 11px" }}>
@@ -185,8 +186,8 @@ export function CardMarketActions({ v }: { v: Pick }) {
         {rows.map((r) => (
           <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ width: 34, flexShrink: 0, fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub2 }}>{r.label}</span>
-            <div style={{ flex: 1, minWidth: 0, height: 14, borderRadius: 4, background: C.track, overflow: "hidden" }}>
-              <div style={{ width: `${(r.n / maxN) * 100}%`, height: "100%", borderRadius: 4, background: r.fill }} />
+            <div className="hz-hbar-track hz-hbar-md">
+              <div className="hz-hbar-fill" style={{ width: `${(r.n / maxN) * 100}%`, background: r.fill }} />
             </div>
             <span style={{ width: 30, flexShrink: 0, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12-5)", fontWeight: 800, color: r.ink }}>
               {r.n}건
@@ -308,7 +309,7 @@ export function CardHighGap({ v, tops, failed = false }: { v: Pick; tops: StockH
               <span style={{ width: 76, flexShrink: 0, fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.label, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {st.name}
               </span>
-              <div style={{ flex: 1, height: 7, borderRadius: R.pill, background: C.track, overflow: "hidden", minWidth: 0 }}>
+              <div className="hz-hbar-track hz-hbar-md">
                 {/* 막대 = **고점 근접도**(52주 고점 = 꽉 찬 막대). 오른쪽 숫자는 그대로
                     괴리율이라, 둘을 더하면 늘 100 이다.
 
@@ -321,7 +322,7 @@ export function CardHighGap({ v, tops, failed = false }: { v: Pick; tops: StockH
                        데다 −51 과 −80 이 같은 그림이 된다.
                     근접도로 두면 축이 '고점 = 100' 이라 임의로 정한 수가 없고, 잘릴 일도
                     없다(같은 값이 52.5 · 64.0 · 48.9 로 갈린다). */}
-                <div style={{ width: `${Math.max(0, Math.min(100, 100 + st.gapPct))}%`, height: "100%", borderRadius: R.pill, background: rankColor[i] ?? "var(--c-blue-4)" }} />
+                <div className="hz-hbar-fill" style={{ width: `${Math.max(0, Math.min(100, 100 + st.gapPct))}%`, background: rankColor[i] ?? "var(--c-blue-4)" }} />
               </div>
               <span style={{ width: 50, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: C.ink }}>
                 {st.gapPct >= 0 ? "+" : ""}{st.gapPct.toFixed(1)}%
@@ -518,7 +519,8 @@ export function CardAsia({ v }: { v: Pick }) {
                 </span>
                 <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub }}>{b.sub}</span>
               </span>
-              <div style={{ position: "relative", flex: 1, minWidth: 0, height: 16 }}>
+              {/* 막대 두께는 카드 안 목록 막대(14px, shadcn.css .hz-hbar-md)와 맞춘다(2026-09-27, 16 → 14). */}
+              <div style={{ position: "relative", flex: 1, minWidth: 0, height: 14 }}>
                 <div style={{ position: "absolute", inset: 0, borderRadius: 4, background: C.track }} />
                 {/* 기준국만 진한 파랑. 넷을 다 같은 색으로 두면 "누가 기준인지"를 라벨
                     굵기로만 말하게 되는데, 그건 막대를 훑는 눈에 안 걸린다. */}
@@ -626,8 +628,8 @@ export function CardVolume({ v }: { v: Pick }) {
         {rows.map((r) => (
           <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ width: 60, flexShrink: 0, fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>{r.label}</span>
-            <div style={{ flex: 1, height: 9, borderRadius: R.pill, background: C.track, overflow: "hidden", minWidth: 0 }}>
-              <div style={{ width: `${((r.value ?? 0) / max) * 100}%`, height: "100%", borderRadius: R.pill, background: r.fill }} />
+            <div className="hz-hbar-track hz-hbar-md">
+              <div className="hz-hbar-fill" style={{ width: `${((r.value ?? 0) / max) * 100}%`, background: r.fill }} />
             </div>
             <span style={{ width: 58, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12-5)", fontWeight: 700, color: r.strong ? C.ink : C.label }}>
               {r.value !== null ? fmt(r.value) : "-"}

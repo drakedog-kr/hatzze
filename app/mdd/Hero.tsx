@@ -494,7 +494,7 @@ export function Underwater({
   // 기간이 길면(전체 = 27년 등) 해마다 찍을 때 라벨이 서로 겹쳐 붙어 버린다
   // ("2001200220032004…"). 들어갈 수 있는 라벨 수를 세어 1·2·5·10년 중 가장 촘촘한
   // 간격을 고르고, 그 배수 해에만 라벨을 둔다(2005·2010·2015… 처럼 떨어지는 해로).
-  const LABEL_SLOT = 68; // 라벨 하나가 차지할 최소 폭(단위). 좁은 화면에선 CSS 가 하나씩 거른다(.mdd-uw-x [data-minor]).
+  const LABEL_SLOT = 68; // 라벨 하나가 차지할 최소 폭(단위). 좁은 화면에선 CSS 가 하나씩 거른다(.hz-chart-x [data-minor]).
   const maxLabels = Math.max(2, Math.floor((W - PAD_L) / LABEL_SLOT));
   let yearStep = 1;
   for (const s of [1, 2, 5, 10]) {
@@ -597,8 +597,8 @@ export function Underwater({
      축 글자는 그 상자 왼쪽(퍼센트)·아래(연도) 칸에 HTML 로 — 늘 11px(shadcn 축 글자 text-xs · 옅은 색). */
   const pctLabel = (dd: number) => `${dd < -0.5 ? "−" : ""}${Math.abs(Math.round(dd))}%`;
   const chartWith = (extraClass: string) => (
-    <div className="mdd-uw">
-      <div className="mdd-uw-y" aria-hidden>
+    <div className="hz-chart-axes">
+      <div className="hz-chart-y" aria-hidden>
         {rows.map((dd, i) => (
           <span key={i} style={{ top: `${((y(dd) + VB_PAD) / VBH) * 100}%` }}>
             {pctLabel(dd)}
@@ -609,7 +609,7 @@ export function Underwater({
         {chartOnly}
         {crosshair(extraClass)}
       </div>
-      <div className="mdd-uw-x" aria-hidden>
+      <div className="hz-chart-x" aria-hidden>
         {ticks.map((t, i) => (
           // 둘째마다 표시 — 좁은 폭에선 CSS 가 이것들을 숨겨 연도가 겹치지 않는다.
           <span key={t.year} data-minor={i % 2 === 1 ? "" : undefined} style={{ left: `${(t.x / W) * 100}%` }}>

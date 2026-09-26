@@ -1378,7 +1378,7 @@
 .dv-tsub { display: block; font-size: var(--fs-11); font-weight: 500; color: var(--c-sub); }
 /* 비중 칸 — 숫자 아래 얇은 막대. */
 .dv-tweight-bar { display: block; width: 52px; height: 4px; margin: 5px 0 0 auto; border-radius: 2px; background: var(--c-track); overflow: hidden; }
-.dv-tweight-bar > span { display: block; height: 100%; border-radius: 2px; background: var(--c-blue); }
+.dv-tweight-bar > span { display: block; height: 100%; border-radius: 0 2px 2px 0; background: var(--c-blue); } /* 데이터 끝만 둥글게(shadcn 막대 꼴, 09-27) */
 /* 줄의 투자금 — 넓은 화면은 비중 막대 아래(.dv-tinvest), 비중 칸이 접히는 1,128 아래는 1년 배당 아래(.dv-tinvest-m). */
 .dv-tinvest { margin-top: 4px; white-space: nowrap; }
 .dv-tinvest-m { display: none; }
@@ -1459,7 +1459,7 @@
 }
 .dv-cal-cell:hover { background: var(--tx-btn); }
 .dv-cal-cell[aria-pressed="true"] { background: var(--c-blue-tint); box-shadow: inset 0 0 0 1px var(--c-blue); }
-.dv-cal-bar { width: 100%; max-width: 28px; margin-top: auto; border-radius: 4px 4px 2px 2px; background: var(--c-blue); }
+.dv-cal-bar { width: 100%; max-width: 28px; margin-top: auto; border-radius: 4px 4px 0 0; background: var(--c-blue); } /* 위(데이터 끝)만 둥글고 바닥은 각지게(shadcn 막대 꼴, 09-27 · 바닥 2 → 0) */
 .dv-cal-cell:not(.dv-cal-on) .dv-cal-bar { height: 3px; background: var(--c-track); }
 .dv-cal-month { font-size: var(--fs-11); color: var(--c-sub); }
 .dv-cal-amt { font-size: var(--fs-11); font-weight: 700; color: var(--c-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }

@@ -383,7 +383,7 @@ html[data-sidebar="icon"] .hz-sidebar [data-label]:hover::after {
    · 마우스를 올린 줄에 옅은 띠가 깔린다(shadcn 툴팁 커서 fill-muted 자리). 툴팁은 달지 않는다(값이 이미 적혀 있다).
      ⚠️ 막대를 밝히지 않는다 — 한때 brightness(1.08) 로 밝혔더니 옅은 파랑 막대가 회색 트랙과 같아져 사라졌다
         (코스피 막대 대비 1.15 → 1.01, 09-27 Hun 지적).
-   쓰는 곳: MDD MeterRow(시장 탓·회복 분포·같은 테마 종목) · 역대 낙폭 Top 5.
+   쓰는 곳: MDD MeterRow(시장 탓·회복 분포·같은 테마 종목) · 역대 낙폭 Top 5 · 홈 카드 목록 막대(-md) · 표 안 막대(-sm).
    ⚠️ 이름이 hz-hbar-* 인 까닭: `.hz-bar` 는 카더라·내부자·서학의 트랙형 알약 막대가 먼저 쓰는 이름이다(kadera.css).
       같은 이름을 쓰면 이 파일이 맨 뒤에 실려 그쪽 막대의 모서리·높이를 덮는다(한때 그랬다, 09-27). */
 .hz-hbar-row {
@@ -404,6 +404,13 @@ html[data-sidebar="icon"] .hz-sidebar [data-label]:hover::after {
   border-radius: 4px;
   background: var(--c-track);
   overflow: hidden;
+}
+/* 두께 세 단 — 막대가 주인공인 시트 22(기본) · 카드 안 목록 14 · 표 안 작은 막대 8. 모양 규칙은 같다. */
+.hz-hbar-md {
+  height: 14px;
+}
+.hz-hbar-sm {
+  height: 8px;
 }
 .hz-hbar-fill {
   display: block;
@@ -444,20 +451,22 @@ html[data-sidebar="icon"] .hz-sidebar [data-label]:hover::after {
   border-radius: 2px;
 }
 
-/* ── MDD 언더워터 축 — 그림 밖 HTML 칸의 축 글자(늘 12px, shadcn 축 text-xs 자리) ─────────────
-   왼쪽 칸(38px)에 퍼센트, 그림 아래 줄에 연도. 칸 위치는 TSX 가 뷰박스 비율(%)로 준다.
-   좁은 폭(차트 480px 이하)에선 연도를 하나씩 걸러 서로 붙지 않게 한다(data-minor). */
-.mdd-uw {
+/* ── 차트 축 — 그림 밖 HTML 칸의 축 글자(늘 12px, shadcn 축 text-xs 자리) ─────────────
+   왼쪽 칸(--hz-chart-y, 기본 38px)에 세로축 값, 그림 아래 줄에 가로축 눈금. 칸 위치는 TSX 가 뷰박스 비율(%)로 준다.
+   그림 안 <text> 는 그림이 폭에 맞춰 늘어나는 만큼 같이 커져 PC 에서 15px 남짓으로 투박했다(Hun, 09-27).
+   쓰는 곳: MDD 언더워터 · 내부자 종목 주가 차트.
+   좁은 폭(차트 480px 이하)에선 가로축 눈금을 하나씩 걸러 서로 붙지 않게 한다(data-minor). */
+.hz-chart-axes {
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-columns: var(--hz-chart-y, 38px) minmax(0, 1fr);
   column-gap: 8px;
   container-type: inline-size;
 }
-.mdd-uw-y {
+.hz-chart-y {
   position: relative;
 }
-.mdd-uw-y > span,
-.mdd-uw-x > span {
+.hz-chart-y > span,
+.hz-chart-x > span {
   position: absolute;
   /* 11px · 400 · --c-muted 는 너무 흐렸다(Hun, 09-27) — shadcn 축 글자 크기(12px)에 굵기 600, 한 단 진한 --c-sub(5.55:1). */
   font-size: var(--fs-12);
@@ -467,21 +476,21 @@ html[data-sidebar="icon"] .hz-sidebar [data-label]:hover::after {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.mdd-uw-y > span {
+.hz-chart-y > span {
   right: 0;
   transform: translateY(-50%);
 }
-.mdd-uw-x {
+.hz-chart-x {
   position: relative;
   grid-column: 2;
   height: 18px;
 }
-.mdd-uw-x > span {
+.hz-chart-x > span {
   top: 6px;
   transform: translateX(-50%);
 }
 @container (max-width: 480px) {
-  .mdd-uw-x > span[data-minor] {
+  .hz-chart-x > span[data-minor] {
     display: none;
   }
 }
