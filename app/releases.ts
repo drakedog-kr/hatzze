@@ -29,6 +29,12 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 비어 있던 과표가 채워져 세후 금액이 바로잡힐 뿐 쓰는 법은 그대로다. Patch.
+    version: "1.21.2",
+    date: "2026-09-26",
+    changes: ["배당으로 살기가 TIGER ETF 분배금 중 과세되는 몫에만 세금을 매깁니다."],
+  },
+  {
     // 무엇을 세고 고르는지만 달라질 뿐 쓰는 법은 그대로다. Patch.
     version: "1.21.1",
     date: "2026-09-26",
