@@ -35,8 +35,8 @@ export function CardBuffett({ v }: { v: Pick }) {
               {dt && dt.gdp ? `약 ${jo(dt.gdp)}조원` : "기준 100"}
             </span>
           </div>
-          {/* shadcn 막대 꼴(빈칸 위, 데이터 끝만 둥근 14px 막대 · shadcn.css .hz-hbar-*) — MDD 와 같은 방식(2026-09-27). */}
-          <div className="hz-hbar-track hz-hbar-md">
+          {/* shadcn 막대 꼴(빈칸 위, 데이터 끝만 둥근 10px 막대 · shadcn.css .hz-hbar-*) — MDD 와 같은 방식(2026-09-27). */}
+          <div className="hz-hbar-track hz-hbar-md hz-hbar-block">
             <div className="hz-hbar-fill" style={{ width: `${gdpWidth}%`, background: "var(--c-blue-5)" }} />
           </div>
         </div>
@@ -47,7 +47,7 @@ export function CardBuffett({ v }: { v: Pick }) {
               {dt && dt.market_cap ? `약 ${jo(dt.market_cap)}조원` : `${v.disp}${v.unit}`}
             </span>
           </div>
-          <div className="hz-hbar-track hz-hbar-md">
+          <div className="hz-hbar-track hz-hbar-md hz-hbar-block">
             <div className="hz-hbar-fill" style={{ width: "100%", background: C.blue }} />
           </div>
         </div>
@@ -519,8 +519,8 @@ export function CardAsia({ v }: { v: Pick }) {
                 </span>
                 <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub }}>{b.sub}</span>
               </span>
-              {/* 막대 두께는 카드 안 목록 막대(14px, shadcn.css .hz-hbar-md)와 맞춘다(2026-09-27, 16 → 14). */}
-              <div style={{ position: "relative", flex: 1, minWidth: 0, height: 14 }}>
+              {/* 막대 두께는 카드 안 목록 막대(10px, shadcn.css .hz-hbar-md)와 맞춘다(2026-09-27, 16 → 10). */}
+              <div style={{ position: "relative", flex: 1, minWidth: 0, height: 10 }}>
                 <div style={{ position: "absolute", inset: 0, borderRadius: 4, background: C.track }} />
                 {/* 기준국만 진한 파랑. 넷을 다 같은 색으로 두면 "누가 기준인지"를 라벨
                     굵기로만 말하게 되는데, 그건 막대를 훑는 눈에 안 걸린다. */}

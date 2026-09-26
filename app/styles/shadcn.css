@@ -378,12 +378,12 @@ html[data-sidebar="icon"] .hz-sidebar [data-label]:hover::after {
 
 /* ── shadcn 차트 모양 — 가로 막대(Bar Chart · Horizontal / Custom Label) ─────────────────────
    Recharts 는 들이지 않는다(차트 화면마다 100KB 넘게 늘어난다). 우리 div 막대에 모양만 옮긴다(2026-09-26).
-   · 두툼한 막대(높이 22 ≤ 24) 뒤에 빈칸(회색 트랙)을 깐다 — 최댓값에 견줘 얼마나 찼는지가 보여야 한다(09-27). 값은 오른쪽 칸.
+   · 막대(높이 12 — 리스크 프로필 거울 막대와 같다) 뒤에 빈칸(회색 트랙)을 깐다 — 최댓값에 견줘 얼마나 찼는지가 보여야 한다(09-27). 값은 오른쪽 칸.
    · **데이터 끝만 4px 둥글고 기준선 쪽은 각지다** — 막대가 한 기준선에서 자라는 것이 보여야 한다(차트 지침).
    · 마우스를 올린 줄에 옅은 띠가 깔린다(shadcn 툴팁 커서 fill-muted 자리). 툴팁은 달지 않는다(값이 이미 적혀 있다).
      ⚠️ 막대를 밝히지 않는다 — 한때 brightness(1.08) 로 밝혔더니 옅은 파랑 막대가 회색 트랙과 같아져 사라졌다
-        (코스피 막대 대비 1.15 → 1.01, 09-27 Hun 지적).
-   쓰는 곳: MDD MeterRow(시장 탓·회복 분포·같은 테마 종목) · 역대 낙폭 Top 5 · 홈 카드 목록 막대(-md) · 표 안 막대(-sm).
+        (코스피 막대 대비 1.15 → 1.01, 09-27 지적).
+   쓰는 곳: MDD MeterRow(시장 탓·회복 분포·같은 테마 종목) · 역대 낙폭 Top 5(-md) · 홈 카드 목록 막대(-md).
    ⚠️ 이름이 hz-hbar-* 인 까닭: `.hz-bar` 는 카더라·내부자·서학의 트랙형 알약 막대가 먼저 쓰는 이름이다(kadera.css).
       같은 이름을 쓰면 이 파일이 맨 뒤에 실려 그쪽 막대의 모서리·높이를 덮는다(한때 그랬다, 09-27). */
 .hz-hbar-row {
@@ -399,18 +399,25 @@ html[data-sidebar="icon"] .hz-sidebar [data-label]:hover::after {
 .hz-hbar-track {
   flex: 1;
   min-width: 0;
-  height: 22px;
+  /* 22 였다가 너무 두껍다는 지적으로 12(09-27 — 리스크 프로필 막대 굵기는 괜찮다고 했다). */
+  height: 12px;
   display: flex;
   border-radius: 4px;
   background: var(--c-track);
   overflow: hidden;
 }
-/* 두께 세 단 — 막대가 주인공인 시트 22(기본) · 카드 안 목록 14 · 표 안 작은 막대 8. 모양 규칙은 같다. */
+/* 두께 — 시트 목록 12(기본) · 카드 안 목록·표 안 10(-md) · 더 작은 자리 8(-sm). 모양 규칙은 같다. */
 .hz-hbar-md {
-  height: 14px;
+  height: 10px;
 }
 .hz-hbar-sm {
   height: 8px;
+}
+/* 세로로 쌓는 칸(flex column) 안의 막대 — 기본 flex:1 이 세로로 먹혀 높이가 0 이 된다(버핏지수 카드 막대가 사라졌다, 09-27).
+   그런 자리는 늘어나지 말고 폭만 채운다. */
+.hz-hbar-block {
+  flex: none;
+  width: 100%;
 }
 .hz-hbar-fill {
   display: block;
@@ -453,7 +460,7 @@ html[data-sidebar="icon"] .hz-sidebar [data-label]:hover::after {
 
 /* ── 차트 축 — 그림 밖 HTML 칸의 축 글자(늘 12px, shadcn 축 text-xs 자리) ─────────────
    왼쪽 칸(--hz-chart-y, 기본 38px)에 세로축 값, 그림 아래 줄에 가로축 눈금. 칸 위치는 TSX 가 뷰박스 비율(%)로 준다.
-   그림 안 <text> 는 그림이 폭에 맞춰 늘어나는 만큼 같이 커져 PC 에서 15px 남짓으로 투박했다(Hun, 09-27).
+   그림 안 <text> 는 그림이 폭에 맞춰 늘어나는 만큼 같이 커져 PC 에서 15px 남짓으로 투박했다(09-27).
    쓰는 곳: MDD 언더워터 · 내부자 종목 주가 차트.
    좁은 폭(차트 480px 이하)에선 가로축 눈금을 하나씩 걸러 서로 붙지 않게 한다(data-minor). */
 .hz-chart-axes {
@@ -468,7 +475,7 @@ html[data-sidebar="icon"] .hz-sidebar [data-label]:hover::after {
 .hz-chart-y > span,
 .hz-chart-x > span {
   position: absolute;
-  /* 11px · 400 · --c-muted 는 너무 흐렸다(Hun, 09-27) — shadcn 축 글자 크기(12px)에 굵기 600, 한 단 진한 --c-sub(5.55:1). */
+  /* 11px · 400 · --c-muted 는 너무 흐렸다(09-27) — shadcn 축 글자 크기(12px)에 굵기 600, 한 단 진한 --c-sub(5.55:1). */
   font-size: var(--fs-12);
   font-weight: 600;
   line-height: 1;

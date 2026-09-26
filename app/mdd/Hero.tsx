@@ -459,7 +459,7 @@ export function Underwater({
   const W = 720;
   const H = 176;
   // 축 글자(0%·−23%·연도)는 그림 **밖**의 HTML 칸에 선다(2026-09-27). 그림 안 <text> 는 그림이 폭에 맞춰 늘어나는 만큼
-  // 같이 커져 PC 에서 15px 남짓으로 투박했다(Hun 지적). 밖에 두면 어느 폭에서든 11px 이다. 그래서 그림엔 왼쪽 여백이 없다.
+  // 같이 커져 PC 에서 15px 남짓으로 투박했다(지적). 밖에 두면 어느 폭에서든 11px 이다. 그래서 그림엔 왼쪽 여백이 없다.
   const PAD_L = 0;
   // 뷰박스 위아래 여유 — 0% 선과 호버 점·최저점 동그라미가 가장자리에서 잘리지 않을 만큼.
   const VB_PAD = 6;
@@ -579,7 +579,7 @@ export function Underwater({
         </linearGradient>
       </defs>
       {/* 선·격자는 화면에서 늘 1px — 그림이 가로 720 단위를 화면 폭에 맞춰 늘이고 줄여서, 그대로 두면 PC 에선 1.4px 로
-          굵어지고 폰에선 0.4px 로 흐려진다(vectorEffect non-scaling-stroke). shadcn 차트처럼 선은 가늘게(Hun, 09-27). */}
+          굵어지고 폰에선 0.4px 로 흐려진다(vectorEffect non-scaling-stroke). shadcn 차트처럼 선은 가늘게(09-27). */}
       {gridRows.map((dd, i) => (
         <line key={i} x1={PAD_L} y1={y(dd)} x2={W} y2={y(dd)} stroke="var(--c-line)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
       ))}
