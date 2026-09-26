@@ -915,7 +915,7 @@
 
 /* 앵커를 쓸 수 있으면 **카드 위에 딱 붙여** 연다 — 셀을 통째로 덮지 않아도 되고, 좁은
    폭에서 어느 쪽으로 펼칠지는 브라우저가 고른다(position-try-fallbacks).
-   집의 다른 오버레이 셋(.hz-tip · .hz-theme-pop · .hz-yrpop)과 같은 어법이다. */
+   집의 다른 오버레이(.hz-tip · .hz-theme-pop)와 같은 어법이다(MDD .hz-yrpop 은 2026-09-26 에 shadcn Popover 로 옮겼다). */
 @supports (anchor-scope: --a) and (position-area: top center) {
   /* 이름은 **카드마다** 붙이고 anchor-scope 로 그 카드 안에 가둔다 — 안 가두면 네 팝오버가
      전부 마지막 카드에 달라붙는다(.hz-tip 주석의 그 함정). */
