@@ -354,7 +354,7 @@ export function DayBars({
                 flex: 1,
                 minWidth: 0,
                 height: `${Math.max(2, (v / max) * height)}px`,
-                borderRadius: "2px 2px 0 0",
+                borderRadius: "4px 4px 0 0", // 데이터 끝만 둥글게 · 바닥은 각지게(shadcn 막대 꼴, 2026-09-27 · 2 → 4px)
                 background: fill(v, i),
                 opacity: dim(i),
               }}

@@ -1058,6 +1058,9 @@ a.hz-theme-chip:hover { background: var(--tx-btn); }
   display: block;
   height: 100%;
   background: var(--c-blue);
+  /* 데이터 끝만 둥글게(shadcn 막대 꼴 · MDD 막대와 같은 방식, 2026-09-27). 시작점은 트랙 모서리가 감싼다.
+     예전엔 끝이 각지게 잘렸다. */
+  border-radius: 0 3px 3px 0;
 }
 
 /* ── 시트 안의 표 ──────────────────────────────────────────────────

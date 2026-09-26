@@ -401,26 +401,63 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
 }
 
 /* 고점 대비 낙폭 곡선(언더워터). dd 는 0 이하이고 아래로 갈수록 깊다. */
+
+/**
+ * 점들을 단조 3차 곡선(Fritsch–Carlson, d3 curveMonotoneX 와 같은 셈)으로 잇는 SVG path.
+ * 점 사이 곡선이 이웃 두 점의 값을 넘지 않는다 — 부드럽게 그려도 최저점·0% 선을 넘어 그리지 않는다.
+ */
+function smoothPath(pts: [number, number][]): string {
+  const n = pts.length;
+  if (n === 0) return "";
+  if (n < 3) return pts.map(([px, py], i) => `${i === 0 ? "M" : "L"}${px.toFixed(1)},${py.toFixed(1)}`).join(" ");
+  const dx: number[] = [];
+  const slope: number[] = [];
+  for (let i = 0; i < n - 1; i++) {
+    dx.push(pts[i + 1][0] - pts[i][0]);
+    slope.push(dx[i] === 0 ? 0 : (pts[i + 1][1] - pts[i][1]) / dx[i]);
+  }
+  // 점마다 접선 기울기. 양옆 기울기의 부호가 다르면(꼭짓점) 0 — 거기서 곡선이 넘어서지 않는다.
+  const m: number[] = [slope[0]];
+  for (let i = 1; i < n - 1; i++) {
+    if (slope[i - 1] * slope[i] <= 0) m.push(0);
+    else {
+      const w1 = 2 * dx[i] + dx[i - 1];
+      const w2 = dx[i] + 2 * dx[i - 1];
+      m.push((w1 + w2) / (w1 / slope[i - 1] + w2 / slope[i]));
+    }
+  }
+  m.push(slope[n - 2]);
+  let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < n - 1; i++) {
+    const [x0, y0] = pts[i];
+    const [x1, y1] = pts[i + 1];
+    const h = dx[i] / 3;
+    d += ` C${(x0 + h).toFixed(1)},${(y0 + m[i] * h).toFixed(1)} ${(x1 - h).toFixed(1)},${(y1 - m[i + 1] * h).toFixed(1)} ${x1.toFixed(1)},${y1.toFixed(1)}`;
+  }
+  return d;
+}
+
 export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodLabel: string; market: string | null }) {
   const series = a.underwater;
   const mdd = a.mdd;
   const W = 720;
   const H = 176;
-  // 왼쪽 여백 — y축 라벨(0%·−23%·−45%)을 이 안에 두어 곡선과 겹치지 않게 한다.
-  // 예전엔 라벨을 플롯 안(x=3)에 그려 0% 가 곡선과 겹쳐 읽기 어려웠다.
-  //
-  // 폭은 '라벨 최대 폭(4글자 −99% 기준 실측 27.8) + 라벨↔플롯 간격 8' 로 잡는다.
-  // 이러면 가장 넓은 라벨의 왼쪽 끝이 x≈0 에 딱 붙어, 오른쪽(플롯이 x=W 까지라 여백 0)과
-  // 좌우 여백이 같아진다. 예전 48 은 왼쪽만 12 units 남아 오른쪽보다 넓어 보였다.
-  const LABEL_GAP = 8;
-  const PAD_L = 36;
-  const floor = Math.min(mdd, -1); // 0 나눗셈·완전 평평 방지
+  // 축 글자(0%·−23%·연도)는 그림 **밖**의 HTML 칸에 선다(2026-09-27). 그림 안 <text> 는 그림이 폭에 맞춰 늘어나는 만큼
+  // 같이 커져 PC 에서 15px 남짓으로 투박했다(지적). 밖에 두면 어느 폭에서든 11px 이다. 그래서 그림엔 왼쪽 여백이 없다.
+  const PAD_L = 0;
+  // 뷰박스 위아래 여유 — 0% 선과 호버 점·최저점 동그라미가 가장자리에서 잘리지 않을 만큼.
+  const VB_PAD = 6;
+  const VBH = H + VB_PAD * 2;
   const n = series.length;
+  const floor = Math.min(mdd, -1); // 0 나눗셈·완전 평평 방지
   const x = (i: number) => (n <= 1 ? PAD_L : PAD_L + (i / (n - 1)) * (W - PAD_L));
   const y = (dd: number) => (dd / floor) * H;
 
-  const line = series.map((p, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(p.dd).toFixed(1)}`).join(" ");
-  const area = `${line} L${W},0 Z`;
+  // shadcn 영역 차트는 곡선이 부드럽다(Recharts type="natural"). 여기선 **단조 3차 곡선**으로 잇는다 —
+  // natural 은 점 사이에서 값을 넘어서(0% 위로 튀거나 최저점보다 깊게) 그릴 수 있는데, 단조 곡선은 점 사이 값이
+  // 늘 이웃 두 점 사이에 머문다. 최저점·0% 선이 곡선 때문에 거짓말하지 않는다.
+  const line = smoothPath(series.map((p, i) => [x(i), y(p.dd)]));
+  const area = `${line} L${x(n - 1).toFixed(1)},0 L${x(0).toFixed(1)},0 Z`;
 
   // 연도 경계(1월로 처음 넘어가는 지점)를 눈금으로. 첫 데이터 지점은 연중(예: 2016-07)에
   // 시작해 완전한 연도가 아니고, x=0 이라 라벨이 왼쪽으로 잘린다("2016"→"16"). 그래서
@@ -433,7 +470,7 @@ export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodL
   // 기간이 길면(전체 = 27년 등) 해마다 찍을 때 라벨이 서로 겹쳐 붙어 버린다
   // ("2001200220032004…"). 들어갈 수 있는 라벨 수를 세어 1·2·5·10년 중 가장 촘촘한
   // 간격을 고르고, 그 배수 해에만 라벨을 둔다(2005·2010·2015… 처럼 떨어지는 해로).
-  const LABEL_SLOT = 68; // 라벨 하나가 차지할 최소 폭(연도 라벨 실측 ~28 + 여유)
+  const LABEL_SLOT = 68; // 라벨 하나가 차지할 최소 폭(단위). 좁은 화면에선 CSS 가 하나씩 거른다(.hz-chart-x [data-minor]).
   const maxLabels = Math.max(2, Math.floor((W - PAD_L) / LABEL_SLOT));
   let yearStep = 1;
   for (const s of [1, 2, 5, 10]) {
@@ -443,6 +480,8 @@ export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodL
   const ticks = yearMarks.filter((t) => t.year % yearStep === 0);
   // 그리드 라인(0/절반/바닥) 라벨.
   const rows = [0, floor / 2, floor];
+  // 격자는 넷으로 나눈 다섯 줄(shadcn 차트처럼 옅게 촘촘히), 라벨은 위 셋에만.
+  const gridRows = [0, floor / 4, floor / 2, (floor * 3) / 4, floor];
   // 기간 최저점 — 곡선에서 가장 깊은 지점에 표시를 남긴다.
   let ti = 0;
   for (let i = 1; i < n; i++) if (series[i].dd < series[ti].dd) ti = i;
@@ -458,16 +497,16 @@ export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodL
   /* 크로스헤어 띠 — 보이지 않는 세로 띠가 눌리면 기준선(hz-vline)과 툴팁(hz-tip)을 낸다.
      위치를 **뷰박스 비율(%)**로 잡는다. 예전엔 카드 padding(22/20/42 px)을 기준으로 잡아
      그 카드 안에서만 맞았는데, 확대 보기는 padding 이 달라서 그대로 두면 곡선과 어긋난다.
-     뷰박스는 `0 -6 720 202` 이고 플롯은 y 0~176 · x 36~720 이므로 비율은 이렇게 떨어진다. */
+     뷰박스는 `0 -6 720 188` 이고 플롯은 y 0~176 · x 0~720 이므로 위아래로 6 씩 들어온다. */
   const crosshair = (extraClass: string) => (
     <div
       className={`mdd-crosshair${extraClass}`}
       style={{
         position: "absolute",
-        top: `${(6 / (H + 26)) * 100}%`,
-        left: `${(PAD_L / W) * 100}%`,
+        top: `${(VB_PAD / VBH) * 100}%`,
+        left: 0,
         right: 0,
-        bottom: `${(20 / (H + 26)) * 100}%`,
+        bottom: `${(VB_PAD / VBH) * 100}%`,
       }}
     >
       {series.map((p, i) => {
@@ -490,39 +529,60 @@ export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodL
 
   const chartOnly = (
       <svg
-      viewBox={`0 -6 ${W} ${H + 26}`}
+      viewBox={`0 ${-VB_PAD} ${W} ${VBH}`}
       width="100%"
       style={{ overflow: "visible" }}
       role="img"
       aria-label={`고점 대비 낙폭 곡선. 현재 ${fmtPct(series[n - 1].dd)}, 기간 최저 ${fmtPct(mdd)}`}
     >
-      <line x1={PAD_L} y1="0" x2={W} y2="0" stroke={C.line} strokeWidth="1" />
-      {rows.slice(1).map((dd, i) => (
-        <line key={i} x1={PAD_L} y1={y(dd)} x2={W} y2={y(dd)} stroke={C.line} strokeWidth="1" strokeDasharray="2 5" />
+      {/* shadcn 영역 차트 꼴(Area Chart · Interactive, 2026-09-27) — 면은 그라데이션, 격자는 가로 실선만 옅게, 선은 1px.
+          shadcn 은 선에서 진하고 바닥으로 옅어지는데, 이 차트는 0% 가 위이고 선이 아래라 **깊을수록 진하게** 뒤집었다.
+          종목 한 겹만 그린다 — 시장(코스피) 낙폭을 뒤에 한 겹 더 깔았더니 두 면이 겹쳐 이중으로 보였다(09-27 걷음).
+          시장과의 견줌은 아래 '시장 탓' 구간이 맡는다.
+          이 그림은 확대 보기에서도 한 번 더 그려져 id 가 두 번 선다 — 모양이 같아 어느 쪽을 집어도 같다. */}
+      <defs>
+        <linearGradient id="mdd-uw-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={DOWN_BAR[1]} stopOpacity="0.04" />
+          <stop offset="100%" stopColor={DOWN_BAR[1]} stopOpacity="0.4" />
+        </linearGradient>
+      </defs>
+      {/* 선·격자는 화면에서 늘 1px — 그림이 가로 720 단위를 화면 폭에 맞춰 늘이고 줄여서, 그대로 두면 PC 에선 1.4px 로
+          굵어지고 폰에선 0.4px 로 흐려진다(vectorEffect non-scaling-stroke). shadcn 차트처럼 선은 가늘게(09-27). */}
+      {gridRows.map((dd, i) => (
+        <line key={i} x1={PAD_L} y1={y(dd)} x2={W} y2={y(dd)} stroke="var(--c-line)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
       ))}
-      <path d={area} fill={DOWN_BAR[1]} fillOpacity="0.14" />
-      <path d={line} fill="none" stroke={DOWN_BAR[1]} strokeWidth="1.6" strokeLinejoin="round" />
+      <path d={area} fill="url(#mdd-uw-fill)" />
+      <path d={line} fill="none" stroke={DOWN_BAR[1]} strokeWidth="1" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
       {/* 기간 최저점 표시 — **빈 동그라미만**. 현재 지점에도 속 찬 점을 찍었었는데 뺐다:
           선이 끝나는 자리가 곧 현재이고, 그 값은 히어로가 이미 크게 말한다. */}
-      <circle cx={x(ti)} cy={y(series[ti].dd)} r="3.5" fill={C.card} stroke={DOWN} strokeWidth="1.6" />
-      {rows.map((dd, i) => (
-        <text key={i} x={PAD_L - LABEL_GAP} y={y(dd) + 4} fontSize="11" fill={C.muted} textAnchor="end">
-          {Math.round(dd)}%
-        </text>
-      ))}
-      {ticks.map((t, i) => (
-        <text key={i} x={t.x} y={H + 16} fontSize="11" fill={C.muted} textAnchor="middle">
-          {t.year}
-        </text>
-      ))}
+      <circle cx={x(ti)} cy={y(series[ti].dd)} r="3" fill={C.card} stroke={DOWN} strokeWidth="1.2" vectorEffect="non-scaling-stroke" />
     </svg>
   );
 
-  /* svg 와 띠를 한 상자에 묶는다 — 띠가 svg 박스 기준으로 앉아야 어디에 놓든 안 어긋난다. */
+  /* svg 와 띠를 한 상자에 묶는다 — 띠가 svg 박스 기준으로 앉아야 어디에 놓든 안 어긋난다.
+     축 글자는 그 상자 왼쪽(퍼센트)·아래(연도) 칸에 HTML 로 — 늘 11px(shadcn 축 글자 text-xs · 옅은 색). */
+  const pctLabel = (dd: number) => `${dd < -0.5 ? "−" : ""}${Math.abs(Math.round(dd))}%`;
   const chartWith = (extraClass: string) => (
-    <div style={{ position: "relative" }}>
-      {chartOnly}
-      {crosshair(extraClass)}
+    <div className="hz-chart-axes">
+      <div className="hz-chart-y" aria-hidden>
+        {rows.map((dd, i) => (
+          <span key={i} style={{ top: `${((y(dd) + VB_PAD) / VBH) * 100}%` }}>
+            {pctLabel(dd)}
+          </span>
+        ))}
+      </div>
+      <div style={{ position: "relative", minWidth: 0 }}>
+        {chartOnly}
+        {crosshair(extraClass)}
+      </div>
+      <div className="hz-chart-x" aria-hidden>
+        {ticks.map((t, i) => (
+          // 둘째마다 표시 — 좁은 폭에선 CSS 가 이것들을 숨겨 연도가 겹치지 않는다.
+          <span key={t.year} data-minor={i % 2 === 1 ? "" : undefined} style={{ left: `${(t.x / W) * 100}%` }}>
+            {t.year}
+          </span>
+        ))}
+      </div>
     </div>
   );
 

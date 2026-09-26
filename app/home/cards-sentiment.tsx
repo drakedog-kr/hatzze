@@ -420,8 +420,9 @@ export function CardYoutube({ v }: { v: Pick }) {
         {rows.map((r) => (
           <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ width: 34, flexShrink: 0, fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>{r.label}</span>
-            <div style={{ flex: 1, height: 9, borderRadius: R.pill, background: C.track, overflow: "hidden", minWidth: 0 }}>
-              <div style={{ width: `${((r.value ?? 0) / max) * 100}%`, height: "100%", borderRadius: R.pill, background: r.fill }} />
+            {/* shadcn 막대 꼴(빈칸 위, 데이터 끝만 둥근 10px 막대 · shadcn.css .hz-hbar-*) — MDD 와 같은 방식(2026-09-27). */}
+            <div className="hz-hbar-track hz-hbar-md">
+              <div className="hz-hbar-fill" style={{ width: `${((r.value ?? 0) / max) * 100}%`, background: r.fill }} />
             </div>
             <span style={{ width: 78, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12-5)", fontWeight: 700, color: r.strong ? C.ink : C.label }}>
               {r.value != null ? fmt(r.value) : "-"}

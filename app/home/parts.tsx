@@ -583,12 +583,17 @@ export function AreaChart({
     baseline === "zero" ? H / 2 - (t / span) * (H / 2) : H - 4 - ((t - lo) / span) * (H - 8);
   const base = baseline === "zero" ? H / 2 : H;
   const line = points.map((p, i) => `${(i / (points.length - 1)) * 100},${y(p.value)}`).join(" ");
+  // 그라데이션 id — 카드마다 달라야 한다(아래 주석: id 는 문서 전역이라 같은 이름이면 먼저 그린 색으로 다 칠해진다).
+  // 색·첫 날짜·점 수·높이로 짓는다. 같은 차트가 두 번 그려질 때만 같은 이름이 되고, 그땐 모양도 같다.
+  let hsh = 0;
+  for (const ch of `${color}|${points[0].key}|${points.length}|${H}`) hsh = (hsh * 31 + ch.charCodeAt(0)) >>> 0;
+  const gid = `hz-area-${hsh.toString(36)}`;
   return (
     <div style={{ position: "relative", height: H }}>
       <svg viewBox={`0 0 100 ${H}`} style={{ width: "100%", height: H, display: "block" }} preserveAspectRatio="none">
-        {/* 면적은 그라데이션 대신 **같은 색 반투명 한 겹**이다. SVG 그라데이션은 id 가
-            문서 전역이라 카드마다 색이 다르면 서로 덮어쓴다 — 카드 넷이 같은 id 를 쓰면
-            먼저 그린 색으로 다 칠해진다. */}
+        {/* shadcn 영역 차트 꼴(2026-09-27, MDD 언더워터와 같은 방식) — 선은 1px, 면은 선 쪽이 진하고 바닥으로 옅어지는 그라데이션.
+            SVG 그라데이션은 id 가 문서 전역이라 카드마다 색이 다르면 서로 덮어쓴다 — 그래서 한때 반투명 한 겹이었고,
+            지금은 카드마다 다른 id(gid)를 짓는다. */}
         {baseline === "zero" && (
           <defs>
             <clipPath id="hz-clip-up"><rect x="0" y="0" width="100" height={H / 2} /></clipPath>
@@ -602,9 +607,17 @@ export function AreaChart({
             <line x1="0" y1={H / 2} x2="100" y2={H / 2} stroke="var(--c-line)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
           </>
         ) : (
-          <polygon points={`0,${base} ${line} 100,${base}`} fill={color} opacity={0.16} />
+          <>
+            <defs>
+              <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={color} stopOpacity={0.32} />
+                <stop offset="100%" stopColor={color} stopOpacity={0.03} />
+              </linearGradient>
+            </defs>
+            <polygon points={`0,${base} ${line} 100,${base}`} fill={`url(#${gid})`} />
+          </>
         )}
-        <polyline points={line} fill="none" stroke={color} strokeWidth={1.6} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        <polyline points={line} fill="none" stroke={color} strokeWidth={1} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
       </svg>
       {/* 호버 크로스헤어 — MDD 낙폭 차트와 같은 어법. 끝쪽 지점은 툴팁이 카드 밖으로
           넘치지 않게 여는 방향을 튼다(안 그러면 가로 스크롤이 생긴다). */}

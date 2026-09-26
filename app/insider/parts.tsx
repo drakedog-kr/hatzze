@@ -847,11 +847,11 @@ export function PriceChart({
   if (bars.length < 2) return null;
   const W = 720;
   const H = height;
-  // 왼쪽 여백에 세로축 라벨이 앉는다(MDD 와 같은 계산 — 라벨 폭 + 간격).
-  const PAD_L = 46;
-  const LABEL_GAP = 8;
+  // 축 글자는 그림 **밖** HTML 칸에 선다(MDD 언더워터와 같은 방식, 2026-09-27) — 그림 안 <text> 는 그림이 폭에 맞춰
+  // 늘어나는 만큼 같이 커져 PC 에서 15px 남짓으로 투박했다. 그래서 그림엔 왼쪽 여백이 없고 아래 여백도 점·선 몫만.
+  const PAD_L = 0;
   const PAD_T = 10;
-  const PAD_B = 22;
+  const PAD_B = 8;
   const lo = Math.min(...bars.map((b) => b.close));
   const hi = Math.max(...bars.map((b) => b.close));
   const pad = (hi - lo) * 0.12 || 1;
@@ -871,8 +871,9 @@ export function PriceChart({
       monthTicks.push({ x: x(i), label: `${Number(bars[i].date.slice(5, 7))}월` });
     }
   }
-  // 세로축 — 위·가운데·아래 셋. 더 넣으면 반년짜리 작은 차트에서 시끄럽다.
+  // 세로축 — 위·가운데·아래 셋. 더 넣으면 반년짜리 작은 차트에서 시끄럽다. 격자는 그 사이까지 다섯 줄로 옅게.
   const rows = [max - pad / 2, (min + max) / 2, min + pad / 2];
+  const gridRows = [rows[0], (rows[0] + rows[1]) / 2, rows[1], (rows[1] + rows[2]) / 2, rows[2]];
 
   const at = new Map(bars.map((b, i) => [b.date, i]));
   // 매매일이 휴장일이면 그 다음 거래일에 붙인다 — 안 붙이면 마커가 통째로 사라진다.
@@ -950,17 +951,33 @@ export function PriceChart({
   };
 
   return (
-    <div style={{ position: "relative" }}>
+    <div className="hz-chart-axes" style={{ ["--hz-chart-y" as string]: "44px" }}>
+      {/* 세로축 — 값이 무엇인지 안 적으면 축이 0 에서 시작하지 않는다는 걸 알 길이 없다.
+          ⚠️ 두 통화를 다 그려 두고 CSS 가 하나만 보여 준다 — 화면의 다른 금액과 같은 수다. */}
+      <div className="hz-chart-y" aria-hidden>
+        {rows.map((v, i) => (
+          <Fragment key={i}>
+            <span className="hz-krw" style={{ top: `${(y(v) / H) * 100}%` }}>
+              {rate ? `${(Math.round((v * rate) / 1000) / 10).toFixed(1)}만` : `$${Math.round(v)}`}
+            </span>
+            <span className="hz-usd" style={{ top: `${(y(v) / H) * 100}%` }}>
+              ${Math.round(v).toLocaleString("en-US")}
+            </span>
+          </Fragment>
+        ))}
+      </div>
+    <div style={{ position: "relative", minWidth: 0 }}>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block", overflow: "visible" }} role="img"
            aria-label={`주가 ${bars[0].date}~${bars[n - 1].date}, 매매 시점 ${marks.length}곳`}>
         <defs>
           <linearGradient id="hz-pc" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--c-blue)" stopOpacity="0.16" />
-            <stop offset="100%" stopColor="var(--c-blue)" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--c-blue)" stopOpacity="0.28" />
+            <stop offset="100%" stopColor="var(--c-blue)" stopOpacity="0.03" />
           </linearGradient>
         </defs>
-        {rows.map((v, i) => (
-          <line key={i} x1={PAD_L} y1={y(v)} x2={W} y2={y(v)} stroke={C.line} strokeWidth="1" strokeDasharray="2 5" />
+        {/* shadcn 영역 차트 꼴(MDD 언더워터와 같은 방식) — 격자는 옅은 가로 실선, 선은 화면에서 늘 1px(non-scaling-stroke). */}
+        {gridRows.map((v, i) => (
+          <line key={i} x1={PAD_L} y1={y(v)} x2={W} y2={y(v)} stroke={C.line} strokeWidth="1" vectorEffect="non-scaling-stroke" />
         ))}
         <path d={area} fill="url(#hz-pc)" />
         {/* ⚠️ 선을 먼저, 마커를 나중에. **고리 안으로 선이 지나가면 안 된다** — 순서를
@@ -970,8 +987,9 @@ export function PriceChart({
           d={line}
           fill="none"
           stroke="var(--c-blue)"
-          strokeWidth="1.6"
+          strokeWidth="1"
           strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
           pointerEvents="none"
         />
         {drawn.map((s) => {
@@ -995,40 +1013,6 @@ export function PriceChart({
             />
           );
         })}
-        {/* 세로축 — 값이 무엇인지 안 적으면 축이 0 에서 시작하지 않는다는 걸 알 길이 없다.
-            ⚠️ 글꼴을 **반드시 준다**. SVG text 는 body 를 안 물려받아 기본 세리프로 떨어진다.
-            ⚠️ 두 통화를 다 그려 두고 CSS 가 하나만 보여 준다 — 화면의 다른 금액과 같은 수다. */}
-        {rows.map((v, i) => (
-          <g key={i}>
-            <text
-              className="hz-krw"
-              x={PAD_L - LABEL_GAP}
-              y={y(v) + 4}
-              fontSize="11"
-              fontFamily={MONO}
-              fill={C.muted}
-              textAnchor="end"
-            >
-              {rate ? `${(Math.round((v * rate) / 1000) / 10).toFixed(1)}만` : `$${Math.round(v)}`}
-            </text>
-            <text
-              className="hz-usd"
-              x={PAD_L - LABEL_GAP}
-              y={y(v) + 4}
-              fontSize="11"
-              fontFamily={MONO}
-              fill={C.muted}
-              textAnchor="end"
-            >
-              ${Math.round(v).toLocaleString("en-US")}
-            </text>
-          </g>
-        ))}
-        {monthTicks.map((t, i) => (
-          <text key={i} x={t.x} y={H - 6} fontSize="11" fontFamily={MONO} fill={C.muted} textAnchor="middle">
-            {t.label}
-          </text>
-        ))}
       </svg>
       {/* 호버 띠 — 데이터 점마다 하나. MDD 크로스헤어와 같은 어법이라 새 언어를 안 만든다. */}
       <div
@@ -1102,6 +1086,14 @@ export function PriceChart({
           />
         );
       })}
+    </div>
+      <div className="hz-chart-x" aria-hidden>
+        {monthTicks.map((t, k) => (
+          <span key={k} data-minor={k % 2 === 1 ? "" : undefined} style={{ left: `${(t.x / W) * 100}%` }}>
+            {t.label}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

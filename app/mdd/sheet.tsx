@@ -119,7 +119,7 @@ export function MeterRow({
   valueWidth?: number;
 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+    <div className="hz-hbar-row" style={{ display: "flex", alignItems: "center", gap: 10 }}>
       <span style={{ width: labelWidth, flex: "none", display: "flex", alignItems: "center", gap: 3, minWidth: 0 }}>
         <span
           style={{
@@ -142,16 +142,20 @@ export function MeterRow({
           </span>
         )}
       </span>
-      <span style={{ flex: 1, minWidth: 0, height: 11, background: C.track, borderRadius: 4, overflow: "hidden" }}>
-        <span style={{ display: "block", height: "100%", width: `${Math.max(2, Math.min(100, pct))}%`, background: color, borderRadius: 4 }} />
+      {/* shadcn 가로 막대 차트 꼴(2026-09-26) — 막대 12px(리스크 프로필 막대와 같은 굵기), 데이터 끝만 둥글고 기준선 쪽은 각지다.
+          빈칸(회색 트랙)은 깐다 — 막대가 최댓값에 견줘 얼마나 찼는지가 보여야 한다(09-27). 트랙 위에 값을 얹으면
+          회색 바탕에서 글자가 흐려져서, 값은 예전처럼 오른쪽 칸에 모은다.
+          막대엔 툴팁을 달지 않는다 — 값이 이미 오른쪽에 적혀 있고, 예전에도 없었다(한때 달았다가 지적으로 걷음, 09-27). */}
+      <span style={{ flex: 1, minWidth: 0, display: "flex" }}>
+        <span className="hz-hbar-track">
+          <span className="hz-hbar-fill" style={{ width: `${Math.max(2, Math.min(100, pct))}%`, background: color }} />
+        </span>
       </span>
       <span
+        className="hz-hbar-value"
         style={{
           width: valueWidth,
-          flex: "none",
           textAlign: "right",
-          fontFamily: MONO,
-          fontSize: "var(--fs-11-5)",
           fontWeight: strong ? 800 : 700,
           /* 막대색을 글자에 그대로 쓰면 안 된다. 램프의 --c-blue-1(#1b7fd4)은 흰 위
              명암비 4.17 이라 11.5px 값이 안 읽힌다 — 채우는 색과 읽는 색은 다른 물건이다
@@ -199,15 +203,16 @@ export function MirrorRow({
   left: { pct: number; value: string; color: string; ink: string };
   right: { pct: number; value: string; color: string; ink: string; dashed?: boolean };
 }) {
-  const bar: React.CSSProperties = { position: "absolute", top: 3, height: 8, minWidth: 5 };
+  // 막대는 shadcn 막대 차트 꼴로 두툼하게(8 → 12) · 바깥 끝만 둥글게(2026-09-26).
+  const bar: React.CSSProperties = { position: "absolute", top: 1, height: 12, minWidth: 5 };
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <span style={{ ...ROW_TEXT, width: MIRROR_LABEL_W, fontWeight: 700, color: C.sub2 }}>{label}</span>
       <span style={{ ...ROW_TEXT, width: MIRROR_LEFT_W, textAlign: "right", fontWeight: 800, color: left.ink }}>{left.value}</span>
       <div style={{ position: "relative", flex: 1, minWidth: 0, height: 14 }}>
         <span style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1.5, background: C.line }} />
-        <span style={{ ...bar, right: "50%", width: `${left.pct}%`, borderRadius: "3px 0 0 3px", background: left.color }} />
-        <span style={{ ...bar, left: "50%", width: `${right.pct}%`, borderRadius: "0 3px 3px 0", background: right.dashed ? UNRECOVERED : right.color }} />
+        <span style={{ ...bar, right: "50%", width: `${left.pct}%`, borderRadius: "4px 0 0 4px", background: left.color }} />
+        <span style={{ ...bar, left: "50%", width: `${right.pct}%`, borderRadius: "0 4px 4px 0", background: right.dashed ? UNRECOVERED : right.color }} />
       </div>
       <span style={{ ...ROW_TEXT, width: MIRROR_RIGHT_W, fontWeight: 800, color: right.ink }}>{right.value}</span>
     </div>
@@ -254,7 +259,8 @@ export function TwinRow({
   a: { pct: number; value: string; color: string; ink: string };
   b: { pct: number; value: string; color: string; ink: string };
 }) {
-  const bar = (pct: number, color: string): React.CSSProperties => ({ display: "block", height: 6, width: `${pct}%`, minWidth: pct > 0 ? 4 : 0, borderRadius: 3, background: color });
+  // shadcn 막대 차트(Multiple) 꼴로 두툼하게(6 → 8) · 데이터 끝만 둥글고 기준선 쪽은 각지게 · 두 막대 사이 2px(2026-09-26).
+  const bar = (pct: number, color: string): React.CSSProperties => ({ display: "block", height: 8, width: `${pct}%`, minWidth: pct > 0 ? 4 : 0, borderRadius: "0 4px 4px 0", background: color });
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <span style={{ ...ROW_TEXT, width: MIRROR_LABEL_W, fontWeight: 700, color: C.sub2 }}>{label}</span>
