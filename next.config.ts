@@ -11,6 +11,11 @@ const nextConfig: NextConfig = {
   // 로컬 프로덕션 미리보기(`npm run build:local`)가 dev 서버를 죽이던 게 그 경우다.
   distDir: process.env.NEXT_DIST_DIR || ".next",
 
+  // 이미지 최적화(`/_next/image`)는 쓰지 않는다 — next/image 를 한 곳도 안 쓴다(종목 로고는 /api/logo 가 크기를 맞춘다).
+  // 그래도 경로는 기본으로 열려 있어, 16.3.3 에서야 고쳐진 AVIF 원격 코드 실행 권고(GHSA, 이미지 최적화 API)의
+  // 공격면이 된다. 쓰지 않는 것은 닫는다(2026-09-26).
+  images: { unoptimized: true },
+
   // OG 이미지(app/opengraph-image/route.tsx)가 런타임에 읽는 폰트를 프로덕션 번들에
   // 확실히 포함시킨다 — 없으면 배포 환경에서 폰트 로딩이 실패할 수 있다.
   // 본문·설명은 Pretendard(한글), 워드마크는 브랜드 서체 Bricolage Grotesque.
