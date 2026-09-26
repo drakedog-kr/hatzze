@@ -1428,7 +1428,7 @@
    흰색을 얹어 타일보다 밝은 띠로. 비중 막대 트랙도 같은 값(--c-track 은 1.49). */
 :root[data-theme="dark"] .dv-goal-bar { background: rgba(255, 255, 255, 0.09); border-color: rgba(255, 255, 255, 0.12); }
 :root[data-theme="dark"] .dv-tweight-bar { background: rgba(255, 255, 255, 0.12); }
-.dv-goal-fill { display: block; height: 100%; border-radius: 999px; background: var(--c-blue); transition: width 0.2s ease; }
+.dv-goal-fill { display: block; height: 100%; min-width: 2%; border-radius: 999px; background: var(--c-blue); transition: width 0.2s ease; }
 .dv-goal-ends { display: flex; justify-content: space-between; gap: 8px; font-size: var(--fs-11-5); color: var(--c-sub); }
 .dv-goal-ends b { color: var(--c-ink); font-weight: 700; font-variant-numeric: tabular-nums; }
 /* 타일 셋 — 카드 안이라 흰 타일. */
