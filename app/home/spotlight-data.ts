@@ -11,7 +11,7 @@ import { THEME_PUBLIC } from "../screen-flags";
  * 시장 브리핑 히어로 바닥 '오늘 눈에 띄는 것' 칩의 재료(국장 카더라 히어로와 같은 줄, .hz-tx-spot).
  *
  * 칩 둘 — 모두 집계값이라 LLM 문장이 아니다(카더라와 같은 원칙). 둘 다 다른 화면으로 보낸다.
- *   ① 시각 칩: 평일 개장 전엔 간밤 미장(국장 미리보기), 그 밖엔 카더라 급부상 1위.
+ *   ① 시각 칩: 평일 06:30~10:00 간밤 미장(국장 미리보기), 그 밖엔 카더라 급부상 1위.
  *      규칙은 lib/next-up-slot.ts, 고르는 건 브라우저(HeroSpotlights).
  *   ② 테마 유입 1위 — 그 테마 리포트로. 카더라 히어로의 '테마 유입' 칩과 같은 값(점유율 증가폭 1위).
  *
@@ -62,7 +62,7 @@ async function previewChip(): Promise<{ chip: SpotChip | null; date: string | nu
       date: p.date,
     };
   } catch (e) {
-    console.error("[spotlight] 국장 미리보기를 못 읽었습니다 — 개장 전 칩을 뺍니다", e);
+    console.error("[spotlight] 국장 미리보기를 못 읽었습니다 — 간밤 미장 칩을 뺍니다", e);
     return { chip: null, date: null };
   }
 }
@@ -113,7 +113,7 @@ export async function loadSpotlight(): Promise<SpotlightData> {
   const [preview, surging, theme] = await Promise.all([previewChip(), surgingChip(), themeChip()]);
   const clock = { previewDate: preview.date };
   return {
-    // 개장 전 칩이 없는 날(미장 휴장 등)엔 그 시각에도 카더라 칩이 선다(clock.previewDate 가 null).
+    // 간밤 미장 칩이 없는 날(미장 휴장 등)엔 그 시각에도 카더라 칩이 선다(clock.previewDate 가 null).
     timed: { preview: preview.chip, kadera: surging },
     clock,
     // 시각은 여기서 읽는다 — 렌더 중에 Date.now() 를 부르면 react-hooks/purity 에 걸린다.

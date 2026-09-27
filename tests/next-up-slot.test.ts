@@ -20,13 +20,14 @@ describe("kstParts", () => {
 describe("pickNextUpSlot", () => {
   const mon = { previewDate: "2026-09-28" };
 
-  it("평일 개장 전엔 그날 미리보기", () => {
+  it("평일 06:30 부터 개장 뒤 한 시간(10:00 전)까지 그날 미리보기", () => {
     assert.equal(pickNextUpSlot(kst("2026-09-28 06:30"), mon), "preview");
-    assert.equal(pickNextUpSlot(kst("2026-09-28 08:59"), mon), "preview");
+    assert.equal(pickNextUpSlot(kst("2026-09-28 09:00"), mon), "preview");
+    assert.equal(pickNextUpSlot(kst("2026-09-28 09:59"), mon), "preview");
   });
 
-  it("그 밖엔 카더라 — 06:30 전 · 장중 · 저녁", () => {
-    for (const t of ["2026-09-28 06:29", "2026-09-28 09:00", "2026-09-28 15:30", "2026-09-28 21:00"]) {
+  it("그 밖엔 카더라 — 06:30 전 · 10:00 부터 · 저녁", () => {
+    for (const t of ["2026-09-28 06:29", "2026-09-28 10:00", "2026-09-28 15:30", "2026-09-28 21:00"]) {
       assert.equal(pickNextUpSlot(kst(t), mon), "kadera", t);
     }
   });

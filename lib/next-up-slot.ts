@@ -7,8 +7,9 @@
  *
  * ## 규칙(한국 시각)
  *
- *   평일 06:30~09:00  국장 미리보기(간밤 미장) — 그날 미리보기가 만들어졌고(06:30~07:00 실행) 밤사이
- *                     크게 움직인 종목이 있을 때만.
+ *   평일 06:30~10:00  국장 미리보기(간밤 미장) — 그날 미리보기가 만들어졌고(06:30~07:00 실행) 밤사이
+ *                     크게 움직인 종목이 있을 때만. 개장(09:00) 뒤 한 시간까지 둔다 — 장 초반엔 간밤 미장과
+ *                     엮인 종목이 여전히 궁금한 때라서(2026-09-28 요청으로 09:00 → 10:00).
  *   그 밖             카더라 급부상 종목.
  *
  * 근거는 방문 시각이다(2026-08-14~09-10 GA4, 스파이크 3일 뺀 평균). 평일 8시가 하루 최강인데
@@ -26,7 +27,7 @@ export type NextUpClock = {
 
 const KST_MS = 9 * 3600 * 1000;
 const PREVIEW_FROM = 6 * 60 + 30; // 06:30 — 미리보기 실행이 06:30~07:00 에 끝난다.
-const MARKET_OPEN = 9 * 60;
+const PREVIEW_UNTIL = 10 * 60; // 10:00 — 개장 뒤 한 시간(위 주석).
 
 /** nowMs(UTC 에포크 ms)의 한국 날짜 · 요일(0=일) · 하루 중 분. */
 export function kstParts(nowMs: number): { date: string; dow: number; min: number } {
@@ -41,6 +42,6 @@ export function kstParts(nowMs: number): { date: string; dow: number; min: numbe
 export function pickNextUpSlot(nowMs: number, clock: NextUpClock): NextUpSlot {
   const { date, dow, min } = kstParts(nowMs);
   const weekday = dow >= 1 && dow <= 5;
-  if (weekday && min >= PREVIEW_FROM && min < MARKET_OPEN && clock.previewDate === date) return "preview";
+  if (weekday && min >= PREVIEW_FROM && min < PREVIEW_UNTIL && clock.previewDate === date) return "preview";
   return "kadera";
 }
