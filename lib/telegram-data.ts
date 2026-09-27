@@ -149,6 +149,72 @@ export function sentimentWindow(base: string, countByDate: Map<string, number>, 
 }
 
 /**
+ * 낙관도 추이가 그리는 일수. 두 화면 히어로의 센티먼트 칸 아래 작은 선 그래프가 쓴다.
+ * 14일이면 주말 두 번이 선의 대부분을 차지해 흐름보다 요일이 먼저 읽힌다.
+ */
+export const SENTIMENT_TREND_DAYS = 30;
+
+export type SentimentPoint = { date: string; score: number };
+
+/**
+ * 낙관도 추이 — 날마다 **그날 큰 숫자가 보여 줬을 값**을 하나씩(오래된→최신).
+ *
+ * 하루치 원값을 찍으면 안 된다. 주말엔 글이 평일의 1/4 로 줄고 낙관도가 50~56 으로
+ * 떨어져(평일 60~75, 2026-09-27 실측 78일) 선이 매주 톱니가 된다 — 여론이 아니라
+ * 표본이 바뀐 것이다. 게다가 기준일 점이 아직 덜 찬 하루(그날 45건)라 바로 위 큰 숫자와
+ * 어긋난다. 그래서 점마다 sentimentWindow 로 **큰 숫자와 같은 날들**을 묶는다. 마지막
+ * 점은 곧 큰 숫자다(같은 행·같은 규칙·같은 식).
+ *
+ * `rows` 는 overall 행만. 행이 없는 날은 점도 없다 — 그날은 파이프라인이 안 돌아 화면의
+ * 기준일이 전날에 머물렀으므로, 점을 만들면 전날 값을 한 번 더 찍게 된다.
+ */
+export function sentimentTrend(
+  base: string,
+  rows: { date: string; positive_count: number | null; negative_count: number | null; message_count: number | null }[],
+  floor: number,
+): SentimentPoint[] {
+  const byDate = new Map(rows.map((r) => [r.date, r] as const));
+  const countByDate = new Map(rows.map((r) => [r.date, r.message_count ?? 0] as const));
+  const out: SentimentPoint[] = [];
+  for (let k = SENTIMENT_TREND_DAYS - 1; k >= 0; k--) {
+    const date = addDaysISO(base, -k);
+    if (!byDate.has(date)) continue;
+    let pos = 0;
+    let neg = 0;
+    for (const d of sentimentWindow(date, countByDate, floor)) {
+      pos += byDate.get(d)?.positive_count ?? 0;
+      neg += byDate.get(d)?.negative_count ?? 0;
+    }
+    const score = optimismPct(pos, neg);
+    if (score !== null) out.push({ date, score });
+  }
+  return out;
+}
+
+/**
+ * 추이에 쓸 overall 행을 읽는다. 국장·미장 표가 같은 열이라 한 벌로 둔다.
+ * 첫 점도 넓힌 날까지 봐야 하므로 SENTIMENT_WINDOW_MAX_DAYS − 1 일을 더 받는다(33행 남짓).
+ * 실패하면 null — 큰 숫자는 따로 읽으므로 그래프 칸만 이유를 적는다.
+ */
+export async function loadSentimentTrend(
+  table: "telegram_sentiment_daily" | "telegram_us_sentiment_daily",
+  base: string,
+  floor: number,
+): Promise<SentimentPoint[] | null> {
+  const { data, error } = await getSupabaseAdmin()
+    .from(table)
+    .select("date,positive_count,negative_count,message_count")
+    .eq("scope", "overall")
+    .gte("date", addDaysISO(base, -(SENTIMENT_TREND_DAYS - 1) - (SENTIMENT_WINDOW_MAX_DAYS - 1)))
+    .lte("date", base);
+  if (error) {
+    console.error(`[loadSentimentTrend] ${table} 추이를 못 읽었습니다`, error);
+    return null;
+  }
+  return sentimentTrend(base, data ?? [], floor);
+}
+
+/**
  * LLM 문장이 **기준일분이 아직 없을 때 며칠까지 거슬러 올라가 쓰나**.
  *
  * 파이프라인은 언급 집계를 20단계쯤에서 오늘 날짜로 쓰고 문장은 60단계쯤에서 만든다.
@@ -1883,6 +1949,8 @@ export type EcosystemSentiment = {
   /** 표본(positive/negative/total)을 같이 넘긴다 — 얇은 테마는 100:0 같은 극단값이
    *  나오는데, 몇 건 기준인지 보여줘야 그 숫자를 제대로 읽을 수 있다. */
   byTheme: { name: string; pos: number; positive: number; negative: number; total: number }[];
+  /** 최근 SENTIMENT_TREND_DAYS 일 낙관도(sentimentTrend). 마지막 점이 score 다. 조회 실패면 null */
+  trend: SentimentPoint[] | null;
 };
 
 // 낙관도 → 라벨/색 구간은 시장 브리핑의 감성 카드와 공유한다(lib/format.ts sentimentTone).
@@ -1969,11 +2037,16 @@ export async function getEcosystemSentiment(): Promise<MaybeFailed<EcosystemSent
   // ⚠️ 예전의 "기준일 뺀 앞 3일"(windowBefore)은 오늘 글을 하나도 안 넣어 사흘 전 분위기를
   //    오늘 것처럼 보여 줬다. 종목 리포트는 여전히 그 창을 쓴다 — 둘은 이제 다른 기간이다.
   const base = await kaderaBaseDate();
-  const { data, error } = await db
-    .from("telegram_sentiment_daily")
-    .select("date,scope,positive_count,neutral_count,negative_count,message_count")
-    .gte("date", addDaysISO(base, -(SENTIMENT_WINDOW_MAX_DAYS - 1)))
-    .lte("date", base);
+  // 추이(overall 만 33행)는 따로 받는다. 이 조회에 30일을 붙이면 테마 행까지 30일치가 와서
+  // 1,000행 캡에 닿는다.
+  const [{ data, error }, trend] = await Promise.all([
+    db
+      .from("telegram_sentiment_daily")
+      .select("date,scope,positive_count,neutral_count,negative_count,message_count")
+      .gte("date", addDaysISO(base, -(SENTIMENT_WINDOW_MAX_DAYS - 1)))
+      .lte("date", base),
+    loadSentimentTrend("telegram_sentiment_daily", base, SENTIMENT_MIN_MESSAGES),
+  ]);
   if (error) {
     console.error("[getEcosystemSentiment] 감성 집계를 못 읽었습니다", error);
     return LOAD_FAILED;
@@ -2043,6 +2116,7 @@ export async function getEcosystemSentiment(): Promise<MaybeFailed<EcosystemSent
     windowDays: window.size,
     summary: (brief?.sentiment_summary as string | null) ?? null,
     byTheme,
+    trend,
   };
 }
 

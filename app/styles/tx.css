@@ -450,6 +450,9 @@
   gap: 3px;
   min-width: 0;
 }
+/* 센티먼트 추이(2026-09-27, 카더라 두 히어로) — 현황 타일(.hz-tx-stat)과 같은 껍데기에 줄 간격만 넓힌다.
+   옛 2×2 현황 자리를 통째로 쓴다(parts.tsx 의 SentimentTrendTile). */
+.hz-tx-trend { gap: 6px; }
 .hz-tx-stat-l {
   font-size: var(--fs-11-5);
   font-weight: 600;

@@ -24,10 +24,13 @@ import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { sentimentTone } from "@/lib/format";
 import {
   LLM_TEXT_CARRY_DAYS,
+  SENTIMENT_WINDOW_MAX_DAYS,
+  type SentimentPoint,
   addDaysISO,
   channelMeta,
   fetchAllRows,
   lastKaderaUpdatedAt,
+  loadSentimentTrend,
   optimismPct,
   sentimentWindow,
   todayKstDate,
@@ -75,15 +78,6 @@ export const usKaderaBaseDate = cache(async (): Promise<string> => {
 export const US_SENTIMENT_MIN_MESSAGES = 400;
 /** 막대 차트가 그리는 일수. 세는 창보다 길어야 추이가 읽힌다(국내와 같은 이유). */
 export const US_CHART_DAYS = 7;
-/**
- * 센티먼트 일별 막대가 그리는 일수. 톤은 종목보다 천천히 움직여 창이 더 길다.
- *
- * ⚠️ 12인 건 데이터가 아니라 **조판**이 정한 값이다. 이 카드는 반칸이고 옆에
- *    '미장에서만 나오는 말'(12줄)이 나란히 선다 — 둘 중 하나가 짧으면 그만큼이
- *    통째로 빈칸이 된다(줄 수와 일수를 서로 반대로 움직여 두 번 어긋났다).
- *    파이프라인의 ISSUE_KEYWORD_LIMIT(12) 와 짝이다. 한쪽만 고치면 반드시 한쪽이 빈다.
- */
-export const US_SENTIMENT_SERIES_DAYS = 14;
 
 /** ISO 날짜에 며칠 더한다. UTC 로 계산해 서머타임·로컬 타임존을 타지 않는다. */
 function addDays(iso: string, n: number): string {
@@ -154,12 +148,6 @@ export type UsChannelShare = {
 export type MarketSplitPoint = { date: string; total: number; us: number; kr: number };
 
 export type UsKaderaSummary = {
-  /** 미국 종목을 한 번이라도 언급한 채널 수 / 전체 채널 수 */
-  usChannels: number;
-  totalChannels: number;
-  /** 창 안의 미국 종목 언급 수와 등장 종목 수 */
-  mentions: number;
-  tickers: number;
   /** 집계가 닿아 있는 마지막 날(KST). */
   lastDate: string | null;
   /** 파이프라인이 마지막으로 수집한 시각. 히어로 '최종 업데이트'가 이걸 쓴다 —
@@ -417,20 +405,14 @@ export async function getMarketAttentionSplit(days = 14): Promise<MarketSplitPoi
 
 /** 모니터링 현황. 카드 머리의 '무엇을 얼마나 보고 있나'를 채운다. */
 export async function getUsKaderaSummary(): Promise<UsKaderaSummary> {
-  // 셋은 서로 안 기댄다 — 나란히 띄운다.
-  const [channelRows, { rows, dates }, lastUpdated] = await Promise.all([
-    loadChannelDaily(),
+  // 둘은 서로 안 기댄다 — 나란히 띄운다.
+  // (현황 타일 넷 — 채널 수 둘·언급 수·종목 수 — 은 히어로에서 빠지며 같이 걷었다, 2026-09-27.)
+  const [{ dates }, lastUpdated] = await Promise.all([
     loadUsStockDaily(US_WINDOW_DAYS),
     // 국장과 같은 규칙으로 '이 화면이 만들어진 시각'을 쓴다(telegram-data 의 주석 참고).
     lastKaderaUpdatedAt(getSupabaseAdmin(), "telegram_us_daily_brief"),
   ]);
-  const handles = new Set(channelRows.map((r) => r.channel_handle));
-  const usHandles = new Set(channelRows.filter((r) => (r.us_msgs || 0) > 0).map((r) => r.channel_handle));
   return {
-    usChannels: usHandles.size,
-    totalChannels: handles.size,
-    mentions: rows.reduce((s, r) => s + (r.mention_count || 0), 0),
-    tickers: new Set(rows.map((r) => r.ticker)).size,
     lastDate: dates.at(-1) ?? null,
     lastUpdated,
   };
@@ -457,8 +439,8 @@ export type UsSentiment = {
   /** 테마별 낙관↔비관(중립 제외). 표본을 같이 넘긴다 — 얇은 테마는 100:0 같은 극단값이
    *  나오는데, 몇 건 기준인지 보여줘야 그 숫자를 제대로 읽을 수 있다(국장과 같은 규칙). */
   byTheme: { name: string; pos: number; positive: number; negative: number; total: number }[];
-  /** 최근 14일 낙관도 추이(오름차순). 그날 표본이 없으면 그 날은 빠진다 */
-  series: { date: string; score: number }[];
+  /** 최근 SENTIMENT_TREND_DAYS 일 낙관도(sentimentTrend, 국장과 같은 규칙). 마지막 점이 score 다. 조회 실패면 null */
+  trend: SentimentPoint[] | null;
 };
 
 export type UsIssueKeyword = {
@@ -524,16 +506,17 @@ export async function getUsSentiment(): Promise<UsSentiment | null> {
     return null;
   }
 
-  // 추이 막대(14일)까지 한 번에 받는다. 창(3일)은 그 부분집합이라 조회가 하나면 된다.
-  //
-  // ⚠️ scope 를 안 거른다 — 테마별 막대까지 같은 조회에서 나온다. 14일 × 17스코프라
-  //    1,000행 캡에 못 미친다(전체 표가 484행). 캡 근처가 되면 fetchAllRows 로 옮길 것.
-  const from = addDays(base, -(US_SENTIMENT_SERIES_DAYS - 1));
-  const { data, error } = await db
-    .from("telegram_us_sentiment_daily")
-    .select("date,scope,positive_count,neutral_count,negative_count,message_count")
-    .gte("date", from)
-    .lte("date", base);
+  // 창이 넓어질 수 있는 최대 일수만큼 받는다. scope 를 안 거른다 — 테마별 막대까지 같은
+  // 조회에서 나온다. 30일 추이(overall 만)는 따로 받는다 — 여기에 붙이면 테마 행까지
+  // 30일치가 와서 1,000행 캡에 다가간다.
+  const [{ data, error }, trend] = await Promise.all([
+    db
+      .from("telegram_us_sentiment_daily")
+      .select("date,scope,positive_count,neutral_count,negative_count,message_count")
+      .gte("date", addDays(base, -(SENTIMENT_WINDOW_MAX_DAYS - 1)))
+      .lte("date", base),
+    loadSentimentTrend("telegram_us_sentiment_daily", base, US_SENTIMENT_MIN_MESSAGES),
+  ]);
   if (error || !data?.length) {
     if (error) console.error("[getUsSentiment] 집계를 못 읽었습니다", error);
     return null;
@@ -596,11 +579,7 @@ export async function getUsSentiment(): Promise<UsSentiment | null> {
     messageCount: sum.total,
     windowDays: win.length || window.size,
     byTheme,
-    series: rows
-      .slice()
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .map((r) => ({ date: r.date, score: optimismPct(r.positive_count ?? 0, r.negative_count ?? 0) }))
-      .filter((p): p is { date: string; score: number } => p.score !== null),
+    trend,
   };
 }
 
