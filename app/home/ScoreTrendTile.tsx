@@ -52,7 +52,9 @@ export function ScoreTrendTile({ points, days }: { points: ScorePoint[] | null; 
   return (
     <div className="hz-tx-stat hz-tx-trend">
       {cap}
-      <div style={{ height: 70, display: "flex", gap: 6 }}>
+      {/* 차트 칸은 70 이 바닥이고, 옆 칸에 남는 높이가 있으면 늘어난다 — 홈 히어로에서 글 칸이 더 긴 날 이 타일이
+          남는 높이를 받아 밑선을 바닥 칩 줄과 맞춘다(tx.css .hz-tx-hero-home 주석). SVG 가 칸을 따라 늘어난다. */}
+      <div className="hz-trend-plot" style={{ minHeight: 70, display: "flex", gap: 6 }}>
         <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
           <svg
             viewBox={`0 0 100 ${H}`}
