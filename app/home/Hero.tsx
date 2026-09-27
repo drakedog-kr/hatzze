@@ -121,11 +121,18 @@ export function Hero({
   // ⭐ 세 줄 요약(2026-09-28~) — 줄마다 "[흐름] …" 이름표가 붙어 저장된다(generate_daily_summary.py
   //    BRIEF_LABELS). 이름표가 셋 다 있으면 새 형식으로 그리고, 아니면 옛 형식(아래)으로 그린다 —
   //    파이프라인이 한 번 돌기 전까지 DB 에는 옛 줄이 남아 있다.
-  const briefRows = summaryLines.map((line) => {
-    const m = BRIEF_LABEL_RE.exec(line);
-    return m ? { label: m[1], text: line.slice(m[0].length) } : null;
-  });
-  const brief = briefRows.length > 0 && briefRows.every(Boolean) ? (briefRows as { label: string; text: string }[]) : null;
+  //    첫 줄에 이름표가 있으면 새 형식이다. 이름표 없는 줄은 앞 줄에 이어 붙인다 — 모델이 '한두 문장'을 두 줄로
+  //    낸 경우다(파이프라인도 줄바꿈을 공백으로 바꿔 저장하지만 한 겹 더 막는다). 안 그러면 옛 형식으로 떨어져
+  //    "[흐름] …"이 날것으로 찍힌다.
+  let brief: { label: string; text: string }[] | null = null;
+  if (summaryLines.length > 0 && BRIEF_LABEL_RE.test(summaryLines[0])) {
+    brief = [];
+    for (const line of summaryLines) {
+      const m = BRIEF_LABEL_RE.exec(line);
+      if (m) brief.push({ label: m[1], text: line.slice(m[0].length) });
+      else brief[brief.length - 1].text += ` ${line}`;
+    }
+  }
   const meaningLine = summaryLines[0] ?? null;
   const balanceLine = summaryLines.length >= 3 ? summaryLines[1] : null;
   const trendLine = (summaryLines.length >= 3 ? summaryLines[2] : summaryLines[1]) ?? null;
@@ -164,8 +171,8 @@ export function Hero({
              쓴다. 옛 형식의 첫 문단(초고온 개수 템플릿)은 뺐다 — '뜨거운 곳'이 같은 말을 하고, 옛 ② 문단과
              같은 개수를 두 번 말하고 있었다. */
           <dl className="hz-tx-hero-body hz-brief3">
-            {brief.map((r) => (
-              <div key={r.label} className="hz-brief3-row">
+            {brief.map((r, i) => (
+              <div key={`${i}-${r.label}`} className="hz-brief3-row">
                 {/* 여론 줄의 이름표는 카더라로 간다 — 그 줄의 출처이고, 더 읽을 곳이다. */}
                 <dt>
                   {r.label === "여론" ? (

@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 
 from generate_daily_summary import (
     CHANGE_NONE,
+    change_fallback,
+    hot_fallback,
     brief_story,
     temp_gap,
     yeoron_problems,
@@ -120,6 +122,19 @@ def test_hot_problems():
     assert hot_problems("**경제 베스트셀러 비중**이 94%로 초고온입니다.", rows, hot, top) == ["쓰지 않을 지표 경제 베스트셀러 비중"]
     # 가장 뜨거운 지표가 쉬는 날 다른 지표를 '가장 높은'이라 부르면 거짓
     assert hot_problems("**옵션 풋/콜 비율**이 가장 높은 64%입니다.", rows, hot, top) == ["'가장' 표현"]
+    # 전체 1등은 쉬지 않아도 시장 지표 1등이 쉬면 '시장에서 가장 높은'도 거짓이다(Haiku 가 실제로 쓴 꼴)
+    rows2 = [_row("경제 베스트셀러 비중", "감성", 94), _row("옵션 풋/콜 비율", "시장", 64, rest=True), _row("금 대비 코스피 상대강도", "시장", 63)]
+    h2, t2 = balance_counts(rows2)
+    assert hot_problems("시장에서는 **금 대비 코스피 상대강도**가 가장 높습니다.", rows2, h2, t2) == ["'가장' 표현"]
+    # 활용형도 잡는다 — "가장 뜨겁습니다"는 '뜨거'가 아니라 '뜨겁'이라 옛 정규식을 빠져나갔다(Haiku, 09-28)
+    assert hot_problems("시장 지표 중에는 **금 대비 코스피 상대강도**가 가장 뜨겁습니다.", rows2, h2, t2) == ["'가장' 표현"]
+    assert hot_problems("시장에서는 **금 대비 코스피 상대강도**가 가장 과열돼 있습니다.", rows2, h2, t2) == ["'가장' 표현"]
+    # '가장 식은'은 1등 주장이 아니다
+    assert hot_problems("시장 지표 가운데 가장 식은 쪽은 **금 대비 코스피 상대강도**입니다.", rows2, h2, t2) == []
+    # 아무것도 안 쉬면 '가장'은 맞는 말이다
+    rows3 = [dict(r, rest=False) for r in rows2]
+    h3, t3 = balance_counts(rows3)
+    assert hot_problems("**경제 베스트셀러 비중**이 가장 높습니다.", rows3, h3, t3) == []
     # 개수도 대조한다(굵게 써도)
     assert hot_problems("초고온에는 감성 지표 **2개**가 들었습니다.", rows, hot, top) == ["초고온 감성 2개"]
     # 자료 안쪽 말(Opus 가 실제로 쓴 꼴, 2026-09-28)
@@ -197,3 +212,36 @@ def test_yeoron_problems():
     assert yeoron_problems("카더라에서는 낙관과 비관이 팽팽하고 글이 496건 올라왔습니다.", "중립", NAMES) == ["숫자"]
     assert yeoron_problems("카더라 총평에 따르면 낙관과 비관이 팽팽합니다.", "중립", NAMES) == ["안쪽 말"]
     assert yeoron_problems("카더라에서는 낙관과 비관이 팽팽하고 **옵션 풋/콜 비율** 이야기가 많습니다.", "중립", NAMES) == ["지표 이름"]
+
+
+def test_hot_fallback_is_true_and_josa_free():
+    rows = [_row("경제 베스트셀러 비중", "감성", 94), _row("옵션 풋/콜 비율", "시장", 64, rest=True),
+            _row("금 대비 코스피 상대강도", "시장", 63), _row("코스피 상승 속도", "시장", 0), _row("고점권 외국인 매도", "시장", 0)]
+    hot, top = balance_counts(rows)
+    s = hot_fallback(rows, hot)
+    assert s == ("초고온에 든 지표는 **경제 베스트셀러 비중**(94%) 하나입니다. "
+                 "시장 지표 가운데 가장 식은 쪽은 **코스피 상승 속도**(0%) · **고점권 외국인 매도**(0%)입니다.")
+    assert hot_problems(s, rows, hot, top) == []
+    # 초고온 지표가 쉬면 종류와 개수로
+    rested = [dict(r, rest=(r["name"] == "경제 베스트셀러 비중")) for r in rows]
+    h2, t2 = balance_counts(rested)
+    s2 = hot_fallback(rested, h2)
+    assert s2.startswith("초고온에는 감성 지표 1개가 들었습니다.")
+    assert hot_problems(s2, rested, h2, t2) == []
+
+
+def test_hot_fallback_no_hot_names_top_only_when_true():
+    rows = [_row("금 대비 코스피 상대강도", "시장", 63), _row("코스피 상승 속도", "시장", 0)]
+    hot, top = balance_counts(rows)
+    assert hot_fallback(rows, hot).startswith("초고온에 든 지표는 없고 과열도가 가장 높은 지표는 **금 대비 코스피 상대강도**(63%)입니다.")
+    # 1등이 쉬면 '가장'을 안 붙인다
+    rows = [_row("옵션 풋/콜 비율", "시장", 64, rest=True)] + rows
+    hot, top = balance_counts(rows)
+    s = hot_fallback(rows, hot)
+    assert s.startswith("초고온에 든 지표는 없습니다.")
+    assert hot_problems(s, rows, hot, top) == []
+
+
+def test_change_fallback_lists_movers():
+    got = change_fallback([{"name": "경제뉴스 감성 지수", "hotter": True}, {"name": "VKOSPI (변동성지수)", "hotter": False}])
+    assert got == "최근 하루 평소보다 크게 움직인 지표는 **경제뉴스 감성 지수**(더 뜨거워짐) · **VKOSPI (변동성지수)**(식음)입니다."

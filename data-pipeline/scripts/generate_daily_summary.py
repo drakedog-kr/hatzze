@@ -213,14 +213,14 @@ YEORON_FACTS_NOTE = (
     "방금 쓴 문장이 자료와 어긋납니다. 분위기는 [여론] 줄에 적힌 것만 쓰고, 숫자·지표 이름·자료 안쪽 말은 "
     "쓰지 말고, 같은 뜻으로"
 )
-# 가장 뜨거운 지표가 표시에 걸려 빠진 날에만 HOT_SYSTEM 끝에 붙는다. 모델은 목록에서 이름을 쓸 수 있는 첫
+# 전체나 시장 지표 안의 1등이 표시에 걸려 빠진 날에만 HOT_SYSTEM 끝에 붙는다(skipped_hotter). 모델은 목록에서 이름을 쓸 수 있는 첫
 # 지표를 버릇처럼 "가장 뜨거운 ○○"라 부르는데 그날은 거짓이다.
 # ⚠️ 자료에 사실 한 줄로는 안 됐다(2026-09-28 옛 주인공 문단 · Opus 첫 시도 11/11 "가장 뜨거운").
 #    지시 한 줄로 0/11 — 같은 말을 처음부터 준다.
 HOT_SKIP_NOTE = """
 
-[오늘 주의] '← 이 지표는 문장에 쓰지 마세요' 표시가 붙은 지표가 가장 뜨겁습니다. 표시 없는 지표를
-'가장 뜨거운'·'가장 높은'이라고 부르지 마세요."""
+[오늘 주의] '← 이 지표는 문장에 쓰지 마세요' 표시가 붙은 지표가 전체나 시장 지표 안에서 가장 뜨겁습니다.
+표시 없는 지표를 '가장 뜨거운'·'가장 높은'이라고 부르지 마세요."""
 
 # 요약에서 **아예 언급하지 않을** 지표 — slug → 다시 풀리는 raw_value 하한.
 #
@@ -266,7 +266,7 @@ def mentionable(row: dict) -> bool:
 HOT_WINDOW = 5
 HOT_MAX_IN_WINDOW = 2
 # '가장 뜨거운 ○○' 처럼 1등이라 부르는 말. 더 뜨거운 지표를 건너뛴 날엔 거짓이 된다.
-SUPERLATIVE_RE = re.compile(r"(?:가장|제일)\s*(?:뜨거|높)|1위")
+SUPERLATIVE_RE = re.compile(r"(?:가장|제일)\s*(?:뜨[거겁]|높|과열)|1위")
 
 
 def name_forms(name: str) -> list[str]:
@@ -311,10 +311,18 @@ def resting_names(prev_lines: list[str], names: list[str]) -> set[str]:
 
 
 def skipped_hotter(rows: list[dict]) -> bool:
-    """가장 뜨거운 지표가 표시(mentionable)에 걸려 빠졌나 — 그날은 다른 지표를 '가장 뜨거운'이라 부르면
-    거짓이다. rows 는 과열도 내림차순."""
-    pick = next((r for r in rows if mentionable(r)), None)
-    return bool(rows) and pick is not None and rows[0] is not pick and rows[0]["capped"] > pick["capped"]
+    """표시(mentionable)에 걸려 빠진 지표가 **전체에서든 시장 지표 안에서든** 1등보다 뜨거운가 — 그날은 다른
+    지표를 '가장 뜨거운'·'가장 높은'이라 부르면 거짓이다. rows 는 과열도 내림차순.
+
+    ⚠️ 시장 지표 안도 본다. 전체 1등(베스트셀러 94%)은 쉬지 않는데 시장 1등(풋/콜 64%)이 쉬는 날, 모델이
+       "시장에서는 금 대비 코스피 상대강도(63%)가 가장 높으며"라고 썼다(2026-09-28 Haiku 폴백 재현).
+    """
+
+    def skipped(scope: list[dict]) -> bool:
+        pick = next((r for r in scope if mentionable(r)), None)
+        return bool(scope) and pick is not None and scope[0] is not pick and scope[0]["capped"] > pick["capped"]
+
+    return skipped(rows) or skipped([r for r in rows if r["category"] == SPOTLIGHT_CATEGORY])
 
 
 # 우리 자료 안에서만 쓰는 말 — '← 이 지표는 문장에 쓰지 마세요' 표시를 모델이 "표시 없는 지표 중에서는"
@@ -455,6 +463,39 @@ def yeoron_problems(text: str, tone: str, names: list[str]) -> list[str]:
     if INNER_WORDS_RE.search(plain) or re.search(r"총평|발췌", plain):
         found.append("안쪽 말")
     return found
+
+
+# ── 마지막 문장(모든 후보가 사실 대조에 걸렸을 때) ─────────────────────────────────────────
+# 다시 쓰기를 다 써도 후보가 전부 어긋나면 모델 문장 대신 자료로 지은 문장을 쓴다. 이름 뒤에 조사를 붙이지
+# 않게 짓는다(받침을 몰라도 된다). 2026-09-28 Haiku(API 폴백 때 쓰는 모델)가 시장 1등이 쉬는 날 세 번 모두
+# "시장 지표 중 금 대비 코스피 상대강도가 가장 높습니다"라고 써서 넣었다 — 그대로 저장하면 거짓이 나간다.
+def _named(r: dict, with_pct: bool = True) -> str:
+    return f"**{r['name']}**({r['capped']:.0f}%)" if with_pct else f"**{r['name']}**"
+
+
+def hot_fallback(rows: list[dict], hot: dict[str, int]) -> str:
+    hots = [r for r in rows if r["hot"]]
+    named = [r for r in hots if mentionable(r)]
+    if not hots:
+        first = "초고온에 든 지표는 없습니다."
+        # '가장'은 1등을 건너뛴 날엔 거짓이라(skipped_hotter) 그런 날엔 안 붙인다.
+        if rows and mentionable(rows[0]) and not skipped_hotter(rows):
+            first = f"초고온에 든 지표는 없고 과열도가 가장 높은 지표는 {_named(rows[0])}입니다."
+    elif len(named) == len(hots) and len(named) <= 2:
+        first = f"초고온에 든 지표는 {' · '.join(_named(r) for r in named)} {'하나' if len(named) == 1 else '둘'}입니다."
+    else:
+        kinds = " · ".join(f"{k} 지표 {n}개" for k, n in hot.items() if n)
+        first = f"초고온에는 {kinds}가 들었습니다."
+    market = sorted(
+        (r for r in rows if r["category"] == SPOTLIGHT_CATEGORY and mentionable(r)), key=lambda r: r["capped"]
+    )[:2]
+    second = f" 시장 지표 가운데 가장 식은 쪽은 {' · '.join(_named(r) for r in market)}입니다." if market else ""
+    return first + second
+
+
+def change_fallback(movers: list[dict]) -> str:
+    parts = " · ".join(f"{_named(m, with_pct=False)}({'더 뜨거워짐' if m['hotter'] else '식음'})" for m in movers)
+    return f"최근 하루 평소보다 크게 움직인 지표는 {parts}입니다."
 
 
 def change_digest(movers: list[dict]) -> str:
@@ -873,16 +914,18 @@ def main() -> None:
         how: str = "한 문장",
         facts: Callable[[str], list[str]] | None = None,
         facts_note: str = "",
+        fallback: Callable[[], str] | None = None,
     ) -> str:
         """한두 문장 — 길이가 목표를 벗어나면 다시 쓰게 한다.
 
         카더라 총평의 ask_brief_sentence 와 같은 방식이다. 후보를 모아 두고 목표 범위
-        안의 첫 번째를, 없으면 한가운데에 가장 가까운 걸 고른다. **빈 문장은 절대 안 낸다** —
+        안의 첫 번째를, 없으면 한가운데에 가장 가까운 걸 고른다. 길이 때문에 빈 문장을 내진 않는다 —
         요약이 통째로 저장되지 않는 것보다 길이가 몇 자 어긋나는 게 낫다.
 
         facts 는 줄마다 사실 대조('달라진 것'의 목록 밖 지표 change_problems · '뜨거운 곳'의 쉬는 지표·
         '가장' 표현·개수 hot_problems). 어긋난 자리를 돌려주면 그 문장을 버리고 facts_note 로 다시 쓰게
-        하고, 고를 때도 어긋난 후보는 뒤로 민다.
+        하고, 고를 때도 어긋난 후보는 뒤로 민다. **후보가 전부 어긋나면** fallback(자료로 지은 문장, 없으면
+        빈 문자열 = 그 줄을 뺀다)을 쓴다 — 어긋난 문장을 저장하지 않는다.
         """
         lo, hi = length
         # 줄마다 모델에게 준 자료가 다르다. 오타 검사의 '원문에 있는가' 대조도 **그 줄이 실제로 본
@@ -913,9 +956,14 @@ def main() -> None:
                 )
             candidates.append(one_sentence(retry, src))
         # 깨진 후보는 길이가 맞아도 안 쓴다 — 길이는 어긋나도 읽히지만 깨진 글자는 못 읽는다.
-        # 자료와 어긋난 후보도 같은 취급이다. 다만 전부 어긋나면 그중에서 고른다(빈 문장보다 낫다).
+        # 자료와 어긋난 후보도 같은 취급이다. 전부 어긋나면 fallback 을 쓰고, fallback 이 없는 줄('흐름')만
+        # 그중에서 고른다(빈 문장보다 낫다).
+        right = [t for t in candidates if t.strip() and is_clean(t, src) and not wrong(t)]
+        if not right and facts is not None and fallback is not None:
+            print(f"[WARNING] 후보 {len(candidates)}개가 모두 자료와 어긋나 자료로 지은 문장을 씁니다.")
+            return fallback()
         usable = (
-            [t for t in candidates if t.strip() and is_clean(t, src) and not wrong(t)]
+            right
             or [t for t in candidates if t.strip() and is_clean(t, src)]
             or [t for t in candidates if t.strip()]
         )
@@ -937,6 +985,7 @@ def main() -> None:
             how="한두 문장",
             facts=lambda t: change_problems(t, mover_names, names),
             facts_note=CHANGE_FACTS_NOTE,
+            fallback=lambda: change_fallback(movers),
         )
         if movers
         else CHANGE_NONE
@@ -950,6 +999,7 @@ def main() -> None:
         how="한두 문장",
         facts=lambda t: hot_problems(t, rows, hot_n, top_n),
         facts_note=HOT_FACTS_NOTE,
+        fallback=lambda: hot_fallback(rows, hot_n),
     )
     if not trend or not change or not hot:
         print("[WARNING] LLM 응답이 비어 요약을 저장하지 않습니다.")
@@ -958,43 +1008,53 @@ def main() -> None:
     # 여론 — 카더라 총평(같은 잡에서 먼저 돈다, daily-update.yml)과 여론 집계. 총평이 없거나 낡았으면 이 줄만
     # 뺀다(세 줄로 저장된다 — 화면은 줄 수와 상관없이 이름표로 그린다).
     yeoron = ""
-    brief = (
-        client.table("telegram_daily_brief")
-        .select("date, sentiment_summary")
-        .order("date", desc=True)
-        .limit(1)
-        .execute()
-    ).data
-    if brief and (date.fromisoformat(target_date) - date.fromisoformat(brief[0]["date"])).days <= YEORON_MAX_AGE_DAYS:
-        latest = brief[0]["date"]
-        since = (date.fromisoformat(latest) - timedelta(days=KR.SENTIMENT_WINDOW_MAX_DAYS)).isoformat()
-        sent_rows = (
-            client.table("telegram_sentiment_daily")
-            .select("date, scope, positive_count, negative_count, message_count")
-            .eq("scope", "overall")
-            .gte("date", since)
-            .lte("date", latest)
+    # ⚠️ 여론 줄은 곁가지다 — 카더라 표 조회나 이 줄 생성이 깨져도 앞 세 줄은 저장한다(예외를 삼킨다).
+    try:
+        brief = (
+            client.table("telegram_daily_brief")
+            .select("date, sentiment_summary")
+            .order("date", desc=True)
+            .limit(1)
             .execute()
         ).data
-        tone = yeoron_tone(sent_rows, latest)
-        if tone:
-            yeoron_src = yeoron_digest(tone, brief_story(brief[0]["sentiment_summary"]), temp_gap(stage, tone))
-            print(yeoron_src)
-            print("─" * 60)
-            yeoron = sized_sentence(
-                YEORON_SYSTEM,
-                YEORON_LEN,
-                yeoron_src,
-                how="한두 문장",
-                facts=lambda t: yeoron_problems(t, tone, names),
-                facts_note=YEORON_FACTS_NOTE,
-            )
+        if brief and (date.fromisoformat(target_date) - date.fromisoformat(brief[0]["date"])).days <= YEORON_MAX_AGE_DAYS:
+            latest = brief[0]["date"]
+            since = (date.fromisoformat(latest) - timedelta(days=KR.SENTIMENT_WINDOW_MAX_DAYS)).isoformat()
+            sent_rows = (
+                client.table("telegram_sentiment_daily")
+                .select("date, scope, positive_count, negative_count, message_count")
+                .eq("scope", "overall")
+                .gte("date", since)
+                .lte("date", latest)
+                .execute()
+            ).data
+            tone = yeoron_tone(sent_rows, latest)
+            if tone:
+                yeoron_src = yeoron_digest(tone, brief_story(brief[0]["sentiment_summary"]), temp_gap(stage, tone))
+                print(yeoron_src)
+                print("─" * 60)
+                yeoron = sized_sentence(
+                    YEORON_SYSTEM,
+                    YEORON_LEN,
+                    yeoron_src,
+                    how="한두 문장",
+                    facts=lambda t: yeoron_problems(t, tone, names),
+                    facts_note=YEORON_FACTS_NOTE,
+                    # 여론은 곁가지라 틀린 분위기를 싣느니 그 줄을 뺀다.
+                    fallback=lambda: "",
+                )
+    except Exception as e:  # noqa: BLE001 — 어떤 실패든 이 줄만 빼고 간다
+        print(f"[WARNING] 여론 줄을 만들지 못해 뺍니다: {e!r}")
+        yeoron = ""
     if not yeoron:
-        print("[여론] 카더라 총평·여론 집계가 없거나 낡아 이 줄을 뺍니다.")
+        print("[여론] 이 줄을 뺍니다 — 카더라 총평·여론 집계가 없거나 낡았거나, 문장이 자료와 어긋났습니다.")
 
     # 줄마다 이름표를 붙여 개행으로 잇는다 — 화면(app/home/Hero.tsx)이 이름표로 새 형식을 알아보고, 굵게는
     # 지표 이름에만 남긴다(keep_bold_names). ⚠️ 줄 순서가 화면 순서다.
     lines = [trend, change, hot] + ([yeoron] if yeoron else [])
+    # 한 줄 안의 줄바꿈은 공백으로 — '한두 문장'을 모델이 두 줄로 내면 이름표 없는 줄이 생겨 화면이 새 형식을
+    # 못 알아본다(날것 "[흐름] …"이 찍힌다). 화면도 이름표 없는 줄을 앞 줄에 이어 붙이지만 여기서 먼저 막는다.
+    lines = [re.sub(r"\s*\n+\s*", " ", t).strip() for t in lines]
     summary = "\n".join(f"[{label}] {keep_bold_names(t, names)}" for label, t in zip(BRIEF_LABELS, lines))
     print("[요약]\n  " + summary.replace("\n", "\n  "))
 
