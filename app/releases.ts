@@ -29,6 +29,12 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 제목 글자 모양만 바뀌고 쓰는 법은 그대로다. Patch.
+    version: "1.22.1",
+    date: "2026-09-27",
+    changes: ["카더라 센티먼트 추이 제목이 인기 테마별 소제목과 같은 글자로 보입니다."],
+  },
+  {
     // 히어로에 없던 그래프가 새로 붙는다. Minor.
     version: "1.22.0",
     date: "2026-09-27",
