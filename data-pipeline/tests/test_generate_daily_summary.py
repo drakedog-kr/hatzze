@@ -4,15 +4,19 @@
 개수는 그 자리 이름과 함께 돌아온다.
 """
 import pytest
+from datetime import datetime, timezone
 
 from generate_daily_summary import (
+    CHANGE_NONE,
     balance_count_problems,
     balance_counts,
-    keep_bold,
-    resting_spotlights,
-    skipped_hotter,
-    spotlight_name,
-    spotlight_problems,
+    change_problems,
+    hot_line_of,
+    hot_problems,
+    keep_bold_names,
+    name_forms,
+    pick_movers,
+    resting_names,
 )
 
 HOT = {"시장": 2, "감성": 1}
@@ -67,81 +71,89 @@ def test_balance_counts_matches_the_digest_line():
     assert top == {"시장": 3, "감성": 2}
 
 
-@pytest.mark.parametrize(
-    "text, spans, want",
-    [
-        # Opus 5.5 가 실제로 쓴 꼴(2026-09-28) — ① 은 지표 이름만 남긴다.
-        ("시장 지표 중 가장 뜨거운 **옵션 풋/콜 비율**은 과열도 **64%**로 높습니다.", 1,
-         "시장 지표 중 가장 뜨거운 **옵션 풋/콜 비율**은 과열도 64%로 높습니다."),
-        ("오늘은 **감성 지표**가 **시장 지표**보다 조금 더 뜨겁습니다. 초고온에는 **감성 지표 1개**만 들었습니다.", 0,
-         "오늘은 감성 지표가 시장 지표보다 조금 더 뜨겁습니다. 초고온에는 감성 지표 1개만 들었습니다."),
-        ("굵게가 없는 문장입니다.", 1, "굵게가 없는 문장입니다."),
-        ("짝이 **안 맞는 별표입니다.", 1, "짝이 안 맞는 별표입니다."),
-        ("", 0, ""),
-    ],
-)
-def test_keep_bold(text, spans, want):
-    assert keep_bold(text, spans) == want
+NAMES = ["옵션 풋/콜 비율", "금 대비 코스피 상대강도", "경제 베스트셀러 비중", "버핏지수", "VKOSPI (변동성지수)"]
 
 
-NAMES = ["옵션 풋/콜 비율", "금 대비 코스피 상대강도", "최근 한 달 매매 안전장치 동향", "버핏지수", "VKOSPI (변동성지수)"]
-PUTCALL = "**옵션 풋/콜 비율**은 콜옵션이 풋옵션보다 많을수록 높아지며, 과열도 64%로 시장 지표 중 가장 높습니다."
-GOLD = "시장 지표 중 가장 뜨거운 **금 대비 코스피 상대강도**는 과열도 63%로 주식 쪽에 돈이 몰렸다는 뜻입니다."
+def test_name_forms_accept_short_and_unspaced():
+    assert set(name_forms("VKOSPI (변동성지수)")) == {"VKOSPI (변동성지수)", "VKOSPI(변동성지수)", "VKOSPI"}
+    assert name_forms("버핏지수") == ["버핏지수"]
 
 
-def test_spotlight_name_prefers_bold_then_first_mention():
-    assert spotlight_name(PUTCALL, NAMES) == "옵션 풋/콜 비율"
-    # 굵게가 옛 이름이면 문장에 먼저 나오는 지금 이름으로
-    assert spotlight_name("**깃헙 트레이딩봇 저장소 생성 수**와 금 대비 코스피 상대강도가 …", NAMES) == "금 대비 코스피 상대강도"
-    assert spotlight_name("지표 이름이 없는 문장입니다.", NAMES) is None
-    # 괄호를 뗀 짧은 이름도 같은 지표다
-    assert spotlight_name("**VKOSPI**는 과열도 47%로 …", NAMES) == "VKOSPI (변동성지수)"
-    assert spotlight_name("변동성을 재는 VKOSPI가 …", NAMES) == "VKOSPI (변동성지수)"
-    # Opus 가 실제로 쓴 꼴(2026-09-28) — 괄호 앞 띄어쓰기가 없다
-    assert spotlight_name("**VKOSPI(변동성지수)**는 급락에 대비하는 …", NAMES) == "VKOSPI (변동성지수)"
+def test_keep_bold_names_only():
+    # Opus 가 실제로 쓴 꼴(2026-09-28) — 숫자·개수까지 굵게 쓴다. 지표 이름만 남긴다.
+    text = "초고온은 **경제 베스트셀러 비중**(**94%**) 하나뿐이고 **감성 지표 1개**만 들었습니다. **VKOSPI**는 식었습니다."
+    assert keep_bold_names(text, NAMES) == "초고온은 **경제 베스트셀러 비중**(94%) 하나뿐이고 감성 지표 1개만 들었습니다. **VKOSPI**는 식었습니다."
+    assert keep_bold_names("짝이 **안 맞는 별표", NAMES) == "짝이 안 맞는 별표"
 
 
-VIX = "**VKOSPI (변동성지수)**는 과열도 47%로 …"
+def test_hot_line_of_reads_new_and_old_rows():
+    new = "[흐름] 23℃입니다.\n[달라진 것] …\n[뜨거운 곳] **경제 베스트셀러 비중**이 초고온입니다."
+    assert hot_line_of(new) == "[뜨거운 곳] **경제 베스트셀러 비중**이 초고온입니다."
+    # 옛 형식은 첫 줄(주인공 문단)이 같은 일을 했다
+    assert hot_line_of("**옵션 풋/콜 비율**은 …\n감성 지표가 …\n지난주 …") == "**옵션 풋/콜 비율**은 …"
+    assert hot_line_of(None) == ""
 
 
-def test_rests_after_two_of_the_last_four_days():
-    # 최근 날부터. 앞 나흘에 두 번 나왔으면 오늘 쉰다 — 어느 닷새에도 이틀까지.
-    assert resting_spotlights([PUTCALL, PUTCALL, GOLD, VIX], NAMES) == {"옵션 풋/콜 비율"}
-    assert resting_spotlights([PUTCALL, GOLD, VIX, PUTCALL], NAMES) == {"옵션 풋/콜 비율"}
-    assert resting_spotlights([GOLD, VIX, PUTCALL, PUTCALL, PUTCALL], NAMES) == {"옵션 풋/콜 비율"}
+def test_rest_after_two_of_the_last_four_hot_lines():
+    pc, gold, best = "**옵션 풋/콜 비율**", "**금 대비 코스피 상대강도**", "**경제 베스트셀러 비중**"
+    # 최근 날부터. 한 줄에 둘을 부르면 둘 다 센다.
+    assert resting_names([f"{best} · {pc}", best, gold, gold], NAMES) == {"경제 베스트셀러 비중", "금 대비 코스피 상대강도"}
+    assert resting_names([pc, gold, best, "VKOSPI(변동성지수)"], NAMES) == set()
     # 다섯째 날 앞은 창 밖이다
-    assert resting_spotlights([GOLD, VIX, PUTCALL, VIX.replace("47", "45"), PUTCALL], NAMES) == {"VKOSPI (변동성지수)"}
-    # 두 지표가 함께 쉬는 날
-    assert resting_spotlights([GOLD, GOLD, PUTCALL, PUTCALL], NAMES) == {"옵션 풋/콜 비율", "금 대비 코스피 상대강도"}
-    assert resting_spotlights([PUTCALL, GOLD, VIX], NAMES) == set()
-    assert resting_spotlights([PUTCALL, PUTCALL], NAMES) == {"옵션 풋/콜 비율"}  # 행이 적어도 찬 건 찼다
-    assert resting_spotlights(["", "", "", ""], NAMES) == set()  # 요약이 비었던 날은 안 센다
+    assert resting_names([gold, best, pc, gold, pc], NAMES) == {"금 대비 코스피 상대강도"}
+    assert resting_names(["", ""], NAMES) == set()
 
 
-def _rows(rest_putcall=False):
-    return [
-        {"name": "경제 베스트셀러 비중", "category": "감성", "capped": 94.0, "slug": "a", "raw": 1, "rest": False},
-        {"name": "옵션 풋/콜 비율", "category": "시장", "capped": 64.0, "slug": "b", "raw": 1, "rest": rest_putcall},
-        {"name": "금 대비 코스피 상대강도", "category": "시장", "capped": 63.0, "slug": "c", "raw": 1, "rest": False},
-        {"name": "버핏지수", "category": "시장", "capped": 58.0, "slug": "buffett_index", "raw": 180.0, "rest": False},
-    ]
+def _row(name, cat, capped, rest=False, slug="x", raw=1.0):
+    return {"name": name, "category": cat, "capped": capped, "hot": capped >= 75, "rest": rest, "slug": slug, "raw": raw}
 
 
-def test_skipped_hotter_names_the_next_pick_and_its_rank():
-    assert skipped_hotter(_rows()) == (None, 0)
-    pick, rank = skipped_hotter(_rows(rest_putcall=True))
-    assert (pick["name"], rank) == ("금 대비 코스피 상대강도", 2)
+def test_hot_problems():
+    rows = [_row("경제 베스트셀러 비중", "감성", 94, rest=True), _row("옵션 풋/콜 비율", "시장", 64), _row("버핏지수", "시장", 58, slug="buffett_index", raw=180)]
+    hot, top = balance_counts(rows)
+    ok = "초고온에는 감성 지표 1개만 들었고, **옵션 풋/콜 비율**이 시장 지표 중 64%입니다."
+    assert hot_problems(ok, rows, hot, top) == []
+    assert hot_problems("**경제 베스트셀러 비중**이 94%로 초고온입니다.", rows, hot, top) == ["쓰지 않을 지표 경제 베스트셀러 비중"]
+    # 가장 뜨거운 지표가 쉬는 날 다른 지표를 '가장 높은'이라 부르면 거짓
+    assert hot_problems("**옵션 풋/콜 비율**이 가장 높은 64%입니다.", rows, hot, top) == ["'가장' 표현"]
+    # 개수도 대조한다(굵게 써도)
+    assert hot_problems("초고온에는 감성 지표 **2개**가 들었습니다.", rows, hot, top) == ["초고온 감성 2개"]
+    # 자료 안쪽 말(Opus 가 실제로 쓴 꼴, 2026-09-28)
+    assert hot_problems("표시 없는 지표 중에서는 **옵션 풋/콜 비율**이 64%입니다.", rows, hot, top) == ["안쪽 말"]
 
 
-def test_spotlight_problems():
-    rested = _rows(rest_putcall=True)
-    assert spotlight_problems(GOLD, rested) == ["'가장' 표현"]
-    assert spotlight_problems(PUTCALL, rested) == ["쓰지 않을 지표 옵션 풋/콜 비율", "'가장' 표현"]
-    ok = "**금 대비 코스피 상대강도**는 과열도 63%로 안전자산보다 주식에 돈이 몰렸다는 뜻입니다."
-    assert spotlight_problems(ok, rested) == []
-    # 보통 날엔 '가장'이 맞는 말이다. 문턱에 걸린 버핏지수 이름만 잡는다.
-    assert spotlight_problems(PUTCALL, _rows()) == []
-    assert spotlight_problems("버핏지수도 높은 편입니다.", _rows()) == ["쓰지 않을 지표 버핏지수"]
-    # 쉬는 지표를 짧은 이름으로 꺼내도 잡는다
-    vix_rest = [{"name": "VKOSPI (변동성지수)", "category": "시장", "capped": 70.0, "slug": "v", "raw": 1, "rest": True}]
-    assert spotlight_problems("VKOSPI가 높습니다.", vix_rest) == ["쓰지 않을 지표 VKOSPI (변동성지수)"]
+def test_change_problems_only_listed_names():
+    movers = {"경제 베스트셀러 비중"}
+    assert change_problems("**경제 베스트셀러 비중**이 더 뜨거워졌습니다.", movers, NAMES) == []
+    assert change_problems("**버핏지수**도 올랐습니다.", movers, NAMES) == ["목록 밖 지표 버핏지수"]
+
+
+NOW = datetime(2026, 9, 27, 12, 0, tzinfo=timezone.utc)
+FRESH = "2026-09-27T10:34:00+00:00"
+STALE = "2026-09-26T08:00:00+00:00"
+JUMPY = [10, 11, 10, 11, 10, 11, 10, 11, 16]  # 평소 ±1, 마지막 +5(평소의 5배)
+
+
+def _mv(name, values, direction="high", created=FRESH):
+    return {"name": name, "category": "감성", "direction": direction, "values": values, "created_at": created}
+
+
+def test_pick_movers_ranks_by_usual_move():
+    got = pick_movers([_mv("a", JUMPY), _mv("b", [10, 11, 10, 11, 10, 11, 10, 11, 12.5]), _mv("c", [10, 11, 10, 11, 10, 11, 10, 11, 13])], NOW)
+    assert [(m["name"], m["times"]) for m in got] == [("a", 5.0), ("c", 2.0)]
+
+
+def test_pick_movers_heat_direction_and_freshness():
+    assert pick_movers([_mv("v", JUMPY, direction="low")], NOW)[0]["hotter"] is False
+    # 하루 넘게 묵은 값(하루 늦게 오는 지표가 같은 변화를 이틀 드는 경우)은 안 본다
+    assert pick_movers([_mv("a", JUMPY, created=STALE), _mv("b", JUMPY, created=None)], NOW) == []
+
+
+def test_pick_movers_sparse_indicator_uses_mean():
+    # 베스트셀러 비중처럼 정수로 가끔 바뀐다. 직전 15번 변화 중 1 이 4번 → 평균 4/15, 마지막 1 → 3.75배
+    got = pick_movers([_mv("best", [5, 5, 5, 6, 6, 6, 5, 5, 5, 5, 6, 6, 6, 6, 5, 5, 6])], NOW)
+    assert len(got) == 1 and abs(got[0]["times"] - 15 / 4) < 1e-9
+
+
+def test_change_none_is_a_sentence():
+    assert CHANGE_NONE.endswith("습니다.")

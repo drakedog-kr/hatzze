@@ -105,7 +105,8 @@ SITE_URL = "https://hatzze.fun"
 # 잘못 풀리면 utm_medium 부터가 통째로 안 붙어 GA 에서 텔레그램 유입이 사라진다.
 UTM = "utm_source=telegram&utm_medium=social&utm_campaign=daily_broadcast"
 
-# 요약을 몇 문장까지 실을지. ai_summary 는 [주인공 지표][최근 추세] 두 문장이다.
+# 요약을 몇 문장까지 실을지. ai_summary 는 2026-09-28 부터 [흐름][달라진 것][뜨거운 곳] 세 줄이다
+# (그 전엔 [주인공 지표][시장 vs 감성][최근 추세]). 2 면 흐름 · 달라진 것까지 싣는다.
 # 2 면 사이트 히어로와 같은 말을 하고(일관성), 1 로 낮추면 추세 문장이 잘려 나가고 글이
 # 120 자쯤 짧아진다. "채널 글이 길다" 싶을 때 여기만 만지면 된다.
 SUMMARY_SENTENCES = 2
@@ -495,6 +496,8 @@ def build_evening(score_row: dict, surging: list[dict]) -> str:
     # 히어로는 두 문장을 한 문단으로 붙여 저장하는데, 그대로 실으면 150자짜리 한 덩어리가
     # 되어 폰에서 눈이 미끄러진다(실측).
     sentences = [s.strip() for s in (score_row.get("ai_summary") or "").splitlines() if s.strip()]
+    # 세 줄 요약의 이름표("[흐름] ")는 화면용이다 — 채널 글엔 떼고 싣는다.
+    sentences = [re.sub(r"^\[(흐름|달라진 것|뜨거운 곳)\]\s*", "", s) for s in sentences]
     # 여기도 금지어 그물을 안 지나던 자리다. ai_summary 는 파이프라인이 만들어 표에 넣어
     # 둔 LLM 문장이라 compose() 의 검사와 무관하다(bc.safe_summary_lines 주석).
     #
