@@ -30,7 +30,7 @@ import { fetchDailyHistory, yahooSymbol } from "./yahoo-history";
 export type UsMoveReasonRow = {
   ticker: string;
   name: string;
-  /** 집계 기준일(메시지 작성일, KST) */
+  /** 이 줄의 작성일(KST). 주말 판을 합치면 판의 date 보다 이를 수 있다 */
   date: string;
   /** 직전 미국장 세션의 종가 등락률. 못 구하면 null */
   changeRate: number | null;
@@ -79,6 +79,22 @@ const BOARD_STALE_DAYS = 3;
  * 이쪽이 낫다. 열흘 연휴(2025 추석)까지 덮는 값이다.
  */
 const BOARD_MAX_DAYS = 14;
+
+/**
+ * 작성일 `date` 의 글이 말하는 미국장(ET) — `date - 1일` 이하의 마지막 **평일**.
+ * 판을 합칠 때 "같은 장을 가리키나"를 가르는 열쇠로만 쓴다. 등락률은 여전히 야후 일봉이 정한다(lastUsSession).
+ *
+ * 미국 휴장일은 모른다. 그래도 **잘못 합치지는 않는다** — 이 열쇠가 같으려면 두 작성일 사이의 `d-1` 이 전부
+ * 주말이어야 하고, 그 날들은 실제로도 같은 장을 가리킨다. 휴장일이 끼면 열쇠가 갈려 안 합쳐질 뿐이다(예전 동작).
+ */
+function usSessionKey(date: string): string {
+  let d = addDaysISO(date, -1);
+  for (;;) {
+    const wd = new Date(`${d}T00:00:00Z`).getUTCDay();
+    if (wd !== 0 && wd !== 6) return d;
+    d = addDaysISO(d, -1);
+  }
+}
 
 type UsReasonRow = {
   date: string;
@@ -135,7 +151,8 @@ async function lastUsSession(
 }
 
 /**
- * 미장 '급등 종목' 카드 — 가장 최근 날짜의 까닭 목록, **오른 종목만** 오름폭 순.
+ * 미장 '급등 종목' 카드 — 가장 최근 날짜가 가리키는 미국장의 까닭 목록(같은 장을 가리키는 판은 합친다),
+ * **오른 종목만** 오름폭 순.
  *
  * ⛔ 파이프라인은 양방향을 만든다. 내린 종목의 까닭은 표에 남는다 — 지금은 읽는 화면이
  *    없지만(미국 종목엔 아직 실주소가 없다) 국내와 같은 규칙으로 둔다.
@@ -159,11 +176,25 @@ export const getUsMoveReasons = cache(async (): Promise<MaybeFailed<UsMoveReason
   if (!date || date < addDaysISO(base, -BOARD_MAX_DAYS)) return null;
   const stale = date < addDaysISO(base, -BOARD_STALE_DAYS);
 
+  /**
+   * ⭐ **같은 미국장을 가리키는 판을 합친다**(2026-09-27). 토·일·월 작성일은 셋 다 금요일 장을 가리킨다.
+   *
+   * 예전엔 가장 늦은 날짜의 판 하나만 읽었다. 주말엔 판이 안 생겨 월요일 판이 금요일 장을 맡았는데,
+   * PR #596 으로 토·일 저녁에도 판이 생기면서 **일요일 판이 금요일 장 직후의 토요일 판을 덮었다.**
+   * 09-27 실측: 토요일 판엔 블룸에너지 +8.27%(10채널)·델 +5.01%(6채널)가 있었는데 일요일 글엔 둘이
+   * 거의 안 나와 카드 1위가 퀄컴 +3.97% 가 됐다. 이유도 약해졌다 — 퀄컴이 토요일엔 실제 계기
+   * ("글로벌 특허 라이선스 계약 갱신으로 … 불확실성 해소")였는데 일요일엔 "AI 스마트폰 교체 수요" 같은 일반론이었다.
+   *
+   * 한 종목이 여러 판에 있으면 **장 마감에 가장 가까운(이른) 날짜** 의 줄을 쓴다(아래 dedupe). 합치는 창은
+   * 작성일 사흘 앞까지면 충분하다 — 토·일·월이 가장 긴 묶음이다.
+   */
+  const session = usSessionKey(date);
+  const sameSession = [0, 1, 2, 3].map((k) => addDaysISO(date, -k)).filter((d) => usSessionKey(d) === session);
   const { data, error } = await db
     .from("telegram_us_stock_move_reason")
     .select("date,ticker,reason,quoted_change_rate,mention_count,channel_count")
-    .eq("date", date)
-    .limit(BOARD_MAX);
+    .in("date", sameSession)
+    .limit(BOARD_MAX * sameSession.length);
   if (error) {
     console.error("[getUsMoveReasons] 까닭 목록을 못 읽었습니다", error);
     return LOAD_FAILED;
@@ -176,9 +207,16 @@ export const getUsMoveReasons = cache(async (): Promise<MaybeFailed<UsMoveReason
    * ⚠️ 미장은 하루 줄 수가 국내보다 적다(실측 09-08 총 17줄). 까닭 있는 오른 줄이 아홉에
    *    못 미치면 카드가 그만큼만 선다 — 빈 칸을 만드는 것보다 짧은 게 낫다.
    */
-  const rows = ((data ?? []) as UsReasonRow[])
+  const withReason = ((data ?? []) as UsReasonRow[])
     .map((r) => ({ ...r, reason: (r.reason ?? "").trim() }))
     .filter((r) => r.reason !== "");
+  // 종목마다 한 줄 — 이른 날짜 것(위 합치기 주석). 까닭 없는 줄을 먼저 걸렀으므로, 이른 판에 까닭이 없으면
+  // 늦은 판의 까닭이 올라온다. 채널 수는 더하지 않는다 — 같은 채널이 이틀에 걸쳐 두 번 세어진다.
+  const firstByTicker = new Map<string, (typeof withReason)[number]>();
+  for (const r of [...withReason].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))) {
+    if (!firstByTicker.has(r.ticker)) firstByTicker.set(r.ticker, r);
+  }
+  const rows = [...firstByTicker.values()];
   if (!rows.length) return { date, rows: [], stale };
 
   const names = await usNames(rows.map((r) => r.ticker));
@@ -193,7 +231,8 @@ export const getUsMoveReasons = cache(async (): Promise<MaybeFailed<UsMoveReason
   const out: UsMoveReasonRow[] = rows.map((r) => ({
     ticker: r.ticker,
     name: names.get(r.ticker) ?? r.ticker,
-    date,
+    // 줄 자신의 작성일이다(합친 판이면 판 날짜와 다를 수 있다). 세션 조회도 이 값으로 한다 — 같은 장이 나온다.
+    date: r.date,
     changeRate: null,
     sessionDate: null,
     closePrice: null,
@@ -217,11 +256,11 @@ export const getUsMoveReasons = cache(async (): Promise<MaybeFailed<UsMoveReason
     todo.forEach((r) => asked.add(r.ticker));
     await Promise.all(
       todo.map(async (r) => {
-        const session = await lastUsSession(r.ticker, date);
-        if (!session) return;
-        r.changeRate = session.rate;
-        r.sessionDate = session.sessionDate;
-        r.closePrice = session.close;
+        const bar = await lastUsSession(r.ticker, r.date);
+        if (!bar) return;
+        r.changeRate = bar.rate;
+        r.sessionDate = bar.sessionDate;
+        r.closePrice = bar.close;
       }),
     );
     return todo.length;
