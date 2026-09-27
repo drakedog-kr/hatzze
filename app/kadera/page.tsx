@@ -27,7 +27,7 @@ import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { AiMark, C, Icon, MONO } from "../ui";
 import { ExpandableList } from "./ExpandableList";
-import { Avatar, ChangeRate, DayBars, DeltaPp, Highlight, Pill, QuoteDate, RankBadge, RankDelta, Sparkline, highlightTerms, termsFor } from "./parts";
+import { Avatar, ChangeRate, DayBars, DeltaPp, Highlight, Pill, QuoteDate, RankBadge, RankDelta, SentimentTrendTile, Sparkline, highlightTerms, termsFor } from "./parts";
 import { fmtKoDate, stockHref } from "@/lib/stock-page";
 import { THEME_NAMES, themeHref } from "@/lib/theme-href";
 import { THEMES } from "@/lib/stock-themes";
@@ -73,12 +73,6 @@ function compact(n: number): string {
 
 /* 요약 글의 굵힘(highlightTerms)은 미장 히어로도 똑같이 쓴다. 한쪽만 고쳐져 두 화면의
    강조 규칙이 갈리지 않도록 ./parts 로 옮겼다 — 규칙과 함정은 그쪽 주석에. */
-
-function formatKR(n: number): string {
-  if (n >= 1e8) return `${(n / 1e8).toFixed(1).replace(/\.0$/, "")}억`;
-  if (n >= 1e4) return `${(n / 1e4).toFixed(1).replace(/\.0$/, "")}만`;
-  return n.toLocaleString("ko-KR");
-}
 
 /**
  * 그 종목의 MDD 정밀분석 주소. 이름은 MDD 페이지가 code 로 찾으므로 URL 엔 code·market
@@ -467,15 +461,13 @@ export default async function KaderaPage() {
     keywords.slice(0, 5).map((x) => x.word),
   );
 
-  /* 채널을 세는 세 줄은 전부 **지금 수집 중인 채널**을 센다(getTelegramSummary 주석).
-     목록에 있어도 peer 캐시가 없어 한 건도 안 걷히는 채널은 모니터링하고 있는 것이
-     아니다. 화면에 덧붙이는 표시는 없다 — 숫자 자체가 사실이면 설명할 것이 없다. */
-  const miniStats: { label: string; note?: string; value: string; unit: string; help?: string }[] = [
-    { label: "모니터링 채널", value: `${summary.channelCount}`, unit: "개" },
-    { label: "총 구독자", value: formatKR(summary.totalSubscribers).replace(/[만억]$/, ""), unit: formatKR(summary.totalSubscribers).slice(-1) },
-    { label: "활성 채널", note: "7일", value: `${summary.activeChannels}`, unit: "개", help: "최근 7일 안에 메시지를 올린 채널입니다." },
-    { label: "총 메시지", note: "7일", value: summary.messages7d.toLocaleString("ko-KR"), unit: "개" },
-  ];
+  /* 히어로의 현황 타일(모니터링 채널·총 구독자·활성 채널·총 메시지)은 전부 걷었다(2026-09-27).
+     그 자리는 센티먼트 추이가 다 쓴다 — 오른쪽 칸이 통째로 여론 이야기라 왼쪽 제목과 한 덩어리로 읽힌다.
+     - 메시지 수는 이미 히어로에 있다(센티먼트 캡션의 "최근 N일 · N건 분석").
+     - 채널 수는 채널을 세는 카드(채널 파워 랭킹) 머리로 옮겼다. 값은 **활성 채널**(최근 7일 안에
+       글을 올린 채널)이다 — 목록에 있어도 peer 캐시가 없어 한 건도 안 걷히는 채널은 모니터링하고
+       있는 것이 아니다(getTelegramSummary 주석). 옛 channelCount(320)는 이것과 거의 같은 말이었다.
+     - 총 구독자는 채널마다 구독자를 더한 값이라 여러 채널을 구독한 한 사람이 여러 번 세어졌다. */
 
   // ── 테마 로테이션 ──────────────────────────────────────────────────
   // 표는 **점유율 순위 그대로**(themes 가 이미 그 순서다) 순위 번호를 달아 나열한다 —
@@ -780,26 +772,8 @@ export default async function KaderaPage() {
             )}
           </div>
 
-          {/* ② 모니터링 현황 — 넷을 2×2 타일로. 숫자와 단위는 절대 안 쪼갠다(nowrap). */}
-          <div className="hz-tx-stats">
-            {miniStats.map((s) => (
-              <div key={s.label} className="hz-tx-stat">
-                <span className="hz-tx-stat-l">
-                  {s.label}
-                  {s.note && <span style={{ color: C.sub2, fontWeight: 500 }}>{s.note}</span>}
-                  {s.help && (
-                    <span className="hz-tip hz-tip-wide" data-tip={s.help} data-ga-tip={s.label} style={{ display: "inline-flex", cursor: "help", flexShrink: 0 }}>
-                      <Icon name="help" style={{ fontSize: "var(--fs-12)", color: C.muted }} />
-                    </span>
-                  )}
-                </span>
-                <strong className="hz-tx-stat-v">
-                  {s.value}
-                  <small>{s.unit}</small>
-                </strong>
-              </div>
-            ))}
-          </div>
+          {/* ② 센티먼트 추이 — 옛 현황 타일 자리를 다 쓴다. */}
+          <SentimentTrendTile points={sentimentFailed ? null : (sentiment?.trend ?? [])} />
 
           {/* ③ 미장으로 건너가는 통로는 **머리 오른쪽 도구**로 옮겼다(2026-09-22, AppShell 의 MarketSwap).
               히어로 안의 큰 단추보다 어느 화면에서나 같은 자리인 편이 낫다. */}
@@ -1408,7 +1382,10 @@ export default async function KaderaPage() {
             level={3}
             icon="military_tech"
             title="채널 파워 랭킹"
-            desc="조회율·확산력까지 반영한 채널 영향력"
+            /* 채널 수는 히어로에서 옮겨 왔다(위 '현황 타일' 주석). 0 이면 못 센 것이라 그 꼬리만 뺀다 —
+               "0곳"은 거짓이다. 꼬리 안 띄어쓰기는 줄바꿈 없는 공백(\u00a0)이다 — 폰(375)에서 "302곳"만
+               둘째 줄로 떨어졌다. 이제 접히면 "모니터링 채널 302곳"이 통째로 넘어간다. */
+            desc={`조회율·확산력까지 반영한 채널 영향력${summary.activeChannels > 0 ? ` · 모니터링\u00a0채널\u00a0${summary.activeChannels}곳` : ""}`}
             /* 채널 등록 신청을 머리 도구에서 여기로 내렸다(2026-09-22) — 채널을 세는 카드가 신청을 받는 자리이기도 하다.
                알약 꼴은 테마 로테이션 머리의 '테마 자세히 보기'와 같다(.hz-sheet-head-note hz-theme-headpill). */
             right={

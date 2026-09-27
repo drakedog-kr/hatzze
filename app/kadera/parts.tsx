@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { shortDate } from "@/lib/format";
+import { sentimentTone, shortDate } from "@/lib/format";
 
 import { C, MONO, R } from "../ui";
 
@@ -413,6 +413,125 @@ export function Sparkline({ data, width = 62, height = 26 }: { data: number[]; w
           }}
         />
       ))}
+    </div>
+  );
+}
+
+/** 낙관도 한 점의 색. 구간은 알약과 같다(sentimentTone). 낙관·비관은 알약 점과 같은 색이고,
+ *  중립만 알약의 --c-hint 대신 한 단 진한 회색이다 — 회색 타일 위에서 hint 점은 안 보인다. */
+const toneDot = (score: number) => {
+  const { tone } = sentimentTone(score);
+  return tone === "hot" ? "var(--c-warm-2)" : tone === "cold" ? "var(--c-blue-2)" : C.sub;
+};
+
+/**
+ * 히어로 센티먼트 칸 아래의 **낙관도 추이** 타일. 국장·미장 두 히어로가 같이 쓴다.
+ *
+ * 옛 현황 타일(2×2) 자리를 통째로 쓴다. 키도 그 2×2 와 같다(판 70px → 타일 137px) — 옆 칸이
+ * 커지면 브리핑 문단 아래가 그만큼 빈다(.hz-tx-hero-side 주석). 판 높이를 키울 땐 그 공백부터 볼 것.
+ *
+ * `points` 가 null 이면 조회 실패, 빈 배열이면 아직 기록이 없는 것이다 — 빈자리의 문구가 갈린다.
+ *
+ * 점은 날마다 **그날 큰 숫자가 보여 줬을 값**이다(sentimentTrend). 마지막 점이 바로 위 큰
+ * 숫자와 같아야 하므로 여기서 다시 셈하지 않는다.
+ *
+ * 그림:
+ * - 세로축은 0~100 이 아니라 30~80(값이 넘치면 그만큼 넓힌다). 0~100 이면 47~72 가 거의
+ *   평평한 선이 된다.
+ * - 60 위·40 아래를 옅게 칠한다. 알약이 '낙관 우세'·'비관 우세'를 가르는 바로 그 문턱이라,
+ *   선이 칠한 띠 안에 있으면 그날 알약이 그 말이었다는 뜻이 된다. 띠 이름은 오른쪽 여백에 —
+ *   선의 양 끝이 판 가장자리에 닿아 안에 적으면 끝점과 겹친다.
+ * - preserveAspectRatio="none" 이라 점(원)은 SVG 로 못 그린다(찌그러진다). 끝점·호버 점은 HTML 이다.
+ */
+export function SentimentTrendTile({ points }: { points: { date: string; score: number }[] | null }) {
+  const cap = (
+    <span className="hz-tx-stat-l">
+      센티먼트 추이
+      <span style={{ color: C.sub2, fontWeight: 500 }}>30일</span>
+    </span>
+  );
+  if (!points || points.length < 2) {
+    return (
+      <div className="hz-tx-stat hz-tx-trend">
+        {cap}
+        <p style={{ margin: 0, color: C.sub, fontSize: "var(--fs-12)" }}>
+          {points === null ? "추이를 불러오지 못했습니다." : "추이를 그릴 기록이 아직 없습니다."}
+        </p>
+      </div>
+    );
+  }
+
+  const H = 100;
+  const vals = points.map((p) => p.score);
+  const lo = Math.max(0, Math.min(30, Math.min(...vals) - 4));
+  const hi = Math.min(100, Math.max(80, Math.max(...vals) + 4));
+  const y = (v: number) => ((hi - v) / (hi - lo)) * H;
+  const x = (i: number) => (i / (points.length - 1)) * 100;
+  const line = points.map((p, i) => `${x(i)},${y(p.score)}`).join(" ");
+  const last = points[points.length - 1];
+  // 띠 이름의 세로 자리(%) — 각 띠의 가운데.
+  const hotMid = y((hi + 60) / 2);
+  const coldMid = y((40 + lo) / 2);
+
+  return (
+    <div className="hz-tx-stat hz-tx-trend">
+      {cap}
+      <div style={{ height: 70, display: "flex", gap: 6 }}>
+        <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
+          <svg
+            viewBox={`0 0 100 ${H}`}
+            preserveAspectRatio="none"
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "block", overflow: "visible" }}
+            aria-hidden
+          >
+            <rect x="0" y="0" width="100" height={y(60)} fill="var(--c-hot)" opacity={0.08} />
+            <rect x="0" y={y(40)} width="100" height={H - y(40)} fill="var(--c-blue)" opacity={0.08} />
+            <polyline points={line} fill="none" stroke={C.inkSoft} strokeWidth={1.5} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+          </svg>
+          {/* 끝점 — 기준일. 바로 위 큰 숫자가 이 점이다. */}
+          <span
+            style={{
+              position: "absolute",
+              left: "100%",
+              top: `${y(last.score)}%`,
+              width: 8,
+              height: 8,
+              borderRadius: 999,
+              border: "2px solid var(--tx-tile)",
+              background: toneDot(last.score),
+              transform: "translate(-50%, -50%)",
+              pointerEvents: "none",
+            }}
+          />
+          {/* 호버 크로스헤어 — 홈 AreaChart 와 같은 어법(칸 n 등분 · 선과 점은 --hz-x 자리). */}
+          <div style={{ position: "absolute", inset: 0, display: "flex" }}>
+            {points.map((p, i) => {
+              const at = i / (points.length - 1);
+              const edge = at < 0.25 ? " hz-tip-start" : at > 0.75 ? " hz-tip-end" : "";
+              return (
+                <div
+                  key={p.date}
+                  className={`hz-tip hz-vline${edge}`}
+                  data-tip={`${shortDate(p.date)} · 낙관 ${p.score}%`}
+                  style={{ flex: 1, position: "relative", ["--hz-x" as string]: `${at * 100}%` }}
+                >
+                  <span className="hz-vdot" style={{ top: `${y(p.score)}%`, background: toneDot(p.score), borderColor: "var(--tx-tile)" }} />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        {/* 띠 이름. 폭은 '낙관' 두 글자만큼 고정 — 줄마다 판의 오른끝이 같은 자리에 선다. */}
+        <div style={{ position: "relative", width: 24, flexShrink: 0, fontSize: "var(--fs-11)", fontWeight: 700, lineHeight: 1 }}>
+          <span style={{ position: "absolute", right: 0, top: `${hotMid}%`, transform: "translateY(-50%)", color: "var(--c-hot-ink)" }}>낙관</span>
+          <span style={{ position: "absolute", right: 0, top: `${coldMid}%`, transform: "translateY(-50%)", color: "var(--c-cold-ink)" }}>비관</span>
+        </div>
+      </div>
+      {/* 양 끝 날짜. 오른쪽 여백(띠 이름 24 + 틈 6)만큼 비워 판의 끝과 맞춘다. */}
+      <div style={{ display: "flex", justifyContent: "space-between", paddingRight: 30, fontFamily: MONO, fontSize: "var(--fs-11)", color: C.sub2 }}>
+        <span>{shortDate(points[0].date)}</span>
+        <span>{shortDate(last.date)}</span>
+      </div>
     </div>
   );
 }

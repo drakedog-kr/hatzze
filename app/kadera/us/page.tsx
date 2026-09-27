@@ -41,6 +41,7 @@ import {
   Highlight,
   RankBadge,
   RankDelta,
+  SentimentTrendTile,
   Sparkline,
   highlightTerms,
   termsFor,
@@ -468,36 +469,9 @@ export default async function UsKaderaPage() {
     keywords.slice(0, 5).map((x) => x.keyword),
   );
 
-  // 히어로 ① 의 네 줄. 국장의 miniStats 와 같은 얼개다 — 라벨·값·단위로 나눠 두면
-  // 값의 오른끝이 네 줄 모두 같은 자리에 선다.
-  const miniStats: {
-    label: string;
-    note?: string;
-    value: string;
-    unit: string;
-    help?: string;
-  }[] = [
-    { label: "모니터링 채널", value: `${summary.totalChannels}`, unit: "개" },
-    {
-      label: "미장 언급 채널",
-      note: "30일",
-      value: `${summary.usChannels}`,
-      unit: "개",
-      help: "최근 30일 안에 미장 종목을 한 번이라도 언급한 채널입니다. 제목에 '미국'이 없는 평범한 국내 채널이 대부분입니다.",
-    },
-    {
-      label: "미장 종목 언급",
-      note: `${US_WINDOW_DAYS}일`,
-      value: summary.mentions.toLocaleString("ko-KR"),
-      unit: "회",
-    },
-    {
-      label: "언급된 종목",
-      note: `${US_WINDOW_DAYS}일`,
-      value: `${summary.tickers}`,
-      unit: "개",
-    },
-  ];
+  // 히어로의 현황 타일 넷(모니터링 채널·미장 언급 채널·미장 종목 언급·언급된 종목)은 전부 걷었다
+  // (2026-09-27, 국장과 같이). 그 자리는 센티먼트 추이가 다 쓴다. 채널 규모는 '몇 곳이 말하나'
+  // 카드 아래 "모니터링 채널 N곳 중…"이 이미 말한다.
 
   return (
     // 뿌리의 hz-tx 가 이번 리디자인을 켠다(globals.css). 국장 카더라와 같은 스코프라
@@ -657,26 +631,8 @@ export default async function UsKaderaPage() {
             )}
           </div>
 
-          {/* ② 모니터링 현황 — 넷을 2×2 타일로. 숫자와 단위는 절대 안 쪼갠다(nowrap). */}
-          <div className="hz-tx-stats">
-            {miniStats.map((s) => (
-              <div key={s.label} className="hz-tx-stat">
-                <span className="hz-tx-stat-l">
-                  {s.label}
-                  {s.note && <span style={{ color: C.sub2, fontWeight: 500 }}>{s.note}</span>}
-                  {s.help && (
-                    <span className="hz-tip hz-tip-wide" data-tip={s.help} data-ga-tip={s.label} style={{ display: "inline-flex", cursor: "help", flexShrink: 0 }}>
-                      <Icon name="help" style={{ fontSize: "var(--fs-12)", color: C.muted }} />
-                    </span>
-                  )}
-                </span>
-                <strong className="hz-tx-stat-v">
-                  {s.value}
-                  <small>{s.unit}</small>
-                </strong>
-              </div>
-            ))}
-          </div>
+          {/* ② 센티먼트 추이 — 옛 현황 타일 자리를 다 쓴다(국장과 같은 판). */}
+          <SentimentTrendTile points={sentiment ? sentiment.trend : []} />
 
           {/* ③ 국장으로 건너가는 통로는 **머리 오른쪽 도구**로 옮겼다(2026-09-22, AppShell 의 MarketSwap). */}
         </aside>

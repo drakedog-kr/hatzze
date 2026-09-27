@@ -99,12 +99,8 @@ export default function Loading() {
         </div>
         <div className="hz-tx-hero-side">
           <Block h={214} r={16} />
-          <div className="hz-tx-stats">
-            <Block h={66} r={14} />
-            <Block h={66} r={14} />
-            <Block h={66} r={14} />
-            <Block h={66} r={14} />
-          </div>
+          {/* 센티먼트 추이 — 옛 현황 2×2 자리를 통째로 쓴다(실물 키 137). */}
+          <Block h={137} r={14} />
           {/* ⚠️ 여기 '미장 카더라 보기' 단추 자리(42×12)가 있었다. 2026-09-22 에 그 단추를 머리 도구로 옮겼는데
               자리표시자만 남아, 로딩 중에는 없는 단추의 빈 상자가 보였다. **실물에서 부품을 빼면 이 파일도 같이 본다.** */}
         </div>

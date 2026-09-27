@@ -29,6 +29,12 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 히어로에 없던 그래프가 새로 붙는다. Minor.
+    version: "1.22.0",
+    date: "2026-09-27",
+    changes: ["국장·미장 카더라 첫 화면에서 센티먼트 30일 추이를 봅니다."],
+  },
+  {
     // 미장 추출이 은행 이름을 세는 자리만 좁힐 뿐 쓰는 법은 그대로다. Patch.
     version: "1.21.11",
     date: "2026-09-27",
