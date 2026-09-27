@@ -32,8 +32,8 @@ SK하이닉스는 **하이퍼리퀴드에서 계속 거래된다.** 달러로 �
 
   · 전날 종가가 **직전 영업일 것이 아니면** 건너뛴다. 낡은 종가에 오늘 선물을 견주면
     프리미엄이 통째로 거짓이 된다 — 화면에는 그럴듯한 숫자로 보인다.
-  · 거래대금이 바닥인 시장은 **표시가가 값이 아니다**. `xyz:KRW` 는 미결제도 거래도 0 인데
-    표시가만 붙어 있다. 문턱을 두고 미달이면 그 종목만 뺀다.
+  · 거래가 없는 시장은 **표시가가 값이 아니다**. `xyz:KRW` 는 미결제도 거래도 0 인데
+    표시가만 붙어 있다. 거래대금이나 미결제가 0 이면 그 종목만 뺀다(tradeable).
 """
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.krx_client import krx_get  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
-from common.timeutil import KST, today_kst  # noqa: E402
+from common.timeutil import KST, krx_trading_days, today_kst  # noqa: E402
 
 INFO = "https://api.hyperliquid.xyz/info"
 
@@ -75,16 +75,19 @@ TARGETS = [
 #   현대차      131일  상관 0.941  방향 일치 89.3%  기울기 0.91
 #   코스피200    66일  상관 0.866  방향 일치 86.4%  기울기 0.62  ← 그래서 뺐다
 
-# 이 아래면 표시가를 값으로 안 본다. 24시간 거래대금(달러) 기준.
+# 이 아래면 **얇다고 로그에만** 남긴다(담기는 담는다). 24시간 거래대금(달러) 기준.
 # 실측(2026-09-03): SKHX 2.3억 · SMSN 4,300만 · EWY 2,600만 · KR200 55만 · KRW 0.
 #
-# ⭐ **100만 → 10만으로 내렸다**(2026-09-05 지시). 문턱이 막으려던 것은 `xyz:KRW` 처럼
-#    거래도 미결제도 **0** 인데 표시가만 붙어 있는 시장이다. 100만은 그 0 과 정상 사이를
-#    한참 위에서 갈랐다 — 현대차가 그날 73만으로 내려앉자 카드가 통째로 사라졌는데,
-#    73만은 거래가 없는 값이 아니다(미결제 4,419계약). 이틀 전만 해도 194만이었다.
-# ⚠️ 세 종목은 고정 목록이라 문턱에 걸리면 **카드가 말없이 없어진다**. 그래서 문턱은
-#    "얇다" 가 아니라 "값이 아니다" 를 가르는 자리에 둔다. 10만이면 0 인 시장만 걸린다.
-MIN_DAY_VOLUME_USD = 100_000
+# ⭐⭐ **문턱으로 빼지 않는다**(2026-09-28). 처음엔 100만, 09-05 에 10만으로 내렸는데 둘 다 같은 사고를 냈다 —
+#    문턱이 막으려던 것은 `xyz:KRW` 처럼 거래도 미결제도 **0** 인 시장인데, 현대차는 추석 연휴·주말에
+#    거래가 8.6만 → 3.3만 → 2.6만 달러로 얇아지자(미결제 약 5,000계약, 살아 있는 시장) 카드가 사흘 말없이
+#    사라졌다. 세 종목은 고정 목록이라 문턱에 걸리면 **카드가 통째로 없어진다.** 이제 0 인 시장만 뺀다
+#    (tradeable). 얇은 종목은 화면이 거래대금 순으로 세우므로 맨 뒤에 서고, 카드에 거래대금이 같이 찍힌다.
+THIN_DAY_VOLUME_USD = 100_000
+# 기준 종가가 오늘로부터 **KRX 개장일로 몇 날** 지났는지의 상한. 아침엔 직전 개장일치(1), 저녁엔 당일치(0)가 정상이다.
+# ⚠️ 달력 '나흘'로 재던 것을 바꿨다(2026-09-28) — 추석(09-24·25 휴장) 뒤 첫 아침은 09-23 종가가 달력으로 5일이라
+#    세 종목이 다 빠졌다. 개장일로 세면 1 이다(check_freshness 와 같은 셈).
+MAX_CLOSE_LAG = 1
 
 FX_TICKER = "KRW=X"  # 나머지 지표가 쓰는 것과 같은 원천(fetch_usdkrw_volatility.py)
 
@@ -213,6 +216,19 @@ def usdkrw() -> float:
     return float(s.iloc[-1])
 
 
+def tradeable(p: dict) -> bool:
+    """표시가를 값으로 볼 수 있나 — 거래대금과 미결제가 둘 다 0 보다 커야 한다(`xyz:KRW` 는 둘 다 0)."""
+    return p["vlm"] > 0 and p["oi"] > 0
+
+
+def close_lag(close_date: str, today) -> int:
+    """기준 종가 날짜 뒤로 오늘까지 지난 KRX 개장일 수. 당일치면 0, 직전 개장일치면 1."""
+    d = datetime.strptime(close_date, "%Y-%m-%d").date()
+    if d >= today:
+        return 0
+    return sum(1 for x in krx_trading_days(d, today) if x > d)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true", help="저장하지 않고 무엇이 나오는지만 찍는다")
@@ -263,18 +279,20 @@ def main() -> None:
         if p is None:
             print(f"[경고] {name}: {DEX}:{sym} 이 목록에 없습니다 — 건너뜁니다")
             continue
-        if p["vlm"] < MIN_DAY_VOLUME_USD:
-            print(f"[경고] {name}: 24시간 거래대금 ${p['vlm']:,.0f} 로 문턱 미달 — 건너뜁니다")
+        if not tradeable(p):
+            print(f"[경고] {name}: 거래대금 ${p['vlm']:,.0f} · 미결제 {p['oi']:,.0f} — 거래가 없는 시장이라 건너뜁니다")
             continue
+        if p["vlm"] < THIN_DAY_VOLUME_USD:
+            print(f"[안내] {name}: 24시간 거래대금 ${p['vlm']:,.0f} 로 얇습니다(미결제 {p['oi']:,.0f}) — 담습니다")
         if code not in base:
             print(f"[경고] {name}: 어느 원천에도 종가가 없습니다 — 건너뜁니다")
             continue
 
         prev, close_date = base[code]
-        # ⚠️ 종가가 너무 낡으면 담지 않는다. 연휴를 감안해 나흘까지만 본다.
-        gap_days = (today_kst() - datetime.strptime(close_date, "%Y-%m-%d").date()).days
-        if gap_days > 4:
-            print(f"[경고] {name}: 종가가 {close_date} 로 {gap_days}일 낡았습니다 — 건너뜁니다")
+        # ⚠️ 종가가 낡으면 담지 않는다. 낡음은 KRX 개장일로 센다(MAX_CLOSE_LAG 주석).
+        lag = close_lag(close_date, today_kst())
+        if lag > MAX_CLOSE_LAG:
+            print(f"[경고] {name}: 종가가 {close_date} 로 개장일 {lag}날 낡았습니다 — 건너뜁니다")
             continue
 
         krw = p["usd"] * fx
@@ -299,7 +317,7 @@ def main() -> None:
         print(
             f"   {name:10} ${p['usd']:>10,.2f} → {krw:>12,.0f}원   "
             f"전날 종가({close_date}) {prev:>10,.0f}원   {rows[-1]['diff_pct']:+.2f}%"
-            f"   거래대금 ${p['vlm']/1e6:,.0f}M"
+            f"   거래대금 ${p['vlm']/1e6:,.2f}M"
         )
 
     if not rows:
