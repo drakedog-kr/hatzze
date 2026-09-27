@@ -259,7 +259,7 @@ def mentionable(row: dict) -> bool:
 
     문턱이 걸린 지표는 raw 가 그 값을 넘을 때만 통과. raw 가 없으면(아직 안 채워짐)
     보수적으로 제외한다 — 문턱을 확인 못 한 채 올리는 것보다 낫다.
-    주인공을 연달아 맡아 오늘 쉬는 지표(rest, resting_spotlight)도 여기서 빠진다.
+    주인공을 자주 맡아 오늘 쉬는 지표(rest, resting_spotlights)도 여기서 빠진다.
     """
     if row.get("rest"):
         return False
@@ -270,15 +270,29 @@ def mentionable(row: dict) -> bool:
     return raw is not None and float(raw) >= gate
 
 
-# ① 주인공을 같은 지표가 며칠까지 연달아 맡나. 앞 날들이 전부 같은 지표였으면 오늘은 그 지표를
-# 쉬게 하고(mentionable → False) 다음으로 뜨거운 시장 지표가 맡는다. 다음 날은 다시 나올 수 있다.
+# ① 주인공 — 어느 SPOTLIGHT_WINDOW 날을 잘라 봐도 같은 지표는 SPOTLIGHT_MAX_IN_WINDOW 날까지.
+# 앞 (WINDOW−1) 날에 이미 MAX 번 나온 지표는 오늘 쉬고(mentionable → False) 다음으로 뜨거운
+# 시장 지표가 맡는다. 연속도 MAX 날을 못 넘는다.
 #
-# 2026-09-28 요청("같은 지표를 4일 연속 이상으로는 언급하지 않게, 최대 3일 연속"). 시장 지표 중
-# 옵션 풋/콜 비율이 늘 위에 있어 프로덕션 ① 이 09-11~17 7일 · 09-22~27 6일 연속 같은 지표였다
-# (07-17 이후 4일 넘게 이어진 구간 넷이 전부 9월).
-SPOTLIGHT_STREAK_MAX = 3
+# 시장 지표 중 옵션 풋/콜 비율이 늘 위에 있어 프로덕션 ① 이 09-11~17 7일 · 09-22~27 6일 연속
+# 같은 지표였다(2026-09-28 지적). 9월 기록에 규칙을 대 본 값(대신 나올 지표 자신의 제한은 뺀 어림):
+#     규칙 없음 풋/콜 17/27일 · 최장 7일 연속      연속 최대 3일   14/27 · 3일
+#     연속 최대 2일      12/27 · 2일 · 바뀐 날 7    5일 중 2일     9/27 · 2일 · 바뀐 날 11 ← 채택
+#     7일 중 2일          6/27 · 2일 · 바뀐 날 16(① 이 '가장 뜨거운 지표 풀이'라는 뜻이 흐려진다)
+# 연속만 막으면 풋/콜 둘 · 다른 지표 하나가 되풀이된다. 닷새 창은 대략 첫째 둘 · 둘째 둘 · 셋째 하나로 돈다.
+SPOTLIGHT_WINDOW = 5
+SPOTLIGHT_MAX_IN_WINDOW = 2
 # '가장 뜨거운 ○○' 처럼 1등이라 부르는 말. 더 뜨거운 시장 지표를 건너뛴 날엔 거짓이 된다.
 SUPERLATIVE_RE = re.compile(r"(?:가장|제일)\s*(?:뜨거|높)|1위")
+
+
+def name_forms(name: str) -> list[str]:
+    """문장에서 이 지표를 가리킬 수 있는 꼴 — 이름 그대로와, 끝의 괄호를 뗀 짧은 이름.
+
+    "VKOSPI (변동성지수)" 를 모델이 "VKOSPI" 로만 쓸 수 있다.
+    """
+    short = re.sub(r"\s*\([^)]*\)\s*$", "", name)
+    return [name] if short == name or not short else [name, short]
 
 
 def spotlight_name(line: str, names: list[str]) -> str | None:
@@ -286,28 +300,26 @@ def spotlight_name(line: str, names: list[str]) -> str | None:
 
     굵게 친 첫 곳이 지표 이름이면 그것(프로덕션 ① 은 늘 지표 이름 한 곳만 굵다, keep_bold),
     아니면 문장에 가장 먼저 나오는 지표 이름. 07-17 이후 73일 중 72일이 둘 다로 같은 답을
-    냈고, 어긋난 하루는 지금은 이름이 바뀐 옛 지표였다(못 찾으면 None — 연속으로 안 센다).
+    냈고, 어긋난 하루는 지금은 이름이 바뀐 옛 지표였다(못 찾으면 None — 세지 않는다).
     """
     m = re.search(r"\*\*(.+?)\*\*", line)
-    if m and m.group(1) in names:
-        return m.group(1)
-    found = [(line.find(n), -len(n), n) for n in names if n in line]
+    if m:
+        for n in names:
+            if m.group(1) in name_forms(n):
+                return n
+    found = [(line.find(f), -len(f), n) for n in names for f in name_forms(n) if f in line]
     return min(found)[2] if found else None
 
 
-def resting_spotlight(prev_lines: list[str], names: list[str]) -> str | None:
-    """앞 SPOTLIGHT_STREAK_MAX 날의 ① 이 전부 같은 지표면 그 이름 — 오늘은 그 지표가 쉰다.
+def resting_spotlights(prev_lines: list[str], names: list[str]) -> set[str]:
+    """앞 (SPOTLIGHT_WINDOW−1) 날의 ① 에 이미 SPOTLIGHT_MAX_IN_WINDOW 번 나온 지표들 — 오늘 쉰다.
 
     prev_lines 는 오늘보다 앞선 daily_score 행의 ① 문장, **최근 날부터**. 오늘 행의 문장은
     넣지 않는다(아침에 쓴 오늘 문장을 저녁 실행이 다시 쓸 때 제 자신과 겹쳐 세지 않게).
+    앞 날이 모자라도(행이 적은 초기) 있는 만큼으로 센다 — 그 안에서 이미 다 찼으면 창 안에서도 찼다.
     """
-    recent = prev_lines[:SPOTLIGHT_STREAK_MAX]
-    if len(recent) < SPOTLIGHT_STREAK_MAX:
-        return None
-    picked = {spotlight_name(line, names) for line in recent}
-    if len(picked) == 1 and None not in picked:
-        return picked.pop()
-    return None
+    picked = [spotlight_name(line, names) for line in prev_lines[: SPOTLIGHT_WINDOW - 1]]
+    return {n for n in set(picked) if n is not None and picked.count(n) >= SPOTLIGHT_MAX_IN_WINDOW}
 
 
 def skipped_hotter(rows: list[dict]) -> tuple[dict | None, int]:
@@ -326,7 +338,11 @@ def skipped_hotter(rows: list[dict]) -> tuple[dict | None, int]:
 def spotlight_problems(text: str, rows: list[dict]) -> list[str]:
     """① 문장이 표시 붙은 지표를 꺼냈거나, 건너뛴 날에 '가장 뜨거운'이라 불렀으면 그 자리."""
     plain = text.replace("**", "")
-    found = [f"쓰지 않을 지표 {r['name']}" for r in rows if not mentionable(r) and r["name"] in plain]
+    found = [
+        f"쓰지 않을 지표 {r['name']}"
+        for r in rows
+        if not mentionable(r) and any(f in plain for f in name_forms(r["name"]))
+    ]
     if skipped_hotter(rows)[0] is not None and SUPERLATIVE_RE.search(plain):
         found.append("'가장' 표현")
     return found
@@ -656,13 +672,15 @@ def main() -> None:
         .execute()
     )
 
-    # 앞 날들의 ① 주인공이 전부 같은 지표면 오늘은 그 지표를 쉬게 한다(resting_spotlight).
+    # 앞 날들의 ① 주인공으로 이미 자주 나온 지표는 오늘 쉬게 한다(resting_spotlights).
     names = [ind["name"] for ind in indicators.data]
-    resting = resting_spotlight(
+    resting = resting_spotlights(
         [(r.get("ai_summary") or "").split("\n")[0] for r in ds.data[1:]], names
     )
-    if resting:
-        print(f"[주인공] {resting} — 앞 {SPOTLIGHT_STREAK_MAX}일 연속 ① 이라 오늘은 쉽니다.")
+    for n in sorted(resting):
+        print(
+            f"[주인공] {n} — 앞 {SPOTLIGHT_WINDOW - 1}일 ① 에 {SPOTLIGHT_MAX_IN_WINDOW}번 이상 나와 오늘은 쉽니다."
+        )
 
     rows: list[dict] = []
     for ind in indicators.data:
@@ -691,7 +709,7 @@ def main() -> None:
                 # 모델이 방향을 거꾸로 읽는다(build_digest 주석 참고).
                 "slug": ind.get("slug"),
                 "raw": iv.data[0].get("raw_value"),
-                "rest": ind["name"] == resting,
+                "rest": ind["name"] in resting,
             }
         )
 

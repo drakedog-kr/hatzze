@@ -9,7 +9,7 @@ from generate_daily_summary import (
     balance_count_problems,
     balance_counts,
     keep_bold,
-    resting_spotlight,
+    resting_spotlights,
     skipped_hotter,
     spotlight_name,
     spotlight_problems,
@@ -84,7 +84,7 @@ def test_keep_bold(text, spans, want):
     assert keep_bold(text, spans) == want
 
 
-NAMES = ["옵션 풋/콜 비율", "금 대비 코스피 상대강도", "최근 한 달 매매 안전장치 동향", "버핏지수", "코스피 상승 속도"]
+NAMES = ["옵션 풋/콜 비율", "금 대비 코스피 상대강도", "최근 한 달 매매 안전장치 동향", "버핏지수", "VKOSPI (변동성지수)"]
 PUTCALL = "**옵션 풋/콜 비율**은 콜옵션이 풋옵션보다 많을수록 높아지며, 과열도 64%로 시장 지표 중 가장 높습니다."
 GOLD = "시장 지표 중 가장 뜨거운 **금 대비 코스피 상대강도**는 과열도 63%로 주식 쪽에 돈이 몰렸다는 뜻입니다."
 
@@ -94,15 +94,28 @@ def test_spotlight_name_prefers_bold_then_first_mention():
     # 굵게가 옛 이름이면 문장에 먼저 나오는 지금 이름으로
     assert spotlight_name("**깃헙 트레이딩봇 저장소 생성 수**와 금 대비 코스피 상대강도가 …", NAMES) == "금 대비 코스피 상대강도"
     assert spotlight_name("지표 이름이 없는 문장입니다.", NAMES) is None
+    # 괄호를 뗀 짧은 이름도 같은 지표다
+    assert spotlight_name("**VKOSPI**는 과열도 47%로 …", NAMES) == "VKOSPI (변동성지수)"
+    assert spotlight_name("변동성을 재는 VKOSPI가 …", NAMES) == "VKOSPI (변동성지수)"
+    # Opus 가 실제로 쓴 꼴(2026-09-28) — 괄호 앞 띄어쓰기가 없다
+    assert spotlight_name("**VKOSPI(변동성지수)**는 급락에 대비하는 …", NAMES) == "VKOSPI (변동성지수)"
 
 
-def test_rests_only_after_three_same_days():
-    # 최근 날부터
-    assert resting_spotlight([PUTCALL, PUTCALL, PUTCALL, GOLD], NAMES) == "옵션 풋/콜 비율"
-    assert resting_spotlight([PUTCALL, PUTCALL, GOLD, PUTCALL], NAMES) is None
-    assert resting_spotlight([GOLD, PUTCALL, PUTCALL, PUTCALL], NAMES) is None  # 쉰 다음 날은 다시 나온다
-    assert resting_spotlight([PUTCALL, PUTCALL], NAMES) is None  # 앞 날이 모자라면 안 센다
-    assert resting_spotlight(["", "", ""], NAMES) is None  # 요약이 비었던 날은 안 센다
+VIX = "**VKOSPI (변동성지수)**는 과열도 47%로 …"
+
+
+def test_rests_after_two_of_the_last_four_days():
+    # 최근 날부터. 앞 나흘에 두 번 나왔으면 오늘 쉰다 — 어느 닷새에도 이틀까지.
+    assert resting_spotlights([PUTCALL, PUTCALL, GOLD, VIX], NAMES) == {"옵션 풋/콜 비율"}
+    assert resting_spotlights([PUTCALL, GOLD, VIX, PUTCALL], NAMES) == {"옵션 풋/콜 비율"}
+    assert resting_spotlights([GOLD, VIX, PUTCALL, PUTCALL, PUTCALL], NAMES) == {"옵션 풋/콜 비율"}
+    # 다섯째 날 앞은 창 밖이다
+    assert resting_spotlights([GOLD, VIX, PUTCALL, VIX.replace("47", "45"), PUTCALL], NAMES) == {"VKOSPI (변동성지수)"}
+    # 두 지표가 함께 쉬는 날
+    assert resting_spotlights([GOLD, GOLD, PUTCALL, PUTCALL], NAMES) == {"옵션 풋/콜 비율", "금 대비 코스피 상대강도"}
+    assert resting_spotlights([PUTCALL, GOLD, VIX], NAMES) == set()
+    assert resting_spotlights([PUTCALL, PUTCALL], NAMES) == {"옵션 풋/콜 비율"}  # 행이 적어도 찬 건 찼다
+    assert resting_spotlights(["", "", "", ""], NAMES) == set()  # 요약이 비었던 날은 안 센다
 
 
 def _rows(rest_putcall=False):
@@ -129,3 +142,6 @@ def test_spotlight_problems():
     # 보통 날엔 '가장'이 맞는 말이다. 문턱에 걸린 버핏지수 이름만 잡는다.
     assert spotlight_problems(PUTCALL, _rows()) == []
     assert spotlight_problems("버핏지수도 높은 편입니다.", _rows()) == ["쓰지 않을 지표 버핏지수"]
+    # 쉬는 지표를 짧은 이름으로 꺼내도 잡는다
+    vix_rest = [{"name": "VKOSPI (변동성지수)", "category": "시장", "capped": 70.0, "slug": "v", "raw": 1, "rest": True}]
+    assert spotlight_problems("VKOSPI가 높습니다.", vix_rest) == ["쓰지 않을 지표 VKOSPI (변동성지수)"]
