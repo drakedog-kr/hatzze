@@ -145,6 +145,37 @@ def bare_ranking(text: str) -> bool:
     """이유 없는 순위 나열인가. 항목마다 서술이 붙어 있으면 아니다."""
     flat = " ".join((text or "").split())
     return bool(_RANK_HEAD.search(flat)) and not _ITEM_REASON.search(flat)
+
+
+# ── 리서치를 내는 은행: 은행이 '말한' 글과 은행이 '말해지는' 글 ───────────────────
+#
+# 미장 사전의 이 다섯은 상장사이면서 리서치 발행처다. 채널 글 대부분에서 은행은 **말하는
+# 쪽**이다 — `골드만삭스는 하이퍼스케일러 투자가 늘 것으로 전망`, `JP모건) 한미반도체; …`,
+# `SiTime(+9.1%) 모건스탠리가 비중확대로 커버리지 개시`, `골드만삭스 컨퍼런스에서 젠슨 황이`.
+# 종목 매칭은 맞지만 그 문장은 은행의 의견이지 은행 주가가 움직인 까닭이 아니다. 그런데 발췌가
+# 그것뿐이면 모델이 그중 가장 많이 나온 전망을 까닭으로 옮긴다. 2026-09-27 미장 카드 4위에
+# `골드만삭스 ▲1.32% · 하이퍼스케일러 AI 투자 확대 전망` 이 떴다(국장 증권사는 추출 단계의
+# 발행처 판정이 먼저 거른다. 미장 추출엔 그 판정이 없다).
+#
+# 수: 은행 이름 **바로 뒤에** 등락 표기가 붙은 글만 발췌에 넣는다(`JP모건(-1.71%)`,
+#     `골드만삭스 -3.96%`). 은행이 말해지는 대상일 때 쓰는 꼴이다. 발췌 창도 그 자리에 세운다
+#     — 한 글에 `JP모건의 보안 지출 전망에 센티넬원(+3.85%)` 과 `JP모건(-1.71%)` 이 같이 있으면
+#     첫 자리로 창을 세우는 기본 규칙은 앞의 전망을 보여 준다.
+# ⭐ 이름 **앞의** 표기는 은행 것으로 안 읽는다. 국장 수급 정리 채널의 `(+20.1%) 로보티즈` 꼴을
+#    읽으려 둔 규칙인데, 은행 이름 앞의 표기는 거의 늘 은행이 움직인 **남의 종목** 것이다
+#    (`GE Vernova(+4.8%) 모건스탠리 컨퍼런스에서`). 방향이 뜻을 가른다.
+# ⭐ 주가 얘기가 한 건도 없는 날은 주목도 후보에서 빼고 그 칸을 다음 종목에 준다.
+#
+# 실측(2026-09-05~26 · 은행 발췌 풀 728건, 복붙 제외):
+#   은행 이름 뒤 표기가 붙은 글 30건 · 이름 앞 표기 4건(넷 다 남의 종목 것)
+#   표에 저장된 은행 까닭 13줄 중 은행 리서치를 옮긴 8줄은 발췌가 전부 빠지고,
+#   은행 자신의 까닭 5줄(09-15·16·17·17·23)은 그날 표기 붙은 글이 1~14건씩 있어 남는다.
+#
+# ⚠️ 이 목록은 손으로 이은 것이지만 기준이 있다. 같은 기간 미장 사전 전체에서 이름 뒤에
+#    `은/는/이/가 … 전망·제시·상향·목표주가` 가 붙는 비율이 JPM 28 · BAC 27 · C 25 · GS 24 ·
+#    MS 22% 이고 그다음(시에나 13%)부터는 뚝 떨어진다. 시에나 쪽은 자기 가이던스와 남이 낸
+#    목표가라 말해지는 대상이다. 사전에 은행이 새로 들어오면 같은 비율을 재 볼 것.
+RESEARCH_HOUSES = frozenset({"JPM", "GS", "MS", "BAC", "C"})
 BATCH = 5             # 호출당 종목 수. 시스템 프롬프트 한 번에 다섯 종목을 읽힌다
 REASON_LEN = (12, 45)
 TEXT_CHUNK = 50       # `.in_()` 목록 길이(generate_telegram_narratives.TEXT_CHUNK 과 같은 이유)
@@ -177,48 +208,57 @@ _LIST_DOWN = re.compile(r"하락률|하락\s*종목|급락\s*종목|약세\s*종
 _SIGN = {"+": 1, "▲": 1, "△": 1, "↑": 1, "-": -1, "−": -1, "▼": -1, "▽": -1, "↓": -1}
 
 
-def quoted_move(text: str, needle: str) -> float | None:
-    """본문에서 needle(종목 표기) 바로 옆의 등락 표기를 읽는다. 없으면 None. 여럿이면 절댓값 최대."""
+def quoted_moves(text: str, needle: str, *, leading: bool = True) -> list[tuple[float, str]]:
+    """본문에서 needle(종목 표기) 바로 옆의 등락 표기를 전부 읽는다 → [(등락, 그 자리)].
+
+    '그 자리'는 이름과 표기를 이은 본문 조각이다(`JP모건(-1.71%)`). 발췌 창을 거기 세울 때 쓴다.
+    leading=False 면 이름 **앞**의 표기(`(+20.1%) 로보티즈` 꼴)는 안 읽는다(RESEARCH_HOUSES 주석).
+    """
     if not needle:
-        return None
+        return []
     flat = " ".join(text.split())
-    found: list[float] = []
+    found: list[tuple[float, str]] = []
     list_up, list_down = bool(_LIST_UP.search(flat)), bool(_LIST_DOWN.search(flat))
     flags = re.IGNORECASE if not re.search(r"[가-힣]", needle) else 0
     for m in re.finditer(re.escape(needle), flat, flags=flags):
-        after = flat[m.end() : m.end() + WINDOW_AFTER]
-        before = flat[max(0, m.start() - WINDOW_BEFORE) : m.start()]
-        if _LIMIT_UP.search(after):
-            found.append(30.0)
-        elif _LIMIT_DOWN.search(after):
-            found.append(-30.0)
+        a0, b0 = m.end(), max(0, m.start() - WINDOW_BEFORE)
+        after = flat[a0 : a0 + WINDOW_AFTER]
+        before = flat[b0 : m.start()]
+        if x := _LIMIT_UP.search(after):
+            found.append((30.0, flat[m.start() : a0 + x.end()]))
+        elif x := _LIMIT_DOWN.search(after):
+            found.append((-30.0, flat[m.start() : a0 + x.end()]))
         x = _AFTER_SIGNED.match(after)
         if x and not _YOY.match(after[x.end():]):
             v = float(x.group(2))
             if 0 < v <= 30:
-                found.append(_SIGN[x.group(1)] * v)
+                found.append((_SIGN[x.group(1)] * v, flat[m.start() : a0 + x.end()]))
             continue
         x = _AFTER_WORD.match(after)
         if x:
             v = float(x.group(1))
             tail = after[x.start(1):]
             if 0 < v <= 30:
-                found.append(v if any(w in tail for w in _UP_WORDS) else -v)
+                found.append((v if any(w in tail for w in _UP_WORDS) else -v, flat[m.start() : a0 + x.end()]))
             continue
-        x = _BEFORE_SIGNED.search(before)
+        x = _BEFORE_SIGNED.search(before) if leading else None
         if x:
             v = float(x.group(2))
             if 0 < v <= 30:
-                found.append(_SIGN[x.group(1)] * v)
+                found.append((_SIGN[x.group(1)] * v, flat[b0 + x.start() : m.end()]))
             continue
         x = _AFTER_BARE.match(after[:8 + 6])
         if x and (list_up or list_down) and not _YOY.match(after[x.end():]):
             v = float(x.group(1))
             if 0 < v <= 30:
-                found.append(v if list_up and not list_down else -v)
-    if not found:
-        return None
-    return max(found, key=abs)
+                found.append((v if list_up and not list_down else -v, flat[m.start() : a0 + x.end()]))
+    return found
+
+
+def quoted_move(text: str, needle: str, *, leading: bool = True) -> float | None:
+    """본문에서 needle(종목 표기) 바로 옆의 등락 표기를 읽는다. 없으면 None. 여럿이면 절댓값 최대."""
+    found = quoted_moves(text, needle, leading=leading)
+    return max((v for v, _spot in found), key=abs) if found else None
 
 
 # ── 프롬프트 ──────────────────────────────────────────────────────────────────
@@ -505,6 +545,7 @@ MARKETS = {
         "mentions": "telegram_message_us_stocks",
         "names": ("us_stocks", "ticker,name_ko", "ticker", "name_ko"),
         "fill_krx": False,
+        "research_houses": RESEARCH_HOUSES,
     },
 }
 
@@ -550,12 +591,14 @@ def run_market(db, client, cfg: dict, day: str, dry_run: bool) -> int:
     print(f"[{tag} {day}] 본문 받음 {len(rows):,}건 (후보 {len(by_code)}종목)")
 
     # 5) 채널 글의 등락 표기 → quoted, move_msgs
+    #    은행(RESEARCH_HOUSES)은 이름 앞의 표기를 안 읽는다 — 은행이 움직인 남의 종목 것이다.
+    houses = cfg.get("research_houses", frozenset())
     quoted: dict[str, float | None] = {}
     move_msgs: dict[str, int] = {}
     for code, lst in by_code.items():
         vals = []
         for mk, needle in lst:
-            v = quoted_move(msgs[mk].get("text") or "", needle)
+            v = quoted_move(msgs[mk].get("text") or "", needle, leading=code not in houses)
             if v is not None:
                 vals.append(v)
         quoted[code] = max(vals, key=abs) if vals else None
@@ -565,9 +608,10 @@ def run_market(db, client, cfg: dict, day: str, dry_run: bool) -> int:
         [c for c in by_code if quoted[c] is not None and abs(quoted[c]) >= QUOTED_MIN],
         key=lambda c: (-abs(quoted[c]), -(counts[c].get("channel_count") or 0)),
     )
+    # 주가 얘기가 한 건도 없는 은행은 아래 발췌가 비어 칸만 차지한다. 그 칸을 다음 종목에 준다.
     heavy = [
         c for c in sorted(by_code, key=lambda c: -float(counts[c].get("weighted_score") or 0))
-        if c not in moved
+        if c not in moved and (c not in houses or move_msgs[c])
     ][:HEAVY_N]
     min_quoted = cfg.get("min_quoted", 0)
     if len(moved) < min_quoted:
@@ -586,12 +630,14 @@ def run_market(db, client, cfg: dict, day: str, dry_run: bool) -> int:
     digests: list[tuple[str, str, str]] = []
     for code in targets:
         lst = by_code[code]
+        house = code in houses
 
         # 등락 표기가 붙은 글을 앞에, 그다음 조회수. 같은 본문(복붙)은 하나만.
         def rank(item):
             mk, needle = item
             m = msgs[mk]
-            return (0 if quoted_move(m.get("text") or "", needle) is not None else 1, -(m.get("views") or 0))
+            q = quoted_move(m.get("text") or "", needle, leading=not house)
+            return (0 if q is not None else 1, -(m.get("views") or 0))
 
         seen: set[str] = set()
         picked: list[tuple[dict, str]] = []
@@ -600,6 +646,12 @@ def run_market(db, client, cfg: dict, day: str, dry_run: bool) -> int:
             t = m.get("text") or ""
             if not t.strip() or bare_ranking(t):
                 continue
+            if house:
+                # 은행은 이름 뒤에 제 등락이 붙은 글만. 창도 그 자리에 세운다(RESEARCH_HOUSES 주석).
+                spots = quoted_moves(t, needle, leading=False)
+                if not spots:
+                    continue
+                needle = spots[0][1]
             k = re.sub(r"[^0-9A-Za-z가-힣]", "", t)[:80]
             if k in seen:
                 continue
