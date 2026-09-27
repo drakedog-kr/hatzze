@@ -277,7 +277,7 @@ export function wonOf(v: number | null, rate: number): string {
 /**
  * 금액 한 자리 — 달러와 원을 **둘 다 그려 두고** CSS 가 하나만 보여 준다.
  *
- * ⭐ 서학개미와 같은 수다(`app/seohak/money.tsx`). 이 화면의 줄도 거의 다 서버
+ * ⭐ 통화 스위치(AppShell)와 짝이다. 이 화면의 줄도 거의 다 서버
  * 컴포넌트라, 통화를 리액트 상태로 두면 그 전부를 클라이언트로 끌어와야 한다. 대신
  * 뿌리 요소의 `data-cur` 를 보고 globals.css 가 한쪽을 숨긴다 — 기본(속성 없음)이 원화다.
  *

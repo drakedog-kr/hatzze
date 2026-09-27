@@ -23,7 +23,7 @@ import { clearLoadFailure, noteLoadFailure } from "@/lib/load-state";
  *   - 조회 하나하나(URL·헤더가 키)가 따로 캐시돼 페이징(`offset`·`limit` 쿼리)도 안 섞이고,
  *   - 200 이 아닌 응답은 Next 가 애초에 안 담아 실패는 굳지 않으며,
  *   - 응답이 JSON 텍스트라 값의 꼴을 안 따진다.
- * 야후·FRED 조회가 이미 같은 방식이다(lib/yahoo-quote.ts · lib/seohak-external.ts).
+ * 야후·FRED 조회가 이미 같은 방식이다(lib/yahoo-quote.ts · lib/usd-krw.ts).
  *
  * ## 무엇이 달라지나
  *

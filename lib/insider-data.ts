@@ -35,7 +35,7 @@
 import { cache } from "react";
 
 import { getSupabaseAdmin } from "@/lib/supabase-server";
-import { getUsdKrw } from "@/lib/seohak-external";
+import { getUsdKrw } from "@/lib/usd-krw";
 import { LOAD_FAILED, type MaybeFailed, isLoadFailed } from "@/lib/load-state";
 import { fetchAllRows } from "@/lib/telegram-data";
 import { usQuotes } from "@/lib/us-telegram-data";

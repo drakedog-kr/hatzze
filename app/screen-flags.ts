@@ -29,7 +29,7 @@
  *   1. 아래 값을 true 로 바꾼다.
  *      ↳ 이것만으로 푸터 바로가기와 **소식 띠**가 함께 켜진다. 띠 문구는 정해 뒀다.
  *   2. `app/AppShell.tsx` 의 COMING_SOON 항목을 지우고 NAV 에 `{ href: "/preview", ... }` 를
- *      같은 자리(서학개미 다음)에 넣는다.
+ *      같은 자리에 넣는다.
  *   3. `app/releases.ts` 에 한 줄 올린다(화면이 하나 느는 것이라 Minor).
  *
  * ⛔ **여라는 말이 있기 전에는 바꾸지 말 것.** 화면이 다 만들어졌다는 것과 여는 것은
@@ -114,23 +114,3 @@ export const THEME_PUBLIC = true;
 export const THEME_NAV_NEW = true;
 // 화면 캐시를 비우고 데우는 자리는 손댈 것이 없다 — `scripts/revalidate.sh` 의 DEFAULT_WARM 에 /theme·/theme/us 가 이미 있고,
 // 파이프라인의 '테마 리포트 화면만 먼저 비우고 데우기' 스텝도 그대로다(안 연 동안은 404 라 아무 일이 없다).
-
-/**
- * 서학개미 장부(/seohak) — **끄는 스위치**(여는 스위치가 아니다). 2026-09-22: 테마 리포트를 머지하면서 이 화면은
- * 폐기하기로 했다. 일단 끈다 — 코드와 표는 남기고 화면·사이드바·푸터·사이트맵·수집 파이프라인만 멈춘다.
- *
- * false 면
- *   app/seohak/layout.tsx   배포에선 404(로컬은 그대로 보인다). ⚠️ page.tsx 가 아니라 레이아웃에서 막는다 — loading.tsx 때문에
- *                           page 에서 부르면 200 으로 굳는다(2026-09-23 소프트 404)
- *   app/seohak/page.tsx     noindex
- *   app/AppShell.tsx        사이드바 항목이 빠진다
- *   app/Footer.tsx          바로가기와 '해외투자' 출처 묶음이 빠진다(그 원천은 이 화면만 썼다)
- *   app/sitemap-urls.ts     사이트맵에서 빠진다
- *   scripts/check-routes.mjs 색인 목록 검사에서 예외
- *   scripts/revalidate.sh   데우는 목록에서 빠져 있다
- *   .github/workflows/daily-update.yml  수집 세 스텝(예탁원·ETF·TIC)과 전용 요약·알림을 뺐다(2026-09-26, 09-22 부터 if: false 로
- *                           꺼져 있던 것). 스크립트 fetch_seohak_*.py 와 표는 남아 있다.
- * 되살릴 일이 있으면 위 자리들을 되돌리고, 뺀 스텝은 지우기 전 yml 에서 가져온다
- * (`git log -S seohak_health -- .github/workflows/daily-update.yml` 이 그 커밋을 찾는다).
- */
-export const SEOHAK_PUBLIC = false;

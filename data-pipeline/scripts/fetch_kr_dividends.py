@@ -8,7 +8,7 @@
 
     https://apis.data.go.kr/1160100/GetStocDiviInfoService_V2/getDiviInfo_V2
 
-⚠️ 주소에 `/service/` 가 없고 끝에 `_V2` 가 붙는다 — fetch_seohak_settlement.py 와 같은 함정.
+⚠️ 주소에 `/service/` 가 없고 끝에 `_V2` 가 붙는다(같은 포털의 예탁원 결제 API 에서도 밟은 함정이다).
    `getDiviInfo`(V2 없이)는 NO_OPENAPI_SERVICE 를 낸다.
 
 ## ⚠️⚠️ 날짜별 증분이 아니라 **매일 스냅숏 하나**를 통째로 준다
@@ -258,7 +258,7 @@ def main() -> None:
     db = get_client()
 
     if not raw:
-        # "못 받았다"와 "표가 낡았다"는 다른 사건이다 — fetch_seohak_settlement.py 와 같은 잣대.
+        # "못 받았다"와 "표가 낡았다"는 다른 사건이다 — 잣대는 표의 최신 날짜다(fetch_seohak_etf.py 와 같다).
         newest = newest_snapshot(db)
         if newest is None:
             raise RuntimeError("배당 자료를 하나도 못 받았고 표도 비어 있다")

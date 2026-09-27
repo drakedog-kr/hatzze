@@ -39,12 +39,12 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     ...(await pageMetadata({ title: TITLE, description: DESCRIPTION, path: "/" })),
     metadataBase: new URL(SITE_URL),
-    // 뒤쪽 여섯은 브리핑 밖 화면들의 낱말이다. 앞의 아홉만 있을 때는 카더라·내부자·
-    // 서학개미가 한 번도 안 나와, 다섯 화면 중 하나만 신고하는 목록이었다.
+    // 뒤쪽 다섯은 브리핑 밖 화면들의 낱말이다. 앞의 아홉만 있을 때는 카더라·내부자가
+    // 한 번도 안 나와, 여러 화면 중 하나만 신고하는 목록이었다. ('서학개미'는 그 화면을 걷으며 뺐다.)
     // (구글은 2009년부터 이 메타를 랭킹에 쓰지 않는다. 네이버 쪽은 확인하지 않았다.)
     keywords: [
       "코스피 과열도", "시장 과열도", "버핏지수", "VKOSPI", "공포탐욕지수", "증시 심리", "코스피 지표", "hatzze", "햇쩨",
-      "카더라", "주식 텔레그램", "내부자 거래", "13F", "서학개미", "MDD",
+      "카더라", "주식 텔레그램", "내부자 거래", "13F", "MDD",
     ],
     verification: {
       ...(GOOGLE_VERIFICATION ? { google: GOOGLE_VERIFICATION } : {}),
@@ -119,7 +119,7 @@ const THEME_COLOR = { light: "#e8f0fa", dark: "#101013" } as const;
  * 같이 뒤집어야 한다.
  *
  * 통화(`hz-cur`)는 값이 **세 가지**다 — 없음(아직 안 고름) · krw · usd. "안 고름"이면
- * 속성을 안 붙여서 **화면이 자기 기본값을 쓴다**(서학개미는 원화, 내부자 리포트는 달러,
+ * 속성을 안 붙여서 **화면이 자기 기본값을 쓴다**(내부자 리포트는 달러,
  * mobile.css 의 `[data-cur-default]`). "안 고름"과 "원화 고름"을 반드시 갈라야 한다 —
  * 안 가르면 /insider 에서 ₩ 를 눌러도 다시 달러로 돌아간다.
  */

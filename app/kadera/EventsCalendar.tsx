@@ -38,8 +38,7 @@ function stockHrefOf(e: CalEvent): string {
   return e.market === "US" ? `/mdd?code=${e.code}&market=US` : `/stock/${e.code}`;
 }
 
-/** 요일 이름. **일요일이 첫 칸이다** — 서학개미 장부(app/seohak/CalendarHero.tsx)와 같은 차례라
- *  두 화면의 달력을 같은 눈으로 읽는다. 날짜 이름과 머리글이 같은 배열을 쓴다. */
+/** 요일 이름. **일요일이 첫 칸이다**(옛 서학개미 장부 달력과 같은 차례였다). 날짜 이름과 머리글이 같은 배열을 쓴다. */
 const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
 
 function addDays(iso: string, n: number): string {

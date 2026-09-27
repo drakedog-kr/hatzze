@@ -8,7 +8,7 @@ import { PageJsonLd } from "./JsonLd";
 import { NOTE_PAGE } from "./daily/copy";
 import { DIVIDEND_PAGE } from "./dividend/copy";
 import { KR_THEME_SHORT, THEME_PAGE, US_THEME_PAGE } from "./theme/copy";
-import { DAILY_PUBLIC, DIVIDEND_PUBLIC, SEOHAK_PUBLIC, THEME_NAV_NEW, THEME_PUBLIC } from "./screen-flags";
+import { DAILY_PUBLIC, DIVIDEND_PUBLIC, THEME_NAV_NEW, THEME_PUBLIC } from "./screen-flags";
 import { DOC_PAGES } from "./legal";
 import { THEME_NAMES, US_THEME_NAMES, themeHref, usThemeHref } from "@/lib/theme-href";
 import { ShellEnvContext, useShellEnv, type ShellEnv } from "./shell-env";
@@ -198,7 +198,7 @@ function UsEmpireIcon({ size = 20 }: { size?: number }) {
 // 서브(국장 → /kadera)에는 두지 않는다 — 부모가 이미 자기 문장을 갖고 있다.
 type NavChild = { label: string; href?: string; Glyph: Glyph; badge?: string; tip?: string; sub?: string; isNew?: boolean };
 
-// icon 은 Material Symbols 이름, Glyph 는 직접 그린 SVG 다(폰트에 없는 것 — 태극·성조·개미).
+// icon 은 Material Symbols 이름, Glyph 는 직접 그린 SVG 다(폰트에 없는 것 — 태극·성조).
 // 둘 중 하나만 있으면 된다. NavGlyph 가 Glyph 를 우선한다.
 type NavItem = {
   href: string;
@@ -276,32 +276,6 @@ function buildNav(themeNav: boolean): NavItem[] {
     //    (사이드바에 예고로 걸어 두고 만들었다). 2026-08-26 에 뗐다.
   },
   { href: "/mdd", label: "MDD 정밀분석", icon: "trending_down", sub: "고점에서 얼마나 내려왔고 언제 회복했을까" },
-  // ⚠️ **'준비 중' 배지를 단 채로 NAV 에 있다.** 화면은 다 만들어졌지만 아직 안 열었다.
-  // COMING_SOON 에 두면 본문 헤더(PageHeader)가 NAV 에서 경로를 못 찾아 **제목 칸을
-  // 통째로 비운다** — 그래서 이 화면만 제목도 부제도 없이 카드부터 시작했다.
-  // 열 때는 이 줄의 badge 만 지우면 된다.
-  // 서학개미 장부 — 2026-09-22 부터 꺼 두었다(폐기 예정, app/screen-flags.ts SEOHAK_PUBLIC). 항목은 남긴다.
-  ...(SEOHAK_PUBLIC
-    ? [
-      {
-        href: "/seohak",
-        // ⚠️ "서학개미 해부도" 였다(2026-08-27 개명). '해부'는 갈라서 안을 보여 준다는 약속인데,
-        //    정작 가르던 카드(종류별 구성 · 개인과 기관 · 시작 연도별 성과)는 근거가 틀려 다 뺐다.
-        //    남은 여섯 장은 언제 얼마가 나갔고 얼마나 머물렀고 지금 얼마가 됐나 하는 **기록**이라,
-        //    이름을 그쪽으로 옮겼다. 주소(/seohak)는 색인이 이미 끝나 있어 그대로 둔다.
-        label: "서학개미 장부",
-        Glyph: AntIcon,
-        // ⚠️ "한국인이…" 였다. 이 화면은 **개인**을 재는데 그 부제는 국민연금까지 포함한
-        // 전 국민을 가리켰다. 화면의 모집단이 부제와 갈리면 카드 숫자를 통째로 다르게 읽는다.
-        // ⚠️ 그다음엔 "얼마를 넣었고 지금 얼마가 됐나" 였는데, 그건 **카드 한 장**('원화로
-        // 보면')만 가리켰다. 화면이 자라면서 매매 습관·보유기간·가계 자리·ETF 까지 들어왔다.
-        // 두 축(어떻게 사고파나 · 그래서 얼마가 됐나)으로 줄여 적는다.
-        sub: "개인이 미국 주식을 어떻게 사고팔고 얼마가 됐나",
-        // ⚠️ `badge: "준비 중"` 이 여기 있었다. 이 줄을 지우는 것이 곧 **화면을 여는 것**이다
-        //    (사이드바에 예고로 걸어 두고 만들었다). 2026-08-19 에 뗐다.
-      },
-      ]
-    : []),
   // 2026-09-04 에 열었다. COMING_SOON 에서 옮겨 온 항목이다.
   //
   // 맨 아래에 두는 이유는 이 화면이 하루 중 07~09시에만 쓸모가 있어서다 — 종일 보는
@@ -412,8 +386,8 @@ const comingSoonFor = (env: ShellEnv): SoonItem[] => (env.themeNav ? COMING_SOON
 const NAV_GROUPS: { label: string; hrefs: string[] }[] = [
   { label: "오늘 시장", hrefs: ["/", "/preview", NOTE_PAGE.href] },
   { label: "시장 여론", hrefs: ["/kadera", THEME_PAGE.href] },
-  // 배당 → MDD → 내부자(2026-09-26). 서학개미 장부는 내려 둔 화면이라(SEOHAK_PUBLIC) 다시 열면 맨 끝에 선다.
-  { label: "분석과 기록", hrefs: [DIVIDEND_PAGE.href, "/mdd", "/insider", "/seohak"] },
+  // 배당 → MDD → 내부자(2026-09-26).
+  { label: "분석과 기록", hrefs: [DIVIDEND_PAGE.href, "/mdd", "/insider"] },
 ];
 
 type SidebarRow =
@@ -506,67 +480,6 @@ function NavGlyph({ item, size }: { item: { icon?: IconName; Glyph?: (p: { size?
   // 이름이 없으면 예전처럼 빈 아이콘 칸을 그대로 둔다(칸이 빠지면 gap 이 달라진다).
   if (!item.icon) return <span className="ms" style={{ fontSize: size }} />;
   return <Icon name={item.icon} style={{ fontSize: size }} />;
-}
-
-/**
- * 서학개미 아이콘. Material Symbols 에 개미가 없어서 직접 그렸다.
- *
- * 폰트를 먼저 뒤졌다: ant · insects · termite · bug 는 글리프 자체가 없어서 리거처가
- * 안 잡히고 "ANT" 같은 대문자 텍스트로 찍힌다. 실제로 있는 벌레는 pest_control 과
- * bug_report 둘뿐인데, 둘 다 몸통이 한 덩어리인 딱정벌레라 개미로 안 읽힌다.
- *
- * 어법은 브랜드 유령(Logo.tsx 의 GhostSymbol)을 따랐다 — 외곽선이 아니라 통으로 채운
- * 덩어리에 눈을 파낸다. 해부학적으로 정확한 개미(머리·가슴·배 3마디 + 다리 6개)를
- * 외곽선으로 그려도 봤는데, 이 아이콘이 실제로 쓰이는 16px 에서는 다리가 뭉개져
- * 그냥 얼룩이 된다. 덩어리는 작아져도 형태가 남는다.
- *
- * 눈은 흰 원이 아니라 fillRule="evenodd" 로 뚫은 구멍이다. 흰색으로 칠하면 다크모드
- * 카드(어두운 배경) 위에서 흰 점이 떠 버린다. 구멍이라야 배경을 안 가린다.
- *
- * 좌표는 받은 시안을 1200px 기준으로 재서 24 박스로 옮긴 값이다(배율 0.0505).
- * 그래서 눈 지름 대 몸통 높이(32%), 더듬이 굵기(1.52) 같은 비율이 시안 그대로다.
- * 별도 transform 없이 그림이 이미 박스에 맞다 — bbox 는 x 3.8~20.0, y 1.6~22.5 다.
- *
- * 더듬이 두 가닥은 몸통 '안'(y 12.5·12.2)에서 끝난다. 몸통 테두리에 딱 맞춰 끝내면
- * 둥근 캡이 실루엣 위로 튀어나와 이음매에 혹 두 개가 생긴다. 채움 안쪽으로 밀어 넣으면
- * 캡이 덮여서 시안처럼 한 덩어리로 이어진다. 몸통 오른쪽 위 모서리(19.73)는 더듬이
- * 바깥선(18.97 + 굵기 절반 0.76)과 같은 값이라 둘이 단차 없이 만난다.
- */
-/**
- * 자리보다 몇 배 크게/작게 그릴지. 여신상(LIBERTY_BLEED)과 같은 장치인데 **방향이 반대**다 —
- * 개미는 통으로 채운 덩어리라 같은 크기로 그리면 옆의 선 아이콘들보다 무겁게 보인다.
- * 넘거나 모자란 만큼은 마진으로 되메워 **줄에서 차지하는 자리는 size 그대로**다.
- */
-const ANT_SHRINK = 0.85;
-
-function AntIcon({ size = 16 }: { size?: number }) {
-  const draw = Math.round(size * ANT_SHRINK);
-  const pull = (draw - size) / 2;
-  return (
-    <svg
-      width={draw}
-      height={draw}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.52}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      style={{ display: "block", flexShrink: 0, margin: -pull }}
-    >
-      {/* 몸통 + 눈구멍(한 path 에 evenodd) */}
-      <path
-        fill="currentColor"
-        stroke="none"
-        fillRule="evenodd"
-        d="M19.73 10.4 C19.9 12 19.98 13.5 19.98 15 C19.98 19.2 16.3 22.46 11.9 22.46 C7.5 22.46 3.82 19.2 3.82 15.6 C3.82 12.2 7 9.84 11.2 9.84 C14.6 9.84 18.2 9.9 19.73 10.4 Z M10.03 13.52 a2.02 2.02 0 1 0 4.04 0 a2.02 2.02 0 1 0 -4.04 0 Z"
-      />
-      {/* 뒤로 쓸리는 더듬이 두 가닥 */}
-      <path d="M5.64 2.41 C9.8 1.55 14.8 2 17.2 4.3 C18.5 5.55 18.97 7.4 18.97 12.5" />
-      <path d="M6.09 5.14 C9.8 4.4 14 4.8 16 6.6 C16.9 7.4 17.15 8.6 17.15 12.2" />
-    </svg>
-  );
 }
 
 /**
@@ -1213,16 +1126,15 @@ function remember(name: string, value: string) {
 }
 
 /**
- * 통화 스위치 — **달러 금액을 내는 화면에서만** 뜬다(서학개미 장부 · 내부자 리포트).
+ * 통화 스위치 — **달러 금액을 내는 화면에서만** 뜬다(지금은 내부자 리포트 하나).
  *
- * 서학개미는 예탁원 결제(달러)와 KRX·한국은행(원)을 함께 다뤄서, 원천이 준 통화를
- * 그대로 내면 한 페이지에 두 통화가 섞인다. 내부자 리포트는 전부 달러라 한국 독자가
- * 크기를 가늠하기 어렵다. 둘 다 기본을 원화로 두고 이 스위치로 갈아 끼운다.
+ * 내부자 리포트는 전부 달러라 한국 독자가 크기를 가늠하기 어렵다. 원화를 얹어 두고
+ * 이 스위치로 갈아 끼운다. (처음엔 서학개미 장부가 같이 썼다. 그 화면은 2026-09-27 에 걷었다.)
  *
  * ## ⭐ 테마 토글과 같은 수다
  *
  * 뿌리 요소의 `data-cur` 하나를 바꾸면 globals.css 가 숨길 쪽을 고른다. 금액은 카드가
- * **두 벌 다 그려 놓았다**(`app/seohak/money.tsx`) — 그 화면의 카드가 거의 다 서버
+ * **두 벌 다 그려 놓았다**(`app/insider/parts.tsx` 의 `Money`) — 그 화면의 카드가 거의 다 서버
  * 컴포넌트라, 통화를 리액트 상태로 두면 그 전부를 클라이언트로 끌어와야 한다.
  *
  * ⚠️ 환율(FRED)을 못 받은 날에는 카드가 달러만 낸다(`Money` 가 그렇게 떨어진다).
@@ -1287,7 +1199,6 @@ function CurrencyToggle({ fallback }: { fallback: "krw" | "usd" }) {
  *    한다** — 갈리면 서버가 그린 화면과 스위치의 눌린 칸이 어긋난다.
  */
 const CURRENCY_PAGES: { prefix: string; fallback: "krw" | "usd" }[] = [
-  { prefix: "/seohak", fallback: "krw" },
   // 재료가 전부 미국 공시라 달러가 원본이고, 원화는 크기를 가늠하라고 얹은 것이다.
   { prefix: "/insider", fallback: "usd" },
 ];
