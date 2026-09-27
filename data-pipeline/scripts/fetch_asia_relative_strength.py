@@ -4,11 +4,19 @@ kospi_close_raw로 "아시아 3국 대비 코스피 상대강도"를 계산해 S
 각 지수(코스피 포함)마다 자기 자신의 거래일 기준으로 "최근 20거래일 수익률"을
 따로 계산한다 — 시장마다 휴장일이 달라서 "20일 전"을 달력일이 아니라 그 지수
 자체의 20번째 이전 거래일로 잡아야 정확하다(compute_20d_return). 그 다음
-날짜 문자열이 코스피·일본·홍콩·대만 4개 시계열 모두에 공통으로 존재하는
-날짜만 골라 아시아 3국 평균 수익률과 코스피 초과 수익률(코스피 - 아시아 평균)을
-계산한다. 이 교집합 방식 때문에 각국 휴장일이 겹치지 않는 날은 자연히
-제외된다(예: 한국은 개장, 일본은 공휴일인 날은 그날 값이 안 나옴) — 데이터
-품질을 위한 의도된 트레이드오프다.
+**코스피 거래일마다** 세 나라 각각의 "그날 이전 가장 최근 값"을 붙여(asof_value)
+아시아 3국 평균 수익률과 코스피 초과 수익률(코스피 - 아시아 평균)을 계산한다.
+
+⚠️ 처음엔 네 시계열의 **날짜 교집합**만 썼다. 그러면 한 나라만 쉬어도 그날 값이 비고,
+나라마다 휴장이 번갈아 겹치면 지표가 며칠씩 멈춘다. 2026-09 에 일본 연휴(09-21~23)와
+추석·대만 휴장이 이어져 09-18 값에 열흘 넘게 멈춰 있었고, 화면은 그 값을 오늘 값처럼
+보여 줬다. 지금은 코스피가 연 날이면 값이 나온다. 다른 나라 값을 앞 거래일에서 가져온
+날은 details.asof 에 그 날짜를 남긴다.
+
+가져오는 값은 MAX_ASOF_DAYS(달력일) 안으로 제한한다. 2015~2026 야후 종가에서 잰 시장별
+최장 휴장이 대만 13일(2023 설) · 일본 11일(2019 골든위크) · 홍콩 6일이라 14일이면 휴장은
+다 덮고, 그보다 길게 비면 수집이 죽은 것이니 값을 만들지 않는다(그러면 check_freshness 가
+기본 허용치로 잡는다).
 
 kospi_close_raw가 가진 1년치 범위 안에서 계산 가능한 구간(각 시계열의 최초
 20거래일 이후부터)을 매 실행마다 전부 다시 upsert한다 — raw_value는 동일하지만
@@ -20,6 +28,7 @@ normalized_score는 payload에 없어 보존되고, yfinance 조회는 어차피
 from __future__ import annotations
 
 import sys
+from bisect import bisect_right
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -38,6 +47,8 @@ TICKERS = {
 }
 RETURN_WINDOW = 20  # 최근 20거래일 수익률
 BACKFILL_DAYS = 365
+# 다른 나라 값을 앞 거래일에서 가져올 수 있는 최대 간격(달력일). 머리말 참고.
+MAX_ASOF_DAYS = 14
 
 KOSPI_RAW_SLUG = "kospi_close_raw"
 
@@ -102,6 +113,44 @@ def compute_20d_return(prices: dict[str, float]) -> dict[str, float]:
     return result
 
 
+def asof_value(returns: dict[str, float], d: str) -> tuple[str, float] | None:
+    """returns 에서 d 이하의 가장 최근 날짜와 값. 없거나 MAX_ASOF_DAYS 보다 오래되면 None."""
+    dates = sorted(returns)
+    i = bisect_right(dates, d)
+    if i == 0:
+        return None
+    found = dates[i - 1]
+    if (date.fromisoformat(d) - date.fromisoformat(found)).days > MAX_ASOF_DAYS:
+        return None
+    return found, returns[found]
+
+
+def build_rows(
+    kospi_returns: dict[str, float], asia_returns: dict[str, dict[str, float]]
+) -> list[dict]:
+    """코스피 거래일마다 한 행. 세 나라 중 하나라도 값을 못 붙이면 그날은 뺀다.
+
+    반환: [{date, raw_value, details}] — details 는 카드가 그리는 네 나라 20일 수익률과,
+    앞 거래일 값을 가져온 나라가 있으면 asof({키: 날짜}).
+    """
+    keys = {"^N225": "nikkei", "^HSI": "hangseng", "^TWII": "taiex"}
+    rows = []
+    for d in sorted(kospi_returns):
+        picked = {t: asof_value(asia_returns.get(t, {}), d) for t in keys}
+        if any(v is None for v in picked.values()):
+            continue
+        asia_avg = sum(v[1] for v in picked.values()) / len(keys)
+        details: dict = {"kospi": round(kospi_returns[d], 2)}
+        details.update({keys[t]: round(v[1], 2) for t, v in picked.items()})
+        carried = {keys[t]: v[0] for t, v in picked.items() if v[0] != d}
+        if carried:
+            details["asof"] = carried
+        rows.append(
+            {"date": d, "raw_value": round(kospi_returns[d] - asia_avg, 2), "details": details}
+        )
+    return rows
+
+
 def main() -> None:
     client = get_client()
     indicator_id = ensure_indicator(client, INDICATOR_META)
@@ -122,63 +171,36 @@ def main() -> None:
         print(f"[yfinance] {name}({ticker}) 종가 {len(prices)}건 → 20일 수익률 {len(returns)}건")
         asia_returns[ticker] = returns
 
-    common_dates = (
-        set(kospi_returns)
-        & set(asia_returns["^N225"])
-        & set(asia_returns["^HSI"])
-        & set(asia_returns["^TWII"])
-    )
-    if not common_dates:
-        print(f"[{INDICATOR_SLUG}] 4개 시계열의 공통 날짜가 없습니다")
+    built = build_rows(kospi_returns, asia_returns)
+    if not built:
+        print(f"[{INDICATOR_SLUG}] 계산할 수 있는 코스피 거래일이 없습니다")
         return
 
-    def relative_strength(d: str) -> float:
-        asia_avg = (
-            asia_returns["^N225"][d] + asia_returns["^HSI"][d] + asia_returns["^TWII"][d]
-        ) / 3
-        return kospi_returns[d] - asia_avg
-
-    def details_for(d: str) -> dict:
-        # 카드가 목업 원본대로 4개국 상대 막대를 그릴 수 있도록 각국 20일 수익률을
-        # details(JSONB)에 함께 저장한다(코스피=100 기준 상대지수는 프론트에서 계산).
-        return {
-            "kospi": round(kospi_returns[d], 2),
-            "nikkei": round(asia_returns["^N225"][d], 2),
-            "hangseng": round(asia_returns["^HSI"][d], 2),
-            "taiex": round(asia_returns["^TWII"][d], 2),
-        }
-
-    # 공통 날짜 전체를 매 실행마다 다시 upsert한다 — raw_value는 동일하지만 카드용
+    # 계산 가능한 날 전체를 매 실행마다 다시 upsert한다 — raw_value는 동일하지만 카드용
     # 세부값(각국 수익률)을 details에 채워 넣기 위해서다. normalized_score는 payload에
     # 없어 보존되고, yfinance 조회는 어차피 매 실행마다 하므로 추가 비용은 없다.
-    rows = [
-        {
-            "indicator_id": indicator_id,
-            "date": d,
-            "raw_value": round(relative_strength(d), 2),
-            "details": details_for(d),
-        }
-        for d in sorted(common_dates)
-    ]
+    rows = [{"indicator_id": indicator_id, **r} for r in built]
     client.table("indicator_values").upsert(
         rows, on_conflict="indicator_id,date"
     ).execute()
-    print(f"[Supabase] indicator_values upsert 완료: {len(rows)}건 (details 포함)")
-
-    latest_date = max(common_dates)
-    latest_asia_avg = (
-        asia_returns["^N225"][latest_date]
-        + asia_returns["^HSI"][latest_date]
-        + asia_returns["^TWII"][latest_date]
-    ) / 3
+    carried_days = sum(1 for r in built if "asof" in r["details"])
     print(
-        f"[{INDICATOR_SLUG}] 최신값 ({latest_date} 기준): "
-        f"코스피 20일 수익률 {kospi_returns[latest_date]:.2f}%, "
-        f"아시아 3국 평균 {latest_asia_avg:.2f}% "
-        f"(일본 {asia_returns['^N225'][latest_date]:.2f}%, "
-        f"홍콩 {asia_returns['^HSI'][latest_date]:.2f}%, "
-        f"대만 {asia_returns['^TWII'][latest_date]:.2f}%), "
-        f"초과 수익률 {relative_strength(latest_date):.2f}%p"
+        f"[Supabase] indicator_values upsert 완료: {len(rows)}건 (details 포함 · "
+        f"다른 나라 값을 앞 거래일에서 가져온 날 {carried_days}건)"
+    )
+
+    latest = built[-1]
+    dt = latest["details"]
+    asia_avg = (dt["nikkei"] + dt["hangseng"] + dt["taiex"]) / 3
+    note = ""
+    if "asof" in dt:
+        note = " · 앞 거래일 값: " + ", ".join(f"{k} {v}" for k, v in dt["asof"].items())
+    print(
+        f"[{INDICATOR_SLUG}] 최신값 ({latest['date']} 기준): "
+        f"코스피 20일 수익률 {dt['kospi']:.2f}%, "
+        f"아시아 3국 평균 {asia_avg:.2f}% "
+        f"(일본 {dt['nikkei']:.2f}%, 홍콩 {dt['hangseng']:.2f}%, 대만 {dt['taiex']:.2f}%), "
+        f"초과 수익률 {latest['raw_value']:.2f}%p{note}"
     )
 
 
