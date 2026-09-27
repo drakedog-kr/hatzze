@@ -1476,8 +1476,6 @@
 .dv-cal-cell:not(.dv-cal-on) .dv-cal-add { display: inline-flex; height: 18px; margin-top: 2px; align-items: center; color: var(--c-blue); opacity: 0.8; }
 .dv-cal-cell:hover .dv-cal-add, .dv-cal-cell[aria-pressed="true"] .dv-cal-add { opacity: 1; }
 
-.dv-note { margin: -6px 0 0; padding: 0 4px; font-size: var(--fs-12); line-height: 1.55; color: var(--c-sub); word-break: keep-all; }
-
 /* 바스켓 투자금 — 세 시트가 함께 쓰는 슬라이더 한 줄. */
 .dv-amount { padding: 18px 26px 16px; }
 .dv-amount-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
