@@ -112,6 +112,10 @@ const nextConfig: NextConfig = {
         "/daily/opengraph-image",
         "/preview/opengraph-image",
         "/changelog/opengraph-image",
+        // 테마 목록 둘과 테마 42장(2026-09-27). `:theme` 한 칸이 `/theme/us/opengraph-image` 도 잡는다.
+        "/theme/opengraph-image",
+        "/theme/:theme/opengraph-image",
+        "/theme/us/:theme/opengraph-image",
       ].map((source) => ({ source, headers: [noindex] })),
     ];
   },
