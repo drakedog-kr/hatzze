@@ -216,6 +216,27 @@ BALANCE_LEN = (80, 100)
 #    62자(37~90), Opus 는 83~87자. 72 로 걸었을 땐 다시 쓴 문장이 65~71자로 상한에 붙었다.
 TREND_LEN = (55, 66)
 HERO_RETRIES = 2
+# facts 대조에 걸렸을 때 다시 쓰기 문구(뒤에 " **{how}**으로 다시 쓰세요."가 붙는다).
+# 틀린 숫자·이름은 되풀이하지 않는다(적어 주면 그걸 다시 쓴다). 맞는 자리만 다시 가리킨다.
+BALANCE_FACTS_NOTE = (
+    "방금 쓴 문장의 개수가 자료의 [갈림] 줄과 다릅니다. 개수는 [갈림] 줄에 적힌 것만 그대로 쓰고, 같은 뜻으로"
+)
+# 건너뛴 날에만 SPOTLIGHT_SYSTEM 끝에 붙는다. 프롬프트가 '과열도가 가장 높은(가장 뜨거운) 지표를
+# 골라'라고 하니 모델은 고른 지표를 그대로 "시장 지표 중 가장 뜨거운 ○○"라 부른다. 표시에 걸린
+# 더 뜨거운 지표를 건너뛴 날엔 거짓이다.
+# ⚠️ 자료에 사실 한 줄("표시 없는 시장 지표 중 가장 높은 것은 ○○이고 전체로는 2번째")로는 안 됐다
+#    (2026-09-28 Opus 11회 첫 시도 11회 전부 "가장 뜨거운"). 다시 쓰기 문구로 지시하니 11회 모두
+#    고쳤다 — 같은 말을 처음부터 준다.
+SPOTLIGHT_SKIP_NOTE = """
+
+[오늘 주의] '← 이 지표는 문장에 쓰지 마세요' 표시가 붙은 시장 지표가 표시 없는 시장 지표보다
+더 뜨겁습니다. 표시 없는 시장 지표 중 과열도가 가장 높은 것을 고르되, 그 지표를 '가장 뜨거운'·
+'가장 높은'이라고 부르지 마세요."""
+SPOTLIGHT_FACTS_NOTE = (
+    "방금 쓴 문장이 자료와 어긋납니다. '← 이 지표는 문장에 쓰지 마세요' 표시가 붙은 지표는 이름도 쓰지 말고, "
+    "표시가 없는 시장 지표 중 과열도가 가장 높은 것을 고르세요. 그보다 뜨거운 지표가 표시에 걸려 빠졌다면 "
+    "고른 지표를 '가장 뜨거운'·'가장 높은'이라고 부르지 마세요."
+)
 
 # 요약에서 **아예 언급하지 않을** 지표 — slug → 다시 풀리는 raw_value 하한.
 #
@@ -238,12 +259,77 @@ def mentionable(row: dict) -> bool:
 
     문턱이 걸린 지표는 raw 가 그 값을 넘을 때만 통과. raw 가 없으면(아직 안 채워짐)
     보수적으로 제외한다 — 문턱을 확인 못 한 채 올리는 것보다 낫다.
+    주인공을 연달아 맡아 오늘 쉬는 지표(rest, resting_spotlight)도 여기서 빠진다.
     """
+    if row.get("rest"):
+        return False
     gate = MENTION_RAW_GATES.get(row.get("slug") or "")
     if gate is None:
         return True
     raw = row.get("raw")
     return raw is not None and float(raw) >= gate
+
+
+# ① 주인공을 같은 지표가 며칠까지 연달아 맡나. 앞 날들이 전부 같은 지표였으면 오늘은 그 지표를
+# 쉬게 하고(mentionable → False) 다음으로 뜨거운 시장 지표가 맡는다. 다음 날은 다시 나올 수 있다.
+#
+# 2026-09-28 요청("같은 지표를 4일 연속 이상으로는 언급하지 않게, 최대 3일 연속"). 시장 지표 중
+# 옵션 풋/콜 비율이 늘 위에 있어 프로덕션 ① 이 09-11~17 7일 · 09-22~27 6일 연속 같은 지표였다
+# (07-17 이후 4일 넘게 이어진 구간 넷이 전부 9월).
+SPOTLIGHT_STREAK_MAX = 3
+# '가장 뜨거운 ○○' 처럼 1등이라 부르는 말. 더 뜨거운 시장 지표를 건너뛴 날엔 거짓이 된다.
+SUPERLATIVE_RE = re.compile(r"(?:가장|제일)\s*(?:뜨거|높)|1위")
+
+
+def spotlight_name(line: str, names: list[str]) -> str | None:
+    """① 문장이 주인공으로 다룬 지표 이름.
+
+    굵게 친 첫 곳이 지표 이름이면 그것(프로덕션 ① 은 늘 지표 이름 한 곳만 굵다, keep_bold),
+    아니면 문장에 가장 먼저 나오는 지표 이름. 07-17 이후 73일 중 72일이 둘 다로 같은 답을
+    냈고, 어긋난 하루는 지금은 이름이 바뀐 옛 지표였다(못 찾으면 None — 연속으로 안 센다).
+    """
+    m = re.search(r"\*\*(.+?)\*\*", line)
+    if m and m.group(1) in names:
+        return m.group(1)
+    found = [(line.find(n), -len(n), n) for n in names if n in line]
+    return min(found)[2] if found else None
+
+
+def resting_spotlight(prev_lines: list[str], names: list[str]) -> str | None:
+    """앞 SPOTLIGHT_STREAK_MAX 날의 ① 이 전부 같은 지표면 그 이름 — 오늘은 그 지표가 쉰다.
+
+    prev_lines 는 오늘보다 앞선 daily_score 행의 ① 문장, **최근 날부터**. 오늘 행의 문장은
+    넣지 않는다(아침에 쓴 오늘 문장을 저녁 실행이 다시 쓸 때 제 자신과 겹쳐 세지 않게).
+    """
+    recent = prev_lines[:SPOTLIGHT_STREAK_MAX]
+    if len(recent) < SPOTLIGHT_STREAK_MAX:
+        return None
+    picked = {spotlight_name(line, names) for line in recent}
+    if len(picked) == 1 and None not in picked:
+        return picked.pop()
+    return None
+
+
+def skipped_hotter(rows: list[dict]) -> tuple[dict | None, int]:
+    """표시(mentionable)에 걸려 건너뛴 시장 지표 중 **후보 1등보다 뜨거운** 것이 있나.
+
+    있으면 (후보 1등, 그 지표의 시장 지표 전체 순위)를, 없으면 (None, 0)을 돌려준다. 그런 날엔
+    후보 1등을 '가장 뜨거운'이라 부르면 거짓이다. rows 는 과열도 내림차순.
+    """
+    market = [r for r in rows if r["category"] == SPOTLIGHT_CATEGORY]
+    pick = next((r for r in market if mentionable(r)), None)
+    if pick is None or market[0] is pick or market[0]["capped"] <= pick["capped"]:
+        return None, 0
+    return pick, market.index(pick) + 1
+
+
+def spotlight_problems(text: str, rows: list[dict]) -> list[str]:
+    """① 문장이 표시 붙은 지표를 꺼냈거나, 건너뛴 날에 '가장 뜨거운'이라 불렀으면 그 자리."""
+    plain = text.replace("**", "")
+    found = [f"쓰지 않을 지표 {r['name']}" for r in rows if not mentionable(r) and r["name"] in plain]
+    if skipped_hotter(rows)[0] is not None and SUPERLATIVE_RE.search(plain):
+        found.append("'가장' 표현")
+    return found
 
 
 def normalize_category(raw: str | None) -> str:
@@ -544,7 +630,7 @@ def main() -> None:
     # 최신 날짜 기준으로 맞춘다). 최근 8일을 받아 3번째 문단(추세)용 궤적을 만든다.
     ds = (
         client.table("daily_score")
-        .select("date, score, stage")
+        .select("date, score, stage, ai_summary")
         .order("date", desc=True)
         .limit(8)
         .execute()
@@ -569,6 +655,14 @@ def main() -> None:
         .order("created_at", desc=False)
         .execute()
     )
+
+    # 앞 날들의 ① 주인공이 전부 같은 지표면 오늘은 그 지표를 쉬게 한다(resting_spotlight).
+    names = [ind["name"] for ind in indicators.data]
+    resting = resting_spotlight(
+        [(r.get("ai_summary") or "").split("\n")[0] for r in ds.data[1:]], names
+    )
+    if resting:
+        print(f"[주인공] {resting} — 앞 {SPOTLIGHT_STREAK_MAX}일 연속 ① 이라 오늘은 쉽니다.")
 
     rows: list[dict] = []
     for ind in indicators.data:
@@ -597,6 +691,7 @@ def main() -> None:
                 # 모델이 방향을 거꾸로 읽는다(build_digest 주석 참고).
                 "slug": ind.get("slug"),
                 "raw": iv.data[0].get("raw_value"),
+                "rest": ind["name"] == resting,
             }
         )
 
@@ -632,6 +727,7 @@ def main() -> None:
         source: str | None = None,
         how: str = "한 문장",
         facts: Callable[[str], list[str]] | None = None,
+        facts_note: str = BALANCE_FACTS_NOTE,
     ) -> str:
         """한 문장 — 길이가 목표를 벗어나면 다시 쓰게 한다.
 
@@ -639,8 +735,9 @@ def main() -> None:
         안의 첫 번째를, 없으면 한가운데에 가장 가까운 걸 고른다. **빈 문장은 절대 안 낸다** —
         요약이 통째로 저장되지 않는 것보다 길이가 몇 자 어긋나는 게 낫다.
 
-        facts 는 문단별 사실 대조(갈림 문단의 개수, balance_count_problems). 어긋난 자리를
-        돌려주면 그 문장을 버리고 다시 쓰게 하고, 고를 때도 어긋난 후보는 뒤로 민다.
+        facts 는 문단별 사실 대조(갈림 문단의 개수 balance_count_problems · 주인공 문단의
+        쉬는 지표·'가장' 표현 spotlight_problems). 어긋난 자리를 돌려주면 그 문장을 버리고
+        facts_note 로 다시 쓰게 하고, 고를 때도 어긋난 후보는 뒤로 민다.
         """
         lo, hi = length
         # 문단마다 모델에게 준 자료가 다르다(갈림 문단은 ℃ 블록이 빠진다). 오타 검사의
@@ -661,12 +758,8 @@ def main() -> None:
                 retry = system + f"\n\n[다시 쓰기] 방금 쓴 문장에 깨진 글자나 오타가 있습니다. 같은 뜻으로 **{how}**으로 다시 쓰세요."
             elif off:
                 # 틀린 숫자는 되풀이하지 않는다(적어 주면 그 숫자를 다시 쓴다). 맞는 줄만 다시 가리킨다.
-                print(f"[WARNING] 개수가 자료와 달라 다시 씁니다({' · '.join(off)}): {cur[:40]}…")
-                retry = (
-                    system
-                    + f"\n\n[다시 쓰기] 방금 쓴 문장의 개수가 자료의 [갈림] 줄과 다릅니다. 개수는 [갈림] 줄에 적힌 "
-                    f"것만 그대로 쓰고, 같은 뜻으로 **{how}**으로 다시 쓰세요."
-                )
+                print(f"[WARNING] 자료와 어긋나 다시 씁니다({' · '.join(off)}): {cur[:40]}…")
+                retry = system + f"\n\n[다시 쓰기] {facts_note} **{how}**으로 다시 쓰세요."
             else:
                 need = "늘려" if len(cur) < lo else "줄여"
                 retry = (
@@ -677,7 +770,7 @@ def main() -> None:
                 )
             candidates.append(one_sentence(retry, src))
         # 깨진 후보는 길이가 맞아도 안 쓴다 — 길이는 어긋나도 읽히지만 깨진 글자는 못 읽는다.
-        # 개수가 어긋난 후보도 같은 취급이다. 다만 전부 어긋나면 그중에서 고른다(빈 문장보다 낫다).
+        # 자료와 어긋난 후보도 같은 취급이다. 다만 전부 어긋나면 그중에서 고른다(빈 문장보다 낫다).
         usable = (
             [t for t in candidates if t.strip() and is_clean(t, src) and not wrong(t)]
             or [t for t in candidates if t.strip() and is_clean(t, src)]
@@ -690,8 +783,22 @@ def main() -> None:
             return in_goal[0]
         return min(usable, key=lambda t: abs(len(t) - (lo + hi) / 2))
 
+    # 표시에 걸려 건너뛴 **더 뜨거운** 시장 지표가 있는 날엔 ① 프롬프트 끝에 주의 한 줄을 붙인다
+    # (SPOTLIGHT_SKIP_NOTE 주석). 보통 날엔 프롬프트가 그대로다.
+    spot_system = SPOTLIGHT_SYSTEM
+    pick, rank = skipped_hotter(rows)
+    if pick is not None:
+        spot_system = SPOTLIGHT_SYSTEM + SPOTLIGHT_SKIP_NOTE
+        print(f"[주인공] 더 뜨거운 시장 지표를 건너뜀 — 후보 1등 {pick['name']}(시장 {rank}번째)")
+
     # 주인공 문장과 추세 문장을 따로 생성해 문단 수를 항상 정확히 2로 고정한다.
-    spotlight = sized_sentence(SPOTLIGHT_SYSTEM, SPOTLIGHT_LEN)
+    spotlight = sized_sentence(
+        spot_system,
+        SPOTLIGHT_LEN,
+        None,
+        facts=lambda t: spotlight_problems(t, rows),
+        facts_note=SPOTLIGHT_FACTS_NOTE,
+    )
     # 갈림 문단만 두 문장을 허용한다 — 80자를 한 문장에 넣으면 만연체가 되고, '한 문장만' 이라
     # 다시 시키면 모델이 근거를 버리고 60자대로 되돌아간다(2026-09-06 실측 4/4).
     hot, top = balance_counts(rows)
