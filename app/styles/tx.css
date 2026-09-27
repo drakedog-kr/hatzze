@@ -1669,3 +1669,61 @@
   .dv-tcost-open, .dv-table-clear { padding-block: 4px; margin-block: -4px; }
   .dv-tsort { padding-top: 5px; padding-bottom: 5px; }
 }
+
+/* ── 햇쩨 지수 칸 = 큰 숫자 + 지표 분포 목록 + 온도 띠(시장 브리핑, 2026-09-28) ──
+   옛 두 칸(햇쩨 지수 · 지표 분포)을 하나로 합쳤다. 분포의 호버 자리는 어느 후보든 .hz-dist-row 라
+   팝오버(위로 열림)·띠 강조(:has .hz-dist-seg)가 그대로 든다. 음수 마진(줄 배경 번짐)은 여기선 걷는다. */
+/* 핀: 머리(속 빈 원 9px) + 대(2px). 대가 띠(12~21px)를 세로로 가로지른다 — 옛 칸의 인라인 핀과 같은 치수. */
+.hz-tx-pin {
+  position: absolute;
+  top: 0;
+  width: 9px;
+  height: 25px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.hz-tx-pin::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 8px;
+  width: 2px;
+  height: 17px;
+  transform: translateX(-50%);
+  border-radius: 1px;
+  background: var(--c-ink);
+  box-shadow: 0 0 0 2px var(--tx-tile);
+}
+.hz-tx-pin::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 9px;
+  height: 9px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid var(--c-ink);
+  background: var(--tx-tile);
+}
+/* 큰 숫자 오른쪽의 세로 목록(뜨거운 구간부터). 줄은 .hz-dist-row 라 호버·초점에 지표 목록이 열린다. */
+.hz-vlist { display: flex; flex-direction: column; width: 128px; flex-shrink: 0; }
+.hz-vlist > .hz-dist-row {
+  margin: 0;
+  padding: 1px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+/* 폰(≤560)에서는 누르는 줄이 40px 이상이라(layout.css '손가락으로 누르는 줄') 넉 줄이 160px 로 부푼다.
+   두 줄 두 칸(2×2)으로 접어 84px 로 — 큰 숫자 옆 자리는 그대로다. */
+@media (max-width: 560px) {
+  .hz-vlist {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    width: 176px;
+  }
+  .hz-vlist > .hz-dist-row { padding: 1px 6px; gap: 6px; }
+  .hz-vlist-more { display: none; }
+}

@@ -1,4 +1,4 @@
-import { getKospiCloseSeries, getLatestDailyScore, getPublicIndicators, getTopStockHighGaps } from "@/lib/data";
+import { SCORE_TREND_DAYS, getKospiCloseSeries, getLatestDailyScore, getPublicIndicators, getScoreHistory, getTopStockHighGaps } from "@/lib/data";
 import { assertLoaded, isLoadFailed } from "@/lib/load-state";
 import { SectionIntro } from "./SectionIntro";
 import type { IndicatorCategory } from "@/lib/data";
@@ -45,12 +45,14 @@ const FALLBACK_ICONS: Record<string, IconName> = {
 };
 
 export default async function Home() {
-  const [dailyScore, indicators, rawTopGaps, rawKospiPath] = await Promise.all([
+  const [dailyScore, indicators, rawTopGaps, rawKospiPath, rawScoreTrend] = await Promise.all([
     getLatestDailyScore(),
     getPublicIndicators(),
     getTopStockHighGaps(3),
     // 상승 속도 카드의 60일 궤적. 내부용 지표라 getPublicIndicators 에 안 잡힌다.
     getKospiCloseSeries(61),
+    // 히어로의 햇쩨 지수 추이(최근 SCORE_TREND_DAYS 일).
+    getScoreHistory(),
   ]);
 
   /* 조회 실패를 "자료 없음" 과 가른다(lib/load-state.ts). 두 값 다 카드의 **곁가지**라,
@@ -61,7 +63,7 @@ export default async function Home() {
   // 실패한 조회가 있으면 던진다 — 사본(ISR)에 실패한 화면을 담지 않는다(lib/load-state.ts).
   // 아래의 "실패했다는 사실을 카드에 남기는" 길은 그래서 실제로는 안 탄다. 남겨 두는 건
   // 던지지 않기로 되돌릴 때 그대로 살아나게 하려는 것이다.
-  assertLoaded("/", { topGaps: rawTopGaps, kospiPath: rawKospiPath });
+  assertLoaded("/", { topGaps: rawTopGaps, kospiPath: rawKospiPath, scoreTrend: rawScoreTrend });
   const topGapsFailed = isLoadFailed(rawTopGaps);
   const topGaps = topGapsFailed ? [] : rawTopGaps;
   const kospiPathFailed = isLoadFailed(rawKospiPath);
@@ -112,6 +114,8 @@ export default async function Home() {
                 socialHits={countHits("감성")}
                 bandCounts={bandCounts}
                 bandTotal={bandTotal}
+                trend={isLoadFailed(rawScoreTrend) ? null : rawScoreTrend}
+                trendDays={SCORE_TREND_DAYS}
               />
             ) : (
               <section style={{ background: C.card, borderRadius: 16, padding: 44, textAlign: "center", color: C.sub }}>
