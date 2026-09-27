@@ -9,7 +9,7 @@
 "**애플**리케이션"이 애플로 잡혔다. `boundary_ok` 가 앞 글자(한글/영숫자/한자)를 보는
 이유가 정확히 그것이다. URL 마스킹·긴이름 우선·대소문자 규칙도 같은 이유로 재사용한다.
 
-## 국내와 다르게 하는 것 셋
+## 국내와 다르게 하는 것 넷
 
 1. **사전이 DB 가 아니라 config 에서 온다.** 국내는 KRX API 가 종목명을 주지만
    미국은 한글 표기를 주는 원천이 없다. `config/us_stock_extraction.py` 가 원본이고,
@@ -23,7 +23,12 @@
    제품명·기술명으로도 쓰이는 것들이다: RTX+숫자=GPU · ARM+아키텍처 · 구글+플레이.
    국내의 '동음이의'(결 ③)와 같은 부류라 이름을 죽이지 않고 자리를 본다.
 
-국내에만 있는 규칙(compound_key·publisher_context·modifier_context·우선주)은 안 쓴다.
+4. **리서치를 내는 은행은 '주식으로 다뤄진' 자리만 센다**(RESEARCH_HOUSES · treated_as_stock).
+   골드만삭스·JP모건·모건스탠리·뱅크오브아메리카·씨티그룹은 거의 늘 전망을 **말하는 쪽**으로
+   나온다. 국내의 publisher_context 와 같은 문제인데, 치우침이 훨씬 커서 빼는 쪽이 아니라
+   인정하는 쪽으로 가른다(근거는 config 주석).
+
+국내에만 있는 나머지 규칙(compound_key·modifier_context·우선주)은 안 쓴다.
 전부 한국 상장사 이름의 생김새에서 나온 규칙이라 미국 종목엔 걸릴 자리가 없다.
 
 실행:
@@ -44,10 +49,12 @@ from urllib.request import Request, urlopen
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from common.quoted_move import own_move_after  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from config.us_stock_extraction import (  # noqa: E402
     NAME_EXCLUDE,
     NEGATIVE_CONTEXT,
+    RESEARCH_HOUSES,
     US_NAMES,
     primary_names,
     sanity_check,
@@ -62,6 +69,25 @@ from extract_telegram_stocks import (  # noqa: E402
 )
 
 NEG_RE = {name: re.compile(pat) for name, pat in NEGATIVE_CONTEXT.items()}
+
+
+def treated_as_stock(text: str, end: int, ticker: str) -> bool:
+    """은행(RESEARCH_HOUSES) 이름 한 자리가 그 회사를 **주식·회사로** 다룬 자리인가.
+
+    셋 중 하나면 인정한다(config.RESEARCH_HOUSES 주석의 실측):
+      이름 바로 뒤에 제 등락 표기  `JP모건(-1.71%)` · `골드만삭스 9% 급등`
+      이름 뒤에 `주가`             `뱅크오브아메리카 주가 급락 과도` · `골드만삭스의 주가는`
+      뉴스 목록 머리 `(티커) —`    `• 골드만삭스 (GS) — ETF 운용사 NEOS 를 인수하기로 합의`
+    나머지 자리(`골드만삭스는 … 전망`, `JP모건) 한미반도체;`, `주관사는 모건스탠리`)는 은행이
+    말하는 쪽이거나 거래의 역할이라 그 은행 주식 언급이 아니다.
+    """
+    if own_move_after(text, end):
+        return True
+    head = text[end : end + 24]
+    return bool(
+        re.match(r"\s*\(\s*" + re.escape(ticker) + r"\s*\)\s*[—–-]", head)
+        or re.match(r"\s*(?:\([^()\n]{0,12}\)\s*)?(?:의\s*)?주가(?!지수)", head)
+    )
 
 
 def build_dictionary() -> dict[str, str]:
@@ -92,6 +118,10 @@ def extract(text: str, pattern, match_to_ticker: dict[str, str], caseless: dict[
         if neg and neg.match(text, m.end()):
             continue
         ticker = match_to_ticker[key]
+        # 리서치를 내는 은행은 주식으로 다뤄진 자리만 센다. 한 글에 발행처 자리와 주가 자리가
+        # 같이 나오는 일이 흔해(`… 골드만삭스는 전망 … 골드만삭스(-3.96%)`) 자리마다 따로 본다.
+        if ticker in RESEARCH_HOUSES and not treated_as_stock(text, m.end(), ticker):
+            continue
         found.setdefault(ticker, matched)
     return found
 

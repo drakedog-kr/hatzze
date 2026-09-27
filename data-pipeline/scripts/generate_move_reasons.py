@@ -47,6 +47,8 @@ from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.prompt_style import PLAIN_PROSE_RULE_SHORT  # noqa: E402
+# 등락 표기 읽기는 미장 추출(은행 이름 판정)과 같은 잣대라 common 에 둔다.
+from common.quoted_move import quoted_move, quoted_moves  # noqa: E402
 from common.supabase_client import (  # noqa: E402
     get_client,
     load_all,
@@ -56,6 +58,7 @@ from common.supabase_client import (  # noqa: E402
 )
 from common.text_check import problems  # noqa: E402
 from common.timeutil import KST, today_kst  # noqa: E402
+from config.us_stock_extraction import RESEARCH_HOUSES  # noqa: E402
 
 import generate_telegram_narratives as KR  # noqa: E402
 
@@ -147,119 +150,21 @@ def bare_ranking(text: str) -> bool:
     return bool(_RANK_HEAD.search(flat)) and not _ITEM_REASON.search(flat)
 
 
-# ── 리서치를 내는 은행: 은행이 '말한' 글과 은행이 '말해지는' 글 ───────────────────
+# ── 리서치를 내는 은행(config.us_stock_extraction.RESEARCH_HOUSES) ──────────────────
 #
-# 미장 사전의 이 다섯은 상장사이면서 리서치 발행처다. 채널 글 대부분에서 은행은 **말하는
-# 쪽**이다 — `골드만삭스는 하이퍼스케일러 투자가 늘 것으로 전망`, `JP모건) 한미반도체; …`,
-# `SiTime(+9.1%) 모건스탠리가 비중확대로 커버리지 개시`, `골드만삭스 컨퍼런스에서 젠슨 황이`.
-# 종목 매칭은 맞지만 그 문장은 은행의 의견이지 은행 주가가 움직인 까닭이 아니다. 그런데 발췌가
-# 그것뿐이면 모델이 그중 가장 많이 나온 전망을 까닭으로 옮긴다. 2026-09-27 미장 카드 4위에
-# `골드만삭스 ▲1.32% · 하이퍼스케일러 AI 투자 확대 전망` 이 떴다(국장 증권사는 추출 단계의
-# 발행처 판정이 먼저 거른다. 미장 추출엔 그 판정이 없다).
+# 미장 추출이 이 다섯의 태그를 '주식으로 다뤄진' 글에만 붙인다. 여기서는 한 겹 더 좁혀서,
+# 은행 이름 **바로 뒤에** 제 등락이 붙은 글(`JP모건(-1.71%)`)만 발췌에 넣고 창도 그 자리에 세운다.
+# 한 글에 `JP모건의 보안 지출 전망에 센티넬원(+3.85%)` 과 `JP모건(-1.71%)` 이 같이 있으면 첫 자리로
+# 창을 세우는 기본 규칙은 앞의 전망을 보여 준다. 이름 **앞**의 표기(`SiTime(+9.1%) 모건스탠리가`)는
+# 은행이 움직인 남의 종목 것이라 안 읽는다. 주가 얘기가 없는 날은 주목도 후보에서도 뺀다.
 #
-# 수: 은행 이름 **바로 뒤에** 등락 표기가 붙은 글만 발췌에 넣는다(`JP모건(-1.71%)`,
-#     `골드만삭스 -3.96%`). 은행이 말해지는 대상일 때 쓰는 꼴이다. 발췌 창도 그 자리에 세운다
-#     — 한 글에 `JP모건의 보안 지출 전망에 센티넬원(+3.85%)` 과 `JP모건(-1.71%)` 이 같이 있으면
-#     첫 자리로 창을 세우는 기본 규칙은 앞의 전망을 보여 준다.
-# ⭐ 이름 **앞의** 표기는 은행 것으로 안 읽는다. 국장 수급 정리 채널의 `(+20.1%) 로보티즈` 꼴을
-#    읽으려 둔 규칙인데, 은행 이름 앞의 표기는 거의 늘 은행이 움직인 **남의 종목** 것이다
-#    (`GE Vernova(+4.8%) 모건스탠리 컨퍼런스에서`). 방향이 뜻을 가른다.
-# ⭐ 주가 얘기가 한 건도 없는 날은 주목도 후보에서 빼고 그 칸을 다음 종목에 준다.
-#
-# 실측(2026-09-05~26 · 은행 발췌 풀 728건, 복붙 제외):
-#   은행 이름 뒤 표기가 붙은 글 30건 · 이름 앞 표기 4건(넷 다 남의 종목 것)
-#   표에 저장된 은행 까닭 13줄 중 은행 리서치를 옮긴 8줄은 발췌가 전부 빠지고,
-#   은행 자신의 까닭 5줄(09-15·16·17·17·23)은 그날 표기 붙은 글이 1~14건씩 있어 남는다.
-#
-# ⚠️ 이 목록은 손으로 이은 것이지만 기준이 있다. 같은 기간 미장 사전 전체에서 이름 뒤에
-#    `은/는/이/가 … 전망·제시·상향·목표주가` 가 붙는 비율이 JPM 28 · BAC 27 · C 25 · GS 24 ·
-#    MS 22% 이고 그다음(시에나 13%)부터는 뚝 떨어진다. 시에나 쪽은 자기 가이던스와 남이 낸
-#    목표가라 말해지는 대상이다. 사전에 은행이 새로 들어오면 같은 비율을 재 볼 것.
-RESEARCH_HOUSES = frozenset({"JPM", "GS", "MS", "BAC", "C"})
+# 실측(2026-09-05~26 · 은행 발췌 풀 728건): 이름 뒤 표기 30건 · 이름 앞 표기 4건(넷 다 남의 종목 것).
+# 표에 저장된 은행 까닭 13줄 중 리서치를 옮긴 8줄은 발췌가 전부 빠지고 은행 자신의 5줄은 남는다.
+
 BATCH = 5             # 호출당 종목 수. 시스템 프롬프트 한 번에 다섯 종목을 읽힌다
 REASON_LEN = (12, 45)
 TEXT_CHUNK = 50       # `.in_()` 목록 길이(generate_telegram_narratives.TEXT_CHUNK 과 같은 이유)
 KRX_FILL_DAYS = 7     # 며칠 전 행까지 KRX 확정값을 채워 보나
-
-# ── 채널 글의 등락 표기 ────────────────────────────────────────────────────────
-#
-# 종목명 **바로 옆**에 붙은 등락만 읽는다. 처음엔 앞 40자·뒤 70자 창을 봤는데, 그 창에
-# 이웃 종목의 숫자가 들어왔다 — "조선(삼성중공업 +8.6%, 한화오션 +5.5%) … 약세: 미디어·
-# 교육(-37.5%)" 에서 세 종목이 전부 −37.5 로 읽혔고, "+40% YoY" 가 삼성전자의 등락이
-# 됐다(2026-09-06 dry-run 실측). 그래서 자리를 좁힌다:
-#   뒤  ≤ 24자. 사이에 올 수 있는 건 코드·시총 괄호(`[042660]`·`(1485.0조)`), 조사, `|`·`:` 뿐
-#   앞  ≤ 12자. `(+20.1%) 로보티즈` 꼴(수급 정리 채널)
-#   부호 없는 %는 이름 바로 뒤(≤ 8자)에 붙었을 때만, 글 전체가 상승률·하락률 목록일 때만
-#   YoY·QoQ·MoM 이 따라오면 실적 증감이지 등락이 아니다
-#   30 을 넘는 값은 안 믿는다(상한가가 30). 상장 첫날 +100% 같은 건 주목도 후보로 잡힌다
-WINDOW_BEFORE, WINDOW_AFTER = 12, 34
-_NUM = r"(\d{1,2}(?:\.\d{1,2})?)"
-_GAP = r"(?:\s*(?:\[[0-9A-Z]{6}\]|\([^()%]{0,12}\)|전\s*거래일\s*대비|전일\s*대비|전일비|은|는|이|가|의|도|주가|\||:|,)?\s*){0,3}"
-_AFTER_SIGNED = re.compile(_GAP + r"\(?\s*([+\-−▲▼△▽↑↓])\s*" + _NUM + r"\s*%")
-_AFTER_WORD = re.compile(_GAP + _NUM + r"\s*%\s*(?:오른|상승|급등|올라|뛴|하락|급락|내린|내려|빠진|떨어)")
-_AFTER_BARE = re.compile(r"\s*\(?\s*" + _NUM + r"\s*%")
-_BEFORE_SIGNED = re.compile(r"\(?\s*([+\-−▲▼△▽↑↓])\s*" + _NUM + r"\s*%\s*\)?\s*$")
-_YOY = re.compile(r"^\s*(?:YoY|QoQ|MoM|yoy|qoq|y/y|q/q)")
-_LIMIT_UP = re.compile(r"^\s*(?:[^가-힣]{0,6})?(?:상한가|상따)")
-_LIMIT_DOWN = re.compile(r"^\s*(?:[^가-힣]{0,6})?하한가")
-_UP_WORDS = ("오른", "상승", "급등", "올라", "뛴", "↑")
-_LIST_UP = re.compile(r"상승률|상승\s*종목|급등\s*종목|특징주|강세\s*종목")
-_LIST_DOWN = re.compile(r"하락률|하락\s*종목|급락\s*종목|약세\s*종목")
-_SIGN = {"+": 1, "▲": 1, "△": 1, "↑": 1, "-": -1, "−": -1, "▼": -1, "▽": -1, "↓": -1}
-
-
-def quoted_moves(text: str, needle: str, *, leading: bool = True) -> list[tuple[float, str]]:
-    """본문에서 needle(종목 표기) 바로 옆의 등락 표기를 전부 읽는다 → [(등락, 그 자리)].
-
-    '그 자리'는 이름과 표기를 이은 본문 조각이다(`JP모건(-1.71%)`). 발췌 창을 거기 세울 때 쓴다.
-    leading=False 면 이름 **앞**의 표기(`(+20.1%) 로보티즈` 꼴)는 안 읽는다(RESEARCH_HOUSES 주석).
-    """
-    if not needle:
-        return []
-    flat = " ".join(text.split())
-    found: list[tuple[float, str]] = []
-    list_up, list_down = bool(_LIST_UP.search(flat)), bool(_LIST_DOWN.search(flat))
-    flags = re.IGNORECASE if not re.search(r"[가-힣]", needle) else 0
-    for m in re.finditer(re.escape(needle), flat, flags=flags):
-        a0, b0 = m.end(), max(0, m.start() - WINDOW_BEFORE)
-        after = flat[a0 : a0 + WINDOW_AFTER]
-        before = flat[b0 : m.start()]
-        if x := _LIMIT_UP.search(after):
-            found.append((30.0, flat[m.start() : a0 + x.end()]))
-        elif x := _LIMIT_DOWN.search(after):
-            found.append((-30.0, flat[m.start() : a0 + x.end()]))
-        x = _AFTER_SIGNED.match(after)
-        if x and not _YOY.match(after[x.end():]):
-            v = float(x.group(2))
-            if 0 < v <= 30:
-                found.append((_SIGN[x.group(1)] * v, flat[m.start() : a0 + x.end()]))
-            continue
-        x = _AFTER_WORD.match(after)
-        if x:
-            v = float(x.group(1))
-            tail = after[x.start(1):]
-            if 0 < v <= 30:
-                found.append((v if any(w in tail for w in _UP_WORDS) else -v, flat[m.start() : a0 + x.end()]))
-            continue
-        x = _BEFORE_SIGNED.search(before) if leading else None
-        if x:
-            v = float(x.group(2))
-            if 0 < v <= 30:
-                found.append((_SIGN[x.group(1)] * v, flat[b0 + x.start() : m.end()]))
-            continue
-        x = _AFTER_BARE.match(after[:8 + 6])
-        if x and (list_up or list_down) and not _YOY.match(after[x.end():]):
-            v = float(x.group(1))
-            if 0 < v <= 30:
-                found.append((v if list_up and not list_down else -v, flat[m.start() : a0 + x.end()]))
-    return found
-
-
-def quoted_move(text: str, needle: str, *, leading: bool = True) -> float | None:
-    """본문에서 needle(종목 표기) 바로 옆의 등락 표기를 읽는다. 없으면 None. 여럿이면 절댓값 최대."""
-    found = quoted_moves(text, needle, leading=leading)
-    return max((v for v, _spot in found), key=abs) if found else None
-
 
 # ── 프롬프트 ──────────────────────────────────────────────────────────────────
 #
