@@ -1,4 +1,4 @@
-"""오늘의 과열도 지수와 지표들을 LLM(Claude Haiku)으로 2~3문장 요약해
+"""오늘의 과열도 지수와 지표들을 LLM(Claude Opus 5.5)으로 2~3문장 요약해
 daily_score.ai_summary에 저장한다. 프론트 히어로 카드가 이 문장을 읽어 렌더한다.
 
 calculate_score.py가 daily_score/indicator_values를 채운 뒤 실행하는 후속 단계다.
@@ -28,14 +28,22 @@ from common.supabase_client import get_client  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 
-# Haiku 4.5. 호출은 구독(llm_client)으로 나가지만 모델은 Haiku 를 유지한다.
+# Opus 5.5. 호출은 구독(llm_client)으로 나가고, 구독이 막힌 날엔 llm_client 가 Haiku 로 바꿔 API 로 보낸다.
 # 2026-09-12 에 Sonnet 5 를 같은 자료로 견줬다. ② 갈림 문단은 Sonnet 이 정확했지만(Haiku 는
 # 초고온 개수와 상위 5개의 관계를 뭉갠다), 발송 글·급부상 한 줄까지 세 곳을 놓고 본 판정은
 # "일단 전부 Haiku". Sonnet 은 규칙의 전언 예시를 모든 문장에 적용해 전언체가 되고, 규칙을 풀면
 # 그 규칙이 막던 시세 표현이 샌다. Sonnet 으로 가려면 프롬프트를 Sonnet 기준으로 다시 쓰고
 # 변형마다 수십 회 재야 한다(이 파일 TREND_SYSTEM 주석의 4변형×40회와 같은 규모).
 # ⚠️ 분류 쪽(디시·뉴스 제목, 텔레그램 메시지)은 눈금이 분류기에 맞춰 보정돼 있어 어차피 Haiku 다.
-MODEL = "claude-haiku-4-5"
+# 2026-09-28 Haiku → Opus 5.5. 사이트 첫 화면 맨 위 글이다. 09-23 에 총평·발송 글과 함께 옮겼다가
+# 09-24 에 이 자리만 Haiku 로 되돌렸고(말투가 같고 길이만 늘었다), 정확성을 재 보고 다시 옮겼다.
+# 같은 재료(09-27 저온 23℃ · 마지막 값이 어제) 8회씩: 자료와 어긋난 문장 Opus 0회 · Haiku 3회
+# ("27℃대의 고온" · 26일 값을 26℃로 · 없는 구간 이름 "중온"). 하루 두 번 돌고 한 번에 세 대목을
+# 쓴다. Opus 는 저절로 쓰는 문장이 Haiku 보다 길어 세 대목의 *_LEN 상한을 모두 내렸다(그 주석).
+# 그 대가로 다시 쓰기가 늘어 한 번에 호출이 6~8번(Haiku 3~7번) · 51초(19초)다.
+# 보이는 글자 수는 합계 중앙 222자(같은 재료 Haiku 240자, 프로덕션 3주 중앙 247자).
+# ⚠️ Opus 는 굵게를 문장마다 넣는다 — 저장 직전에 keep_bold 로 ① 지표 이름 한 곳만 남긴다.
+MODEL = "claude-opus-5-5"
 
 # 초고온 진입선 = 진행률 ≥ 75. calculate_score.py의 HOT_ZONE과 동일하게 맞춘다.
 # 이 지점이 곧 카드에 "기준선"으로 적히는 값이라, 화면·요약·배지가 한 지점을 가리킨다.
@@ -188,7 +196,12 @@ SPOTLIGHT_CATEGORY = "시장"
 # 필요하지만, 추세 문장은 햇쩨 지수 궤적 하나라 늘릴 내용이 없다. 같은 하한(75)을 걸었더니
 # 추세가 두 번 다시 써도 62자에 머물렀고, 억지로 늘린 것들은 "내려온 후 반등과 다시 하락을
 # 반복하는"처럼 말이 겉돌았다. 문장마다 할 말의 양이 다르니 자리도 다르게 준다.
-SPOTLIGHT_LEN = (75, 115)
+#
+# ⚠️ 상한을 115→100 으로 내렸다(2026-09-23, Opus 5.5 로 옮기며). 길이는 첫 프롬프트에 없고
+#    벗어났을 때 다시 쓰기에서만 적힌다. 그래서 모델이 저절로 쓰는 길이가 곧 화면 길이인데,
+#    Haiku 는 3주 중앙 92자(78~115)를 쓰고 Opus 는 102~114자를 써 옛 상한 안에 그대로 들어왔다.
+#    상한을 Haiku 의 실제 길이 쪽으로 당겨 넘는 문장만 줄여 쓰게 했다.
+SPOTLIGHT_LEN = (75, 100)
 # 두 종류를 이름으로 부르고 근거까지 붙이면 두 문장이 필요하다. 주인공 문단보다는 짧다.
 #
 # ⚠️ (60, 95)였다가 (80, 110)으로 올렸다(2026-09-06). ℃ 블록을 digest 에서 빼자 문장이
@@ -196,8 +209,12 @@ SPOTLIGHT_LEN = (75, 115)
 #    이름을 나열해 채운다(실측 8회 중 2회) — 그래서 구간 이름('초고온에 든 지표 N개')을
 #    다시 허용해 채울 재료를 주고, 지표 이름 금지에는 나쁜 예를 붙였다. 그 조합의 실측
 #    8회: 80~97자 6회, 77자·65자 각 1회. 재료를 빼면 길이가 따라 빠진다는 규칙 그대로다.
-BALANCE_LEN = (80, 110)
-TREND_LEN = (55, 90)
+#
+# ⚠️ 상한을 110→100 으로 내렸다(2026-09-23). Haiku 3주 평균 90자, Opus 는 92~107자였다.
+BALANCE_LEN = (80, 100)
+# ⚠️ 상한을 90→66 으로 내렸다(2026-09-23). 까닭은 SPOTLIGHT_LEN 과 같다 — Haiku 는 3주 평균
+#    62자(37~90), Opus 는 83~87자. 72 로 걸었을 땐 다시 쓴 문장이 65~71자로 상한에 붙었다.
+TREND_LEN = (55, 66)
 HERO_RETRIES = 2
 
 # 요약에서 **아예 언급하지 않을** 지표 — slug → 다시 풀리는 raw_value 하한.
@@ -363,7 +380,12 @@ def balance_count_problems(text: str, hot: dict[str, int], top: dict[str, int]) 
 
     ⚠️ 검사는 좁게만 한다. 여기서 못 잡는 꼴(개수를 아예 안 적은 문장·"시장 지표는 없으며")은
     그냥 통과다. 잡는 것은 **적힌 개수가 틀린 것**뿐이다.
+
+    ⚠️ 굵게 표시(`**`)를 먼저 벗긴다. Opus 5.5 는 개수를 "감성 지표만 **1개**"처럼 굵게 쓰는데,
+       그대로 두면 정규식이 `지표`와 숫자 사이의 별표에 걸려 **아무것도 못 잡고 통과시킨다**
+       (2026-09-28 확인. Haiku 는 3주 동안 22문장 모두 개수를 굵게 안 써서 드러나지 않았다).
     """
+    text = text.replace("**", "")
     words = (("상위", "top"), ("초고온", "hot"))
 
     def scope(pos: int) -> str:
@@ -398,6 +420,27 @@ def balance_count_problems(text: str, hot: dict[str, int], top: dict[str, int]) 
         if not all(ref[k] == n for k in BALANCE_KINDS):
             found.append(f"{'상위' if where == 'top' else '초고온'} 각각 {n}개")
     return found
+
+
+def keep_bold(text: str, spans: int) -> str:
+    """굵게(`**…**`)를 앞에서 spans 곳만 남기고 나머지는 벗긴다.
+
+    COMMON 의 '중요한 부분(지표 이름, 핵심 수치)은 굵게' 지시를 Haiku 는 ① 의 지표 이름 한 곳에만
+    따랐다(프로덕션 09-06~09-27 22일 전부 ① 1곳 · ② 0곳 · ③ 0곳). Opus 5.5 는 문장마다 따라
+    한 번에 10곳 가까이 굵게 쓴다(2026-09-28 같은 재료 8회 중앙 9.5곳 — "**감성 지표**가
+    **시장 지표**보다 … **감성 지표 3개**, **시장 지표 2개**"). 화면 모양은 그대로 두려고 저장
+    직전에 코드로 맞춘다. 프롬프트를 고치면 문장까지 다시 재야 한다.
+    """
+    parts = text.split("**")
+    if len(parts) % 2 == 0:
+        # 짝이 안 맞는 별표 — 어디까지가 굵게인지 모르니 전부 벗긴다.
+        return text.replace("**", "")
+    out = [parts[0]]
+    for i in range(1, len(parts), 2):
+        inner, after = parts[i], parts[i + 1]
+        out.append(f"**{inner}**" if (i + 1) // 2 <= spans else inner)
+        out.append(after)
+    return "".join(out)
 
 
 def balance_verdict_lines(rows: list[dict]) -> list[str]:
@@ -663,6 +706,10 @@ def main() -> None:
     if not spotlight or not trend:
         print("[WARNING] LLM 응답이 비어 요약을 저장하지 않습니다.")
         return
+    # 굵게는 ① 의 지표 이름 한 곳만(keep_bold). 길이 검사는 위에서 별표째 끝났다.
+    spotlight = keep_bold(spotlight, 1)
+    balance = keep_bold(balance, 0)
+    trend = keep_bold(trend, 0)
 
     # 개행으로 이어 저장 → 프론트가 개행으로 나눠 각각 한 문단으로 렌더(오프너 포함 3문단).
     # ⚠️ 줄 순서가 화면의 문단 순서다(app/page.tsx 가 인덱스로 집는다).

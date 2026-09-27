@@ -5,7 +5,7 @@
 """
 import pytest
 
-from generate_daily_summary import balance_count_problems, balance_counts
+from generate_daily_summary import balance_count_problems, balance_counts, keep_bold
 
 HOT = {"시장": 2, "감성": 1}
 TOP = {"시장": 3, "감성": 2}
@@ -31,6 +31,15 @@ def test_correct_sentences_pass(text, hot, top):
     assert balance_count_problems(text, hot, top) == []
 
 
+def test_bold_counts_are_still_checked():
+    # Opus 5.5 가 실제로 쓴 꼴(2026-09-28). 별표가 `지표`와 숫자 사이에 끼어도 대조해야 한다.
+    hot, top = {"시장": 0, "감성": 1}, {"시장": 2, "감성": 3}
+    ok = "감성 지표가 시장 지표보다 조금 더 뜨겁습니다. 초고온에 든 지표는 감성 지표만 **1개**이고, 상위 5개 안에도 감성 지표가 **3개**, 시장 지표가 **2개** 들었습니다."
+    assert balance_count_problems(ok, hot, top) == []
+    bad = ok.replace("**3개**", "**2개**")
+    assert balance_count_problems(bad, hot, top) == ["상위 감성 2개"]
+
+
 def test_each_form_checks_both_kinds():
     text = "초고온 구간에는 두 종류가 각각 1개씩 들었으나 상위 5개 안에는 시장 지표 3개, 감성 지표 2개로 갈립니다."
     assert balance_count_problems(text, {"시장": 0, "감성": 1}, TOP) == ["초고온 각각 1개"]
@@ -48,3 +57,20 @@ def test_balance_counts_matches_the_digest_line():
     hot, top = balance_counts(rows)
     assert hot == {"시장": 2, "감성": 1}
     assert top == {"시장": 3, "감성": 2}
+
+
+@pytest.mark.parametrize(
+    "text, spans, want",
+    [
+        # Opus 5.5 가 실제로 쓴 꼴(2026-09-28) — ① 은 지표 이름만 남긴다.
+        ("시장 지표 중 가장 뜨거운 **옵션 풋/콜 비율**은 과열도 **64%**로 높습니다.", 1,
+         "시장 지표 중 가장 뜨거운 **옵션 풋/콜 비율**은 과열도 64%로 높습니다."),
+        ("오늘은 **감성 지표**가 **시장 지표**보다 조금 더 뜨겁습니다. 초고온에는 **감성 지표 1개**만 들었습니다.", 0,
+         "오늘은 감성 지표가 시장 지표보다 조금 더 뜨겁습니다. 초고온에는 감성 지표 1개만 들었습니다."),
+        ("굵게가 없는 문장입니다.", 1, "굵게가 없는 문장입니다."),
+        ("짝이 **안 맞는 별표입니다.", 1, "짝이 안 맞는 별표입니다."),
+        ("", 0, ""),
+    ],
+)
+def test_keep_bold(text, spans, want):
+    assert keep_bold(text, spans) == want

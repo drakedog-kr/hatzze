@@ -11,7 +11,7 @@ export type DailyScore = {
   score: number;
   stage: string;
   updated_at: string;
-  // LLM(Claude Haiku)이 생성한 오늘의 요약. 컬럼이 없거나(마이그레이션 전) 아직
+  // LLM(Claude Opus 5.5)이 생성한 오늘의 요약. 컬럼이 없거나(마이그레이션 전) 아직
   // 생성 전이면 null이고, 이땐 히어로가 기존 템플릿 문장으로 폴백한다.
   ai_summary: string | null;
   /**
