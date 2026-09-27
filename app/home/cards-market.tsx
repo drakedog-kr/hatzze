@@ -1,7 +1,9 @@
 // 홈의 시장 지표 카드들. app/page.tsx 에서 그대로 옮겨 왔다(app/home/parts.tsx 머리말 참고).
 
+import Link from "next/link";
 import type { ClosePoint, StockHighGap } from "@/lib/data";
 import { formatEokMixed, formatIndicatorValue, shortDate } from "@/lib/format";
+import { stockHref } from "@/lib/stock-page";
 import { BLUE_SCALE, C, MONO, R } from "../ui";
 import { sourceDateBadge, Shell, TitleRow, Big, Foot, HeatKnob, HeatFill, HeatBar, AreaChart } from "./parts";
 import type { Pick } from "./parts";
@@ -207,7 +209,7 @@ export function CardMarketActions({ v }: { v: Pick }) {
 // 그 외 전 종목까지 100% 가 전부 드러난다. 각도보다 길이가 견주기도 쉽다.
 export function CardTurnover({ v }: { v: Pick }) {
   const share = v.raw ?? 0; // 상위10 거래대금 비중 %
-  const dt = v.details as unknown as { top5?: { name: string; share: number }[]; total_jo?: number } | null;
+  const dt = v.details as unknown as { top5?: { name: string; code?: string; share: number }[]; total_jo?: number } | null;
   const top = (dt?.top5 ?? []).slice(0, 4);
   // 비중만으론 "얼마"인지 안 보인다 — 전체 거래대금에 비중을 곱해 금액으로 준다.
   const totalJo = dt?.total_jo ?? null;
@@ -222,9 +224,9 @@ export function CardTurnover({ v }: { v: Pick }) {
   const restOfTop = Math.max(0, share - namedSum);
   const others = Math.max(0, 100 - share);
   const segs = [
-    ...top.map((t, i) => ({ key: t.name, label: t.name, pct: t.share, fill: BLUE_SCALE[i] ?? "var(--c-blue-5)", ink: C.ink })),
-    { key: "__rest", label: "나머지 상위 10종목", pct: restOfTop, fill: "var(--c-blue-5)", ink: C.ink },
-    { key: "__others", label: "그 외 전 종목", pct: others, fill: C.track, ink: C.sub2 },
+    ...top.map((t, i) => ({ key: t.name, label: t.name, code: t.code, pct: t.share, fill: BLUE_SCALE[i] ?? "var(--c-blue-5)", ink: C.ink })),
+    { key: "__rest", label: "나머지 상위 10종목", code: undefined, pct: restOfTop, fill: "var(--c-blue-5)", ink: C.ink },
+    { key: "__others", label: "그 외 전 종목", code: undefined, pct: others, fill: C.track, ink: C.sub2 },
   ];
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
@@ -239,9 +241,26 @@ export function CardTurnover({ v }: { v: Pick }) {
             s2.pct <= 0 ? null : (
               <div key={s2.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ width: 8, height: 8, borderRadius: 3, background: s2.fill, flexShrink: 0 }} />
-                <span style={{ flex: 1, minWidth: 0, fontSize: "var(--fs-12)", fontWeight: 600, color: C.label, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {s2.label}
-                </span>
+                {/* 종목 줄은 종목 화면으로 잇는다(코드가 있는 줄만 — 옛 행엔 코드가 없다). 말줄임을 자르는
+                    상자가 링크 자신이라 크기·굵기·clip 을 링크에 준다(.hz-stock-link 주석). */}
+                {s2.code ? (
+                  <span style={{ flex: 1, minWidth: 0, display: "flex" }}>
+                    <Link
+                      href={stockHref(s2.code)}
+                      className="hz-stock-link hz-stock-link-label"
+                      data-ga="cta_click"
+                      data-ga-cta="stock"
+                      data-ga-surface="home_turnover"
+                      style={{ minWidth: 0, fontSize: "var(--fs-12)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                    >
+                      {s2.label}
+                    </Link>
+                  </span>
+                ) : (
+                  <span style={{ flex: 1, minWidth: 0, fontSize: "var(--fs-12)", fontWeight: 600, color: C.label, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {s2.label}
+                  </span>
+                )}
                 <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 800, color: s2.ink }}>{s2.pct.toFixed(1)}%</span>
               </div>
             ),
@@ -306,9 +325,16 @@ export function CardHighGap({ v, tops, failed = false }: { v: Pick; tops: StockH
           </span>
           {tops.map((st, i) => (
             <div key={st.code} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ width: 76, flexShrink: 0, fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.label, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              <Link
+                href={stockHref(st.code)}
+                className="hz-stock-link hz-stock-link-label"
+                data-ga="cta_click"
+                data-ga-cta="stock"
+                data-ga-surface="home_high_gap"
+                style={{ width: 76, flexShrink: 0, fontSize: "var(--fs-12-5)", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+              >
                 {st.name}
-              </span>
+              </Link>
               <div className="hz-hbar-track hz-hbar-md">
                 {/* 막대 = **고점 근접도**(52주 고점 = 꽉 찬 막대). 오른쪽 숫자는 그대로
                     괴리율이라, 둘을 더하면 늘 100 이다.
