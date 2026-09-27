@@ -20,7 +20,6 @@ import Footer from "./Footer";
 import { NewBadge } from "./VersionBadge";
 import GaEvents from "./GaEvents";
 import { TipTap } from "./TipTap";
-import { HolidayGreeting } from "./HolidayGreeting";
 import { CommandMenu, openCommandMenu, preloadCommandMenu } from "@/components/command-menu";
 import { Kbd } from "@/components/ui/kbd";
 import type { IconName } from "@/lib/icon-names";
@@ -2151,8 +2150,6 @@ export default function AppShell({ children, themeNav = THEME_PUBLIC }: { childr
             두었으므로(버튼 33 · 띠 34) 여기 순서는 읽기 좋은 대로 둔다. */}
         <ToTop scroller={mainRef} show={pastFold} />
         <PcHint />
-        {/* 명절 인사 팝업. 네이티브 <dialog> 의 맨 위 층에 뜨므로 자리·z-index 와 무관하다. 기간 밖이면 아무것도 안 그린다. */}
-        <HolidayGreeting />
       </div>
       </div>
     </div>
