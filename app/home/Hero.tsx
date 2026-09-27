@@ -1,9 +1,12 @@
 // 홈 히어로 — 오늘의 온도·요약·지표 분포. app/page.tsx 에서 그대로 옮겨 왔다(app/home/parts.tsx 머리말 참고).
 
-import type { DailyScore } from "@/lib/data";
+import type { ReactNode } from "react";
+
+import type { DailyScore, ScorePoint } from "@/lib/data";
 import { compareLabel, formatKstUpdate } from "@/lib/format";
 import { AiMark, C, Icon, MONO, stageForScore } from "../ui";
 import { STAGE_META, renderRichSummary } from "./parts";
+import { ScoreTrendTile } from "./ScoreTrendTile";
 
 /** 점수(0~100)가 게이지 호 위에서 갖는 x 좌표. 호는 반지름 124, 중심 (150,150) 의 반원이다. */
 /**
@@ -66,6 +69,8 @@ export function Hero({
   socialHits,
   bandCounts,
   bandTotal,
+  trend,
+  trendDays,
 }: {
   dailyScore: DailyScore;
   tradHits: number;
@@ -74,6 +79,9 @@ export function Hero({
   bandCounts: { label: string; count: number; fill: string; items: BandItem[] }[];
   /** 위 넷의 합. 25가 아니라 **오늘 값이 들어온 지표 수**다(자료가 늦는 날 24가 된다). */
   bandTotal: number;
+  /** 햇쩨 지수 추이의 점(날짜 오름차순). null 이면 조회 실패. */
+  trend: ScorePoint[] | null;
+  trendDays: number;
 }) {
   const stageLabel = stageForScore(dailyScore.score);
   const stage = STAGE_META[stageLabel] ?? STAGE_META["상온"];
@@ -161,181 +169,160 @@ export function Hero({
       </p>
 
       <aside className="hz-tx-hero-side">
-        {/* ── ① 햇쩨 지수 ─────────────────────────────────────────── */}
-        <div className="hz-tx-tile">
-          <div className="hz-tx-tile-cap">
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-              햇쩨 지수
-              <span
-                className="hz-tip hz-tip-wide hz-tip-below"
-                data-tip="지표 25개 가중 평균"
-                data-ga-tip="hatzze_index"
-                style={{ display: "inline-flex", cursor: "help" }}
-              >
-                <Icon name="help" style={{ fontSize: "var(--fs-14)", color: C.muted }} />
-              </span>
-            </span>
-            {/* 구간 알약 — 카더라 센티먼트 타일의 '낙관 우세' 알약과 같은 꼴. */}
-            <span className="hz-tx-pill" style={{ color: stage.color }}>
-              <span className="hz-tx-pill-dot" style={{ background: stage.color }} />
-              {stageLabel}
-            </span>
-          </div>
+        {/* ── ① 햇쩨 지수 + 지표 분포(한 칸, 2026-09-28) ──────────────────
+            옛 두 칸(햇쩨 지수 · 지표 분포)을 합쳤다. 줄인 높이만큼 아래 추이 칸이 들어가 히어로 키는 그대로다
+            (.hz-tx-hero-side 주석의 공백 문제). 후보 셋(구간 이름 줄에 개수 · 얇은 분포 막대 · 큰 숫자 옆 세로 목록) 중 마지막 꼴이다. */}
+        <IndexTile
+          score={score}
+          temp={temp}
+          stageLabel={stageLabel}
+          stageColor={stage.color}
+          deltaLabel={deltaLabel}
+          deltaText={deltaText}
+          deltaColor={deltaColor}
+          bandCounts={bandCounts}
+          bandTotal={bandTotal}
+        />
 
-          {/* 밑선 맞춤은 CSS 가 한다(.hz-figrow) — 곁줄에 padding 을 얹어 흉내 내지 말 것. */}
-          <div className="hz-figrow">
-            {/* 도수는 정수(위 temp 주석). ℃ 는 카더라의 % 와 같은 작은 단위 글자다. */}
-            <strong className="hz-tx-big" style={{ fontFamily: MONO, color: stage.color }}>
-              {temp}
-              <span>℃</span>
-            </strong>
-            <div className="hz-figrow-aside">
-              <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub }}>0~100 과열도 환산</span>
-              <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 700, color: C.sub }}>
-                {deltaLabel} <span style={{ color: deltaColor, fontWeight: 800 }}>{deltaText}</span>
-              </span>
-            </div>
-          </div>
-
-          {/* 4칸 띠 + 핀. 마커의 left 는 점수를 그대로 % 로 쓴다 — 띠 네 칸이 0·25·50·75
-              경계와 정확히 같은 폭이라 계산이 필요 없다. 핀 머리는 속을 타일색으로 비워
-              '값'이 아니라 '가리키는 자리'로 읽히게 한다(옛 히어로 주석 그대로). */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <div style={{ position: "relative", paddingTop: 12 }}>
-              <div style={{ display: "flex", height: 9, borderRadius: 3, overflow: "hidden" }}>
-                {HERO_STRIP.map((bg, i) => (
-                  <span key={i} style={{ width: "25%", background: bg }} />
-                ))}
-              </div>
-              <span
-                style={{
-                  position: "absolute",
-                  left: `${score}%`,
-                  top: 8,
-                  transform: "translateX(-50%)",
-                  width: 2,
-                  height: 17,
-                  background: C.ink,
-                  borderRadius: 1,
-                  boxShadow: "0 0 0 2px var(--tx-tile)",
-                }}
-              />
-              <span
-                style={{
-                  position: "absolute",
-                  left: `${score}%`,
-                  top: 0,
-                  transform: "translateX(-50%)",
-                  width: 9,
-                  height: 9,
-                  borderRadius: "50%",
-                  border: `2px solid ${C.ink}`,
-                  background: "var(--tx-tile)",
-                  boxSizing: "border-box",
-                }}
-              />
-            </div>
-            {/* 눈금 숫자는 --c-sub 이상으로. faint/hint 는 장식용 구분선 전용이다(대비 규칙). */}
-            <div style={{ position: "relative", height: 13 }}>
-              {[0, 25, 50, 75, 100].map((n) => (
-                <span
-                  key={n}
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    ...(n === 0 ? { left: 0 } : n === 100 ? { right: 0 } : { left: `${n}%`, transform: "translateX(-50%)" }),
-                    fontFamily: MONO,
-                    fontSize: "var(--fs-11)",
-                    fontWeight: 600,
-                    color: C.sub,
-                  }}
-                >
-                  {n}
-                </span>
-              ))}
-            </div>
-            {/* 지금 구간만 진하게. 나머지는 --c-label — faint 로 떨구면 넷 중 셋이 안 읽힌다. */}
-            <div style={{ display: "flex" }}>
-              {BAND_LABELS.map((l) => (
-                <span
-                  key={l}
-                  style={{
-                    flex: 1,
-                    textAlign: "center",
-                    fontSize: "var(--fs-11)",
-                    fontWeight: l === stageLabel ? 800 : 600,
-                    color: l === stageLabel ? stage.color : C.label,
-                  }}
-                >
-                  {l}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* ── ② 지표 분포 ─────────────────────────────────────────── */}
-        {/* 히어로가 답을 하나(26℃)만 주면 "그 하나가 어떻게 나온 값인지"가 안 보인다. 구간
-            카드에 마우스를 올리면 그 구간의 지표가 목록으로 열리고(.hz-dist-pop), 이름을
-            누르면 아래 시트의 그 셀로 내려간다.
-            ⚠️ 네 구간이 **가로 한 줄**이라 목록은 **위로** 연다 — 옆으로 열면 가는 길에 옆
-            칸을 밟아 내용이 바뀐다. 자세한 것은 globals.css 의 `.hz-tx .hz-dist-pop` 주석. */}
-        <div className="hz-tx-tile hz-dist">
-          <div className="hz-tx-tile-cap">
-            <span>지표 분포</span>
-            {/* 분모 — 25개 전부가 아니라 **오늘 값이 들어온 것**만 센다. 자료가 늦는 날 24가
-                되는데 적어 두지 않으면 숫자가 틀린 것처럼 보인다. */}
-            <span style={{ fontWeight: 600 }}>{bandTotal}개 집계</span>
-          </div>
-          <div className="hz-dist-bar">
-            {bandCounts.map((b, i) =>
-              b.count === 0 ? null : (
-                <span key={b.label} className="hz-dist-seg" data-band={i} style={{ width: `${(b.count / bandTotal) * 100}%`, background: b.fill }} />
-              ),
-            )}
-          </div>
-          {/* 네 구간을 한 줄에 — 칸마다 [● 이름] 위, 개수 아래(globals.css 의 .hz-tx-bands). */}
-          <div className="hz-tx-bands">
-            {bandCounts.map((b, i) => (
-              <div
-                key={b.label}
-                className={`hz-dist-row${b.count === 0 ? " hz-dist-row-none" : ""}`}
-                data-band={i}
-                tabIndex={0}
-                style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4, minWidth: 0 }}
-              >
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.label, whiteSpace: "nowrap" }}>
-                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: b.fill, flexShrink: 0 }} />
-                  {b.label}
-                </span>
-                <strong style={{ fontFamily: MONO, fontSize: "var(--fs-17)", fontWeight: 800, lineHeight: 1, color: C.ink }}>{b.count}</strong>
-                {b.count > 0 ? (
-                  <div className="hz-dist-pop hz-scroll">
-                    <div className="hz-dist-pop-head">
-                      {b.label} {b.count}개 · 과열도순 · 눌러서 이동
-                    </div>
-                    {b.items.map((it) => (
-                      <a key={it.slug} href={`#ind-${ANCHOR_ALIAS[it.slug] ?? it.slug}`} className="hz-dist-pop-item">
-                        <span className="hz-dist-pop-name">{it.name}</span>
-                        <span className="hz-dist-pop-heat">{Math.round(it.heat)}</span>
-                      </a>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="hz-dist-pop hz-dist-pop-slim">
-                    <p className="hz-dist-pop-none">오늘은 {b.label} 구간에 든 지표가 없습니다</p>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-          {bandCounts[3].count > 0 && (
-            <span style={{ fontSize: "var(--fs-12)", lineHeight: 1.5, color: C.sub, textWrap: "pretty" }}>
-              초고온 {bandCounts[3].count}개가 온도를 끌어올렸습니다
-            </span>
-          )}
-        </div>
+        {/* ── ② 햇쩨 지수 추이 ─────────────────────────────────────────
+            카더라 두 히어로의 센티먼트 추이와 같은 자리·같은 키다(app/home/ScoreTrendTile.tsx). */}
+        <ScoreTrendTile points={trend} days={trendDays} />
       </aside>
     </section>
+  );
+}
+
+
+type Band = { label: string; count: number; fill: string; items: BandItem[] };
+
+/** 구간 하나의 지표 목록(호버·초점에 위로 열린다). 옛 분포 칸의 그것 그대로다. */
+function DistPop({ b }: { b: Band }) {
+  return b.count > 0 ? (
+    <div className="hz-dist-pop hz-scroll">
+      <div className="hz-dist-pop-head">
+        {b.label} {b.count}개 · 과열도순 · 눌러서 이동
+      </div>
+      {b.items.map((it) => (
+        <a key={it.slug} href={`#ind-${ANCHOR_ALIAS[it.slug] ?? it.slug}`} className="hz-dist-pop-item">
+          <span className="hz-dist-pop-name">{it.name}</span>
+          <span className="hz-dist-pop-heat">{Math.round(it.heat)}</span>
+        </a>
+      ))}
+    </div>
+  ) : (
+    <div className="hz-dist-pop hz-dist-pop-slim">
+      <p className="hz-dist-pop-none">오늘은 {b.label} 구간에 든 지표가 없습니다</p>
+    </div>
+  );
+}
+
+/** 옛 햇쩨 지수 칸의 4칸 띠 + 핀. 네 칸이 0·25·50·75 경계와 같은 폭이라 핀 자리는 점수 그대로의 % 다. */
+function Strip({ score, segs, below }: { score: number; segs: boolean; below?: ReactNode }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ position: "relative", paddingTop: 12 }}>
+        <div style={{ display: "flex", height: 9, borderRadius: 3, overflow: "hidden" }}>
+          {HERO_STRIP.map((bg, i) => (
+            <span key={i} className={segs ? "hz-dist-seg" : undefined} data-band={i} style={{ width: "25%", background: bg }} />
+          ))}
+        </div>
+        <span className="hz-tx-pin" style={{ left: `${score}%` }} />
+      </div>
+      {below}
+    </div>
+  );
+}
+
+function IndexTile({
+  score,
+  temp,
+  stageLabel,
+  stageColor,
+  deltaLabel,
+  deltaText,
+  deltaColor,
+  bandCounts,
+  bandTotal,
+}: {
+  score: number;
+  temp: number;
+  stageLabel: string;
+  stageColor: string;
+  deltaLabel: string;
+  deltaText: string;
+  deltaColor: string;
+  bandCounts: Band[];
+  bandTotal: number;
+}) {
+  const cap = (
+    <div className="hz-tx-tile-cap">
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+        햇쩨 지수
+        <span className="hz-tip hz-tip-wide hz-tip-below" data-tip="지표 25개 가중 평균" data-ga-tip="hatzze_index" style={{ display: "inline-flex", cursor: "help" }}>
+          <Icon name="help" style={{ fontSize: "var(--fs-14)", color: C.muted }} />
+        </span>
+      </span>
+      <span className="hz-tx-pill" style={{ color: stageColor }}>
+        <span className="hz-tx-pill-dot" style={{ background: stageColor }} />
+        {stageLabel}
+      </span>
+    </div>
+  );
+  const big = (
+    <strong className="hz-tx-big" style={{ fontFamily: MONO, color: stageColor }}>
+      {temp}
+      <span>℃</span>
+    </strong>
+  );
+  const asideLines = (
+    <>
+      {/* 폰(≤560)에선 뒤 꼬리를 뗀다 — 옆 2×2 목록에 자리를 내주면 두 줄로 접혀 칸이 커진다(tx.css .hz-vlist-more). */}
+      <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub }}>
+        지표 {bandTotal}개<span className="hz-vlist-more"> · 0~100 과열도 환산</span>
+      </span>
+      <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 700, color: C.sub }}>
+        {deltaLabel} <span style={{ color: deltaColor, fontWeight: 800 }}>{deltaText}</span>
+      </span>
+    </>
+  );
+  /* 띠 아래 구간 이름 줄. 지금 구간만 진하게(옛 칸과 같다). */
+  const names = (
+    <div style={{ display: "flex" }}>
+      {BAND_LABELS.map((l) => (
+        <span key={l} style={{ flex: 1, textAlign: "center", fontSize: "var(--fs-11)", fontWeight: l === stageLabel ? 800 : 600, color: l === stageLabel ? stageColor : C.label }}>
+          {l}
+        </span>
+      ))}
+    </div>
+  );
+
+  // 큰 숫자(왼쪽)와 네 구간 개수(오른쪽, 뜨거운 구간부터 세로)를 한 줄에. 온도 띠는 그 아래 폭 전체.
+  // 세로 목록의 줄이 곧 옛 분포 칸의 호버 자리다(.hz-dist-row) — 목록·띠 강조가 그대로 든다.
+  return (
+    <div className="hz-tx-tile hz-dist">
+      {cap}
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+          {big}
+          <div style={{ display: "flex", flexDirection: "column" }}>{asideLines}</div>
+        </div>
+        <div className="hz-vlist">
+          {[...bandCounts].reverse().map((b) => {
+            const i = BAND_LABELS.indexOf(b.label);
+            return (
+              <div key={b.label} className={`hz-dist-row hz-vlist-item${b.count === 0 ? " hz-dist-row-none" : ""}`} data-band={i} tabIndex={0}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.label }}>
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: b.fill }} />
+                  {b.label}
+                </span>
+                <b style={{ fontFamily: MONO, fontSize: "var(--fs-12-5)", fontWeight: 800, color: C.ink }}>{b.count}</b>
+                <DistPop b={b} />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <Strip score={score} segs below={names} />
+    </div>
   );
 }

@@ -99,6 +99,32 @@ export type IndicatorWithLatestValue = {
   historyPoints: { date: string; value: number }[];
 };
 
+export type ScorePoint = { date: string; score: number };
+
+/** 햇쩨 지수 추이가 보여 주는 기간(달력일). 카더라 센티먼트 추이와 같은 30일이다. */
+export const SCORE_TREND_DAYS = 30;
+
+/**
+ * 햇쩨 지수 추이(홈 히어로) — 최근 SCORE_TREND_DAYS 일의 daily_score, 날짜 오름차순.
+ *
+ * ⚠️ 이 표는 한동안 **그날의 눈금**으로 쓰여 쌓였다. 가중치·눈금을 바꾼 날 앞뒤로 값이 이어지지 않아
+ *    시장에 없던 급락·반등이 그려진다(2026-08 검사). 눈금을 바꾸면 recompute_score_history.py 로
+ *    지난 행을 지금 눈금으로 다시 써야 이 선이 정직하다.
+ * 로컬에서는 dev-overrides.json 의 `scoreHistory` 가 같은 날짜의 값을 덮는다(표에 쓰기 전 미리보기).
+ */
+export const getScoreHistory = cache(async function getScoreHistory(): Promise<MaybeFailed<ScorePoint[]>> {
+  const since = new Date(Date.now() - SCORE_TREND_DAYS * 86400e3).toISOString().slice(0, 10);
+  const { data, error } = await getSupabaseServer()
+    .from("daily_score")
+    .select("date,score")
+    .gte("date", since)
+    .order("date", { ascending: true });
+  if (error) return LOAD_FAILED;
+  const rows = new Map<string, number>((data ?? []).map((r) => [r.date as string, Number(r.score)]));
+  for (const o of getDevOverrides().scoreHistory ?? []) if (o.date >= since) rows.set(o.date, o.score);
+  return [...rows.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([date, score]) => ({ date, score }));
+});
+
 /**
  * 최신 daily_score 한 줄.
  *
