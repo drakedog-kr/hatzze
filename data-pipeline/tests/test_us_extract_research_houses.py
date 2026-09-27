@@ -56,3 +56,6 @@ def test_own_move_after_reads_only_after_the_name():
     assert not own_move_after(t, end)
     t2 = "은행주 약세\n모건스탠리\n-2.88%"
     assert own_move_after(t2, t2.index("모건스탠리") + len("모건스탠리"))
+    # 이름 뒤 공백이 길어도 표기를 놓치지 않는다(원문을 먼저 자르면 창 밖으로 밀린다).
+    t3 = "골드만삭스" + " " * 200 + "-3.96%"
+    assert own_move_after(t3, len("골드만삭스"))

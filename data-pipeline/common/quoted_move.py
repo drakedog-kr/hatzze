@@ -114,8 +114,9 @@ def own_move_after(text: str, end: int) -> bool:
     quoted_moves(leading=False) 와 같은 잣대를 한 자리에 댄 것이다. 추출은 이름이 나온 자리마다
     따로 판정해서(한 글에 발행처 자리와 주가 자리가 같이 있다) 이름으로 다시 찾지 않고 좌표를 받는다.
     """
-    raw = text[end : end + WINDOW_AFTER * 4]
-    after = ((" " if raw[:1].isspace() else "") + " ".join(raw.split()))[:WINDOW_AFTER]
+    # 뒤를 통째로 편 뒤 자른다. 원문을 먼저 자르면 이름 뒤 공백이 길 때(줄바꿈·들여쓰기) 표기가 창 밖으로 밀린다.
+    tail = text[end:]
+    after = ((" " if tail[:1].isspace() else "") + " ".join(tail.split()))[:WINDOW_AFTER]
     flat = " ".join(text.split())
     return bool(moves_at(
         "", after, list_up=bool(_LIST_UP.search(flat)), list_down=bool(_LIST_DOWN.search(flat)), leading=False,
