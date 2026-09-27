@@ -28,13 +28,11 @@ def test_chuseok_2026_does_not_age_krx_data():
     assert business_day_lag("2026-09-23", date(2026, 9, 25)) == 0
 
 
-def test_asia_relative_strength_on_2026_09_23():
-    # 일본 연휴(09-21~23)로 공통 날짜가 09-18 에 멈췄다. 개장일로도 3일이라 기본 허용 2는
-    # 넘고, 이 지표의 허용치 안에는 든다.
-    lag = business_day_lag("2026-09-18", date(2026, 9, 23))
-    assert lag == 3
-    assert lag > DEFAULT_ALLOWANCE
-    assert lag <= ALLOWANCE["kospi_asia_relative_strength"]
+def test_asia_relative_strength_uses_default_allowance():
+    # 09-18 에 멈췄던 것(일본 연휴)은 허용치 7로 덮었었다. 수집이 코스피 거래일마다 값을 내게
+    # 바뀐 뒤로는 다른 KRX 지표와 같은 잣대(기본 2)로 본다.
+    assert "kospi_asia_relative_strength" not in ALLOWANCE
+    assert business_day_lag("2026-09-18", date(2026, 9, 23)) > DEFAULT_ALLOWANCE
 
 
 def test_holiday_table_is_weekdays_only_and_covers_its_years():
