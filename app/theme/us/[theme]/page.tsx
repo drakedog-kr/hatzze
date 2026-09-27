@@ -6,7 +6,7 @@ import { withSubjectParticle } from "@/lib/format";
 import { usThemeFromParam, usThemeHref, usThemeSlug } from "@/lib/theme-href";
 import { getUsThemePage } from "@/lib/us-theme-page";
 
-import { KADERA_CARD } from "../../../og-copy";
+import { themeCard } from "../../../og-copy";
 import { pageMetadata } from "../../../seo";
 import { THEME_PUBLIC } from "../../../screen-flags";
 import { US_MARKET } from "../../market";
@@ -38,8 +38,7 @@ export async function generateMetadata({ params }: { params: Promise<{ theme: st
       hot.length ? ` 최근 3일 말 많은 종목은 ${hot.join("·")}입니다.` : ""
     } 말 많은 미국 종목과 그 이유, 앞으로의 일정을 테마 단위로 읽습니다.`,
     path: usThemeHref(theme),
-    ownImage: KADERA_CARD.alt,
-    imagePath: "/kadera",
+    ownImage: themeCard(theme, "us", usThemeHref(theme)).alt,
   });
   return PUBLIC ? meta : { ...meta, robots: { index: false, follow: false } };
 }

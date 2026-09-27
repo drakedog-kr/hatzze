@@ -81,6 +81,15 @@ function readBandColor(img: HTMLImageElement): string | null {
  * personal project 로 보고 넣지 않기로 했다(2026-07-27 판단). 광고·구독·유료
  * 기능이 붙는 시점에는 다시 봐야 한다.
  */
+
+/**
+ * 받은 그림이 진짜 로고인가. 라우트는 로고가 없을 때 1×1 투명 그림을 200 으로 준다(app/api/logo 의 reply).
+ * 폭 0 은 받다 실패한 것(옛 404 가 브라우저 캐시에 남은 경우 포함), 폭 1 은 '없음' 표시다.
+ */
+function isRealLogo(img: HTMLImageElement): boolean {
+  return img.naturalWidth > 1;
+}
+
 export function StockLogo({
   code,
   name,
@@ -117,6 +126,8 @@ export function StockLogo({
   // 하드 리프레시로 보면 늘 정상으로 보인다 — 재방문으로 재현할 것. 없는 로고의 404 를
   // 이제 브라우저가 7일 캐시하므로 이 레이스는 전보다 흔하다.
   // 여기서 complete 로 두 경우를 같이 받아 onError 와 같은 전이를 태운다.
+  // (2026-09-27 부터 없는 로고는 404 가 아니라 1×1 그림이라 load 쪽으로 온다 — isRealLogo 가 가른다.
+  //  옛 404 가 브라우저 캐시에 남아 있는 동안은 위 레이스도 그대로라 두 갈래를 다 둔다.)
   //
   // 이 확인을 인라인 ref 콜백으로 했다가 되돌렸다 — 콜백 신원이 매 렌더마다 바뀌어
   // React 가 detach/attach 를 반복했고, 그때마다 loading="lazy" 의 관찰이 리셋돼서
@@ -127,7 +138,7 @@ export function StockLogo({
     // complete 는 '로드가 끝났다'만 뜻한다. 성패는 naturalWidth 로 가른다
     // (0 이면 받다 실패한 것이다. 아직 안 끝났으면 complete 가 false 다).
     if (!node?.complete) return;
-    if (node.naturalWidth) setTile(readBandColor(node));
+    if (isRealLogo(node)) setTile(readBandColor(node));
     else setFailed(true);
   }, []);
 
@@ -146,7 +157,7 @@ export function StockLogo({
       // 화면에 144장을 한꺼번에 요청해서(2026-09-17 실측), 그런 긴 목록만 `lazy` 로 켠다.
       loading={lazy ? "lazy" : undefined}
       ref={imgRef}
-      onLoad={(e) => setTile(readBandColor(e.currentTarget))}
+      onLoad={(e) => (isRealLogo(e.currentTarget) ? setTile(readBandColor(e.currentTarget)) : setFailed(true))}
       onError={() => setFailed(true)}
       className="hz-stock-logo"
       style={

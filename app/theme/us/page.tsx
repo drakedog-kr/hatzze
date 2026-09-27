@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { themeUpdatedAt } from "@/lib/theme-page";
 import { listUsThemeOverview, listUsThemeRisers } from "@/lib/us-theme-page";
 
-import { KADERA_CARD } from "../../og-copy";
+import { US_THEME_CARD } from "../../og-copy";
 import { pageMetadata } from "../../seo";
 import { THEME_PUBLIC } from "../../screen-flags";
 import { US_THEME_PAGE } from "../copy";
@@ -22,11 +22,10 @@ const DEPLOYED = Boolean(process.env.VERCEL_ENV);
 
 export async function generateMetadata(): Promise<Metadata> {
   const meta = await pageMetadata({
-    title: `${US_THEME_PAGE.label} | hatzze`,
+    title: `${US_THEME_PAGE.short} | hatzze`,
     description: US_THEME_PAGE.description,
     path: US_THEME_PAGE.href,
-    ownImage: KADERA_CARD.alt,
-    imagePath: "/kadera",
+    ownImage: US_THEME_CARD.alt,
   });
   return PUBLIC ? meta : { ...meta, robots: { index: false, follow: false } };
 }

@@ -5,7 +5,7 @@ import { assertLoaded } from "@/lib/load-state";
 import { withSubjectParticle } from "@/lib/format";
 import { getThemePage, themeFromParam, themeHref, themeSlug } from "@/lib/theme-page";
 
-import { KADERA_CARD } from "../../og-copy";
+import { themeCard } from "../../og-copy";
 import { pageMetadata } from "../../seo";
 import { THEME_PUBLIC } from "../../screen-flags";
 import { KR_MARKET } from "../market";
@@ -40,8 +40,7 @@ export async function generateMetadata({ params }: { params: Promise<{ theme: st
       hot.length ? ` 최근 3일 말 많은 종목은 ${hot.join("·")}입니다.` : ""
     } 말 많은 종목과 그 이유, 앞으로의 일정을 테마 단위로 읽습니다.`,
     path: themeHref(theme),
-    ownImage: KADERA_CARD.alt,
-    imagePath: "/kadera",
+    ownImage: themeCard(theme, "kr", themeHref(theme)).alt,
   });
   return PUBLIC ? meta : { ...meta, robots: { index: false, follow: false } };
 }

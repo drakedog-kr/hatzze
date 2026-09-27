@@ -13,7 +13,7 @@ import { LOGO_CACHE, LOGO_TICKER_RE, isLogoSize, logoVerdict } from "@/lib/stock
  *     까지는 안 간다. 200 만 저장하므로 없는 로고는 배포마다 한 번씩 다시 물어본다(배당 페이지
  *     12장 남짓).
  *
- * 무료 한도를 넘긴 동안(429)은 15분짜리 404 로 바꿔 준다. 그동안 방문마다 logo.dev 를 두 번씩
+ * 무료 한도를 넘긴 동안(429)은 15분짜리 빈 그림으로 바꿔 준다. 그동안 방문마다 logo.dev 를 두 번씩
  * 두드리던 것이 CDN 에서 멈추고, 화면은 머리글자 배지가 즉시 뜬다.
  */
 
@@ -51,7 +51,18 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/logo/[ticker
   });
 }
 
-/** 그림이 없는 두 경우. 상태는 같은 404 라 클라이언트는 onError 하나로 배지로 넘어간다. */
+/**
+ * 그림이 없는 두 경우. **200 + 1×1 투명 GIF** 로 준다. 클라이언트(StockLogo)는 폭이 1px 인 그림을
+ * '없음'으로 읽고 머리글자 배지로 넘어간다.
+ *
+ * 한때 404 였다. 동작은 같았지만 브라우저가 없는 로고마다 콘솔에 "Failed to load resource … 404" 를
+ * 찍어, 로고 없는 코스닥 종목이 넷 선 /preview 에 오류 넷이 쌓였다(2026-09-27 점검). 200 이라
+ * CDN 캐시(s-maxage)도 전처럼 걸린다 — 없는 로고 때문에 logo.dev 를 다시 두드리지 않는다.
+ */
+const BLANK_GIF = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
+
 function reply(verdict: "missing" | "error") {
-  return new Response(null, { status: 404, headers: { "Cache-Control": LOGO_CACHE[verdict] } });
+  return new Response(BLANK_GIF, {
+    headers: { "Content-Type": "image/gif", "Cache-Control": LOGO_CACHE[verdict], "X-Logo": verdict },
+  });
 }

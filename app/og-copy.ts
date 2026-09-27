@@ -1,5 +1,5 @@
 /**
- * /kadera·/mdd·/seohak·/insider·/dividend·/daily·/preview·/changelog 공유 카드에 들어가는 글.
+ * /kadera·/mdd·/seohak·/insider·/dividend·/daily·/preview·/changelog·/theme 공유 카드에 들어가는 글.
  *
  * 왜 카드 파일 안이 아니라 여기냐면, 같은 글을 두 곳이 봐야 하기 때문이다 —
  * 카드를 그리는 opengraph-image.tsx 와, og:image:alt 를 채우는 app/seo.ts.
@@ -150,3 +150,46 @@ export const CHANGELOG_CARD: OgCopy = {
   foot: "hatzze.fun/changelog",
   alt: "업데이트 기록 · 무엇이 언제 바뀌었는지 버전별로 적어 둡니다",
 };
+
+/**
+ * 테마 목록 카드(국장·미장). 제목은 사이드바·본문 제목과 같은 '판세'다(app/theme/copy.ts).
+ * 줄 길이는 앞의 카드들과 같은 폭(24·22·21자 안쪽)으로 끊는다. 그림은 테마 지도(Treemap)의 생김새다.
+ */
+export const THEME_CARD: OgCopy = {
+  title: "국장 테마 판세",
+  lines: [
+    "반도체·로봇·원전 같은 테마마다",
+    "채널에서 무슨 얘기가 도는지,",
+    "말 많은 종목과 그 이유를 봅니다.",
+  ],
+  foot: "hatzze.fun/theme",
+  alt: "국장 테마 판세 · 반도체·로봇·원전 같은 테마마다 채널에서 무슨 얘기가 도는지 봅니다",
+};
+
+export const US_THEME_CARD: OgCopy = {
+  title: "미장 테마 판세",
+  lines: [
+    "AI반도체·빅테크·원자력 같은 테마마다",
+    "채널에서 무슨 얘기가 도는지,",
+    "말 많은 미국 종목과 그 이유를 봅니다.",
+  ],
+  foot: "hatzze.fun/theme/us",
+  alt: "미장 테마 판세 · AI반도체·빅테크·원자력 같은 테마마다 채널에서 무슨 얘기가 도는지 봅니다",
+};
+
+/**
+ * 테마 한 장의 카드(국장 26 · 미장 16). 제목이 테마 이름이고, 본문은 그 화면 부제(AppShell DEEP_PAGES)와
+ * 같은 말을 세 줄로 끊는다. 미장은 국장과 이름이 겹치는 테마(금융)가 있어 첫 줄에 시장을 적는다.
+ * ⛔ 숫자·종목 이름을 적지 않는다. 카드는 한 번 굳으면 못 고치는데 그 화면의 값은 매일 바뀐다.
+ *
+ * @param path 주소(`/theme/semiconductor`). 카드 맨 아래에 그대로 적는다.
+ */
+export function themeCard(theme: string, market: "kr" | "us", path: string): OgCopy {
+  const head = market === "us" ? `미장 ${theme}` : theme;
+  return {
+    title: theme,
+    lines: [`${head} 테마를 두고`, "채널에서 요즘 무슨 얘기가 도는지,", "말 많은 종목과 그 이유를 봅니다."],
+    foot: `hatzze.fun${path}`,
+    alt: `${head} 테마 · 채널에서 요즘 무슨 얘기가 도는지, 말 많은 종목과 그 이유를 봅니다`,
+  };
+}

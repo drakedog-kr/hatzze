@@ -3,10 +3,10 @@ import { notFound } from "next/navigation";
 
 import { listThemeOverview, listThemeRisers, themeUpdatedAt } from "@/lib/theme-page";
 
-import { KADERA_CARD } from "../og-copy";
+import { THEME_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { THEME_PUBLIC } from "../screen-flags";
-import { THEME_PAGE } from "./copy";
+import { KR_THEME_SHORT, THEME_PAGE } from "./copy";
 import { KR_MARKET } from "./market";
 import { ThemeIndexView } from "./ThemeIndexView";
 
@@ -21,11 +21,10 @@ const DEPLOYED = Boolean(process.env.VERCEL_ENV);
 
 export async function generateMetadata(): Promise<Metadata> {
   const meta = await pageMetadata({
-    title: `${THEME_PAGE.label} | hatzze`,
+    title: `${KR_THEME_SHORT} | hatzze`,
     description: THEME_PAGE.description,
     path: THEME_PAGE.href,
-    ownImage: KADERA_CARD.alt,
-    imagePath: "/kadera",
+    ownImage: THEME_CARD.alt,
   });
   return PUBLIC ? meta : { ...meta, robots: { index: false, follow: false } };
 }

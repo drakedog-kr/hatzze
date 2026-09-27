@@ -167,10 +167,11 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
       <section className="hz-sheet">
         <div className="hz-kd-hero">
           <div className="hz-kd-hero-q">
-            <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-              <strong style={{ fontSize: "var(--fs-20)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>{d.person}</strong>
+            {/* 이 화면의 h1(인물과 회사). 셸의 제목 칸은 비어 있다(AppShell SELF_TITLED_PREFIXES). */}
+            <h1 style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0, margin: 0, fontSize: "inherit", fontWeight: "inherit" }}>
+              <strong style={{ fontSize: "var(--fs-20)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>{d.person}</strong>{" "}
               <span style={{ fontSize: T.body, color: C.sub }}>{d.firm}</span>
-            </div>
+            </h1>
             {/* ⭐ **라벨 → 값 → 끝.** 예전엔 값 아래에 회색 두 줄("신고한 미국 상장주 합계 ·
                 2026 Q1" 과 "직전 2025 Q4 $15.5B")이 겹쳐 있었다. 굵기도 색도 같은 두 줄이라
                 어느 쪽이 이 숫자의 이름인지 안 보였다. 이름은 위로 올리고, 단서는 물음표
