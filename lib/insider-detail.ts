@@ -26,7 +26,7 @@
 import { cache } from "react";
 
 import { getSupabaseAdmin } from "@/lib/supabase-server";
-import { getUsdKrw } from "@/lib/seohak-external";
+import { getUsdKrw } from "@/lib/usd-krw";
 import { fetchAllRows } from "@/lib/telegram-data";
 import { usQuotes } from "@/lib/us-telegram-data";
 import { fetchDailyHistory } from "@/lib/yahoo-history";

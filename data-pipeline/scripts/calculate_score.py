@@ -567,7 +567,7 @@ def main() -> None:
     #      적어 두었는데 여기만 안 따랐다.
     today = today_kst().isoformat()
     now_utc = datetime.now(timezone.utc).isoformat()
-    # prev_score(=덮어쓰기 직전 실행의 점수)를 여기서 함께 적던 것을 걷었다. 화면에서
+    # prev_score(=덮어쓰기 직전 실행의 점수)를 여기서 함께 적던 것을 걷었다(칸은 migration_087 에서 지웠다). 화면에서
     # 그 값을 읽던 자리가 없어졌고, 남겨 두면 아무도 안 읽는 칸을 매 실행 채우게 된다.
     # 히어로 배지는 앞 '날짜' 행과 견준다(lib/data.ts 의 prevDay 주석에 근거를 적어 뒀다).
     payload = {

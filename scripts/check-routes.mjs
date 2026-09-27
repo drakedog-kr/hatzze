@@ -53,8 +53,6 @@ const EXCLUDED = new Map([
   ...(flags.THEME_PUBLIC ? [] : [["/theme", "아직 안 연 화면(app/screen-flags.ts THEME_PUBLIC=false). noindex 라 사이트맵에 없어야 한다"]]),
   // 미장 테마 리포트(/theme/us) — 같은 플래그. 테마별 실주소(/theme/us/[theme])는 아래 DYNAMIC 에 있다.
   ...(flags.THEME_PUBLIC ? [] : [["/theme/us", "아직 안 연 화면(app/screen-flags.ts THEME_PUBLIC=false). noindex 라 사이트맵에 없어야 한다"]]),
-  // 서학개미 장부(/seohak) — 꺼 둔 화면(SEOHAK_PUBLIC=false, 폐기 예정). 배포에선 404 라 사이트맵에 없어야 한다.
-  ...(flags.SEOHAK_PUBLIC ? [] : [["/seohak", "꺼 둔 화면(app/screen-flags.ts SEOHAK_PUBLIC=false). 배포에선 404"]]),
 ]);
 
 /**

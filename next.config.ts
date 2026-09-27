@@ -106,7 +106,6 @@ const nextConfig: NextConfig = {
         "/kadera/opengraph-image",
         "/kadera/us/opengraph-image",
         "/mdd/opengraph-image",
-        "/seohak/opengraph-image",
         "/insider/opengraph-image",
         "/dividend/opengraph-image",
         "/daily/opengraph-image",
