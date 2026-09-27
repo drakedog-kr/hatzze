@@ -1881,7 +1881,7 @@ export default async function UsKaderaPage() {
           <div className="hz-sheet-foot" style={{ marginTop: "auto" }}>
             <span style={{ fontSize: "var(--fs-11-5)", lineHeight: 1.6, color: C.sub }}>
               막대는 모니터링 채널 {breadth.totalChannels}곳 중 몇 곳이
-              말했는지입니다 · 같은 채널이 며칠에 걸쳐 말해도 한 곳으로 셉니다
+              말했는지입니다
             </span>
           </div>
         </section>
