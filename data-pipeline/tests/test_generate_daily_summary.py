@@ -8,6 +8,10 @@ from datetime import datetime, timezone
 
 from generate_daily_summary import (
     CHANGE_NONE,
+    brief_story,
+    temp_gap,
+    yeoron_problems,
+    yeoron_tone,
     balance_count_problems,
     balance_counts,
     change_problems,
@@ -157,3 +161,39 @@ def test_pick_movers_sparse_indicator_uses_mean():
 
 def test_change_none_is_a_sentence():
     assert CHANGE_NONE.endswith("습니다.")
+
+
+def _sent(d, pos, neg, n):
+    return {"date": d, "scope": "overall", "positive_count": pos, "negative_count": neg, "message_count": n}
+
+
+def test_yeoron_tone_uses_kadera_window():
+    # 오늘+어제가 2,000건을 넘으면 둘만 본다 — 사흘 전의 낙관은 안 들어간다(카더라 히어로와 같은 창).
+    rows = [_sent("2026-09-27", 300, 300, 1200), _sent("2026-09-26", 300, 300, 1200), _sent("2026-09-25", 900, 100, 1200)]
+    assert yeoron_tone(rows, "2026-09-27") == "중립"
+    # 표본이 얇으면 하루씩 넓힌다
+    thin = [_sent("2026-09-27", 300, 300, 600), _sent("2026-09-26", 300, 300, 600), _sent("2026-09-25", 900, 100, 1200)]
+    assert yeoron_tone(thin, "2026-09-27") == "낙관 우세"
+    assert yeoron_tone([], "2026-09-27") is None
+
+
+def test_brief_story_is_second_paragraph():
+    assert brief_story("분위기 대목입니다.\n\n테마 대목입니다.\n\n뉴스 대목입니다.") == "테마 대목입니다."
+    assert brief_story("한 대목뿐") == ""
+    assert brief_story(None) == ""
+
+
+def test_temp_gap_only_when_they_disagree():
+    assert temp_gap("저온", "낙관 우세") == "시장 온도는 저온인데 여론은 낙관이 우세합니다."
+    assert temp_gap("초고온", "비관 우세") == "시장 온도는 초고온인데 여론은 비관이 우세합니다."
+    assert temp_gap("저온", "중립") is None
+    assert temp_gap("상온", "낙관 우세") is None
+
+
+def test_yeoron_problems():
+    ok = "카더라에서는 낙관과 비관이 팽팽하고, 사흘 전엔 거의 없던 HBM 이야기가 새로 올라왔습니다."
+    assert yeoron_problems(ok, "중립", NAMES) == []
+    assert yeoron_problems("카더라에서는 낙관이 우세하고 HBM 이야기가 늘었습니다.", "중립", NAMES) == ["분위기 낙관 우세"]
+    assert yeoron_problems("카더라에서는 낙관과 비관이 팽팽하고 글이 496건 올라왔습니다.", "중립", NAMES) == ["숫자"]
+    assert yeoron_problems("카더라 총평에 따르면 낙관과 비관이 팽팽합니다.", "중립", NAMES) == ["안쪽 말"]
+    assert yeoron_problems("카더라에서는 낙관과 비관이 팽팽하고 **옵션 풋/콜 비율** 이야기가 많습니다.", "중립", NAMES) == ["지표 이름"]

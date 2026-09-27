@@ -29,6 +29,10 @@ from common.supabase_client import get_client  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 
+# 여론 줄은 카더라 히어로와 **같은 말**을 해야 한다 — 창·낙관도·구간 이름을 카더라 총평 스크립트에서 그대로
+# 가져온다(세 번째 사본을 두지 않는다. 프론트 lib/telegram-data.ts 와의 쌍둥이 관계는 그쪽 주석).
+import generate_telegram_narratives as KR  # noqa: E402
+
 # Opus 5.5. 호출은 구독(llm_client)으로 나가고, 구독이 막힌 날엔 llm_client 가 Haiku 로 바꿔 API 로 보낸다.
 # 2026-09-12 에 Sonnet 5 를 같은 자료로 견줬다. ② 갈림 문단은 Sonnet 이 정확했지만(Haiku 는
 # 초고온 개수와 상위 5개의 관계를 뭉갠다), 발송 글·급부상 한 줄까지 세 곳을 놓고 본 판정은
@@ -114,8 +118,10 @@ COMMON = """\
 #   흐름      햇쩨 지수가 며칠간 어떻게 움직였나(옛 ③ 그대로 — TREND_SYSTEM).
 #   달라진 것  최근 하루 새로 들어온 값 가운데 평소보다 크게 움직인 지표(pick_movers). 날마다 바뀐다.
 #   뜨거운 곳  지금 어디가 뜨겁고 어디가 식었나(초고온 · 가장 식은 시장 지표).
+#   여론      주식 텔레그램(카더라)의 분위기와 그날 이야기 한 가지(같은 날 넷째 줄로 채택 — 세 줄이
+#             '얼마나 뜨거운가'의 여러 면이라, 비어 있던 '사람들은 무슨 얘기를 하나'를 채운다).
 # 이름표는 코드가 붙인다(BRIEF_LABELS) — 화면(app/home/Hero.tsx)이 이름표로 새 형식을 알아본다.
-BRIEF_LABELS = ("흐름", "달라진 것", "뜨거운 곳")
+BRIEF_LABELS = ("흐름", "달라진 것", "뜨거운 곳", "여론")
 
 TREND_SYSTEM = COMMON + """
 
@@ -152,6 +158,20 @@ HOT_SYSTEM = COMMON + """
 - 과열도는 [지표별] 목록의 값을 그대로 씁니다.
 - 햇쩨 지수와 ℃, 며칠간의 흐름, 어제와 달라진 점은 쓰지 마세요(앞 두 줄이 맡습니다)."""
 
+# ⚠️ 분위기 말은 [여론] 줄 그대로다 — 카더라 히어로 제목("지금 여론은 낙관이 우세합니다")과 같은 창·같은
+#    경계로 셌다(yeoron_tone). 하루치 낙관도를 쓰면 카더라 화면의 창 값과 어긋나서 숫자는 아예 안 준다.
+# ⚠️ [이야기]는 카더라 총평의 둘째 대목(테마 지형)이다. 총평이 이미 '오늘 새로 오른 이야기'를 골라
+#    써 두었고 숫자가 없다(그 대목 규칙). 셋째 대목(뉴스·종목)은 종목·시세 말이 많아 안 준다.
+YEORON_SYSTEM = COMMON + """
+
+[이번 문장 — 여론]
+주식 텔레그램 채널(카더라)의 여론을 **한두 문장**에 담으세요. "카더라에서는"으로 시작합니다.
+- 먼저 [여론] 줄의 분위기를 그대로 씁니다('낙관이 우세'·'낙관과 비관이 팽팽'·'비관이 우세' 중 적힌 것).
+- 이어서 [이야기] 발췌에서 가장 눈에 띄는 이야기 **한 가지**를 짧게 씁니다. 발췌를 그대로 베끼진 마세요.
+- [온도차] 줄이 있으면 그 사실을 한 구절로 덧붙입니다. 없으면 두 온도를 견주지 마세요.
+- 숫자(%, 건수)는 쓰지 마세요. 종목 이름·주가 움직임·전망도 쓰지 마세요.
+- 햇쩨 지수의 ℃, 지표 이름은 쓰지 마세요(앞 세 줄이 맡습니다)."""
+
 
 # '뜻:' 설명을 붙일 지표 수와 카테고리. 옛 주인공 문단(시장 지표 중 가장 뜨거운 것 뜻풀이)의 근거였고,
 # 지금은 '흐름' 줄 자료(build_digest 기본값)에만 남아 있다 — 그 자료로 09-28 에 쟀으니 그대로 둔다.
@@ -171,6 +191,8 @@ SPOTLIGHT_CATEGORY = "시장"
 TREND_LEN = (50, 75)
 CHANGE_LEN = (50, 100)
 HOT_LEN = (60, 106)
+# 여론: 분위기 한 구절 + 이야기 한 가지 (+ 온도차 한 구절). 실측은 PR #611 본문.
+YEORON_LEN = (45, 100)
 HERO_RETRIES = 2
 
 # 크게 움직인 지표가 없는 날의 '달라진 것' 줄. 모델을 부르지 않는다 — 없다는 말을 꾸밀 재료가 없다.
@@ -186,6 +208,10 @@ HOT_FACTS_NOTE = (
     "방금 쓴 문장이 자료와 어긋납니다. '← 이 지표는 문장에 쓰지 마세요' 표시가 붙은 지표는 이름도 쓰지 말고, "
     "개수는 [갈림] 줄에 적힌 것만 쓰세요. 표시가 붙은 지표가 더 뜨겁다면 다른 지표를 '가장 뜨거운'·'가장 높은'이라고 "
     "부르지 마세요. '표시'·'목록' 같은 자료 안쪽 말은 문장에 쓰지 마세요."
+)
+YEORON_FACTS_NOTE = (
+    "방금 쓴 문장이 자료와 어긋납니다. 분위기는 [여론] 줄에 적힌 것만 쓰고, 숫자·지표 이름·자료 안쪽 말은 "
+    "쓰지 말고, 같은 뜻으로"
 )
 # 가장 뜨거운 지표가 표시에 걸려 빠진 날에만 HOT_SYSTEM 끝에 붙는다. 모델은 목록에서 이름을 쓸 수 있는 첫
 # 지표를 버릇처럼 "가장 뜨거운 ○○"라 부르는데 그날은 거짓이다.
@@ -366,6 +392,69 @@ def pick_movers(rows: list[dict], now: datetime) -> list[dict]:
         out.append((times, {**r, "times": times, "hotter": (last > 0) == (r.get("direction") != "low")}))
     out.sort(key=lambda x: -x[0])
     return [m for _, m in out[:MOVERS_LIMIT]]
+
+
+# ── 여론(카더라) ─────────────────────────────────────────────────────────────────────
+# 분위기 → 문장에 쓸 말. 카더라 히어로 제목(app/kadera/page.tsx headline)과 같은 말이다.
+YEORON_TONE_WORDS = {"낙관 우세": "낙관이 우세", "중립": "낙관과 비관이 팽팽", "비관 우세": "비관이 우세"}
+# 문장이 다른 분위기를 말했는지 가르는 꼴. '우세'·'팽팽'을 앞뒤 낱말과 함께 본다.
+_TONE_PATTERNS = {
+    "낙관 우세": re.compile(r"낙관(?:이|적인 [^.,]{0,6})?\s*우세|낙관 쪽으로 기울"),
+    "중립": re.compile(r"팽팽|엇비슷|중립"),
+    "비관 우세": re.compile(r"비관(?:이|적인 [^.,]{0,6})?\s*우세|비관 쪽으로 기울"),
+}
+# 이 날짜보다 오래된 총평이면 여론 줄을 안 쓴다(총평 단계가 실패한 날). 전날 총평까지는 받는다 — 아침
+# 실행이 그날 총평보다 먼저 도는 경우를 막으려는 여유다.
+YEORON_MAX_AGE_DAYS = 1
+
+
+def yeoron_tone(sent_rows: list[dict], latest: str) -> str | None:
+    """카더라 히어로와 같은 창(KR.sentiment_window)으로 센 전체 낙관도의 구간 이름(KR.tone_label)."""
+    overall = [r for r in sent_rows if r.get("scope") == "overall"]
+    count_by_date = {r["date"]: r.get("message_count") or 0 for r in overall}
+    days = set(KR.sentiment_window(count_by_date, latest, KR.SENTIMENT_MIN_MESSAGES))
+    pos = sum(r.get("positive_count") or 0 for r in overall if r["date"] in days)
+    neg = sum(r.get("negative_count") or 0 for r in overall if r["date"] in days)
+    opt = KR.optimism(pos, neg)
+    return None if opt is None else KR.tone_label(opt)
+
+
+def brief_story(summary: str | None) -> str:
+    """카더라 총평의 둘째 대목(테마 지형). 대목은 빈 줄로 갈린다(app/kadera/page.tsx 와 같은 규칙)."""
+    paras = [p.strip() for p in re.split(r"\n{2,}", summary or "") if p.strip()]
+    return paras[1] if len(paras) > 1 else ""
+
+
+def temp_gap(stage: str, tone: str) -> str | None:
+    """시장 온도와 여론이 엇갈리는 날만 사실 한 줄. 그 밖엔 두 온도를 견주지 않는다(없는 대비를 짓지 않게)."""
+    if stage == "저온" and tone == "낙관 우세":
+        return "시장 온도는 저온인데 여론은 낙관이 우세합니다."
+    if stage in ("고온", "초고온") and tone == "비관 우세":
+        return f"시장 온도는 {stage}인데 여론은 비관이 우세합니다."
+    return None
+
+
+def yeoron_digest(tone: str, story: str, gap: str | None) -> str:
+    lines = [f"[여론] 최근 주식 텔레그램 채널 글의 분위기: {YEORON_TONE_WORDS[tone]}"]
+    if story:
+        lines += ["[이야기] 카더라 총평에서 발췌", story]
+    if gap:
+        lines.append(f"[온도차] {gap}")
+    return "\n".join(lines)
+
+
+def yeoron_problems(text: str, tone: str, names: list[str]) -> list[str]:
+    """여론 줄이 다른 분위기를 말했거나, 숫자·지표 이름·자료 안쪽 말을 옮겼으면."""
+    plain = text.replace("**", "")
+    found = [f"분위기 {t}" for t, pat in _TONE_PATTERNS.items() if t != tone and pat.search(plain)]
+    if re.search(r"\d\s*(?:%|건|회|개)", plain):
+        found.append("숫자")
+    if names_in_line(plain, names):
+        found.append("지표 이름")
+    # 재료 이름을 옮기는 것도 안쪽 말이다("카더라 총평에 따르면") — 읽는 사람에겐 출처가 두 겹이 된다.
+    if INNER_WORDS_RE.search(plain) or re.search(r"총평|발췌", plain):
+        found.append("안쪽 말")
+    return found
 
 
 def change_digest(movers: list[dict]) -> str:
@@ -866,9 +955,46 @@ def main() -> None:
         print("[WARNING] LLM 응답이 비어 요약을 저장하지 않습니다.")
         return
 
+    # 여론 — 카더라 총평(같은 잡에서 먼저 돈다, daily-update.yml)과 여론 집계. 총평이 없거나 낡았으면 이 줄만
+    # 뺀다(세 줄로 저장된다 — 화면은 줄 수와 상관없이 이름표로 그린다).
+    yeoron = ""
+    brief = (
+        client.table("telegram_daily_brief")
+        .select("date, sentiment_summary")
+        .order("date", desc=True)
+        .limit(1)
+        .execute()
+    ).data
+    if brief and (date.fromisoformat(target_date) - date.fromisoformat(brief[0]["date"])).days <= YEORON_MAX_AGE_DAYS:
+        latest = brief[0]["date"]
+        since = (date.fromisoformat(latest) - timedelta(days=KR.SENTIMENT_WINDOW_MAX_DAYS)).isoformat()
+        sent_rows = (
+            client.table("telegram_sentiment_daily")
+            .select("date, scope, positive_count, negative_count, message_count")
+            .eq("scope", "overall")
+            .gte("date", since)
+            .lte("date", latest)
+            .execute()
+        ).data
+        tone = yeoron_tone(sent_rows, latest)
+        if tone:
+            yeoron_src = yeoron_digest(tone, brief_story(brief[0]["sentiment_summary"]), temp_gap(stage, tone))
+            print(yeoron_src)
+            print("─" * 60)
+            yeoron = sized_sentence(
+                YEORON_SYSTEM,
+                YEORON_LEN,
+                yeoron_src,
+                how="한두 문장",
+                facts=lambda t: yeoron_problems(t, tone, names),
+                facts_note=YEORON_FACTS_NOTE,
+            )
+    if not yeoron:
+        print("[여론] 카더라 총평·여론 집계가 없거나 낡아 이 줄을 뺍니다.")
+
     # 줄마다 이름표를 붙여 개행으로 잇는다 — 화면(app/home/Hero.tsx)이 이름표로 새 형식을 알아보고, 굵게는
     # 지표 이름에만 남긴다(keep_bold_names). ⚠️ 줄 순서가 화면 순서다.
-    lines = [trend, change, hot]
+    lines = [trend, change, hot] + ([yeoron] if yeoron else [])
     summary = "\n".join(f"[{label}] {keep_bold_names(t, names)}" for label, t in zip(BRIEF_LABELS, lines))
     print("[요약]\n  " + summary.replace("\n", "\n  "))
 
