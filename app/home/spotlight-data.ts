@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getPreview } from "@/lib/kr-preview";
+import { getPreview, sessionSpan, type SessionSpan } from "@/lib/kr-preview";
 import { isLoadFailed } from "@/lib/load-state";
 import { pickNextUpSlot, type NextUpClock, type NextUpSlot } from "@/lib/next-up-slot";
 import { getSurgingStocks, getThemeRotation } from "@/lib/telegram-data";
@@ -11,7 +11,7 @@ import { THEME_PUBLIC } from "../screen-flags";
  * 시장 브리핑 히어로 바닥 '오늘 눈에 띄는 것' 칩의 재료(국장 카더라 히어로와 같은 줄, .hz-tx-spot).
  *
  * 칩 둘 — 모두 집계값이라 LLM 문장이 아니다(카더라와 같은 원칙). 둘 다 다른 화면으로 보낸다.
- *   ① 시각 칩: 평일 06:30~10:00 간밤 미장(국장 미리보기), 그 밖엔 카더라 급부상 1위.
+ *   ① 시각 칩: 평일 06:30~10:00 밤사이 미장(국장 미리보기), 그 밖엔 카더라 급부상 1위.
  *      규칙은 lib/next-up-slot.ts, 고르는 건 브라우저(HeroSpotlights).
  *   ② 테마 유입 1위 — 그 테마 리포트로. 카더라 히어로의 '테마 유입' 칩과 같은 값(점유율 증가폭 1위).
  *
@@ -50,6 +50,11 @@ const HOT = "var(--c-hot-ink)";
 const COLD = "var(--c-cold-ink)";
 const pct = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(1)}%`;
 
+// 미장 칩 머리말. 어느 경우인지는 국장 미리보기 화면과 같은 판정이다(sessionSpan).
+// ⛔ "간밤"·"어젯밤"은 쓰지 않는다 — "간밤 미장"으로 냈다가 어색하다고 이 셋으로 정했다(2026-09-28).
+// 'earlier'(어젯밤보다 앞 세션 하나)는 평일 아침엔 주말 뒤뿐이다 — 미장이 쉰 밤은 칩을 안 세운다(아래 usHoliday).
+const SESSION_CAP: Record<SessionSpan, string> = { night: "밤사이 미장", earlier: "주말 미장", stretch: "연휴 동안 미장" };
+
 async function previewChip(): Promise<{ chip: SpotChip | null; date: string | null }> {
   try {
     const p = await getPreview();
@@ -58,11 +63,18 @@ async function previewChip(): Promise<{ chip: SpotChip | null; date: string | nu
     // 가장 붐비는 시각(평일 8시)에 선다. 그땐 카더라 칩이 선다.
     if (p.usHoliday || !top || !p.date) return { chip: null, date: null };
     return {
-      chip: { cap: "간밤 미장", name: top.usName, val: pct(top.dp), ink: top.dp > 0 ? HOT : COLD, href: "/preview", ga: "spotlight_preview" },
+      chip: {
+        cap: SESSION_CAP[sessionSpan(p.date, p.usSession, p.usFrom)],
+        name: top.usName,
+        val: pct(top.dp),
+        ink: top.dp > 0 ? HOT : COLD,
+        href: "/preview",
+        ga: "spotlight_preview",
+      },
       date: p.date,
     };
   } catch (e) {
-    console.error("[spotlight] 국장 미리보기를 못 읽었습니다 — 간밤 미장 칩을 뺍니다", e);
+    console.error("[spotlight] 국장 미리보기를 못 읽었습니다 — 미장 칩을 뺍니다", e);
     return { chip: null, date: null };
   }
 }
@@ -113,7 +125,7 @@ export async function loadSpotlight(): Promise<SpotlightData> {
   const [preview, surging, theme] = await Promise.all([previewChip(), surgingChip(), themeChip()]);
   const clock = { previewDate: preview.date };
   return {
-    // 간밤 미장 칩이 없는 날(미장 휴장 등)엔 그 시각에도 카더라 칩이 선다(clock.previewDate 가 null).
+    // 미장 칩이 없는 날(미장 휴장 등)엔 그 시각에도 카더라 칩이 선다(clock.previewDate 가 null).
     timed: { preview: preview.chip, kadera: surging },
     clock,
     // 시각은 여기서 읽는다 — 렌더 중에 Date.now() 를 부르면 react-hooks/purity 에 걸린다.
