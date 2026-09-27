@@ -282,14 +282,16 @@ export default async function StockDetailPage({
           <div className="hz-kd-hero-q">
             <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
               <StockLogo code={d.ticker} name={d.name} market="US" size={40} />
-              <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+              {/* 이 화면의 h1(티커와 이름). 셸의 제목 칸은 비어 있다(AppShell SELF_TITLED_PREFIXES).
+                  생김새는 그대로 두고 감싸는 태그만 h1 이다 — 사이의 공백은 읽을 때 "NVDA 엔비디아"로 떼어 준다. */}
+              <h1 style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, margin: 0, fontSize: "inherit", fontWeight: "inherit" }}>
                 <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
                   {d.ticker}
-                </strong>
+                </strong>{" "}
                 <span style={{ fontSize: T.body, fontWeight: 500, color: C.sub, overflow: "hidden", textOverflow: "ellipsis" }}>
                   {d.name || "이름 미상"}
                 </span>
-              </span>
+              </h1>
             </div>
             <Quote price={d.price} change={d.changeRate} rate={d.usdKrw} large />
 

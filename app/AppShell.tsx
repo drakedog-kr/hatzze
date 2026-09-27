@@ -1436,8 +1436,18 @@ function encodedPath(pathname: string): string {
     .join("/");
 }
 
+/**
+ * **자기 h1 을 그리는** 상세 화면의 주소 머리. 셸은 이 화면들의 이름(종목·투자자)을 알 길이 없다.
+ *
+ * 국장 종목(`/stock/005930`)은 NAV 에 부모가 없어 저절로 제목 칸이 비지만, 미장 종목·투자자는
+ * `/insider` 아래라 부모를 집어 와 h1 이 '내부자 리포트'가 됐다(2026-09-27 점검 · `<title>` 은
+ * '엔비디아(NVDA) 내부자 공시'). 여기 적힌 주소는 제목 칸을 비우고, 화면이 히어로에 자기 h1 을 둔다.
+ */
+const SELF_TITLED_PREFIXES = ["/insider/stock/", "/insider/investor/"];
+
 function PageHeader() {
   const pathname = useAppPathname();
+  const selfTitled = SELF_TITLED_PREFIXES.some((p) => pathname.startsWith(p));
   const page = navFor(useShellEnv()).find((n) => isActive(n.href, pathname));
   // 서브 페이지에서는 서브의 이름을 h1 으로 쓴다. 부모(구역)의 이름을 그대로 두면
   // /kadera 와 /kadera/us 두 페이지가 **같은 h1** 을 갖는다.
@@ -1508,7 +1518,7 @@ function PageHeader() {
       {/* ⚠️ `page` 만으로는 부족하다 — NAV 에 없고 DEEP_PAGES 에만 있는 화면
           (아직 안 연 /preview)이 제목 칸을 통째로 비운다. */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12, minWidth: 0, flex: 1 }}>
-      {(page || deep) && (
+      {(page || deep) && !selfTitled && (
         <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
           {/* 배지는 제목과 같은 줄, 세로 가운데 정렬. baseline 으로 두면 알약의 **글자**
               밑선이 제목 밑선에 맞아, 알약 자체는 그만큼(패딩+테두리) 아래로 내려앉는다 —
