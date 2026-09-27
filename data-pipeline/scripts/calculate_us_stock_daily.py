@@ -187,6 +187,7 @@ def main() -> None:
         db.table("telegram_us_stock_daily").upsert(
             stock_rows[i : i + 500], on_conflict="date,ticker"
         ).execute()
+    drop_stale_stock_rows(db, stock_rows)
     for i in range(0, len(channel_rows), 500):
         db.table("telegram_us_channel_daily").upsert(
             channel_rows[i : i + 500], on_conflict="date,channel_handle"
@@ -206,6 +207,41 @@ def main() -> None:
 #    화면은 창이 다르면 이 표를 안 쓰고 일별 최댓값으로 물러난다(getUsStockReports).
 #    그러니 여기를 고쳐야 합집합이 다시 쓰인다.
 BREADTH_WINDOW_DAYS = 3
+
+
+# 지울 옛 행이 이번에 쓴 행의 이 비율을 넘으면 지우지 않고 멈춘다. 추출이 반쯤 비었거나 조회가
+# 잘렸을 때 멀쩡한 과거 행을 쓸어 내지 않게 하는 안전장치다. 평소는 0 이고, 은행 화자 행을 뺀
+# 2026-09-27 에 4%(307행 / 7,794행)였다.
+STALE_MAX_RATIO = 0.2
+
+
+def drop_stale_stock_rows(db, stock_rows: list[dict]) -> None:
+    """이번 계산에 없는 (날짜, 종목) 행을 지운다.
+
+    ⚠️⚠️ **upsert 만으로는 '없어진 행'이 안 없어진다.** 위 주석은 "전량 재계산이라 upsert 로
+    갈아 끼운다"고 했지만, 갈아 끼워지는 건 **이번에도 나온** 행뿐이다. 추출 규칙이 바뀌어 어떤
+    종목의 그날 언급이 0 이 되면 그 행은 새로 안 만들어지고 옛 숫자를 든 채 남는다. 은행 화자
+    행을 종목 언급에서 뺀 2026-09-27(config.RESEARCH_HOUSES 주석)에 드러났다 — 은행 행 304개가
+    그대로 남아 금융 테마 점유율도 급부상도 안 바뀌었고, 예전 규칙 변경이 남긴 DLR·EQIX·ASTS
+    한 줄씩도 같이 나왔다. 국내 짝(calculate_stock_daily)은 지우고 다시 쓰는 구조라 이 구멍이 없다.
+    """
+    if not stock_rows:
+        return
+    fresh = {(r["date"], r["ticker"]) for r in stock_rows}
+    stale = [
+        r["id"]
+        for r in load_all_keyset(db, "telegram_us_stock_daily", "id,date,ticker")
+        if (r["date"], r["ticker"]) not in fresh
+    ]
+    if not stale:
+        return
+    if len(stale) > len(stock_rows) * STALE_MAX_RATIO:
+        print(f"[경고] 지울 옛 행이 {len(stale):,}행으로 이번에 쓴 {len(stock_rows):,}행의 "
+              f"{STALE_MAX_RATIO:.0%} 를 넘습니다. 입력이 잘렸을 수 있어 지우지 않습니다.")
+        return
+    for i in range(0, len(stale), 200):
+        db.table("telegram_us_stock_daily").delete().in_("id", stale[i : i + 200]).execute()
+    print(f"[정리] 이번 계산에 없는 (날짜, 종목) {len(stale):,}행 삭제")
 
 
 def save_breadth(db, messages: dict, us_mentions: list[dict]) -> None:
@@ -263,6 +299,22 @@ def save_breadth(db, messages: dict, us_mentions: list[dict]) -> None:
             db.table("telegram_us_stock_breadth").upsert(
                 rows[i : i + 500], on_conflict="as_of_date,window_days,ticker"
             ).execute()
+        # 같은 날 앞선 실행이 쓴 종목 중 이번에 없는 것도 지운다(drop_stale_stock_rows 와 같은 구멍).
+        keep = {r["ticker"] for r in rows}
+        stale = [
+            r["ticker"]
+            for r in (
+                db.table("telegram_us_stock_breadth").select("ticker")
+                .eq("as_of_date", as_of.isoformat()).eq("window_days", BREADTH_WINDOW_DAYS)
+                .execute().data or []
+            )
+            if r["ticker"] not in keep
+        ]
+        if stale:
+            db.table("telegram_us_stock_breadth").delete().eq("as_of_date", as_of.isoformat()).eq(
+                "window_days", BREADTH_WINDOW_DAYS
+            ).in_("ticker", stale).execute()
+            print(f"[정리] telegram_us_stock_breadth 이번에 없는 {len(stale)}종목 삭제: {', '.join(stale)}")
     except Exception as exc:  # noqa: BLE001
         print(f"[안내] telegram_us_stock_breadth 저장을 건너뜁니다({type(exc).__name__}) — "
               "마이그레이션 037 적용 여부를 확인하세요.")
