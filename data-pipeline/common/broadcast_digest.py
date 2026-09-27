@@ -74,6 +74,7 @@ from .supabase_client import execute_with_retry, load_keyset
 from .surging import load_stock_daily, top_surging
 from .text_check import problems
 from .timeutil import KST, today_kst
+from config.us_stock_extraction import is_house
 
 FORMATS = ("morning2", "evening2", "midweek", "us_weekend", "weekly2")
 NY = ZoneInfo("America/New_York")
@@ -160,6 +161,9 @@ class Excerpt:
     posted_at: datetime
     kr: list[str] = field(default_factory=list)   # 종목코드
     us: list[str] = field(default_factory=list)   # 티커
+    # 미국 얘기 글인가. us 보다 넓다 — 은행이 전망을 말한 글(config.RESEARCH_HOUSES 주석)은 은행을
+    # 종목 태그로 안 달지만 미국 거시·AI 투자 얘기라 미장 몫 재료로는 고른다.
+    us_talk: bool = False
     channels: set[str] = field(default_factory=set)  # 같은 본문을 나른 채널들(복붙 묶음)
 
 
@@ -362,9 +366,11 @@ def tag_stocks(db, excerpts: list[Excerpt]) -> tuple[dict[str, str], dict[str, s
             if e and r["stock_code"] not in e.kr:
                 e.kr.append(r["stock_code"])
                 kr_codes.add(r["stock_code"])
-        for r in paged("telegram_message_us_stocks", "id,channel_handle,message_id,ticker", chunk):
+        for r in paged("telegram_message_us_stocks", "id,channel_handle,message_id,ticker,method", chunk):
             e = keys.get((r["channel_handle"], int(r["message_id"])))
-            if e and r["ticker"] not in e.us:
+            if e:
+                e.us_talk = True
+            if e and not is_house(r) and r["ticker"] not in e.us:
                 e.us.append(r["ticker"])
                 us_tickers.add(r["ticker"])
 
@@ -383,7 +389,7 @@ def load_material(db, lo: datetime, hi: datetime, n: int, multi: bool = False, u
     picked = pick_excerpts(rows, n * 2 if us_only else n)
     kr_names, us_names = tag_stocks(db, picked)
     if us_only:
-        picked = [e for e in picked if e.us][:n]
+        picked = [e for e in picked if e.us_talk][:n]
         for i, e in enumerate(picked):
             e.n = i + 1
     return Material(picked, kr_names, us_names, (lo, hi), len(rows))

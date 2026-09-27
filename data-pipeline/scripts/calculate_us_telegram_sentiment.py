@@ -46,7 +46,7 @@ from common.supabase_client import has_column, get_client, load_all, load_all_ke
 from common.timeutil import KST  # noqa: E402
 from config.issue_keywords import EXCLUDE, MAX_KEYWORD_LEN, MIN_KEYWORD_LEN  # noqa: E402
 from config.stock_extraction import ALIASES as STOCK_ALIASES  # noqa: E402
-from config.us_stock_extraction import US_NAMES  # noqa: E402
+from config.us_stock_extraction import US_NAMES, is_house  # noqa: E402
 from config.us_stock_themes import US_THEMES  # noqa: E402
 
 # 정규화·버킷 규칙은 국내 집계가 이미 정한 것을 그대로 가져다 쓴다. 여기서 다시 짜면
@@ -369,7 +369,7 @@ def main() -> None:
     #    있어야 한다 — 국내 쪽이 telegram_message_stocks 에서 stock_code 를 받는 것과
     #    같은 자리다. 열 하나가 늘 뿐 조회 수는 그대로다.
     us_mentions = load_all_keyset(
-        db, "telegram_message_us_stocks", "id,channel_handle,message_id,ticker"
+        db, "telegram_message_us_stocks", "id,channel_handle,message_id,ticker,method"
     )
     us_keys = {(m["channel_handle"], m["message_id"]) for m in us_mentions}
     if not us_keys:
@@ -384,8 +384,11 @@ def main() -> None:
         for t in tickers:
             themes_of_ticker[t].append(theme)
     tickers_of_msg: dict[tuple[str, int], set[str]] = defaultdict(set)
+    # 은행 화자 행(config.RESEARCH_HOUSES 주석)은 '미국 얘기'로는 세지만(위 us_keys) 어느 종목·테마의
+    # 톤으로는 안 센다 — `골드만삭스는 … 전망` 의 톤은 금융 테마나 골드만삭스의 톤이 아니다.
     for m in us_mentions:
-        tickers_of_msg[(m["channel_handle"], m["message_id"])].add(m["ticker"])
+        if not is_house(m):
+            tickers_of_msg[(m["channel_handle"], m["message_id"])].add(m["ticker"])
 
     # text_hash 는 migration_065 가 더한 열이다. 아직 없으면 그 열 없이 읽고 중복 제거를 건너뛴다.
     has_hash = has_column(db, "telegram_message_analysis", "text_hash")

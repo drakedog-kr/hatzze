@@ -37,6 +37,7 @@ from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.supabase_client import get_client, load_all  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 from common.us_theme_risers import us_theme_risers  # noqa: E402
+from config.us_stock_extraction import is_house  # noqa: E402
 from config.us_stock_themes import US_THEMES  # noqa: E402
 
 import generate_telegram_narratives as KR  # noqa: E402
@@ -169,6 +170,9 @@ def main() -> None:
             themes_of[t].append(theme)
 
     msgs = [m for m in US.load_us_messages(db, since) if m["date"] <= end]
+    # 은행 화자 태그(config.RESEARCH_HOUSES 주석)는 테마 재료에서 뗀다 — `골드만삭스는 … 전망` 은 금융 테마 얘기가 아니다.
+    for m in msgs:
+        m["mentions"] = [x for x in m["mentions"] if not is_house(x)]
     print(f"[재료] 창 안 미국 언급 메시지 {len(msgs):,}건")
 
     # ── 둘째 몫: 급부상 종목의 이유 ── digest 는 종목 요약과 같은 함수·같은 창.

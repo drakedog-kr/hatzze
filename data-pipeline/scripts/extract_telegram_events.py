@@ -256,7 +256,11 @@ class UsLinker:
         c = " ".join((company or "").split())
         if not c:
             return None
-        found = USEX.extract(c, self.pattern, self.match_to_ticker, self.caseless)
+        # 은행(RESEARCH_HOUSES)은 추출이 '주식으로 다뤄진 자리'만 종목 언급으로 돌려주는데, 여기 오는 건
+        # 모델이 뽑은 회사 **이름** 하나라(`JP모건`) 그 자리가 없다. 이름을 잇는 일이라 말하는 자리도 받는다.
+        house: dict[str, str] = {}
+        found = USEX.extract(c, self.pattern, self.match_to_ticker, self.caseless, house)
+        found = {**house, **found}
         if len(found) == 1:
             return next(iter(found))
         if len(found) > 1:
