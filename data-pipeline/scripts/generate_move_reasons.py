@@ -58,7 +58,7 @@ from common.supabase_client import (  # noqa: E402
 )
 from common.text_check import problems  # noqa: E402
 from common.timeutil import KST, today_kst  # noqa: E402
-from config.us_stock_extraction import RESEARCH_HOUSES  # noqa: E402
+from config.us_stock_extraction import RESEARCH_HOUSES, is_house  # noqa: E402
 
 import generate_telegram_narratives as KR  # noqa: E402
 
@@ -152,8 +152,9 @@ def bare_ranking(text: str) -> bool:
 
 # ── 리서치를 내는 은행(config.us_stock_extraction.RESEARCH_HOUSES) ──────────────────
 #
-# 미장 추출이 이 다섯의 태그를 '주식으로 다뤄진' 글에만 붙인다. 여기서는 한 겹 더 좁혀서,
-# 은행 이름 **바로 뒤에** 제 등락이 붙은 글(`JP모건(-1.71%)`)만 발췌에 넣고 창도 그 자리에 세운다.
+# 미장 추출이 이 다섯이 말하는 자리만 있는 글을 method="house" 로 표시하고, 아래 언급 읽기가 그 행을 거른다.
+# 여기서는 한 겹 더 좁혀서 은행 이름 **바로 뒤에** 제 등락이 붙은 글(`JP모건(-1.71%)`)만 발췌에 넣고
+# 창도 그 자리에 세운다.
 # 한 글에 `JP모건의 보안 지출 전망에 센티넬원(+3.85%)` 과 `JP모건(-1.71%)` 이 같이 있으면 첫 자리로
 # 창을 세우는 기본 규칙은 앞의 전망을 보여 준다. 이름 **앞**의 표기(`SiTime(+9.1%) 모건스탠리가`)는
 # 은행이 움직인 남의 종목 것이라 안 읽는다. 주가 얘기가 없는 날은 주목도 후보에서도 뺀다.
@@ -484,8 +485,11 @@ def run_market(db, client, cfg: dict, day: str, dry_run: bool) -> int:
     #    날짜로 좁히는 서버 조인은 8초 벽에 걸린다, 2026-09-06 실측).
     cset = set(cands0)
     by_code: dict[str, list[tuple[tuple, str]]] = defaultdict(list)
-    for m in load_all_keyset(db, cfg["mentions"], f"id,channel_handle,message_id,{key},match_text"):
+    for m in load_all_keyset(db, cfg["mentions"], f"id,channel_handle,message_id,{key},match_text,method"):
         mk = (m["channel_handle"], m["message_id"])
+        # 은행 화자 행(미장 · config.RESEARCH_HOUSES 주석)은 그 은행 언급이 아니다. 국장 행엔 없는 값이다.
+        if is_house(m):
+            continue
         if m[key] in cset and mk in msgs:
             by_code[m[key]].append((mk, m.get("match_text") or ""))
 

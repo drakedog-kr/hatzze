@@ -61,6 +61,7 @@ from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.supabase_client import get_client, load_all, load_window_keyset  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
 from common.timeutil import KST  # noqa: E402
+from config.us_stock_extraction import is_house  # noqa: E402
 
 # 국내 스크립트에서 그대로 가져다 쓰는 기계. 길이 규칙·문장 자르기·낙관도 평활은
 # 두 화면이 같아야 하고, 손으로 베끼면 한쪽만 고쳤을 때 조용히 갈린다.
@@ -348,7 +349,7 @@ def load_us_messages(db, since_date: str) -> list[dict]:
         db,
         "telegram_messages",
         # forwards 는 미장 테마 요약(generate_us_theme_briefs.py)이 발췌를 줄 세울 때 쓴다(views + forwards×3 — 국장 종목 요약과 같은 잣대).
-        "id,channel_handle,message_id,text,posted_at,views,forwards,telegram_message_us_stocks(ticker,match_text)",
+        "id,channel_handle,message_id,text,posted_at,views,forwards,telegram_message_us_stocks(ticker,match_text,method)",
         since_utc,
     )
     out = []
@@ -512,7 +513,9 @@ def build_brief_digest(db, latest: str, msgs: list[dict], name_of: dict[str, str
         counter = Counter()
         for m in picked:
             for x in m["mentions"]:
-                counter[x["ticker"]] += 1
+                # 은행 화자 행(config.RESEARCH_HOUSES 주석)은 화제 종목이 아니다. 글은 위 발췌에 그대로 남는다.
+                if not is_house(x):
+                    counter[x["ticker"]] += 1
         if counter:
             lines += [
                 "",
@@ -582,7 +585,9 @@ def build_stock_digests(
     by_ticker: dict[str, list[dict]] = defaultdict(list)
     for m in win:
         for x in m["mentions"]:
-            by_ticker[x["ticker"]].append({**m, "match_text": x.get("match_text")})
+            # 은행이 전망을 말한 글은 그 은행의 종목 요약 재료가 아니다(config.RESEARCH_HOUSES 주석).
+            if not is_house(x):
+                by_ticker[x["ticker"]].append({**m, "match_text": x.get("match_text")})
 
     # 동률은 티커로 가른다 — 안 가르면 메시지를 받은 순서가 순위를 정하고, 그 순서는
     # 조회 방식이 바뀔 때마다 달라진다(2026-09-15 실측: GS·SPCX 124회 동률이 뒤집혔다).

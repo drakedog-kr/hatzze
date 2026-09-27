@@ -59,3 +59,87 @@ def test_own_move_after_reads_only_after_the_name():
     # 이름 뒤 공백이 길어도 표기를 놓치지 않는다(원문을 먼저 자르면 창 밖으로 밀린다).
     t3 = "골드만삭스" + " " * 200 + "-3.96%"
     assert own_move_after(t3, len("골드만삭스"))
+
+
+# ── 화자 자리는 지우지 않고 표시한다(method="house") ──────────────────────────
+
+def test_speaker_only_bank_goes_to_house():
+    mt = ex.build_dictionary()
+    pattern, caseless = ex.build_pattern(list(mt))
+    house = {}
+    found = ex.extract("골드만삭스는 하이퍼스케일러 AI 투자가 늘 것으로 전망했다", pattern, mt, caseless, house)
+    assert "GS" not in found and house == {"GS": "골드만삭스"}
+    house = {}
+    found = ex.extract("골드만삭스는 유가 전망을 올렸다. 골드만삭스(-3.96%) 하락", pattern, mt, caseless, house)
+    assert "GS" in found and house == {}
+
+
+def test_is_house():
+    from config.us_stock_extraction import HOUSE_METHOD, is_house
+    assert is_house({"ticker": "GS", "method": HOUSE_METHOD})
+    assert not is_house({"ticker": "GS", "method": "dict"})
+    assert not is_house({"ticker": "GS"})  # 국장 행·예전 행은 method 가 dict·alias·None 이다
+
+
+def test_event_linker_still_links_bank_names():
+    import extract_telegram_events as ev
+    link = ev.UsLinker()
+    assert link.ticker_of("JP모건") == "JPM"
+    assert link.ticker_of("골드만삭스") == "GS"
+    assert link.ticker_of("엔비디아") == "NVDA"
+
+
+class _Resp:
+    def __init__(self, data):
+        self.data = data
+
+
+class _Q:
+    def __init__(self, rows):
+        self.rows, self.ids = rows, None
+
+    def select(self, *_a, **_k):
+        return self
+
+    def in_(self, _col, vals):
+        self.ids = set(vals)
+        return self
+
+    def order(self, *_a, **_k):
+        return self
+
+    def range(self, a, b):
+        self.rows = self.rows[a : b + 1]
+        return self
+
+    def execute(self):
+        return _Resp([r for r in self.rows if self.ids is None or r.get("message_id", r.get("ticker", r.get("code"))) in self.ids])
+
+
+class _DB:
+    def __init__(self, tables):
+        self.tables = tables
+
+    def table(self, name):
+        return _Q(list(self.tables.get(name, [])))
+
+
+def test_broadcast_tags_skip_house_but_keep_us_talk():
+    from datetime import datetime
+
+    import common.broadcast_digest as bd
+
+    e1 = bd.Excerpt(n=1, channel="a", message_id=1, text="골드만삭스는 AI CapEx 전망", views=1, forwards=0, posted_at=datetime(2026, 9, 25))
+    e2 = bd.Excerpt(n=2, channel="a", message_id=2, text="엔비디아 급등", views=1, forwards=0, posted_at=datetime(2026, 9, 25))
+    e3 = bd.Excerpt(n=3, channel="a", message_id=3, text="코스피 마감", views=1, forwards=0, posted_at=datetime(2026, 9, 25))
+    db = _DB({
+        "telegram_message_us_stocks": [
+            {"channel_handle": "a", "message_id": 1, "ticker": "GS", "method": "house"},
+            {"channel_handle": "a", "message_id": 2, "ticker": "NVDA", "method": "dict"},
+        ],
+        "us_stocks": [{"ticker": "NVDA", "name_ko": "엔비디아"}],
+    })
+    bd.tag_stocks(db, [e1, e2, e3])
+    assert (e1.us, e1.us_talk) == ([], True)      # 미장 몫 재료로는 고르되 골드만삭스 태그는 안 단다
+    assert (e2.us, e2.us_talk) == (["NVDA"], True)
+    assert (e3.us, e3.us_talk) == ([], False)

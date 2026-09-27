@@ -56,6 +56,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client, load_all, load_all_keyset  # noqa: E402
 from common.timeutil import KST  # noqa: E402
+from config.us_stock_extraction import is_house  # noqa: E402
 
 # 창 길이. 짧으면 표본이 얇아 lift 가 튀고, 길면 새로 생긴 연결이 늦게 뜬다.
 WINDOW_DAYS = 14
@@ -80,7 +81,11 @@ def main() -> None:
         (m["channel_handle"], m["message_id"]): m["posted_at"]
         for m in load_all_keyset(db, "telegram_messages", "id,channel_handle,message_id,posted_at")
     }
-    us_rows = load_all_keyset(db, "telegram_message_us_stocks", "id,channel_handle,message_id,ticker")
+    # 은행 화자 행(config.RESEARCH_HOUSES 주석)은 종목 짝이 아니다 — `골드만삭스는 … 삼성전자 목표가 상향`.
+    us_rows = [
+        r for r in load_all_keyset(db, "telegram_message_us_stocks", "id,channel_handle,message_id,ticker,method")
+        if not is_house(r)
+    ]
     kr_rows = load_all_keyset(db, "telegram_message_stocks", "id,channel_handle,message_id,stock_code")
 
     dates = [

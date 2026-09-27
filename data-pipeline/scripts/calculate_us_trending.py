@@ -38,6 +38,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import PAGE_SIZE, get_client, load_all, load_all_keyset  # noqa: E402
 from common.timeutil import KST, today_kst  # noqa: E402
+from config.us_stock_extraction import is_house  # noqa: E402
 
 # ⚠️ 국내(calculate_telegram_trending.py)·lib/telegram-data.ts 와 같은 값이어야 한다.
 # 같은 화면 어법의 카드라, 가중치가 갈리면 두 목록이 다른 뜻의 '트렌딩'이 된다.
@@ -111,7 +112,11 @@ def fetch_texts(db, keys: list[tuple[str, int]]) -> dict[tuple[str, int], str]:
 
 
 def us_stock_tags(db, keys: list[tuple[str, int]], name_of: dict[str, str]) -> dict[tuple[str, int], list[str]]:
-    """메시지별 **미국** 종목 태그. 국내 종목은 붙이지 않는다."""
+    """메시지별 **미국** 종목 태그. 국내 종목은 붙이지 않는다.
+
+    은행 화자 행(config.RESEARCH_HOUSES 주석)은 태그로 안 붙인다 — 글은 미장 트렌딩 후보로 남지만
+    (`골드만삭스, 하이퍼스케일러 AI CapEx 전망`) 그 글이 골드만삭스 주식 얘기는 아니다.
+    """
     if not keys:
         return {}
     ids = sorted({k[1] for k in keys})
@@ -123,7 +128,7 @@ def us_stock_tags(db, keys: list[tuple[str, int]], name_of: dict[str, str]) -> d
         while True:
             page = (
                 db.table("telegram_message_us_stocks")
-                .select("channel_handle,message_id,ticker")
+                .select("channel_handle,message_id,ticker,method")
                 .in_("message_id", chunk)
                 .order("id")
                 .range(start, start + PAGE_SIZE - 1)
@@ -132,7 +137,7 @@ def us_stock_tags(db, keys: list[tuple[str, int]], name_of: dict[str, str]) -> d
             ) or []
             for r in page:
                 k = (r["channel_handle"], r["message_id"])
-                if k not in want:
+                if k not in want or is_house(r):
                     continue
                 arr = by_msg.setdefault(k, [])
                 nm = name_of.get(r["ticker"], r["ticker"])

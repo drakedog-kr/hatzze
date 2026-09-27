@@ -23,10 +23,11 @@
    제품명·기술명으로도 쓰이는 것들이다: RTX+숫자=GPU · ARM+아키텍처 · 구글+플레이.
    국내의 '동음이의'(결 ③)와 같은 부류라 이름을 죽이지 않고 자리를 본다.
 
-4. **리서치를 내는 은행은 '주식으로 다뤄진' 자리만 센다**(RESEARCH_HOUSES · treated_as_stock).
-   골드만삭스·JP모건·모건스탠리·뱅크오브아메리카·씨티그룹은 거의 늘 전망을 **말하는 쪽**으로
-   나온다. 국내의 publisher_context 와 같은 문제인데, 치우침이 훨씬 커서 빼는 쪽이 아니라
-   인정하는 쪽으로 가른다(근거는 config 주석).
+4. **리서치를 내는 은행은 '주식으로 다뤄진' 자리만 종목 언급으로 센다**(RESEARCH_HOUSES ·
+   treated_as_stock). 골드만삭스·JP모건·모건스탠리·뱅크오브아메리카·씨티그룹은 거의 늘 전망을
+   **말하는 쪽**으로 나온다. 국내의 publisher_context 와 같은 문제인데, 치우침이 훨씬 커서 빼는
+   쪽이 아니라 인정하는 쪽으로 가른다. 말하는 자리만 있는 글은 행을 지우지 않고
+   `method="house"` 로 남긴다 — 그 글도 '미장 글'이긴 해서다(근거는 config 주석).
 
 국내에만 있는 나머지 규칙(compound_key·modifier_context·우선주)은 안 쓴다.
 전부 한국 상장사 이름의 생김새에서 나온 규칙이라 미국 종목엔 걸릴 자리가 없다.
@@ -52,6 +53,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common.quoted_move import own_move_after  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from config.us_stock_extraction import (  # noqa: E402
+    HOUSE_METHOD,
     NAME_EXCLUDE,
     NEGATIVE_CONTEXT,
     RESEARCH_HOUSES,
@@ -95,8 +97,17 @@ def build_dictionary() -> dict[str, str]:
     return {name: tk for name, tk in US_NAMES.items() if name not in NAME_EXCLUDE}
 
 
-def extract(text: str, pattern, match_to_ticker: dict[str, str], caseless: dict[str, str]) -> dict[str, str]:
-    """티커 → 본문에 적혀 있던 표기. 한 메시지에서 같은 종목은 한 번만 센다."""
+def extract(
+    text: str, pattern, match_to_ticker: dict[str, str], caseless: dict[str, str],
+    house: dict[str, str] | None = None,
+) -> dict[str, str]:
+    """티커 → 본문에 적혀 있던 표기. 한 메시지에서 같은 종목은 한 번만 센다.
+
+    house 를 주면 **말하는 자리로만** 나온 은행(RESEARCH_HOUSES)을 거기 적는다(티커 → 첫 표기).
+    같은 글에 그 은행이 주식으로 다뤄진 자리도 있으면 돌려주는 쪽에만 있다. 저장(main)은 이걸
+    method="house" 행으로 남기고, 회사 이름을 티커로 잇는 쪽(extract_telegram_events)은 이것도
+    이름으로 받는다. 안 주면 예전처럼 종목 언급만 돌려준다.
+    """
     # URL 을 같은 길이로 마스킹한다. 길이를 유지해야 경계 판정이 안 흔들린다.
     text = URL_RE.sub(lambda m: MASK_CHAR * len(m.group(0)), text)
 
@@ -121,8 +132,13 @@ def extract(text: str, pattern, match_to_ticker: dict[str, str], caseless: dict[
         # 리서치를 내는 은행은 주식으로 다뤄진 자리만 센다. 한 글에 발행처 자리와 주가 자리가
         # 같이 나오는 일이 흔해(`… 골드만삭스는 전망 … 골드만삭스(-3.96%)`) 자리마다 따로 본다.
         if ticker in RESEARCH_HOUSES and not treated_as_stock(text, m.end(), ticker):
+            if house is not None:
+                house.setdefault(ticker, matched)
             continue
         found.setdefault(ticker, matched)
+    if house is not None:
+        for ticker in found:
+            house.pop(ticker, None)
     return found
 
 
@@ -275,11 +291,23 @@ def main() -> None:
     messages = load_messages(db)
     rows: list[dict] = []
     mention: Counter = Counter()
+    house_rows = 0
     hit_msgs = 0
     samples: list[tuple[str, str]] = []
 
     for msg in messages:
-        found = extract(msg["text"], pattern, match_to_ticker, caseless)
+        house: dict[str, str] = {}
+        found = extract(msg["text"], pattern, match_to_ticker, caseless, house)
+        # 은행이 말하는 자리로만 나온 글도 행은 남긴다(method="house"). 종목별로 세는 곳이 거른다.
+        for ticker, match_text in house.items():
+            house_rows += 1
+            rows.append({
+                "channel_handle": msg["channel_handle"],
+                "message_id": msg["message_id"],
+                "ticker": ticker,
+                "match_text": match_text,
+                "method": HOUSE_METHOD,
+            })
         if not found:
             continue
         hit_msgs += 1
@@ -297,7 +325,8 @@ def main() -> None:
             samples.append((names, msg["text"].replace("\n", " ")[:60]))
 
     print(f"\n메시지 {len(messages):,}건 중 {hit_msgs:,}건에서 미국 종목 발견 "
-          f"({hit_msgs/max(1,len(messages))*100:.1f}%) · 총 언급 {len(rows):,}건")
+          f"({hit_msgs/max(1,len(messages))*100:.1f}%) · 총 언급 {len(rows) - house_rows:,}건"
+          f" · 은행 화자 행(method={HOUSE_METHOD}) {house_rows:,}건")
     print(f"등장한 티커 {len(mention)} / {len(set(match_to_ticker.values()))}개\n")
     print("=== 최다 언급 TOP 15 ===")
     for ticker, cnt in mention.most_common(15):

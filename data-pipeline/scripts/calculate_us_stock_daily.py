@@ -37,6 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client, load_all, load_all_keyset  # noqa: E402
 from common.timeutil import KST, today_kst  # noqa: E402
+from config.us_stock_extraction import is_house  # noqa: E402
 
 # 트렌딩 점수 가중치. 국내(calculate_stock_daily)와 같은 값이어야 한다.
 W_VIEWS, W_FWD, W_REPLIES = 0.5, 3.0, 1.5
@@ -67,8 +68,11 @@ def main() -> None:
         )
     }
     us_mentions = load_all_keyset(
-        db, "telegram_message_us_stocks", "id,channel_handle,message_id,ticker"
+        db, "telegram_message_us_stocks", "id,channel_handle,message_id,ticker,method"
     )
+    # 은행 화자 행(config.RESEARCH_HOUSES 주석)은 **종목별로 셀 때만** 뺀다. 아래 채널 집계의
+    # '미국 얘기를 한 글'에는 그대로 든다 — 은행 이름만 있는 글도 미국 거시·AI 투자 얘기다.
+    stock_mentions = [m for m in us_mentions if not is_house(m)]
     # 국내 언급은 채널 집계의 kr_msgs 에만 쓴다(국장 vs 미장 배분 카드).
     kr_mentions = load_all_keyset(
         db, "telegram_message_stocks", "id,channel_handle,message_id,stock_code"
@@ -79,7 +83,7 @@ def main() -> None:
     agg: dict[tuple[str, str], dict] = defaultdict(
         lambda: {"mentions": 0, "channels": set(), "views": 0, "fwd": 0, "weighted": 0.0}
     )
-    for men in us_mentions:
+    for men in stock_mentions:
         msg = messages.get((men["channel_handle"], men["message_id"]))
         if not msg or not msg["posted_at"]:
             continue
@@ -187,7 +191,7 @@ def main() -> None:
         db.table("telegram_us_channel_daily").upsert(
             channel_rows[i : i + 500], on_conflict="date,channel_handle"
         ).execute()
-    save_breadth(db, messages, us_mentions)
+    save_breadth(db, messages, stock_mentions)
     print(f"\n[Supabase] telegram_us_stock_daily {len(stock_rows):,}행 · "
           f"telegram_us_channel_daily {len(channel_rows):,}행 저장 완료")
 
