@@ -11,7 +11,7 @@ export type DailyScore = {
   score: number;
   stage: string;
   updated_at: string;
-  // LLM(Claude Haiku)이 생성한 오늘의 요약. 컬럼이 없거나(마이그레이션 전) 아직
+  // LLM(Claude Opus 5.5)이 생성한 오늘의 요약. 컬럼이 없거나(마이그레이션 전) 아직
   // 생성 전이면 null이고, 이땐 히어로가 기존 템플릿 문장으로 폴백한다.
   ai_summary: string | null;
   /**
@@ -167,13 +167,19 @@ export const getLatestDailyScore = cache(async function getLatestDailyScore(): P
   // 로컬 dev 전용 오버레이(운영 빌드에선 no-op). 운영 DB에 요약을 쓰기 전에
   // 로컬에서만 미리 문장을 얹어 보기 위한 장치.
   const summaryOverride = getDevOverrides().summary;
+  // ⭐ 오늘 행에 요약이 아직 없으면 **앞 행의 요약**을 보인다. 아침 실행은 점수 계산이 오늘 행을 새로 만들고
+  //    30~40초 뒤 히어로 요약이 채운다(2026-09-26·27 실측 24~30초). 한 시간짜리 사본이 하필 그 사이에
+  //    다시 그려지거나 요약 단계가 실패한 날엔 히어로가 요약 없이 한 줄만 남았다. 그 몇십 초·그날은 제목·
+  //    지수가 오늘 것이고 문장이 앞 날 것이라 '오늘 23℃' 같은 말이 조금 어긋날 수 있다 — 빈 칸보다 낫다(요청).
+  const own = row.ai_summary?.trim() ? row.ai_summary : null;
+  const carried = prev?.ai_summary?.trim() ? prev.ai_summary : null;
 
   return {
     date: row.date,
     score: row.score,
     stage: row.stage,
     updated_at: row.updated_at,
-    ai_summary: summaryOverride ?? row.ai_summary ?? null,
+    ai_summary: summaryOverride ?? own ?? carried ?? null,
     // 날짜를 같이 넘긴다. 이 행이 정말 하루 전인지는 화면이 라벨을 고를 때 따져야 한다
     // (자료가 하루 빠진 날엔 "전일"이 아니다).
     prevDay: prev ? { date: prev.date, score: prev.score } : null,

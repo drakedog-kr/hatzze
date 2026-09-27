@@ -4,11 +4,12 @@ import { SectionIntro } from "./SectionIntro";
 import type { IndicatorCategory } from "@/lib/data";
 import { C, Icon, R, stageForScore } from "./ui";
 import { pick, GenericCard } from "./home/parts";
-import { BAND_LABELS, DIST_FILL, Hero } from "./home/Hero";
+import { ANCHOR_ALIAS, BAND_LABELS, DIST_FILL, Hero } from "./home/Hero";
 import type { BandItem } from "./home/Hero";
 import { CardBuffett, CardLeverage, CardMarketActions, CardTurnover, CardHighGap, CardSpeed, CardVkospi, CardAsia, CardGoldRatio, CardVolume, CardFx, CardNetBuy, CardLimitUp, CardPutCall } from "./home/cards-market";
 import { CardComingSoon, CardDivergence, CardTrend, CardSentiment, CardYoutube, CardSpending, CardUpbit, CardBrokerage } from "./home/cards-sentiment";
 import type { IconName } from "@/lib/icon-names";
+import { loadSpotlight } from "./home/spotlight-data";
 
 // 캐시 주기는 루트 레이아웃의 `revalidate` 가 정한다(app/layout.tsx). 예전엔 여기가
 // force-dynamic 이라 방문마다 서버가 새로 그렸다.
@@ -45,7 +46,7 @@ const FALLBACK_ICONS: Record<string, IconName> = {
 };
 
 export default async function Home() {
-  const [dailyScore, indicators, rawTopGaps, rawKospiPath, rawScoreTrend] = await Promise.all([
+  const [dailyScore, indicators, rawTopGaps, rawKospiPath, rawScoreTrend, spotlight] = await Promise.all([
     getLatestDailyScore(),
     getPublicIndicators(),
     getTopStockHighGaps(3),
@@ -53,6 +54,9 @@ export default async function Home() {
     getKospiCloseSeries(61),
     // 히어로의 햇쩨 지수 추이(최근 SCORE_TREND_DAYS 일).
     getScoreHistory(),
+    // 히어로 바닥 '오늘 눈에 띄는 것' 칩. 실패해도 던지지 않는다(app/home/spotlight-data.ts 머리말) —
+    // 그래서 아래 assertLoaded 에 넣지 않는다.
+    loadSpotlight(),
   ]);
 
   /* 조회 실패를 "자료 없음" 과 가른다(lib/load-state.ts). 두 값 다 카드의 **곁가지**라,
@@ -104,6 +108,16 @@ export default async function Home() {
   }));
   const bandTotal = bandCounts.reduce((a, b) => a + b.count, 0);
 
+  // 세 줄 요약의 굵은 지표 이름 → 그 카드. 괄호를 뗀 짧은 이름("VKOSPI")도 받는다 — 모델이 줄여 쓴다.
+  const nameAnchors: Record<string, string> = {};
+  for (const i of indicators) {
+    const href = `#ind-${ANCHOR_ALIAS[i.slug] ?? i.slug}`;
+    nameAnchors[i.name] = href;
+    const short = i.name.replace(/\s*\([^)]*\)\s*$/, "");
+    if (short && short !== i.name) nameAnchors[short] = href;
+  }
+
+
   return (
     /* 뿌리의 hz-tx 가 이번 리디자인(시트 모서리 20·구간 제목·히어로 격자)을 켠다 — globals.css. */
     <div className="hz-tx">
@@ -116,6 +130,8 @@ export default async function Home() {
                 bandTotal={bandTotal}
                 trend={isLoadFailed(rawScoreTrend) ? null : rawScoreTrend}
                 trendDays={SCORE_TREND_DAYS}
+                spotlight={spotlight}
+                nameAnchors={nameAnchors}
               />
             ) : (
               <section style={{ background: C.card, borderRadius: 16, padding: 44, textAlign: "center", color: C.sub }}>

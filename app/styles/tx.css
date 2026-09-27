@@ -612,6 +612,65 @@
 .hz-tx-chip-cap { color: var(--c-sub); }
 .hz-tx-chip b { font-weight: 800; }
 .hz-tx-chip > .ms { font-size: var(--fs-14); color: var(--c-muted); }
+/* ── 시장 브리핑 히어로(.hz-tx-hero-home) — 바닥 칩 줄과 옆 타일의 밑선을 한 줄에 ──────────────
+   카더라처럼 '오늘 눈에 띄는 것'은 맨 아래에 서고(남는 높이는 글 칸이 받는다), 그 밑선이 옆 칸 마지막
+   타일의 밑선과 같은 선이어야 한다(2026-09-28 지적, 카더라 캡처). 칩 줄 아래 안쪽 여백이 26 인데 옆 칸은
+   14 라, 홈처럼 옆 칸이 더 길어 히어로 키를 정하는 판에선 타일이 12px 아래로 내려가 선이 어긋났다
+   (카더라는 글 칸이 더 길어 옆 칸이 늘어나며 저절로 맞는다). 옆 칸 아래 여백도 26 으로 맞춘다 — 아래
+   여백이 카더라처럼 넉넉해진다. 접히는 폭(≤1200)은 옆 칸이 위로 올라가 해당이 없다. */
+@media (min-width: 1201px) {
+  .hz-tx-hero-home > .hz-tx-hero-side { padding-bottom: 26px; }
+  /* 반대로 글 칸이 더 긴 날(요약 네 줄)엔 옆 칸이 늘어나며 마지막 타일 아래가 비어 선이 다시 어긋났다(80 대 27).
+     그 남는 높이는 추이 타일이 받는다 — 차트 칸이 늘어난다(ScoreTrendTile .hz-trend-plot). 옆 칸이 더 긴 날엔
+     남는 높이가 없어 그대로다. */
+  .hz-tx-hero-home > .hz-tx-hero-side > .hz-tx-trend { flex: 1 1 auto; }
+  .hz-tx-hero-home > .hz-tx-hero-side > .hz-tx-trend > .hz-trend-plot { flex: 1 1 auto; }
+}
+
+/* 시장 브리핑 '세 줄 요약'(흐름 · 달라진 것 · 뜨거운 곳, 2026-09-28). 이름표 칸 + 문장 칸.
+   문장 글씨는 .hz-tx-hero-body p 와 한 벌이다(같은 자리 같은 글 — 그 규칙 주석). */
+.hz-brief3 { margin: 0; gap: 12px; }
+.hz-brief3-row {
+  display: grid;
+  grid-template-columns: 66px minmax(0, 1fr);
+  column-gap: 12px;
+  align-items: baseline;
+}
+.hz-brief3-row dt {
+  font-size: var(--fs-12-5);
+  font-weight: 800;
+  color: var(--c-sub);
+  white-space: nowrap;
+}
+.hz-brief3-row dd {
+  margin: 0;
+  font-size: var(--fs-14);
+  line-height: 1.75;
+  letter-spacing: -0.01em;
+  color: var(--c-ink-soft);
+  text-wrap: pretty;
+  word-break: keep-all;
+}
+/* 굵은 지표 이름 → 아래 그 카드. 굵기는 옛 요약의 굵은 이름과 같고, 밑줄은 옅게만 — 문장 속 링크가 셋
+   넘게 서면 줄마다 파란 덩이가 된다. 색은 클래스가 쥔다(인라인은 :hover 를 이긴다). */
+.hz-brief3-link {
+  font-weight: 700;
+  color: var(--c-ink);
+  text-decoration: underline;
+  text-decoration-color: var(--c-line);
+  text-underline-offset: 3px;
+  transition: color 0.12s ease;
+}
+.hz-brief3-link:hover { color: var(--c-blue-1); text-decoration-color: currentColor; }
+/* 여론 이름표 → 카더라. 이름표 색 그대로 두고 올리면 진해진다(.hz-theme-textlink 와 같은 결). */
+.hz-brief3-dt-link { color: var(--c-sub); text-decoration: none; transition: color 0.12s ease; }
+.hz-brief3-dt-link:hover { color: var(--c-ink); }
+@media (max-width: 560px) {
+  /* 폰에선 이름표를 문장 위로 — 66px 칸이 문장 폭을 너무 먹는다. 글씨는 .hz-tx-hero-body p 와 같이 올린다. */
+  .hz-brief3-row { grid-template-columns: minmax(0, 1fr); row-gap: 2px; }
+  .hz-brief3-row dd { font-size: var(--fs-14-5); }
+}
+
 /* 칩이 데려가는 시트가 화면 맨 위에 딱 붙지 않게 조금 띄운다. */
 .hz-tx .hz-sheet[id] { scroll-margin-top: 16px; }
 

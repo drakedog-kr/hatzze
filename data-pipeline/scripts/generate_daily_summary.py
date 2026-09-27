@@ -1,4 +1,4 @@
-"""오늘의 과열도 지수와 지표들을 LLM(Claude Haiku)으로 2~3문장 요약해
+"""오늘의 과열도 지수와 지표들을 LLM(Claude Opus 5.5)으로 세 줄(흐름 · 달라진 것 · 뜨거운 곳) 요약해
 daily_score.ai_summary에 저장한다. 프론트 히어로 카드가 이 문장을 읽어 렌더한다.
 
 calculate_score.py가 daily_score/indicator_values를 채운 뒤 실행하는 후속 단계다.
@@ -16,7 +16,8 @@ from __future__ import annotations
 import re
 import sys
 from collections.abc import Callable
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
+from statistics import median
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -28,14 +29,24 @@ from common.supabase_client import get_client  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 
-# Haiku 4.5. 호출은 구독(llm_client)으로 나가지만 모델은 Haiku 를 유지한다.
+# 여론 줄은 카더라 히어로와 **같은 말**을 해야 한다 — 창·낙관도·구간 이름을 카더라 총평 스크립트에서 그대로
+# 가져온다(세 번째 사본을 두지 않는다. 프론트 lib/telegram-data.ts 와의 쌍둥이 관계는 그쪽 주석).
+import generate_telegram_narratives as KR  # noqa: E402
+
+# Opus 5.5. 호출은 구독(llm_client)으로 나가고, 구독이 막힌 날엔 llm_client 가 Haiku 로 바꿔 API 로 보낸다.
 # 2026-09-12 에 Sonnet 5 를 같은 자료로 견줬다. ② 갈림 문단은 Sonnet 이 정확했지만(Haiku 는
 # 초고온 개수와 상위 5개의 관계를 뭉갠다), 발송 글·급부상 한 줄까지 세 곳을 놓고 본 판정은
 # "일단 전부 Haiku". Sonnet 은 규칙의 전언 예시를 모든 문장에 적용해 전언체가 되고, 규칙을 풀면
 # 그 규칙이 막던 시세 표현이 샌다. Sonnet 으로 가려면 프롬프트를 Sonnet 기준으로 다시 쓰고
 # 변형마다 수십 회 재야 한다(이 파일 TREND_SYSTEM 주석의 4변형×40회와 같은 규모).
 # ⚠️ 분류 쪽(디시·뉴스 제목, 텔레그램 메시지)은 눈금이 분류기에 맞춰 보정돼 있어 어차피 Haiku 다.
-MODEL = "claude-haiku-4-5"
+# 2026-09-28 Haiku → Opus 5.5. 사이트 첫 화면 맨 위 글이다. 09-23 에 총평·발송 글과 함께 옮겼다가
+# 09-24 에 이 자리만 Haiku 로 되돌렸고(말투가 같고 길이만 늘었다), 정확성을 재 보고 다시 옮겼다.
+# 같은 재료(09-27 저온 23℃ · 마지막 값이 어제) 8회씩: 자료와 어긋난 문장 Opus 0회 · Haiku 3회
+# ("27℃대의 고온" · 26일 값을 26℃로 · 없는 구간 이름 "중온"). 옮기며 요약도 세 줄 형식으로 바꿨다
+# (BRIEF_LABELS 주석). 하루 두 번 돌고 한 번에 세 줄을 쓴다 — 호출 3~6번 · 16~34초(09-28 11회).
+# ⚠️ Opus 는 굵게를 문장마다 넣는다 — 저장 직전에 keep_bold_names 로 지표 이름에만 남긴다.
+MODEL = "claude-opus-5-5"
 
 # 초고온 진입선 = 진행률 ≥ 75. calculate_score.py의 HOT_ZONE과 동일하게 맞춘다.
 # 이 지점이 곧 카드에 "기준선"으로 적히는 값이라, 화면·요약·배지가 한 지점을 가리킨다.
@@ -64,11 +75,8 @@ def stage_for_score(score: float) -> str:
     return "초고온"
 
 
-# 요약 포맷은 항상 오프너(프론트 고정) + 주인공 지표 뜻풀이 + 최근 추세 = 3문단이다.
-# 한 번의 호출로 '2문장'을 강제하면 모델이 종종 3문장을 뱉어 문단 수가 흔들려서,
-# 주인공 문장과 추세 문장을 '따로' 생성한다(각 호출은 딱 한 문장). 이렇게 하면 문단
-# 수가 항상 정확히 2로 고정된다. 두 문장은 개행으로 이어 저장하고 프론트가 개행으로
-# 나눠 각각 한 문단으로 렌더한다.
+# 요약은 세 줄이고 줄마다 따로 쓴다(각 호출은 한두 문장). 한 번에 여러 문단을 시키면 모델이 문단
+# 수를 흔든다(옛 두 문장 때 실측). 줄은 이름표를 붙여 개행으로 이어 저장하고 프론트가 이름표로 나눈다.
 COMMON = """\
 당신은 한국 주식시장의 "과열도(온도)"를 보여주는 대시보드 '햇쩨(hatzze)'의 오늘의 요약을 쓰는 작성자입니다.
 아래 데이터를 보고, 지시된 '한 문장'만 씁니다.
@@ -90,7 +98,7 @@ COMMON = """\
 - 헤드라인 '햇쩨 지수'는 ℃로, 개별 지표는 과열도 %로 말합니다.
 
 [강조 형식]
-- 중요한 부분(지표 이름, 핵심 수치)은 **별표 두 개로 감싸** 굵게. 예: **깃헙 트레이딩봇 저장소 생성 수**.
+- **지표 이름만** 별표 두 개로 감싸 굵게 씁니다. 예: **깃헙 거래봇 생성 수**. 숫자·온도·다른 말은 굵게 하지 마세요.
 - 온도 단어(저온/상온/고온/초고온)는 별표로 감싸지 마세요(색 자동). 그 외 마크다운·목록·제목 금지.
 
 [절대 하지 말 것]
@@ -102,67 +110,19 @@ COMMON = """\
 
 [출력] 설명·머리말 없이, 지시된 딱 '한 문장'만 출력하세요."""
 
-# 문단 2: 주인공 지표 + 뜻풀이 (A)
+# ── 세 줄 요약(2026-09-28~) — 흐름 · 달라진 것 · 뜨거운 곳 ────────────────────────────────────
 #
-# 주인공은 '시장' 카테고리에서만 고른다. 감성 지표(검색량·커뮤니티 말투·유튜브 조회수)는
-# 하루치 잡음이 크고 대체로 시장 지표보다 과열도가 높게 튄다 — 그냥 '가장 뜨거운 하나'를
-# 고르게 두면 요약 문단이 며칠씩 감성 지표만 물고 늘어졌다. 지수의 무게중심은 시장 쪽이니
-# 주인공도 거기서 고른다(감성은 3문단의 추세와 카드들이 계속 보여준다).
-SPOTLIGHT_SYSTEM = COMMON + """
+# 예전엔 [주인공 지표 뜻풀이][시장 vs 감성][최근 추세] 세 문단이었다. ① 이 매일 같은 지표의 **정의**를
+# 되풀이했고(풋/콜 비율이 9월에 17일), 화면 첫 줄 템플릿("초고온에 시장 N개, 감성 M개")과 ② 가 같은
+# 개수를 두 번 말했다. 후보 셋을 오늘 자료로 써서 보여 주고 '세 줄 요약'이 채택됐다(2026-09-28).
+#   흐름      햇쩨 지수가 며칠간 어떻게 움직였나(옛 ③ 그대로 — TREND_SYSTEM).
+#   달라진 것  최근 하루 새로 들어온 값 가운데 평소보다 크게 움직인 지표(pick_movers). 날마다 바뀐다.
+#   뜨거운 곳  지금 어디가 뜨겁고 어디가 식었나(초고온 · 가장 식은 시장 지표).
+#   여론      주식 텔레그램(카더라)의 분위기와 그날 이야기 한 가지(같은 날 넷째 줄로 채택 — 세 줄이
+#             '얼마나 뜨거운가'의 여러 면이라, 비어 있던 '사람들은 무슨 얘기를 하나'를 채운다).
+# 이름표는 코드가 붙인다(BRIEF_LABELS) — 화면(app/home/Hero.tsx)이 이름표로 새 형식을 알아본다.
+BRIEF_LABELS = ("흐름", "달라진 것", "뜨거운 곳", "여론")
 
-[이번 문장 — 주인공 지표 뜻풀이]
-**카테고리가 '시장'인 지표 중에서만** 과열도가 가장 높은(가장 뜨거운) 지표 '하나'를 골라,
-이름과 함께 그 지표가 무엇을 재는지·왜 뜨거운 게 의미 있는지를 쉬운 말로 한 문장에 담으세요.
-'감성' 지표가 더 뜨겁더라도 고르지 마세요(시장 지표가 하나도 없을 때만 감성에서 고릅니다).
-지표 밑 '뜻:' 설명을 근거로 삼되 그대로 베끼진 마세요. 지표는 하나만 씁니다. 여러 개를
-나열하지 마세요."""
-
-# 문단 3: 시장 vs 감성 (, 2026-09-05)
-#
-# ⚠️ 이 문단은 2026-08-03 에 화면에서 뺐던 것이다. 뺀 까닭은 **자리가 없어서**다
-#    (확인). 그때 코드에 적힌 "만들어 낸 문장이라 결이 달랐다" 는 나중에 붙인
-#    설명이었다. 이번 리디자인에서 브리핑 칸이 넓어져 자리가 생겼고, 이번에는 템플릿이
-#    아니라 모델이 쓴다.
-#
-# 앞 문단이 '가장 뜨거운 지표 하나'를 짚고 뒷 문단이 '지수의 궤적'을 말하는데, 그 사이에
-# **어느 종류가 뜨거운가**가 빠져 있었다. 지수 한 숫자로는 안 보이는 층이다 — 돈이 실제로
-# 움직인 정도(시장)와 사람들이 들뜬 정도(감성)가 갈리는 날이 있고, 그게 갈릴 때가 오히려
-# 할 말이 있는 날이다.
-#
-# ⚠️⚠️ **두 종류를 이름으로 부른다.** 처음 초안이 "감성 지표가 위를 차지했습니다" 였는데
-# 무슨 뜻인지 안 읽혔다(지적). '위' · '그쪽' 같은 대명사를 쓰지 말고 **'시장 지표'와
-# '감성 지표'를 문장 안에 그대로 적게** 한다.
-# ⚠️ 두 종류가 비슷한 날엔 억지로 갈라 말하지 않게 해 둔다 — 없는 대비를 지어내면
-#    그 문단이 매일 같은 말을 하게 된다.
-BALANCE_SYSTEM = COMMON + """
-
-[이번 문장 — 시장 지표와 감성 지표의 갈림]
-지표는 두 종류입니다. **시장 지표**는 거래대금·변동성·옵션 비율처럼 시장에서 나온 숫자이고,
-**감성 지표**는 검색량·유튜브 조회수·베스트셀러처럼 사람들이 얼마나 들떠 있는지를 잽니다.
-두 종류의 과열도를 견줘, 어느 쪽이 더 뜨거운지를 **한두 문장**에 담으세요. 첫 문장은
-어느 쪽이 뜨거운지, 둘째 문장은 그 근거(어느 구간에 몇 개씩 들었는지)로 나누면 자연스럽습니다.
-
-- **'시장 지표'와 '감성 지표'라는 말을 문장 안에 그대로 쓰세요.** '위를 차지했다' ·
-  '그쪽' · '이쪽' 처럼 가리키는 말로 대신하지 마세요 — 무슨 뜻인지 안 읽힙니다.
-- **어느 쪽이 뜨거운지는 [갈림] 줄에 적힌 대로 쓰세요. 스스로 다시 판정하지 마세요.** 근거
-  숫자(초고온에 든 개수, 상위 5개 안의 개수)도 그 줄의 것을 씁니다. 판정을 모델에 맡겼더니 같은
-  자료로 방향이 뒤집히거나 한 문장 안에서 앞뒤가 어긋났습니다. 지표 **이름은 쓰지 마세요**
-  (바로 앞 문단이 이미 하나를 짚었습니다).
-- 두 종류가 엇비슷하면 억지로 가르지 말고 "두 종류가 비슷한 수준입니다" 처럼 적으세요.
-- 퍼센트 숫자는 최대 하나만 씁니다.
-- **'햇쩨 지수'와 ℃ 를 쓰지 마세요. 어제·오늘·지난주의 온도나 며칠간의 오르내림도
-  말하지 마세요.** 그건 바로 다음 문단이 통째로 맡는 일입니다. 이 문장은 두 종류의
-  대비 하나만 말합니다.
-- '초고온' 같은 지표 구간 이름은 써도 됩니다 — "초고온 구간에 든 지표 4개 중 시장 지표가
-  3개"처럼 두 종류를 견주는 근거가 됩니다.
-- **지표 이름은 절대 쓰지 마세요.** 길이를 채우려고 지표를 나열하는 것이 이 문장의 가장
-  흔한 잘못입니다. 나쁜 예: "시장은 옵션 비율과 매매 안전장치 동향의 초고온이 주도하는
-  가운데 감성은 경제 베스트셀러 비중만 초고온 수준입니다."
-  좋은 문장의 뼈대: 첫 문장은 어느 종류가 더 뜨거운지, 둘째 문장은 초고온·상위권에 두 종류가
-  몇 개씩 들었는지입니다. 이 뼈대를 그대로 베끼지 말고 그날 숫자에 맞게 자기 말로 쓰세요.
-"""
-
-# 문단 4: 최근 추세 (②)
 TREND_SYSTEM = COMMON + """
 
 [이번 문장 — 최근 추세]
@@ -170,35 +130,97 @@ TREND_SYSTEM = COMMON + """
 담으세요. (예: "지난주 50℃대에서 며칠째 내려와 오늘 25℃까지 식은 흐름입니다.") 과거
 궤적만 서술하고 앞으로의 방향은 예측하지 마세요."""
 
+# ⚠️ 방향은 '더 뜨거워짐·식음'으로만 준다. 원값이 올랐는지를 주면 낮을수록 뜨거운 지표(VKOSPI·
+#    풋/콜)에서 모델이 거꾸로 읽는다(build_digest 머리말의 raw 금지와 같은 까닭).
+# ⚠️ 숫자는 digest 에 아예 안 넣는다 — 주면 문장에 샌다(카더라 총평 08-23 교훈). '평소의 N배'는
+#    화면 어디에도 없는 수치라 읽는 사람이 기준을 모른다.
+CHANGE_SYSTEM = COMMON + """
 
-# 첫 문장(주인공 뜻풀이)에 근거를 주기 위해, 상위 몇 개 지표엔 설명문(뜻)을 함께 붙인다.
+[이번 문장 — 달라진 것]
+[달라진 것] 목록은 최근 하루 새로 들어온 값 가운데 **그 지표의 평소 변화 폭보다 크게 움직인**
+지표입니다(크게 움직인 순서). 목록 앞쪽 지표 한두 개(많아야 세 개)가 과열 쪽으로 움직였는지 식는
+쪽으로 움직였는지를 **한두 문장**에 담으세요.
+- 방향은 목록에 적힌 '더 뜨거워짐'·'식음'을 그대로 따르세요. 원래 값이 올랐다·내렸다고 쓰지
+  마세요(낮을수록 뜨거운 지표가 있어 거꾸로 읽힙니다).
+- 지표 밑 '뜻:'이 있으면 그 지표가 무엇을 재는지 한마디 곁들여도 됩니다. 그대로 베끼진 마세요.
+- **목록에 없는 지표는 쓰지 마세요.** 과열도 %, 몇 배 같은 숫자는 쓰지 마세요.
+- 햇쩨 지수와 ℃, 며칠간의 흐름은 쓰지 마세요(앞 줄이 맡습니다)."""
+
+HOT_SYSTEM = COMMON + """
+
+[이번 문장 — 뜨거운 곳]
+지금 어디가 뜨겁고 어디가 식어 있는지를 **한두 문장**에 담으세요.
+- 초고온(과열도 75 이상)에 든 지표가 있으면 그 지표를 과열도와 함께 말하세요. 없으면 과열도가
+  가장 높은 지표를 말하세요.
+- 이어서 과열도가 가장 낮은 **시장 지표** 한두 개가 식어 있다고 말하세요.
+- '← 이 지표는 문장에 쓰지 마세요' 표시가 붙은 지표는 이름을 쓰지 말고, 필요하면 "초고온에 든
+  감성 지표 1개"처럼 종류와 개수로 말하세요. 개수는 [갈림] 줄에 적힌 것만 씁니다.
+- 과열도는 [지표별] 목록의 값을 그대로 씁니다.
+- 햇쩨 지수와 ℃, 며칠간의 흐름, 어제와 달라진 점은 쓰지 마세요(앞 두 줄이 맡습니다)."""
+
+# ⚠️ 분위기 말은 [여론] 줄 그대로다 — 카더라 히어로 제목("지금 여론은 낙관이 우세합니다")과 같은 창·같은
+#    경계로 셌다(yeoron_tone). 하루치 낙관도를 쓰면 카더라 화면의 창 값과 어긋나서 숫자는 아예 안 준다.
+# ⚠️ [이야기]는 카더라 총평의 둘째 대목(테마 지형)이다. 총평이 이미 '오늘 새로 오른 이야기'를 골라
+#    써 두었고 숫자가 없다(그 대목 규칙). 셋째 대목(뉴스·종목)은 종목·시세 말이 많아 안 준다.
+YEORON_SYSTEM = COMMON + """
+
+[이번 문장 — 여론]
+주식 텔레그램 채널(카더라)의 여론을 **한두 문장**에 담으세요. "카더라에서는"으로 시작합니다.
+- 먼저 [여론] 줄의 분위기를 그대로 씁니다('낙관이 우세'·'낙관과 비관이 팽팽'·'비관이 우세' 중 적힌 것).
+- 이어서 [이야기] 발췌에서 가장 눈에 띄는 이야기 **한 가지**를 짧게 씁니다. 발췌를 그대로 베끼진 마세요.
+- [온도차] 줄이 있으면 그 사실을 한 구절로 덧붙입니다. 없으면 두 온도를 견주지 마세요.
+- 숫자(%, 건수)는 쓰지 마세요. 종목 이름·주가 움직임·전망도 쓰지 마세요.
+- 햇쩨 지수의 ℃, 지표 이름은 쓰지 마세요(앞 세 줄이 맡습니다)."""
+
+
+# '뜻:' 설명을 붙일 지표 수와 카테고리. 옛 주인공 문단(시장 지표 중 가장 뜨거운 것 뜻풀이)의 근거였고,
+# 지금은 '흐름' 줄 자료(build_digest 기본값)에만 남아 있다 — 그 자료로 09-28 에 쟀으니 그대로 둔다.
+# '뜨거운 곳' 줄은 desc=False 로 뺀다(뜻풀이 줄이 아니다). '달라진 것'은 움직인 지표 자신의 뜻을 쓴다.
 DESC_TOP_N = 5
-
-# 주인공 문장이 고르는 카테고리. '뜻:' 설명도 이 카테고리 상위 N개에 붙여야 한다 —
-# 전체 상위 5개에만 붙이면, 시장 지표가 전체 8위쯤에 있는 날엔 주인공으로 뽑힌 지표에
-# 근거가 하나도 안 딸려 가서 모델이 뜻을 지어내야 한다(프롬프트가 금지한 바로 그 일).
 SPOTLIGHT_CATEGORY = "시장"
 
-# 히어로 요약 한 문장의 길이. 길이 규칙이 아예 없어서 문장이 들쭉날쭉했다 —
-# 실측(2026-07-25~26): 111자 · 95자 · 108자 · 57자. 57자짜리는 앞뒤 문단과 나란히 놓였을 때
-# 혼자 말이 없어 보인다. 하한을 두는 게 핵심이고(짧은 쪽이 문제였다), 상한은 문단이
-# 지나치게 길어지지 않게 두는 안전장치다.
+# 줄마다 길이(화면에 보이는 글자 — 굵게 별표는 빼고 센다, sized_sentence). 길이는 첫 프롬프트에 없고
+# 벗어났을 때 다시 쓰기에서만 적힌다. 그래서 모델이 저절로 쓰는 길이가 곧 화면 길이이고, 범위는 넘친
+# 문장만 줄여 쓰게 하는 울타리다.
 #
-# **두 문장의 범위를 다르게 잡는다.** 주인공 문장은 지표가 무엇을 재는지 풀어야 해서 자리가
-# 필요하지만, 추세 문장은 햇쩨 지수 궤적 하나라 늘릴 내용이 없다. 같은 하한(75)을 걸었더니
-# 추세가 두 번 다시 써도 62자에 머물렀고, 억지로 늘린 것들은 "내려온 후 반등과 다시 하락을
-# 반복하는"처럼 말이 겉돌았다. 문장마다 할 말의 양이 다르니 자리도 다르게 준다.
-SPOTLIGHT_LEN = (75, 115)
-# 두 종류를 이름으로 부르고 근거까지 붙이면 두 문장이 필요하다. 주인공 문단보다는 짧다.
-#
-# ⚠️ (60, 95)였다가 (80, 110)으로 올렸다(2026-09-06). ℃ 블록을 digest 에서 빼자 문장이
-#    60자대로 줄어 화면에서 한 줄이 됐다(두 줄을 바라는 지적). 하한만 올리면 모델이 지표
-#    이름을 나열해 채운다(실측 8회 중 2회) — 그래서 구간 이름('초고온에 든 지표 N개')을
-#    다시 허용해 채울 재료를 주고, 지표 이름 금지에는 나쁜 예를 붙였다. 그 조합의 실측
-#    8회: 80~97자 6회, 77자·65자 각 1회. 재료를 빼면 길이가 따라 빠진다는 규칙 그대로다.
-BALANCE_LEN = (80, 110)
-TREND_LEN = (55, 90)
+# 흐름: 옛 추세 문단 그대로. (55, 66)은 별표째 센 값이었다 — Opus 는 온도를 굵게 써서 별표만 8~12자였다.
+#       보이는 글자로 센다.
+# 세 범위 모두 2026-09-28 Opus 11회(오늘 자료 5 · 9/18·9/21·9/25 각 2)의 저장된 길이에 맞췄다 —
+# 흐름 61~73 · 달라진 것 81~98 · 뜨거운 곳 77~106. 합계 중앙 ≈ 250자로 옛 세 문단(프로덕션 3주 중앙
+# 247자)과 같다. 처음 잡은 (50,70)·(40,90)·(55,100)은 멀쩡한 문장을 몇 자 차이로 다시 쓰게 했다.
+TREND_LEN = (50, 75)
+CHANGE_LEN = (50, 100)
+HOT_LEN = (60, 106)
+# 여론: 분위기 한 구절 + 이야기 한 가지 (+ 온도차 한 구절). 실측은 PR #611 본문.
+YEORON_LEN = (45, 100)
 HERO_RETRIES = 2
+
+# 크게 움직인 지표가 없는 날의 '달라진 것' 줄. 모델을 부르지 않는다 — 없다는 말을 꾸밀 재료가 없다.
+CHANGE_NONE = "최근 하루 새로 들어온 값 가운데 평소보다 크게 움직인 지표는 없었습니다."
+
+# facts 대조에 걸렸을 때 다시 쓰기 문구(뒤에 " **{how}**으로 다시 쓰세요."가 붙는다).
+# 틀린 숫자·이름은 되풀이하지 않는다(적어 주면 그걸 다시 쓴다). 맞는 자리만 다시 가리킨다.
+CHANGE_FACTS_NOTE = (
+    "방금 쓴 문장에 [달라진 것] 목록에 없는 지표나 자료 안쪽 말('목록'·'표시')이 들어갔습니다. 목록의 지표만 "
+    "쓰고, 읽는 사람의 말로 같은 뜻을"
+)
+HOT_FACTS_NOTE = (
+    "방금 쓴 문장이 자료와 어긋납니다. '← 이 지표는 문장에 쓰지 마세요' 표시가 붙은 지표는 이름도 쓰지 말고, "
+    "개수는 [갈림] 줄에 적힌 것만 쓰세요. 표시가 붙은 지표가 더 뜨겁다면 다른 지표를 '가장 뜨거운'·'가장 높은'이라고 "
+    "부르지 마세요. '표시'·'목록' 같은 자료 안쪽 말은 문장에 쓰지 마세요."
+)
+YEORON_FACTS_NOTE = (
+    "방금 쓴 문장이 자료와 어긋납니다. 분위기는 [여론] 줄에 적힌 것만 쓰고, 숫자·지표 이름·자료 안쪽 말은 "
+    "쓰지 말고, 같은 뜻으로"
+)
+# 전체나 시장 지표 안의 1등이 표시에 걸려 빠진 날에만 HOT_SYSTEM 끝에 붙는다(skipped_hotter). 모델은 목록에서 이름을 쓸 수 있는 첫
+# 지표를 버릇처럼 "가장 뜨거운 ○○"라 부르는데 그날은 거짓이다.
+# ⚠️ 자료에 사실 한 줄로는 안 됐다(2026-09-28 옛 주인공 문단 · Opus 첫 시도 11/11 "가장 뜨거운").
+#    지시 한 줄로 0/11 — 같은 말을 처음부터 준다.
+HOT_SKIP_NOTE = """
+
+[오늘 주의] '← 이 지표는 문장에 쓰지 마세요' 표시가 붙은 지표가 전체나 시장 지표 안에서 가장 뜨겁습니다.
+표시 없는 지표를 '가장 뜨거운'·'가장 높은'이라고 부르지 마세요."""
 
 # 요약에서 **아예 언급하지 않을** 지표 — slug → 다시 풀리는 raw_value 하한.
 #
@@ -221,12 +243,269 @@ def mentionable(row: dict) -> bool:
 
     문턱이 걸린 지표는 raw 가 그 값을 넘을 때만 통과. raw 가 없으면(아직 안 채워짐)
     보수적으로 제외한다 — 문턱을 확인 못 한 채 올리는 것보다 낫다.
+    '뜨거운 곳' 줄에 자주 나와 오늘 쉬는 지표(rest, resting_names)도 여기서 빠진다.
     """
+    if row.get("rest"):
+        return False
     gate = MENTION_RAW_GATES.get(row.get("slug") or "")
     if gate is None:
         return True
     raw = row.get("raw")
     return raw is not None and float(raw) >= gate
+
+
+# '뜨거운 곳' 줄 — 어느 HOT_WINDOW 날을 잘라 봐도 같은 지표 이름은 HOT_MAX_IN_WINDOW 날까지.
+# 앞 (WINDOW−1) 날의 그 줄에 이미 MAX 번 나온 지표는 오늘 이름을 쓰지 않는다(mentionable → False,
+# "초고온에 든 감성 지표 1개"처럼 종류와 개수로 말한다). 연속도 MAX 날을 못 넘는다.
+#
+# 2026-09-28 요청("같은 지표를 4일 연속 이상으로는 언급하지 않게") → 비교 끝에 '닷새 중 이틀'. 그때는 옛
+# 주인공 문단(① 가장 뜨거운 시장 지표 뜻풀이)에 걸었다 — 옵션 풋/콜 비율이 09-11~17 7일 · 09-22~27 6일
+# 연속이었다. 같은 날 세 줄 요약으로 바뀌며 주인공 문단이 없어져, 지표 이름을 늘 부르는 이 줄로 옮겼다.
+# 9월 기록에 대 본 값(옛 주인공 기준 어림): 규칙 없음 풋/콜 17/27일 · 최장 7일 → 5일 중 2일 9/27 · 2일.
+# '달라진 것' 줄에는 걸지 않는다 — 크게 움직인 지표는 날마다 바뀌고, 막으면 실제 움직임을 숨긴다.
+HOT_WINDOW = 5
+HOT_MAX_IN_WINDOW = 2
+# '가장 뜨거운 ○○' 처럼 1등이라 부르는 말. 더 뜨거운 지표를 건너뛴 날엔 거짓이 된다.
+SUPERLATIVE_RE = re.compile(r"(?:가장|제일)\s*(?:뜨[거겁]|높|과열)|1위")
+
+
+def name_forms(name: str) -> list[str]:
+    """문장에서 이 지표를 가리킬 수 있는 꼴 — 이름 그대로와, 끝의 괄호를 뗀 짧은 이름.
+
+    "VKOSPI (변동성지수)" 를 모델이 "VKOSPI" 나 "VKOSPI(변동성지수)" 로 쓸 수 있다.
+    """
+    short = re.sub(r"\s*\([^)]*\)\s*$", "", name)
+    forms = [name, name.replace(" (", "(")]
+    if short and short != name:
+        forms.append(short)
+    return list(dict.fromkeys(forms))
+
+
+def names_in_line(line: str, names: list[str]) -> set[str]:
+    """이 줄이 이름을 꺼낸 지표들. 굵게 별표는 벗기고 찾는다."""
+    plain = line.replace("**", "")
+    return {n for n in names if any(f in plain for f in name_forms(n))}
+
+
+def hot_line_of(summary: str | None) -> str:
+    """저장된 요약에서 '뜨거운 곳' 줄. 옛 형식(이름표 없음)이면 첫 줄 — 그땐 주인공 문단이 같은 일을 했다."""
+    lines = [x.strip() for x in (summary or "").split("\n") if x.strip()]
+    for x in lines:
+        if x.startswith("[뜨거운 곳]"):
+            return x
+    return "" if any(x.startswith("[") for x in lines) else (lines[0] if lines else "")
+
+
+def resting_names(prev_lines: list[str], names: list[str]) -> set[str]:
+    """앞 (HOT_WINDOW−1) 날의 '뜨거운 곳' 줄에 이미 HOT_MAX_IN_WINDOW 번 나온 지표들 — 오늘 쉰다.
+
+    prev_lines 는 오늘보다 앞선 daily_score 행의 그 줄(hot_line_of), **최근 날부터**. 오늘 행의 문장은
+    넣지 않는다(아침에 쓴 오늘 문장을 저녁 실행이 다시 쓸 때 제 자신과 겹쳐 세지 않게).
+    앞 날이 모자라도(행이 적은 초기) 있는 만큼으로 센다 — 그 안에서 이미 다 찼으면 창 안에서도 찼다.
+    """
+    counts: dict[str, int] = {}
+    for line in prev_lines[: HOT_WINDOW - 1]:
+        for n in names_in_line(line, names):
+            counts[n] = counts.get(n, 0) + 1
+    return {n for n, c in counts.items() if c >= HOT_MAX_IN_WINDOW}
+
+
+def skipped_hotter(rows: list[dict]) -> bool:
+    """표시(mentionable)에 걸려 빠진 지표가 **전체에서든 시장 지표 안에서든** 1등보다 뜨거운가 — 그날은 다른
+    지표를 '가장 뜨거운'·'가장 높은'이라 부르면 거짓이다. rows 는 과열도 내림차순.
+
+    ⚠️ 시장 지표 안도 본다. 전체 1등(베스트셀러 94%)은 쉬지 않는데 시장 1등(풋/콜 64%)이 쉬는 날, 모델이
+       "시장에서는 금 대비 코스피 상대강도(63%)가 가장 높으며"라고 썼다(2026-09-28 Haiku 폴백 재현).
+    """
+
+    def skipped(scope: list[dict]) -> bool:
+        pick = next((r for r in scope if mentionable(r)), None)
+        return bool(scope) and pick is not None and scope[0] is not pick and scope[0]["capped"] > pick["capped"]
+
+    return skipped(rows) or skipped([r for r in rows if r["category"] == SPOTLIGHT_CATEGORY])
+
+
+# 우리 자료 안에서만 쓰는 말 — '← 이 지표는 문장에 쓰지 마세요' 표시를 모델이 "표시 없는 지표 중에서는"
+# 처럼 문장에 옮겼다(2026-09-28 이름 쉬는 날 첫 시도). 읽는 사람에겐 뜻이 없는 말이다.
+INNER_WORDS_RE = re.compile(r"표시|목록|\[갈림\]|\[지표별\]")
+
+
+def hot_problems(text: str, rows: list[dict], hot: dict[str, int], top: dict[str, int]) -> list[str]:
+    """'뜨거운 곳' 줄이 표시 붙은 지표를 꺼냈거나, 건너뛴 날에 '가장 뜨거운'이라 불렀거나, 개수가 틀렸거나,
+    자료 안쪽 말을 옮겼으면."""
+    plain = text.replace("**", "")
+    found = [
+        f"쓰지 않을 지표 {r['name']}"
+        for r in rows
+        if not mentionable(r) and any(f in plain for f in name_forms(r["name"]))
+    ]
+    if skipped_hotter(rows) and SUPERLATIVE_RE.search(plain):
+        found.append("'가장' 표현")
+    if INNER_WORDS_RE.search(plain):
+        found.append("안쪽 말")
+    return found + balance_count_problems(plain, hot, top)
+
+
+def change_problems(text: str, mover_names: set[str], names: list[str]) -> list[str]:
+    """'달라진 것' 줄이 목록 밖 지표를 꺼냈거나 자료 안쪽 말을 옮겼으면."""
+    found = [f"목록 밖 지표 {n}" for n in sorted(names_in_line(text, names) - mover_names)]
+    return found + (["안쪽 말"] if INNER_WORDS_RE.search(text.replace("**", "")) else [])
+
+
+# ── 크게 움직인 지표(달라진 것) ──────────────────────────────────────────────────────────
+#
+# 최근 하루 새로 들어온 값 가운데 **그 지표의 평소 변화 폭**(직전 MOVER_WINDOW 번 변화의 절댓값 중앙값)의
+# MOVERS_MIN_TIMES 배를 넘은 것, 큰 순서로 MOVERS_LIMIT 개.
+# - 과열도가 아니라 **원값**으로 잰다. calculate_score 는 최신 행의 과열도만 다시 셈해서 옛 행은 옛
+#   눈금이다 — 과열도끼리 빼면 눈금을 손본 날 시장과 무관한 변화가 생긴다(07-30 개인 순매수 원값
+#   80,469 → 80,712 인데 과열도 110.6 → 66).
+# - 값이 가끔만 바뀌는 지표(베스트셀러 비중 5%→6% · 매매 안전장치 0.25→0.33)는 중앙값이 0 이라 평균으로
+#   나눈다. 안 그러면 한 번 움직일 때마다 무한대로 1등이 된다.
+# - '새 값'은 행이 DB 에 **처음 들어온 시각**(created_at)으로 가른다. 자료 날짜로 가르면 하루 늦게 오는
+#   검색 지표가 같은 변화를 이틀 들고 온다. 휴장으로 새 값이 없는 KRX 지표는 저절로 빠진다.
+# 2026-09-14~27 을 되돌려 재 보니 하루 2~8개가 두 배를 넘었고 날마다 다른 지표가 위에 섰다.
+MOVERS_LIMIT = 3
+MOVERS_MIN_TIMES = 2.0
+MOVERS_FRESH_HOURS = 24
+MOVER_WINDOW = 15
+MOVER_MIN_CHANGES = 5
+
+
+def pick_movers(rows: list[dict], now: datetime) -> list[dict]:
+    """rows 의 각 행: values(원값, 오래된→최신) · created_at(최신 값이 들어온 ISO 시각) · direction."""
+    out: list[tuple[float, dict]] = []
+    for r in rows:
+        created = r.get("created_at")
+        if not created:
+            continue
+        age = (now - datetime.fromisoformat(str(created).replace("Z", "+00:00"))).total_seconds()
+        if not (0 <= age <= MOVERS_FRESH_HOURS * 3600):
+            continue
+        v = [float(x) for x in r.get("values") or []]
+        if len(v) < MOVER_MIN_CHANGES + 2:
+            continue
+        last = v[-1] - v[-2]
+        if last == 0:
+            continue
+        past = [abs(v[i] - v[i - 1]) for i in range(len(v) - 2, 0, -1)][:MOVER_WINDOW]
+        if len(past) < MOVER_MIN_CHANGES:
+            continue
+        mid = median(past)
+        scale = mid if mid > 0 else sum(past) / len(past)
+        if not scale > 0:
+            continue
+        times = abs(last) / scale
+        if times < MOVERS_MIN_TIMES:
+            continue
+        out.append((times, {**r, "times": times, "hotter": (last > 0) == (r.get("direction") != "low")}))
+    out.sort(key=lambda x: -x[0])
+    return [m for _, m in out[:MOVERS_LIMIT]]
+
+
+# ── 여론(카더라) ─────────────────────────────────────────────────────────────────────
+# 분위기 → 문장에 쓸 말. 카더라 히어로 제목(app/kadera/page.tsx headline)과 같은 말이다.
+YEORON_TONE_WORDS = {"낙관 우세": "낙관이 우세", "중립": "낙관과 비관이 팽팽", "비관 우세": "비관이 우세"}
+# 문장이 다른 분위기를 말했는지 가르는 꼴. '우세'·'팽팽'을 앞뒤 낱말과 함께 본다.
+_TONE_PATTERNS = {
+    "낙관 우세": re.compile(r"낙관(?:이|적인 [^.,]{0,6})?\s*우세|낙관 쪽으로 기울"),
+    "중립": re.compile(r"팽팽|엇비슷|중립"),
+    "비관 우세": re.compile(r"비관(?:이|적인 [^.,]{0,6})?\s*우세|비관 쪽으로 기울"),
+}
+# 이 날짜보다 오래된 총평이면 여론 줄을 안 쓴다(총평 단계가 실패한 날). 전날 총평까지는 받는다 — 아침
+# 실행이 그날 총평보다 먼저 도는 경우를 막으려는 여유다.
+YEORON_MAX_AGE_DAYS = 1
+
+
+def yeoron_tone(sent_rows: list[dict], latest: str) -> str | None:
+    """카더라 히어로와 같은 창(KR.sentiment_window)으로 센 전체 낙관도의 구간 이름(KR.tone_label)."""
+    overall = [r for r in sent_rows if r.get("scope") == "overall"]
+    count_by_date = {r["date"]: r.get("message_count") or 0 for r in overall}
+    days = set(KR.sentiment_window(count_by_date, latest, KR.SENTIMENT_MIN_MESSAGES))
+    pos = sum(r.get("positive_count") or 0 for r in overall if r["date"] in days)
+    neg = sum(r.get("negative_count") or 0 for r in overall if r["date"] in days)
+    opt = KR.optimism(pos, neg)
+    return None if opt is None else KR.tone_label(opt)
+
+
+def brief_story(summary: str | None) -> str:
+    """카더라 총평의 둘째 대목(테마 지형). 대목은 빈 줄로 갈린다(app/kadera/page.tsx 와 같은 규칙)."""
+    paras = [p.strip() for p in re.split(r"\n{2,}", summary or "") if p.strip()]
+    return paras[1] if len(paras) > 1 else ""
+
+
+def temp_gap(stage: str, tone: str) -> str | None:
+    """시장 온도와 여론이 엇갈리는 날만 사실 한 줄. 그 밖엔 두 온도를 견주지 않는다(없는 대비를 짓지 않게)."""
+    if stage == "저온" and tone == "낙관 우세":
+        return "시장 온도는 저온인데 여론은 낙관이 우세합니다."
+    if stage in ("고온", "초고온") and tone == "비관 우세":
+        return f"시장 온도는 {stage}인데 여론은 비관이 우세합니다."
+    return None
+
+
+def yeoron_digest(tone: str, story: str, gap: str | None) -> str:
+    lines = [f"[여론] 최근 주식 텔레그램 채널 글의 분위기: {YEORON_TONE_WORDS[tone]}"]
+    if story:
+        lines += ["[이야기] 카더라 총평에서 발췌", story]
+    if gap:
+        lines.append(f"[온도차] {gap}")
+    return "\n".join(lines)
+
+
+def yeoron_problems(text: str, tone: str, names: list[str]) -> list[str]:
+    """여론 줄이 다른 분위기를 말했거나, 숫자·지표 이름·자료 안쪽 말을 옮겼으면."""
+    plain = text.replace("**", "")
+    found = [f"분위기 {t}" for t, pat in _TONE_PATTERNS.items() if t != tone and pat.search(plain)]
+    if re.search(r"\d\s*(?:%|건|회|개)", plain):
+        found.append("숫자")
+    if names_in_line(plain, names):
+        found.append("지표 이름")
+    # 재료 이름을 옮기는 것도 안쪽 말이다("카더라 총평에 따르면") — 읽는 사람에겐 출처가 두 겹이 된다.
+    if INNER_WORDS_RE.search(plain) or re.search(r"총평|발췌", plain):
+        found.append("안쪽 말")
+    return found
+
+
+# ── 마지막 문장(모든 후보가 사실 대조에 걸렸을 때) ─────────────────────────────────────────
+# 다시 쓰기를 다 써도 후보가 전부 어긋나면 모델 문장 대신 자료로 지은 문장을 쓴다. 이름 뒤에 조사를 붙이지
+# 않게 짓는다(받침을 몰라도 된다). 2026-09-28 Haiku(API 폴백 때 쓰는 모델)가 시장 1등이 쉬는 날 세 번 모두
+# "시장 지표 중 금 대비 코스피 상대강도가 가장 높습니다"라고 써서 넣었다 — 그대로 저장하면 거짓이 나간다.
+def _named(r: dict, with_pct: bool = True) -> str:
+    return f"**{r['name']}**({r['capped']:.0f}%)" if with_pct else f"**{r['name']}**"
+
+
+def hot_fallback(rows: list[dict], hot: dict[str, int]) -> str:
+    hots = [r for r in rows if r["hot"]]
+    named = [r for r in hots if mentionable(r)]
+    if not hots:
+        first = "초고온에 든 지표는 없습니다."
+        # '가장'은 1등을 건너뛴 날엔 거짓이라(skipped_hotter) 그런 날엔 안 붙인다.
+        if rows and mentionable(rows[0]) and not skipped_hotter(rows):
+            first = f"초고온에 든 지표는 없고 과열도가 가장 높은 지표는 {_named(rows[0])}입니다."
+    elif len(named) == len(hots) and len(named) <= 2:
+        first = f"초고온에 든 지표는 {' · '.join(_named(r) for r in named)} {'하나' if len(named) == 1 else '둘'}입니다."
+    else:
+        kinds = " · ".join(f"{k} 지표 {n}개" for k, n in hot.items() if n)
+        first = f"초고온에는 {kinds}가 들었습니다."
+    market = sorted(
+        (r for r in rows if r["category"] == SPOTLIGHT_CATEGORY and mentionable(r)), key=lambda r: r["capped"]
+    )[:2]
+    second = f" 시장 지표 가운데 가장 식은 쪽은 {' · '.join(_named(r) for r in market)}입니다." if market else ""
+    return first + second
+
+
+def change_fallback(movers: list[dict]) -> str:
+    parts = " · ".join(f"{_named(m, with_pct=False)}({'더 뜨거워짐' if m['hotter'] else '식음'})" for m in movers)
+    return f"최근 하루 평소보다 크게 움직인 지표는 {parts}입니다."
+
+
+def change_digest(movers: list[dict]) -> str:
+    """'달라진 것' 줄이 보는 자료. 숫자는 안 넣는다(CHANGE_SYSTEM 주석)."""
+    lines = ["[달라진 것] 최근 하루 새로 들어온 값 가운데 평소 변화 폭보다 크게 움직인 지표(크게 움직인 순서)"]
+    for m in movers:
+        lines.append(f"- {m['name']} ({m['category']}): {'더 뜨거워짐' if m['hotter'] else '식음'}")
+        if m.get("desc"):
+            lines.append(f"    뜻: {m['desc']}")
+    return "\n".join(lines)
 
 
 def normalize_category(raw: str | None) -> str:
@@ -363,7 +642,12 @@ def balance_count_problems(text: str, hot: dict[str, int], top: dict[str, int]) 
 
     ⚠️ 검사는 좁게만 한다. 여기서 못 잡는 꼴(개수를 아예 안 적은 문장·"시장 지표는 없으며")은
     그냥 통과다. 잡는 것은 **적힌 개수가 틀린 것**뿐이다.
+
+    ⚠️ 굵게 표시(`**`)를 먼저 벗긴다. Opus 5.5 는 개수를 "감성 지표만 **1개**"처럼 굵게 쓰는데,
+       그대로 두면 정규식이 `지표`와 숫자 사이의 별표에 걸려 **아무것도 못 잡고 통과시킨다**
+       (2026-09-28 확인. Haiku 는 3주 동안 22문장 모두 개수를 굵게 안 써서 드러나지 않았다).
     """
+    text = text.replace("**", "")
     words = (("상위", "top"), ("초고온", "hot"))
 
     def scope(pos: int) -> str:
@@ -398,6 +682,25 @@ def balance_count_problems(text: str, hot: dict[str, int], top: dict[str, int]) 
         if not all(ref[k] == n for k in BALANCE_KINDS):
             found.append(f"{'상위' if where == 'top' else '초고온'} 각각 {n}개")
     return found
+
+
+def keep_bold_names(text: str, names: list[str]) -> str:
+    """굵게(`**…**`)는 **지표 이름에만** 남기고 나머지는 벗긴다. 짝이 안 맞으면 전부 벗긴다.
+
+    화면(app/home/Hero.tsx renderBriefLine)이 굵은 지표 이름을 그 카드로 잇는다 — 굵은 조각이 곧 링크다.
+    Opus 5.5 는 '중요한 부분은 굵게' 지시를 문장마다 따라 한 번에 10곳 가까이 굵게 썼다(2026-09-28 · 8회
+    중앙 9.5곳, 숫자·개수·온도까지). 프롬프트도 '지표 이름만'으로 좁혔지만 여기서 한 번 더 거른다.
+    """
+    parts = text.split("**")
+    if len(parts) % 2 == 0:
+        return text.replace("**", "")
+    forms = {f for n in names for f in name_forms(n)}
+    out = [parts[0]]
+    for i in range(1, len(parts), 2):
+        inner, after = parts[i], parts[i + 1]
+        out.append(f"**{inner}**" if inner.strip() in forms else inner)
+        out.append(after)
+    return "".join(out)
 
 
 def balance_verdict_lines(rows: list[dict]) -> list[str]:
@@ -438,6 +741,7 @@ def build_digest(
     recent: list[tuple[str, float]],
     *,
     index_lines: bool = True,
+    desc: bool = True,
 ) -> str:
     """LLM에 넘길 지표 요약(사람이 읽는 한글 텍스트). 과열도 높은 순으로 정렬해
     모델이 '눈여겨볼 지표'를 고르기 쉽게 한다.
@@ -484,7 +788,7 @@ def build_digest(
         hot_mark = " · 초고온" if r["hot"] else ""
         gate_mark = "" if mentionable(r) else "  ← 이 지표는 문장에 쓰지 마세요"
         lines.append(f"- {r['name']} ({r['category']}): 과열도 {r['capped']:.0f}%{hot_mark}{gate_mark}")
-        if r["name"] in desc_names and r.get("desc"):
+        if desc and r["name"] in desc_names and r.get("desc"):
             lines.append(f"    뜻: {r['desc']}")
     return "\n".join(lines)
 
@@ -498,10 +802,11 @@ def main() -> None:
     client = get_client()
 
     # 프론트가 보여주는 '최신' daily_score 행에 요약을 붙인다(오늘 계산이 안 돌았어도
-    # 최신 날짜 기준으로 맞춘다). 최근 8일을 받아 3번째 문단(추세)용 궤적을 만든다.
+    # 최신 날짜 기준으로 맞춘다). 최근 8일을 받아 '흐름' 줄의 궤적을 만든다. 앞 날들의 요약은
+    # '뜨거운 곳' 줄의 이름 쉬기(resting_names)에 쓴다.
     ds = (
         client.table("daily_score")
-        .select("date, score, stage")
+        .select("date, score, stage, ai_summary")
         .order("date", desc=True)
         .limit(8)
         .execute()
@@ -516,25 +821,30 @@ def main() -> None:
     recent = [(r["date"], float(r["score"])) for r in reversed(ds.data)]
     stage = stage_for_score(score)  # 저장된 라벨 대신 점수에서 재계산(프론트와 동일 규칙)
 
-    # 공개 지표 + 각 지표의 최신 값. normalized_score는 calculate_score가 저장한 원본
-    # 진행률(캡핑 전)이라, 여기서 캡핑/Hit을 다시 계산한다. description_beginner는
-    # 1번째 문단(주인공 뜻풀이)의 근거로 상위 지표에 붙인다.
+    # 공개 지표 + 각 지표의 최근 값. normalized_score는 calculate_score가 저장한 원본
+    # 진행률(캡핑 전)이라, 여기서 캡핑/Hit을 다시 계산한다. 원값 이력(values)과 최신 값이 들어온
+    # 시각(created_at)은 '달라진 것'(pick_movers)에 쓴다.
     indicators = (
         client.table("indicators")
-        .select("id, slug, name, category, description_beginner")
+        .select("id, slug, name, category, description_beginner, direction")
         .eq("is_public", True)
         .order("created_at", desc=False)
         .execute()
     )
 
+    names = [ind["name"] for ind in indicators.data]
+    resting = resting_names([hot_line_of(r.get("ai_summary")) for r in ds.data[1:]], names)
+    for n in sorted(resting):
+        print(f"[뜨거운 곳] {n} — 앞 {HOT_WINDOW - 1}일 그 줄에 {HOT_MAX_IN_WINDOW}번 이상 나와 오늘은 이름을 쉽니다.")
+
     rows: list[dict] = []
     for ind in indicators.data:
         iv = (
             client.table("indicator_values")
-            .select("normalized_score, raw_value")
+            .select("date, normalized_score, raw_value, created_at")
             .eq("indicator_id", ind["id"])
             .order("date", desc=True)
-            .limit(1)
+            .limit(MOVER_WINDOW + 3)
             .execute()
         )
         if not iv.data:
@@ -550,10 +860,14 @@ def main() -> None:
                 "desc": ind.get("description_beginner"),
                 "capped": capped,
                 "hot": capped >= HOT_ZONE,
-                # 주인공 자격 심사에만 쓴다. digest 에는 넣지 않는다 — raw 를 보여주면
+                # 이름 쉬기·크게 움직임 판정에만 쓴다. digest 에는 원값을 넣지 않는다 — raw 를 보여주면
                 # 모델이 방향을 거꾸로 읽는다(build_digest 주석 참고).
                 "slug": ind.get("slug"),
                 "raw": iv.data[0].get("raw_value"),
+                "rest": ind["name"] in resting,
+                "direction": ind.get("direction"),
+                "values": [x["raw_value"] for x in reversed(iv.data) if x.get("raw_value") is not None],
+                "created_at": iv.data[0].get("created_at"),
             }
         )
 
@@ -563,12 +877,18 @@ def main() -> None:
 
     rows.sort(key=lambda r: r["capped"], reverse=True)
     hot_count = sum(1 for r in rows if r["hot"])
+    # 흐름 줄: 옛 추세 문단과 같은 자료(℃ 블록 + 지표 목록).
     digest = build_digest(score, stage, hot_count, rows, recent)
-    # 갈림 문단만 ℃ 가 든 블록을 뺀 자료로 쓴다(build_digest 의 index_lines 주석 참고).
-    balance_digest = build_digest(score, stage, hot_count, rows, recent, index_lines=False)
+    # 뜨거운 곳 줄: ℃ 블록을 빼고 [갈림] 개수를 넣은 자료(옛 갈림 문단의 것). ℃ 가 있으면 흐름 줄의 일까지
+    # 해 버린다(build_digest 의 index_lines 주석). '뜻:'도 뺀다 — 이 줄은 뜻풀이가 아니다.
+    hot_digest = build_digest(score, stage, hot_count, rows, recent, index_lines=False, desc=False)
+    movers = pick_movers(rows, datetime.now(timezone.utc))
+    change_src = change_digest(movers)
 
     print("─" * 60)
     print(digest)
+    print("─" * 60)
+    print(change_src if movers else "[달라진 것] 없음")
     print("─" * 60)
 
     anthropic = get_llm_client(ANTHROPIC_API_KEY)
@@ -583,27 +903,34 @@ def main() -> None:
         # 별표(**...**)는 굵게 표시용이라 유지한다 — 프론트가 파싱해 <b>로 렌더한다.
         return "".join(b.text for b in resp.content if b.type == "text").strip()
 
+    def seen(t: str) -> int:
+        """화면에 보이는 글자 수 — 굵게 별표는 뺀다. Opus 는 굵게를 많이 써서 별표째 세면 길이가 부풀었다."""
+        return len(t.replace("**", ""))
+
     def sized_sentence(
         system: str,
         length: tuple[int, int],
-        source: str | None = None,
+        source: str,
         how: str = "한 문장",
         facts: Callable[[str], list[str]] | None = None,
+        facts_note: str = "",
+        fallback: Callable[[], str] | None = None,
     ) -> str:
-        """한 문장 — 길이가 목표를 벗어나면 다시 쓰게 한다.
+        """한두 문장 — 길이가 목표를 벗어나면 다시 쓰게 한다.
 
         카더라 총평의 ask_brief_sentence 와 같은 방식이다. 후보를 모아 두고 목표 범위
-        안의 첫 번째를, 없으면 한가운데에 가장 가까운 걸 고른다. **빈 문장은 절대 안 낸다** —
+        안의 첫 번째를, 없으면 한가운데에 가장 가까운 걸 고른다. 길이 때문에 빈 문장을 내진 않는다 —
         요약이 통째로 저장되지 않는 것보다 길이가 몇 자 어긋나는 게 낫다.
 
-        facts 는 문단별 사실 대조(갈림 문단의 개수, balance_count_problems). 어긋난 자리를
-        돌려주면 그 문장을 버리고 다시 쓰게 하고, 고를 때도 어긋난 후보는 뒤로 민다.
+        facts 는 줄마다 사실 대조('달라진 것'의 목록 밖 지표 change_problems · '뜨거운 곳'의 쉬는 지표·
+        '가장' 표현·개수 hot_problems). 어긋난 자리를 돌려주면 그 문장을 버리고 facts_note 로 다시 쓰게
+        하고, 고를 때도 어긋난 후보는 뒤로 민다. **후보가 전부 어긋나면** fallback(자료로 지은 문장, 없으면
+        빈 문자열 = 그 줄을 뺀다)을 쓴다 — 어긋난 문장을 저장하지 않는다.
         """
         lo, hi = length
-        # 문단마다 모델에게 준 자료가 다르다(갈림 문단은 ℃ 블록이 빠진다). 오타 검사의
-        # '원문에 있는가' 대조도 **그 문단이 실제로 본 자료**로 해야 한다 — 안 그러면
-        # 못 본 낱말을 근거로 통과시키거나 반대로 멀쩡한 말을 오타로 버린다.
-        src = digest if source is None else source
+        # 줄마다 모델에게 준 자료가 다르다. 오타 검사의 '원문에 있는가' 대조도 **그 줄이 실제로 본
+        # 자료**로 해야 한다 — 안 그러면 못 본 낱말을 근거로 통과시키거나 멀쩡한 말을 오타로 버린다.
+        src = source
         wrong = facts or (lambda _t: [])
         candidates = [one_sentence(system, src)]
         for _ in range(HERO_RETRIES):
@@ -611,64 +938,125 @@ def main() -> None:
             # 길이가 맞아도 글자가 깨졌거나 오타가 있으면 다시 쓴다(common/text_check.py).
             found = problems(cur, src)
             off = wrong(cur)
-            if lo <= len(cur) <= hi and not found and not off:
+            if lo <= seen(cur) <= hi and not found and not off:
                 break
             if found:
                 print(f"[WARNING] 문장을 버리고 다시 씁니다({' · '.join(found)}): {cur[:40]}…")
                 retry = system + f"\n\n[다시 쓰기] 방금 쓴 문장에 깨진 글자나 오타가 있습니다. 같은 뜻으로 **{how}**으로 다시 쓰세요."
             elif off:
-                # 틀린 숫자는 되풀이하지 않는다(적어 주면 그 숫자를 다시 쓴다). 맞는 줄만 다시 가리킨다.
-                print(f"[WARNING] 개수가 자료와 달라 다시 씁니다({' · '.join(off)}): {cur[:40]}…")
-                retry = (
-                    system
-                    + f"\n\n[다시 쓰기] 방금 쓴 문장의 개수가 자료의 [갈림] 줄과 다릅니다. 개수는 [갈림] 줄에 적힌 "
-                    f"것만 그대로 쓰고, 같은 뜻으로 **{how}**으로 다시 쓰세요."
-                )
+                print(f"[WARNING] 자료와 어긋나 다시 씁니다({' · '.join(off)}): {cur[:40]}…")
+                retry = system + f"\n\n[다시 쓰기] {facts_note} **{how}**으로 다시 쓰세요."
             else:
-                need = "늘려" if len(cur) < lo else "줄여"
+                need = "늘려" if seen(cur) < lo else "줄여"
                 retry = (
                     system
-                    + f"\n\n[다시 쓰기] 방금 쓴 문장은 {len(cur)}자입니다. 뜻은 유지하면서 "
+                    + f"\n\n[다시 쓰기] 방금 쓴 문장은 {seen(cur)}자입니다. 뜻은 유지하면서 "
                     f"{need} {lo}~{hi}자로 **{how}**만 다시 쓰세요.\n"
                     f"[방금 쓴 문장]\n{cur}"
                 )
             candidates.append(one_sentence(retry, src))
         # 깨진 후보는 길이가 맞아도 안 쓴다 — 길이는 어긋나도 읽히지만 깨진 글자는 못 읽는다.
-        # 개수가 어긋난 후보도 같은 취급이다. 다만 전부 어긋나면 그중에서 고른다(빈 문장보다 낫다).
+        # 자료와 어긋난 후보도 같은 취급이다. 전부 어긋나면 fallback 을 쓰고, fallback 이 없는 줄('흐름')만
+        # 그중에서 고른다(빈 문장보다 낫다).
+        right = [t for t in candidates if t.strip() and is_clean(t, src) and not wrong(t)]
+        if not right and facts is not None and fallback is not None:
+            print(f"[WARNING] 후보 {len(candidates)}개가 모두 자료와 어긋나 자료로 지은 문장을 씁니다.")
+            return fallback()
         usable = (
-            [t for t in candidates if t.strip() and is_clean(t, src) and not wrong(t)]
+            right
             or [t for t in candidates if t.strip() and is_clean(t, src)]
             or [t for t in candidates if t.strip()]
         )
         if not usable:
             return ""
-        in_goal = [t for t in usable if lo <= len(t) <= hi]
+        in_goal = [t for t in usable if lo <= seen(t) <= hi]
         if in_goal:
             return in_goal[0]
-        return min(usable, key=lambda t: abs(len(t) - (lo + hi) / 2))
+        return min(usable, key=lambda t: abs(seen(t) - (lo + hi) / 2))
 
-    # 주인공 문장과 추세 문장을 따로 생성해 문단 수를 항상 정확히 2로 고정한다.
-    spotlight = sized_sentence(SPOTLIGHT_SYSTEM, SPOTLIGHT_LEN)
-    # 갈림 문단만 두 문장을 허용한다 — 80자를 한 문장에 넣으면 만연체가 되고, '한 문장만' 이라
-    # 다시 시키면 모델이 근거를 버리고 60자대로 되돌아간다(2026-09-06 실측 4/4).
-    hot, top = balance_counts(rows)
-    balance = sized_sentence(
-        BALANCE_SYSTEM,
-        BALANCE_LEN,
-        balance_digest,
-        how="한두 문장",
-        facts=lambda t: balance_count_problems(t, hot, top),
+    # 줄마다 따로 쓴다 — 한 번에 세 줄을 시키면 줄 수가 흔들린다(옛 두 문장 때 실측).
+    trend = sized_sentence(TREND_SYSTEM, TREND_LEN, digest)
+    mover_names = {m["name"] for m in movers}
+    change = (
+        sized_sentence(
+            CHANGE_SYSTEM,
+            CHANGE_LEN,
+            change_src,
+            how="한두 문장",
+            facts=lambda t: change_problems(t, mover_names, names),
+            facts_note=CHANGE_FACTS_NOTE,
+            fallback=lambda: change_fallback(movers),
+        )
+        if movers
+        else CHANGE_NONE
     )
-    trend = sized_sentence(TREND_SYSTEM, TREND_LEN)
-    if not spotlight or not trend:
+    hot_n, top_n = balance_counts(rows)
+    hot_system = HOT_SYSTEM + HOT_SKIP_NOTE if skipped_hotter(rows) else HOT_SYSTEM
+    hot = sized_sentence(
+        hot_system,
+        HOT_LEN,
+        hot_digest,
+        how="한두 문장",
+        facts=lambda t: hot_problems(t, rows, hot_n, top_n),
+        facts_note=HOT_FACTS_NOTE,
+        fallback=lambda: hot_fallback(rows, hot_n),
+    )
+    if not trend or not change or not hot:
         print("[WARNING] LLM 응답이 비어 요약을 저장하지 않습니다.")
         return
 
-    # 개행으로 이어 저장 → 프론트가 개행으로 나눠 각각 한 문단으로 렌더(오프너 포함 3문단).
-    # ⚠️ 줄 순서가 화면의 문단 순서다(app/page.tsx 가 인덱스로 집는다).
-    #    가운데를 끼웠으니 저쪽도 같이 고쳐야 한다 — 안 고치면 추세가 사라진다.
-    summary = f"{spotlight}\n{balance}\n{trend}"
-    print(f"[요약]\n  ① {spotlight}\n  ② {balance}\n  ③ {trend}")
+    # 여론 — 카더라 총평(같은 잡에서 먼저 돈다, daily-update.yml)과 여론 집계. 총평이 없거나 낡았으면 이 줄만
+    # 뺀다(세 줄로 저장된다 — 화면은 줄 수와 상관없이 이름표로 그린다).
+    yeoron = ""
+    # ⚠️ 여론 줄은 곁가지다 — 카더라 표 조회나 이 줄 생성이 깨져도 앞 세 줄은 저장한다(예외를 삼킨다).
+    try:
+        brief = (
+            client.table("telegram_daily_brief")
+            .select("date, sentiment_summary")
+            .order("date", desc=True)
+            .limit(1)
+            .execute()
+        ).data
+        if brief and (date.fromisoformat(target_date) - date.fromisoformat(brief[0]["date"])).days <= YEORON_MAX_AGE_DAYS:
+            latest = brief[0]["date"]
+            since = (date.fromisoformat(latest) - timedelta(days=KR.SENTIMENT_WINDOW_MAX_DAYS)).isoformat()
+            sent_rows = (
+                client.table("telegram_sentiment_daily")
+                .select("date, scope, positive_count, negative_count, message_count")
+                .eq("scope", "overall")
+                .gte("date", since)
+                .lte("date", latest)
+                .execute()
+            ).data
+            tone = yeoron_tone(sent_rows, latest)
+            if tone:
+                yeoron_src = yeoron_digest(tone, brief_story(brief[0]["sentiment_summary"]), temp_gap(stage, tone))
+                print(yeoron_src)
+                print("─" * 60)
+                yeoron = sized_sentence(
+                    YEORON_SYSTEM,
+                    YEORON_LEN,
+                    yeoron_src,
+                    how="한두 문장",
+                    facts=lambda t: yeoron_problems(t, tone, names),
+                    facts_note=YEORON_FACTS_NOTE,
+                    # 여론은 곁가지라 틀린 분위기를 싣느니 그 줄을 뺀다.
+                    fallback=lambda: "",
+                )
+    except Exception as e:  # noqa: BLE001 — 어떤 실패든 이 줄만 빼고 간다
+        print(f"[WARNING] 여론 줄을 만들지 못해 뺍니다: {e!r}")
+        yeoron = ""
+    if not yeoron:
+        print("[여론] 이 줄을 뺍니다 — 카더라 총평·여론 집계가 없거나 낡았거나, 문장이 자료와 어긋났습니다.")
+
+    # 줄마다 이름표를 붙여 개행으로 잇는다 — 화면(app/home/Hero.tsx)이 이름표로 새 형식을 알아보고, 굵게는
+    # 지표 이름에만 남긴다(keep_bold_names). ⚠️ 줄 순서가 화면 순서다.
+    lines = [trend, change, hot] + ([yeoron] if yeoron else [])
+    # 한 줄 안의 줄바꿈은 공백으로 — '한두 문장'을 모델이 두 줄로 내면 이름표 없는 줄이 생겨 화면이 새 형식을
+    # 못 알아본다(날것 "[흐름] …"이 찍힌다). 화면도 이름표 없는 줄을 앞 줄에 이어 붙이지만 여기서 먼저 막는다.
+    lines = [re.sub(r"\s*\n+\s*", " ", t).strip() for t in lines]
+    summary = "\n".join(f"[{label}] {keep_bold_names(t, names)}" for label, t in zip(BRIEF_LABELS, lines))
+    print("[요약]\n  " + summary.replace("\n", "\n  "))
 
     client.table("daily_score").update({"ai_summary": summary}).eq(
         "date", target_date

@@ -3,7 +3,7 @@ import { assertLoaded } from "@/lib/load-state";
 import { notFound } from "next/navigation";
 
 import { getOvernightLive, type OvernightRow } from "@/lib/kr-overnight";
-import { getPreview, type PreviewLink, type PreviewMover } from "@/lib/kr-preview";
+import { getPreview, sessionWord, type PreviewLink, type PreviewMover } from "@/lib/kr-preview";
 
 import { SectionIntro } from "../SectionIntro";
 import { SectionHead } from "../kadera/SectionHead";
@@ -168,32 +168,6 @@ const PCT = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(2)}%`;
  */
 const sessionDay = (iso: string) =>
   `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}(${"일월화수목금토"[new Date(`${iso}T00:00:00Z`).getUTCDay()]})`;
-
-/**
- * 화면 곳곳의 "밤사이" 자리에 들어갈 말. 카드의 미장 세션이 **어젯밤** 것이면 "밤사이",
- * 그보다 앞이면 그 세션의 요일("금요일")이고, 세션이 여럿 쌓였으면 "연휴 동안" 이다.
- *
- *   토 아침  세션 금 = 어제      → 밤사이(금요일 미장이 정말 그 밤사이에 닫혔다)
- *   일·월 아침 세션 금 < 어제    → 금요일(그 밤에는 미장이 없었다)
- *   추석 뒤 월 09-28 세션 09-23~25 → 연휴 동안(수집기가 세 세션을 누적했다 · usFrom 09-23)
- *
- * ⚠️ "연휴 동안" 을 요일보다 먼저 본다. 09-28 의 마지막 세션은 금요일이지만 숫자는 수·목·금
- *    누적이라 "금요일" 로 적으면 틀린다.
- *
- * ⚠️ 카드를 비우지 않고 말만 바꾼다. 월요일 개장이 반응하는 게 바로 금요일 미장이고
- *    백테스트도 월요일을 금요일 세션과 짝지어 쟀다. 주말 방문이 몰리는 일요일 저녁도
- *    월요일을 준비하는 때라 그 카드가 필요하다(휴장 다음 날과 다른 점이다).
- * ⚠️ 비교 잣대는 달력의 오늘이 아니라 그 줄의 국내 날짜(`date`)다. 아침 실행 전 새벽에
- *    어제 줄을 보여 줄 때도 그 줄 기준으로 맞아야 한다.
- * `usSession` 이 없는 줄(마이그레이션 083 전·수집기 배포 전)은 예전처럼 "밤사이" 다.
- */
-function sessionWord(date: string | null, usSession: string | null, usFrom: string | null): string {
-  if (!date || !usSession) return "밤사이";
-  if (usFrom && usFrom < usSession) return "연휴 동안";
-  const lastNight = new Date(Date.parse(`${date}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
-  if (usSession >= lastNight) return "밤사이";
-  return `${"일월화수목금토"[new Date(`${usSession}T00:00:00Z`).getUTCDay()]}요일`;
-}
 
 /**
  * 24시간 거래대금($). 백만 달러 단위로 적되 **1M 이 안 되는 마켓을 0M 으로 뭉개지 않는다.**
