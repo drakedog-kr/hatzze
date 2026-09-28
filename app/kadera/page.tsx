@@ -42,7 +42,7 @@ import { PhoneFold } from "./PhoneFold";
 import { TrendingTabs } from "./TrendingTabs";
 import TimeAgo from "./TimeAgo";
 import { timeAgoInitial } from "./time-ago";
-import { themeDiffStyle, themeTip } from "./theme-vs-usual";
+import { themeShownPos, themeTip } from "./theme-vs-usual";
 
 // 미리보기 이미지는 옆의 opengraph-image.tsx 가 그린다(ownImage). 자세한 건 app/seo.ts 주석 참고.
 export async function generateMetadata(): Promise<Metadata> {
@@ -753,10 +753,10 @@ export default async function KaderaPage() {
                 </div>
                 {sentiment.byTheme.length > 0 && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 2 }}>
-                    <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, letterSpacing: ".04em", color: C.sub }}>인기 테마별 평소 대비 비관 ↔ 낙관</span>
-                    {/* 막대는 그 테마의 평소와 견준다(theme-vs-usual.ts). 가운데 선이 평소다. */}
+                    <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, letterSpacing: ".04em", color: C.sub }}>인기 테마별 비관 ↔ 낙관</span>
+                    {/* 막대가 나뉘는 지점은 그 테마의 평소 대비다(theme-vs-usual.ts). 평소와 같으면 반반. */}
                     {sentiment.byTheme.map((t) => {
-                      const seg = themeDiffStyle(t);
+                      const shown = themeShownPos(t);
                       return (
                         <div
                           key={t.name}
@@ -766,9 +766,9 @@ export default async function KaderaPage() {
                         >
                           {/* 이름 칸 폭을 고정한다 — flex 로 두면 막대 시작점이 행마다 어긋난다. */}
                           <span style={{ ...clip, width: 62, flexShrink: 0, fontSize: "var(--fs-11)", fontWeight: 700, color: C.label }}>{t.name}</span>
-                          <span style={{ flex: 1, minWidth: 0, position: "relative", height: 7, borderRadius: 999, overflow: "hidden", background: "var(--c-track)" }}>
-                            {seg && <span style={seg} />}
-                            <span style={{ position: "absolute", top: 0, bottom: 0, left: "calc(50% - 0.5px)", width: 1, background: "var(--c-divider-strong)" }} />
+                          <span style={{ flex: 1, minWidth: 0, display: "flex", height: 7, borderRadius: 999, overflow: "hidden" }}>
+                            <span style={{ width: `${100 - shown}%`, background: "var(--c-blue-3)" }} />
+                            <span style={{ width: `${shown}%`, background: "var(--c-warm-3)" }} />
                           </span>
                         </div>
                       );

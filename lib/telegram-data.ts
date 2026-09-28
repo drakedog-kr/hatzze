@@ -1979,7 +1979,7 @@ export type EcosystemSentiment = {
   summary: string | null; // LLM 총평. 아직 생성 전이면 null
   /** 표본(positive/negative/total)을 같이 넘긴다 — 얇은 테마는 100:0 같은 극단값이
    *  나오는데, 몇 건 기준인지 보여줘야 그 숫자를 제대로 읽을 수 있다.
-   *  usual 은 그 테마의 평소 낙관도(loadThemeUsual). 막대는 pos − usual 을 그린다. 평소가 얇으면 null */
+   *  usual 은 그 테마의 평소 낙관도(loadThemeUsual). 막대는 평소를 50:50 으로 옮겨 나눈다. 평소가 얇으면 null */
   byTheme: { name: string; pos: number; usual: number | null; positive: number; negative: number; total: number }[];
   /** 최근 SENTIMENT_TREND_DAYS 일 낙관도(sentimentTrend). 마지막 점이 score 다. 조회 실패면 null */
   trend: SentimentPoint[] | null;
@@ -2064,11 +2064,12 @@ export function optimismPct(pos: number, neg: number): number | null {
  * 테마 막대는 그 테마 종목이 붙은 글의 톤이라 수주·실적 같은 회사 호재가 대부분이다. 그래서
  * 78일 동안 국장 막대 302개 중 95%가 낙관 구간이었고 비관 구간은 한 번도 없었다(중앙값 79).
  * 삼전닉스가 5% 빠진 09-28 에도 반도체는 79 였다(2026-09-29 실측). 절대값으로는 늘 밝으니
- * 막대는 **평소보다 밝은지 어두운지**를 그린다. 문턱 하나(예: 80 을 중립으로)로 옮기지 않은
+ * 막대는 평소를 50:50 으로 옮겨 **평소보다 밝은지 어두운지**를 그린다(app/kadera/theme-vs-usual.ts).
+ * 막대 모양·제목은 그대로다. 문턱 하나(예: 80 을 중립으로)로 옮기지 않은
  * 이유는 테마마다 평소가 달라서다(지주·밸류업 85 안팎, 원전 70 안팎).
  *
  * 창과 겹치지 않게 창 첫날 전날까지만 본다. 평소가 너무 얇으면(THEME_USUAL_MIN_DECIDED 미만)
- * 그 테마는 평소가 없다 — 막대는 비우고 툴팁으로 이유를 적는다.
+ * 그 테마는 평소가 없다 — 막대는 예전처럼 낙관도 그대로 나누고 툴팁에 그렇다고 적는다.
  *
  * ⚠️ 총평 digest(generate_telegram_narratives.py theme_usual)와 **같은 날짜 범위·같은 하한**이어야
  * 한다. 총평이 "평소보다 낙관 쪽"이라고 쓴 테마가 옆 막대에서 반대로 그려지면 안 된다.
