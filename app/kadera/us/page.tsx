@@ -610,8 +610,11 @@ export default async function UsKaderaPage() {
                   </div>
                 </div>
                 {sentiment.byTheme.length > 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 2 }}>
-                    <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, letterSpacing: ".04em", color: C.sub }}>인기 테마별 비관 ↔ 낙관</span>
+                  // 이름 칸은 62px 이고, 그보다 긴 테마 이름이 있을 때만 그 이름만큼 넓어진다(국장·미장 같은 규칙).
+                  // 칸 폭을 네 줄이 같이 쓰도록 격자로 둔다 — 줄마다 따로 넓히면 막대 시작점이 줄마다 어긋나
+                  // 눈이 세로로 훑질 못한다. 예전엔 미장만 96px 로 고정해 국장보다 막대가 34px 짧았다.
+                  <div style={{ display: "grid", gridTemplateColumns: "minmax(62px, max-content) minmax(0, 1fr)", columnGap: 10, rowGap: 6, paddingTop: 2 }}>
+                    <span style={{ gridColumn: "1 / -1", fontSize: "var(--fs-11)", fontWeight: 700, letterSpacing: ".04em", color: C.sub }}>인기 테마별 비관 ↔ 낙관</span>
                     {/* 막대가 나뉘는 지점은 그 테마의 평소 대비다(theme-vs-usual.ts). 평소와 같으면 반반. */}
                     {sentiment.byTheme.map((t) => {
                       const shown = themeShownPos(t);
@@ -620,14 +623,10 @@ export default async function UsKaderaPage() {
                           key={t.name}
                           className="hz-tip hz-tip-wide"
                           data-tip={themeTip(t)}
-                          style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}
+                          style={{ display: "grid", gridColumn: "1 / -1", gridTemplateColumns: "subgrid", alignItems: "center", minWidth: 0 }}
                         >
-                          {/* 이름 칸 폭을 고정한다 — flex 로 두면 막대 시작점이 행마다 어긋난다. */}
-                          {/* 96 은 실측이다 — 78 에서 "AI 인프라·클라우드"가 잘렸다. 국장(62)보다 넓은 이유는
-                              미장 테마명이 길기 때문이다. 폭을 고정하는 이유는 그대로다: flex 로 두면
-                              막대 시작점이 행마다 어긋나 눈이 세로로 훑질 못한다. */}
-                          <span style={{ ...clip, width: 96, flexShrink: 0, fontSize: "var(--fs-11)", fontWeight: 700, color: C.label }}>{t.name}</span>
-                          <span style={{ flex: 1, minWidth: 0, display: "flex", height: 7, borderRadius: 999, overflow: "hidden" }}>
+                          <span style={{ ...clip, fontSize: "var(--fs-11)", fontWeight: 700, color: C.label }}>{t.name}</span>
+                          <span style={{ minWidth: 0, display: "flex", height: 7, borderRadius: 999, overflow: "hidden" }}>
                             <span style={{ width: `${100 - shown}%`, background: "var(--c-blue-3)" }} />
                             <span style={{ width: `${shown}%`, background: "var(--c-warm-3)" }} />
                           </span>
