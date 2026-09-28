@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
+from common.market_sentiment import MARKET_MIN_MESSAGES, load_market_daily  # noqa: E402
 from common.prompt_style import PLAIN_PROSE_RULE  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
@@ -416,11 +417,15 @@ _TONE_PATTERNS = {
 YEORON_MAX_AGE_DAYS = 1
 
 
-def yeoron_tone(sent_rows: list[dict], latest: str) -> str | None:
-    """카더라 히어로와 같은 창(KR.sentiment_window)으로 센 전체 낙관도의 구간 이름(KR.tone_label)."""
+def yeoron_tone(sent_rows: list[dict], latest: str, floor: int | None = None) -> str | None:
+    """카더라 히어로와 같은 창(KR.sentiment_window)으로 센 전체 낙관도의 구간 이름(KR.tone_label).
+
+    `sent_rows` 는 카더라 큰 숫자와 같은 재료다 — 시장 글 표(common/market_sentiment)가 있으면 그 행을
+    scope='overall' 로 넘기고 `floor` 는 MARKET_MIN_MESSAGES, 없으면 예전 전체 글 행과 기본 문턱.
+    """
     overall = [r for r in sent_rows if r.get("scope") == "overall"]
     count_by_date = {r["date"]: r.get("message_count") or 0 for r in overall}
-    days = set(KR.sentiment_window(count_by_date, latest, KR.SENTIMENT_MIN_MESSAGES))
+    days = set(KR.sentiment_window(count_by_date, latest, floor or KR.SENTIMENT_MIN_MESSAGES))
     pos = sum(r.get("positive_count") or 0 for r in overall if r["date"] in days)
     neg = sum(r.get("negative_count") or 0 for r in overall if r["date"] in days)
     opt = KR.optimism(pos, neg)
@@ -1028,7 +1033,14 @@ def main() -> None:
                 .lte("date", latest)
                 .execute()
             ).data
-            tone = yeoron_tone(sent_rows, latest)
+            # 카더라 큰 숫자와 같은 재료로 — 시장 글 표가 있으면 그 행(lib/telegram-data.getEcosystemSentiment 와 같은 분기).
+            market_rows = load_market_daily(
+                client, "kr", since=since, until=latest
+            )
+            if any((r.get("positive_count") or 0) + (r.get("negative_count") or 0) for r in market_rows):
+                tone = yeoron_tone([{**r, "scope": "overall"} for r in market_rows], latest, MARKET_MIN_MESSAGES)
+            else:
+                tone = yeoron_tone(sent_rows, latest)
             if tone:
                 yeoron_src = yeoron_digest(tone, brief_story(brief[0]["sentiment_summary"]), temp_gap(stage, tone))
                 print(yeoron_src)

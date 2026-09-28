@@ -30,6 +30,7 @@ import {
   channelMeta,
   fetchAllRows,
   lastKaderaUpdatedAt,
+  loadMarketSentiment,
   loadSentimentTrend,
   optimismPct,
   sentimentWindow,
@@ -402,6 +403,8 @@ export type UsSentiment = {
   negative: number; // 셋의 합은 항상 100(반올림 보정)
   messageCount: number;
   windowDays: number;
+  /** 큰 숫자·막대·추이·건수를 무엇으로 셌나(국장 EcosystemSentiment.basis 와 같은 뜻) */
+  basis: "market" | "all";
   /** 테마별 낙관↔비관(중립 제외). 표본을 같이 넘긴다 — 얇은 테마는 100:0 같은 극단값이
    *  나오는데, 몇 건 기준인지 보여줘야 그 숫자를 제대로 읽을 수 있다(국장과 같은 규칙). */
   byTheme: { name: string; pos: number; positive: number; negative: number; total: number }[];
@@ -475,13 +478,16 @@ export async function getUsSentiment(): Promise<UsSentiment | null> {
   // 창이 넓어질 수 있는 최대 일수만큼 받는다. scope 를 안 거른다 — 테마별 막대까지 같은
   // 조회에서 나온다. 30일 추이(overall 만)는 따로 받는다 — 여기에 붙이면 테마 행까지
   // 30일치가 와서 1,000행 캡에 다가간다.
-  const [{ data, error }, trend] = await Promise.all([
+  // 큰 숫자는 시장 글 기준(loadMarketSentiment, 미국 증시 전체를 말한 글)을 먼저 쓰고, 없으면 예전
+  // '미국 종목이 붙은 글' 기준으로 돌아간다. 예전 기준은 30일 내내 낙관이었다(2026-09-29 실측).
+  const [{ data, error }, allTrend, market] = await Promise.all([
     db
       .from("telegram_us_sentiment_daily")
       .select("date,scope,positive_count,neutral_count,negative_count,message_count")
       .gte("date", addDays(base, -(SENTIMENT_WINDOW_MAX_DAYS - 1)))
       .lte("date", base),
     loadSentimentTrend("telegram_us_sentiment_daily", base, US_SENTIMENT_MIN_MESSAGES),
+    loadMarketSentiment("us", base),
   ]);
   if (error || !data?.length) {
     if (error) console.error("[getUsSentiment] 집계를 못 읽었습니다", error);
@@ -507,8 +513,10 @@ export async function getUsSentiment(): Promise<UsSentiment | null> {
   );
   if (!sum.total) return null;
 
-  const [positive, neutral, negative] = toPercents(sum.pos, sum.neu, sum.neg);
-  const score = optimismPct(sum.pos, sum.neg) ?? 50;
+  // 테마 막대는 언제나 예전 톤(종목 글)이다 — 테마는 종목에 딸린 이야기라 '시장 전체' 판정이 없다.
+  const head = market ?? { ...sum, windowDays: win.length || window.size, trend: allTrend };
+  const [positive, neutral, negative] = toPercents(head.pos, head.neu, head.neg);
+  const score = optimismPct(head.pos, head.neg) ?? 50;
   const { label, tone } = sentimentTone(score);
 
   // 테마별 막대는 **큰 숫자와 같은 창**(창 안 합계)을 쓴다. 하루치로 그리면 옆의
@@ -542,10 +550,11 @@ export async function getUsSentiment(): Promise<UsSentiment | null> {
     positive,
     neutral,
     negative,
-    messageCount: sum.total,
-    windowDays: win.length || window.size,
+    messageCount: head.total,
+    windowDays: head.windowDays,
+    basis: market ? "market" : "all",
     byTheme,
-    trend,
+    trend: market ? market.trend : allTrend,
   };
 }
 

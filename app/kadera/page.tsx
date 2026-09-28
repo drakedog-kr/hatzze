@@ -463,7 +463,7 @@ export default async function KaderaPage() {
 
   /* 히어로의 현황 타일(모니터링 채널·총 구독자·활성 채널·총 메시지)은 전부 걷었다(2026-09-27).
      그 자리는 센티먼트 추이가 다 쓴다 — 오른쪽 칸이 통째로 여론 이야기라 왼쪽 제목과 한 덩어리로 읽힌다.
-     - 메시지 수는 이미 히어로에 있다(센티먼트 캡션의 "최근 N일 · N건 분석").
+     - 메시지 수는 걷었다. 센티먼트 캡션의 건수는 2026-09-29부터 시장 글 수다("최근 N일 · 시장 글 N건").
      - 채널 수는 채널 파워 랭킹 머리로 옮겼다가 거기서도 뺐다(2026-09-28). 화면에 채널 수가 없다.
      - 총 구독자는 채널마다 구독자를 더한 값이라 여러 채널을 구독한 한 사람이 여러 번 세어졌다. */
 
@@ -715,7 +715,7 @@ export default async function KaderaPage() {
                   </strong>
                   <div className="hz-figrow-aside">
                     <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub }}>
-                      최근 {sentiment.windowDays}일 · {sentiment.messageCount.toLocaleString("ko-KR")}건 분석
+                      최근 {sentiment.windowDays}일 · {sentiment.basis === "market" ? `시장 글 ${sentiment.messageCount.toLocaleString("ko-KR")}건` : `${sentiment.messageCount.toLocaleString("ko-KR")}건 분석`}
                     </span>
                     {/* 툴팁은 문장이 아니라 물음표에 건다(옛 히어로 주석과 같은 이유). */}
                     {/* ⚠️ `alignItems` 가 center 가 아니라 **baseline** 이다. 이 줄은 곁줄의
@@ -726,7 +726,7 @@ export default async function KaderaPage() {
                       중립 {sentiment.neutral}% 제외 후 환산
                       <span
                         className="hz-tip hz-tip-wide"
-                        data-tip="중립 뺀 낙관·비관 비율"
+                        data-tip={sentiment.basis === "market" ? "시장 글의 낙관·비관 비율" : "중립 뺀 낙관·비관 비율"}
                         data-ga-tip="sentiment_ratio"
                         style={{ display: "inline-flex", cursor: "help", flexShrink: 0, alignSelf: "center" }}
                       >
