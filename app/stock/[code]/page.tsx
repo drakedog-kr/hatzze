@@ -85,7 +85,7 @@ export async function generateMetadata({
   if (!d) return { title: "종목을 찾을 수 없습니다 | hatzze", robots: { index: false, follow: false } };
 
   const meta = await pageMetadata({
-    title: `${d.name}(${d.code}) 텔레그램 언급 | hatzze`,
+    title: `${d.name}(${d.code}) 상세 정보 | hatzze`,
     description: `${withSubjectParticle(d.name)} 주식 텔레그램에서 얼마나 회자되는지 봅니다. 최근 ${STOCK_STAT_DAYS}일 언급 ${d.totalMentions.toLocaleString("ko-KR")}회, 언급된 날 ${d.activeDays}일. 일별 추이와 가장 많이 언급된 날을 함께 봅니다.`,
     path: stockHref(d.code),
     // 종목 화면은 국장 카더라 구역이라 그 카드를 쓴다(app/seo.ts 의 imagePath).
@@ -231,7 +231,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
       {/* 셸이 이 주소의 이름을 모른다(위 머리말). 구조화 데이터도 여기서 낸다. */}
       {/* ⚠️ 이름은 **화면에 보이는 것 그대로**여야 한다(JsonLd 머리말). h1 이 "삼성전자"
           이므로 여기도 그것이다. `<title>` 의 긴 꼴을 넣으면 검색 결과의 이동 경로가
-          `hatzze.fun › 국장 카더라 › 삼성전자(005930) 텔레그램 언급` 이 되어, 화면에
+          `hatzze.fun › 국장 카더라 › 삼성전자(005930) 상세 정보` 가 되어, 화면에
           없는 이름을 구글에만 말하는 셈이 된다. */}
       <PageJsonLd
         title={d.name}

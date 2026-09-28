@@ -1397,8 +1397,16 @@ function PageHeader() {
    *    색인 대상이 아닌데 구조화 데이터만 내면 서로 어긋난 신호가 된다.
    * ⛔ 법률 문서(이용약관·개인정보처리방침)에도 내지 않는다. 검색 대상이 아니다 — DEEP_PAGES 에
    *    `ld: "none"` 으로 들어 있다(app/legal.tsx DOC_PAGES). 제목은 이제 셸이 그린다(2026-09-26).
+   *
+   * 서브 항목 **아래** 화면(테마 한 장 `/theme/robot` · `/theme/us/memory`)의 부모는 구역이 아니라 그 서브 항목이다 —
+   * 화면 맨 위 뒤로 가기 줄(국장 테마 판세 › 로봇)과 같게. 구역 이름을 쓰면 미장 테마가 국장 목록(/theme)을 부모로 댔다.
    */
-  const parent = page && page.href !== pathname ? { name: page.label, path: page.href } : null;
+  const under = page?.children?.find((c) => c.href && c.href !== pathname && childActive(page.children!, c, pathname));
+  const parent = under?.href
+    ? { name: under.label, path: under.href }
+    : page && page.href !== pathname
+      ? { name: page.label, path: page.href }
+      : null;
   /**
    * ⛔ **이 셸이 이름을 아는 화면에만 낸다.**
    *
