@@ -62,7 +62,7 @@ from common.prompt_style import PLAIN_PROSE_RULE_SHORT  # noqa: E402
 from common.supabase_client import get_client, load_all  # noqa: E402
 from common.surging import load_stock_daily, top_surging, window_end_for  # noqa: E402
 from common.text_check import is_clean  # noqa: E402
-from common.us_surging import top_us_surging  # noqa: E402
+from common.us_surging import load_us_stock_daily, top_us_surging  # noqa: E402
 
 import generate_telegram_narratives as KR  # noqa: E402
 import generate_us_telegram_narratives as US  # noqa: E402
@@ -214,7 +214,9 @@ def run_us(db, client, dry_run: bool) -> int:
         print("[미장] telegram_us_sentiment_daily 가 비어 있습니다. 건너뜁니다.")
         return 0
     latest = rows[0]["date"]
-    tickers = top_us_surging(db, CARDS)
+    # ⚠️ 화면과 같은 창으로 부른다 — 기준일을 뺀 앞 14일(load_us_stock_daily 주석). 벽시계 창이면
+    #    오늘까지 들어가 카드에 없는 종목의 문장을 만든다(2026-09-28 여섯 중 셋).
+    tickers = top_us_surging(db, CARDS, preloaded=load_us_stock_daily(db, base_date=latest))
     if not tickers:
         print("[미장] 급부상 종목이 없습니다.")
         return 0
