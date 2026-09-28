@@ -14,8 +14,12 @@ scripts/generate_telegram_narratives.py 가 그 종목의 요약을 미리 만�
     단 저녁 실행 뒤에는 오늘을 넣는다 — 창의 끝날은 window_end_for 가 정한다.
   - 절대량이 아니라 그날 전체 대비 **점유율**로 비교한다. 주말엔 전체 언급이 평일의
     1/10~1/20 이라 절대량으로 보면 모든 종목이 '감소'로 나온다.
-  - 최근 3일 일평균 점유율 ÷ 그 이전 일평균 점유율. 분모가 거의 0인 종목이 터무니없는
-    배수를 받지 않도록 분자·분모에 SHARE_SMOOTHING 을 함께 더한다.
+  - 최근 3일의 **날마다 몫 평균** ÷ 그 이전 기간을 **합친** 몫(surging_shares · score_surging).
+    평소까지 날마다 평균하면 대화가 평일의 16분의 1인 연휴 하루가 평소를 부풀리고(2026-09-28 HLB
+    428위), 최근까지 합치면 조용한 날 터진 소식이 그날 카드에 안 뜬다(09-24 HLB 16위). 까닭과
+    되돌려 재기는 lib/surging-score.ts 머리 주석. 분모가 거의 0인 종목이 터무니없는 배수를 받지
+    않도록 분자·분모에 SHARE_SMOOTHING 을 함께 더한다.
+  - 최근 언급 MIN_RECENT_MENTIONS(3)회 미만은 카드 정원을 채울 때 맨 뒤로(2026-09-28 에 2→3, 미장과 같은 하한).
   - 정렬은 배수 → 언급수 → 종목코드(완전 동점에서 DB 행 순서에 딸리지 않게), 그 뒤
     신뢰도 tier 로 안정 정렬한다.
   - 채널 수는 창 안의 **서로 다른 채널 수**다(common/channel_breadth.py). 정원을
@@ -32,7 +36,8 @@ from .timeutil import KST, today_kst
 
 LOOKBACK_DAYS = 14   # getSurgingStocks 의 loadStockDaily(14)
 RECENT_MAX = 3       # recentN = min(3, …)
-SHARE_SMOOTHING = 0.002  # 언급 1회가 그날 대화에서 차지하는 몫(실측 중앙값 0.0018)
+SHARE_SMOOTHING = 0.002  # 언급 1회가 그날 대화에서 차지하는 몫(실측 중앙값 0.0018) · lib/surging-score.ts 와 같은 값
+MIN_RECENT_MENTIONS = 3  # lib/surging-score.ts 와 같은 값. 이보다 적으면 표본이 얇다
 CARD_LIMIT = 5       # 사이트 카드 정원. 자르기 전에 여기까지 세워야 순서가 카드와 같다
 
 # 그날 글이 이 시각(KST)을 넘겨서까지 모였으면 급부상 창에 그날을 넣는다. 저녁 실행(17:30 발사)의
@@ -147,6 +152,65 @@ def load_stock_daily(
     return rows, dates
 
 
+def surging_shares(
+    rows: list[dict], dates: list[str], key: str, recent_days: int = RECENT_MAX
+) -> tuple[list[str], dict[str, dict]]:
+    """종목별 (최근 날마다 몫 평균, 앞 기간 합친 몫, 최근 언급 수). 국장·미장이 같이 쓴다.
+
+    lib/surging-score.ts surgingShares 의 사본이다. 두 테스트가 같은 예제로 같은 값을 확인한다
+    (tests/test_surging_score.py · tests/surging-score.test.ts). `key` 는 'stock_code' 또는 'ticker'.
+
+    평소는 합쳐서 — 조용한 연휴·주말 하루가 대화량만큼만 반영돼 평소를 부풀리지 못한다.
+    최근은 날마다 평균해서 — 조용한 날 터진 소식도 그날 하루만큼 반영돼 그날 카드에 뜬다.
+    """
+    recent_n = min(recent_days, max(1, len(dates) - 1))
+    recent_list = dates[-recent_n:]
+    recent_set = set(recent_list)
+
+    day_total: dict[str, float] = {}
+    prior_total = 0.0
+    for r in rows:
+        w = float(r["weighted_score"] or 0)
+        day_total[r["date"]] = day_total.get(r["date"], 0.0) + w
+        if r["date"] not in recent_set:
+            prior_total += w
+
+    agg: dict[str, dict] = {}
+    for r in rows:
+        w = float(r["weighted_score"] or 0)
+        a = agg.setdefault(r[key], {"recent_share_sum": 0.0, "prior_w": 0.0, "mentions": 0})
+        if r["date"] in recent_set:
+            total = day_total.get(r["date"], 0.0)
+            a["recent_share_sum"] += (w / total) if total > 0 else 0.0
+            a["mentions"] += r["mention_count"] or 0
+        else:
+            a["prior_w"] += w
+
+    stats = {
+        k: {
+            "recent_share": a["recent_share_sum"] / recent_n,
+            "base_share": (a["prior_w"] / prior_total) if prior_total > 0 else 0.0,
+            "mentions": a["mentions"],
+        }
+        for k, a in agg.items()
+    }
+    return recent_list, stats
+
+
+def score_surging(rows: list[dict], dates: list[str]) -> tuple[list[str], dict[str, dict]]:
+    """국장 — (최근 날짜 목록, {code: {mentions, ratio, is_new}}). lib/surging-score.ts scoreSurging 의 사본."""
+    recent_list, stats = surging_shares(rows, dates, "stock_code")
+    scores = {
+        code: {
+            "mentions": s["mentions"],
+            "ratio": (s["recent_share"] + SHARE_SMOOTHING) / (s["base_share"] + SHARE_SMOOTHING),
+            "is_new": s["base_share"] == 0,
+        }
+        for code, s in stats.items()
+    }
+    return recent_list, scores
+
+
 def top_surging(
     db,
     limit: int = CARD_LIMIT,
@@ -172,45 +236,15 @@ def top_surging(
     if not rows or not dates:
         return []
 
-    recent_n = min(RECENT_MAX, max(1, len(dates) - 1))
-    recent_dates = set(dates[-recent_n:])
-    prior_count = max(len(dates) - recent_n, 1)
-
-    day_total: dict[str, float] = {}
-    for r in rows:
-        day_total[r["date"]] = day_total.get(r["date"], 0.0) + float(r["weighted_score"] or 0)
-
-    agg: dict[str, dict] = {}
-    for r in rows:
-        a = agg.setdefault(
-            r["stock_code"], {"recent_share": 0.0, "recent_m": 0, "prior_share": 0.0}
-        )
-        total = day_total.get(r["date"], 0.0)
-        share = (float(r["weighted_score"] or 0) / total) if total > 0 else 0.0
-        if r["date"] in recent_dates:
-            a["recent_share"] += share
-            a["recent_m"] += r["mention_count"] or 0
-        else:
-            a["prior_share"] += share
-
-    scored = []
-    for code, a in agg.items():
-        base = a["prior_share"] / prior_count
-        recent_per_day = a["recent_share"] / recent_n
-        scored.append(
-            {
-                "code": code,
-                "mentions": a["recent_m"],
-                "ratio": (recent_per_day + SHARE_SMOOTHING) / (base + SHARE_SMOOTHING),
-                "is_new": base == 0,
-            }
-        )
+    recent_list, scores = score_surging(rows, dates)
+    recent_dates = set(recent_list)
+    scored = [{"code": code, **s} for code, s in scores.items()]
 
     scored.sort(key=lambda s: (-s["ratio"], -s["mentions"], s["code"]))
 
-    # 신뢰도 tier — ① 언급 2회↑ + 뚜렷한 상승 ② 언급 2회↑ 완만 ③ 언급 1회(표본이 하나).
+    # 신뢰도 tier — ① 언급 3회↑ + 뚜렷한 상승 ② 언급 3회↑ 완만 ③ 언급 3회 미만(표본이 얇다).
     def tier(s: dict) -> int:
-        if s["mentions"] < 2:
+        if s["mentions"] < MIN_RECENT_MENTIONS:
             return 3
         return 1 if s["ratio"] >= 1.3 else 2
 

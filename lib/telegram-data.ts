@@ -6,6 +6,7 @@ import { channelPhotoUrl } from "@/lib/channel-photo";
 import { sentimentTone } from "@/lib/format";
 import { THEMES } from "@/lib/stock-themes";
 import { LOAD_FAILED, type MaybeFailed } from "@/lib/load-state";
+import { MIN_RECENT_MENTIONS, scoreSurging } from "@/lib/surging-score";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { changeRateOf, fetchYahooQuote } from "@/lib/yahoo-quote";
 
@@ -587,14 +588,6 @@ async function computeSummaryLive(
 
 // ─── 종목 일별 집계 공통 로더 ────────────────────────────────────────────────
 
-/**
- * 점유율 비교용 평활 상수 — '언급 1회가 그날 대화에서 차지하는 몫'.
- * telegram_stock_daily 949건 실측: 언급 1회 종목의 점유율 중앙값 0.0018.
- * 배수를 낼 때 분자·분모에 함께 더해, 표본이 1회치뿐인 종목이 거대한 배수를
- * 받는 걸 막는다(자세한 이유는 getSurgingStocks 안 주석).
- */
-const SHARE_SMOOTHING = 0.002;
-
 // channel_count 는 일부러 뺐다. 창 전체의 '서로 다른 채널 수'는 일별 개수로 복원할 수
 // 없어서(recentChannelCount 주석) 프론트가 쓸 데가 없고, 14일 × 수천 행에 실려 오는
 // 열이라 안 받는 편이 낫다. 파이프라인 집계에는 그대로 남아 있다.
@@ -809,7 +802,7 @@ export const surgingWindowEnd = cache(async (): Promise<string> => {
 
 /**
  * 급부상 종목 — 각 종목의 최근 활동이 평소 대비 얼마나 튀었나(momentum).
- * 최근 3일 일평균 weighted 를 그 이전 일평균과 비교한다. 창의 끝날은 surgingWindowEnd 가
+ * 최근 3일의 날마다 몫 평균을 그 이전 기간을 합친 몫과 비교한다(lib/surging-score.ts). 창의 끝날은 surgingWindowEnd 가
  * 정한다(저녁 실행 뒤엔 오늘까지).
  * 이전 기록이 없으면 신규 등장(🆕).
  */
@@ -822,58 +815,26 @@ export async function getSurgingStocks(
   const { rows, dates } = await loadStockDaily(14, await surgingWindowEnd());
   if (!rows.length) return [];
 
-  const recentN = Math.min(3, Math.max(1, dates.length - 1));
-  const recentDateList = dates.slice(-recentN);
-  const recentDates = new Set(recentDateList);
-  const priorCount = Math.max(dates.length - recentN, 1);
+  // 평소는 앞 기간을 합쳐서, 최근은 날마다 평균해서 몫을 낸다 — 조용한 연휴 하루가 평소를 부풀리지
+  // 않게 하되 그날 터진 소식은 그날 카드에 뜨게. 까닭과 실측은 lib/surging-score.ts 머리 주석.
+  const { recentDates: recentDateList, scores } = scoreSurging(rows, dates);
 
-  // 주말엔 전체 언급량이 평일의 1/10~1/20로 떨어져, 절대량으로 비교하면 모든 종목이
-  // "감소"로 보여 카드가 비어버린다. 그래서 그날 전체 대비 '비중(share)'으로 비교해
-  // 볼륨 수준의 영향을 제거하고 "대화에서 차지한 몫이 커졌나"만 본다.
-  const dayTotal = new Map<string, number>();
-  for (const r of rows) dayTotal.set(r.date, (dayTotal.get(r.date) ?? 0) + (Number(r.weighted_score) || 0));
+  const infoOf = await stockInfoMap([...scores.keys()]);
 
-  const byStock = new Map<
-    string,
-    { recentShare: number; recentM: number; priorShare: number; byDate: Map<string, number> }
-  >();
-  for (const r of rows) {
-    const a = byStock.get(r.stock_code) ?? { recentShare: 0, recentM: 0, priorShare: 0, byDate: new Map() };
-    a.byDate.set(r.date, r.mention_count || 0);
-    const total = dayTotal.get(r.date) || 0;
-    const share = total > 0 ? (Number(r.weighted_score) || 0) / total : 0;
-    if (recentDates.has(r.date)) {
-      a.recentShare += share;
-      a.recentM += r.mention_count || 0;
-    } else {
-      a.priorShare += share;
-    }
-    byStock.set(r.stock_code, a);
-  }
-
-  const infoOf = await stockInfoMap([...byStock.keys()]);
-
-  const scored = [...byStock.entries()]
+  const scored = [...scores.entries()]
     .map(([code, a]) => {
-      const recentPerDay = a.recentShare / recentDateList.length;
-      const base = a.priorShare / priorCount;
       const info = infoOf.get(code);
       return {
         code,
         name: info?.name ?? code,
-        recentMentions: a.recentM,
+        recentMentions: a.recentMentions,
         // 여기서는 못 센다 — '서로 다른 채널 수'는 일별 집계의 합집합이라 원자료를
         // 봐야 하고(recentChannelCount 주석), 카드에 오르지도 못할 1,700여 종목까지
         // 물을 이유가 없다. 정원을 확정한 뒤 그 몇 건만 아래에서 채운다.
         // null 로 둔다 — 아래에서 못 채우면 그대로 '못 셌다'가 되고, 화면이 문구를 뺀다.
         channelCount: null as number | null,
-        // 평활(+SHARE_SMOOTHING)한 뒤 나눈다. 그냥 나누면 분모가 거의 0인 종목이
-        // "▲162.8배"처럼 터무니없는 배수를 받는데, 실제론 3일간 2회 언급·1개 채널이라
-        // 표본이 사실상 없는 경우다. 상수는 '언급 1회가 만드는 몫'(실측 중앙값 0.0018)
-        // 이라, 최근 몫이 1회치밖에 안 되면 배수가 2배 근처로 눌리고, 진짜 두꺼운
-        // 급증(몫이 1회치의 수십 배)은 거의 그대로 남는다.
-        ratio: (recentPerDay + SHARE_SMOOTHING) / (base + SHARE_SMOOTHING),
-        isNew: base === 0,
+        ratio: a.ratio,
+        isNew: a.isNew,
         series: dates.map((d) => a.byDate.get(d) ?? 0),
         seriesDates: dates,
         recentDays: recentDateList.length,
@@ -894,12 +855,13 @@ export async function getSurgingStocks(
 
   // 카드 정원은 항상 채운다 — 기준을 만족한 종목만 넣으면 조용한 날에 4개·3개로 줄어
   // 레이아웃이 들쭉날쭉해진다. 다만 아무거나 끌어오면 안 되고 '덜 미더운 순서'로 메운다:
-  //   ① 언급 2회↑ + 뚜렷하게 뛴 것(본래 기준)
-  //   ② 언급 2회↑지만 상승폭이 완만한 것
-  //   ③ 언급 1회 — 표본이 하나라 사실상 노이즈
+  //   ① 언급 3회↑ + 뚜렷하게 뛴 것(본래 기준)
+  //   ② 언급 3회↑지만 상승폭이 완만한 것
+  //   ③ 언급 MIN_RECENT_MENTIONS(3)회 미만 — 표본이 얇아 사실상 노이즈. 2026-09-28 에 2회에서 3회로
+  //      올렸다(미장과 같은 하한). 59일 동안 2회짜리 카드 4장(피스피스스튜디오·동아쏘시오홀딩스)만 빠졌다
   // ③을 ②보다 먼저 넣으면 4위 ▲1.3배 밑에 5위 ▲37배가 붙어 정렬이 깨져 보인다.
-  // (평활 후에는 배수 자체가 눌리지만, '2회 이상'이라는 표본 하한은 그대로 둔다.)
-  const tier = (s: SurgingStock) => (s.recentMentions < 2 ? 3 : s.ratio >= 1.3 ? 1 : 2);
+  // (평활 후에는 배수 자체가 눌리지만, 표본 하한은 그대로 둔다.)
+  const tier = (s: SurgingStock) => (s.recentMentions < MIN_RECENT_MENTIONS ? 3 : s.ratio >= 1.3 ? 1 : 2);
   const list = [...scored].sort((x, y) => tier(x) - tier(y)).slice(0, limit);
 
   // 표시용 가격은 실시간(야후) 우선 — KRX 저장 종가는 며칠 지연돼, 같은 종목이 이 카드와

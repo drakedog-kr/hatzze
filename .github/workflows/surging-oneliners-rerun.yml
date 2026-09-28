@@ -1,0 +1,75 @@
+# 급부상 카드의 한 줄 요약만 다시 만든다. 손으로만 돈다.
+#
+# ## 왜 따로 있나
+#
+# 한 줄 요약은 LLM 이 쓴다. 구독 경로(claude -p)는 러너에만 열려 있고, 로컬에서 생성기를 돌리면
+# 토큰이 없어 조용히 API 로 청구된다(common/llm_client.py 머리말). 그렇다고 daily-update.yml 을
+# 손으로 돌리면 지표 수집 전부가 한 번 더 돈다. 그래서 생성기 하나만 도는 길을 따로 둔다
+# (move-reasons-rerun.yml 과 같은 꼴).
+#
+# 처음 쓸 곳은 급부상 셈법을 바꾼 PR(1.25.4)을 머지한 직후다. 화면은 배포 즉시 새 목록을 그리는데
+# 한 줄 요약은 다음 실행에서야 새 목록 기준으로 만들어져, 그 사이 새로 오른 카드에 문장이 비거나
+# 며칠 전 문장이 붙는다.
+#
+# ⚠️ 기준일(telegram_(us_)sentiment_daily 최신 날짜)의 문장을 **덮어쓴다**(upsert). 창 끝날
+#    (telegram_surging_window)도 그 자리에서 다시 정한다 — 파이프라인 한 줄 요약 스텝과 똑같다.
+name: 급부상 한 줄 요약 다시 만들기 (수동)
+
+on:
+  workflow_dispatch:
+    inputs:
+      market:
+        description: "어느 쪽 (both=둘 다 · kr=국장만 · us=미장만)"
+        type: choice
+        default: both
+        options: [both, kr, us]
+
+jobs:
+  rerun:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      # 구독 경로가 먼저, 실패하면 API(daily-update.yml 과 같다). 로그의 `[LLM]` 줄로 어느 쪽이었는지 본다.
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r data-pipeline/requirements.txt
+
+      - name: Install Claude Code CLI (LLM 구독 경로)
+        continue-on-error: true
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/claude" --version
+
+      - name: 급부상 한 줄 요약 다시 만들기
+        env:
+          MARKET: ${{ github.event.inputs.market }}
+        run: |
+          case "$MARKET" in
+            kr) flag=--kr-only ;;
+            us) flag=--us-only ;;
+            *) flag= ;;
+          esac
+          python data-pipeline/scripts/generate_surging_oneliners.py $flag
+
+      # 새 문장이 바로 보이게 카더라 두 화면만 비우고 데운다(daily-update.yml 의 같은 자리와 같다).
+      - name: 카더라 화면 비우고 데우기
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        env:
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: bash scripts/revalidate.sh /kadera /kadera/us

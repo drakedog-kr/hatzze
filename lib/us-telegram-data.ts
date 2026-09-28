@@ -40,6 +40,7 @@ import {
 import { changeRateOf, fetchYahooQuote } from "@/lib/yahoo-quote";
 import { yahooSymbol } from "@/lib/yahoo-history";
 import { US_THEMES } from "@/lib/us-stock-themes";
+import { scoreUsSurging } from "@/lib/surging-score";
 
 /** 급부상 판정에서 '최근'으로 볼 일수. 국내(KADERA_WINDOW_DAYS)와 같게 둔다. */
 export const US_WINDOW_DAYS = 3;
@@ -85,14 +86,6 @@ function addDays(iso: string, n: number): string {
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 }
-
-/**
- * 배수 계산의 평활 상수. 국내와 같은 값·같은 이유다.
- *
- * 그냥 나누면 분모가 거의 0인 종목이 "▲162.8배"처럼 터무니없는 배수를 받는다.
- * 실제론 3일에 2회 언급인 종목이라 화면 신뢰도를 깎는다.
- */
-const SHARE_SMOOTHING = 0.0006;
 
 export type UsStock = { ticker: string; name: string };
 
@@ -240,58 +233,31 @@ export async function getUsSurgingStocks(
 
   // 안 끝난 오늘은 loadUsStockDaily 의 창(windowBefore)이 이미 뺐다. 여기서는 그 꼬리
   // US_WINDOW_DAYS 칸을 '최근'으로 잡고 나머지를 비교군으로 둔다.
-  const recentN = Math.min(US_WINDOW_DAYS, Math.max(1, dates.length - 1));
-  const recentDates = new Set(dates.slice(-recentN));
-  const priorCount = Math.max(dates.length - recentN, 1);
+  // 평소는 앞 기간을 합쳐서, 최근은 날마다 평균해서 몫을 낸다 — 국장과 같은 셈법이다(lib/surging-score.ts).
+  // 최근 언급 MIN_RECENT_MENTIONS(3)회 미만·배수 1 이하는 뺀다(3일에 두어 번 언급된 종목이 배수만 크게 받는 걸 막는다).
+  const { recentDates, ranked: scoredAll } = scoreUsSurging(rows, dates, US_WINDOW_DAYS);
 
-  const dayTotal = new Map<string, number>();
-  for (const r of rows) dayTotal.set(r.date, (dayTotal.get(r.date) ?? 0) + (Number(r.weighted_score) || 0));
-
-  const byTicker = new Map<
-    string,
-    { recentShare: number; recentM: number; priorShare: number; channels: number; byDate: Map<string, number> }
-  >();
+  // ⚠️ 여기서 센 채널 수는 **폴백일 뿐**이다. 일별 채널 수는 여러 날을 묶어도 합집합이
+  // 아니라, 합치면 겹쳐 세고 최댓값을 쓰면 실제보다 작다(엔비디아 100 vs 204).
+  // 아래에서 telegram_us_stock_breadth 로 덮어쓴다. 이 값은 그 표가 비었을 때만 남는다.
+  const recentSet = new Set(recentDates);
+  const channelsFallback = new Map<string, number>();
   for (const r of rows) {
-    const a = byTicker.get(r.ticker) ?? { recentShare: 0, recentM: 0, priorShare: 0, channels: 0, byDate: new Map() };
-    a.byDate.set(r.date, r.mention_count || 0);
-    const total = dayTotal.get(r.date) || 0;
-    const share = total > 0 ? (Number(r.weighted_score) || 0) / total : 0;
-    if (recentDates.has(r.date)) {
-      a.recentShare += share;
-      a.recentM += r.mention_count || 0;
-      // ⚠️ 여기서 센 값은 **쓰지 않는다.** 일별 채널 수는 여러 날을 묶어도 합집합이
-      // 아니라, 합치면 겹쳐 세고 최댓값을 쓰면 실제보다 작다(엔비디아 100 vs 204).
-      // 아래에서 telegram_us_stock_breadth 로 덮어쓴다. 이 줄은 그 표가 비었을 때의
-      // 폴백으로만 남긴다.
-      a.channels = Math.max(a.channels, r.channel_count || 0);
-    } else {
-      a.priorShare += share;
-    }
-    byTicker.set(r.ticker, a);
+    if (recentSet.has(r.date)) channelsFallback.set(r.ticker, Math.max(channelsFallback.get(r.ticker) ?? 0, r.channel_count || 0));
   }
 
   const nameOf = await usNameMap();
   const chartDates = dates.slice(-US_CHART_DAYS);
 
-  const ranked = [...byTicker.entries()]
-    .map(([ticker, a]) => {
-      const recentPerDay = a.recentShare / recentN;
-      const base = a.priorShare / priorCount;
-      return {
-        ticker,
-        name: nameOf.get(ticker) ?? ticker,
-        recentMentions: a.recentM,
-        channelCount: a.channels || null,
-        // 평활한 뒤 나눈다. 그냥 나누면 분모가 거의 0인 종목이 터무니없는 배수를 받는다.
-        multiple: (recentPerDay + SHARE_SMOOTHING) / (base + SHARE_SMOOTHING),
-        series: chartDates.map((d) => a.byDate.get(d) ?? 0),
-        seriesDates: chartDates,
-      };
-    })
-    // 표본이 너무 얇은 것은 뺀다 — 3일에 두어 번 언급된 종목이 배수만 크게 받는 걸 막는다.
-    .filter((s) => s.recentMentions >= 3 && s.multiple > 1)
-    .sort((a, b) => b.multiple - a.multiple)
-    .slice(0, limit);
+  const ranked = scoredAll.slice(0, limit).map((s) => ({
+    ticker: s.ticker,
+    name: nameOf.get(s.ticker) ?? s.ticker,
+    recentMentions: s.recentMentions,
+    channelCount: channelsFallback.get(s.ticker) || null,
+    multiple: s.multiple,
+    series: chartDates.map((d) => s.byDate.get(d) ?? 0),
+    seriesDates: chartDates,
+  }));
 
   // 시세는 **고른 것만** 받는다. 후보 전부를 물으면 카드에 못 오를 종목까지 왕복한다.
   const [quotes, chOf] = await Promise.all([
