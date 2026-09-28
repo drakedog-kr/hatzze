@@ -133,10 +133,15 @@ export const DOWN_BAR = ["var(--c-blue-1)", "var(--c-blue-2)", "var(--c-blue-3)"
 
 export const UP_BAR = "var(--c-warm-1)";
 
+/** DOWN_BAR[1] 의 짝. 낙폭과 수익을 좌우로 견주는 거울 막대(리스크 프로필)가 쓴다 — 사이트에서 두 방향을
+    나란히 세우는 데이터 면(카더라 낙관·비관 막대 · 테마 트리맵)이 다 램프의 이 단이다(2026-09-28). */
+export const UP_BAR_MID = "var(--c-warm-2)";
+
 export const UP_BAR_SOFT = "var(--c-warm-3)";
 
-/** 미회복 — 채우지 않은 분홍 점선. 위 색 축 주석 참고. */
-export const UNRECOVERED = `repeating-linear-gradient(90deg, ${UP_BAR_SOFT} 0 3px, transparent 3px 6px)`;
+/** 미회복 — 채우지 않은 분홍 점선. 위 색 축 주석 참고. 옆줄의 회복 막대(UP_BAR_MID)와 같은 색이라야
+    같은 계열로 읽힌다 — warm-3 일 땐 회색 타일 위 명암비 1.5 라 점선이 거의 안 보였다. */
+export const UNRECOVERED = `repeating-linear-gradient(90deg, ${UP_BAR_MID} 0 3px, transparent 3px 6px)`;
 
 /** 시트 안쪽 본문 padding. 머리(.hz-sheet-head)의 22 와 좌우를 맞춘다. */
 export const PAD = "18px 22px";

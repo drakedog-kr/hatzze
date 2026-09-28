@@ -23,12 +23,20 @@
 //   · 타일 부제("감수한 위험만큼 돌려받았나" 등)를 걷었다. 제목과 머리 문장이 이미 같은 말을 한다.
 //   · 부제 끝에 붙어 있던 "(최근 5건)"은 제목 옆으로 — 굵기만 빼고 같은 크기로 붙인다.
 //   · "10년 전체" 버튼을 타일 바닥 오른쪽에서 **제목 줄 오른쪽**으로 올렸다. 팝오버는 그래서 아래로 편다.
+//
+// ## 2026-09-28 막대 색 한 단 진하게
+//
+//   · 오픈 때 색(blue-3 · warm-3, 지수 blue-4)이 리디자인 뒤에도 그대로였다. 회색 타일 위 명암비가
+//     1.86 · 1.50 · 1.29 라 막대가 배경처럼 보였다. 이 시트는 모든 줄이 주인공인데 다른 시트가
+//     '강조 뒤 흐린 줄'에 쓰는 색을 쓰고 있었다.
+//   · 거울 막대 → blue-2 · warm-2(카더라 낙관·비관 막대와 같은 단). 타일 위 2.66 · 2.14, 다크 4.21 · 3.15.
+//   · 셋째 타일 지수 → blue-3(1.86 · 다크 2.60). 이 종목(blue-1)보다 옅어야 하는 비교 막대라 한 단만 올린다.
 
 import { useEffect, useState } from "react";
 import type { RiskProfile as RiskProfileData, YearStat } from "@/lib/mdd";
 import { C, Icon } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
-import { benchName, fmtDur, DOWN, UP, DOWN_BAR, UP_BAR_SOFT } from "./shared";
+import { benchName, fmtDur, DOWN, UP, DOWN_BAR, UP_BAR_MID } from "./shared";
 import { Sheet, MirrorRow, MirrorAxis, TwinRow, TwinAxis } from "./sheet";
 
 const RISK_ROWS = 5; // 모든 타일이 쓰는 고정 줄 수(연도 5개 · 사건 5건)
@@ -125,7 +133,7 @@ export function RiskProfile({ r, periodLabel, market }: { r: RiskProfileData; pe
             ),
           viz: (
             <>
-              <MirrorAxis left={{ label: "그 해 낙폭", color: DOWN_BAR[2] }} right={{ label: "그 해 수익", color: UP_BAR_SOFT }} />
+              <MirrorAxis left={{ label: "그 해 낙폭", color: DOWN_BAR[1] }} right={{ label: "그 해 수익", color: UP_BAR_MID }} />
               {rows(
                 (() => {
                   const max = Math.max(...yearly.flatMap((y) => [Math.abs(y.ret), Math.abs(y.mdd)]), 1);
@@ -133,11 +141,11 @@ export function RiskProfile({ r, periodLabel, market }: { r: RiskProfileData; pe
                     <MirrorRow
                       key={y.year}
                       label={`${y.year}`}
-                      left={{ pct: halfSqrt(y.mdd, max), value: `${Math.round(y.mdd)}%`, color: DOWN_BAR[2], ink: DOWN }}
+                      left={{ pct: halfSqrt(y.mdd, max), value: `${Math.round(y.mdd)}%`, color: DOWN_BAR[1], ink: DOWN }}
                       right={{
                         pct: halfSqrt(y.ret, max),
                         value: `${y.ret >= 0 ? "+" : "−"}${Math.abs(Math.round(y.ret))}%`,
-                        color: y.ret >= 0 ? UP_BAR_SOFT : DOWN_BAR[2],
+                        color: y.ret >= 0 ? UP_BAR_MID : DOWN_BAR[1],
                         ink: y.ret >= 0 ? UP : DOWN,
                       }}
                     />
@@ -167,7 +175,7 @@ export function RiskProfile({ r, periodLabel, market }: { r: RiskProfileData; pe
             ),
           viz: (
             <>
-              <MirrorAxis left={{ label: "빠지는 데", color: DOWN_BAR[2] }} right={{ label: "되찾는 데", color: UP_BAR_SOFT }} />
+              <MirrorAxis left={{ label: "빠지는 데", color: DOWN_BAR[1] }} right={{ label: "되찾는 데", color: UP_BAR_MID }} />
               {rows(
                 (() => {
                   const max = Math.max(...events.map((e) => Math.max(e.dropDays, e.recoverDays ?? 0)), 1);
@@ -175,12 +183,12 @@ export function RiskProfile({ r, periodLabel, market }: { r: RiskProfileData; pe
                     <MirrorRow
                       key={i}
                       label={eventLabels[i]}
-                      left={{ pct: halfSqrt(e.dropDays, max), value: fmtDur(e.dropDays), color: DOWN_BAR[2], ink: DOWN }}
+                      left={{ pct: halfSqrt(e.dropDays, max), value: fmtDur(e.dropDays), color: DOWN_BAR[1], ink: DOWN }}
                       right={{
                         // 미회복은 '지금까지 걸린 시간'이 아직 안 끝났다는 뜻이라 짧은 점선만 둔다.
                         pct: e.recoverDays === null ? 4 : halfSqrt(e.recoverDays, max),
                         value: e.recoverDays === null ? "미회복" : fmtDur(e.recoverDays),
-                        color: UP_BAR_SOFT,
+                        color: UP_BAR_MID,
                         ink: e.recoverDays === null ? C.sub : UP,
                         dashed: e.recoverDays === null,
                       }}
@@ -214,7 +222,7 @@ export function RiskProfile({ r, periodLabel, market }: { r: RiskProfileData; pe
               ),
             viz: (
               <>
-                <TwinAxis a={{ label: "이 종목", color: DOWN_BAR[0] }} b={{ label: bench, color: DOWN_BAR[3] }} />
+                <TwinAxis a={{ label: "이 종목", color: DOWN_BAR[0] }} b={{ label: bench, color: DOWN_BAR[2] }} />
                 {rows(
                   (() => {
                     const max = Math.max(...events.flatMap((e) => [Math.abs(e.stock), e.market !== null ? Math.abs(e.market) : 0]), 1);
@@ -226,7 +234,7 @@ export function RiskProfile({ r, periodLabel, market }: { r: RiskProfileData; pe
                         b={{
                           pct: e.market === null ? 0 : half(e.market, max) * 2,
                           value: e.market === null ? "—" : `${Math.round(e.market)}%`,
-                          color: DOWN_BAR[3],
+                          color: DOWN_BAR[2],
                           ink: C.sub,
                         }}
                       />
