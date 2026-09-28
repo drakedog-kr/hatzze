@@ -29,6 +29,12 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 막대 색만 진해진다. Patch.
+    version: "1.25.2",
+    date: "2026-09-28",
+    changes: ["MDD 정밀분석 리스크 프로필의 막대가 더 진한 색으로 나옵니다."],
+  },
+  {
     // 이름만 맞춘다. 쓰는 법은 그대로다. Patch.
     version: "1.25.1",
     date: "2026-09-28",
