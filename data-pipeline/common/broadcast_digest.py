@@ -361,9 +361,10 @@ def tag_stocks(db, excerpts: list[Excerpt]) -> tuple[dict[str, str], dict[str, s
     kr_codes: set[str] = set()
     us_tickers: set[str] = set()
     for chunk in _in_chunks(ids):
-        for r in paged("telegram_message_stocks", "id,channel_handle,message_id,stock_code", chunk):
+        for r in paged("telegram_message_stocks", "id,channel_handle,message_id,stock_code,method", chunk):
             e = keys.get((r["channel_handle"], int(r["message_id"])))
-            if e and r["stock_code"] not in e.kr:
+            # 증권사 화자 행(config.HOUSE_METHOD 주석)은 태그로 안 단다 — `유진투자증권은 … 추산` 은 유진투자증권 소식이 아니다.
+            if e and not is_house(r) and r["stock_code"] not in e.kr:
                 e.kr.append(r["stock_code"])
                 kr_codes.add(r["stock_code"])
         for r in paged("telegram_message_us_stocks", "id,channel_handle,message_id,ticker,method", chunk):

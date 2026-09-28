@@ -107,6 +107,7 @@ from config.stock_extraction import (  # noqa: E402
     AMBIGUOUS_NAMES,
     HEAD_NOUN_NAMES,
     HOMONYM_CUES,
+    is_house,
 )
 
 # 화면 카드 정원. app/kadera/page.tsx 의 getSurgingStocks(6) 와 같아야 한다.
@@ -153,7 +154,7 @@ def load_mentions(db, codes: list[str], since: str, until: str) -> dict[str, lis
     rows = load_window_keyset(
         db,
         "telegram_messages",
-        "id,channel_handle,message_id,posted_at,text,telegram_message_stocks!inner(stock_code,match_text)",
+        "id,channel_handle,message_id,posted_at,text,telegram_message_stocks!inner(stock_code,match_text,method)",
         f"{since}T00:00:00+09:00",
         narrow=lambda q: q.in_("telegram_message_stocks.stock_code", codes).lt(
             "posted_at", f"{day_after}T00:00:00+09:00"
@@ -165,6 +166,9 @@ def load_mentions(db, codes: list[str], since: str, until: str) -> dict[str, lis
         if not (since <= day <= until):
             continue
         for t in msg.get("telegram_message_stocks") or []:
+            # 증권사 화자 행(config.HOUSE_METHOD 주석)은 카드가 세지 않는다. 감시도 같은 것만 센다.
+            if is_house(t):
+                continue
             out[t["stock_code"]].append(
                 {
                     "channel": msg["channel_handle"],

@@ -487,7 +487,8 @@ def run_market(db, client, cfg: dict, day: str, dry_run: bool) -> int:
     by_code: dict[str, list[tuple[tuple, str]]] = defaultdict(list)
     for m in load_all_keyset(db, cfg["mentions"], f"id,channel_handle,message_id,{key},match_text,method"):
         mk = (m["channel_handle"], m["message_id"])
-        # 은행 화자 행(미장 · config.RESEARCH_HOUSES 주석)은 그 은행 언급이 아니다. 국장 행엔 없는 값이다.
+        # 화자 행은 그 회사 언급이 아니다 — 미장은 은행(config.RESEARCH_HOUSES 주석), 국장은 증권사
+        # (config.stock_extraction HOUSE_METHOD 주석).
         if is_house(m):
             continue
         if m[key] in cset and mk in msgs:

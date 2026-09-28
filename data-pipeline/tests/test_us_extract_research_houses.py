@@ -25,6 +25,10 @@ def test_houses_are_in_the_dictionary():
     "이번 공모의 공동 주관사는 JP모건, 모건스탠리, 씨티그룹이 맡았다",
     "젠슨 황은 골드만삭스 컨퍼런스에서 사이버 보안을 다음 적용 분야로 지목했다",
     "뱅크오브아메리카의 월간 펀드매니저 설문조사에 따르면 현금 비중이 낮아졌다",
+    # 국장 증권사 화자 규칙(config.stock_extraction HOUSE_METHOD)과 같은 꼴이 미장 은행에도 house 로 가는지
+    "- 주관사 : 모건스탠리,골드만삭스\n- 시장구분 : 나스닥",
+    "골드만삭스는 30조원 규모의 현금배당을 주당 4604원으로 환산했다",
+    "(모건스탠리, Overweight, 목표주가 $250)",
 ])
 def test_bank_as_speaker_or_role_is_not_a_mention(tagger, text):
     assert not set(tagger(text)) & RESEARCH_HOUSES
@@ -137,9 +141,16 @@ def test_broadcast_tags_skip_house_but_keep_us_talk():
             {"channel_handle": "a", "message_id": 1, "ticker": "GS", "method": "house"},
             {"channel_handle": "a", "message_id": 2, "ticker": "NVDA", "method": "dict"},
         ],
+        # 국장 증권사 화자 행(config.stock_extraction HOUSE_METHOD)도 발췌 태그로 안 단다.
+        "telegram_message_stocks": [
+            {"channel_handle": "a", "message_id": 3, "stock_code": "001200", "method": "house"},
+            {"channel_handle": "a", "message_id": 3, "stock_code": "005930", "method": "dict"},
+        ],
         "us_stocks": [{"ticker": "NVDA", "name_ko": "엔비디아"}],
+        "stocks": [{"code": "005930", "name": "삼성전자"}, {"code": "001200", "name": "유진투자증권"}],
     })
-    bd.tag_stocks(db, [e1, e2, e3])
+    kr_names, _ = bd.tag_stocks(db, [e1, e2, e3])
     assert (e1.us, e1.us_talk) == ([], True)      # 미장 몫 재료로는 고르되 골드만삭스 태그는 안 단다
     assert (e2.us, e2.us_talk) == (["NVDA"], True)
     assert (e3.us, e3.us_talk) == ([], False)
+    assert e3.kr == ["005930"] and kr_names == {"005930": "삼성전자"}

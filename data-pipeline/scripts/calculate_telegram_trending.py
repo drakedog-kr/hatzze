@@ -47,6 +47,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import PAGE_SIZE, get_client  # noqa: E402
 from common.timeutil import KST, today_kst  # noqa: E402
+from config.stock_extraction import is_house  # noqa: E402
 
 # ⚠️ lib/telegram-data.ts 의 TREND_W_* 와 같은 값이어야 한다.
 TREND_W_VIEWS = 0.5
@@ -165,6 +166,8 @@ def us_only_keys(db, rows: list[dict]) -> set[tuple[str, int]]:
 
     조회가 실패하면 빈 집합을 돌려준다 — 그날 목록에 미장 글이 섞일 뿐, 카드가 비지는
     않는다. 이 갈래가 트렌딩 전체를 데려가지 않게 하는 것이 우선이다.
+
+    화자 행(method="house")도 태그로 센다 — '국내 글인가'를 묻는 자리다(common.market_tags 머리 주석).
     """
     want = {(m["channel_handle"], m["message_id"]) for m in rows}
     if not want:
@@ -245,14 +248,15 @@ def stock_tags(db, top: list[dict]) -> dict[tuple[str, int], list[str]]:
     while True:
         page = (
             db.table("telegram_message_stocks")
-            .select("channel_handle,message_id,stock_code")
+            .select("channel_handle,message_id,stock_code,method")
             .in_("message_id", ids)
             .order("id")
             .range(start, start + PAGE_SIZE - 1)
             .execute()
             .data
         ) or []
-        rows.extend(page)
+        # 증권사 화자 행(config.HOUSE_METHOD 주석)은 태그로 안 붙인다. 글은 그대로 후보다.
+        rows.extend(r for r in page if not is_house(r))
         if len(page) < PAGE_SIZE:
             break
         start += PAGE_SIZE

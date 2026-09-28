@@ -40,6 +40,8 @@ PostgREST 는 넘친 만큼을 **에러 없이** 잘라서 채널 수가 조용�
 
 from __future__ import annotations
 
+from config.stock_extraction import is_house
+
 PAGE = 1000
 # `.in_()` 에 넣을 종목 수 상한 — 넘으면 서버에서 안 좁히고 전부 받아 고른다.
 IN_LIST_MAX = 200
@@ -154,7 +156,7 @@ def _mentions_by_code(db, codes: set[str]) -> dict[str, list[tuple[str, int]]]:
     while True:
         q = (
             db.table("telegram_message_stocks")
-            .select("id,channel_handle,message_id,stock_code")
+            .select("id,channel_handle,message_id,stock_code,method")
             .order("id")
             .limit(PAGE)
         )
@@ -166,7 +168,8 @@ def _mentions_by_code(db, codes: set[str]) -> dict[str, list[tuple[str, int]]]:
         if not page:
             break
         for r in page:
-            if r["stock_code"] in codes:
+            # 증권사 화자 행(config.HOUSE_METHOD 주석)은 그 증권사를 다룬 채널로 안 센다.
+            if r["stock_code"] in codes and not is_house(r):
                 out.setdefault(r["stock_code"], []).append(
                     (r["channel_handle"], r["message_id"])
                 )

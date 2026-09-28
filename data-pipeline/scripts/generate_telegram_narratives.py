@@ -85,6 +85,7 @@ from common.supabase_client import (  # noqa: E402
 from common.surging import load_stock_daily, top_surging  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
 from common.timeutil import KST, md_with_weekday  # noqa: E402
+from config.stock_extraction import is_house  # noqa: E402
 from common.supabase_client import load_all  # noqa: E402
 
 MODEL = "claude-haiku-4-5"
@@ -1794,9 +1795,14 @@ def build_stock_digests(
     required = [(code, name_of.get(code, code)) for code, _ in top]
     required += [(c, name_of.get(c, c)) for c, _m in weekly if c not in have]
 
-    mentions = load_all_keyset(
-        db, "telegram_message_stocks", "id,channel_handle,message_id,stock_code,match_text"
-    )
+    # 증권사 화자 행(config.HOUSE_METHOD 주석)은 그 증권사의 요약 재료가 아니다. 글은 다른 종목 재료로 남는다.
+    mentions = [
+        m
+        for m in load_all_keyset(
+            db, "telegram_message_stocks", "id,channel_handle,message_id,stock_code,match_text,method"
+        )
+        if not is_house(m)
+    ]
     # 발췌에 쓸 본문. **창 안만 받는다** — 아래에서 어차피 posted_at >= since 로 거르는데,
     # load_all 로 받으면 그 창 밖 10만여 건의 본문까지 받아 놓고 버리게 된다.
     #

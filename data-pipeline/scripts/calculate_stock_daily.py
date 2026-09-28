@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from common.supabase_client import get_client  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 from common.supabase_client import load_all, load_all_keyset  # noqa: E402
+from config.stock_extraction import is_house  # noqa: E402
 
 # 트렌딩 점수 가중치(트렌딩 메시지 공식과 동일).
 W_VIEWS, W_FWD, W_REPLIES = 0.5, 3.0, 1.5
@@ -52,9 +53,15 @@ def main() -> None:
             "id,channel_handle,message_id,posted_at,views,forwards,replies",
         )
     }
-    mentions = load_all_keyset(
-        db, "telegram_message_stocks", "id,channel_handle,message_id,stock_code"
-    )
+    # 증권사 화자 행(config.HOUSE_METHOD 주석 — `…증권은 … 추산했다` `주관사 : …증권`)은 그 증권사
+    # 언급이 아니다. 종목별로 세는 이 표에서만 뺀다.
+    mentions = [
+        m
+        for m in load_all_keyset(
+            db, "telegram_message_stocks", "id,channel_handle,message_id,stock_code,method"
+        )
+        if not is_house(m)
+    ]
 
     # (date, code) -> 집계 누적
     agg: dict[tuple[str, str], dict] = defaultdict(

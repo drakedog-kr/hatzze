@@ -51,6 +51,7 @@ from config.issue_keywords import (  # noqa: E402
     MIN_KEYWORD_LEN,
 )
 from config.stock_extraction import ALIASES as STOCK_ALIASES  # noqa: E402
+from config.stock_extraction import is_house  # noqa: E402
 from config.stock_themes import THEMES  # noqa: E402
 
 OVERALL = "overall"
@@ -237,10 +238,16 @@ def main() -> None:
             if code:
                 themes_of_code[code].append(theme)
 
-    mentions = load_all_keyset(db, "telegram_message_stocks", "id,channel_handle,message_id,stock_code")
+    mentions = load_all_keyset(db, "telegram_message_stocks", "id,channel_handle,message_id,stock_code,method")
+    # codes_of_msg 는 '국내 글인가'(아래 미장 글 빼기)에 쓰고, 테마 톤에는 stock_codes_of_msg 를 쓴다.
+    # 증권사 화자 행(config.HOUSE_METHOD 주석)은 앞에는 들고 뒤에는 안 든다 — `…증권은 … 전망` 글은 국내
+    # 글이지만 그 톤이 금융 테마의 톤은 아니다.
     codes_of_msg: dict[tuple[str, int], set[str]] = defaultdict(set)
+    stock_codes_of_msg: dict[tuple[str, int], set[str]] = defaultdict(set)
     for m in mentions:
         codes_of_msg[(m["channel_handle"], m["message_id"])].add(m["stock_code"])
+        if not is_house(m):
+            stock_codes_of_msg[(m["channel_handle"], m["message_id"])].add(m["stock_code"])
 
     # 미국 종목만 다룬 글 — 톤에서 뺀다(머리 주석). 미국 태그 표는 extract_telegram_us_stocks
     # 가 이 스텝보다 먼저 채운다(워크플로 순서). 비었거나 못 읽으면 빼지 않고 예전처럼 센다 —
@@ -301,7 +308,7 @@ def main() -> None:
                 seen_body.add((date, h))
             tone[(date, OVERALL)][sentiment] += 1
             # 이 메시지가 언급한 종목들이 속한 테마 전부에 같은 톤을 반영(중복 제거).
-            msg_themes = {t for code in codes_of_msg.get(key, ()) for t in themes_of_code.get(code, ())}
+            msg_themes = {t for code in stock_codes_of_msg.get(key, ()) for t in themes_of_code.get(code, ())}
             for theme in msg_themes:
                 tone[(date, theme)][sentiment] += 1
 

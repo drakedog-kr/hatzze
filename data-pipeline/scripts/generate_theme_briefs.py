@@ -52,6 +52,7 @@ from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.supabase_client import get_client, load_all, load_all_keyset  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
 from common.timeutil import KST  # noqa: E402
+from config.stock_extraction import is_house  # noqa: E402
 from config.stock_themes import THEMES  # noqa: E402
 
 import generate_telegram_narratives as KR  # noqa: E402
@@ -512,11 +513,12 @@ def main() -> None:
     print(f"[재료] 메시지 {len(msgs):,}건 (기간 {since}~{latest})")
 
     name_of, code_of, themes_of = code_maps(db)
-    mentions = load_all_keyset(db, "telegram_message_stocks", "id,channel_handle,message_id,stock_code,match_text")
+    mentions = load_all_keyset(db, "telegram_message_stocks", "id,channel_handle,message_id,stock_code,match_text,method")
     tags_by_key: dict[tuple, list[dict]] = defaultdict(list)
     for m in mentions:
         k = (m["channel_handle"], m["message_id"])
-        if k in msgs:
+        # 증권사 화자 행(config.HOUSE_METHOD 주석)은 금융 테마 재료가 아니다 — `…증권은 … 전망` 은 증권주 얘기가 아니다.
+        if k in msgs and not is_house(m):
             tags_by_key[k].append(m)
     print(f"[재료] 창 안 종목 태그 {sum(len(v) for v in tags_by_key.values()):,}건 · 글 {len(tags_by_key):,}건")
 

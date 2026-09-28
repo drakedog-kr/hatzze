@@ -28,7 +28,9 @@ prefix_context 참고).
 우선주(…우) 등 파생 종목은 사전에서 제외해 잡음을 줄인다.
 
 상장 증권사 이름은 종목보다 **리포트 발행처 표기**로 훨씬 자주 나와 따로 본다
-(publisher_context 참고).
+(publisher_context 참고). 표기가 아니라 문장 속 화자(`…증권은 … 추산했다`)·거래 역할
+(`주관사 : …증권`)로 나온 자리는 행을 남기되 method="house" 로 표시한다(speaker_context ·
+config.HOUSE_METHOD 주석). 종목별로 세는 곳은 그 행을 거른다.
 
 LLM 보강은 여기 붙일 자리만 두고(사전이 0개 잡은 메시지 대상), 실측 후 정한다.
 
@@ -56,6 +58,9 @@ from config.stock_extraction import (  # noqa: E402
     GROUP_SUFFIXES,
     HEAD_NOUN_NAMES,
     HOMONYM_CUES,
+    HOUSE_METHOD,
+    HOUSE_ROLE_LABELS,
+    HOUSE_SPEAKER_VERBS,
     JOSA,
     JOSA_HEAD,
     JOSA_TRAILING,
@@ -106,6 +111,47 @@ CODE_ANNOTATION_RE = re.compile(r"\(\d{6}\)")
 # 태그 줄과 ⏰ 사이엔 줄바꿈이 있다(`레이, 배럴\n⏰ 2026-09-11`) — 공백을 뭉갠 표본으로 재고
 # 한 줄로 짜면 하나도 안 걸린다(2026-09-15 에 그렇게 한 번 헛돌았다).
 NEWSBOT_TAG_RE = re.compile(r"📰 \[[^\]\n]*\][^⏰]{0,300}⏰")
+
+# ── 증권사 화자 자리(speaker_context · config.HOUSE_METHOD 주석) ──────────────────────
+# ① 역할 머리표 — 같은 줄에서 머리표 콜론 뒤 40자 안에 이름이 있다(`주관사 : 유진투자증권,미래에셋증권`).
+#    머리표 앞은 낱말 경계여야 한다 — `체결기관 :`·`신탁기관 :`의 `기관`이 걸리면 안 된다(자사주 공시의
+#    그 칸은 일부러 뺐다, config.HOUSE_ROLE_LABELS 주석). 긴 머리표부터 맞춘다(`대표주관사` > `주관사`).
+HOUSE_ROLE_RE = re.compile(
+    rf"(?:^|[^가-힣A-Za-z])(?:{'|'.join(sorted(map(re.escape, HOUSE_ROLE_LABELS), key=len, reverse=True))})"
+    r"\s*[:：][^\n:：]{0,40}$"
+)
+# ② 주어. 다른 증권사 이름이 나열로 앞서 있어도(`교보증권과 유진투자증권, 삼성증권은`) 주어까지 건너뛴다.
+HOUSE_COORD_RE = re.compile(r"(?:\s*(?:과|와|,|·|및)\s*[가-힣A-Za-z]{1,10}증권)*")
+HOUSE_SUBJECT_RE = re.compile(r"(?:은|이|도)(?![가-힣])|에 따르면")
+HOUSE_SENTENCE_END_RE = re.compile(r"\n|[.!?。](?=\s|$)")
+_VERBS = "|".join(HOUSE_SPEAKER_VERBS)
+# 동사형만. `전망치`·`예상보다`·`평가이익`(명사형)과 `전망된다`(피동)는 여기 안 걸린다.
+HOUSE_VERB_RE = re.compile(rf"(?:{_VERBS})(?:했|함|합니|하[며면고였는기되]|한다|한(?![가-힣])|해(?![가-힣]))")
+# 보고서 문체의 명사 끝맺음(`…할 것으로 전망.` `…수준을 전망`). 앞 낱말이 ㄹ 받침이면(`부각될 전망`)
+# '…할 것으로 보인다'는 뜻이라 화자가 아니다 — speaker_context 가 따로 본다.
+HOUSE_NOMINAL_END_RE = re.compile(rf"(\S+)\s+(?:{_VERBS})\s*$|(?:로|으로|을|를|고|며)(?:{_VERBS})\s*$")
+HOUSE_NOMINAL_MID_RE = re.compile(rf"(?:로|으로)\s*(?:{_VERBS})\s*,")
+HOUSE_EXTRA_VERB_RE = re.compile(r"내다[봤보]|꼽[았은]|(?:다고|라고|로|으로)\s*(?:봤|보았|본다)")
+# 리서치에만 나오는 낱말 — 목표주가·투자의견과 `X원에서 Y원으로`(목표가 조정 나열).
+HOUSE_RESEARCH_RE = re.compile(
+    r"목표주가|목표가|투자의견|커버리지|적정주가|TP\b"
+    r"|[\d,.]+\s*(?:만|천)?\s*원에서\s*[\d,.]+\s*(?:만|천)?\s*원으로"
+    r"|(?:보고서|리포트)(?:를 통해|에서|를 내|에 따르면)"
+    r"|(?:작성|발간|발행|내놓|내놨)(?:한|은)?[^.\n]{0,30}(?:리포트|(?<!통합|사업|반기|분기|감사)보고서|자료|전망)"
+    r"|전망에 따르면|(?:전망|분석|의견)을 (?:내놨|내놓|제시)"
+    r"|(?:추정치|전망치|목표치|예상치|전망|추정)(?:을|를|은|는|도)?[^.\n]{0,40}(?:상향|하향|낮췄|높였|올렸|내렸|수정|조정)"
+)
+HOUSE_OWN_PLAN_RE = re.compile(r"(?:계획|방안|비전|정책|로드맵)(?:을|를)\s*제시")
+# `…증권에 따르면` 뒤가 그 회사 자신의 얘기면 화자가 아니다(`4일 삼성증권에 따르면 회사는 … 영업이익`).
+HOUSE_SELF_RE = re.compile(r"회사는|자사|당사|동사")
+# ③ 속격 + 리서치 낱말. `반기보고서`·`지속가능통합보고서`는 그 회사 자신의 문서라 뺀다.
+HOUSE_GENITIVE_RE = re.compile(
+    r"의[^\n]{0,25}?(?:리포트|(?<!통합|사업|반기|분기|감사)보고서|자료(?!\s*제출)|연구원|애널리스트|리서치|매크로팀|FICC|Daily|데일리)"
+    r"|의 판단(?:[.]|$|이다|입니다)"
+)
+# ④ 괄호 귀속. 괄호 안에 리서치 낱말이 있거나, 이름 앞이 비었거나 날짜뿐이다(`(2026.08.24 NH투자증권)`).
+HOUSE_PAREN_CUE_RE = re.compile(r"목표주가|목표가|TP\b|BUY|Buy|투자의견|리포트|발간")
+HOUSE_PAREN_DATE_RE = re.compile(r"^\s*(?:\d{2,4}[./-]\d{1,2}[./-]\d{1,2}\.?)?\s*$")
 
 
 def load_dictionary(db) -> tuple[dict[str, str], dict[str, str], set[str]]:
@@ -359,14 +405,76 @@ def publisher_context(text: str, start: int, end: int, trailing_word: bool = Tru
     return bool(nxt_word and HANGUL_OR_ALNUM.match(nxt_word.group(1)))
 
 
+def _ends_with_rieul(word: str) -> bool:
+    """낱말 끝 음절이 ㄹ 받침인가(`부각될`). 목적격 조사 을·를은 빼고 본다(`수준을 전망`은 화자다)."""
+    ch = word[-1] if word else ""
+    return "가" <= ch <= "힣" and ch not in "을를" and (ord(ch) - 0xAC00) % 28 == 8
+
+
+def _speaker_clause(clause: str) -> bool:
+    """주어 뒤 한 문장이 리서치 화법인가(config.HOUSE_SPEAKER_VERBS 주석)."""
+    if HOUSE_RESEARCH_RE.search(clause):
+        return True
+    for m in HOUSE_VERB_RE.finditer(clause):
+        if not HOUSE_OWN_PLAN_RE.search(clause[max(0, m.start() - 12) : m.end()]):
+            return True
+    if HOUSE_EXTRA_VERB_RE.search(clause) or HOUSE_NOMINAL_MID_RE.search(clause):
+        return True
+    m = HOUSE_NOMINAL_END_RE.search(clause.rstrip(" .·,"))
+    return bool(m and not (m.group(1) and _ends_with_rieul(m.group(1))))
+
+
+def speaker_context(text: str, start: int, end: int) -> bool:
+    """이 자리의 증권사 이름이 '종목'이 아니라 **말하는 쪽**(리서치 화자·거래 역할)인가.
+
+    publisher_context 가 걸러 내고 남은 자리에만 본다. 걸리면 그 자리는 종목 언급으로 안 세고,
+    한 글의 모든 자리가 이 꼴이면 행을 method="house" 로 남긴다(config.HOUSE_METHOD 주석 — 꼴 넷과
+    실측, 지우지 않는 까닭). publisher_context 와 달리 방향이 반대인 자리가 없다: 증권사가 제
+    소식의 주어일 때(`키움증권이 … 어닝 서프라이즈를 기록`)는 서술어가 분석 동사가 아니라 안 걸린다.
+    """
+    line_before = text[:start].rsplit("\n", 1)[-1]
+    after = text[end:]
+    # ① 역할 머리표의 값 자리.
+    if HOUSE_ROLE_RE.search(line_before):
+        return True
+    # ② 주어 + 분석 동사. 문장 하나(최대 300자)만 본다 — 다음 문장의 동사는 다른 주어의 것이다.
+    rest = after[HOUSE_COORD_RE.match(after).end() :]
+    subj = HOUSE_SUBJECT_RE.match(rest)
+    if subj:
+        tail = rest[subj.end() : subj.end() + 300]
+        stop = HOUSE_SENTENCE_END_RE.search(tail)
+        clause = tail[: stop.start()] if stop else tail
+        if subj.group(0) == "에 따르면":
+            return not HOUSE_SELF_RE.search(clause)
+        return _speaker_clause(clause)
+    # ③ 속격 + 리서치 낱말.
+    if HOUSE_GENITIVE_RE.match(after):
+        return True
+    # ④ 같은 줄 괄호 안의 귀속.
+    open_at, close_at = line_before.rfind("("), line_before.rfind(")")
+    line_after = after.split("\n", 1)[0]
+    if open_at > close_at and ")" in line_after[:80]:
+        inner_before = line_before[open_at + 1 :]
+        inner_after = line_after[: line_after.index(")")]
+        if HOUSE_PAREN_CUE_RE.search(f"{inner_before} {inner_after}"):
+            return True
+        return bool(HOUSE_PAREN_DATE_RE.match(inner_before)) and not inner_after.strip()
+    return False
+
+
 def extract(
-    text: str, pattern, match_to_code, method, ambiguous, caseless, positions: dict | None = None
+    text: str, pattern, match_to_code, method, ambiguous, caseless, positions: dict | None = None,
+    house: dict[str, str] | None = None,
 ) -> dict[str, tuple[str, str]]:
     """text에서 {code: (match_text, method)} (메시지 내 중복 제거).
 
     positions 를 주면 종목마다 **인정된 첫 자리**(start, end)를 거기 적는다. 마스킹이 길이를
     지키므로 원문 좌표 그대로다. 점검 스크립트(scan_phantom_week)가 문맥을 보일 때 쓴다 —
     본문에서 이름을 다시 찾으면 거부된 자리(GS건설의 GS)를 인정된 자리로 잘못 보인다.
+
+    house 를 주면 **말하는 자리로만** 나온 증권사(speaker_context)를 거기 적는다(코드 → 첫 표기).
+    같은 글에 그 증권사가 종목으로 다뤄진 자리도 있으면 돌려주는 쪽에만 있다. 저장(main)은 이걸
+    method="house" 행으로 남긴다. 안 주면 예전처럼 종목 언급만 돌려준다.
     """
     # URL 안의 문자열은 본문 언급이 아니다. 길이를 유지해 경계 판정을 흐트러뜨리지 않는다.
     text = URL_RE.sub(lambda m: MASK_CHAR * len(m.group(0)), text)
@@ -417,6 +525,12 @@ def extract(
             text, m.start(), m.end(), trailing_word=key not in MEDIA_NAMES
         ):
             continue
+        # 발행처 표기가 아니어도 증권사가 **말하는 쪽**이면(`…증권은 … 추산했다` `주관사 : …증권`)
+        # 이 자리는 종목 언급이 아니다. 행은 남긴다(house) — config.HOUSE_METHOD 주석.
+        if key.endswith("증권") and speaker_context(text, m.start(), m.end()):
+            if house is not None:
+                house.setdefault(match_to_code[key], matched)
+            continue
         # 합성어의 꼬리로 쓰이는 이름은 앞 자리도 본다("뷰티 디바이스"). 승격(compound_key)
         # 전에 판정해야 한다 — 걸러야 할 건 사전 키가 놓인 자리이지 승격된 이름이 아니다.
         if key in HEAD_NOUN_NAMES and modifier_context(text, m.start()):
@@ -441,6 +555,9 @@ def extract(
             found[code] = (matched, method[key])
             if positions is not None:
                 positions[code] = (m.start(), m.end())
+    if house is not None:
+        for code in found:
+            house.pop(code, None)
     return found
 
 
@@ -503,8 +620,22 @@ def main() -> None:
     msgs_with_hit = 0
     samples = []
 
+    house_counter: Counter = Counter()
     for msg in messages:
-        found = extract(msg["text"], pattern, match_to_code, method, ambiguous, caseless)
+        house: dict[str, str] = {}
+        found = extract(msg["text"], pattern, match_to_code, method, ambiguous, caseless, house=house)
+        # 증권사가 말하는 자리로만 나온 글도 행은 남긴다(method="house"). 종목별로 세는 곳이 거른다.
+        for code, match_text in house.items():
+            house_counter[code] += 1
+            rows.append(
+                {
+                    "channel_handle": msg["channel_handle"],
+                    "message_id": msg["message_id"],
+                    "stock_code": code,
+                    "match_text": match_text,
+                    "method": HOUSE_METHOD,
+                }
+            )
         if found:
             msgs_with_hit += 1
         for code, (match_text, meth) in found.items():
@@ -523,8 +654,14 @@ def main() -> None:
             names = ", ".join(f"{code_to_name.get(c,c)}({t[0]})" for c, t in found.items())
             samples.append((names, msg["text"].replace("\n", " ")[:60]))
 
-    print(f"메시지 {len(messages)}건 중 {msgs_with_hit}건에서 종목 발견 · 총 언급 {len(rows)}건")
-    print(f"경로: {dict(method_counter)}\n")
+    n_house = sum(house_counter.values())
+    print(f"메시지 {len(messages)}건 중 {msgs_with_hit}건에서 종목 발견 · 총 언급 {len(rows) - n_house}건")
+    print(f"경로: {dict(method_counter)}")
+    print(
+        f"증권사 화자 행(method={HOUSE_METHOD}, 언급으로 안 셈) {n_house}건 · "
+        + " · ".join(f"{code_to_name.get(c, c)} {n}" for c, n in house_counter.most_common(8))
+        + "\n"
+    )
     print("=== 최다 언급 종목 TOP 15 ===")
     for code, cnt in mention_counter.most_common(15):
         print(f"  {cnt:>4}회  {code_to_name.get(code, code)} ({code})")

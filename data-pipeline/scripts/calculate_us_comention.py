@@ -86,7 +86,11 @@ def main() -> None:
         r for r in load_all_keyset(db, "telegram_message_us_stocks", "id,channel_handle,message_id,ticker,method")
         if not is_house(r)
     ]
-    kr_rows = load_all_keyset(db, "telegram_message_stocks", "id,channel_handle,message_id,stock_code")
+    # 국내 쪽 증권사 화자 행(config.stock_extraction HOUSE_METHOD 주석)도 짝이 아니다 — `유진투자증권은 … 엔비디아`.
+    kr_rows = [
+        r for r in load_all_keyset(db, "telegram_message_stocks", "id,channel_handle,message_id,stock_code,method")
+        if not is_house(r)
+    ]
 
     dates = [
         datetime.fromisoformat(p).astimezone(KST).date()

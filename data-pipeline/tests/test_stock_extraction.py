@@ -434,3 +434,138 @@ def test_week2_phantoms_are_not_stocks(text):
 )
 def test_week2_real_mentions_survive(text, code):
     assert code in _week2(text)
+
+
+# ── 증권사가 말하는 쪽으로 나온 자리 — method="house" ─────────────────────────────────
+# 2026-09-28 급부상 카드의 유진투자증권 3건과, 증권사 이름 자리 전량을 읽으며 모은 실제 문장이다.
+# 근거와 실측은 config/stock_extraction.py 의 HOUSE_METHOD 주석.
+
+BROKER_DICT = {
+    "유진투자증권": "001200", "미래에셋증권": "006800", "삼성증권": "016360", "키움증권": "039490",
+    "NH투자증권": "005940", "현대차증권": "001500", "LS증권": "078020", "대신증권": "003540",
+    "교보증권": "030610", "한양증권": "001750", "SK증권": "001510", "DB증권": "016610",
+    "삼성전자": "005930", "산일전기": "062040", "한국금융지주": "071050",
+}
+
+
+def _broker(text: str) -> tuple[set[str], dict[str, str]]:
+    """(종목 언급, 화자로만 나온 증권사 {코드: 표기})."""
+    match_to_code = dict(BROKER_DICT)
+    pattern, caseless = build_pattern(list(match_to_code))
+    house: dict[str, str] = {}
+    found = extract(text, pattern, match_to_code, {k: "dict" for k in match_to_code}, set(), caseless, house=house)
+    return set(found), house
+
+
+@pytest.mark.parametrize(
+    "text, code",
+    [
+        # 2026-09-28 카드의 세 건
+        ("2️⃣ 빅웨이브로보틱스 신규 상장\n- 주관사 : 유진투자증권,미래에셋증권\n- 시장구분 : 코스닥", "001200"),
+        ("2️⃣ 빅웨이브로보틱스 신규 상장\n- 주관사 : 유진투자증권,미래에셋증권\n- 시장구분 : 코스닥", "006800"),
+        ("🔹 증권가가 추산한 잠재 사업 규모\n유진투자증권은 UAE에서 창출될 수 있는 잠재 사업을 약 25.5조~26조원으로 추산.", "001200"),
+        ("유진투자증권은 30조원 규모의 현금배당을 보통주와 우선주 각각 주당 4604원으로 환산했다. 이를 적용하면", "001200"),
+        # ① 역할 머리표
+        (" - 목표주가 : 78,000원(🔺14.71%)\n - 기관 : 현대차증권[하희지]\n\n📌 미스토홀딩스(081660)", "001500"),
+        ("원문: 유진투자증권 「병목의 핑퐁 게임」 (2026-08-18)", "001200"),
+        # ② 주어 + 분석 동사 · 목표가 조정 나열 · 나열된 주어 · 출처
+        ("LS증권은 산일전기 목표주가를 25만원 → 29만원으로 16% 상향했습니다.", "078020"),
+        ("하나증권은 기존 76만원에서 65만원으로, DB증권은 90만원에서 70만원으로 내렸다.", "016610"),
+        ("4일 금융투자업계에 따르면 교보증권과 유진투자증권, 삼성증권은 LG이노텍이 MSCI 한국 지수에 새로 들어갈 것으로 예상했다.", "030610"),
+        ("NH투자증권은 2028년 영업이익률 20% 수준을 전망\n\n✅자체 AIDC 개발", "005940"),
+        ("3.대신증권에 따르면 2004~2025년 명절 연휴 직후 5거래일 코스피는 평균 1.34% 상승했고", "003540"),
+        # ③ 속격 + 리서치 · ④ 괄호 귀속
+        ("[투자] 07/21 달러, 중동 불안에 상승\n\n이 문서는 키움증권의 FICC 일일 분석 리포트로, 증권 종목 리포트가 아닙니다.", "039490"),
+        ("- 두산밥캣: 대규모 관세 환입이 이끈 어닝 서프라이즈 (키움증권, BUY, 목표주가 9.6만원)", "039490"),
+        ("완공 계획 중인 상황\n\n(2026.08.24 NH투자증권)", "005940"),
+    ],
+)
+def test_brokerage_as_speaker_goes_to_house(text, code):
+    found, house = _broker(text)
+    assert code not in found
+    assert code in house
+
+
+@pytest.mark.parametrize(
+    "text, code",
+    [
+        # 증권주 강세(2026-09-12~14 같은 날의 꼴) — 그 회사 주가 얘기다
+        ("증권: 삼성증권(+8.7%), 미래에셋증권(+4.0%), 키움증권(+3.8%)", "016360"),
+        ("증권주 강세 … 한국금융지주 +6%, 미래에셋증권 +5%", "006800"),
+        ("#증권\n[+29.8%] SK증권\n[+14.2%] 상상인증권", "001510"),
+        ("▷이에 금일 SK증권, 미래에셋증권, 대신증권, 한양증권 등 증권 테마가 하락.", "003540"),
+        # 증권사 자신의 소식 — 명사형 '전망치'·'예상보다', ㄹ 받침 뒤 '전망', 자기 계획·문서
+        ("키움증권이 올해 2분기 시장 전망치를 대폭 뛰어넘는 '어닝 서프라이즈'를 기록했다.", "039490"),
+        ("삼성증권은 2분기 역대 최대 분기 실적을 기록했으나 예상보다 큰 인건비 증가로 컨센서스를 소폭 하회했다.", "016360"),
+        ("한양증권은 곧바로 중앙그룹 익스포저의 87%를 연내 회수할 전망이라며 진화에 나섰다.", "001750"),
+        ("키움증권은 별도 순이익 30% 이상 환원 계획을 제시했다.", "039490"),
+        ("NH투자증권이 최근 발간한 2026 지속가능통합보고서는 지난해와 비교해 분위기가 확연히 달라졌다.", "005940"),
+        ("삼성증권이 9년 만에 숙원사업인 발행어음 사업에 진출한다.", "016360"),
+        ("4일 삼성증권에 따르면 회사는 지난 2분기 영업이익과 당기순이익이 모두 늘었다.", "016360"),
+        # 자사주 공시의 중개 증권사는 센다 — 2026-08-19 SK하이닉스 40조 공시의 이 칸이 SK증권 상한가를 불렀다
+        ("취득방법 : 장내매수\n중개업자 : SK증권(SK Securities Co., Ltd.)\n결정일자 : 2026-08-19", "001510"),
+        ("취득목적 : 자기주식 소각을 통한 주주가치 제고\n신탁기관 : SK증권\n\n※ 시총 : 1,096 조원", "001510"),
+        # 공시·목록에서 그 회사가 주인공인 자리
+        ("(유가)미래에셋증권 - 투자설명서(일괄신고)", "006800"),
+        ("기업명: 대신증권(시가총액: 1조 3,084억) A003540\n보고서명: 주식소각결정", "003540"),
+        # 괄호 귀속의 발행처와 그 리포트의 주인공이 한 줄에 있다 — 주인공은 산다
+        ("- 미래에셋증권 (현대차증권, 상향, BUY/목표주가 4.2만원)", "006800"),
+    ],
+)
+def test_brokerage_stock_mentions_survive(text, code):
+    found, house = _broker(text)
+    assert code in found
+    assert code not in house
+
+
+def test_paren_publisher_beside_its_subject_goes_to_house():
+    found, house = _broker("- 미래에셋증권 (현대차증권, 상향, BUY/목표주가 4.2만원)")
+    assert "001500" not in found and house == {"001500": "현대차증권"}
+
+
+def test_one_real_spot_keeps_the_brokerage_as_a_mention():
+    # 한 글에 화자 자리와 주가 자리가 같이 있으면 종목 언급이다(미장 은행과 같은 규칙).
+    text = "유진투자증권은 UAE 잠재 사업을 26조원으로 추산했다.\n증권주 강세 … 유진투자증권 +5.2%"
+    found, house = _broker(text)
+    assert "001200" in found and house == {}
+
+
+def test_other_companies_as_speakers_still_count():
+    # 증권사가 아닌 회사는 제 전망을 말해도 그 회사 언급이다.
+    found, house = _broker("삼성전자는 3분기 영업이익이 늘 것으로 전망했다")
+    assert found == {"005930"} and house == {}
+
+
+def test_extract_without_house_arg_keeps_old_signature():
+    # 이벤트 추출·데일리 노트처럼 house 를 안 주는 호출은 화자 자리를 그냥 건너뛴다.
+    match_to_code = dict(BROKER_DICT)
+    pattern, caseless = build_pattern(list(match_to_code))
+    found = extract("유진투자증권은 30조원을 4604원으로 환산했다.", pattern, match_to_code,
+                    {k: "dict" for k in match_to_code}, set(), caseless)
+    assert found == {}
+
+
+def test_is_house_is_shared_by_both_markets():
+    from config.stock_extraction import HOUSE_METHOD, is_house
+    from config.us_stock_extraction import is_house as us_is_house
+
+    assert us_is_house is is_house
+    assert is_house({"stock_code": "001200", "method": HOUSE_METHOD})
+    assert not is_house({"stock_code": "001200", "method": "dict"})
+    assert not is_house({"stock_code": "001200", "method": "alias"})
+    assert not is_house({"stock_code": "001200"})
+
+
+def test_phantom_check_counts_what_the_card_counts(monkeypatch):
+    # 유령 감시는 카드와 같은 언급만 센다 — 화자 행은 빼고 본다.
+    import check_phantom_stocks as cp
+
+    rows = [
+        {"channel_handle": "a", "message_id": 1, "posted_at": "2026-09-26T13:23:00+09:00", "text": "유진투자증권은 … 추산",
+         "telegram_message_stocks": [{"stock_code": "001200", "match_text": "유진투자증권", "method": "house"}]},
+        {"channel_handle": "b", "message_id": 2, "posted_at": "2026-09-26T14:00:00+09:00", "text": "유진투자증권 +5%",
+         "telegram_message_stocks": [{"stock_code": "001200", "match_text": "유진투자증권", "method": "dict"}]},
+    ]
+    monkeypatch.setattr(cp, "load_window_keyset", lambda *_a, **_k: rows)
+    got = cp.load_mentions(None, ["001200"], "2026-09-25", "2026-09-27")
+    assert [m["channel"] for m in got["001200"]] == ["b"]
