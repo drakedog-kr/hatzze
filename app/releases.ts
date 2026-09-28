@@ -29,6 +29,12 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 파이프라인 스텝 순서만 바뀐다. 쓰는 법은 그대로다. Patch.
+    version: "1.25.3",
+    date: "2026-09-28",
+    changes: ["국장 카더라가 미장 카더라보다 먼저 새 내용으로 바뀝니다."],
+  },
+  {
     // 막대 색만 진해진다. Patch.
     version: "1.25.2",
     date: "2026-09-28",

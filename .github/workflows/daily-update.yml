@@ -529,10 +529,6 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/extract_telegram_events.py
 
-      # 미장 LLM 문장. 미장 센티먼트·테마·동시언급이 전부 끝난 뒤여야 digest 가 찬다.
-      # ⚠️ 국장 총평(아래)과 **따로** 두는 이유: 한쪽이 실패해도 다른 쪽은 나가야 하고,
-      #    미장 실패는 미장 알림에만 잡혀야 한다.
-
       # ⚠️ 위 일정 추출은 **아침 발송보다 앞이어야 한다.** 발송이 파이프라인 중간으로 올라온 뒤
       #    (2026-09-10) 이 스텝이 뒤에 남아, 밤사이 메시지에서 새로 뽑히는 일정이 그날 아침 글에
       #    안 실리고 하루 밀렸다. 실측(09-08~09-11 '오늘 일정' 103건): **47%가 그날 아침 추출분**
@@ -637,24 +633,12 @@ jobs:
           REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
         run: bash scripts/revalidate.sh /preview
 
-      - name: (텔레그램) 미국×국내 동시 언급
-        id: telegram_us_comention
-        continue-on-error: true
-        run: python data-pipeline/scripts/calculate_us_comention.py
-
-      # 미장 트렌딩·테마는 미국 종목 추출 바로 뒤여도 되지만(입력이 telegram_message_us_stocks
-      # 와 telegram_us_stock_daily 뿐), 국내 짝 옆에 둔다 — 같은 종류의 계산이 흩어져 있으면
-      # 나중에 "이게 왜 여기 있지"를 다시 풀어야 한다.
-      - name: (텔레그램) 미장 트렌딩 메시지 선별
-        id: telegram_us_trending
-        continue-on-error: true
-        run: python data-pipeline/scripts/calculate_us_trending.py
-
-      - name: (텔레그램) 미장 테마 일별 집계
-        id: telegram_us_theme
-        continue-on-error: true
-        run: python data-pipeline/scripts/calculate_us_theme_daily.py
-
+      # ⭐ **짝이 있는 스텝은 국장이 먼저, 미장이 뒤다**(2026-09-28). 여기 트렌딩·테마와 아래
+      #    총평이 미장 먼저였는데, 미장 카더라를 처음 들일 때 국장 짝 바로 앞에 끼워 넣은 자리가
+      #    남은 것이었다(의존이 있어서가 아니다). 추출·일별 집계·센티먼트·급부상 한 줄·등락 까닭·
+      #    테마 요약은 원래 국장이 먼저다.
+      #    텔레그램 스텝이 만든 표 가운데 두 시장이 서로 읽는 것은 종목 추출 둘(telegram_message_stocks · _us_stocks)뿐이고 그
+      #    둘은 위에서 이미 끝났다. 그래서 이 뒤의 순서는 어느 화면이 먼저 새로워지느냐만 가른다.
       - name: (텔레그램) 트렌딩 메시지 선별
         id: telegram_trending
         continue-on-error: true
@@ -664,6 +648,24 @@ jobs:
         id: telegram_theme_daily
         continue-on-error: true
         run: python data-pipeline/scripts/calculate_theme_daily.py
+
+      # 미장 동시 언급·트렌딩·테마는 미국 종목 추출 바로 뒤여도 되지만(입력이 telegram_message_(us_)stocks
+      # 와 telegram_us_stock_daily 뿐), 국내 짝 뒤에 둔다 — 같은 종류의 계산이 흩어져 있으면
+      # 나중에 "이게 왜 여기 있지"를 다시 풀어야 한다.
+      - name: (텔레그램) 미국×국내 동시 언급
+        id: telegram_us_comention
+        continue-on-error: true
+        run: python data-pipeline/scripts/calculate_us_comention.py
+
+      - name: (텔레그램) 미장 트렌딩 메시지 선별
+        id: telegram_us_trending
+        continue-on-error: true
+        run: python data-pipeline/scripts/calculate_us_trending.py
+
+      - name: (텔레그램) 미장 테마 일별 집계
+        id: telegram_us_theme
+        continue-on-error: true
+        run: python data-pipeline/scripts/calculate_us_theme_daily.py
 
       # LLM 계층 — 메시지별 분류(돈이 드는 단계, 증분) → 결정적 집계 → 문장 생성.
       # 분류가 실패해도 집계는 직전까지 저장된 분류분으로 돌고, 집계가 실패하면
@@ -719,21 +721,9 @@ jobs:
           SLOT: ${{ github.event.inputs.slot }}
         run: python data-pipeline/scripts/generate_move_reasons.py --slot "$SLOT"
 
-      - name: (텔레그램) 미장 총평·종목 요약 생성
-        id: telegram_us_narratives
-        continue-on-error: true
-        run: python data-pipeline/scripts/generate_us_telegram_narratives.py
-
-      # ⭐ 미장 카더라를 국장과 갈라 낸다. 미장 총평이 국장보다 5~8분 먼저 들어가는데
-      #    (2026-09-15~21 아침 6회 실측, 평균 7분) 한 자리에서 같이 비우면 그 7분을
-      #    미장이 그냥 기다린다. 이 화면이 읽는 표는 전부 이 앞에서 끝난다.
-      - name: 미장 카더라 화면만 먼저 비우고 데우기
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        env:
-          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
-        run: bash scripts/revalidate.sh /kadera/us
-
+      # 국장 LLM 문장. 국장 센티먼트·테마·트렌딩이 전부 끝난 뒤여야 digest 가 찬다.
+      # ⭐ 미장 총평보다 앞이다(2026-09-28, 위 트렌딩 머리 주석). 예전엔 미장 동시 언급·트렌딩·테마·
+      #    총평이 앞에 서서 국장 카더라가 그만큼을 그냥 기다렸다(09-18~27 16회 실측 중앙 9.5분, 6.8~13.5분).
       - name: (텔레그램) 총평·종목 요약 생성
         id: telegram_narratives
         continue-on-error: true
@@ -742,12 +732,13 @@ jobs:
       # ⚠️ **이 스텝은 테마 요약 두 스텝보다 앞에 있어야 한다.** 뒤에 두면 카더라 화면이 테마 요약 42회(국장 26 · 미장 16)를
       #    기다린 뒤에야 갈린다 — 카더라가 읽는 표는 여기서 이미 끝났고, 테마 요약 표(telegram_theme_brief 둘)를 읽는 것은
       #    테마 화면뿐이다(lib/theme-page.ts · lib/us-theme-page.ts).
-      # ⭐ **카더라 두 화면만 여기서 먼저 비운다.** 위에서 국장 총평이 막 들어갔는데 화면
-      #    사본은 30분짜리라, 다음 만료까지 옛 글이 나간다. 2026-09-22 저녁이 그랬다 —
-      #    미장 총평이 20:26:56, 국장 총평이 20:35:17 에 들어갔고 두 화면의 사본이 하필
+      # ⭐ **카더라 화면은 시장마다 제 총평 직후에 먼저 비운다.** 총평이 막 들어갔는데 화면
+      #    사본은 30분짜리라, 다음 만료까지 옛 글이 나간다. 2026-09-22 저녁이 그랬다(그때는
+      #    미장이 앞이었다) — 미장 총평이 20:26:56, 국장 총평이 20:35:17 에 들어갔고 두 화면의 사본이 하필
       #    그 사이 20:29:48 에 구워져, 21시에 잡이 끝날 때까지 미장만 새 글이고 국장은
       #    그날 아침 글이었다(화면 낙관도 70%, 표 74%). 사본이 30분마다 갈리니 이 8분
       #    틈에 떨어질 확률이 3할쯤이고, 저녁 8~9시는 방문이 둘째로 많은 시간대다.
+      #    두 화면을 한 자리에서 같이 비우지 않는 것도 같은 까닭이다. 그러면 국장이 미장 총평을 기다린다.
       #
       #    총평만 사는 게 아니다. 급부상 한 줄·등락 까닭·트렌딩·테마도 전부 이 앞에서
       #    끝나므로, 여기서 비우면 카더라 면이 통째로 제 시각에 맞는다.
@@ -763,6 +754,23 @@ jobs:
         env:
           REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
         run: bash scripts/revalidate.sh /kadera
+
+      # 미장 LLM 문장. 미장 센티먼트·테마·동시언급이 전부 끝난 뒤여야 digest 가 찬다.
+      # ⚠️ 국장 총평(위)과 **따로** 두는 이유: 한쪽이 실패해도 다른 쪽은 나가야 하고,
+      #    미장 실패는 미장 알림에만 잡혀야 한다.
+      - name: (텔레그램) 미장 총평·종목 요약 생성
+        id: telegram_us_narratives
+        continue-on-error: true
+        run: python data-pipeline/scripts/generate_us_telegram_narratives.py
+
+      # 미장 카더라도 제 총평 직후에 비운다(위 국장 것과 같은 규칙). 이 화면이 읽는 표는 전부
+      # 이 앞에서 끝난다. 테마 요약보다 앞인 것도 위 국장 것과 같은 까닭이다.
+      - name: 미장 카더라 화면만 먼저 비우고 데우기
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        env:
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: bash scripts/revalidate.sh /kadera/us
 
       # 테마 리포트(/theme/[테마])의 '요즘 무슨 얘기' · 함께 언급된 테마 · 발췌. 테마 26개에 Haiku 한 번씩.
       # 기준일을 telegram_sentiment_daily 에서 집으므로 센티먼트 집계 뒤여야 한다(위 급부상 한 줄과 같은 이유).
@@ -1792,6 +1800,22 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/calculate_kr_dividend_stats.py
 
+      # 고배당기업(배당소득 분리과세 대상) 목록 — KIND 페이지 POST 한 번. ⚠️ 거래소 사이트라 미국 러너에서 막힐 수 있다.
+      # 국장 스텝은 미국 배당주보다 앞에 둔다(2026-09-28, update 잡 카더라 블록과 같은 원칙). 배당 화면은 이 잡 끝에서
+      # 한 번 비우므로 이 순서가 화면 시각을 바꾸지는 않는다. 요청이 막혀도 재시도 상한이 있어 뒤 스텝을 붙들지 않는다(common/kind.py).
+      - name: Fetch 고배당기업 목록 (배당주)
+        id: kr_high_dividend
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_kr_high_dividend.py
+
+      # 배당성향(KIND 배당정보, 지난 사업연도 한 줄씩) — POST 한 번. 위와 같은 사이트.
+      - name: Fetch 배당성향 (배당주)
+        id: kr_dividend_payout
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_kr_dividend_payout.py
+
       # 미국 배당주. SEC 공시(키 없음, 초당 10회) 300종목 3분 + 핀허브 시세 180종목 4분쯤.
       # 미국 러너에서 SEC·핀허브는 잘 열린다(KRX·data.go.kr 와 반대다).
       - name: Fetch 미국 배당주 요약 (배당주)
@@ -1816,20 +1840,6 @@ jobs:
         if: ${{ !cancelled() }}
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_seohak_etf.py
-
-      # 고배당기업(배당소득 분리과세 대상) 목록 — KIND 페이지 POST 한 번. ⚠️ 거래소 사이트라 미국 러너에서 막힐 수 있다.
-      - name: Fetch 고배당기업 목록 (배당주)
-        id: kr_high_dividend
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        run: python data-pipeline/scripts/fetch_kr_high_dividend.py
-
-      # 배당성향(KIND 배당정보, 지난 사업연도 한 줄씩) — POST 한 번. 위와 같은 사이트.
-      - name: Fetch 배당성향 (배당주)
-        id: kr_dividend_payout
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        run: python data-pipeline/scripts/fetch_kr_dividend_payout.py
 
       # ⭐ 배당 표가 다 바뀐 직후 **이 화면들만** 먼저 비운다(PR #543 의 규칙 — 자료가 쓰인 직후에 그 화면만).
       #    한 잡이던 때는 배당이 맨 끝이라 잡 끝 전체 비우기가 이 몫을 했다. 떼고 나니 배당은 update 보다 한두 시간
@@ -1856,8 +1866,8 @@ jobs:
         id: dividend_health
         if: always()
         run: |
-          names=("fetch_kr_dividends.py" "fetch_kr_dividend_notices.py" "calculate_kr_dividend_stats.py" "fetch_us_dividends.py" "fetch_etf_dividends.py" "fetch_seohak_etf.py" "fetch_kr_high_dividend.py" "fetch_kr_dividend_payout.py")
-          outcomes=("${{ steps.kr_dividends.outcome }}" "${{ steps.kr_dividend_notices.outcome }}" "${{ steps.kr_dividend_stats.outcome }}" "${{ steps.us_dividends.outcome }}" "${{ steps.etf_dividends.outcome }}" "${{ steps.etf_flows.outcome }}" "${{ steps.kr_high_dividend.outcome }}" "${{ steps.kr_dividend_payout.outcome }}")
+          names=("fetch_kr_dividends.py" "fetch_kr_dividend_notices.py" "calculate_kr_dividend_stats.py" "fetch_kr_high_dividend.py" "fetch_kr_dividend_payout.py" "fetch_us_dividends.py" "fetch_etf_dividends.py" "fetch_seohak_etf.py")
+          outcomes=("${{ steps.kr_dividends.outcome }}" "${{ steps.kr_dividend_notices.outcome }}" "${{ steps.kr_dividend_stats.outcome }}" "${{ steps.kr_high_dividend.outcome }}" "${{ steps.kr_dividend_payout.outcome }}" "${{ steps.us_dividends.outcome }}" "${{ steps.etf_dividends.outcome }}" "${{ steps.etf_flows.outcome }}")
 
           {
             echo "## 배당주"
