@@ -417,18 +417,16 @@ NEGATIVE_CONTEXT: dict[str, str] = {
 #   영문 표기는 사전이 못 잡는다) '미장 글'인 것은 맞다. 지웠을 때 재현: 미장 총평 재료 −8.8%(그날
 #   조회 3·5위가 빠짐) · 미장 트렌딩 첫 6칸 30일 −14 · 국장 트렌딩 첫 6칸 +3.
 # ⚠️ 이 표를 **종목별로** 새로 읽는 곳을 만들면 is_house 로 거를 것. 안 거르면 은행이 다시 부푼다.
+#    국장 표(telegram_message_stocks)에도 증권사 화자 행이 같은 값으로 들어간다(config.stock_extraction 주석).
 #
 # 대상은 비율로 골랐다. 같은 기간 미장 사전 전체에서 이름 뒤에 `은/는/이/가 … 전망·제시·
 # 목표주가` 가 붙는 비율이 JPM 28 · BAC 27 · C 25 · GS 24 · MS 22% 이고 그다음(시에나 13%,
 # 자기 가이던스와 남이 낸 목표가라 말해지는 대상)부터 뚝 떨어진다. 사전에 은행·증권사가
 # 새로 들어오면(웰스파고·UBS·바클레이즈 …) 같은 비율을 재고 넣을 것.
 RESEARCH_HOUSES: frozenset[str] = frozenset({"JPM", "GS", "MS", "BAC", "C"})
-HOUSE_METHOD = "house"
-
-
-def is_house(row: dict) -> bool:
-    """telegram_message_us_stocks 행이 은행 화자 자리(종목 언급으로 안 세는 행)인가."""
-    return row.get("method") == HOUSE_METHOD
+# 표시 값과 판정은 국장 증권사 화자 행과 하나를 쓴다(config.stock_extraction 의 HOUSE_METHOD 주석).
+# 이 모듈에서 가져다 쓰는 곳이 많아 이름은 그대로 다시 내보낸다.
+from config.stock_extraction import HOUSE_METHOD, is_house  # noqa: E402,F401
 
 # ── 한글 표기인데 다른 뜻으로 더 자주 쓰여 아예 뺀 것 ───────────────────────
 #
