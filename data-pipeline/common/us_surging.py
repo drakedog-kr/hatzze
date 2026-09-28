@@ -16,7 +16,8 @@
 계산 규칙(저쪽 주석 요약):
   - 최근 14일 telegram_us_stock_daily 에서 **마지막 날은 뺀다**(하루가 덜 차 추이를 왜곡).
   - 절대량이 아니라 그날 전체 대비 **점유율**로 비교한다.
-  - 최근 3일 일평균 점유율 ÷ 그 이전 일평균 점유율. 분자·분모에 SHARE_SMOOTHING 을
+  - 최근 3일의 날마다 몫 평균 ÷ 그 이전 기간을 합친 몫 — 국장과 같은 셈법이다
+    (common/surging.surging_shares · lib/surging-score.ts 머리 주석). 분자·분모에 SHARE_SMOOTHING 을
     함께 더해, 분모가 거의 0인 종목이 터무니없는 배수를 받지 않게 한다.
   - 표본이 얇은 것은 뺀다(최근 언급 3회 미만) · 배수가 1 이하면 뺀다.
   - 정렬은 배수 내림차순.
@@ -24,9 +25,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from .supabase_client import load_all_keyset
+from .surging import surging_shares
 
 # ⚠️ 저쪽 상수와 같은 값이어야 한다(lib/us-telegram-data.ts).
 LOOKBACK_DAYS = 14
@@ -36,23 +38,53 @@ MIN_RECENT_MENTIONS = 3
 CARD_LIMIT = 6           # 화면이 getUsSurgingStocks(6) 으로 부른다
 
 
-def load_us_stock_daily(db) -> tuple[list[dict], list[str]]:
+def load_us_stock_daily(db, base_date: str | None = None) -> tuple[list[dict], list[str]]:
     """최근 LOOKBACK_DAYS 일의 telegram_us_stock_daily 와 날짜 목록(오름차순).
 
-    창의 시작을 UTC 로 잡는 것은 프론트를 그대로 따른 것이다(common/surging.py 와 같은 이유).
+    ⚠️⚠️ **`base_date` 를 주면 화면과 같은 창**이 된다 — 기준일(telegram_us_sentiment_daily 최신)을
+    뺀 앞 LOOKBACK_DAYS 일(lib/us-telegram-data.ts loadUsStockDaily 의 windowBefore). 안 주면 예전
+    그대로 '벽시계 기준 최근 14일'이라 **오늘까지 들어가** 화면 카드와 목록이 갈린다. 국장은
+    2026-09-05 에 같은 구멍을 막았고(common/surging.load_stock_daily), 미장은 2026-09-28 에야 막았다 —
+    그날 한 줄 요약 여섯 중 셋(RTX·리비안·존슨앤존슨)이 카드에 없는 종목이었고 카드의 셋은
+    며칠 전 문장을 물려 쓰고 있었다.
+
     ⚠️ 종목 × 날짜라 14일치가 1,000행을 쉽게 넘는다. 페이징하지 않으면 PostgREST 가
     **에러 없이** 잘라서 최신 날짜가 통째로 빠진 채 '평소 대비'가 계산된다.
     """
-    since = (datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)).date().isoformat()
+    if base_date:
+        end = date.fromisoformat(base_date) - timedelta(days=1)
+        since = (end - timedelta(days=LOOKBACK_DAYS - 1)).isoformat()
+        until = end.isoformat()
+    else:
+        since = (datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)).date().isoformat()
+        until = None
     rows = [
         r
         for r in load_all_keyset(
             db, "telegram_us_stock_daily", "id,date,ticker,mention_count,weighted_score"
         )
-        if r["date"] >= since
+        if r["date"] >= since and (until is None or r["date"] <= until)
     ]
     dates = sorted({r["date"] for r in rows})
     return rows, dates
+
+
+def score_us_surging(rows: list[dict], dates: list[str]) -> list[tuple[str, float, int]]:
+    """[(티커, 배수, 최근 언급)] 배수 내림차순 — 최근 언급 3회 미만·배수 1 이하는 뺀다.
+
+    lib/surging-score.ts scoreUsSurging 의 사본이다(같은 예제로 테스트한다).
+    """
+    _recent, stats = surging_shares(rows, dates, "ticker", RECENT_MAX)
+    scored = []
+    for ticker, s in stats.items():
+        if s["mentions"] < MIN_RECENT_MENTIONS:
+            continue
+        mult = (s["recent_share"] + SHARE_SMOOTHING) / (s["base_share"] + SHARE_SMOOTHING)
+        if mult <= 1:
+            continue
+        scored.append((ticker, mult, s["mentions"]))
+    scored.sort(key=lambda x: -x[1])
+    return scored
 
 
 def top_us_surging(
@@ -67,34 +99,5 @@ def top_us_surging(
     if not rows:
         return []
 
-    # 마지막 날은 아직 안 끝난 날이라 뺀다.
-    recent_n = min(RECENT_MAX, max(1, len(dates) - 1))
-    recent = set(dates[-recent_n:])
-    prior_count = max(len(dates) - recent_n, 1)
-
-    day_total: dict[str, float] = {}
-    for r in rows:
-        day_total[r["date"]] = day_total.get(r["date"], 0.0) + float(r["weighted_score"] or 0)
-
-    agg: dict[str, dict] = {}
-    for r in rows:
-        a = agg.setdefault(r["ticker"], {"recent": 0.0, "prior": 0.0, "m": 0})
-        total = day_total.get(r["date"], 0.0)
-        share = (float(r["weighted_score"] or 0) / total) if total > 0 else 0.0
-        if r["date"] in recent:
-            a["recent"] += share
-            a["m"] += r["mention_count"] or 0
-        else:
-            a["prior"] += share
-
-    scored = []
-    for ticker, a in agg.items():
-        if a["m"] < MIN_RECENT_MENTIONS:
-            continue
-        mult = (a["recent"] / recent_n + SHARE_SMOOTHING) / (a["prior"] / prior_count + SHARE_SMOOTHING)
-        if mult <= 1:
-            continue
-        scored.append((ticker, mult))
-
-    scored.sort(key=lambda x: -x[1])
-    return [t for t, _ in scored[:CARD_LIMIT][:limit]]
+    scored = score_us_surging(rows, dates)
+    return [s[0] for s in scored[:CARD_LIMIT][:limit]]
