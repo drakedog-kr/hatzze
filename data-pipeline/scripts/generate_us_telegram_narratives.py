@@ -58,6 +58,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
+from common.market_sentiment import MARKET_MIN_MESSAGES, load_market_daily  # noqa: E402
 from common.supabase_client import get_client, load_all, load_window_keyset  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
 from common.timeutil import KST  # noqa: E402
@@ -130,6 +131,8 @@ NEWS_MIN_MSGS = 150
 # 평일 660~880건 · 주말 185~270건이라, 주말도 살리되 수집이 무너진 날은 뺀다.
 BASE_DAY_MIN_MSGS = 120
 BASE_DAY_SAME_BAND = 5   # 하루와 창의 낙관도 차이가 이보다 작으면 '비슷하다'로 적는다
+# 시장 글 기준으로 하루 분위기를 말할 최소 건수. 미국 시장 글은 평일 하루 110~160건이다(2026-09 실측).
+BASE_DAY_MIN_MARKET = 60
 COMENTION_ROWS = 5     # 셋째 대목에 줄 '함께 언급된 국내 종목' 짝 수
 STOCK_EXCERPTS = 3     # 종목 한 건당 발췌 수
 THEME_TOP_N = 5        # 화면 테마 카드가 8줄이지만 digest 는 위 5개면 충분하다
@@ -414,31 +417,62 @@ def build_brief_digest(db, latest: str, msgs: list[dict], name_of: dict[str, str
         agg["total"] += r["message_count"]
     if not agg["total"]:
         return None
-    opt = optimism(agg["positive"], agg["negative"])
+    # [전체] 낙관도는 화면 큰 숫자와 같은 재료다 — 미국 증시 전체를 말한 글(common/market_sentiment).
+    # 그 표가 없거나 비었으면 예전처럼 '미국 종목이 붙은 글'로 센다(lib/us-telegram-data.getUsSentiment 와 같은 분기).
+    market_rows = load_market_daily(db, "us", until=latest)
+    m_days = sentiment_window({r["date"]: r["message_count"] for r in market_rows}, latest, MARKET_MIN_MESSAGES)
+    m_win = [r for r in market_rows if r["date"] in set(m_days)]
+    head = Counter()
+    for r in m_win:
+        head["positive"] += r["positive_count"]
+        head["neutral"] += r["neutral_count"]
+        head["negative"] += r["negative_count"]
+        head["total"] += r["message_count"]
+    use_market = head["total"] > 0 and head["positive"] + head["negative"] > 0
+    if use_market:
+        head_days, sent = m_days, m_win
+    else:
+        head, head_days = agg, sent_days
+
+    opt = optimism(head["positive"], head["negative"])
     if opt is None:
         return None
 
     lines = [
         "이 데이터는 **한국 주식 텔레그램 채널들이 미국 종목을 두고 나눈 이야기**입니다.",
         "",
-        f"[전체] 최근 {len(sent_days)}일({sent_days[0][5:]}~{sent_days[-1][5:]}, 오늘 포함) · 낙관도 {opt}% · {tone_label(opt)} "
+        f"[전체] 최근 {len(head_days)}일({head_days[0][5:]}~{head_days[-1][5:]}, 오늘 포함) · 낙관도 {opt}% · {tone_label(opt)} "
         f"(낙관 : 비관 = {opt} : {100 - opt})",
-        f"  ※ 낙관도는 중립을 뺀 값입니다. 전체의 {agg['neutral'] * 100 // agg['total']}%가 중립이라 제외했습니다.",
+        f"  ※ 낙관도는 중립을 뺀 값입니다. {'미국 증시 전체를 말한 글' if use_market else '전체'}의 "
+        f"{head['neutral'] * 100 // head['total']}%가 중립이라 제외했습니다.",
     ]
 
     # 낙관도 궤적(오래된→최신). 창보다 조금 길게 보여 '움직임'이 보이게 한다.
     trail = []
-    all_sent = [
-        r
-        for r in load_all(
-            db, "telegram_us_sentiment_daily", "date,scope,positive_count,negative_count"
-        )
-        if r["scope"] == "overall" and r["date"] <= end
-    ]
-    for r in sorted(all_sent, key=lambda x: x["date"])[-5:]:
-        o = optimism(r["positive_count"], r["negative_count"])
-        if o is not None:
-            trail.append((r["date"], o))
+    if use_market:
+        # 화면 30일 추이와 같은 값 — 날마다 그날 큰 숫자가 보여 줬을 값.
+        by_date = {r["date"]: r for r in market_rows if r["date"] <= end}
+        counts = {d: r["message_count"] for d, r in by_date.items()}
+        for d in sorted(by_date)[-5:]:
+            ds = set(sentiment_window(counts, d, MARKET_MIN_MESSAGES))
+            o = optimism(
+                sum(by_date[x]["positive_count"] for x in ds if x in by_date),
+                sum(by_date[x]["negative_count"] for x in ds if x in by_date),
+            )
+            if o is not None:
+                trail.append((d, o))
+    else:
+        all_sent = [
+            r
+            for r in load_all(
+                db, "telegram_us_sentiment_daily", "date,scope,positive_count,negative_count"
+            )
+            if r["scope"] == "overall" and r["date"] <= end
+        ]
+        for r in sorted(all_sent, key=lambda x: x["date"])[-5:]:
+            o = optimism(r["positive_count"], r["negative_count"])
+            if o is not None:
+                trail.append((r["date"], o))
     if len(trail) > 1:
         lines.append(trail_line(trail))
         # 재료 옆에 적는다 — 요일을 안 주니 화요일 추이를 "주 후반 톤이 내려앉았다"고 썼다
@@ -457,7 +491,8 @@ def build_brief_digest(db, latest: str, msgs: list[dict], name_of: dict[str, str
         optimism(sum(r["positive_count"] for r in others), sum(r["negative_count"] for r in others))
         if others else None
     )
-    if day and day_opt is not None and others_opt is not None and (day["message_count"] or 0) >= BASE_DAY_MIN_MSGS:
+    day_min = BASE_DAY_MIN_MARKET if use_market else BASE_DAY_MIN_MSGS
+    if day and day_opt is not None and others_opt is not None and (day["message_count"] or 0) >= day_min:
         diff = day_opt - others_opt
         if abs(diff) < BASE_DAY_SAME_BAND:
             moved = "이 기간의 다른 날과 비슷합니다"

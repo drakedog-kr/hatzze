@@ -216,6 +216,60 @@ export async function loadSentimentTrend(
 }
 
 /**
+ * **시장 글** 기준 낙관도의 기간을 넓히는 문턱 — 오늘+어제의 시장 글이 이만큼이 안 되면 하루씩 뒤로.
+ * 시장 글은 평일 이틀에 380건 안팎, 추석 연휴 이틀은 50~90건이었다(2026-09-21~28 실측). 200 이면
+ * 평일은 오늘+어제로 끝나고 주말·연휴만 넓어진다. 국장·미장 공통.
+ * ⚠️ 파이프라인 common/market_sentiment.py 의 MARKET_MIN_MESSAGES 와 같은 값이어야 한다(총평이 같은 날들을 인용한다).
+ */
+export const MARKET_MIN_MESSAGES = 200;
+
+export type MarketSentiment = {
+  pos: number;
+  neu: number;
+  neg: number;
+  total: number;
+  windowDays: number;
+  trend: SentimentPoint[];
+};
+
+/**
+ * 헤드라인 낙관도의 재료 — **시장 전체를 말한 글**만 센 날짜별 건수(migration_088).
+ *
+ * 전체 글로 세면 종목이 붙은 글(회사 소식·특징주·리포트)이 헤드라인을 끌어올린다. 수주·계약 같은
+ * 호재가 대부분이라 78일 내내 낙관도 61~90이었고, 헤드라인이 79일 동안 '비관 우세'를 한 번도
+ * 못 찍었다(2026-09-29 실측). 그래서 글마다 "국내·미국 증시 전체에 대해서는?"을 따로 묻고
+ * (scripts/analyze_telegram_market.py) 그 답으로 센다. 테마 막대는 예전 톤 그대로다.
+ *
+ * 표가 없거나(마이그레이션 전) 창 안에 시장 글이 하나도 없으면 null — 호출부는 예전처럼 전체 글로 센다.
+ * 기간 규칙은 sentimentWindow 그대로이고 문턱만 MARKET_MIN_MESSAGES 다. 추이도 같은 행으로 그린다.
+ */
+export async function loadMarketSentiment(market: "kr" | "us", base: string): Promise<MarketSentiment | null> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("telegram_market_sentiment_daily")
+    .select("date,positive_count,neutral_count,negative_count,message_count")
+    .eq("market", market)
+    .gte("date", addDaysISO(base, -(SENTIMENT_TREND_DAYS - 1) - (SENTIMENT_WINDOW_MAX_DAYS - 1)))
+    .lte("date", base);
+  if (error) {
+    console.error(`[loadMarketSentiment] ${market} 시장 낙관도를 못 읽어 전체 글 기준으로 셉니다`, error);
+    return null;
+  }
+  const rows = data ?? [];
+  const countByDate = new Map(rows.map((r) => [r.date, r.message_count ?? 0] as const));
+  const days = new Set(sentimentWindow(base, countByDate, MARKET_MIN_MESSAGES));
+  const sum = { pos: 0, neu: 0, neg: 0, total: 0 };
+  for (const r of rows) {
+    if (!days.has(r.date)) continue;
+    sum.pos += r.positive_count ?? 0;
+    sum.neu += r.neutral_count ?? 0;
+    sum.neg += r.negative_count ?? 0;
+    sum.total += r.message_count ?? 0;
+  }
+  if (!sum.total || sum.pos + sum.neg === 0) return null;
+  return { ...sum, windowDays: days.size, trend: sentimentTrend(base, rows, MARKET_MIN_MESSAGES) };
+}
+
+/**
  * LLM 문장이 **기준일분이 아직 없을 때 며칠까지 거슬러 올라가 쓰나**.
  *
  * 파이프라인은 언급 집계를 20단계쯤에서 오늘 날짜로 쓰고 문장은 60단계쯤에서 만든다.
@@ -1914,9 +1968,14 @@ export type EcosystemSentiment = {
   positive: number;
   neutral: number;
   negative: number; // 셋의 합은 항상 100(반올림 보정). 아래 3분할 막대가 이걸 그린다
+  /** 이 기간에 분석한 글 전체 수(overall). 큰 숫자를 시장 글로 셀 때도 캡션("최근 N일 · N건 분석")은
+   *  카더라가 읽은 글 전체를 보여 준다 — 시장 글만 적으면 건수가 확 줄어 보여서다(2026-09-29). */
   messageCount: number;
-  /** 이 숫자들이 본 날수. 보통 2(오늘+어제), 표본이 얇은 날은 3~4(SENTIMENT_WINDOW_DAYS 주석). */
+  /** 위 건수가 본 날수. 보통 2(오늘+어제), 표본이 얇은 날은 3~4(SENTIMENT_WINDOW_DAYS 주석). */
   windowDays: number;
+  /** 큰 숫자·3분할 막대·추이를 무엇으로 셌나. market = 시장 전체를 말한 글(loadMarketSentiment),
+   *  all = 예전처럼 전체 글(시장 판정 표가 없거나 빈 동안). market 일 때만 "중립 제외" 옆에 물음표가 붙는다. */
+  basis: "market" | "all";
   summary: string | null; // LLM 총평. 아직 생성 전이면 null
   /** 표본(positive/negative/total)을 같이 넘긴다 — 얇은 테마는 100:0 같은 극단값이
    *  나오는데, 몇 건 기준인지 보여줘야 그 숫자를 제대로 읽을 수 있다. */
@@ -2011,13 +2070,15 @@ export async function getEcosystemSentiment(): Promise<MaybeFailed<EcosystemSent
   const base = await kaderaBaseDate();
   // 추이(overall 만 33행)는 따로 받는다. 이 조회에 30일을 붙이면 테마 행까지 30일치가 와서
   // 1,000행 캡에 닿는다.
-  const [{ data, error }, trend] = await Promise.all([
+  // 큰 숫자는 시장 글 기준(loadMarketSentiment)을 먼저 쓰고, 없으면 예전 전체 글 기준으로 돌아간다.
+  const [{ data, error }, allTrend, market] = await Promise.all([
     db
       .from("telegram_sentiment_daily")
       .select("date,scope,positive_count,neutral_count,negative_count,message_count")
       .gte("date", addDaysISO(base, -(SENTIMENT_WINDOW_MAX_DAYS - 1)))
       .lte("date", base),
     loadSentimentTrend("telegram_sentiment_daily", base, SENTIMENT_MIN_MESSAGES),
+    loadMarketSentiment("kr", base),
   ]);
   if (error) {
     console.error("[getEcosystemSentiment] 감성 집계를 못 읽었습니다", error);
@@ -2042,7 +2103,10 @@ export async function getEcosystemSentiment(): Promise<MaybeFailed<EcosystemSent
 
   const overall = agg.get("overall");
   if (!overall?.total) return null;
-  const [positive, neutral, negative] = toPercents(overall.pos, overall.neu, overall.neg);
+  // 큰 숫자·3분할 막대의 재료. 시장 글 기준이 있으면 그걸, 없으면 전체 글(overall). 캡션 건수는 늘 overall.
+  // 테마 막대는 언제나 전체 글 톤이다 — 테마는 종목에 딸린 이야기라 '시장 전체' 판정이 없다.
+  const head = market ?? { ...overall, windowDays: window.size, trend: allTrend };
+  const [positive, neutral, negative] = toPercents(head.pos, head.neu, head.neg);
 
   // 테마 막대는 낙관↔비관 양분 구조라 중립을 뺀 대립 비율로 그린다.
   // 하한·개수는 총평 쪽과 같이 움직여야 한다(THEME_TOP_N 주석 참고).
@@ -2073,7 +2137,7 @@ export async function getEcosystemSentiment(): Promise<MaybeFailed<EcosystemSent
   if (briefErr) console.error("[getEcosystemSentiment] 총평 문장을 못 읽었습니다", briefErr);
 
   // 헤드라인은 중립을 뺀 낙관도 — 테마별 막대와 같은 기준으로 맞춘다(위 타입 주석 참고).
-  const optimism = optimismPct(overall.pos, overall.neg) ?? 50;
+  const optimism = optimismPct(head.pos, head.neg) ?? 50;
 
   const { label, tone } = sentimentTone(optimism);
 
@@ -2086,9 +2150,10 @@ export async function getEcosystemSentiment(): Promise<MaybeFailed<EcosystemSent
     negative,
     messageCount: overall.total,
     windowDays: window.size,
+    basis: market ? "market" : "all",
     summary: (brief?.sentiment_summary as string | null) ?? null,
     byTheme,
-    trend,
+    trend: market ? market.trend : allTrend,
   };
 }
 

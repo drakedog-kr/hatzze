@@ -582,14 +582,18 @@ export default async function UsKaderaPage() {
                         물음표만 alignSelf 로 가운데에 둔다 — 그림이라 글줄 밑선에 앉히면 낮다. */}
                     <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 700, color: C.sub, display: "inline-flex", alignItems: "baseline", gap: 4, width: "fit-content" }}>
                       중립 {sentiment.neutral}% 제외 후 환산
-                      <span
-                        className="hz-tip hz-tip-wide"
-                        data-tip="중립 뺀 낙관·비관 비율"
-                        data-ga-tip="us_sentiment_ratio"
-                        style={{ display: "inline-flex", cursor: "help", flexShrink: 0, alignSelf: "center" }}
-                      >
-                        <Icon name="help" style={{ fontSize: "var(--fs-12)", color: C.muted }} />
-                      </span>
+                      {/* 캡션 건수는 글 전체라, 낙관도가 그중 시장 글로만 셌다는 걸 물음표가 알린다.
+                          예전 방식(전체 글)으로 셀 때는 물음표를 안 단다 — '중립 제외'는 줄 글이 이미 말한다. */}
+                      {sentiment.basis === "market" && (
+                        <span
+                          className="hz-tip hz-tip-wide"
+                          data-tip="증시 전체를 다룬 글만 계산"
+                          data-ga-tip="us_sentiment_ratio"
+                          style={{ display: "inline-flex", cursor: "help", flexShrink: 0, alignSelf: "center" }}
+                        >
+                          <Icon name="help" style={{ fontSize: "var(--fs-12)", color: C.muted }} />
+                        </span>
+                      )}
                     </span>
                   </div>
                 </div>
