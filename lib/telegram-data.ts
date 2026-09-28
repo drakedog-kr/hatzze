@@ -1968,11 +1968,13 @@ export type EcosystemSentiment = {
   positive: number;
   neutral: number;
   negative: number; // 셋의 합은 항상 100(반올림 보정). 아래 3분할 막대가 이걸 그린다
+  /** 이 기간에 분석한 글 전체 수(overall). 큰 숫자를 시장 글로 셀 때도 캡션("최근 N일 · N건 분석")은
+   *  카더라가 읽은 글 전체를 보여 준다 — 시장 글만 적으면 건수가 확 줄어 보여서다(2026-09-29). */
   messageCount: number;
-  /** 이 숫자들이 본 날수. 보통 2(오늘+어제), 표본이 얇은 날은 3~4(SENTIMENT_WINDOW_DAYS 주석). */
+  /** 위 건수가 본 날수. 보통 2(오늘+어제), 표본이 얇은 날은 3~4(SENTIMENT_WINDOW_DAYS 주석). */
   windowDays: number;
-  /** 큰 숫자·3분할 막대·추이·건수를 무엇으로 셌나. market = 시장 전체를 말한 글(loadMarketSentiment),
-   *  all = 예전처럼 전체 글(시장 판정 표가 없거나 빈 동안). 캡션 문구가 이걸 보고 갈린다. */
+  /** 큰 숫자·3분할 막대·추이를 무엇으로 셌나. market = 시장 전체를 말한 글(loadMarketSentiment),
+   *  all = 예전처럼 전체 글(시장 판정 표가 없거나 빈 동안). 툴팁 문구가 이걸 보고 갈린다. */
   basis: "market" | "all";
   summary: string | null; // LLM 총평. 아직 생성 전이면 null
   /** 표본(positive/negative/total)을 같이 넘긴다 — 얇은 테마는 100:0 같은 극단값이
@@ -2101,7 +2103,7 @@ export async function getEcosystemSentiment(): Promise<MaybeFailed<EcosystemSent
 
   const overall = agg.get("overall");
   if (!overall?.total) return null;
-  // 큰 숫자·3분할 막대·건수의 재료. 시장 글 기준이 있으면 그걸, 없으면 전체 글(overall).
+  // 큰 숫자·3분할 막대의 재료. 시장 글 기준이 있으면 그걸, 없으면 전체 글(overall). 캡션 건수는 늘 overall.
   // 테마 막대는 언제나 전체 글 톤이다 — 테마는 종목에 딸린 이야기라 '시장 전체' 판정이 없다.
   const head = market ?? { ...overall, windowDays: window.size, trend: allTrend };
   const [positive, neutral, negative] = toPercents(head.pos, head.neu, head.neg);
@@ -2146,8 +2148,8 @@ export async function getEcosystemSentiment(): Promise<MaybeFailed<EcosystemSent
     positive,
     neutral,
     negative,
-    messageCount: head.total,
-    windowDays: head.windowDays,
+    messageCount: overall.total,
+    windowDays: window.size,
     basis: market ? "market" : "all",
     summary: (brief?.sentiment_summary as string | null) ?? null,
     byTheme,

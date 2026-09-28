@@ -401,9 +401,10 @@ export type UsSentiment = {
   positive: number;
   neutral: number;
   negative: number; // 셋의 합은 항상 100(반올림 보정)
+  /** 이 기간에 분석한 글 전체 수. 큰 숫자를 시장 글로 셀 때도 캡션은 전체 글이다(국장과 같은 규칙) */
   messageCount: number;
   windowDays: number;
-  /** 큰 숫자·막대·추이·건수를 무엇으로 셌나(국장 EcosystemSentiment.basis 와 같은 뜻) */
+  /** 큰 숫자·막대·추이를 무엇으로 셌나(국장 EcosystemSentiment.basis 와 같은 뜻) */
   basis: "market" | "all";
   /** 테마별 낙관↔비관(중립 제외). 표본을 같이 넘긴다 — 얇은 테마는 100:0 같은 극단값이
    *  나오는데, 몇 건 기준인지 보여줘야 그 숫자를 제대로 읽을 수 있다(국장과 같은 규칙). */
@@ -550,8 +551,8 @@ export async function getUsSentiment(): Promise<UsSentiment | null> {
     positive,
     neutral,
     negative,
-    messageCount: head.total,
-    windowDays: head.windowDays,
+    messageCount: sum.total,
+    windowDays: win.length || window.size,
     basis: market ? "market" : "all",
     byTheme,
     trend: market ? market.trend : allTrend,

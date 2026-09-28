@@ -573,7 +573,7 @@ export default async function UsKaderaPage() {
                   </strong>
                   <div className="hz-figrow-aside">
                     <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub }}>
-                      최근 {sentiment.windowDays}일 · {sentiment.basis === "market" ? `시장 글 ${sentiment.messageCount.toLocaleString("ko-KR")}건` : `${sentiment.messageCount.toLocaleString("ko-KR")}건 분석`}
+                      최근 {sentiment.windowDays}일 · {sentiment.messageCount.toLocaleString("ko-KR")}건 분석
                     </span>
                     {/* 툴팁은 문장이 아니라 물음표에 건다(국장 히어로와 같은 규칙). */}
                     {/* ⚠️ `alignItems` 가 center 가 아니라 **baseline** 이다. 이 줄은 곁줄의
