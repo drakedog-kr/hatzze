@@ -1974,7 +1974,7 @@ export type EcosystemSentiment = {
   /** 위 건수가 본 날수. 보통 2(오늘+어제), 표본이 얇은 날은 3~4(SENTIMENT_WINDOW_DAYS 주석). */
   windowDays: number;
   /** 큰 숫자·3분할 막대·추이를 무엇으로 셌나. market = 시장 전체를 말한 글(loadMarketSentiment),
-   *  all = 예전처럼 전체 글(시장 판정 표가 없거나 빈 동안). market 일 때만 "중립 제외" 옆에 물음표가 붙는다. */
+   *  all = 예전처럼 전체 글(시장 판정 표가 없거나 빈 동안). */
   basis: "market" | "all";
   summary: string | null; // LLM 총평. 아직 생성 전이면 null
   /** 표본(positive/negative/total)을 같이 넘긴다 — 얇은 테마는 100:0 같은 극단값이
