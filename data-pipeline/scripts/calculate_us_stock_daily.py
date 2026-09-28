@@ -73,7 +73,8 @@ def main() -> None:
     # 은행 화자 행(config.RESEARCH_HOUSES 주석)은 **종목별로 셀 때만** 뺀다. 아래 채널 집계의
     # '미국 얘기를 한 글'에는 그대로 든다 — 은행 이름만 있는 글도 미국 거시·AI 투자 얘기다.
     stock_mentions = [m for m in us_mentions if not is_house(m)]
-    # 국내 언급은 채널 집계의 kr_msgs 에만 쓴다(국장 vs 미장 배분 카드).
+    # 국내 언급은 채널 집계의 kr_msgs 에만 쓴다(국장 vs 미장 배분 카드). '국내 얘기를 한 글'을 세는 자리라
+    # 증권사 화자 행(method="house")도 그대로 든다 — config.stock_extraction HOUSE_METHOD 주석의 ②.
     kr_mentions = load_all_keyset(
         db, "telegram_message_stocks", "id,channel_handle,message_id,stock_code"
     )

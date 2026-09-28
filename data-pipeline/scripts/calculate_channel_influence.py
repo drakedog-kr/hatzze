@@ -28,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client, load_all  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
+from config.stock_extraction import HOUSE_METHOD  # noqa: E402
 
 RECENT_POSTS = 30  # 평균 조회수/포워드율 계산에 쓰는 최근 게시물 수
 GROWING_VIEW_RATE = 3.0  # 이 뷰레이트(%) 미만이면 "성장 중" 등급
@@ -89,9 +90,12 @@ def save_collection_stats(
         .count
     ) or 0
     # 누적 종목 언급. 이것도 화면이 렌더마다 세던 count 다.
+    # 증권사 화자 행(config.stock_extraction HOUSE_METHOD 주석)은 언급이 아니라 뺀다. method 가 빈 행은 없지만
+    # (추출이 늘 dict·alias·house 를 적는다) neq 가 NULL 을 같이 빼지 않게 or 로 둔다.
     total_mentions = (
         db.table("telegram_message_stocks")
         .select("id", count="exact")
+        .or_(f"method.is.null,method.neq.{HOUSE_METHOD}")
         .limit(1)
         .execute()
         .count

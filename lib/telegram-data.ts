@@ -539,9 +539,12 @@ async function computeSummaryLive(
   const channelCount = collected.length;
   const totalSubscribers = collected.reduce((s, c) => s + (c.subscriber_count ?? 0), 0);
 
+  // 증권사 화자 행(method="house" — data-pipeline/config/stock_extraction.py HOUSE_METHOD 주석)은
+  // 언급이 아니라 뺀다. 파이프라인 저장값(calculate_channel_influence.py)과 같은 규칙이다.
   const { count: totalMentions, error: mentionsErr } = await db
     .from("telegram_message_stocks")
-    .select("id", { count: "exact", head: true });
+    .select("id", { count: "exact", head: true })
+    .or("method.is.null,method.neq.house");
   // ⚠️ 이 자리는 `data` 가 아니라 `count` 를 받아서, "data 만 받는 곳" 을 훑을 때 빠진다.
   //    실패하면 아래 `totalMentions ?? 0` 이 걸려 **언급 0회**가 그대로 화면에 찍힌다.
   if (mentionsErr) console.error("[computeSummaryLive] 총 언급 수를 못 읽었습니다", mentionsErr);
@@ -1037,6 +1040,9 @@ async function taggedKeys(table: string, candidates: { channelHandle: string; me
  *
  * 조회가 실패하면 아무것도 안 빠진다 — 카드가 비는 것보다 미장 글이 몇 건 섞이는 쪽이
  * 낫다.
+ *
+ * 화자 행(method="house")도 국내 태그로 센다 — '국내 글인가'를 묻는 자리라서다
+ * (data-pipeline/common/market_tags.py 머리 주석).
  */
 async function usOnlyKeys(candidates: { channelHandle: string; messageId: number }[]): Promise<Set<string>> {
   const us = await taggedKeys("telegram_message_us_stocks", candidates);
@@ -1201,13 +1207,15 @@ export async function getTrendingMessages(
   // message_id 는 채널별로만 유일해서 채널을 안 걸면 다른 채널의 같은 번호 메시지까지
   // 딸려온다(한 번호가 최대 60행). 아래에서 채널까지 포함한 키로 걸러내므로 결과는
   // 맞지만, 행이 많아지면 1000행 상한에 잘려 태그가 조용히 사라질 수 있어 페이징한다.
+  // 증권사 화자 행(method="house")은 태그로 안 붙인다 — calculate_telegram_trending.stock_tags 와 같은 규칙.
   const tags = await fetchAllRows<{ channel_handle: string; message_id: number; stock_code: string }>(
     "id",
     () =>
       db
         .from("telegram_message_stocks")
         .select("channel_handle,message_id,stock_code")
-        .in("message_id", top.map((m) => m.messageId)),
+        .in("message_id", top.map((m) => m.messageId))
+        .or("method.is.null,method.neq.house"),
   );
 
   if (tags.length) {
@@ -1317,6 +1325,8 @@ async function recentChannelCount(code: string, from: string, to: string): Promi
       // posted_at 은 거르는 데만 쓰고 결과엔 필요 없어서, 행마다 딸려 오지 않게 한다.
       .select("channel_handle,telegram_messages!inner()")
       .eq("stock_code", code)
+      // 증권사 화자 행(method="house")은 그 종목을 다룬 채널로 안 센다 — common/channel_breadth.py 와 같은 규칙.
+      .or("method.is.null,method.neq.house")
       // 아래 위아래 경계를 둘 다 건다. 예전엔 하한만(rolling N일) 걸어서 **오늘이 섞였다** —
       // 막대 차트와 언급 수는 오늘을 빼고 그리는데 채널 수만 오늘을 포함해, 한 줄에 적힌
       // 두 값이 서로 다른 기간을 말했다. 창이 7일일 땐 1/7 차이라 안 보였지만 3일이면 1/3 이다.

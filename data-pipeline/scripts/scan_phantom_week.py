@@ -73,6 +73,7 @@ from config.stock_extraction import (  # noqa: E402
     AMBIGUOUS_NAMES,
     HEAD_NOUN_NAMES,
     HOMONYM_CUES,
+    is_house,
 )
 from extract_telegram_stocks import JOSA_TAIL_RE, build_pattern, extract, load_dictionary  # noqa: E402
 
@@ -377,7 +378,8 @@ def main() -> None:
     cased: dict[str, Counter] = defaultdict(Counter)  # 표기가 사전과 다른 대소문자
     tagged_msgs = 0
     for m in msgs:
-        tags = m.get("telegram_message_stocks") or []
+        # 증권사 화자 행(config.HOUSE_METHOD 주석)은 종목 언급으로 안 센다 — extract() 가 자리를 안 주는 행이다.
+        tags = [t for t in m.get("telegram_message_stocks") or [] if not is_house(t)]
         if not tags:
             continue
         tagged_msgs += 1
