@@ -388,7 +388,7 @@ BRIEF_THEME_SYSTEM = COMMON + f"""
 - 화제어는 분류기가 붙인 이름이라 **가끔 오타나 말이 안 되는 낱말이 섞입니다.** 그런 건
   건너뛰고 다음 것을 쓰세요. 뜻을 모르겠는 낱말을 그대로 옮기지 마세요.
 
-- **둘째 문장의 본론은 '부피'입니다.** 화면의 테마 막대는 테마마다 비관↔낙관 **비율**만
+- **둘째 문장의 본론은 '부피'입니다.** 화면의 테마 막대는 테마마다 평소 대비 **기울기**만
   보여주고, 그 비율 뒤에 몇 건이 있는지는 안 보여줍니다. digest 의 건수가 그걸 압니다 —
   어느 테마가 대화를 얼마나 끌고 있는지, 나머지와 견주면 어느 정도인지를 말하세요.
 - ⚠️ **건수는 견주는 데 쓰고, 목록으로 읊지 마세요.** 네 테마의 건수를 차례로 나열하면
@@ -399,8 +399,10 @@ BRIEF_THEME_SYSTEM = COMMON + f"""
   '몇 배' 같은 말을 붙이지 마세요.
 - 🚫 **테마별 낙관도 퍼센트는 한 번도 쓰지 마세요.** digest 에 "낙관도 74%"라고 적혀
   있어도 옮기지 마세요. 그 숫자는 바로 옆 막대가 그림으로 이미 말하고 있습니다.
-  기울기를 말할 땐 구간 라벨(낙관 우세·중립·비관 우세)이나 **테마끼리의 순서**로만
-  말하세요("가장 낙관 쪽으로 기운 건 2차전지입니다").
+  기울기를 말할 땐 [테마별]에 적힌 평소 대비 라벨(평소보다 낙관 쪽·평소와 비슷·평소보다
+  비관 쪽)로만 말하세요("반도체는 평소보다 낙관 쪽으로 기울었습니다"). 옆 막대가 평소와의
+  차이를 그리므로 '낙관 우세' 같은 절대 라벨을 테마에 붙이지 마세요.
+  '평소 기록이 적어 견줄 수 없음'인 테마는 기울기를 말하지 말고 부피로만 쓰세요.
   **이 대목에 퍼센트 기호가 한 번이라도 들어가면 잘못 쓴 것입니다.**
 - ⚠️ **'가장 ~한'이라고 쓸 거면 digest 의 값을 실제로 견주고 쓰세요.** 언급이 가장 많은
   테마와 낙관이 가장 기운 테마는 대개 다릅니다. 이 둘을 뒤섞으면 한 문단 안에서 앞뒤가
@@ -568,8 +570,24 @@ def optimism(positive: int, negative: int) -> int | None:
 # 맞추는 방향은 **총평을 카드에 맞춘다**(4개). 카드가 4개인 건 반칸 카드에 막대 4줄이
 # 왼쪽 종합 막대와 높이가 맞는 한계라 늘리기 어렵고, 총평은 어차피 상위 몇 개만
 # 인용하기 때문이다. 프롬프트가 요구하는 "테마 최소 2개 언급"에도 4개면 충분하다.
-MIN_DECIDED = 8
+MIN_DECIDED = 20  # 8 → 20(2026-09-29). 8~19건짜리 막대는 연휴에 몇 건으로 크게 흔들렸다
 THEME_TOP_N = 4
+
+# ── 테마의 '평소' — 화면 막대가 평소 대비로 바뀌었다(2026-09-29) ─────────────────────
+#
+# 테마 글은 회사 호재가 대부분이라 절대 낙관도는 늘 밝다(78일 동안 국장 막대 95%가 낙관
+# 구간, 비관 구간 0). 그래서 막대는 그 테마의 평소보다 밝은지 어두운지를 그린다. 총평도 같은
+# 말을 해야 한다 — 막대가 평소보다 비관 쪽인데 총평이 "낙관 우세"라고 하면 확인할 길이 없다.
+#
+#   평소 = 창 첫날 앞 THEME_USUAL_DAYS 일(달력 날짜)을 합친 낙관도
+#   평소가 THEME_USUAL_MIN_DECIDED 건 미만이면 평소 없음
+#
+# ⚠️ lib/telegram-data.ts loadThemeUsual 의 THEME_USUAL_DAYS · THEME_USUAL_MIN_DECIDED 와 같은
+#    값이어야 한다(위 MIN_DECIDED 와 같은 손 사본 관례).
+THEME_USUAL_DAYS = 30
+THEME_USUAL_MIN_DECIDED = 60
+# 평소와 이만큼 안쪽이면 '평소와 비슷'. 미장 총평의 BASE_DAY_SAME_BAND 와 같은 폭이다.
+THEME_USUAL_BAND = 5
 
 
 # 문장 검수(깨진 글자·오타)는 common/text_check.py 가 맡는다. 예전엔 여기서 대체문자
@@ -636,6 +654,30 @@ def first_sentences(text: str, limit: int) -> str:
 #
 # 분위기·테마는 2문장이 맞다. 105~170자 구간은 두 문장이면 문장당 55~85자로 편하다.
 BRIEF_SENTENCE_CAP = {"tone": 2, "theme": 2, "news": 3, "schedule": 2}
+
+
+def theme_usual(all_sent: list[dict], scope: str, window_start: str) -> int | None:
+    """그 테마의 평소 낙관도 — 창 첫날 앞 THEME_USUAL_DAYS 일 합계(위 THEME_USUAL_DAYS 주석)."""
+    start = date.fromisoformat(window_start)
+    lo = (start - timedelta(days=THEME_USUAL_DAYS)).isoformat()
+    hi = (start - timedelta(days=1)).isoformat()
+    pos = neg = 0
+    for r in all_sent:
+        if r["scope"] == scope and lo <= r["date"] <= hi:
+            pos += r["positive_count"] or 0
+            neg += r["negative_count"] or 0
+    if pos + neg < THEME_USUAL_MIN_DECIDED:
+        return None
+    return optimism(pos, neg)
+
+
+def usual_label(opt: int, usual: int) -> str:
+    """평소 대비 라벨. 총평이 테마 기울기를 말할 때 쓰는 말이 이것뿐이다(BRIEF_THEME_SYSTEM)."""
+    if opt - usual >= THEME_USUAL_BAND:
+        return "평소보다 낙관 쪽"
+    if usual - opt >= THEME_USUAL_BAND:
+        return "평소보다 비관 쪽"
+    return "평소와 비슷"
 
 
 def tone_label(optimism_pct: int) -> str:
@@ -1404,8 +1446,8 @@ def build_brief_digest(db, latest: str, msgs: list[dict]) -> str | None:
     # "화면에 뜨는 것과 같다"를 프롬프트에도 적어 둔다. 모델이 인용해도 되는 테마의
     # 범위가 곧 화면의 범위라는 걸, digest 를 읽는 사람도 모델도 같이 보게 하려는 것이다.
     lines.append(
-        f"[테마별] 낙관도 (중립 제외 · 낙관+비관 {MIN_DECIDED}건 이상 · "
-        f"화면 막대에 뜨는 상위 {THEME_TOP_N}개입니다)"
+        f"[테마별] 평소 대비 기울기 (중립 뺀 낙관도를 그 테마의 직전 {THEME_USUAL_DAYS}일과 견줌 · "
+        f"낙관+비관 {MIN_DECIDED}건 이상 · 화면 막대에 뜨는 상위 {THEME_TOP_N}개입니다)"
     )
     # 카드(lib/telegram-data.getEcosystemSentiment)와 **같은 정렬·하한·개수**로 고른다.
     # 셋 다 맞아야 총평과 옆 막대가 같은 테마를 말한다(위 THEME_TOP_N 주석 참고).
@@ -1420,17 +1462,19 @@ def build_brief_digest(db, latest: str, msgs: list[dict]) -> str | None:
         key=lambda kv: kv[1]["total"],
         reverse=True,
     )[:THEME_TOP_N]
+    window_start = min(sent_days)
     for scope, c in themes:
         o = optimism(c["positive"], c["negative"])
         if o is None:
             continue
         # 숫자만 주면 모델이 방향을 뒤집어 읽는다 — "낙관이 43%로 우세"(2026-07-20),
-        # "38%로 상대적으로 높은"(07-19) 처럼. 화면 카드가 쓰는 것과 같은 구간 라벨을
-        # 함께 줘서 해석을 고정한다(lib/format.sentimentTone 과 같은 경계).
-        lines.append(
-            f"- {scope}: {c['total']}건 · 낙관도 {o}% · {tone_label(o)} "
-            f"(낙관 {c['positive']}건 · 비관 {c['negative']}건)"
-        )
+        # "38%로 상대적으로 높은"(07-19) 처럼. 화면 막대가 그리는 것과 같은 말(평소 대비
+        # 라벨)을 함께 줘서 해석을 고정한다. 절대 구간 라벨(낙관 우세)은 막대에 없어서 뺐다.
+        u = theme_usual(all_sent, scope, window_start)
+        if u is None:
+            lines.append(f"- {scope}: {c['total']}건 · 평소 기록이 적어 견줄 수 없음 (낙관도 {o}%)")
+        else:
+            lines.append(f"- {scope}: {c['total']}건 · {usual_label(o, u)} (낙관도 {o}% · 평소 {u}%)")
     if not themes:
         lines.append(f"- (표본 {MIN_DECIDED}건 이상인 테마가 없습니다. 테마 언급은 생략하세요)")
     if len(themes) >= 2 and (cmp := volume_comparison_line(themes)):

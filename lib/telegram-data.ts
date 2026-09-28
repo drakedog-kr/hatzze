@@ -1978,8 +1978,9 @@ export type EcosystemSentiment = {
   basis: "market" | "all";
   summary: string | null; // LLM 총평. 아직 생성 전이면 null
   /** 표본(positive/negative/total)을 같이 넘긴다 — 얇은 테마는 100:0 같은 극단값이
-   *  나오는데, 몇 건 기준인지 보여줘야 그 숫자를 제대로 읽을 수 있다. */
-  byTheme: { name: string; pos: number; positive: number; negative: number; total: number }[];
+   *  나오는데, 몇 건 기준인지 보여줘야 그 숫자를 제대로 읽을 수 있다.
+   *  usual 은 그 테마의 평소 낙관도(loadThemeUsual). 막대는 평소를 50:50 으로 옮겨 나눈다. 평소가 얇으면 null */
+  byTheme: { name: string; pos: number; usual: number | null; positive: number; negative: number; total: number }[];
   /** 최근 SENTIMENT_TREND_DAYS 일 낙관도(sentimentTrend). 마지막 점이 score 다. 조회 실패면 null */
   trend: SentimentPoint[] | null;
 };
@@ -2026,10 +2027,11 @@ export function toPercents(pos: number, neu: number, neg: number): [number, numb
  */
 const THEME_TOP_N = 4;
 
-/** 낙관/비관이 합쳐 이만큼은 돼야 비율에 의미가 있다. 그 아래는 한두 건에 100:0이 되어
- *  실제보다 단정적으로 보인다. 남은 극단값은 표본을 툴팁으로 같이 보여 해석을 돕는다.
+/** 낙관/비관이 합쳐 이만큼은 돼야 비율에 의미가 있다. 그 아래는 몇 건에 막대가 크게 흔들려
+ *  실제보다 단정적으로 보인다. 8 이던 것을 20 으로 올렸다(2026-09-29) — 8~19건짜리 막대가
+ *  78일 동안 302개 중 36개였고 대부분 연휴에 떴다.
  *  위 THEME_TOP_N 주석의 동기화 규칙이 이 값에도 그대로 적용된다. */
-const THEME_MIN_DECIDED = 8;
+const THEME_MIN_DECIDED = 20;
 
 /**
  * 낙관도(%) — 중립을 뺀 '낙관 : 비관' 중 낙관 쪽 비중. **평활을 건다.**
@@ -2054,6 +2056,57 @@ const SENTIMENT_PRIOR = 5;
 export function optimismPct(pos: number, neg: number): number | null {
   if (pos + neg === 0) return null;
   return Math.round(((pos + SENTIMENT_PRIOR) / (pos + neg + 2 * SENTIMENT_PRIOR)) * 100);
+}
+
+/**
+ * 테마 막대의 '평소' — 창 첫날 **앞** THEME_USUAL_DAYS 일(달력 날짜)을 합친 그 테마의 낙관도.
+ *
+ * 테마 막대는 그 테마 종목이 붙은 글의 톤이라 수주·실적 같은 회사 호재가 대부분이다. 그래서
+ * 78일 동안 국장 막대 302개 중 95%가 낙관 구간이었고 비관 구간은 한 번도 없었다(중앙값 79).
+ * 삼전닉스가 5% 빠진 09-28 에도 반도체는 79 였다(2026-09-29 실측). 절대값으로는 늘 밝으니
+ * 막대는 평소를 50:50 으로 옮겨 **평소보다 밝은지 어두운지**를 그린다(app/kadera/theme-vs-usual.ts).
+ * 막대 모양·제목은 그대로다. 문턱 하나(예: 80 을 중립으로)로 옮기지 않은
+ * 이유는 테마마다 평소가 달라서다(지주·밸류업 85 안팎, 원전 70 안팎).
+ *
+ * 창과 겹치지 않게 창 첫날 전날까지만 본다. 평소가 너무 얇으면(THEME_USUAL_MIN_DECIDED 미만)
+ * 그 테마는 평소가 없다 — 막대는 예전처럼 낙관도 그대로 나누고 툴팁에 그렇다고 적는다.
+ *
+ * ⚠️ 총평 digest(generate_telegram_narratives.py theme_usual)와 **같은 날짜 범위·같은 하한**이어야
+ * 한다. 총평이 "평소보다 낙관 쪽"이라고 쓴 테마가 옆 막대에서 반대로 그려지면 안 된다.
+ * 테마 넷만 30일치라 120행 남짓 — 1,000행 캡과 멀다.
+ */
+export const THEME_USUAL_DAYS = 30;
+export const THEME_USUAL_MIN_DECIDED = 60;
+
+export async function loadThemeUsual(
+  table: "telegram_sentiment_daily" | "telegram_us_sentiment_daily",
+  names: string[],
+  windowStart: string,
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (!names.length) return out;
+  const { data, error } = await getSupabaseAdmin()
+    .from(table)
+    .select("scope,positive_count,negative_count")
+    .in("scope", names)
+    .gte("date", addDaysISO(windowStart, -THEME_USUAL_DAYS))
+    .lte("date", addDaysISO(windowStart, -1));
+  if (error) {
+    // 평소를 못 읽으면 막대만 비고 테마 이름·툴팁은 남는다 — 카드를 통째로 내릴 일은 아니다.
+    console.error(`[loadThemeUsual] ${table} 평소 값을 못 읽었습니다`, error);
+    return out;
+  }
+  const agg = new Map<string, { pos: number; neg: number }>();
+  for (const r of data ?? []) {
+    const a = agg.get(r.scope) ?? { pos: 0, neg: 0 };
+    a.pos += r.positive_count ?? 0;
+    a.neg += r.negative_count ?? 0;
+    agg.set(r.scope, a);
+  }
+  for (const [name, a] of agg) {
+    if (a.pos + a.neg >= THEME_USUAL_MIN_DECIDED) out.set(name, optimismPct(a.pos, a.neg) ?? 50);
+  }
+  return out;
 }
 
 
@@ -2108,18 +2161,11 @@ export async function getEcosystemSentiment(): Promise<MaybeFailed<EcosystemSent
   const head = market ?? { ...overall, windowDays: window.size, trend: allTrend };
   const [positive, neutral, negative] = toPercents(head.pos, head.neu, head.neg);
 
-  // 테마 막대는 낙관↔비관 양분 구조라 중립을 뺀 대립 비율로 그린다.
+  // 테마 막대는 중립을 뺀 낙관도를 그 테마의 평소와 견준다(loadThemeUsual 주석).
   // 하한·개수는 총평 쪽과 같이 움직여야 한다(THEME_TOP_N 주석 참고).
-  const byTheme = [...agg.entries()]
+  const topThemes = [...agg.entries()]
     .filter(([scope, a]) => scope !== "overall" && a.pos + a.neg >= THEME_MIN_DECIDED)
-    .map(([scope, a]) => ({
-      name: scope,
-      pos: optimismPct(a.pos, a.neg) ?? 50,
-      positive: a.pos,
-      negative: a.neg,
-      total: a.total,
-    }))
-    .sort((x, y) => y.total - x.total)
+    .sort((x, y) => y[1].total - x[1].total)
     .slice(0, THEME_TOP_N);
 
   // 총평은 **기준일분만** 집는다. 파이프라인이 이 문장을 저장할 때 쓴 날짜가 곧 기준일이라
@@ -2129,12 +2175,19 @@ export async function getEcosystemSentiment(): Promise<MaybeFailed<EcosystemSent
   // 예전엔 날짜를 안 보고 최신 한 행을 집었다. 그래서 그날 실행이 실패하면 이틀·사흘 전
   // 문장이 오늘 숫자 옆에 그대로 붙었다(2026-08-04 수집 타임아웃 같은 날). 못 찾으면
   // 문장 없이 숫자만 낸다 — 틀린 기간을 말하는 문장을 붙이는 것보다 없는 편이 낫다.
-  const { data: brief, error: briefErr } = await db
-    .from("telegram_daily_brief")
-    .select("sentiment_summary")
-    .eq("date", base)
-    .maybeSingle();
+  const [{ data: brief, error: briefErr }, usual] = await Promise.all([
+    db.from("telegram_daily_brief").select("sentiment_summary").eq("date", base).maybeSingle(),
+    loadThemeUsual("telegram_sentiment_daily", topThemes.map(([scope]) => scope), [...window].sort()[0]),
+  ]);
   if (briefErr) console.error("[getEcosystemSentiment] 총평 문장을 못 읽었습니다", briefErr);
+  const byTheme = topThemes.map(([scope, a]) => ({
+    name: scope,
+    pos: optimismPct(a.pos, a.neg) ?? 50,
+    usual: usual.get(scope) ?? null,
+    positive: a.pos,
+    negative: a.neg,
+    total: a.total,
+  }));
 
   // 헤드라인은 중립을 뺀 낙관도 — 테마별 막대와 같은 기준으로 맞춘다(위 타입 주석 참고).
   const optimism = optimismPct(head.pos, head.neg) ?? 50;

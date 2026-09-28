@@ -32,6 +32,7 @@ import {
   lastKaderaUpdatedAt,
   loadMarketSentiment,
   loadSentimentTrend,
+  loadThemeUsual,
   optimismPct,
   sentimentWindow,
   todayKstDate,
@@ -407,8 +408,9 @@ export type UsSentiment = {
   /** 큰 숫자·막대·추이를 무엇으로 셌나(국장 EcosystemSentiment.basis 와 같은 뜻) */
   basis: "market" | "all";
   /** 테마별 낙관↔비관(중립 제외). 표본을 같이 넘긴다 — 얇은 테마는 100:0 같은 극단값이
-   *  나오는데, 몇 건 기준인지 보여줘야 그 숫자를 제대로 읽을 수 있다(국장과 같은 규칙). */
-  byTheme: { name: string; pos: number; positive: number; negative: number; total: number }[];
+   *  나오는데, 몇 건 기준인지 보여줘야 그 숫자를 제대로 읽을 수 있다(국장과 같은 규칙).
+   *  usual 은 그 테마의 평소 낙관도(loadThemeUsual). 막대는 평소를 50:50 으로 옮겨 나눈다. 평소가 얇으면 null */
+  byTheme: { name: string; pos: number; usual: number | null; positive: number; negative: number; total: number }[];
   /** 최근 SENTIMENT_TREND_DAYS 일 낙관도(sentimentTrend, 국장과 같은 규칙). 마지막 점이 score 다. 조회 실패면 null */
   trend: SentimentPoint[] | null;
 };
@@ -444,7 +446,7 @@ export type UsIssueKeyword = {
  *    그래서 여기서는 짝이 없다. 미장 총평에 테마 톤을 넣게 되면 그때 같이 맞출 것.
  */
 const US_THEME_TOP_N = 4;
-const US_THEME_MIN_DECIDED = 8;
+const US_THEME_MIN_DECIDED = 20; // 8 → 20(2026-09-29, 국장 THEME_MIN_DECIDED 와 같은 이유)
 
 type UsSentimentRow = {
   date: string;
@@ -532,17 +534,20 @@ export async function getUsSentiment(): Promise<UsSentiment | null> {
     themeAgg.set(r.scope, a);
   }
   // 언급이 많은 테마부터 넷. '가장 밝은 테마'로 세우면 표본 얇은 테마가 늘 위에 선다.
-  const byTheme = [...themeAgg.entries()]
+  // 막대는 그 테마의 평소와 견준다 — 절대값은 늘 밝다(국장 loadThemeUsual 주석).
+  const topThemes = [...themeAgg.entries()]
     .filter(([, a]) => a.pos + a.neg >= US_THEME_MIN_DECIDED)
-    .map(([name, a]) => ({
-      name,
-      pos: optimismPct(a.pos, a.neg) ?? 50,
-      positive: a.pos,
-      negative: a.neg,
-      total: a.total,
-    }))
-    .sort((x, y) => y.total - x.total)
+    .sort((x, y) => y[1].total - x[1].total)
     .slice(0, US_THEME_TOP_N);
+  const usual = await loadThemeUsual("telegram_us_sentiment_daily", topThemes.map(([name]) => name), [...window].sort()[0]);
+  const byTheme = topThemes.map(([name, a]) => ({
+    name,
+    pos: optimismPct(a.pos, a.neg) ?? 50,
+    usual: usual.get(name) ?? null,
+    positive: a.pos,
+    negative: a.neg,
+    total: a.total,
+  }));
 
   return {
     score,
