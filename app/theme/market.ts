@@ -3,7 +3,7 @@ import "server-only";
 import { fmtKoDate } from "@/lib/stock-page";
 import { THEME_NAMES, US_THEME_NAMES, marketThemeHref, themeStockHref, type ThemeMarketKey } from "@/lib/theme-href";
 
-import { THEME_PAGE, US_THEME_PAGE } from "./copy";
+import { KR_THEME_SHORT, THEME_PAGE, US_THEME_PAGE } from "./copy";
 
 /**
  * 테마 리포트의 **시장 한 벌** — 국장·미장이 같은 뷰(ThemeIndexView · ThemeDetailView)를 그리고, 다른 것은 여기 든 것뿐이다.
@@ -12,7 +12,7 @@ import { THEME_PAGE, US_THEME_PAGE } from "./copy";
  */
 export type ThemeMarket = {
   key: ThemeMarketKey;
-  /** 목록 화면의 주소·이름(뒤로 가기 줄 · '테마 전체 보기'). */
+  /** 목록 화면의 주소·이름(뒤로 가기 줄 · '테마 전체 보기'). 이름은 사이드바 서브 항목·목록 제목과 같은 '판세'다. */
   indexHref: string;
   indexLabel: string;
   /** 사전의 테마 이름(사전 순서). 이웃 테마·'n개 테마'가 쓴다. */
@@ -30,7 +30,7 @@ export type ThemeMarket = {
 export const KR_MARKET: ThemeMarket = {
   key: "kr",
   indexHref: THEME_PAGE.href,
-  indexLabel: THEME_PAGE.label,
+  indexLabel: KR_THEME_SHORT,
   themeNames: THEME_NAMES,
   themeHref: (t) => marketThemeHref("kr", t),
   stockHref: (c) => themeStockHref("kr", c),
@@ -42,7 +42,7 @@ export const KR_MARKET: ThemeMarket = {
 export const US_MARKET: ThemeMarket = {
   key: "us",
   indexHref: US_THEME_PAGE.href,
-  indexLabel: US_THEME_PAGE.label,
+  indexLabel: US_THEME_PAGE.short,
   themeNames: US_THEME_NAMES,
   themeHref: (t) => marketThemeHref("us", t),
   stockHref: (c) => themeStockHref("us", c),
