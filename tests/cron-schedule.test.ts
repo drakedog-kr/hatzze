@@ -27,6 +27,27 @@ function hmMin(hm: string): number {
   return h * 60 + m;
 }
 
+/** ci.yml 의 `paths:` 목록들(pull_request · push). 파서 없이 `- "…"` 줄만 모은다. */
+function ciPathLists(): string[][] {
+  const lists: string[][] = [];
+  let cur: string[] | null = null;
+  for (const line of readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8").split("\n")) {
+    if (/^\s+paths:\s*$/.test(line)) {
+      cur = [];
+      lists.push(cur);
+      continue;
+    }
+    if (/^\s*#/.test(line)) continue;
+    const m = line.match(/^\s+- "(.+)"\s*$/);
+    if (cur && m) cur.push(m[1]);
+    else cur = null;
+  }
+  return lists;
+}
+/** 경로 필터 한 줄이 파일을 덮나. ci.yml 은 `dir/**` 와 파일 이름 두 꼴만 쓴다. */
+const covers = (glob: string, file: string) =>
+  glob.endsWith("/**") ? file.startsWith(glob.slice(0, -2)) : glob === file;
+
 describe("vercel.json 과 CRON_TO_JOB", () => {
   it("vercel.json 의 크론은 전부 표에 있다 — 없으면 라우트가 400 만 내고 아무것도 안 던진다", () => {
     for (const c of crons) {
@@ -37,6 +58,14 @@ describe("vercel.json 과 CRON_TO_JOB", () => {
   it("파이프라인은 하루 두 번(아침·저녁)이다", () => {
     const slots = pipelineCrons.map((c) => CRON_TO_JOB[c.schedule].inputs(new Date("2026-09-22T00:00:00Z")).slot);
     assert.deepEqual(slots.sort(), ["evening", "morning"]);
+  });
+
+  it("CI 는 vercel.json 만 바뀐 PR 에서도 돈다 — 경로 필터에서 빠지면 크론만 옮긴 PR 을 위 검사가 못 본다", () => {
+    const lists = ciPathLists();
+    assert.equal(lists.length, 2, "ci.yml 에서 paths 목록 둘(pull_request · push)을 못 찾았다");
+    for (const globs of lists) {
+      assert.ok(globs.some((g) => covers(g, "vercel.json")), `경로 필터에 vercel.json 이 없다: ${globs.join(", ")}`);
+    }
   });
 });
 

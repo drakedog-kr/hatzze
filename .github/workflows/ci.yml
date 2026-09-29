@@ -18,6 +18,8 @@ on:
       - "package.json"
       - "package-lock.json"
       - "tsconfig.json"
+      # tests/cron-schedule.test.ts 가 읽는다. 크론만 옮긴 PR 에서도 표에 있는지 검사해야 한다.
+      - "vercel.json"
       - ".github/workflows/ci.yml"
   push:
     branches: [main]
@@ -30,6 +32,7 @@ on:
       - "package.json"
       - "package-lock.json"
       - "tsconfig.json"
+      - "vercel.json"
 
 jobs:
   routes:
