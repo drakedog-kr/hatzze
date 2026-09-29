@@ -58,7 +58,6 @@ import re
 import sys
 import time
 from datetime import date, datetime, timezone
-from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -69,6 +68,7 @@ from urllib3.exceptions import NewConnectionError  # noqa: E402
 from common import broadcast_content as bc  # noqa: E402
 from common import broadcast_digest as bd  # noqa: E402
 from common.config import ANTHROPIC_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_BROADCAST_CHAT_ID  # noqa: E402
+from common.js_round import js_fixed1, js_round  # noqa: E402
 from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 from common.retry import backoff_delay  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
@@ -170,43 +170,8 @@ TELEGRAM_ATTEMPTS = 3
 
 
 # ─── 프론트와 같은 표시 규칙 ──────────────────────────────────────────────────
-
-
-def _js_quantize(value: float, places: str) -> Decimal:
-    """JS 의 반올림(동점은 큰 쪽)을 배정도 실수의 **정확한 값** 위에서 흉내 낸다.
-
-    Decimal(float) 은 그 double 이 실제로 담고 있는 값을 그대로 받는다(0.1 이 아니라
-    0.1000000000000000055…). JS 의 Math.round·toFixed 도 같은 정확한 값을 기준으로
-    가장 가까운 결과를 고르고 동점이면 큰 쪽을 택하므로, 여기서 ROUND_HALF_UP 을 걸면
-    두 언어가 같은 답을 낸다.
-
-    **산술로 흉내 내면 안 된다.** 처음엔 floor(x*10 + 0.5)/10 으로 썼는데 9.35 에서
-    갈렸다 — 9.35 라는 double 은 실제로 9.34999999999999964… 여서 JS 는 "9.3" 을
-    내는데, ×10 이 부동소수 반올림으로 정확히 93.5 가 되는 바람에 이쪽만 "9.4" 가 됐다.
-    급부상 카드가 "▲9.3배"인데 채널이 "9.4배"라고 말하는, 딱 피하려던 종류의 어긋남이다.
-
-    (JS 의 Math.round 는 음수 동점을 +∞ 쪽으로 보내 ROUND_HALF_UP 과 갈리지만, 여기 쓰는
-    값은 과열도 0~100 과 언급 배수라 둘 다 음수가 될 수 없다.)
-    """
-    return Decimal(value).quantize(Decimal(places), rounding=ROUND_HALF_UP)
-
-
-def js_round(value: float) -> int:
-    """JS 의 Math.round 와 같은 반올림.
-
-    Python 내장 round() 는 은행가 반올림이라 round(2.5)==2 인데 JS 는 3 이다. 도수는
-    사이트가 Math.round 로 찍으므로(app/page.tsx Hero), 같은 규칙을 써야 26℃ 자리에서
-    둘이 1도 어긋나지 않는다.
-    """
-    return int(_js_quantize(value, "1"))
-
-
-def js_fixed1(value: float) -> str:
-    """JS 의 Number.prototype.toFixed(1) 과 같은 문자열.
-
-    급부상 카드가 `s.ratio.toFixed(1)` 로 "9.4배"를 찍는다(app/kadera/page.tsx).
-    """
-    return str(_js_quantize(value, "0.1"))
+#
+# 도수·배수 반올림(js_round·js_fixed1)은 common/js_round.py 에 있다 — 홈 요약도 같은 규칙을 쓴다.
 
 
 def stage_for_score(score: float) -> str:

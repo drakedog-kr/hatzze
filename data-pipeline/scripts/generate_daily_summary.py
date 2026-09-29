@@ -23,6 +23,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
+from common.js_round import js_round  # noqa: E402
 from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 from common.market_sentiment import MARKET_MIN_MESSAGES, load_market_daily  # noqa: E402
 from common.prompt_style import PLAIN_PROSE_RULE  # noqa: E402
@@ -475,7 +476,7 @@ def yeoron_problems(text: str, tone: str, names: list[str]) -> list[str]:
 # 않게 짓는다(받침을 몰라도 된다). 2026-09-28 Haiku(API 폴백 때 쓰는 모델)가 시장 1등이 쉬는 날 세 번 모두
 # "시장 지표 중 금 대비 코스피 상대강도가 가장 높습니다"라고 써서 넣었다 — 그대로 저장하면 거짓이 나간다.
 def _named(r: dict, with_pct: bool = True) -> str:
-    return f"**{r['name']}**({r['capped']:.0f}%)" if with_pct else f"**{r['name']}**"
+    return f"**{r['name']}**({js_round(r['capped'])}%)" if with_pct else f"**{r['name']}**"
 
 
 def hot_fallback(rows: list[dict], hot: dict[str, int]) -> str:
@@ -596,7 +597,7 @@ def trend_lines(recent: list[tuple[str, float]], today: date | None = None) -> l
     lines = ["[최근 추세] 햇쩨 지수(℃) 날짜별"]
     for iso, s in recent:
         d = date.fromisoformat(iso)
-        lines.append(f"- {d.month}월 {d.day}일({_DOW[d.weekday()]}): {s:.0f}℃{day_tag(d, ref)}")
+        lines.append(f"- {d.month}월 {d.day}일({_DOW[d.weekday()]}): {js_round(s)}℃{day_tag(d, ref)}")
     if recent:
         last_iso, last_s = recent[-1]
         last = date.fromisoformat(last_iso)
@@ -608,7 +609,7 @@ def trend_lines(recent: list[tuple[str, float]], today: date | None = None) -> l
             )
             lines.append(
                 f"  ※ 오늘({ref.month}월 {ref.day}일) 값은 아직 없습니다. "
-                f"마지막 줄의 {last_s:.0f}℃는 {when} 값입니다."
+                f"마지막 줄의 {js_round(last_s)}℃는 {when} 값입니다."
             )
     return lines
 
@@ -775,7 +776,7 @@ def build_digest(
     lines: list[str] = []
     if index_lines:
         lines.append(
-            f"[전체] 햇쩨 지수 {score:.0f}℃ · {stage} 구간 · 초고온 구간에 든 지표 {hot_count}개"
+            f"[전체] 햇쩨 지수 {js_round(score)}℃ · {stage} 구간 · 초고온 구간에 든 지표 {hot_count}개"
         )
         if recent:
             lines += trend_lines(recent)
@@ -792,7 +793,7 @@ def build_digest(
     for r in rows:
         hot_mark = " · 초고온" if r["hot"] else ""
         gate_mark = "" if mentionable(r) else "  ← 이 지표는 문장에 쓰지 마세요"
-        lines.append(f"- {r['name']} ({r['category']}): 과열도 {r['capped']:.0f}%{hot_mark}{gate_mark}")
+        lines.append(f"- {r['name']} ({r['category']}): 과열도 {js_round(r['capped'])}%{hot_mark}{gate_mark}")
         if desc and r["name"] in desc_names and r.get("desc"):
             lines.append(f"    뜻: {r['desc']}")
     return "\n".join(lines)
