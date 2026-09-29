@@ -58,6 +58,25 @@ describe("analyzeDrawdown 의 모집단", () => {
     assert.equal(a.recovery.recoveredCount, 1);
     assert.equal(a.recovery.unrecoveredCount, 1);
   });
+  it("deeperCount 는 지금보다 **더** 깊었던 사건만 — 오늘이 진행 중 사건의 바닥이면 그 사건은 안 든다", () => {
+    // 히어로 문장 "지금(X)보다 깊이 잠긴 적은 … N번"이 이 수다. similarCount 를 쓰면 신저점 날마다 하나가
+    // 더 세어져, 같은 화면의 '이보다 깊었던 날: 없음'과 "1번"이 나란히 섰다(deeperThanNowDays 가 고친 것과 같은 병).
+    assert.ok(a?.recovery);
+    // 위 열: 지금 −10% 가 진행 중 사건의 바닥이라 −40% 한 번뿐.
+    assert.equal(a.recovery.deeperCount, 1);
+
+    // 신저점 날: 지금이 이 구간의 최악이다.
+    const low = analyzeDrawdown(bars([100, 110, 105, 112, 120, 118, 121, 115, 100, 90, 80]));
+    assert.ok(low?.recovery);
+    assert.equal(low.deeperThanNowDays, 0);
+    assert.equal(low.recovery.similarCount, 1);
+    assert.equal(low.recovery.deeperCount, 0);
+
+    // 바닥에서 튄 날: 진행 중 사건의 바닥(−33.9%)은 지금(−25.6%)보다 깊었으므로 센다.
+    const bounced = analyzeDrawdown(bars([100, 110, 105, 112, 120, 118, 121, 115, 100, 90, 80, 90]));
+    assert.ok(bounced?.recovery);
+    assert.equal(bounced.recovery.deeperCount, 1);
+  });
   it("지금이 신고가 부근(−1% 안쪽)이면 회복 통계를 내지 않는다", () => {
     const b = analyzeDrawdown(bars([100, 90, 100, 99.5]));
     assert.ok(b);
