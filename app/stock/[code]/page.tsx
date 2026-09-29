@@ -220,6 +220,10 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
     // 배당 카드 — 배당으로 살기가 열리기 전엔 안 그린다(링크가 404 로 간다). 기본키 조회 셋뿐이라 464장에도 가볍다.
     DIVIDEND_PUBLIC ? getStockDividend(d.code) : Promise.resolve(null),
   ]);
+  // 곁다리 넷도 실패하면 폴백(`[]` · `null`)을 돌려줘 그 칸만 빠진다 — 배당 카드가 빠지면 배당 자료가 없는 종목과 똑같이 보인다.
+  // 위의 검사는 이 조회들 **앞**이라 못 본다. 한 번 더 던져 칸 빠진 화면이 사본(ISR)에 한 시간 담기지 않게 한다
+  // (lib/load-state.ts — kadera 도 따로 받은 구간 뒤에 다시 부른다). 재생성이면 마지막 성공본이 그대로 나간다.
+  assertLoaded("/stock/[code]");
   // 그날 등락률. 파이프라인이 KRX 확정값을 채웠으면 그것, 아니면 stocks 의 값이 **그 날짜일 때만** 쓴다
   // (이 화면은 야후를 안 부른다 — lib/stock-page.ts 머리말 ①). 둘 다 아니면 까닭만 보여준다.
   const whyRate = why ? (why.changeRate ?? (d.priceDate === why.date ? d.changeRate : null)) : null;
