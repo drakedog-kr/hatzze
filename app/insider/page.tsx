@@ -190,7 +190,9 @@ export default async function InsiderPage() {
   const bigTrim = top(ov.managerTrims);
   const highlights = [
     bigBuy && {
-      label: "임원이 크게 내놓은 곳",
+      // ⚠️ 카드의 [0] 이 **장내 매수가 앞선 종목**일 수 있다 — 그때 value 는 산 금액이다
+      //    (InsiderActivity.direction). 말을 방향에서 골라야 "샀다"를 "내놓았다"로 적지 않는다.
+      label: bigBuy.direction === "buy" ? "임원이 장내에서 크게 산 곳" : "임원이 크게 내놓은 곳",
       href: insiderListHref("exec"),
       ticker: bigBuy.ticker,
       name: bigBuy.name,

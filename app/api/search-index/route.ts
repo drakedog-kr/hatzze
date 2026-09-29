@@ -1,4 +1,4 @@
-import { isLoadFailed } from "@/lib/load-state";
+import { LoadFailedError, isLoadFailed } from "@/lib/load-state";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import {
   KADERA_WINDOW_DAYS,
@@ -41,8 +41,14 @@ import { US_WINDOW_DAYS, getUsSurgingStocks, getUsThemeRotation, usKaderaBaseDat
  *
  * ## 실패는 따로따로
  *
- * 국장 종목 목록을 못 읽으면 503(검색이 설 자리가 없다). 나머지(언급 수·미장·추천·테마)는 각자 비워서
+ * 국장 종목 목록을 못 읽으면 던진다(검색이 설 자리가 없다). 나머지(언급 수·미장·추천·테마)는 각자 비워서
  * 보낸다 — 추천 하나가 삐끗했다고 종목 검색까지 막을 까닭이 없다.
+ *
+ * ⚠️ 503 을 **돌려주면 안 된다.** 이 라우트는 ISR 이라 Next 가 응답 상태까지 사본에 담는다 — 재생성 때
+ *    DB 가 한 번 삐끗하면 그 503 이 마지막 성공본을 덮고 한 시간 동안 모든 ⌘K 가 "불러오지 못했습니다"다.
+ *    던지면 마지막 성공본이 남고 다음 요청에서 다시 만든다(lib/load-state.ts 와 같은 원리). 사본이 없을 때는
+ *    500 이 나가는데, 팔레트는 ok 가 아닌 응답을 모두 같은 오류로 받는다. 빌드 때 던지면 빌드가 멈춘다 —
+ *    assertLoaded 로 던지는 다른 화면과 같다.
  *
  * 한 시간마다 새로 만든다(목록과 집계가 하루 두 번 파이프라인에서만 바뀐다).
  */
@@ -169,9 +175,8 @@ export async function GET() {
   const base = await kaderaBaseDate();
   const krList = loadKr(base);
   const [kr, us, themes, trend] = await Promise.all([krList, loadUs(), loadThemes(), loadTrend(krList)]);
-  if (kr === null) {
-    return Response.json({ error: "종목 목록을 불러오지 못했습니다" }, { status: 503 });
-  }
+  // 503 을 돌려주지 않고 던진다 — 돌려준 503 은 사본에 담긴다(머리말 '실패는 따로따로').
+  if (kr === null) throw new LoadFailedError("/api/search-index", ["stocks"]);
   const body: SearchIndex = { kr, us, trend, themes, asOf: base };
   return Response.json(body);
 }

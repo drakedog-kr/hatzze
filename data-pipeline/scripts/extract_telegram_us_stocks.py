@@ -51,7 +51,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from common.quoted_move import own_move_after  # noqa: E402
-from common.supabase_client import get_client  # noqa: E402
+from common.supabase_client import execute_with_retry, get_client  # noqa: E402
 from config.us_stock_extraction import (  # noqa: E402
     HOUSE_METHOD,
     NAME_EXCLUDE,
@@ -62,12 +62,13 @@ from config.us_stock_extraction import (  # noqa: E402
     sanity_check,
 )
 
-# 매칭 기계는 국내 스크립트 것을 그대로 쓴다(위 docstring 참고).
+# 매칭 기계는 국내 스크립트 것을 그대로 쓴다(위 docstring 참고). 표 갈아 끼우기(replace_rows)도 같다.
 from extract_telegram_stocks import (  # noqa: E402
     MASK_CHAR,
     URL_RE,
     boundary_ok,
     build_pattern,
+    replace_rows,
 )
 
 NEG_RE = {name: re.compile(pat) for name, pat in NEGATIVE_CONTEXT.items()}
@@ -194,29 +195,34 @@ def sync_master(db, dry_run: bool) -> None:
     (실측: 채운 다음 실행에서 다시 177개를 채우고 있었다). 이 저장소가 details 열에서
     이미 배운 것과 같다 — **통째로 대입하지 말고 병합할 것.**
     그래서 저장 직전에 기존 값을 읽어 합친다. SEC 가 죽은 날에도 이름이 안 사라진다.
+    (정확히는 **다른 행에 실린** 열이 덮인다 — postgrest-py 가 행 키의 합집합을 열 목록으로 보낸다.
+    어느 행에도 안 실은 열은 그대로 둔다. 기존 값을 못 읽은 날은 그 길로 간다.)
     """
     names = primary_names()
     rows = [{"ticker": tk, "name_ko": name} for tk, name in names.items()]
 
-    stored_en: dict[str, str] = {}
     try:
-        for r in db.table("us_stocks").select("ticker,name_en").execute().data or []:
-            if r.get("name_en"):
-                stored_en[r["ticker"]] = r["name_en"]
+        stored = execute_with_retry(db.table("us_stocks").select("ticker,name_en")).data or []
     except Exception as exc:
         print(f"[경고] us_stocks 를 못 읽었습니다({exc}). 영문명은 이번에 건드리지 않습니다.")
-        stored_en = {}
+        stored = None
 
-    need = {tk for tk in names if tk not in stored_en}
-    fetched = fetch_sec_names(need) if need else {}
-    if need:
-        missing = need - set(fetched)
-        print(f"[SEC] 영문명 {len(fetched)}/{len(need)}종목 받음"
-              f"{'' if not missing else ' · 못 찾은 것: ' + ', '.join(sorted(missing))}")
+    # 못 읽은 날은 기존 값을 몰라 병합할 수 없다 — name_en 을 **어느 행에도** 싣지 않는다. 그래야
+    # upsert 가 그 열을 안 건드린다(postgrest-py 는 행 키의 합집합을 열 목록으로 보낸다). 예전엔 이날
+    # 전 종목을 빈 칸으로 보고 SEC 를 불렀고, SEC 까지 실패하면 null 을 실어 저장된 이름을 다 지웠다.
+    # SEC 도 안 부른다. 빈 칸은 다음 실행이 메운다.
+    if stored is not None:
+        stored_en = {r["ticker"]: r["name_en"] for r in stored if r.get("name_en")}
+        need = {tk for tk in names if tk not in stored_en}
+        fetched = fetch_sec_names(need) if need else {}
+        if need:
+            missing = need - set(fetched)
+            print(f"[SEC] 영문명 {len(fetched)}/{len(need)}종목 받음"
+                  f"{'' if not missing else ' · 못 찾은 것: ' + ', '.join(sorted(missing))}")
 
-    # 받은 것 + 이미 있던 것. 둘 다 없으면 null 을 그대로 실어 열을 비워 둔다.
-    for r in rows:
-        r["name_en"] = fetched.get(r["ticker"]) or stored_en.get(r["ticker"])
+        # 받은 것 + 이미 있던 것. 둘 다 없으면 null 을 그대로 실어 열을 비워 둔다.
+        for r in rows:
+            r["name_en"] = fetched.get(r["ticker"]) or stored_en.get(r["ticker"])
 
     if dry_run:
         print(f"[dry-run] us_stocks {len(rows)}종목 (upsert 안 함)")
@@ -340,20 +346,16 @@ def main() -> None:
         return
 
     # 예외 없이 0건으로 끝나는 고장을 막는다(사전이 깨지거나 조회가 빈 경우).
-    # 아래 delete 가 먼저 도므로, 이 가드가 없으면 **표를 비우고 아무것도 안 넣는다.**
+    # 아래 갈아 끼우기는 이번에 없는 행을 지우므로, 이 가드가 없으면 **표를 비우고 아무것도 안 넣는다.**
     # 문턱을 비율이 아니라 0 으로 둔 이유는 fetch_telegram 과 같다 — 12만 건에서
     # 미국 언급이 0이면 그건 시장 상황이 아니라 고장이다.
     if not rows:
         print("[오류] 미국 종목 언급이 0건입니다. 기존 데이터를 지우지 않고 멈춥니다.")
         sys.exit(1)
 
-    # 재실행 = 전량 삭제 후 삽입. 사전을 고치면 과거분까지 소급 반영된다(국내와 같다).
-    db.table("telegram_message_us_stocks").delete().neq(
-        "id", "00000000-0000-0000-0000-000000000000"
-    ).execute()
-    # 한 요청이 크면 statement timeout 에 걸린다. 다른 쓰기와 같은 500행 단위.
-    for i in range(0, len(rows), 500):
-        db.table("telegram_message_us_stocks").insert(rows[i : i + 500]).execute()
+    # 재실행 = 전량 갈아 끼우기. 사전을 고치면 과거분까지 소급 반영된다(국내와 같다).
+    # 도중에 죽어도 표가 반쯤 비지 않게 국내 쪽 replace_rows 로 한다(그 docstring 참고).
+    replace_rows(db, "telegram_message_us_stocks", rows, "channel_handle,message_id,ticker")
     print(f"\n[Supabase] telegram_message_us_stocks {len(rows):,}건 저장 완료")
 
 

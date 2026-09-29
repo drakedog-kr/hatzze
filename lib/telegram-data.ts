@@ -6,8 +6,10 @@ import { channelPhotoUrl } from "@/lib/channel-photo";
 import { sentimentTone } from "@/lib/format";
 import { THEMES } from "@/lib/stock-themes";
 import { LOAD_FAILED, type MaybeFailed } from "@/lib/load-state";
+import { RISING_WINDOW_DAYS, channelDeltas, type ChannelDelta, type ChannelSnapshot } from "@/lib/rising-channels";
 import { MIN_RECENT_MENTIONS, scoreSurging } from "@/lib/surging-score";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
+import { trendingTodayStartISO } from "@/lib/trending-window";
 import { changeRateOf, fetchYahooQuote } from "@/lib/yahoo-quote";
 
 // 카더라 리포트 데이터 접근 계층. telegram_* 테이블은 비공개(공개 read 없음)라
@@ -1015,33 +1017,9 @@ export type TrendingMessage = {
  *
  * "today"는 일수가 아니라 KST 달력 기준이다 — 화면 라벨이 "오늘"이라 24시간
  * 롤링(daysAgoISO(1))으로 하면 어제 저녁 글이 늘 오늘 것으로 섞인다.
- * 다만 오전 첫 수집 전에는 전날 0시부터로 잡는다(아래 trendingTodayStartISO).
+ * 다만 오전 첫 수집 전에는 전날 0시부터로 잡는다(lib/trending-window.ts 의 trendingTodayStartISO).
  */
 export type TrendingWindow = "today" | number;
-
-/** 수집 워크플로우의 첫 실행 시각(KST). .github/workflows/daily-update.yml 의 cron 과 맞춘다. */
-const FIRST_COLLECTION_HOUR_KST = 9;
-
-/**
- * '오늘' 창의 시작 시각.
- *
- * KST 오늘 0시로 그냥 잡으면 자정 직후 이 카드가 통째로 빈다 — 수집이 09시·17시에만
- * 돌아서 새벽에는 오늘 글이 DB 에 아예 없기 때문이다(실측 KST 2026-07-22 00:31:
- * 오늘 0건 / 어제 471건). 볼 게 없는 게 아니라 아직 안 담긴 것뿐인데 "아직 화제
- * 메시지가 없습니다" 만 뜬다.
- *
- * 그래서 첫 수집이 도는 09시 전에는 전날 0시를 창 시작으로 쓴다. 09시가 지나면
- * 그날 글이 담기므로 자연스럽게 오늘 0시로 넘어간다.
- */
-function trendingTodayStartISO(): string {
-  // Date.now()+9h 의 UTC 시각 = KST 시각(todayKstDate 와 같은 방식).
-  const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
-  const start = new Date(`${todayKstDate()}T00:00:00+09:00`);
-  if (kstNow.getUTCHours() < FIRST_COLLECTION_HOUR_KST) {
-    start.setUTCDate(start.getUTCDate() - 1);
-  }
-  return start.toISOString();
-}
 
 /** 트렌딩 메시지 TOP N (창: windowDays). 점수는 view가 지배적이라 view순으로 후보를 좁힌 뒤 정확 점수로 정렬. */
 /** 화면 탭 ↔ 저장 키. 파이프라인(calculate_telegram_trending.py)의 WINDOWS 와 같아야 한다. */
@@ -1861,49 +1839,28 @@ export type RisingChannel = {
  */
 export async function getRisingChannels(limit = 10): Promise<RisingChannel[]> {
   const db = getSupabaseAdmin();
-  // 채널 하나당 하루 한 행이라 8일 창은 채널 수 × 8 이다 — 채널이 317개면 2,500행이
+  // 창(최신 스냅샷일과 그 7일 전)은 channelDeltas 가 자른다. 조회는 최신일이 어제(아침 수집 전)여도
+  // 7일 전까지 닿게 KST 로 하루 넉넉히 받는다(lib/rising-channels.ts 머리 주석).
+  // 채널 하나당 하루 한 행이라 채널 수 × 9 행이다 — 채널이 317개면 2,800행이
   // 넘어 페이징 없이는 1,000행에서 조용히 잘린다. 잘리면 대부분 채널이 스냅샷 한 개만
-  // 잡혀 아래 `arr.length < 2` 에서 탈락하고, 증감 순위가 실제와 무관해진다.
-  const data = await fetchAllRows<{ channel_handle: string; date: string; subscriber_count: number | null }>(
+  // 잡혀 스냅샷 둘 미만으로 탈락하고, 증감 순위가 실제와 무관해진다.
+  const data = await fetchAllRows<ChannelSnapshot>(
     "id",
     () =>
       db
         .from("telegram_channel_stats")
         .select("channel_handle,date,subscriber_count")
-        .gte("date", daysAgoISO(8).slice(0, 10)),
+        .gte("date", daysAgoKstDate(RISING_WINDOW_DAYS + 1)),
   );
 
-  const byCh = new Map<string, { d: string; s: number }[]>();
-  for (const r of data ?? []) {
-    if (r.subscriber_count == null) continue;
-    const arr = byCh.get(r.channel_handle) ?? [];
-    arr.push({ d: r.date, s: r.subscriber_count });
-    byCh.set(r.channel_handle, arr);
-  }
-  // 스냅샷은 백필이 안 돼 오늘부터 하루씩 쌓인다 — 지금 잰 구간이 며칠인지 그대로 알린다.
-  const snapDates = [...new Set((data ?? []).map((r) => r.date))].sort();
-  const spanDays = snapDates.length
-    ? Math.round(
-        (new Date(snapDates[snapDates.length - 1]).getTime() - new Date(snapDates[0]).getTime()) / (24 * 60 * 60 * 1000),
-      )
-    : 0;
+  const { deltas, spanDays } = channelDeltas(data ?? []);
 
-  type Delta = { handle: string; subscriberCount: number; delta: number };
-  const real: Delta[] = [];
-  const flat: Delta[] = [];
-  for (const [h, arr] of byCh) {
-    if (arr.length < 2) continue;
-    arr.sort((a, b) => a.d.localeCompare(b.d));
-    const delta = arr[arr.length - 1].s - arr[0].s;
-    (delta > 0 ? real : flat).push({
-      handle: h,
-      subscriberCount: arr[arr.length - 1].s,
-      delta,
-    });
-  }
+  const real: ChannelDelta[] = [];
+  const flat: ChannelDelta[] = [];
+  for (const d of deltas) (d.delta > 0 ? real : flat).push(d);
   // 증감이 같으면 handle 로 가른다 — 정수라 동점이 흔하고(특히 0), 동점을 안 가르면
   // 순서가 DB 행 순서에 딸려 흔들린다(채널 랭킹에서 실제로 겪었다).
-  const byDelta = (a: Delta, b: Delta) => b.delta - a.delta || a.handle.localeCompare(b.handle);
+  const byDelta = (a: ChannelDelta, b: ChannelDelta) => b.delta - a.delta || a.handle.localeCompare(b.handle);
   real.sort(byDelta);
   flat.sort(byDelta);
 
@@ -2048,8 +2005,10 @@ const THEME_MIN_DECIDED = 20;
  * 실측(k=5): 반도체 122:103 54% → 54%(불변), 전체 64% → 64%(불변),
  *            인터넷·플랫폼 82:0 100% → 95%, 하한(8:0) 100% → 72%.
  *
- * ⚠️ 파이프라인 optimism()(generate_telegram_narratives.py)과 **같은 식·같은 k** 여야 한다.
- * 총평 문장이 인용하는 숫자와 그 옆 막대가 갈리면 확인할 방법이 없는 값이 화면에 나간다.
+ * ⚠️ 파이프라인 optimism()(generate_telegram_narratives.py)과 **같은 식·같은 k·같은 반올림**이어야 한다.
+ * 총평 문장이 인용하는 숫자와 그 옆 막대가 갈리면 확인할 방법이 없는 값이 화면에 나간다. 반올림은 여기
+ * Math.round(동점은 큰 쪽)가 기준이고 파이썬 쪽이 ROUND_HALF_UP 으로 맞춘다 — 내장 round() 로 두었을 때
+ * 145:85(62.5)를 화면은 63, 총평은 62 로 말했다(data-pipeline/tests/test_optimism_rounding.py).
  */
 const SENTIMENT_PRIOR = 5;
 

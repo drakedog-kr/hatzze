@@ -23,20 +23,21 @@ function Reading({ data, periodLabel }: { data: MddResult; periodLabel: string }
 
   // 1 — 얼마나 드문 깊이인가.
   //
-  // ⚠️ 두 수는 모집단이 다르다. bigDrops 는 −20% 보다 깊은 사건만(depthHistogram), similarCount 는
+  // ⚠️ 두 수는 모집단이 다르다. bigDrops 는 −20% 보다 깊은 사건만(depthHistogram), deeperCount 는
   //    깊이와 상관없이 **지금보다 깊었던** 사건 전부(recoveryStats)다. 지금 낙폭이 −20% 보다
   //    얕으면 뒤가 앞보다 커진다(NVDA −2.3% 일 때 7 vs 64, 2026-09-09 실측). 그래서 뒤 문장을
   //    "그중" 으로 앞에 묶지 않고, 지금 낙폭을 적어 자기 모집단을 스스로 말하게 한다.
+  // ⚠️ similarCount(같거나 더 깊었던)가 아니다 — 신저점 날에는 진행 중 사건 자신이 세어져 "없음" 옆에 "1번"이 선다.
   const bigDrops = a.depthBuckets.reduce((s, d) => s + d.count, 0);
   if (bigDrops > 0) {
     paras.push(
       <p key="depth" style={p}>
         {periodLabel} 동안 <b style={b()}>−20%보다 깊이</b> 잠긴 구간은 {bigDrops}번이었고, 가장 깊었던 때는{" "}
         <b style={b()}>{fmtPct(a.mdd)}</b>였습니다.
-        {a.recovery && a.recovery.similarCount > 0 && (
+        {a.recovery && a.recovery.deeperCount > 0 && (
           <>
             {" "}
-            지금({fmtPct(a.currentDd)})보다 깊이 잠긴 적은 같은 기간에 {a.recovery.similarCount}번입니다.
+            지금({fmtPct(a.currentDd)})보다 깊이 잠긴 적은 같은 기간에 {a.recovery.deeperCount}번입니다.
           </>
         )}
       </p>,

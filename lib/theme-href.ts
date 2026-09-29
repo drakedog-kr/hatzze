@@ -107,7 +107,8 @@ export function usThemeFromParam(param: string): string | null {
   } catch {
     return null;
   }
-  return name in US_THEMES ? name : null;
+  // `in` 이 아니라 자기 키만 본다 — `in` 은 Object.prototype 까지 봐서 constructor·toString 같은 주소가 테마로 통했다.
+  return Object.hasOwn(US_THEMES, name) ? name : null;
 }
 
 // ─── 두 시장을 한 손잡이로 ──────────────────────────────────────────────
@@ -142,5 +143,6 @@ export function themeFromParam(param: string): string | null {
   } catch {
     return null;
   }
-  return name in THEMES ? name : null;
+  // 자기 키만 본다. `in` 이면 /theme/constructor 가 404 대신 엉뚱한 주소로 넘어가고 메타데이터가 500 을 냈다.
+  return Object.hasOwn(THEMES, name) ? name : null;
 }

@@ -180,6 +180,16 @@ def main() -> None:
 
     sidecar_entries = search_market_actions(SIDECAR_KEYWORD, fetch_start, today)
     cb_entries = search_market_actions(CIRCUIT_BREAKER_SEARCH_KEYWORD, fetch_start, today)
+    # '매매거래중단' 검색엔 개별종목 매매정지(SPAC 합병 등)가 늘 섞여 나온다(모듈 docstring).
+    # 1년 넘는 기간에 그것마저 0건이면 조용한 시장이 아니라 페이지를 못 읽은 것이다 — 점검
+    # 안내 같은 200 응답이나 마크업 변경으로 정규식이 하나도 안 걸린 경우. 그대로 가면 366일치가
+    # 전부 0 으로 덮이는데, 오늘 날짜 행이 생기니 check_freshness 도 못 잡는다. 여기서 멈춰 이전
+    # 값을 지킨다. 사이드카 0건은 보지 않는다 — 사이드카 없는 1년은 실제로 있을 수 있다.
+    if not cb_entries:
+        raise RuntimeError(
+            f"KIND '{CIRCUIT_BREAKER_SEARCH_KEYWORD}' 검색 결과를 한 건도 못 읽었습니다 — "
+            "페이지 구조가 바뀌었거나 결과 대신 안내 페이지가 왔을 수 있습니다"
+        )
 
     sidecars = classify_sidecar(sidecar_entries)
     buy_dates = [d for direction, d in sidecars if direction == "buy"]

@@ -361,6 +361,27 @@ def reconcile_years(r: dict, hist: list[dict], today: date) -> None:
     r["growth_5y_pct"] = growth
 
 
+def apply_payments(r: dict, hist: list[dict], today: date) -> str | None:
+    """stockanalysis 지급 건으로 12개월 합·지급 달·다음 지급을 채운다. SEC 값과 10% 넘게 갈리면 그 한 줄을 돌려준다."""
+    paid, nxt = trailing(hist, today)
+    # ⚠️ 지급 기록은 있는데 지난 365일 지급도, 선언된 다음 건도 없으면 배당을 끊은 것이다 — 0 으로 적는다.
+    #    SEC 로 물러나면 '마지막 네 분기'(FRESH_DAYS 400일 안쪽) 합이라 끊기 전 배당으로 수익률이 나간다.
+    #    기록이 아예 없거나(안 주는 종목 · 표 모양이 바뀌어 행을 못 읽은 날) 다음 건이 선언돼 있으면
+    #    (연 1회 지급이 작년보다 며칠 늦은 경우) 예전처럼 SEC 값을 둔다.
+    if not paid and (not hist or nxt):
+        return None
+    sa_ttm = round(sum((p["amount"] for p in paid), 0.0), 4)
+    gap = f"{r['ticker']} SA {sa_ttm} vs SEC {r['ttm_dps']}" if r["ttm_dps"] > 0 and abs(sa_ttm - r["ttm_dps"]) / r["ttm_dps"] > SEC_SA_GAP else None
+    r["ttm_dps"] = sa_ttm
+    r["ttm_method"] = "sa"
+    r["ttm_payments"] = [{"pay": p["pay"], "amount": p["amount"], "ex": p.get("ex")} for p in paid]
+    r["pay_months"] = sorted({int(p["pay"][5:7]) for p in paid})
+    if nxt:
+        r["next_pay_date"], r["next_pay_amount"] = nxt["pay"], nxt["amount"]
+    reconcile_years(r, hist, today)
+    return gap
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
@@ -459,19 +480,9 @@ def main() -> None:
             # 배당성향(지난 12개월 배당 ÷ 주당순이익)과 해마다 늘려 온 햇수 — 표 위 요약 칸(마이그레이션 078).
             r["payout_pct"] = stats["payout_pct"]
             r["growth_years"] = stats["growth_years"]
-            paid, nxt = trailing(hist, today)
-            if not paid:
-                continue
-            sa_ttm = round(sum(p["amount"] for p in paid), 4)
-            if r["ttm_dps"] > 0 and abs(sa_ttm - r["ttm_dps"]) / r["ttm_dps"] > SEC_SA_GAP:
-                gaps.append(f"{r['ticker']} SA {sa_ttm} vs SEC {r['ttm_dps']}")
-            r["ttm_dps"] = sa_ttm
-            r["ttm_method"] = "sa"
-            r["ttm_payments"] = [{"pay": p["pay"], "amount": p["amount"], "ex": p.get("ex")} for p in paid]
-            r["pay_months"] = sorted({int(p["pay"][5:7]) for p in paid})
-            if nxt:
-                r["next_pay_date"], r["next_pay_amount"] = nxt["pay"], nxt["amount"]
-            reconcile_years(r, hist, today)
+            gap = apply_payments(r, hist, today)
+            if gap:
+                gaps.append(gap)
             if i % 50 == 0:
                 print(f"[SA] {i}/{len(rows)}")
         print(f"[SA] 페이지 없음 {len(sa_missing)} {sa_missing[:6]} · 파싱 실패 {len(sa_fail)} {sa_fail[:6]} · SEC 와 10% 넘게 갈린 종목 {len(gaps)}"

@@ -346,7 +346,8 @@ def ask_once(client, batch: list[tuple[str, str, str]]) -> dict[str, str]:
 
 
 def ask(client, batch: list[tuple[str, str, str]], retries: int = REASON_RETRIES) -> dict[str, str]:
-    """[(code, name, digest)] → {code: reason}. 까닭을 못 얻은 종목은 빈 문자열이다.
+    """[(code, name, digest)] → {code: reason}. 모델이 '까닭 없음'이라 답한 종목은 빈 문자열이고,
+    끝내 쓸 문장을 못 얻은 종목(호출이 다 깨졌거나 검수에 다 걸렸다)은 **결과에 없다.**
 
     ⭐ **검수에 걸린 문장은 다시 묻는다**(2026-09-10). 종목 내러티브·히어로 요약은 진작
     재시도 루프를 갖고 있는데(text_check 모듈 머리말 '쓰는 법') 여기만 없었다. 모델이
@@ -356,6 +357,12 @@ def ask(client, batch: list[tuple[str, str, str]], retries: int = REASON_RETRIES
     ⛔ **모델이 빈 문자열로 답한 것은 다시 안 묻는다.** 그건 "발췌에 까닭이 없다"는 정직한
        답이라(SYSTEM 프롬프트가 그렇게 시킨다) 조르면 지어내라는 압박이 된다. 다시 묻는
        것은 ⑴ 응답에 아예 없던 종목과 ⑵ 썼는데 검수에 걸린 종목뿐이다.
+
+    ⛔ **못 얻은 것을 빈 문자열로 채우지 않는다.** 한때 채웠더니 run_market 이 NULL 로 저장했다.
+       NULL 은 "까닭을 말한 글이 없다"(마이그레이션 066)라 종목 화면이 "말한 곳이 없습니다"를
+       띄우고, 같은 날짜를 다시 만드는 실행(토요일 10:30 판 → 저녁 실행 · move-reasons-rerun)은
+       과부하(529)가 한 번 길게 이어지면 앞 실행의 멀쩡한 까닭을 그 NULL 로 덮었다.
+       빠진 종목은 저장부가 건너뛴다.
     """
     out: dict[str, str] = {}
     todo = list(batch)
@@ -389,7 +396,6 @@ def ask(client, batch: list[tuple[str, str, str]], retries: int = REASON_RETRIES
     for code, name, _d in todo:
         if code not in out:
             print(f"  [포기] {name}: {retries + 1}번 물었는데 쓸 문장을 못 얻었습니다")
-            out[code] = ""
     return out
 
 
@@ -595,10 +601,17 @@ def run_market(db, client, cfg: dict, day: str, dry_run: bool) -> int:
             print(f"  [{tag} 배치 {i // BATCH + 1}] 실패: {type(exc).__name__}: {exc}")
 
     # 8) 저장. 까닭이 빈 종목도 저장한다(화면이 "말한 곳이 없다"고 적는다).
+    #    ⛔ 단 **까닭을 못 얻은 종목(reasons 에 없다)은 안 쓴다**(ask 독스트링). 모델이 답한 적
+    #       없는 종목을 NULL 로 쓰면 앞 실행의 까닭을 지우고 "말한 곳이 없습니다"를 띄운다.
     now = datetime.now(timezone.utc).isoformat()
     out_rows = []
+    missed = 0
     for code, name, _d in digests:
-        r = reasons.get(code, "")
+        if code not in reasons:
+            missed += 1
+            print(f"  [{tag} {name}] 까닭을 못 얻어 저장하지 않습니다 — 앞 실행의 행이 있으면 그대로 둡니다")
+            continue
+        r = reasons[code]
         out_rows.append({
             "date": day, key: code, "reason": r or None,
             "quoted_change_rate": quoted.get(code), "move_msgs": move_msgs.get(code, 0),
@@ -615,7 +628,9 @@ def run_market(db, client, cfg: dict, day: str, dry_run: bool) -> int:
     #    2026-09-07 에 문턱을 2 → 3 으로 올리고 다시 돌렸는데 표가 40 → 45행이 되고 걸러냈어야
     #    할 두 종목이 그대로 카드에 남아 있었다(신라에스지·케이엠제약). 규칙을 바꿔도 화면이
     #    안 바뀌면 여기를 볼 것 — 이 표는 '그날 것을 다시 만든다'가 아니라 '덮어쓴다' 였다.
-    keep = {r[key] for r in out_rows}
+    # ⚠️ 남길 것은 **저장한 행이 아니라 후보 전부**다. 위에서 못 얻은 종목을 건너뛰므로 저장한
+    #    행으로 세면 호출이 다 깨진 날 그날 표가 통째로 지워진다.
+    keep = {code for code, _n, _d in digests}
     stale = [
         r[key]
         for r in (db.table(cfg["table"]).select(key).eq("date", day).range(0, 999).execute().data or [])
@@ -624,7 +639,10 @@ def run_market(db, client, cfg: dict, day: str, dry_run: bool) -> int:
     if stale:
         db.table(cfg["table"]).delete().eq("date", day).in_(key, stale).execute()
         print(f"[정리] 후보에서 빠진 {len(stale)}행 삭제")
-    print(f"[Supabase] {cfg['table']} {len(out_rows)}행 저장 (까닭 있음 {sum(1 for r in out_rows if r['reason'])})")
+    print(
+        f"[Supabase] {cfg['table']} {len(out_rows)}행 저장 (까닭 있음 {sum(1 for r in out_rows if r['reason'])})"
+        + (f" · 못 얻어 건너뜀 {missed}" if missed else "")
+    )
     return len(out_rows)
 
 

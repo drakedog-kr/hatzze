@@ -48,24 +48,40 @@ TREND_W_REPLIES = 1.5
 
 STORE_N = 36                 # 화면이 6건씩 세 번 펼친다
 STOCK_TAGS_PER_MESSAGE = 3
-FIRST_COLLECTION_HOUR_KST = 9
+# ⚠️ 국내(calculate_telegram_trending.py)·lib/trending-window.ts 와 같은 값이어야 한다 — 거기
+#    주석 참고(아침 트렌딩 스텝이 'KRX 공표(08:00 KST) 대기' 뒤라 08시다).
+FIRST_COLLECTION_HOUR_KST = 8
 
 WINDOWS: list[tuple[str, int | None]] = [("today", None), ("w7", 7), ("w30", 30)]
 
 
-def window_start(days: int | None) -> datetime:
+def window_start(days: int | None, now: datetime | None = None) -> datetime:
     """창의 시작 시각. `days` 가 None 이면 '오늘' 창.
 
     '오늘' 창은 자정에 갑자기 비지 않도록 첫 수집 시각 전에는 어제 0시로 물러난다
     (국내와 같은 규칙).
+
+    ⚠️ 화면(getUsTrendingMessages)은 저장된 시작점을 대조하지 않고 그대로 싣는다. 여기서
+    '어제 0시'를 저장하면 저녁 실행까지 어제 글이 대부분인 목록이 '오늘' 탭에 뜬다.
     """
     if days is not None:
-        return datetime.now(timezone.utc) - timedelta(days=days)
-    kst_now = datetime.now(KST)
+        return (now or datetime.now(timezone.utc)) - timedelta(days=days)
+    kst_now = (now or datetime.now(KST)).astimezone(KST)
     start = kst_now.replace(hour=0, minute=0, second=0, microsecond=0)
     if kst_now.hour < FIRST_COLLECTION_HOUR_KST:
         start -= timedelta(days=1)
     return start
+
+
+def in_window(rows: list[dict], start: datetime) -> list[dict]:
+    """posted_at 이 start 이후인 행.
+
+    ⚠️ **문자열로 견주지 않는다.** DB 는 posted_at 을 UTC('+00:00')로 주는데 '오늘' 창의
+    start 는 KST('+09:00')다. 글자로 견주면 00~09시 KST 글이 UTC 로는 전날 날짜라 통째로
+    빠져, '오늘' 목록이 사실상 09시부터였다 — 하필 미국 얘기가 가장 많은 새벽 마감 시간대다.
+    국내는 같은 값을 PostgREST(.gte)에 넘겨 DB 가 시각으로 견주므로 이 함정이 없다.
+    """
+    return [m for m in rows if datetime.fromisoformat(m["posted_at"]) >= start]
 
 
 # 공백 포함 이 글자 수 미만인 본문은 트렌딩에 안 올린다(국장 calculate_telegram_trending.MIN_TEXT_CHARS 와 같은 값).
@@ -176,7 +192,7 @@ def main() -> None:
     for key, days in WINDOWS:
         start = window_start(days)
         iso = start.isoformat()
-        rows = [m for m in us_meta if m["posted_at"] >= iso]
+        rows = in_window(us_meta, start)
         rows.sort(key=lambda m: -score(m))
         picked[key] = rows[:STORE_N]
         print(f"[트렌딩] {key}: 후보 {len(rows):,}건 → {len(picked[key])}건 (창 시작 {iso})")

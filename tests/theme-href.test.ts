@@ -38,6 +38,13 @@ describe("theme-href", () => {
     assert.equal(themeFromParam("no-such-theme"), null);
     assert.equal(themeFromParam("%E0%A4%A"), null);
   });
+  it("객체 기본 속성 이름(constructor 등)은 사전의 테마가 아니다", () => {
+    // `in` 은 Object.prototype 까지 봐서 /theme/constructor 가 404 대신 이상한 주소로 301 됐다.
+    for (const p of ["constructor", "hasOwnProperty", "toString", "__proto__"]) {
+      assert.equal(themeFromParam(p), null, p);
+      assert.equal(usThemeFromParam(p), null, p);
+    }
+  });
 });
 
 describe("theme-href (미장)", () => {

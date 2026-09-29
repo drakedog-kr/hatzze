@@ -73,6 +73,12 @@ export const CHARACTER_MIN_DD = -8;
 export type RecoveryStats = {
   /** 지금과 같거나 더 깊었던 사건 수(진행 중 포함). */
   similarCount: number;
+  /**
+   * 그중 지금보다 **더** 깊었던 사건 수 — 히어로의 "지금보다 깊이 잠긴 적은 N번"이 이 값이다.
+   * 오늘이 진행 중 사건의 바닥(신저점)이면 그 사건의 깊이가 곧 지금이라 빠진다(deeperThanNowDays 의 `<` 와
+   * 같은 까닭). similarCount 를 쓰면 신저점 날마다 하나가 더 세어져 '이보다 깊었던 날: 없음' 옆에 "1번"이 섰다.
+   */
+  deeperCount: number;
   recoveredCount: number;
   unrecoveredCount: number;
   /** 회복한 사건들의 달력 일수. 회복 사례가 없으면 null. */
@@ -209,12 +215,14 @@ function recoveryStats(eps: Episode[], currentDd: number): RecoveryStats | null 
   if (currentDd > -1) return null;
   const similar = eps.filter((e) => e.depth <= currentDd);
   if (similar.length === 0) {
-    return { similarCount: 0, recoveredCount: 0, unrecoveredCount: 0, minDays: null, medianDays: null, maxDays: null, samples: [] };
+    return { similarCount: 0, deeperCount: 0, recoveredCount: 0, unrecoveredCount: 0, minDays: null, medianDays: null, maxDays: null, samples: [] };
   }
   const recovered = similar.filter((e) => e.recovered);
   const days = recovered.map((e) => e.days);
   return {
     similarCount: similar.length,
+    // 진행 중 사건의 깊이는 currentDd 와 같은 식·같은 고점으로 나와, 신저점 날에는 두 값이 비트까지 같다.
+    deeperCount: similar.filter((e) => e.depth < currentDd).length,
     recoveredCount: recovered.length,
     unrecoveredCount: similar.length - recovered.length,
     minDays: days.length ? Math.min(...days) : null,
@@ -495,6 +503,10 @@ function closeOnOrBefore(bars: Bar[], date: string): number | null {
  * 해마다 '얼마 벌었나(수익률)'와 '그 해 안에서 얼마나 아팠나(최악 낙폭)'.
  * 낙폭은 그 해 안의 고점 대비로만 잰다 — 해를 넘겨 이어지는 낙폭이 아니라
  * "그 해를 보낸 사람이 겪은 최악"을 보여주려는 것이다.
+ *
+ * 수익은 **전해 마지막 종가**에서 잰다(연 수익률의 보통 셈). 그 해 첫 종가에서 재면 첫 거래일의
+ * 움직임이 어느 해에도 안 들어가, 1월 2일에 +10% 뛴 해가 "그 해 수익 0%"가 되고 막대들을 이어
+ * 붙여도 기간 수익이 안 나온다. 앞 종가가 없는 창의 첫 해만 그 해 첫 종가에서 잰다.
  */
 function yearlyStats(bars: Bar[]): YearStat[] {
   const byYear = new Map<number, Bar[]>();
@@ -506,7 +518,11 @@ function yearlyStats(bars: Bar[]): YearStat[] {
   }
 
   const out: YearStat[] = [];
+  let prevYearLast: number | null = null;
   for (const [year, ys] of [...byYear.entries()].sort((a, b) => a[0] - b[0])) {
+    const base = prevYearLast ?? ys[0].close;
+    // 막대에서 빠지는 토막 난 해도 다음 해의 출발점은 된다 — 그래서 continue 보다 먼저 적는다.
+    prevYearLast = ys[ys.length - 1].close;
     if (ys.length < 20) continue; // 상장·조회 경계의 토막 난 해는 뺀다
     let peak = -Infinity;
     let mdd = 0;
@@ -515,7 +531,7 @@ function yearlyStats(bars: Bar[]): YearStat[] {
       const dd = (b.close / peak - 1) * 100;
       if (dd < mdd) mdd = dd;
     }
-    out.push({ year, ret: (ys[ys.length - 1].close / ys[0].close - 1) * 100, mdd });
+    out.push({ year, ret: (ys[ys.length - 1].close / base - 1) * 100, mdd });
   }
   return out;
 }

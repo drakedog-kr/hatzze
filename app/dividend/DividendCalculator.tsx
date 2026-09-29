@@ -11,10 +11,11 @@ import { inflate, type BasketLite, type MoreLists, type StockLite, type StockWir
 import { newId, holdingsStore, writeHoldings } from "./store";
 import type { Holding } from "./store";
 import { won, wonShort, pct } from "./format";
-import { IRP_RISK_MAX, isSafeAsset, taxRate, ACCOUNTS, TAX_HELP, taxNote } from "./tax";
+import { IRP_RISK_MAX, isSafeAsset, ACCOUNTS, TAX_HELP, taxNote } from "./tax";
 import type { Account, TaxMode } from "./tax";
 import { accountTag, DEFAULT_SHARES, GOAL_DEFAULT_MAN, ADD_DEFAULT_MAN, BASKET_ROWS, AMOUNT_DEFAULT, SCOPES, scopeOf, computeLines, basketCodes, nextAccountFor, basketShares } from "./shared";
 import type { Scope } from "./shared";
+import { goalBasis, monthlyOf } from "./calc";
 import { SearchBox, QuickChips, MoreRows } from "./Search";
 import { HoldingsTable } from "./Holdings";
 import type { SortKey } from "./Holdings";
@@ -179,6 +180,8 @@ export function DividendCalculator({
   const invest = active.reduce((s, l) => s + (l.investKrw ?? 0), 0);
   const priced = active.filter((l) => l.investKrw != null);
   const yieldPct = invest > 0 ? (priced.reduce((s, l) => s + l.grossKrw, 0) / invest) * 100 : null;
+  // 목표까지 칸도 투자금을 아는 줄로만 센다 — 종가 없는 줄의 배당까지 넣으면 수익률이 부풀어 필요한 투자금이 몇 분의 1로 적혔다.
+  const goalIn = goalBasis(active);
   // 금융소득 종합과세 문턱과 고배당기업(분리과세 대상) 배당의 몫 — **일반 계좌 줄만** 합친다(ISA·연금 계좌 안 소득은 금융소득에
   // 안 합친다). 못 담아 일반 세율로 센 줄(outside)도 실제론 일반 계좌라 넣는다. 세전 합이 문턱 근처인 사람에게만 뜻이 있어 그때만 적는다.
   const generalLines = active.filter((l) => l.account === "general" || l.outside);
@@ -200,18 +203,10 @@ export function DividendCalculator({
   })();
   const exemptInvested = afterTax ? byAccount("exempt").filter((l) => !l.outside).reduce((s, l) => s + (l.investKrw ?? 0), 0) : 0;
   const heroNote = taxNote(taxMode, grossAll, taxableAll, sepGross, outsideCount, irpInfo, mixed, { invested: exemptInvested });
-  // 달력에 못 드는 줄 — 지급 달을 모르는 것(미국 주식, 국내 ETF). 배당이 있는 줄만 센다.
+  // 달력에 못 드는 줄 — 지급일 기록(pays)이 없는 것(stockanalysis 에 없는 미국 종목 등). 배당이 있는 줄만 센다.
   const noCalCount = active.filter((l) => l.stock.dps > 0 && !l.stock.pays.length).length;
-  // 달력은 지급 달을 아는 종목(국내)만. 미국은 공시에 지급일이 없다.
-  const monthly = useMemo(() => {
-    const m = new Array<number>(13).fill(0);
-    for (const l of active) {
-      // 달러 지급 건(미국 ETF)은 환율을 곱해야 원화 달력에 든다 — 빠뜨렸더니 SCHD 3월이 22원으로 찍혔다.
-      const f = (1 - taxRate(l.stock, taxMode === "gross" ? "gross" : l.account)) * (l.stock.currency === "USD" ? fx : 1);
-      for (const [month, amt] of l.stock.pays) m[month] += amt * l.shares * f;
-    }
-    return m;
-  }, [active, taxMode, fx]);
+  // 달력은 지급 달을 아는 줄만. 세후는 줄의 세후 ÷ 세전으로 — 히어로·표와 같은 값(calc.ts 의 monthlyOf).
+  const monthly = useMemo(() => monthlyOf(active, fx), [active, fx]);
 
   const add = (code: string, source: string) => {
     if (!byCode.has(code)) return;
@@ -515,8 +510,8 @@ export function DividendCalculator({
             <MonthFill month={fillMonth} order={fillOrder} holdings={holdings} onPick={(code) => add(code, "fill_month")} onClose={() => setFillMonth(null)} />
           )}
           {lines.length > 0 && <Upcoming lines={active} fx={fx} mode={taxMode} />}
-          {lines.length > 0 && invest > 0 && total > 0 && (
-            <GoalBox invest={invest} net={total} goalMan={goalMan} addMan={addMan} onGoal={setGoalMan} onAdd={setAddMan} />
+          {lines.length > 0 && goalIn.invest > 0 && goalIn.net > 0 && (
+            <GoalBox invest={goalIn.invest} net={goalIn.net} skipped={goalIn.skipped} goalMan={goalMan} addMan={addMan} onGoal={setGoalMan} onAdd={setAddMan} />
           )}
         </div>
 

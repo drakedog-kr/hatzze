@@ -58,16 +58,17 @@ import re
 import sys
 import time
 from datetime import date, datetime, timezone
-from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import requests  # noqa: E402
+from urllib3.exceptions import NewConnectionError  # noqa: E402
 
 from common import broadcast_content as bc  # noqa: E402
 from common import broadcast_digest as bd  # noqa: E402
 from common.config import ANTHROPIC_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_BROADCAST_CHAT_ID  # noqa: E402
+from common.js_round import js_fixed1, js_round  # noqa: E402
 from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 from common.retry import backoff_delay  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
@@ -169,43 +170,8 @@ TELEGRAM_ATTEMPTS = 3
 
 
 # ─── 프론트와 같은 표시 규칙 ──────────────────────────────────────────────────
-
-
-def _js_quantize(value: float, places: str) -> Decimal:
-    """JS 의 반올림(동점은 큰 쪽)을 배정도 실수의 **정확한 값** 위에서 흉내 낸다.
-
-    Decimal(float) 은 그 double 이 실제로 담고 있는 값을 그대로 받는다(0.1 이 아니라
-    0.1000000000000000055…). JS 의 Math.round·toFixed 도 같은 정확한 값을 기준으로
-    가장 가까운 결과를 고르고 동점이면 큰 쪽을 택하므로, 여기서 ROUND_HALF_UP 을 걸면
-    두 언어가 같은 답을 낸다.
-
-    **산술로 흉내 내면 안 된다.** 처음엔 floor(x*10 + 0.5)/10 으로 썼는데 9.35 에서
-    갈렸다 — 9.35 라는 double 은 실제로 9.34999999999999964… 여서 JS 는 "9.3" 을
-    내는데, ×10 이 부동소수 반올림으로 정확히 93.5 가 되는 바람에 이쪽만 "9.4" 가 됐다.
-    급부상 카드가 "▲9.3배"인데 채널이 "9.4배"라고 말하는, 딱 피하려던 종류의 어긋남이다.
-
-    (JS 의 Math.round 는 음수 동점을 +∞ 쪽으로 보내 ROUND_HALF_UP 과 갈리지만, 여기 쓰는
-    값은 과열도 0~100 과 언급 배수라 둘 다 음수가 될 수 없다.)
-    """
-    return Decimal(value).quantize(Decimal(places), rounding=ROUND_HALF_UP)
-
-
-def js_round(value: float) -> int:
-    """JS 의 Math.round 와 같은 반올림.
-
-    Python 내장 round() 는 은행가 반올림이라 round(2.5)==2 인데 JS 는 3 이다. 도수는
-    사이트가 Math.round 로 찍으므로(app/page.tsx Hero), 같은 규칙을 써야 26℃ 자리에서
-    둘이 1도 어긋나지 않는다.
-    """
-    return int(_js_quantize(value, "1"))
-
-
-def js_fixed1(value: float) -> str:
-    """JS 의 Number.prototype.toFixed(1) 과 같은 문자열.
-
-    급부상 카드가 `s.ratio.toFixed(1)` 로 "9.4배"를 찍는다(app/kadera/page.tsx).
-    """
-    return str(_js_quantize(value, "0.1"))
+#
+# 도수·배수 반올림(js_round·js_fixed1)은 common/js_round.py 에 있다 — 홈 요약도 같은 규칙을 쓴다.
 
 
 def stage_for_score(score: float) -> str:
@@ -537,6 +503,15 @@ def paragraphs(text: str) -> list[str]:
     return out
 
 
+def keyword_line(day: str, keywords: list[tuple[str, int]]) -> str:
+    """갈래 문단이 사라진 날 대신 싣는 키워드 나열(build_morning).
+
+    ⚠️ **여기서 이스케이프하지 않는다.** 이 줄은 paragraphs() → to_telegram_html() 이 이스케이프한다.
+       미리 html.escape 하면 두 번 걸려 채널에 'M&amp;A'·'S&amp;P500' 이 글자 그대로 보인다.
+    """
+    return f"{day} 오간 말: " + " · ".join(k for k, _ in keywords)
+
+
 def build_morning(db, llm) -> str:
     """A · 어제 브리핑 — 평일 아침. [어제 키워드 갈래] → [밤사이 이야기] → [CTA].
 
@@ -614,7 +589,7 @@ def build_morning(db, llm) -> str:
     # 이 파일이 이미 한 번 겪은 어긋남이라 같은 자리를 두 번 내주지 않는다.
     # (짝인 day_topic 은 "어제는"·"7월 27일에는" 이라 이 자리엔 안 맞는다.)
     if not head_text and keywords:
-        head_text = f"{day} 오간 말: " + " · ".join(html.escape(k, quote=False) for k, _ in keywords)
+        head_text = keyword_line(day, keywords)
         print("[안내] 갈래 해설이 없어 키워드를 그대로 싣습니다.")
 
     # 그래도 둘 다 비면 글을 안 만든다. 남는 건 제목 두 줄과 링크뿐이라, 읽는 사람에게
@@ -879,6 +854,19 @@ def probe_chats(token: str) -> None:
     print("공개 채널이면 숫자 대신 \"@핸들\"을 그대로 써도 됩니다.")
 
 
+def never_reached(exc: requests.RequestException) -> bool:
+    """요청이 텔레그램에 **닿지 못한 게 확실한** 실패인가 — 연결조차 못 맺었다.
+
+    연결 시간 초과(ConnectTimeout)와 연결 거부·이름 풀이 실패(NewConnectionError 를 싼
+    ConnectionError)만 그렇다. 응답 읽기 시간 초과(ReadTimeout)·읽다 끊김·HTML 502 본문
+    (res.json() 의 JSONDecodeError 도 RequestException 이다)은 요청이 이미 갔을 수 있다.
+    """
+    if isinstance(exc, requests.ConnectTimeout):
+        return True
+    reason = getattr(exc.args[0], "reason", None) if exc.args else None
+    return isinstance(exc, requests.ConnectionError) and isinstance(reason, NewConnectionError)
+
+
 def send(token: str, chat_id: str, text: str) -> None:
     """Bot API sendMessage. 실패하면 예외를 올려 워크플로가 실패로 집계하게 한다.
 
@@ -889,6 +877,12 @@ def send(token: str, chat_id: str, text: str) -> None:
 
     링크 미리보기는 끈다. 메시지가 이미 도수를 말하고 있어서 OG 카드가 같은 숫자를
     한 번 더 크게 보여주면 글 길이만 두 배가 된다. 켜고 싶으면 is_disabled 만 뒤집으면 된다.
+
+    ⛔ **닿았는지 모르는 실패는 다시 보내지 않는다.** sendMessage 에는 멱등 키가 없어서,
+       텔레그램이 글을 올린 뒤 응답만 잃은 경우(ReadTimeout · HTML 502)에 다시 보내면
+       구독자에게 같은 글이 두 번 간다. 다시 보내는 것은 연결조차 못 맺은 실패(never_reached)와
+       텔레그램이 ok:false 로 답한 실패뿐이다. 나머지는 바로 실패로 올린다 — 안 나간 글이
+       두 번 나간 글보다 낫다(워크플로의 run_attempt 가드와 같은 쪽이다).
     """
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {
@@ -900,6 +894,7 @@ def send(token: str, chat_id: str, text: str) -> None:
 
     last = ""
     for attempt in range(1, TELEGRAM_ATTEMPTS + 1):
+        unknown = False
         try:
             res = requests.post(url, json=payload, timeout=TELEGRAM_TIMEOUT_SEC)
             body = res.json()
@@ -912,6 +907,13 @@ def send(token: str, chat_id: str, text: str) -> None:
         except requests.RequestException as e:
             # 예외를 그대로 찍지 않는다 — URL 이 딸려 나온다. 타입만 남긴다.
             last = f"{type(e).__name__}"
+            unknown = not never_reached(e)
+        # ⚠️ except 밖에서 올린다. 안에서 올리면 원래 예외가 'During handling…' 으로 같이 찍혀
+        #    봇 토큰이 든 URL 이 로그에 남는다.
+        if unknown:
+            raise RuntimeError(
+                f"텔레그램 발송 결과를 알 수 없습니다({last}). 이미 올라갔을 수 있어 다시 보내지 않습니다 — 채널을 확인하세요."
+            )
         if attempt < TELEGRAM_ATTEMPTS:
             delay = backoff_delay(attempt)
             print(f"[텔레그램] 전송 실패({last}). {delay:.0f}초 뒤 재시도 {attempt + 1}/{TELEGRAM_ATTEMPTS}")

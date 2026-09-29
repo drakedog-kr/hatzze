@@ -509,7 +509,7 @@ def main() -> None:
     end = date.fromisoformat(latest) - timedelta(days=1)
     since = (end - timedelta(days=KR.WINDOW_OFFSET)).isoformat()
     msgs_list = KR.load_messages_since(db, since)
-    msgs = {(m["channel_handle"], m["message_id"]): m for m in msgs_list if m["posted_at"][:10] >= since}
+    msgs = {(m["channel_handle"], m["message_id"]): m for m in msgs_list if KR.posted_since(m["posted_at"], since)}
     print(f"[재료] 메시지 {len(msgs):,}건 (기간 {since}~{latest})")
 
     name_of, code_of, themes_of = code_maps(db)

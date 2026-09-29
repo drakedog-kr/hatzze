@@ -32,6 +32,8 @@ import { usQuotes } from "@/lib/us-telegram-data";
 import { fetchDailyHistory } from "@/lib/yahoo-history";
 import { displayName } from "@/lib/us-ticker-names";
 import { canonicalTicker, tickerSpellings } from "@/lib/us-ticker-spellings";
+import { filedQuarters, isCik, quarterMarks, stockPosition } from "@/lib/insider-13f";
+import { type MentionPoint, mentionTrend } from "@/lib/insider-trend";
 
 /** 언급 추이로 그리는 날수. 표에 41일치가 있어 그보다 길게 잡을 이유가 없다. */
 export const MENTION_TREND_DAYS = 40;
@@ -104,7 +106,8 @@ export type TradeMark = {
   high: number | null;
 };
 
-export type MentionPoint = { date: string; mentions: number; channels: number };
+/** 언급 추이 한 점. 0 으로 메우는 계산은 lib/insider-trend.ts 에 있다. */
+export type { MentionPoint };
 
 /** 이 종목을 든 거물 한 명. 비중은 그 사람 포트폴리오 안에서의 몫이다. */
 export type StockHolder = {
@@ -219,6 +222,7 @@ export type StockDetail = {
   /** 오늘(가장 최근 날) 언급. 없으면 0 이다. */
   mentionsToday: number;
   channelsToday: number;
+  /** 추이의 끝점 = 언급 표 전체의 가장 최근 날(이 종목의 마지막 언급일이 아니다). */
   mentionDate: string | null;
   holders: StockHolder[];
   /** 거물 명단 전체 수. "N/62" 의 분모다. */
@@ -288,20 +292,6 @@ export type ManagerDetail = {
   exited: { ticker: string; name: string; value: number; weight: number; inKadera: boolean }[];
 };
 
-/** 표에 없는 날을 0 으로 메운다. 안 메우면 막대가 주말을 건너뛰어 추이가 거짓말한다. */
-function fillDays(rows: MentionPoint[], end: string, days: number): MentionPoint[] {
-  const have = new Map(rows.map((r) => [r.date, r]));
-  const out: MentionPoint[] = [];
-  const d = new Date(`${end}T00:00:00Z`);
-  for (let i = days - 1; i >= 0; i--) {
-    const t = new Date(d);
-    t.setUTCDate(t.getUTCDate() - i);
-    const key = t.toISOString().slice(0, 10);
-    out.push(have.get(key) ?? { date: key, mentions: 0, channels: 0 });
-  }
-  return out;
-}
-
 /**
  * 운용사별 최신·직전 분기를 가른다.
  *
@@ -330,7 +320,7 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
     console.error(`[insider/stock] ${label} 조회 실패`, e);
   };
 
-  const [stockRows, mentionRows, holdingRows, managerRows, congressRows, insiderRows, consensusRows, actionRows] =
+  const [stockRows, mentionRows, holdingRows, managerRows, congressRows, insiderRows, consensusRows, actionRows, latestMention] =
     await Promise.all([
     db.from("us_stocks").select("ticker,name_ko,name_en").in("ticker", spellings).limit(1),
     fetchAllRows<{ date: string; mention_count: number | null; channel_count: number | null }>(
@@ -338,9 +328,9 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
       () => db.from("telegram_us_stock_daily").select("date,mention_count,channel_count").in("ticker", spellings),
       { onError: failed("언급 추이") },
     ),
-    fetchAllRows<{ cik: number; shares: number | null; value: number | null; report_date: string }>(
+    fetchAllRows<{ cik: number; ticker: string; shares: number | null; value: number | null; report_date: string }>(
       "cik",
-      () => db.from("us_manager_holding").select("cik,shares,value,report_date").in("ticker", spellings),
+      () => db.from("us_manager_holding").select("cik,ticker,shares,value,report_date").in("ticker", spellings),
       { onError: failed("거물 보유") },
     ),
     fetchAllRows<{ cik: number; person: string; firm: string }>(
@@ -409,12 +399,15 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
       .in("ticker", spellings)
       .order("action_date", { ascending: false })
       .limit(30),
+    // 언급 추이의 끝점 — 표 전체의 가장 최근 날. 이 종목의 마지막 행이 아니다(mentionTrend 주석).
+    db.from("telegram_us_stock_daily").select("date").order("date", { ascending: false }).limit(1),
   ]);
 
-  // 한 번에 받는 표 셋은 fetchAllRows 를 안 거쳐 error 를 여기서 본다.
+  // 한 번에 받는 표 넷은 fetchAllRows 를 안 거쳐 error 를 여기서 본다.
   if (stockRows.error) failed("종목 사전")(stockRows.error);
   if (consensusRows.error) failed("애널리스트 컨센서스")(consensusRows.error);
   if (actionRows.error) failed("애널리스트 의견")(actionRows.error);
+  if (latestMention.error) failed("언급 기준일")(latestMention.error);
 
   // 어느 축에도 흔적이 없으면 우리가 아는 종목이 아니다. 빈 화면 대신 404 를 준다.
   // ⚠️ 단, 조회가 깨져서 비어 보이는 것이면 404 가 아니라 오류다 — 멀쩡한 종목 주소를
@@ -438,9 +431,11 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
     mentions: m.mention_count ?? 0,
     channels: m.channel_count ?? 0,
   }));
-  const lastDate = trendRaw.length ? trendRaw[trendRaw.length - 1].date : null;
-  const trend = lastDate ? fillDays(trendRaw, lastDate, MENTION_TREND_DAYS) : [];
-  const today = trend.length ? trend[trend.length - 1] : null;
+  const { trend, today, date: mentionDate } = mentionTrend(
+    trendRaw,
+    latestMention.data?.[0]?.date ?? null,
+    MENTION_TREND_DAYS,
+  );
 
   // 거물별 최신 분기의 보유만 남기고, 직전 분기와 견줘 움직임을 붙인다.
   const managerOf = new Map(managerRows.map((m) => [m.cik, m]));
@@ -455,41 +450,29 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
   );
   const aumOf = new Map<string, number>();
   for (const t of totals) aumOf.set(`${t.cik}|${t.report_date}`, (aumOf.get(`${t.cik}|${t.report_date}`) ?? 0) + (t.value ?? 0));
+  // ⚠️ 분기도 여기서 고른다. 이 종목의 행만 보면 새로 담은 곳은 직전 분기가, 정리한 곳은
+  //    최신 분기가 안 보인다(lib/insider-13f.ts 머리말).
+  const filed = filedQuarters(totals);
 
   const holders: StockHolder[] = [];
   for (const [cik, rows] of byCik) {
     const m = managerOf.get(cik);
     if (!m) continue;
-    const { latest, prior } = quartersOf(rows.map((r) => r.report_date));
-    if (!latest) continue;
-    const now = rows.find((r) => r.report_date === latest);
-    if (!now) continue;
-    const before = prior ? rows.find((r) => r.report_date === prior) : undefined;
-    // ⚠️ 판정은 **주식 수**로 한다. 금액은 주가가 움직여도 변해서, 한 주도 안 사고
-    //    늘어난 것처럼 보인다.
-    const move: StockHolder["move"] = !prior
-      ? null
-      : !before
-        ? "new"
-        : (now.shares ?? 0) > (before.shares ?? 0)
-          ? "add"
-          : (now.shares ?? 0) < (before.shares ?? 0)
-            ? "trim"
-            : "hold";
-    const aum = aumOf.get(`${cik}|${latest}`) ?? 0;
-    const was = before?.shares ?? 0;
+    // 분모 조회가 깨져 그 운용사의 분기를 모르면 이 종목의 행에서 고른다. 신규·청산은
+    // 못 가르지만(화면 머리에 실패가 뜬다) 보유자가 통째로 사라지지는 않는다.
+    const p = stockPosition(rows, filed.get(cik) ?? [...new Set(rows.map((r) => r.report_date))].sort());
+    if (!p) continue;
+    const aum = aumOf.get(`${cik}|${p.reportDate}`) ?? 0;
     holders.push({
       cik,
       person: m.person,
       firm: m.firm,
-      shares: now.shares ?? 0,
-      value: now.value ?? 0,
-      weight: aum ? ((now.value ?? 0) / aum) * 100 : 0,
-      move,
-      // 인물 상세(`getManagerDetail`)와 **같은 식**이다. 한쪽만 고치면 같은 보유가
-      // 두 화면에서 다른 증감률로 뜬다.
-      sharesChange: before && was ? (((now.shares ?? 0) - was) / was) * 100 : null,
-      reportDate: latest,
+      shares: p.shares,
+      value: p.value,
+      weight: aum ? (p.value / aum) * 100 : 0,
+      move: p.move,
+      sharesChange: p.sharesChange,
+      reportDate: p.reportDate,
     });
   }
   holders.sort((a, b) => b.value - a.value);
@@ -609,21 +592,11 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
   }
   // ── 거물 마커: 분기 경계마다 늘린 곳 / 줄인 곳 ─────────────────────
   // ⚠️ 13F 에는 매매일이 없다. 분기말에 찍고 "그 분기 사이에 이만큼 바뀌었다"로 읽는다.
-  const qs = [...new Set(holdingRows.map((h) => h.report_date))].sort();
-  for (let i = 1; i < qs.length; i++) {
-    const cur = new Map(holdingRows.filter((h) => h.report_date === qs[i]).map((h) => [h.cik, h]));
-    const prev = new Map(holdingRows.filter((h) => h.report_date === qs[i - 1]).map((h) => [h.cik, h]));
-    for (const cik of new Set([...cur.keys(), ...prev.keys()])) {
-      const m = managerOf.get(cik);
-      if (!m) continue;
-      const a = cur.get(cik);
-      const b = prev.get(cik);
-      // 판정은 주식 수로. 금액은 주가가 움직여도 변한다.
-      if (a && !b) addMark(qs[i], "buy", "manager", m.person);
-      else if (!a && b) addMark(qs[i], "sell", "manager", m.person);
-      else if (a && b && (a.shares ?? 0) > (b.shares ?? 0)) addMark(qs[i], "buy", "manager", m.person);
-      else if (a && b && (a.shares ?? 0) < (b.shares ?? 0)) addMark(qs[i], "sell", "manager", m.person);
-    }
+  // ⚠️ 분기는 운용사마다 자기가 낸 것끼리 견준다(quarterMarks 주석 — 합친 분기로 견주면
+  //    늦게 내는 곳 때문에 없는 매수·매도가 찍힌다).
+  for (const k of quarterMarks(holdingRows, filed)) {
+    const m = managerOf.get(k.cik);
+    if (m) addMark(k.date, k.side, "manager", m.person);
   }
   const marks = [...markOf.values()].sort((a, b) => a.date.localeCompare(b.date));
 
@@ -667,7 +640,7 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
     trend,
     mentionsToday: today?.mentions ?? 0,
     channelsToday: today?.channels ?? 0,
-    mentionDate: lastDate,
+    mentionDate,
     holders,
     managerCount: managerRows.length,
     bars,
@@ -705,6 +678,9 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
 });
 
 export const getManagerDetail = cache(async (cik: number): Promise<ManagerDetail | null> => {
+  // 번호로 못 읽는 주소는 묻지도 않고 "없는 인물"이다. 물으면 DB 가 400 을 내 아래에서
+  // 명단 조회 실패로 던진다(isCik 주석). 메타데이터도 이 함수를 부르므로 여기서 막는다.
+  if (!isCik(cik)) return null;
   const db = getSupabaseAdmin();
   if (!db) return null;
 
@@ -740,7 +716,8 @@ export const getManagerDetail = cache(async (cik: number): Promise<ManagerDetail
   const aum = now.reduce((s, h) => s + (h.value ?? 0), 0);
 
   // 카더라에 **한 번이라도** 오른 종목. 하루치로 보면 대부분 빠져서 표시가 뜻을 잃는다.
-  const kadera = new Set(mentionRows.map((r) => r.ticker));
+  // ⚠️ 대표 표기로 대 본다. 13F 는 BRK-B 인데 카더라는 BRK 다(lib/us-ticker-spellings.ts).
+  const kadera = new Set(mentionRows.map((r) => canonicalTicker(r.ticker)));
   const nameOf = (t: string) => displayName(t, null);
 
   const holdings: ManagerHolding[] = now
@@ -757,7 +734,7 @@ export const getManagerDetail = cache(async (cik: number): Promise<ManagerDetail
         weight: aum ? ((h.value ?? 0) / aum) * 100 : 0,
         move,
         sharesChange: b && was ? ((shares - was) / was) * 100 : null,
-        inKadera: kadera.has(h.ticker),
+        inKadera: kadera.has(canonicalTicker(h.ticker)),
       };
     })
     .sort((a, b) => b.value - a.value);
@@ -774,7 +751,7 @@ export const getManagerDetail = cache(async (cik: number): Promise<ManagerDetail
       name: nameOf(h.ticker),
       value: h.value ?? 0,
       weight: priorAum ? ((h.value ?? 0) / priorAum) * 100 : 0,
-      inKadera: kadera.has(h.ticker),
+      inKadera: kadera.has(canonicalTicker(h.ticker)),
     }))
     .sort((a, b) => b.value - a.value);
 

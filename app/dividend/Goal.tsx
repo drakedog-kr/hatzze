@@ -36,13 +36,17 @@ function monthsToGoal(invest: number, yearlyRate: number, addMonthly: number, gr
 export function GoalBox({
   invest,
   net,
+  skipped,
   goalMan,
   addMan,
   onGoal,
   onAdd,
 }: {
+  /** 투자금과 그 투자금이 내는 1년 세후 배당 — 종가 없는 줄은 둘 다에서 뺀 값(calc.ts 의 goalBasis). */
   invest: number;
   net: number;
+  /** 그렇게 뺀, 배당 있는 줄 수. 있으면 '지금 한 달 배당금'이 히어로의 한 달 평균보다 적은 까닭을 적는다. */
+  skipped: number;
   goalMan: number;
   addMan: number;
   onGoal: (v: number) => void;
@@ -130,7 +134,10 @@ export function GoalBox({
                 <ProgressIndicator className="dv-goal-fill" />
               </ProgressTrack>
             </Progress>
-            <span className="dv-goal-bnote">{reached ? "목표를 이미 넘었습니다" : `목표의 ${Math.round(progress)}%입니다`}</span>
+            <span className="dv-goal-bnote">
+              {reached ? "목표를 이미 넘었습니다" : `목표의 ${Math.round(progress)}%입니다`}
+              {skipped > 0 && ` · 종가가 없는 ${skipped}종목은 빼고 셌습니다`}
+            </span>
           </div>
 
           <div className="dv-goal-block">

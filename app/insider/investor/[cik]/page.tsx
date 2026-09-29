@@ -3,6 +3,7 @@ import { assertLoaded } from "@/lib/load-state";
 import { notFound } from "next/navigation";
 
 import { getManagerDetail } from "@/lib/insider-detail";
+import { isCik } from "@/lib/insider-13f";
 
 import { SectionHead } from "../../../kadera/SectionHead";
 import { INSIDER_CARD } from "../../../og-copy";
@@ -117,7 +118,7 @@ export async function generateMetadata({ params }: { params: Promise<{ cik: stri
 export default async function InvestorDetailPage({ params }: { params: Promise<{ cik: string }> }) {
   const { cik } = await params;
   const n = Number(cik);
-  if (!Number.isFinite(n)) notFound();
+  if (!isCik(n)) notFound();
   const d = await getManagerDetail(n);
   // notFound() 앞에서 던진다 — 조회가 죽어 null 이 온 것을 "없는 투자자"로 읽어 404 를
   // 사본에 담지 않도록(app/stock/[code]/page.tsx 와 같은 이유).

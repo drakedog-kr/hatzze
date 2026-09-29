@@ -45,10 +45,12 @@ from __future__ import annotations
 import re
 import sys
 from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from common.supabase_client import execute_with_retry  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.supabase_client import load_all  # noqa: E402
 from config.stock_extraction import (  # noqa: E402
@@ -72,6 +74,8 @@ from config.stock_extraction import (  # noqa: E402
 )
 
 # 우선주/파생 종목 제외 패턴(…우, …우B, …N우, …우(전환) 등).
+# ⚠️ 이름만 보면 우로 끝나는 **보통주**(`성우` 458650)까지 빠진다. 보통주 단축코드는 끝자리가 0 이라
+#    (calculate_kr_dividend_stats 와 같은 잣대) 코드도 우선주일 때만 뺀다(load_dictionary).
 PREFERRED_RE = re.compile(r"(우[A-Z]?|\d우|우\(전환\))$")
 HANGUL_OR_ALNUM = re.compile(r"[가-힣0-9A-Za-z]")
 HANGUL = re.compile(r"[가-힣]")
@@ -133,11 +137,12 @@ HOUSE_NOMINAL_END_RE = re.compile(rf"(\S+)\s+(?:{_VERBS})\s*$|(?:로|으로|을|
 HOUSE_NOMINAL_MID_RE = re.compile(rf"(?:로|으로)\s*(?:{_VERBS})\s*,")
 HOUSE_EXTRA_VERB_RE = re.compile(r"내다[봤보]|꼽[았은]|(?:다고|라고|로|으로)\s*(?:봤|보았|본다)")
 # 리서치에만 나오는 낱말 — 목표주가·투자의견과 `X원에서 Y원으로`(목표가 조정 나열).
+# `발행어음`은 증권사 자신의 사업 이름이라 리서치의 '발행'에서 뺀다(`삼성증권이 발행어음 … 수혜를 입을 전망`).
 HOUSE_RESEARCH_RE = re.compile(
     r"목표주가|목표가|투자의견|커버리지|적정주가|TP\b"
     r"|[\d,.]+\s*(?:만|천)?\s*원에서\s*[\d,.]+\s*(?:만|천)?\s*원으로"
     r"|(?:보고서|리포트)(?:를 통해|에서|를 내|에 따르면)"
-    r"|(?:작성|발간|발행|내놓|내놨)(?:한|은)?[^.\n]{0,30}(?:리포트|(?<!통합|사업|반기|분기|감사)보고서|자료|전망)"
+    r"|(?:작성|발간|발행(?!어음)|내놓|내놨)(?:한|은)?[^.\n]{0,30}(?:리포트|(?<!통합|사업|반기|분기|감사)보고서|자료|전망)"
     r"|전망에 따르면|(?:전망|분석|의견)을 (?:내놨|내놓|제시)"
     r"|(?:추정치|전망치|목표치|예상치|전망|추정)(?:을|를|은|는|도)?[^.\n]{0,40}(?:상향|하향|낮췄|높였|올렸|내렸|수정|조정)"
 )
@@ -160,7 +165,7 @@ def load_dictionary(db) -> tuple[dict[str, str], dict[str, str], set[str]]:
     name_to_code = {}
     for s in stocks:
         name = s["name"].strip()
-        if name in EXCLUDE_NAMES or PREFERRED_RE.search(name):
+        if name in EXCLUDE_NAMES or (PREFERRED_RE.search(name) and not s["code"].endswith("0")):
             continue
         name_to_code[name] = s["code"]
 
@@ -405,8 +410,20 @@ def publisher_context(text: str, start: int, end: int, trailing_word: bool = Tru
     return bool(nxt_word and HANGUL_OR_ALNUM.match(nxt_word.group(1)))
 
 
+# ㄹ 관형형인데 '을'·'를'로 끝나는 낱말. 받침 있는 줄기는 `있을`·`입을`·`높을`, 르 불규칙은 `오를`·`이를`로
+# 적어 목적격 조사(`수준을 전망` `강세를 전망`)와 끝 음절이 같다 — 음절로는 못 가른다. 그래서 낱말째 적는다.
+# 한 음절 줄기 + 을 꼴만 두어 같은 음절로 끝나는 명사(`실적을`의 적)는 안 걸린다. `있을`·`없을`·`않을`은
+# 앞말에 붙여 쓰는 일이 잦아(`변함없을` `할수있을`) 끝만 본다.
+RIEUL_EUL_WORDS = frozenset(
+    [f"{stem}을" for stem in "있없않입받얻높낮좋많적작늦넓좁깊같넘겪맞막잡찾잃쌓남"]
+    + ["오를", "이를", "따를", "빠를", "치를", "머무를", "가파를"]
+)
+
+
 def _ends_with_rieul(word: str) -> bool:
-    """낱말 끝 음절이 ㄹ 받침인가(`부각될`). 목적격 조사 을·를은 빼고 본다(`수준을 전망`은 화자다)."""
+    """낱말이 ㄹ 관형형으로 끝나는가(`부각될` `있을` `오를`). 목적격 조사 을·를은 빼고 본다(`수준을 전망`은 화자다)."""
+    if word in RIEUL_EUL_WORDS or word.endswith(("있을", "없을", "않을")):
+        return True
     ch = word[-1] if word else ""
     return "가" <= ch <= "힣" and ch not in "을를" and (ord(ch) - 0xAC00) % 28 == 8
 
@@ -604,6 +621,37 @@ def load_messages(db) -> list[dict]:
     return msgs
 
 
+def replace_rows(db, table: str, rows: list[dict], on_conflict: str) -> None:
+    """태그 표를 이번 추출 결과로 **갈아 끼운다** — 도중에 죽어도 표가 반쪽이 되지 않게.
+
+    미장 짝(extract_telegram_us_stocks)도 이걸 쓴다.
+
+    예전엔 전량 delete 뒤 500행씩 insert 했다. 25만 행이면 요청이 500번을 넘는데, 그중 하나만
+    끊겨도(execute_with_retry 주석의 GOAWAY) 앞 배치만 든 표가 남았다. 다음 스텝
+    (calculate_stock_daily)이 '전량 재계산'이라 그 반쪽 표로 일별 집계·급부상을 다시 만들어,
+    다음 성공 실행까지 화면이 틀린 숫자를 보였다. 실패 알림 문구('그 시점의 값이 화면에 그대로
+    남아 있습니다')가 가정하는 것과 반대다.
+
+    그래서 순서를 뒤집는다.
+      1) 유일 키(on_conflict)로 upsert 한다. 행마다 이번 실행 시각을 created_at 에 찍는다.
+      2) 전부 들어간 뒤에만 그 시각보다 옛 행 — 이번 추출에 없는 행 — 을 지운다.
+    도중에 죽으면 표엔 지난 결과에 이번에 쓴 만큼이 덮여 있다. 지운 건 없다.
+
+    upsert 는 같은 키를 같은 값으로 덮을 뿐이라 **다시 던져도 행이 늘지 않는다.** 그래서 끊긴
+    요청을 execute_with_retry 로 다시 던진다 — 그 함수가 쓰기를 막는 까닭(insert 가 두 번 들어감)이
+    여기엔 없다. 옛 행 지우기도 같은 조건을 한 번 더 던질 뿐이다.
+
+    ⚠️ created_at 은 **직접 실어야 한다.** 열 기본값(now())은 INSERT 에만 붙어서, 이미 있던 키를
+       덮는 upsert 는 옛 시각을 그대로 둔다. 그러면 2) 가 살아 있는 행까지 지운다.
+    """
+    stamp = datetime.now(timezone.utc).isoformat()
+    # 한 요청이 크면 statement timeout 에 걸린다. 다른 쓰기와 같은 500행 단위.
+    for i in range(0, len(rows), 500):
+        batch = [{**r, "created_at": stamp} for r in rows[i : i + 500]]
+        execute_with_retry(db.table(table).upsert(batch, on_conflict=on_conflict))
+    execute_with_retry(db.table(table).delete().lt("created_at", stamp))
+
+
 def main() -> None:
     dry_run = "--dry-run" in sys.argv[1:]
     db = get_client()
@@ -673,10 +721,9 @@ def main() -> None:
         print("\n--dry-run: DB에 저장하지 않았습니다.")
         return
 
-    # 재실행 시 최신 상태로 맞추기 위해 전량 삭제 후 삽입(추출 규칙이 바뀌면 과거분도 갱신).
-    db.table("telegram_message_stocks").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
-    for i in range(0, len(rows), 500):
-        db.table("telegram_message_stocks").insert(rows[i : i + 500]).execute()
+    # 재실행 시 최신 상태로 갈아 끼운다(추출 규칙이 바뀌면 과거분도 갱신). 도중에 죽어도 표가
+    # 반쯤 비지 않게 replace_rows 가 순서를 잡는다.
+    replace_rows(db, "telegram_message_stocks", rows, "channel_handle,message_id,stock_code")
     print(f"\n[Supabase] telegram_message_stocks {len(rows)}건 저장 완료")
 
 

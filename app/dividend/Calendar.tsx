@@ -11,6 +11,7 @@ import { isPensionLike, fitsAccount, taxRate, taxableShare } from "./tax";
 import type { TaxMode } from "./tax";
 import { ROW_CHIPS, UPCOMING_MAX, UPCOMING_DAYS, MONTHS, SCOPES } from "./shared";
 import type { Scope, Line } from "./shared";
+import { expectedPays } from "./calc";
 import { QuickChips } from "./Search";
 
 /* ── 달마다 얼마 ─────────────────────────────────────────────────── */
@@ -83,8 +84,8 @@ function upcomingOf(lines: Line[], fx: number, mode: TaxMode): { items: Upcoming
   const today = new Date(Date.now() + 9 * 3600e3);
   const iso = today.toISOString().slice(0, 10);
   const horizon = new Date(today.getTime() + UPCOMING_DAYS * 86400e3).toISOString().slice(0, 10);
-  const year = Number(iso.slice(0, 4));
   const out: UpcomingItem[] = [];
+  let expectedKrw = 0;
   const dateLabel = (d: string) => `${Number(d.slice(5, 7))}월 ${Number(d.slice(8, 10))}일`;
   // 같은 종목이 두 줄(ISA·일반 계좌)이면 일정은 하나로 — 세후 금액은 줄마다 세율이 달라 줄별로 떼어 더한다.
   const groups = new Map<string, Line[]>();
@@ -105,6 +106,9 @@ function upcomingOf(lines: Line[], fx: number, mode: TaxMode): { items: Upcoming
     const unit = s.kind === "etf" ? "분배금" : "배당금";
     // 공시된 확정값 — 지급일까지 있으면 그날, 지급일이 없으면(국내 결산배당 공시) 기준일 줄에 금액을 적는다.
     const sure = s.nextPay && (s.nextPay[0] ? s.nextPay[0] >= iso : !!s.nextRecord && s.nextRecord >= iso) ? s.nextPay : null;
+    // 지난 1년 지급일로 어림한 석 달 안의 건 — 확정 건의 짝은 빠져 있다. 합에는 전부, 표에는 확정 건이 없을 때 첫 건만.
+    const expected = expectedPays(s.pays, iso, horizon, sure && { pay: sure[0], record: s.nextRecord });
+    for (const e of expected) expectedKrw += net(ls, e.v)[1];
     if (s.nextRecord && s.nextRecord >= iso) {
       const a = sure && !sure[0] ? net(ls, sure[1]) : null;
       out.push({
@@ -120,21 +124,15 @@ function upcomingOf(lines: Line[], fx: number, mode: TaxMode): { items: Upcoming
     }
     if (sure) continue;
     // 날짜를 모르면 지난 1년 지급일을 올해(지났으면 내년)로 옮겨 가장 가까운 것 하나.
-    const expected = s.pays
-      .map(([m, v, d]) => {
-        const md = `${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-        return { date: `${year}-${md}` >= iso ? `${year}-${md}` : `${year + 1}-${md}`, v };
-      })
-      .filter((e) => e.date <= horizon)
-      .sort((a, b) => a.date.localeCompare(b.date))[0];
-    if (expected) {
-      const a = net(ls, expected.v);
+    const next = expected[0];
+    if (next) {
+      const a = net(ls, next.v);
       out.push({
         key: `${s.code}-e`,
-        when: `${dateLabel(expected.date)}쯤`,
-        sortKey: expected.date,
+        when: `${dateLabel(next.date)}쯤`,
+        sortKey: next.date,
         name: s.name,
-        what: `${unit} 1주에 ${money(expected.v, s)} · 지난해 이날`,
+        what: `${unit} 1주에 ${money(next.v, s)} · 지난해 이날`,
         amount: a[0],
         amountKrw: a[1],
         tag: "예상",
@@ -142,9 +140,8 @@ function upcomingOf(lines: Line[], fx: number, mode: TaxMode): { items: Upcoming
     }
   }
   out.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-  // 합은 자르기 전 전부(석 달 안). 표에 못 든 줄도 합엔 든다.
+  // 합은 자르기 전 전부(석 달 안). 표에 못 든 줄도, 표엔 한 줄로 선 종목의 뒤 지급(월배당의 둘째·셋째 달)도 합엔 든다.
   const sureKrw = out.filter((i) => i.tag === "확정").reduce((t, i) => t + i.amountKrw, 0);
-  const expectedKrw = out.filter((i) => i.tag === "예상").reduce((t, i) => t + i.amountKrw, 0);
   return { items: out.slice(0, UPCOMING_MAX), sureKrw, expectedKrw };
 }
 

@@ -9,7 +9,10 @@ create table if not exists public.indicators (
   slug text not null unique,
   name text not null,
   headline text,
-  category text not null check (category in ('정통', '밈')),
+  -- 분류는 fetch 스크립트의 INDICATOR_META 가 정하고 ensure_indicator 가 실행마다 덮어쓴다.
+  -- 이 목록과 META 가 어긋나면 지표 수집이 전부 제약 위반으로 죽는다(정통/밈 → 시장/감성
+  -- 때 여기만 안 고쳐서 새 환경 구성이 불가능했다 — migration_089).
+  category text not null check (category in ('시장', '감성')),
   description_beginner text not null,
   unit text not null,
   is_public boolean not null default true,
@@ -18,7 +21,7 @@ create table if not exists public.indicators (
   created_at timestamptz not null default now()
 );
 
-comment on table public.indicators is '지표 메타데이터 (정통/밈 트랙 구분)';
+comment on table public.indicators is '지표 메타데이터 (시장/감성 트랙 구분)';
 comment on column public.indicators.slug is '코드에서 참조하는 안정적인 식별자 (예: us_10y_yield)';
 comment on column public.indicators.description_beginner is '초보자용 한줄 설명';
 comment on column public.indicators.is_public is '프론트엔드 노출 여부. false면 다른 지표 계산용 내부 캐시(예: kospi_close_raw)라 화면에 표시하지 않음';
@@ -44,12 +47,14 @@ create table if not exists public.indicator_values (
   raw_value numeric not null,
   normalized_score numeric,
   threshold numeric,
+  details jsonb,
   created_at timestamptz not null default now(),
   unique (indicator_id, date)
 );
 
 comment on table public.indicator_values is '지표별 일별 원시값 및 정규화 스코어(기준선 대비 진행률 %, 100 초과·음수 가능)';
 comment on column public.indicator_values.threshold is '그날 calculate_score.py가 계산한 Hit 기준값. kospi_high_gap/youtube_finance_search_views처럼 기준값이 매일 바뀌는 지표가 있어 indicators가 아니라 여기 저장한다';
+comment on column public.indicator_values.details is '카드 보조 숫자(평소 대비 배수·기준선 등). fetch 스크립트와 calculate_score.py가 각자 자기 키만 병합해 쓴다(common/details.py)';
 
 create index if not exists indicator_values_indicator_id_date_idx
   on public.indicator_values (indicator_id, date desc);

@@ -64,6 +64,8 @@ type FetchInit = RequestInit & { next?: { revalidate?: number } };
  *
  * 5xx 와 끊김(fetch 가 던짐)만 센다. 4xx 는 다시 해도 같은 답이라(없는 행 406 · 잘못된
  * 질의 400) 사본에 담겨도 해가 없고, notFound() 로 가야 하는 경로가 여기 걸리면 안 된다.
+ *
+ * 곁가지 조회(withScopedLoadFailures 안에서 시작한 것)의 실패는 그 자리 목록으로 간다 — 홈 히어로 칩.
  */
 function noteIfFailed(input: RequestInfo | URL, method: string, res: Promise<Response>): Promise<Response> {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;

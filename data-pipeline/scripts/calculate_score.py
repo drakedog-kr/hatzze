@@ -94,6 +94,10 @@ CCSI_SLUG = "consumer_sentiment_index"
 CCSI_PCTILE_ANCHORS = [(90.0, 10), (98.0, 25), (102.0, 50), (107.0, 75), (112.0, 90)]
 # 코스피 전고점 대비 낙폭(%) 역대 분위수(10년 실측). 낙폭이 얕을수록(0에 가까울수록) 증시 강함.
 KOSPI_DD_PCTILE_ANCHORS = [(-25.9, 10), (-21.6, 25), (-15.1, 50), (-3.4, 75), (-0.4, 90)]
+# 괴리 lead(증시%ile − 실물%ile) 눈금 — 눈금을 왜 이렇게 폈는지는 main 의 괴리 override 주석.
+# backfill_scores·recompute_score_history 도 lead_progress 를 가져다 쓴다. main 안 지역 상수였을
+# 땐 둘이 손으로 베껴야 했고, 2026-07-23 max(0, lead) 를 걷어낼 때 backfill 만 옛 공식에 남았다.
+LEAD_FLOOR, LEAD_CEIL = -75.0, 45.0
 NEUTRAL_PROGRESS = 50.0  # 값이 아예 없는 지표(no_value)를 표에 표시할 때 쓰는 자리표시자
 
 # 종합점수 표시 눈금 — 가중평균 원점수를 '역대 백분위' 앵커로 펴서 보여준다.
@@ -244,6 +248,11 @@ def percentile_from_anchors(value: float, anchors: list[tuple[float, int]]) -> f
     return float(anchors[-1][1])  # 도달 불가(방어)
 
 
+def lead_progress(lead: float) -> float:
+    """괴리 lead(−75~+45)를 0~100 과열도로 편다. 캡핑 전 값이라 normalized_score 에 그대로 쓴다."""
+    return (lead - LEAD_FLOOR) / (LEAD_CEIL - LEAD_FLOOR) * 100
+
+
 def ccsi_real_strength(client) -> tuple[float, float] | None:
     """CCSI 최신값을 (실물강도 백분위 0~100, CCSI 원값)으로 돌려준다.
 
@@ -370,6 +379,26 @@ def cap_progress(progress: float) -> float:
     return min(max(progress, 0.0), 100.0)
 
 
+def relative_surge_progress(details: dict, config: dict) -> float | None:
+    """거래대금(relative_surge) 과열도 — 캡핑 전. details 에 surge_pct 가 없으면 None.
+
+    절대 거래대금 대신 "30일 평균 대비 %"(fetch가 details.surge_pct에 저장)로 잰다. 30일 상대만으로는
+    1년에 걸쳐 5배가 되는 흐름이 안 보인다(사상 최고점 당일 41.9조인데 급증율 +2.3%라 과열도 25.6).
+    details.level_pct(직전 250영업일 백분위)를 level_weight 만큼 섞어 '국면'을 되살린다.
+    backfill_scores·recompute_score_history 도 이 함수를 쓴다 — 따로 베꼈을 땐 backfill 이 이 섞기를 빠뜨렸다.
+    """
+    rs = config["relative_surge"]
+    surge = details.get("surge_pct")
+    if surge is None:
+        return None
+    progress = (surge - rs["floor"]) / (rs["ceil"] - rs["floor"]) * 100
+    lw = config.get("level_weight")
+    level = details.get("level_pct")
+    if lw and level is not None:
+        progress = cap_progress(progress) * (1 - lw) + float(level) * lw
+    return progress
+
+
 def stage_for_score(score: float) -> str:
     if score < 25:
         return "저온"
@@ -408,19 +437,11 @@ def main() -> None:
             capped_progress = cap_progress(progress)
 
             avg_30d = None
-            rs = config.get("relative_surge")
-            if rs is not None:
-                # 절대 거래대금 대신 "30일 평균 대비 %"(fetch가 details.surge_pct에 저장)로.
-                surge = latest_details.get("surge_pct")
-                if surge is not None:
-                    progress = (surge - rs["floor"]) / (rs["ceil"] - rs["floor"]) * 100
-                    # 30일 상대만으로는 1년에 걸쳐 5배가 되는 흐름이 안 보인다(사상 최고점
-                    # 당일 41.9조인데 급증율 +2.3%라 과열도 25.6). details.level_pct(직전
-                    # 250영업일 백분위)를 level_weight 만큼 섞어 '국면'을 되살린다.
-                    lw = config.get("level_weight")
-                    level = latest_details.get("level_pct")
-                    if lw and level is not None:
-                        progress = cap_progress(progress) * (1 - lw) + float(level) * lw
+            if config.get("relative_surge") is not None:
+                # 절대 거래대금 대신 "30일 평균 대비 %" + 250영업일 백분위(relative_surge_progress).
+                surge_progress = relative_surge_progress(latest_details, config)
+                if surge_progress is not None:
+                    progress = surge_progress
                     capped_progress = cap_progress(progress)
                     avg_30d = latest_details.get("avg_30d")
 
@@ -459,7 +480,6 @@ def main() -> None:
     # 동행성은 +0.533으로 멀쩡한 지표인데 절반이 뭉개져 점수에 기여를 못 한 것이다. 이제
     # lead(-75~+45)를 그대로 0~100에 펴서, 실물이 크게 앞서면 '차갑다'로 읽히게 한다.
     # 카드는 여전히 lead의 부호로 "실물 X% 강세"↔"증시 X% 강세"를 양방향으로 보여준다.
-    LEAD_FLOOR, LEAD_CEIL = -75.0, 45.0
     by_slug = {r["slug"]: r for r in results}
     sb = by_slug.get("small_business_crisis_index")
     hg = by_slug.get("kospi_high_gap")
@@ -469,7 +489,7 @@ def main() -> None:
         real_strength, ccsi_value = ccsi
         market_strength, gap_pct = mkt
         lead = market_strength - real_strength  # +면 증시 앞섬, −면 실물 앞섬
-        sb["progress"] = (lead - LEAD_FLOOR) / (LEAD_CEIL - LEAD_FLOOR) * 100
+        sb["progress"] = lead_progress(lead)
         sb["capped_progress"] = cap_progress(sb["progress"])
         sb["hit"] = sb["capped_progress"] >= HOT_ZONE
         # 카드에 적을 기준선도 같은 척도로 되돌린다(진행률 75가 되는 lead 값).

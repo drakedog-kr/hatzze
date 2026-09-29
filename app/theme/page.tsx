@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { assertLoaded } from "@/lib/load-state";
 import { listThemeOverview, listThemeRisers, themeUpdatedAt } from "@/lib/theme-page";
 
 import { THEME_CARD } from "../og-copy";
@@ -32,6 +33,9 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function ThemeIndexPage() {
   if (!PUBLIC && DEPLOYED) notFound();
   const [themes, risersAll, updatedAt] = await Promise.all([listThemeOverview(), listThemeRisers(), themeUpdatedAt("kr")]);
+  // 조회가 5xx 로 죽었으면 던진다 — "불러오지 못했습니다" 화면을 사본(ISR)에 담지 않는다(lib/load-state.ts).
+  // 목록 함수들은 실패를 null 로 돌려줘서, 이게 없으면 그 렌더가 성공으로 쳐져 다음 재생성(최대 한 시간)까지 나간다.
+  assertLoaded("/theme");
   // 이유를 못 쓴 종목(등락률 목록에만 있던 것)은 싣지 않는다 — "이유를 말한 곳이 없습니다"가 줄을 차지했다(2026-09-22).
   const risers = risersAll === null ? null : risersAll.filter((r) => r.reason);
   return <ThemeIndexView market={KR_MARKET} themes={themes} risers={risers} updatedAt={updatedAt} />;

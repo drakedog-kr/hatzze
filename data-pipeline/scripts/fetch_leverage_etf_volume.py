@@ -81,6 +81,11 @@ OPEN_INTEREST_KEY = "ACC_OPNINT_QTY"
 
 ETF_THRESHOLD = 40_000.0  # 억원 (4조원) — 기존 leverage_etf_volume 기준값
 OI_SURGE_THRESHOLD = 150.0  # 최근 1년 평균 대비 %, "완전히 달아오름" 기준
+# 미결제약정 평균은 날짜마다 '그날까지 1년(달력일)'으로 낸다(oi_avg_on 참고).
+OI_AVG_DAYS = 365
+# 평균이 널뛰지 않을 최소 표본. 원본이 쌓이기 시작한 직후(2025-07)는 평균이 며칠치뿐이라
+# 오늘/평균이 늘 100% 근처로 나온다 — 그런 날은 종합 지수를 쓰지 않는다.
+OI_AVG_MIN_SAMPLE = 60
 
 ETF_RAW_SLUG = "leverage_etf_trade_value_raw"
 ETF_RAW_META = {
@@ -133,6 +138,22 @@ def get_values(client, indicator_id: str, start: date) -> dict[str, float]:
         .execute()
     )
     return {row["date"]: float(row["raw_value"]) for row in result.data}
+
+
+def oi_avg_on(oi_values: dict[str, float], d: str) -> float | None:
+    """d 까지 1년(OI_AVG_DAYS) 미결제약정 평균. 표본이 OI_AVG_MIN_SAMPLE 보다 적으면 None.
+
+    ⚠️ **날짜마다 그날까지만 본다.** 예전엔 불러온 1년치 전체 평균 하나를 모든 날짜에 썼다.
+    최신 행은 그게 곧 '최근 1년 평균'이라 맞지만, 지난 행은 그 뒤의 약정까지 섞인 평균이라
+    매 실행 값이 바뀌었다 — 06-01 부터 약정이 두 배가 되면 03-02 행이 그날 58.33 에서
+    09-29 재실행 50.02 로 내려간다(tests/test_leverage_oi_avg.py). 점수·카드는 최신 행만
+    읽어 멀쩡했지만 recompute_score_history 와 백테스트가 이 지난 행으로 계산한다.
+    """
+    start = (date.fromisoformat(d) - timedelta(days=OI_AVG_DAYS)).isoformat()
+    window = [v for k, v in oi_values.items() if start <= k <= d]
+    if len(window) < OI_AVG_MIN_SAMPLE:
+        return None
+    return sum(window) / len(window)
 
 
 def fetch_leverage_etf_trading_value(bas_dd: str) -> float | None:
@@ -244,7 +265,9 @@ def main() -> None:
     today = date.today()
     start = today - timedelta(days=BACKFILL_DAYS)
     etf_values = get_values(client, etf_raw_id, start)
-    oi_values = get_values(client, oi_raw_id, start)
+    # 맨 앞 날짜도 '그날까지 1년' 평균을 내도록 미결제약정은 1년을 더 읽는다(약 500행,
+    # 1,000행 상한 안). 다시 쓰는 날짜는 그대로 최근 1년이다 — etf_values 가 거기서 끊긴다.
+    oi_values = get_values(client, oi_raw_id, start - timedelta(days=OI_AVG_DAYS))
     print(
         f"[종합 지수] ETF 거래대금 {len(etf_values)}건, 선물 미결제약정 {len(oi_values)}건 보유"
     )
@@ -256,16 +279,18 @@ def main() -> None:
         )
         return
 
-    oi_avg = sum(oi_values.values()) / len(oi_values)
-
-    common_dates = sorted(set(etf_values) & set(oi_values))
+    oi_avg = {d: oi_avg_on(oi_values, d) for d in set(etf_values) & set(oi_values)}
+    common_dates = sorted(d for d, avg in oi_avg.items() if avg is not None)
     if not common_dates:
-        print("[종합 지수] ETF·선물 공통 날짜가 없어 종합 지수를 계산할 수 없습니다")
+        print(
+            "[종합 지수] ETF·선물 공통 날짜가 없거나 미결제약정 평균 표본이 "
+            f"{OI_AVG_MIN_SAMPLE}일 미만이라 종합 지수를 계산할 수 없습니다"
+        )
         return
 
     def composite_for(d: str) -> tuple[float, float, float, float]:
         etf_progress = etf_values[d] / ETF_THRESHOLD * 100
-        oi_surge_pct = oi_values[d] / oi_avg * 100
+        oi_surge_pct = oi_values[d] / oi_avg[d] * 100
         oi_progress = oi_surge_pct / OI_SURGE_THRESHOLD * 100
         composite = etf_progress * 0.5 + oi_progress * 0.5
         return etf_progress, oi_progress, composite, oi_surge_pct
@@ -316,7 +341,7 @@ def main() -> None:
         f"[종합 지수] 최신값 ({latest_date} 기준): "
         f"ETF 거래대금 {etf_values[latest_date]:.1f}억원(진행률 {etf_progress:.1f}%), "
         f"선물 미결제약정 {oi_values[latest_date]:,.0f}계약"
-        f"(1년 평균 대비 {oi_values[latest_date] / oi_avg * 100:.1f}%, 진행률 {oi_progress:.1f}%), "
+        f"(1년 평균 대비 {oi_values[latest_date] / oi_avg[latest_date] * 100:.1f}%, 진행률 {oi_progress:.1f}%), "
         f"종합 지수 {composite:.2f}pt"
     )
 

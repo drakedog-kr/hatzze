@@ -31,6 +31,11 @@ from common.indicator import ensure_indicator  # noqa: E402
 # genre=6015 = 금융(Finance). limit=100 상위 100개 무료앱.
 RSS_URL = "https://itunes.apple.com/kr/rss/topfreeapplications/genre=6015/limit=100/json"
 LIMIT = 100
+# 이보다 적게 오면 비었거나 잘린 응답으로 보고 멈춘다. 금융 차트는 100개가 꽉 차 있어 비는 일이
+# 없다 — 그대로 점수를 내면 '증권 앱이 차트에서 빠졌다'(0점·바닥)와 구분이 안 되고, 오늘 날짜
+# 행이라 check_freshness 도 못 잡는다. 잘린 차트도 그 아래 증권 앱 몫이 빠져 점수가 눌린다.
+# 몇 개 모자란 정도로는 멈추지 않게 문턱은 절반으로 둔다.
+MIN_ENTRIES = LIMIT // 2
 REQUEST_TIMEOUT_SEC = 15
 
 # 증권(주식거래) 앱 식별 키워드 — 앱 이름 또는 판매사(artist)에 포함되면 증권 앱으로 본다.
@@ -71,6 +76,10 @@ def fetch_brokerage_froth() -> tuple[float, list[dict]]:
     entries = resp.json().get("feed", {}).get("entry", [])
     if isinstance(entries, dict):  # 결과가 1개면 dict로 올 수 있어 리스트로 정규화
         entries = [entries]
+    if len(entries) < MIN_ENTRIES:
+        raise RuntimeError(
+            f"앱스토어 금융 차트가 {len(entries)}개뿐입니다(요청 {LIMIT}개) — 응답이 비었거나 잘렸습니다"
+        )
 
     charted: list[dict] = []
     score = 0.0

@@ -364,6 +364,8 @@ def main() -> None:
     fx = usdkrw()
     key = FINNHUB_API_KEY or ""
     sa_fail = 0
+    # 페이지를 못 받은 ETF(타임아웃·429·5xx·구조 변경). 아래 정리 단계가 이들의 저장된 행은 둔다.
+    sa_missed: set[str] = set()
     for e in US_ETFS:
         # 지급 건은 stockanalysis 가 먼저다. 못 받으면 설정의 `pays`(있을 때)로.
         pays: list[tuple[str, float]] = []
@@ -373,6 +375,8 @@ def main() -> None:
         except PageChanged:
             hist = None
             sa_fail += 1
+        if hist is None:
+            sa_missed.add(e["code"])
         nxt = None
         if hist:
             paid, nxt = trailing(hist, today)
@@ -401,7 +405,7 @@ def main() -> None:
         r["usdkrw"] = fx[0] if fx else None
         r["usdkrw_date"] = fx[1] if fx else None
 
-    print(f"[ETF] {len(rows)}종목 (국내 {kr_count} · 미국 {len(rows) - kr_count}, stockanalysis 실패 {sa_fail}) · 시세 국내 {latest[0] if latest else '없음'}"
+    print(f"[ETF] {len(rows)}종목 (국내 {kr_count} · 미국 {len(rows) - kr_count}, stockanalysis 못 받음 {len(sa_missed)} · 그중 파싱 실패 {sa_fail}) · 시세 국내 {latest[0] if latest else '없음'}"
           + (f" · 환율 {fx[0]:,.2f}({fx[1]})" if fx else " · 환율 없음"))
     for r in [x for x in rows if x["currency"] == "USD"] + [x for x in rows if x["currency"] == "KRW"][:8]:
         unit = "$" if r["currency"] == "USD" else "원"
@@ -423,6 +427,10 @@ def main() -> None:
         if got < (MIN_ROWS_TO_PRUNE if market == "KR" else 10):
             continue
         keep = {r["code"] for r in rows if r["market"] == market}
+        if market == "US":
+            # ⚠️ 페이지를 못 받아 건너뛴 ETF 는 '이번에 안 나온 행'이 아니다 — 지우면 다음 실행까지 화면에서 사라진다.
+            #    어제 행을 둔다. 404(없는 티커)도 None 이라 여기 들지만 목록에서 빼면 다음 실행에 지워진다.
+            keep |= sa_missed
         stale = [r["code"] for r in db.table(TABLE).select("code").eq("market", market).execute().data if r["code"] not in keep]
         if stale:
             db.table(TABLE).delete().in_("code", stale).execute()

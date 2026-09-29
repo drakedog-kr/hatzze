@@ -702,6 +702,9 @@ export type UsTrendingMessage = {
  * 겹침을 막으려는 게 아니라(공백 없이도 안 겹친다) 경계를 갓 넘어온 날을 막으려는
  * 것이다 — 공백이 없으면 기준 창의 가장 최근 날이 '어제까지 최근 창에 있던 날'이라,
  * 최근 3일을 하루 밀린 자기 자신과 견주는 꼴이 된다.
+ *
+ * ⚠️ 미장 총평 둘째 대목이 적는 점유율은 이 표의 값이다 — 파이썬 사본
+ * (generate_us_telegram_narratives.theme_window_shares)이 같은 창·같은 평균으로 낸다.
  */
 const THEME_SERIES_DAYS = 14;
 const THEME_RECENT_DAYS = 3;
@@ -919,6 +922,8 @@ export async function getUsDailyBrief(): Promise<{ date: string | null; paragrap
  * 종목 선정은 **파이프라인과 같은 규칙**이어야 한다(창 안 언급 수 내림차순). 규칙이
  * 갈리면 화면에 뜨는 종목의 문장이 비는데, 그게 가장 알아채기 어려운 어긋남이다 —
  * 파이프라인은 자기 목록만 보고 "다 만들었다"고 끝낸다.
+ * 창도 같아야 한다 — 기준일을 뺀 앞 US_WINDOW_DAYS 일(generate_us_telegram_narratives.card_window).
+ * 저쪽이 기준일을 넣은 사흘로 고르던 때(~2026-09-29) 이 카드와 하루 어긋났다.
  */
 export async function getUsStockReports(limit = 4): Promise<UsStockReport[]> {
   const db = getSupabaseAdmin();

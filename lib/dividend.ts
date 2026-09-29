@@ -448,6 +448,8 @@ export async function getDividendData(): Promise<DividendData | null> {
   const priceDate = all.reduce<string | null>((m, s) => (s.priceDate && s.priceDate > (m ?? "") ? s.priceDate : m), null);
   // 종가 날짜가 최신이 아닌 종목은 상장폐지된 것이다(`stocks` 는 지우지 않는다 — fetch_krx_stocks.py).
   // 거래정지는 KRX 목록에 그대로 있어 여기 안 걸린다. 검색에 뜨면 옛 값으로 계산되니 뺀다.
+  // ⚠️ 코스피·코스닥이 늘 같은 날짜로 올라온다는 전제다 — fetch_krx_stocks.py 가 한 시장이라도 비면 둘 다 안 올린다.
+  //    한 시장만 올라가면 이 필터가 다른 시장 전부를 상장폐지로 본다.
   const kr = priceDate ? all.filter((s) => s.priceDate === priceDate) : all;
   const [us, etf, highDiv, payout] = await Promise.all([loadUs(report), loadEtf(report), loadHighDiv(report), loadPayout(report)]);
   const krByCode = new Map(kr.map((s) => [s.code, s]));

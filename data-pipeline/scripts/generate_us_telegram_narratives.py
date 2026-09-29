@@ -10,7 +10,7 @@
 ## 대목이 맡는 재료 (국내와 같은 얼개다)
 
   ① 분위기   [오늘 하루] + [전체] 낙관도·추이        100~115자 · 2문장
-  ② 테마 지형 [오늘 테마별] 몫 + [미장 쏠림 화제어]   150~170자 · 2문장
+  ② 테마 지형 [오늘 테마별] 차례 + [미장 쏠림 화제어]  150~170자 · 2문장
   ③ 이야기   [오늘 오간 이야기] 발췌 + [화제 종목]    185~210자 · 3문장
   ④ 일정     [오간 앞으로의 일정] 발췌               110~165자 · 2문장
 
@@ -39,6 +39,8 @@
 어느 쪽이 옳으냐보다 **둘이 같은 사흘을 말하는 것**이 먼저다. 국내에서 이게 두 번 어긋났고
 (길이 한 번, 끝점 한 번) 둘 다 화면의 숫자와 문장이 다른 값을 말했다.
 ⚠️ 저쪽 US_WINDOW_DAYS 를 바꾸면 여기 WINDOW_DAYS 도 같이 바꿀 것.
+⚠️ **종목 리포트는 기준일을 빼고 센다**(발췌만 기준일까지). 그 카드(getUsStockReports)는
+loadUsStockDaily(windowBefore)로 읽어 기준일 앞 사흘을 세기 때문이다 — card_window · build_stock_digests 주석.
 
 실행:
     cd data-pipeline && source .venv/bin/activate
@@ -58,6 +60,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
+from common.js_round import js_fixed1  # noqa: E402
 from common.market_sentiment import MARKET_MIN_MESSAGES, load_market_daily  # noqa: E402
 from common.supabase_client import get_client, load_all, load_window_keyset  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
@@ -85,12 +88,12 @@ from generate_telegram_narratives import (  # noqa: E402
     BRIEF_NEWS_COMMON,
     MODEL,
     NEWS_SCHEDULE_NOTE,
-    SCHEDULE_BLOCK_HEAD,
     SCHEDULE_EXCERPTS,
     SENTIMENT_WINDOW_DAYS,
     brief_body,
     excerpt,
     first_sentences,
+    has_schedule_block,
     kst_date,
     optimism,
     percent_count,
@@ -136,6 +139,10 @@ BASE_DAY_MIN_MARKET = 60
 COMENTION_ROWS = 5     # 셋째 대목에 줄 '함께 언급된 국내 종목' 짝 수
 STOCK_EXCERPTS = 3     # 종목 한 건당 발췌 수
 THEME_TOP_N = 5        # 화면 테마 카드가 8줄이지만 digest 는 위 5개면 충분하다
+# 테마 로테이션 표가 점유율을 내는 창. ⚠️ lib/us-telegram-data.ts 의 THEME_SERIES_DAYS ·
+# THEME_RECENT_DAYS 와 같은 값이어야 한다(theme_window_shares 주석).
+THEME_SERIES_DAYS = 14
+THEME_RECENT_DAYS = 3
 KEYWORD_TOP_N = 8
 
 
@@ -206,8 +213,8 @@ BRIEF_THEME_SYSTEM = US_COMMON + f"""
 [오늘 테마별]과 [미장 쏠림 화제어]를 근거로, **오늘 미국 이야기가 어디에 몰려 있는지**를
 **두 문장**으로 쓰세요. 앞 대목이 온도 하나를 말했으니 여기는 그 관심이 어디에 있는지를 맡습니다.
 
-- **[오늘 테마별]은 기준일 하루의 몫입니다.** '최근 며칠'이 아니라 오늘 이야기로 쓰세요.
-  반대로 [미장 쏠림 화제어]는 사흘치라 '오늘'이라고 부르지 마세요.
+- **[오늘 테마별]의 차례는 기준일 하루 것입니다.** 어디에 몰렸는지는 '최근 며칠'이 아니라
+  오늘 이야기로 쓰세요. 반대로 [미장 쏠림 화제어]는 사흘치라 '오늘'이라고 부르지 마세요.
 - **테마는 반드시 둘 이상 집으세요.** 1위만 적으면 이 대목이 매일 같은 얼굴이 됩니다.
   1위를 쓰고, **그 아래에서 한 가지를 더** 집어 대비를 만드세요.
 - [미장 쏠림 화제어]는 **전체 대화보다 미국 이야기에 유난히 몰린 말**입니다. 그냥 흔한
@@ -215,8 +222,13 @@ BRIEF_THEME_SYSTEM = US_COMMON + f"""
   ⚠️ 쏠림 배수(4.3배 같은 숫자)는 **쓰지 마세요.** 옆 카드가 그 숫자를 찍습니다.
 - ⚠️ **점유율 퍼센트는 딱 하나만 씁니다.** 나쁜 예: "AI반도체가 33.5%, 금융이 13.5%,
   메모리가 12.2%를 차지했습니다" — 숫자가 셋이면 읽는 사람이 어느 것이 중요한지 못
-  고르고, 그 숫자는 바로 옆 표에 이미 다 있습니다. 1위만 숫자로 쓰고 나머지는
+  고르고, 그 숫자는 화면 테마 표에 이미 다 있습니다. 1위만 숫자로 쓰고 나머지는
   "그 뒤를 금융과 메모리가 이었습니다"처럼 **말로** 적으세요.
+- ⚠️ **그 퍼센트는 [오늘 테마별]에 적힌 '최근 {THEME_RECENT_DAYS}일 점유율'이고, 문장에도
+  '최근 {THEME_RECENT_DAYS}일'이라고 밝힙니다.** 화면 테마 표가 찍는 값과 같은 숫자입니다. 오늘
+  하루의 점유율은 일부러 안 적었습니다 — 표에 없는 숫자라 독자가 확인할 곳이 없습니다.
+  "오늘 점유율 ○%"라고 쓰지 마세요. 차례('가장 많이 몰린')는 오늘 것이라 표의 순위와 다를 수
+  있습니다 — 순위는 오늘 차례로만 말하세요.
 - 종목명·구체적 사건은 셋째 대목 몫이니 여기서 미리 쓰지 마세요.
 - **길이는 {BRIEF_THEME_LEN[0]}~{BRIEF_THEME_LEN[1]}자**(공백 포함) · **두 문장.**"""
 
@@ -327,6 +339,17 @@ def window_dates(latest: str) -> tuple[str, str]:
     return (end - timedelta(days=WINDOW_DAYS - 1)).isoformat(), end.isoformat()
 
 
+def card_window(latest: str) -> tuple[str, str]:
+    """주요 종목 리포트 카드가 세는 구간 — **기준일을 뺀** 앞 WINDOW_DAYS 일.
+
+    카드(lib/us-telegram-data.ts getUsStockReports)는 loadUsStockDaily 의 windowBefore 로 읽어
+    기준일을 빼고 센다. 총평(window_dates)과 달리 이쪽은 국장 종목 요약과 같은 규칙이다 —
+    세는 창은 기준일을 빼고, 발췌는 기준일 것까지 본다(build_stock_digests).
+    """
+    end = date.fromisoformat(latest) - timedelta(days=1)
+    return (end - timedelta(days=WINDOW_DAYS - 1)).isoformat(), end.isoformat()
+
+
 def load_us_messages(db, since_date: str) -> list[dict]:
     """창 안의 **미국 종목을 언급한** 메시지. 본문·언급 티커·매칭 표기를 함께 준다.
 
@@ -389,6 +412,52 @@ def news_sample(msgs: list[dict], since: str, end: str) -> tuple[list[dict], lis
             break
     used.sort()
     return picked, used
+
+
+def theme_window_shares(rows: list[dict]) -> dict[str, float]:
+    """테마 로테이션 표(lib/us-telegram-data.ts getUsThemeRotation)가 찍는 점유율 — 테마 → %.
+
+    저쪽과 같은 규칙이다. 기준은 이 표의 최신 날짜, 그 앞 THEME_SERIES_DAYS 일 안에서 **날짜가
+    있는** 마지막 THEME_RECENT_DAYS 날의 평균이고, 그날 안 뜬 테마는 0 으로 쳐 창 날짜 수로 나눈다.
+    """
+    if not rows:
+        return {}
+    base = max(r["date"] for r in rows)
+    since = (date.fromisoformat(base) - timedelta(days=THEME_SERIES_DAYS - 1)).isoformat()
+    # 날짜 차례로 더한다 — 저쪽이 날짜 오름차순으로 reduce 하고, 실수 덧셈은 차례에 따라 끝자리가
+    # 갈려 toFixed(1) 이 0.1 어긋난다. load_all 은 무작위 id 차례로 준다.
+    win = sorted((r for r in rows if since <= r["date"] <= base), key=lambda r: r["date"])
+    recent = set(sorted({r["date"] for r in win})[-THEME_RECENT_DAYS:])
+    sums: dict[str, float] = {}
+    for r in win:
+        sums[r["theme"]] = sums.get(r["theme"], 0.0) + (
+            float(r["share_pct"] or 0) if r["date"] in recent else 0.0
+        )
+    return {t: v / max(1, len(recent)) for t, v in sums.items()}
+
+
+def theme_lines(rows: list[dict], end: str) -> list[str]:
+    """총평 둘째 대목의 [오늘 테마별] 블록. rows 는 telegram_us_theme_daily 행.
+
+    **차례는 오늘 것, 퍼센트는 표의 것이다**(파일 머리 '숫자는 창 것, 주제는 오늘 것').
+    예전엔 기준일 하루의 share_pct 를 줬는데, 그 숫자를 확인할 곳인 테마 로테이션 표는
+    최근 3일 평균을 찍는다. 오늘 하루 40% 로 튄 테마를 요약은 40% 라 적고 표는 26.7% 로
+    찍었다. 하루치 언급 수도 화면에 없어 같이 뺐다(첫째 대목 [오늘 하루]와 같은 처리).
+    """
+    themes = [r for r in rows if r["date"] == end]
+    if not themes:
+        return []
+    shares = theme_window_shares(rows)
+    lines = ["", f"[오늘 테마별] {end} 하루 미국 언급이 많이 몰린 차례 (상위 {THEME_TOP_N}개)"]
+    for r in sorted(themes, key=lambda r: r["rank"])[:THEME_TOP_N]:
+        # toFixed(1) 과 같은 반올림(동점은 큰 쪽) — `:.1f` 는 12.25 를 12.2 로 적어 표의 12.3 과 갈린다.
+        lines.append(f"- {r['theme']} · 최근 {THEME_RECENT_DAYS}일 점유율 {js_fixed1(shares.get(r['theme'], 0.0))}%")
+    lines.append(
+        f"  ※ 오늘 하루의 점유율은 일부러 안 적었습니다. 화면 테마 표가 최근 {THEME_RECENT_DAYS}일 평균이라"
+        f" 확인할 곳이 없습니다. 퍼센트는 위 최근 {THEME_RECENT_DAYS}일 값만 쓰고 '최근 {THEME_RECENT_DAYS}일'이라고"
+        " 밝히세요. 차례는 오늘 하루 것이라 표의 순위와 다를 수 있습니다."
+    )
+    return lines
 
 
 def build_brief_digest(db, latest: str, msgs: list[dict], name_of: dict[str, str]) -> str | None:
@@ -505,15 +574,9 @@ def build_brief_digest(db, latest: str, msgs: list[dict], name_of: dict[str, str
         ]
 
     # ── 테마 ────────────────────────────────────────────────────────────────
-    themes = [
-        r
-        for r in load_all(db, "telegram_us_theme_daily", "date,theme,share_pct,mention_count,rank")
-        if r["date"] == end
-    ]
-    if themes:
-        lines += ["", f"[오늘 테마별] {end} 하루의 미국 언급에서 차지한 몫 (상위 {THEME_TOP_N}개)"]
-        for r in sorted(themes, key=lambda r: r["rank"])[:THEME_TOP_N]:
-            lines.append(f"- {r['theme']}: 점유율 {float(r['share_pct']):.1f}% · 언급 {r['mention_count']}회")
+    lines += theme_lines(
+        load_all(db, "telegram_us_theme_daily", "date,theme,share_pct,rank"), end
+    )
 
     # ── 쏠림 화제어 ─────────────────────────────────────────────────────────
     kws = (
@@ -613,16 +676,32 @@ def build_stock_digests(
 
     `tickers` 를 주면 **그 종목들만** 만든다(순서도 준 대로). 급부상 한 줄 요약
     (scripts/generate_surging_oneliners.py)이 쓰는 길이다 — 국내 짝과 같은 얼개다.
-    창에 언급이 없는 티커는 재료가 없어 조용히 빠진다."""
-    since, end = window_dates(latest)
-    win = [m for m in msgs if since <= m["date"] <= end]
+    창에 언급이 없는 티커는 재료가 없어 조용히 빠진다.
 
-    by_ticker: dict[str, list[dict]] = defaultdict(list)
-    for m in win:
-        for x in m["mentions"]:
-            # 은행이 전망을 말한 글은 그 은행의 종목 요약 재료가 아니다(config.RESEARCH_HOUSES 주석).
-            if not is_house(x):
-                by_ticker[x["ticker"]].append({**m, "match_text": x.get("match_text")})
+    ⚠️ **창이 길마다 다르다.** `tickers` 없이 부르면 주요 종목 리포트 카드의 창(card_window —
+    기준일을 뺀 앞 3일)으로 종목을 고르고 센다. 기준일을 넣은 창으로 고르던 때는 카드와
+    사흘이 하루 어긋나, 기준일 앞 사흘째에 몰린 종목이 카드에 뜨고도 그날 요약이 없었다
+    (아래 required 도 자기 목록만 봐서 검사를 통과했다). `tickers` 를 주는 길은 예전 그대로
+    window_dates(기준일 포함)다 — 테마 급부상(common/us_theme_risers)이 기준일을 넣어 센다.
+    메시지는 두 창을 다 덮게 받아 넘길 것(main 참고)."""
+    since, end = window_dates(latest) if tickers is not None else card_window(latest)
+
+    def by_ticker_in(until: str) -> dict[str, list[dict]]:
+        out: dict[str, list[dict]] = defaultdict(list)
+        for m in msgs:
+            if not since <= m["date"] <= until:
+                continue
+            for x in m["mentions"]:
+                # 은행이 전망을 말한 글은 그 은행의 종목 요약 재료가 아니다(config.RESEARCH_HOUSES 주석).
+                if not is_house(x):
+                    out[x["ticker"]].append({**m, "match_text": x.get("match_text")})
+        return out
+
+    by_ticker = by_ticker_in(end)
+    # 발췌는 기준일 것까지 본다(국장 종목 요약과 같은 규칙) — 세는 값이 아니라 '무엇이 화제였나'의
+    # 예시라, 기준일을 빼면 아침 실행이 밤사이 미장 마감 소식을 못 보고 하루 늦은 얘기를 한다.
+    # 고르기·언급 수·[일별]은 위 창(카드와 같은 사흘) 그대로다.
+    excerpt_pool = by_ticker_in(latest)
 
     # 동률은 티커로 가른다 — 안 가르면 메시지를 받은 순서가 순위를 정하고, 그 순서는
     # 조회 방식이 바뀔 때마다 달라진다(2026-09-15 실측: GS·SPCX 124회 동률이 뒤집혔다).
@@ -640,7 +719,7 @@ def build_stock_digests(
         name = name_of.get(ticker, ticker)
         by_day = Counter(m["date"] for m in items)
         chans = len({m["channel_handle"] for m in items})
-        top = sorted(items, key=lambda m: -(m.get("views") or 0))[:STOCK_EXCERPTS]
+        top = sorted(excerpt_pool[ticker], key=lambda m: -(m.get("views") or 0))[:STOCK_EXCERPTS]
         lines = [
             f"[종목] {name} ({ticker}) · 미국 상장",
             f"[최근 {WINDOW_DAYS}일] 언급 {len(items)}회 · {chans}개 채널",
@@ -675,14 +754,16 @@ def main() -> None:
         return
     latest = rows[0]["date"]
     since, end = window_dates(latest)
-    print(f"[기준일] {latest} (창 {since} ~ {end})")
+    card_since, card_end = card_window(latest)
+    print(f"[기준일] {latest} (창 {since} ~ {end} · 종목 리포트 {card_since} ~ {card_end})")
 
     name_of = {
         s["ticker"]: s["name_ko"]
         for s in load_all(db, "us_stocks", "ticker,name_ko", order_by="ticker")
     }
-    msgs = load_us_messages(db, since)
-    print(f"[재료] 창 안 미국 언급 메시지 {len([m for m in msgs if m['date'] <= end]):,}건")
+    # 종목 리포트 창이 하루 앞에서 시작하므로 그만큼 앞에서부터 받는다(총평은 제 창으로 다시 자른다).
+    msgs = load_us_messages(db, min(since, card_since))
+    print(f"[재료] 창 안 미국 언급 메시지 {len([m for m in msgs if since <= m['date'] <= end]):,}건")
 
     brief_digest = build_brief_digest(db, latest, msgs, name_of)
     stock_digests, required = build_stock_digests(latest, msgs, name_of)
@@ -765,7 +846,7 @@ def main() -> None:
                 ("news", BRIEF_NEWS_SYSTEM, BRIEF_NEWS_LEN),
             ]
             # 넷째 대목은 **재료가 있는 날만** 쓴다(국장 쪽 같은 자리의 주석 참고).
-            if SCHEDULE_BLOCK_HEAD in brief_digest:
+            if has_schedule_block(brief_digest):
                 slots.append(("schedule", BRIEF_SCHEDULE_SYSTEM, BRIEF_SCHEDULE_LEN))
             paragraphs = []
             for key, system, length in slots:

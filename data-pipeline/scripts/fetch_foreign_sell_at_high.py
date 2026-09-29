@@ -66,7 +66,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.ecos_client import EcosUnavailableError, statistic_search  # noqa: E402
+from common.ecos_client import EcosNoDataError, EcosUnavailableError, statistic_search  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 
@@ -102,7 +102,14 @@ def _ecos_daily(item_code: str, start: str, end: str) -> dict[str, float]:
         hi = min(end, f"{year}1231")
         if lo > hi:
             continue
-        for row in statistic_search(ECOS_STAT_CODE, ECOS_CYCLE, lo, hi, item_code, count=1000):
+        try:
+            rows = statistic_search(ECOS_STAT_CODE, ECOS_CYCLE, lo, hi, item_code, count=1000)
+        except EcosNoDataError:
+            # 연 단위로 자르면 개장일이 하나도 없는 조각이 생긴다 — 새해 첫 개장일 자료가
+            # 올라오기 전의 올해 조각(1/1 저녁·1/2 아침 실행 …), 시작일이 휴장인 12/31 하루로
+            # 잘린 첫 조각. 빈 조각일 뿐이라 건너뛴다(전체 표본이 모자라면 build_rows 가 따로 멈춘다).
+            continue
+        for row in rows:
             out[row["TIME"]] = float(row["DATA_VALUE"])
     return out
 

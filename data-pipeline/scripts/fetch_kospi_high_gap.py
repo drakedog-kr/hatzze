@@ -68,6 +68,10 @@ SPEED_SLUG = "kospi_speed_60d"
 # 차트 축이 달력일인 건 x축이 시간이라 그 단위가 자연스러워서다(실제 span 은 60거래일
 # ≈ 84일이라 90은 어림값이다). 정확한 거래일 수는 여기 상수와 코드 주석에만 둔다.
 SPEED_WINDOW = 60
+# compute_speed 가 읽는 종가 창(달력일). 약 500행이라 1,000행 상한 안이고, 앞 60거래일을 뺀
+# 나머지 날짜의 행을 매번 다시 쓴다. 그보다 오래된 속도 행은 마지막에 쓴 값 그대로 남는데,
+# 60거래일 앞 종가만 보는 값이라 창을 잘라도 달라지지 않는다.
+SPEED_LOOKBACK_DAYS = 2 * BACKFILL_DAYS
 SPEED_META = {
     "slug": SPEED_SLUG,
     "name": "코스피 상승 속도",
@@ -133,16 +137,22 @@ def backfill_raw_prices(client, raw_indicator_id: str) -> None:
 
 
 def compute_speed(client, raw_indicator_id: str) -> list[dict]:
-    """60거래일 수익률을 계산 가능한 **모든 날짜**에 대해 돌려준다.
+    """60거래일 수익률을 최근 SPEED_LOOKBACK_DAYS 창에서 계산 가능한 **모든 날짜**에 대해 돌려준다.
 
     gap 과 달리 오늘 한 행만 쓰지 않고 전량 재계산하는 이유는 fetch_kosdaq_ratio·
     fetch_upbit_speculation 과 같다 — 공식이 바뀔 수 있는 파생값이라 "이미 있는 날짜는
     건너뛰기"로 두면 과거 값이 낡은 채 남는다. 카드의 추세선도 이 히스토리를 쓴다.
+
+    ⚠️ **날짜 창을 건다.** 예전엔 창 없이 오름차순 전부를 받았는데, 이 표는 지우는 곳 없이
+    해마다 약 245행씩 자라 1,000행을 넘는 순간(2029년께) PostgREST 가 에러 없이 **가장 오래된
+    1,000행만** 준다 — kospi_speed_60d 가 그 날짜에 멈춘다(tests/test_kospi_speed_window.py).
     """
+    window_start = (today_kst() - timedelta(days=SPEED_LOOKBACK_DAYS)).isoformat()
     rows = (
         client.table("indicator_values")
         .select("date,raw_value")
         .eq("indicator_id", raw_indicator_id)
+        .gte("date", window_start)
         .order("date")
         .execute()
     ).data

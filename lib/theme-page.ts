@@ -17,6 +17,7 @@ import {
 import { THEMES } from "./stock-themes";
 import { getEventsForCodes, todayKst, type UpcomingEvent } from "./kadera-why";
 import { isLoadFailed } from "./load-state";
+import { parseRisers, type RiserRow, type ThemeRiser } from "./theme-risers";
 import { changeRateOf, fetchYahooQuote } from "./yahoo-quote";
 
 /**
@@ -65,6 +66,7 @@ export const THEME_REASON_DAYS = THEME_TREND_DAYS;
 
 // 주소 만들기·되돌리기는 lib/theme-href.ts 에 있다(셸도 읽어야 해서 server-only 밖이다).
 export { THEME_NAMES, themeFromParam, themeHref, themeSlug } from "./theme-href";
+export { RISER_MAX, RISER_MIN_MENTIONS, RISER_MIN_RATIO, parseRisers, type RiserRow, type ThemeRiser } from "./theme-risers";
 
 export type ThemeMember = { code: string; name: string; market: string | null };
 
@@ -328,7 +330,8 @@ export function buildHotStocks(
  * 실패한 칸은 "불러오지 못했습니다"라고 말한다(loadFailed).
  */
 export const getThemePage = cache(async (theme: string): Promise<ThemePageData | null> => {
-  if (!(theme in THEMES)) return null;
+  // 자기 키만 본다 — `in` 이면 "constructor" 가 통과해 아래 themeMembers 가 names.slice 에서 죽는다(lib/theme-href.ts).
+  if (!Object.hasOwn(THEMES, theme)) return null;
   const db = getSupabaseAdmin();
 
   const [members, baseDate] = await Promise.all([themeMembers(theme), kaderaBaseDate()]);
@@ -630,59 +633,7 @@ export async function listThemeOverview(): Promise<ThemeOverview[] | null> {
 }
 
 // ─── 갑자기 많이 언급된 종목(/theme 카드) ───────────────────────────────
-
-/** 후보가 되려면 최근 사흘에 이만큼은 언급돼야 한다. 두세 번 스친 작은 종목이 "10배"로 오르는 걸 막는다. */
-export const RISER_MIN_MENTIONS = 5;
-/** '말이 늘었다'고 칠 최소 배수. 종목 지도의 첫 색 단(1.5배)과 같다. 그 아래는 늘었다기보다 요동이다. */
-export const RISER_MIN_RATIO = 1.5;
-/** 카드에 세우는 최대 줄 수. 후보가 적으면 적은 대로 보인다 — '더 보기'는 두지 않는다(2026-09-21). */
-export const RISER_MAX = 10;
-
-export type ThemeRiser = {
-  theme: string;
-  code: string;
-  name: string;
-  market: string | null;
-  /** 최근 사흘 언급. */
-  recent: number;
-  /** 그 앞 사흘 언급. 0 이면 새로 등장. */
-  prior: number;
-  /** recent / prior. prior 가 0 이면 null(새로 등장). */
-  ratio: number | null;
-  /** 채널이 말한 까닭(LLM, 50~90자). 파이프라인이 못 썼으면 null. */
-  reason: string | null;
-};
-
-/** 요약 행의 riser 칸(파이프라인이 쓴 그대로). code 는 국장이면 6자리 코드, 미장이면 티커. */
-export type RiserRow = { theme: string; date: string; riser: { code: string; name: string; market: string | null; recent: number; prior: number; ratio: number | null; reason: string | null } | null };
-
-/** 최신순 행에서 테마마다 첫 것만 골라 줄을 세운다(새로 등장 > 배수 > 언급 수, 최대 RISER_MAX). 미장도 같은 규칙. */
-export function parseRisers(rows: RiserRow[], known: (theme: string) => boolean): ThemeRiser[] {
-  const seen = new Set<string>();
-  const out: ThemeRiser[] = [];
-  for (const r of rows) {
-    if (!known(r.theme) || seen.has(r.theme) || !r.riser?.code) continue;
-    seen.add(r.theme);
-    const s = r.riser;
-    out.push({
-      theme: r.theme,
-      code: s.code,
-      name: s.name,
-      market: s.market ?? null,
-      recent: Number(s.recent) || 0,
-      prior: Number(s.prior) || 0,
-      ratio: s.ratio == null ? null : Number(s.ratio),
-      reason: s.reason?.trim() || null,
-    });
-  }
-  const better = (a: ThemeRiser, b: ThemeRiser) => {
-    // 새로 등장 > 배수 > 언급 수.
-    if ((a.ratio === null) !== (b.ratio === null)) return a.ratio === null;
-    if (a.ratio !== null && b.ratio !== null && a.ratio !== b.ratio) return a.ratio > b.ratio;
-    return a.recent > b.recent;
-  };
-  return out.sort((a, b) => (better(a, b) ? -1 : better(b, a) ? 1 : 0)).slice(0, RISER_MAX);
-}
+// 문턱 상수·타입·줄 세우기(parseRisers)는 lib/theme-risers.ts 에 있다(순수 함수라 따로 테스트한다).
 
 /**
  * 테마마다 **앞 사흘보다 언급이 가장 많이 는 종목** 하나와 까닭. 종목 지도(테마 화면)가 색으로 보이는 것을
@@ -706,7 +657,8 @@ export async function listThemeRisers(): Promise<ThemeRiser[] | null> {
     .select("theme,date,riser")
     .gte("date", addDaysISO(baseDate, -LLM_TEXT_CARRY_DAYS))
     .lte("date", baseDate)
-    .not("riser", "is", null)
+    // riser 가 빈 행도 받는다 — 오늘 후보가 없다는 행이 있어야 어제 riser 로 거슬러 가지 않는다(parseRisers).
+    // 26테마 × 이틀이라 200 안이다.
     .order("date", { ascending: false })
     .limit(200);
   if (error) {

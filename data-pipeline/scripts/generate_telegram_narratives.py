@@ -73,6 +73,7 @@ from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 from common.broadcast_content import weekly_top_stocks  # noqa: E402
 from common.channel_breadth import channel_breadth_map  # noqa: E402
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
+from common.js_round import js_round  # noqa: E402
 from common.market_tags import is_kr_led, is_us_only, market_counts  # noqa: E402
 from common.market_sentiment import MARKET_MIN_MESSAGES, load_market_daily  # noqa: E402
 from common.prompt_style import PLAIN_PROSE_RULE  # noqa: E402
@@ -551,7 +552,9 @@ def optimism(positive: int, negative: int) -> int | None:
     if decided == 0:
         return None
     k = SENTIMENT_PRIOR
-    return round((positive + k) / (decided + 2 * k) * 100)
+    # 반올림도 화면(Math.round, 동점은 큰 쪽)과 같아야 한다. 내장 round() 는 은행가 반올림이라 62.5 → 62,
+    # 40.5 → 40 이 돼, 카드 63% 옆 총평이 "62%"를 말하거나 라벨이 중립/비관 우세로 갈렸다(common/js_round).
+    return js_round((positive + k) / (decided + 2 * k) * 100)
 
 
 # ── 총평이 볼 테마: 카드와 **글자 그대로 같은 집합**이어야 한다 ────────────────────
@@ -760,7 +763,10 @@ SCHEDULE_CHARS = 200
 #    확실한 대신 소형주라 화제성이 약해서, 자리를 많이 주면 그날 진짜 화제였던 일정이
 #    밀린다. 두 자리면 하나는 남고 나머지는 도달 순으로 채워진다.
 SCHEDULE_DART_SLOTS = 2
-# 블록 이름. 호출부가 "넷째 대목 재료가 있나"를 이 문자열로 판정한다.
+# 블록 이름. 머리글을 만드는 schedule_lines 와 블록을 찾는 schedule_digest 가 같이 쓴다.
+#
+# ⚠️ **이름이 digest 에 들어 있나로 "넷째 대목 재료가 있나"를 판정하지 말 것.** 셋째 대목
+#    옆 주의(NEWS_SCHEDULE_NOTE)도 이 이름을 품고 있어 늘 참이 된다 — has_schedule_block 주석.
 #
 # ⚠️ **대괄호를 넣지 말 것.** 실제 머리글은 기간이 앞에 붙어 `[09-03~09-06 오간 앞으로의
 #    일정]` 이 된다. `"[오간 앞으로의 일정]"` 으로 두면 어느 날에도 안 맞아 넷째 대목이
@@ -771,6 +777,7 @@ SCHEDULE_BLOCK_HEAD = "오간 앞으로의 일정"
 # 앞날 시점이 **못박힌** 것만 통과시킨다.
 #   - `예정일자 : YYYY-MM-DD` 는 공시 원본이 확정한 값이라 그대로 믿는다.
 #   - `9월 9일` 같은 월·일은 기준일 이후 SCHEDULE_LOOKAHEAD_DAYS 안쪽일 때만 앞날로 친다.
+#     해가 안 적혀 있으니 기준일 이후 처음 오는 그날로 읽는다(12월에 본 '1월 7일'은 이듬해).
 #   - 상대 표현은 흔들림이 적은 것만 남긴다. '이번 주'는 지난 이야기에도 붙어서 뺐다.
 _SCHED_ABS = re.compile(
     r"예정일자\s*[:：]\s*(\d{4})-(\d{2})-(\d{2})|(?:오는\s*)?(\d{1,2})월\s*(\d{1,2})일"
@@ -878,6 +885,18 @@ def schedule_digest(brief_digest: str) -> str:
     return brief_digest[brief_digest.rfind("\n", 0, at) + 1 :]
 
 
+def has_schedule_block(brief_digest: str) -> bool:
+    """넷째 대목을 부를 재료가 있나. 재료를 꺼내는 schedule_digest 와 **같은 찾기**로 판정한다.
+
+    ⚠️ `SCHEDULE_BLOCK_HEAD in brief_digest` 로 보면 안 된다. 셋째 대목 발췌 옆 주의
+    (NEWS_SCHEDULE_NOTE)가 "[오간 앞으로의 일정] 이 맡습니다"로 그 이름을 품고 있어서, 발췌가
+    있는 날이면 일정 블록이 없어도 참이 된다. 일정 조회가 시간 초과로 빈 블록을 낸 날에도
+    넷째 대목이 빈 재료로 불리고, API 가 빈 메시지를 거절하면 그 예외가 앞 세 대목까지
+    저장 전에 날린다. 판정과 재료가 같은 찾기를 쓰면 둘이 갈릴 수가 없다.
+    """
+    return bool(schedule_digest(brief_digest))
+
+
 def schedule_like(text: str) -> bool:
     """넷째 대목이 일정 이야기를 담고 있나. 표지 하나면 통과 — 걸러야 할 건 아예 없는 경우다."""
     return bool(_SCHED_MARK.search(text or ""))
@@ -932,24 +951,45 @@ def schedule_prefilter(base: date) -> str:
     return ",".join(f"text.ilike.*{t}*" for t in terms)
 
 
+def _sched_date(m: "re.Match[str]", base: date) -> date | None:
+    """_SCHED_ABS 매치 하나가 가리키는 날. 없는 날(2월 30일)이면 None.
+
+    월·일만 적힌 것은 **기준일 이후 처음 오는 그날**로 읽는다. 해를 base.year 로 못박으면
+    9월 초부터는 창(SCHEDULE_LOOKAHEAD_DAYS)이 넘어가는 이듬해 1~3월 일정이 전부 '지난 날'이
+    됐다 — schedule_prefilter 는 그 달 이름까지 받아 오는데 여기서 버리던 것이다. 올해 이미
+    지난 날은 내년 그날이 되어 창 밖에서 걸러지므로 옛 기사의 '3월 5일'은 여전히 빠진다.
+    """
+    if m.group(1):
+        try:
+            return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        except ValueError:
+            return None
+    for year in (base.year, base.year + 1):
+        try:
+            d = date(year, int(m.group(4)), int(m.group(5)))
+        except ValueError:
+            continue  # 2월 29일은 한쪽 해에만 있다
+        if d >= base:
+            return d
+    return None
+
+
 def schedule_hit(text: str, base: date) -> bool:
-    """앞날 시점이 못박혔고 · 앞으로 일어날 일이고 · 종목에 붙는 일정인가."""
+    """앞날 시점이 못박혔고 · 앞으로 일어날 일이고 · 종목에 붙는 일정인가.
+
+    날짜는 **첫 매치만 보지 않는다.** "9월 28일 마감 시황 … 10월 2일 상장 예정"처럼 글머리의
+    지난 날짜가 뒤에 적힌 일정을 가렸다. 다만 공시의 `예정일자` 가 있으면 그것만 본다(위 주석).
+    """
     if not (_SCHED_WILL.search(text) and _SCHED_KIND.search(text)):
         return False
-    m = _SCHED_ABS.search(text)
-    if m:
-        if m.group(1):
-            try:
-                d = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
-            except ValueError:
-                return False
-            return d >= base
-        try:
-            d = date(base.year, int(m.group(4)), int(m.group(5)))
-        except ValueError:
-            return False
-        return base <= d <= base + timedelta(days=SCHEDULE_LOOKAHEAD_DAYS)
-    return bool(_SCHED_REL.search(text))
+    marks = list(_SCHED_ABS.finditer(text))
+    if not marks:
+        return bool(_SCHED_REL.search(text))
+    fixed = [m for m in marks if m.group(1)]
+    if fixed:
+        return any(d is not None and d >= base for d in (_sched_date(m, base) for m in fixed))
+    until = base + timedelta(days=SCHEDULE_LOOKAHEAD_DAYS)
+    return any(d is not None and base <= d <= until for d in (_sched_date(m, base) for m in marks))
 
 
 # ── 일정 발췌를 사람이 읽는 꼴로 맞추는 자리 ──────────────────────────────────
@@ -1146,6 +1186,16 @@ def kst_date(posted_at: str) -> str:
     return (
         datetime.fromisoformat(posted_at.replace("Z", "+00:00")) + timedelta(hours=9)
     ).date().isoformat()
+
+
+def posted_since(posted_at: str, since: str) -> bool:
+    """posted_at(UTC timestamptz)이 KST 날짜 since 이후인가 — 창의 아래 경계.
+
+    `posted_at[:10] >= since` 로 재면 UTC 날짜라 창 첫날 00~09시(KST)가 빠진다. 종목 요약의
+    [언급 톤]·발췌 후보와 테마 요약 재료가 그렇게 첫날 아침을 흘리고 있었다. load_messages_since
+    가 하루 앞(UTC)부터 받아 오는 게 바로 여기서 kst_date 로 거르라는 여유분이다.
+    """
+    return kst_date(posted_at) >= since
 
 
 def load_messages_since(db, since_date: str) -> list[dict]:
@@ -1943,7 +1993,7 @@ def build_stock_digests(
         keys = [k for k in by_code.get(code, []) if k in msgs]
         # 발췌는 창 안팎을 따지지 않고 오늘 것까지 본다 — 세는 값이 아니라 '무엇이 화제였나'의
         # 예시라, 최신 소식을 빼면 요약이 하루 늦은 얘기를 한다.
-        keys = [k for k in keys if msgs[k]["posted_at"][:10] >= since]
+        keys = [k for k in keys if posted_since(msgs[k]["posted_at"], since)]
 
         tone = Counter(analysis[k] for k in keys if k in analysis)
         if tone:
@@ -2123,7 +2173,7 @@ def main() -> None:
             ]
             # 넷째 대목은 **재료가 있는 날만** 쓴다. ask_brief_sentence 는 빈 문장을 절대
             # 안 내므로, 재료 없이 부르면 모델이 없는 일정을 지어내고 그게 그대로 저장된다.
-            if SCHEDULE_BLOCK_HEAD in brief_digest:
+            if has_schedule_block(brief_digest):
                 slots.append(("schedule", BRIEF_SCHEDULE_SYSTEM, BRIEF_SCHEDULE_LEN))
             paragraphs = []
             for key, system, length in slots:

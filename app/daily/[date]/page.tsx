@@ -100,6 +100,9 @@ export default async function DailyDatePage({ params }: { params: Promise<{ date
     noteNeighbors(date),
     r.note ? getNoteStocks(r.note.stocks, r.note.date) : Promise.resolve(EMPTY_STOCKS),
   ]);
+  // 위의 것은 글 자체만 본다. 목록·앞뒤 글·종목 시세도 실패하면 빈 값으로 물러서서, 여기서 한 번 더
+  // 보지 않으면 그 카드들이 빠진 화면이 사본에 담긴다(/daily 와 같은 자리).
+  assertLoaded("/daily/[date]");
 
   return (
     <>

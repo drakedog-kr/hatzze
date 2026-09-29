@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { assertLoaded } from "@/lib/load-state";
 import { themeUpdatedAt } from "@/lib/theme-page";
 import { listUsThemeOverview, listUsThemeRisers } from "@/lib/us-theme-page";
 
@@ -33,6 +34,8 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function UsThemeIndexPage() {
   if (!PUBLIC && DEPLOYED) notFound();
   const [themes, risersAll, updatedAt] = await Promise.all([listUsThemeOverview(), listUsThemeRisers(), themeUpdatedAt("us")]);
+  // 국장 목록(app/theme/page.tsx)과 같다 — 실패한 렌더를 사본에 담지 않는다.
+  assertLoaded("/theme/us");
   const risers = risersAll === null ? null : risersAll.filter((r) => r.reason);
   return <ThemeIndexView market={US_MARKET} themes={themes} risers={risers} updatedAt={updatedAt} />;
 }
