@@ -7,6 +7,7 @@ import { LLM_TEXT_CARRY_DAYS, addDaysISO, channelMeta, fetchAllRows } from "./te
 import { US_WINDOW_DAYS, getUsThemeRotation, usKaderaBaseDate, usQuotes } from "./us-telegram-data";
 import { US_THEMES } from "./us-stock-themes";
 import { getUsEventsForTickers } from "./kadera-us-why";
+import { themeDetailWindow } from "./theme-window";
 import {
   THEME_FLOW_DAYS,
   THEME_TREND_DAYS,
@@ -35,9 +36,6 @@ import {
  *   표        telegram_us_theme_daily · telegram_us_stock_daily · telegram_us_stock_move_reason · telegram_us_stock_event ·
  *             telegram_us_theme_brief(마이그레이션 082). 종목 열쇠는 6자리 코드가 아니라 **티커**고, 화면 타입의 `code` 에
  *             티커를, `market` 에 "US" 를 넣는다(로고·링크가 그걸로 가른다).
- *   창        **기준일을 포함한** 3일. 미장은 창마다 기준일을 넣는다(usKaderaBaseDate 주석 · 파이프라인 window_dates ·
- *             getUsThemeRotation). 국장은 기준일을 뺀다(windowBefore). 여기서 국장 규칙을 쓰면 요약 문장과 화면 숫자가
- *             다른 기간을 말한다.
  *   시세      stocks 표의 KRX 종가가 없다. 히어로 '시세 반응'은 야후 시세(usQuotes, 30분 캐시)로 그 자리에서 낸다 —
  *             테마 하나가 최대 30종목이라 요청 30개, 카더라 미장이 같은 함수로 같은 양을 부른다.
  *   등락의 이유  change_rate 대신 **채널이 적은 등락률**(quoted_change_rate)이다(마이그레이션 069 머리말 — 미국장 하루와
@@ -61,11 +59,6 @@ async function usThemeMembers(theme: string): Promise<ThemeMember[] | null> {
   return tickers.filter((t) => nameOf.has(t)).map((t) => ({ code: t, name: nameOf.get(t)!, market: "US" }));
 }
 
-/** 기준일을 **포함한** 마지막 n 일(오래된→최신). */
-function daysEndingAt(base: string, n: number): string[] {
-  return Array.from({ length: n }, (_, i) => addDaysISO(base, -(n - 1 - i)));
-}
-
 export const getUsThemePage = cache(async (theme: string): Promise<ThemePageData | null> => {
   // 자기 키만 본다(국장 getThemePage 와 같은 까닭).
   if (!Object.hasOwn(US_THEMES, theme)) return null;
@@ -81,9 +74,7 @@ export const getUsThemePage = cache(async (theme: string): Promise<ThemePageData
   const tickers = members.map((m) => m.code);
   const byCode = new Map<string, ThemeMember>(members.map((m) => [m.code, m]));
 
-  const trendDays = daysEndingAt(baseDate, THEME_TREND_DAYS);
-  const recentDays = trendDays.slice(-US_WINDOW_DAYS);
-  const usualDayCount = trendDays.length - US_WINDOW_DAYS;
+  const { trendDays, recentDays, usualDayCount } = themeDetailWindow(baseDate, THEME_TREND_DAYS, US_WINDOW_DAYS);
   const first = trendDays[0];
 
   type ThemeDailyRow = { date: string; share_pct: number | string; rank: number | null; mention_count: number | null };
