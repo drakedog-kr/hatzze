@@ -1,13 +1,19 @@
-"""네이버 데이터랩 검색어트렌드 API 한 번 호출로 두 개의 생활소비 지표를 함께
-가져와 Supabase indicator_values에 upsert한다.
+"""네이버 데이터랩 검색어트렌드 API로 두 개의 생활소비 지표를 가져와 Supabase
+indicator_values에 upsert한다.
 
 - 오마카세·파인다이닝 웨이팅 검색 지수(fine_dining_search_index): 경험 소비 과열 신호
 - 자영업 폐업·권리금 검색 지수(small_business_crisis_index): 실물경제 위기 신호
 
-데이터랩 API는 한 요청에 keywordGroups를 여러 개 담아 그룹별 결과를 한 번에
-돌려준다(그룹 자체는 fetch_naver_luxury_car_trend.py처럼 그룹 내 키워드
-검색량을 합산한 0~100 상대지수). 두 지표가 완전히 다른 주제라 그룹은
-분리하되, API 호출은 하나로 묶어 쿼터를 아낀다.
+두 그룹은 **요청을 따로** 보낸다. 데이터랩 ratio 는 그룹마다가 아니라 한 요청 결과
+전체에서 가장 큰 값을 100 으로 둔 상대값이다. 예전엔 쿼터를 아끼려고 두 그룹을 한 요청에
+담았는데, 그러면 봉우리가 낮은 쪽이 높은 쪽 눈금으로 눌린다 — '폐업' 검색이 1년 최고치를
+찍으면 파인다이닝 관심은 그대로여도 raw 가 통째로 내려가, 고정 눈금(floor 18 / ceiling 48)에
+그대로 대는 과열도가 저온 쪽으로 밀린다. 따로 받으면 각 그룹이
+fetch_naver_luxury_car_trend.py 처럼 자기 1년 최고치 = 100 인 지수가 된다. 호출은 하나 → 둘.
+
+⚠️ floor 18 / ceiling 48 은 한 요청으로 받던 값으로 잡았다. 그때 1년 최고치를 파인다이닝이
+쥐고 있었다면 값은 그대로고, 폐업 쪽이 쥐고 있었다면 raw 가 (100 ÷ 파인다이닝 최고치)배로
+올라간다. 바꾼 뒤 첫 실행에서 raw 가 뛰었으면 눈금을 다시 볼 것.
 
 fetch_naver_trend.py와 동일하게 조회 기간(1년) 내 모든 날짜별 값을 매 실행마다
 upsert한다. 같은 날짜를 다시 upsert해도 값을 덮어쓸 뿐이라 멱등적이며, 별도의
@@ -82,32 +88,28 @@ GROUP_CONFIGS = [
 
 
 def fetch_search_trends() -> list[list[dict]]:
-    """GROUP_CONFIGS와 같은 순서로 각 그룹의 일별 데이터 포인트 리스트를 반환."""
+    """GROUP_CONFIGS와 같은 순서로 각 그룹의 일별 데이터 포인트 리스트를 반환.
+
+    그룹마다 요청을 따로 보낸다 — 한 요청에 담으면 두 그룹이 0~100 눈금 하나를 나눠 쓴다
+    (모듈 docstring 참고).
+    """
     end = date.today()
     start = end - timedelta(days=LOOKBACK_DAYS)
 
-    resp = search_trend(
-        {
-            "startDate": start.isoformat(),
-            "endDate": end.isoformat(),
-            "timeUnit": "date",
-            "keywordGroups": [
-                {"groupName": g["group_name"], "keywords": g["keywords"]}
-                for g in GROUP_CONFIGS
-            ],
-        }
-    )
-    resp.raise_for_status()
-    results = resp.json()["results"]
-    if len(results) != len(GROUP_CONFIGS):
-        raise RuntimeError(
-            f"네이버 데이터랩 응답 그룹 수({len(results)})가 요청 그룹 수"
-            f"({len(GROUP_CONFIGS)})와 다릅니다"
-        )
-
     data_by_group = []
-    for config, result in zip(GROUP_CONFIGS, results):
-        data_points = result["data"]
+    for config in GROUP_CONFIGS:
+        resp = search_trend(
+            {
+                "startDate": start.isoformat(),
+                "endDate": end.isoformat(),
+                "timeUnit": "date",
+                "keywordGroups": [
+                    {"groupName": config["group_name"], "keywords": config["keywords"]}
+                ],
+            }
+        )
+        resp.raise_for_status()
+        data_points = resp.json()["results"][0]["data"]
         if not data_points:
             raise RuntimeError(f"'{config['group_name']}' 그룹에 데이터가 없습니다")
         data_by_group.append(data_points)
