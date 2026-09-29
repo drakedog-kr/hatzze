@@ -774,6 +774,7 @@ SCHEDULE_BLOCK_HEAD = "오간 앞으로의 일정"
 # 앞날 시점이 **못박힌** 것만 통과시킨다.
 #   - `예정일자 : YYYY-MM-DD` 는 공시 원본이 확정한 값이라 그대로 믿는다.
 #   - `9월 9일` 같은 월·일은 기준일 이후 SCHEDULE_LOOKAHEAD_DAYS 안쪽일 때만 앞날로 친다.
+#     해가 안 적혀 있으니 기준일 이후 처음 오는 그날로 읽는다(12월에 본 '1월 7일'은 이듬해).
 #   - 상대 표현은 흔들림이 적은 것만 남긴다. '이번 주'는 지난 이야기에도 붙어서 뺐다.
 _SCHED_ABS = re.compile(
     r"예정일자\s*[:：]\s*(\d{4})-(\d{2})-(\d{2})|(?:오는\s*)?(\d{1,2})월\s*(\d{1,2})일"
@@ -947,24 +948,45 @@ def schedule_prefilter(base: date) -> str:
     return ",".join(f"text.ilike.*{t}*" for t in terms)
 
 
+def _sched_date(m: "re.Match[str]", base: date) -> date | None:
+    """_SCHED_ABS 매치 하나가 가리키는 날. 없는 날(2월 30일)이면 None.
+
+    월·일만 적힌 것은 **기준일 이후 처음 오는 그날**로 읽는다. 해를 base.year 로 못박으면
+    9월 초부터는 창(SCHEDULE_LOOKAHEAD_DAYS)이 넘어가는 이듬해 1~3월 일정이 전부 '지난 날'이
+    됐다 — schedule_prefilter 는 그 달 이름까지 받아 오는데 여기서 버리던 것이다. 올해 이미
+    지난 날은 내년 그날이 되어 창 밖에서 걸러지므로 옛 기사의 '3월 5일'은 여전히 빠진다.
+    """
+    if m.group(1):
+        try:
+            return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        except ValueError:
+            return None
+    for year in (base.year, base.year + 1):
+        try:
+            d = date(year, int(m.group(4)), int(m.group(5)))
+        except ValueError:
+            continue  # 2월 29일은 한쪽 해에만 있다
+        if d >= base:
+            return d
+    return None
+
+
 def schedule_hit(text: str, base: date) -> bool:
-    """앞날 시점이 못박혔고 · 앞으로 일어날 일이고 · 종목에 붙는 일정인가."""
+    """앞날 시점이 못박혔고 · 앞으로 일어날 일이고 · 종목에 붙는 일정인가.
+
+    날짜는 **첫 매치만 보지 않는다.** "9월 28일 마감 시황 … 10월 2일 상장 예정"처럼 글머리의
+    지난 날짜가 뒤에 적힌 일정을 가렸다. 다만 공시의 `예정일자` 가 있으면 그것만 본다(위 주석).
+    """
     if not (_SCHED_WILL.search(text) and _SCHED_KIND.search(text)):
         return False
-    m = _SCHED_ABS.search(text)
-    if m:
-        if m.group(1):
-            try:
-                d = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
-            except ValueError:
-                return False
-            return d >= base
-        try:
-            d = date(base.year, int(m.group(4)), int(m.group(5)))
-        except ValueError:
-            return False
-        return base <= d <= base + timedelta(days=SCHEDULE_LOOKAHEAD_DAYS)
-    return bool(_SCHED_REL.search(text))
+    marks = list(_SCHED_ABS.finditer(text))
+    if not marks:
+        return bool(_SCHED_REL.search(text))
+    fixed = [m for m in marks if m.group(1)]
+    if fixed:
+        return any(d is not None and d >= base for d in (_sched_date(m, base) for m in fixed))
+    until = base + timedelta(days=SCHEDULE_LOOKAHEAD_DAYS)
+    return any(d is not None and base <= d <= until for d in (_sched_date(m, base) for m in marks))
 
 
 # ── 일정 발췌를 사람이 읽는 꼴로 맞추는 자리 ──────────────────────────────────
