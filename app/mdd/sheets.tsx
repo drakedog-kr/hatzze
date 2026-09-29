@@ -397,9 +397,12 @@ export function TopDrawdowns({ eps }: { eps: Episode[] }) {
   const worst = Math.max(...eps.map((e) => Math.abs(e.depth)), 1);
   /* 열 폭은 .mdd-top-row(globals.css)가 잡는다. 인라인으로 두면 좁은 폭의 미디어쿼리를
      이겨서 열이 안 줄어든다. */
+  /* 딱지는 "깊은 순"이다. "−20% 이상"이었는데 topDrawdowns 는 깊이 문턱 없이 깊은 다섯 건이라(lib/mdd.ts)
+     1년·저변동 종목에서는 −6%·−4% 줄이 그 딱지 아래 섰다. 표를 −20% 로 거르면 대부분의 1년 화면이
+     빈 시트가 되고 차트가 지나야 할 날(anchorDates)도 바뀌어서, 표가 아니라 딱지를 사실에 맞췄다. */
   return (
     <Sheet>
-      <SectionHead level={3} icon="history" title="역대 낙폭 Top 5" desc="이만큼 빠졌던 구간과 회복까지 걸린 기간" note="−20% 이상" />
+      <SectionHead level={3} icon="history" title="역대 낙폭 Top 5" desc="이만큼 빠졌던 구간과 회복까지 걸린 기간" note="깊은 순" />
       <div className="hz-thead mdd-top-row">
         <span>구간</span>
         <span>낙폭</span>
