@@ -28,6 +28,10 @@ REQUEST_DELAY_SEC = 0.05
 VOLUME_AVG_WINDOW = 30  # 급증도 비교 기준: 직전 30영업일 평균 거래대금
 LEVEL_WINDOW = 250      # 절대 수준 비교 기준: 직전 1년(250영업일) 분포에서의 백분위
 LEVEL_MIN_SAMPLE = 60   # 백분위가 널뛰지 않을 최소 표본
+# 다시 쓰는 1년치 맨 앞 행도 250영업일 창을 다 채우도록 그만큼 앞을 더 읽는다.
+# 250영업일은 달력으로 1년 남짓(연휴 포함 약 370일)이라 넉넉히 잡는다. 합쳐 약 520행이라
+# get_values 가 페이징 없이 받는 1,000행 상한 안이다.
+LEVEL_LOOKBACK_DAYS = 400
 TARGET_INDEX_NAME = "코스피"
 TRADING_VALUE_KEY = "ACC_TRDVAL"
 WON_PER_EOK = 100_000_000  # 1억원 = 1e8원
@@ -125,19 +129,28 @@ def store_rolling_average_details(client, indicator_id: str) -> None:
     상관은 **-0.019** 였다. 2026-06-22 사상 최고점 당일 거래대금이 41.9조인데 급증율이
     +2.3%라 과열도가 25.6(저온 근처)으로 찍혔다. 급증율은 '단기 발작'을, 절대 백분위는
     '국면'을 잡으므로 calculate_score 가 7:3으로 섞는다.
+
+    **다시 쓰는 건 최근 BACKFILL_DAYS 행뿐이고, 창은 그보다 앞까지 읽어 채운다**(2026-09-29).
+    예전엔 오늘-365일부터만 읽고 그 안을 전부 다시 써서, 행이 늙을수록 level_pct 창이 250행에서
+    줄었다 — 앞쪽 거래가 몰린 구간이 창 밖으로 밀려나면 같은 날 값이 64.8 → 100.0 으로 바뀐다
+    (tests/test_kospi_volume_details.py). 창이 60행 밑으로 줄면 details 를 통째로 갈아 끼워
+    level_pct 가 **지워졌고**, 1년 넘은 행은 전부 그 상태로 굳었다. recompute_score_history 가
+    지난 점수를 이 값으로 다시 낸다.
     """
     today = date.today()
     start = today - timedelta(days=BACKFILL_DAYS)
-    values = get_values(client, indicator_id, start)
+    values = get_values(client, indicator_id, start - timedelta(days=LEVEL_LOOKBACK_DAYS))
     dates_sorted = sorted(values)
 
     rows = []
     for i in range(VOLUME_AVG_WINDOW, len(dates_sorted)):
+        d = dates_sorted[i]
+        if d < start.isoformat():
+            continue  # 창을 채우려고 읽은 앞자리 — 이 행 details 는 그대로 둔다
         window = [values[dates_sorted[j]] for j in range(i - VOLUME_AVG_WINDOW, i)]
         avg = sum(window) / VOLUME_AVG_WINDOW
         if avg <= 0:
             continue
-        d = dates_sorted[i]
         detail = {
             "avg_30d": round(avg, 0),
             "surge_pct": round(values[d] / avg * 100 - 100, 1),
