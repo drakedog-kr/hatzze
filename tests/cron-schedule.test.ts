@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-import { CRON_TO_JOB, hasRunSince, resolveJob, sinceIso } from "../lib/cron-schedule.ts";
+import { CRON_TO_JOB, hasRunSince, PREVIEW_RUN_TITLE, resolveJob, sinceIso } from "../lib/cron-schedule.ts";
 
 type Cron = { path: string; schedule: string };
 const crons: Cron[] = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8")).crons;
@@ -135,5 +135,50 @@ describe("이미 돌았나(sinceIso + hasRunSince) — 실제 시각으로 재�
     const since = sinceIso("21:30", at("2026-09-22T21:29:59Z"));
     assert.equal(since, "2026-09-21T21:30:00Z");
     assert.equal(hasRunSince([run("2026-09-22T08:30:04Z")], since).covered, true);
+  });
+});
+
+describe("채널 발송: 미리보기 실행은 그날 몫으로 세지 않는다", () => {
+  // 2026-10-03(토) KST 10:30 = 01:30Z. 경계는 KST 자정(10-02 15:00Z).
+  const sat = "30 1 * * 6";
+  const since = sinceIso(CRON_TO_JOB[sat].fireUtc, new Date("2026-10-03T01:30:00Z"));
+  const run = (created_at: string, display_title: string) => ({
+    created_at,
+    display_title,
+    html_url: `run@${created_at}`,
+  });
+
+  it("아침에 기본값(send 끔)으로 돌린 미리보기만 있으면 던진다 — 세면 그날 글이 아예 안 나간다", () => {
+    assert.equal(hasRunSince([run("2026-10-03T00:05:12Z", "미리보기 · us_weekend")], since).covered, false);
+  });
+
+  it("그날 실제로 보낸 실행은 센다 — 다시 던지면 같은 글이 두 번 나간다", () => {
+    const runs = [run("2026-10-03T01:30:04Z", "발송 · us_weekend"), run("2026-10-03T00:05:12Z", "미리보기 · us_weekend")];
+    assert.equal(hasRunSince(runs, since).url, "run@2026-10-03T01:30:04Z");
+  });
+
+  it("run-name 이 생기기 전 실행(제목이 워크플로 이름)은 예전처럼 센다", () => {
+    const old = run("2026-10-03T00:05:12Z", "Telegram Broadcast (수 12:30 · 토 10:30 · 일 21:00)");
+    assert.equal(hasRunSince([old], since).covered, true);
+  });
+
+  // 위 판단은 워크플로가 미리보기 실행에 붙이는 제목에 기댄다. 제목 규칙이 어긋나면 다시 조용히 센다.
+  const yml = readFileSync(new URL("../.github/workflows/telegram-broadcast.yml", import.meta.url), "utf8");
+
+  it("워크플로는 '미리보기' 스텝이 도는 실행에만 그 머리를 붙인다", () => {
+    const runName = yml.match(/^run-name: (.+)$/m)?.[1] ?? "";
+    const cond = yml.match(/- name: 미리보기 \(수동 실행 · 발송 끔\)\n\s+if: (.+)\n/)?.[1] ?? "";
+    assert.ok(cond, "미리보기 스텝의 조건을 못 찾았다");
+    assert.ok(runName.startsWith(`\${{ ${cond} && format('${PREVIEW_RUN_TITLE} `), runName);
+  });
+
+  it("워크플로 게이트도 미리보기를 '도는 중'으로 세지 않는다 — 세면 그 사이 온 발송이 스스로 빠진다", () => {
+    assert.ok(yml.includes(`startswith(\\"${PREVIEW_RUN_TITLE}\\")`), "게이트 jq 에 미리보기 제외가 없다");
+  });
+
+  it("CI 는 telegram-broadcast.yml 만 바뀐 PR 에서도 돈다 — 위 두 검사가 그 파일을 읽는다", () => {
+    for (const globs of ciPathLists()) {
+      assert.ok(globs.some((g) => covers(g, ".github/workflows/telegram-broadcast.yml")), globs.join(", "));
+    }
   });
 });

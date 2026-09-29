@@ -77,6 +77,7 @@ const BROADCAST_JOB: Job = {
   label: "채널 발송",
   workflow: BROADCAST,
   // KST 자정. 그날 실행이 하나라도 있으면(손으로 돌린 것 포함) 안 던진다.
+  // 발송을 끈 미리보기만은 안 센다(PREVIEW_RUN_TITLE).
   fireUtc: "15:00",
   inputs: (now) => ({ send: "true", format: broadcastFormat(now) }),
 };
@@ -177,12 +178,26 @@ function kstDay(now: Date): number {
   return new Date(now.getTime() + 9 * 60 * 60 * 1000).getUTCDay(); // 0=일 … 6=토
 }
 
+/**
+ * 아무것도 보내지도 쓰지도 않는 실행의 제목 머리. telegram-broadcast.yml 의 `run-name` 이
+ * send 를 끈 수동 실행(미리보기)에 붙이고, 실행 목록에는 `display_title` 로 온다.
+ *
+ * ⚠️ 이 실행은 '이미 처리됨'으로 세지 않는다. 기본값(send 끔)으로 손으로 돌려 본 미리보기가
+ *    그날 몫으로 잡히면 정작 발송 크론이 안 던지고, 그날 글이 **한 통도** 안 나간다. 경계를
+ *    KST 자정으로 둔 까닭(두 번 나가지 않게)과 반대 결과다. 워크플로 안의 게이트도 같은
+ *    제목을 빼고 센다. 머리를 바꾸면 셋을 같이 고칠 것 — tests/cron-schedule.test.ts 가 본다.
+ */
+export const PREVIEW_RUN_TITLE = "미리보기";
+
 /** 실행 목록에서 이 몫의 실행이 있는지 본다. 결과(성공·실패)는 보지 않는다 — 위 주석 참고.
+ *  미리보기(PREVIEW_RUN_TITLE)만 뺀다. 제목이 없는 실행은 예전처럼 센다.
  */
 export function hasRunSince(
-  runs: { created_at: string; html_url?: string; conclusion?: string | null }[],
+  runs: { created_at: string; html_url?: string; conclusion?: string | null; display_title?: string }[],
   since: string,
 ): { covered: boolean; url?: string } {
-  const hit = runs.find((r) => r.created_at >= since);
+  const hit = runs.find(
+    (r) => r.created_at >= since && !(r.display_title ?? "").startsWith(PREVIEW_RUN_TITLE),
+  );
   return hit ? { covered: true, url: hit.html_url } : { covered: false };
 }

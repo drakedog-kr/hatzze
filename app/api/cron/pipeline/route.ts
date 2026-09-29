@@ -23,7 +23,9 @@ const RETRY_DELAY_MS = 5_000;
 const api = (workflow: string, tail: string) =>
   `https://api.github.com/repos/${REPO}/actions/workflows/${workflow}/${tail}`;
 
-type Run = { created_at: string; html_url?: string };
+// display_title 은 run-name 이 매긴 제목이다. 미리보기(발송 끔) 실행을 가려 세지 않는 데 쓴다
+// (lib/cron-schedule.ts PREVIEW_RUN_TITLE).
+type Run = { created_at: string; html_url?: string; display_title?: string };
 
 /** 깃헙 호출 실패. `status` 가 없으면 응답을 못 받고 끊긴 것이다(타임아웃·네트워크). */
 class GithubError extends Error {
@@ -57,7 +59,8 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
  * 그 클릭을 대신하는 시계다. 판단 규칙과 시각의 근거는 lib/cron-schedule.ts 주석에 있다.
  *
  * 이미 이 슬롯의 실행이 있으면(깃헙 백업이 먼저 돌았거나 손으로 돌렸거나) 아무것도 하지
- * 않는다. 그래서 주 시계이면서 동시에 중복 방지 장치다.
+ * 않는다. 그래서 주 시계이면서 동시에 중복 방지 장치다. 단, 발송을 끈 미리보기 실행은
+ * 아무것도 안 보내므로 세지 않는다(hasRunSince).
  *
  * ⚠️ **못 정하면 던지지 않는다.** 깃헙 조회가 실패하면 실행이 있는지 없는지 알 수 없는데,
  *    그 상태에서 던지면 이미 도는 파이프라인 위에 하나를 더 얹어 같은 표를 동시에 쓰고
