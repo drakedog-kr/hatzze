@@ -12,9 +12,9 @@ import {
   getThemeRotation,
   kaderaBaseDate,
   lastKaderaUpdatedAt,
-  windowBefore,
 } from "./telegram-data";
 import { THEMES } from "./stock-themes";
+import { themeDetailWindow } from "./theme-window";
 import { getEventsForCodes, todayKst, type UpcomingEvent } from "./kadera-why";
 import { isLoadFailed } from "./load-state";
 import { parseRisers, type RiserRow, type ThemeRiser } from "./theme-risers";
@@ -154,7 +154,7 @@ export type ThemePageData = {
   /** 최근 거래일 테마 종목의 등락 묶음(위 ThemeQuotes). */
   quotes: ThemeQuotes;
   baseDate: string;
-  /** 최근 사흘(기준일 제외). 카더라와 같은 창이다. */
+  /** 최근 사흘(기준일 포함). 히어로 점유율(테마 로테이션)과 같은 창이다(lib/theme-window.ts). */
   recentDays: string[];
   /** 최근 사흘 평균 점유율(%)과 순위. 테마 로테이션 카드와 같은 계산이다. */
   recentShare: number | null;
@@ -346,10 +346,9 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
   const byCode = new Map<string, ThemeMember>(members.map((m) => [m.code, { code: m.code, name: m.name, market: m.market }]));
   const quotes = themeQuotes(members);
 
-  const trendDays = windowBefore(baseDate, THEME_TREND_DAYS);
-  const recentDays = trendDays.slice(-KADERA_WINDOW_DAYS);
+  // 기준일을 넣은 30일 — 히어로의 점유율·순위(테마 로테이션)가 기준일을 넣은 사흘이라 막대·말 많은 종목도 그 사흘을 센다.
   // 종목의 '평소' = 최근 사흘을 뺀 나머지 27일. 종목 집계는 이 30일을 다 받는다(테마 55종목 × 30일 ≤ 1,650행, 페이징).
-  const usualDayCount = trendDays.length - KADERA_WINDOW_DAYS;
+  const { trendDays, recentDays, usualDayCount } = themeDetailWindow(baseDate, THEME_TREND_DAYS, KADERA_WINDOW_DAYS);
   const first = trendDays[0];
   const last = trendDays[trendDays.length - 1];
 

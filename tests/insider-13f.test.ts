@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { filedQuarters, holdersByTicker, isCik, quarterMarks, stockPosition } from "../lib/insider-13f.ts";
+import { filedQuarters, holdersByTicker, isCik, managerMoves, quarterMarks, stockPosition } from "../lib/insider-13f.ts";
 
 const Q4 = "2025-12-31";
 const Q1 = "2026-03-31";
@@ -180,6 +180,74 @@ describe("holdersByTicker", () => {
       managers,
     );
     assert.deepEqual(m.get("NVDA"), [{ person: "버핏", value: 20 }]);
+  });
+});
+
+describe("managerMoves", () => {
+  // 메인 화면 '월가 거물이 늘린/줄인 종목' 카드의 재료. 운용사마다 자기 최신 분기와 직전 분기를 견준다.
+  const managers = new Map([
+    [1, { person: "게이너" }],
+    [2, { person: "버핏" }],
+    [3, { person: "애크먼" }],
+  ]);
+  const latest = new Map([[1, Q2], [2, Q2], [3, Q1]]);
+  const prior = new Map([[1, Q1], [2, Q1], [3, Q4]]);
+  const h = (cik: number, ticker: string, report_date: string, shares: number, value: number) => ({ cik, ticker, report_date, shares, value });
+  const moves = (rows: ReturnType<typeof h>[]) =>
+    managerMoves(rows, managers, (cik) => latest.get(cik) ?? null, (cik) => prior.get(cik) ?? null);
+
+  it("한 클래스 — 신규·청산·늘림·줄임을 예전 카드와 같게 센다(그대로 든 곳은 안 센다)", () => {
+    const m = moves([
+      h(1, "NVDA", Q2, 100, 1_000), // 신규
+      h(2, "NVDA", Q1, 50, 400), h(2, "NVDA", Q2, 80, 800), // 늘림 60% — 직전 금액의 60% 를 움직였다
+      h(1, "AAPL", Q1, 10, 100), // 청산
+      h(2, "AAPL", Q1, 40, 400), h(2, "AAPL", Q2, 30, 330), // 줄임 25%
+      h(3, "AAPL", Q4, 5, 50), h(3, "AAPL", Q1, 5, 60), // 그대로 — 금액만 바뀌었다
+    ]);
+    assert.deepEqual(m.get("NVDA"), {
+      up: { count: 2, mark: 1, who: [{ n: "게이너", v: 1_000 }, { n: "버핏", v: 240 }] },
+      down: { count: 0, mark: 0, who: [] },
+    });
+    assert.deepEqual(m.get("AAPL"), {
+      up: { count: 0, mark: 0, who: [] },
+      down: { count: 2, mark: 1, who: [{ n: "게이너", v: 100 }, { n: "버핏", v: 100 }] },
+    });
+  });
+
+  it("BRK-A·BRK-B 가 BRK 한 줄로 모이고, 두 클래스를 다 든 운용사는 한 명이다", () => {
+    const m = moves([
+      h(1, "BRK-A", Q1, 1, 700_000), h(1, "BRK-A", Q2, 1, 740_000),
+      h(1, "BRK-B", Q1, 100, 46_000), h(1, "BRK-B", Q2, 200, 98_000),
+      h(2, "BRK-B", Q2, 10, 4_900),
+    ]);
+    assert.equal(m.get("BRK-A"), undefined);
+    assert.equal(m.get("BRK-B"), undefined);
+    const brk = m.get("BRK");
+    assert.ok(brk);
+    assert.equal(brk.up.count, 2, "게이너(늘림) · 버핏(신규)");
+    assert.equal(brk.up.mark, 1);
+    assert.equal(brk.down.count, 0);
+    assert.deepEqual(brk.up.who.map((w) => w.n).sort(), ["게이너", "버핏"]);
+    // 게이너가 움직인 몫은 BRK-B 100주(직전 분기 한 주 460달러) = 46,000달러다. BRK-A 는 그대로다.
+    assert.ok(Math.abs(brk.up.who.find((w) => w.n === "게이너")!.v - 46_000) < 1e-6);
+  });
+
+  it("클래스만 갈아 든 것은 정리·신규가 아니다 — 한 주 값으로 환산해 같으면 안 센다", () => {
+    // BRK-A 1주(70만 달러)를 팔고 같은 값의 BRK-B 1,500주를 샀다. 예전 카드는 BRK-A 청산 · BRK-B 신규로 양쪽에 띄웠다.
+    const m = moves([h(1, "BRK-A", Q1, 1, 700_000), h(1, "BRK-B", Q2, 1_500, 700_000)]);
+    assert.equal(m.get("BRK"), undefined);
+    assert.equal(m.get("BRK-A"), undefined);
+    assert.equal(m.get("BRK-B"), undefined);
+  });
+
+  it("직전 분기를 안 낸 운용사와 명단 밖 운용사는 건너뛴다", () => {
+    const m = managerMoves(
+      [h(1, "NVDA", Q2, 100, 1_000), h(9, "NVDA", Q1, 1, 10), h(9, "NVDA", Q2, 5, 50)],
+      managers,
+      (cik) => latest.get(cik) ?? null,
+      () => null,
+    );
+    assert.equal(m.size, 0);
   });
 });
 

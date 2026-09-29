@@ -328,9 +328,10 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
       () => db.from("telegram_us_stock_daily").select("date,mention_count,channel_count").in("ticker", spellings),
       { onError: failed("언급 추이") },
     ),
+    // 정렬은 기본 키 전부(tests/manager-holding-paging.test.ts) — 아래 비중 분모와 같은 까닭.
     fetchAllRows<{ cik: number; ticker: string; shares: number | null; value: number | null; report_date: string }>(
-      "cik",
-      () => db.from("us_manager_holding").select("cik,ticker,shares,value,report_date").in("ticker", spellings),
+      "report_date",
+      () => db.from("us_manager_holding").select("cik,ticker,shares,value,report_date").in("ticker", spellings).order("cik").order("ticker"),
       { onError: failed("거물 보유") },
     ),
     fetchAllRows<{ cik: number; person: string; firm: string }>(
@@ -443,9 +444,11 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
   for (const h of holdingRows) byCik.set(h.cik, [...(byCik.get(h.cik) ?? []), h]);
 
   // 비중의 분모 — 그 운용사의 **전체** 보유 합계. 종목 하나만 받아서는 못 구한다.
+  // ⚠️ 정렬은 기본 키 (cik, ticker, report_date) 전부다. cik 하나로 넘기면 한 운용사의 행 수천 개가 동점이라
+  //    쪽 경계에서 행이 빠지거나 겹쳐 비중이 흔들렸다(#622 에서 찾음). ticker 는 받지 않아도 정렬에는 건다.
   const totals = await fetchAllRows<{ cik: number; value: number | null; report_date: string }>(
-    "cik",
-    () => db.from("us_manager_holding").select("cik,value,report_date"),
+    "report_date",
+    () => db.from("us_manager_holding").select("cik,value,report_date").order("cik").order("ticker"),
     { onError: failed("비중 분모") },
   );
   const aumOf = new Map<string, number>();
@@ -693,9 +696,10 @@ export const getManagerDetail = cache(async (cik: number): Promise<ManagerDetail
 
   const [managerRows, holdingRows, mentionRows] = await Promise.all([
     db.from("us_manager").select("cik,person,firm").eq("cik", cik).limit(1),
+    // 정렬은 (ticker, report_date) — cik 는 eq 로 고정했다. ticker 하나면 분기 둘이 동점이라 큰 운용사(1,000행 넘게)에서 빠지거나 겹친다.
     fetchAllRows<{ ticker: string; shares: number | null; value: number | null; report_date: string }>(
-      "ticker",
-      () => db.from("us_manager_holding").select("ticker,shares,value,report_date").eq("cik", cik),
+      "report_date",
+      () => db.from("us_manager_holding").select("ticker,shares,value,report_date").eq("cik", cik).order("ticker"),
       { onError: failed("보유") },
     ),
     fetchAllRows<{ ticker: string; date: string }>(

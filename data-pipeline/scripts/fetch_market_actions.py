@@ -39,8 +39,9 @@ raw_value("매수 사이드카 비중") = 매수 / (매수 + 매도 + CB + 2)
 의미상 맞다). 임계값은 config/indicator_thresholds.py에서 0.50으로, 옛 임계값 2.0과
 같은 엄격도(1년 중 16일 도달)에 맞췄다.
 
-KIND 검색은 날짜 범위 쿼리라 페이지 하나로 1년치를 통째로 받아올 수 있다(연간
-사이드카 20~30건, CB 5~10건 수준이라 페이지네이션 없이 한 번에 충분).
+KIND 검색은 날짜 범위 쿼리라 한 번에 1년치를 받아온다. 사이드카·CB 자체는 연간 수십 건이지만
+'매매거래중단' 검색엔 개별종목 매매정지가 섞여 한 쪽(500건)을 넘을 수 있어 **끝 쪽까지 넘긴다**
+(search_market_actions). 예전엔 첫 쪽만 받아 넘치면 오래된 CB 발동이 조용히 빠질 수 있었다.
 그래서 매일 새 날짜 범위로 재검색하는 대신, 1년치 이벤트를 한 번만 받아와
 메모리 안에서 날짜별로 30일 슬라이딩 윈도우를 계산한다 —
 fetch_asia_relative_strength.py의 20일 수익률 계산과 같은 접근이다. 최초
@@ -79,7 +80,13 @@ REQUEST_TIMEOUT_SEC = 20
 # ⛔ 이 인자를 "403 재시도는 무의미하다"며 지우지 말 것. 그 일반론은 맞지만 이 호스트는
 #    예외다. 지우면 다음 차단 물결에서 이 지표만 또 혼자 죽는다.
 KIND_RETRY_STATUSES = DEFAULT_RETRY_STATUSES | {403}
-PAGE_SIZE = 500  # 연간 발동 건수(수십 건 수준)를 한 페이지에 다 담기에 충분
+PAGE_SIZE = 500
+# 넘길 쪽의 상한. 500 × 40 = 2만 건 — 1년치 '매매거래중단'이 그보다 많을 리 없다. 넘으면 멈추고 알린다
+# (끝 쪽을 못 알아보는 응답이 오는 경우다. 조용히 잘라 쓰면 1년치 지표가 틀린 채 덮인다).
+MAX_PAGES = 40
+# 쪽에 든 행 하나마다 한 번 나오는 표시. 쪽이 찼는지는 **읽은 항목 수가 아니라 이것으로** 센다 — 정규식이 못 읽는
+# 행이 하나라도 섞이면 찬 쪽이 덜 차 보여 첫 쪽에서 멈춘다(fetch_kr_dividend_notices.list_filings 가 겪은 것).
+ROW_MARKER = '<strong class="name">'
 
 SIDECAR_KEYWORD = "사이드카"
 CIRCUIT_BREAKER_SEARCH_KEYWORD = "매매거래중단"  # KIND는 "서킷브레이커"라는 단어를 안 씀
@@ -108,8 +115,35 @@ INDICATOR_META = {
 }
 
 
+ENTRY_PATTERN = re.compile(
+    r'<strong class="name"><a[^>]*>([^<]+)</a></strong>\s*'
+    r'<span class="subject"><a href="#" title="([^"]+)"[^>]*>.*?</a></span>\s*'
+    r'<em class="date">\s*([\d-]{10})',
+    re.DOTALL,
+)
+
+
 def search_market_actions(kwd: str, from_date: date, to_date: date) -> list[tuple[str, str, date]]:
-    """(시장명, 제목, 날짜) 리스트를 반환. 시/분/초는 버리고 날짜만 쓴다."""
+    """(시장명, 제목, 날짜) 리스트를 반환. 시/분/초는 버리고 날짜만 쓴다. 결과를 끝 쪽까지 넘겨 받는다."""
+    entries: list[tuple[str, str, date]] = []
+    prev: list[tuple[str, str, date]] | None = None
+    for page in range(1, MAX_PAGES + 1):
+        text = _search_page(kwd, from_date, to_date, page)
+        batch = _parse_entries(text)
+        # 결과가 쪽 크기의 배수면 끝을 넘긴 쪽을 묻게 된다. 빈 쪽 대신 마지막 쪽을 다시 주면 두 번 세지 않는다.
+        if batch and batch == prev:
+            return entries
+        entries.extend(batch)
+        if max(text.count(ROW_MARKER), len(batch)) < PAGE_SIZE:
+            return entries
+        prev = batch
+    raise RuntimeError(
+        f"KIND '{kwd}' 검색이 {MAX_PAGES}쪽({MAX_PAGES * PAGE_SIZE:,}건)을 넘었습니다 — 끝 쪽을 못 알아봤을 수 있어 "
+        "잘라 쓰지 않고 멈춥니다"
+    )
+
+
+def _search_page(kwd: str, from_date: date, to_date: date, page: int) -> str:
     resp = post_with_retry(
         KIND_SEARCH_URL,
         label="KIND",
@@ -122,7 +156,7 @@ def search_market_actions(kwd: str, from_date: date, to_date: date) -> list[tupl
             "kwd": kwd,
             "fromData": from_date.isoformat(),
             "toData": to_date.isoformat(),
-            "pageIndex": "1",
+            "pageIndex": str(page),
             "currentPageSize": str(PAGE_SIZE),
         },
         headers={"User-Agent": "Mozilla/5.0"},
@@ -130,15 +164,12 @@ def search_market_actions(kwd: str, from_date: date, to_date: date) -> list[tupl
         retry_statuses=KIND_RETRY_STATUSES,
     )
     resp.raise_for_status()
+    return resp.text
 
+
+def _parse_entries(text: str) -> list[tuple[str, str, date]]:
     entries = []
-    pattern = re.compile(
-        r'<strong class="name"><a[^>]*>([^<]+)</a></strong>\s*'
-        r'<span class="subject"><a href="#" title="([^"]+)"[^>]*>.*?</a></span>\s*'
-        r'<em class="date">\s*([\d-]{10})',
-        re.DOTALL,
-    )
-    for market, raw_title, date_str in pattern.findall(resp.text):
+    for market, raw_title, date_str in ENTRY_PATTERN.findall(text):
         title = re.sub(r"</?b>", "", raw_title)  # <b>강조</b> 태그 제거
         entries.append((market.strip(), title.strip(), date.fromisoformat(date_str.strip())))
     return entries

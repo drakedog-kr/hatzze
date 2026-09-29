@@ -522,8 +522,8 @@ export function execRows(rows: InsiderActivity[], rate: number | null) {
             </span>
             {/* ⚠️ 여기 "내놓은 금액"이라 적어 두었다가 2026-08-22 에 날짜로 바꿨다.
                 취득이냐 처분이냐는 **왼쪽 코드 요약이 이미 말한다** — "장내 매도 165건 ·
-                전환 7건" 은 이 금액이 무엇인지 라벨보다 정확히 말한다. 카드 물음표에도
-                금액이 처분만 더한 값이라고 적혀 있다. */}
+                전환 7건" 은 이 금액이 무엇인지 라벨보다 정확히 말한다. 전체보기 물음표가
+                규칙(처분 합계, 장내 매수가 더 크면 매수 합계 — InsiderActivity.value)을 적는다. */}
             <span style={{ ...ROW.sub, whiteSpace: "nowrap" }}>{fmtDate(b.filedDate)} 접수</span>
           </span>
         }
