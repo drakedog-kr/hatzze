@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { cache } from "react";
 
 /**
@@ -69,20 +70,60 @@ export class LoadFailedError extends Error {
 
 const loadFailures = cache((): Map<string, string> => new Map());
 
+/** withScopedLoadFailures 가 연 자리의 목록. 그 안에서 시작한 조회의 실패는 렌더 목록 대신 여기 적힌다. */
+const scoped = new AsyncLocalStorage<Map<string, string>>();
+
 /**
  * 조회 실패를 이번 렌더의 목록에 적는다. 던지지 않는다 — 던지는 것은 `assertLoaded`.
  *
  * `key` 는 같은 조회를 다시 시도했을 때 같아야 한다(메서드 + 전체 URL). supabase-js 가
  * 끊김·503 을 스스로 다시 시도해 성공하면 `clearLoadFailure` 로 지운다 — 첫 시도의
  * 실패만 보고 던지면 결국 받아 온 화면을 버리게 된다.
+ *
+ * withScopedLoadFailures 안에서 시작한 조회면 렌더 목록이 아니라 그 자리 목록에 적는다.
  */
 export function noteLoadFailure(key: string, detail: string): void {
-  loadFailures().set(key, detail);
+  (scoped.getStore() ?? loadFailures()).set(key, detail);
 }
 
 /** 같은 조회가 나중에 성공했다. 앞서 적은 실패를 지운다. */
 export function clearLoadFailure(key: string): void {
-  loadFailures().delete(key);
+  (scoped.getStore() ?? loadFailures()).delete(key);
+}
+
+/**
+ * `fn` 안에서 **시작한** 조회의 실패를 이번 렌더의 목록이 아니라 이 자리의 목록에 모은다.
+ * 돌려준 `failed` 가 비어 있지 않으면 `value` 는 실패한 조회의 폴백으로 만든 값이다 — 부른 쪽이
+ * 그 값을 **버려야** 한다. 판정은 위 noteLoadFailure·clearLoadFailure 가 한다(lib/supabase-server.ts
+ * 의 fetch 가 부르는 그대로).
+ *
+ * ## 왜 필요한가
+ *
+ * 실패는 조회를 감싼 코드와 상관없이 fetch 자리에서 적힌다(위 loadFailures). 그래서 **곁가지**
+ * 조회 하나가 깨져도 페이지 끝 assertLoaded 가 화면을 통째로 던진다. 홈 히어로 바닥 칩
+ * (app/home/spotlight-data.ts)이 그랬다 — 미리보기 표 하나가 5xx 면 브리핑·카드 25장이 다 안
+ * 새로 그려졌다. 칩이 **빠진** 홈은 사본에 담겨도 되는 화면이다.
+ *
+ * ⚠️ 실패를 그냥 **안 적으면** 안 된다. 로더 여럿이 에러를 삼키고 그럴듯한 값을 돌려준다 —
+ *    getPreview 는 kr_preview_day 가 5xx 면 지난 날짜로 물러서고, getSurgingStocks 는 몇 쪽이
+ *    빠진 행으로 배수를 낸다. 적지 않으면 그 틀린 칩이 한 시간짜리 사본에 담긴다. 그래서 칩마다
+ *    제 목록에 모으고, 목록이 비지 않은 칩은 뺀다.
+ *
+ * ## 왜 모듈 변수가 아니라 비동기 문맥인가
+ *
+ * 칩은 본 조회들과 같은 Promise.all 로 나란히 돈다. 칩 앞뒤로 목록을 떠서 새로 생긴 것을
+ * 옮기면, 그 사이에 실패한 **본 조회**까지 옮겨져 깨진 화면이 사본에 담긴다 — 이 파일이 막으려는
+ * 바로 그것이다. 비동기 문맥은 `fn` 안에서 시작한 일(await·타이머·then 까지)에만 따라간다.
+ *
+ * ⚠️ React `cache` 로 감싼 조회 함수를 본 조회와 **나눠 쓰면** 안 된다. 먼저 부른 쪽의 문맥에서
+ *    한 번만 돌아, 여기서 먼저 부르면 본 조회 몫의 실패가 이 자리 목록으로 간다. 홈의 본 조회
+ *    (lib/data)는 kr_preview_*·telegram_* 를 안 읽어 지금은 겹치지 않는다.
+ * ⚠️ 이 파일은 서버에서만 import 한다(node:async_hooks). 클라이언트로는 LOAD_FAILED **값**만 넘어간다.
+ */
+export async function withScopedLoadFailures<T>(fn: () => Promise<T>): Promise<{ value: T; failed: string[] }> {
+  const local = new Map<string, string>();
+  const value = await scoped.run(local, fn);
+  return { value, failed: [...local.values()] };
 }
 
 /**

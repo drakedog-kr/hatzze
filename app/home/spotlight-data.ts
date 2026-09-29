@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getPreview, sessionSpan, type SessionSpan } from "@/lib/kr-preview";
-import { isLoadFailed } from "@/lib/load-state";
+import { isLoadFailed, withScopedLoadFailures } from "@/lib/load-state";
 import { pickNextUpSlot, type NextUpClock, type NextUpSlot } from "@/lib/next-up-slot";
 import { getSurgingStocks, getThemeRotation } from "@/lib/telegram-data";
 import { THEME_SLUGS, themeHref } from "@/lib/theme-href";
@@ -21,6 +21,10 @@ import { THEME_PUBLIC } from "../screen-flags";
  *
  * ⭐ 조회가 실패해도 홈을 던지지 않는다. 홈은 조회 하나가 깨지면 사본을 안 만들고 던지는데
  *    (assertLoaded), 칩은 곁가지라 거기 묶으면 미리보기 조회 하나가 홈 전체를 막는다. 그 칩만 빠진다.
+ *    ⚠️ 아래 try/catch 만으로는 안 된다 — 5xx 는 조회를 감싼 코드와 상관없이 fetch 자리에서 홈의 실패
+ *    목록에 적힌다(lib/supabase-server.ts). 그래서 칩마다 제 목록(withScopedLoadFailures)에 모으고,
+ *    조회가 하나라도 실패한 칩은 뺀다. 로더가 폴백을 돌려줘도(getPreview 의 지난 날짜, getSurgingStocks
+ *    의 빠진 행) 그 값으로 칩을 세우지 않는다 — 틀린 칩이 사본에 담기지 않게.
  */
 
 export type SpotChip = {
@@ -121,8 +125,20 @@ async function themeChip(): Promise<SpotChip | null> {
   }
 }
 
+/** 칩 하나를 제 실패 목록 안에서 만든다. 그 안의 조회가 하나라도 5xx·끊김이면 칩 대신 `none` (머리말 ⭐). */
+async function chipOrNone<T>(label: string, make: () => Promise<T>, none: T): Promise<T> {
+  const { value, failed } = await withScopedLoadFailures(make);
+  if (!failed.length) return value;
+  console.error(`[spotlight] ${label} 조회가 실패했습니다 — 그 칩을 뺍니다: ${failed.join(", ")}`);
+  return none;
+}
+
 export async function loadSpotlight(): Promise<SpotlightData> {
-  const [preview, surging, theme] = await Promise.all([previewChip(), surgingChip(), themeChip()]);
+  const [preview, surging, theme] = await Promise.all([
+    chipOrNone("국장 미리보기", previewChip, { chip: null, date: null }),
+    chipOrNone("급부상", surgingChip, null),
+    chipOrNone("테마 로테이션", themeChip, null),
+  ]);
   const clock = { previewDate: preview.date };
   return {
     // 미장 칩이 없는 날(미장 휴장 등)엔 그 시각에도 카더라 칩이 선다(clock.previewDate 가 null).
