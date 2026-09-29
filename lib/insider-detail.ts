@@ -33,6 +33,7 @@ import { fetchDailyHistory } from "@/lib/yahoo-history";
 import { displayName } from "@/lib/us-ticker-names";
 import { canonicalTicker, tickerSpellings } from "@/lib/us-ticker-spellings";
 import { filedQuarters, quarterMarks, stockPosition } from "@/lib/insider-13f";
+import { type MentionPoint, mentionTrend } from "@/lib/insider-trend";
 
 /** 언급 추이로 그리는 날수. 표에 41일치가 있어 그보다 길게 잡을 이유가 없다. */
 export const MENTION_TREND_DAYS = 40;
@@ -105,7 +106,8 @@ export type TradeMark = {
   high: number | null;
 };
 
-export type MentionPoint = { date: string; mentions: number; channels: number };
+/** 언급 추이 한 점. 0 으로 메우는 계산은 lib/insider-trend.ts 에 있다. */
+export type { MentionPoint };
 
 /** 이 종목을 든 거물 한 명. 비중은 그 사람 포트폴리오 안에서의 몫이다. */
 export type StockHolder = {
@@ -220,6 +222,7 @@ export type StockDetail = {
   /** 오늘(가장 최근 날) 언급. 없으면 0 이다. */
   mentionsToday: number;
   channelsToday: number;
+  /** 추이의 끝점 = 언급 표 전체의 가장 최근 날(이 종목의 마지막 언급일이 아니다). */
   mentionDate: string | null;
   holders: StockHolder[];
   /** 거물 명단 전체 수. "N/62" 의 분모다. */
@@ -289,20 +292,6 @@ export type ManagerDetail = {
   exited: { ticker: string; name: string; value: number; weight: number; inKadera: boolean }[];
 };
 
-/** 표에 없는 날을 0 으로 메운다. 안 메우면 막대가 주말을 건너뛰어 추이가 거짓말한다. */
-function fillDays(rows: MentionPoint[], end: string, days: number): MentionPoint[] {
-  const have = new Map(rows.map((r) => [r.date, r]));
-  const out: MentionPoint[] = [];
-  const d = new Date(`${end}T00:00:00Z`);
-  for (let i = days - 1; i >= 0; i--) {
-    const t = new Date(d);
-    t.setUTCDate(t.getUTCDate() - i);
-    const key = t.toISOString().slice(0, 10);
-    out.push(have.get(key) ?? { date: key, mentions: 0, channels: 0 });
-  }
-  return out;
-}
-
 /**
  * 운용사별 최신·직전 분기를 가른다.
  *
@@ -331,7 +320,7 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
     console.error(`[insider/stock] ${label} 조회 실패`, e);
   };
 
-  const [stockRows, mentionRows, holdingRows, managerRows, congressRows, insiderRows, consensusRows, actionRows] =
+  const [stockRows, mentionRows, holdingRows, managerRows, congressRows, insiderRows, consensusRows, actionRows, latestMention] =
     await Promise.all([
     db.from("us_stocks").select("ticker,name_ko,name_en").in("ticker", spellings).limit(1),
     fetchAllRows<{ date: string; mention_count: number | null; channel_count: number | null }>(
@@ -410,12 +399,15 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
       .in("ticker", spellings)
       .order("action_date", { ascending: false })
       .limit(30),
+    // 언급 추이의 끝점 — 표 전체의 가장 최근 날. 이 종목의 마지막 행이 아니다(mentionTrend 주석).
+    db.from("telegram_us_stock_daily").select("date").order("date", { ascending: false }).limit(1),
   ]);
 
-  // 한 번에 받는 표 셋은 fetchAllRows 를 안 거쳐 error 를 여기서 본다.
+  // 한 번에 받는 표 넷은 fetchAllRows 를 안 거쳐 error 를 여기서 본다.
   if (stockRows.error) failed("종목 사전")(stockRows.error);
   if (consensusRows.error) failed("애널리스트 컨센서스")(consensusRows.error);
   if (actionRows.error) failed("애널리스트 의견")(actionRows.error);
+  if (latestMention.error) failed("언급 기준일")(latestMention.error);
 
   // 어느 축에도 흔적이 없으면 우리가 아는 종목이 아니다. 빈 화면 대신 404 를 준다.
   // ⚠️ 단, 조회가 깨져서 비어 보이는 것이면 404 가 아니라 오류다 — 멀쩡한 종목 주소를
@@ -439,9 +431,11 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
     mentions: m.mention_count ?? 0,
     channels: m.channel_count ?? 0,
   }));
-  const lastDate = trendRaw.length ? trendRaw[trendRaw.length - 1].date : null;
-  const trend = lastDate ? fillDays(trendRaw, lastDate, MENTION_TREND_DAYS) : [];
-  const today = trend.length ? trend[trend.length - 1] : null;
+  const { trend, today, date: mentionDate } = mentionTrend(
+    trendRaw,
+    latestMention.data?.[0]?.date ?? null,
+    MENTION_TREND_DAYS,
+  );
 
   // 거물별 최신 분기의 보유만 남기고, 직전 분기와 견줘 움직임을 붙인다.
   const managerOf = new Map(managerRows.map((m) => [m.cik, m]));
@@ -646,7 +640,7 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
     trend,
     mentionsToday: today?.mentions ?? 0,
     channelsToday: today?.channels ?? 0,
-    mentionDate: lastDate,
+    mentionDate,
     holders,
     managerCount: managerRows.length,
     bars,
