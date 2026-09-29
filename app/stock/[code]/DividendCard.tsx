@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import type { DividendStock } from "@/lib/dividend";
 
+import { showsSepTax } from "../../dividend/calc";
 import { DIVIDEND_PAGE } from "../../dividend/copy";
 import { SectionHead } from "../../kadera/SectionHead";
 import { C, MONO } from "../../ui";
@@ -28,7 +29,8 @@ export function DividendCard({ s }: { s: DividendStock }) {
   if (s.payout) facts.push(`${s.payout.year != null ? `${s.payout.year}년 ` : ""}배당성향 ${Math.round(s.payout.pct).toLocaleString("ko-KR")}%`);
   if (s.growth5 != null && s.streak >= 5 && Math.abs(Math.round(s.growth5)) >= 1) facts.push(`5년 연 ${s.growth5 > 0 ? "+" : "−"}${Math.abs(Math.round(s.growth5))}%`);
   if (s.streak >= 3) facts.push(s.streak >= 15 ? "15년 넘게 연속 배당" : `${s.streak}년 연속 배당`);
-  if (s.highDiv) facts.push("분리과세 대상");
+  // 전부 감액배당(비과세)이면 안 붙인다 — /dividend 의 줄과 같은 규칙(showsSepTax).
+  if (showsSepTax(s)) facts.push("분리과세 대상");
   const href = `${DIVIDEND_PAGE.href}?add=${encodeURIComponent(s.code)}`;
 
   return (

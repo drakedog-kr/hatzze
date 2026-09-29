@@ -89,3 +89,14 @@ export function goalBasis(
     skipped: new Set(lines.filter((l) => l.investKrw == null && l.netKrw > 0).map((l) => l.stock.code)).size,
   };
 }
+
+/**
+ * '분리과세' 알약을 붙이나 — 고배당기업(배당소득 분리과세 대상, 2026~2028)이고 지난 1년 배당에 과세되는 몫이 있을 때.
+ * 전부 감액배당(비과세)이면 안 붙인다 — 배당소득이 아니라 분리과세를 고를 몫이 없다(메가스터디, 2026-09-17 지적).
+ * /dividend 의 줄(Holdings)과 종목 페이지 배당 카드(DividendCard)가 같이 쓴다 — 카드만 이 조건이 빠져 두 화면이 달랐다.
+ * 계좌에 따른 조건(일반 계좌 줄에만)은 줄 쪽이 따로 건다. highDiv 는 화면마다 꼴이 달라 있나 없나만 본다.
+ */
+export function showsSepTax(s: { highDiv: object | null; taxable: number | null; dps: number }): boolean {
+  const fullyTaxFree = s.taxable != null && s.dps > 0 && s.taxable <= 0;
+  return s.highDiv != null && !fullyTaxFree;
+}

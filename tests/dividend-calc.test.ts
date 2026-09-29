@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { expectedPays, goalBasis, monthlyOf } from "../app/dividend/calc.ts";
+import { expectedPays, goalBasis, monthlyOf, showsSepTax } from "../app/dividend/calc.ts";
 
 const round = (v: number[]) => v.map((x) => Math.round(x));
 const sum = (v: number[]) => v.reduce((t, x) => t + x, 0);
@@ -116,5 +116,29 @@ describe("goalBasis — 목표까지 칸의 투자금과 배당", () => {
   it("같은 종목을 두 계좌에 나눠 담았으면 뺀 종목은 하나로 센다 — 화면이 'N종목'이라 적는다", () => {
     const isa = { ...unpriced, netKrw: 200_000 };
     assert.equal(goalBasis([samsung, unpriced, isa]).skipped, 1);
+  });
+});
+
+describe("showsSepTax — '분리과세' 알약(/dividend 의 줄 · 종목 페이지 배당 카드)", () => {
+  const high = [2025, 45] as [number, number];
+
+  it("고배당기업이어도 지난 1년 배당이 전부 감액배당이면 안 붙인다", () => {
+    // 메가스터디(2026-09-17 지적) — 비과세라 분리과세를 고를 배당소득이 없다.
+    assert.equal(showsSepTax({ highDiv: high, taxable: 0, dps: 1_500 }), false);
+  });
+
+  it("과세 몫이 조금이라도 있거나 모르면 붙인다", () => {
+    assert.equal(showsSepTax({ highDiv: high, taxable: 500, dps: 1_500 }), true);
+    assert.equal(showsSepTax({ highDiv: high, taxable: null, dps: 1_500 }), true);
+  });
+
+  it("고배당기업이 아니면 안 붙인다", () => {
+    assert.equal(showsSepTax({ highDiv: null, taxable: null, dps: 1_500 }), false);
+  });
+
+  it("종목 페이지의 highDiv(객체 꼴)도 같은 규칙", () => {
+    const card = { payoutPct: 45, growthPct: 10, year: 2025 };
+    assert.equal(showsSepTax({ highDiv: card, taxable: 0, dps: 1_500 }), false);
+    assert.equal(showsSepTax({ highDiv: card, taxable: null, dps: 1_500 }), true);
   });
 });

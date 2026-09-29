@@ -10,6 +10,7 @@ import { isSafeAsset, fitsAccount, ACCOUNTS, ACCOUNT_SHORT } from "./tax";
 import type { Account, TaxMode } from "./tax";
 import { HOT_YIELD_PCT, TODAY_KST, Badges, SPLIT_OPTION, nextAccountFor } from "./shared";
 import type { Line } from "./shared";
+import { showsSepTax } from "./calc";
 
 /** 표 위 '정렬' 목록의 열쇠. 고르면 순서 자체가 바뀌어 저장된다(DividendCalculator.sortLines). */
 export type SortKey = "net" | "invest" | "yield" | "name";
@@ -267,9 +268,8 @@ function HoldingRow({
     }
   }
   // 고배당기업(배당소득 분리과세 대상). 일반 계좌로 세는 줄에만 — ISA·연금 계좌 소득은 금융소득에 안 합친다.
-  // 지난 1년 배당이 전부 감액배당(비과세)이면 안 붙인다 — 배당소득이 아니라 분리과세를 고를 몫이 없다(메가스터디, 2026-09-17 지적).
-  const fullyTaxFree = s.taxable != null && s.dps > 0 && s.taxable <= 0;
-  if (s.highDiv && !fullyTaxFree && (mode === "gross" || line.account === "general" || line.outside)) facts.push({ text: "분리과세", title: "고배당기업입니다. 배당이 2,000만원을 넘어도 종합과세 대신 분리과세(14~30%)를 고를 수 있습니다." });
+  // 지난 1년 배당이 전부 감액배당(비과세)이면 안 붙인다 — 종목 페이지 배당 카드와 같은 규칙(calc.ts 의 showsSepTax).
+  if (showsSepTax(s) && (mode === "gross" || line.account === "general" || line.outside)) facts.push({ text: "분리과세", title: "고배당기업입니다. 배당이 2,000만원을 넘어도 종합과세 대신 분리과세(14~30%)를 고를 수 있습니다." });
   // 지난 날짜는 안 붙인다 — 표가 며칠 낡으면 '다음' 기준일·지급일이 어제일 수 있다.
   const todayKst = TODAY_KST;
   if (s.nextRecord && s.nextRecord >= todayKst) facts.push({ text: `기준일 ${md(s.nextRecord)}`, title: `${s.nextRecord}에 주주면 다음 배당을 받습니다.` });
