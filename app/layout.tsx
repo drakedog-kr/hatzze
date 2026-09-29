@@ -99,6 +99,9 @@ export const revalidate = 3600;
  */
 const THEME_COLOR = { light: "#e8f0fa", dark: "#101013" } as const;
 
+/** 한국 시각의 연도("2026"). 푸터 저작권 줄에 넘긴다 — 아래 AppShell 자리 주석. */
+const KST_YEAR = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric" });
+
 /**
  * 테마·통화 쿠키를 **브라우저가** 페인트 전에 읽어 <html> 에 붙이는 스크립트.
  *
@@ -212,8 +215,10 @@ export default function RootLayout({
           <body>에 속성을 주입해 불일치 경고를 낸다. body 자신의 속성 불일치만
           무시한다 — 내부 컴포넌트 hydration 검사에는 영향 없다. */}
       <body className="font-sans" suppressHydrationWarning>
-        {/* 테마 리포트를 사이드바 링크로 낼지는 서버가 정한다(AppShell 의 ShellEnv 주석) — 열었거나, 배포가 아닌 로컬. */}
-        <AppShell themeNav={THEME_PUBLIC || !process.env.VERCEL_ENV}>
+        {/* 테마 리포트를 사이드바 링크로 낼지는 서버가 정한다(AppShell 의 ShellEnv 주석) — 열었거나, 배포가 아닌 로컬.
+            푸터 저작권 연도도 서버가 **한국 시각**으로 정한다 — 브라우저가 제 시계로 세면 새해 첫 아홉 시간 동안
+            서버 HTML 과 갈린다(Footer 주석). 사본이 새해를 한 시간쯤 늦게 따라가는 건 해가 없다. */}
+        <AppShell themeNav={THEME_PUBLIC || !process.env.VERCEL_ENV} year={Number(KST_YEAR.format(new Date()))}>
           {children}
         </AppShell>
       </body>

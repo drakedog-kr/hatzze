@@ -1945,7 +1945,16 @@ function ToTop({
   );
 }
 
-export default function AppShell({ children, themeNav = THEME_PUBLIC }: { children: React.ReactNode; themeNav?: boolean }) {
+export default function AppShell({
+  children,
+  themeNav = THEME_PUBLIC,
+  year,
+}: {
+  children: React.ReactNode;
+  themeNav?: boolean;
+  /** 푸터 저작권 연도 — 서버가 한국 시각으로 정한다(Footer 주석). */
+  year: number;
+}) {
   const env: ShellEnv = { themeNav };
   const mainRef = useRef<HTMLElement>(null);
   const scrolledDown = useScrolledDown(mainRef);
@@ -2072,7 +2081,7 @@ export default function AppShell({ children, themeNav = THEME_PUBLIC }: { childr
             <NewsStrip />
             <PageHeader />
             {children}
-            <Footer />
+            <Footer year={year} />
           </div>
         </main>
         {/* 둘 다 오른쪽 아래 구석을 쓴다. 층은 DOM 순서가 아니라 z-index 로 못박아

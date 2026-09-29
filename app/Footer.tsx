@@ -114,12 +114,17 @@ function GroupLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function Footer() {
+/**
+ * @param year 저작권 연도. **서버가 한국 시각으로 정해** 넘긴다(app/layout.tsx → AppShell).
+ *   예전엔 여기서 `new Date().getFullYear()` 를 불렀는데, 푸터는 서버(UTC)에서 한 번·브라우저(KST)에서 또 한 번
+ *   그려져 해마다 1월 1일 00:00~09:00 KST 에는 서버 HTML 의 2026 과 브라우저의 2027 이 갈렸다 — 모든 화면이
+ *   하이드레이션 불일치(React #418)로 셸을 통째로 다시 그렸다. 받은 값을 그대로 쓰면 두 쪽이 같다.
+ */
+export default function Footer({ year }: { year: number }) {
   /* 테마 리포트 줄을 낼지는 **서버가 정한 값**을 받는다(app/shell-env.tsx). 예전엔 여기서 `!process.env.VERCEL_ENV` 를
      읽었는데, 푸터는 셸(클라이언트 컴포넌트) 안에 있어 브라우저에서는 그 값이 늘 undefined 다 — 서버 HTML 엔 없던 줄이
      하이드레이션 뒤에 나타나고, 안 연 화면이면 눌러서 404 로 간다(2026-09-22에 고쳤다). */
   const { themeNav } = useShellEnv();
-  const year = new Date().getFullYear();
   return (
     /* 2026-09-04 리디자인: 위 여백 64 · 윗선 아래 40. 토스 푸터의 어법은 '조용한 회색 글 +
        넉넉한 여백'이라 크기·색은 그대로 두고 간격과 굵기만 손봤다. */
