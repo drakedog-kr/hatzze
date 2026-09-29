@@ -222,6 +222,11 @@ def holdings_of(doc: str) -> list[dict]:
         name = g("nameOfIssuer")
         if not name:
             continue
+        # ⚠️ 옵션(putCall 이 있는 줄)은 뺀다. 기초 종목의 CUSIP 을 그대로 달고 오고 sshPrnamt·value 가
+        #    기초 주식 수·명목 금액이라, 두면 같은 티커의 보통주에 합산된다 — 풋(하락 베팅)이
+        #    "크게 산 종목"으로, 분기 대비 "늘린 종목"으로 나간다. 옛 서학개미 스크립트도 이렇게 걸렀다.
+        if g("putCall"):
+            continue
         out.append({"name": name, "cusip": (g("cusip") or "").upper(), "value": num("value"), "shares": num("sshPrnamt")})
     return out
 
