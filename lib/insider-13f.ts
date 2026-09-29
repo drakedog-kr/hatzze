@@ -112,3 +112,34 @@ export function stockPosition(
     sharesChange: s?.sharesChange ?? null,
   };
 }
+
+/**
+ * 차트의 거물 마커 재료 — 운용사마다 **자기가 낸 이웃 분기** 사이에 이 종목을 늘렸나 줄였나.
+ * 표시는 그 운용사의 나중 분기말에 찍는다(13F 에는 매매일이 없다).
+ *
+ * ⚠️ 모든 운용사의 분기를 한 줄로 합쳐 이웃끼리 견주면 안 된다. 한 분기 늦게 내는 곳
+ *    (퍼싱 스퀘어)의 옛 분기가 끼면 나머지가 전부 그 다음 분기에 "샀다"로 찍히고, 아직
+ *    이번 분기를 안 낸 곳은 행이 없다는 이유로 "팔았다"로 찍힌다 — 13F 철마다 거의 모든
+ *    종목에서 그랬다. 운용사가 **내지 않은 분기에는 아무것도 안 찍는다.**
+ */
+export function quarterMarks(
+  rows: (ClassRow & { cik: number; report_date: string })[],
+  quarters: Map<number, string[]>,
+): { cik: number; date: string; side: "buy" | "sell" }[] {
+  const byCik = new Map<number, typeof rows>();
+  for (const r of rows) byCik.set(r.cik, [...(byCik.get(r.cik) ?? []), r]);
+  const out: { cik: number; date: string; side: "buy" | "sell" }[] = [];
+  for (const [cik, mine] of byCik) {
+    // stockPosition 과 같은 물러남 — 그 운용사의 분기를 모르면 이 종목의 행에서 고른다.
+    const qs = quarters.get(cik) ?? [...new Set(mine.map((r) => r.report_date))].sort();
+    for (let i = 1; i < qs.length; i++) {
+      const s = quarterShift(
+        mine.filter((r) => r.report_date === qs[i]),
+        mine.filter((r) => r.report_date === qs[i - 1]),
+      );
+      if (!s || s.move === "hold") continue;
+      out.push({ cik, date: qs[i], side: s.move === "new" || s.move === "add" ? "buy" : "sell" });
+    }
+  }
+  return out;
+}

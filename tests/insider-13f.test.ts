@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { filedQuarters, stockPosition } from "../lib/insider-13f.ts";
+import { filedQuarters, quarterMarks, stockPosition } from "../lib/insider-13f.ts";
 
 const Q4 = "2025-12-31";
 const Q1 = "2026-03-31";
@@ -94,5 +94,51 @@ describe("stockPosition", () => {
     assert.ok(p);
     assert.equal(p.move, "add");
     assert.equal(p.value, 792_000);
+  });
+});
+
+describe("quarterMarks", () => {
+  const h = (cik: number, ticker: string, report_date: string, shares: number) => ({ cik, ticker, report_date, shares, value: shares * 10 });
+  const sorted = (m: { cik: number; date: string; side: string }[]) =>
+    [...m].sort((a, b) => a.date.localeCompare(b.date) || a.cik - b.cik);
+
+  it("한 분기 늦게 내는 곳이 섞여도, 자기 두 분기에서 그대로인 곳은 아무것도 안 찍힌다", () => {
+    const rows = [h(1, "XYZ", Q1, 100), h(1, "XYZ", Q2, 100), h(2, "XYZ", Q1, 50), h(2, "XYZ", Q2, 50), h(3, "XYZ", Q4, 10), h(3, "XYZ", Q1, 10)];
+    const quarters = new Map([[1, [Q1, Q2]], [2, [Q1, Q2]], [3, [Q4, Q1]]]);
+    assert.deepEqual(quarterMarks(rows, quarters), []);
+  });
+
+  it("이번 분기를 아직 안 낸 곳은 '팔았다'로 찍히지 않는다", () => {
+    const rows = [h(1, "XYZ", Q1, 100), h(1, "XYZ", Q2, 100), h(2, "XYZ", Q1, 50)];
+    assert.deepEqual(quarterMarks(rows, new Map([[1, [Q1, Q2]], [2, [Q1]]])), []);
+  });
+
+  it("새로 담은 곳은 매수, 전량 정리한 곳은 매도 — 그 운용사의 나중 분기에 찍힌다", () => {
+    const rows = [h(1, "XYZ", Q2, 70), h(2, "XYZ", Q1, 80)];
+    assert.deepEqual(sorted(quarterMarks(rows, new Map([[1, [Q1, Q2]], [2, [Q1, Q2]]]))), [
+      { cik: 1, date: Q2, side: "buy" },
+      { cik: 2, date: Q2, side: "sell" },
+    ]);
+  });
+
+  it("분기가 셋이면 이웃한 자기 분기끼리 차례로 견준다", () => {
+    const rows = [h(1, "XYZ", Q4, 100), h(1, "XYZ", Q1, 120), h(1, "XYZ", Q2, 90)];
+    assert.deepEqual(sorted(quarterMarks(rows, new Map([[1, [Q4, Q1, Q2]]]))), [
+      { cik: 1, date: Q1, side: "buy" },
+      { cik: 1, date: Q2, side: "sell" },
+    ]);
+  });
+
+  it("클래스가 둘이면 한 번만, 행 순서와 무관하게 찍힌다", () => {
+    const rows = [
+      { cik: 1, ticker: "BRK-A", report_date: Q2, shares: 1, value: 740_000 },
+      { cik: 1, ticker: "BRK-B", report_date: Q2, shares: 150, value: 75_000 },
+      { cik: 1, ticker: "BRK-A", report_date: Q1, shares: 1, value: 700_000 },
+      { cik: 1, ticker: "BRK-B", report_date: Q1, shares: 100, value: 48_000 },
+    ];
+    const quarters = new Map([[1, [Q1, Q2]]]);
+    const want = [{ cik: 1, date: Q2, side: "buy" }];
+    assert.deepEqual(quarterMarks(rows, quarters), want);
+    assert.deepEqual(quarterMarks([...rows].reverse(), quarters), want);
   });
 });

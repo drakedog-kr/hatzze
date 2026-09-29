@@ -32,7 +32,7 @@ import { usQuotes } from "@/lib/us-telegram-data";
 import { fetchDailyHistory } from "@/lib/yahoo-history";
 import { displayName } from "@/lib/us-ticker-names";
 import { canonicalTicker, tickerSpellings } from "@/lib/us-ticker-spellings";
-import { filedQuarters, stockPosition } from "@/lib/insider-13f";
+import { filedQuarters, quarterMarks, stockPosition } from "@/lib/insider-13f";
 
 /** 언급 추이로 그리는 날수. 표에 41일치가 있어 그보다 길게 잡을 이유가 없다. */
 export const MENTION_TREND_DAYS = 40;
@@ -598,21 +598,11 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
   }
   // ── 거물 마커: 분기 경계마다 늘린 곳 / 줄인 곳 ─────────────────────
   // ⚠️ 13F 에는 매매일이 없다. 분기말에 찍고 "그 분기 사이에 이만큼 바뀌었다"로 읽는다.
-  const qs = [...new Set(holdingRows.map((h) => h.report_date))].sort();
-  for (let i = 1; i < qs.length; i++) {
-    const cur = new Map(holdingRows.filter((h) => h.report_date === qs[i]).map((h) => [h.cik, h]));
-    const prev = new Map(holdingRows.filter((h) => h.report_date === qs[i - 1]).map((h) => [h.cik, h]));
-    for (const cik of new Set([...cur.keys(), ...prev.keys()])) {
-      const m = managerOf.get(cik);
-      if (!m) continue;
-      const a = cur.get(cik);
-      const b = prev.get(cik);
-      // 판정은 주식 수로. 금액은 주가가 움직여도 변한다.
-      if (a && !b) addMark(qs[i], "buy", "manager", m.person);
-      else if (!a && b) addMark(qs[i], "sell", "manager", m.person);
-      else if (a && b && (a.shares ?? 0) > (b.shares ?? 0)) addMark(qs[i], "buy", "manager", m.person);
-      else if (a && b && (a.shares ?? 0) < (b.shares ?? 0)) addMark(qs[i], "sell", "manager", m.person);
-    }
+  // ⚠️ 분기는 운용사마다 자기가 낸 것끼리 견준다(quarterMarks 주석 — 합친 분기로 견주면
+  //    늦게 내는 곳 때문에 없는 매수·매도가 찍힌다).
+  for (const k of quarterMarks(holdingRows, filed)) {
+    const m = managerOf.get(k.cik);
+    if (m) addMark(k.date, k.side, "manager", m.person);
   }
   const marks = [...markOf.values()].sort((a, b) => a.date.localeCompare(b.date));
 
