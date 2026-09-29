@@ -260,7 +260,7 @@ export async function listUsThemeRisers(): Promise<ThemeRiser[] | null> {
     .select("theme,date,riser")
     .gte("date", addDaysISO(baseDate, -LLM_TEXT_CARRY_DAYS))
     .lte("date", baseDate)
-    .not("riser", "is", null)
+    // riser 가 빈 행도 받는다(국장 listThemeRisers 와 같은 까닭). 16테마 × 이틀.
     .order("date", { ascending: false })
     .limit(200);
   if (error) {
