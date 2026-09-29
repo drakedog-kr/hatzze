@@ -51,7 +51,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from common.quoted_move import own_move_after  # noqa: E402
-from common.supabase_client import get_client  # noqa: E402
+from common.supabase_client import execute_with_retry, get_client  # noqa: E402
 from config.us_stock_extraction import (  # noqa: E402
     HOUSE_METHOD,
     NAME_EXCLUDE,
@@ -195,29 +195,34 @@ def sync_master(db, dry_run: bool) -> None:
     (실측: 채운 다음 실행에서 다시 177개를 채우고 있었다). 이 저장소가 details 열에서
     이미 배운 것과 같다 — **통째로 대입하지 말고 병합할 것.**
     그래서 저장 직전에 기존 값을 읽어 합친다. SEC 가 죽은 날에도 이름이 안 사라진다.
+    (정확히는 **다른 행에 실린** 열이 덮인다 — postgrest-py 가 행 키의 합집합을 열 목록으로 보낸다.
+    어느 행에도 안 실은 열은 그대로 둔다. 기존 값을 못 읽은 날은 그 길로 간다.)
     """
     names = primary_names()
     rows = [{"ticker": tk, "name_ko": name} for tk, name in names.items()]
 
-    stored_en: dict[str, str] = {}
     try:
-        for r in db.table("us_stocks").select("ticker,name_en").execute().data or []:
-            if r.get("name_en"):
-                stored_en[r["ticker"]] = r["name_en"]
+        stored = execute_with_retry(db.table("us_stocks").select("ticker,name_en")).data or []
     except Exception as exc:
         print(f"[경고] us_stocks 를 못 읽었습니다({exc}). 영문명은 이번에 건드리지 않습니다.")
-        stored_en = {}
+        stored = None
 
-    need = {tk for tk in names if tk not in stored_en}
-    fetched = fetch_sec_names(need) if need else {}
-    if need:
-        missing = need - set(fetched)
-        print(f"[SEC] 영문명 {len(fetched)}/{len(need)}종목 받음"
-              f"{'' if not missing else ' · 못 찾은 것: ' + ', '.join(sorted(missing))}")
+    # 못 읽은 날은 기존 값을 몰라 병합할 수 없다 — name_en 을 **어느 행에도** 싣지 않는다. 그래야
+    # upsert 가 그 열을 안 건드린다(postgrest-py 는 행 키의 합집합을 열 목록으로 보낸다). 예전엔 이날
+    # 전 종목을 빈 칸으로 보고 SEC 를 불렀고, SEC 까지 실패하면 null 을 실어 저장된 이름을 다 지웠다.
+    # SEC 도 안 부른다. 빈 칸은 다음 실행이 메운다.
+    if stored is not None:
+        stored_en = {r["ticker"]: r["name_en"] for r in stored if r.get("name_en")}
+        need = {tk for tk in names if tk not in stored_en}
+        fetched = fetch_sec_names(need) if need else {}
+        if need:
+            missing = need - set(fetched)
+            print(f"[SEC] 영문명 {len(fetched)}/{len(need)}종목 받음"
+                  f"{'' if not missing else ' · 못 찾은 것: ' + ', '.join(sorted(missing))}")
 
-    # 받은 것 + 이미 있던 것. 둘 다 없으면 null 을 그대로 실어 열을 비워 둔다.
-    for r in rows:
-        r["name_en"] = fetched.get(r["ticker"]) or stored_en.get(r["ticker"])
+        # 받은 것 + 이미 있던 것. 둘 다 없으면 null 을 그대로 실어 열을 비워 둔다.
+        for r in rows:
+            r["name_en"] = fetched.get(r["ticker"]) or stored_en.get(r["ticker"])
 
     if dry_run:
         print(f"[dry-run] us_stocks {len(rows)}종목 (upsert 안 함)")
