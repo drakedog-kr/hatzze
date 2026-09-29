@@ -47,6 +47,7 @@ from calculate_score import (  # noqa: E402
     KOSPI_DD_PCTILE_ANCHORS,
     cap_progress,
     compute_progress,
+    lead_progress,
     percentile_from_anchors,
     stage_for_score,
 )
@@ -105,7 +106,7 @@ def progress_by_date(slug: str, rows: list[dict]) -> dict[str, float]:
 
 
 def divergence_by_date(client, ids: dict[str, str]) -> dict[str, float]:
-    """실물–증시 괴리: 날짜 → progress(= max(0, 증시%ile − 실물%ile)).
+    """실물–증시 괴리: 날짜 → progress(= lead_progress(증시%ile − 실물%ile), 캡핑 전).
 
     CCSI 는 월 1회라 그 달 이후의 모든 날짜에 '가장 최근 공표값'을 적용한다.
     코스피 신고가 괴리율이 없는 날짜는 계산하지 않는다(그 지표를 그날 제외).
@@ -126,7 +127,7 @@ def divergence_by_date(client, ids: dict[str, str]) -> dict[str, float]:
             continue
         real = percentile_from_anchors(prior[-1], CCSI_PCTILE_ANCHORS)
         market = percentile_from_anchors(float(g["raw_value"]), KOSPI_DD_PCTILE_ANCHORS)
-        out[d] = max(0.0, market - real)
+        out[d] = lead_progress(market - real)
     return out
 
 

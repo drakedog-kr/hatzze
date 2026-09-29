@@ -94,6 +94,10 @@ CCSI_SLUG = "consumer_sentiment_index"
 CCSI_PCTILE_ANCHORS = [(90.0, 10), (98.0, 25), (102.0, 50), (107.0, 75), (112.0, 90)]
 # 코스피 전고점 대비 낙폭(%) 역대 분위수(10년 실측). 낙폭이 얕을수록(0에 가까울수록) 증시 강함.
 KOSPI_DD_PCTILE_ANCHORS = [(-25.9, 10), (-21.6, 25), (-15.1, 50), (-3.4, 75), (-0.4, 90)]
+# 괴리 lead(증시%ile − 실물%ile) 눈금 — 눈금을 왜 이렇게 폈는지는 main 의 괴리 override 주석.
+# backfill_scores·recompute_score_history 도 lead_progress 를 가져다 쓴다. main 안 지역 상수였을
+# 땐 둘이 손으로 베껴야 했고, 2026-07-23 max(0, lead) 를 걷어낼 때 backfill 만 옛 공식에 남았다.
+LEAD_FLOOR, LEAD_CEIL = -75.0, 45.0
 NEUTRAL_PROGRESS = 50.0  # 값이 아예 없는 지표(no_value)를 표에 표시할 때 쓰는 자리표시자
 
 # 종합점수 표시 눈금 — 가중평균 원점수를 '역대 백분위' 앵커로 펴서 보여준다.
@@ -242,6 +246,11 @@ def percentile_from_anchors(value: float, anchors: list[tuple[float, int]]) -> f
         if v0 <= value <= v1:
             return p0 + (value - v0) / (v1 - v0) * (p1 - p0)
     return float(anchors[-1][1])  # 도달 불가(방어)
+
+
+def lead_progress(lead: float) -> float:
+    """괴리 lead(−75~+45)를 0~100 과열도로 편다. 캡핑 전 값이라 normalized_score 에 그대로 쓴다."""
+    return (lead - LEAD_FLOOR) / (LEAD_CEIL - LEAD_FLOOR) * 100
 
 
 def ccsi_real_strength(client) -> tuple[float, float] | None:
@@ -459,7 +468,6 @@ def main() -> None:
     # 동행성은 +0.533으로 멀쩡한 지표인데 절반이 뭉개져 점수에 기여를 못 한 것이다. 이제
     # lead(-75~+45)를 그대로 0~100에 펴서, 실물이 크게 앞서면 '차갑다'로 읽히게 한다.
     # 카드는 여전히 lead의 부호로 "실물 X% 강세"↔"증시 X% 강세"를 양방향으로 보여준다.
-    LEAD_FLOOR, LEAD_CEIL = -75.0, 45.0
     by_slug = {r["slug"]: r for r in results}
     sb = by_slug.get("small_business_crisis_index")
     hg = by_slug.get("kospi_high_gap")
@@ -469,7 +477,7 @@ def main() -> None:
         real_strength, ccsi_value = ccsi
         market_strength, gap_pct = mkt
         lead = market_strength - real_strength  # +면 증시 앞섬, −면 실물 앞섬
-        sb["progress"] = (lead - LEAD_FLOOR) / (LEAD_CEIL - LEAD_FLOOR) * 100
+        sb["progress"] = lead_progress(lead)
         sb["capped_progress"] = cap_progress(sb["progress"])
         sb["hit"] = sb["capped_progress"] >= HOT_ZONE
         # 카드에 적을 기준선도 같은 척도로 되돌린다(진행률 75가 되는 lead 값).

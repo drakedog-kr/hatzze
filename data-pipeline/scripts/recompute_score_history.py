@@ -49,9 +49,6 @@ from config.indicator_thresholds import INDICATOR_THRESHOLDS  # noqa: E402
 from config.indicator_weights import INDICATOR_WEIGHTS  # noqa: E402
 import calculate_score as cs  # noqa: E402
 
-# calculate_score.main() 안의 괴리 눈금과 같아야 한다(거기 지역 상수라 가져올 수 없다).
-LEAD_FLOOR, LEAD_CEIL = -75.0, 45.0
-
 
 def load_series(db, indicator_id: str) -> list[dict]:
     """(date, raw_value, details) 전부, 날짜 오름차순. 1,000행 상한을 넘길 수 있어 이어 받는다."""
@@ -118,7 +115,7 @@ def score_on(d: str, series: dict[str, list[dict]], weights_db: dict[str, float]
         real = cs.percentile_from_anchors(float(c["raw_value"]), cs.CCSI_PCTILE_ANCHORS)
         mkt = cs.percentile_from_anchors(float(g["raw_value"]), cs.KOSPI_DD_PCTILE_ANCHORS)
         lead = mkt - real  # +면 증시 앞섬, −면 실물 앞섬
-        sb["capped"] = cs.cap_progress((lead - LEAD_FLOOR) / (LEAD_CEIL - LEAD_FLOOR) * 100)
+        sb["capped"] = cs.cap_progress(cs.lead_progress(lead))
 
     wsum = sum(i["weight"] for i in items)
     if not wsum:
