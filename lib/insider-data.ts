@@ -40,6 +40,8 @@ import { LOAD_FAILED, type MaybeFailed, isLoadFailed } from "@/lib/load-state";
 import { fetchAllRows } from "@/lib/telegram-data";
 import { usQuotes } from "@/lib/us-telegram-data";
 import { displayName } from "@/lib/us-ticker-names";
+import { canonicalTicker } from "@/lib/us-ticker-spellings";
+import { holdersByTicker } from "@/lib/insider-13f";
 
 /**
  * 공시 집계 창. 파이프라인(fetch_us_insider.py 의 WINDOW_DAYS)과 **반드시 같아야 한다.**
@@ -550,15 +552,8 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
   const latestQ = (cik: number) => quartersOf.get(cik)?.[0] ?? null;
   const priorQ = (cik: number) => quartersOf.get(cik)?.[1] ?? null;
 
-  const holdersOf = new Map<string, { person: string; value: number }[]>();
-  for (const h of holdingRows) {
-    const m = managerOf.get(h.cik);
-    if (!m || h.report_date !== latestQ(h.cik)) continue;
-    const list = holdersOf.get(h.ticker) ?? [];
-    list.push({ person: m.person, value: h.value ?? 0 });
-    holdersOf.set(h.ticker, list);
-  }
-  for (const list of holdersOf.values()) list.sort((a, b) => b.value - a.value);
+  // ⚠️ 열쇠가 대표 표기다(13F 의 BRK-B·BRK-A → BRK). 까닭은 holdersByTicker 주석.
+  const holdersOf = holdersByTicker(holdingRows, latestQ, managerOf);
 
 
   // 티커 → 의원 신고. 매수·매도를 따로 센다 — 의원 축은 임원과 달리 재량 매매라
@@ -575,8 +570,10 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
   };
   const congressOf = new Map<string, Cg>();
   for (const c of congressRows) {
+    // ⚠️ 의원 표는 버크셔를 BRK.B 로 적는다. 대표 표기로 모아야 카더라의 BRK 줄과 만난다.
+    const key = canonicalTicker(c.ticker);
     const cur =
-      congressOf.get(c.ticker) ??
+      congressOf.get(key) ??
       {
         buys: 0,
         sells: 0,
@@ -595,13 +592,14 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
     cur.members.set(c.member, (cur.members.get(c.member) ?? 0) + 1);
     const d = c.transaction_date ?? c.filed_date;
     if (d && (!cur.latest || d > cur.latest)) cur.latest = d;
-    congressOf.set(c.ticker, cur);
+    congressOf.set(key, cur);
   }
   const ins = new Map(insiderRows.map((r) => [String(r.ticker), r]));
 
   const rows: InsiderRow[] = mentionRows.map((m) => {
     const i = ins.get(m.ticker);
     const n = (k: string) => Number(i?.[k] ?? 0);
+    const key = canonicalTicker(m.ticker);
     return {
       ticker: m.ticker,
       name: nameOf.get(m.ticker) ?? m.ticker,
@@ -615,15 +613,15 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
       others: n("other_count"),
       people: n("person_count"),
       latestFiled: (i?.latest_filed_date as string | null) ?? null,
-      holders: holdersOf.get(m.ticker)?.length ?? 0,
-      holderNames: (holdersOf.get(m.ticker) ?? []).map((h) => h.person),
-      congressBuys: congressOf.get(m.ticker)?.buys ?? 0,
-      congressSells: congressOf.get(m.ticker)?.sells ?? 0,
-      congressMembers: congressOf.get(m.ticker)?.members.size ?? 0,
-      congressLatest: congressOf.get(m.ticker)?.latest ?? null,
+      holders: holdersOf.get(key)?.length ?? 0,
+      holderNames: (holdersOf.get(key) ?? []).map((h) => h.person),
+      congressBuys: congressOf.get(key)?.buys ?? 0,
+      congressSells: congressOf.get(key)?.sells ?? 0,
+      congressMembers: congressOf.get(key)?.members.size ?? 0,
+      congressLatest: congressOf.get(key)?.latest ?? null,
       // 건수가 많은 의원을 앞에 둔다 — 화면이 첫 이름만 적고 나머지를 "외 N명"으로 줄이므로,
       // 그 첫 이름이 그 종목을 가장 많이 건드린 사람이라야 뜻이 있다.
-      congressNames: [...(congressOf.get(m.ticker)?.members ?? new Map<string, number>())]
+      congressNames: [...(congressOf.get(key)?.members ?? new Map<string, number>())]
         .sort((a, b) => b[1] - a[1])
         .map(([name]) => name),
       price: null,
@@ -640,7 +638,8 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
   // ⚠️ 한 종목이 여러 날 신고되면 창 안에서 여러 행으로 온다. **종목 단위로 합쳐야**
   //    "이 종목을 며칠에 걸쳐 몇 명이 샀나"가 나온다. 날짜별로 두면 같은 회사가 목록에
   //    두 번 뜬다.
-  const ourTickers = new Set(rows.map((r) => r.ticker));
+  // ⚠️ 대표 표기로 담는다. 13F·의원 카드의 BRK-B·BRK.B 도 카더라의 BRK 로 알아봐야 한다.
+  const ourTickers = new Set(rows.map((r) => canonicalTicker(r.ticker)));
 
   // ── 분기 비교: 늘린 종목 · 줄인 종목 ──────────────────────────────
   // ⚠️ 13F 는 분기 스냅샷이라 "샀다"가 아니라 **두 분기의 차이**다. 분기 중간에 사고팔면
@@ -699,7 +698,7 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
     names: [...side.who].sort((a, b) => b.v - a.v).map((w) => w.n),
     movers: side.count,
     against: other.count,
-    inKadera: ourTickers.has(ticker),
+    inKadera: ourTickers.has(canonicalTicker(ticker)),
   });
   const entries = [...moveOf.entries()];
   const managerAdds = entries

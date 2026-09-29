@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { filedQuarters, quarterMarks, stockPosition } from "../lib/insider-13f.ts";
+import { filedQuarters, holdersByTicker, quarterMarks, stockPosition } from "../lib/insider-13f.ts";
 
 const Q4 = "2025-12-31";
 const Q1 = "2026-03-31";
@@ -140,5 +140,45 @@ describe("quarterMarks", () => {
     const want = [{ cik: 1, date: Q2, side: "buy" }];
     assert.deepEqual(quarterMarks(rows, quarters), want);
     assert.deepEqual(quarterMarks([...rows].reverse(), quarters), want);
+  });
+});
+
+describe("holdersByTicker", () => {
+  const managers = new Map([
+    [1, { person: "게이너" }],
+    [2, { person: "버핏" }],
+    [3, { person: "애크먼" }],
+  ]);
+  const latest = new Map([[1, Q2], [2, Q2], [3, Q1]]);
+  const h = (cik: number, ticker: string, report_date: string, value: number) => ({ cik, ticker, report_date, value });
+
+  it("13F 의 BRK-B·BRK-A 가 카더라의 BRK 로 모인다 — 원래 표기로 두면 BRK 줄이 '거물 0명'이 된다", () => {
+    const m = holdersByTicker([h(2, "BRK-B", Q2, 50_000), h(3, "BRK.B", Q1, 9_000)], (cik) => latest.get(cik) ?? null, managers);
+    assert.deepEqual(m.get("BRK"), [
+      { person: "버핏", value: 50_000 },
+      { person: "애크먼", value: 9_000 },
+    ]);
+    assert.equal(m.get("BRK-B"), undefined);
+  });
+
+  it("두 클래스를 다 든 운용사는 한 명이고 금액을 더한다", () => {
+    const m = holdersByTicker(
+      [h(1, "BRK-B", Q2, 75_000), h(1, "BRK-A", Q2, 740_000), h(2, "BRK-B", Q2, 50_000)],
+      (cik) => latest.get(cik) ?? null,
+      managers,
+    );
+    assert.deepEqual(m.get("BRK"), [
+      { person: "게이너", value: 815_000 },
+      { person: "버핏", value: 50_000 },
+    ]);
+  });
+
+  it("운용사의 최신 분기 보유만 센다(직전 분기 행과 명단 밖 운용사는 뺀다)", () => {
+    const m = holdersByTicker(
+      [h(1, "NVDA", Q1, 10), h(2, "NVDA", Q2, 20), h(9, "NVDA", Q2, 30)],
+      (cik) => latest.get(cik) ?? null,
+      managers,
+    );
+    assert.deepEqual(m.get("NVDA"), [{ person: "버핏", value: 20 }]);
   });
 });

@@ -1,6 +1,7 @@
 /**
- * 월가 거물(13F) 보유를 **두 분기로 견주는** 규칙. DB 를 안 만지는 순수 계산이라
- * 단위 테스트(tests/insider-13f.test.ts)가 그대로 부른다. 조회는 lib/insider-detail.ts 가 한다.
+ * 월가 거물(13F) 보유를 읽는 규칙 — 두 분기를 견주고, 표마다 다른 종목 표기를 모은다. DB 를
+ * 안 만지는 순수 계산이라 단위 테스트(tests/insider-13f.test.ts)가 그대로 부른다. 조회는
+ * lib/insider-detail.ts(종목·인물 상세)와 lib/insider-data.ts(메인)가 한다.
  *
  * ## ⚠️ 분기는 그 운용사가 **낸 분기 전체**에서 고른다
  *
@@ -17,6 +18,7 @@
  * 곳은 분기마다 행이 둘이라, 앞의 한 줄만 집으면 금액이 반쪽이 되고 BRK-A 주식 수를
  * BRK-B 와 견주는 일까지 생긴다(정렬이 cik 하나라 어느 줄이 앞일지도 정해져 있지 않다).
  */
+import { canonicalTicker } from "./us-ticker-spellings.ts";
 
 /** 한 분기 · 한 클래스의 보유. 같은 (운용사, 티커, 분기)는 수집기가 한 줄로 합쳐 둔다. */
 export type ClassRow = { ticker: string; shares: number | null; value: number | null };
@@ -140,6 +142,39 @@ export function quarterMarks(
       if (!s || s.move === "hold") continue;
       out.push({ cik, date: qs[i], side: s.move === "new" || s.move === "add" ? "buy" : "sell" });
     }
+  }
+  return out;
+}
+
+/**
+ * 티커 → 그 종목을 **자기 최신 분기에** 든 거물들, 금액 큰 순. 메인 화면의 '월가 거물이
+ * 들고 있는 종목'이 쓴다(화면은 앞 둘만 이름으로 적는다).
+ *
+ * ⚠️ 열쇠는 대표 표기(canonicalTicker)다. 13F 는 버크셔를 BRK-B·BRK-A 로 적고 카더라
+ *    언급은 BRK 라, 원래 표기로 두면 BRK 줄이 "거물 0명"이 되어 카드에서 통째로 빠졌다
+ *    (lib/us-ticker-spellings.ts 가 막으려던 "없다고 단언"이다).
+ * ⚠️ 한 운용사가 두 클래스를 다 들었으면 **한 명**이다. 금액을 더해 한 줄로 둔다 — 행마다
+ *    넣으면 같은 사람이 두 번 세어진다.
+ */
+export function holdersByTicker(
+  rows: { cik: number; ticker: string; value: number | null; report_date: string }[],
+  latestOf: (cik: number) => string | null,
+  managers: Map<number, { person: string }>,
+): Map<string, { person: string; value: number }[]> {
+  const sums = new Map<string, Map<number, number>>();
+  for (const h of rows) {
+    if (!managers.has(h.cik) || h.report_date !== latestOf(h.cik)) continue;
+    const t = canonicalTicker(h.ticker);
+    const byCik = sums.get(t) ?? new Map<number, number>();
+    byCik.set(h.cik, (byCik.get(h.cik) ?? 0) + (h.value ?? 0));
+    sums.set(t, byCik);
+  }
+  const out = new Map<string, { person: string; value: number }[]>();
+  for (const [t, byCik] of sums) {
+    out.set(
+      t,
+      [...byCik].map(([cik, value]) => ({ person: managers.get(cik)!.person, value })).sort((a, b) => b.value - a.value),
+    );
   }
   return out;
 }

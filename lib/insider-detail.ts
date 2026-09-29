@@ -719,7 +719,8 @@ export const getManagerDetail = cache(async (cik: number): Promise<ManagerDetail
   const aum = now.reduce((s, h) => s + (h.value ?? 0), 0);
 
   // 카더라에 **한 번이라도** 오른 종목. 하루치로 보면 대부분 빠져서 표시가 뜻을 잃는다.
-  const kadera = new Set(mentionRows.map((r) => r.ticker));
+  // ⚠️ 대표 표기로 대 본다. 13F 는 BRK-B 인데 카더라는 BRK 다(lib/us-ticker-spellings.ts).
+  const kadera = new Set(mentionRows.map((r) => canonicalTicker(r.ticker)));
   const nameOf = (t: string) => displayName(t, null);
 
   const holdings: ManagerHolding[] = now
@@ -736,7 +737,7 @@ export const getManagerDetail = cache(async (cik: number): Promise<ManagerDetail
         weight: aum ? ((h.value ?? 0) / aum) * 100 : 0,
         move,
         sharesChange: b && was ? ((shares - was) / was) * 100 : null,
-        inKadera: kadera.has(h.ticker),
+        inKadera: kadera.has(canonicalTicker(h.ticker)),
       };
     })
     .sort((a, b) => b.value - a.value);
@@ -753,7 +754,7 @@ export const getManagerDetail = cache(async (cik: number): Promise<ManagerDetail
       name: nameOf(h.ticker),
       value: h.value ?? 0,
       weight: priorAum ? ((h.value ?? 0) / priorAum) * 100 : 0,
-      inKadera: kadera.has(h.ticker),
+      inKadera: kadera.has(canonicalTicker(h.ticker)),
     }))
     .sort((a, b) => b.value - a.value);
 
