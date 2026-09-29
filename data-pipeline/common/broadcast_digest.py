@@ -594,7 +594,9 @@ def load_new_faces(db, base_date: date) -> list[dict]:
     if not dates:
         return []
     try:
-        top = top_surging(db, 10, preloaded=(rows, dates))
+        # ⚠️ cap 도 같이 준다. limit 만 주면 top_surging 이 정원(CARD_LIMIT=5)까지만 세워 상위 다섯만 본다 —
+        #    그 다섯이 한 채널짜리인 날엔 6~10위의 새 종목이 있어도 블록이 빠졌다.
+        top = top_surging(db, 10, preloaded=(rows, dates), cap=10)
     except Exception as e:  # noqa: BLE001 — 채널 폭 조회가 statement timeout 으로 죽는 날이 있다(로컬 실측)
         print(f"[안내] 급부상 계산 실패({type(e).__name__}). '처음 회자된 종목' 블록을 뺍니다.")
         return []
