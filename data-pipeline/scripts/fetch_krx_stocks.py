@@ -94,8 +94,12 @@ def main() -> None:
         sys.exit(1)
 
     stocks: dict[str, dict] = {}
-    for url in (KOSPI_URL, KOSDAQ_URL):
-        for d in fetch_rows(url, bas_dd):
+    empty: list[str] = []
+    for mkt, url in (("KOSPI", KOSPI_URL), ("KOSDAQ", KOSDAQ_URL)):
+        got = fetch_rows(url, bas_dd)
+        if not got:
+            empty.append(mkt)
+        for d in got:
             code = (d.get("ISU_CD") or "").strip()
             name = (d.get("ISU_NM") or "").strip()
             if not code or not name:
@@ -114,6 +118,13 @@ def main() -> None:
                 "market_cap": _to_int(d.get("MKTCAP")),
             }
 
+    # ⚠️ 한 시장이라도 비면 아무것도 올리지 않는다. fetch_rows 는 재시도가 다 실패해도 빈 목록을 줄 뿐이라,
+    #    그대로 가면 코스피만 새 price_date 로 올라가고 코스닥은 어제 날짜에 남는다. 배당 화면(lib/dividend.ts)은
+    #    종가 날짜가 최신이 아닌 종목을 상장폐지로 보고 빼므로 코스닥 전부가 조용히 사라진다.
+    #    통째로 건너뛰면 두 시장 다 어제 저장분으로 이어 간다(워크플로 krx_master 는 실패해도 뒤가 돈다).
+    if empty:
+        print(f"[오류] {bas_dd} {'·'.join(empty)} 종목을 못 받았습니다. 한 시장만 올리지 않도록 중단합니다.")
+        sys.exit(1)
     if not stocks:
         print(f"[오류] {bas_dd} 종목이 0개입니다. 중단합니다.")
         sys.exit(1)
