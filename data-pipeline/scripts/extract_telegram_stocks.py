@@ -45,10 +45,12 @@ from __future__ import annotations
 import re
 import sys
 from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from common.supabase_client import execute_with_retry  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.supabase_client import load_all  # noqa: E402
 from config.stock_extraction import (  # noqa: E402
@@ -604,6 +606,37 @@ def load_messages(db) -> list[dict]:
     return msgs
 
 
+def replace_rows(db, table: str, rows: list[dict], on_conflict: str) -> None:
+    """태그 표를 이번 추출 결과로 **갈아 끼운다** — 도중에 죽어도 표가 반쪽이 되지 않게.
+
+    미장 짝(extract_telegram_us_stocks)도 이걸 쓴다.
+
+    예전엔 전량 delete 뒤 500행씩 insert 했다. 25만 행이면 요청이 500번을 넘는데, 그중 하나만
+    끊겨도(execute_with_retry 주석의 GOAWAY) 앞 배치만 든 표가 남았다. 다음 스텝
+    (calculate_stock_daily)이 '전량 재계산'이라 그 반쪽 표로 일별 집계·급부상을 다시 만들어,
+    다음 성공 실행까지 화면이 틀린 숫자를 보였다. 실패 알림 문구('그 시점의 값이 화면에 그대로
+    남아 있습니다')가 가정하는 것과 반대다.
+
+    그래서 순서를 뒤집는다.
+      1) 유일 키(on_conflict)로 upsert 한다. 행마다 이번 실행 시각을 created_at 에 찍는다.
+      2) 전부 들어간 뒤에만 그 시각보다 옛 행 — 이번 추출에 없는 행 — 을 지운다.
+    도중에 죽으면 표엔 지난 결과에 이번에 쓴 만큼이 덮여 있다. 지운 건 없다.
+
+    upsert 는 같은 키를 같은 값으로 덮을 뿐이라 **다시 던져도 행이 늘지 않는다.** 그래서 끊긴
+    요청을 execute_with_retry 로 다시 던진다 — 그 함수가 쓰기를 막는 까닭(insert 가 두 번 들어감)이
+    여기엔 없다. 옛 행 지우기도 같은 조건을 한 번 더 던질 뿐이다.
+
+    ⚠️ created_at 은 **직접 실어야 한다.** 열 기본값(now())은 INSERT 에만 붙어서, 이미 있던 키를
+       덮는 upsert 는 옛 시각을 그대로 둔다. 그러면 2) 가 살아 있는 행까지 지운다.
+    """
+    stamp = datetime.now(timezone.utc).isoformat()
+    # 한 요청이 크면 statement timeout 에 걸린다. 다른 쓰기와 같은 500행 단위.
+    for i in range(0, len(rows), 500):
+        batch = [{**r, "created_at": stamp} for r in rows[i : i + 500]]
+        execute_with_retry(db.table(table).upsert(batch, on_conflict=on_conflict))
+    execute_with_retry(db.table(table).delete().lt("created_at", stamp))
+
+
 def main() -> None:
     dry_run = "--dry-run" in sys.argv[1:]
     db = get_client()
@@ -673,10 +706,9 @@ def main() -> None:
         print("\n--dry-run: DB에 저장하지 않았습니다.")
         return
 
-    # 재실행 시 최신 상태로 맞추기 위해 전량 삭제 후 삽입(추출 규칙이 바뀌면 과거분도 갱신).
-    db.table("telegram_message_stocks").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
-    for i in range(0, len(rows), 500):
-        db.table("telegram_message_stocks").insert(rows[i : i + 500]).execute()
+    # 재실행 시 최신 상태로 갈아 끼운다(추출 규칙이 바뀌면 과거분도 갱신). 도중에 죽어도 표가
+    # 반쯤 비지 않게 replace_rows 가 순서를 잡는다.
+    replace_rows(db, "telegram_message_stocks", rows, "channel_handle,message_id,stock_code")
     print(f"\n[Supabase] telegram_message_stocks {len(rows)}건 저장 완료")
 
 

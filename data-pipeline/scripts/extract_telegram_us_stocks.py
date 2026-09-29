@@ -62,12 +62,13 @@ from config.us_stock_extraction import (  # noqa: E402
     sanity_check,
 )
 
-# 매칭 기계는 국내 스크립트 것을 그대로 쓴다(위 docstring 참고).
+# 매칭 기계는 국내 스크립트 것을 그대로 쓴다(위 docstring 참고). 표 갈아 끼우기(replace_rows)도 같다.
 from extract_telegram_stocks import (  # noqa: E402
     MASK_CHAR,
     URL_RE,
     boundary_ok,
     build_pattern,
+    replace_rows,
 )
 
 NEG_RE = {name: re.compile(pat) for name, pat in NEGATIVE_CONTEXT.items()}
@@ -340,20 +341,16 @@ def main() -> None:
         return
 
     # 예외 없이 0건으로 끝나는 고장을 막는다(사전이 깨지거나 조회가 빈 경우).
-    # 아래 delete 가 먼저 도므로, 이 가드가 없으면 **표를 비우고 아무것도 안 넣는다.**
+    # 아래 갈아 끼우기는 이번에 없는 행을 지우므로, 이 가드가 없으면 **표를 비우고 아무것도 안 넣는다.**
     # 문턱을 비율이 아니라 0 으로 둔 이유는 fetch_telegram 과 같다 — 12만 건에서
     # 미국 언급이 0이면 그건 시장 상황이 아니라 고장이다.
     if not rows:
         print("[오류] 미국 종목 언급이 0건입니다. 기존 데이터를 지우지 않고 멈춥니다.")
         sys.exit(1)
 
-    # 재실행 = 전량 삭제 후 삽입. 사전을 고치면 과거분까지 소급 반영된다(국내와 같다).
-    db.table("telegram_message_us_stocks").delete().neq(
-        "id", "00000000-0000-0000-0000-000000000000"
-    ).execute()
-    # 한 요청이 크면 statement timeout 에 걸린다. 다른 쓰기와 같은 500행 단위.
-    for i in range(0, len(rows), 500):
-        db.table("telegram_message_us_stocks").insert(rows[i : i + 500]).execute()
+    # 재실행 = 전량 갈아 끼우기. 사전을 고치면 과거분까지 소급 반영된다(국내와 같다).
+    # 도중에 죽어도 표가 반쯤 비지 않게 국내 쪽 replace_rows 로 한다(그 docstring 참고).
+    replace_rows(db, "telegram_message_us_stocks", rows, "channel_handle,message_id,ticker")
     print(f"\n[Supabase] telegram_message_us_stocks {len(rows):,}건 저장 완료")
 
 
