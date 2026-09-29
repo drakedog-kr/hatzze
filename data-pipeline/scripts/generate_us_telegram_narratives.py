@@ -39,8 +39,8 @@
 어느 쪽이 옳으냐보다 **둘이 같은 사흘을 말하는 것**이 먼저다. 국내에서 이게 두 번 어긋났고
 (길이 한 번, 끝점 한 번) 둘 다 화면의 숫자와 문장이 다른 값을 말했다.
 ⚠️ 저쪽 US_WINDOW_DAYS 를 바꾸면 여기 WINDOW_DAYS 도 같이 바꿀 것.
-⚠️ **종목 리포트는 기준일을 뺀다.** 그 카드(getUsStockReports)는 loadUsStockDaily(windowBefore)로
-읽어 기준일 앞 사흘을 세기 때문이다 — card_window · build_stock_digests 주석.
+⚠️ **종목 리포트는 기준일을 빼고 센다**(발췌만 기준일까지). 그 카드(getUsStockReports)는
+loadUsStockDaily(windowBefore)로 읽어 기준일 앞 사흘을 세기 때문이다 — card_window · build_stock_digests 주석.
 
 실행:
     cd data-pipeline && source .venv/bin/activate
@@ -342,7 +342,8 @@ def card_window(latest: str) -> tuple[str, str]:
     """주요 종목 리포트 카드가 세는 구간 — **기준일을 뺀** 앞 WINDOW_DAYS 일.
 
     카드(lib/us-telegram-data.ts getUsStockReports)는 loadUsStockDaily 의 windowBefore 로 읽어
-    기준일을 빼고 센다. 총평(window_dates)과 달리 이쪽은 국장 종목 요약과 같은 규칙이다.
+    기준일을 빼고 센다. 총평(window_dates)과 달리 이쪽은 국장 종목 요약과 같은 규칙이다 —
+    세는 창은 기준일을 빼고, 발췌는 기준일 것까지 본다(build_stock_digests).
     """
     end = date.fromisoformat(latest) - timedelta(days=1)
     return (end - timedelta(days=WINDOW_DAYS - 1)).isoformat(), end.isoformat()
@@ -680,14 +681,23 @@ def build_stock_digests(
     window_dates(기준일 포함)다 — 테마 급부상(common/us_theme_risers)이 기준일을 넣어 센다.
     메시지는 두 창을 다 덮게 받아 넘길 것(main 참고)."""
     since, end = window_dates(latest) if tickers is not None else card_window(latest)
-    win = [m for m in msgs if since <= m["date"] <= end]
 
-    by_ticker: dict[str, list[dict]] = defaultdict(list)
-    for m in win:
-        for x in m["mentions"]:
-            # 은행이 전망을 말한 글은 그 은행의 종목 요약 재료가 아니다(config.RESEARCH_HOUSES 주석).
-            if not is_house(x):
-                by_ticker[x["ticker"]].append({**m, "match_text": x.get("match_text")})
+    def by_ticker_in(until: str) -> dict[str, list[dict]]:
+        out: dict[str, list[dict]] = defaultdict(list)
+        for m in msgs:
+            if not since <= m["date"] <= until:
+                continue
+            for x in m["mentions"]:
+                # 은행이 전망을 말한 글은 그 은행의 종목 요약 재료가 아니다(config.RESEARCH_HOUSES 주석).
+                if not is_house(x):
+                    out[x["ticker"]].append({**m, "match_text": x.get("match_text")})
+        return out
+
+    by_ticker = by_ticker_in(end)
+    # 발췌는 기준일 것까지 본다(국장 종목 요약과 같은 규칙) — 세는 값이 아니라 '무엇이 화제였나'의
+    # 예시라, 기준일을 빼면 아침 실행이 밤사이 미장 마감 소식을 못 보고 하루 늦은 얘기를 한다.
+    # 고르기·언급 수·[일별]은 위 창(카드와 같은 사흘) 그대로다.
+    excerpt_pool = by_ticker_in(latest)
 
     # 동률은 티커로 가른다 — 안 가르면 메시지를 받은 순서가 순위를 정하고, 그 순서는
     # 조회 방식이 바뀔 때마다 달라진다(2026-09-15 실측: GS·SPCX 124회 동률이 뒤집혔다).
@@ -705,7 +715,7 @@ def build_stock_digests(
         name = name_of.get(ticker, ticker)
         by_day = Counter(m["date"] for m in items)
         chans = len({m["channel_handle"] for m in items})
-        top = sorted(items, key=lambda m: -(m.get("views") or 0))[:STOCK_EXCERPTS]
+        top = sorted(excerpt_pool[ticker], key=lambda m: -(m.get("views") or 0))[:STOCK_EXCERPTS]
         lines = [
             f"[종목] {name} ({ticker}) · 미국 상장",
             f"[최근 {WINDOW_DAYS}일] 언급 {len(items)}회 · {chans}개 채널",

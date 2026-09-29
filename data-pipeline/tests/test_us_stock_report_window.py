@@ -63,3 +63,19 @@ def test_tickers_mode_keeps_base_inclusive_window():
     assert [t for t, _n, _d in digests] == ["BBB"]
     assert "[일별] 09-29 70회" in digests[0][2]
     assert required == [("BBB", "BBB")]
+
+
+def test_excerpts_reach_the_base_day_but_counts_do_not():
+    # 국장 종목 요약과 같은 규칙 — 세는 값은 카드의 사흘, 발췌는 기준일 것까지(아침 실행의 밤사이 마감 소식).
+    plan = PLAN + [("2026-09-29", "C1", 5)]
+    msgs = _msgs(plan)
+    for m in msgs:
+        if m["date"] == "2026-09-29" and m["mentions"][0]["ticker"] == "C1":
+            m["views"] = 10_000
+            m["text"] = "C1 밤사이 마감 소식"
+    digests, required = US.build_stock_digests(BASE, msgs, NAMES)
+    c1 = next(d for t, _n, d in digests if t == "C1")
+    assert "[최근 3일] 언급 40회" in c1
+    assert "[일별] 09-27 20회 · 09-28 20회" in c1
+    assert "C1 밤사이 마감 소식" in c1
+    assert [t for t, _n in required] == ["AAA", "C1", "C2", "C3"]
