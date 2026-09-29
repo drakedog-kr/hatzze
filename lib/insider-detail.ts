@@ -32,7 +32,7 @@ import { usQuotes } from "@/lib/us-telegram-data";
 import { fetchDailyHistory } from "@/lib/yahoo-history";
 import { displayName } from "@/lib/us-ticker-names";
 import { canonicalTicker, tickerSpellings } from "@/lib/us-ticker-spellings";
-import { filedQuarters, quarterMarks, stockPosition } from "@/lib/insider-13f";
+import { filedQuarters, isCik, quarterMarks, stockPosition } from "@/lib/insider-13f";
 import { type MentionPoint, mentionTrend } from "@/lib/insider-trend";
 
 /** 언급 추이로 그리는 날수. 표에 41일치가 있어 그보다 길게 잡을 이유가 없다. */
@@ -678,6 +678,9 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
 });
 
 export const getManagerDetail = cache(async (cik: number): Promise<ManagerDetail | null> => {
+  // 번호로 못 읽는 주소는 묻지도 않고 "없는 인물"이다. 물으면 DB 가 400 을 내 아래에서
+  // 명단 조회 실패로 던진다(isCik 주석). 메타데이터도 이 함수를 부르므로 여기서 막는다.
+  if (!isCik(cik)) return null;
   const db = getSupabaseAdmin();
   if (!db) return null;
 

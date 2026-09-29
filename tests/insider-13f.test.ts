@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { filedQuarters, holdersByTicker, quarterMarks, stockPosition } from "../lib/insider-13f.ts";
+import { filedQuarters, holdersByTicker, isCik, quarterMarks, stockPosition } from "../lib/insider-13f.ts";
 
 const Q4 = "2025-12-31";
 const Q1 = "2026-03-31";
@@ -180,5 +180,12 @@ describe("holdersByTicker", () => {
       managers,
     );
     assert.deepEqual(m.get("NVDA"), [{ person: "버핏", value: 20 }]);
+  });
+});
+
+describe("isCik", () => {
+  it("양의 정수만 CIK 다 — 1.5·1e30·NaN 을 bigint 열에 물으면 PostgREST 가 400 을 내고 404 대신 오류 화면이 뜬다", () => {
+    assert.equal(isCik(1067983), true);
+    for (const n of [1.5, 1e30, Number.NaN, Number("abc"), Infinity, 0, -1]) assert.equal(isCik(n), false, String(n));
   });
 });

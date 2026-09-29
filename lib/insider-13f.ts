@@ -178,3 +178,14 @@ export function holdersByTicker(
   }
   return out;
 }
+
+/**
+ * 주소의 `[cik]` 가 SEC 운용사 번호로 읽히나 — 양의 정수만.
+ *
+ * ⚠️ `Number.isFinite` 로는 모자라다. `1.5`·`1e30` 이 통과해 bigint 열(us_manager.cik)에
+ *    그대로 물리면 PostgREST 가 400 을 내고, 인물 상세는 명단 조회 실패로 던져 404 대신
+ *    오류 화면이 뜬다. `abc` 는 메타데이터 쪽에서 NaN 으로 같은 길을 탔다.
+ */
+export function isCik(n: number): boolean {
+  return Number.isSafeInteger(n) && n > 0;
+}
