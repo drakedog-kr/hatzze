@@ -47,12 +47,14 @@ create table if not exists public.indicator_values (
   raw_value numeric not null,
   normalized_score numeric,
   threshold numeric,
+  details jsonb,
   created_at timestamptz not null default now(),
   unique (indicator_id, date)
 );
 
 comment on table public.indicator_values is '지표별 일별 원시값 및 정규화 스코어(기준선 대비 진행률 %, 100 초과·음수 가능)';
 comment on column public.indicator_values.threshold is '그날 calculate_score.py가 계산한 Hit 기준값. kospi_high_gap/youtube_finance_search_views처럼 기준값이 매일 바뀌는 지표가 있어 indicators가 아니라 여기 저장한다';
+comment on column public.indicator_values.details is '카드 보조 숫자(평소 대비 배수·기준선 등). fetch 스크립트와 calculate_score.py가 각자 자기 키만 병합해 쓴다(common/details.py)';
 
 create index if not exists indicator_values_indicator_id_date_idx
   on public.indicator_values (indicator_id, date desc);

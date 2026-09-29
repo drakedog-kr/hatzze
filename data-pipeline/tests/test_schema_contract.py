@@ -3,7 +3,7 @@
 운영 DB 는 SQL Editor 에서 손으로 고친 것이 있어 잘 돈다. 그런데 레포의 schema.sql + migration 을
 차례로 붙여 새 환경을 만들면, 손으로만 고친 자리에서 fetch 스크립트가 첫 DB 호출에 죽는다
 (migration_019 가 daily_score.stage 로 같은 일을 겪었다). 여기서는 SQL 을 실행하지 않고 파일을
-읽어 **마지막으로 적힌 정의**가 코드가 쓰는 값을 받는지만 본다.
+읽어 **마지막으로 적힌 정의**가 코드가 쓰는 값·컬럼을 받는지만 본다.
 """
 import re
 from pathlib import Path
@@ -52,6 +52,20 @@ def _category_check_allows() -> set[str] | None:
     return allowed
 
 
+def _has_column(table: str, column: str) -> bool:
+    """schema.sql 의 create table 이나 migration 의 add/drop column 을 차례로 따라간 마지막 상태."""
+    has = False
+    for path in _sql_files():
+        sql = _sql(path)
+        body = _create_table_body(sql, table)
+        if body and re.search(rf"^\s*{column}\s", body, re.M):
+            has = True
+        pattern = rf"alter table public\.{table}\s+(add|drop) column (?:if (?:not )?exists )?{column}\b"
+        for e in re.finditer(pattern, sql, re.I):
+            has = e.group(1).lower() == "add"
+    return has
+
+
 def _meta_categories() -> set[str]:
     """ensure_indicator 로 indicators 행을 쓰는 스크립트들의 META category 값."""
     cats: set[str] = set()
@@ -69,3 +83,11 @@ def test_indicators_category_check_accepts_every_meta_category():
     assert cats, "META category 를 하나도 못 찾았다 — 정규식이 낡았다"
     allowed = _category_check_allows()
     assert allowed is None or cats <= allowed, f"허용 {sorted(allowed)} 에 없는 값: {sorted(cats - allowed)}"
+
+
+def test_indicator_values_has_details_column():
+    # fetch 스크립트 대부분이 details 를 upsert 하고, calculate_score·check_freshness·common/details
+    # 가 details 를 함께 읽는다. 컬럼이 없으면 PostgREST 가 행을 거절해 지표가 안
+    # 쌓이고 점수·신선도 게이트가 죽어 발송도 선다(화면은 lib/data.ts 가 details 없이 다시 읽어
+    # 버티므로 그전까지 안 보인다).
+    assert _has_column("indicator_values", "details")
