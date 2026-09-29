@@ -179,6 +179,63 @@ export function holdersByTicker(
   return out;
 }
 
+/** 늘림·줄임 카드 한쪽 — 그쪽으로 움직인 사람 수, 그중 신규(또는 청산) 수, 이름과 움직인 금액. */
+export type MoveSide = { count: number; mark: number; who: { n: string; v: number }[] };
+export type TickerMoves = { up: MoveSide; down: MoveSide };
+
+/**
+ * 메인 화면 '월가 거물이 늘린/줄인 종목' 카드의 재료 — 운용사마다 **자기** 최신 분기(`latestOf`)와 직전
+ * 분기(`priorOf`)를 견줘, 종목마다 누가 어느 쪽으로 움직였나. 직전 분기가 없는 운용사는 건너뛴다.
+ *
+ * ⚠️ 열쇠는 대표 표기(canonicalTicker)이고 판정은 quarterShift 다 — 종목 상세와 같은 식이다. 원래 표기로
+ *    두면 버크셔를 두 클래스로 든 곳이 BRK-A·BRK-B 두 줄로 세어지고, BRK-A 를 팔고 같은 값의 BRK-B 를
+ *    산 곳은 '청산'과 '신규'로 두 카드에 다 떴다(#622 에서 찾음).
+ * 움직인 금액(`v`)은 신규면 이번 분기 금액, 청산이면 직전 분기 금액, 늘림·줄임이면 직전 분기 금액 × 주식 수
+ * 증감률이다(주가 변동을 뺀 수량 변화의 몫). 이름을 금액 순으로 세우는 데만 쓴다.
+ */
+export function managerMoves(
+  rows: (ClassRow & { cik: number; report_date: string })[],
+  managers: Map<number, { person: string }>,
+  latestOf: (cik: number) => string | null,
+  priorOf: (cik: number) => string | null,
+): Map<string, TickerMoves> {
+  const pairs = new Map<number, Map<string, { now: ClassRow[]; before: ClassRow[] }>>();
+  for (const r of rows) {
+    const lq = latestOf(r.cik);
+    const pq = priorOf(r.cik);
+    if (!managers.has(r.cik) || !lq || !pq) continue;
+    const at = r.report_date === lq ? "now" : r.report_date === pq ? "before" : null;
+    if (!at) continue;
+    const byTicker = pairs.get(r.cik) ?? new Map<string, { now: ClassRow[]; before: ClassRow[] }>();
+    const t = canonicalTicker(r.ticker);
+    const p = byTicker.get(t) ?? { now: [], before: [] };
+    p[at].push(r);
+    byTicker.set(t, p);
+    pairs.set(r.cik, byTicker);
+  }
+  const out = new Map<string, TickerMoves>();
+  for (const [cik, byTicker] of pairs) {
+    const n = managers.get(cik)!.person;
+    for (const [t, { now, before }] of byTicker) {
+      const s = quarterShift(now, before);
+      if (!s || s.move === "hold") continue;
+      const mv = out.get(t) ?? { up: { count: 0, mark: 0, who: [] }, down: { count: 0, mark: 0, who: [] } };
+      if (s.move === "new" || s.move === "exit") {
+        const side = s.move === "new" ? mv.up : mv.down;
+        side.count += 1;
+        side.mark += 1;
+        side.who.push({ n, v: sum(s.move === "new" ? now : before, "value") });
+      } else {
+        const side = s.move === "add" ? mv.up : mv.down;
+        side.count += 1;
+        side.who.push({ n, v: s.sharesChange == null ? 0 : (Math.abs(s.sharesChange) / 100) * sum(before, "value") });
+      }
+      out.set(t, mv);
+    }
+  }
+  return out;
+}
+
 /**
  * 주소의 `[cik]` 가 SEC 운용사 번호로 읽히나 — 양의 정수만.
  *

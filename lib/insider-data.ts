@@ -41,7 +41,7 @@ import { fetchAllRows } from "@/lib/telegram-data";
 import { usQuotes } from "@/lib/us-telegram-data";
 import { displayName } from "@/lib/us-ticker-names";
 import { canonicalTicker } from "@/lib/us-ticker-spellings";
-import { holdersByTicker } from "@/lib/insider-13f";
+import { holdersByTicker, managerMoves, type MoveSide } from "@/lib/insider-13f";
 
 /**
  * 공시 집계 창. 파이프라인(fetch_us_insider.py 의 WINDOW_DAYS)과 **반드시 같아야 한다.**
@@ -646,46 +646,8 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
   // ── 분기 비교: 늘린 종목 · 줄인 종목 ──────────────────────────────
   // ⚠️ 13F 는 분기 스냅샷이라 "샀다"가 아니라 **두 분기의 차이**다. 분기 중간에 사고팔면
   //    안 보인다. 그래서 화면 문구도 "늘렸다/줄였다"로 적는다.
-  type Side = { count: number; mark: number; who: { n: string; v: number }[] };
-  type Move = { up: Side; down: Side };
-  const blank = (): Move => ({ up: { count: 0, mark: 0, who: [] }, down: { count: 0, mark: 0, who: [] } });
-  const moveOf = new Map<string, Move>();
-  const byCikTicker = new Map<string, Map<string, { shares: number; value: number }>>();
-  for (const h of holdingRows) {
-    const key = `${h.cik}|${h.report_date}`;
-    const m = byCikTicker.get(key) ?? new Map();
-    m.set(h.ticker, { shares: h.shares ?? 0, value: h.value ?? 0 });
-    byCikTicker.set(key, m);
-  }
-  for (const [cik, m] of managerOf) {
-    const lq = latestQ(cik);
-    const pq = priorQ(cik);
-    if (!lq || !pq) continue; // 비교할 과거가 없는 운용사는 건너뛴다
-    const now = byCikTicker.get(`${cik}|${lq}`) ?? new Map();
-    const before = byCikTicker.get(`${cik}|${pq}`) ?? new Map();
-    for (const ticker of new Set([...now.keys(), ...before.keys()])) {
-      const a = now.get(ticker);
-      const b = before.get(ticker);
-      const mv = moveOf.get(ticker) ?? blank();
-      if (a && !b) {
-        mv.up.count += 1;
-        mv.up.mark += 1; // 신규
-        mv.up.who.push({ n: m.person, v: a.value });
-      } else if (!a && b) {
-        mv.down.count += 1;
-        mv.down.mark += 1; // 청산
-        mv.down.who.push({ n: m.person, v: b.value });
-      } else if (a && b && a.shares !== b.shares) {
-        // ⚠️ 금액이 아니라 **주식 수**로 판정한다. 값은 주가가 움직여도 변해서, 한 주도
-        //    안 사고 늘어난 것처럼 보인다.
-        const side = a.shares > b.shares ? mv.up : mv.down;
-        const moved = b.shares ? (Math.abs(a.shares - b.shares) / b.shares) * b.value : 0;
-        side.count += 1;
-        side.who.push({ n: m.person, v: moved });
-      }
-      moveOf.set(ticker, mv);
-    }
-  }
+  // ⚠️ 열쇠는 대표 표기이고 판정은 클래스를 합친다(managerMoves) — BRK-A·BRK-B 가 한 줄이다.
+  const moveOf = managerMoves(holdingRows, managerOf, latestQ, priorQ);
   /**
    * ⭐ 한 종목이 두 카드에 같이 뜨지 않게 **순증감**으로 가른다.
    *
@@ -693,7 +655,7 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
    * '늘린' 1위이면서 '줄인' 2위가 된다(실제로 그랬다). 많이 움직인 쪽에만 놓으면
    * 그 모순이 사라지고, 여러 곳이 **한 방향으로** 모인 종목이 위로 올라온다.
    */
-  const toMove = (ticker: string, side: Side, other: Side): ManagerMove => ({
+  const toMove = (ticker: string, side: MoveSide, other: MoveSide): ManagerMove => ({
     ticker,
     name: labelOf(ticker),
     mark: side.mark,
