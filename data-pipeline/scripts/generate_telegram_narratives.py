@@ -64,6 +64,7 @@ import re
 import sys
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta, timezone
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -551,7 +552,11 @@ def optimism(positive: int, negative: int) -> int | None:
     if decided == 0:
         return None
     k = SENTIMENT_PRIOR
-    return round((positive + k) / (decided + 2 * k) * 100)
+    # 반올림도 화면(Math.round, 동점은 큰 쪽)과 같아야 한다. 내장 round() 는 은행가 반올림이라 62.5 → 62,
+    # 40.5 → 40 이 돼, 카드 63% 옆 총평이 "62%"를 말하거나 라벨이 중립/비관 우세로 갈렸다. 같은 double 의
+    # 정확한 값 위에서 ROUND_HALF_UP — send_telegram_broadcast._js_quantize 와 같은 방식이다(산술 흉내는 안 된다).
+    x = (positive + k) / (decided + 2 * k) * 100
+    return int(Decimal(x).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
 # ── 총평이 볼 테마: 카드와 **글자 그대로 같은 집합**이어야 한다 ────────────────────

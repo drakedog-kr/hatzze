@@ -2005,8 +2005,10 @@ const THEME_MIN_DECIDED = 20;
  * 실측(k=5): 반도체 122:103 54% → 54%(불변), 전체 64% → 64%(불변),
  *            인터넷·플랫폼 82:0 100% → 95%, 하한(8:0) 100% → 72%.
  *
- * ⚠️ 파이프라인 optimism()(generate_telegram_narratives.py)과 **같은 식·같은 k** 여야 한다.
- * 총평 문장이 인용하는 숫자와 그 옆 막대가 갈리면 확인할 방법이 없는 값이 화면에 나간다.
+ * ⚠️ 파이프라인 optimism()(generate_telegram_narratives.py)과 **같은 식·같은 k·같은 반올림**이어야 한다.
+ * 총평 문장이 인용하는 숫자와 그 옆 막대가 갈리면 확인할 방법이 없는 값이 화면에 나간다. 반올림은 여기
+ * Math.round(동점은 큰 쪽)가 기준이고 파이썬 쪽이 ROUND_HALF_UP 으로 맞춘다 — 내장 round() 로 두었을 때
+ * 145:85(62.5)를 화면은 63, 총평은 62 로 말했다(data-pipeline/tests/test_optimism_rounding.py).
  */
 const SENTIMENT_PRIOR = 5;
 
