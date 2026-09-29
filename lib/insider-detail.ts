@@ -32,6 +32,7 @@ import { usQuotes } from "@/lib/us-telegram-data";
 import { fetchDailyHistory } from "@/lib/yahoo-history";
 import { displayName } from "@/lib/us-ticker-names";
 import { canonicalTicker, tickerSpellings } from "@/lib/us-ticker-spellings";
+import { filedQuarters, stockPosition } from "@/lib/insider-13f";
 
 /** 언급 추이로 그리는 날수. 표에 41일치가 있어 그보다 길게 잡을 이유가 없다. */
 export const MENTION_TREND_DAYS = 40;
@@ -338,9 +339,9 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
       () => db.from("telegram_us_stock_daily").select("date,mention_count,channel_count").in("ticker", spellings),
       { onError: failed("언급 추이") },
     ),
-    fetchAllRows<{ cik: number; shares: number | null; value: number | null; report_date: string }>(
+    fetchAllRows<{ cik: number; ticker: string; shares: number | null; value: number | null; report_date: string }>(
       "cik",
-      () => db.from("us_manager_holding").select("cik,shares,value,report_date").in("ticker", spellings),
+      () => db.from("us_manager_holding").select("cik,ticker,shares,value,report_date").in("ticker", spellings),
       { onError: failed("거물 보유") },
     ),
     fetchAllRows<{ cik: number; person: string; firm: string }>(
@@ -455,41 +456,29 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
   );
   const aumOf = new Map<string, number>();
   for (const t of totals) aumOf.set(`${t.cik}|${t.report_date}`, (aumOf.get(`${t.cik}|${t.report_date}`) ?? 0) + (t.value ?? 0));
+  // ⚠️ 분기도 여기서 고른다. 이 종목의 행만 보면 새로 담은 곳은 직전 분기가, 정리한 곳은
+  //    최신 분기가 안 보인다(lib/insider-13f.ts 머리말).
+  const filed = filedQuarters(totals);
 
   const holders: StockHolder[] = [];
   for (const [cik, rows] of byCik) {
     const m = managerOf.get(cik);
     if (!m) continue;
-    const { latest, prior } = quartersOf(rows.map((r) => r.report_date));
-    if (!latest) continue;
-    const now = rows.find((r) => r.report_date === latest);
-    if (!now) continue;
-    const before = prior ? rows.find((r) => r.report_date === prior) : undefined;
-    // ⚠️ 판정은 **주식 수**로 한다. 금액은 주가가 움직여도 변해서, 한 주도 안 사고
-    //    늘어난 것처럼 보인다.
-    const move: StockHolder["move"] = !prior
-      ? null
-      : !before
-        ? "new"
-        : (now.shares ?? 0) > (before.shares ?? 0)
-          ? "add"
-          : (now.shares ?? 0) < (before.shares ?? 0)
-            ? "trim"
-            : "hold";
-    const aum = aumOf.get(`${cik}|${latest}`) ?? 0;
-    const was = before?.shares ?? 0;
+    // 분모 조회가 깨져 그 운용사의 분기를 모르면 이 종목의 행에서 고른다. 신규·청산은
+    // 못 가르지만(화면 머리에 실패가 뜬다) 보유자가 통째로 사라지지는 않는다.
+    const p = stockPosition(rows, filed.get(cik) ?? [...new Set(rows.map((r) => r.report_date))].sort());
+    if (!p) continue;
+    const aum = aumOf.get(`${cik}|${p.reportDate}`) ?? 0;
     holders.push({
       cik,
       person: m.person,
       firm: m.firm,
-      shares: now.shares ?? 0,
-      value: now.value ?? 0,
-      weight: aum ? ((now.value ?? 0) / aum) * 100 : 0,
-      move,
-      // 인물 상세(`getManagerDetail`)와 **같은 식**이다. 한쪽만 고치면 같은 보유가
-      // 두 화면에서 다른 증감률로 뜬다.
-      sharesChange: before && was ? (((now.shares ?? 0) - was) / was) * 100 : null,
-      reportDate: latest,
+      shares: p.shares,
+      value: p.value,
+      weight: aum ? (p.value / aum) * 100 : 0,
+      move: p.move,
+      sharesChange: p.sharesChange,
+      reportDate: p.reportDate,
     });
   }
   holders.sort((a, b) => b.value - a.value);
