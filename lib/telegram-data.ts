@@ -6,6 +6,7 @@ import { channelPhotoUrl } from "@/lib/channel-photo";
 import { sentimentTone } from "@/lib/format";
 import { THEMES } from "@/lib/stock-themes";
 import { LOAD_FAILED, type MaybeFailed } from "@/lib/load-state";
+import { RISING_WINDOW_DAYS, channelDeltas, type ChannelDelta, type ChannelSnapshot } from "@/lib/rising-channels";
 import { MIN_RECENT_MENTIONS, scoreSurging } from "@/lib/surging-score";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { trendingTodayStartISO } from "@/lib/trending-window";
@@ -1838,49 +1839,28 @@ export type RisingChannel = {
  */
 export async function getRisingChannels(limit = 10): Promise<RisingChannel[]> {
   const db = getSupabaseAdmin();
-  // 채널 하나당 하루 한 행이라 8일 창은 채널 수 × 8 이다 — 채널이 317개면 2,500행이
+  // 창(최신 스냅샷일과 그 7일 전)은 channelDeltas 가 자른다. 조회는 최신일이 어제(아침 수집 전)여도
+  // 7일 전까지 닿게 KST 로 하루 넉넉히 받는다(lib/rising-channels.ts 머리 주석).
+  // 채널 하나당 하루 한 행이라 채널 수 × 9 행이다 — 채널이 317개면 2,800행이
   // 넘어 페이징 없이는 1,000행에서 조용히 잘린다. 잘리면 대부분 채널이 스냅샷 한 개만
-  // 잡혀 아래 `arr.length < 2` 에서 탈락하고, 증감 순위가 실제와 무관해진다.
-  const data = await fetchAllRows<{ channel_handle: string; date: string; subscriber_count: number | null }>(
+  // 잡혀 스냅샷 둘 미만으로 탈락하고, 증감 순위가 실제와 무관해진다.
+  const data = await fetchAllRows<ChannelSnapshot>(
     "id",
     () =>
       db
         .from("telegram_channel_stats")
         .select("channel_handle,date,subscriber_count")
-        .gte("date", daysAgoISO(8).slice(0, 10)),
+        .gte("date", daysAgoKstDate(RISING_WINDOW_DAYS + 1)),
   );
 
-  const byCh = new Map<string, { d: string; s: number }[]>();
-  for (const r of data ?? []) {
-    if (r.subscriber_count == null) continue;
-    const arr = byCh.get(r.channel_handle) ?? [];
-    arr.push({ d: r.date, s: r.subscriber_count });
-    byCh.set(r.channel_handle, arr);
-  }
-  // 스냅샷은 백필이 안 돼 오늘부터 하루씩 쌓인다 — 지금 잰 구간이 며칠인지 그대로 알린다.
-  const snapDates = [...new Set((data ?? []).map((r) => r.date))].sort();
-  const spanDays = snapDates.length
-    ? Math.round(
-        (new Date(snapDates[snapDates.length - 1]).getTime() - new Date(snapDates[0]).getTime()) / (24 * 60 * 60 * 1000),
-      )
-    : 0;
+  const { deltas, spanDays } = channelDeltas(data ?? []);
 
-  type Delta = { handle: string; subscriberCount: number; delta: number };
-  const real: Delta[] = [];
-  const flat: Delta[] = [];
-  for (const [h, arr] of byCh) {
-    if (arr.length < 2) continue;
-    arr.sort((a, b) => a.d.localeCompare(b.d));
-    const delta = arr[arr.length - 1].s - arr[0].s;
-    (delta > 0 ? real : flat).push({
-      handle: h,
-      subscriberCount: arr[arr.length - 1].s,
-      delta,
-    });
-  }
+  const real: ChannelDelta[] = [];
+  const flat: ChannelDelta[] = [];
+  for (const d of deltas) (d.delta > 0 ? real : flat).push(d);
   // 증감이 같으면 handle 로 가른다 — 정수라 동점이 흔하고(특히 0), 동점을 안 가르면
   // 순서가 DB 행 순서에 딸려 흔들린다(채널 랭킹에서 실제로 겪었다).
-  const byDelta = (a: Delta, b: Delta) => b.delta - a.delta || a.handle.localeCompare(b.handle);
+  const byDelta = (a: ChannelDelta, b: ChannelDelta) => b.delta - a.delta || a.handle.localeCompare(b.handle);
   real.sort(byDelta);
   flat.sort(byDelta);
 
