@@ -31,7 +31,7 @@
 
 모델이 "연말"·"내년"을 12-31·01-01 로 굳혀 쓴다(2026-09-06 표본 150건 실측). 그래서
 정밀도(day·month·quarter·year)를 따로 받고, 화면 달력에는 day 만 올린다.
-작성일보다 앞선 날짜(지난 일)는 버린다.
+작성일보다 앞선 날짜(지난 일)는 버린다 — 달·분기·해 단위는 **그 기간의 끝**으로 견준다(date_ok).
 
 실행:
     cd data-pipeline && source .venv/bin/activate
@@ -43,6 +43,7 @@
 
 from __future__ import annotations
 
+import calendar
 import json
 import re
 import sys
@@ -277,6 +278,28 @@ def parse_date(s: str) -> date | None:
         return None
 
 
+def period_end(d: date, precision: str) -> date:
+    """정밀도가 가리키는 기간의 마지막 날. day 는 그날이다."""
+    if precision == "year":
+        return date(d.year, 12, 31)
+    if precision in ("month", "quarter"):
+        m = d.month if precision == "month" else (d.month - 1) // 3 * 3 + 3
+        return date(d.year, m, calendar.monthrange(d.year, m)[1])
+    return d
+
+
+def date_ok(d: date, precision: str, posted: date) -> bool:
+    """작성일 기준으로 아직 안 지났고 너무 멀지도 않은 일정인가.
+
+    ⚠️ **지났는지는 기간의 끝으로 본다.** SYSTEM 이 달·분기·해 단위를 그 기간 **첫날**로 적게
+       하므로 첫날을 작성일과 견주면 이미 시작된 기간이 전부 '지난 일'이 된다. 09-15 글의
+       "연말 합병 기일"(01-01 year)·"하반기 양산"(07-01 quarter)·"9월 말 상장"(09-01 month)이
+       다 그렇게 버려지고, 메시지는 읽음 표시가 남아 다시 묻지도 않는다.
+    ⚠️ 너무 먼지는 그대로 첫날로 본다 — 작성일에서 LOOKAHEAD_DAYS 안에 시작하는 일정만 믿는다.
+    """
+    return period_end(d, precision) >= posted and d <= posted + timedelta(days=LOOKAHEAD_DAYS)
+
+
 def main() -> None:
     args = sys.argv[1:]
     dry_run = "--dry-run" in args
@@ -353,7 +376,7 @@ def main() -> None:
                 if not d:
                     dropped["날짜 못 읽음"] += 1
                     continue
-                if d < posted or d > posted + timedelta(days=LOOKAHEAD_DAYS):
+                if not date_ok(d, e.get("precision") or "day", posted):
                     dropped["지난 날짜·너무 먼 날짜"] += 1
                     continue
                 ev = " ".join((e.get("event") or "").split())[:60]

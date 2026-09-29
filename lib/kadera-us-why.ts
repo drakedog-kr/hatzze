@@ -3,6 +3,7 @@ import { cache } from "react";
 import { getSupabaseAdmin } from "./supabase-server";
 import { addDaysISO, LLM_TEXT_CARRY_DAYS } from "./telegram-data";
 import { todayKst, type DatePrecision, type UpcomingEvent } from "./kadera-why";
+import { byPeriodEnd, periodFloor, stillAhead } from "./event-period";
 import { LOAD_FAILED, type MaybeFailed } from "./load-state";
 import { fetchDailyHistory, yahooSymbol } from "./yahoo-history";
 
@@ -379,8 +380,9 @@ export const getUsUpcomingEvents = cache(async (days = 35, limit = 400): Promise
 
 
 /**
- * 미장 테마 화면용 — 준 티커들의 **오늘 이후 일정 전부**(정밀도 무관, 가까운 날부터). 화면이 day 는 달력에,
- * 달·분기만 짚인 것은 그 아래에 가른다. 국내 짝은 lib/kadera-why.ts getEventsForCodes.
+ * 미장 테마 화면용 — 준 티커들의 **아직 안 끝난 일정 전부**(정밀도 무관, 먼저 끝나는 것부터). 화면이 day 는 달력에,
+ * 달·분기만 짚인 것은 그 아래에 가른다. 국내 짝은 lib/kadera-why.ts getEventsForCodes — 이미 시작된 달·분기·해를
+ * 기간의 끝으로 거르는 규칙(lib/event-period.ts)도 같다.
  */
 export async function getUsEventsForTickers(tickers: string[], limit = 12): Promise<UpcomingEvent[]> {
   if (!tickers.length) return [];
@@ -390,14 +392,15 @@ export async function getUsEventsForTickers(tickers: string[], limit = 12): Prom
     .from("telegram_us_stock_event")
     .select("channel_handle,ticker,event_date,date_precision,event,posted_at")
     .in("ticker", tickers)
-    .gte("event_date", from)
+    .gte("event_date", periodFloor(from))
+    .or(`date_precision.neq.day,event_date.gte.${from}`)
     .limit(1000);
   if (error) {
     console.error(`[getUsEventsForTickers] 일정을 못 읽었습니다`, error);
     return [];
   }
-  const grouped = groupUsEvents((data ?? []) as UsEventRow[]);
-  grouped.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : b.channels - a.channels));
+  const grouped = groupUsEvents((data ?? []) as UsEventRow[]).filter((e) => stillAhead(e, from));
+  grouped.sort(byPeriodEnd);
   const picked = grouped.slice(0, limit);
   const names = await usNames([...new Set(picked.map((e) => e.code))]);
   return picked.map((e) => ({ ...e, name: names.get(e.code) ?? e.code }));

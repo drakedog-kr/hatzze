@@ -3,6 +3,7 @@ import { cache } from "react";
 import { getSupabaseAdmin } from "./supabase-server";
 import { addDaysISO, kaderaBaseDate } from "./telegram-data";
 import { LOAD_FAILED, type MaybeFailed } from "./load-state";
+import { byPeriodEnd, periodFloor, stillAhead, type DatePrecision } from "./event-period";
 import { fetchDailyHistory, yahooSymbol } from "./yahoo-history";
 
 /**
@@ -332,7 +333,7 @@ export async function getStockMoveReason(code: string, base?: string): Promise<S
 
 // ─── 다가오는 일정 ─────────────────────────────────────────────────────────
 
-export type DatePrecision = "day" | "month" | "quarter" | "year";
+export type { DatePrecision };
 
 export type UpcomingEvent = {
   /** 국내는 6자리 종목코드, 미장은 티커 */
@@ -446,7 +447,13 @@ export const getUpcomingEvents = cache(async (days = 35, limit = 400): Promise<M
   return attachNames(capped.slice(0, limit));
 });
 
-/** 종목 화면용 — 오늘 이후의 일정 전부(정밀도 무관), 가까운 날부터. 없으면 빈 배열(정상). */
+/**
+ * 종목 화면용 — 아직 안 끝난 일정 전부(정밀도 무관), 먼저 끝나는 것부터. 없으면 빈 배열(정상).
+ *
+ * ⚠️ 달·분기·해 단위는 기간 **첫날**로 적혀 있어 `event_date >= 오늘` 로 거르면 이미 시작된
+ *    "9월 중"·"3분기"·올해 "2026년"이 다 빠진다. 올해 1월 1일부터 읽고 기간의 끝으로 거른다
+ *    (lib/event-period.ts). day 는 예전처럼 오늘부터다.
+ */
 export async function getStockEvents(code: string, limit = 8): Promise<UpcomingEvent[]> {
   const db = getSupabaseAdmin();
   const from = todayKst();
@@ -454,19 +461,20 @@ export async function getStockEvents(code: string, limit = 8): Promise<UpcomingE
     .from("telegram_stock_event")
     .select("channel_handle,stock_code,event_date,date_precision,event,posted_at")
     .eq("stock_code", code)
-    .gte("event_date", from)
+    .gte("event_date", periodFloor(from))
+    .or(`date_precision.neq.day,event_date.gte.${from}`)
     .limit(500);
   if (error) {
     console.error(`[getStockEvents] ${code} 일정을 못 읽었습니다`, error);
     return [];
   }
-  const grouped = groupEvents((data ?? []) as EventRow[]);
-  grouped.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : b.channels - a.channels));
+  const grouped = groupEvents((data ?? []) as EventRow[]).filter((e) => stillAhead(e, from));
+  grouped.sort(byPeriodEnd);
   return attachNames(grouped.slice(0, limit));
 }
 
 /**
- * 테마 화면용 — 여러 종목의 오늘 이후 일정, 가까운 날부터. getStockEvents 와 같은 묶음 규칙이다.
+ * 테마 화면용 — 여러 종목의 아직 안 끝난 일정, 먼저 끝나는 것부터. getStockEvents 와 같은 묶음·거름 규칙이다.
  * 종목 목록은 테마 하나의 사전(최대 55)이라 `.in()` URL 이 짧다.
  */
 export async function getEventsForCodes(codes: string[], limit = 12): Promise<UpcomingEvent[]> {
@@ -477,14 +485,15 @@ export async function getEventsForCodes(codes: string[], limit = 12): Promise<Up
     .from("telegram_stock_event")
     .select("channel_handle,stock_code,event_date,date_precision,event,posted_at")
     .in("stock_code", codes)
-    .gte("event_date", from)
+    .gte("event_date", periodFloor(from))
+    .or(`date_precision.neq.day,event_date.gte.${from}`)
     .limit(1000);
   if (error) {
     console.error(`[getEventsForCodes] 일정을 못 읽었습니다`, error);
     return [];
   }
-  const grouped = groupEvents((data ?? []) as EventRow[]);
-  grouped.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : b.channels - a.channels));
+  const grouped = groupEvents((data ?? []) as EventRow[]).filter((e) => stillAhead(e, from));
+  grouped.sort(byPeriodEnd);
   return attachNames(grouped.slice(0, limit));
 }
 
