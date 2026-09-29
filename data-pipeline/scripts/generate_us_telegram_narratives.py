@@ -10,7 +10,7 @@
 ## 대목이 맡는 재료 (국내와 같은 얼개다)
 
   ① 분위기   [오늘 하루] + [전체] 낙관도·추이        100~115자 · 2문장
-  ② 테마 지형 [오늘 테마별] 몫 + [미장 쏠림 화제어]   150~170자 · 2문장
+  ② 테마 지형 [오늘 테마별] 차례 + [미장 쏠림 화제어]  150~170자 · 2문장
   ③ 이야기   [오늘 오간 이야기] 발췌 + [화제 종목]    185~210자 · 3문장
   ④ 일정     [오간 앞으로의 일정] 발췌               110~165자 · 2문장
 
@@ -138,6 +138,10 @@ BASE_DAY_MIN_MARKET = 60
 COMENTION_ROWS = 5     # 셋째 대목에 줄 '함께 언급된 국내 종목' 짝 수
 STOCK_EXCERPTS = 3     # 종목 한 건당 발췌 수
 THEME_TOP_N = 5        # 화면 테마 카드가 8줄이지만 digest 는 위 5개면 충분하다
+# 테마 로테이션 표가 점유율을 내는 창. ⚠️ lib/us-telegram-data.ts 의 THEME_SERIES_DAYS ·
+# THEME_RECENT_DAYS 와 같은 값이어야 한다(theme_window_shares 주석).
+THEME_SERIES_DAYS = 14
+THEME_RECENT_DAYS = 3
 KEYWORD_TOP_N = 8
 
 
@@ -208,8 +212,8 @@ BRIEF_THEME_SYSTEM = US_COMMON + f"""
 [오늘 테마별]과 [미장 쏠림 화제어]를 근거로, **오늘 미국 이야기가 어디에 몰려 있는지**를
 **두 문장**으로 쓰세요. 앞 대목이 온도 하나를 말했으니 여기는 그 관심이 어디에 있는지를 맡습니다.
 
-- **[오늘 테마별]은 기준일 하루의 몫입니다.** '최근 며칠'이 아니라 오늘 이야기로 쓰세요.
-  반대로 [미장 쏠림 화제어]는 사흘치라 '오늘'이라고 부르지 마세요.
+- **[오늘 테마별]의 차례는 기준일 하루 것입니다.** 어디에 몰렸는지는 '최근 며칠'이 아니라
+  오늘 이야기로 쓰세요. 반대로 [미장 쏠림 화제어]는 사흘치라 '오늘'이라고 부르지 마세요.
 - **테마는 반드시 둘 이상 집으세요.** 1위만 적으면 이 대목이 매일 같은 얼굴이 됩니다.
   1위를 쓰고, **그 아래에서 한 가지를 더** 집어 대비를 만드세요.
 - [미장 쏠림 화제어]는 **전체 대화보다 미국 이야기에 유난히 몰린 말**입니다. 그냥 흔한
@@ -217,8 +221,13 @@ BRIEF_THEME_SYSTEM = US_COMMON + f"""
   ⚠️ 쏠림 배수(4.3배 같은 숫자)는 **쓰지 마세요.** 옆 카드가 그 숫자를 찍습니다.
 - ⚠️ **점유율 퍼센트는 딱 하나만 씁니다.** 나쁜 예: "AI반도체가 33.5%, 금융이 13.5%,
   메모리가 12.2%를 차지했습니다" — 숫자가 셋이면 읽는 사람이 어느 것이 중요한지 못
-  고르고, 그 숫자는 바로 옆 표에 이미 다 있습니다. 1위만 숫자로 쓰고 나머지는
+  고르고, 그 숫자는 화면 테마 표에 이미 다 있습니다. 1위만 숫자로 쓰고 나머지는
   "그 뒤를 금융과 메모리가 이었습니다"처럼 **말로** 적으세요.
+- ⚠️ **그 퍼센트는 [오늘 테마별]에 적힌 '최근 {THEME_RECENT_DAYS}일 점유율'이고, 문장에도
+  '최근 {THEME_RECENT_DAYS}일'이라고 밝힙니다.** 화면 테마 표가 찍는 값과 같은 숫자입니다. 오늘
+  하루의 점유율은 일부러 안 적었습니다 — 표에 없는 숫자라 독자가 확인할 곳이 없습니다.
+  "오늘 점유율 ○%"라고 쓰지 마세요. 차례('가장 많이 몰린')는 오늘 것이라 표의 순위와 다를 수
+  있습니다 — 순위는 오늘 차례로만 말하세요.
 - 종목명·구체적 사건은 셋째 대목 몫이니 여기서 미리 쓰지 마세요.
 - **길이는 {BRIEF_THEME_LEN[0]}~{BRIEF_THEME_LEN[1]}자**(공백 포함) · **두 문장.**"""
 
@@ -403,6 +412,49 @@ def news_sample(msgs: list[dict], since: str, end: str) -> tuple[list[dict], lis
     return picked, used
 
 
+def theme_window_shares(rows: list[dict]) -> dict[str, float]:
+    """테마 로테이션 표(lib/us-telegram-data.ts getUsThemeRotation)가 찍는 점유율 — 테마 → %.
+
+    저쪽과 같은 규칙이다. 기준은 이 표의 최신 날짜, 그 앞 THEME_SERIES_DAYS 일 안에서 **날짜가
+    있는** 마지막 THEME_RECENT_DAYS 날의 평균이고, 그날 안 뜬 테마는 0 으로 쳐 창 날짜 수로 나눈다.
+    """
+    if not rows:
+        return {}
+    base = max(r["date"] for r in rows)
+    since = (date.fromisoformat(base) - timedelta(days=THEME_SERIES_DAYS - 1)).isoformat()
+    win = [r for r in rows if since <= r["date"] <= base]
+    recent = set(sorted({r["date"] for r in win})[-THEME_RECENT_DAYS:])
+    sums: dict[str, float] = {}
+    for r in win:
+        sums[r["theme"]] = sums.get(r["theme"], 0.0) + (
+            float(r["share_pct"] or 0) if r["date"] in recent else 0.0
+        )
+    return {t: v / max(1, len(recent)) for t, v in sums.items()}
+
+
+def theme_lines(rows: list[dict], end: str) -> list[str]:
+    """총평 둘째 대목의 [오늘 테마별] 블록. rows 는 telegram_us_theme_daily 행.
+
+    **차례는 오늘 것, 퍼센트는 표의 것이다**(파일 머리 '숫자는 창 것, 주제는 오늘 것').
+    예전엔 기준일 하루의 share_pct 를 줬는데, 그 숫자를 확인할 곳인 테마 로테이션 표는
+    최근 3일 평균을 찍는다. 오늘 하루 40% 로 튄 테마를 요약은 40% 라 적고 표는 26.7% 로
+    찍었다. 하루치 언급 수도 화면에 없어 같이 뺐다(첫째 대목 [오늘 하루]와 같은 처리).
+    """
+    themes = [r for r in rows if r["date"] == end]
+    if not themes:
+        return []
+    shares = theme_window_shares(rows)
+    lines = ["", f"[오늘 테마별] {end} 하루 미국 언급이 많이 몰린 차례 (상위 {THEME_TOP_N}개)"]
+    for r in sorted(themes, key=lambda r: r["rank"])[:THEME_TOP_N]:
+        lines.append(f"- {r['theme']} · 최근 {THEME_RECENT_DAYS}일 점유율 {shares.get(r['theme'], 0.0):.1f}%")
+    lines.append(
+        f"  ※ 오늘 하루의 점유율은 일부러 안 적었습니다. 화면 테마 표가 최근 {THEME_RECENT_DAYS}일 평균이라"
+        f" 확인할 곳이 없습니다. 퍼센트는 위 최근 {THEME_RECENT_DAYS}일 값만 쓰고 '최근 {THEME_RECENT_DAYS}일'이라고"
+        " 밝히세요. 차례는 오늘 하루 것이라 표의 순위와 다를 수 있습니다."
+    )
+    return lines
+
+
 def build_brief_digest(db, latest: str, msgs: list[dict], name_of: dict[str, str]) -> str | None:
     """총평용 digest. 낙관도 창은 화면 카드와 같다(오늘+어제, 얇으면 넓힘 — sentiment_window).
     발췌·테마·화제어는 그대로 WINDOW_DAYS(기준일 포함 3일)를 본다."""
@@ -517,15 +569,9 @@ def build_brief_digest(db, latest: str, msgs: list[dict], name_of: dict[str, str
         ]
 
     # ── 테마 ────────────────────────────────────────────────────────────────
-    themes = [
-        r
-        for r in load_all(db, "telegram_us_theme_daily", "date,theme,share_pct,mention_count,rank")
-        if r["date"] == end
-    ]
-    if themes:
-        lines += ["", f"[오늘 테마별] {end} 하루의 미국 언급에서 차지한 몫 (상위 {THEME_TOP_N}개)"]
-        for r in sorted(themes, key=lambda r: r["rank"])[:THEME_TOP_N]:
-            lines.append(f"- {r['theme']}: 점유율 {float(r['share_pct']):.1f}% · 언급 {r['mention_count']}회")
+    lines += theme_lines(
+        load_all(db, "telegram_us_theme_daily", "date,theme,share_pct,rank"), end
+    )
 
     # ── 쏠림 화제어 ─────────────────────────────────────────────────────────
     kws = (
