@@ -24,6 +24,8 @@ on:
       # 발송 워크플로의 미리보기 제목(run-name)이 시계와 어긋나지 않는지도 거기서 본다.
       - "vercel.json"
       - ".github/workflows/telegram-broadcast.yml"
+      # tests/trending-window.test.ts 가 읽는다. 트렌딩 스텝이 KRX 08:00 대기 뒤에 있는지 본다.
+      - ".github/workflows/daily-update.yml"
       - ".github/workflows/ci.yml"
   push:
     branches: [main]
@@ -39,6 +41,7 @@ on:
       - "tsconfig.json"
       - "vercel.json"
       - ".github/workflows/telegram-broadcast.yml"
+      - ".github/workflows/daily-update.yml"
 
 jobs:
   routes:

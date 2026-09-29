@@ -7,7 +7,7 @@
  * 돌리는 법: `npm test`.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import { CRON_TO_JOB, hasRunSince, PREVIEW_RUN_TITLE, resolveJob, sinceIso } from "../lib/cron-schedule.ts";
@@ -179,6 +179,24 @@ describe("채널 발송: 미리보기 실행은 그날 몫으로 세지 않는�
   it("CI 는 telegram-broadcast.yml 만 바뀐 PR 에서도 돈다 — 위 두 검사가 그 파일을 읽는다", () => {
     for (const globs of ciPathLists()) {
       assert.ok(globs.some((g) => covers(g, ".github/workflows/telegram-broadcast.yml")), globs.join(", "));
+    }
+  });
+
+  it("테스트가 읽는 워크플로 파일은 전부 CI 경로 필터에 있다 — 그 파일만 바뀐 PR 에서도 검사가 돈다", () => {
+    // 테스트 코드에 적힌 .github/workflows/*.yml 을 모은다. ci.yml 은 이 검사 자신이 읽는 파일이라 뺀다.
+    const dirs = [new URL("./", import.meta.url), new URL("../data-pipeline/tests/", import.meta.url)];
+    const read = new Set<string>();
+    for (const dir of dirs) {
+      for (const name of readdirSync(dir)) {
+        if (!/\.(test\.ts|py)$/.test(name)) continue;
+        for (const m of readFileSync(new URL(name, dir), "utf8").matchAll(/\.github\/workflows\/[\w-]+\.yml/g)) {
+          if (!m[0].endsWith("/ci.yml")) read.add(m[0]);
+        }
+      }
+    }
+    assert.ok(read.has(".github/workflows/daily-update.yml"), [...read].join(", "));
+    for (const globs of ciPathLists()) {
+      for (const f of read) assert.ok(globs.some((g) => covers(g, f)), `경로 필터에 ${f} 가 없다: ${globs.join(", ")}`);
     }
   });
 });
