@@ -1185,6 +1185,16 @@ def kst_date(posted_at: str) -> str:
     ).date().isoformat()
 
 
+def posted_since(posted_at: str, since: str) -> bool:
+    """posted_at(UTC timestamptz)이 KST 날짜 since 이후인가 — 창의 아래 경계.
+
+    `posted_at[:10] >= since` 로 재면 UTC 날짜라 창 첫날 00~09시(KST)가 빠진다. 종목 요약의
+    [언급 톤]·발췌 후보와 테마 요약 재료가 그렇게 첫날 아침을 흘리고 있었다. load_messages_since
+    가 하루 앞(UTC)부터 받아 오는 게 바로 여기서 kst_date 로 거르라는 여유분이다.
+    """
+    return kst_date(posted_at) >= since
+
+
 def load_messages_since(db, since_date: str) -> list[dict]:
     """posted_at 이 since_date(KST) 이후인 메시지만 페이지를 이어 받는다.
 
@@ -1980,7 +1990,7 @@ def build_stock_digests(
         keys = [k for k in by_code.get(code, []) if k in msgs]
         # 발췌는 창 안팎을 따지지 않고 오늘 것까지 본다 — 세는 값이 아니라 '무엇이 화제였나'의
         # 예시라, 최신 소식을 빼면 요약이 하루 늦은 얘기를 한다.
-        keys = [k for k in keys if msgs[k]["posted_at"][:10] >= since]
+        keys = [k for k in keys if posted_since(msgs[k]["posted_at"], since)]
 
         tone = Counter(analysis[k] for k in keys if k in analysis)
         if tone:
