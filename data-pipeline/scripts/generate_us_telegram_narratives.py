@@ -87,12 +87,12 @@ from generate_telegram_narratives import (  # noqa: E402
     BRIEF_NEWS_COMMON,
     MODEL,
     NEWS_SCHEDULE_NOTE,
-    SCHEDULE_BLOCK_HEAD,
     SCHEDULE_EXCERPTS,
     SENTIMENT_WINDOW_DAYS,
     brief_body,
     excerpt,
     first_sentences,
+    has_schedule_block,
     kst_date,
     optimism,
     percent_count,
@@ -832,7 +832,7 @@ def main() -> None:
                 ("news", BRIEF_NEWS_SYSTEM, BRIEF_NEWS_LEN),
             ]
             # 넷째 대목은 **재료가 있는 날만** 쓴다(국장 쪽 같은 자리의 주석 참고).
-            if SCHEDULE_BLOCK_HEAD in brief_digest:
+            if has_schedule_block(brief_digest):
                 slots.append(("schedule", BRIEF_SCHEDULE_SYSTEM, BRIEF_SCHEDULE_LEN))
             paragraphs = []
             for key, system, length in slots:

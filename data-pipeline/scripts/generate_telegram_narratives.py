@@ -760,7 +760,10 @@ SCHEDULE_CHARS = 200
 #    확실한 대신 소형주라 화제성이 약해서, 자리를 많이 주면 그날 진짜 화제였던 일정이
 #    밀린다. 두 자리면 하나는 남고 나머지는 도달 순으로 채워진다.
 SCHEDULE_DART_SLOTS = 2
-# 블록 이름. 호출부가 "넷째 대목 재료가 있나"를 이 문자열로 판정한다.
+# 블록 이름. 머리글을 만드는 schedule_lines 와 블록을 찾는 schedule_digest 가 같이 쓴다.
+#
+# ⚠️ **이름이 digest 에 들어 있나로 "넷째 대목 재료가 있나"를 판정하지 말 것.** 셋째 대목
+#    옆 주의(NEWS_SCHEDULE_NOTE)도 이 이름을 품고 있어 늘 참이 된다 — has_schedule_block 주석.
 #
 # ⚠️ **대괄호를 넣지 말 것.** 실제 머리글은 기간이 앞에 붙어 `[09-03~09-06 오간 앞으로의
 #    일정]` 이 된다. `"[오간 앞으로의 일정]"` 으로 두면 어느 날에도 안 맞아 넷째 대목이
@@ -876,6 +879,18 @@ def schedule_digest(brief_digest: str) -> str:
     if at < 0:
         return ""
     return brief_digest[brief_digest.rfind("\n", 0, at) + 1 :]
+
+
+def has_schedule_block(brief_digest: str) -> bool:
+    """넷째 대목을 부를 재료가 있나. 재료를 꺼내는 schedule_digest 와 **같은 찾기**로 판정한다.
+
+    ⚠️ `SCHEDULE_BLOCK_HEAD in brief_digest` 로 보면 안 된다. 셋째 대목 발췌 옆 주의
+    (NEWS_SCHEDULE_NOTE)가 "[오간 앞으로의 일정] 이 맡습니다"로 그 이름을 품고 있어서, 발췌가
+    있는 날이면 일정 블록이 없어도 참이 된다. 일정 조회가 시간 초과로 빈 블록을 낸 날에도
+    넷째 대목이 빈 재료로 불리고, API 가 빈 메시지를 거절하면 그 예외가 앞 세 대목까지
+    저장 전에 날린다. 판정과 재료가 같은 찾기를 쓰면 둘이 갈릴 수가 없다.
+    """
+    return bool(schedule_digest(brief_digest))
 
 
 def schedule_like(text: str) -> bool:
@@ -2123,7 +2138,7 @@ def main() -> None:
             ]
             # 넷째 대목은 **재료가 있는 날만** 쓴다. ask_brief_sentence 는 빈 문장을 절대
             # 안 내므로, 재료 없이 부르면 모델이 없는 일정을 지어내고 그게 그대로 저장된다.
-            if SCHEDULE_BLOCK_HEAD in brief_digest:
+            if has_schedule_block(brief_digest):
                 slots.append(("schedule", BRIEF_SCHEDULE_SYSTEM, BRIEF_SCHEDULE_LEN))
             paragraphs = []
             for key, system, length in slots:
