@@ -1,6 +1,8 @@
 import "server-only";
 
+import { settledKrxCloseDate } from "./krx-close";
 import { getSupabaseServer } from "./supabase-server";
+import { priceContradictsDayRange } from "./yahoo-quote";
 
 /**
  * 국내 장이 닫힌 동안 밖에서 붙은 값.
@@ -213,9 +215,9 @@ async function liveFx(): Promise<number | null> {
  * 서서 250,000 에 닫혀 있었다. KRX 에 물어도 그 시각에는 09-02 가 최신이었다. 화면이
  * 날짜를 적고 있어 거짓말은 아니지만, 그 사이의 % 는 한 세션 어긋난 값을 견준 것이다.
  *
- * 그래서 **당일 종가는 야후에서 받는다.** 15:30 직후부터 나온다. 두 원천을 09-03 종가로
- * 맞춰 봤다 — 야후 meta 250,000 · 네이버 250,000 으로 같다(야후 **일봉**은 그날 칸이
- * null 이었다. 일봉을 믿지 말고 meta 를 쓸 것).
+ * 그래서 **당일 종가는 야후에서 받는다.** 15:30 직후부터 나오지만 16:00 부터 믿는다(아래
+ * liveCloses). 두 원천을 09-03 종가로 맞춰 봤다 — 야후 meta 250,000 · 네이버 250,000 으로 같다
+ * (야후 **일봉**은 그날 칸이 null 이었다. 일봉을 믿지 말고 meta 를 쓸 것).
  */
 
 /** 야후 심볼 접미사. 지금 세 종목이 다 코스피라 `.KS` 하나면 된다.
@@ -226,37 +228,26 @@ const YF_SUFFIX = ".KS";
 const YF_CHART = (code: string) =>
   `https://query1.finance.yahoo.com/v8/finance/chart/${code}${YF_SUFFIX}?range=1d&interval=1d&t=${bucketMs()}`;
 
-/** ms → 한국 시각의 {날짜문자열, 자정부터의 분, 요일}. */
-function kst(ms: number) {
-  const d = new Date(ms + 9 * 3600 * 1000);
-  return {
-    date: d.toISOString().slice(0, 10),
-    min: d.getUTCHours() * 60 + d.getUTCMinutes(),
-    day: d.getUTCDay(), // 0=일
-  };
-}
-
-const OPEN_MIN = 9 * 60;
-const CLOSE_MIN = 15 * 60 + 30;
-
 /**
  * 종목별 **가장 최근에 끝난 정규장의 종가**와 그 날짜.
  *
- * ⭐ 판정은 야후의 시각 도장이 아니라 **지금이 장중인가**로 한다. 야후의
+ * ⭐ 판정은 야후가 말하는 장 시간이 아니라 **지금 시각**으로 한다. 야후의
  * `currentTradingPeriod.regular.end` 가 15:00 로 적혀 있어(KRX 는 2016년부터 15:30)
  * 그 값을 믿으면 15:00~15:30 을 잘못 읽는다. `regularMarketTime` 자체는 15:30 을
  * 가리키므로 둘이 서로 어긋난다 — 그래서 야후가 말하는 장 시간은 아예 안 쓴다.
  *
- * 장중(평일 09:00~15:30)이고 도장이 오늘이면 그건 **진행 중인 값**이라 종가가 아니다.
- * 그때는 담아 둔 값이 이미 맞다(그날 아침 수집기가 직전 거래일 종가를 넣어 뒀다).
+ * 도장이 오늘이고 16:00 KST 전이면 종가로 안 쓴다(lib/krx-close.ts). 장중엔 진행 중인 값이고,
+ * 마감 직후 30분은 야후가 전날 값에 멈춘 응답을 줄 수 있다 — 2026-07-28 에 15:16~15:37 동안
+ * 삼성전자가 전날 254,000 에 멈춰 당일 고가 240,000 보다 높았다. 예전엔 15:30 까지만 막아서
+ * 그런 값이 "오늘 종가"로 들어가 %를 틀리게 냈다. 같은 까닭으로 현재가가 당일 고가·저가 밖이면
+ * 버린다(priceContradictsDayRange). 둘 다 lib/yahoo-history.ts 와 같은 규칙이다.
+ * 버리면 담아 둔 값이 쓰인다(그날 아침 수집기가 직전 거래일 종가를 넣어 뒀다) — 날짜를 같이 적으므로
+ * 거짓말은 아니다.
  */
 async function liveCloses(
   codes: string[],
 ): Promise<Record<string, { close: number; date: string }>> {
-  const now = kst(Date.now());
-  const inSession =
-    now.day >= 1 && now.day <= 5 && now.min >= OPEN_MIN && now.min < CLOSE_MIN;
-
+  const nowMs = Date.now();
   const got = await Promise.all(
     codes.map(async (code) => {
       try {
@@ -267,14 +258,23 @@ async function liveCloses(
         });
         if (!res.ok) return null;
         const j = (await res.json()) as {
-          chart?: { result?: { meta?: { regularMarketPrice?: number; regularMarketTime?: number } }[] };
+          chart?: {
+            result?: {
+              meta?: {
+                regularMarketPrice?: number;
+                regularMarketTime?: number;
+                regularMarketDayHigh?: number;
+                regularMarketDayLow?: number;
+              };
+            }[];
+          };
         };
         const m = j.chart?.result?.[0]?.meta;
         if (!m?.regularMarketPrice || !m.regularMarketTime) return null;
-        const stamp = kst(m.regularMarketTime * 1000);
-        // 장중에 찍힌 오늘 값은 종가가 아니다.
-        if (inSession && stamp.date === now.date) return null;
-        return [code, { close: Math.round(m.regularMarketPrice), date: stamp.date }] as const;
+        // 16:00 전에 찍힌 오늘 값은 종가가 아니다. 제 고가·저가 밖이면 낡은 값이다.
+        const date = settledKrxCloseDate(m.regularMarketTime * 1000, nowMs);
+        if (!date || priceContradictsDayRange(m.regularMarketPrice, m)) return null;
+        return [code, { close: Math.round(m.regularMarketPrice), date }] as const;
       } catch {
         return null;
       }
