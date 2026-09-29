@@ -67,24 +67,31 @@ TEXT_CHUNK = 50
 # 안 나간다.
 TAG_ID_CHUNK = 50
 
-# ⚠️ lib/telegram-data.ts 의 FIRST_COLLECTION_HOUR_KST 와 같은 값이어야 한다.
-FIRST_COLLECTION_HOUR_KST = 9
+# '오늘' 창이 어제 0시에서 오늘 0시로 넘어가는 시각(KST). 발사(06:30)가 아니라 아침 트렌딩
+# 스텝이 도는 시각에 맞춘다 — 그 스텝은 'KRX 공표(08:00 KST) 대기' 뒤라 늘 08시 이후다.
+# ⚠️ lib/trending-window.ts 의 FIRST_COLLECTION_HOUR_KST 와 같은 값이어야 한다
+#    (tests/trending-window.test.ts 가 대조한다).
+FIRST_COLLECTION_HOUR_KST = 8
 
 # 화면 탭과 일대일. (저장 키, 창 길이) — 'today' 는 아래에서 따로 계산한다.
 WINDOWS: list[tuple[str, int | None]] = [("today", None), ("w7", 7), ("w30", 30)]
 
 
-def window_start(days: int | None) -> datetime:
+def window_start(days: int | None, now: datetime | None = None) -> datetime:
     """창의 시작 시각. `days` 가 None 이면 '오늘' 창.
 
-    '오늘' 창은 자정에 갑자기 비지 않도록 **첫 수집 시각 전에는 어제 0시**로 물러난다
-    (lib/telegram-data.ts 의 trendingTodayStartISO 와 같은 규칙). 파이프라인은 그 시각
-    이후에만 도므로 저장값의 시작점은 늘 '그 날 0시'가 되고, 새벽 방문자가 화면에서
+    '오늘' 창은 자정에 갑자기 비지 않도록 **FIRST_COLLECTION_HOUR_KST 전에는 어제 0시**로
+    물러난다(lib/trending-window.ts 의 trendingTodayStartISO 와 같은 규칙). 트렌딩 스텝은
+    그 시각 이후에만 도므로 저장값의 시작점은 늘 '그 날 0시'가 되고, 새벽 방문자가 화면에서
     보던 '어제 0시'와 같은 지점이다.
+
+    ⚠️ 이 값이 9 로 남아 있던 동안(발사를 06:30 으로 당긴 2026-09-23 부터) 08시대 아침
+    실행이 '어제 0시'를 저장했고, 09시부터 저녁 실행까지 화면이 그 목록을 버리고 느린 길로
+    뽑았다. `now` 는 테스트가 시각을 박으려고 받는다(tests/test_trending_window.py).
     """
     if days is not None:
-        return datetime.now(timezone.utc) - timedelta(days=days)
-    kst_now = datetime.now(KST)
+        return (now or datetime.now(timezone.utc)) - timedelta(days=days)
+    kst_now = (now or datetime.now(KST)).astimezone(KST)
     start = kst_now.replace(hour=0, minute=0, second=0, microsecond=0)
     if kst_now.hour < FIRST_COLLECTION_HOUR_KST:
         start -= timedelta(days=1)
