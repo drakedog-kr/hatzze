@@ -36,7 +36,7 @@ export const INSIDER_LISTS: Record<InsiderListSlug, InsiderListSpec> = {
   exec: {
     title: "임원이 신고한 매매",
     sub: "종목으로 묶어 금액이 큰 순입니다. 장내 매수는 파랗게 적었습니다.",
-    help: "옵션 행사에 딸린 매도가 섞입니다. 금액은 처분만 더한 값입니다.",
+    help: "옵션 행사에 딸린 매도가 섞입니다. 금액은 처분 합계이고, 장내 매수가 더 큰 종목만 매수 합계입니다.",
     icon: "account_balance_wallet",
   },
   congress: {
