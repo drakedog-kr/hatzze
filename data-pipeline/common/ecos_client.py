@@ -26,6 +26,15 @@ class EcosUnavailableError(RuntimeError):
     """재시도를 다 쓰고도 ECOS 에 닿지 못했을 때(네트워크 문제)."""
 
 
+class EcosNoDataError(RuntimeError):
+    """조회는 됐는데 그 기간에 자료가 없을 때(RESULT.CODE == INFO-200).
+
+    RuntimeError 를 이어받아, 빈 결과를 예외로 알아채던 호출부(버핏지수·CCSI)는 전과 같이
+    동작한다. 빈 구간이 정상인 호출부만 이걸 골라 잡는다(fetch_foreign_sell_at_high 의
+    연 단위 조각 — 새해 첫 개장일 전의 올해 조각은 늘 빈다).
+    """
+
+
 def fetch_ecos_payload(url: str) -> dict:
     """URL 을 그대로 GET 해 JSON 을 돌려준다. 연결 실패는 재시도, 끝내 실패하면 예외."""
     last_error: Exception | None = None
@@ -61,7 +70,9 @@ def statistic_search(
     block = payload.get("StatisticSearch")
     if not block:
         # ECOS 는 조회 결과가 없을 때 {"RESULT": {"CODE": "INFO-200", ...}} 를 준다.
-        raise RuntimeError(f"ECOS 응답에 StatisticSearch 가 없습니다: {payload}")
+        # 인증키·호출 한도 같은 다른 RESULT 와 갈라 둔다 — 그쪽은 잡으면 안 되는 오류다.
+        error = EcosNoDataError if (payload.get("RESULT") or {}).get("CODE") == "INFO-200" else RuntimeError
+        raise error(f"ECOS 응답에 StatisticSearch 가 없습니다: {payload}")
 
     rows = [r for r in block.get("row", []) if r.get("DATA_VALUE") not in (None, "")]
     rows.sort(key=lambda r: r["TIME"])
