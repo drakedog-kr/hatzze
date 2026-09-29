@@ -503,6 +503,15 @@ def paragraphs(text: str) -> list[str]:
     return out
 
 
+def keyword_line(day: str, keywords: list[tuple[str, int]]) -> str:
+    """갈래 문단이 사라진 날 대신 싣는 키워드 나열(build_morning).
+
+    ⚠️ **여기서 이스케이프하지 않는다.** 이 줄은 paragraphs() → to_telegram_html() 이 이스케이프한다.
+       미리 html.escape 하면 두 번 걸려 채널에 'M&amp;A'·'S&amp;P500' 이 글자 그대로 보인다.
+    """
+    return f"{day} 오간 말: " + " · ".join(k for k, _ in keywords)
+
+
 def build_morning(db, llm) -> str:
     """A · 어제 브리핑 — 평일 아침. [어제 키워드 갈래] → [밤사이 이야기] → [CTA].
 
@@ -580,7 +589,7 @@ def build_morning(db, llm) -> str:
     # 이 파일이 이미 한 번 겪은 어긋남이라 같은 자리를 두 번 내주지 않는다.
     # (짝인 day_topic 은 "어제는"·"7월 27일에는" 이라 이 자리엔 안 맞는다.)
     if not head_text and keywords:
-        head_text = f"{day} 오간 말: " + " · ".join(html.escape(k, quote=False) for k, _ in keywords)
+        head_text = keyword_line(day, keywords)
         print("[안내] 갈래 해설이 없어 키워드를 그대로 싣습니다.")
 
     # 그래도 둘 다 비면 글을 안 만든다. 남는 건 제목 두 줄과 링크뿐이라, 읽는 사람에게
