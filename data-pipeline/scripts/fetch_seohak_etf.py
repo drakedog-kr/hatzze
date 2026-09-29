@@ -121,7 +121,11 @@ def main() -> None:
 
     rows: list[dict] = []
     days = 0
-    for back in range(LOOKBACK_DAYS):
+    # ⚠️ **오래된 날부터** 돈다. 표에 없던 거래일(앞 실행의 KRX 실패·수집 중단)을 이번에 받으면
+    #    그다음 거래일의 '직전'은 그 날이어야 한다. 오늘부터 거꾸로 돌면 방금 받은 날이 늘 더
+    #    늦은 날이라 직전이 못 되고, 다음 거래일이 그 앞 날과 견줘 이틀치 설정·환매를 떠안는다 —
+    #    그 날 몫이 자기 행과 다음 행에 두 번 들어간다(tests/test_seohak_etf_flow.py).
+    for back in reversed(range(LOOKBACK_DAYS)):
         day = date.today() - timedelta(days=back)
         bas_dd = day.strftime("%Y%m%d")
         # ⚠️ `krx_get` 은 응답 객체를 준다(딕셔너리가 아니다). 401 은 재시도 없이
