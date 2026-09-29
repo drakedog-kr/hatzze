@@ -379,6 +379,26 @@ def cap_progress(progress: float) -> float:
     return min(max(progress, 0.0), 100.0)
 
 
+def relative_surge_progress(details: dict, config: dict) -> float | None:
+    """거래대금(relative_surge) 과열도 — 캡핑 전. details 에 surge_pct 가 없으면 None.
+
+    절대 거래대금 대신 "30일 평균 대비 %"(fetch가 details.surge_pct에 저장)로 잰다. 30일 상대만으로는
+    1년에 걸쳐 5배가 되는 흐름이 안 보인다(사상 최고점 당일 41.9조인데 급증율 +2.3%라 과열도 25.6).
+    details.level_pct(직전 250영업일 백분위)를 level_weight 만큼 섞어 '국면'을 되살린다.
+    backfill_scores·recompute_score_history 도 이 함수를 쓴다 — 따로 베꼈을 땐 backfill 이 이 섞기를 빠뜨렸다.
+    """
+    rs = config["relative_surge"]
+    surge = details.get("surge_pct")
+    if surge is None:
+        return None
+    progress = (surge - rs["floor"]) / (rs["ceil"] - rs["floor"]) * 100
+    lw = config.get("level_weight")
+    level = details.get("level_pct")
+    if lw and level is not None:
+        progress = cap_progress(progress) * (1 - lw) + float(level) * lw
+    return progress
+
+
 def stage_for_score(score: float) -> str:
     if score < 25:
         return "저온"
@@ -417,19 +437,11 @@ def main() -> None:
             capped_progress = cap_progress(progress)
 
             avg_30d = None
-            rs = config.get("relative_surge")
-            if rs is not None:
-                # 절대 거래대금 대신 "30일 평균 대비 %"(fetch가 details.surge_pct에 저장)로.
-                surge = latest_details.get("surge_pct")
-                if surge is not None:
-                    progress = (surge - rs["floor"]) / (rs["ceil"] - rs["floor"]) * 100
-                    # 30일 상대만으로는 1년에 걸쳐 5배가 되는 흐름이 안 보인다(사상 최고점
-                    # 당일 41.9조인데 급증율 +2.3%라 과열도 25.6). details.level_pct(직전
-                    # 250영업일 백분위)를 level_weight 만큼 섞어 '국면'을 되살린다.
-                    lw = config.get("level_weight")
-                    level = latest_details.get("level_pct")
-                    if lw and level is not None:
-                        progress = cap_progress(progress) * (1 - lw) + float(level) * lw
+            if config.get("relative_surge") is not None:
+                # 절대 거래대금 대신 "30일 평균 대비 %" + 250영업일 백분위(relative_surge_progress).
+                surge_progress = relative_surge_progress(latest_details, config)
+                if surge_progress is not None:
+                    progress = surge_progress
                     capped_progress = cap_progress(progress)
                     avg_30d = latest_details.get("avg_30d")
 

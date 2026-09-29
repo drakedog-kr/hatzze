@@ -94,16 +94,10 @@ def score_on(d: str, series: dict[str, list[dict]], weights_db: dict[str, float]
             thr = statistics.mean(float(r["raw_value"]) for r in rows if r["date"] <= d)
         prog = cs.compute_progress(slug, cur, thr, cfg)
         capped = cs.cap_progress(prog)
-        rs = cfg.get("relative_surge")
-        if rs is not None:
-            surge = det.get("surge_pct")
-            if surge is not None:
-                prog = (surge - rs["floor"]) / (rs["ceil"] - rs["floor"]) * 100
-                lw = cfg.get("level_weight")
-                level = det.get("level_pct")
-                if lw and level is not None:
-                    prog = cs.cap_progress(prog) * (1 - lw) + float(level) * lw
-                capped = cs.cap_progress(prog)
+        if cfg.get("relative_surge") is not None:
+            surge_prog = cs.relative_surge_progress(det, cfg)
+            if surge_prog is not None:
+                capped = cs.cap_progress(surge_prog)
         weight = INDICATOR_WEIGHTS.get(slug, weights_db.get(slug, 1.0))
         items.append({"slug": slug, "capped": capped, "weight": weight})
 

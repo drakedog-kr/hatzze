@@ -8,7 +8,7 @@ raw 4,293행 중 263행). daily_score 도 15행뿐이라 과열도 추이 차트
 **날짜마다 기준선이 다른 지표를 어떻게 다루나.**
 - cumulative_average(유튜브·예탁금): 그날까지 쌓인 값만으로 평균을 낸다. 오늘 기준
   평균을 과거에 소급하면 그때는 알 수 없던 정보를 쓰는 셈이라(lookahead) 추이가 왜곡된다.
-- relative_surge(거래대금): fetch 가 날짜별로 details.surge_pct 를 남겨 둬 그대로 쓴다.
+- relative_surge(거래대금): fetch 가 날짜별로 details.surge_pct·level_pct 를 남겨 둬 그대로 쓴다.
 - 실물–증시 괴리: CCSI(월 1회)와 코스피 신고가 괴리율이 둘 다 있는 날만 계산한다.
   둘 중 하나라도 없는 과거 날짜는 **그 지표를 그날 가중 평균에서 빼고**, 옛 의미
   (자영업 검색지수 ÷ 70)로 억지로 채우지 않는다.
@@ -49,6 +49,7 @@ from calculate_score import (  # noqa: E402
     compute_progress,
     lead_progress,
     percentile_from_anchors,
+    relative_surge_progress,
     stage_for_score,
 )
 
@@ -93,12 +94,10 @@ def progress_by_date(slug: str, rows: list[dict]) -> dict[str, float]:
         else:
             threshold = cfg["threshold"]
 
-        rs = cfg.get("relative_surge")
-        if rs is not None:
-            surge = details.get("surge_pct")
-            if surge is None:
-                continue  # fetch 가 아직 세부값을 안 남긴 날짜
-            out[r["date"]] = (float(surge) - rs["floor"]) / (rs["ceil"] - rs["floor"]) * 100
+        if cfg.get("relative_surge") is not None:
+            p = relative_surge_progress(details, cfg)  # 250일 백분위 섞기까지 라이브와 같다
+            if p is not None:  # None = fetch 가 아직 세부값을 안 남긴 날짜
+                out[r["date"]] = p
             continue
 
         out[r["date"]] = compute_progress(slug, cur, threshold, cfg)
