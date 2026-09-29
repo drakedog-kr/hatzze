@@ -493,9 +493,11 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
     // ⚠️ 이제 표가 분기를 쌓는다(migration_050). report_date 를 같이 받아 **운용사별
     //    최신 분기**를 골라야 한다 — 전체 최신 분기로 자르면 한 분기 늦은 곳(퍼싱
     //    스퀘어)이 통째로 빠진다.
+    // ⚠️ 정렬은 기본 키 (cik, ticker, report_date) 전부다 — ticker 하나면 같은 종목을 든 거물·분기 행이 동점이라
+    //    쪽 경계에서 빠지거나 겹친다(fetchAllRows 머리말 [2]). build 가 앞 둘을 걸고 fetchAllRows 가 report_date 를 얹는다.
     fetchAllRows<{ cik: number; ticker: string; value: number | null; shares: number | null; report_date: string }>(
-      "ticker",
-      () => db.from("us_manager_holding").select("cik,ticker,value,shares,report_date"),
+      "report_date",
+      () => db.from("us_manager_holding").select("cik,ticker,value,shares,report_date").order("cik").order("ticker"),
       { onError: failed("거물 보유") },
     ),
     // 의원 신고. 창이 90일이라 행이 늘 수 있어 페이징한다(정렬 키는 유일해야 하므로 doc_id).
