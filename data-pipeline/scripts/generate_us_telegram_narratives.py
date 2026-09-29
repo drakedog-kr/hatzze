@@ -60,6 +60,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
+from common.js_round import js_fixed1  # noqa: E402
 from common.market_sentiment import MARKET_MIN_MESSAGES, load_market_daily  # noqa: E402
 from common.supabase_client import get_client, load_all, load_window_keyset  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
@@ -423,7 +424,9 @@ def theme_window_shares(rows: list[dict]) -> dict[str, float]:
         return {}
     base = max(r["date"] for r in rows)
     since = (date.fromisoformat(base) - timedelta(days=THEME_SERIES_DAYS - 1)).isoformat()
-    win = [r for r in rows if since <= r["date"] <= base]
+    # 날짜 차례로 더한다 — 저쪽이 날짜 오름차순으로 reduce 하고, 실수 덧셈은 차례에 따라 끝자리가
+    # 갈려 toFixed(1) 이 0.1 어긋난다. load_all 은 무작위 id 차례로 준다.
+    win = sorted((r for r in rows if since <= r["date"] <= base), key=lambda r: r["date"])
     recent = set(sorted({r["date"] for r in win})[-THEME_RECENT_DAYS:])
     sums: dict[str, float] = {}
     for r in win:
@@ -447,7 +450,8 @@ def theme_lines(rows: list[dict], end: str) -> list[str]:
     shares = theme_window_shares(rows)
     lines = ["", f"[오늘 테마별] {end} 하루 미국 언급이 많이 몰린 차례 (상위 {THEME_TOP_N}개)"]
     for r in sorted(themes, key=lambda r: r["rank"])[:THEME_TOP_N]:
-        lines.append(f"- {r['theme']} · 최근 {THEME_RECENT_DAYS}일 점유율 {shares.get(r['theme'], 0.0):.1f}%")
+        # toFixed(1) 과 같은 반올림(동점은 큰 쪽) — `:.1f` 는 12.25 를 12.2 로 적어 표의 12.3 과 갈린다.
+        lines.append(f"- {r['theme']} · 최근 {THEME_RECENT_DAYS}일 점유율 {js_fixed1(shares.get(r['theme'], 0.0))}%")
     lines.append(
         f"  ※ 오늘 하루의 점유율은 일부러 안 적었습니다. 화면 테마 표가 최근 {THEME_RECENT_DAYS}일 평균이라"
         f" 확인할 곳이 없습니다. 퍼센트는 위 최근 {THEME_RECENT_DAYS}일 값만 쓰고 '최근 {THEME_RECENT_DAYS}일'이라고"

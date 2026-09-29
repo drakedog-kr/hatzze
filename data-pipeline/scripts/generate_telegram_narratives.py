@@ -64,7 +64,6 @@ import re
 import sys
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta, timezone
-from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -74,6 +73,7 @@ from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 from common.broadcast_content import weekly_top_stocks  # noqa: E402
 from common.channel_breadth import channel_breadth_map  # noqa: E402
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
+from common.js_round import js_round  # noqa: E402
 from common.market_tags import is_kr_led, is_us_only, market_counts  # noqa: E402
 from common.market_sentiment import MARKET_MIN_MESSAGES, load_market_daily  # noqa: E402
 from common.prompt_style import PLAIN_PROSE_RULE  # noqa: E402
@@ -553,10 +553,8 @@ def optimism(positive: int, negative: int) -> int | None:
         return None
     k = SENTIMENT_PRIOR
     # 반올림도 화면(Math.round, 동점은 큰 쪽)과 같아야 한다. 내장 round() 는 은행가 반올림이라 62.5 → 62,
-    # 40.5 → 40 이 돼, 카드 63% 옆 총평이 "62%"를 말하거나 라벨이 중립/비관 우세로 갈렸다. 같은 double 의
-    # 정확한 값 위에서 ROUND_HALF_UP — send_telegram_broadcast._js_quantize 와 같은 방식이다(산술 흉내는 안 된다).
-    x = (positive + k) / (decided + 2 * k) * 100
-    return int(Decimal(x).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    # 40.5 → 40 이 돼, 카드 63% 옆 총평이 "62%"를 말하거나 라벨이 중립/비관 우세로 갈렸다(common/js_round).
+    return js_round((positive + k) / (decided + 2 * k) * 100)
 
 
 # ── 총평이 볼 테마: 카드와 **글자 그대로 같은 집합**이어야 한다 ────────────────────
