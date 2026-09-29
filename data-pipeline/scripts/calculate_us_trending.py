@@ -73,6 +73,17 @@ def window_start(days: int | None, now: datetime | None = None) -> datetime:
     return start
 
 
+def in_window(rows: list[dict], start: datetime) -> list[dict]:
+    """posted_at 이 start 이후인 행.
+
+    ⚠️ **문자열로 견주지 않는다.** DB 는 posted_at 을 UTC('+00:00')로 주는데 '오늘' 창의
+    start 는 KST('+09:00')다. 글자로 견주면 00~09시 KST 글이 UTC 로는 전날 날짜라 통째로
+    빠져, '오늘' 목록이 사실상 09시부터였다 — 하필 미국 얘기가 가장 많은 새벽 마감 시간대다.
+    국내는 같은 값을 PostgREST(.gte)에 넘겨 DB 가 시각으로 견주므로 이 함정이 없다.
+    """
+    return [m for m in rows if datetime.fromisoformat(m["posted_at"]) >= start]
+
+
 # 공백 포함 이 글자 수 미만인 본문은 트렌딩에 안 올린다(국장 calculate_telegram_trending.MIN_TEXT_CHARS 와 같은 값).
 MIN_TEXT_CHARS = 10
 
@@ -181,7 +192,7 @@ def main() -> None:
     for key, days in WINDOWS:
         start = window_start(days)
         iso = start.isoformat()
-        rows = [m for m in us_meta if m["posted_at"] >= iso]
+        rows = in_window(us_meta, start)
         rows.sort(key=lambda m: -score(m))
         picked[key] = rows[:STORE_N]
         print(f"[트렌딩] {key}: 후보 {len(rows):,}건 → {len(picked[key])}건 (창 시작 {iso})")
