@@ -503,6 +503,10 @@ function closeOnOrBefore(bars: Bar[], date: string): number | null {
  * 해마다 '얼마 벌었나(수익률)'와 '그 해 안에서 얼마나 아팠나(최악 낙폭)'.
  * 낙폭은 그 해 안의 고점 대비로만 잰다 — 해를 넘겨 이어지는 낙폭이 아니라
  * "그 해를 보낸 사람이 겪은 최악"을 보여주려는 것이다.
+ *
+ * 수익은 **전해 마지막 종가**에서 잰다(연 수익률의 보통 셈). 그 해 첫 종가에서 재면 첫 거래일의
+ * 움직임이 어느 해에도 안 들어가, 1월 2일에 +10% 뛴 해가 "그 해 수익 0%"가 되고 막대들을 이어
+ * 붙여도 기간 수익이 안 나온다. 앞 종가가 없는 창의 첫 해만 그 해 첫 종가에서 잰다.
  */
 function yearlyStats(bars: Bar[]): YearStat[] {
   const byYear = new Map<number, Bar[]>();
@@ -514,7 +518,11 @@ function yearlyStats(bars: Bar[]): YearStat[] {
   }
 
   const out: YearStat[] = [];
+  let prevYearLast: number | null = null;
   for (const [year, ys] of [...byYear.entries()].sort((a, b) => a[0] - b[0])) {
+    const base = prevYearLast ?? ys[0].close;
+    // 막대에서 빠지는 토막 난 해도 다음 해의 출발점은 된다 — 그래서 continue 보다 먼저 적는다.
+    prevYearLast = ys[ys.length - 1].close;
     if (ys.length < 20) continue; // 상장·조회 경계의 토막 난 해는 뺀다
     let peak = -Infinity;
     let mdd = 0;
@@ -523,7 +531,7 @@ function yearlyStats(bars: Bar[]): YearStat[] {
       const dd = (b.close / peak - 1) * 100;
       if (dd < mdd) mdd = dd;
     }
-    out.push({ year, ret: (ys[ys.length - 1].close / ys[0].close - 1) * 100, mdd });
+    out.push({ year, ret: (ys[ys.length - 1].close / base - 1) * 100, mdd });
   }
   return out;
 }

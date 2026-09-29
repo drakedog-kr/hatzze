@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { analyzeDrawdown, drawdownSeries, episodes } from "../lib/mdd.ts";
+import { analyzeDrawdown, drawdownSeries, episodes, riskProfile } from "../lib/mdd.ts";
 
 /** 하루 간격의 종가 열. */
 function bars(closes: number[]) {
@@ -81,5 +81,47 @@ describe("analyzeDrawdown 의 모집단", () => {
     const b = analyzeDrawdown(bars([100, 90, 100, 99.5]));
     assert.ok(b);
     assert.equal(b.recovery, null);
+  });
+});
+
+/** from~to(YYYY-MM-DD) 평일마다 한 봉. close 는 그날 날짜로 정한다. */
+function weekdayBars(from: string, to: string, close: (date: string) => number) {
+  const out: { date: string; close: number }[] = [];
+  for (let t = Date.parse(from); t <= Date.parse(to); t += 86_400_000) {
+    const d = new Date(t);
+    if (d.getUTCDay() === 0 || d.getUTCDay() === 6) continue;
+    const date = d.toISOString().slice(0, 10);
+    out.push({ date, close: close(date) });
+  }
+  return out;
+}
+
+describe("riskProfile 의 해마다 수익", () => {
+  it("그 해 수익은 전해 마지막 종가에서 잰다 — 첫 거래일의 움직임도 그 해 몫이다", () => {
+    // 2024 내내 100, 2025 첫 거래일(01-02)에 110 으로 뛰고 그대로. 첫날 종가에서 재면 두 해 다 0% 가 되어
+    // 기간 수익 +10% 가 어느 해에도 안 잡혔다.
+    const r = riskProfile(weekdayBars("2024-01-02", "2025-12-31", (d) => (d < "2025" ? 100 : 110)), null);
+    assert.ok(r);
+    assert.deepEqual(
+      r.yearly.map((y) => [y.year, Math.round(y.ret * 10) / 10]),
+      [
+        [2024, 0],
+        [2025, 10],
+      ],
+    );
+  });
+  it("거래일이 모자라 빠지는 해도 다음 해의 기준 종가는 준다", () => {
+    // 2023 은 12월 열흘(< 20 거래일)이라 막대가 없지만, 그 해 마지막 종가 80 이 2024 의 출발점이다.
+    const r = riskProfile(weekdayBars("2023-12-18", "2024-12-31", (d) => (d < "2024" ? 80 : 100)), null);
+    assert.ok(r);
+    assert.deepEqual(
+      r.yearly.map((y) => [y.year, Math.round(y.ret * 10) / 10]),
+      [[2024, 25]],
+    );
+  });
+  it("창의 첫 해는 앞 종가가 없어 그 해 첫 종가에서 잰다", () => {
+    const r = riskProfile(weekdayBars("2024-01-02", "2024-12-31", (d) => (d < "2024-07" ? 100 : 120)), null);
+    assert.ok(r);
+    assert.equal(Math.round(r.yearly[0].ret), 20);
   });
 });
