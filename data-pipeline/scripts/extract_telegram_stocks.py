@@ -74,6 +74,8 @@ from config.stock_extraction import (  # noqa: E402
 )
 
 # 우선주/파생 종목 제외 패턴(…우, …우B, …N우, …우(전환) 등).
+# ⚠️ 이름만 보면 우로 끝나는 **보통주**(`성우` 458650)까지 빠진다. 보통주 단축코드는 끝자리가 0 이라
+#    (calculate_kr_dividend_stats 와 같은 잣대) 코드도 우선주일 때만 뺀다(load_dictionary).
 PREFERRED_RE = re.compile(r"(우[A-Z]?|\d우|우\(전환\))$")
 HANGUL_OR_ALNUM = re.compile(r"[가-힣0-9A-Za-z]")
 HANGUL = re.compile(r"[가-힣]")
@@ -163,7 +165,7 @@ def load_dictionary(db) -> tuple[dict[str, str], dict[str, str], set[str]]:
     name_to_code = {}
     for s in stocks:
         name = s["name"].strip()
-        if name in EXCLUDE_NAMES or PREFERRED_RE.search(name):
+        if name in EXCLUDE_NAMES or (PREFERRED_RE.search(name) and not s["code"].endswith("0")):
             continue
         name_to_code[name] = s["code"]
 

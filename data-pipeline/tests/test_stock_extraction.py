@@ -95,6 +95,24 @@ def test_short_acronym_must_match_dictionary_case():
     assert set(found) == {"035420", "034120"}
 
 
+def test_common_stock_whose_name_ends_in_u_stays_in_the_dictionary(monkeypatch):
+    # 우선주는 이름(…우·…2우B)과 코드(끝자리가 0 이 아님)가 둘 다 그렇다. 이름만 보면 보통주 성우가 빠졌다.
+    import extract_telegram_stocks as ets
+
+    stocks = [
+        {"code": "005930", "name": "삼성전자"}, {"code": "005935", "name": "삼성전자우"},
+        {"code": "005387", "name": "현대차2우B"}, {"code": "00088K", "name": "한화3우B"},
+        {"code": "458650", "name": "성우"}, {"code": "015750", "name": "성우하이텍"},
+    ]
+    monkeypatch.setattr(ets, "load_all", lambda *_a, **_k: stocks)
+    match_to_code, method, ambiguous = ets.load_dictionary(None)
+    assert not {"삼성전자우", "현대차2우B", "한화3우B"} & set(match_to_code)
+    assert match_to_code["성우"] == "458650" and "성우" in ambiguous
+    pattern, caseless = build_pattern(list(match_to_code))
+    for text in ("성우(458650) 상한가", "(코스닥)성우 - 반기보고서"):
+        assert set(extract(text, pattern, match_to_code, method, ambiguous, caseless)) == {"458650"}
+
+
 # ── 2026-09-24: 띄어 쓴 외국 지명·선박명 뒤의 케이프(064820) ──────────────────────
 
 
