@@ -67,7 +67,8 @@ function daysEndingAt(base: string, n: number): string[] {
 }
 
 export const getUsThemePage = cache(async (theme: string): Promise<ThemePageData | null> => {
-  if (!(theme in US_THEMES)) return null;
+  // 자기 키만 본다(국장 getThemePage 와 같은 까닭).
+  if (!Object.hasOwn(US_THEMES, theme)) return null;
   const db = getSupabaseAdmin();
 
   const [members, baseDate] = await Promise.all([usThemeMembers(theme), usKaderaBaseDate()]);

@@ -328,7 +328,8 @@ export function buildHotStocks(
  * 실패한 칸은 "불러오지 못했습니다"라고 말한다(loadFailed).
  */
 export const getThemePage = cache(async (theme: string): Promise<ThemePageData | null> => {
-  if (!(theme in THEMES)) return null;
+  // 자기 키만 본다 — `in` 이면 "constructor" 가 통과해 아래 themeMembers 가 names.slice 에서 죽는다(lib/theme-href.ts).
+  if (!Object.hasOwn(THEMES, theme)) return null;
   const db = getSupabaseAdmin();
 
   const [members, baseDate] = await Promise.all([themeMembers(theme), kaderaBaseDate()]);
