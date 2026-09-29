@@ -71,3 +71,21 @@ export function expectedPays(
   const after = sure?.pay ?? "";
   return all.filter((e) => e.i !== twin && e.date > after).map(({ date, v }) => ({ date, v }));
 }
+
+/**
+ * 목표까지 칸이 세는 바탕 — 투자금과 그 투자금이 내는 1년 세후 배당(원). 수익률(세후 ÷ 투자금)이 필요한 투자금·달 수·
+ * 5·10·20년 뒤를 다 정한다. 종가도 평단도 없는 줄(investKrw null)은 배당만 있고 투자금은 0 으로 들어가 수익률을 부풀린다
+ * (KRX 시세를 못 받은 날엔 국내 ETF 가 전부 그렇다) — 둘에서 다 뺀다. 히어로의 배당수익률과 같은 식이다.
+ * skipped 는 그렇게 뺀 줄 가운데 배당이 있는 것의 수(칸에 "빼고 셌다"고 적는다).
+ */
+export function goalBasis(
+  lines: (Pick<Line, "investKrw" | "netKrw"> & { stock: Pick<StockLite, "code"> })[],
+): { invest: number; net: number; skipped: number } {
+  const priced = lines.filter((l) => l.investKrw != null);
+  return {
+    invest: priced.reduce((s, l) => s + (l.investKrw ?? 0), 0),
+    net: priced.reduce((s, l) => s + l.netKrw, 0),
+    // '종가가 없는 N종목' 이라 줄이 아니라 종목을 센다 — 같은 종목을 두 계좌에 나눠 담으면 두 줄이다.
+    skipped: new Set(lines.filter((l) => l.investKrw == null && l.netKrw > 0).map((l) => l.stock.code)).size,
+  };
+}

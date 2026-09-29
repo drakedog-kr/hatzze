@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { expectedPays, monthlyOf } from "../app/dividend/calc.ts";
+import { expectedPays, goalBasis, monthlyOf } from "../app/dividend/calc.ts";
 
 const round = (v: number[]) => v.map((x) => Math.round(x));
 const sum = (v: number[]) => v.reduce((t, x) => t + x, 0);
@@ -87,5 +87,34 @@ describe("expectedPays — 다가오는 일정의 '석 달 안 예상' 합에 �
   it("지난 날은 내년으로 옮기고, 석 달 밖은 빼고, 가까운 순으로 선다", () => {
     const got = expectedPays([[1, 10, 15], [11, 10, 10], [12, 10, 20]], "2026-11-15", "2027-02-15", null);
     assert.deepEqual(dates(got), ["2026-12-20", "2027-01-15"]);
+  });
+});
+
+describe("goalBasis — 목표까지 칸의 투자금과 배당", () => {
+  // 삼성전자 100주(종가 70,000 → 투자금 700만원, 세후 122,162원)와 종가가 없는 날의 국내 ETF 1,000주(세후 456,840원).
+  const samsung = { stock: { code: "005930" }, investKrw: 7_000_000, netKrw: 122_162 };
+  const unpriced = { stock: { code: "069500" }, investKrw: null, netKrw: 456_840 };
+
+  it("종가도 평단도 없는 줄은 투자금에도 배당에도 안 넣는다 — 수익률이 부풀지 않게", () => {
+    const g = goalBasis([samsung, unpriced]);
+    assert.equal(g.invest, 7_000_000);
+    assert.equal(g.net, 122_162);
+    // 세후 수익률 1.75%. 배당만 다 넣으면 8.27% 가 돼 필요한 투자금을 5분의 1로 적었다.
+    assert.equal(Math.round((g.net / g.invest) * 10_000) / 100, 1.75);
+    assert.equal(g.skipped, 1);
+  });
+
+  it("종가 없는 줄이 없으면 전부 센다", () => {
+    const g = goalBasis([samsung, { stock: { code: "000660" }, investKrw: 3_000_000, netKrw: 90_000 }]);
+    assert.deepEqual(g, { invest: 10_000_000, net: 212_162, skipped: 0 });
+  });
+
+  it("배당이 없는 줄은 종가가 없어도 뺐다고 안 센다", () => {
+    assert.equal(goalBasis([samsung, { stock: { code: "069500" }, investKrw: null, netKrw: 0 }]).skipped, 0);
+  });
+
+  it("같은 종목을 두 계좌에 나눠 담았으면 뺀 종목은 하나로 센다 — 화면이 'N종목'이라 적는다", () => {
+    const isa = { ...unpriced, netKrw: 200_000 };
+    assert.equal(goalBasis([samsung, unpriced, isa]).skipped, 1);
   });
 });

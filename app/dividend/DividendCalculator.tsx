@@ -15,7 +15,7 @@ import { IRP_RISK_MAX, isSafeAsset, ACCOUNTS, TAX_HELP, taxNote } from "./tax";
 import type { Account, TaxMode } from "./tax";
 import { accountTag, DEFAULT_SHARES, GOAL_DEFAULT_MAN, ADD_DEFAULT_MAN, BASKET_ROWS, AMOUNT_DEFAULT, SCOPES, scopeOf, computeLines, basketCodes, nextAccountFor, basketShares } from "./shared";
 import type { Scope } from "./shared";
-import { monthlyOf } from "./calc";
+import { goalBasis, monthlyOf } from "./calc";
 import { SearchBox, QuickChips, MoreRows } from "./Search";
 import { HoldingsTable } from "./Holdings";
 import type { SortKey } from "./Holdings";
@@ -180,6 +180,8 @@ export function DividendCalculator({
   const invest = active.reduce((s, l) => s + (l.investKrw ?? 0), 0);
   const priced = active.filter((l) => l.investKrw != null);
   const yieldPct = invest > 0 ? (priced.reduce((s, l) => s + l.grossKrw, 0) / invest) * 100 : null;
+  // 목표까지 칸도 투자금을 아는 줄로만 센다 — 종가 없는 줄의 배당까지 넣으면 수익률이 부풀어 필요한 투자금이 몇 분의 1로 적혔다.
+  const goalIn = goalBasis(active);
   // 금융소득 종합과세 문턱과 고배당기업(분리과세 대상) 배당의 몫 — **일반 계좌 줄만** 합친다(ISA·연금 계좌 안 소득은 금융소득에
   // 안 합친다). 못 담아 일반 세율로 센 줄(outside)도 실제론 일반 계좌라 넣는다. 세전 합이 문턱 근처인 사람에게만 뜻이 있어 그때만 적는다.
   const generalLines = active.filter((l) => l.account === "general" || l.outside);
@@ -508,8 +510,8 @@ export function DividendCalculator({
             <MonthFill month={fillMonth} order={fillOrder} holdings={holdings} onPick={(code) => add(code, "fill_month")} onClose={() => setFillMonth(null)} />
           )}
           {lines.length > 0 && <Upcoming lines={active} fx={fx} mode={taxMode} />}
-          {lines.length > 0 && invest > 0 && total > 0 && (
-            <GoalBox invest={invest} net={total} goalMan={goalMan} addMan={addMan} onGoal={setGoalMan} onAdd={setAddMan} />
+          {lines.length > 0 && goalIn.invest > 0 && goalIn.net > 0 && (
+            <GoalBox invest={goalIn.invest} net={goalIn.net} skipped={goalIn.skipped} goalMan={goalMan} addMan={addMan} onGoal={setGoalMan} onAdd={setAddMan} />
           )}
         </div>
 
