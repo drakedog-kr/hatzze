@@ -64,6 +64,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import requests  # noqa: E402
+from urllib3.exceptions import NewConnectionError  # noqa: E402
 
 from common import broadcast_content as bc  # noqa: E402
 from common import broadcast_digest as bd  # noqa: E402
@@ -879,6 +880,19 @@ def probe_chats(token: str) -> None:
     print("공개 채널이면 숫자 대신 \"@핸들\"을 그대로 써도 됩니다.")
 
 
+def never_reached(exc: requests.RequestException) -> bool:
+    """요청이 텔레그램에 **닿지 못한 게 확실한** 실패인가 — 연결조차 못 맺었다.
+
+    연결 시간 초과(ConnectTimeout)와 연결 거부·이름 풀이 실패(NewConnectionError 를 싼
+    ConnectionError)만 그렇다. 응답 읽기 시간 초과(ReadTimeout)·읽다 끊김·HTML 502 본문
+    (res.json() 의 JSONDecodeError 도 RequestException 이다)은 요청이 이미 갔을 수 있다.
+    """
+    if isinstance(exc, requests.ConnectTimeout):
+        return True
+    reason = getattr(exc.args[0], "reason", None) if exc.args else None
+    return isinstance(exc, requests.ConnectionError) and isinstance(reason, NewConnectionError)
+
+
 def send(token: str, chat_id: str, text: str) -> None:
     """Bot API sendMessage. 실패하면 예외를 올려 워크플로가 실패로 집계하게 한다.
 
@@ -889,6 +903,12 @@ def send(token: str, chat_id: str, text: str) -> None:
 
     링크 미리보기는 끈다. 메시지가 이미 도수를 말하고 있어서 OG 카드가 같은 숫자를
     한 번 더 크게 보여주면 글 길이만 두 배가 된다. 켜고 싶으면 is_disabled 만 뒤집으면 된다.
+
+    ⛔ **닿았는지 모르는 실패는 다시 보내지 않는다.** sendMessage 에는 멱등 키가 없어서,
+       텔레그램이 글을 올린 뒤 응답만 잃은 경우(ReadTimeout · HTML 502)에 다시 보내면
+       구독자에게 같은 글이 두 번 간다. 다시 보내는 것은 연결조차 못 맺은 실패(never_reached)와
+       텔레그램이 ok:false 로 답한 실패뿐이다. 나머지는 바로 실패로 올린다 — 안 나간 글이
+       두 번 나간 글보다 낫다(워크플로의 run_attempt 가드와 같은 쪽이다).
     """
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {
@@ -900,6 +920,7 @@ def send(token: str, chat_id: str, text: str) -> None:
 
     last = ""
     for attempt in range(1, TELEGRAM_ATTEMPTS + 1):
+        unknown = False
         try:
             res = requests.post(url, json=payload, timeout=TELEGRAM_TIMEOUT_SEC)
             body = res.json()
@@ -912,6 +933,13 @@ def send(token: str, chat_id: str, text: str) -> None:
         except requests.RequestException as e:
             # 예외를 그대로 찍지 않는다 — URL 이 딸려 나온다. 타입만 남긴다.
             last = f"{type(e).__name__}"
+            unknown = not never_reached(e)
+        # ⚠️ except 밖에서 올린다. 안에서 올리면 원래 예외가 'During handling…' 으로 같이 찍혀
+        #    봇 토큰이 든 URL 이 로그에 남는다.
+        if unknown:
+            raise RuntimeError(
+                f"텔레그램 발송 결과를 알 수 없습니다({last}). 이미 올라갔을 수 있어 다시 보내지 않습니다 — 채널을 확인하세요."
+            )
         if attempt < TELEGRAM_ATTEMPTS:
             delay = backoff_delay(attempt)
             print(f"[텔레그램] 전송 실패({last}). {delay:.0f}초 뒤 재시도 {attempt + 1}/{TELEGRAM_ATTEMPTS}")
