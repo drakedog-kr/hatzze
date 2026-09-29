@@ -39,6 +39,8 @@
 어느 쪽이 옳으냐보다 **둘이 같은 사흘을 말하는 것**이 먼저다. 국내에서 이게 두 번 어긋났고
 (길이 한 번, 끝점 한 번) 둘 다 화면의 숫자와 문장이 다른 값을 말했다.
 ⚠️ 저쪽 US_WINDOW_DAYS 를 바꾸면 여기 WINDOW_DAYS 도 같이 바꿀 것.
+⚠️ **종목 리포트는 기준일을 뺀다.** 그 카드(getUsStockReports)는 loadUsStockDaily(windowBefore)로
+읽어 기준일 앞 사흘을 세기 때문이다 — card_window · build_stock_digests 주석.
 
 실행:
     cd data-pipeline && source .venv/bin/activate
@@ -324,6 +326,16 @@ STOCK_SYSTEM = US_COMMON + f"""
 def window_dates(latest: str) -> tuple[str, str]:
     """digest 가 볼 구간. **화면(getUsSentiment)과 같은 규칙 — 기준일을 포함한다.**"""
     end = date.fromisoformat(latest)
+    return (end - timedelta(days=WINDOW_DAYS - 1)).isoformat(), end.isoformat()
+
+
+def card_window(latest: str) -> tuple[str, str]:
+    """주요 종목 리포트 카드가 세는 구간 — **기준일을 뺀** 앞 WINDOW_DAYS 일.
+
+    카드(lib/us-telegram-data.ts getUsStockReports)는 loadUsStockDaily 의 windowBefore 로 읽어
+    기준일을 빼고 센다. 총평(window_dates)과 달리 이쪽은 국장 종목 요약과 같은 규칙이다.
+    """
+    end = date.fromisoformat(latest) - timedelta(days=1)
     return (end - timedelta(days=WINDOW_DAYS - 1)).isoformat(), end.isoformat()
 
 
@@ -613,8 +625,15 @@ def build_stock_digests(
 
     `tickers` 를 주면 **그 종목들만** 만든다(순서도 준 대로). 급부상 한 줄 요약
     (scripts/generate_surging_oneliners.py)이 쓰는 길이다 — 국내 짝과 같은 얼개다.
-    창에 언급이 없는 티커는 재료가 없어 조용히 빠진다."""
-    since, end = window_dates(latest)
+    창에 언급이 없는 티커는 재료가 없어 조용히 빠진다.
+
+    ⚠️ **창이 길마다 다르다.** `tickers` 없이 부르면 주요 종목 리포트 카드의 창(card_window —
+    기준일을 뺀 앞 3일)으로 종목을 고르고 센다. 기준일을 넣은 창으로 고르던 때는 카드와
+    사흘이 하루 어긋나, 기준일 앞 사흘째에 몰린 종목이 카드에 뜨고도 그날 요약이 없었다
+    (아래 required 도 자기 목록만 봐서 검사를 통과했다). `tickers` 를 주는 길은 예전 그대로
+    window_dates(기준일 포함)다 — 테마 급부상(common/us_theme_risers)이 기준일을 넣어 센다.
+    메시지는 두 창을 다 덮게 받아 넘길 것(main 참고)."""
+    since, end = window_dates(latest) if tickers is not None else card_window(latest)
     win = [m for m in msgs if since <= m["date"] <= end]
 
     by_ticker: dict[str, list[dict]] = defaultdict(list)
@@ -675,14 +694,16 @@ def main() -> None:
         return
     latest = rows[0]["date"]
     since, end = window_dates(latest)
-    print(f"[기준일] {latest} (창 {since} ~ {end})")
+    card_since, card_end = card_window(latest)
+    print(f"[기준일] {latest} (창 {since} ~ {end} · 종목 리포트 {card_since} ~ {card_end})")
 
     name_of = {
         s["ticker"]: s["name_ko"]
         for s in load_all(db, "us_stocks", "ticker,name_ko", order_by="ticker")
     }
-    msgs = load_us_messages(db, since)
-    print(f"[재료] 창 안 미국 언급 메시지 {len([m for m in msgs if m['date'] <= end]):,}건")
+    # 종목 리포트 창이 하루 앞에서 시작하므로 그만큼 앞에서부터 받는다(총평은 제 창으로 다시 자른다).
+    msgs = load_us_messages(db, min(since, card_since))
+    print(f"[재료] 창 안 미국 언급 메시지 {len([m for m in msgs if since <= m['date'] <= end]):,}건")
 
     brief_digest = build_brief_digest(db, latest, msgs, name_of)
     stock_digests, required = build_stock_digests(latest, msgs, name_of)

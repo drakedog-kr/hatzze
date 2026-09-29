@@ -919,6 +919,8 @@ export async function getUsDailyBrief(): Promise<{ date: string | null; paragrap
  * 종목 선정은 **파이프라인과 같은 규칙**이어야 한다(창 안 언급 수 내림차순). 규칙이
  * 갈리면 화면에 뜨는 종목의 문장이 비는데, 그게 가장 알아채기 어려운 어긋남이다 —
  * 파이프라인은 자기 목록만 보고 "다 만들었다"고 끝낸다.
+ * 창도 같아야 한다 — 기준일을 뺀 앞 US_WINDOW_DAYS 일(generate_us_telegram_narratives.card_window).
+ * 저쪽이 기준일을 넣은 사흘로 고르던 때(~2026-09-29) 이 카드와 하루 어긋났다.
  */
 export async function getUsStockReports(limit = 4): Promise<UsStockReport[]> {
   const db = getSupabaseAdmin();
