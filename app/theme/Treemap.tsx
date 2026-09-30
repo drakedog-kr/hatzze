@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { marketThemeHref, themeStockHref, type ThemeMarketKey } from "@/lib/theme-href";
 import type { ThemeHotStock, ThemeOverview } from "@/lib/theme-page";
+import { stockTone, usualDeltaShort, usualDeltaText } from "@/lib/stock-usual";
 import { squarify } from "@/lib/treemap";
 
 import { MONO } from "../ui";
@@ -81,24 +82,14 @@ export function themeTiles(themes: ThemeOverview[], market: ThemeMarketKey = "kr
 }
 
 /**
- * 테마 화면의 칸 — 넓이는 최근 사흘 언급 수, 색은 **평소와 견준 배수**(평소 = 지난 한 달 하루 평균의 사흘치,
- * lib/theme-page.ts usualMentions). 점유율 %p 가 아니라 배수인 이유: 종목 하나의 언급은 몇 회에서 몇백 회까지 폭이
+ * 테마 화면의 칸 — 넓이는 최근 사흘 언급 수, 색은 **평소와 견준 배수**(평소 = 지난 한 달의 **몫**이 최근 사흘에도
+ * 그대로였다면 나왔을 언급 수 · lib/stock-usual.ts expectedUsualMentions — 언급 수로 재면 요일을 탔다). 점유율 %p 가 아니라 배수인 이유: 종목 하나의 언급은 몇 회에서 몇백 회까지 폭이
  * 넓어 차이(회)로 단을 나누면 큰 종목만 색이 들고, 배수로 나눠야 "평소보다 말이 늘었나"가 종목 크기와 무관하게 읽힌다.
  * 문턱: 1.5배 이상·2.5배 이상·5배 이상(또는 지난 한 달 0회에서 새로 등장). 줄어든 쪽도 같은 비율.
  * 글자는 배수가 아니라 **평소 대비 +60% / −42%** 다 — "앞 사흘의 58%"는 직관적이지 않았다(2026-09-21).
  */
-/** 종목의 색 단계(kadera.css 의 .is-up-N · .is-down-N · .is-flat). 지도 칸과 표의 이름 옆 태그가 같은 색을 쓴다. */
-export function stockTone(m: number, usual: number): string {
-  if (usual === 0) return m >= 5 ? "is-up-3" : m >= 2 ? "is-up-2" : "is-up-1";
-  const ratio = m / usual;
-  if (ratio >= 5) return "is-up-3";
-  if (ratio >= 2.5) return "is-up-2";
-  if (ratio >= 1.5) return "is-up-1";
-  if (ratio <= 1 / 5) return "is-down-3";
-  if (ratio <= 1 / 2.5) return "is-down-2";
-  if (ratio <= 1 / 1.5) return "is-down-1";
-  return "is-flat";
-}
+/* 색 단계·평소 대비 문구는 lib/stock-usual.ts 에 있다(순수 함수라 테스트가 부른다). 예전처럼 여기서도 가져가게 다시 내보낸다. */
+export { stockTone, toneForRatio, usualDeltaText } from "@/lib/stock-usual";
 
 export function stockTiles(stocks: ThemeHotStock[], market: ThemeMarketKey = "kr"): TreemapTile[] {
   return stocks.map((s) => ({
@@ -110,16 +101,8 @@ export function stockTiles(stocks: ThemeHotStock[], market: ThemeMarketKey = "kr
     // 채널 수(하루 최다 n곳)는 뺐다(2026-09-22) — 이 지도가 말하는 것은 언급의 크기와 평소와의 차이 둘이고, 셋째 값은 칸마다 다른 잣대를 하나 더 얹는다.
     tip: `${s.name} · 최근 3일 ${s.mentions.toLocaleString("ko-KR")}회 · ${usualDeltaText(s.mentions, s.usualMentions)}`,
     valueText: `${s.mentions.toLocaleString("ko-KR")}회`,
-    deltaText: s.usualMentions === 0 ? "새로 등장" : usualDeltaText(s.mentions, s.usualMentions).replace("평소 대비 ", "").replace(" 언급", ""),
+    deltaText: usualDeltaShort(s.mentions, s.usualMentions),
   }));
-}
-
-/** 평소와 견준 언급 변화 한 마디 — "평소 대비 +60% 언급" · "평소 대비 −42% 언급" · "새로 등장". 표의 이름 옆 태그와 지도 툴팁이 같이 쓴다. */
-export function usualDeltaText(mentions: number, usual: number): string {
-  if (usual === 0) return "새로 등장";
-  const pct = Math.round((mentions / usual - 1) * 100);
-  if (pct === 0) return "평소만큼 언급";
-  return `평소 대비 ${pct > 0 ? "+" : "−"}${Math.abs(pct)}% 언급`;
 }
 
 export function Treemap({
