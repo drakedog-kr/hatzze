@@ -201,6 +201,47 @@
   box-shadow: 0 1px 2px var(--c-shadow);
 }
 
+/* 폰 탑바의 **한 칸** 통화 토글(PageTools compact). 이웃 단추(검색·테마·메뉴)와 같은 38px 한 칸이다.
+   두 칸 알약(70px)이 검색 단추가 더해진 탑바를 넘치게 해서(320px 에서 메뉴 단추가 화면 밖 46px, 375px 에서 11px
+   잘림 — 2026-09-30 점검) 폰에서만 한 칸으로 접는다. 데스크톱 머리는 자리가 넉넉해 두 칸 알약 그대로다.
+   지금 통화를 크게, 누르면 바뀔 통화를 작게 적는다. 어느 쪽을 보일지는 두 칸 알약과 같은 규칙이다 — 뿌리의 data-cur,
+   없으면 단추 자신의 data-cur-default. 둘 다 그려 두고 하나만 보인다(서버는 쿠키를 모른다). */
+.hz-cur-one {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  background: var(--c-bg);
+  color: var(--c-ink);
+  font: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.hz-cur-one-v {
+  display: none;
+  align-items: baseline;
+  gap: 1px;
+  font-size: var(--fs-17);
+  font-weight: 800;
+  line-height: 1;
+}
+/* 작은 글자도 4.5:1 — --c-muted 는 다크에서 모자라 --c-sub 를 쓴다. */
+.hz-cur-one-v small {
+  font-size: var(--fs-11);
+  font-weight: 700;
+  color: var(--c-sub);
+}
+:root[data-cur="krw"] .hz-cur-one > .hz-cur-one-v[data-cur="krw"],
+:root[data-cur="usd"] .hz-cur-one > .hz-cur-one-v[data-cur="usd"],
+:root:not([data-cur]) .hz-cur-one[data-cur-default="krw"] > .hz-cur-one-v[data-cur="krw"],
+:root:not([data-cur]) .hz-cur-one[data-cur-default="usd"] > .hz-cur-one-v[data-cur="usd"] {
+  display: inline-flex;
+}
+
 /* ── 테마 단추의 아이콘 ──────────────────────────────────────────────────
    해·달을 둘 다 그려 두고 뿌리의 data-theme 으로 하나만 보인다. 통화 스위치와 같은
    이유다 — 서버는 쿠키를 몰라 리액트 상태로 고르면 다크 이용자에게 첫 페인트 뒤
@@ -228,10 +269,24 @@
      한 번 넣었다가 실측하고 뺐다.
    ⭐ 문턱이 360 인 것은 그 아래가 실제로 쓰이는 폭이라서다 — 갤럭시 폴드 커버(280),
      아이폰 SE 1세대(320). 360·375 는 이미 여유가 16px 이상이라 손대지 않는다. */
+/* 오른쪽 단추 묶음(검색 · 통화/시장 건너가기 · 테마 · 메뉴)의 사이. 인라인에 두면 아래 미디어쿼리가 못 이긴다. */
+.hz-topbar-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
 @media (max-width: 360px) {
+  /* ⚠️ 2026-09-30: 탑바에 검색 단추가 더해져 단추가 넷인 화면(/insider 의 통화 · 카더라·테마의 ⇄)이 다시 넘쳤다.
+     통화를 한 칸(38)으로 접고도 로고 124 + 단추 넷 152 + 사이 셋 24 + 패딩 24 + 탑바 gap 16 = 340 이라 320 에서
+     20px 모자랐다. 탑바 gap 을 0 으로(가운데 빈 칸이 flex:1 이라 로고와 단추는 저절로 떨어진다), 단추 사이를 4 로
+     줄이면 312 — 8px 가 남는다. 단추가 셋인 화면은 20px 남는다. */
   .hz-topbar {
     padding: 0 12px;
-    gap: 8px;
+    gap: 0;
+  }
+  .hz-topbar-tools {
+    gap: 4px;
   }
 }
 

@@ -87,6 +87,12 @@ export type StockPageData = {
   priceDate: string | null;
   /** 막대용. 언급이 없는 날도 0으로 채워 STOCK_TREND_DAYS 칸이 늘 찬다. */
   trend: StockTrendPoint[];
+  /**
+   * 기준일(아직 하루가 덜 찬 날)의 **지금까지** 집계. 합계·최다일에는 넣지 않고, 막대 끝에 빗금 칸으로만 그린다 —
+   * '왜 움직였나'가 그날 이야기를 하는데 막대가 전날에서 끝나면 급등한 날 자체가 그림에 없었다(2026-09-30 점검).
+   * 행이 없으면(파이프라인이 아직 그날을 안 셌다) null.
+   */
+  today: StockTrendPoint | null;
   /** 최근 STOCK_STAT_DAYS 일 언급 합. */
   totalMentions: number;
   /** 그중 언급이 있던 날 수. 사이트맵 자격과 같은 잣대다. */
@@ -168,7 +174,8 @@ export const getStockPage = cache(async (code: string): Promise<StockPageData | 
       .select("date,mention_count,channel_count")
       .eq("stock_code", code)
       .gte("date", statDays[0])
-      .lte("date", last)
+      // 기준일까지 받는다. 기준일 행은 막대 끝 빗금 칸(today)에만 쓰고 합계에는 안 넣는다(아래 statRows).
+      .lte("date", baseDate)
       .order("date"),
     // 상위 몇 종목만 있고 나머지는 없는 게 정상이라 실패와 부재를 구분하지 않는다 —
     // 어느 쪽이든 문장을 안 그린다.
@@ -191,7 +198,10 @@ export const getStockPage = cache(async (code: string): Promise<StockPageData | 
   if (dailyRes.error) console.error(`[getStockPage] ${code} 언급 집계를 못 읽었습니다`, dailyRes.error);
 
   const loadFailed = Boolean(dailyRes.error);
-  const rows = (dailyRes.data ?? []) as DailyRow[];
+  const allRows = (dailyRes.data ?? []) as DailyRow[];
+  // 합계·최다일·색인 자격은 **기준일을 뺀** 창으로만 센다(위 windowBefore). 기준일 행은 반나절치라 섞으면 안 된다.
+  const rows = allRows.filter((r) => r.date <= last);
+  const todayRow = allRows.find((r) => r.date === baseDate);
   const byDate = new Map(rows.map((r) => [r.date, r]));
   // 언급이 0인 날은 표에 행이 자체가 없다. 있는 행만 그리면 종목마다 막대 개수가 달라져
   // 나란히 놓인 두 화면이 서로 다른 기간을 그린다(getStockReport 주석에 같은 경고).
@@ -233,6 +243,9 @@ export const getStockPage = cache(async (code: string): Promise<StockPageData | 
     changeRate: (stock.change_rate as number | null) ?? null,
     priceDate: (stock.price_date as string | null) ?? null,
     trend,
+    today: todayRow
+      ? { date: baseDate, mentions: todayRow.mention_count ?? 0, channels: todayRow.channel_count ?? 0 }
+      : null,
     totalMentions,
     activeDays,
     peak,
