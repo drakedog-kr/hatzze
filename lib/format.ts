@@ -63,97 +63,88 @@ const KST_UPDATE_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
   day: "2-digit",
   weekday: "short",
   hour: "2-digit",
+  minute: "2-digit",
   hourCycle: "h23",
 });
 
+/** '최종 업데이트' 의 눈금. */
+const UPDATE_STEP_MS = 30 * 60 * 1000;
+
+function kstUpdateParts(date: Date) {
+  const parts = KST_UPDATE_FORMATTER.formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? "";
+  return {
+    month: Number(get("month")),
+    day: Number(get("day")),
+    weekday: get("weekday").replace("요일", ""),
+    hour: Number(get("hour")),
+    minute: Number(get("minute")),
+  };
+}
+
+const hourLabel = (hour: number) => `${hour < 12 ? "오전" : "오후"} ${hour % 12 || 12}시`;
+
+// 화면의 다른 날짜("9월 22일 종가"·"9월 23일 기준")와 같은 꼴로 적는다(2026-09-23). 예전엔
+// "2026-09-23(수)" 라 한 화면에 날짜 표기가 둘이었다. 연도는 뺀다 — 이 줄은 늘 오늘·어제다.
+const updateLabel = (p: ReturnType<typeof kstUpdateParts>, time: string) =>
+  `${p.month}월 ${p.day}일(${p.weekday}) ${time} 기준`;
+
 /**
- * 정기 실행의 **표기용 완료 시각**(KST). cron 발화 시각이 아니라 완료를 여기에 맞춰 스냅한다.
- * .github/workflows/daily-update.yml 의 cron 주석 참고.
+ * "최종 업데이트" 라벨 — 자료가 쓰인 시각을 **가장 가까운 30분**으로 적는다(2026-09-30).
  *
- * 2026-08-29 에 다시 쟀다. 시계를 Vercel 로 옮기면서(아침 07:00 · 저녁 18:00 발사,
- * `vercel.json` 의 crons) 큐 지연이 사라져 완료가 거의 고정됐다:
+ *   08:26 → 오전 8시 30분 · 08:46 → 오전 9시 · 20:14 → 오후 8시 · 20:32 → 오후 8시 30분
  *
- *   아침  07:00 발사 + 소요 76~105분(평균 87) → 완료 08:16~08:45, 중심 08:27
- *   저녁  18:00 발사 + 소요 69~107분(평균 83) → 완료 19:09~19:47, 중심 19:23
+ * 한가운데(:15·:45 정각)는 뒤쪽으로 올린다. 날짜·요일도 올린 시각에서 뽑는다 — 23:50 은
+ * 다음 날 "오전 12시" 다. KST 는 UTC 와 정시 단위로만 어긋나서, 절대 시각을 30분 눈금에
+ * 맞추면 KST 에서도 :00·:30 에 떨어진다.
  *
- * 표기는 `오전 9시 기준` 처럼 **콜론 없이 '시'** 로 적는다(2026-08-29). `9:00` 은 그 시각에
- * 정확히 잰 값처럼 읽히는데 실제 완료는 08:27 이고, 무엇보다 아래 '벗어난 실행' 쪽이
- * `8시경` 이라 한 화면에서 콜론과 '시' 가 갈렸다. 이제 **'경' 의 유무만이 정확도를 가른다.**
+ * ## 왜 정각 스냅을 걷었나
  *
- * 그래서 **아침 9시 · 오후 8시**는 그대로 둔다. 중심에서 아침은 33분, 저녁은 37분
- * 앞선다 — 슬랙 2시간 안이라 스냅이 유지되고, 표기를 실제 완료보다 뒤에 두는 원칙도
- * 그대로다.
+ * 예전엔 정기 실행을 [9, 20] 정각에 붙였다 — 그 시각 ±2시간 안이면 "오후 8시", 밖이면
+ * "오후 11시경". 발사를 Vercel 로 고정하면 완료도 고정될 거라 봤는데, 09-23~09-30 한 주를
+ * 재 보니 저녁 국장 카더라가 19:12~20:32, 시장 브리핑이 19:35~20:35 로 한 시간 넘게
+ * 흔들렸고 **모두 "오후 8시 기준"으로 떴다.** 09-30 저녁 카더라는 20:32 에 바뀌었는데도
+ * "오후 8시" 라, 늦은 날인지 라벨만 봐서는 알 수 없었다. 30분 눈금이면 어긋남이 늘 15분
+ * 안이고, 실행 일정을 옮겨도 여기를 고칠 일이 없다(옛 배열은 일정과 같이 옮겨야 했다).
  *
- * 이 배열을 처음 고를 때(2026-08-14)는 큐 지연이 31~69분 붙는다고 보고 완료를
- * 08:40·20:10 근처로 잡았다. 그 뒤 큐가 빨라져 08-16~08-26 실측은 08:15·19:32 였고,
- * 이제 발사가 고정되면서 08:27·19:23 이 된다. 세 번 움직이는 동안 배열은 그대로 맞았다
- * — 슬랙이 2시간이라 이 폭을 다 덮는다. **다음에 또 움직이면 이 줄부터 다시 잴 것.**
+ * 콜론 없이 '시·분' 으로 적는 건 그대로다(2026-08-29). "8:30" 은 그 시각에 정확히 잰 값처럼
+ * 읽힌다. '경' 은 뗐다 — 모든 라벨이 같은 눈금이라 정확도를 가를 표시가 필요 없다.
  *
- * ⚠️ **워크플로 일정을 바꾸면 여기도 같이 바꿀 것.** 2026-08-14 에 아침을 11시대에서
- * 8시대로 당겼는데, 이 배열을 그대로 뒀다면 08:45 에 끝난 실행이 스냅에 걸려 화면에
- * "오전 11:00 기준"으로 표시됐을 것이다 — 실제보다 두 시간 늦은 거짓말이다.
- *
- * ⭐ 여기 적는 시각은 **실제 완료보다 조금 뒤**다(옛 설정은 반대로 바닥값이었다 —
- * 완료 20:20 에 "오후 7시"). 읽는 사람에게 정각이 자연스럽다는 판단으로 뒤쪽에 맞췄고,
- * 대신 표기가 아직 오지 않은 시각을 가리키는 날이 생긴다(08:20 에 끝나면 40분 앞선다).
- *
- * ⚠️ **아침 슬롯의 지연은 아직 표본이 없다.** 위 31~62분 중 62분은 옛 슬롯(00:00 UTC,
- * 전 세계에서 가장 붐빈다) 값이고, 31분은 인접 슬롯(20:00 UTC)을 한 번 잰 값이다.
- * 새 슬롯(21:30 UTC)에서 한 주 돌려 본 뒤 이 숫자를 다시 잴 것.
+ * 테마 판세는 여기에 카더라 총평 시각을 넘긴다(lib/theme-page.ts 의 themeUpdatedAt).
+ * 국장 미리보기만 정해 둔 정각에 붙인다(formatKstUpdateSnapped).
  */
-const SCHEDULED_HOURS_KST = [9, 20];
+export function formatKstUpdate(isoString: string): string {
+  const rounded = Math.round(new Date(isoString).getTime() / UPDATE_STEP_MS) * UPDATE_STEP_MS;
+  const p = kstUpdateParts(new Date(rounded));
+  return updateLabel(p, `${hourLabel(p.hour)}${p.minute ? ` ${p.minute}분` : ""}`);
+}
+
 /** 예정 시각에서 이만큼 안에 끝났으면 "예정대로 돌았다"고 보고 정각으로 스냅한다.
  *
  * ⚠️ **3에서 2로 줄였다(2026-08-14).** 기준 시각을 [11,19] → [9,20] 으로 옮기면서 3을
  * 그대로 두면 창이 06~12시·17~23시로 벌어져, 밤 11시에 끝난 실행까지 정각으로 스냅된다.
  * 그건 예전에 한 번 고친 버그다(아래 함수 주석의 "23:28 에 끝난 실행이 오후 5:00 으로
- * 표시됐다"가 그 사건). 2면 창이 07~11시·18~22시가 되어, 정기 실행의 흔들림은 전부
- * 덮으면서 자정 근처는 실제 시각을 적는다.
- * (아침은 08:00 게이트 때문에 08:10 이전에 못 끝나고, 지연이 210분까지 늘어도 아침
- *  11:10 · 오후 22:10 이라 양쪽 다 이 창 안이다.)
+ * 표시됐다"가 그 사건).
  */
 const SCHEDULE_SLACK_HOURS = 2;
 
 /**
- * "최종 업데이트" 라벨.
+ * 정해 둔 정각에 붙이는 "최종 업데이트" 라벨. **국장 미리보기만 쓴다**(app/preview/page.tsx 의
+ * HERO_HOURS · PERP_HOURS). 다른 화면은 2026-09-30 에 30분 눈금(formatKstUpdate)으로 옮겼다.
  *
- * 파이프라인 완료가 KST 11:00·17:00 근처가 되도록 발화 시각을 설계했다(cron 은 그보다
- * 앞서 발화하고 GitHub 예약 큐 지연 90~150분이 실행을 그 시각으로 밀어준다 — 자세한 건
- * 워크플로 cron 주석). 완료는 그래도 날마다 흔들리므로, 예정 시각 ±3시간 안이면 그 정각으로
- * 스냅하고(정기 실행의 깔끔함 유지), 벗어난 실행(수동·재시도)은 실제 시각을 적어 거짓말을
- * 막는다 — 예전엔 무조건 정각 스냅이라 KST 23:28 에 끝난 실행이 "오후 5:00 기준"으로 표시됐다.
+ * `scheduledHours` 중 하나에서 ±2시간 안이면 그 정각("오전 7시 기준"), 밖이면 실제 시(時)에
+ * '경'을 붙인다("오후 3시경 기준"). 벗어난 실행(수동·재시도)까지 정각에 붙이면 거짓말이 된다 —
+ * 예전엔 무조건 정각 스냅이라 KST 23:28 에 끝난 실행이 "오후 5:00 기준"으로 표시됐다.
  *
- * ## ⚠️ 파이프라인 **끝**에 쓰이지 않는 자료는 자기 시각을 넘겨야 한다
- *
- * 기본값 [9, 20] 은 **잡이 끝나는 시각**이다(아침 08:27 · 저녁 19:23 완료). 그런데 스텝이
- * 79개라 앞쪽에서 쓰이는 자료는 그보다 한참 이르다 — 국장 미리보기의 종목 줄은 맨 앞
- * 스텝이라 **07시**에 쓰인다. 그 값에 기본 눈금을 대면 여유 2시간에 걸려 "오전 9시" 로
- * 붙어 **두 시간을 앞당겨 거짓말한다**(2026-09-04 지적, 실측 34줄이 전부 7시).
- *
- * 그래서 `scheduledHours` 를 받는다. **화면이 자기 자료가 쓰이는 시각을 안다.**
- * ⛔ 기본값을 고쳐서 맞추지 말 것 — 시장 브리핑(08:40·19:31)과 카더라는 지금 값이 맞고,
- *    기본을 흔들면 멀쩡한 화면들이 같이 어긋난다.
+ * ⚠️ 눈금은 **화면이 자기 자료가 쓰이는 시각**으로 넘긴다. 미리보기의 종목 줄은 파이프라인
+ * 맨 앞 스텝이라, 잡이 끝나는 시각(옛 기본값 [9, 20])에 대면 "오전 9시" 로 붙어 두 시간을
+ * 앞당겨 거짓말한다(2026-09-04 지적, 실측 34줄이 전부 7시).
  */
-export function formatKstUpdate(
-  isoString: string,
-  scheduledHours: readonly number[] = SCHEDULED_HOURS_KST,
-): string {
-  const parts = KST_UPDATE_FORMATTER.formatToParts(new Date(isoString));
-  const get = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((p) => p.type === type)?.value ?? "";
-
-  const weekday = get("weekday").replace("요일", "");
-  const hour = Number(get("hour"));
-
-  const scheduled = scheduledHours.find((h) => Math.abs(hour - h) <= SCHEDULE_SLACK_HOURS);
-  const time =
-    scheduled !== undefined
-      ? `${scheduled < 12 ? "오전" : "오후"} ${scheduled % 12 || 12}시`
-      : `${hour < 12 ? "오전" : "오후"} ${hour % 12 || 12}시경`;
-
-  // 화면의 다른 날짜("9월 22일 종가"·"9월 23일 기준")와 같은 꼴로 적는다(2026-09-23). 예전엔
-  // "2026-09-23(수)" 라 한 화면에 날짜 표기가 둘이었다. 연도는 뺀다 — 이 줄은 늘 오늘·어제다.
-  return `${Number(get("month"))}월 ${Number(get("day"))}일(${weekday}) ${time} 기준`;
+export function formatKstUpdateSnapped(isoString: string, scheduledHours: readonly number[]): string {
+  const p = kstUpdateParts(new Date(isoString));
+  const scheduled = scheduledHours.find((h) => Math.abs(p.hour - h) <= SCHEDULE_SLACK_HOURS);
+  return updateLabel(p, scheduled !== undefined ? hourLabel(scheduled) : `${hourLabel(p.hour)}경`);
 }
 
 /**

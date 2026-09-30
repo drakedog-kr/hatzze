@@ -13,7 +13,7 @@ import { PREVIEW_PUBLIC } from "../screen-flags";
 import { StockLogo } from "../StockLogo";
 import { KOSPI_AFTER } from "../kr-preview-table";
 import { C, Icon, MONO } from "../ui";
-import { formatKstUpdate } from "@/lib/format";
+import { formatKstUpdateSnapped } from "@/lib/format";
 
 /**
  * 국장 미리보기 — 간밤 미장에서 크게 움직인 종목이 오늘 아침 국내 어디와 엮이는지.
@@ -196,11 +196,12 @@ const VOL = (v: number | null) => {
 const HL_DEX = "xyz";
 
 /**
- * 이 화면의 자료가 **실제로 쓰이는 시각**(KST). `formatKstUpdate` 의 기본 눈금 [9, 20] 은
- * 잡이 **끝나는** 시각이라 이 화면에는 안 맞는다 — 스텝이 79개인데 여기 쓰이는 둘은
- * 앞쪽에 있다.
+ * 이 화면의 자료가 **실제로 쓰이는 시각**(KST). `formatKstUpdateSnapped` 가 이 정각에 붙인다.
+ * 다른 화면의 '최종 업데이트'는 2026-09-30 부터 30분 눈금(`formatKstUpdate`)이고, 이 화면만
+ * 예전 방식 그대로다. 옛 공용 눈금 [9, 20] 은 잡이 **끝나는** 시각이라 이 화면에는 안 맞았다 —
+ * 스텝이 79개인데 여기 쓰이는 둘은 앞쪽에 있다.
  *
- *   HERO_HOURS   종목 줄은 **맨 앞 스텝**이라 07시다. 기본 눈금에 대면 여유 2시간에 걸려
+ *   HERO_HOURS   종목 줄은 **맨 앞 스텝**이라 07시다. 옛 눈금에 대면 여유 2시간에 걸려
  *                "오전 9시" 로 붙어 두 시간을 앞당겨 거짓말한다(2026-09-04 실측: 34줄이 전부 7시).
  *   PERP_HOURS   하이퍼리퀴드는 **KRX 08:00 게이트 바로 뒤**라 아침 08시 · 저녁 18시다.
  *                (이 눈금은 실시간을 못 받아 담아 둔 값으로 물러선 날에만 쓰인다.)
@@ -804,9 +805,9 @@ export default async function PreviewPage() {
             </div>
           )}
           {/* ⭐ **최종 업데이트는 이 저장소의 공용 어법이다**(시장 브리핑·카더라와 같은 모양:
-              schedule 아이콘 + `formatKstUpdate`). 값은 그날 줄의 `created_at` 이고, 수집기가
+              schedule 아이콘 + "… 기준"). 값은 그날 줄의 `created_at` 이고, 수집기가
               그날 것을 통째로 갈아 끼우므로 그게 곧 마지막 실행 시각이다.
-              ⚠️ 눈금은 기본값(오전 9시·오후 8시)이 아니라 HERO_HOURS [7] 이다. 자동 실행은 이
+              ⚠️ 다른 화면의 30분 눈금이 아니라 HERO_HOURS [7] 정각에 붙인다. 자동 실행은 이
               줄을 06:31 에 쓰고 ±2시간 안이라 늘 "오전 7시 기준" 이 된다(저녁 실행은 이 표를
               안 쓴다). 손으로 5~9시 밖에 돌린 실행만 "오후 3시경" 처럼 실제 시각이 적힌다.
 
@@ -824,7 +825,7 @@ export default async function PreviewPage() {
                 작아지고, 그러면 기준선이 옆 두 칸보다 3px 내려앉는다(2026-09-03 실측).
                 옆 칸 설명과 같은 1.6 을 줘야 셋이 같은 줄에 앉는다. */}
             <span style={{ fontSize: "var(--fs-11-5)", lineHeight: 1.6, color: C.sub }}>
-              최종 업데이트 · {updatedAt ? formatKstUpdate(updatedAt, HERO_HOURS) : "—"}
+              최종 업데이트 · {updatedAt ? formatKstUpdateSnapped(updatedAt, HERO_HOURS) : "—"}
             </span>
           </div>
         </div>
@@ -942,7 +943,7 @@ export default async function PreviewPage() {
           {/* ⭐ '시점' 알약은 살아 있는 값일 때 **날짜와 분까지** 적는다("9/4 오전 2:40 시점").
               10분마다 새로 받으므로 "오후 8시" 로 뭉개면 방금 값인지 두 시간 전 값인지 구별이
               안 되고, 날짜가 없으면 새벽에 어제 것인지 오늘 것인지가 안 갈린다.
-              담아 둔 값으로 물러선 날에는 집안 어법(formatKstUpdate)을 쓴다 — 그쪽은 이미
+              담아 둔 값으로 물러선 날에는 집안 어법(formatKstUpdateSnapped)을 쓴다 — 그쪽은 이미
               연·월·일과 요일을 다 적는다(그때는 아침 실행 시각이다).
 
               ⭐ 환율은 **부제에 한 번만** 적는다(2026-09-03). 카드마다 되풀이하면 종목 셋에
@@ -961,7 +962,7 @@ export default async function PreviewPage() {
               overnight.capturedAt
                 ? overnight.live
                   ? `${kstStamp(overnight.capturedAt)} 시점`
-                  : `${formatKstUpdate(overnight.capturedAt, PERP_HOURS).replace(" 기준", "")} 시점`
+                  : `${formatKstUpdateSnapped(overnight.capturedAt, PERP_HOURS).replace(" 기준", "")} 시점`
                 : undefined
             }
             /* ⚠️ '거래된' 이 아니라 **'거래되는'** 이다(2026-09-05 지적). 시트 제목이
