@@ -28,7 +28,7 @@
  * ⚠️ 사라/팔라로 읽힐 말과 종목 이름은 넣지 않는다(app/og-card.tsx 의 ChatterArt 와 같은 규칙).
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -361,7 +361,17 @@ const introPosts = {
  * 4·5·6. 실제 화면(1080×1350). capture.mjs 가 찍은 폰 화면(intro/shots/)을 카드에 넣는다.
  * 폰 폭 390 을 560 으로 키워 넣고 위쪽만 보여 준 뒤 아래를 바탕색으로 흐려 '더 있다'를 말한다 —
  * 화면 아래의 'PC를 권해 드립니다' 알림도 이렇게 빠진다. 캡처가 없으면 이 그림만 건너뛴다.
+ *
+ * 숫자는 날마다 바뀌므로 틀 아래에 **찍은 날**을 적는다(캡처 파일의 수정 시각, 한국 시각).
  */
+function shotDate(src) {
+  if (!existsSync(src)) return "";
+  const [m, d] = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric" })
+    .format(statSync(src).mtime)
+    .split("-")
+    .map(Number);
+  return ` · ${m}월 ${d}일 화면`;
+}
 function introShot(file, shot, label, headline, url) {
   const src = join(HERE, "intro", "shots", shot);
   return {
@@ -383,14 +393,14 @@ function introShot(file, shot, label, headline, url) {
   <img src="${pathToFileURL(src).href}" style="display:block;width:560px">
   <div style="position:absolute;left:0;right:0;bottom:0;height:170px;background:linear-gradient(180deg,rgba(247,250,253,0),${C.bg})"></div>
 </div>
-<div style="position:absolute;left:0;right:0;bottom:56px;text-align:center;font-size:28px;font-weight:700;color:${C.faint}">${url}</div>
+<div style="position:absolute;left:0;right:0;bottom:56px;text-align:center;font-size:28px;font-weight:700;color:${C.faint}">${url}${shotDate(src)}</div>
 `,
     ),
   };
 }
 const introShots = [
   introShot("intro/04-briefing-1080.png", "briefing.png", "시장 브리핑", "지금 시장이 몇 도인지 한눈에", "hatzze.fun"),
-  introShot("intro/05-kadera-1080.png", "kadera.png", "카더라 리포트", "주식 텔레그램에서<br>어떤 종목이 얼마나 오가는지", "hatzze.fun/kadera"),
+  introShot("intro/05-kadera-1080.png", "kadera.png", "카더라 리포트", "주식 텔레그램의 분위기,<br>낙관일까 비관일까", "hatzze.fun/kadera"),
   introShot("intro/06-theme-1080.png", "theme.png", "테마 리포트", "요즘 어느 테마에<br>관심이 쏠리는지", "hatzze.fun/theme"),
 ];
 
