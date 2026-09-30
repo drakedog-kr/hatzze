@@ -183,10 +183,6 @@ ${bubble("고점 대비 몇 %?", { x: 668, y: 640, size: 40, tail: "tl" })}
 
 /**
  * PC 타이틀(966×300). 글자를 그림에 넣었으니 네이버 쪽 '블로그 제목' 글자 표시는 끄고 쓴다.
- *
- * 같은 판을 두 배(1932×600)로도 찍는다. 더 고화질로 달라는 요청을 받았다(2026-09-30) — 966 그대로는
- * 선명한 화면(레티나)에서 글자가 번진다. 네이버가 큰 그림을 966 에 맞춰 줄이면 두 배 판이 낫고,
- * 줄이지 않고 잘라 보이면 966 판을 쓴다 — 올려 보고 고른다.
  */
 const title = {
   file: "pc-title-966x300.png",
@@ -208,7 +204,6 @@ ${bubble("요즘 무슨 테마?", { x: 616, y: 182, size: 22, tail: "tl" })}
 `,
   ),
 };
-const title2x = { ...title, file: "pc-title-966x300@2x.png", scale: 2 };
 
 /**
  * 위젯 배너(170×600). 위젯 직접등록은 HTML 이라 <img width="170"> 로 크기를 못 박을 수 있어서
@@ -243,27 +238,52 @@ const widget = {
   ),
 };
 
-const OUT = process.env.OUT_DIR ?? HERE;
-const chrome = chromePath();
-const work = mkdtempSync(join(tmpdir(), "naver-blog-"));
-for (const img of [profile, cover, title, title2x, widget]) {
-  const htmlFile = join(work, img.file.replace(/\.png$/, ".html"));
-  writeFileSync(htmlFile, img.html);
-  const out = join(OUT, img.file);
+/**
+ * 크게 그려서 줄인다(SUPERSAMPLE 배).
+ *
+ * 크기 그대로 찍으면 두 가지가 거칠다(2026-09-30, "같은 크기에 화질만 고화질로"):
+ *   · 글자 가장자리에 분홍·하늘색 번짐 — 크롬이 LCD 서브픽셀로 글자를 다듬는다. 모니터에
+ *     따라, 네이버가 다시 줄이거나 누르면 얼룩으로 보인다. --disable-lcd-text 로 끈다.
+ *   · 유령·말풍선 윤곽의 계단 — 한 픽셀 안에서만 섞으니 곡선이 덜 매끄럽다.
+ * 세 배로 그린 뒤 <img> 로 제 크기에 맞춰 한 번 더 찍으면 크롬이 고품질로 줄여 둘 다 사라진다.
+ * 픽셀 수(파일 크기 규격)는 그대로다.
+ */
+const SUPERSAMPLE = 3;
+
+function shoot(htmlFile, w, h, scale, out) {
   execFileSync(
     chrome,
     [
       "--headless",
       "--disable-gpu",
+      "--disable-lcd-text",
       "--hide-scrollbars",
       ...(process.getuid?.() === 0 ? ["--no-sandbox"] : []),
-      `--window-size=${img.w},${img.h}`,
-      `--force-device-scale-factor=${img.scale}`,
+      `--window-size=${w},${h}`,
+      `--force-device-scale-factor=${scale}`,
       "--virtual-time-budget=4000",
       `--screenshot=${out}`,
       pathToFileURL(htmlFile).href,
     ],
     { stdio: "ignore" },
   );
-  console.log(`${THEME}  ${img.file}  ${img.w * img.scale}×${img.h * img.scale}`);
+}
+
+const OUT = process.env.OUT_DIR ?? HERE;
+const chrome = chromePath();
+const work = mkdtempSync(join(tmpdir(), "naver-blog-"));
+for (const img of [profile, cover, title, widget]) {
+  const W = img.w * img.scale;
+  const H = img.h * img.scale;
+  const base = join(work, img.file.replace(/\.png$/, ""));
+  writeFileSync(`${base}.html`, img.html);
+  shoot(`${base}.html`, img.w, img.h, img.scale * SUPERSAMPLE, `${base}.big.png`);
+  writeFileSync(
+    `${base}.down.html`,
+    `<!doctype html><html><head><style>html,body{margin:0;width:${W}px;height:${H}px;overflow:hidden}` +
+      `img{display:block;width:${W}px;height:${H}px}</style></head>` +
+      `<body><img src="${pathToFileURL(`${base}.big.png`).href}"></body></html>`,
+  );
+  shoot(`${base}.down.html`, W, H, 1, join(OUT, img.file));
+  console.log(`${THEME}  ${img.file}  ${W}×${H}`);
 }
