@@ -8,6 +8,8 @@ import { describe, it } from "node:test";
 import {
   compareLabel,
   formatEokMixed,
+  formatKstUpdate,
+  formatKstUpdateSnapped,
   formatSampleCount,
   hasFinal,
   shortDate,
@@ -33,6 +35,38 @@ describe("compareLabel", () => {
   });
   it("하루보다 멀면 그 날짜를 적는다(주말·휴장 뒤)", () => {
     assert.equal(compareLabel("2026-09-15", "2026-09-12"), "9월 12일 대비");
+  });
+});
+
+describe("formatKstUpdate", () => {
+  // 입력은 UTC 다(파이프라인이 +09:00 으로 써도 DB 가 UTC 로 돌려준다). KST = UTC+9.
+  it("가장 가까운 30분으로 적는다", () => {
+    assert.equal(formatKstUpdate("2026-09-29T23:26:00Z"), "9월 30일(수) 오전 8시 30분 기준"); // 08:26
+    assert.equal(formatKstUpdate("2026-09-29T23:46:00Z"), "9월 30일(수) 오전 9시 기준"); // 08:46
+    assert.equal(formatKstUpdate("2026-09-30T11:32:34Z"), "9월 30일(수) 오후 8시 30분 기준"); // 20:32
+    assert.equal(formatKstUpdate("2026-09-30T11:14:00Z"), "9월 30일(수) 오후 8시 기준"); // 20:14
+  });
+  it("한가운데(:15·:45 정각)는 뒤로 올린다", () => {
+    assert.equal(formatKstUpdate("2026-09-30T11:14:59Z"), "9월 30일(수) 오후 8시 기준");
+    assert.equal(formatKstUpdate("2026-09-30T11:15:00Z"), "9월 30일(수) 오후 8시 30분 기준");
+    assert.equal(formatKstUpdate("2026-09-30T11:45:00Z"), "9월 30일(수) 오후 9시 기준");
+  });
+  it("오프셋이 붙은 입력도 같은 순간으로 읽는다", () => {
+    assert.equal(formatKstUpdate("2026-09-30T20:32:34.123+09:00"), "9월 30일(수) 오후 8시 30분 기준");
+  });
+  it("정오는 오후 12시, 자정 가까이는 다음 날 오전 12시", () => {
+    assert.equal(formatKstUpdate("2026-09-30T03:10:00Z"), "9월 30일(수) 오후 12시 기준"); // 12:10
+    assert.equal(formatKstUpdate("2026-09-30T14:50:00Z"), "10월 1일(목) 오전 12시 기준"); // 23:50
+  });
+});
+
+describe("formatKstUpdateSnapped", () => {
+  it("정해 둔 정각 ±2시간 안이면 그 정각에 붙인다(국장 미리보기)", () => {
+    assert.equal(formatKstUpdateSnapped("2026-09-29T21:31:00Z", [7]), "9월 30일(수) 오전 7시 기준"); // 06:31
+    assert.equal(formatKstUpdateSnapped("2026-09-30T09:45:00Z", [8, 18]), "9월 30일(수) 오후 6시 기준"); // 18:45
+  });
+  it("창 밖이면 실제 시에 '경'을 붙인다", () => {
+    assert.equal(formatKstUpdateSnapped("2026-09-30T06:10:00Z", [7]), "9월 30일(수) 오후 3시경 기준"); // 15:10
   });
 });
 
