@@ -1639,57 +1639,39 @@ const NEWS_EVENT = "hz-news-change";
    ⛔⛔ **아직 안 연 화면을 알리는 띠는 화면을 여는 날 함께 켜진다.** 이 띠에는 푸터
    바로가기 같은 조건부가 없어서, 띠만 먼저 넣으면 프로덕션에서 눌러 404 로 간다. 그때는
    `app/screen-flags.ts` 의 플래그로 갈라 목적지가 열려 있을 때만 걸리게 한다(국장
-   미리보기·배당으로 살기 때 그렇게 했고, 지금 테마 리포트가 그렇다 — 아래 newsFor). */
-/* 소식 둘을 세워 두고 newsFor 가 하나를 고른다. 목적지가 우리 화면이면 **그 구역 안에서는 안 그린다**(NewsStrip 의 startsWith).
-   이전 소식들(내부자 → 국장 미리보기 → 데일리 노트 → 텔레그램 2판 → 배당으로 살기)은 git 이력에 있다 — 되살릴 땐 키를 새로 딴다.
+   미리보기·배당으로 살기·테마 리포트 때 그렇게 했다). */
+/* 지금 거는 소식은 하나(NEWS). 목적지가 우리 화면이면 **그 구역 안에서는 안 그린다**(NewsStrip 의 startsWith).
+   이전 소식들(내부자 → 국장 미리보기 → 데일리 노트 → 텔레그램 2판 → 배당으로 살기 → 텔레그램 3판 → 테마 리포트 오픈)은
+   git 이력에 있다 — 되살릴 땐 키를 새로 딴다.
    ⚠️ 문구에 숫자를 넣지 않는다(위 주석). */
 /* tailShort: 폰(≤560)에서 tail 대신 쓰는 짧은 꼬리. 이름이 앞에 서는 소식은 폰에서 한 줄로 잘리므로(components.css 의
    .hz-news-namefirst) 긴 tail 은 문장 중간에서 '…'로 끊긴다. 한 줄(360px 폰에서 글자 칸 238px)에 들어가는 문장을 따로 둔다. */
 type NewsItem = { key: string; from: string; href: string; head?: string; name: string; tail: string; tailShort?: string; aria?: string; icon: IconName; ga: string };
 
-/* 2026-09-23 · 테마 리포트 오픈 소식.
-   ⛔ 목적지가 안 연 화면이라 **themeNav 를 따른다** — 배포에서는 THEME_PUBLIC 을 켠 뒤에야 걸리고, 그 전에는 아래 텔레그램 소식이
-   그대로 선다. 로컬 개발 서버에서는 늘 이쪽이라 문구·아이콘을 눈으로 볼 수 있다. */
-const THEME_NEWS: NewsItem = {
-  key: "hz-news-theme",
-  // 여는 날 아침. 머지·배포가 이 시각 뒤라 바로 뜬다(그 전엔 플래그가 false 라 아예 안 걸린다).
-  from: "2026-09-23T00:00:00+09:00",
-  href: THEME_PAGE.href,
-  name: THEME_PAGE.label,
-  tail: "를 열었습니다. 국장·미장 테마마다 어디에 관심이 쏠리고 무슨 얘기가 도는지 봅니다.",
-  // 폰에서는 첫 문장만. 전체 문장은 360px 폰에서 세 줄이라 한 줄로 자르면 "국장·미장 테마마다…"에서 끊겼다(2026-09-24 지적).
-  tailShort: "를 열었습니다.",
-  // 사이드바 NAV 의 그 화면 아이콘(category)과 같은 것.
-  icon: THEME_PAGE.icon,
-  ga: "news-theme",
-};
-
-/* 2026-09-19 · 텔레그램 구독 권유(PR #534·#535).
-   ⭐ 이 소식은 **문장이 먼저 오고 밑줄 이름이 뒤에 선다**(head → name → tail). 앞 소식들은 화면 이름이 문장 첫머리였는데,
-   이번엔 내용(개장 전과 마감 뒤)이 주인공이고 텔레그램은 뒤로 뺐다 — 텔레그램 채널이라는 말을 앞세우면 리딩방 류로 읽혀
-   반감이 먼저 온다(2026-09-19 결정). 그래서 문장 어디에도 '텔레그램'이 없고, 어디로 가는지는 아이콘(사이드바 채널과 같은
-   send)과 링크의 aria-label 이 말한다 — 사이드바의 "오늘 뭐래?" 와 같은 방식이다.
-   ⚠️ 둘째 문장은 해요체다. 서비스 말투는 합쇼체지만 이 띠의 권유 한 줄만 예외로 정했다(2026-09-19). 다른 곳에 번지지 말 것. */
+/* 2026-10-01 · 텔레그램 구독 권유 4판. 테마 리포트 오픈 소식(9/23~)을 내리고 다시 건다.
+   ⭐ **문장이 먼저 오고 밑줄 이름이 뒤에 선다**(head → name → tail). 사람들이 가장 궁금해하는 '왜 올랐나'가 주인공이고
+   텔레그램은 뒤로 뺐다 — 텔레그램 채널이라는 말을 앞세우면 리딩방 류로 읽혀 반감이 먼저 온다(2026-09-19 결정, 3판부터).
+   그래서 문장 어디에도 '텔레그램'이 없고, 어디로 가는지는 아이콘(사이드바 채널과 같은 send)과 링크의 aria-label 이 말한다.
+   3판("매일 개장 전과 마감 뒤에 그날의 이야기와 이유를 정리합니다. 구독하고 받아 보세요!")은 git 이력에 있다.
+   ⚠️ 키를 새로 땄다(v4) — 3판을 닫았던 사람에게도 다시 뜬다. */
 const TELEGRAM_NEWS: NewsItem = {
-  key: "hz-news-telegram-v3",
+  key: "hz-news-telegram-v4",
   // 머지·배포 직후부터. 채널은 이미 열려 있으니 기다릴 글이 없다.
-  from: "2026-09-19T00:00:00+09:00",
+  from: "2026-10-01T00:00:00+09:00",
   href: TELEGRAM.href,
   // 밑줄 앞에 서는 문장. 끝의 공백이 이름과의 사이를 띄운다.
-  head: "매일 개장 전과 마감 뒤에 그날의 이야기와 이유를 정리합니다. ",
-  name: "구독하고 받아 보세요!",
+  head: "오늘 왜 올랐는지, 장이 끝나면 정리해서 보내 드립니다. ",
+  name: "받아 보기",
   tail: "",
   // 문장이 목적지를 말하지 않으므로 스크린리더에는 여기서 말한다(사이드바 TELEGRAM.aria 와 같은 꼴).
-  aria: "매일 개장 전과 마감 뒤에 그날의 이야기와 이유를 정리합니다. 구독하고 받아 보세요! 텔레그램 채널 열기(새 탭)",
+  aria: "오늘 왜 올랐는지, 장이 끝나면 정리해서 보내 드립니다. 받아 보기 — 텔레그램 채널 열기(새 탭)",
   // 사이드바·모바일 탭바의 채널 아이콘과 같은 것. 본문에서는 안 쓰는 아이콘이라 한 화면 두 번 규칙에 안 걸린다.
   icon: TELEGRAM.icon,
   ga: "news-telegram",
 };
 
-/** 지금 걸 소식 하나. 테마 리포트가 열려 있으면(로컬은 늘) 그 소식을, 아니면 텔레그램 구독 권유를 세운다. */
-function newsFor(themeNav: boolean): NewsItem {
-  return themeNav ? THEME_NEWS : TELEGRAM_NEWS;
-}
+/** 지금 걸 소식. 소식을 바꿀 땐 이 줄과 위 덩이만 갈아 끼운다. */
+const NEWS: NewsItem = TELEGRAM_NEWS;
 
 // 모듈이 읽힐 때 한 번만 본다(렌더 안에서 Date.now() 를 부르면 React 컴파일러 린트가 막는다).
 // 서버는 어차피 안 그리고(getServerSnapshot 이 false), 클라이언트는 페이지를 열 때마다 새로 읽는다.
@@ -1724,8 +1706,7 @@ function newsStoreFor(news: NewsItem) {
 
 function NewsStrip() {
   const pathname = useAppPathname();
-  const { themeNav } = useShellEnv();
-  const news = newsFor(themeNav);
+  const news = NEWS;
   const store = newsStoreFor(news);
   const show = useSyncExternalStore(store.subscribe, store.getSnapshot, () => false);
 
