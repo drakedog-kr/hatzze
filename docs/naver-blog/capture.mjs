@@ -4,7 +4,7 @@
  *     CHROME=<chrome-headless-shell 경로> node docs/naver-blog/capture.mjs
  *     BASE=http://localhost:3000 ... node docs/naver-blog/capture.mjs   # 다른 주소에서 찍기
  *
- * 결과는 intro/shots/ 에 쓰고, render.mjs 가 그걸 틀에 넣어 intro/04·05·06 을 만든다.
+ * 결과는 intro/shots/ 에 쓰고, render.mjs 가 그걸 틀에 넣어 intro/03·04·05 를 만든다.
  * 폰으로 직접 캡처한 그림을 같은 이름으로 intro/shots/ 에 두어도 된다(render.mjs 는 위쪽만 잘라 쓴다).
  *
  * ## 왜 폰 크기인가

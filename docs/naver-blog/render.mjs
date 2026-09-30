@@ -239,7 +239,7 @@ const widget = {
 };
 
 /* ─── 소개 글(intro/) ──────────────────────────────────────────────────
- * 블로그 첫 글 '햇쩨를 소개합니다'에 들어가는 세 장. 원고는 intro/draft.md.
+ * 블로그 첫 글 '햇쩨를 소개합니다'에 들어가는 그림. 번호가 곧 글에 나오는 차례다. 원고는 intro/draft.md.
  * 폭은 1080 — 폰에서 글 폭을 꽉 채우는 크기다. 그림 속 글자는 네이버가 못 읽으니 같은 내용을
  * 본문 글로도 적는다(원고가 그렇게 짜여 있다).
  */
@@ -333,9 +333,9 @@ function postCard(q, name, when, mine = false) {
   );
 }
 
-/** 3. 블로그에 올라오는 글(1080×1080). 말풍선 넷은 커버와 같은 넷이다(위 머리말). */
+/** 6. 블로그에 올라오는 글(1080×1080). 말풍선 넷은 커버와 같은 넷이다(위 머리말). */
 const introPosts = {
-  file: "intro/03-posts-1080.png",
+  file: "intro/06-posts-1080.png",
   w: 1080,
   h: 1080,
   scale: 1,
@@ -358,7 +358,7 @@ const introPosts = {
 };
 
 /**
- * 4·5·6. 실제 화면(1080×1350). capture.mjs 가 찍은 폰 화면(intro/shots/)을 카드에 넣는다.
+ * 3·4·5. 실제 화면(1080×1350). capture.mjs 가 찍은 폰 화면(intro/shots/)을 카드에 넣는다.
  * 폰 폭 390 을 560 으로 키워 넣고 위쪽만 보여 준 뒤 아래를 바탕색으로 흐려 '더 있다'를 말한다 —
  * 화면 아래의 'PC를 권해 드립니다' 알림도 이렇게 빠진다. 캡처가 없으면 이 그림만 건너뛴다.
  *
@@ -399,9 +399,9 @@ function introShot(file, shot, label, headline, url) {
   };
 }
 const introShots = [
-  introShot("intro/04-briefing-1080.png", "briefing.png", "시장 브리핑", "지금 시장이 몇 도인지 한눈에", "hatzze.fun"),
-  introShot("intro/05-kadera-1080.png", "kadera.png", "카더라 리포트", "주식 텔레그램의 분위기,<br>낙관일까 비관일까", "hatzze.fun/kadera"),
-  introShot("intro/06-theme-1080.png", "theme.png", "테마 리포트", "요즘 어느 테마에<br>관심이 쏠리는지", "hatzze.fun/theme"),
+  introShot("intro/03-briefing-1080.png", "briefing.png", "시장 브리핑", "지금 시장이 몇 도인지 한눈에", "hatzze.fun"),
+  introShot("intro/04-kadera-1080.png", "kadera.png", "카더라 리포트", "주식 텔레그램의 분위기,<br>낙관일까 비관일까", "hatzze.fun/kadera"),
+  introShot("intro/05-theme-1080.png", "theme.png", "테마 리포트", "요즘 어느 테마에<br>관심이 쏠리는지", "hatzze.fun/theme"),
 ];
 
 /**

@@ -37,8 +37,8 @@
 | `intro/draft.md` | 원고. 스마트에디터에 붙여 넣고 `[소제목]` 줄을 소제목 서식으로 바꾼다 |
 | `intro/01-cover-1080.png` | 사진 1 · 대표 이미지(검색 썸네일이 정사각으로 잘려서 정사각) |
 | `intro/02-screens-1080.png` | 사진 2 · 사이트 화면 여덟 개. 묶음은 사이드바와 같다 |
-| `intro/03-posts-1080.png` | 사진 3 · 이 블로그에 올라오는 글 넷 |
-| `intro/04·05·06-*.png` | 사진 4·5·6 · 실제 화면(시장 브리핑 · 카더라 · 테마). `capture.mjs` 로 찍은 `intro/shots/` 를 `render.mjs` 가 틀에 넣는다 |
+| `intro/03·04·05-*.png` | 사진 3·4·5 · 실제 화면(시장 브리핑 · 카더라 · 테마). `capture.mjs` 로 찍은 `intro/shots/` 를 `render.mjs` 가 틀에 넣는다 |
+| `intro/06-posts-1080.png` | 사진 6 · 이 블로그에 올라오는 글 넷 |
 
 실제 화면은 폰 폭(390)을 세 배로 찍는다. 폰으로 직접 캡처한 그림을 같은 이름(`briefing.png` · `kadera.png` · `theme.png`)으로 `intro/shots/` 에 두어도 된다.
 
