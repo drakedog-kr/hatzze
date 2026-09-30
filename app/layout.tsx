@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
 import AppShell from "./AppShell";
-import { THEME_PUBLIC } from "./screen-flags";
+import { DAILY_PUBLIC, THEME_PUBLIC } from "./screen-flags";
+import { NOTE_PAGE } from "./daily/copy";
 import { SLOGAN } from "./brand";
 import { SITE_NAME, SITE_URL, pageMetadata } from "./seo";
 import { ICON_FONT_HREF } from "@/lib/icon-names";
@@ -96,8 +97,10 @@ export const revalidate = 3600;
  * 값은 globals.css 의 --c-bg 와 **같아야 한다**(메타 태그에는 var() 를 못 쓴다).
  * 팔레트를 갈면서 여기가 옛 값(#0e131c / #d4daea)으로 남아 주소창만 이전 팔레트를
  * 띠고 있었다 — --c-bg 를 바꿀 땐 이 줄을 같이 볼 것.
+ * ⚠️ 라이트가 또 한 번 뒤처져 있었다(#e8f0fa · --c-bg 는 #f7fafd). 토글을 누르면 ThemeToggle 이 --c-bg 를 읽어
+ *    다시 맞추므로 **첫 화면과 토글 뒤의 주소창 색이 달랐다**(2026-09-30). 이제 tests/og-colors.test.ts 가 맞춰 본다.
  */
-const THEME_COLOR = { light: "#e8f0fa", dark: "#101013" } as const;
+const THEME_COLOR = { light: "#f7fafd", dark: "#101013" } as const;
 
 /** 한국 시각의 연도("2026"). 푸터 저작권 줄에 넘긴다 — 아래 AppShell 자리 주석. */
 const KST_YEAR = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric" });
@@ -145,6 +148,12 @@ export default function RootLayout({
             토글을 누를 때는 AppShell 의 ThemeToggle 이 --c-bg 를 읽어 다시 맞춘다. */}
         <meta name="theme-color" content={THEME_COLOR.light} />
         <script dangerouslySetInnerHTML={{ __html: PREF_SCRIPT }} />
+        {/* 데일리 노트 RSS(app/daily/rss.xml). 구독기·검색엔진이 머리의 이 줄로 피드를 찾는다. 안 연 동안은 싣지 않는다.
+            ⚠️ metadata 의 alternates.types 로 두지 않는 까닭 — 페이지마다 pageMetadata 가 alternates(canonical)를
+            통째로 새로 선언해, 루트에 둔 types 가 모든 하위 화면에서 사라진다(Next 의 얕은 병합). */}
+        {DAILY_PUBLIC ? (
+          <link rel="alternate" type="application/rss+xml" title={`${SITE_NAME} ${NOTE_PAGE.label}`} href={`${NOTE_PAGE.href}/rss.xml`} />
+        ) : null}
         {/* 본문·숫자는 전부 Pretendard 쪼갠 판(자체 호스팅, lib/fonts.ts)이다. 화면에 나온 글자가 든 조각만 받는다.
             예전엔 전체판 2MB 를 next/font 로 모든 화면이 미리 받았고, 주소에 배포마다 바뀌는 ?dpl= 가 붙어
             재방문자도 배포마다 다시 받았다(2026-09-26). 미리 받는 건 모든 화면이 쓰는 12조각뿐이다.
