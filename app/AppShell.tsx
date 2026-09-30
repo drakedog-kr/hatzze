@@ -1531,7 +1531,8 @@ function TopBar({
       {/* 오른쪽 묶음: 테마 토글 + 햄버거(모바일 전용). 햄버거가 화면 맨 오른쪽 끝이다.
           데스크톱에서는 햄버거가 display:none 이라 flex 에서 아예 빠지고, 남는 건
           예전과 같은 토글 하나다 — 순서를 바꿔도 데스크톱은 그대로다. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+      {/* 사이 간격은 .hz-topbar-tools(mobile.css) 가 정한다 — 인라인이면 좁은 폰 규칙(≤360)이 못 이긴다. */}
+      <div className="hz-topbar-tools">
         <button
           type="button"
           className="hz-menu-btn"
