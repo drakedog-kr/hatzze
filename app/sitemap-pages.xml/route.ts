@@ -42,13 +42,12 @@ function xmlEscape(s: string) {
 }
 
 export async function GET() {
-  // `/sitemap.xml` 과 같은 값이다 — 요청 시각. 까닭은 app/sitemap.ts 머리말 참고.
-  const lastmod = new Date().toISOString();
+  // `/sitemap.xml` 과 같은 값이다 — 아는 곳에만 수정일을 적는다. 까닭은 app/sitemap.ts 머리말 참고.
   const urls = SITEMAP_ENTRIES.map(
     (e) =>
       `  <url>\n` +
       `    <loc>${xmlEscape(absolute(e.path))}</loc>\n` +
-      `    <lastmod>${lastmod}</lastmod>\n` +
+      (e.lastmod ? `    <lastmod>${e.lastmod}</lastmod>\n` : "") +
       `    <changefreq>${e.changeFrequency}</changefreq>\n` +
       `    <priority>${e.priority}</priority>\n` +
       `  </url>`,

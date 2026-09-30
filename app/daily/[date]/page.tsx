@@ -4,8 +4,9 @@ import { notFound } from "next/navigation";
 
 import { EMPTY_STOCKS, getNote, getNoteStocks, isNoteDate, listNotes, noteHref, noteNeighbors } from "@/lib/daily-note";
 import { noteDescription } from "@/lib/daily-note-md";
+import { jsonLdHtml } from "@/lib/json-ld";
 
-import { SITE_NAME, SITE_URL } from "../../brand";
+import { SITE_URL } from "../../brand";
 import { NOTE_CARD } from "../../og-copy";
 import { pageMetadata } from "../../seo";
 import { DAILY_PUBLIC } from "../../screen-flags";
@@ -21,11 +22,12 @@ import { NoteView } from "../NoteView";
  * 공유가 되고, 검색엔진이 하루 한 편을 각각 색인한다 — 매일 새 글이 쌓이는 화면은 이
  * 사이트에서 이것이 처음이다.
  *
- * ## 제목은 셸이, 구조화 데이터는 여기서
+ * ## 제목도 구조화 데이터도 여기서
  *
- * 본문 헤더의 h1("데일리 노트")은 셸(AppShell)이 그린다. 셸은 클라이언트 컴포넌트라 글
- * 제목을 모르므로 `<title>` 과 Article 구조화 데이터는 이 파일이 낸다. 셸의 PageJsonLd 는
- * 이 주소에 안 나온다(NAV·DEEP_PAGES 어디에도 정확히 없는 경로라 `named` 가 false 다).
+ * 셸(AppShell)은 클라이언트 컴포넌트라 글 제목을 모른다. 예전엔 셸이 h1 을 '데일리 노트'로 그려 날짜마다
+ * h1 이 같았다. 지금은 셸이 이 주소의 제목 칸을 비우고(SELF_TITLED_PREFIXES) 글 제목이 h1 이다(NoteView `dated`).
+ * `<title>` 과 Article 구조화 데이터도 이 파일이 낸다. 셸의 PageJsonLd 는 이 주소에 안 나온다(NAV·DEEP_PAGES
+ * 어디에도 정확히 없는 경로라 `named` 가 false 다).
  */
 
 const PUBLIC = DAILY_PUBLIC;
@@ -55,6 +57,8 @@ export async function generateMetadata({ params }: { params: Promise<{ date: str
     // 날짜별 글은 자기 카드가 없어 목록(/daily)의 카드를 쓴다(app/seo.ts 의 imagePath).
     ownImage: NOTE_CARD.alt,
     imagePath: "/daily",
+    // 화면이 아니라 **글**이다 — og:type article 과 발행·수정 시각(아래 Article 구조화 데이터와 같은 값).
+    article: { publishedTime: r.note.createdAt, modifiedTime: r.note.updatedAt },
   });
   return PUBLIC ? meta : { ...meta, robots: { index: false, follow: false } };
 }
@@ -62,8 +66,27 @@ export async function generateMetadata({ params }: { params: Promise<{ date: str
 /**
  * Article 구조화 데이터. **연 뒤에만** 낸다 — 안 연 화면은 noindex 라 색인 대상이 아닌데
  * 구조화 데이터만 내면 서로 어긋난 신호가 된다(셸의 PageJsonLd 와 같은 규칙).
+ *
+ * - 시각은 **시간대가 붙은 ISO** 다. 예전엔 `2026-09-05` 처럼 날짜만 적어 몇 시(어느 나라 기준)인지가 없었다.
+ *   발행은 처음 올린 시각, 수정은 마지막으로 올린 시각이다(표의 created_at · updated_at).
+ * - image 는 공유 카드와 같은 그림이다(메타데이터의 og:image — 목록 /daily 의 카드).
+ * - isPartOf 는 `@id` 로 가리키기만 한다. 예전엔 여기서 CollectionPage 를 이름('데일리 노트 | hatzze')과 함께 다시
+ *   선언했는데, 셸이 /daily 에 내는 선언('데일리 노트')과 이름이 달랐다 — 같은 것을 두 번 선언하지 않는다(JsonLd 머리말).
+ * - 넣을 때 jsonLdHtml 을 쓴다. 제목·요약이 DB 에서 와서 `</script>` 가 섞이면 태그가 끊긴다(lib/json-ld.ts).
  */
-function ArticleJsonLd({ title, date, updatedAt, description }: { title: string; date: string; updatedAt: string; description: string }) {
+function ArticleJsonLd({
+  title,
+  date,
+  createdAt,
+  updatedAt,
+  description,
+}: {
+  title: string;
+  date: string;
+  createdAt: string;
+  updatedAt: string;
+  description: string;
+}) {
   const url = `${SITE_URL}${noteHref(date)}`;
   const data = {
     "@context": "https://schema.org",
@@ -73,14 +96,15 @@ function ArticleJsonLd({ title, date, updatedAt, description }: { title: string;
     description,
     url,
     mainEntityOfPage: url,
+    image: `${SITE_URL}${NOTE_PAGE.href}/opengraph-image`,
     inLanguage: "ko-KR",
-    datePublished: date,
+    datePublished: createdAt,
     dateModified: updatedAt,
     author: { "@id": `${SITE_URL}/#organization` },
     publisher: { "@id": `${SITE_URL}/#organization` },
-    isPartOf: { "@type": "CollectionPage", "@id": `${SITE_URL}${NOTE_PAGE.href}#webpage`, name: `${NOTE_PAGE.label} | ${SITE_NAME}` },
+    isPartOf: { "@id": `${SITE_URL}${NOTE_PAGE.href}#webpage` },
   };
-  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }} />;
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(data) }} />;
 }
 
 export default async function DailyDatePage({ params }: { params: Promise<{ date: string }> }) {
@@ -107,9 +131,15 @@ export default async function DailyDatePage({ params }: { params: Promise<{ date
   return (
     <>
       {PUBLIC && r.note && (
-        <ArticleJsonLd title={r.note.title} date={r.note.date} updatedAt={r.note.updatedAt} description={noteDescription(r.note.bodyMd)} />
+        <ArticleJsonLd
+          title={r.note.title}
+          date={r.note.date}
+          createdAt={r.note.createdAt}
+          updatedAt={r.note.updatedAt}
+          description={noteDescription(r.note.bodyMd)}
+        />
       )}
-      <NoteView note={r.note} failed={r.failed} neighbors={neighbors} archive={archive.notes} stocks={stocks} />
+      <NoteView note={r.note} failed={r.failed} neighbors={neighbors} archive={archive.notes} stocks={stocks} dated />
     </>
   );
 }

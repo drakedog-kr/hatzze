@@ -1353,8 +1353,9 @@ function encodedPath(pathname: string): string {
  * 국장 종목(`/stock/005930`)은 NAV 에 부모가 없어 저절로 제목 칸이 비지만, 미장 종목·투자자는
  * `/insider` 아래라 부모를 집어 와 h1 이 '내부자 리포트'가 됐다(2026-09-27 점검 · `<title>` 은
  * '엔비디아(NVDA) 내부자 공시'). 여기 적힌 주소는 제목 칸을 비우고, 화면이 히어로에 자기 h1 을 둔다.
+ * 날짜별 데일리 노트(`/daily/2026-09-05`)도 같다 — 날짜마다 h1 이 '데일리 노트'로 같았다. 글 제목이 h1 이다(NoteView).
  */
-const SELF_TITLED_PREFIXES = ["/insider/stock/", "/insider/investor/"];
+const SELF_TITLED_PREFIXES = ["/insider/stock/", "/insider/investor/", `${NOTE_PAGE.href}/`];
 
 function PageHeader() {
   const pathname = useAppPathname();
@@ -1402,9 +1403,16 @@ function PageHeader() {
    * 화면 맨 위 뒤로 가기 줄(국장 테마 판세 › 로봇)과 같게. 구역 이름을 쓰면 미장 테마가 국장 목록(/theme)을 부모로 댔다.
    */
   const under = page?.children?.find((c) => c.href && c.href !== pathname && childActive(page.children!, c, pathname));
+  /**
+   * 구역의 대문이 곧 첫 서브인 구역(카더라 리포트 → 국장 카더라 `/kadera`)에서 **다른 서브**(미장 카더라 `/kadera/us`)는
+   * 대문 아래가 아니라 **옆**이다. 부모로 구역 이름을 대면 화면 어디에도 없는 이름이 이동 경로에 선다 — 사이드바가
+   * 평평해져(2026-09-25) '카더라 리포트'·'테마 리포트'는 이제 안 보이고, 그 링크(/kadera)를 열면 '국장 카더라'다.
+   * 첫 서브 이름을 대면 미장이 국장 아래라는 거짓 계층이 된다. 그래서 이동 경로를 `홈 › 미장 카더라` 로 둔다(2026-09-30 점검).
+   */
+  const besideGate = Boolean(child && child.href === pathname && page?.children?.some((c) => c.href === page.href));
   const parent = under?.href
     ? { name: under.label, path: under.href }
-    : page && page.href !== pathname
+    : page && page.href !== pathname && !besideGate
       ? { name: page.label, path: page.href }
       : null;
   /**
