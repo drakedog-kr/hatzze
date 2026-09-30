@@ -249,9 +249,6 @@ export default async function DividendPage() {
       popularUs={popularUs}
       popularEtf={popularEtf}
       more={more}
-      computedFor={data?.computedFor ?? null}
-      priceDate={data?.priceDate ?? null}
-      usPriceDate={data?.usPriceDate ?? null}
       usdkrw={data?.usdkrw ?? null}
       failedSources={data?.failedSources ?? []}
     />

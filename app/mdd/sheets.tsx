@@ -33,7 +33,7 @@ export function Attribution({
       self: false,
       color: DOWN_BAR[2],
       // "○○ 업종"이 어떤 종목인지 툴팁으로 밝힌다 — 이 종목은 뺀 나머지 대표 종목 평균이다.
-      help: themePeers.length ? `${themePeers.join(" · ")}. 이 테마 대표 종목의 평균입니다 (이 종목 제외).` : undefined,
+      help: themePeers.length ? `${themePeers.join(" · ")}의 평균입니다(이 종목 제외).` : undefined,
     });
   rows.push({ label: stockName, v: attr.stock, self: true, color: DOWN_BAR[0] });
   const worst = Math.max(...rows.map((r) => Math.abs(r.v)), 1);

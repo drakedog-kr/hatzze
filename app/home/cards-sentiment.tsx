@@ -142,7 +142,7 @@ export function CardDivergence({ v }: { v: Pick }) {
       heat: 100 - real,
       tip:
         ccsi != null
-          ? `한국은행 소비자심리지수(CCSI) 최신값은 ${ccsi}입니다. 이게 역대(2008~) 분포에서 몇 번째로 높은지를 0~100으로 매긴 값이 실물 강도입니다.`
+          ? `한국은행 소비자심리지수(CCSI) 최신값은 ${ccsi}입니다.`
           : undefined,
     },
     {
@@ -152,7 +152,7 @@ export function CardDivergence({ v }: { v: Pick }) {
       heat: market,
       tip:
         gap != null
-          ? `코스피는 최근 종가 기준 전고점보다 ${Math.abs(gap)}% 아래입니다. 이 낙폭이 역대(10년) 분포에서 얼마나 얕은지를 0~100으로 매긴 값이 증시 강세입니다.`
+          ? `코스피는 최근 종가 기준 전고점보다 ${Math.abs(gap)}% 아래입니다.`
           : undefined,
     },
   ];
