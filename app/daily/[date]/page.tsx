@@ -25,7 +25,8 @@ import { NoteView } from "../NoteView";
  * ## 제목도 구조화 데이터도 여기서
  *
  * 셸(AppShell)은 클라이언트 컴포넌트라 글 제목을 모른다. 예전엔 셸이 h1 을 '데일리 노트'로 그려 날짜마다
- * h1 이 같았다. 지금은 셸이 이 주소의 제목 칸을 비우고(SELF_TITLED_PREFIXES) 글 제목이 h1 이다(NoteView `dated`).
+ * h1 이 같았다. 지금은 셸이 '데일리 노트'를 모양 그대로 h1 이 아닌 글자로 그리고(LABEL_TITLED_PREFIXES) 글 제목이
+ * h1 이다(NoteView `dated`).
  * `<title>` 과 Article 구조화 데이터도 이 파일이 낸다. 셸의 PageJsonLd 는 이 주소에 안 나온다(NAV·DEEP_PAGES
  * 어디에도 정확히 없는 경로라 `named` 가 false 다).
  */

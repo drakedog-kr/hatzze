@@ -1353,13 +1353,21 @@ function encodedPath(pathname: string): string {
  * 국장 종목(`/stock/005930`)은 NAV 에 부모가 없어 저절로 제목 칸이 비지만, 미장 종목·투자자는
  * `/insider` 아래라 부모를 집어 와 h1 이 '내부자 리포트'가 됐다(2026-09-27 점검 · `<title>` 은
  * '엔비디아(NVDA) 내부자 공시'). 여기 적힌 주소는 제목 칸을 비우고, 화면이 히어로에 자기 h1 을 둔다.
- * 날짜별 데일리 노트(`/daily/2026-09-05`)도 같다 — 날짜마다 h1 이 '데일리 노트'로 같았다. 글 제목이 h1 이다(NoteView).
  */
-const SELF_TITLED_PREFIXES = ["/insider/stock/", "/insider/investor/", `${NOTE_PAGE.href}/`];
+const SELF_TITLED_PREFIXES = ["/insider/stock/", "/insider/investor/"];
+
+/**
+ * 제목 칸을 **그대로 보이되 h1 은 아닌** 주소. 날짜별 데일리 노트(`/daily/2026-09-05`)는 맨 위에 '데일리 노트'가
+ * 예전 모양 그대로 서지만, 그 글자는 h1 이 아니다 — 날짜마다 h1 이 '데일리 노트'로 같아 글마다 고유한 제목 신호가
+ * 없었다(2026-09-30 점검). 글 제목이 h1 이다(NoteView `dated`). 모양은 태그와 상관없다 — 크기는 .hz-page-title,
+ * 굵기·여백은 인라인 값이 정한다. 화면 머리를 이동 줄로 바꾸는 안은 모양이 달라져 뺐다.
+ */
+const LABEL_TITLED_PREFIXES = [`${NOTE_PAGE.href}/`];
 
 function PageHeader() {
   const pathname = useAppPathname();
   const selfTitled = SELF_TITLED_PREFIXES.some((p) => pathname.startsWith(p));
+  const TitleTag = LABEL_TITLED_PREFIXES.some((p) => pathname.startsWith(p)) ? "p" : "h1";
   const page = navFor(useShellEnv()).find((n) => isActive(n.href, pathname));
   // 서브 페이지에서는 서브의 이름을 h1 으로 쓴다. 부모(구역)의 이름을 그대로 두면
   // /kadera 와 /kadera/us 두 페이지가 **같은 h1** 을 갖는다.
@@ -1454,9 +1462,9 @@ function PageHeader() {
             {/* 크기는 .hz-page-title(globals.css)이 든다 — 폰에서 줄여야 하는데 인라인은
                 미디어쿼리를 이긴다. 2026-09-04 리디자인: 23 → 30. 구간 제목(21)·시트 머리(17)
                 보다 커야 "이 화면의 이름"으로 읽힌다(23 이던 땐 구간 제목 24 보다 작았다). */}
-            <h1 className="hz-page-title" style={{ margin: 0, fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>
+            <TitleTag className="hz-page-title" style={{ margin: 0, fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>
               {title}
-            </h1>
+            </TitleTag>
             {badge && (
               <span
                 style={{

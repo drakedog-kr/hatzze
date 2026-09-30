@@ -13,10 +13,7 @@ import {
 import { noteHeadings, parseNoteMarkdown, type NoteBlock, type NoteInline } from "@/lib/daily-note-md";
 import { stockHref } from "@/lib/stock-page";
 
-import { BackTrail } from "@/components/back-trail";
-
 import { Icon, MONO } from "../ui";
-import { NOTE_PAGE } from "./copy";
 import { ShareButton } from "./ShareButton";
 import { NoteArchiveList } from "./NoteArchiveList";
 
@@ -103,8 +100,9 @@ function Block({ block }: { block: NoteBlock }) {
 }
 
 /**
- * ⭐ 날짜 주소(`/daily/2026-09-05`)에서는 글 제목이 **h1** 이다. 셸이 그 주소의 제목 칸을 비운다(AppShell
- * SELF_TITLED_PREFIXES). 예전엔 날짜마다 h1 이 똑같이 '데일리 노트'라 글마다 고유한 제목 신호가 없었다(2026-09-30 점검).
+ * ⭐ 날짜 주소(`/daily/2026-09-05`)에서는 글 제목이 **h1** 이다. 셸은 그 주소의 '데일리 노트'를 모양 그대로 두되 h1 이
+ * 아닌 글자로 그린다(AppShell LABEL_TITLED_PREFIXES). 예전엔 날짜마다 h1 이 똑같이 '데일리 노트'라 글마다 고유한 제목
+ * 신호가 없었다(2026-09-30 점검). 크기는 .hz-note-title 이 정해 h1 이어도 h2 와 같아 보인다.
  * `/daily`(가장 최근 글)는 셸의 '데일리 노트'가 h1 이고 글 제목은 h2 그대로다 — 그 화면의 canonical 이 날짜 주소다.
  */
 function NoteArticle({ note, blocks, dated }: { note: DailyNote; blocks: NoteBlock[]; dated: boolean }) {
@@ -291,18 +289,12 @@ export function NoteView({
   neighbors: NoteNeighbors;
   archive: NoteStub[];
   stocks: NoteStocks;
-  /** 날짜 주소에서 그리는가. 그러면 글 제목이 h1 이고 맨 위에 '데일리 노트 › 날짜' 줄을 둔다(NoteArticle 주석). */
+  /** 날짜 주소에서 그리는가. 그러면 글 제목이 h1 이다(NoteArticle 주석). */
   dated?: boolean;
 }) {
   const blocks = note ? parseNoteMarkdown(note.bodyMd) : [];
   return (
     <div className="hz-tx hz-note-page">
-      {/* 셸이 제목 칸을 비운 자리라 어느 목록의 글인지를 여기서 말한다. 그리드 두 칸을 가로지르게 둔다. */}
-      {dated && note && (
-        <div className="hz-note-trail">
-          <BackTrail parent={{ name: NOTE_PAGE.label, href: NOTE_PAGE.href }} current={fmtNoteDateShort(note.date)} />
-        </div>
-      )}
       <div className="hz-note-main">
         {note ? (
           <>
