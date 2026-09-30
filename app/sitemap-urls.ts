@@ -62,7 +62,7 @@ export const SITEMAP_ENTRIES: SitemapEntry[] = [
     : []),
   // 카드 여덟 장의 '전체보기'. 화면 안에서만 링크가 걸려 있어 크롤러가 닿기 어렵다 —
   // 목록이 매일 바뀌는 실제 콘텐츠라 사이트맵에 직접 올린다.
-  // (종목·투자자 상세는 수가 많고 DB 를 읽어야 해서 아직 없다. 종목별 실주소 작업에서 다룬다.)
+  // (종목·투자자 상세는 DB 를 읽어야 해서 app/sitemap-insider.xml 이 따로 펼친다.)
   ...INSIDER_LIST_SLUGS.map((slug) => ({
     path: `/insider/list/${slug}`,
     changeFrequency: "daily" as const,

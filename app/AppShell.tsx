@@ -1433,8 +1433,8 @@ function PageHeader() {
    * 말한다. 구조화 데이터는 그 화면을 정확히 설명해야 하므로, 이름을 모르면 **안 내는
    * 편이 맞다**(루트의 WebSite·Organization 은 그대로 남는다).
    *
-   * 종목·투자자 상세는 아직 사이트맵에도 없다. 종목별 실주소 작업에서 자기 제목을
-   * 갖게 되면 그때 여기 조건을 풀면 된다.
+   * 종목·투자자 상세는 이름을 아는 화면 파일이 자기 구조화 데이터를 직접 낸다(국장 종목과 같다 ·
+   * app/insider/stock/[ticker]/detail.tsx · app/insider/investor/[cik]/page.tsx). 여기 조건은 그대로 둔다.
    */
   const named = Boolean(deep) || child?.href === pathname || page?.href === pathname;
   return (
@@ -1547,7 +1547,8 @@ function TopBar({
       {/* 오른쪽 묶음: 테마 토글 + 햄버거(모바일 전용). 햄버거가 화면 맨 오른쪽 끝이다.
           데스크톱에서는 햄버거가 display:none 이라 flex 에서 아예 빠지고, 남는 건
           예전과 같은 토글 하나다 — 순서를 바꿔도 데스크톱은 그대로다. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+      {/* 사이 간격은 .hz-topbar-tools(mobile.css) 가 정한다 — 인라인이면 좁은 폰 규칙(≤360)이 못 이긴다. */}
+      <div className="hz-topbar-tools">
         <button
           type="button"
           className="hz-menu-btn"

@@ -106,7 +106,7 @@ export function DividendCard({ s }: { s: DividendStock }) {
             data-ga-cta="to_dividend_calc"
             data-ga-surface="stock_page"
           >
-            {/* 화살표 아이콘은 아래 'MDD 정밀분석에서 보기'가 이미 쓴다 — 한 화면에 같은 아이콘 둘 금지. */}
+            {/* 화살표 아이콘을 달지 않는다 — 아래 '다음에 볼 곳' 칸마다 꺾쇠가 있어 한 화면에 이동 표시가 겹친다. */}
             {DIVIDEND_PAGE.label}에서 주수 넣어 계산하기
           </Link>
         </div>

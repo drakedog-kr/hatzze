@@ -63,7 +63,9 @@ function specOf(kind: string) {
 export async function generateMetadata({ params }: { params: Promise<{ kind: string }> }): Promise<Metadata> {
   const { kind } = await params;
   const spec = specOf(kind);
-  if (!spec) return pageMetadata({ title: "내부자 리포트 | hatzze", description: "", path: "/insider", ownImage: INSIDER_CARD.alt });
+  // ⛔ 없는 목록에 canonical(`/insider`)을 주지 않는다 — 종목·투자자 상세와 같은 규칙(app/stock/[code]/page.tsx).
+  //    그냥 빼면 루트의 canonical `/` 를 물려받아 null 로 지운다(app/insider/stock/[ticker]/detail.tsx STOCK_NOT_FOUND_META).
+  if (!spec) return { title: "목록을 찾을 수 없습니다 | hatzze", robots: { index: false, follow: false }, alternates: { canonical: null } };
   return pageMetadata({
     title: `${spec.title} | 내부자 리포트 | hatzze`,
     description: spec.sub,
