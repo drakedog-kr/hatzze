@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
 import AppShell from "./AppShell";
-import { THEME_PUBLIC } from "./screen-flags";
+import { DAILY_PUBLIC, THEME_PUBLIC } from "./screen-flags";
+import { NOTE_PAGE } from "./daily/copy";
 import { SLOGAN } from "./brand";
 import { SITE_NAME, SITE_URL, pageMetadata } from "./seo";
 import { ICON_FONT_HREF } from "@/lib/icon-names";
 import { PRETENDARD_CSS, PRETENDARD_PRELOAD } from "@/lib/fonts";
+import { jsonLdHtml } from "@/lib/json-ld";
 
 
 // 서치콘솔·서치어드바이저 소유확인 토큰. 값이 없으면 메타 태그 자체를 만들지 않는다
@@ -79,8 +81,9 @@ export async function generateMetadata(): Promise<Metadata> {
  *    페이지 1800(종목 카드 시세 · 10분 야후 캐시), 미리보기 600(밤사이 시세). 여러 값이
  *    겹치면 **가장 짧은 것**이 그 라우트의 주기다(Next 문서).
  * ⚠️ 정적으로 읽히는 리터럴이어야 한다(`60 * 60` 은 안 된다 — Next 문서).
- * ⚠️ 요청마다 그려야 하는 화면은 자기 파일에서 force-dynamic 을 건다(/mdd ·
- *    /insider/stock/[ticker] — searchParams 를 읽어 어차피 동적이다).
+ * ⚠️ 요청마다 그려야 하는 화면은 자기 파일에서 force-dynamic 을 건다(/mdd — searchParams 를
+ *    읽어 어차피 동적이다). 미장 종목 상세도 그랬다가 기간을 경로로 옮기고 사본이 됐다(2026-09-30 ·
+ *    lib/insider-range.ts).
  * ⚠️ 실패한 조회가 든 렌더는 사본에 담기면 안 된다. 페이지가 자료를 다 받은 뒤
  *    assertLoaded 로 던진다(lib/load-state.ts). 던지면 마지막 성공본이 남는다.
  * ⚠️ 라우트 안의 fetch 중 **가장 짧은 revalidate 도 그 라우트의 주기가 된다**(Next 문서).
@@ -96,8 +99,10 @@ export const revalidate = 3600;
  * 값은 globals.css 의 --c-bg 와 **같아야 한다**(메타 태그에는 var() 를 못 쓴다).
  * 팔레트를 갈면서 여기가 옛 값(#0e131c / #d4daea)으로 남아 주소창만 이전 팔레트를
  * 띠고 있었다 — --c-bg 를 바꿀 땐 이 줄을 같이 볼 것.
+ * ⚠️ 라이트가 또 한 번 뒤처져 있었다(#e8f0fa · --c-bg 는 #f7fafd). 토글을 누르면 ThemeToggle 이 --c-bg 를 읽어
+ *    다시 맞추므로 **첫 화면과 토글 뒤의 주소창 색이 달랐다**(2026-09-30). 이제 tests/og-colors.test.ts 가 맞춰 본다.
  */
-const THEME_COLOR = { light: "#e8f0fa", dark: "#101013" } as const;
+const THEME_COLOR = { light: "#f7fafd", dark: "#101013" } as const;
 
 /** 한국 시각의 연도("2026"). 푸터 저작권 줄에 넘긴다 — 아래 AppShell 자리 주석. */
 const KST_YEAR = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric" });
@@ -145,6 +150,12 @@ export default function RootLayout({
             토글을 누를 때는 AppShell 의 ThemeToggle 이 --c-bg 를 읽어 다시 맞춘다. */}
         <meta name="theme-color" content={THEME_COLOR.light} />
         <script dangerouslySetInnerHTML={{ __html: PREF_SCRIPT }} />
+        {/* 데일리 노트 RSS(app/daily/rss.xml). 구독기·검색엔진이 머리의 이 줄로 피드를 찾는다. 안 연 동안은 싣지 않는다.
+            ⚠️ metadata 의 alternates.types 로 두지 않는 까닭 — 페이지마다 pageMetadata 가 alternates(canonical)를
+            통째로 새로 선언해, 루트에 둔 types 가 모든 하위 화면에서 사라진다(Next 의 얕은 병합). */}
+        {DAILY_PUBLIC ? (
+          <link rel="alternate" type="application/rss+xml" title={`${SITE_NAME} ${NOTE_PAGE.label}`} href={`${NOTE_PAGE.href}/rss.xml`} />
+        ) : null}
         {/* 본문·숫자는 전부 Pretendard 쪼갠 판(자체 호스팅, lib/fonts.ts)이다. 화면에 나온 글자가 든 조각만 받는다.
             예전엔 전체판 2MB 를 next/font 로 모든 화면이 미리 받았고, 주소에 배포마다 바뀌는 ?dpl= 가 붙어
             재방문자도 배포마다 다시 받았다(2026-09-26). 미리 받는 건 모든 화면이 쓰는 12조각뿐이다.
@@ -182,11 +193,12 @@ export default function RootLayout({
             }}
           />
         ) : null}
-        {/* 구조화 데이터(JSON-LD) — 검색엔진에 사이트/조직 정보를 명시적으로 제공. */}
+        {/* 구조화 데이터(JSON-LD) — 검색엔진에 사이트/조직 정보를 명시적으로 제공.
+            지금 값은 상수뿐이지만 PageJsonLd·노트 Article 과 같은 자리(lib/json-ld.ts)로 넣는다. */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
+            __html: jsonLdHtml({
               "@context": "https://schema.org",
               "@graph": [
                 {

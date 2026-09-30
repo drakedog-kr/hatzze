@@ -1,8 +1,8 @@
 import { SITE_URL } from "./brand";
-import { NOTE_PAGE } from "./daily/copy";
 import { DIVIDEND_PAGE } from "./dividend/copy";
 import { INSIDER_LIST_SLUGS } from "./insider/lists";
-import { DAILY_PUBLIC, DIVIDEND_PUBLIC, THEME_PUBLIC } from "./screen-flags";
+import { RELEASES } from "./releases";
+import { DIVIDEND_PUBLIC, THEME_PUBLIC } from "./screen-flags";
 import { THEME_PAGE, US_THEME_PAGE } from "./theme/copy";
 // ⚠️ 상대 경로다 — scripts/check-routes.mjs 가 이 파일을 맨 node 로 읽어서 `@/` 별칭을 못 푼다.
 import { THEME_NAMES, US_THEME_NAMES, themeHref, usThemeHref } from "../lib/theme-href";
@@ -23,6 +23,16 @@ export type SitemapEntry = {
   path: string;
   changeFrequency: "daily" | "monthly" | "yearly";
   priority: number;
+  /**
+   * 마지막으로 바뀐 날(YYYY-MM-DD). **아는 곳에만** 적는다.
+   *
+   * 예전엔 모든 줄이 '지금'이었다. 그런데 `/sitemap.xml` 은 요청 시각 API 를 안 쓰는 규약 파일이라 **빌드 때
+   * 굳는다**(Next 문서 sitemap.md) — 배포할 때마다 약관까지 "방금 바뀜"이었고, 요청마다 그리는 `/sitemap-pages.xml`
+   * 과도 값이 달랐다. 틀린 수정일이 쌓이면 검색엔진은 그 사이트맵의 lastmod 를 통째로 안 믿는다. 매일 바뀌는
+   * 화면의 진짜 날짜는 DB 에 있어 이 목록(DB 를 안 읽는다)이 모르므로 비운다. IndexNow 도 이 값으로 고른다
+   * (scripts/indexnow-urls.mjs — 비어 있으면 changefreq 로 판단한다).
+   */
+  lastmod?: string;
 };
 
 export const SITEMAP_ENTRIES: SitemapEntry[] = [
@@ -35,9 +45,8 @@ export const SITEMAP_ENTRIES: SitemapEntry[] = [
   // 국장 미리보기(2026-09-04 오픈). 07~09시에만 쓸모가 있는 화면이지만 내용은 매일
   // 새로 쌓이므로 daily 다.
   { path: "/preview", changeFrequency: "daily", priority: 0.7 },
-  // 데일리 노트. 안 연 동안은 싣지 않는다(noindex 와 어긋나면 안 된다). 날짜별 글은 표를
-  // 읽어야 해서 app/sitemap-notes.xml 이 따로 펼친다.
-  ...(DAILY_PUBLIC ? [{ path: NOTE_PAGE.href, changeFrequency: "daily" as const, priority: 0.7 }] : []),
+  // 데일리 노트(/daily)는 싣지 않는다. 본문이 가장 최근 글 그대로라 canonical 이 그 글의 날짜 주소이고
+  // (app/daily/page.tsx), 사이트맵에는 canonical 주소만 싣는다. 날짜별 글은 app/sitemap-notes.xml 이 펼친다.
   // 배당 계산기. 안 연 동안은 싣지 않는다(noindex 와 어긋나면 안 된다). 종가·배당이 매일 갱신되므로 daily.
   ...(DIVIDEND_PUBLIC ? [{ path: DIVIDEND_PAGE.href, changeFrequency: "daily" as const, priority: 0.7 }] : []),
   // 테마 리포트 — 목록 한 장 + 테마 26장. 안 연 동안은 싣지 않는다(noindex 와 어긋나면 안 된다).
@@ -53,7 +62,7 @@ export const SITEMAP_ENTRIES: SitemapEntry[] = [
     : []),
   // 카드 여덟 장의 '전체보기'. 화면 안에서만 링크가 걸려 있어 크롤러가 닿기 어렵다 —
   // 목록이 매일 바뀌는 실제 콘텐츠라 사이트맵에 직접 올린다.
-  // (종목·투자자 상세는 수가 많고 DB 를 읽어야 해서 아직 없다. 종목별 실주소 작업에서 다룬다.)
+  // (종목·투자자 상세는 DB 를 읽어야 해서 app/sitemap-insider.xml 이 따로 펼친다.)
   ...INSIDER_LIST_SLUGS.map((slug) => ({
     path: `/insider/list/${slug}`,
     changeFrequency: "daily" as const,
@@ -63,8 +72,9 @@ export const SITEMAP_ENTRIES: SitemapEntry[] = [
   // 매일 헛걸음하므로 yearly·낮은 우선순위로 둔다.
   { path: "/terms", changeFrequency: "yearly", priority: 0.3 },
   { path: "/privacy", changeFrequency: "yearly", priority: 0.3 },
-  // 버전을 올릴 때만 바뀐다. 법정 고지보다는 자주, 지표 화면보다는 훨씬 드물다.
-  { path: "/changelog", changeFrequency: "monthly", priority: 0.3 },
+  // 버전을 올릴 때만 바뀐다. 법정 고지보다는 자주, 지표 화면보다는 훨씬 드물다. 수정일은 최신 판의 배포일이다.
+  // (약관·개인정보는 시행일이 적혀 있지만 고친 판이 시행일보다 먼저 올라가 수정일로 못 쓴다 — app/legal.tsx.)
+  { path: "/changelog", changeFrequency: "monthly", priority: 0.3, lastmod: RELEASES[0].date },
 ];
 
 /**

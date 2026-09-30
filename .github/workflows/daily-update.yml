@@ -1653,13 +1653,15 @@ jobs:
       # ⭐ 내부자 표가 다 바뀐 직후 **이 화면들만** 먼저 비운다(배당 잡과 같은 까닭). 이 잡은 10분 안에 끝나는데
       #    finalize 의 전체 비우기는 update 끝(두세 시간 뒤)을 기다린다. 이 표들을 읽는 화면은 /insider 와 그 아래
       #    상세 셋(종목·투자자·전체보기)뿐이다(lib/insider-data.ts · lib/insider-detail.ts). 상세는 패턴이라 데우지 않는다.
+      #    종목 상세는 주소가 두 꼴이다 — 기본 기간(/insider/stock/NVDA)과 다른 기간(/insider/stock/NVDA/1y). 패턴은
+      #    그 꼴의 화면만 비우므로(revalidatePath(…, "page")) 둘 다 적는다(lib/insider-range.ts).
       # ⚠️ 대괄호는 셸 글롭이라 따옴표를 벗기지 말 것.
       - name: 내부자 리포트 화면만 먼저 비우고 데우기
         if: ${{ !cancelled() }}
         continue-on-error: true
         env:
           REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
-        run: bash scripts/revalidate.sh /insider '/insider/stock/[ticker]' '/insider/investor/[cik]' '/insider/list/[kind]'
+        run: bash scripts/revalidate.sh /insider '/insider/stock/[ticker]' '/insider/stock/[ticker]/[range]' '/insider/investor/[cik]' '/insider/list/[kind]'
 
       # ── 내부자 리포트 전용 알림 ──────────────────────────────────────────
       # 위 알림들과 **합치지 않았다.** 제목이 곧 진단이라는 같은 이유다.

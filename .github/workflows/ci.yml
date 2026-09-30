@@ -26,6 +26,8 @@ on:
       - ".github/workflows/telegram-broadcast.yml"
       # tests/trending-window.test.ts 가 읽는다. 트렌딩 스텝이 KRX 08:00 대기 뒤에 있는지 본다.
       - ".github/workflows/daily-update.yml"
+      # data-pipeline/tests/test_publish_daily_note_indexnow.py 가 읽는다. IndexNow 키가 노트 스크립트와 같은지 본다.
+      - ".github/workflows/indexnow.yml"
       - ".github/workflows/ci.yml"
   push:
     branches: [main]
@@ -42,6 +44,7 @@ on:
       - "vercel.json"
       - ".github/workflows/telegram-broadcast.yml"
       - ".github/workflows/daily-update.yml"
+      - ".github/workflows/indexnow.yml"
 
 jobs:
   routes:

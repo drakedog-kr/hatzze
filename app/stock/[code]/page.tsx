@@ -16,7 +16,7 @@ import {
 } from "@/lib/stock-page";
 
 import { getStockDividend } from "@/lib/dividend";
-import { daysFromToday, eventDateLabel, getStockEvents, getStockMoveReason, type UpcomingEvent } from "@/lib/kadera-why";
+import { daysFromToday, eventDateLabel, getStockEvents, getStockMoveReason } from "@/lib/kadera-why";
 import { DIVIDEND_PUBLIC } from "../../screen-flags";
 import { DividendCard } from "./DividendCard";
 import { Pill } from "../../kadera/parts";
@@ -27,6 +27,7 @@ import { KADERA_CARD } from "../../og-copy";
 import { pageMetadata } from "../../seo";
 import { AiMark, C, Icon, MONO, R } from "../../ui";
 import { BackTrail } from "@/components/back-trail";
+import { themeHref } from "@/lib/theme-href";
 
 /**
  * 종목 하나의 실주소(`/stock/005930`).
@@ -195,6 +196,40 @@ function Quote({ d }: { d: StockPageData }) {
       </span>
       {d.priceDate && <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>{fmtKoDate(d.priceDate)} 종가</span>}
     </div>
+  );
+}
+
+/**
+ * 끝의 '다음에 볼 곳'. 이 화면은 '얼마나 회자되나'만 답한다 — 테마의 흐름, 고점에서의 거리, 오늘 무엇이 도는지는
+ * 각 화면이 답한다. 예전의 'MDD 정밀분석에서 보기' 카드가 이 줄로 들어왔다(배당 계산은 바로 위 배당 카드의 단추가 잇는다).
+ * ⭐ 서버 링크라 크롤러도 타고 간다 — 464장이 서로와 구역 화면으로 이어진다.
+ */
+function NextLinks({ d }: { d: StockPageData }) {
+  const links: { href: string; icon: "hub" | "trending_down" | "forum"; title: string; sub: string }[] = [
+    ...(d.themes[0] ? [{ href: themeHref(d.themes[0]), icon: "hub" as const, title: `${d.themes[0]} 테마`, sub: "테마 판세에서 흐름 보기" }] : []),
+    { href: stockMddHref(d.code, d.market), icon: "trending_down", title: "MDD 정밀분석", sub: "고점에서 얼마나 내려와 있나" },
+    { href: PARENT.path, icon: "forum", title: PARENT.name, sub: "오늘 무엇이 회자되나" },
+  ];
+  return (
+    <nav className="hz-snext" aria-label="다음에 볼 곳">
+      <span className="hz-snext-cap">다음에 볼 곳</span>
+      <div className="hz-snext-row">
+        {links.map((l) => (
+          <Link key={l.href} href={l.href} className="hz-snext-i">
+            <span aria-hidden="true">
+              <Icon name={l.icon} style={{ fontSize: 20, color: "var(--c-cold-ink)" }} />
+            </span>
+            <span className="hz-snext-tx">
+              <b>{l.title}</b>
+              <span>{l.sub}</span>
+            </span>
+            <span aria-hidden="true" className="hz-snext-go">
+              <Icon name="chevron_right" style={{ fontSize: 18 }} />
+            </span>
+          </Link>
+        ))}
+      </div>
+    </nav>
   );
 }
 
@@ -418,40 +453,23 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
           <SectionHead
             icon="calendar_month"
             title="다가오는 일정"
+            note={`앞으로 ${events.length}건`}
             desc="커뮤니티가 짚은 날입니다. 같은 일정을 두고 날짜가 갈리기도 합니다."
             level={2}
           />
-          <div style={{ paddingBottom: 6 }}>
-            {(() => {
-              // 카더라 '다가오는 일정'과 같은 아젠다 꼴 — 날짜가 머리, 그 아래 무슨 일. 여기는 한
-              // 종목의 자리라 줄에 이름이 없고, 달·분기·해만 짚인 일정도 머리로 선다("10월 중").
-              const groups = new Map<string, UpcomingEvent[]>();
-              for (const e of events) {
-                const k = `${e.date}|${e.precision}`;
-                const g = groups.get(k);
-                if (g) g.push(e);
-                else groups.set(k, [e]);
-              }
-              return [...groups.values()].map((items) => (
-                <div key={`${items[0].date}-${items[0].precision}`}>
-                  <div className="hz-agenda-day">
-                    <span style={{ fontSize: "var(--fs-13-5)", fontWeight: 800, color: C.ink, letterSpacing: "-.01em" }}>{eventDateLabel(items[0])}</span>
-                    {items[0].precision === "day" && (
-                      <Pill tone={["오늘", "내일"].includes(daysFromToday(items[0].date)) ? "blue" : "plain"}>{daysFromToday(items[0].date)}</Pill>
-                    )}
-                  </div>
-                  {items.map((e) => (
-                    <div key={e.event} className="hz-trow hz-cols-cal-one">
-                      <span style={{ minWidth: 0, fontSize: "var(--fs-13-5)", lineHeight: 1.6, color: C.inkSoft, wordBreak: "keep-all", textWrap: "pretty" }}>
-                        {e.event}
-                      </span>
-                      {e.channels >= 2 ? <Pill tone="blue">{e.channels}곳이 언급</Pill> : <span />}
-                    </div>
-                  ))}
-                </div>
-              ));
-            })()}
-          </div>
+          {/* 한 건 한 줄 타임라인(2026-09-30). 예전엔 날짜가 머리, 그 아래 일이 한 줄씩이라 건마다 두 줄에 오른쪽이 비었다.
+              이 화면은 한 종목의 자리라 줄에 이름이 없고, 달·분기·해만 짚인 일정도 날짜 칸에 글로 선다("10월 중"). */}
+          <ol className="hz-stl">
+            {events.map((e) => (
+              <li key={`${e.date}-${e.precision}-${e.event}`} className="hz-stl-row">
+                <span className="hz-stl-dot" aria-hidden="true" />
+                <span className="hz-stl-date">{eventDateLabel(e)}</span>
+                <span className="hz-stl-dd">{e.precision === "day" ? daysFromToday(e.date) : ""}</span>
+                <span className="hz-stl-ev">{e.event}</span>
+                {e.channels >= 2 ? <Pill tone="blue">{e.channels}곳이 언급</Pill> : <span className="hz-stl-one">1곳</span>}
+              </li>
+            ))}
+          </ol>
         </section>
       )}
       {/* ── 회자된 까닭(LLM) ────────────────────────────────────────
@@ -463,7 +481,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
               글리프라 머리와 본문에 같은 그림이 두 번 섰고, 무엇보다 ✨ 는 "생성형 AI가 썼다"는
               **고지 표시**다(app/ui.tsx AiMark 머리말). 장식으로 같이 쓰면 그 뜻이 흐려진다.
               확성기는 카더라의 '트렌딩 메시지'와 같은 뜻으로 쓴다 — 채널에서 떠들썩했던 것. */}
-          <SectionHead icon="campaign" title="무엇이 화제였습니까" note="최근 3일" level={2} />
+          <SectionHead icon="campaign" title="무엇이 화제였나" note="최근 3일" level={2} />
           {/* ⚠️ 고지 문구를 **글자로 깔지 않는다.** ✨ 하나가 고지를 품는 것이 이 저장소의
               방식이다(app/ui.tsx AiMark 머리말: 문장마다 한 줄씩 깔면 정작 읽어야 할
               요약보다 고지가 길어진다). 누르거나 마우스를 올리면 문구가 뜨고, 같은
@@ -537,32 +555,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
           자리는 같은 테마 종목 아래(2026-09-15 지시) — 카더라(왜·화제·일정·테마)가 먼저, 배당은 그다음. */}
       {dividend && <DividendCard s={dividend} />}
 
-      {/* ── 낙폭으로 이어 주기 ──────────────────────────────────────
-          이 화면은 '얼마나 회자되나'만 답한다. '고점에서 얼마나 내려왔나'는 MDD가 답하는데
-          그건 브라우저에서 계산하는 도구라 여기 얹지 않는다. 링크로 잇는다. */}
-      <section className="hz-sheet">
-        <Link
-          href={stockMddHref(d.code, d.market)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            padding: "18px 22px",
-            textDecoration: "none",
-          }}
-        >
-          <span style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-            <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, color: C.ink, letterSpacing: "-.01em" }}>
-              MDD 정밀분석에서 보기
-            </span>
-            <span style={{ fontSize: "var(--fs-12)", color: C.sub, wordBreak: "keep-all" }}>
-              {withTopicParticle(d.name)} 고점에서 얼마나 내려와 있는지, 이만큼 빠졌던 적이 과거에 몇 번이었는지 봅니다.
-            </span>
-          </span>
-          <Icon name="arrow_forward" style={{ fontSize: "var(--fs-20)", color: C.sub, flexShrink: 0 }} />
-        </Link>
-      </section>
+      <NextLinks d={d} />
 
       {/* 자료가 어디까지 찬 날인지. 카드마다 날짜를 적는 대신 바닥에 한 줄로 둔다. */}
       <p style={{ margin: 0, fontSize: "var(--fs-11)", color: C.muted, textAlign: "right" }}>

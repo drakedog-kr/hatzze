@@ -99,14 +99,21 @@ function Block({ block }: { block: NoteBlock }) {
   }
 }
 
-function NoteArticle({ note, blocks }: { note: DailyNote; blocks: NoteBlock[] }) {
+/**
+ * ⭐ 날짜 주소(`/daily/2026-09-05`)에서는 글 제목이 **h1** 이다. 셸은 그 주소의 '데일리 노트'를 모양 그대로 두되 h1 이
+ * 아닌 글자로 그린다(AppShell LABEL_TITLED_PREFIXES). 예전엔 날짜마다 h1 이 똑같이 '데일리 노트'라 글마다 고유한 제목
+ * 신호가 없었다(2026-09-30 점검). 크기는 .hz-note-title 이 정해 h1 이어도 h2 와 같아 보인다.
+ * `/daily`(가장 최근 글)는 셸의 '데일리 노트'가 h1 이고 글 제목은 h2 그대로다 — 그 화면의 canonical 이 날짜 주소다.
+ */
+function NoteArticle({ note, blocks, dated }: { note: DailyNote; blocks: NoteBlock[]; dated: boolean }) {
+  const Title = dated ? "h1" : "h2";
   return (
     <article className="hz-note hz-sheet">
       <header className="hz-note-head">
         <time className="hz-note-date" dateTime={note.date}>
           {fmtNoteDate(note.date)}
         </time>
-        <h2 className="hz-note-title">{note.title}</h2>
+        <Title className="hz-note-title">{note.title}</Title>
       </header>
       <div className="hz-note-body">
         {blocks.map((b, i) => (
@@ -275,12 +282,15 @@ export function NoteView({
   neighbors,
   archive,
   stocks,
+  dated = false,
 }: {
   note: DailyNote | null;
   failed: boolean;
   neighbors: NoteNeighbors;
   archive: NoteStub[];
   stocks: NoteStocks;
+  /** 날짜 주소에서 그리는가. 그러면 글 제목이 h1 이다(NoteArticle 주석). */
+  dated?: boolean;
 }) {
   const blocks = note ? parseNoteMarkdown(note.bodyMd) : [];
   return (
@@ -288,7 +298,7 @@ export function NoteView({
       <div className="hz-note-main">
         {note ? (
           <>
-            <NoteArticle note={note} blocks={blocks} />
+            <NoteArticle note={note} blocks={blocks} dated={dated} />
             <NoteNav neighbors={neighbors} />
           </>
         ) : (

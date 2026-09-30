@@ -44,9 +44,10 @@ const flags = await import(pathToFileURL(join(APP, "screen-flags.ts")).href);
  */
 const EXCLUDED = new Map([
   // `/preview` 가 여기 있었고 2026-09-04 에 열면서 사이트맵으로 옮겼다.
-  // 데일리 노트 — 아직 안 열었다. 여는 순간 사이트맵 쪽(app/sitemap-urls.ts)이 같은 플래그로
-  // 켜지고 이 줄은 빠지므로, 여는 날 여기를 손댈 일이 없다.
-  ...(flags.DAILY_PUBLIC ? [] : [["/daily", "아직 안 연 화면(app/screen-flags.ts DAILY_PUBLIC=false). noindex 라 사이트맵에 없어야 한다"]]),
+  // 데일리 노트 목록 — 연 뒤에도 싣지 않는다. 본문이 가장 최근 글 그대로라 canonical 이 그 글의 날짜 주소다.
+  ["/daily", flags.DAILY_PUBLIC
+    ? "본문이 가장 최근 글과 같아 canonical 이 그 날짜 주소다(app/daily/page.tsx). 날짜 주소는 sitemap-notes.xml 이 싣는다"
+    : "아직 안 연 화면(app/screen-flags.ts DAILY_PUBLIC=false). noindex 라 사이트맵에 없어야 한다"],
   // 배당으로 살기(/dividend) — 같은 방식. 여는 날 app/sitemap-urls.ts 가 같은 플래그로 켜지고 이 줄은 빠진다.
   ...(flags.DIVIDEND_PUBLIC ? [] : [["/dividend", "아직 안 연 화면(app/screen-flags.ts DIVIDEND_PUBLIC=false). noindex 라 사이트맵에 없어야 한다"]]),
   // 테마 리포트(/theme) — 같은 방식. 테마별 실주소(/theme/[theme])는 아래 DYNAMIC 에 있다.
@@ -64,8 +65,9 @@ const DYNAMIC = new Map([
   ["/stock/[code]", "sitemap-stocks.xml 이 DB 를 읽어 펼친다(lib/stock-page.ts listIndexableStocks)"],
   ["/theme/[theme]", "사전의 테마 26개를 app/sitemap-urls.ts 가 THEME_NAMES 로 펼친다(열린 뒤에만)"],
   ["/theme/us/[theme]", "미장 사전의 테마 16개를 app/sitemap-urls.ts 가 US_THEME_NAMES 로 펼친다(열린 뒤에만)"],
-  ["/insider/stock/[ticker]", "수가 많고 DB 를 읽어야 한다. 사이트맵 동적 생성 때 다룬다"],
-  ["/insider/investor/[cik]", "위와 같다"],
+  ["/insider/stock/[ticker]", "미장 사전을 app/sitemap-insider.xml 이 읽어 펼친다(사전 밖 종목은 noindex)"],
+  ["/insider/stock/[ticker]/[range]", "차트 기간 주소. canonical 이 기본 주소(/insider/stock/[ticker])라 사이트맵에 싣지 않는다"],
+  ["/insider/investor/[cik]", "추적 명단 us_manager 를 app/sitemap-insider.xml 이 읽어 펼친다"],
   ["/daily/[date]", "날짜가 표에서 온다. app/sitemap-notes.xml 이 읽어 펼친다(lib/daily-note.ts listAllNoteDates)"],
 ]);
 

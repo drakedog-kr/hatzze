@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { assertLoaded } from "@/lib/load-state";
 import { notFound } from "next/navigation";
 
-import { EMPTY_STOCKS, getLatestNote, getNoteStocks, listNotes, noteNeighbors, type NoteNeighbors } from "@/lib/daily-note";
+import { EMPTY_STOCKS, getLatestNote, getNoteStocks, listNotes, noteHref, noteNeighbors, type NoteNeighbors } from "@/lib/daily-note";
+import { noteDescription } from "@/lib/daily-note-md";
 
 import { NOTE_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
@@ -31,13 +32,28 @@ const DEPLOYED = Boolean(process.env.VERCEL_ENV);
 // 캐시 주기는 루트 레이아웃의 `revalidate` 가 정한다(app/layout.tsx). 예전엔 여기가
 // force-dynamic 이라 방문마다 서버가 새로 그렸다.
 
+/**
+ * ## canonical 은 그 글의 날짜 주소다
+ *
+ * 이 화면의 본문은 가장 최근 글 **그대로**이고, 같은 글이 `/daily/2026-09-29` 에도 자기 주소로 있다. 둘이 각자
+ * canonical 을 내면 같은 본문이 두 주소로 색인을 다투고, 검색엔진이 아무 쪽이나 고른다(2026-09-30 점검).
+ * 오래 남는 쪽은 날짜 주소라 그쪽을 가리킨다 — og:url 도 같이 따라가서, 이 화면을 공유해도 링크가 다음 날
+ * 다른 글로 바뀌지 않는다. 설명도 고정 소개문 대신 그 글의 첫머리다.
+ *
+ * 그래서 `/daily` 는 사이트맵에 없다(app/sitemap-urls.ts · canonical 이 아닌 주소를 싣지 않는다). 날짜 주소는
+ * app/sitemap-notes.xml 이 싣는다. 글이 아직 없거나 못 읽었으면 예전처럼 자기 주소다.
+ */
 export async function generateMetadata(): Promise<Metadata> {
+  // 본문과 같은 조회다 — cache 라 한 번만 돈다.
+  const latest = await getLatestNote();
   // ⚠️ await 를 빼지 말 것 — robots 를 얹으려고 펼친다(app/preview/page.tsx 의 같은 자리 주석).
   const meta = await pageMetadata({
     title: `${NOTE_PAGE.label} | hatzze`,
-    description: NOTE_PAGE.description,
-    path: NOTE_PAGE.href,
+    description: (latest.note && noteDescription(latest.note.bodyMd)) || NOTE_PAGE.description,
+    path: latest.note ? noteHref(latest.note.date) : NOTE_PAGE.href,
     ownImage: NOTE_CARD.alt,
+    // 카드는 이 폴더의 것이다 — path 가 날짜 주소로 바뀌어도 그림 주소는 그대로 둔다.
+    imagePath: NOTE_PAGE.href,
   });
   return PUBLIC ? meta : { ...meta, robots: { index: false, follow: false } };
 }
