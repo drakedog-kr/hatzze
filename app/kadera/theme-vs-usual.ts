@@ -30,6 +30,9 @@ export const THEME_USUAL_Z = 2;
  * 그래서 평활 전 비율(낙관 ÷ 낙관+비관)을 평소와 견주고, 폭은 max(5, 2 × 표준오차)로 잡는다.
  * 185건(표준오차 3)이면 폭 6, 20건이면 폭 18 안팎이다. 표준오차는 '평소와 같다'고 볼 때의 값
  * (평소 비율로 계산)이라 평소가 극단일수록 좁아진다.
+ *
+ * 실측(2026-09-30, 최근 30일 날마다 상위 4테마의 판정): 예전 규칙은 '덜'이 '더'보다 훨씬 잦았다 —
+ * 국장 덜 42% · 더 13%, 미장 41% · 27%. 새 규칙은 국장 21% · 22%, 미장 28% · 25% 로 한쪽에 안 쏠린다.
  */
 export function usualShift(positive: number, negative: number, usual: number): "up" | "down" | "same" {
   const n = positive + negative;
