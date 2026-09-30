@@ -42,7 +42,7 @@ import { PhoneFold } from "./PhoneFold";
 import { TrendingTabs } from "./TrendingTabs";
 import TimeAgo from "./TimeAgo";
 import { timeAgoInitial } from "./time-ago";
-import { themeShownPos, themeTip } from "./theme-vs-usual";
+import { themeTip } from "./theme-vs-usual";
 
 // 미리보기 이미지는 옆의 opengraph-image.tsx 가 그린다(ownImage). 자세한 건 app/seo.ts 주석 참고.
 export async function generateMetadata(): Promise<Metadata> {
@@ -755,24 +755,21 @@ export default async function KaderaPage() {
                   // 눈이 세로로 훑질 못한다. 예전엔 미장만 96px 로 고정해 국장보다 막대가 34px 짧았다.
                   <div style={{ display: "grid", gridTemplateColumns: "minmax(62px, max-content) minmax(0, 1fr)", columnGap: 10, rowGap: 6, paddingTop: 2 }}>
                     <span style={{ gridColumn: "1 / -1", fontSize: "var(--fs-11)", fontWeight: 700, letterSpacing: ".04em", color: C.sub }}>인기 테마별 비관 ↔ 낙관</span>
-                    {/* 막대가 나뉘는 지점은 그 테마의 평소 대비다(theme-vs-usual.ts). 평소와 같으면 반반. */}
-                    {sentiment.byTheme.map((t) => {
-                      const shown = themeShownPos(t);
-                      return (
-                        <div
-                          key={t.name}
-                          className="hz-tip hz-tip-wide"
-                          data-tip={themeTip(t)}
-                          style={{ display: "grid", gridColumn: "1 / -1", gridTemplateColumns: "subgrid", alignItems: "center", minWidth: 0 }}
-                        >
-                          <span style={{ ...clip, fontSize: "var(--fs-11)", fontWeight: 700, color: C.label }}>{t.name}</span>
-                          <span style={{ minWidth: 0, display: "flex", height: 7, borderRadius: 999, overflow: "hidden" }}>
-                            <span style={{ width: `${100 - shown}%`, background: "var(--c-blue-3)" }} />
-                            <span style={{ width: `${shown}%`, background: "var(--c-warm-3)" }} />
-                          </span>
-                        </div>
-                      );
-                    })}
+                    {/* 막대는 낙관도 그대로 나눈다. 평소와 견준 말은 툴팁이 한다(theme-vs-usual.ts). */}
+                    {sentiment.byTheme.map((t) => (
+                      <div
+                        key={t.name}
+                        className="hz-tip hz-tip-wide"
+                        data-tip={themeTip(t)}
+                        style={{ display: "grid", gridColumn: "1 / -1", gridTemplateColumns: "subgrid", alignItems: "center", minWidth: 0 }}
+                      >
+                        <span style={{ ...clip, fontSize: "var(--fs-11)", fontWeight: 700, color: C.label }}>{t.name}</span>
+                        <span style={{ minWidth: 0, display: "flex", height: 7, borderRadius: 999, overflow: "hidden" }}>
+                          <span style={{ width: `${100 - t.pos}%`, background: "var(--c-blue-3)" }} />
+                          <span style={{ width: `${t.pos}%`, background: "var(--c-warm-3)" }} />
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 )}
               </>
