@@ -1,3 +1,5 @@
+import { jsonLdHtml } from "@/lib/json-ld";
+
 import { SITE_NAME, SITE_URL } from "./brand";
 
 /**
@@ -85,10 +87,10 @@ export function PageJsonLd({
   return (
     <script
       type="application/ld+json"
-      // 화면에 아무것도 그리지 않는다. JSON.stringify 가 값을 이스케이프하므로
-      // 종목명·채널명에 따옴표가 섞여도 안전하다.
+      // 화면에 아무것도 그리지 않는다. ⚠️ JSON.stringify 만으로는 안전하지 않다 — 따옴표는 이스케이프하지만
+      // `<` 는 그대로라 값에 `</script>` 가 섞이면 태그가 끊긴다(lib/json-ld.ts). 이름이 DB 에서 오는 화면이 있다.
       dangerouslySetInnerHTML={{
-        __html: JSON.stringify({ "@context": "https://schema.org", "@graph": graph }),
+        __html: jsonLdHtml({ "@context": "https://schema.org", "@graph": graph }),
       }}
     />
   );

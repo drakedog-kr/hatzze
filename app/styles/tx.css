@@ -1050,8 +1050,8 @@
   padding-bottom: 20px; border-bottom: 1px solid var(--c-sheet-row);
 }
 .hz-note-date { font-size: var(--fs-13); font-weight: 600; color: var(--c-muted); font-variant-numeric: tabular-nums; }
-/* 글 제목은 h2 다 — h1 은 셸의 "데일리 노트". 그래도 이 화면의 주인공이라 화면 제목(30)
-   바로 아래 크기(26)를 준다. keep-all 로 낱말 가운데서 안 끊는다. */
+/* 글 제목. 날짜 주소에서는 h1, /daily 에서는 h2 다(NoteView 주석). 태그와 상관없이 같아 보이게 여백·크기·굵기를
+   모두 여기서 정한다. 화면 제목(30) 바로 아래 크기(26)다. keep-all 로 낱말 가운데서 안 끊는다. */
 .hz-note-title {
   margin: 0; font-size: var(--fs-26); line-height: 1.32; font-weight: 800; letter-spacing: -.025em;
   color: var(--c-ink); word-break: keep-all; overflow-wrap: anywhere;

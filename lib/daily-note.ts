@@ -41,6 +41,11 @@ export type DailyNote = {
   /** 제목·날짜 줄을 뗀 본문 마크다운. lib/daily-note-md.ts 가 푼다. */
   bodyMd: string;
   shortMd: string | null;
+  /**
+   * 처음 올린 시각(ISO). 같은 날 다시 올려도 안 바뀐다(표의 기본값 now() 가 insert 때만 든다).
+   * 글의 발행 시각이라 공유 메타(article:published_time)와 Article 구조화 데이터가 쓴다.
+   */
+  createdAt: string;
   /** 마지막으로 올린 시각(ISO). 고친 원고를 다시 올리면 바뀐다. */
   updatedAt: string;
   stocks: NoteStockRefs;
@@ -53,6 +58,8 @@ type Row = {
   title: string;
   body_md: string;
   short_md: string | null;
+  /** 067 부터 있는 열이다. 없으면 updated_at 으로 물러선다. */
+  created_at?: string;
   updated_at: string;
   /** 068 전 줄은 없거나 `{}` 다. 열 자체가 없으면 select("*") 가 그냥 안 준다. */
   stocks?: unknown;
@@ -117,6 +124,7 @@ function toNote(r: Row): DailyNote {
     title: r.title,
     bodyMd: r.body_md,
     shortMd: r.short_md,
+    createdAt: r.created_at ?? r.updated_at,
     updatedAt: r.updated_at,
     stocks: toRefs(r.stocks),
   };
@@ -133,6 +141,7 @@ function devNotes(): DailyNote[] | null {
       title: n.title,
       bodyMd: n.body_md,
       shortMd: n.short_md ?? null,
+      createdAt: n.updated_at ?? `${n.date}T11:00:00.000Z`,
       updatedAt: n.updated_at ?? `${n.date}T11:00:00.000Z`,
       stocks: toRefs(n.stocks),
     }))

@@ -7,12 +7,12 @@ import { SITEMAP_ENTRIES, absolute } from "./sitemap-urls";
  *
  * 주소 목록은 `app/sitemap-urls.ts` 한 곳에 있다. 새 화면을 열 때 볼 곳도 거기다.
  *
- * ## lastModified 는 요청 시각이다
+ * ## lastModified 는 아는 곳에만 적는다
  *
- * 실제 데이터 갱신 시각이 아니라 이 함수가 도는 시각이라, 크롤러에게는 "늘 방금 바뀐
- * 사이트"로 보인다. 정직한 값은 아니지만 **지금은 그 편이 낫다** — 색인이 모자란 쪽이
- * 문제라 크롤링을 부르는 게 이득이다. 색인이 붙고 나면 `daily_score` 의 실제 날짜로
- * 바꾸는 게 맞다.
+ * 예전엔 모든 줄에 "지금"을 적고 "요청 시각이라 늘 방금 바뀐 사이트로 보인다"고 여겼다. 실제로는 이 파일이
+ * 요청 시각 API 를 안 써서 **빌드 때 굳는다**(Next 문서 01-metadata/sitemap.md) — 배포 시각이 약관까지 모든 줄의
+ * 수정일이었다. 틀린 수정일은 검색엔진이 사이트맵의 lastmod 를 통째로 안 믿게 만든다. 그래서 아는 날짜만 적고
+ * (업데이트 기록 = 최신 판 배포일) 나머지는 비운다(sitemap-urls.ts 의 `lastmod` 주석).
  *
  * ## 왜 같은 내용을 `/sitemap-pages.xml` 로 한 벌 더 내나
  *
@@ -23,10 +23,9 @@ import { SITEMAP_ENTRIES, absolute } from "./sitemap-urls";
  * 자세한 것은 app/sitemap-pages.xml/route.ts 머리말에 있다.
  */
 export default function sitemap(): MetadataRoute.Sitemap {
-  const now = new Date();
   return SITEMAP_ENTRIES.map((e) => ({
     url: absolute(e.path),
-    lastModified: now,
+    ...(e.lastmod ? { lastModified: e.lastmod } : {}),
     changeFrequency: e.changeFrequency,
     priority: e.priority,
   }));
