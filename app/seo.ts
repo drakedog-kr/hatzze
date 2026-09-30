@@ -85,6 +85,7 @@ export async function pageMetadata({
   path,
   ownImage,
   imagePath,
+  article,
 }: {
   title: string;
   description: string;
@@ -101,6 +102,11 @@ export async function pageMetadata({
    * 과열도 카드로 떨어져서, 내부자 종목을 공유했는데 온도 카드가 떴다(2026-09-17 지적).
    */
   imagePath?: string;
+  /**
+   * 날짜가 있는 **글**일 때(데일리 노트 한 편). 주면 og:type 이 `article` 이 되고 발행·수정 시각이 붙는다 —
+   * 카카오·페이스북 미리보기와 검색엔진이 화면이 아니라 글로 읽는다. 값은 ISO 시각(시간대 포함)이다.
+   */
+  article?: { publishedTime: string; modifiedTime?: string };
 }): Promise<Metadata> {
   const images = [
     ownImage
@@ -115,7 +121,9 @@ export async function pageMetadata({
     // 이 페이지가 홈의 중복이라고 선언하는 셈이라 검색엔진이 색인하지 않는다.
     alternates: { canonical: path },
     openGraph: {
-      type: "website",
+      ...(article
+        ? { type: "article" as const, publishedTime: article.publishedTime, modifiedTime: article.modifiedTime }
+        : { type: "website" as const }),
       locale: "ko_KR",
       url: `${SITE_URL}${path}`,
       siteName: SITE_NAME,

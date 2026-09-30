@@ -1356,9 +1356,18 @@ function encodedPath(pathname: string): string {
  */
 const SELF_TITLED_PREFIXES = ["/insider/stock/", "/insider/investor/"];
 
+/**
+ * 제목 칸을 **그대로 보이되 h1 은 아닌** 주소. 날짜별 데일리 노트(`/daily/2026-09-05`)는 맨 위에 '데일리 노트'가
+ * 예전 모양 그대로 서지만, 그 글자는 h1 이 아니다 — 날짜마다 h1 이 '데일리 노트'로 같아 글마다 고유한 제목 신호가
+ * 없었다(2026-09-30 점검). 글 제목이 h1 이다(NoteView `dated`). 모양은 태그와 상관없다 — 크기는 .hz-page-title,
+ * 굵기·여백은 인라인 값이 정한다. 화면 머리를 이동 줄로 바꾸는 안은 모양이 달라져 뺐다.
+ */
+const LABEL_TITLED_PREFIXES = [`${NOTE_PAGE.href}/`];
+
 function PageHeader() {
   const pathname = useAppPathname();
   const selfTitled = SELF_TITLED_PREFIXES.some((p) => pathname.startsWith(p));
+  const TitleTag = LABEL_TITLED_PREFIXES.some((p) => pathname.startsWith(p)) ? "p" : "h1";
   const page = navFor(useShellEnv()).find((n) => isActive(n.href, pathname));
   // 서브 페이지에서는 서브의 이름을 h1 으로 쓴다. 부모(구역)의 이름을 그대로 두면
   // /kadera 와 /kadera/us 두 페이지가 **같은 h1** 을 갖는다.
@@ -1402,9 +1411,16 @@ function PageHeader() {
    * 화면 맨 위 뒤로 가기 줄(국장 테마 판세 › 로봇)과 같게. 구역 이름을 쓰면 미장 테마가 국장 목록(/theme)을 부모로 댔다.
    */
   const under = page?.children?.find((c) => c.href && c.href !== pathname && childActive(page.children!, c, pathname));
+  /**
+   * 구역의 대문이 곧 첫 서브인 구역(카더라 리포트 → 국장 카더라 `/kadera`)에서 **다른 서브**(미장 카더라 `/kadera/us`)는
+   * 대문 아래가 아니라 **옆**이다. 부모로 구역 이름을 대면 화면 어디에도 없는 이름이 이동 경로에 선다 — 사이드바가
+   * 평평해져(2026-09-25) '카더라 리포트'·'테마 리포트'는 이제 안 보이고, 그 링크(/kadera)를 열면 '국장 카더라'다.
+   * 첫 서브 이름을 대면 미장이 국장 아래라는 거짓 계층이 된다. 그래서 이동 경로를 `홈 › 미장 카더라` 로 둔다(2026-09-30 점검).
+   */
+  const besideGate = Boolean(child && child.href === pathname && page?.children?.some((c) => c.href === page.href));
   const parent = under?.href
     ? { name: under.label, path: under.href }
-    : page && page.href !== pathname
+    : page && page.href !== pathname && !besideGate
       ? { name: page.label, path: page.href }
       : null;
   /**
@@ -1417,8 +1433,8 @@ function PageHeader() {
    * 말한다. 구조화 데이터는 그 화면을 정확히 설명해야 하므로, 이름을 모르면 **안 내는
    * 편이 맞다**(루트의 WebSite·Organization 은 그대로 남는다).
    *
-   * 종목·투자자 상세는 아직 사이트맵에도 없다. 종목별 실주소 작업에서 자기 제목을
-   * 갖게 되면 그때 여기 조건을 풀면 된다.
+   * 종목·투자자 상세는 이름을 아는 화면 파일이 자기 구조화 데이터를 직접 낸다(국장 종목과 같다 ·
+   * app/insider/stock/[ticker]/detail.tsx · app/insider/investor/[cik]/page.tsx). 여기 조건은 그대로 둔다.
    */
   const named = Boolean(deep) || child?.href === pathname || page?.href === pathname;
   return (
@@ -1446,9 +1462,9 @@ function PageHeader() {
             {/* 크기는 .hz-page-title(globals.css)이 든다 — 폰에서 줄여야 하는데 인라인은
                 미디어쿼리를 이긴다. 2026-09-04 리디자인: 23 → 30. 구간 제목(21)·시트 머리(17)
                 보다 커야 "이 화면의 이름"으로 읽힌다(23 이던 땐 구간 제목 24 보다 작았다). */}
-            <h1 className="hz-page-title" style={{ margin: 0, fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>
+            <TitleTag className="hz-page-title" style={{ margin: 0, fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>
               {title}
-            </h1>
+            </TitleTag>
             {badge && (
               <span
                 style={{
@@ -1531,7 +1547,8 @@ function TopBar({
       {/* 오른쪽 묶음: 테마 토글 + 햄버거(모바일 전용). 햄버거가 화면 맨 오른쪽 끝이다.
           데스크톱에서는 햄버거가 display:none 이라 flex 에서 아예 빠지고, 남는 건
           예전과 같은 토글 하나다 — 순서를 바꿔도 데스크톱은 그대로다. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+      {/* 사이 간격은 .hz-topbar-tools(mobile.css) 가 정한다 — 인라인이면 좁은 폰 규칙(≤360)이 못 이긴다. */}
+      <div className="hz-topbar-tools">
         <button
           type="button"
           className="hz-menu-btn"

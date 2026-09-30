@@ -8,6 +8,7 @@ import { SLOGAN } from "./brand";
 import { SITE_NAME, SITE_URL, pageMetadata } from "./seo";
 import { ICON_FONT_HREF } from "@/lib/icon-names";
 import { PRETENDARD_CSS, PRETENDARD_PRELOAD } from "@/lib/fonts";
+import { jsonLdHtml } from "@/lib/json-ld";
 
 
 // 서치콘솔·서치어드바이저 소유확인 토큰. 값이 없으면 메타 태그 자체를 만들지 않는다
@@ -80,8 +81,9 @@ export async function generateMetadata(): Promise<Metadata> {
  *    페이지 1800(종목 카드 시세 · 10분 야후 캐시), 미리보기 600(밤사이 시세). 여러 값이
  *    겹치면 **가장 짧은 것**이 그 라우트의 주기다(Next 문서).
  * ⚠️ 정적으로 읽히는 리터럴이어야 한다(`60 * 60` 은 안 된다 — Next 문서).
- * ⚠️ 요청마다 그려야 하는 화면은 자기 파일에서 force-dynamic 을 건다(/mdd ·
- *    /insider/stock/[ticker] — searchParams 를 읽어 어차피 동적이다).
+ * ⚠️ 요청마다 그려야 하는 화면은 자기 파일에서 force-dynamic 을 건다(/mdd — searchParams 를
+ *    읽어 어차피 동적이다). 미장 종목 상세도 그랬다가 기간을 경로로 옮기고 사본이 됐다(2026-09-30 ·
+ *    lib/insider-range.ts).
  * ⚠️ 실패한 조회가 든 렌더는 사본에 담기면 안 된다. 페이지가 자료를 다 받은 뒤
  *    assertLoaded 로 던진다(lib/load-state.ts). 던지면 마지막 성공본이 남는다.
  * ⚠️ 라우트 안의 fetch 중 **가장 짧은 revalidate 도 그 라우트의 주기가 된다**(Next 문서).
@@ -191,11 +193,12 @@ export default function RootLayout({
             }}
           />
         ) : null}
-        {/* 구조화 데이터(JSON-LD) — 검색엔진에 사이트/조직 정보를 명시적으로 제공. */}
+        {/* 구조화 데이터(JSON-LD) — 검색엔진에 사이트/조직 정보를 명시적으로 제공.
+            지금 값은 상수뿐이지만 PageJsonLd·노트 Article 과 같은 자리(lib/json-ld.ts)로 넣는다. */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
+            __html: jsonLdHtml({
               "@context": "https://schema.org",
               "@graph": [
                 {
