@@ -1643,7 +1643,8 @@ const NEWS_EVENT = "hz-news-change";
 /* 지금 거는 소식은 하나(NEWS). 목적지가 우리 화면이면 **그 구역 안에서는 안 그린다**(NewsStrip 의 startsWith).
    이전 소식들(내부자 → 국장 미리보기 → 데일리 노트 → 텔레그램 2판 → 배당으로 살기 → 텔레그램 3판 → 테마 리포트 오픈)은
    git 이력에 있다 — 되살릴 땐 키를 새로 딴다.
-   ⚠️ 문구에 숫자를 넣지 않는다(위 주석). */
+   ⚠️ 문구에 숫자를 넣지 않는다(위 주석).
+   ⛔ 소식을 새로 걸거나 문구를 고칠 때는 app/releases.ts 에 판을 올리지 않는다(2026-10-01 지시 — 업데이트 기록에 안 싣는다). */
 /* tailShort: 폰(≤560)에서 tail 대신 쓰는 짧은 꼬리. 이름이 앞에 서는 소식은 폰에서 한 줄로 잘리므로(components.css 의
    .hz-news-namefirst) 긴 tail 은 문장 중간에서 '…'로 끊긴다. 한 줄(360px 폰에서 글자 칸 238px)에 들어가는 문장을 따로 둔다. */
 type NewsItem = { key: string; from: string; href: string; head?: string; name: string; tail: string; tailShort?: string; aria?: string; icon: IconName; ga: string };
