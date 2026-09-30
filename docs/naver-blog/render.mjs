@@ -1,21 +1,30 @@
 /**
  * 네이버 블로그에 올릴 이미지 네 장을 그린다 — 프로필 · 모바일 커버 · PC 타이틀 · 위젯 배너.
  *
- *     CHROME=<chrome-headless-shell 경로> node docs/naver-blog/render.mjs   # 같은 폴더에 PNG 네 장
+ *     CHROME=<chrome-headless-shell 경로> node docs/naver-blog/render.mjs              # 밝은 판
+ *     THEME=dark CHROME=<chrome-headless-shell 경로> node docs/naver-blog/render.mjs   # 어두운 판
  *
  * 그림은 HTML 로 짜고 크롬 헤드리스 셸로 찍는다(아래 chromePath 머리말). 서체는 사이트가 이미 받는 두 패키지
  * (pretendard · @fontsource/bricolage-grotesque)를 node_modules 에서 읽으니 `npm install`
- * 이 되어 있으면 따로 받을 것이 없다.
+ * 이 되어 있으면 따로 받을 것이 없다. 결과는 같은 폴더에 쓰고, OUT_DIR 로 바꿀 수 있다.
  *
- * ## 로고는 app/icon.svg 를 그대로 쓴다
+ * ## 파랑은 점으로만 쓴다
  *
- * 유령 심볼의 길(path)과 색(#0064ff)을 여기 다시 적지 않고 파일에서 읽는다. 로고를 고치면
- * 이 스크립트만 다시 돌리면 된다. 워드마크는 app/Logo.tsx 의 규격(Bricolage Grotesque 700,
+ * 첫 판은 네 장 모두 로고 파랑(#0064ff)을 바탕에 깔았다가 "너무 파래서 촌스럽다"는 말을 들었다
+ * (2026-09-30). 지금은 사이트 화면과 같은 배색이다 — 옅은 바탕 · 흰 카드 · 잉크 글자에 파랑은
+ * 유령과 말풍선 하나에만 쓴다. 공유 카드(app/og-card.tsx)가 이미 그 결이다.
+ * 색은 app/styles/theme.css 의 라이트·다크 토큰을 손으로 옮겼다. 팔레트를 바꾸면 여기도 볼 것.
+ *
+ * ## 로고는 app/icon.svg 에서 읽는다
+ *
+ * 유령 심볼의 길(path)은 파일에서 읽는다. 배색은 app/Logo.tsx 의 GhostSymbol 과 같다 —
+ * 몸통 파랑 · 눈 흰색 · 눈동자 파랑. 워드마크는 같은 파일의 규격(Bricolage Grotesque 700,
  * 자간 -0.035em, 소문자 hatzze)을 따른다.
  *
  * ## 말풍선 네 개는 블로그 카테고리 넷이다
  *
  * 오늘 뭐래?(데일리 요약) · 요즘 무슨 테마?(테마) · 배당 얼마 받지?(배당) · 고점 대비 몇 %?(MDD).
+ * 파란 말풍선은 '오늘 뭐래?' 하나다 — 매일 나가는 글이자 텔레그램 채널 이름이라 햇쩨 자신의 말이다.
  * ⚠️ 사라/팔라로 읽힐 말과 종목 이름은 넣지 않는다(app/og-card.tsx 의 ChatterArt 와 같은 규칙).
  */
 import { execFileSync } from "node:child_process";
@@ -31,13 +40,35 @@ const PRETENDARD = join(NM, "pretendard/dist/public/static");
 const BRICOLAGE = join(NM, "@fontsource/bricolage-grotesque/files/bricolage-grotesque-latin-700-normal.woff2");
 
 const ICON = readFileSync(join(ROOT, "app/icon.svg"), "utf8");
-/** 로고 파랑. app/icon.svg 의 배경색을 읽는다 — 화면 토큰(--c-blue #3182f6)이 아니라 원본 로고색이다. */
-const BRAND = ICON.match(/<rect[^>]*fill="(#[0-9a-fA-F]{6})"/)[1];
-/** 유령 몸통 길. 같은 파일에서 읽는다. */
+/** 유령 몸통 길. */
 const GHOST_PATH = ICON.match(/<path d="([^"]+)"/)[1];
-/** 커버·타이틀의 아래쪽 색. 네이버가 커버 아래에 블로그명·별명을 흰 글자로 얹어서 아래를 조금 어둡게 둔다. */
-const DEEP = "#0047c2";
-const INK = "#0e2136"; // --c-ink
+
+/** app/styles/theme.css 의 토큰. 이름도 그쪽을 따른다(--c-bg → bg). */
+const THEMES = {
+  light: {
+    bg: "#f7fafd",
+    card: "#ffffff",
+    ink: "#0e2136",
+    sub: "#556a84",
+    faint: "#8ba0b6",
+    line: "#eaf0f7",
+    blue: "#3182f6",
+    shadow: "0 8px 24px rgba(14,33,54,.07)",
+  },
+  dark: {
+    bg: "#101013",
+    card: "#202027",
+    ink: "#e4e4e5",
+    sub: "#9e9ea4",
+    faint: "#7e7e87",
+    line: "#2f2f39",
+    blue: "#3485fa",
+    shadow: "0 8px 24px rgba(0,0,0,.35)",
+  },
+};
+const THEME = process.env.THEME ?? "light";
+const C = THEMES[THEME];
+if (!C) throw new Error(`THEME 은 ${Object.keys(THEMES).join(" · ")} 중 하나입니다.`);
 
 /**
  * 크롬 **헤드리스 셸**(chrome-headless-shell)을 쓴다.
@@ -54,25 +85,25 @@ function chromePath() {
   return hit;
 }
 
-/** 유령 심볼. h 는 높이(px), 폭은 viewBox 비율(100/104)을 따른다. 몸통 흰색 · 눈 로고 파랑(app/icon.svg 와 같은 배색). */
-function ghost(h, { body = "#ffffff", eye = BRAND } = {}) {
+/** 유령 심볼. h 는 높이(px), 폭은 viewBox 비율(100/104)을 따른다. 배색은 app/Logo.tsx 의 GhostSymbol. */
+function ghost(h) {
   return (
     `<svg width="${((h * 100) / 104).toFixed(1)}" height="${h}" viewBox="0 0 100 104" style="display:block">` +
-    `<path d="${GHOST_PATH}" fill="${body}"/>` +
-    `<ellipse cx="39" cy="50" rx="9.5" ry="12" fill="${eye}"/><circle cx="66" cy="52" r="7" fill="${eye}"/>` +
-    `<circle cx="42" cy="45" r="3" fill="${body}"/></svg>`
+    `<path d="${GHOST_PATH}" fill="${C.blue}"/>` +
+    `<ellipse cx="39" cy="50" rx="9.5" ry="12" fill="#fff"/><circle cx="66" cy="52" r="7" fill="#fff"/>` +
+    `<circle cx="42" cy="45" r="3" fill="${C.blue}"/></svg>`
   );
 }
 
-function wordmark(size, color = "#ffffff") {
-  return `<span class="wm" style="font-size:${size}px;color:${color}">hatzze</span>`;
+function wordmark(size) {
+  return `<span class="wm" style="font-size:${size}px">hatzze</span>`;
 }
 
 /**
  * 말풍선. tail 은 꼬리 자리(각진 모서리) — 유령 쪽을 향하게 둔다.
- * app/og-card.tsx 의 ChatterArt 와 같은 모양(한 모서리만 각지게)이다.
+ * app/og-card.tsx 의 ChatterArt 와 같은 모양(한 모서리만 각지게)이다. mine 이면 파랑.
  */
-function bubble(text, { x, y, size, tail }) {
+function bubble(text, { x, y, size, tail, mine = false }) {
   const r = Math.round(size * 0.95);
   const s = Math.round(size * 0.3);
   const radius = {
@@ -81,13 +112,16 @@ function bubble(text, { x, y, size, tail }) {
     tl: `${s}px ${r}px ${r}px ${r}px`,
     tr: `${r}px ${s}px ${r}px ${r}px`,
   }[tail];
+  const skin = mine
+    ? `background:${C.blue};color:#fff;border:1px solid ${C.blue}`
+    : `background:${C.card};color:${C.ink};border:1px solid ${C.line}`;
   return (
-    `<div class="bubble" style="left:${x}px;top:${y}px;font-size:${size}px;` +
+    `<div class="bubble" style="left:${x}px;top:${y}px;font-size:${size}px;${skin};` +
     `padding:${Math.round(size * 0.5)}px ${Math.round(size * 0.8)}px;border-radius:${radius}">${text}</div>`
   );
 }
 
-function page(w, h, body, extraCss = "") {
+function page(w, h, body) {
   const font = (weight, file) =>
     `@font-face{font-family:Pretendard;font-weight:${weight};src:url("${pathToFileURL(join(PRETENDARD, file))}")}`;
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>
@@ -97,18 +131,16 @@ ${font(800, "Pretendard-ExtraBold.otf")}
 @font-face{font-family:Bricolage;font-weight:700;src:url("${pathToFileURL(BRICOLAGE)}")}
 *{box-sizing:border-box}
 html,body{margin:0;width:${w}px;height:${h}px;overflow:hidden}
-body{position:relative;font-family:Pretendard,sans-serif;color:#fff;background:${BRAND};
+body{position:relative;font-family:Pretendard,sans-serif;color:${C.ink};background:${C.bg};
   -webkit-font-smoothing:antialiased;word-break:keep-all}
-.wm{font-family:Bricolage,sans-serif;font-weight:700;letter-spacing:-0.035em;line-height:1;display:inline-block}
-.bubble{position:absolute;background:#fff;color:${INK};font-weight:700;letter-spacing:-0.02em;line-height:1;white-space:nowrap;
-  box-shadow:0 10px 30px rgba(0,20,70,.18)}
-${extraCss}
+.wm{font-family:Bricolage,sans-serif;font-weight:700;letter-spacing:-0.035em;line-height:1;display:inline-block;color:${C.ink}}
+.bubble{position:absolute;font-weight:700;letter-spacing:-0.02em;line-height:1;white-space:nowrap;box-shadow:${C.shadow}}
 </style></head><body>${body}</body></html>`;
 }
 
 /* ─── 네 장 ─────────────────────────────────────────────────────────── */
 
-/** 프로필. app/icon.svg 에서 모서리 둥글림만 뺀다 — 네이버가 원으로 잘라 보여서 둥근 모서리가 이중으로 깎인다. */
+/** 프로필. 네이버가 원으로 잘라 보이니 유령을 가운데 60% 안에 둔다(app/icon.svg 와 같은 비율). */
 const profile = {
   file: "profile-512.png",
   w: 512,
@@ -117,7 +149,7 @@ const profile = {
   html: page(
     512,
     512,
-    ICON.replace(/ rx="\d+"/, "").replace(/width="\d+" height="\d+"/, 'width="512" height="512"'),
+    `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">${ghost(282)}</div>`,
   ),
 };
 
@@ -135,14 +167,13 @@ const cover = {
     1080,
     1300,
     `
-<div style="position:absolute;inset:0;background:linear-gradient(180deg,${BRAND} 0%,${BRAND} 45%,${DEEP} 100%)"></div>
 <!-- 뒤의 선은 오르내리기만 하고 방향이 없다. 오른쪽 위로 치솟는 선은 '오른다'로 읽힌다. -->
 <svg style="position:absolute;left:0;top:0" width="1080" height="1300" viewBox="0 0 1080 1300">
   <polyline points="-10,600 110,650 210,590 320,640 430,560 540,620 650,570 760,640 870,580 980,630 1090,590"
-    fill="none" stroke="rgba(255,255,255,.16)" stroke-width="10" stroke-linejoin="round" stroke-linecap="round"/>
+    fill="none" stroke="${C.line}" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
 </svg>
 <div style="position:absolute;left:${540 - 150}px;top:330px">${ghost(312)}</div>
-${bubble("오늘 뭐래?", { x: 96, y: 236, size: 40, tail: "br" })}
+${bubble("오늘 뭐래?", { x: 96, y: 236, size: 40, tail: "br", mine: true })}
 ${bubble("배당 얼마 받지?", { x: 650, y: 268, size: 40, tail: "bl" })}
 ${bubble("요즘 무슨 테마?", { x: 70, y: 610, size: 40, tail: "tr" })}
 ${bubble("고점 대비 몇 %?", { x: 668, y: 640, size: 40, tail: "tl" })}
@@ -162,13 +193,12 @@ const title = {
     966,
     300,
     `
-<div style="position:absolute;inset:0;background:linear-gradient(120deg,${BRAND} 0%,${BRAND} 55%,${DEEP} 100%)"></div>
 <div style="position:absolute;left:64px;top:0;height:300px;display:flex;flex-direction:column;justify-content:center">
   <div style="display:flex;align-items:center;gap:18px">${ghost(84)}${wordmark(82)}</div>
   <div style="margin-top:22px;font-size:30px;font-weight:800;letter-spacing:-0.03em">데이터와 여론으로 읽는 시장</div>
-  <div style="margin-top:10px;font-size:19px;font-weight:500;opacity:.78;letter-spacing:-0.01em">매일 저녁 데일리 요약 · 배당 · 테마 · MDD</div>
+  <div style="margin-top:10px;font-size:19px;font-weight:500;color:${C.sub};letter-spacing:-0.01em">매일 저녁 데일리 요약 · 배당 · 테마 · MDD</div>
 </div>
-${bubble("오늘 뭐래?", { x: 650, y: 54, size: 22, tail: "bl" })}
+${bubble("오늘 뭐래?", { x: 650, y: 54, size: 22, tail: "bl", mine: true })}
 ${bubble("배당 얼마 받지?", { x: 716, y: 118, size: 22, tail: "br" })}
 ${bubble("요즘 무슨 테마?", { x: 616, y: 182, size: 22, tail: "tl" })}
 `,
@@ -188,14 +218,13 @@ const widget = {
     170,
     600,
     `
-<div style="position:absolute;inset:0;background:linear-gradient(180deg,${BRAND} 0%,${BRAND} 60%,${DEEP} 100%)"></div>
 <div style="position:absolute;left:0;right:0;top:44px;display:flex;flex-direction:column;align-items:center">
   ${ghost(64)}
   <div style="margin-top:14px">${wordmark(40)}</div>
   <div style="margin-top:14px;font-size:15px;font-weight:800;line-height:1.4;text-align:center;letter-spacing:-0.03em">데이터와 여론으로<br>읽는 시장</div>
 </div>
-<div style="position:absolute;left:22px;right:22px;top:250px;border-top:1px solid rgba(255,255,255,.28)"></div>
-<div style="position:absolute;left:22px;right:22px;top:270px;display:flex;flex-direction:column;gap:13px;font-size:14px;font-weight:700;letter-spacing:-0.02em">
+<div style="position:absolute;left:22px;right:22px;top:250px;border-top:1px solid ${C.line}"></div>
+<div style="position:absolute;left:22px;right:22px;top:270px;display:flex;flex-direction:column;gap:13px;font-size:14px;font-weight:700;letter-spacing:-0.02em;color:${C.sub}">
   <div>시장 온도</div>
   <div>카더라 리포트</div>
   <div>테마 리포트</div>
@@ -203,7 +232,7 @@ const widget = {
   <div>MDD 정밀분석</div>
   <div>내부자 리포트</div>
 </div>
-<div style="position:absolute;left:18px;right:18px;bottom:30px;height:46px;border-radius:23px;background:#fff;color:${BRAND};
+<div style="position:absolute;left:18px;right:18px;bottom:30px;height:46px;border-radius:23px;background:${C.blue};color:#fff;
   display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;letter-spacing:-0.02em">hatzze.fun 열기 →</div>
 `,
   ),
@@ -231,5 +260,5 @@ for (const img of [profile, cover, title, widget]) {
     ],
     { stdio: "ignore" },
   );
-  console.log(`${img.file}  ${img.w * img.scale}×${img.h * img.scale}`);
+  console.log(`${THEME}  ${img.file}  ${img.w * img.scale}×${img.h * img.scale}`);
 }
