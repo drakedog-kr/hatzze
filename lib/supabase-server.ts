@@ -45,7 +45,7 @@ import { clearLoadFailure, noteLoadFailure } from "@/lib/load-state";
  * 적혀 있든 모든 화면이 5분마다 다시 그려졌다(빌드 매니페스트로 확인, 2026-09-19). 그래서
  * 레이아웃의 1시간과 같은 3600 이다 — 더 짧게 두려면 그 화면이 5분마다 다시 그려져도 되는지
  * 먼저 볼 것(app/layout.tsx 의 셈). 자료는 파이프라인이 끝날 때 /api/revalidate 가 비우므로
- * 이 기한은 그 호출이 안 왔을 때의 상한이고, 동적 화면(/mdd · 종목 상세)과 API 도 그 호출로
+ * 이 기한은 그 호출이 안 왔을 때의 상한이고, 동적 화면(/mdd)과 API 도 그 호출로
  * 같이 비워진다(revalidatePath("/", "layout") 은 그 아래 fetch 데이터 캐시까지 비운다).
  */
 export const READ_CACHE_SECONDS = 3600;

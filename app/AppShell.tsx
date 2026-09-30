@@ -1417,8 +1417,8 @@ function PageHeader() {
    * 말한다. 구조화 데이터는 그 화면을 정확히 설명해야 하므로, 이름을 모르면 **안 내는
    * 편이 맞다**(루트의 WebSite·Organization 은 그대로 남는다).
    *
-   * 종목·투자자 상세는 아직 사이트맵에도 없다. 종목별 실주소 작업에서 자기 제목을
-   * 갖게 되면 그때 여기 조건을 풀면 된다.
+   * 종목·투자자 상세는 이름을 아는 화면 파일이 자기 구조화 데이터를 직접 낸다(국장 종목과 같다 ·
+   * app/insider/stock/[ticker]/detail.tsx · app/insider/investor/[cik]/page.tsx). 여기 조건은 그대로 둔다.
    */
   const named = Boolean(deep) || child?.href === pathname || page?.href === pathname;
   return (

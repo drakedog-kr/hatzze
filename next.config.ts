@@ -42,7 +42,25 @@ const nextConfig: NextConfig = {
   // 주의: 308 은 브라우저가 영구 캐시하므로, 되돌리려면 이 항목을 지우는 것만으로는
   // 이미 방문한 사용자에게 즉시 반영되지 않는다.
   async redirects() {
-    return [{ source: "/telegram", destination: "/kadera", permanent: true }];
+    return [
+      { source: "/telegram", destination: "/kadera", permanent: true },
+      // 미장 종목 상세의 차트 기간이 쿼리(`?p=1y`)에서 경로(`/insider/stock/NVDA/1y`)로 옮겨 갔다(2026-09-30).
+      // 쿼리를 읽는 화면은 사본(ISR)에 못 담겨서다(lib/insider-range.ts 머리말). 옛 주소·공유된 링크를 넘긴다.
+      // ⚠️ 값은 lib/insider-range.ts 의 ALT_RANGE_KEYS 와 같아야 한다 — 이 파일에서 lib 를 부르지 않으려고
+      //    글자로 적었고, tests/insider-range.test.ts 가 둘을 맞춰 본다. 기본 기간(`?p=6m`)은 넘기지 않는다
+      //    (기본 주소가 쿼리를 무시하고 같은 화면을 준다).
+      // ⚠️ 쿼리는 목적지에 그대로 따라붙는다(`…/1y?p=1y` · Next 문서 redirects.md). 화면이 쿼리를 안 읽고
+      //    canonical 이 기본 주소라 해가 없다.
+      {
+        source: "/insider/stock/:ticker",
+        has: [{ type: "query", key: "p", value: "(?<p>3m|1y|2y)" }],
+        destination: "/insider/stock/:ticker/:p",
+        permanent: true,
+      },
+      // 기본 기간에는 경로가 따로 없다(기본 주소 하나가 그 화면이다). 손으로 친 `/…/6m` 을 넘긴다. 페이지에서
+      // permanentRedirect 로 하면 loading.tsx 때문에 이미 흐르기 시작한 뒤라 308 이 아니라 meta refresh 가 된다.
+      { source: "/insider/stock/:ticker/6m", destination: "/insider/stock/:ticker", permanent: true },
+    ];
   },
 
   /**

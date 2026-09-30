@@ -6,6 +6,7 @@ import { getManagerDetail } from "@/lib/insider-detail";
 import { isCik } from "@/lib/insider-13f";
 
 import { SectionHead } from "../../../kadera/SectionHead";
+import { PageJsonLd } from "../../../JsonLd";
 import { INSIDER_CARD } from "../../../og-copy";
 import { pageMetadata } from "../../../seo";
 import { C, Icon, MONO } from "../../../ui";
@@ -101,10 +102,16 @@ function Rows({ items, name }: { items: React.ReactNode[]; name: string }) {
   );
 }
 
+/** 이동 경로의 부모. 화면 맨 위 줄(BackTrail)과 구조화 데이터가 **같은 문자열**을 쓴다(JsonLd 머리말). */
+const PARENT = { name: "내부자 리포트", path: "/insider" };
+
 export async function generateMetadata({ params }: { params: Promise<{ cik: string }> }): Promise<Metadata> {
   const { cik } = await params;
   const d = await getManagerDetail(Number(cik));
-  if (!d) return pageMetadata({ title: "내부자 리포트 | hatzze", description: "", path: "/insider", ownImage: INSIDER_CARD.alt });
+  // ⛔ 없는 투자자에 canonical 을 주지 않는다. 예전엔 `/insider` 를 가리켜 "이 404 주소는 내부자 리포트와
+  //    같은 화면"이라고 말했다(국장 종목 화면이 먼저 고친 실수 · app/stock/[code]/page.tsx). 색인하지 말라고만 한다.
+  //    그냥 빼면 루트의 canonical `/` 를 물려받아 null 로 지운다(app/insider/stock/[ticker]/detail.tsx STOCK_NOT_FOUND_META).
+  if (!d) return { title: "투자자를 찾을 수 없습니다 | hatzze", robots: { index: false, follow: false }, alternates: { canonical: null } };
   return pageMetadata({
     title: `${d.person} 포트폴리오 · ${d.firm} 13F | hatzze`,
     description: `${d.person}(${d.firm})이 신고한 미국 상장주 ${d.holdings.length}종목. SEC 13F 공시 기준이며 직전 분기와 견준 변화를 함께 봅니다.`,
@@ -163,7 +170,14 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
     // (규칙은 globals.css 의 `[data-cur-default]`).
     <div className="hz-tx" data-cur-default="usd">
       <LoadFailedNote sources={d.failedSources} />
-      <BackTrail parent={{ name: "내부자 리포트", href: "/insider" }} current={d.person} />
+      {/* 셸은 이 화면의 이름을 몰라 구조화 데이터를 안 낸다(AppShell PageHeader 의 named). 여기서 낸다. */}
+      <PageJsonLd
+        title={d.person}
+        description={`${d.firm} ${d.person}의 SEC 13F 신고 보유 종목과 직전 분기 대비 변화입니다.`}
+        path={`/insider/investor/${d.cik}`}
+        trail={[PARENT]}
+      />
+      <BackTrail parent={{ name: PARENT.name, href: PARENT.path }} current={d.person} />
 
       <section className="hz-sheet">
         <div className="hz-kd-hero">

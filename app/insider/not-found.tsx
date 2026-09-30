@@ -7,4 +7,5 @@
  * 경계를 이 세그먼트에 하나 두면 한 경계만 건너면 되어 종목·인물 상세(`/insider/stock/ZZZZZ`)와
  * 같은 길이 된다.
  */
-export { default } from "../not-found";
+// 머리 태그(canonical 을 지우는 것)도 같이 가져온다 — 경계가 여기 있으면 루트 파일의 메타데이터는 안 읽힌다.
+export { default, metadata } from "../not-found";
