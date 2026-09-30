@@ -58,9 +58,6 @@ export function DividendCalculator({
   popularUs,
   popularEtf,
   more,
-  computedFor,
-  priceDate,
-  usPriceDate,
   usdkrw,
   failedSources,
 }: {
@@ -70,9 +67,6 @@ export function DividendCalculator({
   popularUs: string[];
   popularEtf: string[];
   more: MoreLists;
-  computedFor: string | null;
-  priceDate: string | null;
-  usPriceDate: string | null;
   usdkrw: { rate: number; date: string | null } | null;
   /** 조회에 실패한 자료의 이름(lib/dividend.ts 의 DividendData.failedSources). 비면 안 그린다. */
   failedSources: string[];
@@ -356,25 +350,13 @@ export function DividendCalculator({
     );
   }
 
-  // 세금·시세는 히어로 라벨 옆 물음표 하나에 몰아 넣는다 — 바닥에 문단으로 두니 아무도 안 읽을 길이였다
-  // (2026-09-13 지적). 꼭 필요한 셋만: 세금을 어떻게 뗐나 · 시세와 기록이 언제 것인가 · 보장 없음.
-  // 출처 이름은 여기 안 적는다(같은 날 지적) — 사이트 바닥글의 '데이터 출처'가 그 자리다(app/Footer.tsx,
+  // 히어로 라벨 옆 물음표는 세금을 어떻게 뗐는지 한 줄만 말한다. 시세 기준일·배당 기록 기준·'배당은 바뀔 수 있다'까지
+  // 세 줄이던 것을 2026-09-30 에 줄였다(툴팁은 한 문장 — 이용자 지적 "너무 복잡해").
+  // 출처 이름은 여기 안 적는다(2026-09-13 지적) — 사이트 바닥글의 '데이터 출처'가 그 자리다(app/Footer.tsx,
   // stockanalysis 는 약관이 출처 표기를 조건으로 발췌를 허용하므로 거기서 지우지 말 것).
-  const helpText = [
-    mixed
-      ? `세금: 줄마다 고른 계좌로 — ${ACCOUNTS.map((a) => [a, byAccount(a.key).length] as const).filter(([, n]) => n > 0).map(([a, n]) => `${a.label} ${n}`).join(" · ")}`
-      : TAX_HELP[taxMode],
-    [
-      priceDate ? `시세: 국내 ${priceDate} 종가` : null,
-      usdkrw && usPriceDate ? `미국 ${usPriceDate} · 환율 ${Math.round(usdkrw.rate).toLocaleString("ko-KR")}원` : null,
-      computedFor ? `배당 기록은 ${computedFor} 기준 12개월` : null,
-    ]
-      .filter(Boolean)
-      .join(" · "),
-    "배당은 회사가 바꿀 수 있습니다.",
-  ]
-    .filter(Boolean)
-    .join("\n");
+  const helpText = mixed
+    ? `세금: 줄마다 고른 계좌로 — ${ACCOUNTS.map((a) => [a, byAccount(a.key).length] as const).filter(([, n]) => n > 0).map(([a, n]) => `${a.label} ${n}`).join(" · ")}`
+    : TAX_HELP[taxMode];
 
   return (
     <div className="hz-tx">
@@ -401,7 +383,7 @@ export function DividendCalculator({
             <>
               <p className="dv-hero-label">
                 1년에 받는 배당{mixed ? " (계좌별)" : accountTag(taxMode)}
-                <span className="hz-tip hz-tip-wide hz-tip-lines dv-help" data-tip={helpText} style={{ cursor: "help" }} aria-label="세금·시세·출처 설명">
+                <span className="hz-tip hz-tip-wide dv-help" data-tip={helpText} style={{ cursor: "help" }} aria-label="세금 설명">
                   <Icon name="help" style={{ fontSize: "var(--fs-14)" }} />
                 </span>
               </p>

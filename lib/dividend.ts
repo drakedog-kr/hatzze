@@ -800,7 +800,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       icon: "toll",
       codes: codes(covered),
       meta: "yield",
-      caution: "분배금엔 주가 상승분을 미리 떼어 받는 몫이 섞입니다. 목표 분배율은 약속이 아닙니다.",
+      caution: "분배금엔 주가 상승분을 미리 떼어 받는 몫이 섞입니다.",
     },
     {
       key: "reit",
@@ -856,7 +856,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       icon: "star",
       codes: codes(preferred),
       meta: "discount",
-      caution: "의결권이 없고 거래가 적어 배당수익률이 높아 보입니다. 오래 둘 돈에 맞습니다.",
+      caution: "의결권이 없고 거래가 적어 배당수익률이 높아 보입니다.",
     },
     {
       key: "account",
