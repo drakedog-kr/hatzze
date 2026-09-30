@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-import { BLUE, CARD_BG, COLD, TRACK, OG_SIZE, TitleCard, dataUri, loadOgFonts } from "../og-card";
+import { BLUE_2, CARD_BG, CHIP, OG_SIZE, TitleCard, WARM_2, dataUri, loadOgFonts } from "../og-card";
 import type { OgCopy } from "../og-copy";
 
 /**
@@ -9,15 +9,19 @@ import type { OgCopy } from "../og-copy";
  */
 
 /**
- * 테마 지도. **목록 화면의 Treemap 생김새를 그대로 옮긴 그림**이다 — 큰 칸일수록 관심이 많고 진하다.
+ * 테마 지도. **목록 화면의 Treemap 생김새를 그대로 옮긴 그림**이다 — 칸 크기가 관심, 색이 변화다.
  * 값은 생김새만 옮긴 것이라 특정 날의 판이 아니다. 글자는 안 넣는다(Satori 가 SVG 안 글자에 폰트를 못 넘긴다).
+ *
+ * 색은 화면과 **같은 말**을 한다 — 늘어난 칸은 따뜻한 색(--c-warm-2), 줄어든 칸은 파랑(--c-blue-2), 그대로인 칸은
+ * 칩 회색이고 농도 세 단계(24·45·58%)도 kadera.css 의 `.hz-tm-tile.is-up-N` 그대로다(흰 카드 위 불투명도 = color-mix).
+ * 예전엔 파랑 계열만 칠해 실제 지도의 따뜻한 칸이 카드에 없었다(2026-09-30 점검).
  */
 const TILES: { x: number; y: number; w: number; h: number; fill: string; opacity: number }[] = [
-  { x: 0, y: 0, w: 150, h: 230, fill: COLD, opacity: 1 },
-  { x: 156, y: 0, w: 188, h: 120, fill: BLUE, opacity: 0.8 },
-  { x: 156, y: 126, w: 100, h: 104, fill: BLUE, opacity: 0.55 },
-  { x: 262, y: 126, w: 82, h: 50, fill: BLUE, opacity: 0.35 },
-  { x: 262, y: 182, w: 82, h: 48, fill: TRACK, opacity: 1 },
+  { x: 0, y: 0, w: 150, h: 230, fill: WARM_2, opacity: 0.58 },
+  { x: 156, y: 0, w: 188, h: 120, fill: BLUE_2, opacity: 0.45 },
+  { x: 156, y: 126, w: 100, h: 104, fill: WARM_2, opacity: 0.45 },
+  { x: 262, y: 126, w: 82, h: 50, fill: BLUE_2, opacity: 0.24 },
+  { x: 262, y: 182, w: 82, h: 48, fill: CHIP, opacity: 1 },
 ];
 
 function tilesSvg(): string {

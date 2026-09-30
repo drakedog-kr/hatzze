@@ -16,25 +16,23 @@ const nextConfig: NextConfig = {
   // 공격면이 된다. 쓰지 않는 것은 닫는다(2026-09-26).
   images: { unoptimized: true },
 
-  // OG 이미지(app/opengraph-image/route.tsx)가 런타임에 읽는 폰트를 프로덕션 번들에
-  // 확실히 포함시킨다 — 없으면 배포 환경에서 폰트 로딩이 실패할 수 있다.
-  // 본문·설명은 Pretendard(한글), 워드마크는 브랜드 서체 Bricolage Grotesque.
-  outputFileTracingIncludes: {
-    // 홈은 매 요청 그리는 라우트라 런타임에 폰트를 읽는다. /kadera·/mdd 카드는 빌드
-    // 시점에 굳지만, Next 가 요청 시 렌더로 돌려도 죽지 않도록 같이 넣어 둔다.
-    "/opengraph-image": [
-      "./node_modules/pretendard/dist/public/static/Pretendard-*.otf",
-      "./node_modules/@fontsource/bricolage-grotesque/files/bricolage-grotesque-latin-700-normal.woff",
-    ],
-    "/kadera/opengraph-image": [
-      "./node_modules/pretendard/dist/public/static/Pretendard-*.otf",
-      "./node_modules/@fontsource/bricolage-grotesque/files/bricolage-grotesque-latin-700-normal.woff",
-    ],
-    "/mdd/opengraph-image": [
-      "./node_modules/pretendard/dist/public/static/Pretendard-*.otf",
-      "./node_modules/@fontsource/bricolage-grotesque/files/bricolage-grotesque-latin-700-normal.woff",
-    ],
-  },
+  // 공유 카드(opengraph-image)가 런타임에 읽는 폰트를 프로덕션 번들에 확실히 싣는다 — 없으면 배포 환경에서
+  // 폰트 로딩이 실패한다. 본문은 Pretendard(한글) 두 굵기, 워드마크는 브랜드 서체 Bricolage Grotesque.
+  //
+  // ⭐ 키는 **카드 전부**를 잡는 패턴이다(picomatch · Next 문서 output.md). 예전엔 홈·/kadera·/mdd 셋만 적혀 있어
+  //    /kadera/us 와 요청 시 그리는 테마 42장이 빠져 있었다(2026-09-30 점검). 값은 카드가 실제로 읽는 세 파일뿐이다
+  //    (app/og-fonts.ts) — 예전 glob `Pretendard-*.otf` 는 안 쓰는 일곱 굵기까지 약 14MB 를 실었다.
+  //    둘이 어긋나지 않는지 tests/og-routes.test.ts 가 본다.
+  outputFileTracingIncludes: Object.fromEntries(
+    ["/opengraph-image", "/**/opengraph-image"].map((route) => [
+      route,
+      [
+        "./node_modules/pretendard/dist/public/static/Pretendard-ExtraBold.otf",
+        "./node_modules/pretendard/dist/public/static/Pretendard-Medium.otf",
+        "./node_modules/@fontsource/bricolage-grotesque/files/bricolage-grotesque-latin-700-normal.woff",
+      ],
+    ]),
+  ),
 
   // 카더라 리포트가 /telegram 으로 먼저 배포됐다(2026-07-20). /kadera 로 옮기면서
   // 옛 주소로 들어오는 방문자·검색엔진을 넘긴다. permanent=true 는 308(301과 동등하게
@@ -75,8 +73,10 @@ const nextConfig: NextConfig = {
    * 크롤러가 robots.txt 를 따르기 때문에, 막는 순간 공유 카드가 통째로 죽는다.
    * `X-Robots-Tag: noindex` 는 가져가는 것은 그대로 두고 색인만 뗀다.
    *
-   * ⚠️ 경로를 손으로 적는다. 새 화면에 `opengraph-image.tsx` 를 놓으면 여기 한 줄을
-   *    같이 넣을 것 — 안 넣어도 화면은 멀쩡해서 티가 안 난다.
+   * ⭐ 경로는 **패턴 하나**다(`:path*` 뒤에 opengraph-image — 홈의 `/opengraph-image` 도 잡는다). 예전엔 카드 열세 곳을
+   *    손으로 적었고 "새 카드를 놓으면 여기 한 줄을 같이 넣을 것 — 안 넣어도 화면은 멀쩡해서 티가 안 난다"는 주석이
+   *    지키는 전부였다. 사이트맵을 두 번 빠뜨린 것과 같은 자리라 패턴으로 바꾸고, 카드 파일마다 이 패턴에 걸리는지
+   *    tests/og-routes.test.ts 가 Next 의 매처로 확인한다.
    */
   async headers() {
     const noindex = { key: "X-Robots-Tag", value: "noindex" };
@@ -119,21 +119,7 @@ const nextConfig: NextConfig = {
         source: "/fonts/:path*",
         headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
       },
-      ...[
-        "/opengraph-image",
-        "/kadera/opengraph-image",
-        "/kadera/us/opengraph-image",
-        "/mdd/opengraph-image",
-        "/insider/opengraph-image",
-        "/dividend/opengraph-image",
-        "/daily/opengraph-image",
-        "/preview/opengraph-image",
-        "/changelog/opengraph-image",
-        // 테마 목록 둘과 테마 42장(2026-09-27). `:theme` 한 칸이 `/theme/us/opengraph-image` 도 잡는다.
-        "/theme/opengraph-image",
-        "/theme/:theme/opengraph-image",
-        "/theme/us/:theme/opengraph-image",
-      ].map((source) => ({ source, headers: [noindex] })),
+      { source: "/:path*/opengraph-image", headers: [noindex] },
     ];
   },
 };

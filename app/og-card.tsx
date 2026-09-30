@@ -1,6 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { BLUE, CARD_BG, INK, SUB, TRACK } from "./og-colors";
+import { OG_FONT_FILES } from "./og-fonts";
+
 /**
  * 공유 미리보기(OG) 카드가 공유하는 재료.
  *
@@ -8,23 +11,14 @@ import { join } from "node:path";
  * /kadera·/kadera/us·/mdd 는 각자의 정적 카드(각 폴더의 opengraph-image.tsx 파일 컨벤션).
  * 넷이 한 세트로 보이려면 배경·글자색·워드마크·폰트가 같아야 해서 여기에 모았다.
  *
- * Satori 는 CSS 변수를 못 읽어서 색을 직접 적는다. app/globals.css 의 라이트 테마
- * 값을 그대로 옮긴 것이니 그쪽을 바꾸면 여기도 바꿀 것.
+ * Satori 는 CSS 변수를 못 읽어서 색을 직접 적는다. 값은 app/og-colors.ts 에 있고 테스트가 theme.css 와 맞춰 본다.
  */
 export const OG_SIZE = { width: 1200, height: 630 };
 export const OG_CONTENT_TYPE = "image/png";
 
-/* ⚠️ 여기 hex 는 globals.css 의 토큰을 **손으로 베낀 것**이다. Satori 는 CSS 변수를
-   못 읽어서 값을 박을 수밖에 없는데, 그러면 팔레트를 바꿀 때 여기가 조용히 뒤처진다.
-   실제로 2026-08 콘솔 리디자인 뒤로 넉 달치가 옛 값(#191f28 · #4e5968 · #e5e8eb ·
-   #1b64da)으로 남아 있었다. **팔레트를 건드리면 이 줄들을 같이 볼 것.**
-   (같은 이유로 layout.tsx 의 theme-color 메타도 함께 봐야 한다.) */
-export const INK = "#0e2136"; // --c-ink
-export const SUB = "#556a84"; // --c-sub
-export const CARD_BG = "#ffffff"; // --c-card
-export const TRACK = "#eef3f9"; // --c-track
-export const BLUE = "#3182f6"; // --c-blue
-export const COLD = "#2371b2"; // --c-cold
+/* 색은 app/og-colors.ts 한 곳에 있다(theme.css 토큰을 손으로 옮긴 값 · tests/og-colors.test.ts 가 대조한다).
+   카드 파일들이 예전처럼 여기서 가져가도록 다시 내보낸다. */
+export { BLUE, BLUE_2, CARD_BG, CHIP, COLD, INK, OG_STAGES, SUB, TRACK, WARM_2 } from "./og-colors";
 
 const GHOST =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 104">' +
@@ -36,29 +30,41 @@ export function dataUri(svg: string): string {
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 }
 
-const FONT_DIR = "node_modules/pretendard/dist/public/static";
-// 워드마크는 본문과 서체가 다르다. app/Logo.tsx 의 브랜드 규격이
-// Bricolage Grotesque 700 · letter-spacing -0.035em 라, 화면과 공유 이미지가
-// 같은 글자로 보이려면 이 파일도 같은 서체를 써야 한다. 화면 쪽은 Google Fonts
-// CDN 으로 받지만 Satori 는 폰트 바이트를 직접 받아야 해서 여기서만 로컬 파일을 읽는다.
-const WORDMARK_FONT =
-  "node_modules/@fontsource/bricolage-grotesque/files/bricolage-grotesque-latin-700-normal.woff";
-
 /**
- * ImageResponse 에 넘길 폰트 바이트.
- * Satori 는 woff2 를 못 읽어서(otf·woff 만 읽는다) 화면과 달리 정적 파일을 쓴다.
+ * 카드가 읽는 폰트 파일은 app/og-fonts.ts 에 있다. next.config.ts 의 outputFileTracingIncludes 가 **그 셋만** 번들에
+ * 싣는다 — 예전 glob(`Pretendard-*.otf`)은 안 쓰는 굵기까지 9개(약 14MB)를 실었다.
+ * 워드마크 서체(Bricolage Grotesque)는 화면에선 Google Fonts CDN 으로 받지만 Satori 는 폰트 바이트를 직접 받아야
+ * 해서 여기서만 로컬 파일을 읽는다.
  */
-export async function loadOgFonts() {
+async function readOgFonts() {
+  const read = (f: string) => readFile(join(process.cwd(), f));
   const [extraBold, medium, bricolage] = await Promise.all([
-    readFile(join(process.cwd(), FONT_DIR, "Pretendard-ExtraBold.otf")),
-    readFile(join(process.cwd(), FONT_DIR, "Pretendard-Medium.otf")),
-    readFile(join(process.cwd(), WORDMARK_FONT)),
+    read(OG_FONT_FILES.extraBold),
+    read(OG_FONT_FILES.medium),
+    read(OG_FONT_FILES.wordmark),
   ]);
   return [
     { name: "Pretendard", data: extraBold, weight: 800 as const, style: "normal" as const },
     { name: "Pretendard", data: medium, weight: 500 as const, style: "normal" as const },
     { name: "Bricolage Grotesque", data: bricolage, weight: 700 as const, style: "normal" as const },
   ];
+}
+
+let fontsPromise: ReturnType<typeof readOgFonts> | null = null;
+
+/**
+ * ImageResponse 에 넘길 폰트 바이트.
+ * Satori 는 woff2 를 못 읽어서(otf·woff 만 읽는다) 화면과 달리 정적 파일을 쓴다.
+ *
+ * ⭐ 함수 인스턴스에서 **한 번만** 읽는다. 예전엔 요청마다 약 3.2MB 를 다시 읽었다 — 홈 카드는 동적이라 카톡·크롤러가
+ *    올 때마다 그 값을 치렀다. 읽다 실패하면 다음 요청이 다시 읽게 비워 둔다.
+ */
+export function loadOgFonts() {
+  fontsPromise ??= readOgFonts().catch((e) => {
+    fontsPromise = null;
+    throw e;
+  });
+  return fontsPromise;
 }
 
 export function Wordmark({ size }: { size: number }) {

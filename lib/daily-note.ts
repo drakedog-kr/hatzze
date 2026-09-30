@@ -204,6 +204,39 @@ export const listNotes = cache(async (limit: number = NOTE_ARCHIVE_LIMIT): Promi
   }
 });
 
+/** 피드(RSS) 한 줄. 본문은 요약을 뽑으려고 받는다. */
+export type FeedNote = { date: string; title: string; bodyMd: string; createdAt: string; updatedAt: string };
+
+/** 피드에 싣는 편수. 구독기는 새 글만 가져가고, 검색엔진은 사이트맵으로 전부를 본다 — 한 달이면 넉넉하다. */
+export const FEED_LIMIT = 30;
+
+/**
+ * RSS 피드용 최근 글(app/daily/rss.xml). 최신이 앞. 못 읽으면 null — 빈 목록과 가른다(빈 피드는 "글이 없다"는
+ * 뜻이 분명한 답이라, 조회 실패를 그걸로 위장하면 구독기가 글이 사라졌다고 읽는다).
+ *
+ * 발행 시각은 처음 올린 시각(created_at · 같은 날 다시 올려도 안 바뀐다)이다.
+ */
+export async function listFeedNotes(limit: number = FEED_LIMIT): Promise<FeedNote[] | null> {
+  const dev = devNotes();
+  if (dev) {
+    return dev.slice(0, limit).map((n) => ({ date: n.date, title: n.title, bodyMd: n.bodyMd, createdAt: n.updatedAt, updatedAt: n.updatedAt }));
+  }
+  try {
+    const { data, error } = await getSupabaseServer()
+      .from(TABLE)
+      .select("date,title,body_md,created_at,updated_at")
+      .order("date", { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return ((data as { date: string; title: string; body_md: string; created_at: string | null; updated_at: string }[] | null) ?? []).map(
+      (r) => ({ date: r.date, title: r.title, bodyMd: r.body_md, createdAt: r.created_at ?? r.updated_at, updatedAt: r.updated_at }),
+    );
+  } catch (e) {
+    console.error("[daily-note] 피드 목록을 읽지 못했습니다:", e);
+    return null;
+  }
+}
+
 export type NoteNeighbors = { prev: NoteStub | null; next: NoteStub | null };
 
 /**

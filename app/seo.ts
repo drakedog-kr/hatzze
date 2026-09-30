@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { getLatestDailyScore } from "@/lib/data";
 
 import { SITE_NAME, SITE_URL, SLOGAN } from "./brand";
+import { OG_DESIGN_VERSION, ogVersion } from "./og-copy";
 import { stageForScore } from "./ui";
 
 // 정의는 app/brand.ts 에 있다. 여기서는 기존 import 경로를 지키려고 다시 내보내기만 한다.
@@ -27,6 +28,9 @@ const OG_FALLBACK = {
  * 값(타임스탬프 등)을 넣으면 바뀐 게 없어도 재수집을 부르므로, **이미지에 실제로
  * 찍히는 값(기준일·정수 도수)만** 키로 쓴다. 구간 라벨은 도수에서 나오므로 따로 안 넣는다.
  *
+ * 끝의 `-d2` 는 카드 **그림**의 판이다(og-copy.ts OG_DESIGN_VERSION). 그림을 바꾼 날 같은 도수 주소에 옛 그림이
+ * 굳어 있지 않게 한다(2026-09-30 게이지 → 4칸 막대).
+ *
  * 쿼리는 캐시 키일 뿐이라 이미지 라우트는 이 값을 읽지 않는다(항상 최신을 그린다).
  * 조회가 실패하면 버전 없는 URL 로 두는데, 그 URL 이 그리는 폴백 카드는 날마다
  * 같은 그림이라 버전을 붙일 것도 없다.
@@ -37,7 +41,7 @@ async function ogImage(): Promise<OgImage> {
     if (!latest) return OG_FALLBACK;
     const deg = Math.round(latest.score);
     return {
-      url: `/opengraph-image?v=${latest.date}-${deg}`,
+      url: `/opengraph-image?v=${latest.date}-${deg}-d${OG_DESIGN_VERSION}`,
       ...OG_SIZE,
       alt: `hatzze 오늘의 코스피 과열도 ${deg}℃ · ${stageForScore(latest.score)} 구간`,
     };
@@ -64,7 +68,8 @@ async function ogImage(): Promise<OgImage> {
  *  - images 를 선언하면 → 그게 이긴다(자기 폴더의 opengraph-image.tsx 는 무시된다).
  *  - images 를 비우면 → 컨벤션이 채워 주지 **않는다**. og:image 가 통째로 사라진다.
  * 즉 어느 쪽이든 URL 을 손으로 가리켜야 한다. 다행히 컨벤션 파일이 만든 경로는
- * 해시 쿼리 없이도 같은 PNG 를 200 으로 주므로 그 경로를 그대로 쓴다.
+ * 해시 쿼리 없이도 같은 PNG 를 200 으로 주므로 그 경로를 그대로 쓴다. 대신 우리 버전(`?v=`)을 붙인다 —
+ * 컨벤션의 빌드 해시가 안 붙는 주소라, 버전이 없으면 카드를 고쳐도 카톡이 옛 그림을 계속 낸다(og-copy.ts ogVersion).
  * (루트는 규칙이 또 반대라, 컨벤션이 layout 의 images 를 도로 덮어썼다. 그래서 홈
  *  카드만 컨벤션을 못 쓰고 라우트 핸들러로 뺐다 — app/opengraph-image/route.tsx 주석 참고.)
  *
@@ -104,7 +109,10 @@ export async function pageMetadata({
   article?: { publishedTime: string; modifiedTime?: string };
 }): Promise<Metadata> {
   const images = [
-    ownImage ? { url: `${imagePath ?? path}/opengraph-image`, ...OG_SIZE, alt: ownImage } : await ogImage(),
+    ownImage
+      ? // 주소에 카드의 버전을 붙인다 — 글이나 그림을 고치면 주소가 바뀌어 카톡이 새로 긁는다(og-copy.ts ogVersion).
+        { url: `${imagePath ?? path}/opengraph-image?v=${ogVersion(ownImage)}`, ...OG_SIZE, alt: ownImage }
+      : await ogImage(),
   ];
   return {
     title,
