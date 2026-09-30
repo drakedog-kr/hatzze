@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { DOC_WIDTH } from "./legal";
@@ -26,6 +27,19 @@ import { C, Icon } from "./ui";
  *    위에 "내부자 리포트" 제목이 그대로 남는다. 여기 h1 과 둘이 되는데, 없는 주소의
  *    화면이라 감수한다. 셸을 고쳐 이 화면을 알아보게 하는 건 값에 비해 얻는 게 없다.
  */
+/**
+ * 404 의 머리 태그. 상태 404 로 나가는 없는 주소(`/nonexistent` · `/stock/000000`)는 페이지의 generateMetadata 가
+ * 아니라 **이 파일의** 메타데이터를 쓴다(레이아웃 → not-found 순으로 모은다 · next/dist/lib/metadata/resolve-metadata.js).
+ *
+ * ⛔ canonical 을 **지운다.** 안 적으면 루트가 선언한 canonical `/` 를 물려받아(app/seo.ts 주석) 모든 404 가
+ *    "나는 홈과 같은 화면"이라고 말했다(2026-09-30 실측 · `/stock/999999` 의 canonical 이 `https://hatzze.fun`).
+ *    제목도 없어 루트의 사이트 제목이 그대로 나갔다. noindex 는 Next 가 404 에 알아서 넣으므로 적지 않는다(두 벌이 된다).
+ */
+export const metadata: Metadata = {
+  title: "찾을 수 없는 주소입니다 | hatzze",
+  alternates: { canonical: null },
+};
+
 export default function NotFound() {
   return (
     <div style={{ maxWidth: DOC_WIDTH }}>

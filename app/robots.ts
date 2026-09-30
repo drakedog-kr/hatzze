@@ -40,6 +40,8 @@ export default function robots(): MetadataRoute.Robots {
       // 종목 실주소 464장. 콘솔에 손으로 안 넣어도 크롤러는 여기서 찾아온다
       // (app/sitemap-stocks.xml/route.ts 머리말 참고).
       `${SITE_URL}/sitemap-stocks.xml`,
+      // 내부자 리포트 상세 — 미장 종목 약 200 · 월가 투자자 약 60(app/sitemap-insider.xml/route.ts).
+      `${SITE_URL}/sitemap-insider.xml`,
       // 데일리 노트 날짜별 글. 안 연 동안은 적지 않는다 — 그 화면들이 noindex 인데 사이트맵을
       // 가리키면 두 신호가 어긋난다(app/sitemap-notes.xml 머리말).
       ...(DAILY_PUBLIC ? [`${SITE_URL}/sitemap-notes.xml`] : []),

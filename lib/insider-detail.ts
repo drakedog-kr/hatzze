@@ -34,45 +34,10 @@ import { displayName } from "@/lib/us-ticker-names";
 import { canonicalTicker, tickerSpellings } from "@/lib/us-ticker-spellings";
 import { filedQuarters, isCik, quarterMarks, stockPosition } from "@/lib/insider-13f";
 import { type MentionPoint, mentionTrend } from "@/lib/insider-trend";
+import { PRICE_RANGE_DEFAULT, isPriceRange, yearsOf } from "@/lib/insider-range";
 
 /** 언급 추이로 그리는 날수. 표에 41일치가 있어 그보다 길게 잡을 이유가 없다. */
 export const MENTION_TREND_DAYS = 40;
-
-/**
- * 차트 기간 선택지.
- *
- * ## ⚠️ 주가가 아니라 **공시가 어디까지 있느냐**로 정했다
- *
- * 벤치마킹한 쪽은 1W·1M·3M·1Y·5Y·ALL 이다. 그쪽 차트의 주인공은 주가지만 **우리 차트의
- * 주인공은 매매 시점**이라, 공시가 없는 구간은 빈 선일 뿐이다. 실측(2026-08-21):
- *
- *   창      임원 장내매매      의원 매매        13F 분기
- *   1개월   2,280건           104건           0개   ← 거물 배지를 눌러도 빈 화면
- *   3개월   8,062건           444건           1개
- *   6개월   11,018건(99.96%)  1,312건         2개   ← 분기 비교가 성립하는 최소
- *   1년     11,021건          2,211건(92%)    3개
- *   2년     11,022건(전부)     2,401건(99.9%)  3개   ← 우리가 가진 전부
- *
- * ⛔ 1주·1개월을 넣지 말 것 — 13F 분기가 0개라 "거물"을 골라도 아무것도 안 뜬다.
- *    눌러서 빈 화면이 나오는 선택지는 두면 안 된다.
- * ⛔ 5년·전체도 넣지 말 것 — 우리 공시가 최대 2년이라 3년이 빈 선이고 마커가 오른쪽
- *    끝에 뭉친다.
- */
-export const PRICE_RANGES = [
-  { key: "3m", label: "3개월", years: 0.25 },
-  { key: "6m", label: "6개월", years: 0.5 },
-  { key: "1y", label: "1년", years: 1 },
-  { key: "2y", label: "2년", years: 2 },
-] as const;
-
-export type PriceRangeKey = (typeof PRICE_RANGES)[number]["key"];
-
-/** 기본 창. 임원이 사실상 전부 들어오고 13F 두 분기가 잡히는 최소다. */
-export const PRICE_RANGE_DEFAULT: PriceRangeKey = "6m";
-
-export const yearsOf = (key: string | undefined): number =>
-  PRICE_RANGES.find((r) => r.key === key)?.years ??
-  PRICE_RANGES.find((r) => r.key === PRICE_RANGE_DEFAULT)!.years;
 
 /**
  * 차트에 찍는 매매 표시 한 점.
@@ -214,6 +179,14 @@ export type StockDetail = {
   failedSources: string[];
   ticker: string;
   name: string;
+  /**
+   * 우리 사전(`us_stocks`)에 있는 종목인가. 색인 문턱이다 — 사이트맵(app/sitemap-insider.xml)이 사전을
+   * 그대로 펼치므로 화면의 noindex 도 같은 잣대여야 두 신호가 안 어긋난다.
+   *
+   * 사전 밖 종목은 의원 신고로만 들어온다(13F·임원 표는 사전 종목만 받고, 의원 표만 외래키를 뗐다 —
+   * migration_049). 그 화면은 의원 몇 줄뿐이라 얇다.
+   */
+  listed: boolean;
   price: number | null;
   changeRate: number | null;
   usdKrw: number | null;
@@ -303,13 +276,13 @@ function quartersOf(dates: string[]): { latest: string | null; prior: string | n
   return { latest: q[0] ?? null, prior: q[1] ?? null };
 }
 
-export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string): Promise<StockDetail | null> => {
+const loadStockDetail = cache(async (rawTicker: string, range: string): Promise<StockDetail | null> => {
   // ⚠️ 표마다 클래스 표기가 갈린다(13F 는 BRK-B, 의원은 BRK.B, 나머지는 BRK). 하나만
   //    물으면 나머지 표가 통째로 안 잡혀 화면이 "0명" 이라고 **없다고 단언**한다.
   //    까닭과 접미사를 기계로 붙이면 안 되는 이유는 lib/us-ticker-spellings.ts 주석에.
   const ticker = canonicalTicker(rawTicker);
   const spellings = tickerSpellings(rawTicker);
-  const years = yearsOf(rangeKey);
+  const years = yearsOf(range);
   const db = getSupabaseAdmin();
   if (!db) return null;
 
@@ -637,6 +610,7 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
     failedSources,
     ticker,
     name,
+    listed: (stockRows.data?.length ?? 0) > 0,
     price: q?.price ?? null,
     changeRate: q?.changeRate ?? null,
     usdKrw: fx?.now ?? null,
@@ -679,6 +653,16 @@ export const getStockDetail = cache(async (rawTicker: string, rangeKey?: string)
       .sort((a, b) => b.filedDate.localeCompare(a.filedDate) || (b.value ?? 0) - (a.value ?? 0)),
   };
 });
+
+/**
+ * 종목 상세. **메타데이터와 본문이 같은 캐시 칸을 쓰게** 기간을 여기서 한 꼴로 맞춘다.
+ *
+ * React cache 는 인자 목록이 열쇠다. 예전엔 generateMetadata 가 `(ticker)`, 본문이 `(ticker, "6m")` 로
+ * 불러 두 칸이 됐고, 요청마다 조회 20여 번과 야후 두 번이 두 벌씩 돌았다(2026-09-30 점검). 없는 기간과
+ * 빈 기간을 모두 기본 기간으로 접어 넘기면 부르는 쪽이 어떻게 부르든 한 칸이다.
+ */
+export const getStockDetail = (rawTicker: string, rangeKey?: string): Promise<StockDetail | null> =>
+  loadStockDetail(rawTicker, isPriceRange(rangeKey) ? rangeKey : PRICE_RANGE_DEFAULT);
 
 export const getManagerDetail = cache(async (cik: number): Promise<ManagerDetail | null> => {
   // 번호로 못 읽는 주소는 묻지도 않고 "없는 인물"이다. 물으면 DB 가 400 을 내 아래에서

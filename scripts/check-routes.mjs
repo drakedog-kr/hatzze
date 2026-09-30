@@ -64,8 +64,9 @@ const DYNAMIC = new Map([
   ["/stock/[code]", "sitemap-stocks.xml 이 DB 를 읽어 펼친다(lib/stock-page.ts listIndexableStocks)"],
   ["/theme/[theme]", "사전의 테마 26개를 app/sitemap-urls.ts 가 THEME_NAMES 로 펼친다(열린 뒤에만)"],
   ["/theme/us/[theme]", "미장 사전의 테마 16개를 app/sitemap-urls.ts 가 US_THEME_NAMES 로 펼친다(열린 뒤에만)"],
-  ["/insider/stock/[ticker]", "수가 많고 DB 를 읽어야 한다. 사이트맵 동적 생성 때 다룬다"],
-  ["/insider/investor/[cik]", "위와 같다"],
+  ["/insider/stock/[ticker]", "미장 사전을 app/sitemap-insider.xml 이 읽어 펼친다(사전 밖 종목은 noindex)"],
+  ["/insider/stock/[ticker]/[range]", "차트 기간 주소. canonical 이 기본 주소(/insider/stock/[ticker])라 사이트맵에 싣지 않는다"],
+  ["/insider/investor/[cik]", "추적 명단 us_manager 를 app/sitemap-insider.xml 이 읽어 펼친다"],
   ["/daily/[date]", "날짜가 표에서 온다. app/sitemap-notes.xml 이 읽어 펼친다(lib/daily-note.ts listAllNoteDates)"],
 ]);
 
