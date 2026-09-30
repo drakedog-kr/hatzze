@@ -205,6 +205,9 @@ export default function RootLayout({
                   name: SITE_NAME,
                   url: SITE_URL,
                   logo: `${SITE_URL}/icon.svg`,
+                  // 네이버 서치어드바이저 '연관 채널'이 이 목록을 읽는다. 거기 제출한 채널이 네이버 검색의
+                  // hatzze.fun 결과 아래에 붙는다(노출 여부는 네이버가 사이트 신뢰도를 보고 정한다).
+                  sameAs: ["https://blog.naver.com/hatzze", "https://t.me/hatzze69"],
                 },
               ],
             }),
