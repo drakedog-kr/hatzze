@@ -1755,7 +1755,9 @@ function NewsStrip() {
           )}
         </span>
         <span className="hz-news-go">
-          <span className="hz-news-go-label">보러 가기</span>
+          {/* 문장이 먼저 서는 소식(head)은 밑줄 이름이 곧 할 일("받아 보기")이라 '보러 가기'를 겹쳐 적지 않는다(2026-10-01).
+              화살표는 남긴다 — 띠 전체가 눌린다는 표시다. 이름이 앞에 서는 소식("테마 리포트를 열었습니다")에는 그대로 붙는다. */}
+          {!news.head && <span className="hz-news-go-label">보러 가기</span>}
           <Icon name="arrow_forward" style={{ fontSize: "var(--fs-15)" }} />
         </span>
       </Link>
