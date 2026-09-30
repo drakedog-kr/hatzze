@@ -569,11 +569,14 @@ export async function listThemeOverview(): Promise<ThemeOverview[] | null> {
   const [rotation, baseDate] = await Promise.all([getThemeRotation(100), kaderaBaseDate()]);
   if (isLoadFailed(rotation)) return null;
 
-  // 집계가 있는 날 열흘. 기준일은 뺀다(아직 하루가 덜 찼다).
+  // 집계가 있는 날 열흘, **기준일까지**. 화면이 끝 두 칸을 '어제·오늘'로 읽고('새로 상위에 오른 테마' · '어제까지
+  // 5위 안'), 옆의 점유율·순위(로테이션)도 기준일을 넣은 사흘이다. 한동안 "아직 하루가 덜 찼다"며 기준일을 빼서 두 칸이
+  // 그저께·어제였다 — 오늘 뜬 테마는 오늘 보여야 한다(2026-09-29 결정). 미장 목록(listUsThemeOverview)과 같은 규칙.
+  // 21일 × 26테마 = 546행이라 1,000행 캡 안이다.
   const { data, error } = await db
     .from("telegram_theme_daily")
     .select("date,theme,share_pct")
-    .lt("date", baseDate)
+    .lte("date", baseDate)
     .gte("date", addDaysISO(baseDate, -THEME_FLOW_DAYS * 2))
     .order("date", { ascending: false });
   if (error) {

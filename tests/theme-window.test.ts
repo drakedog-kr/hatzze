@@ -53,3 +53,16 @@ describe("히어로와 나머지 칸이 같은 사흘", () => {
     });
   }
 });
+
+describe("테마 목록의 열흘 흐름도 기준일까지", () => {
+  // 목록 화면은 흐름의 끝 두 칸을 '어제·오늘'로 읽는다('새로 상위에 오른 테마' · '어제까지 5위 안'). 국장이 기준일을
+  // 빼서 그 두 칸이 그저께·어제였다. 오늘 뜬 테마는 오늘 보여야 한다(2026-09-29 결정) — 미장 목록은 처음부터 넣었다.
+  for (const [p, fn] of [["lib/theme-page.ts", "listThemeOverview"], ["lib/us-theme-page.ts", "listUsThemeOverview"]]) {
+    it(`${p} ${fn}`, () => {
+      const src = read(p);
+      const body = src.slice(src.indexOf(`export async function ${fn}(`));
+      const flowQuery = body.slice(0, body.indexOf(".order("));
+      assert.match(flowQuery, /\.lte\("date", baseDate\)/, "흐름 조회가 기준일을 넣지 않는다");
+    });
+  }
+});
