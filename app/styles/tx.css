@@ -1050,8 +1050,8 @@
   padding-bottom: 20px; border-bottom: 1px solid var(--c-sheet-row);
 }
 .hz-note-date { font-size: var(--fs-13); font-weight: 600; color: var(--c-muted); font-variant-numeric: tabular-nums; }
-/* 글 제목은 h2 다 — h1 은 셸의 "데일리 노트". 그래도 이 화면의 주인공이라 화면 제목(30)
-   바로 아래 크기(26)를 준다. keep-all 로 낱말 가운데서 안 끊는다. */
+/* 글 제목. 날짜 주소에서는 h1, /daily 에서는 h2 다(NoteView 주석). 태그와 상관없이 같아 보이게 여백·크기·굵기를
+   모두 여기서 정한다. 화면 제목(30) 바로 아래 크기(26)다. keep-all 로 낱말 가운데서 안 끊는다. */
 .hz-note-title {
   margin: 0; font-size: var(--fs-26); line-height: 1.32; font-weight: 800; letter-spacing: -.025em;
   color: var(--c-ink); word-break: keep-all; overflow-wrap: anywhere;
@@ -1785,4 +1785,65 @@
   }
   .hz-vlist > .hz-dist-row { padding: 1px 6px; gap: 6px; }
   .hz-vlist-more { display: none; }
+}
+
+/* ── 종목 상세(/stock/…) 일정 · 다음에 볼 곳 — 2026-09-30 ────────────────────────
+   값은 인라인이 아니라 여기 — 폰 규칙(≤560)이 이겨야 하고, 464장이 같은 인라인 style 을 HTML 에 되풀이하지 않게 한다. */
+/* 다가오는 일정 — 한 건 한 줄 타임라인 */
+.hz-stl { list-style: none; margin: 0; padding: 6px 26px 12px; }
+.hz-stl-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 18px 118px 60px minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 44px;
+  column-gap: 8px;
+}
+.hz-stl-row + .hz-stl-row { box-shadow: inset 0 1px 0 var(--c-hairline); }
+.hz-stl-row::before { content: ""; position: absolute; left: 4px; top: 0; bottom: 0; border-left: 2px solid var(--c-line); }
+.hz-stl-row:first-child::before { top: 50%; }
+.hz-stl-row:last-child::before { bottom: 50%; }
+.hz-stl-row:only-child::before { display: none; }
+.hz-stl-dot { position: relative; z-index: 1; width: 10px; height: 10px; border-radius: 50%; background: var(--c-card); box-shadow: inset 0 0 0 2px var(--c-blue); }
+.hz-stl-date { font-size: var(--fs-13-5); font-weight: 800; color: var(--c-ink); white-space: nowrap; }
+.hz-stl-dd { font-size: var(--fs-12); font-weight: 600; color: var(--c-sub); white-space: nowrap; }
+.hz-stl-ev { font-size: var(--fs-13-5); line-height: 1.6; color: var(--c-ink-soft); min-width: 0; word-break: keep-all; text-wrap: pretty; }
+.hz-stl-one { font-size: var(--fs-11-5); color: var(--c-sub); padding-right: 8px; }
+
+/* 다음에 볼 곳 */
+.hz-snext {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 22px 20px;
+  background: var(--c-card);
+  border-radius: var(--tx-r, 16px);
+  box-shadow: inset 0 0 0 1px var(--c-sheet-line);
+}
+.hz-snext-cap { font-size: var(--fs-14); font-weight: 800; color: var(--c-ink); letter-spacing: -0.01em; }
+.hz-snext-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.hz-snext-i {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 10px 12px 10px 14px;
+  border-radius: var(--tx-r-tile, 12px);
+  background: var(--tx-tile, var(--c-soft));
+  text-decoration: none;
+}
+.hz-snext-i:hover { background: var(--c-blue-tint); }
+.hz-snext-i .ms { display: block; }
+.hz-snext-tx { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.hz-snext-tx b { font-size: var(--fs-14); font-weight: 800; color: var(--c-ink); }
+.hz-snext-tx span { font-size: var(--fs-12); color: var(--c-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hz-snext-go { margin-left: auto; color: var(--c-muted); }
+
+@media (max-width: 560px) {
+  .hz-stl { padding: 4px 16px 10px; }
+  .hz-stl-row { grid-template-columns: 18px minmax(0, 1fr) auto; row-gap: 0; padding: 8px 0; }
+  .hz-stl-dd { display: none; }
+  .hz-stl-ev { grid-column: 2; }
+  .hz-stl-row > :last-child { grid-column: 3; grid-row: 1 / span 2; }
+  .hz-snext { padding: 16px; }
 }

@@ -10,7 +10,7 @@ import { DeltaPp, Pill, RankBadge } from "../kadera/parts";
 import { SectionHead } from "../kadera/SectionHead";
 import { AiMark, C, Icon, MONO } from "../ui";
 import type { ThemeMarket } from "./market";
-import { Treemap, TreemapLegend, stockTone, themeTiles } from "./Treemap";
+import { Treemap, TreemapLegend, themeTiles, toneForRatio } from "./Treemap";
 
 /**
  * 테마 목록의 본문 — **국장(/theme)과 미장(/theme/us)이 같이 쓴다.** 위에 히어로(1:1:2 판), 그 아래 **점유율 지도**(트리맵),
@@ -368,6 +368,7 @@ export function ThemeIndexView({
           /* 제목·설명은 짧고 글자 그대로(2026-09-21 "더 직관적이고 심플하게"). 셈법은 물음표 도움말로 내렸다. */
           title="테마별 급부상 종목"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
+          noteHelp="배수는 언급 수가 아니라 테마 대화에서 차지한 몫으로 견줍니다. 주말엔 대화가 평일의 10분의 1로 줄어, 언급 수를 그대로 견주면 요일이 배수를 정합니다."
           desc="테마마다 3일 전 대비 언급이 크게 늘어난 종목 하나와 요즘 도는 얘기입니다."
           level={2}
         />
@@ -399,7 +400,9 @@ export function ThemeIndexView({
                       <StockLogo code={r.code} name={r.name} market={r.market} size={26} />
                       <span className="hz-theme-namerow">
                         <span className="hz-theme-name" style={{ ...clip, fontSize: "var(--fs-13-5)", fontWeight: 800, letterSpacing: "-.01em" }}>{r.name}</span>
-                        <span className={`hz-theme-tag ${stockTone(r.recent, r.prior)}`}>{riserDelta(r)}</span>
+                        {/* 색은 **배수 그대로**(파이프라인이 몫으로 낸 값). 예전엔 최근·앞 언급 수의 비율로 칠해, 요일을 탄 숫자가
+                            글자(배수)와 다른 단을 골랐다. */}
+                        <span className={`hz-theme-tag ${toneForRatio(r.ratio, r.recent)}`}>{riserDelta(r)}</span>
                       </span>
                     </Link>
                     {/* 까닭(LLM 50~90자, ✨ 고지). 카더라 카드의 한 줄(22~30자)보다 길다 — 이 칸은 줄 폭을 다

@@ -254,9 +254,43 @@ def main() -> None:
     db.table(TABLE).upsert(row, on_conflict="date").execute()
     print(f"[Supabase] {TABLE} {date_iso} 저장 — /daily/{date_iso}")
     revalidate_site()
+    # 사본을 비운 **뒤에** 알린다 — 먼저 알리면 검색엔진이 옛 사본(글 없는 404)을 가져갈 수 있다.
+    ping_indexnow([f"{SITE_URL}/daily/{date_iso}"])
 
 
-REVALIDATE_URL = "https://hatzze.fun/api/revalidate"
+SITE_URL = "https://hatzze.fun"
+REVALIDATE_URL = f"{SITE_URL}/api/revalidate"
+
+# IndexNow 키. public/<키>.txt 로 공개돼 있다 — 키를 공개하는 것이 규약의 전제다(그 파일을 띄울 수 있다는 것이
+# 소유 증명이다). ⚠️ .github/workflows/indexnow.yml 의 KEY 와 같은 값이어야 한다.
+INDEXNOW_KEY = "ab6f7eb990b731962fa46e5b6693c232"
+# 규약상 한 곳에 내면 참여 엔진끼리 나눠 갖지만, 네이버는 자기 엔드포인트를 따로 안내해 둘 다 낸다(워크플로와 같다).
+INDEXNOW_ENDPOINTS = ("https://api.indexnow.org/IndexNow", "https://searchadvisor.naver.com/indexnow")
+
+
+def indexnow_body(urls: list[str]) -> dict:
+    """IndexNow 에 보낼 본문. 호스트는 사이트 주소에서 뗀다."""
+    host = SITE_URL.split("://", 1)[1]
+    return {"host": host, "key": INDEXNOW_KEY, "keyLocation": f"{SITE_URL}/{INDEXNOW_KEY}.txt", "urlList": urls}
+
+
+def ping_indexnow(urls: list[str]) -> None:
+    """새 글을 빙·네이버에 바로 알린다.
+
+    파이프라인 뒤에 도는 IndexNow 워크플로는 손으로 올리는 이 글에 닿지 않는다 — 다음 파이프라인까지 반나절을
+    기다리거나, 그때도 사이트맵 수정일로만 잡힌다(scripts/indexnow-urls.mjs). 올린 그 자리에서 한 편만 보낸다.
+    실패해도 올린 글은 그대로이고 사이트맵이 남아 있어 알리기만 한다.
+    """
+    data = json.dumps(indexnow_body(urls)).encode("utf-8")
+    for ep in INDEXNOW_ENDPOINTS:
+        req = urllib.request.Request(ep, data=data, method="POST", headers={"Content-Type": "application/json; charset=utf-8"})
+        try:
+            with urllib.request.urlopen(req, timeout=20) as res:
+                print(f"[indexnow] {ep} → {res.status}")
+        except urllib.error.HTTPError as e:
+            print(f"[indexnow] {ep} → {e.code} — 사이트맵으로 다음에 잡힙니다")
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            print(f"[indexnow] {ep} 접속 실패({e}) — 사이트맵으로 다음에 잡힙니다")
 
 
 def revalidate_site() -> None:

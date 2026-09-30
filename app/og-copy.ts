@@ -174,3 +174,54 @@ export function themeCard(theme: string, market: "kr" | "us", path: string): OgC
     alt: `${head} 테마 · 채널에서 요즘 무슨 얘기가 도는지, 말 많은 종목과 그 이유를 봅니다`,
   };
 }
+
+/**
+ * 카드 **그림**의 판. 카드를 그리는 코드(app/og-card.tsx · 각 폴더의 opengraph-image.tsx · 홈 카드 라우트)를 바꾸면
+ * 올린다. 글은 아래 ogVersion 이 알아서 세지만 그림은 코드라 셀 수가 없다.
+ *
+ *   1  첫 판(주소에 버전이 없던 때)
+ *   2  2026-09-30 — 홈 카드를 2색 4칸 막대로 · 모든 카드 주소에 버전을 붙임
+ */
+export const OG_DESIGN_VERSION = 2;
+
+/** 이 파일에 적힌 정적 카드. 테마 한 장 카드(themeCard)는 이름마다 만들어져 여기 없다. */
+const STATIC_CARDS: OgCopy[] = [
+  KADERA_CARD,
+  US_KADERA_CARD,
+  MDD_CARD,
+  INSIDER_CARD,
+  DIVIDEND_CARD,
+  NOTE_CARD,
+  PREVIEW_CARD,
+  CHANGELOG_CARD,
+  THEME_CARD,
+  US_THEME_CARD,
+];
+
+/** FNV-1a 32비트. 짧고 의존이 없으면 된다 — 암호가 아니라 '내용이 바뀌었나'의 표시다. */
+function fnv1a(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(36);
+}
+
+/**
+ * 카드 주소에 붙일 버전(`/kadera/opengraph-image?v=…`). 카드의 **글 전부와 그림 판**으로 만든다.
+ *
+ * ## 왜 붙이나
+ *
+ * 카카오·페이스북·X 는 og:image 를 **주소 단위로** 오래 캐시한다. 카드 글이나 그림을 고쳐도 주소가 같으면 이미 퍼진
+ * 채팅방은 물론이고 새로 공유하는 링크에도 옛 카드가 뜬다. 카드 문구는 줄바꿈·말풍선 겹침으로 여러 번 고쳤다(위 주석들).
+ * 홈 카드만 날짜·도수로 버전을 달고 있었고 나머지 열둘은 버전이 없었다(2026-09-30 점검). 글이 그대로면 버전도 그대로라
+ * 괜히 다시 긁어 가게 하지 않는다.
+ *
+ * 메타데이터는 카드의 alt 만 들고 온다(app/seo.ts 의 ownImage). 그 alt 로 이 파일의 카드를 찾아 글 전부를 세고,
+ * 못 찾으면(테마 한 장 카드) alt 만 센다 — 그 카드의 나머지 글은 테마 이름에서 기계로 나와 alt 와 같이 바뀐다.
+ */
+export function ogVersion(alt: string): string {
+  const card = STATIC_CARDS.find((c) => c.alt === alt);
+  return fnv1a(`${OG_DESIGN_VERSION}\n${card ? JSON.stringify(card) : alt}`);
+}

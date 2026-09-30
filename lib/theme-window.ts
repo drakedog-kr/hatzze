@@ -21,7 +21,7 @@ export function daysEndingAt(base: string, n: number): string[] {
 
 /**
  * 테마 상세의 창 — 추이 막대 `trendLen` 일, 그 끝 `recentLen` 일(최근), 그 앞 일수(평소).
- * 말 많은 종목의 '평소 대비'가 평소 하루 평균 × 최근 일수와 견준다(buildHotStocks).
+ * 말 많은 종목의 '평소 대비'가 평소 창의 **몫**을 최근 창에 옮긴 기대 언급 수와 견준다(buildHotStocks · lib/stock-usual.ts).
  */
 export function themeDetailWindow(base: string, trendLen: number, recentLen: number) {
   const trendDays = daysEndingAt(base, trendLen);

@@ -14,6 +14,7 @@ import {
   lastKaderaUpdatedAt,
 } from "./telegram-data";
 import { THEMES } from "./stock-themes";
+import { expectedUsualMentions } from "./stock-usual";
 import { themeDetailWindow } from "./theme-window";
 import { getEventsForCodes, todayKst, type UpcomingEvent } from "./kadera-why";
 import { isLoadFailed } from "./load-state";
@@ -280,7 +281,9 @@ export function parseBriefRow(b: BriefRow | null, meta: Awaited<ReturnType<typeo
 export type StockDailyLike = { date: string; code: string; mentions: number | null; channels: number | null; weight: number | string | null };
 
 /**
- * '이 테마의 주인공' — 최근 창 언급 합 순. 평소(usualDayCount 일)의 하루 평균 × 창 길이가 usualMentions.
+ * '이 테마의 주인공' — 최근 창 언급 합 순. usualMentions 는 **평소 몫으로 본 최근 창의 기대 언급 수**다
+ * (lib/stock-usual.ts expectedUsualMentions — 앞날들의 언급 합 ÷ 그날들 테마 대화 총량 × 최근 창 총량). 언급 수 그대로
+ * 하루 평균 × 창 길이로 재던 때는 요일을 탔다. `share` 가 없거나 총량을 못 읽었으면 그 옛 식으로 물러선다.
  * 국장·미장이 같은 규칙으로 줄을 세운다(lib/us-theme-page.ts). reasons 는 최신순이어야 종목마다 처음 만난 것이 가장 최근 까닭이다.
  */
 export function buildHotStocks(
@@ -289,6 +292,7 @@ export function buildHotStocks(
   usualDayCount: number,
   byCode: Map<string, ThemeMember>,
   reasons: ThemeReasonRow[],
+  share?: { usualDays: string[]; dayTotals: Map<string, number> | null },
 ): ThemeHotStock[] {
   const agg = new Map<string, { m: number; c: number; w: number; u: number }>();
   for (const r of rows) {
@@ -316,11 +320,41 @@ export function buildHotStocks(
       return {
         ...byCode.get(code)!,
         mentions: a.m,
-        usualMentions: usualDayCount > 0 ? (a.u / usualDayCount) * recentSet.size : 0,
+        usualMentions: share
+          ? expectedUsualMentions({ usualSum: a.u, recentDays: [...recentSet], usualDays: share.usualDays, dayTotals: share.dayTotals })
+          : usualDayCount > 0
+            ? (a.u / usualDayCount) * recentSet.size
+            : 0,
         channels: a.c,
         reason: why ? { date: why.date, reason: why.reason, changeRate: why.changeRate } : null,
       };
     });
+}
+
+/**
+ * 날짜 → 그날 **테마 대화 총량**(모든 테마의 mention_count 합 — 사전 종목 언급을 테마마다 센 것). '평소 대비'의 분모다
+ * (lib/stock-usual.ts). 파이프라인의 테마 급부상(common/theme_risers.py pick_risers)이 같은 값을 행에서 직접 센다.
+ *
+ * 국장 26테마 × 30일 = 780행 남짓이라 가볍다. 테마가 늘어 1,000행 캡을 넘어도 (date, theme) 순으로 이어 받는다.
+ * 못 읽으면 null — buildHotStocks 가 옛 식(하루 평균 × 일수)으로 물러선다. 실패는 fetch 자리에서 적혀(noteLoadFailure)
+ * 페이지 끝 assertLoaded 가 사본에 안 담는다.
+ */
+export async function themeDayTotals(
+  table: "telegram_theme_daily" | "telegram_us_theme_daily",
+  first: string,
+  last: string,
+): Promise<Map<string, number> | null> {
+  const db = getSupabaseAdmin();
+  let failed = false;
+  const rows = await fetchAllRows<{ date: string; theme: string; mention_count: number | null }>(
+    "theme",
+    () => db.from(table).select("date,theme,mention_count").gte("date", first).lte("date", last).order("date"),
+    { onError: (e) => { failed = true; console.error(`[themeDayTotals] ${table} 총량을 못 읽었습니다`, e); } },
+  );
+  if (failed) return null;
+  const out = new Map<string, number>();
+  for (const r of rows) out.set(r.date, (out.get(r.date) ?? 0) + (r.mention_count ?? 0));
+  return out;
 }
 
 /**
@@ -357,7 +391,7 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
   type ReasonRow = { date: string; stock_code: string; reason: string | null; change_rate: number | string | null; channel_count: number | null };
 
   let stockDailyFailed = false;
-  const [themeDaily, stockDaily, reasonRows, events, rotation, briefRow, meta] = await Promise.all([
+  const [themeDaily, stockDaily, reasonRows, events, rotation, briefRow, meta, dayTotals] = await Promise.all([
     db.from("telegram_theme_daily").select("date,share_pct,rank,mention_count").eq("theme", theme).gte("date", first).lte("date", last).order("date"),
     codes.length
       ? fetchAllRows<StockDailyRow>(
@@ -392,6 +426,8 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
       .limit(1)
       .maybeSingle(),
     channelMeta(),
+    // '평소 대비'의 분모 — 날마다의 테마 대화 총량(모든 테마). 종목 언급을 몫으로 견줘 요일을 지운다.
+    themeDayTotals("telegram_theme_daily", first, last),
   ]);
 
   let loadFailed = false;
@@ -436,12 +472,14 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
 
   // ── 말 많은 종목 ── 최근 사흘 언급 합 순. 머리가 "많이 언급된 순서"라고 말하니 잣대도 언급 수다
   // (테마 로테이션 팝오버는 주목도순인데, 그쪽은 "점유율을 만든 종목"이라 잣대가 다르다). 동률은 주목도.
+  const recentSet = new Set(recentDays);
   const hotStocks = buildHotStocks(
     stockDaily.map((r) => ({ date: r.date, code: r.stock_code, mentions: r.mention_count, channels: r.channel_count, weight: r.weighted_score })),
-    new Set(recentDays),
+    recentSet,
     usualDayCount,
     byCode,
     reasons,
+    { usualDays: trendDays.filter((d) => !recentSet.has(d)), dayTotals },
   );
 
   // ── 점유율·순위 ── 테마 로테이션과 같은 값이어야 카드에서 이 화면으로 넘어와도 숫자가 같다.
