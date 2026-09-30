@@ -157,6 +157,9 @@ const profile = {
  * 모바일 앱 커버(1080×1300). 폰으로 들어오는 사람이 가장 먼저 보는 판이다.
  * 위 160px 은 네이버 상단 바가, 아래 480px 쯤은 블로그명·별명·이웃추가 단추가 덮는다 —
  * 그림은 그 사이에 모은다.
+ *
+ * 뒤에 깔았던 꺾은선은 뺐다(2026-09-30, "지그재그 이상해"). 차트처럼 보이려던 장식이었는데
+ * 유령과 말풍선만으로 '데이터와 여론'이 읽힌다.
  */
 const cover = {
   file: "mobile-cover-1080x1300.png",
@@ -167,11 +170,6 @@ const cover = {
     1080,
     1300,
     `
-<!-- 뒤의 선은 오르내리기만 하고 방향이 없다. 오른쪽 위로 치솟는 선은 '오른다'로 읽힌다. -->
-<svg style="position:absolute;left:0;top:0" width="1080" height="1300" viewBox="0 0 1080 1300">
-  <polyline points="-10,600 110,650 210,590 320,640 430,560 540,620 650,570 760,640 870,580 980,630 1090,590"
-    fill="none" stroke="${C.line}" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
-</svg>
 <div style="position:absolute;left:${540 - 150}px;top:330px">${ghost(312)}</div>
 ${bubble("오늘 뭐래?", { x: 96, y: 236, size: 40, tail: "br", mine: true })}
 ${bubble("배당 얼마 받지?", { x: 650, y: 268, size: 40, tail: "bl" })}
