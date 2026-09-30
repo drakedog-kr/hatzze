@@ -6,7 +6,6 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { withSubjectParticle, withTopicParticle } from "@/lib/format";
 import {
   STOCK_STAT_DAYS,
-  STOCK_TREND_DAYS,
   fmtKoDate,
   getStockPage,
   stockHref,
@@ -27,9 +26,8 @@ import { StockLogo } from "../../StockLogo";
 import { KADERA_CARD } from "../../og-copy";
 import { pageMetadata } from "../../seo";
 import { AiMark, C, Icon, MONO, R } from "../../ui";
-import { PageTools } from "../../PageTools";
+import { BackTrail } from "@/components/back-trail";
 import { themeHref } from "@/lib/theme-href";
-import { KADERA_WINDOW_DAYS } from "@/lib/telegram-data";
 
 /**
  * 종목 하나의 실주소(`/stock/005930`).
@@ -60,10 +58,6 @@ import { KADERA_WINDOW_DAYS } from "@/lib/telegram-data";
  * 쪽에도 없어 **제목 칸을 통째로 비운다**(그게 의도다. 종목 이름을 셸이 알 방법이
  * 없다 — 셸은 클라이언트 컴포넌트라 DB 를 못 읽는다). 그래서 h1 과 구조화 데이터를
  * 이 파일이 직접 낸다. 다른 화면처럼 셸에 맡기면 464장이 전부 같은 h1 을 갖는다.
- *
- * 2026-09-30 부터는 셸이 이 경로에서 **머리를 아예 그리지 않는다**(AppShell 의 SELF_INTRO_PREFIXES). 예전엔 도구(다크 모드)만
- * 남은 빈 띠가 약 58px 있었고, 이름은 첫 카드 안에서야 나왔다. 이제 이 화면의 머리(Intro)가 부모 경로 · 이름(h1) · 종가 ·
- * 도구를 한 줄에 그린다 — 다른 화면의 제목 줄과 같은 자리다.
  */
 // 캐시 주기는 루트 레이아웃의 `revalidate` 가 정한다(app/layout.tsx). 예전엔 여기가
 // force-dynamic 이라 방문마다 서버가 새로 그렸다.
@@ -108,182 +102,100 @@ export async function generateMetadata({
   return d.indexable ? meta : { ...meta, robots: { index: false, follow: true } };
 }
 
-/** "2026-09-07" → "9/7". 막대 아래 눈금은 짧아야 칸 사이에 선다. */
-function mdLabel(iso: string) {
-  const [, m, d] = iso.split("-");
-  return `${Number(m)}/${Number(d)}`;
-}
-
-/** 그 날이 월요일인가 — 막대 아래 주 눈금. 날짜 문자열만 보므로 시간대와 무관하다. */
-function isMonday(iso: string) {
-  return new Date(`${iso}T00:00:00Z`).getUTCDay() === 1;
-}
-
 /**
  * 언급 추이 막대. **SVG 도 라이브러리도 안 쓴다** — 30개짜리 막대는 div 로 충분하고,
  * 서버 컴포넌트로 남길 수 있어 클라이언트 번들이 안 는다(내부자 종목 상세와 같은 꼴).
  *
  * ⚠️ 빈 날을 0 으로 메워 받는다. 안 메우면 언급 없는 날을 건너뛰어 막대 간격이 날짜와
  *    어긋나고, 추이가 실제보다 촘촘해 보인다.
- *
- * 2026-09-30: 최근 사흘(카더라와 같은 창 — 'LLM 문장이 말하는 기간')을 진하게, 그 전을 옅게 칠하고, 가장 많던 날에
- * '최다 N회'를 단다. 기준일은 합계에서 빼지만(아직 반나절) 막대 끝에 **빗금 칸**으로 둔다 — 위의 '왜 움직였나'가 그날
- * 이야기를 하는데 막대가 전날에서 끝나면 급등한 날이 그림에 없었다. 옅은 막대(--c-blue-3)의 명암비는 낮지만(2.0) 값은
- * 툴팁과 왼쪽 통계 칸에 있고, 두 색의 구분은 범례가 받친다(카더라 리포트 타일과 같은 짝).
  */
-function Trend({ points, today }: { points: StockTrendPoint[]; today: StockTrendPoint | null }) {
-  const max = Math.max(1, ...points.map((p) => p.mentions), today?.mentions ?? 0);
-  const cols = points.length + (today ? 1 : 0);
-  const recentFrom = points.length - KADERA_WINDOW_DAYS;
-  const peakAt = points.reduce((best, p, i) => (p.mentions > points[best].mentions ? i : best), 0);
-  const colPct = (i: number) => ((i + 0.5) / cols) * 100;
+function Trend({ points }: { points: StockTrendPoint[] }) {
+  const max = Math.max(1, ...points.map((p) => p.mentions));
   return (
-    <div className="hz-strend">
-      {points[peakAt].mentions > 0 && (
-        <span className="hz-strend-peak" style={{ left: `${colPct(peakAt)}%` }}>
-          최다 {points[peakAt].mentions.toLocaleString("ko-KR")}회
-        </span>
-      )}
-      <div className="hz-strend-bars">
-        {points.map((p, i) => {
-          // ⚠️⚠️ 손닿는 자리는 **막대가 아니라 칸 전체**다. 막대 높이로 호버를 받으면 언급이
-          //    적은 날은 높이가 3%(3px)뿐이라 사실상 못 짚는다.
-          const at = i / Math.max(1, cols - 1);
-          const edge = at > 0.72 ? " hz-tip-end" : at < 0.28 ? " hz-tip-start" : "";
-          return (
-            <span key={p.date} className={`hz-tip hz-vline hz-strend-col${edge}`} data-tip={`${fmtKoDate(p.date)} · 언급 ${p.mentions}회 · 채널 ${p.channels}곳`}>
-              <span
-                className={`hz-strend-bar${p.mentions ? (i >= recentFrom ? " is-recent" : "") : " is-zero"}`}
+    <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 96, padding: "4px 0 0" }}>
+      {points.map((p, i) => {
+        // ⚠️⚠️ 손닿는 자리는 **막대가 아니라 칸 전체**다. 막대 높이로 호버를 받으면 언급이
+        //    적은 날은 높이가 3%(3px)뿐이라 사실상 못 짚는다.
+        const at = i / Math.max(1, points.length - 1);
+        const edge = at > 0.72 ? " hz-tip-end" : at < 0.28 ? " hz-tip-start" : "";
+        return (
+          <span
+            key={p.date}
+            className={`hz-tip hz-vline${edge}`}
+            data-tip={`${fmtKoDate(p.date)} · 언급 ${p.mentions}회 · 채널 ${p.channels}곳`}
+            style={{
+              position: "relative",
+              flex: 1,
+              minWidth: 0,
+              height: "100%",
+              display: "flex",
+              alignItems: "flex-end",
+            }}
+          >
+            <span
+              style={{
+                width: "100%",
                 // 0 인 날도 1px 은 남긴다. 아예 없으면 "자료가 없는 날"과 구별이 안 된다.
-                style={{ height: `${Math.max(p.mentions ? 3 : 1, (p.mentions / max) * 100)}%` }}
-              />
-            </span>
-          );
-        })}
-        {today && (
-          <span className="hz-tip hz-vline hz-strend-col hz-tip-end hz-strend-today" data-tip={`${fmtKoDate(today.date)} · 집계 중(지금까지 ${today.mentions}회)`}>
-            <span className="hz-strend-bar is-partial" style={{ height: `${Math.max(today.mentions ? 3 : 1, (today.mentions / max) * 100)}%` }} />
+                height: `${Math.max(p.mentions ? 3 : 1, (p.mentions / max) * 100)}%`,
+                borderRadius: 2,
+                background: p.mentions ? C.blue : C.track,
+              }}
+            />
           </span>
-        )}
-      </div>
-      <div className="hz-strend-x" aria-hidden="true">
-        {points.map((p, i) =>
-          isMonday(p.date) ? (
-            // 끝 쪽 월요일 눈금은 폰에서 '집계 중' 눈금과 겹친다(칸이 좁다) — 그때만 숨긴다(tx.css ≤560).
-            <span key={p.date} className={today && i >= points.length - 3 ? "is-near-today" : undefined} style={{ left: `${colPct(i)}%` }}>
-              {mdLabel(p.date)}
-            </span>
-          ) : null,
-        )}
-        {today && (
-          <span className="hz-strend-x-today" style={{ left: `${colPct(points.length)}%` }}>
-            {mdLabel(today.date)}
-            <br />
-            집계 중
-          </span>
-        )}
-      </div>
+        );
+      })}
     </div>
   );
 }
 
-/** 통계 칸의 한 줄. 이름은 왼쪽, 값은 오른쪽 끝에 맞춘다. */
+/** 히어로 둘째 칸의 한 줄. 이름은 왼쪽, 값은 오른쪽 끝에 맞춘다. */
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="hz-sstat">
-      <span className="hz-sstat-l">{label}</span>
-      <span className="hz-sstat-v">
-        <strong>{value}</strong>
-        {sub && <span>{sub}</span>}
+    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
+      <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub, whiteSpace: "nowrap" }}>{label}</span>
+      <span style={{ textAlign: "right", minWidth: 0 }}>
+        <strong style={{ fontFamily: MONO, fontSize: "var(--fs-13)", fontWeight: 800, color: C.ink }}>{value}</strong>
+        {sub && <span style={{ fontSize: "var(--fs-11)", color: C.muted, marginLeft: 5 }}>{sub}</span>}
       </span>
     </div>
   );
 }
 
-/** 오르내림 색 — 이 저장소의 온도색 둘(--c-hot-ink · --c-cold-ink). 화살표를 같이 둔다(색만으로 방향을 말하지 않는다). */
-function moveColor(v: number) {
-  return v > 0 ? "var(--c-hot-ink)" : v < 0 ? "var(--c-cold-ink)" : C.sub2;
-}
-function moveText(v: number) {
-  return `${v > 0 ? "▲" : v < 0 ? "▼" : ""}${Math.abs(v).toFixed(2)}%`;
-}
-
 /**
- * 화면 머리 — 부모 경로 · 로고 · 이름(h1) · 코드와 시장 · 오른쪽 종가 · 도구, 그 아래 '왜 움직였나' 한 줄.
+ * 종가와 등락률. **야후가 아니라 `stocks` 표(KRX)에서 온 값**이다(머리말 참고).
  *
- * 종가는 **야후가 아니라 `stocks` 표(KRX)에서 온 값**이다(머리말 참고). 폰(≤560)에서는 종가가 둘째 줄로 내려가고
- * 도구는 탑바가 맡는다(다른 화면의 머리 도구와 같은 규칙 — .hz-page-tools 가 ≤900 에서 숨는다).
- *
- * 한 줄 미리보기는 상자 전체를 링크로 두지 않는다. 안의 ✨(AiMark)가 고지를 여는 **단추**라 링크 안에 넣으면 대화형
- * 요소가 겹친다. 오른쪽 '왜 움직였나 ›' 만 아래 시트로 가는 링크다.
+ * ⚠️ 오르내림 색은 이 저장소의 온도색 두 가지를 그대로 쓴다(--c-hot-ink · --c-cold-ink).
+ *    빨강·초록을 새로 들이면 이 화면만 다른 색 체계를 갖게 된다. 화살표를 같이 두는
+ *    것도 규칙이다 — 색만으로 방향을 말하면 색을 못 가르는 눈에는 아무 말도 아니다.
+ *    (app/insider/parts.tsx 의 Quote 와 같은 꼴이다. 저쪽은 달러라 그대로 못 쓴다.)
  */
-function Intro({ d, marketLabel, why, whyRate }: {
-  d: StockPageData;
-  marketLabel: string | null;
-  why: { reason: string | null } | null;
-  whyRate: number | null;
-}) {
+function Quote({ d }: { d: StockPageData }) {
+  if (d.price == null) return null;
+  const chg = d.changeRate;
   return (
-    <header className="hz-sintro">
-      <nav aria-label="현재 위치" className="hz-sintro-crumb">
-        <Link href={PARENT.path} className="hz-back-link">
-          {PARENT.name}
-        </Link>
-        <span aria-hidden="true">
-          <Icon name="chevron_right" style={{ fontSize: 15 }} />
-        </span>
-      </nav>
-      <div className="hz-sintro-row">
-        <div className="hz-sintro-id">
-          <StockLogo code={d.code} name={d.name} market={d.market} size={44} />
-          <div className="hz-sintro-name">
-            {/* 이 화면의 h1. 셸이 이 경로에서 머리를 그리지 않으므로 여기가 유일한 h1 이다. */}
-            <h1>{d.name}</h1>
-            <span>
-              {d.code}
-              {marketLabel && ` · ${marketLabel}`}
-            </span>
-          </div>
-        </div>
-        {d.price != null && (
-          <div className="hz-sintro-quote">
-            <span className="hz-sintro-quote-main">
-              <strong>{d.price.toLocaleString("ko-KR")}</strong>
-              <span className="hz-sintro-won">원</span>
-              {d.changeRate != null && (
-                <span className="hz-sintro-chg" style={{ color: moveColor(d.changeRate) }}>
-                  {moveText(d.changeRate)}
-                </span>
-              )}
-            </span>
-            {d.priceDate && <span className="hz-sintro-date">{fmtKoDate(d.priceDate)} 종가</span>}
-          </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+        <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
+          {d.price.toLocaleString("ko-KR")}
+        </strong>
+        <span style={{ fontSize: "var(--fs-13)", fontWeight: 600, color: C.sub }}>원</span>
+        {chg != null && (
+          <span
+            style={{
+              fontFamily: MONO,
+              fontSize: "var(--fs-13)",
+              fontWeight: 700,
+              whiteSpace: "nowrap",
+              color: chg > 0 ? "var(--c-hot-ink)" : chg < 0 ? "var(--c-cold-ink)" : C.sub2,
+            }}
+          >
+            {chg > 0 ? "▲" : chg < 0 ? "▼" : ""}
+            {Math.abs(chg).toFixed(2)}%
+          </span>
         )}
-        <div className="hz-page-tools hz-sintro-tools">
-          <PageTools />
-        </div>
-      </div>
-      {why?.reason && (
-        <div className="hz-sintro-why">
-          <AiMark size={15} style={{ flexShrink: 0 }} />
-          <p>
-            {why.reason}
-            {whyRate != null && (
-              <span className="hz-sintro-why-rate" style={{ color: moveColor(whyRate) }}>
-                {" "}
-                {moveText(whyRate)}
-              </span>
-            )}
-          </p>
-          <a href="#why" className="hz-sintro-why-go">
-            왜 움직였나
-            <span aria-hidden="true">
-              <Icon name="chevron_right" style={{ fontSize: 16 }} />
-            </span>
-          </a>
-        </div>
-      )}
-    </header>
+      </span>
+      {d.priceDate && <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>{fmtKoDate(d.priceDate)} 종가</span>}
+    </div>
   );
 }
 
@@ -367,84 +279,112 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
         trail={[PARENT]}
       />
 
-      <Intro d={d} marketLabel={marketLabel} why={why} whyRate={whyRate} />
+      <BackTrail parent={{ name: PARENT.name, href: PARENT.path }} current={d.name} />
 
       {/* ── 히어로 ──────────────────────────────────────────────────
-          두 칸. **얼마나 회자됐나(1/3) · 일별 추이(2/3).** 종목 정체와 종가는 머리(Intro)로 올라갔다 —
-          예전엔 첫 칸이 그 자리였고, 머리 줄은 도구만 있는 빈 띠였다(2026-09-30). */}
+          세 칸. **종목 정체 · 얼마나 회자됐나 · 일별 추이.**
+          가운데 칸이 이 화면의 주인공이다. 시세는 곁다리라 첫 칸 아래에 작게 둔다. */}
       <section className="hz-sheet">
-        <div className="hz-kd-hero hz-shero">
+        <div className="hz-kd-hero">
+          <div className="hz-kd-hero-q">
+            <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+              <StockLogo code={d.code} name={d.name} market={d.market} size={40} />
+              <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                {/* 이 화면의 h1. 셸의 헤더가 비어 있으므로 여기가 유일한 h1이다. */}
+                <h1
+                  style={{
+                    margin: 0,
+                    fontSize: "var(--fs-20)",
+                    fontWeight: 800,
+                    color: C.ink,
+                    letterSpacing: "-.02em",
+                    wordBreak: "keep-all",
+                  }}
+                >
+                  {d.name}
+                </h1>
+                <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub }}>
+                  {d.code}
+                  {marketLabel && <span style={{ fontFamily: "inherit", marginLeft: 6 }}>{marketLabel}</span>}
+                </span>
+              </span>
+            </div>
+            <Quote d={d} />
+          </div>
+
           <div className="hz-kd-hero-q">
             <div className="hz-kd-hero-title">
-              <span className="hz-shero-t">최근 {STOCK_STAT_DAYS}일</span>
+              <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>
+                최근 {STOCK_STAT_DAYS}일
+              </span>
             </div>
             {/* ⛔ 못 읽은 날에 **0 을 찍지 않는다.** 옆 칸은 "못 불러왔다"고 말하는데 이 칸만
                 "0회 언급 · 언급된 날 0일" 이면 한 화면이 서로 다른 두 말을 하고, 그중 하나는
                 거짓이다. 고장은 고장이라고 적는다. */}
             {d.loadFailed ? (
-              <p className="hz-shero-note">집계를 지금 불러오지 못했습니다.</p>
+              <p style={{ margin: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub, lineHeight: 1.7 }}>
+                집계를 지금 불러오지 못했습니다.
+              </p>
             ) : (
               <>
-                <span className="hz-shero-big">
-                  <strong>{d.totalMentions.toLocaleString("ko-KR")}</strong>
-                  <span>회 언급</span>
-                </span>
-                <div className="hz-sstats">
-                  <Stat label="언급된 날" value={`${d.activeDays}일`} />
-                  {/* 막대(최근 30일) 밖의 날짜면 그렇다고 적는다 — 옆 그림에서 그날을 찾다가 못 찾는다. */}
-                  {d.peak && (
-                    <Stat
-                      label="가장 많던 날"
-                      value={`${d.peak.mentions.toLocaleString("ko-KR")}회`}
-                      sub={`${fmtKoDate(d.peak.date)}${d.peak.date < d.trend[0].date ? " (그래프 밖)" : ""}`}
-                    />
-                  )}
-                  {/* ⛔ '기간 채널 수'가 아니다. 날이 다르면 채널 명단도 달라서 일별 값으로는
-                      합집합을 못 만든다(lib/stock-page.ts 머리말 ②). 라벨이 **하루**라고
-                      말하고 있어야 이 값이 정확해진다. */}
-                  {d.peakChannels && (
-                    <Stat
-                      label="하루 최다 채널"
-                      value={`${d.peakChannels.channels}곳`}
-                      sub={`${fmtKoDate(d.peakChannels.date)}${d.peakChannels.date < d.trend[0].date ? " (그래프 밖)" : ""}`}
-                    />
-                  )}
-                </div>
+                <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
+                <strong
+                  style={{ fontFamily: MONO, fontSize: "var(--fs-24)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}
+                >
+                  {d.totalMentions.toLocaleString("ko-KR")}
+                </strong>
+                <span style={{ fontFamily: MONO, fontSize: "var(--fs-22)", fontWeight: 600, color: C.sub }}>회</span>
+                <span style={{ fontSize: "var(--fs-17)", fontWeight: 600, color: C.sub }}>언급</span>
+              </span>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <Stat label="언급된 날" value={`${d.activeDays}일`} />
+                {d.peak && (
+                  <Stat label="가장 많던 날" value={`${d.peak.mentions.toLocaleString("ko-KR")}회`} sub={fmtKoDate(d.peak.date)} />
+                )}
+                {/* ⛔ '기간 채널 수'가 아니다. 날이 다르면 채널 명단도 달라서 일별 값으로는
+                    합집합을 못 만든다(lib/stock-page.ts 머리말 ②). 라벨이 **하루**라고
+                    말하고 있어야 이 값이 정확해진다. */}
+                {d.peakChannels && (
+                  <Stat
+                    label="하루 최다 채널"
+                    value={`${d.peakChannels.channels}곳`}
+                    sub={fmtKoDate(d.peakChannels.date)}
+                  />
+                )}
+              </div>
               </>
             )}
           </div>
 
           <div className="hz-kd-hero-h">
-            <div className="hz-kd-hero-title hz-shero-head">
-              <span className="hz-shero-t">
-                일별 언급 추이 <span>{STOCK_TREND_DAYS}일</span>
+            <div className="hz-kd-hero-title">
+              <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>
+                일별 언급 추이
               </span>
-              {!d.loadFailed && d.totalMentions > 0 && (
-                <span className="hz-shero-legend">
-                  <i className="is-recent" />
-                  최근 {KADERA_WINDOW_DAYS}일 {d.recentMentions.toLocaleString("ko-KR")}회
-                  <i />
-                  그 전
-                </span>
-              )}
             </div>
             {d.loadFailed ? (
               /* ⛔ "잡힌 적이 없습니다" 로 적으면 안 된다. 못 읽은 것과 없는 것은 다르고,
                  그 둘이 화면에서 같아지면 고장이 자료로 위장된다. */
-              <p className="hz-shero-note">언급 자료를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오.</p>
-            ) : d.totalMentions === 0 && !d.today?.mentions ? (
-              <p className="hz-shero-note">
+              <p style={{ margin: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub, lineHeight: 1.7 }}>
+                언급 자료를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오.
+              </p>
+            ) : d.totalMentions === 0 ? (
+              <p style={{ margin: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub, lineHeight: 1.7 }}>
                 {withTopicParticle(d.name)} 최근 {STOCK_STAT_DAYS}일 사이 주식 텔레그램에서 잡힌 적이 없습니다.
               </p>
             ) : (
               <>
-                {/* ⚠️ 기간은 양끝을 다 적는다 — "8월 2일부터 30일" 은 끝날짜로 읽혔다. 막대가 어디서 끝나는지와 오늘분이
-                    아직 집계 중이라는 것을 함께 말한다(기준일은 합계에 안 들어간다). */}
-                <span className="hz-shero-cap">
-                  {fmtKoDate(d.trend[0].date)} ~ {fmtKoDate(d.trend[d.trend.length - 1].date)}
-                  {d.today ? " · 오늘분 집계 중" : ""}
-                </span>
-                <Trend points={d.trend} today={d.today} />
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
+                  <span style={{ fontSize: "var(--fs-12)", color: C.sub }}>
+                    최근 3일 {d.recentMentions.toLocaleString("ko-KR")}회
+                  </span>
+                  {/* ⚠️ "8월 2일부터 30일" 로 적었더니 끝날짜("8월 30일")로 읽혔다.
+                      기간은 양끝을 다 적어야 한 가지로만 읽힌다. */}
+                  <span style={{ fontSize: "var(--fs-11)", color: C.muted, whiteSpace: "nowrap" }}>
+                    {fmtKoDate(d.trend[0].date)} ~ {fmtKoDate(d.trend[d.trend.length - 1].date)}
+                  </span>
+                </div>
+                <Trend points={d.trend} />
               </>
             )}
           </div>
@@ -456,8 +396,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
           3일 안의 것만 보여준다 —
           지난주 까닭을 오늘 시세 옆에 두면 다른 날 이야기가 된다. 없는 게 정상이라 없으면 안 그린다. */}
       {why && (
-        // 머리의 한 줄 미리보기가 여기로 온다(#why). 폰 탑바(54)에 안 가리게 scroll-margin 은 tx.css 가 준다.
-        <section className="hz-sheet hz-sanchor" id="why">
+        <section className="hz-sheet">
           <SectionHead
             /* ⚠️ trending_up 이었다. 카더라 '급등 종목' 카드에서 옮겨 온 값인데, 이 표는
                **내린 날도 보여준다**(바로 위 주석). 아래 등락률이 ▼ 로 찍히는 날 아이콘만
@@ -618,9 +557,9 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
 
       <NextLinks d={d} />
 
-      {/* 자료가 어디까지 찬 날인지. 카드마다 날짜를 적는 대신 바닥에 한 줄로 둔다. 기준일은 합계에 안 들어간다(막대 끝 빗금 칸). */}
+      {/* 자료가 어디까지 찬 날인지. 카드마다 날짜를 적는 대신 바닥에 한 줄로 둔다. */}
       <p style={{ margin: 0, fontSize: "var(--fs-11)", color: C.muted, textAlign: "right" }}>
-        집계 기준일 {fmtKoDate(d.baseDate)}(그날분은 집계 중). 언급은 주식 텔레그램 채널에서 셉니다.
+        집계 기준일 {fmtKoDate(d.baseDate)}. 언급은 주식 텔레그램 채널에서 셉니다.
       </p>
     </div>
   );
