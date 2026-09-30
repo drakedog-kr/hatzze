@@ -43,6 +43,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import has_column, get_client, load_all, load_all_keyset  # noqa: E402
+from common.theme_tone import THEME_TONE_MAX_THEMES, list_effect_lines, theme_tone_targets  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 from config.issue_keywords import EXCLUDE, MAX_KEYWORD_LEN, MIN_KEYWORD_LEN  # noqa: E402
 from config.stock_extraction import ALIASES as STOCK_ALIASES  # noqa: E402
@@ -446,6 +447,8 @@ def main() -> None:
     # ⚠️ 해시가 null 인 행(migration_065 이전 · backfill 전)은 중복 판정 없이 그대로 센다.
     seen_body: set[tuple[str, str]] = set()
     folded_dup = 0
+    list_tone: dict[tuple[str, str], Counter] = defaultdict(Counter)  # 나열 글이라 테마 톤에서 뺀 몫(미리보기용)
+    list_dropped = 0
 
     for a in analysis:
         key = (a["channel_handle"], a["message_id"])
@@ -468,11 +471,18 @@ def main() -> None:
                 # 이 메시지가 말한 종목들이 속한 테마 **전부**에 같은 톤을 반영(중복 제거).
                 # 국내 calculate_telegram_sentiment 와 같은 규칙이다 — 한 글이 엔비디아와
                 # 마이크론을 같이 말하면 AI반도체와 메모리 둘 다 그 톤을 겪은 것이 맞다.
-                for theme in {
+                # 단, 테마를 여럿 건드린 나열 글은 테마 톤에서 뺀다(common/theme_tone).
+                msg_themes = {
                     th
                     for tk in tickers_of_msg.get(key, ())
                     for th in themes_of_ticker.get(tk, ())
-                }:
+                }
+                targets = theme_tone_targets(msg_themes)
+                if msg_themes and not targets:
+                    list_dropped += 1
+                    for theme in msg_themes:
+                        list_tone[(date, theme)][a["sentiment"]] += 1
+                for theme in targets:
                     tone[(date, theme)][a["sentiment"]] += 1
 
         for word in a.get("keywords") or []:
@@ -492,6 +502,7 @@ def main() -> None:
         return
     if folded_dup:
         print(f"[집계] 같은 날 같은 본문이라 톤에서 접은 글 {folded_dup:,}건")
+    print(f"[집계] 테마 {THEME_TONE_MAX_THEMES}개 넘게 건드린 나열 글 {list_dropped:,}건 — 테마 톤에서만 뺐습니다")
 
     sentiment_rows = [
         {
@@ -545,6 +556,10 @@ def main() -> None:
         print(f"  {latest} 전체 {n}건 → 긍정 {overall['positive_count'] * 100 // n}% · "
               f"중립 {overall['neutral_count'] * 100 // n}% · "
               f"비관 {overall['negative_count'] * 100 // n}%")
+    # 나열 글을 넣었을 때와 뺀 뒤 — 화면 창(오늘+어제)과 같은 이틀. THEME_TONE_MAX_THEMES 를 고를 때 본다.
+    print(f"  나열 글 빼기 전 → 뒤 (최근 이틀 {', '.join(dates[-2:])})")
+    for line in list_effect_lines(tone, list_tone, dates[-2:]):
+        print(line)
 
     issue_rows, issue_days = issue_keyword_rows(keyword_rows, all_total_by_date, channels_by_day)
     arrow = {"up": "▲", "down": "▼", "flat": "·", None: " "}

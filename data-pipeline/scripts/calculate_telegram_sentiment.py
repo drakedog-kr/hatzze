@@ -17,6 +17,7 @@
 - **메시지 톤을 그 메시지가 언급한 모든 종목/테마에 동일하게 적용한다.** 한 메시지가 두
   종목을 서로 다른 톤으로 말하는 경우는 v1에서 감수한다 — 종목별로 나누려면 호출이 종목
   수만큼 늘어나는데, 실측상 대부분의 메시지는 단일 종목을 중심으로 쓰인다.
+  단, **테마를 여럿 건드린 나열 글(특징주·순위 목록)은 테마 톤에서 뺀다**(common/theme_tone).
 - **화제어 정규화**: 소문자·공백 제거로 버킷을 만들고(HBM/hbm/H B M 이 한 칸에 모임),
   ALIASES 로 표기 흔들림을 통합한 뒤, 일반어·종목명·길이 이상치를 버린다.
   화면 표기는 그 버킷에서 가장 자주 쓰인 실제 표기를 고른다 — 사전에 없는 새 이슈도
@@ -42,6 +43,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.market_tags import US_TAGS, is_us_only  # noqa: E402
 from common.supabase_client import has_column, get_client  # noqa: E402
+from common.theme_tone import THEME_TONE_MAX_THEMES, list_effect_lines, theme_tone_targets  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 from common.supabase_client import load_all, load_all_keyset  # noqa: E402
 from config.issue_keywords import (  # noqa: E402
@@ -271,6 +273,8 @@ def main() -> None:
 
     # ── 집계 ────────────────────────────────────────────────────────────────
     tone: dict[tuple[str, str], Counter] = defaultdict(Counter)  # (date, scope) -> 톤 카운트
+    list_tone: dict[tuple[str, str], Counter] = defaultdict(Counter)  # 나열 글이라 테마 톤에서 뺀 몫(미리보기용)
+    list_dropped = 0
     kw_hits: dict[tuple[str, str], int] = defaultdict(int)       # (date, 버킷) -> 횟수
     kw_spellings: dict[str, Counter] = defaultdict(Counter)      # 버킷 -> 실제 표기 빈도
     skipped_no_date = 0
@@ -309,7 +313,12 @@ def main() -> None:
             tone[(date, OVERALL)][sentiment] += 1
             # 이 메시지가 언급한 종목들이 속한 테마 전부에 같은 톤을 반영(중복 제거).
             msg_themes = {t for code in stock_codes_of_msg.get(key, ()) for t in themes_of_code.get(code, ())}
-            for theme in msg_themes:
+            targets = theme_tone_targets(msg_themes)
+            if msg_themes and not targets:
+                list_dropped += 1
+                for theme in msg_themes:
+                    list_tone[(date, theme)][sentiment] += 1
+            for theme in targets:
                 tone[(date, theme)][sentiment] += 1
 
         for word in a.get("keywords") or []:
@@ -325,6 +334,7 @@ def main() -> None:
     if folded_dup:
         print(f"[집계] 같은 날 같은 본문이라 톤에서 접은 글 {folded_dup:,}건")
     print(f"[집계] 미국 종목만 다뤄 톤에서 뺀 글 {dropped_us_only:,}건 (화제어는 그대로 셉니다)")
+    print(f"[집계] 테마 {THEME_TONE_MAX_THEMES}개 넘게 건드린 나열 글 {list_dropped:,}건 — 테마 톤에서만 뺐습니다")
 
     sentiment_rows = [
         {
@@ -368,6 +378,10 @@ def main() -> None:
     for r in top_theme:
         n = max(1, r["message_count"])
         print(f"    {r['scope']}: {n}건 · 긍정 {r['positive_count'] * 100 // n}%")
+    # 나열 글을 넣었을 때와 뺀 뒤 — 화면 창(오늘+어제)과 같은 이틀. THEME_TONE_MAX_THEMES 를 고를 때 본다.
+    print(f"  나열 글 빼기 전 → 뒤 (최근 이틀 {', '.join(dates[-2:])})")
+    for line in list_effect_lines(tone, list_tone, dates[-2:]):
+        print(line)
 
     # 화면의 이슈 키워드 카드와 **같은 규칙**으로 뽑아 그대로 저장한다. 예전엔 여기서
     # 7일 합만 세어 로그에 찍었는데, 그건 카드와 창도 문턱도 달라 눈으로 대조할 수 없었다.
