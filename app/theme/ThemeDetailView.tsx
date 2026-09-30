@@ -374,6 +374,7 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
           icon="leaderboard"
           title="이 테마의 주인공"
           note={`최근 ${KADERA_WINDOW_DAYS}일`}
+          noteHelp="평소 대비는 지난 한 달 동안 테마 대화에서 차지하던 몫과 견줍니다. 주말·이른 아침처럼 대화가 적은 날에도 숫자가 요일을 타지 않습니다."
           desc="상위 열 종목과 채널이 말한 이유입니다."
         />
         {d.loadFailed ? (

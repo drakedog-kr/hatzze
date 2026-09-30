@@ -18,8 +18,9 @@
 ## 창은 화면과 같다
 
 기준일을 **포함한** 사흘(brief_window). 화면의 '최근 사흘 점유율'과 '말 많은 종목'이 같은 사흘을
-세므로(lib/theme-window.ts) 문장이 다른 기간을 말하면 안 된다. 둘째 몫(갑자기 언급된 종목)의 까닭은
-종목 요약(build_stock_digests)의 창을 그대로 쓴다 — 그 종목은 theme_risers 가 그 창으로 고른다.
+세므로(lib/theme-window.ts) 문장이 다른 기간을 말하면 안 된다. 둘째 몫(갑자기 언급된 종목)도 같은 사흘이다 —
+theme_risers 가 기준일을 넣은 사흘로 고르고(2026-09-30 부터 · 예전엔 기준일을 빼 하루 어긋났다), 까닭 digest 도
+build_stock_digests(end=기준일)로 같은 사흘을 본다.
 
 ## 숫자는 문장에 안 옮긴다
 
@@ -518,8 +519,8 @@ def main() -> None:
     latest = rows[0]["date"]
     print(f"[기준일] {latest}")
 
-    # 요약 재료는 기준일을 넣은 사흘(brief_window) — 화면 창과 같다. 받아 오기는 하루 더 앞부터다: 아래
-    # 갑자기 언급 digest(build_stock_digests)가 기준일 전날에서 끝나는 사흘을 이 목록에서 스스로 거른다.
+    # 요약 재료는 기준일을 넣은 사흘(brief_window) — 화면 창과 같다. 받아 오기는 종목 digest 의 창(WINDOW_OFFSET)을
+    # 덮게 넉넉히 잡는다 — 아래 갑자기 언급 digest(build_stock_digests)가 이 목록에서 자기 창을 스스로 거른다.
     since, _until = brief_window(latest)
     stock_since = (date.fromisoformat(latest) - timedelta(days=1 + KR.WINDOW_OFFSET)).isoformat()
     msgs_list = KR.load_messages_since(db, stock_since)
@@ -537,10 +538,11 @@ def main() -> None:
     print(f"[재료] 창 안 종목 태그 {sum(len(v) for v in tags_by_key.values()):,}건 · 글 {len(tags_by_key):,}건")
 
     # ── 둘째 몫: 갑자기 많이 언급된 종목의 까닭 ──
-    # 창은 종목 요약(build_stock_digests)과 같은 사흘이라 digest 도 그 함수로 만든다.
+    # theme_risers 는 기준일을 넣은 사흘로 고른다. digest 도 그 사흘이어야 까닭이 같은 날들을 말한다 — end=기준일.
+    # (end 를 안 주면 build_stock_digests 는 기준일 전날에서 끝난다 — 카더라 종목 리포트의 창이다.)
     risers = theme_risers(db, latest)
     riser_codes = [r["code"] for r in risers]
-    riser_digests, _ = KR.build_stock_digests(db, latest, codes=riser_codes, msgs=msgs_list) if riser_codes else ([], [])
+    riser_digests, _ = KR.build_stock_digests(db, latest, codes=riser_codes, msgs=msgs_list, end=latest) if riser_codes else ([], [])
     digest_of = {code: d for code, _n, d in riser_digests}
     riser_of = {r["theme"]: r for r in risers}
     market_of = {s["code"]: s.get("market") for s in load_all(db, "stocks", "code,market", order_by="code")}

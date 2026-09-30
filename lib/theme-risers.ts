@@ -20,7 +20,10 @@ export type ThemeRiser = {
   recent: number;
   /** 그 앞 사흘 언급. 0 이면 새로 등장. */
   prior: number;
-  /** recent / prior. prior 가 0 이면 null(새로 등장). */
+  /**
+   * 최근 사흘 **몫** ÷ 앞 사흘 몫(테마 대화 총량에서 차지한 몫 · data-pipeline/common/theme_risers.py). 언급 수의 비율
+   * (recent / prior)과 다를 수 있다 — 주말이 낀 창은 총량이 작아서다. prior 가 0 이면 null(새로 등장).
+   */
   ratio: number | null;
   /** 채널이 말한 까닭(LLM, 50~90자). 파이프라인이 못 썼으면 null. */
   reason: string | null;

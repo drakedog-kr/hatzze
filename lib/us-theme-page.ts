@@ -16,6 +16,7 @@ import {
   flowStats,
   parseBriefRow,
   parseRisers,
+  themeDayTotals,
   themeQuotes,
   type BriefRow,
   type RiserRow,
@@ -82,7 +83,7 @@ export const getUsThemePage = cache(async (theme: string): Promise<ThemePageData
   type ReasonRow = { date: string; ticker: string; reason: string | null; quoted_change_rate: number | string | null; channel_count: number | null };
 
   let stockDailyFailed = false;
-  const [themeDaily, stockDaily, reasonRows, events, rotation, briefRow, meta, quoteMap] = await Promise.all([
+  const [themeDaily, stockDaily, reasonRows, events, rotation, briefRow, meta, quoteMap, dayTotals] = await Promise.all([
     db.from("telegram_us_theme_daily").select("date,share_pct,rank,mention_count").eq("theme", theme).gte("date", first).lte("date", baseDate).order("date"),
     fetchAllRows<StockDailyRow>(
       "id",
@@ -115,6 +116,8 @@ export const getUsThemePage = cache(async (theme: string): Promise<ThemePageData
       console.error(`[getUsThemePage] ${theme} 시세를 못 받았습니다`, e);
       return new Map<string, { price: number; changeRate: number | null }>();
     }),
+    // '평소 대비'의 분모 — 날마다의 미장 테마 대화 총량(국장 getThemePage 와 같은 규칙 · lib/stock-usual.ts).
+    themeDayTotals("telegram_us_theme_daily", first, baseDate),
   ]);
 
   let loadFailed = false;
@@ -143,12 +146,14 @@ export const getUsThemePage = cache(async (theme: string): Promise<ThemePageData
     return { date, share: r ? Number(r.share_pct) || 0 : 0, rank: r?.rank ?? null, mentions: r?.mention_count ?? 0, hasReason: reasonDates.has(date) };
   });
 
+  const recentSet = new Set(recentDays);
   const hotStocks = buildHotStocks(
     stockDaily.map((r) => ({ date: r.date, code: r.ticker, mentions: r.mention_count, channels: r.channel_count, weight: r.weighted_score })),
-    new Set(recentDays),
+    recentSet,
     usualDayCount,
     byCode,
     reasons,
+    { usualDays: trendDays.filter((d) => !recentSet.has(d)), dayTotals },
   );
 
   let recentShare: number | null = null;

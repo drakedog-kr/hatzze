@@ -6,7 +6,7 @@
 
   공통 규칙   COMMON 이 아니라 US_COMMON(generate_us_telegram_narratives) — 증권사 리포트 용어를 더 막고
               미국 기업 이름은 발췌의 한글 표기를 쓰라는 규칙이 붙어 있다.
-  창          기준일을 **포함한** 3일(window_dates). 국장은 기준일을 뺀 3일. 미장은 화면(getUsSentiment ·
+  창          기준일을 **포함한** 3일(window_dates). 국장도 같다(급부상 창은 2026-09-30 에 맞췄다). 미장은 화면(getUsSentiment ·
               getUsThemeRotation)이 전부 기준일을 넣어 세므로 여기도 같아야 문장이 같은 기간을 말한다.
   메시지      load_us_messages 가 본문·언급(티커·매칭 표기)을 한 번에 준다 — 국장처럼 태그 표를 따로 읽고
               본문을 뒤에 붙일 일이 없다(미국 언급 메시지는 창에 천여 건이라 본문째 받아도 가볍다).
