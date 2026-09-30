@@ -1755,12 +1755,15 @@ function NewsStrip() {
             news.tail
           )}
         </span>
-        <span className="hz-news-go">
-          {/* 문장이 먼저 서는 소식(head)은 밑줄 이름이 곧 할 일("받아 보기")이라 '보러 가기'를 겹쳐 적지 않는다(2026-10-01).
-              화살표는 남긴다 — 띠 전체가 눌린다는 표시다. 이름이 앞에 서는 소식("테마 리포트를 열었습니다")에는 그대로 붙는다. */}
-          {!news.head && <span className="hz-news-go-label">보러 가기</span>}
-          <Icon name="arrow_forward" style={{ fontSize: "var(--fs-15)" }} />
-        </span>
+        {/* 문장이 먼저 서는 소식(head)은 밑줄 이름이 곧 할 일("받아 보기")이라 '보러 가기 →'를 통째로 뺀다(2026-10-01).
+            글자만 뺐더니 화살표가 닫기(X) 바로 옆에 붙어 어색했다. 이름이 앞에 서는 소식("테마 리포트를 열었습니다")에는
+            그대로 붙는다. 닫기가 오른쪽 끝에 서는 건 링크의 flex:1 이 맡으므로 빼도 자리가 안 흔들린다. */}
+        {!news.head && (
+          <span className="hz-news-go">
+            <span className="hz-news-go-label">보러 가기</span>
+            <Icon name="arrow_forward" style={{ fontSize: "var(--fs-15)" }} />
+          </span>
+        )}
       </Link>
       <button type="button" onClick={dismiss} aria-label="알림 닫기" className="hz-news-x">
         <Icon name="close" style={{ fontSize: "var(--fs-17)" }} />
