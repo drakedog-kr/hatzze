@@ -358,6 +358,43 @@ const introPosts = {
 };
 
 /**
+ * 4·5·6. 실제 화면(1080×1350). capture.mjs 가 찍은 폰 화면(intro/shots/)을 카드에 넣는다.
+ * 폰 폭 390 을 560 으로 키워 넣고 위쪽만 보여 준 뒤 아래를 바탕색으로 흐려 '더 있다'를 말한다 —
+ * 화면 아래의 'PC를 권해 드립니다' 알림도 이렇게 빠진다. 캡처가 없으면 이 그림만 건너뛴다.
+ */
+function introShot(file, shot, label, headline, url) {
+  const src = join(HERE, "intro", "shots", shot);
+  return {
+    file,
+    needs: src,
+    w: 1080,
+    h: 1350,
+    scale: 1,
+    html: page(
+      1080,
+      1350,
+      `
+<div style="position:absolute;left:84px;right:84px;top:84px">
+  <div style="font-size:28px;font-weight:800;color:${C.blue};letter-spacing:-0.01em">${label}</div>
+  <div style="margin-top:14px;font-size:48px;font-weight:800;letter-spacing:-0.035em;line-height:1.3">${headline}</div>
+</div>
+<div style="position:absolute;left:${(1080 - 560) / 2}px;top:300px;width:560px;height:930px;overflow:hidden;
+  border-radius:40px;border:1px solid ${C.line};background:${C.card};box-shadow:0 18px 50px rgba(14,33,54,.12)">
+  <img src="${pathToFileURL(src).href}" style="display:block;width:560px">
+  <div style="position:absolute;left:0;right:0;bottom:0;height:170px;background:linear-gradient(180deg,rgba(247,250,253,0),${C.bg})"></div>
+</div>
+<div style="position:absolute;left:0;right:0;bottom:56px;text-align:center;font-size:28px;font-weight:700;color:${C.faint}">${url}</div>
+`,
+    ),
+  };
+}
+const introShots = [
+  introShot("intro/04-briefing-1080.png", "briefing.png", "시장 브리핑", "지금 시장이 몇 도인지 한눈에", "hatzze.fun"),
+  introShot("intro/05-kadera-1080.png", "kadera.png", "카더라 리포트", "주식 텔레그램에서<br>어떤 종목이 얼마나 오가는지", "hatzze.fun/kadera"),
+  introShot("intro/06-theme-1080.png", "theme.png", "테마 리포트", "요즘 어느 테마에<br>관심이 쏠리는지", "hatzze.fun/theme"),
+];
+
+/**
  * 크게 그려서 줄인다(SUPERSAMPLE 배).
  *
  * 크기 그대로 찍으면 두 가지가 거칠다(2026-09-30, "같은 크기에 화질만 고화질로"):
@@ -391,7 +428,11 @@ function shoot(htmlFile, w, h, scale, out) {
 const OUT = process.env.OUT_DIR ?? HERE;
 const chrome = chromePath();
 const work = mkdtempSync(join(tmpdir(), "naver-blog-"));
-for (const img of [profile, cover, title, widget, introCover, introScreens, introPosts]) {
+for (const img of [profile, cover, title, widget, introCover, introScreens, introPosts, ...introShots]) {
+  if (img.needs && !existsSync(img.needs)) {
+    console.log(`${THEME}  ${img.file}  건너뜀(캡처 없음: capture.mjs 를 먼저 돌린다)`);
+    continue;
+  }
   const W = img.w * img.scale;
   const H = img.h * img.scale;
   const base = join(work, img.file.replace(/\.png$/, "").replaceAll("/", "_"));
