@@ -409,7 +409,7 @@ export type UsSentiment = {
   basis: "market" | "all";
   /** 테마별 낙관↔비관(중립 제외). 표본을 같이 넘긴다 — 얇은 테마는 100:0 같은 극단값이
    *  나오는데, 몇 건 기준인지 보여줘야 그 숫자를 제대로 읽을 수 있다(국장과 같은 규칙).
-   *  usual 은 그 테마의 평소 낙관도(loadThemeUsual). 막대는 평소를 50:50 으로 옮겨 나눈다. 평소가 얇으면 null */
+   *  usual 은 그 테마의 평소 낙관도(loadThemeUsual). 툴팁이 평소와 견준 말을 한다(막대는 pos 그대로). 평소가 얇으면 null */
   byTheme: { name: string; pos: number; usual: number | null; positive: number; negative: number; total: number }[];
   /** 최근 SENTIMENT_TREND_DAYS 일 낙관도(sentimentTrend, 국장과 같은 규칙). 마지막 점이 score 다. 조회 실패면 null */
   trend: SentimentPoint[] | null;
@@ -534,7 +534,7 @@ export async function getUsSentiment(): Promise<UsSentiment | null> {
     themeAgg.set(r.scope, a);
   }
   // 언급이 많은 테마부터 넷. '가장 밝은 테마'로 세우면 표본 얇은 테마가 늘 위에 선다.
-  // 막대는 그 테마의 평소와 견준다 — 절대값은 늘 밝다(국장 loadThemeUsual 주석).
+  // 툴팁은 그 테마의 평소와 견준다 — 절대값은 늘 밝다(국장 loadThemeUsual 주석).
   const topThemes = [...themeAgg.entries()]
     .filter(([, a]) => a.pos + a.neg >= US_THEME_MIN_DECIDED)
     .sort((x, y) => y[1].total - x[1].total)
