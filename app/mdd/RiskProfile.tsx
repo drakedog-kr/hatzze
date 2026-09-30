@@ -73,10 +73,22 @@ function YearsPopover({ years, label }: { years: YearStat[]; label: string }) {
   );
 }
 
-export function RiskProfile({ r, periodLabel, market }: { r: RiskProfileData; periodLabel: string; market: string | null }) {
+export function RiskProfile({
+  r,
+  periodLabel,
+  market,
+  marketFailed = false,
+}: {
+  r: RiskProfileData;
+  periodLabel: string;
+  market: string | null;
+  /** 이번 응답에서 지수 시세를 일시적으로 못 받았다(api/mdd partial). "데이터가 없다"와 "지금 못 불러왔다"를 가른다. */
+  marketFailed?: boolean;
+}) {
   const yrs = Math.max(1, Math.round(r.years));
   const alone = r.withMarket === null ? 0 : r.bigDropCount - r.withMarket;
   const bench = benchName(market);
+  const benchMissing = marketFailed ? `${bench} 시세를 지금 불러오지 못했습니다` : `${bench} 데이터가 없습니다`;
   /* 두 벌을 구분해서 든다.
        scoped — **조회 기간 전체**의 해들. 머리 문장이 세는 창이고, '전체' 팝오버가 펴는 것도 이것이다.
        yearly — 그중 막대로 깔 최근 RISK_ROWS 줄. 자리 때문에 자른 것뿐이다.
@@ -114,7 +126,9 @@ export function RiskProfile({ r, periodLabel, market }: { r: RiskProfileData; pe
      ⚠️ '최악'(기간 전체 최대 낙폭)은 적지 않는다. 막대는 해 안에서 다시 잡은 고점 대비라 잣대가
      둘이 된다 — 기간 최저점은 히어로가 이미 크게 적는다.
      ⚠️ 수익은 **복리 연평균(CAGR)** 이라 문장에 "복리로"를 적는다. 산술 평균과 4~7%p 갈린다.
-     ⚠️ 비율("보상 0.89배")은 쓰지 않는다 — 1 미만의 '배'는 손해로 먼저 읽힌다. */
+     ⚠️ 비율("보상 0.89배")은 쓰지 않는다 — 1 미만의 '배'는 손해로 먼저 읽힌다.
+     ⚠️ 수익은 **주가만**이다(분할만 조정한 종가 · lib/mdd.ts). 배당을 넣지 않아 고배당주는 연 3~6%p 낮게 나온다 — 예전엔
+        "벌었습니다"라고 적어 총수익처럼 읽혔다(mdd#14). 문장에 '주가'와 '배당 제외'를 밝힌다. */
   const avgYearMdd = scoped.length ? scoped.reduce((s, y) => s + y.mdd, 0) / scoped.length : 0;
   const tile1: TileBody =
     yearly.length === 0
@@ -123,12 +137,12 @@ export function RiskProfile({ r, periodLabel, market }: { r: RiskProfileData; pe
           lead:
             r.annualReturn >= 0 && avgYearMdd < 0 ? (
               <>
-                해마다 <Num color={DOWN}>−{Math.abs(Math.round(avgYearMdd))}%</Num> 낙폭을 견디고 복리로 연{" "}
-                <Num color={UP}>+{r.annualReturn.toFixed(1)}%</Num>를 벌었습니다
+                해마다 <Num color={DOWN}>−{Math.abs(Math.round(avgYearMdd))}%</Num> 낙폭을 견디며 주가가 복리로 연{" "}
+                <Num color={UP}>+{r.annualReturn.toFixed(1)}%</Num> 올랐습니다(배당 제외)
               </>
             ) : (
               <>
-                연평균(복리) <Num color={DOWN}>{Math.abs(r.annualReturn).toFixed(1)}%</Num> 손실이라 견딘 위험을 보상하지 못했습니다
+                주가가 연평균(복리) <Num color={DOWN}>{Math.abs(r.annualReturn).toFixed(1)}%</Num> 내려 견딘 위험을 보상하지 못했습니다(배당 제외)
               </>
             ),
           viz: (
@@ -206,11 +220,11 @@ export function RiskProfile({ r, periodLabel, market }: { r: RiskProfileData; pe
     events.length === 0
       ? { lead: null, viz: empty("큰 하락이 없었습니다.") }
       : !events.some((e) => e.market !== null)
-        ? { lead: null, viz: empty(`${bench} 데이터가 없습니다.`) }
+        ? { lead: null, viz: empty(`${benchMissing}.`) }
         : {
             lead:
               r.withMarket === null ? (
-                <>{bench} 데이터가 없습니다</>
+                <>{benchMissing}</>
               ) : alone > 0 ? (
                 <>
                   큰 하락 <Num>{r.bigDropCount}번</Num> 중 <Num color={DOWN}>{alone}번</Num>은 이 종목만 빠졌습니다

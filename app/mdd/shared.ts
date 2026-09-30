@@ -24,6 +24,20 @@ export type ThemeCmp = { name: string; peers: Peer[]; avgDd: number; sincePeakAv
 // 이름이 아래 Attribution 컴포넌트와 겹쳐 Data 를 붙였다(파일을 나누면서 한 모듈 안 겹침이 import 충돌이 된다).
 export type AttributionData = { sincePeakDays: number; stock: number; market: number | null; theme: number | null };
 
+/**
+ * 이번 응답에서 **일시적으로 못 받은 것**(api/mdd 의 partial). 없으면 null.
+ * 화면은 이걸로 "기록이 없다"(자료 부재)와 "지금 못 불러왔다"(일시 실패)를 가른다 — 둘은 뜻이 다르다.
+ */
+export type MddPartial = {
+  /** 시장 지수(코스피·코스닥·S&P500) 시세를 못 받았다. */
+  market: boolean;
+  /** 테마 대표 종목 중 조회를 건 수와 받은 수. */
+  peersRequested: number;
+  peersOk: number;
+  /** 대표 종목 명단 조회 자체가 깨졌다(국내). */
+  lookupFailed: boolean;
+};
+
 export type MddResult = {
   ok: true;
   code: string;
@@ -34,6 +48,7 @@ export type MddResult = {
   attribution: AttributionData | null;
   theme: ThemeCmp | null;
   risk: RiskProfileData | null;
+  partial: MddPartial | null;
 };
 
 export const PERIODS: { key: string; label: string }[] = [
@@ -45,6 +60,57 @@ export const PERIODS: { key: string; label: string }[] = [
 ];
 
 export const DEFAULT: StockOption = { code: "005930", name: "삼성전자", market: "KOSPI" };
+
+/** 처음 여는 기간. 주소에 years 가 없으면 이것이다. */
+export const DEFAULT_YEARS = "10";
+
+/**
+ * 기간 키를 아는 것으로 접는다. 모르는 값·빈 값은 기본 기간이다.
+ * ⚠️ 객체 조회(`YEARS[k]`)로 거르면 "constructor" 같은 프로토타입 키가 통과한다 — 목록과 글자로 견준다.
+ */
+export function normalizeYears(raw: string | null | undefined): string {
+  return PERIODS.some((p) => p.key === raw) ? (raw as string) : DEFAULT_YEARS;
+}
+
+/**
+ * 고른 종목·기간의 주소 쿼리(`?code=…&market=…&years=…`). 공유·새로고침·뒤로 가기가 이 주소로 선다(MddExplorer).
+ * 기본 기간이면 years 를 뺀다 — 카더라 카드의 링크(/mdd?code=…&market=…)와 같은 꼴을 유지한다.
+ */
+export function mddQuery(s: Pick<StockOption, "code" | "market">, years: string): string {
+  const q = new URLSearchParams({ code: s.code });
+  if (s.market) q.set("market", s.market);
+  if (years !== DEFAULT_YEARS) q.set("years", years);
+  return `?${q}`;
+}
+
+/**
+ * 조회 기간을 사람 말로. 상장 이력이 요청 기간보다 짧으면(`truncated`) '상장 이후·약 N년'이다.
+ * 허용치 0.5년 — 1년 조회에서 8개월 이력도 '최근 1년'이 되는 문제는 알려져 있다(mdd#16).
+ */
+export function periodInfo(years: string, firstDate: string, asOf: string): { label: string; truncated: boolean; approxYears: number } {
+  const approxYears = (Date.parse(asOf) - Date.parse(firstDate)) / (365 * 86_400_000);
+  const requested = years === "all" ? Infinity : Number(years);
+  const truncated = years !== "all" && approxYears < requested - 0.5;
+  const label = years === "all" || truncated ? `상장 이후·약 ${Math.max(1, Math.round(approxYears))}년` : `최근 ${years}년`;
+  return { label, truncated, approxYears };
+}
+
+/**
+ * 지금 낙폭이 **조회 기간의 최저점**인가. 히어로의 '가장 깊은 낙폭' 문장은 이때만 쓴다.
+ * 예전엔 회복 전례가 없다는 것만 보고 "지금이 이 종목의 역대 최대 낙폭"이라 적었다 — 100→55→60 처럼 저점에서
+ * 조금 올라온 때(지금 −40% · 기간 최저 −45%)에도, 1년 조회에서도 같은 문장이었다(mdd#5). 0.05%p 는 반올림 여유다.
+ */
+export const isDeepestNow = (a: { currentDd: number; mdd: number }) => a.currentDd <= a.mdd + 0.05;
+
+/**
+ * 히어로 바닥의 주의 한 줄. 전체 구간은 합병·감자가 섞이는 것을, 상장 이력이 요청보다 짧으면 표본이 짧음을 말한다.
+ * 예전엔 '2년 미만'으로 가려, 삼성전자를 1년으로 봐도 "표본이 짧아…"가 떴다(고른 기간이 1년일 뿐 표본이 짧은 게 아니다).
+ */
+export function cautionText(years: string, truncated: boolean, approxYears: number): string | null {
+  if (years === "all") return "전체 구간에는 합병·감자·액면병합이 섞여 있어, 아주 오래된 낙폭은 지금의 회사와 다를 수 있습니다.";
+  if (truncated) return `상장한 지 약 ${Math.max(1, Math.round(approxYears))}년이라 표본이 짧습니다. 더 오래된 종목과 같은 무게로 보지 마십시오.`;
+  return null;
+}
 
 /**
  * 검색 결과 줄에 붙는 시장 배지. **코스피는 안 붙인다** — 목록의 대부분이라 붙이면
@@ -73,12 +139,12 @@ export const fmtPrice = (n: number, market: string | null | undefined) =>
 /**
  * '시장'의 이름. 낙폭을 무엇과 견주고 있는지는 화면 곳곳에 글자로 나온다 —
  * 엔비디아 낙폭 옆에 "코스피"라고 적혀 있으면 그 문장은 통째로 거짓이 된다.
- * ⚠️ api/mdd 가 고르는 지수(^KS11 / ^GSPC)와 짝이다. 한쪽만 고치지 말 것.
+ * ⚠️ api/mdd 가 고르는 지수(^KS11 · ^KQ11 · ^GSPC)와 짝이다. 한쪽만 고치지 말 것.
  */
-export const benchName = (market: string | null | undefined) => (market === "US" ? "S&P500" : "코스피");
+export const benchName = (market: string | null | undefined) => (market === "US" ? "S&P500" : market === "KOSDAQ" ? "코스닥" : "코스피");
 
-/** 시장 이름에 붙는 주격 조사. "코스피는" · "S&P500은"(오백 → ㄱ받침). */
-export const benchParticle = (market: string | null | undefined) => (market === "US" ? "은" : "는");
+/** 시장 이름에 붙는 주격 조사. "코스피는" · "코스닥은"(닥 → ㄱ받침) · "S&P500은"(오백 → ㄱ받침). */
+export const benchParticle = (market: string | null | undefined) => (market === "US" || market === "KOSDAQ" ? "은" : "는");
 
 /**
  * "같은 기간 코스피는 −30.0%, 반도체 업종은 −35.3% ___" 의 마지막 동사.

@@ -8,7 +8,22 @@ import type { MddAnalysis } from "@/lib/mdd";
 import { C, Icon, MONO } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
 import { StockLogo } from "../StockLogo";
-import { fmtPct, fmtPrice, benchName, benchParticle, benchVerb, fmtDur, fmtDayCount, fmtDay, DOWN, UP, DOWN_BAR } from "./shared";
+import {
+  fmtPct,
+  fmtPrice,
+  benchName,
+  benchParticle,
+  benchVerb,
+  cautionText,
+  fmtDur,
+  fmtDayCount,
+  fmtDay,
+  isDeepestNow,
+  periodInfo,
+  DOWN,
+  UP,
+  DOWN_BAR,
+} from "./shared";
 import type { MddResult } from "./shared";
 import { Sheet, Foot, StatCell } from "./sheet";
 
@@ -17,6 +32,7 @@ const ZoomDialog = dynamic(() => import("../ZoomDialog").then((m) => m.ZoomDialo
 
 function Reading({ data, periodLabel }: { data: MddResult; periodLabel: string }) {
   const a = data.analysis;
+  const period = periodInfo(data.years, a.firstDate, a.asOf);
   const p: React.CSSProperties = { margin: 0, fontSize: "var(--fs-14)", lineHeight: 1.7, color: C.inkSoft, wordBreak: "keep-all" };
   const b = (color?: string) => ({ fontWeight: 800, color: color ?? C.ink });
   const paras: React.ReactNode[] = [];
@@ -57,7 +73,7 @@ function Reading({ data, periodLabel }: { data: MddResult; periodLabel: string }
             바로 드러났다 — "S&P500은 +3.4% 빠졌습니다"(실측). 부호로 동사를 가른다. */}
         같은 기간 {benchName(data.market)}
         {benchParticle(data.market)}{" "}
-        {attr.market !== null ? fmtPct(attr.market) : "기록이 없고"}
+        {attr.market !== null ? fmtPct(attr.market) : data.partial?.market ? "지금 불러오지 못했고" : "기록이 없고"}
         {attr.theme !== null && <>, {themeName ?? "테마"} 업종은 {fmtPct(attr.theme)}</>}{" "}
         {benchVerb(attr.market, attr.theme)}.
         {gap !== null &&
@@ -88,25 +104,23 @@ function Reading({ data, periodLabel }: { data: MddResult; periodLabel: string }
           </>
         ) : r.recoveredCount === 1 ? (
           <>
-            고점을 되찾은 전례는 <b style={b()}>{fmtDur(r.medianDays!)}</b> 걸린 한 번뿐이라, 기간은 범위로만 참고하십시오.
+            {/* 범위가 없는 한 번이라 '범위로 참고'는 틀린 말이었다(mdd#5). */}
+            고점을 되찾은 전례는 <b style={b()}>{fmtDur(r.medianDays!)}</b> 걸린 한 번뿐이라 참고로만 보십시오.
           </>
         ) : (
           <>
-            이만큼 깊게 빠진 뒤 <b style={b()}>회복한 전례가 없습니다</b>. 지금이 이 종목의 역대 최대 낙폭입니다.
+            {/* '가장 깊다'는 지금이 **조회 기간의 최저점**일 때만, 그리고 기간을 밝혀서 말한다. 예전 "역대 최대 낙폭"은
+                1·3년 조회에서도, 저점에서 조금 올라온 때에도 떴다(isDeepestNow 주석). */}
+            {period.label} 동안 이만큼 깊게 빠진 뒤 <b style={b()}>회복한 전례가 없습니다</b>.
+            {isDeepestNow(a) && <> 지금이 이 기간의 가장 깊은 낙폭입니다.</>}
           </>
         )}
       </p>,
     );
   }
 
-  // 정직성 경고 — 겹쳐 쌓지 않고 필요한 것만.
-  const approxYears = (Date.parse(a.asOf) - Date.parse(a.firstDate)) / (365 * 86_400_000);
-  const caution =
-    data.years === "all"
-      ? "전체 구간에는 합병·감자·액면병합이 섞여 있어, 아주 오래된 낙폭은 지금의 회사와 다를 수 있습니다."
-      : approxYears < 2
-        ? "표본이 짧아 더 오래된 종목과 같은 무게로 보지 마십시오."
-        : null;
+  // 정직성 경고 — 겹쳐 쌓지 않고 필요한 것만(shared.ts cautionText).
+  const caution = cautionText(data.years, period.truncated, period.approxYears);
 
   return (
     <>

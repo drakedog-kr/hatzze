@@ -6,6 +6,7 @@ import { getUsStockReports, getUsSurgingStocks } from "@/lib/us-telegram-data";
 import { MDD_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { MddExplorer, type StockOption, type SuggestGroups } from "./MddExplorer";
+import { normalizeYears } from "./shared";
 
 // 미리보기 이미지는 옆의 opengraph-image.tsx 가 그린다(ownImage). 자세한 건 app/seo.ts 주석 참고.
 export async function generateMetadata(): Promise<Metadata> {
@@ -111,6 +112,8 @@ async function resolveInitial(sp: Record<string, string | string[] | undefined>)
 
   // 이름을 code 로 조회한다. stocks 에 없으면(상폐·외국주 등) 이름 자리에 code 를 쓰고
   // market 은 URL 값을 그대로 믿는다 — 심볼(.KS/.KQ)만 맞으면 낙폭은 계산된다.
+  // ⚠️ stocks 에 **있으면 표의 시장이 이긴다.** 예전엔 URL 이 이겨, 코스닥→코스피 이전상장 뒤의 낡은 링크
+  //    (market=KOSDAQ)가 .KQ 로 조회해 '과거 시세를 불러오지 못했습니다'로 죽었다(mdd#27). 위 주석대로 URL 은 폴백이다.
   let name = code;
   let market = marketParam;
   try {
@@ -121,7 +124,7 @@ async function resolveInitial(sp: Record<string, string | string[] | undefined>)
       .maybeSingle();
     if (data) {
       name = (data.name as string) ?? code;
-      market = marketParam ?? ((data.market as string) ?? null);
+      market = (data.market as string | null) ?? marketParam;
     }
   } catch {
     // 조회 실패 시 위 기본값(code·URL market)으로 진행
@@ -236,6 +239,8 @@ export default async function MddPage({
   await new Promise((r) => setTimeout(r, 200));
 
   const sp = await searchParams;
+  // 기간도 주소에서 받는다(?years=3). 모르는 값은 기본 기간 — api/mdd 와 같은 규칙(normalizeYears).
+  const initialYears = normalizeYears(typeof sp.years === "string" ? sp.years : null);
   const [kospi, us, initial, suggestions] = await Promise.all([
     loadKospiStocks(),
     loadUsStocks(),
@@ -245,6 +250,15 @@ export default async function MddPage({
   // 국내를 앞에 둔다. 등급이 같을 때의 마지막 정렬은 rankStockMatches 가 맡으므로
   // 이 순서가 결과를 흔들지는 않는다 — 두 목록을 잇는 자리일 뿐이다.
   const stocks = [...kospi, ...us];
-  // key 로 초기 종목이 바뀌면 리마운트 — /mdd?code=A → ?code=B 로 이동해도 반영된다.
-  return <MddExplorer key={initial?.code ?? "default"} stocks={stocks} initial={initial} suggestions={suggestions} />;
+  // key 로 초기 종목·기간이 바뀌면 리마운트 — 링크로 /mdd?code=A → ?code=B 로 이동해도 반영된다.
+  // (화면 안에서 고르는 것은 서버를 다시 부르지 않고 주소만 바꾼다 — MddExplorer 의 pushState.)
+  return (
+    <MddExplorer
+      key={`${initial?.code ?? "default"}-${initialYears}`}
+      stocks={stocks}
+      initial={initial}
+      initialYears={initialYears}
+      suggestions={suggestions}
+    />
+  );
 }
