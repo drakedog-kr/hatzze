@@ -60,6 +60,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 import sys
 from collections import Counter, defaultdict
@@ -594,8 +595,11 @@ THEME_TOP_N = 4
 THEME_USUAL_DAYS = 30
 THEME_USUAL_MIN_DECIDED = 60
 # 평소와 이만큼 안쪽이면 '평소와 비슷'. 미장 총평의 BASE_DAY_SAME_BAND 와 같은 폭이다.
-# ⚠️ app/kadera/theme-vs-usual.ts 의 THEME_USUAL_BAND(툴팁 판정)와 같은 값이어야 한다.
+# 표본이 작으면 폭이 더 넓어진다 — 우연한 흔들림(표준오차)의 THEME_USUAL_Z 배(usual_label 주석).
+# ⚠️ app/kadera/theme-vs-usual.ts 의 THEME_USUAL_BAND · THEME_USUAL_Z · usualShift(툴팁 판정)와
+#    같은 값·같은 식이어야 한다.
 THEME_USUAL_BAND = 5
+THEME_USUAL_Z = 2
 
 
 # 문장 검수(깨진 글자·오타)는 common/text_check.py 가 맡는다. 예전엔 여기서 대체문자
@@ -679,11 +683,25 @@ def theme_usual(all_sent: list[dict], scope: str, window_start: str) -> int | No
     return optimism(pos, neg)
 
 
-def usual_label(opt: int, usual: int) -> str:
-    """평소 대비 라벨. 총평이 테마 기울기를 말할 때 쓰는 말이 이것뿐이다(BRIEF_THEME_SYSTEM)."""
-    if opt - usual >= THEME_USUAL_BAND:
+def usual_label(positive: int, negative: int, usual: int) -> str:
+    """평소 대비 라벨. 총평이 테마 기울기를 말할 때 쓰는 말이 이것뿐이다(BRIEF_THEME_SYSTEM).
+
+    **글이 적으면 웬만해선 '평소와 비슷'이다**(2026-09-30). 예전엔 평활한 낙관도와 평소의 차이가
+    5 이상이면 바로 기울기를 말했는데, 낙관+비관 20건이면 우연만으로도 ±10 가까이 흔들리고, 평활이
+    작은 표본을 50 쪽으로 당겨(테마 평소는 늘 50 위) 평소와 똑같아도 '비관 쪽'이 나왔다.
+    그래서 평활 전 비율을 평소와 견주고, 폭은 max(THEME_USUAL_BAND, THEME_USUAL_Z × 표준오차)다.
+    표준오차는 평소 비율로 계산한다('평소와 같다'고 볼 때의 흔들림).
+    ⚠️ 화면 usualShift(app/kadera/theme-vs-usual.ts)와 같은 식 — 연산 순서까지 맞춰 경계에서 안 갈린다.
+    """
+    n = positive + negative
+    if n == 0:
+        return "평소와 비슷"
+    u = usual / 100
+    diff = (positive / n - u) * 100
+    band = max(THEME_USUAL_BAND, THEME_USUAL_Z * math.sqrt((u * (1 - u)) / n) * 100)
+    if diff >= band:
         return "평소보다 낙관 쪽"
-    if usual - opt >= THEME_USUAL_BAND:
+    if -diff >= band:
         return "평소보다 비관 쪽"
     return "평소와 비슷"
 
@@ -1529,7 +1547,9 @@ def build_brief_digest(db, latest: str, msgs: list[dict]) -> str | None:
         if u is None:
             lines.append(f"- {scope}: {c['total']}건 · 평소 기록이 적어 견줄 수 없음 (낙관도 {o}%)")
         else:
-            lines.append(f"- {scope}: {c['total']}건 · {usual_label(o, u)} (낙관도 {o}% · 평소 {u}%)")
+            lines.append(
+                f"- {scope}: {c['total']}건 · {usual_label(c['positive'], c['negative'], u)} (낙관도 {o}% · 평소 {u}%)"
+            )
     if not themes:
         lines.append(f"- (표본 {MIN_DECIDED}건 이상인 테마가 없습니다. 테마 언급은 생략하세요)")
     if len(themes) >= 2 and (cmp := volume_comparison_line(themes)):

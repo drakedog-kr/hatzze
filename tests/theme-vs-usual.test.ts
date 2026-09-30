@@ -9,36 +9,59 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-import { THEME_USUAL_BAND, themeTip } from "../app/kadera/theme-vs-usual.ts";
+import { THEME_USUAL_BAND, THEME_USUAL_Z, themeTip, usualShift } from "../app/kadera/theme-vs-usual.ts";
 
 const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
 
+// AI반도체(2026-09-30 미장): 낙관 126 · 비관 59 → 화면 낙관도 67%, 평소 80%
+const AI_SEMI = { pos: 67, usual: 80, positive: 126, negative: 59 };
+
 describe("themeTip", () => {
   it("평소보다 낮으면 '덜 낙관적' — 낙관이 과반이어도 '비관'이라 하지 않는다", () => {
-    // 2026-09-30 미장 AI반도체: 낙관 126 · 비관 59 → 67%, 평소 80%
-    assert.equal(themeTip({ pos: 67, usual: 80 }), "평소보다 덜 낙관적이에요 · 낙관 67% (평소 80%)");
+    assert.equal(themeTip(AI_SEMI), "평소보다 덜 낙관적이에요 · 낙관 67% (평소 80%)");
   });
 
   it("평소보다 높으면 '더 낙관적'", () => {
-    assert.equal(themeTip({ pos: 88, usual: 80 }), "평소보다 더 낙관적이에요 · 낙관 88% (평소 80%)");
+    assert.equal(
+      themeTip({ pos: 88, usual: 80, positive: 440, negative: 60 }),
+      "평소보다 더 낙관적이에요 · 낙관 88% (평소 80%)",
+    );
   });
 
-  it("폭 안쪽은 '평소와 비슷' — 총평 usual_label 과 같은 경계", () => {
-    // test_theme_usual.py 의 예제 그대로: 84·74 는 벗어나고 83·75 는 안쪽이다(평소 79).
-    assert.match(themeTip({ pos: 84, usual: 79 }), /^평소보다 더 낙관적/);
-    assert.match(themeTip({ pos: 74, usual: 79 }), /^평소보다 덜 낙관적/);
-    assert.match(themeTip({ pos: 83, usual: 79 }), /^평소와 비슷해요/);
-    assert.match(themeTip({ pos: 75, usual: 79 }), /^평소와 비슷해요/);
+  it("글이 적으면 평소와 똑같은 비율이 '덜 낙관적'으로 나오지 않는다", () => {
+    // 16:4 = 80%. 평활값은 70 이라 예전엔 '덜 낙관적'이었다.
+    assert.equal(
+      themeTip({ pos: 70, usual: 80, positive: 16, negative: 4 }),
+      "평소와 비슷해요 · 낙관 70% (평소 80%)",
+    );
   });
 
   it("평소가 없으면 낙관도만 말한다", () => {
-    assert.equal(themeTip({ pos: 67, usual: null }), "낙관 67% · 평소 기록이 아직 적어요");
+    assert.equal(themeTip({ ...AI_SEMI, usual: null }), "낙관 67% · 평소 기록이 아직 적어요");
+  });
+});
+
+describe("usualShift", () => {
+  it("같은 12 차이도 표본이 작으면 '비슷'", () => {
+    assert.equal(usualShift(68, 32, 80), "down"); // 100건 — 폭 8
+    assert.equal(usualShift(17, 8, 80), "same"); // 25건 — 폭 16
   });
 
-  it("판정 폭이 총평(generate_telegram_narratives.py)의 THEME_USUAL_BAND 와 같다", () => {
-    const py = read("data-pipeline/scripts/generate_telegram_narratives.py").match(/^THEME_USUAL_BAND = (\d+)/m);
-    assert.ok(py, "파이썬 쪽 THEME_USUAL_BAND 를 못 찾았다");
-    assert.equal(Number(py[1]), THEME_USUAL_BAND);
+  it("총평 usual_label(test_theme_usual.py USUAL_CASES)과 같은 답을 낸다", () => {
+    const py = read("data-pipeline/tests/test_theme_usual.py");
+    const table = py.slice(py.indexOf("USUAL_CASES = ["), py.indexOf("]\n", py.indexOf("USUAL_CASES = [")));
+    const rows = [...table.matchAll(/\((\d+), (\d+), (\d+), "([^"]+)"\)/g)];
+    assert.ok(rows.length >= 8, "파이썬 표를 못 읽었다");
+    const want = { "평소보다 낙관 쪽": "up", "평소보다 비관 쪽": "down", "평소와 비슷": "same" } as const;
+    for (const [, pos, neg, usual, label] of rows) {
+      assert.equal(usualShift(Number(pos), Number(neg), Number(usual)), want[label as keyof typeof want], `${pos}:${neg} vs ${usual}`);
+    }
+  });
+
+  it("폭 상수가 총평(generate_telegram_narratives.py)과 같다", () => {
+    const src = read("data-pipeline/scripts/generate_telegram_narratives.py");
+    assert.equal(Number(src.match(/^THEME_USUAL_BAND = (\d+)/m)?.[1]), THEME_USUAL_BAND);
+    assert.equal(Number(src.match(/^THEME_USUAL_Z = (\d+)/m)?.[1]), THEME_USUAL_Z);
   });
 });
 
