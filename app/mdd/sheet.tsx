@@ -6,7 +6,7 @@ import { Skeleton as SkeletonBlock } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { C, Icon, MONO } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
-import { UNRECOVERED, PAD } from "./shared";
+import { UNRECOVERED, PAD, periodInfo } from "./shared";
 import type { MddResult } from "./shared";
 import type { IconName } from "@/lib/icon-names";
 
@@ -15,11 +15,7 @@ import type { IconName } from "@/lib/icon-names";
  * 요청한 기간보다 상장 이력이 짧으면 "최근 10년"은 거짓이 되므로 실제 구간으로 바꾼다.
  */
 export function periodLabelOf(data: MddResult): string {
-  const a = data.analysis;
-  const approxYears = (Date.parse(a.asOf) - Date.parse(a.firstDate)) / (365 * 86_400_000);
-  const requested = data.years === "all" ? Infinity : Number(data.years);
-  const truncated = data.years !== "all" && approxYears < requested - 0.5;
-  return data.years === "all" || truncated ? `상장 이후·약 ${Math.max(1, Math.round(approxYears))}년` : `최근 ${data.years}년`;
+  return periodInfo(data.years, data.analysis.firstDate, data.analysis.asOf).label;
 }
 
 /* ── 공통 프리미티브 ───────────────────────────────────────────────

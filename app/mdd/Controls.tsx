@@ -402,7 +402,7 @@ export function Results({ data }: { data: MddResult }) {
       <Underwater a={a} periodLabel={periodLabel} market={data.market} />
 
       {data.risk ? (
-        <RiskProfile r={data.risk} periodLabel={periodLabel} market={data.market} />
+        <RiskProfile r={data.risk} periodLabel={periodLabel} market={data.market} marketFailed={data.partial?.market ?? false} />
       ) : (
         <AbsentSheet
           icon="monitoring"
@@ -459,20 +459,35 @@ export function Results({ data }: { data: MddResult }) {
             body={
               a.currentDd > -1
                 ? "지금은 고점 부근이라 원인을 나눌 하락이 없습니다."
-                : `고점(${a.athDate}) 무렵의 ${benchName(data.market)} 기록이 없어 같은 기간을 나란히 놓지 못했습니다.`
+                : // 일시 실패(야후 제한·타임아웃)를 자료 부재로 설명하지 않는다 — 응답의 partial 이 가른다(api/mdd).
+                  data.partial?.market
+                  ? `${benchName(data.market)} 시세를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오.`
+                  : `고점(${a.athDate}) 무렵의 ${benchName(data.market)} 기록이 없어 같은 기간을 나란히 놓지 못했습니다.`
             }
           />
         )}
         <Character ch={a.character} currentDd={a.currentDd} />
       </Pair>
       {data.theme ? (
-        <Theme theme={data.theme} />
+        <>
+          <Theme theme={data.theme} />
+          {/* 대표 종목 일부만 받았으면 그렇다고 적는다 — 평균이 몇 종목으로 낸 것인지 읽는 사람이 알아야 한다. */}
+          {data.partial && data.partial.peersOk < data.partial.peersRequested && (
+            <p style={{ margin: "-6px 4px 0", fontSize: "var(--fs-11)", color: C.muted }}>
+              대표 {data.partial.peersRequested}종목 중 {data.partial.peersOk}종목만 불러와 비교했습니다. 잠시 뒤 다시 열면 채워질 수 있습니다.
+            </p>
+          )}
+        </>
       ) : (
         <AbsentSheet
           icon="hub"
           title="테마 비교"
           sub="같은 테마 대표 종목들과 지금 낙폭을 나란히 놓습니다"
-          body="이 종목이 묶인 테마를 찾지 못했습니다. 테마 대표 종목 목록에 등록된 종목에서만 비교가 나옵니다."
+          body={
+            data.partial && (data.partial.lookupFailed || data.partial.peersRequested > 0)
+              ? "테마 대표 종목의 시세를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오."
+              : "이 종목이 묶인 테마를 찾지 못했습니다. 테마 대표 종목 목록에 등록된 종목에서만 비교가 나옵니다."
+          }
         />
       )}
     </div>

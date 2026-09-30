@@ -6,6 +6,8 @@ import { MDD_PEER_MAX, themesForName, THEMES } from "@/lib/stock-themes";
 import { US_MDD_PEER_MAX, US_THEMES, themesForTicker } from "@/lib/us-stock-themes";
 import { fetchDailyHistory, yahooSymbol } from "@/lib/yahoo-history";
 
+import { normalizeYears } from "../../mdd/shared";
+
 // MDD(최대낙폭) 분석. 야후 일봉을 호출 시점에 직접 받아 계산하고, 상단 티커
 // (/api/ticker)와 같은 방식으로 CDN 에 15분 캐시한다 — 별도 크론·DB 없이.
 // 일봉은 하루 한 번 바뀌므로 이 정도 캐시로 야후 부하를 충분히 던다.
@@ -13,10 +15,16 @@ export const dynamic = "force-dynamic";
 // 시장·테마 대표 종목(최대 10개+코스피)의 히스토리를 병렬 조회한다. 넉넉히 준다.
 export const maxDuration = 20;
 
-/** 기간 프리셋(년). "all"은 상장 이후 전체(야후가 상장 이후만 준다). */
+/** 기간 프리셋(년). "all"은 상장 이후 전체(야후가 상장 이후만 준다). 키는 화면 PERIODS 와 같다(normalizeYears). */
 const YEARS: Record<string, number> = { "1": 1, "3": 3, "5": 5, "10": 10, all: 100 };
-/** 코스피 지수 심볼 — 시장 대비 비교의 기준. 상단 티커와 같은 심볼을 쓴다. */
+/** 코스피 지수 심볼 — 코스피 상장 종목의 시장 기준. 상단 티커와 같은 심볼을 쓴다. */
 const KOSPI = "^KS11";
+/**
+ * 코스닥 지수 심볼 — 코스닥 상장 종목의 시장 기준(2026-09-30). 예전엔 국내면 시장과 상관없이 코스피와 견줘,
+ * 코스닥이 코스피보다 크게 빠진 구간(바이오·2차전지 조정기)의 '이 종목 고유의 낙폭'·'혼자 빠졌다'가 부풀었다.
+ * ⚠️ 화면의 benchName(app/mdd/shared.ts)과 짝이다 — 한쪽만 고치면 "코스피는 −30%" 가 코스닥 숫자를 말한다.
+ */
+const KOSDAQ = "^KQ11";
 /**
  * 미국 상장의 시장 기준. S&P500 이다.
  *
@@ -28,14 +36,22 @@ const SP500 = "^GSPC";
 
 type Peer = { name: string; code: string; dd: number; isSelf: boolean };
 type Theme = { name: string; peers: Peer[]; avgDd: number; sincePeakAvg: number | null };
+/**
+ * 테마 비교의 결과와 **얼마나 받아 왔나**. requested 는 조회를 건 대표 종목 수, ok 는 시세를 받은 수다.
+ * 사전에 없는 종목이면 requested 0(부분 실패가 아니다). lookupFailed 는 대표 종목 명단 조회 자체가 깨진 것이다.
+ */
+type ThemeFetch = { theme: Theme | null; requested: number; ok: number; lookupFailed: boolean };
+const NO_THEME: ThemeFetch = { theme: null, requested: 0, ok: 0, lookupFailed: false };
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = (searchParams.get("code") ?? "").trim();
   const market = searchParams.get("market");
   const name = (searchParams.get("name") ?? "").trim();
-  const yearsKey = searchParams.get("years") ?? "10";
-  const years = YEARS[yearsKey] ?? 10;
+  // ⚠️ 모르는 키는 기본 기간으로 접는다 — `YEARS["constructor"]` 가 함수라 NaN 기간으로 502 가 났고, "7" 은 10년으로
+  //    계산하면서 응답에 "7" 을 실어 화면이 '최근 7년'이라 적었다. 응답에도 접은 키를 싣는다.
+  const yearsKey = normalizeYears(searchParams.get("years"));
+  const years = YEARS[yearsKey];
 
   // 국내는 6자리(숫자·영문), 미국은 티커 1~5자다. 예전엔 `{6}` 고정이라 미국 티커가
   // 통째로 400 이었다 — 미장 카드에서 링크를 걸 수 없던 이유가 이것이다.
@@ -59,17 +75,19 @@ export async function GET(request: Request) {
   const atHigh = analysis.currentDd > -1;
   const athDate = analysis.athDate;
 
-  // 코스피는 항상 받는다 — 원인 분해(고점 이후)뿐 아니라 리스크 프로필의 '시장 동반성'도
-  // 코스피 시계열이 필요하기 때문이다.
-  // 시장 기준은 상장 시장을 따른다. 엔비디아 낙폭을 코스피와 견주는 건 뜻이 없다.
+  // 시장 지수는 항상 받는다 — 원인 분해(고점 이후)뿐 아니라 리스크 프로필의 '시장 동반성'도
+  // 지수 시계열이 필요하기 때문이다.
+  // 시장 기준은 상장 시장을 따른다 — 코스피 · 코스닥(2026-09-30) · 미국은 S&P500. 엔비디아 낙폭을 코스피와,
+  // 알테오젠 낙폭을 코스피와 견주는 건 뜻이 없다.
   //
   // 테마 비교도 시장에 따라 갈린다. 사전만 다르고 결과 모양은 같아 화면은 하나다.
-  const [marketBars, theme] = await Promise.all([
-    fetchDailyHistory(isUs ? SP500 : KOSPI, years),
+  const [marketBars, themeFetch] = await Promise.all([
+    fetchDailyHistory(isUs ? SP500 : market === "KOSDAQ" ? KOSDAQ : KOSPI, years),
     isUs
       ? buildUsThemeComparison(code, years, analysis.currentDd, athDate)
       : buildThemeComparison(name, market, years, analysis.currentDd, athDate),
   ]);
+  const theme = themeFetch.theme;
 
   // 리스크 프로필(보상·큰 하락 빈도·시장 동반성) — 종목·코스피 종가로 요약.
   const risk = riskProfile(bars, marketBars);
@@ -88,9 +106,30 @@ export async function GET(request: Request) {
         }
       : null;
 
+  /**
+   * ## 부분 실패는 짧게 캐시하고 화면에 알린다
+   *
+   * 지수나 대표 종목 조회가 일시적으로 실패해도(야후 429·타임아웃) 응답은 200 이다 — 종목 자체의 낙폭은 섰다.
+   * 예전엔 그 응답이 성공과 같은 15분(+10분)을 달고 나가, 화면이 "고점 무렵의 코스피 기록이 없어"·"테마를 찾지
+   * 못했습니다"처럼 **일시 실패를 자료 부재로** 설명한 채 그 주소의 모든 방문자에게 25분간 굳었다(mdd#1).
+   * 지금은 무엇이 빠졌는지 `partial` 에 싣고, 1분만 캐시해 곧 다시 받게 한다.
+   */
+  const marketFailed = marketBars === null;
+  const peersFailed = themeFetch.lookupFailed || themeFetch.ok < themeFetch.requested;
+  const partial =
+    marketFailed || peersFailed
+      ? { market: marketFailed, peersRequested: themeFetch.requested, peersOk: themeFetch.ok, lookupFailed: themeFetch.lookupFailed }
+      : null;
+
   return NextResponse.json(
-    { ok: true, code, name, market, symbol, years: yearsKey, analysis, attribution, theme, risk },
-    { headers: { "Cache-Control": "public, s-maxage=900, stale-while-revalidate=600" } },
+    { ok: true, code, name, market, symbol, years: yearsKey, analysis, attribution, theme, risk, partial },
+    {
+      headers: {
+        "Cache-Control": partial
+          ? "public, s-maxage=60, stale-while-revalidate=60"
+          : "public, s-maxage=900, stale-while-revalidate=600",
+      },
+    },
   );
 }
 
@@ -109,13 +148,13 @@ async function buildUsThemeComparison(
   years: number,
   selfDd: number,
   athDate: string,
-): Promise<Theme | null> {
-  if (!ticker) return null;
+): Promise<ThemeFetch> {
+  if (!ticker) return NO_THEME;
   const matched = themesForTicker(ticker);
-  if (matched.length === 0) return null;
+  if (matched.length === 0) return NO_THEME;
   const themeName = matched[0];
   const peerTickers = US_THEMES[themeName].filter((t) => t !== ticker).slice(0, US_MDD_PEER_MAX);
-  if (!peerTickers.length) return null;
+  if (!peerTickers.length) return NO_THEME;
 
   // 최대 10개라 1,000행 캡과 무관하다.
   let nameOf = new Map<string, string>();
@@ -144,16 +183,17 @@ async function buildUsThemeComparison(
   );
 
   const ok = fetched.filter((p): p is NonNullable<typeof p> => p !== null);
+  const counts = { requested: peerTickers.length, ok: ok.length, lookupFailed: false };
   const peers: Peer[] = ok.map((p) => ({ name: p.name, code: p.code, dd: p.dd, isSelf: false }));
   peers.push({ name: nameOf.get(ticker) ?? ticker, code: "", dd: selfDd, isSelf: true });
   peers.sort((a, b) => a.dd - b.dd); // 깊게 빠진 순
-  if (peers.length < 2) return null;
+  if (peers.length < 2) return { theme: null, ...counts };
 
   const avgDd = peers.reduce((s, p) => s + p.dd, 0) / peers.length;
   const sinceVals = ok.map((p) => p.sincePeak).filter((v): v is number => v !== null);
   const sincePeakAvg = sinceVals.length ? sinceVals.reduce((s, v) => s + v, 0) / sinceVals.length : null;
 
-  return { name: themeName, peers, avgDd, sincePeakAvg };
+  return { theme: { name: themeName, peers, avgDd, sincePeakAvg }, ...counts };
 }
 
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
@@ -184,10 +224,10 @@ async function buildThemeComparison(
   years: number,
   selfDd: number,
   athDate: string,
-): Promise<Theme | null> {
-  if (!name) return null;
+): Promise<ThemeFetch> {
+  if (!name) return NO_THEME;
   const matched = themesForName(name);
-  if (matched.length === 0) return null;
+  if (matched.length === 0) return NO_THEME;
   const themeName = matched[0]; // 여러 테마에 걸치면 첫 번째(사전 순서 = 대표성 순서)
   // **앞에서부터 잘라 쓴다**(미국 쪽과 같다). 이 화면은 "○○ 대표 N종목"이지 업종
   // 통계가 아니다. 사전이 카더라 쪽 필요로 366종목까지 넓어져 반도체만 55종목이라,
@@ -197,14 +237,18 @@ async function buildThemeComparison(
   // 대표 종목의 코드·시장을 stocks(공개 read)에서 한 번에 받는다. 이름은 KRX 정식명과
   // 정확히 일치한다(사전이 그 전제로 큐레이션돼 있다). 최대 10개라 1000행 캡과 무관.
   let members: { code: string; name: string; market: string | null }[] = [];
+  // 명단 조회가 깨지면 대표 종목이 0 이 된다 — "테마를 찾지 못했다"가 아니라 "못 불러왔다"다(아래 partial).
+  let lookupFailed = false;
   try {
-    const { data } = await getSupabaseServer()
+    const { data, error } = await getSupabaseServer()
       .from("stocks")
       .select("code, name, market")
       .in("name", memberNames);
+    if (error) throw error;
     members = data ?? [];
   } catch {
     members = [];
+    lookupFailed = true;
   }
 
   const fetched = await Promise.all(
@@ -217,16 +261,17 @@ async function buildThemeComparison(
   );
 
   const ok = fetched.filter((p): p is NonNullable<typeof p> => p !== null);
+  const counts = { requested: members.length, ok: ok.length, lookupFailed };
   const peers: Peer[] = ok.map((p) => ({ name: p.name, code: p.code, dd: p.dd, isSelf: false }));
   peers.push({ name, code: "", dd: selfDd, isSelf: true });
   peers.sort((a, b) => a.dd - b.dd); // 깊게 빠진 순
 
   // 자기 종목만 남으면(피어를 하나도 못 받음) 비교의 의미가 없다.
-  if (peers.length < 2) return null;
+  if (peers.length < 2) return { theme: null, ...counts };
 
   const avgDd = peers.reduce((s, p) => s + p.dd, 0) / peers.length;
   const sinceVals = ok.map((p) => p.sincePeak).filter((v): v is number => v !== null);
   const sincePeakAvg = sinceVals.length ? sinceVals.reduce((s, v) => s + v, 0) / sinceVals.length : null;
 
-  return { name: themeName, peers, avgDd, sincePeakAvg };
+  return { theme: { name: themeName, peers, avgDd, sincePeakAvg }, ...counts };
 }
