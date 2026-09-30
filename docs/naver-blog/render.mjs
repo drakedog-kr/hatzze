@@ -28,7 +28,7 @@
  * ⚠️ 사라/팔라로 읽힐 말과 종목 이름은 넣지 않는다(app/og-card.tsx 의 ChatterArt 와 같은 규칙).
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -238,6 +238,125 @@ const widget = {
   ),
 };
 
+/* ─── 소개 글(intro/) ──────────────────────────────────────────────────
+ * 블로그 첫 글 '햇쩨를 소개합니다'에 들어가는 세 장. 원고는 intro/draft.md.
+ * 폭은 1080 — 폰에서 글 폭을 꽉 채우는 크기다. 그림 속 글자는 네이버가 못 읽으니 같은 내용을
+ * 본문 글로도 적는다(원고가 그렇게 짜여 있다).
+ */
+
+/** 1. 대표 이미지(1080×1080). 네이버 검색 썸네일이 정사각으로 잘려서 처음부터 정사각이다. */
+const introCover = {
+  file: "intro/01-cover-1080.png",
+  w: 1080,
+  h: 1080,
+  scale: 1,
+  html: page(
+    1080,
+    1080,
+    `
+<div style="position:absolute;left:${540 - 144}px;top:200px">${ghost(300)}</div>
+${bubble("오늘 뭐래?", { x: 130, y: 178, size: 38, tail: "br", mine: true })}
+${bubble("배당 얼마 받지?", { x: 676, y: 300, size: 38, tail: "bl" })}
+<div style="position:absolute;left:0;right:0;top:590px;text-align:center">
+  <div style="font-size:76px;font-weight:800;letter-spacing:-0.035em">햇쩨를 소개합니다</div>
+  <div style="margin-top:26px;font-size:36px;font-weight:700;color:${C.sub};letter-spacing:-0.02em">데이터와 여론으로 읽는 시장</div>
+</div>
+<div style="position:absolute;left:0;right:0;bottom:86px;display:flex;justify-content:center;align-items:center;gap:14px">
+  ${ghost(44)}${wordmark(46)}<span style="font-size:30px;font-weight:700;color:${C.faint};margin-left:6px">hatzze.fun</span>
+</div>
+`,
+  ),
+};
+
+/** 화면 안내의 한 줄. 이름은 사이트 사이드바와 같은 말을 쓴다. */
+function screenRow(name, desc) {
+  return (
+    `<div style="display:flex;align-items:baseline;gap:22px;padding:22px 0;border-top:1px solid ${C.line}">` +
+    `<div style="width:250px;flex-shrink:0;font-size:34px;font-weight:800;letter-spacing:-0.03em">${name}</div>` +
+    `<div style="font-size:29px;font-weight:500;line-height:1.45;color:${C.sub};letter-spacing:-0.02em">${desc}</div></div>`
+  );
+}
+function screenGroup(label, rows) {
+  return (
+    `<div style="margin-top:44px"><div style="font-size:26px;font-weight:800;color:${C.blue};letter-spacing:-0.01em;margin-bottom:10px">${label}</div>` +
+    rows.join("") +
+    `</div>`
+  );
+}
+
+/**
+ * 2. 사이트 화면 안내(1080×1460). 묶음은 사이드바와 같다 — 오늘 시장 · 시장 여론 · 분석과 기록
+ * (app/AppShell.tsx 의 NAV_GROUPS). 화면이 늘거나 이름이 바뀌면 여기도 고친다.
+ */
+const introScreens = {
+  file: "intro/02-screens-1080.png",
+  w: 1080,
+  h: 1460,
+  scale: 1,
+  html: page(
+    1080,
+    1460,
+    `
+<div style="position:absolute;left:84px;right:84px;top:84px">
+  <div style="display:flex;align-items:center;gap:16px">${ghost(52)}${wordmark(54)}</div>
+  <div style="margin-top:28px;font-size:52px;font-weight:800;letter-spacing:-0.035em;line-height:1.3">hatzze.fun에서 볼 수 있는 것</div>
+  ${screenGroup("오늘 시장", [
+    screenRow("시장 브리핑", "지표 25개로 잰 오늘의 시장 온도(℃)와 30일 흐름"),
+    screenRow("국장 미리보기", "밤사이 미국이 크게 움직인 날, 국내 시장은 보통 어떻게 열렸나"),
+    screenRow("데일리 노트", "하루의 시장 이야기를 매일 저녁 한 편의 글로"),
+  ])}
+  ${screenGroup("시장 여론", [
+    screenRow("카더라 리포트", "주식 텔레그램에서 국내·미국 종목이 얼마나 회자되는지"),
+    screenRow("테마 리포트", "국장 26개, 미장 16개 테마마다 요즘 도는 이야기와 말 많은 종목"),
+  ])}
+  ${screenGroup("분석과 기록", [
+    screenRow("배당으로 살기", "종목과 주수를 넣으면 1년 배당을 계좌별 세후로"),
+    screenRow("MDD 정밀분석", "고점에서 얼마나 내려왔고, 과거엔 얼마 만에 돌아왔나"),
+    screenRow("내부자 리포트", "미국 임원과 하원의원, 월가 기관이 신고한 매매"),
+  ])}
+</div>
+<div style="position:absolute;left:84px;right:84px;bottom:70px;font-size:28px;font-weight:700;color:${C.faint}">무료 · 회원가입 없음 · hatzze.fun</div>
+`,
+  ),
+};
+
+/** 블로그 글 안내의 한 칸. 말풍선(질문)이 위, 카테고리 이름과 올라오는 때가 아래. */
+function postCard(q, name, when, mine = false) {
+  const skin = mine ? `background:${C.blue};color:#fff` : `background:${C.bg};color:${C.ink};border:1px solid ${C.line}`;
+  return (
+    `<div style="background:${C.card};border:1px solid ${C.line};border-radius:28px;padding:40px 38px;box-shadow:${C.shadow};` +
+    `display:flex;flex-direction:column;justify-content:space-between;height:350px">` +
+    `<div><span style="display:inline-block;${skin};font-size:30px;font-weight:700;letter-spacing:-0.02em;line-height:1;` +
+    `padding:16px 24px;border-radius:28px 28px 28px 9px">${q}</span></div>` +
+    `<div><div style="font-size:38px;font-weight:800;letter-spacing:-0.03em">${name}</div>` +
+    `<div style="margin-top:12px;font-size:27px;font-weight:600;color:${C.sub}">${when}</div></div></div>`
+  );
+}
+
+/** 3. 블로그에 올라오는 글(1080×1080). 말풍선 넷은 커버와 같은 넷이다(위 머리말). */
+const introPosts = {
+  file: "intro/03-posts-1080.png",
+  w: 1080,
+  h: 1080,
+  scale: 1,
+  html: page(
+    1080,
+    1080,
+    `
+<div style="position:absolute;left:84px;right:84px;top:96px">
+  <div style="font-size:52px;font-weight:800;letter-spacing:-0.035em">이 블로그에 올라오는 글</div>
+  <div style="margin-top:16px;font-size:29px;font-weight:500;color:${C.sub};letter-spacing:-0.02em">매일 저녁 한 편, 그리고 주 한두 번 깊이 보는 글</div>
+  <div style="margin-top:56px;display:grid;grid-template-columns:1fr 1fr;gap:28px">
+    ${postCard("오늘 뭐래?", "데일리 노트", "매일 저녁", true)}
+    ${postCard("배당 얼마 받지?", "배당으로 살기", "돌아가며 주 한두 번")}
+    ${postCard("요즘 무슨 테마?", "테마 리포트", "돌아가며 주 한두 번")}
+    ${postCard("고점 대비 몇 %?", "MDD 정밀분석", "돌아가며 주 한두 번")}
+  </div>
+</div>
+`,
+  ),
+};
+
 /**
  * 크게 그려서 줄인다(SUPERSAMPLE 배).
  *
@@ -272,10 +391,10 @@ function shoot(htmlFile, w, h, scale, out) {
 const OUT = process.env.OUT_DIR ?? HERE;
 const chrome = chromePath();
 const work = mkdtempSync(join(tmpdir(), "naver-blog-"));
-for (const img of [profile, cover, title, widget]) {
+for (const img of [profile, cover, title, widget, introCover, introScreens, introPosts]) {
   const W = img.w * img.scale;
   const H = img.h * img.scale;
-  const base = join(work, img.file.replace(/\.png$/, ""));
+  const base = join(work, img.file.replace(/\.png$/, "").replaceAll("/", "_"));
   writeFileSync(`${base}.html`, img.html);
   shoot(`${base}.html`, img.w, img.h, img.scale * SUPERSAMPLE, `${base}.big.png`);
   writeFileSync(
@@ -284,6 +403,7 @@ for (const img of [profile, cover, title, widget]) {
       `img{display:block;width:${W}px;height:${H}px}</style></head>` +
       `<body><img src="${pathToFileURL(`${base}.big.png`).href}"></body></html>`,
   );
+  mkdirSync(dirname(join(OUT, img.file)), { recursive: true });
   shoot(`${base}.down.html`, W, H, 1, join(OUT, img.file));
   console.log(`${THEME}  ${img.file}  ${W}×${H}`);
 }
