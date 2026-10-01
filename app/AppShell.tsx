@@ -1368,11 +1368,19 @@ const SELF_TITLED_PREFIXES = ["/insider/stock/", "/insider/investor/"];
  */
 const LABEL_TITLED_PREFIXES = [`${NOTE_PAGE.href}/`];
 
+/**
+ * v2 대시보드로 옮긴 화면(2026-10-02 시제품). 제목·부제 줄을 **화면에서만** 걷는다 — 토스증권·Blockworks 처럼
+ * 화면 이름은 사이드바의 현재 항목이 말하고, 본문은 첫 줄부터 내용이다. h1 은 지우지 않는다(검색엔진·스크린리더가
+ * 이 화면의 이름을 읽는 자리다). 오른쪽 도구(미장 전환·테마)는 그대로 선다.
+ */
+const V2_PAGES = ["/kadera"];
+
 function PageHeader() {
   const pathname = useAppPathname();
   const selfTitled = SELF_TITLED_PREFIXES.some((p) => pathname.startsWith(p));
   const TitleTag = LABEL_TITLED_PREFIXES.some((p) => pathname.startsWith(p)) ? "p" : "h1";
   const page = navFor(useShellEnv()).find((n) => isActive(n.href, pathname));
+  const v2 = V2_PAGES.includes(pathname);
   // 서브 페이지에서는 서브의 이름을 h1 으로 쓴다. 부모(구역)의 이름을 그대로 두면
   // /kadera 와 /kadera/us 두 페이지가 **같은 h1** 을 갖는다.
   //
@@ -1442,7 +1450,7 @@ function PageHeader() {
    */
   const named = Boolean(deep) || child?.href === pathname || page?.href === pathname;
   return (
-    <header className="hz-page-head">
+    <header className={`hz-page-head${v2 ? " is-v2" : ""}`}>
       {named && title && sub && !badge && deep?.ld !== "none" && (
         <PageJsonLd
           title={title}
@@ -1458,7 +1466,7 @@ function PageHeader() {
           (아직 안 연 /preview)이 제목 칸을 통째로 비운다. */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12, minWidth: 0, flex: 1 }}>
       {(page || deep) && !selfTitled && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
+        <div className={v2 ? "sr-only" : undefined} style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
           {/* 배지는 제목과 같은 줄, 세로 가운데 정렬. baseline 으로 두면 알약의 **글자**
               밑선이 제목 밑선에 맞아, 알약 자체는 그만큼(패딩+테두리) 아래로 내려앉는다 —
               옆에 붙은 라벨이 아니라 매달린 것처럼 보였다. */}

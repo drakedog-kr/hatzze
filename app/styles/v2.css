@@ -1,7 +1,8 @@
 /* ── v2 리디자인 — 국장 카더라 대시보드(2026-10-02) ─────────────────────────
    토스증권 홈 · Blockworks 앱의 결. **화면은 짧게, 패널은 높이를 못박고 안에서 스크롤한다.**
    예전 화면은 1440 에서 4,000px 넘게 내려갔다(시트마다 목록 길이만큼 늘었다). 여기선 세 줄이다:
-     수치 띠 · [종목 보드 | 오늘의 요약·여론] · [테마·화제어 | 화제 글 | 일정·채널]
+     수치 띠 · [종목 보드 | 오늘의 요약] · [테마·화제어 | 다가오는 일정 | 여론]
+   화제 글·채널 순위·뜨는 채널은 걷었다(두 달 동안 카더라 방문자의 2~5%만 눌렀다).
    비슷한 목록은 탭으로 묶어 패널 수를 줄였다(탭 이름이 곧 제목이다 — PanelTabs 머리말).
 
    줄 꼴은 하나다: 순위(흐린 숫자) · 이름 · 값(오른쪽) · 변화(▲▼). 색은 오르내림(빨강·파랑)에만 쓴다.
@@ -21,32 +22,32 @@
   grid-template-rows: auto 480px 400px;
   grid-template-areas:
     "kpi   kpi   kpi"
-    "board board brief"
-    "lists feed  side";
+    "board board  brief"
+    "lists events mood";
 }
 .v2-a-kpi { grid-area: kpi; }
 .v2-a-board { grid-area: board; }
 .v2-a-brief { grid-area: brief; }
 .v2-a-lists { grid-area: lists; }
-.v2-a-feed { grid-area: feed; }
-.v2-a-side { grid-area: side; }
+.v2-a-events { grid-area: events; }
+.v2-a-mood { grid-area: mood; }
 
 @container kd (max-width: 999px) {
   .v2-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-rows: auto 480px 400px 400px;
     grid-template-areas:
-      "kpi   kpi"
-      "board board"
-      "brief lists"
-      "feed  side";
+      "kpi    kpi"
+      "board  board"
+      "brief  mood"
+      "lists  events";
   }
 }
 @container kd (max-width: 699px) {
   .v2-grid {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto 380px 420px 440px 420px;
-    grid-template-areas: "kpi" "board" "brief" "lists" "feed" "side";
+    grid-template-rows: auto auto 380px 420px 420px 420px;
+    grid-template-areas: "kpi" "board" "brief" "mood" "lists" "events";
   }
 }
 
@@ -318,56 +319,6 @@ a.v2-li:hover { background: var(--c-hover); }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* 화제 글 — 뉴스 피드처럼 */
-.v2-feed {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.v2-feed-item {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding: 12px 18px;
-  border-bottom: 1px solid var(--c-sheet-row);
-  text-decoration: none;
-  transition: background-color 0.12s ease;
-}
-.v2-feed-item:hover { background: var(--c-hover); }
-.v2-feed-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.v2-feed-head > b {
-  min-width: 0;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--c-ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.v2-feed-meta {
-  margin-left: auto;
-  flex-shrink: 0;
-  font-size: 12px;
-  color: var(--c-sub2);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.v2-feed-text {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  font-size: 13.5px;
-  line-height: 1.55;
-  color: var(--c-ink-soft);
-  overflow-wrap: anywhere;
 }
 
 /* ── 오늘의 요약 · 여론 ── */
@@ -723,5 +674,10 @@ a.v2-chip:hover { background: var(--c-blue-tint); color: var(--c-cold-ink); }
   .v2-ptab { font-size: 15px; }
   .v2-lh,
   .v2-li { padding: 0 14px; }
-  .v2-feed-item { padding: 12px 14px; }
+}
+
+/* ── 화면 머리 ── v2 화면은 제목·부제를 화면에서 걷는다(AppShell 의 V2_PAGES). 오른쪽 도구만 남는데,
+   ≤900 에선 도구도 숨어 머리가 높이 0 이 된다 — 그때 위아래 간격(20 + 20)이 겹쳐 빈 띠가 생기므로 하나를 지운다. */
+@media (max-width: 900px) {
+  .hz-page-head.is-v2 { margin-top: -20px; }
 }

@@ -1,13 +1,9 @@
-import { Skeleton } from "@/components/ui/skeleton";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Suspense } from "react";
 
 import {
-  getChannelRanking,
   getEcosystemSentiment,
   getIssueKeywords,
-  getRisingChannels,
   getStockNarratives,
   getSurgingOneliners,
   getStockReport,
@@ -15,7 +11,6 @@ import {
   getTelegramSummary,
   getThemeRotation,
   getTopStocksWithTrend,
-  getTrendingMessages,
   KADERA_WINDOW_DAYS,
 } from "@/lib/telegram-data";
 import type { ThemeRotation } from "@/lib/telegram-data";
@@ -32,10 +27,9 @@ import { THEME_NAMES, themeHref } from "@/lib/theme-href";
 import { THEMES } from "@/lib/stock-themes";
 import { THEME_PUBLIC } from "../screen-flags";
 import { BOARD_TILES, getMoveReasons, getUpcomingEvents, todayKst } from "@/lib/kadera-why";
-import { CHANNEL_FORM } from "../brand";
 import { StockBoard } from "./StockBoard";
 import { PanelTabs } from "./PanelTabs";
-import { ChannelRows, EventRows, FeedRows, KeywordRows, RisingRows, ThemeRows } from "./V2Lists";
+import { EventRows, KeywordRows, ThemeRows } from "./V2Lists";
 import type { BoardStock, BoardTab } from "./StockBoard";
 
 // 미리보기 이미지는 옆의 opengraph-image.tsx 가 그린다(ownImage). 자세한 건 app/seo.ts 주석 참고.
@@ -90,47 +84,6 @@ for (const [theme, names] of Object.entries(THEMES)) {
   for (const n of names) THEMES_OF_NAME.set(n, [...(THEMES_OF_NAME.get(n) ?? []), theme]);
 }
 
-/**
- * 화제 글 패널(오늘 · 7일 · 30일). 이 한 장만 Suspense 로 떼어 놨다 — 조회 셋(기간마다 36건)이 화면의 나머지보다
- * 느려, 기다리면 화면 전체가 그만큼 늦게 뜬다. 기간 탭 셋은 서버가 미리 다 그려 넘긴다.
- */
-async function FeedPanel() {
-  const [today, week, month] = await Promise.all([
-    getTrendingMessages("today", 36),
-    getTrendingMessages(7, 36),
-    getTrendingMessages(30, 36),
-  ]);
-  assertLoaded("/kadera trending");
-  return (
-    <PanelTabs
-      className="v2-a-feed"
-      name="feed"
-      title="화제 글"
-      tabs={[
-        { key: "today", label: "오늘", node: <FeedRows items={today} label="오늘" /> },
-        { key: "w1", label: "7일", node: <FeedRows items={week} label="최근 7일" /> },
-        { key: "m1", label: "30일", node: <FeedRows items={month} label="최근 30일" /> },
-      ]}
-    />
-  );
-}
-
-/** 화제 글이 오기 전 자리. 판 높이는 격자가 쥐므로 여기선 머리와 줄 몇 개만 흉내 낸다. */
-function FeedSkeleton() {
-  return (
-    <section className="v2-panel v2-a-feed" aria-hidden>
-      <header className="v2-p-head">
-        <Skeleton style={{ height: 18, width: 72, borderRadius: 6 }} />
-      </header>
-      <div className="v2-p-body" style={{ padding: "12px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
-        {[0, 1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} style={{ height: 58, borderRadius: 8 }} />
-        ))}
-      </div>
-    </section>
-  );
-}
-
 export default async function KaderaPage() {
   // 종목 리포트는 "어느 종목인지"를 먼저 알아야 해서 getTopStocksWithTrend 에 매여 있다.
   // 그렇다고 이걸 await 한 **뒤에** 나머지를 시작하면, 나머지와 아무 상관 없는 그 왕복이
@@ -145,8 +98,6 @@ export default async function KaderaPage() {
   const [
     summary,
     surging,
-    channels,
-    rising,
     rawThemes,
     reports,
     rawSentiment,
@@ -160,8 +111,7 @@ export default async function KaderaPage() {
       getTelegramSummary(),
       // 3×2 셀 격자라 여섯이어야 줄이 찬다(예전 카드 배치에선 다섯이었다).
       getSurgingStocks(6),
-      getChannelRanking(),
-      getRisingChannels(10),
+      // v2: 채널 파워 랭킹 · 뜨는 채널 · 화제 글은 걷었다(2026-10-02). 두 달 동안 카더라 방문자의 2~5%만 눌렀다.
       getThemeRotation(10),
       reportsPromise,
       getEcosystemSentiment(),
@@ -406,10 +356,9 @@ export default async function KaderaPage() {
           <StockBoard tabs={boardTabs} stocks={board} />
         </section>
 
-        {/* ── 오늘의 요약 · 여론 ── */}
+        {/* ── 오늘의 요약 ── */}
         <PanelTabs
           className="v2-a-brief"
-          id="mood"
           name="brief"
           tabs={[
             {
@@ -422,12 +371,6 @@ export default async function KaderaPage() {
                 </span>
               ),
               node: briefNode,
-            },
-            {
-              key: "mood",
-              label: "여론",
-              meta: sentiment ? `최근 ${sentiment.windowDays}일 · ${sentiment.messageCount.toLocaleString("ko-KR")}건` : undefined,
-              node: moodNode,
             },
           ]}
         />
@@ -455,42 +398,33 @@ export default async function KaderaPage() {
           ]}
         />
 
-        {/* ── 화제 글 ── 이 한 장만 늦게 온다(FeedPanel 머리말). */}
-        <Suspense fallback={<FeedSkeleton />}>
-          <FeedPanel />
-        </Suspense>
-
-        {/* ── 일정 · 채널 ── */}
+        {/* ── 다가오는 일정 ── '앞으로 뭐 있나'. 채널 탭 아래 숨어 있던 것을 제 패널로 꺼냈다. */}
         <PanelTabs
-          className="v2-a-side"
+          className="v2-a-events"
           id="events"
-          name="side"
+          name="events"
           tabs={[
             {
               key: "events",
-              label: "일정",
+              label: "다가오는 일정",
               meta: "앞으로 5주",
               node: eventsFailed ? <p className="v2-empty">일정을 불러오지 못했습니다.</p> : <EventRows events={events} today={kaderaToday} />,
             },
+          ]}
+        />
+
+        {/* ── 여론 ── 낙관도 · 테마별 기울기 · 30일 추이. 요약 패널의 탭에서 제 패널로 꺼냈다. */}
+        <PanelTabs
+          className="v2-a-mood"
+          id="mood"
+          name="mood"
+          tabs={[
             {
-              key: "ch",
-              label: "채널 순위",
-              meta: (
-                <a
-                  href={CHANNEL_FORM}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="v2-more"
-                  data-ga="cta_click"
-                  data-ga-cta="register_channel"
-                  data-ga-surface="power_rank"
-                >
-                  채널 등록 신청
-                </a>
-              ),
-              node: <ChannelRows channels={channels} />,
+              key: "mood",
+              label: "여론",
+              meta: sentiment ? `최근 ${sentiment.windowDays}일 · ${sentiment.messageCount.toLocaleString("ko-KR")}건` : undefined,
+              node: moodNode,
             },
-            { key: "rise", label: "뜨는 채널", meta: "최근 7일", node: <RisingRows rising={rising} /> },
           ]}
         />
       </div>
