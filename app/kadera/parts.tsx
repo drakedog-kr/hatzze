@@ -422,7 +422,7 @@ export function Sparkline({ data, width = 62, height = 26 }: { data: number[]; w
  * 히어로 센티먼트 칸의 인기 테마 줄 — **평소 대비 막대**(국장·미장 같은 판).
  *
  * 가운데 눈금이 그 테마의 평소다. 오늘 낙관이 평소보다 적으면 왼쪽(파랑), 많으면 오른쪽(주황)으로 뻗고,
- * 평소와 다르다고 말할 만큼은 아니면 회색이다. 왜 낙관도 그대로 나누지 않는지는 theme-vs-usual.ts 머리 주석.
+ * 평소와 다르다고 말할 만큼은 아니면 회색이다(--tx-flat). 왜 낙관도 그대로 나누지 않는지는 theme-vs-usual.ts 머리 주석.
  * 숫자(낙관 %·평소 %)는 툴팁이 말한다 — 막대 길이는 평활 전 비율로 재서 툴팁 숫자의 뺄셈과 1~2점 갈릴 수 있어,
  * 줄에는 숫자를 적지 않는다(themeTip 주석의 2026-09-30 지적과 같은 까닭).
  *
@@ -436,7 +436,7 @@ export function ThemeVsUsualRows({ themes }: { themes: (ThemeRow & { name: strin
       <span style={{ gridColumn: "1 / -1", fontSize: "var(--fs-11)", fontWeight: 700, letterSpacing: ".04em", color: C.sub }}>인기 테마 · 평소와 견주면</span>
       {themes.map((t) => {
         const lean = themeLean(t);
-        const fill = !lean ? null : lean.shift === "up" ? "var(--c-warm-3)" : lean.shift === "down" ? "var(--c-blue-3)" : C.bar;
+        const fill = !lean ? null : lean.shift === "up" ? "var(--c-warm-3)" : lean.shift === "down" ? "var(--c-blue-3)" : "var(--tx-flat)";
         const ink = lean?.shift === "up" ? "var(--c-hot-ink)" : lean?.shift === "down" ? "var(--c-cold-ink)" : C.sub;
         return (
           <div
@@ -447,7 +447,8 @@ export function ThemeVsUsualRows({ themes }: { themes: (ThemeRow & { name: strin
           >
             <span style={{ ...clip, fontSize: "var(--fs-11)", fontWeight: 700, color: C.label }}>{t.name}</span>
             <span style={{ position: "relative", minWidth: 0, height: 7 }}>
-              <span style={{ position: "absolute", inset: 0, borderRadius: 999, background: C.track, overflow: "hidden" }}>
+              {/* 트랙·회색 채움은 타일 전용 반투명 색(tx.css --tx-track · --tx-flat) — --c-track 은 회색 타일 위에서 사라진다. */}
+              <span style={{ position: "absolute", inset: 0, borderRadius: 999, background: "var(--tx-track)", overflow: "hidden" }}>
                 {lean && fill && (
                   <span
                     style={{
@@ -464,7 +465,7 @@ export function ThemeVsUsualRows({ themes }: { themes: (ThemeRow & { name: strin
                 )}
               </span>
               {/* 평소 눈금 — 데이터가 아니라 '자'라서 marker(트랙보다 진하고 잉크보다 옅다). 막대보다 위아래로 조금 길다. */}
-              <span style={{ position: "absolute", left: "50%", top: -2, bottom: -2, width: 2, borderRadius: 1, transform: "translateX(-50%)", background: C.marker }} />
+              <span style={{ position: "absolute", left: "50%", top: -3, bottom: -3, width: 2, borderRadius: 1, transform: "translateX(-50%)", background: C.marker }} />
             </span>
             <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, color: ink, whiteSpace: "nowrap" }}>
               {lean ? LEAN_WORD[lean.shift] : LEAN_WORD.none}
