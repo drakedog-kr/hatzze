@@ -436,7 +436,8 @@ export function ThemeVsUsualRows({ themes }: { themes: (ThemeRow & { name: strin
       <span style={{ gridColumn: "1 / -1", fontSize: "var(--fs-11)", fontWeight: 700, letterSpacing: ".04em", color: C.sub }}>인기 테마 · 평소와 견주면</span>
       {themes.map((t) => {
         const lean = themeLean(t);
-        const fill = !lean ? null : lean.shift === "up" ? "var(--c-warm-3)" : lean.shift === "down" ? "var(--c-blue-3)" : "var(--tx-flat)";
+        // 색은 바로 위 큰 비관·낙관 막대, 테마 로테이션 줄의 오르내림과 같은 -2 단이다 — 한 화면에서 같은 말을 같은 색으로.
+        const fill = !lean ? null : lean.shift === "up" ? "var(--c-warm-2)" : lean.shift === "down" ? "var(--c-blue-2)" : "var(--tx-flat)";
         const ink = lean?.shift === "up" ? "var(--c-hot-ink)" : lean?.shift === "down" ? "var(--c-cold-ink)" : C.sub;
         return (
           <div
@@ -447,7 +448,7 @@ export function ThemeVsUsualRows({ themes }: { themes: (ThemeRow & { name: strin
           >
             <span style={{ ...clip, fontSize: "var(--fs-11)", fontWeight: 700, color: C.label }}>{t.name}</span>
             <span style={{ position: "relative", minWidth: 0, height: 7 }}>
-              {/* 트랙·회색 채움은 타일 전용 반투명 색(tx.css --tx-track · --tx-flat) — --c-track 은 회색 타일 위에서 사라진다. */}
+              {/* 트랙·회색 채움·눈금은 잉크를 섞은 타일 전용 색(tx.css --tx-track · --tx-flat · --tx-tick) — --c-track 은 회색 타일 위에서 사라진다. */}
               <span style={{ position: "absolute", inset: 0, borderRadius: 999, background: "var(--tx-track)", overflow: "hidden" }}>
                 {lean && fill && (
                   <span
@@ -464,8 +465,8 @@ export function ThemeVsUsualRows({ themes }: { themes: (ThemeRow & { name: strin
                   />
                 )}
               </span>
-              {/* 평소 눈금 — 데이터가 아니라 '자'라서 marker(트랙보다 진하고 잉크보다 옅다). 막대보다 위아래로 조금 길다. */}
-              <span style={{ position: "absolute", left: "50%", top: -3, bottom: -3, width: 2, borderRadius: 1, transform: "translateX(-50%)", background: C.marker }} />
+              {/* 평소 눈금 — 데이터가 아니라 '자'라서 채움보다 가늘고 위아래로 조금 길다. --c-marker 는 트랙을 진하게 한 뒤로 트랙보다 옅어 틈처럼 보여 잉크 섞은 색이다. */}
+              <span style={{ position: "absolute", left: "50%", top: -3, bottom: -3, width: 2, borderRadius: 1, transform: "translateX(-50%)", background: "var(--tx-tick)" }} />
             </span>
             <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, color: ink, whiteSpace: "nowrap" }}>
               {lean ? LEAN_WORD[lean.shift] : LEAN_WORD.none}
