@@ -46,6 +46,25 @@ const NOT_SAFE_ETF = /혼합[5-9]\d|커버드콜|밸런스/;
 /** IRP 의 안전자산 30% 에 드는 종목인가 — 국내 상장 채권형·채권혼합형 ETF. */
 export const isSafeAsset = (s: StockLite) => s.kind === "etf" && s.currency === "KRW" && SAFE_ETF.test(s.name) && !NOT_SAFE_ETF.test(s.name);
 
+/** 해외 자산에 투자하는 국내 상장 ETF — lib/dividend.ts 의 OVERSEAS 와 같은 식(서버 코드를 클라이언트로 끌어오지 않으려고 베낀다). */
+const OVERSEAS_ETF = /미국|나스닥|S&P|글로벌|해외|일본|유로|차이나|인도|선진|신흥|테크TOP10|엔비디아/;
+
+/** 외국에서 떼는 세금이 거의 없는 해외 ETF — 채권 이자(미국 국채 이자는 외국 투자자에게 원천징수가 없다)와 옵션 프리미엄(커버드콜). */
+const LITTLE_FOREIGN_TAX = /커버드콜|프리미엄|채권|국채|회사채|단기|머니마켓|금리|CD|KOFR|혼합/;
+
+/**
+ * 일반 계좌에서 이 줄의 세금을 실제보다 많이 세는가 — 해외 주식에 투자하는 국내 상장 ETF.
+ *
+ * 2025년부터 이런 ETF 의 분배금은 펀드가 외국에 낸 세금(미국 배당이면 15%)을 국내 세금에서 빼 준다 — 국내에서 더 떼는 건
+ * 15.4% × 과표 − 외국납부세액이다. 이 화면은 분배금에 15.4% 를 그대로 떼어, 미국배당다우존스류 세후가 분배금의 13~14%만큼
+ * 적게 나온다(2026-10-01 점검 dividend#0). 외국납부세액은 운용사 공시에만 있는데(분배마다 다르다) 아직 못 받는다 — TIGER
+ * 사이트는 GitHub 러너에서 안 열린다(fetch_etf_dividends.py 의 stored_taxable). 받기 전까지는 **값은 그대로 두고** 줄에 알린다.
+ * 모자라게 세는 쪽이 없는 돈을 셈에 넣는 쪽보다 낫다. 채권형·커버드콜은 외국 세금이 거의 없어 15.4% 가 맞으니 뺀다.
+ */
+export function foreignTaxNotCredited(s: StockLite): boolean {
+  return s.kind === "etf" && s.currency === "KRW" && s.dps > 0 && OVERSEAS_ETF.test(s.name) && !LITTLE_FOREIGN_TAX.test(s.name);
+}
+
 /** 연금 계좌 둘 — 담을 수 있는 것과 세율이 같다. */
 export const isPensionLike = (mode: TaxMode) => mode === "pension" || mode === "irp";
 

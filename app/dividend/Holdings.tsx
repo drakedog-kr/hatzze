@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { useRef, useState } from "react";
 import { StockLogo } from "../StockLogo";
 import { won, usd, money, pct } from "./format";
-import { isSafeAsset, fitsAccount, ACCOUNTS, ACCOUNT_SHORT } from "./tax";
+import { isSafeAsset, fitsAccount, foreignTaxNotCredited, ACCOUNTS, ACCOUNT_SHORT } from "./tax";
 import type { Account, TaxMode } from "./tax";
 import { HOT_YIELD_PCT, TODAY_KST, Badges, SPLIT_OPTION, nextAccountFor } from "./shared";
 import type { Line } from "./shared";
@@ -266,6 +266,10 @@ function HoldingRow({
         title: pct <= 0 ? `분배금 ${won(s.dps)}에 세금이 안 붙습니다.` : `분배금 ${won(s.dps)} 중 ${won(s.taxable)}에만 세금이 붙습니다.`,
       });
     }
+  }
+  // 해외 주식형 국내 ETF 는 외국에서 낸 세금만큼 국내에서 덜 뗀다 — 이 셈엔 아직 그게 없다(tax.tsx 의 foreignTaxNotCredited).
+  if (mode !== "gross" && (line.account === "general" || line.outside) && foreignTaxNotCredited(s)) {
+    facts.push({ text: "실제 세금 더 적음", title: "해외에서 이미 낸 세금을 빼 주지 않은 값이라, 실제로 떼는 세금은 이보다 적습니다." });
   }
   // 고배당기업(배당소득 분리과세 대상). 일반 계좌로 세는 줄에만 — ISA·연금 계좌 소득은 금융소득에 안 합친다.
   // 지난 1년 배당이 전부 감액배당(비과세)이면 안 붙인다 — 종목 페이지 배당 카드와 같은 규칙(calc.ts 의 showsSepTax).
