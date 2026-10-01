@@ -14,7 +14,7 @@
 
   ⚠️ **본문을 같이 받지 않는다.** 11만 행의 text 를 받는 건 예전에 월 10GB 전송을
      만들었던 바로 그 실수다(digest 사건). 여기서는 점수에 필요한 컬럼만 받아 순위를
-     정하고, **정해진 108건(3창×36)의 본문만** 따로 받는다.
+     정하고, **고른 후보(3창 × 36 × 2, 겹치면 그보다 적다)의 본문만** 따로 받는다.
   ⚠️ **필터를 걸고 OFFSET 으로 페이징하지 않는다.** `posted_at` 필터를 걸고 .range() 로
      넘기면 13만 행에서 statement timeout 이 난다(2026-08-11 미국 종목 추출이 그렇게
      죽었고 워크플로는 초록이었다). 필터 없이 통째로 받아 파이썬에서 창을 자른다 —
@@ -36,7 +36,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.supabase_client import PAGE_SIZE, get_client, load_all, load_all_keyset  # noqa: E402
+from common.supabase_client import PAGE_SIZE, get_client, load_all, load_all_keyset, replace_rows  # noqa: E402
 from common.timeutil import KST, today_kst  # noqa: E402
 from config.us_stock_extraction import is_house  # noqa: E402
 
@@ -86,6 +86,10 @@ def in_window(rows: list[dict], start: datetime) -> list[dict]:
 
 # 공백 포함 이 글자 수 미만인 본문은 트렌딩에 안 올린다(국장 calculate_telegram_trending.MIN_TEXT_CHARS 와 같은 값).
 MIN_TEXT_CHARS = 10
+# 본문을 받아 볼 후보 = 정원 × 이 배수. 짧은 본문으로 빠진 자리를 다음 글이 메운다(예전엔 정원만 받아 빠진 만큼 목록이 줄었다).
+CANDIDATE_MULT = 2
+# 본문을 한 번에 받는 id 수 — `.in_()` 목록이 길면 URL 이 커져 요청이 안 나간다(국내 TEXT_CHUNK 와 같은 값).
+TEXT_CHUNK = 50
 
 
 def clean_text(raw: str | None) -> str:
@@ -100,30 +104,25 @@ def score(m: dict) -> float:
     )
 
 
-def fetch_texts(db, keys: list[tuple[str, int]]) -> dict[tuple[str, int], str]:
-    """정해진 메시지들의 본문만 받아 온다.
+def fetch_texts(db, ids: list[str]) -> dict[str, str]:
+    """telegram_messages.id → 정리한 본문. 줄 세우기가 끝난 뒤 **고른 후보의 본문만** 받는다(국내 fetch_texts 와 같다).
 
-    ⚠️ message_id 는 채널 안에서만 유일하다. `.in_()` 으로 번호만 좁히면 다른 채널의
-    같은 번호가 딸려 오므로 **(채널, 번호)** 로 짝지어 골라낸다.
+    ⚠️ 예전엔 message_id(채널 안에서만 유일한 번호)로 `.in_()` 해 (채널, 번호)로 골라냈다. 한 번호가 채널마다 있어
+       300개 번호에 행이 1,000을 넘으면 PostgREST 가 **소리 없이 잘랐고**, 잘린 글은 본문이 없는 것으로 보여
+       순위에서 조용히 빠졌다 — 점수 높은 글도(2026-10-01 점검 pipeline-telegram#2). 유일한 id 로 받으면
+       요청한 수보다 많은 행이 올 수 없다.
     """
-    if not keys:
-        return {}
-    ids = sorted({k[1] for k in keys})
-    want = set(keys)
-    out: dict[tuple[str, int], str] = {}
-    for i in range(0, len(ids), 300):
-        chunk = ids[i : i + 300]
-        rows = (
+    out: dict[str, str] = {}
+    for i in range(0, len(ids), TEXT_CHUNK):
+        page = (
             db.table("telegram_messages")
-            .select("channel_handle,message_id,text")
-            .in_("message_id", chunk)
+            .select("id,text")
+            .in_("id", ids[i : i + TEXT_CHUNK])
             .execute()
             .data
         ) or []
-        for r in rows:
-            k = (r["channel_handle"], r["message_id"])
-            if k in want:
-                out[k] = clean_text(r.get("text"))
+        for r in page:
+            out[r["id"]] = clean_text(r.get("text"))
     return out
 
 
@@ -194,26 +193,26 @@ def main() -> None:
         iso = start.isoformat()
         rows = in_window(us_meta, start)
         rows.sort(key=lambda m: -score(m))
-        picked[key] = rows[:STORE_N]
-        print(f"[트렌딩] {key}: 후보 {len(rows):,}건 → {len(picked[key])}건 (창 시작 {iso})")
+        # 본문이 짧아 빠지는 글이 있어 정원보다 넉넉히 둔다 — 빠진 자리는 다음 글이 받아 정원을 채운다.
+        picked[key] = rows[: STORE_N * CANDIDATE_MULT]
+        print(f"[트렌딩] {key}: 후보 {len(rows):,}건 → 본문 볼 것 {len(picked[key])}건 (창 시작 {iso})")
 
-    # 본문·태그는 **고른 것만** 받는다. 최대 108건이라 왕복이 가볍다.
-    all_keys = [(m["channel_handle"], m["message_id"]) for rows in picked.values() for m in rows]
-    texts = fetch_texts(db, all_keys)
+    # 본문·태그는 **고른 것만** 받는다. 많아야 216건이라 왕복이 가볍다.
+    texts = fetch_texts(db, sorted({m["id"] for rows in picked.values() for m in rows}))
+    # 본문이 짧은 글을 빼고 창마다 정원까지만 — 태그는 남은 것만 받는다.
+    chosen = {
+        key: [m for m in picked[key] if len(texts.get(m["id"], "")) >= MIN_TEXT_CHARS][:STORE_N] for key, _ in WINDOWS
+    }
+    all_keys = [(m["channel_handle"], m["message_id"]) for rows in chosen.values() for m in rows]
     tags = us_stock_tags(db, all_keys, name_of)
 
     payload: list[dict] = []
     for key, days in WINDOWS:
         start = window_start(days)
-        rank = 0
-        for m in picked[key]:
+        # 본문이 공백뿐이거나 한마디뿐인 글(미디어만)은 위 chosen 에서 이미 뺐다 — 순위를 건너뛰지 않고 다음 글이 그 자리를 받는다.
+        for rank, m in enumerate(chosen[key], 1):
             k = (m["channel_handle"], m["message_id"])
-            text = texts.get(k, "")
-            if len(text) < MIN_TEXT_CHARS:  # 공백뿐이거나 한마디뿐인 본문
-                # 본문이 공백뿐인 것(미디어만)은 화면에서도 걸러진다. 순위를 건너뛰지 않고
-                # 다음 것이 그 자리를 받도록 rank 를 여기서 센다.
-                continue
-            rank += 1
+            text = texts[m["id"]]
             payload.append(
                 {
                     "window_key": key,
@@ -244,9 +243,8 @@ def main() -> None:
         print("[트렌딩] 저장할 것이 없어 기존 목록을 그대로 둡니다.")
         return
 
-    for key, _ in WINDOWS:
-        db.table("telegram_us_trending_message").delete().eq("window_key", key).execute()
-    db.table("telegram_us_trending_message").upsert(payload, on_conflict="window_key,rank").execute()
+    # 먼저 넣고 이번에 안 쓴 옛 줄만 지운다 — 국내와 같다(replace_rows 주석).
+    replace_rows(db, "telegram_us_trending_message", payload, "window_key,rank", stamp_col="updated_at")
     print(f"[트렌딩] 총 {len(payload)}건 저장")
 
 

@@ -45,7 +45,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.supabase_client import PAGE_SIZE, get_client  # noqa: E402
+from common.supabase_client import PAGE_SIZE, get_client, replace_rows  # noqa: E402
 from common.timeutil import KST, today_kst  # noqa: E402
 from config.stock_extraction import is_house  # noqa: E402
 
@@ -335,10 +335,9 @@ def main() -> None:
         print("[트렌딩] 저장할 것이 없어 기존 목록을 그대로 둡니다.")
         return
 
-    # 정원이 줄어든 날(예: 36 → 20) 옛 뒷줄이 남지 않도록 창별로 지우고 다시 넣는다.
-    for key, _ in WINDOWS:
-        db.table("telegram_trending_message").delete().eq("window_key", key).execute()
-    db.table("telegram_trending_message").upsert(payload, on_conflict="window_key,rank").execute()
+    # 정원이 줄어든 날(예: 36 → 20) 옛 뒷줄이 남지 않게 갈아 끼운다 — 먼저 넣고, 이번에 안 쓴 옛 줄만 지운다.
+    # 창별로 먼저 지우던 때는 지운 뒤 upsert 가 끊기면 카드가 빈 채로 남았다(replace_rows 주석).
+    replace_rows(db, "telegram_trending_message", payload, "window_key,rank", stamp_col="updated_at")
     print(f"[트렌딩] 총 {len(payload)}건 저장")
 
 

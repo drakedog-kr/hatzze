@@ -513,6 +513,7 @@ export function eventDateLabel(e: { date: string; precision: DatePrecision }): s
   }
   if (e.precision === "month") return `${yearPrefix}${m}월 중`;
   if (e.precision === "quarter") return `${yearPrefix}${Math.ceil(m / 3)}분기`;
+  if (e.precision === "half") return `${yearPrefix}${m <= 6 ? "상반기" : "하반기"}`;
   return `${y}년`;
 }
 

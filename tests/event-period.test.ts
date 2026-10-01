@@ -18,6 +18,14 @@ describe("periodEnd", () => {
     assert.equal(periodEnd("2026-07-01", "quarter"), "2026-09-30");
     assert.equal(periodEnd("2026-10-01", "quarter"), "2026-12-31");
     assert.equal(periodEnd("2026-01-01", "year"), "2026-12-31");
+    assert.equal(periodEnd("2026-01-01", "half"), "2026-06-30");
+    assert.equal(periodEnd("2026-07-01", "half"), "2026-12-31");
+  });
+
+  it("하반기는 10월에도 남는다 — 3분기로 적던 때는 10-01 에 사라졌다", () => {
+    assert.ok(stillAhead({ date: "2026-07-01", precision: "half" }, "2026-10-15"));
+    assert.ok(stillAhead({ date: "2026-07-01", precision: "half" }, "2026-12-31"));
+    assert.ok(!stillAhead({ date: "2026-01-01", precision: "half" }, "2026-07-01"));
   });
 });
 

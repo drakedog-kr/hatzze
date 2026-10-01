@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { hasRunSince, resolveJob, sinceIso } from "@/lib/cron-schedule";
+import { CATCH_UP_MIN, hasCatchUp, hasRunSince, resolveJob, sinceIso, type Job } from "@/lib/cron-schedule";
 
 // Vercel 크론이 부르는 자리다. 캐시가 끼면 판단이 굳으므로 매번 새로 돈다.
 export const dynamic = "force-dynamic";
@@ -76,6 +76,9 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
  *
  * ⚠️ Vercel 크론 전달은 best effort 라 **같은 예약이 두 번 불릴 수 있다**(문서에 명시).
  *    던지면 깃헙이 곧바로 실행을 만들므로, 두 번째 호출은 그 실행을 보고 스스로 빠진다.
+ *
+ * ⚠️ **끝내 못 던지면 운영자에게 알린다**(alertOperator). 파이프라인 두 슬롯은 20분 뒤 만회 크론이 같은 판단을 한 번
+ *    더 한다(lib/cron-schedule.ts CATCH_UP_MIN) — 예전엔 시계가 한 번 실패하면 그 몫을 메울 호출도, 아는 사람도 없었다.
  */
 export async function GET(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
@@ -84,15 +87,18 @@ export async function GET(request: Request) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
-  const token = process.env.GH_DISPATCH_TOKEN;
-  if (!token) {
-    return NextResponse.json({ ok: false, error: "GH_DISPATCH_TOKEN 이 없습니다" }, { status: 500 });
+  // 어느 예약이 불렀나. 크론 여럿이 같은 경로를 쓰므로 헤더로 가른다.
+  const schedule = request.headers.get("x-vercel-cron-schedule");
+  const job = resolveJob(schedule);
+  if (!job) {
+    await alertOperator(null, `vercel.json 의 크론(${schedule ?? "헤더 없음"})이 lib/cron-schedule.ts 표에 없습니다`);
+    return NextResponse.json({ ok: false, error: "모르는 크론" }, { status: 400 });
   }
 
-  // 어느 예약이 불렀나. 크론 넷이 같은 경로를 쓰므로 헤더로 가른다.
-  const job = resolveJob(request.headers.get("x-vercel-cron-schedule"));
-  if (!job) {
-    return NextResponse.json({ ok: false, error: "모르는 크론" }, { status: 400 });
+  const token = process.env.GH_DISPATCH_TOKEN;
+  if (!token) {
+    await alertOperator(job, "GH_DISPATCH_TOKEN 이 Vercel 환경변수에 없습니다");
+    return NextResponse.json({ ok: false, error: "GH_DISPATCH_TOKEN 이 없습니다" }, { status: 500 });
   }
 
   const now = new Date();
@@ -110,6 +116,7 @@ export async function GET(request: Request) {
     runs = await listRunsRetrying(job.workflow, gh, errors, "실행 목록");
   } catch {
     // 못 정했으니 던지지 않는다(위 주석).
+    await alertOperator(job, `실행 목록을 못 받아 던지지 않았습니다 — ${errors.join(" · ")}`);
     return NextResponse.json(
       { ok: false, job: job.label, dispatched: false, errors },
       { status: 502 },
@@ -142,6 +149,7 @@ export async function GET(request: Request) {
       again = await listRunsRetrying(job.workflow, gh, errors, "재확인");
     } catch {
       // 못 정했으니 던지지 않는다(위 주석). 던져졌을 수도 있어 unknown 으로 남긴다.
+      await alertOperator(job, `던졌는지 알 수 없습니다 — 실행 목록을 확인하세요 · ${errors.join(" · ")}`);
       return NextResponse.json(
         { ok: false, job: job.label, since, dispatched: "unknown", errors },
         { status: 502 },
@@ -163,10 +171,53 @@ export async function GET(request: Request) {
   // 끊겨서 끝났으면 깃헙이 받았을 수도 있어 "안 던졌다"고 단정하지 않는다. 사람이 실행
   // 목록을 보고 판단한다(던지면 실행이 곧 생기므로 중복이 되진 않는다).
   const cut = last instanceof GithubError && last.status === undefined;
+  await alertOperator(
+    job,
+    cut ? `던졌는지 알 수 없습니다 — 실행 목록을 확인하세요 · ${errors.join(" · ")}` : `던지지 못했습니다 — ${errors.join(" · ")}`,
+  );
   return NextResponse.json(
     { ok: false, job: job.label, since, dispatched: cut ? "unknown" : false, errors },
     { status: 502 },
   );
+}
+
+/**
+ * 시계가 이 몫을 못 던졌을 때 운영자에게 텔레그램으로 알린다(automation#0).
+ *
+ * 예전엔 502 를 Vercel 로그에 남기고 끝이었다. 토큰 만료·깃헙 장애·크론 누락이 생기면 그날 지표·카더라·발송이 통째로
+ * 빠진 채, 화면은 옛 값을 태연히 보여 주고 사람이 알아챌 때까지 갔다.
+ *
+ * 깃헙 이슈로 알리지 않는 까닭: 가장 흔할 원인 하나가 GH_DISPATCH_TOKEN 만료(fine-grained PAT 는 기한이 있다)인데,
+ * 그 토큰으로는 이슈도 못 연다. 그래서 통로를 깃헙 밖에 둔다 — 발송에 쓰는 그 봇(TELEGRAM_BOT_TOKEN)으로 운영자
+ * 대화(TELEGRAM_ALERT_CHAT_ID)에 보낸다. 둘 다 Vercel 환경변수에 있을 때만이고, 없으면 로그에만 남는다.
+ *
+ * ⚠️ 알림이 실패해도 응답은 그대로다 — 알림 통로를 넓히려다 판단을 잃으면 본말이 뒤집힌다.
+ * ⚠️ 401(비밀값 불일치)에는 안 보낸다. 누구나 이 주소를 두드릴 수 있어 알림 폭탄이 된다.
+ */
+async function alertOperator(job: Job | null, detail: string): Promise<void> {
+  const name = job ? `'${job.label}'` : "크론";
+  // 만회 크론은 '이미 돌았나'부터 보므로, 던졌는지 모르는 경우에도 기다리면 된다.
+  const next = !job
+    ? ""
+    : hasCatchUp(job)
+      ? ` ${CATCH_UP_MIN}분 뒤 만회 크론이 한 번 더 봅니다.`
+      : ` 실행이 없으면 손으로 돌려야 합니다: https://github.com/${REPO}/actions/workflows/${job.workflow}`;
+  const text = `⚠️ 파이프라인 시계 — ${name}: ${detail}.${next}`;
+  console.error(`[cron] ${text}`);
+  const bot = process.env.TELEGRAM_BOT_TOKEN;
+  const chat = process.env.TELEGRAM_ALERT_CHAT_ID;
+  if (!bot || !chat) return;
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${bot}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chat, text: text.slice(0, 3500), disable_web_page_preview: true }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!res.ok) console.error(`[cron] 운영자 알림 ${res.status}`);
+  } catch (e) {
+    console.error("[cron] 운영자 알림 실패", e);
+  }
 }
 
 /** 실행 목록 한 번. 못 받으면 GithubError 를 던진다. */

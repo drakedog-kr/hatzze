@@ -42,7 +42,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.supabase_client import has_column, get_client, load_all, load_all_keyset  # noqa: E402
+from common.supabase_client import has_column, get_client, load_all, load_all_keyset, replace_rows  # noqa: E402
 from common.theme_tone import THEME_TONE_MAX_THEMES, list_effect_lines, theme_tone_targets  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 from config.issue_keywords import EXCLUDE, MAX_KEYWORD_LEN, MIN_KEYWORD_LEN  # noqa: E402
@@ -602,30 +602,24 @@ def main() -> None:
         print("[dry-run] 저장하지 않고 종료합니다.")
         return
 
-    # ── 저장 (전량 재계산: 삭제 후 삽입) ────────────────────────────────────
-    # 종목별 톤은 기준일 × 창 단위로 통째 갈아 끼운다(id 열이 없어 다른 삭제 조건).
+    # ── 저장 (전량 재계산: 갈아 끼우기 — common/supabase_client.replace_rows) ─────
+    # 종목별 톤은 기준일 × 창 단위로 갈아 끼운다 — 다른 기준일 행은 둔다(where).
     if tone_rows:
-        db.table(STOCK_TONE_TABLE).delete().eq("as_of_date", tone_rows[0]["as_of_date"]).eq(
-            "window_days", STOCK_TONE_WINDOW_DAYS
-        ).execute()
-        for i in range(0, len(tone_rows), 500):
-            db.table(STOCK_TONE_TABLE).insert(tone_rows[i:i + 500]).execute()
+        replace_rows(
+            db, STOCK_TONE_TABLE, tone_rows, "as_of_date,window_days,ticker", stamp_col="updated_at",
+            where={"as_of_date": tone_rows[0]["as_of_date"], "window_days": STOCK_TONE_WINDOW_DAYS},
+        )
         print(f"[Supabase] {STOCK_TONE_TABLE} {len(tone_rows)}행 저장")
 
-    for table, rows in ((SENTIMENT_TABLE, sentiment_rows), (KEYWORD_TABLE, keyword_rows)):
-        # PostgREST 는 조건 없는 delete 를 막으므로 항상 참인 조건을 준다.
-        db.table(table).delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
-        # 500행씩 — 한 statement 가 8초(statement_timeout)를 넘지 않게. 총 소요가 아니라
-        # statement 하나에 걸리는 천장이라, 쪼개면 행이 아무리 많아도 안 걸린다.
-        for i in range(0, len(rows), 500):
-            db.table(table).insert(rows[i : i + 500]).execute()
+    # delete → insert 였다. 도중에 죽으면 표가 비거나 반쪽이 됐다 — 갈아 끼운다(replace_rows 주석, 500행씩 쪼개는 것도 그쪽).
+    for table, rows, key in ((SENTIMENT_TABLE, sentiment_rows, "date,scope"), (KEYWORD_TABLE, keyword_rows, "date,keyword")):
+        replace_rows(db, table, rows, key)
         print(f"[Supabase] {table} {len(rows)}행 저장")
 
     # 파생 표는 원자료를 쓴 **뒤에** 저장한다. 순서가 뒤집히면 잠깐이지만 카드가
     # 원자료보다 앞선 값을 말한다.
     if issue_rows:
-        db.table(ISSUE_KEYWORD_TABLE).delete().gte("rank", 0).execute()
-        db.table(ISSUE_KEYWORD_TABLE).insert(issue_rows).execute()
+        replace_rows(db, ISSUE_KEYWORD_TABLE, issue_rows, "rank", stamp_col="updated_at")
         print(f"[Supabase] {ISSUE_KEYWORD_TABLE} {len(issue_rows)}행 저장 "
               f"({issue_rows[0]['computed_for']} 기준)")
     else:

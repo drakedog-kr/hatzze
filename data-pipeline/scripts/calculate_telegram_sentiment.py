@@ -42,7 +42,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.market_tags import US_TAGS, is_us_only  # noqa: E402
-from common.supabase_client import has_column, get_client  # noqa: E402
+from common.supabase_client import has_column, get_client, replace_rows  # noqa: E402
 from common.theme_tone import THEME_TONE_MAX_THEMES, list_effect_lines, theme_tone_targets  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 from common.supabase_client import load_all, load_all_keyset  # noqa: E402
@@ -161,7 +161,8 @@ def issue_keyword_rows(keyword_rows: list[dict]) -> list[dict]:
 
 
 def save_issue_keywords(db, rows: list[dict]) -> None:
-    """전량 교체. 표가 아직 없어도(마이그레이션 023 미적용) 파이프라인을 세우지 않는다.
+    """갈아 끼운다(replace_rows — 순위가 키, 실행 시각은 updated_at). 표가 아직 없어도(마이그레이션 023 미적용)
+    파이프라인을 세우지 않는다.
 
     이 표는 **속도만 담당하고 정확성은 담당하지 않는다** — 비어 있으면 프론트가
     telegram_keyword_daily 에서 즉석 계산으로 떨어져 예전과 똑같이 그린다. 그래서
@@ -171,8 +172,7 @@ def save_issue_keywords(db, rows: list[dict]) -> None:
         print(f"[안내] 이슈 키워드가 비어 저장을 건너뜁니다({ISSUE_KEYWORD_TABLE}).")
         return
     try:
-        db.table(ISSUE_KEYWORD_TABLE).delete().gte("rank", 0).execute()
-        db.table(ISSUE_KEYWORD_TABLE).insert(rows).execute()
+        replace_rows(db, ISSUE_KEYWORD_TABLE, rows, "rank", stamp_col="updated_at")
     except Exception as exc:  # noqa: BLE001
         print(
             f"[안내] {ISSUE_KEYWORD_TABLE} 저장을 건너뜁니다({type(exc).__name__}) — "
@@ -396,18 +396,13 @@ def main() -> None:
         print("[dry-run] 저장하지 않고 종료합니다.")
         return
 
-    # ── 저장 (전량 재계산: 삭제 후 삽입) ────────────────────────────────────
-    for table, rows in (
-        ("telegram_sentiment_daily", sentiment_rows),
-        ("telegram_keyword_daily", keyword_rows),
+    # ── 저장 (전량 재계산: 갈아 끼우기) ───────────────────────────────────────
+    # delete → insert 였다. 도중에 죽으면 표가 비거나 반쪽이 됐다(replace_rows 주석).
+    for table, rows, key in (
+        ("telegram_sentiment_daily", sentiment_rows, "date,scope"),
+        ("telegram_keyword_daily", keyword_rows, "date,keyword"),
     ):
-        # 전량 재계산 — PostgREST는 조건 없는 delete를 막으므로 항상 참인 조건을 준다
-        # (calculate_theme_daily.py 와 같은 패턴).
-        db.table(table).delete().neq(
-            "id", "00000000-0000-0000-0000-000000000000"
-        ).execute()
-        for i in range(0, len(rows), 500):
-            db.table(table).insert(rows[i : i + 500]).execute()
+        replace_rows(db, table, rows, key)
         print(f"[Supabase] {table} {len(rows)}행 저장")
 
     # 화제어 원자료를 쓴 뒤에 저장한다 — 이 표는 그것의 파생이라 순서가 뒤집히면

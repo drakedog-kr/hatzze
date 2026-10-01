@@ -36,7 +36,22 @@ export type Job = {
   fireUtc: string;
   /** 던질 때 넘길 입력. 요일에 따라 달라지므로 함수다. */
   inputs: (now: Date) => Record<string, string>;
+  /** 본 발화가 못 던진 몫을 다시 보는 **만회** 크론인가(아래 CATCH_UP_MIN). 알림 문구만 가른다. */
+  catchUp?: boolean;
 };
+
+/**
+ * 만회 크론은 본 발화 몇 분 뒤에 같은 잡을 한 번 더 본다(automation#0).
+ *
+ * 시계가 이것 하나라 본 발화가 못 던지면 그 몫을 메울 호출이 없었다 — 깃헙이 3분 넘게 5xx 를 주거나(라우트의 재시도가
+ * 그 안에 끝난다), Vercel 이 크론 하나를 아예 안 부르면(전달이 best effort, 문서 명시) 그날 지표·카더라·발송이 통째로
+ * 빠지고 아무도 몰랐다. 만회 호출은 판단이 본 발화와 같다 — 같은 슬롯 경계로 '이미 돌았나'를 보므로 본 발화가 던졌으면
+ * (돌고 있어도) 스스로 빠진다. 둘이 같은 초에 겹쳐도 워크플로 게이트가 늦게 생긴 쪽을 뺀다(daily-update.yml '수동 실행').
+ *
+ * ⚠️ 아침은 늦출수록 개장(09:00) 전 브리핑이 밀린다. 20분이면 KRX 게이트(08:00)에서 덜 자는 만큼이라 거의 그대로다.
+ * ⚠️ 토큰이 만료된 날은 만회도 같이 실패한다 — 그때를 위해 라우트가 운영자에게 알린다(route.ts alertOperator).
+ */
+export const CATCH_UP_MIN = 20;
 
 /**
  * Vercel 크론 → 잡. 크론들이 같은 경로를 쓰므로 `x-vercel-cron-schedule` 헤더로 가른다.
@@ -82,24 +97,34 @@ const BROADCAST_JOB: Job = {
   inputs: (now) => ({ send: "true", format: broadcastFormat(now) }),
 };
 
+const PIPELINE_MORNING: Job = {
+  key: "pipeline-morning",
+  label: "파이프라인 아침",
+  workflow: DAILY,
+  fireUtc: "21:00",
+  // ⭐ `slot` 은 워크플로가 아침·저녁을 가르는 유일한 표시다. **주말에는 `broadcast` 가
+  //    둘 다 'none' 이라 그것만으로는 못 가른다.** 지금은 디시 감성 스텝이 이걸 본다.
+  inputs: (now) => ({ broadcast: isKstWeekday(now) ? "morning" : "none", slot: "morning" }),
+};
+
+const PIPELINE_EVENING: Job = {
+  key: "pipeline-evening",
+  label: "파이프라인 저녁",
+  workflow: DAILY,
+  fireUtc: "08:00",
+  inputs: (now) => ({ broadcast: isKstWeekday(now) ? "evening" : "none", slot: "evening" }),
+};
+
+/** 본 잡과 경계·입력이 같은 만회 잡(CATCH_UP_MIN). */
+const catchUp = (job: Job): Job => ({ ...job, key: `${job.key}-catchup`, label: `${job.label}(만회)`, catchUp: true });
+
 export const CRON_TO_JOB: Record<string, Job> = {
   // ── 파이프라인. 여기 적힌 시각이 이 워크플로가 도는 유일한 시각이다. ──
-  "30 21 * * *": {
-    key: "pipeline-morning",
-    label: "파이프라인 아침",
-    workflow: DAILY,
-    fireUtc: "21:00",
-    // ⭐ `slot` 은 워크플로가 아침·저녁을 가르는 유일한 표시다. **주말에는 `broadcast` 가
-    //    둘 다 'none' 이라 그것만으로는 못 가른다.** 지금은 디시 감성 스텝이 이걸 본다.
-    inputs: (now) => ({ broadcast: isKstWeekday(now) ? "morning" : "none", slot: "morning" }),
-  },
-  "30 8 * * *": {
-    key: "pipeline-evening",
-    label: "파이프라인 저녁",
-    workflow: DAILY,
-    fireUtc: "08:00",
-    inputs: (now) => ({ broadcast: isKstWeekday(now) ? "evening" : "none", slot: "evening" }),
-  },
+  "30 21 * * *": PIPELINE_MORNING,
+  "30 8 * * *": PIPELINE_EVENING,
+  // 만회 — 본 발화 20분 뒤(06:50 · 17:50 KST). 본 발화가 던졌으면 스스로 빠진다(CATCH_UP_MIN 주석).
+  "50 21 * * *": catchUp(PIPELINE_MORNING),
+  "50 8 * * *": catchUp(PIPELINE_EVENING),
 
   // ── 채널 발송(주중 점검 · 이번 주 미장 흐름 · 한 주 정리). 요일마다 시각이 다르다. ──
   //
@@ -125,6 +150,11 @@ export const CRON_TO_JOB: Record<string, Job> = {
     inputs: () => ({}),
   },
 };
+
+/** 이 잡이 못 던진 몫을 다시 볼 만회 크론이 있나 — 알림이 '기다리면 된다'와 '손으로 돌려야 한다'를 가른다. */
+export function hasCatchUp(job: Job): boolean {
+  return !job.catchUp && Object.values(CRON_TO_JOB).some((j) => j.catchUp && j.key === `${job.key}-catchup`);
+}
 
 export function resolveJob(schedule: string | null): Job | null {
   if (!schedule) return null;
