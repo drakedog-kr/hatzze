@@ -91,3 +91,34 @@ def test_indicator_values_has_details_column():
     # 쌓이고 점수·신선도 게이트가 죽어 발송도 선다(화면은 lib/data.ts 가 details 없이 다시 읽어
     # 버티므로 그전까지 안 보인다).
     assert _has_column("indicator_values", "details")
+
+
+def _precision_check_allows(table: str) -> set[str] | None:
+    """일정 표 date_precision 검사가 마지막으로 허용하는 값(_category_check_allows 와 같은 방식)."""
+    allowed: set[str] | None = None
+    for path in _sql_files():
+        sql = _sql(path)
+        body = _create_table_body(sql, table)
+        if body:
+            m = re.search(r"date_precision\s+text\s+not\s+null\s+check\s*\(\s*date_precision\s+in\s*\(([^)]*)\)", body, re.I)
+            allowed = _quoted(m.group(1)) if m else None
+        events = re.finditer(
+            rf"drop constraint if exists {table}_date_precision_check"
+            rf"|add constraint {table}_date_precision_check\s+check\s*\(\s*date_precision\s+in\s*\(([^)]*)\)",
+            sql,
+            re.I,
+        )
+        for e in events:
+            allowed = _quoted(e.group(1)) if e.group(1) is not None else None
+    return allowed
+
+
+def test_event_precision_check_accepts_every_extracted_precision():
+    # 추출기가 내는 정밀도를 검사가 안 받으면 그 일정 묶음이 23514 로 거절된다(half — 마이그레이션 091).
+    src = (SCRIPTS / "extract_telegram_events.py").read_text(encoding="utf-8")
+    m = re.search(r'"precision":\s*\{"type":\s*"string",\s*"enum":\s*\[([^\]]*)\]', src)
+    assert m, "SCHEMA 의 precision enum 을 못 찾았다 — 정규식이 낡았다"
+    precisions = set(re.findall(r'"([^"]+)"', m.group(1)))
+    for table in ("telegram_stock_event", "telegram_us_stock_event"):
+        allowed = _precision_check_allows(table)
+        assert allowed is not None and precisions <= allowed, f"{table} 허용 {allowed} 에 없는 값: {precisions - (allowed or set())}"

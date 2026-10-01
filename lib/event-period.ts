@@ -10,7 +10,8 @@
  * 순수 함수만 둔다 — lib/kadera-why.ts 는 서버 전용이라 테스트가 못 부른다(tests/event-period.test.ts).
  */
 
-export type DatePrecision = "day" | "month" | "quarter" | "year";
+/** half 는 상·하반기(1월 1일 · 7월 1일로 적힌다, 마이그레이션 091). 그 전엔 '하반기'를 3분기로 적어 10월에 사라졌다. */
+export type DatePrecision = "day" | "month" | "quarter" | "half" | "year";
 
 type Dated = { date: string; precision: DatePrecision };
 
@@ -20,6 +21,7 @@ export function periodEnd(date: string, precision: DatePrecision): string {
   const y = Number(date.slice(0, 4));
   if (precision === "year") return `${y}-12-31`;
   const m = Number(date.slice(5, 7));
+  if (precision === "half") return m <= 6 ? `${y}-06-30` : `${y}-12-31`;
   const last = precision === "month" ? m : Math.ceil(m / 3) * 3;
   const d = new Date(Date.UTC(y, last, 0)).getUTCDate(); // 다음 달 0일 = 그 달 말일
   return `${y}-${String(last).padStart(2, "0")}-${String(d).padStart(2, "0")}`;

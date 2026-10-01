@@ -39,3 +39,22 @@ def test_finished_period_and_past_day_are_dropped():
 def test_lookahead_still_counts_from_the_start():
     assert not E.date_ok(POSTED.replace(year=2028), "day", POSTED)
     assert not E.date_ok(date(2028, 1, 1), "year", POSTED)
+
+
+def test_half_runs_to_the_end_of_the_half():
+    # '하반기'를 3분기(07-01 quarter)로 적던 때는 10월 이후 글의 하반기 일정이 '지난 일'로 버려졌다(pipeline-telegram#4).
+    assert E.period_end(date(2026, 7, 1), "half") == date(2026, 12, 31)
+    assert E.period_end(date(2026, 1, 1), "half") == date(2026, 6, 30)
+    assert E.date_ok(date(2026, 7, 1), "half", date(2026, 10, 20))
+    assert not E.date_ok(date(2026, 1, 1), "half", date(2026, 7, 2))
+    assert "half" in E.SCHEMA["properties"]["results"]["items"]["properties"]["events"]["items"]["properties"]["precision"]["enum"]
+
+
+def test_half_falls_back_to_the_remaining_quarter():
+    """검사가 half 를 아직 안 받는 DB(마이그레이션 091 전)에 쓸 때 — 그 반기의 남은 분기로 옮긴다."""
+    row = {"event_date": "2026-07-01", "date_precision": "half", "event": "양산"}
+    assert E.half_as_quarter(row, date(2026, 10, 20)) == {**row, "event_date": "2026-10-01", "date_precision": "quarter"}
+    assert E.half_as_quarter(row, date(2026, 8, 3))["event_date"] == "2026-07-01"
+    assert E.half_as_quarter(row, date(2026, 5, 9))["event_date"] == "2026-07-01"  # 반기보다 앞서 올라온 글
+    first_half = {**row, "event_date": "2026-01-01"}
+    assert E.half_as_quarter(first_half, date(2026, 5, 9))["event_date"] == "2026-04-01"

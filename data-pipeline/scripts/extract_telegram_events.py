@@ -30,7 +30,7 @@
 ## 날짜 정밀도가 요점이다
 
 모델이 "연말"·"내년"을 12-31·01-01 로 굳혀 쓴다(2026-09-06 표본 150건 실측). 그래서
-정밀도(day·month·quarter·year)를 따로 받고, 화면 달력에는 day 만 올린다.
+정밀도(day·month·quarter·half·year)를 따로 받고, 화면 달력에는 day 만 올린다.
 작성일보다 앞선 날짜(지난 일)는 버린다 — 달·분기·해 단위는 **그 기간의 끝**으로 견준다(date_ok).
 
 실행:
@@ -58,6 +58,7 @@ from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.supabase_client import get_client, load_keyset  # noqa: E402
+from postgrest.exceptions import APIError  # noqa: E402
 from common.timeutil import KST, today_kst  # noqa: E402
 
 import extract_telegram_stocks as EX  # noqa: E402
@@ -117,10 +118,10 @@ SYSTEM = """당신은 한국 주식 텔레그램 메시지에서 **앞으로 예
 일정마다:
 - company: 어느 회사·종목의 일인지, 메시지에 적힌 이름 그대로. 특정 회사 일이 아니면 빈 문자열.
 - date: YYYY-MM-DD. 상대 표현(내일·다음 주·이달 말)은 작성일 기준으로 환산.
-  달만 있으면 그 달 1일, 분기만 있으면 그 분기 첫날, 해만 있으면 그 해 1월 1일로 적되
-  precision 에 사실대로 표시합니다.
-- precision: day(날짜가 적혀 있었다) · month(달만) · quarter(분기만) · year(해만).
-  "연말"은 month 가 아니라 year 입니다. "하반기"는 quarter 로 두고 7월 1일로 적습니다.
+  달만 있으면 그 달 1일, 분기만 있으면 그 분기 첫날, 반기만 있으면 그 반기 첫날(상반기 1월 1일 ·
+  하반기 7월 1일), 해만 있으면 그 해 1월 1일로 적되 precision 에 사실대로 표시합니다.
+- precision: day(날짜가 적혀 있었다) · month(달만) · quarter(분기만) · half(상반기·하반기) · year(해만).
+  "연말"은 month 가 아니라 year 입니다. "하반기"는 half 로 두고 7월 1일로 적습니다.
 - event: 무슨 일인지 짧은 명사구(예: 3상 임상 결과 발표, 실적 발표, 보호예수 해제,
   신주 상장, 주주총회, 인적분할 기일, 신제품 공개). 전망·권유는 넣지 않습니다.
 - market: KR(국내 상장사) · US(미국 상장사) · MACRO(경제지표·정책·시장 전체) · OTHER.
@@ -143,7 +144,7 @@ SCHEMA = {
                             "properties": {
                                 "company": {"type": "string"},
                                 "date": {"type": "string"},
-                                "precision": {"type": "string", "enum": ["day", "month", "quarter", "year"]},
+                                "precision": {"type": "string", "enum": ["day", "month", "quarter", "half", "year"]},
                                 "event": {"type": "string"},
                                 "market": {"type": "string", "enum": ["KR", "US", "MACRO", "OTHER"]},
                             },
@@ -282,10 +283,24 @@ def period_end(d: date, precision: str) -> date:
     """정밀도가 가리키는 기간의 마지막 날. day 는 그날이다."""
     if precision == "year":
         return date(d.year, 12, 31)
+    if precision == "half":
+        return date(d.year, 6, 30) if d.month <= 6 else date(d.year, 12, 31)
     if precision in ("month", "quarter"):
         m = d.month if precision == "month" else (d.month - 1) // 3 * 3 + 3
         return date(d.year, m, calendar.monthrange(d.year, m)[1])
     return d
+
+
+def half_as_quarter(row: dict, posted: date) -> dict:
+    """half 를 그 반기의 **남은 분기**로 옮긴 행 — 검사가 half 를 아직 안 받는 DB(마이그레이션 091 전)에 쓸 때.
+
+    작성일이 그 반기 안이면 작성일이 든 분기, 반기보다 앞이면 반기의 첫 분기. 예전처럼 'N분기'로 남지만
+    10월에 올라온 '하반기'가 3분기(이미 끝남)로 적혀 버려지지는 않는다.
+    """
+    d = date.fromisoformat(row["event_date"])
+    first = date(d.year, 1 if d.month <= 6 else 7, 1)
+    at = max(first, min(posted, period_end(d, "half")))
+    return {**row, "event_date": date(at.year, (at.month - 1) // 3 * 3 + 1, 1).isoformat(), "date_precision": "quarter"}
 
 
 def date_ok(d: date, precision: str, posted: date) -> bool:
@@ -293,7 +308,7 @@ def date_ok(d: date, precision: str, posted: date) -> bool:
 
     ⚠️ **지났는지는 기간의 끝으로 본다.** SYSTEM 이 달·분기·해 단위를 그 기간 **첫날**로 적게
        하므로 첫날을 작성일과 견주면 이미 시작된 기간이 전부 '지난 일'이 된다. 09-15 글의
-       "연말 합병 기일"(01-01 year)·"하반기 양산"(07-01 quarter)·"9월 말 상장"(09-01 month)이
+       "연말 합병 기일"(01-01 year)·"하반기 양산"(07-01)·"9월 말 상장"(09-01 month)이
        다 그렇게 버려지고, 메시지는 읽음 표시가 남아 다시 묻지도 않는다.
     ⚠️ 너무 먼지는 그대로 첫날로 본다 — 작성일에서 LOOKAHEAD_DAYS 안에 시작하는 일정만 믿는다.
     """
@@ -413,13 +428,22 @@ def main() -> None:
 
         # 같은 메시지 안의 중복(같은 종목·날짜·행사)은 하나만
         def flush(rows: list[dict], table: str, key: str) -> int:
-            uniq: dict[tuple, dict] = {}
-            for row in rows:
-                uniq[(row["channel_handle"], row["message_id"], row[key], row["event_date"], row["event"])] = row
+            def dedupe(rs: list[dict]) -> dict[tuple, dict]:
+                return {(row["channel_handle"], row["message_id"], row[key], row["event_date"], row["event"]): row for row in rs}
+
+            uniq = dedupe(rows)
             if not uniq:
                 return 0
-            db.table(table).upsert(list(uniq.values()),
-                                   on_conflict=f"channel_handle,message_id,{key},event_date,event").execute()
+            conflict = f"channel_handle,message_id,{key},event_date,event"
+            try:
+                db.table(table).upsert(list(uniq.values()), on_conflict=conflict).execute()
+            except APIError as exc:
+                # 검사가 half 를 아직 안 받는다(마이그레이션 091 전) — 남은 분기로 옮겨 한 번 더 쓴다(half_as_quarter).
+                if exc.code != "23514" or not any(r["date_precision"] == "half" for r in uniq.values()):
+                    raise
+                print(f"  [{table}] 반기(half)를 못 받아 분기로 옮겨 씁니다 — supabase/migration_091 을 적용하세요")
+                uniq = dedupe([half_as_quarter(r, kst_dt(r["posted_at"]).date()) if r["date_precision"] == "half" else r for r in uniq.values()])
+                db.table(table).upsert(list(uniq.values()), on_conflict=conflict).execute()
             for row in uniq.values():
                 print(f"  {row['event_date']} · {row[key]} · {row['event']} [{row['date_precision']}]")
             return len(uniq)
