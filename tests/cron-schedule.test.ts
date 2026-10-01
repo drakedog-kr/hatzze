@@ -10,11 +10,14 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-import { CRON_TO_JOB, hasRunSince, PREVIEW_RUN_TITLE, resolveJob, sinceIso } from "../lib/cron-schedule.ts";
+import { CATCH_UP_MIN, CRON_TO_JOB, hasCatchUp, hasRunSince, PREVIEW_RUN_TITLE, resolveJob, sinceIso } from "../lib/cron-schedule.ts";
 
 type Cron = { path: string; schedule: string };
 const crons: Cron[] = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8")).crons;
 const pipelineCrons = crons.filter((c) => resolveJob(c.schedule)?.workflow === "daily-update.yml");
+/** 본 발화만(만회 크론 빼고). */
+const mainPipelineCrons = pipelineCrons.filter((c) => !CRON_TO_JOB[c.schedule].catchUp);
+const slotOf = (c: Cron) => CRON_TO_JOB[c.schedule].inputs(new Date("2026-09-22T00:00:00Z")).slot;
 
 /** "M H * * *" 의 하루 중 분(UTC). */
 function fireMin(schedule: string): number {
@@ -56,8 +59,7 @@ describe("vercel.json 과 CRON_TO_JOB", () => {
   });
 
   it("파이프라인은 하루 두 번(아침·저녁)이다", () => {
-    const slots = pipelineCrons.map((c) => CRON_TO_JOB[c.schedule].inputs(new Date("2026-09-22T00:00:00Z")).slot);
-    assert.deepEqual(slots.sort(), ["evening", "morning"]);
+    assert.deepEqual(mainPipelineCrons.map(slotOf).sort(), ["evening", "morning"]);
   });
 
   it("CI 는 vercel.json 만 바뀐 PR 에서도 돈다 — 경로 필터에서 빠지면 크론만 옮긴 PR 을 위 검사가 못 본다", () => {
@@ -82,7 +84,7 @@ describe("슬롯 경계(fireUtc)", () => {
       const lo = hmMin(CRON_TO_JOB[a.schedule].fireUtc);
       const span = (fireMin(a.schedule) - lo + 1440) % 1440;
       for (const b of pipelineCrons) {
-        if (b === a) continue;
+        if (b === a || slotOf(b) === slotOf(a)) continue; // 같은 슬롯의 만회 크론은 일부러 경계 안에 둔다
         const off = (fireMin(b.schedule) - lo + 1440) % 1440;
         assert.ok(off > span, `${b.schedule} 가 ${a.schedule} 의 슬롯 안에 든다`);
       }
@@ -91,8 +93,8 @@ describe("슬롯 경계(fireUtc)", () => {
 });
 
 describe("이미 돌았나(sinceIso + hasRunSince) — 실제 시각으로 재현", () => {
-  const morning = pipelineCrons.find((c) => CRON_TO_JOB[c.schedule].inputs(new Date()).slot === "morning")!;
-  const evening = pipelineCrons.find((c) => CRON_TO_JOB[c.schedule].inputs(new Date()).slot === "evening")!;
+  const morning = mainPipelineCrons.find((c) => CRON_TO_JOB[c.schedule].inputs(new Date()).slot === "morning")!;
+  const evening = mainPipelineCrons.find((c) => CRON_TO_JOB[c.schedule].inputs(new Date()).slot === "evening")!;
   const mFire = CRON_TO_JOB[morning.schedule].fireUtc;
   const eFire = CRON_TO_JOB[evening.schedule].fireUtc;
   // 2026-09-23(수) KST 아침 06:30 = 09-22 21:30Z, 저녁 17:30 = 09-23 08:30Z.
@@ -135,6 +137,43 @@ describe("이미 돌았나(sinceIso + hasRunSince) — 실제 시각으로 재�
     const since = sinceIso("21:30", at("2026-09-22T21:29:59Z"));
     assert.equal(since, "2026-09-21T21:30:00Z");
     assert.equal(hasRunSince([run("2026-09-22T08:30:04Z")], since).covered, true);
+  });
+});
+
+describe("만회 크론 — 본 발화가 못 던진 몫을 한 번 더 본다(automation#0)", () => {
+  const run = (created_at: string) => ({ created_at, html_url: `run@${created_at}` });
+
+  it("슬롯마다 만회가 하나 — 본 발화 CATCH_UP_MIN 분 뒤, 경계·워크플로·입력이 같다", () => {
+    for (const main of mainPipelineCrons) {
+      const m = CRON_TO_JOB[main.schedule];
+      const ups = pipelineCrons.filter((c) => CRON_TO_JOB[c.schedule].catchUp && slotOf(c) === slotOf(main));
+      assert.equal(ups.length, 1, `${main.schedule} 의 만회 크론이 ${ups.length}개`);
+      const up = CRON_TO_JOB[ups[0].schedule];
+      assert.equal(fireMin(ups[0].schedule) - fireMin(main.schedule), CATCH_UP_MIN);
+      assert.equal(up.fireUtc, m.fireUtc);
+      assert.equal(up.workflow, m.workflow);
+      const at = new Date("2026-09-23T00:00:00Z");
+      assert.deepEqual(up.inputs(at), m.inputs(at));
+      assert.ok(hasCatchUp(m) && !hasCatchUp(up));
+    }
+  });
+
+  it("본 발화가 던졌으면(돌고 있어도) 만회는 안 던지고, 아무것도 없으면 던진다", () => {
+    // 2026-09-23(수) KST 아침: 본 발화 21:30Z, 만회 21:50Z.
+    const up = pipelineCrons.find((c) => CRON_TO_JOB[c.schedule].catchUp && slotOf(c) === "morning")!;
+    const since = sinceIso(CRON_TO_JOB[up.schedule].fireUtc, new Date("2026-09-22T21:50:00Z"));
+    assert.equal(hasRunSince([run("2026-09-22T21:30:04Z")], since).covered, true);
+    assert.equal(hasRunSince([run("2026-09-22T08:30:04Z")], since).covered, false);
+  });
+
+  it("아침 만회도 KRX 공표 게이트(08:00 KST = 23:00Z) 전에 던진다 — 늦으면 개장 전 브리핑이 밀린다", () => {
+    for (const c of pipelineCrons.filter((x) => slotOf(x) === "morning")) assert.ok(fireMin(c.schedule) < 23 * 60, c.schedule);
+  });
+
+  it("발송·사전 스캔에는 만회가 없다 — 알림이 '손으로 돌려야 한다'고 말한다", () => {
+    for (const c of crons.filter((x) => resolveJob(x.schedule)?.workflow !== "daily-update.yml")) {
+      assert.equal(hasCatchUp(CRON_TO_JOB[c.schedule]), false, c.schedule);
+    }
   });
 });
 
