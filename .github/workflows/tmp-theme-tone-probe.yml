@@ -1,0 +1,32 @@
+# ⚠️ 임시 측정 — 머지하지 않는다. 테마 톤이 그 테마 주가를 따라 움직이나(읽기 전용, DB 에 안 쓴다).
+# 이 브랜치에 푸시할 때만 돈다. 결과를 읽고 나면 이 파일과 스크립트를 지운다.
+name: 임시 측정 — 테마 톤과 주가
+
+on:
+  push:
+    branches: [claude/happy-bardeen-t17504]
+    paths:
+      - ".github/workflows/tmp-theme-tone-probe.yml"
+      - "data-pipeline/scripts/tmp_theme_tone_probe.py"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: data-pipeline/requirements.txt
+      - run: pip install -r data-pipeline/requirements.txt
+      - name: 측정
+        working-directory: data-pipeline
+        run: python scripts/tmp_theme_tone_probe.py
