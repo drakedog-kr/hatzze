@@ -1,117 +1,337 @@
-/* ── v2 리디자인 ─────────────────────────────────────────────────────────────
-   2.0.0 으로 가는 새 결. 셀 격자(카드 여러 장)를 **줄 하나에 항목 하나**인 표로 바꾼다.
-   같은 값이 같은 세로줄에 서야 위에서 아래로 견줄 수 있다.
+/* ── v2 리디자인 — 국장 카더라 대시보드(2026-10-02) ─────────────────────────
+   2.0.0 으로 가는 새 결. 토스증권 홈과 Blockworks 앱처럼 **한 판의 대시보드**로 짠다.
+   - 큰 구간 제목('1 최근 뜨는 것' 같은 SectionIntro)과 큰 히어로 제목을 걷었다. 패널마다 작은 제목만 단다.
+   - 맨 위는 수치 띠, 가운데는 종목 보드(탭 + 표 + 고른 종목의 상세 패널), 나머지는 패널 격자.
+   - 글자는 다섯 단을 기본으로 쓴다: 12 보조 · 13 등락 · 14 본문 · 15 제목 · 17~22 주인공 숫자.
 
-   글자 눈금은 다섯 단만 쓴다: 12 보조 · 13 등락 · 14 본문 · 15 이름 · 20 주인공 숫자.
-   예전 화면은 9~40px 사이 27단을 썼고, 11·11.5·12 처럼 눈으로 못 가르는 단이 한 카드에 섞였다.
+   전부 .v2-kd 아래에만 건다. 뿌리에 이 클래스가 없는 화면은 그대로다.
+   폭에 따른 꼴은 화면 폭이 아니라 **판 자신의 폭**(컨테이너 쿼리)으로 가른다 — 사이드바 폭을 셈할 필요가 없다. */
 
-   폭에 따른 꼴은 화면 폭이 아니라 **표 자신의 폭**(컨테이너 쿼리)으로 가른다. 사이드바가 있든
-   없든 표가 받은 폭이 같으면 같은 꼴이다. 칸 배치는 grid-template-areas 하나가 쥔다 — 마크업은 한 벌이다. */
-
-.v2-table {
-  container: v2table / inline-size;
-  padding: 4px 12px 12px;
+.v2-kd {
+  container: kd / inline-size;
+  display: block;
 }
 
-.v2-thead,
-.v2-row {
+.v2-grid {
   display: grid;
-  grid-template-columns: 24px minmax(190px, 1.1fr) 76px 92px 76px minmax(0, 2fr) 104px 92px;
-  grid-template-areas: "rank stock ratio trend count why price act";
-  column-gap: 16px;
-  align-items: center;
-}
-
-.v2-c-rank { grid-area: rank; }
-.v2-c-stock { grid-area: stock; min-width: 0; }
-.v2-c-ratio { grid-area: ratio; }
-.v2-c-trend { grid-area: trend; }
-.v2-c-count { grid-area: count; }
-.v2-c-why { grid-area: why; min-width: 0; }
-.v2-c-price { grid-area: price; }
-.v2-c-act { grid-area: act; }
-
-/* 열 머리 — 흐린 12px. 숫자 칸은 숫자와 같은 쪽(오른쪽)에 붙는다. */
-.v2-thead {
-  height: 40px;
-  padding: 0 14px;
-  border-bottom: 1px solid var(--c-sheet-row);
-  margin-bottom: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--c-sub2);
-}
-.v2-thead .v2-c-rank { text-align: center; }
-.v2-thead .v2-c-ratio,
-.v2-thead .v2-c-count,
-.v2-thead .v2-c-price { text-align: right; }
-
-.v2-tbody {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-/* 줄 사이에 선을 긋지 않는다. 숫자를 오른쪽에 맞추고 줄을 넉넉히 주면 선 없이도 갈린다.
-   누를 수 있는 줄이라는 것은 호버 바탕이 말한다. */
-.v2-row {
-  min-height: 76px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  transition: background-color 0.12s ease;
-}
-.v2-row:hover { background: var(--c-hover); }
-
-.v2-rank {
-  text-align: center;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--c-sub);
-  font-variant-numeric: tabular-nums;
-}
-
-.v2-stock {
-  display: flex;
-  align-items: center;
   gap: 12px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-areas:
+    "kpi    kpi    kpi    kpi    kpi    kpi"
+    "brief  brief  brief  brief  mood   mood"
+    "board  board  board  board  board  board"
+    "themes themes themes kw     kw     kw"
+    "events events events events events events"
+    "feed   feed   feed   ch     ch     ch"
+    "feed   feed   feed   rise   rise   rise";
 }
-.v2-stock-txt {
+.v2-a-kpi { grid-area: kpi; }
+.v2-a-brief { grid-area: brief; }
+.v2-a-mood { grid-area: mood; }
+.v2-a-board { grid-area: board; }
+.v2-a-themes { grid-area: themes; }
+.v2-a-kw { grid-area: kw; }
+.v2-a-events { grid-area: events; }
+/* 피드는 옆 칸(채널 둘) 키에 맞춰 늘이지 않는다 — 늘이면 글 목록 아래가 통째로 빈다(1440 에서 372px).
+   바닥이 들쭉날쭉한 편이 판 안에 빈 자리가 남는 것보다 낫다. */
+.v2-a-feed { grid-area: feed; align-self: start; min-width: 0; }
+.v2-a-ch { grid-area: ch; }
+.v2-a-rise { grid-area: rise; }
+
+@container kd (max-width: 999px) {
+  .v2-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      "kpi    kpi"
+      "brief  mood"
+      "board  board"
+      "themes themes"
+      "kw     kw"
+      "events events"
+      "feed   feed"
+      "ch     ch"
+      "rise   rise";
+  }
+}
+@container kd (max-width: 699px) {
+  .v2-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "kpi" "brief" "board" "mood" "themes" "kw" "events" "feed" "ch" "rise";
+  }
+}
+
+/* ── 패널 ── 그림자 대신 헤어라인 한 줄. 머리는 작은 제목과 조건 알약뿐이고 아이콘 타일을 걷는다. */
+.v2-kd .hz-sheet {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  min-width: 0;
+  border-radius: 16px;
+  border: 1px solid var(--c-sheet-line);
+  box-shadow: none;
 }
-.v2-name {
+.v2-kd .hz-sheet-head {
+  padding: 14px 18px 12px;
+  gap: 10px;
+  align-items: center;
+  background: var(--c-card);
+  border-bottom: 1px solid var(--c-sheet-row);
+}
+.v2-kd .hz-sheet-head-ico { display: none; }
+.v2-kd .hz-sheet-head-txt { gap: 2px; }
+.v2-kd .hz-sheet-head-title {
   font-size: 15px;
   font-weight: 700;
   line-height: 20px;
   letter-spacing: -0.01em;
+}
+.v2-kd .hz-sheet-head-desc {
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--c-sub2);
+}
+.v2-kd .hz-sheet-head-note { font-size: 12px; }
+
+/* ── 수치 띠 ── 칸마다 1위 하나. 누르면 그 패널로 간다. */
+.v2-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  background: var(--c-card);
+  border: 1px solid var(--c-sheet-line);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.v2-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 14px 18px;
+  border-right: 1px solid var(--c-sheet-row);
+  text-decoration: none;
+  transition: background-color 0.12s ease;
+}
+a.v2-kpi:hover { background: var(--c-hover); }
+.v2-kpi:last-child { border-right: 0; }
+.v2-kpi-cap {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-sub2);
+}
+.v2-kpi-val {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 24px;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.v2-kpi-sub {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--c-sub);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.v2-kpi-time { justify-content: center; }
+.v2-kpi-time .v2-kpi-sub { font-weight: 600; }
+
+/* ── 오늘의 요약 ── */
+.v2-brief {
+  padding: 16px 20px 20px;
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--c-ink-soft);
+  word-break: keep-all;
+}
+.v2-brief p { margin: 0; }
+.v2-brief p + p { margin-top: 10px; }
+
+/* ── 여론 ── */
+.v2-mood {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px 18px;
+}
+.v2-mood-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 8px;
+  row-gap: 2px;
+}
+.v2-mood-big {
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.v2-mood-big span { font-size: 18px; margin-left: 1px; }
+.v2-mood-label { font-size: 15px; font-weight: 700; }
+.v2-mood-note {
+  flex-basis: 100%;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--c-sub2);
+}
+
+/* ── 종목 보드 ── 표(왼쪽) + 고른 종목의 상세(오른쪽 360). 판이 좁으면 상세가 표 아래로 간다. */
+.v2-a-board { container: board / inline-size; }
+.v2-board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  flex: 1;
+}
+.v2-board-main {
+  min-width: 0;
+  border-right: 1px solid var(--c-sheet-row);
+}
+.v2-board-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--c-sheet-row);
+}
+.v2-tabs { display: flex; gap: 22px; }
+.v2-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 52px;
+  padding: 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--c-sub2);
+  cursor: pointer;
+}
+.v2-tab:hover { color: var(--c-ink-soft); }
+.v2-tab[aria-selected="true"] {
+  color: var(--c-ink);
+  border-bottom-color: var(--c-ink);
+}
+.v2-tab-n {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--c-sub2);
+}
+.v2-pill {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--c-chip);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-sub);
+  white-space: nowrap;
+}
+.v2-empty {
+  margin: 0;
+  padding: 28px 18px;
+  font-size: 13.5px;
+  color: var(--c-sub);
+}
+
+/* 표. 칸 구성은 탭마다 다르다. 숫자 칸은 오른쪽에 붙는다. */
+.v2-bt-head,
+.v2-bt-row {
+  display: grid;
+  column-gap: 14px;
+  align-items: center;
+  padding: 0 18px;
+}
+.v2-bt-surge .v2-bt-head,
+.v2-bt-surge .v2-bt-row,
+.v2-bt-talk .v2-bt-head,
+.v2-bt-talk .v2-bt-row {
+  grid-template-columns: 22px minmax(150px, 1fr) 80px 104px 64px 112px;
+}
+.v2-bt-move .v2-bt-head,
+.v2-bt-move .v2-bt-row {
+  grid-template-columns: 22px minmax(140px, 0.9fr) 76px minmax(0, 2fr) 92px;
+}
+.v2-bt-head {
+  height: 36px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-sub2);
+  border-bottom: 1px solid var(--c-sheet-row);
+}
+.v2-bt-head > span:first-child { text-align: center; }
+.v2-bt-head > span:last-child,
+.v2-bt-surge .v2-bt-head > span:nth-child(3),
+.v2-bt-surge .v2-bt-head > span:nth-child(5),
+.v2-bt-talk .v2-bt-head > span:nth-child(3),
+.v2-bt-talk .v2-bt-head > span:nth-child(5),
+.v2-bt-move .v2-bt-head > span:nth-child(3) { text-align: right; }
+.v2-bt-body {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+}
+.v2-bt-row {
+  width: 100%;
+  min-height: 56px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+.v2-bt-row:hover { background: var(--c-hover); }
+.v2-bt-row[aria-pressed="true"] {
+  background: var(--c-plate);
+  box-shadow: inset 3px 0 0 var(--c-blue);
+}
+.v2-rank {
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--c-sub);
+  font-variant-numeric: tabular-nums;
+}
+.v2-stock {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.v2-stock-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.v2-name {
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 20px;
   color: var(--c-ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* 이름 아랫줄(코드 · 신규 · 언급 수 · 테마 칩). **한 줄 높이로 못박고 접어 넘긴다** — 자리가 모자라면
-   뒤의 조각이 둘째 줄로 내려가 통째로 가려진다. nowrap 으로 자르면 칩이 글자 중간에서 잘려 깨져 보였다
-   (375px 에서 여섯 줄 중 셋). 그래서 덜 중요한 것을 뒤에 둔다: 칩이 먼저 빠지고 코드는 끝까지 남는다. */
-.v2-stock-sub {
+.v2-sub {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  column-gap: 6px;
-  height: 18px;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
+  gap: 6px;
   font-size: 12px;
-  line-height: 18px;
+  line-height: 16px;
   color: var(--c-sub2);
-}
-.v2-code { font-variant-numeric: tabular-nums; }
-/* 칩이 줄 높이(18)를 넘으면 그 줄이 21 이 되어 아래 3px 이 잘린다. 이 줄 안에서만 18 로 맞춘다. */
-.v2-stock-sub .hz-theme-tag.hz-kd-theme-chip {
-  padding: 0 7px;
-  line-height: 18px;
+  font-variant-numeric: tabular-nums;
 }
 .v2-tag {
   padding: 0 6px;
@@ -120,152 +340,268 @@
   color: var(--c-cold-ink);
   font-weight: 700;
 }
-/* 넓은 표에선 언급 수가 제 세로줄(.v2-count)에 있다. 표가 좁아져 그 줄이 빠지면 여기서 보인다. */
-.v2-count-inline { display: none; }
-
-.v2-ratio {
+.v2-num {
   text-align: right;
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  color: var(--c-hot);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-ink);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.v2-ratio small {
-  margin-left: 1px;
-  font-size: 13px;
-  font-weight: 700;
+.v2-ratio {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--c-hot);
 }
+.v2-ratio small { margin-left: 1px; font-size: 12.5px; font-weight: 700; }
+.v2-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+.v2-chg {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--c-sub);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.v2-num > .v2-chg { font-size: 14px; }
+.v2-chg.is-up { color: var(--c-hot); }
+.v2-chg.is-down { color: var(--c-cold); }
+.v2-chg.is-lg { font-size: 15px; }
+.v2-reason {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--c-ink-soft);
+  word-break: keep-all;
+}
+.v2-cell-bars { display: block; }
 
 .v2-bars {
   display: flex;
   align-items: flex-end;
   gap: 3px;
-  height: 30px;
+  height: 26px;
 }
+.v2-bars.is-big { height: 64px; gap: 4px; }
 .v2-bars > span {
   flex: 1;
-  min-width: 4px;
+  min-width: 3px;
   border-radius: 2px 2px 1px 1px;
 }
 
-.v2-count {
+/* 상세 패널 */
+.v2-detail {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  gap: 14px;
+  min-width: 0;
+  padding: 18px 20px 20px;
+}
+.v2-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.v2-detail-id {
+  display: flex;
+  flex-direction: column;
   gap: 2px;
+  min-width: 0;
+}
+.v2-detail-name {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 24px;
+  letter-spacing: -0.02em;
+  color: var(--c-ink);
+  text-decoration: none;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.v2-detail-name:hover { color: var(--c-cold-ink); }
+.v2-detail-code {
+  font-size: 12.5px;
+  color: var(--c-sub2);
+  font-variant-numeric: tabular-nums;
+}
+.v2-detail-quote {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.v2-detail-quote strong {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--c-ink);
+  font-variant-numeric: tabular-nums;
+}
+.v2-detail-themes { display: flex; flex-wrap: wrap; gap: 6px; }
+.v2-chip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--c-chip);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-label);
+  text-decoration: none;
+}
+a.v2-chip:hover { background: var(--c-blue-tint); color: var(--c-cold-ink); }
+.v2-detail-chart { display: flex; flex-direction: column; gap: 8px; }
+.v2-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: var(--c-sub2);
+  font-variant-numeric: tabular-nums;
+}
+.v2-cap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--c-sub);
+}
+.v2-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+.v2-facts > div {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--tx-tile);
+}
+.v2-facts dt {
   font-size: 12px;
   color: var(--c-sub2);
 }
-.v2-count strong {
-  font-size: 14px;
+.v2-facts dd {
+  margin: 2px 0 0;
+  font-size: 15px;
   font-weight: 700;
   color: var(--c-ink);
   font-variant-numeric: tabular-nums;
 }
-
-.v2-why {
-  margin: 0;
-  display: flex;
-  gap: 7px;
+.v2-facts dd .v2-chg { font-size: 15px; }
+.v2-hot { color: var(--c-hot); }
+.v2-note p {
+  margin: 6px 0 0;
   font-size: 14px;
-  line-height: 1.55;
+  line-height: 1.65;
   color: var(--c-ink-soft);
-}
-.v2-why-txt {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
   word-break: keep-all;
   text-wrap: pretty;
 }
-.v2-why.is-empty { color: var(--c-sub2); }
-
-.v2-price {
+.v2-muted { color: var(--c-sub2); }
+.v2-note p.v2-muted { color: var(--c-sub2); }
+.v2-detail-links {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  white-space: nowrap;
+  gap: 8px;
+  margin-top: auto;
 }
-.v2-price strong {
-  font-size: 14px;
+.v2-link {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--tx-btn);
+  font-size: 13.5px;
   font-weight: 700;
   color: var(--c-ink);
-  font-variant-numeric: tabular-nums;
+  text-decoration: none;
 }
-.v2-change {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--c-sub);
-  font-variant-numeric: tabular-nums;
+.v2-link:hover { background: var(--tx-btn-hover); }
+.v2-link .ms { font-size: 16px; }
+
+/* 판이 좁으면 상세가 표 아래로 간다. */
+@container board (max-width: 899px) {
+  .v2-board { grid-template-columns: minmax(0, 1fr); }
+  .v2-board-main {
+    border-right: 0;
+    border-bottom: 1px solid var(--c-sheet-row);
+  }
 }
-.v2-change.is-up { color: var(--c-hot); }
-.v2-change.is-down { color: var(--c-cold); }
-.v2-price-missing {
-  font-size: 12px;
-  color: var(--c-sub2);
+/* 폰: 열 머리를 걷고 숫자 하나와 시세만 남긴다. 급등 이유는 문장이 둘째 줄로 내려간다. */
+@container board (max-width: 599px) {
+  .v2-board-top {
+    flex-wrap: wrap;
+    padding: 0 14px;
+    row-gap: 0;
+  }
+  .v2-board-top .v2-pill { margin-bottom: 10px; }
+  .v2-tabs { gap: 16px; }
+  .v2-tab { font-size: 15px; height: 48px; }
+  .v2-bt-head { display: none; }
+  .v2-bt-row { padding-left: 14px; padding-right: 14px; column-gap: 10px; }
+  .v2-hide-sm,
+  .v2-cell-bars { display: none; }
+  .v2-bt-surge .v2-bt-row,
+  .v2-bt-talk .v2-bt-row { grid-template-columns: 18px minmax(0, 1fr) auto 92px; }
+  .v2-bt-move .v2-bt-row {
+    grid-template-columns: 18px minmax(0, 1fr) auto;
+    row-gap: 4px;
+  }
+  .v2-bt-move .v2-reason { grid-column: 2 / -1; font-size: 13.5px; }
+  .v2-bt-move .v2-price { display: none; }
+  .v2-detail { padding: 16px 14px 18px; }
 }
 
-.v2-act {
+/* ── 메시지 피드 ── 말풍선 타일 격자를 걷고 뉴스 피드처럼 줄로 세운다(Blockworks 'News' 자리).
+   마크업은 그대로(TrendingList)고 이 판 안에서만 생김새를 바꾼다. */
+.v2-kd .v2-a-feed .hz-panelgrid {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
+  gap: 0;
+  padding: 0;
+  background: none;
 }
-.v2-act .hz-mdd-link { font-size: 12px; }
-
-/* ── 중간: 숫자는 윗줄, 문장과 바로가기는 아랫줄 ───────────────────────────── */
-@container v2table (max-width: 999px) {
-  .v2-thead,
-  .v2-row {
-    grid-template-columns: 24px minmax(0, 1fr) 76px 92px 104px;
-    grid-template-areas: "rank stock ratio trend price";
-  }
-  .v2-row {
-    grid-template-areas:
-      "rank stock ratio trend price"
-      ".    why   why   why   act";
-    row-gap: 8px;
-  }
-  .v2-thead .v2-c-count,
-  .v2-thead .v2-c-why,
-  .v2-thead .v2-c-act,
-  .v2-row .v2-c-count { display: none; }
-  .v2-count-inline { display: inline; }
+.v2-kd .v2-a-feed .hz-panelgrid > * {
+  background: none;
+  border-radius: 0;
+  border-bottom: 1px solid var(--c-sheet-row);
 }
+.v2-kd .v2-a-feed .hz-lift:hover {
+  transform: none;
+  background: var(--c-hover);
+}
+.v2-kd .v2-a-feed .hz-lift.hz-msg-card { padding: 14px 18px; }
+.v2-kd .v2-a-feed .hz-bubble {
+  padding: 0;
+  gap: 8px;
+  border-radius: 0;
+  background: none;
+}
+.v2-kd .v2-a-feed .hz-panelgrid + .hz-sheet-foot { padding: 12px 18px 16px; }
 
-/* ── 좁음(폰): 이름과 배수 · 문장 · 시세와 바로가기 ──────────────────────── */
-@container v2table (max-width: 559px) {
-  .v2-table { padding: 2px 6px 8px; }
-  .v2-thead { display: none; }
-  /* 셋째 줄은 시세(왼쪽)와 바로가기(오른쪽)가 **한 칸을 같이 쓴다.** 따로 칸을 주면 바로가기 폭(80)이
-     셋째 세로줄 폭이 되어 그만큼 이름 칸이 줄었고, 이름 아랫줄의 언급 수가 밀려 가려졌다. */
-  .v2-row {
-    grid-template-columns: 18px minmax(0, 1fr) auto;
-    grid-template-areas:
-      "rank stock ratio"
-      ".    why   why"
-      ".    foot  foot";
-    column-gap: 10px;
-    row-gap: 8px;
-    padding: 14px 10px;
+/* 폰: 수치 띠를 2열 세 줄(286px)로 쌓지 않고 한 줄로 두고 옆으로 민다. 잘린 끝 칸이 더 있다는 표시다. */
+@container kd (max-width: 699px) {
+  .v2-kpis {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
   }
-  .v2-row .v2-c-trend { display: none; }
-  .v2-row .v2-c-price,
-  .v2-row .v2-c-act { grid-area: foot; }
-  .v2-price {
-    flex-direction: row;
-    align-items: baseline;
-    gap: 6px;
-    justify-self: start;
-  }
-  .v2-act {
-    flex-direction: row;
-    gap: 10px;
-    justify-self: end;
+  .v2-kpis::-webkit-scrollbar { display: none; }
+  .v2-kpi {
+    flex: 0 0 auto;
+    min-width: 136px;
+    max-width: 180px;
+    padding: 12px 14px;
+    scroll-snap-align: start;
   }
 }

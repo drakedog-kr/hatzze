@@ -53,7 +53,6 @@ import { timeAgoInitial } from "../time-ago";
 import { PhoneFold } from "../PhoneFold";
 import { SectionHead } from "../SectionHead";
 import { SectionIntro } from "../../SectionIntro";
-import { SurgeTable } from "../SurgeTable";
 
 export async function generateMetadata(): Promise<Metadata> {
   return pageMetadata({
@@ -623,10 +622,6 @@ export default async function UsKaderaPage() {
 
       <SectionIntro n={1} title="최근 뜨는 것" />
 
-      {/* ── 급부상 종목: 줄 하나에 종목 하나인 표(v2) ────────────────────────────
-          국장 짝(app/kadera/page.tsx)과 같은 표다(SurgeTable 머리말). 다른 것은 셋뿐이다 —
-          미국 종목엔 아직 실주소가 없어 이름이 글자로만 서고, 시세 폴백이 없어 못 받으면 빈칸이며,
-          바로가기가 MDD·공시 둘이다. 이름이 곧 티커인 종목(RTX·TEAM)은 티커를 또 붙이지 않는다. */}
       {/* id 는 히어로 바로가기 칩의 목적지다(아래 이슈 키워드도 같다). */}
       <section className="hz-sheet" id="surging">
         <SectionHead level={3}
@@ -648,34 +643,236 @@ export default async function UsKaderaPage() {
             또렷해집니다.
           </p>
         ) : (
-          <SurgeTable
-            recentDays={US_WINDOW_DAYS}
-            rows={surging.map((s) => ({
-              key: s.ticker,
-              name: s.name,
-              code: s.name !== s.ticker ? s.ticker : null,
-              logo: { code: s.ticker, market: "US" },
-              href: null,
-              ratioText: s.multiple >= 10 ? String(Math.round(s.multiple)) : s.multiple.toFixed(1),
-              isNew: false,
-              series: s.series,
-              dates: s.seriesDates,
-              hot: US_WINDOW_DAYS,
-              mentions: s.recentMentions,
-              channels: s.channelCount,
-              line: surgeLines[s.ticker] ?? null,
-              price: s.price != null ? fmtPrice(s.price, "US") : null,
-              change: s.changeRate,
-              priceMissing: "시세를 못 받았습니다",
-              themes: <ThemeChips ticker={s.ticker} />,
-              actions: (
-                <>
-                  <UsMddLink ticker={s.ticker} />
-                  <UsInsiderLink ticker={s.ticker} />
-                </>
-              ),
-            }))}
-          />
+          /* 폰에서만 셋까지 보이고 '더 보기'로 편다(PhoneFold 머리말). 넓은 화면은 3×2 그대로다. */
+          <PhoneFold total={surging.length} name="kadera_us_surging">
+          <div className="hz-panelgrid hz-panelgrid-3">
+            {surging.map((s, i) => {
+              return (
+                <div key={s.ticker} className="hz-panel-pad">
+                  {/* baseline 정렬이어야 한다. flex-start 는 상자 윗변을 맞추는데, 이 줄엔
+                      14px 종목명과 11px 티커·11.5px 표본이 섞여 있어 상자를 맞추면 정작
+                      눈에 보이는 글자 밑선이 어긋난다(국장에서 실측 3.8px). */}
+                  <div
+                    className="hz-tile-head"
+                    style={{
+                      display: "flex",
+                      alignItems: "baseline",
+                      gap: 8,
+                      minWidth: 0,
+                    }}
+                  >
+                    <RankBadge n={i + 1} />
+                    {/* minWidth:0 — flex 항목의 기본 min-width:auto 가 살아 있으면 이름이
+                        안 줄어 말줄임이 안 걸리고 셀 밖으로 넘친다. */}
+                    <strong
+                      style={{
+                        ...clip,
+                        minWidth: 0,
+                        fontSize: "var(--fs-14)",
+                        fontWeight: 800,
+                        letterSpacing: "-.01em",
+                        color: C.ink,
+                      }}
+                    >
+                      {s.name}
+                    </strong>
+                    {/* 한글 표기가 없어 티커를 이름으로 쓰는 종목이 있다(RTX·TEAM).
+                        그때 티커를 또 붙이면 "RTX RTX" 가 된다. */}
+                    {s.name !== s.ticker && (
+                      <span
+                        style={{
+                          fontFamily: MONO,
+                          fontSize: "var(--fs-11)",
+                          color: C.sub2,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {s.ticker}
+                      </span>
+                    )}
+                    {/* 속한 테마 칩(미장 테마 리포트로). 종목 하나에서 테마 전체로 넓혀 보는 길 — 국장과 같은 자리. */}
+                    <ThemeChips ticker={s.ticker} />
+                    <span style={{ flex: 1 }} />
+                    {/* '몇 개 채널'과 '며칠에 몇 회'는 둘 다 이 배수의 표본 크기를 말한다 —
+                        한 덩어리로 오른쪽 위에 모아 두면 아래 그래픽이 배수와 막대만 남는다. */}
+                    <span
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "flex-end",
+                        gap: 2,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {s.channelCount !== null && (
+                        <span
+                          style={{
+                            fontSize: "var(--fs-11-5)",
+                            color: C.sub2,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {s.channelCount}개 채널
+                        </span>
+                      )}
+                      <span
+                        style={{
+                          fontFamily: MONO,
+                          fontSize: "var(--fs-11-5)",
+                          fontWeight: 700,
+                          color: C.label,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        최근 {US_WINDOW_DAYS}일 기준 {s.recentMentions}회
+                      </span>
+                    </span>
+                  </div>
+
+                  {/* 이 셀이 말하려는 건 시세가 아니라 이 배수다 — 30px 로 올려 주인공을 못박는다. */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "baseline",
+                      gap: 9,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <strong
+                      style={{
+                        fontFamily: MONO,
+                        fontSize: "var(--fs-30)",
+                        fontWeight: 800,
+                        letterSpacing: "-.035em",
+                        lineHeight: 1,
+                        color: C.hot,
+                      }}
+                    >
+                      {s.multiple >= 10
+                        ? Math.round(s.multiple)
+                        : s.multiple.toFixed(1)}
+                      <span
+                        style={{
+                          fontSize: "var(--fs-18)",
+                          fontWeight: 700,
+                          letterSpacing: "-.02em",
+                        }}
+                      >
+                        배
+                      </span>
+                    </strong>
+                    <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2 }}>
+                      평소 대비
+                    </span>
+                  </div>
+
+                  <DayBars
+                    values={s.series}
+                    dates={s.seriesDates}
+                    tone="warm"
+                    hot={US_WINDOW_DAYS}
+                  />
+
+                  {/* 왜 뜨는지 한 줄. 국장 급부상 카드와 같은 자리·같은 상자다
+                      (app/kadera/page.tsx 의 같은 블록 주석에 까닭을 적었다). 문장이 아직
+                      없으면 줄을 지우지 말고 그렇다고 적는다 — 집계와 문장 사이가 20~40분
+                      뜨는데 그동안 이 줄만 사라지면 카드가 어제와 달라 보인다. */}
+                  {surgeLines[s.ticker] ? (
+                    <div
+                      style={{
+                        fontSize: "var(--fs-13)",
+                        lineHeight: 1.7,
+                        display: "flex",
+                        gap: 9,
+                        background: C.card,
+                        borderRadius: 12,
+                        padding: "12px 13px",
+                      }}
+                    >
+                      <AiMark size={15} style={{ flexShrink: 0 }} />
+                      <p
+                        style={{
+                          margin: 0,
+                          color: "var(--c-ink-soft)",
+                          textWrap: "pretty",
+                          wordBreak: "keep-all",
+                        }}
+                      >
+                        {surgeLines[s.ticker]}
+                      </p>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        fontSize: "var(--fs-13)",
+                        lineHeight: 1.7,
+                        display: "flex",
+                        gap: 9,
+                        background: C.card,
+                        borderRadius: 12,
+                        padding: "12px 13px",
+                      }}
+                    >
+                      <AiMark size={15} style={{ flexShrink: 0 }} />
+                      <p
+                        style={{
+                          margin: 0,
+                          color: C.sub2,
+                          wordBreak: "keep-all",
+                        }}
+                      >
+                        한 줄 요약은 오늘 집계가 끝나면 붙습니다.
+                      </p>
+                    </div>
+                  )}
+
+
+      {/* 국장 셀과 같은 마지막 줄이다. 다른 건 폴백뿐 — 국내는 야후가 안 되면
+                      KRX 저장 종가로 떨어지는데(그때 등락률 대신 기준일을 단다) 미국은
+                      그 저장분이 없어 그냥 빈칸이다. 틀린 숫자를 그리는 것보다 낫다. */}
+                  <div
+                    style={{
+                      marginTop: "auto",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      paddingTop: 2,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    {s.price != null ? (
+                      <>
+                        <span
+                          style={{
+                            fontFamily: MONO,
+                            fontSize: "var(--fs-11)",
+                            fontWeight: 700,
+                            color: C.label,
+                            whiteSpace: "nowrap",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {fmtPrice(s.price, "US")}
+                        </span>
+                        <ChangeRate
+                          rate={s.changeRate}
+                          style={{ fontSize: "var(--fs-11-5)", fontWeight: 800 }}
+                        />
+                      </>
+                    ) : (
+                      <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2 }}>
+                        시세를 못 받았습니다
+                      </span>
+                    )}
+                    <span style={{ flex: 1 }} />
+                    <UsMddLink ticker={s.ticker} />
+                    <UsInsiderLink ticker={s.ticker} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          </PhoneFold>
         )}
       </section>
 
