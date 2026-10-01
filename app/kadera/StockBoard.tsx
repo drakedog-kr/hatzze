@@ -44,7 +44,7 @@ export type BoardTab = {
   /** 탭 옆 조건 알약("최근 3일 vs 평소"). */
   note: string;
   codes: string[];
-  /** 순위·종목 뒤, 현재가 앞에 서는 열 머리. 셋째 열은 좁은 표에서 숨는다(급등 탭은 둘뿐). */
+  /** 순위·종목 뒤에 서는 열 머리. */
   heads: string[];
   /** 목록이 비었을 때 표 자리에 설 말. */
   empty: string;
@@ -95,7 +95,7 @@ function Bars({ values, dates, hot, tone, big }: { values: number[]; dates: stri
   );
 }
 
-/** 표 한 줄의 가운데 칸들. 탭마다 견주는 숫자가 다르다. */
+/** 표 한 줄의 순위·종목 뒤 칸들. 탭마다 견주는 숫자가 다르다. 줄은 한 줄 높이다 — 문장은 상세 패널이 든다. */
 function Cells({ tab, s }: { tab: BoardTab["key"]; s: BoardStock }) {
   if (tab === "surge" && s.surge) {
     return (
@@ -107,7 +107,9 @@ function Cells({ tab, s }: { tab: BoardTab["key"]; s: BoardStock }) {
         <span className="v2-cell-bars">
           <Bars values={s.series.slice(-7)} dates={s.dates.slice(-7)} hot={s.surge.days} tone="warm" />
         </span>
-        <span className="v2-num v2-hide-sm">{s.surge.mentions}회</span>
+        <span className="v2-num">
+          <Change rate={s.change} />
+        </span>
       </>
     );
   }
@@ -128,7 +130,9 @@ function Cells({ tab, s }: { tab: BoardTab["key"]; s: BoardStock }) {
         <span className="v2-cell-bars">
           <Bars values={s.series.slice(-7)} dates={s.dates.slice(-7)} hot={s.talk.days} tone="cold" />
         </span>
-        <span className="v2-num v2-hide-sm">{s.talk.channels ?? "-"}곳</span>
+        <span className="v2-num">
+          <Change rate={s.change} />
+        </span>
       </>
     );
   }
@@ -159,7 +163,7 @@ function Detail({ s, tab }: { s: BoardStock; tab: BoardTab["key"] }) {
   return (
     <aside className="v2-detail" aria-live="polite">
       <div className="v2-detail-head">
-        <StockLogo code={s.code} name={s.name} market={s.market} size={40} />
+        <StockLogo code={s.code} name={s.name} market={s.market} size={32} />
         <div className="v2-detail-id">
           <Link href={`/stock/${s.code}`} className="v2-detail-name">
             {s.name}
@@ -252,15 +256,15 @@ export function StockBoard({ tabs, stocks }: { tabs: BoardTab[]; stocks: Record<
   return (
     <div className="v2-board">
       <div className="v2-board-main">
-        <div className="v2-board-top">
-          <div className="v2-tabs" role="tablist" aria-label="종목 목록">
+        <header className="v2-p-head">
+          <div className="v2-ptabs" role="tablist" aria-label="종목 목록">
             {tabs.map((t) => (
               <button
                 key={t.key}
                 type="button"
                 role="tab"
                 aria-selected={t.key === tab.key}
-                className="v2-tab"
+                className="v2-ptab"
                 onClick={() => {
                   setTabKey(t.key);
                   setPicked(null);
@@ -268,26 +272,22 @@ export function StockBoard({ tabs, stocks }: { tabs: BoardTab[]; stocks: Record<
                 }}
               >
                 {t.label}
-                <span className="v2-tab-n">{t.codes.length}</span>
               </button>
             ))}
           </div>
-          <span className="v2-pill">{tab.note}</span>
-        </div>
+          <span className="v2-p-meta">{tab.note}</span>
+        </header>
 
         {tab.codes.length === 0 ? (
           <p className="v2-empty">{tab.empty}</p>
         ) : (
           <div className={`v2-bt v2-bt-${tab.key}`} role="tabpanel">
-            <div className="v2-bt-head" aria-hidden="true">
+            <div className="v2-lh v2-bt-row" aria-hidden="true">
               <span>#</span>
               <span>종목</span>
-              {tab.heads.map((h, i) => (
-                <span key={h} className={tab.key !== "move" && i === 2 ? "v2-hide-sm" : undefined}>
-                  {h}
-                </span>
+              {tab.heads.map((h) => (
+                <span key={h}>{h}</span>
               ))}
-              <span>현재가</span>
             </div>
             <ol className="v2-bt-body">
               {tab.codes.map((c, i) => {
@@ -304,22 +304,13 @@ export function StockBoard({ tabs, stocks }: { tabs: BoardTab[]; stocks: Record<
                         track("kadera_board", { action: "pick", tab: tab.key, rank: i + 1 });
                       }}
                     >
-                      <span className="v2-rank">{i + 1}</span>
+                      <span className="v2-li-rank">{i + 1}</span>
                       <span className="v2-stock">
-                        <StockLogo code={s.code} name={s.name} market={s.market} size={28} />
-                        <span className="v2-stock-txt">
-                          <span className="v2-name">{s.name}</span>
-                          <span className="v2-sub">
-                            {s.code}
-                            {tab.key === "surge" && s.surge?.isNew && <span className="v2-tag">신규</span>}
-                          </span>
-                        </span>
+                        <StockLogo code={s.code} name={s.name} market={s.market} size={24} />
+                        <span className="v2-name">{s.name}</span>
+                        {tab.key === "surge" && s.surge?.isNew && <span className="v2-tag">신규</span>}
                       </span>
                       <Cells tab={tab.key} s={s} />
-                      <span className="v2-num v2-price">
-                        {s.price !== null ? fmtWon(s.price) : "-"}
-                        {tab.key !== "move" && <Change rate={s.change} />}
-                      </span>
                     </button>
                   </li>
                 );
