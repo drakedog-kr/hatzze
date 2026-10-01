@@ -11,11 +11,16 @@ on:
 
 permissions:
   contents: read
+  actions: read # 지난 실행의 재료 아티팩트를 받는다
+
+env:
+  # 재료(DB 에서 읽은 것·주가)를 남긴 지난 실행. 비우면 처음부터 읽는다(DB 15분 남짓).
+  PROBE_CACHE_RUN: ""
 
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 90
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
@@ -24,9 +29,25 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
-          cache: pip
-          cache-dependency-path: data-pipeline/requirements.txt
-      - run: pip install -r data-pipeline/requirements.txt
+      # 측정에 드는 것만 — 전체 requirements 는 형태소 분석기 빌드로 10분이 걸린다.
+      - run: pip install "requests>=2.32,<3" "python-dotenv>=1.0,<2" "supabase>=2.31,<3" "pandas>=2.2,<3" "yfinance>=1.2,<2"
+      - name: 지난 재료 받기
+        if: env.PROBE_CACHE_RUN != ''
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: probe-cache
+          path: data-pipeline/probe_cache
+          run-id: ${{ env.PROBE_CACHE_RUN }}
+          github-token: ${{ github.token }}
       - name: 측정
         working-directory: data-pipeline
         run: python scripts/tmp_theme_tone_probe.py
+      - name: 재료 남기기
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: probe-cache
+          path: data-pipeline/probe_cache
+          retention-days: 3
+          if-no-files-found: ignore

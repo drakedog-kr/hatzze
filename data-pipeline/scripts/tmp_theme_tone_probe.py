@@ -9,12 +9,13 @@ DB 에는 아무것도 쓰지 않는다. 주가는 야후 일봉(수정 종가)�
 
 from __future__ import annotations
 
+import gzip
 import math
+import pickle
 import re
 import sys
 import time
 from collections import Counter, defaultdict
-from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote
@@ -26,6 +27,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.market_tags import is_us_only  # noqa: E402
 from common.supabase_client import get_client, load_all_keyset, load_window_keyset  # noqa: E402
+
+# 읽은 재료·주가를 여기 남긴다. 워크플로가 아티팩트로 올리고, 다음 실행이 받아 DB 를 다시 안 읽는다.
+CACHE = Path(__file__).resolve().parent.parent / "probe_cache"
 from common.theme_tone import theme_tone_targets  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 from config.stock_extraction import is_house  # noqa: E402
@@ -69,9 +73,9 @@ def chart(symbol: str, start: date) -> dict[str, float]:
     p1 = int(datetime.combine(start, datetime.min.time(), tzinfo=timezone.utc).timestamp())
     p2 = int(time.time())
     url = f"https://query1.finance.yahoo.com/v8/finance/chart/{quote(symbol)}"
-    for attempt in range(4):
+    for attempt in range(2):
         try:
-            res = requests.get(url, params={"period1": p1, "period2": p2, "interval": "1d"}, headers=UA, timeout=20)
+            res = requests.get(url, params={"period1": p1, "period2": p2, "interval": "1d"}, headers=UA, timeout=10)
             if res.status_code == 404:
                 return {}
             res.raise_for_status()
@@ -96,12 +100,54 @@ def returns(closes: dict[str, float], drop_from: str) -> dict[str, float]:
     return {d: (closes[d] / closes[p] - 1) * 100 for p, d in zip(days, days[1:]) if closes[p]}
 
 
-def fetch_all(symbols: list[str], start: date, drop_from: str) -> dict[str, dict[str, float]]:
-    with ThreadPoolExecutor(8) as ex:
-        got = dict(zip(symbols, ex.map(lambda s: chart(s, start), symbols)))
-    missing = [s for s, v in got.items() if not v]
-    log(f"[주가] {len(symbols) - len(missing)}/{len(symbols)}종목 받음" + (f" · 못 받음 {missing[:12]}" if missing else ""))
-    return {s: returns(v, drop_from) for s, v in got.items() if v}
+def fetch_closes(symbols: list[str], start: date) -> dict[str, dict[str, float]]:
+    """종가(수정) — 지난 실행이 남긴 게 있으면 그걸 쓰고, 없는 것만 yfinance 묶음으로 받는다."""
+    f = CACHE / "prices.pkl.gz"
+    out: dict[str, dict[str, float]] = {}
+    if f.exists():
+        with gzip.open(f, "rb") as fh:
+            out = pickle.load(fh)
+    need = [x for x in symbols if x not in out]
+    log(f"[주가] {len(symbols)}종목 중 지난 실행분 {len(symbols) - len(need)} · 새로 받을 것 {len(need)}")
+    if need:
+        import yfinance as yf
+
+        step = 40
+        for i in range(0, len(need), step):
+            chunk = need[i : i + step]
+            t0 = time.time()
+            try:
+                df = yf.download(
+                    chunk, start=start.isoformat(), interval="1d", auto_adjust=True,
+                    progress=False, threads=True, timeout=20,
+                )
+                close = df["Close"] if len(df) else None
+                if isinstance(close, pd.Series):
+                    close = close.to_frame(chunk[0])
+                if close is not None:
+                    for x in chunk:
+                        if x in close.columns:
+                            col = close[x].dropna()
+                            if len(col):
+                                out[x] = {ix.strftime("%Y-%m-%d"): float(v) for ix, v in col.items()}
+            except Exception as exc:  # noqa: BLE001
+                log(f"[주가] yfinance 묶음 {i // step + 1} 실패: {exc}")
+            log(f"[주가] 묶음 {i // step + 1}/{math.ceil(len(need) / step)}: {sum(1 for x in chunk if x in out)}/{len(chunk)} ({time.time() - t0:.0f}초)")
+        miss = [x for x in need if x not in out]
+        if miss:
+            t0 = time.time()
+            for x in miss[:60]:
+                v = chart(x, start)
+                if v:
+                    out[x] = v
+            log(f"[주가] yfinance 가 못 준 {len(miss)}종목 중 앞 60개를 차트 API 로 다시 — {sum(1 for x in miss if x in out)}개 받음 ({time.time() - t0:.0f}초)")
+        CACHE.mkdir(exist_ok=True)
+        with gzip.open(f, "wb") as fh:
+            pickle.dump(out, fh)
+    missing = [x for x in symbols if x not in out]
+    if missing:
+        log(f"[주가] 끝내 못 받은 {len(missing)}종목: {missing[:15]}")
+    return out
 
 
 # ── 통계 ──────────────────────────────────────────────────────────────────
@@ -137,45 +183,70 @@ def add_days(d: str, n: int) -> str:
 # ── 재료 ──────────────────────────────────────────────────────────────────
 
 
-def load_inputs(db, since_iso: str):
+def load_inputs(db, since_iso: str) -> dict:
+    """글 하나에 필요한 것만 추린 재료. 본문은 '등락 말'이 있는지만 남기고 버린다."""
+    f = CACHE / "inputs.pkl.gz"
+    if f.exists():
+        with gzip.open(f, "rb") as fh:
+            data = pickle.load(fh)
+        log(f"[재료] 지난 실행이 남긴 재료를 씁니다({f.stat().st_size / 1e6:.0f}MB · {data['at']} 에 읽음)")
+        return data
     log("[재료] 메시지·분류·태그를 읽습니다 …")
     t0 = time.time()
-    messages = load_window_keyset(db, "telegram_messages", "id,channel_handle,message_id,posted_at,text", since_iso)
-    analysis = load_all_keyset(db, "telegram_message_analysis", "id,channel_handle,message_id,sentiment,text_hash")
-    kr_mentions = load_all_keyset(db, "telegram_message_stocks", "id,channel_handle,message_id,stock_code,method")
-    us_mentions = load_all_keyset(db, "telegram_message_us_stocks", "id,channel_handle,message_id,ticker,method")
-    market = load_all_keyset(db, "telegram_message_market", "id,channel_handle,message_id,kr,us,kind")
-    stocks = load_all_keyset(db, "stocks", "code,name,market", key="code")
+    msg = {}
+    for m in load_window_keyset(db, "telegram_messages", "id,channel_handle,message_id,posted_at,text", since_iso):
+        if m.get("posted_at"):
+            msg[(m["channel_handle"], m["message_id"])] = (
+                datetime.fromisoformat(m["posted_at"]).astimezone(KST).date().isoformat(),
+                bool(MOVE_RE.search(m.get("text") or "")),
+            )
+    log(f"[재료] 메시지 {len(msg):,} ({time.time() - t0:.0f}초)")
+    data = {
+        "at": datetime.now(timezone.utc).astimezone(KST).isoformat(timespec="minutes"),
+        "msg": msg,
+        "analysis": [
+            ((a["channel_handle"], a["message_id"]), a["sentiment"], a.get("text_hash"))
+            for a in load_all_keyset(db, "telegram_message_analysis", "id,channel_handle,message_id,sentiment,text_hash")
+        ],
+        "kr_mentions": [
+            ((m["channel_handle"], m["message_id"]), m["stock_code"], is_house(m))
+            for m in load_all_keyset(db, "telegram_message_stocks", "id,channel_handle,message_id,stock_code,method")
+        ],
+        "us_mentions": [
+            ((m["channel_handle"], m["message_id"]), m["ticker"], is_house(m))
+            for m in load_all_keyset(db, "telegram_message_us_stocks", "id,channel_handle,message_id,ticker,method")
+        ],
+        "kind": {
+            (r["channel_handle"], r["message_id"]): r["kind"]
+            for r in load_all_keyset(db, "telegram_message_market", "id,channel_handle,message_id,kind")
+        },
+        "stocks": load_all_keyset(db, "stocks", "code,name,market", key="code"),
+    }
     log(
-        f"[재료] 메시지 {len(messages):,} · 분류 {len(analysis):,} · 국내 태그 {len(kr_mentions):,} · "
-        f"미국 태그 {len(us_mentions):,} · 시장 판정 {len(market):,} · 종목 {len(stocks):,} ({time.time() - t0:.0f}초)"
+        f"[재료] 분류 {len(data['analysis']):,} · 국내 태그 {len(data['kr_mentions']):,} · 미국 태그 {len(data['us_mentions']):,} · "
+        f"시장 판정 {len(data['kind']):,} · 종목 {len(data['stocks']):,} ({time.time() - t0:.0f}초)"
     )
-    return messages, analysis, kr_mentions, us_mentions, market, stocks
+    CACHE.mkdir(exist_ok=True)
+    with gzip.open(f, "wb") as fh:
+        pickle.dump(data, fh)
+    log(f"[재료] 남겨 둠 {f.stat().st_size / 1e6:.0f}MB")
+    return data
 
 
-def build_records(side: str, messages, analysis, kr_mentions, us_mentions, market, stocks):
+def build_records(side: str, data: dict):
     """화면 테마 톤과 같은 규칙으로 글 하나씩 — (날짜, 톤, 테마, 종류, 등락 말 여부, 종목)."""
-    date_of, move_of = {}, {}
-    for m in messages:
-        if not m.get("posted_at"):
-            continue
-        key = (m["channel_handle"], m["message_id"])
-        date_of[key] = datetime.fromisoformat(m["posted_at"]).astimezone(KST).date().isoformat()
-        move_of[key] = bool(MOVE_RE.search(m.get("text") or ""))
-    kind_of = {(r["channel_handle"], r["message_id"]): r["kind"] for r in market}
-
+    msg, kind_of, stocks = data["msg"], data["kind"], data["stocks"]
     codes_of_msg: dict = defaultdict(set)
     kr_syms_of_msg: dict = defaultdict(set)
-    for m in kr_mentions:
-        k = (m["channel_handle"], m["message_id"])
-        codes_of_msg[k].add(m["stock_code"])
-        if not is_house(m):
-            kr_syms_of_msg[k].add(m["stock_code"])
-    us_keys = {(m["channel_handle"], m["message_id"]) for m in us_mentions}
+    for k, code, house in data["kr_mentions"]:
+        codes_of_msg[k].add(code)
+        if not house:
+            kr_syms_of_msg[k].add(code)
+    us_keys = {k for k, _, _ in data["us_mentions"]}
     us_syms_of_msg: dict = defaultdict(set)
-    for m in us_mentions:
-        if not is_house(m):
-            us_syms_of_msg[(m["channel_handle"], m["message_id"])].add(m["ticker"])
+    for k, ticker, house in data["us_mentions"]:
+        if not house:
+            us_syms_of_msg[k].add(ticker)
 
     if side == "kr":
         code_of = {s["name"]: s["code"] for s in stocks}
@@ -196,29 +267,27 @@ def build_records(side: str, messages, analysis, kr_mentions, us_mentions, marke
 
     seen: set = set()
     recs, overall = [], defaultdict(Counter)
-    for a in analysis:
-        key = (a["channel_handle"], a["message_id"])
-        d = date_of.get(key)
+    for key, sentiment, h in data["analysis"]:
+        d, move = msg.get(key, (None, False))
         if not d:
             continue
         if side == "kr" and key in us_only:
             continue
         if side == "us" and key not in us_keys:
             continue
-        h = a.get("text_hash")
         if h and (d, h) in seen:
             continue
         if h:
             seen.add((d, h))
-        overall[d][a["sentiment"]] += 1
+        overall[d][sentiment] += 1
         syms = syms_of_msg.get(key, set())
         themes = {t for s in syms for t in themes_of.get(s, ())}
         targets = theme_tone_targets(themes)
         if not targets:
             continue
         recs.append({
-            "date": d, "sent": a["sentiment"], "themes": targets, "n_themes": len(themes),
-            "kind": kind_of.get(key), "move": move_of.get(key, False), "syms": syms,
+            "date": d, "sent": sentiment, "themes": targets, "n_themes": len(themes),
+            "kind": kind_of.get(key), "move": move, "syms": syms,
         })
     return recs, overall, themes_of
 
@@ -231,7 +300,7 @@ def run_side(side: str, db, inputs, start_day: str, today: str) -> None:
     log("\n" + "=" * 100)
     log(f"■ {name}")
     log("=" * 100)
-    recs, overall, themes_of = build_records(side, *inputs)
+    recs, overall, themes_of = build_records(side, inputs)
     dict_themes = THEMES if side == "kr" else US_THEMES
 
     # 테마 × 변형 × 날짜 톤
@@ -274,9 +343,9 @@ def run_side(side: str, db, inputs, start_day: str, today: str) -> None:
 
     # 주가
     if side == "kr":
-        mk = {s["code"]: s.get("market") for s in inputs[5]}
+        mk = {s["code"]: s.get("market") for s in inputs["stocks"]}
         sym_of = {}
-        code_of = {s["name"]: s["code"] for s in inputs[5]}
+        code_of = {s["name"]: s["code"] for s in inputs["stocks"]}
         members = {}
         for t in top:
             codes = [code_of[n] for n in dict_themes[t] if n in code_of]
@@ -291,7 +360,8 @@ def run_side(side: str, db, inputs, start_day: str, today: str) -> None:
         sym_of = {s: s.replace(".", "-") for t in top for s in members[t]}
         index_sym = "^GSPC"
     syms = sorted(set(sym_of.values()) | {index_sym})
-    rets = fetch_all(syms, date.fromisoformat(start_day) - timedelta(days=45), today)
+    closes = fetch_closes(syms, date.fromisoformat(start_day) - timedelta(days=45))
+    rets = {x: returns(v, today) for x, v in closes.items() if x in syms}
     idx = rets.get(index_sym, {})
     trading = sorted(idx)
     if not trading:
