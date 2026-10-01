@@ -143,23 +143,21 @@ function Detail({ s, tab }: { s: BoardStock; tab: BoardTab["key"] }) {
   // 패널 막대는 가진 것 중 가장 긴 줄(급부상은 14일, 주요 종목은 7일).
   const tone = tab === "talk" ? "cold" : "warm";
   const hot = s.surge?.days ?? s.talk?.days ?? 0;
-  const facts: { k: string; v: React.ReactNode }[] = [];
-  if (s.surge) {
-    facts.push({ k: "평소 대비", v: <b className="v2-hot">{s.surge.ratio.toFixed(1)}배</b> });
-    facts.push({ k: `최근 ${s.surge.days}일 언급`, v: `${s.surge.mentions}회` });
-  } else if (s.talk) {
-    facts.push({ k: `최근 ${s.talk.days}일 언급`, v: `${s.talk.mentions.toLocaleString("ko-KR")}회` });
-  }
+  /* 사실은 타일 넷이 아니라 한 줄로 — 표의 같은 줄이 이미 배수·언급을 크게 보이고 있어, 여기선 맥락만 덧붙인다. */
+  const facts: React.ReactNode[] = [];
+  if (s.surge) facts.push(<>평소 대비 <b className="v2-hot">{s.surge.ratio.toFixed(1)}배</b></>);
+  const mentions = s.surge ?? s.talk;
+  if (mentions) facts.push(<>최근 {mentions.days}일 <b>{mentions.mentions.toLocaleString("ko-KR")}회</b></>);
+  if (s.move) facts.push(<>{shortDate(s.move.date)} <Change rate={s.move.change} /></>);
   const channels = s.surge?.channels ?? s.talk?.channels ?? s.move?.channels ?? null;
-  if (channels !== null) facts.push({ k: "말한 채널", v: `${channels}곳` });
-  if (s.surge?.isNew) facts.push({ k: "처음 등장", v: "신규" });
-  if (s.move) facts.push({ k: `${shortDate(s.move.date)} 등락`, v: <Change rate={s.move.change} /> });
+  if (channels !== null) facts.push(<>채널 <b>{channels}곳</b></>);
 
   const notes: { cap: string; text: string | null; fallback: string }[] = [];
   if (s.surge) notes.push({ cap: "왜 뜨나", text: s.surge.line, fallback: "한 줄 요약은 오늘 집계가 끝나면 붙습니다." });
   if (s.move) notes.push({ cap: "왜 움직였나", text: s.move.reason, fallback: "" });
   if (s.talk) notes.push({ cap: "흐름 요약", text: s.talk.narrative, fallback: "흐름 요약은 오늘 집계가 끝나면 붙습니다." });
 
+  /* 차례: 이름·시세 → 사실 한 줄 → AI 문장(이 패널의 주인공) → 언급 막대 → 테마 → 바로가기. */
   return (
     <aside className="v2-detail" aria-live="polite">
       <div className="v2-detail-head">
@@ -184,6 +182,35 @@ function Detail({ s, tab }: { s: BoardStock; tab: BoardTab["key"] }) {
           <span className="v2-muted">가격 정보 준비 중</span>
         )}
       </div>
+      {facts.length > 0 && (
+        <p className="v2-facts">
+          {facts.map((f, i) => (
+            <span key={i}>{f}</span>
+          ))}
+        </p>
+      )}
+
+      {notes.map((n) => (
+        <div key={n.cap} className="v2-note">
+          <span className="v2-cap">
+            <AiMark size={13} />
+            {n.cap}
+          </span>
+          <p className={n.text ? undefined : "v2-muted"}>{n.text ?? n.fallback}</p>
+        </div>
+      ))}
+
+      {s.series.length > 0 && (
+        <div className="v2-detail-chart">
+          <span className="v2-cap">최근 {s.series.length}일 언급</span>
+          <Bars values={s.series} dates={s.dates} hot={hot} tone={tone} big />
+          <span className="v2-axis">
+            <span>{shortDate(s.dates[0])}</span>
+            <span>{shortDate(s.dates[s.dates.length - 1])}</span>
+          </span>
+        </div>
+      )}
+
       {s.themes.length > 0 && (
         <div className="v2-detail-themes">
           {s.themes.map((t) =>
@@ -199,38 +226,6 @@ function Detail({ s, tab }: { s: BoardStock; tab: BoardTab["key"] }) {
           )}
         </div>
       )}
-
-      {s.series.length > 0 && (
-        <div className="v2-detail-chart">
-          <span className="v2-cap">최근 {s.series.length}일 언급</span>
-          <Bars values={s.series} dates={s.dates} hot={hot} tone={tone} big />
-          <span className="v2-axis">
-            <span>{shortDate(s.dates[0])}</span>
-            <span>{shortDate(s.dates[s.dates.length - 1])}</span>
-          </span>
-        </div>
-      )}
-
-      {facts.length > 0 && (
-        <dl className="v2-facts">
-          {facts.map((f) => (
-            <div key={f.k}>
-              <dt>{f.k}</dt>
-              <dd>{f.v}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
-
-      {notes.map((n) => (
-        <div key={n.cap} className="v2-note">
-          <span className="v2-cap">
-            <AiMark size={13} />
-            {n.cap}
-          </span>
-          <p className={n.text ? undefined : "v2-muted"}>{n.text ?? n.fallback}</p>
-        </div>
-      ))}
 
       <div className="v2-detail-links">
         <Link href={`/stock/${s.code}`} className="v2-link">

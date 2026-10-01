@@ -403,3 +403,7 @@
 .hz-logo-link:hover {
   opacity: 0.72;
 }
+
+/* 사이드바 맨 아래 줄(오늘 뭐래? + 다크 모드). 접힌 아이콘 막대(64px)에선 둘이 한 줄에 안 들어가 세로로 쌓는다. */
+html[data-sidebar="icon"] .hz-sidebar .hz-side-foot { flex-direction: column; }
+html[data-sidebar="icon"] .hz-sidebar .hz-side-foot .hz-theme-btn { width: 100% !important; }

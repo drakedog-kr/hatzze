@@ -113,7 +113,6 @@ export function EventRows({ events, today }: { events: UpcomingEvent[]; today: s
                   <>
                     <span className="v2-li-main">{e.name}</span>
                     <span className="v2-ev-text">{e.event}</span>
-                    <span className="v2-li-val v2-li-soft">{e.channels}곳</span>
                   </>
                 );
                 return (
@@ -132,6 +131,47 @@ export function EventRows({ events, today }: { events: UpcomingEvent[]; today: s
           </section>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * 여론 30일 추이 — 선 하나와 50 기준선. 옛 추이 타일(parts.tsx SentimentTrendTile)은 제 캡션·띠 색·라벨을 들고 있어
+ * 패널 안에서 제목이 두 번 서고 그래픽이 겹쳤다. 여기선 선과 마지막 점, 양 끝 날짜만 남긴다.
+ */
+export function MoodTrend({ points }: { points: { date: string; score: number }[] | null }) {
+  if (!points || points.length < 2) {
+    return <p className="v2-muted" style={{ margin: 0, fontSize: 12.5 }}>{points === null ? "추이를 불러오지 못했습니다." : "추이를 그릴 기록이 아직 없습니다."}</p>;
+  }
+  const W = 100;
+  const H = 40;
+  const lo = Math.min(30, ...points.map((p) => p.score)) - 2;
+  const hi = Math.max(70, ...points.map((p) => p.score)) + 2;
+  const x = (i: number) => (i / (points.length - 1)) * W;
+  const y = (v: number) => ((hi - v) / (hi - lo)) * H;
+  const last = points[points.length - 1];
+  const md = (iso: string) => {
+    const [, m, d] = iso.split("-");
+    return `${Number(m)}/${Number(d)}`;
+  };
+  return (
+    <div className="v2-trend">
+      <span className="v2-cap">30일 추이</span>
+      <div className="v2-trend-plot">
+        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
+          <line x1="0" x2={W} y1={y(50)} y2={y(50)} className="v2-trend-mid" vectorEffect="non-scaling-stroke" />
+          <polyline points={points.map((p, i) => `${x(i)},${y(p.score)}`).join(" ")} className="v2-trend-line" vectorEffect="non-scaling-stroke" />
+        </svg>
+        <span
+          className={`v2-trend-dot ${last.score >= 50 ? "is-up" : "is-down"}`}
+          style={{ top: `${(y(last.score) / H) * 100}%` }}
+          title={`${md(last.date)} 낙관 ${last.score}%`}
+        />
+      </div>
+      <span className="v2-axis">
+        <span>{md(points[0].date)}</span>
+        <span>{md(last.date)}</span>
+      </span>
     </div>
   );
 }

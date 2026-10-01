@@ -13,15 +13,13 @@ import {
   getTopStocksWithTrend,
   KADERA_WINDOW_DAYS,
 } from "@/lib/telegram-data";
-import type { ThemeRotation } from "@/lib/telegram-data";
 
-import { formatKstUpdate } from "@/lib/format";
 import { assertLoaded, isLoadFailed } from "@/lib/load-state";
 
 import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { AiMark, C, Icon } from "../ui";
-import { SentimentTrendTile, ThemeVsUsualRows, highlightTerms, termsFor } from "./parts";
+import { highlightTerms, termsFor } from "./parts";
 import { fmtKoDate } from "@/lib/stock-page";
 import { THEME_NAMES, themeHref } from "@/lib/theme-href";
 import { THEMES } from "@/lib/stock-themes";
@@ -29,8 +27,16 @@ import { THEME_PUBLIC } from "../screen-flags";
 import { BOARD_TILES, getMoveReasons, getUpcomingEvents, todayKst } from "@/lib/kadera-why";
 import { StockBoard } from "./StockBoard";
 import { PanelTabs } from "./PanelTabs";
-import { EventRows, KeywordRows, ThemeRows } from "./V2Lists";
+import { EventRows, KeywordRows, MoodTrend, ThemeRows } from "./V2Lists";
 import type { BoardStock, BoardTab } from "./StockBoard";
+
+/** "10/1 19:30" — 패널 머리에 들어갈 짧은 KST 시각. */
+function shortKst(iso: string): string {
+  const d = new Date(new Date(iso).getTime() + 9 * 3600_000);
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${hh}:${mm}`;
+}
 
 // 미리보기 이미지는 옆의 opengraph-image.tsx 가 그린다(ownImage). 자세한 건 app/seo.ts 주석 참고.
 export async function generateMetadata(): Promise<Metadata> {
@@ -175,16 +181,6 @@ export default async function KaderaPage() {
      - 총 구독자는 채널마다 구독자를 더한 값이라 여러 채널을 구독한 한 사람이 여러 번 세어졌다. */
 
   // ── 테마 로테이션 ──────────────────────────────────────────────────
-  // 표는 **점유율 순위 그대로**(themes 가 이미 그 순서다) 순위 번호를 달아 나열한다 —
-  // 옆 이슈 키워드와 같은 골격이라 두 시트를 나란히 훑을 수 있다.
-  // 막대는 **점유율**이다(변화폭이 아니다). 변화폭으로 그리면 1위 반도체(28%)가 +1.1%p
-  // 라는 이유로 작은 막대가 되어, 순위표인데 순위가 그림에서 사라진다. 변화폭은 오른쪽
-  // 값 칸이 부호·색으로 말한다(이슈 키워드의 ▲/▼ 횟수와 같은 자리).
-  const delta = (t: ThemeRotation) => (t.shareDelta === null ? 0 : t.shareDelta);
-  // 맨 위 수치 띠의 '테마 유입 1위'. 표 순서와는 무관하므로 따로 고른다.
-  const moved = themes.filter((t) => t.shareDelta !== null);
-  const topIn = moved.length ? moved.reduce((a, b) => (delta(b) > delta(a) ? b : a)) : null;
-
   /* ── 히어로 헤드라인 ────────────────────────────────────────────────
      토스의 어법(큰 두 줄 제목 + 짧은 본문)을 빌렸다. 첫 줄은 고정이고 둘째 줄은
      센티먼트 구간(lib/format.ts 의 sentimentTone)이 정한다 — 같은 구간에서 옆 타일의
@@ -250,7 +246,7 @@ export default async function KaderaPage() {
       key: "surge",
       label: "급부상",
       note: `최근 ${surgeDays}일 vs 평소`,
-      heads: ["평소 대비", "7일 언급", `최근 ${surgeDays}일`],
+      heads: ["평소 대비", "7일 언급", "등락률"],
       codes: surging.map((s) => s.code),
       empty: "아직 급부상 신호가 뚜렷한 종목이 없습니다. 데이터가 쌓일수록 또렷해집니다.",
     },
@@ -266,36 +262,11 @@ export default async function KaderaPage() {
       key: "talk",
       label: "많이 언급",
       note: `최근 ${KADERA_WINDOW_DAYS}일`,
-      heads: [`최근 ${KADERA_WINDOW_DAYS}일`, "7일 언급", "채널"],
+      heads: [`최근 ${KADERA_WINDOW_DAYS}일`, "7일 언급", "등락률"],
       codes: stockReports.map((r) => r.code),
       empty: "아직 리포트를 만들 종목이 없습니다.",
     },
   ];
-
-  /* ── 지표 띠(맨 위) ────────────────────────────────────────────────────
-     예전 히어로의 큰 두 줄 제목과 '오늘 눈에 띄는 것' 칩 셋을 한 줄의 수치 칸으로 바꿨다(토스증권 지수 띠 ·
-     Blockworks 'Market Overview' 의 자리). 칸마다 1위 하나만 — 집계값이라 날마다 사실이다. 없는 칸은 빠진다. */
-  const topMove = moveRows[0];
-  const kpis = [
-    sentiment && {
-      cap: "여론 낙관도",
-      val: `${sentiment.score}%`,
-      ink: toneInk,
-      sub: sentiment.label,
-      href: "#mood",
-    },
-    surging[0] && { cap: "급부상 1위", val: surging[0].name, ink: C.ink, sub: `평소 대비 ${surging[0].ratio.toFixed(1)}배`, subInk: "var(--c-hot-ink)", href: "#surging" },
-    topMove && {
-      cap: "가장 많이 오른",
-      val: topMove.name,
-      ink: C.ink,
-      sub: topMove.changeRate !== null ? `▲${Math.abs(topMove.changeRate).toFixed(2)}%` : fmtKoDate(topMove.date),
-      subInk: "var(--c-hot-ink)",
-      href: "#surging",
-    },
-    topIn && { cap: "테마 유입 1위", val: topIn.theme, ink: C.ink, sub: `점유율 ▲${Math.abs(delta(topIn)).toFixed(1)}%p`, subInk: "var(--c-hot-ink)", href: "#themes" },
-    keywords[0] && { cap: "화제어 1위", val: keywords[0].word, ink: C.ink, sub: `${keywords[0].count.toLocaleString("ko-KR")}회`, href: "#keywords" },
-  ].filter((x): x is NonNullable<typeof x> => Boolean(x)) as { cap: string; val: string; ink: string; sub: string; subInk?: string; href: string }[];
 
   const briefNode = (
     <div className="v2-brief">
@@ -307,6 +278,8 @@ export default async function KaderaPage() {
       })()}
     </div>
   );
+  /* 여론 — 낙관도 하나와 30일 추이. 예전 히어로의 각주(중립 제외 셈법)·테마별 기울기는 걷었다 — 한 패널에
+     그래픽이 넷이면 무엇이 주인공인지 흐려진다. 셈법은 숫자 옆 물음표가 든다. */
   const moodNode = !sentiment ? (
     <p className="v2-empty">{sentimentFailed ? "감성 집계를 불러오지 못했습니다." : "아직 분석된 메시지가 없습니다."}</p>
   ) : (
@@ -319,37 +292,27 @@ export default async function KaderaPage() {
         <span className="v2-mood-label" style={{ color: toneInk }}>
           {sentiment.label}
         </span>
-        <span className="v2-mood-note">중립 {sentiment.neutral}% 제외 · 증시 전체를 다룬 글만</span>
+        <span className="hz-tip hz-tip-wide v2-mood-help" data-tip="시장 글만, 중립 제외" aria-label="셈법">
+          <Icon name="help" />
+        </span>
       </div>
-      <div className="hz-tx-split">
-        <span style={{ width: `${100 - sentiment.score}%`, background: "var(--c-blue-2)" }} />
-        <span style={{ width: `${sentiment.score}%`, background: "var(--c-warm-2)" }} />
+      <div>
+        <div className="hz-tx-split">
+          <span style={{ width: `${100 - sentiment.score}%`, background: "var(--c-blue-2)" }} />
+          <span style={{ width: `${sentiment.score}%`, background: "var(--c-warm-2)" }} />
+        </div>
+        <div className="v2-mood-ends">
+          <span>비관 {100 - sentiment.score}</span>
+          <span>낙관 {sentiment.score}</span>
+        </div>
       </div>
-      <ThemeVsUsualRows themes={sentiment.byTheme} />
-      <SentimentTrendTile points={sentimentFailed ? null : sentiment.trend} />
+      <MoodTrend points={sentimentFailed ? null : sentiment.trend} />
     </div>
   );
 
   return (
     <div className="hz-tx v2-kd">
       <div className="v2-grid">
-        {/* ── 수치 띠 ── */}
-        <section className="v2-kpis v2-a-kpi" aria-label="오늘의 수치">
-          {kpis.map((k) => (
-            <a key={k.cap} href={k.href} className="v2-kpi" data-ga="kadera_spotlight_click" data-ga-target={k.href.slice(1)}>
-              <span className="v2-kpi-cap">{k.cap}</span>
-              <span className="v2-kpi-line">
-                <span className="v2-kpi-val" style={{ color: k.ink }}>
-                  {k.val}
-                </span>
-                <span className="v2-kpi-sub" style={k.subInk ? { color: k.subInk } : undefined}>
-                  {k.sub}
-                </span>
-              </span>
-            </a>
-          ))}
-        </section>
-
         {/* ── 종목 보드 ── 급부상 · 급등 이유 · 많이 언급(StockBoard 머리말). id 는 홈·수치 띠의 목적지다. */}
         <section className="v2-panel v2-a-board" id="surging">
           <span id="why" aria-hidden="true" />
@@ -367,7 +330,7 @@ export default async function KaderaPage() {
               meta: (
                 <span className="v2-ai">
                   <AiMark size={13} />
-                  {summary.lastUpdated ? formatKstUpdate(summary.lastUpdated) : "AI 요약"}
+                  {summary.lastUpdated ? `${shortKst(summary.lastUpdated)} 기준` : "AI 요약"}
                 </span>
               ),
               node: briefNode,

@@ -898,7 +898,8 @@ function Sidebar() {
 
 
       {/* 바닥에 붙인다(margin-top:auto). 예전엔 flex:1 빈 칸을 끼웠는데 그 칸도 간격(28)을 하나 더 먹었다. */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: "auto" }}>
+      {/* '오늘 뭐래?' 와 다크 모드 단추가 한 줄에 선다(2026-10-02, 머리 오른쪽에서 옮겨 왔다). 접힌 막대에선 세로로 쌓인다(.hz-side-foot). */}
+      <div className="hz-side-foot" style={{ display: "flex", gap: 8, marginTop: "auto" }}>
         {/* 라벨은 바뀌었어도 data-ga-cta 는 "community" 그대로 둔다 — 값을 같이 바꾸면
             이름 변경 전후의 클릭수를 한 줄로 비교할 수 없다. 탭바·푸터도 같은 값이다. */}
         <a
@@ -921,6 +922,7 @@ function Sidebar() {
           className="hz-tip hz-tg-cta"
           data-tip="텔레그램에서 매일 시장 요약을 해 드립니다"
           style={{
+            flex: 1,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -936,6 +938,7 @@ function Sidebar() {
           <Icon name={TELEGRAM.icon} style={{ fontSize: "var(--fs-19)" }} />
           <span className="hz-side-text">{TELEGRAM.label}</span>
         </a>
+        <ThemeToggle size={44} radius={R.nav} />
       </div>
     </aside>
   );
@@ -1262,14 +1265,15 @@ function PageTools() {
         const page = CURRENCY_PAGES.find((p) => pathname.startsWith(p.prefix));
         return page ? <CurrencyToggle key={page.prefix} fallback={page.fallback} /> : null;
       })()}
-      {/* 안 연 동안 배포에서는 /theme 가 404 라 단추도 내지 않는다(themeNav — ShellEnv 주석). */}
-      {(themeNav || !pathname.startsWith(THEME_PAGE.href)) && <MarketSwap pathname={pathname} />}
-      <ThemeToggle />
+      {/* 안 연 동안 배포에서는 /theme 가 404 라 단추도 내지 않는다(themeNav — ShellEnv 주석).
+          v2 화면은 시장 전환 단추를 안 둔다 — 사이드바에 국장·미장 항목이 이미 있다(V2_PAGES 주석). */}
+      {(themeNav || !pathname.startsWith(THEME_PAGE.href)) && !V2_PAGES.includes(pathname) && <MarketSwap pathname={pathname} />}
+      {/* 다크 모드 단추는 여기 없다 — PC 는 사이드바 맨 아래, 폰은 탑바가 따로 단다(2026-10-02). */}
     </>
   );
 }
 
-function ThemeToggle() {
+function ThemeToggle({ size = 38, radius = R.control }: { size?: number; radius?: string | number }) {
   // 상태를 두지 않는다. 지금 테마는 뿌리의 data-theme 이 유일한 정의고(layout.tsx 의
   // PREF_SCRIPT 가 페인트 전에 붙인다), 아이콘은 CSS 가 그 속성을 보고 고른다
   // (mobile.css .hz-if-light/.hz-if-dark). 리액트 상태로 아이콘을 고르면 서버가 쿠키를
@@ -1299,13 +1303,14 @@ function ThemeToggle() {
     <button
       onClick={toggle}
       aria-label="다크 모드 전환"
+      className="hz-theme-btn"
       style={{
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        width: 38,
-        height: 38,
-        borderRadius: R.control,
+        width: size,
+        height: size,
+        borderRadius: radius,
         border: `1px solid ${C.line}`,
         background: C.bg,
         color: C.sub,
@@ -1582,6 +1587,8 @@ function TopBar({
           <Icon name="search" style={{ fontSize: "var(--fs-20)" }} />
         </button>
         <PageTools />
+        {/* PC 에선 사이드바 맨 아래에 있다. 폰은 사이드바가 숨으니 탑바에 둔다. */}
+        <ThemeToggle />
         <button
           type="button"
           className="hz-menu-btn"
