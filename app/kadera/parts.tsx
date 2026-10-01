@@ -433,7 +433,7 @@ export function ThemeVsUsualRows({ themes }: { themes: (ThemeRow & { name: strin
   if (!themes.length) return null;
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(62px, max-content) minmax(0, 1fr) max-content", columnGap: 10, rowGap: 6, paddingTop: 2 }}>
-      <span style={{ gridColumn: "1 / -1", fontSize: "var(--fs-11)", fontWeight: 700, letterSpacing: ".04em", color: C.sub }}>인기 테마 · 평소와 견주면</span>
+      <span style={{ gridColumn: "1 / -1", fontSize: "var(--fs-11)", fontWeight: 700, letterSpacing: ".04em", color: C.sub }}>인기 테마 · 평소 대비</span>
       {themes.map((t) => {
         const lean = themeLean(t);
         // 색은 바로 위 큰 비관·낙관 막대, 테마 로테이션 줄의 오르내림과 같은 -2 단이다 — 한 화면에서 같은 말을 같은 색으로.
