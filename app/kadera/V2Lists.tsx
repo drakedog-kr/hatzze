@@ -6,12 +6,12 @@ import type { IssueKeyword, ThemeRotation } from "@/lib/telegram-data";
 import { StockLogo } from "../StockLogo";
 
 /**
- * v2 국장 카더라의 패널과 목록들(2026-10-02). **탭도, 눌러야 열리는 상세도 없다** — 패널마다 제 목록을 다 펴 두고,
- * AI 문장은 종목 줄 바로 아래 둘째 줄에 적는다(눌러 보지 않아도 읽힌다).
+ * v2 국장 카더라의 패널과 목록들(2026-10-02). **탭도, 눌러야 열리는 상세도 없다** — 목록을 다 펴 두고,
+ * AI 문장은 종목 줄의 마지막 칸에 바로 적는다(눌러 보지 않아도 읽힌다).
  *
  * 줄 꼴은 두 가지뿐이다.
- *   종목 줄(StockList)  순위 · 로고 · 이름 · 값 · 등락  /  둘째 줄에 문장
- *   목록 줄(테마·화제어) 순위 · 이름 · 값 · 변화
+ *   종목 표(StockSection) 순위 · 로고 · 이름 · 등락률 · 값 · 문장 — 한 줄
+ *   목록 줄(테마·화제어)  순위 · 이름 · 값 · 변화
  * 예전엔 목록마다 막대·스파크라인·순위 배지·말풍선·칩이 제각각이라 한 화면에 그래픽 종류가 열 가지를 넘었다.
  * 여기선 색을 오르내림(빨강·파랑) 하나에만 쓰고, 나머지는 글자와 정렬로 가른다.
  */
@@ -42,54 +42,93 @@ export function Panel({
 }
 
 function Change({ rate }: { rate: number | null }) {
-  if (rate === null) return <span className="v2-sl-chg" />;
+  if (rate === null) return <span className="v2-td-chg">-</span>;
   const [cls, arrow] = rate > 0 ? [" is-up", "▲"] : rate < 0 ? [" is-down", "▼"] : ["", ""];
   return (
-    <span className={`v2-sl-chg${cls}`}>
+    <span className={`v2-td-chg${cls}`}>
       {arrow}
       {Math.abs(rate).toFixed(2)}%
     </span>
   );
 }
 
-export type StockLine = {
+export type StockRow = {
   code: string;
   name: string;
   market: string | null;
-  /** 이름 오른쪽 값("6.7배" · "84회"). 없으면 등락만 선다. */
-  value?: string;
-  /** 값을 빨간 잉크로(급부상 배수). */
-  valueHot?: boolean;
   change: number | null;
+  /** 넷째 칸 값("6.7배" · "746회"). move 표에는 없다. */
+  metric?: string;
+  /** 값을 빨간 잉크로(급부상 배수). */
+  metricHot?: boolean;
   /** 이름 옆 작은 꼬리표("신규"). */
   tag?: string;
-  /** 둘째 줄 문장(AI 한 줄 · 커뮤니티가 말한 이유 · 흐름 요약). */
+  /** 마지막 칸 문장(AI 한 줄 · 커뮤니티가 말한 이유 · 흐름 요약). 한 줄로 자르고 전문은 title 에 둔다. */
   text: string | null;
-  /** 문장이 아직 없을 때 그 자리에 설 말. 없으면 둘째 줄을 비운다. */
+  /** 문장이 아직 없을 때 그 자리에 설 말. */
   pending?: string;
 };
 
-/** 종목 줄 목록. 줄 전체가 그 종목 화면으로 가는 링크다(MDD 정밀분석은 종목 화면이 잇는다). */
-export function StockList({ items, empty }: { items: StockLine[]; empty: string }) {
-  if (!items.length) return <p className="v2-empty">{empty}</p>;
+/**
+ * 종목 표 한 구획 — 토스증권 '실시간 차트'의 줄 꼴. 한 줄 44px, 칸은 순위 · 종목 · 등락률 · 값 · 문장.
+ * **세 구획(급부상 · 오늘 움직인 · 많이 언급)이 같은 칸 폭을 쓴다** — 위아래로 훑을 때 등락률·값이 한 세로줄에 선다.
+ * move 표는 값 칸이 없어 문장이 그 자리부터 시작한다(v2.css 의 .v2-tbl-move).
+ * 줄 전체가 그 종목 화면으로 가는 링크다(MDD 정밀분석은 종목 화면이 잇는다).
+ */
+export function StockSection({
+  title,
+  meta,
+  id,
+  kind,
+  heads,
+  rows,
+  empty,
+}: {
+  title: string;
+  meta?: React.ReactNode;
+  id?: string;
+  kind: "surge" | "move" | "talk";
+  heads: string[];
+  rows: StockRow[];
+  empty: string;
+}) {
   return (
-    <ol className="v2-sl-list">
-      {items.map((s, i) => (
-        <li key={s.code}>
-          <Link href={`/stock/${s.code}`} className="v2-sl">
-            <span className="v2-li-rank">{i + 1}</span>
-            <StockLogo code={s.code} name={s.name} market={s.market} size={24} />
-            <span className="v2-sl-name">
-              <span>{s.name}</span>
-              {s.tag && <span className="v2-tag">{s.tag}</span>}
-            </span>
-            <span className={`v2-sl-val${s.valueHot ? " is-hot" : ""}`}>{s.value ?? ""}</span>
-            <Change rate={s.change} />
-            {(s.text || s.pending) && <span className={`v2-sl-text${s.text ? "" : " is-pending"}`}>{s.text ?? s.pending}</span>}
-          </Link>
-        </li>
-      ))}
-    </ol>
+    <section className="v2-sec" id={id}>
+      <header className="v2-sec-head">
+        <h2 className="v2-sec-title">{title}</h2>
+        {meta && <span className="v2-p-meta">{meta}</span>}
+      </header>
+      {rows.length === 0 ? (
+        <p className="v2-empty">{empty}</p>
+      ) : (
+        <div className={`v2-tbl v2-tbl-${kind}`}>
+          <div className="v2-tr v2-th" aria-hidden="true">
+            {heads.map((h, i) => (
+              <span key={i}>{h}</span>
+            ))}
+          </div>
+          <ol className="v2-tb">
+            {rows.map((r, i) => (
+              <li key={r.code}>
+                <Link href={`/stock/${r.code}`} className="v2-tr">
+                  <span className="v2-td-rank">{i + 1}</span>
+                  <span className="v2-td-stock">
+                    <StockLogo code={r.code} name={r.name} market={r.market} size={26} />
+                    <span className="v2-td-name">{r.name}</span>
+                    {r.tag && <span className="v2-tag">{r.tag}</span>}
+                  </span>
+                  <Change rate={r.change} />
+                  {kind !== "move" && <span className={`v2-td-metric${r.metricHot ? " is-hot" : ""}`}>{r.metric ?? ""}</span>}
+                  <span className={`v2-td-text${r.text ? "" : " is-pending"}`} title={r.text ?? undefined}>
+                    {r.text ?? r.pending ?? ""}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+    </section>
   );
 }
 
