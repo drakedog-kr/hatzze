@@ -3,13 +3,95 @@ import Link from "next/link";
 import type { UpcomingEvent } from "@/lib/kadera-why";
 import type { IssueKeyword, ThemeRotation } from "@/lib/telegram-data";
 
+import { StockLogo } from "../StockLogo";
 
 /**
- * v2 대시보드의 목록들(2026-10-02). 테마·화제어·일정이 **한 가지 줄 꼴**을 쓴다:
- *   순위(흐린 숫자) · 이름 · 값(오른쪽) · 변화(▲▼ 색)
+ * v2 국장 카더라의 패널과 목록들(2026-10-02). **탭도, 눌러야 열리는 상세도 없다** — 패널마다 제 목록을 다 펴 두고,
+ * AI 문장은 종목 줄 바로 아래 둘째 줄에 적는다(눌러 보지 않아도 읽힌다).
+ *
+ * 줄 꼴은 두 가지뿐이다.
+ *   종목 줄(StockList)  순위 · 로고 · 이름 · 값 · 등락  /  둘째 줄에 문장
+ *   목록 줄(테마·화제어) 순위 · 이름 · 값 · 변화
  * 예전엔 목록마다 막대·스파크라인·순위 배지·말풍선·칩이 제각각이라 한 화면에 그래픽 종류가 열 가지를 넘었다.
  * 여기선 색을 오르내림(빨강·파랑) 하나에만 쓰고, 나머지는 글자와 정렬로 가른다.
  */
+
+/** 패널 껍데기 — 작은 제목과 오른쪽 조건 알약. 높이는 내용이 정한다(안에서 스크롤하지 않는다). */
+export function Panel({
+  title,
+  meta,
+  id,
+  className,
+  children,
+}: {
+  title: string;
+  meta?: React.ReactNode;
+  id?: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className={`v2-panel${className ? ` ${className}` : ""}`} id={id}>
+      <header className="v2-p-head">
+        <h2 className="v2-p-title">{title}</h2>
+        {meta && <span className="v2-p-meta">{meta}</span>}
+      </header>
+      <div className="v2-p-body">{children}</div>
+    </section>
+  );
+}
+
+function Change({ rate }: { rate: number | null }) {
+  if (rate === null) return <span className="v2-sl-chg" />;
+  const [cls, arrow] = rate > 0 ? [" is-up", "▲"] : rate < 0 ? [" is-down", "▼"] : ["", ""];
+  return (
+    <span className={`v2-sl-chg${cls}`}>
+      {arrow}
+      {Math.abs(rate).toFixed(2)}%
+    </span>
+  );
+}
+
+export type StockLine = {
+  code: string;
+  name: string;
+  market: string | null;
+  /** 이름 오른쪽 값("6.7배" · "84회"). 없으면 등락만 선다. */
+  value?: string;
+  /** 값을 빨간 잉크로(급부상 배수). */
+  valueHot?: boolean;
+  change: number | null;
+  /** 이름 옆 작은 꼬리표("신규"). */
+  tag?: string;
+  /** 둘째 줄 문장(AI 한 줄 · 커뮤니티가 말한 이유 · 흐름 요약). */
+  text: string | null;
+  /** 문장이 아직 없을 때 그 자리에 설 말. 없으면 둘째 줄을 비운다. */
+  pending?: string;
+};
+
+/** 종목 줄 목록. 줄 전체가 그 종목 화면으로 가는 링크다(MDD 정밀분석은 종목 화면이 잇는다). */
+export function StockList({ items, empty }: { items: StockLine[]; empty: string }) {
+  if (!items.length) return <p className="v2-empty">{empty}</p>;
+  return (
+    <ol className="v2-sl-list">
+      {items.map((s, i) => (
+        <li key={s.code}>
+          <Link href={`/stock/${s.code}`} className="v2-sl">
+            <span className="v2-li-rank">{i + 1}</span>
+            <StockLogo code={s.code} name={s.name} market={s.market} size={24} />
+            <span className="v2-sl-name">
+              <span>{s.name}</span>
+              {s.tag && <span className="v2-tag">{s.tag}</span>}
+            </span>
+            <span className={`v2-sl-val${s.valueHot ? " is-hot" : ""}`}>{s.value ?? ""}</span>
+            <Change rate={s.change} />
+            {(s.text || s.pending) && <span className={`v2-sl-text${s.text ? "" : " is-pending"}`}>{s.text ?? s.pending}</span>}
+          </Link>
+        </li>
+      ))}
+    </ol>
+  );
+}
 
 /** ▲1.6%p · ▼3계단. 0·null 은 흐린 '-'. */
 function Delta({ v, unit, digits = 1 }: { v: number | null; unit: string; digits?: number }) {
@@ -91,8 +173,12 @@ export function KeywordRows({ keywords }: { keywords: IssueKeyword[] }) {
 const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
 
 /** 다가오는 일정 — 날짜 머리 아래 그날 것. 좁은 패널이라 달력 대신 목록이다. */
-export function EventRows({ events, today }: { events: UpcomingEvent[]; today: string }) {
-  const upcoming = events.filter((e) => e.date >= today).sort((a, b) => a.date.localeCompare(b.date) || b.channels - a.channels);
+export function EventRows({ events, today, limit = 10 }: { events: UpcomingEvent[]; today: string; limit?: number }) {
+  // 가까운 것부터 limit 개만 — 5주치를 다 펴면 패널이 화면 몇 장 길이가 된다(본문 3,600px 이었다).
+  const upcoming = events
+    .filter((e) => e.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date) || b.channels - a.channels)
+    .slice(0, limit);
   if (!upcoming.length) return <p className="v2-empty">앞으로 5주 안에 날짜가 짚인 일정이 아직 없습니다.</p>;
   const groups = new Map<string, UpcomingEvent[]>();
   for (const e of upcoming) groups.set(e.date, [...(groups.get(e.date) ?? []), e]);

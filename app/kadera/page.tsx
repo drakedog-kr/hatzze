@@ -24,11 +24,9 @@ import { fmtKoDate } from "@/lib/stock-page";
 import { THEME_NAMES, themeHref } from "@/lib/theme-href";
 import { THEMES } from "@/lib/stock-themes";
 import { THEME_PUBLIC } from "../screen-flags";
-import { BOARD_TILES, getMoveReasons, getUpcomingEvents, todayKst } from "@/lib/kadera-why";
-import { StockBoard } from "./StockBoard";
-import { PanelTabs } from "./PanelTabs";
-import { EventRows, KeywordRows, MoodTrend, ThemeRows } from "./V2Lists";
-import type { BoardStock, BoardTab } from "./StockBoard";
+import { getMoveReasons, getUpcomingEvents, todayKst } from "@/lib/kadera-why";
+import { EventRows, KeywordRows, MoodTrend, Panel, StockList, ThemeRows } from "./V2Lists";
+import type { StockLine } from "./V2Lists";
 
 /** "10/1 19:30" — 패널 머리에 들어갈 짧은 KST 시각. */
 function shortKst(iso: string): string {
@@ -63,16 +61,6 @@ export const revalidate = 1800;
 /* 요약 글의 굵힘(highlightTerms)은 미장 히어로도 똑같이 쓴다. 한쪽만 고쳐져 두 화면의
    강조 규칙이 갈리지 않도록 ./parts 로 옮겼다 — 규칙과 함정은 그쪽 주석에. */
 
-
-
-
-/**
- * '급등 종목' 카드에 세우는 타일 수. **3열 격자라 3의 배수여야** 마지막 줄이 찬다(급부상 카드와 같은 판).
- *
- * ⚠️ 숫자를 여기 두지 않는다. lib/kadera-why 의 2차 시세 조회가 **이 장수만큼**을 채우므로,
- *    두 값이 갈리면 화면 끝자리가 다시 '등락 준비 중' 으로 뜬다. 바꿀 땐 그쪽 한 곳만 고친다.
- */
-const WHY_TILES = BOARD_TILES;
 
 /**
  * 테마 리포트로 가는 길을 낼 것인가. 안 연 화면(app/screen-flags.ts THEME_PUBLIC)으로 링크를 내면 배포에서 404 라
@@ -180,105 +168,45 @@ export default async function KaderaPage() {
      - 채널 수는 채널 파워 랭킹 머리로 옮겼다가 거기서도 뺐다(2026-09-28). 화면에 채널 수가 없다.
      - 총 구독자는 채널마다 구독자를 더한 값이라 여러 채널을 구독한 한 사람이 여러 번 세어졌다. */
 
-  // ── 테마 로테이션 ──────────────────────────────────────────────────
-  /* ── 히어로 헤드라인 ────────────────────────────────────────────────
-     토스의 어법(큰 두 줄 제목 + 짧은 본문)을 빌렸다. 첫 줄은 고정이고 둘째 줄은
-     센티먼트 구간(lib/format.ts 의 sentimentTone)이 정한다 — 같은 구간에서 옆 타일의
-     라벨('낙관 우세')과 큰 숫자가 나오므로 셋이 한 사실을 말한다. 낱말 하나만 잉크색으로
-     짚는다. 잉크 토큰(--c-hot-ink)이지 원색(--c-hot)이 아니다 — 회색 타일 위에서도
-     4.5 를 넘기는 값은 잉크 쪽이다(Pill 주석의 실측). */
+  /* 여론 숫자의 잉크. 센티먼트 구간(lib/format.ts 의 sentimentTone)이 색을 정한다. 잉크 토큰(--c-hot-ink)이지
+     원색(--c-hot)이 아니다 — 회색 면 위에서도 4.5 를 넘기는 값은 잉크 쪽이다(Pill 주석의 실측). */
   const toneInk = sentiment?.tone === "hot" ? "var(--c-hot-ink)" : sentiment?.tone === "cold" ? "var(--c-cold-ink)" : C.ink;
-  /* ── 종목 보드(가운데 판)의 재료 ───────────────────────────────────────
-     급부상 · 급등 이유 · 많이 언급, 세 목록을 **종목 하나의 사실 묶음**으로 합친다(StockBoard 머리말).
-     한 종목이 여러 목록에 오르면 상세 패널이 그 사실을 다 모은다. 시세는 실시간을 먼저 쓴다 —
-     급부상·주요 종목은 야후 실시간(못 받으면 KRX 저장 종가), 급등 이유는 그날 종가라 맨 뒤다. */
-  const board: Record<string, BoardStock> = {};
-  const boardBase = (code: string, name: string, market: string | null): BoardStock =>
-    (board[code] ??= {
-      code,
-      name,
-      market,
-      price: null,
-      change: null,
-      priceNote: null,
-      series: [],
-      dates: [],
-      hot: 0,
-      themes: (THEMES_OF_NAME.get(name) ?? []).slice(0, 3).map((t) => ({ name: t, href: THEME_LINKS ? themeHref(t) : null })),
-    });
-  for (const s of surging) {
-    const b = boardBase(s.code, s.name, s.market);
-    b.price = s.closePrice;
-    // 야후 실시간이 아니면 등락률 대신 기준일을 단다 — 저장 종가면 등락률도 그날 것이라 방향까지 뒤집혀 보인다(QuoteDate 주석).
-    b.change = s.isLive ? s.changeRate : null;
-    b.priceNote = s.isLive ? null : s.priceDate ? `${fmtKoDate(s.priceDate)} 종가` : "종가 기준";
-    b.series = s.series;
-    b.dates = s.seriesDates;
-    b.hot = s.recentDays;
-    b.surge = { ratio: s.ratio, isNew: s.isNew, mentions: s.recentMentions, days: s.recentDays, channels: s.channelCount, line: surgeLines[s.code] ?? null };
-  }
-  for (const r of stockReports) {
-    const b = boardBase(r.code, r.name, r.market);
-    if (b.price === null && r.price != null) {
-      b.price = r.price;
-      b.change = r.changeRate;
-    }
-    if (!b.series.length) {
-      b.series = r.series.map((d) => d.mentions);
-      b.dates = r.series.map((d) => d.date);
-      b.hot = r.series.filter((d) => d.scored).length;
-    }
-    b.talk = { mentions: r.totalMentions, days: KADERA_WINDOW_DAYS, channels: r.channelCount, narrative: narratives[r.code] ?? null };
-  }
-  const moveRows = (why?.rows ?? []).slice(0, WHY_TILES);
-  // 급락 이유 — 5% 넘게 내린 줄만(lib/kadera-why.ts DOWN_MIN). 하루 몇 줄 안 된다.
-  const dropRows = (why?.down ?? []).slice(0, WHY_TILES);
-  for (const r of [...moveRows, ...dropRows]) {
-    const b = boardBase(r.code, r.name, r.market);
-    if (b.price === null && r.closePrice != null) {
-      b.price = r.closePrice;
-      // 그날 종가다. 등락률은 패널의 '등락' 칸이 따로 적으니 시세 옆엔 기준일만 단다.
-      b.priceNote = `${fmtKoDate(r.date)} 종가`;
-    }
-    b.move = { reason: r.reason, change: r.changeRate, date: r.date, channels: r.channelCount };
-  }
+
+  /* ── 종목 목록 셋의 재료 ────────────────────────────────────────────────
+     급부상 · 오늘 움직인 종목(오른 것 + 크게 내린 것) · 많이 언급. 탭으로 나누지 않고 셋을 나란히 편다.
+     AI 문장은 줄 아래에 바로 적는다(눌러야 열리는 상세 패널을 걷었다). */
   const surgeDays = surging[0]?.recentDays ?? KADERA_WINDOW_DAYS;
-  const boardTabs: BoardTab[] = [
-    {
-      key: "surge",
-      label: "급부상",
-      note: `최근 ${surgeDays}일 vs 평소`,
-      heads: ["평소 대비", "7일 언급", "등락률"],
-      codes: surging.map((s) => s.code),
-      empty: "아직 급부상 신호가 뚜렷한 종목이 없습니다. 데이터가 쌓일수록 또렷해집니다.",
-    },
-    {
-      key: "move",
-      label: "급등 이유",
-      note: why ? `${fmtKoDate(why.date)} 기준` : "그날 기준",
-      heads: ["등락률", "커뮤니티가 말한 이유"],
-      codes: moveRows.map((r) => r.code),
-      empty: whyFailed ? "이유를 불러오지 못했습니다." : "오늘 집계가 끝나면 채워집니다. 저녁 실행 뒤에 그날 것이 붙습니다.",
-    },
-    {
-      key: "drop",
-      label: "급락 이유",
-      note: why ? `${fmtKoDate(why.date)} 기준` : "그날 기준",
-      heads: ["등락률", "커뮤니티가 말한 이유"],
-      codes: dropRows.map((r) => r.code),
-      empty: whyFailed
-        ? "이유를 불러오지 못했습니다."
-        : "이날은 5% 넘게 내린 종목 가운데 커뮤니티가 이유를 말한 곳이 없습니다.",
-    },
-    {
-      key: "talk",
-      label: "많이 언급",
-      note: `최근 ${KADERA_WINDOW_DAYS}일`,
-      heads: [`최근 ${KADERA_WINDOW_DAYS}일`, "7일 언급", "등락률"],
-      codes: stockReports.map((r) => r.code),
-      empty: "아직 리포트를 만들 종목이 없습니다.",
-    },
-  ];
+  const surgeItems: StockLine[] = surging.map((s) => ({
+    code: s.code,
+    name: s.name,
+    market: s.market,
+    value: `${s.ratio.toFixed(1)}배`,
+    valueHot: true,
+    // 야후 실시간이 아니면(KRX 저장 종가 폴백) 등락률을 안 단다 — 그날 것이라 방향까지 뒤집혀 보인다(QuoteDate 주석).
+    change: s.isLive ? s.changeRate : null,
+    tag: s.isNew ? "신규" : undefined,
+    text: surgeLines[s.code] ?? null,
+    pending: "한 줄 요약은 오늘 집계가 끝나면 붙습니다.",
+  }));
+  // 오늘 움직인 종목 — 오른 것 여섯, 그 아래 5% 넘게 내린 것 셋까지(lib/kadera-why.ts DOWN_MIN). 내린 줄은 없는 날이 많다.
+  const moveLine = (r: NonNullable<typeof why>["rows"][number]): StockLine => ({
+    code: r.code,
+    name: r.name,
+    market: r.market,
+    change: r.changeRate,
+    text: r.reason,
+  });
+  const upItems = (why?.rows ?? []).slice(0, 6).map(moveLine);
+  const downItems = (why?.down ?? []).slice(0, 3).map(moveLine);
+  const talkItems: StockLine[] = stockReports.map((r) => ({
+    code: r.code,
+    name: r.name,
+    market: r.market,
+    value: `${r.totalMentions.toLocaleString("ko-KR")}회`,
+    change: r.changeRate,
+    text: narratives[r.code] ?? null,
+    pending: "흐름 요약은 오늘 집계가 끝나면 붙습니다.",
+  }));
 
   const briefNode = (
     <div className="v2-brief">
@@ -325,83 +253,82 @@ export default async function KaderaPage() {
   return (
     <div className="hz-tx v2-kd">
       <div className="v2-grid">
-        {/* ── 종목 보드 ── 급부상 · 급등 이유 · 많이 언급(StockBoard 머리말). id 는 홈·수치 띠의 목적지다. */}
-        <section className="v2-panel v2-a-board" id="surging">
-          <span id="why" aria-hidden="true" />
-          <StockBoard tabs={boardTabs} stocks={board} />
-        </section>
-
-        {/* ── 오늘의 요약 ── */}
-        <PanelTabs
+        {/* ── 오늘의 요약 ── 접지 않고 다 편다. 이 화면의 주인공이다. */}
+        <Panel
+          title="오늘의 요약"
           className="v2-a-brief"
-          name="brief"
-          tabs={[
-            {
-              key: "brief",
-              label: "오늘의 요약",
-              meta: (
-                <span className="v2-ai">
-                  <AiMark size={13} />
-                  {summary.lastUpdated ? `${shortKst(summary.lastUpdated)} 기준` : "AI 요약"}
-                </span>
-              ),
-              node: briefNode,
-            },
-          ]}
-        />
+          meta={
+            <span className="v2-ai">
+              <AiMark size={13} />
+              {summary.lastUpdated ? `${shortKst(summary.lastUpdated)} 기준` : "AI 요약"}
+            </span>
+          }
+        >
+          {briefNode}
+        </Panel>
 
-        {/* ── 테마 · 화제어 ── */}
-        <PanelTabs
-          className="v2-a-lists"
-          id="themes"
-          name="themes"
-          tabs={[
-            {
-              key: "themes",
-              label: "테마",
-              meta: THEME_LINKS ? (
-                <Link href="/theme" className="v2-more">
-                  전체 보기
-                  <Icon name="chevron_right" />
-                </Link>
-              ) : (
-                "최근 3일 vs 이전"
-              ),
-              node: <ThemeRows themes={themes} hrefOf={(t) => (THEME_LINKS ? themeHref(t) : null)} />,
-            },
-            { key: "kw", label: "화제어", meta: "최근 3일", node: <KeywordRows keywords={keywords} /> },
-          ]}
-        />
-
-        {/* ── 다가오는 일정 ── '앞으로 뭐 있나'. 채널 탭 아래 숨어 있던 것을 제 패널로 꺼냈다. */}
-        <PanelTabs
-          className="v2-a-events"
-          id="events"
-          name="events"
-          tabs={[
-            {
-              key: "events",
-              label: "다가오는 일정",
-              meta: "앞으로 5주",
-              node: eventsFailed ? <p className="v2-empty">일정을 불러오지 못했습니다.</p> : <EventRows events={events} today={kaderaToday} />,
-            },
-          ]}
-        />
-
-        {/* ── 여론 ── 낙관도 · 테마별 기울기 · 30일 추이. 요약 패널의 탭에서 제 패널로 꺼냈다. */}
-        <PanelTabs
-          className="v2-a-mood"
+        {/* ── 여론 ── */}
+        <Panel
+          title="여론"
           id="mood"
-          name="mood"
-          tabs={[
-            {
-              key: "mood",
-              label: "여론",
-              meta: sentiment ? `최근 ${sentiment.windowDays}일 · ${sentiment.messageCount.toLocaleString("ko-KR")}건` : undefined,
-              node: moodNode,
-            },
-          ]}
-        />
+          className="v2-a-mood"
+          meta={sentiment ? `최근 ${sentiment.windowDays}일 · ${sentiment.messageCount.toLocaleString("ko-KR")}건` : undefined}
+        >
+          {moodNode}
+        </Panel>
+
+        {/* ── 종목 셋 ── id 는 홈의 '급부상' 바로가기가 찾아온다. */}
+        <Panel title="급부상 종목" id="surging" className="v2-a-surge" meta={`최근 ${surgeDays}일 vs 평소`}>
+          <StockList items={surgeItems} empty="아직 급부상 신호가 뚜렷한 종목이 없습니다." />
+        </Panel>
+
+        <Panel title="오늘 움직인 종목" id="why" className="v2-a-move" meta={why ? `${fmtKoDate(why.date)} 기준` : undefined}>
+          {whyFailed ? (
+            <p className="v2-empty">이유를 불러오지 못했습니다.</p>
+          ) : (
+            <>
+              <StockList items={upItems} empty="오늘 집계가 끝나면 채워집니다. 저녁 실행 뒤에 그날 것이 붙습니다." />
+              {downItems.length > 0 && (
+                <>
+                  <h3 className="v2-sub-head">크게 내린 종목</h3>
+                  <StockList items={downItems} empty="" />
+                </>
+              )}
+            </>
+          )}
+        </Panel>
+
+        <Panel title="많이 언급된 종목" className="v2-a-talk" meta={`최근 ${KADERA_WINDOW_DAYS}일`}>
+          <StockList items={talkItems} empty="아직 리포트를 만들 종목이 없습니다." />
+        </Panel>
+
+        {/* ── 테마 · 화제어 · 일정 ── 셋 다 여덟 줄까지만 편다. 셋째 줄 높이를 첫 화면 안쪽에 묶는다(열 줄이면 540px).
+            테마 전체는 '전체 보기'가, 일정 나머지는 종목 화면이 잇는다. */}
+        <Panel
+          title="테마"
+          id="themes"
+          className="v2-a-themes"
+          meta={
+            THEME_LINKS ? (
+              <Link href="/theme" className="v2-more">
+                전체 보기
+                <Icon name="chevron_right" />
+              </Link>
+            ) : (
+              "최근 3일 vs 이전"
+            )
+          }
+        >
+          <ThemeRows themes={themes.slice(0, 8)} hrefOf={(t) => (THEME_LINKS ? themeHref(t) : null)} />
+        </Panel>
+
+        <Panel title="화제어" id="keywords" className="v2-a-kw" meta="최근 3일">
+          <KeywordRows keywords={keywords.slice(0, 8)} />
+        </Panel>
+
+        <Panel title="다가오는 일정" id="events" className="v2-a-events" meta="앞으로 5주">
+          {eventsFailed ? <p className="v2-empty">일정을 불러오지 못했습니다.</p> : <EventRows events={events} today={kaderaToday} limit={8} />}
+        </Panel>
       </div>
     </div>
   );
