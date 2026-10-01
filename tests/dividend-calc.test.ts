@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { expectedPays, goalBasis, monthlyOf, showsSepTax } from "../app/dividend/calc.ts";
+import { expectedPays, goalBasis, monthlyOf, rankMatches, showsSepTax } from "../app/dividend/calc.ts";
 
 const round = (v: number[]) => v.map((x) => Math.round(x));
 const sum = (v: number[]) => v.reduce((t, x) => t + x, 0);
@@ -140,5 +140,59 @@ describe("showsSepTax — '분리과세' 알약(/dividend 의 줄 · 종목 페�
     const card = { payoutPct: 45, growthPct: 10, year: 2025 };
     assert.equal(showsSepTax({ highDiv: card, taxable: 0, dps: 1_500 }), false);
     assert.equal(showsSepTax({ highDiv: card, taxable: null, dps: 1_500 }), true);
+  });
+});
+
+describe("rankMatches — 종목 검색 상자의 순위", () => {
+  const us = (code: string, name: string, alias: string) => ({ code, name, alias, cap: 0 });
+  // 미장 칸은 넷만 보인다(Search.tsx). 영문명에 o·t 가 든 종목이 티커보다 앞서면 티커 종목이 아예 안 보였다.
+  const usList = [
+    us("KO", "코카콜라", "Coca-Cola Co"),
+    us("ORCL", "오라클", "Oracle Corp"),
+    us("MSFT", "마이크로소프트", "Microsoft Corp"),
+    us("MO", "알트리아", "Altria Group Inc"),
+    us("MCD", "맥도날드", "McDonald's Corp"),
+    us("T", "AT&T", "AT&T Inc"),
+    us("TXN", "텍사스인스트루먼트", "Texas Instruments Inc"),
+    us("TGT", "타깃", "Target Corp"),
+    us("O", "리얼티인컴", "Realty Income Corp"),
+    us("OKE", "원오크", "ONEOK Inc"),
+    us("V", "비자", "Visa Inc"),
+    us("MOH", "몰리나", "Molina Healthcare Inc"),
+  ];
+  const codes = (q: string, limit = 4) => rankMatches(usList, q, limit).map((s) => s.code);
+
+  it("티커가 똑같으면 맨 앞 — O · T · MO · V", () => {
+    assert.equal(codes("O")[0], "O");
+    assert.equal(codes("o")[0], "O");
+    assert.equal(codes("T")[0], "T");
+    assert.equal(codes("MO")[0], "MO");
+    assert.equal(codes("v")[0], "V");
+  });
+
+  it("영문 한 글자로는 이름·영문명 '안'을 안 본다 — 티커·이름·영문명 앞부분만", () => {
+    // o 가 영문명 안에 든 코카콜라·마이크로소프트는 안 걸린다. 영문명이 O 로 시작하는 오라클·원오크는 티커 앞자리 다음.
+    assert.deepEqual(codes("O", 10), ["O", "ORCL", "OKE"]);
+  });
+
+  it("두 글자부터는 영문명 안도 찾는다 — 티커 앞자리 다음", () => {
+    assert.deepEqual(codes("MO", 10), ["MO", "MOH"]);
+    // 영문명 앞부분(코카콜라)이 먼저, 영문명 안(…corp · income)은 그 뒤에 이름 짧은 순.
+    assert.deepEqual(codes("co", 10), ["KO", "TGT", "ORCL", "MCD", "O", "MSFT"]);
+    assert.equal(codes("coca")[0], "KO");
+    assert.equal(codes("realty")[0], "O");
+  });
+
+  it("국내는 이름 앞부분이 먼저, 같은 등급은 큰 회사부터", () => {
+    const kr = [
+      { code: "009150", name: "삼성전기", alias: null, cap: 120_000 },
+      { code: "009155", name: "삼성전기우", alias: null, cap: 3_000 },
+      { code: "005930", name: "삼성전자", alias: null, cap: 16_000_000 },
+    ];
+    assert.deepEqual(rankMatches(kr, "삼성전").map((s) => s.code), ["005930", "009150", "009155"]);
+    assert.deepEqual(rankMatches(kr, "005930").map((s) => s.code), ["005930"]);
+    assert.deepEqual(rankMatches(kr, "").map((s) => s.code), []);
+    // 한글 한 글자는 이름 안도 본다 — "기" → 삼성전기·삼성전기우.
+    assert.deepEqual(rankMatches(kr, "기").map((s) => s.code), ["009150", "009155"]);
   });
 });
