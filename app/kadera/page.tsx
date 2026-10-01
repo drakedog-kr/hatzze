@@ -27,7 +27,7 @@ import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { AiMark, C, Icon, MONO } from "../ui";
 import { ExpandableList } from "./ExpandableList";
-import { Avatar, ChangeRate, DayBars, DeltaPp, Highlight, Pill, QuoteDate, RankBadge, RankDelta, SentimentTrendTile, Sparkline, highlightTerms, termsFor } from "./parts";
+import { Avatar, ChangeRate, DayBars, DeltaPp, Highlight, Pill, QuoteDate, RankBadge, RankDelta, SentimentTrendTile, Sparkline, ThemeVsUsualRows, highlightTerms, termsFor } from "./parts";
 import { fmtKoDate, stockHref } from "@/lib/stock-page";
 import { THEME_NAMES, themeHref } from "@/lib/theme-href";
 import { THEMES } from "@/lib/stock-themes";
@@ -42,7 +42,6 @@ import { PhoneFold } from "./PhoneFold";
 import { TrendingTabs } from "./TrendingTabs";
 import TimeAgo from "./TimeAgo";
 import { timeAgoInitial } from "./time-ago";
-import { themeTip } from "./theme-vs-usual";
 
 // 미리보기 이미지는 옆의 opengraph-image.tsx 가 그린다(ownImage). 자세한 건 app/seo.ts 주석 참고.
 export async function generateMetadata(): Promise<Metadata> {
@@ -749,29 +748,8 @@ export default async function KaderaPage() {
                     <span style={{ color: "var(--c-hot-ink)" }}>낙관 {sentiment.score}</span>
                   </div>
                 </div>
-                {sentiment.byTheme.length > 0 && (
-                  // 이름 칸은 62px 이고, 그보다 긴 테마 이름이 있을 때만 그 이름만큼 넓어진다(국장·미장 같은 규칙).
-                  // 칸 폭을 네 줄이 같이 쓰도록 격자로 둔다 — 줄마다 따로 넓히면 막대 시작점이 줄마다 어긋나
-                  // 눈이 세로로 훑질 못한다. 예전엔 미장만 96px 로 고정해 국장보다 막대가 34px 짧았다.
-                  <div style={{ display: "grid", gridTemplateColumns: "minmax(62px, max-content) minmax(0, 1fr)", columnGap: 10, rowGap: 6, paddingTop: 2 }}>
-                    <span style={{ gridColumn: "1 / -1", fontSize: "var(--fs-11)", fontWeight: 700, letterSpacing: ".04em", color: C.sub }}>인기 테마별 비관 ↔ 낙관</span>
-                    {/* 막대는 낙관도 그대로 나눈다. 평소와 견준 말은 툴팁이 한다(theme-vs-usual.ts). */}
-                    {sentiment.byTheme.map((t) => (
-                      <div
-                        key={t.name}
-                        className="hz-tip hz-tip-wide"
-                        data-tip={themeTip(t)}
-                        style={{ display: "grid", gridColumn: "1 / -1", gridTemplateColumns: "subgrid", alignItems: "center", minWidth: 0 }}
-                      >
-                        <span style={{ ...clip, fontSize: "var(--fs-11)", fontWeight: 700, color: C.label }}>{t.name}</span>
-                        <span style={{ minWidth: 0, display: "flex", height: 7, borderRadius: 999, overflow: "hidden" }}>
-                          <span style={{ width: `${100 - t.pos}%`, background: "var(--c-blue-3)" }} />
-                          <span style={{ width: `${t.pos}%`, background: "var(--c-warm-3)" }} />
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                {/* 인기 테마 — 평소 대비 막대(parts.tsx ThemeVsUsualRows · theme-vs-usual.ts 머리 주석). */}
+                <ThemeVsUsualRows themes={sentiment.byTheme} />
               </>
             )}
           </div>

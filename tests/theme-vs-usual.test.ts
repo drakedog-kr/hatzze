@@ -1,7 +1,7 @@
 /**
- * app/kadera/theme-vs-usual.ts — 카더라 히어로 인기 테마 막대의 툴팁(국장·미장).
+ * app/kadera/theme-vs-usual.ts — 카더라 히어로 인기 테마 줄(국장·미장).
  *
- * 막대는 낙관도 그대로 나누고, 평소와 견준 말은 툴팁 첫마디가 한다(2026-09-30). 국장 총평이
+ * 줄은 평소 대비 막대이고(2026-10-01), 툴팁 첫마디가 같은 판정을 말로 한다. 국장 총평이
  * 같은 테마를 옆에서 말하므로 판정 폭은 파이썬 usual_label(data-pipeline/tests/test_theme_usual.py)과
  * 같아야 한다. 돌리는 법: `npm test`.
  */
@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-import { THEME_USUAL_BAND, THEME_USUAL_Z, themeTip, usualShift } from "../app/kadera/theme-vs-usual.ts";
+import { LEAN_WORD, THEME_USUAL_BAND, THEME_USUAL_Z, themeLean, themeTip, usualShift } from "../app/kadera/theme-vs-usual.ts";
 
 const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
 
@@ -65,12 +65,42 @@ describe("usualShift", () => {
   });
 });
 
-describe("테마 막대", () => {
-  it("국장·미장 모두 낙관도(t.pos) 그대로 나눈다 — 평소 대비로 옮기면 낙관 과반 테마가 파랗게 보인다", () => {
+describe("themeLean — 평소 대비 막대", () => {
+  it("평소보다 낙관이 적으면 왼쪽, 길이는 판정과 같은 평활 전 비율로 잰다", () => {
+    // 126/185 = 68.1% → 평소 80 보다 11.9 낮다 → 반쪽(50) 의 11.9/20
+    assert.deepEqual(themeLean(AI_SEMI), { shift: "down", side: "left", width: 29.7 });
+  });
+
+  it("차이가 THEME_LEAN_FULL 을 넘으면 반쪽 끝까지만", () => {
+    // 반도체 9/11 같은 날 — 57:43 vs 평소 79
+    assert.deepEqual(themeLean({ pos: 57, usual: 79, positive: 57, negative: 43 }), { shift: "down", side: "left", width: 50 });
+  });
+
+  it("평소보다 많으면 오른쪽", () => {
+    assert.deepEqual(themeLean({ pos: 94, usual: 88, positive: 470, negative: 30 }), { shift: "up", side: "right", width: 15 });
+  });
+
+  it("글이 적어 평활값이 낮아도 평소와 같은 비율이면 막대가 없다 — 평활값으로 재면 왼쪽으로 뻗는다", () => {
+    // 16:4 = 80%. 평활값 70 으로 쟀다면 −10 이라 왼쪽 1/4 이 칠해졌다.
+    assert.deepEqual(themeLean({ pos: 70, usual: 80, positive: 16, negative: 4 }), { shift: "same", side: "right", width: 0 });
+  });
+
+  it("평소가 없으면 막대 없이 '기록 적음'", () => {
+    assert.equal(themeLean({ ...AI_SEMI, usual: null }), null);
+    assert.equal(LEAN_WORD.none, "기록 적음");
+  });
+
+  it("줄 끝의 말은 '비관'이라 하지 않는다 — 낙관 과반 테마가 평소보다 낮을 뿐인 날이 대부분이다", () => {
+    for (const w of Object.values(LEAN_WORD)) assert.ok(!w.includes("비관"), w);
+  });
+});
+
+describe("테마 줄", () => {
+  it("국장·미장 모두 같은 평소 대비 막대를 쓴다 — 낙관도로 나누는 두 색 막대로 되돌리지 않는다", () => {
     for (const p of ["app/kadera/page.tsx", "app/kadera/us/page.tsx"]) {
       const src = read(p);
-      assert.ok(src.includes('width: `${t.pos}%`, background: "var(--c-warm-3)"'), p);
-      assert.ok(src.includes('width: `${100 - t.pos}%`, background: "var(--c-blue-3)"'), p);
+      assert.ok(src.includes("<ThemeVsUsualRows themes={sentiment.byTheme} />"), p);
+      assert.ok(!src.includes("width: `${t.pos}%`"), p);
     }
   });
 });
