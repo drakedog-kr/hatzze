@@ -31,6 +31,12 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // Next.js 16.2.12 → 16.3.8 보안 업데이트(next/og 원격 코드 실행 등 critical 1 · high 3). 화면·쓰는 법은 그대로다. Patch.
+    version: "1.30.4",
+    date: "2026-10-01",
+    changes: ["사이트를 그리는 프레임워크(Next.js)의 보안 업데이트를 적용했습니다."],
+  },
+  {
     // 파이프라인 안정성 — 집계 표 갈아 끼우기, 미장 트렌딩 1,000행 상한, 하반기 일정, 시계 만회·알림. 쓰는 법은 그대로다. Patch.
     version: "1.30.3",
     date: "2026-10-01",
