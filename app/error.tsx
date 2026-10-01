@@ -20,8 +20,11 @@ import { C, Icon } from "./ui";
  *
  * 오류 경계는 클라이언트 컴포넌트여야 한다(Next 규칙). 그래서 `metadata` 를 못 내고,
  * 셸이 주소로 고른 제목이 위에 그대로 남는다.
+ *
+ * ⭐ '다시 시도'는 `unstable_retry()` 다(Next 16 · error.md). `reset()` 은 오류 상태만 지우고 **다시 받아 오지 않아서**,
+ *    Supabase 가 잠깐 흔들린 서버 오류에서는 같은 오류를 되그렸다 — 단추가 고장 난 것처럼 보였다(2026-10-01 점검 shell#6).
  */
-export default function ErrorPage({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function ErrorPage({ error, unstable_retry }: { error: Error & { digest?: string }; unstable_retry: () => void }) {
   useEffect(() => {
     // 서버 쪽 스택은 Vercel 로그에 digest 로 남는다. 브라우저 콘솔에도 한 줄 남겨 두면
     // 이용자가 제보할 때 digest 를 같이 보낼 수 있다.
@@ -43,7 +46,7 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
         </p>
       )}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 22 }}>
-        <button type="button" onClick={reset} className="hz-btn-soft" style={{ padding: "0 14px", cursor: "pointer" }}>
+        <button type="button" onClick={() => unstable_retry()} className="hz-btn-soft" style={{ padding: "0 14px", cursor: "pointer" }}>
           <Icon name="refresh" style={{ fontSize: "var(--fs-18)" }} />
           다시 시도
         </button>
