@@ -329,6 +329,8 @@
   }
   .hz-main {
     padding-top: calc(54px + var(--hz-main-pad));
+    /* #앵커·포커스로 스크롤할 때 고정 탑바(54) 밑에 숨지 않게 그만큼 띄운다(WCAG 2.4.11 · 2026-10-01 점검 shell#0). */
+    scroll-padding-top: calc(54px + var(--hz-main-pad));
   }
 
   /* 햄버거 메뉴. 백드롭·패널 모두 탑바(40)보다 아래에 둬서, 열려 있는 동안에도
@@ -354,6 +356,11 @@
     border: 1px solid var(--c-line);
     border-radius: var(--r-card);
     box-shadow: 0 12px 32px var(--c-shadow);
+    /* ⚠️ 높이를 화면 안에 묶고 안에서 굴린다. 예전엔 제한이 없어 가로로 돌린 폰(높이 375~430)이나 200% 확대에서
+       아래쪽 항목(설정·도구)을 스크롤로도 키보드로도 못 닿았다(2026-10-01 점검 a11y#2). 54 는 탑바, 16 은 아래 여유. */
+    max-height: calc(100dvh - 54px - 16px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   /* 첫 방문자 PC 권유 토스트. 색을 반전(ink 바탕 · bg 글자)해 카드가 아니라 '알림'으로
