@@ -2,6 +2,7 @@ import Link from "next/link";
 import { sentimentTone, shortDate } from "@/lib/format";
 
 import { C, MONO, R } from "../ui";
+import { LEAN_WORD, type ThemeRow, themeLean, themeTip } from "./theme-vs-usual";
 
 /**
  * 카더라 리포트가 공유하는 표시 프리미티브.
@@ -413,6 +414,66 @@ export function Sparkline({ data, width = 62, height = 26 }: { data: number[]; w
           }}
         />
       ))}
+    </div>
+  );
+}
+
+/**
+ * 히어로 센티먼트 칸의 인기 테마 줄 — **평소 대비 막대**(국장·미장 같은 판).
+ *
+ * 가운데 눈금이 그 테마의 평소다. 오늘 낙관이 평소보다 적으면 왼쪽(파랑), 많으면 오른쪽(주황)으로 뻗고,
+ * 평소와 다르다고 말할 만큼은 아니면 회색이다(--tx-flat). 왜 낙관도 그대로 나누지 않는지는 theme-vs-usual.ts 머리 주석.
+ * 숫자(낙관 %·평소 %)는 툴팁이 말한다 — 막대 길이는 평활 전 비율로 재서 툴팁 숫자의 뺄셈과 1~2점 갈릴 수 있어,
+ * 줄에는 숫자를 적지 않는다(themeTip 주석의 2026-09-30 지적과 같은 까닭).
+ *
+ * 이름 칸은 62px 이고, 그보다 긴 테마 이름이 있을 때만 그 이름만큼 넓어진다. 칸 폭을 네 줄이 같이 쓰도록
+ * 격자로 둔다 — 줄마다 따로 넓히면 가운데 눈금이 줄마다 어긋나 눈이 세로로 훑질 못한다.
+ */
+export function ThemeVsUsualRows({ themes }: { themes: (ThemeRow & { name: string })[] }) {
+  if (!themes.length) return null;
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(62px, max-content) minmax(0, 1fr) max-content", columnGap: 10, rowGap: 6, paddingTop: 2 }}>
+      <span style={{ gridColumn: "1 / -1", fontSize: "var(--fs-11)", fontWeight: 700, letterSpacing: ".04em", color: C.sub }}>인기 테마 · 평소 대비</span>
+      {themes.map((t) => {
+        const lean = themeLean(t);
+        // 색은 바로 위 큰 비관·낙관 막대, 테마 로테이션 줄의 오르내림과 같은 -2 단이다 — 한 화면에서 같은 말을 같은 색으로.
+        const fill = !lean ? null : lean.shift === "up" ? "var(--c-warm-2)" : lean.shift === "down" ? "var(--c-blue-2)" : "var(--tx-flat)";
+        const ink = lean?.shift === "up" ? "var(--c-hot-ink)" : lean?.shift === "down" ? "var(--c-cold-ink)" : C.sub;
+        return (
+          <div
+            key={t.name}
+            className="hz-tip hz-tip-wide"
+            data-tip={themeTip(t)}
+            style={{ display: "grid", gridColumn: "1 / -1", gridTemplateColumns: "subgrid", alignItems: "center", minWidth: 0 }}
+          >
+            <span style={{ ...clip, fontSize: "var(--fs-11)", fontWeight: 700, color: C.label }}>{t.name}</span>
+            <span style={{ position: "relative", minWidth: 0, height: 7 }}>
+              {/* 트랙·회색 채움·눈금은 잉크를 섞은 타일 전용 색(tx.css --tx-track · --tx-flat · --tx-tick) — --c-track 은 회색 타일 위에서 사라진다. */}
+              <span style={{ position: "absolute", inset: 0, borderRadius: 999, background: "var(--tx-track)", overflow: "hidden" }}>
+                {lean && fill && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      bottom: 0,
+                      ...(lean.side === "left"
+                        ? { right: "50%", borderRadius: "999px 0 0 999px" }
+                        : { left: "50%", borderRadius: "0 999px 999px 0" }),
+                      width: `${lean.width}%`,
+                      background: fill,
+                    }}
+                  />
+                )}
+              </span>
+              {/* 평소 눈금 — 데이터가 아니라 '자'라서 채움보다 가늘고 위아래로 조금 길다. --c-marker 는 트랙을 진하게 한 뒤로 트랙보다 옅어 틈처럼 보여 잉크 섞은 색이다. */}
+              <span style={{ position: "absolute", left: "50%", top: -3, bottom: -3, width: 2, borderRadius: 1, transform: "translateX(-50%)", background: "var(--tx-tick)" }} />
+            </span>
+            <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, color: ink, whiteSpace: "nowrap" }}>
+              {lean ? LEAN_WORD[lean.shift] : LEAN_WORD.none}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }

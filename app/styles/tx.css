@@ -17,6 +17,14 @@
   --tx-tile: #f3f6fa;
   --tx-btn: rgba(14, 33, 54, 0.05);
   --tx-btn-hover: rgba(14, 33, 54, 0.09);
+  /* 회색 타일 위 테마 줄(parts.tsx ThemeVsUsualRows)의 빈 트랙 · '평소 수준' 채움 · 평소 눈금.
+     --c-track(#eef3f9)은 흰 카드 기준이라 타일(#f3f6fa) 위에서는 사라지고, --c-bar 는 연파랑이라 '덜 낙관'으로
+     읽혔다(2026-10-01 폰·다크 캡처). 테마 로테이션 줄을 올렸을 때 트랙이 사라진 일(kadera.css .hz-trow:hover
+     .hz-bar)과 같은 처방 — **잉크를 섞어** 어느 바탕에서든 한 단 어둡게(다크에선 밝게) 둔다. 잉크가 다크에서
+     밝은 색으로 바뀌므로 다크 블록을 따로 둘 필요가 없다. 7% 로는 "배경과 구분이 잘 안 간다"는 말을 들어 올렸다. */
+  --tx-track: color-mix(in srgb, var(--c-ink) 11%, transparent);
+  --tx-flat: color-mix(in srgb, var(--c-ink) 32%, transparent);
+  --tx-tick: color-mix(in srgb, var(--c-ink) 58%, transparent);
   /* 2026-09-04 실측으로 다시 맞춘 값이다. 토스 를 훑어 보니 카드 모서리는 **16px 이
      18곳으로 다수**고 20px 은 7곳뿐이었다(컨트롤은 10~12, 알약 999). 처음엔 20/16 으로
      뒀는데 그러면 카드와 그 안 타일의 차이가 4밖에 안 나 층이 약하고, 카드 자체도 토스
@@ -453,8 +461,8 @@
 /* 센티먼트 추이(2026-09-27, 카더라 두 히어로) — 현황 타일(.hz-tx-stat)과 같은 껍데기에 줄 간격만 넓힌다.
    옛 2×2 현황 자리를 통째로 쓴다(parts.tsx 의 SentimentTrendTile). */
 .hz-tx-trend { gap: 6px; }
-/* 제목은 현황 라벨(11.5/600)이 아니라 바로 위 센티먼트 타일의 소제목 '인기 테마별 비관 ↔ 낙관'
-   (page.tsx 인라인 11/700/.04em)과 같다 — 현황 칸이 다 빠져 오른쪽 칸의 작은 제목이 한 벌이다.
+/* 제목은 현황 라벨(11.5/600)이 아니라 바로 위 센티먼트 타일의 소제목 '인기 테마 · 평소 대비'
+   (parts.tsx ThemeVsUsualRows 인라인 11/700/.04em)과 같다 — 현황 칸이 다 빠져 오른쪽 칸의 작은 제목이 한 벌이다.
    ⚠️ 그쪽은 인라인 스타일이라 한쪽만 고치면 다시 갈린다. 선택자가 한 단 세서 아래 .hz-tx-stat-l 을 이긴다. */
 .hz-tx-trend > .hz-tx-stat-l { font-size: var(--fs-11); font-weight: 700; letter-spacing: .04em; }
 .hz-tx-stat-l {
