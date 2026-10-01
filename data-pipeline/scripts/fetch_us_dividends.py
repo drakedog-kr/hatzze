@@ -14,6 +14,7 @@
            stockanalysis 에 없는 종목은 SEC 값으로 넘어간다.
   시세   핀허브 `quote`(FINNHUB_API_KEY). fetch_kr_preview.py 와 같은 창(분당 60회).
   환율   ECB 참조환율(common/fx.py, 전 영업일). 화면이 달러를 원으로 옮길 때 쓴다. 안 오면 FRED.
+  ⚠️ 시세·환율을 못 받은 날은 표에 있던 바로 전 값을 물려받는다(common/carry_quote.py) — None 으로 쓰면 어제 값까지 지워진다.
 
 ## ⚠️⚠️ XBRL 배당 태그는 회사마다 다르게 쓴다 — 2026-09-12 에 12곳을 열어 본 결과
 
@@ -80,6 +81,7 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from common.carry_quote import carry_close, fx_or_last, load_last_quotes  # noqa: E402
 from common.config import FINNHUB_API_KEY  # noqa: E402
 from common.fx import usdkrw  # noqa: E402
 from common.stockanalysis import PageChanged, dividend_page, trailing  # noqa: E402
@@ -499,8 +501,13 @@ def main() -> None:
         r.setdefault("growth_years", None)
 
     # 시세. 배당이 있는 종목만 부른다 — 없는 종목은 수익률이 없어 시세가 필요 없다.
-    fx = usdkrw()
-    print(f"[환율] 원/달러 {fx[0]:,.2f} ({fx[1]})" if fx else "[환율] 환율을 못 받았습니다 — 화면이 원화 환산을 접습니다")
+    # 못 받은 시세·환율은 표에 있던 바로 전 값을 물려받는다(common/carry_quote.py 머리말).
+    last = load_last_quotes(db, TABLE, "ticker")
+    fx, fx_carried = fx_or_last(usdkrw(), last)
+    if fx_carried:
+        print(f"[환율] 오늘 환율을 못 받아 표에 있던 {fx[1]} 값 {fx[0]:,.2f}원을 씁니다")
+    else:
+        print(f"[환율] 원/달러 {fx[0]:,.2f} ({fx[1]})" if fx else "[환율] 환율을 못 받았고 표에도 없습니다 — 화면이 원화 환산을 접습니다")
     paying = [r for r in rows if r["ttm_dps"] > 0]
     if args.dry_run and not args.only:
         print(f"[핀허브] --dry-run 이라 시세 {len(paying)}종목은 건너뜁니다")
@@ -516,14 +523,19 @@ def main() -> None:
         if q:
             r["close"], r["price_date"] = q
             r["ttm_yield_pct"] = round(r["ttm_dps"] / q[0] * 100, 3) if q[0] > 0 else None
+    carried: list[str] = []
     for r in rows:
         r.setdefault("close", None)
         r.setdefault("price_date", None)
         r.setdefault("ttm_yield_pct", None)
+        if r["ttm_dps"] > 0 and carry_close(r, last.get(r["ticker"])):
+            carried.append(r["ticker"])
         r["usdkrw"] = fx[0] if fx else None
         r["usdkrw_date"] = fx[1] if fx else None
+    if carried:
+        print(f"[핀허브] 시세를 못 받아 어제 종가를 물려받은 종목 {len(carried)} {carried[:8]}")
 
-    priced = [r for r in paying if r.get("close")]
+    priced = [r for r in paying if r.get("close") and r["ticker"] not in carried]
     print(f"[요약] 배당 있음 {len(paying)}종목 · 시세 받음 {len(priced)} · 지급 달 있음 {sum(1 for r in rows if r['pay_months'])} · 방법: "
           + " · ".join(f"{m} {sum(1 for r in rows if r['ttm_method'] == m)}" for m in ("sa", "quarters", "monthly", "annualized", "events", "fy", "none")))
     for r in sorted(priced, key=lambda r: -(r["ttm_yield_pct"] or 0))[:6]:
