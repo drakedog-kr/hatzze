@@ -105,32 +105,6 @@ export function Badges({ s }: { s: StockLite }) {
   );
 }
 
-/* ── 검색 ─────────────────────────────────────────────────────────── */
-const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
-
-/**
- * 이름 앞부분 일치 → 이름 포함 → 코드 앞부분 순. 같은 등급 안에서는 **큰 회사**부터, 그다음 이름이
- * 짧은 것 — "삼성전" 은 삼성전자(1,600조)가 삼성전기우보다, "KB" 는 KB금융이 KBG 보다 앞에 선다.
- * (배당금 순으로 세웠더니 삼성전기우가, 이름 길이 순으로 세웠더니 KBG 가 맨 위였다.)
- */
-export function rankMatches(stocks: StockLite[], query: string, limit = 8): StockLite[] {
-  const q = norm(query);
-  if (!q) return [];
-  const starts: StockLite[] = [];
-  const includes: StockLite[] = [];
-  const codes: StockLite[] = [];
-  for (const s of stocks) {
-    const name = norm(s.name);
-    const alias = s.alias ? norm(s.alias) : "";
-    if (name.startsWith(q)) starts.push(s);
-    else if (name.includes(q) || (alias && alias.includes(q))) includes.push(s);
-    else if (s.code.startsWith(q.toUpperCase())) codes.push(s);
-  }
-  const closer = (a: StockLite, b: StockLite) => b.cap - a.cap || a.name.length - b.name.length || a.name.localeCompare(b.name, "ko");
-  const bigger = (a: StockLite, b: StockLite) => b.cap - a.cap || a.name.localeCompare(b.name, "ko");
-  return [...starts.sort(closer), ...includes.sort(bigger), ...codes.sort(bigger)].slice(0, limit);
-}
-
 /* ── 셈 ───────────────────────────────────────────────────────────── */
 export type Line = {
   stock: StockLite;

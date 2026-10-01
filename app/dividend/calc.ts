@@ -100,3 +100,49 @@ export function showsSepTax(s: { highDiv: object | null; taxable: number | null;
   const fullyTaxFree = s.taxable != null && s.dps > 0 && s.taxable <= 0;
   return s.highDiv != null && !fullyTaxFree;
 }
+
+/* ── 검색 ─────────────────────────────────────────────────────────── */
+const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
+
+/**
+ * 종목 검색 상자(Search.tsx)의 순위. 등급표는 MDD·⌘K 검색과 같은 줄 세움이다(lib/search-rank.ts 머리말).
+ *
+ *   0    코드·티커가 똑같다      "O" → 리얼티인컴, "005930" → 삼성전자
+ *   1    이름 앞부분
+ *   2    코드·티커 앞부분
+ *   2.5  영문명 앞부분            "coca" → 코카콜라
+ *   3    이름 안
+ *   3.5  영문명 안
+ *   ⚠️ 영문자·숫자 **한 글자**면 '안' 매치(3·3.5)를 안 본다 — 그건 티커를 치는 중이다. 한글 한 글자("배")는 이름 안도 본다.
+ *
+ * 같은 등급 안에서는 **큰 회사**부터, 그다음 이름이 짧은 것 — "삼성전" 은 삼성전자(1,600조)가 삼성전기우보다, "KB" 는
+ * KB금융이 KBG 보다 앞에 선다(배당금 순으로 세웠더니 삼성전기우가, 이름 길이 순으로 세웠더니 KBG 가 맨 위였다).
+ *
+ * ⚠️ 예전엔 이름 앞 → 이름·영문명 안 → 코드 앞 순이라 서학개미가 가장 흔히 치는 **짧은 티커**가 묻혔다. "O" 를 치면 영문명에
+ *    o 가 든 미국 종목 수백 개가 리얼티인컴(O)보다 앞섰고, 미장 칸은 넷만 보여 아예 안 보였다 — T(AT&T)·MO(알트리아)·V(비자)도
+ *    같았다(2026-10-01 점검 dividend#8). 영문명 '안' 매치를 한 글자에 걸면 거의 모든 미국 종목이 걸린다.
+ */
+export function rankMatches<T extends Pick<StockLite, "code" | "name" | "alias" | "cap">>(stocks: T[], query: string, limit = 8): T[] {
+  const q = norm(query);
+  if (!q) return [];
+  const qCode = q.toUpperCase();
+  const tickerish = /^[a-z0-9]$/.test(q);
+  const graded: { s: T; g: number }[] = [];
+  for (const s of stocks) {
+    const name = norm(s.name);
+    const alias = s.alias ? norm(s.alias) : "";
+    const code = s.code.toUpperCase();
+    let g: number;
+    if (code === qCode || name === q) g = 0;
+    else if (name.startsWith(q)) g = 1;
+    else if (code.startsWith(qCode)) g = 2;
+    else if (alias.startsWith(q)) g = 2.5;
+    else if (tickerish) continue;
+    else if (name.includes(q)) g = 3;
+    else if (alias.includes(q)) g = 3.5;
+    else continue;
+    graded.push({ s, g });
+  }
+  graded.sort((a, b) => a.g - b.g || b.s.cap - a.s.cap || a.s.name.length - b.s.name.length || a.s.name.localeCompare(b.s.name, "ko"));
+  return graded.slice(0, limit).map((x) => x.s);
+}

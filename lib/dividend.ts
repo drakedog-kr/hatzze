@@ -336,15 +336,25 @@ export function toEtfStock(r: EtfRow): DividendStock {
 /** 조회 실패를 호출부에 알리는 통로. 라벨은 화면에 그대로 적힌다(DividendData.failedSources). */
 type ReportFailure = (label: string, e: unknown) => void;
 
-async function loadEtf(report: ReportFailure): Promise<DividendStock[]> {
+async function loadEtf(report: ReportFailure): Promise<{ stocks: DividendStock[]; fx: UsdKrw | null }> {
   // 국내 953 + 미국 33(2026-09-16)이라 한 번에 물으면 1,000행 캡에 걸린다 — 쪽으로 받는다.
   const rows = await fetchAllRows<EtfRow>("code", () => getSupabaseServer().from("etf_dividend").select("*"), {
     onError: (e) => report("ETF 분배 기록", e),
   });
-  return rows.map(toEtfStock);
+  return { stocks: rows.map(toEtfStock), fx: latestFx(rows) };
 }
 
 export type UsdKrw = { rate: number; date: string | null };
+
+/** 행들에 실린 원/달러 가운데 날짜가 가장 늦은 것. 없으면 null. */
+export function latestFx(rows: { usdkrw: number | null; usdkrw_date: string | null }[]): UsdKrw | null {
+  let best: UsdKrw | null = null;
+  for (const r of rows) {
+    if (r.usdkrw == null || !(Number(r.usdkrw) > 0)) continue;
+    if (!best || (r.usdkrw_date ?? "") > (best.date ?? "")) best = { rate: Number(r.usdkrw), date: r.usdkrw_date };
+  }
+  return best;
+}
 
 /** 표가 없거나 실패하면 빈 목록 — 미국이 빠져도 국내 계산기는 그대로 뜬다. */
 async function loadUs(report: ReportFailure): Promise<{ stocks: DividendStock[]; fx: UsdKrw | null; priceDate: string | null }> {
@@ -352,13 +362,8 @@ async function loadUs(report: ReportFailure): Promise<{ stocks: DividendStock[];
     const { data, error } = await getSupabaseServer().from("us_dividend_stock").select(US_COLUMNS).order("ticker").limit(1000);
     if (error) throw error;
     const rows = (data ?? []) as unknown as UsRow[];
-    const fxRow = rows.find((r) => r.usdkrw != null);
     const priceDate = rows.reduce<string | null>((m, r) => (r.price_date && r.price_date > (m ?? "") ? r.price_date : m), null);
-    return {
-      stocks: rows.map(toUsStock),
-      fx: fxRow?.usdkrw != null ? { rate: Number(fxRow.usdkrw), date: fxRow.usdkrw_date } : null,
-      priceDate,
-    };
+    return { stocks: rows.map(toUsStock), fx: latestFx(rows), priceDate };
   } catch (e) {
     report("미국 배당 기록", e);
     return { stocks: [], fx: null, priceDate: null };
@@ -451,7 +456,8 @@ export async function getDividendData(): Promise<DividendData | null> {
   // ⚠️ 코스피·코스닥이 늘 같은 날짜로 올라온다는 전제다 — fetch_krx_stocks.py 가 한 시장이라도 비면 둘 다 안 올린다.
   //    한 시장만 올라가면 이 필터가 다른 시장 전부를 상장폐지로 본다.
   const kr = priceDate ? all.filter((s) => s.priceDate === priceDate) : all;
-  const [us, etf, highDiv, payout] = await Promise.all([loadUs(report), loadEtf(report), loadHighDiv(report), loadPayout(report)]);
+  const [us, etfLoaded, highDiv, payout] = await Promise.all([loadUs(report), loadEtf(report), loadHighDiv(report), loadPayout(report)]);
+  const etf = etfLoaded.stocks;
   const krByCode = new Map(kr.map((s) => [s.code, s]));
   for (const s of kr) {
     s.highDiv = highDiv.get(s.code) ?? null;
@@ -465,15 +471,21 @@ export async function getDividendData(): Promise<DividendData | null> {
     }
   }
   // 환율이 없으면 미국 종목을 원화로 못 옮긴다 — 그날은 미국을 통째로 뺀다(반쪽 계산보다 낫다).
-  const usStocks = us.fx ? us.stocks : [];
-  const etfs = etf.filter((s) => s.currency === "KRW" || us.fx);
+  // 미국 표에 환율이 없으면 ETF 표의 환율로 물러선다(두 스크립트가 따로 받는다). 파이프라인도 못 받은 날엔 표의 바로 전
+  // 값을 물려받는다(data-pipeline/common/carry_quote.py). 그래도 없으면 '환율'을 실패로 적는다 — 조회는 성공이라 그냥
+  // 두면 "오늘은 미국 종목이 없네"로 읽히고, 칩 자리엔 '다 담았습니다'가 섰다(dividend#6).
+  const fx = us.fx ?? etfLoaded.fx;
+  const wantsFx = us.stocks.length > 0 || etf.some((s) => s.currency === "USD");
+  if (!fx && wantsFx) report("환율(미국 종목)", new Error("usdkrw 가 미국 배당·ETF 표 어디에도 없다"));
+  const usStocks = fx ? us.stocks : [];
+  const etfs = etf.filter((s) => s.currency === "KRW" || fx);
   return {
     stocks: [...kr, ...usStocks, ...etfs],
     baskets: pickBaskets(kr, usStocks, etfs, highDiv.size > 0),
     computedFor: loaded.computedFor,
     priceDate,
-    usPriceDate: us.fx ? us.priceDate : null,
-    usdkrw: us.fx,
+    usPriceDate: fx ? us.priceDate : null,
+    usdkrw: fx,
     failedSources,
   };
 }

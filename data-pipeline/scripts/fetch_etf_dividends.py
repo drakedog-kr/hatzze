@@ -5,6 +5,8 @@
   국내 시세    KRX Open API `etp/etf_bydd_trd` — 최신 가용 거래일 하루치(1,171종목)에서 코드로 찾는다
   미국 시세    핀허브 `quote`
   환율         ECB 참조환율(common/fx.py) · 안 오면 FRED
+  ⚠️ 시세(국내·미국)·환율을 못 받은 날은 표에 있던 바로 전 값을 물려받는다(common/carry_quote.py) — None 으로 쓰면
+     어제 값까지 지워진다.
 
 '1년에 얼마'는 미국·국내 다 같다 — **지난 365일 안에 지급된 건의 합.** 지급 달은 그 건들의 달이라 달력에 든다.
 
@@ -56,6 +58,7 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from common.carry_quote import carry_close, fx_or_last, load_last_quotes  # noqa: E402
 from common.config import FINNHUB_API_KEY  # noqa: E402
 from common.fx import usdkrw  # noqa: E402
 from common.krx_client import krx_get  # noqa: E402
@@ -312,10 +315,11 @@ def main() -> None:
 
     latest = krx_latest()
     if latest is None:
-        print("[ETF] KRX 시세를 못 받았습니다 — 국내 ETF 는 시세 없이 넣습니다")
+        print("[ETF] KRX 시세를 못 받았습니다 — 국내 ETF 는 표에 있던 바로 전 종가를 물려받습니다")
     kr_hist = seibro_history(today)
     # 이번에 받은 과표가 먼저고, 못 받은 지급 건은 저장된 값으로 채운다(stored_taxable 주석). 읽기만 하므로 --dry-run 에서도 부른다.
     db = get_client()
+    last = load_last_quotes(db, TABLE, "code")
     fresh = tiger_taxable(today) if kr_hist is not None else {}
     kept = stored_taxable(db) if kr_hist is not None else {}
     taxable = {**kept, **fresh}
@@ -361,7 +365,9 @@ def main() -> None:
         for r in sorted(partial, key=lambda r: r["taxable_dps"] / r["ttm_dps"])[:6]:
             print(f"  {r['name_ko']:34s} 분배금 {r['ttm_dps']:>8,.0f} 과표 {r['taxable_dps']:>8,.0f} ({r['taxable_dps'] / r['ttm_dps'] * 100:.0f}%)")
 
-    fx = usdkrw()
+    fx, fx_carried = fx_or_last(usdkrw(), last)
+    if fx_carried:
+        print(f"[환율] 오늘 환율을 못 받아 표에 있던 {fx[1]} 값 {fx[0]:,.2f}원을 씁니다")
     key = FINNHUB_API_KEY or ""
     sa_fail = 0
     # 페이지를 못 받은 ETF(타임아웃·429·5xx·구조 변경). 아래 정리 단계가 이들의 저장된 행은 둔다.
@@ -401,6 +407,9 @@ def main() -> None:
             "ttm_yield_pct": round(ttm / q[0] * 100, 3) if q and q[0] > 0 and ttm else None,
             "computed_for": today.isoformat(),
         })
+    carried = [r["code"] for r in rows if carry_close(r, last.get(r["code"]))]
+    if carried:
+        print(f"[ETF] 시세를 못 받아 어제 종가를 물려받은 ETF {len(carried)} {carried[:8]}{' …' if len(carried) > 8 else ''}")
     for r in rows:
         r["usdkrw"] = fx[0] if fx else None
         r["usdkrw_date"] = fx[1] if fx else None
