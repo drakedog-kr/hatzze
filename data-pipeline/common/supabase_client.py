@@ -1,4 +1,5 @@
 import time
+from datetime import datetime, timezone
 
 import httpx  # supabase(postgrest)가 쓰는 HTTP 클라이언트. 전송 예외 타입만 빌려 온다.
 from supabase import Client, create_client
@@ -48,6 +49,49 @@ def execute_with_retry(q):
                 flush=True,
             )
             time.sleep(delay)
+
+
+def replace_rows(
+    db, table: str, rows: list[dict], on_conflict: str, stamp_col: str = "created_at", where: dict | None = None
+) -> None:
+    """표를 이번 결과로 **갈아 끼운다** — 도중에 죽어도 표가 반쪽이 되거나 비지 않게.
+
+    태그 표(extract_telegram_stocks · extract_telegram_us_stocks)와 집계 표(종목·테마 일별, 센티먼트·화제어,
+    이슈 키워드)가 쓴다.
+
+    예전엔 전량 delete 뒤 500행씩 insert 했다. 그중 한 요청만 끊겨도(execute_with_retry 주석의 GOAWAY) 앞 배치만 든
+    표가 남았고, delete 와 insert 사이 몇 초 동안 들어온 페이지 요청은 빈 표를 읽었다. 다음 스텝이 그 표를 '전량
+    재계산'의 재료로 쓰면 틀린 값이 퍼졌다(태그 표 → calculate_stock_daily). 실패 알림 문구('그 시점의 값이 화면에
+    그대로 남아 있습니다')가 가정하는 것과 반대다(2026-10-01 점검 pipeline-telegram#0 · db#2).
+
+    그래서 순서를 뒤집는다.
+      1) 유일 키(on_conflict)로 upsert 한다. 행마다 이번 실행 시각을 stamp_col 에 찍는다.
+      2) 전부 들어간 뒤에만 그 시각보다 옛 행 — 이번 결과에 없는 행 — 을 지운다.
+    도중에 죽으면 표엔 지난 결과에 이번에 쓴 만큼이 덮여 있다. 지운 건 없다.
+    where 를 주면 2) 를 그 범위(열 = 값)에서만 한다 — 기준일·창 하나만 갈아 끼우고 다른 날 행은 두는 표(미장 종목별 톤).
+
+    upsert 는 같은 키를 같은 값으로 덮을 뿐이라 **다시 던져도 행이 늘지 않는다.** 그래서 끊긴 요청을
+    execute_with_retry 로 다시 던진다 — 그 함수가 쓰기를 막는 까닭(insert 가 두 번 들어감)이 여기엔 없다.
+    옛 행 지우기도 같은 조건을 한 번 더 던질 뿐이다.
+
+    ⚠️ stamp_col 은 **직접 실어야 한다.** 열 기본값(now())은 INSERT 에만 붙어서, 이미 있던 키를 덮는 upsert 는 옛
+       시각을 그대로 둔다. 그러면 2) 가 살아 있는 행까지 지운다.
+    ⚠️ on_conflict 는 표의 유일 제약과 **열이 똑같아야** 한다(PostgREST 42P10). 행에는 표의 열을 빠짐없이 싣는다 —
+       payload 에 없는 열은 upsert 가 옛 값을 그대로 둔다(insert 였다면 기본값이 됐다).
+    ⚠️ rows 가 비면 아무것도 안 한다. 빈 결과로 갈아 끼우면 표가 통째로 빈다 — 앞 단계가 죽었을 때가 대부분이다.
+    """
+    if not rows:
+        print(f"[안내] {table} — 이번 결과가 비어 표를 그대로 둡니다")
+        return
+    stamp = datetime.now(timezone.utc).isoformat()
+    # 한 요청이 크면 statement timeout 에 걸린다. 다른 쓰기와 같은 500행 단위.
+    for i in range(0, len(rows), 500):
+        batch = [{**r, stamp_col: stamp} for r in rows[i : i + 500]]
+        execute_with_retry(db.table(table).upsert(batch, on_conflict=on_conflict))
+    q = db.table(table).delete().lt(stamp_col, stamp)
+    for col, value in (where or {}).items():
+        q = q.eq(col, value)
+    execute_with_retry(q)
 
 
 def get_client() -> Client:

@@ -31,7 +31,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.supabase_client import get_client, load_all  # noqa: E402
+from common.supabase_client import get_client, load_all, replace_rows  # noqa: E402
 from config.us_stock_themes import US_THEMES, sanity_check  # noqa: E402
 
 
@@ -130,12 +130,8 @@ def main() -> None:
         print("\n--dry-run: DB에 저장하지 않았습니다.")
         return
 
-    db.table("telegram_us_theme_daily").delete().neq(
-        "id", "00000000-0000-0000-0000-000000000000"
-    ).execute()
-    # 500행씩 — 한 statement 가 statement_timeout 을 넘지 않게(다른 쓰기와 같은 규칙).
-    for i in range(0, len(rows), 500):
-        db.table("telegram_us_theme_daily").insert(rows[i : i + 500]).execute()
+    # 전량 재계산이지만 delete → insert 가 아니라 갈아 끼우기다 — 도중에 죽어도 표가 비지 않게(replace_rows 주석).
+    replace_rows(db, "telegram_us_theme_daily", rows, "date,theme")
     print(f"\n[Supabase] telegram_us_theme_daily {len(rows)}행 저장 완료")
 
 

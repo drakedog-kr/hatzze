@@ -22,7 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.supabase_client import get_client  # noqa: E402
+from common.supabase_client import get_client, replace_rows  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 from common.supabase_client import load_all, load_all_keyset  # noqa: E402
 from config.stock_extraction import is_house  # noqa: E402
@@ -121,11 +121,8 @@ def main() -> None:
         print("\n--dry-run: DB에 저장하지 않았습니다.")
         return
 
-    db.table("telegram_stock_daily").delete().neq(
-        "id", "00000000-0000-0000-0000-000000000000"
-    ).execute()
-    for i in range(0, len(rows), 500):
-        db.table("telegram_stock_daily").insert(rows[i : i + 500]).execute()
+    # 전량 재계산이지만 delete → insert 가 아니라 갈아 끼우기다 — 도중에 죽어도 표가 비지 않게(replace_rows 주석).
+    replace_rows(db, "telegram_stock_daily", rows, "date,stock_code")
     print(f"\n[Supabase] telegram_stock_daily {len(rows)}행 저장 완료")
 
 
