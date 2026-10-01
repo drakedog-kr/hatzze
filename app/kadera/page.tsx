@@ -27,7 +27,7 @@ import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { AiMark, C, Icon, MONO } from "../ui";
 import { ExpandableList } from "./ExpandableList";
-import { Avatar, ChangeRate, DayBars, DeltaPp, Highlight, Pill, QuoteDate, RankBadge, RankDelta, SentimentTrendTile, Sparkline, ThemeVsUsualRows, highlightTerms, termsFor } from "./parts";
+import { Avatar, ChangeRate, DayBars, DeltaPp, Highlight, QuoteDate, RankBadge, RankDelta, SentimentTrendTile, Sparkline, ThemeVsUsualRows, highlightTerms, termsFor } from "./parts";
 import { fmtKoDate, stockHref } from "@/lib/stock-page";
 import { THEME_NAMES, themeHref } from "@/lib/theme-href";
 import { THEMES } from "@/lib/stock-themes";
@@ -38,6 +38,7 @@ import { StockLogo } from "../StockLogo";
 import { CHANNEL_FORM } from "../brand";
 import { SectionHead } from "./SectionHead";
 import { SectionIntro } from "../SectionIntro";
+import { SurgeTable } from "./SurgeTable";
 import { PhoneFold } from "./PhoneFold";
 import { TrendingTabs } from "./TrendingTabs";
 import TimeAgo from "./TimeAgo";
@@ -764,7 +765,11 @@ export default async function KaderaPage() {
 
       <SectionIntro n={1} title="최근 뜨는 것" />
 
-      {/* ── 급부상 종목: 시트 안 3×2 셀 ─────────────────────────────── */}
+      {/* ── 급부상 종목: 줄 하나에 종목 하나인 표(v2, SurgeTable 머리말) ────────────
+          예전 3×2 셀 격자는 여섯 종목을 견주려면 눈이 Z 자로 오갔다. 표는 배수·언급·문장이
+          각자 한 세로줄에 서서 위에서 아래로 훑는다. 미장 짝(app/kadera/us/page.tsx)과 같은 표다.
+          ⭐ 한 줄 요약이 아직 없으면 줄을 지우지 않고 그렇다고 적는다(2026-09-05 지적 "왜 없어졌어").
+             집계와 문장 사이가 20~40분 뜨고, 급부상은 명단이 매일 갈려 어제 문장을 못 물려받는다. */}
       {/* id 는 히어로 바로가기 칩의 목적지다(아래 테마·화제어도 같다). */}
       <section className="hz-sheet" id="surging">
         <SectionHead level={3}
@@ -778,130 +783,32 @@ export default async function KaderaPage() {
             아직 급부상 신호가 뚜렷한 종목이 없습니다. 데이터가 쌓일수록 또렷해집니다.
           </p>
         ) : (
-          <>
-            {/* 폰에서만 셋까지 보이고 '더 보기'로 편다(PhoneFold 머리말). 넓은 화면은 3×2 그대로다. */}
-            <PhoneFold total={surging.length} name="kadera_surging">
-            <div className="hz-panelgrid hz-panelgrid-3">
-              {surging.map((s, i) => {
-                const values = s.series.slice(-7);
-                const dates = s.seriesDates.slice(-7);
-                return (
-                  <div key={s.code} className="hz-panel-pad">
-                    {/* baseline 정렬이어야 한다. flex-start 는 **상자 윗변**을 맞추는데,
-                        이 줄엔 14px 종목명과 11px 코드·11.5px 표본이 섞여 있어 상자를 맞추면
-                        정작 눈에 보이는 글자 밑선이 어긋난다(실측 3.8px). 순위 배지는 판이라
-                        글자 밑선이 아니라 판의 광학 중심으로 읽히므로 같이 내려가도 된다. */}
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
-                      <RankBadge n={i + 1} />
-                      {/* minWidth:0 — flex 항목의 기본 min-width:auto 가 살아 있으면 이름이
-                          줄지 않아 말줄임이 안 걸리고 셀 밖으로 넘친다(820px 에서 실측 3px).
-                          줄어도 되는 건 이름뿐이라 여기만 풀어 준다. */}
-                      {/* ⚠️ 말줄임은 **링크가** 물어야 한다. flex 항목이 링크로 바뀌었으므로
-                          clip(nowrap·overflow·ellipsis)과 minWidth:0 이 여기 붙어야 예전과
-                          똑같이 줄어든다. 안쪽 strong 에 두면 자르는 상자가 없어 안 걸린다.
-                          ⚠️⚠️ **글자 크기도 링크가 물어야 한다.** 안쪽에만 두면 바깥 상자가
-                          자기 줄 높이를 **물려받은 글꼴**로 잡아 3px 높아진다(14 → 21px 이던
-                          줄이 24px). 실측으로 아래 카드가 2~4px 밀렸다. 크기·자간을 링크에
-                          두고 굵기만 strong 이 물려받게 하면 예전과 픽셀까지 같아진다
-                          (strong 은 Tailwind preflight 가 `bolder` 로 두므로 inherit 을 적어야
-                          800 이 된다. 안 적으면 900 이 된다). */}
-                      <Link
-                        href={stockHref(s.code)}
-                        className="hz-stock-link"
-                        style={{ ...clip, minWidth: 0, fontSize: "var(--fs-14)", fontWeight: 800, letterSpacing: "-.01em" }}
-                      >
-                        <strong style={{ fontWeight: "inherit" }}>{s.name}</strong>
-                      </Link>
-                      <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", color: C.sub2, flexShrink: 0 }}>{s.code}</span>
-                      <span style={{ flex: 1 }} />
-                      {/* '몇 개 채널'과 '며칠에 몇 회'는 둘 다 이 배수의 표본 크기를 말한다 —
-                          한 덩어리로 오른쪽 위에 모아 두면 아래 그래픽이 배수와 막대만 남는다.
-                          ⚠️ '평소 N회'는 여기 없다. 배수는 언급 **횟수**가 아니라 그날 전체
-                          대화에서 차지한 **몫(share)** 을 평활해 낸 값이라(getSurgingStocks),
-                          횟수 둘을 나란히 두면 그 비가 배수와 안 맞아 눈금이 둘 생긴다. */}
-                      <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
-                        {/* channelCount 가 null 이면 못 센 것이다(조회 실패). 그 줄만 뺀다 —
-                            0 을 찍으면 "이 종목을 다룬 채널이 없다"는 거짓이 되는데, 바로
-                            아래 '최근 N일 기준 M회'가 그 말과 대놓고 어긋난다. */}
-                        {s.channelCount !== null && (
-                          <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2, whiteSpace: "nowrap" }}>{s.channelCount}개 채널</span>
-                        )}
-                        <span style={{ fontFamily: MONO, fontSize: "var(--fs-11-5)", fontWeight: 700, color: C.label, whiteSpace: "nowrap" }}>
-                          최근 {s.recentDays}일 기준 {s.recentMentions}회
-                        </span>
-                      </span>
-                    </div>
-
-                    {/* 이 셀이 말하려는 건 시세가 아니라 이 배수다 — 30px 로 올려 주인공을 못박는다. */}
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
-                      <strong style={{ fontFamily: MONO, fontSize: "var(--fs-30)", fontWeight: 800, letterSpacing: "-.035em", lineHeight: 1, color: C.hot }}>
-                        {s.ratio.toFixed(1)}
-                        <span style={{ fontSize: "var(--fs-18)", fontWeight: 700, letterSpacing: "-.02em" }}>배</span>
-                      </strong>
-                      <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2 }}>평소 대비</span>
-                      {s.isNew && <Pill tone="blue">신규 등장</Pill>}
-                    </div>
-
-                    <DayBars values={values} dates={dates} tone="warm" hot={Math.min(s.recentDays, values.length)} />
-
-                    {/* 왜 뜨는지 한 줄. 없는 종목은 이 줄만 빠진다 — 카드가 marginTop:auto 로
-                        바닥을 잡고 있어 한 장만 짧아져도 격자가 어긋나지 않는다.
-                        ⚠️ 상자 생김새는 **주요 종목 리포트의 AI 상자와 글자까지 같다**(카드색 ·
-                        radius 12 · padding 12/13 · 13px). 한때 맨 글자로 뒀는데 "이 카드는 이미
-                        흰 판" 이라고 잘못 봤기 때문이다 — 실측하면 둘 다 회색 타일(#f3f6fa)이라
-                        상자가 있어야 문장이 뜬다(2026-09-05 지적). 두 카드가 한 벌이다.
-                        ⭐ **문장이 없으면 숨기지 말고 까닭을 적는다**(2026-09-05 지적:
-                        "왜 없어졌어"). 파이프라인이 집계를 끝낸 뒤 이 문장을 만들기까지
-                        20~40분이 뜨는데, 그동안 이 줄만 사라지면 카드가 어제와 달라 보인다.
-                        막대·배수·가격은 다 있으니 빈 건 문장뿐이라고 말해 주는 편이 낫다.
-                        ⭐ **상자와 아이콘은 문장이 있을 때와 똑같이 둔다**(2026-09-05 지적).
-                        글씨만 남기면 카드 높이가 달라져 여섯 장이 들쭉날쭉해진다. 글자색만
-                        흐리게(sub2) 두어 아직 내용이 아니라는 것을 말한다.
-                        ⚠️ 급부상은 명단이 매일 갈려 **어제 문장을 물려받지 못한다** — 주요
-                        종목 리포트가 쓰는 소급(LLM_TEXT_CARRY_DAYS)이 여기선 거의 안 듣는다. */}
-                    {surgeLines[s.code] ? (
-                      <div style={{ fontSize: "var(--fs-13)", lineHeight: 1.7, display: "flex", gap: 9, background: C.card, borderRadius: 12, padding: "12px 13px" }}>
-                        <AiMark size={15} style={{ flexShrink: 0 }} />
-                        <p style={{ margin: 0, color: "var(--c-ink-soft)", textWrap: "pretty", wordBreak: "keep-all" }}>
-                          {surgeLines[s.code]}
-                        </p>
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: "var(--fs-13)", lineHeight: 1.7, display: "flex", gap: 9, background: C.card, borderRadius: 12, padding: "12px 13px" }}>
-                        <AiMark size={15} style={{ flexShrink: 0 }} />
-                        <p style={{ margin: 0, color: C.sub2, wordBreak: "keep-all" }}>
-                          한 줄 요약은 오늘 집계가 끝나면 붙습니다.
-                        </p>
-                      </div>
-                    )}
-
-                    <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 8, paddingTop: 2, flexWrap: "wrap" }}>
-                      {s.closePrice != null ? (
-                        <>
-                          <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", fontWeight: 700, color: C.label, whiteSpace: "nowrap", flexShrink: 0 }}>
-                            {s.closePrice.toLocaleString("ko-KR")}원
-                          </span>
-                          {/* 야후 실시간이 아니면(KRX 저장 종가 폴백) 등락률 대신 기준일을 단다.
-                              폴백이면 등락률도 그날 것이라, 화살표를 그대로 두면 가격뿐 아니라
-                              방향까지 뒤집혀 보인다(QuoteDate 주석). */}
-                          {s.isLive ? (
-                            <ChangeRate rate={s.changeRate} style={{ fontSize: "var(--fs-11-5)", fontWeight: 800 }} />
-                          ) : (
-                            <QuoteDate date={s.priceDate} style={{ fontSize: "var(--fs-11-5)" }} />
-                          )}
-                        </>
-                      ) : (
-                        <span style={{ fontSize: "var(--fs-11-5)", color: C.sub2 }}>가격 정보 준비 중</span>
-                      )}
-                      <span style={{ flex: 1 }} />
-                      <MddLink code={s.code} market={s.market} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            </PhoneFold>
-          </>
+          <SurgeTable
+            recentDays={surging[0].recentDays}
+            rows={surging.map((s) => ({
+              key: s.code,
+              name: s.name,
+              code: s.code,
+              logo: { code: s.code, market: s.market },
+              href: stockHref(s.code),
+              ratioText: s.ratio.toFixed(1),
+              isNew: s.isNew,
+              series: s.series.slice(-7),
+              dates: s.seriesDates.slice(-7),
+              hot: s.recentDays,
+              mentions: s.recentMentions,
+              channels: s.channelCount,
+              line: surgeLines[s.code] ?? null,
+              price: s.closePrice != null ? `${s.closePrice.toLocaleString("ko-KR")}원` : null,
+              // 야후 실시간이 아니면(KRX 저장 종가 폴백) 등락률 대신 기준일을 단다 — 폴백이면 등락률도
+              // 그날 것이라 화살표를 두면 방향까지 뒤집혀 보인다(QuoteDate 주석).
+              change: s.isLive ? s.changeRate : null,
+              priceNote: s.isLive ? undefined : <QuoteDate date={s.priceDate} style={{ fontSize: 12 }} />,
+              priceMissing: "가격 준비 중",
+              themes: <ThemeChips name={s.name} />,
+              actions: <MddLink code={s.code} market={s.market} />,
+            }))}
+          />
         )}
       </section>
 
