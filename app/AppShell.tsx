@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useAppPathname } from "./use-app-pathname";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { INSIDER_LISTS, INSIDER_LIST_SLUGS, insiderListHref } from "./insider/lists";
 import { PageJsonLd } from "./JsonLd";
 import { NOTE_PAGE } from "./daily/copy";
@@ -478,7 +478,7 @@ function NavGroupLabel({ label, first, inset }: { label: string; first: boolean;
 function NavGlyph({ item, size }: { item: { icon?: IconName; Glyph?: (p: { size?: number }) => React.ReactElement }; size: number }) {
   if (item.Glyph) return <item.Glyph size={size} />;
   // 이름이 없으면 예전처럼 빈 아이콘 칸을 그대로 둔다(칸이 빠지면 gap 이 달라진다).
-  if (!item.icon) return <span className="ms" style={{ fontSize: size }} />;
+  if (!item.icon) return <span className="ms" style={{ fontSize: size }} aria-hidden="true" />;
   return <Icon name={item.icon} style={{ fontSize: size }} />;
 }
 
@@ -816,7 +816,7 @@ function Sidebar() {
                 {...intentPrefetch(child.href)}
                 className={`hz-nav-item${on ? " hz-nav-active" : ""}`}
                 aria-current={on ? "page" : undefined}
-                aria-label={child.isNew ? `${child.label} · 새로 생긴 화면` : undefined}
+                aria-label={child.isNew ? `${child.label} · 새로 생긴 화면` : child.label}
                 style={{
                   ...rowStyle,
                   color: on ? undefined : C.sub,
@@ -846,8 +846,10 @@ function Sidebar() {
               {...intentPrefetch(item.href)}
               className={`hz-nav-item${active ? " hz-nav-active" : ""}`}
               /* 빨간 N 은 보는 사람에게만 뜻이 통하는 표식이라(aria-hidden) 읽어 주는 기계에는 말로 적는다.
-                 ⚠️ 보이는 글자로 시작해야 음성으로 조작하는 사람이 본 대로 부를 수 있다(WCAG 2.5.3). */
-              aria-label={item.isNew ? `${item.label} · 새로 생긴 화면` : undefined}
+                 ⚠️ 보이는 글자로 시작해야 음성으로 조작하는 사람이 본 대로 부를 수 있다(WCAG 2.5.3).
+                 새 화면이 아니어도 이름을 단다 — 사이드바를 접으면 라벨(.hz-side-text)이 숨고 아이콘은
+                 aria-hidden 이라, 이름이 없으면 접힌 메뉴 링크가 전부 '이름 없는 링크'가 된다(a11y#0). */
+              aria-label={item.isNew ? `${item.label} · 새로 생긴 화면` : item.label}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -1231,6 +1233,8 @@ function MarketSwap({ pathname }: { pathname: string }) {
     <Link
       href={to.href}
       className="hz-btn-soft hz-topbar-cta"
+      // 좁은 폭에서는 라벨이 숨어 아이콘(aria-hidden)만 남는다 — 이름을 따로 단다(a11y#0).
+      aria-label={`${to.label} 보기`}
       title={`${to.label} 보기`}
       data-ga="cta_click"
       data-ga-cta={to.ga}
@@ -1949,6 +1953,85 @@ function ToTop({
   );
 }
 
+/**
+ * 화면을 옮기면 본문(main)을 **맨 위로**, 뒤로·앞으로 가기면 **그 화면에서 보던 자리로** 되돌린다.
+ *
+ * ⚠️ 스크롤이 문서가 아니라 main 안이라(셸 주석) Next 가 링크 이동 때 하는 스크롤 처리(layout-router)가 여기에
+ *    닿지 않는다. 예전엔 옮겨도 이전 화면의 스크롤 자리 그대로 열려, 새 화면의 제목·소식 띠가 가려진 채로
+ *    시작했고, 종목에 들어갔다 돌아오면 목록에서 읽던 자리를 잃었다(2026-10-01 점검 shell#0).
+ *
+ * 자리는 **주소(pathname)마다 메모리에** 적는다. 쿼리만 바뀌는 이동(MDD 의 종목·기간)과 #앵커는 pathname 이 그대로라
+ * 건드리지 않는다. 새로고침하면 브라우저 기본처럼 맨 위다.
+ *
+ * ⭐ 바꿔 끼우기는 useLayoutEffect 다. 새 화면이 그려진 직후·칠하기 전에 돌아서 한 프레임도 옛 자리로 안 보인다.
+ *    또 내용 높이가 줄어 생기는 스크롤 이벤트는 그다음 프레임에 오므로, 그보다 먼저 '지금 주소'를 바꿔 두면
+ *    그 이벤트가 이전 화면의 자리를 덮어쓰지 않는다. 자식(페이지)의 레이아웃 효과보다 늦게 돌아 Next 의 처리도 이긴다.
+ *
+ * ⚠️ 되돌린 직후 잠깐(RESTORE_HOLD_MS) 브라우저의 스크롤 앵커링을 끄고, 사람이 아닌 무언가가 자리를 옮기면 되민다.
+ *    뒤늦게 데이터가 그려지면 앵커링이 자리를 엉뚱하게 옮겼다 — MDD 에 444 로 되돌린 지 0.14초 뒤 1563 으로
+ *    튀었다(크로미움 실측, 2026-10-01). 휠·터치·키·클릭이 오면 그 사람이 움직인 것이니 바로 놓는다.
+ */
+const RESTORE_HOLD_MS = 1500;
+
+function useMainScrollRestore(ref: React.RefObject<HTMLElement | null>, pathname: string) {
+  const saved = useRef(new Map<string, number>());
+  const current = useRef(pathname);
+  const popped = useRef(false);
+  const hold = useRef<{ top: number; until: number } | null>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const release = () => {
+      hold.current = null;
+      el.style.overflowAnchor = "";
+    };
+    const onScroll = () => {
+      const h = hold.current;
+      if (h && performance.now() > h.until) release();
+      else if (h && Math.abs(el.scrollTop - h.top) > 1) {
+        el.scrollTo({ top: h.top, behavior: "instant" });
+        return;
+      }
+      saved.current.set(current.current, el.scrollTop);
+    };
+    const intents = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
+    el.addEventListener("scroll", onScroll, { passive: true });
+    for (const t of intents) el.addEventListener(t, release, { passive: true });
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      for (const t of intents) el.removeEventListener(t, release);
+    };
+  }, [ref]);
+
+  useEffect(() => {
+    const onPop = () => {
+      popped.current = true;
+    };
+    // capture — Next 도 popstate 를 듣고 그 안에서 새 화면을 그리므로(레이아웃 효과까지 돈다) 그보다 먼저 표시해야 한다.
+    window.addEventListener("popstate", onPop, { capture: true });
+    return () => window.removeEventListener("popstate", onPop, { capture: true });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (current.current === pathname) return;
+    current.current = pathname;
+    const back = popped.current;
+    popped.current = false;
+    const el = ref.current;
+    if (!el) return;
+    const top = back ? (saved.current.get(pathname) ?? 0) : 0;
+    el.scrollTo({ top, behavior: "instant" });
+    if (back && top > 0) {
+      hold.current = { top, until: performance.now() + RESTORE_HOLD_MS };
+      el.style.overflowAnchor = "none";
+    } else {
+      hold.current = null;
+      el.style.overflowAnchor = "";
+    }
+  }, [pathname, ref]);
+}
+
 export default function AppShell({
   children,
   themeNav = THEME_PUBLIC,
@@ -1965,6 +2048,7 @@ export default function AppShell({
   const pastFold = useScrolledPastFold(mainRef);
   const [menuOpen, setMenuOpen] = useState(false);
   const pathname = useAppPathname();
+  useMainScrollRestore(mainRef, pathname);
 
   // 페이지를 옮기면 닫는다. 패널은 셸에 얹혀 있어 라우팅만으로는 사라지지 않는다.
   //

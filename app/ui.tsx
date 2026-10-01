@@ -115,8 +115,12 @@ export function Icon({
   style?: React.CSSProperties;
   className?: string;
 }) {
+  // ⭐ 아이콘은 그림일 뿐이라 **접근성 트리에서 뺀다**(aria-hidden). 글자가 리거처 이름('monitoring' · 'swap_horiz')이라
+  //    빼지 않으면 스크린리더가 "monitoring 시장 브리핑"으로 읽고, 브라우저 자동 번역이 'home' · 'close' 를 번역해
+  //    아이콘이 글자로 깨진다(translate="no" 가 막는다). 2026-10-01 점검 a11y#0 · shell#4 · home-daily#20 · kadera-kr#11 · mdd#29.
+  //    ⚠️ 그래서 **아이콘만 있는 단추·링크는 aria-label 을 꼭 단다** — 아이콘이 이름을 대신해 주지 않는다.
   return (
-    <span className={className ? `ms ${className}` : "ms"} style={style}>
+    <span className={className ? `ms ${className}` : "ms"} style={style} aria-hidden="true" translate="no">
       {name}
     </span>
   );

@@ -11,7 +11,8 @@ import Link from "next/link";
  * 실제로 뜰 일은 거의 없다. 있어야 하는 이유는 하나다 — 없으면 그 드문 날에 Next 의
  * 영문 기본 화면이 나간다.
  */
-export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+// '다시 시도'는 reset() 이 아니라 unstable_retry() 다 — reset 은 다시 받아 오지 않아 서버 오류를 되그린다(app/error.tsx 주석).
+export default function GlobalError({ error, unstable_retry }: { error: Error & { digest?: string }; unstable_retry: () => void }) {
   return (
     <html lang="ko">
       <body
@@ -36,7 +37,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
           <div style={{ display: "flex", gap: 8, marginTop: 22 }}>
             <button
               type="button"
-              onClick={reset}
+              onClick={() => unstable_retry()}
               style={{
                 height: 38,
                 padding: "0 14px",
