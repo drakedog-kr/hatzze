@@ -9,7 +9,8 @@ import { StockLogo } from "../StockLogo";
 import { type MoreLists, type StockLite } from "./types";
 import type { Holding } from "./store";
 import { money, pct } from "./format";
-import { HOT_YIELD_PCT, SCOPES, scopeOf, Badges, rankMatches } from "./shared";
+import { HOT_YIELD_PCT, SCOPES, scopeOf, Badges } from "./shared";
+import { rankMatches } from "./calc";
 import type { Scope } from "./shared";
 
 /* ── 검색 ─────────────────────────────────────────────────────────── */
@@ -121,8 +122,11 @@ export function QuickChips({
   onPick: (code: string) => void;
 }) {
   const held = new Set(holdings.map((h) => h.code));
-  const items = codes.map((c) => byCode.get(c)).filter((s): s is StockLite => !!s && !held.has(s.code));
-  if (!items.length) return <p className="dv-chips-empty">다 담았습니다. 검색으로 더 찾을 수 있습니다.</p>;
+  const known = codes.map((c) => byCode.get(c)).filter((s): s is StockLite => !!s);
+  const items = known.filter((s) => !held.has(s.code));
+  // '다 담았다'는 세울 종목이 있었는데 전부 담았을 때만이다. 목록이 처음부터 비면(환율을 못 받아 미국 종목이 빠진 날 등)
+  // 그 말이 거짓이 된다 — 그날 미장 칸에 '다 담았습니다'가 섰다(dividend#6).
+  if (!items.length) return <p className="dv-chips-empty">{known.length ? "다 담았습니다. 검색으로 더 찾을 수 있습니다." : "지금은 보여 드릴 종목이 없습니다."}</p>;
   return (
     <div className="dv-chips">
       {label && <span className="dv-chips-label">{label}</span>}
