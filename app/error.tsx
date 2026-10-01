@@ -21,10 +21,12 @@ import { C, Icon } from "./ui";
  * 오류 경계는 클라이언트 컴포넌트여야 한다(Next 규칙). 그래서 `metadata` 를 못 내고,
  * 셸이 주소로 고른 제목이 위에 그대로 남는다.
  *
- * ⭐ '다시 시도'는 `unstable_retry()` 다(Next 16 · error.md). `reset()` 은 오류 상태만 지우고 **다시 받아 오지 않아서**,
+ * ⭐ '다시 시도'는 `retry()` 다(error.md). `reset()` 은 오류 상태만 지우고 **다시 받아 오지 않아서**,
  *    Supabase 가 잠깐 흔들린 서버 오류에서는 같은 오류를 되그렸다 — 단추가 고장 난 것처럼 보였다(2026-10-01 점검 shell#6).
+ * ⚠️ 16.2 에서는 `unstable_retry` 였고 16.3 에서 `retry` 로 정식이 됐다. **16.3 은 옛 이름을 안 넘긴다**(error-boundary.js 가
+ *    reset · retry 둘만 준다) — 옛 이름을 그대로 두면 단추가 undefined 를 불러 오류 화면 위에서 또 죽는다.
  */
-export default function ErrorPage({ error, unstable_retry }: { error: Error & { digest?: string }; unstable_retry: () => void }) {
+export default function ErrorPage({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
   useEffect(() => {
     // 서버 쪽 스택은 Vercel 로그에 digest 로 남는다. 브라우저 콘솔에도 한 줄 남겨 두면
     // 이용자가 제보할 때 digest 를 같이 보낼 수 있다.
@@ -46,7 +48,7 @@ export default function ErrorPage({ error, unstable_retry }: { error: Error & { 
         </p>
       )}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 22 }}>
-        <button type="button" onClick={() => unstable_retry()} className="hz-btn-soft" style={{ padding: "0 14px", cursor: "pointer" }}>
+        <button type="button" onClick={() => retry()} className="hz-btn-soft" style={{ padding: "0 14px", cursor: "pointer" }}>
           <Icon name="refresh" style={{ fontSize: "var(--fs-18)" }} />
           다시 시도
         </button>
