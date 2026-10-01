@@ -18,15 +18,16 @@ import { assertLoaded, isLoadFailed } from "@/lib/load-state";
 
 import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
-import { AiMark, C, Icon } from "../ui";
+import { AiMark, Icon } from "../ui";
 import { highlightTerms, termsFor } from "./parts";
 import { fmtKoDate } from "@/lib/stock-page";
 import { THEME_NAMES, themeHref } from "@/lib/theme-href";
 import { THEMES } from "@/lib/stock-themes";
 import { THEME_PUBLIC } from "../screen-flags";
 import { getMoveReasons, getUpcomingEvents, todayKst } from "@/lib/kadera-why";
-import { EventRows, KeywordRows, MoodTrend, Panel, StockSection, ThemeRows } from "./V2Lists";
-import type { StockRow } from "./V2Lists";
+import { EventsCard, MoodCard, ThemeCard } from "./V2Band";
+import { KaderaBoard } from "./KaderaBoard";
+import type { BoardRow, BoardSection, PaneStock } from "./KaderaBoard";
 
 /** "10/1 19:30" — 패널 머리에 들어갈 짧은 KST 시각. */
 function shortKst(iso: string): string {
@@ -168,180 +169,212 @@ export default async function KaderaPage() {
      - 채널 수는 채널 파워 랭킹 머리로 옮겼다가 거기서도 뺐다(2026-09-28). 화면에 채널 수가 없다.
      - 총 구독자는 채널마다 구독자를 더한 값이라 여러 채널을 구독한 한 사람이 여러 번 세어졌다. */
 
-  /* 여론 숫자의 잉크. 센티먼트 구간(lib/format.ts 의 sentimentTone)이 색을 정한다. 잉크 토큰(--c-hot-ink)이지
-     원색(--c-hot)이 아니다 — 회색 면 위에서도 4.5 를 넘기는 값은 잉크 쪽이다(Pill 주석의 실측). */
-  const toneInk = sentiment?.tone === "hot" ? "var(--c-hot-ink)" : sentiment?.tone === "cold" ? "var(--c-cold-ink)" : C.ink;
-
-  /* ── 종목 표 셋의 재료 ──────────────────────────────────────────────────
-     급부상 · 오늘 움직인 종목(오른 것 + 크게 내린 것) · 많이 언급. 탭 없이 한 판에 차례로 쌓는다(StockSection 머리말).
-     AI 문장은 줄의 마지막 칸에 한 줄로 — 넓은 칸이라 대개 다 들어가고, 넘치면 잘리며 전문은 올려 보면 뜬다. */
+  /* ── 표 셋과 읽기 칸의 재료 ──────────────────────────────────────────────
+     급부상 · 오늘 움직인 종목(오른 것 + 5% 넘게 내린 것) · 많이 언급(KaderaBoard 머리말).
+     읽기 칸의 종목 정보는 종목 하나의 사실을 다 모은다 — 한 종목이 여러 표에 오르면 문장이 셋까지 붙는다. */
   const surgeDays = surging[0]?.recentDays ?? KADERA_WINDOW_DAYS;
-  const surgeRows: StockRow[] = surging.map((s) => ({
-    code: s.code,
-    name: s.name,
-    market: s.market,
-    // 야후 실시간이 아니면(KRX 저장 종가 폴백) 등락률을 안 단다 — 그날 것이라 방향까지 뒤집혀 보인다(QuoteDate 주석).
-    change: s.isLive ? s.changeRate : null,
-    metric: `${s.ratio.toFixed(1)}배`,
-    metricHot: true,
-    tag: s.isNew ? "신규" : undefined,
-    text: surgeLines[s.code] ?? null,
-    pending: "한 줄 요약은 오늘 집계가 끝나면 붙습니다.",
-  }));
-  // 오른 것 여섯 뒤에 5% 넘게 내린 것 셋까지(lib/kadera-why.ts DOWN_MIN). 내린 줄은 없는 날이 많다 — 색(▲빨강 ▼파랑)이 둘을 가른다.
-  const moveRow = (r: NonNullable<typeof why>["rows"][number]): StockRow => ({
-    code: r.code,
-    name: r.name,
-    market: r.market,
-    change: r.changeRate,
-    text: r.reason,
-  });
-  const moveRows = [...(why?.rows ?? []).slice(0, 6), ...(why?.down ?? []).slice(0, 3)].map(moveRow);
-  const talkRows: StockRow[] = stockReports.map((r) => ({
-    code: r.code,
-    name: r.name,
-    market: r.market,
-    change: r.changeRate,
-    metric: `${r.totalMentions.toLocaleString("ko-KR")}회`,
-    text: narratives[r.code] ?? null,
-    pending: "흐름 요약은 오늘 집계가 끝나면 붙습니다.",
-  }));
+  const pane: Record<string, PaneStock> = {};
+  const paneOf = (code: string, name: string, market: string | null): PaneStock =>
+    (pane[code] ??= { code, name, market, price: null, change: null, priceNote: null, series: [], dates: [], hot: 0, tone: "warm", facts: [], notes: [] });
 
-  const briefNode = (
-    <div className="v2-brief">
-      {(() => {
-        const used = new Set<string>();
-        return (sentiment?.summary ?? "오늘의 요약을 준비하고 있습니다.")
-          .split(/\n{2,}/)
-          .map((para, i) => <p key={i}>{highlightTerms(para, summaryTerms, used, { linkTerms: THEME_LINKS ? THEME_LINK_MAP : undefined })}</p>);
-      })()}
+  const surgeRows: BoardRow[] = surging.map((s) => {
+    const p = paneOf(s.code, s.name, s.market);
+    p.price = s.closePrice;
+    // 야후 실시간이 아니면(KRX 저장 종가 폴백) 등락률 대신 기준일 — 그날 것이라 방향까지 뒤집혀 보인다(QuoteDate 주석).
+    p.change = s.isLive ? s.changeRate : null;
+    p.priceNote = s.isLive ? null : s.priceDate ? `${fmtKoDate(s.priceDate)} 종가` : "종가 기준";
+    p.series = s.series;
+    p.dates = s.seriesDates;
+    p.hot = s.recentDays;
+    p.facts.push({ k: "평소 대비", v: `${s.ratio.toFixed(1)}배`, hot: true }, { k: `최근 ${s.recentDays}일 언급`, v: `${s.recentMentions}회` });
+    if (s.channelCount !== null) p.facts.push({ k: "말한 채널", v: `${s.channelCount}곳` });
+    p.notes.push({ cap: "왜 뜨나", text: surgeLines[s.code] ?? null, fallback: "한 줄 요약은 오늘 집계가 끝나면 붙습니다." });
+    return {
+      code: s.code,
+      name: s.name,
+      market: s.market,
+      change: s.isLive ? s.changeRate : null,
+      tag: s.isNew ? "신규" : undefined,
+      cells: [{ v: `${s.ratio.toFixed(1)}배`, hot: true }, { v: `${s.recentMentions}회` }],
+      bars: { values: s.series.slice(-7), hot: s.recentDays, tone: "warm" },
+      text: surgeLines[s.code] ?? null,
+      pending: "집계가 끝나면 붙습니다",
+    };
+  });
+
+  const moveRow = (r: NonNullable<typeof why>["rows"][number]): BoardRow => {
+    const p = paneOf(r.code, r.name, r.market);
+    if (p.price === null && r.closePrice != null) {
+      p.price = r.closePrice;
+      p.priceNote = `${fmtKoDate(r.date)} 종가`;
+    }
+    if (r.changeRate !== null) p.facts.push({ k: `${fmtKoDate(r.date)} 등락`, v: `${r.changeRate > 0 ? "+" : ""}${r.changeRate.toFixed(2)}%`, hot: r.changeRate > 0 });
+    p.notes.push({ cap: (r.changeRate ?? 0) < 0 ? "내린 까닭" : "오른 까닭", text: r.reason, fallback: "" });
+    return {
+      code: r.code,
+      name: r.name,
+      market: r.market,
+      change: r.changeRate,
+      cells: [{ v: r.closePrice != null ? `${r.closePrice.toLocaleString("ko-KR")}원` : "-" }],
+      text: r.reason,
+    };
+  };
+  // 오른 것 여섯 뒤에 크게 내린 것 셋까지(lib/kadera-why.ts DOWN_MIN). 내린 줄은 없는 날이 많고, 부호 색이 둘을 가른다.
+  const moveRows = [...(why?.rows ?? []).slice(0, 6), ...(why?.down ?? []).slice(0, 3)].map(moveRow);
+
+  const talkRows: BoardRow[] = stockReports.map((r) => {
+    const p = paneOf(r.code, r.name, r.market);
+    if (p.price === null && r.price != null) {
+      p.price = r.price;
+      p.change = r.changeRate;
+    }
+    if (!p.series.length) {
+      p.series = r.series.map((d) => d.mentions);
+      p.dates = r.series.map((d) => d.date);
+      p.hot = r.series.filter((d) => d.scored).length;
+      p.tone = "cold";
+    }
+    if (!p.facts.some((f) => f.k.endsWith("언급"))) p.facts.push({ k: `최근 ${KADERA_WINDOW_DAYS}일 언급`, v: `${r.totalMentions.toLocaleString("ko-KR")}회` });
+    if (r.channelCount !== null && !p.facts.some((f) => f.k === "말한 채널")) p.facts.push({ k: "말한 채널", v: `${r.channelCount}곳` });
+    p.notes.push({ cap: "흐름 요약", text: narratives[r.code] ?? null, fallback: "흐름 요약은 오늘 집계가 끝나면 붙습니다." });
+    return {
+      code: r.code,
+      name: r.name,
+      market: r.market,
+      change: r.changeRate,
+      cells: [{ v: `${r.totalMentions.toLocaleString("ko-KR")}회` }, { v: r.channelCount !== null ? `${r.channelCount}곳` : "-" }],
+      bars: { values: r.series.slice(-7).map((d) => d.mentions), hot: r.series.slice(-7).filter((d) => d.scored).length, tone: "cold" },
+      text: narratives[r.code] ?? null,
+      pending: "집계가 끝나면 붙습니다",
+    };
+  });
+
+  const sections: BoardSection[] = [
+    {
+      id: "surging",
+      title: "급부상 종목",
+      meta: `최근 ${surgeDays}일 vs 평소`,
+      kind: "surge",
+      heads: ["", "종목", "등락률", "평소 대비", `${surgeDays}일 언급`, "7일", "왜 뜨나"],
+      rows: surgeRows,
+      empty: "아직 급부상 신호가 뚜렷한 종목이 없습니다.",
+    },
+    {
+      id: "why",
+      title: "오늘 움직인 종목",
+      meta: why ? `${fmtKoDate(why.date)} 기준` : undefined,
+      kind: "move",
+      heads: ["", "종목", "등락률", "종가", "커뮤니티가 말한 까닭"],
+      rows: moveRows,
+      empty: whyFailed ? "까닭을 불러오지 못했습니다." : "오늘 집계가 끝나면 채워집니다. 저녁 실행 뒤에 그날 것이 붙습니다.",
+    },
+    {
+      id: "talk",
+      title: "많이 언급된 종목",
+      meta: `최근 ${KADERA_WINDOW_DAYS}일`,
+      kind: "talk",
+      heads: ["", "종목", "등락률", "언급", "채널", "7일", "흐름 요약"],
+      rows: talkRows,
+      empty: "아직 리포트를 만들 종목이 없습니다.",
+    },
+  ];
+
+  /* 읽기 칸의 평소 모습 — 오늘의 요약(AI). 문단은 빈 줄에서 가르고, 굵힌 낱말은 세 문단에 걸쳐 한 번씩만(highlightTerms 주석). */
+  const summaryNode = (
+    <div className="v2-sum">
+      <div className="v2-sum-head">
+        <b>오늘의 요약</b>
+        <span className="v2-ai-badge">
+          <AiMark size={12} />
+          AI 요약{summary.lastUpdated ? ` · ${shortKst(summary.lastUpdated)}` : ""}
+        </span>
+      </div>
+      <div className="v2-sum-body">
+        {(() => {
+          const used = new Set<string>();
+          return (sentiment?.summary ?? "오늘의 요약을 준비하고 있습니다.")
+            .split(/\n{2,}/)
+            .map((para, i) => <p key={i}>{highlightTerms(para, summaryTerms, used, { linkTerms: THEME_LINKS ? THEME_LINK_MAP : undefined })}</p>);
+        })()}
+      </div>
+      <p className="v2-sum-hint">표의 종목에 마우스를 올리면 이 칸에 그 종목 이야기가 뜹니다.</p>
     </div>
   );
-  /* 여론 — 낙관도 하나와 30일 추이. 예전 히어로의 각주(중립 제외 셈법)·테마별 기울기는 걷었다 — 한 패널에
-     그래픽이 넷이면 무엇이 주인공인지 흐려진다. 셈법은 숫자 옆 물음표가 든다. */
-  const moodNode = !sentiment ? (
-    <p className="v2-empty">{sentimentFailed ? "감성 집계를 불러오지 못했습니다." : "아직 분석된 메시지가 없습니다."}</p>
-  ) : (
-    <div className="v2-mood">
-      <div className="v2-mood-top">
-        <strong className="v2-mood-big" style={{ color: toneInk }}>
-          {sentiment.score}
-          <span>%</span>
-        </strong>
-        <span className="v2-mood-label" style={{ color: toneInk }}>
-          {sentiment.label}
-        </span>
-        <span className="hz-tip hz-tip-wide v2-mood-help" data-tip="시장 글만, 중립 제외" aria-label="셈법">
-          <Icon name="help" />
-        </span>
-      </div>
-      <div>
-        <div className="hz-tx-split">
-          <span style={{ width: `${100 - sentiment.score}%`, background: "var(--c-blue-2)" }} />
-          <span style={{ width: `${sentiment.score}%`, background: "var(--c-warm-2)" }} />
-        </div>
-        <div className="v2-mood-ends">
-          <span>비관 {100 - sentiment.score}</span>
-          <span>낙관 {sentiment.score}</span>
-        </div>
-      </div>
-      <MoodTrend points={sentimentFailed ? null : sentiment.trend} />
-    </div>
+
+  /* 화제어 — 표 아래 칩 줄. 칩마다 언급 수와 점유율 변화. */
+  const keywordChips = (
+    <section className="v2-sec" id="keywords">
+      <header className="v2-sec-head">
+        <h2>화제어</h2>
+        <span>최근 3일 · 종목명이 아닌 말</span>
+      </header>
+      {keywords.length === 0 ? (
+        <p className="v2-empty">아직 뽑을 화제어가 없습니다.</p>
+      ) : (
+        <ul className="v2-chips">
+          {keywords.slice(0, 12).map((k) => {
+            const d = k.shareDelta === null ? null : k.shareDelta * 100;
+            return (
+              <li key={k.word} className="v2-chip">
+                <b>{k.word}</b>
+                <span>{k.count.toLocaleString("ko-KR")}회</span>
+                {d !== null && Math.abs(d) >= 0.05 && (
+                  <span className={d > 0 ? "is-up" : "is-down"}>
+                    {d > 0 ? "+" : "-"}
+                    {Math.abs(d).toFixed(1)}%p
+                  </span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 
   return (
     <div className="hz-tx v2-kd">
-      <div className="v2-grid">
-        {/* ── 왼쪽: 종목 표 한 판 ── 세 구획이 같은 칸 폭을 쓴다. 맨 아래 테마·화제어가 나란히. */}
-        <div className="v2-main">
-          {/* id 는 홈의 '급부상' 바로가기가 찾아온다. */}
-          <StockSection
-            title="급부상 종목"
-            id="surging"
-            kind="surge"
-            meta={`최근 ${surgeDays}일 vs 평소`}
-            heads={["#", "종목", "등락률", "평소 대비", "왜 뜨나"]}
-            rows={surgeRows}
-            empty="아직 급부상 신호가 뚜렷한 종목이 없습니다."
-          />
-          {whyFailed ? (
-            <section className="v2-sec" id="why">
-              <header className="v2-sec-head">
-                <h2 className="v2-sec-title">오늘 움직인 종목</h2>
-              </header>
-              <p className="v2-empty">이유를 불러오지 못했습니다.</p>
-            </section>
-          ) : (
-            <StockSection
-              title="오늘 움직인 종목"
-              id="why"
-              kind="move"
-              meta={why ? `${fmtKoDate(why.date)} 기준` : undefined}
-              heads={["#", "종목", "등락률", "커뮤니티가 말한 이유"]}
-              rows={moveRows}
-              empty="오늘 집계가 끝나면 채워집니다. 저녁 실행 뒤에 그날 것이 붙습니다."
-            />
+      <div className="v2-panel">
+        {/* 상태 줄 — 토스의 '국내 장 닫힘 · 해외 정규장' 자리. 우리는 집계 시각과 분석한 글 수. */}
+        <div className="v2-status">
+          <span className="v2-status-item">
+            <i className="v2-dot" />
+            {summary.lastUpdated ? `${shortKst(summary.lastUpdated)} 집계` : "집계 준비 중"}
+          </span>
+          {sentiment && (
+            <span className="v2-status-item">
+              <i className="v2-dot is-soft" />
+              최근 {sentiment.windowDays}일 글 {sentiment.messageCount.toLocaleString("ko-KR")}건 분석
+            </span>
           )}
-          <StockSection
-            title="많이 언급된 종목"
-            kind="talk"
-            meta={`최근 ${KADERA_WINDOW_DAYS}일`}
-            heads={["#", "종목", "등락률", "언급", "흐름 요약"]}
-            rows={talkRows}
-            empty="아직 리포트를 만들 종목이 없습니다."
-          />
-          {/* 테마 · 화제어 — 여덟 줄씩 나란히. 테마 전체는 '전체 보기'가 잇는다. */}
-          <div className="v2-pair">
-            <section className="v2-sec" id="themes">
-              <header className="v2-sec-head">
-                <h2 className="v2-sec-title">테마</h2>
-                <span className="v2-p-meta">
-                  {THEME_LINKS ? (
-                    <Link href="/theme" className="v2-more">
-                      전체 보기
-                      <Icon name="chevron_right" />
-                    </Link>
-                  ) : (
-                    "최근 3일 vs 이전"
-                  )}
-                </span>
-              </header>
-              <ThemeRows themes={themes.slice(0, 8)} hrefOf={(t) => (THEME_LINKS ? themeHref(t) : null)} />
-            </section>
-            <section className="v2-sec" id="keywords">
-              <header className="v2-sec-head">
-                <h2 className="v2-sec-title">화제어</h2>
-                <span className="v2-p-meta">최근 3일</span>
-              </header>
-              <KeywordRows keywords={keywords.slice(0, 8)} />
-            </section>
-          </div>
+          {THEME_LINKS && (
+            <Link href="/theme" className="v2-status-link">
+              테마 전체 보기
+              <Icon name="chevron_right" />
+            </Link>
+          )}
         </div>
 
-        {/* ── 오른쪽: 오늘의 요약 · 여론 · 다가오는 일정 ── 요약은 접지 않고 다 편다. */}
-        <aside className="v2-rail">
-          <Panel
-            title="오늘의 요약"
-            meta={
-              <span className="v2-ai">
-                <AiMark size={13} />
-                {summary.lastUpdated ? `${shortKst(summary.lastUpdated)} 기준` : "AI 요약"}
-              </span>
-            }
-          >
-            {briefNode}
-          </Panel>
-          <Panel
-            title="여론"
-            id="mood"
-            meta={sentiment ? `최근 ${sentiment.windowDays}일 · ${sentiment.messageCount.toLocaleString("ko-KR")}건` : undefined}
-          >
-            {moodNode}
-          </Panel>
-          <Panel title="다가오는 일정" id="events" meta="앞으로 5주">
-            {eventsFailed ? <p className="v2-empty">일정을 불러오지 못했습니다.</p> : <EventRows events={events} today={kaderaToday} limit={8} />}
-          </Panel>
-        </aside>
+        {/* 지수 줄 — 여론 낙관도 · 상위 테마 여섯 · 다가오는 일정 */}
+        <div className="v2-band" id="themes">
+          {sentiment ? (
+            <MoodCard score={sentiment.score} label={sentiment.label} trend={sentiment.trend ?? []} />
+          ) : (
+            <div className="v2-bigcard" id="mood">
+              <span className="v2-card-name">여론 낙관도</span>
+              <p className="v2-muted">{sentimentFailed ? "감성 집계를 불러오지 못했습니다." : "아직 분석된 메시지가 없습니다."}</p>
+            </div>
+          )}
+          <div className="v2-themes">
+            {themes.slice(0, 6).map((t, i) => (
+              <ThemeCard key={t.theme} t={t} i={i} href={THEME_LINKS ? themeHref(t.theme) : null} />
+            ))}
+          </div>
+          <EventsCard events={events} today={kaderaToday} failed={eventsFailed} />
+        </div>
+
+        {/* 표 셋 + 읽기 칸 */}
+        <KaderaBoard sections={sections} stocks={pane} summary={summaryNode} after={keywordChips} />
       </div>
     </div>
   );
