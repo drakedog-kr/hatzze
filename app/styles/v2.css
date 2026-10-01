@@ -366,6 +366,8 @@ a.v2-li:hover { background: var(--c-hover); }
   flex: 1;
   min-height: 0;
 }
+.v2-board.is-solo { grid-template-columns: minmax(0, 1fr); }
+.v2-board.is-solo .v2-board-main { border-right: 0; }
 .v2-board-main {
   display: flex;
   flex-direction: column;
@@ -406,7 +408,8 @@ a.v2-li:hover { background: var(--c-hover); }
 }
 .v2-bt-surge .v2-bt-row,
 .v2-bt-talk .v2-bt-row { grid-template-columns: 22px minmax(0, 1fr) 60px 64px 72px; }
-.v2-bt-move .v2-bt-row { grid-template-columns: 22px minmax(100px, 0.75fr) 72px minmax(0, 1.6fr); }
+.v2-bt-move .v2-bt-row,
+.v2-bt-drop .v2-bt-row { grid-template-columns: 22px minmax(150px, 1fr) 72px minmax(0, 1.3fr); }
 .v2-bt-row:hover { background: var(--c-hover); }
 .v2-bt-row[aria-pressed="true"] { background: var(--c-plate); }
 /* 열 머리도 같은 격자를 쓴다(.v2-lh 의 모양 + .v2-bt-row 의 칸). */
@@ -417,8 +420,10 @@ a.v2-li:hover { background: var(--c-hover); }
 .v2-lh.v2-bt-row:hover { background: var(--c-card); }
 .v2-bt-surge .v2-lh > span:nth-child(n + 3),
 .v2-bt-talk .v2-lh > span:nth-child(n + 3) { text-align: right; }
-.v2-bt-move .v2-lh > span:nth-child(3) { text-align: right; }
-.v2-bt-move .v2-lh > span:nth-child(4) { text-align: left; }
+.v2-bt-move .v2-lh > span:nth-child(3),
+.v2-bt-drop .v2-lh > span:nth-child(3) { text-align: right; }
+.v2-bt-move .v2-lh > span:nth-child(4),
+.v2-bt-drop .v2-lh > span:nth-child(4) { text-align: left; }
 .v2-stock {
   display: flex;
   align-items: center;
@@ -628,14 +633,17 @@ a.v2-chip:hover { background: var(--c-blue-tint); color: var(--c-cold-ink); }
   .v2-bt-surge .v2-bt-row,
   .v2-bt-talk .v2-bt-row { grid-template-columns: 18px minmax(0, 1fr) 56px 68px; }
   /* 급등 이유는 이유가 주인공이라 폰에서도 뺄 수 없다 — 둘째 줄로 내린다. */
-  .v2-bt-move .v2-bt-row {
+  .v2-bt-move .v2-bt-row,
+  .v2-bt-drop .v2-bt-row {
     grid-template-columns: 18px minmax(0, 1fr) 68px;
     row-gap: 2px;
     padding-top: 8px;
     padding-bottom: 8px;
   }
-  .v2-bt-move .v2-reason { grid-column: 2 / -1; font-size: 13px; }
-  .v2-bt-move .v2-lh > span:nth-child(4) { display: none; }
+  .v2-bt-move .v2-reason,
+  .v2-bt-drop .v2-reason { grid-column: 2 / -1; font-size: 13px; }
+  .v2-bt-move .v2-lh > span:nth-child(4),
+  .v2-bt-drop .v2-lh > span:nth-child(4) { display: none; }
 }
 
 @container kd (max-width: 699px) {

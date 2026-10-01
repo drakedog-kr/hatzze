@@ -39,7 +39,8 @@ export type BoardStock = {
 };
 
 export type BoardTab = {
-  key: "surge" | "move" | "talk";
+  /** move = 급등 이유 · drop = 급락 이유. 둘 다 BoardStock.move 를 읽는다(한 종목이 같은 날 오르고 내릴 수는 없다). */
+  key: "surge" | "move" | "drop" | "talk";
   label: string;
   /** 탭 옆 조건 알약("최근 3일 vs 평소"). */
   note: string;
@@ -113,7 +114,7 @@ function Cells({ tab, s }: { tab: BoardTab["key"]; s: BoardStock }) {
       </>
     );
   }
-  if (tab === "move" && s.move) {
+  if ((tab === "move" || tab === "drop") && s.move) {
     return (
       <>
         <span className="v2-num">
@@ -154,7 +155,7 @@ function Detail({ s, tab }: { s: BoardStock; tab: BoardTab["key"] }) {
 
   const notes: { cap: string; text: string | null; fallback: string }[] = [];
   if (s.surge) notes.push({ cap: "왜 뜨나", text: s.surge.line, fallback: "한 줄 요약은 오늘 집계가 끝나면 붙습니다." });
-  if (s.move) notes.push({ cap: "왜 움직였나", text: s.move.reason, fallback: "" });
+  if (s.move) notes.push({ cap: (s.move.change ?? 0) < 0 ? "왜 내렸나" : "왜 올랐나", text: s.move.reason, fallback: "" });
   if (s.talk) notes.push({ cap: "흐름 요약", text: s.talk.narrative, fallback: "흐름 요약은 오늘 집계가 끝나면 붙습니다." });
 
   /* 차례: 이름·시세 → 사실 한 줄 → AI 문장(이 패널의 주인공) → 언급 막대 → 테마 → 바로가기. */
@@ -249,7 +250,8 @@ export function StockBoard({ tabs, stocks }: { tabs: BoardTab[]; stocks: Record<
   const sel = code ? stocks[code] : undefined;
 
   return (
-    <div className="v2-board">
+    // 고를 종목이 없는 탭(급락 이유가 빈 날)은 상세 칸을 비워 두지 않고 표가 판 전체를 쓴다.
+    <div className={`v2-board${sel ? "" : " is-solo"}`}>
       <div className="v2-board-main">
         <header className="v2-p-head">
           <div className="v2-ptabs" role="tablist" aria-label="종목 목록">

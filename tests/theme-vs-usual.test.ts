@@ -99,7 +99,10 @@ describe("테마 줄", () => {
   it("국장·미장 모두 같은 평소 대비 막대를 쓴다 — 낙관도로 나누는 두 색 막대로 되돌리지 않는다", () => {
     for (const p of ["app/kadera/page.tsx", "app/kadera/us/page.tsx"]) {
       const src = read(p);
-      assert.ok(src.includes("<ThemeVsUsualRows themes={sentiment.byTheme} />"), p);
+      // v2 국장 카더라(2026-10-02 시제품)는 여론 패널에서 테마별 막대를 아예 뺐다 — 그리면 이 부품이어야 한다.
+      if (p === "app/kadera/us/page.tsx" || src.includes("ThemeVsUsualRows")) {
+        assert.ok(src.includes("<ThemeVsUsualRows themes={sentiment.byTheme} />"), p);
+      }
       assert.ok(!src.includes("width: `${t.pos}%`"), p);
     }
   });

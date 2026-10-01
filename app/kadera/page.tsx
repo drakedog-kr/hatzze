@@ -231,7 +231,9 @@ export default async function KaderaPage() {
     b.talk = { mentions: r.totalMentions, days: KADERA_WINDOW_DAYS, channels: r.channelCount, narrative: narratives[r.code] ?? null };
   }
   const moveRows = (why?.rows ?? []).slice(0, WHY_TILES);
-  for (const r of moveRows) {
+  // 급락 이유 — 5% 넘게 내린 줄만(lib/kadera-why.ts DOWN_MIN). 하루 몇 줄 안 된다.
+  const dropRows = (why?.down ?? []).slice(0, WHY_TILES);
+  for (const r of [...moveRows, ...dropRows]) {
     const b = boardBase(r.code, r.name, r.market);
     if (b.price === null && r.closePrice != null) {
       b.price = r.closePrice;
@@ -257,6 +259,16 @@ export default async function KaderaPage() {
       heads: ["등락률", "커뮤니티가 말한 이유"],
       codes: moveRows.map((r) => r.code),
       empty: whyFailed ? "이유를 불러오지 못했습니다." : "오늘 집계가 끝나면 채워집니다. 저녁 실행 뒤에 그날 것이 붙습니다.",
+    },
+    {
+      key: "drop",
+      label: "급락 이유",
+      note: why ? `${fmtKoDate(why.date)} 기준` : "그날 기준",
+      heads: ["등락률", "커뮤니티가 말한 이유"],
+      codes: dropRows.map((r) => r.code),
+      empty: whyFailed
+        ? "이유를 불러오지 못했습니다."
+        : "이날은 5% 넘게 내린 종목 가운데 커뮤니티가 이유를 말한 곳이 없습니다.",
     },
     {
       key: "talk",

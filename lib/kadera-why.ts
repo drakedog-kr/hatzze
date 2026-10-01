@@ -50,7 +50,22 @@ export type MoveReasonRow = {
 //    yahooBars 응답에서 `date` 이하 22거래일(한 달)의 종가를 잘라 넘기면 된다 — 일주일(5칸)은
 //    선이 되기엔 너무 짧아 한 달로 잡았었다. 야후 호출은 등락률 때문에 어차피 도므로 공짜다.
 
-export type MoveReasonBoard = { date: string; rows: MoveReasonRow[] };
+/**
+ * rows = 오른 줄(오름폭 순) · down = **크게 내린 줄**(내림폭 순, v2 '급락 이유' 탭, 2026-10-02).
+ * down 은 등락률을 실제로 구한 줄만 담는다 — 채널 글의 등락 표기는 크기·부호가 틀리는 날이 있어서다
+ * (SK하이닉스: 09-30 표기 +29.98 · KRX +0.62, 10-01 표기 -30).
+ */
+export type MoveReasonBoard = { date: string; rows: MoveReasonRow[]; down: MoveReasonRow[] };
+
+/**
+ * '급락'으로 세우는 문턱(%). 이보다 덜 내린 줄은 급락 탭에 안 올린다.
+ *
+ * 파이프라인이 내린 종목의 까닭도 만들지만(후보는 채널 글의 등락 표기 절댓값 순), 2026-09-16~10-01 열흘을 재 보니
+ * 하루 40줄 중 내린 줄은 0~6줄뿐이었고, 2~4% 내린 줄에는 '수혜 기대'·'공급 기대' 같은 **오를 까닭**이 붙어 있었다
+ * (그 종목이 회자된 까닭이지 내린 까닭이 아니다). 크게 내린 줄은 '매출 허위계상 의혹'·'임상 중단'·'합병 철회'처럼
+ * 내린 까닭이 맞는 편이라 문턱을 둔다. 문턱 위에도 어긋난 줄이 남는다 — 고치는 자리는 파이프라인 프롬프트다.
+ */
+const DOWN_MIN = -5;
 
 /** 표에서 읽어 오는 최대 줄 수. 파이프라인 상한(CAP=40)과 같다 */
 const BOARD_MAX = 40;
@@ -190,7 +205,7 @@ export const getMoveReasons = cache(async (): Promise<MaybeFailed<MoveReasonBoar
   const rows = ((data ?? []) as ReasonRow[])
     .map((r) => ({ ...r, reason: (r.reason ?? "").trim() }))
     .filter((r) => r.reason !== "");
-  if (!rows.length) return { date, rows: [] };
+  if (!rows.length) return { date, rows: [], down: [] };
 
   const info = await stockRows(rows.map((r) => r.stock_code));
   // 야후를 부를 줄 고르기 — KRX 확정값이 있으면 그것, 없으면 채널 글의 표기로 어림한다.
@@ -202,6 +217,10 @@ export const getMoveReasons = cache(async (): Promise<MaybeFailed<MoveReasonBoar
       .slice(0, QUOTE_ROWS)
       .map((r) => r.stock_code),
   );
+  // 급락 탭 몫 — 표기상 많이 내린 줄. 하루에 몇 줄 안 돼(DOWN_MIN 주석) 왕복이 얼마 안 는다.
+  for (const r of [...rows].filter((r) => hint(r) < 0).sort((a, b) => hint(a) - hint(b)).slice(0, BOARD_TILES)) {
+    willQuote.add(r.stock_code);
+  }
   const out: MoveReasonRow[] = rows.map((r) => {
     const s = info.get(r.stock_code);
     let changeRate: number | null = num(r.change_rate);
@@ -292,7 +311,17 @@ export const getMoveReasons = cache(async (): Promise<MaybeFailed<MoveReasonBoar
     if (!(await fillFromYahoo(boardOf().slice(0, BOARD_TILES)))) break;
   }
 
-  return { date, rows: boardOf() };
+  /** 급락 후보 — 등락률을 아직 못 구했으면 표기가 마이너스인 줄도 후보로 둔다(채워 보고 가른다). */
+  const downCandidates = (): MoveReasonRow[] =>
+    out
+      .filter((r) => (r.changeRate !== null ? r.changeRate <= DOWN_MIN : (r.quotedChange ?? 0) < 0))
+      .sort((a, b) => (a.changeRate ?? a.quotedChange ?? 0) - (b.changeRate ?? b.quotedChange ?? 0));
+  for (let round = 0; round < BOARD_MAX; round++) {
+    if (!(await fillFromYahoo(downCandidates().slice(0, BOARD_TILES)))) break;
+  }
+  const down = downCandidates().filter((r) => r.changeRate !== null && r.changeRate <= DOWN_MIN);
+
+  return { date, rows: boardOf(), down };
 });
 
 export type StockMoveReason = {
