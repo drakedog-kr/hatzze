@@ -1,7 +1,7 @@
 /**
  * 테마 리포트(/theme)의 이름과 문구 **한 벌**.
  *
- * 사이드바(AppShell)·푸터·페이지 메타데이터가 같은 라벨을 쓴다(app/daily/copy.ts 와 같은 이유).
+ * 사이드바(AppShell)·페이지 메타데이터가 같은 라벨을 쓴다(app/daily/copy.ts 와 같은 이유).
  *
  * ⚠️ 이 파일은 `server-only` 가 아니다 — 셸(클라이언트 컴포넌트)이 읽는다. DB 를 읽는
  *    것은 lib/theme-page.ts 에 있다.

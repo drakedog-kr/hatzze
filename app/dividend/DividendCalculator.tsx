@@ -352,8 +352,8 @@ export function DividendCalculator({
 
   // 히어로 라벨 옆 물음표는 세금을 어떻게 뗐는지 한 줄만 말한다. 시세 기준일·배당 기록 기준·'배당은 바뀔 수 있다'까지
   // 세 줄이던 것을 2026-09-30 에 줄였다(툴팁은 한 문장 — 이용자 지적 "너무 복잡해").
-  // 출처 이름은 여기 안 적는다(2026-09-13 지적) — 사이트 바닥글의 '데이터 출처'가 그 자리다(app/Footer.tsx,
-  // stockanalysis 는 약관이 출처 표기를 조건으로 발췌를 허용하므로 거기서 지우지 말 것).
+  // 출처 이름은 여기 안 적는다(2026-09-13 지적) — 이용약관 끝의 '데이터 출처'가 그 자리다(app/terms/page.tsx.
+  // 전 화면 푸터가 거기로 건너간다. stockanalysis 는 약관이 출처 표기를 조건으로 발췌를 허용하므로 거기서 지우지 말 것).
   const helpText = mixed
     ? `세금: 줄마다 고른 계좌로 — ${ACCOUNTS.map((a) => [a, byAccount(a.key).length] as const).filter(([, n]) => n > 0).map(([a, n]) => `${a.label} ${n}`).join(" · ")}`
     : TAX_HELP[taxMode];

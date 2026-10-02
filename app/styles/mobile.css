@@ -254,35 +254,6 @@
   }
 }
 
-/* 푸터 '데이터 출처' 두 칸. 넓을 땐 내용에 맞춰 두 칸(auto), 좁으면 한 칸으로 접는다.
-   ⚠️ 칸마다 min-width:140 이 있어야 출처 이름이 낱말 단위로 안 부서진다. 그런데 그
-   최소값 둘과 gap 32 를 더하면 312 라, 320px 화면(쓸 수 있는 폭 278)에서 넘쳤다.
-   ⭐ 문턱을 360 으로 둔 건 375 에서 이미 두 칸이 150.5px 씩 들어가기 때문이다 —
-     경계를 그 아래에 둬야 멀쩡한 폭을 건드리지 않는다. */
-/* 바로가기 두 단. 칸을 열 줄 한 단으로 두면 326px 세로였다(2026-09-22). */
-.hz-foot-nav {
-  columns: 2;
-  column-gap: 28px;
-}
-.hz-foot-nav > * { break-inside: avoid; }
-/* 출처 칸은 180 으로 못박는다 — auto 면 긴 목록이 한 줄로 늘어져 묶음이 577px 였고 브랜드 칸 옆에 못 섰다. */
-.hz-foot-sources {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(140px, 180px));
-  gap: 12px 32px;
-}
-.hz-foot-sources > * {
-  min-width: 0;
-}
-@media (max-width: 360px) {
-  .hz-foot-sources {
-    grid-template-columns: 1fr;
-  }
-  .hz-foot-sources > * {
-    min-width: 0;
-  }
-}
-
 /* 탑바의 '채널 등록 신청'. `hz-btn-soft` 를 그대로 쓰되 좌우 여백만 준다.
    ⚠️ **좁은 화면에서는 글자를 뺀다.** 탑바는 320px 에서 여유가 6px 밖에 안 남는
    자리라(햄버거가 잘려 못 누르던 것을 오늘 고쳤다), 90px 짜리 글자를 달고 있으면
