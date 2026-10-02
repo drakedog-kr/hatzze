@@ -59,22 +59,27 @@ export function SentimentModule({
   score,
   label,
   trend,
+  days,
 }: {
   score: number;
   label: string;
   trend: SentimentPoint[];
+  /** 큰 숫자가 본 날수(보통 2). 막대는 30일이라 둘을 갈라 적어야 한다 — 머리에 '최근 30일'만 두었더니 76% 도 30일 값으로 읽혔다. */
+  days: number;
 }) {
   const vals = trend.map((p) => p.score);
   const far = Math.max(10, ...vals.map((v) => Math.abs(v - 50)));
   const hi = vals.length ? Math.max(...vals) : score;
   const lo = vals.length ? Math.min(...vals) : score;
   return (
-    <Module id="mood" title="여론 낙관도" meta={`최근 ${vals.length || 1}일`}>
+    <Module id="mood" title="여론 낙관도" meta={`최근 ${days}일 시장 글`}>
       <div className="v2-mood">
         <div className="v2-mood-now">
           <b className={score >= 50 ? "is-up" : "is-down"}>{score}%</b>
           <span className="v2-tag">{label}</span>
         </div>
+        {/* 숫자의 정의 — lib/telegram-data.ts EcosystemSentiment.score(낙관 ÷ (낙관 + 비관), 중립 제외). */}
+        <p className="v2-mood-def">낙관하는 글과 비관하는 글 중 낙관하는 글의 비율입니다. 중립인 글은 뺍니다.</p>
         {vals.length > 1 && (
           <div className="v2-diverge" aria-hidden="true">
             {vals.map((v, i) => {
@@ -89,18 +94,18 @@ export function SentimentModule({
             })}
           </div>
         )}
+        {/* 막대 읽는 법을 바로 밑에 — '가운데 선 50%' 만으로는 위아래가 무슨 뜻인지 몰랐다. */}
+        <p className="v2-mood-cap">
+          지난 {vals.length}일 · 막대가 가운데 선 위면 낙관 우세, 아래면 비관 우세
+        </p>
         <dl className="v2-mood-foot">
           <div>
-            <dt>최고</dt>
+            <dt>{vals.length}일 최고</dt>
             <dd>{hi}%</dd>
           </div>
           <div>
             <dt>최저</dt>
             <dd>{lo}%</dd>
-          </div>
-          <div>
-            <dt>가운데 선</dt>
-            <dd>50%</dd>
           </div>
         </dl>
       </div>
@@ -120,11 +125,21 @@ export function ThemeHeat({ themes, hrefOf }: { themes: ThemeRotation[]; hrefOf:
   const days = Math.min(14, Math.max(0, ...rows.map((t) => t.series.length)));
   const max = Math.max(0.0001, ...rows.flatMap((t) => t.series.slice(-days)));
   return (
-    <Module id="themes" title="테마 점유율" meta={`최근 ${days}일 · 언급 비중`}>
+    <Module id="themes" title="테마 점유율" meta="종목 언급 중 테마별 비중">
       {rows.length === 0 ? (
         <p className="v2-empty">아직 집계된 테마가 없습니다.</p>
       ) : (
         <div className="v2-heat">
+          {/* 머리 줄 — 칸마다 무엇인지. 예전엔 '점유율 · %p' 를 표 밑에만 적어 오른쪽 두 숫자가 무엇인지 몰랐다. */}
+          <div className="v2-heat-row v2-heat-th" aria-hidden="true">
+            <span>테마</span>
+            <span className="v2-heat-span">
+              <span>{days}일 전</span>
+              <span>오늘</span>
+            </span>
+            <span>점유율</span>
+            <span>변화</span>
+          </div>
           <ol>
             {rows.map((t) => {
               const cells = t.series.slice(-days);
@@ -143,7 +158,7 @@ export function ThemeHeat({ themes, hrefOf }: { themes: ThemeRotation[]; hrefOf:
                   </span>
                   <span className="v2-heat-share">{t.sharePct.toFixed(1)}%</span>
                   <span className={`v2-heat-delta${d === null || d === 0 ? "" : d > 0 ? " is-up" : " is-down"}`}>
-                    {d === null || d === 0 ? "-" : `${sign(d)}${Math.abs(d).toFixed(1)}`}
+                    {d === null || d === 0 ? "-" : `${sign(d)}${Math.abs(d).toFixed(1)}%p`}
                   </span>
                 </>
               );
@@ -160,13 +175,10 @@ export function ThemeHeat({ themes, hrefOf }: { themes: ThemeRotation[]; hrefOf:
               );
             })}
           </ol>
-          <div className="v2-heat-axis" aria-hidden="true">
-            <span>{days}일 전</span>
-            <span>오늘</span>
-            <span className="v2-heat-axis-r">점유율 · %p</span>
-          </div>
         </div>
       )}
+      {/* 기간은 lib/telegram-data.ts 의 THEME_RECENT_DAYS(3) · THEME_PRIOR_GAP_DAYS(5). */}
+      <p className="v2-mod-note">칸이 진할수록 그날 많이 말한 테마입니다. 점유율은 최근 3일 평균이고, 변화는 5일 이상 지난 기간과 견준 차이입니다.</p>
     </Module>
   );
 }
@@ -182,14 +194,14 @@ function dayLabel(date: string, today: string): string {
 }
 
 /**
- * 다가오는 일정 — 채널 글이 날짜를 짚은 일정, 가까운 열까지. 몇 채널이 짚었는지를 근거로 단다.
+ * 다가오는 일정 — 채널 글이 날짜를 짚은 일정, 가까운 일곱까지(여론·테마 모듈에 읽는 법을 단 뒤 오른쪽 줄기가 길어져 열에서 줄였다). 몇 채널이 짚었는지를 근거로 단다.
  * 오른쪽 줄기의 맨 아래 모듈이라 왼쪽 줄기 끝까지 늘어난다(v2.css) — 남는 자리는 목록 아래 비고, 각주는 바닥에 붙는다.
  */
 export function EventsModule({ events, today, failed }: { events: UpcomingEvent[]; today: string; failed: boolean }) {
   const next = events
     .filter((e) => e.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date) || b.channels - a.channels)
-    .slice(0, 10);
+    .slice(0, 7);
   return (
     <Module id="events" title="다가오는 일정" meta="채널이 짚은 날짜">
       {failed ? (
@@ -204,7 +216,7 @@ export function EventsModule({ events, today, failed }: { events: UpcomingEvent[
               <span className="v2-ev-txt">
                 <b>{e.name}</b> {e.event}
               </span>
-              <span className="v2-ev-src">{e.channels}곳</span>
+              <span className="v2-ev-src">채널 {e.channels}곳</span>
             </li>
           ))}
         </ul>

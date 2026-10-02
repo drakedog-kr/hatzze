@@ -200,7 +200,7 @@
 .v2-tr {
   display: grid;
   /* 종목 칸을 168 로 못박는다 — fr 로 두면 표마다 남는 폭이 달라 등락률 칸이 1px 씩 어긋났다. */
-  grid-template-columns: 20px 168px 68px 64px 56px 48px minmax(0, 1fr);
+  grid-template-columns: 20px 168px 72px 64px 64px minmax(0, 1fr);
   align-items: center;
   column-gap: 12px;
   min-height: 40px;
@@ -211,7 +211,7 @@
   transition: background-color 0.15s;
 }
 .v2-tbl li:last-child .v2-tr { border-bottom: 0; }
-.v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px 68px 84px minmax(0, 1fr); }
+.v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px 72px 84px minmax(0, 1fr); }
 a.v2-tr:hover { background: var(--t-tint); }
 .v2-th {
   min-height: 30px;
@@ -221,7 +221,6 @@ a.v2-tr:hover { background: var(--t-tint); }
   color: var(--t-ink3);
 }
 .v2-th > :nth-child(n + 3) { text-align: right; }
-.v2-tbl:not(.is-move) .v2-th > :nth-child(6) { text-align: center; }
 .v2-th > :last-child { display: inline-flex; align-items: center; gap: 3px; text-align: left; }
 .v2-td-rank { text-align: center; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
 .v2-td-stock { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -241,7 +240,7 @@ a.v2-tr:hover { background: var(--t-tint); }
 .v2-td-num.is-hot,
 .v2-td-chg.is-up { color: var(--t-up); }
 .v2-td-chg.is-down { color: var(--t-down); }
-.v2-td-bars { display: flex; justify-content: center; }
+.v2-td-chg.is-none { font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-td-text {
   min-width: 0;
   font-weight: 500;
@@ -251,14 +250,6 @@ a.v2-tr:hover { background: var(--t-tint); }
   text-overflow: ellipsis;
 }
 .v2-td-text.is-pending { color: var(--t-ink3); }
-
-/* 7일 언급 막대 — 배수에 들어간 칸만 색, 가장 높은 칸이 가장 진하다 */
-.v2-bars { display: flex; align-items: flex-end; gap: 2px; width: 44px; height: 18px; }
-.v2-bars i { flex: 1; border-radius: 1px 1px 0 0; background: color-mix(in srgb, var(--t-up) 40%, transparent); }
-.v2-bars.is-cold i { background: color-mix(in srgb, var(--t-down) 38%, transparent); }
-.v2-bars i.is-off { background: var(--t-bar-off); }
-.v2-bars i.is-peak { background: var(--t-up); }
-.v2-bars.is-cold i.is-peak { background: var(--t-down); }
 
 /* 로고 — 원형. 로고가 없는 종목의 글자 배지는 회색 한 가지. */
 .v2-kd .hz-stock-logo,
@@ -303,6 +294,10 @@ a.v2-tr:hover { background: var(--t-tint); }
 .v2-dv-down { align-self: start; border-radius: 0 0 1px 1px; background: color-mix(in srgb, var(--t-down) 50%, transparent); }
 .v2-dv.is-last .v2-dv-up { background: var(--t-up); }
 .v2-dv.is-last .v2-dv-down { background: var(--t-down); }
+.v2-mood-def,
+.v2-mood-cap { margin: 0; font-size: 12px; font-weight: 500; line-height: 18px; color: var(--t-ink3); word-break: keep-all; }
+.v2-mood-def { margin-top: -4px; }
+.v2-mood-cap { margin-top: -4px; }
 .v2-mood-foot {
   display: flex;
   gap: 16px;
@@ -320,7 +315,7 @@ a.v2-tr:hover { background: var(--t-tint); }
 .v2-heat ol { list-style: none; margin: 0; padding: 0; }
 .v2-heat-row {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) 44px 32px;
+  grid-template-columns: 72px minmax(0, 1fr) 42px 50px;
   align-items: center;
   column-gap: 8px;
   min-height: 28px;
@@ -339,19 +334,15 @@ a.v2-heat-row:hover { background: var(--t-tint); }
 .v2-heat-delta { font-weight: 500; color: var(--t-ink3); }
 .v2-heat-delta.is-up { color: var(--t-up); font-weight: 600; }
 .v2-heat-delta.is-down { color: var(--t-down); font-weight: 600; }
-.v2-heat-axis {
-  display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) 84px;
-  column-gap: 8px;
-  padding: 4px 14px 0;
+.v2-heat-th {
+  min-height: 24px;
   font-size: 11px;
   font-weight: 500;
   line-height: 16px;
   color: var(--t-ink3);
 }
-.v2-heat-axis > :first-child { grid-column: 2; grid-row: 1; justify-self: start; }
-.v2-heat-axis > :nth-child(2) { grid-column: 2; grid-row: 1; justify-self: end; }
-.v2-heat-axis-r { grid-column: 3; grid-row: 1; text-align: right; }
+.v2-heat-th > :nth-child(n + 3) { text-align: right; }
+.v2-heat-span { display: flex; justify-content: space-between; }
 
 /* ── 다가오는 일정 ── */
 .v2-events { list-style: none; margin: 0; padding: 0; }
@@ -390,31 +381,25 @@ a.v2-heat-row:hover { background: var(--t-tint); }
 
 /* ── 폭에 따라 ─────────────────────────────────────────────────────────────
    판 1,100 이상: 오른쪽 줄기 340.
-   1,000~1,099(1,280~1,366 노트북): 오른쪽 줄기 300 · 표의 7일 막대 칸을 뺀다.
+   1,000~1,099(1,280~1,366 노트북): 오른쪽 줄기 300 · 종목 칸 160.
    1,000 미만: 한 줄기. 오른쪽 모듈은 표 아래로 내려가 두 칸 격자.
    680 미만: 표 줄이 두 층(종목 · 값 · 등락 / 문장 2줄), 오른쪽 모듈 한 칸. */
 @container kd (max-width: 1099px) {
   .v2-grid { grid-template-columns: minmax(0, 1fr) 300px; }
-  .v2-tr { grid-template-columns: 20px 160px 68px 64px 56px minmax(0, 1fr); }
-  .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 160px 68px 84px minmax(0, 1fr); }
-  .v2-td-bars,
-  .v2-tbl:not(.is-move) .v2-th > :nth-child(6) { display: none; }
+  .v2-tr { grid-template-columns: 20px 160px 72px 64px 64px minmax(0, 1fr); }
+  .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 160px 72px 84px minmax(0, 1fr); }
 }
 @container kd (max-width: 999px) {
   .v2-grid { grid-template-columns: minmax(0, 1fr); }
   .v2-rail { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
   .v2-col > .v2-mod:last-child { flex: none; }
-  .v2-tr { grid-template-columns: 20px 168px 68px 64px 56px 48px minmax(0, 1fr); }
-  .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px 68px 84px minmax(0, 1fr); }
-  .v2-td-bars { display: flex; }
-  .v2-tbl:not(.is-move) .v2-th > :nth-child(6) { display: block; }
+  .v2-tr { grid-template-columns: 20px 168px 72px 64px 64px minmax(0, 1fr); }
+  .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px 72px 84px minmax(0, 1fr); }
   .v2-cover-cell { flex: 1 1 auto; }
 }
 @container kd (max-width: 799px) {
-  .v2-td-bars,
-  .v2-tbl:not(.is-move) .v2-th > :nth-child(6) { display: none; }
-  .v2-tr { grid-template-columns: 20px 150px 68px 64px 56px minmax(0, 1fr); }
-  .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 150px 68px 84px minmax(0, 1fr); }
+  .v2-tr { grid-template-columns: 20px 150px 72px 64px 64px minmax(0, 1fr); }
+  .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 150px 72px 84px minmax(0, 1fr); }
 }
 @container kd (max-width: 679px) {
   .v2-rail { grid-template-columns: minmax(0, 1fr); }
@@ -436,6 +421,10 @@ a.v2-heat-row:hover { background: var(--t-tint); }
   .v2-td-rank { grid-area: rank; }
   .v2-td-stock { grid-area: stock; }
   .v2-td-c0 { grid-area: n1; }
+  /* 머리 줄이 없으니 값 앞에 그 칸 이름을 붙인다('평소의 6.2배' · '언급 805회' · '종가 10,850원'). */
+  .v2-td-c0[data-k]::before { content: attr(data-k) " "; font-weight: 500; color: var(--t-ink3); }
+  /* 꼬리표('첫 언급')까지 서면 종목 이름이 잘린다(375 에서 세미파이브 · 코스모로보틱스). 폰에선 이름이 먼저다. */
+  .v2-badge { display: none; }
   .v2-td-chg { grid-area: chg; }
   .v2-td-c1 { display: none; }
   .v2-td-text {

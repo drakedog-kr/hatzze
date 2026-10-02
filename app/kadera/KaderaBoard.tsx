@@ -11,6 +11,9 @@ import { Module } from "./V2Modules";
  * 토스 홈의 얼개 그대로라 걷었다. 대신 줄이 문장을 한 줄로 끝까지 싣고, 잘린 문장은 줄에 마우스를 올리면 전문이
  * 뜬다(title). 줄을 누르면 그 종목 화면 — 거기가 종목 하나의 자료를 다 모은 자리다.
  * 조회는 하지 않는다 — 서버(page.tsx)가 줄을 다 만들어 넘긴다.
+ *
+ * 2026-10-02 '헷갈리는 것 걷기'로 뺀 것: 7일 언급 막대 칸. 한 화면에 기간이 2·3·7·14·30일로 다섯 갈래라 무엇이 며칠인지
+ * 놓쳤고, 급부상은 빨강·많이 언급은 파랑이라 같은 막대가 표마다 색이 달랐다. 흐름은 종목 화면에서 본다.
  */
 export type BoardRow = {
   code: string;
@@ -18,10 +21,10 @@ export type BoardRow = {
   market: string | null;
   change: number | null;
   tag?: string;
+  /** 꼬리표에 마우스를 올리면 뜨는 뜻(15자 안). */
+  tagTip?: string;
   /** 등락률 뒤 숫자 칸들(이미 꼴을 갖춘 글자). hot 이면 빨간 잉크. */
   cells: { v: string; hot?: boolean }[];
-  /** 7일 언급 막대. 없으면 그 칸을 비운다. */
-  bars?: { values: number[]; hot: number; tone: "warm" | "cold" } | null;
   /** 마지막 칸 문장(한 줄로 자르고, 전문은 title). */
   text: string | null;
   pending?: string;
@@ -33,6 +36,8 @@ export type BoardSection = {
   meta?: string;
   kind: "surge" | "move" | "talk";
   heads: string[];
+  /** 첫 숫자 칸의 이름(폰에서 값 앞에 붙는다). 폰은 표 머리 줄을 숨겨 '6.2배'만 남으면 무엇의 배수인지 몰랐다. */
+  key0?: string;
   /** 마지막 칸이 생성형 AI 문장이면 그 머리에 AI 표시(이용약관 4조). */
   aiText?: boolean;
   rows: BoardRow[];
@@ -41,20 +46,6 @@ export type BoardSection = {
 
 const pct = (r: number) => `${r > 0 ? "+" : r < 0 ? "-" : ""}${Math.abs(r).toFixed(2)}%`;
 const chgCls = (r: number | null) => (r === null ? "" : r > 0 ? " is-up" : r < 0 ? " is-down" : "");
-
-function Bars({ values, hot, tone }: { values: number[]; hot: number; tone: "warm" | "cold" }) {
-  const max = Math.max(1, ...values);
-  const start = values.length - Math.min(hot, values.length);
-  let peak = -1;
-  for (let i = start; i < values.length; i++) if (peak < 0 || values[i] > values[peak]) peak = i;
-  return (
-    <span className={`v2-bars is-${tone}`} aria-hidden="true">
-      {values.map((v, i) => (
-        <i key={i} className={i < start ? "is-off" : i === peak ? "is-peak" : undefined} style={{ height: v > 0 ? `max(3px, ${(v / max) * 100}%)` : 2 }} />
-      ))}
-    </span>
-  );
-}
 
 export function SignalTable({ sec }: { sec: BoardSection }) {
   const last = sec.heads.length - 1;
@@ -80,15 +71,19 @@ export function SignalTable({ sec }: { sec: BoardSection }) {
                   <span className="v2-td-stock">
                     <StockLogo code={r.code} name={r.name} market={r.market} size={22} />
                     <span className="v2-td-name">{r.name}</span>
-                    {r.tag && <span className="v2-badge">{r.tag}</span>}
+                    {r.tag && (
+                      <span className={`v2-badge${r.tagTip ? " hz-tip" : ""}`} data-tip={r.tagTip}>
+                        {r.tag}
+                      </span>
+                    )}
                   </span>
-                  <span className={`v2-td-num v2-td-chg${chgCls(r.change)}`}>{r.change === null ? "-" : pct(r.change)}</span>
+                  {/* 값이 없으면 '-' 대신 '없음' — 바로 옆 칸들의 '-0.73%' 와 같은 글자라 내렸다는 뜻으로 읽혔다. */}
+                  <span className={`v2-td-num v2-td-chg${chgCls(r.change)}${r.change === null ? " is-none" : ""}`}>{r.change === null ? "없음" : pct(r.change)}</span>
                   {r.cells.map((c, k) => (
-                    <span key={k} className={`v2-td-num v2-td-c${k}${c.hot ? " is-hot" : ""}`}>
+                    <span key={k} className={`v2-td-num v2-td-c${k}${c.hot ? " is-hot" : ""}`} data-k={k === 0 ? sec.key0 : undefined}>
                       {c.v}
                     </span>
                   ))}
-                  {sec.kind !== "move" && <span className="v2-td-bars">{r.bars && <Bars values={r.bars.values} hot={r.bars.hot} tone={r.bars.tone} />}</span>}
                   <span className={`v2-td-text${r.text ? "" : " is-pending"}`}>{r.text ?? r.pending ?? ""}</span>
                 </Link>
               </li>

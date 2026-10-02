@@ -179,9 +179,10 @@ export default async function KaderaPage() {
     market: s.market,
     // 야후 실시간이 아니면(KRX 저장 종가 폴백) 등락률을 비운다 — 그날 것이라 방향까지 뒤집혀 보인다(QuoteDate 주석).
     change: s.isLive ? s.changeRate : null,
-    tag: s.isNew ? "신규" : undefined,
+    // '신규'는 신규 상장으로 읽혔다(그날 표엔 진짜 신규 상장 종목도 있었다). 뜻은 '평소 기간엔 언급이 없던 종목'(lib/surging-score.ts baseShare 0).
+    tag: s.isNew ? "첫 언급" : undefined,
+    tagTip: s.isNew ? "평소엔 언급이 없던 종목" : undefined,
     cells: [{ v: `${s.ratio.toFixed(1)}배`, hot: true }, { v: `${s.recentMentions}회` }],
-    bars: { values: s.series.slice(-7), hot: s.recentDays, tone: "warm" },
     text: surgeLines[s.code] ?? null,
     pending: "집계가 끝나면 붙습니다",
   }));
@@ -202,28 +203,33 @@ export default async function KaderaPage() {
     market: r.market,
     change: r.changeRate,
     cells: [{ v: `${r.totalMentions.toLocaleString("ko-KR")}회` }, { v: r.channelCount !== null ? `${r.channelCount}곳` : "-" }],
-    bars: { values: r.series.slice(-7).map((d) => d.mentions), hot: r.series.slice(-7).filter((d) => d.scored).length, tone: "cold" },
     text: narratives[r.code] ?? null,
     pending: "집계가 끝나면 붙습니다",
   }));
 
+  /* ⚠️ 등락률은 표마다 **날이 다르다.** 급부상·많이 언급은 지금 시세(야후)이고, 움직인 종목은 그날 장 마감 값이다.
+     머리를 둘 다 '등락률'로 두었더니 한 종목(윈팩)이 두 표에서 +6.27% · +26.03% 로 달라 헷갈렸다(2026-10-02) — 머리에 날을 붙인다. */
+  const whyDay = why ? why.date.slice(5).split("-").map(Number).join("/") : null;
   const sections: BoardSection[] = [
     {
       id: "surging",
       title: "급부상 종목",
-      meta: `최근 ${surgeDays}일 언급 · 평소와 견줌`,
+      meta: `최근 ${surgeDays}일 언급이 평소보다 크게 는 종목`,
       kind: "surge",
-      heads: ["", "종목", "등락률", "평소 대비", `${surgeDays}일 언급`, "7일", "왜 뜨나"],
+      heads: ["", "종목", "지금 등락", "평소 대비", `${surgeDays}일 언급`, "왜 뜨나"],
+      key0: "평소의",
       aiText: true,
       rows: surgeRows,
       empty: "아직 급부상 신호가 뚜렷한 종목이 없습니다.",
     },
     {
       id: "why",
-      title: "오늘 움직인 종목",
-      meta: why ? `${fmtKoDate(why.date)} 종가 · 채널 글이 말한 까닭` : "채널 글이 말한 까닭",
+      // '오늘'이라 적으면 안 된다 — 아침에 보면 어제 장 마감의 일이다. 날은 근거 자리에 적는다.
+      title: "크게 움직인 종목",
+      meta: why ? `${fmtKoDate(why.date)} 장 마감 기준 · 채널 글이 말한 까닭` : "채널 글이 말한 까닭",
       kind: "move",
-      heads: ["", "종목", "등락률", "종가", "까닭"],
+      heads: ["", "종목", whyDay ? `${whyDay} 등락` : "등락", "종가", "움직인 까닭"],
+      key0: "종가",
       aiText: true,
       rows: moveRows,
       empty: whyFailed ? "까닭을 불러오지 못했습니다." : "오늘 집계가 끝나면 채워집니다. 저녁 실행 뒤에 그날 것이 붙습니다.",
@@ -231,44 +237,39 @@ export default async function KaderaPage() {
     {
       id: "talk",
       title: "많이 언급된 종목",
-      meta: `최근 ${KADERA_WINDOW_DAYS}일 언급 수`,
+      meta: `최근 ${KADERA_WINDOW_DAYS}일 언급이 많은 순`,
       kind: "talk",
-      heads: ["", "종목", "등락률", "언급", "채널", "7일", "흐름 요약"],
+      heads: ["", "종목", "지금 등락", "언급", "말한 채널", "흐름 요약"],
+      key0: "언급",
       aiText: true,
       rows: talkRows,
       empty: "아직 리포트를 만들 종목이 없습니다.",
     },
   ];
 
-  /* 첫 줄 — 집계 개요. 블록웍스의 'Market Overview' 띠처럼 작은 이름 위에 값. 숫자마다 근거(기간)를 단다. */
-  const newCount = surging.filter((x) => x.isNew).length;
+  /* 첫 줄 — 개요. 블록웍스의 'Market Overview' 띠처럼 작은 이름 위에 값. 숫자마다 근거(기간)를 단다.
+     '급부상 6종목 · 신규 2' 칸은 뺐다 — 바로 아래 표가 같은 말을 하고, '신규'가 무슨 뜻인지 띠만 봐서는 몰랐다(2026-10-02). */
   const topTheme = themes[0];
   const cover: { k: string; v: string; sub?: string; live?: boolean }[] = [
-    { k: "집계", v: summary.lastUpdated ? shortKst(summary.lastUpdated) : "준비 중", live: true },
-    ...(sentiment ? [{ k: "분석한 글", v: `${sentiment.messageCount.toLocaleString("ko-KR")}건`, sub: `최근 ${sentiment.windowDays}일` }] : []),
-    { k: "급부상", v: `${surging.length}종목`, sub: newCount > 0 ? `신규 ${newCount}` : undefined },
-    ...(topTheme ? [{ k: "가장 많이 말한 테마", v: topTheme.theme, sub: `${topTheme.sharePct.toFixed(1)}%` }] : []),
+    { k: "업데이트", v: summary.lastUpdated ? shortKst(summary.lastUpdated) : "준비 중", live: true },
+    ...(sentiment ? [{ k: "읽은 채널 글", v: `${sentiment.messageCount.toLocaleString("ko-KR")}건`, sub: `최근 ${sentiment.windowDays}일` }] : []),
+    ...(topTheme ? [{ k: "가장 많이 말한 테마", v: topTheme.theme, sub: `언급의 ${topTheme.sharePct.toFixed(1)}%` }] : []),
   ];
 
   /* 화제어 — 오른쪽 줄기 맨 아래 모듈. 칩마다 언급 수와 점유율 변화. */
   const keywordModule = (
-    <Module id="keywords" title="화제어" meta="최근 3일 · 종목명이 아닌 말">
+    <Module id="keywords" title="화제어" meta="종목 이름 말고 많이 나온 말 · 최근 3일">
       {keywords.length === 0 ? (
         <p className="v2-empty">아직 뽑을 화제어가 없습니다.</p>
       ) : (
         <ul className="v2-chips">
+          {/* 칩마다 붙던 점유율 변화(+2.5)는 뺐다 — 단위 없는 숫자가 언급 수 옆에 하나 더 붙어 무슨 값인지 몰랐다(2026-10-02).
+              새로 떠오른 말은 오늘의 요약이 문장으로 짚는다. */}
           {keywords.slice(0, 12).map((k) => {
-            const d = k.shareDelta === null ? null : k.shareDelta * 100;
             return (
               <li key={k.word} className="v2-chip">
                 <b>{k.word}</b>
-                <span>{k.count.toLocaleString("ko-KR")}</span>
-                {d !== null && Math.abs(d) >= 0.05 && (
-                  <span className={d > 0 ? "is-up" : "is-down"}>
-                    {d > 0 ? "+" : "-"}
-                    {Math.abs(d).toFixed(1)}
-                  </span>
-                )}
+                <span>{k.count.toLocaleString("ko-KR")}회</span>
               </li>
             );
           })}
@@ -304,13 +305,8 @@ export default async function KaderaPage() {
       <div className="v2-grid">
         {/* 왼쪽 줄기 — 오늘의 요약 → 신호 표 셋 */}
         <div className="v2-col">
-          <Module
-            id="brief"
-            title="오늘의 요약"
-            ai
-            meta={summary.lastUpdated ? `${shortKst(summary.lastUpdated)} 작성` : undefined}
-            aside={sentiment ? `근거 글 ${sentiment.messageCount.toLocaleString("ko-KR")}건` : undefined}
-          >
+          {/* 시각과 글 수는 개요 띠에 있다 — 여기 또 적으면 같은 숫자가 한 화면에 두 번 뜬다. */}
+          <Module id="brief" title="오늘의 요약" ai>
             <div className="v2-brief">
               {(() => {
                 const used = new Set<string>();
@@ -328,7 +324,7 @@ export default async function KaderaPage() {
         {/* 오른쪽 줄기 — 여론 · 테마 · 화제어 · 일정 */}
         <div className="v2-col v2-rail">
           {sentiment ? (
-            <SentimentModule score={sentiment.score} label={sentiment.label} trend={sentiment.trend ?? []} />
+            <SentimentModule score={sentiment.score} label={sentiment.label} trend={sentiment.trend ?? []} days={sentiment.windowDays} />
           ) : (
             <Module id="mood" title="여론 낙관도">
               <p className="v2-empty">{sentimentFailed ? "감성 집계를 불러오지 못했습니다." : "아직 분석된 메시지가 없습니다."}</p>
