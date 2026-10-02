@@ -530,7 +530,7 @@ export default async function UsKaderaPage() {
 
         {/* 각주 문장이 있던 자리다. 화면 부제와 같은 말이라 뺐고(토스 라이팅의 Remove empty
             sentences) 대신 아래 시트로 데려가는 칩을 세운다 — 국장과 같은 어법이다.
-            '신호 아님' 고지는 푸터 면책이 전 화면에서 든다. */}
+            '신호 아님' 고지는 투자 유의사항(/disclaimer)이 든다. */}
         {spotlights.length > 0 && (
           <div className="hz-tx-note hz-tx-spot">
             <span className="hz-tx-spot-cap">오늘 눈에 띄는 것</span>

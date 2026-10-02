@@ -72,6 +72,7 @@ export const SITEMAP_ENTRIES: SitemapEntry[] = [
   // 매일 헛걸음하므로 yearly·낮은 우선순위로 둔다.
   { path: "/terms", changeFrequency: "yearly", priority: 0.3 },
   { path: "/privacy", changeFrequency: "yearly", priority: 0.3 },
+  { path: "/disclaimer", changeFrequency: "yearly", priority: 0.3 },
   // 버전을 올릴 때만 바뀐다. 법정 고지보다는 자주, 지표 화면보다는 훨씬 드물다. 수정일은 최신 판의 배포일이다.
   // (약관·개인정보는 시행일이 적혀 있지만 고친 판이 시행일보다 먼저 올라가 수정일로 못 쓴다 — app/legal.tsx.)
   { path: "/changelog", changeFrequency: "monthly", priority: 0.3, lastmod: RELEASES[0].date },

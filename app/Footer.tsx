@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { SOURCES_HREF } from "./legal";
+import { DISCLAIMER_HREF } from "./legal";
 import { BetaBadge, GhostSymbol, Wordmark } from "./Logo";
 import { C } from "./ui";
 import { VersionLink } from "./VersionBadge";
@@ -8,17 +8,18 @@ import { VersionLink } from "./VersionBadge";
 /** 문의 창구. 여기 한 곳만 바꾸면 본문 문구와 mailto: 가 같이 따라온다. */
 const CONTACT_EMAIL = "hatzze@proton.me";
 
-// 푸터에는 소개 · 문의 · 법정 고지만 둔다. 색은 전부 CSS 변수(C.*)라 라이트/다크가 함께 전환된다.
+// 푸터에는 소개 · 문의 · 문서 링크(이용약관 · 개인정보처리방침 · 투자 유의사항) · 저작권만 둔다.
+// 색은 전부 CSS 변수(C.*)라 라이트/다크가 함께 전환된다.
 //
-// 2026-10-02 에 '바로가기'와 '데이터 출처' 두 칸을 걷었다(요청).
-//   · 바로가기 — 같은 목록이 사이드바와 폰의 햄버거 메뉴에 있다(텔레그램 채널까지). 푸터에만 있던
-//     주소(이용약관 · 개인정보처리방침 · 업데이트 기록)는 아래 줄과 버전 표기가 그대로 가리킨다.
-//     검색엔진도 이 셋을 사이트맵으로 찾는다.
-//   · 데이터 출처 — 목록째 이용약관 끝의 '데이터 출처'로 옮겼다(app/terms/page.tsx 의 SOURCE_GROUPS).
-//     ⚠️ 단 **'한국거래소 통계정보' 한 마디는 여기 남는다.** KRX OPEN API 이용약관 제10조 ③ 이 "결과를
-//     사용하여 화면을 제작한 경우, **해당 화면에** '한국거래소 통계정보'를 사용한 결과임을 명시"하라고
-//     글자 그대로 요구한다. 약관 페이지 한 곳에만 적으면 다른 화면이 그 명시를 잃는다. 푸터는 전 화면
-//     공통이라 이 한 문장으로 모든 화면의 의무가 채워진다 — 지우지 말 것. 글자도 바꾸지 말 것.
+// 2026-10-02 에 걷은 것(요청).
+//   · '바로가기' — 같은 목록이 사이드바와 폰의 햄버거 메뉴에 있다(텔레그램 채널까지). 푸터에만 있던
+//     주소(이용약관 · 개인정보처리방침 · 업데이트 기록)는 아래 줄과 버전 표기가 그대로 가리키고, 사이트맵에도 있다.
+//   · '데이터 출처' 목록과 면책 문장("투자 조언이나 매수·매도 추천이 아닙니다…") — 투자 유의사항(app/disclaimer/page.tsx)으로
+//     모았다. 토스증권처럼 고지는 한 페이지에 두고 모든 화면에서 링크로 닿게 한다.
+//   · '한국거래소 통계정보' 문장 — KRX OPEN API 이용약관 제10조 ③ 은 KRX 자료로 만든 '해당 화면에' 이 문구를 적으라고
+//     하지만, **운영자가 알고서 화면마다 적지 않기로 했다**(2026-10-02). stockanalysis.com·공공데이터포털의 출처 표기 조건도
+//     같은 결정이다 — 이름은 투자 유의사항의 '데이터 출처'에만 있다.
+//     ⛔ 다시 넣자고 제안하지 말 것. 이 결정은 위험을 듣고 내린 것이다.
 
 /**
  * @param year 저작권 연도. **서버가 한국 시각으로 정해** 넘긴다(app/layout.tsx → AppShell).
@@ -102,9 +103,8 @@ export default function Footer({ year }: { year: number }) {
         </p>
       </div>
 
-      {/* 하단 바: 면책 + 출처 + 저작권 */}
-      {/* 윗선 하나로 본문과 갈라 둔다 — 토스 푸터의 맨 아랫줄(회사 정보·저작권)이 그 꼴이다.
-          면책 문장은 법률 고지라 글자를 키우지 않고(12) 색만 유지한다. */}
+      {/* 하단 바: 문서 링크 + 저작권 */}
+      {/* 윗선 하나로 본문과 갈라 둔다 — 토스 푸터의 맨 아랫줄(회사 정보·저작권)이 그 꼴이다. */}
       <div
         style={{
           marginTop: 36,
@@ -117,23 +117,9 @@ export default function Footer({ year }: { year: number }) {
           alignItems: "center",
         }}
       >
-        <div style={{ fontSize: "var(--fs-12)", lineHeight: 1.6, color: "var(--c-muted)" }}>
-          <p style={{ margin: 0 }}>
-            이 서비스는 재미와 참고를 위한 정보 제공 목적이며, 투자 조언이나 매수·매도 추천이 아닙니다. 모든 투자 판단과 책임은 이용자 본인에게 있습니다.
-          </p>
-          {/* ⚠️ '한국거래소 통계정보'는 KRX 약관이 지정한 글자다(위 머리 주석). 나머지 출처는 이용약관 끝에 모았다. */}
-          <p style={{ margin: 0 }}>
-            시세와 통계 일부는 한국거래소 통계정보를 사용한 결과입니다. 자료 출처는{" "}
-            <Link href={SOURCES_HREF} className="hz-footer-link" style={{ textDecoration: "underline", textUnderlineOffset: 2 }}>
-              데이터 출처
-            </Link>
-            에 모아 두었습니다.
-          </p>
-        </div>
-        {/* 이용약관·개인정보처리방침은 법정 고지라 저작권 옆에 둔다. 좁은 화면에서 두 줄로
-            갈리더라도 한 덩어리로 붙어 있게 감싼다.
-            순서는 이용약관이 먼저다 — 서비스 전반을 정하는 쪽이 앞이고, 처리방침은 그중
-            개인정보 한 갈래를 따로 떼어 놓은 문서다(약관 10항이 그쪽을 가리킨다). */}
+        {/* 문서 셋은 법정 고지라 서비스 메뉴(사이드바)가 아니라 저작권 줄에 둔다. 좁은 화면에서 두 줄로 갈리더라도
+            한 덩어리로 붙어 있게 감싼다. 순서는 이용약관이 먼저다 — 서비스 전반을 정하는 쪽이 앞이고, 처리방침은 그중
+            개인정보 한 갈래를 떼어 놓은 문서다(약관 10항이 그쪽을 가리킨다). 투자 유의사항은 약관 3·4·5조를 줄인 안내라 끝. */}
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <Link href="/terms" className="hz-footer-link" style={{ fontSize: "var(--fs-12)", fontWeight: 600 }}>
             이용약관
@@ -141,8 +127,11 @@ export default function Footer({ year }: { year: number }) {
           <Link href="/privacy" className="hz-footer-link" style={{ fontSize: "var(--fs-12)", fontWeight: 600 }}>
             개인정보처리방침
           </Link>
-          <p style={{ margin: 0, fontSize: "var(--fs-12)", fontWeight: 600, color: "var(--c-muted)" }}>Copyright © {year} hatzze.</p>
+          <Link href={DISCLAIMER_HREF} className="hz-footer-link" style={{ fontSize: "var(--fs-12)", fontWeight: 600 }}>
+            투자 유의사항
+          </Link>
         </div>
+        <p style={{ margin: 0, fontSize: "var(--fs-12)", fontWeight: 600, color: "var(--c-muted)" }}>Copyright © {year} hatzze.</p>
       </div>
     </footer>
   );
