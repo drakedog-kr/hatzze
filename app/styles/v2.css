@@ -177,8 +177,10 @@
 }
 .v2-band .v2-themes { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 8px; }
 
-/* ── 아래 — 왼쪽 표 셋 + 화제어 · 오른쪽 오늘의 요약 ──
-   요약 칸은 2차의 읽기 칸 자리라 화면에 붙어 따라온다(sticky) — 표가 길어도 오른쪽이 비지 않는다. */
+/* ── 셋째 줄 — 왼쪽 표 둘 · 오른쪽 오늘의 요약 ──
+   ⭐ 줄 높이는 **왼쪽 표 둘이 정한다.** 요약 칸은 높이에 끼지 않고(absolute) 그 높이를 꽉 채운다 — 글이 짧으면 칸이 안 줄어
+   빈틈이 없고, 길면 칸 안에서 스크롤한다. 오른쪽 아래 공백을 없애려는 것이다(2026-10-02 "공백은 있으면 안 된다").
+   sticky 로 따라오게 했을 땐 왼쪽이 표 셋 + 화제어라 요약 아래가 1,000px 가까이 비었다. */
 .v2-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
@@ -186,13 +188,9 @@
   gap: 12px;
 }
 .v2-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.v2-rail > .v2-mod {
-  position: sticky;
-  top: 12px;
-  max-height: calc(100vh - 120px);
-  overflow-y: auto;
-  scrollbar-width: thin;
-}
+.v2-rail { position: relative; }
+.v2-rail > .v2-mod { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.v2-rail .v2-brief { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
 
 /* 오늘의 요약 */
 .v2-brief { padding: 12px 16px 16px; font-size: 14px; font-weight: 500; line-height: 1.75; color: var(--t-ink2); word-break: keep-all; }
@@ -267,22 +265,8 @@ a.v2-tr:hover { background: var(--t-tint); }
 }
 .v2-td-text.is-pending { color: var(--t-ink3); }
 
-/* 많이 언급 — 두 층. 숫자 칸은 다른 표와 같은 자리(등락률이 한 세로줄)에 두고, 흐름 요약은 둘째 층에서 종목 칸부터 끝까지 쓴다.
-   한 칸에 넣으면 첫 문장(65자 안팎)도 판 1,280 에서 세 줄을 넘어 잘렸다(2026-10-02). */
-.v2-tbl.is-talk .v2-tr {
-  grid-template-columns: 20px 168px 72px 64px minmax(0, 1fr);
-  grid-template-areas:
-    "rank stock chg  n1   ."
-    ".    text  text text text";
-}
-.v2-tbl.is-talk .v2-th { grid-template-areas: none; }
-.v2-tbl.is-talk .v2-th > :last-child { display: none; }
-.v2-tbl.is-talk .v2-td-rank { grid-area: rank; }
-.v2-tbl.is-talk .v2-td-stock { grid-area: stock; }
-.v2-tbl.is-talk .v2-td-chg { grid-area: chg; }
-.v2-tbl.is-talk .v2-td-c0 { grid-area: n1; }
-.v2-tbl.is-talk ol .v2-td-text { grid-area: text; padding: 0 0 10px; -webkit-line-clamp: 2; }
-.v2-tbl.is-talk ol .v2-tr { padding-top: 6px; }
+/* 많이 언급 — 판 폭 전체에 서는 표라 넓은 판에선 다른 표와 같은 한 줄이다(문장 칸 ≈760px, 첫 문장이 두 줄 안에 든다).
+   좁은 판(1,000 미만)에선 두 층 — 숫자 줄 아래 흐름 요약이 판 폭을 다 쓴다(아래 폭 규칙). 한 층으로 두면 첫 문장(65자 안팎)이 세 줄을 넘겼다. */
 
 /* 로고 — 원형. 로고가 없는 종목의 글자 배지는 회색 한 가지. */
 .v2-kd .hz-stock-logo,
@@ -455,6 +439,8 @@ a.v2-ev-row:hover { background: var(--t-tint); }
 @container kd (max-width: 1099px) {
   .v2-band { grid-template-columns: 216px minmax(0, 1fr) 300px; }
   .v2-grid { grid-template-columns: minmax(0, 1fr) 300px; }
+  /* 요약 칸이 300 으로 좁아지면 14px 로는 표 둘 높이를 한 줄 넘겼다(1,280 에서 20px) — 칸 안 스크롤이 생기지 않게 한 단 줄인다. */
+  .v2-rail .v2-brief { font-size: 13px; line-height: 1.9; }
   .v2-tr,
   .v2-tbl.is-talk .v2-tr { grid-template-columns: 20px 160px 72px 64px minmax(0, 1fr); }
   .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 160px 72px minmax(0, 1fr); }
@@ -462,9 +448,25 @@ a.v2-ev-row:hover { background: var(--t-tint); }
 @container kd (max-width: 999px) {
   .v2-band { grid-template-columns: 216px minmax(0, 1fr); }
   .v2-band > #events { grid-column: 1 / -1; }
+  /* 많이 언급 두 층 — 숫자 줄 아래 흐름 요약이 판 폭을 다 쓴다. 칸이 좁아 한 층이면 첫 문장이 세 줄을 넘겼다(2026-10-02). */
+  .v2-tbl.is-talk .v2-tr {
+    grid-template-areas:
+      "rank stock chg  n1   ."
+      ".    text  text text text";
+  }
+  .v2-tbl.is-talk .v2-th { grid-template-areas: none; }
+  .v2-tbl.is-talk .v2-th > :last-child { display: none; }
+  .v2-tbl.is-talk .v2-td-rank { grid-area: rank; }
+  .v2-tbl.is-talk .v2-td-stock { grid-area: stock; }
+  .v2-tbl.is-talk .v2-td-chg { grid-area: chg; }
+  .v2-tbl.is-talk .v2-td-c0 { grid-area: n1; }
+  .v2-tbl.is-talk ol .v2-td-text { grid-area: text; padding: 0 0 10px; -webkit-line-clamp: 2; }
+  .v2-tbl.is-talk ol .v2-tr { padding-top: 6px; }
+
   .v2-grid { grid-template-columns: minmax(0, 1fr); }
-  .v2-rail { order: -1; }
-  .v2-rail > .v2-mod { position: static; max-height: none; overflow: visible; }
+  .v2-rail { order: -1; position: static; }
+  .v2-rail > .v2-mod { position: static; }
+  .v2-rail .v2-brief { overflow: visible; }
   .v2-tr,
   .v2-tbl.is-talk .v2-tr { grid-template-columns: 20px 168px 72px 64px minmax(0, 1fr); }
   .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px 72px minmax(0, 1fr); }

@@ -278,8 +278,8 @@ export default async function KaderaPage() {
         <ul className="v2-chips">
           {/* 칩마다 붙던 점유율 변화(+2.5)는 뺐다 — 단위 없는 숫자가 언급 수 옆에 하나 더 붙어 무슨 값인지 몰랐다(2026-10-02).
               새로 떠오른 말은 오늘의 요약이 문장으로 짚는다. */}
-          {/* 여덟까지 — 화제어는 세는 것(메타)이라 칩을 줄이고 맨 아래에 둔다. */}
-          {keywords.slice(0, 8).map((k) => {
+          {/* 화제어는 세는 것(메타)이라 맨 아래 한 줄. 판 폭 전체라 열까지 한 줄에 든다. */}
+          {keywords.slice(0, 10).map((k) => {
             return (
               <li key={k.word} className="v2-chip">
                 <b>{k.word}</b>
@@ -330,16 +330,16 @@ export default async function KaderaPage() {
         <EventsModule events={events} today={kaderaToday} failed={eventsFailed} limit={5} />
       </div>
 
+      {/* 셋째 줄 — 왼쪽 표 둘(왜 움직였나 · 왜 뜨나) · 오른쪽 오늘의 요약. ⭐ 요약 칸은 **표 둘의 높이에 맞춰 꽉 찬다**(v2.css .v2-rail) —
+          왼쪽 줄기가 표 셋 + 화제어였을 때 요약 하나뿐인 오른쪽 아래가 1,000px 가까이 비었다(2026-10-02 "공백은 있으면 안 된다"). */}
       <div className="v2-grid">
-        {/* 왼쪽 — 신호 표 셋 → 화제어 */}
         <div className="v2-col">
-          {sections.map((sec) => (
-            <SignalTable key={sec.id} sec={sec} />
-          ))}
-          {keywordModule}
+          {sections
+            .filter((sec) => sec.id !== "talk")
+            .map((sec) => (
+              <SignalTable key={sec.id} sec={sec} />
+            ))}
         </div>
-
-        {/* 오른쪽 — 오늘의 요약. 2차의 읽기 칸 자리라 화면에 붙어 따라온다(sticky). 시각과 글 수는 개요 띠에 있어 여기 또 적지 않는다. */}
         <div className="v2-col v2-rail">
           <Module id="brief" title="오늘의 요약" ai>
             <div className="v2-brief">
@@ -353,6 +353,14 @@ export default async function KaderaPage() {
           </Module>
         </div>
       </div>
+
+      {/* 넷째 줄부터 판 폭 전체 — 많이 언급(흐름 요약이 한 줄로 다 들어간다) · 화제어 */}
+      {sections
+        .filter((sec) => sec.id === "talk")
+        .map((sec) => (
+          <SignalTable key={sec.id} sec={sec} />
+        ))}
+      {keywordModule}
     </div>
   );
 }
