@@ -14,12 +14,13 @@ import {
   KADERA_WINDOW_DAYS,
 } from "@/lib/telegram-data";
 
-import { getKrIndexCloses, getLatestDailyScore } from "@/lib/data";
+import { getKrIndexCloses } from "@/lib/data";
+import { formatKstUpdate } from "@/lib/format";
+import { getOvernightUs } from "@/lib/kr-preview";
 import { assertLoaded, isLoadFailed } from "@/lib/load-state";
 
 import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
-import { Icon, stageForScore } from "../ui";
 import { highlightTerms, termsFor, ThemeVsUsualRows } from "./parts";
 import { fmtKoDate } from "@/lib/stock-page";
 import { THEME_NAMES, themeHref } from "@/lib/theme-href";
@@ -46,13 +47,6 @@ const MAX_ROWS = BOARD_TILES;
 /** 움직인 종목의 위 다섯 줄 — '오른 셋 + 내린 둘'로 짠다(아래 moveRows). */
 const FIRST_ROWS = 5;
 
-/** "10/1 19:30" — 패널 머리에 들어갈 짧은 KST 시각. */
-function shortKst(iso: string): string {
-  const d = new Date(new Date(iso).getTime() + 9 * 3600_000);
-  const hh = String(d.getUTCHours()).padStart(2, "0");
-  const mm = String(d.getUTCMinutes()).padStart(2, "0");
-  return `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${hh}:${mm}`;
-}
 
 // 미리보기 이미지는 옆의 opengraph-image.tsx 가 그린다(ownImage). 자세한 건 app/seo.ts 주석 참고.
 export async function generateMetadata(): Promise<Metadata> {
@@ -118,7 +112,7 @@ export default async function KaderaPage() {
     rawWhy,
     rawEvents,
     rawIndexes,
-    dailyScore,
+    overnightUs,
   ] =
     await Promise.all([
       getTelegramSummary(),
@@ -132,9 +126,9 @@ export default async function KaderaPage() {
       getSurgingOneliners(),
       getMoveReasons(),
       getUpcomingEvents(35, 400),
-      // 첫 줄의 시장 맥락 — 지수 종가와 햇쩨 지수. 둘 다 곁들이는 칸이라 실패해도 화면을 세우고 그 칸만 뺀다.
+      // 첫 줄의 시장 맥락 — 지수 종가와 간밤 미국. 둘 다 곁들이는 칸이라 실패해도 화면을 세우고 그 칸만 뺀다.
       getKrIndexCloses(),
-      getLatestDailyScore().catch(() => null),
+      getOvernightUs(),
     ]);
   const stockReports = reports.filter((r): r is NonNullable<typeof r> => r !== null);
 
@@ -290,7 +284,8 @@ export default async function KaderaPage() {
     },
   ];
 
-  /* 첫 줄 — 시장 맥락(지수 종가 · 햇쩨 지수) + 언제 · 얼마나 읽었나.
+  /* 첫 줄 — 시장 맥락(지수 종가 · 간밤 미국) + 언제 · 얼마나 읽었나.
+     햇쩨 지수 칸은 하루 만에 뺐다(2026-10-03 "빼고 다른 것", 수급은 아니고). 간밤 미국은 국장을 여는 사람이 먼저 찾는 것이라 그 자리에 둔다.
      ⭐ 시장 맥락은 이 화면 어디에도 없던 것이다(2026-10-03 "더 유용한 정보로"). 채널 이야기를 읽기 전에 그날 시장이 어땠나를 한 줄로 준다.
      ⛔ 아래 모듈 1등을 되풀이하지 말 것 — '가장 많이 말한 테마'는 테마 카드 첫 장과 같은 말이라 뺐고(2026-10-02), 그 전 수치 띠도 같은 까닭으로 걷었다. */
   const indexes = isLoadFailed(rawIndexes) ? null : rawIndexes;
@@ -298,7 +293,7 @@ export default async function KaderaPage() {
   const indexCells = indexes
     ? ([["코스피", indexes.kospi], ["코스닥", indexes.kosdaq]] as const).flatMap(([name, v]) => (v ? [{ name, ...v }] : []))
     : [];
-  const temp = dailyScore ? Math.round(Math.max(0, Math.min(100, dailyScore.score))) : null;
+
 
   /* 이슈 키워드 — 오른쪽 칸 오늘의 요약 아래, 한 단 열 줄(V2Modules.tsx KeywordTable). */
   const keywordModule = <KeywordTable keywords={keywords} split={false} />;
@@ -324,33 +319,30 @@ export default async function KaderaPage() {
             ))}
           </div>
         )}
-        {temp !== null && (
-          // 햇쩨 지수는 홈 히어로가 자세히 보여 준다 — 칸 전체가 그리로 가는 링크다.
-          <Link href="/" className="v2-cover-cell v2-cover-hz" data-ga="kadera_index_click">
-            <span className="v2-cover-k">햇쩨 지수</span>
+        {overnightUs && (
+          // 국장 미리보기가 아침마다 받아 두는 값이다 — 칸 전체가 그 화면으로 가는 링크. 날짜는 미국 세션 날짜(주말엔 '간밤'이 아니다).
+          <Link href="/preview" className="v2-cover-cell v2-cover-go" data-ga="kadera_preview_click">
+            <span className="v2-cover-k">{overnightUs.session.slice(5).split("-").map(Number).join("/")} 미국</span>
             <span className="v2-cover-v">
-              <b>{temp}℃</b>
-              <em>{stageForScore(temp)}</em>
+              <em>S&amp;P500</em>
+              <span className={`v2-cover-chg${overnightUs.spx > 0 ? " is-up" : overnightUs.spx < 0 ? " is-down" : ""}`}>
+                {overnightUs.spx > 0 ? "+" : overnightUs.spx < 0 ? "-" : ""}
+                {Math.abs(overnightUs.spx).toFixed(2)}%
+              </span>
             </span>
           </Link>
         )}
         <div className="v2-cover-cell v2-cover-meta">
           <span className="v2-cover-k">
             <i className="v2-dot" />
-            {summary.lastUpdated ? `${shortKst(summary.lastUpdated)} 업데이트` : "업데이트 준비 중"}
+            {summary.lastUpdated ? formatKstUpdate(summary.lastUpdated, "업데이트") : "업데이트 준비 중"}
           </span>
           {sentiment && (
             <span className="v2-cover-k">
-              채널 글 {sentiment.messageCount.toLocaleString("ko-KR")}건 · 최근 {sentiment.windowDays}일
+              채널 글 {sentiment.messageCount.toLocaleString("ko-KR")}건 분석 · 최근 {sentiment.windowDays}일
             </span>
           )}
         </div>
-        {THEME_LINKS && (
-          <Link href="/theme" className="v2-cover-link">
-            테마 전체 보기
-            <Icon name="chevron_right" />
-          </Link>
-        )}
       </div>
 
       {/* 둘째 줄 — 여론 · 테마 여섯 · 일정이 한 줄로(2026-10-02 요청: 2차 때 자리 그대로). 오른쪽 일정 칸은 아래 요약 칸과 같은 폭이라

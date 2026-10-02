@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { UpcomingEvent } from "@/lib/kadera-why";
 import type { IssueKeyword, SentimentPoint, ThemeRotation } from "@/lib/telegram-data";
 
-import { AiMark } from "../ui";
+import { AiMark, Icon } from "../ui";
 
 /**
  * v2 국장 카더라의 부품 — '모듈' 한 장과 오른쪽 칸의 모듈 셋(2026-10-02 3차).
@@ -145,7 +145,20 @@ export function ThemeCards({ themes, hrefOf }: { themes: ThemeRotation[]; hrefOf
   // 남는 높이는 줄이 나눠 먹는다(v2.css .v2-band .v2-themes 1fr).
   const rows = themes.slice(0, 10);
   return (
-    <Module id="themes" title="테마 점유율" meta="최근 3일">
+    <Module
+      id="themes"
+      title="테마 점유율"
+      meta="최근 3일"
+      // 테마 전체 보기는 이 머리 오른쪽에 둔다(2026-10-03) — 첫 줄 띠 끝에 있을 땐 띠가 1,280 에서 두 줄로 접혔고, 카드를 보다 넘어가는 자리가 여기다.
+      aside={
+        hrefOf && (
+          <Link href="/theme" className="v2-more">
+            전체 보기
+            <Icon name="chevron_right" />
+          </Link>
+        )
+      }
+    >
       {rows.length === 0 ? (
         <p className="v2-empty">아직 집계된 테마가 없습니다.</p>
       ) : (
