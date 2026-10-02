@@ -62,11 +62,11 @@ export const DAILY_PUBLIC = true;
 
 /**
  * 배당으로 살기(/dividend) — 종목과 주수를 넣으면 1년에 얼마 받는지 계산하는 화면. 2026-09-11 에
- * 만들었고 **아직 안 열었다.** 읽는 곳은 데일리 노트와 같다(사이드바·사이트맵·검사) + 이용약관의 데이터 출처.
+ * 만들었고 **아직 안 열었다.** 읽는 곳은 데일리 노트와 같다(사이드바·사이트맵·검사) + 투자 유의사항의 데이터 출처.
  *
  *   app/dividend/page.tsx     배포된 곳에서 404 를 낼지, noindex 를 달지
  *   app/AppShell.tsx          NAV ↔ COMING_SOON · DEEP_PAGES
- *   app/terms/page.tsx        이용약관 '데이터 출처'의 배당 줄
+ *   app/disclaimer/page.tsx   투자 유의사항 '데이터 출처'의 배당 줄
  *   app/sitemap-urls.ts       사이트맵
  *   scripts/check-routes.mjs  안 연 동안 사이트맵에 없는 것을 정상으로 볼지
  *

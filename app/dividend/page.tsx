@@ -23,7 +23,7 @@ import type { MoreLists, MoreRow, StockLite, StockWire } from "./types";
 
 /**
  * ⛔ **아직 안 연 화면이다.** 스위치는 `app/screen-flags.ts` 한 곳에 있다 — 사이드바·
- * 사이트맵·이용약관의 데이터 출처가 같은 값을 읽으므로 여는 날 고칠 곳이 흩어지지 않는다.
+ * 사이트맵·투자 유의사항의 데이터 출처가 같은 값을 읽으므로 여는 날 고칠 곳이 흩어지지 않는다.
  */
 const PUBLIC = DIVIDEND_PUBLIC;
 

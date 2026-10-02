@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { B, DOC_WIDTH, Lead, P, PREV_EFFECTIVE, Revision, Section, SOURCES_ID, TERMS_EFFECTIVE, Ul } from "../legal";
-import { DIVIDEND_PUBLIC } from "../screen-flags";
+import { B, DOC_WIDTH, Lead, P, PREV_EFFECTIVE, Revision, Section, TERMS_EFFECTIVE, Ul } from "../legal";
 import { C } from "../ui";
 import { pageMetadata } from "../seo";
 
@@ -22,64 +21,6 @@ export async function generateMetadata(): Promise<Metadata> {
 const EFFECTIVE_DATE = TERMS_EFFECTIVE;
 /** 문의 창구. Footer·개인정보처리방침과 같은 주소를 쓴다. */
 const CONTACT_EMAIL = "hatzze@proton.me";
-
-// 이용약관 끝의 '데이터 출처'. 실제 fetch 스크립트가 쓰는 소스를 카테고리별로 정리.
-// 2026-10-02 에 푸터에서 옮겨 왔다(app/Footer.tsx 머리 주석 — 푸터는 '한국거래소 통계정보' 한 문장과 이 목록으로 가는 링크만 남겼다).
-//
-// ⚠️ "한국거래소 통계정보" 는 KRX OPEN API 이용약관 제10조 ③ 이 글자 그대로 요구하는
-// 표기다("결과를 사용하여 화면을 제작한 경우, 해당 화면에 '한국거래소 통계정보'를
-// 사용한 결과임을 명시해야 한다"). 다른 줄과 모양을 맞추려고 "한국거래소(KRX)" 로
-// 되돌리면 약관이 지정한 문구가 아니게 된다. 약관은 '해당 화면에' 명시하라고 해서, 모든 화면의
-// 의무는 이 목록이 아니라 **푸터의 문장**이 채운다(app/Footer.tsx). 여기는 전체 목록이다.
-//
-// ⚠️ **여기 적은 곳은 전부 실제로 호출해야 하고, 호출하는 곳은 전부 여기 있어야 한다.**
-// 출처 표기는 장식이 아니라 고지라, 안 쓰는 곳을 적으면 없는 권위를 빌리는 것이고 쓰는
-// 곳을 빠뜨리면 고지를 뺀 것이다. 2026-08-01 대조에서 양쪽이 다 어긋나 있었다 —
-// "미 연준(FRED)" 은 env 키만 남고 호출부가 없었고(common/config.py 의 FRED_API_KEY
-// 는 아무도 import 하지 않는다. KMA_API_KEY 도 같은 상태), 카더라 리포트 한 페이지를
-// 통째로 채우는 텔레그램은 목록에 없었다(이용약관 4항·카더라 페이지는 이미 밝히고 있어
-// 그때의 푸터 목록만 빠져 있었다).
-//
-// 대조법: `grep -rhoE 'https?://[a-z0-9.-]+' data-pipeline lib app/api | sort -u` 로 실제
-// 호출 호스트를 뽑아 이 목록과 맞춘다. 단 MTProto 를 쓰는 텔레그램 수집(telethon)은 URL
-// 이 안 잡히니 라이브러리 이름으로 따로 볼 것. docs.google.com(채널 목록 시트)·
-// api.telegram.org(우리 발송 봇)은 우리 설비지 자료 출처가 아니라 여기 안 적는다.
-const SOURCE_GROUPS: { label: string; items: string }[] = [
-  /* ⚠️ 2026-09-03 대조에서 둘이 빠져 있었다(위 대조법 grep 으로 찾았다).
-       핀허브        — 국장 미리보기가 미국 종목 간밤 등락을 여기서 받는다(무료 티어 quote).
-       하이퍼리퀴드  — 국내 장이 닫힌 동안의 삼성전자·SK하이닉스·현대차 무기한선물 값.
-                       빌더 마켓(`xyz`)이라 하이퍼리퀴드 본체 목록에는 없지만, 우리가
-                       부르는 호스트는 api.hyperliquid.xyz 하나다.
-     ⚠️ 야후는 지수 종가와 원/달러에 쓴다(개별 미국 종목은 핀허브). 둘을 합치지 말 것. */
-  { label: "증시·시세", items: "한국거래소 통계정보 · 야후 파이낸스 · 핀허브 · 하이퍼리퀴드" },
-  /* ECOS 에서 받는 건 GDP(200Y109)·소비자심리지수(511Y002)·외국인 순매수(802Y001) 셋이다
-     (서학개미 장부가 읽던 자금순환표 281Y002 는 그 화면과 함께 빠졌다).
-     FRED 는 **원/달러 환율(DEXKOUS)만** 받는다 — 나스닥·S&P 같은 벤더 지수는 안 쓴다
-     (그쪽은 FRED 를 거쳐도 벤더 약관을 따른다. lib/usd-krw.ts 머리말 참고).
-     배당 페이지의 원/달러는 ECB 참조환율(frankfurter.dev 중계)이 먼저고 FRED 는 그 뒤 — data-pipeline/common/fx.py. */
-  { label: "거시·경제통계", items: "한국은행(ECOS) · 미 연준(FRED) · 유럽중앙은행(ECB)" },
-  /* 내부자 리포트가 여기서 나온다. 셋 다 이름을 적어야 하는 원천이다.
-       SEC EDGAR — 임원 Form 4 · 월가 거물 13F
-       미 하원    — STOCK Act 매매 신고(PTR)
-       ⚠️⚠️ stockanalysis.com 은 **약관이 출처 표기를 조건으로** 발췌를 허용한다
-            ("do not modify the content and clearly state where you got it from").
-            카드 안 문구는 짧게 줄였다(목록 물음표의 이름은 app/insider/lists.ts) — 여기서도 지우지 말 것.
-            ⚠️ 한때 "stockanalysis.com(S&P Global)" 로 둘을 같이 적었다. 밝혀야 하는 건
-               **받아 온 곳**이라 앞의 것만 남긴다 — S&P Global 은 그 위의 집계 주체이지
-               우리가 약관을 맺은 상대가 아니고, 그 사실은 카드 물음표가 말한다. */
-  { label: "미국 공시·전망", items: "SEC EDGAR · 미 하원 · stockanalysis.com" },
-  /* 배당으로 살기가 여기서 나온다. 화면 안에는 출처 이름이 없으므로(물음표 툴팁에서도 뺐다, 2026-09-13)
-     이름이 남는 곳은 여기뿐이다(전 화면 푸터가 이 목록으로 건너온다). 미국 배당 지급일·배당성향은 위 stockanalysis.com 이 같이 맡는다.
-       한국예탁결제원 — 국내 배당 기록(공공데이터포털 주식배당정보, 2유형이라 출처 표시가 조건)
-       한국거래소 KIND — 고배당기업(분리과세 대상) 목록·배당성향·배당 결정 공시(확정 배당·감액배당, 2026-09-17부터)
-     국내 ETF 분배금(SEIBro 분배금지급현황, 2026-09-16부터)도 한국예탁결제원이라 위 이름에 든다. 미래에셋 TIGER 사이트는
-     2026-09-17부터 과표(과세되는 몫)만 받는데 출처 표기를 조건으로 건 약관이 없어 적지 않는다(2026-09-13 결정과 같음).
-     여는 날까지는 숨긴다(DIVIDEND_PUBLIC) — 안 쓰는 곳을 적으면 없는 권위를 빌리는 것이다(위 주석). */
-  ...(DIVIDEND_PUBLIC ? [{ label: "배당", items: "한국예탁결제원 · 한국거래소 KIND" }] : []),
-  { label: "검색·뉴스", items: "네이버 · 유튜브" },
-  { label: "커뮤니티·소비", items: "텔레그램 · 디시인사이드 · 알라딘" },
-  { label: "가상자산·기타", items: "업비트 · GitHub · 앱스토어" },
-];
 
 function Mail() {
   return (
@@ -367,21 +308,6 @@ export default function TermsPage() {
           해결을 위해 성실히 협의하며, 협의가 이루어지지 않으면 민사소송법이 정한 관할 법원에
           제기합니다.
         </P>
-      </Section>
-
-      {/* 조항이 아니라 안내라 번호를 달지 않고 맨 끝에 둔다. 목록이 바뀌어도 약관 개정(시행일 · 7일 전 알림)이 아니다. */}
-      <Section title="데이터 출처" id={SOURCES_ID}>
-        <P>
-          서비스가 자료를 받아 오는 곳입니다. 원본 자료의 권리는 8조에 적은 대로 각 제공 기관에
-          있습니다.
-        </P>
-        <Ul>
-          {SOURCE_GROUPS.map((g) => (
-            <li key={g.label}>
-              <B>{g.label}</B>. {g.items}
-            </li>
-          ))}
-        </Ul>
       </Section>
     </div>
   );

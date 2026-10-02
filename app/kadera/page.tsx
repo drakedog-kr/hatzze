@@ -666,7 +666,7 @@ export default async function KaderaPage() {
             버튼의 밑선과 같은 선에 선다(.hz-tx-hero 주석).
             ⚠️ 여기 있던 각주 두 문장은 다 뺐다. "…매수·매도 신호가 아닙니다"는 지시(09-04),
                "…무엇에 주목하는지를 모아 보여줍니다"는 화면 부제와 같은 말이라(토스 라이팅
-               원칙 Remove empty sentences). '신호 아님' 고지는 푸터 면책이 전 화면에서 든다. */}
+               원칙 Remove empty sentences). '신호 아님' 고지는 투자 유의사항(/disclaimer)이 든다. */}
         {spotlights.length > 0 && (
           <div className="hz-tx-note hz-tx-spot">
             <span className="hz-tx-spot-cap">오늘 눈에 띄는 것</span>
