@@ -25,8 +25,10 @@ export type BoardRow = {
   tagTip?: string;
   /** 등락률 뒤 숫자 칸들(이미 꼴을 갖춘 글자). hot 이면 빨간 잉크. */
   cells: { v: string; hot?: boolean }[];
-  /** 마지막 칸 문장(한 줄로 자르고, 전문은 title). */
+  /** 마지막 칸 문장(두 줄까지). */
   text: string | null;
+  /** 줄에 마우스를 올리면 뜨는 전문. 없으면 text. */
+  full?: string | null;
   pending?: string;
 };
 
@@ -50,7 +52,8 @@ const chgCls = (r: number | null) => (r === null ? "" : r > 0 ? " is-up" : r < 0
 export function SignalTable({ sec }: { sec: BoardSection }) {
   const last = sec.heads.length - 1;
   return (
-    <Module id={sec.id} title={sec.title} meta={sec.meta} aside={sec.rows.length > 0 ? `${sec.rows.length}종목` : undefined}>
+    /* 많이 언급(talk)은 줄이 두 층이다 — 숫자 줄 아래 흐름 요약이 판 폭을 다 쓴다(v2.css). 그 칸엔 머리가 없으니 AI 표시는 모듈 제목 앞으로. */
+    <Module id={sec.id} title={sec.title} meta={sec.meta} ai={sec.kind === "talk" && sec.aiText}>
       {sec.rows.length === 0 ? (
         <p className="v2-empty">{sec.empty}</p>
       ) : (
@@ -58,7 +61,7 @@ export function SignalTable({ sec }: { sec: BoardSection }) {
           <div className="v2-tr v2-th" aria-hidden="true">
             {sec.heads.map((h, i) => (
               <span key={i}>
-                {i === last && sec.aiText && <AiMark size={11} />}
+                {i === last && sec.aiText && sec.kind !== "talk" && <AiMark size={11} />}
                 {h}
               </span>
             ))}
@@ -66,7 +69,7 @@ export function SignalTable({ sec }: { sec: BoardSection }) {
           <ol>
             {sec.rows.map((r, i) => (
               <li key={r.code}>
-                <Link href={`/stock/${r.code}`} className="v2-tr" title={r.text ?? undefined}>
+                <Link href={`/stock/${r.code}`} className="v2-tr" title={r.full ?? r.text ?? undefined}>
                   <span className="v2-td-rank">{i + 1}</span>
                   <span className="v2-td-stock">
                     <StockLogo code={r.code} name={r.name} market={r.market} size={22} />

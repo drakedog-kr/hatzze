@@ -57,22 +57,18 @@ export function Module({
  */
 export function SentimentModule({
   score,
-  label,
   trend,
   days,
 }: {
   score: number;
-  label: string;
   trend: SentimentPoint[];
   /** 큰 숫자가 본 날수(보통 2). 막대는 30일이라 둘을 갈라 적어야 한다 — 머리에 '최근 30일'만 두었더니 76% 도 30일 값으로 읽혔다. */
   days: number;
 }) {
   const vals = trend.map((p) => p.score);
   const far = Math.max(10, ...vals.map((v) => Math.abs(v - 50)));
-  const hi = vals.length ? Math.max(...vals) : score;
-  const lo = vals.length ? Math.min(...vals) : score;
   return (
-    <Module id="mood" title="여론 낙관도" meta={`최근 ${days}일 시장 글`} aside={<span className="v2-tag">{label}</span>}>
+    <Module id="mood" title="여론 낙관도" meta={`최근 ${days}일 시장 글`}>
       <div className="v2-mood">
         {/* ⛔ 뜻을 문장으로 달지 않는다(2026-10-02 "사족 없이"). 큰 숫자 밑 갈림 막대가 '낙관과 비관을 나눈 몫'이라는 뜻을 대신한다 —
             중립 글은 두 쪽 어디에도 안 든다(lib/telegram-data.ts EcosystemSentiment.score). */}
@@ -109,9 +105,6 @@ export function SentimentModule({
             </span>
             <span className="v2-trend-x">
               <span>{vals.length}일 전</span>
-              <span>
-                최고 {hi}% · 최저 {lo}%
-              </span>
               <span>오늘</span>
             </span>
           </div>
@@ -124,80 +117,47 @@ export function SentimentModule({
 const sign = (v: number) => (v > 0 ? "+" : v < 0 ? "-" : "");
 
 /**
- * 테마 히트맵 — 줄은 테마, 칸은 날(최근 14일), 진하기는 그날 점유율. 오른쪽에 지금 점유율과 변화.
- * 진하기의 끝은 **이 표 전체에서 가장 높은 칸**이다 — 줄마다 따로 잡으면 작은 테마도 새까맣게 칠해져 크기 비교가 사라진다.
- * 색은 오름·내림이 아니라 브랜드 파랑 한 가지(점유율은 방향이 아니라 양이다).
+ * 테마 점유율 — 줄마다 이름 · 막대(점유율) · 점유율 · 변화. 2026-10-02 에 14일 히트맵(칸 14개 + 머리 줄 + 진하기 범례)에서
+ * 줄였다 — "복잡하다". 추이는 변화(%p) 한 칸이 맡는다.
+ * 막대 길이의 끝은 1위 테마다(점유율 100% 가 아니라) — 10% 안팎 테마들이 실낱이 되지 않게.
+ * 점유율 = 최근 3일 평균(머리 띠의 '최근 3일'), 변화 = 5일 이상 전 평균과의 차이(lib/telegram-data.ts THEME_PRIOR_GAP_DAYS).
  */
-export function ThemeHeat({ themes, hrefOf }: { themes: ThemeRotation[]; hrefOf: ((theme: string) => string) | null }) {
+export function ThemeShare({ themes, hrefOf }: { themes: ThemeRotation[]; hrefOf: ((theme: string) => string) | null }) {
   const rows = themes.slice(0, 10);
-  const days = Math.min(14, Math.max(0, ...rows.map((t) => t.series.length)));
-  const max = Math.max(0.0001, ...rows.flatMap((t) => t.series.slice(-days)));
+  const top = Math.max(0.0001, ...rows.map((t) => t.sharePct));
   return (
-    <Module
-      id="themes"
-      title="테마 점유율"
-      meta="최근 3일"
-      aside={
-        /* 진하기 범례 — 문장 대신 칸 넷. */
-        <span className="v2-legend" aria-hidden="true">
-          적음
-          {[0.15, 0.4, 0.7, 1].map((o) => (
-            <i key={o} style={{ opacity: o }} />
-          ))}
-          많음
-        </span>
-      }
-    >
+    <Module id="themes" title="테마 점유율" meta="최근 3일">
       {rows.length === 0 ? (
         <p className="v2-empty">아직 집계된 테마가 없습니다.</p>
       ) : (
-        <div className="v2-heat">
-          {/* 머리 줄 — 칸마다 무엇인지. 점유율은 최근 3일 평균(머리 띠의 '최근 3일'), 변화는 5일 이상 전 평균과의 차이(THEME_PRIOR_GAP_DAYS). */}
-          <div className="v2-heat-row v2-heat-th" aria-hidden="true">
-            <span>테마</span>
-            <span className="v2-heat-span">
-              <span>{days}일 전</span>
-              <span>오늘</span>
-            </span>
-            <span>점유율</span>
-            <span>변화</span>
-          </div>
-          <ol>
-            {rows.map((t) => {
-              const cells = t.series.slice(-days);
-              const pad = days - cells.length;
-              const d = t.shareDelta;
-              const body = (
-                <>
-                  <span className="v2-heat-name">{t.theme}</span>
-                  <span className="v2-heat-cells" aria-hidden="true">
-                    {Array.from({ length: pad }, (_, i) => (
-                      <i key={`p${i}`} className="is-none" />
-                    ))}
-                    {cells.map((v, i) => (
-                      <i key={i} style={{ opacity: 0.1 + 0.9 * (v / max) }} />
-                    ))}
-                  </span>
-                  <span className="v2-heat-share">{t.sharePct.toFixed(1)}%</span>
-                  <span className={`v2-heat-delta${d === null || d === 0 ? "" : d > 0 ? " is-up" : " is-down"}`}>
-                    {d === null || d === 0 ? "-" : `${sign(d)}${Math.abs(d).toFixed(1)}%p`}
-                  </span>
-                </>
-              );
-              return (
-                <li key={t.theme}>
-                  {hrefOf ? (
-                    <Link href={hrefOf(t.theme)} className="v2-heat-row">
-                      {body}
-                    </Link>
-                  ) : (
-                    <div className="v2-heat-row">{body}</div>
-                  )}
-                </li>
-              );
-            })}
-          </ol>
-        </div>
+        <ol className="v2-share">
+          {rows.map((t) => {
+            const d = t.shareDelta;
+            const body = (
+              <>
+                <span className="v2-share-name">{t.theme}</span>
+                <span className="v2-share-bar" aria-hidden="true">
+                  <i style={{ width: `${(t.sharePct / top) * 100}%` }} />
+                </span>
+                <span className="v2-share-pct">{t.sharePct.toFixed(1)}%</span>
+                <span className={`v2-share-delta${d === null || d === 0 ? "" : d > 0 ? " is-up" : " is-down"}`}>
+                  {d === null || d === 0 ? "-" : `${sign(d)}${Math.abs(d).toFixed(1)}%p`}
+                </span>
+              </>
+            );
+            return (
+              <li key={t.theme}>
+                {hrefOf ? (
+                  <Link href={hrefOf(t.theme)} className="v2-share-row">
+                    {body}
+                  </Link>
+                ) : (
+                  <div className="v2-share-row">{body}</div>
+                )}
+              </li>
+            );
+          })}
+        </ol>
       )}
     </Module>
   );
@@ -214,7 +174,8 @@ function dayLabel(date: string, today: string): string {
 }
 
 /**
- * 다가오는 일정 — 채널 글이 날짜를 짚은 일정, 가까운 일곱까지(여론·테마 모듈에 읽는 법을 단 뒤 오른쪽 줄기가 길어져 열에서 줄였다). 몇 채널이 짚었는지를 근거로 단다.
+ * 다가오는 일정 — 채널 글이 날짜를 짚은 일정, 가까운 열넷까지. 오른쪽 줄기 맨 아래라 왼쪽 줄기 길이를 메우는 자리다 —
+ * 표 문장이 세 줄까지 감싸게 되면서(2026-10-02) 왼쪽이 길어져 일곱이면 334px 가 비었다. 몇 채널이 짚었는지를 근거로 단다.
  * 오른쪽 줄기의 맨 아래 모듈이라 왼쪽 줄기 끝까지 늘어난다(v2.css) — 남는 자리는 목록 아래 빈다.
  * ⛔ '채널 글에서 뽑은 날짜라 공시와 다를 수 있다' 같은 각주를 달지 않는다(2026-10-02 "사족 없이") — 머리 띠의 '채널이 짚은 날짜'가 그 말이다.
  */
@@ -222,7 +183,7 @@ export function EventsModule({ events, today, failed }: { events: UpcomingEvent[
   const next = events
     .filter((e) => e.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date) || b.channels - a.channels)
-    .slice(0, 7);
+    .slice(0, 14);
   return (
     <Module id="events" title="다가오는 일정" meta="채널이 짚은 날짜">
       {failed ? (
@@ -231,15 +192,30 @@ export function EventsModule({ events, today, failed }: { events: UpcomingEvent[
         <p className="v2-empty">앞으로 5주 안에 날짜가 짚인 일정이 아직 없습니다.</p>
       ) : (
         <ul className="v2-events">
-          {next.map((e) => (
-            <li key={`${e.code}-${e.date}-${e.event}`}>
-              <span className={`v2-ev-day${e.date === today ? " is-today" : ""}`}>{dayLabel(e.date, today)}</span>
-              <span className="v2-ev-txt">
-                <b>{e.name}</b> {e.event}
-              </span>
-              <span className="v2-ev-src">채널 {e.channels}곳</span>
-            </li>
-          ))}
+          {next.map((e) => {
+            const body = (
+              <>
+                <span className={`v2-ev-day${e.date === today ? " is-today" : ""}`}>{dayLabel(e.date, today)}</span>
+                <span className="v2-ev-txt">
+                  <b>{e.name}</b> {e.event}
+                </span>
+                <span className="v2-ev-src">채널 {e.channels}곳</span>
+              </>
+            );
+            // 국내 종목은 그 종목 화면으로 — 표의 줄과 같은 동작이다. 미장 티커는 아직 실주소가 없어 글자로 둔다.
+            const kr = e.market === "KOSPI" || e.market === "KOSDAQ";
+            return (
+              <li key={`${e.code}-${e.date}-${e.event}`}>
+                {kr ? (
+                  <Link href={`/stock/${e.code}`} className="v2-ev-row">
+                    {body}
+                  </Link>
+                ) : (
+                  <div className="v2-ev-row">{body}</div>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </Module>

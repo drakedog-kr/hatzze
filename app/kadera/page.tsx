@@ -25,9 +25,17 @@ import { THEME_NAMES, themeHref } from "@/lib/theme-href";
 import { THEMES } from "@/lib/stock-themes";
 import { THEME_PUBLIC } from "../screen-flags";
 import { getMoveReasons, getUpcomingEvents, todayKst } from "@/lib/kadera-why";
-import { EventsModule, Module, SentimentModule, ThemeHeat } from "./V2Modules";
+import { EventsModule, Module, SentimentModule, ThemeShare } from "./V2Modules";
 import { SignalTable } from "./KaderaBoard";
 import type { BoardRow, BoardSection } from "./KaderaBoard";
+
+/**
+ * 문단의 첫 문장. 표 줄에는 한 문장만 싣고 전문은 줄 title 로 둔다 — 흐름 요약(두세 문장)을 한 줄로 자르면 낱말 한가운데서
+ * 끊겼다(2026-10-02, 여섯 줄 모두). ⚠️ 마침표 뒤 공백이 아니라 **한글 뒤 마침표**로 가른다(소수점·도메인 오인, app/insider/parts.tsx).
+ */
+function firstSentence(t: string | null): string | null {
+  return t ? t.split(/(?<=[가-힣]\.)\s+/)[0] : null;
+}
 
 /** "10/1 19:30" — 패널 머리에 들어갈 짧은 KST 시각. */
 function shortKst(iso: string): string {
@@ -197,13 +205,16 @@ export default async function KaderaPage() {
     text: r.reason,
   }));
 
-  const talkRows: BoardRow[] = stockReports.map((r) => ({
+  /* 줄은 **언급 수 순**으로 세운다. 여섯을 고르는 건 주목도(채널 크기를 실은 점수, getTopStocksWithTrend)라 그 순서 그대로 두면
+     번호와 바로 옆 '언급' 칸이 어긋났다(87회 → 68회 → 144회, 2026-10-02). 고르는 잣대는 두고 늘어놓는 순서만 칸에 맞춘다. */
+  const talkRows: BoardRow[] = [...stockReports].sort((a, b) => b.totalMentions - a.totalMentions).map((r) => ({
     code: r.code,
     name: r.name,
     market: r.market,
     change: r.changeRate,
     cells: [{ v: `${r.totalMentions.toLocaleString("ko-KR")}회` }, { v: r.channelCount !== null ? `${r.channelCount}곳` : "-" }],
-    text: narratives[r.code] ?? null,
+    text: firstSentence(narratives[r.code] ?? null),
+    full: narratives[r.code] ?? null,
     pending: "집계가 끝나면 붙습니다",
   }));
 
@@ -324,13 +335,13 @@ export default async function KaderaPage() {
         {/* 오른쪽 줄기 — 여론 · 테마 · 화제어 · 일정 */}
         <div className="v2-col v2-rail">
           {sentiment ? (
-            <SentimentModule score={sentiment.score} label={sentiment.label} trend={sentiment.trend ?? []} days={sentiment.windowDays} />
+            <SentimentModule score={sentiment.score} trend={sentiment.trend ?? []} days={sentiment.windowDays} />
           ) : (
             <Module id="mood" title="여론 낙관도">
               <p className="v2-empty">{sentimentFailed ? "감성 집계를 불러오지 못했습니다." : "아직 분석된 메시지가 없습니다."}</p>
             </Module>
           )}
-          <ThemeHeat themes={themes} hrefOf={THEME_LINKS ? themeHref : null} />
+          <ThemeShare themes={themes} hrefOf={THEME_LINKS ? themeHref : null} />
           {keywordModule}
           {/* 맨 아래 — 왼쪽 줄기 끝까지 늘어나는 자리(v2.css .v2-grid). 목록이 가장 길게 늘 수 있는 모듈이라 여기 둔다. */}
           <EventsModule events={events} today={kaderaToday} failed={eventsFailed} />
