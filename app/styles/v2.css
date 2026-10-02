@@ -165,13 +165,26 @@
 }
 
 /* ── 두 줄기 ── */
+/* 두 줄기는 바닥을 맞춘다(stretch) — 줄기마다 맨 아래 모듈이 남는 높이를 먹는다. 오른쪽이 짧으면 일정 모듈이,
+   왼쪽이 짧으면 마지막 표가 늘어난다. 늘어난 모듈은 내용이 위에 붙고, 일정의 각주는 바닥에 붙는다. */
 .v2-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
-  align-items: start;
+  align-items: stretch;
   gap: 12px;
 }
 .v2-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.v2-col > .v2-mod:last-child { flex: 1 0 auto; display: flex; flex-direction: column; }
+.v2-mod-note {
+  margin: auto 0 0;
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--t-line);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  color: var(--t-ink3);
+  word-break: keep-all;
+}
 
 /* 오늘의 요약 */
 .v2-brief { padding: 12px 16px 16px; font-size: 14px; font-weight: 500; line-height: 1.75; color: var(--t-ink2); word-break: keep-all; }
@@ -390,6 +403,7 @@ a.v2-heat-row:hover { background: var(--t-tint); }
 @container kd (max-width: 999px) {
   .v2-grid { grid-template-columns: minmax(0, 1fr); }
   .v2-rail { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .v2-col > .v2-mod:last-child { flex: none; }
   .v2-tr { grid-template-columns: 20px 168px 68px 64px 56px 48px minmax(0, 1fr); }
   .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px 68px 84px minmax(0, 1fr); }
   .v2-td-bars { display: flex; }
@@ -434,6 +448,9 @@ a.v2-heat-row:hover { background: var(--t-tint); }
     word-break: keep-all;
   }
   .v2-brief { padding: 10px 14px 14px; }
+  /* 열까지 싣는 건 넓은 화면에서 오른쪽 줄기를 왼쪽 끝까지 채우려는 것이다. 한 줄기인 폰에선 그만큼 길어지기만 해서 예전 수로 줄인다. */
+  .v2-events li:nth-child(n + 6),
+  .v2-heat li:nth-child(n + 9) { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .v2-dot { animation: none; }

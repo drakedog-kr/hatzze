@@ -116,7 +116,7 @@ const sign = (v: number) => (v > 0 ? "+" : v < 0 ? "-" : "");
  * 색은 오름·내림이 아니라 브랜드 파랑 한 가지(점유율은 방향이 아니라 양이다).
  */
 export function ThemeHeat({ themes, hrefOf }: { themes: ThemeRotation[]; hrefOf: ((theme: string) => string) | null }) {
-  const rows = themes.slice(0, 8);
+  const rows = themes.slice(0, 10);
   const days = Math.min(14, Math.max(0, ...rows.map((t) => t.series.length)));
   const max = Math.max(0.0001, ...rows.flatMap((t) => t.series.slice(-days)));
   return (
@@ -181,12 +181,15 @@ function dayLabel(date: string, today: string): string {
   return `${m}/${d} ${WEEKDAY[new Date(`${date}T12:00:00+09:00`).getUTCDay()]}`;
 }
 
-/** 다가오는 일정 — 채널 글이 날짜를 짚은 일정, 가까운 다섯. 몇 채널이 짚었는지를 근거로 단다. */
+/**
+ * 다가오는 일정 — 채널 글이 날짜를 짚은 일정, 가까운 열까지. 몇 채널이 짚었는지를 근거로 단다.
+ * 오른쪽 줄기의 맨 아래 모듈이라 왼쪽 줄기 끝까지 늘어난다(v2.css) — 남는 자리는 목록 아래 비고, 각주는 바닥에 붙는다.
+ */
 export function EventsModule({ events, today, failed }: { events: UpcomingEvent[]; today: string; failed: boolean }) {
   const next = events
     .filter((e) => e.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date) || b.channels - a.channels)
-    .slice(0, 5);
+    .slice(0, 10);
   return (
     <Module id="events" title="다가오는 일정" meta="채널이 짚은 날짜">
       {failed ? (
@@ -206,6 +209,7 @@ export function EventsModule({ events, today, failed }: { events: UpcomingEvent[
           ))}
         </ul>
       )}
+      <p className="v2-mod-note">채널 글에서 뽑은 날짜입니다. 공시로 확정된 일정과 다를 수 있습니다.</p>
     </Module>
   );
 }

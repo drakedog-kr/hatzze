@@ -325,7 +325,7 @@ export default async function KaderaPage() {
           ))}
         </div>
 
-        {/* 오른쪽 줄기 — 여론 · 테마 · 일정 · 화제어 */}
+        {/* 오른쪽 줄기 — 여론 · 테마 · 화제어 · 일정 */}
         <div className="v2-col v2-rail">
           {sentiment ? (
             <SentimentModule score={sentiment.score} label={sentiment.label} trend={sentiment.trend ?? []} />
@@ -335,8 +335,9 @@ export default async function KaderaPage() {
             </Module>
           )}
           <ThemeHeat themes={themes} hrefOf={THEME_LINKS ? themeHref : null} />
-          <EventsModule events={events} today={kaderaToday} failed={eventsFailed} />
           {keywordModule}
+          {/* 맨 아래 — 왼쪽 줄기 끝까지 늘어나는 자리(v2.css .v2-grid). 목록이 가장 길게 늘 수 있는 모듈이라 여기 둔다. */}
+          <EventsModule events={events} today={kaderaToday} failed={eventsFailed} />
         </div>
       </div>
     </div>
