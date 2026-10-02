@@ -181,7 +181,11 @@ export default async function KaderaPage() {
      급부상 · 오늘 움직인 종목(오른 것 + 5% 넘게 내린 것) · 많이 언급(KaderaBoard 머리말). */
   const surgeDays = surging[0]?.recentDays ?? KADERA_WINDOW_DAYS;
 
-  const surgeRows: BoardRow[] = surging.map((s) => ({
+  /* ⭐ 표 셋은 **다섯 줄씩** 같다(2026-10-03 "숫자가 딱 떨어지면"). 급부상 여섯 · 움직인 아홉은 예전 카드 격자(3×2 · 3×3)를 채우던 수였다.
+     열은 못 올린다 — 급부상 한 줄은 파이프라인이 여섯 장까지만 쓰고(generate_surging_oneliners.py), 까닭은 오른 것 아홉까지다(BOARD_TILES). */
+  const ROWS = 5;
+
+  const surgeRows: BoardRow[] = surging.slice(0, ROWS).map((s) => ({
     code: s.code,
     name: s.name,
     market: s.market,
@@ -195,8 +199,9 @@ export default async function KaderaPage() {
     pending: "집계가 끝나면 붙습니다",
   }));
 
-  // 오른 것 여섯 뒤에 크게 내린 것 셋까지(lib/kadera-why.ts DOWN_MIN). 내린 줄은 없는 날이 많고, 부호 색이 둘을 가른다.
-  const moveRows: BoardRow[] = [...(why?.rows ?? []).slice(0, 6), ...(why?.down ?? []).slice(0, 3)].map((r) => ({
+  // 다섯 줄 = 오른 것 + 크게 내린 것(lib/kadera-why.ts DOWN_MIN) 둘까지. 내린 게 없는 날은 오른 것 다섯. 부호 색이 둘을 가른다.
+  const downs = (why?.down ?? []).slice(0, 2);
+  const moveRows: BoardRow[] = [...(why?.rows ?? []).slice(0, ROWS - downs.length), ...downs].map((r) => ({
     code: r.code,
     name: r.name,
     market: r.market,
@@ -207,7 +212,7 @@ export default async function KaderaPage() {
 
   /* 줄은 **언급 수 순**으로 세운다. 여섯을 고르는 건 주목도(채널 크기를 실은 점수, getTopStocksWithTrend)라 그 순서 그대로 두면
      번호와 바로 옆 '언급' 칸이 어긋났다(87회 → 68회 → 144회, 2026-10-02). 고르는 잣대는 두고 늘어놓는 순서만 칸에 맞춘다. */
-  const talkRows: BoardRow[] = [...stockReports].sort((a, b) => b.totalMentions - a.totalMentions).map((r) => ({
+  const talkRows: BoardRow[] = [...stockReports].sort((a, b) => b.totalMentions - a.totalMentions).slice(0, ROWS).map((r) => ({
     code: r.code,
     name: r.name,
     market: r.market,
@@ -223,21 +228,11 @@ export default async function KaderaPage() {
   const whyDay = why ? why.date.slice(5).split("-").map(Number).join("/") : null;
   /* ⭐ 순서와 칸은 **독자의 질문**으로 정한다(2026-10-02 "유용한 걸 내세우고 덜 유용한 건 적게"). 카더라를 여는 사람의 질문은
      ① 왜 올랐어/떨어졌어 ② 요즘 무슨 얘기가 도나 ③ 앞으로 뭐 있나 셋이다(2026-09-04 기각 때 세운 잣대). 그래서
-     - 표 순서: 크게 움직인 종목(①) → 급부상(① · 왜 뜨나) → 많이 언급(②). 일정(③)은 둘째 줄에 있다.
+     - 표 순서: 급부상(왜 뜨나) → 크게 움직인 종목(왜 움직였나) → 많이 언급(무슨 얘기). 일정(앞으로 뭐)은 둘째 줄에 있다.
+       급부상이 맨 위인 것은 카더라만 보여 줄 수 있는 신호라서다(2026-10-03 요청). 움직인 종목은 시세가 먼저 말한 일이다.
      - 칸: '세는 것'(언급 수 · 채널 수 · 종가)은 고르는 잣대지 독자가 찾는 내용이 아니다. 표마다 숫자 칸을 하나로 줄이고 그 폭을 문장에 준다.
        크게 움직인 종목 '종가' · 급부상 '3일 언급' · 많이 언급 '말한 채널'을 뺐다. 남긴 숫자는 그 표가 왜 그 종목을 골랐는지 말하는 하나다. */
   const sections: BoardSection[] = [
-    {
-      id: "why",
-      // '오늘'이라 적으면 안 된다 — 아침에 보면 어제 장 마감의 일이다. 날은 근거 자리에 적는다.
-      title: "크게 움직인 종목",
-      meta: why ? `${fmtKoDate(why.date)} 장 마감` : undefined,
-      kind: "move",
-      heads: ["", "종목", whyDay ? `${whyDay} 등락` : "등락", "움직인 까닭"],
-      aiText: true,
-      rows: moveRows,
-      empty: whyFailed ? "까닭을 불러오지 못했습니다." : "오늘 집계가 끝나면 채워집니다. 저녁 실행 뒤에 그날 것이 붙습니다.",
-    },
     {
       id: "surging",
       title: "급부상 종목",
@@ -248,6 +243,17 @@ export default async function KaderaPage() {
       aiText: true,
       rows: surgeRows,
       empty: "아직 급부상 신호가 뚜렷한 종목이 없습니다.",
+    },
+    {
+      id: "why",
+      // '오늘'이라 적으면 안 된다 — 아침에 보면 어제 장 마감의 일이다. 날은 근거 자리에 적는다.
+      title: "크게 움직인 종목",
+      meta: why ? `${fmtKoDate(why.date)} 장 마감` : undefined,
+      kind: "move",
+      heads: ["", "종목", whyDay ? `${whyDay} 등락` : "등락", "움직인 까닭"],
+      aiText: true,
+      rows: moveRows,
+      empty: whyFailed ? "까닭을 불러오지 못했습니다." : "오늘 집계가 끝나면 채워집니다. 저녁 실행 뒤에 그날 것이 붙습니다.",
     },
     {
       id: "talk",

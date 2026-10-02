@@ -171,7 +171,7 @@
    세 모듈은 높이를 맞춘다(stretch). */
 .v2-band {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 340px;
+  grid-template-columns: 260px minmax(0, 1fr) 400px;
   align-items: stretch;
   gap: 12px;
 }
@@ -190,14 +190,15 @@
    sticky 로 따라오게 했을 땐 왼쪽이 표 셋 + 화제어라 요약 아래가 1,000px 가까이 비었다. */
 .v2-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
+  /* 요약 칸 400 — 표가 다섯 줄씩(2026-10-03)이라 표 둘의 키가 556px 로 줄었다. 340 이면 요약 글이 110px 넘쳐 칸 안 스크롤이 생겼다. */
+  grid-template-columns: minmax(0, 1fr) 400px;
   align-items: stretch;
   gap: 12px;
 }
 .v2-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .v2-rail { position: relative; }
 .v2-rail > .v2-mod { position: absolute; inset: 0; display: flex; flex-direction: column; }
-.v2-rail .v2-brief { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+.v2-rail .v2-brief { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; font-size: 13px; line-height: 1.95; }
 
 /* 오늘의 요약 */
 .v2-brief { padding: 12px 16px 16px; font-size: 14px; font-weight: 500; line-height: 1.75; color: var(--t-ink2); word-break: keep-all; }
@@ -456,10 +457,10 @@ a.v2-ev-row:hover { background: var(--t-tint); }
    1,000 미만: 둘째 줄은 여론 | 테마, 일정은 한 줄 전체. 아래는 한 줄기 — 요약이 표 위로(붙어 따라오지 않는다).
    680 미만: 둘째 줄 한 칸 · 표 줄이 두 층(종목 · 값 · 등락 / 문장). */
 @container kd (max-width: 1099px) {
-  .v2-band { grid-template-columns: 216px minmax(0, 1fr) 300px; }
-  .v2-grid { grid-template-columns: minmax(0, 1fr) 300px; }
-  /* 요약 칸이 300 으로 좁아지면 14px 로는 표 둘 높이를 한 줄 넘겼다(1,280 에서 20px) — 칸 안 스크롤이 생기지 않게 한 단 줄인다. */
-  .v2-rail .v2-brief { font-size: 13px; line-height: 1.9; }
+  .v2-band { grid-template-columns: 216px minmax(0, 1fr) 340px; }
+  .v2-grid { grid-template-columns: minmax(0, 1fr) 340px; }
+  /* 요약 칸 340 — 1.95 면 1,280 에서 20px 넘쳤다. 한 단 좁힌다. */
+  .v2-rail .v2-brief { line-height: 1.85; }
   .v2-tr,
   .v2-tbl.is-talk .v2-tr { grid-template-columns: 20px 160px 72px 64px minmax(0, 1fr); }
   .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 160px 72px minmax(0, 1fr); }
