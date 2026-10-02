@@ -462,11 +462,12 @@ function NavGroupLabel({ label, first, inset }: { label: string; first: boolean;
       role="presentation"
       className="hz-side-text"
       style={{
-        margin: first ? "0 0 -2px" : "14px 0 -2px",
+        // v2(2026-10-03): 굵은 잉크 → 본문 모듈 머리의 근거 글자 꼴(12 · 500 · 회색). 묶음 이름은 메뉴가 아니라 표지라 한 단 물린다.
+        margin: first ? "0 0 4px" : "16px 0 4px",
         padding: `0 ${inset}px`,
         fontSize: "var(--fs-12)",
-        fontWeight: 700,
-        color: C.label,
+        fontWeight: 500,
+        color: C.muted,
       }}
     >
       {label}
@@ -651,12 +652,12 @@ function SearchTrigger() {
       onFocus={preloadCommandMenu}
       aria-label="종목·테마 검색"
       data-label="검색"
-      className="hz-side-search border-border text-muted-foreground hover:bg-accent flex h-9 w-full shrink-0 cursor-pointer items-center gap-2 rounded-xl border bg-transparent px-3 text-[13px] transition-colors"
+      className="hz-side-search text-muted-foreground flex h-[34px] w-full shrink-0 cursor-pointer items-center gap-2 rounded-[6px] border bg-transparent px-2.5 text-[13px] transition-colors"
       // 사이드바 바깥 간격(28)을 위아래로 덜어 쓴다 — 로고와 16 · 메뉴와 20. 늘어난 높이를 44px 로 묶어 사이드바가
       // 프로덕션 높이(782) 안에 들게 한다(노트북에서 스크롤이 생기면 안 된다).
-      style={{ margin: "-12px 0 -8px" }}
+      style={{ margin: "-6px 0 -4px" }}
     >
-      <Icon name="search" style={{ fontSize: 17 }} />
+      <Icon name="search" style={{ fontSize: 16 }} />
       <span className="hz-side-text">종목·테마 검색</span>
       <Kbd className="hz-side-text ml-auto">{mac ? "⌘K" : "Ctrl K"}</Kbd>
     </button>
@@ -690,9 +691,10 @@ function Sidebar() {
         flexShrink: 0,
         background: C.card,
         borderRight: `1px solid var(--c-divider)`,
-        padding: "28px 14px 20px",
+        // v2(2026-10-03): 본문 모듈과 같은 눈금으로 줄였다 — 글자 13 · 줄 34 · 모서리 6 · 1px 가는 선.
+        padding: "22px 12px 16px",
         // 28: 묶음 머리를 넣으며 사이드바가 782 → 930px 로 늘어 노트북에서 스크롤이 생겼다(2026-09-25). 줄 여백과 함께 줄였다.
-        gap: 28,
+        gap: 22,
         // 내용 높이는 745px 다(2026-09-26 실측 · 로고 아래 슬로건을 뺀 뒤 · 프로덕션 782). 창이 그보다 낮을 때만(1366×768 노트북 등) 사이드바
         // 안에서 스크롤한다 — 예전엔 맨 아래 텔레그램 칸이 잘렸다. 막대는 숨긴다(보이면 어수선하다는 지적).
         overflowY: "auto",
@@ -700,7 +702,7 @@ function Sidebar() {
         scrollbarWidth: "none",
       }}
     >
-      <div style={{ padding: "0 6px" }}>
+      <div style={{ padding: "0 4px" }}>
         {/* 베타 배지는 로고 우측 상단에 붙인다 — 서비스 전체가 베타라는 표시라서,
             페이지마다(예전엔 카더라 제목 옆) 다는 것보다 여기 한 곳이 맞다.
             alignItems:flex-start 로 로고 윗선에 맞춰 위첨자처럼 올린다. */}
@@ -709,7 +711,7 @@ function Sidebar() {
         <LogoTag className="hz-side-logo" style={{ margin: 0, display: "flex", alignItems: "center", gap: 5 }}>
           {/* 로고는 메인(시장 브리핑)으로 가는 링크 — 어느 페이지에서든 홈으로 돌아올 수 있게. */}
           <Link href="/" aria-label="hatzze 홈" className="hz-logo-link" style={{ display: "inline-flex" }}>
-            <LogoLockup symbolSize={29} wordmarkSize={30} gap={7} />
+            <LogoLockup symbolSize={26} wordmarkSize={27} gap={6} />
           </Link>
           {/* 배지 크기는 '준비 중' 배지와 맞춘다(10px / padding 3-7). 서로 다른 크기면
               같은 사이드바 안에서 배지가 두 종류로 보인다. */}
@@ -717,9 +719,9 @@ function Sidebar() {
         </LogoTag>
       </div>
       <SearchTrigger />
-      <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
         {sidebarItems(env).map((row) => {
-          if (row.kind === "group") return <NavGroupLabel key={`g-${row.label}`} label={row.label} first={row.first} inset={12} />;
+          if (row.kind === "group") return <NavGroupLabel key={`g-${row.label}`} label={row.label} first={row.first} inset={10} />;
           if (row.kind === "soon") {
             const soon = row.item;
             return (
@@ -730,18 +732,18 @@ function Sidebar() {
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 12,
-                  padding: "10px 12px",
+                  gap: 10,
+                  padding: "8px 10px",
                   color: C.disabled,
                   fontWeight: 600,
-                  borderRadius: R.nav,
+                  borderRadius: 6,
                 }}
               >
-                <NavGlyph item={soon} size={20} />
+                <NavGlyph item={soon} size={18} />
                 {/* 배지를 라벨 '우측 상단'에 위첨자로 띄운다(로고 옆 베타 배지와 같은 어법).
                     absolute 라 배지가 행 폭 계산에서 빠져 라벨이 눌리지도, 항목이 넘치지도 않는다. */}
                 <span className="hz-side-text" style={{ position: "relative", display: "inline-flex" }}>
-                  <span style={{ fontSize: "var(--fs-14)", whiteSpace: "nowrap" }}>{soon.label}</span>
+                  <span style={{ fontSize: "var(--fs-13)", whiteSpace: "nowrap" }}>{soon.label}</span>
                   <span
                     style={{
                       position: "absolute",
@@ -771,9 +773,9 @@ function Sidebar() {
             const rowStyle = {
               display: "flex",
               alignItems: "center",
-              gap: 12,
-              padding: "10px 12px",
-              borderRadius: R.nav,
+              gap: 10,
+              padding: "8px 10px",
+              borderRadius: 6,
             } as const;
             if (!child.href) {
               return (
@@ -783,9 +785,9 @@ function Sidebar() {
                   data-tip={child.tip}
                   style={{ ...rowStyle, color: C.disabled, fontWeight: 600 }}
                 >
-                  <child.Glyph size={20} dimmed />
+                  <child.Glyph size={18} dimmed />
                   <span className="hz-side-text" style={{ position: "relative", display: "inline-flex" }}>
-                    <span style={{ fontSize: "var(--fs-14)", whiteSpace: "nowrap" }}>{child.label}</span>
+                    <span style={{ fontSize: "var(--fs-13)", whiteSpace: "nowrap" }}>{child.label}</span>
                     <span
                       style={{
                         position: "absolute",
@@ -824,8 +826,8 @@ function Sidebar() {
                   textDecoration: "none",
                 }}
               >
-                <child.Glyph size={20} />
-                <span className="hz-side-text" style={{ position: "relative", display: "inline-flex", fontSize: "var(--fs-14)" }}>
+                <child.Glyph size={18} />
+                <span className="hz-side-text" style={{ position: "relative", display: "inline-flex", fontSize: "var(--fs-13)" }}>
                   {child.label}
                   {child.isNew && (
                     <span style={{ position: "absolute", left: "100%", top: -1, marginLeft: 3 }}>
@@ -853,8 +855,8 @@ function Sidebar() {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 12,
-                padding: "10px 12px",
+                gap: 10,
+                padding: "8px 10px",
                 // 활성 항목의 바탕·글자색은 여기 없다 — globals.css 의 .hz-nav-active 가 든다
                 // (옅은 하늘색 타일 + 파란 잉크, 2026-09-04 리디자인. 8월 목업의 꽉 찬 파랑
                 // 알약은 그 칸만 무거워 배너처럼 읽혔다).
@@ -866,14 +868,14 @@ function Sidebar() {
                 // ⚠️ 활성 항목에 파란 그림자를 주지 않는다. 0 10px 20px 이라 **바로 아래
                 // 항목 위로 번져서**, 그 항목만 호버 배경이 푸르스름하게 도드라졌다
                 // (카더라는 볼록하고 MDD 는 평평해 보이던 원인, 2026-08-03).
-                borderRadius: R.nav,
+                borderRadius: 6,
                 textDecoration: "none",
               }}
             >
-              <NavGlyph item={item} size={20} />
+              <NavGlyph item={item} size={18} />
               {/* 새 화면 표식은 '준비 중' 배지와 같은 자리다 — 라벨 우측 상단 위첨자. absolute 라 배지가
                   행 폭 계산에서 빠져 210px 사이드바에서 라벨이 눌리지 않는다. */}
-              <span className="hz-side-text" style={{ position: "relative", display: "inline-flex", fontSize: "var(--fs-14)" }}>
+              <span className="hz-side-text" style={{ position: "relative", display: "inline-flex", fontSize: "var(--fs-13)" }}>
                 {item.label}
                 {item.isNew && (
                   /* top −1 은 눈대중이 아니다. 14px 라벨이 21px 줄상자 안에 서면 잉크 꼭대기가 상자 위에서
@@ -899,7 +901,7 @@ function Sidebar() {
 
       {/* 바닥에 붙인다(margin-top:auto). 예전엔 flex:1 빈 칸을 끼웠는데 그 칸도 간격(28)을 하나 더 먹었다. */}
       {/* '오늘 뭐래?' 와 다크 모드 단추가 한 줄에 선다(2026-10-02, 머리 오른쪽에서 옮겨 왔다). 접힌 막대에선 세로로 쌓인다(.hz-side-foot). */}
-      <div className="hz-side-foot" style={{ display: "flex", gap: 8, marginTop: "auto" }}>
+      <div className="hz-side-foot" style={{ display: "flex", gap: 6, marginTop: "auto" }}>
         {/* 라벨은 바뀌었어도 data-ga-cta 는 "community" 그대로 둔다 — 값을 같이 바꾸면
             이름 변경 전후의 클릭수를 한 줄로 비교할 수 없다. 햄버거 메뉴도 같은 값이다(푸터 링크는 2026-10-02 에 걷었다). */}
         <a
@@ -927,18 +929,18 @@ function Sidebar() {
             alignItems: "center",
             justifyContent: "center",
             gap: 8,
-            // 높이 44 · 모서리 12 — 카더라 히어로의 '미장 카더라 보기' 버튼과 같은 눈금이다.
-            padding: 12,
-            borderRadius: R.nav,
-            fontSize: "var(--fs-14)",
-            fontWeight: 700,
+            // 높이 38 · 모서리 6 — v2 모듈과 같은 눈금(2026-10-03). 테두리·바탕은 .hz-sidebar .hz-tg-cta(v2.css).
+            padding: 9,
+            borderRadius: 6,
+            fontSize: "var(--fs-13)",
+            fontWeight: 600,
             textDecoration: "none",
           }}
         >
-          <Icon name={TELEGRAM.icon} style={{ fontSize: "var(--fs-19)" }} />
+          <Icon name={TELEGRAM.icon} style={{ fontSize: 18 }} />
           <span className="hz-side-text">{TELEGRAM.label}</span>
         </a>
-        <ThemeToggle size={44} radius={R.nav} />
+        <ThemeToggle size={38} radius={6} />
       </div>
     </aside>
   );
