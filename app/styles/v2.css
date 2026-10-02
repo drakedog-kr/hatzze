@@ -579,6 +579,8 @@ a.v2-ev-row:hover { background: var(--t-tint); }
 .hz-sidebar .hz-theme-btn { border-color: var(--sd-line) !important; background: transparent !important; }
 .hz-sidebar .hz-theme-btn:hover { background: var(--sd-tint) !important; }
 .hz-sidebar .hz-theme-btn .ms { font-size: 18px !important; }
+/* 접힌 막대(64px)에선 검색 단추도 다른 항목처럼 가운데 — 안쪽 왼쪽 여백(10px)이 남아 돋보기가 2.5px 왼쪽으로 쏠렸다(2026-10-03). */
+html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center; gap: 0; padding-left: 0; padding-right: 0; }
 
 /* ── 화면 머리 ── v2 화면은 제목·부제를 화면에서 걷고(AppShell 의 V2_PAGES) 오른쪽 도구도 두지 않는다 — 머리가 높이 0 이 된다.
    그대로 두면 위아래 간격(20 + 20)이 겹쳐 빈 띠가 생기므로 하나를 지운다. */
