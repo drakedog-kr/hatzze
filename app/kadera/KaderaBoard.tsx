@@ -69,7 +69,7 @@ export function SignalTable({ sec }: { sec: BoardSection }) {
               </span>
             ))}
           </div>
-          {/* 칸을 채울 땐 줄이 고르게 늘어난다(v2.css .v2-fill .v2-tbody). */}
+          {/* 짝지은 칸보다 짧으면 줄이 고르게 늘어난다(v2.css .v2-grid .v2-tbody). */}
           <ol className="v2-tbody">
             {sec.rows.map((r, i) => (
               <li key={r.code}>

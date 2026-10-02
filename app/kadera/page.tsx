@@ -335,35 +335,23 @@ export default async function KaderaPage() {
         <EventsModule events={events} today={kaderaToday} failed={eventsFailed} limit={9} />
       </div>
 
-      {/* 셋째 줄 — 왼쪽 표 둘(왜 뜨나 · 왜 움직였나, 열 줄씩) · 오른쪽 오늘의 요약 + 이슈 키워드. 그 아래 많이 언급(판 폭 전체).
-          ⭐ 두 칸 중 짧은 쪽은 표 줄이 고르게 늘어나 키를 맞춘다(v2.css .v2-fill) — 2026-10-02 "공백은 있으면 안 된다". */}
+      {/* 셋째 줄 — [급부상 | 오늘의 요약] · [크게 움직인 | 이슈 키워드] · [많이 언급(판 폭 전체)]. 자리는 v2.css .v2-grid 의 영역 이름이 정한다.
+          ⭐ 왼쪽 · 오른쪽을 같은 줄에 짝지어 경계가 맞는다. 한 줄에서 짧은 쪽은 표 줄이 고르게 늘어난다 — 2026-10-02 "공백은 있으면 안 된다". */}
       <div className="v2-grid">
-        <div className="v2-col v2-fill">
-          {sections
-            .filter((sec) => sec.id !== "talk")
-            .map((sec) => (
-              <SignalTable key={sec.id} sec={sec} />
-            ))}
-        </div>
-        <div className="v2-col v2-rail v2-fill">
-          <Module id="brief" title="오늘의 요약" ai>
-            <div className="v2-brief">
-              {(() => {
-                const used = new Set<string>();
-                return (sentiment?.summary ?? "오늘의 요약을 준비하고 있습니다.")
-                  .split(/\n{2,}/)
-                  .map((para, i) => <p key={i}>{highlightTerms(para, summaryTerms, used, { linkTerms: THEME_LINKS ? THEME_LINK_MAP : undefined })}</p>);
-              })()}
-            </div>
-          </Module>
-          {keywordModule}
-        </div>
-        {/* 넷째 줄 판 폭 전체 — 많이 언급(흐름 요약 첫 문장이 한 줄로 다 들어간다) */}
-        {sections
-          .filter((sec) => sec.id === "talk")
-          .map((sec) => (
-            <SignalTable key={sec.id} sec={sec} />
-          ))}
+        {sections.map((sec) => (
+          <SignalTable key={sec.id} sec={sec} />
+        ))}
+        <Module id="brief" title="오늘의 요약" ai>
+          <div className="v2-brief">
+            {(() => {
+              const used = new Set<string>();
+              return (sentiment?.summary ?? "오늘의 요약을 준비하고 있습니다.")
+                .split(/\n{2,}/)
+                .map((para, i) => <p key={i}>{highlightTerms(para, summaryTerms, used, { linkTerms: THEME_LINKS ? THEME_LINK_MAP : undefined })}</p>);
+            })()}
+          </div>
+        </Module>
+        {keywordModule}
       </div>
     </div>
   );

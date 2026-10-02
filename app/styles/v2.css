@@ -184,35 +184,44 @@
 .v2-band .v2-events li { flex: 1; display: flex; }
 .v2-band .v2-ev-row { flex: 1; align-items: center; }
 
-/* ── 셋째 줄 — 왼쪽 표 둘(열 줄씩) · 오른쪽 오늘의 요약 + 이슈 키워드, 그 아래 많이 언급(판 폭 전체) ──
+/* ── 셋째 줄 — [급부상 | 오늘의 요약] · [크게 움직인 | 이슈 키워드] · [많이 언급(판 폭 전체)] ──
    ⭐ 표는 열 줄을 **다 펼친다**(2026-10-03 — 쪽 넘김도 표 안 스크롤도 "별로"). 열 줄 표 둘은 요약 하나보다 400px 넘게 길어서
-   이슈 키워드를 요약 아래로 올려 오른쪽 칸을 채운다. 두 칸 중 짧은 쪽은 표 줄이 고르게 늘어나 키를 맞춘다(빈 곳 없음).
+   이슈 키워드를 요약 아래로 올려 오른쪽을 채운다.
+   ⭐ 왼쪽 · 오른쪽을 **같은 줄(grid row)에 짝지어** 세운다 — 칸마다 따로 쌓았더니 표 둘 사이 경계와 요약 · 키워드 사이 경계가
+   서로 다른 높이에 서서 오와 열이 어긋났다(2026-10-03). 한 줄에서 짧은 쪽은 표 줄이 고르게 늘어나 키를 맞춘다(빈 곳 없음).
    sticky 로 따라오게 했을 땐 왼쪽이 표 셋 + 화제어라 요약 아래가 1,000px 가까이 비었다. */
 .v2-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 400px;
+  grid-template-areas:
+    "surging brief"
+    "why     keywords"
+    "talk    talk";
   align-items: stretch;
   gap: 12px;
 }
-.v2-grid > #talk { grid-column: 1 / -1; }
-.v2-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.v2-grid > #surging { grid-area: surging; }
+.v2-grid > #why { grid-area: why; }
+.v2-grid > #talk { grid-area: talk; }
+.v2-grid > #brief { grid-area: brief; }
+.v2-grid > #keywords { grid-area: keywords; }
 /* 칸 채우기 — 요약은 제 키, 표 · 순위표는 남는 높이를 받아 줄마다 고르게 늘린다. */
-.v2-fill > .v2-mod:not(#brief) { flex: 1 1 auto; display: flex; flex-direction: column; }
-.v2-fill .v2-tbl,
-.v2-fill .v2-kw,
-.v2-fill .v2-kw-col { flex: 1; display: flex; flex-direction: column; }
-.v2-fill .v2-tbody,
-.v2-fill .v2-kw ol { flex: 1; display: flex; flex-direction: column; }
-.v2-fill .v2-tbody > li { flex: 1 0 auto; display: flex; }
-.v2-fill .v2-tbody > li > .v2-tr { flex: 1; }
-.v2-fill .v2-kw ol > li { flex: 1 0 auto; }
-.v2-rail .v2-brief { font-size: 13px; line-height: 1.95; }
+.v2-grid > .v2-mod { display: flex; flex-direction: column; }
+.v2-grid .v2-tbl,
+.v2-grid .v2-kw,
+.v2-grid .v2-kw-col { flex: 1; display: flex; flex-direction: column; }
+.v2-grid .v2-tbody,
+.v2-grid .v2-kw ol { flex: 1; display: flex; flex-direction: column; }
+.v2-grid .v2-tbody > li { flex: 1 0 auto; display: flex; }
+.v2-grid .v2-tbody > li > .v2-tr { flex: 1; }
+.v2-grid .v2-kw ol > li { flex: 1 0 auto; }
+.v2-grid > #brief .v2-brief { font-size: 13px; line-height: 1.95; }
 /* 오른쪽 칸(400 · 340)의 이슈 키워드는 한 단 열 줄 — 막대 칸이 들어갈 폭이 없어 폰과 같은 꼴(순위 · 키워드 · 횟수 · 변화).
    한 줄기(1,000 미만)에선 판 폭 전체라 막대를 그대로 둔다. */
 @container kd (min-width: 1000px) {
-  .v2-rail .v2-kw-row { grid-template-columns: 20px minmax(0, 1fr) 64px 64px; }
-  .v2-rail .v2-kw-bar,
-  .v2-rail .v2-kw-th > :nth-child(3) { display: none; }
+  .v2-grid > #keywords .v2-kw-row { grid-template-columns: 20px minmax(0, 1fr) 64px 64px; }
+  .v2-grid > #keywords .v2-kw-bar,
+  .v2-grid > #keywords .v2-kw-th > :nth-child(3) { display: none; }
 }
 
 /* 오늘의 요약 */
@@ -476,7 +485,7 @@ a.v2-ev-row:hover { background: var(--t-tint); }
   .v2-band { grid-template-columns: 216px minmax(0, 1fr) 340px; }
   .v2-grid { grid-template-columns: minmax(0, 1fr) 340px; }
   /* 요약 칸 340 — 글이 길어져 줄이 높아지는 만큼 한 단 좁힌다. */
-  .v2-rail .v2-brief { line-height: 1.85; }
+  .v2-grid > #brief .v2-brief { line-height: 1.85; }
   .v2-tr,
   .v2-tbl.is-talk .v2-tr { grid-template-columns: 20px 160px 72px 64px minmax(0, 1fr); }
   .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 160px 72px minmax(0, 1fr); }
@@ -502,11 +511,11 @@ a.v2-ev-row:hover { background: var(--t-tint); }
   .v2-tbl.is-talk ol .v2-td-text { grid-area: text; padding: 0 0 10px; -webkit-line-clamp: 2; }
   .v2-tbl.is-talk ol .v2-tr { padding-top: 6px; }
 
-  /* 한 줄기 — 칸을 풀어 모듈을 차례로 세운다: 요약 → 급부상 → 크게 움직인 → 많이 언급 → 이슈 키워드. */
-  .v2-grid { grid-template-columns: minmax(0, 1fr); }
-  .v2-grid > .v2-col { display: contents; }
-  .v2-grid #brief { order: -1; }
-  .v2-grid #keywords { order: 1; }
+  /* 한 줄기 — 요약 → 급부상 → 크게 움직인 → 많이 언급 → 이슈 키워드. */
+  .v2-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "brief" "surging" "why" "talk" "keywords";
+  }
   .v2-tr,
   .v2-tbl.is-talk .v2-tr { grid-template-columns: 20px 168px 72px 64px minmax(0, 1fr); }
   .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px 72px minmax(0, 1fr); }
