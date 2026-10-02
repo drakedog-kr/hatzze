@@ -19,7 +19,7 @@ import { assertLoaded, isLoadFailed } from "@/lib/load-state";
 import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { Icon } from "../ui";
-import { highlightTerms, termsFor } from "./parts";
+import { highlightTerms, termsFor, ThemeVsUsualRows } from "./parts";
 import { fmtKoDate } from "@/lib/stock-page";
 import { THEME_NAMES, themeHref } from "@/lib/theme-href";
 import { THEMES } from "@/lib/stock-themes";
@@ -320,14 +320,17 @@ export default async function KaderaPage() {
           한 세로줄에 선다. */}
       <div className="v2-band">
         {sentiment ? (
-          <SentimentModule score={sentiment.score} label={sentiment.label} trend={sentiment.trend ?? []} days={sentiment.windowDays} />
+          <SentimentModule score={sentiment.score} label={sentiment.label} trend={sentiment.trend ?? []} days={sentiment.windowDays}>
+            {/* 테마별 낙관도 — 인기 테마의 평소 대비 막대(parts.tsx ThemeVsUsualRows · theme-vs-usual.ts). 미장과 같은 부품이다. */}
+            <ThemeVsUsualRows themes={sentiment.byTheme} />
+          </SentimentModule>
         ) : (
           <Module id="mood" title="여론 낙관도">
             <p className="v2-empty">{sentimentFailed ? "감성 집계를 불러오지 못했습니다." : "아직 분석된 메시지가 없습니다."}</p>
           </Module>
         )}
         <ThemeCards themes={themes} hrefOf={THEME_LINKS ? themeHref : null} />
-        <EventsModule events={events} today={kaderaToday} failed={eventsFailed} limit={5} />
+        <EventsModule events={events} today={kaderaToday} failed={eventsFailed} limit={9} />
       </div>
 
       {/* 셋째 줄 — 왼쪽 표 둘(왜 움직였나 · 왜 뜨나) · 오른쪽 오늘의 요약. ⭐ 요약 칸은 **표 둘의 높이에 맞춰 꽉 찬다**(v2.css .v2-rail) —

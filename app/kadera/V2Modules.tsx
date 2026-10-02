@@ -96,12 +96,15 @@ export function SentimentModule({
   label,
   trend,
   days,
+  children,
 }: {
   score: number;
   label: string;
   trend: SentimentPoint[];
   /** 큰 숫자가 본 날수(보통 2). 선은 30일이라 머리 띠엔 큰 숫자의 기간을 적는다. */
   days: number;
+  /** 선 아래에 붙는 것 — 인기 테마의 평소 대비 낙관도(page.tsx 가 ThemeVsUsualRows 를 넘긴다). */
+  children?: React.ReactNode;
 }) {
   const vals = trend.map((p) => p.score);
   const tone: Tone = score >= 50 ? "up" : "down";
@@ -114,7 +117,7 @@ export function SentimentModule({
           <b className={`is-${tone}`}>{score}%</b>
           <span className="v2-reason">{label}</span>
         </span>
-        <Spark id="v2-mood-spark" values={vals} base={50} w={300} h={80} tone={tone} dot />
+        <Spark id="v2-mood-spark" values={vals} base={50} w={300} h={64} tone={tone} dot />
         <span className="v2-card-foot">
           <span>
             <em>{vals.length}일 최고</em>
@@ -125,6 +128,7 @@ export function SentimentModule({
             {lo}%
           </span>
         </span>
+        {children && <div className="v2-mood-themes">{children}</div>}
       </div>
     </Module>
   );
@@ -137,7 +141,9 @@ const sign = (v: number) => (v > 0 ? "+" : v < 0 ? "-" : "");
  * 점유율 = 최근 3일 평균(머리 띠의 '최근 3일'), 변화 = 5일 이상 전 평균과의 차이(lib/telegram-data.ts THEME_PRIOR_GAP_DAYS).
  */
 export function ThemeCards({ themes, hrefOf }: { themes: ThemeRotation[]; hrefOf: ((theme: string) => string) | null }) {
-  const rows = themes.slice(0, 6);
+  // 열 — 2칸 × 5줄. 옆 여론 칸이 테마별 낙관도까지 실어 키가 커졌다(2026-10-02) — 여섯이면 이 칸 아래가 100px 비었다.
+  // 남는 높이는 줄이 나눠 먹는다(v2.css .v2-band .v2-themes 1fr).
+  const rows = themes.slice(0, 10);
   return (
     <Module id="themes" title="테마 점유율" meta="최근 3일">
       {rows.length === 0 ? (

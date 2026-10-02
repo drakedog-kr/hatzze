@@ -176,6 +176,13 @@
   gap: 12px;
 }
 .v2-band .v2-themes { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 8px; }
+/* 세 모듈은 키가 같아야 하고(stretch) 안이 비면 안 된다 — 가장 큰 여론 칸이 높이를 정하면, 테마 카드 줄과 일정 줄이 그 높이를
+   나눠 먹는다(1fr · flex 1). 개수를 맞춰 메우면 그날 자료 길이에 따라 다시 빈다([[공백 금지]] 2026-10-02). */
+.v2-band > .v2-mod { display: flex; flex-direction: column; }
+.v2-band .v2-themes { flex: 1; grid-auto-rows: minmax(52px, 1fr); }
+.v2-band .v2-events { flex: 1; }
+.v2-band .v2-events li { flex: 1; display: flex; }
+.v2-band .v2-ev-row { flex: 1; align-items: center; }
 
 /* ── 셋째 줄 — 왼쪽 표 둘 · 오른쪽 오늘의 요약 ──
    ⭐ 줄 높이는 **왼쪽 표 둘이 정한다.** 요약 칸은 높이에 끼지 않고(absolute) 그 높이를 꽉 채운다 — 글이 짧으면 칸이 안 줄어
@@ -307,7 +314,7 @@ a.v2-tr:hover { background: var(--t-tint); }
 .v2-delta { font-size: 12px; line-height: 16px; color: var(--t-ink3); }
 .v2-delta.is-up { color: var(--t-up); }
 .v2-delta.is-down { color: var(--t-down); }
-.v2-bigcard .v2-spark { height: 80px; margin: 8px 0 6px; }
+.v2-bigcard .v2-spark { height: 64px; margin: 8px 0 6px; }
 .v2-card-foot {
   display: flex;
   gap: 14px;
@@ -317,6 +324,8 @@ a.v2-tr:hover { background: var(--t-tint); }
 }
 .v2-card-foot > span { display: flex; flex-direction: column; }
 .v2-card-foot em { font-style: normal; font-weight: 500; color: var(--t-ink3); }
+/* 테마별 낙관도(ThemeVsUsualRows) — 선 그래프 아래, 가는 선으로 가른다. 부품은 국장·미장 공용이라 안쪽 꼴은 그대로 둔다. */
+.v2-mood-themes { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--t-line); }
 
 /* 테마 작은 카드 — 둘째 줄 가운데에 두 칸 × 세 줄. 미니 선 56 · 이름 + 대장 꼬리표 · 점유율 + 변화 */
 .v2-themes { display: grid; grid-auto-rows: 56px; gap: 2px; padding: 6px; }
@@ -478,6 +487,9 @@ a.v2-ev-row:hover { background: var(--t-tint); }
   .v2-minicard { grid-template-columns: 36px minmax(0, 1fr); gap: 8px; padding: 0 6px; }
   .v2-minicard .v2-spark { width: 36px; height: 28px; }
   .v2-mini-name .v2-reason { display: none; }
+  /* 테마 열 · 일정 아홉은 둘째 줄 세 칸의 키를 맞추려는 것이다. 한 줄기인 폰에선 길어지기만 해서 여섯 · 다섯으로. */
+  .v2-band .v2-themes > :nth-child(n + 7),
+  .v2-band .v2-events li:nth-child(n + 6) { display: none; }
   .v2-cover-cell { flex: 1 1 40%; padding: 8px 12px; border-bottom: 1px solid var(--t-line); }
   /* 두 칸씩 접히면 오른쪽 칸의 세로선이 모듈 테두리와 겹친다. */
   .v2-cover-cell:nth-child(2n) { border-right: 0; }
