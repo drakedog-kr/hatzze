@@ -129,7 +129,7 @@ const WHY_TILES = BOARD_TILES;
 
 /**
  * 테마 리포트로 가는 길을 낼 것인가. 안 연 화면(app/screen-flags.ts THEME_PUBLIC)으로 링크를 내면 배포에서 404 라
- * 여는 날까지는 감춘다 — 로컬(배포 아님)에서는 만드는 중에 봐야 하니 켠다. 푸터 바로가기와 같은 규칙.
+ * 여는 날까지는 감춘다 — 로컬(배포 아님)에서는 만드는 중에 봐야 하니 켠다. 사이드바와 같은 규칙.
  * 테마 로테이션 줄·유입/이탈 두 칸·급등 종목/종목 리포트의 테마 칩·오늘의 브리핑 문장 속 테마 이름이 이 값을 본다(2026-09-22).
  */
 const THEME_LINKS = THEME_PUBLIC || !process.env.VERCEL_ENV;
@@ -666,7 +666,7 @@ export default async function KaderaPage() {
             버튼의 밑선과 같은 선에 선다(.hz-tx-hero 주석).
             ⚠️ 여기 있던 각주 두 문장은 다 뺐다. "…매수·매도 신호가 아닙니다"는 지시(09-04),
                "…무엇에 주목하는지를 모아 보여줍니다"는 화면 부제와 같은 말이라(토스 라이팅
-               원칙 Remove empty sentences). '신호 아님' 고지는 푸터 면책이 전 화면에서 든다. */}
+               원칙 Remove empty sentences). '신호 아님' 고지는 투자 유의사항(/disclaimer)이 든다. */}
         {spotlights.length > 0 && (
           <div className="hz-tx-note hz-tx-spot">
             <span className="hz-tx-spot-cap">오늘 눈에 띄는 것</span>

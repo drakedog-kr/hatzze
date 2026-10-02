@@ -23,7 +23,13 @@ export const PRIVACY_EFFECTIVE = "2026년 10월 5일";
 export const PREV_EFFECTIVE = "2026년 8월 6일";
 
 /**
- * 문서 화면 셋(업데이트 기록·이용약관·개인정보처리방침)의 제목과 그 아래 한 줄. **셸(AppShell)의 페이지 머리가 그린다** —
+ * 투자 유의사항(토스증권 '투자 유의사항'의 자리). 면책 고지와 데이터 출처를 여기 모은다 — 화면마다 적지 않고
+ * 모든 화면의 푸터 맨 아랫줄이 이리로 건너온다(2026-10-02, app/Footer.tsx 머리 주석).
+ */
+export const DISCLAIMER_HREF = "/disclaimer";
+
+/**
+ * 문서 화면 넷(업데이트 기록·이용약관·개인정보처리방침·투자 유의사항)의 제목과 그 아래 한 줄. **셸(AppShell)의 페이지 머리가 그린다** —
  * 다른 화면과 같은 자리·같은 크기다(DEEP_PAGES 에 섞인다).
  *
  * 예전엔 문서마다 본문 안에 24px 제목을 따로 그렸다(DocTitle). 셸은 NAV·DEEP_PAGES 에 없는 주소라 제목 칸을 비워 두는데
@@ -36,6 +42,7 @@ export const DOC_PAGES: Record<string, { label: string; sub: string; ld: "WebPag
   "/changelog": { label: "업데이트 기록", sub: "무엇이 언제 바뀌었는지 적어 둡니다", ld: "WebPage" },
   "/terms": { label: "이용약관", sub: `시행일 · ${TERMS_EFFECTIVE}`, ld: "none" },
   "/privacy": { label: "개인정보처리방침", sub: `시행일 · ${PRIVACY_EFFECTIVE}`, ld: "none" },
+  [DISCLAIMER_HREF]: { label: "투자 유의사항", sub: "정보를 이용하시기 전에 확인해 주십시오", ld: "none" },
 };
 
 /**
@@ -67,9 +74,13 @@ export function Lead({ children }: { children: React.ReactNode }) {
   return <div style={{ fontSize: "var(--fs-14)", lineHeight: 1.85, color: C.sub }}>{children}</div>;
 }
 
-export function Section({ title, children }: { title: string; children: React.ReactNode }) {
+/** 투자 유의사항의 '데이터 출처' 절. ⚠️ 주소의 앵커는 영문이어야 한다(한글 주소 금지 규칙). */
+export const SOURCES_ID = "sources";
+
+export function Section({ title, id, children }: { title: string; id?: string; children: React.ReactNode }) {
   return (
-    <section style={{ marginTop: 36 }}>
+    // scroll-margin — 푸터에서 앵커로 뛰어오면 제목이 화면 맨 위에 딱 붙지 않게 한 줄 띄운다.
+    <section id={id} style={{ marginTop: 36, scrollMarginTop: 16 }}>
       <h2 style={{ margin: "0 0 12px", fontSize: "var(--fs-17)", fontWeight: 700, color: C.ink, letterSpacing: "-0.01em" }}>
         {title}
       </h2>

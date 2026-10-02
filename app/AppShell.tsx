@@ -900,7 +900,7 @@ function Sidebar() {
       {/* 바닥에 붙인다(margin-top:auto). 예전엔 flex:1 빈 칸을 끼웠는데 그 칸도 간격(28)을 하나 더 먹었다. */}
       <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: "auto" }}>
         {/* 라벨은 바뀌었어도 data-ga-cta 는 "community" 그대로 둔다 — 값을 같이 바꾸면
-            이름 변경 전후의 클릭수를 한 줄로 비교할 수 없다. 탭바·푸터도 같은 값이다. */}
+            이름 변경 전후의 클릭수를 한 줄로 비교할 수 없다. 햄버거 메뉴도 같은 값이다(푸터 링크는 2026-10-02 에 걷었다). */}
         <a
           href={TELEGRAM.href}
           target="_blank"
@@ -1640,8 +1640,8 @@ const NEWS_EVENT = "hz-news-change";
    다시 본다(닫힌 표시는 옛 키에 남아 있을 뿐 새 키를 막지 않는다).
    ⚠️ 옛 키를 되쓰지 말 것 — 그 소식을 닫았던 사람은 새 소식을 못 본다.
 
-   ⛔⛔ **아직 안 연 화면을 알리는 띠는 화면을 여는 날 함께 켜진다.** 이 띠에는 푸터
-   바로가기 같은 조건부가 없어서, 띠만 먼저 넣으면 프로덕션에서 눌러 404 로 간다. 그때는
+   ⛔⛔ **아직 안 연 화면을 알리는 띠는 화면을 여는 날 함께 켜진다.** 이 띠에는 사이드바
+   NAV 같은 조건부가 없어서, 띠만 먼저 넣으면 프로덕션에서 눌러 404 로 간다. 그때는
    `app/screen-flags.ts` 의 플래그로 갈라 목적지가 열려 있을 때만 걸리게 한다(국장
    미리보기·배당으로 살기·테마 리포트 때 그렇게 했다). */
 /* 지금 거는 소식은 하나(NEWS). 목적지가 우리 화면이면 **그 구역 안에서는 안 그린다**(NewsStrip 의 startsWith).
@@ -1963,6 +1963,11 @@ function ToTop({
  * 자리는 **주소(pathname)마다 메모리에** 적는다. 쿼리만 바뀌는 이동(MDD 의 종목·기간)과 #앵커는 pathname 이 그대로라
  * 건드리지 않는다. 새로고침하면 브라우저 기본처럼 맨 위다.
  *
+ * ⚠️ **다른 화면의 #앵커로 오면 맨 위가 아니라 그 자리로 간다.** 맨 위로만 보냈더니 Next 가 앵커로 내려 준 자리를
+ *    이 훅이 도로 0 으로 덮어, 홈 급부상 칩(/kadera#surging)이 화면 맨 위에 떨어졌다(2026-10-02). 앵커가 아직 안 그려졌으면(loading.tsx 가 먼저 뜨는 화면 — 카더라) 맨 위로 둔 채
+ *    ANCHOR_WAIT_MS 동안 기다렸다가 그려지는 순간 내려간다. 그 사이 사람이 스크롤하면 기다림을 버린다.
+ *    주소창·새 탭으로 #앵커 주소를 바로 열 때도 처음 한 번 같은 일을 한다(브라우저 기본 이동이 main 안에서 늘 되리란 보장이 없어서).
+ *
  * ⭐ 바꿔 끼우기는 useLayoutEffect 다. 새 화면이 그려진 직후·칠하기 전에 돌아서 한 프레임도 옛 자리로 안 보인다.
  *    또 내용 높이가 줄어 생기는 스크롤 이벤트는 그다음 프레임에 오므로, 그보다 먼저 '지금 주소'를 바꿔 두면
  *    그 이벤트가 이전 화면의 자리를 덮어쓰지 않는다. 자식(페이지)의 레이아웃 효과보다 늦게 돌아 Next 의 처리도 이긴다.
@@ -1972,12 +1977,55 @@ function ToTop({
  *    튀었다(크로미움 실측, 2026-10-01). 휠·터치·키·클릭이 오면 그 사람이 움직인 것이니 바로 놓는다.
  */
 const RESTORE_HOLD_MS = 1500;
+const ANCHOR_WAIT_MS = 3000;
+
+/**
+ * 주소의 #앵커로 main 을 내린다. 지금 있으면 바로 내리고 true, 아직 안 그려졌으면 그려질 때까지(최대 ANCHOR_WAIT_MS)
+ * 기다리게 걸어 두고 false. 기다림을 거두는 함수는 `waiting` 에 넣는다 — 사람이 스크롤하거나 화면을 또 옮기면 부른다.
+ * 제목 위 여백은 앵커 쪽 scroll-margin-top 이 정한다(tx.css 의 .hz-sheet[id] · legal.tsx 의 Section).
+ */
+function seekAnchor(el: HTMLElement, hash: string, waiting: React.RefObject<(() => void) | null>): boolean {
+  let id = "";
+  try {
+    id = decodeURIComponent(hash.slice(1));
+  } catch {
+    // 깨진 %-인코딩(#%E0%A4%A)은 decodeURIComponent 가 던진다 — 앵커가 없는 것으로 친다.
+  }
+  if (!id) return false;
+  const find = () => {
+    const a = document.getElementById(id);
+    return a && el.contains(a) ? a : null;
+  };
+  const toAnchor = (a: HTMLElement) => a.scrollIntoView({ block: "start", behavior: "instant" });
+  const now = find();
+  if (now) {
+    toAnchor(now);
+    return true;
+  }
+  const obs = new MutationObserver(() => {
+    const a = find();
+    if (!a) return;
+    stop();
+    toAnchor(a);
+  });
+  const timer = window.setTimeout(() => stop(), ANCHOR_WAIT_MS);
+  const stop = () => {
+    obs.disconnect();
+    window.clearTimeout(timer);
+    if (waiting.current === stop) waiting.current = null;
+  };
+  obs.observe(el, { childList: true, subtree: true });
+  waiting.current = stop;
+  return false;
+}
 
 function useMainScrollRestore(ref: React.RefObject<HTMLElement | null>, pathname: string) {
   const saved = useRef(new Map<string, number>());
   const current = useRef(pathname);
   const popped = useRef(false);
   const hold = useRef<{ top: number; until: number } | null>(null);
+  /** 아직 안 그려진 #앵커를 기다리는 중이면 그 기다림을 거두는 함수. */
+  const waiting = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const el = ref.current;
@@ -1985,6 +2033,7 @@ function useMainScrollRestore(ref: React.RefObject<HTMLElement | null>, pathname
     const release = () => {
       hold.current = null;
       el.style.overflowAnchor = "";
+      waiting.current?.();
     };
     const onScroll = () => {
       const h = hold.current;
@@ -1998,6 +2047,8 @@ function useMainScrollRestore(ref: React.RefObject<HTMLElement | null>, pathname
     const intents = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
     el.addEventListener("scroll", onScroll, { passive: true });
     for (const t of intents) el.addEventListener(t, release, { passive: true });
+    // 처음 연 주소에 #앵커가 있으면(주소창·새 탭) 그 자리로. 아래 레이아웃 효과는 처음엔 안 돈다(current 가 이미 이 주소).
+    if (window.location.hash) seekAnchor(el, window.location.hash, waiting);
     return () => {
       el.removeEventListener("scroll", onScroll);
       for (const t of intents) el.removeEventListener(t, release);
@@ -2018,8 +2069,15 @@ function useMainScrollRestore(ref: React.RefObject<HTMLElement | null>, pathname
     current.current = pathname;
     const back = popped.current;
     popped.current = false;
+    waiting.current?.();
     const el = ref.current;
     if (!el) return;
+    // 뒤로 가기는 앵커보다 보던 자리가 먼저다.
+    if (!back && seekAnchor(el, window.location.hash, waiting)) {
+      hold.current = null;
+      el.style.overflowAnchor = "";
+      return;
+    }
     const top = back ? (saved.current.get(pathname) ?? 0) : 0;
     el.scrollTo({ top, behavior: "instant" });
     if (back && top > 0) {
@@ -2035,12 +2093,9 @@ function useMainScrollRestore(ref: React.RefObject<HTMLElement | null>, pathname
 export default function AppShell({
   children,
   themeNav = THEME_PUBLIC,
-  year,
 }: {
   children: React.ReactNode;
   themeNav?: boolean;
-  /** 푸터 저작권 연도 — 서버가 한국 시각으로 정한다(Footer 주석). */
-  year: number;
 }) {
   const env: ShellEnv = { themeNav };
   const mainRef = useRef<HTMLElement>(null);
@@ -2169,7 +2224,7 @@ export default function AppShell({
             <NewsStrip />
             <PageHeader />
             {children}
-            <Footer year={year} />
+            <Footer />
           </div>
         </main>
         {/* 둘 다 오른쪽 아래 구석을 쓴다. 층은 DOM 순서가 아니라 z-index 로 못박아
