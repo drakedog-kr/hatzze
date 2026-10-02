@@ -38,11 +38,11 @@ function firstSentence(t: string | null): string | null {
 }
 
 /**
- * 신호 표 하나의 최대 줄 수(2026-10-03 "다섯은 너무 적다, 스무 줄까지"). 표 안에서 스크롤한다(KaderaBoard 머리말).
+ * 신호 표 하나의 줄 수 — 열 줄을 다 펼친다(2026-10-03 "다섯은 너무 적다" → 쪽 넘김 · 표 안 스크롤 둘 다 "별로" → "열 줄이라도 한 번에").
  * 움직인 종목의 시세 2차 조회가 화면에 설 줄을 알아야 해서 그쪽 상수를 그대로 쓴다(lib/kadera-why.ts BOARD_TILES 주석).
  */
 const MAX_ROWS = BOARD_TILES;
-/** 표가 스크롤 전에 보여 주는 줄 수 — 넓은 판에서 다섯 줄 안팎이다(v2.css .v2-tbody). 움직인 종목의 첫 줄들을 짤 때 쓴다. */
+/** 움직인 종목의 위 다섯 줄 — '오른 셋 + 내린 둘'로 짠다(아래 moveRows). */
 const FIRST_ROWS = 5;
 
 /** "10/1 19:30" — 패널 머리에 들어갈 짧은 KST 시각. */
@@ -100,7 +100,7 @@ export default async function KaderaPage() {
   // 그렇다고 이걸 await 한 **뒤에** 나머지를 시작하면, 나머지와 아무 상관 없는 그 왕복이
   // 페이지 앞에 통째로 붙는다(실측 240ms, 콜드 1,976ms). 독립적인 조회들은 지금 바로
   // 띄우고, 종목 리포트만 이 프로미스에 이어 붙인다 — 둘이 나란히 간다.
-  // 스무 종목(MAX_ROWS)이라 종목 리포트도 스무 번 나란히 묻는다 — 많이 언급 표가 네 쪽을 넘긴다.
+  // 열 종목(MAX_ROWS)이라 종목 리포트도 열 번 나란히 묻는다.
   const topStocksPromise = getTopStocksWithTrend(MAX_ROWS);
   const reportsPromise = topStocksPromise.then((tops) =>
     Promise.all(tops.map((s) => getStockReport(s.code))),
@@ -187,8 +187,8 @@ export default async function KaderaPage() {
      급부상 · 오늘 움직인 종목(오른 것 + 5% 넘게 내린 것) · 많이 언급(KaderaBoard 머리말). */
   const surgeDays = surging[0]?.recentDays ?? KADERA_WINDOW_DAYS;
 
-  /* ⭐ 표 셋은 **최대 스무 줄**이고 표 안에서 스크롤한다(2026-10-03 "숫자가 딱 떨어지면" → "다섯은 너무 적다, 스무 줄까지"
-     → 쪽 넘김은 "불편하다"). 급부상 여섯 · 움직인 아홉은 예전 카드 격자(3×2 · 3×3)를 채우던 수였다. */
+  /* ⭐ 표 셋은 **열 줄씩 다 펼친다**(2026-10-03 "숫자가 딱 떨어지면" → "다섯은 너무 적다" → 쪽 넘김 · 표 안 스크롤은 "별로").
+     급부상 여섯 · 움직인 아홉은 예전 카드 격자(3×2 · 3×3)를 채우던 수였다. */
   const surgeRows: BoardRow[] = surging.map((s) => ({
     code: s.code,
     name: s.name,
@@ -204,8 +204,8 @@ export default async function KaderaPage() {
   }));
 
   /* 오른 것(큰 순) + 크게 내린 것(lib/kadera-why.ts DOWN_MIN, 하루 0~6줄). 부호 색이 둘을 가른다.
-     ⭐ 첫 다섯 줄은 '오른 셋 + 내린 둘'이다 — 다섯 줄 판 그대로. 내린 까닭도 독자가 찾는 것이라(급락 이유) 스크롤하지 않고 보이게 둔다.
-     움직인 폭 순으로 한 줄에 세우면 상한가가 많은 날 내린 줄이 맨 아래로 밀렸다(2026-10-03: 오른 18줄이 모두 14% 넘게 올라 -10.22% 가 19위).
+     ⭐ 위 다섯 줄은 '오른 셋 + 내린 둘'이다 — 다섯 줄 판 그대로. 내린 까닭도 독자가 찾는 것이라(급락 이유) 위에 둔다.
+     움직인 폭 순으로 한 줄에 세우면 상한가가 많은 날 내린 줄이 표 밖으로 밀렸다(2026-10-03: 오른 18줄이 모두 14% 넘게 올라 -10.22% 가 19위).
      그 아래는 남은 오른 것, 그다음 남은 내린 것. */
   const ups = why?.rows ?? [];
   const downs = why?.down ?? [];
@@ -291,8 +291,8 @@ export default async function KaderaPage() {
     ...(sentiment ? [{ k: "읽은 채널 글", v: `${sentiment.messageCount.toLocaleString("ko-KR")}건`, sub: `최근 ${sentiment.windowDays}일` }] : []),
   ];
 
-  /* 이슈 키워드 — 맨 아래 판 폭 전체의 순위표(V2Modules.tsx KeywordTable). */
-  const keywordModule = <KeywordTable keywords={keywords} />;
+  /* 이슈 키워드 — 오른쪽 칸 오늘의 요약 아래, 한 단 열 줄(V2Modules.tsx KeywordTable). */
+  const keywordModule = <KeywordTable keywords={keywords} split={false} />;
 
   return (
     <div className="hz-tx v2-kd">
@@ -335,8 +335,8 @@ export default async function KaderaPage() {
         <EventsModule events={events} today={kaderaToday} failed={eventsFailed} limit={9} />
       </div>
 
-      {/* 셋째 줄 — 왼쪽 표 둘(왜 뜨나 · 왜 움직였나) · 오른쪽 오늘의 요약. ⭐ 줄 높이는 **요약 글이 정하고 표 둘이 나눠 채운다**
-          (v2.css .v2-fill) — 표는 안에서 스크롤하니 높이가 얼마든 빈 곳이 안 생긴다(2026-10-02 "공백은 있으면 안 된다"). */}
+      {/* 셋째 줄 — 왼쪽 표 둘(왜 뜨나 · 왜 움직였나, 열 줄씩) · 오른쪽 오늘의 요약 + 이슈 키워드. 그 아래 많이 언급(판 폭 전체).
+          ⭐ 두 칸 중 짧은 쪽은 표 줄이 고르게 늘어나 키를 맞춘다(v2.css .v2-fill) — 2026-10-02 "공백은 있으면 안 된다". */}
       <div className="v2-grid">
         <div className="v2-col v2-fill">
           {sections
@@ -345,7 +345,7 @@ export default async function KaderaPage() {
               <SignalTable key={sec.id} sec={sec} />
             ))}
         </div>
-        <div className="v2-col v2-rail">
+        <div className="v2-col v2-rail v2-fill">
           <Module id="brief" title="오늘의 요약" ai>
             <div className="v2-brief">
               {(() => {
@@ -356,16 +356,15 @@ export default async function KaderaPage() {
               })()}
             </div>
           </Module>
+          {keywordModule}
         </div>
+        {/* 넷째 줄 판 폭 전체 — 많이 언급(흐름 요약 첫 문장이 한 줄로 다 들어간다) */}
+        {sections
+          .filter((sec) => sec.id === "talk")
+          .map((sec) => (
+            <SignalTable key={sec.id} sec={sec} />
+          ))}
       </div>
-
-      {/* 넷째 줄부터 판 폭 전체 — 많이 언급(흐름 요약이 한 줄로 다 들어간다) · 화제어 */}
-      {sections
-        .filter((sec) => sec.id === "talk")
-        .map((sec) => (
-          <SignalTable key={sec.id} sec={sec} />
-        ))}
-      {keywordModule}
     </div>
   );
 }

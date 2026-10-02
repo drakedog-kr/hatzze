@@ -184,26 +184,36 @@
 .v2-band .v2-events li { flex: 1; display: flex; }
 .v2-band .v2-ev-row { flex: 1; align-items: center; }
 
-/* ── 셋째 줄 — 왼쪽 표 둘 · 오른쪽 오늘의 요약 ──
-   ⭐ 줄 높이는 **요약 글이 정하고, 왼쪽 표 둘이 그 높이를 나눠 채운다**(2026-10-03). 표는 줄이 스물이라 안에서 스크롤하니
-   높이가 얼마든 빈 곳이 안 생긴다. 예전엔 거꾸로 표 둘(다섯 줄씩)이 정하고 요약이 채웠는데, 글이 짧은 날 요약 아래가 비었다(1440 에서 27px).
-   - 왼쪽 칸은 높이에 끼지 않는다(contain: size) — 끼면 스무 줄 키로 줄이 늘어난다.
-   - 줄의 바닥값(minmax 520): 요약이 짧은 날에도 표마다 네 줄 반은 보이게. 그날은 요약 아래가 조금 빈다.
+/* ── 셋째 줄 — 왼쪽 표 둘(열 줄씩) · 오른쪽 오늘의 요약 + 이슈 키워드, 그 아래 많이 언급(판 폭 전체) ──
+   ⭐ 표는 열 줄을 **다 펼친다**(2026-10-03 — 쪽 넘김도 표 안 스크롤도 "별로"). 열 줄 표 둘은 요약 하나보다 400px 넘게 길어서
+   이슈 키워드를 요약 아래로 올려 오른쪽 칸을 채운다. 두 칸 중 짧은 쪽은 표 줄이 고르게 늘어나 키를 맞춘다(빈 곳 없음).
    sticky 로 따라오게 했을 땐 왼쪽이 표 셋 + 화제어라 요약 아래가 1,000px 가까이 비었다. */
 .v2-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 400px;
-  grid-template-rows: minmax(520px, auto);
   align-items: stretch;
   gap: 12px;
 }
+.v2-grid > #talk { grid-column: 1 / -1; }
 .v2-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.v2-fill { contain: size; }
-.v2-fill > .v2-mod { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
-.v2-fill .v2-tbl { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.v2-fill .v2-tbody { flex: 1; min-height: 0; max-height: none; }
-.v2-rail > .v2-mod { flex: 1; }
+/* 칸 채우기 — 요약은 제 키, 표 · 순위표는 남는 높이를 받아 줄마다 고르게 늘린다. */
+.v2-fill > .v2-mod:not(#brief) { flex: 1 1 auto; display: flex; flex-direction: column; }
+.v2-fill .v2-tbl,
+.v2-fill .v2-kw,
+.v2-fill .v2-kw-col { flex: 1; display: flex; flex-direction: column; }
+.v2-fill .v2-tbody,
+.v2-fill .v2-kw ol { flex: 1; display: flex; flex-direction: column; }
+.v2-fill .v2-tbody > li { flex: 1 0 auto; display: flex; }
+.v2-fill .v2-tbody > li > .v2-tr { flex: 1; }
+.v2-fill .v2-kw ol > li { flex: 1 0 auto; }
 .v2-rail .v2-brief { font-size: 13px; line-height: 1.95; }
+/* 오른쪽 칸(400 · 340)의 이슈 키워드는 한 단 열 줄 — 막대 칸이 들어갈 폭이 없어 폰과 같은 꼴(순위 · 키워드 · 횟수 · 변화).
+   한 줄기(1,000 미만)에선 판 폭 전체라 막대를 그대로 둔다. */
+@container kd (min-width: 1000px) {
+  .v2-rail .v2-kw-row { grid-template-columns: 20px minmax(0, 1fr) 64px 64px; }
+  .v2-rail .v2-kw-bar,
+  .v2-rail .v2-kw-th > :nth-child(3) { display: none; }
+}
 
 /* 오늘의 요약 */
 .v2-brief { padding: 12px 16px 16px; font-size: 14px; font-weight: 500; line-height: 1.75; color: var(--t-ink2); word-break: keep-all; }
@@ -232,26 +242,6 @@
   transition: background-color 0.15s;
 }
 .v2-tbl li:last-child .v2-tr { border-bottom: 0; }
-/* 표 몸 — 줄은 다 그려 두고(최대 스무 줄) 안에서 스크롤한다. 머리 줄은 바깥이라 남는다.
-   다섯 줄 반에서 멈춘다 — 반 줄이 걸려 보여야 아래에 더 있는 줄 안다(맥은 스크롤 막대가 숨어 있다).
-   다섯 줄씩 쪽을 넘기던 단추는 "불편하다"로 걷었다(2026-10-03). 셋째 줄 왼쪽 표 둘은 이 높이 대신 요약 칸 높이를 나눠 채운다(.v2-fill). */
-.v2-tbody {
-  max-height: 220px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--t-frame) transparent;
-}
-/* 아래 끝이 옅어진다 — 더 내릴 줄이 있다는 표시. 걸치는 줄은 줄 높이에 따라 5px 까지 줄어(1280) 그것만으론 안 읽혔다.
-   sticky 라 스크롤 중엔 창 바닥에 붙고, 끝까지 내리면 마지막 줄 아래 빈 24px 위에 놓여 마지막 줄을 가리지 않는다. 여섯 줄부터. */
-.v2-tbody:has(> li:nth-child(6))::after {
-  content: "";
-  position: sticky;
-  bottom: 0;
-  display: block;
-  height: 24px;
-  background: linear-gradient(to bottom, transparent, var(--t-card));
-  pointer-events: none;
-}
 .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px 72px minmax(0, 1fr); }
 a.v2-tr:hover { background: var(--t-tint); }
 .v2-th {
@@ -512,14 +502,11 @@ a.v2-ev-row:hover { background: var(--t-tint); }
   .v2-tbl.is-talk ol .v2-td-text { grid-area: text; padding: 0 0 10px; -webkit-line-clamp: 2; }
   .v2-tbl.is-talk ol .v2-tr { padding-top: 6px; }
 
-  /* 한 줄기 — 요약이 표 위로. 표는 제 키(다섯 줄 반)로 선다. */
-  .v2-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
-  .v2-rail { order: -1; }
-  .v2-fill { contain: none; }
-  .v2-fill > .v2-mod { flex: none; }
-  .v2-fill .v2-tbody { max-height: 220px; }
-  /* 많이 언급은 여기서 두 층(57px 안팎)이라 220 이면 세 줄만 보였다. 다섯 줄 남짓으로. */
-  .v2-tbl.is-talk .v2-tbody { max-height: 310px; }
+  /* 한 줄기 — 칸을 풀어 모듈을 차례로 세운다: 요약 → 급부상 → 크게 움직인 → 많이 언급 → 이슈 키워드. */
+  .v2-grid { grid-template-columns: minmax(0, 1fr); }
+  .v2-grid > .v2-col { display: contents; }
+  .v2-grid #brief { order: -1; }
+  .v2-grid #keywords { order: 1; }
   .v2-tr,
   .v2-tbl.is-talk .v2-tr { grid-template-columns: 20px 168px 72px 64px minmax(0, 1fr); }
   .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px 72px minmax(0, 1fr); }
@@ -575,24 +562,6 @@ a.v2-ev-row:hover { background: var(--t-tint); }
     word-break: keep-all;
   }
   .v2-brief { padding: 10px 14px 14px; }
-  /* 표 몸 — 폰에선 다섯 줄씩 묶어 **옆으로 민다**(1~5위 · 6~10위). 두 층 줄(78px 안팎)이라 세로 스크롤 220px 엔 두 줄만 들었고,
-     페이지를 내리던 손가락이 표에 걸려 열다섯 줄을 지나야 빠져나왔다. 다음 묶음이 오른쪽에 28px 걸쳐 보인다. */
-  .v2-tbl .v2-tbody,
-  .v2-tbl.is-talk .v2-tbody {
-    max-height: none;
-    display: grid;
-    grid-auto-flow: column;
-    grid-template-rows: repeat(5, auto);
-    grid-auto-columns: calc(100% - 28px);
-    overflow-x: auto;
-    overflow-y: hidden;
-    overscroll-behavior-x: contain;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: none;
-  }
-  .v2-tbody > li:nth-child(5n + 1) { scroll-snap-align: start; }
-  .v2-tbody > li:nth-child(5n) .v2-tr { border-bottom: 0; }
-  .v2-tbody:has(> li:nth-child(6))::after { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .v2-dot,

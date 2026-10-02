@@ -254,13 +254,15 @@ export function EventsModule({ events, today, failed, limit = 5 }: { events: Upc
  * 그래서 옛 이슈 키워드 시트의 재료(점유율 · 변화)를 다른 표와 같은 꼴로 되살렸다.
  * - 언급량 막대의 끝은 1위다. 점유율 분모는 표에 세운 낱말들의 합(옛 화면과 같다 — 새 조회가 없고 막대와 숫자가 같은 재료다).
  * - 변화 = 최근 3일 평균 점유율 − 그 이전 평균(IssueKeyword.shareDelta, %p). 비교할 과거가 없으면 '-'.
- * - 판 폭 전체라 다섯 줄씩 두 단으로 놓는다(한 단 열 줄이면 오른쪽이 빈다). 폰은 한 단.
+ * - 판 폭 전체에 설 땐 다섯 줄씩 두 단으로 놓는다(한 단 열 줄이면 오른쪽이 빈다). 폰은 한 단.
+ *   2026-10-03 부터는 오른쪽 칸(오늘의 요약 아래)에 한 단 열 줄로 선다 — 열 줄로 늘린 표 둘 옆을 채운다.
  */
-export function KeywordTable({ keywords }: { keywords: IssueKeyword[] }) {
+export function KeywordTable({ keywords, split = true }: { keywords: IssueKeyword[]; split?: boolean }) {
   const rows = keywords.slice(0, 10);
   const top = Math.max(1, ...rows.map((k) => k.count));
   const total = rows.reduce((a, k) => a + k.count, 0) || 1;
-  const half = Math.ceil(rows.length / 2);
+  // 오른쪽 좁은 칸에 설 땐(split=false) 한 단 열 줄이다(page.tsx 셋째 줄).
+  const half = split ? Math.ceil(rows.length / 2) : rows.length;
   const cols = [rows.slice(0, half), rows.slice(half)].filter((c) => c.length > 0);
   return (
     <Module id="keywords" title="이슈 키워드" meta="최근 3일">
