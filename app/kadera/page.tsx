@@ -26,7 +26,7 @@ import { THEMES } from "@/lib/stock-themes";
 import { THEME_PUBLIC } from "../screen-flags";
 import { BOARD_TILES, getMoveReasons, getUpcomingEvents, todayKst } from "@/lib/kadera-why";
 import { EventsModule, KeywordTable, Module, SentimentModule, ThemeCards } from "./V2Modules";
-import { PAGE_ROWS, SignalTable } from "./KaderaBoard";
+import { SignalTable } from "./KaderaBoard";
 import type { BoardRow, BoardSection } from "./KaderaBoard";
 
 /**
@@ -38,16 +38,12 @@ function firstSentence(t: string | null): string | null {
 }
 
 /**
- * 신호 표 하나의 최대 줄 수 — 다섯 줄씩 네 쪽(2026-10-03 "다섯은 너무 적다, 스무 줄까지"). 움직인 종목의 시세 2차 조회가
- * 화면에 설 줄을 알아야 해서 그쪽 상수를 그대로 쓴다(lib/kadera-why.ts BOARD_TILES 주석).
+ * 신호 표 하나의 최대 줄 수(2026-10-03 "다섯은 너무 적다, 스무 줄까지"). 표 안에서 스크롤한다(KaderaBoard 머리말).
+ * 움직인 종목의 시세 2차 조회가 화면에 설 줄을 알아야 해서 그쪽 상수를 그대로 쓴다(lib/kadera-why.ts BOARD_TILES 주석).
  */
 const MAX_ROWS = BOARD_TILES;
-
-/** 줄 수를 쪽(PAGE_ROWS)의 배수로 내린다. 마지막 쪽만 짧으면 표 높이가 줄어 오른쪽 요약 칸이 같이 줄었다. 한 쪽도 안 차면 그대로. */
-function fitPages(n: number): number {
-  return n <= PAGE_ROWS ? n : n - (n % PAGE_ROWS);
-}
-const fullPages = <T,>(xs: T[]): T[] => xs.slice(0, fitPages(xs.length));
+/** 표가 스크롤 전에 보여 주는 줄 수 — 넓은 판에서 다섯 줄 안팎이다(v2.css .v2-tbody). 움직인 종목의 첫 줄들을 짤 때 쓴다. */
+const FIRST_ROWS = 5;
 
 /** "10/1 19:30" — 패널 머리에 들어갈 짧은 KST 시각. */
 function shortKst(iso: string): string {
@@ -191,9 +187,9 @@ export default async function KaderaPage() {
      급부상 · 오늘 움직인 종목(오른 것 + 5% 넘게 내린 것) · 많이 언급(KaderaBoard 머리말). */
   const surgeDays = surging[0]?.recentDays ?? KADERA_WINDOW_DAYS;
 
-  /* ⭐ 표 셋은 **다섯 줄씩 같은 쪽**으로 넘긴다(2026-10-03 "숫자가 딱 떨어지면" → "다섯은 너무 적다, 스무 줄까지").
-     급부상 여섯 · 움직인 아홉은 예전 카드 격자(3×2 · 3×3)를 채우던 수였다. 줄 수는 쪽의 배수로 자른다(fullPages). */
-  const surgeRows: BoardRow[] = fullPages(surging).map((s) => ({
+  /* ⭐ 표 셋은 **최대 스무 줄**이고 표 안에서 스크롤한다(2026-10-03 "숫자가 딱 떨어지면" → "다섯은 너무 적다, 스무 줄까지"
+     → 쪽 넘김은 "불편하다"). 급부상 여섯 · 움직인 아홉은 예전 카드 격자(3×2 · 3×3)를 채우던 수였다. */
+  const surgeRows: BoardRow[] = surging.map((s) => ({
     code: s.code,
     name: s.name,
     market: s.market,
@@ -208,31 +204,31 @@ export default async function KaderaPage() {
   }));
 
   /* 오른 것(큰 순) + 크게 내린 것(lib/kadera-why.ts DOWN_MIN, 하루 0~6줄). 부호 색이 둘을 가른다.
-     ⭐ 첫 쪽은 '오른 셋 + 내린 둘'이다 — 다섯 줄 판 그대로. 내린 까닭도 독자가 찾는 것이라(급락 이유) 누르지 않고 보이게 둔다.
-     움직인 폭 순으로 한 줄에 세우면 상한가가 많은 날 내린 줄이 넷째 쪽으로 밀렸다(2026-10-03: 오른 18줄이 모두 14% 넘게 올라 -10.22% 가 19위).
-     둘째 쪽부터는 남은 오른 것, 그다음 남은 내린 것. */
+     ⭐ 첫 다섯 줄은 '오른 셋 + 내린 둘'이다 — 다섯 줄 판 그대로. 내린 까닭도 독자가 찾는 것이라(급락 이유) 스크롤하지 않고 보이게 둔다.
+     움직인 폭 순으로 한 줄에 세우면 상한가가 많은 날 내린 줄이 맨 아래로 밀렸다(2026-10-03: 오른 18줄이 모두 14% 넘게 올라 -10.22% 가 19위).
+     그 아래는 남은 오른 것, 그다음 남은 내린 것. */
   const ups = why?.rows ?? [];
   const downs = why?.down ?? [];
   const downsFirst = Math.min(2, downs.length);
-  const moveRows: BoardRow[] = fullPages(
-    [
-      ...ups.slice(0, PAGE_ROWS - downsFirst),
-      ...downs.slice(0, downsFirst),
-      ...ups.slice(PAGE_ROWS - downsFirst),
-      ...downs.slice(downsFirst),
-    ].slice(0, MAX_ROWS),
-  ).map((r) => ({
-    code: r.code,
-    name: r.name,
-    market: r.market,
-    change: r.changeRate,
-    cells: [],
-    text: r.reason,
-  }));
+  const moveRows: BoardRow[] = [
+    ...ups.slice(0, FIRST_ROWS - downsFirst),
+    ...downs.slice(0, downsFirst),
+    ...ups.slice(FIRST_ROWS - downsFirst),
+    ...downs.slice(downsFirst),
+  ]
+    .slice(0, MAX_ROWS)
+    .map((r) => ({
+      code: r.code,
+      name: r.name,
+      market: r.market,
+      change: r.changeRate,
+      cells: [],
+      text: r.reason,
+    }));
 
   /* 줄은 **언급 수 순**으로 세운다. 여섯을 고르는 건 주목도(채널 크기를 실은 점수, getTopStocksWithTrend)라 그 순서 그대로 두면
      번호와 바로 옆 '언급' 칸이 어긋났다(87회 → 68회 → 144회, 2026-10-02). 고르는 잣대는 두고 늘어놓는 순서만 칸에 맞춘다. */
-  const talkRows: BoardRow[] = fullPages([...stockReports].sort((a, b) => b.totalMentions - a.totalMentions)).map((r) => ({
+  const talkRows: BoardRow[] = [...stockReports].sort((a, b) => b.totalMentions - a.totalMentions).map((r) => ({
     code: r.code,
     name: r.name,
     market: r.market,
@@ -339,10 +335,10 @@ export default async function KaderaPage() {
         <EventsModule events={events} today={kaderaToday} failed={eventsFailed} limit={9} />
       </div>
 
-      {/* 셋째 줄 — 왼쪽 표 둘(왜 움직였나 · 왜 뜨나) · 오른쪽 오늘의 요약. ⭐ 요약 칸은 **표 둘의 높이에 맞춰 꽉 찬다**(v2.css .v2-rail) —
-          왼쪽 줄기가 표 셋 + 화제어였을 때 요약 하나뿐인 오른쪽 아래가 1,000px 가까이 비었다(2026-10-02 "공백은 있으면 안 된다"). */}
+      {/* 셋째 줄 — 왼쪽 표 둘(왜 뜨나 · 왜 움직였나) · 오른쪽 오늘의 요약. ⭐ 줄 높이는 **요약 글이 정하고 표 둘이 나눠 채운다**
+          (v2.css .v2-fill) — 표는 안에서 스크롤하니 높이가 얼마든 빈 곳이 안 생긴다(2026-10-02 "공백은 있으면 안 된다"). */}
       <div className="v2-grid">
-        <div className="v2-col">
+        <div className="v2-col v2-fill">
           {sections
             .filter((sec) => sec.id !== "talk")
             .map((sec) => (

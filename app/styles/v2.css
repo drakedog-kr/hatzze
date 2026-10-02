@@ -185,20 +185,25 @@
 .v2-band .v2-ev-row { flex: 1; align-items: center; }
 
 /* ── 셋째 줄 — 왼쪽 표 둘 · 오른쪽 오늘의 요약 ──
-   ⭐ 줄 높이는 **왼쪽 표 둘이 정한다.** 요약 칸은 높이에 끼지 않고(absolute) 그 높이를 꽉 채운다 — 글이 짧으면 칸이 안 줄어
-   빈틈이 없고, 길면 칸 안에서 스크롤한다. 오른쪽 아래 공백을 없애려는 것이다(2026-10-02 "공백은 있으면 안 된다").
+   ⭐ 줄 높이는 **요약 글이 정하고, 왼쪽 표 둘이 그 높이를 나눠 채운다**(2026-10-03). 표는 줄이 스물이라 안에서 스크롤하니
+   높이가 얼마든 빈 곳이 안 생긴다. 예전엔 거꾸로 표 둘(다섯 줄씩)이 정하고 요약이 채웠는데, 글이 짧은 날 요약 아래가 비었다(1440 에서 27px).
+   - 왼쪽 칸은 높이에 끼지 않는다(contain: size) — 끼면 스무 줄 키로 줄이 늘어난다.
+   - 줄의 바닥값(minmax 520): 요약이 짧은 날에도 표마다 네 줄 반은 보이게. 그날은 요약 아래가 조금 빈다.
    sticky 로 따라오게 했을 땐 왼쪽이 표 셋 + 화제어라 요약 아래가 1,000px 가까이 비었다. */
 .v2-grid {
   display: grid;
-  /* 요약 칸 400 — 표가 다섯 줄씩(2026-10-03)이라 표 둘의 키가 556px 로 줄었다. 340 이면 요약 글이 110px 넘쳐 칸 안 스크롤이 생겼다. */
   grid-template-columns: minmax(0, 1fr) 400px;
+  grid-template-rows: minmax(520px, auto);
   align-items: stretch;
   gap: 12px;
 }
 .v2-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.v2-rail { position: relative; }
-.v2-rail > .v2-mod { position: absolute; inset: 0; display: flex; flex-direction: column; }
-.v2-rail .v2-brief { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; font-size: 13px; line-height: 1.95; }
+.v2-fill { contain: size; }
+.v2-fill > .v2-mod { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+.v2-fill .v2-tbl { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.v2-fill .v2-tbody { flex: 1; min-height: 0; max-height: none; }
+.v2-rail > .v2-mod { flex: 1; }
+.v2-rail .v2-brief { font-size: 13px; line-height: 1.95; }
 
 /* 오늘의 요약 */
 .v2-brief { padding: 12px 16px 16px; font-size: 14px; font-weight: 500; line-height: 1.75; color: var(--t-ink2); word-break: keep-all; }
@@ -227,32 +232,26 @@
   transition: background-color 0.15s;
 }
 .v2-tbl li:last-child .v2-tr { border-bottom: 0; }
-/* 쪽 넘김 — 쪽(ol)마다 한 칸에 겹쳐 세우고 지금 쪽만 보인다(Pager.tsx 머리말). 높이는 가장 높은 쪽이 정하고, 낮은 쪽은 줄이 늘어나 채운다. */
-.v2-pages { display: grid; }
-.v2-pages > ol { grid-area: 1 / 1; display: flex; flex-direction: column; }
-.v2-pages > ol > li { flex: 1 0 auto; display: flex; flex-direction: column; }
-.v2-pages > ol > li > .v2-tr { flex: 1 0 auto; }
-.v2-pages > ol.is-off { visibility: hidden; }
-/* 머리 띠 오른쪽의 쪽 단추 — 누르는 자리는 24px, 띠 높이(제목 줄 20px)는 그대로 둔다(위아래 -2px). */
-.v2-mod-aside:has(.v2-pg) { align-self: center; }
-.v2-pg { display: flex; align-items: center; gap: 2px; margin: -2px -6px -2px 0; }
-.v2-pg button {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: 0;
-  border-radius: 4px;
-  background: none;
-  color: var(--t-ink2);
-  cursor: pointer;
+/* 표 몸 — 줄은 다 그려 두고(최대 스무 줄) 안에서 스크롤한다. 머리 줄은 바깥이라 남는다.
+   다섯 줄 반에서 멈춘다 — 반 줄이 걸려 보여야 아래에 더 있는 줄 안다(맥은 스크롤 막대가 숨어 있다).
+   다섯 줄씩 쪽을 넘기던 단추는 "불편하다"로 걷었다(2026-10-03). 셋째 줄 왼쪽 표 둘은 이 높이 대신 요약 칸 높이를 나눠 채운다(.v2-fill). */
+.v2-tbody {
+  max-height: 220px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--t-frame) transparent;
 }
-.v2-pg button:hover:not(:disabled) { background: var(--t-tint); color: var(--t-ink); }
-.v2-pg button:disabled { color: var(--t-ink4); cursor: default; }
-.v2-pg .ms { font-size: 18px; }
-.v2-pg-n { min-width: 30px; text-align: center; font-size: 12px; font-weight: 600; line-height: 20px; color: var(--t-ink); }
-.v2-pg-n span { font-weight: 500; color: var(--t-ink3); }
+/* 아래 끝이 옅어진다 — 더 내릴 줄이 있다는 표시. 걸치는 줄은 줄 높이에 따라 5px 까지 줄어(1280) 그것만으론 안 읽혔다.
+   sticky 라 스크롤 중엔 창 바닥에 붙고, 끝까지 내리면 마지막 줄 아래 빈 24px 위에 놓여 마지막 줄을 가리지 않는다. 여섯 줄부터. */
+.v2-tbody:has(> li:nth-child(6))::after {
+  content: "";
+  position: sticky;
+  bottom: 0;
+  display: block;
+  height: 24px;
+  background: linear-gradient(to bottom, transparent, var(--t-card));
+  pointer-events: none;
+}
 .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px 72px minmax(0, 1fr); }
 a.v2-tr:hover { background: var(--t-tint); }
 .v2-th {
@@ -486,7 +485,7 @@ a.v2-ev-row:hover { background: var(--t-tint); }
 @container kd (max-width: 1099px) {
   .v2-band { grid-template-columns: 216px minmax(0, 1fr) 340px; }
   .v2-grid { grid-template-columns: minmax(0, 1fr) 340px; }
-  /* 요약 칸 340 — 1.95 면 1,280 에서 20px 넘쳤다. 한 단 좁힌다. */
+  /* 요약 칸 340 — 글이 길어져 줄이 높아지는 만큼 한 단 좁힌다. */
   .v2-rail .v2-brief { line-height: 1.85; }
   .v2-tr,
   .v2-tbl.is-talk .v2-tr { grid-template-columns: 20px 160px 72px 64px minmax(0, 1fr); }
@@ -513,10 +512,14 @@ a.v2-ev-row:hover { background: var(--t-tint); }
   .v2-tbl.is-talk ol .v2-td-text { grid-area: text; padding: 0 0 10px; -webkit-line-clamp: 2; }
   .v2-tbl.is-talk ol .v2-tr { padding-top: 6px; }
 
-  .v2-grid { grid-template-columns: minmax(0, 1fr); }
-  .v2-rail { order: -1; position: static; }
-  .v2-rail > .v2-mod { position: static; }
-  .v2-rail .v2-brief { overflow: visible; }
+  /* 한 줄기 — 요약이 표 위로. 표는 제 키(다섯 줄 반)로 선다. */
+  .v2-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+  .v2-rail { order: -1; }
+  .v2-fill { contain: none; }
+  .v2-fill > .v2-mod { flex: none; }
+  .v2-fill .v2-tbody { max-height: 220px; }
+  /* 많이 언급은 여기서 두 층(57px 안팎)이라 220 이면 세 줄만 보였다. 다섯 줄 남짓으로. */
+  .v2-tbl.is-talk .v2-tbody { max-height: 310px; }
   .v2-tr,
   .v2-tbl.is-talk .v2-tr { grid-template-columns: 20px 168px 72px 64px minmax(0, 1fr); }
   .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px 72px minmax(0, 1fr); }
@@ -572,6 +575,24 @@ a.v2-ev-row:hover { background: var(--t-tint); }
     word-break: keep-all;
   }
   .v2-brief { padding: 10px 14px 14px; }
+  /* 표 몸 — 폰에선 다섯 줄씩 묶어 **옆으로 민다**(1~5위 · 6~10위). 두 층 줄(78px 안팎)이라 세로 스크롤 220px 엔 두 줄만 들었고,
+     페이지를 내리던 손가락이 표에 걸려 열다섯 줄을 지나야 빠져나왔다. 다음 묶음이 오른쪽에 28px 걸쳐 보인다. */
+  .v2-tbl .v2-tbody,
+  .v2-tbl.is-talk .v2-tbody {
+    max-height: none;
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(5, auto);
+    grid-auto-columns: calc(100% - 28px);
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .v2-tbody > li:nth-child(5n + 1) { scroll-snap-align: start; }
+  .v2-tbody > li:nth-child(5n) .v2-tr { border-bottom: 0; }
+  .v2-tbody:has(> li:nth-child(6))::after { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .v2-dot,
