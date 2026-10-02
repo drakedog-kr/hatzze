@@ -139,9 +139,21 @@
 .v2-cover-v { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .v2-cover-v b { font-size: 13px; font-weight: 700; line-height: 20px; }
 .v2-cover-v em { font-style: normal; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
+/* 시장 맥락 칸 — 'M/D 종가' 다음에 코스피 · 코스닥(이름 · 값 · 등락) */
+.v2-cover-idx { gap: 16px; }
+.v2-cover-chg { font-size: 12px; font-weight: 600; color: var(--t-ink3); }
+.v2-cover-chg.is-up { color: var(--t-up); }
+.v2-cover-chg.is-down { color: var(--t-down); }
+/* 햇쩨 지수 칸은 홈 히어로로 가는 링크 */
+.v2-cover-hz { color: var(--t-ink); text-decoration: none; transition: background-color 0.15s; }
+.v2-cover-hz:hover { background: var(--t-tint); }
+/* 언제 · 얼마나 읽었나 — 근거일 뿐이라 오른쪽에 낮게, 테두리 없이 */
+.v2-cover-meta { margin-left: auto; gap: 12px; border-right: 0; }
+/* 글줄로 둔다 — 점을 품은 inline-flex(가운데 정렬)는 밑선이 점에 맞춰져 옆 칸 글자보다 2px 떴다. 줄 높이도 옆 칸 값(20)과 같게. */
+.v2-cover-meta .v2-cover-k { display: inline; line-height: 20px; }
+.v2-cover-meta .v2-dot { display: inline-block; margin-right: 6px; vertical-align: 1px; }
 .v2-cover-link {
   align-self: center;
-  margin-left: auto;
   margin-right: 10px;
   display: inline-flex;
   align-items: center;
@@ -520,6 +532,10 @@ a.v2-ev-row:hover { background: var(--t-tint); }
   .v2-tbl.is-talk .v2-tr { grid-template-columns: 20px 168px 72px 64px minmax(0, 1fr); }
   .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px 72px minmax(0, 1fr); }
   .v2-cover-cell { flex: 1 1 auto; }
+  /* 두 줄 — 시장 맥락(지수 · 햇쩨 지수) / 업데이트 · 테마 링크. 업데이트 칸을 늘 다음 줄로 보내고(60%) 첫 줄 밑에 선을 긋는다. */
+  .v2-cover-idx,
+  .v2-cover-hz { border-bottom: 1px solid var(--t-line); }
+  .v2-cover-meta { flex: 1 1 60%; }
 }
 @container kd (max-width: 679px) {
   .v2-band { grid-template-columns: minmax(0, 1fr); }
@@ -533,7 +549,13 @@ a.v2-ev-row:hover { background: var(--t-tint); }
   .v2-cover-cell { flex: 1 1 40%; padding: 8px 12px; border-bottom: 1px solid var(--t-line); }
   /* 두 칸씩 접히면 오른쪽 칸의 세로선이 모듈 테두리와 겹친다. */
   .v2-cover-cell:nth-child(2n) { border-right: 0; }
-  .v2-cover-link { margin: 6px 8px; }
+  .v2-cover-link { margin: 6px 8px 6px auto; }
+  /* 지수 칸은 한 줄 전체 — 날짜는 위 작은 줄, 코스피 · 코스닥은 아래 나란히. 반 칸에 두면 둘째 지수가 잘렸다(375). */
+  .v2-cover-idx { flex: 1 1 100%; display: grid; grid-template-columns: 1fr 1fr; row-gap: 2px; column-gap: 12px; border-right: 0; }
+  .v2-cover-idx > .v2-cover-k { grid-column: 1 / -1; }
+  .v2-cover .v2-cover-hz { border-right: 1px solid var(--t-line); }
+  /* 폰에선 업데이트 시각만 — 읽은 글 수까지 서면 반 칸을 넘는다. */
+  .v2-cover-meta .v2-cover-k + .v2-cover-k { display: none; }
   .v2-th { display: none; }
   .v2-tr,
   .v2-tbl.is-move .v2-tr,

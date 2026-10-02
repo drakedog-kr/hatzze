@@ -349,6 +349,36 @@ export async function getKospiCloseSeries(days = 61): Promise<MaybeFailed<CloseP
     .filter((p) => Number.isFinite(p.close) && p.close > 0);
 }
 
+/** 지수 하나의 마지막 종가와 전 거래일 대비(%). 앞 거래일 값이 없으면 changePct 는 null. */
+export type IndexClose = { date: string; close: number; changePct: number | null };
+
+/**
+ * 코스피 · 코스닥 마지막 종가와 전 거래일 대비 — 국장 카더라 첫 줄(개요 띠)이 쓴다.
+ *
+ * 둘 다 내부용 캐시 지표(kospi_close_raw · kosdaq_close_raw, is_public=false)라 getPublicIndicators 에 안 잡힌다.
+ * 파이프라인이 하루 두 번 채우는 값이라 화면을 새로고침해도 안 바뀐다 — 햇쩨 지수와 같은 리듬이다(위 getKospiCloseSeries).
+ * 지수마다 최근 두 줄만 읽는다(embedded limit 은 지수마다 걸린다).
+ */
+export async function getKrIndexCloses(): Promise<MaybeFailed<{ kospi: IndexClose | null; kosdaq: IndexClose | null }>> {
+  const { data, error } = await getSupabaseServer()
+    .from("indicators")
+    .select("slug,indicator_values(date,raw_value)")
+    .in("slug", ["kospi_close_raw", "kosdaq_close_raw"])
+    .order("date", { referencedTable: "indicator_values", ascending: false })
+    .limit(2, { referencedTable: "indicator_values" });
+  if (error) {
+    console.error("[getKrIndexCloses] 코스피 · 코스닥 종가를 못 읽었습니다", error);
+    return LOAD_FAILED;
+  }
+  const of = (slug: string): IndexClose | null => {
+    const rows = ((data ?? []).find((r) => r.slug === slug)?.indicator_values ?? []) as { date: string; raw_value: number }[];
+    const [last, prev] = rows.map((r) => ({ date: r.date, close: Number(r.raw_value) })).filter((p) => Number.isFinite(p.close) && p.close > 0);
+    if (!last) return null;
+    return { date: last.date, close: last.close, changePct: prev ? (last.close / prev.close - 1) * 100 : null };
+  };
+  return { kospi: of("kospi_close_raw"), kosdaq: of("kosdaq_close_raw") };
+}
+
 export async function getTopStockHighGaps(limit = 3): Promise<MaybeFailed<StockHighGap[]>> {
   const { data: rows, error } = await getSupabaseServer()
     .from("indicators")

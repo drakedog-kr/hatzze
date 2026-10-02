@@ -14,11 +14,12 @@ import {
   KADERA_WINDOW_DAYS,
 } from "@/lib/telegram-data";
 
+import { getKrIndexCloses, getLatestDailyScore } from "@/lib/data";
 import { assertLoaded, isLoadFailed } from "@/lib/load-state";
 
 import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
-import { Icon } from "../ui";
+import { Icon, stageForScore } from "../ui";
 import { highlightTerms, termsFor, ThemeVsUsualRows } from "./parts";
 import { fmtKoDate } from "@/lib/stock-page";
 import { THEME_NAMES, themeHref } from "@/lib/theme-href";
@@ -116,6 +117,8 @@ export default async function KaderaPage() {
     rawSurgeLines,
     rawWhy,
     rawEvents,
+    rawIndexes,
+    dailyScore,
   ] =
     await Promise.all([
       getTelegramSummary(),
@@ -129,6 +132,9 @@ export default async function KaderaPage() {
       getSurgingOneliners(),
       getMoveReasons(),
       getUpcomingEvents(35, 400),
+      // 첫 줄의 시장 맥락 — 지수 종가와 햇쩨 지수. 둘 다 곁들이는 칸이라 실패해도 화면을 세우고 그 칸만 뺀다.
+      getKrIndexCloses(),
+      getLatestDailyScore().catch(() => null),
     ]);
   const stockReports = reports.filter((r): r is NonNullable<typeof r> => r !== null);
 
@@ -284,12 +290,15 @@ export default async function KaderaPage() {
     },
   ];
 
-  /* 첫 줄 — 언제 · 얼마나 읽었나만 한 줄로. 개요 칸이 셋이던 때(작은 이름 위에 값, 63px)보다 낮춰 내용에 자리를 준다.
-     '가장 많이 말한 테마'는 바로 아래 테마 카드 첫 장과 같은 말이라 뺐다(2026-10-02). */
-  const cover: { k: string; v: string; sub?: string; live?: boolean }[] = [
-    { k: "업데이트", v: summary.lastUpdated ? shortKst(summary.lastUpdated) : "준비 중", live: true },
-    ...(sentiment ? [{ k: "읽은 채널 글", v: `${sentiment.messageCount.toLocaleString("ko-KR")}건`, sub: `최근 ${sentiment.windowDays}일` }] : []),
-  ];
+  /* 첫 줄 — 시장 맥락(지수 종가 · 햇쩨 지수) + 언제 · 얼마나 읽었나.
+     ⭐ 시장 맥락은 이 화면 어디에도 없던 것이다(2026-10-03 "더 유용한 정보로"). 채널 이야기를 읽기 전에 그날 시장이 어땠나를 한 줄로 준다.
+     ⛔ 아래 모듈 1등을 되풀이하지 말 것 — '가장 많이 말한 테마'는 테마 카드 첫 장과 같은 말이라 뺐고(2026-10-02), 그 전 수치 띠도 같은 까닭으로 걷었다. */
+  const indexes = isLoadFailed(rawIndexes) ? null : rawIndexes;
+  const indexDate = indexes?.kospi?.date ?? indexes?.kosdaq?.date ?? null;
+  const indexCells = indexes
+    ? ([["코스피", indexes.kospi], ["코스닥", indexes.kosdaq]] as const).flatMap(([name, v]) => (v ? [{ name, ...v }] : []))
+    : [];
+  const temp = dailyScore ? Math.round(Math.max(0, Math.min(100, dailyScore.score))) : null;
 
   /* 이슈 키워드 — 오른쪽 칸 오늘의 요약 아래, 한 단 열 줄(V2Modules.tsx KeywordTable). */
   const keywordModule = <KeywordTable keywords={keywords} split={false} />;
@@ -298,18 +307,44 @@ export default async function KaderaPage() {
     <div className="hz-tx v2-kd">
       {/* 첫 줄 — 집계 개요 */}
       <div className="v2-cover">
-        {cover.map((c) => (
-          <div key={c.k} className="v2-cover-cell">
-            <span className="v2-cover-k">
-              {c.live && <i className="v2-dot" />}
-              {c.k}
-            </span>
-            <span className="v2-cover-v">
-              <b>{c.v}</b>
-              {c.sub && <em>{c.sub}</em>}
-            </span>
+        {indexDate && indexCells.length > 0 && (
+          <div className="v2-cover-cell v2-cover-idx">
+            <span className="v2-cover-k">{indexDate.slice(5).split("-").map(Number).join("/")} 종가</span>
+            {indexCells.map((c) => (
+              <span key={c.name} className="v2-cover-v">
+                <em>{c.name}</em>
+                <b>{c.close.toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b>
+                {c.changePct !== null && (
+                  <span className={`v2-cover-chg${c.changePct > 0 ? " is-up" : c.changePct < 0 ? " is-down" : ""}`}>
+                    {c.changePct > 0 ? "+" : c.changePct < 0 ? "-" : ""}
+                    {Math.abs(c.changePct).toFixed(2)}%
+                  </span>
+                )}
+              </span>
+            ))}
           </div>
-        ))}
+        )}
+        {temp !== null && (
+          // 햇쩨 지수는 홈 히어로가 자세히 보여 준다 — 칸 전체가 그리로 가는 링크다.
+          <Link href="/" className="v2-cover-cell v2-cover-hz" data-ga="kadera_index_click">
+            <span className="v2-cover-k">햇쩨 지수</span>
+            <span className="v2-cover-v">
+              <b>{temp}℃</b>
+              <em>{stageForScore(temp)}</em>
+            </span>
+          </Link>
+        )}
+        <div className="v2-cover-cell v2-cover-meta">
+          <span className="v2-cover-k">
+            <i className="v2-dot" />
+            {summary.lastUpdated ? `${shortKst(summary.lastUpdated)} 업데이트` : "업데이트 준비 중"}
+          </span>
+          {sentiment && (
+            <span className="v2-cover-k">
+              채널 글 {sentiment.messageCount.toLocaleString("ko-KR")}건 · 최근 {sentiment.windowDays}일
+            </span>
+          )}
+        </div>
         {THEME_LINKS && (
           <Link href="/theme" className="v2-cover-link">
             테마 전체 보기
