@@ -313,10 +313,31 @@ export default async function KaderaPage() {
         )}
       </div>
 
+      {/* 둘째 줄 — 여론 · 테마 여섯 · 일정이 한 줄로(2026-10-02 요청: 2차 때 자리 그대로). 오른쪽 일정 칸은 아래 요약 칸과 같은 폭이라
+          한 세로줄에 선다. */}
+      <div className="v2-band">
+        {sentiment ? (
+          <SentimentModule score={sentiment.score} label={sentiment.label} trend={sentiment.trend ?? []} days={sentiment.windowDays} />
+        ) : (
+          <Module id="mood" title="여론 낙관도">
+            <p className="v2-empty">{sentimentFailed ? "감성 집계를 불러오지 못했습니다." : "아직 분석된 메시지가 없습니다."}</p>
+          </Module>
+        )}
+        <ThemeCards themes={themes} hrefOf={THEME_LINKS ? themeHref : null} />
+        <EventsModule events={events} today={kaderaToday} failed={eventsFailed} limit={5} />
+      </div>
+
       <div className="v2-grid">
-        {/* 왼쪽 줄기 — 오늘의 요약 → 신호 표 셋 */}
+        {/* 왼쪽 — 신호 표 셋 → 화제어 */}
         <div className="v2-col">
-          {/* 시각과 글 수는 개요 띠에 있다 — 여기 또 적으면 같은 숫자가 한 화면에 두 번 뜬다. */}
+          {sections.map((sec) => (
+            <SignalTable key={sec.id} sec={sec} />
+          ))}
+          {keywordModule}
+        </div>
+
+        {/* 오른쪽 — 오늘의 요약. 2차의 읽기 칸 자리라 화면에 붙어 따라온다(sticky). 시각과 글 수는 개요 띠에 있어 여기 또 적지 않는다. */}
+        <div className="v2-col v2-rail">
           <Module id="brief" title="오늘의 요약" ai>
             <div className="v2-brief">
               {(() => {
@@ -327,24 +348,6 @@ export default async function KaderaPage() {
               })()}
             </div>
           </Module>
-          {sections.map((sec) => (
-            <SignalTable key={sec.id} sec={sec} />
-          ))}
-        </div>
-
-        {/* 오른쪽 줄기 — 여론 · 테마 · 화제어 · 일정 */}
-        <div className="v2-col v2-rail">
-          {sentiment ? (
-            <SentimentModule score={sentiment.score} label={sentiment.label} trend={sentiment.trend ?? []} days={sentiment.windowDays} />
-          ) : (
-            <Module id="mood" title="여론 낙관도">
-              <p className="v2-empty">{sentimentFailed ? "감성 집계를 불러오지 못했습니다." : "아직 분석된 메시지가 없습니다."}</p>
-            </Module>
-          )}
-          <ThemeCards themes={themes} hrefOf={THEME_LINKS ? themeHref : null} />
-          {keywordModule}
-          {/* 맨 아래 — 왼쪽 줄기 끝까지 늘어나는 자리(v2.css .v2-grid). 목록이 가장 길게 늘 수 있는 모듈이라 여기 둔다. */}
-          <EventsModule events={events} today={kaderaToday} failed={eventsFailed} />
         </div>
       </div>
     </div>

@@ -197,15 +197,15 @@ function dayPill(date: string, today: string): string {
 
 /**
  * 다가오는 일정 — 날짜 알약 + 일정. 2차의 일정 카드 꼴을 되살렸다(2026-10-02 요청).
- * 오른쪽 줄기 맨 아래라 왼쪽 줄기 끝까지 늘어나는 자리다(v2.css) — 가까운 열넷까지 싣고, 남는 자리는 목록 아래 빈다.
+ * 둘째 줄(여론 · 테마 옆) 오른쪽 칸이다 — 가까운 다섯.
  * ⛔ '채널 글에서 뽑은 날짜라 공시와 다를 수 있다' 같은 각주를 달지 않는다(사족) — 머리 띠의 '채널이 짚은 날짜'가 그 말이다.
  * 국내 종목 줄은 그 종목 화면으로 간다(표의 줄과 같은 동작). 미장 티커는 아직 실주소가 없어 글자로 둔다.
  */
-export function EventsModule({ events, today, failed }: { events: UpcomingEvent[]; today: string; failed: boolean }) {
+export function EventsModule({ events, today, failed, limit = 5 }: { events: UpcomingEvent[]; today: string; failed: boolean; limit?: number }) {
   const next = events
     .filter((e) => e.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date) || b.channels - a.channels)
-    .slice(0, 14);
+    .slice(0, limit);
   return (
     <Module id="events" title="다가오는 일정" meta="채널이 짚은 날짜">
       {failed ? (
