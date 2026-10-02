@@ -4,19 +4,24 @@
    - 면: 페이지 위에 판 하나(#fbfcfd · r12 · 안쪽 흰 0.75px + 바깥 옅은 선). 판 안 블록은 테두리 없이 호버 면으로만.
    - 색: 오름 빨강 · 내림 파랑 두 가지. 등락은 +/- 로 적는다(토스 표기).
    - 얼개: 상태 줄 → 지수 줄(여론 · 테마 여섯 · 일정) → 표 셋 + 오른쪽 읽기 칸(평소엔 오늘의 요약, 줄에 마우스를 올리면 그 종목).
-   토큰 이름은 토스의 의미 토큰을 줄여 쓴 것이다(--t-ink = txt-neutral-primary …). 전부 .v2-kd 아래에만 건다. */
+   토큰 이름은 토스의 의미 토큰을 줄여 쓴 것이다(--t-ink = txt-neutral-primary …). 전부 .v2-kd 아래에만 건다.
+   ⚠️ 토스 값을 그대로 쓰면 작은 글자 몇 곳이 4.5:1 에 못 미친다(라이트 파랑 #2272eb 판 위 4.37 · 빨강 칩 위 4.19 · 47% 회색 2.97).
+      이 사이트는 4.5 를 지켜 왔으니 색상(hue)은 두고 명도만 가장 어두운 면(칩 바탕)에서 4.5 를 넘는 지점까지 옮겼다
+      (2026-10-02 이분 탐색: 라이트 오름 #d3212f · 내림 #1466e2 · 회색3 .62 / 다크 오름 #f76b7c · 내림 #5199ff · 회색3 .60).
+      47% 회색(--t-ink4)은 어떤 값으로도 작은 글자에 못 쓴다 — 점·막대 같은 글자 아닌 것에만 쓴다. */
 
 .v2-kd {
   --t-panel: #fbfcfd;
   --t-card: #ffffff;
   --t-ink: rgba(26, 31, 41, 0.89);
   --t-ink2: rgba(24, 31, 43, 0.77);
-  --t-ink3: rgba(22, 31, 46, 0.61);
+  --t-ink3: rgba(22, 31, 46, 0.62);
   --t-ink4: rgba(18, 31, 51, 0.47);
-  --t-up: #de2b39;
-  --t-down: #2272eb;
+  --t-up: #d3212f;
+  --t-down: #1466e2;
   --t-up-weak: rgba(237, 40, 49, 0.08);
   --t-down-weak: rgba(26, 122, 249, 0.09);
+  --t-down-deep: #1362d9;
   --t-green: #03b26c;
   --t-tint: rgba(7, 25, 76, 0.04);
   --t-tint-weak: rgba(13, 25, 74, 0.02);
@@ -38,12 +43,13 @@
   --t-card: #202025;
   --t-ink: rgba(242, 246, 255, 0.9);
   --t-ink2: rgba(217, 223, 235, 0.8);
-  --t-ink3: rgba(216, 223, 237, 0.59);
+  --t-ink3: rgba(216, 223, 237, 0.6);
   --t-ink4: rgba(211, 224, 243, 0.42);
-  --t-up: #f5445a;
-  --t-down: #4391ff;
+  --t-up: #f76b7c;
+  --t-down: #5199ff;
   --t-up-weak: rgba(245, 68, 90, 0.14);
   --t-down-weak: rgba(67, 145, 255, 0.16);
+  --t-down-deep: #5199ff;
   --t-green: #1cd28a;
   --t-tint: rgba(214, 224, 239, 0.09);
   --t-tint-weak: rgba(218, 223, 233, 0.04);
@@ -102,7 +108,8 @@
 /* ── 지수 줄 ── 큰 카드 216 · 테마 여섯(2열 × 3) · 일정 카드 */
 .v2-band {
   display: grid;
-  grid-template-columns: 216px minmax(0, 1fr) 300px;
+  /* 오른쪽 칸은 아래 읽기 칸과 같은 340 — 일정 카드와 읽기 칸이 한 세로줄에 선다. */
+  grid-template-columns: 216px minmax(0, 1fr) 340px;
   gap: 16px;
   align-items: stretch;
   padding: 0 0 4px;
@@ -246,10 +253,11 @@ a.v2-minicard:hover,
   font-weight: 500;
   line-height: 22px;
   text-align: center;
-  color: var(--t-ink3);
+  color: var(--t-ink2);
   font-variant-numeric: tabular-nums;
 }
-.v2-daypill.is-today { background: var(--t-down-weak); color: var(--t-down); font-weight: 600; }
+/* '오늘' 알약은 일정 카드(2% 면) 위 파란 면이라 한 겹 더 어둡다 — 내림 파랑으로는 4.38 이라 이 자리만 한 단 내린다(4.67). */
+.v2-daypill.is-today { background: var(--t-down-weak); color: var(--t-down-deep); font-weight: 600; }
 .v2-event-txt {
   min-width: 0;
   font-size: 13px;
@@ -280,13 +288,14 @@ a.v2-minicard:hover,
   padding: 14px 12px 6px;
 }
 .v2-sec-head h2 { margin: 0; font-size: 14px; font-weight: 700; line-height: 20px; color: var(--t-ink); }
-.v2-sec-head span { font-size: 12px; font-weight: 500; color: var(--t-ink4); }
+.v2-sec-head span { font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-empty { margin: 0; padding: 8px 12px 14px; font-weight: 500; color: var(--t-ink3); }
 
 .v2-tbl ol { list-style: none; margin: 0; padding: 0; }
 .v2-tr {
   display: grid;
-  grid-template-columns: 20px minmax(150px, 1.1fr) 68px 64px 56px 52px minmax(0, 1.5fr);
+  /* 종목 칸을 176 으로 못박는다 — fr 로 두면 표마다 남는 폭이 달라 등락률 칸이 1px 씩 어긋났다. */
+  grid-template-columns: 20px 176px 68px 64px 56px 52px minmax(0, 1fr);
   align-items: center;
   column-gap: 12px;
   min-height: 44px;
@@ -296,7 +305,7 @@ a.v2-minicard:hover,
   text-decoration: none;
   transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.v2-tbl.is-move .v2-tr { grid-template-columns: 20px minmax(150px, 1.1fr) 68px 84px minmax(0, 2.2fr); }
+.v2-tbl.is-move .v2-tr { grid-template-columns: 20px 176px 68px 84px minmax(0, 1fr); }
 a.v2-tr:hover,
 a.v2-tr.is-on { background: var(--t-tint); }
 .v2-th { min-height: 32px; color: var(--t-ink3); }
@@ -330,7 +339,7 @@ a.v2-tr.is-on { background: var(--t-tint); }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.v2-td-text.is-pending { color: var(--t-ink4); }
+.v2-td-text.is-pending { color: var(--t-ink3); }
 
 /* 7일 언급 막대 — 배수에 들어간 칸만 색, 가장 높은 칸이 가장 진하다 */
 .v2-bars { display: flex; align-items: flex-end; gap: 2px; width: 44px; height: 18px; }
@@ -392,7 +401,10 @@ a.v2-tr.is-on { background: var(--t-tint); }
 .v2-sum-body { font-size: 14px; font-weight: 500; line-height: 1.75; color: var(--t-ink2); word-break: keep-all; }
 .v2-sum-body p { margin: 0; }
 .v2-sum-body p + p { margin-top: 10px; }
-.v2-sum-body strong, .v2-sum-body b, .v2-sum-body a { color: var(--t-ink); font-weight: 700; }
+/* 굵힌 낱말은 highlightTerms 가 인라인으로 800 · 옛 잉크를 박는다 — 토스 최대 굵기 700 · 토큰 잉크로 덮는다. */
+.v2-sum-body b { color: var(--t-ink) !important; font-weight: 700 !important; }
+.v2-sum-body .hz-kd-termlink { color: var(--t-ink); font-weight: 700; text-decoration-color: var(--t-ink3); }
+.v2-sum-body .hz-kd-termlink:hover { color: var(--t-down); text-decoration-color: var(--t-down); }
 .v2-sum-hint {
   margin: 14px 0 0;
   padding: 8px 10px;
@@ -425,15 +437,15 @@ a.v2-tr.is-on { background: var(--t-tint); }
   box-shadow: inset 0 0 0 0.75px var(--t-line);
 }
 .v2-ps-facts > div { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; line-height: 18px; }
-.v2-ps-facts dt { font-weight: 500; color: var(--t-ink4); }
+.v2-ps-facts dt { font-weight: 500; color: var(--t-ink3); }
 .v2-ps-facts dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
 .v2-ps-facts dd.is-hot { color: var(--t-up); }
 .v2-ps-cap { display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; }
 .v2-ps-note p { margin: 4px 0 0; font-size: 14px; font-weight: 500; line-height: 1.6; color: var(--t-ink); word-break: keep-all; }
-.v2-ps-note p.v2-muted { color: var(--t-ink4); }
+.v2-ps-note p.v2-muted { color: var(--t-ink3); }
 .v2-ps-chart { display: flex; flex-direction: column; gap: 6px; }
 .v2-ps-chart .v2-ps-cap { font-weight: 600; color: var(--t-ink3); font-size: 12px; }
-.v2-ps-axis { display: flex; justify-content: space-between; font-size: 11px; font-weight: 500; color: var(--t-ink4); font-variant-numeric: tabular-nums; }
+.v2-ps-axis { display: flex; justify-content: space-between; font-size: 11px; font-weight: 500; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
 .v2-ps-links { display: flex; gap: 8px; }
 .v2-ps-links a {
   flex: 1;
@@ -452,9 +464,20 @@ a.v2-tr.is-on { background: var(--t-tint); }
 .v2-ps-links .ms { font-size: 16px; }
 
 /* ── 폭에 따라 ─────────────────────────────────────────────────────────────
-   읽기 칸이 표 옆에 서려면 판이 1,100 은 돼야 한다. 그보다 좁으면 읽기 칸은 표 위로 올라가 늘 요약만 보이고,
-   표 줄은 둘째 줄에 문장을 단다(호버가 없는 폰에서도 다 읽힌다). */
+   판 1,100 이상: 오른쪽 칸 340.
+   판 900~1,099(창 1,280~1,366 노트북이 여기다): 오른쪽 칸을 300 으로 줄이고 표의 7일 막대 칸만 뺀다 — 읽기 칸이 표 옆에
+     남아야 호버로 종목을 볼 수 있다. 토스도 1,024 에서 표와 종목 정보를 나란히 둔다(해부 노트 12절).
+   판 900 미만: 읽기 칸이 표 위로 올라가 늘 요약이고, 표 줄은 둘째 줄에 문장을 단다(호버가 없는 폰에서도 다 읽힌다). */
 @container kd (max-width: 1099px) {
+  .v2-band { grid-template-columns: 216px minmax(0, 1fr) 300px; }
+  .v2-board { grid-template-columns: minmax(0, 1fr) 300px; }
+  .v2-tr { grid-template-columns: 20px 168px 68px 64px 56px minmax(0, 1fr); }
+  .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px 68px 84px minmax(0, 1fr); }
+  .v2-td-bars,
+  .v2-tbl:not(.is-move) .v2-th > :nth-child(6) { display: none; }
+  .v2-pane { padding: 14px 16px 16px; }
+}
+@container kd (max-width: 899px) {
   .v2-band { grid-template-columns: 216px minmax(0, 1fr); }
   .v2-eventcard { grid-column: 1 / -1; }
   .v2-board { grid-template-columns: minmax(0, 1fr); }
@@ -477,8 +500,7 @@ a.v2-tr.is-on { background: var(--t-tint); }
   .v2-td-stock { grid-area: stock; }
   .v2-td-c0 { grid-area: n1; }
   .v2-td-chg { grid-area: chg; }
-  .v2-td-c1,
-  .v2-td-bars { display: none; }
+  .v2-td-c1 { display: none; }
   .v2-td-text {
     grid-area: text;
     display: -webkit-box;
