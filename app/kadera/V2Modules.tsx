@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import type { UpcomingEvent } from "@/lib/kadera-why";
-import type { SentimentPoint, ThemeRotation } from "@/lib/telegram-data";
+import type { IssueKeyword, SentimentPoint, ThemeRotation } from "@/lib/telegram-data";
 
 import { AiMark } from "../ui";
 
@@ -243,6 +243,63 @@ export function EventsModule({ events, today, failed, limit = 5 }: { events: Upc
             );
           })}
         </ul>
+      )}
+    </Module>
+  );
+}
+
+/**
+ * 이슈 키워드 — 순위표(2026-10-03). 줄마다 순위 · 키워드 · 언급량 막대 · 횟수 · 변화.
+ * 단어와 횟수만 늘어놓은 칩은 "대충 만든 것 같고 유용한지 모르겠다"는 지적을 받았다 — 무엇이 늘고 줄었는지가 안 보였다.
+ * 그래서 옛 이슈 키워드 시트의 재료(점유율 · 변화)를 다른 표와 같은 꼴로 되살렸다.
+ * - 언급량 막대의 끝은 1위다. 점유율 분모는 표에 세운 낱말들의 합(옛 화면과 같다 — 새 조회가 없고 막대와 숫자가 같은 재료다).
+ * - 변화 = 최근 3일 평균 점유율 − 그 이전 평균(IssueKeyword.shareDelta, %p). 비교할 과거가 없으면 '-'.
+ * - 판 폭 전체라 다섯 줄씩 두 단으로 놓는다(한 단 열 줄이면 오른쪽이 빈다). 폰은 한 단.
+ */
+export function KeywordTable({ keywords }: { keywords: IssueKeyword[] }) {
+  const rows = keywords.slice(0, 10);
+  const top = Math.max(1, ...rows.map((k) => k.count));
+  const total = rows.reduce((a, k) => a + k.count, 0) || 1;
+  const half = Math.ceil(rows.length / 2);
+  const cols = [rows.slice(0, half), rows.slice(half)].filter((c) => c.length > 0);
+  return (
+    <Module id="keywords" title="이슈 키워드" meta="최근 3일">
+      {rows.length === 0 ? (
+        <p className="v2-empty">아직 뽑을 이슈 키워드가 없습니다.</p>
+      ) : (
+        <div className="v2-kw">
+          {cols.map((col, ci) => (
+            <div key={ci} className="v2-kw-col">
+              <div className="v2-kw-row v2-kw-th" aria-hidden="true">
+                <span />
+                <span>키워드</span>
+                <span>언급량</span>
+                <span>횟수</span>
+                <span>변화</span>
+              </div>
+              <ol>
+                {col.map((k) => {
+                  const d = k.shareDelta === null ? null : k.shareDelta * 100;
+                  const dCls = d === null || Math.abs(d) < 0.05 ? "" : d > 0 ? " is-up" : " is-down";
+                  return (
+                    <li key={k.word} className="v2-kw-row">
+                      <span className="v2-kw-rank">{k.rank}</span>
+                      <span className="v2-kw-word">{k.word}</span>
+                      <span className="v2-kw-bar" aria-hidden="true">
+                        <i style={{ width: `${(k.count / top) * 100}%` }} />
+                        <em>{((k.count / total) * 100).toFixed(1)}%</em>
+                      </span>
+                      <span className="v2-kw-num">{k.count.toLocaleString("ko-KR")}회</span>
+                      <span className={`v2-kw-num v2-kw-delta${dCls}`}>
+                        {d === null || Math.abs(d) < 0.05 ? "-" : `${sign(d)}${Math.abs(d).toFixed(1)}%p`}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          ))}
+        </div>
       )}
     </Module>
   );

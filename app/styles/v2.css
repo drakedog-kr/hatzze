@@ -422,23 +422,33 @@ a.v2-ev-row:hover { background: var(--t-tint); }
 }
 .v2-event-txt b { font-weight: 600; color: var(--t-ink); }
 
-/* ── 화제어 칩 ── */
-.v2-chips { list-style: none; margin: 0; padding: 12px 14px 14px; display: flex; flex-wrap: wrap; gap: 6px; }
-.v2-chip {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 5px;
-  height: 28px;
-  padding: 0 9px;
-  border: 1px solid var(--t-line);
-  border-radius: 4px;
-  line-height: 26px;
-  font-variant-numeric: tabular-nums;
+/* ── 이슈 키워드 — 순위표. 판 폭 전체라 다섯 줄씩 두 단(1,000 미만은 한 단). 줄 꼴은 신호 표와 같다(40px · 가는 선 · 머리 줄 옅은 면). ── */
+.v2-kw { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.v2-kw-col { min-width: 0; }
+.v2-kw-col + .v2-kw-col { border-left: 1px solid var(--t-line); }
+.v2-kw ol { list-style: none; margin: 0; padding: 0; }
+.v2-kw-row {
+  display: grid;
+  grid-template-columns: 20px 112px minmax(0, 1fr) 64px 64px;
+  align-items: center;
+  column-gap: 12px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--t-line);
 }
-.v2-chip b { font-weight: 600; }
-.v2-chip span { font-size: 12px; font-weight: 500; color: var(--t-ink3); }
-.v2-chip span.is-up { color: var(--t-up); font-weight: 600; }
-.v2-chip span.is-down { color: var(--t-down); font-weight: 600; }
+.v2-kw ol li:last-child { border-bottom: 0; }
+.v2-kw-th { min-height: 30px; background: var(--t-head); font-size: 12px; font-weight: 600; color: var(--t-ink3); }
+.v2-kw-th > :nth-child(n + 4) { text-align: right; }
+.v2-kw-rank { text-align: center; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
+.v2-kw-word { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 언급량 — 막대(끝 = 1위) + 점유율. 막대 폭 %는 이 칸의 첫 단 폭 기준이다. */
+.v2-kw-bar { display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: center; column-gap: 8px; min-width: 0; }
+.v2-kw-bar i { display: block; justify-self: start; height: 6px; border-radius: 3px; background: var(--t-heat); }
+.v2-kw-bar em { font-style: normal; font-size: 12px; font-weight: 500; color: var(--t-ink3); text-align: right; font-variant-numeric: tabular-nums; }
+.v2-kw-num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.v2-kw-delta { font-size: 12px; font-weight: 500; color: var(--t-ink3); }
+.v2-kw-delta.is-up { color: var(--t-up); font-weight: 600; }
+.v2-kw-delta.is-down { color: var(--t-down); font-weight: 600; }
 
 /* ── 폭에 따라 ─────────────────────────────────────────────────────────────
    판 1,100 이상: 둘째 줄 260 | 테마 | 340 · 오른쪽 요약 칸 340.
@@ -457,6 +467,9 @@ a.v2-ev-row:hover { background: var(--t-tint); }
 @container kd (max-width: 999px) {
   .v2-band { grid-template-columns: 216px minmax(0, 1fr); }
   .v2-band > #events { grid-column: 1 / -1; }
+  .v2-kw { grid-template-columns: minmax(0, 1fr); }
+  .v2-kw-col + .v2-kw-col { border-left: 0; border-top: 1px solid var(--t-line); }
+  .v2-kw-col + .v2-kw-col .v2-kw-th { display: none; }
   /* 많이 언급 두 층 — 숫자 줄 아래 흐름 요약이 판 폭을 다 쓴다. 칸이 좁아 한 층이면 첫 문장이 세 줄을 넘겼다(2026-10-02). */
   .v2-tbl.is-talk .v2-tr {
     grid-template-areas:
@@ -515,6 +528,10 @@ a.v2-ev-row:hover { background: var(--t-tint); }
   .v2-tbl.is-talk ol .v2-td-text { -webkit-line-clamp: 4; }
   /* 꼬리표('첫 언급')까지 서면 종목 이름이 잘린다(375 에서 세미파이브 · 코스모로보틱스). 폰에선 이름이 먼저다. */
   .v2-badge { display: none; }
+  /* 이슈 키워드 — 폰에선 막대를 빼고 순위 · 키워드 · 횟수 · 변화만. */
+  .v2-kw-row { grid-template-columns: 20px minmax(0, 1fr) 64px 64px; }
+  .v2-kw-bar,
+  .v2-kw-th > :nth-child(3) { display: none; }
   .v2-td-chg { grid-area: chg; }
   .v2-td-c1 { display: none; }
   .v2-td-text {

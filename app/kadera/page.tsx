@@ -25,7 +25,7 @@ import { THEME_NAMES, themeHref } from "@/lib/theme-href";
 import { THEMES } from "@/lib/stock-themes";
 import { THEME_PUBLIC } from "../screen-flags";
 import { getMoveReasons, getUpcomingEvents, todayKst } from "@/lib/kadera-why";
-import { EventsModule, Module, SentimentModule, ThemeCards } from "./V2Modules";
+import { EventsModule, KeywordTable, Module, SentimentModule, ThemeCards } from "./V2Modules";
 import { SignalTable } from "./KaderaBoard";
 import type { BoardRow, BoardSection } from "./KaderaBoard";
 
@@ -269,28 +269,8 @@ export default async function KaderaPage() {
     ...(sentiment ? [{ k: "읽은 채널 글", v: `${sentiment.messageCount.toLocaleString("ko-KR")}건`, sub: `최근 ${sentiment.windowDays}일` }] : []),
   ];
 
-  /* 화제어 — 오른쪽 줄기 맨 아래 모듈. 칩마다 언급 수와 점유율 변화. */
-  const keywordModule = (
-    <Module id="keywords" title="화제어" meta="최근 3일">
-      {keywords.length === 0 ? (
-        <p className="v2-empty">아직 뽑을 화제어가 없습니다.</p>
-      ) : (
-        <ul className="v2-chips">
-          {/* 칩마다 붙던 점유율 변화(+2.5)는 뺐다 — 단위 없는 숫자가 언급 수 옆에 하나 더 붙어 무슨 값인지 몰랐다(2026-10-02).
-              새로 떠오른 말은 오늘의 요약이 문장으로 짚는다. */}
-          {/* 화제어는 세는 것(메타)이라 맨 아래 한 줄. 판 폭 전체라 열까지 한 줄에 든다. */}
-          {keywords.slice(0, 10).map((k) => {
-            return (
-              <li key={k.word} className="v2-chip">
-                <b>{k.word}</b>
-                <span>{k.count.toLocaleString("ko-KR")}회</span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </Module>
-  );
+  /* 이슈 키워드 — 맨 아래 판 폭 전체의 순위표(V2Modules.tsx KeywordTable). */
+  const keywordModule = <KeywordTable keywords={keywords} />;
 
   return (
     <div className="hz-tx v2-kd">
