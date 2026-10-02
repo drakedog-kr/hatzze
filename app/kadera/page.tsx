@@ -190,7 +190,7 @@ export default async function KaderaPage() {
     // '신규'는 신규 상장으로 읽혔다(그날 표엔 진짜 신규 상장 종목도 있었다). 뜻은 '평소 기간엔 언급이 없던 종목'(lib/surging-score.ts baseShare 0).
     tag: s.isNew ? "첫 언급" : undefined,
     tagTip: s.isNew ? "평소엔 언급이 없던 종목" : undefined,
-    cells: [{ v: `${s.ratio.toFixed(1)}배`, hot: true }, { v: `${s.recentMentions}회` }],
+    cells: [{ v: `${s.ratio.toFixed(1)}배`, hot: true }],
     text: surgeLines[s.code] ?? null,
     pending: "집계가 끝나면 붙습니다",
   }));
@@ -201,7 +201,7 @@ export default async function KaderaPage() {
     name: r.name,
     market: r.market,
     change: r.changeRate,
-    cells: [{ v: r.closePrice != null ? `${r.closePrice.toLocaleString("ko-KR")}원` : "-" }],
+    cells: [],
     text: r.reason,
   }));
 
@@ -212,7 +212,7 @@ export default async function KaderaPage() {
     name: r.name,
     market: r.market,
     change: r.changeRate,
-    cells: [{ v: `${r.totalMentions.toLocaleString("ko-KR")}회` }, { v: r.channelCount !== null ? `${r.channelCount}곳` : "-" }],
+    cells: [{ v: `${r.totalMentions.toLocaleString("ko-KR")}회` }],
     text: firstSentence(narratives[r.code] ?? null),
     full: narratives[r.code] ?? null,
     pending: "집계가 끝나면 붙습니다",
@@ -221,36 +221,40 @@ export default async function KaderaPage() {
   /* ⚠️ 등락률은 표마다 **날이 다르다.** 급부상·많이 언급은 지금 시세(야후)이고, 움직인 종목은 그날 장 마감 값이다.
      머리를 둘 다 '등락률'로 두었더니 한 종목(윈팩)이 두 표에서 +6.27% · +26.03% 로 달라 헷갈렸다(2026-10-02) — 머리에 날을 붙인다. */
   const whyDay = why ? why.date.slice(5).split("-").map(Number).join("/") : null;
+  /* ⭐ 순서와 칸은 **독자의 질문**으로 정한다(2026-10-02 "유용한 걸 내세우고 덜 유용한 건 적게"). 카더라를 여는 사람의 질문은
+     ① 왜 올랐어/떨어졌어 ② 요즘 무슨 얘기가 도나 ③ 앞으로 뭐 있나 셋이다(2026-09-04 기각 때 세운 잣대). 그래서
+     - 표 순서: 크게 움직인 종목(①) → 급부상(① · 왜 뜨나) → 많이 언급(②). 일정(③)은 둘째 줄에 있다.
+     - 칸: '세는 것'(언급 수 · 채널 수 · 종가)은 고르는 잣대지 독자가 찾는 내용이 아니다. 표마다 숫자 칸을 하나로 줄이고 그 폭을 문장에 준다.
+       크게 움직인 종목 '종가' · 급부상 '3일 언급' · 많이 언급 '말한 채널'을 뺐다. 남긴 숫자는 그 표가 왜 그 종목을 골랐는지 말하는 하나다. */
   const sections: BoardSection[] = [
-    {
-      id: "surging",
-      title: "급부상 종목",
-      meta: `최근 ${surgeDays}일 · 평소 대비`,
-      kind: "surge",
-      heads: ["", "종목", "지금 등락", "평소 대비", `${surgeDays}일 언급`, "왜 뜨나"],
-      key0: "평소의",
-      aiText: true,
-      rows: surgeRows,
-      empty: "아직 급부상 신호가 뚜렷한 종목이 없습니다.",
-    },
     {
       id: "why",
       // '오늘'이라 적으면 안 된다 — 아침에 보면 어제 장 마감의 일이다. 날은 근거 자리에 적는다.
       title: "크게 움직인 종목",
       meta: why ? `${fmtKoDate(why.date)} 장 마감` : undefined,
       kind: "move",
-      heads: ["", "종목", whyDay ? `${whyDay} 등락` : "등락", "종가", "움직인 까닭"],
-      key0: "종가",
+      heads: ["", "종목", whyDay ? `${whyDay} 등락` : "등락", "움직인 까닭"],
       aiText: true,
       rows: moveRows,
       empty: whyFailed ? "까닭을 불러오지 못했습니다." : "오늘 집계가 끝나면 채워집니다. 저녁 실행 뒤에 그날 것이 붙습니다.",
+    },
+    {
+      id: "surging",
+      title: "급부상 종목",
+      meta: `최근 ${surgeDays}일 · 평소 대비`,
+      kind: "surge",
+      heads: ["", "종목", "지금 등락", "평소 대비", "왜 뜨나"],
+      key0: "평소의",
+      aiText: true,
+      rows: surgeRows,
+      empty: "아직 급부상 신호가 뚜렷한 종목이 없습니다.",
     },
     {
       id: "talk",
       title: "많이 언급된 종목",
       meta: `최근 ${KADERA_WINDOW_DAYS}일`,
       kind: "talk",
-      heads: ["", "종목", "지금 등락", "언급", "말한 채널", "흐름 요약"],
+      heads: ["", "종목", "지금 등락", "언급", "흐름 요약"],
       key0: "언급",
       aiText: true,
       rows: talkRows,
@@ -258,13 +262,11 @@ export default async function KaderaPage() {
     },
   ];
 
-  /* 첫 줄 — 개요. 블록웍스의 'Market Overview' 띠처럼 작은 이름 위에 값. 숫자마다 근거(기간)를 단다.
-     '급부상 6종목 · 신규 2' 칸은 뺐다 — 바로 아래 표가 같은 말을 하고, '신규'가 무슨 뜻인지 띠만 봐서는 몰랐다(2026-10-02). */
-  const topTheme = themes[0];
+  /* 첫 줄 — 언제 · 얼마나 읽었나만 한 줄로. 개요 칸이 셋이던 때(작은 이름 위에 값, 63px)보다 낮춰 내용에 자리를 준다.
+     '가장 많이 말한 테마'는 바로 아래 테마 카드 첫 장과 같은 말이라 뺐다(2026-10-02). */
   const cover: { k: string; v: string; sub?: string; live?: boolean }[] = [
     { k: "업데이트", v: summary.lastUpdated ? shortKst(summary.lastUpdated) : "준비 중", live: true },
     ...(sentiment ? [{ k: "읽은 채널 글", v: `${sentiment.messageCount.toLocaleString("ko-KR")}건`, sub: `최근 ${sentiment.windowDays}일` }] : []),
-    ...(topTheme ? [{ k: "가장 많이 말한 테마", v: topTheme.theme, sub: `언급의 ${topTheme.sharePct.toFixed(1)}%` }] : []),
   ];
 
   /* 화제어 — 오른쪽 줄기 맨 아래 모듈. 칩마다 언급 수와 점유율 변화. */
@@ -276,7 +278,8 @@ export default async function KaderaPage() {
         <ul className="v2-chips">
           {/* 칩마다 붙던 점유율 변화(+2.5)는 뺐다 — 단위 없는 숫자가 언급 수 옆에 하나 더 붙어 무슨 값인지 몰랐다(2026-10-02).
               새로 떠오른 말은 오늘의 요약이 문장으로 짚는다. */}
-          {keywords.slice(0, 12).map((k) => {
+          {/* 여덟까지 — 화제어는 세는 것(메타)이라 칩을 줄이고 맨 아래에 둔다. */}
+          {keywords.slice(0, 8).map((k) => {
             return (
               <li key={k.word} className="v2-chip">
                 <b>{k.word}</b>

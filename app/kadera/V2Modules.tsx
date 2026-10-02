@@ -169,7 +169,7 @@ export function ThemeCards({ themes, hrefOf }: { themes: ThemeRotation[]; hrefOf
               </>
             );
             return hrefOf ? (
-              <Link key={t.theme} href={hrefOf(t.theme)} className="v2-minicard">
+              <Link key={t.theme} href={hrefOf(t.theme)} className="v2-minicard" data-ga="kadera_theme_click">
                 {body}
               </Link>
             ) : (
@@ -227,7 +227,7 @@ export function EventsModule({ events, today, failed, limit = 5 }: { events: Upc
             return (
               <li key={`${e.code}-${e.date}-${e.event}`}>
                 {kr ? (
-                  <Link href={`/stock/${e.code}`} className="v2-ev-row">
+                  <Link href={`/stock/${e.code}`} className="v2-ev-row" data-ga="kadera_event_click">
                     {body}
                   </Link>
                 ) : (

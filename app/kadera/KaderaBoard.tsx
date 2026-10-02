@@ -69,7 +69,13 @@ export function SignalTable({ sec }: { sec: BoardSection }) {
           <ol>
             {sec.rows.map((r, i) => (
               <li key={r.code}>
-                <Link href={`/stock/${r.code}`} className="v2-tr" title={r.full ?? r.text ?? undefined}>
+                <Link
+                  href={`/stock/${r.code}`}
+                  className="v2-tr"
+                  title={r.full ?? r.text ?? undefined}
+                  // 표마다 이벤트 이름을 따로 둔다 — 맞춤 측정기준 없이도 GA 에서 이름만으로 어느 표가 눌리는지 센다(유용함을 재는 잣대).
+                  data-ga={`kadera_${sec.id}_click`}
+                >
                   <span className="v2-td-rank">{i + 1}</span>
                   <span className="v2-td-stock">
                     <StockLogo code={r.code} name={r.name} market={r.market} size={22} />

@@ -117,12 +117,13 @@
   border: 1px solid var(--t-frame);
   border-radius: 6px;
 }
+/* 한 줄 — 이름 옆에 값(예전 '작은 이름 위에 값' 63px 에서 40px). 언제 · 얼마나 읽었나는 근거일 뿐 내용이 아니라 낮게 둔다. */
 .v2-cover-cell {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: baseline;
+  gap: 8px;
   min-width: 0;
-  padding: 10px 18px;
+  padding: 9px 16px;
   border-right: 1px solid var(--t-line);
 }
 .v2-cover-k {
@@ -136,7 +137,7 @@
   white-space: nowrap;
 }
 .v2-cover-v { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.v2-cover-v b { font-size: 15px; font-weight: 700; line-height: 22px; }
+.v2-cover-v b { font-size: 13px; font-weight: 700; line-height: 20px; }
 .v2-cover-v em { font-style: normal; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-cover-link {
   align-self: center;
@@ -208,7 +209,8 @@
 .v2-tr {
   display: grid;
   /* 종목 칸을 168 로 못박는다 — fr 로 두면 표마다 남는 폭이 달라 등락률 칸이 1px 씩 어긋났다. */
-  grid-template-columns: 20px 168px 72px 64px 64px minmax(0, 1fr);
+  /* 숫자 칸은 표마다 하나(그 표가 종목을 고른 까닭) — 나머지 폭은 문장에 준다(2026-10-02 '세는 것은 고르는 데만'). */
+  grid-template-columns: 20px 168px 72px 64px minmax(0, 1fr);
   align-items: center;
   column-gap: 12px;
   min-height: 40px;
@@ -219,7 +221,7 @@
   transition: background-color 0.15s;
 }
 .v2-tbl li:last-child .v2-tr { border-bottom: 0; }
-.v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px 72px 84px minmax(0, 1fr); }
+.v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px 72px minmax(0, 1fr); }
 a.v2-tr:hover { background: var(--t-tint); }
 .v2-th {
   min-height: 30px;
@@ -268,10 +270,10 @@ a.v2-tr:hover { background: var(--t-tint); }
 /* 많이 언급 — 두 층. 숫자 칸은 다른 표와 같은 자리(등락률이 한 세로줄)에 두고, 흐름 요약은 둘째 층에서 종목 칸부터 끝까지 쓴다.
    한 칸에 넣으면 첫 문장(65자 안팎)도 판 1,280 에서 세 줄을 넘어 잘렸다(2026-10-02). */
 .v2-tbl.is-talk .v2-tr {
-  grid-template-columns: 20px 168px 72px 64px 64px minmax(0, 1fr);
+  grid-template-columns: 20px 168px 72px 64px minmax(0, 1fr);
   grid-template-areas:
-    "rank stock chg  n1   n2   ."
-    ".    text  text text text text";
+    "rank stock chg  n1   ."
+    ".    text  text text text";
 }
 .v2-tbl.is-talk .v2-th { grid-template-areas: none; }
 .v2-tbl.is-talk .v2-th > :last-child { display: none; }
@@ -279,7 +281,6 @@ a.v2-tr:hover { background: var(--t-tint); }
 .v2-tbl.is-talk .v2-td-stock { grid-area: stock; }
 .v2-tbl.is-talk .v2-td-chg { grid-area: chg; }
 .v2-tbl.is-talk .v2-td-c0 { grid-area: n1; }
-.v2-tbl.is-talk .v2-td-c1 { grid-area: n2; }
 .v2-tbl.is-talk ol .v2-td-text { grid-area: text; padding: 0 0 10px; -webkit-line-clamp: 2; }
 .v2-tbl.is-talk ol .v2-tr { padding-top: 6px; }
 
@@ -455,8 +456,8 @@ a.v2-ev-row:hover { background: var(--t-tint); }
   .v2-band { grid-template-columns: 216px minmax(0, 1fr) 300px; }
   .v2-grid { grid-template-columns: minmax(0, 1fr) 300px; }
   .v2-tr,
-  .v2-tbl.is-talk .v2-tr { grid-template-columns: 20px 160px 72px 64px 64px minmax(0, 1fr); }
-  .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 160px 72px 84px minmax(0, 1fr); }
+  .v2-tbl.is-talk .v2-tr { grid-template-columns: 20px 160px 72px 64px minmax(0, 1fr); }
+  .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 160px 72px minmax(0, 1fr); }
 }
 @container kd (max-width: 999px) {
   .v2-band { grid-template-columns: 216px minmax(0, 1fr); }
@@ -465,8 +466,8 @@ a.v2-ev-row:hover { background: var(--t-tint); }
   .v2-rail { order: -1; }
   .v2-rail > .v2-mod { position: static; max-height: none; overflow: visible; }
   .v2-tr,
-  .v2-tbl.is-talk .v2-tr { grid-template-columns: 20px 168px 72px 64px 64px minmax(0, 1fr); }
-  .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px 72px 84px minmax(0, 1fr); }
+  .v2-tbl.is-talk .v2-tr { grid-template-columns: 20px 168px 72px 64px minmax(0, 1fr); }
+  .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px 72px minmax(0, 1fr); }
   .v2-cover-cell { flex: 1 1 auto; }
 }
 @container kd (max-width: 679px) {
