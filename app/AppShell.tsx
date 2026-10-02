@@ -1380,8 +1380,8 @@ const LABEL_TITLED_PREFIXES = [`${NOTE_PAGE.href}/`];
  * 화면 이름은 사이드바의 현재 항목이 말하고, 본문은 첫 줄부터 내용이다. h1 은 지우지 않는다(검색엔진·스크린리더가
  * 이 화면의 이름을 읽는 자리다). 오른쪽 도구(미장 전환·테마)는 그대로 선다.
  */
-// 시장 브리핑(/)은 2026-10-03 에 들였다 — 카더라 v2 의 디자인 규칙을 옮겼다.
-const V2_PAGES = ["/", "/kadera"];
+// 시장 브리핑(/) · MDD 는 2026-10-03 에 들였다 — 카더라 v2 의 디자인 규칙을 옮겼다.
+const V2_PAGES = ["/", "/kadera", "/mdd"];
 
 function PageHeader() {
   const pathname = useAppPathname();

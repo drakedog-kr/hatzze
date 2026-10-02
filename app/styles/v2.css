@@ -662,8 +662,10 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
    카드 25장은 부품(app/home/parts.tsx · cards-*.tsx)을 내부자 · MDD 가 같이 써서 **고치지 않고 이 범위에서 덮는다.**
    부품이 인라인 style 로 값을 박아 둔 자리는 !important 로만 이긴다(카더라 .v2-brief b 와 같은 사정). */
 
-/* 옛 토큰을 v2 값으로 — 카드는 인라인 style 로 var(--c-*) 를 읽으므로 값만 바꿔 끼우면 25장이 같이 따라온다. 다크는 --t-* 가 따라간다. */
-.v2-bf {
+/* 옛 토큰을 v2 값으로 — 카드는 인라인 style 로 var(--c-*) 를 읽으므로 값만 바꿔 끼우면 25장이 같이 따라온다. 다크는 --t-* 가 따라간다.
+   MDD(.v2-md)도 같은 묶음을 쓴다 — 시트 부품이 같은 옛 토큰을 읽는다. */
+.v2-bf,
+.v2-md {
   --c-ink: var(--t-ink);
   --c-ink-soft: var(--t-ink2);
   --c-label: var(--t-ink2);
@@ -689,7 +691,8 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 }
 
 /* 다크의 빨간 글자 — 카드 안 알약은 옅은 빨강 면 위에 서는데 --t-up(#f76b7c)이면 3.84 였다. 한 단 밝힌다. */
-[data-theme="dark"] .v2-bf { --c-hot-ink: #ff94a0; }
+[data-theme="dark"] .v2-bf,
+[data-theme="dark"] .v2-md { --c-hot-ink: #ff94a0; }
 
 /* 둘째 줄 — 햇쩨 지수 | 오늘의 브리핑. 왼쪽 칸 폭은 아래 시트 첫 열(25%)에 맞춘다 — 사이 12px 가 시트 첫 세로선 위에 걸쳐 열이 맞는다.
    두 모듈은 키가 같고(stretch) 안이 비면 안 된다 — 짧은 쪽은 줄이 고르게 늘어난다(구간 줄 · 브리핑 줄). */
@@ -809,4 +812,86 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 @container kd (max-width: 679px) {
   .v2-bf .v2-sheet .hz-cards { grid-template-columns: minmax(0, 1fr); }
   .v2-brief3-row { grid-template-columns: 56px minmax(0, 1fr); padding: 10px 14px; }
+}
+
+/* ── v2 MDD(2026-10-03) — 카더라 · 시장 브리핑의 v2 규칙을 옮겼다 ─────────────────────────────
+   얼개: 조회 막대(검색 · 기간) → [종목 | 지금 낙폭 | 이 하락의 맥락](app/mdd/Hero.tsx HeroStrip) → 시트들(물속 차트 · 리스크 프로필 · 짝 둘 · 테마).
+   시트 머리(SectionHead)는 여섯 화면 공용이라 고치지 않고 이 범위에서 덮는다 — 아이콘 타일 · 부제(설명 문장) · 바닥 각주를 걷고
+   제목 13/700 + 근거 글자. 구간 제목은 코드에서 걷었다(Controls.tsx). */
+.v2-md {
+  --tx-r: 6px;
+  --tx-r-tile: 4px;
+  /* 회색 타일(리스크 프로필 세 칸 등)을 걷는다 — v2 는 면이 아니라 가는 선으로 칸을 가른다(아래 .hz-panelgrid). */
+  --tx-tile: transparent;
+  /* 큰 숫자(원인 분해 · 회복 34, 성격 21)와 그 단위(17) — v2 눈금으로. */
+  --fs-34: 22px;
+  --fs-21: 15px;
+  --fs-17: 13px;
+}
+.v2-kd.v2-md .hz-sheet { border-color: var(--t-frame); border-radius: 6px; box-shadow: none; }
+.v2-kd.v2-md .hz-sheet-head { padding: 10px 14px; gap: 8px; align-items: baseline; background: var(--t-card); border-bottom: 1px solid var(--t-line); }
+.v2-kd.v2-md .hz-sheet-head-ico,
+.v2-kd.v2-md .hz-sheet-head-desc,
+.v2-kd.v2-md .hz-sheet-foot { display: none; }
+.v2-kd.v2-md .hz-sheet-head-title { font-size: 13px; font-weight: 700; line-height: 20px; letter-spacing: 0; }
+/* 오른쪽 알약('최근 10년' · '표본 3회') → 근거 글자. 인라인 글자 크기 · 굵기 · 색이라 !important. */
+.v2-kd.v2-md .hz-sheet-head-note { padding: 0; border: 0; background: none; font-size: 12px !important; font-weight: 500 !important; color: var(--t-ink3) !important; }
+/* 표 — 열 머리는 옅은 면, 줄 여백은 v2 표와 같게(14). */
+.v2-kd.v2-md .hz-thead { padding: 6px 14px; background: var(--t-head); border-bottom: 1px solid var(--t-line); font-size: 12px; }
+.v2-kd.v2-md .hz-trow { padding: 9px 14px; }
+/* 패널 격자(리스크 프로필 세 칸) — 회색 타일 대신 세로 가는 선. */
+.v2-kd.v2-md .hz-panelgrid { padding: 0; gap: 0; }
+.v2-kd.v2-md .hz-panelgrid > * { border-radius: 0; box-shadow: inset -1px 0 0 var(--t-line); }
+.v2-kd.v2-md .hz-panelgrid > :last-child { box-shadow: none; }
+.v2-kd.v2-md .hz-panel-pad { padding: 12px 14px 14px; }
+.v2-kd.v2-md .mdd-pair { gap: 12px; }
+
+/* 기간 토글 — 회색 트랙 + 흰 칩 대신 흰 판 + 고른 칸만 옅은 면(검색창과 같은 키 41). */
+.v2-kd.v2-md .hz-seg { align-items: stretch; height: 41px; padding: 3px; gap: 2px; border: 1px solid var(--t-frame); border-radius: 6px; background: var(--t-card); }
+.v2-kd.v2-md .hz-seg > button { padding: 0 10px; border-radius: 4px; font-size: 12px; font-weight: 600; color: var(--t-ink3); }
+.v2-kd.v2-md .hz-seg > button[aria-pressed="true"] { background: var(--t-tint); color: var(--t-ink); box-shadow: none; }
+.v2-kd.v2-md .hz-seg-hover > button[aria-pressed="false"]:hover { color: var(--t-ink); }
+
+/* 둘째 줄 — 종목 | 지금 낙폭 | 이 하락의 맥락. 키는 셋이 같고(stretch) 바닥 줄(전고점 · 저점 / 통계 셋)은 바닥에 붙는다. */
+.v2-md-band { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.4fr); align-items: stretch; gap: 12px; }
+.v2-md-band > .v2-mod { display: flex; flex-direction: column; }
+.v2-md-body { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 12px 14px 14px; }
+.v2-md-price { display: flex; align-items: center; gap: 10px; }
+.v2-md-chg { font-size: 12px; font-weight: 600; line-height: 16px; font-variant-numeric: tabular-nums; }
+.v2-md-chg.is-up { color: var(--t-up); }
+.v2-md-chg.is-down { color: var(--t-down); }
+.v2-md-rows { margin-top: auto; }
+.v2-md-aside { font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
+.v2-card-val.is-big .v2-md-aside b { font-size: 12px; font-weight: 700; line-height: 16px; letter-spacing: 0; }
+.v2-card-val.is-big .v2-md-aside b.is-up { color: var(--t-up); }
+.v2-card-val.is-big .v2-md-aside b.is-down { color: var(--t-down); }
+.v2-md-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--t-line); }
+/* 통계 칸 — 라벨 12/500 · 값 13/700(인라인 11/700 대문자 간격 · 15/800 이라 !important). */
+.v2-md .mdd-stat-label { font-size: 12px !important; font-weight: 500 !important; letter-spacing: 0 !important; color: var(--t-ink3) !important; }
+.v2-md .mdd-stat-value { font-size: 13px !important; font-weight: 700 !important; letter-spacing: 0 !important; }
+.v2-md .mdd-stat-sub { font-size: 12px !important; color: var(--t-ink3) !important; }
+/* 둘째 줄의 빈 곳 — 셋 중 가장 긴 칸(지금 낙폭)이 키를 정하고, 나머지는 안쪽 줄이 남는 높이를 나눠 받는다.
+   종목: 전고점 · 저점 두 줄이 늘어난다. 지금 낙폭 · 맥락: 덩어리 사이가 고르게 벌어진다. */
+.v2-md-rows { flex: 1; display: flex; flex-direction: column; }
+.v2-md-rows > div { flex: 1 0 auto; align-items: center !important; }
+.v2-md-dd .v2-md-body,
+.v2-md-read .v2-md-body { justify-content: space-between; }
+/* 통계 칸을 바닥에 붙이던 margin-top:auto 가 남는 높이를 한곳(게이지 아래)에 다 모았다 — 고르게 나누도록 푼다. */
+.v2-md-dd .v2-md-stats { margin-top: 0; }
+/* 시장 탓일까 — 막대 세 줄이 가는 선으로 나뉜 줄이 되어 옆 시트(이 하락의 성격) 키까지 늘어난다. 인라인 여백 · 간격이라 !important. */
+.v2-md .mdd-attr-body { padding: 12px 14px 4px !important; gap: 12px !important; }
+.v2-md .mdd-attr-rows { gap: 0 !important; justify-content: stretch !important; }
+.v2-md .mdd-attr-rows > .hz-hbar-row { flex: 1 0 auto; min-height: 36px; border-top: 1px solid var(--t-line); }
+/* 이 하락의 맥락 — 오늘의 요약 · 브리핑과 같은 글줄(13 · 22). */
+.v2-md-read .v2-md-body p { font-size: 13px !important; font-weight: 500; line-height: 22px !important; color: var(--t-ink2) !important; }
+.v2-md-read .v2-md-body b { font-weight: 700 !important; }
+
+/* 셋이 한 줄인 건 판 1,000 까지 — 1,280(판 1,004)에서 두 칸 + 맥락 한 줄로 접으면 둘째 줄 키가 406 이었다. */
+@container kd (max-width: 999px) {
+  .v2-md-band { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); }
+  .v2-md-band > .v2-md-read { grid-column: 1 / -1; }
+}
+@container kd (max-width: 679px) {
+  .v2-md-band { grid-template-columns: minmax(0, 1fr); }
+  .v2-kd.v2-md .hz-panelgrid > * { box-shadow: inset 0 -1px 0 var(--t-line); }
 }

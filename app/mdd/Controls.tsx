@@ -5,7 +5,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { gaSearchTerm, gaStockCode, track } from "@/lib/ga";
 import { C, Icon, MONO } from "../ui";
-import { SectionIntro } from "../SectionIntro";
 import { StockLogo } from "../StockLogo";
 import { PERIODS, marketBadge, benchName } from "./shared";
 import type { StockOption, Suggestion, SuggestGroups, MddResult } from "./shared";
@@ -258,16 +257,17 @@ export function Controls({
             display: "flex",
             alignItems: "center",
             gap: 8,
-            background: C.track,
-            border: `1px solid ${focused ? C.blue : "transparent"}`,
-            boxShadow: focused ? `0 0 0 3px var(--c-blue-tint)` : "none",
-            borderRadius: 12,
-            padding: "0 14px",
-            height: 44,
+            // v2: 흰 판 + 1px 테두리 + 모서리 6 — 모듈과 같은 면(2026-10-03). 고를 때만 파란 테두리.
+            background: "var(--t-card)",
+            border: `1px solid ${focused ? "var(--t-down)" : "var(--t-frame)"}`,
+            boxShadow: focused ? `0 0 0 3px var(--t-down-weak)` : "none",
+            borderRadius: 6,
+            padding: "0 12px",
+            height: 41,
             transition: "border-color .15s, box-shadow .15s",
           }}
         >
-          <Icon name="search" style={{ fontSize: "var(--fs-20)", color: focused ? C.blue : C.sub }} />
+          <Icon name="search" style={{ fontSize: 18, color: focused ? "var(--t-down)" : "var(--t-ink3)" }} />
           <input
             value={query}
             onChange={(e) => {
@@ -379,14 +379,8 @@ export function Controls({
 }
 
 /* ── 결과 ─────────────────────────────────────────────────────── */
-/* 구간 제목. 설명은 달지 않는다 — **하는 일은 이름 짓기가 아니라 박자 만들기**다
-   (insider 의 GroupTitle 주석과 같은 판단). 아래 시트마다 제목과 부제가 이미 있어서,
-   그 위에 또 한 줄을 얹으면 같은 말이 두 번 난다. 생김새는 공용 SectionIntro 다.
-   `n` 은 장 번호다 — 이 화면은 두 장이라 01·02 로 읽는 순서를 말해 준다. */
-
-function GroupLabel({ n, title }: { n: number; title: string }) {
-  return <SectionIntro n={n} title={title} />;
-}
+/* 구간 제목(SectionIntro '01 과거 낙폭 사례' · '02 이 하락의 정체')은 v2 에서 걷었다(2026-10-03) — 모듈 머리 띠가 이름을 말하고,
+   v2 화면(카더라 · 시장 브리핑)엔 큰 구간 제목이 없다. */
 
 /** 50:50 두 시트가 나란히 서는 줄. 좁아지면 한 장씩 접힌다. */
 function Pair({ children }: { children: React.ReactNode }) {
@@ -397,7 +391,8 @@ export function Results({ data }: { data: MddResult }) {
   const a = data.analysis;
   const periodLabel = periodLabelOf(data);
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    // v2: 모듈 사이 간격은 v2 한 값(12). 구간 제목('01 과거 낙폭 사례' · '02 이 하락의 정체')은 걷었다 — 모듈 머리가 이름을 말한다.
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <HeroStrip data={data} periodLabel={periodLabel} />
       <Underwater a={a} periodLabel={periodLabel} market={data.market} />
 
@@ -414,7 +409,6 @@ export function Results({ data }: { data: MddResult }) {
 
       {/* ⚠️ 부제가 바로 아래 시트("역대 낙폭 Top 5")의 부제와 **글자까지 같았다.** 구간 부제는
           그 아래 시트들을 아우르는 말이라야 한다 — 한 시트의 말을 그대로 올리면 되풀이다. */}
-      <GroupLabel n={1} title="과거 낙폭 사례" />
       {/* 시트는 데이터가 없어도 자리를 지킨다 — 이유는 AbsentSheet 주석 참고.
           짝의 칸 수도 그대로 유지해야 50:50 이 안 어긋난다. */}
       <Pair>
@@ -441,7 +435,6 @@ export function Results({ data }: { data: MddResult }) {
         )}
       </Pair>
 
-      <GroupLabel n={2} title="이 하락의 정체" />
       <Pair>
         {data.attribution ? (
           <Attribution

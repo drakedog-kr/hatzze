@@ -77,11 +77,11 @@ export function StatCell({ label, value, sub, tone }: { label: string; value: st
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
       {/* 한 줄 고정·말줄임은 클래스(.mdd-stat-clip)가 쥔다 — 폰에선 접어야 해서(sheets.css). */}
-      <span className="mdd-stat-clip" style={{ fontSize: "var(--fs-11)", fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>
+      <span className="mdd-stat-clip mdd-stat-label" style={{ fontSize: "var(--fs-11)", fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>
         {label}
       </span>
-      <strong style={{ fontSize: "var(--fs-15)", fontWeight: 800, color: tone ?? C.ink, letterSpacing: "-.02em" }}>{value}</strong>
-      {sub && <span className="mdd-stat-clip" style={{ fontSize: "var(--fs-11)", color: C.muted }}>{sub}</span>}
+      <strong className="mdd-stat-value" style={{ fontSize: "var(--fs-15)", fontWeight: 800, color: tone ?? C.ink, letterSpacing: "-.02em" }}>{value}</strong>
+      {sub && <span className="mdd-stat-clip mdd-stat-sub" style={{ fontSize: "var(--fs-11)", color: C.muted }}>{sub}</span>}
     </div>
   );
 }
@@ -326,16 +326,21 @@ export function Skeleton({ periodOnly }: { periodOnly: boolean }) {
   return (
     // position:relative 는 아래 hz-loading-float 의 기준 상자가 되기 위한 것이다.
     <div style={{ position: "relative" }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }} aria-hidden>
-        <section className="hz-sheet" style={{ display: "flex", flexWrap: "wrap" }}>
-          {[290, 300, 300].map((basis, i) => (
-            <div key={i} style={{ flex: `1 1 ${basis}px`, minWidth: 0, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 12 }}>
-              {block(14)}
-              {block(38)}
-              {block(48)}
-            </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }} aria-hidden>
+        {/* v2: 둘째 줄은 모듈 셋(Hero.tsx HeroStrip 과 같은 .v2-md-band). */}
+        <div className="v2-md-band">
+          {[0, 1, 2].map((i) => (
+            <section key={i} className="hz-sheet">
+              {body(
+                <>
+                  {block(14)}
+                  {block(38)}
+                  {block(48)}
+                </>,
+              )}
+            </section>
           ))}
-        </section>
+        </div>
         <section className="hz-sheet">{body(block(201))}</section>
         <div className="mdd-pair">
           {[0, 1].map((i) => (

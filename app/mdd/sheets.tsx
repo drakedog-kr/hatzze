@@ -53,7 +53,7 @@ export function Attribution({
   return (
     <Sheet>
       <SectionHead level={3} icon="call_split" title="시장 탓일까, 종목 탓일까" desc="지수·업종과 견줘 이 종목만의 낙폭이 얼마인지" note="같은 기간" />
-      <div style={{ flex: 1, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 18 }}>
+      <div className="mdd-attr-body" style={{ flex: 1, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 18 }}>
         {/* 큰 수치는 **아래 각주·히어로 해설과 같은 값·같은 단위**여야 한다(2026-08-04).
             예전엔 여기만 '몫'(|gap| ÷ 자기 낙폭 = 14%)이라, 한 시트 안에서 14% 와 4.9%p 가
             같은 것을 말하는 듯 다르게 적혔다. 게다가 그 14% 는 아래 막대 어디에도 안 보이는
@@ -78,7 +78,9 @@ export function Attribution({
         {/* 옆 시트(이 하락의 성격)에 맞춰 늘어나는데 여긴 막대 셋뿐이라 가운데가 빈다.
             줄 간격을 벌려 채우지는 않는다 — 길이를 견주는 차트라 막대끼리 멀어지면
             비교가 어려워진다. 묶음을 붙여 둔 채 남는 공간을 위아래로 가른다. */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 11, justifyContent: "center" }}>
+        {/* v2(2026-10-03): 막대 셋을 가는 선으로 나눈 줄로 두고 남는 높이를 줄마다 나눠 받는다(v2.css .mdd-attr-rows) —
+            위아래가 비면 v2 의 '빈 곳 금지'에 걸린다. 줄 사이가 벌어져도 선이 표로 묶어 견주기가 남는다. */}
+        <div className="mdd-attr-rows" style={{ flex: 1, display: "flex", flexDirection: "column", gap: 11, justifyContent: "center" }}>
           {rows.map((r) => (
             // 고점 이후 수익률이라 시장·업종은 상승(+)일 수도 있다 — 그때만 빨강으로 가른다.
             <MeterRow
