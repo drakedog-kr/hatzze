@@ -123,31 +123,6 @@ type Row = {
   kr_intra: number | null;
 };
 
-/** 간밤 미국 — 그 세션의 미국 날짜와 S&P500 등락률(%). */
-export type OvernightUs = { session: string; spx: number };
-
-/**
- * 가장 최근 미국 세션의 S&P500 등락 — v2 국장 카더라 첫 줄이 쓴다(누르면 이 화면으로 간다).
- *
- * `kr_preview_day` 한 줄만 읽는다. 아침 실행이 쓴 값이라 하루 종일 같고, 주말 · 휴장 아침엔 실행이 없어
- * 그 전 세션이 남는다 — 그래서 화면은 '간밤'이라 적지 않고 세션 날짜(us_session, 미국 날짜)를 적는다.
- * 세션 날짜가 없는 옛 줄(마이그레이션 전)이나 값이 빈 날은 null — 그 칸만 빠진다.
- */
-export async function getOvernightUs(): Promise<OvernightUs | null> {
-  const { data, error } = await getSupabaseServer()
-    .from("kr_preview_day")
-    .select("spx_dp,us_session")
-    .order("date", { ascending: false })
-    .limit(1);
-  if (error) {
-    console.error("[getOvernightUs] 간밤 미국 등락을 못 읽었습니다", error);
-    return null;
-  }
-  const r = data?.[0] as { spx_dp: number | null; us_session: string | null } | undefined;
-  if (!r || r.spx_dp == null || !r.us_session) return null;
-  return { session: r.us_session, spx: Number(r.spx_dp) };
-}
-
 export async function getPreview(): Promise<PreviewData> {
   const db = getSupabaseServer();
 

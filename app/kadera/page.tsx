@@ -16,7 +16,6 @@ import {
 
 import { getKrIndexCloses } from "@/lib/data";
 import { formatKstUpdate } from "@/lib/format";
-import { getOvernightUs } from "@/lib/kr-preview";
 import { assertLoaded, isLoadFailed } from "@/lib/load-state";
 
 import { KADERA_CARD } from "../og-copy";
@@ -26,9 +25,11 @@ import { fmtKoDate } from "@/lib/stock-page";
 import { THEME_NAMES, themeHref } from "@/lib/theme-href";
 import { THEMES } from "@/lib/stock-themes";
 import { THEME_PUBLIC } from "../screen-flags";
+import { Icon } from "../ui";
 import { BOARD_TILES, getMoveReasons, getUpcomingEvents, todayKst } from "@/lib/kadera-why";
 import { EventsModule, KeywordTable, Module, SentimentModule, ThemeCards } from "./V2Modules";
 import { SignalTable } from "./KaderaBoard";
+import { loadCoverChips } from "./cover-chips";
 import type { BoardRow, BoardSection } from "./KaderaBoard";
 
 /**
@@ -112,7 +113,7 @@ export default async function KaderaPage() {
     rawWhy,
     rawEvents,
     rawIndexes,
-    overnightUs,
+    coverChips,
   ] =
     await Promise.all([
       getTelegramSummary(),
@@ -126,9 +127,9 @@ export default async function KaderaPage() {
       getSurgingOneliners(),
       getMoveReasons(),
       getUpcomingEvents(35, 400),
-      // 첫 줄의 시장 맥락 — 지수 종가와 간밤 미국. 둘 다 곁들이는 칸이라 실패해도 화면을 세우고 그 칸만 뺀다.
+      // 첫 줄 — 지수 종가와 칩 둘(밤사이 미장 · 미장 급부상). 곁들이는 칸이라 실패해도 화면을 세우고 그 칸만 뺀다.
       getKrIndexCloses(),
-      getOvernightUs(),
+      loadCoverChips(),
     ]);
   const stockReports = reports.filter((r): r is NonNullable<typeof r> => r !== null);
 
@@ -284,8 +285,8 @@ export default async function KaderaPage() {
     },
   ];
 
-  /* 첫 줄 — 시장 맥락(지수 종가 · 간밤 미국) + 언제 · 얼마나 읽었나.
-     햇쩨 지수 칸은 하루 만에 뺐다(2026-10-03 "빼고 다른 것", 수급은 아니고). 간밤 미국은 국장을 여는 사람이 먼저 찾는 것이라 그 자리에 둔다.
+  /* 첫 줄 — 시장 맥락(지수 종가) + 칩 둘(이 화면에 없는 것 → 다른 화면, cover-chips.ts) + 언제 · 얼마나 읽었나.
+     그 자리는 햇쩨 지수 → S&P500 → 칩으로 바뀌었다(2026-10-03, 둘 다 "별로" · 수급도 아님).
      ⭐ 시장 맥락은 이 화면 어디에도 없던 것이다(2026-10-03 "더 유용한 정보로"). 채널 이야기를 읽기 전에 그날 시장이 어땠나를 한 줄로 준다.
      ⛔ 아래 모듈 1등을 되풀이하지 말 것 — '가장 많이 말한 테마'는 테마 카드 첫 장과 같은 말이라 뺐고(2026-10-02), 그 전 수치 띠도 같은 까닭으로 걷었다. */
   const indexes = isLoadFailed(rawIndexes) ? null : rawIndexes;
@@ -319,19 +320,17 @@ export default async function KaderaPage() {
             ))}
           </div>
         )}
-        {overnightUs && (
-          // 국장 미리보기가 아침마다 받아 두는 값이다 — 칸 전체가 그 화면으로 가는 링크. 날짜는 미국 세션 날짜(주말엔 '간밤'이 아니다).
-          <Link href="/preview" className="v2-cover-cell v2-cover-go" data-ga="kadera_preview_click">
-            <span className="v2-cover-k">{overnightUs.session.slice(5).split("-").map(Number).join("/")} 미국</span>
+        {coverChips.map((c) => (
+          // 칸 하나가 링크 하나 — 띠의 다른 칸과 같은 꼴(가는 세로선 · 작은 머리말 · 값). 알약 칩은 v2 결과 안 맞아 걷었다(2026-10-03).
+          <Link key={c.ga} href={c.href} className="v2-cover-cell v2-cover-go" data-ga={c.ga}>
+            <span className="v2-cover-k">{c.cap}</span>
             <span className="v2-cover-v">
-              <em>S&amp;P500</em>
-              <span className={`v2-cover-chg${overnightUs.spx > 0 ? " is-up" : overnightUs.spx < 0 ? " is-down" : ""}`}>
-                {overnightUs.spx > 0 ? "+" : overnightUs.spx < 0 ? "-" : ""}
-                {Math.abs(overnightUs.spx).toFixed(2)}%
-              </span>
+              <b>{c.name}</b>
+              <span className={`v2-cover-chg is-${c.tone}`}>{c.val}</span>
             </span>
+            <Icon name="chevron_right" />
           </Link>
-        )}
+        ))}
         <div className="v2-cover-cell v2-cover-meta">
           <span className="v2-cover-k">
             <i className="v2-dot" />
