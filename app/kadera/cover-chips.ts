@@ -4,6 +4,8 @@ import { getPreview } from "@/lib/kr-preview";
 import { withScopedLoadFailures } from "@/lib/load-state";
 import { getUsSurgingStocks } from "@/lib/us-telegram-data";
 
+import type { CoverLink } from "./V2Modules";
+
 /**
  * v2 국장 카더라 첫 줄의 칩 둘(2026-10-03 요청) — **이 화면에 없는 것**을 하나씩 싣고 다른 화면으로 보낸다.
  *   ① 밤사이 미장에서 크게 움직인 종목 → 국장 미리보기
@@ -14,14 +16,7 @@ import { getUsSurgingStocks } from "@/lib/us-telegram-data";
  *
  * 칩은 곁가지라 조회가 실패해도 화면을 던지지 않고 그 칩만 뺀다 — 칩마다 제 실패 목록에 모은다(spotlight-data 의 chipOrNone 과 같은 까닭).
  */
-export type CoverChip = {
-  cap: string;
-  name: string;
-  val: string;
-  tone: "up" | "down" | "flat";
-  href: string;
-  ga: string;
-};
+export type CoverChip = CoverLink;
 
 async function scoped(label: string, make: () => Promise<CoverChip | null>): Promise<CoverChip | null> {
   try {

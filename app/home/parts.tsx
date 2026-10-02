@@ -233,6 +233,7 @@ function HitBadge({ label = "초고온" }: { label?: string }) {
     // (예전엔 배지에 top을 직접 줬는데, 그 값은 테두리 기준이고 제목은 여백 기준이라 서로
     //  어긋났다 — 1칸 카드에서 배지가 제목보다 6px 위에 떠 있었다.)
     <span
+      className="hz-hit-badge"
       style={{
         position: "absolute",
         top: "var(--hz-card-pad)",
@@ -311,6 +312,7 @@ export function TitleRow({
     <div className="hz-cell-head" style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
       <Icon
         name={icon}
+        className="hz-cell-icon"
         style={{
           fontSize: iconSize,
           lineHeight: "18px",
@@ -331,11 +333,12 @@ export function TitleRow({
             justifyContent: right ? "space-between" : undefined,
           }}
         >
-          <span className="hz-clamp2" style={{ fontSize: "var(--fs-13-5)", fontWeight: 800, color: C.ink, lineHeight: 1.3, letterSpacing: "-.01em", wordBreak: "keep-all" }}>
+          <span className="hz-clamp2 hz-cell-name" style={{ fontSize: "var(--fs-13-5)", fontWeight: 800, color: C.ink, lineHeight: 1.3, letterSpacing: "-.01em", wordBreak: "keep-all" }}>
             {name}
           </span>
           {badge && (
             <span
+              className="hz-cell-badge"
               style={{
                 fontSize: "var(--fs-11)",
                 fontWeight: 700,
@@ -352,7 +355,7 @@ export function TitleRow({
           {right && <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>{right}</div>}
         </div>
         {desc && (
-          <p className="hz-clamp2" style={{ margin: 0, fontSize: "var(--fs-12-5)", lineHeight: 1.45, color: C.sub2, wordBreak: "keep-all" }}>{desc}</p>
+          <p className="hz-clamp2 hz-cell-desc" style={{ margin: 0, fontSize: "var(--fs-12-5)", lineHeight: 1.45, color: C.sub2, wordBreak: "keep-all" }}>{desc}</p>
         )}
       </div>
     </div>
@@ -377,6 +380,7 @@ export function Big({
     // 내린다. 예전엔 nowrap 이라 sub 가 자리를 차지한 채 숫자 쪽만 눌렸다.
     <div style={{ display: "flex", alignItems: "baseline", gap: 8, rowGap: 4, flexWrap: "wrap" }}>
       <span
+        className="hz-big"
         style={{
           fontFamily: MONO,
           fontSize: size,
@@ -390,11 +394,11 @@ export function Big({
         }}
       >
         {disp}
-        {unit && <span style={{ fontSize: size * 0.5 }}>{unit}</span>}
+        {unit && <span className="hz-big-unit" style={{ fontSize: size * 0.5 }}>{unit}</span>}
       </span>
       {/* 곁말은 목업에서 **강조색이 아니라 회색**이다(12.5 / --c-sub2). 큰 수치와 같은
           색이면 둘이 한 덩어리로 읽혀 어느 쪽이 결론인지 흐려진다. */}
-      {sub && <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>{sub}</span>}
+      {sub && <span className="hz-big-sub" style={{ fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>{sub}</span>}
     </div>
   );
 }
@@ -404,7 +408,7 @@ export function Foot({ text, color = C.sub }: { text: string; color?: string }) 
     // ④ 각주 슬롯 — 늘 셀 바닥이다. 위 그래픽 존이 flex:1 이라 대개 여기까지 밀려
     // 내려오지만, 그래픽이 140 을 넘겨 존이 늘어난 셀에서는 marginTop:auto 가 있어야
     // 각주가 바닥에 붙는다. 25칸의 각주 밑선이 한 줄로 맞아야 시트가 표로 읽힌다.
-    <div style={{ marginTop: "auto" }}>
+    <div className="hz-cell-foot" style={{ marginTop: "auto" }}>
       <p
         style={{
           margin: 0,

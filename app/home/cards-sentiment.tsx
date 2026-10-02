@@ -450,7 +450,7 @@ function SubSpend({ v, icon, showScale }: { v: Pick; icon: IconName; showScale: 
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <Icon name={icon} style={{ fontSize: "var(--fs-18)", color: "var(--c-blue-1)" }} />
-        <span style={{ flex: 1, fontSize: "var(--fs-12-5)", fontWeight: 700, color: C.label, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <span className="hz-subspend-name" style={{ flex: 1, fontSize: "var(--fs-12-5)", fontWeight: 700, color: C.label, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {v.name}
         </span>
         <strong

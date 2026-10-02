@@ -656,3 +656,157 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 /* ── 화면 머리 ── v2 화면은 제목·부제를 화면에서 걷고(AppShell 의 V2_PAGES) 오른쪽 도구도 두지 않는다 — 머리가 높이 0 이 된다.
    그대로 두면 위아래 간격(20 + 20)이 겹쳐 빈 띠가 생기므로 하나를 지운다. */
 .hz-page-head.is-v2 { margin-top: -20px; }
+
+/* ── v2 시장 브리핑(2026-10-03) — 카더라 v2 의 규칙을 옮겼다 ─────────────────────────────
+   얼개: 첫 줄 띠(.v2-cover, 카더라와 같은 부품) → 둘째 줄 [햇쩨 지수 | 오늘의 브리핑](app/home/V2Briefing.tsx) → 지표 모듈 둘(시장 · 감성).
+   카드 25장은 부품(app/home/parts.tsx · cards-*.tsx)을 내부자 · MDD 가 같이 써서 **고치지 않고 이 범위에서 덮는다.**
+   부품이 인라인 style 로 값을 박아 둔 자리는 !important 로만 이긴다(카더라 .v2-brief b 와 같은 사정). */
+
+/* 옛 토큰을 v2 값으로 — 카드는 인라인 style 로 var(--c-*) 를 읽으므로 값만 바꿔 끼우면 25장이 같이 따라온다. 다크는 --t-* 가 따라간다. */
+.v2-bf {
+  --c-ink: var(--t-ink);
+  --c-ink-soft: var(--t-ink2);
+  --c-label: var(--t-ink2);
+  --c-sub: var(--t-ink2);
+  --c-sub2: var(--t-ink3);
+  /* muted 는 아이콘만이 아니라 카드 안 작은 글자(축 이름 · 단위)도 쓴다 — 47%(ink4)면 2.95 라 62%(ink3)로. */
+  --c-muted: var(--t-ink3);
+  --c-hairline: var(--t-line);
+  --c-line: var(--t-line);
+  --c-sheet-line: var(--t-line);
+  --c-sep-h: var(--t-line);
+  --c-sheet-row: var(--t-line);
+  --c-chip: var(--t-tint);
+  --c-hot-ink: var(--t-up);
+  /* 파란 글자는 옅은 파랑 면(알약) 위에도 서서 한 단 진한 값 — 다크에서 --t-down 은 4.48 이었다(카더라 '첫 언급' 꼬리표와 같은 사정). */
+  --c-cold-ink: var(--t-down-deep);
+  /* 카드 안 알약(전고점 · 고점권 아님 · 우세 …)은 v2 꼬리표 모서리(4)로 — 둥근 알약은 v2 결과 안 맞는다(카더라 첫 줄 칩에서 걷은 것과 같다). */
+  --r-pill: 4px;
+  /* 카드 몇 장(검색량 · 감성 · 코인 · 여윳돈 · 레버리지 · 안전장치 …)은 큰 숫자를 Big 부품 대신 직접 32 · 30 으로 박았다 — 같은 22 로. */
+  --fs-30: 22px;
+  --fs-32: 22px;
+  --hz-card-pad: 16px;
+}
+
+/* 다크의 빨간 글자 — 카드 안 알약은 옅은 빨강 면 위에 서는데 --t-up(#f76b7c)이면 3.84 였다. 한 단 밝힌다. */
+[data-theme="dark"] .v2-bf { --c-hot-ink: #ff94a0; }
+
+/* 둘째 줄 — 햇쩨 지수 | 오늘의 브리핑. 왼쪽 칸 폭은 아래 시트 첫 열(25%)에 맞춘다 — 사이 12px 가 시트 첫 세로선 위에 걸쳐 열이 맞는다.
+   두 모듈은 키가 같고(stretch) 안이 비면 안 된다 — 짧은 쪽은 줄이 고르게 늘어난다(구간 줄 · 브리핑 줄). */
+.v2-bf-band {
+  display: grid;
+  grid-template-columns: calc(25% - 6px) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 12px;
+}
+.v2-bf-band > .v2-mod { display: flex; flex-direction: column; }
+.v2-index { position: relative; flex: 1; }
+.v2-index-delta { display: inline-flex; gap: 4px; margin-left: auto; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
+.v2-card-val.is-big .v2-index-delta b { font-size: 12px; font-weight: 700; line-height: 16px; letter-spacing: 0; color: var(--t-ink2); }
+.v2-card-val.is-big .v2-index-delta b.is-up { color: var(--t-up); }
+.v2-card-val.is-big .v2-index-delta b.is-down { color: var(--t-down); }
+/* 구간별 지표 수 — 이름 · 막대(오늘 지표 중 몫) · 개수. 줄에 마우스를 올리면 그 구간의 지표 목록(.hz-dist-pop)이 오른쪽으로 열린다. */
+.v2-bands { flex: 1; display: flex; flex-direction: column; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--t-line); }
+.v2-band-row {
+  flex: 1 0 auto;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 24px;
+  align-items: center;
+  column-gap: 10px;
+  min-height: 28px;
+  margin: 0 -8px;
+  padding: 0 8px;
+  border-radius: 4px;
+}
+.v2-band-row:hover,
+.v2-band-row:focus-within { background: var(--t-tint); }
+.v2-band-name { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--t-ink2); }
+.v2-band-name i { width: 7px; height: 7px; border-radius: 50%; }
+.v2-band-bar { height: 6px; border-radius: 3px; background: var(--t-bar-off); overflow: hidden; }
+.v2-band-bar i { display: block; height: 100%; border-radius: 3px; }
+.v2-band-n { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.v2-bf .hz-dist-pop { top: 8px; bottom: 8px; border-color: var(--t-frame); border-radius: 6px; }
+
+/* 오늘의 브리핑 — 이름표 칸 · 문장 칸 두 칸 줄, 줄마다 가는 선. 줄은 남는 높이를 고르게 받는다(옆 햇쩨 지수가 키를 정하는 날). */
+.v2-brief3 { flex: 1; display: flex; flex-direction: column; margin: 0; }
+.v2-brief3-row {
+  flex: 1 0 auto;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-content: center;
+  column-gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--t-line);
+}
+.v2-brief3-row:last-child { border-bottom: 0; }
+.v2-brief3 dt { font-size: 12px; font-weight: 600; line-height: 22px; color: var(--t-ink3); }
+.v2-brief3 dt a { color: var(--t-ink2); text-decoration: none; }
+.v2-brief3 dt a:hover { color: var(--t-down); }
+.v2-brief3 dd { margin: 0; font-size: 13px; font-weight: 500; line-height: 22px; color: var(--t-ink2); word-break: keep-all; }
+/* 굵은 낱말 · 지표 이름 링크 — renderRichSummary 가 인라인으로 800 · 온도색을 박는다. 굵기만 v2 로 내린다(색은 온도 낱말의 뜻이라 둔다). */
+.v2-brief3 dd b,
+.v2-brief3 dd strong { font-weight: 700 !important; }
+.v2-bf .hz-brief3-link { color: var(--t-ink); font-weight: 700; text-decoration: underline; text-decoration-color: var(--t-ink4); text-underline-offset: 3px; }
+.v2-bf .hz-brief3-link:hover { color: var(--t-down); text-decoration-color: var(--t-down); }
+
+/* 지표 모듈 — 모듈 하나에 셀 격자. 시트의 둥근 판 · 안쪽 링 · 그림자는 걷고 모듈 테두리가 바깥을 맡는다.
+   셀이 오른쪽 · 아래 선을 긋는데 끝 열 · 끝 줄의 선은 모듈 테두리와 겹쳐 두 겹이 된다 — 격자를 1px 밖으로 밀어 모듈이 잘라 낸다. */
+.v2-bf .v2-sheet .hz-cards {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0 -1px -1px 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.v2-bf .hz-cards > * {
+  min-height: 0 !important;
+  gap: 12px !important;
+  box-shadow: inset -1px 0 0 var(--t-line), inset 0 -1px 0 var(--t-line);
+}
+.v2-bf .hz-cards > .hz-cell-hot {
+  background: var(--t-up-weak);
+  box-shadow: inset 0 2px 0 var(--t-up), inset -1px 0 0 var(--t-line), inset 0 -1px 0 var(--t-line);
+}
+/* 칸 머리 — 아이콘 · 부제(설명 문장)를 걷고 이름 한 줄(13/700). 화면에 설명 문장을 두지 않는다(카더라 v2 규칙). */
+.v2-bf .hz-cell-head { height: auto; min-height: 20px; }
+.v2-bf .hz-cell-hot .hz-cell-head { padding-right: 48px; }
+.v2-bf .hz-cell-icon,
+.v2-bf .hz-cell-desc,
+.v2-bf .hz-cell-foot { display: none !important; }
+.v2-bf .hz-cell-name { font-size: 13px !important; font-weight: 700 !important; line-height: 20px !important; letter-spacing: 0 !important; color: var(--t-ink) !important; }
+/* 이름 옆 꼬리표('최근 한 달' · 'M/D 기준') — 알약을 걷고 근거 글자(모듈 머리의 meta 와 같은 꼴). */
+.v2-bf .hz-cell-badge { padding: 0 !important; background: none !important; font-size: 12px !important; font-weight: 500 !important; color: var(--t-ink3) !important; }
+.v2-bf .hz-hit-badge { top: 16px !important; right: 16px !important; height: 20px !important; }
+/* 초고온 꼬리표 — 꽉 찬 빨강에 판 색 글자. 옅은 빨강 면이면 초고온 칸의 옅은 바탕과 겹쳐 4.14 였다. */
+.v2-bf .hz-hit-badge > span {
+  height: 18px;
+  padding: 0 5px !important;
+  border-radius: 4px !important;
+  background: var(--t-up) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  line-height: 18px !important;
+  color: var(--t-card) !important;
+}
+/* 큰 숫자 — 40 → 22. 카더라 큰 숫자(20)보다 한 단 크다 — 이 칸에선 숫자가 주인공이다. */
+.v2-bf .hz-big { font-size: 22px !important; font-weight: 700 !important; line-height: 28px !important; letter-spacing: -0.01em !important; }
+.v2-bf .hz-big-unit { font-size: 14px !important; }
+.v2-bf .hz-big-sub { font-size: 12px !important; font-weight: 500 !important; color: var(--t-ink3) !important; }
+.v2-bf .hz-cell-graphic { min-height: 0; gap: 12px !important; }
+/* 여윳돈 칸의 지표 이름 — 칸이 251px 이 되는 1,280 에서 '오마카세·파인다이닝 웨이팅 검색 지수'가 말줄임으로 잘렸다. 두 줄로 감는다. */
+.v2-bf .hz-subspend-name { white-space: normal !important; overflow: visible !important; word-break: keep-all; line-height: 1.35; }
+/* 지표 제보 칸 — 점선 · 파란 면을 걷고 조용한 칸으로. 마지막 줄의 빈 슬롯을 채우는 자리다. */
+.v2-bf .hz-report-cell { background: none !important; border: 0 !important; min-height: 0 !important; padding: 16px !important; gap: 6px !important; }
+.v2-bf .hz-report-cell:hover { background: var(--t-tint) !important; }
+.v2-bf .hz-report-cell > div { width: 32px !important; height: 32px !important; background: var(--t-tint) !important; }
+.v2-bf .hz-report-cell strong { font-size: 13px !important; font-weight: 700 !important; }
+.v2-bf .hz-report-cell span { font-size: 12px !important; color: var(--t-ink3) !important; }
+
+@container kd (max-width: 999px) {
+  .v2-bf-band { grid-template-columns: minmax(0, 1fr); }
+  .v2-bf .v2-sheet .hz-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container kd (max-width: 679px) {
+  .v2-bf .v2-sheet .hz-cards { grid-template-columns: minmax(0, 1fr); }
+  .v2-brief3-row { grid-template-columns: 56px minmax(0, 1fr); padding: 10px 14px; }
+}

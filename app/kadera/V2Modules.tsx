@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import type { IndexClose } from "@/lib/data";
 import type { UpcomingEvent } from "@/lib/kadera-why";
 import type { IssueKeyword, SentimentPoint, ThemeRotation } from "@/lib/telegram-data";
 
@@ -49,14 +50,14 @@ export function Module({
   );
 }
 
-type Tone = "up" | "down" | "flat";
+export type Tone = "up" | "down" | "flat";
 
 /**
  * 선 그래프 — 아래로 옅어지는 면 · 기준선(점선) · 선 · 끝점 후광. 2차(토스 지수 카드 꼴)의 것을 그대로 되살렸다(2026-10-02 요청).
  * 색은 tone 클래스가 currentColor 로 쥔다(오름 빨강 · 내림 파랑). 면의 그라데이션도 같은 색이라 한 덩어리로 읽힌다.
  * 늘이는 그림이라(preserveAspectRatio none) 끝점은 svg 밖 span 이 그린다 — 안에서 그리면 타원으로 찌그러진다.
  */
-function Spark({ id, values, base, w, h, tone, dot }: { id: string; values: number[]; base?: number; w: number; h: number; tone: Tone; dot?: boolean }) {
+export function Spark({ id, values, base, w, h, tone, dot }: { id: string; values: number[]; base?: number; w: number; h: number; tone: Tone; dot?: boolean }) {
   if (values.length < 2) return <div className="v2-spark-empty" />;
   const all = base === undefined ? values : [...values, base];
   const lo = Math.min(...all);
@@ -317,5 +318,57 @@ export function KeywordTable({ keywords, split = true }: { keywords: IssueKeywor
         </div>
       )}
     </Module>
+  );
+}
+
+/* ── 첫 줄(개요 띠) 칸들 — 국장 카더라 · 시장 브리핑이 같이 쓴다(v2.css .v2-cover). ───────────────────────── */
+
+const signPct = (v: number, digits: number) => `${v > 0 ? "+" : v < 0 ? "-" : ""}${Math.abs(v).toFixed(digits)}%`;
+
+/** 'M/D 종가' 코스피 · 코스닥(값 · 전 거래일 대비). 둘 다 없으면 칸을 안 그린다. */
+export function CoverIndexCell({ kospi, kosdaq }: { kospi: IndexClose | null; kosdaq: IndexClose | null }) {
+  const cells = ([["코스피", kospi], ["코스닥", kosdaq]] as const).flatMap(([name, v]) => (v ? [{ name, ...v }] : []));
+  const date = kospi?.date ?? kosdaq?.date;
+  if (!date || !cells.length) return null;
+  return (
+    <div className="v2-cover-cell v2-cover-idx">
+      <span className="v2-cover-k">{date.slice(5).split("-").map(Number).join("/")} 종가</span>
+      {cells.map((c) => (
+        <span key={c.name} className="v2-cover-v">
+          <em>{c.name}</em>
+          <b>{c.close.toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b>
+          {c.changePct !== null && <span className={`v2-cover-chg${c.changePct > 0 ? " is-up" : c.changePct < 0 ? " is-down" : ""}`}>{signPct(c.changePct, 2)}</span>}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+export type CoverLink = { cap: string; name: string; val: string; tone: Tone; href: string; ga: string };
+
+/** 링크 칸 — 이 화면에 없는 것을 싣고 다른 화면으로 보낸다. 띠의 다른 칸과 같은 꼴 + 끝에 작은 ›(알약 칩은 v2 결과 안 맞아 걷었다). */
+export function CoverLinkCell({ c }: { c: CoverLink }) {
+  return (
+    <Link href={c.href} className="v2-cover-cell v2-cover-go" data-ga={c.ga}>
+      <span className="v2-cover-k">{c.cap}</span>
+      <span className="v2-cover-v">
+        <b>{c.name}</b>
+        <span className={`v2-cover-chg is-${c.tone}`}>{c.val}</span>
+      </span>
+      <Icon name="chevron_right" />
+    </Link>
+  );
+}
+
+/** 오른쪽 끝 — 언제 · 무엇을 얼마나 읽었나(두 줄). */
+export function CoverMeta({ updated, basis }: { updated: string; basis?: string | null }) {
+  return (
+    <div className="v2-cover-cell v2-cover-meta">
+      <span className="v2-cover-k">
+        <i className="v2-dot" />
+        {updated}
+      </span>
+      {basis && <span className="v2-cover-k">{basis}</span>}
+    </div>
   );
 }

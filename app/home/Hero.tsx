@@ -114,25 +114,13 @@ export function Hero({
      ⚠️⚠️ **두 줄짜리 옛 자료를 그대로 살려야 한다.** 저장된 문장은 파이프라인이 다시
      돌아야 세 줄이 되는데, 그때까지 인덱스를 [0][1][2] 로 못박으면 **추세 문단이 통째로
      사라진다**(옛 자료의 [1] 은 추세인데 [2] 는 없다). 줄 수로 갈라 집는다. */
-  const summaryLines = (dailyScore.ai_summary ?? "")
-    .split("\n")
-    .map((x) => x.trim())
-    .filter(Boolean);
+  const { lines: summaryLines, brief } = parseBrief(dailyScore.ai_summary);
   // ⭐ 세 줄 요약(2026-09-28~) — 줄마다 "[흐름] …" 이름표가 붙어 저장된다(generate_daily_summary.py
   //    BRIEF_LABELS). 이름표가 셋 다 있으면 새 형식으로 그리고, 아니면 옛 형식(아래)으로 그린다 —
   //    파이프라인이 한 번 돌기 전까지 DB 에는 옛 줄이 남아 있다.
   //    첫 줄에 이름표가 있으면 새 형식이다. 이름표 없는 줄은 앞 줄에 이어 붙인다 — 모델이 '한두 문장'을 두 줄로
   //    낸 경우다(파이프라인도 줄바꿈을 공백으로 바꿔 저장하지만 한 겹 더 막는다). 안 그러면 옛 형식으로 떨어져
   //    "[흐름] …"이 날것으로 찍힌다.
-  let brief: { label: string; text: string }[] | null = null;
-  if (summaryLines.length > 0 && BRIEF_LABEL_RE.test(summaryLines[0])) {
-    brief = [];
-    for (const line of summaryLines) {
-      const m = BRIEF_LABEL_RE.exec(line);
-      if (m) brief.push({ label: m[1], text: line.slice(m[0].length) });
-      else brief[brief.length - 1].text += ` ${line}`;
-    }
-  }
   const meaningLine = summaryLines[0] ?? null;
   const balanceLine = summaryLines.length >= 3 ? summaryLines[1] : null;
   const trendLine = (summaryLines.length >= 3 ? summaryLines[2] : summaryLines[1]) ?? null;
@@ -241,8 +229,8 @@ export function Hero({
 
 type Band = { label: string; count: number; fill: string; items: BandItem[] };
 
-/** 구간 하나의 지표 목록(호버·초점에 위로 열린다). 옛 분포 칸의 그것 그대로다. */
-function DistPop({ b }: { b: Band }) {
+/** 구간 하나의 지표 목록(호버·초점에 위로 열린다). 옛 분포 칸의 그것 그대로다. v2 햇쩨 지수 모듈도 쓴다. */
+export function DistPop({ b }: { b: Band }) {
   return b.count > 0 ? (
     <div className="hz-dist-pop hz-scroll">
       <div className="hz-dist-pop-head">
@@ -378,10 +366,29 @@ function IndexTile({
 const BRIEF_LABEL_RE = /^\[(흐름|달라진 것|뜨거운 곳|여론)\]\s*/;
 
 /**
+ * 저장된 요약을 줄로 가르고, 첫 줄에 이름표가 있으면 새 형식(이름표 · 문장)으로 묶는다. 이름표 없는 줄은 앞 줄에 잇는다
+ * (모델이 '한두 문장'을 두 줄로 낸 경우). 아니면 brief 는 null — 옛 형식 줄을 그대로 쓴다. 히어로 · v2 브리핑 모듈이 같이 쓴다.
+ */
+export function parseBrief(summary: string | null | undefined): { lines: string[]; brief: { label: string; text: string }[] | null } {
+  const lines = (summary ?? "")
+    .split("\n")
+    .map((x) => x.trim())
+    .filter(Boolean);
+  if (!lines.length || !BRIEF_LABEL_RE.test(lines[0])) return { lines, brief: null };
+  const brief: { label: string; text: string }[] = [];
+  for (const line of lines) {
+    const m = BRIEF_LABEL_RE.exec(line);
+    if (m) brief.push({ label: m[1], text: line.slice(m[0].length) });
+    else brief[brief.length - 1].text += ` ${line}`;
+  }
+  return { lines, brief };
+}
+
+/**
  * 세 줄 요약의 한 줄. 굵은 조각(**…**)이 지표 이름이면 그 카드로 내려가는 링크가 된다 — 파이프라인이
  * 굵게를 지표 이름에만 남긴다. 나머지는 옛 요약과 같은 규칙(renderRichSummary: 굵게 · 온도 낱말 색)이다.
  */
-function renderBriefLine(text: string, anchors: Record<string, string>): ReactNode {
+export function renderBriefLine(text: string, anchors: Record<string, string>): ReactNode {
   return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) => {
     const name = /^\*\*[^*]+\*\*$/.test(part) ? part.slice(2, -2) : null;
     const href = name ? anchors[name] : undefined;

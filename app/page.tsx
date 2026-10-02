@@ -1,15 +1,17 @@
-import { SCORE_TREND_DAYS, getKospiCloseSeries, getLatestDailyScore, getPublicIndicators, getScoreHistory, getTopStockHighGaps } from "@/lib/data";
+import { SCORE_TREND_DAYS, getKospiCloseSeries, getKrIndexCloses, getLatestDailyScore, getPublicIndicators, getScoreHistory, getTopStockHighGaps } from "@/lib/data";
+import { formatKstUpdate } from "@/lib/format";
 import { assertLoaded, isLoadFailed } from "@/lib/load-state";
-import { SectionIntro } from "./SectionIntro";
 import type { IndicatorCategory } from "@/lib/data";
-import { C, Icon, R, stageForScore } from "./ui";
+import { Icon, R, stageForScore } from "./ui";
 import { pick, GenericCard } from "./home/parts";
-import { ANCHOR_ALIAS, BAND_LABELS, DIST_FILL, Hero } from "./home/Hero";
+import { ANCHOR_ALIAS, BAND_LABELS, DIST_FILL } from "./home/Hero";
 import type { BandItem } from "./home/Hero";
+import { BriefModule, IndexModule } from "./home/V2Briefing";
+import { CoverIndexCell, CoverLinkCell, CoverMeta, Module, type CoverLink } from "./kadera/V2Modules";
 import { CardBuffett, CardLeverage, CardMarketActions, CardTurnover, CardHighGap, CardSpeed, CardVkospi, CardAsia, CardGoldRatio, CardVolume, CardFx, CardNetBuy, CardLimitUp, CardPutCall } from "./home/cards-market";
 import { CardComingSoon, CardDivergence, CardTrend, CardSentiment, CardYoutube, CardSpending, CardUpbit, CardBrokerage } from "./home/cards-sentiment";
 import type { IconName } from "@/lib/icon-names";
-import { loadSpotlight } from "./home/spotlight-data";
+import { loadSpotlight, type SpotChip } from "./home/spotlight-data";
 
 // 캐시 주기는 루트 레이아웃의 `revalidate` 가 정한다(app/layout.tsx). 예전엔 여기가
 // force-dynamic 이라 방문마다 서버가 새로 그렸다.
@@ -46,7 +48,7 @@ const FALLBACK_ICONS: Record<string, IconName> = {
 };
 
 export default async function Home() {
-  const [dailyScore, indicators, rawTopGaps, rawKospiPath, rawScoreTrend, spotlight] = await Promise.all([
+  const [dailyScore, indicators, rawTopGaps, rawKospiPath, rawScoreTrend, spotlight, rawIndexes] = await Promise.all([
     getLatestDailyScore(),
     getPublicIndicators(),
     getTopStockHighGaps(3),
@@ -57,6 +59,8 @@ export default async function Home() {
     // 히어로 바닥 '오늘 눈에 띄는 것' 칩. 실패해도 던지지 않는다(app/home/spotlight-data.ts 머리말) —
     // 그래서 아래 assertLoaded 에 넣지 않는다.
     loadSpotlight(),
+    // v2 첫 줄의 지수 종가(국장 카더라와 같은 칸). 곁들이는 칸이라 실패해도 칸만 빠진다.
+    getKrIndexCloses(),
   ]);
 
   /* 조회 실패를 "자료 없음" 과 가른다(lib/load-state.ts). 두 값 다 카드의 **곁가지**라,
@@ -117,31 +121,45 @@ export default async function Home() {
     if (short && short !== i.name) nameAnchors[short] = href;
   }
 
+  /* ── v2(2026-10-03) — 카더라 v2 의 디자인 규칙을 옮겼다 ──────────────────────────
+     첫 줄 띠(지수 종가 · 링크 칸 · 업데이트) → 둘째 줄 [햇쩨 지수 | 오늘의 브리핑] → 지표 모듈 둘(시장 · 감성).
+     페이지 제목 · 구간 제목('01 시장 지표')은 걷고 모듈 머리 띠가 이름을 말한다. 카드 안의 부제 · 바닥 설명 문장은 v2.css .v2-bf 가 숨긴다
+     (부품은 내부자 · MDD 가 같이 써서 고치지 않고 이 화면에서만 덮는다).
+     링크 칸은 홈 '오늘 눈에 띄는 것'의 재료다(급부상 1위 · 테마 유입 1위). ⛔ 밤사이 미장 칸은 안 쓴다 — 2026-10-03 "별로". */
+  const toLink = (c: SpotChip): CoverLink => ({ cap: c.cap, name: c.name, val: c.val.replace("▲", "+"), tone: "up", href: c.href, ga: c.ga });
+  const coverLinks = [spotlight.timed.kadera, ...spotlight.fixed].filter((c): c is SpotChip => c !== null).map(toLink);
+  const indexes = isLoadFailed(rawIndexes) ? null : rawIndexes;
+  const nMarket = indicators.filter((i) => i.category === "시장").length;
+  const nSocial = indicators.filter((i) => i.category === "감성").length;
+  const hitsMeta = (n: number, hits: number) => `${n}개${hits ? ` · 초고온 ${hits}` : ""}`;
+
 
   return (
-    /* 뿌리의 hz-tx 가 이번 리디자인(시트 모서리 20·구간 제목·히어로 격자)을 켠다 — globals.css. */
-    <div className="hz-tx">
+    /* 뿌리의 hz-tx 는 카드 안 조판(시트 · 셀)을 켠다 — globals.css. v2-kd 는 v2 토큰 · 폭 단계, v2-bf 는 이 화면 전용 덮기(v2.css). */
+    <div className="hz-tx v2-kd v2-bf">
+            {/* 첫 줄 — 지수 종가 · 링크 칸(카더라로) · 업데이트 */}
+            <div className="v2-cover">
+              {indexes && <CoverIndexCell kospi={indexes.kospi} kosdaq={indexes.kosdaq} />}
+              {coverLinks.map((c) => (
+                <CoverLinkCell key={c.ga} c={c} />
+              ))}
+              <CoverMeta updated={dailyScore ? formatKstUpdate(dailyScore.updated_at, "업데이트") : "업데이트 준비 중"} basis={`지표 ${bandTotal}개 분석`} />
+            </div>
+
+            {/* 둘째 줄 — 햇쩨 지수 | 오늘의 브리핑 */}
             {dailyScore ? (
-              <Hero
-                dailyScore={dailyScore}
-                tradHits={countHits("시장")}
-                socialHits={countHits("감성")}
-                bandCounts={bandCounts}
-                bandTotal={bandTotal}
-                trend={isLoadFailed(rawScoreTrend) ? null : rawScoreTrend}
-                trendDays={SCORE_TREND_DAYS}
-                spotlight={spotlight}
-                nameAnchors={nameAnchors}
-              />
+              <div className="v2-bf-band">
+                <IndexModule dailyScore={dailyScore} trend={isLoadFailed(rawScoreTrend) ? null : rawScoreTrend} days={SCORE_TREND_DAYS} bands={bandCounts} total={bandTotal} />
+                <BriefModule summary={dailyScore.ai_summary} nameAnchors={nameAnchors} />
+              </div>
             ) : (
-              <section style={{ background: C.card, borderRadius: 16, padding: 44, textAlign: "center", color: C.sub }}>
-                아직 계산된 스코어가 없습니다.
-              </section>
+              <Module id="index" title="햇쩨 지수">
+                <p className="v2-empty">아직 계산된 스코어가 없습니다.</p>
+              </Module>
             )}
 
-            {/* 시장 지표 (category=시장) */}
-            <section style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <SectionIntro n={1} id="market" title="시장 지표" />
+            {/* 시장 지표 (category=시장) — 모듈 하나에 셀 격자. 구간 제목(SectionIntro)의 앵커 id 는 모듈이 그대로 잇는다. */}
+            <Module id="market" title="시장 지표" meta={hitsMeta(nMarket, countHits("시장"))} className="v2-sheet">
               <div className="hz-cards">
                 {/* 순서 = 가중치(config/indicator_weights.py) × 직관성 × 변동성.
                     ① 가중치 1·2위(4.5/4.0)를 2칸으로 맨 앞에 — 둘 다 설명이 필요 없는 지표다.
@@ -175,11 +193,10 @@ export default async function Home() {
                   <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["시장"]} />
                 ))}
               </div>
-            </section>
+            </Module>
 
             {/* 감성 지표 (category=감성) */}
-            <section style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <SectionIntro n={2} id="sentiment" title="감성 지표" />
+            <Module id="sentiment" title="감성 지표" meta={hitsMeta(nSocial, countHits("감성"))} className="v2-sheet">
               <div className="hz-cards">
                 {/* 시장 지표와 같은 원칙으로 순서만 바꿨다 — 칸 수는 기존과 동일(12칸).
                     검색량(가중치 3.0)과 코인 투기를 앞세우고, 명품·오마카세는 재미는 크지만
@@ -201,6 +218,7 @@ export default async function Home() {
                   <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["감성"]} />
                 ))}
                 <a
+                  className="hz-report-cell"
                   href="https://forms.gle/P4wzp2DkP2wyTPWP9"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -231,7 +249,7 @@ export default async function Home() {
                   <span style={{ fontSize: "var(--fs-12-5)", color: "var(--c-sub)" }}>아이디어가 있다면 알려주세요</span>
                 </a>
               </div>
-            </section>
+            </Module>
     </div>
   );
 }
