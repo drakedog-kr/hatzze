@@ -227,6 +227,32 @@
   transition: background-color 0.15s;
 }
 .v2-tbl li:last-child .v2-tr { border-bottom: 0; }
+/* 쪽 넘김 — 쪽(ol)마다 한 칸에 겹쳐 세우고 지금 쪽만 보인다(Pager.tsx 머리말). 높이는 가장 높은 쪽이 정하고, 낮은 쪽은 줄이 늘어나 채운다. */
+.v2-pages { display: grid; }
+.v2-pages > ol { grid-area: 1 / 1; display: flex; flex-direction: column; }
+.v2-pages > ol > li { flex: 1 0 auto; display: flex; flex-direction: column; }
+.v2-pages > ol > li > .v2-tr { flex: 1 0 auto; }
+.v2-pages > ol.is-off { visibility: hidden; }
+/* 머리 띠 오른쪽의 쪽 단추 — 누르는 자리는 24px, 띠 높이(제목 줄 20px)는 그대로 둔다(위아래 -2px). */
+.v2-mod-aside:has(.v2-pg) { align-self: center; }
+.v2-pg { display: flex; align-items: center; gap: 2px; margin: -2px -6px -2px 0; }
+.v2-pg button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--t-ink2);
+  cursor: pointer;
+}
+.v2-pg button:hover:not(:disabled) { background: var(--t-tint); color: var(--t-ink); }
+.v2-pg button:disabled { color: var(--t-ink4); cursor: default; }
+.v2-pg .ms { font-size: 18px; }
+.v2-pg-n { min-width: 30px; text-align: center; font-size: 12px; font-weight: 600; line-height: 20px; color: var(--t-ink); }
+.v2-pg-n span { font-weight: 500; color: var(--t-ink3); }
 .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px 72px minmax(0, 1fr); }
 a.v2-tr:hover { background: var(--t-tint); }
 .v2-th {
@@ -240,7 +266,8 @@ a.v2-tr:hover { background: var(--t-tint); }
 .v2-th > :last-child { display: inline-flex; align-items: center; gap: 3px; text-align: left; }
 .v2-td-rank { text-align: center; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
 .v2-td-stock { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.v2-td-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 긴 이름은 두 줄로 감는다 — 말줄임으로 자르면 'LIG디펜스앤에어로스페이스'가 'LIG디펜스앤에어…'로 남았다(2026-10-03, 스무 줄로 늘리자 처음 걸렸다). */
+.v2-td-name { min-width: 0; line-height: 18px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .v2-badge {
   flex-shrink: 0;
   height: 18px;

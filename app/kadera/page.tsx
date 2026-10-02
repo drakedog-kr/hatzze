@@ -24,9 +24,9 @@ import { fmtKoDate } from "@/lib/stock-page";
 import { THEME_NAMES, themeHref } from "@/lib/theme-href";
 import { THEMES } from "@/lib/stock-themes";
 import { THEME_PUBLIC } from "../screen-flags";
-import { getMoveReasons, getUpcomingEvents, todayKst } from "@/lib/kadera-why";
+import { BOARD_TILES, getMoveReasons, getUpcomingEvents, todayKst } from "@/lib/kadera-why";
 import { EventsModule, KeywordTable, Module, SentimentModule, ThemeCards } from "./V2Modules";
-import { SignalTable } from "./KaderaBoard";
+import { PAGE_ROWS, SignalTable } from "./KaderaBoard";
 import type { BoardRow, BoardSection } from "./KaderaBoard";
 
 /**
@@ -36,6 +36,18 @@ import type { BoardRow, BoardSection } from "./KaderaBoard";
 function firstSentence(t: string | null): string | null {
   return t ? t.split(/(?<=[가-힣]\.)\s+/)[0] : null;
 }
+
+/**
+ * 신호 표 하나의 최대 줄 수 — 다섯 줄씩 네 쪽(2026-10-03 "다섯은 너무 적다, 스무 줄까지"). 움직인 종목의 시세 2차 조회가
+ * 화면에 설 줄을 알아야 해서 그쪽 상수를 그대로 쓴다(lib/kadera-why.ts BOARD_TILES 주석).
+ */
+const MAX_ROWS = BOARD_TILES;
+
+/** 줄 수를 쪽(PAGE_ROWS)의 배수로 내린다. 마지막 쪽만 짧으면 표 높이가 줄어 오른쪽 요약 칸이 같이 줄었다. 한 쪽도 안 차면 그대로. */
+function fitPages(n: number): number {
+  return n <= PAGE_ROWS ? n : n - (n % PAGE_ROWS);
+}
+const fullPages = <T,>(xs: T[]): T[] => xs.slice(0, fitPages(xs.length));
 
 /** "10/1 19:30" — 패널 머리에 들어갈 짧은 KST 시각. */
 function shortKst(iso: string): string {
@@ -92,9 +104,8 @@ export default async function KaderaPage() {
   // 그렇다고 이걸 await 한 **뒤에** 나머지를 시작하면, 나머지와 아무 상관 없는 그 왕복이
   // 페이지 앞에 통째로 붙는다(실측 240ms, 콜드 1,976ms). 독립적인 조회들은 지금 바로
   // 띄우고, 종목 리포트만 이 프로미스에 이어 붙인다 — 둘이 나란히 간다.
-  // 4종목인 이유: 시트 안 2×2 격자라 넷이어야 줄이 찬다. 파이프라인은 상위 6종목까지
-  // 흐름 요약을 만들므로(NARRATIVE_TOP_N) 넷째 칸에도 문단이 붙는다.
-  const topStocksPromise = getTopStocksWithTrend(6);
+  // 스무 종목(MAX_ROWS)이라 종목 리포트도 스무 번 나란히 묻는다 — 많이 언급 표가 네 쪽을 넘긴다.
+  const topStocksPromise = getTopStocksWithTrend(MAX_ROWS);
   const reportsPromise = topStocksPromise.then((tops) =>
     Promise.all(tops.map((s) => getStockReport(s.code))),
   );
@@ -112,8 +123,7 @@ export default async function KaderaPage() {
   ] =
     await Promise.all([
       getTelegramSummary(),
-      // 3×2 셀 격자라 여섯이어야 줄이 찬다(예전 카드 배치에선 다섯이었다).
-      getSurgingStocks(6),
+      getSurgingStocks(MAX_ROWS),
       // v2: 채널 파워 랭킹 · 뜨는 채널 · 화제 글은 걷었다(2026-10-02). 두 달 동안 카더라 방문자의 2~5%만 눌렀다.
       getThemeRotation(10),
       reportsPromise,
@@ -181,11 +191,9 @@ export default async function KaderaPage() {
      급부상 · 오늘 움직인 종목(오른 것 + 5% 넘게 내린 것) · 많이 언급(KaderaBoard 머리말). */
   const surgeDays = surging[0]?.recentDays ?? KADERA_WINDOW_DAYS;
 
-  /* ⭐ 표 셋은 **다섯 줄씩** 같다(2026-10-03 "숫자가 딱 떨어지면"). 급부상 여섯 · 움직인 아홉은 예전 카드 격자(3×2 · 3×3)를 채우던 수였다.
-     열은 못 올린다 — 급부상 한 줄은 파이프라인이 여섯 장까지만 쓰고(generate_surging_oneliners.py), 까닭은 오른 것 아홉까지다(BOARD_TILES). */
-  const ROWS = 5;
-
-  const surgeRows: BoardRow[] = surging.slice(0, ROWS).map((s) => ({
+  /* ⭐ 표 셋은 **다섯 줄씩 같은 쪽**으로 넘긴다(2026-10-03 "숫자가 딱 떨어지면" → "다섯은 너무 적다, 스무 줄까지").
+     급부상 여섯 · 움직인 아홉은 예전 카드 격자(3×2 · 3×3)를 채우던 수였다. 줄 수는 쪽의 배수로 자른다(fullPages). */
+  const surgeRows: BoardRow[] = fullPages(surging).map((s) => ({
     code: s.code,
     name: s.name,
     market: s.market,
@@ -199,9 +207,21 @@ export default async function KaderaPage() {
     pending: "집계가 끝나면 붙습니다",
   }));
 
-  // 다섯 줄 = 오른 것 + 크게 내린 것(lib/kadera-why.ts DOWN_MIN) 둘까지. 내린 게 없는 날은 오른 것 다섯. 부호 색이 둘을 가른다.
-  const downs = (why?.down ?? []).slice(0, 2);
-  const moveRows: BoardRow[] = [...(why?.rows ?? []).slice(0, ROWS - downs.length), ...downs].map((r) => ({
+  /* 오른 것(큰 순) + 크게 내린 것(lib/kadera-why.ts DOWN_MIN, 하루 0~6줄). 부호 색이 둘을 가른다.
+     ⭐ 첫 쪽은 '오른 셋 + 내린 둘'이다 — 다섯 줄 판 그대로. 내린 까닭도 독자가 찾는 것이라(급락 이유) 누르지 않고 보이게 둔다.
+     움직인 폭 순으로 한 줄에 세우면 상한가가 많은 날 내린 줄이 넷째 쪽으로 밀렸다(2026-10-03: 오른 18줄이 모두 14% 넘게 올라 -10.22% 가 19위).
+     둘째 쪽부터는 남은 오른 것, 그다음 남은 내린 것. */
+  const ups = why?.rows ?? [];
+  const downs = why?.down ?? [];
+  const downsFirst = Math.min(2, downs.length);
+  const moveRows: BoardRow[] = fullPages(
+    [
+      ...ups.slice(0, PAGE_ROWS - downsFirst),
+      ...downs.slice(0, downsFirst),
+      ...ups.slice(PAGE_ROWS - downsFirst),
+      ...downs.slice(downsFirst),
+    ].slice(0, MAX_ROWS),
+  ).map((r) => ({
     code: r.code,
     name: r.name,
     market: r.market,
@@ -212,7 +232,7 @@ export default async function KaderaPage() {
 
   /* 줄은 **언급 수 순**으로 세운다. 여섯을 고르는 건 주목도(채널 크기를 실은 점수, getTopStocksWithTrend)라 그 순서 그대로 두면
      번호와 바로 옆 '언급' 칸이 어긋났다(87회 → 68회 → 144회, 2026-10-02). 고르는 잣대는 두고 늘어놓는 순서만 칸에 맞춘다. */
-  const talkRows: BoardRow[] = [...stockReports].sort((a, b) => b.totalMentions - a.totalMentions).slice(0, ROWS).map((r) => ({
+  const talkRows: BoardRow[] = fullPages([...stockReports].sort((a, b) => b.totalMentions - a.totalMentions)).map((r) => ({
     code: r.code,
     name: r.name,
     market: r.market,
