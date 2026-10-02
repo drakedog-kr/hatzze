@@ -1,18 +1,17 @@
-/* ── v2 리디자인 — 국장 카더라(2026-10-02) ─────────────────────────────────────
-   토스증권 웹을 해부한 값 그대로 입힌다(레포 밖 /Users/hun/hatzze-toss-design-notes/tossinvest-anatomy-2026-10-02.md).
-   - 글자: 13px/600 이 기본. 보조 12, 강조 14, 화면 최대 18. 위계는 크기가 아니라 회색 투명도 4단(.89/.77/.61/.47)으로.
-   - 면: 페이지 위에 판 하나(#fbfcfd · r12 · 안쪽 흰 0.75px + 바깥 옅은 선). 판 안 블록은 테두리 없이 호버 면으로만.
-   - 색: 오름 빨강 · 내림 파랑 두 가지. 등락은 +/- 로 적는다(토스 표기).
-   - 얼개: 상태 줄 → 지수 줄(여론 · 테마 여섯 · 일정) → 표 셋 + 오른쪽 읽기 칸(평소엔 오늘의 요약, 줄에 마우스를 올리면 그 종목).
-   토큰 이름은 토스의 의미 토큰을 줄여 쓴 것이다(--t-ink = txt-neutral-primary …). 전부 .v2-kd 아래에만 건다.
-   ⚠️ 토스 값을 그대로 쓰면 작은 글자 몇 곳이 4.5:1 에 못 미친다(라이트 파랑 #2272eb 판 위 4.37 · 빨강 칩 위 4.19 · 47% 회색 2.97).
-      이 사이트는 4.5 를 지켜 왔으니 색상(hue)은 두고 명도만 가장 어두운 면(칩 바탕)에서 4.5 를 넘는 지점까지 옮겼다
-      (2026-10-02 이분 탐색: 라이트 오름 #d3212f · 내림 #1466e2 · 회색3 .62 / 다크 오름 #f76b7c · 내림 #5199ff · 회색3 .60).
-      47% 회색(--t-ink4)은 어떤 값으로도 작은 글자에 못 쓴다 — 점·막대 같은 글자 아닌 것에만 쓴다. */
+/* ── v2 리디자인 — 국장 카더라(2026-10-02 3차) ────────────────────────────────
+   2차는 토스증권 홈을 얼개째 옮겼다(한 판 · 지수 카드 줄 · 표 + 오른쪽 종목 정보 칸). "토스랑 구성이 똑같다 · 인텔리전스
+   플랫폼 같은 느낌이 덜하다"는 지적에 얼개와 면을 바꿨다.
+   - 면: 한 판(r12 · 옅은 그림자) 대신 **모듈**. 모듈마다 1px 테두리 · 모서리 6 · 머리 띠(제목 · 근거 · 오른쪽 덧붙임) · 행마다 가는 선.
+     블록웍스 대시보드의 모듈(테두리 10% · r4 · 행 33px)에서 '모듈마다 머리 띠와 근거'를 가져왔다.
+   - 얼개: 개요 띠 → 두 줄기. 왼쪽은 오늘의 요약과 신호 표 셋, 오른쪽은 여론 막대 · 테마 히트맵 · 일정 · 화제어.
+   - 글자: 13px 기본은 그대로(토스 해부에서 얻은 것 중 남길 것). 숫자는 고정폭 숫자(tabular-nums).
+   - 색: 오름 빨강 · 내림 파랑. 양(점유율)은 브랜드 파랑 한 가지의 진하기.
+   토큰은 .v2-kd 아래에만 건다. 바탕·카드는 사이트 토큰(--c-bg · --c-card)을 따라 다른 화면과 같은 면 위에 선다.
+   ⚠️ 글자 회색은 2차에 잰 대비값 그대로다(라이트 오름 #d3212f · 내림 #1466e2 · 회색3 .62 / 다크 오름 #f76b7c · 내림 #5199ff · 회색3 .60).
+      47% 회색(--t-ink4)은 작은 글자에 못 쓴다 — 막대 같은 글자 아닌 것에만. */
 
 .v2-kd {
-  --t-panel: #fbfcfd;
-  --t-card: #ffffff;
+  --t-card: var(--c-card);
   --t-ink: rgba(26, 31, 41, 0.89);
   --t-ink2: rgba(24, 31, 43, 0.77);
   --t-ink3: rgba(22, 31, 46, 0.62);
@@ -23,24 +22,22 @@
   --t-down-weak: rgba(26, 122, 249, 0.09);
   --t-down-deep: #1362d9;
   --t-green: #03b26c;
+  --t-heat: var(--c-blue);
+  --t-frame: rgba(15, 23, 42, 0.1);
+  --t-line: rgba(15, 23, 42, 0.06);
+  --t-head: rgba(15, 23, 42, 0.025);
   --t-tint: rgba(7, 25, 76, 0.04);
-  --t-tint-weak: rgba(13, 25, 74, 0.02);
-  --t-press: rgba(3, 31, 63, 0.09);
-  --t-line: rgba(7, 25, 76, 0.05);
-  --t-edge: rgba(7, 25, 76, 0.06);
-  --t-inner: rgba(255, 255, 255, 0.96);
-  --t-base: rgba(2, 32, 59, 0.17);
   --t-bar-off: rgba(7, 25, 76, 0.08);
   container: kd / inline-size;
-  display: block;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   color: var(--t-ink);
   font-size: 13px;
   font-weight: 600;
   line-height: 20px;
 }
 [data-theme="dark"] .v2-kd {
-  --t-panel: #17171c;
-  --t-card: #202025;
   --t-ink: rgba(242, 246, 255, 0.9);
   --t-ink2: rgba(217, 223, 235, 0.8);
   --t-ink3: rgba(216, 223, 237, 0.6);
@@ -49,282 +46,183 @@
   --t-down: #5199ff;
   --t-up-weak: rgba(245, 68, 90, 0.14);
   --t-down-weak: rgba(67, 145, 255, 0.16);
-  --t-down-deep: #5199ff;
+  /* 파란 면(알약·배지) 위 파란 글자 — 내림 파랑(#5199ff)은 '신규' 배지에서 4.49 라 한 단 밝힌다. */
+  --t-down-deep: #66a8ff;
   --t-green: #1cd28a;
-  --t-tint: rgba(214, 224, 239, 0.09);
-  --t-tint-weak: rgba(218, 223, 233, 0.04);
-  --t-press: rgba(214, 224, 239, 0.14);
-  --t-line: rgba(214, 224, 239, 0.09);
-  --t-edge: rgba(214, 224, 239, 0.09);
-  --t-inner: rgba(255, 255, 255, 0);
-  --t-base: rgba(212, 223, 248, 0.19);
+  --t-frame: rgba(255, 255, 255, 0.1);
+  --t-line: rgba(255, 255, 255, 0.06);
+  --t-head: rgba(255, 255, 255, 0.025);
+  --t-tint: rgba(214, 224, 239, 0.07);
   --t-bar-off: rgba(214, 224, 239, 0.12);
 }
+.v2-muted,
+.v2-empty { margin: 0; color: var(--t-ink3); font-weight: 500; }
+.v2-empty { padding: 14px; }
 
-/* ── 판 ── */
-.v2-panel {
-  padding: 8px;
-  background: var(--t-panel);
-  border-radius: 12px;
-  box-shadow: inset 0 0 0 0.75px var(--t-inner), 0 0 0 1px var(--t-edge);
+/* ── 모듈 ── */
+.v2-mod {
+  min-width: 0;
+  background: var(--t-card);
+  border: 1px solid var(--t-frame);
+  border-radius: 6px;
+  overflow: hidden;
 }
-.v2-muted { margin: 0; color: var(--t-ink3); font-weight: 500; }
+/* 머리 띠 — 제목 · 근거 · 오른쪽 덧붙임이 한 밑선에 앉는다(baseline). AI 표시는 제 줄 상자 가운데(AiMark 의 alignSelf). */
+.v2-mod-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--t-line);
+}
+.v2-mod-head h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  flex-shrink: 0;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 20px;
+  color: var(--t-ink);
+}
+.v2-mod-meta {
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--t-ink3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.v2-mod-aside {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--t-ink3);
+  font-variant-numeric: tabular-nums;
+}
 
-/* 상태 줄 — 토스의 '● 국내 장 닫힘 · ● 해외 정규장' 자리 */
-.v2-status {
+/* ── 개요 띠 — 작은 이름 위에 값 ── */
+.v2-cover {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 16px;
-  min-height: 44px;
-  padding: 0 12px;
+  align-items: stretch;
+  background: var(--t-card);
+  border: 1px solid var(--t-frame);
+  border-radius: 6px;
 }
-.v2-status-item { display: inline-flex; align-items: center; gap: 6px; color: var(--t-ink); }
+.v2-cover-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 10px 18px;
+  border-right: 1px solid var(--t-line);
+}
+.v2-cover-k {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 16px;
+  color: var(--t-ink3);
+  white-space: nowrap;
+}
+.v2-cover-v { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.v2-cover-v b { font-size: 15px; font-weight: 700; line-height: 22px; }
+.v2-cover-v em { font-style: normal; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
+.v2-cover-link {
+  align-self: center;
+  margin-left: auto;
+  margin-right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  height: 30px;
+  padding: 0 6px 0 10px;
+  border-radius: 6px;
+  color: var(--t-ink2);
+  text-decoration: none;
+  transition: background-color 0.15s;
+}
+.v2-cover-link:hover { background: var(--t-tint); color: var(--t-ink); }
+.v2-cover-link .ms { font-size: 16px; }
 .v2-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: var(--t-green);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--t-green) 18%, transparent);
+  animation: v2-live 2.4s ease-in-out infinite;
 }
-.v2-dot.is-soft { background: var(--t-ink4); box-shadow: none; }
-.v2-status-link {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 1px;
-  height: 28px;
-  padding: 0 6px 0 10px;
-  border-radius: 999px;
-  background: var(--t-card);
-  box-shadow: 0 0 0 1px var(--t-edge);
-  color: var(--t-ink2);
-  text-decoration: none;
-  transition: background-color 0.2s;
+@keyframes v2-live {
+  50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--t-green) 0%, transparent); }
 }
-.v2-status-link:hover { background: var(--t-tint); }
-.v2-status-link .ms { font-size: 16px; }
 
-/* ── 지수 줄 ── 큰 카드 216 · 테마 여섯(2열 × 3) · 일정 카드 */
-.v2-band {
-  display: grid;
-  /* 오른쪽 칸은 아래 읽기 칸과 같은 340 — 일정 카드와 읽기 칸이 한 세로줄에 선다. */
-  grid-template-columns: 216px minmax(0, 1fr) 340px;
-  gap: 16px;
-  align-items: stretch;
-  padding: 0 0 4px;
-}
-.v2-bigcard,
-.v2-minicard {
-  border-radius: 8px;
-  color: var(--t-ink);
-  text-decoration: none;
-  transition: background-color 0.2s;
-}
-a.v2-minicard:hover,
-.v2-bigcard:hover { background: var(--t-tint-weak); }
-.v2-bigcard {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  padding: 8px 12px;
-}
-.v2-card-name {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-.v2-reason {
-  flex-shrink: 0;
-  max-width: 100%;
-  height: 16px;
-  padding: 0 5px;
-  border-radius: 4px;
-  background: var(--t-tint);
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 16px;
-  color: var(--t-ink2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.v2-card-val { display: flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
-.v2-card-val b { font-size: 14px; font-weight: 600; }
-.v2-delta { font-size: 12px; line-height: 16px; color: var(--t-ink3); }
-.v2-delta.is-up { color: var(--t-up); }
-.v2-delta.is-down { color: var(--t-down); }
-.v2-bigcard .v2-spark { height: 72px; margin: 6px 0 4px; }
-.v2-card-foot {
-  display: flex;
-  gap: 14px;
-  font-size: 12px;
-  line-height: 16px;
-  font-variant-numeric: tabular-nums;
-}
-.v2-card-foot > span { display: flex; flex-direction: column; }
-.v2-card-foot em { font-style: normal; font-weight: 500; color: var(--t-ink3); }
-
-.v2-themes {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: 56px;
-  gap: 4px 12px;
-  min-width: 0;
-}
-.v2-minicard {
-  display: grid;
-  grid-template-columns: 56px minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  padding: 0 12px 0 8px;
-}
-.v2-minicard .v2-spark { width: 56px; height: 40px; }
-.v2-mini-txt { display: flex; flex-direction: column; min-width: 0; }
-.v2-mini-name {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 18px;
-}
-.v2-mini-name > span:first-child { flex-shrink: 0; }
-.v2-mini-name .v2-reason { flex-shrink: 1; min-width: 0; }
-
-/* 선 그래프 — 아래로 옅어지는 면 · 점선 기준선 · 끝점 후광(토스 지수 카드) */
-.v2-spark { position: relative; color: var(--t-ink4); }
-.v2-spark.is-up { color: var(--t-up); }
-.v2-spark.is-down { color: var(--t-down); }
-.v2-spark svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.v2-spark-line { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
-.v2-spark-base { stroke: var(--t-base); stroke-width: 1; stroke-dasharray: 2 3; }
-.v2-spark-dot {
-  position: absolute;
-  right: -4px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: currentColor;
-  transform: translateY(-50%);
-  box-shadow: 0 0 0 2px var(--t-panel);
-}
-.v2-spark-dot::after {
-  content: "";
-  position: absolute;
-  inset: -6px;
-  border-radius: 50%;
-  background: currentColor;
-  opacity: 0.18;
-  animation: v2-halo 2.4s ease-out infinite;
-}
-@keyframes v2-halo {
-  0% { transform: scale(0.6); opacity: 0.28; }
-  70% { transform: scale(1.25); opacity: 0; }
-  100% { transform: scale(1.25); opacity: 0; }
-}
-.v2-spark-empty { height: 40px; }
-
-/* 일정 카드 — 토스 '주요 일정'(2% 면 · r12 · 날짜 알약) */
-.v2-eventcard {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-  padding: 12px 16px;
-  border-radius: 12px;
-  background: var(--t-tint-weak);
-  box-shadow: inset 0 0 0 0.75px var(--t-line);
-}
-.v2-eventcard ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.v2-eventcard li { display: flex; align-items: center; gap: 10px; min-width: 0; height: 28px; }
-.v2-daypill {
-  flex-shrink: 0;
-  min-width: 52px;
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 999px;
-  background: var(--t-tint);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 22px;
-  text-align: center;
-  color: var(--t-ink2);
-  font-variant-numeric: tabular-nums;
-}
-/* '오늘' 알약은 일정 카드(2% 면) 위 파란 면이라 한 겹 더 어둡다 — 내림 파랑으로는 4.38 이라 이 자리만 한 단 내린다(4.67). */
-.v2-daypill.is-today { background: var(--t-down-weak); color: var(--t-down-deep); font-weight: 600; }
-.v2-event-txt {
-  min-width: 0;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--t-ink2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.v2-event-txt b { font-weight: 600; color: var(--t-ink); }
-
-/* ── 표 셋 + 읽기 칸 ── */
-.v2-board {
+/* ── 두 줄기 ── */
+.v2-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
   align-items: start;
-  gap: 16px;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--t-line);
+  gap: 12px;
 }
-.v2-tables { min-width: 0; }
-.v2-sec { min-width: 0; padding-bottom: 8px; }
-.v2-sec-head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 14px 12px 6px;
-}
-.v2-sec-head h2 { margin: 0; font-size: 14px; font-weight: 700; line-height: 20px; color: var(--t-ink); }
-.v2-sec-head span { font-size: 12px; font-weight: 500; color: var(--t-ink3); }
-.v2-empty { margin: 0; padding: 8px 12px 14px; font-weight: 500; color: var(--t-ink3); }
+.v2-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 
+/* 오늘의 요약 */
+.v2-brief { padding: 12px 16px 16px; font-size: 14px; font-weight: 500; line-height: 1.75; color: var(--t-ink2); word-break: keep-all; }
+.v2-brief p { margin: 0; }
+.v2-brief p + p { margin-top: 10px; }
+/* 굵힌 낱말은 highlightTerms 가 인라인으로 800 · 옛 잉크를 박는다 — 700 · 토큰 잉크로 덮는다. */
+.v2-brief b { color: var(--t-ink) !important; font-weight: 700 !important; }
+.v2-brief .hz-kd-termlink { color: var(--t-ink); font-weight: 700; text-decoration-color: var(--t-ink3); }
+.v2-brief .hz-kd-termlink:hover { color: var(--t-down); text-decoration-color: var(--t-down); }
+
+/* ── 신호 표 ── 행마다 가는 선, 머리 줄은 옅은 면 */
 .v2-tbl ol { list-style: none; margin: 0; padding: 0; }
 .v2-tr {
   display: grid;
-  /* 종목 칸을 176 으로 못박는다 — fr 로 두면 표마다 남는 폭이 달라 등락률 칸이 1px 씩 어긋났다. */
-  grid-template-columns: 20px 176px 68px 64px 56px 52px minmax(0, 1fr);
+  /* 종목 칸을 168 로 못박는다 — fr 로 두면 표마다 남는 폭이 달라 등락률 칸이 1px 씩 어긋났다. */
+  grid-template-columns: 20px 168px 68px 64px 56px 48px minmax(0, 1fr);
   align-items: center;
   column-gap: 12px;
-  min-height: 44px;
-  padding: 0 12px;
-  border-radius: 8px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--t-line);
   color: var(--t-ink);
   text-decoration: none;
-  transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.15s;
 }
-.v2-tbl.is-move .v2-tr { grid-template-columns: 20px 176px 68px 84px minmax(0, 1fr); }
-a.v2-tr:hover,
-a.v2-tr.is-on { background: var(--t-tint); }
-.v2-th { min-height: 32px; color: var(--t-ink3); }
+.v2-tbl li:last-child .v2-tr { border-bottom: 0; }
+.v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px 68px 84px minmax(0, 1fr); }
+a.v2-tr:hover { background: var(--t-tint); }
+.v2-th {
+  min-height: 30px;
+  background: var(--t-head);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--t-ink3);
+}
 .v2-th > :nth-child(n + 3) { text-align: right; }
 .v2-tbl:not(.is-move) .v2-th > :nth-child(6) { text-align: center; }
-.v2-th > :last-child { text-align: left; }
-.v2-td-rank { text-align: center; font-variant-numeric: tabular-nums; }
+.v2-th > :last-child { display: inline-flex; align-items: center; gap: 3px; text-align: left; }
+.v2-td-rank { text-align: center; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
 .v2-td-stock { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .v2-td-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .v2-badge {
   flex-shrink: 0;
   height: 18px;
   padding: 0 5px;
-  border-radius: 5px;
+  border-radius: 4px;
   background: var(--t-down-weak);
   font-size: 11px;
   font-weight: 600;
   line-height: 18px;
-  color: var(--t-down);
+  color: var(--t-down-deep);
 }
 .v2-td-num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .v2-td-num.is-hot,
@@ -343,23 +241,133 @@ a.v2-tr.is-on { background: var(--t-tint); }
 
 /* 7일 언급 막대 — 배수에 들어간 칸만 색, 가장 높은 칸이 가장 진하다 */
 .v2-bars { display: flex; align-items: flex-end; gap: 2px; width: 44px; height: 18px; }
-.v2-bars i { flex: 1; border-radius: 1.5px 1.5px 0.5px 0.5px; background: color-mix(in srgb, var(--t-up) 40%, transparent); }
+.v2-bars i { flex: 1; border-radius: 1px 1px 0 0; background: color-mix(in srgb, var(--t-up) 40%, transparent); }
 .v2-bars.is-cold i { background: color-mix(in srgb, var(--t-down) 38%, transparent); }
 .v2-bars i.is-off { background: var(--t-bar-off); }
 .v2-bars i.is-peak { background: var(--t-up); }
 .v2-bars.is-cold i.is-peak { background: var(--t-down); }
-.v2-bars.is-big { width: 100%; height: 56px; gap: 3px; }
 
-/* 화제어 칩 */
-.v2-chips { list-style: none; margin: 0; padding: 2px 12px 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+/* 로고 — 원형. 로고가 없는 종목의 글자 배지는 회색 한 가지. */
+.v2-kd .hz-stock-logo,
+.v2-kd .hz-stock-badge { border-radius: 50%; mask-image: none; }
+.v2-kd .v2-td-stock .hz-stock-badge { background: var(--t-tint); color: var(--t-ink3); }
+
+/* ── 여론 낙관도 — 50 위아래로 갈리는 막대 ── */
+.v2-mood { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px 14px; }
+.v2-mood-now { display: flex; align-items: baseline; gap: 8px; }
+.v2-mood-now b { font-size: 24px; font-weight: 700; line-height: 30px; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.v2-mood-now b.is-up { color: var(--t-up); }
+.v2-mood-now b.is-down { color: var(--t-down); }
+.v2-tag {
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--t-tint);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  color: var(--t-ink2);
+}
+.v2-diverge {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  height: 72px;
+}
+/* 가운데 선 = 50 */
+.v2-diverge::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: 1px dashed var(--t-frame);
+}
+/* 막대 한 칸 = 위 반(낙관)과 아래 반(비관). 막대 높이(%)는 반 칸 기준 — 50 에서 가장 멀리 간 날이 반 칸을 다 채운다. */
+.v2-dv { flex: 1; display: grid; grid-template-rows: 1fr 1fr; min-width: 0; }
+.v2-dv i { display: block; width: 100%; min-height: 0; }
+.v2-dv-up { align-self: end; border-radius: 1px 1px 0 0; background: color-mix(in srgb, var(--t-up) 50%, transparent); }
+.v2-dv-down { align-self: start; border-radius: 0 0 1px 1px; background: color-mix(in srgb, var(--t-down) 50%, transparent); }
+.v2-dv.is-last .v2-dv-up { background: var(--t-up); }
+.v2-dv.is-last .v2-dv-down { background: var(--t-down); }
+.v2-mood-foot {
+  display: flex;
+  gap: 16px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.v2-mood-foot div { display: flex; gap: 4px; }
+.v2-mood-foot dt { font-weight: 500; color: var(--t-ink3); }
+.v2-mood-foot dd { margin: 0; font-weight: 600; }
+
+/* ── 테마 히트맵 ── 줄 = 테마, 칸 = 날, 진하기 = 점유율 */
+.v2-heat { padding: 6px 0 8px; }
+.v2-heat ol { list-style: none; margin: 0; padding: 0; }
+.v2-heat-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 44px 32px;
+  align-items: center;
+  column-gap: 8px;
+  min-height: 28px;
+  padding: 0 14px;
+  color: var(--t-ink);
+  text-decoration: none;
+  transition: background-color 0.15s;
+}
+a.v2-heat-row:hover { background: var(--t-tint); }
+.v2-heat-name { min-width: 0; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2-heat-cells { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; height: 16px; }
+.v2-heat-cells i { border-radius: 2px; background: var(--t-heat); }
+.v2-heat-cells i.is-none { background: var(--t-bar-off); }
+.v2-heat-share,
+.v2-heat-delta { text-align: right; font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.v2-heat-delta { font-weight: 500; color: var(--t-ink3); }
+.v2-heat-delta.is-up { color: var(--t-up); font-weight: 600; }
+.v2-heat-delta.is-down { color: var(--t-down); font-weight: 600; }
+.v2-heat-axis {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 84px;
+  column-gap: 8px;
+  padding: 4px 14px 0;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+  color: var(--t-ink3);
+}
+.v2-heat-axis > :first-child { grid-column: 2; grid-row: 1; justify-self: start; }
+.v2-heat-axis > :nth-child(2) { grid-column: 2; grid-row: 1; justify-self: end; }
+.v2-heat-axis-r { grid-column: 3; grid-row: 1; text-align: right; }
+
+/* ── 다가오는 일정 ── */
+.v2-events { list-style: none; margin: 0; padding: 0; }
+.v2-events li {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--t-line);
+}
+.v2-events li:last-child { border-bottom: 0; }
+.v2-ev-day { font-size: 12px; font-weight: 600; color: var(--t-ink2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.v2-ev-day.is-today { color: var(--t-down-deep); }
+.v2-ev-txt { min-width: 0; font-weight: 500; color: var(--t-ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2-ev-txt b { font-weight: 600; color: var(--t-ink); }
+.v2-ev-src { font-size: 12px; font-weight: 500; color: var(--t-ink3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* ── 화제어 칩 ── */
+.v2-chips { list-style: none; margin: 0; padding: 12px 14px 14px; display: flex; flex-wrap: wrap; gap: 6px; }
 .v2-chip {
   display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 30px;
-  padding: 0 10px;
-  border-radius: 8px;
-  background: var(--t-tint);
+  align-items: baseline;
+  gap: 5px;
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--t-line);
+  border-radius: 4px;
+  line-height: 26px;
   font-variant-numeric: tabular-nums;
 }
 .v2-chip b { font-weight: 600; }
@@ -367,124 +375,39 @@ a.v2-tr.is-on { background: var(--t-tint); }
 .v2-chip span.is-up { color: var(--t-up); font-weight: 600; }
 .v2-chip span.is-down { color: var(--t-down); font-weight: 600; }
 
-/* 로고 — 토스처럼 원형. 로고가 없는 종목의 글자 배지는 회색 한 가지. */
-.v2-kd .hz-stock-logo,
-.v2-kd .hz-stock-badge { border-radius: 50%; mask-image: none; }
-.v2-kd .v2-td-stock .hz-stock-badge,
-.v2-kd .v2-ps-head .hz-stock-badge { background: var(--t-tint); color: var(--t-ink3); }
-
-/* 읽기 칸 — 평소엔 오늘의 요약, 줄에 마우스를 올리면 그 종목 */
-.v2-pane {
-  position: sticky;
-  top: 12px;
-  max-height: calc(100vh - 120px);
-  overflow-y: auto;
-  scrollbar-width: thin;
-  padding: 16px 18px 18px;
-  border-radius: 12px;
-  background: var(--t-card);
-  box-shadow: 0 0 0 1px var(--t-edge), 0 4px 16px var(--t-tint-weak);
-}
-.v2-pane[data-mode="stock"] .v2-pane-sum { display: none; }
-.v2-sum-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
-.v2-sum-head b { font-size: 14px; font-weight: 700; }
-.v2-ai-badge {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--t-ink3);
-  white-space: nowrap;
-}
-.v2-sum-body { font-size: 14px; font-weight: 500; line-height: 1.75; color: var(--t-ink2); word-break: keep-all; }
-.v2-sum-body p { margin: 0; }
-.v2-sum-body p + p { margin-top: 10px; }
-/* 굵힌 낱말은 highlightTerms 가 인라인으로 800 · 옛 잉크를 박는다 — 토스 최대 굵기 700 · 토큰 잉크로 덮는다. */
-.v2-sum-body b { color: var(--t-ink) !important; font-weight: 700 !important; }
-.v2-sum-body .hz-kd-termlink { color: var(--t-ink); font-weight: 700; text-decoration-color: var(--t-ink3); }
-.v2-sum-body .hz-kd-termlink:hover { color: var(--t-down); text-decoration-color: var(--t-down); }
-.v2-sum-hint {
-  margin: 14px 0 0;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: var(--t-tint-weak);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 18px;
-  color: var(--t-ink3);
-}
-
-.v2-pane-stock { display: flex; flex-direction: column; gap: 14px; }
-.v2-ps-head { display: flex; align-items: center; gap: 10px; }
-.v2-ps-id { display: flex; flex-direction: column; min-width: 0; }
-.v2-ps-id b { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.v2-ps-id span { font-size: 12px; font-weight: 500; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
-.v2-ps-quote { display: flex; align-items: baseline; gap: 8px; font-variant-numeric: tabular-nums; }
-.v2-ps-quote b { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
-.v2-ps-chg { font-size: 13px; font-weight: 600; color: var(--t-ink3); }
-.v2-ps-chg.is-up { color: var(--t-up); }
-.v2-ps-chg.is-down { color: var(--t-down); }
-.v2-ps-facts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px 16px;
-  margin: 0;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--t-tint-weak);
-  box-shadow: inset 0 0 0 0.75px var(--t-line);
-}
-.v2-ps-facts > div { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; line-height: 18px; }
-.v2-ps-facts dt { font-weight: 500; color: var(--t-ink3); }
-.v2-ps-facts dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
-.v2-ps-facts dd.is-hot { color: var(--t-up); }
-.v2-ps-cap { display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; }
-.v2-ps-note p { margin: 4px 0 0; font-size: 14px; font-weight: 500; line-height: 1.6; color: var(--t-ink); word-break: keep-all; }
-.v2-ps-note p.v2-muted { color: var(--t-ink3); }
-.v2-ps-chart { display: flex; flex-direction: column; gap: 6px; }
-.v2-ps-chart .v2-ps-cap { font-weight: 600; color: var(--t-ink3); font-size: 12px; }
-.v2-ps-axis { display: flex; justify-content: space-between; font-size: 11px; font-weight: 500; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
-.v2-ps-links { display: flex; gap: 8px; }
-.v2-ps-links a {
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1px;
-  height: 36px;
-  border-radius: 8px;
-  background: var(--t-tint);
-  color: var(--t-ink);
-  text-decoration: none;
-  transition: background-color 0.2s;
-}
-.v2-ps-links a:hover { background: var(--t-press); }
-.v2-ps-links .ms { font-size: 16px; }
-
 /* ── 폭에 따라 ─────────────────────────────────────────────────────────────
-   판 1,100 이상: 오른쪽 칸 340.
-   판 900~1,099(창 1,280~1,366 노트북이 여기다): 오른쪽 칸을 300 으로 줄이고 표의 7일 막대 칸만 뺀다 — 읽기 칸이 표 옆에
-     남아야 호버로 종목을 볼 수 있다. 토스도 1,024 에서 표와 종목 정보를 나란히 둔다(해부 노트 12절).
-   판 900 미만: 읽기 칸이 표 위로 올라가 늘 요약이고, 표 줄은 둘째 줄에 문장을 단다(호버가 없는 폰에서도 다 읽힌다). */
+   판 1,100 이상: 오른쪽 줄기 340.
+   1,000~1,099(1,280~1,366 노트북): 오른쪽 줄기 300 · 표의 7일 막대 칸을 뺀다.
+   1,000 미만: 한 줄기. 오른쪽 모듈은 표 아래로 내려가 두 칸 격자.
+   680 미만: 표 줄이 두 층(종목 · 값 · 등락 / 문장 2줄), 오른쪽 모듈 한 칸. */
 @container kd (max-width: 1099px) {
-  .v2-band { grid-template-columns: 216px minmax(0, 1fr) 300px; }
-  .v2-board { grid-template-columns: minmax(0, 1fr) 300px; }
-  .v2-tr { grid-template-columns: 20px 168px 68px 64px 56px minmax(0, 1fr); }
-  .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px 68px 84px minmax(0, 1fr); }
+  .v2-grid { grid-template-columns: minmax(0, 1fr) 300px; }
+  .v2-tr { grid-template-columns: 20px 160px 68px 64px 56px minmax(0, 1fr); }
+  .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 160px 68px 84px minmax(0, 1fr); }
   .v2-td-bars,
   .v2-tbl:not(.is-move) .v2-th > :nth-child(6) { display: none; }
-  .v2-pane { padding: 14px 16px 16px; }
 }
-@container kd (max-width: 899px) {
-  .v2-band { grid-template-columns: 216px minmax(0, 1fr); }
-  .v2-eventcard { grid-column: 1 / -1; }
-  .v2-board { grid-template-columns: minmax(0, 1fr); }
-  .v2-pane { order: -1; position: static; max-height: none; }
-  .v2-pane .v2-pane-stock { display: none; }
-  .v2-pane .v2-pane-sum { display: block !important; }
-  .v2-sum-hint { display: none; }
+@container kd (max-width: 999px) {
+  .v2-grid { grid-template-columns: minmax(0, 1fr); }
+  .v2-rail { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .v2-tr { grid-template-columns: 20px 168px 68px 64px 56px 48px minmax(0, 1fr); }
+  .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px 68px 84px minmax(0, 1fr); }
+  .v2-td-bars { display: flex; }
+  .v2-tbl:not(.is-move) .v2-th > :nth-child(6) { display: block; }
+  .v2-cover-cell { flex: 1 1 auto; }
+}
+@container kd (max-width: 799px) {
+  .v2-td-bars,
+  .v2-tbl:not(.is-move) .v2-th > :nth-child(6) { display: none; }
+  .v2-tr { grid-template-columns: 20px 150px 68px 64px 56px minmax(0, 1fr); }
+  .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 150px 68px 84px minmax(0, 1fr); }
+}
+@container kd (max-width: 679px) {
+  .v2-rail { grid-template-columns: minmax(0, 1fr); }
+  .v2-cover-cell { flex: 1 1 40%; padding: 8px 12px; border-bottom: 1px solid var(--t-line); }
+  /* 두 칸씩 접히면 오른쪽 칸의 세로선이 모듈 테두리와 겹친다. */
+  .v2-cover-cell:nth-child(2n) { border-right: 0; }
+  .v2-cover-link { margin: 6px 8px; }
   .v2-th { display: none; }
   .v2-tr,
   .v2-tbl.is-move .v2-tr {
@@ -510,20 +433,10 @@ a.v2-tr.is-on { background: var(--t-tint); }
     line-height: 19px;
     word-break: keep-all;
   }
-}
-@container kd (max-width: 679px) {
-  .v2-panel { padding: 6px; }
-  .v2-band { grid-template-columns: minmax(0, 1fr); gap: 10px; }
-  .v2-bigcard .v2-spark { height: 64px; }
-  .v2-themes { grid-auto-rows: 52px; gap: 2px 8px; }
-  .v2-minicard { grid-template-columns: 36px minmax(0, 1fr); gap: 8px; padding: 0 6px; }
-  .v2-minicard .v2-spark { width: 36px; height: 28px; }
-  .v2-mini-name .v2-reason { display: none; }
-  .v2-status-link { margin-left: 0; }
-  .v2-pane { padding: 14px; }
+  .v2-brief { padding: 10px 14px 14px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .v2-spark-dot::after { animation: none; }
+  .v2-dot { animation: none; }
 }
 
 /* ── 화면 머리 ── v2 화면은 제목·부제를 화면에서 걷고(AppShell 의 V2_PAGES) 오른쪽 도구도 두지 않는다 — 머리가 높이 0 이 된다.
