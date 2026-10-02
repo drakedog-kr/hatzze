@@ -67,9 +67,17 @@ export function Lead({ children }: { children: React.ReactNode }) {
   return <div style={{ fontSize: "var(--fs-14)", lineHeight: 1.85, color: C.sub }}>{children}</div>;
 }
 
-export function Section({ title, children }: { title: string; children: React.ReactNode }) {
+/**
+ * 이용약관 끝의 '데이터 출처'. 푸터의 출처 문장이 여기로 건너온다(app/Footer.tsx).
+ * ⚠️ 주소의 앵커는 영문이어야 한다(한글 주소 금지 규칙).
+ */
+export const SOURCES_ID = "sources";
+export const SOURCES_HREF = `/terms#${SOURCES_ID}`;
+
+export function Section({ title, id, children }: { title: string; id?: string; children: React.ReactNode }) {
   return (
-    <section style={{ marginTop: 36 }}>
+    // scroll-margin — 푸터에서 앵커로 뛰어오면 제목이 화면 맨 위에 딱 붙지 않게 한 줄 띄운다.
+    <section id={id} style={{ marginTop: 36, scrollMarginTop: 16 }}>
       <h2 style={{ margin: "0 0 12px", fontSize: "var(--fs-17)", fontWeight: 700, color: C.ink, letterSpacing: "-0.01em" }}>
         {title}
       </h2>
