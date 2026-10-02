@@ -28,6 +28,7 @@
   --t-head: rgba(15, 23, 42, 0.025);
   --t-tint: rgba(7, 25, 76, 0.04);
   --t-bar-off: rgba(7, 25, 76, 0.08);
+  --t-base: rgba(2, 32, 59, 0.17);
   container: kd / inline-size;
   display: flex;
   flex-direction: column;
@@ -54,6 +55,7 @@
   --t-head: rgba(255, 255, 255, 0.025);
   --t-tint: rgba(214, 224, 239, 0.07);
   --t-bar-off: rgba(214, 224, 239, 0.12);
+  --t-base: rgba(212, 223, 248, 0.19);
 }
 .v2-muted,
 .v2-empty { margin: 0; color: var(--t-ink3); font-weight: 500; }
@@ -271,109 +273,137 @@ a.v2-tr:hover { background: var(--t-tint); }
 .v2-kd .hz-stock-badge { border-radius: 50%; mask-image: none; }
 .v2-kd .v2-td-stock .hz-stock-badge { background: var(--t-tint); color: var(--t-ink3); }
 
-/* ── 여론 낙관도 — 50 위아래로 갈리는 막대 ── */
-.v2-mood { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px 14px; }
-/* 낙관 · 비관 두 몫 — 앞선 쪽(is-lead)이 큰 숫자다. 뜻은 아래 갈림 막대가 맡는다(문장으로 달지 않는다). */
-.v2-mood-now { display: flex; justify-content: space-between; align-items: baseline; }
-.v2-mood-side { display: inline-flex; align-items: baseline; gap: 4px; font-size: 12px; font-weight: 600; color: var(--t-ink2); }
-.v2-mood-side b { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.v2-mood-side.is-lead b { font-size: 24px; line-height: 30px; letter-spacing: -0.01em; }
-.v2-mood-side.is-up b { color: var(--t-up); }
-.v2-mood-side.is-down b { color: var(--t-down); }
-.v2-split { display: flex; gap: 2px; height: 6px; }
-.v2-split i { border-radius: 3px; }
-.v2-split i.is-up { background: var(--t-up); }
-.v2-split i.is-down { background: var(--t-down); }
-.v2-tag {
-  height: 20px;
-  padding: 0 6px;
-  border-radius: 4px;
-  background: var(--t-tint);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 20px;
-  color: var(--t-ink2);
-}
-/* 30일 추이 — 왼쪽 축(낙관 · 비관) + 막대 + 아래 축(30일 전 · 최고·최저 · 오늘). */
-.v2-trend {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  grid-template-rows: 64px auto;
-  column-gap: 8px;
-  row-gap: 4px;
-  margin-top: 6px;
-}
-.v2-trend-y,
-.v2-trend-x { font-size: 11px; font-weight: 500; line-height: 14px; color: var(--t-ink3); white-space: nowrap; }
-.v2-trend-y { display: flex; flex-direction: column; justify-content: space-between; }
-.v2-trend-x { grid-column: 2; display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
-.v2-diverge {
-  position: relative;
-  display: flex;
-  gap: 2px;
-  height: 100%;
-}
-/* 가운데 선 = 50 */
-.v2-diverge::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  border-top: 1px dashed var(--t-frame);
-}
-/* 막대 한 칸 = 위 반(낙관)과 아래 반(비관). 막대 높이(%)는 반 칸 기준 — 50 에서 가장 멀리 간 날이 반 칸을 다 채운다. */
-.v2-dv { flex: 1; display: grid; grid-template-rows: 1fr 1fr; min-width: 0; }
-.v2-dv i { display: block; width: 100%; min-height: 0; }
-.v2-dv-up { align-self: end; border-radius: 1px 1px 0 0; background: color-mix(in srgb, var(--t-up) 50%, transparent); }
-.v2-dv-down { align-self: start; border-radius: 0 0 1px 1px; background: color-mix(in srgb, var(--t-down) 50%, transparent); }
-.v2-dv.is-last .v2-dv-up { background: var(--t-up); }
-.v2-dv.is-last .v2-dv-down { background: var(--t-down); }
-/* ── 테마 점유율 ── 이름 · 막대 · 점유율 · 변화 */
-.v2-share { list-style: none; margin: 0; padding: 6px 0; }
-.v2-share-row {
-  display: grid;
-  grid-template-columns: 76px minmax(0, 1fr) 44px 52px;
-  align-items: center;
-  column-gap: 10px;
-  min-height: 30px;
-  padding: 0 14px;
+/* ── 오른쪽 줄기의 세 모듈 — 2차(토스 지적 전)의 카드 꼴을 되살렸다(2026-10-02 요청 "낙관도나 그런 거는 그 전 버전처럼").
+   여론 큰 카드 · 테마 작은 카드 · 일정 날짜 알약. 그사이 시험한 50 위아래 막대 · 갈림 막대 · 테마 히트맵 · 막대 목록은 걷었다. */
+.v2-bigcard,
+.v2-minicard {
   color: var(--t-ink);
   text-decoration: none;
-  transition: background-color 0.15s;
+  transition: background-color 0.2s;
 }
-a.v2-share-row:hover { background: var(--t-tint); }
-.v2-share-name { min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.v2-share-bar { height: 6px; border-radius: 3px; background: var(--t-bar-off); overflow: hidden; }
-.v2-share-bar i { display: block; height: 100%; border-radius: 3px; background: var(--t-heat); }
-.v2-share-pct,
-.v2-share-delta { text-align: right; font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.v2-share-delta { font-weight: 500; color: var(--t-ink3); }
-.v2-share-delta.is-up { color: var(--t-up); font-weight: 600; }
-.v2-share-delta.is-down { color: var(--t-down); font-weight: 600; }
+.v2-bigcard { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 12px 14px 14px; }
+.v2-reason {
+  flex-shrink: 0;
+  max-width: 100%;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--t-tint);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+  color: var(--t-ink2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.v2-card-val { display: flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
+.v2-card-val b { font-size: 14px; font-weight: 600; }
+/* 여론 값은 모듈 머리가 이름을 들고 있어 한 단 키운다(카드 시절엔 이름 줄 밑의 14px 이었다). */
+.v2-card-val.is-big { align-items: center; }
+.v2-card-val.is-big b { font-size: 20px; font-weight: 700; line-height: 28px; letter-spacing: -0.01em; }
+.v2-card-val b.is-up { color: var(--t-up); }
+.v2-card-val b.is-down { color: var(--t-down); }
+.v2-delta { font-size: 12px; line-height: 16px; color: var(--t-ink3); }
+.v2-delta.is-up { color: var(--t-up); }
+.v2-delta.is-down { color: var(--t-down); }
+.v2-bigcard .v2-spark { height: 80px; margin: 8px 0 6px; }
+.v2-card-foot {
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.v2-card-foot > span { display: flex; flex-direction: column; }
+.v2-card-foot em { font-style: normal; font-weight: 500; color: var(--t-ink3); }
 
-/* ── 다가오는 일정 ── */
-.v2-events { list-style: none; margin: 0; padding: 0; }
-.v2-events li { border-bottom: 1px solid var(--t-line); }
-.v2-events li:last-child { border-bottom: 0; }
-.v2-ev-row {
+/* 테마 작은 카드 — 한 줄에 하나(오른쪽 줄기 폭이라). 미니 선 56 · 이름 + 대장 꼬리표 · 점유율 + 변화 */
+.v2-themes { display: grid; grid-auto-rows: 56px; gap: 2px; padding: 6px; }
+.v2-minicard {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
+  grid-template-columns: 56px minmax(0, 1fr);
   align-items: center;
-  column-gap: 10px;
-  min-height: 38px;
-  padding: 6px 14px;
+  gap: 12px;
+  min-width: 0;
+  padding: 0 10px 0 8px;
+  border-radius: 6px;
+}
+a.v2-minicard:hover { background: var(--t-tint); }
+.v2-minicard .v2-spark { width: 56px; height: 40px; }
+.v2-mini-txt { display: flex; flex-direction: column; min-width: 0; }
+.v2-mini-name { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; font-weight: 500; line-height: 18px; }
+.v2-mini-name > span:first-child { flex-shrink: 0; }
+.v2-mini-name .v2-reason { flex-shrink: 1; min-width: 0; }
+
+/* 선 그래프 — 아래로 옅어지는 면 · 점선 기준선 · 끝점 후광 */
+.v2-spark { position: relative; color: var(--t-ink4); }
+.v2-spark.is-up { color: var(--t-up); }
+.v2-spark.is-down { color: var(--t-down); }
+.v2-spark svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.v2-spark-line { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+.v2-spark-base { stroke: var(--t-base); stroke-width: 1; stroke-dasharray: 2 3; }
+.v2-spark-dot {
+  position: absolute;
+  right: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  transform: translateY(-50%);
+  box-shadow: 0 0 0 2px var(--t-card);
+}
+.v2-spark-dot::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.18;
+  animation: v2-halo 2.4s ease-out infinite;
+}
+@keyframes v2-halo {
+  0% { transform: scale(0.6); opacity: 0.28; }
+  70% { transform: scale(1.25); opacity: 0; }
+  100% { transform: scale(1.25); opacity: 0; }
+}
+.v2-spark-empty { height: 40px; }
+
+/* ── 다가오는 일정 — 날짜 알약 ── */
+.v2-events { list-style: none; margin: 0; padding: 8px 6px 10px; display: flex; flex-direction: column; gap: 2px; }
+.v2-ev-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  padding: 4px 8px;
+  border-radius: 6px;
   color: var(--t-ink);
   text-decoration: none;
   transition: background-color 0.15s;
 }
 a.v2-ev-row:hover { background: var(--t-tint); }
-.v2-ev-day { font-size: 12px; font-weight: 600; color: var(--t-ink2); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.v2-ev-day.is-today { color: var(--t-down-deep); }
-.v2-ev-txt {
+.v2-daypill {
+  flex-shrink: 0;
+  min-width: 56px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--t-tint);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 22px;
+  text-align: center;
+  color: var(--t-ink2);
+  font-variant-numeric: tabular-nums;
+}
+/* '오늘' 알약은 파란 면 위 파란 글자라 한 단 짙게(--t-down-deep). */
+.v2-daypill.is-today { background: var(--t-down-weak); color: var(--t-down-deep); font-weight: 600; }
+/* 일정 글은 두 줄까지 — 한 줄로 자르면 긴 일정이 잘렸다. 알약(22px)과 첫 줄 가운데를 맞추려 줄 높이도 22. */
+.v2-event-txt {
   min-width: 0;
   font-weight: 500;
-  line-height: 18px;
+  line-height: 22px;
   color: var(--t-ink2);
   word-break: keep-all;
   display: -webkit-box;
@@ -381,8 +411,7 @@ a.v2-ev-row:hover { background: var(--t-tint); }
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.v2-ev-txt b { font-weight: 600; color: var(--t-ink); }
-.v2-ev-src { font-size: 12px; font-weight: 500; color: var(--t-ink3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.v2-event-txt b { font-weight: 600; color: var(--t-ink); }
 
 /* ── 화제어 칩 ── */
 .v2-chips { list-style: none; margin: 0; padding: 12px 14px 14px; display: flex; flex-wrap: wrap; gap: 6px; }
@@ -467,11 +496,11 @@ a.v2-ev-row:hover { background: var(--t-tint); }
   }
   .v2-brief { padding: 10px 14px 14px; }
   /* 열까지 싣는 건 넓은 화면에서 오른쪽 줄기를 왼쪽 끝까지 채우려는 것이다. 한 줄기인 폰에선 그만큼 길어지기만 해서 예전 수로 줄인다. */
-  .v2-events li:nth-child(n + 6),
-  .v2-share li:nth-child(n + 9) { display: none; }
+  .v2-events li:nth-child(n + 6) { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .v2-dot { animation: none; }
+  .v2-dot,
+  .v2-spark-dot::after { animation: none; }
 }
 
 /* ── 화면 머리 ── v2 화면은 제목·부제를 화면에서 걷고(AppShell 의 V2_PAGES) 오른쪽 도구도 두지 않는다 — 머리가 높이 0 이 된다.

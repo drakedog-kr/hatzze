@@ -25,7 +25,7 @@ import { THEME_NAMES, themeHref } from "@/lib/theme-href";
 import { THEMES } from "@/lib/stock-themes";
 import { THEME_PUBLIC } from "../screen-flags";
 import { getMoveReasons, getUpcomingEvents, todayKst } from "@/lib/kadera-why";
-import { EventsModule, Module, SentimentModule, ThemeShare } from "./V2Modules";
+import { EventsModule, Module, SentimentModule, ThemeCards } from "./V2Modules";
 import { SignalTable } from "./KaderaBoard";
 import type { BoardRow, BoardSection } from "./KaderaBoard";
 
@@ -335,13 +335,13 @@ export default async function KaderaPage() {
         {/* 오른쪽 줄기 — 여론 · 테마 · 화제어 · 일정 */}
         <div className="v2-col v2-rail">
           {sentiment ? (
-            <SentimentModule score={sentiment.score} trend={sentiment.trend ?? []} days={sentiment.windowDays} />
+            <SentimentModule score={sentiment.score} label={sentiment.label} trend={sentiment.trend ?? []} days={sentiment.windowDays} />
           ) : (
             <Module id="mood" title="여론 낙관도">
               <p className="v2-empty">{sentimentFailed ? "감성 집계를 불러오지 못했습니다." : "아직 분석된 메시지가 없습니다."}</p>
             </Module>
           )}
-          <ThemeShare themes={themes} hrefOf={THEME_LINKS ? themeHref : null} />
+          <ThemeCards themes={themes} hrefOf={THEME_LINKS ? themeHref : null} />
           {keywordModule}
           {/* 맨 아래 — 왼쪽 줄기 끝까지 늘어나는 자리(v2.css .v2-grid). 목록이 가장 길게 늘 수 있는 모듈이라 여기 둔다. */}
           <EventsModule events={events} today={kaderaToday} failed={eventsFailed} />

@@ -49,66 +49,82 @@ export function Module({
   );
 }
 
+type Tone = "up" | "down" | "flat";
+
 /**
- * 여론 낙관도 — 50 을 가운데 선으로 두고 날마다 위(낙관)·아래(비관)로 뻗는 막대 30개.
- * 선 그래프 대신 막대인 것은 '50 을 넘었나'가 이 숫자의 뜻이라서다 — 위아래가 갈리면 그날 기울기가 한눈에 읽힌다.
- * 막대 길이는 30일 중 가장 멀리 간 날을 끝으로 잡는다(고정 ±50 이면 18~79 사이 움직임이 납작해진다).
- * ⚠️ 전날 대비를 달지 않는다 — 시장 글만 센 낙관도는 하루 표본이 얇아 +35%p 같은 흔들림이 큰 글씨로 뜬다(2차 때 걷었다).
+ * 선 그래프 — 아래로 옅어지는 면 · 기준선(점선) · 선 · 끝점 후광. 2차(토스 지수 카드 꼴)의 것을 그대로 되살렸다(2026-10-02 요청).
+ * 색은 tone 클래스가 currentColor 로 쥔다(오름 빨강 · 내림 파랑). 면의 그라데이션도 같은 색이라 한 덩어리로 읽힌다.
+ * 늘이는 그림이라(preserveAspectRatio none) 끝점은 svg 밖 span 이 그린다 — 안에서 그리면 타원으로 찌그러진다.
+ */
+function Spark({ id, values, base, w, h, tone, dot }: { id: string; values: number[]; base?: number; w: number; h: number; tone: Tone; dot?: boolean }) {
+  if (values.length < 2) return <div className="v2-spark-empty" />;
+  const all = base === undefined ? values : [...values, base];
+  const lo = Math.min(...all);
+  const hi = Math.max(...all);
+  const pad = (hi - lo) * 0.14 || 1;
+  const y = (v: number) => h - ((v - (lo - pad)) / (hi - lo + pad * 2)) * h;
+  const x = (i: number) => (i / (values.length - 1)) * w;
+  const pts = values.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`);
+  const line = `M${pts.join(" L")}`;
+  const area = `${line} L${w},${h} L0,${h} Z`;
+  const lastTop = (y(values[values.length - 1]) / h) * 100;
+  return (
+    <div className={`v2-spark is-${tone}`}>
+      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="currentColor" stopOpacity="0.2" />
+            <stop offset="1" stopColor="currentColor" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {base !== undefined && <line x1="0" x2={w} y1={y(base)} y2={y(base)} className="v2-spark-base" vectorEffect="non-scaling-stroke" />}
+        <path d={area} fill={`url(#${id})`} />
+        <path d={line} className="v2-spark-line" vectorEffect="non-scaling-stroke" />
+      </svg>
+      {dot && <span className="v2-spark-dot" style={{ top: `${lastTop}%` }} />}
+    </div>
+  );
+}
+
+/**
+ * 여론 낙관도 — 값 · 꼬리표 · 30일 선(50 이 점선) · 30일 최고/최저. 2차의 큰 카드를 모듈 안으로 옮긴 것이다(2026-10-02 요청:
+ * "낙관도나 그런 거는 토스 지적 전 버전처럼"). 그사이 시험한 50 위아래 막대 · 갈림 막대는 걷었다.
+ * ⚠️ 전날 대비를 달지 않는다 — 시장 글만 센 낙관도는 하루 표본이 얇아 +35%p 같은 흔들림이 큰 글씨로 뜬다.
  */
 export function SentimentModule({
   score,
+  label,
   trend,
   days,
 }: {
   score: number;
+  label: string;
   trend: SentimentPoint[];
-  /** 큰 숫자가 본 날수(보통 2). 막대는 30일이라 둘을 갈라 적어야 한다 — 머리에 '최근 30일'만 두었더니 76% 도 30일 값으로 읽혔다. */
+  /** 큰 숫자가 본 날수(보통 2). 선은 30일이라 머리 띠엔 큰 숫자의 기간을 적는다. */
   days: number;
 }) {
   const vals = trend.map((p) => p.score);
-  const far = Math.max(10, ...vals.map((v) => Math.abs(v - 50)));
+  const tone: Tone = score >= 50 ? "up" : "down";
+  const hi = vals.length ? Math.max(...vals) : score;
+  const lo = vals.length ? Math.min(...vals) : score;
   return (
     <Module id="mood" title="여론 낙관도" meta={`최근 ${days}일 시장 글`}>
-      <div className="v2-mood">
-        {/* ⛔ 뜻을 문장으로 달지 않는다(2026-10-02 "사족 없이"). 큰 숫자 밑 갈림 막대가 '낙관과 비관을 나눈 몫'이라는 뜻을 대신한다 —
-            중립 글은 두 쪽 어디에도 안 든다(lib/telegram-data.ts EcosystemSentiment.score). */}
-        <div className="v2-mood-now">
-          <span className={`v2-mood-side is-up${score >= 50 ? " is-lead" : ""}`}>
-            낙관 <b>{score}%</b>
+      <div className="v2-bigcard">
+        <span className="v2-card-val is-big">
+          <b className={`is-${tone}`}>{score}%</b>
+          <span className="v2-reason">{label}</span>
+        </span>
+        <Spark id="v2-mood-spark" values={vals} base={50} w={300} h={80} tone={tone} dot />
+        <span className="v2-card-foot">
+          <span>
+            <em>{vals.length}일 최고</em>
+            {hi}%
           </span>
-          <span className={`v2-mood-side is-down${score < 50 ? " is-lead" : ""}`}>
-            비관 <b>{100 - score}%</b>
+          <span>
+            <em>{vals.length}일 최저</em>
+            {lo}%
           </span>
-        </div>
-        <div className="v2-split" aria-hidden="true">
-          <i className="is-up" style={{ width: `${score}%` }} />
-          <i className="is-down" style={{ width: `${100 - score}%` }} />
-        </div>
-        {/* 30일 추이 — 읽는 법은 축 글자가 맡는다(왼쪽 낙관·비관, 아래 30일 전·오늘). */}
-        {vals.length > 1 && (
-          <div className="v2-trend" aria-hidden="true">
-            <span className="v2-trend-y">
-              <span>낙관</span>
-              <span>비관</span>
-            </span>
-            <span className="v2-diverge">
-              {vals.map((v, i) => {
-                const h = `${(Math.abs(v - 50) / far) * 100}%`;
-                const last = i === vals.length - 1;
-                return (
-                  <span key={i} className={`v2-dv${last ? " is-last" : ""}`}>
-                    <i className="v2-dv-up" style={{ height: v >= 50 ? h : 0 }} />
-                    <i className="v2-dv-down" style={{ height: v < 50 ? h : 0 }} />
-                  </span>
-                );
-              })}
-            </span>
-            <span className="v2-trend-x">
-              <span>{vals.length}일 전</span>
-              <span>오늘</span>
-            </span>
-          </div>
-        )}
+        </span>
       </div>
     </Module>
   );
@@ -117,47 +133,52 @@ export function SentimentModule({
 const sign = (v: number) => (v > 0 ? "+" : v < 0 ? "-" : "");
 
 /**
- * 테마 점유율 — 줄마다 이름 · 막대(점유율) · 점유율 · 변화. 2026-10-02 에 14일 히트맵(칸 14개 + 머리 줄 + 진하기 범례)에서
- * 줄였다 — "복잡하다". 추이는 변화(%p) 한 칸이 맡는다.
- * 막대 길이의 끝은 1위 테마다(점유율 100% 가 아니라) — 10% 안팎 테마들이 실낱이 되지 않게.
+ * 테마 — 작은 카드 목록. 미니 선(14일 점유율) · 이름 · 대장 종목 꼬리표 · 점유율 · 변화. 2차의 테마 카드를 그대로 되살렸다(2026-10-02 요청).
  * 점유율 = 최근 3일 평균(머리 띠의 '최근 3일'), 변화 = 5일 이상 전 평균과의 차이(lib/telegram-data.ts THEME_PRIOR_GAP_DAYS).
  */
-export function ThemeShare({ themes, hrefOf }: { themes: ThemeRotation[]; hrefOf: ((theme: string) => string) | null }) {
-  const rows = themes.slice(0, 10);
-  const top = Math.max(0.0001, ...rows.map((t) => t.sharePct));
+export function ThemeCards({ themes, hrefOf }: { themes: ThemeRotation[]; hrefOf: ((theme: string) => string) | null }) {
+  const rows = themes.slice(0, 6);
   return (
     <Module id="themes" title="테마 점유율" meta="최근 3일">
       {rows.length === 0 ? (
         <p className="v2-empty">아직 집계된 테마가 없습니다.</p>
       ) : (
-        <ol className="v2-share">
-          {rows.map((t) => {
+        <div className="v2-themes">
+          {rows.map((t, i) => {
             const d = t.shareDelta;
+            const tone: Tone = d === null || d === 0 ? "flat" : d > 0 ? "up" : "down";
+            const lead = t.stocks[0]?.name;
             const body = (
               <>
-                <span className="v2-share-name">{t.theme}</span>
-                <span className="v2-share-bar" aria-hidden="true">
-                  <i style={{ width: `${(t.sharePct / top) * 100}%` }} />
-                </span>
-                <span className="v2-share-pct">{t.sharePct.toFixed(1)}%</span>
-                <span className={`v2-share-delta${d === null || d === 0 ? "" : d > 0 ? " is-up" : " is-down"}`}>
-                  {d === null || d === 0 ? "-" : `${sign(d)}${Math.abs(d).toFixed(1)}%p`}
+                <Spark id={`v2-theme-spark-${i}`} values={t.series} w={56} h={40} tone={tone} />
+                <span className="v2-mini-txt">
+                  <span className="v2-mini-name">
+                    <span>{t.theme}</span>
+                    {lead && <span className="v2-reason">대장 {lead}</span>}
+                  </span>
+                  <span className="v2-card-val">
+                    <b>{t.sharePct.toFixed(1)}%</b>
+                    {d !== null && d !== 0 && (
+                      <span className={`v2-delta is-${tone}`}>
+                        {sign(d)}
+                        {Math.abs(d).toFixed(1)}%p
+                      </span>
+                    )}
+                  </span>
                 </span>
               </>
             );
-            return (
-              <li key={t.theme}>
-                {hrefOf ? (
-                  <Link href={hrefOf(t.theme)} className="v2-share-row">
-                    {body}
-                  </Link>
-                ) : (
-                  <div className="v2-share-row">{body}</div>
-                )}
-              </li>
+            return hrefOf ? (
+              <Link key={t.theme} href={hrefOf(t.theme)} className="v2-minicard">
+                {body}
+              </Link>
+            ) : (
+              <div key={t.theme} className="v2-minicard">
+                {body}
+              </div>
             );
           })}
-        </ol>
+        </div>
       )}
     </Module>
   );
@@ -165,19 +186,20 @@ export function ThemeShare({ themes, hrefOf }: { themes: ThemeRotation[]; hrefOf
 
 const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
 
-function dayLabel(date: string, today: string): string {
+/** '오늘 · 내일 · 10/5(월)' 알약 글자. */
+function dayPill(date: string, today: string): string {
   if (date === today) return "오늘";
   const diff = Math.round((Date.parse(`${date}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
   if (diff === 1) return "내일";
   const [, m, d] = date.split("-").map(Number);
-  return `${m}/${d} ${WEEKDAY[new Date(`${date}T12:00:00+09:00`).getUTCDay()]}`;
+  return `${m}/${d}(${WEEKDAY[new Date(`${date}T12:00:00+09:00`).getUTCDay()]})`;
 }
 
 /**
- * 다가오는 일정 — 채널 글이 날짜를 짚은 일정, 가까운 열넷까지. 오른쪽 줄기 맨 아래라 왼쪽 줄기 길이를 메우는 자리다 —
- * 표 문장이 세 줄까지 감싸게 되면서(2026-10-02) 왼쪽이 길어져 일곱이면 334px 가 비었다. 몇 채널이 짚었는지를 근거로 단다.
- * 오른쪽 줄기의 맨 아래 모듈이라 왼쪽 줄기 끝까지 늘어난다(v2.css) — 남는 자리는 목록 아래 빈다.
- * ⛔ '채널 글에서 뽑은 날짜라 공시와 다를 수 있다' 같은 각주를 달지 않는다(2026-10-02 "사족 없이") — 머리 띠의 '채널이 짚은 날짜'가 그 말이다.
+ * 다가오는 일정 — 날짜 알약 + 일정. 2차의 일정 카드 꼴을 되살렸다(2026-10-02 요청).
+ * 오른쪽 줄기 맨 아래라 왼쪽 줄기 끝까지 늘어나는 자리다(v2.css) — 가까운 열넷까지 싣고, 남는 자리는 목록 아래 빈다.
+ * ⛔ '채널 글에서 뽑은 날짜라 공시와 다를 수 있다' 같은 각주를 달지 않는다(사족) — 머리 띠의 '채널이 짚은 날짜'가 그 말이다.
+ * 국내 종목 줄은 그 종목 화면으로 간다(표의 줄과 같은 동작). 미장 티커는 아직 실주소가 없어 글자로 둔다.
  */
 export function EventsModule({ events, today, failed }: { events: UpcomingEvent[]; today: string; failed: boolean }) {
   const next = events
@@ -195,14 +217,12 @@ export function EventsModule({ events, today, failed }: { events: UpcomingEvent[
           {next.map((e) => {
             const body = (
               <>
-                <span className={`v2-ev-day${e.date === today ? " is-today" : ""}`}>{dayLabel(e.date, today)}</span>
-                <span className="v2-ev-txt">
+                <span className={`v2-daypill${e.date === today ? " is-today" : ""}`}>{dayPill(e.date, today)}</span>
+                <span className="v2-event-txt">
                   <b>{e.name}</b> {e.event}
                 </span>
-                <span className="v2-ev-src">채널 {e.channels}곳</span>
               </>
             );
-            // 국내 종목은 그 종목 화면으로 — 표의 줄과 같은 동작이다. 미장 티커는 아직 실주소가 없어 글자로 둔다.
             const kr = e.market === "KOSPI" || e.market === "KOSDAQ";
             return (
               <li key={`${e.code}-${e.date}-${e.event}`}>
