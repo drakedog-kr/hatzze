@@ -214,7 +214,7 @@ export default async function KaderaPage() {
     {
       id: "surging",
       title: "급부상 종목",
-      meta: `최근 ${surgeDays}일 언급이 평소보다 크게 는 종목`,
+      meta: `최근 ${surgeDays}일 · 평소 대비`,
       kind: "surge",
       heads: ["", "종목", "지금 등락", "평소 대비", `${surgeDays}일 언급`, "왜 뜨나"],
       key0: "평소의",
@@ -226,7 +226,7 @@ export default async function KaderaPage() {
       id: "why",
       // '오늘'이라 적으면 안 된다 — 아침에 보면 어제 장 마감의 일이다. 날은 근거 자리에 적는다.
       title: "크게 움직인 종목",
-      meta: why ? `${fmtKoDate(why.date)} 장 마감 기준 · 채널 글이 말한 까닭` : "채널 글이 말한 까닭",
+      meta: why ? `${fmtKoDate(why.date)} 장 마감` : undefined,
       kind: "move",
       heads: ["", "종목", whyDay ? `${whyDay} 등락` : "등락", "종가", "움직인 까닭"],
       key0: "종가",
@@ -237,7 +237,7 @@ export default async function KaderaPage() {
     {
       id: "talk",
       title: "많이 언급된 종목",
-      meta: `최근 ${KADERA_WINDOW_DAYS}일 언급이 많은 순`,
+      meta: `최근 ${KADERA_WINDOW_DAYS}일`,
       kind: "talk",
       heads: ["", "종목", "지금 등락", "언급", "말한 채널", "흐름 요약"],
       key0: "언급",
@@ -258,7 +258,7 @@ export default async function KaderaPage() {
 
   /* 화제어 — 오른쪽 줄기 맨 아래 모듈. 칩마다 언급 수와 점유율 변화. */
   const keywordModule = (
-    <Module id="keywords" title="화제어" meta="종목 이름 말고 많이 나온 말 · 최근 3일">
+    <Module id="keywords" title="화제어" meta="최근 3일">
       {keywords.length === 0 ? (
         <p className="v2-empty">아직 뽑을 화제어가 없습니다.</p>
       ) : (

@@ -166,7 +166,7 @@
 
 /* ── 두 줄기 ── */
 /* 두 줄기는 바닥을 맞춘다(stretch) — 줄기마다 맨 아래 모듈이 남는 높이를 먹는다. 오른쪽이 짧으면 일정 모듈이,
-   왼쪽이 짧으면 마지막 표가 늘어난다. 늘어난 모듈은 내용이 위에 붙고, 일정의 각주는 바닥에 붙는다. */
+   왼쪽이 짧으면 마지막 표가 늘어난다. 늘어난 모듈은 내용이 위에 붙는다. */
 .v2-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
@@ -175,16 +175,6 @@
 }
 .v2-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .v2-col > .v2-mod:last-child { flex: 1 0 auto; display: flex; flex-direction: column; }
-.v2-mod-note {
-  margin: auto 0 0;
-  padding: 10px 14px 12px;
-  border-top: 1px solid var(--t-line);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 18px;
-  color: var(--t-ink3);
-  word-break: keep-all;
-}
 
 /* 오늘의 요약 */
 .v2-brief { padding: 12px 16px 16px; font-size: 14px; font-weight: 500; line-height: 1.75; color: var(--t-ink2); word-break: keep-all; }
@@ -257,11 +247,18 @@ a.v2-tr:hover { background: var(--t-tint); }
 .v2-kd .v2-td-stock .hz-stock-badge { background: var(--t-tint); color: var(--t-ink3); }
 
 /* ── 여론 낙관도 — 50 위아래로 갈리는 막대 ── */
-.v2-mood { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px 14px; }
-.v2-mood-now { display: flex; align-items: baseline; gap: 8px; }
-.v2-mood-now b { font-size: 24px; font-weight: 700; line-height: 30px; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
-.v2-mood-now b.is-up { color: var(--t-up); }
-.v2-mood-now b.is-down { color: var(--t-down); }
+.v2-mood { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px 14px; }
+/* 낙관 · 비관 두 몫 — 앞선 쪽(is-lead)이 큰 숫자다. 뜻은 아래 갈림 막대가 맡는다(문장으로 달지 않는다). */
+.v2-mood-now { display: flex; justify-content: space-between; align-items: baseline; }
+.v2-mood-side { display: inline-flex; align-items: baseline; gap: 4px; font-size: 12px; font-weight: 600; color: var(--t-ink2); }
+.v2-mood-side b { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.v2-mood-side.is-lead b { font-size: 24px; line-height: 30px; letter-spacing: -0.01em; }
+.v2-mood-side.is-up b { color: var(--t-up); }
+.v2-mood-side.is-down b { color: var(--t-down); }
+.v2-split { display: flex; gap: 2px; height: 6px; }
+.v2-split i { border-radius: 3px; }
+.v2-split i.is-up { background: var(--t-up); }
+.v2-split i.is-down { background: var(--t-down); }
 .v2-tag {
   height: 20px;
   padding: 0 6px;
@@ -272,11 +269,24 @@ a.v2-tr:hover { background: var(--t-tint); }
   line-height: 20px;
   color: var(--t-ink2);
 }
+/* 30일 추이 — 왼쪽 축(낙관 · 비관) + 막대 + 아래 축(30일 전 · 최고·최저 · 오늘). */
+.v2-trend {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: 64px auto;
+  column-gap: 8px;
+  row-gap: 4px;
+  margin-top: 6px;
+}
+.v2-trend-y,
+.v2-trend-x { font-size: 11px; font-weight: 500; line-height: 14px; color: var(--t-ink3); white-space: nowrap; }
+.v2-trend-y { display: flex; flex-direction: column; justify-content: space-between; }
+.v2-trend-x { grid-column: 2; display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
 .v2-diverge {
   position: relative;
   display: flex;
   gap: 2px;
-  height: 72px;
+  height: 100%;
 }
 /* 가운데 선 = 50 */
 .v2-diverge::before {
@@ -294,21 +304,11 @@ a.v2-tr:hover { background: var(--t-tint); }
 .v2-dv-down { align-self: start; border-radius: 0 0 1px 1px; background: color-mix(in srgb, var(--t-down) 50%, transparent); }
 .v2-dv.is-last .v2-dv-up { background: var(--t-up); }
 .v2-dv.is-last .v2-dv-down { background: var(--t-down); }
-.v2-mood-def,
-.v2-mood-cap { margin: 0; font-size: 12px; font-weight: 500; line-height: 18px; color: var(--t-ink3); word-break: keep-all; }
-.v2-mood-def { margin-top: -4px; }
-.v2-mood-cap { margin-top: -4px; }
-.v2-mood-foot {
-  display: flex;
-  gap: 16px;
-  margin: 0;
-  font-size: 12px;
-  line-height: 16px;
-  font-variant-numeric: tabular-nums;
-}
-.v2-mood-foot div { display: flex; gap: 4px; }
-.v2-mood-foot dt { font-weight: 500; color: var(--t-ink3); }
-.v2-mood-foot dd { margin: 0; font-weight: 600; }
+/* 진하기 범례 — 테마 히트맵 머리 띠 오른쪽 */
+.v2-legend { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; color: var(--t-ink3); }
+.v2-legend i { width: 9px; height: 9px; border-radius: 2px; background: var(--t-heat); }
+.v2-legend i:first-of-type { margin-left: 4px; }
+.v2-legend i:last-of-type { margin-right: 4px; }
 
 /* ── 테마 히트맵 ── 줄 = 테마, 칸 = 날, 진하기 = 점유율 */
 .v2-heat { padding: 6px 0 8px; }
