@@ -1462,12 +1462,13 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-tm-legend i { width: 10px; height: 10px; border-radius: 2px; background: color-mix(in srgb, var(--t-down) 35%, transparent); }
 .v2-tm-legend i.is-recent { background: var(--t-down); }
 
-/* 이 테마의 주인공 — 몫 막대 + 한 단 열 줄 */
+/* 이 테마의 주인공 — 몫 막대 + 한 단 열 줄. 칸은 순위 · 종목(태그) · 이유(남는 폭) · 언급(채널) — 이름 → 문장 → 숫자(테마 목록 두 표와 같다). */
 .v2-tm-share { padding: 12px 14px; border-bottom: 1px solid var(--t-line); }
-.v2-tm-hottbl .v2-tr { grid-template-columns: 20px 252px 64px minmax(0, 1fr); min-height: 44px; }
+.v2-tm-hottbl .v2-tr { grid-template-columns: 20px 252px minmax(0, 1fr) 64px; min-height: 44px; }
+.v2-tm-hottbl:not(.no-reason) .v2-th > :nth-child(3) { text-align: left; }
+.v2-tm-hottbl .v2-th > :last-child { display: block; text-align: right; }
 /* 열 종목 모두 이유가 없으면 그 칸을 걷는다(종목 · 언급만). */
 .v2-tm-hottbl.no-reason .v2-tr { grid-template-columns: 20px minmax(0, 1fr) 80px; }
-.v2-tm-hottbl.no-reason .v2-th > :last-child { justify-content: flex-end; text-align: right; }
 
 /* 일정 · 함께 거론되는 테마 — 일정 줄이 주인공 키에 맞춰 고르게 늘어난다. 달 · 분기만 짚인 일정은 알약 글자가 길다('10월 중'). */
 .v2-tm-events { flex: 1; }
@@ -1495,7 +1496,8 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-tm-dayhead .v2-badge { align-self: center; }
 .v2-tm-dayhead em { margin-left: auto; font-style: normal; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-tm-reasonrows { list-style: none; margin: 0; padding: 0; }
-.v2-tm-reasonrows .v2-tr { grid-template-columns: 220px 72px minmax(0, 1fr) 76px; }
+/* 종목 · 까닭(남는 폭) · 등락 · 채널 수 — 숫자 둘은 줄 오른쪽 끝에. */
+.v2-tm-reasonrows .v2-tr { grid-template-columns: 220px minmax(0, 1fr) 72px 76px; }
 .v2-td-ch { font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-tm-days > section:last-child li:last-child .v2-tr { border-bottom: 0; }
 
@@ -1506,7 +1508,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   .v2-tm-band.is-pair { grid-template-columns: minmax(0, 1fr); }
   .v2-tm-flowtbl .v2-tr { grid-template-columns: 20px 200px minmax(0, 1fr) 64px 108px; }
   .v2-tm-risertbl .v2-tr { grid-template-columns: 88px 220px minmax(0, 1fr) 80px; }
-  .v2-tm-reasonrows .v2-tr { grid-template-columns: 200px 72px minmax(0, 1fr) 72px; }
+  .v2-tm-reasonrows .v2-tr { grid-template-columns: 200px minmax(0, 1fr) 72px 72px; }
 }
 @container kd (max-width: 679px) {
   /* 폰 — 표 머리 줄은 위 신호 표 규칙대로 숨고, 줄은 두 층(위 이름 · 숫자, 아래 문장). */

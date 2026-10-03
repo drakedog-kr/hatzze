@@ -304,11 +304,13 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
               </div>
               {/* 열 종목 모두 이유가 없으면 그 칸을 걷는다 — '-' 만 열 줄 서 있었다(원전). */}
               <div className={`v2-tbl v2-tm-hottbl${anyReason ? "" : " no-reason"}`}>
+                {/* 칸 차례는 이름 → 문장 → 숫자(2026-10-04, 테마 목록의 두 표와 같다). 숫자(오른쪽 정렬)가 문장 앞에 붙으면 '597회'와 이유 첫 낱말이
+                    한 덩어리로 읽혔다. */}
                 <div className="v2-tr v2-th" aria-hidden="true">
                   <span />
                   <span>종목</span>
-                  <span>언급 · 채널</span>
                   {anyReason && <span>채널이 말한 이유</span>}
+                  <span>언급 · 채널</span>
                 </div>
                 <ol className="v2-tbody">
                   {d.hotStocks.slice(0, HOT_ROWS).map((s, i) => (
@@ -321,22 +323,21 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
                           {/* 평소와 견준 언급 변화 — 색은 지도 칸과 같은 단계(stockTone). */}
                           <span className={`hz-theme-tag ${stockTone(s.mentions, s.usualMentions)}`}>{usualDeltaText(s.mentions, s.usualMentions)}</span>
                         </span>
-                        <span className="v2-td-num v2-td-two">
-                          {s.mentions.toLocaleString("ko-KR")}회<em>{s.channels}곳</em>
-                        </span>
-                        {/* 까닭 한 줄과 날짜. 그날 등락률은 여기 안 적는다 — 시세는 '등락의 이유'의 몫(2026-09-21). */}
+                        {/* 까닭 한 줄과 날짜. 그날 등락률은 여기 안 적는다 — 시세는 '등락의 이유'의 몫(2026-09-21).
+                            까닭이 없는 줄은 비워 둔다 — '-' 가 열 줄 중 일곱 줄에 서서 줄마다 잡음이었다. */}
                         {anyReason && (
                           <span className={`v2-td-text${s.reason ? "" : " is-pending"}`}>
-                            {s.reason ? (
+                            {s.reason && (
                               <>
                                 {s.reason.reason}
                                 <em className="v2-td-date">{fmtKoDate(s.reason.date)}</em>
                               </>
-                            ) : (
-                              "-"
                             )}
                           </span>
                         )}
+                        <span className="v2-td-num v2-td-two">
+                          {s.mentions.toLocaleString("ko-KR")}회<em>{s.channels}곳</em>
+                        </span>
                       </Link>
                     </li>
                   ))}
@@ -351,7 +352,8 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
 
       {events.length === 0 && <div className="v2-tm-band is-pair">{sideMods}</div>}
 
-      {/* 넷째 줄 — 등락의 이유(기준일까지의 이레). 날짜 머리 하나 아래 그날 종목들 — 줄은 종목 · 등락(폭 고정) · 까닭(남는 폭) · 채널 수. */}
+      {/* 넷째 줄 — 등락의 이유(기준일까지의 이레). 날짜 머리 하나 아래 그날 종목들 — 줄은 종목 · 까닭(남는 폭) · 등락 · 채널 수.
+          숫자 둘은 줄 오른쪽 끝에 모은다(2026-10-04) — 등락이 종목과 까닭 사이에 있을 땐 '+3.27%'와 까닭 첫 낱말이 붙어 읽혔다. */}
       <Module title="등락의 이유" meta={`${fmtKoDate(reasonStart)} ~ ${fmtKoDate(reasonEnd)} · 크게 움직인 날`} className="v2-tm-reasons">
         {reasonDays.length === 0 ? (
           <p className="v2-empty">최근 {REASON_DAYS}일 사이 이 테마 종목에 붙은 이유가 없습니다.</p>
@@ -372,10 +374,10 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
                           <StockLogo code={r.code} name={r.name} market={r.market} size={22} />
                           <span className="v2-td-name">{r.name}</span>
                         </span>
+                        <span className="v2-td-text">{r.reason}</span>
                         <span className={`v2-td-num v2-td-chg${toneCls(r.changeRate)}${r.changeRate == null ? " is-none" : ""}`} title={market.reasonRateNote}>
                           {r.changeRate == null ? (market.key === "kr" && date === newestReason ? "종가 전" : "-") : signPct(r.changeRate)}
                         </span>
-                        <span className="v2-td-text">{r.reason}</span>
                         <span className="v2-td-num v2-td-ch">{r.channelCount}곳 언급</span>
                       </Link>
                     </li>
