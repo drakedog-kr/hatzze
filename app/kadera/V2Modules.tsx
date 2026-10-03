@@ -362,15 +362,14 @@ export function CoverLinkCell({ c }: { c: CoverLink }) {
   );
 }
 
-/** 오른쪽 끝 — 언제 · 무엇을 얼마나 읽었나(두 줄). */
+/** 오른쪽 끝 — 언제 · 무엇을 얼마나 읽었나. **한 줄**이다(2026-10-03 "모든 페이지 이건 한 줄로") — 두 줄로 쌓던 때가 있었다. */
 export function CoverMeta({ updated, basis }: { updated: string; basis?: string | null }) {
   return (
     <div className="v2-cover-cell v2-cover-meta">
       <span className="v2-cover-k">
         <i className="v2-dot" />
-        {updated}
+        {basis ? `${updated} · ${basis}` : updated}
       </span>
-      {basis && <span className="v2-cover-k">{basis}</span>}
     </div>
   );
 }

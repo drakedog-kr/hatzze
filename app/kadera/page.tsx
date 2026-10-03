@@ -301,7 +301,7 @@ export default async function KaderaPage() {
         ))}
         <CoverMeta
           updated={summary.lastUpdated ? formatKstUpdate(summary.lastUpdated, "업데이트") : "업데이트 준비 중"}
-          basis={sentiment ? `채널 글 ${sentiment.messageCount.toLocaleString("ko-KR")}건 분석 · 최근 ${sentiment.windowDays}일` : null}
+          basis={sentiment ? `채널 글 ${sentiment.messageCount.toLocaleString("ko-KR")}건 · 최근 ${sentiment.windowDays}일` : null}
         />
       </div>
 
