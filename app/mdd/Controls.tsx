@@ -376,7 +376,7 @@ export function Results({ data, bigDrops, onPick }: { data: MddResult; bigDrops?
       {/* v2(2026-10-03 판정표 1단계) — 독자 질문 순서: 얼마나 빠졌나(위 둘) → 흔한가 · 언제 되찾나 → 왜(시장) · 장기 성적 → 업종 → 다른 종목.
           옛 Top 5 · 리스크 '하락 vs 회복' · '혼자 빠지나' · 성격 타일은 같은 사건을 네 군데서 말해 사례 표 하나 + 회복 칸으로 합쳤다.
           시트는 자료가 없어도 자리를 지킨다(AbsentSheet 주석) — 짝의 칸 수가 그대로여야 줄이 안 어긋난다. */}
-      <div className="v2-md-row is-21">
+      <div className="v2-md-row is-21 is-quad">
         {a.topDrawdowns.length > 0 ? (
           <CasesTable a={a} periodLabel={periodLabel} market={data.market} focus={focus} onFocus={onFocus} />
         ) : (
@@ -387,10 +387,13 @@ export function Results({ data, bigDrops, onPick }: { data: MddResult; bigDrops?
         ) : (
           <AbsentSheet icon="timer" title="회복까지" sub="" body="지금은 고점 부근이라 회복을 기다릴 하락이 없습니다." />
         )}
-      </div>
 
-      {/* 시장 탓 | 해마다 — 업종 칸과 자리를 바꿨다(2026-10-03). 업종 칸은 아래에서 많이 빠진 대형주와 짝을 짓는다. */}
-      <div className="v2-md-row is-12">
+        {/* 해마다 | 시장 탓 — 위 줄(사례 2 : 회복 1)과 한 격자에 둬 칸 경계도 높이도 같다(2026-10-03 "위와 같은 크기로"). */}
+        {data.risk ? (
+          <YearsModule r={data.risk} periodLabel={periodLabel} />
+        ) : (
+          <AbsentSheet icon="monitoring" title="해마다" sub="" body="상장한 지 얼마 되지 않아 연도별 성적을 낼 만큼 이력이 쌓이지 않았습니다." />
+        )}
         {data.attribution ? (
           <Attribution
             attr={data.attribution}
@@ -413,11 +416,6 @@ export function Results({ data, bigDrops, onPick }: { data: MddResult; bigDrops?
                   : `고점(${a.athDate}) 무렵의 ${benchName(data.market)} 기록이 없어 같은 기간을 나란히 놓지 못했습니다.`
             }
           />
-        )}
-        {data.risk ? (
-          <YearsModule r={data.risk} periodLabel={periodLabel} />
-        ) : (
-          <AbsentSheet icon="monitoring" title="해마다" sub="" body="상장한 지 얼마 되지 않아 연도별 성적을 낼 만큼 이력이 쌓이지 않았습니다." />
         )}
       </div>
 

@@ -876,7 +876,8 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 /* 짝 줄 — 표가 넓은 쪽을 차지한다(사례 표 2 : 회복 1 · 시장 탓 1 : 업종 2). 짧은 쪽은 안쪽 줄이 늘어 키를 맞춘다. */
 .v2-md-row { display: grid; gap: 12px; align-items: stretch; }
 .v2-md-row.is-21 { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
-.v2-md-row.is-12 { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+/* 사례 · 회복 / 해마다 · 시장 탓 네 칸을 한 격자에 — 두 줄의 키가 같다(키 큰 줄에 맞춘다). 좁은 폭에선 한 단이라 풀어 준다. */
+.v2-md-row.is-quad { grid-auto-rows: 1fr; }
 .v2-md-row > .v2-mod,
 .v2-md-row > .hz-sheet { display: flex; flex-direction: column; }
 
@@ -984,8 +985,8 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   .v2-md-band { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); }
   .v2-md-band > .v2-md-sum { grid-column: 1 / -1; }
   .v2-md-row.is-21,
-  .v2-md-row.is-12,
   .v2-md-row.is-11 { grid-template-columns: minmax(0, 1fr); }
+  .v2-md-row.is-quad { grid-auto-rows: auto; }
 }
 @container kd (max-width: 679px) {
   /* 사례 표 — 두 층(구간 · 깊이 / 시장 · 빠진 · 되찾은 · 유형). 여섯 칸이 한 줄이면 폰 폭(351)에 안 든다. */
