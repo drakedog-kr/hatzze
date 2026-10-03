@@ -38,19 +38,6 @@ export type MddPartial = {
   lookupFailed: boolean;
 };
 
-/**
- * 이 종목을 텔레그램 채널이 어떻게 말했나(카더라 자료) — v2 MDD 둘째 줄 '채널이 말한 까닭'(2026-10-03).
- * 계산기류(낙폭 · 회복)는 어디서나 하지만 이 자료는 여기만 있다. 최근 TALK_DAYS 일만 싣는다.
- *  - mentions: 날마다 언급 수(빈 날은 0) — 오래된 날부터.
- *  - reasons: 그 기간 채널이 짚은 '움직인 까닭'(까닭 글이 있는 날만) — 최근 날부터, 다섯까지.
- * 조회가 깨지면 null — 화면은 그 칸에 '못 불러왔습니다'를 적는다(자료 없음과 가른다).
- */
-export type MddTalk = {
-  days: number;
-  mentions: { date: string; count: number }[];
-  reasons: { date: string; reason: string; change: number | null }[];
-};
-
 export type MddResult = {
   ok: true;
   code: string;
@@ -62,8 +49,6 @@ export type MddResult = {
   theme: ThemeCmp | null;
   risk: RiskProfileData | null;
   partial: MddPartial | null;
-  /** 카더라 자료. 옛 응답(캐시)에는 없을 수 있다. */
-  talk?: MddTalk | null;
 };
 
 export const PERIODS: { key: string; label: string }[] = [
@@ -193,3 +178,136 @@ export const UP_BAR_SOFT = "var(--c-warm-3)";
 
 /** 시트 안쪽 본문 padding. 머리(.hz-sheet-head)의 22 와 좌우를 맞춘다. */
 export const PAD = "18px 22px";
+
+/* ── 낙폭 요약 ─────────────────────────────────────────────────────
+   둘째 줄 셋째 칸 — 이 종목 낙폭을 쉬운 말로 한 줄씩(2026-10-03, 옛 '이 하락의 맥락' 세 문단을 다시 짠 것).
+   **LLM 을 쓰지 않는다** — 화면이 이미 가진 수치를 문장으로 옮길 뿐이라 AI 표시도 안 붙인다.
+
+   옛 문단과 다른 점:
+    - 독자 물음 순서로 줄을 가른다 — 깊이(흔한가) → 회복(전에는 얼마나 걸렸나) → 시장 → 업종. 줄마다 이름표.
+    - 숫자를 말로 바꾼다 — '682일'(옆 칸이 적는다) 대신 '열흘에 3일꼴', 회복 표본 대신 '이번이 4번째'.
+    - '같은 기간'이 무엇과 같은지 밝힌다 — '6월 18일 고점 이후'. 옛 문단은 바로 앞 문장이 조회 기간이라 10년으로 읽혔다.
+    - 신고가 부근이면 회복 · 시장 줄 대신 기간 최대 낙폭을 적는다(옆 칸 게이지가 그때 안 뜬다).
+   ⚠️ 시장 · 업종이 **올랐을 때**를 빼먹지 말 것 — 미장을 들이자 "S&P500은 +3.4% 빠졌습니다"가 떴다(옛 benchVerb). */
+
+/** 문장 한 조각 — 글자 그대로, 또는 굵게. */
+export type SumPart = string | { b: string };
+export type SumRow = { key: "depth" | "worst" | "recovery" | "market" | "theme"; label: string; parts: SumPart[] };
+
+/** 이만큼 차이 나면 '비슷하게'가 아니다 — 3%p, 또는 이 종목 낙폭의 15% 중 큰 쪽. */
+const SUM_SIMILAR_PP = 3;
+const SUM_SIMILAR_RATIO = 0.15;
+/** 시장 · 업종 등락이 이 안쪽이면 '거의 그대로'. */
+const SUM_FLAT = 3;
+
+const pp = (n: number) => `${Math.abs(n).toFixed(1)}%p`;
+
+/**
+ * 두 기간을 한 단위로 — fmtDur 를 따로 부르면 364일 · 381일이 "12개월~1.0년"이 된다.
+ * 긴 쪽이 1년을 넘고 짧은 쪽도 11개월 가까이면 둘 다 년으로 적고, 같아지면 하나만 적는다.
+ */
+function durRange(min: number, max: number): string {
+  const lo = max >= 365 && min >= 330 ? `${(min / 365).toFixed(1)}년` : fmtDur(min);
+  const hi = fmtDur(max);
+  if (lo === hi) return hi;
+  // 단위가 같으면 앞 단위를 뗀다 — "1.6~3.0년", "4~9개월".
+  const unit = ["년", "개월", "일"].find((u) => lo.endsWith(u) && hi.endsWith(u));
+  return unit ? `${lo.slice(0, -unit.length)}~${hi}` : `${lo}~${hi}`;
+}
+
+/**
+ * 시장(또는 업종) 등락과 이 종목 낙폭을 견주는 문장. subject 는 '…코스피는', subjectDo 는 '…코스피도',
+ * avg 는 숫자 앞에 붙는 말('평균 ' 또는 ''). up · flat · 비슷 · 더 · 덜 다섯 갈래.
+ */
+function versus(subject: string, subjectDo: string, avg: string, v: number, stock: number): SumPart[] {
+  if (v >= SUM_FLAT) return [`${subject} 오히려 ${avg}`, { b: fmtPct(v) }, " 올랐습니다."];
+  if (v > -SUM_FLAT) return [`${subject} ${avg}`, { b: fmtPct(v) }, "로 거의 그대로였습니다."];
+  const gap = stock - v;
+  if (Math.abs(gap) <= Math.max(SUM_SIMILAR_PP, SUM_SIMILAR_RATIO * Math.abs(stock))) {
+    return [`${subjectDo} ${avg}`, { b: fmtPct(v) }, "로 ", { b: "비슷하게" }, " 빠졌습니다."];
+  }
+  return [`${subject} ${avg}`, { b: fmtPct(v) }, "로 이 종목보다 ", { b: `${pp(gap)} ${gap < 0 ? "덜" : "더"}` }, " 빠졌습니다."];
+}
+
+/**
+ * 낙폭 요약 줄들. 재료가 없는 줄은 빠진다(빈 줄을 세우지 않는다).
+ * 시장 줄의 '더 · 덜'은 시장 쪽에서 본 말이다 — "코스피는 −23.2%로 이 종목보다 13.7%p 덜 빠졌습니다".
+ */
+export function mddSummary(d: Pick<MddResult, "analysis" | "attribution" | "theme" | "market" | "years" | "partial">): SumRow[] {
+  const a = d.analysis;
+  const atHigh = a.currentDd > -1;
+  const span = periodInfo(d.years, a.firstDate, a.asOf).label.replace("·", " ");
+  const rows: SumRow[] = [];
+
+  // 깊이 — 지금보다 깊이 빠져 있던 날이 얼마나 흔했나(옆 칸 '이보다 깊었던 날'을 말로).
+  const p = a.tradingDays > 0 ? a.deeperThanNowDays / a.tradingDays : 0;
+  const k = Math.min(9, Math.max(1, Math.round(p * 10)));
+  rows.push({
+    key: "depth",
+    label: "깊이",
+    parts:
+      a.deeperThanNowDays === 0
+        ? [`${span} 동안 `, { b: "지금이 가장 깊이" }, " 빠져 있습니다."]
+        : p < 0.05
+          ? [`${span} 동안 지금보다 깊이 빠져 있던 날은 `, { b: `${a.deeperThanNowDays.toLocaleString("ko-KR")}일` }, "뿐입니다."]
+          : p >= 0.95
+            ? [`${span} 동안 `, { b: "거의 모든 날" }, "이 지금보다 깊이 빠져 있었습니다."]
+            : [`${span} 동안 지금보다 깊이 빠져 있던 날은 `, { b: `열흘에 ${k}일꼴` }, "입니다."],
+  });
+
+  if (atHigh) {
+    // 신고가 부근 — 옆 칸 게이지가 안 뜨니 기간 최대 낙폭을 여기서. 회복 · 시장 줄은 '고점 이후'가 없어 못 쓴다.
+    const worst = a.topDrawdowns[0];
+    if (worst && worst.depth <= -5) {
+      rows.push({
+        key: "worst",
+        label: "최대 낙폭",
+        parts: worst.recovered
+          ? [`${span} 가장 깊었던 하락은 `, { b: fmtPct(worst.depth) }, "였고, 고점을 되찾기까지 ", { b: fmtDur(worst.days) }, " 걸렸습니다."]
+          : [`${span} 가장 깊었던 하락은 `, { b: fmtPct(worst.depth) }, "입니다."],
+      });
+    }
+  } else if (a.recovery && a.recovery.similarCount > 0) {
+    // 회복 — 진행 중인 하락은 마지막 하나뿐이라(새 고점이 앞 하락을 끝낸다) '이번이 N번째 · 앞선 N−1번'으로 말할 수 있다.
+    const r = a.recovery;
+    const nth = r.similarCount;
+    const done = r.recoveredCount;
+    const head: SumPart[] = ["이만큼 빠진 하락은 ", { b: nth === 1 ? "이번이 처음" : `이번이 ${nth}번째` }, "입니다."];
+    let tail: SumPart[] = [];
+    if (r.unrecoveredCount === 1 && done > 0) {
+      tail =
+        done === 1
+          ? [" 앞선 1번은 고점을 되찾기까지 ", { b: fmtDur(r.minDays!) }, " 걸렸습니다."]
+          : done === 2
+            ? [" 앞선 2번은 고점을 되찾기까지 ", { b: durRange(r.minDays!, r.maxDays!) }, " 걸렸습니다."]
+            : [` 앞선 ${done}번은 고점을 되찾기까지 보통 `, { b: fmtDur(r.medianDays!) }, " 걸렸습니다."];
+    }
+    rows.push({ key: "recovery", label: "회복", parts: nth === 1 ? [`${span} 동안 `, ...head] : [...head, ...tail] });
+  }
+
+  const attr = d.attribution;
+  let marketShown = false;
+  if (!atHigh && attr) {
+    const bench = benchName(d.market);
+    const eun = d.market === "US" || d.market === "KOSDAQ" ? "은" : "는";
+    const since = `${fmtDay(a.athDate, a.asOf)} 고점 이후`;
+    if (attr.market !== null) {
+      rows.push({ key: "market", label: "시장", parts: versus(`${since} ${bench}${eun}`, `${since} ${bench}도`, "", attr.market, attr.stock) });
+      marketShown = true;
+    } else if (d.partial?.market) {
+      rows.push({ key: "market", label: "시장", parts: [`${bench} 시세를 지금 불러오지 못했습니다.`] });
+    }
+  }
+
+  const th = d.theme;
+  if (th) {
+    const who = `${th.name} 대표 ${th.peers.length}종목`;
+    if (atHigh) {
+      rows.push({ key: "theme", label: "업종", parts: [`${who}은 평균 고점 대비 `, { b: fmtPct(th.avgDd) }, "입니다."] });
+    } else if (attr && attr.theme !== null) {
+      const lead = marketShown ? "같은 기간" : `${fmtDay(a.athDate, a.asOf)} 고점 이후`;
+      rows.push({ key: "theme", label: "업종", parts: versus(`${lead} ${who}은`, `${lead} ${who}도`, "평균 ", attr.theme, attr.stock) });
+    }
+  }
+  return rows;
+}

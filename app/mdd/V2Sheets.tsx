@@ -1,69 +1,38 @@
 "use client";
 
 // v2 MDD 의 새 모듈 넷(2026-10-03 "껍데기만 바꾸면 v2 가 아니다" → 판정표 1단계).
-//  - 채널이 말한 까닭(둘째 줄 셋째 칸) — 옛 '이 하락의 맥락' 자리. 그 세 문단은 아래 모듈 숫자를 되읽기만 했다.
+//  - 낙폭 요약(둘째 줄 셋째 칸) — 옛 '이 하락의 맥락' 세 문단을 이름표 줄로 다시 짰다(문장은 shared.ts mddSummary).
 //  - 역대 하락 사례 — 옛 'Top 5' · 리스크 '하락 vs 회복 속도' · '혼자 빠지나, 같이 빠지나' · 성격 타일이 같은 사건을 네 군데서 말하던 것을 표 하나로.
 //  - 회복까지 — 옛 '회복까지 걸린 기간' + '이 하락의 성격'(급락형 · 완만형의 회복 중앙값). 깊이 분포 막대는 사례 표와 겹쳐 뺐다.
 //  - 해마다 — 옛 리스크 '낙폭 대비 보상'. 최근 다섯 해 + '전체보기' 팝업 대신 조회 기간의 해를 다 펼친다(누르지 않고 보이게).
 
-import Link from "next/link";
-
 import { CHARACTER_SPLIT_DAYS } from "@/lib/mdd";
 import type { MddAnalysis, RiskProfile as RiskProfileData } from "@/lib/mdd";
 
-import { Module, Spark } from "../kadera/V2Modules";
-import { Icon } from "../ui";
+import { Module } from "../kadera/V2Modules";
 import { RecoveryRange } from "./sheets";
-import { benchName, fmtDayCount, fmtDur, fmtPct, fmtYm } from "./shared";
-import type { MddTalk } from "./shared";
+import { benchName, fmtDayCount, fmtDur, fmtPct, fmtYm, mddSummary } from "./shared";
+import type { MddResult } from "./shared";
 
-const md = (iso: string) => iso.slice(5).split("-").map(Number).join("/");
 const tone = (v: number | null | undefined) => (v === null || v === undefined || v === 0 ? "" : v > 0 ? " is-up" : " is-down");
 
-/* ── 채널이 말한 까닭 ───────────────────────────────────────────── */
-export function TalkModule({ talk, code, market }: { talk: MddTalk | null | undefined; code: string; market: string | null }) {
-  // 종목 화면은 국장만 있다(app/stock/[code]). 미장은 머리 오른쪽 링크를 안 단다.
-  const href = market === "US" ? null : `/stock/${code}`;
-  const aside = href && (
-    <Link href={href} className="v2-more" data-ga="mdd_stock_page_click">
-      종목 화면
-      <Icon name="chevron_right" />
-    </Link>
-  );
-  if (!talk) {
-    return (
-      <Module title="채널이 말한 까닭" aside={aside} className="v2-md-talk">
-        <p className="v2-empty">채널 자료를 불러오지 못했습니다.</p>
-      </Module>
-    );
-  }
-  const counts = talk.mentions.map((m) => m.count);
-  const total = counts.reduce((a, b) => a + b, 0);
+/* ── 낙폭 요약 ─────────────────────────────────────────────────── */
+/**
+ * 시장 브리핑 '오늘의 브리핑'과 같은 꼴(.v2-brief3 — 이름표 칸 · 문장 칸, 줄은 남는 높이를 고르게 받는다).
+ * 문장은 계산으로 만든다 — LLM 이 아니라 AI 표시를 안 붙인다.
+ */
+export function SummaryModule({ data }: { data: MddResult }) {
+  const rows = mddSummary(data);
   return (
-    <Module title="채널이 말한 까닭" meta={`최근 ${talk.days}일`} aside={aside} className="v2-md-talk">
-      <div className="v2-md-body">
-        <span className="v2-card-val is-big">
-          <b>{total.toLocaleString("ko-KR")}회</b>
-          <span className="v2-reason">채널 언급</span>
-        </span>
-        {/* 날마다 언급 수 — 낙폭 차트와 나란히 보면 '빠질 때 채널이 떠들었나'가 보인다. 양이라 브랜드 파랑 한 가지. */}
-        {total > 0 && <Spark id="v2-md-talk-spark" values={counts} w={300} h={36} tone="down" />}
-        <ol className="v2-md-why">
-          {talk.reasons.length === 0 ? (
-            <li className="is-empty">이 기간 채널이 짚은 까닭이 없습니다</li>
-          ) : (
-            talk.reasons.map((r) => (
-              <li key={r.date}>
-                <span className="v2-md-why-d">{md(r.date)}</span>
-                <span className={`v2-md-why-c${tone(r.change)}`}>{r.change === null ? "없음" : fmtPct(r.change)}</span>
-                <span className="v2-md-why-t" title={r.reason}>
-                  {r.reason}
-                </span>
-              </li>
-            ))
-          )}
-        </ol>
-      </div>
+    <Module title="낙폭 요약" className="v2-md-sum">
+      <dl className="v2-brief3">
+        {rows.map((r) => (
+          <div key={r.key} className="v2-brief3-row">
+            <dt>{r.label}</dt>
+            <dd>{r.parts.map((p, i) => (typeof p === "string" ? p : <b key={i}>{p.b}</b>))}</dd>
+          </div>
+        ))}
+      </dl>
     </Module>
   );
 }

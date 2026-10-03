@@ -8,7 +8,7 @@ import type { MddAnalysis } from "@/lib/mdd";
 import { C, Icon, MONO } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
 import { Module } from "../kadera/V2Modules";
-import { TalkModule } from "./V2Sheets";
+import { SummaryModule } from "./V2Sheets";
 import { StockLogo } from "../StockLogo";
 import {
   fmtPct,
@@ -28,9 +28,9 @@ import { Sheet, Foot, StatCell } from "./sheet";
 const ZoomDialog = dynamic(() => import("../ZoomDialog").then((m) => m.ZoomDialog), { ssr: false });
 
 /* ── 히어로 ──────────────────────────────────────────────────────
-   둘째 줄 모듈 셋 — 종목 | 지금 낙폭 | 채널이 말한 까닭(V2Sheets.tsx TalkModule). 카더라 · 시장 브리핑 둘째 줄과 같은
-   v2 모듈 꼴이다(2026-10-03). 예전엔 다른 화면 히어로와 같은 3칸 틀(.hz-kd-hero)에 회색 타일 둘 + 흰 문장 칸이었고,
-   셋째 칸 문단(이 하락의 맥락)은 아래 모듈 숫자를 문장으로 되읽기만 해서 걷었다. */
+   둘째 줄 모듈 셋 — 종목 | 지금 낙폭 | 낙폭 요약(V2Sheets.tsx SummaryModule). 카더라 · 시장 브리핑 둘째 줄과 같은
+   v2 모듈 꼴이다(2026-10-03). 예전엔 다른 화면 히어로와 같은 3칸 틀(.hz-kd-hero)에 회색 타일 둘 + 흰 문장 칸('이 하락의
+   맥락' 세 문단)이었다. 그 문단은 줄마다 이름표를 단 요약으로 다시 짰다. */
 
 export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel: string }) {
   const a = data.analysis;
@@ -92,8 +92,9 @@ export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel:
         </div>
       </Module>
 
-      {/* 3 — 채널이 말한 까닭(카더라 자료). 옛 '이 하락의 맥락' 세 문단은 아래 모듈 숫자를 그대로 되읽어 걷었다(판정표 1). */}
-      <TalkModule talk={data.talk} code={data.code} market={data.market} />
+      {/* 3 — 낙폭 요약. 이 종목 낙폭을 쉬운 말로 한 줄씩(깊이 · 회복 · 시장 · 업종). 잠깐 '채널이 말한 까닭'(카더라 언급)을
+          세웠다가 걷었다(2026-10-03 "이 종목 mdd 를 쉽게 말해 주는 게 낫다"). */}
+      <SummaryModule data={data} />
     </div>
   );
 }
