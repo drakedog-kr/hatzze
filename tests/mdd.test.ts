@@ -188,6 +188,13 @@ describe("priceLadder — MDD '수익 · 손실 비율'", () => {
     assert.equal(Math.round(sumAbove * 10), Math.round(l.aboveShare * 10));
     // 지금 가격과 같은 날(276,000)은 비싸지 않다 — 선 바로 아래 칸에 든다.
     assert.ok(l.bands[l.aboveCount].days > 0);
+    // 평균 매수가 — 손실 쪽은 지금보다 비싸고 수익 쪽은 지금 이하, 전체는 그 사이(거래량 가중).
+    assert.ok(l.lossAvg! > l.price && l.gainAvg! <= l.price);
+    assert.ok(l.avgPrice > l.gainAvg! && l.avgPrice < l.lossAvg!);
+    // 손실 쪽은 360,000 · 300,000 이 같은 거래량으로 섞였다 — 날수로 가중한 평균이 곧 답이다.
+    const lossDays = series.filter((b) => b.date > "2025-10-02" && b.close > 276_000);
+    const want = lossDays.reduce((s, b) => s + b.close, 0) / lossDays.length;
+    assert.equal(Math.round(l.lossAvg!), Math.round(want));
   });
 
   it("지금이 1년 최고가면 선 위 칸이 없다", () => {
@@ -195,6 +202,7 @@ describe("priceLadder — MDD '수익 · 손실 비율'", () => {
     const l = priceLadder(series, 8)!;
     assert.equal(l.aboveCount, 0);
     assert.equal(l.aboveShare, 0);
+    assert.equal(l.lossAvg, null, "손실 쪽 거래가 없다");
     assert.equal(l.bands[0].hi, 130);
   });
 

@@ -523,6 +523,13 @@ export type PriceLadder = {
   /** 비싼 칸부터. 앞의 aboveCount 칸이 지금 가격보다 위, 나머지가 아래. */
   bands: LadderBand[];
   aboveCount: number;
+  /**
+   * 평균 매수가 — 창 거래대금 ÷ 거래량(한 주를 평균 얼마에 샀나, 종가 어림). 전체 · 수익 쪽(anchor 이하에서 거래) · 손실 쪽(anchor 위).
+   * 그쪽에 거래가 없으면 null. MDD '수익 · 손실 비율' 칸의 표(2026-10-04 "정보가 없는 느낌").
+   */
+  avgPrice: number;
+  gainAvg: number | null;
+  lossAvg: number | null;
 };
 
 /**
@@ -561,13 +568,17 @@ export function priceLadder(bars: Bar[], rows: number): PriceLadder | null {
   const down = Array.from({ length: nBelow }, (_, j) => ({ lo: Math.max(0, fix(anchor - (j + 1) * step)), hi: fix(anchor - j * step), value: 0, days: 0 }));
   let total = 0;
   let above = 0;
+  let shares = 0;
+  let sharesAbove = 0;
   for (const b of win) {
     const v = b.close * b.volume!;
+    shares += b.volume!;
     if (b.close > anchor) {
       const c = up[Math.min(nAbove - 1, Math.max(0, Math.ceil((b.close - anchor) / step) - 1))];
       c.value += v;
       c.days += 1;
       above += v;
+      sharesAbove += b.volume!;
     } else {
       const c = down[Math.min(nBelow - 1, Math.max(0, Math.floor((anchor - b.close) / step)))];
       c.value += v;
@@ -586,6 +597,9 @@ export function priceLadder(bars: Bar[], rows: number): PriceLadder | null {
     step,
     bands: [...up.reverse().map(share), ...down.map(share)],
     aboveCount: nAbove,
+    avgPrice: total / shares,
+    gainAvg: shares > sharesAbove ? (total - above) / (shares - sharesAbove) : null,
+    lossAvg: sharesAbove > 0 ? above / sharesAbove : null,
   };
 }
 

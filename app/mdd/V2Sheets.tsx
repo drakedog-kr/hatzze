@@ -12,7 +12,7 @@ import { CHARACTER_SPLIT_DAYS } from "@/lib/mdd";
 import type { MddAnalysis, RiskProfile as RiskProfileData } from "@/lib/mdd";
 
 import { CoverLinkCell, CoverMeta, Module, type CoverLink } from "../kadera/V2Modules";
-import { benchName, fmtCloseDay, fmtDay, fmtDayCount, fmtDur, fmtPct, fmtYm, mddSummary } from "./shared";
+import { benchName, fmtCloseDay, fmtDay, fmtDayCount, fmtDur, fmtPct, fmtPrice, fmtYm, mddSummary } from "./shared";
 import type { PriceLadder } from "@/lib/mdd";
 import type { AttributionData, MddResult, StockOption, ThemeCmp } from "./shared";
 
@@ -148,7 +148,10 @@ export function ThemeModule({ theme, onPick }: { theme: ThemeCmp; onPick: (s: St
  * 손실 = 지금 가격보다 비싸게 거래된 날의 거래대금 몫, 수익 = 나머지.
  *
  * 1~4차(10-03~04)는 큰 숫자 · 갈림 막대 · 가격대 목록이나 가격대 막대 그림을 겹쳐 실어 "한번에 이해하기 힘들다" · "너무 복잡하다" ·
- * "투박하다"였다. 지금은 도넛 하나와 숫자 둘뿐이다(운영자 판단, 10-04) — 가운데는 기준(지금 가격), 오른쪽은 답(수익 중 · 손실 중).
+ * "투박하다"였고, 도넛 하나와 숫자 둘로 줄이자 이번엔 "정보가 없는 느낌"이었다(10-04). 그래서 그림은 도넛 하나로 두고 표 하나를 더한다:
+ *  ① 도넛 + 수익 중 · 손실 중 — 가운데는 기준(지금 가격).
+ *  ② 평균 매수가 표 — 전체 · 수익 중 · 손실 중 세 줄, 줄마다 평균 매수가와 그 값 대비 지금 수익률. "산 사람들은 평균 얼마에 샀고 지금 얼마나
+ *     벌었나 · 잃었나"를 한 줄씩 말한다. 칸 머리 줄(평균 매수가 · 지금 수익률)이 열의 뜻을 말해 설명 문장을 안 단다.
  * 가격대별 몫(priceLadder 의 bands)은 그리지 않는다.
  * ⚠️ 사람 수가 아니라 거래대금(산 쪽)으로 센 어림이다 — 이미 판 사람 · 1년 넘게 든 사람은 못 가른다. 머리 근거가 '최근 1년 거래 기준'.
  */
@@ -166,6 +169,17 @@ export function LadderModule({ ladder, market }: { ladder: PriceLadder; market: 
   const gap = gain > 0 && loss > 0 ? RING_GAP : 0;
   const gainLen = Math.max(0, (RING_C * gain) / 100 - gap);
   const lossLen = Math.max(0, (RING_C * loss) / 100 - gap);
+  // 평균은 어림이라 끝자리까지 적지 않는다 — 국장은 10만 원 이상 백 원, 만 원 이상 십 원 단위(209,432원 → 209,400원). 미장은 센트 그대로.
+  const roundAvg = (v: number) => (isUs ? v : v >= 100_000 ? Math.round(v / 100) * 100 : v >= 10_000 ? Math.round(v / 10) * 10 : Math.round(v));
+  // 배포 직후 옛 응답(평균 매수가 없음)이 캐시에 남아 있으면 표를 빼고 도넛만.
+  const avgRows: { label: string; avg: number; cls?: string }[] = [];
+  for (const [label, avg, cls] of [
+    ["전체", ladder.avgPrice, undefined],
+    ["수익 중", ladder.gainAvg, "is-gain"],
+    ["손실 중", ladder.lossAvg, "is-loss"],
+  ] as const) {
+    if (avg != null && avg > 0) avgRows.push({ label, avg, cls });
+  }
   return (
     <Module title="수익 · 손실 비율" meta="최근 1년 거래 기준" className="v2-md-pl">
       <div className="v2-md-pl-body">
@@ -202,6 +216,31 @@ export function LadderModule({ ladder, market }: { ladder: PriceLadder; market: 
           </div>
         </dl>
       </div>
+      {avgRows.length > 0 && (
+        <table className="v2-md-pl-tbl">
+          <thead>
+            <tr>
+              <th scope="col">
+                <span className="sr-only">구분</span>
+              </th>
+              <th scope="col">평균 매수가</th>
+              <th scope="col">지금 수익률</th>
+            </tr>
+          </thead>
+          <tbody>
+            {avgRows.map(({ label, avg, cls }) => {
+              const ret = (ladder.price / avg - 1) * 100;
+              return (
+                <tr key={label} className={cls}>
+                  <th scope="row">{label}</th>
+                  <td>{fmtPrice(roundAvg(avg), market)}</td>
+                  <td className={ret > 0.05 ? "is-up" : ret < -0.05 ? "is-down" : undefined}>{fmtPct(ret)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
     </Module>
   );
 }
