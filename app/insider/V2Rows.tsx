@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import type { AnalystTop, CongressTicker, InsiderActivity, InsiderRow, ManagerMove } from "@/lib/insider-data";
+import type { AnalystTop, CongressTicker, InsiderActivity, ManagerMove, ManagerRank } from "@/lib/insider-data";
 
 import { StockLogo } from "../StockLogo";
 import { Money } from "./parts";
@@ -19,6 +19,7 @@ function Row({
   href,
   ticker,
   name,
+  sub,
   aux,
   value,
   ga,
@@ -27,6 +28,8 @@ function Row({
   href: string;
   ticker?: string;
   name: string;
+  /** 종목이 아니라 사람이 주인공인 줄(거물 명단)의 곁 이름 — 운용사. 이름 뒤 회색 글자. */
+  sub?: string;
   aux?: React.ReactNode;
   value: React.ReactNode;
   ga: string;
@@ -41,6 +44,7 @@ function Row({
           {ticker && <StockLogo code={ticker} name={name} market="US" size={20} />}
           {ticker && <b>{ticker}</b>}
           {showName && <span className={ticker ? "v2-in-name" : "v2-in-name is-lead"}>{name}</span>}
+          {sub && sub !== name && <span className="v2-in-name">{sub}</span>}
         </span>
         <span className="v2-in-aux">{aux}</span>
         <span className="v2-in-val">{value}</span>
@@ -110,34 +114,21 @@ export function moveLines(rows: ManagerMove[], kind: "add" | "trim") {
 }
 
 /**
- * 커뮤니티에서 뜨거운 종목 — 곁 숫자 언급 수 · 든 거물 수, 값은 등락률.
- * ⭐ 옛 '월가 거물이 들고 있는 종목' 모듈을 여기 합쳤다 — 둘 다 같은 줄(카더라에 오른 미장 종목)을 다른 순서로 세운 것이라, 언급 옆에
- *    든 거물 수를 한 칸 두면 한 표가 두 질문에 답한다.
+ * 운용자산이 큰 순(월가 거물 명단) — 거물 · 운용사 | 가장 크게 담은 한 종목과 그 비중 | 신고 합계(13F).
+ * 2026-10-04 되살림(운영자 판단) — 한때 첫 줄 띠의 링크 칸으로만 남겼고 그 자리엔 '커뮤니티에서 뜨거운 종목'이 섰다.
+ * ⚠️ 값은 13F 신고 합계라 진짜 운용자산이 아니다(미국 상장주 롱만 · ManagerRank.aum 주석). 모듈 머리의 물음표가 그 말을 한다.
  */
-export function hotLines(rows: InsiderRow[]) {
-  return rows.map((r, i) => (
+export function managerLines(rows: ManagerRank[], rate: number | null) {
+  return rows.map((m, i) => (
     <Row
-      key={r.ticker}
+      key={m.cik}
       rank={i + 1}
-      href={stockHref(r.ticker)}
-      ticker={r.ticker}
-      name={r.name}
-      aux={
-        <>
-          언급 {r.mentions}회{r.holders > 0 ? ` · 거물 ${r.holders}명` : ""}
-        </>
-      }
-      value={
-        r.changeRate == null ? (
-          <em>시세 없음</em>
-        ) : (
-          <span className={r.changeRate > 0 ? "is-up" : r.changeRate < 0 ? "is-down" : undefined}>
-            {r.changeRate > 0 ? "+" : r.changeRate < 0 ? "-" : ""}
-            {Math.abs(r.changeRate).toFixed(2)}%
-          </span>
-        )
-      }
-      ga="insider_hot_click"
+      href={`/insider/investor/${m.cik}`}
+      name={m.person}
+      sub={m.firm}
+      aux={m.topTicker ? `최대 비중 ${m.topName || m.topTicker} ${Math.round(m.topWeight)}%` : `${m.holdings}종목`}
+      value={<Money usd={m.aum} rate={rate} />}
+      ga="insider_managers_click"
     />
   ));
 }

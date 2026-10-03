@@ -7,10 +7,10 @@ import Link from "next/link";
 import { fmtKoDate } from "@/lib/stock-page";
 
 import { CurrencyToggle } from "../AppShell";
-import { CoverLinkCell, CoverMeta, Module } from "../kadera/V2Modules";
-import { insiderListHref } from "./lists";
+import { CoverMeta, Module } from "../kadera/V2Modules";
+import { INSIDER_LISTS, insiderListHref } from "./lists";
 import { fmtDate, insiderNote } from "./parts";
-import { analystLines, congressLines, execLines, hotLines, moveLines } from "./V2Rows";
+import { analystLines, congressLines, execLines, managerLines, moveLines } from "./V2Rows";
 import { INSIDER_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { Icon } from "../ui";
@@ -59,18 +59,18 @@ export default async function InsiderPage() {
   assertLoaded("/insider");
 
   /* ── v2(2026-10-03) — 카더라 · 시장 브리핑의 v2 규칙을 옮겼다 ──────────────────────────
-     첫 줄 띠(새 신고 · 거물 명단 · 통화 · 업데이트) → 짝 모듈 세 줄. 줄은 한 줄 · 네 칸(V2Rows.tsx — 순위 · 종목 · 곁 숫자 · 값).
-     ⭐ 2차(같은 날 "너무 복잡하다"): 모듈 여덟 → 여섯 · 두 줄 + 알약 줄 → 한 줄. '월가 거물이 들고 있는 종목'은 뜨거운 종목 표의
-        곁 숫자(거물 N명)로 합쳤고, '운용자산이 큰 순'(거물 명단)은 첫 줄 띠의 링크 칸으로 옮겼다.
+     첫 줄 띠(새 신고 · 통화 · 업데이트) → 짝 모듈 세 줄. 줄은 한 줄 · 네 칸(V2Rows.tsx — 순위 · 종목 · 곁 숫자 · 값).
+     ⭐ 2차(같은 날 "너무 복잡하다"): 모듈 여덟 → 여섯 · 두 줄 + 알약 줄 → 한 줄.
+     ⭐ 3차(2026-10-04 운영자 판단): '커뮤니티에서 뜨거운 종목' 걷고 '운용자산이 큰 순'(거물 명단) 되살림.
      ⛔ 옛 히어로 '오늘의 브리핑' 넉 줄(아래 모듈 1등의 되풀이) · 구간 제목 · 시트 부제 · 안내 쪽지(TapHint)는 걷었다.
-     ⭐ 짝 순서는 **새로 들어오는 것부터**: 임원 · 의원 신고(매일) → 거물 분기 변화(분기) → 카더라에 오른 종목 · 증권가. */
+     ⭐ 짝 순서는 **새로 들어오는 것부터**: 임원 · 의원 신고(매일) → 거물 분기 변화(분기) → 거물 명단 · 증권가. */
   const quarter = insiderNote("adds", ov);
   return (
     // ⭐ 내부자 리포트는 **달러가 기본**이다 — 재료가 전부 미국 공시라 달러가 원본이고, 원화는 크기를 가늠하라고 얹은 것이다.
     // 쿠키로 한 번이라도 고르면 그 선택이 이긴다(규칙은 globals.css 의 `[data-cur-default]`).
     <div className="hz-tx v2-kd v2-in" data-cur-default="usd">
       <LoadFailedNote sources={ov.failedSources} />
-      {/* 첫 줄 — 새 신고(그 축이 마지막으로 받은 날 · 그날 들어온 신고서 수) · 거물 명단(링크) · 통화 · 업데이트(공시 끝점 · 추적 규모).
+      {/* 첫 줄 — 새 신고(그 축이 마지막으로 받은 날 · 그날 들어온 신고서 수) · 통화 · 업데이트(공시 끝점 · 추적 규모).
           ⚠️ 새 신고 숫자는 창 전체가 아니라 **마지막 접수일 하루치**다(InsiderOverview.latestInsiderFilings 주석). */}
       <div className="v2-cover">
         <div className="v2-cover-cell v2-cover-idx">
@@ -86,11 +86,6 @@ export default async function InsiderPage() {
             </span>
           ))}
         </div>
-        {ov.managerRanks.length > 0 && (
-          <CoverLinkCell
-            c={{ cap: "월가 거물 명단", name: `${ov.scale.managers.toLocaleString("ko-KR")}명`, val: quarter, href: insiderListHref("managers"), ga: "insider_cover_managers" }}
-          />
-        )}
         {/* 통화 — 환율을 못 받은 날(usdKrw null)은 달러만 내므로 스위치도 안 세운다(InsiderOverview.usdKrw 주석).
             v2 화면은 머리를 걷어 이 띠로 옮겼다. 폰(≤560)은 탑바에 그대로 있다. */}
         {ov.usdKrw != null && (
@@ -125,10 +120,22 @@ export default async function InsiderPage() {
         </Module>
       </div>
 
-      {/* ③ 카더라에 오른 미장 종목(언급 · 든 거물) · 증권가 시선 */}
+      {/* ③ 월가 거물 명단(운용자산 순) · 증권가 시선.
+          2026-10-04 운영자 판단으로 '커뮤니티에서 뜨거운 종목'을 걷고 '운용자산이 큰 순'을 되살렸다(첫 줄 띠의 거물 명단 링크 칸은 이 모듈과 겹쳐 걷었다). */}
       <div className="v2-in-pair">
-        <Module title="커뮤니티에서 뜨거운 종목" meta={`${insiderNote("hot", ov)} · 언급 순`} aside={<SeeAll href="/insider/list/hot" />}>
-          {ov.rows.length === 0 ? <p className="v2-empty">아직 채울 자료가 없습니다.</p> : <Rows items={hotLines(ov.rows.slice(0, BLOCK_ROWS))} />}
+        <Module
+          title={INSIDER_LISTS.managers.title}
+          meta={`${insiderNote("managers", ov)} · 월가 거물 ${ov.scale.managers.toLocaleString("ko-KR")}명`}
+          aside={
+            <>
+              <span className="hz-tip hz-tip-wide v2-in-help" data-tip={INSIDER_LISTS.managers.help} aria-label={INSIDER_LISTS.managers.help} tabIndex={0}>
+                <Icon name="help" />
+              </span>
+              <SeeAll href={insiderListHref("managers")} />
+            </>
+          }
+        >
+          {ov.managerRanks.length === 0 ? <p className="v2-empty">명단을 못 읽었습니다.</p> : <Rows items={managerLines(ov.managerRanks.slice(0, BLOCK_ROWS), ov.usdKrw)} />}
         </Module>
         <Module
           title="증권가가 긍정적으로 보는 종목"
