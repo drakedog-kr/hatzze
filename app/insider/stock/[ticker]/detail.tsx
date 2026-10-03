@@ -8,12 +8,13 @@ import { PRICE_RANGES, type PriceRangeKey, stockDetailHref } from "@/lib/insider
 import { assertLoaded } from "@/lib/load-state";
 
 import { SectionHead } from "../../../kadera/SectionHead";
+import { CoverMeta, Module } from "../../../kadera/V2Modules";
+import { CurrencyToggle } from "../../../AppShell";
 import { ChartZoom } from "../../ChartZoom";
 import { StockLogo } from "../../../StockLogo";
 import { PageJsonLd } from "../../../JsonLd";
 import { INSIDER_CARD } from "../../../og-copy";
 import { pageMetadata } from "../../../seo";
-import { C, MONO } from "../../../ui";
 import { LoadFailedNote } from "../../../LoadFailedNote";
 import { ExpandableList } from "../../../kadera/ExpandableList";
 import {
@@ -28,8 +29,6 @@ import {
   MarkRadios,
   Money,
   PriceChart,
-  Quote,
-  T,
   WIDE_COLS,
   WideHead,
   fmtDate,
@@ -152,32 +151,16 @@ export async function stockDetailMetadata(ticker: string, range: PriceRangeKey):
  */
 function Trend({ points }: { points: { date: string; mentions: number; channels: number }[] }) {
   const max = Math.max(1, ...points.map((p) => p.mentions));
+  // v2 — 종목 페이지 · 테마 한 장의 추이와 같은 꼴(.v2-tm-trend). 최근 사흘만 진한 파랑.
+  const recentFrom = points.length >= 3 ? points[points.length - 3].date : "";
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 96, padding: "4px 22px 0" }}>
+    <div className="v2-tm-trend" role="img" aria-label={`최근 ${points.length}일 언급 막대`}>
       {points.map((p, i) => {
-        // ⚠️⚠️ 손닿는 자리는 **막대가 아니라 칸 전체**다. 막대 높이로 호버를 받으면 언급이
-        //    적은 날은 높이가 3%(3px)뿐이라 사실상 못 짚는다 — 0 인 날은 1px 이다.
-        //    빈 칸을 세로로 꽉 채워 두고 그 안에 막대를 아래로 붙인다.
-        // ⚠️ 가장자리에서 여는 방향은 앵커 위치지정이 알아서 튼다(globals.css). 아래
-        //    start/end 는 그걸 모르는 브라우저용 보험이다.
         const at = i / Math.max(1, points.length - 1);
         const edge = at > 0.72 ? " hz-tip-end" : at < 0.28 ? " hz-tip-start" : "";
         return (
-          <span
-            key={p.date}
-            className={`hz-tip hz-vline${edge}`}
-            data-tip={`${fmtDate(p.date)} · 언급 ${p.mentions}회 · 채널 ${p.channels}곳`}
-            style={{ position: "relative", flex: 1, minWidth: 0, height: "100%", display: "flex", alignItems: "flex-end" }}
-          >
-            <span
-              style={{
-                width: "100%",
-                // 0 인 날도 1px 은 남긴다 — 아예 없으면 "자료가 없는 날"과 구별이 안 된다.
-                height: `${Math.max(p.mentions ? 3 : 1, (p.mentions / max) * 100)}%`,
-                borderRadius: 2,
-                background: p.mentions ? "var(--c-blue)" : "var(--c-track)",
-              }}
-            />
+          <span key={p.date} className={`hz-tip hz-vline${edge}`} data-tip={`${fmtDate(p.date)} · 언급 ${p.mentions}회 · 채널 ${p.channels}곳`}>
+            <i className={!p.mentions ? "is-none" : p.date >= recentFrom ? "is-recent" : undefined} style={{ height: `${Math.max(p.mentions ? 3 : 1, (p.mentions / max) * 100)}%` }} />
           </span>
         );
       })}
@@ -292,196 +275,117 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
       )}
       <BackTrail parent={{ name: PARENT.name, href: PARENT.path }} current={d.name} />
 
-      {/* ── 히어로 ──────────────────────────────────────────────────
-          세 칸 — **종목 정체 · 공시에 남은 것 · 커뮤니티 관심 추이.**
-
-          ⭐ 예전엔 첫 칸이 로고와 시세뿐이라 아래가 통째로 비었다. 주가 일봉을 이미
-          받고 있으므로 **52주 위치와 기간 수익률이 공짜로 나온다** — 새 원천 없이
-          같은 자료를 더 쓰는 것이다.
-          ⭐ 둘째 칸은 세 축의 수만 세던 것을 **방향까지** 편다. "임원 신고 222건"보다
-          "내놓은 것 135 · 장내에서 산 것 0"이 훨씬 많은 말을 한다. */}
-      <section className="hz-sheet">
-        <div className="hz-kd-hero">
-          <div className="hz-kd-hero-q">
-            <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-              <StockLogo code={d.ticker} name={d.name} market="US" size={40} />
-              {/* 이 화면의 h1(티커와 이름). 셸의 제목 칸은 비어 있다(AppShell SELF_TITLED_PREFIXES).
-                  생김새는 그대로 두고 감싸는 태그만 h1 이다 — 사이의 공백은 읽을 때 "NVDA 엔비디아"로 떼어 준다. */}
-              <h1 style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, margin: 0, fontSize: "inherit", fontWeight: "inherit" }}>
-                <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
-                  {d.ticker}
-                </strong>{" "}
-                <span style={{ fontSize: T.body, fontWeight: 500, color: C.sub, overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {d.name || "이름 미상"}
-                </span>
-              </h1>
-            </div>
-            <Quote price={d.price} change={d.changeRate} rate={d.usdKrw} large />
-
-            {d.week52 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-                  <span style={{ fontSize: T.small, fontWeight: 600, color: C.sub }}>52주 위치</span>
-                  <span style={{ fontFamily: MONO, fontSize: T.small, fontWeight: 800, color: C.ink }}>
-                    {Math.round(d.week52.position)}%
-                  </span>
-                </div>
-                {/* 저점~고점 사이 어디인가. 노브 하나로 위치를 찍는다 — 막대만 채우면
-                    "얼마나 올랐나"로 잘못 읽힌다. */}
-                <span className="hz-range">
-                  <span className="hz-range-knob" style={{ left: `${d.week52.position}%` }} />
-                </span>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                  <span style={{ fontFamily: MONO, fontSize: T.small, color: C.muted }}>
-                    <Money usd={d.week52.low} rate={d.usdKrw} />
-                  </span>
-                  <span style={{ fontFamily: MONO, fontSize: T.small, color: C.muted }}>
-                    <Money usd={d.week52.high} rate={d.usdKrw} />
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* 기간 수익률 셋(1개월·3개월·1년)을 **한 줄**로.
-                ⚠️ 칸을 넷으로 늘려 봤다가 되돌렸다. 히어로 왼쪽 칸이 203px 인데 넷은
-                   226px 를 요구해서 2×2 가 되고, 그 두 줄이 어색했다(2026-08-25).
-                   셋이면 가장 넓은 종목도 여유가 남는다(insider-detail 의 returns 주석).
-                ⭐ flexWrap 은 남겨 둔다 — 세 자리 수익률(+1234.5%) 같은 극단에서
-                  잘리느니 접히는 편이 낫다. 평소엔 아무 일도 안 한다. */}
-            {d.returns.length > 0 && (
-              <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
-                {d.returns.map((r) => (
-                  <span key={r.label} style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                    <span
-                      style={{
-                        fontFamily: MONO,
-                        fontSize: T.body,
-                        fontWeight: 800,
-                        color: r.pct > 0 ? "var(--c-hot-ink)" : r.pct < 0 ? "var(--c-cold-ink)" : C.sub,
-                      }}
-                    >
-                      {r.pct > 0 ? "+" : r.pct < 0 ? "−" : ""}
-                      {Math.abs(r.pct).toFixed(1)}%
-                    </span>
-                    <span style={{ fontSize: T.small, color: C.muted }}>{r.label}</span>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="hz-kd-hero-q">
-            <div className="hz-kd-hero-title">
-              <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>공시에 남은 것</span>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {[
-                {
-                  label: "월가 거물 보유",
-                  n: d.holders.length,
-                  unit: `/${d.managerCount}명`,
-                  sub: quarterMoves,
-                },
-                {
-                  label: "미 하원의원 신고",
-                  n: members,
-                  unit: "명",
-                  sub: `매수 ${cgBuys.length} · 매도 ${cgSells.length}건`,
-                },
-                {
-                  label: "임원 신고",
-                  n: d.insiders.length,
-                  unit: "건",
-                  sub: `내놓은 것 ${execSells.length} · 장내에서 산 것 ${execBuys.length}`,
-                },
-              ].map((s) => (
-                <div key={s.label} style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                  <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
-                    <span style={{ fontSize: T.small, fontWeight: 600, color: C.sub }}>{s.label}</span>
-                    <strong style={{ fontFamily: MONO, fontSize: "var(--fs-17)", fontWeight: 800, color: s.n ? C.ink : C.muted }}>
-                      {s.n.toLocaleString("ko-KR")}
-                      {/* 단위는 값보다 **한 단 아래**다 — 이 저장소가 `num()` 주석에 적어 둔
-                          규칙이고, 그 자리는 값 13 옆에 단위 12/600 이다(한 포인트 차이에
-                          굵기와 색으로 가른다). 여기도 같은 비율로 17 옆에 15/600 이다.
-                          ⚠️ 11px/700 이었다. 여섯 단이 벌어져 단위가 각주처럼 작았다.
-                          ⚠️ 그렇다고 **같은 크기로 두면 안 된다** — `num()` 주석의 경고
-                             그대로 "17"과 "/63명"이 두 덩이로 읽힌다(2026-08-26 에 해 보고
-                             되돌렸다). 크기는 붙이고 굵기·색으로 가르는 게 답이다.
-                          ⚠️ `<strong>` 안이라 굵기를 안 적으면 800 을 물려받는다. */}
-                      <span style={{ fontSize: "var(--fs-15)", fontWeight: 600, color: C.sub2, marginLeft: 2 }}>{s.unit}</span>
-                    </strong>
-                  </div>
-                  {/* ⭐ 수 하나보다 **방향**이 말이 많다. 같은 222건이어도 무엇이었는지가 다르다. */}
-                  <span style={{ fontSize: T.small, color: C.muted, textAlign: "right" }}>{s.sub}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* ⭐ 제일 넓은 칸이 **카더라 언급 추이**다. 이 화면이 저쪽과 갈리는 자리다. */}
-          <div className="hz-kd-hero-h" style={{ padding: 0 }}>
-            <div style={{ padding: "22px 22px 0" }}>
-              <div className="hz-kd-hero-title">
-                <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>
-                  커뮤니티 관심 추이
-                </span>
-              </div>
-              {d.trend.length === 0 ? (
-                <p style={{ margin: "10px 0 0", fontSize: T.body, fontWeight: 500, color: C.sub, lineHeight: 1.7 }}>
-                  이 종목은 아직 커뮤니티에서 잡힌 적이 없습니다.
-                </p>
-              ) : (
-                /* ⚠️ 셋을 ` · ` 로 이어 한 줄로 두었더니 큰 숫자 옆에 긴 꼬리가 붙어
-                   읽히지 않았다. 서로 다른 것을 재는 값 셋(언제 · 얼마나 넓게 · 얼마나
-                   드문가)이라 한 줄로 이으면 어디서 끊어 읽을지가 안 보인다.
-                   ⭐ 큰 숫자는 왼쪽에 두고 셋은 **오른쪽 위에 한 줄씩** 세운다. 오른끝
-                     정렬이라 줄마다 시작점이 달라도 끝이 맞아 세 값이 한 묶음으로 읽힌다. */
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    justifyContent: "space-between",
-                    gap: 12,
-                    marginTop: 10,
-                  }}
-                >
-                  <span style={{ display: "inline-flex", alignItems: "baseline", gap: 7 }}>
-                    <strong style={{ fontFamily: MONO, fontSize: "var(--fs-24)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
-                      {d.mentionsToday}
-                    </strong>
-                    {/* 위 '공시에 남은 것'의 단위와 같은 규칙 — 값보다 한 단 아래(24 → 22),
-                        굵기와 색으로 가른다. */}
-                    <span style={{ fontFamily: MONO, fontSize: "var(--fs-22)", fontWeight: 600, color: C.sub }}>회</span>
-                    {/* '회' 는 숫자에 붙는 단위라 MONO 지만 '언급' 은 낱말이라 본문 글꼴이다.
-                        한 덩이로 묶어 MONO 로 두면 낱말이 숫자처럼 보인다. */}
-                    <span style={{ fontSize: "var(--fs-17)", fontWeight: 600, color: C.sub }}>언급</span>
-                  </span>
-                  <span
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "flex-end",
-                      gap: 2,
-                      fontSize: T.small,
-                      color: C.sub,
-                      textAlign: "right",
-                      whiteSpace: "nowrap",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <span>{fmtDate(d.mentionDate)} 하루</span>
-                    <span>채널 {d.channelsToday}곳</span>
-                    <span>
-                      최근 {d.trend.length}일 최다 {peak}회
-                    </span>
-                  </span>
-                </div>
-              )}
-            </div>
-            {d.trend.length > 0 && <Trend points={d.trend} />}
-          </div>
+      {/* ── 첫 줄 띠 · 둘째 줄(v2, 2026-10-03) ─────────────────────────────
+          옛 히어로 세 칸(종목 정체 · 공시에 남은 것 · 커뮤니티 관심 추이)을 v2 꼴로 옮겼다 — 종목 정체(티커 · 시세 · 52주 위치 · 기간 수익률)는
+          첫 줄 띠 칸들로, 나머지 둘은 둘째 줄 짝으로. 통화 스위치도 머리에서 이 띠로 왔다(v2 화면은 머리를 걷는다 · 폰은 탑바).
+          ⭐ 52주 위치와 기간 수익률은 받아 둔 일봉에서 공짜로 나온다(새 원천 없음).
+          ⭐ 공시에 남은 것은 세 축의 수만이 아니라 **방향까지** 편다 — "임원 신고 222건"보다 "내놓은 것 135 · 장내에서 산 것 0"이 많은 말을 한다. */}
+      <div className="v2-cover">
+        <div className="v2-cover-cell v2-sk-id">
+          <StockLogo code={d.ticker} name={d.name} market="US" size={20} />
+          {/* 검색이 이 화면의 이름으로 읽는 자리라 h1 — 티커와 이름 사이 공백은 읽을 때 "NVDA 엔비디아"로 떼어 준다. */}
+          <h1>
+            {d.ticker}
+            {d.name && d.name.toUpperCase() !== d.ticker.toUpperCase() ? <span className="v2-cover-k"> {d.name}</span> : null}
+          </h1>
         </div>
-      </section>
+        {d.price != null && (
+          <div className="v2-cover-cell">
+            <span className="v2-cover-k">현재가</span>
+            <span className="v2-cover-v">
+              <b>
+                <Money usd={d.price} rate={d.usdKrw} />
+              </b>
+              {d.changeRate != null && (
+                <span className={`v2-cover-chg${d.changeRate > 0 ? " is-up" : d.changeRate < 0 ? " is-down" : ""}`}>
+                  {d.changeRate > 0 ? "+" : d.changeRate < 0 ? "-" : ""}
+                  {Math.abs(d.changeRate).toFixed(2)}%
+                </span>
+              )}
+            </span>
+          </div>
+        )}
+        {/* 52주 위치 — 저점 0 · 고점 100 사이 어디인가. "얼마나 올랐나"가 아니다. */}
+        {d.week52 && (
+          <div className="v2-cover-cell">
+            <span className="v2-cover-k">52주 위치</span>
+            <span className="v2-cover-v">
+              <b>{Math.round(d.week52.position)}%</b>
+              <span className="v2-cover-chg">
+                <Money usd={d.week52.low} rate={d.usdKrw} /> ~ <Money usd={d.week52.high} rate={d.usdKrw} />
+              </span>
+            </span>
+          </div>
+        )}
+        {d.returns.length > 0 && (
+          <div className="v2-cover-cell v2-cover-idx">
+            <span className="v2-cover-k">수익률</span>
+            {d.returns.map((r) => (
+              <span key={r.label} className="v2-cover-v">
+                <em>{r.label}</em>
+                <span className={`v2-cover-chg${r.pct > 0 ? " is-up" : r.pct < 0 ? " is-down" : ""}`}>
+                  {r.pct > 0 ? "+" : r.pct < 0 ? "-" : ""}
+                  {Math.abs(r.pct).toFixed(1)}%
+                </span>
+              </span>
+            ))}
+          </div>
+        )}
+        {d.usdKrw != null && (
+          <div className="v2-cover-cell v2-in-cur">
+            <span className="v2-cover-k">통화</span>
+            <CurrencyToggle fallback="usd" />
+          </div>
+        )}
+        <CoverMeta updated={d.mentionDate ? `${fmtDate(d.mentionDate)} 언급 기준` : "언급 준비 중"} basis={`월가 거물 ${d.managerCount}명 추적`} />
+      </div>
+
+      {/* 둘째 줄 — 공시에 남은 것 | 커뮤니티 관심 추이. 둘 다 안이 늘어난다(줄 · 막대). */}
+      <div className="v2-tm-band is-brief">
+        <Module title="공시에 남은 것" meta="거물 · 의원 · 임원">
+          <dl className="v2-isd-facts">
+            {[
+              { label: "월가 거물 보유", n: d.holders.length, unit: `/${d.managerCount}명`, sub: quarterMoves },
+              { label: "미 하원의원 신고", n: members, unit: "명", sub: `매수 ${cgBuys.length} · 매도 ${cgSells.length}건` },
+              { label: "임원 신고", n: d.insiders.length, unit: "건", sub: `내놓은 것 ${execSells.length} · 장내에서 산 것 ${execBuys.length}` },
+            ].map((s) => (
+              <div key={s.label}>
+                <dt>{s.label}</dt>
+                <dd>
+                  <b className={s.n ? undefined : "is-zero"}>
+                    {s.n.toLocaleString("ko-KR")}
+                    <span>{s.unit}</span>
+                  </b>
+                  <em>{s.sub}</em>
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </Module>
+        <Module title="커뮤니티 관심 추이" meta={d.trend.length ? `최근 ${d.trend.length}일` : undefined} className="v2-tm-trendmod">
+          {d.trend.length === 0 ? (
+            <p className="v2-empty">이 종목은 아직 커뮤니티에서 잡힌 적이 없습니다.</p>
+          ) : (
+            <div className="v2-tm-trendbody">
+              <div className="v2-tm-figs">
+                <span>
+                  <b>{d.mentionsToday}회</b>
+                  <em>{fmtDate(d.mentionDate)} 하루 언급</em>
+                </span>
+                <span>
+                  <b>{d.channelsToday}곳</b>
+                  <em>그날 채널</em>
+                </span>
+                <span>
+                  <b>{peak}회</b>
+                  <em>최근 {d.trend.length}일 최다</em>
+                </span>
+              </div>
+              <Trend points={d.trend} />
+            </div>
+          )}
+        </Module>
+      </div>
 
       {/* ── 주가와 매매 시점 ─────────────────────────────────────────
           ⭐ 벤치마킹한 쪽은 차트에 13F·의회·임원·ETF 를 다 얹는다. 우리는 **사람이

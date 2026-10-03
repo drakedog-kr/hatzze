@@ -1781,6 +1781,8 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
   --fs-12-5: 12px;
   --fs-11-5: 12px;
   --fs-10-5: 11px;
+  /* 종목 상세의 애널리스트 칸 큰 숫자(22) — v2 큰 숫자 눈금(20)으로. */
+  --fs-22: 20px;
 }
 /* 짝 — 키가 같고(stretch) 짧은 쪽은 줄이 고르게 늘어난다(빈 곳 없음). 좁으면 한 줄기. */
 .v2-in-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 12px; }
@@ -1908,3 +1910,30 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
   .v2-sk .v2-brief3-row { grid-template-columns: 76px minmax(0, 1fr); }
   .v2-sk-months b { display: none; }
 }
+
+/* 내부자 종목 · 투자자 상세 — 첫 줄 띠(.v2-sk-id 를 같이 쓴다) · 둘째 줄 [공시에 남은 것 · 이번 분기에 한 것 | 추이 · 상위 종목 몫].
+   줄 넷 · 셋(.v2-isd-facts)은 이름 · 값(+단위) · 곁말, 남는 높이를 고르게 받는다(옆 막대 모듈과 키가 같다). */
+.v2-isd-facts { flex: 1; display: flex; flex-direction: column; margin: 0; padding: 2px 14px; }
+.v2-isd-facts > div { flex: 1 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; }
+.v2-isd-facts > div + div { border-top: 1px solid var(--t-line); }
+.v2-isd-facts dt { font-size: 12px; font-weight: 500; color: var(--t-ink2); }
+.v2-isd-facts dd { display: flex; flex-direction: column; align-items: flex-end; gap: 0; margin: 0; text-align: right; }
+.v2-isd-facts b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.v2-isd-facts b.is-zero { color: var(--t-ink3); }
+.v2-isd-facts b span { margin-left: 1px; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
+.v2-isd-facts em { font-style: normal; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
+/* 집중도 — 한 줄 막대(상위 다섯 종목이 진하기 순) + 아래 종목 · 몫. */
+.v2-isd-conc { justify-content: center; }
+.v2-isd-concbar { display: flex; height: 12px; border-radius: 3px; overflow: hidden; background: var(--t-bar-off); }
+.v2-isd-conclist { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px 16px; list-style: none; margin: 0; padding: 0; }
+.v2-isd-conclist li { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; }
+.v2-isd-conclist i { flex: none; width: 8px; height: 8px; border-radius: 2px; }
+.v2-isd-conclist b { font-weight: 700; }
+.v2-isd-conclist span { margin-left: auto; font-weight: 600; color: var(--t-ink2); font-variant-numeric: tabular-nums; }
+.v2-sk-id .v2-cover-k .v2-in-help { margin-left: 2px; }
+/* 폰 — 상세 화면의 첫 줄 칸(운용자산 · 현재가 · 52주 위치)은 값이 길어 반 칸에 안 든다(버핏 '운용자산 $299.3B +13.7%'가 12px 넘침).
+   테마 한 장과 같이 칸마다 한 줄. */
+@container kd (max-width: 679px) {
+  .v2-in .v2-cover-cell:not(.v2-cover-go):not(.v2-cover-meta):not(.v2-in-cur) { flex: 1 1 100%; flex-wrap: wrap; row-gap: 2px; }
+}
+.v2-cover-k .v2-in-help .ms { font-size: 14px; }

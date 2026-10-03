@@ -1385,13 +1385,12 @@ const LABEL_TITLED_PREFIXES = [`${NOTE_PAGE.href}/`];
  */
 // 시장 브리핑(/) · MDD · 배당으로 살기 · 테마 판세(목록 · 테마 한 장, 국장 · 미장) · 국장 미리보기는 2026-10-03 에 들였다 — 카더라 v2 의 디자인 규칙을 옮겼다.
 const V2_PAGES = ["/", "/kadera", "/mdd", "/dividend", "/preview", "/insider"];
-/** 테마 판세(/theme/semiconductor · /theme/us/memory) · 데일리 노트(/daily/2026-10-02) · 내부자 전체보기(/insider/list/exec) ·
- *  종목 페이지(/stock/005930)는 주소가 여럿이라 앞머리로 가른다. 내부자의 투자자 · 종목 상세는 아직 옛 꼴이다(2026-10-03). */
+/** 테마 판세(/theme/semiconductor · /theme/us/memory) · 데일리 노트(/daily/2026-10-02) · 내부자 전체보기 · 종목 · 투자자 상세 ·
+ *  종목 페이지(/stock/005930)는 주소가 여럿이라 앞머리로 가른다. */
 const isV2Page = (pathname: string) =>
   V2_PAGES.includes(pathname) ||
   [THEME_PAGE.href, NOTE_PAGE.href].some((p) => pathname === p || pathname.startsWith(`${p}/`)) ||
-  pathname.startsWith("/insider/list/") ||
-  pathname.startsWith("/stock/");
+  ["/insider/list/", "/insider/stock/", "/insider/investor/", "/stock/"].some((p) => pathname.startsWith(p));
 
 function PageHeader() {
   const pathname = useAppPathname();
