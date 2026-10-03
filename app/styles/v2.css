@@ -1793,9 +1793,42 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 /* 짝 — 키가 같고(stretch) 짧은 쪽은 줄이 고르게 늘어난다(빈 곳 없음). 좁으면 한 줄기. */
 .v2-in-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 12px; }
 .v2-in-pair > .v2-mod { display: flex; flex-direction: column; }
-.v2-in-rows { flex: 1; display: flex; flex-direction: column; list-style: none; margin: 0; padding: 0; }
-.v2-in-rows > li { flex: 1 0 auto; display: flex; }
-.v2-in-rows > li > * { flex: 1; }
+/* 본 화면의 줄(V2Rows.tsx) — 한 줄 · 네 칸(순위 · 종목 · 곁 숫자 · 값). 줄마다 따로 격자면 곁 숫자 폭이 달라 칸이 어긋난다 —
+   목록이 열을 정하고 줄은 subgrid 로 따른다. 줄은 모듈 남는 높이를 고르게 나눠 받는다(짝 모듈 키가 같다). */
+.v2-in-rows {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto auto;
+  grid-auto-rows: minmax(44px, 1fr);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.v2-in-rows > li { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; border-bottom: 1px solid var(--t-line); }
+.v2-in-rows > li:last-child { border-bottom: 0; }
+.v2-in-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  align-items: center;
+  column-gap: 12px;
+  padding: 0 14px;
+  color: var(--t-ink);
+  text-decoration: none;
+  transition: background-color 0.15s;
+}
+.v2-in-row:hover { background: var(--t-tint); }
+.v2-in-rank { text-align: center; font-size: 12px; font-weight: 500; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
+.v2-in-who { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.v2-in-who b { flex: none; font-weight: 700; }
+.v2-in-name { min-width: 0; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); overflow-wrap: anywhere; word-break: keep-all; }
+.v2-in-name.is-lead { font-size: 13px; font-weight: 600; color: var(--t-ink); }
+.v2-in-aux { text-align: right; font-size: 12px; font-weight: 500; color: var(--t-ink3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.v2-in-val { text-align: right; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.v2-in-val em { margin-left: 4px; font-style: normal; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
+.v2-in-val .is-up { color: var(--t-up); }
+.v2-in-val .is-down { color: var(--t-down); }
+.v2-in-pair-n { display: inline-flex; gap: 8px; }
 /* 줄 — 글 시작선 15(모듈 테두리 1 + 14) · 가는 선 · 호버는 옅은 회색(다른 v2 표와 같다). */
 .v2-in .hz-trow { min-height: 52px; padding: 6px 14px; column-gap: 12px; border-bottom-color: var(--t-line); }
 .v2-in .hz-trow:hover { background: var(--t-tint); }
@@ -1822,6 +1855,14 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 @container kd (max-width: 679px) {
   /* 머리 근거('10/1까지 90일 · 의원 수 순')가 제목 옆에서 말줄임으로 잘렸다(375) — 다음 줄로 접는다. */
   .v2-in .v2-mod-head { flex-wrap: wrap; row-gap: 0; }
+  /* 줄 — 폰은 곁 숫자를 이름 아래 둘째 줄로(한 줄에 넷이면 이름이 눌린다). */
+  .v2-in-rows { grid-template-columns: 20px minmax(0, 1fr) auto; grid-auto-rows: minmax(52px, auto); }
+  .v2-in-row { row-gap: 1px; padding-top: 6px; padding-bottom: 6px; }
+  .v2-in-rank { grid-row: 1 / span 2; }
+  .v2-in-who { grid-column: 2; grid-row: 1; }
+  .v2-in-val { grid-column: 3; grid-row: 1 / span 2; }
+  .v2-in-aux { grid-column: 2; grid-row: 2; text-align: left; padding-left: 28px; }
+  .v2-in-aux:empty { display: none; }
 }
 /* 전체보기(/insider/list/…) — 뒤로 가기 줄 · 열 머리 · '더 보기' 줄을 v2 꼴로. 열 격자는 행 함수(WIDE_COLS)가 인라인으로 준다. */
 .v2-in > nav { font-size: 13px; }
