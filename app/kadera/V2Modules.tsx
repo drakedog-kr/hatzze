@@ -207,7 +207,8 @@ export function ThemeCards({ themes, hrefOf }: { themes: ThemeRotation[]; hrefOf
 const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
 
 /** '오늘 · 내일 · 10/5(월)' 알약 글자. */
-function dayPill(date: string, today: string): string {
+/** 일정 날짜 알약 글자 — 오늘 · 내일 · 'M/D(요일)'. 테마 화면 일정(app/theme/ThemeDetailView.tsx)도 같이 쓴다. */
+export function dayPill(date: string, today: string): string {
   if (date === today) return "오늘";
   const diff = Math.round((Date.parse(`${date}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
   if (diff === 1) return "내일";

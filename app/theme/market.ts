@@ -8,7 +8,7 @@ import { KR_THEME_SHORT, THEME_PAGE, US_THEME_PAGE } from "./copy";
 /**
  * 테마 리포트의 **시장 한 벌** — 국장·미장이 같은 뷰(ThemeIndexView · ThemeDetailView)를 그리고, 다른 것은 여기 든 것뿐이다.
  * 주소·사전·시세 캡션·도움말의 낱말. 자료를 읽는 쪽은 lib/theme-page.ts(국장) · lib/us-theme-page.ts(미장)이고
- * 둘 다 같은 타입을 낸다. 클라이언트 부품(ReasonWeeks)엔 함수를 못 넘기니 `key` 만 넘기고 그쪽이 lib/theme-href.ts 로 주소를 만든다.
+ * 둘 다 같은 타입을 낸다. 클라이언트 부품엔 함수를 못 넘기니 `key` 만 넘기고 그쪽이 lib/theme-href.ts 로 주소를 만든다.
  */
 export type ThemeMarket = {
   key: ThemeMarketKey;

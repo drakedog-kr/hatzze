@@ -665,23 +665,3 @@ main.hz-scroll { overflow-x: clip; }
 
    목록이 줄에 붙어 있어서 마우스를 목록으로 옮겨도 :hover 가 유지된다 —
    :hover 는 조상까지 함께 걸리고, 목록은 줄의 자식이다. */
-
-/* 배경만 카드 안쪽 여백까지 번지게 한다. 음수 마진을 패딩과 같은 값으로 둬 margin box
-   치수는 그대로 남긴다 — 이 목록은 space-between 으로 남는 높이를 줄들이 나눠 갖는
-   구조라, 줄의 외곽 치수가 바뀌면 그 배분이 흔들린다. 줄 사이 간격만 10px 좁아 보인다. */
-.hz-theme-row {
-  position: relative;
-  margin: -5px -12px;
-  padding: 5px 12px;
-  border-radius: var(--r-control);
-  transition: background 0.13s ease;
-}
-.hz-theme-row:hover,
-.hz-theme-row:focus-within {
-  background: var(--c-blue-tint);
-}
-/* 마우스 없이도 열 수 있어야 한다(줄에 tabindex 를 준다). 터치에서도 이 경로로 열린다. */
-.hz-theme-row:focus-visible {
-  outline: 2px solid var(--c-blue);
-  outline-offset: -1px;
-}

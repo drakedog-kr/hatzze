@@ -1269,7 +1269,7 @@ function PageTools() {
       })()}
       {/* 안 연 동안 배포에서는 /theme 가 404 라 단추도 내지 않는다(themeNav — ShellEnv 주석).
           v2 화면은 시장 전환 단추를 안 둔다 — 사이드바에 국장·미장 항목이 이미 있다(V2_PAGES 주석). */}
-      {(themeNav || !pathname.startsWith(THEME_PAGE.href)) && !V2_PAGES.includes(pathname) && <MarketSwap pathname={pathname} />}
+      {(themeNav || !pathname.startsWith(THEME_PAGE.href)) && !isV2Page(pathname) && <MarketSwap pathname={pathname} />}
       {/* 다크 모드 단추는 여기 없다 — PC 는 사이드바 맨 아래, 폰은 탑바가 따로 단다(2026-10-02). */}
     </>
   );
@@ -1380,15 +1380,17 @@ const LABEL_TITLED_PREFIXES = [`${NOTE_PAGE.href}/`];
  * 화면 이름은 사이드바의 현재 항목이 말하고, 본문은 첫 줄부터 내용이다. h1 은 지우지 않는다(검색엔진·스크린리더가
  * 이 화면의 이름을 읽는 자리다). 오른쪽 도구(미장 전환·테마)는 그대로 선다.
  */
-// 시장 브리핑(/) · MDD · 배당으로 살기는 2026-10-03 에 들였다 — 카더라 v2 의 디자인 규칙을 옮겼다.
+// 시장 브리핑(/) · MDD · 배당으로 살기 · 테마 판세(목록 · 테마 한 장, 국장 · 미장)는 2026-10-03 에 들였다 — 카더라 v2 의 디자인 규칙을 옮겼다.
 const V2_PAGES = ["/", "/kadera", "/mdd", "/dividend"];
+/** 테마 판세는 테마마다 주소가 있어(/theme/semiconductor · /theme/us/memory) 앞머리로 가른다. */
+const isV2Page = (pathname: string) => V2_PAGES.includes(pathname) || pathname === THEME_PAGE.href || pathname.startsWith(`${THEME_PAGE.href}/`);
 
 function PageHeader() {
   const pathname = useAppPathname();
   const selfTitled = SELF_TITLED_PREFIXES.some((p) => pathname.startsWith(p));
   const TitleTag = LABEL_TITLED_PREFIXES.some((p) => pathname.startsWith(p)) ? "p" : "h1";
   const page = navFor(useShellEnv()).find((n) => isActive(n.href, pathname));
-  const v2 = V2_PAGES.includes(pathname);
+  const v2 = isV2Page(pathname);
   // 서브 페이지에서는 서브의 이름을 h1 으로 쓴다. 부모(구역)의 이름을 그대로 두면
   // /kadera 와 /kadera/us 두 페이지가 **같은 h1** 을 갖는다.
   //
