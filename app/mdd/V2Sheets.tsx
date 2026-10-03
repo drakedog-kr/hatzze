@@ -26,7 +26,7 @@ const tone = (v: number | null | undefined) => (v === null || v === undefined ||
  * 카더라 · 시장 브리핑 첫 줄과 같은 부품(.v2-cover). 이 화면 어디에도 없는 것만 싣는다.
  *  - 같은 기간 기준 지수의 고점 대비 — 종목만 빠졌나, 시장 전체가 내려와 있나를 첫눈에.
  *  - 종목 화면 · 테마 리포트 — 이 종목을 더 읽을 다른 화면으로.
- *  - 오른쪽 끝 종가 기준일 · 거래일 수(옛 가격 옆 'M/D 종가'를 여기로 옮겼다 — 한 화면에 두 번 적지 않는다).
+ *  - 오른쪽 끝 종가 기준일 · 거래일 수 한 줄(옛 가격 옆 'M/D 종가'를 여기로 옮겼다 — 한 화면에 두 번 적지 않는다).
  * ⛔ 종목 가격 · 등락은 싣지 않는다 — 바로 아래 종목 칸이 크게 말한다.
  */
 export function MddCover({ data, periodLabel }: { data: MddResult; periodLabel: string }) {
@@ -60,7 +60,8 @@ export function MddCover({ data, periodLabel }: { data: MddResult; periodLabel: 
       {links.map((c) => (
         <CoverLinkCell key={c.ga} c={c} />
       ))}
-      <CoverMeta updated={`${fmtCloseDay(a.asOf)} 종가 기준`} basis={`거래일 ${a.tradingDays.toLocaleString("ko-KR")}일`} />
+      {/* 한 줄로(2026-10-03) — 카더라는 칩 둘과 함께라 두 줄로 쌓지만, 여기는 칸이 적어 한 줄에 든다. */}
+      <CoverMeta updated={`${fmtCloseDay(a.asOf)} 종가 기준 · 거래일 ${a.tradingDays.toLocaleString("ko-KR")}일`} />
     </div>
   );
 }
