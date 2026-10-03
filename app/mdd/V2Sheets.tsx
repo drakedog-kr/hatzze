@@ -144,58 +144,63 @@ export function ThemeModule({ theme, onPick }: { theme: ThemeCmp; onPick: (s: St
 
 /* ── 수익 · 손실 비율 ─────────────────────────────────────────── */
 /**
- * 최근 1년 거래대금을 가격대로 나눈 것(lib/mdd.ts priceLadder) — '많이 빠진 대형주'(종목과 상관없는 고정 목록) 자리(2026-10-03).
- * 낙폭 화면을 여는 사람은 대개 손실 중인 보유자라 "지난 1년 이 종목을 산 돈 중 얼마가 지금 수익이고 얼마가 손실인가"를 묻는다.
+ * 최근 1년 이 종목을 산 돈 중 얼마가 지금 수익이고 얼마가 손실인가(lib/mdd.ts priceLadder 의 aboveShare) — '많이 빠진 대형주' 자리(2026-10-03).
+ * 손실 = 지금 가격보다 비싸게 거래된 날의 거래대금 몫, 수익 = 나머지.
  *
- * 1~3차(10-03~04)는 큰 숫자 · 갈림 막대 · 가격대 목록(줄마다 범위 · 막대 · %)을 겹쳐 실어 "한번에 이해하기 힘들다" · "너무 복잡하다"였다
- * — 한 칸에 숫자가 스무 개 가까이 섰다. 지금은 둘뿐이다(운영자 판단, 10-04):
- *  ① 맨 위 = 수익 중(빨강) · 손실 중(파랑) 두 숫자. 손실 = 지금보다 비싼 가격에서 거래된 몫(선 위 칸의 합), 수익 = 나머지.
- *  ② 그림 하나 = 가격대마다 막대(위가 비싼 쪽) · 지금 선. 글자는 1년 최고 · 지금 · 1년 최저 가격 셋뿐이고, 칸마다의 범위 · 몫은
- *     마우스를 올리면 뜬다(데이터 툴팁). 막대 색이 곧 ① 의 두 색이라 범례를 따로 안 둔다.
+ * 1~4차(10-03~04)는 큰 숫자 · 갈림 막대 · 가격대 목록이나 가격대 막대 그림을 겹쳐 실어 "한번에 이해하기 힘들다" · "너무 복잡하다" ·
+ * "투박하다"였다. 지금은 도넛 하나와 숫자 둘뿐이다(운영자 판단, 10-04) — 가운데는 기준(지금 가격), 오른쪽은 답(수익 중 · 손실 중).
+ * 가격대별 몫(priceLadder 의 bands)은 그리지 않는다.
  * ⚠️ 사람 수가 아니라 거래대금(산 쪽)으로 센 어림이다 — 이미 판 사람 · 1년 넘게 든 사람은 못 가른다. 머리 근거가 '최근 1년 거래 기준'.
  */
+const RING_R = 42;
+const RING_C = 2 * Math.PI * RING_R;
+/** 두 호 사이 틈(둘레 길이). 한쪽이 0 이면 틈 없이 고리 하나. */
+const RING_GAP = 1.6;
+
 export function LadderModule({ ladder, market }: { ladder: PriceLadder; market: string | null }) {
   const isUs = market === "US";
-  const max = Math.max(0.0001, ...ladder.bands.map((b) => b.share));
-  // 칸 너비가 1 이상이면 경계가 정수다(lib/mdd.ts priceLadder). 1 아래(동전주)만 소수 둘째 자리까지.
-  const num = (v: number) =>
-    isUs ? `$${v.toLocaleString("en-US", { maximumFractionDigits: ladder.step >= 1 ? 0 : 2 })}` : v.toLocaleString("ko-KR", { maximumFractionDigits: 0 });
-  const won = (v: number) => (isUs ? num(v) : `${num(v)}원`);
   const priceNow = isUs ? `$${ladder.price.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : `${Math.round(ladder.price).toLocaleString("ko-KR")}원`;
-  // 배포 직후 옛 응답(지금 가격에서 안 나눈 칸)이 캐시에 남아 있으면 aboveCount 가 없다 — 아래 끝이 지금 가격 이상인 칸까지를 위로 본다.
-  const split = ladder.aboveCount ?? ladder.bands.filter((b) => b.lo >= ladder.price).length;
   // 둘의 합이 100 이 되게 손실을 반올림하고 수익은 나머지로.
   const loss = Math.round(ladder.aboveShare);
   const gain = 100 - loss;
-  const n = ladder.bands.length;
-  const bar = (b: PriceLadder["bands"][number], i: number) => (
-    <div key={b.lo} className={`v2-pl-row hz-tip hz-tip-start ${i < split ? "is-loss" : "is-gain"}`} data-tip={`${num(b.lo)}~${won(b.hi)} · ${b.share.toFixed(1)}%`}>
-      {/* 가격 글자는 그림의 위 끝(1년 최고 칸의 위 끝)과 아래 끝에만. 지금 선이 그 끝이면(1년 최고 · 최저가 지금) 선이 대신 말한다. */}
-      <span className="v2-pl-axis">{i === 0 && split > 0 ? won(b.hi) : i === n - 1 && split < n ? won(b.lo) : ""}</span>
-      <span className="v2-pl-bar">
-        <i style={{ width: `${Math.max(2, (b.share / max) * 100)}%` }} />
-      </span>
-    </div>
-  );
+  const gap = gain > 0 && loss > 0 ? RING_GAP : 0;
+  const gainLen = Math.max(0, (RING_C * gain) / 100 - gap);
+  const lossLen = Math.max(0, (RING_C * loss) / 100 - gap);
   return (
-    <Module title="수익 · 손실 비율" meta="최근 1년 거래 기준" className="v2-md-ladder">
-      <div className="v2-md-pl">
-        <span className="v2-md-pl-side is-gain">
-          <em>수익 중</em>
-          <b>{gain}%</b>
-        </span>
-        <span className="v2-md-pl-side is-loss">
-          <em>손실 중</em>
-          <b>{loss}%</b>
-        </span>
-      </div>
-      <div className="v2-pl-chart" role="img" aria-label={`최근 1년 가격대별 거래 · 지금 ${priceNow} 위는 손실 ${loss}%, 아래는 수익 ${gain}%`}>
-        {ladder.bands.slice(0, split).map((b, i) => bar(b, i))}
-        <div className="v2-pl-now">
-          <span>지금 {priceNow}</span>
-          <i />
+    <Module title="수익 · 손실 비율" meta="최근 1년 거래 기준" className="v2-md-pl">
+      <div className="v2-md-pl-body">
+        <div className="v2-md-pl-ring" role="img" aria-label={`지금 ${priceNow} 기준 수익 중 ${gain}% · 손실 중 ${loss}%`}>
+          {/* 12시에서 시계 방향으로 수익(빨강), 이어서 손실(파랑). */}
+          <svg viewBox="0 0 100 100" aria-hidden="true">
+            {gainLen > 0 && (
+              <circle cx="50" cy="50" r={RING_R} className="is-gain" strokeDasharray={`${gainLen} ${RING_C}`} strokeDashoffset={-gap / 2} />
+            )}
+            {lossLen > 0 && (
+              <circle
+                cx="50"
+                cy="50"
+                r={RING_R}
+                className="is-loss"
+                strokeDasharray={`${lossLen} ${RING_C}`}
+                strokeDashoffset={-((RING_C * gain) / 100 + gap / 2)}
+              />
+            )}
+          </svg>
+          <span className="v2-md-pl-center">
+            <em>지금</em>
+            <b>{priceNow}</b>
+          </span>
         </div>
-        {ladder.bands.slice(split).map((b, i) => bar(b, split + i))}
+        <dl className="v2-md-pl-legend">
+          <div className="is-gain">
+            <dt>수익 중</dt>
+            <dd>{gain}%</dd>
+          </div>
+          <div className="is-loss">
+            <dt>손실 중</dt>
+            <dd>{loss}%</dd>
+          </div>
+        </dl>
       </div>
     </Module>
   );
