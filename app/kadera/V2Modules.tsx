@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import type { IndexClose } from "@/lib/data";
+import { shortDate } from "@/lib/format";
 import type { UpcomingEvent } from "@/lib/kadera-why";
 import type { IssueKeyword, SentimentPoint, ThemeRotation } from "@/lib/telegram-data";
 
@@ -67,8 +68,29 @@ export type Tone = "up" | "down" | "flat";
  * 선 그래프 — 아래로 옅어지는 면 · 기준선(점선) · 선 · 끝점 후광. 2차(토스 지수 카드 꼴)의 것을 그대로 되살렸다(2026-10-02 요청).
  * 색은 tone 클래스가 currentColor 로 쥔다(오름 빨강 · 내림 파랑). 면의 그라데이션도 같은 색이라 한 덩어리로 읽힌다.
  * 늘이는 그림이라(preserveAspectRatio none) 끝점은 svg 밖 span 이 그린다 — 안에서 그리면 타원으로 찌그러진다.
+ * tips 를 주면 점마다 호버 칸을 깐다 — 마우스를 올리면 그날 값이 뜨고 세로선 · 점이 선다(옛 히어로 · 여론 추이와 같은 .hz-vline 어법).
+ * v2 로 옮기며 빠졌던 것을 되살렸다(2026-10-04 "원래 호버하면 몇인지 나왔는데 지금은 안 된다").
  */
-export function Spark({ id, values, base, w, h, tone, dot }: { id: string; values: number[]; base?: number; w: number; h: number; tone: Tone; dot?: boolean }) {
+export function Spark({
+  id,
+  values,
+  base,
+  w,
+  h,
+  tone,
+  dot,
+  tips,
+}: {
+  id: string;
+  values: number[];
+  base?: number;
+  w: number;
+  h: number;
+  tone: Tone;
+  dot?: boolean;
+  /** 점마다의 툴팁 글(values 와 같은 길이). */
+  tips?: string[];
+}) {
   if (values.length < 2) return <div className="v2-spark-empty" />;
   const all = base === undefined ? values : [...values, base];
   const lo = Math.min(...all);
@@ -94,6 +116,24 @@ export function Spark({ id, values, base, w, h, tone, dot }: { id: string; value
         <path d={line} className="v2-spark-line" vectorEffect="non-scaling-stroke" />
       </svg>
       {dot && <span className="v2-spark-dot" style={{ top: `${lastTop}%` }} />}
+      {tips && tips.length === values.length && (
+        // 칸 n 등분 — i 번째 칸 안에서 점의 자리는 칸 폭의 i/(n-1) 이라 --hz-x 하나로 선과 점이 점 위에 선다.
+        <div className="v2-spark-hits">
+          {values.map((v, i) => {
+            const at = i / (values.length - 1);
+            return (
+              <div
+                key={i}
+                className={`hz-tip hz-vline${at < 0.25 ? " hz-tip-start" : at > 0.75 ? " hz-tip-end" : ""}`}
+                data-tip={tips[i]}
+                style={{ ["--hz-x" as string]: `${at * 100}%` }}
+              >
+                <span className="hz-vdot" style={{ top: `${(y(v) / h) * 100}%` }} />
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -129,7 +169,7 @@ export function SentimentModule({
           <b className={`is-${tone}`}>{score}%</b>
           <span className="v2-reason">{label}</span>
         </span>
-        <Spark id="v2-mood-spark" values={vals} base={50} w={300} h={64} tone={tone} dot />
+        <Spark id="v2-mood-spark" values={vals} base={50} w={300} h={64} tone={tone} dot tips={trend.map((p) => `${shortDate(p.date)} · 낙관 ${p.score}%`)} />
         <span className="v2-card-foot">
           <span>
             <em>{vals.length}일 최고</em>

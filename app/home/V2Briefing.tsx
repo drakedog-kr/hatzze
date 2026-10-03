@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import type { DailyScore, ScorePoint } from "@/lib/data";
-import { compareLabel } from "@/lib/format";
+import { compareLabel, shortDate } from "@/lib/format";
 
 import { Module, Spark, type Tone } from "../kadera/V2Modules";
 import { stageForScore } from "../ui";
@@ -54,7 +54,16 @@ export function IndexModule({
             </span>
           )}
         </span>
-        <Spark id="v2-index-spark" values={vals} base={50} w={300} h={64} tone={tone} dot />
+        <Spark
+          id="v2-index-spark"
+          values={vals}
+          base={50}
+          w={300}
+          h={64}
+          tone={tone}
+          dot
+          tips={(trend ?? []).map((p) => `${shortDate(p.date)} · ${Math.round(p.score)}℃ ${stageForScore(p.score)}`)}
+        />
         <span className="v2-card-foot">
           <span>
             <em>{days}일 최고</em>

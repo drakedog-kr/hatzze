@@ -443,6 +443,10 @@ a.v2-minicard:hover { background: var(--t-tint); }
   100% { transform: scale(1.25); opacity: 0; }
 }
 .v2-spark-empty { height: 40px; }
+/* 점마다의 호버 칸(Spark tips) — 그림 위를 n 등분해 덮는다. 세로선 · 점 · 툴팁 꼴은 .hz-vline · .hz-vdot(sheets.css · shadcn.css). */
+.v2-spark-hits { position: absolute; inset: 0; display: flex; }
+.v2-spark-hits > .hz-vline { position: relative; flex: 1; }
+.v2-spark-hits .hz-vdot { background: currentColor; }
 
 /* ── 다가오는 일정 — 날짜 알약 ── */
 .v2-events { list-style: none; margin: 0; padding: 8px 6px 10px; display: flex; flex-direction: column; gap: 2px; }
