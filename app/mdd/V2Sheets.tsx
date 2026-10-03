@@ -118,6 +118,8 @@ export function ThemeModule({ theme, onPick }: { theme: ThemeCmp; onPick: (s: St
   const self = theme.peers.find((p) => p.isSelf);
   const rank = self ? theme.peers.filter((p) => p.dd < self.dd).length + 1 : null;
   return (
+    // ⚠️ 머리에 잣대('최근 10년 고점 대비')를 더해 봤다가 걷었다(2026-10-03) — 폰(375)에서 머리가 175px 뿐이라 말줄임으로 잘렸다.
+    // 위 '시장 탓' 칸의 업종 평균과 숫자가 다른 까닭(그쪽은 이 종목 고점 이후 같은 기간)은 그 칸 머리가 말한다.
     <Module
       title={`${theme.name} 대표 ${theme.peers.length}종목 안에서`}
       meta={`${rank ? `깊게 빠진 순 ${rank}위 · ` : ""}평균 ${fmtPct(theme.avgDd)}`}
@@ -315,6 +317,9 @@ export function RecoveryModule({ a }: { a: MddAnalysis }) {
         {hasRange && <RangeLine min={r.minDays!} median={r.medianDays!} max={r.maxDays!} />}
         {kinds.some(([, , k]) => k) && (
           <div className="v2-md-kinds">
+            {/* 머리 줄 — 아래 두 줄이 센 하락. 위 '이만큼 빠졌던 n번'(지금만큼 깊었던 것)과 모집단이 달라(15% 넘게 빠졌다 되찾은 것 전부)
+                3번 + 2번이 4번과 안 맞아 보였다(2026-10-03). */}
+            <span className="v2-md-kinds-cap">15% 넘게 빠졌다 되찾은 {kinds.reduce((s, [, , k]) => s + (k?.count ?? 0), 0)}번</span>
             {kinds.map(([key, label, k]) => (
               <div key={key} className={`v2-md-kind${ch!.currentClass === key ? " is-now" : ""}`}>
                 <span className="v2-md-kind-name">

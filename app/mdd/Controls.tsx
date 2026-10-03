@@ -388,19 +388,19 @@ export function Results({ data, bigDrops, onPick }: { data: MddResult; bigDrops?
         {a.topDrawdowns.length > 0 ? (
           <CasesTable a={a} periodLabel={periodLabel} market={data.market} focus={focus} onFocus={onFocus} />
         ) : (
-          <AbsentSheet icon="history" title="역대 하락 사례" sub="" body="이 기간엔 순위를 매길 만한 하락이 없었습니다. 기간을 넓히면 더 나올 수 있습니다." />
+          <AbsentSheet title="역대 하락 사례" body="이 기간엔 순위를 매길 만한 하락이 없었습니다." />
         )}
         {a.recovery ? (
           <RecoveryModule a={a} />
         ) : (
-          <AbsentSheet icon="timer" title="회복까지" sub="" body="지금은 고점 부근이라 회복을 기다릴 하락이 없습니다." />
+          <AbsentSheet title="회복까지" body="지금은 고점 부근이라 회복을 기다릴 하락이 없습니다." />
         )}
 
         {/* 해마다 | 시장 탓 — 위 줄(사례 2 : 회복 1)과 한 격자에 둬 칸 경계도 높이도 같다(2026-10-03 "위와 같은 크기로"). */}
         {data.risk ? (
           <YearsModule r={data.risk} periodLabel={periodLabel} />
         ) : (
-          <AbsentSheet icon="monitoring" title="해마다" sub="" body="상장한 지 얼마 되지 않아 연도별 성적을 낼 만큼 이력이 쌓이지 않았습니다." />
+          <AbsentSheet title="해마다" body="상장한 지 얼마 되지 않아 연도별 성적을 낼 만큼 이력이 쌓이지 않았습니다." />
         )}
         {data.attribution ? (
           <AttributionModule
@@ -412,9 +412,7 @@ export function Results({ data, bigDrops, onPick }: { data: MddResult; bigDrops?
           />
         ) : (
           <AbsentSheet
-            icon="call_split"
             title="시장 탓 · 종목 탓"
-            sub=""
             body={
               a.currentDd > -1
                 ? "지금은 고점 부근이라 원인을 나눌 하락이 없습니다."
@@ -434,13 +432,11 @@ export function Results({ data, bigDrops, onPick }: { data: MddResult; bigDrops?
           <ThemeModule theme={data.theme} onPick={onPick} />
         ) : (
           <AbsentSheet
-            icon="hub"
             title="업종 안에서"
-            sub=""
             body={
               data.partial && (data.partial.lookupFailed || data.partial.peersRequested > 0)
                 ? "테마 대표 종목의 시세를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오."
-                : "이 종목이 묶인 테마를 찾지 못했습니다. 테마 대표 종목 목록에 등록된 종목에서만 비교가 나옵니다."
+                : "이 종목이 묶인 테마를 찾지 못했습니다."
             }
           />
         )}

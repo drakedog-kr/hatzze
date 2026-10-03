@@ -96,6 +96,22 @@ function weekdayBars(from: string, to: string, close: (date: string) => number) 
   return out;
 }
 
+describe("analyzeDrawdown 의 lastDrop — 신고가 날 종목 칸이 쓰는 직전 큰 하락", () => {
+  it("15% 넘게 빠졌다 되찾은 것 중 마지막이고, 잔물결은 건너뛴다", () => {
+    // 100 → 60 (−40%) → 110 회복 · 새 고점 → 105 (−4.5% 잔물결) → 120 새 고점(오늘)
+    const a = analyzeDrawdown(bars([100, 80, 60, 90, 110, 105, 120]))!;
+    assert.equal(a.athDate, a.asOf);
+    assert.ok(a.lastDrop);
+    assert.equal(a.lastDrop!.peak, 100);
+    assert.equal(a.lastDrop!.trough, 60);
+    assert.equal(Math.round(a.lastDrop!.depth), -40);
+    assert.equal(a.lastDrop!.recoveryDate, bars([0, 0, 0, 0, 0])[4].date);
+  });
+  it("되찾은 큰 하락이 없으면 null", () => {
+    assert.equal(analyzeDrawdown(bars([100, 95, 101, 102]))!.lastDrop, null);
+  });
+});
+
 describe("riskProfile 의 해마다 수익", () => {
   it("그 해 수익은 전해 마지막 종가에서 잰다 — 첫 거래일의 움직임도 그 해 몫이다", () => {
     // 2024 내내 100, 2025 첫 거래일(01-02)에 110 으로 뛰고 그대로. 첫날 종가에서 재면 두 해 다 0% 가 되어

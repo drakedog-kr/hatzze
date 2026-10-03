@@ -871,7 +871,7 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-md-band > .v2-mod { display: flex; flex-direction: column; }
 .v2-md-body { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 12px 14px 14px; }
 .v2-md-price { display: flex; align-items: center; gap: 10px; }
-.v2-md-chg { font-size: 12px; font-weight: 600; line-height: 16px; font-variant-numeric: tabular-nums; }
+.v2-md-chg { font-size: 12px; font-weight: 600; line-height: 16px; font-variant-numeric: tabular-nums; color: var(--t-ink3); }
 .v2-md-chg.is-up { color: var(--t-up); }
 .v2-md-chg.is-down { color: var(--t-down); }
 .v2-md-rows { margin-top: auto; }
@@ -955,6 +955,7 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 
 /* 회복까지 — 중앙값 · 범위 선 · 빠진 속도별 두 줄(지금 꼬리표). 두 줄이 남는 높이를 받는다. */
 .v2-md-kinds { flex: 1; display: flex; flex-direction: column; margin-top: 4px; border-top: 1px solid var(--t-line); }
+.v2-md-kinds-cap { padding-top: 8px; font-size: 11px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
 .v2-md-kind { flex: 1 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; column-gap: 12px; min-height: 36px; border-bottom: 1px solid var(--t-line); font-variant-numeric: tabular-nums; }
 .v2-md-kind:last-child { border-bottom: 0; }
 .v2-md-kind-name { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
@@ -990,7 +991,8 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-md-case.is-on,
 .v2-md-case.is-on:hover { background: var(--t-down-weak); box-shadow: inset 3px 0 0 var(--t-down); }
 /* 사례 번호 — 물속 차트의 번호 표식과 같은 꼴(작은 동그라미). */
-.v2-md-case-n { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; margin-right: 8px; border: 1.5px solid var(--t-down); border-radius: 50%; font-style: normal; font-size: 10px; font-weight: 700; line-height: 1; color: var(--t-down); vertical-align: 1px; font-variant-numeric: tabular-nums; }
+/* 사례 번호 — 물속 차트 바닥 표식(.mdd-uw-num 18px · 11px)과 같은 크기. 10px 은 v2 눈금 밖이었다(2026-10-03). */
+.v2-md-case-n { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-right: 8px; border: 1.5px solid var(--t-down); border-radius: 50%; font-style: normal; font-size: 11px; font-weight: 700; line-height: 1; color: var(--t-down); vertical-align: 1px; font-variant-numeric: tabular-nums; }
 .v2-md-case.is-on .v2-md-case-n { background: var(--t-down); color: var(--t-card); }
 
 /* 물속 차트 머리 — 기간 글자 + '종목만 · ○○와 함께' 탭(키 28). */

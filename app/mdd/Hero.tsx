@@ -41,6 +41,11 @@ export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel:
   const atHigh = a.currentDd > -1;
   const sincePeak = Math.round((Date.parse(a.asOf) - Date.parse(a.athDate)) / 86_400_000);
   const fromLow = a.low > 0 ? (a.price / a.low - 1) * 100 : 0;
+  // 오늘이 신고가면 전고점 · 저점이 둘 다 오늘 종가다 — 현재가와 같은 값이 세 번 서고 '고점 이후 0일 · 저점 대비 0.0%'가 남았다(심텍, 2026-10-03).
+  // 그날은 직전 큰 하락(15% 넘게 빠졌다 되찾은 마지막 것)의 고점 · 저점 · 되찾은 날을 대신 적는다.
+  const drop = sincePeak === 0 ? a.lastDrop : null;
+  // 등락 0.0%(반올림해 0)은 오르지도 내리지도 않았다 — 빨강으로 칠하지 않는다.
+  const tone = (v: number) => (Math.abs(v) < 0.05 ? undefined : v > 0 ? "is-up" : "is-down");
   const period = periodInfo(data.years, a.firstDate, a.asOf);
   const caution = cautionShort(data.years, period.truncated, period.approxYears);
 
@@ -55,12 +60,21 @@ export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel:
             <StockLogo code={data.code} name={data.name} market={data.market} size={32} />
             <span className="v2-card-val is-big">
               <b>{fmtPrice(a.price, data.market)}</b>
-              {a.changePct !== null && <span className={`v2-md-chg ${a.changePct >= 0 ? "is-up" : "is-down"}`}>{fmtPct(a.changePct)}</span>}
+              {a.changePct !== null && <span className={["v2-md-chg", tone(a.changePct)].filter(Boolean).join(" ")}>{fmtPct(a.changePct)}</span>}
             </span>
           </div>
           <div className="v2-md-rows">
-            <PriceRow label="전고점" date={fmtDay(a.athDate, a.asOf)} value={fmtPrice(a.ath, data.market)} />
-            <PriceRow label="저점" date={fmtDay(a.lowDate, a.asOf)} value={fmtPrice(a.low, data.market)} />
+            {drop ? (
+              <>
+                <PriceRow label="직전 고점" date={fmtDay(drop.peakDate, a.asOf)} value={fmtPrice(drop.peak, data.market)} />
+                <PriceRow label="직전 저점" date={fmtDay(drop.troughDate, a.asOf)} value={fmtPrice(drop.trough, data.market)} />
+              </>
+            ) : (
+              <>
+                <PriceRow label="전고점" date={fmtDay(a.athDate, a.asOf)} value={fmtPrice(a.ath, data.market)} />
+                <PriceRow label="저점" date={fmtDay(a.lowDate, a.asOf)} value={fmtPrice(a.low, data.market)} />
+              </>
+            )}
           </div>
         </div>
       </Module>
@@ -83,15 +97,25 @@ export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel:
             <b className={atHigh ? undefined : "is-down"}>{atHigh ? "신고가 부근" : fmtPct(a.currentDd)}</b>
             {!atHigh && <span className="v2-md-aside">전고점 대비</span>}
           </span>
-          {!atHigh && <DrawdownGauge current={a.currentDd} mdd={a.mdd} periodLabel={periodLabel} />}
+          {/* 신고가 부근에도 게이지를 둔다 — 핀이 0% 에 서고 '최대' 눈금이 이 기간 가장 깊었던 자리를 말한다. 빼면 칸 가운데가 비었다. */}
+          <DrawdownGauge current={a.currentDd} mdd={a.mdd} periodLabel={periodLabel} />
           {/* 통계 셋 — 칸 바닥에 붙는다. 보조 줄에 기간 이름은 안 붙인다('전체' 조회에서 칸을 넘겼다). */}
           <div className="v2-md-stats">
             {/* '기간 최저점'은 게이지 끝 · 사례 표 첫 줄과 같은 값이라 뺐다(판정표 3) — 그 자리에 저점 대비. */}
             {/* 보조 줄('2,448일 중' · '6월 18일부터' · '7월 30일 저점')은 걷었다 — 띠의 거래일 수 · 옆 종목 칸의 전고점 · 저점 날짜와
                 같은 말이었다(2026-10-03). */}
             <StatCell label="이보다 깊었던 날" value={deeperLabel(a)} />
-            <StatCell label="고점 이후" value={fmtDayCount(sincePeak)} />
-            <StatCell label="저점 대비" value={fmtPct(fromLow)} tone={fromLow >= 0 ? UP : DOWN} />
+            {drop ? (
+              <>
+                <StatCell label="직전 하락" value={fmtPct(drop.depth)} tone={DOWN} />
+                <StatCell label="되찾은 날" value={fmtDay(drop.recoveryDate, a.asOf)} />
+              </>
+            ) : (
+              <>
+                <StatCell label="고점 이후" value={fmtDayCount(sincePeak)} />
+                <StatCell label="저점 대비" value={fmtPct(fromLow)} tone={Math.abs(fromLow) < 0.05 ? undefined : fromLow > 0 ? UP : DOWN} />
+              </>
+            )}
           </div>
         </div>
       </Module>

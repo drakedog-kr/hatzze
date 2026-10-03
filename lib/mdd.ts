@@ -132,6 +132,12 @@ export type MddAnalysis = {
   recovery: RecoveryStats | null;
   character: DrawdownCharacter | null;
   topDrawdowns: Episode[];
+  /**
+   * 직전 큰 하락 — 15% 넘게 빠졌다 되찾은 사건 중 마지막 것(고점 · 저점의 날과 종가).
+   * 오늘이 신고가인 날 화면이 쓴다: 전고점 · 저점이 둘 다 오늘 종가라 종목 칸에 같은 값이 세 번 섰다(심텍, 2026-10-03).
+   * 깊이 문턱은 급락형 · 완만형 표본과 같다(CHARACTER_MIN_DEPTH) — 하루 −0.3% 같은 잔물결을 '직전 하락'이라 부르지 않는다.
+   */
+  lastDrop: { peakDate: string; peak: number; troughDate: string; trough: number; depth: number; recoveryDate: string } | null;
   /** 낙폭 구간별 발생 횟수(−20% 이상 하락만). 위 depthHistogram 주석 참고. */
   depthBuckets: DepthBucket[];
 };
@@ -408,6 +414,18 @@ export function analyzeDrawdown(bars: Bar[]): MddAnalysis | null {
   const deeperDays = ds.filter((p) => p.dd < last.dd).length;
   const eps = episodes(bars);
   const topDrawdowns = [...eps].sort((a, b) => a.depth - b.depth).slice(0, 5);
+  const closeOn = new Map(bars.map((b) => [b.date, b.close]));
+  const big = [...eps].reverse().find((e) => e.recovered && e.depth <= CHARACTER_MIN_DEPTH);
+  const lastDrop = big
+    ? {
+        peakDate: big.peakDate,
+        peak: closeOn.get(big.peakDate)!,
+        troughDate: big.troughDate,
+        trough: closeOn.get(big.troughDate)!,
+        depth: big.depth,
+        recoveryDate: big.recoveryDate!,
+      }
+    : null;
 
   /* 차트가 반드시 지나야 하는 날 = 화면이 날짜와 값을 함께 적는 곳.
      헤드라인의 최고가(athDate)·기간 최저점(mddDate)과 '역대 낙폭 Top 5'의 고점·저점이다.
@@ -437,6 +455,7 @@ export function analyzeDrawdown(bars: Bar[]): MddAnalysis | null {
     recovery: recoveryStats(eps, last.dd),
     character: drawdownCharacter(eps, last.dd, bars),
     topDrawdowns,
+    lastDrop,
     depthBuckets: depthHistogram(eps),
   };
 }

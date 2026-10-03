@@ -5,10 +5,9 @@
 import { Skeleton as SkeletonBlock } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { C, Icon } from "../ui";
-import { SectionHead } from "../kadera/SectionHead";
+import { Module } from "../kadera/V2Modules";
 import { PAD, periodInfo } from "./shared";
 import type { MddResult } from "./shared";
-import type { IconName } from "@/lib/icon-names";
 
 /**
  * "최근 10년" / "상장 이후·약 6년" — 화면 곳곳이 같은 말을 써야 해서 한곳에서 만든다.
@@ -57,18 +56,15 @@ export function Foot({ children }: { children: React.ReactNode }) {
  * 옆 시트 가운데가 텅 비고, (2) 문턱이 절벽이라 시트가 깜빡인다 — 성격 시트는 −8% 문턱이라
  * KB금융(−7.9%)이 0.1%p 차이로 사라져, 하루 사이 생겼다 없어지면 "어제 있던 게 왜 없지"가
  * 된다. 자리를 지키고 왜 못 보여주는지를 적는다.
+ *
+ * v2(2026-10-03): 옛 시트(머리 아이콘 타일 + 정보 아이콘 + 두 문장)를 v2 모듈(머리 띠 + 까닭 한 줄)로. 신고가 종목에선
+ * '회복까지' · '시장 탓' 두 칸이 나란히 이 꼴이 돼 정보 아이콘이 한 화면에 둘 섰다.
  */
-export function AbsentSheet({ icon, title, sub, body }: { icon: IconName; title: string; sub: string; body: string }) {
+export function AbsentSheet({ title, body }: { title: string; body: string }) {
   return (
-    <Sheet>
-      <SectionHead level={3} icon={icon} title={title} desc={sub} />
-      <div style={{ padding: PAD }}>
-        <p style={{ margin: 0, color: C.muted, fontSize: "var(--fs-12)", lineHeight: 1.7, wordBreak: "keep-all" }}>
-          <Icon name="info" style={{ fontSize: "var(--fs-14)", verticalAlign: -2, marginRight: 4 }} />
-          {body}
-        </p>
-      </div>
-    </Sheet>
+    <Module title={title}>
+      <p className="v2-empty">{body}</p>
+    </Module>
   );
 }
 
