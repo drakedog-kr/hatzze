@@ -1878,3 +1878,33 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 .v2-kd.v2-in .hz-sheet-head-note { padding: 0; border: 0; background: none; font-size: 12px !important; font-weight: 500 !important; color: var(--t-ink3) !important; }
 .v2-kd.v2-in .hz-seg { border-color: var(--t-frame); border-radius: 6px; }
 .v2-kd.v2-in .hz-seg > button { border-radius: 4px; font-size: 12px; font-weight: 600; }
+
+/* ── v2 종목 페이지(/stock/[code], 2026-10-03) — 테마 한 장(.v2-tm)과 같은 얼개 · 같은 부품 ─────────────────────────────
+   뿌리가 "v2-kd v2-tm v2-sk" 라 띠 · 짝(.v2-tm-band) · 추이(.v2-tm-trend) · 알약(.v2-tm-pill) 규칙을 그대로 받는다. 여기는 이 화면만의 조각. */
+/* 첫 칸 — 종목 이름이 이 화면의 h1 이다(셸은 이 주소의 제목을 모른다). 띠의 값 글자(13/700)와 같은 크기로. */
+.v2-sk-id { align-items: center; }
+.v2-sk-id h1 { margin: 0; font-size: 13px; font-weight: 700; line-height: 20px; color: var(--t-ink); white-space: nowrap; }
+.v2-sk-id .v2-cover-k { margin-left: 2px; }
+/* 요즘 도는 얘기 — 이름표 칸에 날짜 · 등락이 서서 시장 브리핑보다 넓다. */
+.v2-sk .v2-brief3-row { grid-template-columns: 96px minmax(0, 1fr); }
+.v2-sk .v2-brief3 dt b { font-weight: 700; }
+.v2-sk .v2-brief3 dt b.is-up { color: var(--t-up); }
+.v2-sk .v2-brief3 dt b.is-down { color: var(--t-down); }
+.v2-sk-src { font-size: 12px; color: var(--t-ink3); }
+/* 일정 줄 끝 — 몇 곳이 짚었나. */
+.v2-sk-evn { flex: none; margin-left: auto; font-size: 12px; font-weight: 500; line-height: 22px; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
+/* 배당 — 달마다 막대(받은 달만 파랑) · 달 · 그달 받은 돈. */
+.v2-sk-months { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; }
+.v2-sk-months > span { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+.v2-sk-mbar { display: flex; align-items: flex-end; justify-content: center; width: 100%; height: 48px; }
+.v2-sk-mbar i { display: block; width: 100%; max-width: 22px; border-radius: 2px; background: var(--t-down); }
+.v2-sk-mbar i.is-none { background: var(--t-bar-off); }
+.v2-sk-months em { font-style: normal; font-size: 11px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
+.v2-sk-months b { font-size: 11px; font-weight: 600; line-height: 14px; color: var(--t-ink2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v2-sk-facts { margin: 0; font-size: 12px; font-weight: 500; line-height: 18px; color: var(--t-ink3); word-break: keep-all; }
+/* 추이 · 배당 숫자 칸 — 넷이면 폰 폭(351)을 넘었다. 접어 두 줄로. */
+.v2-sk .v2-tm-figs { flex-wrap: wrap; row-gap: 8px; }
+@container kd (max-width: 679px) {
+  .v2-sk .v2-brief3-row { grid-template-columns: 76px minmax(0, 1fr); }
+  .v2-sk-months b { display: none; }
+}
