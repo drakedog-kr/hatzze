@@ -5,12 +5,11 @@ import type { ClosePoint, StockHighGap } from "@/lib/data";
 import { formatEokMixed, formatIndicatorValue, shortDate } from "@/lib/format";
 import { stockHref } from "@/lib/stock-page";
 import { BLUE_SCALE, C, MONO, R } from "../ui";
-import { sourceDateBadge, Shell, TitleRow, Big, Foot, HeatKnob, HeatFill, HeatBar, AreaChart } from "./parts";
+import { sourceDateBadge, Shell, TitleRow, Big, Foot, HeatKnob, HeatFill, HeatBar, AreaChart, SplitStats } from "./parts";
 import type { Pick } from "./parts";
 
 export function CardBuffett({ v }: { v: Pick }) {
   const dt = v.details;
-  const ratio = v.raw !== null ? v.raw / 100 : null; // 시총/GDP 배수
   // GDP 막대는 시총을 100% 로 둔 상대 길이다. 둘이 같은 축 위에 있어야 "몇 배"가 그림으로 읽힌다.
   const gdpWidth = v.raw && v.raw > 0 ? Math.min(100, (100 / v.raw) * 100) : 50;
   const jo = (won: number) => Math.round(won / 1e12).toLocaleString("ko-KR"); // 원 → 조원
@@ -19,21 +18,16 @@ export function CardBuffett({ v }: { v: Pick }) {
       {/* ⚠️ payments(지폐) 였다. 이 지표는 돈의 크기가 아니라 **나라 경제(GDP) 대비 증시
           크기**라, 지폐보다 경제를 가리키는 그림이 가깝다. 지폐는 거래대금 카드로 옮겼다. */}
       <TitleRow desc={v.headline} icon="account_balance" name={v.name} />
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-        <Big disp={v.disp} unit={v.unit} color={v.color} size={32} />
-        {ratio !== null && (
-          <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
-            {ratio.toFixed(1)}배
-          </span>
-        )}
-      </div>
+      {/* 'n배' 알약과 '증시가 실물 경제보다 n배 커진 상태입니다' 상자를 걷었다(2026-10-03 v2) — 큰 숫자 195% 와
+          같은 값을 두 번 더 말했다. 몇 배인지는 아래 두 막대 길이가 그림으로 말한다. */}
+      <Big disp={v.disp} unit={v.unit} color={v.color} size={32} />
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
             <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>
               나라 경제 (GDP){dt && dt.gdp_year ? ` · ${String(dt.gdp_year).slice(2)}년 ${dt.gdp_q}분기` : ""}
             </span>
-            <span style={{ fontFamily: MONO, fontSize: "var(--fs-12-5)", fontWeight: 700, color: C.label, whiteSpace: "nowrap" }}>
+            <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: C.label, whiteSpace: "nowrap" }}>
               {dt && dt.gdp ? `약 ${jo(dt.gdp)}조원` : "기준 100"}
             </span>
           </div>
@@ -45,7 +39,7 @@ export function CardBuffett({ v }: { v: Pick }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
             <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>증시 시가총액</span>
-            <span style={{ fontFamily: MONO, fontSize: "var(--fs-12-5)", fontWeight: 700, color: C.ink, whiteSpace: "nowrap" }}>
+            <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: C.ink, whiteSpace: "nowrap" }}>
               {dt && dt.market_cap ? `약 ${jo(dt.market_cap)}조원` : `${v.disp}${v.unit}`}
             </span>
           </div>
@@ -53,9 +47,6 @@ export function CardBuffett({ v }: { v: Pick }) {
             <div className="hz-hbar-fill" style={{ width: "100%", background: C.blue }} />
           </div>
         </div>
-        <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.label, background: C.soft, borderRadius: R.control, padding: "9px 11px" }}>
-          증시가 실물 경제보다 {ratio !== null ? `${ratio.toFixed(1)}배 커진` : "커진"} 상태입니다
-        </span>
       </div>
       <Foot text={v.desc} />
     </Shell>
@@ -97,11 +88,11 @@ export function CardLeverage({ v }: { v: Pick }) {
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="rocket_launch" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-        <strong style={{ fontFamily: MONO, fontSize: "var(--fs-32)", fontWeight: 800, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
+        <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
           {heat ?? "-"}
-          <span style={{ fontSize: "var(--fs-17)", fontWeight: 700, color: C.sub }}>/100</span>
+          <span style={{ fontSize: "var(--fs-13)", fontWeight: 700, color: C.sub }}>/100</span>
         </strong>
-        <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.sub2 }}>종합 과열도</span>
+        <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>종합 과열도</span>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <HeatFill pct={heat ?? 0} />
@@ -111,20 +102,13 @@ export function CardLeverage({ v }: { v: Pick }) {
         </div>
       </div>
       {dt && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10 }}>
-          {/* 서브바 두 개는 각자 '자기 기준 대비 달성률'이라 큰 숫자와 다른 눈금이다.
-              라벨을 '기준 대비'로 갈라 둔 것이 그 표시다(같은 이름으로 부르면 안 된다). */}
-          <div style={{ background: C.soft, borderRadius: R.control, padding: 13, display: "flex", flexDirection: "column", gap: 5 }}>
-            <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub2 }}>ETF 거래대금</span>
-            <strong style={{ fontFamily: MONO, fontSize: "var(--fs-17)", fontWeight: 800, color: C.ink }}>{etfAmount ?? "-"}</strong>
-            <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>{etfBaseLabel} 대비 {Math.round(dt.etf_progress ?? 0)}%</span>
-          </div>
-          <div style={{ background: C.soft, borderRadius: R.control, padding: 13, display: "flex", flexDirection: "column", gap: 5 }}>
-            <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub2 }}>선물 미결제약정</span>
-            <strong style={{ fontFamily: MONO, fontSize: "var(--fs-17)", fontWeight: 800, color: C.ink }}>{oiAmount ?? "-"}</strong>
-            <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>1년 평균 대비 {oiVsAvg !== null ? Math.round(oiVsAvg) : "-"}%</span>
-          </div>
-        </div>
+        // 근거 둘은 각자 '자기 기준 대비'라 큰 숫자와 다른 눈금이다 — 아래 줄을 '기준 대비'로 갈라 둔 것이 그 표시다.
+        <SplitStats
+          items={[
+            { label: "ETF 거래대금", value: etfAmount ?? "-", sub: `${etfBaseLabel} 대비 ${Math.round(dt.etf_progress ?? 0)}%` },
+            { label: "선물 미결제약정", value: oiAmount ?? "-", sub: `1년 평균 대비 ${oiVsAvg !== null ? Math.round(oiVsAvg) : "-"}%` },
+          ]}
+        />
       )}
       <Foot text={v.desc} />
     </Shell>
@@ -159,39 +143,40 @@ export function CardMarketActions({ v }: { v: Pick }) {
   //    따로 필요하다(그러면 오늘 값이 54.5 → 9.1 로 내려간다).
   const dir =
     buyN > sellN
-      ? { label: "매수 우세", color: C.hot, hint: "달아오른 쪽이 잦았습니다" }
+      ? { label: "매수 우세", color: C.hot }
       : sellN > buyN
-        ? { label: "매도 우세", color: C.neutral, hint: "식는 쪽이 잦았습니다" }
-        : { label: "균형", color: C.ink, hint: "양쪽이 비슷했습니다" };
+        ? { label: "매도 우세", color: C.neutral }
+        : { label: "균형", color: C.ink };
   // 세 값을 **같은 눈금**에 올린다. 숫자 타일 셋으로 흩어 두면 5·8·6 을 눈이 직접 빼야
   // 하는데, 같은 축의 막대로 두면 "매도가 더 잦았다"가 길이로 바로 증명된다.
   // 색이 방향을 진다 — 매수 안전장치(상승 제동)는 달아오른 쪽이라 고온, 매도 쪽은 식는
   // 쪽이라 상온 파랑, CB 는 둘 다 걸릴 수 있어 중립인 연파랑.
+  // 줄 이름은 장치 이름 그대로 — 'CB' 같은 영문 약어는 걷었다(v2, 2026-10-03). 매수 · 매도는 사이드카 방향이다(fetch_market_actions.py).
   const rows = [
-    { label: "매수", n: buyN, fill: C.hot, ink: C.hot },
-    { label: "매도", n: sellN, fill: C.neutral, ink: C.ink },
-    { label: "CB", n: cbN, fill: "var(--c-blue-4)", ink: C.label },
+    { label: "매수 사이드카", n: buyN, fill: C.hot, ink: C.hot },
+    { label: "매도 사이드카", n: sellN, fill: C.neutral, ink: C.ink },
+    { label: "서킷브레이커", n: cbN, fill: "var(--c-blue-4)", ink: C.label },
   ];
   const maxN = Math.max(1, buyN, sellN, cbN);
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       {/* ⚠️ speed(속도계) 였다. 이 지표가 세는 것은 VI·사이드카·서킷브레이커 — 시장을
           **멈추는** 장치이지 속도가 아니다. 속도계는 MDD 의 '하락 vs 회복 속도' 타일이 쓴다. */}
-      <TitleRow desc={v.headline} icon="shield" name={v.name} badge="최근 한 달" />
+      {/* '최근 한 달' 꼬리표는 걷었다 — 지표 이름('최근 한 달 매매 안전장치 동향')이 이미 말한다. */}
+      <TitleRow desc={v.headline} icon="shield" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-        {/* 한글은 같은 font-size 라도 숫자보다 글리프가 커 보인다 — 다른 카드의 32px 숫자와
-            '눈에 보이는 크기'를 맞춘 값이 30 이다. */}
-        <strong style={{ fontSize: "var(--fs-30)", fontWeight: 800, letterSpacing: "-.03em", color: dir.color, lineHeight: 1 }}>{dir.label}</strong>
-        <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>{dir.hint}</span>
+        <strong style={{ fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: dir.color, lineHeight: 1 }}>{dir.label}</strong>
+        {/* 곁말은 판정을 풀어 쓴 문장('양쪽이 비슷했습니다')이었다 — 문장 대신 셋을 합친 건수. 판정은 아래 막대가 증명한다. */}
+        <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2, whiteSpace: "nowrap" }}>{buyN + sellN + cbN}건 발동</span>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {rows.map((r) => (
           <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ width: 34, flexShrink: 0, fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub2 }}>{r.label}</span>
+            <span style={{ width: 76, flexShrink: 0, fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>{r.label}</span>
             <div className="hz-hbar-track hz-hbar-md">
               <div className="hz-hbar-fill" style={{ width: `${(r.n / maxN) * 100}%`, background: r.fill }} />
             </div>
-            <span style={{ width: 30, flexShrink: 0, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12-5)", fontWeight: 800, color: r.ink }}>
+            <span style={{ width: 30, flexShrink: 0, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: r.ink }}>
               {r.n}건
             </span>
           </div>
@@ -261,7 +246,7 @@ export function CardTurnover({ v }: { v: Pick }) {
                     {s2.label}
                   </span>
                 )}
-                <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 800, color: s2.ink }}>{s2.pct.toFixed(1)}%</span>
+                <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: s2.ink }}>{s2.pct.toFixed(1)}%</span>
               </div>
             ),
           )}
@@ -319,7 +304,7 @@ export function CardHighGap({ v, tops, failed = false }: { v: Pick; tops: StockH
             className="hz-tip hz-tip-wide hz-tip-start"
             data-tip={`현재가와 52주 고점 모두 야후 파이낸스 종가 기준입니다${tops[0]?.priceDate ? ` (${tops[0].priceDate} 종가)` : ""}. 막대가 꽉 찰수록 고점에 가깝습니다.`}
             data-ga-tip="high_gap_source"
-            style={{ fontSize: "var(--fs-11-5)", fontWeight: 700, color: C.muted }}
+            style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.muted }}
           >
             거래대금 상위 종목의 52주 고점 근접도
           </span>
@@ -331,7 +316,7 @@ export function CardHighGap({ v, tops, failed = false }: { v: Pick; tops: StockH
                 data-ga="cta_click"
                 data-ga-cta="stock"
                 data-ga-surface="home_high_gap"
-                style={{ width: 76, flexShrink: 0, fontSize: "var(--fs-12-5)", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                style={{ width: 76, flexShrink: 0, fontSize: "var(--fs-12)", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
               >
                 {st.name}
               </Link>
@@ -447,8 +432,9 @@ export function CardVkospi({ v }: { v: Pick }) {
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="monitor_heart" name={v.name} />
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-        <Big disp={v.disp} color={v.color} size={32} sub="변동성지수" />
-        <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+        {/* 곁말 '변동성지수'는 걷었다 — 지표 이름 'VKOSPI (변동성지수)'와 같은 말이다(v2, 2026-10-03). */}
+        <Big disp={v.disp} color={v.color} size={32} />
+        <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
           {verdict}
         </span>
       </div>
@@ -463,10 +449,10 @@ export function CardVkospi({ v }: { v: Pick }) {
             이었는데, 방심은 시장의 상태가 아니라 그 상태에 대한 평가라서 눈금 끝에
             적히면 무엇을 잰 값인지가 흐려졌다(2026-08-04). 낮은 쪽이 왜 과열 신호인지는
             셀 맨 아래 설명 한 줄이 맡는다. */}
+        {/* 가운데 '최근 30일 범위'는 걷었다 — 위 알약('최근 30일 중 낮은 편')이 같은 기간을 말한다. */}
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.muted }}>잔잔 {lo !== null ? Math.round(lo) : "-"}</span>
-          <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>최근 30일 범위</span>
-          <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.muted }}>출렁 {hi !== null ? Math.round(hi) : "-"}</span>
+          <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.muted }}>잔잔 {lo !== null ? Math.round(lo) : "-"}</span>
+          <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.muted }}>출렁 {hi !== null ? Math.round(hi) : "-"}</span>
         </div>
       </div>
       <Foot text={v.desc} />
@@ -474,15 +460,17 @@ export function CardVkospi({ v }: { v: Pick }) {
   );
 }
 
+// v2(2026-10-03): 두 칸 폭(wide) — 시장 판 15칸을 16칸으로 맞추는 한 장. 막대 넷이 가로로 길어져 붙은 값(100 대 107)이 더 벌어진다.
 export function CardAsia({ v }: { v: Pick }) {
   const dt = v.details;
   const k = dt?.kospi ?? 0;
   const bars = dt
     ? [
-        { label: "KOSPI", sub: "한국", index: 100, self: true },
-        { label: "Nikkei", sub: "일본", index: 100 + ((dt.nikkei ?? 0) - k), self: false },
-        { label: "HangSeng", sub: "홍콩", index: 100 + ((dt.hangseng ?? 0) - k), self: false },
-        { label: "Taiex", sub: "대만", index: 100 + ((dt.taiex ?? 0) - k), self: false },
+        // 줄 이름은 나라 이름 한 줄(v2, 2026-10-03). 영문 지수 이름(Nikkei · HangSeng · Taiex) 위에 나라를 한 줄 더 얹던 두 줄 꼴을 걷었다.
+        { label: "한국", index: 100, self: true },
+        { label: "일본", index: 100 + ((dt.nikkei ?? 0) - k), self: false },
+        { label: "홍콩", index: 100 + ((dt.hangseng ?? 0) - k), self: false },
+        { label: "대만", index: 100 + ((dt.taiex ?? 0) - k), self: false },
       ]
     : [];
   // 눈금 상한. 가장 큰 나라도 막대 끝에 딱 붙지 않게 4% 만큼 여유를 둔다 — 붙으면
@@ -493,11 +481,11 @@ export function CardAsia({ v }: { v: Pick }) {
   const kospiPct = bars.length ? pct(bars[0].index) : "0%";
   // 라벨·값 칸 폭. 파선을 덮어씌우는 상자가 이 값을 그대로 되읽어야 막대 칸에 정확히
   // 겹친다(숫자를 두 곳에 적으면 반드시 어긋난다).
-  const LABEL_W = 62;
+  const LABEL_W = 28;
   const VALUE_W = 34;
   const ROW_GAP = 9;
   return (
-    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
+    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} wide minH={230}>
       {/* ⚠️ public(지구본) 이었다. 아래 CardNetBuy("고점권 외국인 매도")가 같은 지구본을
           쓰고 있어 한 화면에 둘이었다. 지구본은 그쪽이 갖는다 — 저 카드는 **누가** 사고파는지
           (외국인)를 말하는 자리라 방향에 매이지 않는 그림이 필요하고, 이 카드가 실제로 하는
@@ -539,11 +527,8 @@ export function CardAsia({ v }: { v: Pick }) {
           </span>
           {bars.map((b) => (
             <div key={b.label} style={{ display: "flex", alignItems: "center", gap: ROW_GAP }}>
-              <span style={{ width: LABEL_W, flexShrink: 0, display: "flex", flexDirection: "column", gap: 1 }}>
-                <span style={{ fontSize: "var(--fs-11)", fontWeight: b.self ? 800 : 700, color: b.self ? C.ink : C.label, whiteSpace: "nowrap" }}>
-                  {b.label}
-                </span>
-                <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub }}>{b.sub}</span>
+              <span style={{ width: LABEL_W, flexShrink: 0, fontSize: "var(--fs-12)", fontWeight: b.self ? 700 : 600, color: b.self ? C.ink : C.sub2, whiteSpace: "nowrap" }}>
+                {b.label}
               </span>
               {/* 막대 두께는 카드 안 목록 막대(10px, shadcn.css .hz-hbar-md)와 맞춘다(2026-09-27, 16 → 10). */}
               <div style={{ position: "relative", flex: 1, minWidth: 0, height: 10 }}>
@@ -569,7 +554,7 @@ export function CardAsia({ v }: { v: Pick }) {
                   textAlign: "right",
                   fontFamily: MONO,
                   fontSize: "var(--fs-12)",
-                  fontWeight: 800,
+                  fontWeight: 700,
                   color: b.self ? C.ink : C.label,
                 }}
               >
@@ -594,7 +579,7 @@ export function CardAsia({ v }: { v: Pick }) {
                   whiteSpace: "nowrap",
                 }}
               >
-                KOSPI 100 기준
+                코스피 100 기준
               </span>
             </div>
             <span style={{ width: VALUE_W, flexShrink: 0 }} />
@@ -657,7 +642,7 @@ export function CardVolume({ v }: { v: Pick }) {
             <div className="hz-hbar-track hz-hbar-md">
               <div className="hz-hbar-fill" style={{ width: `${((r.value ?? 0) / max) * 100}%`, background: r.fill }} />
             </div>
-            <span style={{ width: 58, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12-5)", fontWeight: 700, color: r.strong ? C.ink : C.label }}>
+            <span style={{ width: 58, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: r.strong ? C.ink : C.label }}>
               {r.value !== null ? fmt(r.value) : "-"}
             </span>
           </div>
@@ -749,7 +734,7 @@ export function CardNetBuy({ v }: { v: Pick }) {
           <span
             style={{
               alignSelf: "flex-start",
-              fontSize: "var(--fs-11-5)",
+              fontSize: "var(--fs-12)",
               fontWeight: 700,
               padding: "4px 10px",
               borderRadius: R.pill,
@@ -860,11 +845,11 @@ export function CardLimitUp({ v }: { v: Pick }) {
       />
       <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
         {rank.length === 0 ? (
-          <span style={{ fontSize: "var(--fs-12-5)", color: C.sub }}>10% 넘게 오른 종목이 없습니다</span>
+          <span style={{ fontSize: "var(--fs-12)", color: C.sub }}>10% 넘게 오른 종목이 없습니다</span>
         ) : (
           rank.map((r, i) => (
             <div key={`${r.n}-${i}`} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, minWidth: 0 }}>
-              <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.label, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.label, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {r.n}
               </span>
               <span
@@ -872,7 +857,7 @@ export function CardLimitUp({ v }: { v: Pick }) {
                   flexShrink: 0,
                   fontFamily: MONO,
                   fontSize: "var(--fs-12)",
-                  fontWeight: 800,
+                  fontWeight: 700,
                   color: "var(--card-accent-ink, var(--c-cold-ink))",
                   background: "var(--card-accent-tint, var(--c-blue-tint))",
                   borderRadius: R.pill,
@@ -891,7 +876,7 @@ export function CardLimitUp({ v }: { v: Pick }) {
               buckets.map((b) => `${b.label}: ${b.n}종목`).join("\n") +
               (listed ? `\n전체: ${listed.toLocaleString("ko-KR")}종목` : "")
             }
-            style={{ fontSize: "var(--fs-11-5)", color: C.sub }}
+            style={{ fontSize: "var(--fs-11)", color: C.sub }}
           >
             외 {rest}개
           </span>
@@ -903,7 +888,8 @@ export function CardLimitUp({ v }: { v: Pick }) {
 }
 
 // 옵션 풋/콜 비율 — 콜(상승 베팅) vs 풋(하락 대비) 거래량 비중.
-// 목업은 두 칸을 **gap 4 로 떼어** 각자 알약으로 두고, 아래에 비중과 뜻풀이를 두 줄로 깐다.
+// 목업은 두 칸을 **gap 4 로 떼어** 각자 알약으로 두고, 아래에 비중을 깐다.
+// 뜻풀이 줄('콜 = 상승 베팅 · 풋 = 하락 대비')은 걷었다(v2, 2026-10-03 — 화면에 정의 문장을 두지 않는다). 뜻은 막대 툴팁이 진다.
 export function CardPutCall({ v }: { v: Pick }) {
   const dt = v.details as unknown as {
     put_vol?: number; call_vol?: number; put_eok?: number; call_eok?: number;
@@ -941,10 +927,6 @@ export function CardPutCall({ v }: { v: Pick }) {
         <div style={{ display: "flex", justifyContent: "space-between" }}>
           <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: C.mania }}>콜 {Math.round(callShare)}%</span>
           <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: C.cold }}>풋 {Math.round(100 - callShare)}%</span>
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>콜 = 상승 베팅</span>
-          <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>풋 = 하락 대비</span>
         </div>
       </div>
       <Foot text={v.desc} />

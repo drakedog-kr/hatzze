@@ -147,6 +147,7 @@ export function Shell({
   slug,
   hit = false,
   warm = false,
+  wide = false,
   minH = 230,
   children,
 }: {
@@ -159,6 +160,11 @@ export function Shell({
   hit?: boolean;
   /** 고온 이상(진행률 ≥ 50). 카드에 붙는 보조 배지의 색을 가른다(pick 의 warm 주석). */
   warm?: boolean;
+  /**
+   * 두 칸 폭(v2, 2026-10-03). 시장 15칸 · 감성 11칸이라 4열 · 2열 어디서든 끝 줄 한 칸이 비었다 —
+   * 판마다 한 장을 두 칸으로 펴서 16 · 12 로 맞춘다. 폭이 갈리는 자리는 v2.css .hz-cell-wide.
+   */
+  wide?: boolean;
   minH?: number;
   children: React.ReactNode;
 }) {
@@ -182,7 +188,7 @@ export function Shell({
       // 2026-08 콘솔 리디자인: 카드가 아니라 **시트 안의 셀**이다. 배경·격자선·최소
       // 높이는 globals.css 의 .hz-cards > * 가 준다 — 여기서 인라인으로 주면 초고온
       // 셀의 상단 라인(.hz-cell-hot)을 덮어써 버린다.
-      className={hit ? "hz-cell-hot" : undefined}
+      className={[hit ? "hz-cell-hot" : "", wide ? "hz-cell-wide" : ""].filter(Boolean).join(" ") || undefined}
       style={{
         // 모든 카드의 divider(Foot 등) 가로 위치가 동일하도록 안쪽 여백을 통일한다.
         // 값은 폭에 따라 22 → 18 (globals.css 의 --hz-card-pad).
@@ -252,7 +258,7 @@ function HitBadge({ label = "초고온" }: { label?: string }) {
           background: "var(--c-mania-tint)",
           /* tint 위에 C.mania 를 그대로 얹으면 명암비 4.21 이라 배지 글자가 안 읽힌다. */
           color: "var(--c-hot-ink)",
-          fontWeight: 800,
+          fontWeight: 700,
           fontSize: "var(--fs-11)",
           lineHeight: 1.2,
           padding: "5px 10px",
@@ -333,7 +339,7 @@ export function TitleRow({
             justifyContent: right ? "space-between" : undefined,
           }}
         >
-          <span className="hz-clamp2 hz-cell-name" style={{ fontSize: "var(--fs-13-5)", fontWeight: 800, color: C.ink, lineHeight: 1.3, letterSpacing: "-.01em", wordBreak: "keep-all" }}>
+          <span className="hz-clamp2 hz-cell-name" style={{ fontSize: "var(--fs-13)", fontWeight: 700, color: C.ink, lineHeight: 1.3, letterSpacing: "-.01em", wordBreak: "keep-all" }}>
             {name}
           </span>
           {badge && (
@@ -355,7 +361,7 @@ export function TitleRow({
           {right && <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>{right}</div>}
         </div>
         {desc && (
-          <p className="hz-clamp2 hz-cell-desc" style={{ margin: 0, fontSize: "var(--fs-12-5)", lineHeight: 1.45, color: C.sub2, wordBreak: "keep-all" }}>{desc}</p>
+          <p className="hz-clamp2 hz-cell-desc" style={{ margin: 0, fontSize: "var(--fs-12)", lineHeight: 1.45, color: C.sub2, wordBreak: "keep-all" }}>{desc}</p>
         )}
       </div>
     </div>
@@ -384,7 +390,7 @@ export function Big({
         style={{
           fontFamily: MONO,
           fontSize: size,
-          fontWeight: 800,
+          fontWeight: 700,
           color,
           lineHeight: 1,
           letterSpacing: "-0.03em",
@@ -398,7 +404,7 @@ export function Big({
       </span>
       {/* 곁말은 목업에서 **강조색이 아니라 회색**이다(12.5 / --c-sub2). 큰 수치와 같은
           색이면 둘이 한 덩어리로 읽혀 어느 쪽이 결론인지 흐려진다. */}
-      {sub && <span className="hz-big-sub" style={{ fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>{sub}</span>}
+      {sub && <span className="hz-big-sub" style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>{sub}</span>}
     </div>
   );
 }
@@ -490,8 +496,8 @@ export function HeatBar({ v, hideThreshold = false }: { v: Pick; hideThreshold?:
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 700, color: C.muted }}>과열도</span>
-        <span style={{ fontFamily: MONO, fontSize: "var(--fs-12-5)", fontWeight: 800, color: v.color }}>
+        <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, color: C.muted }}>과열도</span>
+        <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: v.color }}>
           {Math.round(v.capped)}
           <span style={{ color: C.sub, fontWeight: 600 }}>/100</span>
         </span>
@@ -502,10 +508,39 @@ export function HeatBar({ v, hideThreshold = false }: { v: Pick; hideThreshold?:
         <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>과열 100</span>
       </div>
       {v.hotDisp && !hideThreshold && (
-        <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub2, background: C.soft, borderRadius: R.control, padding: "8px 10px" }}>
+        // 회색 상자였다 — 눈금 아래 글자 한 줄로(v2, 2026-10-03). 양 끝 '안심 · 과열 100' 과 같은 꼴.
+        <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.sub }}>
           초고온 기준선 {v.hotDisp} {v.dirLabel}
         </span>
       )}
+    </div>
+  );
+}
+
+/**
+ * 근거 두 칸 — 레버리지 · 코인 · 실물–증시 괴리가 큰 숫자 아래 근거 둘을 나란히 둔다.
+ * 회색 타일 둘이었는데(v2, 2026-10-03) 위 가는 선 하나 · 가운데 세로선 하나로 나눈 두 칸으로 바꿨다 —
+ * 칸 안에 칸을 또 띄우면 시트 격자 위에 상자가 한 겹 더 앉는다(MDD · 배당에서 걷은 것과 같다). 꼴은 v2.css .hz-split.
+ */
+export function SplitStats({
+  items,
+}: {
+  items: { label: React.ReactNode; value: React.ReactNode; color?: string; sub?: React.ReactNode; tip?: string }[];
+}) {
+  return (
+    <div className="hz-split">
+      {items.map((it, i) => (
+        <div key={i} className="hz-split-cell">
+          {/* 툴팁이 있는 이름은 점선 밑줄로 표시한다 — 물음표 아이콘을 칸마다 달면 한 칸에 같은 아이콘이 둘 선다. */}
+          <span className={it.tip ? "hz-split-k hz-tip hz-tip-wide hz-tip-start is-tip" : "hz-split-k"} data-tip={it.tip}>
+            {it.label}
+          </span>
+          <strong className="hz-split-v" style={it.color ? { color: it.color } : undefined}>
+            {it.value}
+          </strong>
+          {it.sub && <span className="hz-split-sub">{it.sub}</span>}
+        </div>
+      ))}
     </div>
   );
 }

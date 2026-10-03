@@ -1,8 +1,8 @@
 // 홈의 감성 지표 카드들. app/page.tsx 에서 그대로 옮겨 왔다(app/home/parts.tsx 머리말 참고).
 
 import { formatIndicatorValue, formatSampleCount, sentimentTone, shortDate } from "@/lib/format";
-import { C, Icon, MONO, R } from "../ui";
-import { overheatColor, Shell, TitleRow, Big, Foot, HeatFill, AreaChart } from "./parts";
+import { C, MONO, R } from "../ui";
+import { overheatColor, Shell, TitleRow, Big, Foot, HeatFill, AreaChart, SplitStats } from "./parts";
 import type { Pick } from "./parts";
 import type { IconName } from "@/lib/icon-names";
 
@@ -12,23 +12,21 @@ import type { IconName } from "@/lib/icon-names";
 export function CardComingSoon() {
   return (
     <Shell minH={230}>
-      <TitleRow icon="credit_score" name="신용융자 잔고" desc="빚내서 주식을 산 금액" badge="준비 중" />
+      {/* v2(2026-10-03): 이름 옆 '준비 중' 꼬리표 · 회색 면 · 모래시계를 걷었다 — 상자 안 글자와 꼬리표가 같은 말을 했다.
+          점선 테두리 하나가 '빈자리'를 말한다(지표 제보 칸과 같은 어법). */}
+      <TitleRow icon="credit_score" name="신용융자 잔고" desc="빚내서 주식을 산 금액" />
       <div
         style={{
           flex: 1,
           minHeight: 96,
           borderRadius: R.control,
-          border: `1.5px dashed ${C.line}`,
-          background: C.soft,
+          border: `1px dashed ${C.line}`,
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          gap: 8,
         }}
       >
-        <Icon name="hourglass_empty" style={{ fontSize: "var(--fs-24)", color: C.muted }} />
-        <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 700, color: C.sub }}>데이터 준비 중</span>
+        <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub }}>데이터 준비 중</span>
       </div>
       <Foot text="빚내서 주식 사는 돈이 불어나면 과열 신호입니다" />
     </Shell>
@@ -160,37 +158,27 @@ export function CardDivergence({ v }: { v: Pick }) {
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="compare_arrows" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-        <strong style={{ fontSize: "var(--fs-30)", fontWeight: 800, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
+        <strong style={{ fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
           {leadWho} <span style={{ fontFamily: MONO }}>{Math.round(Math.abs(lead))}%</span>
         </strong>
-        <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.sub2 }}>강세</span>
+        <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>강세</span>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10 }}>
-        {tiles.map((t) => (
-          <div key={t.label} style={{ background: C.soft, borderRadius: R.control, padding: 13, display: "flex", flexDirection: "column", gap: 6 }}>
-            <span
-              className={t.tip ? "hz-tip hz-tip-wide hz-tip-start" : undefined}
-              data-tip={t.tip}
-              style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "var(--fs-11-5)", fontWeight: 700, color: C.sub2 }}
-            >
-              {t.label}
-              {/* ⚠️ `C.hint` 였다. 그 토큰은 **점선·비활성 아이콘**용이라 명암비가 라이트
-                  1.49 · 다크 2.3 으로, 그림에 요구되는 3:1 에도 못 미친다. 이 물음표는
-                  장식이 아니라 **툴팁이 있다는 유일한 표시**라 안 보이면 기능이 사라진다.
-                  시트 머리(kadera/SectionHead)가 같은 이유로 이미 muted 로 옮겼다. */}
-              {t.tip && <Icon name="help" style={{ fontSize: "var(--fs-13)", color: C.muted }} />}
-            </span>
-            <span style={{ fontSize: "var(--fs-11-5)", color: C.muted }}>{t.hint}</span>
-            {/* 색은 값이 아니라 **그 값이 뜻하는 과열도**(heat)로 낸다 — 위 주석 참고.
-                예전엔 '앞서는 쪽'만 파랑이고 나머지는 먹색이라, 같은 눈금의 두 수가 서로 다른
-                규칙으로 칠해져 비교가 안 됐다. 어느 쪽이 앞서는지는 위 큰 수치가 이미 말한다. */}
-            <strong style={{ fontFamily: MONO, fontSize: "var(--fs-17)", fontWeight: 800, color: overheatColor(t.heat) }}>
+      {/* 회색 타일 둘 → 가는 선으로 나눈 두 칸(v2, 2026-10-03 · parts.tsx SplitStats). 물음표 아이콘 둘은 점선 밑줄로 —
+          한 칸에 같은 아이콘이 둘 섰다. 색은 값이 아니라 **그 값이 뜻하는 과열도**(heat)로 낸다 — 위 주석 참고. */}
+      <SplitStats
+        items={tiles.map((t) => ({
+          label: t.label,
+          tip: t.tip,
+          value: (
+            <>
               {level(t.value)} {Math.round(t.value)}
-              <span style={{ fontSize: "var(--fs-12)", color: C.sub }}>/100</span>
-            </strong>
-          </div>
-        ))}
-      </div>
+              <span style={{ fontWeight: 500, color: C.sub }}>/100</span>
+            </>
+          ),
+          color: overheatColor(t.heat),
+          sub: t.hint,
+        }))}
+      />
       <Foot text={v.desc} />
     </Shell>
   );
@@ -214,15 +202,15 @@ export function CardTrend({ v, icon }: { v: Pick; icon: IconName }) {
       {vsAvg !== null ? (
         <>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-            <strong style={{ fontFamily: MONO, fontSize: "var(--fs-32)", fontWeight: 800, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
+            <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
               {vsAvg.toFixed(1)}배
             </strong>
             {/* 화살표·막대·숫자가 **한 색**이어야 한다. 예전엔 숫자만 온도색이고
                 화살표·막대는 평균 대비 방향(>1 이면 빨강)이라, 1.1배(과열도 저온) 카드가
                 파란 숫자 옆에 빨간 화살표를 달고 있었다 — 한 줄이 두 말을 했다.
                 방향은 이미 화살표 모양과 막대가 뻗는 쪽이 말한다. 색은 온도만 맡는다. */}
-            {arrow && <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 700, color: v.color }}>{arrow}</span>}
-            <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.sub2 }}>평소 대비</span>
+            {arrow && <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: v.color }}>{arrow}</span>}
+            <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>평소 대비</span>
           </div>
           <VsAvg ratio={vsAvg} knob={v.color} />
         </>
@@ -231,7 +219,7 @@ export function CardTrend({ v, icon }: { v: Pick; icon: IconName }) {
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
             <Big disp={v.disp} unit={v.unit} color={v.color} size={32} />
             {v.hotDisp && (
-              <span style={{ fontFamily: MONO, fontSize: "var(--fs-11-5)", fontWeight: 700, color: C.sub, background: C.chip, borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+              <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: C.sub, background: C.chip, borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
                 초고온 {v.hotDisp}
               </span>
             )}
@@ -334,12 +322,12 @@ export function CardSentiment({
             {/* 순서는 앱 전체에서 '비관 : 낙관'으로 통일한다(카더라 테마 막대도 동일). */}
             {/* 숫자도 막대와 같은 편을 든다 — 비관은 저온색, 낙관은 초고온색.
                 한 색으로 적으면 "63:37" 중 어느 쪽이 어느 편인지 다시 라벨을 봐야 한다. */}
-            <strong style={{ fontFamily: MONO, fontSize: "var(--fs-32)", fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1 }}>
+            <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", lineHeight: 1 }}>
               <span style={{ color: C.cold }}>{ratio.neg}</span>
               <span style={{ color: C.sub2 }}>:</span>
               <span style={{ color: C.mania }}>{ratio.pos}</span>
             </strong>
-            <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.sub2 }}>{sentimentTone(ratio.pos).label}</span>
+            <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>{sentimentTone(ratio.pos).label}</span>
           </div>
           {/* 표본 크기 알약. 낱말을 줄인 건 말맛이 아니라 **폭** 때문이다 — 이 알약은 왼쪽
               헤드라인(숫자 + 톤 라벨)과 한 줄을 나눠 쓰는데, 넘치면 다음 줄로 내려가면서
@@ -363,7 +351,7 @@ export function CardSentiment({
               자릿수가 늘면 이 여유 7px 이 바로 사라지므로(다섯 자리 248 ✗ · 여섯 자리 255 ✗)
               건수는 formatSampleCount 가 만 단위로 묶는다 — 폭이 자릿수에 안 딸리게 하는 게
               핵심이고, 그 함수 주석에 이 예산의 근거를 적어 뒀다. */}
-          <span style={{ fontFamily: MONO, fontSize: "var(--fs-11-5)", fontWeight: 700, color: C.sub, background: C.chip, borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+          <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: C.sub, background: C.chip, borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
             {ratio.days > 1 ? `${ratio.days}일` : countNoun} {formatSampleCount(ratio.total)}건
           </span>
         </div>
@@ -378,8 +366,8 @@ export function CardSentiment({
           <div style={{ width: `${posW}%`, borderRadius: "0 99px 99px 0", background: C.mania }} />
         </div>
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ fontSize: "var(--fs-11-5)", fontWeight: optimistic ? 600 : 700, color: C.cold }}>비관</span>
-          <span style={{ fontSize: "var(--fs-11-5)", fontWeight: optimistic ? 700 : 600, color: C.mania }}>낙관</span>
+          <span style={{ fontSize: "var(--fs-11)", fontWeight: optimistic ? 600 : 700, color: C.cold }}>비관</span>
+          <span style={{ fontSize: "var(--fs-11)", fontWeight: optimistic ? 700 : 600, color: C.mania }}>낙관</span>
         </div>
       </div>
       <Foot text={v.desc} />
@@ -406,14 +394,14 @@ export function CardYoutube({ v }: { v: Pick }) {
       <TitleRow desc={v.headline} icon="play_circle" name={v.name} />
       {ratio !== null && (
         <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-          <strong style={{ fontFamily: MONO, fontSize: "var(--fs-32)", fontWeight: 800, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
+          <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
             {ratio.toFixed(1)}배
           </strong>
           {/* 초보 검색량 카드와 같은 화살표 규칙 — 기준은 1배(평소)다. */}
           {ratio !== 1 && (
-            <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 700, color: ratio < 1 ? C.cold : C.hot }}>{ratio > 1 ? "↑" : "↓"}</span>
+            <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: ratio < 1 ? C.cold : C.hot }}>{ratio > 1 ? "↑" : "↓"}</span>
           )}
-          <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.sub2 }}>평소 대비</span>
+          <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>평소 대비</span>
         </div>
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -424,7 +412,7 @@ export function CardYoutube({ v }: { v: Pick }) {
             <div className="hz-hbar-track hz-hbar-md">
               <div className="hz-hbar-fill" style={{ width: `${((r.value ?? 0) / max) * 100}%`, background: r.fill }} />
             </div>
-            <span style={{ width: 78, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12-5)", fontWeight: 700, color: r.strong ? C.ink : C.label }}>
+            <span style={{ width: 78, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: r.strong ? C.ink : C.label }}>
               {r.value != null ? fmt(r.value) : "-"}
             </span>
           </div>
@@ -438,7 +426,7 @@ export function CardYoutube({ v }: { v: Pick }) {
 // 여윳돈이 향하는 곳 — 명품·수입차 + 오마카세·파인다이닝. 지표 둘이 한 카드에 들어가는
 // 유일한 카드다. 목업은 세로 구분선으로 반 가르지 않고 **두 줄을 위아래로** 쌓고,
 // 눈금 라벨(적음·평소·많음)은 아래쪽 한 번만 적는다.
-function SubSpend({ v, icon, showScale }: { v: Pick; icon: IconName; showScale: boolean }) {
+function SubSpend({ v, showScale }: { v: Pick; showScale: boolean }) {
   const ratio = v.details?.vs_avg ?? null;
   // 화살표와 색이 **같은 경계**를 써야 한다. 예전엔 화살표가 `ratio === 1` 로만 갈려서,
   // 0.98배(화면엔 "1.0배")가 색은 중립인데 화살표만 ↓ 로 떴다 — 한 줄이 두 말을 했다.
@@ -449,15 +437,15 @@ function SubSpend({ v, icon, showScale }: { v: Pick; icon: IconName; showScale: 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <Icon name={icon} style={{ fontSize: "var(--fs-18)", color: "var(--c-blue-1)" }} />
-        <span className="hz-subspend-name" style={{ flex: 1, fontSize: "var(--fs-12-5)", fontWeight: 700, color: C.label, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {/* 줄 앞 아이콘(쇼핑백 · 식기)은 걷었다(v2, 2026-10-03) — 셀 머리 아이콘을 걷은 것과 같은 까닭. 이름이 말한다. */}
+        <span className="hz-subspend-name" style={{ flex: 1, fontSize: "var(--fs-12)", fontWeight: 700, color: C.label, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {v.name}
         </span>
         <strong
           style={{
             fontFamily: MONO,
-            fontSize: "var(--fs-16)",
-            fontWeight: 800,
+            fontSize: "var(--fs-13)",
+            fontWeight: 700,
             // 막대와 같은 색이어야 한다 — 숫자가 파랑인데 막대가 빨강이면 한 줄이 두 말을 한다.
             // 그 "같은 색"은 **온도**다(2026-08-04). 방향으로 맞췄더니 이번엔 이 줄만
             // 다른 카드와 규칙이 갈렸다.
@@ -490,28 +478,26 @@ export function CardSpending({ luxury, dining }: { luxury: Pick; dining: Pick })
           : Math.abs(dr - 1) >= Math.abs(lr - 1)
             ? { v: dining, r: dr, other: "명품" }
             : { v: luxury, r: lr, other: "외식" };
-  // 나머지 한쪽이 평소 수준이면 그렇다고 적는다 — 큰 숫자 하나만 두면 "둘 중 무엇이냐"가
-  // 안 보인다. 0.05 는 소수 첫째 자리로 적었을 때 1.0 으로 보이는 폭이다.
-  const otherR = lead && lead.other === "명품" ? lr : dr;
-  const otherWord =
-    otherR === null ? "" : Math.abs(otherR - 1) < 0.05 ? `${lead?.other}은 평소 수준` : `${lead?.other} ${otherR.toFixed(1)}배`;
+  // 곁말은 큰 숫자가 둘 중 무엇인지만 말한다. 나머지 한쪽 값('· 명품 0.9배')을 붙였었는데 바로 아래 두 줄이 같은 값을 다시 적어
+  // 걷었다(v2, 2026-10-03).
   // 지표 둘이 한 셀이라 스크롤 목적지 id 는 하나만 붙는다(명품). 오마카세로 오는
   // 스크롤은 ANCHOR_ALIAS 가 이 id 로 돌려보낸다.
   return (
-    <Shell slug={luxury.ind?.slug} hit={luxury.isHit || dining.isHit} warm={luxury.warm || dining.warm} minH={230}>
+    // 두 칸 폭(wide) — 감성 판 11칸을 12칸으로 맞추는 한 장. 지표가 둘인 유일한 셀이라 폭을 가장 잘 쓴다(v2, 2026-10-03).
+    <Shell slug={luxury.ind?.slug} hit={luxury.isHit || dining.isHit} warm={luxury.warm || dining.warm} wide minH={230}>
       <TitleRow icon="local_mall" name="여윳돈이 향하는 곳" desc="명품·외식 검색량으로 본 소비 심리" />
       {lead && (
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-          <strong style={{ fontFamily: MONO, fontSize: "var(--fs-32)", fontWeight: 800, letterSpacing: "-.03em", color: lead.v.color, lineHeight: 1, whiteSpace: "nowrap" }}>
+          <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: lead.v.color, lineHeight: 1, whiteSpace: "nowrap" }}>
             {lead.r.toFixed(1)}배
           </strong>
-          <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>
-            {lead.other === "명품" ? "외식" : "명품"} 검색{otherWord && ` · ${otherWord}`}
+          <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>
+            {lead.other === "명품" ? "외식" : "명품"} 검색
           </span>
         </div>
       )}
-      <SubSpend v={luxury} icon="shopping_bag" showScale={false} />
-      <SubSpend v={dining} icon="restaurant" showScale />
+      <SubSpend v={luxury} showScale={false} />
+      <SubSpend v={dining} showScale />
       {/* 지표가 둘이지만 설명은 하나로 합쳐 적는다. 두 문장을 이어 붙이면 이 카드만
           설명이 두 줄이 되어 같은 행 카드들과 밑선이 어긋난다. 제목("여윳돈이 향하는 곳")도
           DB 가 아니라 여기서 정하므로, 합친 문장도 같은 자리에 두는 게 맞다. */}
@@ -529,36 +515,28 @@ export function CardSpending({ luxury, dining }: { luxury: Pick; dining: Pick })
 export function CardUpbit({ v }: { v: Pick }) {
   const dt = v.details;
   const heat = v.capped === null ? null : Math.round(v.capped);
-  const volLabel = (x: number) => (x >= 100 ? "HIGH" : x >= 60 ? "MID" : "LOW");
+  // 영문 HIGH · MID · LOW 를 우리말로(v2, 2026-10-03). 문턱은 그대로다.
+  const volLabel = (x: number) => (x >= 100 ? "높음" : x >= 60 ? "보통" : "낮음");
   const premium = dt?.kimchi_premium ?? null;
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="currency_bitcoin" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-        <strong style={{ fontFamily: MONO, fontSize: "var(--fs-32)", fontWeight: 800, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
+        <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
           {heat ?? "-"}
-          <span style={{ fontSize: "var(--fs-17)", fontWeight: 700, color: C.sub }}>/100</span>
+          <span style={{ fontSize: "var(--fs-13)", fontWeight: 700, color: C.sub }}>/100</span>
         </strong>
-        <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.sub2 }}>과열도</span>
+        <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>과열도</span>
       </div>
       <HeatFill pct={heat ?? 0} />
       {dt && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10 }}>
-          <div style={{ background: C.soft, borderRadius: R.control, padding: 13, display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub2 }}>김치 프리미엄</span>
-            <strong style={{ fontFamily: MONO, fontSize: "var(--fs-17)", fontWeight: 800, color: v.color }}>
-              {premium !== null ? `${premium > 0 ? "+" : ""}${premium.toFixed(1)}%` : "-"}
-            </strong>
-          </div>
-          <div style={{ background: C.soft, borderRadius: R.control, padding: 13, display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub2 }}>거래량 강도</span>
-            {/* HIGH/MID/LOW 도 0~100 진행률에서 나온 말이라 같은 밴드 규칙으로 칠한다.
-                파랑으로 못박아 두면 HIGH 일 때도 차분한 색이라 값과 색이 반대말을 한다. */}
-            <strong style={{ fontSize: "var(--fs-17)", fontWeight: 800, color: overheatColor(dt.volume_progress ?? 0) }}>
-              {volLabel(dt.volume_progress ?? 0)}
-            </strong>
-          </div>
-        </div>
+        // 회색 타일 둘 → 가는 선으로 나눈 두 칸(v2, 2026-10-03). 거래량 강도의 말은 0~100 진행률에서 나온 것이라 같은 밴드 규칙으로 칠한다.
+        <SplitStats
+          items={[
+            { label: "김치 프리미엄", value: premium !== null ? `${premium > 0 ? "+" : ""}${premium.toFixed(1)}%` : "-", color: v.color },
+            { label: "거래량 강도", value: volLabel(dt.volume_progress ?? 0), color: overheatColor(dt.volume_progress ?? 0) },
+          ]}
+        />
       )}
       <Foot text={v.desc} />
     </Shell>
@@ -570,30 +548,20 @@ export function CardUpbit({ v }: { v: Pick }) {
 // 오른쪽 정렬한 숫자는 눈이 매번 다른 자리를 찾아야 했는데, 왼쪽 알약은 자리가 고정이다.
 export function CardBrokerage({ v }: { v: Pick }) {
   const count = v.details?.count ?? 0;
-  const topRank = v.details?.top_rank ?? null;
   const charted = (v.details as unknown as { charted?: { name: string; rank: number }[] })?.charted ?? [];
   // 긴 앱 이름을 짧게: 첫 구분자(-, (, ,) 앞부분만, 18자 제한
   const shortName = (n: string) => (n.split(/[-(,]/)[0].trim().slice(0, 18) || n);
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="leaderboard" name={v.name} />
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-        <Big disp={`${count}개`} color={v.color} size={32} sub="인기차트 진입" />
-        {topRank !== null && (
-          <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
-            최고 {topRank}위
-          </span>
-        )}
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {/* '최고 n위' 알약을 걷었다 — 아래 목록 첫 줄이 같은 순위를 적는다(v2, 2026-10-03). */}
+      <Big disp={`${count}개`} color={v.color} size={32} sub="인기차트 진입" />
+      {/* 회색 둥근 행 넷 → 가는 선으로 나눈 목록(v2). 순위는 왼쪽 고정 폭 숫자라 이름 길이와 상관없이 같은 자리에 선다. */}
+      <div className="hz-rank-list">
         {charted.slice(0, 4).map((app, i) => (
-          <div key={`${app.name}-${i}`} style={{ display: "flex", alignItems: "center", gap: 10, background: C.soft, borderRadius: 12, padding: "9px 12px", minWidth: 0 }}>
-            <span style={{ flexShrink: 0, fontFamily: MONO, fontSize: "var(--fs-11-5)", fontWeight: 800, color: i === 0 ? "var(--c-cold-ink)" : C.sub, background: C.card, borderRadius: 8, padding: "3px 8px" }}>
-              {app.rank}위
-            </span>
-            <span style={{ flex: 1, fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.label, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {shortName(app.name)}
-            </span>
+          <div key={`${app.name}-${i}`} className="hz-rank-row">
+            <span className="hz-rank-n">{app.rank}위</span>
+            <span className="hz-rank-name">{shortName(app.name)}</span>
           </div>
         ))}
       </div>
