@@ -498,12 +498,12 @@ export function drawdownNow(bars: Bar[]): DdNow | null {
 }
 
 /* ── 가격대별 거래 ─────────────────────────────────────────────────
- * 최근 1년 거래대금(그날 종가 × 거래량)을 같은 폭의 가격대로 나눈 것 — MDD '가격대별 거래' 칸(2026-10-03, '많이 빠진 대형주' 자리).
- * 낙폭 화면을 여는 사람은 대개 손실 중인 보유자라 "지금 가격보다 비싸게 산 돈이 얼마나 되나 · 어느 가격대에 몰렸나"를 묻는다.
+ * 최근 1년 거래대금(그날 종가 × 거래량)을 같은 폭의 가격대로 나눈 것 — MDD '거래가 몰린 가격대' 칸(2026-10-03, '많이 빠진 대형주' 자리).
+ * 낙폭 화면을 여는 사람은 대개 손실 중인 보유자라 "지금 가격보다 비싸게 거래된 돈이 얼마나 되나 · 어느 가격대에 몰렸나"를 묻는다.
  * ⚠️ 하루를 종가 한 점으로 본다 — 장중에 어느 가격에서 거래됐는지는 나누지 못하는 어림이다.
  */
 
-/** 가격대 칸 수. 칸 맨 위에 요약(큰 숫자 · 갈림 막대)이 서서 옆 업종 칸(11줄)과 같은 키에 여덟 줄이 든다(2026-10-03). */
+/** 가격대 칸 수의 상한. 칸 맨 위에 요약(큰 숫자)이 서서 옆 업종 칸(11줄)과 같은 키에 여덟 줄이 든다(2026-10-03). */
 export const LADDER_ROWS = 8;
 /** 창(달력 일). 1년. */
 const LADDER_DAYS = 365;
@@ -514,18 +514,24 @@ export type PriceLadder = {
   to: string;
   /** 지금 종가. */
   price: number;
-  /** 창 거래대금 중 종가가 지금보다 높았던 날의 몫(%). 칸 경계와 상관없이 날마다 잰 값이다. */
+  /** 칸 경계가 지나는 지금 가격 — 종가를 칸 단위로 반올림한 값(국장은 대개 종가 그대로). 화면의 '지금' 선이 여기 선다. */
+  anchor: number;
+  /** 창 거래대금 중 anchor 보다 비싼 칸들의 몫(%) — 위 aboveCount 칸의 share 합과 같다. */
   aboveShare: number;
   /** 가격대 칸 너비(원 · 달러) — 칸 경계를 떨어지는 수로 맞춘 값. */
   step: number;
-  /** 비싼 칸부터. */
+  /** 비싼 칸부터. 앞의 aboveCount 칸이 지금 가격보다 위, 나머지가 아래. */
   bands: LadderBand[];
+  aboveCount: number;
 };
 
 /**
- * 칸 경계는 **떨어지는 수**로 맞춘다 — 같은 폭으로만 자르면 '121,337~143,373' 같은 경계가 섰다.
- * 칸 너비를 유효 숫자 두 자리로 올림하고 아래 끝을 그 단위로 내림한다. 그래서 위 끝이 최고가를 조금 넘을 수 있다(칸 하나 남짓).
+ * 칸 경계는 **지금 가격에서 출발**한다 — 그래야 '지금' 선이 칸 사이에 정확히 서고, 선 위 칸의 합이 곧 '지금보다 비싸게 거래된 몫'이다.
+ * 처음엔 최저가에서 같은 폭으로 잘라 지금 가격이 칸 한가운데 들었고, 그 칸에 '지금' 꼬리표만 달았다 — 큰 숫자(31%)와 막대 색의
+ * 갈림이 어디서 나뉘는지 화면에서 안 보여 "한번에 이해하기 힘들다"였다(2026-10-04).
+ * 칸 너비는 유효 숫자 두 자리로 올림하고(같은 폭으로만 자르면 '121,337~143,373' 같은 경계가 섰다), 지금 가격도 그 단위로 반올림한다.
  * 너비가 1 이상이면 단위를 1 아래로 내리지 않는다 — 엔비디아(너비 6.4달러)가 6.5 로 잡혀 줄 이름이 '$224'(실제 223.5)로 어긋났다.
+ * 위아래 칸 수를 합쳐 rows 를 넘으면 너비를 한 단위씩 키운다. 그래서 칸이 rows 보다 적을 수 있다.
  */
 export function priceLadder(bars: Bar[], rows: number): PriceLadder | null {
   if (bars.length === 0 || rows < 2) return null;
@@ -540,27 +546,46 @@ export function priceLadder(bars: Bar[], rows: number): PriceLadder | null {
   if (!(max > min)) return null;
   const raw = (max - min) / rows;
   const unit = raw >= 1 ? Math.max(1, 10 ** (Math.floor(Math.log10(raw)) - 1)) : 10 ** (Math.floor(Math.log10(raw)) - 1);
-  const step = Math.ceil(raw / unit) * unit;
-  const lo = Math.floor(min / unit) * unit;
-  const acc = Array.from({ length: rows }, (_, i) => ({ lo: lo + i * step, hi: lo + (i + 1) * step, value: 0, days: 0 }));
+  // 소수 단위(동전주)에서 반올림 찌꺼기(0.30000000000000004)가 경계에 남지 않게 단위의 자릿수로 자른다.
+  const digits = Math.max(0, -Math.floor(Math.log10(unit)));
+  const fix = (v: number) => Number(v.toFixed(digits));
+  const anchor = fix(Math.round(last.close / unit) * unit);
+  let step = fix(Math.ceil(raw / unit) * unit);
+  const countAbove = (s: number) => (max > anchor ? Math.ceil((max - anchor) / s) : 0);
+  const countBelow = (s: number) => (anchor >= min ? Math.floor((anchor - min) / s) + 1 : 0);
+  while (countAbove(step) + countBelow(step) > rows) step = fix(step + unit);
+  const nAbove = countAbove(step);
+  const nBelow = countBelow(step);
+  // 위 칸은 (anchor + i·step, anchor + (i+1)·step], 아래 칸은 [anchor − (j+1)·step, anchor − j·step]. 지금 가격과 같은 날은 아래(비싸지 않다).
+  const up = Array.from({ length: nAbove }, (_, i) => ({ lo: fix(anchor + i * step), hi: fix(anchor + (i + 1) * step), value: 0, days: 0 }));
+  const down = Array.from({ length: nBelow }, (_, j) => ({ lo: Math.max(0, fix(anchor - (j + 1) * step)), hi: fix(anchor - j * step), value: 0, days: 0 }));
   let total = 0;
   let above = 0;
   for (const b of win) {
     const v = b.close * b.volume!;
-    const i = Math.min(rows - 1, Math.max(0, Math.floor((b.close - lo) / step)));
-    acc[i].value += v;
-    acc[i].days += 1;
+    if (b.close > anchor) {
+      const c = up[Math.min(nAbove - 1, Math.max(0, Math.ceil((b.close - anchor) / step) - 1))];
+      c.value += v;
+      c.days += 1;
+      above += v;
+    } else {
+      const c = down[Math.min(nBelow - 1, Math.max(0, Math.floor((anchor - b.close) / step)))];
+      c.value += v;
+      c.days += 1;
+    }
     total += v;
-    if (b.close > last.close) above += v;
   }
   if (!(total > 0)) return null;
+  const share = (c: { lo: number; hi: number; value: number; days: number }) => ({ lo: c.lo, hi: c.hi, share: (c.value / total) * 100, days: c.days });
   return {
     from: win[0].date,
     to: last.date,
     price: last.close,
+    anchor,
     aboveShare: (above / total) * 100,
     step,
-    bands: acc.reverse().map((b) => ({ lo: b.lo, hi: b.hi, share: (b.value / total) * 100, days: b.days })),
+    bands: [...up.reverse().map(share), ...down.map(share)],
+    aboveCount: nAbove,
   };
 }
 

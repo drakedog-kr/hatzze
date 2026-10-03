@@ -100,7 +100,7 @@ export async function GET(request: Request) {
 
   // 해마다 수익 · 낙폭과 복리 연평균(화면 '해마다' 모듈) — 종목 종가로 요약.
   const risk = riskProfile(bars);
-  // 최근 1년 가격대별 거래대금('가격대별 거래대금' 칸).
+  // 최근 1년 가격대별 거래대금('거래가 몰린 가격대' 칸).
   const ladder = priceLadder(bars, LADDER_ROWS);
 
   // 원인 분해 — 이 종목의 고점 이후, 같은 기간 시장·테마는 얼마나 움직였나.

@@ -151,7 +151,7 @@ describe("drawdownNow — 첫 줄 띠의 시장 칸(같은 기간 지수의 지�
   });
 });
 
-describe("priceLadder — MDD '가격대별 거래'", () => {
+describe("priceLadder — MDD '거래가 몰린 가격대'", () => {
   it("최근 1년만 세고, 비싼 칸부터, 몫의 합은 100 이며 '지금보다 비싸게'는 날마다 잰다", () => {
     // 1년 전보다 앞선 날(200원)은 창 밖이라 칸을 키우지 않는다. 창 안은 100 → 150 → 120.
     const series = weekdayBars("2025-06-02", "2026-10-02", (dt) => (dt < "2025-10-01" ? 200 : dt < "2026-04-01" ? 100 : dt < "2026-08-01" ? 150 : 120)).map((b) => ({
@@ -159,9 +159,10 @@ describe("priceLadder — MDD '가격대별 거래'", () => {
       volume: 1000,
     }));
     const l = priceLadder(series, 10)!;
-    assert.equal(l.bands.length, 10);
-    assert.ok(l.bands[0].lo > l.bands[9].lo, "비싼 칸이 위");
-    assert.ok(l.bands[0].hi >= 150 && l.bands[9].lo <= 100, "창 안 최고 · 최저가를 덮는다");
+    const n = l.bands.length;
+    assert.ok(n >= 2 && n <= 10, "칸은 rows 를 넘지 않는다");
+    assert.ok(l.bands[0].lo > l.bands[n - 1].lo, "비싼 칸이 위");
+    assert.ok(l.bands[0].hi >= 150 && l.bands[n - 1].lo <= 100, "창 안 최고 · 최저가를 덮는다");
     assert.ok(l.bands[0].hi < 200, "창 밖 200원은 안 센다");
     assert.equal(Math.round(l.bands.reduce((s, b) => s + b.share, 0)), 100);
     // 지금 120원보다 비싸게 거래된 날 = 150원 구간. 거래대금(종가 × 거래량) 몫이라 날수 몫보다 크다.
@@ -170,7 +171,31 @@ describe("priceLadder — MDD '가격대별 거래'", () => {
     const want = (days.filter((d) => d.close > 120).reduce((s, d) => s + v(d), 0) / days.reduce((s, d) => s + v(d), 0)) * 100;
     assert.equal(Math.round(l.aboveShare * 10), Math.round(want * 10));
     // 칸 경계는 떨어지는 수(유효 숫자 두 자리)다.
-    assert.ok(Number.isInteger(l.step) && Number.isInteger(l.bands[9].lo));
+    assert.ok(Number.isInteger(l.step) && Number.isInteger(l.bands[n - 1].lo));
+  });
+
+  it("칸 경계가 지금 가격을 지나고, 선 위 칸의 합이 '지금보다 비싸게'다", () => {
+    const series = weekdayBars("2025-10-06", "2026-10-02", (dt) => (dt < "2026-01-01" ? 91_500 : dt < "2026-05-01" ? 360_000 : dt < "2026-08-01" ? 300_000 : 276_000)).map((b) => ({
+      ...b,
+      volume: 1000,
+    }));
+    const l = priceLadder(series, 8)!;
+    assert.equal(l.anchor, 276_000);
+    assert.ok(l.aboveCount > 0 && l.aboveCount < l.bands.length);
+    assert.equal(l.bands[l.aboveCount - 1].lo, l.anchor, "선 바로 위 칸의 아래 끝");
+    assert.equal(l.bands[l.aboveCount].hi, l.anchor, "선 바로 아래 칸의 위 끝");
+    const sumAbove = l.bands.slice(0, l.aboveCount).reduce((s, b) => s + b.share, 0);
+    assert.equal(Math.round(sumAbove * 10), Math.round(l.aboveShare * 10));
+    // 지금 가격과 같은 날(276,000)은 비싸지 않다 — 선 바로 아래 칸에 든다.
+    assert.ok(l.bands[l.aboveCount].days > 0);
+  });
+
+  it("지금이 1년 최고가면 선 위 칸이 없다", () => {
+    const series = weekdayBars("2025-10-06", "2026-10-02", (dt) => (dt < "2026-06-01" ? 100 : 130)).map((b) => ({ ...b, volume: 1000 }));
+    const l = priceLadder(series, 8)!;
+    assert.equal(l.aboveCount, 0);
+    assert.equal(l.aboveShare, 0);
+    assert.equal(l.bands[0].hi, 130);
   });
 
   it("거래량이 없거나 스무 날이 안 되면 null", () => {

@@ -6,7 +6,7 @@
 //  - 역대 하락 사례 — 옛 'Top 5' · 리스크 '하락 vs 회복 속도' · '혼자 빠지나, 같이 빠지나' · 성격 타일이 같은 사건을 네 군데서 말하던 것을 표 하나로.
 //  - 회복까지 — 옛 '회복까지 걸린 기간' + '이 하락의 성격'(급락형 · 완만형의 회복 중앙값). 깊이 분포 막대는 사례 표와 겹쳐 뺐다.
 //  - 해마다 — 옛 리스크 '낙폭 대비 보상'. 최근 다섯 해 + '전체보기' 팝업 대신 조회 기간의 해를 다 펼친다(누르지 않고 보이게).
-//  - 업종 안에서 · 가격대별 거래 — 나란한 두 칸, 줄마다 이름 · 막대 · 값. 업종 줄은 누르면 그 종목 MDD 로.
+//  - 업종 안에서 · 거래가 몰린 가격대 — 나란한 두 칸, 줄마다 이름 · 막대 · 값. 업종 줄은 누르면 그 종목 MDD 로.
 
 import { CHARACTER_SPLIT_DAYS } from "@/lib/mdd";
 import type { MddAnalysis, RiskProfile as RiskProfileData } from "@/lib/mdd";
@@ -142,16 +142,16 @@ export function ThemeModule({ theme, onPick }: { theme: ThemeCmp; onPick: (s: St
   );
 }
 
-/* ── 가격대별 거래대금 ─────────────────────────────────────────── */
+/* ── 거래가 몰린 가격대 ─────────────────────────────────────────── */
 /**
  * 최근 1년 거래대금을 가격대로 나눈 것(lib/mdd.ts priceLadder) — '많이 빠진 대형주'(종목과 상관없는 고정 목록) 자리(2026-10-03).
- * 낙폭 화면을 여는 사람은 대개 손실 중인 보유자라 "지금보다 비싸게 산 돈이 얼마나 되나 · 어느 가격대에 몰렸나"를 묻는다.
+ * 낙폭 화면을 여는 사람은 대개 손실 중인 보유자라 "지금보다 비싸게 거래된 돈이 얼마나 되나 · 어느 가격대에 몰렸나"를 묻는다.
  *
- * 처음엔 가격대 목록만 두고 머리에 '지금보다 비싸게 31%'를 적었는데 "무슨 뜻인지 모르겠다"였다(10-03) — 숫자(가격대 몫)와
- * 색(파랑 · 회색)의 뜻이 화면 어디에도 없었다. 그래서 맨 위에 답을 먼저 세운다:
- *  ① 큰 숫자 = 지난 1년 거래대금 중 지금 가격보다 비싸게 산 돈의 몫(날마다 잰 값, 칸 어림 아님)
- *  ② 갈림 막대 = 그 몫을 길이로, 양 끝 글자가 곧 아래 막대 두 색의 범례(비싸게 산 돈 = 파랑 · 싸게 산 돈 = 회색)
- *  ③ 가격대 목록 = 위 줄일수록 비싼 가격대(호가창처럼), 지금 가격이 든 줄에 '지금'
+ * 1차(10-03)는 머리에 '31%'만, 2차는 큰 숫자 + 갈림 막대(비싸게 산 돈 · 싸게 산 돈) + 가격대 목록('261,000원~' 줄에 '지금' 꼬리표)이었다.
+ * 둘 다 "무슨 말인지 한번에 이해하기 힘들다"였다(10-04) — 지금 가격이 칸 한가운데 들어 31% 가 목록 어디서 갈리는지 안 보였고,
+ * '산 돈'은 사는 쪽만 센 것처럼 읽혔다. 그래서 칸을 지금 가격에서 나누고(priceLadder) 목록 한가운데 **지금 선**을 긋는다:
+ *  ① 큰 숫자 = 선 위 파란 칸의 합(지금보다 비싼 가격에서 거래된 몫)
+ *  ② 가격대 목록 = 위 줄일수록 비싼 가격대(호가창처럼), 줄 이름은 범위 그대로 · 선 위는 파랑, 아래는 회색
  */
 export function LadderModule({ ladder, market }: { ladder: PriceLadder; market: string | null }) {
   const isUs = market === "US";
@@ -161,46 +161,38 @@ export function LadderModule({ ladder, market }: { ladder: PriceLadder; market: 
     isUs ? `$${v.toLocaleString("en-US", { maximumFractionDigits: ladder.step >= 1 ? 0 : 2 })}` : v.toLocaleString("ko-KR", { maximumFractionDigits: 0 });
   const won = (v: number) => (isUs ? num(v) : `${num(v)}원`);
   const priceNow = isUs ? `$${ladder.price.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : `${Math.round(ladder.price).toLocaleString("ko-KR")}원`;
+  // 배포 직후 옛 응답(지금 가격에서 안 나눈 칸)이 캐시에 남아 있으면 aboveCount 가 없다 — 아래 끝이 지금 가격 이상인 칸까지를 위로 본다.
+  const split = ladder.aboveCount ?? ladder.bands.filter((b) => b.lo >= ladder.price).length;
   const above = Math.round(ladder.aboveShare);
-  // 비싼 줄부터라 지금 가격이 든 줄 = lo ≤ 가격 < hi 인 첫 줄. 최고가와 맨 위 경계가 딱 겹치면 못 찾으니 맨 위 줄로.
-  let nowIdx = ladder.bands.findIndex((b) => ladder.price >= b.lo && ladder.price < b.hi);
-  if (nowIdx < 0 && ladder.bands.length && ladder.price >= ladder.bands[0].lo) nowIdx = 0;
+  const row = (b: PriceLadder["bands"][number], i: number) => (
+    <li key={b.lo} className={i < split ? "is-above" : "is-below"}>
+      <div className="v2-dd-row hz-tip hz-tip-start" data-tip={`거래일 ${b.days}일 · 1년 거래대금의 ${b.share.toFixed(1)}%`}>
+        <span className="v2-dd-name">
+          {num(b.lo)}~{won(b.hi)}
+        </span>
+        <span className="v2-dd-bar">
+          <i style={{ ["--w" as string]: `${Math.max(1.5, (b.share / max) * 100)}%` }} />
+        </span>
+        <span className="v2-dd-val">{b.share.toFixed(1)}%</span>
+      </div>
+    </li>
+  );
   return (
-    <Module title="가격대별 거래대금" meta="최근 1년" className="v2-md-ladder">
+    <Module title="거래가 몰린 가격대" meta="최근 1년" className="v2-md-ladder">
       <div className="v2-md-ld-sum">
         <span className="v2-card-val is-big">
           <b className="is-down">{above}%</b>
-          <span className="v2-md-aside">지금 {priceNow}보다 비싸게 산 돈</span>
+          <span className="v2-md-aside">지금보다 비싼 가격에서 거래</span>
         </span>
-        <div className="v2-md-ld-split" aria-hidden="true">
-          <span className="v2-md-ld-split-bar">
-            <i style={{ width: `${ladder.aboveShare}%` }} />
-          </span>
-          <span className="v2-md-ld-split-lab">
-            <span className="is-above">비싸게 산 돈</span>
-            <span>싸게 산 돈</span>
-          </span>
-        </div>
       </div>
       <div className="v2-dd-wrap">
         <ol className="v2-dd v2-ladder" aria-label="최근 1년 가격대별 거래대금 몫">
-          {ladder.bands.map((b, i) => (
-            <li key={b.lo} className={i === nowIdx ? "is-self" : i < nowIdx ? "is-above" : "is-below"}>
-              {/* 줄 이름은 칸의 아래 끝 가격. 칸 범위 · 거래일 수 · 몫은 데이터 툴팁. */}
-              <div
-                className="v2-dd-row hz-tip hz-tip-start"
-                data-tip={`${num(b.lo)}~${won(b.hi)}에서 거래일 ${b.days}일 · 1년 거래대금의 ${b.share.toFixed(1)}%`}
-              >
-                <span className="v2-dd-name">
-                  {won(b.lo)}~{i === nowIdx && <span className="v2-badge">지금</span>}
-                </span>
-                <span className="v2-dd-bar">
-                  <i style={{ ["--w" as string]: `${Math.max(1.5, (b.share / max) * 100)}%` }} />
-                </span>
-                <span className="v2-dd-val">{b.share.toFixed(1)}%</span>
-              </div>
-            </li>
-          ))}
+          {ladder.bands.slice(0, split).map((b, i) => row(b, i))}
+          <li className="v2-ladder-now">
+            <span>지금 {priceNow}</span>
+            <i aria-hidden="true" />
+          </li>
+          {ladder.bands.slice(split).map((b, i) => row(b, split + i))}
         </ol>
       </div>
     </Module>

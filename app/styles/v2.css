@@ -1080,22 +1080,19 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-dd .is-self .v2-dd-name { font-weight: 700; color: var(--t-ink); }
 .v2-dd .is-self .v2-dd-val { color: var(--t-down-deep); }
 .v2-dd .is-self .v2-dd-bar > i { background: var(--t-down); }
-/* 가격대별 거래(app/mdd/V2Sheets.tsx LadderModule) — 지금 가격보다 비싼 칸은 파랑(그 가격에 산 돈은 지금 손실), 싼 칸은 회색. 지금 칸은 위 is-self.
-   줄 이름 옆 '지금' 꼬리표는 회복까지 칸과 같은 .v2-badge. 숫자 줄 이름이라 자리 맞춤 숫자로. */
-.v2-ladder .v2-dd-name { display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.v2-md-ladder .v2-dd-wrap { --dd-name: 116px; }
-/* 맨 위 요약 — 큰 숫자(지금보다 비싸게 산 돈의 몫) + 갈림 막대. 막대 양 끝 글자가 아래 목록 두 색의 범례다. */
-.v2-md-ld-sum { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px 10px; border-bottom: 1px solid var(--t-line); }
-.v2-md-ld-split { display: flex; flex-direction: column; gap: 4px; }
-.v2-md-ld-split-bar { display: flex; height: 8px; overflow: hidden; border-radius: 4px; background: color-mix(in srgb, var(--t-ink3) 45%, transparent); }
-.v2-md-ld-split-bar > i { display: block; height: 100%; background: color-mix(in srgb, var(--t-down) 55%, transparent); }
-.v2-md-ld-split-lab { display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; line-height: 16px; color: var(--t-ink2); }
-.v2-md-ld-split-lab > .is-above { color: var(--t-down); }
+/* 거래가 몰린 가격대(app/mdd/V2Sheets.tsx LadderModule) — 지금 선 위 칸은 파랑(그 가격에 거래된 돈은 지금 손실), 아래 칸은 회색.
+   줄 이름은 가격 범위 — 숫자 줄 이름이라 자리 맞춤 숫자로, 한 줄에 다 든다. */
+.v2-ladder .v2-dd-name { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v2-md-ladder .v2-dd-wrap { --dd-name: 136px; }
+/* 맨 위 요약 — 큰 숫자(선 위 파란 칸의 합). 숫자 색이 곧 위 칸 막대 색이라 범례를 따로 안 둔다. */
+.v2-md-ld-sum { padding: 12px 14px 10px; border-bottom: 1px solid var(--t-line); }
 /* 회색은 45% — 28% 였을 때 다크에서 빈 막대 바탕(불투명도 0.12)과 0.17 로 거의 같아 막대가 안 보였다. */
 .v2-ladder > .is-below .v2-dd-bar > i { background: color-mix(in srgb, var(--t-ink3) 45%, transparent); }
-/* 비싼 칸은 갈림 막대의 '비싸게 산 돈'과 같은 파랑(55%) — 범례와 막대 색이 같아야 읽힌다. 지금 칸은 위 is-self 의 진한 파랑. */
 .v2-ladder > .is-above .v2-dd-bar > i { background: color-mix(in srgb, var(--t-down) 55%, transparent); }
 .v2-ladder > .is-below .v2-dd-val { color: var(--t-ink2); }
+/* 지금 선 — 가격 이름 칸에 '지금 276,000원', 막대 · 값 칸을 가로지르는 선. 줄 사이에 서서 늘어나지 않는다(flex 0). */
+.v2-ladder > .v2-ladder-now { flex: 0 0 auto; display: grid; grid-template-columns: var(--dd-name) minmax(0, 1fr); align-items: center; column-gap: var(--dd-gap); padding: 3px var(--dd-in); font-size: 12px; font-weight: 700; line-height: 16px; color: var(--t-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v2-ladder > .v2-ladder-now > i { height: 0; border-top: 1.5px solid var(--t-ink); }
 .v2-dd-avg {
   position: absolute;
   top: 8px;

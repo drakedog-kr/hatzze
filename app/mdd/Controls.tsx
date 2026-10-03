@@ -425,7 +425,7 @@ export function Results({ data, onPick }: { data: MddResult; onPick: (s: StockOp
         )}
       </div>
 
-      {/* 업종 안에서 | 가격대별 거래대금 — 나란한 두 칸, 키가 같다(가격대 칸은 맨 위 요약 아래 여덟 줄).
+      {/* 업종 안에서 | 거래가 몰린 가격대 — 나란한 두 칸, 키가 같다(가격대 칸은 맨 위 요약 아래 여덟 줄 이하 + 지금 선).
           업종 칸 줄을 누르면 그 종목으로 바뀌고 맨 위로 올라간다(MddExplorer pickFromResults).
           '많이 빠진 대형주'(종목과 상관없는 시총 상위 고정 목록)였던 자리다 — 2026-10-03 "투자자가 궁금해할 것"으로 바꿨다. */}
       <div className="v2-md-row is-11">
@@ -444,7 +444,7 @@ export function Results({ data, onPick }: { data: MddResult; onPick: (s: StockOp
         {data.ladder ? (
           <LadderModule ladder={data.ladder} market={data.market} />
         ) : (
-          <AbsentSheet title="가격대별 거래대금" body="거래량 기록이 짧아 가격대를 나누지 못했습니다." />
+          <AbsentSheet title="거래가 몰린 가격대" body="거래량 기록이 짧아 가격대를 나누지 못했습니다." />
         )}
       </div>
       {/* 대표 종목 일부만 받았으면 그렇다고 적는다 — 평균이 몇 종목으로 낸 것인지 읽는 사람이 알아야 한다. */}
