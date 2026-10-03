@@ -815,17 +815,15 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 }
 
 /* ── v2 MDD(2026-10-03) — 카더라 · 시장 브리핑의 v2 규칙을 옮겼다 ─────────────────────────────
-   얼개: 조회 막대(검색 · 기간) → [종목 | 지금 낙폭 | 이 하락의 맥락](app/mdd/Hero.tsx HeroStrip) → 시트들(물속 차트 · 리스크 프로필 · 짝 둘 · 테마).
+   얼개: 조회 막대(검색 · 기간) → [종목 | 지금 낙폭 | 채널이 말한 까닭](app/mdd/Hero.tsx HeroStrip) → 물속 차트
+   → [역대 하락 사례 | 회복까지] → [시장탓 | 테마] → 해마다(app/mdd/Controls.tsx Results · V2Sheets.tsx).
    시트 머리(SectionHead)는 여섯 화면 공용이라 고치지 않고 이 범위에서 덮는다 — 아이콘 타일 · 부제(설명 문장) · 바닥 각주를 걷고
    제목 13/700 + 근거 글자. 구간 제목은 코드에서 걷었다(Controls.tsx). */
 .v2-md {
   --tx-r: 6px;
   --tx-r-tile: 4px;
-  /* 회색 타일(리스크 프로필 세 칸 등)을 걷는다 — v2 는 면이 아니라 가는 선으로 칸을 가른다(아래 .hz-panelgrid). */
-  --tx-tile: transparent;
-  /* 큰 숫자(원인 분해 · 회복 34, 성격 21)와 그 단위(17) — v2 눈금으로. */
+  /* 큰 숫자(시장탓 34)와 그 단위(17) — v2 눈금으로. */
   --fs-34: 22px;
-  --fs-21: 15px;
   --fs-17: 13px;
 }
 .v2-kd.v2-md .hz-sheet { border-color: var(--t-frame); border-radius: 6px; box-shadow: none; }
@@ -836,15 +834,6 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-kd.v2-md .hz-sheet-head-title { font-size: 13px; font-weight: 700; line-height: 20px; letter-spacing: 0; }
 /* 오른쪽 알약('최근 10년' · '표본 3회') → 근거 글자. 인라인 글자 크기 · 굵기 · 색이라 !important. */
 .v2-kd.v2-md .hz-sheet-head-note { padding: 0; border: 0; background: none; font-size: 12px !important; font-weight: 500 !important; color: var(--t-ink3) !important; }
-/* 표 — 열 머리는 옅은 면, 줄 여백은 v2 표와 같게(14). */
-.v2-kd.v2-md .hz-thead { padding: 6px 14px; background: var(--t-head); border-bottom: 1px solid var(--t-line); font-size: 12px; }
-.v2-kd.v2-md .hz-trow { padding: 9px 14px; }
-/* 패널 격자(리스크 프로필 세 칸) — 회색 타일 대신 세로 가는 선. */
-.v2-kd.v2-md .hz-panelgrid { padding: 0; gap: 0; }
-.v2-kd.v2-md .hz-panelgrid > * { border-radius: 0; box-shadow: inset -1px 0 0 var(--t-line); }
-.v2-kd.v2-md .hz-panelgrid > :last-child { box-shadow: none; }
-.v2-kd.v2-md .hz-panel-pad { padding: 12px 14px 14px; }
-.v2-kd.v2-md .mdd-pair { gap: 12px; }
 
 /* 기간 토글 — 회색 트랙 + 흰 칩 대신 흰 판 + 고른 칸만 옅은 면(검색창과 같은 키 41). */
 .v2-kd.v2-md .hz-seg { align-items: stretch; height: 41px; padding: 3px; gap: 2px; border: 1px solid var(--t-frame); border-radius: 6px; background: var(--t-card); }
@@ -852,7 +841,7 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-kd.v2-md .hz-seg > button[aria-pressed="true"] { background: var(--t-tint); color: var(--t-ink); box-shadow: none; }
 .v2-kd.v2-md .hz-seg-hover > button[aria-pressed="false"]:hover { color: var(--t-ink); }
 
-/* 둘째 줄 — 종목 | 지금 낙폭 | 이 하락의 맥락. 키는 셋이 같고(stretch) 바닥 줄(전고점 · 저점 / 통계 셋)은 바닥에 붙는다. */
+/* 둘째 줄 — 종목 | 지금 낙폭 | 채널이 말한 까닭. 키는 셋이 같고(stretch) 바닥 줄(전고점 · 저점 / 통계 셋)은 바닥에 붙는다. */
 .v2-md-band { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.4fr); align-items: stretch; gap: 12px; }
 .v2-md-band > .v2-mod { display: flex; flex-direction: column; }
 .v2-md-body { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 12px 14px 14px; }
@@ -874,22 +863,124 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
    종목: 전고점 · 저점 두 줄이 늘어난다. 지금 낙폭 · 맥락: 덩어리 사이가 고르게 벌어진다. */
 .v2-md-rows { flex: 1; display: flex; flex-direction: column; }
 .v2-md-rows > div { flex: 1 0 auto; align-items: center !important; }
-.v2-md-dd .v2-md-body,
-.v2-md-read .v2-md-body { justify-content: space-between; }
+.v2-md-dd .v2-md-body { justify-content: space-between; }
 /* 통계 칸을 바닥에 붙이던 margin-top:auto 가 남는 높이를 한곳(게이지 아래)에 다 모았다 — 고르게 나누도록 푼다. */
 .v2-md-dd .v2-md-stats { margin-top: 0; }
 /* 시장 탓일까 — 막대 세 줄이 가는 선으로 나뉜 줄이 되어 옆 시트(이 하락의 성격) 키까지 늘어난다. 인라인 여백 · 간격이라 !important. */
 .v2-md .mdd-attr-body { padding: 12px 14px 4px !important; gap: 12px !important; }
 .v2-md .mdd-attr-rows { gap: 0 !important; justify-content: stretch !important; }
 .v2-md .mdd-attr-rows > .hz-hbar-row { flex: 1 0 auto; min-height: 36px; border-top: 1px solid var(--t-line); }
-/* 이 하락의 맥락 — 오늘의 요약 · 브리핑과 같은 글줄(13 · 22). */
-.v2-md-read .v2-md-body p { font-size: 13px !important; font-weight: 500; line-height: 22px !important; color: var(--t-ink2) !important; }
-.v2-md-read .v2-md-body b { font-weight: 700 !important; }
+
+
+/* ── v2 MDD 1단계(2026-10-03 판정표) — 새 모듈 ── */
+.v2-md-asof { font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
+/* 짝 줄 — 표가 넓은 쪽을 차지한다(사례 표 2 : 회복 1 · 시장 탓 1 : 업종 2). 짧은 쪽은 안쪽 줄이 늘어 키를 맞춘다. */
+.v2-md-row { display: grid; gap: 12px; align-items: stretch; }
+.v2-md-row.is-21 { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+.v2-md-row.is-12 { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+.v2-md-row > .v2-mod,
+.v2-md-row > .hz-sheet { display: flex; flex-direction: column; }
+
+/* 채널이 말한 까닭 — 언급 합 · 날마다 언급 선 · 까닭 줄(날짜 · 등락 · 까닭 두 줄). 줄은 남는 높이를 나눠 받는다. */
+/* 남는 높이는 언급 선이 받는다 — 까닭이 한두 줄인 종목(대부분)에서 까닭 줄을 늘리면 줄 위아래가 45px 씩 비었다. */
+.v2-md-talk .v2-spark { flex: 1 1 36px; min-height: 36px; }
+.v2-md-why { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--t-line); }
+.v2-md-why > li {
+  display: grid;
+  grid-template-columns: 36px 52px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--t-line);
+  font-size: 12px;
+  line-height: 18px;
+}
+.v2-md-why > li:last-child { border-bottom: 0; }
+.v2-md-why > li.is-empty { display: flex; color: var(--t-ink3); font-weight: 500; }
+.v2-md-why-d { color: var(--t-ink3); font-weight: 500; font-variant-numeric: tabular-nums; }
+.v2-md-why-c { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--t-ink3); }
+.v2-md-why-c.is-up { color: var(--t-up); }
+.v2-md-why-c.is-down { color: var(--t-down); }
+.v2-md-why-t { font-size: 13px; font-weight: 500; color: var(--t-ink2); word-break: keep-all; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* 역대 하락 사례 — 구간 · 깊이 · 시장 · 빠진 기간 · 되찾은 기간 · 유형. 한 줄 40, 가는 선, 머리 줄 옅은 면. 진행 중인 줄은 옅은 면. */
+.v2-md-cases { flex: 1; display: flex; flex-direction: column; }
+.v2-md-cases ol { flex: 1; display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.v2-md-case {
+  flex: 1 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) repeat(4, minmax(0, 1fr)) 44px;
+  align-items: center;
+  column-gap: 12px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--t-line);
+  font-variant-numeric: tabular-nums;
+}
+.v2-md-cases li:last-child { border-bottom: 0; }
+.v2-md-case-th { flex: none; min-height: 30px; background: var(--t-head); font-size: 12px; font-weight: 600; color: var(--t-ink3); }
+.v2-md-case > :nth-child(n + 2):nth-child(-n + 5) { text-align: right; }
+.v2-md-case > :last-child { text-align: right; }
+.v2-md-case.is-now { background: var(--t-tint); }
+.v2-md-case-span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2-md-case-span b { font-weight: 700; color: var(--t-down); }
+.v2-md-case .is-num { font-weight: 600; }
+.v2-md-case .is-num.is-up { color: var(--t-up); }
+.v2-md-case .is-num.is-down { color: var(--t-down); }
+.v2-md-case em { font-style: normal; color: var(--t-ink3); }
+.v2-md-case-kind { font-size: 12px; font-weight: 500; color: var(--t-ink2); }
+
+/* 회복까지 — 중앙값 · 범위 선 · 빠진 속도별 두 줄(지금 꼬리표). 두 줄이 남는 높이를 받는다. */
+.v2-md-kinds { flex: 1; display: flex; flex-direction: column; margin-top: 4px; border-top: 1px solid var(--t-line); }
+.v2-md-kind { flex: 1 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) auto 64px; align-items: center; column-gap: 12px; min-height: 36px; border-bottom: 1px solid var(--t-line); font-variant-numeric: tabular-nums; }
+.v2-md-kind:last-child { border-bottom: 0; }
+.v2-md-kind-name { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.v2-md-kind-n { font-size: 12px; font-weight: 500; color: var(--t-ink3); }
+.v2-md-kind-v { text-align: right; font-weight: 700; }
+.v2-md-kind.is-now .v2-md-kind-v { color: var(--t-up); }
+
+/* 해마다 — 해 하나가 한 칸(연도 · 수익 · 낙폭). 칸이 모자라면 줄을 바꾼다('전체' 조회는 스무 해가 넘는다). 첫 칸은 줄 이름. */
+/* auto-fit — 빈 칸 트랙을 접어 해 칸이 판 폭을 나눠 갖는다(auto-fill 이면 10년 조회에 오른쪽 3분의 1이 비었다). */
+.v2-md-yrs { display: grid; grid-template-columns: repeat(auto-fit, minmax(68px, 1fr)); border-top: 1px solid var(--t-line); }
+.v2-md-yr { display: grid; grid-template-rows: repeat(3, 24px); align-items: center; padding: 6px 10px; box-shadow: inset -1px 0 0 var(--t-line), inset 0 -1px 0 var(--t-line); font-variant-numeric: tabular-nums; }
+.v2-md-yr > :first-child { font-size: 12px; font-weight: 500; color: var(--t-ink3); }
+.v2-md-yr .is-num { font-weight: 600; }
+.v2-md-yr .is-num.is-up { color: var(--t-up); }
+.v2-md-yr .is-num.is-down { color: var(--t-down); }
+.v2-md-yr .is-num.is-low { font-size: 12px; font-weight: 500; color: var(--t-ink3); }
+.v2-md-yr.is-head { background: var(--t-head); }
+.v2-md-yr.is-head > * { font-size: 12px; font-weight: 600; color: var(--t-ink3); }
+.v2-md-years .v2-md-body { gap: 12px; }
+
+/* 업종 안에서 — 두 단으로(넓은 칸 2 의 폭을 쓴다). 위에서 아래로 채우고 다음 단으로. */
+.v2-md .mdd-theme-rows { display: block !important; columns: 2; column-gap: 28px; padding: 12px 14px 14px !important; }
+.v2-md .mdd-theme-rows > * { break-inside: avoid; margin-bottom: 9px; }
 
 /* 셋이 한 줄인 건 판 1,000 까지 — 1,280(판 1,004)에서 두 칸 + 맥락 한 줄로 접으면 둘째 줄 키가 406 이었다. */
 @container kd (max-width: 999px) {
   .v2-md-band { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); }
-  .v2-md-band > .v2-md-read { grid-column: 1 / -1; }
+  .v2-md-band > .v2-md-talk { grid-column: 1 / -1; }
+  .v2-md-row.is-21,
+  .v2-md-row.is-12 { grid-template-columns: minmax(0, 1fr); }
+}
+@container kd (max-width: 679px) {
+  /* 사례 표 — 두 층(구간 · 깊이 / 시장 · 빠진 · 되찾은 · 유형). 여섯 칸이 한 줄이면 폰 폭(351)에 안 든다. */
+  .v2-md-case-th { display: none; }
+  .v2-md-case {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    /* ⚠️ 영역 이름에 'span' 을 쓰지 말 것 — 격자 자리 지정의 예약어라 무시되고 칸이 한 칸으로 눌려 글자가 잘렸다. */
+    grid-template-areas: "per per per dd" "mk dn up kind";
+    row-gap: 2px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  .v2-md-case > :nth-child(1) { grid-area: per; }
+  .v2-md-case > :nth-child(2) { grid-area: dd; }
+  .v2-md-case > :nth-child(3) { grid-area: mk; text-align: left; font-size: 12px; }
+  .v2-md-case > :nth-child(4) { grid-area: dn; font-size: 12px; }
+  .v2-md-case > :nth-child(5) { grid-area: up; font-size: 12px; }
+  .v2-md-case > :nth-child(6) { grid-area: kind; }
+  .v2-md .mdd-theme-rows { columns: 1; }
 }
 @container kd (max-width: 679px) {
   .v2-md-band { grid-template-columns: minmax(0, 1fr); }

@@ -10,8 +10,8 @@ import { PERIODS, marketBadge, benchName } from "./shared";
 import type { StockOption, Suggestion, SuggestGroups, MddResult } from "./shared";
 import { periodLabelOf, AbsentSheet } from "./sheet";
 import { HeroStrip, Underwater } from "./Hero";
-import { RiskProfile } from "./RiskProfile";
-import { Attribution, Recovery, Character, Theme, TopDrawdowns } from "./sheets";
+import { Attribution, Theme } from "./sheets";
+import { CasesTable, RecoveryModule, YearsModule } from "./V2Sheets";
 
 /**
  * 시가총액 상위 KOSPI 보통주를 큰 것부터 손으로 고정한 목록(2026-07 기준).
@@ -382,10 +382,6 @@ export function Controls({
 /* 구간 제목(SectionIntro '01 과거 낙폭 사례' · '02 이 하락의 정체')은 v2 에서 걷었다(2026-10-03) — 모듈 머리 띠가 이름을 말하고,
    v2 화면(카더라 · 시장 브리핑)엔 큰 구간 제목이 없다. */
 
-/** 50:50 두 시트가 나란히 서는 줄. 좁아지면 한 장씩 접힌다. */
-function Pair({ children }: { children: React.ReactNode }) {
-  return <div className="mdd-pair">{children}</div>;
-}
 
 export function Results({ data }: { data: MddResult }) {
   const a = data.analysis;
@@ -396,46 +392,23 @@ export function Results({ data }: { data: MddResult }) {
       <HeroStrip data={data} periodLabel={periodLabel} />
       <Underwater a={a} periodLabel={periodLabel} market={data.market} />
 
-      {data.risk ? (
-        <RiskProfile r={data.risk} periodLabel={periodLabel} market={data.market} marketFailed={data.partial?.market ?? false} />
-      ) : (
-        <AbsentSheet
-          icon="monitoring"
-          title="리스크 프로필"
-          sub="이 종목을 들고 있으면 어떤 위험을 감수하게 되는지, 세 가지 각도로 봅니다"
-          body="상장한 지 얼마 되지 않아 연도별 성적과 큰 하락을 낼 만큼 이력이 쌓이지 않았습니다."
-        />
-      )}
-
-      {/* ⚠️ 부제가 바로 아래 시트("역대 낙폭 Top 5")의 부제와 **글자까지 같았다.** 구간 부제는
-          그 아래 시트들을 아우르는 말이라야 한다 — 한 시트의 말을 그대로 올리면 되풀이다. */}
-      {/* 시트는 데이터가 없어도 자리를 지킨다 — 이유는 AbsentSheet 주석 참고.
-          짝의 칸 수도 그대로 유지해야 50:50 이 안 어긋난다. */}
-      <Pair>
+      {/* v2(2026-10-03 판정표 1단계) — 독자 질문 순서: 얼마나 빠졌나(위 둘) → 흔한가 · 언제 되찾나 → 왜(시장 · 업종) → 장기 성적.
+          옛 Top 5 · 리스크 '하락 vs 회복' · '혼자 빠지나' · 성격 타일은 같은 사건을 네 군데서 말해 사례 표 하나 + 회복 칸으로 합쳤다.
+          시트는 자료가 없어도 자리를 지킨다(AbsentSheet 주석) — 짝의 칸 수가 그대로여야 줄이 안 어긋난다. */}
+      <div className="v2-md-row is-21">
         {a.topDrawdowns.length > 0 ? (
-          <TopDrawdowns eps={a.topDrawdowns} />
+          <CasesTable a={a} periodLabel={periodLabel} market={data.market} />
         ) : (
-          <AbsentSheet
-            icon="history"
-            title="역대 낙폭 Top 5"
-            sub="이만큼 빠졌던 구간과 회복까지 걸린 기간"
-            body="이 기간엔 순위를 매길 만한 하락이 없었습니다. 기간을 넓히면 더 나올 수 있습니다."
-          />
+          <AbsentSheet icon="history" title="역대 하락 사례" sub="" body="이 기간엔 순위를 매길 만한 하락이 없었습니다. 기간을 넓히면 더 나올 수 있습니다." />
         )}
         {a.recovery ? (
-          <Recovery a={a} periodLabel={periodLabel} />
+          <RecoveryModule a={a} />
         ) : (
-          <AbsentSheet
-            /* ⚠️ 아래 실제 시트(`Recovery`)와 **같은 아이콘**이어야 한다 — 같은 자리에 번갈아 선다. */
-            icon="timer"
-            title="회복까지 걸린 기간"
-            sub="과거 사례로 본 회복 소요 기간"
-            body="지금은 고점 부근이라 회복을 기다릴 하락이 없습니다."
-          />
+          <AbsentSheet icon="timer" title="회복까지" sub="" body="지금은 고점 부근이라 회복을 기다릴 하락이 없습니다." />
         )}
-      </Pair>
+      </div>
 
-      <Pair>
+      <div className="v2-md-row is-12">
         {data.attribution ? (
           <Attribution
             attr={data.attribution}
@@ -448,7 +421,7 @@ export function Results({ data }: { data: MddResult }) {
           <AbsentSheet
             icon="call_split"
             title="시장 탓일까, 종목 탓일까"
-            sub="지수·업종과 견줘 이 종목만의 낙폭이 얼마인지"
+            sub=""
             body={
               a.currentDd > -1
                 ? "지금은 고점 부근이라 원인을 나눌 하락이 없습니다."
@@ -459,29 +432,32 @@ export function Results({ data }: { data: MddResult }) {
             }
           />
         )}
-        <Character ch={a.character} currentDd={a.currentDd} />
-      </Pair>
-      {data.theme ? (
-        <>
+        {data.theme ? (
           <Theme theme={data.theme} />
-          {/* 대표 종목 일부만 받았으면 그렇다고 적는다 — 평균이 몇 종목으로 낸 것인지 읽는 사람이 알아야 한다. */}
-          {data.partial && data.partial.peersOk < data.partial.peersRequested && (
-            <p style={{ margin: "-6px 4px 0", fontSize: "var(--fs-11)", color: C.muted }}>
-              대표 {data.partial.peersRequested}종목 중 {data.partial.peersOk}종목만 불러와 비교했습니다. 잠시 뒤 다시 열면 채워질 수 있습니다.
-            </p>
-          )}
-        </>
+        ) : (
+          <AbsentSheet
+            icon="hub"
+            title="업종 안에서"
+            sub=""
+            body={
+              data.partial && (data.partial.lookupFailed || data.partial.peersRequested > 0)
+                ? "테마 대표 종목의 시세를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오."
+                : "이 종목이 묶인 테마를 찾지 못했습니다. 테마 대표 종목 목록에 등록된 종목에서만 비교가 나옵니다."
+            }
+          />
+        )}
+      </div>
+      {/* 대표 종목 일부만 받았으면 그렇다고 적는다 — 평균이 몇 종목으로 낸 것인지 읽는 사람이 알아야 한다. */}
+      {data.theme && data.partial && data.partial.peersOk < data.partial.peersRequested && (
+        <p style={{ margin: "-6px 4px 0", fontSize: "var(--fs-11)", color: C.muted }}>
+          대표 {data.partial.peersRequested}종목 중 {data.partial.peersOk}종목만 불러와 비교했습니다. 잠시 뒤 다시 열면 채워질 수 있습니다.
+        </p>
+      )}
+
+      {data.risk ? (
+        <YearsModule r={data.risk} periodLabel={periodLabel} />
       ) : (
-        <AbsentSheet
-          icon="hub"
-          title="테마 비교"
-          sub="같은 테마 대표 종목들과 지금 낙폭을 나란히 놓습니다"
-          body={
-            data.partial && (data.partial.lookupFailed || data.partial.peersRequested > 0)
-              ? "테마 대표 종목의 시세를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오."
-              : "이 종목이 묶인 테마를 찾지 못했습니다. 테마 대표 종목 목록에 등록된 종목에서만 비교가 나옵니다."
-          }
-        />
+        <AbsentSheet icon="monitoring" title="해마다" sub="" body="상장한 지 얼마 되지 않아 연도별 성적을 낼 만큼 이력이 쌓이지 않았습니다." />
       )}
     </div>
   );

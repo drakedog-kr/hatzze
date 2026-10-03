@@ -30,6 +30,11 @@ export type Episode = {
   /** 고점→저점까지의 달력 일수 — 하락 '속도'(급락형/완만형)를 가른다. */
   troughDays: number;
   recovered: boolean;
+  /**
+   * 같은 기간(고점→저점) 시장 지수의 등락(%). 조회 경로(api/mdd)가 지수 시세를 받은 뒤 채운다 — 못 받았으면 null.
+   * v2 '역대 하락 사례' 표의 한 칸이다(2026-10-03). 예전엔 리스크 프로필의 '혼자 빠지나, 같이 빠지나'가 큰 하락만 따로 셌다.
+   */
+  market?: number | null;
 };
 
 /**
@@ -436,60 +441,32 @@ export function analyzeDrawdown(bars: Bar[]): MddAnalysis | null {
   };
 }
 
-/* ── 리스크 프로필 ─────────────────────────────────────────────────
- * 종목의 '기질'을 숫자 몇 개로 요약한다(스탯 타일용):
- *   보상 = 감수한 최악 낙폭 대비 벌어준 수익(연환산)
- *   빈도 = 큰 하락(−20% 이상)이 평균 몇 년에 한 번
- *   동반 = 그 큰 하락들이 시장과 함께였나, 이 종목만이었나
+/* ── 해마다 ───────────────────────────────────────────────────────
+ * 조회 기간의 복리 연평균 수익과 해마다 수익 · 그 해 최악 낙폭(화면 '해마다' 모듈, app/mdd/V2Sheets.tsx).
+ * 예전엔 '리스크 프로필'로 큰 하락 빈도 · 시장 동반성 · 하락 vs 회복 속도도 냈다 — v2(2026-10-03)에서 그 셋은
+ * '역대 하락 사례' 표(사건마다 깊이 · 같은 기간 시장 · 빠진 기간 · 되찾은 기간)로 옮겨 여기서 걷었다.
  */
 
-/** 큰 하락으로 셀 낙폭 기준(%, 음수). */
-const RP_BIG_DROP = -20;
-/** 시장이 종목 낙폭의 이 비율만큼 이상 빠졌으면 '시장 동반'으로 본다. */
-const RP_MARKET_RATIO = 0.5;
-
 export type RiskProfile = {
-  /** 분석 기간(년). 수익·빈도는 이 기간에 의존한다. */
+  /** 분석 기간(년). 수익은 이 기간에 의존한다. */
   years: number;
   /** 연환산 수익률(%). 음수일 수 있다. */
   annualReturn: number;
-  /** 최대 낙폭(%, 음수). */
-  mdd: number;
-  /** 큰 하락 기준(%, 음수). */
-  bigDropThreshold: number;
-  /** 큰 하락 횟수. */
-  bigDropCount: number;
-  /** 큰 하락 중 시장과 함께 빠진 횟수. 코스피 데이터 없으면 null. */
-  withMarket: number | null;
-  /** 큰 하락의 고점→저점 일수 중앙값(빠지는 속도). 표본 얇으면 null. */
-  dropDaysMedian: number | null;
-  /** 큰 하락의 저점→회복 일수 중앙값(되찾는 속도). 표본 얇으면 null. */
-  recoverDaysMedian: number | null;
-  /** 큰 하락 사건들 — 그때 종목 낙폭과 코스피 낙폭(같은 창). '시장 동반성' 시각화용. */
-  events: RiskEvent[];
-  /** 해마다 얼마 벌고(수익) 얼마나 아팠나(그 해 최악 낙폭). '낙폭 대비 보상' 시각화용. */
+  /** 해마다 얼마 벌고(수익) 얼마나 아팠나(그 해 최악 낙폭). */
   yearly: YearStat[];
-};
-
-/**
- * 큰 하락 한 번 — 그 창에서 종목·코스피가 각각 얼마나 빠졌나,
- * 그리고 고점→저점(dropDays)·저점→회복(recoverDays)이 각각 며칠이었나.
- */
-export type RiskEvent = {
-  year: number;
-  /** 고점이 난 달(1~12). 한 해에 두 건 이상이면 화면에서 이걸로 줄을 구분한다. */
-  month: number;
-  stock: number;
-  market: number | null;
-  dropDays: number;
-  /** 저점→고점 회복까지의 일수. 아직 회복 못 했으면 null. */
-  recoverDays: number | null;
 };
 
 /** 한 해의 수익률과 그 해 안에서 겪은 최악 낙폭(둘 다 %). */
 export type YearStat = { year: number; ret: number; mdd: number };
 
 /** date(YYYY-MM-DD) 당일 또는 그 이전의 마지막 종가. 없으면 null. */
+/** `from` 종가에서 `to` 종가까지 등락(%). 두 날 중 하나라도 그 전 종가가 없으면 null. 사례 표의 시장 칸이 쓴다. */
+export function moveBetween(bars: Bar[], from: string, to: string): number | null {
+  const a = closeOnOrBefore(bars, from);
+  const b = closeOnOrBefore(bars, to);
+  return a && b ? (b / a - 1) * 100 : null;
+}
+
 function closeOnOrBefore(bars: Bar[], date: string): number | null {
   let res: number | null = null;
   for (const b of bars) {
@@ -537,7 +514,7 @@ function yearlyStats(bars: Bar[]): YearStat[] {
 }
 
 /** 종목 종가 + (있으면) 시장 종가로 리스크 프로필을 낸다. */
-export function riskProfile(bars: Bar[], marketBars: Bar[] | null): RiskProfile | null {
+export function riskProfile(bars: Bar[]): RiskProfile | null {
   const n = bars.length;
   if (n < 30) return null;
   const first = bars[0];
@@ -545,63 +522,10 @@ export function riskProfile(bars: Bar[], marketBars: Bar[] | null): RiskProfile 
   const years = (Date.parse(last.date) - Date.parse(first.date)) / (365 * 86_400_000);
   if (years < 0.5) return null;
 
-  const annualReturn = (Math.pow(last.close / first.close, 1 / years) - 1) * 100;
-
-  let peak = -Infinity;
-  let mdd = 0;
-  for (const b of bars) {
-    if (b.close > peak) peak = b.close;
-    const dd = (b.close / peak - 1) * 100;
-    if (dd < mdd) mdd = dd;
-  }
-
-  const big = episodes(bars).filter((e) => e.depth <= RP_BIG_DROP);
-  const bigDropCount = big.length;
-  const hasMarket = !!(marketBars && marketBars.length > 1);
-
-  // 큰 하락마다 그 창에서 코스피가 얼마나 빠졌는지. 시각화(events)와 동반 판정(withMarket)에 둘 다 쓴다.
-  const events: RiskEvent[] = big.map((e) => {
-    let market: number | null = null;
-    if (hasMarket) {
-      const mp = closeOnOrBefore(marketBars!, e.peakDate);
-      const mt = closeOnOrBefore(marketBars!, e.troughDate);
-      if (mp && mt) market = (mt / mp - 1) * 100;
-    }
-    return {
-      year: Number(e.peakDate.slice(0, 4)),
-      month: Number(e.peakDate.slice(5, 7)),
-      stock: e.depth,
-      market,
-      dropDays: e.troughDays,
-      recoverDays: e.recovered ? e.days - e.troughDays : null,
-    };
-  });
-
-  // 시장이 종목 낙폭의 절반 이상 함께 빠졌으면 '동반'. 코스피가 아예 없으면 null.
-  const withMarket = hasMarket
-    ? events.filter((ev) => ev.market !== null && ev.market <= RP_MARKET_RATIO * ev.stock).length
-    : null;
-
-  // 하락 vs 회복 속도 — 되찾은 큰 하락만(고점→저점, 저점→회복). 표본 2건 미만이면 null.
-  const bigRecovered = big.filter((e) => e.recovered);
-  const enoughSpeed = bigRecovered.length >= 2;
-
   return {
     years,
-    annualReturn,
-    mdd,
-    bigDropThreshold: RP_BIG_DROP,
-    bigDropCount,
-    withMarket,
-    dropDaysMedian: enoughSpeed ? median(bigRecovered.map((e) => e.troughDays)) : null,
-    recoverDaysMedian: enoughSpeed ? median(bigRecovered.map((e) => e.days - e.troughDays)) : null,
-    events: events.slice(-6),
-    /**
-     * 해마다 한 줄이라 조회 기간 전체를 그대로 보낸다(10년이면 11개, 전체면 상장 이후 전부).
-     * 예전엔 여기서 6개로 잘랐는데, 화면이 최근 5줄만 막대로 그리므로 그걸로 충분했다.
-     * 지금은 타일에 '전체보기'가 붙어 조회 기간 전체를 펼쳐 보여주므로 자르면 안 된다
-     * (자르면 10년을 골라도 6년치만 열린다). 한 줄이 숫자 셋이라 늘려도 응답이 거의 안 는다.
-     */
+    annualReturn: (Math.pow(last.close / first.close, 1 / years) - 1) * 100,
+    // 조회 기간 전체를 그대로 보낸다(10년이면 11개, 전체면 상장 이후 전부). 화면이 조회 기간만큼 잘라 다 펼친다.
     yearly: yearlyStats(bars),
   };
 }

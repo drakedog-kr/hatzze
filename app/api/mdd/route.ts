@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 
-import { analyzeDrawdown, drawdownSeries, riskProfile, type Bar } from "@/lib/mdd";
-import { getSupabaseServer } from "@/lib/supabase-server";
+import { analyzeDrawdown, drawdownSeries, moveBetween, riskProfile, type Bar } from "@/lib/mdd";
+import { getSupabaseAdmin, getSupabaseServer } from "@/lib/supabase-server";
 import { MDD_PEER_MAX, themesForName, THEMES } from "@/lib/stock-themes";
 import { US_MDD_PEER_MAX, US_THEMES, themesForTicker } from "@/lib/us-stock-themes";
 import { fetchDailyHistory, yahooSymbol } from "@/lib/yahoo-history";
 
-import { normalizeYears } from "../../mdd/shared";
+import { normalizeYears, type MddTalk } from "../../mdd/shared";
 
 // MDD(최대낙폭) 분석. 야후 일봉을 호출 시점에 직접 받아 계산하고, 상단 티커
 // (/api/ticker)와 같은 방식으로 CDN 에 15분 캐시한다 — 별도 크론·DB 없이.
@@ -43,6 +43,61 @@ type Theme = { name: string; peers: Peer[]; avgDd: number; sincePeakAvg: number 
 type ThemeFetch = { theme: Theme | null; requested: number; ok: number; lookupFailed: boolean };
 const NO_THEME: ThemeFetch = { theme: null, requested: 0, ok: 0, lookupFailed: false };
 
+/** '채널이 말한 까닭'이 보는 기간(달력일). 국장 종목 언급은 2026-07-12 부터 쌓였다. */
+const TALK_DAYS = 90;
+
+/**
+ * 이 종목의 카더라 자료 — 날마다 언급 수와 채널이 짚은 '움직인 까닭'(v2 MDD 둘째 줄, 2026-10-03).
+ * 텔레그램 표는 공개 키로 막혀 있어(RLS) 서버 키로 읽는다 — 카더라 화면들(lib/kadera-why.ts)과 같다.
+ * 국장 · 미장은 표 이름과 종목 열만 다르다(미장 까닭엔 확정 등락률이 없어 채널 글의 표기를 쓴다).
+ * 실패하면 null — 낙폭 화면 전체를 막지 않는다.
+ */
+async function loadTalk(code: string, isUs: boolean): Promise<MddTalk | null> {
+  const todayKst = new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10);
+  const since = new Date(Date.parse(`${todayKst}T00:00:00Z`) - (TALK_DAYS - 1) * 86_400_000).toISOString().slice(0, 10);
+  const db = getSupabaseAdmin();
+  const key = isUs ? "ticker" : "stock_code";
+  try {
+    const [daily, why] = await Promise.all([
+      db
+        .from(isUs ? "telegram_us_stock_daily" : "telegram_stock_daily")
+        .select("date,mention_count")
+        .eq(key, code)
+        .gte("date", since)
+        .lte("date", todayKst),
+      db
+        .from(isUs ? "telegram_us_stock_move_reason" : "telegram_stock_move_reason")
+        .select(isUs ? "date,reason,quoted_change_rate" : "date,reason,change_rate,quoted_change_rate")
+        .eq(key, code)
+        .gte("date", since)
+        .not("reason", "is", null)
+        .order("date", { ascending: false })
+        .limit(5),
+    ]);
+    if (daily.error || why.error) {
+      console.error("[api/mdd] 카더라 자료를 못 읽었습니다", daily.error ?? why.error);
+      return null;
+    }
+    const byDate = new Map((daily.data ?? []).map((r) => [r.date as string, Number(r.mention_count) || 0]));
+    const mentions: MddTalk["mentions"] = [];
+    for (let t = Date.parse(`${since}T00:00:00Z`); t <= Date.parse(`${todayKst}T00:00:00Z`); t += 86_400_000) {
+      const d = new Date(t).toISOString().slice(0, 10);
+      mentions.push({ date: d, count: byDate.get(d) ?? 0 });
+    }
+    type WhyRow = { date: string; reason: string | null; change_rate?: number | string | null; quoted_change_rate?: number | string | null };
+    const reasons = ((why.data ?? []) as unknown as WhyRow[])
+      .filter((r) => (r.reason ?? "").trim() !== "")
+      .map((r) => {
+        const v = r.change_rate ?? r.quoted_change_rate;
+        return { date: r.date, reason: (r.reason as string).trim(), change: v === null || v === undefined ? null : Number(v) };
+      });
+    return { days: TALK_DAYS, mentions, reasons };
+  } catch (e) {
+    console.error("[api/mdd] 카더라 자료 조회가 깨졌습니다", e);
+    return null;
+  }
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = (searchParams.get("code") ?? "").trim();
@@ -75,22 +130,26 @@ export async function GET(request: Request) {
   const atHigh = analysis.currentDd > -1;
   const athDate = analysis.athDate;
 
-  // 시장 지수는 항상 받는다 — 원인 분해(고점 이후)뿐 아니라 리스크 프로필의 '시장 동반성'도
-  // 지수 시계열이 필요하기 때문이다.
+  // 시장 지수는 항상 받는다 — 원인 분해(고점 이후)와 역대 하락 사례의 '같은 기간 시장' 칸이 지수 시계열을 쓴다.
   // 시장 기준은 상장 시장을 따른다 — 코스피 · 코스닥(2026-09-30) · 미국은 S&P500. 엔비디아 낙폭을 코스피와,
   // 알테오젠 낙폭을 코스피와 견주는 건 뜻이 없다.
   //
   // 테마 비교도 시장에 따라 갈린다. 사전만 다르고 결과 모양은 같아 화면은 하나다.
-  const [marketBars, themeFetch] = await Promise.all([
+  const [marketBars, themeFetch, talk] = await Promise.all([
     fetchDailyHistory(isUs ? SP500 : market === "KOSDAQ" ? KOSDAQ : KOSPI, years),
     isUs
       ? buildUsThemeComparison(code, years, analysis.currentDd, athDate)
       : buildThemeComparison(name, market, years, analysis.currentDd, athDate),
+    loadTalk(code, isUs),
   ]);
+  // 역대 하락 사례마다 같은 기간(고점→저점) 시장 등락 — 사례 표의 '시장' 칸(lib/mdd.ts Episode.market).
+  if (marketBars) {
+    analysis.topDrawdowns = analysis.topDrawdowns.map((e) => ({ ...e, market: moveBetween(marketBars, e.peakDate, e.troughDate) }));
+  }
   const theme = themeFetch.theme;
 
-  // 리스크 프로필(보상·큰 하락 빈도·시장 동반성) — 종목·코스피 종가로 요약.
-  const risk = riskProfile(bars, marketBars);
+  // 해마다 수익 · 낙폭과 복리 연평균(화면 '해마다' 모듈) — 종목·시장 종가로 요약.
+  const risk = riskProfile(bars);
 
   // 원인 분해 — 이 종목의 고점 이후, 같은 기간 시장·테마는 얼마나 움직였나.
   // stock 은 곧 currentDd(고점 이후 수익률과 같다). 시장·테마와 나란히 놓아
@@ -122,7 +181,7 @@ export async function GET(request: Request) {
       : null;
 
   return NextResponse.json(
-    { ok: true, code, name, market, symbol, years: yearsKey, analysis, attribution, theme, risk, partial },
+    { ok: true, code, name, market, symbol, years: yearsKey, analysis, attribution, theme, risk, partial, talk },
     {
       headers: {
         "Cache-Control": partial

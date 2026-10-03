@@ -100,7 +100,7 @@ describe("riskProfile 의 해마다 수익", () => {
   it("그 해 수익은 전해 마지막 종가에서 잰다 — 첫 거래일의 움직임도 그 해 몫이다", () => {
     // 2024 내내 100, 2025 첫 거래일(01-02)에 110 으로 뛰고 그대로. 첫날 종가에서 재면 두 해 다 0% 가 되어
     // 기간 수익 +10% 가 어느 해에도 안 잡혔다.
-    const r = riskProfile(weekdayBars("2024-01-02", "2025-12-31", (d) => (d < "2025" ? 100 : 110)), null);
+    const r = riskProfile(weekdayBars("2024-01-02", "2025-12-31", (d) => (d < "2025" ? 100 : 110)));
     assert.ok(r);
     assert.deepEqual(
       r.yearly.map((y) => [y.year, Math.round(y.ret * 10) / 10]),
@@ -112,7 +112,7 @@ describe("riskProfile 의 해마다 수익", () => {
   });
   it("거래일이 모자라 빠지는 해도 다음 해의 기준 종가는 준다", () => {
     // 2023 은 12월 열흘(< 20 거래일)이라 막대가 없지만, 그 해 마지막 종가 80 이 2024 의 출발점이다.
-    const r = riskProfile(weekdayBars("2023-12-18", "2024-12-31", (d) => (d < "2024" ? 80 : 100)), null);
+    const r = riskProfile(weekdayBars("2023-12-18", "2024-12-31", (d) => (d < "2024" ? 80 : 100)));
     assert.ok(r);
     assert.deepEqual(
       r.yearly.map((y) => [y.year, Math.round(y.ret * 10) / 10]),
@@ -120,7 +120,7 @@ describe("riskProfile 의 해마다 수익", () => {
     );
   });
   it("창의 첫 해는 앞 종가가 없어 그 해 첫 종가에서 잰다", () => {
-    const r = riskProfile(weekdayBars("2024-01-02", "2024-12-31", (d) => (d < "2024-07" ? 100 : 120)), null);
+    const r = riskProfile(weekdayBars("2024-01-02", "2024-12-31", (d) => (d < "2024-07" ? 100 : 120)));
     assert.ok(r);
     assert.equal(Math.round(r.yearly[0].ret), 20);
   });

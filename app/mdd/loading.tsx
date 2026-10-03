@@ -12,8 +12,8 @@ import { C } from "../ui";
  * 두 번째는 이미 있던 것이고 종목·기간을 바꿀 때마다 다시 뜬다. 여기서는 첫 번째만 맡는다.
  *
  * ⭐ **골격은 그쪽 `Skeleton` 과 글자 그대로 같아야 한다.** 두 단계가 이어 붙는데 모양이
- * 다르면 화면이 갈아타는 것처럼 보인다. 그래서 시트 배치(히어로 3분할 → 전폭 차트 →
- * 50:50 짝)를 여기서도 그대로 그린다.
+ * 다르면 화면이 갈아타는 것처럼 보인다. 그래서 시트 배치(둘째 줄 모듈 셋 → 전폭 차트 →
+ * 2:1 짝)를 여기서도 그대로 그린다.
  *
  * ⚠️ **폭 상한을 여기서 걸지 말 것.** 셸(AppShell)이 본문 상자를 이미 1340 으로 잡는다.
  * 예전엔 `maxWidth:1180, margin:"0 auto"` 가 있었는데, 세로 flex 안에서 가로 margin:auto 가
@@ -48,7 +48,7 @@ export default function Loading() {
         <Block h={41} w={218} r={6} bg={C.track} />
       </div>
 
-      {/* MddExplorer 의 Skeleton 과 같은 골격 — 둘째 줄 모듈 셋 + 전폭 차트 + 50:50 짝. */}
+      {/* MddExplorer 의 Skeleton 과 같은 골격 — 둘째 줄 모듈 셋 + 전폭 차트 + 사례 표 · 회복 짝(2:1). */}
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }} aria-hidden>
         <div className="v2-md-band">
           {[0, 1, 2].map((i) => (
@@ -66,7 +66,7 @@ export default function Loading() {
             <Block h={201} />
           </div>
         </section>
-        <div className="mdd-pair">
+        <div className="v2-md-row is-21">
           {[0, 1].map((i) => (
             <section key={i} className="hz-sheet">
               <div style={body}>

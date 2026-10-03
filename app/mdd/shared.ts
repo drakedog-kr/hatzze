@@ -38,6 +38,19 @@ export type MddPartial = {
   lookupFailed: boolean;
 };
 
+/**
+ * 이 종목을 텔레그램 채널이 어떻게 말했나(카더라 자료) — v2 MDD 둘째 줄 '채널이 말한 까닭'(2026-10-03).
+ * 계산기류(낙폭 · 회복)는 어디서나 하지만 이 자료는 여기만 있다. 최근 TALK_DAYS 일만 싣는다.
+ *  - mentions: 날마다 언급 수(빈 날은 0) — 오래된 날부터.
+ *  - reasons: 그 기간 채널이 짚은 '움직인 까닭'(까닭 글이 있는 날만) — 최근 날부터, 다섯까지.
+ * 조회가 깨지면 null — 화면은 그 칸에 '못 불러왔습니다'를 적는다(자료 없음과 가른다).
+ */
+export type MddTalk = {
+  days: number;
+  mentions: { date: string; count: number }[];
+  reasons: { date: string; reason: string; change: number | null }[];
+};
+
 export type MddResult = {
   ok: true;
   code: string;
@@ -49,6 +62,8 @@ export type MddResult = {
   theme: ThemeCmp | null;
   risk: RiskProfileData | null;
   partial: MddPartial | null;
+  /** 카더라 자료. 옛 응답(캐시)에는 없을 수 있다. */
+  talk?: MddTalk | null;
 };
 
 export const PERIODS: { key: string; label: string }[] = [
@@ -96,19 +111,12 @@ export function periodInfo(years: string, firstDate: string, asOf: string): { la
 }
 
 /**
- * 지금 낙폭이 **조회 기간의 최저점**인가. 히어로의 '가장 깊은 낙폭' 문장은 이때만 쓴다.
- * 예전엔 회복 전례가 없다는 것만 보고 "지금이 이 종목의 역대 최대 낙폭"이라 적었다 — 100→55→60 처럼 저점에서
- * 조금 올라온 때(지금 −40% · 기간 최저 −45%)에도, 1년 조회에서도 같은 문장이었다(mdd#5). 0.05%p 는 반올림 여유다.
+ * 지금 낙폭 머리의 물음표 한 마디(15자 안 · 도움말 규칙). 고른 기간을 다 채운 종목엔 안 단다 —
+ * 1년을 골랐을 뿐인 종목에 '표본이 짧다'고 하면 거짓이다. 전체 구간은 합병·감자로 끊긴 가격이 섞인다.
  */
-export const isDeepestNow = (a: { currentDd: number; mdd: number }) => a.currentDd <= a.mdd + 0.05;
-
-/**
- * 히어로 바닥의 주의 한 줄. 전체 구간은 합병·감자가 섞이는 것을, 상장 이력이 요청보다 짧으면 표본이 짧음을 말한다.
- * 예전엔 '2년 미만'으로 가려, 삼성전자를 1년으로 봐도 "표본이 짧아…"가 떴다(고른 기간이 1년일 뿐 표본이 짧은 게 아니다).
- */
-export function cautionText(years: string, truncated: boolean, approxYears: number): string | null {
-  if (years === "all") return "전체 구간에는 합병·감자·액면병합이 섞여 있어, 아주 오래된 낙폭은 지금의 회사와 다를 수 있습니다.";
-  if (truncated) return `상장한 지 약 ${Math.max(1, Math.round(approxYears))}년이라 표본이 짧습니다. 더 오래된 종목과 같은 무게로 보지 마십시오.`;
+export function cautionShort(years: string, truncated: boolean, approxYears: number): string | null {
+  if (years === "all") return "합병·감자 구간 섞임";
+  if (truncated) return `상장 ${Math.max(1, Math.round(approxYears))}년, 표본 짧음`;
   return null;
 }
 
@@ -143,24 +151,6 @@ export const fmtPrice = (n: number, market: string | null | undefined) =>
  */
 export const benchName = (market: string | null | undefined) => (market === "US" ? "S&P500" : market === "KOSDAQ" ? "코스닥" : "코스피");
 
-/** 시장 이름에 붙는 주격 조사. "코스피는" · "코스닥은"(닥 → ㄱ받침) · "S&P500은"(오백 → ㄱ받침). */
-export const benchParticle = (market: string | null | undefined) => (market === "US" || market === "KOSDAQ" ? "은" : "는");
-
-/**
- * "같은 기간 코스피는 −30.0%, 반도체 업종은 −35.3% ___" 의 마지막 동사.
- *
- * 예전엔 "빠졌습니다" 고정이었다. 국장은 이 문장이 뜨는 날 대부분 코스피도 같이
- * 빠져 있어 맞았지만, 미장을 들이자 바로 드러났다 — **"S&P500은 +3.4% 빠졌습니다"**.
- * 부호가 섞이는 경우까지 있어 세 갈래로 가른다(둘 다 하락 / 둘 다 상승 / 엇갈림).
- */
-export function benchVerb(market: number | null, theme: number | null): string {
-  const vals = [market, theme].filter((v): v is number => v !== null);
-  if (!vals.length) return "움직였습니다";
-  if (vals.every((v) => v <= 0)) return "빠졌습니다";
-  if (vals.every((v) => v >= 0)) return "올랐습니다";
-  return "엇갈렸습니다";
-}
-
 /** 기간을 사람 단위로 짧게. 카드 안 큰 숫자는 이 형식으로 통일한다(1,733일 → 4.7년). */
 export const fmtDur = (d: number) => (d >= 365 ? `${(d / 365).toFixed(1)}년` : d >= 45 ? `${Math.round(d / 30)}개월` : `${Math.round(d)}일`);
 
@@ -187,8 +177,8 @@ export const fmtDay = (iso: string, refIso: string) => {
    빨강이다. 그래서 전역 2색 체계와 어긋나지 않는다.
 
    ⚠️ 예전엔 '미회복'이 빨강이었다(경고 뜻). 여기서 빨강은 회복을 뜻하므로 그대로 두면
-   못 돌아온 것이 돌아온 것과 같은 색이 된다. 미회복은 **채우지 않은 분홍 점선**으로
-   "아직 오지 않았다"를 말한다. */
+   못 돌아온 것이 돌아온 것과 같은 색이 된다. 지금 진행 중인 하락은 색이 아니라 글자('진행 중')와
+   옅은 바탕으로 가른다(V2Sheets.tsx CasesTable). */
 
 export const DOWN = "var(--c-cold-ink)";
 
@@ -199,15 +189,7 @@ export const DOWN_BAR = ["var(--c-blue-1)", "var(--c-blue-2)", "var(--c-blue-3)"
 
 export const UP_BAR = "var(--c-warm-1)";
 
-/** DOWN_BAR[1] 의 짝. 낙폭과 수익을 좌우로 견주는 거울 막대(리스크 프로필)가 쓴다 — 사이트에서 두 방향을
-    나란히 세우는 데이터 면(카더라 낙관·비관 막대 · 테마 트리맵)이 다 램프의 이 단이다(2026-09-28). */
-export const UP_BAR_MID = "var(--c-warm-2)";
-
 export const UP_BAR_SOFT = "var(--c-warm-3)";
-
-/** 미회복 — 채우지 않은 분홍 점선. 위 색 축 주석 참고. 옆줄의 회복 막대(UP_BAR_MID)와 같은 색이라야
-    같은 계열로 읽힌다 — warm-3 일 땐 회색 타일 위 명암비 1.5 라 점선이 거의 안 보였다. */
-export const UNRECOVERED = `repeating-linear-gradient(90deg, ${UP_BAR_MID} 0 3px, transparent 3px 6px)`;
 
 /** 시트 안쪽 본문 padding. 머리(.hz-sheet-head)의 22 와 좌우를 맞춘다. */
 export const PAD = "18px 22px";
