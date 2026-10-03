@@ -3,11 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { withObjectParticle } from "@/lib/format";
-import { getStockDetail, type StockCongress, type StockInsider } from "@/lib/insider-detail";
+import { getStockDetail } from "@/lib/insider-detail";
 import { PRICE_RANGES, type PriceRangeKey, stockDetailHref } from "@/lib/insider-range";
 import { assertLoaded } from "@/lib/load-state";
 
-import { SectionHead } from "../../../kadera/SectionHead";
 import { CoverMeta, Module } from "../../../kadera/V2Modules";
 import { CurrencyToggle } from "../../../AppShell";
 import { ChartZoom } from "../../ChartZoom";
@@ -16,24 +15,9 @@ import { PageJsonLd } from "../../../JsonLd";
 import { INSIDER_CARD } from "../../../og-copy";
 import { pageMetadata } from "../../../seo";
 import { LoadFailedNote } from "../../../LoadFailedNote";
-import { ExpandableList } from "../../../kadera/ExpandableList";
-import {
-  CODE_LABEL,
-  AnalystActions,
-  ChartLegend,
-  ConsensusBody,
-  Empty,
-  MarkBadges,
-  EmptyCard,
-  HalfRow,
-  MarkRadios,
-  Money,
-  PriceChart,
-  WIDE_COLS,
-  WideHead,
-  fmtDate,
-  wideStockHolderRows,
-} from "../../parts";
+import { AnalystActions, ConsensusBody, MarkBadges, MarkRadios, Money, PriceChart, fmtDate, moveKind } from "../../parts";
+import { DetailList, congressLines, holderLines, insiderLines } from "../../V2DetailRows";
+import { Icon } from "../../../ui";
 import { BackTrail } from "@/components/back-trail";
 
 /**
@@ -55,52 +39,11 @@ import { BackTrail } from "@/components/back-trail";
  * 섹터·시가총액·직원수는 원천이 없다. "-" 로 자리를 채우거나 그럴듯한 문장을 만들지 말 것.
  * (애널리스트 컨센서스는 2026-08-22 에 원천을 찾아 붙였다 — stockanalysis.com.)
  */
-const SHEET_PAIR_MIN = "min(460px, 100%)";
 /**
- * 처음 펴는 줄 수와 '더 보기' 한 번의 증가분, 그리고 실어 보내는 상한.
- *
- * ⚠️ 상세는 목록이 길다(코어위브 임원 신고 2,021건). 처음부터 다 펴면 **화면이 자료에
- * 파묻혀** 무엇이 중요한지 안 보인다. 눌러서 늘린다.
- * ⚠️ 안 보이는 줄도 클라이언트로 전송되므로 상한이 따로 필요하다.
- *
- * ⭐ 여는 줄 수가 **카드 폭에 따라 다르다.** 거물 카드는 전폭에 여섯 칸짜리 표라 열 줄이
- * 한눈에 들어오지만, 임원·의원 넷은 반쪽 폭(572px)이라 같은 열 줄이면 화면이 길어지기만
- * 한다. 나란히 선 카드 둘의 높이도 다섯 줄일 때 더 잘 맞는다.
+ * 실어 보내는 줄 수 상한. 처음 펴는 줄 수와 '더 보기' 한 번의 증가분은 V2DetailRows(DetailList)가 정한다.
+ * ⚠️ 상세는 목록이 길다(코어위브 임원 신고 2,021건). 안 보이는 줄도 클라이언트로 전송되므로 상한이 따로 필요하다.
  */
-const ROWS_OPEN = 5;
-const ROWS_OPEN_WIDE = 10;
-const ROWS_STEP = 10;
 const ROWS_MAX = 60;
-
-/** 시트의 줄 목록 + 바닥의 '더 보기'. 다섯 시트가 같은 꼴을 쓴다. */
-function Rows({ items, name, open = ROWS_OPEN }: { items: React.ReactNode[]; name: string; open?: number }) {
-  return (
-    <ExpandableList
-      items={items}
-      name={name}
-      initial={open}
-      step={ROWS_STEP}
-      listStyle={{ padding: 0, display: "block" }}
-      footerClassName="hz-sheet-foot-row"
-      footerStyle={{ marginTop: "auto" }}
-    />
-  );
-}
-
-function Pair({ children }: { children: React.ReactNode }) {
-  return <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>{children}</div>;
-}
-
-function HalfSheet({ children }: { children: React.ReactNode }) {
-  return (
-    <section
-      className="hz-sheet"
-      style={{ flex: "1 1 calc(50% - 8px)", minWidth: SHEET_PAIR_MIN, display: "flex", flexDirection: "column" }}
-    >
-      {children}
-    </section>
-  );
-}
 
 /** 이동 경로의 부모. 화면 맨 위 줄(BackTrail)과 구조화 데이터가 **같은 문자열**을 쓴다(JsonLd 머리말). */
 const PARENT = { name: "내부자 리포트", path: "/insider" };
@@ -169,63 +112,6 @@ function Trend({ points }: { points: { date: string; mentions: number; channels:
 }
 
 /**
- * 임원 신고 한 줄. 산 카드와 내놓은 카드가 **같은 함수**를 쓴다.
- *
- * ⚠️ 값 칸이 금액이 아니라 **주식 수로 내려앉을 때가 있다.** 증여·전환은 원천에 단가가
- *    아예 없다(각각 99%). 거기에 "금액 미상"을 적으면 줄에서 가장 강한 자리가 빈 말이
- *    된다 — 주식 수는 늘 있으니 그걸 대신 세운다. 단위가 섞이는 값이라 색을 한 단
- *    내려 다른 종류의 숫자로 보이게 한다.
- */
-function insiderRow(t: StockInsider, i: number, rate: number | null) {
-  const shares = t.shares != null ? `${Math.round(t.shares).toLocaleString("ko-KR")}주` : "미상";
-  return (
-    <li key={`${t.ownerName}-${t.filedDate}-${i}`}>
-      <HalfRow
-        name={t.ownerName ?? "이름 없음"}
-        // 무엇을 · 언제. 코드는 알약이 아니라 글자로 둔다 — 알약은 이름과 색을 다투는데
-        // 이 카드는 이미 매수·매도로 갈라져 있어 종류가 범주가 아니라 곁가지다.
-        note={`${t.code ? (CODE_LABEL[t.code]?.text ?? t.code) : "종류 미상"} · ${fmtDate(t.filedDate)} 접수`}
-        value={t.value != null ? <Money usd={t.value} rate={rate} /> : shares}
-        valueMuted={t.value == null}
-      />
-    </li>
-  );
-}
-
-/**
- * 의원 신고 한 줄.
- *
- * ⚠️ 금액은 **거의 늘 같은 구간**이다 — 실측 2,404건 중 2,069건(86%)이 $1,001~$15,000
- *    하나다. 그래서 이 줄에서 실제로 갈리는 값은 금액이 아니라 **날짜**다. 매매일과
- *    신고일을 가운데에 두고 금액은 끝에서 받는다.
- *
- * ⚠️⚠️ **지연 일수로 접지 말 것.** "27일 뒤 신고"로 적어 봤는데 더 헷갈렸다 — 읽는
- *    사람이 날짜를 기대하는 자리에 기간이 오면 그게 무슨 날인지를 되짚어야 한다.
- *    지연이 얼마나 되는지는 카드 물음표가 제도로 설명한다(최대 45일). 줄은 날짜를 준다.
- */
-function congressRow(c: StockCongress, i: number, rate: number | null) {
-  return (
-    <li key={`${c.member}-${c.filedDate}-${i}`}>
-      <HalfRow
-        name={c.member}
-        // 화살표는 순서를 말한다 — 가운뎃점으로 두면 두 날짜가 나열로 읽힌다.
-        note={`${fmtDate(c.transactionDate)} 매매 → ${fmtDate(c.filedDate)} 신고`}
-        value={
-          c.amountLow != null && c.amountHigh != null ? (
-            <>
-              <Money usd={c.amountLow} rate={rate} />~<Money usd={c.amountHigh} rate={rate} />
-            </>
-          ) : (
-            "구간 미상"
-          )
-        }
-        valueMuted={c.amountLow == null}
-      />
-    </li>
-  );
-}
-
-/**
  * 본문. 기간은 주소(경로)에서 받는다.
  *
  * ⚠️ 기간을 리액트 상태로 두면 차트가 클라이언트 컴포넌트가 되고 일봉이 통째로 번들을 탄다.
@@ -251,11 +137,42 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
   const execSells = d.insiders.filter((t) => t.acquiredDisposed === "D");
   const cgBuys = d.congress.filter((c) => c.kind === "P");
   const cgSells = d.congress.filter((c) => c.kind === "S");
+  // 한 목록에 섞어 최신 순으로(임원은 접수일, 의원은 매매일 — 옛 카드가 쓰던 순서 그대로).
+  const execTrades = [...execBuys, ...execSells].sort((a, b) => b.filedDate.localeCompare(a.filedDate));
+  const cgTrades = [...cgBuys, ...cgSells].sort((a, b) => (b.transactionDate ?? b.filedDate).localeCompare(a.transactionDate ?? a.filedDate));
 
   // 거물의 이번 분기 방향. 비교할 직전 분기가 없는 곳은 move 가 null 이라 안 센다.
-  const added = d.holders.filter((h) => h.move === "new" || h.move === "add").length;
-  const trimmed = d.holders.filter((h) => h.move === "trim").length;
+  // 줄 글자(늘림 · 줄임 · 유지)와 같은 잣대로 센다(parts.tsx moveKind).
+  const kinds = d.holders.map((h) => moveKind(h.move, h.sharesChange));
+  const added = kinds.filter((k) => k === "new" || k === "add").length;
+  const trimmed = kinds.filter((k) => k === "trim").length;
   const quarterMoves = added + trimmed > 0 ? `이번 분기 늘림 ${added} · 줄임 ${trimmed}곳` : "이번 분기 변화 없음";
+
+  const holdersMod =
+    d.holders.length > 0 ? (
+      <Module title="이 종목을 든 월가 거물" meta={`${d.holders.length}/${d.managerCount}명 · 분기말 · 금액 순`} className="v2-isd-mod">
+        <DetailList name="stock_holders" cols="holder" items={holderLines(d.holders.slice(0, ROWS_MAX), d.usdKrw)} />
+      </Module>
+    ) : null;
+  const consensusMod = d.consensus ? (
+    <Module title="월가 애널리스트의 시선" meta={fmtDate(d.consensus.asOf)} className="v2-isd-mod v2-isd-consensus">
+      <ConsensusBody c={d.consensus} price={d.price} rate={d.usdKrw}>
+        <AnalystActions rows={d.analystActions} rate={d.usdKrw} />
+      </ConsensusBody>
+    </Module>
+  ) : null;
+  const execMod =
+    execTrades.length > 0 ? (
+      <Module title="임원 신고" meta={`장내 매수 ${execBuys.length} · 내놓은 것 ${execSells.length}건 · 접수 순`} className="v2-isd-mod">
+        <DetailList name="stock_insider" cols="trade" items={insiderLines(execTrades.slice(0, ROWS_MAX), d.usdKrw)} />
+      </Module>
+    ) : null;
+  const cgMod =
+    cgTrades.length > 0 ? (
+      <Module title="미 하원의원 신고" meta={`매수 ${cgBuys.length} · 매도 ${cgSells.length}건 · 매매일 순`} className="v2-isd-mod">
+        <DetailList name="stock_congress" cols="congress" items={congressLines(cgTrades.slice(0, ROWS_MAX), d.usdKrw)} />
+      </Module>
+    ) : null;
 
   return (
     // ⭐ 내부자 리포트는 **달러가 기본**이다 — 재료가 전부 미국 공시라 달러가 원본이고,
@@ -391,178 +308,85 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
           ⭐ 벤치마킹한 쪽은 차트에 13F·의회·임원·ETF 를 다 얹는다. 우리는 **사람이
           자기 판단으로 장내에서 사고판 것만** 찍는다 — 옵션 행사와 세금 원천징수를
           같이 찍으면 차트가 "임원이 계속 팔았다"고 말하는데, 그 대부분이 기계적
-          흐름이라 틀린 말이다. 13F 도 안 찍는다(분기말 사진이라 '언제'가 없다). */}
+          흐름이라 틀린 말이다. 13F 는 분기말 한 점이다(점 툴팁이 '분기말 기준'이라 말한다).
+          v2(2026-10-04) — 시트 머리(아이콘 · 부제 · 사용법 문장)와 차트 아래 각주 두 문장을 걷었다. 걸러 낸 신고는 범례의 물음표가 말한다. */}
       {d.bars.length > 1 && (
-        <section className="hz-sheet">
-          <SectionHead
-            icon="show_chart"
-            title="주가와 매매 시점"
-            note={`${PRICE_RANGES.find((r) => r.key === range)?.label} · ${d.marks.length}곳`}
-            noteHelp="일봉에 매매 시점 표시"
-            /* ⚠️ "마우스를 올리면" 이었다. 폰에는 마우스가 없고 탭으로 여는데(TipTap),
-                 그 말이 폰에서는 통째로 거짓이 된다. 둘 다 되는 말로 바꾼다.
-               ⚠️ 점에 올리면 **누가** 사고팔았는지 나온다는 걸 아무 데서도 안 알려 주고
-                 있었다 — 짚어 보기 전엔 알 길이 없는 기능이라 여기 적는다. */
-            desc="채운 점이 매수이고 빈 고리가 매도입니다. 선을 짚으면 날짜와 가격이 나오고 점을 짚으면 누가 사고팔았는지 나옵니다."
-          />
-          {/* ⚠️ 배지가 형제 SVG 의 마커를 흐린다(`:has()`). 감싸는 상자가 있어야 그 규칙이
-              닿는다 — 배지와 차트가 같은 부모 안에 있어야 한다. */}
+        <Module
+          title="주가와 매매 시점"
+          meta={`${PRICE_RANGES.find((r) => r.key === range)?.label} · ${d.marks.length}곳`}
+          className="v2-isd-chart"
+          aside={
+            <span className="hz-seg hz-seg-hover hz-periodset">
+              {PRICE_RANGES.map((r) => (
+                <Link
+                  key={r.key}
+                  href={stockDetailHref(d.ticker, r.key)}
+                  // ⚠️ 스크롤을 위로 튕기지 않는다 — 차트를 보다 기간만 바꾸는 것이라
+                  //    맨 위로 올라가면 방금 보던 자리를 잃는다.
+                  scroll={false}
+                  // ⚠️ 미리 받지 않는다. 기간 주소도 사본(ISR)이라 기본값이면 보이는 순간 **화면 전체**를
+                  //    받는다 — 첫 방문마다 사본이 없는 기간 셋을 서버가 새로 그리게 된다(야후 왕복 포함).
+                  prefetch={false}
+                  aria-current={r.key === range ? "true" : undefined}
+                >
+                  {r.label}
+                </Link>
+              ))}
+            </span>
+          }
+        >
           {/* ⚠️ 라디오가 차트 상자보다 **앞**에 있어야 한다 — CSS 가 형제 선택자(`~`)로
               마커를 흐린다. `:has()` 는 쓰면 안 된다(MarkRadios 주석 참고). */}
-          <div className="hz-mkfilter" style={{ padding: "12px 0 16px" }}>
+          <div className="hz-mkfilter">
             <MarkRadios id="hz-mkf" />
-            {/* ⚠️ 배지를 SectionHead 의 `right` 에 넣으면 note 알약이 통째로 안 그려진다 —
-                물음표 툴팁이 거기 붙어 있어 단서가 같이 사라진다. 차트 바로 위에 둔다. */}
-            {/* 왼쪽이 매매자 필터(CSS), 오른쪽이 기간(주소)(2026-09-27 자리 바꿈). 둘 다 서버 컴포넌트로 남는다. */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 10,
-                flexWrap: "wrap",
-                padding: "0 22px 12px",
-              }}
-            >
+            <div className="v2-isd-chartbar">
               <MarkBadges id="hz-mkf" />
-              <span className="hz-seg hz-seg-hover hz-periodset">
-                {PRICE_RANGES.map((r) => (
-                  <Link
-                    key={r.key}
-                    href={stockDetailHref(d.ticker, r.key)}
-                    // ⚠️ 스크롤을 위로 튕기지 않는다 — 차트를 보다 기간만 바꾸는 것이라
-                    //    맨 위로 올라가면 방금 보던 자리를 잃는다.
-                    scroll={false}
-                    // ⚠️ 미리 받지 않는다. 기간 주소도 사본(ISR)이라 기본값이면 보이는 순간 **화면 전체**를
-                    //    받는다 — 첫 방문마다 사본이 없는 기간 셋을 서버가 새로 그리게 된다(야후 왕복 포함).
-                    //    누르면 받는다. 사본이 있으면 금방이다.
-                    prefetch={false}
-                    aria-current={r.key === range ? "true" : undefined}
-                  >
-                    {r.label}
-                  </Link>
-                ))}
+              <span className="v2-isd-legend">
+                <span>
+                  <i className="is-fill" />
+                  매수
+                </span>
+                <span>
+                  <i />
+                  매도
+                </span>
+                <span className="hz-tip v2-in-help" data-tip="옵션 행사·원천징수 제외" aria-label="옵션 행사·원천징수 제외" tabIndex={0}>
+                  <Icon name="help" />
+                </span>
               </span>
             </div>
             <div className="hz-mkfilter-chart">
               {/* 폰에서는 뷰박스 720 이 화면 폭으로 눌려 축 라벨이 안 읽힌다. MDD 언더워터
-                  차트와 같은 확대 보기를 씌운다(같은 `.hz-zoom-*` · 같은 버튼 자리).
-                  ⚠️ 감싸도 마커 필터는 그대로 먹는다 — 그 규칙이 `.hz-mkfilter-chart` 의
-                     **자손**을 고르므로 한 겹 더 들어가도 닿는다. */}
+                  차트와 같은 확대 보기를 씌운다(같은 `.hz-zoom-*` · 같은 버튼 자리). */}
               <ChartZoom label="주가와 매매 시점 차트">
                 <PriceChart bars={d.bars} marks={d.marks} rate={d.usdKrw} />
               </ChartZoom>
-              <ChartLegend />
             </div>
           </div>
-        </section>
+        </Module>
       )}
 
-      {/* v2(2026-10-03) — 구간 제목('01 밖에서 보는 눈' · '월가 거물이 든 것' · '임원과 의원의 신고')은 걷었다. 모듈 머리가 이름을 말한다. */}
-      {/* ── 월가 애널리스트의 시선 ────────────────────────────────────
-          ⭐ 공시 셋(임원·거물·의원)이 "이미 무엇을 했나"라면 이건 **"밖에서는 이 회사를
-             어떻게 보나"** 다. 우리 표에 없던 유일한 바깥 시선이라 공시들보다 앞에 둔다.
-          ⚠️ 커버리지가 없으면 카드를 아예 안 그린다 — 빈 칸을 "-" 로 채우지 않는다. */}
-      {d.consensus && (
-        <section className="hz-sheet">
-          <SectionHead
-            icon="reviews"
-            title="월가 애널리스트의 시선"
-            note={fmtDate(d.consensus.asOf)}
-            noteHelp="S&P Global 집계"
-            desc="증권사들이 이 종목을 어떻게 보고 있는지입니다."
-          />
-          <ConsensusBody c={d.consensus} price={d.price} rate={d.usdKrw}>
-            <AnalystActions rows={d.analystActions} rate={d.usdKrw} />
-          </ConsensusBody>
-        </section>
+      {/* ── [이 종목을 든 월가 거물 | 월가 애널리스트의 시선] · [임원 신고 | 의원 신고] ───────────────
+          v2(2026-10-04) — 구간 제목 · 시트 머리 부제를 걷고 모듈 짝으로. 줄은 한 줄 네 칸(V2DetailRows).
+          ⭐ 빈 모듈은 그리지 않고 짝이 판 폭을 쓴다 — 0건은 둘째 줄 '공시에 남은 것'이 이미 말하고, 빈 모듈을 세우면 옆 짝 높이만큼
+             아래가 빈다(에보뮨: 거물 0 → 576px · 의원 0 → 167px, 2026-10-04 실측). 애널리스트 커버리지가 없을 때도 같다. */}
+      {(holdersMod || consensusMod) && (
+        <div className={`v2-tm-band is-hot${holdersMod && consensusMod ? "" : " is-solo"}`}>
+          {holdersMod}
+          {consensusMod}
+        </div>
       )}
 
-      {/* ── 거물 보유 ────────────────────────────────────────────────── */}
-      <section className="hz-sheet">
-        <SectionHead
-          icon="groups"
-          title="이 종목을 든 월가 거물"
-          note={`${d.holders.length}/${d.managerCount}명`}
-          noteHelp="분기말 기준"
-          desc="금액이 큰 순입니다. 이름 옆에 직전 분기보다 주식 수를 얼마나 늘리고 줄였는지 적었습니다."
-        />
-        {d.holders.length === 0 ? (
-          <Empty>추적 중인 거물 가운데 이 종목을 든 곳은 없습니다.</Empty>
-        ) : (
-          <>
-            {/* 열 머리 — 칸이 여섯이면 무슨 값인지 말해 줘야 한다. 데이터 행과 **같은
-                격자**를 쓴다. */}
-            <WideHead cols={WIDE_COLS.stockHolders} labels={["거물", "소속", "포트폴리오 비중", "금액"]} />
-            <Rows
-              name="stock_holders"
-              open={ROWS_OPEN_WIDE}
-              items={wideStockHolderRows(d.holders.slice(0, ROWS_MAX), d.usdKrw)}
-            />
-          </>
-        )}
-      </section>
-
-      {/* ── 임원 신고: 산 것과 내놓은 것 ─────────────────────────────
-          ⚠️⚠️ 둘로 가르면 **어느 쪽도 아닌 신고가 생긴다** — 옵션 행사(M)·무상 취득(A)·
-          전환(C)이다. 전체의 19%(실측 2,984건)라 그냥 빠뜨리면 합이 안 맞는다.
-          각 카드의 물음표가 몇 건이 빠졌는지 적는다. */}
-      <Pair>
-        <HalfSheet>
-          <SectionHead
-            icon="trending_up"
-            title="임원이 장내에서 산 것"
-            note={`${execBuys.length}건`}
-            noteHelp="장내 매수(P)만"
-            desc="드물게 나옵니다. 없는 것이 정상입니다."
-          />
-          {execBuys.length === 0 ? (
-            <EmptyCard icon="savings">장내에서 산 신고가 없습니다. 임원이 자기 돈으로 사는 일은 대형주에서 드뭅니다.</EmptyCard>
-          ) : (
-            <Rows name="stock_insider_buy" items={execBuys.slice(0, ROWS_MAX).map((t, i) => insiderRow(t, i, d.usdKrw))} />
-          )}
-        </HalfSheet>
-
-        <HalfSheet>
-          <SectionHead
-            icon="trending_down"
-            title="임원이 내놓은 것"
-            note={`${execSells.length}건`}
-            noteHelp="세금·증여 매도 포함"
-            desc="접수일 최신 순입니다. 무엇으로 내놓았는지 옆에 적었습니다."
-          />
-          {execSells.length === 0 ? (
-            <EmptyCard icon="inbox">최근 내놓은 신고가 없습니다.</EmptyCard>
-          ) : (
-            <Rows name="stock_insider_sell" items={execSells.slice(0, ROWS_MAX).map((t, i) => insiderRow(t, i, d.usdKrw))} />
-          )}
-        </HalfSheet>
-      </Pair>
-
-      {/* ── 의원 신고: 산 것과 판 것 ─────────────────────────────────── */}
-      <Pair>
-        <HalfSheet>
-          <SectionHead
-            icon="trending_up"
-            title="의원이 산 것"
-            note={`${cgBuys.length}건`}
-            noteHelp="STOCK Act 매수 신고"
-            desc="실제 매매일 기준 최신 순입니다."
-          />
-          {cgBuys.length === 0 ? <EmptyCard icon="inbox">최근 매수 신고가 없습니다.</EmptyCard> : <Rows name="stock_cg_buy" items={cgBuys.slice(0, ROWS_MAX).map((c, i) => congressRow(c, i, d.usdKrw))} />}
-        </HalfSheet>
-
-        <HalfSheet>
-          <SectionHead
-            icon="trending_down"
-            title="의원이 판 것"
-            note={`${cgSells.length}건`}
-            noteHelp="STOCK Act 매도 신고"
-            desc="실제 매매일 기준 최신 순입니다."
-          />
-          {cgSells.length === 0 ? <EmptyCard icon="inbox">최근 매도 신고가 없습니다.</EmptyCard> : <Rows name="stock_cg_sell" items={cgSells.slice(0, ROWS_MAX).map((c, i) => congressRow(c, i, d.usdKrw))} />}
-        </HalfSheet>
-      </Pair>
+      {/* 산 것과 판 것을 한 목록에(최신 순).
+          ⚠️⚠️ 산 것 · 판 것으로 가르면 **어느 쪽도 아닌 신고**가 남는다(옵션 행사 M · 무상 취득 A · 전환 C, 임원 전체의 19%).
+          예전 반쪽 카드 넷이 그랬듯 여기도 장내 매수(P)와 손을 떠난 것(방향 D)만 담는다 — 머리 띠 수가 그 둘의 합이다.
+          대형주는 임원 장내 매수가 거의 없어 옛 '산 것' 카드가 늘 '0건' 빈 카드였다 — 한 목록이면 그 빈 칸이 없다. */}
+      {(execMod || cgMod) && (
+        <div className={`v2-tm-band ${execMod && cgMod ? "is-pair" : "is-hot is-solo"}`}>
+          {execMod}
+          {cgMod}
+        </div>
+      )}
 
       {/* ⛔ 여기 있던 "SEC와 미 하원이 공개한 공시를 그대로 옮긴 것입니다 …" 각주는
           2026-08-23 에 뺐다. 같은 고지("투자 조언이나 매수·매도 추천이 아닙니다. 모든 투자 판단과

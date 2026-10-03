@@ -5,25 +5,15 @@ import { notFound } from "next/navigation";
 import { getManagerDetail } from "@/lib/insider-detail";
 import { isCik } from "@/lib/insider-13f";
 
-import { SectionHead } from "../../../kadera/SectionHead";
 import { CoverMeta, Module } from "../../../kadera/V2Modules";
 import { CurrencyToggle } from "../../../AppShell";
 import { PageJsonLd } from "../../../JsonLd";
 import { INSIDER_CARD } from "../../../og-copy";
 import { pageMetadata } from "../../../seo";
-import { C, Icon } from "../../../ui";
+import { Icon } from "../../../ui";
 import { LoadFailedNote } from "../../../LoadFailedNote";
-import { ExpandableList } from "../../../kadera/ExpandableList";
-import {
-  Empty,
-  Money,
-  T,
-  WIDE_COLS,
-  WideHead,
-  quarterLabel,
-  wideManagerExitedRows,
-  wideManagerHoldingRows,
-} from "../../parts";
+import { Money, moveKind, quarterLabel } from "../../parts";
+import { DetailList, exitedLines, holdingLines } from "../../V2DetailRows";
 import { BackTrail } from "@/components/back-trail";
 
 /**
@@ -43,7 +33,7 @@ import { BackTrail } from "@/components/back-trail";
  * ## ⭐ 줄의 생김새는 **종목 상세의 거물 표와 같다**
  *
  * 두 화면이 같은 자료(13F)를 사람 쪽·종목 쪽에서 보는 것이라, 줄이 갈리면 독자가 다른
- * 표로 읽는다. `WIDE_COLS.managerHoldings` 가 `stockHolders` 와 같은 값인 것도 그래서다.
+ * 표로 읽는다. 둘 다 V2DetailRows 의 한 줄 네 칸(종목 · 거물 | 분기 움직임 | 비중 | 금액)을 쓰는 것도 그래서다.
  *
  * ## ⚠️⚠️ 히어로가 "운용자산"이라 적는다 — 물음표가 그 값을 치른다
  *
@@ -79,29 +69,10 @@ export async function generateStaticParams() {
 }
 
 /**
- * 처음 펴는 줄 수 · '더 보기' 증가분 · 실어 보내는 상한.
- *
- * ⚠️ 처음부터 다 펴면 화면이 자료에 파묻힌다(소로스가 258종목). 다섯 줄로 열고
- *    눌러서 늘린다. 안 보이는 줄도 전송되므로 상한이 따로 필요하다.
+ * 실어 보내는 줄 수 상한. 처음 펴는 줄 수와 '더 보기' 증가분은 V2DetailRows(DetailList)가 정한다.
+ * ⚠️ 처음부터 다 펴면 화면이 자료에 파묻힌다(소로스가 258종목). 안 보이는 줄도 전송되므로 상한이 따로 필요하다.
  */
-const ROWS_OPEN = 5;
-const ROWS_STEP = 10;
 const ROWS_MAX = 60;
-
-/** 시트의 줄 목록 + 바닥의 '더 보기'. 두 시트가 같은 꼴을 쓴다. */
-function Rows({ items, name }: { items: React.ReactNode[]; name: string }) {
-  return (
-    <ExpandableList
-      items={items}
-      name={name}
-      initial={ROWS_OPEN}
-      step={ROWS_STEP}
-      listStyle={{ padding: 0, display: "block" }}
-      footerClassName="hz-sheet-foot-row"
-      footerStyle={{ marginTop: "auto" }}
-    />
-  );
-}
 
 /** 이동 경로의 부모. 화면 맨 위 줄(BackTrail)과 구조화 데이터가 **같은 문자열**을 쓴다(JsonLd 머리말). */
 const PARENT = { name: "내부자 리포트", path: "/insider" };
@@ -133,12 +104,14 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
   assertLoaded("/insider/investor/[cik]");
   if (!d) notFound();
 
-  const counts = {
-    new: d.holdings.filter((h) => h.move === "new").length,
-    add: d.holdings.filter((h) => h.move === "add").length,
-    trim: d.holdings.filter((h) => h.move === "trim").length,
-    exit: d.exited.length,
-  };
+  // 이번 분기에 한 것 — 갈래마다 종목(비중 큰 순). 줄 글자와 같은 잣대(parts.tsx moveKind)라 표의 '유지' 줄은 늘림 · 줄임에 안 든다.
+  const byKind = (k: "new" | "add" | "trim") => d.holdings.filter((h) => moveKind(h.move, h.sharesChange) === k).map((h) => h.ticker);
+  const moves = [
+    { label: "새로 담음", list: byKind("new") },
+    { label: "늘림", list: byKind("add") },
+    { label: "줄임", list: byKind("trim") },
+    { label: "전량 정리", list: d.exited.map((e) => e.ticker) },
+  ];
   const kaderaCount = d.holdings.filter((h) => h.inKadera).length;
   /**
    * 직전 분기 대비 신고 합계 증감(%). ⚠️ 수익률이 아니다 — 머리말의 AUM 절을 볼 것.
@@ -147,23 +120,8 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
    *    "그대로였다"는 없는 사실이 된다.
    */
   const aumChange = d.priorDate && d.priorAum > 0 ? (d.aum / d.priorAum - 1) * 100 : null;
-  /**
-   * 집중도 막대의 칸 — 상위 다섯 종목 + 나머지.
-   *
-   * ⚠️ 비중은 이미 100% 를 분모로 하는 값이라 **여기서는 다시 눈금을 바꾸지 않는다.**
-   *    목록 표의 막대와 반대다(거기는 서로 견주는 자, 여기는 전체 중 몫).
-   * ⚠️ 보유가 다섯 이하면 "나머지" 칸은 만들지 않는다 — 0% 짜리 빈 칸이 남는다.
-   */
-  const head = d.holdings.slice(0, 5);
-  const top5 = head.reduce((s, h) => s + h.weight, 0);
-  const conc = head.length
-    ? [
-        ...head.map((h) => ({ key: h.ticker, weight: h.weight, rest: false })),
-        ...(d.holdings.length > head.length
-          ? [{ key: `나머지 ${d.holdings.length - head.length}종목`, weight: Math.max(0, 100 - top5), rest: true }]
-          : []),
-      ]
-    : [];
+  // 상위 다섯 종목의 몫 — 첫 줄 띠의 '상위 5종목 %'. 이 사람이 몇 종목에 몰아 거는지 한 숫자로 말한다.
+  const top5 = d.holdings.slice(0, 5).reduce((s, h) => s + h.weight, 0);
 
   return (
     // ⭐ 내부자 리포트는 **달러가 기본**이다 — 재료가 전부 미국 공시라 달러가 원본이고,
@@ -232,105 +190,53 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
         <CoverMeta updated={`${quarterLabel(d.reportDate)} 13F · 분기말 기준`} />
       </div>
 
-      {/* 둘째 줄 — 이번 분기에 한 것(줄 넷) | 상위 종목 몫(집중도 막대). 집중도는 표를 다섯 줄 훑어서는 안 보이고, 이 사람이 어떤 운용을
-          하는지 한눈에 말한다 — 히말라야는 8종목에 다 걸고 국민연금은 541종목에 펴 놓는다. */}
-      <div className="v2-tm-band is-pair">
-        <Module title="이번 분기에 한 것" meta={d.priorDate ? `직전 분기 대비` : undefined}>
-          {d.priorDate ? (
-            <dl className="v2-isd-facts">
-              {[
-                { label: "새로 담음", n: counts.new },
-                { label: "늘림", n: counts.add },
-                { label: "줄임", n: counts.trim },
-                { label: "전량 정리", n: counts.exit },
-              ].map((s) => (
-                <div key={s.label}>
-                  <dt>{s.label}</dt>
-                  <dd>
-                    <b className={s.n ? undefined : "is-zero"}>
-                      {s.n}
-                      <span>종목</span>
-                    </b>
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          ) : (
-            <p className="v2-empty">견줄 직전 분기가 아직 없습니다.</p>
-          )}
-        </Module>
-        <Module title="상위 종목 몫" meta="운용자산 기준">
-          {conc.length > 0 ? (
-            <div className="v2-tm-trendbody v2-isd-conc">
-              <span className="v2-isd-concbar">
-                {conc.map((c, i) => (
-                  <span
-                    key={c.key}
-                    className="hz-tip"
-                    data-tip={`${c.key} ${c.weight.toFixed(1)}%`}
-                    style={{
-                      width: `${c.weight}%`,
-                      background: c.rest ? "transparent" : `color-mix(in srgb, var(--t-down) ${100 - i * 15}%, var(--t-card))`,
-                    }}
-                  />
-                ))}
-              </span>
-              <ol className="v2-isd-conclist">
-                {conc
-                  .filter((c) => !c.rest)
-                  .map((c, i) => (
-                    <li key={c.key}>
-                      <i style={{ background: `color-mix(in srgb, var(--t-down) ${100 - i * 15}%, var(--t-card))` }} />
-                      <b>{c.key}</b>
-                      <span>{c.weight.toFixed(1)}%</span>
-                    </li>
-                  ))}
-              </ol>
-            </div>
-          ) : (
-            <p className="v2-empty">신고된 보유가 없습니다.</p>
-          )}
-        </Module>
-      </div>
-
-      <section className="hz-sheet">
-        <SectionHead
-          icon="donut_large"
+      {/* 둘째 줄 — [보유 종목 | 이번 분기에 한 것 · 전량 정리한 종목](v2, 2026-10-04).
+          ⭐ 보유 종목이 이 화면의 본문이라 넓은 칸을 준다. 옆 칸은 그 표를 읽는 실마리(무엇이 바뀌었나 · 무엇을 다 팔았나).
+          ⛔ '상위 종목 몫'(집중도 막대) 모듈은 걷었다 — 다섯 칸이 보유 종목 표 위 다섯 줄과 같은 숫자였고, 집중도 자체는 첫 줄 띠의
+             '상위 5종목 %'가 말한다(한 화면에 같은 숫자 세 번). 옛 시트 둘(보유 · 전량 정리)도 모듈로 옮겼다. */}
+      <div className="v2-tm-band is-hot v2-isd-inv">
+        <Module
           title="보유 종목"
-          note={`${d.holdings.length}종목 · ${quarterLabel(d.reportDate)}`}
-          noteHelp="비중은 운용자산 기준"
-          desc="비중이 큰 순입니다. 종목을 누르면 그 종목의 공시로 갑니다."
-        />
-        {d.holdings.length === 0 ? (
-          <Empty>신고된 보유가 없습니다.</Empty>
-        ) : (
-          <>
-            <WideHead cols={WIDE_COLS.managerHoldings} labels={["종목", "주식 수", "포트폴리오 비중", "금액"]} />
-            <Rows name="investor_holdings" items={wideManagerHoldingRows(d.holdings.slice(0, ROWS_MAX), d.usdKrw)} />
-          </>
-        )}
-        {d.holdings.length > ROWS_MAX && (
-          <div className="hz-sheet-foot">
-            <span style={{ fontSize: T.small, color: C.sub2, lineHeight: 1.5 }}>
-              비중이 큰 {ROWS_MAX}종목까지 그렸습니다. 전체는 {d.holdings.length}종목입니다.
-            </span>
-          </div>
-        )}
-      </section>
-
-      {d.exited.length > 0 && (
-        <section className="hz-sheet">
-          <SectionHead
-            icon="remove_circle_outline"
-            title="이번 분기에 전량 정리한 종목"
-            note={`${d.exited.length}종목`}
-            noteHelp="직전 분기엔 있던 종목"
-            desc={`${quarterLabel(d.priorDate)} 기준 금액이 큰 순입니다.`}
-          />
-          <WideHead cols={WIDE_COLS.managerExited} labels={["종목", "정리 전 포트폴리오 비중", "정리 전 금액"]} />
-          <Rows name="investor_exited" items={wideManagerExitedRows(d.exited.slice(0, ROWS_MAX), d.usdKrw)} />
-        </section>
-      )}
+          meta={`${d.holdings.length > ROWS_MAX ? `비중 상위 ${ROWS_MAX} / ` : ""}${d.holdings.length}종목 · 비중 순`}
+          className="v2-isd-mod"
+        >
+          {d.holdings.length === 0 ? (
+            <p className="v2-empty">신고된 보유가 없습니다.</p>
+          ) : (
+            <DetailList name="investor_holdings" cols="holding" open={10} items={holdingLines(d.holdings.slice(0, ROWS_MAX), d.usdKrw)} />
+          )}
+        </Module>
+        <div className="v2-tm-side">
+          <Module title="이번 분기에 한 것" meta={d.priorDate ? `직전 분기 대비` : undefined} className="v2-isd-facts-mod">
+            {d.priorDate ? (
+              <dl className="v2-isd-facts">
+                {moves.map((s) => (
+                  <div key={s.label}>
+                    {/* 갈래 이름 아래 종목 — 표를 다 훑지 않아도 무엇을 바꿨는지 보인다(넷까지 · 나머지는 수로). */}
+                    <dt>
+                      {s.label}
+                      {s.list.length > 0 && <em>{s.list.slice(0, 4).join(" · ") + (s.list.length > 4 ? ` 외 ${s.list.length - 4}` : "")}</em>}
+                    </dt>
+                    <dd>
+                      <b className={s.list.length ? undefined : "is-zero"}>
+                        {s.list.length}
+                        <span>종목</span>
+                      </b>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            ) : (
+              <p className="v2-empty">견줄 직전 분기가 아직 없습니다.</p>
+            )}
+          </Module>
+          {d.exited.length > 0 && (
+            <Module title="전량 정리한 종목" meta={`${quarterLabel(d.priorDate)} 비중 · 금액`} className="v2-isd-mod">
+              <DetailList name="investor_exited" cols="exited" open={5} items={exitedLines(d.exited.slice(0, ROWS_MAX), d.usdKrw)} />
+            </Module>
+          )}
+        </div>
+      </div>
 
       {/* ⛔ 여기 있던 "SEC와 미 하원이 공개한 공시를 그대로 옮긴 것입니다 …" 각주는
           2026-08-23 에 뺐다. 같은 고지("투자 조언이나 매수·매도 추천이 아닙니다. 모든 투자 판단과

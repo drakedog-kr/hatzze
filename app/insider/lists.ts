@@ -35,50 +35,50 @@ export const INSIDER_LIST_SLUGS: InsiderListSlug[] = ["exec", "congress", "adds"
 export const INSIDER_LISTS: Record<InsiderListSlug, InsiderListSpec> = {
   exec: {
     title: "임원이 신고한 매매",
-    sub: "종목으로 묶어 금액이 큰 순입니다. 장내 매수는 파랗게 적었습니다.",
-    help: "옵션 행사에 딸린 매도가 섞입니다.",
+    sub: "종목으로 묶어 금액이 큰 순입니다.",
+    help: "옵션 행사 매도 포함",
     icon: "account_balance_wallet",
   },
   congress: {
     title: "미 하원의원이 사고판 것",
     sub: "카더라 밖 종목까지 보고, 여러 의원이 건드린 순입니다.",
-    help: "금액은 구간으로만 신고돼 건수로 적었습니다.",
+    help: "금액이 구간이라 건수로",
     icon: "account_balance",
   },
   adds: {
     title: "월가 거물이 늘린 종목",
     sub: "새로 담았거나 주식 수를 늘린 곳입니다.",
-    help: "분기말 두 시점의 차이입니다.",
+    help: "분기말 두 시점의 차이",
     icon: "trending_up",
   },
   trims: {
     title: "월가 거물이 줄인 종목",
     sub: "주식 수를 줄였거나 전량 정리한 곳입니다.",
-    help: "분기말 두 시점의 차이입니다.",
+    help: "분기말 두 시점의 차이",
     icon: "trending_down",
   },
   hot: {
     title: "커뮤니티에서 뜨거운 종목",
     sub: "주식 텔레그램에서 가장 많이 회자된 미국 종목입니다.",
-    help: "언급은 하루치, 임원 신고는 최근 7일입니다.",
+    help: "언급 하루 · 임원 7일",
     icon: "local_fire_department",
   },
   managers: {
     title: "운용자산이 큰 순",
     sub: "이름을 누르면 그 사람이 무엇을 들고 있는지 봅니다.",
-    help: "13F가 신고하는 미국 상장주만 셉니다.",
+    help: "미국 상장주만 집계",
     icon: "groups",
   },
   analyst: {
     title: "증권가가 긍정적으로 보는 종목",
     sub: "등급을 낸 애널리스트가 10명 이상인 종목만 세웁니다.",
-    help: "stockanalysis.com이 싣는 S&P Global 집계입니다.",
+    help: "stockanalysis.com 집계",
     icon: "reviews",
   },
   holders: {
     title: "월가 거물이 들고 있는 종목",
     sub: "카더라에 오른 종목을 거물 몇 명이 들고 있는지 봅니다.",
-    help: "13F는 분기말 기준이라 지금과 다를 수 있습니다.",
+    help: "분기말 기준",
     // ⚠️ groups 였다. 같은 화면의 `managers`("운용자산이 큰 순")가 이미 그 그림을 쓰고 있어
     //    한 화면에 같은 아이콘이 둘이었다. groups 는 사람 명단인 managers 쪽이 갖는 것이 맞다 —
     //    이 카드의 주어는 사람이 아니라 **종목**이고, 묻는 것은 "그 종목을 들고 있나"다.

@@ -478,6 +478,9 @@ html[data-sidebar="icon"] .hz-sidebar [data-label]:hover::after {
   top: 6px;
   transform: translateX(-50%);
 }
+/* 판 양 끝의 글자 — 가운데 맞춤이면 반이 판 밖으로 나가 잘린다(내부자 종목 차트 '10월'). */
+.hz-chart-x > span[data-edge="end"] { transform: translateX(-100%); }
+.hz-chart-x > span[data-edge="start"] { transform: none; }
 @container (max-width: 480px) {
   .hz-chart-x > span[data-minor] {
     display: none;

@@ -678,7 +678,7 @@ export const getManagerDetail = cache(async (cik: number): Promise<ManagerDetail
     console.error(`[insider/investor] ${label} 조회 실패`, e);
   };
 
-  const [managerRows, holdingRows, mentionRows] = await Promise.all([
+  const [managerRows, holdingRows, mentionRows, nameRows] = await Promise.all([
     db.from("us_manager").select("cik,person,firm").eq("cik", cik).limit(1),
     // 정렬은 (ticker, report_date) — cik 는 eq 로 고정했다. ticker 하나면 분기 둘이 동점이라 큰 운용사(1,000행 넘게)에서 빠지거나 겹친다.
     fetchAllRows<{ ticker: string; shares: number | null; value: number | null; report_date: string }>(
@@ -690,6 +690,13 @@ export const getManagerDetail = cache(async (cik: number): Promise<ManagerDetail
       "ticker",
       () => db.from("telegram_us_stock_daily").select("ticker,date"),
       { onError: failed("카더라 종목") },
+    ),
+    // 종목 이름(추출 사전). 곁가지라 실패해도 화면은 서고 이름만 티커로 남는다 — failedSources 에 안 넣는다.
+    // ⚠️ 예전엔 displayName(t, null) 이라 사전을 안 봐서 애플 · 아메리칸 익스프레스 같은 이름이 다 비었다(2026-10-04).
+    fetchAllRows<{ ticker: string; name_ko: string | null; name_en: string | null }>(
+      "ticker",
+      () => db.from("us_stocks").select("ticker,name_ko,name_en"),
+      { onError: (e: unknown) => console.error("[insider/investor] 종목 이름 조회 실패 — 티커로 둡니다", e) },
     ),
   ]);
 
@@ -706,7 +713,9 @@ export const getManagerDetail = cache(async (cik: number): Promise<ManagerDetail
   // 카더라에 **한 번이라도** 오른 종목. 하루치로 보면 대부분 빠져서 표시가 뜻을 잃는다.
   // ⚠️ 대표 표기로 대 본다. 13F 는 BRK-B 인데 카더라는 BRK 다(lib/us-ticker-spellings.ts).
   const kadera = new Set(mentionRows.map((r) => canonicalTicker(r.ticker)));
-  const nameOf = (t: string) => displayName(t, null);
+  // 13F 표기(BRK-B)와 사전 표기(BRK)가 다를 수 있어 대표 표기로도 찾는다(lib/us-ticker-spellings.ts).
+  const dict = new Map((nameRows ?? []).map((r) => [r.ticker, r.name_ko || r.name_en || null]));
+  const nameOf = (t: string) => displayName(t, dict.get(t) ?? dict.get(canonicalTicker(t)) ?? null);
 
   const holdings: ManagerHolding[] = now
     .map((h) => {
