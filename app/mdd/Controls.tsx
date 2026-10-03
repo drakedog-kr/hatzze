@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { gaSearchTerm, gaStockCode, track } from "@/lib/ga";
 import { C, Icon, MONO } from "../ui";
 import { StockLogo } from "../StockLogo";
-import { MAJOR_NAMES, PERIODS, marketBadge, benchName } from "./shared";
+import { BIG_DROP_SHOW, MAJOR_NAMES, PERIODS, marketBadge, benchName } from "./shared";
 import type { BigDrops, StockOption, Suggestion, SuggestGroups, MddResult } from "./shared";
 import { periodLabelOf, AbsentSheet } from "./sheet";
 import { HeroStrip, Underwater } from "./Hero";
@@ -389,7 +389,7 @@ export function Results({ data, bigDrops, onPick }: { data: MddResult; bigDrops?
         )}
       </div>
 
-      {/* 시장 탓 | 해마다 — 업종 칸과 자리를 바꿨다(2026-10-03). 업종 칸은 한 줄 막대라 판 폭 전체를 쓴다(아래). */}
+      {/* 시장 탓 | 해마다 — 업종 칸과 자리를 바꿨다(2026-10-03). 업종 칸은 아래에서 많이 빠진 대형주와 짝을 짓는다. */}
       <div className="v2-md-row is-12">
         {data.attribution ? (
           <Attribution
@@ -421,29 +421,31 @@ export function Results({ data, bigDrops, onPick }: { data: MddResult; bigDrops?
         )}
       </div>
 
-      {data.theme ? (
-        <ThemeModule theme={data.theme} onPick={onPick} />
-      ) : (
-        <AbsentSheet
-          icon="hub"
-          title="업종 안에서"
-          sub=""
-          body={
-            data.partial && (data.partial.lookupFailed || data.partial.peersRequested > 0)
-              ? "테마 대표 종목의 시세를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오."
-              : "이 종목이 묶인 테마를 찾지 못했습니다. 테마 대표 종목 목록에 등록된 종목에서만 비교가 나옵니다."
-          }
-        />
-      )}
+      {/* 업종 안에서 | 많이 빠진 대형주(판정표 8) — 같은 꼴(이름 · 막대 · 값) 두 칸을 나란히, 줄 수를 맞춰 줄끼리 선다.
+          누르면 그 종목으로 바뀌고 맨 위로 올라간다(MddExplorer pickFromResults). */}
+      <div className="v2-md-row is-11">
+        {data.theme ? (
+          <ThemeModule theme={data.theme} onPick={onPick} />
+        ) : (
+          <AbsentSheet
+            icon="hub"
+            title="업종 안에서"
+            sub=""
+            body={
+              data.partial && (data.partial.lookupFailed || data.partial.peersRequested > 0)
+                ? "테마 대표 종목의 시세를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오."
+                : "이 종목이 묶인 테마를 찾지 못했습니다. 테마 대표 종목 목록에 등록된 종목에서만 비교가 나옵니다."
+            }
+          />
+        )}
+        <BigDropsModule bigDrops={bigDrops} data={data} count={data.theme ? data.theme.peers.length : BIG_DROP_SHOW} onPick={onPick} />
+      </div>
       {/* 대표 종목 일부만 받았으면 그렇다고 적는다 — 평균이 몇 종목으로 낸 것인지 읽는 사람이 알아야 한다. */}
       {data.theme && data.partial && data.partial.peersOk < data.partial.peersRequested && (
         <p style={{ margin: "-6px 4px 0", fontSize: "var(--fs-11)", color: C.muted }}>
           대표 {data.partial.peersRequested}종목 중 {data.partial.peersOk}종목만 불러와 비교했습니다. 잠시 뒤 다시 열면 채워질 수 있습니다.
         </p>
       )}
-
-      {/* 많이 빠진 대형주(판정표 8) — 다음에 볼 종목. 누르면 그 종목으로 바뀌고 맨 위로 올라간다(MddExplorer pickFromResults). */}
-      <BigDropsModule bigDrops={bigDrops} data={data} onPick={onPick} />
     </div>
   );
 }

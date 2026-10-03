@@ -6,18 +6,18 @@
 //  - 역대 하락 사례 — 옛 'Top 5' · 리스크 '하락 vs 회복 속도' · '혼자 빠지나, 같이 빠지나' · 성격 타일이 같은 사건을 네 군데서 말하던 것을 표 하나로.
 //  - 회복까지 — 옛 '회복까지 걸린 기간' + '이 하락의 성격'(급락형 · 완만형의 회복 중앙값). 깊이 분포 막대는 사례 표와 겹쳐 뺐다.
 //  - 해마다 — 옛 리스크 '낙폭 대비 보상'. 최근 다섯 해 + '전체보기' 팝업 대신 조회 기간의 해를 다 펼친다(누르지 않고 보이게).
-//  - 업종 안에서 · 많이 빠진 대형주(2단계 8 · 9) — 한 줄로 늘어선 막대(DdColumns). 누르면 그 종목 MDD 로.
+//  - 업종 안에서 · 많이 빠진 대형주(2단계 8 · 9) — 나란한 두 칸, 줄마다 이름 · 막대 · 값(DdList). 누르면 그 종목 MDD 로.
 
 import { CHARACTER_SPLIT_DAYS } from "@/lib/mdd";
 import type { MddAnalysis, RiskProfile as RiskProfileData } from "@/lib/mdd";
 
 import { CoverLinkCell, CoverMeta, Module, type CoverLink } from "../kadera/V2Modules";
 import { RecoveryRange } from "./sheets";
-import { BIG_DROP_SHOW, benchName, fmtCloseDay, fmtDay, fmtDayCount, fmtDur, fmtPct, fmtYm, mddSummary } from "./shared";
+import { benchName, fmtCloseDay, fmtDay, fmtDayCount, fmtDur, fmtPct, fmtYm, mddSummary } from "./shared";
 import type { BigDrops, MddResult, StockOption, ThemeCmp } from "./shared";
 
-/** 해마다 칸의 수익 — 100% 넘으면 소수점을 뗀다("+274.4%"가 칸 폭 57px 에서 잘렸다, 1280 실측). */
-const pctCell = (v: number) => (Math.abs(v) >= 100 ? `${v > 0 ? "+" : "−"}${Math.round(Math.abs(v))}%` : fmtPct(v));
+/** 차트 막대 끝 수익 — 정수로("+46%"). 막대 칸이 60px 남짓이라 소수점까지 적으면 이웃과 닿는다. 정확한 값은 툴팁에. */
+const pctShort = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.round(Math.abs(v))}%`;
 
 const tone = (v: number | null | undefined) => (v === null || v === undefined || v === 0 ? "" : v > 0 ? " is-up" : " is-down");
 
@@ -65,39 +65,42 @@ export function MddCover({ data, periodLabel }: { data: MddResult; periodLabel: 
   );
 }
 
-/* ── 한 줄로 늘어선 막대 ─────────────────────────────────────────── */
+/* ── 이름 · 막대 · 값 목록 ──────────────────────────────────────── */
 type DdItem = { key: string; name: string; dd: number; self?: boolean; pick?: StockOption | null };
 
 /**
- * 종목 여럿의 지금 낙폭을 **한 줄로** — 막대가 같은 윗선(0%)에서 아래로 내려온다(물속 차트와 같은 방향).
- * 예전 업종 칸은 가로 막대를 두 단으로 접어, 왼쪽 단과 오른쪽 단을 견주려면 눈이 오르내렸다(2026-10-03 지적).
- * 한 줄이면 모든 막대가 한 잣대 위에 선다. 폰(≤679)은 열한 칸이 안 들어가 한 단 가로 막대로 접는다(CSS).
- * 막대 길이는 이 묶음에서 가장 깊은 값에 맞춘다. 누를 수 있는 칸은 그 종목 MDD 로 간다(지금 종목은 안 눌린다).
+ * 종목 여럿의 지금 낙폭 — 한 단 목록, 줄마다 이름 · 막대 · 값. 막대는 모두 같은 왼쪽 선에서 출발해 길이로 견준다.
+ * 옛 업종 칸은 두 단으로 접혀 왼쪽 단과 오른쪽 단을 견주려면 눈이 오르내렸고(10-03 지적), 그 뒤 잠깐 한 줄 가로 배치
+ * (막대가 위에서 아래로)로 바꿨다가 "가로 형태 별로"로 되돌렸다. 막대 길이는 이 묶음에서 가장 깊은 값에 맞춘다.
+ * 줄은 남는 높이를 고르게 받는다(나란한 짝 칸과 키를 맞춘다). 누를 수 있는 줄은 그 종목 MDD 로 간다(지금 종목은 안 눌린다).
+ * 평균은 막대 위를 세로로 지르는 점선 하나(값은 부르는 쪽이 칸 머리에 적는다).
  */
-function DdColumns({ items, avg, onPick, label }: { items: DdItem[]; avg?: number | null; onPick: (s: StockOption) => void; label: string }) {
+function DdList({ items, avg, onPick, label }: { items: DdItem[]; avg?: number | null; onPick: (s: StockOption) => void; label: string }) {
   const worst = Math.max(1, ...items.map((i) => Math.abs(i.dd)), avg != null ? Math.abs(avg) : 0);
-  const h = (v: number) => `${Math.max(2, (Math.abs(v) / worst) * 100)}%`;
+  const w = (v: number) => `${Math.max(1.5, (Math.abs(v) / worst) * 100)}%`;
   return (
-    <div className="v2-dd-wrap" style={{ ["--n" as string]: items.length, ["--avg" as string]: avg != null ? Math.abs(avg) / worst : 0 }}>
+    <div className="v2-dd-wrap" style={avg != null ? { ["--avg" as string]: Math.abs(avg) / worst } : undefined}>
+      {/* 평균 점선 — 값은 칸 머리 근거 글자에 있다. 여기에 글자 자리를 따로 두면 나란한 짝 칸과 줄이 어긋났다. */}
+      {avg != null && <div className="v2-dd-avg" aria-hidden="true" />}
       <ol className="v2-dd" aria-label={label}>
         {items.map((it) => {
           const body = (
             <>
               <span className="v2-dd-name">{it.name}</span>
-              <span className="v2-dd-val">{fmtPct(it.dd)}</span>
               <span className="v2-dd-bar">
-                <i style={{ ["--h" as string]: h(it.dd) }} />
+                <i style={{ ["--w" as string]: w(it.dd) }} />
               </span>
+              <span className="v2-dd-val">{fmtPct(it.dd)}</span>
             </>
           );
           return (
             <li key={it.key} className={it.self ? "is-self" : undefined}>
               {it.pick && !it.self ? (
-                <button type="button" className="v2-dd-col" onClick={() => onPick(it.pick!)} data-ga="mdd_peer_click">
+                <button type="button" className="v2-dd-row" onClick={() => onPick(it.pick!)} data-ga="mdd_peer_click">
                   {body}
                 </button>
               ) : (
-                <div className="v2-dd-col" aria-current={it.self ? "true" : undefined}>
+                <div className="v2-dd-row" aria-current={it.self ? "true" : undefined}>
                   {body}
                 </div>
               )}
@@ -105,24 +108,22 @@ function DdColumns({ items, avg, onPick, label }: { items: DdItem[]; avg?: numbe
           );
         })}
       </ol>
-      {/* 평균은 막대 위를 가로지르는 점선 하나 — 숫자는 오른쪽 끝에(머리 띠에 다시 적지 않는다). */}
-      {avg != null && (
-        <div className="v2-dd-avg">
-          <span>평균 {fmtPct(avg)}</span>
-        </div>
-      )}
     </div>
   );
 }
 
 /* ── 업종 안에서 ─────────────────────────────────────────────────── */
-/** 같은 테마 대표 종목들의 지금 낙폭(각자 고점 대비) — 깊은 순 한 줄. 옛 sheets.tsx Theme(가로 막대 두 단)를 바꿨다. */
+/** 같은 테마 대표 종목들의 지금 낙폭(각자 고점 대비) — 깊은 순 한 단 목록. 옛 sheets.tsx Theme(가로 막대 두 단)를 바꿨다. */
 export function ThemeModule({ theme, onPick }: { theme: ThemeCmp; onPick: (s: StockOption) => void }) {
   const self = theme.peers.find((p) => p.isSelf);
   const rank = self ? theme.peers.filter((p) => p.dd < self.dd).length + 1 : null;
   return (
-    <Module title={`${theme.name} 대표 ${theme.peers.length}종목 안에서`} meta={rank ? `깊게 빠진 순 ${rank}위` : undefined} className="v2-md-theme">
-      <DdColumns
+    <Module
+      title={`${theme.name} 대표 ${theme.peers.length}종목 안에서`}
+      meta={`${rank ? `깊게 빠진 순 ${rank}위 · ` : ""}평균 ${fmtPct(theme.avgDd)}`}
+      className="v2-md-theme"
+    >
+      <DdList
         label={`${theme.name} 대표 종목 지금 낙폭`}
         items={theme.peers.map((p) => ({
           key: p.code || p.name,
@@ -140,23 +141,35 @@ export function ThemeModule({ theme, onPick }: { theme: ThemeCmp; onPick: (s: St
 
 /* ── 많이 빠진 대형주 ────────────────────────────────────────────── */
 /**
- * 시총 상위 스무 종목 중 지금 고점에서 가장 많이 내려온 열 개(page.tsx loadBigDrops) — 처음 온 사람의 입구(판정표 8).
+ * 시총 상위 스무 종목 중 지금 고점에서 가장 많이 내려온 것들(page.tsx loadBigDrops) — 처음 온 사람의 입구(판정표 8).
+ * 줄 수는 옆 업종 칸에 맞춘다(보통 열하나, 업종 칸이 없으면 BIG_DROP_SHOW).
  * 고른 종목의 시장 쪽(국장 · 미장)을 보이고, 기간은 화면 기간을 따른다('전체'는 받는 일봉이 10년치라 10년).
  * 값은 /api/mdd 와 같은 창 · 같은 종가로 낸 것이라 눌러 연 종목의 '지금 낙폭'과 같다.
  */
-export function BigDropsModule({ bigDrops, data, onPick }: { bigDrops: BigDrops | undefined; data: MddResult; onPick: (s: StockOption) => void }) {
+export function BigDropsModule({
+  bigDrops,
+  data,
+  count,
+  onPick,
+}: {
+  bigDrops: BigDrops | undefined;
+  data: MddResult;
+  /** 보일 줄 수 — 옆 업종 칸과 줄 수를 맞춘다(같은 키에 같은 줄 수라야 두 칸의 줄이 나란하다). */
+  count: number;
+  onPick: (s: StockOption) => void;
+}) {
   const isUs = data.market === "US";
   const key = (data.years === "all" ? "10" : data.years) as "1" | "3" | "5" | "10";
   const list = bigDrops ? (isUs ? bigDrops.us : bigDrops.kr) : null;
   const rows = (list ?? [])
     .flatMap((b) => (b.dd[key] ? [{ ...b, d: b.dd[key]! }] : []))
     .sort((x, y) => x.d.dd - y.d.dd)
-    .slice(0, BIG_DROP_SHOW);
+    .slice(0, count);
   return (
     // 머리의 종목 수는 실제로 받은 수다 — 시세가 빈 종목이 빠지면 스물이 아니다.
     <Module title="많이 빠진 대형주" meta={`${isUs ? "미장" : "국장"} 시총 상위 ${list?.length ?? 0}종목 중 · 최근 ${key}년 고점 대비`} className="v2-md-big">
       {rows.length ? (
-        <DdColumns
+        <DdList
           label="많이 빠진 대형주 지금 낙폭"
           items={rows.map((r) => ({
             key: r.code,
@@ -314,20 +327,25 @@ export function RecoveryModule({ a }: { a: MddAnalysis }) {
 
 /* ── 해마다 ─────────────────────────────────────────────────────── */
 /**
- * 조회 기간의 해마다 주가 수익(전해 마지막 종가 대비)과 그 해 안의 최대 낙폭. 머리 숫자는 복리 연평균(CAGR · 배당 제외)이다.
+ * 조회 기간의 해마다 주가 수익(전해 마지막 종가 대비) — 막대 차트 하나. 머리 숫자는 복리 연평균(CAGR · 배당 제외)이다.
  * ⚠️ 해는 조회 기간만큼 자른다 — yearlyStats 는 거래일 20일 넘는 해를 다 세서 10년 조회에 11개가 나온다(옛 RiskProfile 과 같다).
  *
- * 칸마다 수익 막대(0 을 가운데 두고 오르면 위 · 빠지면 아래, 이 칸들 중 가장 큰 값에 맞춘다). 넓은 칸(2fr)으로 옮기며
- * 연도 칸이 한 줄에 들자 옆 '시장 탓' 칸보다 키가 낮아졌다 — 남는 높이는 막대가 받는다(빈 줄을 만들지 않는다).
- * 줄 나눔은 칸 수에 맞춰 고르게(--yr-cols 한 줄 11칸까지 · 폰 --yr-cols-sm 4칸까지) — auto-fit 은 10 + 2 처럼 끝줄에 두 칸만 남겼다.
+ * 예전엔 칸 안에 테두리 친 격자 표(연도 · 수익 · 낙폭 세 줄 + 머리 칸)가 또 들어 있어 "카드 안에 표가 또 있어 복잡하다"(10-03)였다.
+ * 지금은 0 선에서 오르면 위(빨강) · 빠지면 아래(파랑) 막대와 막대 끝 수익, 바닥에 연도뿐이다. 그 해 낙폭은 막대에 올리면 뜨고,
+ * 평균은 머리 줄에 있다. 차트는 남는 높이를 받는다(옆 '시장 탓' 칸과 키를 맞춘다).
+ * 해가 많으면(전체 조회 27년 등) 막대 끝 숫자가 서로 닿아 숨기고(툴팁에 있다) 연도는 하나 걸러 적는다.
  */
 export function YearsModule({ r, periodLabel }: { r: RiskProfileData; periodLabel: string }) {
   const yrs = Math.max(1, Math.round(r.years));
   const years = r.yearly.slice(-yrs);
   const avgMdd = years.length ? years.reduce((s, y) => s + y.mdd, 0) / years.length : 0;
-  const maxRet = Math.max(1, ...years.map((y) => Math.abs(y.ret)));
-  const cells = years.length + 1; // 머리 칸 하나
-  const balance = (max: number) => Math.ceil(cells / Math.ceil(cells / max));
+  const maxUp = Math.max(0, ...years.map((y) => y.ret));
+  const maxDown = Math.max(0, ...years.map((y) => -y.ret));
+  const span = Math.max(1, maxUp + maxDown);
+  const dense = years.length > 14;
+  // 폰(10년이면 칸 32px)에선 세 자리 수익("+214%", 11px 37px)이 이웃 숫자와 닿았다(알테오젠 · 테슬라 실측) — 세 자리만 폰에서 한 단
+  // 작게(.is-wide) 써서 숫자가 제 칸 폭 안에 들게 한다. 이웃 숫자를 위로 띄우는 길은 짧은 막대 쪽을 띄우면 오히려 붙었다.
+  const wide = (v: number) => Math.round(Math.abs(v)) >= 100;
   return (
     <Module title="해마다" meta={`${periodLabel} · 주가만(배당 제외)`} className="v2-md-years">
       <div className="v2-md-body">
@@ -338,23 +356,29 @@ export function YearsModule({ r, periodLabel }: { r: RiskProfileData; periodLabe
             해마다 낙폭 평균 <b className="is-down">{fmtPct(avgMdd)}</b>
           </span>
         </span>
-        <div className="v2-md-yrs" style={{ ["--yr-cols" as string]: balance(11), ["--yr-cols-sm" as string]: balance(4) }}>
-          <div className="v2-md-yr is-head" aria-hidden="true">
-            <span>연도</span>
-            <span>수익</span>
-            <span className="v2-md-yr-bar" />
-            <span>낙폭</span>
-          </div>
-          {years.map((y) => (
-            <div key={y.year} className="v2-md-yr">
-              <span>{y.year}</span>
-              <span className={`is-num${tone(y.ret)}`}>{pctCell(y.ret)}</span>
-              <span className="v2-md-yr-bar" aria-hidden="true">
-                <i className={y.ret >= 0 ? "is-up" : "is-down"} style={{ ["--h" as string]: `${(Math.abs(y.ret) / maxRet) * 50}%` }} />
-              </span>
-              <span className="is-num is-low">{pctCell(y.mdd)}</span>
-            </div>
-          ))}
+        <div
+          className={`v2-yc${dense ? " is-dense" : ""}`}
+          style={{ ["--n" as string]: years.length, ["--zero" as string]: `${(maxUp / span) * 100}%` }}
+          role="img"
+          aria-label={`해마다 수익 ${years.map((y) => `${y.year}년 ${fmtPct(y.ret)}`).join(", ")}`}
+        >
+          {years.map((y, i) => {
+            const at = years.length <= 1 ? 0.5 : i / (years.length - 1);
+            const edge = at < 0.2 ? " hz-tip-start" : at > 0.8 ? " hz-tip-end" : "";
+            return (
+              <div key={y.year} className={`v2-yc-col hz-tip${edge}`} data-tip={`${y.year}년 · 수익 ${fmtPct(y.ret)} · 그 해 낙폭 ${fmtPct(y.mdd)}`}>
+                <span className="v2-yc-plot">
+                  <i className={y.ret >= 0 ? "is-up" : "is-down"} style={{ ["--h" as string]: `${(Math.abs(y.ret) / span) * 100}%` }}>
+                    <em className={wide(y.ret) ? "is-wide" : undefined}>{pctShort(y.ret)}</em>
+                  </i>
+                </span>
+                {/* 하나 걸러 숨길 연도 — 해가 많을 때(.is-dense)만 CSS 가 숨긴다. */}
+                <span className="v2-yc-yr" data-minor={i % 2 === 1 ? "" : undefined}>
+                  {y.year}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </Module>
