@@ -145,14 +145,14 @@ export function ThemeModule({ theme, onPick }: { theme: ThemeCmp; onPick: (s: St
 /* ── 수익 · 손실 비율 ─────────────────────────────────────────── */
 /**
  * 최근 1년 거래대금을 가격대로 나눈 것(lib/mdd.ts priceLadder) — '많이 빠진 대형주'(종목과 상관없는 고정 목록) 자리(2026-10-03).
- * 낙폭 화면을 여는 사람은 대개 손실 중인 보유자라 "지난 1년 이 종목을 산 돈 중 얼마가 지금 수익이고 얼마가 손실인가 ·
- * 손실 난 돈은 어느 가격대에 몰렸나"를 묻는다.
+ * 낙폭 화면을 여는 사람은 대개 손실 중인 보유자라 "지난 1년 이 종목을 산 돈 중 얼마가 지금 수익이고 얼마가 손실인가"를 묻는다.
  *
- * 1차(10-03)는 머리에 '31%'만, 2차는 큰 숫자 + 갈림 막대(비싸게 산 돈 · 싸게 산 돈), 3차는 칸을 지금 가격에서 나누고 지금 선을
- * 그은 목록이었다. 셋 다 "한번에 이해하기 힘들다"였고, 운영자 판단으로 **수익 중 · 손실 중 비율**을 앞세운다(10-04):
- *  ① 맨 위 = 수익 중(빨강) · 손실 중(파랑) 두 숫자와 갈림 막대. 손실 = 지금보다 비싼 가격에서 거래된 몫(선 위 칸의 합), 수익 = 나머지.
- *  ② 가격대 목록 = 위 줄일수록 비싼 가격대(호가창처럼) · 지금 선 위는 손실(파랑) · 아래는 수익(빨강) — 맨 위 두 색과 같다.
- * ⚠️ 사람 수가 아니라 거래대금으로 센 어림이다(누가 아직 들고 있는지는 공개 원천에 없다). 머리 근거가 '최근 1년 거래 기준'을 말한다.
+ * 1~3차(10-03~04)는 큰 숫자 · 갈림 막대 · 가격대 목록(줄마다 범위 · 막대 · %)을 겹쳐 실어 "한번에 이해하기 힘들다" · "너무 복잡하다"였다
+ * — 한 칸에 숫자가 스무 개 가까이 섰다. 지금은 둘뿐이다(운영자 판단, 10-04):
+ *  ① 맨 위 = 수익 중(빨강) · 손실 중(파랑) 두 숫자. 손실 = 지금보다 비싼 가격에서 거래된 몫(선 위 칸의 합), 수익 = 나머지.
+ *  ② 그림 하나 = 가격대마다 막대(위가 비싼 쪽) · 지금 선. 글자는 1년 최고 · 지금 · 1년 최저 가격 셋뿐이고, 칸마다의 범위 · 몫은
+ *     마우스를 올리면 뜬다(데이터 툴팁). 막대 색이 곧 ① 의 두 색이라 범례를 따로 안 둔다.
+ * ⚠️ 사람 수가 아니라 거래대금(산 쪽)으로 센 어림이다 — 이미 판 사람 · 1년 넘게 든 사람은 못 가른다. 머리 근거가 '최근 1년 거래 기준'.
  */
 export function LadderModule({ ladder, market }: { ladder: PriceLadder; market: string | null }) {
   const isUs = market === "US";
@@ -167,18 +167,15 @@ export function LadderModule({ ladder, market }: { ladder: PriceLadder; market: 
   // 둘의 합이 100 이 되게 손실을 반올림하고 수익은 나머지로.
   const loss = Math.round(ladder.aboveShare);
   const gain = 100 - loss;
-  const row = (b: PriceLadder["bands"][number], i: number) => (
-    <li key={b.lo} className={i < split ? "is-loss" : "is-gain"}>
-      <div className="v2-dd-row hz-tip hz-tip-start" data-tip={`거래일 ${b.days}일 · 1년 거래대금의 ${b.share.toFixed(1)}%`}>
-        <span className="v2-dd-name">
-          {num(b.lo)}~{won(b.hi)}
-        </span>
-        <span className="v2-dd-bar">
-          <i style={{ ["--w" as string]: `${Math.max(1.5, (b.share / max) * 100)}%` }} />
-        </span>
-        <span className="v2-dd-val">{b.share.toFixed(1)}%</span>
-      </div>
-    </li>
+  const n = ladder.bands.length;
+  const bar = (b: PriceLadder["bands"][number], i: number) => (
+    <div key={b.lo} className={`v2-pl-row hz-tip hz-tip-start ${i < split ? "is-loss" : "is-gain"}`} data-tip={`${num(b.lo)}~${won(b.hi)} · ${b.share.toFixed(1)}%`}>
+      {/* 가격 글자는 그림의 위 끝(1년 최고 칸의 위 끝)과 아래 끝에만. 지금 선이 그 끝이면(1년 최고 · 최저가 지금) 선이 대신 말한다. */}
+      <span className="v2-pl-axis">{i === 0 && split > 0 ? won(b.hi) : i === n - 1 && split < n ? won(b.lo) : ""}</span>
+      <span className="v2-pl-bar">
+        <i style={{ width: `${Math.max(2, (b.share / max) * 100)}%` }} />
+      </span>
+    </div>
   );
   return (
     <Module title="수익 · 손실 비율" meta="최근 1년 거래 기준" className="v2-md-ladder">
@@ -191,20 +188,14 @@ export function LadderModule({ ladder, market }: { ladder: PriceLadder; market: 
           <em>손실 중</em>
           <b>{loss}%</b>
         </span>
-        <span className="v2-md-pl-bar" role="img" aria-label={`수익 중 ${gain}% · 손실 중 ${loss}%`}>
-          {gain > 0 && <i className="is-gain" style={{ flexGrow: gain }} />}
-          {loss > 0 && <i className="is-loss" style={{ flexGrow: loss }} />}
-        </span>
       </div>
-      <div className="v2-dd-wrap">
-        <ol className="v2-dd v2-ladder" aria-label="최근 1년 가격대별 거래대금 몫">
-          {ladder.bands.slice(0, split).map((b, i) => row(b, i))}
-          <li className="v2-ladder-now">
-            <span>지금 {priceNow}</span>
-            <i aria-hidden="true" />
-          </li>
-          {ladder.bands.slice(split).map((b, i) => row(b, split + i))}
-        </ol>
+      <div className="v2-pl-chart" role="img" aria-label={`최근 1년 가격대별 거래 · 지금 ${priceNow} 위는 손실 ${loss}%, 아래는 수익 ${gain}%`}>
+        {ladder.bands.slice(0, split).map((b, i) => bar(b, i))}
+        <div className="v2-pl-now">
+          <span>지금 {priceNow}</span>
+          <i />
+        </div>
+        {ladder.bands.slice(split).map((b, i) => bar(b, split + i))}
       </div>
     </Module>
   );
