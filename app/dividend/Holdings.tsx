@@ -292,6 +292,14 @@ function HoldingRow({
   if ((s.yieldPct ?? 0) > HOT_YIELD_PCT) facts.push({ text: "초고배당", title: "분배금이 달마다 크게 흔들립니다. 원금을 돌려주는 몫이 섞여 있습니다.", warn: true });
   if (s.close == null) facts.push({ text: "종가 없음", title: "종가가 없어 투자금과 수익률을 못 냅니다.", warn: true });
   if (s.dps > 0 && !s.pays.length) facts.push({ text: "달력엔 없음", title: "지급일 기록이 없어 아래 달력에는 안 들어갑니다.", warn: true });
+  /* v2(2026-10-03) — 줄마다 알약이 셋에서 다섯이라 표가 무거웠다. 주의(붉은 알약)는 다 보이고, 사실은 우선순위 둘만 보인다:
+     다가오는 지급 · 확정 → 비과세/과세(돈이 달라짐) → 분리과세 → 연속 늘림 → 5년 증가율 → 배당성향 → 나머지. 남는 것은 '+n' 하나로 접고
+     올리면 이름이 다 뜬다. */
+  const factRank = (t: string) =>
+    /지급|확정|기준일/.test(t) ? 0 : /과세 \d|^비과세/.test(t) ? 1 : t === "분리과세" ? 2 : /연속 늘림/.test(t) ? 3 : /^5년 연/.test(t) ? 4 : /^배당성향/.test(t) ? 5 : 6;
+  const plain = facts.filter((f) => !f.warn).sort((a, b) => factRank(a.text) - factRank(b.text));
+  const shownFacts = [...plain.slice(0, 2), ...facts.filter((f) => f.warn)];
+  const foldedFacts = plain.slice(2);
 
   const fractional = s.currency === "USD";
   const [sharesTyped, setSharesTyped] = useState<string | null>(null);
@@ -351,11 +359,16 @@ function HoldingRow({
           {facts.length > 0 && (
             <span className="dv-tfacts">
               {/* 브라우저 기본 title 은 1초 뒤에야 뜨고 폰에선 안 뜬다 — 이 화면의 말풍선(.hz-tip)으로. */}
-              {facts.map((f) => (
+              {shownFacts.map((f) => (
                 <span key={f.text} className={`dv-tfact${f.warn ? " dv-tfact-warn" : ""} hz-tip hz-tip-wide`} data-tip={f.title}>
                   {f.text}
                 </span>
               ))}
+              {foldedFacts.length > 0 && (
+                <span className="dv-tfact dv-tfact-more hz-tip hz-tip-wide" data-tip={foldedFacts.map((f) => f.text).join(" · ")} aria-label={`더 있는 사실 ${foldedFacts.length}개: ${foldedFacts.map((f) => f.text).join(", ")}`}>
+                  +{foldedFacts.length}
+                </span>
+              )}
             </span>
           )}
         </span>

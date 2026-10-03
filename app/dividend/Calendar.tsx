@@ -20,16 +20,20 @@ export function MonthCalendar({
   noCalCount,
   selected,
   onPick,
+  bare,
 }: {
   monthly: number[];
   noCalCount: number;
   selected: number | null;
   onPick: (m: number) => void;
+  /** v2 모듈 안에 넣을 때 — 제목 · 부제 줄은 모듈 머리가 말한다(app/dividend/V2Parts.tsx). */
+  bare?: boolean;
 }) {
   const max = Math.max(...MONTHS.map((m) => monthly[m]));
   const paidMonths = MONTHS.filter((m) => monthly[m] > 0).length;
   return (
     <div className="dv-cal">
+      {!bare && (
       <div className="dv-cal-head dv-cal-head-col">
         <span className="dv-cal-title">
           달마다 얼마 들어오나
@@ -39,6 +43,7 @@ export function MonthCalendar({
           {noCalCount > 0 && ` · ${noCalCount}종목은 지급 달을 몰라 뺐습니다`}
         </span>
       </div>
+      )}
       <div className="dv-cal-grid">
         {MONTHS.map((m) => {
           const v = monthly[m];
@@ -77,9 +82,9 @@ export function MonthCalendar({
    여섯 줄까지.
    ⚠️ 서버 렌더에는 없다 — 담은 종목이 브라우저 저장소에서 오므로 hydration 뒤에만 그려져 오늘 날짜를 써도 안전하다. */
 
-type UpcomingItem = { key: string; when: string; sortKey: string; name: string; what: string; amount: string | null; amountKrw: number; tag: "확정" | "예상" | null };
+export type UpcomingItem = { key: string; when: string; sortKey: string; name: string; what: string; amount: string | null; amountKrw: number; tag: "확정" | "예상" | null };
 
-function upcomingOf(lines: Line[], fx: number, mode: TaxMode): { items: UpcomingItem[]; sureKrw: number; expectedKrw: number } {
+export function upcomingOf(lines: Line[], fx: number, mode: TaxMode): { items: UpcomingItem[]; sureKrw: number; expectedKrw: number } {
   // 날짜는 KST 로 — toISOString 은 UTC 라 한국 새벽 0~9시엔 어제가 '오늘'이 돼 지난 일정이 다가오는 일정에 남는다.
   const today = new Date(Date.now() + 9 * 3600e3);
   const iso = today.toISOString().slice(0, 10);
@@ -145,37 +150,20 @@ function upcomingOf(lines: Line[], fx: number, mode: TaxMode): { items: Upcoming
   return { items: out.slice(0, UPCOMING_MAX), sureKrw, expectedKrw };
 }
 
-export function Upcoming({ lines, fx, mode }: { lines: Line[]; fx: number; mode: TaxMode }) {
-  const { items, sureKrw, expectedKrw } = upcomingOf(lines, fx, mode);
-  if (!items.length) return null;
-  const after = mode === "gross" ? "세전" : "세후";
+/** 일정 줄만 — v2 모듈 안에서 쓴다(머리의 합은 모듈 근거 글자가 말한다). */
+export function UpcomingRows({ items }: { items: UpcomingItem[] }) {
   return (
-    <div className="dv-upcoming">
-      <div className="dv-cal-head dv-cal-head-col">
-        <span className="dv-cal-title">
-          다가오는 일정
-        </span>
-        {/* 확정·예상 합 — 표에 못 든 줄까지 석 달 안 전부. 둘 다 0 이면(기준일만 있을 때) 안 적는다. */}
-        {sureKrw + expectedKrw > 0 && (
-          <span className="dv-cal-sub">
-            석 달 안 {after} {sureKrw > 0 ? `확정 ${won(sureKrw)}` : ""}
-            {sureKrw > 0 && expectedKrw > 0 ? " · " : ""}
-            {expectedKrw > 0 ? `예상 ${won(expectedKrw)}` : ""}
-          </span>
-        )}
-      </div>
-      <ul className="dv-upcoming-list">
-        {items.map((it) => (
-          <li key={it.key} className="dv-upcoming-row">
-            <span className="dv-upcoming-when">{it.when}</span>
-            <span className="dv-upcoming-name">{it.name}</span>
-            {it.tag && <span className={`dv-upcoming-tag${it.tag === "확정" ? " dv-upcoming-tag-sure" : ""}`}>{it.tag}</span>}
-            <span className="dv-upcoming-what">{it.what}</span>
-            {it.amount && <span className="dv-upcoming-amt">{it.amount}</span>}
-          </li>
-        ))}
-      </ul>
-    </div>
+    <ul className="dv-upcoming-list">
+      {items.map((it) => (
+        <li key={it.key} className="dv-upcoming-row">
+          <span className="dv-upcoming-when">{it.when}</span>
+          <span className="dv-upcoming-name">{it.name}</span>
+          {it.tag && <span className={`dv-upcoming-tag${it.tag === "확정" ? " dv-upcoming-tag-sure" : ""}`}>{it.tag}</span>}
+          <span className="dv-upcoming-what">{it.what}</span>
+          {it.amount && <span className="dv-upcoming-amt">{it.amount}</span>}
+        </li>
+      ))}
+    </ul>
   );
 }
 

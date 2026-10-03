@@ -1,27 +1,25 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { gaStockCode, track } from "@/lib/ga";
-import { Icon } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
-import { SectionIntro } from "../SectionIntro";
 import { LoadFailedNote } from "../LoadFailedNote";
 import { inflate, type BasketLite, type MoreLists, type StockLite, type StockWire } from "./types";
 import { newId, holdingsStore, writeHoldings } from "./store";
 import type { Holding } from "./store";
-import { won, wonShort, pct } from "./format";
 import { IRP_RISK_MAX, isSafeAsset, ACCOUNTS, TAX_HELP, taxNote } from "./tax";
 import type { Account, TaxMode } from "./tax";
-import { accountTag, DEFAULT_SHARES, GOAL_DEFAULT_MAN, ADD_DEFAULT_MAN, BASKET_ROWS, AMOUNT_DEFAULT, SCOPES, scopeOf, computeLines, basketCodes, nextAccountFor, basketShares } from "./shared";
+import { accountTag, DEFAULT_SHARES, GOAL_DEFAULT_MAN, ADD_DEFAULT_MAN, AMOUNT_DEFAULT, SCOPES, scopeOf, computeLines, basketCodes, nextAccountFor, basketShares } from "./shared";
 import type { Scope } from "./shared";
 import { goalBasis, monthlyOf } from "./calc";
 import { SearchBox, QuickChips, MoreRows } from "./Search";
 import { HoldingsTable } from "./Holdings";
 import type { SortKey } from "./Holdings";
-import { MonthCalendar, Upcoming, MonthFill } from "./Calendar";
-import { GoalBox, AmountControl } from "./Goal";
-import { BasketSheet } from "./Basket";
+import { MonthFill, upcomingOf } from "./Calendar";
+import { GoalBox } from "./Goal";
+import { BasketBoard } from "./V2Baskets";
+import { CalendarModule, DvCover, UpcomingModule, YearlyModule } from "./V2Parts";
 
 // '모두 빼기' 확인 판(Base UI 대화상자, gzip 약 20KB)은 처음 누를 때 받아 온다(ClearDialog.tsx).
 const ClearDialog = dynamic(() => import("./ClearDialog").then((m) => m.ClearDialog), { ssr: false });
@@ -60,6 +58,9 @@ export function DividendCalculator({
   more,
   usdkrw,
   failedSources,
+  counts,
+  priceDate,
+  usPriceDate,
 }: {
   stocks: StockWire[];
   baskets: BasketLite[];
@@ -70,6 +71,10 @@ export function DividendCalculator({
   usdkrw: { rate: number; date: string | null } | null;
   /** 조회에 실패한 자료의 이름(lib/dividend.ts 의 DividendData.failedSources). 비면 안 그린다. */
   failedSources: string[];
+  /** 첫 줄 띠 — 담을 수 있는 종목 수(검색에 걸리는 전부)와 종가 기준일. */
+  counts: { kr: number; us: number; etf: number };
+  priceDate: string | null;
+  usPriceDate: string | null;
 }) {
   // 서버는 null 칸을 뺀 꼴(StockWire)로 보낸다 — 4,366개라 HTML 이 2.2MB 였다. 여기서 한 번 채워 두면 아래는 전부 StockLite.
   const stocks = useMemo(() => wire.map(inflate), [wire]);
@@ -170,10 +175,7 @@ export function DividendCalculator({
   // 줄마다 계좌가 다를 수 있다 — 라벨 꼬리·툴팁·주의 문구는 줄의 계좌로 센다.
   const mixed = afterTax && new Set(active.map((l) => l.account)).size > 1;
   const byAccount = (a: Account) => active.filter((l) => l.account === a);
-  const total = active.reduce((s, l) => s + l.netKrw, 0);
   const invest = active.reduce((s, l) => s + (l.investKrw ?? 0), 0);
-  const priced = active.filter((l) => l.investKrw != null);
-  const yieldPct = invest > 0 ? (priced.reduce((s, l) => s + l.grossKrw, 0) / invest) * 100 : null;
   // 목표까지 칸도 투자금을 아는 줄로만 센다 — 종가 없는 줄의 배당까지 넣으면 수익률이 부풀어 필요한 투자금이 몇 분의 1로 적혔다.
   const goalIn = goalBasis(active);
   // 금융소득 종합과세 문턱과 고배당기업(분리과세 대상) 배당의 몫 — **일반 계좌 줄만** 합친다(ISA·연금 계좌 안 소득은 금융소득에
@@ -201,6 +203,22 @@ export function DividendCalculator({
   const noCalCount = active.filter((l) => l.stock.dps > 0 && !l.stock.pays.length).length;
   // 달력은 지급 달을 아는 줄만. 세후는 줄의 세후 ÷ 세전으로 — 히어로·표와 같은 값(calc.ts 의 monthlyOf).
   const monthly = useMemo(() => monthlyOf(active, fx), [active, fx]);
+
+  // 담은 종목이 없는 날 — 첫 바스켓(꾸준함 우선)을 기본 투자금으로 담았을 때의 결과를 둘째 줄 셋에 미리 그린다(토스 '가치 먼저':
+  // 빈 폼 대신 결과 미리보기. 예전엔 "아직 담은 종목이 없습니다 / 아래에서 종목을 찾아 담거나…" 안내문이었다). 단추 하나로 그대로 담는다.
+  const previewBasket = baskets[0];
+  const previewLines = useMemo(() => {
+    if (holdings.length || !previewBasket) return null;
+    const hs = basketShares(basketCodes(previewBasket, taxMode), AMOUNT_DEFAULT, byCode, fx).map((h) => ({ id: h.code, ...h }));
+    return computeLines(hs, byCode, fx, taxMode, account);
+  }, [holdings.length, previewBasket, taxMode, byCode, fx, account]);
+  const band = lines.length ? active : (previewLines ?? []);
+  const bandTotal = band.reduce((s, l) => s + l.netKrw, 0);
+  const bandInvest = band.reduce((s, l) => s + (l.investKrw ?? 0), 0);
+  const bandYield = bandInvest > 0 ? (band.filter((l) => l.investKrw != null).reduce((s, l) => s + l.grossKrw, 0) / bandInvest) * 100 : null;
+  const bandMonthly = useMemo(() => (lines.length ? monthly : monthlyOf(previewLines ?? [], fx)), [lines.length, monthly, previewLines, fx]);
+  const bandNoCal = band.filter((l) => l.stock.dps > 0 && !l.stock.pays.length).length;
+  const upcoming = upcomingOf(band, fx, taxMode);
 
   const add = (code: string, source: string) => {
     if (!byCode.has(code)) return;
@@ -358,93 +376,69 @@ export function DividendCalculator({
     ? `세금: 줄마다 고른 계좌로 — ${ACCOUNTS.map((a) => [a, byAccount(a.key).length] as const).filter(([, n]) => n > 0).map(([a, n]) => `${a.label} ${n}`).join(" · ")}`
     : TAX_HELP[taxMode];
 
+  const previewTitle = previewBasket ? previewBasket.title : "";
+  const preview = !lines.length && previewLines && previewLines.length ? { title: previewTitle, amount: AMOUNT_DEFAULT } : null;
+
   return (
-    <div className="hz-tx">
+    // v2(2026-10-03) — 카더라 · MDD 와 같은 범위(v2-kd 토큰 · 폭 단계, v2-dv 는 이 화면 전용 덮기 · v2.css).
+    // 큰 구간 제목('01 내 종목으로 계산' · '02 성향별 바스켓')은 걷었다 — 모듈 머리가 이름을 말한다.
+    <div className="hz-tx v2-kd v2-dv">
       <LoadFailedNote sources={failedSources} />
-      <SectionIntro n={1} title="내 종목으로 계산" />
+      <DvCover counts={counts} usdkrw={usdkrw} priceDate={priceDate} usPriceDate={usPriceDate} />
+
+      {/* 둘째 줄 — 결과 셋. 예전엔 한 시트 안에서 검색 · 칩 · 표 아래로 내려가야 달력 · 일정이 보였다. */}
+      <div className="v2-dv-band">
+        <YearlyModule
+          total={bandTotal}
+          invest={bandInvest}
+          yieldPct={bandYield}
+          onCostNote={lines.some((l) => l.onCost)}
+          afterTax={afterTax}
+          onTax={(v) => {
+            track("dividend_tax_toggle", { after_tax: v });
+            setAfterTax(v);
+          }}
+          account={account}
+          onAccount={(a) => {
+            track("dividend_account", { account: a });
+            setAccount(a);
+          }}
+          tag={mixed ? " (계좌별)" : accountTag(taxMode)}
+          help={helpText}
+          note={heroNote}
+          preview={preview}
+          onPreviewApply={() => applyBasket(previewBasket)}
+        />
+        <CalendarModule
+          monthly={bandMonthly}
+          noCalCount={lines.length ? noCalCount : bandNoCal}
+          selected={fillMonth}
+          preview={!!preview}
+          onPick={(m) => {
+            setFillMonth((cur) => (cur === m ? null : m));
+            if (fillMonth !== m) track("dividend_fill_month", { month: m });
+          }}
+        />
+        <UpcomingModule items={upcoming.items} sureKrw={upcoming.sureKrw} expectedKrw={upcoming.expectedKrw} afterTax={afterTax} preview={!!preview} />
+      </div>
+      {/* 달력에서 누른 달 — 그 달에 주는 종목(빈 달 채우기). 둘째 줄 바로 아래 판 폭으로. */}
+      {fillMonth != null && <MonthFill month={fillMonth} order={fillOrder} holdings={holdings} onPick={(code) => add(code, "fill_month")} onClose={() => setFillMonth(null)} />}
+
       <section
         ref={calcRef}
-        className={`hz-sheet dv-calc${dragOver ? " dv-drop-on" : ""}`}
+        className={`v2-mod v2-dv-mine${dragOver ? " dv-drop-on" : ""}`}
         onDragOver={onDragOver}
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
         aria-label="내 종목 계산기"
       >
-        <SectionHead
-          icon="calculate"
-          title="내 종목"
-          desc="종목을 담고 주수를 적으면 바로 계산됩니다."
-          right={<TaxToggle afterTax={afterTax} onChange={(v) => { track("dividend_tax_toggle", { after_tax: v }); setAfterTax(v); }} />}
-        />
-
-        {/* 결과가 먼저 선다. 종목이 없을 때도 이 자리는 비워 두지 않는다 — 무엇을 하면 되는지 적는다. */}
-        <div className="dv-hero">
-          {lines.length ? (
-            <>
-              <p className="dv-hero-label">
-                1년에 받는 배당{mixed ? " (계좌별)" : accountTag(taxMode)}
-                <span className="hz-tip hz-tip-wide dv-help" data-tip={helpText} style={{ cursor: "help" }} aria-label="세금 설명">
-                  <Icon name="help" style={{ fontSize: "var(--fs-14)" }} />
-                </span>
-              </p>
-              <p className="dv-hero-main">{won(total)}</p>
-              {/* 셋은 큰 숫자 다음으로 중요한 값이라 한 줄 문장이 아니라 라벨 달린 칸 셋으로(2026-09-13 지적). */}
-              {/* 카더라 히어로의 현황 타일(.hz-tx-stat)과 같은 부품 — 화면마다 딴 모양을 만들지 않는다. */}
-              <div className="hz-tx-stats dv-hero-stats">
-                <div className="hz-tx-stat">
-                  <span className="hz-tx-stat-l">한 달 평균</span>
-                  <span className="hz-tx-stat-v">{won(total / 12)}</span>
-                </div>
-                {invest > 0 && (
-                  <div className="hz-tx-stat">
-                    <span className="hz-tx-stat-l">투자금{lines.some((l) => l.onCost) ? " · 평단 넣은 종목은 평단 기준" : ""}</span>
-                    <span className="hz-tx-stat-v">{wonShort(Math.round(invest / 1e4) * 1e4)}</span>
-                  </div>
-                )}
-                {yieldPct != null && (
-                  <div className="hz-tx-stat">
-                    <span className="hz-tx-stat-l">배당수익률</span>
-                    <span className="hz-tx-stat-v">{pct(yieldPct)}</span>
-                  </div>
-                )}
-              </div>
-              {afterTax && (
-                <div className="dv-account">
-                  <span className="dv-account-label">계좌 유형</span>
-                  {/* 바로 위 세후·세전과 같은 세그먼트. 좁으면 트랙 안에서 두 줄로 접힌다. */}
-                  <div className="hz-seg hz-seg-hover dv-account-seg" role="group" aria-label="어느 계좌로 세나">
-                    {ACCOUNTS.map((o) => (
-                      <button
-                        key={o.key}
-                        type="button"
-                        aria-pressed={account === o.key}
-                        onClick={() => {
-                          track("dividend_account", { account: o.key });
-                          setAccount(o.key);
-                        }}
-                      >
-                        {o.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {heroNote && <p className="dv-hero-note">{heroNote}</p>}
-            </>
-          ) : (
-            <>
-              <p className="dv-hero-label">1년에 받는 배당</p>
-              <p className="dv-hero-main dv-hero-empty">아직 담은 종목이 없습니다</p>
-              <p className="dv-hero-sub">아래에서 종목을 찾아 담거나, 바스켓을 통째로 담아 보세요.</p>
-            </>
-          )}
-        </div>
-
+        <header className="v2-mod-head">
+          <h2>내 종목</h2>
+        </header>
         <div className="dv-body">
           <SearchBox stocks={stocks} onPick={(code) => add(code, "search")} />
-          {/* 세 갈래가 늘 나란히 선다. 판마다 제목·설명·칩 여덟·'더 보기'. 좁으면 한 판씩 쌓인다.
-              '더 보기'를 열면 그 판의 묶음들이 세 판 **아래에 가로로** 펼쳐진다(좁은 판 안에 여덟씩 네 줄을
-              넣으면 열 줄 넘게 늘어난다). 폰에서는 CSS order 로 그 판 바로 아래에 붙는다. */}
+          {/* 세 갈래가 늘 나란히 선다. 갈래마다 이름 · 근거 · 칩 여덟 · '더 보기'. 좁으면 한 갈래씩 쌓인다.
+              '더 보기'를 열면 그 갈래의 묶음들이 세 갈래 **아래에 가로로** 펼쳐진다. 폰에서는 CSS order 로 그 갈래 바로 아래에 붙는다. */}
           <div className="dv-groups">
             {SCOPES.map((o) => (
               <section key={o.key} className="dv-group" data-scope={o.key} aria-label={o.label}>
@@ -453,7 +447,6 @@ export function DividendCalculator({
                   <span className="dv-group-desc">{o.desc}</span>
                 </div>
                 <QuickChips codes={chipsBy[o.key]} byCode={byCode} holdings={holdings} onPick={(code) => add(code, `chip_${o.key}`)} />
-                {/* 판 맨 아래에 붙는 버튼 — 세 판의 높이가 달라도 같은 줄에 선다(margin-top: auto). */}
                 {more[o.key].rows.length > 0 && (
                   <button type="button" className="dv-more-btn" aria-expanded={moreOpen === o.key} onClick={() => toggleMore(o.key)}>
                     {moreOpen === o.key ? "접기" : `${o.label} 더 보기`}
@@ -476,68 +469,15 @@ export function DividendCalculator({
           {lines.length > 0 && (
             <HoldingsTable lines={lines} inputs={inputs} totalInvest={invest} mode={taxMode} onClear={clearAll} onToggle={setLineOn} onMove={moveLine} onSort={sortLines} onAccount={setLineAccount} onSplit={splitLine} onShares={setShares} onCost={setCost} onRemove={remove} />
           )}
-          {clearUsed && <ClearDialog open={clearAsk} onOpenChange={setClearAsk} count={distinct} onConfirm={clearConfirmed} />}
-          {lines.length > 0 && (
-            <MonthCalendar
-              monthly={monthly}
-              noCalCount={noCalCount}
-              selected={fillMonth}
-              onPick={(m) => {
-                setFillMonth((cur) => (cur === m ? null : m));
-                if (fillMonth !== m) track("dividend_fill_month", { month: m });
-              }}
-            />
-          )}
-          {lines.length > 0 && fillMonth != null && (
-            <MonthFill month={fillMonth} order={fillOrder} holdings={holdings} onPick={(code) => add(code, "fill_month")} onClose={() => setFillMonth(null)} />
-          )}
-          {lines.length > 0 && <Upcoming lines={active} fx={fx} mode={taxMode} />}
-          {lines.length > 0 && goalIn.invest > 0 && goalIn.net > 0 && (
-            <GoalBox invest={goalIn.invest} net={goalIn.net} skipped={goalIn.skipped} goalMan={goalMan} addMan={addMan} onGoal={setGoalMan} onAdd={setAddMan} />
-          )}
         </div>
-
       </section>
+      {clearUsed && <ClearDialog open={clearAsk} onOpenChange={setClearAsk} count={distinct} onConfirm={clearConfirmed} />}
+      {lines.length > 0 && goalIn.invest > 0 && goalIn.net > 0 && (
+        <GoalBox invest={goalIn.invest} net={goalIn.net} skipped={goalIn.skipped} goalMan={goalMan} addMan={addMan} onGoal={setGoalMan} onAdd={setAddMan} />
+      )}
 
-      <SectionIntro n={2} title="성향별 바스켓" />
-      <AmountControl amount={amount} onChange={setAmount} />
-      {/* 열두 장이 세로로 길어 국내 줄까지 스크롤이 길다(2026-09-15 지적) — 줄 이름 넷을 누르면 그 줄로 내려간다. */}
-      <nav className="dv-jump" aria-label="바스켓 묶음으로 이동">
-        <span className="dv-jump-label">바로 가기</span>
-        {BASKET_ROWS.map((cap, i) => (
-          <button key={cap} type="button" className="dv-jump-btn" onClick={() => document.getElementById(`dv-basket-row-${i}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}>
-            {cap}
-          </button>
-        ))}
-      </nav>
-      {/* 열둘을 3개씩 네 줄로. 줄마다 무엇을 묶은 줄인지 한 마디(기본 · 현금흐름 · 질 · 세금과 업종) — 셋씩 번갈아
-          읽을 때 길잡이가 된다. 서버가 주는 순서가 곧 줄 순서다. */}
-      <div className="dv-baskets">
-        {BASKET_ROWS.map((cap, i) => (
-          <Fragment key={cap}>
-            <p className="dv-basket-cap" id={`dv-basket-row-${i}`}>{cap}</p>
-            {baskets.slice(i * 3, i * 3 + 3).map((b) => (
-              <BasketSheet key={b.key} basket={b} amount={amount} byCode={byCode} mode={taxMode} fx={fx} onApply={() => applyBasket(b)} onPick={(code) => add(code, "basket")} />
-            ))}
-          </Fragment>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ── 세후·세전 ────────────────────────────────────────────────────── */
-function TaxToggle({ afterTax, onChange }: { afterTax: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <div className="hz-seg hz-seg-hover" role="group" aria-label="세금 반영">
-      {[
-        { on: true, label: "세후" },
-        { on: false, label: "세전" },
-      ].map((o) => (
-        <button key={o.label} type="button" aria-pressed={afterTax === o.on} onClick={() => onChange(o.on)}>
-          {o.label}
-        </button>
-      ))}
+      {/* 성향별 바스켓 — 표 한 판 + 읽기 칸(V2Baskets.tsx). 예전 카드 열두 장(2,766px)과 '바로 가기' 줄을 대신한다. */}
+      <BasketBoard baskets={baskets} amount={amount} onAmount={setAmount} byCode={byCode} mode={taxMode} fx={fx} onApply={applyBasket} onPick={(code) => add(code, "basket")} />
     </div>
   );
 }

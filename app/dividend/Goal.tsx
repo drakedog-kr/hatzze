@@ -1,11 +1,11 @@
 "use client";
 
-// 목표 배당과 투자금 조절. DividendCalculator.tsx 에서 그대로 옮겨 왔다(store.ts 머리말 참고).
+// 목표까지. DividendCalculator.tsx 에서 옮겨 왔다(store.ts 머리말 참고). 투자금 조절은 바스켓 표 머리(V2Baskets.tsx AmountBar)로 갔다.
 
-import { useState } from "react";
 import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
+import { Module } from "../kadera/V2Modules";
 import { won, wonShort } from "./format";
-import { GOAL_PRESETS_MAN, GOAL_MAX_MONTHS, AMOUNT_TICKS, AMOUNT_QUICK, AMOUNT_TYPED_MAX, amountTick } from "./shared";
+import { GOAL_PRESETS_MAN, GOAL_MAX_MONTHS } from "./shared";
 
 /**
  * 달마다 굴린다: 이달 배당 = 자산 × 수익률 ÷ 12, 배당과 매달 넣는 돈을 자산에 더한다. 배당이 해마다 g% 늘면
@@ -33,6 +33,14 @@ function monthsToGoal(invest: number, yearlyRate: number, addMonthly: number, gr
   return m >= 0 ? m : null;
 }
 
+/**
+ * 목표까지 — 한 줄 네 토막(v2, 2026-10-03). 예전엔 세 층 452px(목표 칩 · 막대 · 타일 여섯)이었다.
+ *   목표      한 달 배당 목표(만원) — 고르기 다섯 + 직접 넣기
+ *   지금      지금 한 달 배당 · 목표의 몇 % 막대
+ *   필요한 돈 목표에 필요한 투자금 · 더 필요한 돈
+ *   걸리는 때 매달 얼마씩 더 넣고 받은 배당을 다시 담으면 몇 년 뒤(지금 담은 종목의 세후 수익률 그대로)
+ * 5 · 10 · 20년 뒤 타일은 뺐다 — 걸리는 때가 같은 셈을 한 줄로 말한다.
+ */
 export function GoalBox({
   invest,
   net,
@@ -45,7 +53,7 @@ export function GoalBox({
   /** 투자금과 그 투자금이 내는 1년 세후 배당 — 종가 없는 줄은 둘 다에서 뺀 값(calc.ts 의 goalBasis). */
   invest: number;
   net: number;
-  /** 그렇게 뺀, 배당 있는 줄 수. 있으면 '지금 한 달 배당금'이 히어로의 한 달 평균보다 적은 까닭을 적는다. */
+  /** 그렇게 뺀, 배당 있는 줄 수. 있으면 '지금'이 위 한 달 평균보다 적은 까닭을 근거 글자에 적는다. */
   skipped: number;
   goalMan: number;
   addMan: number;
@@ -57,189 +65,69 @@ export function GoalBox({
   const add = addMan * 1e4;
   const need = rate > 0 ? (goal * 12) / rate : null;
   const months = goal > 0 ? monthsToGoal(invest, rate, add, 0, goal) : null;
-  // 5·10·20년 뒤 한 달 배당 — 같은 셈을 240달까지 돌려 읽는다(배당 성장 0%).
-  const path = rate > 0 ? projectMonthly(invest, rate, add, 0, 240) : null;
   const monthlyNow = net / 12;
-  const years = months != null ? `${Math.floor(months / 12) ? `${Math.floor(months / 12)}년 ` : ""}${months % 12 ? `${months % 12}개월` : ""}`.trim() : null;
-  const manInput = (value: number, onChange: (v: number) => void, label: string, opts: { step?: number; max?: number; width?: number } = {}) => (
+  const years = months != null ? `${Math.floor(months / 12) ? `${Math.floor(months / 12)}년 ` : ""}${months % 12 ? `${months % 12}개월` : ""}`.trim() || "이번 달" : null;
+  const manInput = (value: number, onChange: (v: number) => void, label: string, width: number) => (
     <input
       type="number"
       inputMode="numeric"
       min={0}
-      max={opts.max}
-      step={opts.step ?? 10}
+      step={10}
       value={value}
-      onChange={(e) => onChange(Math.max(0, Math.min(opts.max ?? Infinity, Math.floor(Number(e.target.value) || 0))))}
+      onChange={(e) => onChange(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
       aria-label={label}
       className="dv-goal-inline"
-      style={opts.width ? { width: opts.width } : undefined}
+      style={{ width }}
     />
   );
   const roundMan = (v: number) => wonShort(Math.round(v / 1e4) * 1e4);
-  // 막대는 목표와 같은 단위(한 달 배당)로 — "투자금 12%"보다 "한 달 13만원, 목표의 12%"가 바로 읽힌다.
   const progress = goal > 0 ? Math.min(100, (monthlyNow / goal) * 100) : 0;
   const reached = need != null && invest >= need;
-  const tile = (label: string, value: string, strong = false) => (
-    <div className={`hz-tx-stat${strong ? " dv-goal-tile-strong" : ""}`}>
-      <span className="hz-tx-stat-l">{label}</span>
-      <span className="hz-tx-stat-v">{value}</span>
-    </div>
-  );
   const remaining = need != null ? Math.max(0, need - invest) : 0;
   return (
-    <div className="dv-goal">
-      {/* 다섯 토막, 토막마다 이름표 한 줄 — 목표 · 지금 · 필요한 돈 · 목표 달성까지 · 이대로 가면. 무엇이 무엇인지
-          이름표가 말하고(2026-09-15: "한 달에 XXX만원이 뭔지, 도달까지가 뭔지, 왜 늘어나는지 모르겠다"), 숫자는
-          타일 모양 하나로. */}
-      <div className="dv-goal-head">
-        <span className="dv-cal-title">
-          목표까지
-        </span>
-      </div>
-
-      <div className="dv-goal-block">
-        <span className="dv-goal-blabel">한 달 배당금 목표</span>
-        <div className="dv-goal-presets" role="group" aria-label="한 달 배당금 목표">
-          {GOAL_PRESETS_MAN.map((v) => (
-            <button key={v} type="button" className={`dv-quick${goalMan === v ? " dv-quick-on" : ""}`} aria-pressed={goalMan === v} onClick={() => onGoal(v)}>
-              {v.toLocaleString("ko-KR")}만원
-            </button>
-          ))}
-          <span className="dv-goal-custom">
-            {manInput(goalMan, onGoal, "한 달 배당금 목표(만원)", { width: 72 })}
-            <span>만원</span>
+    <Module
+      title="목표까지"
+      meta={`지금 담은 종목 수익률 그대로 · 배당은 다시 담음${skipped > 0 ? ` · 종가 없는 ${skipped}종목 뺌` : ""}`}
+      className="v2-dv-goal"
+    >
+      <div className="v2-dv-goal-row">
+        <div className="v2-dv-goal-cell">
+          <span className="v2-dv-goal-k">한 달 배당 목표</span>
+          <div className="v2-dv-goal-presets" role="group" aria-label="한 달 배당 목표">
+            {GOAL_PRESETS_MAN.map((v) => (
+              <button key={v} type="button" aria-pressed={goalMan === v} onClick={() => onGoal(v)}>
+                {v.toLocaleString("ko-KR")}만
+              </button>
+            ))}
+            <span className="v2-dv-goal-own">
+              {manInput(goalMan, onGoal, "한 달 배당 목표(만원)", 64)}만원
+            </span>
+          </div>
+        </div>
+        <div className="v2-dv-goal-cell">
+          <span className="v2-dv-goal-k">지금 한 달</span>
+          <b className="v2-dv-goal-v">{won(monthlyNow)}</b>
+          {/* shadcn Progress(Base UI) — '진행률 막대, 12%'로 읽힌다. */}
+          <Progress value={progress} aria-label="한 달 배당 목표 달성" getAriaValueText={() => `목표 한 달 ${wonShort(goal)} 가운데 지금 ${won(monthlyNow)}, ${Math.round(progress)}%`}>
+            <ProgressTrack className="dv-goal-bar">
+              <ProgressIndicator className="dv-goal-fill" />
+            </ProgressTrack>
+          </Progress>
+          <span className="v2-dv-goal-s">{goal > 0 ? (reached ? "목표를 넘었습니다" : `목표의 ${Math.round(progress)}%`) : "목표를 고르십시오"}</span>
+        </div>
+        <div className="v2-dv-goal-cell">
+          <span className="v2-dv-goal-k">필요한 투자금</span>
+          <b className="v2-dv-goal-v">{need != null && goal > 0 ? roundMan(need) : "없음"}</b>
+          <span className="v2-dv-goal-s">{need != null && goal > 0 ? (reached ? "더 필요한 돈 없음" : `지금보다 ${roundMan(remaining)} 더`) : ""}</span>
+        </div>
+        <div className="v2-dv-goal-cell">
+          <span className="v2-dv-goal-k">목표까지</span>
+          <b className="v2-dv-goal-v">{reached ? "이미 넘음" : months == null ? `${GOAL_MAX_MONTHS / 12}년 넘게` : years}</b>
+          <span className="v2-dv-goal-s">
+            매달 {manInput(addMan, onAdd, "매달 더 넣는 돈(만원)", 56)}만원씩 더 넣으면
           </span>
         </div>
       </div>
-
-      {goal > 0 && need != null ? (
-        <>
-          <div className="dv-goal-block">
-            <div className="dv-goal-ends">
-              <span>
-                지금 한 달 배당금 <b>{won(monthlyNow)}</b>
-              </span>
-              <span>
-                목표 <b>{wonShort(goal)}</b>
-              </span>
-            </div>
-            {/* shadcn Progress(Base UI) — '진행률 막대, 12%'로 읽힌다. 예전엔 role="img" 그림이라 값이 이름 글자에만 있었다.
-                아주 적어도 막대 끝이 보이게 하는 최소 폭(2%)은 CSS(.dv-goal-fill 의 min-width)가 맡는다. */}
-            <Progress
-              value={progress}
-              aria-label="한 달 배당금 목표 달성"
-              getAriaValueText={() => `목표 한 달 ${wonShort(goal)} 가운데 지금 ${won(monthlyNow)}, ${Math.round(progress)}%`}
-            >
-              <ProgressTrack className="dv-goal-bar">
-                <ProgressIndicator className="dv-goal-fill" />
-              </ProgressTrack>
-            </Progress>
-            <span className="dv-goal-bnote">
-              {reached ? "목표를 이미 넘었습니다" : `목표의 ${Math.round(progress)}%입니다`}
-              {skipped > 0 && ` · 종가가 없는 ${skipped}종목은 빼고 셌습니다`}
-            </span>
-          </div>
-
-          <div className="dv-goal-block">
-            <span className="dv-goal-blabel">필요한 돈</span>
-            <div className="hz-tx-stats dv-goal-stats">
-              {tile("목표에 필요한 투자금", roundMan(need))}
-              {tile("지금 투자금", roundMan(invest))}
-              {tile("더 필요한 돈", reached ? "없음" : roundMan(remaining))}
-            </div>
-          </div>
-
-          {!reached && (
-            <div className="dv-goal-block">
-              <span className="dv-goal-blabel">목표 달성까지</span>
-              <div className="dv-goal-answer">
-                <span className="dv-goal-aval">{months == null ? `${GOAL_MAX_MONTHS / 12}년 넘게 걸립니다` : years}</span>
-                <span className="dv-goal-acond">
-                  매달 {manInput(addMan, onAdd, "매달 더 넣는 돈(만원)", { width: 60 })}만원씩 더 넣고 받은 배당을 다시 담을 때
-                </span>
-              </div>
-            </div>
-          )}
-
-          {path && (
-            <div className="dv-goal-block">
-              <span className="dv-goal-blabel">이대로 가면 한 달 배당금</span>
-              <div className="hz-tx-stats dv-goal-stats">
-                {tile("5년 뒤", roundMan(path[60]))}
-                {tile("10년 뒤", roundMan(path[120]))}
-                {tile("20년 뒤", roundMan(path[240]))}
-              </div>
-            </div>
-          )}
-        </>
-      ) : (
-        <p className="dv-goal-out">{goal <= 0 ? "목표를 고르면 얼마가 필요한지 셉니다." : "배당이 0이라 셀 수 없습니다."}</p>
-      )}
-    </div>
-  );
-}
-
-/** 만원 단위 숫자를 쉼표로. 적는 칸이 이 꼴로 보인다(1억 → 10,000). */
-const manFmt = (v: number) => Math.round(v / 1e4).toLocaleString("ko-KR");
-
-export function AmountControl({ amount, onChange }: { amount: number; onChange: (v: number) => void }) {
-  // 적는 칸은 만원 단위. 치는 동안의 문자열을 따로 들어야 "1,00" 같은 중간 상태에서 값이 튀지 않고,
-  // 칸을 떠나면 다시 금액에서 그린다. 치는 대로 바로 반영해서 아래 바스켓 주수가 같이 움직인다.
-  const [typed, setTyped] = useState<string | null>(null);
-  const shown = typed ?? manFmt(amount);
-  const tick = amountTick(amount);
-  const onType = (raw: string) => {
-    const digits = raw.replace(/[^\d]/g, "").replace(/^0+(?=\d)/, "").slice(0, 7);
-    const n = Math.min(AMOUNT_TYPED_MAX, Number(digits) * 1e4);
-    // 상한을 넘겨 치면 칸에도 바로 상한을 보인다 — 칸은 200,000,000 인데 옆 억 표기는 100억이면 어느 쪽이 맞는지 모른다.
-    setTyped(digits ? manFmt(n) : "");
-    if (n >= 1e4) onChange(n);
-  };
-  return (
-    <div className="hz-sheet dv-amount">
-      <div className="dv-amount-head">
-        <label className="dv-amount-label" htmlFor="dv-amount-input">투자금</label>
-        <span className="dv-amount-val">
-          <input
-            id="dv-amount-input"
-            type="text"
-            inputMode="numeric"
-            autoComplete="off"
-            className="dv-amount-input"
-            value={shown}
-            onChange={(e) => onType(e.target.value)}
-            onFocus={(e) => e.target.select()}
-            onBlur={() => setTyped(null)}
-            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-            aria-label="바스켓 투자금(만원)"
-            style={{ width: `${Math.max(3, shown.length + 1)}ch` }}
-          />
-          <span className="dv-amount-unit">만원</span>
-          {/* 1억부터는 만원 숫자만으로 자릿수를 세야 해서 억 단위로 한 번 더 적는다(50,000만원 → 5억원). */}
-          {amount >= 1e8 && <span className="dv-amount-echo">{wonShort(amount)}</span>}
-        </span>
-        <span className="dv-amount-quick">
-          {AMOUNT_QUICK.map((v) => (
-            <button key={v} type="button" className={`dv-quick${amount === v ? " dv-quick-on" : ""}`} onClick={() => { setTyped(null); onChange(v); }} aria-pressed={amount === v}>
-              {wonShort(v)}
-            </button>
-          ))}
-        </span>
-      </div>
-      <input
-        type="range"
-        min={0}
-        max={AMOUNT_TICKS.length - 1}
-        step={1}
-        value={tick}
-        onChange={(e) => { setTyped(null); onChange(AMOUNT_TICKS[Number(e.target.value)]); }}
-        aria-label="바스켓 투자금"
-        aria-valuetext={wonShort(amount)}
-        className="dv-range"
-        // 채운 만큼을 트랙 색으로 — 브라우저 기본 슬라이더는 옛 모양이라(2026-09-15 지적) 트랙·손잡이를 직접 그린다.
-        style={{ "--p": `${(tick / (AMOUNT_TICKS.length - 1)) * 100}%` } as React.CSSProperties}
-      />
-      <p className="dv-amount-note">이 돈을 열 종목에 같은 금액씩 나눠 담으면 종목마다 몇 주가 되는지로 계산합니다. 한 주가 몫보다 비싸면 1주로 잡아 투자금이 조금 넘을 수 있습니다.</p>
-    </div>
+    </Module>
   );
 }

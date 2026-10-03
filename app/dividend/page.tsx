@@ -251,6 +251,9 @@ export default async function DividendPage() {
       more={more}
       usdkrw={data?.usdkrw ?? null}
       failedSources={data?.failedSources ?? []}
+      counts={{ kr: krAll, us: us.length, etf: etfs.length }}
+      priceDate={data?.priceDate ?? null}
+      usPriceDate={data?.usPriceDate ?? null}
     />
   );
 }
