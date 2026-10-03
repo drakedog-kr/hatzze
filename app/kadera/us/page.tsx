@@ -206,7 +206,7 @@ export default async function UsKaderaPage() {
         />
       </div>
 
-      {/* 둘째 줄 — 여론 · 테마 · 일정(국장과 같은 자리) */}
+      {/* 둘째 줄 — 여론 · 오늘의 요약 · 일정(국장과 같은 자리 · 2026-10-04 요약을 테마 점유율 자리로 올렸다) */}
       <div className="v2-band">
         {sentiment ? (
           <SentimentModule score={sentiment.score} label={sentiment.label} trend={sentiment.trend ?? []} days={sentiment.windowDays}>
@@ -217,15 +217,6 @@ export default async function UsKaderaPage() {
             <p className="v2-empty">아직 분석된 메시지가 없습니다.</p>
           </Module>
         )}
-        <ThemeShares themes={themes.rows} hrefOf={THEME_LINKS ? usThemeHref : null} allHref={US_THEME_PAGE.href} />
-        <EventsModule events={events} today={usToday} failed={eventsFailed} limit={9} />
-      </div>
-
-      {/* 셋째 줄 — [급부상 | 오늘의 요약] · [크게 움직인 | 이슈 키워드] · [많이 언급(판 폭 전체)]. 자리는 v2.css .v2-grid 의 영역 이름이 정한다. */}
-      <div className="v2-grid">
-        {sections.map((sec) => (
-          <SignalTable key={sec.id} sec={sec} />
-        ))}
         <Module id="brief" title="오늘의 요약" ai>
           <div className="v2-brief">
             {brief.paragraphs.length === 0 ? (
@@ -246,6 +237,15 @@ export default async function UsKaderaPage() {
             )}
           </div>
         </Module>
+        <EventsModule events={events} today={usToday} failed={eventsFailed} limit={9} />
+      </div>
+
+      {/* 셋째 줄 — [급부상 | 테마 점유율] · [크게 움직인 | 이슈 키워드] · [많이 언급(판 폭 전체)]. 자리는 v2.css .v2-grid 의 영역 이름이 정한다. */}
+      <div className="v2-grid">
+        {sections.map((sec) => (
+          <SignalTable key={sec.id} sec={sec} />
+        ))}
+        <ThemeShares themes={themes.rows} hrefOf={THEME_LINKS ? usThemeHref : null} allHref={US_THEME_PAGE.href} />
         <KeywordTable
           keywords={keywords.map((k) => ({ rank: k.rank, word: k.keyword, count: k.mentionCount, shareDelta: k.shareDelta }))}
           split={false}

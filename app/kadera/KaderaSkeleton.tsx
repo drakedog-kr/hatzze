@@ -3,7 +3,7 @@ import { Spinner } from "@/components/ui/spinner";
 
 /**
  * 국장 · 미장 카더라의 자리표시자(v2, 2026-10-03). 두 화면이 같은 얼개라 골격도 한 벌이다 — 첫 줄 띠, 둘째 줄 모듈 셋
- * (여론 · 테마 · 일정), 셋째 줄 [급부상 | 오늘의 요약] · [크게 움직인 | 이슈 키워드] · [많이 언급].
+ * (여론 · 오늘의 요약 · 일정), 셋째 줄 [급부상 | 테마 점유율] · [크게 움직인 | 이슈 키워드] · [많이 언급](2026-10-04 요약 · 테마 자리 바꿈).
  * 모듈 id 가 실물과 같아 v2.css 의 영역 이름 · 폭 단계가 그대로 선다(1,000 미만 한 줄기 · 폰 한 칸).
  *
  * 왜 자리표시자가 필요한지(사이드바 클라이언트 전환 · 프리페치 경계)는 app/kadera/loading.tsx 머리말.
@@ -34,13 +34,13 @@ export function KaderaSkeleton({ badge, label }: { badge: string; label: string 
     <div className="hz-tx v2-kd" style={{ position: "relative" }} aria-hidden>
       <div className="v2-cover" style={{ height: 41 }} />
       <div className="v2-band">
-        <Mod id="mood" h={300} />
-        <Mod id="themes" h={300} />
-        <Mod id="events" h={300} />
+        <Mod id="mood" h={420} />
+        <Mod id="brief" h={420} />
+        <Mod id="events" h={420} />
       </div>
       <div className="v2-grid">
         <Mod id="surging" h={410} />
-        <Mod id="brief" h={410} />
+        <Mod id="themes" h={410} />
         <Mod id="why" h={410} />
         <Mod id="keywords" h={410} />
         <Mod id="talk" h={426} />

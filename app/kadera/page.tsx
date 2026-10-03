@@ -305,8 +305,8 @@ export default async function KaderaPage() {
         />
       </div>
 
-      {/* 둘째 줄 — 여론 · 테마 여섯 · 일정이 한 줄로(2026-10-02 요청: 2차 때 자리 그대로). 오른쪽 일정 칸은 아래 요약 칸과 같은 폭이라
-          한 세로줄에 선다. */}
+      {/* 둘째 줄 — 여론 · 오늘의 요약 · 일정. 요약이 테마 점유율보다 쓸모가 커서 가운데로 올렸다(2026-10-04 운영자 판단 — 그 전엔
+          여론 · 테마 · 일정이었고 요약은 셋째 줄 오른쪽). 오른쪽 일정 칸은 아래 테마 점유율 칸과 같은 폭이라 한 세로줄에 선다. */}
       <div className="v2-band">
         {sentiment ? (
           <SentimentModule score={sentiment.score} label={sentiment.label} trend={sentiment.trend ?? []} days={sentiment.windowDays}>
@@ -318,16 +318,6 @@ export default async function KaderaPage() {
             <p className="v2-empty">{sentimentFailed ? "감성 집계를 불러오지 못했습니다." : "아직 분석된 메시지가 없습니다."}</p>
           </Module>
         )}
-        <ThemeShares themes={themes} hrefOf={THEME_LINKS ? themeHref : null} />
-        <EventsModule events={events} today={kaderaToday} failed={eventsFailed} limit={9} />
-      </div>
-
-      {/* 셋째 줄 — [급부상 | 오늘의 요약] · [크게 움직인 | 이슈 키워드] · [많이 언급(판 폭 전체)]. 자리는 v2.css .v2-grid 의 영역 이름이 정한다.
-          ⭐ 왼쪽 · 오른쪽을 같은 줄에 짝지어 경계가 맞는다. 한 줄에서 짧은 쪽은 표 줄이 고르게 늘어난다 — 2026-10-02 "공백은 있으면 안 된다". */}
-      <div className="v2-grid">
-        {sections.map((sec) => (
-          <SignalTable key={sec.id} sec={sec} />
-        ))}
         <Module id="brief" title="오늘의 요약" ai>
           <div className="v2-brief">
             {(() => {
@@ -342,6 +332,16 @@ export default async function KaderaPage() {
             })()}
           </div>
         </Module>
+        <EventsModule events={events} today={kaderaToday} failed={eventsFailed} limit={9} />
+      </div>
+
+      {/* 셋째 줄 — [급부상 | 테마 점유율] · [크게 움직인 | 이슈 키워드] · [많이 언급(판 폭 전체)]. 자리는 v2.css .v2-grid 의 영역 이름이 정한다.
+          ⭐ 왼쪽 · 오른쪽을 같은 줄에 짝지어 경계가 맞는다. 한 줄에서 짧은 쪽은 표 줄이 고르게 늘어난다 — 2026-10-02 "공백은 있으면 안 된다". */}
+      <div className="v2-grid">
+        {sections.map((sec) => (
+          <SignalTable key={sec.id} sec={sec} />
+        ))}
+        <ThemeShares themes={themes} hrefOf={THEME_LINKS ? themeHref : null} />
         {keywordModule}
       </div>
     </div>
