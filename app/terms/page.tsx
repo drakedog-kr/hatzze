@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { B, DOC_WIDTH, Lead, P, PREV_EFFECTIVE, Revision, Section, TERMS_EFFECTIVE, Ul } from "../legal";
+import { B, DocCell, DocPage, Lead, P, PREV_EFFECTIVE, Revision, Section, TERMS_EFFECTIVE, Ul } from "../legal";
 import { C } from "../ui";
 import { pageMetadata } from "../seo";
 
@@ -40,15 +40,20 @@ function Inner({ href, children }: { href: string; children: React.ReactNode }) 
 
 export default function TermsPage() {
   return (
-    <div style={{ maxWidth: DOC_WIDTH }}>
-      <Revision effective={EFFECTIVE_DATE} prev={PREV_EFFECTIVE}>
-        <li>2조 서비스의 내용에 국장 미리보기·데일리 노트·테마 리포트·배당으로 살기·텔레그램 채널을 더했습니다</li>
-        <li>3조에 국장 미리보기와 배당으로 살기가 보여 드리는 정보의 성격을 적었습니다</li>
-        <li>4조에 생성형 인공지능이 작성하는 문장의 목록을 넓혔습니다</li>
-        <li>8조에서 출처를 밝혀 인용하는 자료에 배당 자료를 더했습니다</li>
-        <li>머리말에 채널 등록 신청과 지표 제보 때 이메일 주소를 받는다는 사실을 적었습니다</li>
-      </Revision>
-
+    <DocPage
+      title="이용약관"
+      links={[{ href: "/privacy", label: "개인정보처리방침" }, { href: "/disclaimer", label: "투자 유의사항" }]}
+      cells={<DocCell k="시행일" v={EFFECTIVE_DATE} />}
+      revision={
+        <Revision effective={EFFECTIVE_DATE} prev={PREV_EFFECTIVE}>
+          <li>2조 서비스의 내용에 국장 미리보기·데일리 노트·테마 리포트·배당으로 살기·텔레그램 채널을 더했습니다</li>
+          <li>3조에 국장 미리보기와 배당으로 살기가 보여 드리는 정보의 성격을 적었습니다</li>
+          <li>4조에 생성형 인공지능이 작성하는 문장의 목록을 넓혔습니다</li>
+          <li>8조에서 출처를 밝혀 인용하는 자료에 배당 자료를 더했습니다</li>
+          <li>머리말에 채널 등록 신청과 지표 제보 때 이메일 주소를 받는다는 사실을 적었습니다</li>
+        </Revision>
+      }
+    >
       <Lead>
         <P>
           이 약관은 hatzze(이하 <B>서비스</B>)를 이용하실 때 적용되는 조건과, 서비스가 보여
@@ -309,6 +314,6 @@ export default function TermsPage() {
           제기합니다.
         </P>
       </Section>
-    </div>
+    </DocPage>
   );
 }

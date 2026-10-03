@@ -1386,15 +1386,17 @@ const LABEL_TITLED_PREFIXES = [`${NOTE_PAGE.href}/`];
 // 시장 브리핑(/) · MDD · 배당으로 살기 · 테마 판세(목록 · 테마 한 장, 국장 · 미장) · 국장 미리보기 · 미장 카더라는 2026-10-03 에 들였다 — 카더라 v2 의 디자인 규칙을 옮겼다.
 const V2_PAGES = ["/", "/kadera", "/kadera/us", "/mdd", "/dividend", "/preview", "/insider"];
 /** 테마 판세(/theme/semiconductor · /theme/us/memory) · 데일리 노트(/daily/2026-10-02) · 내부자 전체보기 · 종목 · 투자자 상세 ·
- *  종목 페이지(/stock/005930)는 주소가 여럿이라 앞머리로 가른다. */
+ *  종목 페이지(/stock/005930)는 주소가 여럿이라 앞머리로 가른다. 문서 화면 넷(app/legal.tsx DOC_PAGES)은 2026-10-04 에 들였다. */
 const isV2Page = (pathname: string) =>
   V2_PAGES.includes(pathname) ||
   [THEME_PAGE.href, NOTE_PAGE.href].some((p) => pathname === p || pathname.startsWith(`${p}/`)) ||
-  ["/insider/list/", "/insider/stock/", "/insider/investor/", "/stock/"].some((p) => pathname.startsWith(p));
+  ["/insider/list/", "/insider/stock/", "/insider/investor/", "/stock/"].some((p) => pathname.startsWith(p)) ||
+  pathname in DOC_PAGES;
 
 function PageHeader() {
   const pathname = useAppPathname();
-  const selfTitled = SELF_TITLED_PREFIXES.some((p) => pathname.startsWith(p));
+  // 문서 화면 넷(DOC_PAGES)도 첫 줄 띠에 자기 h1 을 둔다(v2, 2026-10-04 · app/legal.tsx DocCover). 이름 · 부제는 구조화 데이터에 그대로 쓰인다.
+  const selfTitled = SELF_TITLED_PREFIXES.some((p) => pathname.startsWith(p)) || pathname in DOC_PAGES;
   const TitleTag = LABEL_TITLED_PREFIXES.some((p) => pathname.startsWith(p)) ? "p" : "h1";
   const page = navFor(useShellEnv()).find((n) => isActive(n.href, pathname));
   const v2 = isV2Page(pathname);

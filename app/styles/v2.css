@@ -1943,3 +1943,83 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
   .v2-in .v2-cover-cell:not(.v2-cover-go):not(.v2-cover-meta):not(.v2-in-cur) { flex: 1 1 100%; flex-wrap: wrap; row-gap: 2px; }
 }
 .v2-cover-k .v2-in-help .ms { font-size: 14px; }
+
+/* ── v2 문서 화면(2026-10-04) — 업데이트 기록 · 투자 유의사항 · 개인정보처리방침 · 이용약관 ──────────────────
+   얼개(app/legal.tsx DocPage): 첫 줄 띠(문서 이름 h1 · 시행일 · 다른 문서) → [개정 안내 · 문서 | 오른쪽 칸(목차 · 데이터 출처)].
+   데일리 노트와 같은 읽는 화면의 꼴이다(.v2-nt-page) — 판 960 이상이면 두 칸, 그 밑이면 오른쪽 칸이 글 아래로 내려가고 목차는 숨긴다.
+   ⭐ 본문은 옛 조판 그대로(14 · 줄 1.85 · 굵기 400 · --c-sub, 조항 제목 17/700). ⛔ v2 눈금(500 · 투명 회색)으로 덮지 말 것 — 긴 글이다(2026-10-03 판단). */
+.v2-dc-page { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 12px; }
+.v2-dc-main,
+.v2-dc-rail { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+@container kd (min-width: 960px) {
+  /* 1,440(판 1,164)에서 글 826 · 칸 326, 1,280(판 1,004)에서 글 684 · 칸 308. 글 한 줄 50~55자. */
+  .v2-dc-page { grid-template-columns: minmax(0, 1fr) clamp(300px, 28%, 360px); }
+}
+@container kd (max-width: 959px) {
+  .v2-dc-tocmod { display: none; }
+}
+.v2-dc-doc { padding: 20px 24px 28px; }
+/* 굵기 400 을 적어야 한다 — v2 뿌리(.v2-kd)가 600 을 물려준다. */
+.v2-dc-txt { font-size: var(--fs-14); font-weight: 400; line-height: 1.85; color: var(--c-sub); word-break: keep-all; overflow-wrap: anywhere; }
+.v2-dc-sec { margin-top: 32px; scroll-margin-top: 16px; }
+.v2-dc-sec h2 { margin: 0 0 10px; font-size: var(--fs-17); font-weight: 700; line-height: 1.45; letter-spacing: -0.01em; color: var(--t-ink); }
+/* 마지막 문단 · 목록의 아래 여백이 문서 모듈 바닥 여백과 겹쳐 쌓이지 않게. */
+.v2-dc-doc > :last-child > .v2-dc-txt > :last-child,
+.v2-dc-lead > :last-child { margin-bottom: 0 !important; }
+
+/* 개정 안내 — 모듈 한 장. 글자는 문서 본문보다 한 단 작다(곁 고지). */
+.v2-dc-revbody { padding: 10px 14px 14px; font-size: 13px; font-weight: 400; line-height: 1.7; color: var(--c-sub); word-break: keep-all; }
+.v2-dc-revbody p { margin: 0 0 6px; }
+.v2-dc-revbody ul { margin: 0; padding-left: 18px; list-style: disc outside; display: flex; flex-direction: column; gap: 2px; }
+
+/* 쿠키 · 국외 이전 같은 짝 고지 — 카드 속 카드 대신 1px 선 · 머리 줄 면(.v2-dc-info). */
+.v2-dc-info { margin: 0 0 12px; border: 1px solid var(--t-line); border-radius: 4px; overflow: hidden; }
+.v2-dc-info-h { padding: 8px 14px; background: var(--t-head); border-bottom: 1px solid var(--t-line); font-size: 13px; font-weight: 700; line-height: 20px; color: var(--t-ink); }
+.v2-dc-info dl { margin: 0; padding: 6px 14px 8px; display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 16px; }
+.v2-dc-info dl > div { display: contents; }
+.v2-dc-info dt { padding: 3px 0; font-size: 12px; font-weight: 600; line-height: 22px; color: var(--t-ink3); white-space: nowrap; }
+.v2-dc-info dd { margin: 0; padding: 3px 0; font-size: 13px; font-weight: 400; line-height: 22px; color: var(--c-sub); overflow-wrap: anywhere; }
+
+/* 목차 — 조항 번호(번호 없는 문서는 차례 번호) · 제목. 누르면 #art-N(번호 있는 조항) · 영문 id 로 뛴다. */
+.v2-dc-toc { list-style: none; margin: 0; padding: 2px 14px; }
+.v2-dc-toc li + li { border-top: 1px solid var(--t-line); }
+.v2-dc-toc a { display: flex; align-items: baseline; gap: 10px; padding: 7px 0; font-size: 13px; font-weight: 500; line-height: 20px; color: var(--t-ink2); text-decoration: none; word-break: keep-all; }
+.v2-dc-toc i { flex: none; width: 16px; font-style: normal; font-size: 12px; font-weight: 600; color: var(--t-ink3); font-variant-numeric: tabular-nums; text-align: right; }
+.v2-dc-toc a:hover { color: var(--t-down); }
+
+/* 데이터 출처(투자 유의사항 오른쪽 칸) — 갈래 · 기관 이름. 갈래 줄마다 가는 선. */
+.v2-dc-src { scroll-margin-top: 16px; }
+.v2-dc-src dl { margin: 0; padding: 2px 14px; }
+.v2-dc-src dl > div { padding: 8px 0; border-bottom: 1px solid var(--t-line); }
+.v2-dc-src dt { font-size: 12px; font-weight: 600; line-height: 18px; color: var(--t-ink3); }
+.v2-dc-src dd { margin: 2px 0 0; font-size: 13px; font-weight: 500; line-height: 20px; color: var(--t-ink); word-break: keep-all; }
+.v2-dc-src p { margin: 0; padding: 8px 14px 12px; font-size: 12px; font-weight: 500; line-height: 18px; color: var(--t-ink3); }
+
+@container kd (max-width: 679px) {
+  .v2-dc-doc { padding: 16px 14px 20px; }
+  .v2-dc-sec { margin-top: 28px; }
+  .v2-dc-sec h2 { font-size: var(--fs-16); }
+  /* 짝 고지 — 폰에선 라벨 위 · 값 아래(라벨 칸이 값 칸을 눌렀다). */
+  .v2-dc-info dl { grid-template-columns: minmax(0, 1fr); }
+  .v2-dc-info dt { padding: 6px 0 0; line-height: 18px; }
+  .v2-dc-info dd { padding: 0 0 4px; }
+}
+
+/* 업데이트 기록(.v2-cl) — 달마다 모듈 한 장 · 판마다 한 줄(버전 · 배포일 · 바뀐 것). 바뀐 것은 한 줄에 하나(releases.ts 규칙).
+   판 폭 전체를 쓴다 — 바뀐 것이 짧아(가운데값 38자) 줄 길이가 안 늘어난다. 폰은 버전 · 날짜 위, 바뀐 것 아래. */
+.v2-cl { display: flex; flex-direction: column; gap: 12px; }
+.v2-cl-mod { scroll-margin-top: 16px; }
+.v2-cl-list { list-style: none; margin: 0; padding: 0 14px; }
+.v2-cl-row { display: grid; grid-template-columns: 112px 48px minmax(0, 1fr); column-gap: 12px; align-items: baseline; padding: 8px 0; }
+.v2-cl-row + .v2-cl-row { border-top: 1px solid var(--t-line); }
+.v2-cl-ver { display: inline-flex; align-items: baseline; gap: 6px; font-size: 13px; font-weight: 700; line-height: 20px; color: var(--t-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v2-cl-ver .v2-badge { align-self: center; }
+.v2-cl-row time { font-size: 12px; font-weight: 500; line-height: 20px; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
+.v2-cl-row ul { margin: 0; padding-left: 16px; list-style: disc outside; display: flex; flex-direction: column; gap: 2px; font-size: 13px; font-weight: 400; line-height: 20px; color: var(--c-sub); word-break: keep-all; overflow-wrap: anywhere; }
+.v2-cl-row ul li::marker { color: var(--t-ink4); }
+@container kd (max-width: 679px) {
+  .v2-cl-row { grid-template-columns: max-content minmax(0, 1fr); row-gap: 4px; padding: 10px 0; }
+  .v2-cl-row ul { grid-column: 1 / -1; }
+  /* 첫 줄 '첫 공개' 칸 — 반 칸(175)에 '2026년 8월 6일 v1.0.0'이 11px 넘쳤다. 판 번호는 맨 아래 줄에 있다. */
+  .v2-cl .v2-cover-cell:last-child em { display: none; }
+}

@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
-import { B, DOC_WIDTH, Lead, P, Section, SOURCES_ID, Ul } from "../legal";
+import { B, DocPage, Lead, Section, SOURCES_ID, Ul } from "../legal";
 import { DIVIDEND_PUBLIC } from "../screen-flags";
-import { C } from "../ui";
+import { Module } from "../kadera/V2Modules";
 import { pageMetadata } from "../seo";
 
 // og:image URL 에 그날의 도수가 실려 있어 요청마다 다시 계산해야 한다(app/terms/page.tsx 와 같다).
@@ -17,7 +16,9 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /*
  * 투자 유의사항 — 토스증권 '투자 유의사항'(tossinvest.com/investment-disclaimers)의 얼개를 따른다.
- * 맨 위에 핵심 넷, 그 아래 화면별 유의점을 짧은 목록으로, 끝에 데이터 출처.
+ * 맨 위에 핵심 넷, 그 아래 화면별 유의점을 짧은 목록으로. 데이터 출처는 v2(2026-10-04)부터 오른쪽 칸 모듈이다 — 글을 읽으면서
+ * 옆에서 같이 보는 자리고, 판이 좁으면 글 아래로 내려가 예전 순서(끝에 출처)와 같아진다. 앵커(#sources)는 그대로다.
+ * '더 알아보기'(이용약관으로 가는 문장)는 걷었다 — 첫 줄 띠의 이용약관 칸이 같은 길이다.
  *
  * 2026-10-02 에 만들었다. 그때까지 모든 화면의 푸터가 들던 면책 문장과 '한국거래소 통계정보' 문장, 출처 목록을
  * 여기 모으고, 푸터에는 이리 오는 링크만 남겼다(app/Footer.tsx 머리 주석).
@@ -88,7 +89,28 @@ const SOURCE_GROUPS: { label: string; items: string }[] = [
 
 export default function DisclaimerPage() {
   return (
-    <div style={{ maxWidth: DOC_WIDTH }}>
+    <DocPage
+      title="투자 유의사항"
+      links={[
+        { href: "/terms", label: "이용약관" },
+        { href: "/privacy", label: "개인정보처리방침" },
+      ]}
+      toc={[{ id: SOURCES_ID, title: "데이터 출처" }]}
+      rail={
+        <Module id={SOURCES_ID} title="데이터 출처" className="v2-dc-src">
+          <dl>
+            {SOURCE_GROUPS.map((g) => (
+              <div key={g.label}>
+                <dt>{g.label}</dt>
+                <dd>{g.items}</dd>
+              </div>
+            ))}
+          </dl>
+          {/* 권리 고지라 문장으로 남긴다('서비스가 자료를 받아 오는 곳입니다'는 모듈 제목이 말해 걷었다). */}
+          <p>원본 자료의 권리는 각 제공 기관에 있습니다.</p>
+        </Module>
+      }
+    >
       <Lead>
         <Ul>
           <li>
@@ -109,7 +131,7 @@ export default function DisclaimerPage() {
         </Ul>
       </Lead>
 
-      <Section title="과열도 점수">
+      <Section title="과열도 점수" id="score">
         <Ul>
           <li>
             점수와 저온·상온·고온·초고온은 시장의 분위기를 하나의 눈금으로 옮긴 것이며, 앞으로의 가격
@@ -122,7 +144,7 @@ export default function DisclaimerPage() {
         </Ul>
       </Section>
 
-      <Section title="카더라·테마 리포트·데일리 노트">
+      <Section title="카더라·테마 리포트·데일리 노트" id="kadera">
         <Ul>
           <li>
             공개된 텔레그램 채널에서 어떤 이야기가 돌았는지 세고 옮길 뿐, 그 이야기가 사실인지 검증하지
@@ -132,7 +154,7 @@ export default function DisclaimerPage() {
         </Ul>
       </Section>
 
-      <Section title="인공지능이 쓴 문장">
+      <Section title="인공지능이 쓴 문장" id="ai">
         <Ul>
           <li>
             인공지능 표시가 붙은 문장은 생성형 인공지능이 썼습니다. 사실과 다르거나 앞뒤가 맞지 않을 수
@@ -142,7 +164,7 @@ export default function DisclaimerPage() {
         </Ul>
       </Section>
 
-      <Section title="과거 기록과 추정치">
+      <Section title="과거 기록과 추정치" id="history">
         <Ul>
           <li>
             국장 미리보기와 MDD 정밀분석의 과거 기록은 지나간 일을 센 것이며, 앞으로 같은 일이
@@ -159,7 +181,7 @@ export default function DisclaimerPage() {
         </Ul>
       </Section>
 
-      <Section title="내부자 리포트">
+      <Section title="내부자 리포트" id="insider">
         <Ul>
           <li>
             이미 신고된 과거의 매매를 보여 드립니다. 신고까지 시차가 있어 지금의 보유 상태와 다를 수
@@ -169,7 +191,7 @@ export default function DisclaimerPage() {
         </Ul>
       </Section>
 
-      <Section title="시세와 갱신">
+      <Section title="시세와 갱신" id="refresh">
         <Ul>
           <li>대부분의 지표는 실시간이 아니며, 하루 두 차례 갱신합니다.</li>
           <li>
@@ -178,27 +200,6 @@ export default function DisclaimerPage() {
           </li>
         </Ul>
       </Section>
-
-      <Section title="데이터 출처" id={SOURCES_ID}>
-        <P>서비스가 자료를 받아 오는 곳입니다. 원본 자료의 권리는 각 제공 기관에 있습니다.</P>
-        <Ul>
-          {SOURCE_GROUPS.map((g) => (
-            <li key={g.label}>
-              <B>{g.label}</B>. {g.items}
-            </li>
-          ))}
-        </Ul>
-      </Section>
-
-      <Section title="더 알아보기">
-        <P>
-          서비스 이용 조건과 책임의 범위는{" "}
-          <Link href="/terms" style={{ color: C.blueInk, textDecoration: "none", fontWeight: 600 }}>
-            이용약관
-          </Link>
-          에 있습니다.
-        </P>
-      </Section>
-    </div>
+    </DocPage>
   );
 }

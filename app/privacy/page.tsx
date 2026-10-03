@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { DOC_WIDTH, Ext, InfoBlock, Lead, P, PREV_EFFECTIVE, PRIVACY_EFFECTIVE, Revision, Section, Ul } from "../legal";
+import { DocCell, DocPage, Ext, InfoBlock, Lead, P, PREV_EFFECTIVE, PRIVACY_EFFECTIVE, Revision, Section, Ul } from "../legal";
 import { C } from "../ui";
 import { pageMetadata } from "../seo";
 
@@ -23,15 +23,20 @@ const CONTACT_EMAIL = "hatzze@proton.me";
 
 export default function PrivacyPage() {
   return (
-    <div style={{ maxWidth: DOC_WIDTH }}>
-      <Revision effective={EFFECTIVE_DATE} prev={PREV_EFFECTIVE}>
-        <li>1·2·3항에 채널 등록 신청과 지표 제보 때 받는 이메일 주소와 그 이용 목적·보유 기간을 적었습니다</li>
-        <li>1항에 이용자의 기기에만 저장되는 정보를 적었습니다</li>
-        <li>5항 처리위탁·국외 이전에 양식을 받는 Google Forms를 더했습니다</li>
-        <li>6항에 통화 선택과 사이드바 접기를 기억하는 쿠키를 더했습니다</li>
-        <li>7항과 9항의 문장을 위 내용에 맞췄습니다</li>
-      </Revision>
-
+    <DocPage
+      title="개인정보처리방침"
+      links={[{ href: "/terms", label: "이용약관" }, { href: "/disclaimer", label: "투자 유의사항" }]}
+      cells={<DocCell k="시행일" v={EFFECTIVE_DATE} />}
+      revision={
+        <Revision effective={EFFECTIVE_DATE} prev={PREV_EFFECTIVE}>
+          <li>1·2·3항에 채널 등록 신청과 지표 제보 때 받는 이메일 주소와 그 이용 목적·보유 기간을 적었습니다</li>
+          <li>1항에 이용자의 기기에만 저장되는 정보를 적었습니다</li>
+          <li>5항 처리위탁·국외 이전에 양식을 받는 Google Forms를 더했습니다</li>
+          <li>6항에 통화 선택과 사이드바 접기를 기억하는 쿠키를 더했습니다</li>
+          <li>7항과 9항의 문장을 위 내용에 맞췄습니다</li>
+        </Revision>
+      }
+    >
       <Lead>
         <P>
           hatzze(이하 &quot;서비스&quot;)는 「개인정보 보호법」 등 관련 법령을 준수하며, 이용자의 정보를
@@ -274,6 +279,6 @@ export default function PrivacyPage() {
           알려 드립니다.
         </P>
       </Section>
-    </div>
+    </DocPage>
   );
 }
