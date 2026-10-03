@@ -392,7 +392,7 @@ a.v2-tr:hover { background: var(--t-tint); }
 /* 테마별 낙관도(ThemeVsUsualRows) — 선 그래프 아래, 가는 선으로 가른다. 부품은 국장·미장 공용이라 안쪽 꼴은 그대로 둔다. */
 .v2-mood-themes { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--t-line); }
 
-/* 테마 점유율(V2Modules.tsx ThemeShares) — 상위 여섯 줄. 순위 · 테마 · 막대(1위 = 끝) · 점유율 · 변화. 줄은 남는 높이를 고르게 받는다.
+/* 테마 점유율(V2Modules.tsx ThemeShares) — 상위 열 줄(한 줄 30px 부터, 남는 높이는 줄이 나눈다). 순위 · 테마 · 막대(1위 = 끝) · 점유율 · 변화. 줄은 남는 높이를 고르게 받는다.
    막대 색은 MDD 업종 목록과 같은 옅은 파랑 — 오르내림이 아니라 '얼마나 몰렸나'라 빨강 · 파랑 뜻을 싣지 않는 한 색. */
 .v2-tsh { flex: 1; display: flex; flex-direction: column; margin: 0; padding: 6px 8px 8px; list-style: none; }
 .v2-tsh > li { flex: 1 0 auto; display: flex; }
@@ -402,7 +402,7 @@ a.v2-tr:hover { background: var(--t-tint); }
   grid-template-columns: 14px 92px minmax(0, 1fr) 46px 52px;
   align-items: center;
   column-gap: 10px;
-  min-height: 36px;
+  min-height: 30px;
   padding: 0 6px;
   border-radius: 4px;
   color: var(--t-ink);

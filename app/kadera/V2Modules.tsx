@@ -200,7 +200,7 @@ export function stockHref(code: string, market: string | null): string | null {
 }
 
 /**
- * 테마 점유율 — 상위 여섯 테마의 막대 목록. 줄마다 순위 · 테마 · 점유율 막대 · 점유율 · 변화(2026-10-04).
+ * 테마 점유율 — 상위 열 테마의 막대 목록. 줄마다 순위 · 테마 · 점유율 막대 · 점유율 · 변화(2026-10-04).
  * 점유율 = 최근 3일 평균(머리 띠의 '최근 3일'), 변화 = 5일 이상 전 평균과의 차이(lib/telegram-data.ts THEME_PRIOR_GAP_DAYS).
  *
  * 2차의 작은 카드 열 장(미니 선 · 이름 · 대장 꼬리표 · 점유율 · 변화)을 되살렸었는데 "열 개라 너무 복잡하고 정보 전달도 잘 안 된다"였다(10-04).
@@ -211,8 +211,9 @@ export function stockHref(code: string, market: string | null): string | null {
 /** 테마 줄이 읽는 칸 — 국장 ThemeRotation · 미장 UsThemeRow 둘 다 맞는다(미장 카더라도 이 부품을 쓴다). */
 type ThemeShareRow = Pick<ThemeRotation, "theme" | "sharePct" | "shareDelta"> & { stocks: { name: string }[] };
 
-/** 목록 줄 수. 열이면 복잡했다 — 여섯이면 첫 줄 셋 칸(여론 · 테마 · 일정)의 키 안에 줄 하나가 넉넉히 선다. */
-const THEME_ROWS = 6;
+/** 목록 줄 수 — 10위까지(운영자 판단, 2026-10-04). 한 줄 30px 이라 첫 줄 셋 칸(여론 · 테마 · 일정)의 키(1,440 에서 363) 안에 든다.
+ *  복잡했던 건 줄 수가 아니라 카드 한 장에 다섯 가지가 선 꼴이었다 — 줄은 한 가지(막대)만 말한다. */
+const THEME_ROWS = 10;
 
 export function ThemeShares({
   themes,
