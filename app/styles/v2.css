@@ -1852,3 +1852,14 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 .v2-in .hz-more-btn:hover { background: var(--t-tint); color: var(--t-ink); }
 .v2-in-help { display: inline-flex; align-items: center; color: var(--t-ink3); cursor: help; }
 .v2-in-help .ms { font-size: 16px; }
+/* 종목 · 투자자 상세(/insider/stock/… · /insider/investor/…) — 코드 얼개는 그대로 두고 이 범위에서 v2 결만 입힌다(MDD .v2-md 와 같은 덮기).
+   시트 머리(SectionHead)의 아이콘 타일 · 부제(설명 문장) · 바닥 각주를 걷고 제목 13/700 + 근거 글자. 구간 제목은 코드에서 걷었다. */
+.v2-kd.v2-in .hz-sheet { border-color: var(--t-frame); border-radius: 6px; box-shadow: none; }
+.v2-kd.v2-in .hz-sheet-head { padding: 10px 14px; gap: 8px; align-items: baseline; background: var(--t-card); border-bottom: 1px solid var(--t-line); }
+.v2-kd.v2-in .hz-sheet-head-ico,
+.v2-kd.v2-in .hz-sheet-head-desc,
+.v2-kd.v2-in .hz-sheet-foot { display: none; }
+.v2-kd.v2-in .hz-sheet-head-title { font-size: 13px; font-weight: 700; line-height: 20px; letter-spacing: 0; }
+.v2-kd.v2-in .hz-sheet-head-note { padding: 0; border: 0; background: none; font-size: 12px !important; font-weight: 500 !important; color: var(--t-ink3) !important; }
+.v2-kd.v2-in .hz-seg { border-color: var(--t-frame); border-radius: 6px; }
+.v2-kd.v2-in .hz-seg > button { border-radius: 4px; font-size: 12px; font-weight: 600; }

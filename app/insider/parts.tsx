@@ -8,7 +8,6 @@
  *    붙이는 순간 여기 실린 데이터가 통째로 클라이언트 번들을 탄다.
  */
 import { Fragment } from "react";
-import { SectionIntro } from "../SectionIntro";
 
 import Link from "next/link";
 
@@ -193,23 +192,6 @@ export function moveBadge(
   const times = 1 + sharesChange / 100;
   const t = times < 10 ? times.toFixed(1).replace(/\.0$/, "") : Math.round(times).toLocaleString("ko-KR");
   return { text: `${t}배로 늘림`, tone: MOVE_TONE.buy };
-}
-
-/**
- * 카드 묶음 앞에 붙는 **구간 이름**. 생김새는 공용 `SectionIntro` —
- * 시장 브리핑·카더라·MDD 의 같은 줄과 한 벌이다.
- *
- * ⭐ 하는 일은 이름 짓기가 아니라 **박자 만들기**다. 카드가 줄줄이 이어지면 어디까지가
- *   한 이야기인지 안 보인다.
- *
- * ⚠️ **묶음 크기(개수)는 안 적는다.** 여기는 한두 장짜리 구간이 많아 숫자가 뜻을 잃는다.
- *    `n` 은 개수가 아니라 **장 번호**다(01·02·03) — 몇 장짜리 글의 어디쯤인지를 말한다.
- * ⚠️ 장이 하나뿐인 화면(거물 상세)에서는 `n` 을 비운다 — "01" 만 혼자 있으면 다음 장이
- *    있다고 약속해 놓고 안 지키는 꼴이다.
- * ⚠️ 태그가 h2 인 것은 문서 구조다 — 페이지 h1 아래 구간 h2, 시트 제목이 h3 다.
- */
-export function GroupTitle({ n, children }: { n?: number; children: string }) {
-  return <SectionIntro n={n} title={children} />;
 }
 
 /**

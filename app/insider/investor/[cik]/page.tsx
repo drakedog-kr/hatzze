@@ -14,7 +14,6 @@ import { LoadFailedNote } from "../../../LoadFailedNote";
 import { ExpandableList } from "../../../kadera/ExpandableList";
 import {
   Empty,
-  GroupTitle,
   Money,
   T,
   WIDE_COLS,
@@ -168,7 +167,7 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
     // ⭐ 내부자 리포트는 **달러가 기본**이다 — 재료가 전부 미국 공시라 달러가 원본이고,
     // 원화는 크기를 가늠하라고 얹은 것이다. 쿠키로 한 번이라도 고르면 그 선택이 이긴다
     // (규칙은 globals.css 의 `[data-cur-default]`).
-    <div className="hz-tx" data-cur-default="usd">
+    <div className="hz-tx v2-kd v2-in" data-cur-default="usd">
       <LoadFailedNote sources={d.failedSources} />
       {/* 셸은 이 화면의 이름을 몰라 구조화 데이터를 안 낸다(AppShell PageHeader 의 named). 여기서 낸다. */}
       <PageJsonLd
@@ -353,8 +352,6 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
           </div>
         </div>
       </section>
-
-      <GroupTitle>이 사람의 포트폴리오</GroupTitle>
 
       <section className="hz-sheet">
         <SectionHead

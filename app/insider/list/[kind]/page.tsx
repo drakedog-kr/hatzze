@@ -15,7 +15,6 @@ import { ExpandableList } from "../../../kadera/ExpandableList";
 import { LoadFailedNote } from "../../../LoadFailedNote";
 import { INSIDER_LISTS, INSIDER_LIST_MAX, INSIDER_LIST_SLUGS, type InsiderListSlug } from "../../lists";
 import {
-  Empty,
   WIDE_COLS,
   WideHead,
   insiderNote,
