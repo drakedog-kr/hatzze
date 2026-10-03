@@ -1701,8 +1701,9 @@ a.v2-pv-kr:hover { background: var(--t-tint); }
    얼개(app/daily/NoteView.tsx 머리말): 첫 줄 띠(이전 글 · 다음 글 · 업데이트) → [글 | 오른쪽 칸(목차 · 언급된 종목 · 지난 노트)].
    ⭐ 오른쪽 칸은 글을 읽으면서 옆에서 같이 보는 자리다(운영자 판단). ⛔ 한 줄기로 펴지 말 것 · ⛔ sticky 금지(2026-09-06).
    글자 — 본문 · 소제목은 **옛 조판 그대로**다(tx.css .hz-note-body: 15.5 · 굵기 400 · 줄 1.85 · 잉크 ink-soft, 소제목 18). v2 눈금(16 · 500 · 회색 ink2)
-   으로 바꿨다가 "기존이 더 가독성이 좋다"로 되돌렸다(2026-10-03) — 긴 글은 500 굵기가 빽빽하고 투명 회색이 흐렸다. ⛔ 본문 글자를 v2 눈금으로 덮지 말 것.
-   제목 20 · 표 · 곁글 13 · 작은 글 12 는 v2. */
+   으로 바꿨다가 "기존이 더 가독성이 좋다"로 되돌렸다(2026-10-03) — 긴 글은 500 굵기가 빽빽하고 투명 회색이 흐렸다. ⛔ 본문 굵기 · 색을 v2 눈금으로 덮지 말 것.
+   크기만 한 단 내렸다 — "전체적으로 폰트가 좀 크다"(2026-10-04): 본문 15.5 → 14.5(줄 1.8) · 소제목 18 → 16 · 제목 20 → 18. 폰(≤560)의 15 · 17 도 같은 값으로.
+   표 · 곁글 13 · 작은 글 12 는 v2. */
 .v2-nt-page { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 12px; }
 .v2-nt-main,
 .v2-nt-rail { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
@@ -1713,10 +1714,13 @@ a.v2-pv-kr:hover { background: var(--t-tint); }
 .v2-nt .v2-mod { display: flex; flex-direction: column; }
 .v2-nt-head { display: flex; flex-direction: column; gap: 4px; padding: 18px 24px 16px; border-bottom: 1px solid var(--t-line); }
 .v2-nt-head time { font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
-.v2-nt-title { margin: 0; font-size: 20px; font-weight: 700; line-height: 28px; letter-spacing: -0.01em; color: var(--t-ink); word-break: keep-all; overflow-wrap: anywhere; }
+.v2-nt-title { margin: 0; font-size: 18px; font-weight: 700; line-height: 26px; letter-spacing: -0.01em; color: var(--t-ink); word-break: keep-all; overflow-wrap: anywhere; }
 /* 본문 — 옛 조판(.hz-note-body, tx.css)의 여백 · 표 · 출처 · 고지 꼴을 쓰고 글자 · 색만 v2 로. 글 시작선은 머리와 같은 24. */
 /* 굵기 400 을 적어야 한다 — v2 뿌리(.v2-kd)가 600 을 물려줘서, 옛 조판이 굵기를 안 적은 본문 · 표가 600 으로 빽빽해졌다. */
-.v2-nt .hz-note-body { padding: 4px 24px 0; font-weight: 400; }
+.v2-nt .hz-note-body { padding: 4px 24px 0; font-size: 14.5px; font-weight: 400; line-height: 1.8; }
+.v2-nt .hz-note-body > p { margin-top: 12px; }
+.v2-nt .hz-note-body > h2 { margin-top: 26px; font-size: 17px; }
+.v2-nt .hz-note-body > h3 { margin-top: 28px; font-size: 16px; }
 .v2-nt .hz-note-body a { color: var(--t-down); }
 .v2-nt .hz-note-rule { border-top-color: var(--t-line); }
 .v2-nt .hz-note-table { font-size: 13px; }
