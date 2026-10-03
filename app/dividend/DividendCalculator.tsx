@@ -204,21 +204,14 @@ export function DividendCalculator({
   // 달력은 지급 달을 아는 줄만. 세후는 줄의 세후 ÷ 세전으로 — 히어로·표와 같은 값(calc.ts 의 monthlyOf).
   const monthly = useMemo(() => monthlyOf(active, fx), [active, fx]);
 
-  // 담은 종목이 없는 날 — 첫 바스켓(꾸준함 우선)을 기본 투자금으로 담았을 때의 결과를 둘째 줄 셋에 미리 그린다(토스 '가치 먼저':
-  // 빈 폼 대신 결과 미리보기. 예전엔 "아직 담은 종목이 없습니다 / 아래에서 종목을 찾아 담거나…" 안내문이었다). 단추 하나로 그대로 담는다.
-  const previewBasket = baskets[0];
-  const previewLines = useMemo(() => {
-    if (holdings.length || !previewBasket) return null;
-    const hs = basketShares(basketCodes(previewBasket, taxMode), AMOUNT_DEFAULT, byCode, fx).map((h) => ({ id: h.code, ...h }));
-    return computeLines(hs, byCode, fx, taxMode, account);
-  }, [holdings.length, previewBasket, taxMode, byCode, fx, account]);
-  const band = lines.length ? active : (previewLines ?? []);
-  const bandTotal = band.reduce((s, l) => s + l.netKrw, 0);
-  const bandInvest = band.reduce((s, l) => s + (l.investKrw ?? 0), 0);
-  const bandYield = bandInvest > 0 ? (band.filter((l) => l.investKrw != null).reduce((s, l) => s + l.grossKrw, 0) / bandInvest) * 100 : null;
-  const bandMonthly = useMemo(() => (lines.length ? monthly : monthlyOf(previewLines ?? [], fx)), [lines.length, monthly, previewLines, fx]);
-  const bandNoCal = band.filter((l) => l.stock.dps > 0 && !l.stock.pays.length).length;
-  const upcoming = upcomingOf(band, fx, taxMode);
+  // 둘째 줄 결과 셋의 재료 — 담은 종목(active)만.
+  // ⛔ 담은 종목이 없는 날 첫 바스켓을 1,000만원어치 담은 셈으로 미리 그리던 '예시'는 걷었다(2026-10-03 "선택한 거 없는데 왜 미리
+  //    계산이 되지?") — '예시' 표시가 칸 머리에 작게만 있어 고른 것처럼 읽혔고, 그 금액은 아래 바스켓 표 첫 줄과 같은 숫자였다.
+  //    이제 결과 셋은 종목을 담았을 때만 선다(아래 렌더).
+  const bandTotal = active.reduce((s, l) => s + l.netKrw, 0);
+  const bandInvest = active.reduce((s, l) => s + (l.investKrw ?? 0), 0);
+  const bandYield = bandInvest > 0 ? (active.filter((l) => l.investKrw != null).reduce((s, l) => s + l.grossKrw, 0) / bandInvest) * 100 : null;
+  const upcoming = upcomingOf(active, fx, taxMode);
 
   const add = (code: string, source: string) => {
     if (!byCode.has(code)) return;
@@ -376,9 +369,6 @@ export function DividendCalculator({
     ? `세금: 줄마다 고른 계좌로 — ${ACCOUNTS.map((a) => [a, byAccount(a.key).length] as const).filter(([, n]) => n > 0).map(([a, n]) => `${a.label} ${n}`).join(" · ")}`
     : TAX_HELP[taxMode];
 
-  const previewTitle = previewBasket ? previewBasket.title : "";
-  const preview = !lines.length && previewLines && previewLines.length ? { title: previewTitle, amount: AMOUNT_DEFAULT } : null;
-
   return (
     // v2(2026-10-03) — 카더라 · MDD 와 같은 범위(v2-kd 토큰 · 폭 단계, v2-dv 는 이 화면 전용 덮기 · v2.css).
     // 큰 구간 제목('01 내 종목으로 계산' · '02 성향별 바스켓')은 걷었다 — 모듈 머리가 이름을 말한다.
@@ -386,41 +376,40 @@ export function DividendCalculator({
       <LoadFailedNote sources={failedSources} />
       <DvCover counts={counts} usdkrw={usdkrw} priceDate={priceDate} usPriceDate={usPriceDate} />
 
-      {/* 둘째 줄 — 결과 셋. 예전엔 한 시트 안에서 검색 · 칩 · 표 아래로 내려가야 달력 · 일정이 보였다. */}
-      <div className="v2-dv-band">
-        <YearlyModule
-          total={bandTotal}
-          invest={bandInvest}
-          yieldPct={bandYield}
-          onCostNote={lines.some((l) => l.onCost)}
-          afterTax={afterTax}
-          onTax={(v) => {
-            track("dividend_tax_toggle", { after_tax: v });
-            setAfterTax(v);
-          }}
-          account={account}
-          onAccount={(a) => {
-            track("dividend_account", { account: a });
-            setAccount(a);
-          }}
-          tag={mixed ? " (계좌별)" : accountTag(taxMode)}
-          help={helpText}
-          note={heroNote}
-          preview={preview}
-          onPreviewApply={() => applyBasket(previewBasket)}
-        />
-        <CalendarModule
-          monthly={bandMonthly}
-          noCalCount={lines.length ? noCalCount : bandNoCal}
-          selected={fillMonth}
-          preview={!!preview}
-          onPick={(m) => {
-            setFillMonth((cur) => (cur === m ? null : m));
-            if (fillMonth !== m) track("dividend_fill_month", { month: m });
-          }}
-        />
-        <UpcomingModule items={upcoming.items} sureKrw={upcoming.sureKrw} expectedKrw={upcoming.expectedKrw} afterTax={afterTax} preview={!!preview} />
-      </div>
+      {/* 둘째 줄 — 결과 셋. 예전엔 한 시트 안에서 검색 · 칩 · 표 아래로 내려가야 달력 · 일정이 보였다. 담은 종목이 있을 때만 선다. */}
+      {lines.length > 0 && (
+        <div className="v2-dv-band">
+          <YearlyModule
+            total={bandTotal}
+            invest={bandInvest}
+            yieldPct={bandYield}
+            onCostNote={lines.some((l) => l.onCost)}
+            afterTax={afterTax}
+            onTax={(v) => {
+              track("dividend_tax_toggle", { after_tax: v });
+              setAfterTax(v);
+            }}
+            account={account}
+            onAccount={(a) => {
+              track("dividend_account", { account: a });
+              setAccount(a);
+            }}
+            tag={mixed ? " (계좌별)" : accountTag(taxMode)}
+            help={helpText}
+            note={heroNote}
+          />
+          <CalendarModule
+            monthly={monthly}
+            noCalCount={noCalCount}
+            selected={fillMonth}
+            onPick={(m) => {
+              setFillMonth((cur) => (cur === m ? null : m));
+              if (fillMonth !== m) track("dividend_fill_month", { month: m });
+            }}
+          />
+          <UpcomingModule items={upcoming.items} sureKrw={upcoming.sureKrw} expectedKrw={upcoming.expectedKrw} afterTax={afterTax} />
+        </div>
+      )}
       {/* 달력에서 누른 달 — 그 달에 주는 종목(빈 달 채우기). 둘째 줄 바로 아래 판 폭으로. */}
       {fillMonth != null && <MonthFill month={fillMonth} order={fillOrder} holdings={holdings} onPick={(code) => add(code, "fill_month")} onClose={() => setFillMonth(null)} />}
 

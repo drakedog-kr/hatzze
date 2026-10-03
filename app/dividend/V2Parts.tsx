@@ -3,7 +3,7 @@
 // v2 배당으로 살기의 부품(2026-10-03 "카더라 · MDD 에서 배운 규칙으로"). 계산은 그대로 두고 꼴과 배치만 v2 로 옮겼다.
 //  - 첫 줄 띠 — 담을 수 있는 종목 수 · 달러 환율 · 종가 기준일(카더라 · MDD 와 같은 부품 .v2-cover).
 //  - 둘째 줄 셋 — 1년에 받는 배당 | 달마다 들어오는 돈 | 다가오는 일정. 예전엔 한 시트 안에서 표 아래로 2,400px 를 내려가야 달력 · 일정이
-//    보였다. 결과를 먼저 세운다. 담은 종목이 없으면 첫 바스켓을 예시로 같은 셋을 그린다(토스 '가치 먼저' — 빈 폼 대신 결과 미리보기).
+//    보였다. 결과를 먼저 세운다. 담은 종목이 없으면 셋 다 안 선다(예시 미리보기는 2026-10-03 걷었다 — 고른 것처럼 읽혔다).
 
 import { Icon } from "../ui";
 import { CoverMeta, Module } from "../kadera/V2Modules";
@@ -86,7 +86,6 @@ function TaxSeg({ afterTax, onChange }: { afterTax: boolean; onChange: (v: boole
 /* ── 1년에 받는 배당 ──────────────────────────────────────────────── */
 /**
  * 큰 숫자 하나 + 줄 셋(한 달 평균 · 투자금 · 배당수익률) + 계좌 고르기. 옛 히어로의 회색 타일 셋을 가는 선으로 나눈 줄로 바꿨다(MDD 종목 칸과 같은 줄 꼴).
- * preview 면 담은 종목이 없는 날 — 첫 바스켓을 기본 투자금으로 담았을 때의 값이고, 아래 단추 하나로 그대로 담는다.
  */
 export function YearlyModule({
   total,
@@ -100,8 +99,6 @@ export function YearlyModule({
   tag,
   help,
   note,
-  preview,
-  onPreviewApply,
 }: {
   total: number;
   invest: number;
@@ -116,17 +113,13 @@ export function YearlyModule({
   tag: string;
   help: string;
   note: string | null;
-  preview?: { title: string; amount: number } | null;
-  onPreviewApply: () => void;
 }) {
-  // 예시면 근거 글자는 '예시' 한 마디 — 바스켓 이름 · 금액은 큰 숫자 옆 꼬리표로(머리에 두면 세후 · 세전 단추에 밀려 잘렸다).
-  const meta = preview ? `예시 · ${afterTax ? "세후" : "세전"}` : afterTax ? `세후${tag}` : "세전";
+  const meta = afterTax ? `세후${tag}` : "세전";
   return (
     <Module title="1년에 받는 배당" meta={meta} aside={<TaxSeg afterTax={afterTax} onChange={onTax} />} className="v2-dv-sum">
       <div className="v2-md-body">
         <span className="v2-card-val is-big">
           <b>{won(total)}</b>
-          {preview && <span className="v2-reason">{`${preview.title} ${wonShort(preview.amount)}`}</span>}
           {/* 세금을 어떻게 뗐나 — 한 문장(2026-09-30 "너무 복잡해"로 줄인 것). 데이터 툴팁이라 15자 규칙 밖. */}
           <span className="hz-tip hz-tip-wide v2-dv-help" data-tip={help} aria-label="세금 설명">
             <Icon name="help" style={{ fontSize: 14 }} />
@@ -152,12 +145,7 @@ export function YearlyModule({
             </div>
           )}
         </div>
-        {preview ? (
-          <button type="button" className="v2-dv-cta" onClick={onPreviewApply}>
-            이 조합 내 종목에 담기
-          </button>
-        ) : (
-          afterTax && (
+        {afterTax && (
             <div className="v2-dv-acct">
               <span className="v2-dv-acct-k">계좌</span>
               <div className="hz-seg hz-seg-hover v2-dv-seg" role="group" aria-label="어느 계좌로 세나">
@@ -168,9 +156,8 @@ export function YearlyModule({
                 ))}
               </div>
             </div>
-          )
         )}
-        {note && !preview && <p className="v2-dv-note">{note}</p>}
+        {note && <p className="v2-dv-note">{note}</p>}
       </div>
     </Module>
   );
@@ -182,16 +169,14 @@ export function CalendarModule({
   noCalCount,
   selected,
   onPick,
-  preview,
 }: {
   monthly: number[];
   noCalCount: number;
   selected: number | null;
   onPick: (m: number) => void;
-  preview: boolean;
 }) {
   const paid = MONTHS.filter((m) => monthly[m] > 0).length;
-  const meta = [preview ? "예시" : null, paid ? `1년에 ${paid}달` : "지급 달 모름", "최근 12개월", noCalCount > 0 ? `${noCalCount}종목 제외` : null]
+  const meta = [paid ? `1년에 ${paid}달` : "지급 달 모름", "최근 12개월", noCalCount > 0 ? `${noCalCount}종목 제외` : null]
     .filter(Boolean)
     .join(" · ");
   return (
@@ -209,16 +194,14 @@ export function UpcomingModule({
   sureKrw,
   expectedKrw,
   afterTax,
-  preview,
 }: {
   items: UpcomingItem[];
   sureKrw: number;
   expectedKrw: number;
   afterTax: boolean;
-  preview: boolean;
 }) {
   const sum = [sureKrw > 0 ? `확정 ${won(sureKrw)}` : null, expectedKrw > 0 ? `예상 ${won(expectedKrw)}` : null].filter(Boolean).join(" · ");
-  const meta = [preview ? "예시" : null, "석 달 안", sum ? `${afterTax ? "세후" : "세전"} ${sum}` : null].filter(Boolean).join(" · ");
+  const meta = ["석 달 안", sum ? `${afterTax ? "세후" : "세전"} ${sum}` : null].filter(Boolean).join(" · ");
   return (
     <Module title="다가오는 일정" meta={meta} className="v2-dv-up">
       <div className="v2-md-body">{items.length ? <UpcomingRows items={items} /> : <p className="v2-empty">석 달 안에 잡힌 일정이 없습니다.</p>}</div>
