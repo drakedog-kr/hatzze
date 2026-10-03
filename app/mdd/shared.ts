@@ -55,7 +55,7 @@ export type MddResult = {
   bench?: DdNow | null;
   /** 같은 지수의 낙폭을 analysis.underwater 날짜마다(같은 길이) — 물속 차트 '시장과 함께' 선. 지수를 못 받았으면 null. */
   benchUnderwater?: (number | null)[] | null;
-  /** 최근 1년 가격대별 거래대금(lib/mdd.ts priceLadder) — '거래가 몰린 가격대' 칸. 거래량이 없거나 이력이 짧으면 null. */
+  /** 최근 1년 가격대별 거래대금(lib/mdd.ts priceLadder) — '수익 · 손실 비율' 칸. 거래량이 없거나 이력이 짧으면 null. */
   ladder?: PriceLadder | null;
 };
 

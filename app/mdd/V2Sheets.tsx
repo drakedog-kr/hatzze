@@ -6,7 +6,7 @@
 //  - 역대 하락 사례 — 옛 'Top 5' · 리스크 '하락 vs 회복 속도' · '혼자 빠지나, 같이 빠지나' · 성격 타일이 같은 사건을 네 군데서 말하던 것을 표 하나로.
 //  - 회복까지 — 옛 '회복까지 걸린 기간' + '이 하락의 성격'(급락형 · 완만형의 회복 중앙값). 깊이 분포 막대는 사례 표와 겹쳐 뺐다.
 //  - 해마다 — 옛 리스크 '낙폭 대비 보상'. 최근 다섯 해 + '전체보기' 팝업 대신 조회 기간의 해를 다 펼친다(누르지 않고 보이게).
-//  - 업종 안에서 · 거래가 몰린 가격대 — 나란한 두 칸, 줄마다 이름 · 막대 · 값. 업종 줄은 누르면 그 종목 MDD 로.
+//  - 업종 안에서 · 수익 · 손실 비율 — 나란한 두 칸, 줄마다 이름 · 막대 · 값. 업종 줄은 누르면 그 종목 MDD 로.
 
 import { CHARACTER_SPLIT_DAYS } from "@/lib/mdd";
 import type { MddAnalysis, RiskProfile as RiskProfileData } from "@/lib/mdd";
@@ -142,16 +142,17 @@ export function ThemeModule({ theme, onPick }: { theme: ThemeCmp; onPick: (s: St
   );
 }
 
-/* ── 거래가 몰린 가격대 ─────────────────────────────────────────── */
+/* ── 수익 · 손실 비율 ─────────────────────────────────────────── */
 /**
  * 최근 1년 거래대금을 가격대로 나눈 것(lib/mdd.ts priceLadder) — '많이 빠진 대형주'(종목과 상관없는 고정 목록) 자리(2026-10-03).
- * 낙폭 화면을 여는 사람은 대개 손실 중인 보유자라 "지금보다 비싸게 거래된 돈이 얼마나 되나 · 어느 가격대에 몰렸나"를 묻는다.
+ * 낙폭 화면을 여는 사람은 대개 손실 중인 보유자라 "지난 1년 이 종목을 산 돈 중 얼마가 지금 수익이고 얼마가 손실인가 ·
+ * 손실 난 돈은 어느 가격대에 몰렸나"를 묻는다.
  *
- * 1차(10-03)는 머리에 '31%'만, 2차는 큰 숫자 + 갈림 막대(비싸게 산 돈 · 싸게 산 돈) + 가격대 목록('261,000원~' 줄에 '지금' 꼬리표)이었다.
- * 둘 다 "무슨 말인지 한번에 이해하기 힘들다"였다(10-04) — 지금 가격이 칸 한가운데 들어 31% 가 목록 어디서 갈리는지 안 보였고,
- * '산 돈'은 사는 쪽만 센 것처럼 읽혔다. 그래서 칸을 지금 가격에서 나누고(priceLadder) 목록 한가운데 **지금 선**을 긋는다:
- *  ① 큰 숫자 = 선 위 파란 칸의 합(지금보다 비싼 가격에서 거래된 몫)
- *  ② 가격대 목록 = 위 줄일수록 비싼 가격대(호가창처럼), 줄 이름은 범위 그대로 · 선 위는 파랑, 아래는 회색
+ * 1차(10-03)는 머리에 '31%'만, 2차는 큰 숫자 + 갈림 막대(비싸게 산 돈 · 싸게 산 돈), 3차는 칸을 지금 가격에서 나누고 지금 선을
+ * 그은 목록이었다. 셋 다 "한번에 이해하기 힘들다"였고, 운영자 판단으로 **수익 중 · 손실 중 비율**을 앞세운다(10-04):
+ *  ① 맨 위 = 수익 중(빨강) · 손실 중(파랑) 두 숫자와 갈림 막대. 손실 = 지금보다 비싼 가격에서 거래된 몫(선 위 칸의 합), 수익 = 나머지.
+ *  ② 가격대 목록 = 위 줄일수록 비싼 가격대(호가창처럼) · 지금 선 위는 손실(파랑) · 아래는 수익(빨강) — 맨 위 두 색과 같다.
+ * ⚠️ 사람 수가 아니라 거래대금으로 센 어림이다(누가 아직 들고 있는지는 공개 원천에 없다). 머리 근거가 '최근 1년 거래 기준'을 말한다.
  */
 export function LadderModule({ ladder, market }: { ladder: PriceLadder; market: string | null }) {
   const isUs = market === "US";
@@ -163,9 +164,11 @@ export function LadderModule({ ladder, market }: { ladder: PriceLadder; market: 
   const priceNow = isUs ? `$${ladder.price.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : `${Math.round(ladder.price).toLocaleString("ko-KR")}원`;
   // 배포 직후 옛 응답(지금 가격에서 안 나눈 칸)이 캐시에 남아 있으면 aboveCount 가 없다 — 아래 끝이 지금 가격 이상인 칸까지를 위로 본다.
   const split = ladder.aboveCount ?? ladder.bands.filter((b) => b.lo >= ladder.price).length;
-  const above = Math.round(ladder.aboveShare);
+  // 둘의 합이 100 이 되게 손실을 반올림하고 수익은 나머지로.
+  const loss = Math.round(ladder.aboveShare);
+  const gain = 100 - loss;
   const row = (b: PriceLadder["bands"][number], i: number) => (
-    <li key={b.lo} className={i < split ? "is-above" : "is-below"}>
+    <li key={b.lo} className={i < split ? "is-loss" : "is-gain"}>
       <div className="v2-dd-row hz-tip hz-tip-start" data-tip={`거래일 ${b.days}일 · 1년 거래대금의 ${b.share.toFixed(1)}%`}>
         <span className="v2-dd-name">
           {num(b.lo)}~{won(b.hi)}
@@ -178,11 +181,19 @@ export function LadderModule({ ladder, market }: { ladder: PriceLadder; market: 
     </li>
   );
   return (
-    <Module title="거래가 몰린 가격대" meta="최근 1년" className="v2-md-ladder">
-      <div className="v2-md-ld-sum">
-        <span className="v2-card-val is-big">
-          <b className="is-down">{above}%</b>
-          <span className="v2-md-aside">지금보다 비싼 가격에서 거래</span>
+    <Module title="수익 · 손실 비율" meta="최근 1년 거래 기준" className="v2-md-ladder">
+      <div className="v2-md-pl">
+        <span className="v2-md-pl-side is-gain">
+          <em>수익 중</em>
+          <b>{gain}%</b>
+        </span>
+        <span className="v2-md-pl-side is-loss">
+          <em>손실 중</em>
+          <b>{loss}%</b>
+        </span>
+        <span className="v2-md-pl-bar" role="img" aria-label={`수익 중 ${gain}% · 손실 중 ${loss}%`}>
+          {gain > 0 && <i className="is-gain" style={{ flexGrow: gain }} />}
+          {loss > 0 && <i className="is-loss" style={{ flexGrow: loss }} />}
         </span>
       </div>
       <div className="v2-dd-wrap">
