@@ -635,7 +635,6 @@
    "어디를 먼저 읽나"가 안 보인다(2026-09-04 지적). 넓은 칸(50%)이 늘 그 화면의 문장 자리다
    — 내부자·미장 카더라·미리보기 셋 다 '오늘의 브리핑'이다. 국장 카더라가 데이터
    타일 옆에 흰 브리핑을 두는 것과 같은 짜임이 되고, 회색 두 칸이 그 문장을 받쳐 준다. */
-.hz-tx .hz-kd-hero > .hz-kd-hero-h,
 .hz-tx .hz-hero-panel > .hz-hero-wide {
   background: transparent;
   padding: 18px 22px;
@@ -648,9 +647,6 @@
   font-size: var(--fs-14);
   line-height: 1.75;
 }
-/* 칸 폭 계산에서 빼 두었던 헤어라인 몫(1·2px)을 되돌린다 — gap 이 그 일을 대신한다. */
-.hz-tx .hz-kd-hero-q { flex: 1 1 calc(25% - 8px); }
-.hz-tx .hz-kd-hero-h { flex: 1 1 calc(50% - 8px); }
 /* 히어로 시트의 각주 띠는 트레이 바로 아래라 윗선을 걷고 여백만 남긴다. */
 .hz-tx .hz-kd-hero + .hz-sheet-foot {
   border-top: 0;
@@ -758,7 +754,6 @@
   /* ⚠️ 넓은 칸(글 칸)은 **따로 적어야 준다.** 위 `> *` 는 클래스 둘이라 스코프의
      `.hz-tx .hz-kd-hero > .hz-kd-hero-h`(클래스 셋)한테 진다 — 트레이만 좁아지고 글 칸
      좌우 22 는 그대로 남아, 3분할 두 화면끼리도 12px 어긋나 있었다. */
-  .hz-tx .hz-kd-hero > .hz-kd-hero-h,
   .hz-tx .hz-hero-panel > .hz-hero-wide { padding: 16px; }
   .hz-tx .hz-kd-hero + .hz-sheet-foot { padding: 0 16px 16px; }
 }
@@ -801,7 +796,6 @@
   .hz-tx .hz-hero-panel { padding: 8px; gap: 8px; }
   .hz-tx .hz-kd-hero > *,
   .hz-tx .hz-hero-cell { padding: 14px; }
-  .hz-tx .hz-kd-hero > .hz-kd-hero-h,
   .hz-tx .hz-hero-panel > .hz-hero-wide { padding: 14px; }
   .hz-tx .hz-kd-hero + .hz-sheet-foot { padding: 0 14px 14px; }
   .hz-tx-tile { padding: 14px 14px; }
