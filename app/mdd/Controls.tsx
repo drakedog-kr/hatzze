@@ -6,43 +6,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { gaSearchTerm, gaStockCode, track } from "@/lib/ga";
 import { C, Icon, MONO } from "../ui";
 import { StockLogo } from "../StockLogo";
-import { PERIODS, marketBadge, benchName } from "./shared";
-import type { StockOption, Suggestion, SuggestGroups, MddResult } from "./shared";
+import { MAJOR_NAMES, PERIODS, marketBadge, benchName } from "./shared";
+import type { BigDrops, StockOption, Suggestion, SuggestGroups, MddResult } from "./shared";
 import { periodLabelOf, AbsentSheet } from "./sheet";
 import { HeroStrip, Underwater } from "./Hero";
-import { Attribution, Theme } from "./sheets";
-import { CasesTable, RecoveryModule, YearsModule } from "./V2Sheets";
-
-/**
- * 시가총액 상위 KOSPI 보통주를 큰 것부터 손으로 고정한 목록(2026-07 기준).
- *
- * 관련도를 데이터로 뽑을 수 없어 손으로 둔다 — stocks 테이블에는 코드·종목명·종가만
- * 있고 시가총액도 상장주식수도 없다. 종가는 대용이 못 된다(삼성바이오로직스 한 주가
- * 삼성전자보다 열 배 넘게 비싸다). 검색창에 대표성을 주는 다른 신호가 없다.
- *
- * 하는 일은 하나다: "삼성"·"현대"처럼 그룹명이 겹쳐 수십 종목이 걸리는 질의에서 어느
- * 쪽을 먼저 보여줄지 가른다. 여기 없는 종목도 검색은 그대로 되고 이름 길이·가나다순으로
- * 뒤에 붙을 뿐이다. 순위가 낡아도 화면에 나오는 수치는 틀리지 않는다 — 후보를 세우는
- * 데만 쓰고 분석값에는 손대지 않기 때문이다. 그래서 시총이 바뀔 때마다 고칠 필요는 없고,
- * 새 대표주가 검색으로 안 나온다는 말이 나올 때 맨 앞쪽만 손보면 된다.
- *
- * 이름은 stocks 테이블(KRX 정식 종목명)과 정확히 같아야 맞는다 — "엔씨소프트"가 아니라
- * "NC", "네이버"가 아니라 "NAVER". lib/stock-themes.ts 의 테마 사전과 일부 겹치지만
- * 일부러 따로 둔다: 그쪽은 테마별 바스켓이라 안에 순서가 없고, 순서를 뜻하게 만들면
- * 테마 카드를 손볼 때 검색 순위가 조용히 따라 바뀐다.
- */
-const MAJOR_NAMES = [
-  "삼성전자", "SK하이닉스", "삼성바이오로직스", "LG에너지솔루션", "현대차", "기아",
-  "두산에너빌리티", "한화에어로스페이스", "HD현대중공업", "셀트리온", "NAVER", "신한지주",
-  "KB금융", "삼성물산", "현대모비스", "한국전력", "카카오", "하나금융지주", "메리츠금융지주",
-  "HD한국조선해양", "삼성생명", "삼성화재", "POSCO홀딩스", "LG화학", "SK스퀘어", "한화오션",
-  "삼성SDI", "크래프톤", "HMM", "하이브", "KT&G", "우리금융지주", "SK이노베이션",
-  "삼성에스디에스", "한국항공우주", "한미반도체", "현대글로비스", "삼성중공업", "LG전자",
-  "SK텔레콤", "KT", "기업은행", "대한항공", "유한양행", "삼양식품", "아모레퍼시픽", "삼성전기",
-  "포스코퓨처엠", "현대건설", "HD현대", "HD현대일렉트릭", "한화시스템", "현대로템", "고려아연",
-  "SK", "LG", "한화", "GS", "CJ", "두산", "삼성증권", "미래에셋증권", "DB손해보험", "현대해상",
-  "LG유플러스", "롯데케미칼", "한진칼", "CJ제일제당", "이마트", "LS",
-];
+import { Attribution } from "./sheets";
+import { BigDropsModule, CasesTable, MddCover, RecoveryModule, ThemeModule, YearsModule } from "./V2Sheets";
 
 const MAJOR_RANK = new Map(MAJOR_NAMES.map((n, i) => [n, i]));
 
@@ -383,21 +352,33 @@ export function Controls({
    v2 화면(카더라 · 시장 브리핑)엔 큰 구간 제목이 없다. */
 
 
-export function Results({ data }: { data: MddResult }) {
+export function Results({ data, bigDrops, onPick }: { data: MddResult; bigDrops?: BigDrops; onPick: (s: StockOption) => void }) {
   const a = data.analysis;
   const periodLabel = periodLabelOf(data);
+  // 사례 표에서 고른 하락 — 물속 차트에 그 구간을 칠한다(판정표 9). 결과가 새로 서면(종목 · 기간 변경) 이 컴포넌트가 새로 서서 풀린다.
+  const [focus, setFocus] = useState<string | null>(null);
+  const ep = focus ? (a.topDrawdowns.find((e) => e.peakDate === focus) ?? null) : null;
+  const onFocus = (peakDate: string | null) => {
+    setFocus(peakDate);
+    // 차트가 화면 밖이면 보이는 데까지만 올린다(이미 보이면 그대로 — block:nearest).
+    if (peakDate) document.getElementById("mdd-uw")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  };
   return (
     // v2: 모듈 사이 간격은 v2 한 값(12). 구간 제목('01 과거 낙폭 사례' · '02 이 하락의 정체')은 걷었다 — 모듈 머리가 이름을 말한다.
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {/* 첫 줄 띠(판정표 7) — 같은 기간 지수 · 다른 화면 링크 · 종가 기준일. */}
+      <MddCover data={data} periodLabel={periodLabel} />
       <HeroStrip data={data} periodLabel={periodLabel} />
-      <Underwater a={a} periodLabel={periodLabel} market={data.market} />
+      <div id="mdd-uw">
+        <Underwater a={a} periodLabel={periodLabel} market={data.market} focus={ep ? { from: ep.peakDate, to: ep.recoveryDate } : null} />
+      </div>
 
-      {/* v2(2026-10-03 판정표 1단계) — 독자 질문 순서: 얼마나 빠졌나(위 둘) → 흔한가 · 언제 되찾나 → 왜(시장 · 업종) → 장기 성적.
+      {/* v2(2026-10-03 판정표 1단계) — 독자 질문 순서: 얼마나 빠졌나(위 둘) → 흔한가 · 언제 되찾나 → 왜(시장) · 장기 성적 → 업종 → 다른 종목.
           옛 Top 5 · 리스크 '하락 vs 회복' · '혼자 빠지나' · 성격 타일은 같은 사건을 네 군데서 말해 사례 표 하나 + 회복 칸으로 합쳤다.
           시트는 자료가 없어도 자리를 지킨다(AbsentSheet 주석) — 짝의 칸 수가 그대로여야 줄이 안 어긋난다. */}
       <div className="v2-md-row is-21">
         {a.topDrawdowns.length > 0 ? (
-          <CasesTable a={a} periodLabel={periodLabel} market={data.market} />
+          <CasesTable a={a} periodLabel={periodLabel} market={data.market} focus={focus} onFocus={onFocus} />
         ) : (
           <AbsentSheet icon="history" title="역대 하락 사례" sub="" body="이 기간엔 순위를 매길 만한 하락이 없었습니다. 기간을 넓히면 더 나올 수 있습니다." />
         )}
@@ -408,6 +389,7 @@ export function Results({ data }: { data: MddResult }) {
         )}
       </div>
 
+      {/* 시장 탓 | 해마다 — 업종 칸과 자리를 바꿨다(2026-10-03). 업종 칸은 한 줄 막대라 판 폭 전체를 쓴다(아래). */}
       <div className="v2-md-row is-12">
         {data.attribution ? (
           <Attribution
@@ -432,21 +414,27 @@ export function Results({ data }: { data: MddResult }) {
             }
           />
         )}
-        {data.theme ? (
-          <Theme theme={data.theme} />
+        {data.risk ? (
+          <YearsModule r={data.risk} periodLabel={periodLabel} />
         ) : (
-          <AbsentSheet
-            icon="hub"
-            title="업종 안에서"
-            sub=""
-            body={
-              data.partial && (data.partial.lookupFailed || data.partial.peersRequested > 0)
-                ? "테마 대표 종목의 시세를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오."
-                : "이 종목이 묶인 테마를 찾지 못했습니다. 테마 대표 종목 목록에 등록된 종목에서만 비교가 나옵니다."
-            }
-          />
+          <AbsentSheet icon="monitoring" title="해마다" sub="" body="상장한 지 얼마 되지 않아 연도별 성적을 낼 만큼 이력이 쌓이지 않았습니다." />
         )}
       </div>
+
+      {data.theme ? (
+        <ThemeModule theme={data.theme} onPick={onPick} />
+      ) : (
+        <AbsentSheet
+          icon="hub"
+          title="업종 안에서"
+          sub=""
+          body={
+            data.partial && (data.partial.lookupFailed || data.partial.peersRequested > 0)
+              ? "테마 대표 종목의 시세를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오."
+              : "이 종목이 묶인 테마를 찾지 못했습니다. 테마 대표 종목 목록에 등록된 종목에서만 비교가 나옵니다."
+          }
+        />
+      )}
       {/* 대표 종목 일부만 받았으면 그렇다고 적는다 — 평균이 몇 종목으로 낸 것인지 읽는 사람이 알아야 한다. */}
       {data.theme && data.partial && data.partial.peersOk < data.partial.peersRequested && (
         <p style={{ margin: "-6px 4px 0", fontSize: "var(--fs-11)", color: C.muted }}>
@@ -454,11 +442,8 @@ export function Results({ data }: { data: MddResult }) {
         </p>
       )}
 
-      {data.risk ? (
-        <YearsModule r={data.risk} periodLabel={periodLabel} />
-      ) : (
-        <AbsentSheet icon="monitoring" title="해마다" sub="" body="상장한 지 얼마 되지 않아 연도별 성적을 낼 만큼 이력이 쌓이지 않았습니다." />
-      )}
+      {/* 많이 빠진 대형주(판정표 8) — 다음에 볼 종목. 누르면 그 종목으로 바뀌고 맨 위로 올라간다(MddExplorer pickFromResults). */}
+      <BigDropsModule bigDrops={bigDrops} data={data} onPick={onPick} />
     </div>
   );
 }

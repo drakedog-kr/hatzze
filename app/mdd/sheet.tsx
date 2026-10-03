@@ -196,6 +196,8 @@ export function Skeleton({ periodOnly }: { periodOnly: boolean }) {
     // position:relative 는 아래 hz-loading-float 의 기준 상자가 되기 위한 것이다.
     <div style={{ position: "relative" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }} aria-hidden>
+        {/* 첫 줄 띠(키 41) — 결과의 MddCover 자리. */}
+        <div className="v2-cover" style={{ height: 41 }} />
         {/* v2: 둘째 줄은 모듈 셋(Hero.tsx HeroStrip 과 같은 .v2-md-band). */}
         <div className="v2-md-band">
           {[0, 1, 2].map((i) => (

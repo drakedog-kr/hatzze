@@ -15,6 +15,7 @@ import {
   fmtPrice,
   fmtDayCount,
   fmtDay,
+  fmtYm,
   periodInfo,
   cautionShort,
   DOWN,
@@ -52,8 +53,6 @@ export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel:
             <span className="v2-card-val is-big">
               <b>{fmtPrice(a.price, data.market)}</b>
               {a.changePct !== null && <span className={`v2-md-chg ${a.changePct >= 0 ? "is-up" : "is-down"}`}>{fmtPct(a.changePct)}</span>}
-              {/* 가격이 어느 날 종가인지 — 주말 · 휴장에 '0.0%'가 오늘 일로 읽혔다(판정표 12). */}
-              <span className="v2-md-asof">{a.asOf.slice(5).split("-").map(Number).join("/")} 종가</span>
             </span>
           </div>
           <div className="v2-md-rows">
@@ -311,7 +310,18 @@ function smoothPath(pts: [number, number][]): string {
   return d;
 }
 
-export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodLabel: string; market: string | null }) {
+export function Underwater({
+  a,
+  periodLabel,
+  market,
+  focus,
+}: {
+  a: MddAnalysis;
+  periodLabel: string;
+  market: string | null;
+  /** 사례 표에서 고른 하락(고점 → 되찾은 날, 진행 중이면 끝까지) — 그 구간을 옅게 칠한다(판정표 9). */
+  focus?: { from: string; to: string | null } | null;
+}) {
   const series = a.underwater;
   const mdd = a.mdd;
   const W = 720;
@@ -356,6 +366,15 @@ export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodL
   const rows = [0, floor / 2, floor];
   // 격자는 넷으로 나눈 다섯 줄(shadcn 차트처럼 옅게 촘촘히), 라벨은 위 셋에만.
   const gridRows = [0, floor / 4, floor / 2, (floor * 3) / 4, floor];
+  // 사례 표에서 고른 구간 — 솎아 낸 점(250개 남짓)이라 날짜로 가장 가까운 점을 찾는다.
+  let band: { x0: number; x1: number } | null = null;
+  if (focus && n > 1) {
+    let i0 = series.findIndex((p) => p.date >= focus.from);
+    if (i0 < 0) i0 = 0;
+    let i1 = n - 1;
+    if (focus.to) for (let i = n - 1; i >= 0; i--) if (series[i].date <= focus.to) { i1 = i; break; }
+    if (i1 > i0) band = { x0: x(i0), x1: x(i1) };
+  }
   // 기간 최저점 — 곡선에서 가장 깊은 지점에 표시를 남긴다.
   let ti = 0;
   for (let i = 1; i < n; i++) if (series[i].dd < series[ti].dd) ti = i;
@@ -425,6 +444,14 @@ export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodL
       {gridRows.map((dd, i) => (
         <line key={i} x1={PAD_L} y1={y(dd)} x2={W} y2={y(dd)} stroke="var(--c-line)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
       ))}
+      {/* 고른 사례 구간 — 면 뒤에 옅게, 양 끝은 점선. */}
+      {band && (
+        <g className="mdd-uw-band">
+          <rect x={band.x0} y={-VB_PAD} width={band.x1 - band.x0} height={VBH} />
+          <line x1={band.x0} y1={-VB_PAD} x2={band.x0} y2={H + VB_PAD} vectorEffect="non-scaling-stroke" />
+          <line x1={band.x1} y1={-VB_PAD} x2={band.x1} y2={H + VB_PAD} vectorEffect="non-scaling-stroke" />
+        </g>
+      )}
       <path d={area} fill="url(#mdd-uw-fill)" />
       <path d={line} fill="none" stroke={DOWN_BAR[1]} strokeWidth="1" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
       {/* 기간 최저점 표시 — **빈 동그라미만**. 현재 지점에도 속 찬 점을 찍었었는데 뺐다:
@@ -466,7 +493,7 @@ export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodL
         icon="show_chart"
         title="언더워터 차트"
         desc="전고점을 0으로 두고 그 아래로 얼마나 잠겼는지"
-        note={periodLabel}
+        note={focus ? `${periodLabel} · ${fmtYm(focus.from)} ~ ${focus.to ? fmtYm(focus.to) : "진행 중"}` : periodLabel}
       />
       <div style={{ padding: "20px 22px 16px", position: "relative" }}>
       {/* overflow:visible — 최저점 표시가 하필 마지막 지점일 때(지금이 역대 최저인

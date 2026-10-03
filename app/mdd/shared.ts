@@ -1,7 +1,7 @@
 // MDD 정밀분석 화면이 같이 쓰는 타입·상수·서식. 2026-09-17 에 MddExplorer.tsx(2,499줄)에서 그대로 옮겨 왔다.
 // 카드 하나 고치려고 2,500줄을 열던 것을 나눈 것이라 동작은 안 바뀐다(나눈 뒤 렌더된 DOM 을 프로덕션과 대조했다).
 
-import type { MddAnalysis, RiskProfile as RiskProfileData } from "@/lib/mdd";
+import type { DdNow, MddAnalysis, RiskProfile as RiskProfileData } from "@/lib/mdd";
 
 export type StockOption = {
   code: string;
@@ -17,9 +17,11 @@ export type Suggestion = StockOption & { note: string };
 
 export type SuggestGroups = { surging: Suggestion[]; report: Suggestion[] };
 
-type Peer = { name: string; code: string; dd: number; isSelf: boolean };
+/** 업종 칸의 한 종목. market 은 눌러서 그 종목 MDD 로 갈 때 쓴다(국장은 코스피 · 코스닥이 섞인다). */
+type Peer = { name: string; code: string; market: string | null; dd: number; isSelf: boolean };
 
-export type ThemeCmp = { name: string; peers: Peer[]; avgDd: number; sincePeakAvg: number | null };
+/** href 는 그 테마 리포트 주소 — 리포트가 없는 테마면 null(api/mdd 가 붙인다). */
+export type ThemeCmp = { name: string; peers: Peer[]; avgDd: number; sincePeakAvg: number | null; href?: string | null };
 
 // 이름이 아래 Attribution 컴포넌트와 겹쳐 Data 를 붙였다(파일을 나누면서 한 모듈 안 겹침이 import 충돌이 된다).
 export type AttributionData = { sincePeakDays: number; stock: number; market: number | null; theme: number | null };
@@ -49,7 +51,60 @@ export type MddResult = {
   theme: ThemeCmp | null;
   risk: RiskProfileData | null;
   partial: MddPartial | null;
+  /** 같은 기간 기준 지수(코스피 · 코스닥 · S&P500)의 지금 낙폭 — 첫 줄 띠의 시장 칸. 지수를 못 받았으면 null. */
+  bench?: DdNow | null;
 };
+
+/**
+ * 시가총액 상위 KOSPI 보통주를 큰 것부터 손으로 고정한 목록(2026-07 기준).
+ *
+ * 관련도를 데이터로 뽑을 수 없어 손으로 둔다 — stocks 테이블에는 코드·종목명·종가만
+ * 있고 시가총액도 상장주식수도 없다. 종가는 대용이 못 된다(삼성바이오로직스 한 주가
+ * 삼성전자보다 열 배 넘게 비싸다). 검색창에 대표성을 주는 다른 신호가 없다.
+ *
+ * 하는 일은 하나다: "삼성"·"현대"처럼 그룹명이 겹쳐 수십 종목이 걸리는 질의에서 어느
+ * 쪽을 먼저 보여줄지 가른다. 여기 없는 종목도 검색은 그대로 되고 이름 길이·가나다순으로
+ * 뒤에 붙을 뿐이다. 순위가 낡아도 화면에 나오는 수치는 틀리지 않는다 — 후보를 세우는
+ * 데만 쓰고 분석값에는 손대지 않기 때문이다. 그래서 시총이 바뀔 때마다 고칠 필요는 없고,
+ * 새 대표주가 검색으로 안 나온다는 말이 나올 때 맨 앞쪽만 손보면 된다.
+ *
+ * '많이 빠진 대형주'(BIG_DROP_POOL)도 앞쪽 스물을 쓴다 — 서버(page.tsx)와 검색(Controls.tsx)이 같이 읽어 여기 둔다.
+ *
+ * 이름은 stocks 테이블(KRX 정식 종목명)과 정확히 같아야 맞는다 — "엔씨소프트"가 아니라
+ * "NC", "네이버"가 아니라 "NAVER". lib/stock-themes.ts 의 테마 사전과 일부 겹치지만
+ * 일부러 따로 둔다: 그쪽은 테마별 바스켓이라 안에 순서가 없고, 순서를 뜻하게 만들면
+ * 테마 카드를 손볼 때 검색 순위가 조용히 따라 바뀐다.
+ */
+export const MAJOR_NAMES = [
+  "삼성전자", "SK하이닉스", "삼성바이오로직스", "LG에너지솔루션", "현대차", "기아",
+  "두산에너빌리티", "한화에어로스페이스", "HD현대중공업", "셀트리온", "NAVER", "신한지주",
+  "KB금융", "삼성물산", "현대모비스", "한국전력", "카카오", "하나금융지주", "메리츠금융지주",
+  "HD한국조선해양", "삼성생명", "삼성화재", "POSCO홀딩스", "LG화학", "SK스퀘어", "한화오션",
+  "삼성SDI", "크래프톤", "HMM", "하이브", "KT&G", "우리금융지주", "SK이노베이션",
+  "삼성에스디에스", "한국항공우주", "한미반도체", "현대글로비스", "삼성중공업", "LG전자",
+  "SK텔레콤", "KT", "기업은행", "대한항공", "유한양행", "삼양식품", "아모레퍼시픽", "삼성전기",
+  "포스코퓨처엠", "현대건설", "HD현대", "HD현대일렉트릭", "한화시스템", "현대로템", "고려아연",
+  "SK", "LG", "한화", "GS", "CJ", "두산", "삼성증권", "미래에셋증권", "DB손해보험", "현대해상",
+  "LG유플러스", "롯데케미칼", "한진칼", "CJ제일제당", "이마트", "LS",
+];
+
+/**
+ * 미장 대형주 — '많이 빠진 대형주'의 미국판 후보(시가총액 상위를 손으로 고정, 2026-10 기준). 위 MAJOR_NAMES 와 같은 까닭으로
+ * 손으로 둔다(us_stocks 에도 시가총액이 없다). 티커는 us_stocks 표기 그대로다(BRK — 야후에 물을 때만 BRK-B).
+ */
+export const US_MAJOR_TICKERS = [
+  "NVDA", "MSFT", "AAPL", "GOOGL", "AMZN", "META", "AVGO", "TSLA", "BRK", "JPM",
+  "LLY", "WMT", "V", "ORCL", "MA", "NFLX", "XOM", "COST", "JNJ", "PLTR",
+];
+
+/** '많이 빠진 대형주' — 시총 상위 몇 종목 중에서 고르나, 그중 몇 개를 보이나. */
+export const BIG_DROP_POOL = 20;
+export const BIG_DROP_SHOW = 10;
+
+/** 대형주 하나의 기간별 지금 낙폭. 키는 조회 기간(1 · 3 · 5 · 10년) — '전체'는 10년 값을 쓴다(받는 일봉이 10년치다). */
+export type BigDrop = { code: string; name: string; market: string | null; dd: Partial<Record<"1" | "3" | "5" | "10", DdNow>> };
+/** 국장 · 미장 두 벌. 화면은 고른 종목의 시장 쪽을 보인다. 조회가 깨지면 null(자료 없음과 가른다). */
+export type BigDrops = { kr: BigDrop[] | null; us: BigDrop[] | null };
 
 export const PERIODS: { key: string; label: string }[] = [
   { key: "1", label: "1년" },
@@ -150,6 +205,12 @@ export const fmtYm = (date: string) => date.slice(0, 7);
  * **"2021년 1월"**(2026-09-23). 예전엔 "2026-06-18" 이라 사이트의 다른 날짜("9월 22일 종가")와
  * 표기가 갈렸다. 여러 해 전의 전고점은 날까지 적어도 읽는 데 보탬이 없고 칸만 넓힌다.
  */
+/** "2026-10-02" → "10월 2일(금)". 첫 줄 띠의 '종가 기준' 날짜. */
+export const fmtCloseDay = (iso: string) => {
+  const d = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
+  return `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일(${"일월화수목금토"[d.getUTCDay()]})`;
+};
+
 export const fmtDay = (iso: string, refIso: string) => {
   const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
   return y === Number(refIso.slice(0, 4)) ? `${m}월 ${d}일` : `${y}년 ${m}월`;

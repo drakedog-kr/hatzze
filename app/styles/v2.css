@@ -873,7 +873,6 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 
 
 /* ── v2 MDD 1단계(2026-10-03 판정표) — 새 모듈 ── */
-.v2-md-asof { font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
 /* 짝 줄 — 표가 넓은 쪽을 차지한다(사례 표 2 : 회복 1 · 시장 탓 1 : 업종 2). 짧은 쪽은 안쪽 줄이 늘어 키를 맞춘다. */
 .v2-md-row { display: grid; gap: 12px; align-items: stretch; }
 .v2-md-row.is-21 { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
@@ -922,8 +921,16 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 
 /* 해마다 — 해 하나가 한 칸(연도 · 수익 · 낙폭). 칸이 모자라면 줄을 바꾼다('전체' 조회는 스무 해가 넘는다). 첫 칸은 줄 이름. */
 /* auto-fit — 빈 칸 트랙을 접어 해 칸이 판 폭을 나눠 갖는다(auto-fill 이면 10년 조회에 오른쪽 3분의 1이 비었다). */
-.v2-md-yrs { display: grid; grid-template-columns: repeat(auto-fit, minmax(68px, 1fr)); border-top: 1px solid var(--t-line); }
-.v2-md-yr { display: grid; grid-template-rows: repeat(3, 24px); align-items: center; padding: 6px 10px; box-shadow: inset -1px 0 0 var(--t-line), inset 0 -1px 0 var(--t-line); font-variant-numeric: tabular-nums; }
+.v2-md-yrs { flex: 1; display: grid; grid-template-columns: repeat(var(--yr-cols), minmax(0, 1fr)); grid-auto-rows: minmax(120px, 1fr); border-top: 1px solid var(--t-line); }
+.v2-md-yr { display: flex; flex-direction: column; min-width: 0; padding: 6px 6px; box-shadow: inset -1px 0 0 var(--t-line), inset 0 -1px 0 var(--t-line); font-variant-numeric: tabular-nums; }
+.v2-md-yr > span:not(.v2-md-yr-bar) { flex: none; line-height: 22px; white-space: nowrap; }
+/* 수익 막대 — 가운데 0 선에서 위(오름) · 아래(빠짐). 남는 키를 이 칸이 받는다. */
+.v2-md-yr-bar { position: relative; flex: 1 1 32px; min-height: 32px; margin: 2px 0; }
+.v2-md-yr-bar::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid var(--t-line); }
+.v2-md-yr.is-head .v2-md-yr-bar::before { display: none; }
+.v2-md-yr-bar > i { position: absolute; left: 50%; width: 10px; height: var(--h); transform: translateX(-50%); }
+.v2-md-yr-bar > i.is-up { bottom: 50%; border-radius: 2px 2px 0 0; background: var(--t-up); }
+.v2-md-yr-bar > i.is-down { top: 50%; border-radius: 0 0 2px 2px; background: var(--t-down); }
 .v2-md-yr > :first-child { font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-md-yr .is-num { font-weight: 600; }
 .v2-md-yr .is-num.is-up { color: var(--t-up); }
@@ -933,9 +940,40 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-md-yr.is-head > * { font-size: 12px; font-weight: 600; color: var(--t-ink3); }
 .v2-md-years .v2-md-body { gap: 12px; }
 
-/* 업종 안에서 — 두 단으로(넓은 칸 2 의 폭을 쓴다). 위에서 아래로 채우고 다음 단으로. */
-.v2-md .mdd-theme-rows { display: block !important; columns: 2; column-gap: 28px; padding: 12px 14px 14px !important; }
-.v2-md .mdd-theme-rows > * { break-inside: avoid; margin-bottom: 9px; }
+/* 첫 줄 띠 — 같은 기간 지수의 고점 대비는 낙폭색. */
+.v2-cover-v b.is-down { color: var(--t-down); }
+
+/* 사례 표 줄 — 누르면 물속 차트에 그 구간을 칠한다(Controls.tsx Results). 고른 줄은 왼쪽 띠 + 옅은 파랑. */
+.v2-md-case[role="button"] { cursor: pointer; transition: background-color 0.15s; }
+.v2-md-case[role="button"]:hover { background: var(--t-tint); }
+.v2-md-case[role="button"]:focus-visible { outline: 2px solid var(--t-down); outline-offset: -2px; }
+.v2-md-case.is-on,
+.v2-md-case.is-on:hover { background: var(--t-down-weak); box-shadow: inset 3px 0 0 var(--t-down); }
+/* 물속 차트의 고른 구간 — 확대 판(포털, v2 범위 밖)에서도 보이게 색에 기본값을 둔다. */
+.mdd-uw-band rect { fill: var(--t-down, #1466e2); fill-opacity: 0.08; }
+.mdd-uw-band line { stroke: var(--t-down, #1466e2); stroke-width: 1; stroke-dasharray: 3 3; stroke-opacity: 0.7; }
+
+/* 한 줄로 늘어선 막대(업종 안에서 · 많이 빠진 대형주, V2Sheets.tsx DdColumns) — 같은 윗선(0%)에서 아래로.
+   머리 높이(이름 두 줄 32 + 값 20 + 틈)와 막대 칸 키(96)를 고정해야 평균 점선이 모든 칸을 같은 높이로 가로지른다. */
+.v2-dd-wrap { --dd-barh: 96px; --dd-head: 77px; position: relative; padding: 12px 14px; }
+.v2-dd { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); column-gap: 4px; margin: 0; padding: 0; list-style: none; }
+.v2-dd > li { display: flex; min-width: 0; }
+.v2-dd-col { flex: 1; display: flex; flex-direction: column; min-width: 0; padding: 6px 4px 0; border: 0; border-radius: 4px; background: none; font: inherit; color: inherit; text-align: center; }
+button.v2-dd-col { cursor: pointer; transition: background-color 0.15s; }
+button.v2-dd-col:hover { background: var(--t-tint); }
+button.v2-dd-col:focus-visible { outline: 2px solid var(--t-down); outline-offset: -2px; }
+/* 이름은 두 줄까지 — 한 칸이 80px 남짓이라 '삼성바이오로직스'(96)가 한 줄에 안 든다. ⛔ 글자를 자르지 않는다. */
+.v2-dd-name { display: flex; align-items: flex-end; justify-content: center; height: 32px; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink2); word-break: keep-all; overflow-wrap: anywhere; }
+.v2-dd-val { font-size: 13px; font-weight: 700; line-height: 20px; color: var(--t-ink); font-variant-numeric: tabular-nums; }
+.v2-dd-bar { position: relative; height: var(--dd-barh); margin-top: 6px; border-top: 1px solid var(--t-line); }
+.v2-dd-bar > i { position: absolute; top: 0; left: 50%; width: min(28px, 60%); height: var(--h); transform: translateX(-50%); border-radius: 0 0 3px 3px; background: color-mix(in srgb, var(--t-down) 38%, transparent); }
+.v2-dd .is-self .v2-dd-name { font-weight: 700; color: var(--t-ink); }
+.v2-dd .is-self .v2-dd-val { color: var(--t-down-deep); }
+.v2-dd .is-self .v2-dd-bar > i { background: var(--t-down); }
+/* 바탕은 옅은 회색 — 옅은 파랑(--t-down-weak)이면 다크에서 파란 값이 4.49 로 떨어졌다. 강조는 막대 · 굵은 이름 · 파란 값이 한다. */
+.v2-dd .is-self .v2-dd-col { background: var(--t-tint); }
+.v2-dd-avg { position: absolute; left: 14px; right: 14px; top: calc(var(--dd-head) + var(--avg) * var(--dd-barh)); border-top: 1px dashed var(--t-ink3); pointer-events: none; }
+.v2-dd-avg > span { position: absolute; right: 0; bottom: 2px; padding: 0 4px; font-size: 12px; font-weight: 600; line-height: 16px; color: var(--t-ink3); background: var(--t-card); }
 
 /* 셋이 한 줄인 건 판 1,000 까지 — 1,280(판 1,004)에서 두 칸 + 맥락 한 줄로 접으면 둘째 줄 키가 406 이었다. */
 @container kd (max-width: 999px) {
@@ -961,7 +999,16 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
   .v2-md-case > :nth-child(4) { grid-area: dn; font-size: 12px; }
   .v2-md-case > :nth-child(5) { grid-area: up; font-size: 12px; }
   .v2-md-case > :nth-child(6) { grid-area: kind; }
-  .v2-md .mdd-theme-rows { columns: 1; }
+  .v2-md-yrs { grid-template-columns: repeat(var(--yr-cols-sm), minmax(0, 1fr)); }
+  /* 한 줄 막대 — 폰은 열 칸이 안 들어가 한 단 가로 막대로 접는다(이름 · 막대 · 값). 평균은 맨 아래 한 줄. */
+  .v2-dd { grid-template-columns: minmax(0, 1fr); }
+  .v2-dd-col { display: grid; grid-template-columns: 104px minmax(0, 1fr) 56px; align-items: center; column-gap: 10px; padding: 6px 4px; text-align: left; }
+  .v2-dd-name { display: block; height: auto; }
+  .v2-dd-bar { order: 2; height: 8px; margin: 0; border: 0; border-radius: 4px; background: var(--t-bar-off); }
+  .v2-dd-bar > i { left: 0; bottom: 0; width: var(--h); height: auto; transform: none; border-radius: 4px; }
+  .v2-dd-val { order: 3; text-align: right; }
+  .v2-dd-avg { position: static; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--t-line); text-align: right; }
+  .v2-dd-avg > span { position: static; padding: 0; }
 }
 @container kd (max-width: 679px) {
   .v2-md-band { grid-template-columns: minmax(0, 1fr); }

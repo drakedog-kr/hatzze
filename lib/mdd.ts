@@ -459,7 +459,6 @@ export type RiskProfile = {
 /** 한 해의 수익률과 그 해 안에서 겪은 최악 낙폭(둘 다 %). */
 export type YearStat = { year: number; ret: number; mdd: number };
 
-/** date(YYYY-MM-DD) 당일 또는 그 이전의 마지막 종가. 없으면 null. */
 /** `from` 종가에서 `to` 종가까지 등락(%). 두 날 중 하나라도 그 전 종가가 없으면 null. 사례 표의 시장 칸이 쓴다. */
 export function moveBetween(bars: Bar[], from: string, to: string): number | null {
   const a = closeOnOrBefore(bars, from);
@@ -467,6 +466,28 @@ export function moveBetween(bars: Bar[], from: string, to: string): number | nul
   return a && b ? (b / a - 1) * 100 : null;
 }
 
+/** 지금 낙폭 한 점 — 마지막 종가가 기간 안 최고 종가보다 얼마나 낮나(%, 0 이하)와 그 고점 날짜. */
+export type DdNow = { dd: number; peakDate: string };
+
+/** bars 전체에서 지금 낙폭. MDD 첫 줄 띠의 시장 칸(같은 기간 지수)이 쓴다. 봉이 없으면 null. */
+export function drawdownNow(bars: Bar[]): DdNow | null {
+  if (bars.length === 0) return null;
+  let peak = bars[0];
+  for (const b of bars) if (b.close >= peak.close) peak = b;
+  return { dd: (bars[bars.length - 1].close / peak.close - 1) * 100, peakDate: peak.date };
+}
+
+/**
+ * 최근 years 년만 잘라 지금 낙폭 — 10년치를 한 번 받아 1 · 3 · 5 · 10년을 다 낸다('많이 빠진 대형주').
+ * 창은 fetchDailyHistory(years) 와 같다(지금에서 years×365일, 그리고 하루 더) — 같은 종목을 눌러 열었을 때 화면의
+ * '지금 낙폭'과 같은 값이 나와야 한다.
+ */
+export function drawdownInWindow(bars: Bar[], years: number, nowMs: number): DdNow | null {
+  const start = new Date(nowMs - years * 365 * 86_400_000 - 86_400_000).toISOString().slice(0, 10);
+  return drawdownNow(bars.filter((b) => b.date >= start));
+}
+
+/** date(YYYY-MM-DD) 당일 또는 그 이전의 마지막 종가. 없으면 null. */
 function closeOnOrBefore(bars: Bar[], date: string): number | null {
   let res: number | null = null;
   for (const b of bars) {

@@ -109,10 +109,24 @@ export async function fetchDailyHistory(
   const now = Math.floor(Date.now() / 1000);
   // 전체(years 아주 큼)여도 야후는 상장 이후만 준다. 여유로 하루 더 뺀다.
   const period1 = years >= 100 ? 0 : Math.max(0, now - Math.ceil(years * SECONDS_PER_YEAR) - 86_400);
-  const url =
-    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}` +
-    `?period1=${period1}&period2=${now}&interval=1d`;
+  return fetchBars(
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}` + `?period1=${period1}&period2=${now}&interval=1d`,
+  );
+}
 
+/**
+ * 최근 10년 일봉 — **주소가 고정**이라 데이터 캐시(30분)에 실제로 걸린다.
+ *
+ * fetchDailyHistory 는 period2 에 지금 시각(초)을 넣어 주소가 부를 때마다 달라진다 — 캐시 키가 주소라 같은 종목을
+ * 1초 뒤에 불러도 야후를 다시 친다. 화면 한 번에 여러 종목을 받는 곳(MDD '많이 빠진 대형주' 스무 종목씩)은
+ * 그러면 방문마다 마흔 번을 친다. `range=10y` 는 일봉을 그대로 준다(2026-10-03 실측 2,449봉 — 월봉으로 접히는 건
+ * `range=max` 뿐이다, 위 머리말 1).
+ */
+export async function fetchDailyHistory10y(symbol: string): Promise<Bar[] | null> {
+  return fetchBars(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=10y&interval=1d`);
+}
+
+async function fetchBars(url: string): Promise<Bar[] | null> {
   try {
     const res = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0" },

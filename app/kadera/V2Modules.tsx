@@ -344,7 +344,8 @@ export function CoverIndexCell({ kospi, kosdaq }: { kospi: IndexClose | null; ko
   );
 }
 
-export type CoverLink = { cap: string; name: string; val: string; tone: Tone; href: string; ga: string };
+/** val · tone 은 이름 옆 작은 값(카더라 칩의 등락 · 배수). 없는 칸도 있다(MDD 종목 화면 · 테마 리포트). */
+export type CoverLink = { cap: string; name: string; val?: string; tone?: Tone; href: string; ga: string };
 
 /** 링크 칸 — 이 화면에 없는 것을 싣고 다른 화면으로 보낸다. 띠의 다른 칸과 같은 꼴 + 끝에 작은 ›(알약 칩은 v2 결과 안 맞아 걷었다). */
 export function CoverLinkCell({ c }: { c: CoverLink }) {
@@ -353,7 +354,7 @@ export function CoverLinkCell({ c }: { c: CoverLink }) {
       <span className="v2-cover-k">{c.cap}</span>
       <span className="v2-cover-v">
         <b>{c.name}</b>
-        <span className={`v2-cover-chg is-${c.tone}`}>{c.val}</span>
+        {c.val && <span className={`v2-cover-chg is-${c.tone ?? "flat"}`}>{c.val}</span>}
       </span>
       <Icon name="chevron_right" />
     </Link>

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { DEFAULT, DEFAULT_YEARS, mddQuery, normalizeYears } from "./shared";
-import type { StockOption, SuggestGroups, MddResult } from "./shared";
+import type { BigDrops, StockOption, SuggestGroups, MddResult } from "./shared";
 
 // page.tsx 가 여기서 가져가던 타입. 파일을 나누면서 shared 로 갔지만 바깥 import 는 그대로 둔다.
 export type { StockOption, SuggestGroups, Suggestion } from "./shared";
@@ -14,12 +14,15 @@ export function MddExplorer({
   initial,
   initialYears = DEFAULT_YEARS,
   suggestions,
+  bigDrops,
 }: {
   stocks: StockOption[];
   initial?: StockOption | null;
   /** 주소의 ?years= (page.tsx 가 normalizeYears 로 거른 값). */
   initialYears?: string;
   suggestions?: SuggestGroups;
+  /** '많이 빠진 대형주'(page.tsx loadBigDrops). */
+  bigDrops?: BigDrops;
 }) {
   // initial 은 URL(?code=…)로 지정된 종목. 없으면 기본 종목(삼성전자)으로 연다.
   const [selected, setSelected] = useState<StockOption>(initial ?? DEFAULT);
@@ -109,6 +112,21 @@ export function MddExplorer({
           없어 티가 안 나고 넓은 화면에서만 드러난다. */
   /* 세로 간격은 시트끼리의 간격(Results 의 gap 16)과 같은 값 하나로 둔다. 예전엔 여기만
      20 이라 조회 바 밑의 틈이 시트 사이보다 넓어, 조회 바가 결과에서 떨어져 보였다. */
+  const pick = (s: StockOption) => {
+    setPeriodOnly(false);
+    setSelected(s);
+    remember(s);
+    pushUrl(s, years);
+  };
+  /* 화면 아래쪽(업종 칸 · 많이 빠진 대형주)에서 종목을 누르면 맨 위로 올린다 — 결과가 자리표시자로 바뀌며 키가 줄어,
+     그 자리에 머물면 바닥(푸터)만 보인다. 본문 스크롤은 셸의 main.hz-scroll 이 맡는다(폰은 창). */
+  const pickFromResults = (s: StockOption) => {
+    pick(s);
+    const main = document.querySelector<HTMLElement>("main.hz-scroll");
+    if (main && main.scrollHeight > main.clientHeight) main.scrollTo({ top: 0, behavior: "smooth" });
+    else window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   return (
     // 뿌리의 hz-tx 가 이번 리디자인을 켠다(globals.css). 세로 간격도 그쪽 값(18)을 쓴다.
     // v2(2026-10-03) — 카더라 · 시장 브리핑의 v2 규칙을 옮겼다. v2-kd 는 v2 토큰 · 폭 단계, v2-md 는 이 화면 전용 덮기(v2.css).
@@ -120,12 +138,7 @@ export function MddExplorer({
       <Controls
         stocks={stocks}
         selected={selected}
-        onSelect={(s) => {
-          setPeriodOnly(false);
-          setSelected(s);
-          remember(s);
-          pushUrl(s, years);
-        }}
+        onSelect={pick}
         years={years}
         onYears={(y) => {
           setPeriodOnly(true);
@@ -137,7 +150,7 @@ export function MddExplorer({
 
       {loading && <Skeleton periodOnly={periodOnly} />}
       {!loading && error && <ErrorCard message={error} />}
-      {!loading && !error && data && <Results data={data} />}
+      {!loading && !error && data && <Results data={data} bigDrops={bigDrops} onPick={pickFromResults} />}
     </div>
   );
 }

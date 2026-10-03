@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { analyzeDrawdown, drawdownSeries, episodes, riskProfile } from "../lib/mdd.ts";
+import { analyzeDrawdown, drawdownInWindow, drawdownNow, drawdownSeries, episodes, riskProfile } from "../lib/mdd.ts";
 
 /** 하루 간격의 종가 열. */
 function bars(closes: number[]) {
@@ -125,3 +125,32 @@ describe("riskProfile 의 해마다 수익", () => {
     assert.equal(Math.round(r.yearly[0].ret), 20);
   });
 });
+
+describe("drawdownNow · drawdownInWindow — '많이 빠진 대형주'와 화면의 '지금 낙폭'이 같아야 한다", () => {
+  it("마지막 종가가 기간 최고 종가보다 얼마나 낮나와 그 고점 날짜", () => {
+    const d = drawdownNow(bars([100, 120, 90, 96]))!;
+    assert.equal(Math.round(d.dd * 10) / 10, -20);
+    assert.equal(d.peakDate, "2024-01-02");
+    assert.equal(drawdownNow([]), null);
+  });
+
+  it("창 밖의 옛 고점은 안 센다 — 10년 전 고점이 1년 창의 낙폭을 키우지 않는다", () => {
+    // 2016 년에 200 을 찍고 2025-10 부터는 100 근처. 1년 창은 2025-10 이후만 본다.
+    const now = Date.parse("2026-10-02T12:00:00Z");
+    const series = weekdayBars("2016-10-03", "2026-10-02", (dt) => (dt < "2017-01-01" ? 200 : dt < "2026-06-01" ? 100 : 90));
+    assert.equal(Math.round(drawdownInWindow(series, 10, now)!.dd), -55);
+    assert.equal(Math.round(drawdownInWindow(series, 1, now)!.dd), -10);
+  });
+
+  it("창은 fetchDailyHistory 와 같다 — 지금에서 years×365일 하고 하루 더", () => {
+    const now = Date.parse("2026-10-02T12:00:00Z");
+    // 2025-10-01 은 365+1 일 전(창 첫날)이라 들어가고, 2025-09-30 은 빠진다.
+    const series = [
+      { date: "2025-09-30", close: 300 },
+      { date: "2025-10-01", close: 200 },
+      { date: "2026-10-02", close: 100 },
+    ];
+    assert.equal(drawdownInWindow(series, 1, now)!.peakDate, "2025-10-01");
+  });
+});
+

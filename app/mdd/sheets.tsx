@@ -1,12 +1,12 @@
 "use client";
 
-// 원인 분해 · 테마 시트와 회복 범위 선. MddExplorer.tsx 에서 옮겨 왔다(shared.ts 머리말 참고).
-// v2(2026-10-03): 회복 · 성격 · Top 5 시트는 V2Sheets.tsx 의 사례 표 · 회복 칸으로 합쳐 여기서 걷었다.
+// 원인 분해 시트와 회복 범위 선. MddExplorer.tsx 에서 옮겨 왔다(shared.ts 머리말 참고).
+// v2(2026-10-03): 회복 · 성격 · Top 5 시트는 V2Sheets.tsx 의 사례 표 · 회복 칸으로, 테마 시트는 한 줄 막대(ThemeModule)로 옮겨 여기서 걷었다.
 
 import { C, MONO } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
 import { fmtPct, benchName, fmtDur, DOWN, UP, DOWN_BAR, UP_BAR, UP_BAR_SOFT } from "./shared";
-import type { ThemeCmp, AttributionData } from "./shared";
+import type { AttributionData } from "./shared";
 import { Sheet, MeterRow } from "./sheet";
 
 /* ── 원인 분해 ─────────────────────────────────────────────────── */
@@ -146,46 +146,5 @@ export function RecoveryRange({ min, median, max }: { min: number; median: numbe
         <span style={{ position: "absolute", right: 0, top: 0, fontFamily: MONO, fontSize: "var(--fs-11)", fontWeight: 700, color: C.muted }}>{fmtDur(max)}</span>
       </div>
     </div>
-  );
-}
-
-/* ── 테마 비교 ─────────────────────────────────────────────────── */
-export function Theme({ theme }: { theme: ThemeCmp }) {
-  const worst = Math.max(...theme.peers.map((p) => Math.abs(p.dd)), 1);
-  const self = theme.peers.find((p) => p.isSelf)!;
-  // 깊게 빠진 순 등수 — dd 가 더 음수(깊음)인 종목 수 +1. 1위 = 가장 깊게 빠짐.
-  const rank = theme.peers.filter((p) => p.dd < self.dd).length + 1;
-  const lead =
-    rank === 1
-      ? "테마에서 가장 깊게 빠졌습니다."
-      : rank === theme.peers.length
-        ? "테마에서 가장 덜 빠졌습니다."
-        : `테마 ${theme.peers.length}종목 중 낙폭 ${rank}위입니다.`;
-  return (
-    <Sheet>
-      <SectionHead level={3}
-        icon="hub"
-        title={`${theme.name} 대표 ${theme.peers.length}종목 안에서`}
-        desc={`${self.name}, ${lead}`}
-        /* v2 는 부제(desc)를 숨긴다 — 순위는 근거 글자로 올린다('8위 · 평균 −26.2%'). */
-        note={`${rank}위 · 평균 ${fmtPct(theme.avgDd)}`}
-      />
-      <div className="mdd-theme-rows" style={{ padding: "18px 22px 20px", display: "flex", flexDirection: "column", gap: 9 }}>
-        {theme.peers.map((p) => (
-          // 이 종목만 진한 파랑, 나머지는 옅은 파랑 — 전부 낙폭이라 빨강은 쓰지 않는다.
-          <MeterRow
-            key={p.code || p.name}
-            label={p.name}
-            pct={(Math.abs(p.dd) / worst) * 100}
-            // 부호는 화면의 다른 퍼센트와 같은 글자(−)로 — '-41%'(하이픈)가 한 화면에 섞여 있었다(판정표 12).
-            value={`${Math.round(p.dd) < 0 ? "−" : ""}${Math.abs(Math.round(p.dd))}%`}
-            color={p.isSelf ? DOWN_BAR[0] : DOWN_BAR[4]}
-            ink={DOWN}
-            strong={p.isSelf}
-            valueWidth={46}
-          />
-        ))}
-      </div>
-    </Sheet>
   );
 }

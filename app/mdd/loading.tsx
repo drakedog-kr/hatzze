@@ -48,8 +48,10 @@ export default function Loading() {
         <Block h={41} w={218} r={6} bg={C.track} />
       </div>
 
-      {/* MddExplorer 의 Skeleton 과 같은 골격 — 둘째 줄 모듈 셋 + 전폭 차트 + 사례 표 · 회복 짝(2:1). */}
+      {/* MddExplorer 의 Skeleton 과 같은 골격 — 첫 줄 띠 + 둘째 줄 모듈 셋 + 전폭 차트 + 사례 표 · 회복 짝(2:1). */}
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }} aria-hidden>
+        {/* 첫 줄 띠(키 41) — 결과의 MddCover 자리. */}
+        <div className="v2-cover" style={{ height: 41 }} />
         <div className="v2-md-band">
           {[0, 1, 2].map((i) => (
             <section key={i} className="hz-sheet">
