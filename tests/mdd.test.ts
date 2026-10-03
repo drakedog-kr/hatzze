@@ -197,6 +197,23 @@ describe("priceLadder — MDD '수익 · 손실 비율'", () => {
     assert.equal(Math.round(l.lossAvg!), Math.round(want));
   });
 
+  it("수익 · 손실은 반올림한 칸 경계가 아니라 지금 가격 그대로 가른다(미장 센트)", () => {
+    // 지금 $233.95 — 칸 경계는 $234 로 반올림된다. $234 에 거래된 날은 지금보다 비싸니 손실 쪽이다.
+    const series = weekdayBars("2025-10-06", "2026-10-02", (dt) => (dt < "2026-03-01" ? 160 : dt < "2026-06-01" ? 234 : dt < "2026-10-02" ? 200 : 233.95)).map((b) => ({
+      ...b,
+      volume: 1000,
+    }));
+    const l = priceLadder(series, 8)!;
+    assert.equal(l.anchor, 234);
+    const days = series.filter((b) => b.date > "2025-10-02");
+    const v = (d: { close: number }) => d.close * 1000;
+    const want = (days.filter((d) => d.close > 233.95).reduce((s, d) => s + v(d), 0) / days.reduce((s, d) => s + v(d), 0)) * 100;
+    assert.ok(want > 0);
+    assert.equal(Math.round(l.aboveShare * 10), Math.round(want * 10));
+    assert.equal(l.lossAvg, 234);
+    assert.ok(l.gainAvg! <= 233.95);
+  });
+
   it("지금이 1년 최고가면 선 위 칸이 없다", () => {
     const series = weekdayBars("2025-10-06", "2026-10-02", (dt) => (dt < "2026-06-01" ? 100 : 130)).map((b) => ({ ...b, volume: 1000 }));
     const l = priceLadder(series, 8)!;

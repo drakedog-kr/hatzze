@@ -516,7 +516,11 @@ export type PriceLadder = {
   price: number;
   /** 칸 경계가 지나는 지금 가격 — 종가를 칸 단위로 반올림한 값(국장은 대개 종가 그대로). 화면의 '지금' 선이 여기 선다. */
   anchor: number;
-  /** 창 거래대금 중 anchor 보다 비싼 칸들의 몫(%) — 위 aboveCount 칸의 share 합과 같다. */
+  /**
+   * 창 거래대금 중 종가가 **지금 가격(price)보다 높았던 날**의 몫(%) — 손실 쪽. 칸 경계(anchor)가 아니라 지금 가격 그대로 가른다.
+   * anchor 는 칸 경계용으로 반올림한 값이라(엔비디아 $233.95 → $234) 그걸로 가르면 그 사이 날이 수익 쪽에 섞였다(2026-10-04).
+   * 국장은 대개 anchor = price 라 위 aboveCount 칸의 share 합과 같다.
+   */
   aboveShare: number;
   /** 가격대 칸 너비(원 · 달러) — 칸 경계를 떨어지는 수로 맞춘 값. */
   step: number;
@@ -573,12 +577,15 @@ export function priceLadder(bars: Bar[], rows: number): PriceLadder | null {
   for (const b of win) {
     const v = b.close * b.volume!;
     shares += b.volume!;
+    // 수익 · 손실은 지금 가격 그대로 가른다(aboveShare 주석). 칸은 아래에서 anchor 로.
+    if (b.close > last.close) {
+      above += v;
+      sharesAbove += b.volume!;
+    }
     if (b.close > anchor) {
       const c = up[Math.min(nAbove - 1, Math.max(0, Math.ceil((b.close - anchor) / step) - 1))];
       c.value += v;
       c.days += 1;
-      above += v;
-      sharesAbove += b.volume!;
     } else {
       const c = down[Math.min(nBelow - 1, Math.max(0, Math.floor((anchor - b.close) / step)))];
       c.value += v;
