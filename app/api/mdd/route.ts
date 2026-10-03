@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { LADDER_MIN_ROWS, LADDER_ROWS, analyzeDrawdown, drawdownNow, drawdownOnDates, drawdownSeries, moveBetween, priceLadder, riskProfile, type Bar } from "@/lib/mdd";
+import { LADDER_ROWS, analyzeDrawdown, drawdownNow, drawdownOnDates, drawdownSeries, moveBetween, priceLadder, riskProfile, type Bar } from "@/lib/mdd";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { MDD_PEER_MAX, themesForName, THEMES } from "@/lib/stock-themes";
 import { US_MDD_PEER_MAX, US_THEMES, themesForTicker } from "@/lib/us-stock-themes";
@@ -100,9 +100,8 @@ export async function GET(request: Request) {
 
   // 해마다 수익 · 낙폭과 복리 연평균(화면 '해마다' 모듈) — 종목 종가로 요약.
   const risk = riskProfile(bars);
-  // 최근 1년 가격대별 거래대금('가격대별 거래' 칸). 칸 수는 옆 업종 칸의 줄 수에 맞춘다 — 같은 키에 같은 줄 수라야 두 칸의 줄이 나란하다.
-  // 업종 칸이 없으면 LADDER_ROWS, 대표 종목이 적어도 LADDER_MIN_ROWS 아래로는 안 쪼갠다(가격대가 너무 굵어진다).
-  const ladder = priceLadder(bars, themeFetch.theme ? Math.max(LADDER_MIN_ROWS, themeFetch.theme.peers.length) : LADDER_ROWS);
+  // 최근 1년 가격대별 거래대금('가격대별 거래대금' 칸).
+  const ladder = priceLadder(bars, LADDER_ROWS);
 
   // 원인 분해 — 이 종목의 고점 이후, 같은 기간 시장·테마는 얼마나 움직였나.
   // stock 은 곧 currentDd(고점 이후 수익률과 같다). 시장·테마와 나란히 놓아

@@ -503,9 +503,8 @@ export function drawdownNow(bars: Bar[]): DdNow | null {
  * ⚠️ 하루를 종가 한 점으로 본다 — 장중에 어느 가격에서 거래됐는지는 나누지 못하는 어림이다.
  */
 
-/** 가격대 칸 수 — 옆 업종 칸과 줄 수를 맞춘다(업종 칸이 없거나 대표 종목이 적으면 이 값 · 하한). */
-export const LADDER_ROWS = 10;
-export const LADDER_MIN_ROWS = 8;
+/** 가격대 칸 수. 칸 맨 위에 요약(큰 숫자 · 갈림 막대)이 서서 옆 업종 칸(11줄)과 같은 키에 여덟 줄이 든다(2026-10-03). */
+export const LADDER_ROWS = 8;
 /** 창(달력 일). 1년. */
 const LADDER_DAYS = 365;
 

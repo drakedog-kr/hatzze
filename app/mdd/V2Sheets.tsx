@@ -142,34 +142,57 @@ export function ThemeModule({ theme, onPick }: { theme: ThemeCmp; onPick: (s: St
   );
 }
 
-/* ── 가격대별 거래 ─────────────────────────────────────────────── */
+/* ── 가격대별 거래대금 ─────────────────────────────────────────── */
 /**
  * 최근 1년 거래대금을 가격대로 나눈 것(lib/mdd.ts priceLadder) — '많이 빠진 대형주'(종목과 상관없는 고정 목록) 자리(2026-10-03).
  * 낙폭 화면을 여는 사람은 대개 손실 중인 보유자라 "지금보다 비싸게 산 돈이 얼마나 되나 · 어느 가격대에 몰렸나"를 묻는다.
- * 위 줄일수록 비싼 가격대(호가창처럼). 지금 가격이 든 줄을 강조하고, 그보다 비싼 줄(그 가격에 산 돈은 지금 손실)은 파랑 ·
- * 싼 줄은 회색 막대. 머리의 몫은 칸으로 어림한 게 아니라 날마다 잰 값(지금 종가보다 비싸게 거래된 날의 거래대금 몫)이다.
- * 줄 모양은 옆 업종 칸과 같은 목록(.v2-dd)이고 줄 수도 맞춘다(api/mdd 가 업종 줄 수로 칸을 나눈다).
+ *
+ * 처음엔 가격대 목록만 두고 머리에 '지금보다 비싸게 31%'를 적었는데 "무슨 뜻인지 모르겠다"였다(10-03) — 숫자(가격대 몫)와
+ * 색(파랑 · 회색)의 뜻이 화면 어디에도 없었다. 그래서 맨 위에 답을 먼저 세운다:
+ *  ① 큰 숫자 = 지난 1년 거래대금 중 지금 가격보다 비싸게 산 돈의 몫(날마다 잰 값, 칸 어림 아님)
+ *  ② 갈림 막대 = 그 몫을 길이로, 양 끝 글자가 곧 아래 막대 두 색의 범례(비싸게 산 돈 = 파랑 · 싸게 산 돈 = 회색)
+ *  ③ 가격대 목록 = 위 줄일수록 비싼 가격대(호가창처럼), 지금 가격이 든 줄에 '지금'
  */
 export function LadderModule({ ladder, market }: { ladder: PriceLadder; market: string | null }) {
   const isUs = market === "US";
   const max = Math.max(0.0001, ...ladder.bands.map((b) => b.share));
-  const fmt = (v: number) =>
-    // 칸 너비가 1 이상이면 경계가 정수다(lib/mdd.ts priceLadder). 1 아래(동전주)만 소수 둘째 자리까지.
+  // 칸 너비가 1 이상이면 경계가 정수다(lib/mdd.ts priceLadder). 1 아래(동전주)만 소수 둘째 자리까지.
+  const num = (v: number) =>
     isUs ? `$${v.toLocaleString("en-US", { maximumFractionDigits: ladder.step >= 1 ? 0 : 2 })}` : v.toLocaleString("ko-KR", { maximumFractionDigits: 0 });
-  const unit = isUs ? "" : "원";
+  const won = (v: number) => (isUs ? num(v) : `${num(v)}원`);
+  const priceNow = isUs ? `$${ladder.price.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : `${Math.round(ladder.price).toLocaleString("ko-KR")}원`;
+  const above = Math.round(ladder.aboveShare);
   // 비싼 줄부터라 지금 가격이 든 줄 = lo ≤ 가격 < hi 인 첫 줄. 최고가와 맨 위 경계가 딱 겹치면 못 찾으니 맨 위 줄로.
   let nowIdx = ladder.bands.findIndex((b) => ladder.price >= b.lo && ladder.price < b.hi);
   if (nowIdx < 0 && ladder.bands.length && ladder.price >= ladder.bands[0].lo) nowIdx = 0;
   return (
-    <Module title="가격대별 거래" meta={`최근 1년 거래대금 · 지금보다 비싸게 ${Math.round(ladder.aboveShare)}%`} className="v2-md-ladder">
+    <Module title="가격대별 거래대금" meta="최근 1년" className="v2-md-ladder">
+      <div className="v2-md-ld-sum">
+        <span className="v2-card-val is-big">
+          <b className="is-down">{above}%</b>
+          <span className="v2-md-aside">지금 {priceNow}보다 비싸게 산 돈</span>
+        </span>
+        <div className="v2-md-ld-split" aria-hidden="true">
+          <span className="v2-md-ld-split-bar">
+            <i style={{ width: `${ladder.aboveShare}%` }} />
+          </span>
+          <span className="v2-md-ld-split-lab">
+            <span className="is-above">비싸게 산 돈</span>
+            <span>싸게 산 돈</span>
+          </span>
+        </div>
+      </div>
       <div className="v2-dd-wrap">
         <ol className="v2-dd v2-ladder" aria-label="최근 1년 가격대별 거래대금 몫">
           {ladder.bands.map((b, i) => (
             <li key={b.lo} className={i === nowIdx ? "is-self" : i < nowIdx ? "is-above" : "is-below"}>
-              {/* 줄 이름은 칸의 아래 끝(호가창처럼 위로 갈수록 비싸다). 칸 범위 · 거래일 수는 데이터 툴팁. */}
-              <div className="v2-dd-row hz-tip hz-tip-start" data-tip={`${fmt(b.lo)}~${fmt(b.hi)}${unit} · 거래일 ${b.days}일`}>
+              {/* 줄 이름은 칸의 아래 끝 가격. 칸 범위 · 거래일 수 · 몫은 데이터 툴팁. */}
+              <div
+                className="v2-dd-row hz-tip hz-tip-start"
+                data-tip={`${num(b.lo)}~${won(b.hi)}에서 거래일 ${b.days}일 · 1년 거래대금의 ${b.share.toFixed(1)}%`}
+              >
                 <span className="v2-dd-name">
-                  {fmt(b.lo)}~{i === nowIdx && <span className="v2-badge">지금</span>}
+                  {won(b.lo)}~{i === nowIdx && <span className="v2-badge">지금</span>}
                 </span>
                 <span className="v2-dd-bar">
                   <i style={{ ["--w" as string]: `${Math.max(1.5, (b.share / max) * 100)}%` }} />
