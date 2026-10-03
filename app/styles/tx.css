@@ -682,38 +682,6 @@
 /* 칩이 데려가는 시트가 화면 맨 위에 딱 붙지 않게 조금 띄운다. */
 .hz-tx .hz-sheet[id] { scroll-margin-top: 16px; }
 
-/* ── 국장 미리보기: 히어로의 '밤사이 가장 크게 움직인 곳' → 아래 타일 ──
-   줄 전체가 누르는 자리다. 호버에서 배경을 깔아 그걸 말한다 — 좌우 9px 을 음수 마진으로
-   되돌려 **줄의 바깥 치수는 그대로** 둔다(.hz-dist-row 와 같은 수법). 안 그러면 호버할
-   때마다 줄 간격이 흔들린다. */
-.hz-mover-link {
-  margin: -5px -9px;
-  padding: 5px 9px;
-  border-radius: var(--r-control);
-  color: inherit;
-  text-decoration: none;
-  transition: background 0.13s ease;
-}
-.hz-mover-link:hover,
-.hz-mover-link:focus-visible { background: var(--c-blue-tint); }
-/* 도착한 타일을 잠깐 짚었다가 **서서히 지운다** — 시장 브리핑의 지표 칸과 같은 어법이다
-   (.hz-cards > *:target 주석에 2.5초·ease-out 의 근거가 있다). 계속 남아 있으면 그
-   타일만 특별한 것처럼 읽히고, 표시가 아예 없으면 여섯 장 중 어디로 왔는지 모른다.
-   ⚠️ 타일의 box-shadow 가 아니라 **덧대는 ::after** 로 그린다. 저쪽과 같은 이유다 —
-   타일이 이미 제 그림자를 지고 있어서, 섞으면 사라질 때 그 그림자까지 흐려진다.
-   ⚠️ `.hz-panel-pad` 는 position 이 없을 수 있어 relative 를 함께 건다. */
-.hz-mover-tile { position: relative; }
-.hz-mover-tile:target::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  border: 2px solid var(--c-blue-3);
-  border-radius: inherit;
-  animation: hz-target-fade 2.5s ease-out forwards;
-}
-.hz-tx .hz-mover-tile { scroll-margin-top: 16px; }
-
 
 /* ════ 나머지 화면에도 같은 결 (2026-09-04) ═══════════════════════════════
    미장 카더라·내부자·MDD·서학개미·종목·미리보기는 저마다 화면이 다르지만 **같은 세 가지

@@ -142,10 +142,10 @@ const SCHEDULE_SLACK_HOURS = 2;
  * 맨 앞 스텝이라, 잡이 끝나는 시각(옛 기본값 [9, 20])에 대면 "오전 9시" 로 붙어 두 시간을
  * 앞당겨 거짓말한다(2026-09-04 지적, 실측 34줄이 전부 7시).
  */
-export function formatKstUpdateSnapped(isoString: string, scheduledHours: readonly number[]): string {
+export function formatKstUpdateSnapped(isoString: string, scheduledHours: readonly number[], tail = "기준"): string {
   const p = kstUpdateParts(new Date(isoString));
   const scheduled = scheduledHours.find((h) => Math.abs(p.hour - h) <= SCHEDULE_SLACK_HOURS);
-  return updateLabel(p, scheduled !== undefined ? hourLabel(scheduled) : `${hourLabel(p.hour)}경`);
+  return updateLabel(p, scheduled !== undefined ? hourLabel(scheduled) : `${hourLabel(p.hour)}경`, tail);
 }
 
 /**

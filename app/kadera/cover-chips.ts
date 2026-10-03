@@ -2,6 +2,7 @@ import "server-only";
 
 import { getPreview } from "@/lib/kr-preview";
 import { withScopedLoadFailures } from "@/lib/load-state";
+import { getSurgingStocks } from "@/lib/telegram-data";
 import { getUsSurgingStocks } from "@/lib/us-telegram-data";
 
 import type { CoverLink } from "./V2Modules";
@@ -51,8 +52,8 @@ async function previewChip(): Promise<CoverChip | null> {
   };
 }
 
-/** ② 미장 카더라 급부상 1위 — 배수 표기는 미장 카더라 화면과 같다(10 이상은 정수). */
-async function usSurgingChip(): Promise<CoverChip | null> {
+/** ② 미장 카더라 급부상 1위 — 배수 표기는 미장 카더라 화면과 같다(10 이상은 정수). ga 는 화면마다 다르다(어느 화면의 칸을 눌렀나). */
+async function usSurgingChip(ga = "kadera_chip_us_surging"): Promise<CoverChip | null> {
   const [top] = await getUsSurgingStocks(1, { withQuotes: false });
   if (!top || !Number.isFinite(top.multiple)) return null;
   return {
@@ -61,11 +62,37 @@ async function usSurgingChip(): Promise<CoverChip | null> {
     val: `${top.multiple >= 10 ? Math.round(top.multiple) : top.multiple.toFixed(1)}배`,
     tone: "up",
     href: "/kadera/us#surging",
-    ga: "kadera_chip_us_surging",
+    ga,
   };
 }
 
+/** 국장 카더라 급부상 1위 — 국장 미리보기 첫 줄이 쓴다. 평소 언급이 없던 종목은 배수가 무한대라 '첫 언급'(카더라 v2 표기). */
+async function krSurgingChip(ga: string): Promise<CoverChip | null> {
+  const [top] = await getSurgingStocks(1, { withQuotes: false });
+  if (!top) return null;
+  return {
+    cap: "국장 급부상",
+    name: top.name,
+    val: top.isNew || !Number.isFinite(top.ratio) ? "첫 언급" : `${top.ratio >= 10 ? Math.round(top.ratio) : top.ratio.toFixed(1)}배`,
+    tone: "up",
+    href: "/kadera#surging",
+    ga,
+  };
+}
+
+/**
+ * 국장 미리보기(v2, 2026-10-03) 첫 줄의 칸 둘 — 개장 전 채널에서 말이 몰리는 종목. 국장 급부상 → 국장 카더라 · 미장 급부상 → 미장 카더라.
+ * ⛔ 위 ① 밤사이 미장 칸은 미리보기 자신을 가리키므로 여기선 안 쓴다.
+ */
+export async function loadPreviewCoverChips(): Promise<CoverChip[]> {
+  const chips = await Promise.all([
+    scoped("국장 급부상", () => krSurgingChip("preview_chip_kr_surging")),
+    scoped("미장 급부상", () => usSurgingChip("preview_chip_us_surging")),
+  ]);
+  return chips.filter((c): c is CoverChip => c !== null);
+}
+
 export async function loadCoverChips(): Promise<CoverChip[]> {
-  const chips = await Promise.all([scoped("국장 미리보기", previewChip), scoped("미장 급부상", usSurgingChip)]);
+  const chips = await Promise.all([scoped("국장 미리보기", previewChip), scoped("미장 급부상", () => usSurgingChip())]);
   return chips.filter((c): c is CoverChip => c !== null);
 }
