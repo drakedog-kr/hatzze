@@ -12,9 +12,8 @@ import { CHARACTER_SPLIT_DAYS } from "@/lib/mdd";
 import type { MddAnalysis, RiskProfile as RiskProfileData } from "@/lib/mdd";
 
 import { CoverLinkCell, CoverMeta, Module, type CoverLink } from "../kadera/V2Modules";
-import { RecoveryRange } from "./sheets";
 import { benchName, fmtCloseDay, fmtDay, fmtDayCount, fmtDur, fmtPct, fmtYm, mddSummary } from "./shared";
-import type { BigDrops, MddResult, StockOption, ThemeCmp } from "./shared";
+import type { AttributionData, BigDrops, MddResult, StockOption, ThemeCmp } from "./shared";
 
 /** 차트 막대 끝 수익 — 정수로("+46%"). 막대 칸이 60px 남짓이라 소수점까지 적으면 이웃과 닿는다. 정확한 값은 툴팁에. */
 const pctShort = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.round(Math.abs(v))}%`;
@@ -293,7 +292,12 @@ export function RecoveryModule({ a }: { a: MddAnalysis }) {
       ] as const)
     : [];
   return (
-    <Module title="회복까지" meta={`이만큼 빠졌던 ${r.similarCount}번 중 ${r.recoveredCount}번 되찾음`} className="v2-md-rec">
+    // 되찾은 사례가 없으면 이번이 처음이다(진행 중인 하락은 마지막 하나뿐) — '1번 중 0번 되찾음'으로 적혔다(카카오 5년 실측).
+    <Module
+      title="회복까지"
+      meta={r.recoveredCount > 0 ? `이만큼 빠졌던 ${r.similarCount}번 중 ${r.recoveredCount}번 되찾음` : "이만큼 빠진 건 이번이 처음"}
+      className="v2-md-rec"
+    >
       <div className="v2-md-body">
         <span className="v2-card-val is-big">
           {r.recoveredCount > 0 ? (
@@ -304,11 +308,11 @@ export function RecoveryModule({ a }: { a: MddAnalysis }) {
           ) : (
             <>
               <b className="is-down">{fmtDayCount(sincePeak)}째</b>
-              <span className="v2-reason">되찾은 전례 없음</span>
+              <span className="v2-reason">고점 이후</span>
             </>
           )}
         </span>
-        {hasRange && <RecoveryRange min={r.minDays!} median={r.medianDays!} max={r.maxDays!} />}
+        {hasRange && <RangeLine min={r.minDays!} median={r.medianDays!} max={r.maxDays!} />}
         {kinds.some(([, , k]) => k) && (
           <div className="v2-md-kinds">
             {kinds.map(([key, label, k]) => (
@@ -318,11 +322,92 @@ export function RecoveryModule({ a }: { a: MddAnalysis }) {
                   {ch!.currentClass === key && <span className="v2-badge">지금</span>}
                 </span>
                 <span className="v2-md-kind-n">{k ? `${k.count}번` : "없음"}</span>
-                <span className="v2-md-kind-v">{k ? fmtDur(k.medianRecovery) : ""}</span>
+                {/* '보통' — 무엇의 기간인지(그 꼴 하락이 되찾기까지 걸린 중앙값). 숫자만이면 '3번 2개월'로 읽혔다(10-03). */}
+                <span className="v2-md-kind-v">{k ? `보통 ${fmtDur(k.medianRecovery)}` : ""}</span>
               </div>
             ))}
           </div>
         )}
+      </div>
+    </Module>
+  );
+}
+
+/**
+ * 최단~최장 위에 중앙값 점 — 회복까지 걸린 기간의 퍼짐. 중앙값 글자는 바로 위 큰 숫자라 다시 적지 않고(10-03 되풀이 걷음),
+ * 양 끝에 '최단 · 최장'을 붙인다(예전엔 숫자만 있어 무엇의 끝인지 몰랐다). 회복이라 빨강 계열.
+ */
+function RangeLine({ min, median, max }: { min: number; median: number; max: number }) {
+  const at = max > min ? ((median - min) / (max - min)) * 100 : 50;
+  return (
+    <div className="v2-md-range">
+      <span className="v2-md-range-track">
+        <i style={{ left: `${at}%` }} />
+      </span>
+      <span className="v2-md-range-lab">
+        <span>최단 {fmtDur(min)}</span>
+        <span>최장 {fmtDur(max)}</span>
+      </span>
+    </div>
+  );
+}
+
+/* ── 시장 탓 · 종목 탓 ───────────────────────────────────────────── */
+/**
+ * 고점 이후 같은 기간 — 기준 지수 · 업종(대표 종목 평균, 이 종목 제외) · 이 종목의 등락을 나란히. 큰 숫자는 기준(업종, 없으면 지수)보다
+ * 더 · 덜 빠진 몫(%p). 옛 sheets.tsx Attribution(옛 시트 + 인라인 34px · 11.5px · 굵기 800)을 v2 모듈 꼴로 다시 썼다(2026-10-03).
+ *
+ * ⚠️ 업종보다 덜 빠진 종목이 절반쯤이다 — 그때 '종목 탓'을 그대로 쓰면 음수가 된다. 낱말을 '덜 빠진 폭'으로 바꾼다.
+ * 단위는 %p — 두 낙폭률의 차이라 % 로 적으면 틀린 말이 된다. 큰 숫자는 온도색을 안 쓴다(경보처럼 읽혔다).
+ * 업종 이름은 '○○ 평균' — 다른 칸('대표 종목')과 같은 대상을 '업종'이라 부르던 것을 맞췄다. 어느 종목인지는 아래 업종 칸이 적는다.
+ */
+export function AttributionModule({
+  attr,
+  stockName,
+  themeName,
+  market,
+  since,
+}: {
+  attr: AttributionData;
+  stockName: string;
+  themeName: string | null;
+  market: string | null;
+  /** 고점 날짜(화면 말투, '6월 18일') — 칸 머리 '○ 고점 이후'. */
+  since: string;
+}) {
+  const bench = benchName(market);
+  const rows: { key: string; label: string; v: number; self?: boolean }[] = [];
+  if (attr.market !== null) rows.push({ key: "market", label: bench, v: attr.market });
+  if (attr.theme !== null) rows.push({ key: "theme", label: `${themeName ?? "업종"} 평균`, v: attr.theme });
+  rows.push({ key: "self", label: stockName, v: attr.stock, self: true });
+  const worst = Math.max(1, ...rows.map((r) => Math.abs(r.v)));
+  const base = attr.theme ?? attr.market;
+  const gap = base !== null && attr.stock !== 0 ? attr.stock - base : null;
+  const excess = gap !== null && gap < 0;
+  const baseLabel = attr.theme !== null ? `${themeName ?? "업종"} 평균` : bench;
+  return (
+    <Module title="시장 탓 · 종목 탓" meta={`${since} 고점 이후`} className="v2-md-attr">
+      <div className="v2-md-body">
+        {gap !== null && (
+          <span className="v2-card-val is-big">
+            <b>{Math.abs(gap).toFixed(1)}%p</b>
+            <span className="v2-reason">{excess ? "종목 탓" : "덜 빠진 폭"}</span>
+            <span className="v2-md-aside">
+              {baseLabel}보다 {excess ? "더" : "덜"} 빠짐
+            </span>
+          </span>
+        )}
+        <ol className="v2-md-attr-rows">
+          {rows.map((r) => (
+            <li key={r.key} className={r.self ? "is-self" : undefined}>
+              <span className="v2-md-attr-name">{r.label}</span>
+              <span className="v2-dd-bar">
+                <i className={r.v >= 0 ? "is-up" : undefined} style={{ ["--w" as string]: `${Math.max(1.5, (Math.abs(r.v) / worst) * 100)}%` }} />
+              </span>
+              <span className={`v2-md-attr-val${r.v > 0 ? " is-up" : ""}`}>{fmtPct(r.v)}</span>
+            </li>
+          ))}
+        </ol>
       </div>
     </Module>
   );

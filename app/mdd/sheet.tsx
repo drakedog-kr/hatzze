@@ -72,8 +72,8 @@ export function AbsentSheet({ icon, title, sub, body }: { icon: IconName; title:
   );
 }
 
-/** 히어로 셀·성격 시트 바닥의 3분할 통계 한 칸 — 라벨 / 값 / 보조. */
-export function StatCell({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
+/** 지금 낙폭 칸 바닥의 3분할 통계 한 칸 — 라벨 / 값. 보조 줄은 걷었다(2026-10-03, 옆 칸 · 띠와 같은 말이었다). */
+export function StatCell({ label, value, tone }: { label: string; value: string; tone?: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
       {/* 한 줄 고정·말줄임은 클래스(.mdd-stat-clip)가 쥔다 — 폰에선 접어야 해서(sheets.css). */}
@@ -81,86 +81,6 @@ export function StatCell({ label, value, sub, tone }: { label: string; value: st
         {label}
       </span>
       <strong className="mdd-stat-value" style={{ fontSize: "var(--fs-15)", fontWeight: 800, color: tone ?? C.ink, letterSpacing: "-.02em" }}>{value}</strong>
-      {sub && <span className="mdd-stat-clip mdd-stat-sub" style={{ fontSize: "var(--fs-11)", color: C.muted }}>{sub}</span>}
-    </div>
-  );
-}
-
-/**
- * 이름 | 트랙 막대 | 값 한 줄. 원인 분해·테마 비교·낙폭 구간 분포가 공유한다.
- *
- * ⚠️ 라벨·값 칸은 고정폭이고 막대만 flex:1 이다. 라벨에 minWidth:0 이 없으면 긴 종목명이
- * 말줄임 대신 칸을 밀어 막대를 좁힌다 — 1440 에서는 안 보이고 좁은 폭에서만 드러난다.
- */
-export function MeterRow({
-  label,
-  pct,
-  value,
-  color,
-  strong,
-  help,
-  ink,
-  labelWidth = 104,
-  valueWidth = 48,
-}: {
-  label: string;
-  pct: number;
-  value: string;
-  color: string;
-  /** 강조 줄의 **글자**색. 없으면 막대색을 쓴다(둘이 같아도 되는 자리를 위해). */
-  ink?: string;
-  strong?: boolean;
-  help?: string;
-  labelWidth?: number;
-  valueWidth?: number;
-}) {
-  return (
-    <div className="hz-hbar-row" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <span style={{ width: labelWidth, flex: "none", display: "flex", alignItems: "center", gap: 3, minWidth: 0 }}>
-        <span
-          style={{
-            fontSize: "var(--fs-11-5)",
-            fontWeight: strong ? 800 : 600,
-            color: strong ? C.ink : C.sub,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-            minWidth: 0,
-          }}
-        >
-          {label}
-        </span>
-        {/* ⚠️ 아래 물음표 색이 hint 였다 — 점선·비활성 아이콘용 토큰이라 라이트 1.49 ·
-            다크 2.3 이다. 툴팁이 있다는 유일한 표시라 SectionHead 와 같은 muted 로 맞춘다. */}
-        {help && (
-          <span className="hz-tip hz-tip-wide" data-tip={help} style={{ flexShrink: 0, display: "inline-flex", cursor: "help", color: C.muted }}>
-            <Icon name="help" style={{ fontSize: "var(--fs-13)" }} />
-          </span>
-        )}
-      </span>
-      {/* shadcn 가로 막대 차트 꼴(2026-09-26) — 막대 12px(리스크 프로필 막대와 같은 굵기), 데이터 끝만 둥글고 기준선 쪽은 각지다.
-          빈칸(회색 트랙)은 깐다 — 막대가 최댓값에 견줘 얼마나 찼는지가 보여야 한다(09-27). 트랙 위에 값을 얹으면
-          회색 바탕에서 글자가 흐려져서, 값은 예전처럼 오른쪽 칸에 모은다.
-          막대엔 툴팁을 달지 않는다 — 값이 이미 오른쪽에 적혀 있고, 예전에도 없었다(한때 달았다가 지적으로 걷음, 09-27). */}
-      <span style={{ flex: 1, minWidth: 0, display: "flex" }}>
-        <span className="hz-hbar-track">
-          <span className="hz-hbar-fill" style={{ width: `${Math.max(2, Math.min(100, pct))}%`, background: color }} />
-        </span>
-      </span>
-      <span
-        className="hz-hbar-value"
-        style={{
-          width: valueWidth,
-          textAlign: "right",
-          fontWeight: strong ? 800 : 700,
-          /* 막대색을 글자에 그대로 쓰면 안 된다. 램프의 --c-blue-1(#1b7fd4)은 흰 위
-             명암비 4.17 이라 11.5px 값이 안 읽힌다 — 채우는 색과 읽는 색은 다른 물건이다
-             (시장 브리핑의 --card-accent-ink 와 같은 규칙). */
-          color: strong ? (ink ?? color) : C.sub,
-        }}
-      >
-        {value}
-      </span>
     </div>
   );
 }

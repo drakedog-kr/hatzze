@@ -5,7 +5,7 @@
 import dynamic from "next/dynamic";
 import { useLayoutEffect, useRef, useState } from "react";
 import type { MddAnalysis } from "@/lib/mdd";
-import { C, Icon, MONO } from "../ui";
+import { C, Icon } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
 import { Module } from "../kadera/V2Modules";
 import { SummaryModule } from "./V2Sheets";
@@ -16,7 +16,9 @@ import {
   fmtDayCount,
   fmtDay,
   fmtYm,
+  fmtDot,
   benchName,
+  marketName,
   periodInfo,
   cautionShort,
   DOWN,
@@ -47,7 +49,7 @@ export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel:
        세 모듈은 키가 같고(stretch) 아래 줄들은 바닥에 붙는다 — 칸 안 빈 곳은 줄 사이로 고르게 간다(v2.css .v2-md-band). */
     <div className="v2-md-band">
       {/* 1 — 종목. 머리 띠의 이름이 곧 이 화면의 주제다. */}
-      <Module title={data.name} meta={[data.code, data.market].filter(Boolean).join(" · ")} className="v2-md-stock">
+      <Module title={data.name} meta={`${data.code} · ${marketName(data.market)}`} className="v2-md-stock">
         <div className="v2-md-body">
           <div className="v2-md-price">
             <StockLogo code={data.code} name={data.name} market={data.market} size={32} />
@@ -85,9 +87,11 @@ export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel:
           {/* 통계 셋 — 칸 바닥에 붙는다. 보조 줄에 기간 이름은 안 붙인다('전체' 조회에서 칸을 넘겼다). */}
           <div className="v2-md-stats">
             {/* '기간 최저점'은 게이지 끝 · 사례 표 첫 줄과 같은 값이라 뺐다(판정표 3) — 그 자리에 저점 대비. */}
-            <StatCell label="이보다 깊었던 날" value={deeperLabel(a)} sub={`${fmtDayCount(a.tradingDays)} 중`} />
-            <StatCell label="고점 이후" value={fmtDayCount(sincePeak)} sub={`${fmtDay(a.athDate, a.asOf)}부터`} />
-            <StatCell label="저점 대비" value={fmtPct(fromLow)} sub={`${fmtDay(a.lowDate, a.asOf)} 저점`} tone={fromLow >= 0 ? UP : DOWN} />
+            {/* 보조 줄('2,448일 중' · '6월 18일부터' · '7월 30일 저점')은 걷었다 — 띠의 거래일 수 · 옆 종목 칸의 전고점 · 저점 날짜와
+                같은 말이었다(2026-10-03). */}
+            <StatCell label="이보다 깊었던 날" value={deeperLabel(a)} />
+            <StatCell label="고점 이후" value={fmtDayCount(sincePeak)} />
+            <StatCell label="저점 대비" value={fmtPct(fromLow)} tone={fromLow >= 0 ? UP : DOWN} />
           </div>
         </div>
       </Module>
@@ -99,14 +103,14 @@ export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel:
   );
 }
 
-/** 히어로 1번 칸의 전고점·저점 두 줄. 윗선은 알파 헤어라인이라 회색 타일 위에서도 보인다. */
+/** 종목 칸의 전고점 · 저점 두 줄 — 이름 · 날짜(12/500) · 값(13/700). 옛 인라인 눈금(11.5px · 굵기 800)을 v2 눈금으로(2026-10-03, v2.css .v2-md-pr). */
 function PriceRow({ label, date, value }: { label: string; date: string; value: string }) {
   return (
-    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, padding: "10px 0", borderTop: "1px solid var(--c-hairline)" }}>
-      <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub, minWidth: 0 }}>
-        {label} <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", color: C.muted }}>{date}</span>
+    <div className="v2-md-pr">
+      <span className="v2-md-pr-k">
+        {label} <span>{date}</span>
       </span>
-      <span style={{ fontFamily: MONO, fontSize: "var(--fs-13)", fontWeight: 800, color: C.ink, flex: "none" }}>{value}</span>
+      <b className="v2-md-pr-v">{value}</b>
     </div>
   );
 }
@@ -260,7 +264,8 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
               whiteSpace: "nowrap",
             }}
           >
-            {periodLabel} 최대 {fmtPct(mdd)}
+            {/* '최근 10년'은 칸 머리 근거 글자와 같은 말이라 뺐다(2026-10-03). */}
+            최대 {fmtPct(mdd)}
           </span>
         )}
         <span
@@ -455,7 +460,7 @@ export function Underwater({
           <div
             key={i}
             className={`hz-tip hz-vline${edge}`}
-            data-tip={`${p.date} · ${fmtPrice(p.close, market)} · 고점 대비 ${fmtPct(p.dd)}${
+            data-tip={`${fmtDot(p.date)} · ${fmtPrice(p.close, market)} · 고점 대비 ${fmtPct(p.dd)}${
               overlay && benchSeries![i] !== null ? ` · ${bench} ${fmtPct(benchSeries![i]!)}` : ""
             }`}
             // 선·호버 점을 실제 점 자리(칸 폭의 i/(n−1))에 세운다(app/home/parts.tsx AreaChart 와 같은 셈).
@@ -565,7 +570,7 @@ export function Underwater({
     <Sheet>
       <SectionHead level={3}
         icon="show_chart"
-        title="언더워터 차트"
+        title="낙폭 추이"
         desc="전고점을 0으로 두고 그 아래로 얼마나 잠겼는지"
         right={
           <div className="mdd-uw-head">
@@ -587,7 +592,8 @@ export function Underwater({
           </div>
         }
       />
-      <div style={{ padding: "20px 22px 16px", position: "relative" }}>
+      {/* 본문 여백은 다른 v2 칸과 같은 12 · 14(옛 시트 20 · 22 였다). */}
+      <div style={{ padding: "12px 14px 14px", position: "relative" }}>
       {/* overflow:visible — 최저점 표시가 하필 마지막 지점일 때(지금이 역대 최저인
           종목) 뷰박스 오른쪽 끝에 놓여 기본값(hidden)이면 반지름만큼 잘린다. 뷰박스를
           넓히는 대신 넘침만 허용한다 — 넓히면 아래 크로스헤어 띠(퍼센트로 잡은 위치)가
@@ -597,7 +603,7 @@ export function Underwater({
       <button
         type="button"
         className="hz-zoom-btn"
-        aria-label="언더워터 차트 확대해서 보기"
+        aria-label="낙폭 추이 차트 확대해서 보기"
         onClick={() => {
           setZoomUsed(true);
           setZoom(true);
@@ -610,7 +616,7 @@ export function Underwater({
       {/* 판은 app/ZoomDialog.tsx(Base UI Dialog)가 그린다 — 여백을 누르거나 Esc 로 닫히고, 초점이 판 안에 갇혔다가
           닫으면 확대 단추로 돌아온다. 무대는 90도 돌려 화면의 긴 변을 쓴다. */}
       {zoomUsed && (
-        <ZoomDialog open={zoom} onOpenChange={setZoom} label="언더워터 차트 확대">
+        <ZoomDialog open={zoom} onOpenChange={setZoom} label="낙폭 추이 차트 확대">
           {chartWith(" mdd-crosshair-zoom")}
         </ZoomDialog>
       )}

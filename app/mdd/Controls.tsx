@@ -6,12 +6,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { gaSearchTerm, gaStockCode, track } from "@/lib/ga";
 import { C, Icon, MONO } from "../ui";
 import { StockLogo } from "../StockLogo";
-import { BIG_DROP_SHOW, MAJOR_NAMES, PERIODS, marketBadge, benchName } from "./shared";
+import { BIG_DROP_SHOW, MAJOR_NAMES, PERIODS, marketBadge, benchName, fmtDay } from "./shared";
 import type { BigDrops, StockOption, Suggestion, SuggestGroups, MddResult } from "./shared";
 import { periodLabelOf, AbsentSheet } from "./sheet";
 import { HeroStrip, Underwater } from "./Hero";
-import { Attribution } from "./sheets";
-import { BigDropsModule, CasesTable, MddCover, RecoveryModule, ThemeModule, YearsModule } from "./V2Sheets";
+import { AttributionModule, BigDropsModule, CasesTable, MddCover, RecoveryModule, ThemeModule, YearsModule } from "./V2Sheets";
 
 const MAJOR_RANK = new Map(MAJOR_NAMES.map((n, i) => [n, i]));
 
@@ -404,17 +403,17 @@ export function Results({ data, bigDrops, onPick }: { data: MddResult; bigDrops?
           <AbsentSheet icon="monitoring" title="해마다" sub="" body="상장한 지 얼마 되지 않아 연도별 성적을 낼 만큼 이력이 쌓이지 않았습니다." />
         )}
         {data.attribution ? (
-          <Attribution
+          <AttributionModule
             attr={data.attribution}
             stockName={data.name}
             themeName={data.theme?.name ?? null}
-            themePeers={data.theme?.peers.filter((p) => !p.isSelf).map((p) => p.name) ?? []}
             market={data.market}
+            since={fmtDay(a.athDate, a.asOf)}
           />
         ) : (
           <AbsentSheet
             icon="call_split"
-            title="시장 탓일까, 종목 탓일까"
+            title="시장 탓 · 종목 탓"
             sub=""
             body={
               a.currentDd > -1

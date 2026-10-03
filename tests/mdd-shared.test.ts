@@ -95,7 +95,7 @@ describe("mddSummary — 낙폭 요약 줄", () => {
     assert.equal(text(rows, "depth"), "최근 10년 동안 지금보다 깊이 빠져 있던 날은 열흘에 3일꼴입니다.");
     assert.equal(text(rows, "recovery"), "이만큼 빠진 하락은 이번이 4번째입니다. 앞선 3번은 고점을 되찾기까지 보통 2.2년 걸렸습니다.");
     assert.equal(text(rows, "market"), "6월 18일 고점 이후 코스피도 −22.7%로 비슷하게 빠졌습니다.");
-    assert.equal(text(rows, "theme"), "같은 기간 반도체 대표 11종목은 평균 −9.2%로 이 종목보다 14.7%p 덜 빠졌습니다.");
+    assert.equal(text(rows, "theme"), "같은 기간 반도체 대표 종목은 평균 −9.2%로 이 종목보다 14.7%p 덜 빠졌습니다.");
   });
 
   it("드문 깊이는 날수로, 지금이 가장 깊으면 그렇게", () => {
@@ -119,7 +119,7 @@ describe("mddSummary — 낙폭 요약 줄", () => {
   it("시장이 올랐으면 '빠졌습니다'라고 하지 않는다 — 미장 조사도", () => {
     const up = mddSummary(base({ market: "US", attribution: { sincePeakDays: 290, stock: -24.4, market: 13.6, theme: -32.7 } }));
     assert.equal(text(up, "market"), "6월 18일 고점 이후 S&P500은 오히려 +13.6% 올랐습니다.");
-    assert.equal(text(up, "theme"), "같은 기간 반도체 대표 11종목은 평균 −32.7%로 이 종목보다 8.3%p 더 빠졌습니다.");
+    assert.equal(text(up, "theme"), "같은 기간 반도체 대표 종목은 평균 −32.7%로 이 종목보다 8.3%p 더 빠졌습니다.");
     const flat = mddSummary(base({ market: "KOSDAQ", attribution: { sincePeakDays: 318, stock: -39.7, market: 1.7, theme: null } }));
     assert.equal(text(flat, "market"), "6월 18일 고점 이후 코스닥은 +1.7%로 거의 그대로였습니다.");
     assert.equal(text(flat, "theme"), null);

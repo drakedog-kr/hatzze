@@ -858,18 +858,33 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 /* 통계 칸 — 라벨 12/500 · 값 13/700(인라인 11/700 대문자 간격 · 15/800 이라 !important). */
 .v2-md .mdd-stat-label { font-size: 12px !important; font-weight: 500 !important; letter-spacing: 0 !important; color: var(--t-ink3) !important; }
 .v2-md .mdd-stat-value { font-size: 13px !important; font-weight: 700 !important; letter-spacing: 0 !important; }
-.v2-md .mdd-stat-sub { font-size: 12px !important; color: var(--t-ink3) !important; }
-/* 둘째 줄의 빈 곳 — 셋 중 가장 긴 칸(지금 낙폭)이 키를 정하고, 나머지는 안쪽 줄이 남는 높이를 나눠 받는다.
-   종목: 전고점 · 저점 두 줄이 늘어난다. 지금 낙폭 · 맥락: 덩어리 사이가 고르게 벌어진다. */
+/* 둘째 줄의 빈 곳 — 셋 중 가장 긴 칸이 키를 정하고, 나머지는 안쪽 줄이 남는 높이를 나눠 받는다.
+   종목: 전고점 · 저점 두 줄이 늘어난다. 지금 낙폭: 덩어리 사이가 고르게 벌어진다. */
 .v2-md-rows { flex: 1; display: flex; flex-direction: column; }
-.v2-md-rows > div { flex: 1 0 auto; align-items: center !important; }
+/* 전고점 · 저점 줄 — 이름 · 날짜(12/500) · 값(13/700). 줄은 남는 높이를 나눠 받고 가는 선으로 가른다. */
+.v2-md-pr { flex: 1 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 36px; border-top: 1px solid var(--t-line); }
+.v2-md-pr-k { min-width: 0; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink2); }
+.v2-md-pr-k > span { margin-left: 4px; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
+.v2-md-pr-v { flex: none; font-size: 13px; font-weight: 700; line-height: 20px; color: var(--t-ink); font-variant-numeric: tabular-nums; }
 .v2-md-dd .v2-md-body { justify-content: space-between; }
 /* 통계 칸을 바닥에 붙이던 margin-top:auto 가 남는 높이를 한곳(게이지 아래)에 다 모았다 — 고르게 나누도록 푼다. */
 .v2-md-dd .v2-md-stats { margin-top: 0; }
-/* 시장 탓일까 — 막대 세 줄이 가는 선으로 나뉜 줄이 되어 옆 시트(이 하락의 성격) 키까지 늘어난다. 인라인 여백 · 간격이라 !important. */
-.v2-md .mdd-attr-body { padding: 12px 14px 4px !important; gap: 12px !important; }
-.v2-md .mdd-attr-rows { gap: 0 !important; justify-content: stretch !important; }
-.v2-md .mdd-attr-rows > .hz-hbar-row { flex: 1 0 auto; min-height: 36px; border-top: 1px solid var(--t-line); }
+/* 회복 범위 — 최단~최장 선 위에 중앙값 점, 양 끝 글자(V2Sheets.tsx RangeLine). */
+.v2-md-range { display: flex; flex-direction: column; gap: 6px; }
+.v2-md-range-track { position: relative; height: 4px; margin: 4px 0; border-radius: 2px; background: color-mix(in srgb, var(--t-up) 28%, transparent); }
+.v2-md-range-track > i { position: absolute; top: 50%; width: 12px; height: 12px; margin-left: -6px; transform: translateY(-50%); border-radius: 50%; background: var(--t-up); box-shadow: 0 0 0 2px var(--t-card); }
+.v2-md-range-lab { display: flex; justify-content: space-between; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
+
+/* 시장 탓 · 종목 탓(V2Sheets.tsx AttributionModule) — 줄마다 이름 · 막대 · 값, 남는 높이를 나눠 받는다(옆 '해마다'와 키가 같다). */
+.v2-md-attr-rows { flex: 1; display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--t-line); }
+.v2-md-attr-rows > li { flex: 1 0 auto; display: grid; grid-template-columns: 96px minmax(0, 1fr) 56px; align-items: center; column-gap: 10px; min-height: 30px; }
+.v2-md-attr-name { min-width: 0; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink2); word-break: keep-all; overflow-wrap: anywhere; }
+.v2-md-attr-val { text-align: right; font-size: 13px; font-weight: 700; line-height: 20px; color: var(--t-ink); font-variant-numeric: tabular-nums; }
+.v2-md-attr-val.is-up { color: var(--t-up); }
+.v2-md-attr-rows > .is-self .v2-md-attr-name { font-weight: 700; color: var(--t-ink); }
+.v2-md-attr-rows > .is-self .v2-md-attr-val { color: var(--t-down-deep); }
+.v2-md-attr-rows > .is-self .v2-dd-bar > i { background: var(--t-down); }
+.v2-md-attr-rows .v2-dd-bar > i.is-up { background: color-mix(in srgb, var(--t-up) 38%, transparent); }
 
 
 /* ── v2 MDD 1단계(2026-10-03 판정표) — 새 모듈 ── */
@@ -883,6 +898,8 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 
 /* 낙폭 요약 — 시장 브리핑 '오늘의 브리핑'과 같은 줄 꼴(.v2-brief3). 굵은 말은 한 단 진하게(옆 숫자 칸과 같은 잉크). */
 .v2-md-sum dd b { color: var(--t-ink); }
+/* 글 시작을 다른 칸 제목 선(14)에 맞춘다 — 브리핑 줄 꼴은 16 이다. */
+.v2-md-sum .v2-brief3-row { padding-left: 14px; padding-right: 14px; }
 
 /* 역대 하락 사례 — 구간 · 깊이 · 시장 · 빠진 기간 · 되찾은 기간 · 유형. 한 줄 40, 가는 선, 머리 줄 옅은 면. 진행 중인 줄은 옅은 면. */
 .v2-md-cases { flex: 1; display: flex; flex-direction: column; }
@@ -913,7 +930,7 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 
 /* 회복까지 — 중앙값 · 범위 선 · 빠진 속도별 두 줄(지금 꼬리표). 두 줄이 남는 높이를 받는다. */
 .v2-md-kinds { flex: 1; display: flex; flex-direction: column; margin-top: 4px; border-top: 1px solid var(--t-line); }
-.v2-md-kind { flex: 1 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) auto 64px; align-items: center; column-gap: 12px; min-height: 36px; border-bottom: 1px solid var(--t-line); font-variant-numeric: tabular-nums; }
+.v2-md-kind { flex: 1 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; column-gap: 12px; min-height: 36px; border-bottom: 1px solid var(--t-line); font-variant-numeric: tabular-nums; }
 .v2-md-kind:last-child { border-bottom: 0; }
 .v2-md-kind-name { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
 .v2-md-kind-n { font-size: 12px; font-weight: 500; color: var(--t-ink3); }
@@ -953,7 +970,8 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 
 /* 물속 차트 머리 — 기간 글자 + '종목만 · ○○와 함께' 탭(키 28). */
 .mdd-uw-head { display: flex; align-items: center; gap: 10px; }
-.v2-kd.v2-md .mdd-uw-seg { height: 28px; padding: 2px; }
+/* 키 24 + 위아래 −2 — 머리 띠 줄 높이(20)를 넘지 않아 다른 칸 머리(42)와 같은 키가 된다(예전 28 이라 49 였다). */
+.v2-kd.v2-md .mdd-uw-seg { height: 24px; margin: -2px 0; padding: 2px; }
 .v2-kd.v2-md .mdd-uw-seg > button { padding: 0 8px; font-size: 12px; }
 /* 물속 차트 표식(HTML) — 사례 번호 · 지금 점. 확대 판(포털, v2 범위 밖)에서도 보이게 색마다 옛 토큰을 기본값으로. */
 .mdd-uw-marks { position: absolute; inset: 0; pointer-events: none; }
@@ -999,7 +1017,7 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-md-row.is-11 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 /* 이름 · 막대 · 값 목록(V2Sheets.tsx DdList) — 막대는 같은 왼쪽 선에서 출발한다. 줄 사이 선은 안 긋는다(막대가 줄을 묶는다).
    줄은 남는 높이를 고르게 받는다. 평균 점선의 가로 자리는 이름 칸 · 값 칸 · 틈 폭으로 막대 칸을 다시 계산한다(아래 변수). */
-.v2-dd-wrap { --dd-pad: 14px; --dd-in: 6px; --dd-name: 104px; --dd-val: 56px; --dd-gap: 10px; position: relative; flex: 1; display: flex; flex-direction: column; padding: 8px var(--dd-pad) 10px; }
+.v2-dd-wrap { --dd-pad: 8px; --dd-in: 6px; --dd-name: 104px; --dd-val: 56px; --dd-gap: 10px; position: relative; flex: 1; display: flex; flex-direction: column; padding: 8px var(--dd-pad) 10px; }
 .v2-dd { flex: 1; display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
 .v2-dd > li { flex: 1 0 auto; display: flex; }
 .v2-dd-row { flex: 1; display: grid; grid-template-columns: var(--dd-name) minmax(0, 1fr) var(--dd-val); align-items: center; column-gap: var(--dd-gap); min-height: 30px; padding: 0 var(--dd-in); border: 0; border-radius: 4px; background: none; font: inherit; color: inherit; text-align: left; }

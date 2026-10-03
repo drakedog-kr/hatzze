@@ -173,6 +173,11 @@ export function marketBadge(market: string | null): string | null {
   return null;
 }
 
+/** 시장 이름 한글 — 종목 칸 머리('005930 · 코스피'). 띠 · 요약이 '코스피'라 영문 'KOSPI'가 한 화면에 섞였다(2026-10-03). */
+export function marketName(market: string | null): string {
+  return market === "US" ? "미국" : market === "KOSDAQ" ? "코스닥" : "코스피";
+}
+
 export const fmtPct = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n).toFixed(1)}%`;
 
 /**
@@ -193,14 +198,20 @@ export const fmtPrice = (n: number, market: string | null | undefined) =>
  */
 export const benchName = (market: string | null | undefined) => (market === "US" ? "S&P500" : market === "KOSDAQ" ? "코스닥" : "코스피");
 
-/** 기간을 사람 단위로 짧게. 카드 안 큰 숫자는 이 형식으로 통일한다(1,733일 → 4.7년). */
-export const fmtDur = (d: number) => (d >= 365 ? `${(d / 365).toFixed(1)}년` : d >= 45 ? `${Math.round(d / 30)}개월` : `${Math.round(d)}일`);
+/**
+ * 기간을 사람 단위로 짧게. 카드 안 큰 숫자는 이 형식으로 통일한다(1,733일 → 4.7년).
+ * 350일부터 해로 적는다 — 365 를 문턱으로 두면 364일이 '12개월', 365일이 '1.0년'으로 같은 길이가 다르게 적혔다(사례 표 실측).
+ */
+export const fmtDur = (d: number) => (d >= 350 ? `${(d / 365).toFixed(1)}년` : d >= 45 ? `${Math.round(d / 30)}개월` : `${Math.round(d)}일`);
 
 export const fmtDayCount = (d: number) => `${Math.round(d).toLocaleString("ko-KR")}일`;
 
-/** 차트 축 라벨용 연·월. "2017-11-24" → "2017-11".
- *  연도를 두 자리로 줄이면("17-11") 연-월인지 월-일인지 분간이 안 된다. */
-export const fmtYm = (date: string) => date.slice(0, 7);
+/** 표 · 차트 머리의 연·월. "2017-11-24" → "2017.11".
+ *  연도를 두 자리로 줄이면("17.11") 연·월인지 월·일인지 분간이 안 된다. 하이픈("2017-11")은 코드 꼴이라 점으로(2026-10-03). */
+export const fmtYm = (date: string) => date.slice(0, 7).replace("-", ".");
+
+/** 하루 날짜 점 표기 — 차트 툴팁. "2024-09-27" → "2024.09.27". */
+export const fmtDot = (date: string) => date.slice(0, 10).replaceAll("-", ".");
 
 /**
  * 하루 날짜를 화면 말투로. 기준일(보통 분석 기준일 asOf)과 **같은 해면 "6월 18일"**, 다른 해면
@@ -364,11 +375,14 @@ export function mddSummary(d: Pick<MddResult, "analysis" | "attribution" | "them
 
   const th = d.theme;
   if (th) {
-    const who = `${th.name} 대표 ${th.peers.length}종목`;
     if (atHigh) {
-      rows.push({ key: "theme", label: "업종", parts: [`${who}은 평균 고점 대비 `, { b: fmtPct(th.avgDd) }, "입니다."] });
+      // avgDd 는 이 종목까지 넣은 평균이라 칸 머리와 같은 개수(대표 N종목)를 적는다.
+      rows.push({ key: "theme", label: "업종", parts: [`${th.name} 대표 ${th.peers.length}종목은 평균 고점 대비 `, { b: fmtPct(th.avgDd) }, "입니다."] });
     } else if (attr && attr.theme !== null) {
+      // ⚠️ 개수를 적지 않는다 — attr.theme 은 이 종목을 뺀(그리고 시세를 받은) 대표 종목 평균이라 칸 머리의 'N종목'과 다르다.
+      //    예전엔 '대표 11종목은 평균'이라 적었는데 실제로는 10종목 평균이었다(2026-10-03).
       const lead = marketShown ? "같은 기간" : `${fmtDay(a.athDate, a.asOf)} 고점 이후`;
+      const who = `${th.name} 대표 종목`;
       rows.push({ key: "theme", label: "업종", parts: versus(`${lead} ${who}은`, `${lead} ${who}도`, "평균 ", attr.theme, attr.stock) });
     }
   }
