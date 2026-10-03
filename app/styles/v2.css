@@ -1651,3 +1651,146 @@ a.v2-pv-kr:hover { background: var(--t-tint); }
   .v2-pv-nums { grid-area: nums; display: flex; flex-wrap: wrap; column-gap: 16px; padding-left: 28px; }
   .v2-pv-nums > [data-k]::before { content: attr(data-k) " "; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 }
+
+/* ── v2 데일리 노트(2026-10-03) — 읽는 글이라 한 줄기 ─────────────────────────────
+   얼개(app/daily/NoteView.tsx 머리말): 첫 줄 띠(이전 글 · 다음 글 · 업데이트) → 글(판 폭, 머리 아래 목차) → 언급된 종목 → 지난 노트.
+   ⛔ [글 | 오른쪽 칸] 두 줄기로 되돌리지 말 것 — 글이 칸보다 늘 길어 칸 아래가 658~2,032px 비었다. sticky 도 답이 아니다(10-02).
+   글자 — 읽는 글이라 본문만 다른 화면보다 크다(15). 제목 20 · 소제목 16 · 표 · 곁글 13 · 작은 글 12. 굵기 700 이 끝. */
+.v2-nt .v2-mod { display: flex; flex-direction: column; }
+/* 글 시작선 — 머리 · 목차 · 본문 · 공유가 같은 선에 선다. 판이 넓으면(1,088 넘게) 글 폭을 1,040 으로 묶고 양옆을 똑같이 띄운다 —
+   판 폭 그대로면 1,440 에서 한 줄이 74자였다(본문 15px · 1,114px). 묶으면 16px 로 65자 안팎. */
+.v2-nt-art { --nt-pad: max(24px, calc((100% - 1040px) / 2)); }
+.v2-nt-head { display: flex; flex-direction: column; gap: 4px; padding: 18px var(--nt-pad) 16px; border-bottom: 1px solid var(--t-line); }
+.v2-nt-head time { font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
+.v2-nt-title { margin: 0; font-size: 20px; font-weight: 700; line-height: 28px; letter-spacing: -0.01em; color: var(--t-ink); word-break: keep-all; overflow-wrap: anywhere; }
+/* 목차 — 판 폭이라 두 단. 번호는 CSS 카운터(본문 h3 에는 번호가 없다). 누르면 #sec-N 으로 뛴다. */
+.v2-nt-toc { padding: 8px var(--nt-pad); background: var(--t-head); border-bottom: 1px solid var(--t-line); }
+.v2-nt-toc ol { list-style: none; margin: 0; padding: 0; counter-reset: toc; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; }
+.v2-nt-toc a {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--t-ink2);
+  text-decoration: none;
+  word-break: keep-all;
+}
+.v2-nt-toc a::before {
+  counter-increment: toc;
+  content: counter(toc, decimal-leading-zero);
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t-ink3);
+  font-variant-numeric: tabular-nums;
+}
+.v2-nt-toc a:hover { color: var(--t-down); }
+/* 본문 — 옛 조판(.hz-note-body, tx.css)의 여백 · 표 · 출처 · 고지 꼴을 쓰고 글자 · 색만 v2 로. 글 시작선은 머리와 같은 24. */
+.v2-nt .hz-note-body { padding: 4px var(--nt-pad) 0; font-size: 16px; font-weight: 500; line-height: 1.85; color: var(--t-ink2); }
+.v2-nt .hz-note-body > p { margin-top: 12px; }
+.v2-nt .hz-note-body > h2 { margin-top: 28px; font-size: 17px; font-weight: 700; color: var(--t-ink); letter-spacing: -0.01em; }
+.v2-nt .hz-note-body > h3 { margin-top: 28px; font-size: 17px; font-weight: 700; color: var(--t-ink); letter-spacing: -0.01em; }
+.v2-nt .hz-note-body b { font-weight: 700; color: var(--t-ink); }
+.v2-nt .hz-note-body a { color: var(--t-down); }
+.v2-nt .hz-note-rule { border-top-color: var(--t-line); }
+.v2-nt .hz-note-table { font-size: 13px; }
+.v2-nt .hz-note-table th,
+.v2-nt .hz-note-table td { border-bottom-color: var(--t-line); }
+.v2-nt .hz-note-table th { font-size: 12px; font-weight: 600; color: var(--t-ink3); background: var(--t-head); }
+.v2-nt .hz-note-table td { font-weight: 500; }
+.v2-nt .hz-note-table td:first-child { color: var(--t-ink); }
+.v2-nt .hz-note-body > p.hz-note-source { font-size: 12px; color: var(--t-ink3); }
+.v2-nt .hz-note-body > p.hz-note-notice { font-size: 12px; font-weight: 500; color: var(--t-ink3); background: var(--t-tint); border-radius: 4px; }
+/* 공유 — 글 끝 오른쪽. v2 꼬리표 꼴(1px 선 · 모서리 4). */
+.v2-nt-foot { display: flex; justify-content: flex-end; padding: 16px var(--nt-pad) 18px; }
+.v2-nt .hz-note-share {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--t-frame);
+  border-radius: 4px;
+  background: var(--t-card);
+  color: var(--t-ink2);
+  font-size: 13px;
+  font-weight: 600;
+}
+.v2-nt .hz-note-share:hover,
+.v2-nt .hz-note-share[data-done="true"] { border-color: var(--t-frame); background: var(--t-tint); color: var(--t-ink); }
+.v2-nt .hz-note-share .ms { font-size: 16px; }
+
+/* 언급된 종목 — 판 폭 여러 단(단 하나 ≥ 240px). 단을 위에서 아래로 채워 마지막 단만 한 줄 짧다. */
+.v2-nt-stocks { list-style: none; margin: 0; padding: 4px 14px 6px; columns: 4 240px; column-gap: 28px; }
+.v2-nt-stocks > li { break-inside: avoid; border-bottom: 1px solid var(--t-line); }
+.v2-nt-stock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 40px;
+  color: var(--t-ink);
+  text-decoration: none;
+}
+a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decoration-color: var(--t-ink4); text-underline-offset: 3px; }
+.v2-nt-stock-name { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; line-height: 18px; }
+.v2-nt-stock-px { flex: none; display: inline-flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v2-nt-stock-px b { font-weight: 700; }
+.v2-nt-stock-px i { font-style: normal; font-size: 12px; font-weight: 600; color: var(--t-ink3); }
+.v2-nt-stock-px i.is-up { color: var(--t-up); }
+.v2-nt-stock-px i.is-down { color: var(--t-down); }
+.v2-nt-stock-px em { font-style: normal; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
+
+/* 지난 노트 — 한 주가 한 줄(월~금 칸). 지금 읽는 글은 옅은 면 + 파란 날짜. 넘김은 머리 띠 오른쪽. */
+.v2-nt-pager { margin-left: auto; display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 500; line-height: 20px; color: var(--t-ink3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v2-nt-pager span { padding: 0 4px; }
+.v2-nt-pager button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--t-ink2);
+  cursor: pointer;
+}
+.v2-nt-pager button .ms { font-size: 18px; }
+.v2-nt-pager button:hover { background: var(--t-tint); color: var(--t-ink); }
+.v2-nt-pager button:disabled { color: var(--t-ink4); background: transparent; cursor: default; }
+.v2-nt-week { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.v2-nt-week > li + li { border-left: 1px solid var(--t-line); }
+.v2-nt-week a { display: flex; flex-direction: column; gap: 2px; height: 100%; padding: 10px 14px 12px; color: var(--t-ink); text-decoration: none; transition: background-color 0.15s; }
+.v2-nt-week a:hover { background: var(--t-tint); }
+.v2-nt-week time { font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
+.v2-nt-week span { font-weight: 600; line-height: 20px; word-break: keep-all; overflow-wrap: anywhere; }
+.v2-nt-week li[aria-current="page"] a { background: var(--t-tint); }
+.v2-nt-week li[aria-current="page"] time { font-weight: 600; color: var(--t-down); }
+
+/* 글이 없을 때 */
+.v2-nt-empty { align-items: center; gap: 8px; padding: 36px 24px; color: var(--t-ink3); text-align: center; }
+.v2-nt-empty p { margin: 0; font-size: 13px; font-weight: 500; line-height: 22px; word-break: keep-all; }
+
+/* 판이 좁으면 한 줄도 짧다 — 본문 15 · 소제목 16 으로 한 단 내린다(1,024 에서 16px 이면 한 줄 45자 남짓). */
+@container kd (max-width: 999px) {
+  .v2-nt .hz-note-body { font-size: 15px; }
+  .v2-nt .hz-note-body > h3 { font-size: 16px; }
+}
+@container kd (max-width: 679px) {
+  .v2-nt-art { --nt-pad: 14px; }
+  .v2-nt-head { padding-top: 16px; padding-bottom: 14px; }
+  .v2-nt-toc { padding-top: 6px; padding-bottom: 6px; }
+  .v2-nt-toc ol { grid-template-columns: minmax(0, 1fr); }
+  .v2-nt .hz-note-body { padding-top: 2px; }
+  .v2-nt .hz-note-body > h3 { margin-top: 24px; }
+  .v2-nt-foot { padding-top: 14px; padding-bottom: 16px; }
+  /* 손가락으로 누르는 폭 — 글자는 그대로, 상자만 키운다. */
+  .v2-nt .hz-note-share { height: 40px; padding: 0 16px; }
+  /* 지난 노트 — 폰은 세로 목록(날짜 칸 고정 · 제목). */
+  .v2-nt-week { grid-auto-flow: row; }
+  .v2-nt-week > li + li { border-left: 0; border-top: 1px solid var(--t-line); }
+  .v2-nt-week a { flex-direction: row; align-items: baseline; gap: 10px; }
+  .v2-nt-week time { flex: none; width: 76px; }
+}

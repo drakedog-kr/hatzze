@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { formatKstUpdate } from "@/lib/format";
 import {
   fmtNoteDate,
   fmtNoteDateShort,
@@ -13,26 +14,30 @@ import {
 import { noteHeadings, parseNoteMarkdown, type NoteBlock, type NoteInline } from "@/lib/daily-note-md";
 import { stockHref } from "@/lib/stock-page";
 
-import { Icon, MONO } from "../ui";
+import { CoverLinkCell, CoverMeta, Module } from "../kadera/V2Modules";
+import { StockLogo } from "../StockLogo";
+import { Icon } from "../ui";
 import { ShareButton } from "./ShareButton";
 import { NoteArchiveList } from "./NoteArchiveList";
 
 /**
- * 데일리 노트 한 편 + 오른쪽 칸. `/daily`(최신)와 `/daily/[date]` 가 같은 것을 그린다.
+ * 데일리 노트 한 편. `/daily`(최신)와 `/daily/[date]` 가 같은 것을 그린다.
  *
  * ## 서버가 그린다
  *
- * 글자가 전부인 화면이라 클라이언트 컴포넌트가 하나도 없다. 크롤러가 첫 HTML 에서 본문을
- * 그대로 읽어야 이 화면이 검색에서 답할 수 있다(종목 실주소 화면과 같은 까닭).
- * 목차의 이동도 `#sec-N` 앵커라 자바스크립트가 없다.
+ * 글자가 전부인 화면이라 클라이언트 컴포넌트는 공유 단추와 지난 노트 넘김뿐이다. 크롤러가 첫 HTML 에서 본문을
+ * 그대로 읽어야 이 화면이 검색에서 답할 수 있다(종목 실주소 화면과 같은 까닭). 목차의 이동도 `#sec-N` 앵커다.
  *
- * ## 두 칸 (2026-09-06 피드백)
+ * ## v2(2026-10-03) — 한 줄기
  *
- * 처음엔 본문 720px 한 칸이었는데 화면의 오른쪽 3분의 1이 비었다. 그 자리에 세 카드를 둔다 —
- * 목차(누르면 그 꼭지로), 언급된 종목(국내는 최근 종가와 함께), 지난 노트. 넓은 화면에서만
- * 두 칸이고 좁으면 본문 아래로 내려간다(globals.css `.hz-note-page`).
+ * 첫 줄 띠(이전 글 · 다음 글 · 업데이트) → 글(판 폭, 머리 아래 목차) → 언급된 종목(판 폭) → 지난 노트(판 폭, 한 주가 한 줄).
+ * 예전엔 [글 | 오른쪽 칸(목차 · 언급된 종목 · 지난 노트)] 두 줄기였는데 글이 칸보다 늘 길어 칸 아래가 비었다 —
+ * 1,440 에서 658px, 1,280 에서 2,032px(칸 321px 에 글 661px 로 눌려 글도 3,147px 로 길어졌다).
+ * ⛔ 오른쪽 칸을 화면에 따라 붙이는 것(sticky)은 답이 아니다(2026-09-06 · 10-02 두 번) — 긴 것은 판 폭 전체로 뺀다.
+ * 글 아래 앞뒤 글 카드는 걷었다 — 첫 줄 띠와 지난 노트가 같은 길을 낸다.
  *
- * ⚠️ h1 은 셸(PageHeader)이 갖는다 — "데일리 노트". 글 제목과 오른쪽 카드 제목은 h2, 꼭지는 h3 다.
+ * ⚠️ h1 은 셸이 갖는다(`/daily` 는 sr-only '데일리 노트', 날짜 주소는 글 제목이 h1 — NoteArticle 주석).
+ *    글 제목 · 모듈 제목은 h2, 꼭지는 h3 다.
  */
 
 function Inline({ inline }: { inline: NoteInline[] }) {
@@ -100,166 +105,97 @@ function Block({ block }: { block: NoteBlock }) {
 }
 
 /**
- * ⭐ 날짜 주소(`/daily/2026-09-05`)에서는 글 제목이 **h1** 이다. 셸은 그 주소의 '데일리 노트'를 모양 그대로 두되 h1 이
- * 아닌 글자로 그린다(AppShell LABEL_TITLED_PREFIXES). 예전엔 날짜마다 h1 이 똑같이 '데일리 노트'라 글마다 고유한 제목
- * 신호가 없었다(2026-09-30 점검). 크기는 .hz-note-title 이 정해 h1 이어도 h2 와 같아 보인다.
+ * 글 한 편 — 머리(날짜 · 제목) · 목차 · 본문 · 공유.
+ *
+ * ⭐ 날짜 주소(`/daily/2026-09-05`)에서는 글 제목이 **h1** 이다. 셸은 그 주소의 '데일리 노트'를 h1 이 아닌 글자로 그린다
+ * (AppShell LABEL_TITLED_PREFIXES). 예전엔 날짜마다 h1 이 똑같이 '데일리 노트'라 글마다 고유한 제목 신호가 없었다(2026-09-30 점검).
  * `/daily`(가장 최근 글)는 셸의 '데일리 노트'가 h1 이고 글 제목은 h2 그대로다 — 그 화면의 canonical 이 날짜 주소다.
+ *
+ * 목차는 꼭지(h3)만 — 그 글의 소제목이 곧 그날의 이야기 목록이다. 판 폭이라 두 단으로 편다.
+ * ⛔ 꼭지 수("6꼭지")를 목차 머리에 적지 않는다(2026-09-06 지시) — 번호가 이미 센다.
  */
 function NoteArticle({ note, blocks, dated }: { note: DailyNote; blocks: NoteBlock[]; dated: boolean }) {
   const Title = dated ? "h1" : "h2";
+  const toc = noteHeadings(blocks).filter((h) => h.level === 3);
   return (
-    <article className="hz-note hz-sheet">
-      <header className="hz-note-head">
-        <time className="hz-note-date" dateTime={note.date}>
-          {fmtNoteDate(note.date)}
-        </time>
-        <Title className="hz-note-title">{note.title}</Title>
+    <article className="v2-mod v2-nt-art">
+      <header className="v2-nt-head">
+        <time dateTime={note.date}>{fmtNoteDate(note.date)}</time>
+        <Title className="v2-nt-title">{note.title}</Title>
       </header>
-      <div className="hz-note-body">
+      {toc.length > 0 && (
+        <nav className="v2-nt-toc" aria-label="글의 꼭지">
+          <ol>
+            {toc.map((h) => (
+              <li key={h.id}>
+                <a href={`#${h.id}`}>{h.text}</a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+      )}
+      <div className="hz-note-body v2-nt-body">
         {blocks.map((b, i) => (
           <Block key={i} block={b} />
         ))}
       </div>
       {/* 공유는 **날짜가 든 주소**로 넘긴다 — `/daily` 를 공유하면 내일 다른 글이 열린다. */}
-      <div className="hz-note-foot">
+      <div className="v2-nt-foot">
         <ShareButton path={noteHref(note.date)} title={note.title} />
       </div>
     </article>
   );
 }
 
-/** 앞뒤 글. 한쪽이 없으면 그 자리는 비운다 — 안 눌리는 글자를 두면 고장으로 보인다. */
-function NoteNav({ neighbors }: { neighbors: NoteNeighbors }) {
-  const { prev, next } = neighbors;
-  if (!prev && !next) return null;
-  return (
-    <nav className="hz-note-nav" aria-label="앞뒤 글">
-      {prev ? (
-        <Link href={noteHref(prev.date)} className="hz-note-nav-prev">
-          <Icon name="arrow_back" style={{ fontSize: "var(--fs-16)" }} />
-          <span>
-            <small>{fmtNoteDateShort(prev.date)}</small>
-            {prev.title}
-          </span>
-        </Link>
-      ) : (
-        <span />
-      )}
-      {next ? (
-        <Link href={noteHref(next.date)} className="hz-note-nav-next">
-          <span>
-            <small>{fmtNoteDateShort(next.date)}</small>
-            {next.title}
-          </span>
-          <Icon name="arrow_forward" style={{ fontSize: "var(--fs-16)" }} />
-        </Link>
-      ) : (
-        <span />
-      )}
-    </nav>
-  );
-}
-
-/** 오른쪽 칸의 카드 한 장. 제목은 h2 — 글 제목과 같은 층이다(둘 다 화면 h1 의 자식). */
-function RailCard({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
-  return (
-    <section className="hz-sheet hz-note-rail-card">
-      <header className="hz-note-rail-head">
-        <h2>{title}</h2>
-        {note && <span>{note}</span>}
-      </header>
-      {children}
-    </section>
-  );
-}
-
-/** 목차. 꼭지(h3)만 — 그 글의 소제목이 곧 그날의 이야기 목록이다. 누르면 앵커로 뛴다. */
-function NoteToc({ blocks }: { blocks: NoteBlock[] }) {
-  const items = noteHeadings(blocks).filter((h) => h.level === 3);
-  if (!items.length) return null;
-  // ⛔ 꼭지 수("6꼭지")를 머리에 적지 않는다(2026-09-06 지시). 아래 번호가 이미 세고 있어
-  //    같은 말이 두 번 나온다.
-  return (
-    <RailCard title="목차">
-      <nav aria-label="글의 꼭지">
-        <ol className="hz-note-toc">
-          {items.map((h) => (
-            <li key={h.id}>
-              <a href={`#${h.id}`}>{h.text}</a>
-            </li>
-          ))}
-        </ol>
-      </nav>
-    </RailCard>
-  );
-}
-
 /**
- * 언급된 종목. 국내는 이름·최근 종가·등락률, 미국은 이름만(종가 원천이 없다).
+ * 언급된 종목 — 판 폭에 여러 단(국내는 이름 · 종가 · 등락, 미국은 이름 · 티커). 종목이 많은 날(20곳 넘게)도 키가 낮다.
  *
- * ⚠️ 종가는 오늘 글이면 야후 실시간(카더라 카드와 같은 소스), 지난 글이면 `stocks` 표의
- *    **최근** KRX 값이다 — 지난 글을 열어도 오늘 시세가 보인다. 기준일이 다른 줄은 그 줄에
- *    따로 적는다(lib/daily-note getNoteStocks 머리말).
+ * ⚠️ 종가는 오늘 글이면 야후 실시간(카더라 카드와 같은 소스), 지난 글이면 `stocks` 표의 **최근** KRX 값이다 —
+ *    지난 글을 열어도 오늘 시세가 보인다. 기준일이 다른 줄은 그 줄에 따로 적는다(lib/daily-note getNoteStocks 머리말).
+ * ⭐ 등락은 +/− 부호(v2 공통) — ▲▼ 는 걷었다.
  */
-function NoteStocksCard({ stocks }: { stocks: NoteStocks }) {
+function NoteStocksModule({ stocks }: { stocks: NoteStocks }) {
   if (!stocks.kr.length && !stocks.us.length) return null;
   const dates = stocks.kr.map((s) => s.priceDate).filter((d): d is string => Boolean(d));
   const latest = dates.length ? dates.reduce((a, b) => (a > b ? a : b)) : null;
   return (
-    <RailCard title="언급된 종목" note={`국내 ${stocks.kr.length} · 미국 ${stocks.us.length}`}>
-      {stocks.kr.length > 0 && (
-        <ul className="hz-note-stocks">
-          {stocks.kr.map((s) => {
-            const chg = s.changeRate;
-            return (
-              <li key={s.code}>
-                <Link href={stockHref(s.code)}>
-                  <span className="hz-note-stock-name">{s.name}</span>
-                  <span className="hz-note-stock-px" style={{ fontFamily: MONO }}>
-                    {s.price != null ? <b>{s.price.toLocaleString("ko-KR")}</b> : <small>시세 없음</small>}
-                    {chg != null && (
-                      <i style={{ color: chg > 0 ? "var(--c-hot-ink)" : chg < 0 ? "var(--c-cold-ink)" : "var(--c-sub2)" }}>
-                        {chg > 0 ? "▲" : chg < 0 ? "▼" : ""}
-                        {Math.abs(chg).toFixed(2)}%
-                      </i>
-                    )}
-                    {s.priceDate && latest && s.priceDate !== latest && <small>{fmtNoteDay(s.priceDate)}</small>}
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      {stocks.us.length > 0 && (
-        <div className="hz-note-us">
-          <span className="hz-note-us-lbl">미국</span>
-          {stocks.us.map((u) => (
-            <span key={u.ticker} className="hz-note-chip">
-              {u.name}
-              <small>{u.ticker}</small>
+    <Module id="stocks" title="언급된 종목" meta={`국내 ${stocks.kr.length} · 미국 ${stocks.us.length}`}>
+      <ul className="v2-nt-stocks">
+        {stocks.kr.map((s) => {
+          const chg = s.changeRate;
+          return (
+            <li key={s.code}>
+              <Link href={stockHref(s.code)} className="v2-nt-stock" data-ga="note_stock_click">
+                <StockLogo code={s.code} name={s.name} market={s.market} size={20} />
+                <span className="v2-nt-stock-name">{s.name}</span>
+                <span className="v2-nt-stock-px">
+                  {s.price != null ? <b>{s.price.toLocaleString("ko-KR")}</b> : <em>시세 없음</em>}
+                  {chg != null && (
+                    <i className={chg > 0 ? "is-up" : chg < 0 ? "is-down" : undefined}>
+                      {chg > 0 ? "+" : chg < 0 ? "-" : ""}
+                      {Math.abs(chg).toFixed(2)}%
+                    </i>
+                  )}
+                  {s.priceDate && latest && s.priceDate !== latest && <em>{fmtNoteDay(s.priceDate)}</em>}
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+        {/* 미국 종목은 종가 원천이 없어 이름 · 티커만. 같은 줄 꼴로 이어 세운다(예전 칩 꼴은 v2 결과 안 맞는다). */}
+        {stocks.us.map((u) => (
+          <li key={u.ticker}>
+            <span className="v2-nt-stock is-us">
+              <StockLogo code={u.ticker} name={u.name} market="US" size={20} />
+              <span className="v2-nt-stock-name">{u.name}</span>
+              <span className="v2-nt-stock-px">
+                <em>{u.ticker}</em>
+              </span>
             </span>
-          ))}
-        </div>
-      )}
-    </RailCard>
-  );
-}
-
-/**
- * 지난 노트 목록. 달력 주(월~일) 단위로 보이고 아래 지난주·다음주로 넘긴다(NoteArchiveList).
- * 지금 보고 있는 글은 `aria-current` 로 표시하고 링크는 그대로 둔다.
- * 머리에 곁글(연도·편수)을 안 단다 — 어느 주인지는 넘김 줄이 말하고, 연도는 넘기다 보면
- * 해가 바뀌는 주가 생겨 하나로는 틀린다.
- */
-function NoteArchive({ notes, current }: { notes: NoteStub[]; current: string | null }) {
-  if (!notes.length) return null;
-  // 표기·주소는 서버가 끝낸다. 클라이언트 컴포넌트가 lib/daily-note.ts 를 못 물기 때문이다.
-  const items = notes.map((n) => ({ date: n.date, title: n.title, href: noteHref(n.date), label: fmtNoteDateShort(n.date) }));
-  return (
-    <RailCard title="지난 노트">
-      <NoteArchiveList items={items} current={current} />
-    </RailCard>
+          </li>
+        ))}
+      </ul>
+    </Module>
   );
 }
 
@@ -269,10 +205,10 @@ function NoteArchive({ notes, current }: { notes: NoteStub[]; current: string | 
  */
 function NoteEmpty({ failed }: { failed: boolean }) {
   return (
-    <div className="hz-note hz-sheet hz-note-empty">
-      <Icon name={failed ? "cloud_off" : "edit_note"} style={{ fontSize: "var(--fs-28)" }} />
+    <section className="v2-mod v2-nt-empty">
+      <Icon name={failed ? "cloud_off" : "edit_note"} style={{ fontSize: 24 }} />
       <p>{failed ? "글을 불러오지 못했습니다. 잠시 뒤 다시 열어 주십시오." : "아직 올라온 글이 없습니다. 매일 저녁 한 편씩 올라옵니다."}</p>
-    </div>
+    </section>
   );
 }
 
@@ -293,23 +229,24 @@ export function NoteView({
   dated?: boolean;
 }) {
   const blocks = note ? parseNoteMarkdown(note.bodyMd) : [];
+  const sections = noteHeadings(blocks).filter((h) => h.level === 3).length;
+  // 표기 · 주소는 서버가 끝낸다. 지난 노트 넘김은 클라이언트 컴포넌트라 lib/daily-note.ts 를 못 문다.
+  const items = archive.map((n) => ({ date: n.date, title: n.title, href: noteHref(n.date), label: fmtNoteDateShort(n.date) }));
+  const { prev, next } = neighbors;
   return (
-    <div className="hz-tx hz-note-page">
-      <div className="hz-note-main">
-        {note ? (
-          <>
-            <NoteArticle note={note} blocks={blocks} dated={dated} />
-            <NoteNav neighbors={neighbors} />
-          </>
-        ) : (
-          <NoteEmpty failed={failed} />
-        )}
+    <div className="hz-tx v2-kd v2-nt">
+      {/* 첫 줄 — 앞뒤 글(한쪽이 없으면 그 칸을 안 세운다 · 안 눌리는 칸은 고장으로 보인다) · 업데이트 */}
+      <div className="v2-cover">
+        {prev && <CoverLinkCell c={{ cap: "이전 글", name: fmtNoteDateShort(prev.date), href: noteHref(prev.date), ga: "note_prev_click" }} />}
+        {next && <CoverLinkCell c={{ cap: "다음 글", name: fmtNoteDateShort(next.date), href: noteHref(next.date), ga: "note_next_click" }} />}
+        <CoverMeta
+          updated={note ? formatKstUpdate(note.updatedAt, "업데이트") : "글 준비 중"}
+          basis={note ? [sections ? `꼭지 ${sections}` : null, stocks.kr.length + stocks.us.length ? `종목 ${stocks.kr.length + stocks.us.length}` : null].filter(Boolean).join(" · ") || null : null}
+        />
       </div>
-      <aside className="hz-note-rail" aria-label="글의 곁">
-        {note && <NoteToc blocks={blocks} />}
-        {note && <NoteStocksCard stocks={stocks} />}
-        <NoteArchive notes={archive} current={note?.date ?? null} />
-      </aside>
+      {note ? <NoteArticle note={note} blocks={blocks} dated={dated} /> : <NoteEmpty failed={failed} />}
+      {note && <NoteStocksModule stocks={stocks} />}
+      {items.length > 0 && <NoteArchiveList items={items} current={note?.date ?? null} />}
     </div>
   );
 }
