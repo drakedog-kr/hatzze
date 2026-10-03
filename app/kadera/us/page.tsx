@@ -23,7 +23,7 @@ import { formatKstUpdate } from "@/lib/format";
 import { pageMetadata } from "../../seo";
 import { US_KADERA_CARD } from "../../og-copy";
 import { ThemeVsUsualRows, highlightTerms, termsFor } from "../parts";
-import { CoverLinkCell, CoverMeta, CoverUsIndexCell, EventsModule, KeywordTable, Module, SentimentModule, ThemeCards } from "../V2Modules";
+import { CoverLinkCell, CoverMeta, CoverUsIndexCell, EventsModule, KeywordTable, Module, SentimentModule, ThemeShares } from "../V2Modules";
 import { SignalTable } from "../KaderaBoard";
 import { loadUsCover } from "../cover-chips";
 import type { BoardRow, BoardSection } from "../KaderaBoard";
@@ -217,7 +217,7 @@ export default async function UsKaderaPage() {
             <p className="v2-empty">아직 분석된 메시지가 없습니다.</p>
           </Module>
         )}
-        <ThemeCards themes={themes.rows} hrefOf={THEME_LINKS ? usThemeHref : null} allHref={US_THEME_PAGE.href} />
+        <ThemeShares themes={themes.rows} hrefOf={THEME_LINKS ? usThemeHref : null} allHref={US_THEME_PAGE.href} />
         <EventsModule events={events} today={usToday} failed={eventsFailed} limit={9} />
       </div>
 

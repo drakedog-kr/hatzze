@@ -25,7 +25,7 @@ import { THEME_NAMES, themeHref } from "@/lib/theme-href";
 import { THEMES } from "@/lib/stock-themes";
 import { THEME_PUBLIC } from "../screen-flags";
 import { BOARD_TILES, getMoveReasons, getUpcomingEvents, todayKst } from "@/lib/kadera-why";
-import { CoverIndexCell, CoverLinkCell, CoverMeta, EventsModule, KeywordTable, Module, SentimentModule, ThemeCards } from "./V2Modules";
+import { CoverIndexCell, CoverLinkCell, CoverMeta, EventsModule, KeywordTable, Module, SentimentModule, ThemeShares } from "./V2Modules";
 import { SignalTable } from "./KaderaBoard";
 import { loadCoverChips } from "./cover-chips";
 import type { BoardRow, BoardSection } from "./KaderaBoard";
@@ -318,7 +318,7 @@ export default async function KaderaPage() {
             <p className="v2-empty">{sentimentFailed ? "감성 집계를 불러오지 못했습니다." : "아직 분석된 메시지가 없습니다."}</p>
           </Module>
         )}
-        <ThemeCards themes={themes} hrefOf={THEME_LINKS ? themeHref : null} />
+        <ThemeShares themes={themes} hrefOf={THEME_LINKS ? themeHref : null} />
         <EventsModule events={events} today={kaderaToday} failed={eventsFailed} limit={9} />
       </div>
 

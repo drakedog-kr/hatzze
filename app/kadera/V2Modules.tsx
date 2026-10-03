@@ -200,31 +200,38 @@ export function stockHref(code: string, market: string | null): string | null {
 }
 
 /**
- * 테마 — 작은 카드 목록. 미니 선(14일 점유율) · 이름 · 대장 종목 꼬리표 · 점유율 · 변화. 2차의 테마 카드를 그대로 되살렸다(2026-10-02 요청).
+ * 테마 점유율 — 상위 여섯 테마의 막대 목록. 줄마다 순위 · 테마 · 점유율 막대 · 점유율 · 변화(2026-10-04).
  * 점유율 = 최근 3일 평균(머리 띠의 '최근 3일'), 변화 = 5일 이상 전 평균과의 차이(lib/telegram-data.ts THEME_PRIOR_GAP_DAYS).
+ *
+ * 2차의 작은 카드 열 장(미니 선 · 이름 · 대장 꼬리표 · 점유율 · 변화)을 되살렸었는데 "열 개라 너무 복잡하고 정보 전달도 잘 안 된다"였다(10-04).
+ * 카드마다 다섯 가지가 서서 한 칸에 쉰 개 가까운 글자 · 그림이 섞였고, 두 칸 격자라 몇 위가 어디인지도 안 읽혔다. 그래서 '어느 테마에
+ * 말이 몰렸나'를 막대 길이 하나로 말한다 — 막대는 1위 테마를 끝으로 한 길이라 몇 배 차이인지가 바로 보인다. 대장 종목은 줄에 마우스를 올리면,
+ * 열흘 흐름 · 나머지 테마는 '전체 보기'(테마 판세)에서 본다.
  */
-/** 테마 카드가 읽는 칸 — 국장 ThemeRotation · 미장 UsThemeRow 둘 다 맞는다(미장 카더라도 이 부품을 쓴다). */
-type ThemeCardRow = Pick<ThemeRotation, "theme" | "sharePct" | "shareDelta" | "series"> & { stocks: { name: string }[] };
+/** 테마 줄이 읽는 칸 — 국장 ThemeRotation · 미장 UsThemeRow 둘 다 맞는다(미장 카더라도 이 부품을 쓴다). */
+type ThemeShareRow = Pick<ThemeRotation, "theme" | "sharePct" | "shareDelta"> & { stocks: { name: string }[] };
 
-export function ThemeCards({
+/** 목록 줄 수. 열이면 복잡했다 — 여섯이면 첫 줄 셋 칸(여론 · 테마 · 일정)의 키 안에 줄 하나가 넉넉히 선다. */
+const THEME_ROWS = 6;
+
+export function ThemeShares({
   themes,
   hrefOf,
   allHref = "/theme",
 }: {
-  themes: ThemeCardRow[];
+  themes: ThemeShareRow[];
   hrefOf: ((theme: string) => string) | null;
   /** 머리 오른쪽 '전체 보기' — 국장 /theme · 미장 /theme/us. */
   allHref?: string;
 }) {
-  // 열 — 2칸 × 5줄. 옆 여론 칸이 테마별 낙관도까지 실어 키가 커졌다(2026-10-02) — 여섯이면 이 칸 아래가 100px 비었다.
-  // 남는 높이는 줄이 나눠 먹는다(v2.css .v2-band .v2-themes 1fr).
-  const rows = themes.slice(0, 10);
+  const rows = themes.slice(0, THEME_ROWS);
+  const max = Math.max(0.0001, ...rows.map((t) => t.sharePct));
   return (
     <Module
       id="themes"
       title="테마 점유율"
       meta="최근 3일"
-      // 테마 전체 보기는 이 머리 오른쪽에 둔다(2026-10-03) — 첫 줄 띠 끝에 있을 땐 띠가 1,280 에서 두 줄로 접혔고, 카드를 보다 넘어가는 자리가 여기다.
+      // 테마 전체 보기는 이 머리 오른쪽에 둔다(2026-10-03) — 첫 줄 띠 끝에 있을 땐 띠가 1,280 에서 두 줄로 접혔고, 목록을 보다 넘어가는 자리가 여기다.
       aside={
         hrefOf && (
           <Link href={allHref} className="v2-more">
@@ -237,42 +244,39 @@ export function ThemeCards({
       {rows.length === 0 ? (
         <p className="v2-empty">아직 집계된 테마가 없습니다.</p>
       ) : (
-        <div className="v2-themes">
+        <ol className="v2-tsh">
           {rows.map((t, i) => {
             const d = t.shareDelta;
-            const tone: Tone = d === null || d === 0 ? "flat" : d > 0 ? "up" : "down";
             const lead = t.stocks[0]?.name;
             const body = (
               <>
-                <Spark id={`v2-theme-spark-${i}`} values={t.series} w={56} h={40} tone={tone} />
-                <span className="v2-mini-txt">
-                  <span className="v2-mini-name">
-                    <span>{t.theme}</span>
-                    {lead && <span className="v2-reason">대장 {lead}</span>}
-                  </span>
-                  <span className="v2-card-val">
-                    <b>{t.sharePct.toFixed(1)}%</b>
-                    {d !== null && d !== 0 && (
-                      <span className={`v2-delta is-${tone}`}>
-                        {sign(d)}
-                        {Math.abs(d).toFixed(1)}%p
-                      </span>
-                    )}
-                  </span>
+                <span className="v2-tsh-rank">{i + 1}</span>
+                <span className="v2-tsh-name">{t.theme}</span>
+                <span className="v2-tsh-bar" aria-hidden="true">
+                  <i style={{ width: `${Math.max(2, (t.sharePct / max) * 100)}%` }} />
+                </span>
+                <b className="v2-tsh-val">{t.sharePct.toFixed(1)}%</b>
+                <span className={`v2-tsh-chg${d == null || Math.abs(d) < 0.05 ? "" : d > 0 ? " is-up" : " is-down"}`}>
+                  {d == null || Math.abs(d) < 0.05 ? "" : `${sign(d)}${Math.abs(d).toFixed(1)}%p`}
                 </span>
               </>
             );
-            return hrefOf ? (
-              <Link key={t.theme} href={hrefOf(t.theme)} className="v2-minicard" data-ga="kadera_theme_click">
-                {body}
-              </Link>
-            ) : (
-              <div key={t.theme} className="v2-minicard">
-                {body}
-              </div>
+            const tip = lead ? `대장 ${lead}` : undefined;
+            return (
+              <li key={t.theme}>
+                {hrefOf ? (
+                  <Link href={hrefOf(t.theme)} className={`v2-tsh-row${tip ? " hz-tip hz-tip-start" : ""}`} data-tip={tip} data-ga="kadera_theme_click">
+                    {body}
+                  </Link>
+                ) : (
+                  <div className={`v2-tsh-row${tip ? " hz-tip hz-tip-start" : ""}`} data-tip={tip}>
+                    {body}
+                  </div>
+                )}
+              </li>
             );
           })}
-        </div>
+        </ol>
       )}
     </Module>
   );

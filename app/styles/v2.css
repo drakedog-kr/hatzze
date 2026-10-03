@@ -209,13 +209,9 @@
   align-items: stretch;
   gap: 12px;
 }
-.v2-band .v2-themes { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 8px; }
-/* 세 모듈은 키가 같아야 하고(stretch) 안이 비면 안 된다 — 가장 큰 여론 칸이 높이를 정하면, 테마 카드 줄과 일정 줄이 그 높이를
-   나눠 먹는다(1fr · flex 1). 개수를 맞춰 메우면 그날 자료 길이에 따라 다시 빈다([[공백 금지]] 2026-10-02). */
+/* 세 모듈은 키가 같아야 하고(stretch) 안이 비면 안 된다 — 가장 큰 여론 칸이 높이를 정하면, 테마 줄과 일정 줄이 그 높이를
+   나눠 먹는다(flex 1). 개수를 맞춰 메우면 그날 자료 길이에 따라 다시 빈다([[공백 금지]] 2026-10-02). */
 .v2-band > .v2-mod { display: flex; flex-direction: column; }
-/* 줄은 남는 높이를 고르게 받되 내용보다 작아지지 않는다(min-content) — 대장 꼬리표가 두 줄로 감기는 카드가 옆 줄로 넘치지 않게. */
-.v2-band .v2-themes { flex: 1; grid-auto-rows: minmax(min-content, 1fr); }
-.v2-band .v2-minicard { min-height: 52px; }
 .v2-band .v2-events { flex: 1; }
 .v2-band .v2-events li { flex: 1; display: flex; }
 .v2-band .v2-ev-row { flex: 1; align-items: center; }
@@ -350,10 +346,9 @@ a.v2-tr:hover { background: var(--t-tint); }
 .v2-kd .hz-stock-badge { border-radius: 50%; mask-image: none; }
 .v2-kd .v2-td-stock .hz-stock-badge { background: var(--t-tint); color: var(--t-ink3); }
 
-/* ── 오른쪽 줄기의 세 모듈 — 2차(토스 지적 전)의 카드 꼴을 되살렸다(2026-10-02 요청 "낙관도나 그런 거는 그 전 버전처럼").
-   여론 큰 카드 · 테마 작은 카드 · 일정 날짜 알약. 그사이 시험한 50 위아래 막대 · 갈림 막대 · 테마 히트맵 · 막대 목록은 걷었다. */
-.v2-bigcard,
-.v2-minicard {
+/* ── 둘째 줄의 세 모듈 — 2차(토스 지적 전)의 카드 꼴을 되살렸다(2026-10-02 요청 "낙관도나 그런 거는 그 전 버전처럼").
+   여론 큰 카드 · 테마 점유율 막대 목록(2026-10-04, 작은 카드 열 장에서) · 일정 날짜 알약. */
+.v2-bigcard {
   color: var(--t-ink);
   text-decoration: none;
   transition: background-color 0.2s;
@@ -397,26 +392,32 @@ a.v2-tr:hover { background: var(--t-tint); }
 /* 테마별 낙관도(ThemeVsUsualRows) — 선 그래프 아래, 가는 선으로 가른다. 부품은 국장·미장 공용이라 안쪽 꼴은 그대로 둔다. */
 .v2-mood-themes { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--t-line); }
 
-/* 테마 작은 카드 — 둘째 줄 가운데에 두 칸 × 세 줄. 미니 선 56 · 이름 + 대장 꼬리표 · 점유율 + 변화 */
-.v2-themes { display: grid; grid-auto-rows: 56px; gap: 2px; padding: 6px; }
-.v2-minicard {
+/* 테마 점유율(V2Modules.tsx ThemeShares) — 상위 여섯 줄. 순위 · 테마 · 막대(1위 = 끝) · 점유율 · 변화. 줄은 남는 높이를 고르게 받는다.
+   막대 색은 MDD 업종 목록과 같은 옅은 파랑 — 오르내림이 아니라 '얼마나 몰렸나'라 빨강 · 파랑 뜻을 싣지 않는 한 색. */
+.v2-tsh { flex: 1; display: flex; flex-direction: column; margin: 0; padding: 6px 8px 8px; list-style: none; }
+.v2-tsh > li { flex: 1 0 auto; display: flex; }
+.v2-tsh-row {
+  flex: 1;
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr);
+  grid-template-columns: 14px 92px minmax(0, 1fr) 46px 52px;
   align-items: center;
-  gap: 12px;
-  min-width: 0;
-  padding: 0 10px 0 8px;
-  border-radius: 6px;
+  column-gap: 10px;
+  min-height: 36px;
+  padding: 0 6px;
+  border-radius: 4px;
+  color: var(--t-ink);
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
 }
-a.v2-minicard:hover { background: var(--t-tint); }
-.v2-minicard .v2-spark { width: 56px; height: 40px; }
-.v2-mini-txt { display: flex; flex-direction: column; min-width: 0; }
-/* 테마 이름 위 · 대장 꼬리표 아래 두 줄(2026-10-04). 한 줄에 나란히 두면 이름이 긴 테마('AI 인프라·클라우드')에서 대장 이름이 잘렸다
-   (미장 '대장 오라클' 47/60px). 꼬리표 글자는 11 → 12(읽는 글자). 카드 키 60 · 둘째 줄 키 363 은 그대로다(1,440 실측). 폰은 꼬리표를 숨긴다(아래). */
-.v2-mini-name { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0; font-size: 12px; font-weight: 500; line-height: 18px; }
-.v2-mini-name > span:first-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* 꼬리표는 자르지 않는다(글자 자르는 꼬리표 금지) — 칸보다 길면('대장 한화에어로스페이스', 1,280 에서 127/101px) 두 줄로 감긴다. */
-.v2-mini-name .v2-reason { min-width: 0; height: auto; font-size: 12px; line-height: 18px; white-space: normal; overflow: visible; word-break: keep-all; overflow-wrap: anywhere; }
+a.v2-tsh-row:hover { background: var(--t-tint); }
+.v2-tsh-rank { font-size: 12px; font-weight: 600; color: var(--t-ink3); text-align: right; }
+.v2-tsh-name { min-width: 0; font-size: 13px; font-weight: 600; line-height: 18px; word-break: keep-all; overflow-wrap: anywhere; }
+.v2-tsh-bar { position: relative; height: 8px; border-radius: 4px; background: var(--t-bar-off); }
+.v2-tsh-bar > i { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 4px; background: color-mix(in srgb, var(--t-down) 45%, transparent); }
+.v2-tsh-val { font-size: 13px; font-weight: 700; text-align: right; }
+.v2-tsh-chg { font-size: 12px; font-weight: 600; text-align: right; color: var(--t-ink3); white-space: nowrap; }
+.v2-tsh-chg.is-up { color: var(--t-up); }
+.v2-tsh-chg.is-down { color: var(--t-down); }
 
 /* 선 그래프 — 아래로 옅어지는 면 · 점선 기준선 · 끝점 후광 */
 .v2-spark { position: relative; color: var(--t-ink4); }
@@ -534,11 +535,8 @@ a.v2-ev-row:hover { background: var(--t-tint); }
    680 미만: 둘째 줄 한 칸 · 표 줄이 두 층(종목 · 값 · 등락 / 문장). */
 @container kd (max-width: 1099px) {
   .v2-band { grid-template-columns: calc(25% - 6px) minmax(0, 1fr) 340px; }
-  /* 테마 카드가 187px 로 좁아진다(1,280) — 미니 선 · 여백을 줄이고 꼬리표를 11px 로 해 '대장 한화에어로스페이스'(115px)가 한 줄에 든다(칸 121).
-     꼬리표가 두 줄로 감기면 카드 열 장이 다 그 키(75)로 늘어 둘째 줄이 69px 높아졌다 — 감기는 건 더 긴 이름에서만. */
-  .v2-band .v2-minicard { grid-template-columns: 44px minmax(0, 1fr); gap: 8px; padding: 0 8px 0 6px; }
-  .v2-band .v2-minicard .v2-spark { width: 44px; }
-  .v2-band .v2-mini-name .v2-reason { padding: 0 4px; font-size: 11px; }
+  /* 테마 칸이 395 로 좁아진다(1,280) — 테마 이름 칸을 줄인다. 긴 이름은 두 줄로 감긴다(잘리지 않는다). */
+  .v2-tsh-row { grid-template-columns: 14px 84px minmax(0, 1fr) 44px 50px; column-gap: 8px; }
   .v2-grid { grid-template-columns: minmax(0, 1fr) 340px; }
   /* 요약 칸 340 — 글이 길어져 줄이 높아지는 만큼 한 단 좁힌다. */
   .v2-grid > #brief .v2-brief { line-height: 1.85; }
@@ -590,14 +588,7 @@ a.v2-ev-row:hover { background: var(--t-tint); }
 }
 @container kd (max-width: 679px) {
   .v2-band { grid-template-columns: minmax(0, 1fr); }
-  .v2-band .v2-themes { grid-auto-rows: 52px; column-gap: 4px; }
-  .v2-minicard,
-  .v2-band .v2-minicard { grid-template-columns: 36px minmax(0, 1fr); gap: 8px; padding: 0 6px; }
-  .v2-minicard .v2-spark,
-  .v2-band .v2-minicard .v2-spark { width: 36px; height: 28px; }
-  .v2-mini-name .v2-reason { display: none; }
-  /* 테마 열 · 일정 아홉은 둘째 줄 세 칸의 키를 맞추려는 것이다. 한 줄기인 폰에선 길어지기만 해서 여섯 · 다섯으로. */
-  .v2-band .v2-themes > :nth-child(n + 7),
+  /* 일정 아홉은 둘째 줄 세 칸의 키를 맞추려는 것이다. 한 줄기인 폰에선 길어지기만 해서 다섯으로. */
   .v2-band .v2-events li:nth-child(n + 6) { display: none; }
   .v2-cover-cell { flex: 1 1 40%; padding: 8px 12px; }
   /* 지수 칸은 한 줄 전체 — 날짜는 위 작은 줄, 코스피 · 코스닥은 아래 나란히. 반 칸에 두면 둘째 지수가 잘렸다(375). */
