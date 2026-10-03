@@ -357,6 +357,12 @@ main.hz-scroll { overflow-x: clip; }
      auto 는 I 빔(텍스트 커서)으로 풀린다 — 60곳 가까이가 그 상태였다. */
   cursor: default;
 }
+/* 단, 누르면 가는 링크 · 단추에 툴팁을 단 곳은 손 모양 — 위 한 줄이 링크의 손 모양까지 지워, 카더라 테마 점유율 줄(대장 종목 툴팁)에
+   마우스를 올려도 화살표였다(2026-10-04). 자리마다 cursor: pointer 를 덧적던 것(kadera.css 지도 칸 등)을 여기 한 곳에서. */
+a.hz-tip[href],
+button.hz-tip:not(:disabled) {
+  cursor: pointer;
+}
 .hz-tip::after {
   /* ⚠️ 숨어 있는 동안엔 상자 자체를 안 만든다(content: none). 전엔 opacity:0 으로만 숨겨서 페이지의 툴팁 수십~백여 개가
      늘 레이아웃에 있었고, 앵커 위치지정을 켠 브라우저(아래 @supports 블록)에선 그 하나하나가 position:fixed 앵커 상자라
