@@ -4,7 +4,11 @@ import { notFound } from "next/navigation";
 
 import { getInsiderOverview } from "@/lib/insider-data";
 
-import { SectionHead } from "../../../kadera/SectionHead";
+import { fmtKoDate } from "@/lib/stock-page";
+
+import { CurrencyToggle } from "../../../AppShell";
+import { CoverMeta, Module } from "../../../kadera/V2Modules";
+import { Icon } from "../../../ui";
 import { INSIDER_CARD } from "../../../og-copy";
 import { pageMetadata } from "../../../seo";
 import { ExpandableList } from "../../../kadera/ExpandableList";
@@ -255,10 +259,10 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
      넣었더니 96자가 되어 아무도 안 읽는 길이가 됐다 — 한 자리에서 한 번만 말한다. */
 
   return (
-    // ⭐ 내부자 리포트는 **달러가 기본**이다 — 재료가 전부 미국 공시라 달러가 원본이고,
-    // 원화는 크기를 가늠하라고 얹은 것이다. 쿠키로 한 번이라도 고르면 그 선택이 이긴다
-    // (규칙은 globals.css 의 `[data-cur-default]`).
-    <div className="hz-tx" data-cur-default="usd">
+    // ⭐ 내부자 리포트는 **달러가 기본**이다 — 재료가 전부 미국 공시라 달러가 원본이고, 원화는 크기를 가늠하라고 얹은 것이다.
+    // 쿠키로 한 번이라도 고르면 그 선택이 이긴다(규칙은 globals.css 의 `[data-cur-default]`).
+    // v2(2026-10-03) — 본 화면(app/insider/page.tsx)과 같은 꼴: 뒤로 가기 줄 → 첫 줄 띠(기준 · 통화 · 업데이트) → 카드마다 모듈.
+    <div className="hz-tx v2-kd v2-in" data-cur-default="usd">
       {/* 조회가 깨진 축은 빈 목록으로 물러나 카드가 "최근에는 없습니다"라고 적는다. 메인과 같은
           줄을 머리에 달아야 그게 실패인지 정말 없는 것인지 갈린다(InsiderOverview.failedSources). */}
       <LoadFailedNote sources={ov.failedSources} />
@@ -266,19 +270,38 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
           왔는지는 사이드바가 못 말한다. */}
       <BackTrail parent={{ name: "내부자 리포트", href: "/insider" }} current={spec.title} />
 
+      <div className="v2-cover">
+        <div className="v2-cover-cell">
+          <span className="v2-cover-k">기준</span>
+          <span className="v2-cover-v">
+            <b>{note}</b>
+          </span>
+        </div>
+        {ov.usdKrw != null && (
+          <div className="v2-cover-cell v2-in-cur">
+            <span className="v2-cover-k">통화</span>
+            <CurrencyToggle fallback="usd" />
+          </div>
+        )}
+        <CoverMeta updated={ov.asOf ? `${fmtKoDate(ov.asOf)}(${"일월화수목금토"[new Date(`${ov.asOf}T00:00:00Z`).getUTCDay()]}) 공시까지` : "공시 준비 중"} />
+      </div>
+
       {cards.map((card) => (
-        <section className="hz-sheet" key={card.title}>
-          <SectionHead level={2}
-            icon={card.icon}
-            title={card.title}
-            // ⚠️ `right` 를 주면 SectionHead 가 note 알약을 통째로 안 그린다 — 물음표
-            //    툴팁이 그 알약에 붙어 있어서 단서가 같이 사라진다. 개수는 알약 안에 적는다.
-            note={`${note} · ${countNote(card.total, card.items.length)}`}
-            noteHelp={spec.help}
-            desc={card.desc}
-          />
+        <Module
+          key={card.title}
+          title={card.title}
+          // ⚠️ 잘렸으면 머리 근거가 그 사실을 적는다("1,000개 중 100개") — "전체보기"라 해 놓고 조용히 100개만 내면 거짓말이 된다.
+          meta={countNote(card.total, card.items.length)}
+          // 셈법 한 마디는 물음표 툴팁으로(데이터 툴팁). 카드 부제(설명 문장)는 걷었다(v2).
+          aside={
+            <span className="hz-tip hz-tip-wide v2-in-help" data-tip={spec.help} aria-label={spec.help} tabIndex={0}>
+              <Icon name="help" />
+            </span>
+          }
+          className="v2-in-listmod"
+        >
           {card.items.length === 0 ? (
-            <Empty>최근에는 없습니다.</Empty>
+            <p className="v2-empty">최근에는 없습니다.</p>
           ) : (
             /* ⚠️ 처음부터 100줄을 펴면 카드 두 장이 200줄 벽이 된다. 열 줄로 열고
                 눌러서 늘린다 — 카더라의 '더 보기'와 같은 부품이다. */
@@ -295,7 +318,7 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
               />
             </>
           )}
-        </section>
+        </Module>
       ))}
 
       {/* ⛔ 여기 있던 "SEC와 미 하원이 공개한 공시를 그대로 옮긴 것입니다 …" 각주는

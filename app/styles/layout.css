@@ -156,69 +156,6 @@
 .hz-totop {
   display: none;
 }
-/* 내부자 리포트 첫 카드의 맨 윗줄 밑에 한 번 뜨는 쪽지(app/insider/TapHint.tsx).
-   종목 줄이 통째로 링크라는 걸 알려 준다.
-
-   ⚠️ 처음엔 폰(≤560)에서만 띄웠다. 폰에는 hover 가 없어 링크인 줄 알 길이 없다는 게
-   근거였는데, 데스크톱에서도 그 줄이 눌린다는 걸 아는 사람이 드물어 폭 제한을 걷었다.
-   그래서 이제 **데스크톱 방문자도 이 쪽지를 소비한다** — 데스크톱에서 한 번 닫은 사람은
-   나중에 폰으로 와도 안 뜬다(예전엔 안 그랬다. TapHint.tsx 주석과 짝을 맞춰 둘 것).
-
-   색은 PC 권유 띠와 같은 반전(ink 바탕 · bg 글자)이다. 새 어법을 만들지 않으려는
-   것이고, 카드 안의 데이터 줄들과 확실히 갈려서 '이건 잠깐 뜬 안내'로 읽힌다.
-
-   ⚠️ 위치는 `position: static` 이다. 줄 사이에 **자리를 차지하고** 끼어야 아래 줄들이
-   밀려나며 "이 줄에 붙은 말"로 보인다. 띄워서 겹치면 가린 줄이 눌리지도 않는다. */
-/* ⭐ 목록의 칸을 **안 차지한다.** 자리를 먹으면 아래 줄들이 통째로 밀려 내려가 화면이
-   덜컹인다(실측 78px 짜리 줄 하나만큼). 높이 0 인 자리표시자만 두고 쪽지는 그 위에 띄운다.
-   ⚠️ 그러면 가려진 줄이 안 눌리므로 손가락을 **통과**시킨다. 닫기 ✕ 만 되돌려 받는다
-      (아래 .hz-tap-hint-x). 가려진 줄을 누르면 그대로 그 종목으로 가고, 그 순간 쪽지도
-      '봤음' 으로 적혀 사라진다. */
-.hz-tap-hint-slot {
-  position: relative;
-  height: 0;
-  pointer-events: none;
-}
-.hz-tap-hint-slot[hidden] {
-  display: none;
-}
-.hz-tap-hint-x {
-  pointer-events: auto;
-}
-.hz-tap-hint {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  /* 자리표시자(높이 0) 기준으로 띄운다. top 6 은 윗줄과 살짝 떨어뜨리는 값이다.
-     ⭐ 폭은 **글 길이에 맞춘다.** 예전엔 left/right 로 양끝을 잡아 카드 폭을 다 먹었는데,
-        스무 자 남짓한 한 줄이 320px 짜리 검은 띠로 서서 가려진 줄을 필요 이상으로 덮었다.
-        넘칠 때만 접히게 max-width 로 상한만 둔다. */
-  position: absolute;
-  left: 8px;
-  top: 6px;
-  width: max-content;
-  max-width: calc(100% - 16px);
-  z-index: 1;
-  padding: 8px 6px 8px 10px;
-  background: var(--c-ink);
-  color: var(--c-bg);
-  border-radius: var(--r-control);
-  font-size: var(--fs-12);
-  font-weight: 600;
-  line-height: 1.45;
-}
-/* 바로 위 줄을 가리키는 삼각 꼭지. 쪽지가 left 8 에서 시작하므로 14 를 더하면 화면 기준
-   22px — 종목 로고(26px) 한가운데다. "이 줄" 이 아니라 "이 종목" 을 가리키게 된다. */
-.hz-tap-hint::before {
-  content: "";
-  position: absolute;
-  top: -5px;
-  left: 14px;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-bottom: 5px solid var(--c-ink);
-}
-
 
 /* 히어로 패딩/gap은 여기서 관리 — 모바일에서 좁혀야 고정 300px 게이지와
    냉정/보통/과열/광기 라벨이 화면 안에 온전히 들어온다. */

@@ -666,7 +666,8 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-md,
 .v2-dv,
 .v2-tm,
-.v2-pv {
+.v2-pv,
+.v2-in {
   --c-ink: var(--t-ink);
   --c-ink-soft: var(--t-ink2);
   --c-label: var(--t-ink2);
@@ -694,7 +695,8 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 [data-theme="dark"] .v2-md,
 [data-theme="dark"] .v2-dv,
 [data-theme="dark"] .v2-tm,
-[data-theme="dark"] .v2-pv { --c-hot-ink: #ff94a0; }
+[data-theme="dark"] .v2-pv,
+[data-theme="dark"] .v2-in { --c-hot-ink: #ff94a0; }
 
 /* 둘째 줄 — 햇쩨 지수 | 오늘의 브리핑. 왼쪽 칸 폭은 아래 시트 첫 열(25%)에 맞춘다 — 사이 12px 가 시트 첫 세로선 위에 걸쳐 열이 맞는다.
    두 모듈은 키가 같고(stretch) 안이 비면 안 된다 — 짧은 쪽은 줄이 고르게 늘어난다(구간 줄 · 브리핑 줄). */
@@ -1794,3 +1796,59 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
   .v2-nt-week a { flex-direction: row; align-items: baseline; gap: 10px; }
   .v2-nt-week time { flex: none; width: 76px; }
 }
+
+/* ── v2 내부자 리포트(2026-10-03) — 본 화면(/insider)과 전체보기(/insider/list/…) ─────────────────────────────
+   얼개(app/insider/page.tsx 머리말): 첫 줄 띠(새 신고 · 최근 90일 공시 · 통화 · 업데이트) → 짝 모듈 네 줄(임원 · 의원 → 거물 늘린 · 줄인 →
+   카더라 · 거물 보유 → 거물 명단 · 증권가). 줄은 parts.tsx 의 행 함수(인라인 style + var(--fs-*) · var(--c-*))를 그대로 쓰고,
+   여기서 토큰만 v2 값으로 바꿔 끼운다(시장 브리핑 .v2-bf 와 같은 수법). 투자자 · 종목 상세는 아직 옛 꼴이다. */
+.v2-in {
+  /* 글자 눈금 — 행 함수의 13.5 · 11.5 · 12.5 · 10.5 를 v2 눈금(13 · 12 · 11)으로. 줄 한 개에 다섯 단이던 것이 셋이 된다. */
+  --fs-13-5: 13px;
+  --fs-12-5: 12px;
+  --fs-11-5: 12px;
+  --fs-10-5: 11px;
+}
+/* 짝 — 키가 같고(stretch) 짧은 쪽은 줄이 고르게 늘어난다(빈 곳 없음). 좁으면 한 줄기. */
+.v2-in-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 12px; }
+.v2-in-pair > .v2-mod { display: flex; flex-direction: column; }
+.v2-in-rows { flex: 1; display: flex; flex-direction: column; list-style: none; margin: 0; padding: 0; }
+.v2-in-rows > li { flex: 1 0 auto; display: flex; }
+.v2-in-rows > li > * { flex: 1; }
+/* 줄 — 글 시작선 15(모듈 테두리 1 + 14) · 가는 선 · 호버는 옅은 회색(다른 v2 표와 같다). */
+.v2-in .hz-trow { min-height: 52px; padding: 6px 14px; column-gap: 12px; border-bottom-color: var(--t-line); }
+.v2-in .hz-trow:hover { background: var(--t-tint); }
+.v2-in .hz-cellbody-wrap { gap: 8px !important; }
+/* ⛔ 이름 · 곁줄을 말줄임으로 자르지 않는다(v2) — 판이 반 폭이라 넘치는 날은 접힌다. */
+.v2-in .hz-cellname,
+.v2-in .hz-cellsub { overflow: visible; white-space: normal; text-overflow: clip; word-break: keep-all; overflow-wrap: anywhere; }
+.v2-in .hz-cellhead { flex-wrap: wrap; row-gap: 2px; }
+.v2-in .hz-bar { background: var(--t-bar-off); border-radius: 3px; }
+.v2-in .hz-bar > span { background: var(--t-down); }
+.v2-in .hz-trow:hover .hz-bar { background: var(--t-bar-off); }
+/* 통화 칸 — 첫 줄 띠 안의 ₩ · $ 스위치. 폰(≤560)은 탑바가 같은 스위치를 들어 여기는 숨는다(AppShell PageTools). */
+/* 머리에 서던 크기(38)면 띠가 58px 로 부풀었다 — 띠 줄 높이(20)에 맞춰 22 로 줄인다. */
+.v2-in-cur { align-items: center; padding-top: 8px; padding-bottom: 8px; }
+.v2-in-cur .hz-cur-switch { height: 22px; padding: 2px; gap: 2px; border-color: var(--t-frame); background: var(--t-tint); }
+.v2-in-cur .hz-cur-switch > button { min-width: 22px; height: 16px; padding: 0 5px; border-radius: 3px; font-size: 12px; font-weight: 600; color: var(--t-ink3); }
+.v2-in-cur .hz-cur-switch > button:hover { color: var(--t-ink); }
+@media (max-width: 560px) {
+  .v2-in-cur { display: none !important; }
+}
+@container kd (max-width: 999px) {
+  .v2-in-pair { grid-template-columns: minmax(0, 1fr); }
+}
+@container kd (max-width: 679px) {
+  /* 머리 근거('10/1까지 90일 · 의원 수 순')가 제목 옆에서 말줄임으로 잘렸다(375) — 다음 줄로 접는다. */
+  .v2-in .v2-mod-head { flex-wrap: wrap; row-gap: 0; }
+}
+/* 전체보기(/insider/list/…) — 뒤로 가기 줄 · 열 머리 · '더 보기' 줄을 v2 꼴로. 열 격자는 행 함수(WIDE_COLS)가 인라인으로 준다. */
+.v2-in > nav { font-size: 13px; }
+.v2-in > nav * { font-size: inherit; }
+.v2-in .hz-thead.hz-wide-head { min-height: 30px; padding: 0 14px; background: var(--t-head); border-bottom: 1px solid var(--t-line); }
+.v2-in .hz-thead > * { font-size: 12px; font-weight: 600; letter-spacing: 0; color: var(--t-ink3); }
+.v2-in .hz-trow.hz-wide { min-height: 52px; }
+.v2-in .hz-sheet-foot-row { min-height: 40px; border-top: 1px solid var(--t-line); }
+.v2-in .hz-more-btn { font-size: 12px !important; font-weight: 600 !important; color: var(--t-ink2); background: transparent; }
+.v2-in .hz-more-btn:hover { background: var(--t-tint); color: var(--t-ink); }
+.v2-in-help { display: inline-flex; align-items: center; color: var(--t-ink3); cursor: help; }
+.v2-in-help .ms { font-size: 16px; }

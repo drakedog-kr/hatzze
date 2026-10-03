@@ -109,7 +109,8 @@ export function Pill({
         color: fg,
         background: bg,
         padding: "3px 9px",
-        borderRadius: 999,
+        // 토큰으로 — v2 화면(.v2-bf · .v2-in …)은 --r-pill 을 4 로 바꿔 꼬리표 꼴이 된다(둥근 알약은 v2 결과 안 맞는다). 옛 화면은 99px 그대로.
+        borderRadius: "var(--r-pill)",
         whiteSpace: "nowrap",
       }}
     >

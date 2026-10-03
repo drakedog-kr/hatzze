@@ -322,8 +322,8 @@ export function Quote({
       <span
         style={{
           fontFamily: MONO,
-          fontSize: large ? 22 : 12,
-          fontWeight: 800,
+          fontSize: large ? 22 : 13,
+          fontWeight: large ? 800 : 700,
           color: C.ink,
           letterSpacing: large ? "-.02em" : undefined,
           whiteSpace: "nowrap",
@@ -342,13 +342,14 @@ export function Quote({
         <span
           style={{
             fontFamily: MONO,
-            fontSize: large ? 13 : 11,
-            fontWeight: 700,
+            fontSize: large ? 13 : 12,
+            fontWeight: large ? 700 : 600,
             whiteSpace: "nowrap",
             color: change > 0 ? "var(--c-hot-ink)" : change < 0 ? "var(--c-cold-ink)" : C.sub2,
           }}
         >
-          {change > 0 ? "▲" : change < 0 ? "▼" : ""}
+          {/* v2(2026-10-03) — 부호는 +/-(다른 화면과 같다). ▲▼ 는 걷었다. */}
+          {change > 0 ? "+" : change < 0 ? "-" : ""}
           {Math.abs(change).toFixed(2)}%
         </span>
       )}

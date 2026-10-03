@@ -1168,7 +1168,7 @@ const curStore = {
   },
 };
 
-function CurrencyToggle({ fallback }: { fallback: "krw" | "usd" }) {
+export function CurrencyToggle({ fallback }: { fallback: "krw" | "usd" }) {
   // 뿌리 속성이 없으면(아직 안 고름) 화면의 기본값이 눌린 칸이다. 이 값은 aria-pressed
   // 에만 쓴다 — **눌린 칸의 모양은 CSS 가 뿌리 속성을 보고 고른다**(mobile.css
   // .hz-cur-switch). 모양까지 리액트가 그리면 쿠키가 기본값과 다른 사람에게 첫 페인트에서
@@ -1257,9 +1257,12 @@ function MarketSwap({ pathname }: { pathname: string }) {
  * ⚠️ 통화는 **달러 금액을 내는 화면에만** 있는 개념이라 경로로 가린다. 국장 화면에
  * 두면 눌러도 아무것도 안 바뀌는 단추가 된다.
  */
-function PageTools() {
+function PageTools({ inHead = false }: { inHead?: boolean }) {
   const pathname = useAppPathname();
   const { themeNav } = useShellEnv();
+  // v2 화면은 머리를 걷는다 — 머리 오른쪽에 도구가 남으면 그 한 줄이 빈 띠가 된다. 내부자 리포트의 통화 스위치는 화면의
+  // 첫 줄 띠가 든다(app/insider/page.tsx). 폰 탑바(≤560)는 그대로 그린다 — 거기엔 첫 줄 띠의 통화 칸이 숨는다.
+  if (inHead && isV2Page(pathname)) return null;
   return (
     <>
       {/* 쿠키로 고른 게 없으면 그 화면의 기본값을 눌린 칸으로 쓴다. */}
@@ -1381,11 +1384,13 @@ const LABEL_TITLED_PREFIXES = [`${NOTE_PAGE.href}/`];
  * 이 화면의 이름을 읽는 자리다). 오른쪽 도구(미장 전환·테마)는 그대로 선다.
  */
 // 시장 브리핑(/) · MDD · 배당으로 살기 · 테마 판세(목록 · 테마 한 장, 국장 · 미장) · 국장 미리보기는 2026-10-03 에 들였다 — 카더라 v2 의 디자인 규칙을 옮겼다.
-const V2_PAGES = ["/", "/kadera", "/mdd", "/dividend", "/preview"];
-/** 테마 판세(/theme/semiconductor · /theme/us/memory) · 데일리 노트(/daily/2026-10-02)는 주소가 여럿이라 앞머리로 가른다. */
+const V2_PAGES = ["/", "/kadera", "/mdd", "/dividend", "/preview", "/insider"];
+/** 테마 판세(/theme/semiconductor · /theme/us/memory) · 데일리 노트(/daily/2026-10-02) · 내부자 전체보기(/insider/list/exec)는
+ *  주소가 여럿이라 앞머리로 가른다. 내부자의 투자자 · 종목 상세는 아직 옛 꼴이다(2026-10-03). */
 const isV2Page = (pathname: string) =>
   V2_PAGES.includes(pathname) ||
-  [THEME_PAGE.href, NOTE_PAGE.href].some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  [THEME_PAGE.href, NOTE_PAGE.href].some((p) => pathname === p || pathname.startsWith(`${p}/`)) ||
+  pathname.startsWith("/insider/list/");
 
 function PageHeader() {
   const pathname = useAppPathname();
@@ -1517,7 +1522,7 @@ function PageHeader() {
       {/* 오른쪽 도구는 테마 토글 하나다. 검색은 PC 에선 사이드바 로고 아래, 폰에선 탑바 돋보기다(2026-09-26).
           알림 벨·프로필 칩은 기능이 없어 걷었다(2026-08-03). */}
       <div className="hz-page-tools">
-        <PageTools />
+        <PageTools inHead />
       </div>
     </header>
   );
