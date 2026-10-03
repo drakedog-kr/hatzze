@@ -179,14 +179,13 @@ export default async function Home() {
                 <CardLeverage v={p("leverage_etf_volume")} />
                 <CardBuffett v={p("buffett_index")} />
                 <CardGoldRatio v={p("kospi_gold_ratio")} />
-                {/* 아시아(두 칸)를 환율 앞에 — 두 칸 셀이 짝수 자리(12)에서 시작해야 4열 · 2열 어디서든 줄이 꽉 찬다(v2, 2026-10-03). */}
-                <CardAsia v={p("kospi_asia_relative_strength")} />
                 <CardFx v={p("usdkrw_volatility")} />
+                <CardAsia v={p("kospi_asia_relative_strength")} />
                 <CardComingSoon />
                 {/* 순서 = 가중치 × 직관성 × 변동성. VIX 대비 VKOSPI 스프레드는 내렸다 — 1년의 76%가 과열도 0이라
                     종합점수에 기여하지 못했고, VKOSPI 에서 파생된 지표라 VKOSPI 카드와 겹쳤다.
                     v2 행 구성(4열, 칸 합계 16): [신고가·거래대금·속도·급등] [외국인·쏠림·풋콜·안전장치]
-                                                [VKOSPI·레버리지·버핏·금] [아시아2·환율·준비중] */}
+                                                [VKOSPI·레버리지·버핏·금] [환율·아시아·준비중2] */}
                 {extra("시장").map((i) => (
                   <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["시장"]} />
                 ))}
@@ -198,8 +197,8 @@ export default async function Home() {
               <div className="hz-cards">
                 {/* 시장 지표와 같은 원칙으로 순서만 바꿨다. 검색량(가중치 3.0)과 코인 투기를 앞세우고,
                     명품·오마카세는 재미는 크지만 가중치 0.5+0.5에 후행 지표라 뒤로.
-                    v2 행 구성(4열, 칸 합계 12): [검색량·뉴스·디씨·코인] [여윳돈2·실물괴리·유튜브]
-                                                [베스트셀러·봇레포·증권앱·제보] */}
+                    v2 행 구성(4열, 칸 합계 12): [검색량·뉴스·디씨·코인] [여윳돈·실물괴리·유튜브·베스트셀러]
+                                                [봇레포·증권앱·제보2] */}
                 <CardTrend v={p("naver_search_trend")} icon="search" />
                 <CardSentiment v={p("news_sentiment")} icon="newspaper" countNoun="뉴스" />
                 <CardSentiment v={p("dcinside_post_count")} icon="forum" countNoun="글" />
@@ -214,7 +213,7 @@ export default async function Home() {
                   <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["감성"]} />
                 ))}
                 <a
-                  className="hz-report-cell"
+                  className="hz-report-cell hz-cell-wide"
                   href="https://forms.gle/P4wzp2DkP2wyTPWP9"
                   target="_blank"
                   rel="noopener noreferrer"

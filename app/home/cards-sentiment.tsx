@@ -11,7 +11,8 @@ import type { IconName } from "@/lib/icon-names";
 // 가짜 데이터라, 값이 없는 카드에 그려 두면 한 번은 진짜로 읽힌다.
 export function CardComingSoon() {
   return (
-    <Shell minH={230}>
+    // 두 칸 폭 — 시장 판 끝 줄의 남는 두 칸을 채운다(지표 14장 + 이 칸 = 16). 지표 칸은 늘리지 않는다(2026-10-03 "2칸은 이상해").
+    <Shell wide minH={230}>
       {/* v2(2026-10-03): 이름 옆 '준비 중' 꼬리표 · 회색 면 · 모래시계를 걷었다 — 상자 안 글자와 꼬리표가 같은 말을 했다.
           점선 테두리 하나가 '빈자리'를 말한다(지표 제보 칸과 같은 어법). */}
       <TitleRow icon="credit_score" name="신용융자 잔고" desc="빚내서 주식을 산 금액" />
@@ -483,8 +484,7 @@ export function CardSpending({ luxury, dining }: { luxury: Pick; dining: Pick })
   // 지표 둘이 한 셀이라 스크롤 목적지 id 는 하나만 붙는다(명품). 오마카세로 오는
   // 스크롤은 ANCHOR_ALIAS 가 이 id 로 돌려보낸다.
   return (
-    // 두 칸 폭(wide) — 감성 판 11칸을 12칸으로 맞추는 한 장. 지표가 둘인 유일한 셀이라 폭을 가장 잘 쓴다(v2, 2026-10-03).
-    <Shell slug={luxury.ind?.slug} hit={luxury.isHit || dining.isHit} warm={luxury.warm || dining.warm} wide minH={230}>
+    <Shell slug={luxury.ind?.slug} hit={luxury.isHit || dining.isHit} warm={luxury.warm || dining.warm} minH={230}>
       <TitleRow icon="local_mall" name="여윳돈이 향하는 곳" desc="명품·외식 검색량으로 본 소비 심리" />
       {lead && (
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>

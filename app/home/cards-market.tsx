@@ -460,7 +460,6 @@ export function CardVkospi({ v }: { v: Pick }) {
   );
 }
 
-// v2(2026-10-03): 두 칸 폭(wide) — 시장 판 15칸을 16칸으로 맞추는 한 장. 막대 넷이 가로로 길어져 붙은 값(100 대 107)이 더 벌어진다.
 export function CardAsia({ v }: { v: Pick }) {
   const dt = v.details;
   const k = dt?.kospi ?? 0;
@@ -485,7 +484,7 @@ export function CardAsia({ v }: { v: Pick }) {
   const VALUE_W = 34;
   const ROW_GAP = 9;
   return (
-    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} wide minH={230}>
+    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       {/* ⚠️ public(지구본) 이었다. 아래 CardNetBuy("고점권 외국인 매도")가 같은 지구본을
           쓰고 있어 한 화면에 둘이었다. 지구본은 그쪽이 갖는다 — 저 카드는 **누가** 사고파는지
           (외국인)를 말하는 자리라 방향에 매이지 않는 그림이 필요하고, 이 카드가 실제로 하는

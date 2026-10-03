@@ -807,7 +807,8 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-bf .hz-report-cell .ms { font-size: 18px; }
 .v2-bf .hz-report-cell strong { font-size: 13px; font-weight: 700; }
 
-/* 두 칸 셀(Shell wide) — 시장 15칸 · 감성 11칸을 16 · 12 로 맞춰 4열 · 2열 어디서든 끝 줄이 꽉 찬다. 한 단(폰)에선 그냥 한 칸. */
+/* 두 칸 셀 — 판 끝의 자리 채움 칸(준비 중 · 지표 제보)만. 지표 14 · 10장 + 두 칸 = 16 · 12 라 4열 · 2열 어디서든 끝 줄이 꽉 찬다.
+   ⛔ 지표 칸은 늘리지 않는다(아시아 · 여윳돈을 늘렸다가 "이상하다"로 되돌림). 한 단(폰)에선 그냥 한 칸. */
 .v2-bf .hz-cards > .hz-cell-wide { grid-column: span 2; }
 
 /* 근거 두 칸(parts.tsx SplitStats) — 회색 타일 둘 대신 위 가는 선 · 가운데 세로선. */
