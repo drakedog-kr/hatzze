@@ -238,7 +238,6 @@ export function NoteView({
   dated?: boolean;
 }) {
   const blocks = note ? parseNoteMarkdown(note.bodyMd) : [];
-  const sections = noteHeadings(blocks).filter((h) => h.level === 3).length;
   // 표기 · 주소는 서버가 끝낸다. 지난 노트 넘김은 클라이언트 컴포넌트라 lib/daily-note.ts 를 못 문다.
   const items = archive.map((n) => ({ date: n.date, title: n.title, href: noteHref(n.date), label: fmtNoteDateShort(n.date) }));
   const { prev, next } = neighbors;
@@ -246,11 +245,12 @@ export function NoteView({
     <div className="hz-tx v2-kd v2-nt">
       {/* 첫 줄 — 앞뒤 글(한쪽이 없으면 그 칸을 안 세운다 · 안 눌리는 칸은 고장으로 보인다) · 업데이트 */}
       <div className="v2-cover">
-        {prev && <CoverLinkCell c={{ cap: "이전 글", name: fmtNoteDateShort(prev.date), href: noteHref(prev.date), ga: "note_prev_click" }} />}
+        {prev && <CoverLinkCell c={{ cap: "이전 글", name: fmtNoteDateShort(prev.date), href: noteHref(prev.date), ga: "note_prev_click", back: true }} />}
         {next && <CoverLinkCell c={{ cap: "다음 글", name: fmtNoteDateShort(next.date), href: noteHref(next.date), ga: "note_next_click" }} />}
         <CoverMeta
           updated={note ? formatKstUpdate(note.updatedAt, "업데이트") : "글 준비 중"}
-          basis={note ? [sections ? `꼭지 ${sections}` : null, stocks.kr.length + stocks.us.length ? `종목 ${stocks.kr.length + stocks.us.length}` : null].filter(Boolean).join(" · ") || null : null}
+          // 꼭지 수는 안 적는다(2026-10-04 운영자 판단 — 2026-09-06 의 "꼭지 수를 머리에 적지 않는다"와 같은 까닭). 종목 수만.
+          basis={note && stocks.kr.length + stocks.us.length ? `종목 ${stocks.kr.length + stocks.us.length}` : null}
         />
       </div>
       <div className="v2-nt-page">

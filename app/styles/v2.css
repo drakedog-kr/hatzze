@@ -162,6 +162,8 @@
 .v2-cover-go:hover { background: var(--t-tint); }
 .v2-cover-go:focus-visible { outline-offset: -2px; }
 .v2-cover-go .ms { align-self: center; margin: 0 -6px 0 -4px; font-size: 16px; line-height: 20px; color: var(--t-ink3); }
+/* 뒤로 가는 칸 — ‹ 가 칸 맨 앞(오른쪽 › 와 거울상 여백). */
+.v2-cover-go.is-back .ms { margin: 0 -4px 0 -6px; }
 /* 언제 · 얼마나 읽었나 — 근거일 뿐이라 오른쪽에 낮게.
    한 줄(2026-10-03 "모든 페이지 이건 한 줄로") — 업데이트 · 무엇을 셌나를 가운뎃점으로 잇는다. 예전엔 두 줄로 쌓았다.
    늘어나는 몫이 칸들의 1,000배라 칸 뒤에 붙으면 남는 폭을 거의 다 가져가고(칸은 제 폭 그대로), 둘째 줄로 내려가면 칸들이 첫 줄을 나눠 채운다.

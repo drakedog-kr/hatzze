@@ -442,18 +442,28 @@ export function CoverUsIndexCell({ label, spx }: { label: string; spx: number })
 }
 
 /** val · tone 은 이름 옆 작은 값(카더라 칩의 등락 · 배수). 없는 칸도 있다(MDD 종목 화면 · 테마 리포트). */
-export type CoverLink = { cap: string; name: string; val?: string; tone?: Tone; href: string; ga: string };
+export type CoverLink = {
+  cap: string;
+  name: string;
+  val?: string;
+  tone?: Tone;
+  href: string;
+  ga: string;
+  /** 뒤로 가는 칸(데일리 노트 '이전 글') — 화살표가 왼쪽을 가리키고 칸 맨 앞에 선다(2026-10-04 "이전 글은 화살표가 왼쪽"). */
+  back?: boolean;
+};
 
 /** 링크 칸 — 이 화면에 없는 것을 싣고 다른 화면으로 보낸다. 띠의 다른 칸과 같은 꼴 + 끝에 작은 ›(알약 칩은 v2 결과 안 맞아 걷었다). */
 export function CoverLinkCell({ c }: { c: CoverLink }) {
   return (
-    <Link href={c.href} className="v2-cover-cell v2-cover-go" data-ga={c.ga}>
+    <Link href={c.href} className={`v2-cover-cell v2-cover-go${c.back ? " is-back" : ""}`} data-ga={c.ga}>
+      {c.back && <Icon name="chevron_left" />}
       <span className="v2-cover-k">{c.cap}</span>
       <span className="v2-cover-v">
         <b>{c.name}</b>
         {c.val && <span className={`v2-cover-chg is-${c.tone ?? "flat"}`}>{c.val}</span>}
       </span>
-      <Icon name="chevron_right" />
+      {!c.back && <Icon name="chevron_right" />}
     </Link>
   );
 }
