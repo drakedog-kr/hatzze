@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Icon } from "../ui";
 
 /**
- * 지난 노트 목록을 **달력 주(월~일) 단위**로 보여 주고, 머리 띠 오른쪽 ‹ · › 로 넘긴다(v2 · 2026-10-03 — 판 폭에 한 주가 한 줄).
+ * 지난 노트 목록을 **달력 주(월~일) 단위**로 보여 주고, 머리 띠 오른쪽 ‹ · › 로 넘긴다(v2 · 2026-10-03). 글 옆 오른쪽 칸에 세로 목록으로 선다.
  *
  * 처음엔 최근 30편을 한 번에 늘어놓았다. 하루 한 편이라 한 달이면 서른 줄이고, 그 줄이
  * 본문 옆 칸을 세로로 다 채워 목차·언급된 종목보다 길어졌다(2026-09-09 지적). 한 번 "7편씩"
@@ -56,8 +56,7 @@ export function NoteArchiveList({ items, current }: { items: NoteArchiveItem[]; 
   const shown = items.filter((n) => mondayOf(n.date) === week);
 
   return (
-    // v2 모듈(머리 띠 + 1px 테두리). 서버 부품(Module)을 못 물어 같은 꼴을 여기서 적는다. 넘김은 머리 띠 오른쪽에 —
-    // 판 폭에 한 주가 한 줄(월~금 다섯 칸)이라 넘김 줄을 아래에 따로 두면 그 줄만 빈다.
+    // v2 모듈(머리 띠 + 1px 테두리). 서버 부품(Module)을 못 물어 같은 꼴을 여기서 적는다. 넘김은 머리 띠 오른쪽에.
     <section className="v2-mod v2-nt-archive" aria-label="지난 노트">
       <header className="v2-mod-head">
         <h2>지난 노트</h2>
@@ -77,7 +76,7 @@ export function NoteArchiveList({ items, current }: { items: NoteArchiveItem[]; 
           </nav>
         )}
       </header>
-      <ul className="v2-nt-week">
+      <ul className="v2-nt-archive-list">
         {shown.map((n) => (
           <li key={n.date} aria-current={n.date === current ? "page" : undefined}>
             <Link href={n.href} data-ga="note_archive_click">

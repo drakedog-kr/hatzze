@@ -28,12 +28,13 @@ import { NoteArchiveList } from "./NoteArchiveList";
  * 글자가 전부인 화면이라 클라이언트 컴포넌트는 공유 단추와 지난 노트 넘김뿐이다. 크롤러가 첫 HTML 에서 본문을
  * 그대로 읽어야 이 화면이 검색에서 답할 수 있다(종목 실주소 화면과 같은 까닭). 목차의 이동도 `#sec-N` 앵커다.
  *
- * ## v2(2026-10-03) — 한 줄기
+ * ## v2(2026-10-03) — 두 줄기 [글 | 오른쪽 칸]
  *
- * 첫 줄 띠(이전 글 · 다음 글 · 업데이트) → 글(판 폭, 머리 아래 목차) → 언급된 종목(판 폭) → 지난 노트(판 폭, 한 주가 한 줄).
- * 예전엔 [글 | 오른쪽 칸(목차 · 언급된 종목 · 지난 노트)] 두 줄기였는데 글이 칸보다 늘 길어 칸 아래가 비었다 —
- * 1,440 에서 658px, 1,280 에서 2,032px(칸 321px 에 글 661px 로 눌려 글도 3,147px 로 길어졌다).
- * ⛔ 오른쪽 칸을 화면에 따라 붙이는 것(sticky)은 답이 아니다(2026-09-06 · 10-02 두 번) — 긴 것은 판 폭 전체로 뺀다.
+ * 첫 줄 띠(이전 글 · 다음 글 · 업데이트) → [글 | 오른쪽 칸(목차 · 언급된 종목 · 지난 노트)].
+ * ⭐ 오른쪽 칸은 **글을 읽으면서 옆에서 같이 보는 자리**다(2026-10-03 운영자 판단 — "언급된 종목을 옆에 같이 볼 수 있었던 게 아주 좋았다
+ *    · 지난 노트 · 목차도 그 자리가 읽으면서 자연스럽다"). 한 번 한 줄기(글 판 폭 · 목차는 글 머리 아래 · 종목 · 지난 노트는 글 아래)로
+ *    바꿨다가 되돌렸다. ⛔ 다시 한 줄기로 펴지 말 것 — 글이 칸보다 길어 칸 아래가 비는 것은 이 화면에선 감수한다.
+ * ⛔ 오른쪽 칸을 화면에 따라 붙이지(sticky) 않는다(2026-09-06 지시: "맞춰서 움직이지 않게, 고정 형태").
  * 글 아래 앞뒤 글 카드는 걷었다 — 첫 줄 띠와 지난 노트가 같은 길을 낸다.
  *
  * ⚠️ h1 은 셸이 갖는다(`/daily` 는 sr-only '데일리 노트', 날짜 주소는 글 제목이 h1 — NoteArticle 주석).
@@ -105,35 +106,21 @@ function Block({ block }: { block: NoteBlock }) {
 }
 
 /**
- * 글 한 편 — 머리(날짜 · 제목) · 목차 · 본문 · 공유.
+ * 글 한 편 — 머리(날짜 · 제목) · 본문 · 공유.
  *
  * ⭐ 날짜 주소(`/daily/2026-09-05`)에서는 글 제목이 **h1** 이다. 셸은 그 주소의 '데일리 노트'를 h1 이 아닌 글자로 그린다
  * (AppShell LABEL_TITLED_PREFIXES). 예전엔 날짜마다 h1 이 똑같이 '데일리 노트'라 글마다 고유한 제목 신호가 없었다(2026-09-30 점검).
  * `/daily`(가장 최근 글)는 셸의 '데일리 노트'가 h1 이고 글 제목은 h2 그대로다 — 그 화면의 canonical 이 날짜 주소다.
  *
- * 목차는 꼭지(h3)만 — 그 글의 소제목이 곧 그날의 이야기 목록이다. 판 폭이라 두 단으로 편다.
- * ⛔ 꼭지 수("6꼭지")를 목차 머리에 적지 않는다(2026-09-06 지시) — 번호가 이미 센다.
  */
 function NoteArticle({ note, blocks, dated }: { note: DailyNote; blocks: NoteBlock[]; dated: boolean }) {
   const Title = dated ? "h1" : "h2";
-  const toc = noteHeadings(blocks).filter((h) => h.level === 3);
   return (
     <article className="v2-mod v2-nt-art">
       <header className="v2-nt-head">
         <time dateTime={note.date}>{fmtNoteDate(note.date)}</time>
         <Title className="v2-nt-title">{note.title}</Title>
       </header>
-      {toc.length > 0 && (
-        <nav className="v2-nt-toc" aria-label="글의 꼭지">
-          <ol>
-            {toc.map((h) => (
-              <li key={h.id}>
-                <a href={`#${h.id}`}>{h.text}</a>
-              </li>
-            ))}
-          </ol>
-        </nav>
-      )}
       <div className="hz-note-body v2-nt-body">
         {blocks.map((b, i) => (
           <Block key={i} block={b} />
@@ -148,7 +135,29 @@ function NoteArticle({ note, blocks, dated }: { note: DailyNote; blocks: NoteBlo
 }
 
 /**
- * 언급된 종목 — 판 폭에 여러 단(국내는 이름 · 종가 · 등락, 미국은 이름 · 티커). 종목이 많은 날(20곳 넘게)도 키가 낮다.
+ * 목차 — 꼭지(h3)만. 그 글의 소제목이 곧 그날의 이야기 목록이다. 누르면 `#sec-N` 으로 뛴다.
+ * ⛔ 꼭지 수("6꼭지")를 머리에 적지 않는다(2026-09-06 지시) — 번호가 이미 센다.
+ */
+function NoteTocModule({ blocks }: { blocks: NoteBlock[] }) {
+  const items = noteHeadings(blocks).filter((h) => h.level === 3);
+  if (!items.length) return null;
+  return (
+    <Module title="목차">
+      <nav aria-label="글의 꼭지">
+        <ol className="v2-nt-toc">
+          {items.map((h) => (
+            <li key={h.id}>
+              <a href={`#${h.id}`}>{h.text}</a>
+            </li>
+          ))}
+        </ol>
+      </nav>
+    </Module>
+  );
+}
+
+/**
+ * 언급된 종목 — 국내는 이름 · 종가 · 등락, 미국은 이름 · 티커. 오른쪽 칸에 한 단으로 선다(좁은 판에선 글 아래 여러 단).
  *
  * ⚠️ 종가는 오늘 글이면 야후 실시간(카더라 카드와 같은 소스), 지난 글이면 `stocks` 표의 **최근** KRX 값이다 —
  *    지난 글을 열어도 오늘 시세가 보인다. 기준일이 다른 줄은 그 줄에 따로 적는다(lib/daily-note getNoteStocks 머리말).
@@ -244,9 +253,14 @@ export function NoteView({
           basis={note ? [sections ? `꼭지 ${sections}` : null, stocks.kr.length + stocks.us.length ? `종목 ${stocks.kr.length + stocks.us.length}` : null].filter(Boolean).join(" · ") || null : null}
         />
       </div>
-      {note ? <NoteArticle note={note} blocks={blocks} dated={dated} /> : <NoteEmpty failed={failed} />}
-      {note && <NoteStocksModule stocks={stocks} />}
-      {items.length > 0 && <NoteArchiveList items={items} current={note?.date ?? null} />}
+      <div className="v2-nt-page">
+        <div className="v2-nt-main">{note ? <NoteArticle note={note} blocks={blocks} dated={dated} /> : <NoteEmpty failed={failed} />}</div>
+        <aside className="v2-nt-rail" aria-label="글의 곁">
+          {note && <NoteTocModule blocks={blocks} />}
+          {note && <NoteStocksModule stocks={stocks} />}
+          {items.length > 0 && <NoteArchiveList items={items} current={note?.date ?? null} />}
+        </aside>
+      </div>
     </div>
   );
 }
