@@ -150,9 +150,10 @@ export function ThemeModule({ theme, onPick }: { theme: ThemeCmp; onPick: (s: St
  * 1~4차(10-03~04)는 큰 숫자 · 갈림 막대 · 가격대 목록이나 가격대 막대 그림을 겹쳐 실어 "한번에 이해하기 힘들다" · "너무 복잡하다" ·
  * "투박하다"였고, 도넛 하나와 숫자 둘로 줄이자 이번엔 "정보가 없는 느낌"이었다(10-04). 그래서 그림은 도넛 하나로 두고 표 하나를 더한다:
  *  ① 도넛 + 수익 중 · 손실 중 — 가운데는 기준(지금 가격).
- *  ② 평균 매수가 표 — 전체 · 수익 중 · 손실 중 세 줄, 줄마다 평균 매수가와 평균 수익률(지금 가격 ÷ 평균 매수가 − 1). "산 사람들은 평균
+ *  ② 평균 매수가 표 — 수익 중 · 손실 중 두 줄, 줄마다 평균 매수가와 평균 수익률(지금 가격 ÷ 평균 매수가 − 1). "산 사람들은 평균
  *     얼마에 샀고 지금 얼마나 벌었나 · 잃었나"를 한 줄씩 말한다. 칸 머리 줄(평균 매수가 · 평균 수익률)이 열의 뜻을 말해 설명 문장을 안 단다.
  *     ⚠️ 평균 수익률은 사람 수가 아니라 산 금액으로 가중한 평균이다 — 그쪽에 들어간 돈 전체의 수익률과 같다('지금 수익률'에서 고침, 10-04).
+ *     '전체' 줄도 있었는데 두 줄을 돈 비중대로 섞은 값이라 겹쳐 걷었다(운영자 판단, 10-04).
  * 가격대별 몫(priceLadder 의 bands)은 그리지 않는다.
  * ⚠️ 사람 수가 아니라 거래대금(산 쪽)으로 센 어림이다 — 이미 판 사람 · 1년 넘게 든 사람은 못 가른다. 머리 근거가 '최근 1년 거래 기준'.
  */
@@ -173,9 +174,8 @@ export function LadderModule({ ladder, market }: { ladder: PriceLadder; market: 
   // 평균은 어림이라 끝자리까지 적지 않는다 — 국장은 10만 원 이상 백 원, 만 원 이상 십 원 단위(209,432원 → 209,400원). 미장은 센트 그대로.
   const roundAvg = (v: number) => (isUs ? v : v >= 100_000 ? Math.round(v / 100) * 100 : v >= 10_000 ? Math.round(v / 10) * 10 : Math.round(v));
   // 배포 직후 옛 응답(평균 매수가 없음)이 캐시에 남아 있으면 표를 빼고 도넛만.
-  const avgRows: { label: string; avg: number; cls?: string }[] = [];
+  const avgRows: { label: string; avg: number; cls: string }[] = [];
   for (const [label, avg, cls] of [
-    ["전체", ladder.avgPrice, undefined],
     ["수익 중", ladder.gainAvg, "is-gain"],
     ["손실 중", ladder.lossAvg, "is-loss"],
   ] as const) {

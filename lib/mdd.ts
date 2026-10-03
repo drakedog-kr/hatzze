@@ -528,10 +528,9 @@ export type PriceLadder = {
   bands: LadderBand[];
   aboveCount: number;
   /**
-   * 평균 매수가 — 창 거래대금 ÷ 거래량(한 주를 평균 얼마에 샀나, 종가 어림). 전체 · 수익 쪽(anchor 이하에서 거래) · 손실 쪽(anchor 위).
+   * 평균 매수가 — 그쪽 거래대금 ÷ 거래량(한 주를 평균 얼마에 샀나, 종가 어림). 수익 쪽(지금 가격 이하에서 거래) · 손실 쪽(지금보다 비싸게).
    * 그쪽에 거래가 없으면 null. MDD '수익 · 손실 비율' 칸의 표(2026-10-04 "정보가 없는 느낌").
    */
-  avgPrice: number;
   gainAvg: number | null;
   lossAvg: number | null;
 };
@@ -604,7 +603,6 @@ export function priceLadder(bars: Bar[], rows: number): PriceLadder | null {
     step,
     bands: [...up.reverse().map(share), ...down.map(share)],
     aboveCount: nAbove,
-    avgPrice: total / shares,
     gainAvg: shares > sharesAbove ? (total - above) / (shares - sharesAbove) : null,
     lossAvg: sharesAbove > 0 ? above / sharesAbove : null,
   };
