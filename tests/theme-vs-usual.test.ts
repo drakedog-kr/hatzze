@@ -18,13 +18,13 @@ const AI_SEMI = { pos: 67, usual: 80, positive: 126, negative: 59 };
 
 describe("themeTip", () => {
   it("평소보다 낮으면 '덜 낙관적' — 낙관이 과반이어도 '비관'이라 하지 않는다", () => {
-    assert.equal(themeTip(AI_SEMI), "평소보다 덜 낙관적이에요 · 낙관 67% (평소 80%)");
+    assert.equal(themeTip(AI_SEMI), "평소보다 덜 낙관적입니다 · 낙관 67% (평소 80%)");
   });
 
   it("평소보다 높으면 '더 낙관적'", () => {
     assert.equal(
       themeTip({ pos: 88, usual: 80, positive: 440, negative: 60 }),
-      "평소보다 더 낙관적이에요 · 낙관 88% (평소 80%)",
+      "평소보다 더 낙관적입니다 · 낙관 88% (평소 80%)",
     );
   });
 
@@ -32,12 +32,12 @@ describe("themeTip", () => {
     // 16:4 = 80%. 평활값은 70 이라 예전엔 '덜 낙관적'이었다.
     assert.equal(
       themeTip({ pos: 70, usual: 80, positive: 16, negative: 4 }),
-      "평소와 비슷해요 · 낙관 70% (평소 80%)",
+      "평소와 비슷합니다 · 낙관 70% (평소 80%)",
     );
   });
 
   it("평소가 없으면 낙관도만 말한다", () => {
-    assert.equal(themeTip({ ...AI_SEMI, usual: null }), "낙관 67% · 평소 기록이 아직 적어요");
+    assert.equal(themeTip({ ...AI_SEMI, usual: null }), "낙관 67% · 평소 기록이 아직 적습니다");
   });
 });
 

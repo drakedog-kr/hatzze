@@ -52,7 +52,8 @@ export function usualShift(positive: number, negative: number, usual: number): "
   return "same";
 }
 
-const SHIFT_WORD = { up: "평소보다 더 낙관적이에요", down: "평소보다 덜 낙관적이에요", same: "평소와 비슷해요" } as const;
+// 서비스 말투는 합쇼체(~니다)다 — 해요체로 남아 있었다(2026-10-04 문구 점검, 국장 · 미장 카더라 테마별 낙관도 툴팁).
+const SHIFT_WORD = { up: "평소보다 더 낙관적입니다", down: "평소보다 덜 낙관적입니다", same: "평소와 비슷합니다" } as const;
 
 /** 막대 반쪽을 다 채우는 평소와의 차이(%p). 넘으면 끝까지 채운다. 실측상 큰 테마의 흔들림이 ±20 안팎이다. */
 export const THEME_LEAN_FULL = 20;
@@ -87,6 +88,6 @@ export const LEAN_WORD = { up: "더 낙관", down: "덜 낙관", same: "평소 �
  *  1~2점 갈릴 수 있어서 줄에는 숫자를 적지 않는다(parts.tsx ThemeVsUsualRows). */
 export function themeTip(t: ThemeRow): string {
   const pos = `낙관 ${t.pos}%`;
-  if (t.usual === null) return `${pos} · 평소 기록이 아직 적어요`;
+  if (t.usual === null) return `${pos} · 평소 기록이 아직 적습니다`;
   return `${SHIFT_WORD[usualShift(t.positive, t.negative, t.usual)]} · ${pos} (평소 ${t.usual}%)`;
 }
