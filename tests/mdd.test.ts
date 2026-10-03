@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { analyzeDrawdown, drawdownInWindow, drawdownNow, drawdownSeries, episodes, riskProfile } from "../lib/mdd.ts";
+import { analyzeDrawdown, drawdownInWindow, drawdownNow, drawdownOnDates, drawdownSeries, episodes, riskProfile } from "../lib/mdd.ts";
 
 /** 하루 간격의 종가 열. */
 function bars(closes: number[]) {
@@ -151,6 +151,21 @@ describe("drawdownNow · drawdownInWindow — '많이 빠진 대형주'와 화�
       { date: "2026-10-02", close: 100 },
     ];
     assert.equal(drawdownInWindow(series, 1, now)!.peakDate, "2025-10-01");
+  });
+});
+
+describe("drawdownOnDates — 물속 차트의 시장 선은 종목 점 날짜에 맞춘다", () => {
+  it("그날 봉이 없으면(휴장 차이) 그 전 마지막 봉, 첫 봉보다 앞이면 null", () => {
+    const idx = [
+      { date: "2024-01-02", close: 100 },
+      { date: "2024-01-03", close: 80 },
+      { date: "2024-01-05", close: 90 },
+    ];
+    const got = drawdownOnDates(idx, ["2024-01-01", "2024-01-02", "2024-01-04", "2024-01-05"]);
+    assert.equal(got[0], null);
+    assert.equal(got[1], 0);
+    assert.equal(Math.round(got[2]!), -20); // 01-04 은 지수 휴장 — 01-03 값
+    assert.equal(Math.round(got[3]!), -10);
   });
 });
 

@@ -53,6 +53,8 @@ export type MddResult = {
   partial: MddPartial | null;
   /** 같은 기간 기준 지수(코스피 · 코스닥 · S&P500)의 지금 낙폭 — 첫 줄 띠의 시장 칸. 지수를 못 받았으면 null. */
   bench?: DdNow | null;
+  /** 같은 지수의 낙폭을 analysis.underwater 날짜마다(같은 길이) — 물속 차트 '시장과 함께' 선. 지수를 못 받았으면 null. */
+  benchUnderwater?: (number | null)[] | null;
 };
 
 /**

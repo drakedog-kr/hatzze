@@ -16,6 +16,7 @@ import {
   fmtDayCount,
   fmtDay,
   fmtYm,
+  benchName,
   periodInfo,
   cautionShort,
   DOWN,
@@ -315,15 +316,32 @@ export function Underwater({
   periodLabel,
   market,
   focus,
+  focusPeak,
+  cases,
+  onCase,
+  benchSeries,
 }: {
   a: MddAnalysis;
   periodLabel: string;
   market: string | null;
   /** 사례 표에서 고른 하락(고점 → 되찾은 날, 진행 중이면 끝까지) — 그 구간을 옅게 칠한다(판정표 9). */
   focus?: { from: string; to: string | null } | null;
+  /** 고른 사례의 고점 날짜 — 표식 하나를 채운다. */
+  focusPeak?: string | null;
+  /** 역대 하락 사례(깊은 순) — 바닥 자리에 사례 표와 같은 번호를 찍는다(판정표 10). */
+  cases?: { peakDate: string; troughDate: string }[];
+  /** 번호 표식을 누르면 그 사례를 고른다(사례 표 줄을 누른 것과 같다). */
+  onCase?: (peakDate: string) => void;
+  /** 같은 기간 기준 지수의 낙폭(series 와 같은 길이) — '○○와 함께' 탭을 골랐을 때만 겹친다. 없으면 탭도 없다. */
+  benchSeries?: (number | null)[] | null;
 }) {
   const series = a.underwater;
   const mdd = a.mdd;
+  const bench = benchName(market);
+  // 시장 선은 고를 때만 — 늘 깔면 두 겹이 겹쳐 이중으로 보였다(09-27 면으로 깔았다가 걷음). 그래서 선택 탭으로 둔다(10-03).
+  const [withMarket, setWithMarket] = useState(false);
+  const overlay = withMarket && !!benchSeries && benchSeries.length === series.length;
+  const benchVals = overlay ? benchSeries!.filter((v): v is number => v !== null) : [];
   const W = 720;
   const H = 176;
   // 축 글자(0%·−23%·연도)는 그림 **밖**의 HTML 칸에 선다(2026-09-27). 그림 안 <text> 는 그림이 폭에 맞춰 늘어나는 만큼
@@ -333,7 +351,8 @@ export function Underwater({
   const VB_PAD = 6;
   const VBH = H + VB_PAD * 2;
   const n = series.length;
-  const floor = Math.min(mdd, -1); // 0 나눗셈·완전 평평 방지
+  // 0 나눗셈·완전 평평 방지. 시장 선을 겹치면 시장이 더 깊었던 때까지 들어가게 바닥을 넓힌다.
+  const floor = Math.min(mdd, -1, ...(benchVals.length ? [Math.min(...benchVals)] : []));
   const x = (i: number) => (n <= 1 ? PAD_L : PAD_L + (i / (n - 1)) * (W - PAD_L));
   const y = (dd: number) => (dd / floor) * H;
 
@@ -375,9 +394,36 @@ export function Underwater({
     if (focus.to) for (let i = n - 1; i >= 0; i--) if (series[i].date <= focus.to) { i1 = i; break; }
     if (i1 > i0) band = { x0: x(i0), x1: x(i1) };
   }
-  // 기간 최저점 — 곡선에서 가장 깊은 지점에 표시를 남긴다.
+  // 기간 최저점 — 곡선에서 가장 깊은 지점에 표시를 남긴다(사례 번호가 있으면 1번이 그 자리라 안 찍는다).
   let ti = 0;
   for (let i = 1; i < n; i++) if (series[i].dd < series[ti].dd) ti = i;
+
+  // 시장 선 — 빈 날(그 전 지수 봉이 없는 첫머리)에서 끊는다.
+  let benchLine = "";
+  if (overlay) {
+    const segs: [number, number][][] = [];
+    let cur: [number, number][] = [];
+    benchSeries!.forEach((v, i) => {
+      if (v === null) {
+        if (cur.length) segs.push(cur);
+        cur = [];
+      } else cur.push([x(i), y(v)]);
+    });
+    if (cur.length) segs.push(cur);
+    benchLine = segs.filter((sg) => sg.length > 1).map((sg) => smoothPath(sg)).join(" ");
+  }
+
+  // 사례 번호 표식 — 바닥 날짜에 가장 가까운 물속 점(250개로 솎았지만 사례 바닥 날짜는 솎기에서 남긴다).
+  const pointOf = (date: string) => {
+    let k = series.findIndex((p) => p.date >= date);
+    if (k < 0) return n - 1;
+    if (k > 0 && series[k].date !== date && Date.parse(date) - Date.parse(series[k - 1].date) < Date.parse(series[k].date) - Date.parse(date)) k -= 1;
+    return k;
+  };
+  const marks = (cases ?? []).map((c, i) => ({ no: i + 1, peak: c.peakDate, k: pointOf(c.troughDate) }));
+  const at = (k: number) => ({ left: `${(x(k) / W) * 100}%`, top: `${((y(series[k].dd) + VB_PAD) / VBH) * 100}%` });
+  // 선 끝 '지금' — 진행 중인 사례의 바닥이 곧 오늘이면(신저점) 그 번호 표식에 '지금'을 붙이고 점은 따로 안 찍는다.
+  const nowOnMark = marks.some((m) => m.k === n - 1);
 
   /* 확대 보기. 폰에서 이 차트는 뷰박스 720 units 가 화면 폭(≈350)으로 눌려 **절반 축척**이
      된다 — 연도·퍼센트 라벨이 11 units 라 실제 5~6px 로 찍혀 안 읽힌다.
@@ -409,7 +455,9 @@ export function Underwater({
           <div
             key={i}
             className={`hz-tip hz-vline${edge}`}
-            data-tip={`${p.date} · ${fmtPrice(p.close, market)} · 고점 대비 ${fmtPct(p.dd)}`}
+            data-tip={`${p.date} · ${fmtPrice(p.close, market)} · 고점 대비 ${fmtPct(p.dd)}${
+              overlay && benchSeries![i] !== null ? ` · ${bench} ${fmtPct(benchSeries![i]!)}` : ""
+            }`}
             // 선·호버 점을 실제 점 자리(칸 폭의 i/(n−1))에 세운다(app/home/parts.tsx AreaChart 와 같은 셈).
             style={{ flex: 1, position: "relative", ["--hz-x" as string]: `${at * 100}%` }}
           >
@@ -430,8 +478,8 @@ export function Underwater({
     >
       {/* shadcn 영역 차트 꼴(Area Chart · Interactive, 2026-09-27) — 면은 그라데이션, 격자는 가로 실선만 옅게, 선은 1px.
           shadcn 은 선에서 진하고 바닥으로 옅어지는데, 이 차트는 0% 가 위이고 선이 아래라 **깊을수록 진하게** 뒤집었다.
-          종목 한 겹만 그린다 — 시장(코스피) 낙폭을 뒤에 한 겹 더 깔았더니 두 면이 겹쳐 이중으로 보였다(09-27 걷음).
-          시장과의 견줌은 아래 '시장 탓' 구간이 맡는다.
+          시장(코스피) 낙폭은 늘 깔지 않는다 — 면으로 한 겹 더 깔았더니 두 면이 겹쳐 이중으로 보였다(09-27 걷음).
+          머리의 '○○와 함께' 탭을 고르면 면 없이 회색 선 하나로만 겹친다(10-03).
           이 그림은 확대 보기에서도 한 번 더 그려져 id 가 두 번 선다 — 모양이 같아 어느 쪽을 집어도 같다. */}
       <defs>
         <linearGradient id="mdd-uw-fill" x1="0" y1="0" x2="0" y2="1">
@@ -453,10 +501,12 @@ export function Underwater({
         </g>
       )}
       <path d={area} fill="url(#mdd-uw-fill)" />
+      {benchLine && <path className="mdd-uw-bench" d={benchLine} vectorEffect="non-scaling-stroke" />}
       <path d={line} fill="none" stroke={DOWN_BAR[1]} strokeWidth="1" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-      {/* 기간 최저점 표시 — **빈 동그라미만**. 현재 지점에도 속 찬 점을 찍었었는데 뺐다:
-          선이 끝나는 자리가 곧 현재이고, 그 값은 히어로가 이미 크게 말한다. */}
-      <circle cx={x(ti)} cy={y(series[ti].dd)} r="3" fill={C.card} stroke={DOWN} strokeWidth="1.2" vectorEffect="non-scaling-stroke" />
+      {/* 기간 최저점 — 빈 동그라미. 사례 번호를 찍으면 1번(가장 깊은 사례)이 그 자리라 안 찍는다. */}
+      {marks.length === 0 && (
+        <circle cx={x(ti)} cy={y(series[ti].dd)} r="3" fill={C.card} stroke={DOWN} strokeWidth="1.2" vectorEffect="non-scaling-stroke" />
+      )}
     </svg>
   );
 
@@ -475,6 +525,30 @@ export function Underwater({
       <div style={{ position: "relative", minWidth: 0 }}>
         {chartOnly}
         {crosshair(extraClass)}
+        {/* 표식은 HTML 로 얹는다 — 그림 안 글자는 그림 폭에 따라 커졌다 작아졌다 한다(축 글자를 밖으로 뺀 것과 같은 까닭).
+            '지금'은 선 끝 점 + 후광. 예전(09)엔 값이 히어로에 있다고 뺐지만, 번호 표식과 같이 보면 지금이 어느 사례 뒤인지가 보인다. */}
+        <div className="mdd-uw-marks">
+          {!nowOnMark && (
+            <span className="mdd-uw-now" style={at(n - 1)} aria-hidden>
+              <em>지금</em>
+            </span>
+          )}
+          {marks.map((m) => (
+            <button
+              key={m.peak}
+              type="button"
+              className={`mdd-uw-num${focusPeak === m.peak ? " is-on" : ""}`}
+              style={at(m.k)}
+              aria-label={`${m.no}번 사례 구간을 차트에 표시`}
+              aria-pressed={focusPeak === m.peak}
+              onClick={() => onCase?.(m.peak)}
+              data-ga="mdd_uw_case"
+            >
+              {m.no}
+              {m.k === n - 1 && <em>지금</em>}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="hz-chart-x" aria-hidden>
         {ticks.map((t, i) => (
@@ -493,7 +567,25 @@ export function Underwater({
         icon="show_chart"
         title="언더워터 차트"
         desc="전고점을 0으로 두고 그 아래로 얼마나 잠겼는지"
-        note={focus ? `${periodLabel} · ${fmtYm(focus.from)} ~ ${focus.to ? fmtYm(focus.to) : "진행 중"}` : periodLabel}
+        right={
+          <div className="mdd-uw-head">
+            <span className="hz-sheet-head-note">
+              {focus ? `${periodLabel} · ${fmtYm(focus.from)} ~ ${focus.to ? fmtYm(focus.to) : "진행 중"}` : periodLabel}
+            </span>
+            {/* 시장 선 고르기(10-03 "옵션을 주자 선택 탭을 넣어서"). 지수를 못 받았으면 탭이 없다. */}
+            {benchSeries && benchSeries.length === series.length && (
+              <div className="hz-seg hz-seg-hover mdd-uw-seg" role="group" aria-label="차트에 시장 겹치기">
+                <button type="button" aria-pressed={!withMarket} onClick={() => setWithMarket(false)}>
+                  종목만
+                </button>
+                <button type="button" aria-pressed={withMarket} onClick={() => setWithMarket(true)} data-ga="mdd_uw_market">
+                  {bench}
+                  {market === "US" || market === "KOSDAQ" ? "과" : "와"} 함께
+                </button>
+              </div>
+            )}
+          </div>
+        }
       />
       <div style={{ padding: "20px 22px 16px", position: "relative" }}>
       {/* overflow:visible — 최저점 표시가 하필 마지막 지점일 때(지금이 역대 최저인

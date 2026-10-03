@@ -487,6 +487,22 @@ export function drawdownInWindow(bars: Bar[], years: number, nowMs: number): DdN
   return drawdownNow(bars.filter((b) => b.date >= start));
 }
 
+/**
+ * 다른 시계열(시장 지수)의 고점 대비 낙폭을 주어진 날짜들에 맞춰 뽑는다 — 물속 차트에 시장 선을 겹칠 때(2026-10-03).
+ * 화면의 물속 점은 250개로 솎은 것이라 그 날짜에 맞춘다. 그날 지수 봉이 없으면(휴장 차이) 그 전 마지막 봉, 그보다 앞이면 null.
+ * 고점은 bars 첫 봉부터 잰다 — 종목과 같은 기간으로 받은 지수라 두 선의 0% 가 같은 출발점에 선다.
+ */
+export function drawdownOnDates(bars: Bar[], dates: readonly string[]): (number | null)[] {
+  const ds = drawdownSeries(bars);
+  const out: (number | null)[] = [];
+  let j = -1;
+  for (const d of dates) {
+    while (j + 1 < ds.length && ds[j + 1].date <= d) j++;
+    out.push(j >= 0 ? ds[j].dd : null);
+  }
+  return out;
+}
+
 /** date(YYYY-MM-DD) 당일 또는 그 이전의 마지막 종가. 없으면 null. */
 function closeOnOrBefore(bars: Bar[], date: string): number | null {
   let res: number | null = null;

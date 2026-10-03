@@ -947,6 +947,50 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-md-case[role="button"]:focus-visible { outline: 2px solid var(--t-down); outline-offset: -2px; }
 .v2-md-case.is-on,
 .v2-md-case.is-on:hover { background: var(--t-down-weak); box-shadow: inset 3px 0 0 var(--t-down); }
+/* 사례 번호 — 물속 차트의 번호 표식과 같은 꼴(작은 동그라미). */
+.v2-md-case-n { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; margin-right: 8px; border: 1.5px solid var(--t-down); border-radius: 50%; font-style: normal; font-size: 10px; font-weight: 700; line-height: 1; color: var(--t-down); vertical-align: 1px; font-variant-numeric: tabular-nums; }
+.v2-md-case.is-on .v2-md-case-n { background: var(--t-down); color: var(--t-card); }
+
+/* 물속 차트 머리 — 기간 글자 + '종목만 · ○○와 함께' 탭(키 28). */
+.mdd-uw-head { display: flex; align-items: center; gap: 10px; }
+.v2-kd.v2-md .mdd-uw-seg { height: 28px; padding: 2px; }
+.v2-kd.v2-md .mdd-uw-seg > button { padding: 0 8px; font-size: 12px; }
+/* 물속 차트 표식(HTML) — 사례 번호 · 지금 점. 확대 판(포털, v2 범위 밖)에서도 보이게 색마다 옛 토큰을 기본값으로. */
+.mdd-uw-marks { position: absolute; inset: 0; pointer-events: none; }
+.mdd-uw-num {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border: 1.5px solid var(--t-down, var(--c-cold-ink));
+  border-radius: 50%;
+  background: var(--t-card, var(--c-card));
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--t-down, var(--c-cold-ink));
+  font-variant-numeric: tabular-nums;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.mdd-uw-num:hover,
+.mdd-uw-num.is-on { background: var(--t-down, var(--c-cold-ink)); color: var(--t-card, var(--c-card)); }
+.mdd-uw-num:focus-visible { outline: 2px solid var(--t-down, var(--c-cold-ink)); outline-offset: 2px; }
+.mdd-uw-now { position: absolute; width: 8px; height: 8px; transform: translate(-50%, -50%); border-radius: 50%; background: var(--t-down, var(--c-cold-ink)); box-shadow: 0 0 0 4px color-mix(in srgb, var(--t-down, #1466e2) 22%, transparent); }
+/* '지금' 글자 — 점 위 가운데. 오른쪽은 선이 끝나 자리가 없고, 왼쪽에 두면 끝 가까운 사례 번호와 겹쳤다(1024 · 폰 실측).
+   사례 번호는 바닥(아래쪽)에 찍히니 위가 비어 있다. */
+.mdd-uw-now > em,
+.mdd-uw-num > em { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); padding: 0 3px; border-radius: 3px; background: var(--t-card, var(--c-card)); font-style: normal; font-size: 11px; font-weight: 700; line-height: 14px; color: var(--t-down, var(--c-cold-ink)); white-space: nowrap; }
+.mdd-uw-num.is-on > em,
+.mdd-uw-num:hover > em { background: var(--t-card, var(--c-card)); color: var(--t-down, var(--c-cold-ink)); }
+/* 시장 선 — 면 없이 회색 선 하나(종목 선은 파랑). */
+.mdd-uw-bench { fill: none; stroke: var(--t-ink3, var(--c-muted)); stroke-width: 1; stroke-linejoin: round; }
+
 /* 물속 차트의 고른 구간 — 확대 판(포털, v2 범위 밖)에서도 보이게 색에 기본값을 둔다. */
 .mdd-uw-band rect { fill: var(--t-down, #1466e2); fill-opacity: 0.08; }
 .mdd-uw-band line { stroke: var(--t-down, #1466e2); stroke-width: 1; stroke-dasharray: 3 3; stroke-opacity: 0.7; }

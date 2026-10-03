@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { analyzeDrawdown, drawdownNow, drawdownSeries, moveBetween, riskProfile, type Bar } from "@/lib/mdd";
+import { analyzeDrawdown, drawdownNow, drawdownOnDates, drawdownSeries, moveBetween, riskProfile, type Bar } from "@/lib/mdd";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { MDD_PEER_MAX, themesForName, THEMES } from "@/lib/stock-themes";
 import { US_MDD_PEER_MAX, US_THEMES, themesForTicker } from "@/lib/us-stock-themes";
@@ -95,6 +95,8 @@ export async function GET(request: Request) {
   const theme = themeFetch.theme;
   // 같은 기간 기준 지수의 지금 낙폭 — 첫 줄 띠의 시장 칸('최근 10년 고점 대비 코스피 −23.2%').
   const bench = marketBars ? drawdownNow(marketBars) : null;
+  // 물속 차트의 '시장과 함께' 선 — 종목 물속 점과 같은 날짜로 맞춘 지수 낙폭(250개 남짓).
+  const benchUnderwater = marketBars ? drawdownOnDates(marketBars, analysis.underwater.map((p) => p.date)) : null;
 
   // 해마다 수익 · 낙폭과 복리 연평균(화면 '해마다' 모듈) — 종목 종가로 요약.
   const risk = riskProfile(bars);
@@ -129,7 +131,7 @@ export async function GET(request: Request) {
       : null;
 
   return NextResponse.json(
-    { ok: true, code, name, market, symbol, years: yearsKey, analysis, attribution, theme, risk, partial, bench },
+    { ok: true, code, name, market, symbol, years: yearsKey, analysis, attribution, theme, risk, partial, bench, benchUnderwater },
     {
       headers: {
         "Cache-Control": partial

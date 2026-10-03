@@ -210,7 +210,7 @@ export function SummaryModule({ data }: { data: MddResult }) {
 
 /* ── 역대 하락 사례 ─────────────────────────────────────────────── */
 /**
- * 사건마다 한 줄 — 구간 · 깊이 · 같은 기간 시장 · 빠진 기간 · 되찾은 기간 · 유형. 깊은 순(lib/mdd.ts topDrawdowns).
+ * 사건마다 한 줄 — 번호 · 구간 · 깊이 · 같은 기간 시장 · 빠진 기간 · 되찾은 기간 · 유형. 깊은 순(lib/mdd.ts topDrawdowns).
  * 시장 칸은 고점→저점 사이 지수 등락이다(api/mdd 가 채운다). 유형은 고점→저점이 CHARACTER_SPLIT_DAYS 이하면 급락.
  */
 export function CasesTable({
@@ -240,7 +240,7 @@ export function CasesTable({
           <span>유형</span>
         </div>
         <ol>
-          {a.topDrawdowns.map((e) => (
+          {a.topDrawdowns.map((e, i) => (
             <li
               key={e.peakDate}
               className={`v2-md-case${e.recovered ? "" : " is-now"}${focus === e.peakDate ? " is-on" : ""}`}
@@ -257,6 +257,8 @@ export function CasesTable({
               }}
             >
               <span className="v2-md-case-span">
+                {/* 물속 차트의 번호 표식과 같은 번호(깊은 순) — 표와 차트가 누르지 않아도 이어진다(판정표 10). */}
+                <i className="v2-md-case-n">{i + 1}</i>
                 {fmtYm(e.peakDate)} ~ {e.recovered ? fmtYm(e.recoveryDate!) : <b>진행 중</b>}
               </span>
               <span className="is-num is-down">{fmtPct(e.depth)}</span>

@@ -370,7 +370,16 @@ export function Results({ data, bigDrops, onPick }: { data: MddResult; bigDrops?
       <MddCover data={data} periodLabel={periodLabel} />
       <HeroStrip data={data} periodLabel={periodLabel} />
       <div id="mdd-uw">
-        <Underwater a={a} periodLabel={periodLabel} market={data.market} focus={ep ? { from: ep.peakDate, to: ep.recoveryDate } : null} />
+        <Underwater
+          a={a}
+          periodLabel={periodLabel}
+          market={data.market}
+          focus={ep ? { from: ep.peakDate, to: ep.recoveryDate } : null}
+          focusPeak={focus}
+          cases={a.topDrawdowns}
+          onCase={(peakDate) => onFocus(focus === peakDate ? null : peakDate)}
+          benchSeries={data.benchUnderwater ?? null}
+        />
       </div>
 
       {/* v2(2026-10-03 판정표 1단계) — 독자 질문 순서: 얼마나 빠졌나(위 둘) → 흔한가 · 언제 되찾나 → 왜(시장) · 장기 성적 → 업종 → 다른 종목.
