@@ -74,9 +74,17 @@
   display: flex;
   align-items: baseline;
   gap: 8px;
+  /* 키를 42 로 못박는다 — 근거(meta) 글이 있는 머리는 기준선 맞춤으로 42, 없는 머리(오늘의 요약 같은 AI 모듈)는 41 이라
+     나란한 짝의 머리 밑줄이 1px 어긋났다(2026-10-04 세부 점검). */
+  min-height: 42px;
   padding: 10px 14px;
   border-bottom: 1px solid var(--t-line);
 }
+/* 제목 뒤 물음표 — 제목 글자와 세로 가운데를 맞춘다(h2 는 baseline 정렬이라 아이콘만 center). */
+.v2-mod-help { display: inline-flex; align-self: center; margin-left: 1px; color: var(--t-ink3); cursor: help; }
+.v2-mod-help .ms { font-size: 15px; }
+.v2-mod-help:hover,
+.v2-mod-help:focus-visible { color: var(--t-ink2); }
 .v2-mod-head h2 {
   display: flex;
   align-items: baseline;
@@ -1748,7 +1756,7 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 .v2-nt-stock-px em { font-style: normal; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 
 /* 지난 노트 — 세로 목록(날짜 칸 고정 · 제목). 지금 읽는 글은 파란 날짜 · 굵은 제목. 넘김은 머리 띠 오른쪽. */
-.v2-nt-pager { margin-left: auto; display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 500; line-height: 20px; color: var(--t-ink3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v2-nt-pager { margin-left: auto; align-self: center; display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 500; line-height: 20px; color: var(--t-ink3); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .v2-nt-pager span { padding: 0 4px; }
 .v2-nt-pager button {
   display: inline-flex;
@@ -2066,7 +2074,9 @@ a.v2-isd-row:hover { background: var(--t-tint); margin: 0 -14px; padding: 0 14px
 .v2-isd-num.is-sub { font-size: 12px; font-weight: 500; color: var(--t-ink2); }
 
 /* 차트 — 머리 띠 오른쪽 기간 단추(작은 세그먼트) · 차트 위 한 줄(매매자 칩 | 범례). */
-.v2-isd-chart .v2-mod-aside .hz-seg { height: 28px; padding: 2px; gap: 2px; border: 1px solid var(--t-frame); border-radius: 4px; background: var(--t-card); }
+/* 머리 키(42)를 안 키우게 — 단추 24px 를 위아래 -2px 로 띄운다(28px 였을 땐 이 머리만 49px 이었다). */
+.v2-isd-chart .v2-mod-aside { align-self: center; }
+.v2-isd-chart .v2-mod-aside .hz-seg { height: 24px; margin-block: -2px; padding: 2px; gap: 2px; border: 1px solid var(--t-frame); border-radius: 4px; background: var(--t-card); }
 .v2-isd-chart .v2-mod-aside .hz-seg > a { display: inline-flex; align-items: center; padding: 0 10px; border-radius: 3px; font-size: 12px; font-weight: 600; color: var(--t-ink3); text-decoration: none; }
 .v2-isd-chart .v2-mod-aside .hz-seg > a[aria-current] { background: var(--t-ink); color: var(--t-card); }
 .v2-isd-chart .v2-mod-aside .hz-seg > a:not([aria-current]):hover { background: var(--t-tint); color: var(--t-ink); }

@@ -19,6 +19,7 @@ import { AiMark, Icon } from "../ui";
 export function Module({
   id,
   title,
+  help,
   meta,
   aside,
   ai,
@@ -27,6 +28,11 @@ export function Module({
 }: {
   id?: string;
   title: string;
+  /**
+   * 제목 바로 뒤 물음표 툴팁(15자 안 한 마디). ⭐ 설명하는 제목에 붙여 둔다 — 머리 띠 오른쪽 끝(aside)에 두면 '전체 보기' 옆에 떨어져
+   * 무엇을 설명하는지 안 읽혔고 글자보다 3px 떠 있었다(2026-10-04 지적).
+   */
+  help?: string;
   /** 제목 옆 근거 — 기간 · 표본 · 기준 시각. 인텔리전스 화면은 숫자마다 '어디서 언제'를 단다. */
   meta?: string;
   aside?: React.ReactNode;
@@ -41,6 +47,11 @@ export function Module({
         <h2>
           {ai && <AiMark size={13} />}
           {title}
+          {help && (
+            <span className="hz-tip hz-tip-wide v2-mod-help" data-tip={help} aria-label={help} tabIndex={0}>
+              <Icon name="help" />
+            </span>
+          )}
         </h2>
         {meta && <span className="v2-mod-meta">{meta}</span>}
         {aside && <span className="v2-mod-aside">{aside}</span>}

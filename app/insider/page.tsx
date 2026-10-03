@@ -126,14 +126,7 @@ export default async function InsiderPage() {
         <Module
           title={INSIDER_LISTS.managers.title}
           meta={`${insiderNote("managers", ov)} · 월가 거물 ${ov.scale.managers.toLocaleString("ko-KR")}명`}
-          aside={
-            <>
-              <span className="hz-tip hz-tip-wide v2-in-help" data-tip={INSIDER_LISTS.managers.help} aria-label={INSIDER_LISTS.managers.help} tabIndex={0}>
-                <Icon name="help" />
-              </span>
-              <SeeAll href={insiderListHref("managers")} />
-            </>
-          }
+          aside={<SeeAll href={insiderListHref("managers")} />}
         >
           {ov.managerRanks.length === 0 ? <p className="v2-empty">명단을 못 읽었습니다.</p> : <Rows items={managerLines(ov.managerRanks.slice(0, BLOCK_ROWS), ov.usdKrw)} />}
         </Module>

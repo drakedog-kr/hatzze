@@ -8,7 +8,6 @@ import { fmtKoDate } from "@/lib/stock-page";
 
 import { CurrencyToggle } from "../../../AppShell";
 import { CoverMeta, Module } from "../../../kadera/V2Modules";
-import { Icon } from "../../../ui";
 import { INSIDER_CARD } from "../../../og-copy";
 import { pageMetadata } from "../../../seo";
 import { ExpandableList } from "../../../kadera/ExpandableList";
@@ -291,12 +290,8 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
           title={card.title}
           // ⚠️ 잘렸으면 머리 근거가 그 사실을 적는다("1,000개 중 100개") — "전체보기"라 해 놓고 조용히 100개만 내면 거짓말이 된다.
           meta={countNote(card.total, card.items.length)}
-          // 셈법 한 마디는 물음표 툴팁으로(데이터 툴팁). 카드 부제(설명 문장)는 걷었다(v2).
-          aside={
-            <span className="hz-tip hz-tip-wide v2-in-help" data-tip={spec.help} aria-label={spec.help} tabIndex={0}>
-              <Icon name="help" />
-            </span>
-          }
+          // 셈법 한 마디는 물음표 툴팁으로 — 제목 바로 뒤(Module help). 카드 부제(설명 문장)는 걷었다(v2).
+          help={spec.help}
           className="v2-in-listmod"
         >
           {card.items.length === 0 ? (
