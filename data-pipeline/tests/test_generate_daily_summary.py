@@ -8,10 +8,10 @@ from datetime import datetime, timezone
 
 from generate_daily_summary import (
     CHANGE_NONE,
+    LINE_MAX,
     change_fallback,
     hot_fallback,
     brief_story,
-    temp_gap,
     yeoron_problems,
     yeoron_tone,
     balance_count_problems,
@@ -198,13 +198,6 @@ def test_brief_story_is_second_paragraph():
     assert brief_story(None) == ""
 
 
-def test_temp_gap_only_when_they_disagree():
-    assert temp_gap("저온", "낙관 우세") == "시장 온도는 저온인데 여론은 낙관이 우세합니다."
-    assert temp_gap("초고온", "비관 우세") == "시장 온도는 초고온인데 여론은 비관이 우세합니다."
-    assert temp_gap("저온", "중립") is None
-    assert temp_gap("상온", "낙관 우세") is None
-
-
 def test_yeoron_problems():
     ok = "카더라에서는 낙관과 비관이 팽팽하고, 사흘 전엔 거의 없던 HBM 이야기가 새로 올라왔습니다."
     assert yeoron_problems(ok, "중립", NAMES) == []
@@ -219,14 +212,14 @@ def test_hot_fallback_is_true_and_josa_free():
             _row("금 대비 코스피 상대강도", "시장", 63), _row("코스피 상승 속도", "시장", 0), _row("고점권 외국인 매도", "시장", 0)]
     hot, top = balance_counts(rows)
     s = hot_fallback(rows, hot)
-    assert s == ("초고온에 든 지표는 **경제 베스트셀러 비중**(94%) 하나입니다. "
-                 "시장 지표 가운데 가장 식은 쪽은 **코스피 상승 속도**(0%) · **고점권 외국인 매도**(0%)입니다.")
+    # 한 곳만 — 식은 시장 지표는 안 적는다(2026-10-04 '뜨거운 곳' 한 줄).
+    assert s == "초고온에 든 지표는 **경제 베스트셀러 비중**(94%) 하나입니다."
     assert hot_problems(s, rows, hot, top) == []
     # 초고온 지표가 쉬면 종류와 개수로
     rested = [dict(r, rest=(r["name"] == "경제 베스트셀러 비중")) for r in rows]
     h2, t2 = balance_counts(rested)
     s2 = hot_fallback(rested, h2)
-    assert s2.startswith("초고온에는 감성 지표 1개가 들었습니다.")
+    assert s2 == "초고온에는 감성 지표 1개가 들었습니다."
     assert hot_problems(s2, rested, h2, t2) == []
 
 
@@ -242,6 +235,17 @@ def test_hot_fallback_no_hot_names_top_only_when_true():
     assert hot_problems(s, rows, hot, top) == []
 
 
+def test_hot_fallback_names_one_of_many():
+    rows = [_row("코인 투자 과열 지수", "감성", 78), _row("경제 베스트셀러 비중", "감성", 76), _row("코스피 상승 속도", "시장", 0)]
+    hot, top = balance_counts(rows)
+    s = hot_fallback(rows, hot)
+    assert s == "초고온에 든 지표 2개 가운데 하나는 **코인 투자 과열 지수**(78%)입니다."
+    assert hot_problems(s, rows, hot, top) == []
+
+
 def test_change_fallback_lists_movers():
     got = change_fallback([{"name": "경제뉴스 감성 지수", "hotter": True}, {"name": "VKOSPI (변동성지수)", "hotter": False}])
     assert got == "최근 하루 평소보다 크게 움직인 지표는 **경제뉴스 감성 지수**(더 뜨거워짐) · **VKOSPI (변동성지수)**(식음)입니다."
+    # 셋이면 앞의 둘만 — 한 줄(LINE_MAX)에 들게.
+    three = change_fallback([{"name": "경제뉴스 감성 지수", "hotter": True}, {"name": "VKOSPI (변동성지수)", "hotter": False}, {"name": "버핏지수", "hotter": True}])
+    assert three == got and len(three.replace("**", "")) <= LINE_MAX
