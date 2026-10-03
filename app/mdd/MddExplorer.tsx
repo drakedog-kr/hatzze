@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { DEFAULT, DEFAULT_YEARS, mddQuery, normalizeYears } from "./shared";
-import type { BigDrops, StockOption, SuggestGroups, MddResult } from "./shared";
+import type { StockOption, SuggestGroups, MddResult } from "./shared";
 
 // page.tsx 가 여기서 가져가던 타입. 파일을 나누면서 shared 로 갔지만 바깥 import 는 그대로 둔다.
 export type { StockOption, SuggestGroups, Suggestion } from "./shared";
@@ -14,15 +14,12 @@ export function MddExplorer({
   initial,
   initialYears = DEFAULT_YEARS,
   suggestions,
-  bigDrops,
 }: {
   stocks: StockOption[];
   initial?: StockOption | null;
   /** 주소의 ?years= (page.tsx 가 normalizeYears 로 거른 값). */
   initialYears?: string;
   suggestions?: SuggestGroups;
-  /** '많이 빠진 대형주'(page.tsx loadBigDrops). */
-  bigDrops?: BigDrops;
 }) {
   // initial 은 URL(?code=…)로 지정된 종목. 없으면 기본 종목(삼성전자)으로 연다.
   const [selected, setSelected] = useState<StockOption>(initial ?? DEFAULT);
@@ -118,7 +115,7 @@ export function MddExplorer({
     remember(s);
     pushUrl(s, years);
   };
-  /* 화면 아래쪽(업종 칸 · 많이 빠진 대형주)에서 종목을 누르면 맨 위로 올린다 — 결과가 자리표시자로 바뀌며 키가 줄어,
+  /* 화면 아래쪽(업종 칸)에서 종목을 누르면 맨 위로 올린다 — 결과가 자리표시자로 바뀌며 키가 줄어,
      그 자리에 머물면 바닥(푸터)만 보인다. 본문 스크롤은 셸의 main.hz-scroll 이 맡는다(폰은 창). */
   const pickFromResults = (s: StockOption) => {
     pick(s);
@@ -150,7 +147,7 @@ export function MddExplorer({
 
       {loading && <Skeleton periodOnly={periodOnly} />}
       {!loading && error && <ErrorCard message={error} />}
-      {!loading && !error && data && <Results data={data} bigDrops={bigDrops} onPick={pickFromResults} />}
+      {!loading && !error && data && <Results data={data} onPick={pickFromResults} />}
     </div>
   );
 }

@@ -10,7 +10,8 @@
  * adjclose 는 감자에서 음수가 나오는 등 깨져 있어 쓰지 않는다(SK하이닉스 실측).
  */
 
-export type Bar = { date: string; close: number };
+/** volume 은 그날 거래량(주). 야후가 안 준 봉(결측)이나 거래량을 안 쓰는 경로에선 없다 — 가격대별 거래(priceLadder)만 쓴다. */
+export type Bar = { date: string; close: number; volume?: number };
 
 /** 각 시점의 고점 대비 낙폭(%). dd 는 0 이하이고, 새 고점에서 0 이 된다. */
 export type DrawdownPoint = { date: string; close: number; dd: number };
@@ -496,14 +497,72 @@ export function drawdownNow(bars: Bar[]): DdNow | null {
   return { dd: (bars[bars.length - 1].close / peak.close - 1) * 100, peakDate: peak.date };
 }
 
-/**
- * 최근 years 년만 잘라 지금 낙폭 — 10년치를 한 번 받아 1 · 3 · 5 · 10년을 다 낸다('많이 빠진 대형주').
- * 창은 fetchDailyHistory(years) 와 같다(지금에서 years×365일, 그리고 하루 더) — 같은 종목을 눌러 열었을 때 화면의
- * '지금 낙폭'과 같은 값이 나와야 한다.
+/* ── 가격대별 거래 ─────────────────────────────────────────────────
+ * 최근 1년 거래대금(그날 종가 × 거래량)을 같은 폭의 가격대로 나눈 것 — MDD '가격대별 거래' 칸(2026-10-03, '많이 빠진 대형주' 자리).
+ * 낙폭 화면을 여는 사람은 대개 손실 중인 보유자라 "지금 가격보다 비싸게 산 돈이 얼마나 되나 · 어느 가격대에 몰렸나"를 묻는다.
+ * ⚠️ 하루를 종가 한 점으로 본다 — 장중에 어느 가격에서 거래됐는지는 나누지 못하는 어림이다.
  */
-export function drawdownInWindow(bars: Bar[], years: number, nowMs: number): DdNow | null {
-  const start = new Date(nowMs - years * 365 * 86_400_000 - 86_400_000).toISOString().slice(0, 10);
-  return drawdownNow(bars.filter((b) => b.date >= start));
+
+/** 가격대 칸 수 — 옆 업종 칸과 줄 수를 맞춘다(업종 칸이 없거나 대표 종목이 적으면 이 값 · 하한). */
+export const LADDER_ROWS = 10;
+export const LADDER_MIN_ROWS = 8;
+/** 창(달력 일). 1년. */
+const LADDER_DAYS = 365;
+
+export type LadderBand = { lo: number; hi: number; share: number; days: number };
+export type PriceLadder = {
+  from: string;
+  to: string;
+  /** 지금 종가. */
+  price: number;
+  /** 창 거래대금 중 종가가 지금보다 높았던 날의 몫(%). 칸 경계와 상관없이 날마다 잰 값이다. */
+  aboveShare: number;
+  /** 가격대 칸 너비(원 · 달러) — 칸 경계를 떨어지는 수로 맞춘 값. */
+  step: number;
+  /** 비싼 칸부터. */
+  bands: LadderBand[];
+};
+
+/**
+ * 칸 경계는 **떨어지는 수**로 맞춘다 — 같은 폭으로만 자르면 '121,337~143,373' 같은 경계가 섰다.
+ * 칸 너비를 유효 숫자 두 자리로 올림하고 아래 끝을 그 단위로 내림한다. 그래서 위 끝이 최고가를 조금 넘을 수 있다(칸 하나 남짓).
+ * 너비가 1 이상이면 단위를 1 아래로 내리지 않는다 — 엔비디아(너비 6.4달러)가 6.5 로 잡혀 줄 이름이 '$224'(실제 223.5)로 어긋났다.
+ */
+export function priceLadder(bars: Bar[], rows: number): PriceLadder | null {
+  if (bars.length === 0 || rows < 2) return null;
+  const last = bars[bars.length - 1];
+  const start = new Date(Date.parse(last.date) - LADDER_DAYS * 86_400_000).toISOString().slice(0, 10);
+  const win = bars.filter((b) => b.date > start && typeof b.volume === "number" && b.volume > 0);
+  // 거래가 스무 날도 안 되면(상장 직후 · 거래량 결측) 가격대를 나눌 표본이 아니다.
+  if (win.length < 20) return null;
+  const closes = win.map((b) => b.close);
+  const min = Math.min(...closes);
+  const max = Math.max(...closes);
+  if (!(max > min)) return null;
+  const raw = (max - min) / rows;
+  const unit = raw >= 1 ? Math.max(1, 10 ** (Math.floor(Math.log10(raw)) - 1)) : 10 ** (Math.floor(Math.log10(raw)) - 1);
+  const step = Math.ceil(raw / unit) * unit;
+  const lo = Math.floor(min / unit) * unit;
+  const acc = Array.from({ length: rows }, (_, i) => ({ lo: lo + i * step, hi: lo + (i + 1) * step, value: 0, days: 0 }));
+  let total = 0;
+  let above = 0;
+  for (const b of win) {
+    const v = b.close * b.volume!;
+    const i = Math.min(rows - 1, Math.max(0, Math.floor((b.close - lo) / step)));
+    acc[i].value += v;
+    acc[i].days += 1;
+    total += v;
+    if (b.close > last.close) above += v;
+  }
+  if (!(total > 0)) return null;
+  return {
+    from: win[0].date,
+    to: last.date,
+    price: last.close,
+    aboveShare: (above / total) * 100,
+    step,
+    bands: acc.reverse().map((b) => ({ lo: b.lo, hi: b.hi, share: (b.value / total) * 100, days: b.days })),
+  };
 }
 
 /**

@@ -6,11 +6,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { gaSearchTerm, gaStockCode, track } from "@/lib/ga";
 import { C, Icon, MONO } from "../ui";
 import { StockLogo } from "../StockLogo";
-import { BIG_DROP_SHOW, MAJOR_NAMES, PERIODS, marketBadge, benchName, fmtDay } from "./shared";
-import type { BigDrops, StockOption, Suggestion, SuggestGroups, MddResult } from "./shared";
+import { MAJOR_NAMES, PERIODS, marketBadge, benchName, fmtDay } from "./shared";
+import type { StockOption, Suggestion, SuggestGroups, MddResult } from "./shared";
 import { periodLabelOf, AbsentSheet } from "./sheet";
 import { HeroStrip, Underwater } from "./Hero";
-import { AttributionModule, BigDropsModule, CasesTable, MddCover, RecoveryModule, ThemeModule, YearsModule } from "./V2Sheets";
+import { AttributionModule, CasesTable, LadderModule, MddCover, RecoveryModule, ThemeModule, YearsModule } from "./V2Sheets";
 
 const MAJOR_RANK = new Map(MAJOR_NAMES.map((n, i) => [n, i]));
 
@@ -351,7 +351,7 @@ export function Controls({
    v2 화면(카더라 · 시장 브리핑)엔 큰 구간 제목이 없다. */
 
 
-export function Results({ data, bigDrops, onPick }: { data: MddResult; bigDrops?: BigDrops; onPick: (s: StockOption) => void }) {
+export function Results({ data, onPick }: { data: MddResult; onPick: (s: StockOption) => void }) {
   const a = data.analysis;
   const periodLabel = periodLabelOf(data);
   // 사례 표에서 고른 하락 — 물속 차트에 그 구간을 칠한다(판정표 9). 결과가 새로 서면(종목 · 기간 변경) 이 컴포넌트가 새로 서서 풀린다.
@@ -425,8 +425,9 @@ export function Results({ data, bigDrops, onPick }: { data: MddResult; bigDrops?
         )}
       </div>
 
-      {/* 업종 안에서 | 많이 빠진 대형주(판정표 8) — 같은 꼴(이름 · 막대 · 값) 두 칸을 나란히, 줄 수를 맞춰 줄끼리 선다.
-          누르면 그 종목으로 바뀌고 맨 위로 올라간다(MddExplorer pickFromResults). */}
+      {/* 업종 안에서 | 가격대별 거래 — 같은 꼴(이름 · 막대 · 값) 두 칸을 나란히, 줄 수를 맞춰 줄끼리 선다(api/mdd 가 업종 줄 수로 가격대를 나눈다).
+          업종 칸 줄을 누르면 그 종목으로 바뀌고 맨 위로 올라간다(MddExplorer pickFromResults).
+          '많이 빠진 대형주'(종목과 상관없는 시총 상위 고정 목록)였던 자리다 — 2026-10-03 "투자자가 궁금해할 것"으로 바꿨다. */}
       <div className="v2-md-row is-11">
         {data.theme ? (
           <ThemeModule theme={data.theme} onPick={onPick} />
@@ -440,7 +441,11 @@ export function Results({ data, bigDrops, onPick }: { data: MddResult; bigDrops?
             }
           />
         )}
-        <BigDropsModule bigDrops={bigDrops} data={data} count={data.theme ? data.theme.peers.length : BIG_DROP_SHOW} onPick={onPick} />
+        {data.ladder ? (
+          <LadderModule ladder={data.ladder} market={data.market} />
+        ) : (
+          <AbsentSheet title="가격대별 거래" body="거래량 기록이 짧아 가격대를 나누지 못했습니다." />
+        )}
       </div>
       {/* 대표 종목 일부만 받았으면 그렇다고 적는다 — 평균이 몇 종목으로 낸 것인지 읽는 사람이 알아야 한다. */}
       {data.theme && data.partial && data.partial.peersOk < data.partial.peersRequested && (

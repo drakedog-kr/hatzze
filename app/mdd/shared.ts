@@ -1,7 +1,7 @@
 // MDD 정밀분석 화면이 같이 쓰는 타입·상수·서식. 2026-09-17 에 MddExplorer.tsx(2,499줄)에서 그대로 옮겨 왔다.
 // 카드 하나 고치려고 2,500줄을 열던 것을 나눈 것이라 동작은 안 바뀐다(나눈 뒤 렌더된 DOM 을 프로덕션과 대조했다).
 
-import type { DdNow, MddAnalysis, RiskProfile as RiskProfileData } from "@/lib/mdd";
+import type { DdNow, MddAnalysis, PriceLadder, RiskProfile as RiskProfileData } from "@/lib/mdd";
 
 export type StockOption = {
   code: string;
@@ -55,6 +55,8 @@ export type MddResult = {
   bench?: DdNow | null;
   /** 같은 지수의 낙폭을 analysis.underwater 날짜마다(같은 길이) — 물속 차트 '시장과 함께' 선. 지수를 못 받았으면 null. */
   benchUnderwater?: (number | null)[] | null;
+  /** 최근 1년 가격대별 거래대금(lib/mdd.ts priceLadder) — '가격대별 거래' 칸. 거래량이 없거나 이력이 짧으면 null. */
+  ladder?: PriceLadder | null;
 };
 
 /**
@@ -69,8 +71,6 @@ export type MddResult = {
  * 뒤에 붙을 뿐이다. 순위가 낡아도 화면에 나오는 수치는 틀리지 않는다 — 후보를 세우는
  * 데만 쓰고 분석값에는 손대지 않기 때문이다. 그래서 시총이 바뀔 때마다 고칠 필요는 없고,
  * 새 대표주가 검색으로 안 나온다는 말이 나올 때 맨 앞쪽만 손보면 된다.
- *
- * '많이 빠진 대형주'(BIG_DROP_POOL)도 앞쪽 스물을 쓴다 — 서버(page.tsx)와 검색(Controls.tsx)이 같이 읽어 여기 둔다.
  *
  * 이름은 stocks 테이블(KRX 정식 종목명)과 정확히 같아야 맞는다 — "엔씨소프트"가 아니라
  * "NC", "네이버"가 아니라 "NAVER". lib/stock-themes.ts 의 테마 사전과 일부 겹치지만
@@ -89,24 +89,6 @@ export const MAJOR_NAMES = [
   "SK", "LG", "한화", "GS", "CJ", "두산", "삼성증권", "미래에셋증권", "DB손해보험", "현대해상",
   "LG유플러스", "롯데케미칼", "한진칼", "CJ제일제당", "이마트", "LS",
 ];
-
-/**
- * 미장 대형주 — '많이 빠진 대형주'의 미국판 후보(시가총액 상위를 손으로 고정, 2026-10 기준). 위 MAJOR_NAMES 와 같은 까닭으로
- * 손으로 둔다(us_stocks 에도 시가총액이 없다). 티커는 us_stocks 표기 그대로다(BRK — 야후에 물을 때만 BRK-B).
- */
-export const US_MAJOR_TICKERS = [
-  "NVDA", "MSFT", "AAPL", "GOOGL", "AMZN", "META", "AVGO", "TSLA", "BRK", "JPM",
-  "LLY", "WMT", "V", "ORCL", "MA", "NFLX", "XOM", "COST", "JNJ", "PLTR",
-];
-
-/** '많이 빠진 대형주' — 시총 상위 몇 종목 중에서 고르나, 그중 몇 개를 보이나. */
-export const BIG_DROP_POOL = 20;
-export const BIG_DROP_SHOW = 10;
-
-/** 대형주 하나의 기간별 지금 낙폭. 키는 조회 기간(1 · 3 · 5 · 10년) — '전체'는 10년 값을 쓴다(받는 일봉이 10년치다). */
-export type BigDrop = { code: string; name: string; market: string | null; dd: Partial<Record<"1" | "3" | "5" | "10", DdNow>> };
-/** 국장 · 미장 두 벌. 화면은 고른 종목의 시장 쪽을 보인다. 조회가 깨지면 null(자료 없음과 가른다). */
-export type BigDrops = { kr: BigDrop[] | null; us: BigDrop[] | null };
 
 export const PERIODS: { key: string; label: string }[] = [
   { key: "1", label: "1년" },

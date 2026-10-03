@@ -1060,6 +1060,12 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-dd .is-self .v2-dd-name { font-weight: 700; color: var(--t-ink); }
 .v2-dd .is-self .v2-dd-val { color: var(--t-down-deep); }
 .v2-dd .is-self .v2-dd-bar > i { background: var(--t-down); }
+/* 가격대별 거래(app/mdd/V2Sheets.tsx LadderModule) — 지금 가격보다 비싼 칸은 파랑(그 가격에 산 돈은 지금 손실), 싼 칸은 회색. 지금 칸은 위 is-self.
+   줄 이름 옆 '지금' 꼬리표는 회복까지 칸과 같은 .v2-badge. 숫자 줄 이름이라 자리 맞춤 숫자로. */
+.v2-ladder .v2-dd-name { display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+/* 회색은 45% — 28% 였을 때 다크에서 빈 막대 바탕(불투명도 0.12)과 0.17 로 거의 같아 막대가 안 보였다. */
+.v2-ladder > .is-below .v2-dd-bar > i { background: color-mix(in srgb, var(--t-ink3) 45%, transparent); }
+.v2-ladder > .is-below .v2-dd-val { color: var(--t-ink2); }
 .v2-dd-avg {
   position: absolute;
   top: 8px;

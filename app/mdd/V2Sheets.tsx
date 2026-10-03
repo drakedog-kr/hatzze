@@ -6,14 +6,15 @@
 //  - 역대 하락 사례 — 옛 'Top 5' · 리스크 '하락 vs 회복 속도' · '혼자 빠지나, 같이 빠지나' · 성격 타일이 같은 사건을 네 군데서 말하던 것을 표 하나로.
 //  - 회복까지 — 옛 '회복까지 걸린 기간' + '이 하락의 성격'(급락형 · 완만형의 회복 중앙값). 깊이 분포 막대는 사례 표와 겹쳐 뺐다.
 //  - 해마다 — 옛 리스크 '낙폭 대비 보상'. 최근 다섯 해 + '전체보기' 팝업 대신 조회 기간의 해를 다 펼친다(누르지 않고 보이게).
-//  - 업종 안에서 · 많이 빠진 대형주(2단계 8 · 9) — 나란한 두 칸, 줄마다 이름 · 막대 · 값(DdList). 누르면 그 종목 MDD 로.
+//  - 업종 안에서 · 가격대별 거래 — 나란한 두 칸, 줄마다 이름 · 막대 · 값. 업종 줄은 누르면 그 종목 MDD 로.
 
 import { CHARACTER_SPLIT_DAYS } from "@/lib/mdd";
 import type { MddAnalysis, RiskProfile as RiskProfileData } from "@/lib/mdd";
 
 import { CoverLinkCell, CoverMeta, Module, type CoverLink } from "../kadera/V2Modules";
 import { benchName, fmtCloseDay, fmtDay, fmtDayCount, fmtDur, fmtPct, fmtYm, mddSummary } from "./shared";
-import type { AttributionData, BigDrops, MddResult, StockOption, ThemeCmp } from "./shared";
+import type { PriceLadder } from "@/lib/mdd";
+import type { AttributionData, MddResult, StockOption, ThemeCmp } from "./shared";
 
 /** 차트 막대 끝 수익 — 정수로("+46%"). 막대 칸이 60px 남짓이라 소수점까지 적으면 이웃과 닿는다. 정확한 값은 툴팁에. */
 const pctShort = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.round(Math.abs(v))}%`;
@@ -141,50 +142,44 @@ export function ThemeModule({ theme, onPick }: { theme: ThemeCmp; onPick: (s: St
   );
 }
 
-/* ── 많이 빠진 대형주 ────────────────────────────────────────────── */
+/* ── 가격대별 거래 ─────────────────────────────────────────────── */
 /**
- * 시총 상위 스무 종목 중 지금 고점에서 가장 많이 내려온 것들(page.tsx loadBigDrops) — 처음 온 사람의 입구(판정표 8).
- * 줄 수는 옆 업종 칸에 맞춘다(보통 열하나, 업종 칸이 없으면 BIG_DROP_SHOW).
- * 고른 종목의 시장 쪽(국장 · 미장)을 보이고, 기간은 화면 기간을 따른다('전체'는 받는 일봉이 10년치라 10년).
- * 값은 /api/mdd 와 같은 창 · 같은 종가로 낸 것이라 눌러 연 종목의 '지금 낙폭'과 같다.
+ * 최근 1년 거래대금을 가격대로 나눈 것(lib/mdd.ts priceLadder) — '많이 빠진 대형주'(종목과 상관없는 고정 목록) 자리(2026-10-03).
+ * 낙폭 화면을 여는 사람은 대개 손실 중인 보유자라 "지금보다 비싸게 산 돈이 얼마나 되나 · 어느 가격대에 몰렸나"를 묻는다.
+ * 위 줄일수록 비싼 가격대(호가창처럼). 지금 가격이 든 줄을 강조하고, 그보다 비싼 줄(그 가격에 산 돈은 지금 손실)은 파랑 ·
+ * 싼 줄은 회색 막대. 머리의 몫은 칸으로 어림한 게 아니라 날마다 잰 값(지금 종가보다 비싸게 거래된 날의 거래대금 몫)이다.
+ * 줄 모양은 옆 업종 칸과 같은 목록(.v2-dd)이고 줄 수도 맞춘다(api/mdd 가 업종 줄 수로 칸을 나눈다).
  */
-export function BigDropsModule({
-  bigDrops,
-  data,
-  count,
-  onPick,
-}: {
-  bigDrops: BigDrops | undefined;
-  data: MddResult;
-  /** 보일 줄 수 — 옆 업종 칸과 줄 수를 맞춘다(같은 키에 같은 줄 수라야 두 칸의 줄이 나란하다). */
-  count: number;
-  onPick: (s: StockOption) => void;
-}) {
-  const isUs = data.market === "US";
-  const key = (data.years === "all" ? "10" : data.years) as "1" | "3" | "5" | "10";
-  const list = bigDrops ? (isUs ? bigDrops.us : bigDrops.kr) : null;
-  const rows = (list ?? [])
-    .flatMap((b) => (b.dd[key] ? [{ ...b, d: b.dd[key]! }] : []))
-    .sort((x, y) => x.d.dd - y.d.dd)
-    .slice(0, count);
+export function LadderModule({ ladder, market }: { ladder: PriceLadder; market: string | null }) {
+  const isUs = market === "US";
+  const max = Math.max(0.0001, ...ladder.bands.map((b) => b.share));
+  const fmt = (v: number) =>
+    // 칸 너비가 1 이상이면 경계가 정수다(lib/mdd.ts priceLadder). 1 아래(동전주)만 소수 둘째 자리까지.
+    isUs ? `$${v.toLocaleString("en-US", { maximumFractionDigits: ladder.step >= 1 ? 0 : 2 })}` : v.toLocaleString("ko-KR", { maximumFractionDigits: 0 });
+  const unit = isUs ? "" : "원";
+  // 비싼 줄부터라 지금 가격이 든 줄 = lo ≤ 가격 < hi 인 첫 줄. 최고가와 맨 위 경계가 딱 겹치면 못 찾으니 맨 위 줄로.
+  let nowIdx = ladder.bands.findIndex((b) => ladder.price >= b.lo && ladder.price < b.hi);
+  if (nowIdx < 0 && ladder.bands.length && ladder.price >= ladder.bands[0].lo) nowIdx = 0;
   return (
-    // 머리의 종목 수는 실제로 받은 수다 — 시세가 빈 종목이 빠지면 스물이 아니다.
-    <Module title="많이 빠진 대형주" meta={`${isUs ? "미장" : "국장"} 시총 상위 ${list?.length ?? 0}종목 중 · 최근 ${key}년 고점 대비`} className="v2-md-big">
-      {rows.length ? (
-        <DdList
-          label="많이 빠진 대형주 지금 낙폭"
-          items={rows.map((r) => ({
-            key: r.code,
-            name: r.name,
-            dd: r.d.dd,
-            self: r.code === data.code,
-            pick: { code: r.code, name: r.name, market: r.market },
-          }))}
-          onPick={onPick}
-        />
-      ) : (
-        <p className="v2-empty">대형주 시세를 지금 불러오지 못했습니다.</p>
-      )}
+    <Module title="가격대별 거래" meta={`최근 1년 거래대금 · 지금보다 비싸게 ${Math.round(ladder.aboveShare)}%`} className="v2-md-ladder">
+      <div className="v2-dd-wrap">
+        <ol className="v2-dd v2-ladder" aria-label="최근 1년 가격대별 거래대금 몫">
+          {ladder.bands.map((b, i) => (
+            <li key={b.lo} className={i === nowIdx ? "is-self" : i < nowIdx ? "is-above" : "is-below"}>
+              {/* 줄 이름은 칸의 아래 끝(호가창처럼 위로 갈수록 비싸다). 칸 범위 · 거래일 수는 데이터 툴팁. */}
+              <div className="v2-dd-row hz-tip hz-tip-start" data-tip={`${fmt(b.lo)}~${fmt(b.hi)}${unit} · 거래일 ${b.days}일`}>
+                <span className="v2-dd-name">
+                  {fmt(b.lo)}~{i === nowIdx && <span className="v2-badge">지금</span>}
+                </span>
+                <span className="v2-dd-bar">
+                  <i style={{ ["--w" as string]: `${Math.max(1.5, (b.share / max) * 100)}%` }} />
+                </span>
+                <span className="v2-dd-val">{b.share.toFixed(1)}%</span>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
     </Module>
   );
 }

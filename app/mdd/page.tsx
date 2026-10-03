@@ -1,15 +1,12 @@
 import type { Metadata } from "next";
 
-import { drawdownInWindow } from "@/lib/mdd";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { getSurgingStocks, getTopStocksWithTrend } from "@/lib/telegram-data";
 import { getUsStockReports, getUsSurgingStocks } from "@/lib/us-telegram-data";
-import { fetchDailyHistory10y, yahooSymbol } from "@/lib/yahoo-history";
 import { MDD_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { MddExplorer, type StockOption, type SuggestGroups } from "./MddExplorer";
-import { BIG_DROP_POOL, MAJOR_NAMES, US_MAJOR_TICKERS, normalizeYears } from "./shared";
-import type { BigDrop, BigDrops } from "./shared";
+import { normalizeYears } from "./shared";
 
 // 미리보기 이미지는 옆의 opengraph-image.tsx 가 그린다(ownImage). 자세한 건 app/seo.ts 주석 참고.
 export async function generateMetadata(): Promise<Metadata> {
@@ -223,48 +220,6 @@ async function loadSuggestions(): Promise<SuggestGroups> {
   }
 }
 
-/**
- * '많이 빠진 대형주'(2026-10-03 판정표 8) — 시총 상위 스무 종목의 지금 낙폭. 처음 온 사람이 검색창을 누르지 않아도
- * 볼 종목이 보이게 하는 입구다(예전 추천 종목은 검색창을 눌러야 떴다). 화면은 고른 종목의 시장 쪽을 깊은 순 열 개로 보인다.
- *
- * 종목마다 10년 일봉을 **고정 주소**로 받아(fetchDailyHistory10y) 데이터 캐시 30분에 걸린다 — 방문마다 야후를 마흔 번
- * 치지 않는다. 한 번 받아 1 · 3 · 5 · 10년 창을 다 낸다(drawdownInWindow — /api/mdd 가 그 기간으로 받는 창과 같다).
- * 그래서 목록에서 눌러 연 종목의 '지금 낙폭'이 목록 값과 같다.
- *
- * 국장 · 미장을 같이 싣는다(화면이 시장에 따라 고른다). 명단 조회가 깨지면 그 시장은 null — '못 불러왔다'로 적는다.
- * 시세가 빈 종목은 빠진다(스물 중 몇 개 빠져도 열 개는 찬다).
- */
-async function loadBigDrops(): Promise<BigDrops> {
-  const now = Date.now();
-  const one = async (code: string, name: string, market: string | null): Promise<BigDrop | null> => {
-    const bars = await fetchDailyHistory10y(yahooSymbol(code, market));
-    if (!bars) return null;
-    const dd: BigDrop["dd"] = {};
-    for (const y of ["1", "3", "5", "10"] as const) {
-      const d = drawdownInWindow(bars, Number(y), now);
-      if (d) dd[y] = d;
-    }
-    return { code, name, market, dd };
-  };
-  const db = getSupabaseServer();
-  const kr = (async () => {
-    const names = MAJOR_NAMES.slice(0, BIG_DROP_POOL);
-    const { data, error } = await db.from("stocks").select("code, name, market").in("name", names);
-    if (error || !data) return null;
-    const rows = await Promise.all(data.map((r) => one(r.code as string, r.name as string, (r.market as string) ?? "KOSPI")));
-    return rows.filter((r): r is BigDrop => r !== null);
-  })().catch(() => null);
-  const us = (async () => {
-    const tickers = US_MAJOR_TICKERS.slice(0, BIG_DROP_POOL);
-    const { data, error } = await db.from("us_stocks").select("ticker, name_ko").in("ticker", tickers);
-    if (error || !data) return null;
-    const rows = await Promise.all(data.map((r) => one(r.ticker as string, (r.name_ko as string) || (r.ticker as string), "US")));
-    return rows.filter((r): r is BigDrop => r !== null);
-  })().catch(() => null);
-  const [k, u] = await Promise.all([kr, us]);
-  return { kr: k, us: u };
-}
-
 export default async function MddPage({
   searchParams,
 }: {
@@ -286,13 +241,7 @@ export default async function MddPage({
   const sp = await searchParams;
   // 기간도 주소에서 받는다(?years=3). 모르는 값은 기본 기간 — api/mdd 와 같은 규칙(normalizeYears).
   const initialYears = normalizeYears(typeof sp.years === "string" ? sp.years : null);
-  const [kospi, us, initial, suggestions, bigDrops] = await Promise.all([
-    loadKospiStocks(),
-    loadUsStocks(),
-    resolveInitial(sp),
-    loadSuggestions(),
-    loadBigDrops(),
-  ]);
+  const [kospi, us, initial, suggestions] = await Promise.all([loadKospiStocks(), loadUsStocks(), resolveInitial(sp), loadSuggestions()]);
   // 국내를 앞에 둔다. 등급이 같을 때의 마지막 정렬은 rankStockMatches 가 맡으므로
   // 이 순서가 결과를 흔들지는 않는다 — 두 목록을 잇는 자리일 뿐이다.
   const stocks = [...kospi, ...us];
@@ -305,7 +254,6 @@ export default async function MddPage({
       initial={initial}
       initialYears={initialYears}
       suggestions={suggestions}
-      bigDrops={bigDrops}
     />
   );
 }

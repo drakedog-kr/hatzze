@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { analyzeDrawdown, drawdownInWindow, drawdownNow, drawdownOnDates, drawdownSeries, episodes, riskProfile } from "../lib/mdd.ts";
+import { analyzeDrawdown, drawdownNow, drawdownOnDates, drawdownSeries, episodes, priceLadder, riskProfile } from "../lib/mdd.ts";
 
 /** 하루 간격의 종가 열. */
 function bars(closes: number[]) {
@@ -142,31 +142,46 @@ describe("riskProfile 의 해마다 수익", () => {
   });
 });
 
-describe("drawdownNow · drawdownInWindow — '많이 빠진 대형주'와 화면의 '지금 낙폭'이 같아야 한다", () => {
+describe("drawdownNow — 첫 줄 띠의 시장 칸(같은 기간 지수의 지금 낙폭)", () => {
   it("마지막 종가가 기간 최고 종가보다 얼마나 낮나와 그 고점 날짜", () => {
     const d = drawdownNow(bars([100, 120, 90, 96]))!;
     assert.equal(Math.round(d.dd * 10) / 10, -20);
     assert.equal(d.peakDate, "2024-01-02");
     assert.equal(drawdownNow([]), null);
   });
+});
 
-  it("창 밖의 옛 고점은 안 센다 — 10년 전 고점이 1년 창의 낙폭을 키우지 않는다", () => {
-    // 2016 년에 200 을 찍고 2025-10 부터는 100 근처. 1년 창은 2025-10 이후만 본다.
-    const now = Date.parse("2026-10-02T12:00:00Z");
-    const series = weekdayBars("2016-10-03", "2026-10-02", (dt) => (dt < "2017-01-01" ? 200 : dt < "2026-06-01" ? 100 : 90));
-    assert.equal(Math.round(drawdownInWindow(series, 10, now)!.dd), -55);
-    assert.equal(Math.round(drawdownInWindow(series, 1, now)!.dd), -10);
+describe("priceLadder — MDD '가격대별 거래'", () => {
+  it("최근 1년만 세고, 비싼 칸부터, 몫의 합은 100 이며 '지금보다 비싸게'는 날마다 잰다", () => {
+    // 1년 전보다 앞선 날(200원)은 창 밖이라 칸을 키우지 않는다. 창 안은 100 → 150 → 120.
+    const series = weekdayBars("2025-06-02", "2026-10-02", (dt) => (dt < "2025-10-01" ? 200 : dt < "2026-04-01" ? 100 : dt < "2026-08-01" ? 150 : 120)).map((b) => ({
+      ...b,
+      volume: 1000,
+    }));
+    const l = priceLadder(series, 10)!;
+    assert.equal(l.bands.length, 10);
+    assert.ok(l.bands[0].lo > l.bands[9].lo, "비싼 칸이 위");
+    assert.ok(l.bands[0].hi >= 150 && l.bands[9].lo <= 100, "창 안 최고 · 최저가를 덮는다");
+    assert.ok(l.bands[0].hi < 200, "창 밖 200원은 안 센다");
+    assert.equal(Math.round(l.bands.reduce((s, b) => s + b.share, 0)), 100);
+    // 지금 120원보다 비싸게 거래된 날 = 150원 구간. 거래대금(종가 × 거래량) 몫이라 날수 몫보다 크다.
+    const days = series.filter((b) => b.date > "2025-10-02");
+    const v = (d: { close: number }) => d.close * 1000;
+    const want = (days.filter((d) => d.close > 120).reduce((s, d) => s + v(d), 0) / days.reduce((s, d) => s + v(d), 0)) * 100;
+    assert.equal(Math.round(l.aboveShare * 10), Math.round(want * 10));
+    // 칸 경계는 떨어지는 수(유효 숫자 두 자리)다.
+    assert.ok(Number.isInteger(l.step) && Number.isInteger(l.bands[9].lo));
   });
 
-  it("창은 fetchDailyHistory 와 같다 — 지금에서 years×365일 하고 하루 더", () => {
-    const now = Date.parse("2026-10-02T12:00:00Z");
-    // 2025-10-01 은 365+1 일 전(창 첫날)이라 들어가고, 2025-09-30 은 빠진다.
-    const series = [
-      { date: "2025-09-30", close: 300 },
-      { date: "2025-10-01", close: 200 },
-      { date: "2026-10-02", close: 100 },
-    ];
-    assert.equal(drawdownInWindow(series, 1, now)!.peakDate, "2025-10-01");
+  it("거래량이 없거나 스무 날이 안 되면 null", () => {
+    assert.equal(priceLadder(bars([100, 110, 90, 95]), 10), null);
+    assert.equal(
+      priceLadder(
+        bars(Array.from({ length: 10 }, (_, i) => 100 + i)).map((b) => ({ ...b, volume: 10 })),
+        10,
+      ),
+      null,
+    );
   });
 });
 
