@@ -68,6 +68,7 @@ from config.stock_extraction import (  # noqa: E402
     JOSA_TRAILING,
     NOT_MENTION_PHRASES,
     PREFIX_NAMES,
+    HOUSE_GROUP_NAMES,
     MEDIA_NAMES,
     PUBLISHER_SHORT_NAMES,
     US_TICKER_COLLISION,
@@ -82,6 +83,8 @@ HANGUL = re.compile(r"[가-힣]")
 HAN = re.compile(r"[一-鿿]")  # SK海力士(=SK하이닉스) 같은 중국어 기사 제목용
 LATIN = re.compile(r"[A-Za-z]")
 LATIN_OR_DIGIT = re.compile(r"[A-Za-z0-9]")
+# 라틴 이름 뒤 `-숫자` 꼬리. 1번 묶음이 있으면 등락률(`SK-4.4%`)이다.
+LATIN_CODE_TAIL_RE = re.compile(r"-\d+(?:\.\d+)?(\s*%)?")
 LATIN_ACRONYM = re.compile(r"^[A-Za-z][A-Za-z0-9&]*$")  # SK, LG, E1 … (한글 종목명 제외)
 URL_RE = re.compile(r"(?:https?://|www\.)\S+")
 # 이름을 합성어 안에 붙들어 매는 이음표("구독·플랫폼·디바이스", "X-레이", "다이렉트-투-
@@ -223,6 +226,13 @@ def boundary_ok(text: str, start: int, end: int, is_ambiguous: bool) -> bool:
     # 그대로 둔다(`SK하이닉스ADR` 은 진짜 언급이다). 한 주 전수에서 잃는 진짜는 `SBS W` 1건.
     if end < len(text) and LATIN_OR_DIGIT.match(text[end - 1]) and LATIN_OR_DIGIT.match(text[end]):
         return False
+    # 같은 이름 뒤에 붙임표+숫자가 붙으면 신약·제품 코드다(2026-10-03) — 항서제약 `HRS-1596`·`HRS-4729`가
+    # HRS(036640) 한 주 40건 중 31건, 세레브라스 `CS-4`가 CS 3건이었다. 등락률(`SK-4.4%`)은 진짜라 뺀다.
+    # 붙임표 뒤 **글자**는 그대로 둔다(아래 ⚠️ — 짝 표기 `한화-EDGE`).
+    if end < len(text) and LATIN_OR_DIGIT.match(text[end - 1]):
+        code_tail = LATIN_CODE_TAIL_RE.match(text, end)
+        if code_tail and not code_tail.group(1):
+            return False
     if not is_ambiguous:
         return True
     # 원천이 본문에 끼워 넣은 종목코드 주석은 걷어 내고 그 뒤를 본다(결 ⑦).
@@ -358,10 +368,14 @@ def is_publisher_name(key: str) -> bool:
     목록이 아니라 stocks 에서 나오는 조건이라 새 증권사가 상장하거나 사명이 바뀌어도
     따라온다. '…제11호스팩'처럼 증권사가 세운 SPAC 은 '스팩'으로 끝나 여기 안 걸린다.
     """
-    return key.endswith("증권") or key in PUBLISHER_SHORT_NAMES or key in MEDIA_NAMES
+    return (
+        key.endswith("증권") or key in PUBLISHER_SHORT_NAMES or key in MEDIA_NAMES or key in HOUSE_GROUP_NAMES
+    )
 
 
-def publisher_context(text: str, start: int, end: int, trailing_word: bool = True) -> bool:
+def publisher_context(
+    text: str, start: int, end: int, trailing_word: bool = True, media: bool = False, group: bool = False
+) -> bool:
     """이 자리의 증권사 이름이 '종목'이 아니라 리포트 **발행처** 표기인가.
 
     이 코퍼스는 증권사 리서치 배포가 큰 몫이라, 증권사 이름은 종목보다 리포트를 낸
@@ -378,6 +392,8 @@ def publisher_context(text: str, start: int, end: int, trailing_word: bool = Tru
     nxt = text[end] if end < len(text) else ""
     after = text[end:]
     line_before = text[:start].rsplit("\n", 1)[-1]
+    if group:
+        return group_house_context(prev, nxt, after, line_before)
 
     # ① "[SK증권 반도체 한동희, 손 건]" — 대괄호 머리에 적는 발신 데스크.
     if prev and prev in "[［":
@@ -388,7 +404,8 @@ def publisher_context(text: str, start: int, end: int, trailing_word: bool = Tru
     # ③ "[리포트 브리핑]한세실업, '…' 목표가 11,000원 - SK증권" — 줄 끝에 구분자를
     #    두고 붙는 귀속. 방향이 중요하다. 이름이 구분자 **뒤**면 발행처지만, 앞이면
     #    ("키움증권 - 높아진 배당 매력도") 그 종목이 리포트의 주인공이라 살려야 한다.
-    if not after.split("\n", 1)[0].strip() and re.search(r"[-–—|/∥]\s*$", line_before):
+    #    줄 끝이 가린 URL 뿐이어도 줄 끝이다(`…목표가↓"-한화 https://…`, 2026-10-03).
+    if not after.split("\n", 1)[0].replace(MASK_CHAR, "").strip() and re.search(r"[-–—|/∥]\s*$", line_before):
         return True
     # ④ "미래에셋증권  [링크]" — 리포트 목록에서 발행처 칸(중간에 "(2026. 07. 24.)"
     #    같은 날짜가 끼기도 해서 같은 줄에 [링크]가 있는지로 본다).
@@ -398,6 +415,20 @@ def publisher_context(text: str, start: int, end: int, trailing_word: bool = Tru
     #    이끄는 귀속. 뒤가 `[`·`|`·줄끝이라 ⑤ 가 못 본다(2026-09-26 주간 점검).
     if re.search(r"(작성자|출처)\s*:[^\n:]{0,40}$", line_before):
         return True
+    # 매체 자리 넷(config.MEDIA_NAMES 주석, 2026-10-03 주간 점검).
+    if media:
+        # ⑦ "<아시아경제>" — 홑화살괄호 귀속
+        if prev and nxt and prev in "<〈《" and nxt in ">〉》":
+            return True
+        # ⑧ "(아시아경제, https://…)" · "(아시아경제 · 2026-10-02)" — 괄호 머리에 매체, 뒤에 주소·날짜
+        if prev and prev in "(（" and re.match(rf"\s*[,·]\s*(?:{MASK_CHAR}|\d{{4}}[./-])", after):
+            return True
+        # ⑨ "🔗 아시아경제" — 링크 머리의 출처
+        if re.search(r"🔗\s*$", line_before):
+            return True
+        # ⑩ "YTN 취재 결과" · "SBS 취재에 따르면"
+        if re.match(r"\s*취재", after):
+            return True
     # ⑤ "삼성증권 리서치센터", "키움증권 신민수", "SK증권 Global Carbon Market Daily"
     #    — 뒤에 부서·애널리스트·리포트 제목이 이어진다. AMBIGUOUS_NAMES 의 뒤 경계
     #    규칙("조사 아닌 한글이 붙으면 거부")과 같은 잣대인데, 발행처 표기는 한 칸
@@ -408,6 +439,30 @@ def publisher_context(text: str, start: int, end: int, trailing_word: bool = Tru
         return False
     nxt_word = re.match(r"[ \t]+(\S)", after)
     return bool(nxt_word and HANGUL_OR_ALNUM.match(nxt_word.group(1)))
+
+
+def group_house_context(prev: str, nxt: str, after: str, line_before: str) -> bool:
+    """그룹 이름만 적은 증권사 표기(config.HOUSE_GROUP_NAMES, `한화`)가 발행처 자리인가.
+
+    증권사 자리 규칙(publisher_context)을 그대로 태우면 그 그룹 **종목** 언급이 죽는다. 전량 재현(2026-10-03)에서
+    ① 대괄호 머리는 `[한화/지주회사/통신서비스] 제목:`(한화를 다룬 리포트)·`[한화, KAI 지분 15% 넘겨…]`(기사 제목),
+    ② 괄호는 `레드백(한화)`, ③ 줄 끝 구분자는 `[관련 종목] SK | 한화`·`실적발표 ⏎ - 한화` 를 발행처로 읽었다.
+    그래서 애널리스트 이름이 붙은 꼴과 문장 뒤 귀속만 본다.
+    """
+    # 줄 끝 귀속 — 앞에 문장이 있고 붙임표 뒤에 이름만 남은 자리(`…목표가↑"-한화 https://…`·`… 유지 – 한화`).
+    # 줄머리 목록(`- 한화`)은 앞이 비어 안 걸린다.
+    if not after.split("\n", 1)[0].replace(MASK_CHAR, "").strip() and re.search(r"\S\s*[-–—]\s*$", line_before):
+        return True
+    # "(26.09.28 한화)" — 괄호 안에 날짜와 이름만
+    if nxt and nxt in ")）" and re.search(r"[(（]\s*\d{2,4}[./-]\d{1,2}[./-]\d{1,2}\.?\s*$", line_before):
+        return True
+    # "<한화 임혜윤 오늘 개장전 …>" · "(한화 이진협)" · "[한화 박제인]" — 이름 뒤 세 글자 애널리스트 이름.
+    # 두 글자는 안 본다(`(한화 기준)`·`[한화 방산 부문과 …]`).
+    if prev and prev in "<〈" and re.match(r"[ \t]+[가-힣]{3}[ \t]", after):
+        return True
+    if prev and prev in "(（[［" and re.match(r"[ \t]+[가-힣]{3}\s*[)）\]］]", after):
+        return True
+    return False
 
 
 # ㄹ 관형형인데 '을'·'를'로 끝나는 낱말. 받침 있는 줄기는 `있을`·`입을`·`높을`, 르 불규칙은 `오를`·`이를`로
@@ -539,7 +594,12 @@ def extract(
         # 증권사 이름은 한 메시지에 여러 번 나오는 일이 흔하다(머리글의 발행처 표기 +
         # 본문의 진짜 언급). 자리마다 따로 보고, 발행처 자리면 이 자리만 건너뛴다.
         if is_publisher_name(key) and publisher_context(
-            text, m.start(), m.end(), trailing_word=key not in MEDIA_NAMES
+            text,
+            m.start(),
+            m.end(),
+            trailing_word=key not in MEDIA_NAMES,
+            media=key in MEDIA_NAMES,
+            group=key in HOUSE_GROUP_NAMES,
         ):
             continue
         # 발행처 표기가 아니어도 증권사가 **말하는 쪽**이면(`…증권은 … 추산했다` `주관사 : …증권`)

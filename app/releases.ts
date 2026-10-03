@@ -31,6 +31,14 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 추출 규칙이 늘어 카드 구성이 달라질 뿐 쓰는 법은 그대로다. Patch.
+    version: "1.30.5",
+    date: "2026-10-03",
+    changes: [
+      "카더라가 계열사·신약 코드·언론사 표기·다른 회사 줄임말(모비스 등)을 그 종목으로 세지 않고, 에코프로HN·신세계I&C는 제 종목으로 셉니다.",
+    ],
+  },
+  {
     // Next.js 16.2.12 → 16.3.8 보안 업데이트(next/og 원격 코드 실행 등 critical 1 · high 3). 화면·쓰는 법은 그대로다. Patch.
     version: "1.30.4",
     date: "2026-10-01",
