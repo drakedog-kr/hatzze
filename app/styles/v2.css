@@ -277,8 +277,9 @@
 .v2-tr {
   display: grid;
   /* 종목 칸을 168 로 못박는다 — fr 로 두면 표마다 남는 폭이 달라 등락률 칸이 1px 씩 어긋났다. */
-  /* 숫자 칸은 표마다 하나(그 표가 종목을 고른 까닭) — 나머지 폭은 문장에 준다(2026-10-02 '세는 것은 고르는 데만'). */
-  grid-template-columns: 20px 168px 72px 64px minmax(0, 1fr);
+  /* 숫자 칸은 표마다 하나(그 표가 종목을 고른 까닭) — 나머지 폭은 문장에 준다(2026-10-02 '세는 것은 고르는 데만').
+     칸 차례는 순위 · 종목 · 문장 · 숫자(2026-10-04) — 숫자(오른쪽 정렬) 뒤에 문장(왼쪽 정렬)이 붙으면 한 덩어리로 읽혔다. */
+  grid-template-columns: 20px 168px minmax(0, 1fr) 72px 64px;
   align-items: center;
   column-gap: 12px;
   min-height: 40px;
@@ -289,7 +290,7 @@
   transition: background-color 0.15s;
 }
 .v2-tbl li:last-child .v2-tr { border-bottom: 0; }
-.v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px 72px minmax(0, 1fr); }
+.v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px minmax(0, 1fr) 72px; }
 a.v2-tr:hover { background: var(--t-tint); }
 .v2-th {
   min-height: 30px;
@@ -298,8 +299,9 @@ a.v2-tr:hover { background: var(--t-tint); }
   font-weight: 600;
   color: var(--t-ink3);
 }
-.v2-th > :nth-child(n + 3) { text-align: right; }
-.v2-th > :last-child { display: inline-flex; align-items: center; gap: 3px; text-align: left; }
+/* 머리 줄 — 셋째 칸이 문장(왼쪽 · AI 표시), 넷째부터 숫자(오른쪽). */
+.v2-th > :nth-child(n + 4) { text-align: right; }
+.v2-th > :nth-child(3) { display: inline-flex; align-items: center; gap: 3px; text-align: left; }
 .v2-td-rank { text-align: center; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
 .v2-td-stock { display: flex; align-items: center; gap: 8px; min-width: 0; }
 /* 긴 이름은 두 줄로 감는다 — 말줄임으로 자르면 'LIG디펜스앤에어로스페이스'가 'LIG디펜스앤에어…'로 남았다(2026-10-03, 스무 줄로 늘리자 처음 걸렸다). */
@@ -531,8 +533,8 @@ a.v2-ev-row:hover { background: var(--t-tint); }
   /* 요약 칸 340 — 글이 길어져 줄이 높아지는 만큼 한 단 좁힌다. */
   .v2-grid > #brief .v2-brief { line-height: 1.85; }
   .v2-tr,
-  .v2-tbl.is-talk .v2-tr { grid-template-columns: 20px 160px 72px 64px minmax(0, 1fr); }
-  .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 160px 72px minmax(0, 1fr); }
+  .v2-tbl.is-talk .v2-tr { grid-template-columns: 20px 160px minmax(0, 1fr) 72px 64px; }
+  .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 160px minmax(0, 1fr) 72px; }
 }
 @container kd (max-width: 999px) {
   .v2-band { grid-template-columns: 216px minmax(0, 1fr); }
@@ -547,7 +549,7 @@ a.v2-ev-row:hover { background: var(--t-tint); }
       ".    text  text text text";
   }
   .v2-tbl.is-talk .v2-th { grid-template-areas: none; }
-  .v2-tbl.is-talk .v2-th > :last-child { display: none; }
+  .v2-tbl.is-talk .v2-th > :nth-child(3) { display: none; }
   .v2-tbl.is-talk .v2-td-rank { grid-area: rank; }
   .v2-tbl.is-talk .v2-td-stock { grid-area: stock; }
   .v2-tbl.is-talk .v2-td-chg { grid-area: chg; }
@@ -560,9 +562,10 @@ a.v2-ev-row:hover { background: var(--t-tint); }
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "brief" "surging" "why" "talk" "keywords";
   }
-  .v2-tr,
+  .v2-tr { grid-template-columns: 20px 168px minmax(0, 1fr) 72px 64px; }
+  .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px minmax(0, 1fr) 72px; }
+  /* 많이 언급은 이 폭에서 두 층(위 영역 이름 참고) — 위 층은 종목 옆에 숫자, 문장은 아래 층 판 폭. */
   .v2-tbl.is-talk .v2-tr { grid-template-columns: 20px 168px 72px 64px minmax(0, 1fr); }
-  .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px 72px minmax(0, 1fr); }
 }
 /* 첫 줄 칸들 — 머리말을 값 위 작은 줄로(지수 칸 66px · 링크 칸 50px 안팎을 아낀다). 이 폭에선 한 줄 꼴이면 칸 셋이 첫 줄에 안 들어
    띠가 세 줄이 됐다(카더라 · 테마 한 장 1,024 실측). 업데이트는 한 줄 그대로. 폰(≤679)은 칸을 반 칸씩 접는 자기 규칙이 있어 뺀다.
@@ -1410,12 +1413,8 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 
 /* 테마 흐름 — 순위 · 테마와 말 많은 종목 · 요즘 도는 얘기(남는 폭) · 점유율(5일 전 대비) · 열흘. 줄 꼴은 신호 표(.v2-tr)와 같다.
    ⭐ 이름 → 문장 → 숫자 차례다(2026-10-04) — 오른쪽 정렬 숫자 칸이 왼쪽 정렬 문장 앞에 붙으면 둘이 한 덩어리로 읽혔다. 숫자는 줄 오른쪽 끝에 모은다.
-   신호 표 머리 줄 규칙(셋째 칸부터 오른쪽 · 마지막 칸 왼쪽)은 문장 칸이 마지막이라는 전제라 이 표 · 급부상 표는 머리 줄 정렬을 따로 준다. */
+   머리 줄 정렬은 신호 표 공통 규칙(셋째 = 문장 왼쪽 · 넷째부터 숫자 오른쪽)을 그대로 쓴다. */
 .v2-tm-flowtbl .v2-tr { grid-template-columns: 20px 240px minmax(0, 1fr) 72px 120px; min-height: 52px; }
-.v2-tm-flowtbl .v2-th > :nth-child(3),
-.v2-tm-risertbl .v2-th > :nth-child(3) { display: inline-flex; align-items: center; gap: 3px; text-align: left; }
-.v2-tm-flowtbl .v2-th > :last-child,
-.v2-tm-risertbl .v2-th > :last-child { display: block; text-align: right; }
 .v2-td-theme2 { display: flex; flex-direction: column; gap: 1px; min-width: 0; padding: 7px 0; }
 .v2-td-theme2 b { font-weight: 700; overflow-wrap: anywhere; }
 .v2-td-share em,
@@ -1465,8 +1464,8 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 /* 이 테마의 주인공 — 몫 막대 + 한 단 열 줄. 칸은 순위 · 종목(태그) · 이유(남는 폭) · 언급(채널) — 이름 → 문장 → 숫자(테마 목록 두 표와 같다). */
 .v2-tm-share { padding: 12px 14px; border-bottom: 1px solid var(--t-line); }
 .v2-tm-hottbl .v2-tr { grid-template-columns: 20px 252px minmax(0, 1fr) 64px; min-height: 44px; }
-.v2-tm-hottbl:not(.no-reason) .v2-th > :nth-child(3) { text-align: left; }
-.v2-tm-hottbl .v2-th > :last-child { display: block; text-align: right; }
+/* 이유 칸이 없으면 셋째 칸이 숫자(언급 · 채널)다 — 머리 줄 공통 규칙(셋째 = 문장)을 되돌린다. */
+.v2-tm-hottbl.no-reason .v2-th > :nth-child(3) { display: block; text-align: right; }
 /* 열 종목 모두 이유가 없으면 그 칸을 걷는다(종목 · 언급만). */
 .v2-tm-hottbl.no-reason .v2-tr { grid-template-columns: 20px minmax(0, 1fr) 80px; }
 

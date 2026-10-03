@@ -15,6 +15,9 @@ import { Module, stockHref } from "./V2Modules";
  * 2026-10-03 줄을 다섯에서 열로 늘려 다 펼친다. 스무 줄을 다섯 줄씩 쪽을 넘기게 했다가 "불편하다", 표 안 스크롤로 바꿨다가
  * "별로"라 둘 다 걷었다 — 누르지도 안에서 내리지도 않고 한 번에 보이는 것이 잣대다.
  *
+ * 칸 차례는 순위 · 종목 · 문장 · 숫자(등락 · 평소 대비 · 언급)다(2026-10-04 "텍스트 배치 개선"). 숫자(오른쪽 정렬)가 문장(왼쪽 정렬) 앞에 서면
+ * '6.9배'와 문장 첫 낱말이 12px 사이로 붙어 한 덩어리로 읽혔다 — 테마 판세 표들과 같은 규칙. heads 는 예전 차례(숫자 먼저)로 받아 여기서 돌린다.
+ *
  * 2026-10-02 '헷갈리는 것 걷기'로 뺀 것: 7일 언급 막대 칸. 한 화면에 기간이 2·3·7·14·30일로 다섯 갈래라 무엇이 며칠인지
  * 놓쳤고, 급부상은 빨강·많이 언급은 파랑이라 같은 막대가 표마다 색이 달랐다. 흐름은 종목 화면에서 본다.
  */
@@ -54,6 +57,8 @@ const chgCls = (r: number | null) => (r === null ? "" : r > 0 ? " is-up" : r < 0
 
 export function SignalTable({ sec }: { sec: BoardSection }) {
   const last = sec.heads.length - 1;
+  // 머리 칸 차례 — 순위 · 종목 · 문장(heads 의 마지막) · 숫자들.
+  const headOrder = [0, 1, last, ...Array.from({ length: Math.max(0, last - 2) }, (_, k) => k + 2)];
   return (
     /* 많이 언급(talk)은 줄이 두 층이다 — 숫자 줄 아래 흐름 요약이 판 폭을 다 쓴다(v2.css). 그 칸엔 머리가 없으니 AI 표시는 모듈 제목 앞으로. */
     <Module id={sec.id} title={sec.title} meta={sec.meta} ai={sec.kind === "talk" && sec.aiText}>
@@ -62,10 +67,10 @@ export function SignalTable({ sec }: { sec: BoardSection }) {
       ) : (
         <div className={`v2-tbl is-${sec.kind}`}>
           <div className="v2-tr v2-th" aria-hidden="true">
-            {sec.heads.map((h, i) => (
+            {headOrder.map((i) => (
               <span key={i}>
                 {i === last && sec.aiText && sec.kind !== "talk" && <AiMark size={11} />}
-                {h}
+                {sec.heads[i]}
               </span>
             ))}
           </div>
@@ -91,6 +96,7 @@ export function SignalTable({ sec }: { sec: BoardSection }) {
                       </span>
                     )}
                   </span>
+                  <span className={`v2-td-text${r.text ? "" : " is-pending"}`}>{r.text ?? r.pending ?? ""}</span>
                   {/* 값이 없으면 '-' 대신 '없음' — 바로 옆 칸들의 '-0.73%' 와 같은 글자라 내렸다는 뜻으로 읽혔다. */}
                   <span className={`v2-td-num v2-td-chg${chgCls(r.change)}${r.change === null ? " is-none" : ""}`}>{r.change === null ? "없음" : pct(r.change)}</span>
                   {r.cells.map((c, k) => (
@@ -98,7 +104,6 @@ export function SignalTable({ sec }: { sec: BoardSection }) {
                       {c.v}
                     </span>
                   ))}
-                  <span className={`v2-td-text${r.text ? "" : " is-pending"}`}>{r.text ?? r.pending ?? ""}</span>
                 </Link>
               </li>
             ))}
