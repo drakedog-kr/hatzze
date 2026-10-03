@@ -119,6 +119,7 @@ export function BasketBoard({
   const cur = rows[sel] ?? rows[0];
   if (!cur) return null;
   const rules = mode === "irp" && cur.b.rulesIrp ? cur.b.rulesIrp : mode === "pension" && cur.b.rulesPension ? cur.b.rulesPension : cur.b.rules;
+  const meta = (st: Parameters<typeof basketMeta>[1]) => basketMeta(cur.b.meta, st);
   return (
     <div className="v2-dv-bk">
       <Module title="성향별 바스켓" meta={`1년에 받는 배당${mode === "gross" ? " · 세전" : ` · 세후${accountTag(mode)}`}`} className="v2-dv-bk-list">
@@ -201,8 +202,12 @@ export function BasketBoard({
                   >
                     <span className="v2-dv-bk-rank">{i + 1}</span>
                     <StockLogo code={l.stock.code} name={l.stock.name} market={l.stock.market} size={20} lazy />
-                    <span className="v2-dv-bk-stn">{l.stock.name}</span>
-                    <span className="v2-dv-bk-stm">{basketMeta(cur.b.meta, l.stock)}</span>
+                    {/* 이름 위 · 고른 까닭(15년 넘게 · 70년 연속 늘림) 아래 두 줄, 주 수는 줄 오른쪽 끝(2026-10-04). 까닭이 주 수 바로 앞에
+                        오른쪽 정렬로 붙어 있을 땐 '15년 넘게 5주'가 한 덩어리로 읽혔다. */}
+                    <span className="v2-dv-bk-stx">
+                      <span className="v2-dv-bk-stn">{l.stock.name}</span>
+                      {meta(l.stock) && <span className="v2-dv-bk-stm">{meta(l.stock)}</span>}
+                    </span>
                     <span className="v2-dv-bk-sts">{l.shares.toLocaleString("ko-KR")}주</span>
                   </button>
                 </li>

@@ -1327,11 +1327,13 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-dv .dv-tfact { border-radius: 4px; background: var(--t-tint); color: var(--t-ink2); font-size: 11px; }
 .v2-dv-bk-list-st { flex: 1; display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--t-line); }
 .v2-dv-bk-list-st > li { flex: 1 0 auto; display: flex; border-bottom: 1px solid var(--t-line); }
-.v2-dv-bk-st { flex: 1; display: grid; grid-template-columns: 16px 20px minmax(0, 1fr) auto 40px; align-items: center; column-gap: 8px; min-height: 32px; padding: 0 4px; border: 0; border-radius: 4px; background: none; font-family: inherit; color: inherit; text-align: left; cursor: grab; }
+.v2-dv-bk-st { flex: 1; display: grid; grid-template-columns: 16px 20px minmax(0, 1fr) 40px; align-items: center; column-gap: 8px; min-height: 40px; padding: 0 4px; border: 0; border-radius: 4px; background: none; font-family: inherit; color: inherit; text-align: left; cursor: grab; }
 .v2-dv-bk-st:hover { background: var(--t-tint); }
 .v2-dv-bk-rank { font-size: 12px; font-weight: 600; color: var(--t-ink3); text-align: right; font-variant-numeric: tabular-nums; }
 .v2-dv-bk-stn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; color: var(--t-ink); }
-.v2-dv-bk-stm { font-size: 12px; font-weight: 500; color: var(--t-ink3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* 이름 · 고른 까닭 두 줄(이름 위). */
+.v2-dv-bk-stx { display: flex; flex-direction: column; min-width: 0; padding: 4px 0; }
+.v2-dv-bk-stm { font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .v2-dv-bk-sts { font-size: 12px; font-weight: 600; color: var(--t-ink2); text-align: right; font-variant-numeric: tabular-nums; }
 .v2-dv-bk-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .v2-dv-bk-foot > span { font-size: 12px; color: var(--t-ink3); }

@@ -4,7 +4,7 @@
 
 import { type BasketLite, type StockLite } from "./types";
 import { pct } from "./format";
-import { streakLabel } from "./shared";
+import { STREAK_CAP } from "./shared";
 
 /** 바스켓 줄 오른쪽 숫자 — 성향마다 "왜 여기 들었나"를 말하는 값. */
 export function basketMeta(meta: BasketLite["meta"], s: StockLite): string {
@@ -13,7 +13,8 @@ export function basketMeta(meta: BasketLite["meta"], s: StockLite): string {
       return s.growth5 != null ? `연 ${s.growth5.toFixed(0)}% 성장` : "";
     case "streak":
       // 미국은 SEC 로 센 연속 연수가 19~20에서 막힌다 — 해마다 늘린 햇수(stockanalysis)가 있으면 그것.
-      return s.growthYears != null ? `${s.growthYears}년 연속 늘림` : streakLabel(s.streak);
+      // 무엇이 몇 년인지까지 적는다 — 이름 아래 줄로 내리자(2026-10-04) '15년 넘게'만으로는 무엇이 15년인지 안 읽혔다.
+      return s.growthYears != null ? `${s.growthYears}년 연속 늘림` : s.streak >= STREAK_CAP ? `${STREAK_CAP}년 넘게 연속 배당` : `${s.streak}년 연속 배당`;
     case "months":
       return s.pays.length ? `${[...new Set(s.pays.map(([m]) => m))].sort((a, b) => a - b).join("·")}월` : "";
     case "growthYears":
