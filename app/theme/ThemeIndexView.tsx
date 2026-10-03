@@ -149,7 +149,10 @@ export function ThemeIndexView({
         )}
       </Module>
 
-      {/* 셋째 줄 — 테마 흐름. 점유율 상위 열 테마 한 줄씩: 순위 · 테마(5일 전 대비)와 말 많은 종목 · 요즘 도는 얘기 첫 문장(✨) · 점유율 · 열흘. */}
+      {/* 셋째 줄 — 테마 흐름. 점유율 상위 열 테마 한 줄씩: 순위 · 테마와 말 많은 종목 · 요즘 도는 얘기 첫 문장(✨) · 점유율(5일 전 대비) · 열흘.
+          ⭐ 칸 차례는 이름 → 문장 → 숫자(2026-10-04 "텍스트 배치가 이상하다"). 숫자 칸(오른쪽 정렬)이 문장(왼쪽 정렬) 앞에 서면 '10일 중 3일 상위'와
+          문장 첫 낱말이 12px 사이로 붙어 한 덩어리로 읽혔다. 숫자는 줄 오른쪽 끝에 모으고, 5일 전 대비(+4.0%p)는 테마 이름 옆에서 점유율 아래로 옮겼다 —
+          그 숫자가 꾸미는 값 바로 밑이다. */}
       <Module
         id="flow"
         title="테마 흐름"
@@ -162,12 +165,12 @@ export function ThemeIndexView({
             <div className="v2-tr v2-th" aria-hidden="true">
               <span />
               <span>테마 · 말 많은 종목</span>
-              <span>점유율</span>
-              <span>최근 {flowDates.length || THEME_FLOW_DAYS}일</span>
               <span>
                 <AiMark size={11} />
                 요즘 도는 얘기
               </span>
+              <span>점유율</span>
+              <span>최근 {flowDates.length || THEME_FLOW_DAYS}일</span>
             </div>
             <ol className="v2-tbody">
               {themes.slice(0, FLOW_ROWS).map((t) => {
@@ -185,19 +188,20 @@ export function ThemeIndexView({
                     >
                       <span className="v2-td-rank">{t.rank}</span>
                       <span className="v2-td-theme2">
-                        <span>
-                          <b>{t.theme}</b>
-                          {d != null && Math.abs(d) >= 0.05 && <em className={d > 0 ? "is-up" : "is-down"}>{pp(d)}</em>}
-                        </span>
+                        <b>{t.theme}</b>
                         <span className="v2-td-sub">{t.topStocks.length ? t.topStocks.map((x) => x.name).join(" · ") : "최근 언급 없음"}</span>
                       </span>
-                      <span className="v2-td-num">{t.sharePct.toFixed(1)}%</span>
+                      <span className={`v2-td-text${t.briefLine ? "" : " is-pending"}`}>{t.briefLine ?? "-"}</span>
+                      {/* 점유율 · 그 아래 5일 전 대비(움직임이 0.05%p 아래면 안 적는다). */}
+                      <span className="v2-td-num v2-td-two v2-td-share">
+                        {t.sharePct.toFixed(1)}%
+                        {d != null && Math.abs(d) >= 0.05 && <em className={d > 0 ? "is-up" : "is-down"}>{pp(d)}</em>}
+                      </span>
                       {/* 열흘 — 지속 · 첫 등장 · 간헐 한 조각, 점유율이 이틀 넘게 같은 쪽으로 가면 그 방향을 아래 작게. */}
                       <span className="v2-td-two v2-td-flow2">
                         <span className={`v2-td-flow${cap.on ? " is-on" : ""}`}>{cap.text}</span>
                         {st.days >= 2 && st.dir !== 0 && <em className={st.dir > 0 ? "is-up" : "is-down"}>{st.days}일째 {st.dir > 0 ? "오르는 중" : "내리는 중"}</em>}
                       </span>
-                      <span className={`v2-td-text${t.briefLine ? "" : " is-pending"}`}>{t.briefLine ?? "-"}</span>
                     </Link>
                   </li>
                 );
@@ -208,7 +212,8 @@ export function ThemeIndexView({
       </Module>
 
       {/* 셋째 줄 — 테마별 급부상 종목. 테마마다 3일 전보다 언급(몫)이 가장 많이 는 종목 하나와 채널이 말한 까닭.
-          고르는 것도 까닭을 쓰는 것도 파이프라인이고(generate_theme_briefs.py) 화면은 요약 행의 riser 를 읽는다. 카더라의 신호 표와 같은 줄 꼴. */}
+          고르는 것도 까닭을 쓰는 것도 파이프라인이고(generate_theme_briefs.py) 화면은 요약 행의 riser 를 읽는다. 카더라의 신호 표와 같은 줄 꼴.
+          칸 차례는 테마 흐름과 같이 이름(테마 · 종목) → 문장 → 숫자(언급)다(2026-10-04). */}
       <Module id="risers" title="테마별 급부상 종목" meta={`최근 ${KADERA_WINDOW_DAYS}일 · 3일 전 대비`}>
         {risers === null ? (
           <p className="v2-empty">테마 요약을 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오.</p>
@@ -219,11 +224,11 @@ export function ThemeIndexView({
             <div className="v2-tr v2-th" aria-hidden="true">
               <span>테마</span>
               <span>종목</span>
-              <span>최근 {KADERA_WINDOW_DAYS}일 언급</span>
               <span>
                 <AiMark size={11} />
                 요즘 도는 얘기
               </span>
+              <span>최근 {KADERA_WINDOW_DAYS}일 언급</span>
             </div>
             <ol className="v2-tbody">
               {risers.map((r) => (
@@ -238,11 +243,11 @@ export function ThemeIndexView({
                       <span className="v2-td-name">{r.name}</span>
                       <span className={`hz-theme-tag ${toneForRatio(r.ratio, r.recent)}`}>{riserDelta(r)}</span>
                     </Link>
+                    <span className="v2-td-text">{r.reason}</span>
                     <span className="v2-td-num v2-td-two">
                       {r.recent.toLocaleString("ko-KR")}회
                       <em>그 전 {r.prior.toLocaleString("ko-KR")}회</em>
                     </span>
-                    <span className="v2-td-text">{r.reason}</span>
                   </div>
                 </li>
               ))}

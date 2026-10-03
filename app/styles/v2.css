@@ -1408,16 +1408,21 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-tm-hot .v2-tbody > li { flex: 1 0 auto; display: flex; }
 .v2-tm-hot .v2-tbody > li > .v2-tr { flex: 1; }
 
-/* 테마 흐름 — 순위 · 테마(5일 전 대비)와 말 많은 종목 · 점유율 · 열흘 · 요즘 도는 얘기(남는 폭). 줄 꼴은 신호 표(.v2-tr)와 같다. */
-.v2-tm-flowtbl .v2-tr { grid-template-columns: 20px 220px 56px 112px minmax(0, 1fr); min-height: 52px; }
+/* 테마 흐름 — 순위 · 테마와 말 많은 종목 · 요즘 도는 얘기(남는 폭) · 점유율(5일 전 대비) · 열흘. 줄 꼴은 신호 표(.v2-tr)와 같다.
+   ⭐ 이름 → 문장 → 숫자 차례다(2026-10-04) — 오른쪽 정렬 숫자 칸이 왼쪽 정렬 문장 앞에 붙으면 둘이 한 덩어리로 읽혔다. 숫자는 줄 오른쪽 끝에 모은다.
+   신호 표 머리 줄 규칙(셋째 칸부터 오른쪽 · 마지막 칸 왼쪽)은 문장 칸이 마지막이라는 전제라 이 표 · 급부상 표는 머리 줄 정렬을 따로 준다. */
+.v2-tm-flowtbl .v2-tr { grid-template-columns: 20px 240px minmax(0, 1fr) 72px 120px; min-height: 52px; }
+.v2-tm-flowtbl .v2-th > :nth-child(3),
+.v2-tm-risertbl .v2-th > :nth-child(3) { display: inline-flex; align-items: center; gap: 3px; text-align: left; }
+.v2-tm-flowtbl .v2-th > :last-child,
+.v2-tm-risertbl .v2-th > :last-child { display: block; text-align: right; }
 .v2-td-theme2 { display: flex; flex-direction: column; gap: 1px; min-width: 0; padding: 7px 0; }
-.v2-td-theme2 > span:first-child { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
 .v2-td-theme2 b { font-weight: 700; overflow-wrap: anywhere; }
-.v2-td-theme2 em,
+.v2-td-share em,
 .v2-td-flow2 em { font-style: normal; font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--t-ink3); }
-.v2-td-theme2 em.is-up,
+.v2-td-share em.is-up,
 .v2-td-flow2 em.is-up { color: var(--t-up); }
-.v2-td-theme2 em.is-down,
+.v2-td-share em.is-down,
 .v2-td-flow2 em.is-down { color: var(--t-down); }
 .v2-td-sub { font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); word-break: keep-all; }
 .v2-td-flow { text-align: right; white-space: nowrap; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
@@ -1431,8 +1436,8 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-tm .hz-theme-tag { flex-shrink: 0; height: 18px; padding: 0 5px; border-radius: 4px; font-size: 11px; font-weight: 600; line-height: 18px; white-space: nowrap; }
 .v2-td-date { margin-left: 6px; font-style: normal; font-size: 11px; color: var(--t-ink3); white-space: nowrap; }
 
-/* 테마별 급부상 종목 — 테마 · 종목(태그) · 언급 · 요즘 도는 얘기 */
-.v2-tm-risertbl .v2-tr { grid-template-columns: 96px 280px 88px minmax(0, 1fr); min-height: 44px; }
+/* 테마별 급부상 종목 — 테마 · 종목(태그) · 요즘 도는 얘기 · 언급(그 전). 테마 흐름과 같은 이름 → 문장 → 숫자 차례. */
+.v2-tm-risertbl .v2-tr { grid-template-columns: 96px 260px minmax(0, 1fr) 88px; min-height: 44px; }
 .v2-tm-risertbl .v2-tr:hover { background: none; }
 
 /* 뒤로 가기 줄(components/back-trail.tsx — 내부자 화면과 같이 쓴다) — v2 눈금(13)으로. 화면 제목이 걷혀 이 줄이 테마 이름을 말한다. */
@@ -1499,8 +1504,8 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   .v2-tm-band.is-brief,
   .v2-tm-band.is-hot,
   .v2-tm-band.is-pair { grid-template-columns: minmax(0, 1fr); }
-  .v2-tm-flowtbl .v2-tr { grid-template-columns: 20px 196px 56px 104px minmax(0, 1fr); }
-  .v2-tm-risertbl .v2-tr { grid-template-columns: 88px 232px 80px minmax(0, 1fr); }
+  .v2-tm-flowtbl .v2-tr { grid-template-columns: 20px 200px minmax(0, 1fr) 64px 108px; }
+  .v2-tm-risertbl .v2-tr { grid-template-columns: 88px 220px minmax(0, 1fr) 80px; }
   .v2-tm-reasonrows .v2-tr { grid-template-columns: 200px 72px minmax(0, 1fr) 72px; }
 }
 @container kd (max-width: 679px) {
@@ -1516,7 +1521,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
     padding-bottom: 8px;
   }
   .v2-tm-flowtbl .v2-td-theme2 { grid-area: theme; padding: 0; }
-  .v2-tm-flowtbl .v2-tr > :nth-child(3) { grid-area: share; }
+  .v2-tm-flowtbl .v2-td-share { grid-area: share; }
   .v2-tm-flowtbl .v2-td-flow2 { grid-area: flow; flex-direction: row; align-items: baseline; justify-content: flex-start; gap: 8px; }
   .v2-tm-risertbl .v2-tr,
   .v2-tm-hottbl .v2-tr,
