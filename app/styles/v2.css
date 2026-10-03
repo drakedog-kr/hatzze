@@ -1293,7 +1293,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 
 /* ── v2 테마 판세(2026-10-03) — 목록(/theme · /theme/us)과 테마 한 장(/theme/… · /theme/us/…) ─────────────────────────────
    얼개(app/theme/ThemeIndexView.tsx · ThemeDetailView.tsx 머리말):
-   목록 = 첫 줄 띠 → [점유율 지도 | 테마 순위] → 테마별 급부상 종목.
+   목록 = 첫 줄 띠 → 점유율 지도(판 폭, 3:1) → 테마 흐름 → 테마별 급부상 종목.
    테마 한 장 = 뒤로 가기 줄 → 첫 줄 띠 → [요즘 도는 얘기 | 30일 점유율 추이] → [이 테마의 주인공 | 일정 · 함께 거론되는 테마] → 등락의 이유.
    ⚠️ 범위 이름이 v2-tm 인 까닭 — .v2-th 는 표 머리 줄 클래스라(위 신호 표) 범위로 쓰면 폰에서 화면이 통째로 숨었다. */
 
@@ -1308,10 +1308,10 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-tm .v2-tm-side > .v2-mod { display: flex; flex-direction: column; }
 .v2-tm-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 
-/* 점유율 지도 — 옆 순위 칸이 키를 정하고 지도가 남는 높이를 다 받는다. 배치는 2:1 로 계산해 두었고(Treemap.tsx) 여기선
-   그 비율 언저리에서만 늘어난다(1,440 에서 733 × 380 안팎). 한 단(1,000 미만)에선 다시 2:1 상자로. */
-.v2-tm-map-in { flex: 1; display: flex; padding: 12px 14px 0; }
-.v2-tm-map .hz-treemap { flex: 1; aspect-ratio: auto; min-height: 280px; background: var(--t-card); border-radius: 4px; }
+/* 점유율 지도 — 판 폭 전체에 낮게. 배치는 부르는 쪽이 준 비율(3:1)로 계산하고 상자도 그 비율로 선다(Treemap.tsx --tm-aspect).
+   한때 [지도 | 테마 순위] 짝이었는데 테마 흐름 표를 되살리며 순위 칸을 걷었다(2026-10-03). */
+.v2-tm-map-in { padding: 12px 14px 0; }
+.v2-tm-map .hz-treemap { aspect-ratio: var(--tm-aspect, 2 / 1); background: var(--t-card); border-radius: 4px; }
 .v2-tm .hz-treemap .hz-tm-tile { border-color: var(--t-card); border-radius: 4px; }
 .v2-tm .hz-tm-name { font-size: 12px; font-weight: 700; }
 .v2-tm .hz-tm-tile.is-lg .hz-tm-name { font-size: 13px; }
@@ -1334,21 +1334,31 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+/* 곁줄은 칸이 넉넉할 때만 — 폰에서 큰 칸(lg)이 실제로는 좁아져 'LG이노 / 텍 ·'처럼 낱말 가운데서 잘렸다. 칸 자신의 크기로 접는다. */
+@container (max-width: 150px) or (max-height: 96px) {
+  .hz-tm-tile .hz-tm-sub { display: none; }
+}
 .v2-tm .hz-tm-legend { gap: 6px 16px; padding: 10px 14px 12px; font-size: 11px; font-weight: 500; color: var(--t-ink3); }
 .v2-tm .hz-tm-sw { width: 10px; height: 10px; border-radius: 2px; }
 
-/* 테마 순위 — 줄 꼴은 신호 표(.v2-tr)와 같다. 지도 키에 맞춰 줄이 고르게 늘어난다. */
-.v2-tm-rank .v2-tbl,
-.v2-tm-rank .v2-tbody,
+/* 주인공 표 — 옆 일정 칸 키에 맞춰 줄이 고르게 늘어난다. */
 .v2-tm-hot .v2-tbl,
 .v2-tm-hot .v2-tbody { flex: 1; display: flex; flex-direction: column; }
-.v2-tm-rank .v2-tbody > li,
 .v2-tm-hot .v2-tbody > li { flex: 1 0 auto; display: flex; }
-.v2-tm-rank .v2-tbody > li > .v2-tr,
 .v2-tm-hot .v2-tbody > li > .v2-tr { flex: 1; }
-.v2-tm-ranktbl .v2-tr { grid-template-columns: 20px minmax(0, 1fr) 52px 64px 88px; min-height: 36px; }
-.v2-tm-ranktbl .v2-th > :last-child { justify-content: flex-end; }
-.v2-tm-ranktbl .v2-td-name { font-weight: 600; }
+
+/* 테마 흐름 — 순위 · 테마(5일 전 대비)와 말 많은 종목 · 점유율 · 열흘 · 요즘 도는 얘기(남는 폭). 줄 꼴은 신호 표(.v2-tr)와 같다. */
+.v2-tm-flowtbl .v2-tr { grid-template-columns: 20px 220px 56px 112px minmax(0, 1fr); min-height: 52px; }
+.v2-td-theme2 { display: flex; flex-direction: column; gap: 1px; min-width: 0; padding: 7px 0; }
+.v2-td-theme2 > span:first-child { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.v2-td-theme2 b { font-weight: 700; overflow-wrap: anywhere; }
+.v2-td-theme2 em,
+.v2-td-flow2 em { font-style: normal; font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--t-ink3); }
+.v2-td-theme2 em.is-up,
+.v2-td-flow2 em.is-up { color: var(--t-up); }
+.v2-td-theme2 em.is-down,
+.v2-td-flow2 em.is-down { color: var(--t-down); }
+.v2-td-sub { font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); word-break: keep-all; }
 .v2-td-flow { text-align: right; white-space: nowrap; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-td-flow.is-on { font-weight: 600; color: var(--t-down-deep); }
 
@@ -1428,16 +1438,25 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   .v2-tm-band.is-brief,
   .v2-tm-band.is-hot,
   .v2-tm-band.is-pair { grid-template-columns: minmax(0, 1fr); }
-  .v2-tm-map .hz-treemap { flex: none; aspect-ratio: 2 / 1; min-height: 0; }
+  .v2-tm-flowtbl .v2-tr { grid-template-columns: 20px 196px 56px 104px minmax(0, 1fr); }
   .v2-tm-risertbl .v2-tr { grid-template-columns: 88px 232px 80px minmax(0, 1fr); }
   .v2-tm-reasonrows .v2-tr { grid-template-columns: 200px 72px minmax(0, 1fr) 72px; }
 }
 @container kd (max-width: 679px) {
   /* 폰 — 표 머리 줄은 위 신호 표 규칙대로 숨고, 줄은 두 층(위 이름 · 숫자, 아래 문장). */
-  .v2-tm-ranktbl .v2-tr { grid-template-columns: 20px minmax(0, 1fr) 48px 56px; grid-template-areas: "rank name share chg"; row-gap: 0; padding-top: 0; padding-bottom: 0; }
-  .v2-tm-ranktbl .v2-td-name { grid-area: name; }
-  .v2-tm-ranktbl .v2-tr > :nth-child(3) { grid-area: share; }
-  .v2-tm-ranktbl .v2-td-flow { display: none; }
+  /* 지도 — 폭이 반의반이라 3:1 이면 칸이 납작해 이름이 안 든다. 3:2 로 세운다(배치는 3:1 그대로라 칸이 세로로만 늘어난다). */
+  .v2-tm-map .hz-treemap { aspect-ratio: 3 / 2; }
+  /* 테마 흐름 — 위 테마 · 점유율, 가운데 열흘 한 조각, 아래 요즘 도는 얘기. */
+  .v2-tm-flowtbl .v2-tr {
+    grid-template-columns: 20px minmax(0, 1fr) auto;
+    grid-template-areas: "rank theme share" ".    flow  flow" ".    text  text";
+    row-gap: 2px;
+    padding-top: 6px;
+    padding-bottom: 8px;
+  }
+  .v2-tm-flowtbl .v2-td-theme2 { grid-area: theme; padding: 0; }
+  .v2-tm-flowtbl .v2-tr > :nth-child(3) { grid-area: share; }
+  .v2-tm-flowtbl .v2-td-flow2 { grid-area: flow; flex-direction: row; align-items: baseline; justify-content: flex-start; gap: 8px; }
   .v2-tm-risertbl .v2-tr,
   .v2-tm-hottbl .v2-tr,
   .v2-tm-reasonrows .v2-tr { row-gap: 2px; padding-top: 8px; padding-bottom: 8px; }

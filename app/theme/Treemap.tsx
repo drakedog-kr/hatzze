@@ -32,9 +32,8 @@ import { MONO } from "../ui";
  * 두면 두 글자만 잘려 보여서 무엇인지 알 수 없다. 작은 칸은 폰에서 더 작아지므로 CSS 가 한 단계 더 접는다.
  */
 
-/** 계산용 좌표계. 가로 100 · 세로 50 = 종횡비 2:1. 세로 좌표는 ×2 해서 퍼센트로 쓴다. */
+/** 계산용 좌표계. 가로 100 · 세로 100/aspect(기본 2:1 → 50). 세로 좌표는 H 로 나눠 퍼센트로 쓴다. */
 const W = 100;
-const H = 50;
 
 /** 변화(%p)를 색 단계로. 문턱은 테마 로테이션 카드에서 눈에 띄던 크기를 기준으로 잡았다. */
 function toneOf(delta: number | null): string {
@@ -109,7 +108,17 @@ export function stockTiles(stocks: ThemeHotStock[], market: ThemeMarketKey = "kr
 
 /* 처음 온 사람에게 한 번 띄우던 쪽지('반도체 칸을 누르면 이 테마의 상세 정보가 열립니다', MapHint)는 걷었다(v2, 2026-10-03) —
    화면에 설명 문장을 두지 않는다. 칸이 눌린다는 것은 마우스를 올리면 바뀌는 칸 색 · 손가락 모양이 말한다. */
-export function Treemap({ tiles, ariaLabel }: { tiles: TreemapTile[]; ariaLabel: string }) {
+export function Treemap({
+  tiles,
+  ariaLabel,
+  aspect = 2,
+}: {
+  tiles: TreemapTile[];
+  ariaLabel: string;
+  /** 가로 ÷ 세로. 배치를 이 비율로 계산하고 상자도 같은 비율로 선다(--tm-aspect · v2.css). 테마 목록 v2 는 판 폭 전체에 낮게 3:1. */
+  aspect?: number;
+}) {
+  const H = W / aspect;
   const rects = squarify(
     tiles.map((t) => ({ key: t.key, value: t.value })),
     W,
@@ -118,7 +127,7 @@ export function Treemap({ tiles, ariaLabel }: { tiles: TreemapTile[]; ariaLabel:
   const byKey = new Map(tiles.map((t) => [t.key, t]));
 
   return (
-    <div className="hz-treemap" role="list" aria-label={ariaLabel}>
+    <div className="hz-treemap" role="list" aria-label={ariaLabel} style={{ ["--tm-aspect" as string]: `${aspect} / 1` }}>
       {rects.map((r) => {
         const t = byKey.get(r.key)!;
         // 글자 단계는 넓이가 아니라 **폭과 높이**로 가른다. 넓이만 보면 가늘고 긴 칸에 이름이 들어가
