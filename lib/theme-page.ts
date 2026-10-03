@@ -117,6 +117,11 @@ export type ThemeReasonRow = ThemeMember & {
   date: string;
   reason: string;
   changeRate: number | null;
+  /**
+   * 그날 종가(원) — 국장은 KRX 확정 종가(telegram_stock_move_reason.close_price, 다음 날 등락률과 같이 채워진다), 오늘 줄은 야후 지금가.
+   * 미장은 늘 null — 채널 글에 적힌 등락률뿐이라 '그날 종가'가 정의되지 않는다(마이그레이션 069). 화면 '등락의 이유'가 % 앞에 적는다(2026-10-04).
+   */
+  close: number | null;
   channelCount: number;
 };
 
@@ -204,7 +209,7 @@ async function themeMembers(theme: string): Promise<MemberRow[] | null> {
 }
 
 /**
- * **오늘 날짜의 까닭 줄**에만 야후 등락률을 채운다. 까닭은 저녁에 만들어지는데 KRX 종가는 이튿날 낮에야 와서
+ * **오늘 날짜의 까닭 줄**에만 야후 등락률 · 지금가를 채운다. 까닭은 저녁에 만들어지는데 KRX 종가는 이튿날 낮에야 와서
  * (generate_move_reasons.fill_krx) 오늘 줄은 하루 동안 등락률이 비어 있었다. 데일리 노트가 오늘 글에만 야후를
  * 보는 규칙(lib/daily-note.ts getNoteStocks)을 그대로 따른다:
  *   - 오늘(KST)이고 change_rate 가 비어 있는 줄만. 어제 줄은 안 본다 — 야후의 등락률은 늘 '지금 세션'이라
@@ -214,14 +219,15 @@ async function themeMembers(theme: string): Promise<MemberRow[] | null> {
  */
 async function fillTodayRates(reasons: ThemeReasonRow[]): Promise<void> {
   const today = todayKst();
-  const todo = reasons.filter((r) => r.date === today && r.changeRate == null);
+  const todo = reasons.filter((r) => r.date === today && (r.changeRate == null || r.close == null));
   if (!todo.length) return;
   await Promise.all(
     todo.map(async (r) => {
       try {
         const q = await fetchYahooQuote(`${r.code}.${r.market === "KOSDAQ" ? "KQ" : "KS"}`, { next: { revalidate: 600 } });
         const rate = q ? changeRateOf(q) : null;
-        if (rate != null) r.changeRate = rate;
+        if (r.changeRate == null && rate != null) r.changeRate = rate;
+        if (r.close == null && q) r.close = q.price;
       } catch (e) {
         console.error(`[getThemePage] ${r.code} 오늘 등락을 야후에서 못 받았습니다`, e);
       }
@@ -388,7 +394,7 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
 
   type ThemeDailyRow = { date: string; share_pct: number | string; rank: number | null; mention_count: number | null };
   type StockDailyRow = { id: number; date: string; stock_code: string; mention_count: number | null; channel_count: number | null; weighted_score: number | string | null };
-  type ReasonRow = { date: string; stock_code: string; reason: string | null; change_rate: number | string | null; channel_count: number | null };
+  type ReasonRow = { date: string; stock_code: string; reason: string | null; change_rate: number | string | null; close_price: number | string | null; channel_count: number | null };
 
   let stockDailyFailed = false;
   const [themeDaily, stockDaily, reasonRows, events, rotation, briefRow, meta, dayTotals] = await Promise.all([
@@ -404,7 +410,7 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
     codes.length
       ? db
           .from("telegram_stock_move_reason")
-          .select("date,stock_code,reason,change_rate,channel_count")
+          .select("date,stock_code,reason,change_rate,close_price,channel_count")
           .in("stock_code", codes)
           .gte("date", first)
           .lte("date", baseDate)
@@ -451,6 +457,7 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
       date: r.date,
       reason: r.reason,
       changeRate: r.change_rate == null ? null : Number(r.change_rate),
+      close: r.close_price == null ? null : Number(r.close_price),
       channelCount: r.channel_count ?? 0,
     });
   }

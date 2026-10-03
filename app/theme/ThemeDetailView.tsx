@@ -130,6 +130,8 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
     }
     return [...m.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([date, list]) => [date, list.sort((a, b) => b.channelCount - a.channelCount)] as const);
   })();
+  // 종가 칸 — 국장만 있다(미장은 늘 null). 하나도 없으면 칸째 걷는다.
+  const anyClose = d.reasons.some((r) => r.close != null);
   // 가장 최근 날의 등락률은 다음 날 낮에 채워진다(KRX 가 그날 종가를 이튿날 준다) — 그날 빈칸엔 '종가 전'. 그보다 옛날의 빈칸은 '-'.
   const newestReason = d.reasons.reduce((m, r) => (r.date > m ? r.date : m), "");
 
@@ -352,13 +354,14 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
 
       {events.length === 0 && <div className="v2-tm-band is-pair">{sideMods}</div>}
 
-      {/* 넷째 줄 — 등락의 이유(기준일까지의 이레). 날짜 머리 하나 아래 그날 종목들 — 줄은 종목 · 까닭(남는 폭) · 등락 · 채널 수.
-          숫자 둘은 줄 오른쪽 끝에 모은다(2026-10-04) — 등락이 종목과 까닭 사이에 있을 땐 '+3.27%'와 까닭 첫 낱말이 붙어 읽혔다. */}
+      {/* 넷째 줄 — 등락의 이유(기준일까지의 이레). 날짜 머리 하나 아래 그날 종목들 — 줄은 종목 · 까닭(남는 폭) · 종가 · 등락 · 채널 수.
+          숫자는 줄 오른쪽 끝에 모은다(2026-10-04) — 등락이 종목과 까닭 사이에 있을 땐 '+3.27%'와 까닭 첫 낱말이 붙어 읽혔다.
+          종가는 % 앞에(같은 날 요청). 미장은 그날 종가가 없어(lib/theme-page.ts ThemeReasonRow.close) 그 칸째 걷는다. */}
       <Module title="등락의 이유" meta={`${fmtKoDate(reasonStart)} ~ ${fmtKoDate(reasonEnd)} · 크게 움직인 날`} className="v2-tm-reasons">
         {reasonDays.length === 0 ? (
           <p className="v2-empty">최근 {REASON_DAYS}일 사이 이 테마 종목에 붙은 이유가 없습니다.</p>
         ) : (
-          <div className="v2-tm-days">
+          <div className={`v2-tm-days${anyClose ? "" : " no-close"}`}>
             {reasonDays.map(([date, list]) => (
               <section key={date} aria-label={fmtKoWd(date)}>
                 <div className="v2-tm-dayhead">
@@ -375,6 +378,7 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
                           <span className="v2-td-name">{r.name}</span>
                         </span>
                         <span className="v2-td-text">{r.reason}</span>
+                        {anyClose && <span className="v2-td-num v2-td-px">{r.close == null ? "" : `${Math.round(r.close).toLocaleString("ko-KR")}원`}</span>}
                         <span className={`v2-td-num v2-td-chg${toneCls(r.changeRate)}${r.changeRate == null ? " is-none" : ""}`} title={market.reasonRateNote}>
                           {r.changeRate == null ? (market.key === "kr" && date === newestReason ? "종가 전" : "-") : signPct(r.changeRate)}
                         </span>

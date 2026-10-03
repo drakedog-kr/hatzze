@@ -1496,8 +1496,10 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-tm-dayhead .v2-badge { align-self: center; }
 .v2-tm-dayhead em { margin-left: auto; font-style: normal; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-tm-reasonrows { list-style: none; margin: 0; padding: 0; }
-/* 종목 · 까닭(남는 폭) · 등락 · 채널 수 — 숫자 둘은 줄 오른쪽 끝에. */
-.v2-tm-reasonrows .v2-tr { grid-template-columns: 220px minmax(0, 1fr) 72px 76px; }
+/* 종목 · 까닭(남는 폭) · 종가 · 등락 · 채널 수 — 숫자는 줄 오른쪽 끝에. 종가가 없는 미장은 그 칸째 없다(.no-close). */
+.v2-tm-reasonrows .v2-tr { grid-template-columns: 220px minmax(0, 1fr) 84px 64px 76px; }
+.v2-tm-days.no-close .v2-tm-reasonrows .v2-tr { grid-template-columns: 220px minmax(0, 1fr) 72px 76px; }
+.v2-td-px { font-weight: 600; color: var(--t-ink); }
 .v2-td-ch { font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-tm-days > section:last-child li:last-child .v2-tr { border-bottom: 0; }
 
@@ -1508,7 +1510,8 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   .v2-tm-band.is-pair { grid-template-columns: minmax(0, 1fr); }
   .v2-tm-flowtbl .v2-tr { grid-template-columns: 20px 200px minmax(0, 1fr) 64px 108px; }
   .v2-tm-risertbl .v2-tr { grid-template-columns: 88px 220px minmax(0, 1fr) 80px; }
-  .v2-tm-reasonrows .v2-tr { grid-template-columns: 200px minmax(0, 1fr) 72px 72px; }
+  .v2-tm-reasonrows .v2-tr { grid-template-columns: 200px minmax(0, 1fr) 80px 64px 72px; }
+  .v2-tm-days.no-close .v2-tm-reasonrows .v2-tr { grid-template-columns: 200px minmax(0, 1fr) 72px 72px; }
 }
 @container kd (max-width: 679px) {
   /* 폰 — 표 머리 줄은 위 신호 표 규칙대로 숨고, 줄은 두 층(위 이름 · 숫자, 아래 문장). */
@@ -1540,11 +1543,18 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
     grid-template-areas: "rank stock num" ".    text text";
   }
   .v2-tm-hottbl .v2-td-two { grid-area: num; }
-  .v2-tm-reasonrows .v2-tr {
+  .v2-tm-reasonrows .v2-tr,
+  .v2-tm-days.no-close .v2-tm-reasonrows .v2-tr {
     grid-template-columns: minmax(0, 1fr) auto auto;
     grid-template-areas: "stock chg ch" "text text text";
     column-gap: 10px;
   }
+  /* 종가가 있는 국장 — 종목 · 종가 · 등락 · 채널 수가 위 한 줄. */
+  .v2-tm-days:not(.no-close) .v2-tm-reasonrows .v2-tr {
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    grid-template-areas: "stock px chg ch" "text text text text";
+  }
+  .v2-tm-reasonrows .v2-td-px { grid-area: px; }
   .v2-tm-reasonrows .v2-td-ch { grid-area: ch; }
   /* 태그는 폰에서 이름 옆에 서면 이름이 잘린다 — 신호 표의 꼬리표와 같이 숨긴다. */
   .v2-tm .v2-td-stock .hz-theme-tag { display: none; }

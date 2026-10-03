@@ -136,7 +136,7 @@ export const getUsThemePage = cache(async (theme: string): Promise<ThemePageData
   for (const r of (reasonRows.data ?? []) as ReasonRow[]) {
     const m = byCode.get(r.ticker);
     if (!m || !r.reason) continue;
-    reasons.push({ ...m, date: r.date, reason: r.reason, changeRate: r.quoted_change_rate == null ? null : Number(r.quoted_change_rate), channelCount: r.channel_count ?? 0 });
+    reasons.push({ ...m, date: r.date, reason: r.reason, changeRate: r.quoted_change_rate == null ? null : Number(r.quoted_change_rate), close: null, channelCount: r.channel_count ?? 0 });
   }
   const reasonDates = new Set(reasons.map((r) => r.date));
 
