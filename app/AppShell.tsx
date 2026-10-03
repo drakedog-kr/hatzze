@@ -1383,8 +1383,8 @@ const LABEL_TITLED_PREFIXES = [`${NOTE_PAGE.href}/`];
  * 화면 이름은 사이드바의 현재 항목이 말하고, 본문은 첫 줄부터 내용이다. h1 은 지우지 않는다(검색엔진·스크린리더가
  * 이 화면의 이름을 읽는 자리다). 오른쪽 도구(미장 전환·테마)는 그대로 선다.
  */
-// 시장 브리핑(/) · MDD · 배당으로 살기 · 테마 판세(목록 · 테마 한 장, 국장 · 미장) · 국장 미리보기는 2026-10-03 에 들였다 — 카더라 v2 의 디자인 규칙을 옮겼다.
-const V2_PAGES = ["/", "/kadera", "/mdd", "/dividend", "/preview", "/insider"];
+// 시장 브리핑(/) · MDD · 배당으로 살기 · 테마 판세(목록 · 테마 한 장, 국장 · 미장) · 국장 미리보기 · 미장 카더라는 2026-10-03 에 들였다 — 카더라 v2 의 디자인 규칙을 옮겼다.
+const V2_PAGES = ["/", "/kadera", "/kadera/us", "/mdd", "/dividend", "/preview", "/insider"];
 /** 테마 판세(/theme/semiconductor · /theme/us/memory) · 데일리 노트(/daily/2026-10-02) · 내부자 전체보기 · 종목 · 투자자 상세 ·
  *  종목 페이지(/stock/005930)는 주소가 여럿이라 앞머리로 가른다. */
 const isV2Page = (pathname: string) =>

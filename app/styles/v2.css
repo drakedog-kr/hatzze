@@ -240,6 +240,12 @@
 .v2-grid .v2-tbody > li > .v2-tr { flex: 1; }
 .v2-grid .v2-kw ol > li { flex: 1 0 auto; }
 .v2-grid > #brief .v2-brief { font-size: 13px; line-height: 1.95; }
+/* 요약이 옆 급부상 표보다 짧은 날 — 대목을 줄로 세워 남는 높이를 나눠 먹는다(.v2-brief3 과 같은 꼴 · 줄 사이 가는 선).
+   대목은 날마다 셋 · 넷이라(넷째는 일정 재료가 있는 날만) 셋인 날 요약 아래가 비었다(미장 2026-10-03 101px).
+   긴 날은 제 키대로 서고 표 줄이 늘어난다(그대로). 대목 안 글은 span 하나에 담는다 — p 를 flex 로 두면 굵힌 낱말이 따로 놀아 줄글이 깨진다. */
+.v2-grid > #brief .v2-brief { flex: 1; display: flex; flex-direction: column; padding-top: 2px; padding-bottom: 4px; }
+.v2-grid > #brief .v2-brief p { flex: 1 0 auto; display: flex; align-items: center; margin: 0; padding: 8px 0; border-bottom: 1px solid var(--t-line); }
+.v2-grid > #brief .v2-brief p:last-child { border-bottom: 0; }
 /* 오른쪽 칸(400 · 340)의 이슈 키워드는 한 단 열 줄 — 막대 칸이 들어갈 폭이 없어 폰과 같은 꼴(순위 · 키워드 · 횟수 · 변화).
    한 줄기(1,000 미만)에선 판 폭 전체라 막대를 그대로 둔다. */
 @container kd (min-width: 1000px) {

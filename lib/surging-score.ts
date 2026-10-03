@@ -117,7 +117,7 @@ export function scoreSurging(
   return { recentDates, scores };
 }
 
-export type UsSurgingScore = { ticker: string; multiple: number; recentMentions: number; byDate: Map<string, number> };
+export type UsSurgingScore = { ticker: string; multiple: number; recentMentions: number; isNew: boolean; byDate: Map<string, number> };
 
 /** 미장 — 최근 언급 MIN_RECENT_MENTIONS 미만·배수 1 이하는 빼고 배수 내림차순. */
 export function scoreUsSurging(
@@ -131,7 +131,8 @@ export function scoreUsSurging(
     if (s.recentMentions < MIN_RECENT_MENTIONS) continue;
     const multiple = (s.recentShare + US_SHARE_SMOOTHING) / (s.baseShare + US_SHARE_SMOOTHING);
     if (multiple <= 1) continue;
-    ranked.push({ ticker, multiple, recentMentions: s.recentMentions, byDate: s.byDate });
+    // isNew — 평소 기간엔 언급이 없던 종목(국장 scoreSurging 과 같은 뜻). v2 표가 '첫 언급' 꼬리표를 단다.
+    ranked.push({ ticker, multiple, recentMentions: s.recentMentions, isNew: s.baseShare === 0, byDate: s.byDate });
   }
   ranked.sort((a, b) => b.multiple - a.multiple);
   return { recentDates, ranked };

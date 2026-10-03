@@ -334,7 +334,11 @@ export default async function KaderaPage() {
               const used = new Set<string>();
               return (sentiment?.summary ?? "오늘의 요약을 준비하고 있습니다.")
                 .split(/\n{2,}/)
-                .map((para, i) => <p key={i}>{highlightTerms(para, summaryTerms, used, { linkTerms: THEME_LINKS ? THEME_LINK_MAP : undefined })}</p>);
+                .map((para, i) => (
+                  <p key={i}>
+                    <span>{highlightTerms(para, summaryTerms, used, { linkTerms: THEME_LINKS ? THEME_LINK_MAP : undefined })}</span>
+                  </p>
+                ));
             })()}
           </div>
         </Module>

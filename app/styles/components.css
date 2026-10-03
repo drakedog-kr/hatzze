@@ -90,17 +90,6 @@
    **테마 리포트로 가는 링크**가 되면서 걷었다 — 팝오버가 보이던 종목 목록은 테마 리포트의 '이 테마의 주인공'이 요약·이유·
    일정과 함께 보인다. 지울 때 grep 으로 참조를 셌다(tsx 0곳). 홈 지표 셀의 팝오버(home.css)는 같은 어법을 제 몫으로 갖고 있다. */
 
-/* 클릭 가능한 카드(트렌딩 메시지 등) — 마우스를 올리면 살짝 떠오르고 테두리가
-   강조돼 "누를 수 있다"는 걸 알린다. */
-.hz-lift {
-  cursor: pointer;
-  transition: transform 0.14s ease, border-color 0.14s ease;
-}
-.hz-lift:hover {
-  transform: translateY(-2px);
-  border-color: var(--c-blue);
-}
-
 /* 리스트 행 링크(채널 랭킹 등) — 호버 시 메시지 카드와 같은 배경으로 강조된다.
    음수 마진으로 여백을 카드 안쪽까지 넓혀 행 전체가 눌리는 느낌을 준다. */
 .hz-row-link {
@@ -229,29 +218,6 @@
   color: #ffffff;
 }
 
-/* 카더라 종목 카드 → MDD 정밀분석 링크. 카드 하단에 은근히 붙는 작은 텍스트 링크다
-   (버튼처럼 크게 두면 카드마다 반복돼 너무 튄다). 평소엔 옅은 회색, 호버에만 파랗게.
-   서버 컴포넌트라 인라인 호버를 못 줘서 여기 클래스로 둔다. */
-.hz-mdd-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: var(--fs-11);
-  font-weight: 600;
-  color: var(--c-sub);
-  text-decoration: none;
-  white-space: nowrap;
-  transition: color 0.12s ease;
-}
-/* 호버는 파랑 램프의 **맨 앞**(--c-blue-1)이다. --c-blue 로 두면 종목 리포트의 최근
-   3일 막대와 똑같은 색인데, 막대는 면적이 크고 이쪽은 11px 글자라 같은 색이 훨씬
-   흐리게 보인다 — 한 단계 깊은 값이라야 "링크를 짚었다"가 읽힌다.
-   다크에선 램프가 뒤집혀 --c-blue-1 이 가장 밝은 값이라, 어두운 바탕에서도 같은
-   '가장 또렷한 파랑' 자리를 그대로 가리킨다. */
-.hz-mdd-link:hover {
-  color: var(--c-blue-1);
-}
-
 /* 종목 이름 링크 — 카더라의 급부상 셀·주요 종목 리포트가 쓴다.
 
    ⚠️ 링크라고 파랗게 칠하지 않는다. 이름은 카드에서 가장 진한 글자(--c-ink)라야 하는데,
@@ -285,39 +251,6 @@
   color: var(--c-blue-1);
 }
 
-/* 주요 종목 리포트의 머리줄 — 로고 · 종목명 · 종목코드 · 시세.
-   시세 묶음은 nowrap 이고 종목코드도 안 줄어서, 좁아지면 줄어들 수 있는 게 종목명(clip)
-   하나뿐이다. 폰에서 그 이름이 0 까지 눌려 아예 안 보였다. 폭이 모자라면 시세를 통째로
-   다음 줄로 내려 이름에 한 줄을 다 준다. */
-.hz-stock-price {
-  margin-left: auto;
-}
-/* 이 줄은 baseline 으로 맞춘다(page.tsx). 17px 종목명·11px 코드·15px 시세가 한 줄에
-   섞여 있어 center 로 두면 눈에 보이는 밑선이 2.5px 어긋난다.
-   로고만 빼 준다 — 그림에는 baseline 이 없어 상자 밑변이 baseline 에 걸리고, 그러면
-   로고가 글자 위로 떠오른다. 이 하나는 광학 중심이 맞다.
-
-   ⚠️ 그 중심은 **줄 전체가 아니라 종목명 줄**의 중심이다. 오른쪽 시세 묶음이 두 줄
-   (N개 채널 · 최근 N일 N회, 37px)이라 줄이 종목명(26px)보다 키가 크고, `align-self: center`
-   로 두면 로고가 줄 한가운데(21px)로 내려가 종목명 중심(13px)보다 8px 아래에 앉았다
-   (2026-09-18 지적, 09-05 리디자인 때 시세가 두 줄이 되면서 생긴 것). baseline 묶음은
-   줄 위(cross-start)에 붙으므로 로고도 위에 붙이고, 종목명 줄(17px × 1.5 = 25.5px)과
-   로고(--hz-logo)의 키 차이 절반만큼 끌어올려 두 중심을 맞춘다. 로고 30px 이면 −2px. */
-.hz-stock-head > :first-child {
-  align-self: flex-start;
-  margin-top: calc((25.5px - var(--hz-logo, 24px)) / 2);
-}
-@media (max-width: 560px) {
-  .hz-stock-head {
-    flex-wrap: wrap;
-    row-gap: 4px;
-  }
-  .hz-stock-price {
-    margin-left: 0;
-    flex-basis: 100%;
-  }
-}
-
 /* 신고가 괴리율 카드의 종목 목록. 넓을 땐 왼쪽 게이지와 세로 선으로 나뉘지만, 좁아져
    아랫줄로 내려가면 그 선이 허공에 뜬다 — 그때는 가로 선으로 바꿔 위아래를 나눈다. */
 .hz-peer-list {
@@ -337,20 +270,6 @@
    (나머지는 더 옅어져 어디를 보고 있는지 분명해진다). 서버 컴포넌트라 인라인 호버를 못 줘서
    여기 클래스로 둔다. 규칙 순서가 곧 우선순위다 — :hover 규칙이 기본 규칙 뒤에 와야
    마우스를 올렸을 때 다른 칸이 같이 옅어진다(안 그러면 진한 막대가 둘이 된다). */
-/* 종목 리포트 막대는 **두 단계뿐**이다 — 진한 칸 = 카드 수치에 들어간 최근 3일,
-   옅은 칸 = 그 앞 배경 맥락. 예전엔 마지막 하루만 진하고 나머지 집계일이 중간 톤이라
-   세 단계였는데, 그러면 "어디까지가 480회인가"가 색으로 안 읽혔다. 경계를 색이 직접
-   말하게 두 단계로 줄인다(값은 숨기지 않는다 — 툴팁·hover 는 7칸 전부 동작). */
-.hz-bars .hz-bar {
-  opacity: 0.95; /* 집계 창(최근 3일) */
-  transition: opacity 0.12s ease;
-}
-.hz-bars .hz-bar-ctx { opacity: 0.45; } /* 그 앞 배경 맥락 */
-.hz-bars:hover .hz-bar { opacity: 0.45; }
-.hz-bars:hover .hz-bar-ctx { opacity: 0.25; }
-.hz-bars .hz-bar-col:hover .hz-bar { opacity: 1; }
-.hz-bars .hz-bar-date { transition: color 0.12s ease; }
-.hz-bars .hz-bar-col:hover .hz-bar-date { color: var(--c-sub); }
 
 /* 카드 바닥에 붙는 옅은 버튼형 링크(모니터링 현황의 "채널 등록 신청"). 파란 글자만
    덩그러니 떠 있으면 눌리는 것인지 알기 어려워, 테두리를 줘 버튼으로 읽히게 한다.

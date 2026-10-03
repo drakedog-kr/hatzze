@@ -89,25 +89,6 @@
   .hz-zoom-btn { display: flex; }
 }
 
-/* 시트 머리의 2단 요약(테마 로테이션의 유입↔이탈 · 이슈 키워드의 1위↔비중).
-   격자를 인라인에 두면 미디어쿼리가 못 이겨서 클래스로 뺀다(이 저장소의 반복된 함정). */
-.hz-kd-duo {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-}
-@media (max-width: 560px) {
-  /* 폰에서는 한 칸씩 세로로. 393px 화면에서 두 칸이면 한 칸이 175px 밖에 안 돼,
-     "한 키워드에 관심이 쏠린 상태"(185px) 같은 부제가 잘렸다 — 두 값을 나란히
-     견주자고 만든 자리인데 정작 설명이 안 읽히면 견줄 것이 없다. */
-  .hz-kd-duo {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  /* 세로로 서면 칸 사이를 가르던 세로선이 할 일이 없어진다 — 가로선으로 바꾼다. */
-  .hz-kd-duo > *:first-child {
-    box-shadow: inset 0 -1px 0 var(--c-sep-h) !important;
-  }
-}
-
 
 /* 푸터의 버전 표기. 눌러서 업데이트 기록(/changelog)으로 간다.
    ⚠️ 색·밑줄을 Footer.tsx 인라인에 두면 아래 :hover 를 이겨서 호버가 아예 안 먹는다.
@@ -348,7 +329,6 @@
      같은 만큼 바깥 여백을 빼면 자리 차지는 그대로다. 인라인 요소는 세로 여백이 줄 높이에 안 끼므로 안쪽 여백만으로 커진다.
      ⚠️ 종목 링크(.hz-stock-link)는 말줄임을 자르는 상자라 ::before 로 넓히면 자기 overflow 에 잘린다 — 여백 방식이어야 한다.
      ⚠️ 테마 태그는 바탕이 있는 알약이라 여백을 늘리면 알약이 커진다 — 그쪽만 ::before 다. */
-  .hz-mdd-link,
   .hz-stock-link,
   .hz-back-link,
   .hz-cellbody-wrap,
@@ -357,8 +337,6 @@
     padding-block: 4px;
     margin-block: -4px;
   }
-  .hz-theme-tag-link { position: relative; }
-  .hz-theme-tag-link::before { content: ""; position: absolute; inset: -3px -2px; }
 }
 /* 아주 좁은 폰. 머리 오른쪽 조작부(기간 탭 등)가 194px 라 320 에서 제목 칸이 14px 로 눌려 "트렌딩 메시지"가
    한 글자씩 여섯 줄이 됐다(2026-09-23 머지 전 점검) — ≤340 에선 조작부를 설명 아랫줄로 내린다. */

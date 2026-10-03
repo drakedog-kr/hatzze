@@ -97,9 +97,11 @@ export type UsSurgingStock = {
   recentMentions: number;
   channelCount: number | null;
   multiple: number;
+  /** 평소 기간엔 언급이 없던 종목(lib/surging-score.ts). 표가 '첫 언급' 꼬리표를 단다 */
+  isNew: boolean;
   series: number[];
   seriesDates: string[];
-  /** 야후 실시간 시세(USD). 못 받으면 null — 카드가 "시세를 못 받았습니다"로 적는다 */
+  /** 야후 실시간 시세(USD). 못 받으면 null — 표가 등락 칸을 '없음'으로 적는다 */
   price: number | null;
   changeRate: number | null;
 };
@@ -257,6 +259,7 @@ export async function getUsSurgingStocks(
     recentMentions: s.recentMentions,
     channelCount: channelsFallback.get(s.ticker) || null,
     multiple: s.multiple,
+    isNew: s.isNew,
     series: chartDates.map((d) => s.byDate.get(d) ?? 0),
     seriesDates: chartDates,
   }));

@@ -97,8 +97,7 @@
    제목부와 내용부를 선이나 여백으로 반드시 가른다. 바탕만 흰색으로 두고 선은 남긴다 —
    회색 띠 + 선이던 예전보다 가볍고, 선이 없던 방금보다 구조가 분명하다.
    아래 여백 16 은 선까지의 거리다(선 위 16 · 선 아래는 내용이 자기 padding 으로 잡는다). */
-.hz-tx .hz-sheet-head,
-.hz-sheet-head-bold {
+.hz-tx .hz-sheet-head {
   padding: 22px 26px 16px;
   background: var(--c-card);
   border-bottom: 1px solid var(--c-sheet-line);
@@ -108,8 +107,7 @@
 /* 글 칸(제목 20 + 간격 2 + 설명 18 = 40)과 아이콘 타일(40)의 세로 길이를 맞춘다.
    34 로 두면 두 줄 글 옆에서 타일이 짧아 어긋나 보였다(2026-09-04 지적). 줄 높이를
    px 로 못박는다 — 비율로 두면 글자 크기 따라 합이 40 에서 벗어난다. */
-.hz-tx .hz-sheet-head .hz-sheet-head-txt,
-.hz-sheet-head-bold .hz-sheet-head-txt { gap: 2px; }
+.hz-tx .hz-sheet-head .hz-sheet-head-txt { gap: 2px; }
 .hz-tx .hz-sheet-head-title {
   font-size: var(--fs-17);
   font-weight: 800;
@@ -123,8 +121,7 @@
   border: 0;
   padding: 4px 10px;
 }
-.hz-tx .hz-sheet-head-ico,
-.hz-sheet-head-bold .hz-sheet-head-ico {
+.hz-tx .hz-sheet-head-ico {
   width: 40px;
   height: 40px;
   border-radius: 12px;
@@ -134,8 +131,7 @@
      잉크 토큰이면 4.66 으로 여유가 있다(Pill 주석과 같은 셈). */
   color: var(--c-cold-ink);
 }
-.hz-tx .hz-sheet-head-ico > .ms,
-.hz-sheet-head-bold .hz-sheet-head-ico > .ms { font-size: var(--fs-20); }
+.hz-tx .hz-sheet-head-ico > .ms { font-size: var(--fs-20); }
 
 /* ── 표: 띠를 걷고 여백만 조금 넓힌다. ── */
 /* 열 머리 띠. 머리 헤어라인 바로 아래 올 때가 있어(하이라이트 없는 표) 위를 넉넉히 둔다 —
@@ -146,51 +142,12 @@
   padding: 14px 26px 9px;
 }
 .hz-tx .hz-trow { padding: 10px 26px; }
-/* 하이라이트 두 칸(테마 유입↔이탈 · 화제어 1위↔변동): 세로선 대신 나란한 두 타일.
-   Highlight 의 세로선은 인라인 box-shadow 라 !important 로만 걷힌다(.hz-kd-duo 의
-   ≤560 규칙과 같은 사정). */
-.hz-tx .hz-kd-duo {
-  padding: 16px 26px 14px;
-  gap: 10px;
-}
-.hz-tx .hz-kd-duo > * {
-  background: var(--tx-tile);
-  border-radius: var(--tx-r-tile);
-  box-shadow: none !important;
-}
 
 /* ── 패널 격자(급부상·종목 리포트·트렌딩): 트레이·테두리·그림자를 걷고 회색 타일로. ── */
-/* ⚠️ 위 여백은 **머리 헤어라인과 첫 내용 사이의 숨**이다. 선이 없던 동안 4 로 두었는데,
-   선을 되살리자 판이 선에 딱 붙어 보였다(2026-09-04 지적). 16 은 머리 아래 여백(16)과
-   같은 값이라 선을 가운데 두고 위아래가 대칭이 된다. */
-.hz-tx .hz-panelgrid {
-  background: transparent;
-  padding: 16px 26px 24px;
-  gap: 14px;
-}
-.hz-tx .hz-panelgrid > * {
-  background: var(--tx-tile);
-  border: 0;
-  box-shadow: none;
-  border-radius: var(--tx-r-tile);
-  /* 타일 안에서 판(--c-plate)에 앉던 순위 배지는 카드색으로 뜬다 — 판과 타일이 한 톤이라
-     그대로 두면 배지가 사라진다. 배지는 인라인 style 이라 변수로만 바꿀 수 있다. */
-  --c-plate: var(--c-card);
-}
-.hz-tx .hz-panel-pad { padding: 20px 20px 18px; }
-.hz-tx .hz-lift { transition: transform 0.14s ease, background 0.14s ease; }
-.hz-tx .hz-lift:hover { background: var(--c-blue-tint); }
-/* 말풍선은 타일 위라 카드색으로 뜬다(타일과 같은 --c-soft 면 안 보인다). */
-.hz-tx .hz-bubble { background: var(--c-card); }
 /* 각주 띠: 표 뒤에서는 헤어라인을 남기고, 패널 격자·히어로 뒤에서는 걷는다. */
 .hz-tx .hz-sheet-foot {
   border-top: 1px solid var(--c-hairline);
   padding: 12px 26px;
-}
-.hz-tx .hz-panelgrid + .hz-sheet-foot {
-  border-top: 0;
-  min-height: 0;
-  padding: 0 26px 20px;
 }
 .hz-tx .hz-sheet-foot-row { border-top: 1px solid var(--c-hairline); }
 
@@ -410,38 +367,6 @@
   letter-spacing: -0.02em;
   margin-left: 1px;
 }
-/* ── 큰 수치 + 곁줄 ──────────────────────────────────────────────
-   "81%" 옆에 작은 설명 두 줄이 서는 짝. 히어로 셋(브리핑·국장·미장)과 MDD 가 같이 쓴다.
-
-   ⭐⭐ **`align-items: last baseline` 이다.** `flex-end` 는 **상자의 밑변**을 맞추는데,
-   40px 숫자의 상자 밑변과 11.5px 두 줄의 상자 밑변은 글자의 밑선과 다른 자리라 늘
-   어긋난다(실측 5px, MDD 는 8.3px). 예전엔 곁줄에 `padding-bottom: 4` 를 손으로 얹어
-   메웠는데, 그건 지금 글꼴·줄간에서만 맞는 값이라 크기를 건드릴 때마다 다시 틀어졌다
-   (2026-09-05 지적). `last baseline` 은 두 칸의 **마지막 글줄 밑선**을 직접 맞춘다 —
-   글자 크기를 바꿔도 따라온다.
-
-   ⚠️ 두 줄을 겹쳐 쓴 것은 일부러다. 앞줄의 `flex-end` 는 `last baseline` 을 모르는
-   브라우저의 바닥값이고(선언이 통째로 무시되면 앞 값이 남는다), 지원하는 곳에서는
-   뒷줄이 이긴다. 손으로 얹던 padding 은 뺐으므로 바닥값도 예전과 같은 정도로만 어긋난다.
-   ⚠️ 곁줄 칸에 `padding-bottom` 을 다시 넣지 말 것 — 밑선을 그만큼 밀어 도로 어긋난다. */
-.hz-figrow {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  align-items: flex-end;
-}
-.hz-figrow {
-  align-items: last baseline;
-}
-/* 곁줄 — 작은 설명 두 줄. 마지막 줄의 밑선이 큰 수치의 밑선과 한 선에 선다. */
-.hz-figrow-aside {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-}
-
-.hz-tx-split { display: flex; height: 10px; border-radius: 5px; overflow: hidden; }
 .hz-tx-stats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -521,13 +446,9 @@
   .hz-tx-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @media (max-width: 900px) {
-  .hz-sheet-head-bold { padding: 18px 16px 8px; }
   .hz-tx .hz-thead,
   .hz-tx .hz-trow { padding: 12px 16px; }
-  .hz-tx .hz-kd-duo { padding: 12px 16px 12px; }
-  .hz-tx .hz-panelgrid { padding: 12px 16px 16px; gap: 10px; }
   .hz-tx .hz-sheet-foot { padding: 12px 16px; }
-  .hz-tx .hz-panelgrid + .hz-sheet-foot { padding: 0 16px 16px; }
   .hz-tx-hero-main { padding: 20px 18px 18px; }
   .hz-tx-hero-side { padding: 16px 18px 18px; }
   .hz-tx-note { padding: 14px 18px 18px; }
@@ -736,8 +657,6 @@
   min-height: 0;
   padding: 0 26px 20px;
 }
-/* 타일 안의 회색 상자(요약 문단 등)는 카드색으로 뒤집어야 안 묻힌다. */
-.hz-tx .hz-kd-hero .hz-bubble { background: var(--c-card); }
 
 /* ── 미리보기가 쓰는 흰 판 히어로도 같은 결로 ──
    시장 브리핑이 이 판을 쓰던 시절의 규칙이 남아 있다(그쪽은 `.hz-tx-hero` 로 옮겼다).
@@ -893,8 +812,6 @@
   .hz-tx-hero-side { padding: 14px 14px 16px; }
   .hz-tx-hero-flip > .hz-tx-hero-main { padding: 16px 16px 16px; }
   .hz-tx-note { padding: 12px 16px 16px; }
-  .hz-tx .hz-panelgrid { padding: 12px 12px 14px; gap: 8px; }
-  .hz-tx .hz-panel-pad { padding: 16px 16px 14px; }
 }
 
 

@@ -138,10 +138,33 @@ export function SentimentModule({
 const sign = (v: number) => (v > 0 ? "+" : v < 0 ? "-" : "");
 
 /**
+ * 종목 한 줄이 가는 곳 — 국내는 종목 페이지(/stock/코드), 미장은 내부자 리포트 종목 화면(/insider/stock/티커).
+ * 미국 종목엔 따로 실주소가 없어 시세 · 공시 · 커뮤니티 관심 추이가 다 있는 그 화면이 종목 화면 노릇을 한다(MDD 의 같은 규칙, app/mdd/V2Sheets.tsx).
+ * 시장을 모르면(null) 길을 안 낸다.
+ */
+export function stockHref(code: string, market: string | null): string | null {
+  if (market === "US") return `/insider/stock/${encodeURIComponent(code)}`;
+  if (market === "KOSPI" || market === "KOSDAQ") return `/stock/${code}`;
+  return null;
+}
+
+/**
  * 테마 — 작은 카드 목록. 미니 선(14일 점유율) · 이름 · 대장 종목 꼬리표 · 점유율 · 변화. 2차의 테마 카드를 그대로 되살렸다(2026-10-02 요청).
  * 점유율 = 최근 3일 평균(머리 띠의 '최근 3일'), 변화 = 5일 이상 전 평균과의 차이(lib/telegram-data.ts THEME_PRIOR_GAP_DAYS).
  */
-export function ThemeCards({ themes, hrefOf }: { themes: ThemeRotation[]; hrefOf: ((theme: string) => string) | null }) {
+/** 테마 카드가 읽는 칸 — 국장 ThemeRotation · 미장 UsThemeRow 둘 다 맞는다(미장 카더라도 이 부품을 쓴다). */
+type ThemeCardRow = Pick<ThemeRotation, "theme" | "sharePct" | "shareDelta" | "series"> & { stocks: { name: string }[] };
+
+export function ThemeCards({
+  themes,
+  hrefOf,
+  allHref = "/theme",
+}: {
+  themes: ThemeCardRow[];
+  hrefOf: ((theme: string) => string) | null;
+  /** 머리 오른쪽 '전체 보기' — 국장 /theme · 미장 /theme/us. */
+  allHref?: string;
+}) {
   // 열 — 2칸 × 5줄. 옆 여론 칸이 테마별 낙관도까지 실어 키가 커졌다(2026-10-02) — 여섯이면 이 칸 아래가 100px 비었다.
   // 남는 높이는 줄이 나눠 먹는다(v2.css .v2-band .v2-themes 1fr).
   const rows = themes.slice(0, 10);
@@ -153,7 +176,7 @@ export function ThemeCards({ themes, hrefOf }: { themes: ThemeRotation[]; hrefOf
       // 테마 전체 보기는 이 머리 오른쪽에 둔다(2026-10-03) — 첫 줄 띠 끝에 있을 땐 띠가 1,280 에서 두 줄로 접혔고, 카드를 보다 넘어가는 자리가 여기다.
       aside={
         hrefOf && (
-          <Link href="/theme" className="v2-more">
+          <Link href={allHref} className="v2-more">
             전체 보기
             <Icon name="chevron_right" />
           </Link>
@@ -220,7 +243,7 @@ export function dayPill(date: string, today: string): string {
  * 다가오는 일정 — 날짜 알약 + 일정. 2차의 일정 카드 꼴을 되살렸다(2026-10-02 요청).
  * 둘째 줄(여론 · 테마 옆) 오른쪽 칸이다 — 가까운 다섯.
  * ⛔ '채널 글에서 뽑은 날짜라 공시와 다를 수 있다' 같은 각주를 달지 않는다(사족) — 머리 띠의 '채널이 짚은 날짜'가 그 말이다.
- * 국내 종목 줄은 그 종목 화면으로 간다(표의 줄과 같은 동작). 미장 티커는 아직 실주소가 없어 글자로 둔다.
+ * 줄은 그 종목 화면으로 간다(표의 줄과 같은 동작) — 국내는 종목 페이지, 미장은 내부자 리포트 종목 화면(stockHref).
  */
 export function EventsModule({ events, today, failed, limit = 5 }: { events: UpcomingEvent[]; today: string; failed: boolean; limit?: number }) {
   const next = events
@@ -244,11 +267,11 @@ export function EventsModule({ events, today, failed, limit = 5 }: { events: Upc
                 </span>
               </>
             );
-            const kr = e.market === "KOSPI" || e.market === "KOSDAQ";
+            const href = stockHref(e.code, e.market);
             return (
               <li key={`${e.code}-${e.date}-${e.event}`}>
-                {kr ? (
-                  <Link href={`/stock/${e.code}`} className="v2-ev-row" data-ga="kadera_event_click">
+                {href ? (
+                  <Link href={href} className="v2-ev-row" data-ga="kadera_event_click">
                     {body}
                   </Link>
                 ) : (
@@ -272,7 +295,7 @@ export function EventsModule({ events, today, failed, limit = 5 }: { events: Upc
  * - 판 폭 전체에 설 땐 다섯 줄씩 두 단으로 놓는다(한 단 열 줄이면 오른쪽이 빈다). 폰은 한 단.
  *   2026-10-03 부터는 오른쪽 칸(오늘의 요약 아래)에 한 단 열 줄로 선다 — 열 줄로 늘린 표 둘 옆을 채운다.
  */
-export function KeywordTable({ keywords, split = true }: { keywords: IssueKeyword[]; split?: boolean }) {
+export function KeywordTable({ keywords, split = true }: { keywords: Pick<IssueKeyword, "rank" | "word" | "count" | "shareDelta">[]; split?: boolean }) {
   const rows = keywords.slice(0, 10);
   const top = Math.max(1, ...rows.map((k) => k.count));
   const total = rows.reduce((a, k) => a + k.count, 0) || 1;
@@ -341,6 +364,23 @@ export function CoverIndexCell({ kospi, kosdaq }: { kospi: IndexClose | null; ko
           {c.changePct !== null && <span className={`v2-cover-chg${c.changePct > 0 ? " is-up" : c.changePct < 0 ? " is-down" : ""}`}>{signPct(c.changePct, 2)}</span>}
         </span>
       ))}
+    </div>
+  );
+}
+
+/**
+ * 미장 카더라 첫 줄의 시장 맥락 — 그 미국 거래일의 S&P500 등락(국장 첫 줄 코스피 · 코스닥 칸의 짝).
+ * 값은 국장 미리보기 수집기가 이미 받아 둔 것(kr_preview_day.spx_dp · ^GSPC)이라 새 조회가 없다. 지수 수준은 저장하지 않아 등락만 적는다.
+ * 머리말은 미국 날짜다('10/2 미장'). 국장이 쉬는 동안 여러 세션을 묶은 날은 '9/30~10/1 미장'(그 누적 등락).
+ */
+export function CoverUsIndexCell({ label, spx }: { label: string; spx: number }) {
+  return (
+    <div className="v2-cover-cell v2-cover-idx">
+      <span className="v2-cover-k">{label}</span>
+      <span className="v2-cover-v">
+        <em>S&amp;P500</em>
+        <b className={`v2-cover-chg${spx > 0 ? " is-up" : spx < 0 ? " is-down" : ""}`}>{signPct(spx, 2)}</b>
+      </span>
     </div>
   );
 }

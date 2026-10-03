@@ -96,3 +96,28 @@ export async function loadCoverChips(): Promise<CoverChip[]> {
   const chips = await Promise.all([scoped("국장 미리보기", previewChip), scoped("미장 급부상", () => usSurgingChip())]);
   return chips.filter((c): c is CoverChip => c !== null);
 }
+
+/**
+ * 미장 카더라(v2, 2026-10-03) 첫 줄 — 시장 맥락 칸(그 미국 거래일 S&P500 등락) + 국장 급부상 칸 하나.
+ * 국장 카더라 첫 줄(코스피 · 코스닥 종가 + 미장 칸 둘)의 짝이다. 이 화면에 없는 것 → 다른 화면.
+ * ⛔ 밤사이 미장 칸(위 ①)은 안 쓴다 — 그 종목은 이 화면의 '크게 움직인 종목' 표와 같은 이야기다.
+ * 시장 맥락은 국장 미리보기 수집기가 받아 둔 값(getPreview().spx)이다. 미리보기가 못 돌았으면 칸만 빠진다.
+ */
+export type UsCover = { index: { label: string; spx: number } | null; chips: CoverChip[] };
+
+export async function loadUsCover(): Promise<UsCover> {
+  const [index, kr] = await Promise.all([
+    (async () => {
+      try {
+        const { value: p, failed } = await withScopedLoadFailures(getPreview);
+        if (failed.length || p.spx == null || !p.usSession) return null;
+        return { label: `${p.usFrom && p.usFrom < p.usSession ? `${md(p.usFrom)}~` : ""}${md(p.usSession)} 미장`, spx: p.spx };
+      } catch (e) {
+        console.error("[kadera-chips] 미장 시장 맥락 칸을 못 만들었습니다 — 그 칸을 뺍니다", e);
+        return null;
+      }
+    })(),
+    scoped("국장 급부상", () => krSurgingChip("kadera_us_chip_kr_surging")),
+  ]);
+  return { index, chips: kr ? [kr] : [] };
+}

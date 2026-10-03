@@ -2,10 +2,10 @@ import Link from "next/link";
 
 import { StockLogo } from "../StockLogo";
 import { AiMark } from "../ui";
-import { Module } from "./V2Modules";
+import { Module, stockHref } from "./V2Modules";
 
 /**
- * v2 국장 카더라의 신호 표 — 급부상 · 오늘 움직인 종목 · 많이 언급(2026-10-02 3차).
+ * v2 카더라의 신호 표 — 급부상 · 오늘 움직인 종목 · 많이 언급(2026-10-02 3차). 미장 카더라도 같은 표를 쓴다(2026-10-03).
  *
  * 표마다 모듈 한 장이다(머리 띠 + 1px 테두리). 2차의 '줄에 마우스를 올리면 오른쪽 칸이 그 종목으로 바뀌는' 칸은
  * 토스 홈의 얼개 그대로라 걷었다. 대신 줄이 문장을 한 줄로 끝까지 싣고, 잘린 문장은 줄에 마우스를 올리면 전문이
@@ -74,7 +74,8 @@ export function SignalTable({ sec }: { sec: BoardSection }) {
             {sec.rows.map((r, i) => (
               <li key={r.code}>
                 <Link
-                  href={`/stock/${r.code}`}
+                  // 국내는 종목 페이지, 미장은 내부자 리포트 종목 화면(stockHref). 시장을 모르면 국내로 본다(국장 표의 예전 동작).
+                  href={stockHref(r.code, r.market) ?? `/stock/${r.code}`}
                   className="v2-tr"
                   title={r.full ?? r.text ?? undefined}
                   // 표마다 이벤트 이름을 따로 둔다 — 맞춤 측정기준 없이도 GA 에서 이름만으로 어느 표가 눌리는지 센다(유용함을 재는 잣대).
