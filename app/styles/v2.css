@@ -348,7 +348,7 @@ a.v2-tr:hover { background: var(--t-tint); }
 .v2-td-text.is-pending { color: var(--t-ink3); }
 
 /* 많이 언급 — 판 폭 전체에 서는 표라 넓은 판에선 다른 표와 같은 한 줄이다(문장 칸 ≈760px, 첫 문장이 두 줄 안에 든다).
-   좁은 판(1,000 미만)에선 두 층 — 숫자 줄 아래 흐름 요약이 판 폭을 다 쓴다(아래 폭 규칙). 한 층으로 두면 첫 문장(65자 안팎)이 세 줄을 넘겼다. */
+   1,000 미만도 한 층이다(표가 판 폭 한 줄기라 문장 칸 ≈480px) — 두 층이면 위 층 오른쪽이 비었다(2026-10-04 점검). 폰만 두 층. */
 
 /* 로고 — 원형. 로고가 없는 종목의 글자 배지는 회색 한 가지. */
 .v2-kd .hz-stock-logo,
@@ -403,14 +403,24 @@ a.v2-tr:hover { background: var(--t-tint); }
 
 /* 테마 점유율(V2Modules.tsx ThemeShares) — 상위 열 줄(한 줄 30px 부터, 남는 높이는 줄이 나눈다). 순위 · 테마 · 막대(1위 = 끝) · 점유율 · 변화. 줄은 남는 높이를 고르게 받는다.
    막대 색은 MDD 업종 목록과 같은 옅은 파랑 — 오르내림이 아니라 '얼마나 몰렸나'라 빨강 · 파랑 뜻을 싣지 않는 한 색. */
-.v2-tsh { flex: 1; display: flex; flex-direction: column; margin: 0; padding: 6px 8px 8px; list-style: none; }
-.v2-tsh > li { flex: 1 0 auto; display: flex; }
-.v2-tsh-row {
+/* 열 줄이 한 격자를 나눠 쓴다(subgrid) — 이름 칸은 가장 긴 이름만큼(최소 92px) 넓어지고, 모자라면 감긴다. 줄마다 따로 92px 이던 때
+   'AI 인프라·클라우드' 줄만 두 줄로 감겨 줄 높이가 어긋났다(2026-10-04 점검). 줄은 남는 키를 고르게 나눈다(1fr). */
+.v2-tsh {
   flex: 1;
   display: grid;
-  grid-template-columns: 14px 92px minmax(0, 1fr) 46px 52px;
-  align-items: center;
+  grid-template-columns: 14px minmax(92px, max-content) minmax(0, 1fr) 46px 52px;
+  grid-auto-rows: minmax(30px, 1fr);
   column-gap: 10px;
+  margin: 0;
+  padding: 6px 8px 8px;
+  list-style: none;
+}
+.v2-tsh > li { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; }
+.v2-tsh-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  align-items: center;
   min-height: 30px;
   padding: 0 6px;
   border-radius: 4px;
@@ -420,7 +430,7 @@ a.v2-tr:hover { background: var(--t-tint); }
 }
 a.v2-tsh-row:hover { background: var(--t-tint); }
 .v2-tsh-rank { font-size: 12px; font-weight: 500; color: var(--t-ink3); text-align: right; }
-.v2-tsh-name { min-width: 0; font-size: 13px; font-weight: 600; line-height: 18px; word-break: keep-all; overflow-wrap: anywhere; }
+.v2-tsh-name { min-width: 0; font-size: 13px; font-weight: 600; line-height: 18px; word-break: keep-all; overflow-wrap: break-word; }
 .v2-tsh-bar { position: relative; height: 8px; border-radius: 4px; background: var(--t-bar-off); }
 .v2-tsh-bar > i { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 4px; background: color-mix(in srgb, var(--t-down) 45%, transparent); }
 .v2-tsh-val { font-size: 13px; font-weight: 600; text-align: right; }
@@ -546,7 +556,7 @@ a.v2-ev-row:hover { background: var(--t-tint); }
 @container kd (max-width: 1099px) {
   .v2-band { grid-template-columns: calc(25% - 6px) minmax(0, 1fr) 340px; }
   /* 테마 칸이 395 로 좁아진다(1,280) — 테마 이름 칸을 줄인다. 긴 이름은 두 줄로 감긴다(잘리지 않는다). */
-  .v2-tsh-row { grid-template-columns: 14px 84px minmax(0, 1fr) 44px 50px; column-gap: 8px; }
+  .v2-tsh { grid-template-columns: 14px minmax(84px, max-content) minmax(0, 1fr) 44px 50px; column-gap: 8px; }
   .v2-grid { grid-template-columns: minmax(0, 1fr) 340px; }
   .v2-tr,
   .v2-tbl.is-talk .v2-tr { grid-template-columns: 20px 160px minmax(0, 1fr) 72px 64px; }
@@ -555,33 +565,22 @@ a.v2-ev-row:hover { background: var(--t-tint); }
 @container kd (max-width: 999px) {
   .v2-band { grid-template-columns: 216px minmax(0, 1fr); }
   .v2-band > #events { grid-column: 1 / -1; }
+  /* 일정은 판 폭 한 줄이라 두 단으로 — 한 단이면 줄마다 오른쪽 500~680px 가 비었다(2026-10-04 점검, 1,100). 위에서 아래로 채운다. */
+  .v2-band > #events .v2-events { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: column; grid-template-rows: repeat(5, auto); column-gap: 12px; }
   .v2-kw { grid-template-columns: minmax(0, 1fr); }
   .v2-kw-col + .v2-kw-col { border-left: 0; border-top: 1px solid var(--t-line); }
   .v2-kw-col + .v2-kw-col .v2-kw-th { display: none; }
-  /* 많이 언급 두 층 — 숫자 줄 아래 흐름 요약이 판 폭을 다 쓴다. 칸이 좁아 한 층이면 첫 문장이 세 줄을 넘겼다(2026-10-02). */
-  .v2-tbl.is-talk .v2-tr {
-    grid-template-areas:
-      "rank stock chg  n1   ."
-      ".    text  text text text";
-  }
-  .v2-tbl.is-talk .v2-th { grid-template-areas: none; }
-  .v2-tbl.is-talk .v2-th > :nth-child(3) { display: none; }
-  .v2-tbl.is-talk .v2-td-rank { grid-area: rank; }
-  .v2-tbl.is-talk .v2-td-stock { grid-area: stock; }
-  .v2-tbl.is-talk .v2-td-chg { grid-area: chg; }
-  .v2-tbl.is-talk .v2-td-c0 { grid-area: n1; }
-  .v2-tbl.is-talk ol .v2-td-text { grid-area: text; padding: 0 0 10px; -webkit-line-clamp: 2; }
-  .v2-tbl.is-talk ol .v2-tr { padding-top: 6px; }
 
   /* 한 줄기 — 급부상 → 테마 점유율 → 크게 움직인 → 많이 언급 → 이슈 키워드(요약은 둘째 줄에 있다). */
   .v2-grid {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "surging" "themes" "why" "talk" "keywords";
   }
-  .v2-tr { grid-template-columns: 20px 168px minmax(0, 1fr) 72px 64px; }
+  /* 한 줄기라 표가 판 폭(846)을 다 쓴다 — 많이 언급도 급부상처럼 한 층(문장 칸 ≈480px, 두 줄)이다. 두 층으로 두면 위 층 오른쪽
+     470px 가 열 줄 모두 비었다(2026-10-04 점검). 폰(679 이하)은 표 셋 모두 두 층이다. */
+  .v2-tr,
+  .v2-tbl.is-talk .v2-tr { grid-template-columns: 20px 168px minmax(0, 1fr) 72px 64px; }
   .v2-tbl.is-move .v2-tr { grid-template-columns: 20px 168px minmax(0, 1fr) 72px; }
-  /* 많이 언급은 이 폭에서 두 층(위 영역 이름 참고) — 위 층은 종목 옆에 숫자, 문장은 아래 층 판 폭. */
-  .v2-tbl.is-talk .v2-tr { grid-template-columns: 20px 168px 72px 64px minmax(0, 1fr); }
 }
 /* 첫 줄 칸들 — 머리말을 값 위 작은 줄로(지수 칸 66px · 링크 칸 50px 안팎을 아낀다). 이 폭에선 한 줄 꼴이면 칸 셋이 첫 줄에 안 들어
    띠가 세 줄이 됐다(카더라 · 테마 한 장 1,024 실측). 업데이트는 한 줄 그대로. 폰(≤679)은 칸을 반 칸씩 접는 자기 규칙이 있어 뺀다.
@@ -606,10 +605,14 @@ a.v2-ev-row:hover { background: var(--t-tint); }
   .v2-band { grid-template-columns: minmax(0, 1fr); }
   /* 일정 아홉은 둘째 줄 세 칸의 키를 맞추려는 것이다. 한 줄기인 폰에선 길어지기만 해서 다섯으로. */
   .v2-band .v2-events li:nth-child(n + 6) { display: none; }
+  .v2-band > #events .v2-events { display: flex; }
   .v2-cover-cell { flex: 1 1 40%; padding: 8px 12px; }
   /* 지수 칸은 한 줄 전체 — 날짜는 위 작은 줄, 코스피 · 코스닥은 아래 나란히. 반 칸에 두면 둘째 지수가 잘렸다(375). */
   .v2-cover-idx { flex: 1 1 100%; display: grid; grid-template-columns: 1fr 1fr; row-gap: 2px; column-gap: 12px; }
   .v2-cover-idx > .v2-cover-k { grid-column: 1 / -1; }
+  /* 값이 하나뿐인 지수 칸(미장 카더라 S&P500)은 반 칸 — 한 줄을 다 쓰면 오른쪽 반이 비었다(2026-10-04 점검). */
+  .v2-cover-idx:not(:has(> .v2-cover-v + .v2-cover-v)) { flex: 1 1 40%; display: flex; flex-wrap: wrap; align-content: center; }
+  .v2-cover-idx:not(:has(> .v2-cover-v + .v2-cover-v)) > .v2-cover-k { flex: 1 1 100%; }
   /* 간밤 미국 · 업데이트도 한 줄씩 — 업데이트 문구('10월 2일(금) 오후 8시 30분 업데이트')가 반 칸(175px)에 안 들어간다. */
   .v2-cover .v2-cover-meta { flex: 1 1 100%; justify-content: flex-start; }
   /* 업데이트 한 줄이 폰 폭(글자 자리 313px)에 들게 11px — 카더라 '10월 13일(월) 오전 8시 30분 업데이트 · 채널 글 3,657건 · 최근 2일'이 12px 로 329px 였다.
@@ -633,7 +636,7 @@ a.v2-ev-row:hover { background: var(--t-tint); }
   .v2-td-rank { grid-area: rank; }
   .v2-td-stock { grid-area: stock; }
   .v2-td-c0 { grid-area: n1; }
-  /* 머리 줄이 없으니 값 앞에 그 칸 이름을 붙인다('평소의 6.2배' · '언급 805회' · '종가 10,850원'). */
+  /* 머리 줄이 없으니 값 앞에 그 칸 이름을 붙인다('언급 6.2배' · '언급 805회' · '종가 10,850원'). */
   .v2-td-c0[data-k]::before { content: attr(data-k) " "; font-weight: 500; color: var(--t-ink3); }
   /* 흐름 요약 첫 문장(65~77자)은 폰 폭(289px)에서 네 줄이다 — 두 줄이면 다섯이 잘렸다. */
   .v2-tbl.is-talk ol .v2-td-text { -webkit-line-clamp: 4; }

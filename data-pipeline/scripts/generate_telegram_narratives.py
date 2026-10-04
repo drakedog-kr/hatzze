@@ -80,6 +80,7 @@ from common.market_sentiment import MARKET_MIN_MESSAGES, load_market_daily  # no
 from common.prompt_style import PLAIN_PROSE_RULE  # noqa: E402
 from common.supabase_client import (  # noqa: E402
     PAGE_SIZE,
+    execute_with_retry,
     get_client,
     load_all_keyset,
     load_keyset,
@@ -104,10 +105,10 @@ MODEL = "claude-haiku-4-5"
 #    추출·등락 까닭·국장/미장 테마 요약)이 같이 따라온다.
 BRIEF_MODEL = "claude-opus-5-5"
 
-# 요약을 만들 종목 수. 카드는 상위 3종목만 보여주지만, 프론트는 페이지 요청 시점에
-# 상위 종목을 다시 뽑는다 — 파이프라인 실행 이후 순위가 바뀌어도 문장이 비지 않도록
-# 여유를 둔다(추가 3건은 하루 2회 호출이라 비용상 무의미한 수준).
-NARRATIVE_TOP_N = 6
+# 요약을 만들 종목 수. 화면 '많이 언급' 표가 열 줄이라(lib/kadera-why.ts BOARD_TILES) 열에 여유 둘을 더한다 —
+# 프론트는 페이지 요청 시점에 상위 종목을 다시 뽑아 파이프라인 실행 뒤 순위가 바뀌어도 문장이 비지 않게.
+# 여섯이던 때 표를 열 줄로 늘리고 이 값을 안 올려 7~10행이 늘 비었다(2026-10-04 점검). ⚠️ BOARD_TILES 와 짝이다.
+NARRATIVE_TOP_N = 12
 # 급부상 종목 중 몇 개까지 요약을 더 만들어 둘지. 텔레그램 채널이 싣는 수와 맞춘다
 # (send_telegram_broadcast.SURGING_SHOW). 상위 N개와 겹치는 만큼 실제 추가 호출은
 # 보통 1~2건이라 비용은 무시할 수준이다.
@@ -1556,17 +1557,15 @@ def build_brief_digest(db, latest: str, msgs: list[dict]) -> str | None:
         lines.append(cmp)
 
     kws = load_all(db, "telegram_keyword_daily", "date,keyword,mention_count")
-    recent = Counter()
-    for r in kws:
-        # 위 낙관도와 같은 구간을 쓴다(오늘 제외). 여기만 오늘을 넣으면 화제어가 반쪽짜리
-        # 하루에 끌려, 문장이 인용하는 주제와 낙관도가 다른 기간을 말하게 된다.
-        if since <= r["date"] <= end:
-            recent[r["keyword"]] += r["mention_count"]
-    if recent:
+    # 화면 이슈 키워드 표(telegram_issue_keyword — 이 실행 앞 calculate_telegram_sentiment 가 쓴다)를 그대로 준다. 미장 총평과 같다.
+    # 예전엔 여기서 '오늘이 빠진 앞 사흘'을 따로 세어 요약이 '하락세 211회'처럼 화면 표에 없는 숫자를 적었다(2026-10-04 점검 —
+    # 표는 오늘을 넣은 사흘이라 하락세가 상위 열에 없었다). 저장된 문장과 화면 숫자는 끝점까지 같아야 한다.
+    issue = execute_with_retry(db.table("telegram_issue_keyword").select("keyword,mention_count").order("rank").limit(10)).data or []
+    if issue:
         lines.append("")
         lines.append(
-            f"[최근 {WINDOW_DAYS}일 화제어] (오늘이 빠진 앞 사흘입니다) "
-            + ", ".join(f"{w} {n}회" for w, n in recent.most_common(10))
+            f"[최근 {WINDOW_DAYS}일 화제어] (화면의 이슈 키워드 표와 같은 값입니다) "
+            + ", ".join(f"{r['keyword']} {r['mention_count']}회" for r in issue)
         )
 
     # 오늘치는 섞지 않고 나란히 둔다 — 문장이 인용할 숫자는 위 창 것, 말할 주제는

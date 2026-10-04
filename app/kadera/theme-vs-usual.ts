@@ -82,12 +82,12 @@ export function themeLean(t: ThemeRow): ThemeLean | null {
 export const LEAN_WORD = { up: "더 낙관", down: "덜 낙관", same: "평소 수준", none: "기록 적음" } as const;
 
 /** 막대 줄의 툴팁. 데이터 툴팁이라 15자 규칙 밖이다.
- *  건수(언급 273건 중 비관 59 · 낙관 126)는 뺐다 — 중립이 빠져 합이 안 맞고, 평활 때문에
- *  건수로 나눈 값과 낙관도가 1%p 갈려 읽는 사람이 계산을 맞춰 보다 막혔다.
- *  판정은 건수로(usualShift), 적는 숫자는 평활값(pos)이다. 막대 길이는 평활 전 비율이라 이 숫자의 뺄셈과
- *  1~2점 갈릴 수 있어서 줄에는 숫자를 적지 않는다(parts.tsx ThemeVsUsualRows). */
+ *  건수(언급 273건 중 비관 59 · 낙관 126)는 뺐다 — 중립이 빠져 합이 안 맞아 읽는 사람이 계산을 맞춰 보다 막혔다.
+ *  적는 숫자는 **판정 · 막대와 같은 평활 전 비율**(낙관 ÷ 낙관+비관)이다. 평활값(pos)을 적으면 평소가 80~90% 대인 테마가
+ *  늘 평소보다 낮게 읽혀, 30건 모두 낙관(막대는 오른쪽)인 전자·부품이 '낙관 88% (평소 92%)'로 떴다(2026-10-04 점검). */
 export function themeTip(t: ThemeRow): string {
-  const pos = `낙관 ${t.pos}%`;
+  const n = t.positive + t.negative;
+  const pos = `낙관 ${n > 0 ? Math.round((t.positive / n) * 100) : t.pos}%`;
   if (t.usual === null) return `${pos} · 평소 기록이 아직 적습니다`;
   return `${SHIFT_WORD[usualShift(t.positive, t.negative, t.usual)]} · ${pos} (평소 ${t.usual}%)`;
 }

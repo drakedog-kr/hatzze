@@ -19,6 +19,7 @@ import { todayKst } from "@/lib/kadera-why";
 import { fmtKoDate } from "@/lib/stock-page";
 import { assertLoaded, isLoadFailed } from "@/lib/load-state";
 import { formatKstUpdate } from "@/lib/format";
+import { lastSession, liveChangeHead } from "@/lib/yahoo-quote";
 
 import { pageMetadata } from "../../seo";
 import { US_KADERA_CARD } from "../../og-copy";
@@ -81,7 +82,7 @@ const times = (m: number) => `${m >= 10 ? Math.round(m) : m.toFixed(1)}배`;
  * 국장이 2026-10-02 에 채널 랭킹 · 뜨는 채널 · 화제 글을 걷은 것과 같은 까닭이다(두 달 동안 카더라 방문자의 2~5%만 눌렀다).
  */
 export default async function UsKaderaPage() {
-  const [summary, surging, sentiment, keywords, themes, brief, reports, surgeLines, rawWhy, rawEvents, cover] = await Promise.all([
+  const [summary, surging, sentiment, keywords, themes, brief, reports, surgeLines, rawWhy, rawEvents, cover, usSession] = await Promise.all([
     getUsKaderaSummary(),
     getUsSurgingStocks(MAX_ROWS),
     getUsSentiment(),
@@ -94,7 +95,10 @@ export default async function UsKaderaPage() {
     getUsUpcomingEvents(35, 400),
     // 첫 줄 — 시장 맥락 · 국장 급부상 칸. 곁들이는 칸이라 실패해도 화면을 세우고 그 칸만 뺀다.
     loadUsCover(),
+    // 급부상 · 많이 언급의 등락 칸 머리 — 미국장이 쉬면 '지금' 대신 마지막 거래일(국장과 같은 규칙).
+    lastSession("^GSPC", "America/New_York").catch(() => null),
   ]);
+  const liveHead = liveChangeHead(usSession);
 
   /* 국장과 같은 규칙 — 조회 실패와 자료 없음을 갈라 빈 자리의 문구를 바꾼다(lib/load-state.ts). */
   // 실패한 조회가 있으면 던진다 — 사본(ISR)에 실패한 화면을 담지 않는다(lib/load-state.ts).
@@ -116,6 +120,9 @@ export default async function UsKaderaPage() {
   );
 
   /* ── 신호 표 셋의 재료(국장 page.tsx 와 같은 짜임 · 같은 칸) ───────────────── */
+  // 흐름 요약은 첫 문장만 줄에 싣는다. 급부상 줄도 한 줄 요약이 없으면 이 첫 문장을 빌린다.
+  const narrativeLead = (t: string | null) => (t ? t.split(/(?<=[가-힣]\.)\s+/)[0] : null);
+  const narrativeOf = new Map(reports.map((r) => [r.ticker, r.narrative] as const));
   const surgeRows: BoardRow[] = surging.map((s) => ({
     code: s.ticker,
     name: s.name,
@@ -123,7 +130,8 @@ export default async function UsKaderaPage() {
     change: s.changeRate,
     // 첫 언급은 배수 대신 그 말을 숫자 칸에(국장 page.tsx 와 같은 규칙, 2026-10-04 점검).
     cells: [s.isNew ? { v: "첫 언급", hot: true, k: "" } : { v: times(s.multiple), hot: true }],
-    text: surgeLines[s.ticker] ?? null,
+    // 한 줄 요약이 없으면 같은 종목의 흐름 요약 첫 문장을 빌린다(국장 page.tsx 와 같은 규칙).
+    text: surgeLines[s.ticker] ?? narrativeLead(narrativeOf.get(s.ticker) ?? null),
     pending: "정리 중",
   }));
 
@@ -147,7 +155,7 @@ export default async function UsKaderaPage() {
     market: "US",
     change: r.changeRate,
     cells: [{ v: `${r.recentMentions.toLocaleString("ko-KR")}회` }],
-    text: r.narrative ? r.narrative.split(/(?<=[가-힣]\.)\s+/)[0] : null,
+    text: narrativeLead(r.narrative) ?? surgeLines[r.ticker] ?? null,
     full: r.narrative,
     pending: "정리 중",
   }));
@@ -162,8 +170,8 @@ export default async function UsKaderaPage() {
       title: "급부상 종목",
       meta: `최근 ${US_WINDOW_DAYS}일 · 평소 대비`,
       kind: "surge",
-      heads: ["", "종목", "지금 등락", "언급 증가", "왜 뜨나"],
-      key0: "평소의",
+      heads: ["", "종목", liveHead, "언급 증가", "왜 뜨나"],
+      key0: "언급",
       aiText: true,
       rows: surgeRows,
       empty: "아직 급부상 신호가 뚜렷한 종목이 없습니다.",
@@ -183,7 +191,7 @@ export default async function UsKaderaPage() {
       title: "많이 언급된 종목",
       meta: `최근 ${US_WINDOW_DAYS}일`,
       kind: "talk",
-      heads: ["", "종목", "지금 등락", "언급", "흐름 요약"],
+      heads: ["", "종목", liveHead, "언급", "흐름 요약"],
       key0: "언급",
       aiText: true,
       rows: talkRows,
@@ -246,7 +254,7 @@ export default async function UsKaderaPage() {
         ))}
         <ThemeShares themes={themes.rows} hrefOf={THEME_LINKS ? usThemeHref : null} allHref={US_THEME_PAGE.href} />
         <KeywordTable
-          keywords={keywords.map((k) => ({ rank: k.rank, word: k.keyword, count: k.mentionCount, shareDelta: k.shareDelta }))}
+          keywords={keywords.map((k) => ({ rank: k.rank, word: k.keyword, count: k.mentionCount, trend: k.trend }))}
           split={false}
         />
       </div>

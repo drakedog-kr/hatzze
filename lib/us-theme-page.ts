@@ -76,7 +76,7 @@ export const getUsThemePage = cache(async (theme: string): Promise<ThemePageData
   const tickers = members.map((m) => m.code);
   const byCode = new Map<string, ThemeMember>(members.map((m) => [m.code, m]));
 
-  const { trendDays, recentDays, usualDayCount } = themeDetailWindow(baseDate, THEME_TREND_DAYS, US_WINDOW_DAYS);
+  const { trendDays, recentDays: windowDays } = themeDetailWindow(baseDate, THEME_TREND_DAYS, US_WINDOW_DAYS);
   const first = trendDays[0];
 
   type ThemeDailyRow = { date: string; share_pct: number | string; rank: number | null; mention_count: number | null };
@@ -149,14 +149,18 @@ export const getUsThemePage = cache(async (theme: string): Promise<ThemePageData
     return { date, share: r ? Number(r.share_pct) || 0 : 0, rank: r?.rank ?? null, mentions: r?.mention_count ?? 0, hasReason: reasonDates.has(date) };
   });
 
+  // '최근 사흘'도 얇은 날을 뺀 끝에서 고른다 — 히어로 점유율(테마 로테이션 · lib/theme-flow.ts usableDays)과 같은 사흘이어야
+  // 한 칸 안의 숫자가 같은 날을 말한다. 평소도 얇은 날은 뺀다.
+  const recentDays = trendDays.filter((d) => !thin.has(d)).slice(-windowDays.length);
   const recentSet = new Set(recentDays);
+  const usualDays = trendDays.filter((d) => !recentSet.has(d) && !thin.has(d));
   const hotStocks = buildHotStocks(
     stockDaily.map((r) => ({ date: r.date, code: r.ticker, mentions: r.mention_count, channels: r.channel_count, weight: r.weighted_score })),
     recentSet,
-    usualDayCount,
+    usualDays.length,
     byCode,
     reasons,
-    { usualDays: trendDays.filter((d) => !recentSet.has(d)), dayTotals },
+    { usualDays, dayTotals },
   );
 
   let recentShare: number | null = null;

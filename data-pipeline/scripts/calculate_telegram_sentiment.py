@@ -44,6 +44,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from common.market_tags import US_TAGS, is_us_only  # noqa: E402
 from common.supabase_client import has_column, get_client, replace_rows  # noqa: E402
 from common.theme_tone import THEME_TONE_MAX_THEMES, list_effect_lines, theme_tone_targets  # noqa: E402
+from common.keyword_overlap import drop_overlaps  # noqa: E402
+from common.thin_days import usable_days  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 from common.supabase_client import load_all, load_all_keyset  # noqa: E402
 from config.issue_keywords import (  # noqa: E402
@@ -82,6 +84,22 @@ ISSUE_KEYWORD_MIN_MENTIONS = 3  # getIssueKeywords 의 MIN_KEYWORD_MENTIONS
 ISSUE_KEYWORD_COUNT_DAYS = 3  # getIssueKeywords 의 KEYWORD_COUNT_DAYS
 # 점유율 차이가 이보다 작으면 '변화 없음'. TS 쪽 FLAT 과 같은 값.
 ISSUE_KEYWORD_FLAT = 1e-6
+# 변화를 '비슷'으로 부를 **상대** 폭 — 앞 기간 점유율의 25% 안쪽. 낱말 하나의 몫이 0.3~2% 라 절대 %p(0.5)로 가르면
+# 반 넘게 늘어도 '비슷'이었다(2026-10-04 점검: 국장 열 줄 중 아홉). 화면(app/kadera/V2Modules.tsx KeywordTable)은 이 trend 를 그대로 쓴다.
+# 미장(calculate_us_telegram_sentiment.py) · 화면 폴백(lib/telegram-data.ts computeIssueKeywords)과 같은 값이다.
+ISSUE_KEYWORD_REL_FLAT = 0.25
+
+
+def keyword_trend(recent_avg: float, prior_avg: float) -> str:
+    """최근 몫이 앞 기간 몫보다 얼마나 움직였나 — 상대 폭으로 가른다(ISSUE_KEYWORD_REL_FLAT). 앞 기간이 0 이면 나온 것만으로 늘어남."""
+    delta = recent_avg - prior_avg
+    if abs(delta) < ISSUE_KEYWORD_FLAT:
+        return "flat"
+    if prior_avg <= 0:
+        return "up"
+    if abs(delta) / prior_avg < ISSUE_KEYWORD_REL_FLAT:
+        return "flat"
+    return "up" if delta > 0 else "down"
 
 
 def issue_keyword_rows(keyword_rows: list[dict]) -> list[dict]:
@@ -96,7 +114,15 @@ def issue_keyword_rows(keyword_rows: list[dict]) -> list[dict]:
     if not rows:
         return []
 
-    dates = sorted({r["date"] for r in rows})
+    day_total: Counter = Counter()
+    for r in rows:
+        day_total[r["date"]] += r["mention_count"] or 0
+
+    # 표본이 거의 없는 날(기준일 아침 · 수집이 끊긴 날)은 창에서 뺀다 — 화면 computeIssueKeywords · 테마 로테이션과
+    # 같은 규칙(common/thin_days.py). 2026-10-04 아침 화제어가 33건뿐인 날이 사흘 평균의 1/3 을 차지했다.
+    dates = usable_days(day_total, sorted({r["date"] for r in rows}))
+    if not dates:
+        return []
     latest = datetime.fromisoformat(dates[-1]).date()
 
     def days_before(d: str) -> int:
@@ -105,10 +131,6 @@ def issue_keyword_rows(keyword_rows: list[dict]) -> list[dict]:
     recent_dates = set(dates[-3:])
     prior_dates = {d for d in dates if days_before(d) >= 5}
     window = {d for d in dates if days_before(d) < ISSUE_KEYWORD_COUNT_DAYS}
-
-    day_total: Counter = Counter()
-    for r in rows:
-        day_total[r["date"]] += r["mention_count"] or 0
 
     total: Counter = Counter()
     recent_share: defaultdict = defaultdict(float)
@@ -126,10 +148,13 @@ def issue_keyword_rows(keyword_rows: list[dict]) -> list[dict]:
     can_compare = bool(prior_dates)
     # 언급 수가 같으면 화제어로 가른다 — 정수라 동점이 흔하고, 안 가르면 순위가
     # 실행마다 흔들린다.
-    ranked = sorted(
+    candidates = sorted(
         ((w, c) for w, c in total.items() if c >= ISSUE_KEYWORD_MIN_MENTIONS),
         key=lambda wc: (-wc[1], wc[0]),
-    )[:ISSUE_KEYWORD_LIMIT]
+    )
+    # 같은 화제를 두 칸에 세우지 않는다(데이터센터 · AI데이터센터 · AI — common/keyword_overlap.py).
+    keep = set(drop_overlaps([w for w, _ in candidates]))
+    ranked = [(w, c) for w, c in candidates if w in keep][:ISSUE_KEYWORD_LIMIT]
 
     out = []
     for i, (word, count) in enumerate(ranked, 1):
@@ -141,12 +166,7 @@ def issue_keyword_rows(keyword_rows: list[dict]) -> list[dict]:
         # 더한 것이다 — 한쪽만 고치면 화살표와 카드의 %p 가 서로 다른 말을 한다.
         # (미장 쪽 calculate_us_telegram_sentiment.py 가 같은 모양이다.)
         delta = None if not can_compare else recent_avg - prior_avg
-        if delta is None:
-            trend = None
-        elif abs(delta) < ISSUE_KEYWORD_FLAT:
-            trend = "flat"
-        else:
-            trend = "up" if delta > 0 else "down"
+        trend = None if delta is None else keyword_trend(recent_avg, prior_avg)
         out.append(
             {
                 "rank": i,

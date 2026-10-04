@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "./supabase-server";
 import { addDaysISO, LLM_TEXT_CARRY_DAYS } from "./telegram-data";
 import { todayKst, type DatePrecision, type UpcomingEvent } from "./kadera-why";
 import { byPeriodEnd, periodFloor, stillAhead } from "./event-period";
+import { dropAlreadyHappened, groupEventRows } from "./event-group";
 import { LOAD_FAILED, type MaybeFailed } from "./load-state";
 import { fetchDailyHistory, yahooSymbol } from "./yahoo-history";
 
@@ -327,37 +328,33 @@ type UsEventRow = {
 /** 한 날짜의 최대 줄 수. 달력은 하루씩 보여주므로 사실상 안 자른다(폭주만 막는다). */
 const EVENTS_PER_DATE = 30;
 
-/**
- * (티커, 날짜, 정밀도)로 묶는다. 행사 문구는 채널마다 조금씩 달라 가장 많이 쓰인 표기를 대표로 삼는다.
- * 국내 groupEvents(lib/kadera-why.ts)와 같은 규칙이다.
- */
+/** 일정 행 → 줄(lib/event-group.ts — 국내 groupEvents 와 같은 규칙). */
 function groupUsEvents(rows: UsEventRow[]): Omit<UpcomingEvent, "name">[] {
-  const groups = new Map<string, UsEventRow[]>();
-  for (const r of rows) {
-    const k = `${r.ticker}|${r.event_date}|${r.date_precision}`;
-    const g = groups.get(k);
-    if (g) g.push(r);
-    else groups.set(k, [r]);
+  return groupEventRows(rows.map((r) => ({ code: r.ticker, channel: r.channel_handle, date: r.event_date, precision: r.date_precision, event: r.event, postedAt: r.posted_at }))).map(
+    (e) => ({ ...e, market: "US" as const }),
+  );
+}
+
+/** 이미 지나간 같은 이야기를 볼 날 수(국내 lib/kadera-why.ts PAST_DAYS 와 같다). */
+const PAST_DAYS = 14;
+
+/** 앞으로의 줄에서 이미 지나간 같은 이야기를 뺀다 — 한 채널 줄의 티커만 지난 PAST_DAYS 일 day 일정을 묻는다(국내 withoutHappened 와 같다). */
+async function withoutHappened<T extends Omit<UpcomingEvent, "name">>(future: T[], from: string): Promise<T[]> {
+  const single = [...new Set(future.filter((e) => e.channels < 2).map((e) => e.code))];
+  if (!single.length) return future;
+  const { data, error } = await getSupabaseAdmin()
+    .from("telegram_us_stock_event")
+    .select("channel_handle,ticker,event_date,date_precision,event,posted_at")
+    .in("ticker", single)
+    .eq("date_precision", "day")
+    .gte("event_date", addDaysISO(from, -PAST_DAYS))
+    .lt("event_date", from)
+    .limit(1000);
+  if (error) {
+    console.error("[withoutHappened] 지난 미장 일정을 못 읽었습니다 — 거르지 않습니다", error);
+    return future;
   }
-  return [...groups.values()].map((g) => {
-    const texts = new Map<string, { text: string; n: number }>();
-    for (const r of g) {
-      const key = r.event.replace(/[\s·,.()]/g, "");
-      const cur = texts.get(key);
-      if (cur) cur.n += 1;
-      else texts.set(key, { text: r.event, n: 1 });
-    }
-    const top = [...texts.values()].sort((a, b) => b.n - a.n)[0];
-    return {
-      code: g[0].ticker,
-      market: "US" as const,
-      date: g[0].event_date,
-      precision: g[0].date_precision,
-      event: top.text,
-      channels: new Set(g.map((r) => r.channel_handle)).size,
-      firstSeen: g.map((r) => r.posted_at).sort()[0],
-    };
-  });
+  return dropAlreadyHappened(future, groupUsEvents((data ?? []) as UsEventRow[]));
 }
 
 /**
@@ -383,7 +380,7 @@ export const getUsUpcomingEvents = cache(async (days = 35, limit = 400): Promise
     console.error("[getUsUpcomingEvents] 일정을 못 읽었습니다", error);
     return LOAD_FAILED;
   }
-  const grouped = groupUsEvents((data ?? []) as UsEventRow[]);
+  const grouped = await withoutHappened(groupUsEvents((data ?? []) as UsEventRow[]), from);
   grouped.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : b.channels - a.channels));
   const perDate = new Map<string, number>();
   const capped = grouped.filter((e) => {
@@ -417,7 +414,7 @@ export async function getUsEventsForTickers(tickers: string[], limit = 12): Prom
     console.error(`[getUsEventsForTickers] 일정을 못 읽었습니다`, error);
     return [];
   }
-  const grouped = groupUsEvents((data ?? []) as UsEventRow[]).filter((e) => stillAhead(e, from));
+  const grouped = await withoutHappened(groupUsEvents((data ?? []) as UsEventRow[]).filter((e) => stillAhead(e, from)), from);
   grouped.sort(byPeriodEnd);
   const picked = grouped.slice(0, limit);
   const names = await usNames([...new Set(picked.map((e) => e.code))]);

@@ -1,0 +1,81 @@
+/**
+ * lib/event-group.ts — 일정 줄 묶기. 2026-10-04 점검에서 같은 일정이 여러 줄로 갈리고(10/8 · 10/9 · 10월 중), 다른 일정이 한 줄로
+ * 합쳐져 채널 수가 부풀었다(삼성전자 '잠정실적발표 6곳'에 배당 · 자사주 채널). 돌리는 법: `npm test`.
+ */
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+
+import { dropAlreadyHappened, eventKind, groupEventRows, periodStart, type EventRowLike } from "../lib/event-group.ts";
+
+const row = (code: string, channel: string, date: string, precision: EventRowLike["precision"], event: string): EventRowLike => ({
+  code,
+  channel,
+  date,
+  precision,
+  event,
+  postedAt: "2026-10-01T00:00:00Z",
+});
+
+describe("periodStart · eventKind", () => {
+  it("달 단위가 1일 · 15일 · 말일로 갈려도 같은 첫날", () => {
+    assert.equal(periodStart("2026-10-31", "month"), "2026-10-01");
+    assert.equal(periodStart("2026-10-15", "month"), "2026-10-01");
+    assert.equal(periodStart("2026-08-20", "quarter"), "2026-07-01");
+    assert.equal(periodStart("2026-12-31", "year"), "2026-01-01");
+  });
+
+  it("표기가 갈리는 실적 · 배당은 한 종류", () => {
+    assert.equal(eventKind("3분기 잠정 실적 발표"), eventKind("잠정실적발표"));
+    assert.equal(eventKind("특별배당 확정"), eventKind("3분기 배당 확정 이사회"));
+    assert.notEqual(eventKind("잠정실적발표"), eventKind("자사주 매입 조기 종료"));
+  });
+});
+
+describe("groupEventRows", () => {
+  it("같은 날 다른 일정은 다른 줄 · 채널 수는 그 일정을 말한 채널만", () => {
+    const out = groupEventRows([
+      row("005930", "a", "2026-10-01", "month", "잠정실적발표"),
+      row("005930", "b", "2026-10-31", "month", "3분기 잠정 실적 발표"),
+      row("005930", "c", "2026-10-01", "month", "자사주 매입 조기 종료"),
+    ]);
+    const byKind = new Map(out.map((e) => [eventKind(e.event), e]));
+    assert.equal(byKind.get("실적")?.channels, 2);
+    assert.equal(byKind.get("자사주")?.channels, 1);
+    assert.equal(byKind.get("실적")?.date, "2026-10-01");
+  });
+
+  it("넓은 기간 줄은 그 안의 같은 이야기 날짜 줄로 접는다 · 가까운 날 한 채널 줄은 뺀다", () => {
+    const out = groupEventRows([
+      row("005930", "a", "2026-10-08", "day", "3분기 잠정 실적 발표"),
+      row("005930", "b", "2026-10-08", "day", "잠정실적 발표"),
+      row("005930", "c", "2026-10-09", "day", "3분기 잠정실적 발표"),
+      row("005930", "d", "2026-10-01", "month", "잠정실적발표"),
+    ]);
+    assert.equal(out.length, 1);
+    assert.equal(out[0].date, "2026-10-08");
+    assert.equal(out[0].channels, 3); // a · b + 달 줄의 d
+  });
+
+  it("다른 종목 · 다른 기간은 그대로", () => {
+    const out = groupEventRows([
+      row("000660", "a", "2026-10-27", "day", "실적발표"),
+      row("000660", "b", "2027-01-01", "month", "실적 발표"),
+    ]);
+    assert.equal(out.length, 2);
+  });
+});
+
+describe("dropAlreadyHappened", () => {
+  it("지난 며칠 안에 여러 채널이 짚은 같은 이야기면 앞으로의 한 채널 줄을 뺀다", () => {
+    const past = groupEventRows([row("MU", "a", "2026-10-01", "day", "실적발표"), row("MU", "b", "2026-10-01", "day", "4분기 실적 발표")]);
+    const future = [
+      { code: "MU", event: "실적 발표", channels: 1 },
+      { code: "MU", event: "투자자 행사", channels: 1 },
+      { code: "NVDA", event: "실적 발표", channels: 1 },
+    ];
+    assert.deepEqual(
+      dropAlreadyHappened(future, past).map((f) => `${f.code} ${f.event}`),
+      ["MU 투자자 행사", "NVDA 실적 발표"],
+    );
+  });
+});

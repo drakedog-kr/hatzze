@@ -357,14 +357,11 @@ export function EventsModule({ events, today, failed, limit = 5 }: { events: Upc
  * 단어와 횟수만 늘어놓은 칩은 "대충 만든 것 같고 유용한지 모르겠다"는 지적을 받았다 — 무엇이 늘고 줄었는지가 안 보였다.
  * 그래서 옛 이슈 키워드 시트의 재료(점유율 · 변화)를 다른 표와 같은 꼴로 되살렸다.
  * - 언급량 막대의 끝은 1위다. 점유율 분모는 표에 세운 낱말들의 합(옛 화면과 같다 — 새 조회가 없고 막대와 숫자가 같은 재료다).
- * - 변화 = 최근 3일 평균 점유율 − 그 이전 평균(IssueKeyword.shareDelta, %p). 비교할 과거가 없으면 '-'.
+ * - 변화 = 최근 3일 평균 점유율이 그 이전 평균보다 25% 넘게 늘었나 · 줄었나(IssueKeyword.trend). 비교할 과거가 없으면 '-'.
  * - 판 폭 전체에 설 땐 다섯 줄씩 두 단으로 놓는다(한 단 열 줄이면 오른쪽이 빈다). 폰은 한 단.
  *   2026-10-03 부터는 오른쪽 칸(오늘의 요약 아래)에 한 단 열 줄로 선다 — 열 줄로 늘린 표 둘 옆을 채운다.
  */
-/** 이슈 키워드 변화를 '비슷'으로 부를 폭(%p). 2026-10-04 국장 열 줄은 −0.4 ~ +0.9, 미장은 −0.3 ~ +3.4 였다. */
-const KW_FLAT_PP = 0.5;
-
-export function KeywordTable({ keywords, split = true }: { keywords: Pick<IssueKeyword, "rank" | "word" | "count" | "shareDelta">[]; split?: boolean }) {
+export function KeywordTable({ keywords, split = true }: { keywords: Pick<IssueKeyword, "rank" | "word" | "count" | "trend">[]; split?: boolean }) {
   const rows = keywords.slice(0, 10);
   const top = Math.max(1, ...rows.map((k) => k.count));
   const total = rows.reduce((a, k) => a + k.count, 0) || 1;
@@ -388,9 +385,10 @@ export function KeywordTable({ keywords, split = true }: { keywords: Pick<IssueK
               </div>
               <ol>
                 {col.map((k) => {
-                  // 변화는 말로 — '+0.3%p'(표 안 점유율의 차이)는 무엇의 %p 인지 안 읽혔다(2026-10-04 점검). 0.5%p 안쪽은 '비슷'.
-                  const d = k.shareDelta === null ? null : k.shareDelta * 100;
-                  const dir = d === null ? null : Math.abs(d) < KW_FLAT_PP ? "flat" : d > 0 ? "up" : "down";
+                  // 변화는 말로 — '+0.3%p'(표 안 점유율의 차이)는 무엇의 %p 인지 안 읽혔다(2026-10-04 점검). 판정은 파이프라인이
+                  // 저장한 trend 하나다(앞 기간 몫의 25% 안쪽이면 '비슷' — calculate_telegram_sentiment.keyword_trend). 화면에서 절대
+                  // %p(0.5)로 다시 가르니 열 줄 중 아홉이 '비슷'이었다.
+                  const dir = k.trend;
                   const dCls = dir === "up" ? " is-up" : dir === "down" ? " is-down" : "";
                   return (
                     <li key={k.word} className="v2-kw-row">

@@ -1,7 +1,8 @@
 import "server-only";
 
+import { getKrIndexCloses } from "@/lib/data";
 import { getPreview } from "@/lib/kr-preview";
-import { withScopedLoadFailures } from "@/lib/load-state";
+import { isLoadFailed, withScopedLoadFailures } from "@/lib/load-state";
 import { getSurgingStocks } from "@/lib/telegram-data";
 import { getUsSurgingStocks } from "@/lib/us-telegram-data";
 
@@ -98,16 +99,32 @@ export async function loadCoverChips(): Promise<CoverChip[]> {
   return chips.filter((c): c is CoverChip => c !== null);
 }
 
+/** 국장 종가 칸 — 미장 카더라 첫 줄이 쓴다. 코스피 마지막 종가 등락 → 국장 카더라(그 화면 첫 줄의 지수 칸과 같은 값). */
+async function krCloseChip(): Promise<CoverChip | null> {
+  const r = await getKrIndexCloses();
+  if (isLoadFailed(r) || !r.kospi || r.kospi.changePct == null) return null;
+  const c = r.kospi.changePct;
+  return {
+    cap: `${md(r.kospi.date)} 국장`,
+    name: "코스피",
+    val: `${c > 0 ? "+" : c < 0 ? "-" : ""}${Math.abs(c).toFixed(2)}%`,
+    tone: c > 0 ? "up" : c < 0 ? "down" : "flat",
+    href: "/kadera",
+    ga: "kadera_us_chip_kr_close",
+  };
+}
+
 /**
- * 미장 카더라(v2, 2026-10-03) 첫 줄 — 시장 맥락 칸(그 미국 거래일 S&P500 등락) + 국장 급부상 칸 하나.
+ * 미장 카더라(v2, 2026-10-03) 첫 줄 — 시장 맥락 칸(그 미국 거래일 S&P500 등락) + 국장 칸 둘(코스피 종가 · 국장 급부상).
  * 국장 카더라 첫 줄(코스피 · 코스닥 종가 + 미장 칸 둘)의 짝이다. 이 화면에 없는 것 → 다른 화면.
+ * 국장 칸이 하나뿐이던 때 1,440 에서 업데이트 칸 앞이 400px 비었다(2026-10-04 점검) — 국장 첫 줄처럼 칸 둘로 거울을 맞춘다.
  * ⛔ 밤사이 미장 칸(위 ①)은 안 쓴다 — 그 종목은 이 화면의 '크게 움직인 종목' 표와 같은 이야기다.
  * 시장 맥락은 국장 미리보기 수집기가 받아 둔 값(getPreview().spx)이다. 미리보기가 못 돌았으면 칸만 빠진다.
  */
 export type UsCover = { index: { label: string; spx: number } | null; chips: CoverChip[] };
 
 export async function loadUsCover(): Promise<UsCover> {
-  const [index, kr] = await Promise.all([
+  const [index, kr, close] = await Promise.all([
     (async () => {
       try {
         const { value: p, failed } = await withScopedLoadFailures(getPreview);
@@ -119,6 +136,7 @@ export async function loadUsCover(): Promise<UsCover> {
       }
     })(),
     scoped("국장 급부상", () => krSurgingChip("kadera_us_chip_kr_surging")),
+    scoped("국장 종가", krCloseChip),
   ]);
-  return { index, chips: kr ? [kr] : [] };
+  return { index, chips: [close, kr].filter((c): c is CoverChip => c !== null) };
 }

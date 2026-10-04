@@ -33,8 +33,8 @@ ROW = {"name": "신용융자 잔고", "category": "시장", "capped": 62.5, "hot
 def test_digest_headline_and_rows_use_the_hero_rounding():
     digest = build_digest(26.5, "상온", 0, [ROW], [])
     assert digest.splitlines()[0].startswith("[전체] 햇쩨 지수 27℃")
-    assert "과열도 63%" in digest
+    assert "과열도 63" in digest and "과열도 63%" not in digest
 
 
 def test_fallback_sentence_uses_the_card_rounding():
-    assert "**신용융자 잔고**(63%)" in hot_fallback([ROW], {"시장": 0, "감성": 0})
+    assert "**신용융자 잔고**(과열도 63)" in hot_fallback([ROW], {"시장": 0, "감성": 0})

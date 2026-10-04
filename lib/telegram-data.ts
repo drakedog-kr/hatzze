@@ -8,6 +8,8 @@ import { THEMES } from "@/lib/stock-themes";
 import { LOAD_FAILED, type MaybeFailed } from "@/lib/load-state";
 import { RISING_WINDOW_DAYS, channelDeltas, type ChannelDelta, type ChannelSnapshot } from "@/lib/rising-channels";
 import { MIN_RECENT_MENTIONS, scoreSurging } from "@/lib/surging-score";
+import { dropOverlaps } from "@/lib/keyword-overlap";
+import { usableDays } from "@/lib/theme-flow";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { trendingTodayStartISO } from "@/lib/trending-window";
 import { changeRateOf, fetchYahooQuote } from "@/lib/yahoo-quote";
@@ -1595,7 +1597,12 @@ export async function getThemeRotation(limit = 10): Promise<MaybeFailed<ThemeRot
   }
   if (!data?.length) return [];
 
-  const dates = [...new Set(data.map((r) => r.date))].sort();
+  // 표본이 거의 없는 날(기준일 아침 · 수집이 끊긴 날)은 창에서 뺀다(lib/theme-flow.ts usableDays).
+  const dayTotals = new Map<string, number>();
+  for (const r of data) dayTotals.set(r.date, (dayTotals.get(r.date) ?? 0) + (r.mention_count ?? 0));
+  const allDates = [...new Set(data.map((r) => r.date))].sort();
+  const dates = usableDays(dayTotals, allDates);
+  if (!dates.length) return [];
   const latestDate = dates[dates.length - 1];
   const DAY = 24 * 60 * 60 * 1000;
   const daysBefore = (d: string) => (new Date(latestDate).getTime() - new Date(d).getTime()) / DAY;
@@ -2273,7 +2280,12 @@ async function computeIssueKeywords(limit: number): Promise<IssueKeyword[]> {
   );
   if (!data.length) return [];
 
-  const dates = [...new Set(data.map((r) => r.date))].sort();
+  // 표본이 거의 없는 날(기준일 아침 · 수집이 끊긴 날)은 창에서 뺀다(lib/theme-flow.ts usableDays).
+  const dayTotals = new Map<string, number>();
+  for (const r of data) dayTotals.set(r.date, (dayTotals.get(r.date) ?? 0) + (r.mention_count ?? 0));
+  const allDates = [...new Set(data.map((r) => r.date))].sort();
+  const dates = usableDays(dayTotals, allDates);
+  if (!dates.length) return [];
   const latestDate = dates[dates.length - 1];
   const DAY = 24 * 60 * 60 * 1000;
   const daysBefore = (d: string) => (new Date(latestDate).getTime() - new Date(d).getTime()) / DAY;
@@ -2304,27 +2316,37 @@ async function computeIssueKeywords(limit: number): Promise<IssueKeyword[]> {
   }
 
   const canCompare = priorDates.size > 0;
-  return [...total.entries()]
+  const candidates = [...total.entries()]
     .filter(([, count]) => count >= MIN_KEYWORD_MENTIONS)
     // 언급 수가 같으면 화제어로 가른다 — 정수라 동점이 흔하고, 안 가르면 순위가
     // DB 행 순서에 딸려 흔들린다(채널 랭킹에서 실제로 겪었다).
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  // 같은 화제를 두 칸에 세우지 않는다 — 파이프라인 common/keyword_overlap.py 와 같은 규칙(lib/keyword-overlap.ts).
+  const keep = new Set(dropOverlaps(candidates.map(([w]) => w)));
+  return candidates
+    .filter(([w]) => keep.has(w))
     .slice(0, limit)
     .map(([word, count]) => {
       // 창 길이가 다르므로 '하루 평균 점유율'로 맞춰 비교한다.
       // 그날 등장하지 않은 화제어는 점유율 0으로 치므로 창 전체 일수로 나눈다.
       const recentAvg = (recentShare.get(word) ?? 0) / Math.max(recentDates.size, 1);
       const priorAvg = (priorShare.get(word) ?? 0) / Math.max(priorDates.size, 1);
-      // 부동소수 비교라 정확히 같은 경우는 드물다 — 점유율 차이가 무시할 수준이면
-      // 'flat' 으로 본다. 둘 다 0인 경우(최근 창에 한 번도 안 나온 말)도 여기 걸린다.
+      // 파이프라인 keyword_trend 와 같은 판정 — 앞 기간 몫의 25% 안쪽이면 'flat'(상대 폭). 절대 %p 로 가르면 낱말 하나의
+      // 몫이 0.3~2% 라 반 넘게 늘어도 '비슷'이었다(2026-10-04 점검). 둘 다 0인 경우(최근 창에 안 나온 말)도 'flat'.
       const FLAT = 1e-6;
+      const REL_FLAT = 0.25;
+      const d = recentAvg - priorAvg;
       const trend: IssueKeyword["trend"] = !canCompare
         ? null
-        : Math.abs(recentAvg - priorAvg) < FLAT
+        : Math.abs(d) < FLAT
           ? "flat"
-          : recentAvg > priorAvg
+          : priorAvg <= 0
             ? "up"
-            : "down";
+            : Math.abs(d) / priorAvg < REL_FLAT
+              ? "flat"
+              : d > 0
+                ? "up"
+                : "down";
       return { rank: 0, word, count, trend, shareDelta: canCompare ? recentAvg - priorAvg : null };
     });
 }

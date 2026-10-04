@@ -1,7 +1,6 @@
 import Link from "next/link";
 
 import { StockLogo } from "../StockLogo";
-import { AiMark } from "../ui";
 import { Module, stockHref } from "./V2Modules";
 
 /**
@@ -60,18 +59,15 @@ export function SignalTable({ sec }: { sec: BoardSection }) {
   // 머리 칸 차례 — 순위 · 종목 · 문장(heads 의 마지막) · 숫자들.
   const headOrder = [0, 1, last, ...Array.from({ length: Math.max(0, last - 2) }, (_, k) => k + 2)];
   return (
-    /* 많이 언급(talk)은 줄이 두 층이다 — 숫자 줄 아래 흐름 요약이 판 폭을 다 쓴다(v2.css). 그 칸엔 머리가 없으니 AI 표시는 모듈 제목 앞으로. */
-    <Module id={sec.id} title={sec.title} meta={sec.meta} ai={sec.kind === "talk" && sec.aiText}>
+    /* AI 표시는 모듈 제목 앞에 둔다(네 표 같은 자리). 머리 칸에 두면 폰(머리 줄을 숨긴다)에서 고지가 사라졌다(2026-10-04 점검). */
+    <Module id={sec.id} title={sec.title} meta={sec.meta} ai={sec.aiText}>
       {sec.rows.length === 0 ? (
         <p className="v2-empty">{sec.empty}</p>
       ) : (
         <div className={`v2-tbl is-${sec.kind}`}>
           <div className="v2-tr v2-th" aria-hidden="true">
             {headOrder.map((i) => (
-              <span key={i}>
-                {i === last && sec.aiText && sec.kind !== "talk" && <AiMark size={11} />}
-                {sec.heads[i]}
-              </span>
+              <span key={i}>{sec.heads[i]}</span>
             ))}
           </div>
           {/* 짝지은 칸보다 짧으면 줄이 고르게 늘어난다(v2.css .v2-grid .v2-tbody). */}
@@ -82,11 +78,14 @@ export function SignalTable({ sec }: { sec: BoardSection }) {
                   // 국내는 종목 페이지, 미장은 내부자 리포트 종목 화면(stockHref). 시장을 모르면 국내로 본다(국장 표의 예전 동작).
                   href={stockHref(r.code, r.market) ?? `/stock/${r.code}`}
                   className="v2-tr"
-                  title={r.full ?? r.text ?? undefined}
+                  // 줄에 다 보이는 문장은 OS 툴팁으로 한 번 더 띄우지 않는다 — 흐름 요약처럼 첫 문장만 보일 때만 전문을 단다.
+                  title={r.full && r.full !== r.text ? r.full : undefined}
                   // 표마다 이벤트 이름을 따로 둔다 — 맞춤 측정기준 없이도 GA 에서 이름만으로 어느 표가 눌리는지 센다(유용함을 재는 잣대).
                   data-ga={`kadera_${sec.id}_click`}
                 >
-                  <span className="v2-td-rank">{i + 1}</span>
+                  {/* 크게 움직인 종목은 번호를 안 단다 — 위 다섯 줄이 '오른 셋 + 내린 둘'이라 번호가 순위로 읽혀 −10% 종목이 +29.8% 종목보다
+                      위로 보였다(2026-10-04 점검). 줄 순서는 그대로다. */}
+                  <span className="v2-td-rank">{sec.kind === "move" ? "" : i + 1}</span>
                   <span className="v2-td-stock">
                     <StockLogo code={r.code} name={r.name} market={r.market} size={22} />
                     <span className="v2-td-name">{r.name}</span>

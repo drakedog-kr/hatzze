@@ -64,6 +64,7 @@ from common.js_round import js_fixed1  # noqa: E402
 from common.market_sentiment import MARKET_MIN_MESSAGES, load_market_daily  # noqa: E402
 from common.supabase_client import get_client, load_all, load_window_keyset  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
+from common.thin_days import usable_days  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 from config.us_stock_extraction import is_house  # noqa: E402
 
@@ -115,11 +116,12 @@ WINDOW_DAYS = 3
 # 1,252 · 하위¼ 666 이라 400 이면 넓히는 날이 9일(주말·수집 첫날). 프론트
 # lib/us-telegram-data.ts 의 US_SENTIMENT_MIN_MESSAGES 와 같은 값이어야 한다.
 US_SENTIMENT_MIN_MESSAGES = 400
-# 요약을 만들 종목 수. 카드는 4장을 보여주지만 프론트가 요청 시점에 상위를 다시 뽑으므로
-# 여유를 둔다 — 실행 뒤 순위가 바뀌어도 문장이 비지 않는다(국내 NARRATIVE_TOP_N 과 같은 이유).
-NARRATIVE_TOP_N = 6
-# 화면 카드가 실제로 그리는 수. 커버리지 검사는 이만큼만 요구한다.
-CARD_TOP_N = 4
+# 요약을 만들 종목 수. 화면 '많이 언급' 표가 열 줄이라(lib/kadera-us-why.ts US_BOARD_TILES) 열에 여유 둘을 더한다 —
+# 프론트가 요청 시점에 상위를 다시 뽑으므로 실행 뒤 순위가 바뀌어도 문장이 비지 않는다(국내 NARRATIVE_TOP_N 과 같은 이유).
+# 여섯이던 때 표를 열 줄로 늘리고 이 값을 안 올려 7~10행이 늘 비었다(2026-10-04 점검). ⚠️ US_BOARD_TILES 와 짝이다.
+NARRATIVE_TOP_N = 12
+# 화면 표가 실제로 그리는 줄 수. 커버리지 검사는 이만큼 요구한다(US_BOARD_TILES).
+CARD_TOP_N = 10
 
 NEWS_EXCERPTS = 6      # 총평 셋째 대목이 볼 발췌 건수
 NEWS_TOP_STOCKS = 6
@@ -427,7 +429,11 @@ def theme_window_shares(rows: list[dict]) -> dict[str, float]:
     # 날짜 차례로 더한다 — 저쪽이 날짜 오름차순으로 reduce 하고, 실수 덧셈은 차례에 따라 끝자리가
     # 갈려 toFixed(1) 이 0.1 어긋난다. load_all 은 무작위 id 차례로 준다.
     win = sorted((r for r in rows if since <= r["date"] <= base), key=lambda r: r["date"])
-    recent = set(sorted({r["date"] for r in win})[-THEME_RECENT_DAYS:])
+    # 표본이 거의 없는 날(기준일 아침)은 뺀다 — 저쪽 usableDays 와 같은 규칙(common/thin_days.py). 총량이 없는 옛 행이면 그대로다.
+    day_totals: dict[str, int] = {}
+    for r in win:
+        day_totals[r["date"]] = day_totals.get(r["date"], 0) + (r.get("mention_count") or 0)
+    recent = set(usable_days(day_totals, sorted({r["date"] for r in win}))[-THEME_RECENT_DAYS:])
     sums: dict[str, float] = {}
     for r in win:
         sums[r["theme"]] = sums.get(r["theme"], 0.0) + (
@@ -575,7 +581,7 @@ def build_brief_digest(db, latest: str, msgs: list[dict], name_of: dict[str, str
 
     # ── 테마 ────────────────────────────────────────────────────────────────
     lines += theme_lines(
-        load_all(db, "telegram_us_theme_daily", "date,theme,share_pct,rank"), end
+        load_all(db, "telegram_us_theme_daily", "date,theme,share_pct,rank,mention_count"), end
     )
 
     # ── 쏠림 화제어 ─────────────────────────────────────────────────────────

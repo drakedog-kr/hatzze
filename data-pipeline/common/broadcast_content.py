@@ -44,6 +44,7 @@ from .prompt_style import PLAIN_PROSE_RULE
 from .supabase_client import execute_with_retry, load_keyset
 from .surging import load_stock_daily
 from .text_check import problems
+from .thin_days import usable_days
 from .timeutil import KST, today_kst
 
 # ─── 재료 상수 ────────────────────────────────────────────────────────────────
@@ -225,7 +226,13 @@ def load_theme_rotation(db) -> list[dict]:
     rows = db.table("telegram_theme_daily").select("date,theme,share_pct,mention_count").gte("date", since).limit(1000).execute().data
     if not rows:
         return []
-    dates = sorted({r["date"] for r in rows})
+    # 표본이 거의 없는 날(기준일 아침)은 창에서 뺀다 — 사이트 getThemeRotation 과 같은 규칙(common/thin_days.py).
+    day_totals: dict[str, int] = defaultdict(int)
+    for r in rows:
+        day_totals[r["date"]] += r["mention_count"] or 0
+    dates = usable_days(day_totals, sorted({r["date"] for r in rows}))
+    if not dates:
+        return []
     latest = date.fromisoformat(dates[-1])
     recent = set(dates[-THEME_RECENT_DAYS:])
     # recent 는 개수로, prior 는 날짜 간격으로 잡는다 — 수집이 끊긴 구간에서는 recent 가

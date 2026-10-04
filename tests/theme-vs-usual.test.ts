@@ -13,12 +13,12 @@ import { LEAN_WORD, THEME_USUAL_BAND, THEME_USUAL_Z, themeLean, themeTip, usualS
 
 const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
 
-// AI반도체(2026-09-30 미장): 낙관 126 · 비관 59 → 화면 낙관도 67%, 평소 80%
+// AI반도체(2026-09-30 미장): 낙관 126 · 비관 59 → 평활 전 비율 68%(툴팁 · 판정 · 막대가 쓰는 값), 평소 80%
 const AI_SEMI = { pos: 67, usual: 80, positive: 126, negative: 59 };
 
 describe("themeTip", () => {
   it("평소보다 낮으면 '덜 낙관적' — 낙관이 과반이어도 '비관'이라 하지 않는다", () => {
-    assert.equal(themeTip(AI_SEMI), "평소보다 덜 낙관적입니다 · 낙관 67% (평소 80%)");
+    assert.equal(themeTip(AI_SEMI), "평소보다 덜 낙관적입니다 · 낙관 68% (평소 80%)");
   });
 
   it("평소보다 높으면 '더 낙관적'", () => {
@@ -29,15 +29,15 @@ describe("themeTip", () => {
   });
 
   it("글이 적으면 평소와 똑같은 비율이 '덜 낙관적'으로 나오지 않는다", () => {
-    // 16:4 = 80%. 평활값은 70 이라 예전엔 '덜 낙관적'이었다.
+    // 16:4 = 80%. 평활값은 70 이라 예전엔 '덜 낙관적'이었고, 그 뒤엔 '비슷 · 낙관 70%'로 숫자와 말이 어긋났다(2026-10-04).
     assert.equal(
       themeTip({ pos: 70, usual: 80, positive: 16, negative: 4 }),
-      "평소와 비슷합니다 · 낙관 70% (평소 80%)",
+      "평소와 비슷합니다 · 낙관 80% (평소 80%)",
     );
   });
 
   it("평소가 없으면 낙관도만 말한다", () => {
-    assert.equal(themeTip({ ...AI_SEMI, usual: null }), "낙관 67% · 평소 기록이 아직 적습니다");
+    assert.equal(themeTip({ ...AI_SEMI, usual: null }), "낙관 68% · 평소 기록이 아직 적습니다");
   });
 });
 

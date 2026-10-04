@@ -14,6 +14,7 @@ import {
 } from "@/lib/telegram-data";
 
 import { getKrIndexCloses } from "@/lib/data";
+import { lastSession, liveChangeHead } from "@/lib/yahoo-quote";
 import { formatKstUpdate } from "@/lib/format";
 import { assertLoaded, isLoadFailed } from "@/lib/load-state";
 
@@ -112,6 +113,7 @@ export default async function KaderaPage() {
     rawEvents,
     rawIndexes,
     coverChips,
+    krSession,
   ] =
     await Promise.all([
       getTelegramSummary(),
@@ -128,8 +130,11 @@ export default async function KaderaPage() {
       // 첫 줄 — 지수 종가와 칩 둘(밤사이 미장 · 미장 급부상). 곁들이는 칸이라 실패해도 화면을 세우고 그 칸만 뺀다.
       getKrIndexCloses(),
       loadCoverChips(),
+      // 급부상 · 많이 언급의 등락 칸 머리 — 장이 쉬면 '지금' 대신 마지막 거래일(lib/yahoo-quote.ts liveChangeHead).
+      lastSession("^KS11", "Asia/Seoul").catch(() => null),
     ]);
   const stockReports = reports.filter((r): r is NonNullable<typeof r> => r !== null);
+  const liveHead = liveChangeHead(krSession);
 
   /* ── 조회 실패를 "자료 없음" 과 가른다 ───────────────────────────────────
      세 로더는 실패하면 `LOAD_FAILED` 를 돌려준다(lib/load-state.ts). 여기서 **한 번만**
@@ -197,7 +202,8 @@ export default async function KaderaPage() {
     // '신규'는 신규 상장으로 읽혔다(그날 표엔 진짜 신규 상장 종목도 있었다). 뜻은 '평소 기간엔 언급이 없던 종목'(lib/surging-score.ts baseShare 0).
     // 첫 언급은 배수 대신 그 말을 숫자 칸에 — 꼬리표 '첫 언급'과 '3.4배'가 한 줄에 같이 서면 서로 반대말로 읽혔다(2026-10-04 점검).
     cells: [s.isNew ? { v: "첫 언급", hot: true, k: "" } : { v: `${s.ratio.toFixed(1)}배`, hot: true }],
-    text: surgeLines[s.code] ?? null,
+    // 한 줄 요약이 없으면 같은 종목의 흐름 요약 첫 문장을 빌린다 — 두 표에 같이 선 종목이 한쪽만 '정리 중'이었다(2026-10-04 점검).
+    text: surgeLines[s.code] ?? firstSentence(narratives[s.code] ?? null),
     pending: "정리 중",
   }));
 
@@ -232,7 +238,7 @@ export default async function KaderaPage() {
     market: r.market,
     change: r.changeRate,
     cells: [{ v: `${r.totalMentions.toLocaleString("ko-KR")}회` }],
-    text: firstSentence(narratives[r.code] ?? null),
+    text: firstSentence(narratives[r.code] ?? null) ?? surgeLines[r.code] ?? null,
     full: narratives[r.code] ?? null,
     pending: "정리 중",
   }));
@@ -253,7 +259,7 @@ export default async function KaderaPage() {
       meta: `최근 ${surgeDays}일 · 평소 대비`,
       kind: "surge",
       // 숫자 칸 이름은 '언급 증가' — '평소 대비'만 두면 바로 옆 '지금 등락'과 붙어 주가 배수로 읽혔다(2026-10-04 점검).
-      heads: ["", "종목", "지금 등락", "언급 증가", "왜 뜨나"],
+      heads: ["", "종목", liveHead, "언급 증가", "왜 뜨나"],
       key0: "언급",
       aiText: true,
       rows: surgeRows,
@@ -275,7 +281,7 @@ export default async function KaderaPage() {
       title: "많이 언급된 종목",
       meta: `최근 ${KADERA_WINDOW_DAYS}일`,
       kind: "talk",
-      heads: ["", "종목", "지금 등락", "언급", "흐름 요약"],
+      heads: ["", "종목", liveHead, "언급", "흐름 요약"],
       key0: "언급",
       aiText: true,
       rows: talkRows,

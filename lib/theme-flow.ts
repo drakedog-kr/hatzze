@@ -23,3 +23,16 @@ export function thinDays(dayTotals: Map<string, number> | null, days: string[]):
   const mid = vals.length % 2 ? vals[(vals.length - 1) / 2] : (vals[vals.length / 2 - 1] + vals[vals.length / 2]) / 2;
   return new Set(days.filter((d) => (dayTotals.get(d) ?? 0) < mid * THIN_DAY_FRAC));
 }
+
+/**
+ * 창을 고를 날 — 표본이 거의 없는 날(thinDays)을 뺀 날짜(오래된→최신). 테마 로테이션 · 테마 상세 · 이슈 키워드가 '최근 3일'을
+ * 이 목록 끝에서 고른다. 날마다의 몫을 같은 무게로 평균하므로, 언급 4건짜리 아침(2026-10-04 국장)이 그대로 들어가면 그날 100% 가
+ * 사흘 평균의 1/3 을 차지해 반도체가 66.7% 로 부풀었다(언급으로 재면 38%). 주말 하루(평소의 7% 이상)는 남는다 —
+ * '오늘 뜬 테마는 오늘 보여야 한다'(2026-09-29, lib/theme-window.ts)는 그대로다.
+ * ⚠️ 파이프라인 짝(common/thin_days.py)과 같은 문턱 · 같은 규칙이다. 한쪽만 고치면 화면과 문장이 다른 사흘을 말한다.
+ */
+export function usableDays(dayTotals: Map<string, number> | null, days: string[]): string[] {
+  const thin = thinDays(dayTotals, days);
+  return days.filter((d) => !thin.has(d));
+}
+

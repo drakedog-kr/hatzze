@@ -389,7 +389,7 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
 
   // 기준일을 넣은 30일 — 히어로의 점유율·순위(테마 로테이션)가 기준일을 넣은 사흘이라 막대·말 많은 종목도 그 사흘을 센다.
   // 종목의 '평소' = 최근 사흘을 뺀 나머지 27일. 종목 집계는 이 30일을 다 받는다(테마 55종목 × 30일 ≤ 1,650행, 페이징).
-  const { trendDays, recentDays, usualDayCount } = themeDetailWindow(baseDate, THEME_TREND_DAYS, KADERA_WINDOW_DAYS);
+  const { trendDays, recentDays: windowDays } = themeDetailWindow(baseDate, THEME_TREND_DAYS, KADERA_WINDOW_DAYS);
   const first = trendDays[0];
   const last = trendDays[trendDays.length - 1];
 
@@ -481,14 +481,18 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
 
   // ── 말 많은 종목 ── 최근 사흘 언급 합 순. 머리가 "많이 언급된 순서"라고 말하니 잣대도 언급 수다
   // (테마 로테이션 팝오버는 주목도순인데, 그쪽은 "점유율을 만든 종목"이라 잣대가 다르다). 동률은 주목도.
+  // '최근 사흘'도 얇은 날을 뺀 끝에서 고른다 — 히어로 점유율(테마 로테이션 · lib/theme-flow.ts usableDays)과 같은 사흘이어야
+  // 한 칸 안의 숫자가 같은 날을 말한다. 평소도 얇은 날은 뺀다.
+  const recentDays = trendDays.filter((d) => !thin.has(d)).slice(-windowDays.length);
   const recentSet = new Set(recentDays);
+  const usualDays = trendDays.filter((d) => !recentSet.has(d) && !thin.has(d));
   const hotStocks = buildHotStocks(
     stockDaily.map((r) => ({ date: r.date, code: r.stock_code, mentions: r.mention_count, channels: r.channel_count, weight: r.weighted_score })),
     recentSet,
-    usualDayCount,
+    usualDays.length,
     byCode,
     reasons,
-    { usualDays: trendDays.filter((d) => !recentSet.has(d)), dayTotals },
+    { usualDays, dayTotals },
   );
 
   // ── 점유율·순위 ── 테마 로테이션과 같은 값이어야 카드에서 이 화면으로 넘어와도 숫자가 같다.

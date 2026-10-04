@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { thinDays, withTodayRank } from "../lib/theme-flow.ts";
+import { thinDays, usableDays, withTodayRank } from "../lib/theme-flow.ts";
 
 describe("withTodayRank", () => {
   it("마지막 날만 표 순위로 바꾸고 그 전 날은 그대로", () => {
@@ -43,5 +43,19 @@ describe("thinDays", () => {
       ["09-29", 100],
     ]);
     assert.deepEqual([...thinDays(totals, ["09-28", "09-29", "09-30"])], ["09-30"]);
+  });
+});
+
+describe("usableDays", () => {
+  it("얇은 날을 뺀 날짜 — 창은 이 목록 끝에서 고른다(파이프라인 common/thin_days.py 와 같은 답)", () => {
+    const totals = new Map([
+      ["09-28", 2776],
+      ["09-29", 2587],
+      ["09-30", 2537],
+      ["10-03", 332],
+      ["10-04", 4],
+    ]);
+    assert.deepEqual(usableDays(totals, ["09-28", "09-29", "09-30", "10-03", "10-04"]), ["09-28", "09-29", "09-30", "10-03"]);
+    assert.deepEqual(usableDays(null, ["a", "b"]), ["a", "b"]);
   });
 });

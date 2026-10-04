@@ -43,6 +43,7 @@ import { changeRateOf, fetchYahooQuote } from "@/lib/yahoo-quote";
 import { yahooSymbol } from "@/lib/yahoo-history";
 import { US_THEMES } from "@/lib/us-stock-themes";
 import { scoreUsSurging } from "@/lib/surging-score";
+import { usableDays } from "@/lib/theme-flow";
 
 /** 급부상 판정에서 '최근'으로 볼 일수. 국내(KADERA_WINDOW_DAYS)와 같게 둔다. */
 export const US_WINDOW_DAYS = 3;
@@ -752,7 +753,12 @@ export async function getUsThemeRotation(limit = 8): Promise<{ date: string | nu
   );
   if (!rows.length) return { date: base, rows: [] };
 
-  const dates = [...new Set(rows.map((r) => r.date))].sort();
+  // 표본이 거의 없는 날(기준일 아침 · 수집이 끊긴 날)은 창에서 뺀다 — 국장 getThemeRotation 과 같은 규칙(lib/theme-flow.ts usableDays).
+  // 2026-10-04 아침 미장 테마 언급이 11건뿐인 날이 사흘 평균의 1/3 을 차지해 우주·방산이 17.4%(언급으로 재면 8.7%) 2위로 섰다.
+  const dayTotals = new Map<string, number>();
+  for (const r of rows) dayTotals.set(r.date, (dayTotals.get(r.date) ?? 0) + (r.mention_count ?? 0));
+  const dates = usableDays(dayTotals, [...new Set(rows.map((r) => r.date))].sort());
+  if (!dates.length) return { date: base, rows: [] };
   const byTheme = new Map<string, Map<string, (typeof rows)[number]>>();
   for (const r of rows) {
     const m = byTheme.get(r.theme) ?? new Map();
@@ -761,8 +767,10 @@ export async function getUsThemeRotation(limit = 8): Promise<{ date: string | nu
   }
 
   const dayMs = 86_400_000;
+  // 앞 창과의 간격은 쓸 날의 마지막 날부터 잰다(국장과 같다). 기준일이 얇아 빠졌으면 하루 앞이 끝이다.
+  const windowEnd = dates[dates.length - 1];
   const daysBefore = (d: string) =>
-    (new Date(`${base}T00:00:00Z`).getTime() - new Date(`${d}T00:00:00Z`).getTime()) / dayMs;
+    (new Date(`${windowEnd}T00:00:00Z`).getTime() - new Date(`${d}T00:00:00Z`).getTime()) / dayMs;
 
   const recentDates = dates.slice(-THEME_RECENT_DAYS);
   // recent 는 **개수**로, prior 는 **날짜 간격**으로 잡는다. 수집이 며칠 끊기면 recent 가

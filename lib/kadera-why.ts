@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "./supabase-server";
 import { addDaysISO, kaderaBaseDate } from "./telegram-data";
 import { LOAD_FAILED, type MaybeFailed } from "./load-state";
 import { byPeriodEnd, periodFloor, stillAhead, type DatePrecision } from "./event-period";
+import { dropAlreadyHappened, groupEventRows, type GroupedEvent } from "./event-group";
 import { fetchDailyHistory, yahooSymbol } from "./yahoo-history";
 
 /**
@@ -397,38 +398,36 @@ export function todayKst(): string {
   return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
-/**
- * (종목, 날짜, 정밀도)로 묶는다. 행사 문구는 채널마다 조금씩 달라 **가장 많이 쓰인 표기**를
- * 대표로 삼고, 채널 수는 묶음 안의 서로 다른 채널을 센다.
- */
+/** 일정 행 → 줄(lib/event-group.ts — 국장 · 미장이 같은 규칙). */
 function groupEvents(rows: EventRow[]): Omit<UpcomingEvent, "name" | "market">[] {
-  const groups = new Map<string, { rows: EventRow[] }>();
-  for (const r of rows) {
-    const k = `${r.stock_code}|${r.event_date}|${r.date_precision}`;
-    const g = groups.get(k);
-    if (g) g.rows.push(r);
-    else groups.set(k, { rows: [r] });
+  return groupEventRows(rows.map((r) => ({ code: r.stock_code, channel: r.channel_handle, date: r.event_date, precision: r.date_precision, event: r.event, postedAt: r.posted_at })));
+}
+
+/** 이미 지나간 같은 이야기를 볼 날 수 — 앞으로의 한 채널 줄을 이 안의 여러 채널 줄과 견준다(lib/event-group.ts dropAlreadyHappened). */
+const PAST_DAYS = 14;
+
+/** 준 종목들의 지난 PAST_DAYS 일 day 일정 줄. 한 채널 줄이 없으면 묻지 않는다. 못 읽으면 빈 목록(거르지 않는다). */
+async function recentPast(codes: string[], from: string): Promise<GroupedEvent[]> {
+  if (!codes.length) return [];
+  const { data, error } = await getSupabaseAdmin()
+    .from("telegram_stock_event")
+    .select("channel_handle,stock_code,event_date,date_precision,event,posted_at")
+    .in("stock_code", codes)
+    .eq("date_precision", "day")
+    .gte("event_date", addDaysISO(from, -PAST_DAYS))
+    .lt("event_date", from)
+    .limit(1000);
+  if (error) {
+    console.error("[recentPast] 지난 일정을 못 읽었습니다 — 거르지 않습니다", error);
+    return [];
   }
-  const out: Omit<UpcomingEvent, "name" | "market">[] = [];
-  for (const { rows: g } of groups.values()) {
-    const texts = new Map<string, { text: string; n: number }>();
-    for (const r of g) {
-      const key = r.event.replace(/[\s·,.()]/g, "");
-      const cur = texts.get(key);
-      if (cur) cur.n += 1;
-      else texts.set(key, { text: r.event, n: 1 });
-    }
-    const top = [...texts.values()].sort((a, b) => b.n - a.n)[0];
-    out.push({
-      code: g[0].stock_code,
-      date: g[0].event_date,
-      precision: g[0].date_precision,
-      event: top.text,
-      channels: new Set(g.map((r) => r.channel_handle)).size,
-      firstSeen: g.map((r) => r.posted_at).sort()[0],
-    });
-  }
-  return out;
+  return groupEvents((data ?? []) as EventRow[]);
+}
+
+/** 앞으로의 줄에서 이미 지나간 같은 이야기를 뺀다 — 한 채널 줄의 종목만 지난 일정을 묻는다. */
+async function withoutHappened<T extends Omit<UpcomingEvent, "name" | "market">>(future: T[], from: string): Promise<T[]> {
+  const single = [...new Set(future.filter((e) => e.channels < 2).map((e) => e.code))];
+  return dropAlreadyHappened(future, await recentPast(single, from));
 }
 
 async function attachNames<T extends { code: string }>(items: T[]): Promise<(T & { name: string; market: string | null })[]> {
@@ -461,7 +460,7 @@ export const getUpcomingEvents = cache(async (days = 35, limit = 400): Promise<M
     console.error("[getUpcomingEvents] 일정을 못 읽었습니다", error);
     return LOAD_FAILED;
   }
-  const grouped = groupEvents((data ?? []) as EventRow[]);
+  const grouped = await withoutHappened(groupEvents((data ?? []) as EventRow[]), from);
   grouped.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : b.channels - a.channels));
   // ⚠️ 한 날짜가 카드를 독차지하지 않게 날짜당 몇 줄로 자른다. 공시 알림 채널이 "추가상장·
   //    변경상장" 을 같은 날에 열 건씩 올리는데(2026-09-07 실측 12건), 그대로 두면 열두 줄이
@@ -480,7 +479,7 @@ export const getUpcomingEvents = cache(async (days = 35, limit = 400): Promise<M
 /**
  * 종목 화면용 — 아직 안 끝난 일정 전부(정밀도 무관), 먼저 끝나는 것부터. 없으면 빈 배열(정상).
  *
- * ⚠️ 달·분기·해 단위는 기간 **첫날**로 적혀 있어 `event_date >= 오늘` 로 거르면 이미 시작된
+ * ⚠️ 달·분기·해 단위는 기간 안의 한 날(대개 첫날, 가끔 15일 · 말일 — 2026-10-04 실측)로 적혀 있어 `event_date >= 오늘` 로 거르면 이미 시작된
  *    "9월 중"·"3분기"·올해 "2026년"이 다 빠진다. 올해 1월 1일부터 읽고 기간의 끝으로 거른다
  *    (lib/event-period.ts). day 는 예전처럼 오늘부터다.
  */
@@ -498,7 +497,7 @@ export async function getStockEvents(code: string, limit = 8): Promise<UpcomingE
     console.error(`[getStockEvents] ${code} 일정을 못 읽었습니다`, error);
     return [];
   }
-  const grouped = groupEvents((data ?? []) as EventRow[]).filter((e) => stillAhead(e, from));
+  const grouped = await withoutHappened(groupEvents((data ?? []) as EventRow[]).filter((e) => stillAhead(e, from)), from);
   grouped.sort(byPeriodEnd);
   return attachNames(grouped.slice(0, limit));
 }
@@ -522,7 +521,7 @@ export async function getEventsForCodes(codes: string[], limit = 12): Promise<Up
     console.error(`[getEventsForCodes] 일정을 못 읽었습니다`, error);
     return [];
   }
-  const grouped = groupEvents((data ?? []) as EventRow[]).filter((e) => stillAhead(e, from));
+  const grouped = await withoutHappened(groupEvents((data ?? []) as EventRow[]).filter((e) => stillAhead(e, from)), from);
   grouped.sort(byPeriodEnd);
   return attachNames(grouped.slice(0, limit));
 }
