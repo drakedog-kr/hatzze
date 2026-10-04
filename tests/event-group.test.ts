@@ -102,6 +102,26 @@ describe("groupEventRows", () => {
     assert.equal(out.filter((e) => eventKind(e.event) === "배당").length, 2);
   });
 
+  it("한 번뿐인 일은 채널이 많은 줄로 · 인수 표기 · 한 글자 다른 글은 한 줄(2026-10-05 점검)", () => {
+    const out = groupEventRows([
+      row("005930", "a", "2026-10-07", "day", "3분기 잠정실적 발표"),
+      row("005930", "b", "2026-10-07", "day", "3분기 잠정실적 발표"),
+      ...["c", "d", "e"].map((ch) => row("005930", ch, "2026-10-08", "day", "3분기 잠정 실적 발표")),
+      row("207940", "a", "2026-11-13", "day", "PolyPeptide Group AG 인수"),
+      row("207940", "b", "2026-11-13", "day", "폴리펩타이드그룹 인수 완료"),
+      row("000660", "a", "2027-02-01", "month", "용인 Y1 첫 클린룸 개설"),
+      row("000660", "b", "2027-02-01", "month", "용인 Y1 첫 클린룸 개설"),
+      row("000660", "c", "2027-02-01", "month", "용인 Y1 클린룸 개설"),
+    ]);
+    const sam = out.filter((e) => e.code === "005930");
+    assert.equal(sam.length, 1);
+    assert.equal(sam[0].date, "2026-10-08");
+    assert.equal(out.filter((e) => e.code === "207940").length, 1);
+    const hy = out.filter((e) => e.code === "000660");
+    assert.equal(hy.length, 1);
+    assert.equal(hy[0].channels, 3);
+  });
+
   it("다른 종목 · 다른 기간은 그대로", () => {
     const out = groupEventRows([
       row("000660", "a", "2026-10-27", "day", "실적발표"),

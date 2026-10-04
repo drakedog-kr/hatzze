@@ -543,15 +543,18 @@ const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
 export function eventDateLabel(e: { date: string; precision: DatePrecision }): string {
   const [y, m, d] = e.date.split("-").map(Number);
   const thisYear = Number(todayKst().slice(0, 4));
-  const yearPrefix = y !== thisYear ? `${y}년 ` : "";
+  // 다른 해는 두 자리('27년') — '2027년 1월 중' 알약 하나가 알약 칸을 91px 로 넓혀 짧은 알약 줄은 글 앞이 40px 남짓 비었다(2026-10-05 점검).
+  const yearPrefix = y !== thisYear ? `${String(y).slice(2)}년 ` : "";
   if (e.precision === "day") {
     const wd = WEEKDAY[new Date(`${e.date}T00:00:00Z`).getUTCDay()];
     return `${yearPrefix}${m}월 ${d}일(${wd})`;
   }
-  if (e.precision === "month") return `${yearPrefix}${m}월 중`;
+  // '중'은 뗀다 — 날짜 알약(10/7(수))과 나란히 서면 '10월'만으로 달 단위가 읽힌다.
+  if (e.precision === "month") return `${yearPrefix}${m}월`;
   if (e.precision === "quarter") return `${yearPrefix}${Math.ceil(m / 3)}분기`;
   if (e.precision === "half") return `${yearPrefix}${m <= 6 ? "상반기" : "하반기"}`;
-  return `${y}년`;
+  // 해 단위도 두 자리('26년') — '2026년'과 '27년 1월'이 한 목록에 섞였다(2026-10-05 점검).
+  return `${String(y).slice(2)}년`;
 }
 
 /** 오늘로부터 며칠 뒤인가("오늘" · "내일" · "3일 뒤"). 달력 줄의 보조 글자. */

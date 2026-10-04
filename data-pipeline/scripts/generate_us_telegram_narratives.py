@@ -704,6 +704,18 @@ def build_stock_digests(
         return out
 
     by_ticker = by_ticker_in(end)
+    # 같은 길이 직전 기간의 언급 수 — [일별]에 붙인다(국장 짝 generate_telegram_narratives 와 같은 재료, 2026-10-05 점검).
+    # 받은 메시지가 그 기간을 덮을 때만 — 덮지 않는데 0회라 적으면 거짓 재료다(테마 급부상 길은 제 범위로 받는다).
+    prev_until = (date.fromisoformat(since) - timedelta(days=1)).isoformat()
+    prev_since = (date.fromisoformat(since) - timedelta(days=WINDOW_DAYS)).isoformat()
+    covered = bool(msgs) and min(m["date"] for m in msgs) <= prev_since
+    prev_count: Counter = Counter()
+    if covered:
+        for m in msgs:
+            if prev_since <= m["date"] <= prev_until:
+                for x in m["mentions"]:
+                    if not is_house(x):
+                        prev_count[x["ticker"]] += 1
     # 발췌는 기준일 것까지 본다(국장 종목 요약과 같은 규칙) — 세는 값이 아니라 '무엇이 화제였나'의
     # 예시라, 기준일을 빼면 아침 실행이 밤사이 미장 마감 소식을 못 보고 하루 늦은 얘기를 한다.
     # 고르기·언급 수·[일별]은 위 창(카드와 같은 사흘) 그대로다.
@@ -729,7 +741,7 @@ def build_stock_digests(
         lines = [
             f"[종목] {name} ({ticker}) · 미국 상장",
             f"[최근 {WINDOW_DAYS}일] 언급 {len(items)}회 · {chans}개 채널",
-            "[일별] " + " · ".join(f"{d[5:]} {by_day[d]}회" for d in sorted(by_day)),
+            "[일별] " + " · ".join(f"{d[5:]} {by_day[d]}회" for d in sorted(by_day)) + (f" · 직전 {WINDOW_DAYS}일 합 {prev_count[ticker]}회" if covered else ""),
             "",
             f"[대표 메시지 발췌] 조회수 상위 {len(top)}건",
         ]
@@ -768,7 +780,8 @@ def main() -> None:
         for s in load_all(db, "us_stocks", "ticker,name_ko", order_by="ticker")
     }
     # 종목 리포트 창이 하루 앞에서 시작하므로 그만큼 앞에서부터 받는다(총평은 제 창으로 다시 자른다).
-    msgs = load_us_messages(db, min(since, card_since))
+    # 직전 같은 길이 기간까지 받는다 — 종목 요약 [일별]의 '직전 N일 합'이 그 기간을 센다(build_stock_digests).
+    msgs = load_us_messages(db, (date.fromisoformat(min(since, card_since)) - timedelta(days=WINDOW_DAYS)).isoformat())
     print(f"[재료] 창 안 미국 언급 메시지 {len([m for m in msgs if since <= m['date'] <= end]):,}건")
 
     brief_digest = build_brief_digest(db, latest, msgs, name_of)

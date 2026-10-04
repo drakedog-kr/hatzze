@@ -1889,13 +1889,16 @@ def build_stock_digests(
     since = (end_d - timedelta(days=WINDOW_OFFSET)).isoformat()
     until = end_d.isoformat()
 
-    daily = [
-        r
-        for r in load_all(
-            db, "telegram_stock_daily", "date,stock_code,mention_count,weighted_score"
-        )
-        if since <= r["date"] <= until
-    ]
+    all_daily = load_all(db, "telegram_stock_daily", "date,stock_code,mention_count,weighted_score")
+    daily = [r for r in all_daily if since <= r["date"] <= until]
+    # 같은 길이 직전 기간의 언급 합 — [일별 추이]에 붙인다. 사흘 안 모양만 주었더니 화면(사흘 대 그 전)과 반대로
+    # '최근 3일 크게 줄었다'고 썼다(브릴스: 사흘 71회 대 직전 9회, 2026-10-05 점검).
+    prev_until = (date.fromisoformat(since) - timedelta(days=1)).isoformat()
+    prev_since = (date.fromisoformat(since) - timedelta(days=WINDOW_OFFSET + 1)).isoformat()
+    prev_m: dict[str, int] = defaultdict(int)
+    for r in all_daily:
+        if prev_since <= r["date"] <= prev_until:
+            prev_m[r["stock_code"]] += r["mention_count"] or 0
     if not daily:
         # 창에 집계가 아예 없으면 어떤 종목도 digest 를 못 만든다. 검사할 대상도 없다.
         return [], []
@@ -1906,6 +1909,8 @@ def build_stock_digests(
         a["w"] += float(r["weighted_score"] or 0)
         a["m"] += r["mention_count"] or 0
         a["by_date"][r["date"]] = r["mention_count"] or 0
+    for c, a in agg.items():
+        a["prev"] = prev_m.get(c, 0)
     top = sorted(agg.items(), key=lambda kv: kv[1]["w"], reverse=True)[:NARRATIVE_TOP_N]
 
     # 주목도 상위 N개에 더해 **급부상 종목**과 **주간 결산이 세우는 종목**도 대상에 넣는다.
@@ -2008,7 +2013,7 @@ def build_stock_digests(
         # 일별 추이는 '모양'을 말하려면 있어야 해서 남기되, 숫자를 베끼지 말라고 적어 둔다.
         lines = [
             f"[종목] {name} ({code})",
-            f"[일별 추이] {series}  ※ 모양 파악용입니다. 이 숫자와 날짜를 문장에 옮기지 마세요",
+            f"[일별 추이] {series} · 직전 {WINDOW_OFFSET + 1}일 합 {a.get('prev', 0)}회  ※ 모양 파악용입니다. 이 숫자와 날짜를 문장에 옮기지 마세요",
         ]
 
         keys = [k for k in by_code.get(code, []) if k in msgs]

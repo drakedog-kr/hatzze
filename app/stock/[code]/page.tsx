@@ -3,7 +3,7 @@ import { assertLoaded } from "@/lib/load-state";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 
-import { withSubjectParticle, withTopicParticle } from "@/lib/format";
+import { withSubjectParticle } from "@/lib/format";
 import { STOCK_STAT_DAYS, STOCK_TREND_DAYS, fmtKoDate, getStockPage, stockHref, stockMddHref, themePeerStocks, type StockTrendPoint } from "@/lib/stock-page";
 
 import { getStockDividend } from "@/lib/dividend";
@@ -133,7 +133,8 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
   const [peers, why, eventList, dividend] = await Promise.all([
     themePeerStocks(d.code, d.themes),
     getStockMoveReason(d.code, d.baseDate),
-    getStockEvents(d.code),
+    // 열둘까지 — 여덟이면 '앞으로 14건' 아래 여덟 줄뿐이라 나머지로 갈 길이 없었다(2026-10-05 점검).
+    getStockEvents(d.code, 12),
     DIVIDEND_PUBLIC ? getStockDividend(d.code) : Promise.resolve(null),
   ]);
   assertLoaded("/stock/[code]");
@@ -165,13 +166,19 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
           ) : undefined
         }
       >
-        <div className="v2-tm-pills">
+        {/* 이름 · 종가 · 등락 줄 격자(판 폭 넷 · 짝 안과 폰 둘, v2.css .v2-sk-peers) — 이름만 든 알약이 판 폭의 절반만 채웠다(2026-10-05 점검). */}
+        <ul className="v2-sk-peers">
           {peers.map((p) => (
-            <Link key={p.code} href={stockHref(p.code)} className="v2-tm-pill" data-ga="stock_peer_click">
-              {p.name}
-            </Link>
+            <li key={p.code}>
+              <Link href={stockHref(p.code)} className="v2-sk-peer" data-ga="stock_peer_click">
+                <StockLogo code={p.code} name={p.name} market={p.market} size={20} lazy />
+                <span className="v2-sk-peer-n">{p.name}</span>
+                {p.price != null && <span className="v2-sk-peer-p">{p.price.toLocaleString("ko-KR")}원</span>}
+                {p.changeRate != null && <span className={`v2-sk-peer-c${tone(p.changeRate)}`}>{signPct(p.changeRate)}</span>}
+              </Link>
+            </li>
           ))}
-        </div>
+        </ul>
       </Module>
     ) : null;
   // 이 종목을 1주 들면 1년에 얼마, 어느 달에 받나. 카더라(화제 · 일정 · 테마)가 먼저, 배당은 그다음(2026-09-15 지시).
@@ -180,7 +187,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
   const eventsMod =
     events.length > 0 ? (
       // 채널 글에서 뽑은 앞날의 일정. 카더라 카드와 달리 달 · 분기 · 연 단위도 보여준다 — 한 종목의 자리라 "10월 중" · "2027년"이 글로 서면 된다.
-      <Module title="다가오는 일정" meta={`채널이 짚은 날짜 · 앞으로 ${eventList.total}건`} className="v2-tm-events">
+      <Module title="다가오는 일정" meta={`채널이 짚은 날짜 · ${eventList.total}건`} className="v2-tm-events">
         <ul className="v2-events">
           {events.map((e) => (
             <li key={`${e.date}-${e.precision}-${e.event}`}>
@@ -189,7 +196,8 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
                   {e.precision === "day" ? dayPill(e.date, today) : eventDateLabel(e)}
                 </span>
                 <span className="v2-event-txt">{e.event}</span>
-                <span className="v2-sk-evn">{e.channels}곳</span>
+                {/* '채널 N곳' — 이유 줄의 '채널 88곳'과 같은 말(2026-10-05 점검). */}
+                <span className="v2-sk-evn">채널 {e.channels}곳</span>
               </div>
             </li>
           ))}
@@ -204,6 +212,15 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
   const richEvents = events.length >= 4;
   const partner = richEvents ? eventsMod : dividendRich ? dividendMod : null;
   const shortEvents = eventsMod && !richEvents ? eventsMod : null;
+  // 짝이 없으면(일정 짧음 · 배당 없음) 짧은 일정과 같은 테마 종목을 오른쪽에 쌓아 추이의 짝으로 — 추이가 판 폭 1,144×56 띠가 되고
+  // 아래 [일정 한 줄 | 종목] 짝은 일정 줄 위아래가 26px 씩 비었다(2026-10-05 점검, HLB).
+  const sideStack =
+    !partner && shortEvents && peersMod ? (
+      <div className="v2-tm-side">
+        {shortEvents}
+        {peersMod}
+      </div>
+    ) : null;
   // 배당이 판 폭 한 줄로 서면 넓은 꼴(숫자 칸 왼쪽 · 달 막대 오른쪽) — 숫자 셋이 왼쪽 210px 에 몰리고 900px 가 비었다.
   const dividendWide = dividend ? <DividendCard s={dividend} wide /> : null;
 
@@ -236,7 +253,8 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
         )}
         {d.themes[0] && <CoverLinkCell c={{ cap: "테마", name: d.themes[0], href: themeHref(d.themes[0]), ga: "stock_cover_theme" }} />}
         <CoverLinkCell c={{ cap: "MDD 정밀분석", name: "고점 대비 낙폭", href: stockMddHref(d.code, d.market), ga: "stock_cover_mdd" }} />
-        <CoverMeta updated={`${koDay(d.baseDate)} 집계 기준`} basis="주식 텔레그램 채널 언급" />
+        {/* 짧게 — 1,100 에서 띠가 두 줄(둘째 줄 왼쪽 560px 빔)이었다(2026-10-05 점검). */}
+        <CoverMeta updated={`${koDay(d.baseDate)} 기준`} basis="텔레그램 언급" />
       </div>
 
       {/* 둘째 줄 — 요즘 도는 얘기(최근 사흘 화제 · 움직인 날의 까닭), 판 폭. 없는 날은 안 그린다. */}
@@ -245,7 +263,8 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
           <dl className="v2-brief3">
             {d.narrative && (
               <div className="v2-brief3-row">
-                <dt>최근 3일</dt>
+                {/* 아래 추이 범례와 같은 날짜로 — '최근 3일'과 '10/1~10/3'이 같은 사흘을 달리 불렀다(2026-10-05 점검). */}
+                <dt>{d.trend.length >= 3 ? `${md(d.trend[d.trend.length - 3].date)}~${md(d.trend[d.trend.length - 1].date)}` : "최근 3일"}</dt>
                 <dd>{d.narrative}</dd>
               </div>
             )}
@@ -266,10 +285,10 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
       )}
 
       {/* 셋째 줄 — 일별 언급 추이 | 일정(없으면 배당). 짝이 없으면 추이가 판 폭. */}
-      <div className={`v2-tm-band is-brief${partner ? "" : " is-solo"}`}>
+      <div className={`v2-tm-band is-brief${partner || sideStack ? "" : " is-solo"}`}>
         <Module
           title="일별 언급 추이"
-          meta={d.trend.length ? `${fmtKoDate(d.trend[0].date)} ~ ${fmtKoDate(d.trend[d.trend.length - 1].date)}` : undefined}
+          meta={d.trend.length ? `${md(d.trend[0].date)}~${md(d.trend[d.trend.length - 1].date)}` : undefined}
           className="v2-tm-trendmod"
         >
           {/* 실패와 '없음'을 다른 문장으로 — 같은 문장이면 고장이 자료로 위장된다. */}
@@ -278,7 +297,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
           ) : d.trend.every((p) => !p.mentions) ? (
             // 판정도 문장도 막대와 같은 기간(30일) — 90일 합으로 보면 8월에만 말이 있던 종목에 빈 막대 30개와 '0회 · 0일'이 섰다(2026-10-04 점검).
             <p className="v2-empty">
-              {withTopicParticle(d.name)} 최근 {STOCK_TREND_DAYS}일 사이 주식 텔레그램에서 잡힌 적이 없습니다.
+              최근 {STOCK_TREND_DAYS}일 언급이 없습니다.
             </p>
           ) : (
             <div className="v2-tm-trendbody">
@@ -301,12 +320,13 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
             </div>
           )}
         </Module>
-        {partner}
+        {partner ?? sideStack}
       </div>
 
-      {/* 넷째 줄부터 — 배당(추이 짝으로 안 쓴 날, 판 폭) · [짧은 일정 | 같은 테마 종목]. 없는 게 정상인 칸은 안 그린다. */}
-      {partner !== dividendMod && dividendWide}
-      {shortEvents && peersMod ? (
+      {/* 넷째 줄부터 — 배당(추이 짝으로 안 쓴 날, 판 폭) · [짧은 일정 | 같은 테마 종목]. 없는 게 정상인 칸은 안 그린다.
+          배당이 없는 종목은 배당 모듈을 안 그린다 — '최근 12개월 현금배당이 없습니다' 한 줄짜리 판 폭 모듈이 열 종목 중 여덟에 섰다(2026-10-05 점검). */}
+      {partner !== dividendMod && dividendRich && dividendWide}
+      {sideStack ? null : shortEvents && peersMod ? (
         <div className="v2-tm-band is-pair">
           {shortEvents}
           {peersMod}
@@ -337,7 +357,8 @@ function TrendFigs({ points }: { points: StockTrendPoint[] }) {
       </span>
       <span>
         <b>{active}일</b>
-        <em>언급된 날</em>
+        {/* '언급 일수' — '24일 · 언급된 날'은 날짜(24일)로, '30일'은 기간으로 읽혔다(2026-10-05 점검). */}
+        <em>언급 일수</em>
       </span>
       {peak && !single && (
         <span>

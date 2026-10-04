@@ -32,11 +32,20 @@ export function DividendCard({ s, wide = false }: { s: DividendStock; wide?: boo
   if (s.streak >= 3) facts.push(s.streak >= 15 ? "15년 넘게 연속 배당" : `${s.streak}년 연속 배당`);
   if (showsSepTax(s)) facts.push("분리과세 대상");
   const href = `${DIVIDEND_PAGE.href}?add=${encodeURIComponent(s.code)}`;
+  // 조각마다 한 덩어리(뒤 '·'까지) — 낱말 가운데서 접혀 '배당'만 떨어지거나 '15년 / 넘게 연속 배당'으로 갈렸다(2026-10-05 점검).
+  const chunks = (parts: string[]) =>
+    parts.map((p, i) => (
+      <span key={p}>
+        <span className="v2-nowrap">{i < parts.length - 1 ? `${p} ·` : p}</span>
+        {i < parts.length - 1 ? " " : ""}
+      </span>
+    ));
 
   return (
     <Module
       title="배당"
-      meta="최근 12개월 · 1주 기준 원"
+      // '1주 기준'은 이름표 '주당 배당금'이 말한다(2026-10-05 점검).
+      meta="최근 12개월 · 원"
       aside={
         s.dps > 0 ? (
           <Link href={href} className="v2-more" data-ga="cta_click" data-ga-cta="to_dividend_calc" data-ga-surface="stock_page">
@@ -51,7 +60,8 @@ export function DividendCard({ s, wide = false }: { s: DividendStock; wide?: boo
           <div className="v2-tm-figs">
             <span>
               <b>{won(s.dps)}</b>
-              <em>1주에 1년</em>
+              {/* '1주에 1년'은 '1주(週)에 1년'으로 끊겨 읽혔다(2026-10-05 점검). */}
+              <em>주당 배당금</em>
             </span>
             <span>
               <b>{s.yieldPct != null ? `${s.yieldPct.toFixed(2)}%` : "없음"}</b>
@@ -80,13 +90,9 @@ export function DividendCard({ s, wide = false }: { s: DividendStock; wide?: boo
             </div>
           )}
           {/* 폰 — 막대 아래 금액 칸(23px)이 좁아 숨기는 대신 받은 달만 한 줄로(누르지 않아도 보이게, 2026-10-04 점검). */}
-          {paidMonths.length > 0 && <p className="v2-sk-paid">{paidMonths.map((m) => `${m}월 ${Math.round(byMonth[m]).toLocaleString("ko-KR")}`).join(" · ")}</p>}
-          {(facts.length > 0 || s.unusual) && (
-            <p className="v2-sk-facts">
-              {facts.join(" · ")}
-              {s.unusual && `${facts.length ? " · " : ""}특별 · 청산배당이 섞여 1년 뒤에도 같으리라 보기 어렵습니다`}
-            </p>
-          )}
+          {paidMonths.length > 0 && <p className="v2-sk-paid">{chunks(paidMonths.map((m) => `${m}월 ${Math.round(byMonth[m]).toLocaleString("ko-KR")}`))}</p>}
+          {/* '특별배당 섞임' — 배당 화면 알약과 같은 말. 설명 문장('1년 뒤에도 같으리라 보기 어렵습니다')은 걷었다(2026-10-05 점검). */}
+          {(facts.length > 0 || s.unusual) && <p className="v2-sk-facts">{chunks(s.unusual ? [...facts, "특별배당 섞임"] : facts)}</p>}
         </div>
       ) : (
         <p className="v2-empty">최근 12개월 현금배당이 없습니다.</p>

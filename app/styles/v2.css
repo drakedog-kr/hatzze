@@ -1569,6 +1569,11 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
      1.25 : 1 이던 땐 첫 칸이 640px 라 이름과 값이 495px 떨어졌고, 넓어야 할 추이 막대는 512px 였다(2026-10-04 점검). */
   .v2-in .v2-tm-band.is-brief { grid-template-columns: calc(25% - 6px) minmax(0, 1fr); }
 }
+/* 종목 화면 680~999 — 짝 칸이 280px 로 고정되면 일정 글이 말줄임으로 잘리고 '공개' · '전환'이 외톨이로 떨어졌다(2026-10-05 점검, 1,100).
+   1,000 이상과 같은 1.25 : 1. ≤679 한 줄기 규칙을 이기지 않게 범위를 묶는다. */
+@container kd (min-width: 680px) and (max-width: 999px) {
+  .v2-sk .v2-tm-band.is-brief:not(.is-solo) { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+}
 /* 짝이 없는 줄 — 혼자 판 폭 전체. 일정이 하나도 없는 테마(주인공), 일정 · 배당이 둘 다 없는 종목(언급 추이). 종목 쪽은 규칙이 없어
    1.25 : 1 두 칸 격자에 오른쪽 45% 가 비었다(2026-10-04 점검). 범위 클래스까지 붙여 위 두 칸 규칙을 이긴다. */
 .v2-tm-band.is-hot.is-solo,
@@ -1727,7 +1732,9 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-tm-events { flex: 1; }
 /* 알약 칸 — 목록 안 가장 긴 알약 폭 하나(subgrid). 알약 폭이 글자마다 달라('10/8(목)' 62 · '2027년 1월 중' 91) 일정 글자의 시작선이
    줄마다 들쭉날쭉했다(2026-10-04 점검). 줄은 남는 높이를 고르게 받는다(1fr). 셋째 칸은 종목 화면의 'N곳'. */
-.v2-tm-events .v2-events { flex: 1; display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; grid-auto-rows: minmax(min-content, 1fr); column-gap: 10px; }
+.v2-tm-events .v2-events { flex: 1; display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; grid-auto-rows: auto; column-gap: 10px; }
+/* ⭐ 줄 키는 auto — minmax(min-content, 1fr)는 키가 안 정해진 격자에서 가장 큰 줄에 모두 맞춰 한 줄짜리 일정 위아래가 비었다(2026-10-05 점검).
+   auto 줄도 칸이 남으면 고르게 늘어난다(align-content: normal). */
 .v2-tm-events .v2-events li { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; }
 .v2-tm-events .v2-ev-row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; }
 .v2-tm-events .v2-daypill { justify-self: start; }
@@ -2305,7 +2312,27 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 .v2-sk .v2-brief3 dt b { font-weight: 600; }
 .v2-sk .v2-brief3 dt b.is-up { color: var(--t-up); }
 .v2-sk .v2-brief3 dt b.is-down { color: var(--t-down); }
-.v2-sk-src { font-size: 12px; color: var(--t-ink3); }
+.v2-sk-src { font-size: 12px; color: var(--t-ink3); white-space: nowrap; }
+.v2-nowrap { white-space: nowrap; }
+/* 짝 없는 판 폭 추이 — 막대 칸이 1,144×56 띠였다(2026-10-05 점검). */
+.v2-sk .v2-tm-band.is-solo .v2-tm-trend { min-height: 112px; }
+/* 판 폭으로 선 짧은 일정 — 글 칸을 내용 폭으로('채널 1곳'이 글 끝에서 881px 떨어져 섰다). */
+.v2-sk > .v2-tm-events .v2-events { grid-template-columns: max-content minmax(0, max-content) max-content; }
+/* 같은 테마 종목 — 이름 · 종가 · 등락 줄 격자. 판 폭이면 넷, 짝 · 쌓기 안과 폰은 둘. */
+.v2-sk-peers { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; padding: 0 14px; list-style: none; column-gap: 24px; }
+.v2-tm-band .v2-sk-peers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* 1,000 미만 옆 칸(370px 남짓)과 폰은 한 열 — 두 열이면 이름 · 종가 · 등락이 한 칸에 안 들어 이름이 세 줄로 접혔다. */
+@container kd (max-width: 999px) {
+  .v2-tm-band .v2-sk-peers { grid-template-columns: minmax(0, 1fr); }
+}
+.v2-sk-peers > li { min-width: 0; border-bottom: 1px solid var(--t-line); }
+.v2-sk-peer { display: flex; align-items: center; gap: 8px; min-height: 44px; color: var(--t-ink); text-decoration: none; font-variant-numeric: tabular-nums; }
+.v2-sk-peer:hover .v2-sk-peer-n { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--t-ink4); }
+.v2-sk-peer-n { flex: 1; min-width: 0; font-weight: 600; word-break: keep-all; overflow-wrap: anywhere; }
+.v2-sk-peer-p { font-size: 13px; font-weight: 500; color: var(--t-ink2); white-space: nowrap; }
+.v2-sk-peer-c { width: 60px; text-align: right; font-size: 12px; font-weight: 500; color: var(--t-ink3); white-space: nowrap; }
+.v2-sk-peer-c.is-up { color: var(--t-up); }
+.v2-sk-peer-c.is-down { color: var(--t-down); }
 /* 일정 줄 끝 — 몇 곳이 짚었나. */
 .v2-sk-evn { flex: none; margin-left: auto; font-size: 12px; font-weight: 500; line-height: 22px; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
 /* 배당 — 달마다 막대(받은 달만 파랑) · 달 · 그달 받은 돈. */
@@ -2331,7 +2358,13 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 /* 추이 · 배당 숫자 칸 — 넷이면 폰 폭(351)을 넘었다. 접어 두 줄로. */
 .v2-sk .v2-tm-figs { flex-wrap: wrap; row-gap: 8px; }
 @container kd (max-width: 679px) {
-  .v2-sk .v2-brief3-row { grid-template-columns: 76px minmax(0, 1fr); }
+  /* 88 · 한 줄 — 76 이면 '10/1 +10.90%'가 날짜 · 등락 두 줄로 갈렸다(2026-10-05 점검). */
+  .v2-sk .v2-brief3-row { grid-template-columns: 88px minmax(0, 1fr); }
+  .v2-sk .v2-brief3 dt { white-space: nowrap; }
+  /* 숫자 넷은 2×2 — 넷째만 둘째 줄에 혼자 섰다. 배당 숫자 셋은 그대로. */
+  .v2-sk .v2-tm-figs:has(> :nth-child(4)) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .v2-sk-peers,
+  .v2-tm-band .v2-sk-peers { grid-template-columns: minmax(0, 1fr); }
   .v2-sk-months b { display: none; }
   .v2-sk-paid { display: block; }
 }

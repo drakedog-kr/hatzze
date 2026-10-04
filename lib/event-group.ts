@@ -43,6 +43,8 @@ const KINDS: [string, RegExp][] = [
   ["승인", /승인|허가/],
   ["출시", /출시|발매|판매개시/],
   ["공개", /공개|발표회|언팩|이벤트|keynote/i],
+  // 인수 · 합병 — 'PolyPeptide Group AG 인수' · '폴리펩타이드그룹 인수 완료'가 두 줄로 섰다(삼성바이오로직스 11/13, 2026-10-05 점검).
+  ["인수", /인수|합병|m&a/i],
   // 증자 절차는 날마다 다른 일이라(공고 · 청약 · 납입) 낱말을 좁게 둔다 — '유상증자' 하나로 묶으면 10/13 공고와 10/15 청약이 ±3일로 합쳐진다.
   ["발행가", /발행가/],
   ["납입", /납입/],
@@ -64,7 +66,31 @@ const dayDiff = (a: string, b: string) => Math.abs(Date.parse(`${a}T00:00:00Z`) 
 /** 이 날짜 안팎(±일)의 같은 이야기는 한 줄로 본다 — '10/8' · '10/9' 처럼 하루 어긋나게 적힌 같은 발표. */
 const NEAR_DAYS = 3;
 /** 가까운 날에 두 번 있을 수 없는 종류 — 한 채널씩 갈린 두 줄도 하나로 접는다(③). */
-const ONE_SHOT = new Set(["실적", "매출", "주총", "공개", "출시"]);
+const ONE_SHOT = new Set(["실적", "매출", "주총", "공개", "출시", "인수"]);
+const KIND_NAMES = new Set(KINDS.map(([k]) => k));
+
+/** 두 글의 편집 거리(글자 단위). 짧은 글끼리만 부른다. */
+function editDistance(a: string, b: string): number {
+  const dp = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = dp[0];
+    dp[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cur = dp[j];
+      dp[j] = Math.min(dp[j] + 1, dp[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = cur;
+    }
+  }
+  return dp[b.length];
+}
+
+/** 종류 낱말이 없는 두 글이 같은 이야기인가 — 한쪽이 다른 쪽에 들었거나(6자 이상) 두 글자 안쪽만 다르다(8자 이상).
+ *  '용인Y1첫클린룸개설' · '용인Y1클린룸개설'이 '첫' 한 글자로 두 줄이 됐다(2026-10-05 점검). */
+function sameRawStory(a: string, b: string): boolean {
+  const [s, l] = a.length <= b.length ? [a, b] : [b, a];
+  if (s.length >= 6 && l.includes(s)) return true;
+  return s.length >= 8 && l.length - s.length <= 2 && editDistance(s, l) <= 2;
+}
 
 type Acc = { code: string; date: string; precision: DatePrecision; kind: string; texts: Map<string, { text: string; n: number }>; channels: Set<string>; firstSeen: string };
 
@@ -94,6 +120,21 @@ export function groupEventRows(rows: EventRowLike[]): GroupedEvent[] {
   const accs = groupRaw(rows);
   const alive = new Set(accs);
 
+  // ⓪ 종류 낱말이 없는 같은 기간 줄끼리 — 거의 같은 글이면 채널이 많은(같으면 먼저 짚인) 줄로 합친다.
+  for (const a of accs) {
+    if (!alive.has(a) || KIND_NAMES.has(a.kind)) continue;
+    for (const b of accs) {
+      if (b === a || !alive.has(b) || KIND_NAMES.has(b.kind) || b.code !== a.code || b.date !== a.date || b.precision !== a.precision) continue;
+      if (!sameRawStory(a.kind, b.kind)) continue;
+      const [keep, drop] = a.channels.size > b.channels.size || (a.channels.size === b.channels.size && a.firstSeen <= b.firstSeen) ? [a, b] : [b, a];
+      for (const c of drop.channels) keep.channels.add(c);
+      for (const [k, v] of drop.texts) if (!keep.texts.has(k)) keep.texts.set(k, v);
+      if (drop.firstSeen < keep.firstSeen) keep.firstSeen = drop.firstSeen;
+      alive.delete(drop);
+      if (drop === a) break;
+    }
+  }
+
   // ① 넓은 기간 줄 → 그 안에 든 더 좁은 같은 이야기 줄로 접는다(가장 좁은 것부터 넓은 쪽으로). '10월 중 실적' → '10/8 실적'.
   const byWidth = [...accs].sort((a, b) => WIDTH[a.precision] - WIDTH[b.precision]);
   for (const wide of byWidth) {
@@ -115,13 +156,14 @@ export function groupEventRows(rows: EventRowLike[]): GroupedEvent[] {
     const better = days.some((o) => o !== one && alive.has(o) && o.code === one.code && o.kind === one.kind && o.channels.size >= 2 && dayDiff(o.date, one.date) <= NEAR_DAYS);
     if (better) alive.delete(one);
   }
-  // ③ 한 번뿐인 일(실적 · 매출 · 주총 · 공개 · 출시)이 가까운 날 한 채널씩 두 줄이면 먼저 짚인 줄 하나만 — 삼성전자 '3분기 잠정실적 발표'가
-  //    10/7 · 10/8 두 줄로 섰다(2026-10-05 점검). 배당 · 증자처럼 날마다 다른 절차가 이어지는 종류는 합치지 않는다.
-  const singles = [...alive].filter((a) => a.precision === "day" && a.channels.size === 1 && ONE_SHOT.has(a.kind));
-  singles.sort((a, b) => (a.firstSeen < b.firstSeen ? -1 : a.firstSeen > b.firstSeen ? 1 : a.date < b.date ? -1 : 1));
-  for (const one of singles) {
+  // ③ 한 번뿐인 일(실적 · 매출 · 주총 · 공개 · 출시 · 인수)이 가까운 날 여러 줄이면 채널이 가장 많은 줄(같으면 먼저 짚인 줄) 하나만 —
+  //    삼성전자 '3분기 잠정실적 발표'가 10/7(2곳) · 10/8(11곳) 두 줄로 섰다(2026-10-05 점검). 채널은 합치지 않는다(다른 날을 말한 채널이다).
+  //    배당 · 증자처럼 날마다 다른 절차가 이어지는 종류는 이 규칙을 안 탄다.
+  const shots = [...alive].filter((a) => a.precision === "day" && ONE_SHOT.has(a.kind));
+  shots.sort((a, b) => b.channels.size - a.channels.size || (a.firstSeen < b.firstSeen ? -1 : a.firstSeen > b.firstSeen ? 1 : a.date < b.date ? -1 : 1));
+  for (const one of shots) {
     if (!alive.has(one)) continue;
-    for (const o of singles) {
+    for (const o of shots) {
       if (o !== one && alive.has(o) && o.code === one.code && o.kind === one.kind && dayDiff(o.date, one.date) <= NEAR_DAYS) alive.delete(o);
     }
   }
