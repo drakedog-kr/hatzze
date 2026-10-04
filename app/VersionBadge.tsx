@@ -224,7 +224,7 @@ const BADGE_LIFT = Math.round(BADGE_SIZE / 2 - INK_TOP);
    링크의 aria-label 이 "새 업데이트가 있습니다" 로 말한다.
    ⛔ role="img" + aria-label 로 바꾸지 말 것 — 크롬은 안쪽 'N' 을 그대로 남긴다.
 
-   ⭐ 사이드바의 '테마 리포트' 옆에도 이 표식이 선다(AppShell). 거기는 위첨자로 올릴 값이 다르므로
+   ⭐ 사이드바의 새 화면 옆에도 이 표식이 선다(AppShell 의 isNew — 2026-10-04 테마 리포트에서 떼어 지금은 단 곳이 없다). 거기는 위첨자로 올릴 값이 다르므로
       끌어올리는 양을 **밖에서 준다** — 푸터는 lift={BADGE_LIFT}(11px 글자 기준), 사이드바는 자리를
       절대 좌표로 잡아 0 이다. 동그라미 안에서 'N' 을 가운데 두는 셈(BADGE_LINE_HEIGHT)은 두 곳이 같다. */
 export function NewBadge({ lift = 0 }: { lift?: number }) {

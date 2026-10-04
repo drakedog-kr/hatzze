@@ -8,7 +8,7 @@ import { PageJsonLd } from "./JsonLd";
 import { NOTE_PAGE } from "./daily/copy";
 import { DIVIDEND_PAGE } from "./dividend/copy";
 import { KR_THEME_SHORT, THEME_PAGE, US_THEME_PAGE } from "./theme/copy";
-import { DAILY_PUBLIC, DIVIDEND_PUBLIC, THEME_NAV_NEW, THEME_PUBLIC } from "./screen-flags";
+import { DAILY_PUBLIC, DIVIDEND_PUBLIC, THEME_PUBLIC } from "./screen-flags";
 import { DOC_PAGES } from "./legal";
 import { THEME_NAMES, US_THEME_NAMES, themeHref, usThemeHref } from "@/lib/theme-href";
 import { ShellEnvContext, useShellEnv, type ShellEnv } from "./shell-env";
@@ -207,7 +207,10 @@ type NavItem = {
   Glyph?: Glyph;
   sub: string;
   badge?: string;
-  /** 라벨 옆 빨간 N — 새로 생긴 화면이라는 표식(app/screen-flags.ts 의 THEME_NAV_NEW). 기한이 없어 뗄 때 그 줄을 지운다. */
+  /**
+   * 라벨 옆 빨간 N — 새로 생긴 화면이라는 표식. 기한이 없어(푸터 배지처럼 저절로 안 꺼진다) 켤 땐 NAV 항목에 이 값을 직접 적고, 뗄 땐 그 줄을 지운다.
+   * 테마 리포트에 2026-09-23 오픈부터 달았다가 2026-10-04 뗐다(v2.0.0).
+   */
   isNew?: boolean;
   children?: NavChild[];
 };
@@ -250,8 +253,6 @@ function buildNav(themeNav: boolean): NavItem[] {
           label: THEME_PAGE.label,
           icon: THEME_PAGE.icon,
           sub: THEME_PAGE.sub,
-          // 새로 생긴 화면 표식(빨간 N). 기한 없이 켜 두고, 뗄 때 screen-flags.ts 의 THEME_NAV_NEW 를 지운다.
-          isNew: THEME_NAV_NEW,
           children: [
             { label: KR_THEME_SHORT, href: THEME_PAGE.href, Glyph: KrTrigramsIcon },
             { label: US_THEME_PAGE.short, href: US_THEME_PAGE.href, Glyph: UsEmpireIcon, sub: US_THEME_PAGE.sub },
