@@ -1206,9 +1206,10 @@ export function CurrencyToggle({ fallback }: { fallback: "krw" | "usd" }) {
  * ⚠️ 기본값은 CSS 에도 적혀 있다(`[data-cur-default]`, globals.css). **두 곳이 같아야
  *    한다** — 갈리면 서버가 그린 화면과 스위치의 눌린 칸이 어긋난다.
  */
-const CURRENCY_PAGES: { prefix: string; fallback: "krw" | "usd" }[] = [
+const CURRENCY_PAGES: { prefix: string; fallback: "krw" | "usd"; except?: RegExp }[] = [
   // 재료가 전부 미국 공시라 달러가 원본이고, 원화는 크기를 가늠하라고 얹은 것이다.
-  { prefix: "/insider", fallback: "usd" },
+  // 돈 값이 없는 전체보기(의원 · 늘린 · 줄인 · 증권가)는 뺀다 — 눌러도 바뀌는 것이 없었다(2026-10-05 점검, 띠 스위치와 같은 목록).
+  { prefix: "/insider", fallback: "usd", except: /^\/insider\/list\/(congress|adds|trims|analyst)(\/|$)/ },
 ];
 
 /* 채널 등록 신청(.hz-btn-soft, 탑바)이 여기 있었다. 국장 카더라 히어로의 큰 단추 → 탑바 → **국장 '채널 파워 랭킹' 카드 머리**로
@@ -1268,7 +1269,7 @@ function PageTools({ inHead = false }: { inHead?: boolean }) {
     <>
       {/* 쿠키로 고른 게 없으면 그 화면의 기본값을 눌린 칸으로 쓴다. */}
       {(() => {
-        const page = CURRENCY_PAGES.find((p) => pathname.startsWith(p.prefix));
+        const page = CURRENCY_PAGES.find((p) => pathname.startsWith(p.prefix) && !p.except?.test(pathname));
         return page ? <CurrencyToggle key={page.prefix} fallback={page.fallback} /> : null;
       })()}
       {/* 안 연 동안 배포에서는 /theme 가 404 라 단추도 내지 않는다(themeNav — ShellEnv 주석).

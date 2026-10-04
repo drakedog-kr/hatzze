@@ -39,7 +39,8 @@ function Row({
   const showName = !ticker || name.toUpperCase() !== ticker.toUpperCase();
   return (
     <li>
-      <Link href={href} className="v2-in-row" data-ga={ga}>
+      {/* 사람이 주인공인 줄(로고 없음)은 폰 둘째 줄을 들여 쓰지 않는다(v2.css .v2-in-row.is-person). */}
+      <Link href={href} className={`v2-in-row${ticker ? "" : " is-person"}`} data-ga={ga}>
         <span className="v2-in-rank">{rank}</span>
         <span className="v2-in-who">
           {ticker && <StockLogo code={ticker} name={name} market="US" size={20} />}
@@ -90,8 +91,9 @@ export function congressLines(rows: CongressTicker[]) {
       aux={`의원 ${c.members}명`}
       value={
         <span className="v2-in-pair-n">
-          {c.buys > 0 && <span className="is-up">매수 {c.buys}</span>}
-          {c.sells > 0 && <span className="is-down">매도 {c.sells}</span>}
+          {/* '건' — 옆 '의원 10명'과 붙어 '매도 10'이 사람 수로 읽혔다(2026-10-05 점검). 굵기는 500(방향은 색이 말한다). */}
+          {c.buys > 0 && <span className="is-up">매수 {c.buys}건</span>}
+          {c.sells > 0 && <span className="is-down">매도 {c.sells}건</span>}
         </span>
       }
       ga="insider_congress_click"
@@ -191,7 +193,13 @@ export function LeanRows({ rows }: { rows: InsiderLeanRow[] }) {
       {rows.map((r) => {
         const total = r.left + r.right;
         const lp = total > 0 ? (r.left / total) * 100 : 0;
-        const n = (v: number) => `${v.toLocaleString("ko-KR")}${r.unit}`;
+        // 단위는 굵게 하지 않는다 — 숫자만 b(2026-10-05 점검).
+        const n = (v: number) => (
+          <>
+            <b>{v.toLocaleString("ko-KR")}</b>
+            {r.unit}
+          </>
+        );
         return (
           <div key={r.key} className="v2-in-lean-row">
             <div className="v2-in-lean-head">
@@ -204,10 +212,10 @@ export function LeanRows({ rows }: { rows: InsiderLeanRow[] }) {
             </div>
             <div className="v2-in-lean-legend">
               <span className="is-up">
-                {r.leftLabel} <b>{n(r.left)}</b>
+                {r.leftLabel} {n(r.left)}
               </span>
               <span className="is-down">
-                {r.rightLabel} <b>{n(r.right)}</b>
+                {r.rightLabel} {n(r.right)}
               </span>
             </div>
           </div>

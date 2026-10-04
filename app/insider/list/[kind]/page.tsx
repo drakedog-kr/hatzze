@@ -17,6 +17,7 @@ import {
   WIDE_COLS,
   WideHead,
   insiderNote,
+  quarterLabel,
   wideAnalystRows,
   wideCongressRows,
   wideExecRows,
@@ -137,7 +138,8 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
             total: sold.length,
             cols: WIDE_COLS.exec,
             heads: ["종목", "신고", "금액"],
-            note: "옵션 행사 · 증여 · 원천징수 포함",
+            // 구분 '·'과 목록 '·'이 같은 꼴이라 네 덩어리로 읽혔다(2026-10-05 점검).
+            note: "옵션 행사 등 포함",
           },
         ];
       }
@@ -159,7 +161,7 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
             items: wideCongressRows(cut(bought), "buy"),
             total: bought.length,
             cols: WIDE_COLS.congress,
-            heads: ["종목", "의원 · 건수", "의원"],
+            heads: ["종목", "의원 · 건수", "의원 수"],
           },
           {
             title: "의원이 판 종목",
@@ -168,7 +170,7 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
             items: wideCongressRows(cut(sold), "sell"),
             total: sold.length,
             cols: WIDE_COLS.congress,
-            heads: ["종목", "의원 · 건수", "의원"],
+            heads: ["종목", "의원 · 건수", "의원 수"],
           },
         ];
       }
@@ -237,11 +239,44 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
         return ov.congressAsOf ? `${koWd(ov.congressAsOf)} 신고까지` : "신고 준비 중";
       case "analyst":
         return ov.analystAsOf ? `${koWd(ov.analystAsOf)} 받음` : "받은 날 없음";
+      case "adds":
+      case "trims":
+        // 무엇과 견줬나 — 기준 칸의 분기('2026 Q2')를 되풀이하지 않고 비교 분기를 적는다(머리 근거의 '직전 분기말 대비'를 옮겼다, 2026-10-05 점검).
+        return ov.compareQuarters.length === 2 ? `${quarterLabel(ov.compareQuarters[0])} 말 대비` : "직전 분기말 대비";
       default:
-        // 분기 축(늘린 · 줄인 · 거물 명단) — 13F 분기.
-        return ov.compareQuarters.length === 2 ? `13F ${note} 신고` : "13F 신고";
+        // 거물 명단 — 분기 신고. '13F'(SEC 서식 이름)는 본 화면에 없는 말이라 뗐다(2026-10-05 점검).
+        return ov.compareQuarters.length === 2 ? `${note} 신고` : "분기 신고";
     }
   })();
+  // 기준 칸 — 날짜는 업데이트 칸이 말하므로 여기는 기간 · 문턱만, 숫자만 굵게(날짜 · 단위는 굵게 하지 않는다, 2026-10-05 점검).
+  const coverBasis = ((): React.ReactNode => {
+    switch (kind as InsiderListSlug) {
+      case "exec":
+        return (
+          <>
+            기간 <b>{ov.windowDays}</b>일
+          </>
+        );
+      case "congress":
+        return (
+          <>
+            기간 <b>{ov.congressWindowDays}</b>일
+          </>
+        );
+      case "analyst":
+        return (
+          <>
+            애널리스트 <b>10</b>명 이상
+          </>
+        );
+      case "managers":
+        return null;
+      default:
+        return <b>{note}</b>;
+    }
+  })();
+  // 돈 값이 있는 목록만 통화 스위치 — 의원 · 늘린 · 줄인 · 증권가는 눌러도 바뀌는 것이 없었다(2026-10-05 점검, AppShell 탑바도 같은 목록).
+  const hasMoney = kind === "exec" || kind === "managers";
 
   /** 잘렸으면 **알약이 그 사실을 적는다.** "전체보기"라 해 놓고 조용히 100개만 내면 거짓말이 된다. */
   const countNote = (total: number, shown: number, unit = "개") =>
@@ -262,13 +297,15 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
       <BackTrail parent={{ name: "내부자 리포트", href: "/insider" }} current={spec.title} />
 
       <div className="v2-cover">
-        <div className="v2-cover-cell">
-          <span className="v2-cover-k">기준</span>
-          <span className="v2-cover-v">
-            <b>{note}</b>
-          </span>
-        </div>
-        {ov.usdKrw != null && (
+        {coverBasis && (
+          <div className="v2-cover-cell">
+            <span className="v2-cover-k">기준</span>
+            <span className="v2-cover-v">
+              <span>{coverBasis}</span>
+            </span>
+          </div>
+        )}
+        {ov.usdKrw != null && hasMoney && (
           <div className="v2-cover-cell v2-in-cur">
             <span className="v2-cover-k">통화</span>
             <CurrencyToggle fallback="usd" />
@@ -284,7 +321,10 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
           title={card.title}
           // ⚠️ 잘렸으면 머리 근거가 그 사실을 적는다("1,000개 중 100개") — "전체보기"라 해 놓고 조용히 100개만 내면 거짓말이 된다.
           // 셈법 한 마디는 머리 근거 끝에 그대로(물음표 말풍선이던 것, 2026-10-04). 카드 부제(설명 문장)는 걷었다(v2).
-          meta={[countNote(card.total, card.items.length, card.unit), card.note ?? spec.note].filter(Boolean).join(" · ")}
+          // 증권가는 문턱('애널리스트 10명 이상')을 기준 칸이 말한다 · 늘린 · 줄인은 비교 분기를 업데이트 칸이 말한다.
+          meta={[countNote(card.total, card.items.length, card.unit), card.note ?? (kind === "analyst" || kind === "adds" || kind === "trims" ? null : spec.note)]
+            .filter(Boolean)
+            .join(" · ")}
           className="v2-in-listmod"
         >
           {card.items.length === 0 ? (

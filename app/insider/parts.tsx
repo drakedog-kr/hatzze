@@ -207,29 +207,6 @@ export function moveBadge(
 }
 
 /**
- * "카더라 언급" 알약 — **회색이다.** 이 화면에서 색은 방향(사고 판 것)이 갖는다.
- *
- * ⚠️ 파랑이었는데 방향의 파랑(`cold`)과 라이트에서 **같은 값**이라(둘 다 `#e8f3fe`),
- *    한 줄에 나란히 서면 색으로 안 갈렸다 — 버핏 페이지 BAC 행이 "6% 줄임"과
- *    "카더라 언급" 둘 다 파랑이었다. 색은 방향에만 남기고 이 표시는 회색으로 내렸다.
- *
- * ⚠️ 여섯 자리가 이 알약을 쓴다. 자리마다 `<Pill>` 을 손으로 적으면 한 곳을 고칠 때
- *    나머지가 남는다 — 실제로 툴팁이 두 자리에만 붙어 있었다.
- *
- * ⚠️ **하루치다.** `ourTickers` 가 `telegram_us_stock_daily` 를 `.eq("date", mentionDate)`
- *    로 하루만 읽는다. 툴팁이 "최근 언급된 적이 있는" 이었는데 그건 쌓인 기간으로 읽혀서
- *    실물보다 넓었다 — 8/25 하루가 107종목인데 최근 7일이면 160종목이라, 기간으로
- *    읽으면 53종목이 빠져 보인다(2026-08-25 실측). 하루로 두기로 하고 문구를 좁혔다.
- */
-export function KaderaPill() {
-  return (
-    <Pill tone="plain" title="오늘 주식 텔레그램에서 언급된 종목입니다">
-      카더라 언급
-    </Pill>
-  );
-}
-
-/**
  * 한 종목의 코드 묶음을 한 줄로 편다 — "세금 원천징수 9 · 장내 매도 2".
  *
  * ⚠️ 종류가 서넛까지 가는데(루멘텀이 F·A·S 셋) 다 적으면 줄이 넘친다. 많은 순으로
@@ -886,14 +863,16 @@ export function MarkBadges({ id }: { id: string }) {
  *
  * 더 알고 싶으면 종목·인물 상세로 간다. 목록은 **고르는 자리**이지 읽는 자리가 아니다.
  */
+/* 첫 칸은 고정 폭 — 비율(1.2fr)이면 이름 뒤 · 가운데 칸 뒤에 270~470px 가 비었다. 본 화면 줄처럼 이름 → 곁말 → 값(2026-10-05 점검).
+   가장 긴 'MSFT 마이크로소프트'가 약 220px. */
 export const WIDE_COLS = {
-  exec: "minmax(220px, 1.2fr) minmax(0, 1.9fr) 128px",
-  congress: "minmax(220px, 1.2fr) minmax(0, 1.9fr) 96px",
-  move: "minmax(220px, 1.2fr) minmax(0, 1.9fr) 96px",
+  exec: "240px minmax(0, 1fr) 128px",
+  congress: "240px minmax(0, 1fr) 96px",
+  move: "240px minmax(0, 1fr) 96px",
   /** 거물 명단. 사람이 주인공이라 첫 칸이 이름, 둘째가 대표 보유, 끝이 금액이다. */
-  managers: "minmax(200px, 1.1fr) minmax(0, 1.6fr) 92px 124px",
+  managers: "200px minmax(0, 1fr) 92px 124px",
   /** 증권가 순위. 끝 칸이 "62명 중 49명"이라 다른 표의 금액 칸보다 넓어야 한다. */
-  analyst: "minmax(220px, 1.2fr) minmax(0, 1.6fr) 132px",
+  analyst: "240px minmax(0, 1fr) 132px",
 } as const;
 
 export function WideHead({ cols, labels }: { cols: string; labels: (string | null)[] }) {
@@ -980,7 +959,8 @@ export function wideExecRows(rows: InsiderActivity[], rate: number | null, side:
           <WideStock key="s" ticker={b.ticker} name={b.name} />,
           text(
             // 날짜는 그 방향 신고의 마지막 접수일(InsiderActivity.boughtFiled · disposedFiled).
-            `${side === "buy" ? `장내 매수 ${b.buyCount}건` : codeSummary(b.codes)} · ${
+            // '임원 N명' — 본 화면과 같은 말('5명'만이면 무엇의 수인지 없었다, 2026-10-05 점검).
+            `${side === "buy" ? `장내 매수 ${b.buyCount}건` : codeSummary(b.codes)} · 임원 ${
               side === "buy" ? b.buyPeople : b.sellPeople
             }명 · ${fmtDate((side === "buy" ? b.boughtFiled : b.disposedFiled) ?? b.filedDate)} 접수`,
             "left",
@@ -1017,7 +997,10 @@ export function wideManagerRows(rows: ManagerRank[], rate: number | null) {
               .join(" · ") || m.firm,
             "left",
           ),
-          num(<>{m.holdings}<span style={{ ...ROW.sub }}>종목</span></>),
+          // 보유 수는 500 — 이름 · 보유 수 · 금액 셋이 굵어 한 줄에 굵은 덩어리가 셋이었다(2026-10-05 점검).
+          <span key="h" style={{ ...ROW.sub, color: C.ink, textAlign: "right", whiteSpace: "nowrap" }}>
+            {m.holdings}종목
+          </span>,
           num(<Money usd={m.aum} rate={rate} />),
         ]}
       />
@@ -1035,14 +1018,10 @@ export function wideAnalystRows(rows: AnalystTop[]) {
           cols={WIDE_COLS.analyst}
           cells={[
             <WideStock key="s" ticker={a.ticker} name={a.name} />,
-            <span key="b" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-              <span className="hz-bar v2-in-ratio" style={{ flex: 1, height: 7 }}>
-                <span style={{ width: `${Math.max(1.5, Math.min(100, share))}%` }} />
-              </span>
-              {/* 본 화면과 같은 꼴 — 'N명 중 적극 매수 M명' · 비율. 등급(매수)을 옆에 두었더니 폰에서 '매수 26명 중 14명'으로 읽혔다(2026-10-04 점검). */}
-              <span style={{ ...ROW.sub, whiteSpace: "nowrap", flexShrink: 0 }}>
-                {a.analystCount}명 중 적극 매수 {a.strongBuy}명
-              </span>
+            // 비율 막대는 걷었다 — 상위 열이 76~82% 라 줄마다 같은 길이로 보였고, 같은 값을 글자 · 끝 칸이 이미 말한다(2026-10-05 점검).
+            // 본 화면과 같은 꼴 — 'N명 중 적극 매수 M명'. 등급(매수)을 옆에 두었더니 폰에서 '매수 26명 중 14명'으로 읽혔다(2026-10-04 점검).
+            <span key="b" style={{ ...ROW.sub, minWidth: 0 }}>
+              {a.analystCount}명 중 적극 매수 {a.strongBuy}명
             </span>,
             num(`${Math.round(share)}%`),
           ]}
@@ -1060,7 +1039,8 @@ export function wideCongressRows(rows: CongressTicker[], side: "buy" | "sell") {
         <WideRow
           cols={WIDE_COLS.congress}
           cells={[
-            <WideStock key="s" ticker={c.ticker} name={c.name} badge={c.inKadera ? <KaderaPill /> : undefined} />,
+            // '카더라 언급' 알약은 걷었다 — 본 화면 줄엔 없고, 한 줄에 굵은 덩어리가 셋이었다(2026-10-05 점검).
+            <WideStock key="s" ticker={c.ticker} name={c.name} />,
             // 이름 · 건수 · 그 방향의 마지막 거래일을 한 칸에. 값 칸은 정렬 기준인 그 방향 의원 수 — 건수를 두었더니 의원 수 순인데
             // 값이 9 · 7 · 6 · 4 … 5건으로 들쭉날쭉해 순서가 틀려 보였다(2026-10-04 점검). 날짜는 산 카드엔 마지막 매수일.
             text(

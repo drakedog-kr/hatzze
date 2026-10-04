@@ -86,7 +86,10 @@ export default async function InsiderPage() {
             <span key={k} className="v2-cover-v">
               <em>{k}</em>
               {/* 신고서 수는 '장' — 아래 매매 방향의 '건'(거래 줄 · 거물×종목)과 다른 것을 센다(2026-10-04 점검). */}
-              <b>{f.count.toLocaleString("ko-KR")}장</b>
+              {/* 단위('장')는 굵게 하지 않는다(2026-10-05 점검). */}
+              <span className="v2-nowrap">
+                <b>{f.count.toLocaleString("ko-KR")}</b>장
+              </span>
               {f.date && <span className="v2-cover-chg">{fmtDate(f.date)}</span>}
             </span>
           ))}
@@ -99,11 +102,8 @@ export default async function InsiderPage() {
             <CurrencyToggle fallback="usd" />
           </div>
         )}
-        <CoverMeta
-          updated={ov.asOf ? `${koDay(ov.asOf)} 공시까지` : "공시 준비 중"}
-          // 축마다 보는 기간 — '최근 90일 임원 1,243명'을 적었더니 바로 아래 임원 모듈 · 브리핑의 7일과 어긋났다(2026-10-04 점검).
-          basis={`임원 ${ov.windowDays}일 · 의원 ${ov.congressWindowDays}일 · 거물 분기`}
-        />
+        {/* 축마다 보는 기간(임원 7일 · 의원 90일 · 거물 분기)은 걷었다 — 모듈 머리 · 매매 방향 · 브리핑이 저마다 말해 첫 화면에 '90일'이 네 번 섰다(2026-10-05 점검). */}
+        <CoverMeta updated={ov.asOf ? `${koDay(ov.asOf)} 공시까지` : "공시 준비 중"} />
       </div>
 
       {/* 둘째 줄 — 매매 방향(숫자) | 오늘의 브리핑(종목). 계산 문장이라 AI 표시가 없다.
