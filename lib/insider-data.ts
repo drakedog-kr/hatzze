@@ -42,6 +42,7 @@ import { usQuotes } from "@/lib/us-telegram-data";
 import { displayName } from "@/lib/us-ticker-names";
 import { canonicalTicker } from "@/lib/us-ticker-spellings";
 import { holdersByTicker, managerMoves, type MoveSide } from "@/lib/insider-13f";
+import { sellSize } from "@/lib/insider-brief";
 
 /**
  * 공시 집계 창. 파이프라인(fetch_us_insider.py 의 WINDOW_DAYS)과 **반드시 같아야 한다.**
@@ -259,6 +260,11 @@ export type InsiderOverview = {
    *   갈리는 순간 개수가 조용히 0 이 된다. 받아 온 행의 최대 접수일에서 직접 센다.
    */
   latestInsiderFilings: { date: string | null; count: number };
+  /**
+   * 최근 7일 장내에서 판 임원을 보유 주식 가운데 판 몫(10% 미만 · 이상)으로 가른 사람 수. 본 화면 '매매 방향'의 임원 줄이다
+   * (2026-10-04 — 장내 매수 · 처분 금액은 매수가 한 주에 한두 종목이라 막대가 늘 한쪽으로 쏠렸다). 셈법은 lib/insider-brief.ts sellSize.
+   */
+  execSellSize: { under: number; over: number };
   /** 위와 같은 규칙, 의원 쪽(PTR 문서 수). */
   latestCongressFilings: { date: string | null; count: number };
   /** 추적 중인 거물 수. 화면의 "N명 중" 분모다. */
@@ -392,6 +398,7 @@ const EMPTY: InsiderOverview = {
   buys: [],
   mentionedCount: 0,
   latestInsiderFilings: { date: null, count: 0 },
+  execSellSize: { under: 0, over: 0 },
   latestCongressFilings: { date: null, count: 0 },
   managerCount: 0,
   failedSources: [],
@@ -755,6 +762,7 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
   // 임원 신고를 **종목 하나로** 묶는다. 규칙은 InsiderActivity 주석 참고.
   let buys: InsiderActivity[] = [];
   let latestInsiderFilings: { date: string | null; count: number } = { date: null, count: 0 };
+  let execSellSize = { under: 0, over: 0 };
   if (asOf) {
     const from = new Date(`${asOf}T00:00:00Z`);
     from.setUTCDate(from.getUTCDate() - (INSIDER_RECENT_DAYS - 1));
@@ -772,17 +780,23 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
       transaction_code: string | null;
       acquired_disposed: string | null;
       accession_no: string;
+      seq: number;
+      shares_after: number | null;
+      transaction_date: string | null;
     }>(
       "seq",
       () =>
         db
           .from("us_insider_txn")
-          .select("ticker,owner_name,shares,price,filed_date,transaction_code,acquired_disposed,seq,accession_no")
+          .select("ticker,owner_name,shares,price,filed_date,transaction_code,acquired_disposed,seq,accession_no,shares_after,transaction_date")
           .gte("filed_date", from.toISOString().slice(0, 10))
           .lte("filed_date", asOf)
           .order("accession_no"),
       { onError: failed("임원 신고") },
     );
+
+    // 장내에서 판 임원의 판 몫 — 같은 조회를 다시 쓴다(칸 둘 shares_after · transaction_date 만 더 받는다).
+    execSellSize = sellSize(rows);
 
     // 마지막 접수일과 그날 들어온 **신고서** 수. 위 조회를 다시 쓰므로 왕복이 늘지 않는다.
     const lastFiled = rows.reduce<string | null>((m, r) => (m && m >= r.filed_date ? m : r.filed_date), null);
@@ -920,6 +934,7 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
     buys,
     mentionedCount: rows.length,
     latestInsiderFilings,
+    execSellSize,
     latestCongressFilings,
     managerCount: managerRows.length,
     usdKrw: fx?.now ?? null,

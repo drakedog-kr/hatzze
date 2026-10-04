@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { insiderBrief, insiderLean, type InsiderBriefRow } from "../lib/insider-brief.ts";
+import { insiderBrief, insiderLean, sellSize, type InsiderBriefRow, type InsiderSellRow } from "../lib/insider-brief.ts";
 import type { CongressTicker, InsiderActivity, ManagerMove } from "../lib/insider-data.ts";
 
 const exec = (ticker: string, bought: number, disposed: number, name = ticker): InsiderActivity => ({
@@ -51,6 +51,7 @@ const base = {
   windowDays: 7,
   congressWindowDays: 90,
   buys: [] as InsiderActivity[],
+  execSellSize: { under: 0, over: 0 },
   congressTickers: [] as CongressTicker[],
   managerAdds: [] as ManagerMove[],
   managerTrims: [] as ManagerMove[],
@@ -61,22 +62,65 @@ const base = {
 const text = (r: InsiderBriefRow) => r.parts.map((p) => (typeof p === "string" ? p : `[${p.name}]`)).join("");
 const row = (rows: InsiderBriefRow[], key: InsiderBriefRow["key"]) => rows.find((r) => r.key === key)!;
 
+describe("sellSize — 임원이 판 몫", () => {
+  const s = (owner: string, ticker: string, shares: number, after: number | null, date: string, acc = "a", seq = 0, code = "S"): InsiderSellRow => ({
+    ticker,
+    owner_name: owner,
+    shares,
+    shares_after: after,
+    transaction_code: code,
+    transaction_date: date,
+    accession_no: acc,
+    seq,
+  });
+
+  it("사람(같은 종목) 하나가 한 칸 — 판 주식 합 ÷ (합 + 마지막 줄의 남은 주식)", () => {
+    const r = sellSize([
+      // 가격대별로 다섯 줄에 나눠 절반을 판 사람 — 줄마다 재면 10% 미만이지만 합치면 50%.
+      s("갑", "AAA", 100, 400, "2026-10-01", "a", 0),
+      s("갑", "AAA", 100, 300, "2026-10-01", "a", 1),
+      s("갑", "AAA", 100, 200, "2026-10-01", "a", 2),
+      s("갑", "AAA", 100, 100, "2026-10-01", "a", 3),
+      s("갑", "AAA", 100, 500, "2026-09-30", "b", 0), // 날짜가 더 이르다 — 마지막 줄이 아니다
+      // 조금 판 사람
+      s("을", "BBB", 10, 990, "2026-10-01"),
+      // 같은 사람이라도 종목이 다르면 다른 칸
+      s("을", "CCC", 50, 50, "2026-10-01"),
+    ]);
+    assert.deepEqual(r, { under: 1, over: 2 });
+  });
+
+  it("장내 매도(S)가 아닌 줄 · 이름 없는 줄 · 남은 주식을 모르는 줄은 안 센다", () => {
+    const r = sellSize([
+      s("갑", "AAA", 100, 0, "2026-10-01", "a", 0, "F"),
+      { ...s("을", "BBB", 100, 0, "2026-10-01"), owner_name: null },
+      s("병", "CCC", 100, null, "2026-10-01"),
+    ]);
+    assert.deepEqual(r, { under: 0, over: 0 });
+  });
+
+  it("딱 10% 는 '10% 이상'", () => {
+    assert.deepEqual(sellSize([s("갑", "AAA", 10, 90, "2026-10-01")]), { under: 0, over: 1 });
+  });
+});
+
 describe("insiderLean — 매매 방향", () => {
-  it("임원은 장내 매수 · 처분 금액, 의원은 건수, 거물은 늘린 쪽 · 줄인 쪽이 더 많은 종목 수", () => {
+  it("임원은 판 몫(사람 수), 의원은 건수, 거물은 늘린 쪽 · 줄인 쪽이 더 많은 종목 수", () => {
     const rows = insiderLean({
       ...base,
-      buys: [exec("A", 30, 0), exec("B", 0, 500), exec("C", 10, 5)],
+      buys: [exec("A", 30, 0), exec("B", 0, 500)],
+      execSellSize: { under: 41, over: 19 },
       congressTickers: [congress("X", 2, 3, 1), congress("Y", 1, 0, 4)],
       managerAdds: [move("M1", 3, 1), move("M2", 2, 2), move("M3", 1, 0)],
       managerTrims: [move("T1", 4, 0), move("M2", 2, 2)],
     });
     assert.deepEqual(
-      rows.map((r) => [r.key, r.span, r.buy, r.sell, r.unit]),
+      rows.map((r) => [r.key, r.tone, r.leftLabel, r.left, r.rightLabel, r.right, r.unit]),
       [
-        ["exec", "7일", 40, 505, "usd"],
-        ["congress", "90일", 3, 5, "건"],
+        ["exec", "size", "10% 미만", 41, "10% 이상", 19, "명"],
+        ["congress", "dir", "매수", 3, "매도", 5, "건"],
         // M2 는 늘린 · 줄인 거물이 같아 어느 쪽에도 안 든다.
-        ["managers", "2026 Q2", 2, 1, "종목"],
+        ["managers", "dir", "늘림", 2, "줄임", 1, "종목"],
       ],
     );
   });

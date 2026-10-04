@@ -4,7 +4,7 @@ import type { InsiderOverview } from "./insider-data";
  * 내부자 리포트 둘째 줄(2026-10-04) — [매매 방향 | 오늘의 브리핑]. 화면이 이미 가진 공시 숫자로 만든다.
  * LLM 을 쓰지 않아 AI 표시를 안 붙인다(MDD 낙폭 요약 app/mdd/shared.ts mddSummary 와 같다).
  *
- * 숫자는 왼쪽 '매매 방향'(insiderLean) — 축마다 산 쪽 · 판 쪽 합계를 한 막대에 가른다. 문장은 오른쪽 '오늘의 브리핑'(insiderBrief) —
+ * 숫자는 왼쪽 '매매 방향'(insiderLean) — 축마다 두 쪽을 한 막대에 가른다(임원은 판 몫, 의원 · 거물은 산 쪽 · 판 쪽). 문장은 오른쪽 '오늘의 브리핑'(insiderBrief) —
  * 그 숫자를 되읽지 않고 **종목**을 적는다. 처음엔 브리핑 한 장에 합계까지 문장으로 넣었더니 숫자가 문장 속에 묻혀 글 덩어리로 읽혔다
  * ("엉성하다", 같은 날).
  *
@@ -17,22 +17,74 @@ import type { InsiderOverview } from "./insider-data";
 
 type BriefInput = Pick<
   InsiderOverview,
-  "windowDays" | "congressWindowDays" | "buys" | "congressTickers" | "managerAdds" | "managerTrims" | "compareQuarters" | "scale"
+  "windowDays" | "congressWindowDays" | "buys" | "execSellSize" | "congressTickers" | "managerAdds" | "managerTrims" | "compareQuarters" | "scale"
 >;
+
+/* ── 임원이 판 몫 ───────────────────────────────────────────────────── */
+
+/** 보유 주식의 이만큼 이상을 팔면 '10% 이상' 쪽. */
+export const SELL_BIG_FRAC = 0.1;
+
+/** 임원 신고 한 줄 중 판 몫을 재는 데 쓰는 칸(us_insider_txn). */
+export type InsiderSellRow = {
+  ticker: string;
+  owner_name: string | null;
+  shares: number | null;
+  shares_after: number | null;
+  transaction_code: string | null;
+  transaction_date: string | null;
+  accession_no: string;
+  seq: number;
+};
+
+/**
+ * 장내에서 판(S) 임원을 **보유 주식 가운데 판 몫**으로 가른다 — 사람 하나(같은 종목)가 한 칸.
+ * 판 몫 = 판 주식 합 ÷ (판 주식 합 + 마지막 매도 뒤 남은 주식). 임원 매도는 대부분 거래일 · 신고서 · 줄 순서대로 한 보유분에서 나가
+ * 마지막 줄의 '남은 주식'이 그 보유분의 끝값이다.
+ * ⚠️ 한 사람이 직접 · 신탁 등 보유분 여럿에서 나눠 팔면 원천이 보유분 이름을 안 줘 마지막 줄 보유분 하나로 잰다 — 몫이 실제와 다를 수 있다.
+ * ⚠️ 줄마다 몫을 재면 안 된다 — 한 번 판 것을 가격대별로 스무 줄에 나눠 신고하면 줄마다 2~5%라 절반을 판 사람도 '10% 미만'이 된다.
+ * 금액이 아니라 사람 수라 한쪽으로 쏠리지 않는다(2026-09-05~10-02 네 주 실측 — 10% 이상 19 · 32 · 38 · 38명, 미만 41 · 32 · 63 · 46명).
+ */
+export function sellSize(rows: InsiderSellRow[]): { under: number; over: number } {
+  const byOwner = new Map<string, InsiderSellRow[]>();
+  for (const r of rows) {
+    if (r.transaction_code !== "S" || !r.owner_name) continue;
+    const k = `${r.owner_name}|${r.ticker}`;
+    const list = byOwner.get(k) ?? [];
+    list.push(r);
+    byOwner.set(k, list);
+  }
+  let under = 0;
+  let over = 0;
+  for (const list of byOwner.values()) {
+    list.sort(
+      (a, b) =>
+        (a.transaction_date ?? "").localeCompare(b.transaction_date ?? "") || a.accession_no.localeCompare(b.accession_no) || a.seq - b.seq,
+    );
+    const sold = list.reduce((s, r) => s + (r.shares ?? 0), 0);
+    const after = list[list.length - 1].shares_after;
+    if (after == null || sold + after <= 0) continue;
+    if (sold / (sold + after) >= SELL_BIG_FRAC) over += 1;
+    else under += 1;
+  }
+  return { under, over };
+}
 
 /* ── 매매 방향 ──────────────────────────────────────────────────────── */
 
-/** 한 축의 산 쪽 · 판 쪽. unit 이 "usd" 면 금액(화면이 통화 스위치대로 그린다), 아니면 그 단위의 개수. */
+/** 한 축의 두 쪽 — 막대 왼쪽 · 오른쪽 토막과 그 아래 두 값. */
 export type InsiderLeanRow = {
   key: "exec" | "congress" | "managers";
   label: string;
-  /** 축의 기간 — '7일' · '90일' · '2026 Q2'. */
+  /** 축의 기간 — '7일' · '90일' · '2026 Q2'. 임원 줄은 무엇을 갈랐는지까지('7일 · 보유 중 판 몫'). */
   span: string;
-  buyLabel: string;
-  sellLabel: string;
-  buy: number;
-  sell: number;
-  unit: "usd" | "건" | "종목";
+  /** dir — 왼쪽 산 쪽(빨강) · 오른쪽 판 쪽(파랑). size — 둘 다 판 쪽이라 왼쪽 연한 파랑 · 오른쪽 진한 파랑. */
+  tone: "dir" | "size";
+  leftLabel: string;
+  rightLabel: string;
+  left: number;
+  right: number;
+  unit: "명" | "건" | "종목";
 };
 
 /** 분기 끝날('2026-06-30') → '2026 Q2'(모듈 머리 parts.tsx quarterLabel 과 같은 꼴). */
@@ -47,29 +99,36 @@ const netTrims = (ov: BriefInput) => ov.managerTrims.filter((m) => m.movers > m.
 const hasQuarters = (ov: BriefInput) => ov.compareQuarters.length === 2 && (netAdds(ov).length > 0 || netTrims(ov).length > 0);
 
 /**
- * 축 셋의 산 쪽 · 판 쪽. 임원은 금액(장내 매수 P · 처분 D — InsiderActivity 의 두 합계), 의원은 건수, 거물은 늘린 쪽 · 줄인 쪽이
- * 더 많은 종목 수(13F 금액은 주가에 오염돼 사람 수로 센다 — ManagerMove 주석). 견줄 분기가 없으면 거물 줄은 빠진다.
+ * 축 셋의 두 쪽.
+ *  - 임원: 장내에서 판 임원을 보유 주식 가운데 판 몫 10% 미만 · 이상으로 가른 사람 수(sellSize).
+ *    ⛔ 장내 매수 · 처분 금액으로 두지 말 것 — 장내 매수가 한 주에 한두 종목이라($3.5M · $540.8M, 10-04 주) 막대가 늘 파랑 한 토막이었다
+ *       ("임원은 매수가 너무 적으니까 다른 걸로", 2026-10-04). 장내에서 산 종목은 브리핑 임원 줄이 적는다.
+ *  - 의원: 매수 · 매도 건수.
+ *  - 거물: 늘린 쪽 · 줄인 쪽이 더 많은 종목 수(13F 금액은 주가에 오염돼 사람 수로 센다 — ManagerMove 주석). 견줄 분기가 없으면 빠진다.
  */
 export function insiderLean(ov: BriefInput): InsiderLeanRow[] {
   const rows: InsiderLeanRow[] = [
     {
       key: "exec",
       label: "임원",
-      span: `${ov.windowDays}일`,
-      buyLabel: "장내 매수",
-      sellLabel: "처분",
-      buy: sum(ov.buys.map((b) => b.boughtValue)),
-      sell: sum(ov.buys.map((b) => b.disposedValue)),
-      unit: "usd",
+      // ⚠️ 216 칸(판 1,000 미만)에 두 값이 한 줄로 들어야 한다 — '보유 10% 미만 41명'이면 8px 모자랐다. '보유'는 머리로 올린다.
+      span: `${ov.windowDays}일 · 보유 중 판 몫`,
+      tone: "size",
+      leftLabel: `${Math.round(SELL_BIG_FRAC * 100)}% 미만`,
+      rightLabel: `${Math.round(SELL_BIG_FRAC * 100)}% 이상`,
+      left: ov.execSellSize.under,
+      right: ov.execSellSize.over,
+      unit: "명",
     },
     {
       key: "congress",
       label: "의원",
       span: `${ov.congressWindowDays}일`,
-      buyLabel: "매수",
-      sellLabel: "매도",
-      buy: sum(ov.congressTickers.map((c) => c.buys)),
-      sell: sum(ov.congressTickers.map((c) => c.sells)),
+      tone: "dir",
+      leftLabel: "매수",
+      rightLabel: "매도",
+      left: sum(ov.congressTickers.map((c) => c.buys)),
+      right: sum(ov.congressTickers.map((c) => c.sells)),
       unit: "건",
     },
   ];
@@ -78,10 +137,11 @@ export function insiderLean(ov: BriefInput): InsiderLeanRow[] {
       key: "managers",
       label: "거물",
       span: quarterShort(ov.compareQuarters[1]),
-      buyLabel: "늘림",
-      sellLabel: "줄임",
-      buy: netAdds(ov).length,
-      sell: netTrims(ov).length,
+      tone: "dir",
+      leftLabel: "늘림",
+      rightLabel: "줄임",
+      left: netAdds(ov).length,
+      right: netTrims(ov).length,
       unit: "종목",
     });
   }
