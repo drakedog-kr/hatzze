@@ -202,10 +202,10 @@ function NightModule({
         </div>
         {after ? (
           <dl className="v2-pv-after">
-            {/* ⚠️ 횟수("189번 뒤")가 아니라 기간(최근 5년)으로 — 사람이 아는 단위는 기간이다(2026-09-02). 날 수는 오른쪽에 작게. */}
+            {/* ⚠️ 횟수("189번 뒤")가 아니라 기간(최근 5년)으로 — 사람이 아는 단위는 기간이다(2026-09-02).
+                날 수(231일)는 걷었다 — 무엇을 센 날인지 안 읽혔다(2026-10-04 지적). '이런 날'이 위 큰 숫자를 가리킨다. */}
             <div className="v2-pv-after-head">
-              <dt>최근 5년 이만큼 {spx != null && spx > 0 ? "오른" : "내린"} 아침 코스피</dt>
-              <dd>{after[2]}일</dd>
+              <dt>최근 5년 이런 날 코스피</dt>
             </div>
             {/* ⭐ 라벨은 개장 · 장 중 · 종가(2026-09-02 확정). '개장 뒤'로 쓰지 말 것 — 개장 직후로 읽힌다. 아래 표와 같은 말이다. */}
             {([["개장", after[3]], ["장 중", after[4]], ["종가", after[5]]] as const).map(([label, v]) => (
@@ -239,7 +239,7 @@ function NightModule({
  * 사실상 개장가를 미리 아는 것에 가깝다. 그래서 더 조심한다 — "밖에서는 지금 얼마에 거래되고 있다" 는 사실만 적는다.
  * ⚠️ **견준 종가의 날짜를 함께 낸다**(값 칸 아래 'M/D 종가'). 그 종가가 직전 영업일 것이 아니면 퍼센트는 거짓인데
  *    화면에서는 그럴듯해 보인다. 날짜가 있어야 읽는 사람이 스스로 알아챈다.
- * ⚠️⚠️ **"국장 종가 대비" 머리를 지우지 말 것.** 시장이 둘이라(해외 선물 · 국내 종가) 라벨이 없으면 퍼센트가
+ * ⚠️⚠️ **"국장 대비" 머리를 지우지 말 것.** 시장이 둘이라(해외 선물 · 국내 종가) 라벨이 없으면 퍼센트가
  *    선물의 하루 등락으로 읽힌다.
  * ⚠️ 출처를 지우지 말 것 — 국내 거래소 값이 아니다. 거래소 이름은 머리 근거(Hyperliquid)에, 마켓 심볼은 이름 아래
  *    링크로 둔다. ⚠️ 심볼의 `xyz` 는 마켓을 띄운 **빌더의 이름**이라 화면에선 떼고, 주소 · GA 에는 그대로 쓴다
@@ -261,7 +261,8 @@ function OvernightModule({ overnight }: { overnight: OvernightData & { live: boo
         <div className="v2-pv-th">
           <span>종목</span>
           <span>해외 값</span>
-          <span>국장 종가 대비</span>
+          {/* '국장 대비'면 국장 종가와 견준 것으로 읽힌다 — '종가'까지 풀어 쓰면 길기만 했다(2026-10-04 지적). */}
+          <span>국장 대비</span>
           <span>24시간 거래</span>
         </div>
         <ol className="v2-tbody">
@@ -418,7 +419,7 @@ function zx(z: number): string {
  *    평소와 같다는 말로 읽혀 바꿨다(2026-10-03, 그날 다섯 중 셋이 1.0~1.1배).
  * ⭐ 묶음 순서는 **평소 폭 대비 큰 순**(z) — 등락률로 세우면 늘 변동성 큰 종목만 올라와 "평소와 달랐던 밤" 이 사라진다.
  */
-function MoverGroup({ m, when, span }: { m: PreviewMover; when: string; span: number }) {
+function MoverGroup({ m, when }: { m: PreviewMover; when: string }) {
   return (
     <li className="v2-pv-grp" id={`mv-${m.ticker}`}>
       <div className="v2-pv-us">
@@ -450,19 +451,7 @@ function MoverGroup({ m, when, span }: { m: PreviewMover; when: string; span: nu
                 </span>
                 {/* 관계는 짧은 꼬리표다 — 쌍마다 다른 개별 관계(사전의 why). */}
                 <span className="v2-pv-why">{l.why}</span>
-                {/* 개장 값의 0 중심 갈림 막대 — 관계 칸 뒤가 줄마다 360px 비던 자리(1440)다. 축은 이 표에서 가장 큰 개장 값. */}
-                <span className="v2-pv-bar" aria-hidden="true">
-                  {l.krOpen != null && l.krOpen !== 0 && (
-                    <i
-                      className={tone(l.krOpen).trim() || undefined}
-                      style={
-                        l.krOpen > 0
-                          ? { left: "50%", width: `${(l.krOpen / span) * 50}%` }
-                          : { right: "50%", width: `${(-l.krOpen / span) * 50}%` }
-                      }
-                    />
-                  )}
-                </span>
+                {/* ⛔ 개장 값 갈림 막대를 걷었다 — 축도 이름도 없어 무엇인지 안 읽혔다(2026-10-04 지적). 관계 칸이 남는 폭을 받는다. */}
                 <span className="v2-pv-nums">
                   {([["개장", l.krOpen], ["장 중", l.krIntra], ["종가", day]] as const).map(([label, v]) => (
                     <span key={label} className={`v2-td-num v2-td-chg${tone(v)}`} data-k={label}>
@@ -501,8 +490,6 @@ export default async function PreviewPage() {
   const when = usHoliday ? "밤사이" : sessionWord(date, usSession, usFrom);
   const movers = sectors.flatMap((s) => s.movers);
   const wall = [...movers].sort((a, b) => b.z - a.z);
-  // 갈림 막대 축 — 표 전체에서 가장 큰 개장 절댓값(10% 여유). 묶음마다 축을 따로 잡으면 막대 길이를 견줄 수 없다.
-  const openSpan = Math.max(0.1, ...wall.flatMap((m) => m.links.map((l) => Math.abs(l.krOpen ?? 0)))) * 1.1;
   const stockCount = new Set(movers.flatMap((m) => m.links.map((l) => l.stock))).size;
   const hasOvernight = overnight.rows.length > 0;
 
@@ -539,7 +526,6 @@ export default async function PreviewPage() {
               <span className="v2-pv-kr">
                 <span>국장 종목</span>
                 <span>관계</span>
-                <span className="v2-pv-bar-h" aria-hidden="true" />
                 <span className="v2-pv-nums">
                   <span>개장</span>
                   <span>장 중</span>
@@ -549,7 +535,7 @@ export default async function PreviewPage() {
             </div>
             <ol>
               {wall.map((m) => (
-                <MoverGroup key={m.ticker} m={m} when={when} span={openSpan} />
+                <MoverGroup key={m.ticker} m={m} when={when} />
               ))}
             </ol>
           </div>

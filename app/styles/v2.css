@@ -1522,7 +1522,9 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
    ⭐ 이름 → 문장 → 숫자 차례다(2026-10-04) — 오른쪽 정렬 숫자 칸이 왼쪽 정렬 문장 앞에 붙으면 둘이 한 덩어리로 읽혔다. 숫자는 줄 오른쪽 끝에 모은다.
    머리 줄 정렬은 신호 표 공통 규칙(셋째 = 문장 왼쪽 · 넷째부터 숫자 오른쪽)을 그대로 쓴다. */
 /* 앞 두 칸 합(20 + 336 = 356)을 아래 급부상 표(96 + 260)와 맞춰 두 표의 문장 칸이 같은 세로선에서 시작한다(2026-10-04 점검). */
-.v2-tm-flowtbl .v2-tr { grid-template-columns: 20px 336px minmax(0, 1fr) 72px 120px; min-height: 52px; }
+/* 점유율 칸 88 — 72 이던 땐 머리 '최근 3일 점유율'이 '율'만 아랫줄로 떨어졌다(2026-10-04 지적). 머리는 한 줄로. */
+.v2-tm-flowtbl .v2-tr { grid-template-columns: 20px 336px minmax(0, 1fr) 88px 120px; min-height: 52px; }
+.v2-tm-flowtbl .v2-th > * { white-space: nowrap; }
 .v2-td-theme2 { display: flex; flex-direction: column; gap: 1px; min-width: 0; padding: 7px 0; }
 .v2-td-theme2 b { font-weight: 600; overflow-wrap: anywhere; }
 .v2-td-share em,
@@ -1627,7 +1629,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   .v2-in .v2-tm-band.is-brief { grid-template-columns: 216px minmax(0, 1fr); }
   .v2-tm-band.is-pair { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .v2-tm-band.is-hot > .v2-tm-side { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
-  .v2-tm-flowtbl .v2-tr { grid-template-columns: 20px 288px minmax(0, 1fr) 64px 108px; }
+  .v2-tm-flowtbl .v2-tr { grid-template-columns: 20px 288px minmax(0, 1fr) 88px 108px; }
   .v2-tm-risertbl .v2-tr { grid-template-columns: 88px 220px minmax(0, 1fr) 80px; }
   .v2-tm-reasonrows .v2-tr { grid-template-columns: 200px minmax(0, 1fr) 80px 64px 72px; }
   .v2-tm-days.no-close .v2-tm-reasonrows .v2-tr { grid-template-columns: 200px minmax(0, 1fr) 72px 72px; }
@@ -1789,7 +1791,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-pv-when { display: none; }
 .v2-pv-kr {
   display: grid;
-  grid-template-columns: 180px 140px minmax(0, 1fr) 72px 72px 72px;
+  grid-template-columns: 180px minmax(0, 1fr) 72px 72px 72px;
   align-items: center;
   column-gap: 12px;
   min-height: 44px;
@@ -1806,12 +1808,6 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-pv-krs > li > .v2-pv-kr { flex: 1; }
 a.v2-pv-kr:hover { background: var(--t-tint); }
 .v2-pv-nums { display: contents; }
-/* 개장 값 갈림 막대 — 가운데 세로선이 0, 오른쪽이 오름 · 왼쪽이 내림. */
-.v2-pv-bar { position: relative; height: 8px; border-radius: 4px; background: var(--t-bar-off); }
-.v2-pv-bar::before { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; border-left: 1px solid var(--t-line); }
-.v2-pv-bar > i { position: absolute; top: 0; bottom: 0; border-radius: 4px; background: var(--t-ink4); }
-.v2-pv-bar > i.is-up { background: var(--t-up); }
-.v2-pv-bar > i.is-down { background: var(--t-down); }
 .v2-pv-why { min-width: 0; font-size: 12px; font-weight: 500; line-height: 18px; color: var(--t-ink3); overflow-wrap: anywhere; }
 .v2-pv-kr .v2-td-num { font-weight: 500; }
 .v2-pv-head { background: var(--t-head); font-size: 12px; font-weight: 500; color: var(--t-ink3); }
@@ -1829,9 +1825,6 @@ a.v2-pv-kr:hover { background: var(--t-tint); }
   .v2-pv-band.is-pair { grid-template-columns: 216px minmax(0, 1fr); }
   .v2-pv-grp { grid-template-columns: 220px minmax(0, 1fr); }
   .v2-pv-kr { grid-template-columns: 148px minmax(0, 1fr) 64px 64px 64px; }
-  /* 국장 칸이 좁아 갈림 막대는 뺀다 — 관계 칸이 남는 폭을 받는다. */
-  .v2-pv-bar,
-  .v2-pv-bar-h { display: none; }
 }
 @container kd (max-width: 679px) {
   .v2-pv-band,
