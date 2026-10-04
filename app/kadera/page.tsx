@@ -265,10 +265,10 @@ export default async function KaderaPage() {
       title: "크게 움직인 종목",
       meta: why ? `${fmtKoDate(why.date)} 장 마감` : undefined,
       kind: "move",
-      heads: ["", "종목", whyDay ? `${whyDay} 등락` : "등락", "움직인 까닭"],
+      heads: ["", "종목", whyDay ? `${whyDay} 등락` : "등락", "움직인 이유"],
       aiText: true,
       rows: moveRows,
-      empty: whyFailed ? "까닭을 불러오지 못했습니다." : "오늘 집계가 끝나면 채워집니다. 저녁 실행 뒤에 그날 것이 붙습니다.",
+      empty: whyFailed ? "이유를 불러오지 못했습니다." : "오늘 집계가 끝나면 채워집니다. 저녁 실행 뒤에 그날 것이 붙습니다.",
     },
     {
       id: "talk",
