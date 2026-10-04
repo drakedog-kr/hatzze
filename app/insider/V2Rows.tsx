@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import type { InsiderBriefRow } from "@/lib/insider-brief";
 import type { AnalystTop, CongressTicker, InsiderActivity, ManagerMove, ManagerRank } from "@/lib/insider-data";
 
 import { StockLogo } from "../StockLogo";
@@ -147,4 +148,34 @@ export function analystLines(rows: AnalystTop[]) {
       ga="insider_analyst_click"
     />
   ));
+}
+
+/**
+ * 오늘의 브리핑 줄 넷(lib/insider-brief.ts) — 이름표 칸 · 문장 칸(.v2-brief3, 시장 브리핑 · MDD 낙폭 요약과 같은 줄 꼴).
+ * 판 1,000 이상은 두 단 — 임원 · 의원 / 거물 · 겹친 곳이 아래 짝 모듈(임원 | 의원 · 늘린 | 줄인)과 같은 세로줄에 선다.
+ * 종목은 종목 화면 링크, 금액은 통화 스위치를 따른다(Money).
+ */
+export function BriefRows({ rows, rate }: { rows: InsiderBriefRow[]; rate: number | null }) {
+  return (
+    <dl className="v2-brief3 v2-in-brief">
+      {rows.map((r) => (
+        <div key={r.key} className="v2-brief3-row">
+          <dt>{r.label}</dt>
+          <dd>
+            {r.parts.map((p, i) =>
+              typeof p === "string" ? (
+                p
+              ) : "usd" in p ? (
+                <Money key={i} usd={p.usd} rate={rate} />
+              ) : (
+                <Link key={i} href={stockHref(p.ticker)} className="v2-in-brief-link" data-ga="insider_brief_click">
+                  {p.name}
+                </Link>
+              ),
+            )}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
 }

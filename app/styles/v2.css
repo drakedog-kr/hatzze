@@ -1889,6 +1889,14 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 /* 짝 — 키가 같고(stretch) 짧은 쪽은 줄이 고르게 늘어난다(빈 곳 없음). 좁으면 한 줄기. */
 .v2-in-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 12px; }
 .v2-in-pair > .v2-mod { display: flex; flex-direction: column; }
+/* 오늘의 브리핑(2026-10-04) — 판 폭 한 장, 안은 두 단(임원 · 의원 / 거물 · 겹친 곳). 가운데 세로선이 아래 짝 모듈 사이 틈(12) 한가운데에 서고,
+   오른 단 글 시작선은 오른쪽 짝 모듈의 글 시작선(틈 반 6 + 테두리 1 + 14 = 21)에 맞춘다 — 위아래가 한 세로줄로 읽힌다. */
+.v2-in-brief { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.v2-in-brief > .v2-brief3-row:nth-child(odd) { border-right: 1px solid var(--t-line); }
+.v2-in-brief > .v2-brief3-row:nth-child(even) { padding-left: 21px; }
+.v2-in-brief > .v2-brief3-row:nth-last-child(-n + 2) { border-bottom: 0; }
+.v2-in-brief-link { color: var(--t-ink); font-weight: 600; text-decoration: underline; text-decoration-color: var(--t-ink4); text-underline-offset: 3px; }
+.v2-in-brief-link:hover { color: var(--t-down); text-decoration-color: var(--t-down); }
 /* 본 화면의 줄(V2Rows.tsx) — 한 줄 · 네 칸(순위 · 종목 · 곁 숫자 · 값). 줄마다 따로 격자면 곁 숫자 폭이 달라 칸이 어긋난다 —
    목록이 열을 정하고 줄은 subgrid 로 따른다. 줄은 모듈 남는 높이를 고르게 나눠 받는다(짝 모듈 키가 같다).
    ⭐ 곁 숫자는 종목 바로 뒤에서 왼쪽 정렬로 선다 — 종목 칸이 남는 폭을 먹고 곁 숫자가 오른쪽 정렬로 값 바로 앞에 붙어 있을 땐
@@ -1950,6 +1958,11 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 }
 @container kd (max-width: 999px) {
   .v2-in-pair { grid-template-columns: minmax(0, 1fr); }
+  /* 짝 모듈이 한 단이 되면 브리핑도 한 단 — 줄 넷이 위에서 아래로. */
+  .v2-in-brief { grid-template-columns: minmax(0, 1fr); }
+  .v2-in-brief > .v2-brief3-row:nth-child(odd) { border-right: 0; }
+  .v2-in-brief > .v2-brief3-row:nth-child(even) { padding-left: 14px; }
+  .v2-in-brief > .v2-brief3-row:nth-last-child(2) { border-bottom: 1px solid var(--t-line); }
 }
 @container kd (max-width: 679px) {
   /* 머리 근거('10/1까지 90일 · 의원 수 순')가 제목 옆에서 말줄임으로 잘렸다(375) — 다음 줄로 접는다. */
