@@ -17,24 +17,49 @@ import type { InsiderOverview } from "./insider-data";
 
 type BriefInput = Pick<
   InsiderOverview,
-  "windowDays" | "congressWindowDays" | "buys" | "execSold" | "congressTickers" | "managerAdds" | "managerTrims" | "compareQuarters" | "scale"
+  "windowDays" | "congressWindowDays" | "buys" | "targetMoves" | "congressTickers" | "managerAdds" | "managerTrims" | "compareQuarters" | "scale"
 >;
+
+/* ── 증권가 목표가 ──────────────────────────────────────────────────── */
+
+/** 목표가를 올린 · 내린 건수를 세는 기간(일). 마지막 의견 날부터 거꾸로 센다. */
+export const TARGET_DAYS = 7;
+
+/**
+ * 증권가 목표가 올림 · 내림 건수 — 의견 하나(증권사 · 애널리스트 · 날)가 한 건. 목표가가 그대로거나 직전 값이 없으면(신규 개시) 안 센다.
+ * 기간 끝은 받은 줄의 마지막 의견 날이다(원천이 주말에도 의견을 싣는다 — 10-03 토요일 NKE).
+ * 매주 고르게 갈린다(2026-09 셋째 주부터 세 주 실측 — 올림 70 · 69 · 66건, 내림 55 · 47 · 59건).
+ */
+export function targetMoves(rows: { action_date: string; target_now: number | null; target_old: number | null }[]): { up: number; down: number; end: string | null } {
+  const end = rows.reduce<string | null>((m, r) => (m && m >= r.action_date ? m : r.action_date), null);
+  if (!end) return { up: 0, down: 0, end: null };
+  const d = new Date(`${end}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - (TARGET_DAYS - 1));
+  const from = d.toISOString().slice(0, 10);
+  let up = 0;
+  let down = 0;
+  for (const r of rows) {
+    if (r.action_date < from || r.target_now == null || r.target_old == null) continue;
+    if (r.target_now > r.target_old) up += 1;
+    else if (r.target_now < r.target_old) down += 1;
+  }
+  return { up, down, end };
+}
 
 /* ── 매매 방향 ──────────────────────────────────────────────────────── */
 
 /** 한 축의 두 쪽 — 막대 왼쪽 · 오른쪽 토막과 그 아래 두 값. */
 export type InsiderLeanRow = {
-  key: "exec" | "congress" | "managers";
+  key: "congress" | "managers" | "analyst";
   label: string;
-  /** 줄 머리 오른쪽 — 축의 기간('90일' · '2026 Q2'), 임원 줄은 무엇을 쟀는지까지('7일 판 금액'). */
+  /** 줄 머리 오른쪽 — 축의 기간('90일' · '2026 Q2'), 증권가 줄은 무엇을 쟀는지까지('7일 목표가'). */
   span: string;
-  /** dir — 왼쪽 산 쪽(빨강) · 오른쪽 판 쪽(파랑). sell — 둘 다 판 쪽이라 왼쪽(그 전) 연한 파랑 · 오른쪽(최근) 진한 파랑. */
-  tone: "dir" | "sell";
+  /** 왼쪽은 오르는 쪽(산 · 늘린 · 올린, 빨강), 오른쪽은 내리는 쪽(판 · 줄인 · 내린, 파랑). */
   leftLabel: string;
   rightLabel: string;
   left: number;
   right: number;
-  unit: "usd" | "건" | "종목";
+  unit: "건" | "종목";
 };
 
 /** 분기 끝날('2026-06-30') → '2026 Q2'(모듈 머리 parts.tsx quarterLabel 과 같은 꼴). */
@@ -49,34 +74,20 @@ const netTrims = (ov: BriefInput) => ov.managerTrims.filter((m) => m.movers > m.
 const hasQuarters = (ov: BriefInput) => ov.compareQuarters.length === 2 && (netAdds(ov).length > 0 || netTrims(ov).length > 0);
 
 /**
- * 축 셋의 두 쪽.
- *  - 임원: 장내에서 판 금액, 그 전 7일 · 최근 7일. 매도가 늘었나 줄었나가 설명 없이 읽힌다.
- *    ⛔ 장내 매수 · 처분 금액으로 두지 말 것 — 장내 매수가 한 주에 한두 종목이라($3.5M · $540.8M, 10-04 주) 막대가 늘 파랑 한 토막이었다
- *       ("임원은 매수가 너무 적으니까 다른 걸로", 2026-10-04). 장내에서 산 종목은 브리핑 임원 줄이 적는다.
- *    ⛔ '가진 주식 대비 조금 판 · 많이 판'(판 몫 10% 기준)도 걷었다 — 물음표 설명이 있어야 읽혔다
- *       ("헬프 툴팁이 필요하면 심플하지 않다 · 한번에 이해하기 어려운 건 우리 사이트에 있으면 안 된다", 같은 날).
- *  - 의원: 매수 · 매도 건수.
- *  - 거물: 늘린 쪽 · 줄인 쪽이 더 많은 종목 수(13F 금액은 주가에 오염돼 사람 수로 센다 — ManagerMove 주석). 견줄 분기가 없으면 빠진다.
+ * 줄 셋의 두 쪽 — 의원(매수 · 매도 건수), 거물(늘린 쪽 · 줄인 쪽이 더 많은 종목 수, 13F 금액은 주가에 오염돼 사람 수로 센다 —
+ * ManagerMove 주석. 견줄 분기가 없으면 빠진다), 증권가(최근 7일 목표가 올림 · 내림 건수).
+ *
+ * 셋째 줄은 처음에 임원이었다. ⛔ 다시 임원으로 두려면 아래를 먼저 볼 것(2026-10-04 하루에 셋을 걷었다):
+ *  - 장내 매수 · 처분 금액 — 매수가 한 주에 한두 종목이라($3.5M · $540.8M) 막대가 늘 파랑 한 토막("매수가 너무 적다").
+ *  - 가진 주식 대비 조금 판 · 많이 판(판 몫 10% 기준) — 물음표 설명이 있어야 읽혔다("한번에 이해하기 어려운 건 우리 사이트에 있으면 안 된다").
+ *  - 판 금액 그 전 7일 · 최근 7일 — "별로". 장내에서 산 종목은 브리핑 임원 줄이 적는다.
  */
 export function insiderLean(ov: BriefInput): InsiderLeanRow[] {
   const rows: InsiderLeanRow[] = [
     {
-      key: "exec",
-      label: "임원",
-      // ⚠️ 216 칸(판 1,000 미만)에 두 값이 한 줄로 들어야 한다 — '그 전 7일 1.9조원 · 최근 7일 7,037억원'은 넘쳤다. '7일'은 머리로.
-      span: `${ov.windowDays}일 판 금액`,
-      tone: "sell",
-      leftLabel: "그 전",
-      rightLabel: "최근",
-      left: ov.execSold.prev,
-      right: ov.execSold.now,
-      unit: "usd",
-    },
-    {
       key: "congress",
       label: "의원",
       span: `${ov.congressWindowDays}일`,
-      tone: "dir",
       leftLabel: "매수",
       rightLabel: "매도",
       left: sum(ov.congressTickers.map((c) => c.buys)),
@@ -89,7 +100,6 @@ export function insiderLean(ov: BriefInput): InsiderLeanRow[] {
       key: "managers",
       label: "거물",
       span: quarterShort(ov.compareQuarters[1]),
-      tone: "dir",
       leftLabel: "늘림",
       rightLabel: "줄임",
       left: netAdds(ov).length,
@@ -97,6 +107,17 @@ export function insiderLean(ov: BriefInput): InsiderLeanRow[] {
       unit: "종목",
     });
   }
+  // 줄 순서는 의원 → 거물 → 증권가(2026-10-04 "의원을 첫째로, 거물을 둘째로, 셋째 칸은 다시 생각"→ 증권가 목표가).
+  rows.push({
+    key: "analyst",
+    label: "증권가",
+    span: `${TARGET_DAYS}일 목표가`,
+    leftLabel: "올림",
+    rightLabel: "내림",
+    left: ov.targetMoves.up,
+    right: ov.targetMoves.down,
+    unit: "건",
+  });
   return rows;
 }
 

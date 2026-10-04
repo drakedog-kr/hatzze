@@ -1904,13 +1904,10 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 .v2-in-lean-bar i { display: block; min-width: 3px; height: 100%; }
 .v2-in-lean-bar i.is-up { background: var(--t-up); }
 .v2-in-lean-bar i.is-down { background: var(--t-down); }
-/* 임원 줄 — 둘 다 판 금액이라 그 전 7일은 같은 파랑을 옅게(최근 7일이 진한 파랑). */
-.v2-in-lean-bar i.is-soft { background: var(--t-down); opacity: 0.32; }
 .v2-in-lean-legend { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); white-space: nowrap; }
 .v2-in-lean-legend b { font-weight: 600; font-variant-numeric: tabular-nums; }
 .v2-in-lean-legend .is-up b { color: var(--t-up); }
 .v2-in-lean-legend .is-down b { color: var(--t-down); }
-.v2-in-lean-legend .is-soft b { color: var(--t-ink2); }
 .v2-in-brief-link { color: var(--t-ink); font-weight: 600; text-decoration: underline; text-decoration-color: var(--t-ink4); text-underline-offset: 3px; }
 .v2-in-brief-link:hover { color: var(--t-down); text-decoration-color: var(--t-down); }
 /* 본 화면의 줄(V2Rows.tsx) — 한 줄 · 네 칸(순위 · 종목 · 곁 숫자 · 값). 줄마다 따로 격자면 곁 숫자 폭이 달라 칸이 어긋난다 —

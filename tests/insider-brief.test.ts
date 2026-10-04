@@ -1,11 +1,11 @@
 /**
- * lib/insider-brief.ts — 내부자 리포트 둘째 줄 [매매 방향 | 오늘의 브리핑]. 숫자는 매매 방향(임원 판 금액 두 기간 · 의원 · 거물 산 쪽 · 판 쪽),
+ * lib/insider-brief.ts — 내부자 리포트 둘째 줄 [매매 방향 | 오늘의 브리핑]. 숫자는 매매 방향(의원 · 거물 · 증권가의 오르는 쪽 · 내리는 쪽),
  * 브리핑은 아래 모듈과 다른 잣대로 고른 종목을 적는다. 겹친 곳은 문턱(의원 둘 · 거물 셋)이 없으면 62곳이 나왔다(2026-10-04).
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { insiderBrief, insiderLean, type InsiderBriefRow } from "../lib/insider-brief.ts";
+import { insiderBrief, insiderLean, targetMoves, type InsiderBriefRow } from "../lib/insider-brief.ts";
 import type { CongressTicker, InsiderActivity, ManagerMove } from "../lib/insider-data.ts";
 
 const exec = (ticker: string, bought: number, disposed: number, name = ticker): InsiderActivity => ({
@@ -51,7 +51,7 @@ const base = {
   windowDays: 7,
   congressWindowDays: 90,
   buys: [] as InsiderActivity[],
-  execSold: { now: 0, prev: 0 },
+  targetMoves: { up: 0, down: 0, end: null as string | null },
   congressTickers: [] as CongressTicker[],
   managerAdds: [] as ManagerMove[],
   managerTrims: [] as ManagerMove[],
@@ -62,30 +62,49 @@ const base = {
 const text = (r: InsiderBriefRow) => r.parts.map((p) => (typeof p === "string" ? p : `[${p.name}]`)).join("");
 const row = (rows: InsiderBriefRow[], key: InsiderBriefRow["key"]) => rows.find((r) => r.key === key)!;
 
+describe("targetMoves — 증권가 목표가", () => {
+  const a = (action_date: string, target_old: number | null, target_now: number | null) => ({ action_date, target_old, target_now });
+
+  it("마지막 의견 날부터 7일 — 올린 · 내린 건수, 그대로거나 직전 값이 없으면 안 센다", () => {
+    const r = targetMoves([
+      a("2026-10-03", 100, 120), // 올림
+      a("2026-10-01", 100, 90), // 내림
+      a("2026-09-27", 50, 60), // 올림 — 끝(10/3)에서 7일째, 든다
+      a("2026-09-26", 50, 40), // 8일째 — 안 든다
+      a("2026-10-02", 70, 70), // 그대로
+      a("2026-10-02", null, 80), // 신규 개시
+    ]);
+    assert.deepEqual(r, { up: 2, down: 1, end: "2026-10-03" });
+  });
+
+  it("줄이 없으면 0", () => {
+    assert.deepEqual(targetMoves([]), { up: 0, down: 0, end: null });
+  });
+});
+
 describe("insiderLean — 매매 방향", () => {
-  it("임원은 판 금액(그 전 7일 · 최근 7일), 의원은 건수, 거물은 늘린 쪽 · 줄인 쪽이 더 많은 종목 수", () => {
+  it("의원 → 거물 → 증권가 — 의원은 건수, 거물은 늘린 쪽 · 줄인 쪽이 더 많은 종목 수, 증권가는 목표가 올림 · 내림", () => {
     const rows = insiderLean({
       ...base,
-      buys: [exec("A", 30, 0), exec("B", 0, 500)],
-      execSold: { now: 518.8, prev: 1426.5 },
+      targetMoves: { up: 66, down: 59, end: "2026-10-03" },
       congressTickers: [congress("X", 2, 3, 1), congress("Y", 1, 0, 4)],
       managerAdds: [move("M1", 3, 1), move("M2", 2, 2), move("M3", 1, 0)],
       managerTrims: [move("T1", 4, 0), move("M2", 2, 2)],
     });
     assert.deepEqual(
-      rows.map((r) => [r.key, r.tone, r.leftLabel, r.left, r.rightLabel, r.right, r.unit]),
+      rows.map((r) => [r.key, r.span, r.leftLabel, r.left, r.rightLabel, r.right, r.unit]),
       [
-        ["exec", "sell", "그 전", 1426.5, "최근", 518.8, "usd"],
-        ["congress", "dir", "매수", 3, "매도", 5, "건"],
+        ["congress", "90일", "매수", 3, "매도", 5, "건"],
         // M2 는 늘린 · 줄인 거물이 같아 어느 쪽에도 안 든다.
-        ["managers", "dir", "늘림", 2, "줄임", 1, "종목"],
+        ["managers", "2026 Q2", "늘림", 2, "줄임", 1, "종목"],
+        ["analyst", "7일 목표가", "올림", 66, "내림", 59, "건"],
       ],
     );
   });
 
   it("견줄 분기가 없으면 거물 줄을 뺀다", () => {
     const rows = insiderLean({ ...base, compareQuarters: ["2026-06-30"], managerAdds: [move("A", 3, 0)] });
-    assert.deepEqual(rows.map((r) => r.key), ["exec", "congress"]);
+    assert.deepEqual(rows.map((r) => r.key), ["congress", "analyst"]);
   });
 });
 

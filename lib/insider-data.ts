@@ -42,6 +42,7 @@ import { usQuotes } from "@/lib/us-telegram-data";
 import { displayName } from "@/lib/us-ticker-names";
 import { canonicalTicker } from "@/lib/us-ticker-spellings";
 import { holdersByTicker, managerMoves, type MoveSide } from "@/lib/insider-13f";
+import { TARGET_DAYS, targetMoves } from "@/lib/insider-brief";
 
 /**
  * 공시 집계 창. 파이프라인(fetch_us_insider.py 의 WINDOW_DAYS)과 **반드시 같아야 한다.**
@@ -259,12 +260,8 @@ export type InsiderOverview = {
    *   갈리는 순간 개수가 조용히 0 이 된다. 받아 온 행의 최대 접수일에서 직접 센다.
    */
   latestInsiderFilings: { date: string | null; count: number };
-  /**
-   * 임원이 장내에서 판(S) 금액 — 최근 7일(now)과 그 전 7일(prev). 본 화면 '매매 방향'의 임원 줄이다(2026-10-04).
-   * ⛔ 장내 매수 · 처분 금액으로 두지 말 것 — 매수가 한 주에 한두 종목이라 막대가 늘 한쪽으로 쏠렸다.
-   * ⛔ '가진 주식 대비 판 몫'도 걷었다 — 물음표 설명이 있어야 읽혔다("한번에 이해하기 어려운 건 우리 사이트에 있으면 안 된다").
-   */
-  execSold: { now: number; prev: number };
+  /** 증권가가 최근 7일 목표가를 올린 · 내린 건수(lib/insider-brief.ts targetMoves). 본 화면 '매매 방향'의 셋째 줄이다(2026-10-04). */
+  targetMoves: { up: number; down: number; end: string | null };
   /** 위와 같은 규칙, 의원 쪽(PTR 문서 수). */
   latestCongressFilings: { date: string | null; count: number };
   /** 추적 중인 거물 수. 화면의 "N명 중" 분모다. */
@@ -398,7 +395,7 @@ const EMPTY: InsiderOverview = {
   buys: [],
   mentionedCount: 0,
   latestInsiderFilings: { date: null, count: 0 },
-  execSold: { now: 0, prev: 0 },
+  targetMoves: { up: 0, down: 0, end: null },
   latestCongressFilings: { date: null, count: 0 },
   managerCount: 0,
   failedSources: [],
@@ -459,7 +456,14 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
     return d.toISOString().slice(0, 10);
   })();
 
-  const [mentionRows, insiderRows, stockRows, managerRows, holdingRows, congressRows, consensusRows] =
+  // 증권가 의견 — 목표가 올림 · 내림만 센다. 마지막 의견 날이 언급 기준일보다 며칠 늦거나 이를 수 있어 두 배 기간을 받는다.
+  const actionFrom = (() => {
+    const d = new Date(`${mentionDate}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - (TARGET_DAYS * 2 - 1));
+    return d.toISOString().slice(0, 10);
+  })();
+
+  const [mentionRows, insiderRows, stockRows, managerRows, holdingRows, congressRows, consensusRows, actionRows] =
     await Promise.all([
     fetchAllRows<{ ticker: string; mention_count: number | null; channel_count: number | null }>(
       "ticker",
@@ -539,6 +543,19 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
       "ticker",
       () => db.from("us_analyst_consensus").select("ticker,as_of_date,consensus,analyst_count,strong_buy"),
       { onError: failed("애널리스트 컨센서스") },
+    ),
+    // ⚠️ 정렬 키가 유일해야 쪽 경계에서 줄이 빠지거나 겹치지 않는다 — build 가 (날, 종목, 증권사)를 걸고 fetchAllRows 가 애널리스트를 얹는다.
+    fetchAllRows<{ action_date: string; target_now: number | null; target_old: number | null }>(
+      "analyst",
+      () =>
+        db
+          .from("us_analyst_action")
+          .select("action_date,target_now,target_old")
+          .gte("action_date", actionFrom)
+          .order("action_date")
+          .order("ticker")
+          .order("firm"),
+      { onError: failed("애널리스트 의견") },
     ),
   ]);
 
@@ -762,7 +779,6 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
   // 임원 신고를 **종목 하나로** 묶는다. 규칙은 InsiderActivity 주석 참고.
   let buys: InsiderActivity[] = [];
   let latestInsiderFilings: { date: string | null; count: number } = { date: null, count: 0 };
-  let execSold = { now: 0, prev: 0 };
   if (asOf) {
     const from = new Date(`${asOf}T00:00:00Z`);
     from.setUTCDate(from.getUTCDate() - (INSIDER_RECENT_DAYS - 1));
@@ -771,48 +787,26 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
     // ⚠️ 정렬 키가 유일해야 페이징이 행을 건너뛰지 않는다. accession_no 하나로는
     //    한 공시에 여러 줄이라 유일하지 않다 — build 가 accession_no 를 먼저 걸고
     //    fetchAllRows 가 seq 를 얹어 (accession_no, seq) 복합 키가 된다.
-    // 그 전 7일 — 장내 매도(S) 금액만 견주므로 그 줄의 주식 수 · 단가만 받는다. 본 조회와 나란히 돌아 왕복이 늘지 않는다.
-    const prevTo = new Date(from);
-    prevTo.setUTCDate(prevTo.getUTCDate() - 1);
-    const prevFrom = new Date(from);
-    prevFrom.setUTCDate(prevFrom.getUTCDate() - INSIDER_RECENT_DAYS);
-    const [rows, prevSales] = await Promise.all([
-      fetchAllRows<{
-        ticker: string;
-        owner_name: string | null;
-        shares: number | null;
-        price: number | null;
-        filed_date: string;
-        transaction_code: string | null;
-        acquired_disposed: string | null;
-        accession_no: string;
-        seq: number;
-      }>(
-        "seq",
-        () =>
-          db
-            .from("us_insider_txn")
-            .select("ticker,owner_name,shares,price,filed_date,transaction_code,acquired_disposed,seq,accession_no")
-            .gte("filed_date", from.toISOString().slice(0, 10))
-            .lte("filed_date", asOf)
-            .order("accession_no"),
-        { onError: failed("임원 신고") },
-      ),
-      fetchAllRows<{ shares: number | null; price: number | null; accession_no: string; seq: number }>(
-        "seq",
-        () =>
-          db
-            .from("us_insider_txn")
-            .select("shares,price,accession_no,seq")
-            .eq("transaction_code", "S")
-            .gte("filed_date", prevFrom.toISOString().slice(0, 10))
-            .lte("filed_date", prevTo.toISOString().slice(0, 10))
-            .order("accession_no"),
-        { onError: failed("임원 지난 신고") },
-      ),
-    ]);
-    const soldValue = (xs: { shares: number | null; price: number | null }[]) => xs.reduce((s, r) => s + (r.shares ?? 0) * (r.price ?? 0), 0);
-    execSold = { now: soldValue(rows.filter((r) => r.transaction_code === "S")), prev: soldValue(prevSales) };
+    const rows = await fetchAllRows<{
+      ticker: string;
+      owner_name: string | null;
+      shares: number | null;
+      price: number | null;
+      filed_date: string;
+      transaction_code: string | null;
+      acquired_disposed: string | null;
+      accession_no: string;
+    }>(
+      "seq",
+      () =>
+        db
+          .from("us_insider_txn")
+          .select("ticker,owner_name,shares,price,filed_date,transaction_code,acquired_disposed,seq,accession_no")
+          .gte("filed_date", from.toISOString().slice(0, 10))
+          .lte("filed_date", asOf)
+          .order("accession_no"),
+      { onError: failed("임원 신고") },
+    );
 
     // 마지막 접수일과 그날 들어온 **신고서** 수. 위 조회를 다시 쓰므로 왕복이 늘지 않는다.
     const lastFiled = rows.reduce<string | null>((m, r) => (m && m >= r.filed_date ? m : r.filed_date), null);
@@ -950,7 +944,7 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
     buys,
     mentionedCount: rows.length,
     latestInsiderFilings,
-    execSold,
+    targetMoves: targetMoves(actionRows),
     latestCongressFilings,
     managerCount: managerRows.length,
     usdKrw: fx?.now ?? null,

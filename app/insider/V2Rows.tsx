@@ -178,18 +178,17 @@ export function BriefRows({ rows }: { rows: InsiderBriefRow[] }) {
 }
 
 /**
- * 매매 방향 — 축마다 두 쪽을 한 막대에 가른다. 의원 · 거물은 산 쪽(빨강) · 판 쪽(파랑) — 사는 쪽 빨강 · 파는 쪽 파랑, 이 화면의 다른 줄과 같은 뜻.
- * 임원은 둘 다 판 쪽이라(판 금액 그 전 7일 · 최근 7일) 연한 파랑 · 진한 파랑(tone "sell", lib/insider-brief.ts insiderLean).
+ * 매매 방향 — 줄마다 두 쪽을 한 막대에 가른다. 왼쪽 오르는 쪽(산 · 늘린 · 올린) 빨강 · 오른쪽 내리는 쪽(판 · 줄인 · 내린) 파랑 —
+ * 사는 쪽 빨강 · 파는 쪽 파랑, 이 화면의 다른 줄과 같은 뜻(lib/insider-brief.ts insiderLean).
  * 막대는 그림일 뿐이라 읽어 주는 기계에선 빼고(aria-hidden) 아래 두 값이 같은 말을 한다. 한쪽이 0 이면 그 토막은 안 그린다.
  */
-export function LeanRows({ rows, rate }: { rows: InsiderLeanRow[]; rate: number | null }) {
+export function LeanRows({ rows }: { rows: InsiderLeanRow[] }) {
   return (
     <div className="v2-in-lean">
       {rows.map((r) => {
         const total = r.left + r.right;
         const lp = total > 0 ? (r.left / total) * 100 : 0;
-        const [lt, rt] = r.tone === "sell" ? ["is-soft", "is-down"] : ["is-up", "is-down"];
-        const n = (v: number) => (r.unit === "usd" ? <Money usd={v} rate={rate} /> : `${v.toLocaleString("ko-KR")}${r.unit}`);
+        const n = (v: number) => `${v.toLocaleString("ko-KR")}${r.unit}`;
         return (
           <div key={r.key} className="v2-in-lean-row">
             <div className="v2-in-lean-head">
@@ -197,14 +196,14 @@ export function LeanRows({ rows, rate }: { rows: InsiderLeanRow[]; rate: number 
               <span>{r.span}</span>
             </div>
             <div className="v2-in-lean-bar" aria-hidden>
-              {r.left > 0 && <i className={lt} style={{ flexBasis: `${lp}%` }} />}
-              {r.right > 0 && <i className={rt} style={{ flexBasis: `${100 - lp}%` }} />}
+              {r.left > 0 && <i className="is-up" style={{ flexBasis: `${lp}%` }} />}
+              {r.right > 0 && <i className="is-down" style={{ flexBasis: `${100 - lp}%` }} />}
             </div>
             <div className="v2-in-lean-legend">
-              <span className={lt}>
+              <span className="is-up">
                 {r.leftLabel} <b>{n(r.left)}</b>
               </span>
-              <span className={rt}>
+              <span className="is-down">
                 {r.rightLabel} <b>{n(r.right)}</b>
               </span>
             </div>
