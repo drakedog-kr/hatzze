@@ -251,6 +251,9 @@ export default async function KaderaPage() {
       id: "surging",
       title: "언급 급부상 종목",
       meta: `최근 ${surgeDays}일 · 평소 대비`,
+      // 첫 표 첫 줄 밑에 한 번 — 줄이 종목 화면으로 가는 링크인데 화살표가 없다. 위 테마 점유율 쪽지를 본 뒤에 뜬다(app/V2Hint.tsx 차례).
+      // id 'stock-row' 는 미리보기 · 데일리 노트와 같은 가르침이라 한 번 보면 셋 다 끝이다.
+      hint: { id: "stock-row", order: 2, text: "종목을 누르면 언급 추이와 요즘 도는 얘기가 나옵니다" },
       kind: "surge",
       // 숫자 칸 이름은 '언급 증가' — '평소 대비'만 두면 바로 옆 '지금 등락'과 붙어 주가 배수로 읽혔다(2026-10-04 점검).
       heads: ["", "종목", liveHead, "언급 증가", "왜 뜨나"],

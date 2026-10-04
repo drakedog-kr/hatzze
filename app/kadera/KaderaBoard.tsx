@@ -49,6 +49,8 @@ export type BoardSection = {
   aiText?: boolean;
   rows: BoardRow[];
   empty: string;
+  /** 처음 온 사람에게 한 번 띄우는 쪽지(app/V2Hint.tsx) — 첫 줄 밑. 줄이 링크인데 화살표가 없어서다. */
+  hint?: { id: string; text: string; order?: number };
 };
 
 const pct = (r: number) => `${r > 0 ? "+" : r < 0 ? "-" : ""}${Math.abs(r).toFixed(2)}%`;
@@ -60,7 +62,13 @@ export function SignalTable({ sec }: { sec: BoardSection }) {
   const headOrder = [0, 1, last, ...Array.from({ length: Math.max(0, last - 2) }, (_, k) => k + 2)];
   return (
     /* AI 표시는 모듈 제목 앞에 둔다(네 표 같은 자리). 머리 칸에 두면 폰(머리 줄을 숨긴다)에서 고지가 사라졌다(2026-10-04 점검). */
-    <Module id={sec.id} title={sec.title} meta={sec.meta} ai={sec.aiText}>
+    <Module
+      id={sec.id}
+      title={sec.title}
+      meta={sec.meta}
+      ai={sec.aiText}
+      hint={sec.hint && sec.rows.length ? { ...sec.hint, anchor: ".v2-tbody > li:first-child" } : undefined}
+    >
       {sec.rows.length === 0 ? (
         <p className="v2-empty">{sec.empty}</p>
       ) : (

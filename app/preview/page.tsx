@@ -522,7 +522,13 @@ export default async function PreviewPage() {
       {/* 엮인 국장 종목 — 판 폭 표. ⛔ 섹터로 나누지 말 것(섹터마다 종목이 1~5 라 덩어리 키가 제각각). 섹터는 미장 칸의 곁말.
           묶을 미장 종목이 없는 날(휴장 · 조용한 밤)은 모듈째 안 그린다 — 브리핑이 "이어 붙일 국장 종목도 없습니다"를 이미 말한다. */}
       {wall.length > 0 && (
-        <Module id="links" title="함께 움직인 국장 종목" meta="최근 5년 이런 날 평균">
+        <Module
+          id="links"
+          title="함께 움직인 국장 종목"
+          meta="최근 5년 이런 날 평균"
+          // 국장 줄이 종목 화면으로 가는 링크다(카더라 · 데일리 노트와 같은 가르침 'stock-row' — 한 번 보면 셋 다 끝).
+          hint={{ id: "stock-row", anchor: ".v2-pv-krs > li:first-child", text: "종목을 누르면 언급 추이와 요즘 도는 얘기가 나옵니다" }}
+        >
           <div className="v2-pv-tbl">
             <div className="v2-pv-grp v2-pv-head">
               <span className="v2-pv-us">{when} 미장</span>

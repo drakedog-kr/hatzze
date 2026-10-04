@@ -64,7 +64,8 @@ export default async function InsiderPage() {
      첫 줄 띠(새 신고 · 통화 · 업데이트) → 짝 모듈 세 줄. 줄은 한 줄 · 네 칸(V2Rows.tsx — 순위 · 종목 · 곁 숫자 · 값).
      ⭐ 2차(같은 날 "너무 복잡하다"): 모듈 여덟 → 여섯 · 두 줄 + 알약 줄 → 한 줄.
      ⭐ 3차(2026-10-04 운영자 판단): '커뮤니티에서 뜨거운 종목' 걷고 '운용자산이 큰 순'(거물 명단) 되살림.
-     ⛔ 옛 히어로 '오늘의 브리핑' 넉 줄(아래 모듈 1등의 되풀이) · 구간 제목 · 시트 부제 · 안내 쪽지(TapHint)는 걷었다.
+     ⛔ 옛 히어로 '오늘의 브리핑' 넉 줄(아래 모듈 1등의 되풀이) · 구간 제목 · 시트 부제는 걷었다.
+     ⭐ 안내 쪽지(옛 TapHint)는 v2 쪽지(app/V2Hint.tsx)로 되살렸다(2026-10-05 운영자 판단) — 첫 모듈(임원)과 거물 명단, 한 번에 하나씩.
      ⭐ 짝 순서는 **새로 들어오는 것부터**: 임원 · 의원 신고(매일) → 거물 분기 변화(분기) → 거물 명단 · 증권가.
      ⭐ 4차(2026-10-04 "브리핑 카드가 있으면" → 같은 날 "엉성하다"): 둘째 줄 [매매 방향 | 오늘의 브리핑] — 다른 v2 화면처럼 첫 칸은 숫자 카드
        (카더라 여론 칸과 같은 폭), 브리핑은 종목만. 옛 넉 줄과 달리 모듈 1등을 되풀이하지 않는다(lib/insider-brief.ts). */
@@ -120,7 +121,13 @@ export default async function InsiderPage() {
 
       {/* ① 임원 · 의원 신고 — 매일 들어온다 */}
       <div className="v2-in-pair">
-        <Module title="임원이 신고한 매매" meta={insiderNote("exec", ov)} aside={<SeeAll href="/insider/list/exec" />}>
+        <Module
+          title="임원이 신고한 매매"
+          meta={insiderNote("exec", ov)}
+          aside={<SeeAll href="/insider/list/exec" />}
+          // 줄이 통째로 종목 상세로 가는 링크인데 화살표가 없어 눌러 보기 전엔 모른다(v1 은 '늘린 종목' 카드에 있었다 · v2 첫 모듈이 임원이라 옮김).
+          hint={ov.buys.length ? { id: "insider-stock", order: 1, anchor: ".v2-in-rows > li:first-child", text: "종목을 누르면 임원·의원 기록까지 함께 나옵니다" } : undefined}
+        >
           {ov.buys.length === 0 ? <p className="v2-empty">최근에는 없습니다.</p> : <Rows items={execLines(ov.buys.slice(0, BLOCK_ROWS), ov.usdKrw)} />}
         </Module>
         <Module title="미 하원의원이 사고판 것" meta={insiderNote("congress", ov)} aside={<SeeAll href="/insider/list/congress" />}>
@@ -145,6 +152,8 @@ export default async function InsiderPage() {
           title={INSIDER_LISTS.managers.title}
           meta={`${insiderNote("managers", ov)} · 월가 거물 ${ov.scale.managers.toLocaleString("ko-KR")}명`}
           aside={<SeeAll href={insiderListHref("managers")} />}
+          // 이름이 거물 상세로 가는 링크다. 옛 문구의 '비중 순으로'는 '~ 순' 표기를 걷은 판단(2026-10-05)에 맞춰 뺐다.
+          hint={ov.managerRanks.length ? { id: "insider-investor", order: 2, anchor: ".v2-in-rows > li:first-child", text: "이름을 누르면 그 거물이 담은 종목이 모두 나옵니다" } : undefined}
         >
           {ov.managerRanks.length === 0 ? <p className="v2-empty">명단을 못 읽었습니다.</p> : <Rows items={managerLines(ov.managerRanks.slice(0, BLOCK_ROWS), ov.usdKrw)} />}
         </Module>

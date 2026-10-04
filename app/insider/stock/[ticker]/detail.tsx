@@ -426,6 +426,8 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
           // 차트가 그리는 자리 수 — 같은 날 · 같은 봉의 신고는 한 점이라 신고 수(d.marks)와 달랐다(2026-10-05 점검).
           meta={`${PRICE_RANGES.find((r) => r.key === range)?.label} · 매매 시점 ${markSpotCount(d.bars, d.marks)}개`}
           className="v2-isd-chart"
+          // 누가 언제 사고팔았는지는 차트 말풍선 안에만 있다 — 폰은 눌러야 열린다. 차트 안 왼쪽 위에 한 번.
+          hint={{ id: "insider-chart", anchor: ".hz-mkfilter-chart", at: "inside", text: "차트를 누르면 그날 주가와 신고된 매매가 나옵니다" }}
           aside={
             <span className="hz-seg hz-seg-hover hz-periodset">
               {PRICE_RANGES.map((r) => (

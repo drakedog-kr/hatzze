@@ -6,6 +6,7 @@ import { stockTone, usualDeltaText } from "@/lib/stock-usual";
 import { squarify } from "@/lib/treemap";
 
 import { MONO } from "../ui";
+import { V2Hint } from "../V2Hint";
 
 /**
  * 점유율 지도(트리맵). **칸의 크기가 최근 사흘 언급, 색이 변화 방향과 크기**다. 테마 목록은 테마를
@@ -104,17 +105,22 @@ export function stockTiles(stocks: ThemeHotStock[], market: ThemeMarketKey = "kr
   }));
 }
 
-/* 처음 온 사람에게 한 번 띄우던 쪽지('반도체 칸을 누르면 이 테마의 상세 정보가 열립니다', MapHint)는 걷었다(v2, 2026-10-03) —
-   화면에 설명 문장을 두지 않는다. 칸이 눌린다는 것은 마우스를 올리면 바뀌는 칸 색 · 손가락 모양이 말한다. */
 export function Treemap({
   tiles,
   ariaLabel,
   aspect = 2,
+  hint,
 }: {
   tiles: TreemapTile[];
   ariaLabel: string;
   /** 가로 ÷ 세로. 배치를 이 비율로 계산하고 상자도 같은 비율로 선다(--tm-aspect · v2.css). 테마 목록 v2 는 판 폭 전체에 낮게 3:1. */
   aspect?: number;
+  /**
+   * 처음 온 사람에게 한 번 띄우는 쪽지(app/V2Hint.tsx). 가장 큰 칸 안, 이름 아래에 선다. `text` 는 그 칸의 이름을 받아 문장을 만든다.
+   * v2 에서 한때 걷었다가(2026-10-03 '설명 문장을 두지 않는다') 2026-10-05 운영자 판단으로 되살렸다 — 칸이 링크라는 건 눌러 보기 전엔
+   * 모르고 폰엔 호버도 없다. 좌표는 칸과 같은 퍼센트라 상자가 늘어나도 같이 움직인다.
+   */
+  hint?: { id: string; order?: number; text: (label: string) => string };
 }) {
   const H = W / aspect;
   const rects = squarify(
@@ -123,6 +129,7 @@ export function Treemap({
     H,
   );
   const byKey = new Map(tiles.map((t) => [t.key, t]));
+  const biggest = rects.length ? rects.reduce((a, b) => (b.w * b.h > a.w * a.h ? b : a)) : null;
 
   return (
     <div className="hz-treemap" role="list" aria-label={ariaLabel} style={{ ["--tm-aspect" as string]: `${aspect} / 1` }}>
@@ -180,6 +187,15 @@ export function Treemap({
           </Link>
         );
       })}
+      {hint && biggest && (
+        // 가장 큰 칸의 이름 · 값 두 줄(약 48px) 아래.
+        <V2Hint
+          id={hint.id}
+          order={hint.order}
+          text={hint.text(byKey.get(biggest.key)!.label)}
+          style={{ left: `calc(${biggest.x}% + 10px)`, top: `calc(${(biggest.y / H) * 100}% + 56px)` }}
+        />
+      )}
     </div>
   );
 }

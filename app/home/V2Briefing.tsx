@@ -42,7 +42,13 @@ export function IndexModule({
   const hi = vals.length ? Math.round(Math.max(...vals)) : temp;
   const lo = vals.length ? Math.round(Math.min(...vals)) : temp;
   return (
-    <Module id="index" title="햇쩨 지수" meta={`지표 ${total}개`}>
+    <Module
+      id="index"
+      title="햇쩨 지수"
+      meta={`지표 ${total}개`}
+      // 구간 줄은 마우스를 올리거나 눌러야 그 구간 지표 목록이 열린다 — 폰엔 호버가 없어 있는 줄 모른다. 지표가 든 첫 구간 밑에 한 번.
+      hint={total ? { id: "home-dist", anchor: ".v2-band-row:not(.hz-dist-row-none)", text: "구간을 누르면 그 구간 지표가 나옵니다" } : undefined}
+    >
       <div className="v2-bigcard v2-index">
         <span className="v2-card-val is-big">
           <b className={`is-${tone}`}>{temp}℃</b>

@@ -148,7 +148,13 @@ export function ThemeIndexView({
         ) : (
           <>
             <div className="v2-tm-map-in">
-              <Treemap tiles={themeTiles(themes, market.key)} ariaLabel="테마별 최근 3일 언급 점유율" aspect={3} />
+              <Treemap
+                tiles={themeTiles(themes, market.key)}
+                ariaLabel="테마별 최근 3일 언급 점유율"
+                aspect={3}
+                // 폰은 지도가 숨어 같은 id 의 쪽지가 아래 테마 흐름 첫 줄에 선다(한 번 보면 둘 다 끝).
+                hint={{ id: "theme-tap", text: (label) => `${label} 칸을 누르면 이 테마의 상세 정보가 열립니다` }}
+              />
             </div>
             {/* 색은 1주 전 대비 변화 — '변화 ±0.3%p 안'은 무엇과 견준 변화인지 안 읽혔다(2026-10-04 점검). */}
             <div className="v2-tm-map-legend">
@@ -184,6 +190,8 @@ export function ThemeIndexView({
             <span className="v2-tm-basis"> · 1주 전 대비</span>
           </>
         }
+        // 폰 전용 쪽지 — 넓은 화면은 지도 칸 쪽지(같은 id)가 같은 말을 한다(v2.css .v2-hint-phone).
+        hint={themes?.length ? { id: "theme-tap", anchor: ".v2-tbody > li:first-child", className: "v2-hint-phone", text: "테마를 누르면 종목과 이유가 함께 나옵니다" } : undefined}
       >
         {themes === null || themes.length === 0 ? (
           <p className="v2-empty">{themes === null ? "테마 집계를 지금 불러오지 못했습니다." : "아직 집계된 테마가 없습니다."}</p>

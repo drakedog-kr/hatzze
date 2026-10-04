@@ -291,6 +291,8 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
           title="일별 언급 추이"
           meta={d.trend.length ? `${md(d.trend[0].date)}~${md(d.trend[d.trend.length - 1].date)}` : undefined}
           className="v2-tm-trendmod"
+          // 날마다의 값은 막대 말풍선에만 있다 — 폰은 눌러야 열린다. 테마 화면 30일 점유율 추이와 같은 가르침(id 'trend-bar').
+          hint={!d.loadFailed && d.trend.some((p) => p.mentions) ? { id: "trend-bar", anchor: ".v2-tm-trend", at: "inside", text: "막대를 누르면 그날 값이 나옵니다" } : undefined}
         >
           {/* 실패와 '없음'을 다른 문장으로 — 같은 문장이면 고장이 자료로 위장된다. */}
           {d.loadFailed ? (

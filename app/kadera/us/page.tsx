@@ -162,6 +162,8 @@ export default async function UsKaderaPage() {
       id: "surging",
       title: "언급 급부상 종목",
       meta: `최근 ${US_WINDOW_DAYS}일 · 평소 대비`,
+      // 국장과 같은 자리 · 같은 차례. 미장 줄은 내부자 리포트 종목 화면으로 가서 문구가 다르다.
+      hint: { id: "stock-row-us", order: 2, text: "종목을 누르면 월가 거물·임원 매매까지 함께 나옵니다" },
       kind: "surge",
       heads: ["", "종목", liveHead, "언급 증가", "왜 뜨나"],
       key0: "언급",

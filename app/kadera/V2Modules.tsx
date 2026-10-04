@@ -6,6 +6,7 @@ import type { UpcomingEvent } from "@/lib/kadera-why";
 import type { IssueKeyword, SentimentPoint, ThemeRotation } from "@/lib/telegram-data";
 
 import { AiMark, Icon } from "../ui";
+import { V2Hint, type HintSpec } from "../V2Hint";
 
 /**
  * v2 국장 카더라의 부품 — '모듈' 한 장과 오른쪽 칸의 모듈 셋(2026-10-02 3차).
@@ -25,6 +26,7 @@ export function Module({
   aside,
   ai,
   className,
+  hint,
   children,
 }: {
   id?: string;
@@ -40,10 +42,12 @@ export function Module({
   /** 생성형 AI 가 쓴 문장을 담은 모듈이면 제목 앞에 AI 표시(이용약관 4조의 고지). */
   ai?: boolean;
   className?: string;
+  /** 처음 온 사람에게 한 번 띄우는 쪽지(app/V2Hint.tsx) — 보통 anchor 로 첫 줄을 가리킨다. */
+  hint?: HintSpec;
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className={`v2-mod${className ? ` ${className}` : ""}`}>
+    <section id={id} className={`v2-mod${className ? ` ${className}` : ""}${hint ? " v2-has-hint" : ""}`}>
       <header className="v2-mod-head">
         <h2>
           {ai && <AiMark size={13} />}
@@ -58,6 +62,7 @@ export function Module({
         {aside && <span className="v2-mod-aside">{aside}</span>}
       </header>
       {children}
+      {hint && <V2Hint {...hint} />}
     </section>
   );
 }
@@ -247,6 +252,9 @@ export function ThemeShares({
     <Module
       id="themes"
       title="테마 점유율"
+      // 줄이 테마 화면으로 가는 링크다(국장 · 미장 같은 id — 한 번 보면 둘 다 끝). 아래 첫 표 쪽지보다 위라 먼저 뜬다.
+      // 첫 li 는 머리 줄이라 둘째 li(첫 테마 줄)를 가리킨다.
+      hint={hrefOf && rows.length ? { id: "kadera-themes", order: 1, anchor: ".v2-tsh > li:nth-child(2)", text: "테마를 누르면 그 테마 종목과 이유가 나옵니다" } : undefined}
       // 머리엔 점유율의 기간만. 변화(+20.5%p)가 견준 기간(1주 전 같은 날들, lib/theme-flow.ts weekAgoDates)은 그 칸 머리가 말한다 —
       // 머리에 '최근 3일 · 1~2주 전 대비'로 나란히 두었더니 두 기간이 한 덩어리로 읽혀 헷갈렸다(2026-10-05 운영자 판단).
       meta="최근 3일"

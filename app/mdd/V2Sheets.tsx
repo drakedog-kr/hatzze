@@ -139,6 +139,9 @@ export function ThemeModule({ theme, onPick }: { theme: ThemeCmp; onPick: (s: St
         </>
       }
       className="v2-md-theme"
+      // 줄이 단추라(누르면 그 종목 MDD 로 바뀐다) 표처럼만 보인다. 이 종목 자신의 줄은 단추가 아니라 단추인 첫 줄을 가리킨다.
+      // 위 '역대 하락 사례' 쪽지를 본 뒤에 뜬다(app/V2Hint.tsx 차례).
+      hint={theme.peers.some((p) => !p.isSelf) ? { id: "mdd-peers", order: 2, anchor: ".v2-dd > li:has(> .v2-dd-row)", text: "종목을 누르면 그 종목의 낙폭으로 바뀝니다" } : undefined}
     >
       <DdList
         label={`${theme.name} 대표 종목 지금 낙폭`}
@@ -310,7 +313,13 @@ export function CasesTable({
 }) {
   const bench = benchName(market);
   return (
-    <Module title="역대 하락 사례" meta={`${periodLabel} · 깊은 순`} className="v2-md-cases-mod">
+    <Module
+      title="역대 하락 사례"
+      meta={`${periodLabel} · 깊은 순`}
+      className="v2-md-cases-mod"
+      // 줄이 단추다(누르면 위 물속 차트에 그 하락 구간이 칠해진다) — 생김새는 그냥 표라 눌러 볼 생각을 안 한다.
+      hint={{ id: "mdd-cases", order: 1, anchor: ".v2-md-case:not(.v2-md-case-th)", text: "줄을 누르면 차트에 그 하락 구간이 칠해집니다" }}
+    >
       <div className="v2-md-cases">
         <div className="v2-md-case v2-md-case-th" aria-hidden="true">
           <span>구간</span>

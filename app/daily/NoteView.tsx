@@ -176,7 +176,18 @@ function NoteStocksModule({ stocks, noteDate }: { stocks: NoteStocks; noteDate: 
   const stale = latest !== null && latest !== noteDate;
   const counts = `국내 ${stocks.kr.length} · 미국 ${stocks.us.length}`;
   return (
-    <Module id="stocks" title="언급된 종목" meta={stale ? `${fmtNoteDay(latest)} 종가 · ${counts}` : counts} className="v2-nt-stockmod">
+    <Module
+      id="stocks"
+      title="언급된 종목"
+      meta={stale ? `${fmtNoteDay(latest)} 종가 · ${counts}` : counts}
+      className="v2-nt-stockmod"
+      // 줄이 종목 화면으로 가는 링크다. 첫 줄이 국내면 카더라 · 미리보기와 같은 'stock-row', 미국 종목뿐이면 내부자 종목 화면이라 'stock-row-us'.
+      hint={
+        stocks.kr.length
+          ? { id: "stock-row", anchor: ".v2-nt-stocks > li:first-child", text: "종목을 누르면 언급 추이와 요즘 도는 얘기가 나옵니다" }
+          : { id: "stock-row-us", anchor: ".v2-nt-stocks > li:first-child", text: "종목을 누르면 월가 거물·임원 매매까지 함께 나옵니다" }
+      }
+    >
       <ul className="v2-nt-stocks">
         {stocks.kr.map((s) => {
           // 등락률은 늘 보인다 — 글 날의 값일 때만 두었더니 주말 · 연휴 글엔 등락이 통째로 빠졌다(2026-10-05 운영자 판단 "기존처럼 등락 %").
