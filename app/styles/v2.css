@@ -343,7 +343,8 @@ a.v2-tr:hover { background: var(--t-tint); }
    두 줄에선 넷이 잘렸다(2026-10-02, 판 1,440 · 칸 334px). 급부상 한 줄 · 움직인 까닭은 짧아 한두 줄로 끝난다. 전문은 줄 title. */
 .v2-td-text {
   min-width: 0;
-  padding: 9px 0;
+  /* 여백은 margin — padding 이면 세 줄 말줄임(내용 상자에서 자른다) 아래 여백 9px 안에 넷째 줄 윗반이 비쳤다(2026-10-05 점검). */
+  margin: 9px 0;
   font-weight: 500;
   line-height: 18px;
   color: var(--t-ink2);
@@ -1528,7 +1529,6 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   font-weight: 500;
   line-height: 16px;
   color: var(--c-ink);
-  opacity: 0.78;
   word-break: keep-all;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -1539,6 +1539,9 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 @container (max-width: 150px) or (max-height: 96px) {
   .hz-tm-tile .hz-tm-sub { display: none; }
 }
+/* '비슷' 칸 — v2 에선 --c-chip 이 거의 투명한 틴트라 흰 카드 위 1.06:1, 빈 구멍처럼 보였다(2026-10-05 점검). 중립 회색 막대 바탕으로. */
+.v2-tm .hz-tm-tile.is-flat,
+.v2-tm .hz-tm-sw.is-flat { background: var(--t-bar-off); }
 .v2-tm .hz-tm-legend { gap: 6px 16px; padding: 10px 14px 12px; font-size: 11px; font-weight: 500; color: var(--t-ink3); }
 .v2-tm .hz-tm-sw { width: 10px; height: 10px; border-radius: 2px; }
 
@@ -1555,6 +1558,9 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 /* 점유율 칸 88 — 72 이던 땐 머리 '최근 3일 점유율'이 '율'만 아랫줄로 떨어졌다(2026-10-04 지적). 머리는 한 줄로. */
 .v2-tm-flowtbl .v2-tr { grid-template-columns: 20px 336px minmax(0, 1fr) 88px 120px; min-height: 52px; }
 .v2-tm-flowtbl .v2-th > * { white-space: nowrap; }
+.v2-tm-flowtbl .v2-th { min-height: 44px; }
+/* 순위는 테마 이름 줄에 — 이름 · 종목 두 줄 칸이 줄 가운데를 정해 순위가 둘 사이에 떠 보였다(2026-10-05 점검). 테마 칸 위 여백 7 과 같은 줄. */
+.v2-tm-flowtbl .v2-tbody .v2-td-rank { align-self: start; margin-top: 7px; }
 .v2-td-theme2 { display: flex; flex-direction: column; gap: 1px; min-width: 0; padding: 7px 0; }
 .v2-td-theme2 b { font-weight: 600; overflow-wrap: anywhere; }
 .v2-td-share em,
@@ -1583,6 +1589,9 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 
 /* 뒤로 가기 줄(components/back-trail.tsx — 내부자 화면과 같이 쓴다) — v2 눈금(13)으로. 화면 제목이 걷혀 이 줄이 테마 이름을 말한다. */
 .v2-tm > nav { font-size: 13px; }
+/* 지금 화면 이름 — v2 에선 이 줄이 화면 제목 자리인데 400 으로 가장 가늘었다(2026-10-05 점검). 테마 · 종목 · 내부자 같이. */
+.v2-tm > nav .cn-breadcrumb-page,
+.v2-in > nav .cn-breadcrumb-page { font-weight: 600; }
 .v2-tm > nav * { font-size: inherit; }
 
 /* 테마 한 장 — 요즘 도는 얘기 · 30일 추이. 글 시작선 15(모듈 테두리 1 + 14). */
@@ -1600,6 +1609,36 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-tm-trend i.is-none { background: var(--t-bar-off); }
 /* 아직 안 끝난 날(오늘) — 옅게. 반나절치라 다른 날과 견줄 막대가 아니다(내부자 종목 상세 mentionPartial). */
 .v2-tm-trend i.is-part { opacity: 0.4; }
+/* 일정을 판 폭으로 쌓을 때(.v2-tm-stack · 1,000 미만 옆 칸) — 두 단을 세로 먼저 채운다(--ev-rows, ThemeDetailView). 줄 키는 제 글만큼.
+   폰(679 이하)은 한 단. */
+.v2-tm-stack { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.v2-tm-stack > .v2-mod { display: flex; flex-direction: column; }
+@container kd (min-width: 680px) {
+  .v2-tm-stack .v2-tm-events .v2-events {
+    grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr);
+    grid-template-rows: repeat(var(--ev-rows, 5), auto);
+    grid-auto-rows: auto;
+    grid-auto-flow: column;
+    column-gap: 12px;
+  }
+  .v2-tm-stack .v2-tm-events .v2-events li { grid-column: span 2; }
+}
+@container kd (min-width: 680px) and (max-width: 999px) {
+  .v2-tm:not(.v2-sk) .v2-tm-band.is-hot .v2-tm-events .v2-events {
+    grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr);
+    grid-template-rows: repeat(var(--ev-rows, 5), auto);
+    grid-auto-flow: column;
+    column-gap: 12px;
+  }
+  .v2-tm:not(.v2-sk) .v2-tm-band.is-hot .v2-tm-events .v2-events li { grid-column: span 2; }
+}
+/* 1,000 이상 — 범례를 숫자 줄 오른쪽 끝으로 올린다. 범례 줄 28px 가 빠져 짧은 요약 옆 추이 칸이 키를 덜 정하고, 숫자 줄 오른쪽 191px 빈자리가 찬다(2026-10-05 점검). */
+@container kd (min-width: 1000px) {
+  .v2-tm-trendbody:has(> .v2-tm-legend) { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto minmax(56px, 1fr); column-gap: 12px; }
+  .v2-tm-trendbody:has(> .v2-tm-legend) > .v2-tm-figs { grid-area: 1 / 1; }
+  .v2-tm-trendbody:has(> .v2-tm-legend) > .v2-tm-legend { grid-area: 1 / 2; align-self: end; }
+  .v2-tm-trendbody:has(> .v2-tm-legend) > .v2-tm-trend { grid-area: 2 / 1 / 3 / 3; }
+}
 .v2-tm-legend { display: flex; gap: 14px; font-size: 11px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
 .v2-tm-legend > span { display: inline-flex; align-items: center; gap: 5px; }
 .v2-tm-legend i { width: 10px; height: 10px; border-radius: 2px; background: color-mix(in srgb, var(--t-down) 35%, transparent); }
@@ -1622,6 +1661,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-tm-events .v2-ev-row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; }
 .v2-tm-events .v2-daypill { justify-self: start; }
 .v2-tm-events .v2-event-txt:last-child { grid-column: 2 / -1; }
+.v2-tm-events .v2-event-txt { text-wrap: pretty; }
 .v2-tm-pills { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 14px; }
 .v2-tm-pill {
   height: 26px;
@@ -1659,7 +1699,19 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   .v2-in .v2-tm-band.is-brief { grid-template-columns: 216px minmax(0, 1fr); }
   .v2-tm-band.is-pair { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .v2-tm-band.is-hot > .v2-tm-side { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
-  .v2-tm-flowtbl .v2-tr { grid-template-columns: 20px 288px minmax(0, 1fr) 88px 108px; }
+  /* 테마 한 장 — 일정 | 함께 거론되는 테마 두 칸이면 알약 칸이 일정 키로 늘어 아래 171~363px 가 비었다(2026-10-05 점검).
+     한 줄기(일정 → 함께 거론되는 테마)로 쌓는다. 일정 두 단은 아래 680 이상 규칙. */
+  .v2-tm:not(.v2-sk) .v2-tm-band.is-hot > .v2-tm-side { display: flex; }
+  /* 줄 키는 제 글만큼 — 1fr 로 고르게 받으면 두 줄짜리 하나에 열한 줄이 다 52px 로 늘었다(폰 반도체). */
+  .v2-tm-events .v2-events { grid-auto-rows: auto; }
+  /* 테마 흐름 — 두 층(위 순위 · 테마 · 점유율 · 열흘, 아래 문장 판 폭). 다섯 칸 한 줄이면 문장 칸이 124~264px 로 짓눌렸다(2026-10-05 점검, 960~1,100). */
+  .v2-tm-flowtbl .v2-tr { grid-template-columns: 20px minmax(0, 1fr) 88px 108px; grid-template-areas: "rank theme share flow" ".    text  text  text"; }
+  .v2-tm-flowtbl .v2-th > :nth-child(3) { display: none; }
+  .v2-tm-flowtbl .v2-td-rank { grid-area: rank; }
+  .v2-tm-flowtbl .v2-td-theme2 { grid-area: theme; }
+  .v2-tm-flowtbl .v2-td-share { grid-area: share; }
+  .v2-tm-flowtbl .v2-td-flow2 { grid-area: flow; }
+  .v2-tm-flowtbl .v2-td-text { grid-area: text; margin-top: 0; }
   .v2-tm-risertbl .v2-tr { grid-template-columns: 88px 220px minmax(0, 1fr) 80px; }
   .v2-tm-reasonrows .v2-tr { grid-template-columns: 200px minmax(0, 1fr) 80px 64px 72px; }
   .v2-tm-days.no-close .v2-tm-reasonrows .v2-tr { grid-template-columns: 200px minmax(0, 1fr) 72px 72px; }
@@ -1687,6 +1739,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
     padding-bottom: 8px;
   }
   .v2-tm-flowtbl .v2-td-theme2 { grid-area: theme; padding: 0; }
+  .v2-tm-flowtbl .v2-tbody .v2-td-rank { margin-top: 0; }
   .v2-tm-flowtbl .v2-td-share { grid-area: share; }
   .v2-tm-flowtbl .v2-td-flow2 { grid-area: flow; flex-direction: row; align-items: baseline; justify-content: flex-start; gap: 8px; }
   .v2-tm-risertbl .v2-tr,

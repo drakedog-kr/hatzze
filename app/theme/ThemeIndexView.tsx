@@ -43,24 +43,6 @@ function flowCaption(t: ThemeOverview): { text: string; on: boolean } {
 /** 흐름 표의 줄 수 — 상위 열 줄이면 지금 화제인 테마가 다 들어온다. 더 보기는 두지 않는다(2026-09-21) — 나머지는 지도에 있다. */
 const FLOW_ROWS = 10;
 
-/** 점유율이 며칠째 같은 방향인가 — 테마 화면 추이의 "n일째 · 오르는 중"과 같은 셈(집계 있는 날만, 마지막 날부터 거슬러). */
-function shareStreak(t: ThemeOverview): { dir: 1 | -1 | 0; days: number } {
-  const pts = t.flow.map((r, i) => (r == null ? null : t.shareFlow[i])).filter((v): v is number => v != null);
-  let dir: 1 | -1 | 0 = 0;
-  let days = 0;
-  for (let i = pts.length - 1; i > 0; i--) {
-    const diff = pts[i] - pts[i - 1];
-    const d = diff > 0 ? 1 : diff < 0 ? -1 : 0;
-    if (dir === 0) {
-      if (d === 0) break;
-      dir = d;
-    }
-    if (d !== dir) break;
-    days += 1;
-  }
-  return { dir, days };
-}
-
 /**
  * 태그 글자 — 바로 옆 칸의 **횟수**(최근 · 그 전)와 같은 잣대로 적는다. 몫의 배수(r.ratio, 줄 세우는 잣대)를 적으면 '39회 · 그 전 3회'
  * 옆에 '31.0배'가 서서 셈이 안 맞았다(2026-10-04 점검). 꼴은 테마 화면 '말 많은 종목'과 같다(3배부터 반올림 · 10배 넘게에서 멈춤).
@@ -122,7 +104,14 @@ export function ThemeIndexView({
           .sort((a, b) => a.rank - b.rank),
         (t) => t.theme,
       );
-  const climber = fresh || dropped ? null : pick(all.filter((t) => (t.rankChange ?? 0) > 0).sort((a, b) => (b.rankChange as number) - (a.rankChange as number)), (t) => t.theme);
+  // 흐름 표(FLOW_ROWS)에 서는 테마만 — 18위 '음식료 +6계단'은 표에도 지도 이름에도 없어 띠를 본 사람이 찾을 수 없었다(2026-10-05 점검).
+  const climber =
+    fresh || dropped
+      ? null
+      : pick(
+          all.filter((t) => (t.rankChange ?? 0) > 0 && t.rank <= FLOW_ROWS).sort((a, b) => (b.rankChange as number) - (a.rankChange as number)),
+          (t) => t.theme,
+        );
   const coverLinks: CoverLink[] = [
     gainer ? { cap: "가장 많이 늘어난 테마", name: gainer.theme, val: pp(gainer.shareDelta as number), tone: "up" as const, href: market.themeHref(gainer.theme), ga: "theme_cover_gainer" } : null,
     loser ? { cap: "가장 많이 줄어든 테마", name: loser.theme, val: pp(loser.shareDelta as number), tone: "down" as const, href: market.themeHref(loser.theme), ga: "theme_cover_loser" } : null,
@@ -142,15 +131,14 @@ export function ThemeIndexView({
         {coverLinks.map((c) => (
           <CoverLinkCell key={c.ga} c={c} />
         ))}
-        <CoverMeta
-          updated={updatedAt ? formatKstUpdate(updatedAt, "업데이트") : "업데이트 준비 중"}
-          // 띠의 '+20.5%p'는 평소(5일 이상 전 평균) 대비 — 업데이트 칸 근거에 적는다(2026-10-04 점검).
-          basis={themes ? `테마 ${themes.length}개 · 최근 ${KADERA_WINDOW_DAYS}일 언급 · 평소 대비` : null}
-        />
+        {/* 근거는 걷었다 — '최근 3일 언급'은 지도 머리, 견준 기간은 흐름 머리가 말한다. 근거를 붙이면 링크 칸 셋 뒤 업데이트가
+            1,280 · 1,366 · 1,440(미장)에서 둘째 줄로 내려가 띠 절반이 비었다(2026-10-05 점검). */}
+        <CoverMeta updated={updatedAt ? formatKstUpdate(updatedAt, "업데이트") : "업데이트 준비 중"} />
       </div>
 
       {/* 둘째 줄 — 점유율 지도. 판 폭 전체에 낮게(3:1) — 칸 크기 = 최근 3일 언급 점유율, 색 = 5일 전 대비 변화. 누르면 그 테마 화면. */}
-      <Module title="테마 점유율 지도" meta={`최근 ${KADERA_WINDOW_DAYS}일 언급 점유율`} className="v2-tm-map">
+      {/* 견준 기간을 글자로 — '평소'는 테마 한 장에서 다른 잣대(말 많은 종목 태그 · 앞 27일)라 두 뜻이 됐다(2026-10-05 점검). */}
+      <Module title="테마 점유율 지도" meta={`최근 ${KADERA_WINDOW_DAYS}일 언급 점유율 · 1~2주 전 대비`} className="v2-tm-map">
         {themes === null ? (
           <p className="v2-empty">테마 집계를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오.</p>
         ) : themes.length === 0 ? (
@@ -162,7 +150,7 @@ export function ThemeIndexView({
             </div>
             {/* 색은 평소(5일 이상 전 평균) 대비 변화 — '변화 ±0.3%p 안'은 무엇과 견준 변화인지 안 읽혔다(2026-10-04 점검). */}
             <div className="v2-tm-map-legend">
-              <TreemapLegend up="평소보다 늘어난 테마" flat="평소와 비슷" down="평소보다 줄어든 테마" />
+              <TreemapLegend up="늘어난 테마" flat="비슷" down="줄어든 테마" />
             </div>
             {/* 폰은 지도 대신 막대 하나(앞 다섯 + 나머지) — 3:2 지도에선 26칸 중 이름이 든 칸이 하나뿐이었다(2026-10-04 점검). */}
             <div className="v2-tm-map-bar">
@@ -187,7 +175,7 @@ export function ThemeIndexView({
         ai
         // 점유율 아래 +%p 는 평소(5일 이상 전 평균) 대비 — 머리에 적는다(2026-10-04 점검).
         // 날짜 범위는 뺐다 — 열흘 값처럼 읽혔는데 점유율 칸은 최근 3일이고 열흘은 마지막 칸('최근 10일' 머리 · 줄 툴팁)뿐이다(2026-10-04 점검).
-        meta={`점유율 상위 ${FLOW_ROWS} · 평소 대비`}
+        meta={`점유율 상위 ${FLOW_ROWS} · 1~2주 전 대비`}
       >
         {themes === null || themes.length === 0 ? (
           <p className="v2-empty">{themes === null ? "테마 집계를 지금 불러오지 못했습니다." : "아직 집계된 테마가 없습니다."}</p>
@@ -203,7 +191,6 @@ export function ThemeIndexView({
             <ol className="v2-tbody">
               {themes.slice(0, FLOW_ROWS).map((t) => {
                 const cap = flowCaption(t);
-                const st = shareStreak(t);
                 const d = t.shareDelta;
                 return (
                   <li key={t.theme}>
@@ -232,10 +219,10 @@ export function ThemeIndexView({
                         {t.sharePct.toFixed(1)}%
                         {d != null && Math.abs(d) >= 0.05 && <em className={d > 0 ? "is-up" : "is-down"}>{pp(d)}</em>}
                       </span>
-                      {/* 열흘 — 지속 · 첫 등장 · 간헐 한 조각, 점유율이 이틀 넘게 같은 쪽으로 가면 그 방향을 아래 작게. */}
+                      {/* 열흘 — 지속 · 첫 등장 · 간헐 한 조각. ⛔ 'n일째 오르는 중'은 걷었다 — 바로 옆 '-3.0%p'(1~2주 전 대비)와 잣대가 달라
+                          한 줄에 반대말로 섰다(2026-10-05 점검). 날마다의 방향은 테마 한 장 30일 추이의 몫이다. */}
                       <span className="v2-td-two v2-td-flow2">
                         <span className={`v2-td-flow${cap.on ? " is-on" : ""}`}>{cap.text}</span>
-                        {st.days >= 2 && st.dir !== 0 && <em className={st.dir > 0 ? "is-up" : "is-down"}>{st.days}일째 {st.dir > 0 ? "오르는 중" : "내리는 중"}</em>}
                       </span>
                     </Link>
                   </li>
@@ -279,7 +266,8 @@ export function ThemeIndexView({
                     <span className="v2-td-text">{r.reason}</span>
                     <span className="v2-td-num v2-td-two">
                       {r.recent.toLocaleString("ko-KR")}회
-                      <em>그 전 {r.prior.toLocaleString("ko-KR")}회</em>
+                      {/* '앞 3일' — 태그('앞 3일의 9배')와 같은 말로. '새로 등장'(앞 3일 0회)이면 태그가 이미 말해 적지 않는다(2026-10-05 점검). */}
+                      {r.prior > 0 && <em>앞 3일 {r.prior.toLocaleString("ko-KR")}회</em>}
                     </span>
                   </div>
                 </li>

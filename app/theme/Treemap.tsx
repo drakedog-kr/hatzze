@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { marketThemeHref, themeStockHref, type ThemeMarketKey } from "@/lib/theme-href";
 import type { ThemeHotStock, ThemeOverview } from "@/lib/theme-page";
-import { stockTone, usualDeltaShort, usualDeltaText } from "@/lib/stock-usual";
+import { stockTone, usualDeltaText } from "@/lib/stock-usual";
 import { squarify } from "@/lib/treemap";
 
 import { MONO } from "../ui";
@@ -63,7 +63,6 @@ export type TreemapTile = {
   /** 툴팁·aria-label. */
   tip: string;
   valueText: string;
-  deltaText?: string;
   /** 큰 칸(lg)에만 서는 곁줄 — 테마 칸이면 그 테마의 말 많은 종목. 가장 큰 칸이 판 절반을 빈 색 면으로 쓰던 것을 채운다(v2, 2026-10-03). */
   sub?: string;
 };
@@ -78,7 +77,6 @@ export function themeTiles(themes: ThemeOverview[], market: ThemeMarketKey = "kr
     href: marketThemeHref(market, t.theme),
     tip: `${t.theme} · 점유율 ${t.sharePct.toFixed(1)}% · ${fmtDelta(t.shareDelta)} · ${t.rank}위`,
     valueText: `${t.sharePct.toFixed(1)}%`,
-    deltaText: fmtDelta(t.shareDelta),
     sub: t.topStocks.length ? t.topStocks.map((x) => x.name).join(" · ") : undefined,
   }));
 }
@@ -103,7 +101,6 @@ export function stockTiles(stocks: ThemeHotStock[], market: ThemeMarketKey = "kr
     // 채널 수(하루 최다 n곳)는 뺐다(2026-09-22) — 이 지도가 말하는 것은 언급의 크기와 평소와의 차이 둘이고, 셋째 값은 칸마다 다른 잣대를 하나 더 얹는다.
     tip: `${s.name} · 최근 3일 ${s.mentions.toLocaleString("ko-KR")}회 · ${usualDeltaText(s.mentions, s.usualMentions)}`,
     valueText: `${s.mentions.toLocaleString("ko-KR")}회`,
-    deltaText: usualDeltaShort(s.mentions, s.usualMentions),
   }));
 }
 
@@ -172,9 +169,9 @@ export function Treemap({
                 {/* 점 앞은 붙이고(\u2060) 점 뒤에 끊을 자리(\u200b)를 둔다 — '전기차·자율주 / 행' 대신 '전기차· / 자율주행'. */}
                 <span className="hz-tm-name">{t.label.replace(/·/g, "\u2060·\u200b")}</span>
                 {size !== "sm" && size !== "tall" && (
+                  // 큰 칸에도 변화(+12.3%p)는 적지 않는다 — 띠 · 흐름 표와 한 화면에 세 번 섰고, 칸 색이 이미 말한다(2026-10-05 점검). 툴팁엔 있다.
                   <span className="hz-tm-val" style={{ fontFamily: MONO }}>
                     {t.valueText}
-                    {size === "lg" && t.deltaText && <span className="hz-tm-delta">{t.deltaText}</span>}
                   </span>
                 )}
                 {size === "lg" && t.sub && <span className="hz-tm-sub">{t.sub}</span>}

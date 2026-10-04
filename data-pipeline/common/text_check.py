@@ -418,3 +418,13 @@ def problems(text: str, source: str | None = None, *, slips: bool = True) -> lis
 def is_clean(text: str, source: str | None = None, *, slips: bool = True) -> bool:
     """문제가 하나도 없으면 True. 호출부의 재시도 루프 합격 조건에 쓴다."""
     return not problems(text, source, slips=slips)
+
+
+# 한글 낱말 + 조사 '와 · 과' 바로 뒤에 라틴 글자가 붙은 자리 — '삼성전자와SK하이닉스를'(2026-10-05 점검, 테마 요약).
+# 모델이 띄어쓰기를 흘린 것이라 다시 묻지 않고 기계로 띄운다. 라틴 글자 **뒤** 조사는 붙여 쓰는 게 맞으니('SK하이닉스와') 건드리지 않는다.
+_GLUED_JOSA_LATIN = re.compile(r"([가-힣](?:와|과))([A-Za-z])")
+
+
+def fix_glued_josa_latin(text: str) -> str:
+    """'…와SK' · '…과AI' 를 '…와 SK' · '…과 AI' 로 띄운다."""
+    return _GLUED_JOSA_LATIN.sub(r"\1 \2", text)

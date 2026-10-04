@@ -9,7 +9,7 @@ import { US_THEMES } from "./us-stock-themes";
 import { getUsEventsForTickers } from "./kadera-us-why";
 import { prevWindowRanks, thinDays, usableDays, withTodayRank } from "./theme-flow";
 import { themeDetailWindow } from "./theme-window";
-import { verifiedChange } from "./quoted-change";
+import { verifiedChangesOnce } from "./quoted-change";
 import { fetchDailyHistory, yahooSymbol } from "./yahoo-history";
 import {
   THEME_FLOW_DAYS,
@@ -143,11 +143,20 @@ export const getUsThemePage = cache(async (theme: string): Promise<ThemePageData
       [...new Set(reasonList.map((r) => r.ticker))].map(async (t) => [t, await fetchDailyHistory(yahooSymbol(t, "US"), 0.15).catch(() => null)] as const),
     ),
   );
+  // 같은 세션은 종목마다 한 번만 싣는다(verifiedChangesOnce) — 나흘 연속 같은 +0.90% 가 섰다(2026-10-05 점검).
+  const changeOf = new Map<ReasonRow, number | null>();
+  for (const t of new Set(reasonList.map((r) => r.ticker))) {
+    const mine = reasonList.filter((r) => r.ticker === t);
+    const ch = verifiedChangesOnce(
+      mine.map((r) => ({ quoted: r.quoted_change_rate == null ? null : Number(r.quoted_change_rate), date: r.date })),
+      barsOf.get(t) ?? null,
+    );
+    mine.forEach((r, i) => changeOf.set(r, ch[i]));
+  }
   const reasons: ThemeReasonRow[] = [];
   for (const r of reasonList) {
     const m = byCode.get(r.ticker)!;
-    const quoted = r.quoted_change_rate == null ? null : Number(r.quoted_change_rate);
-    reasons.push({ ...m, date: r.date, reason: r.reason!, changeRate: verifiedChange(quoted, r.date, barsOf.get(r.ticker) ?? null), close: null, channelCount: r.channel_count ?? 0 });
+    reasons.push({ ...m, date: r.date, reason: r.reason!, changeRate: changeOf.get(r) ?? null, close: null, channelCount: r.channel_count ?? 0 });
   }
   const reasonDates = new Set(reasons.map((r) => r.date));
 

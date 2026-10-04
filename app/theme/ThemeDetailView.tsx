@@ -130,6 +130,11 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
     ...vagueEvents.map((e) => ({ e, pill: eventDateLabel(e), today: false })),
   ].slice(0, Math.max(6, hotRows + 2));
 
+  // 일정이 주인공 표 줄 수의 70% 가 안 되면 옆 칸에 두지 않는다 — 일정 줄이 주인공 키를 나눠 받아 한 줄이 84~187px 로 늘어 칸이 텅 비었다
+  // (방산 2건 · 미장 메모리 1건 · 미장 AI반도체 5건, 2026-10-05 점검). 그때는 주인공을 판 폭으로 펴고 그 아래에 일정(두 단) → 함께 거론되는
+  // 테마를 판 폭으로 쌓는다. 짝(두 칸)으로 두면 키가 같아져 알약 칸 아래가 비었다.
+  const solo = events.length < hotRows * 0.7;
+
   /* 등락의 이유 — 기준일까지의 이레를 날짜로 묶는다(오래된 날이 위 · 달력 순서, 같은 날은 여러 채널이 말한 것이 먼저). */
   const reasonEnd = d.baseDate;
   const reasonStart = addDaysISO(reasonEnd, -(REASON_DAYS - 1));
@@ -162,7 +167,8 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
         {events.length === 0 ? (
           <p className="v2-empty">앞으로 {CALENDAR_DAYS / 7}주 안에 짚인 이 테마 종목의 일정이 아직 없습니다.</p>
         ) : (
-          <ul className="v2-events">
+          // --ev-rows — 두 단으로 세로 먼저 채울 때의 줄 수(판 폭으로 쌓일 때 · 1,000 미만 옆 칸, v2.css .v2-tm-events).
+          <ul className="v2-events" style={{ ["--ev-rows" as string]: Math.ceil(events.length / 2) }}>
             {events.map(({ e, pill, today: isToday }) => (
               <li key={`${e.code}-${e.date}-${e.event}`}>
                 <Link href={market.stockHref(e.code)} className="v2-ev-row" data-ga="theme_event_click">
@@ -240,10 +246,11 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
             <span className="v2-cover-v">
               <em>평균</em>
               <b className={toneCls(d.quotes.avgChange).trim() || undefined}>{signPct(d.quotes.avgChange)}</b>
+              {/* 종목 수는 색만 — 한 줄에 굵은 덩어리가 셋이었다(2026-10-05 점검). 굵게는 평균 등락 하나. */}
               <em>오른 종목</em>
-              <b className="is-up">{d.quotes.up}</b>
+              <span className="v2-cover-chg is-up">{d.quotes.up}</span>
               <em>내린 종목</em>
-              <b className="is-down">{d.quotes.down}</b>
+              <span className="v2-cover-chg is-down">{d.quotes.down}</span>
             </span>
           </div>
         )}
@@ -252,7 +259,8 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
 
       {/* 둘째 줄 — [요즘 도는 얘기 | 30일 점유율 추이]. 글이 키를 정하고 막대가 남는 높이를 받는다. */}
       <div className="v2-tm-band is-brief">
-        <Module title="요즘 도는 얘기" ai meta={d.brief ? `${fmtKoDate(d.brief.date)} · 최근 ${KADERA_WINDOW_DAYS}일 채널 글` : undefined}>
+        {/* 모듈 머리 날짜는 모두 M/D — 한 화면에 '10/2~10/4' · '9월 28일 ~ 10월 4일' 두 꼴이 섰다(2026-10-05 점검). 알약(10/7(수))과 같은 꼴이다. */}
+        <Module title="요즘 도는 얘기" ai meta={d.brief ? `${mdShort(d.brief.date)} · 최근 ${KADERA_WINDOW_DAYS}일 채널 글` : undefined}>
           {d.brief?.brief ? (
             <div className="v2-brief">
               {/* 두 문단(파이프라인이 빈 줄로 가른다). 첫 문단은 가장 크게 오간 이야기, 둘째는 그 밖의 이야기. */}
@@ -272,7 +280,7 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
           )}
         </Module>
 
-        <Module title={`${THEME_TREND_DAYS}일 점유율 추이`} meta={trendFrom && trendTo ? `${fmtKoDate(trendFrom)} ~ ${fmtKoDate(trendTo)}` : undefined} className="v2-tm-trendmod">
+        <Module title={`${THEME_TREND_DAYS}일 점유율 추이`} meta={trendFrom && trendTo ? `${mdShort(trendFrom)}~${mdShort(trendTo)}` : undefined} className="v2-tm-trendmod">
           {d.loadFailed ? (
             <p className="v2-empty">집계를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오.</p>
           ) : (
@@ -287,9 +295,10 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
                   <em>{THEME_TREND_DAYS}일 평균</em>
                 </span>
                 {/* "1일 · 연속 내린 날"은 30일 중 하루가 그랬다는 말로 읽혔다(2026-09-21). "1일째 · 내리는 중"이면 지금 진행형이다. */}
+                {/* 하루뿐이면 '1일째 오르는 중' 대신 '어제보다 오름'(목록은 이틀부터 적던 것과 맞춘다, 2026-10-05 점검). */}
                 <span>
-                  <b>{streakDays ? `${streakDays}일째` : "-"}</b>
-                  <em>{streakDir < 0 ? "내리는 중" : streakDir > 0 ? "오르는 중" : "어제와 같음"}</em>
+                  <b>{streakDays === 1 ? "어제보다" : streakDays ? `${streakDays}일째` : "-"}</b>
+                  <em>{streakDays === 1 ? (streakDir < 0 ? "내림" : "오름") : streakDir < 0 ? "내리는 중" : streakDir > 0 ? "오르는 중" : "어제와 같음"}</em>
                 </span>
               </div>
               <Trend points={d.trend} recent={recentSet} />
@@ -308,7 +317,7 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
       </div>
 
       {/* 셋째 줄 — [이 테마의 주인공 | 다가오는 일정 · 함께 거론되는 테마]. 주인공 열 줄이 키를 정하고 오른쪽 일정 줄이 그 높이를 나눠 받는다. */}
-      <div className={`v2-tm-band is-hot${events.length ? "" : " is-solo"}`}>
+      <div className={`v2-tm-band is-hot${solo ? " is-solo" : ""}`}>
         {/* 이름은 목록 화면과 같은 '말 많은 종목'(2026-10-04 점검). 채널이 말한 이유 칸이 AI 글이라 고지는 머리에. */}
         {/* 사흘을 날짜로 — 이 화면의 사흘은 기준일을 넣고(2026-09-29 결정), 종목 화면 · 카더라는 기준일 앞 사흘이라 같은 '최근 3일'에
             숫자가 달랐다(삼성전자 318회 · 612회, 2026-10-04 점검). */}
@@ -373,19 +382,18 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
           )}
         </Module>
 
-        {events.length > 0 && <div className="v2-tm-side">{sideMods}</div>}
+        {!solo && <div className="v2-tm-side">{sideMods}</div>}
       </div>
 
-      {events.length === 0 && <div className="v2-tm-band is-pair">{sideMods}</div>}
+      {solo && <div className="v2-tm-stack">{sideMods}</div>}
 
       {/* 넷째 줄 — 등락의 이유(기준일까지의 이레). 날짜 머리 하나 아래 그날 종목들 — 줄은 종목 · 까닭(남는 폭) · 종가 · 등락 · 채널 수.
           숫자는 줄 오른쪽 끝에 모은다(2026-10-04) — 등락이 종목과 까닭 사이에 있을 땐 '+3.27%'와 까닭 첫 낱말이 붙어 읽혔다.
           종가는 % 앞에(같은 날 요청). 미장은 그날 종가가 없어(lib/theme-page.ts ThemeReasonRow.close) 그 칸째 걷는다. */}
       {/* '크게 움직인 날'은 뺐다 — 이유 후보엔 많이 언급된 종목도 들어 −0.98% 같은 작은 움직임 줄이 섞인다(2026-10-04 점검). */}
-      <Module title="등락의 이유" meta={`${fmtKoDate(reasonStart)} ~ ${fmtKoDate(reasonEnd)} · 채널이 이유를 단 종목`} className="v2-tm-reasons" ai>
-        {reasonDays.length === 0 ? (
-          <p className="v2-empty">최근 {REASON_DAYS}일 사이 이 테마 종목에 붙은 이유가 없습니다.</p>
-        ) : (
+      {/* 이유가 하나도 없는 주는 모듈째 그리지 않는다 — 문장 한 줄짜리 판 폭 모듈이 섰다(방산, 2026-10-05 점검). */}
+      {reasonDays.length > 0 && (
+        <Module title="등락의 이유" meta={`${mdShort(reasonStart)}~${mdShort(reasonEnd)} · 채널이 이유를 단 종목`} className="v2-tm-reasons" ai>
           <div className={`v2-tm-days${anyClose ? "" : " no-close"}`}>
             {reasonDays.map(([date, list]) => (
               <section key={date} aria-label={fmtKoWd(date)}>
@@ -415,8 +423,8 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
               </section>
             ))}
           </div>
-        )}
-      </Module>
+        </Module>
+      )}
     </div>
   );
 }

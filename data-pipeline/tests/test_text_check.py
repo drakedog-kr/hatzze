@@ -24,3 +24,13 @@ def test_latin_between_hangul_is_caught():
 
 def test_control_char_is_caught():
     assert any("제어문자" in p for p in problems("지표가\x07 올랐습니다."))
+
+
+def test_fix_glued_josa_latin():
+    from common.text_check import fix_glued_josa_latin
+
+    assert fix_glued_josa_latin("삼성전자와SK하이닉스를") == "삼성전자와 SK하이닉스를"
+    assert fix_glued_josa_latin("결과AI 투자") == "결과 AI 투자"
+    # 라틴 글자 뒤 조사는 그대로(붙여 쓰는 게 맞다)
+    assert fix_glued_josa_latin("SK하이닉스와 삼성전자") == "SK하이닉스와 삼성전자"
+    assert fix_glued_josa_latin("엔비디아와 AMD") == "엔비디아와 AMD"

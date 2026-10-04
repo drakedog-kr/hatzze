@@ -51,7 +51,7 @@ from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 from common.broadcast_content import banned_hits  # noqa: E402
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.supabase_client import get_client, load_all, load_all_keyset  # noqa: E402
-from common.text_check import glued_names, is_clean, problems  # noqa: E402
+from common.text_check import fix_glued_josa_latin, glued_names, is_clean, problems  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 from config.stock_extraction import is_house  # noqa: E402
 from config.stock_themes import THEMES  # noqa: E402
@@ -206,7 +206,8 @@ def normalize_paragraphs(text: str) -> str:
     """문단 사이를 빈 줄 하나로 고른다. 모델이 줄바꿈 하나로 문단을 가르거나 빈 줄을 둘 두기도 해서,
     저장 형식을 '\n\n' 하나로 못박는다(화면은 이걸로 <p> 를 가른다)."""
     paras = [p.strip() for p in re.split(r"\n\s*\n|\n", text.strip()) if p.strip()]
-    return "\n\n".join(paras)
+    # 조사 뒤 라틴 글자 띄움도 여기서 — 국장 · 미장(generate_us_theme_briefs.py 가 TB.write_brief 로 부른다) 요약이 함께 거친다.
+    return fix_glued_josa_latin("\n\n".join(paras))
 
 
 def paragraph_count(text: str) -> int:

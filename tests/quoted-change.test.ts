@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { verifiedChange } from "../lib/quoted-change.ts";
+import { verifiedChange, verifiedChangesOnce } from "../lib/quoted-change.ts";
 
 const bars = [
   { date: "2026-09-29", close: 100 },
@@ -20,6 +20,20 @@ describe("verifiedChange", () => {
   it("맞는 세션이 없으면 비운다(터무니없는 값 · 방향이 반대인 값)", () => {
     assert.equal(verifiedChange(22.1, "2026-10-03", bars), null);
     assert.equal(verifiedChange(-3, "2026-10-03", bars), null);
+  });
+
+  it("같은 세션은 종목마다 한 번만 — 가장 이른 글이 가져가고 나머지는 비운다(2026-10-05 점검)", () => {
+    const out = verifiedChangesOnce(
+      [
+        { quoted: 5, date: "2026-10-04" },
+        { quoted: 5, date: "2026-10-03" },
+        { quoted: -2, date: "2026-10-02" },
+      ],
+      bars,
+    );
+    assert.equal(out[0], null);
+    assert.ok(out[1] !== null && Math.abs(out[1] - 4.95) < 0.01);
+    assert.ok(out[2] !== null && Math.abs(out[2] + 1.94) < 0.01);
   });
 
   it("글 날짜보다 뒤 세션이나 너무 앞 세션은 안 본다", () => {

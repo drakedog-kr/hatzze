@@ -247,8 +247,9 @@ export function ThemeShares({
     <Module
       id="themes"
       title="테마 점유율"
-      // 변화(+20.5%p)가 무엇과 견준 값인지는 표 머리 줄 '평소 대비'가 말한다 — 평소 = 5일 이상 전 평균(lib/telegram-data.ts THEME_PRIOR_GAP_DAYS).
-      meta="최근 3일"
+      // 변화(+20.5%p)가 무엇과 견준 값인지 머리에 — 5~14일 전 평균(lib/telegram-data.ts THEME_PRIOR_GAP_DAYS). '평소'라 부르면 테마 한 장의
+      // '평소'(말 많은 종목 태그 · 앞 27일)와 두 뜻이 돼 기간을 글자로 적는다(테마 판세와 같은 말, 2026-10-05 점검).
+      meta="최근 3일 · 1~2주 전 대비"
       // 테마 전체 보기는 이 머리 오른쪽에 둔다(2026-10-03) — 첫 줄 띠 끝에 있을 땐 띠가 1,280 에서 두 줄로 접혔고, 목록을 보다 넘어가는 자리가 여기다.
       aside={
         hrefOf && (
@@ -270,7 +271,7 @@ export function ThemeShares({
               <span>테마</span>
               <span />
               <span>점유율</span>
-              <span>평소 대비</span>
+              <span>변화</span>
             </span>
           </li>
           {rows.map((t, i) => {

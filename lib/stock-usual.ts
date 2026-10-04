@@ -79,10 +79,10 @@ export function usualDeltaShort(mentions: number, usual: number): string {
   return `${pct > 0 ? "+" : "-"}${Math.abs(pct)}%`; // 하이픈 — 띠 · 표의 '-0.60%'와 같은 글자(U+2212 를 쓰면 꼴이 갈렸다)
 }
 
-/** 평소와 견준 언급 변화 한 마디 — "평소 대비 +60% 언급" · "평소의 3배 언급" · "새로 등장". 표 태그와 지도 툴팁이 같이 쓴다. */
+/** 평소와 견준 언급 변화 한 마디 — "평소 대비 +60%" · "평소의 3배" · "새로 등장". 표 태그와 지도 툴팁이 같이 쓴다.
+ *  끝의 '언급'은 뗐다 — 열 줄 태그가 모두 '…언급'으로 끝났고, 표 머리('말 많은 종목 · 언급')가 이미 말한다(2026-10-05 점검). */
 export function usualDeltaText(mentions: number, usual: number): string {
   const short = usualDeltaShort(mentions, usual);
-  if (short === "새로 등장") return short;
-  if (short === "평소만큼") return "평소만큼 언급";
-  return short.endsWith("%") ? `평소 대비 ${short} 언급` : `평소의 ${short} 언급`;
+  if (short === "새로 등장" || short === "평소만큼") return short;
+  return short.endsWith("%") ? `평소 대비 ${short}` : `평소의 ${short}`;
 }

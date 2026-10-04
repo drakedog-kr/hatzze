@@ -74,6 +74,34 @@ describe("groupEventRows", () => {
     assert.equal(eventKind("신주 상장"), "상장");
   });
 
+  it("발행가 · 납입 · 판매 개시 표기가 갈려도 한 줄 — 공고와 청약은 따로(2026-10-05 점검)", () => {
+    const out = groupEventRows([
+      row("247540", "a", "2026-10-13", "day", "확정 발행가액 공고"),
+      row("247540", "b", "2026-10-13", "day", "2차 발행가액 확정 공고"),
+      row("247540", "c", "2026-10-15", "day", "유상증자 청약"),
+      row("247540", "a", "2026-10-23", "day", "유상증자 납입"),
+      row("247540", "b", "2026-10-23", "day", "유상증자 납입 기일"),
+      row("NVDA", "a", "2026-10-23", "day", "DGX Spark 64GB/128GB 판매 개시"),
+      row("NVDA", "b", "2026-10-23", "day", "DGX Spark 출시"),
+    ]);
+    assert.equal(out.filter((e) => e.code === "247540").length, 3);
+    assert.equal(out.filter((e) => e.code === "NVDA").length, 1);
+  });
+
+  it("한 번뿐인 일이 가까운 날 한 채널씩 두 줄이면 먼저 짚인 줄만 · 배당은 그대로", () => {
+    const r = (code: string, ch: string, date: string, ev: string, posted: string): EventRowLike => ({ ...row(code, ch, date, "day", ev), postedAt: posted });
+    const out = groupEventRows([
+      r("005930", "a", "2026-10-07", "3분기 잠정실적 발표", "2026-10-01T00:00:00Z"),
+      r("005930", "b", "2026-10-08", "3분기 잠정 실적 발표", "2026-10-02T00:00:00Z"),
+      r("005930", "a", "2026-10-06", "배당 기준일", "2026-10-01T00:00:00Z"),
+      r("005930", "b", "2026-10-08", "배당금 지급", "2026-10-02T00:00:00Z"),
+    ]);
+    const earn = out.filter((e) => eventKind(e.event) === "실적");
+    assert.equal(earn.length, 1);
+    assert.equal(earn[0].date, "2026-10-07");
+    assert.equal(out.filter((e) => eventKind(e.event) === "배당").length, 2);
+  });
+
   it("다른 종목 · 다른 기간은 그대로", () => {
     const out = groupEventRows([
       row("000660", "a", "2026-10-27", "day", "실적발표"),

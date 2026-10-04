@@ -35,8 +35,14 @@ export function ShareBar({
   return (
     <div role="img" aria-label={ariaLabel} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", height: 12, borderRadius: 6, overflow: "hidden", gap: 2 }}>
+        {/* 나머지 앞은 한 칸 더 띄운다 — 다섯째 파랑과 나머지 회색이 1.05:1 이라 경계가 안 보였다(2026-10-05 점검). */}
         {segs.map((s) => (
-          <span key={s.key} className="hz-tip" data-tip={`${s.name} · ${label(s.n)}`} style={{ width: `${pct(s.n)}%`, minWidth: 3, background: s.color }} />
+          <span
+            key={s.key}
+            className="hz-tip"
+            data-tip={`${s.name} · ${label(s.n)}`}
+            style={{ width: `${pct(s.n)}%`, minWidth: 3, background: s.color, marginLeft: s.key === "rest" ? 2 : undefined }}
+          />
         ))}
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px" }}>

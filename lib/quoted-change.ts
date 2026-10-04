@@ -15,18 +15,41 @@ function near(actual: number, quoted: number): boolean {
   return Math.abs(actual - quoted) <= Math.max(1, Math.abs(quoted) * 0.3);
 }
 
-/** quoted 에 가장 가까운 실제 세션 등락(%) — 그 글 날짜(포함)에서 LOOKBACK_DAYS 일 앞까지의 세션 가운데. 없으면 null. */
-export function verifiedChange(quoted: number | null, msgDate: string, bars: Bar[] | null): number | null {
+/** quoted 에 가장 가까운 실제 세션(봉 날짜 · 등락 %) — 그 글 날짜(포함)에서 LOOKBACK_DAYS 일 앞까지의 세션 가운데. 없으면 null. */
+export function verifiedSession(quoted: number | null, msgDate: string, bars: Bar[] | null): { date: string; change: number } | null {
   if (quoted === null || !bars || bars.length < 2) return null;
   const from = new Date(Date.parse(`${msgDate}T00:00:00Z`) - LOOKBACK_DAYS * 86_400_000).toISOString().slice(0, 10);
-  let best: number | null = null;
+  let best: { date: string; change: number } | null = null;
   for (let i = 1; i < bars.length; i++) {
     const d = bars[i].date;
     if (d < from || d > msgDate) continue;
     const prev = bars[i - 1].close;
     if (!(prev > 0)) continue;
     const ch = (bars[i].close / prev - 1) * 100;
-    if (near(ch, quoted) && (best === null || Math.abs(ch - quoted) < Math.abs(best - quoted))) best = ch;
+    if (near(ch, quoted) && (best === null || Math.abs(ch - quoted) < Math.abs(best.change - quoted))) best = { date: d, change: ch };
   }
   return best;
+}
+
+/** quoted 에 가장 가까운 실제 세션 등락(%). 없으면 null. */
+export function verifiedChange(quoted: number | null, msgDate: string, bars: Bar[] | null): number | null {
+  return verifiedSession(quoted, msgDate, bars)?.change ?? null;
+}
+
+/**
+ * 한 종목의 여러 날 이유에 세션을 붙인다 — 같은 세션은 한 번만(가장 이른 글이 가져간다). 나머지 날은 null('-').
+ * 글 날짜 앞 나흘을 보니 같은 세션이 날마다 다시 뽑혀 TSMC +0.90% 가 나흘 연속 섰고, 읽는 사람은 그날 등락으로 읽었다(2026-10-05 점검).
+ * rows 는 같은 종목의 것만 넘긴다. 돌려주는 배열은 rows 와 같은 차례다.
+ */
+export function verifiedChangesOnce(rows: { quoted: number | null; date: string }[], bars: Bar[] | null): (number | null)[] {
+  const used = new Set<string>();
+  const out: (number | null)[] = rows.map(() => null);
+  const order = rows.map((r, i) => ({ r, i })).sort((a, b) => (a.r.date < b.r.date ? -1 : a.r.date > b.r.date ? 1 : a.i - b.i));
+  for (const { r, i } of order) {
+    const s = verifiedSession(r.quoted, r.date, bars);
+    if (!s || used.has(s.date)) continue;
+    used.add(s.date);
+    out[i] = s.change;
+  }
+  return out;
 }

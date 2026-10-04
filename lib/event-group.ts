@@ -41,8 +41,11 @@ const KINDS: [string, RegExp][] = [
   ["주총", /주총|주주총회/],
   ["상장", /상장/],
   ["승인", /승인|허가/],
-  ["출시", /출시|발매/],
+  ["출시", /출시|발매|판매개시/],
   ["공개", /공개|발표회|언팩|이벤트|keynote/i],
+  // 증자 절차는 날마다 다른 일이라(공고 · 청약 · 납입) 낱말을 좁게 둔다 — '유상증자' 하나로 묶으면 10/13 공고와 10/15 청약이 ±3일로 합쳐진다.
+  ["발행가", /발행가/],
+  ["납입", /납입/],
   ["청약", /청약|공모/],
   // '신주 배정일' · '신주 배정 기준일' · '유상증자 신주 배정 기준일'이 세 줄로 갈렸다(삼성바이오로직스 10/6, 2026-10-05 점검).
   // 상장이 먼저라 '신주 상장'은 상장으로 남는다.
@@ -60,6 +63,8 @@ const dayDiff = (a: string, b: string) => Math.abs(Date.parse(`${a}T00:00:00Z`) 
 
 /** 이 날짜 안팎(±일)의 같은 이야기는 한 줄로 본다 — '10/8' · '10/9' 처럼 하루 어긋나게 적힌 같은 발표. */
 const NEAR_DAYS = 3;
+/** 가까운 날에 두 번 있을 수 없는 종류 — 한 채널씩 갈린 두 줄도 하나로 접는다(③). */
+const ONE_SHOT = new Set(["실적", "매출", "주총", "공개", "출시"]);
 
 type Acc = { code: string; date: string; precision: DatePrecision; kind: string; texts: Map<string, { text: string; n: number }>; channels: Set<string>; firstSeen: string };
 
@@ -109,6 +114,16 @@ export function groupEventRows(rows: EventRowLike[]): GroupedEvent[] {
     if (one.channels.size !== 1) continue;
     const better = days.some((o) => o !== one && alive.has(o) && o.code === one.code && o.kind === one.kind && o.channels.size >= 2 && dayDiff(o.date, one.date) <= NEAR_DAYS);
     if (better) alive.delete(one);
+  }
+  // ③ 한 번뿐인 일(실적 · 매출 · 주총 · 공개 · 출시)이 가까운 날 한 채널씩 두 줄이면 먼저 짚인 줄 하나만 — 삼성전자 '3분기 잠정실적 발표'가
+  //    10/7 · 10/8 두 줄로 섰다(2026-10-05 점검). 배당 · 증자처럼 날마다 다른 절차가 이어지는 종류는 합치지 않는다.
+  const singles = [...alive].filter((a) => a.precision === "day" && a.channels.size === 1 && ONE_SHOT.has(a.kind));
+  singles.sort((a, b) => (a.firstSeen < b.firstSeen ? -1 : a.firstSeen > b.firstSeen ? 1 : a.date < b.date ? -1 : 1));
+  for (const one of singles) {
+    if (!alive.has(one)) continue;
+    for (const o of singles) {
+      if (o !== one && alive.has(o) && o.code === one.code && o.kind === one.kind && dayDiff(o.date, one.date) <= NEAR_DAYS) alive.delete(o);
+    }
   }
 
   return [...alive].map((a) => ({
