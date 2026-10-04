@@ -197,14 +197,16 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
           <span className="v2-cover-v">
             <b>{d.members.length}종목</b>
             {!d.loadFailed && (
+              // '최근 3일 언급 49'는 49 가 횟수인지 종목 수인지 안 읽혔다(2026-10-04 점검).
               <em>
-                최근 {KADERA_WINDOW_DAYS}일 언급 {mentionedCount}
+                최근 {KADERA_WINDOW_DAYS}일 언급된 종목 {mentionedCount}
               </em>
             )}
           </span>
         </div>
         <div className="v2-cover-cell">
-          <span className="v2-cover-k">최근 {KADERA_WINDOW_DAYS}일 점유율</span>
+          {/* +%p 는 평소(5일 이상 전 평균) 대비 — 머리에 적는다(2026-10-04 점검). */}
+          <span className="v2-cover-k">최근 {KADERA_WINDOW_DAYS}일 점유율 · 평소 대비</span>
           <span className="v2-cover-v">
             {d.loadFailed || d.recentShare == null ? (
               <em>{d.loadFailed ? "집계를 불러오지 못했습니다" : "집계된 날이 없습니다"}</em>

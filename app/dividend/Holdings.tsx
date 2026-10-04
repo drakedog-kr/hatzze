@@ -246,8 +246,9 @@ function HoldingRow({
   // 5년 연평균 증가율. 늘린 회사만이 아니라 줄인 회사도 적는다.
   if (s.growth5 != null && s.streak >= 5) {
     const g = Math.round(s.growth5);
-    if (g >= 1) facts.push({ text: `5년 연 +${g}%`, title: `최근 5년 동안 해마다 ${g}%씩 늘었습니다.` });
-    else if (g <= -1) facts.push({ text: `5년 연 −${-g}%`, title: `최근 5년 동안 해마다 ${-g}%씩 줄었습니다.` });
+    // '5년 연 −11%'는 연평균이란 말이 안 읽혔다(2026-10-04 점검) — '5년간 해마다'.
+    if (g >= 1) facts.push({ text: `5년간 해마다 +${g}%`, title: `최근 5년 동안 해마다 ${g}%씩 늘었습니다.` });
+    else if (g <= -1) facts.push({ text: `5년간 해마다 −${-g}%`, title: `최근 5년 동안 해마다 ${-g}%씩 줄었습니다.` });
   }
   if (mode !== "gross" && line.account === "irp" && !line.outside && isSafeAsset(s)) facts.push({ text: "안전자산", title: "IRP에서 안전자산(30% 몫)으로 칩니다." });
   // 세금이 붙는 몫 — 돈이 달라지는 줄에만(전액 과세면 안 붙는다). 국내 주식은 감액배당, 국내 ETF 는 운용사가 공시한 과표.
@@ -292,14 +293,12 @@ function HoldingRow({
   if ((s.yieldPct ?? 0) > HOT_YIELD_PCT) facts.push({ text: "초고배당", title: "분배금이 달마다 크게 흔들립니다. 원금을 돌려주는 몫이 섞여 있습니다.", warn: true });
   if (s.close == null) facts.push({ text: "종가 없음", title: "종가가 없어 투자금과 수익률을 못 냅니다.", warn: true });
   if (s.dps > 0 && !s.pays.length) facts.push({ text: "달력엔 없음", title: "지급일 기록이 없어 아래 달력에는 안 들어갑니다.", warn: true });
-  /* v2(2026-10-03) — 줄마다 알약이 셋에서 다섯이라 표가 무거웠다. 주의(붉은 알약)는 다 보이고, 사실은 우선순위 둘만 보인다:
-     다가오는 지급 · 확정 → 비과세/과세(돈이 달라짐) → 분리과세 → 연속 늘림 → 5년 증가율 → 배당성향 → 나머지. 남는 것은 '+n' 하나로 접고
-     올리면 이름이 다 뜬다. */
+  /* 사실 알약 차례 — 다가오는 지급 · 확정 → 비과세/과세(돈이 달라짐) → 분리과세 → 연속 늘림 → 5년 증가율 → 배당성향 → 나머지, 주의(붉은 알약)는 뒤.
+     ⛔ '+n' 으로 접지 않는다(2026-10-04 점검) — 접힌 알약은 마우스를 올려야 읽혀 '+1'이 무엇인지 몰랐다. 줄이 길어지면 알약이 다음 줄로 감긴다. */
   const factRank = (t: string) =>
-    /지급|확정|기준일/.test(t) ? 0 : /과세 \d|^비과세/.test(t) ? 1 : t === "분리과세" ? 2 : /연속 늘림/.test(t) ? 3 : /^5년 연/.test(t) ? 4 : /^배당성향/.test(t) ? 5 : 6;
+    /지급|확정|기준일/.test(t) ? 0 : /과세 \d|^비과세/.test(t) ? 1 : t === "분리과세" ? 2 : /연속 늘림/.test(t) ? 3 : /^5년간 해마다/.test(t) ? 4 : /^배당성향/.test(t) ? 5 : 6;
   const plain = facts.filter((f) => !f.warn).sort((a, b) => factRank(a.text) - factRank(b.text));
-  const shownFacts = [...plain.slice(0, 2), ...facts.filter((f) => f.warn)];
-  const foldedFacts = plain.slice(2);
+  const shownFacts = [...plain, ...facts.filter((f) => f.warn)];
 
   const fractional = s.currency === "USD";
   const [sharesTyped, setSharesTyped] = useState<string | null>(null);
@@ -364,11 +363,6 @@ function HoldingRow({
                   {f.text}
                 </span>
               ))}
-              {foldedFacts.length > 0 && (
-                <span className="dv-tfact dv-tfact-more hz-tip hz-tip-wide" data-tip={foldedFacts.map((f) => f.text).join(" · ")} aria-label={`더 있는 사실 ${foldedFacts.length}개: ${foldedFacts.map((f) => f.text).join(", ")}`}>
-                  +{foldedFacts.length}
-                </span>
-              )}
             </span>
           )}
         </span>

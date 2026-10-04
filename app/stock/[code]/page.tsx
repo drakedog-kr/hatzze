@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 
 import { withSubjectParticle, withTopicParticle } from "@/lib/format";
-import { STOCK_STAT_DAYS, fmtKoDate, getStockPage, stockHref, stockMddHref, themePeerStocks, type StockTrendPoint } from "@/lib/stock-page";
+import { STOCK_STAT_DAYS, STOCK_TREND_DAYS, fmtKoDate, getStockPage, stockHref, stockMddHref, themePeerStocks, type StockTrendPoint } from "@/lib/stock-page";
 
 import { getStockDividend } from "@/lib/dividend";
 import { eventDateLabel, getStockEvents, getStockMoveReason, todayKst } from "@/lib/kadera-why";
@@ -273,29 +273,10 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
             </p>
           ) : (
             <div className="v2-tm-trendbody">
-              <div className="v2-tm-figs">
-                <span>
-                  <b>{d.totalMentions.toLocaleString("ko-KR")}회</b>
-                  <em>최근 {STOCK_STAT_DAYS}일 언급</em>
-                </span>
-                <span>
-                  <b>{d.activeDays}일</b>
-                  <em>언급된 날</em>
-                </span>
-                {d.peak && (
-                  <span>
-                    <b>{d.peak.mentions.toLocaleString("ko-KR")}회</b>
-                    <em>가장 많던 날 · {fmtKoDate(d.peak.date)}</em>
-                  </span>
-                )}
-                {/* 하루 최다 채널 — 채널 합집합은 하루 단위로만 정확하다(lib/stock-page.ts 머리말 ②). 라벨이 '하루'라고 말해야 한다. */}
-                {d.peakChannels && (
-                  <span>
-                    <b>{d.peakChannels.channels}곳</b>
-                    <em>하루 최다 채널 · {fmtKoDate(d.peakChannels.date)}</em>
-                  </span>
-                )}
-              </div>
+              {/* 위 숫자 넷은 아래 막대와 **같은 기간**(최근 30일)이다 — 90일 숫자를 두었더니 머리 '9월 4일 ~ 10월 3일' 아래에 '가장 많던 날 · 7월 21일'이
+                  서서 기간이 어긋나 보였다(2026-10-04 점검). 90일 값은 검색 설명(generateMetadata)에만 쓴다.
+                  하루 최다 채널 — 채널 합집합은 하루 단위로만 정확하다(lib/stock-page.ts 머리말 ②). 라벨이 '하루'라고 말해야 한다. */}
+              <TrendFigs points={d.trend} />
               <Trend points={d.trend} />
               <div className="v2-tm-legend">
                 <span>
@@ -315,6 +296,38 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
       {/* 넷째 줄부터 — 배당(추이 짝으로 안 쓴 날) · 같은 테마 종목, 각자 판 폭. 없는 게 정상인 칸은 안 그린다. */}
       {partner !== dividendMod && dividendMod}
       {peersMod}
+    </div>
+  );
+}
+
+/** 일별 언급 추이 위 숫자 넷 — 막대(최근 30일)와 같은 기간으로 센다. 가장 많던 날 · 하루 최다 채널은 0 이면 안 세운다. */
+function TrendFigs({ points }: { points: StockTrendPoint[] }) {
+  const total = points.reduce((s, p) => s + p.mentions, 0);
+  const active = points.filter((p) => p.mentions > 0).length;
+  const peak = points.reduce<StockTrendPoint | null>((b, p) => (p.mentions > 0 && (!b || p.mentions > b.mentions) ? p : b), null);
+  const peakCh = points.reduce<StockTrendPoint | null>((b, p) => (p.channels > 0 && (!b || p.channels > b.channels) ? p : b), null);
+  return (
+    <div className="v2-tm-figs">
+      <span>
+        <b>{total.toLocaleString("ko-KR")}회</b>
+        <em>최근 {STOCK_TREND_DAYS}일 언급</em>
+      </span>
+      <span>
+        <b>{active}일</b>
+        <em>언급된 날</em>
+      </span>
+      {peak && (
+        <span>
+          <b>{peak.mentions.toLocaleString("ko-KR")}회</b>
+          <em>가장 많던 날 · {fmtKoDate(peak.date)}</em>
+        </span>
+      )}
+      {peakCh && (
+        <span>
+          <b>{peakCh.channels}곳</b>
+          <em>하루 최다 채널 · {fmtKoDate(peakCh.date)}</em>
+        </span>
+      )}
     </div>
   );
 }

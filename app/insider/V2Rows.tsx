@@ -107,7 +107,8 @@ export function moveLines(rows: ManagerMove[], kind: "add" | "trim") {
       href={stockHref(m.ticker)}
       ticker={m.ticker}
       name={m.name}
-      aux={m.mark > 0 ? `${kind === "add" ? "신규" : "청산"} ${m.mark}곳` : undefined}
+      // 사람 수는 '명' 하나로 — '신규 12곳 · 12명'처럼 같은 거물을 곳 · 명으로 다르게 셌다(2026-10-04 점검).
+      aux={m.mark > 0 ? `${kind === "add" ? "신규" : "청산"} ${m.mark}명` : undefined}
       value={`${m.movers}명`}
       ga={kind === "add" ? "insider_adds_click" : "insider_trims_click"}
     />
@@ -115,7 +116,7 @@ export function moveLines(rows: ManagerMove[], kind: "add" | "trim") {
 }
 
 /**
- * 운용자산이 큰 순(월가 거물 명단) — 거물 · 운용사 | 가장 크게 담은 한 종목과 그 비중 | 신고 합계(13F).
+ * 미국 주식을 많이 든 거물(월가 거물 명단, 옛 '운용자산이 큰 순') — 거물 · 운용사 | 가장 크게 담은 한 종목과 그 비중 | 신고 합계(13F).
  * 2026-10-04 되살림(운영자 판단) — 한때 첫 줄 띠의 링크 칸으로만 남겼고 그 자리엔 '커뮤니티에서 뜨거운 종목'이 섰다.
  * ⚠️ 값은 13F 신고 합계라 진짜 운용자산이 아니다(미국 상장주 롱만 · ManagerRank.aum 주석). 모듈 머리의 물음표가 그 말을 한다.
  */
@@ -143,7 +144,8 @@ export function analystLines(rows: AnalystTop[]) {
       href={stockHref(a.ticker)}
       ticker={a.ticker}
       name={a.name}
-      aux={`${a.analystCount}명 중 ${a.strongBuy}명`}
+      // 무엇의 비율인지 적는다 — '17명 중 14명 · 82%'만이면 14명이 무엇인지 안 읽혔다(2026-10-04 점검).
+      aux={`${a.analystCount}명 중 적극 매수 ${a.strongBuy}명`}
       value={`${a.analystCount > 0 ? Math.round((a.strongBuy / a.analystCount) * 100) : 0}%`}
       ga="insider_analyst_click"
     />

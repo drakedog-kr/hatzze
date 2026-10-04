@@ -928,6 +928,8 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-md-pr-k { min-width: 0; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink2); }
 .v2-md-pr-k > span { margin-left: 4px; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
 .v2-md-pr-v { flex: none; font-size: 13px; font-weight: 600; line-height: 20px; color: var(--t-ink); font-variant-numeric: tabular-nums; }
+/* 곁 값(배당 '떼는 세금' 세율) — 주인공 값이 아니라 한 단 옅고 가늘게. */
+.v2-md-pr-v.is-sub { font-weight: 500; color: var(--t-ink2); }
 .v2-md-dd .v2-md-body { justify-content: space-between; }
 /* 통계 칸을 바닥에 붙이던 margin-top:auto 가 남는 높이를 한곳(게이지 아래)에 다 모았다 — 고르게 나누도록 푼다. */
 .v2-md-dd .v2-md-stats { margin-top: 0; }
@@ -1277,7 +1279,6 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-dv .dv-trow { border-top-color: var(--t-line); }
 .v2-dv .dv-tnum { font-size: 13px; color: var(--t-ink2); }
 .v2-dv .dv-tname-main { font-size: 13px; }
-.v2-dv .dv-tfact-more { background: none; box-shadow: inset 0 0 0 1px var(--t-frame); color: var(--t-ink3); cursor: help; }
 
 /* 목표까지 — 한 줄 네 토막(목표 · 지금 · 필요한 투자금 · 목표까지), 토막은 세로 가는 선으로. */
 .v2-dv-goal-row { display: grid; grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr)); }

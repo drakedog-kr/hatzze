@@ -15,6 +15,7 @@ import {
 } from "./telegram-data";
 import { THEMES } from "./stock-themes";
 import { expectedUsualMentions } from "./stock-usual";
+import { thinDays, withTodayRank } from "./theme-flow";
 import { themeDetailWindow } from "./theme-window";
 import { getEventsForCodes, todayKst, type UpcomingEvent } from "./kadera-why";
 import { isLoadFailed } from "./load-state";
@@ -466,8 +467,9 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
 
   // ── 추이 ── 언급이 0인 날은 표에 행이 없다. 빈 날을 0으로 메워야 막대 개수가 늘 같다.
   const dailyByDate = new Map(((themeDaily.data ?? []) as ThemeDailyRow[]).map((r) => [r.date, r]));
+  const thin = thinDays(dayTotals, trendDays);
   const trend: ThemeTrendPoint[] = trendDays.map((date) => {
-    const r = dailyByDate.get(date);
+    const r = thin.has(date) ? undefined : dailyByDate.get(date);
     return {
       date,
       share: r ? Number(r.share_pct) || 0 : 0,
@@ -658,7 +660,7 @@ export async function listThemeOverview(): Promise<ThemeOverview[] | null> {
     .map((r) => {
       const flow = dates.map((d) => rankOn.get(d)?.get(r.theme) ?? null);
       const shareFlow = dates.map((d) => shareOn.get(d)?.get(r.theme) ?? 0);
-      const { streak, topDays, label } = flowStats(flow);
+      const { streak, topDays, label } = flowStats(withTodayRank(flow, r.rank));
       return {
         theme: r.theme,
         rank: r.rank,

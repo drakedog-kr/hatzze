@@ -136,7 +136,7 @@ export function CardDivergence({ v }: { v: Pick }) {
   const tiles = [
     {
       label: "실물 강도",
-      hint: "소비심리(CCSI)",
+      hint: "소비심리",
       value: real,
       heat: 100 - real,
       tip:
@@ -145,8 +145,8 @@ export function CardDivergence({ v }: { v: Pick }) {
           : undefined,
     },
     {
-      label: "증시 강세",
-      hint: "신고가 근접도",
+      label: "증시 강도",
+      hint: "전고점 근접도",
       value: market,
       heat: market,
       tip:
@@ -159,10 +159,11 @@ export function CardDivergence({ v }: { v: Pick }) {
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="compare_arrows" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+        {/* 큰 숫자는 아래 두 칸 점수의 차이다(실물 73 − 증시 20 = 53). '실물 경제 53% 강세'는 53% 가 무엇인지 안 읽혔다(2026-10-04 점검). */}
         <strong style={{ fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
-          {leadWho} <span style={{ fontFamily: MONO }}>{Math.round(Math.abs(lead))}%</span>
+          {leadWho}가 <span style={{ fontFamily: MONO }}>{Math.round(Math.abs(lead))}점</span>
         </strong>
-        <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>강세</span>
+        <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>앞섬</span>
       </div>
       {/* 회색 타일 둘 → 가는 선으로 나눈 두 칸(v2, 2026-10-03 · parts.tsx SplitStats). 물음표 아이콘 둘은 점선 밑줄로 —
           한 칸에 같은 아이콘이 둘 섰다. 색은 값이 아니라 **그 값이 뜻하는 과열도**(heat)로 낸다 — 위 주석 참고. */}
@@ -221,7 +222,8 @@ export function CardTrend({ v, icon }: { v: Pick; icon: IconName }) {
             <Big disp={v.disp} unit={v.unit} color={v.color} size={32} />
             {v.hotDisp && (
               <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub, background: C.chip, borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
-                초고온 {v.hotDisp}
+                {/* '초고온 6.00%'는 기준선인데 큰 숫자 옆이라 값처럼 읽혔다(2026-10-04 점검) — 기준이라는 걸 말로. */}
+                {v.dirLabel === "이하" ? `${v.hotDisp} 이하면 초고온` : `${v.hotDisp}부터 초고온`}
               </span>
             )}
           </div>
@@ -492,7 +494,7 @@ export function CardSpending({ luxury, dining }: { luxury: Pick; dining: Pick })
             {lead.r.toFixed(1)}배
           </strong>
           <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2, whiteSpace: "nowrap" }}>
-            {lead.other === "명품" ? "외식" : "명품"} 검색
+            {lead.other === "명품" ? "외식" : "명품"} 검색 · 평소 대비
           </span>
         </div>
       )}

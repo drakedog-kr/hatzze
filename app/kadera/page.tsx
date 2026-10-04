@@ -195,11 +195,10 @@ export default async function KaderaPage() {
     // 야후 실시간이 아니면(KRX 저장 종가 폴백) 등락률을 비운다 — 그날 것이라 방향까지 뒤집혀 보인다(QuoteDate 주석).
     change: s.isLive ? s.changeRate : null,
     // '신규'는 신규 상장으로 읽혔다(그날 표엔 진짜 신규 상장 종목도 있었다). 뜻은 '평소 기간엔 언급이 없던 종목'(lib/surging-score.ts baseShare 0).
-    tag: s.isNew ? "첫 언급" : undefined,
-    tagTip: s.isNew ? "평소엔 언급이 없던 종목" : undefined,
-    cells: [{ v: `${s.ratio.toFixed(1)}배`, hot: true }],
+    // 첫 언급은 배수 대신 그 말을 숫자 칸에 — 꼬리표 '첫 언급'과 '3.4배'가 한 줄에 같이 서면 서로 반대말로 읽혔다(2026-10-04 점검).
+    cells: [s.isNew ? { v: "첫 언급", hot: true, k: "" } : { v: `${s.ratio.toFixed(1)}배`, hot: true }],
     text: surgeLines[s.code] ?? null,
-    pending: "집계가 끝나면 붙습니다",
+    pending: "정리 중",
   }));
 
   /* 오른 것(큰 순) + 크게 내린 것(lib/kadera-why.ts DOWN_MIN, 하루 0~6줄). 부호 색이 둘을 가른다.
@@ -235,7 +234,7 @@ export default async function KaderaPage() {
     cells: [{ v: `${r.totalMentions.toLocaleString("ko-KR")}회` }],
     text: firstSentence(narratives[r.code] ?? null),
     full: narratives[r.code] ?? null,
-    pending: "집계가 끝나면 붙습니다",
+    pending: "정리 중",
   }));
 
   /* ⚠️ 등락률은 표마다 **날이 다르다.** 급부상·많이 언급은 지금 시세(야후)이고, 움직인 종목은 그날 장 마감 값이다.
@@ -253,8 +252,9 @@ export default async function KaderaPage() {
       title: "급부상 종목",
       meta: `최근 ${surgeDays}일 · 평소 대비`,
       kind: "surge",
-      heads: ["", "종목", "지금 등락", "평소 대비", "왜 뜨나"],
-      key0: "평소의",
+      // 숫자 칸 이름은 '언급 증가' — '평소 대비'만 두면 바로 옆 '지금 등락'과 붙어 주가 배수로 읽혔다(2026-10-04 점검).
+      heads: ["", "종목", "지금 등락", "언급 증가", "왜 뜨나"],
+      key0: "언급",
       aiText: true,
       rows: surgeRows,
       empty: "아직 급부상 신호가 뚜렷한 종목이 없습니다.",

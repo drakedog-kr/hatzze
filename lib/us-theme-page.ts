@@ -7,6 +7,7 @@ import { LLM_TEXT_CARRY_DAYS, addDaysISO, channelMeta, fetchAllRows } from "./te
 import { US_WINDOW_DAYS, getUsThemeRotation, usKaderaBaseDate, usQuotes } from "./us-telegram-data";
 import { US_THEMES } from "./us-stock-themes";
 import { getUsEventsForTickers } from "./kadera-us-why";
+import { thinDays, withTodayRank } from "./theme-flow";
 import { themeDetailWindow } from "./theme-window";
 import {
   THEME_FLOW_DAYS,
@@ -141,8 +142,10 @@ export const getUsThemePage = cache(async (theme: string): Promise<ThemePageData
   const reasonDates = new Set(reasons.map((r) => r.date));
 
   const dailyByDate = new Map(((themeDaily.data ?? []) as ThemeDailyRow[]).map((r) => [r.date, r]));
+  // 표본이 거의 없는 날(기준일 아침)은 '집계 없음' — 국장 lib/theme-page.ts thinDays 와 같은 규칙.
+  const thin = thinDays(dayTotals, trendDays);
   const trend: ThemeTrendPoint[] = trendDays.map((date) => {
-    const r = dailyByDate.get(date);
+    const r = thin.has(date) ? undefined : dailyByDate.get(date);
     return { date, share: r ? Number(r.share_pct) || 0 : 0, rank: r?.rank ?? null, mentions: r?.mention_count ?? 0, hasReason: reasonDates.has(date) };
   });
 
@@ -226,7 +229,7 @@ export async function listUsThemeOverview(): Promise<ThemeOverview[] | null> {
     .map((r) => {
       const flow = dates.map((d) => rankOn.get(d)?.get(r.theme) ?? null);
       const shareFlow = dates.map((d) => shareOn.get(d)?.get(r.theme) ?? 0);
-      const { streak, topDays, label } = flowStats(flow);
+      const { streak, topDays, label } = flowStats(withTodayRank(flow, r.rank));
       return {
         theme: r.theme,
         rank: r.rank,

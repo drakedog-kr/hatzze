@@ -39,7 +39,8 @@ WON_PER_EOK = 100_000_000  # 1억원 = 1e8원
 INDICATOR_SLUG = "kospi_volume_surge"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
-    "name": "거래대금 급증도",
+    # '거래대금 급증도'였다 — 줄어든 날 '급증도 −28.5%'로 읽혀 화면 점검에서 걸렸다(2026-10-04). 값은 카드가 '평소 대비'로 적는다.
+    "name": "코스피 거래대금",
     "headline": "평소 대비 오늘 오간 거래대금",
     "category": "시장",
     "description_beginner": "거래가 평소보다 몰리면 다들 달려든다는 신호입니다",

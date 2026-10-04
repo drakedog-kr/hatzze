@@ -10,7 +10,6 @@ import { CurrencyToggle } from "../../../AppShell";
 import { PageJsonLd } from "../../../JsonLd";
 import { INSIDER_CARD } from "../../../og-copy";
 import { pageMetadata } from "../../../seo";
-import { Icon } from "../../../ui";
 import { LoadFailedNote } from "../../../LoadFailedNote";
 import { Money, moveKind, quarterLabel } from "../../parts";
 import { DetailList, exitedLines, holdingLines } from "../../V2DetailRows";
@@ -142,19 +141,16 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
           옛 히어로 세 칸(이름 · 운용자산 / 이번 분기에 한 것 / 한눈에)을 v2 꼴로 — 이름 · 운용자산 · 보유 규모 · 통화는 첫 줄 띠로,
           이번 분기에 한 것 · 집중도는 둘째 줄 짝으로. 히어로 바닥의 "13F는 분기말 기준이라 지금과 다를 수 있습니다"는 띠의 업데이트
           자리('2026 Q2 13F · 분기말 기준')가 말한다(설명 문장은 걷는다).
-          ⚠️ 운용자산의 물음표('미국 상장주만 집계')는 지우지 말 것 — 버크셔의 실제 운용자산은 이보다 훨씬 크다. 이 툴팁이 없으면 화면이 거짓말이 된다. */}
+          ⚠️ 이름표를 '운용자산'으로 되돌리지 말 것 — 버크셔의 실제 운용자산은 이보다 훨씬 크다. '미국 주식 보유액'이라 적어야 화면이 거짓말을 안 한다
+             (예전엔 '운용자산' 옆 물음표가 '미국 상장주만 집계'라고 말했다 — 2026-10-04 물음표를 걷고 이름표가 말하게 했다). */}
       <div className="v2-cover">
         <div className="v2-cover-cell v2-sk-id">
           <h1>{d.person}</h1>
           <span className="v2-cover-k">{d.firm}</span>
         </div>
         <div className="v2-cover-cell">
-          <span className="v2-cover-k">
-            운용자산
-            <span className="hz-tip hz-tip-wide v2-in-help" data-tip="미국 상장주만 집계" aria-label="미국 상장주만 집계" tabIndex={0}>
-              <Icon name="help" />
-            </span>
-          </span>
+          {/* '운용자산 ?(미국 상장주만 집계)'였다 — 이름표가 글자 그대로 그 값을 말하게(2026-10-04 "헬프 툴팁이 필요하면 심플하지 않다"). */}
+          <span className="v2-cover-k">미국 주식 보유액</span>
           <span className="v2-cover-v">
             <b>
               <Money usd={d.aum} rate={d.usdKrw} />

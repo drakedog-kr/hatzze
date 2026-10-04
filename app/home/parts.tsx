@@ -511,7 +511,7 @@ export function HeatBar({ v, hideThreshold = false }: { v: Pick; hideThreshold?:
       {v.hotDisp && !hideThreshold && (
         // 회색 상자였다 — 눈금 아래 글자 한 줄로(v2, 2026-10-03). 양 끝 '안심 · 과열 100' 과 같은 꼴.
         <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.sub }}>
-          초고온 기준선 {v.hotDisp} {v.dirLabel}
+          {v.hotDisp} {v.dirLabel}이면 초고온
         </span>
       )}
     </div>

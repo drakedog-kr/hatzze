@@ -622,8 +622,8 @@ export function PriceChart({
    *    (13F 는 분기말 보유의 차이라 매매 물량이 아니다). 없는 축에 숫자를 지어내지 말 것.
    */
   const tipOf = (s: Slot) => {
-    // 거물은 신고 "건"이 아니라 운용사 수다 — 한 곳이 한 번 신고한다.
-    const unit = s.who === "manager" ? "곳" : "건";
+    // 거물은 신고 "건"이 아니라 거물 수다 — 한 사람이 한 번 신고한다. '명'으로 센다(본 화면 · 상세와 같은 단위, 2026-10-04).
+    const unit = s.who === "manager" ? "명" : "건";
     const acts = [s.buy ? `매수 ${s.buy}${unit}` : "", s.sell ? `매도 ${s.sell}${unit}` : ""].filter(Boolean).join(" · ");
     const qty =
       s.shares != null
@@ -1074,7 +1074,7 @@ export function wideMoveRows(rows: ManagerMove[], kind: "add" | "trim") {
             badge={
               m.mark > 0 ? (
                 // 신규·청산은 배지로 종목 옆에 붙인다. 자기 칸을 주면 대부분 빈 칸이 된다.
-                <Pill tone={kind === "add" ? MOVE_TONE.buy : MOVE_TONE.sell} title={`반대로 움직인 곳 ${m.against}명`}>
+                <Pill tone={kind === "add" ? MOVE_TONE.buy : MOVE_TONE.sell} title={`반대로 움직인 거물 ${m.against}명`}>
                   {markLabel} {m.mark}
                 </Pill>
               ) : undefined

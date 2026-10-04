@@ -13,7 +13,8 @@ import { CODE_LABEL, Money, fmtDate, moveBadge } from "./parts";
  * 붙었다. 여기는 방향을 **글자 색**으로만 말하고(사는 쪽 빨강 · 파는 쪽 파랑, 국내 관례 · parts.tsx MOVE_TONE 과 같은 뜻),
  * 산 것과 판 것을 한 목록에 섞어 최신 순으로 세운다 — 반으로 가르면 한쪽이 '0건' 빈 카드가 되는 일이 잦았다(대형주 임원 매수).
  *
- * 칸 폭은 목록마다 다르다(v2.css .v2-isd-list[data-cols]). 열 머리는 두지 않는다 — 칸마다 값이 무엇인지 글자가 말한다(금액 · % · 날짜).
+ * 칸 폭은 목록마다 다르다(v2.css .v2-isd-list[data-cols]). 열 머리는 두지 않는다 — 칸마다 값이 무엇인지 글자가 말한다(금액 · 비중 % · 날짜).
+ * ⭐ 비중엔 '비중'을 붙인다 — 숫자만 '7.0%'면 무엇의 %인지 안 읽혔다(2026-10-04 점검).
  */
 
 const ROWS_OPEN = 8;
@@ -52,7 +53,7 @@ export function holderLines(rows: StockHolder[], rate: number | null) {
           {h.firm && h.firm !== h.person && <span>{h.firm}</span>}
         </span>
         <Move move={h.move} change={h.sharesChange} />
-        <span className="v2-isd-num is-sub">{h.weight < 1 ? h.weight.toFixed(2) : h.weight.toFixed(1)}%</span>
+        <span className="v2-isd-num is-sub">비중 {h.weight < 1 ? h.weight.toFixed(2) : h.weight.toFixed(1)}%</span>
         <span className="v2-isd-num">
           <Money usd={h.value} rate={rate} />
         </span>
@@ -138,7 +139,7 @@ export function holdingLines(rows: ManagerHolding[], rate: number | null) {
       <Link href={`/insider/stock/${encodeURIComponent(h.ticker)}`} className="v2-isd-row" data-ga="insider_holding_click">
         <StockWho ticker={h.ticker} name={h.name} />
         <Move move={h.move} change={h.sharesChange} />
-        <span className="v2-isd-num is-sub">{h.weight < 1 ? h.weight.toFixed(2) : h.weight.toFixed(1)}%</span>
+        <span className="v2-isd-num is-sub">비중 {h.weight < 1 ? h.weight.toFixed(2) : h.weight.toFixed(1)}%</span>
         <span className="v2-isd-num">
           <Money usd={h.value} rate={rate} />
         </span>
@@ -153,7 +154,7 @@ export function exitedLines(rows: { ticker: string; name: string; value: number;
     <li key={e.ticker}>
       <Link href={`/insider/stock/${encodeURIComponent(e.ticker)}`} className="v2-isd-row" data-ga="insider_exited_click">
         <StockWho ticker={e.ticker} name={e.name} />
-        <span className="v2-isd-num is-sub">{e.weight < 1 ? e.weight.toFixed(2) : e.weight.toFixed(1)}%</span>
+        <span className="v2-isd-num is-sub">비중 {e.weight < 1 ? e.weight.toFixed(2) : e.weight.toFixed(1)}%</span>
         <span className="v2-isd-num">
           <Money usd={e.value} rate={rate} />
         </span>

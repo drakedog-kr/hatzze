@@ -17,7 +17,6 @@ import { pageMetadata } from "../../../seo";
 import { LoadFailedNote } from "../../../LoadFailedNote";
 import { AnalystActions, ConsensusBody, MarkBadges, MarkRadios, Money, PriceChart, fmtDate, moveKind } from "../../parts";
 import { DetailList, congressLines, holderLines, insiderLines } from "../../V2DetailRows";
-import { Icon } from "../../../ui";
 import { BackTrail } from "@/components/back-trail";
 
 /**
@@ -146,7 +145,7 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
   const kinds = d.holders.map((h) => moveKind(h.move, h.sharesChange));
   const added = kinds.filter((k) => k === "new" || k === "add").length;
   const trimmed = kinds.filter((k) => k === "trim").length;
-  const quarterMoves = added + trimmed > 0 ? `이번 분기 늘림 ${added} · 줄임 ${trimmed}곳` : "이번 분기 변화 없음";
+  const quarterMoves = added + trimmed > 0 ? `이번 분기 늘림 ${added}명 · 줄임 ${trimmed}명` : "이번 분기 변화 없음";
 
   const holdersMod =
     d.holders.length > 0 ? (
@@ -313,7 +312,8 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
       {d.bars.length > 1 && (
         <Module
           title="주가와 매매 시점"
-          meta={`${PRICE_RANGES.find((r) => r.key === range)?.label} · ${d.marks.length}곳`}
+          // '28곳'은 무엇이 28 인지 안 읽혔다(2026-10-04 점검) — 차트 위 점(매매 시점)의 수다.
+          meta={`${PRICE_RANGES.find((r) => r.key === range)?.label} · 매매 시점 ${d.marks.length}개`}
           className="v2-isd-chart"
           aside={
             <span className="hz-seg hz-seg-hover hz-periodset">
@@ -350,9 +350,8 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
                   <i />
                   매도
                 </span>
-                <span className="hz-tip v2-in-help" data-tip="옵션 행사·원천징수 제외" aria-label="옵션 행사·원천징수 제외" tabIndex={0}>
-                  <Icon name="help" />
-                </span>
+                {/* 걸러 낸 신고 — 물음표 말풍선이던 것을 범례 끝 글자로(2026-10-04 "헬프 툴팁이 필요하면 심플하지 않다"). */}
+                <span className="v2-isd-legend-note">옵션 행사 · 원천징수 제외</span>
               </span>
             </div>
             <div className="hz-mkfilter-chart">

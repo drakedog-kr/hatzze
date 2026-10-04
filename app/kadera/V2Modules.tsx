@@ -172,11 +172,12 @@ export function SentimentModule({
         <Spark id="v2-mood-spark" values={vals} base={50} w={300} h={64} tone={tone} dot tips={trend.map((p) => `${shortDate(p.date)} · 낙관 ${p.score}%`)} />
         <span className="v2-card-foot">
           <span>
-            <em>{vals.length}일 최고</em>
+            {/* '30일 · 29일 최고'로 화면마다 날 수가 달랐다(미장 기록이 하루 짧다) — 한 달로 부른다(2026-10-04 점검). */}
+            <em>한 달 최고</em>
             {hi}%
           </span>
           <span>
-            <em>{vals.length}일 최저</em>
+            <em>한 달 최저</em>
             {lo}%
           </span>
         </span>
@@ -231,7 +232,8 @@ export function ThemeShares({
     <Module
       id="themes"
       title="테마 점유율"
-      meta="최근 3일"
+      // 변화(+20.5%p)가 무엇과 견준 값인지 머리에 — 평소(5일 이상 전 평균, lib/telegram-data.ts THEME_PRIOR_GAP_DAYS)와의 차이다(2026-10-04 점검).
+      meta="최근 3일 · 평소 대비"
       // 테마 전체 보기는 이 머리 오른쪽에 둔다(2026-10-03) — 첫 줄 띠 끝에 있을 땐 띠가 1,280 에서 두 줄로 접혔고, 목록을 보다 넘어가는 자리가 여기다.
       aside={
         hrefOf && (
@@ -351,6 +353,9 @@ export function EventsModule({ events, today, failed, limit = 5 }: { events: Upc
  * - 판 폭 전체에 설 땐 다섯 줄씩 두 단으로 놓는다(한 단 열 줄이면 오른쪽이 빈다). 폰은 한 단.
  *   2026-10-03 부터는 오른쪽 칸(오늘의 요약 아래)에 한 단 열 줄로 선다 — 열 줄로 늘린 표 둘 옆을 채운다.
  */
+/** 이슈 키워드 변화를 '비슷'으로 부를 폭(%p). 2026-10-04 국장 열 줄은 −0.4 ~ +0.9, 미장은 −0.3 ~ +3.4 였다. */
+const KW_FLAT_PP = 0.5;
+
 export function KeywordTable({ keywords, split = true }: { keywords: Pick<IssueKeyword, "rank" | "word" | "count" | "shareDelta">[]; split?: boolean }) {
   const rows = keywords.slice(0, 10);
   const top = Math.max(1, ...rows.map((k) => k.count));
@@ -375,8 +380,10 @@ export function KeywordTable({ keywords, split = true }: { keywords: Pick<IssueK
               </div>
               <ol>
                 {col.map((k) => {
+                  // 변화는 말로 — '+0.3%p'(표 안 점유율의 차이)는 무엇의 %p 인지 안 읽혔다(2026-10-04 점검). 0.5%p 안쪽은 '비슷'.
                   const d = k.shareDelta === null ? null : k.shareDelta * 100;
-                  const dCls = d === null || Math.abs(d) < 0.05 ? "" : d > 0 ? " is-up" : " is-down";
+                  const dir = d === null ? null : Math.abs(d) < KW_FLAT_PP ? "flat" : d > 0 ? "up" : "down";
+                  const dCls = dir === "up" ? " is-up" : dir === "down" ? " is-down" : "";
                   return (
                     <li key={k.word} className="v2-kw-row">
                       <span className="v2-kw-rank">{k.rank}</span>
@@ -387,7 +394,7 @@ export function KeywordTable({ keywords, split = true }: { keywords: Pick<IssueK
                       </span>
                       <span className="v2-kw-num">{k.count.toLocaleString("ko-KR")}회</span>
                       <span className={`v2-kw-num v2-kw-delta${dCls}`}>
-                        {d === null || Math.abs(d) < 0.05 ? "-" : `${sign(d)}${Math.abs(d).toFixed(1)}%p`}
+                        {dir === null ? "-" : dir === "up" ? "늘어남" : dir === "down" ? "줄어듦" : "비슷"}
                       </span>
                     </li>
                   );

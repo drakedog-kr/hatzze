@@ -27,13 +27,17 @@ import { Treemap, TreemapLegend, themeTiles, toneForRatio } from "./Treemap";
  * 제목은 셸이 그린다(화면에서만 걷고 h1 은 남는다 · AppShell isV2Page). 이 파일은 본문만 낸다.
  */
 
-/** 열흘 흐름 한 조각 — n일째 상위 · 다시 상위 · 첫 등장 · 열흘 중 n일 상위 · 상위 밖. 판정은 lib/theme-page.ts listThemeOverview. */
+/**
+ * 열흘 흐름 한 조각 — n일째 5위 안 · 다시 5위 안 · 처음 5위 안 · 열흘 중 n일 5위 안 · 5위 밖. 판정은 lib/theme-page.ts listThemeOverview.
+ * ⭐ '상위'라 부르지 않고 몇 위인지 적는다 — 표가 '점유율 상위 10'이라 6~10위 줄에 '상위 밖'이 붙어 서로 반대말로 읽혔다(2026-10-04 점검).
+ */
 function flowCaption(t: ThemeOverview): { text: string; on: boolean } {
-  // 연속 하루째인데 열흘 안에 상위였던 날이 더 있으면 "돌아온" 것이다 — "1일째 상위"는 어색하다.
-  if (t.label === "streak") return { text: t.streak === 1 ? "다시 상위" : `${t.streak}일째 상위`, on: true };
-  if (t.label === "new") return { text: t.streak === 1 ? "첫 등장" : "2일째 상위", on: true };
-  if (t.label === "intermittent") return { text: `10일 중 ${t.topDays}일 상위`, on: false };
-  return { text: "상위 밖", on: false };
+  const top = `${THEME_FLOW_TOP}위`;
+  // 연속 하루째인데 열흘 안에 5위 안이던 날이 더 있으면 "돌아온" 것이다 — "1일째"는 어색하다.
+  if (t.label === "streak") return { text: t.streak === 1 ? `다시 ${top} 안` : `${t.streak}일째 ${top} 안`, on: true };
+  if (t.label === "new") return { text: t.streak === 1 ? `처음 ${top} 안` : `2일째 ${top} 안`, on: true };
+  if (t.label === "intermittent") return { text: `10일 중 ${t.topDays}일 ${top} 안`, on: false };
+  return { text: `${top} 밖`, on: false };
 }
 
 /** 흐름 표의 줄 수 — 상위 열 줄이면 지금 화제인 테마가 다 들어온다. 더 보기는 두지 않는다(2026-09-21) — 나머지는 지도에 있다. */
@@ -93,7 +97,8 @@ export function ThemeIndexView({
   const gainer = pick(byDelta.filter((t) => (t.shareDelta as number) > 0), (t) => t.theme);
   const loser = pick([...byDelta].reverse().filter((t) => (t.shareDelta as number) < 0), (t) => t.theme);
   const fresh = pick(all.filter((t) => t.label === "new").sort((a, b) => a.rank - b.rank), (t) => t.theme);
-  // 어제는 상위였는데 오늘은 밖인 테마(열흘 흐름의 끝 두 날로 본다).
+  // 어제는 5위 안이었는데 오늘은 밖인 테마. 오늘은 **표의 순위**(최근 3일 점유율)로 본다 — 오늘 하루 순위로 보면 아침 표본이 적어
+  // 표 3위 테마가 '상위에서 내려간 테마 · 3위'로 떴다(2026-10-04 점검, lib/theme-page.ts withTodayRank).
   const dropped = fresh
     ? null
     : pick(
@@ -101,8 +106,7 @@ export function ThemeIndexView({
           .filter((t) => {
             const n = t.flow.length;
             const prev = n >= 2 ? t.flow[n - 2] : null;
-            const cur = t.flow[n - 1];
-            return prev != null && prev <= THEME_FLOW_TOP && (cur == null || cur > THEME_FLOW_TOP);
+            return prev != null && prev <= THEME_FLOW_TOP && t.rank > THEME_FLOW_TOP;
           })
           .sort((a, b) => a.rank - b.rank),
         (t) => t.theme,
@@ -112,9 +116,9 @@ export function ThemeIndexView({
     gainer ? { cap: "가장 많이 늘어난 테마", name: gainer.theme, val: pp(gainer.shareDelta as number), tone: "up" as const, href: market.themeHref(gainer.theme), ga: "theme_cover_gainer" } : null,
     loser ? { cap: "가장 많이 줄어든 테마", name: loser.theme, val: pp(loser.shareDelta as number), tone: "down" as const, href: market.themeHref(loser.theme), ga: "theme_cover_loser" } : null,
     fresh
-      ? { cap: "새로 상위에 오른 테마", name: fresh.theme, val: `${fresh.rank}위`, tone: "up" as const, href: market.themeHref(fresh.theme), ga: "theme_cover_fresh" }
+      ? { cap: `새로 ${THEME_FLOW_TOP}위 안에 든 테마`, name: fresh.theme, val: `${fresh.rank}위`, tone: "up" as const, href: market.themeHref(fresh.theme), ga: "theme_cover_fresh" }
       : dropped
-        ? { cap: "상위에서 내려간 테마", name: dropped.theme, val: `${dropped.rank}위`, tone: "down" as const, href: market.themeHref(dropped.theme), ga: "theme_cover_dropped" }
+        ? { cap: `${THEME_FLOW_TOP}위 밖으로 밀린 테마`, name: dropped.theme, val: `${dropped.rank}위`, tone: "down" as const, href: market.themeHref(dropped.theme), ga: "theme_cover_dropped" }
         : climber
           ? { cap: "순위가 가장 오른 테마", name: climber.theme, val: `+${climber.rankChange}계단`, tone: "up" as const, href: market.themeHref(climber.theme), ga: "theme_cover_climber" }
           : null,
@@ -129,7 +133,8 @@ export function ThemeIndexView({
         ))}
         <CoverMeta
           updated={updatedAt ? formatKstUpdate(updatedAt, "업데이트") : "업데이트 준비 중"}
-          basis={themes ? `테마 ${themes.length}개 · 최근 ${KADERA_WINDOW_DAYS}일 언급` : null}
+          // 띠의 '+20.5%p'는 평소(5일 이상 전 평균) 대비 — 업데이트 칸 근거에 적는다(2026-10-04 점검).
+          basis={themes ? `테마 ${themes.length}개 · 최근 ${KADERA_WINDOW_DAYS}일 언급 · 평소 대비` : null}
         />
       </div>
 
@@ -144,7 +149,8 @@ export function ThemeIndexView({
             <div className="v2-tm-map-in">
               <Treemap tiles={themeTiles(themes, market.key)} ariaLabel="테마별 최근 3일 언급 점유율" aspect={3} />
             </div>
-            <TreemapLegend up="관심이 늘어난 테마" flat="변화 ±0.3%p 안" down="줄어든 테마" />
+            {/* 색은 평소(5일 이상 전 평균) 대비 변화 — '변화 ±0.3%p 안'은 무엇과 견준 변화인지 안 읽혔다(2026-10-04 점검). */}
+            <TreemapLegend up="평소보다 늘어난 테마" flat="평소와 비슷" down="평소보다 줄어든 테마" />
           </>
         )}
       </Module>
@@ -156,7 +162,8 @@ export function ThemeIndexView({
       <Module
         id="flow"
         title="테마 흐름"
-        meta={flowDates.length ? `점유율 상위 ${FLOW_ROWS} · ${fmtKoDate(flowDates[0])} ~ ${fmtKoDate(flowDates[flowDates.length - 1])}` : `점유율 상위 ${FLOW_ROWS}`}
+        // 점유율 아래 +%p 는 평소(5일 이상 전 평균) 대비 — 머리에 적는다(2026-10-04 점검).
+        meta={flowDates.length ? `점유율 상위 ${FLOW_ROWS} · 평소 대비 · ${fmtKoDate(flowDates[0])} ~ ${fmtKoDate(flowDates[flowDates.length - 1])}` : `점유율 상위 ${FLOW_ROWS} · 평소 대비`}
       >
         {themes === null || themes.length === 0 ? (
           <p className="v2-empty">{themes === null ? "테마 집계를 지금 불러오지 못했습니다." : "아직 집계된 테마가 없습니다."}</p>

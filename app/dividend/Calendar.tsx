@@ -137,7 +137,8 @@ export function upcomingOf(lines: Line[], fx: number, mode: TaxMode): { items: U
         when: `${dateLabel(next.date)}쯤`,
         sortKey: next.date,
         name: s.name,
-        what: `${unit} 1주에 ${money(next.v, s)} · 지난해 이날`,
+        // '지난해 이날'은 무엇이 지난해인지 안 읽혔다(2026-10-04 점검) — 날짜와 금액을 작년 지급에서 옮겼다는 뜻.
+        what: `${unit} 1주에 ${money(next.v, s)} · 작년 지급일 기준`,
         amount: a[0],
         amountKrw: a[1],
         tag: "예상",

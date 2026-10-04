@@ -121,11 +121,10 @@ export default async function UsKaderaPage() {
     name: s.name,
     market: "US",
     change: s.changeRate,
-    tag: s.isNew ? "첫 언급" : undefined,
-    tagTip: s.isNew ? "평소엔 언급이 없던 종목" : undefined,
-    cells: [{ v: times(s.multiple), hot: true }],
+    // 첫 언급은 배수 대신 그 말을 숫자 칸에(국장 page.tsx 와 같은 규칙, 2026-10-04 점검).
+    cells: [s.isNew ? { v: "첫 언급", hot: true, k: "" } : { v: times(s.multiple), hot: true }],
     text: surgeLines[s.ticker] ?? null,
-    pending: "집계가 끝나면 붙습니다",
+    pending: "정리 중",
   }));
 
   /* 오른 것(큰 순) + 크게 내린 것(lib/kadera-us-why.ts DOWN_MIN). 위 다섯 줄은 '오른 셋 + 내린 둘'(국장 주석). */
@@ -150,7 +149,7 @@ export default async function UsKaderaPage() {
     cells: [{ v: `${r.recentMentions.toLocaleString("ko-KR")}회` }],
     text: r.narrative ? r.narrative.split(/(?<=[가-힣]\.)\s+/)[0] : null,
     full: r.narrative,
-    pending: "집계가 끝나면 붙습니다",
+    pending: "정리 중",
   }));
 
   /* ⚠️⚠️ 움직인 종목의 등락은 '그날'이 아니라 **직전 미국장 세션**이다(lib/kadera-us-why.ts 머리말). 머리에 세션 날짜를 단다.
@@ -163,7 +162,7 @@ export default async function UsKaderaPage() {
       title: "급부상 종목",
       meta: `최근 ${US_WINDOW_DAYS}일 · 평소 대비`,
       kind: "surge",
-      heads: ["", "종목", "지금 등락", "평소 대비", "왜 뜨나"],
+      heads: ["", "종목", "지금 등락", "언급 증가", "왜 뜨나"],
       key0: "평소의",
       aiText: true,
       rows: surgeRows,

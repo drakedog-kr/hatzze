@@ -79,19 +79,9 @@ export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel:
         </div>
       </Module>
 
-      {/* 2 — 지금 낙폭. 기간이 상장 이력보다 길거나 '전체'면 주의를 물음표 한 마디로(옛 맥락 칸 바닥 문장). */}
-      <Module
-        title="지금 낙폭"
-        meta={periodLabel}
-        aside={
-          caution && (
-            <span className="hz-tip hz-tip-end" data-tip={caution} style={{ display: "inline-flex", cursor: "help" }}>
-              <Icon name="help" style={{ fontSize: 14, color: "var(--t-ink3)" }} />
-            </span>
-          )
-        }
-        className="v2-md-dd"
-      >
+      {/* 2 — 지금 낙폭. 기간이 상장 이력보다 길거나 '전체'면 주의를 머리 근거에 그대로 적는다 — 물음표에 숨기면 마우스를 올려야 읽혔다
+          ("헬프 툴팁이 필요하면 심플하지 않다", 2026-10-04). */}
+      <Module title="지금 낙폭" meta={caution ? `${periodLabel} · ${caution}` : periodLabel} className="v2-md-dd">
         <div className="v2-md-body">
           <span className="v2-card-val is-big">
             <b className={atHigh ? undefined : "is-down"}>{atHigh ? "신고가 부근" : fmtPct(a.currentDd)}</b>

@@ -59,7 +59,8 @@ async function usSurgingChip(ga = "kadera_chip_us_surging"): Promise<CoverChip |
   return {
     cap: "미장 급부상",
     name: top.name,
-    val: `${top.multiple >= 10 ? Math.round(top.multiple) : top.multiple.toFixed(1)}배`,
+    // '언급' 을 붙인다 — '6.3배'만이면 주가 배수로도 읽혔다(2026-10-04 점검). 첫 언급은 배수 대신 그 말(카더라 표와 같다).
+    val: top.isNew ? "첫 언급" : `언급 ${top.multiple >= 10 ? Math.round(top.multiple) : top.multiple.toFixed(1)}배`,
     tone: "up",
     href: "/kadera/us#surging",
     ga,
@@ -73,7 +74,7 @@ async function krSurgingChip(ga: string): Promise<CoverChip | null> {
   return {
     cap: "국장 급부상",
     name: top.name,
-    val: top.isNew || !Number.isFinite(top.ratio) ? "첫 언급" : `${top.ratio >= 10 ? Math.round(top.ratio) : top.ratio.toFixed(1)}배`,
+    val: top.isNew || !Number.isFinite(top.ratio) ? "첫 언급" : `언급 ${top.ratio >= 10 ? Math.round(top.ratio) : top.ratio.toFixed(1)}배`,
     tone: "up",
     href: "/kadera#surging",
     ga,

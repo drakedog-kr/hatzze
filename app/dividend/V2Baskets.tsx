@@ -6,7 +6,6 @@
 // 계산은 옛 바스켓 카드(Basket.tsx BasketSheet)와 같다 — basketCodes → basketShares → computeLines.
 
 import { useMemo, useRef, useState } from "react";
-import { Icon } from "../ui";
 import { Module } from "../kadera/V2Modules";
 import { StockLogo } from "../StockLogo";
 import type { BasketLite, StockLite } from "./types";
@@ -164,11 +163,6 @@ export function BasketBoard({
       <section ref={readRef} className="v2-mod v2-dv-bk-read" aria-label={`${cur.b.title} 구성`}>
         <header className="v2-mod-head">
           <h2>{titleOf(cur.b, mode)}</h2>
-          {cur.b.caution && (
-            <span className="hz-tip hz-tip-wide v2-dv-help" data-tip={cur.b.caution} aria-label={`${cur.b.title} 주의`}>
-              <Icon name="help" style={{ fontSize: 14 }} />
-            </span>
-          )}
           <span className="v2-mod-meta">{cur.b.desc}</span>
         </header>
         {cur.lines.length ? (
@@ -185,6 +179,8 @@ export function BasketBoard({
                   </span>
                 ),
               )}
+              {/* 주의 — 머리의 물음표 말풍선이던 것을 규칙 줄 끝 붉은 알약으로(2026-10-04 "헬프 툴팁이 필요하면 심플하지 않다"). */}
+              {cur.b.caution && <span className="dv-tfact dv-tfact-warn">{cur.b.caution}</span>}
             </div>
             <ol className="v2-dv-bk-list-st">
               {cur.lines.map((l, i) => (

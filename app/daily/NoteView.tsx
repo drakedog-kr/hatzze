@@ -250,7 +250,8 @@ export function NoteView({
         <CoverMeta
           updated={note ? formatKstUpdate(note.updatedAt, "업데이트") : "글 준비 중"}
           // 꼭지 수는 안 적는다(2026-10-04 운영자 판단 — 2026-09-06 의 "꼭지 수를 머리에 적지 않는다"와 같은 까닭). 종목 수만.
-          basis={note && stocks.kr.length + stocks.us.length ? `종목 ${stocks.kr.length + stocks.us.length}` : null}
+          // '종목 15'는 무엇의 15 인지 안 읽혔다(2026-10-04 점검) — 이 글에 언급된 종목 수.
+          basis={note && stocks.kr.length + stocks.us.length ? `언급된 종목 ${stocks.kr.length + stocks.us.length}` : null}
         />
       </div>
       <div className="v2-nt-page">

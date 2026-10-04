@@ -104,7 +104,7 @@ export type Basket = {
   /** '내 계좌 맞춤'만 — 연금저축·IRP 를 골랐을 때 rules 대신 보이는 알약. */
   rulesPension?: string[];
   rulesIrp?: string[];
-  /** 바스켓 밑에 붙는 주의 한 줄(커버드콜·리츠·우선주). */
+  /** 바스켓의 주의 — 규칙 알약 줄 끝에 붉은 알약으로 선다(커버드콜·리츠·우선주). 물음표 말풍선이던 문장을 알약 길이로 줄였다(2026-10-04). */
   caution?: string;
 };
 
@@ -790,7 +790,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "growth",
       title: "성장 우선",
       desc: "배당을 해마다 늘려 온 회사",
-      rules: ["5년 연속 배당", "5년 연 +10%", "증가율 순"],
+      rules: ["5년 연속 배당", "5년간 해마다 +10%", "증가율 순"],
       icon: "stairs",
       codes: codes(growth),
       meta: "growth",
@@ -812,7 +812,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       icon: "toll",
       codes: codes(covered),
       meta: "yield",
-      caution: "분배금엔 주가 상승분을 미리 떼어 받는 몫이 섞입니다.",
+      caution: "주가 상승분 일부를 미리 받음",
     },
     {
       key: "reit",
@@ -822,7 +822,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       icon: "apartment",
       codes: codes(reit),
       meta: "yield",
-      caution: "높은 분배율엔 주가 하락과 특별분배가 섞입니다.",
+      caution: "주가 하락 · 특별분배 섞임",
     },
     {
       key: "aristocrat",
@@ -837,7 +837,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "usgrowth",
       title: "미국 배당성장",
       desc: "10년 넘게 늘려 온 회사 가운데 빠르게 늘리는 곳",
-      rules: ["10년 넘게 늘림", "5년 연 +7%", "배당성향 80% 이하"],
+      rules: ["10년 넘게 늘림", "5년간 해마다 +7%", "배당성향 80% 이하"],
       icon: "rocket_launch",
       codes: codes(usGrowth),
       meta: "growth",
@@ -868,7 +868,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       icon: "star",
       codes: codes(preferred),
       meta: "discount",
-      caution: "의결권이 없고 거래가 적어 배당수익률이 높아 보입니다.",
+      caution: "의결권 없음 · 거래 적음",
     },
     {
       key: "account",

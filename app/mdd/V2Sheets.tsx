@@ -336,11 +336,15 @@ export function CasesTable({
 
 /* ── 회복까지 ───────────────────────────────────────────────────── */
 /**
- * 지금만큼(또는 더) 빠졌던 하락이 고점을 되찾기까지 걸린 기간 — 중앙값 · 최단~최장 · 그중 몇 번 되찾았나.
+ * 지금만큼(또는 더) 빠졌던 하락이 고점을 되찾기까지 걸린 기간 — 보통(중앙값) · 최단~최장 · 그중 몇 번 되찾았나.
  * 아래 두 줄은 빠진 속도별(급락형 · 완만형) 회복 중앙값이고 지금 하락이 어느 쪽인지 꼬리표를 단다(옛 '이 하락의 성격').
+ * ⭐ 위아래가 **다른 하락들**을 센다(위: 지금만큼 깊었던 것 · 아래: 15% 넘게 빠졌다 되찾은 것) — 둘 다 문턱을 숫자로 적는다.
+ *    '이만큼 빠졌던 2번 중 1번'과 '15% 넘게 … 3번'이 한 카드에 서서 숫자가 안 맞아 보였다(2026-10-04 점검). '중앙값'은 '보통'으로.
  */
 export function RecoveryModule({ a }: { a: MddAnalysis }) {
   const r = a.recovery!;
+  // 문턱은 지금 낙폭 그대로(소수 한 자리) — 반올림하면(23.9 → 24) 센 하락과 글자가 조금 어긋난다.
+  const depth = `${Math.abs(a.currentDd).toFixed(1)}% 넘게`;
   const ch = a.character;
   const sincePeak = Math.round((Date.parse(a.asOf) - Date.parse(a.athDate)) / 86_400_000);
   const hasRange = r.recoveredCount >= 2 && r.minDays !== null && r.maxDays !== null && r.maxDays > r.minDays;
@@ -354,7 +358,7 @@ export function RecoveryModule({ a }: { a: MddAnalysis }) {
     // 되찾은 사례가 없으면 이번이 처음이다(진행 중인 하락은 마지막 하나뿐) — '1번 중 0번 되찾음'으로 적혔다(카카오 5년 실측).
     <Module
       title="회복까지"
-      meta={r.recoveredCount > 0 ? `이만큼 빠졌던 ${r.similarCount}번 중 ${r.recoveredCount}번 되찾음` : "이만큼 빠진 건 이번이 처음"}
+      meta={r.recoveredCount > 0 ? `${depth} 빠졌던 ${r.similarCount}번 중 ${r.recoveredCount}번 되찾음` : `${depth} 빠진 건 이번이 처음`}
       className="v2-md-rec"
     >
       <div className="v2-md-body">
@@ -362,7 +366,7 @@ export function RecoveryModule({ a }: { a: MddAnalysis }) {
           {r.recoveredCount > 0 ? (
             <>
               <b>{fmtDur(r.medianDays!)}</b>
-              <span className="v2-reason">중앙값</span>
+              <span className="v2-reason">{r.recoveredCount === 1 ? "걸림" : "보통"}</span>
             </>
           ) : (
             <>

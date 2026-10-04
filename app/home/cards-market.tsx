@@ -105,7 +105,7 @@ export function CardLeverage({ v }: { v: Pick }) {
         // 근거 둘은 각자 '자기 기준 대비'라 큰 숫자와 다른 눈금이다 — 아래 줄을 '기준 대비'로 갈라 둔 것이 그 표시다.
         <SplitStats
           items={[
-            { label: "ETF 거래대금", value: etfAmount ?? "-", sub: `${etfBaseLabel} 대비 ${Math.round(dt.etf_progress ?? 0)}%` },
+            { label: "ETF 거래대금", value: etfAmount ?? "-", sub: `과열선 ${etfBaseLabel}의 ${Math.round(dt.etf_progress ?? 0)}%` },
             { label: "선물 미결제약정", value: oiAmount ?? "-", sub: `1년 평균 대비 ${oiVsAvg !== null ? Math.round(oiVsAvg) : "-"}%` },
           ]}
         />
@@ -141,12 +141,16 @@ export function CardMarketActions({ v }: { v: Pick }) {
   // ⚠️ 눈금 자체는 그대로다. 히어로 '지표 분포'에서 이 지표는 여전히 고온 칸에 앉으므로,
   //    카드와 갈리는 게 거슬리면 indicator_thresholds 에 floor 0.25 를 얹는 재보정이
   //    따로 필요하다(그러면 오늘 값이 54.5 → 9.1 로 내려간다).
+  // 하나도 안 걸린 달은 '균형'이 아니라 '발동 없음'이다 — 0건인데 '균형'이라 적으면 무엇이 맞섰는지 되묻게 됐다(2026-10-04 점검).
+  const total = buyN + sellN + cbN;
   const dir =
-    buyN > sellN
-      ? { label: "매수 우세", color: C.hot }
-      : sellN > buyN
-        ? { label: "매도 우세", color: C.neutral }
-        : { label: "균형", color: C.ink };
+    total === 0
+      ? { label: "발동 없음", color: C.ink }
+      : buyN > sellN
+        ? { label: "매수 우세", color: C.hot }
+        : sellN > buyN
+          ? { label: "매도 우세", color: C.neutral }
+          : { label: "매수 · 매도 같음", color: C.ink };
   // 세 값을 **같은 눈금**에 올린다. 숫자 타일 셋으로 흩어 두면 5·8·6 을 눈이 직접 빼야
   // 하는데, 같은 축의 막대로 두면 "매도가 더 잦았다"가 길이로 바로 증명된다.
   // 색이 방향을 진다 — 매수 안전장치(상승 제동)는 달아오른 쪽이라 고온, 매도 쪽은 식는
@@ -167,7 +171,7 @@ export function CardMarketActions({ v }: { v: Pick }) {
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
         <strong style={{ fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: dir.color, lineHeight: 1 }}>{dir.label}</strong>
         {/* 곁말은 판정을 풀어 쓴 문장('양쪽이 비슷했습니다')이었다 — 문장 대신 셋을 합친 건수. 판정은 아래 막대가 증명한다. */}
-        <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2, whiteSpace: "nowrap" }}>{buyN + sellN + cbN}건 발동</span>
+        {total > 0 && <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2, whiteSpace: "nowrap" }}>{total}건 발동</span>}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {rows.map((r) => (
@@ -384,7 +388,7 @@ export function CardSpeed({ v, path = [], failed = false }: { v: Pick; path?: Cl
             tip={(x) => `${shortDate(x.key)} · ${x.value >= 0 ? "+" : ""}${x.value.toFixed(1)}%`}
           />
           <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>3개월 전 = 0%</span>
+            <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>3개월 전부터</span>
             {hi !== null && lo !== null && (
               <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>
                 최고 {hi >= 0 ? "+" : ""}{hi.toFixed(1)}% · 최저 {lo.toFixed(1)}%
@@ -445,14 +449,12 @@ export function CardVkospi({ v }: { v: Pick }) {
           </div>
           <HeatKnob left={pos * 100} color={knob} />
         </div>
-        {/* 양 끝 라벨은 **변동성 자체**를 말한다(잔잔 ↔ 출렁). 예전엔 '방심 ↔ 불안'
-            이었는데, 방심은 시장의 상태가 아니라 그 상태에 대한 평가라서 눈금 끝에
-            적히면 무엇을 잰 값인지가 흐려졌다(2026-08-04). 낮은 쪽이 왜 과열 신호인지는
-            셀 맨 아래 설명 한 줄이 맡는다. */}
+        {/* 양 끝은 막대의 눈금 — 최근 30일 최저 · 최고. '잔잔 39 · 출렁 58'은 숫자가 무엇인지(30일 최저 · 최고) 안 읽혔다(2026-10-04 점검).
+            그 전엔 '방심 ↔ 불안'이었다(평가라서 걷음, 2026-08-04). 낮은 쪽이 왜 과열 신호인지는 셀 맨 아래 설명 한 줄이 맡는다. */}
         {/* 가운데 '최근 30일 범위'는 걷었다 — 위 알약('최근 30일 중 낮은 편')이 같은 기간을 말한다. */}
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.muted }}>잔잔 {lo !== null ? Math.round(lo) : "-"}</span>
-          <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.muted }}>출렁 {hi !== null ? Math.round(hi) : "-"}</span>
+          <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.muted }}>30일 최저 {lo !== null ? Math.round(lo) : "-"}</span>
+          <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.muted }}>30일 최고 {hi !== null ? Math.round(hi) : "-"}</span>
         </div>
       </div>
       <Foot text={v.desc} />
@@ -596,7 +598,7 @@ export function CardGoldRatio({ v }: { v: Pick }) {
   const k = v.details?.kospi_close;
   const g = v.details?.gold_close;
   const num = (n: number) => n.toLocaleString("ko-KR", { maximumFractionDigits: 0 });
-  const note = typeof k === "number" && typeof g === "number" ? `코스피 ${num(k)} ÷ 금 ${num(g)}` : "코스피 지수 ÷ 금 시세";
+  const note = typeof k === "number" && typeof g === "number" ? `코스피 ${num(k)} ÷ 금 1온스 $${num(g)}` : "코스피 지수 ÷ 금 시세";
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow icon="balance" name={v.name} desc={v.headline} />
@@ -741,7 +743,8 @@ export function CardNetBuy({ v }: { v: Pick }) {
               background: atHigh ? "var(--c-mania-tint)" : "var(--c-blue-tint)",
             }}
           >
-            {atHigh ? "고점권" : "고점권 아님"}
+            {/* 제목('고점권 외국인 매도')의 고점권은 코스피 이야기다 — '고점권 아님'만 적으면 제목과 반대말로 읽혔다(2026-10-04 점검). */}
+            {atHigh ? "코스피 고점권" : "코스피 고점권 아님"}
           </span>
         )}
       </div>
@@ -838,6 +841,7 @@ export function CardLimitUp({ v }: { v: Pick }) {
       <TitleRow desc={v.headline} icon="bolt" name={v.name} badge={sourceDateBadge(v) ?? "최근 거래일 기준"} />
       <Big
         disp={String(surged)}
+        unit="종목"
         color={v.color}
         size={32}
         sub={`${listed ? `${listed.toLocaleString("ko-KR")}종목 중 ` : ""}${(v.raw ?? 0).toFixed(2)}%`}

@@ -289,9 +289,8 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
           key={card.title}
           title={card.title}
           // ⚠️ 잘렸으면 머리 근거가 그 사실을 적는다("1,000개 중 100개") — "전체보기"라 해 놓고 조용히 100개만 내면 거짓말이 된다.
-          meta={countNote(card.total, card.items.length)}
-          // 셈법 한 마디는 물음표 툴팁으로 — 제목 바로 뒤(Module help). 카드 부제(설명 문장)는 걷었다(v2).
-          help={spec.help}
+          // 셈법 한 마디는 머리 근거 끝에 그대로(물음표 말풍선이던 것, 2026-10-04). 카드 부제(설명 문장)는 걷었다(v2).
+          meta={[countNote(card.total, card.items.length), spec.note].filter(Boolean).join(" · ")}
           className="v2-in-listmod"
         >
           {card.items.length === 0 ? (

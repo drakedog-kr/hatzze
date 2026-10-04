@@ -30,7 +30,7 @@ export type BoardRow = {
   /** 꼬리표에 마우스를 올리면 뜨는 뜻(15자 안). */
   tagTip?: string;
   /** 등락률 뒤 숫자 칸들(이미 꼴을 갖춘 글자). hot 이면 빨간 잉크. */
-  cells: { v: string; hot?: boolean }[];
+  cells: { v: string; hot?: boolean; k?: string }[];
   /** 마지막 칸 문장(두 줄까지). */
   text: string | null;
   /** 줄에 마우스를 올리면 뜨는 전문. 없으면 text. */
@@ -100,7 +100,7 @@ export function SignalTable({ sec }: { sec: BoardSection }) {
                   {/* 값이 없으면 '-' 대신 '없음' — 바로 옆 칸들의 '-0.73%' 와 같은 글자라 내렸다는 뜻으로 읽혔다. */}
                   <span className={`v2-td-num v2-td-chg${chgCls(r.change)}${r.change === null ? " is-none" : ""}`}>{r.change === null ? "없음" : pct(r.change)}</span>
                   {r.cells.map((c, k) => (
-                    <span key={k} className={`v2-td-num v2-td-c${k}${c.hot ? " is-hot" : ""}`} data-k={k === 0 ? sec.key0 : undefined}>
+                    <span key={k} className={`v2-td-num v2-td-c${k}${c.hot ? " is-hot" : ""}`} data-k={k === 0 ? (c.k === undefined ? sec.key0 : c.k || undefined) : undefined}>
                       {c.v}
                     </span>
                   ))}

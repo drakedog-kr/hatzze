@@ -5,7 +5,6 @@
 //  - 둘째 줄 셋 — 1년에 받는 배당 | 달마다 들어오는 돈 | 다가오는 일정. 예전엔 한 시트 안에서 표 아래로 2,400px 를 내려가야 달력 · 일정이
 //    보였다. 결과를 먼저 세운다. 담은 종목이 없으면 셋 다 안 선다(예시 미리보기는 2026-10-03 걷었다 — 고른 것처럼 읽혔다).
 
-import { Icon } from "../ui";
 import { CoverMeta, Module } from "../kadera/V2Modules";
 import { fmtCloseDay } from "../mdd/shared";
 import { ACCOUNTS } from "./tax";
@@ -97,7 +96,7 @@ export function YearlyModule({
   account,
   onAccount,
   mixed,
-  help,
+  tax,
   note,
 }: {
   total: number;
@@ -111,7 +110,8 @@ export function YearlyModule({
   onAccount: (a: Account) => void;
   /** 종목마다 계좌가 다르게 담겼나(세후일 때만 참). */
   mixed: boolean;
-  help: string;
+  /** '떼는 세금' 줄 값(세율). 세전이면 빈 글자 — 줄을 안 세운다. */
+  tax: string;
   note: string | null;
 }) {
   // 머리 곁글은 '계좌별'일 때만 — '세후 (ISA)'는 바로 옆 세후 · 세전 버튼과 아래 계좌 버튼이 이미 말한다. 첫 칸이 여론 칸 폭(285 · 245 · 216)으로
@@ -122,12 +122,15 @@ export function YearlyModule({
       <div className="v2-md-body">
         <span className="v2-card-val is-big">
           <b>{won(total)}</b>
-          {/* 세금을 어떻게 뗐나 — 한 문장(2026-09-30 "너무 복잡해"로 줄인 것). 데이터 툴팁이라 15자 규칙 밖. */}
-          <span className="hz-tip hz-tip-wide v2-dv-help" data-tip={help} aria-label="세금 설명">
-            <Icon name="help" style={{ fontSize: 14 }} />
-          </span>
         </span>
         <div className="v2-md-rows">
+          {/* 떼는 세금 — 물음표 말풍선이던 것을 줄로(2026-10-04). 세율만 적고 긴 단서(ISA 비과세 한도 등)는 아래 한 줄(note)이 맡는다. */}
+          {afterTax && tax && (
+            <div className="v2-md-pr">
+              <span className="v2-md-pr-k">떼는 세금</span>
+              <span className="v2-md-pr-v is-sub">{tax}</span>
+            </div>
+          )}
           <div className="v2-md-pr">
             <span className="v2-md-pr-k">한 달 평균</span>
             <b className="v2-md-pr-v">{won(total / 12)}</b>

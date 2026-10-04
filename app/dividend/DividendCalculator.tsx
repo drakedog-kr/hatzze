@@ -8,7 +8,7 @@ import { LoadFailedNote } from "../LoadFailedNote";
 import { inflate, type BasketLite, type MoreLists, type StockLite, type StockWire } from "./types";
 import { newId, holdingsStore, writeHoldings } from "./store";
 import type { Holding } from "./store";
-import { IRP_RISK_MAX, isSafeAsset, ACCOUNTS, TAX_HELP, taxNote } from "./tax";
+import { IRP_RISK_MAX, isSafeAsset, TAX_SHORT, taxNote } from "./tax";
 import type { Account, TaxMode } from "./tax";
 import { DEFAULT_SHARES, GOAL_DEFAULT_MAN, ADD_DEFAULT_MAN, AMOUNT_DEFAULT, SCOPES, scopeOf, computeLines, basketCodes, nextAccountFor, basketShares } from "./shared";
 import type { Scope } from "./shared";
@@ -365,9 +365,8 @@ export function DividendCalculator({
   // 세 줄이던 것을 2026-09-30 에 줄였다(툴팁은 한 문장 — 이용자 지적 "너무 복잡해").
   // 출처 이름은 여기 안 적는다(2026-09-13 지적) — 투자 유의사항의 '데이터 출처'가 그 자리다(app/disclaimer/page.tsx.
   // 전 화면 푸터가 거기로 건너간다. stockanalysis 는 약관이 출처 표기를 조건으로 발췌를 허용하므로 거기서 지우지 말 것).
-  const helpText = mixed
-    ? `세금: 줄마다 고른 계좌로 — ${ACCOUNTS.map((a) => [a, byAccount(a.key).length] as const).filter(([, n]) => n > 0).map(([a, n]) => `${a.label} ${n}`).join(" · ")}`
-    : TAX_HELP[taxMode];
+  // '떼는 세금' 줄 — 계좌가 섞였으면 줄마다 고른 계좌대로 뗀다(표의 줄마다 계좌가 보인다).
+  const taxLine = mixed ? "줄마다 고른 계좌대로" : TAX_SHORT[taxMode];
 
   return (
     // v2(2026-10-03) — 카더라 · MDD 와 같은 범위(v2-kd 토큰 · 폭 단계, v2-dv 는 이 화면 전용 덮기 · v2.css).
@@ -395,7 +394,7 @@ export function DividendCalculator({
               setAccount(a);
             }}
             mixed={mixed}
-            help={helpText}
+            tax={taxLine}
             note={heroNote}
           />
           <CalendarModule

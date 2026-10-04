@@ -110,15 +110,17 @@ export const ACCOUNTS: { key: Account; label: string }[] = [
 /** 줄의 계좌 알약(select)은 폭이 좁아 짧은 이름. */
 export const ACCOUNT_SHORT: Record<Account, string> = { general: "일반 계좌", isa: "ISA", pension: "연금저축", irp: "IRP", exempt: "비과세저축" };
 
-/** 물음표 툴팁의 첫 줄 — 세금을 어떻게 뗐나, 계좌마다. */
-export const TAX_HELP: Record<TaxMode, string> = {
-  general: "세금: 국내 15.4%, 미국 15%를 뗀 값",
-  isa: `세금(ISA): 국내 주식·ETF 9.9%, 해외 주식은 ISA에 못 담아 15% · 만기까지 ${wonShort(ISA_FREE)}(서민형 ${wonShort(ISA_FREE_LOW)})은 비과세라 실제론 이보다 적습니다`,
-  pension: "세금(연금저축): 국내 ETF·상장 리츠는 연금으로 받을 때 5.5% · 주식은 못 담아 15.4%·15%",
-  // 안전자산 30% 얘기는 넘었을 때 히어로 아래 한 줄이 하니 여기엔 안 적는다(2026-09-15 지적: 툴팁이 너무 길다).
-  irp: "세금(IRP): 국내 ETF·상장 리츠는 연금으로 받을 때 5.5% · 주식은 못 담아 15.4%·15%",
-  exempt: `세금(비과세 종합저축): 국내 주식·ETF 배당 0% · 원금 ${wonShort(EXEMPT_LIMIT)}까지(전 금융기관 합산) · 만 65세 이상(2026년부터 기초연금 수급자)·장애인·유공자 등 · 해외 주식은 못 담아 15%`,
-  gross: "세전: 세금을 빼기 전 값(국내 15.4%, 미국 15%를 뗍니다)",
+/**
+ * '1년에 받는 배당' 칸의 '떼는 세금' 줄 — 계좌마다 떼는 세율만 짧게. 물음표 말풍선(TAX_HELP 문장)으로 숨겨 두던 것을 보이게 했다
+ * ("헬프 툴팁이 필요하면 심플하지 않다", 2026-10-04). 216 칸에도 한 줄로 들어야 한다. 세전은 줄을 안 세운다.
+ */
+export const TAX_SHORT: Record<TaxMode, string> = {
+  general: "국내 15.4% · 미국 15%",
+  isa: "국내 9.9% · 해외 15%",
+  pension: "ETF·리츠 5.5% · 주식 15.4%",
+  irp: "ETF·리츠 5.5% · 주식 15.4%",
+  exempt: "국내 0% · 해외 15%",
+  gross: "",
 };
 
 /**
@@ -145,6 +147,8 @@ export function taxNote(mode: TaxMode, grossAll: number, taxableAll: number, sep
   if (irp && irp.riskPct > IRP_RISK_MAX * 100) {
     parts.push(`IRP는 위험자산이 70%까지입니다. 지금 ${Math.round(irp.riskPct)}%라 채권·채권혼합 ETF 같은 안전자산이 ${wonShort(Math.ceil(irp.needKrw / 1e4) * 1e4)} 더 있어야 합니다.`);
   }
+  // ISA 비과세 한도 — 물음표 말풍선에 있던 단서라 '떼는 세금' 줄로 옮기며 여기로 왔다(2026-10-04). 세율만 보면 실제보다 많이 떼는 것으로 읽힌다.
+  if (mode === "isa" && !mixed) parts.push(`ISA는 만기까지 ${wonShort(ISA_FREE)}(서민형 ${wonShort(ISA_FREE_LOW)})이 비과세라 실제 세금은 이보다 적습니다.`);
   if (mode !== "general" && !mixed) return parts.length ? parts.join(" ") : null;
   // 여기부터는 일반 계좌 줄의 금융소득 문턱 — 세전이 아니라 **과세되는 몫**으로 센다(국내 ETF 과표·감액배당을 뺀 값).
   // 섞였으면 '일반 계좌 줄' 이라고 밝힌다. 비과세 몫이 있으면 그 차이를 한 번 적는다.
