@@ -113,7 +113,11 @@ export async function GET(request: Request) {
   const benchUnderwater = marketBars ? drawdownOnDates(marketBars, analysis.underwater.map((p) => p.date)) : null;
 
   // 해마다 수익 · 낙폭과 복리 연평균(화면 '해마다' 모듈) — 종목 종가로 요약.
-  const risk = riskProfile(bars);
+  // ⏳ 옛 화면 받침 — v2 배포 순간 열려 있던 옛 /mdd 탭은 이 API 를 직접 부르고 risk.events.slice · bigDropCount 를 읽는다
+  //    (origin/main app/mdd/RiskProfile.tsx). 새 risk 엔 그 칸이 없어 TypeError 로 오류 화면이 떴다(2026-10-04 머지 전 점검).
+  //    빈 값으로 한동안 함께 실어 보낸다 — v2 화면은 이 칸을 안 읽는다. 다음 판에서 걷는다.
+  const riskCore = riskProfile(bars);
+  const risk = riskCore ? { ...riskCore, events: [], bigDropCount: 0, withMarket: null, dropDaysMedian: null, recoverDaysMedian: null } : riskCore;
   // 최근 1년 가격대별 거래대금('수익 · 손실 비율' 칸).
   const ladder = priceLadder(bars, LADDER_ROWS);
 

@@ -40,11 +40,13 @@ def test_suspended_dividend_is_zero():
     assert gap == "XYZ SA 0.0 vs SEC 2.0"
 
 
-def test_declared_next_payment_keeps_sec():
+def test_declared_next_payment_keeps_annual_amount():
     # 연 1회 지급이 작년보다 며칠 늦은 경우 — 선언은 됐고 아직 안 줬다. 끊은 게 아니다.
+    # 작년 지급(2025-09-26)은 1년 창 끝 바로 앞이라 끝점 여유(common/ttm_window.py)로 그대로 센다(예전엔 SEC 값으로 물러났다).
     r = _row()
     assert us.apply_payments(r, [_pay("2026-10-02", 2.0), _pay("2025-09-26", 2.0)], TODAY) is None
-    assert (r["ttm_dps"], r["ttm_method"]) == (2.0, "quarters")
+    assert r["ttm_dps"] == 2.0
+    assert r["next_pay_date"] == "2026-10-02"
 
 
 def test_no_history_keeps_sec():

@@ -26,6 +26,7 @@
 import { cache } from "react";
 
 import { getSupabaseAdmin } from "@/lib/supabase-server";
+import { withScopedLoadFailures } from "@/lib/load-state";
 import { getUsdKrw } from "@/lib/usd-krw";
 import { fetchAllRows } from "@/lib/telegram-data";
 import { usQuotes } from "@/lib/us-telegram-data";
@@ -289,6 +290,19 @@ function quartersOf(dates: string[]): { latest: string | null; prior: string | n
   return { latest: q[0] ?? null, prior: q[1] ?? null };
 }
 
+/** 표 전체의 가장 이른 접수일 — 실패는 이 안에 가둔다(withScopedLoadFailures). 못 읽으면 null. */
+async function firstFiled(table: "us_congress_trade" | "us_insider_txn"): Promise<string | null> {
+  try {
+    const { value, failed } = await withScopedLoadFailures(async () => {
+      const { data, error } = await getSupabaseAdmin().from(table).select("filed_date").order("filed_date").limit(1);
+      return error ? null : ((data?.[0]?.filed_date as string | undefined) ?? null);
+    });
+    return failed.length ? null : value;
+  } catch {
+    return null;
+  }
+}
+
 const loadStockDetail = cache(async (rawTicker: string, range: string): Promise<StockDetail | null> => {
   // ⚠️ 표마다 클래스 표기가 갈린다(13F 는 BRK-B, 의원은 BRK.B, 나머지는 BRK). 하나만
   //    물으면 나머지 표가 통째로 안 잡혀 화면이 "0명" 이라고 **없다고 단언**한다.
@@ -390,8 +404,9 @@ const loadStockDetail = cache(async (rawTicker: string, range: string): Promise<
     // 언급 추이의 끝점 — 표 전체의 가장 최근 날. 이 종목의 마지막 행이 아니다(mentionTrend 주석).
     db.from("telegram_us_stock_daily").select("date").order("date", { ascending: false }).limit(1),
     // 의원 · 임원 표가 덮는 기간의 시작(표 전체의 가장 이른 접수일) — 세 축의 기간이 달라 화면이 적는다(2026-10-04 점검).
-    db.from("us_congress_trade").select("filed_date").order("filed_date").limit(1),
-    db.from("us_insider_txn").select("filed_date").order("filed_date").limit(1),
+    // 곁가지라 실패를 이 조회 안에 가둔다(못 읽으면 기간 글자만 빠진다) — 그냥 부르면 5xx 한 번에 화면 재생성이 통째로 멈췄다.
+    firstFiled("us_congress_trade"),
+    firstFiled("us_insider_txn"),
   ]);
 
   // 임원 행은 그 티커의 **주된 발행사 CIK** 것만 — 심볼 없는 다른 발행사 신고(블랙스톤 계열이 비상장 펀드를 산 것)가 폴더 CIK 의
@@ -659,8 +674,8 @@ const loadStockDetail = cache(async (rawTicker: string, range: string): Promise<
     mentionDate,
     mentionPartial,
     mentionAsOf,
-    congressSince: (congressStart.data?.[0]?.filed_date as string | undefined) ?? null,
-    insiderSince: (insiderStart.data?.[0]?.filed_date as string | undefined) ?? null,
+    congressSince: congressStart,
+    insiderSince: insiderStart,
     holders,
     holdersQuarter,
     exitedCount,
@@ -739,11 +754,14 @@ export const getManagerDetail = cache(async (cik: number): Promise<ManagerDetail
     ),
     // 종목 이름(추출 사전). 곁가지라 실패해도 화면은 서고 이름만 티커로 남는다 — failedSources 에 안 넣는다.
     // ⚠️ 예전엔 displayName(t, null) 이라 사전을 안 봐서 애플 · 아메리칸 익스프레스 같은 이름이 다 비었다(2026-10-04).
-    fetchAllRows<{ ticker: string; name_ko: string | null; name_en: string | null }>(
-      "ticker",
-      () => db.from("us_stocks").select("ticker,name_ko,name_en"),
-      { onError: (e: unknown) => console.error("[insider/investor] 종목 이름 조회 실패 — 티커로 둡니다", e) },
-    ),
+    // 실패는 이 조회 안에 가둔다(withScopedLoadFailures) — 그냥 부르면 5xx 한 번에 화면 재생성이 통째로 멈췄다(2026-10-04 머지 전 점검).
+    withScopedLoadFailures(() =>
+      fetchAllRows<{ ticker: string; name_ko: string | null; name_en: string | null }>(
+        "ticker",
+        () => db.from("us_stocks").select("ticker,name_ko,name_en"),
+        { onError: (e: unknown) => console.error("[insider/investor] 종목 이름 조회 실패 — 티커로 둡니다", e) },
+      ),
+    ).then(({ value, failed }) => (failed.length ? [] : value)),
   ]);
 
   // 명단 조회가 깨진 것은 "없는 인물"이 아니라 오류다. 404 대신 error.tsx 로 보낸다.

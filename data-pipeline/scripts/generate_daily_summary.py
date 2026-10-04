@@ -865,7 +865,8 @@ def main() -> None:
                 "category": normalize_category(ind.get("category")),
                 "desc": ind.get("description_beginner"),
                 "capped": capped,
-                "hot": capped >= HOT_ZONE,
+                # 화면(app/home/parts.tsx isHit)과 같이 반올림한 값으로 — 74.65 가 화면엔 '75'·초고온인데 요약은 아니라고 셌다.
+                "hot": js_round(capped) >= HOT_ZONE,
                 # 이름 쉬기·크게 움직임 판정에만 쓴다. digest 에는 원값을 넣지 않는다 — raw 를 보여주면
                 # 모델이 방향을 거꾸로 읽는다(build_digest 주석 참고).
                 "slug": ind.get("slug"),

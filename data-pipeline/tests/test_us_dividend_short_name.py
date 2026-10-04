@@ -15,6 +15,10 @@ def test_tails():
     assert us.short_en("Interactive Brokers Group") == "Interactive Brokers"
     assert us.short_en("Stanley Black & Decker") == "Stanley Black & Decker"
     assert us.short_en("3M") == "3M"
+    # '& Co.' · '& Company' 는 '&' 까지 뗀다('Deere &' 로 남았다).
+    assert us.short_en("Deere & Company") == "Deere"
+    assert us.short_en("KKR & Co.") == "KKR"
+    assert us.short_en("Arthur J. Gallagher & Co.") == "Arthur J. Gallagher"
 
 
 def test_never_empty_and_unique():

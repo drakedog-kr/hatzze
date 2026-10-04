@@ -124,7 +124,7 @@ DUR = {"month": (25, 35), "quarter": (80, 100), "half": (170, 190), "nine": (255
 
 # 영문 이름의 법인 꼬리 — 한글 표기가 없는 S&P500 종목은 영문명이 화면 이름인데, 'Rollins, Inc.' · 'Progressive Corporation' 처럼
 # 꼬리가 붙어 한글 이름 옆에서 길고 들쭉날쭉했다(2026-10-04 점검). 꼬리를 떼어 짧은 영문으로 꼴을 맞춘다.
-_EN_TAIL = re.compile(r"(?:,?\s+(?:Inc\.?|Incorporated|Corporation|Corp\.?|Company|Co\.|plc|PLC|Ltd\.?|Group|Holdings))+$")
+_EN_TAIL = re.compile(r"(?:,?\s+(?:&\s*)?(?:Inc\.?|Incorporated|Corporation|Corp\.?|Company|Co\.|plc|PLC|Ltd\.?|Group|Holdings))+$")
 
 
 def short_en(name: str) -> str:

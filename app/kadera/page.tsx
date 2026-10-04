@@ -13,7 +13,7 @@ import {
   KADERA_WINDOW_DAYS,
 } from "@/lib/telegram-data";
 
-import { getKrIndexCloses } from "@/lib/data";
+import { getKrIndexClosesSide } from "@/lib/data";
 import { lastSession, liveChangeHead } from "@/lib/yahoo-quote";
 import { formatKstUpdate } from "@/lib/format";
 import { assertLoaded, isLoadFailed } from "@/lib/load-state";
@@ -128,7 +128,7 @@ export default async function KaderaPage() {
       getMoveReasons(),
       getUpcomingEvents(35, 400),
       // 첫 줄 — 지수 종가와 칩 둘(밤사이 미장 · 미장 급부상). 곁들이는 칸이라 실패해도 화면을 세우고 그 칸만 뺀다.
-      getKrIndexCloses(),
+      getKrIndexClosesSide(),
       loadCoverChips(),
       // 급부상 · 많이 언급의 등락 칸 머리 — 장이 쉬면 '지금' 대신 마지막 거래일(lib/yahoo-quote.ts liveChangeHead).
       lastSession("^KS11", "Asia/Seoul").catch(() => null),

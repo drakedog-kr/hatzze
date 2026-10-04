@@ -61,7 +61,7 @@ const EXCLUDED = new Map([
  * 항목이 없어 실패하므로, 그때 어떻게 할지 정하고 한 줄 적는다.
  */
 const DYNAMIC = new Map([
-  ["/insider/list/[kind]", "슬러그 여덟 개를 sitemap.ts 가 INSIDER_LIST_SLUGS 로 펼친다"],
+  ["/insider/list/[kind]", "슬러그 여섯 개를 sitemap.ts 가 INSIDER_LIST_SLUGS 로 펼친다(걷은 hot · holders 는 next.config 가 308)"],
   ["/stock/[code]", "sitemap-stocks.xml 이 DB 를 읽어 펼친다(lib/stock-page.ts listIndexableStocks)"],
   ["/theme/[theme]", "사전의 테마 26개를 app/sitemap-urls.ts 가 THEME_NAMES 로 펼친다(열린 뒤에만)"],
   ["/theme/us/[theme]", "미장 사전의 테마 16개를 app/sitemap-urls.ts 가 US_THEME_NAMES 로 펼친다(열린 뒤에만)"],

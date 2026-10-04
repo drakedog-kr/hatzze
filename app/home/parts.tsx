@@ -18,9 +18,12 @@ import type { IconName } from "@/lib/icon-names";
  */
 export function overheatColor(pct: number | null): string {
   if (pct === null) return C.sub;
-  if (pct >= 75) return C.mania;
-  if (pct >= 50) return C.hot;
-  if (pct >= 25) return C.neutral;
+  // 화면에 찍히는 정수로 가른다 — 구간 이름(stageForScore)과 같은 잣대. 24.91 이 '25'로 찍히고 상온 목록에 서는데 색만
+  // 저온이었다(2026-10-04 머지 전 점검).
+  const v = Math.round(pct);
+  if (v >= 75) return C.mania;
+  if (v >= 50) return C.hot;
+  if (v >= 25) return C.neutral;
   return C.cold;
 }
 
@@ -100,12 +103,13 @@ export function pick(ind: Ind | undefined): Pick {
     // 초고온 = 진행률 ≥ 75. 모든 지표의 진행률이 '과열도(0~100)'로 통일돼 있어
     // (youtube는 surge_map으로 평균 대비 급증을 매핑) 예외 없이 동일 기준이고,
     // 이 지점이 곧 카드에 적히는 기준선(hotDisp)이다.
-    isHit: (capped ?? 0) >= 75,
+    // 반올림한 값으로 — 구간 이름 · 색과 같은 잣대(stageForScore · overheatColor).
+    isHit: Math.round(capped ?? 0) >= 75,
     // 고온 이상(진행률 ≥ 50). 카드에 붙는 보조 배지의 색을 가르는 값이다 — 배지가 늘
     // 파랑이면 "콜 우세"(= 지금 뜨겁다)가 차분한 색으로 떠서 큰 수치와 반대말을 한다.
     // isHit(≥75)과 따로 두는 이유: 초고온 배지와 셀 상단 라인은 75 가 맞고 색만 50 에서
     // 갈려야 한다. 하나로 묶으면 고온 카드가 파란 배지를 달거나 초고온 표시가 헐거워진다.
-    warm: (capped ?? 0) >= 50,
+    warm: Math.round(capped ?? 0) >= 50,
     // 캡핑 전 원본이 아니라 capped(0~100)를 쓴다 — 색 경계가 0~100 척도 위에 있고,
     // 원본은 −226%나 118% 같은 값이 나와 구간 밖으로 벗어난다.
     color: overheatColor(capped),

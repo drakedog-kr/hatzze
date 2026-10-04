@@ -1,4 +1,4 @@
-import { SCORE_TREND_DAYS, getKospiCloseSeries, getKrIndexCloses, getLatestDailyScore, getPublicIndicators, getScoreHistory, getTopStockHighGaps } from "@/lib/data";
+import { SCORE_TREND_DAYS, getKospiCloseSeries, getKrIndexClosesSide, getLatestDailyScore, getPublicIndicators, getScoreHistory, getTopStockHighGaps } from "@/lib/data";
 import { formatKstUpdate } from "@/lib/format";
 import { assertLoaded, isLoadFailed } from "@/lib/load-state";
 import type { IndicatorCategory } from "@/lib/data";
@@ -60,7 +60,7 @@ export default async function Home() {
     // 그래서 아래 assertLoaded 에 넣지 않는다.
     loadSpotlight(),
     // v2 첫 줄의 지수 종가(국장 카더라와 같은 칸). 곁들이는 칸이라 실패해도 칸만 빠진다.
-    getKrIndexCloses(),
+    getKrIndexClosesSide(),
   ]);
 
   /* 조회 실패를 "자료 없음" 과 가른다(lib/load-state.ts). 두 값 다 카드의 **곁가지**라,

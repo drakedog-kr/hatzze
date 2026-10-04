@@ -74,7 +74,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import execute_with_retry, get_client, load_all  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
-from common.ttm_count import last_n_year  # noqa: E402
+from common.ttm_window import ttm_window  # noqa: E402
 
 TABLE = "kr_dividend_stock"
 CASH_KINDS = ("현금배당", "동시배당")
@@ -87,6 +87,7 @@ PAGE = 1000
 
 
 PAY_LAG_FALLBACK_DAYS = 100  # 지급일이 비었을 때 기준일에 더하는 날수(실측 중앙값 103)
+TWIN_DAYS = 45  # 기준일이 1년에서 이만큼 안쪽으로 떨어져 있으면 같은 차례(분기 간격 91일의 절반)
 YEAR_END_PAY_LAST_MONTH = 4  # 12월 결산 회사의 결산 배당은 이 달까지 지급된다(머리말)
 
 
@@ -187,7 +188,6 @@ def notice_bits(code: str, notices: list[dict], payments: list[dict], today: dat
 
 
 def summarize(code: str, recs: list[dict], today: date, close: float | None) -> dict:
-    ttm_from = today - timedelta(days=365)
     last_year = latest_complete_year(today)
     annual: dict[int, float] = defaultdict(float)
     ttm_dps = 0.0
@@ -222,11 +222,23 @@ def summarize(code: str, recs: list[dict], today: date, close: float | None) -> 
             last_pay = pd
         cash.append((rd, pd, amt))
 
-    # 지난 1년 — 날짜 창이 아니라 **횟수**로(common/ttm_count.py). 9/30 기준일이 지났는데 금액이 아직 없으면 작년 9/30 건이
-    # 창 밖으로 빠져 분기배당이 세 분기만 셌다(2026-10-04 점검, 삼성전자 1,668 → 1,312원). 셀 수 없으면(지급 둘 이하) 날짜 창.
-    picked = last_n_year([(rd, (rd, pd, amt)) for rd, pd, amt in cash], today)
-    if picked is None:
-        picked = [(rd, pd, amt) for rd, pd, amt in cash if rd > ttm_from]
+    # 지난 1년 — 지급일로 모으고(최근 12개월 지급), 기준일로 '같은 차례'를 가려 한 차례 한 건만 센다.
+    # ① 기준일로만 자르면 9/30 기준일이 지났는데 3분기 금액이 아직 없을 때 작년 9/30 건이 창 밖으로 빠져 분기배당을 세 분기만
+    #    셌고(2026-10-04 점검, 삼성전자 1,668 → 1,312원), 개편 뒤 기준일이 늦게 밀린 회사(HD현대 9/30 → 11월)도 같았다.
+    # ② 지급일로만 자르면 지급일이 해마다 앞당겨지는 회사가 같은 차례를 두 번 셌다(영원무역 작년 9/30 · 올해 9/18 지급,
+    #    SK리츠 5건). 그래서 기준일이 1년(± TWIN_DAYS) 떨어진 두 건이 함께 들면 옛 건을 뺀다.
+    # ③ 확정 공시(기준일은 지났고 지급 전)는 함께 세되 1년 전 같은 차례를 새 금액으로 바꾼다 — 지급일로만 자르면 첫 배당 · 새
+    #    중간배당이 지급될 때까지 0 이었다(효성오앤비 · 한국카본).
+    # 지급일이 없는 건은 그 종목의 평소 '기준일 → 지급일' 간격으로 어림한 날로 판정한다.
+    lags = sorted((pd - rd).days for rd, pd, _ in cash if pd and pd >= rd)
+    lag = lags[len(lags) // 2] if lags else PAY_LAG_FALLBACK_DAYS
+    paid_on = lambda rd, pd: pd or rd + timedelta(days=lag)  # noqa: E731
+    twin = lambda a, b: abs(abs((a - b).days) - 365) <= TWIN_DAYS  # noqa: E731
+    picked = ttm_window([(paid_on(rd, pd), (rd, pd, amt)) for rd, pd, amt in cash], today)
+    for c in sorted(c for c in cash if paid_on(c[0], c[1]) > today):
+        picked = [x for x in picked if not twin(c[0], x[0])] + [c]
+    picked.sort(key=lambda t: t[0])
+    picked = [x for i, x in enumerate(picked) if not any(twin(x[0], y[0]) and y[0] > x[0] for y in picked[i + 1 :])]
     for rd, pd, amt in picked:
         ttm_dps += amt
         ttm_count += 1
@@ -241,11 +253,13 @@ def summarize(code: str, recs: list[dict], today: date, close: float | None) -> 
         streak += 1
         y -= 1
     # 최근 5년(last_year-4 … last_year) 각각을 전년과 견줘 줄인 해를 센다.
-    # 특별배당이 낀 해(그 전 해의 두 배 넘게) — 견주는 기준으로 쓰지 않는다. 삼성전자 2020(2,994원, 특별배당)을 5년 전 기준으로
-    # 쓰니 정기배당이 1,416 → 1,668원으로 늘었는데도 '해마다 −11%'였고, 2021 을 줄인 해로 셌다(2026-10-04 점검).
+    # 특별배당이 낀 해 — 그 전 해의 두 배를 넘고 **이듬해 다시 절반 아래로** 돌아온 해(한 번 튄 해). 견주는 기준으로 쓰지 않는다.
+    # 삼성전자 2020(2,994원, 특별배당)을 5년 전 기준으로 쓰니 정기배당이 1,416 → 1,668원으로 늘었는데도 '해마다 −11%'였고,
+    # 2021 을 줄인 해로 셌다(2026-10-04 점검). ⚠️ '두 배 넘게'만 보면 영구 증액(씨젠 2020 100 → 1,500원, 그 뒤 800~1,000원)도
+    # 특별로 봐서 감액한 회사의 증가율이 +47% 로 부풀었다(같은 날 머지 전 점검).
     def special(yy: int) -> bool:
-        before = annual.get(yy - 1, 0)
-        return before > 0 and annual.get(yy, 0) > 2 * before
+        before, cur, after = annual.get(yy - 1, 0), annual.get(yy, 0), annual.get(yy + 1, 0)
+        return before > 0 and cur > 2 * before and after < cur / 2
 
     cuts = 0
     for yy in range(last_year - 4, last_year + 1):
@@ -253,10 +267,10 @@ def summarize(code: str, recs: list[dict], today: date, close: float | None) -> 
         prev, cur = annual.get(ref_year, 0), annual.get(yy, 0)
         if prev > 0 and cur < prev:
             cuts += 1
-    base_year = last_year - 6 if special(last_year - 5) else last_year - 5
+    # 기준 해(5년 전)가 특별배당이 낀 해면 증가율을 내지 않는다 — 기준을 옮기면 기간이 6년이 돼 '5년 연평균' 라벨과 어긋난다.
+    base_year = last_year - 5
     base, top = annual.get(base_year, 0), annual.get(last_year, 0)
-    span = last_year - base_year
-    growth = ((top / base) ** (1 / span) - 1) * 100 if base > 0 and top > 0 else None
+    growth = ((top / base) ** (1 / 5) - 1) * 100 if base > 0 and top > 0 and not special(base_year) else None
     # 12개월 합이 그 전 회계연도의 두 배를 넘으면 특별·청산배당이 섞인 것으로 본다.
     # 견주는 해가 '가장 최근 끝난 해'가 아니라 **그 전 해**인 까닭: 4월 결산 배당이 크게
     # 뛴 해는 최근 끝난 해 자체가 그 배당을 품고 있어 견줘도 안 걸린다(노바텍 2025).

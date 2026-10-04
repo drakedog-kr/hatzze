@@ -33,7 +33,7 @@ import time
 import urllib.request
 from datetime import date
 
-from .ttm_count import last_n_year
+from .ttm_window import ttm_window
 
 UA = {"User-Agent": "hatzze/1.0 (+https://hatzze.fun; contact: support@hatzze.fun)"}
 BASE = {"stock": "https://stockanalysis.com/stocks/{t}/dividend/", "etf": "https://stockanalysis.com/etf/{t}/dividend/"}
@@ -150,14 +150,11 @@ def dividend_history(ticker: str, kind: str = "stock") -> list[dict] | None:
 
 
 def trailing(payments: list[dict], today: date, days: int = 365) -> tuple[list[dict], dict | None]:
-    """(지난 1년에 **지급된** 건, 아직 안 지급된 다음 건). 지급일 기준.
+    """(지난 1년 안에 **지급된** 건, 아직 안 지급된 다음 건). 지급일 기준.
 
-    1년은 날짜 창이 아니라 **횟수**다(common/ttm_count.py) — 매달 초에 주는 JEPI 의 2025-10-03 지급분이 365일 창에서 하루 차이로
-    빠지고 2026-10-05 건은 아직 지급 전이라 11달만 셌다(2026-10-04 점검). 지급이 둘 이하라 횟수를 못 세면 예전 날짜 창이다.
+    창은 날짜(365일)에 끝점 여유를 더한 것이다(common/ttm_window.py) — 매달 초에 주는 JEPI 의 1년 전 같은 차례 지급분이
+    하루 차이로 빠져 11달만 셌다(2026-10-04 점검).
     """
     upcoming = sorted((p for p in payments if p["pay"] > today.isoformat()), key=lambda p: p["pay"])
-    picked = last_n_year([(date.fromisoformat(p["pay"]), p) for p in payments], today)
-    if picked is None:
-        since = (today - __import__("datetime").timedelta(days=days)).isoformat()
-        picked = sorted((p for p in payments if since < p["pay"] <= today.isoformat()), key=lambda p: p["pay"])
-    return picked, (upcoming[0] if upcoming else None)
+    paid = ttm_window([(date.fromisoformat(p["pay"]), p) for p in payments], today, days=days)
+    return paid, (upcoming[0] if upcoming else None)

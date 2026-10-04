@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { getKrIndexCloses } from "@/lib/data";
+import { getKrIndexClosesSide } from "@/lib/data";
 import { formatKstUpdateSnapped } from "@/lib/format";
 import { getOvernightLive, type OvernightData, type OvernightRow } from "@/lib/kr-overnight";
 import { getPreview, sessionWord, type PreviewLink, type PreviewMover } from "@/lib/kr-preview";
@@ -490,7 +490,7 @@ export default async function PreviewPage() {
   const [{ date, updatedAt, spx, sectors, moverCount, usHoliday, usSession, usFrom }, overnight, rawIndexes, coverLinks] = await Promise.all([
     getPreview(),
     getOvernightLive(),
-    getKrIndexCloses(),
+    getKrIndexClosesSide(),
     loadPreviewCoverChips(),
   ]);
   assertLoaded("/preview");
