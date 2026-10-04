@@ -67,14 +67,25 @@ export function DvCover({
 }
 
 /* ── 세후 · 세전 ──────────────────────────────────────────────────── */
-function TaxSeg({ afterTax, onChange }: { afterTax: boolean; onChange: (v: boolean) => void }) {
+/**
+ * 세후 버튼에 마우스를 올리면 떼는 세율이 뜬다(taxTip). 한때 칸 안 '떼는 세금' 줄로 늘 보였는데 "표시할 필요는 없다 — 세후 버튼에 호버하면
+ * 뜨게"(2026-10-04). 그 전엔 큰 숫자 옆 물음표였다. 머리 오른쪽 끝이라 말풍선을 오른쪽 끝에 맞춘다(hz-tip-end).
+ */
+function TaxSeg({ afterTax, onChange, taxTip }: { afterTax: boolean; onChange: (v: boolean) => void; taxTip: string }) {
   return (
     <div className="hz-seg hz-seg-hover v2-dv-seg" role="group" aria-label="세금 반영">
       {[
         { on: true, label: "세후" },
         { on: false, label: "세전" },
       ].map((o) => (
-        <button key={o.label} type="button" aria-pressed={afterTax === o.on} onClick={() => onChange(o.on)}>
+        <button
+          key={o.label}
+          type="button"
+          aria-pressed={afterTax === o.on}
+          onClick={() => onChange(o.on)}
+          className={o.on && taxTip ? "hz-tip hz-tip-end" : undefined}
+          data-tip={o.on && taxTip ? taxTip : undefined}
+        >
           {o.label}
         </button>
       ))}
@@ -96,7 +107,7 @@ export function YearlyModule({
   account,
   onAccount,
   mixed,
-  tax,
+  taxTip,
   note,
 }: {
   total: number;
@@ -110,27 +121,20 @@ export function YearlyModule({
   onAccount: (a: Account) => void;
   /** 종목마다 계좌가 다르게 담겼나(세후일 때만 참). */
   mixed: boolean;
-  /** '떼는 세금' 줄 값(세율). 세전이면 빈 글자 — 줄을 안 세운다. */
-  tax: string;
+  /** 세후 버튼 말풍선 — 떼는 세율('국내 15.4% · 미국 15%를 뗀 값'). */
+  taxTip: string;
   note: string | null;
 }) {
   // 머리 곁글은 '계좌별'일 때만 — '세후 (ISA)'는 바로 옆 세후 · 세전 버튼과 아래 계좌 버튼이 이미 말한다. 첫 칸이 여론 칸 폭(285 · 245 · 216)으로
   // 좁아지자 긴 계좌 이름이 말줄임으로 잘렸다(2026-10-04). 1,000 미만(216)은 그마저 안 들어 숨긴다(v2.css .v2-dv-sum).
   const meta = mixed ? "계좌별" : undefined;
   return (
-    <Module title="1년에 받는 배당" meta={meta} aside={<TaxSeg afterTax={afterTax} onChange={onTax} />} className="v2-dv-sum">
+    <Module title="1년에 받는 배당" meta={meta} aside={<TaxSeg afterTax={afterTax} onChange={onTax} taxTip={taxTip} />} className="v2-dv-sum">
       <div className="v2-md-body">
         <span className="v2-card-val is-big">
           <b>{won(total)}</b>
         </span>
         <div className="v2-md-rows">
-          {/* 떼는 세금 — 물음표 말풍선이던 것을 줄로(2026-10-04). 세율만 적고 긴 단서(ISA 비과세 한도 등)는 아래 한 줄(note)이 맡는다. */}
-          {afterTax && tax && (
-            <div className="v2-md-pr">
-              <span className="v2-md-pr-k">떼는 세금</span>
-              <span className="v2-md-pr-v is-sub">{tax}</span>
-            </div>
-          )}
           <div className="v2-md-pr">
             <span className="v2-md-pr-k">한 달 평균</span>
             <b className="v2-md-pr-v">{won(total / 12)}</b>

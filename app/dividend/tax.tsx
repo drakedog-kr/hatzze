@@ -111,8 +111,8 @@ export const ACCOUNTS: { key: Account; label: string }[] = [
 export const ACCOUNT_SHORT: Record<Account, string> = { general: "일반 계좌", isa: "ISA", pension: "연금저축", irp: "IRP", exempt: "비과세저축" };
 
 /**
- * '1년에 받는 배당' 칸의 '떼는 세금' 줄 — 계좌마다 떼는 세율만 짧게. 물음표 말풍선(TAX_HELP 문장)으로 숨겨 두던 것을 보이게 했다
- * ("헬프 툴팁이 필요하면 심플하지 않다", 2026-10-04). 216 칸에도 한 줄로 들어야 한다. 세전은 줄을 안 세운다.
+ * 계좌마다 떼는 세율(짧게) — '1년에 받는 배당' 칸 세후 버튼의 말풍선이 쓴다(V2Parts.tsx TaxSeg). 긴 단서(ISA 비과세 한도 등)는
+ * 칸 아래 한 줄(taxNote)이 맡는다. 같은 날(2026-10-04) 칸 안 '떼는 세금' 줄 → 세후 버튼 말풍선으로 옮겼다.
  */
 export const TAX_SHORT: Record<TaxMode, string> = {
   general: "국내 15.4% · 미국 15%",

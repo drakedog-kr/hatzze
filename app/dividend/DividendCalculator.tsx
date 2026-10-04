@@ -365,8 +365,9 @@ export function DividendCalculator({
   // 세 줄이던 것을 2026-09-30 에 줄였다(툴팁은 한 문장 — 이용자 지적 "너무 복잡해").
   // 출처 이름은 여기 안 적는다(2026-09-13 지적) — 투자 유의사항의 '데이터 출처'가 그 자리다(app/disclaimer/page.tsx.
   // 전 화면 푸터가 거기로 건너간다. stockanalysis 는 약관이 출처 표기를 조건으로 발췌를 허용하므로 거기서 지우지 말 것).
-  // '떼는 세금' 줄 — 계좌가 섞였으면 줄마다 고른 계좌대로 뗀다(표의 줄마다 계좌가 보인다).
-  const taxLine = mixed ? "줄마다 고른 계좌대로" : TAX_SHORT[taxMode];
+  // 세후 버튼 말풍선 — 고른 계좌의 세율. 계좌가 섞였으면 줄마다 고른 계좌대로 뗀다(표의 줄마다 계좌가 보인다).
+  // 세전을 보고 있을 때도 '세후면 얼마를 떼나'를 말한다(그래서 taxMode 가 아니라 account).
+  const taxTip = mixed ? "줄마다 고른 계좌대로 뗀 값" : `${TAX_SHORT[account]}를 뗀 값`;
 
   return (
     // v2(2026-10-03) — 카더라 · MDD 와 같은 범위(v2-kd 토큰 · 폭 단계, v2-dv 는 이 화면 전용 덮기 · v2.css).
@@ -394,7 +395,7 @@ export function DividendCalculator({
               setAccount(a);
             }}
             mixed={mixed}
-            tax={taxLine}
+            taxTip={taxTip}
             note={heroNote}
           />
           <CalendarModule
