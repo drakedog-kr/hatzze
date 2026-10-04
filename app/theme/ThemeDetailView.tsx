@@ -44,6 +44,7 @@ const VAGUE_ROWS = 6;
 /** 등락의 이유 — 기준일까지의 이레. 30일치를 다 세우면 반도체는 1,830px 였다(2026-09-21). 쪽 넘김은 걷었다(v2). */
 const REASON_DAYS = 7;
 const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
+const mdShort = (iso: string) => `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}`;
 const fmtKoWd = (iso: string) => `${fmtKoDate(iso)}(${WEEKDAY[new Date(`${iso}T00:00:00Z`).getUTCDay()]})`;
 
 // 부호 · 색은 **반올림한 값**으로 정한다 — −0.001 이 '−0.00%'로, +0.04%p 가 회색이 아닌 빨강 '0.0%p'로 찍혔다(2026-10-04 점검).
@@ -309,7 +310,14 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
       {/* 셋째 줄 — [이 테마의 주인공 | 다가오는 일정 · 함께 거론되는 테마]. 주인공 열 줄이 키를 정하고 오른쪽 일정 줄이 그 높이를 나눠 받는다. */}
       <div className={`v2-tm-band is-hot${events.length ? "" : " is-solo"}`}>
         {/* 이름은 목록 화면과 같은 '말 많은 종목'(2026-10-04 점검). 채널이 말한 이유 칸이 AI 글이라 고지는 머리에. */}
-        <Module title="말 많은 종목" meta={`최근 ${KADERA_WINDOW_DAYS}일 언급 · 평소 대비`} className="v2-tm-hot" ai={anyReason}>
+        {/* 사흘을 날짜로 — 이 화면의 사흘은 기준일을 넣고(2026-09-29 결정), 종목 화면 · 카더라는 기준일 앞 사흘이라 같은 '최근 3일'에
+            숫자가 달랐다(삼성전자 318회 · 612회, 2026-10-04 점검). */}
+        <Module
+          title="말 많은 종목"
+          meta={`${d.recentDays.length ? `${mdShort(d.recentDays[0])}~${mdShort(d.recentDays[d.recentDays.length - 1])}` : `최근 ${KADERA_WINDOW_DAYS}일`} 언급 · 평소 대비`}
+          className="v2-tm-hot"
+          ai={anyReason}
+        >
           {d.loadFailed ? (
             <p className="v2-empty">집계를 지금 불러오지 못했습니다.</p>
           ) : d.hotStocks.length === 0 ? (

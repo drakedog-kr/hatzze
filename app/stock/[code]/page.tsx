@@ -94,7 +94,8 @@ export async function generateMetadata({ params }: { params: Promise<{ code: str
  * ⚠️ 빈 날을 0 으로 메워 받는다. 안 메우면 언급 없는 날을 건너뛰어 막대 간격이 날짜와 어긋나고, 추이가 실제보다 촘촘해 보인다.
  */
 function Trend({ points }: { points: StockTrendPoint[] }) {
-  const max = Math.max(1, ...points.map((p) => p.mentions));
+  // 바닥 10 — 그 종목의 최댓값으로만 나누면 30일에 한 번 1회 언급도 꽉 찬 막대라 삼성전자 314회와 같은 키였다(2026-10-04 점검).
+  const max = Math.max(10, ...points.map((p) => p.mentions));
   const recentFrom = points.length >= 3 ? points[points.length - 3].date : "";
   return (
     <div className="v2-tm-trend" role="img" aria-label={`최근 ${points.length}일 언급 막대`}>
@@ -129,13 +130,14 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
   if (!d) notFound();
   if (code !== upper) permanentRedirect(stockHref(upper));
 
-  const [peers, why, events, dividend] = await Promise.all([
+  const [peers, why, eventList, dividend] = await Promise.all([
     themePeerStocks(d.code, d.themes),
     getStockMoveReason(d.code, d.baseDate),
     getStockEvents(d.code),
     DIVIDEND_PUBLIC ? getStockDividend(d.code) : Promise.resolve(null),
   ]);
   assertLoaded("/stock/[code]");
+  const events = eventList.items;
   const whyRate = why ? (why.changeRate ?? (d.priceDate === why.date ? d.changeRate : null)) : null;
   const marketLabel = d.market === "KOSDAQ" ? "코스닥" : d.market === "KOSPI" ? "코스피" : null;
   const today = todayKst();
@@ -178,7 +180,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
   const eventsMod =
     events.length > 0 ? (
       // 채널 글에서 뽑은 앞날의 일정. 카더라 카드와 달리 달 · 분기 · 연 단위도 보여준다 — 한 종목의 자리라 "10월 중" · "2027년"이 글로 서면 된다.
-      <Module title="다가오는 일정" meta={`채널이 짚은 날짜 · 앞으로 ${events.length}건`} className="v2-tm-events">
+      <Module title="다가오는 일정" meta={`채널이 짚은 날짜 · 앞으로 ${eventList.total}건`} className="v2-tm-events">
         <ul className="v2-events">
           {events.map((e) => (
             <li key={`${e.date}-${e.precision}-${e.event}`}>
@@ -194,10 +196,16 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
         </ul>
       </Module>
     ) : null;
-  // 추이의 짝 — 일정이 있으면 일정, 없으면 배당. 둘 다 안쪽이 늘어나는 모듈이다.
+  // 추이의 짝 — 일정이 넉넉하면(넷 이상) 일정, 아니면 배당. 둘 다 안쪽이 늘어나는 모듈이다.
   // ⚠️ 배당이 없는 종목('최근 12개월 현금배당이 없습니다' 한 줄)은 짝으로 세우지 않는다 — 추이 키에 맞춰 늘면 그 한 줄 아래가 통째로 빈다.
+  // ⚠️ 일정이 한두 건이면 짝으로 안 세운다 — 200px 칸 가운데 한 줄이 서고 위아래 58px 가 비었다(HLB, 2026-10-04 점검).
+  //    짧은 일정은 아래 '같은 테마 종목'과 한 줄 짝(둘 다 키가 낮다)으로 선다.
   const dividendRich = Boolean(dividend && dividend.dps > 0);
-  const partner = eventsMod ?? (dividendRich ? dividendMod : null);
+  const richEvents = events.length >= 4;
+  const partner = richEvents ? eventsMod : dividendRich ? dividendMod : null;
+  const shortEvents = eventsMod && !richEvents ? eventsMod : null;
+  // 배당이 판 폭 한 줄로 서면 넓은 꼴(숫자 칸 왼쪽 · 달 막대 오른쪽) — 숫자 셋이 왼쪽 210px 에 몰리고 900px 가 비었다.
+  const dividendWide = dividend ? <DividendCard s={dividend} wide /> : null;
 
   return (
     <div className="hz-tx v2-kd v2-tm v2-sk">
@@ -248,7 +256,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
                   {md(why.date)} {whyRate != null && <b className={tone(whyRate).trim() || undefined}>{signPct(whyRate)}</b>}
                 </dt>
                 <dd>
-                  {why.reason ?? "커뮤니티에서 이유를 말한 곳이 없습니다."}
+                  {why.reason}
                   <span className="v2-sk-src"> · 채널 {why.channelCount}곳</span>
                 </dd>
               </div>
@@ -267,9 +275,10 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
           {/* 실패와 '없음'을 다른 문장으로 — 같은 문장이면 고장이 자료로 위장된다. */}
           {d.loadFailed ? (
             <p className="v2-empty">언급 자료를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오.</p>
-          ) : d.totalMentions === 0 ? (
+          ) : d.trend.every((p) => !p.mentions) ? (
+            // 판정도 문장도 막대와 같은 기간(30일) — 90일 합으로 보면 8월에만 말이 있던 종목에 빈 막대 30개와 '0회 · 0일'이 섰다(2026-10-04 점검).
             <p className="v2-empty">
-              {withTopicParticle(d.name)} 최근 {STOCK_STAT_DAYS}일 사이 주식 텔레그램에서 잡힌 적이 없습니다.
+              {withTopicParticle(d.name)} 최근 {STOCK_TREND_DAYS}일 사이 주식 텔레그램에서 잡힌 적이 없습니다.
             </p>
           ) : (
             <div className="v2-tm-trendbody">
@@ -279,9 +288,11 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
               <TrendFigs points={d.trend} />
               <Trend points={d.trend} />
               <div className="v2-tm-legend">
+                {/* 날짜로 적는다 — 이 화면 · 카더라의 사흘은 기준일 앞 사흘이고, 테마 한 장은 기준일을 넣은 사흘이라(2026-09-29 결정)
+                    같은 '최근 3일'에 숫자가 달랐다(612회 · 318회, 2026-10-04 점검). */}
                 <span>
                   <i className="is-recent" />
-                  최근 3일 {d.recentMentions.toLocaleString("ko-KR")}회
+                  {d.trend.length >= 3 ? `${md(d.trend[d.trend.length - 3].date)}~${md(d.trend[d.trend.length - 1].date)}` : "최근 3일"} {d.recentMentions.toLocaleString("ko-KR")}회
                 </span>
                 <span>
                   <i />그 전
@@ -293,9 +304,19 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
         {partner}
       </div>
 
-      {/* 넷째 줄부터 — 배당(추이 짝으로 안 쓴 날) · 같은 테마 종목, 각자 판 폭. 없는 게 정상인 칸은 안 그린다. */}
-      {partner !== dividendMod && dividendMod}
-      {peersMod}
+      {/* 넷째 줄부터 — 배당(추이 짝으로 안 쓴 날, 판 폭) · [짧은 일정 | 같은 테마 종목]. 없는 게 정상인 칸은 안 그린다. */}
+      {partner !== dividendMod && dividendWide}
+      {shortEvents && peersMod ? (
+        <div className="v2-tm-band is-pair">
+          {shortEvents}
+          {peersMod}
+        </div>
+      ) : (
+        <>
+          {shortEvents}
+          {peersMod}
+        </>
+      )}
     </div>
   );
 }
@@ -306,6 +327,8 @@ function TrendFigs({ points }: { points: StockTrendPoint[] }) {
   const active = points.filter((p) => p.mentions > 0).length;
   const peak = points.reduce<StockTrendPoint | null>((b, p) => (p.mentions > 0 && (!b || p.mentions > b.mentions) ? p : b), null);
   const peakCh = points.reduce<StockTrendPoint | null>((b, p) => (p.channels > 0 && (!b || p.channels > b.channels) ? p : b), null);
+  // 언급된 날이 하루뿐이면 '가장 많던 날' · '하루 최다 채널'은 앞 두 칸과 같은 하루를 되풀이한다 — 세우지 않는다.
+  const single = active <= 1;
   return (
     <div className="v2-tm-figs">
       <span>
@@ -316,13 +339,13 @@ function TrendFigs({ points }: { points: StockTrendPoint[] }) {
         <b>{active}일</b>
         <em>언급된 날</em>
       </span>
-      {peak && (
+      {peak && !single && (
         <span>
           <b>{peak.mentions.toLocaleString("ko-KR")}회</b>
           <em>가장 많던 날 · {fmtKoDate(peak.date)}</em>
         </span>
       )}
-      {peakCh && (
+      {peakCh && !single && (
         <span>
           <b>{peakCh.channels}곳</b>
           <em>하루 최다 채널 · {fmtKoDate(peakCh.date)}</em>

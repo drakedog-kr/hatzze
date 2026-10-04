@@ -328,14 +328,18 @@ export const getMoveReasons = cache(async (): Promise<MaybeFailed<MoveReasonBoar
 
 export type StockMoveReason = {
   date: string;
-  reason: string | null;
+  reason: string;
   channelCount: number;
   mentionCount: number;
   /** KRX 확정 등락률(파이프라인이 다음 날 채운 것). 없으면 null — 화면은 stocks 의 값과 날짜를 맞춰 본다 */
   changeRate: number | null;
 };
 
-/** 종목 화면용 — 기준일에서 사흘 안의 가장 최근 까닭 한 줄. 없으면 null(정상). */
+/**
+ * 종목 화면용 — 기준일에서 사흘 안의 **이유가 있는** 가장 최근 줄. 없으면 null(정상 — 줄을 안 그린다).
+ * 이유 없는 줄까지 고르면 SK하이닉스 10/1(+3.21%, 마이크론 실적)을 두고 10/2(+0.44%, 이유 없음)가 서서
+ * '이유를 말한 곳이 없습니다 · 채널 74곳'이 나왔다 — 74곳이 말했는데 이유가 없다는 문장이 읽히지 않았다(2026-10-04 점검).
+ */
 export async function getStockMoveReason(code: string, base?: string): Promise<StockMoveReason | null> {
   const db = getSupabaseAdmin();
   const b = base ?? (await kaderaBaseDate());
@@ -345,6 +349,8 @@ export async function getStockMoveReason(code: string, base?: string): Promise<S
     .eq("stock_code", code)
     .gte("date", addDaysISO(b, -BOARD_STALE_DAYS))
     .lte("date", b)
+    .not("reason", "is", null)
+    .neq("reason", "")
     .order("date", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -352,10 +358,10 @@ export async function getStockMoveReason(code: string, base?: string): Promise<S
     console.error(`[getStockMoveReason] ${code} 까닭을 못 읽었습니다`, error);
     return null;
   }
-  if (!data) return null;
+  if (!data || !String(data.reason ?? "").trim()) return null;
   return {
     date: data.date as string,
-    reason: (data.reason as string | null) ?? null,
+    reason: String(data.reason).trim(),
     channelCount: (data.channel_count as number | null) ?? 0,
     mentionCount: (data.mention_count as number | null) ?? 0,
     changeRate: num(data.change_rate as number | string | null),
@@ -483,7 +489,8 @@ export const getUpcomingEvents = cache(async (days = 35, limit = 400): Promise<M
  *    "9월 중"·"3분기"·올해 "2026년"이 다 빠진다. 올해 1월 1일부터 읽고 기간의 끝으로 거른다
  *    (lib/event-period.ts). day 는 예전처럼 오늘부터다.
  */
-export async function getStockEvents(code: string, limit = 8): Promise<UpcomingEvent[]> {
+/** 종목 화면용 — 아직 안 끝난 일정 앞 limit 건과, 자르기 전 전부의 수(머리의 '앞으로 N건'). */
+export async function getStockEvents(code: string, limit = 8): Promise<{ items: UpcomingEvent[]; total: number }> {
   const db = getSupabaseAdmin();
   const from = todayKst();
   const { data, error } = await db
@@ -495,11 +502,12 @@ export async function getStockEvents(code: string, limit = 8): Promise<UpcomingE
     .limit(500);
   if (error) {
     console.error(`[getStockEvents] ${code} 일정을 못 읽었습니다`, error);
-    return [];
+    return { items: [], total: 0 };
   }
   const grouped = await withoutHappened(groupEvents((data ?? []) as EventRow[]).filter((e) => stillAhead(e, from)), from);
   grouped.sort(byPeriodEnd);
-  return attachNames(grouped.slice(0, limit));
+  // 자르기 전 수 — 자른 길이를 적으면 삼성전자(10건)가 늘 '앞으로 8건'이었다(2026-10-04 점검).
+  return { items: await attachNames(grouped.slice(0, limit)), total: grouped.length };
 }
 
 /**

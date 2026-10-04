@@ -248,6 +248,26 @@ def attach_texts(db, rows: list[dict]) -> None:
         r["text"] = text_of.get(r["id"]) or ""
 
 
+def spread_by_channel(ordered: list[tuple[dict, str]], limit: int) -> list[tuple[dict, str]]:
+    """앞에서부터 채널마다 한 건씩 먼저 고르고, 모자라면 같은 순서로 나머지를 채운다.
+
+    등락 표기 · 조회수 순으로만 여덟을 고르면 한 채널의 글이 여럿 들어 그 채널의 이유가 '가장 많이 언급된 것'처럼 읽혔다 —
+    리노공업 10/1(+10.90%, 18채널 대부분이 마이크론 CapEx · 반도체 수출)의 이유가 한 채널 글의 '노조 총파업 중단'으로 섰다
+    (2026-10-04 점검). 채널을 고루 넣어야 프롬프트의 '가장 많이 언급된 것 하나'가 채널 수로 읽힌다.
+    """
+    first: list[tuple[dict, str]] = []
+    rest: list[tuple[dict, str]] = []
+    seen_ch: set[str] = set()
+    for item in ordered:
+        ch = item[0].get("channel_handle") or ""
+        if ch in seen_ch:
+            rest.append(item)
+        else:
+            seen_ch.add(ch)
+            first.append(item)
+    return (first + rest)[:limit]
+
+
 def build_digest(name: str, code: str, picked: list[tuple[dict, str]]) -> str:
     lines = [
         f"[종목] {name} ({code})",
@@ -556,7 +576,7 @@ def run_market(db, client, cfg: dict, day: str, dry_run: bool) -> int:
             return (0 if q is not None else 1, -(m.get("views") or 0))
 
         seen: set[str] = set()
-        picked: list[tuple[dict, str]] = []
+        ordered: list[tuple[dict, str]] = []
         for mk, needle in sorted(lst, key=rank):
             m = msgs[mk]
             t = m.get("text") or ""
@@ -572,9 +592,8 @@ def run_market(db, client, cfg: dict, day: str, dry_run: bool) -> int:
             if k in seen:
                 continue
             seen.add(k)
-            picked.append((m, needle))
-            if len(picked) >= EXCERPTS:
-                break
+            ordered.append((m, needle))
+        picked = spread_by_channel(ordered, EXCERPTS)
         if picked:
             digests.append((code, name_of.get(code, code), build_digest(name_of.get(code, code), code, picked)))
 

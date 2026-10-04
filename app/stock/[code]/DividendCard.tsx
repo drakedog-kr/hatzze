@@ -20,7 +20,8 @@ import { Module } from "../../kadera/V2Modules";
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 const won = (v: number) => `${Math.round(v).toLocaleString("ko-KR")}원`;
 
-export function DividendCard({ s }: { s: DividendStock }) {
+/** wide — 판 폭 한 줄로 설 때(추이의 짝이 아닐 때). 숫자 칸 · 곁말을 왼쪽 열에, 달 막대를 오른쪽에 둔다(v2.css .v2-sk-dv.is-wide). */
+export function DividendCard({ s, wide = false }: { s: DividendStock; wide?: boolean }) {
   const byMonth = new Array<number>(13).fill(0);
   for (const p of s.payments) if (p.pay) byMonth[Number(p.pay.slice(5, 7))] += p.amount;
   const paidMonths = MONTHS.filter((m) => byMonth[m] > 0);
@@ -43,7 +44,7 @@ export function DividendCard({ s }: { s: DividendStock }) {
           </Link>
         ) : undefined
       }
-      className="v2-sk-dv"
+      className={`v2-sk-dv${wide ? " is-wide" : ""}`}
     >
       {s.dps > 0 ? (
         <div className="v2-tm-trendbody">
@@ -78,6 +79,8 @@ export function DividendCard({ s }: { s: DividendStock }) {
               })}
             </div>
           )}
+          {/* 폰 — 막대 아래 금액 칸(23px)이 좁아 숨기는 대신 받은 달만 한 줄로(누르지 않아도 보이게, 2026-10-04 점검). */}
+          {paidMonths.length > 0 && <p className="v2-sk-paid">{paidMonths.map((m) => `${m}월 ${Math.round(byMonth[m]).toLocaleString("ko-KR")}`).join(" · ")}</p>}
           {(facts.length > 0 || s.unusual) && (
             <p className="v2-sk-facts">
               {facts.join(" · ")}
