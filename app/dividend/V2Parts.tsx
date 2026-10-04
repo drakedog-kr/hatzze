@@ -7,7 +7,7 @@
 
 import { CoverMeta, Module } from "../kadera/V2Modules";
 import { fmtCloseDay } from "../mdd/shared";
-import { ACCOUNTS } from "./tax";
+import { ACCOUNTS, ACCOUNT_SHORT } from "./tax";
 import type { Account } from "./tax";
 import { MonthCalendar, UpcomingRows, type UpcomingItem } from "./Calendar";
 import { MONTHS } from "./shared";
@@ -108,7 +108,6 @@ export function YearlyModule({
   onAccount,
   mixed,
   taxTip,
-  note,
 }: {
   total: number;
   invest: number;
@@ -123,7 +122,6 @@ export function YearlyModule({
   mixed: boolean;
   /** 세후 버튼 말풍선 — 떼는 세율('국내 15.4% · 미국 15%를 뗀 값'). */
   taxTip: string;
-  note: string | null;
 }) {
   // 머리 곁글은 '계좌별'일 때만 — '세후 (ISA)'는 바로 옆 세후 · 세전 버튼과 아래 계좌 버튼이 이미 말한다. 첫 칸이 여론 칸 폭(285 · 245 · 216)으로
   // 좁아지자 긴 계좌 이름이 말줄임으로 잘렸다(2026-10-04). 1,000 미만(216)은 그마저 안 들어 숨긴다(v2.css .v2-dv-sum).
@@ -149,7 +147,7 @@ export function YearlyModule({
           )}
           {yieldPct != null && (
             <div className="v2-md-pr">
-              <span className="v2-md-pr-k">배당수익률</span>
+              <span className="v2-md-pr-k">{afterTax ? "세후 수익률" : "배당수익률"}</span>
               <b className="v2-md-pr-v">{pct(yieldPct)}</b>
             </div>
           )}
@@ -158,15 +156,15 @@ export function YearlyModule({
             <div className="v2-dv-acct">
               <span className="v2-dv-acct-k">계좌</span>
               <div className="hz-seg hz-seg-hover v2-dv-seg" role="group" aria-label="어느 계좌로 세나">
+                {/* 짧은 이름(비과세저축) — 긴 이름이면 다섯 단추 가운데 하나만 둘째 줄에 혼자 섰다(2026-10-04 점검). 줄은 셋 · 둘로 칸을 꽉 채운다(v2.css). */}
                 {ACCOUNTS.map((o) => (
                   <button key={o.key} type="button" aria-pressed={account === o.key} onClick={() => onAccount(o.key)}>
-                    {o.label}
+                    {ACCOUNT_SHORT[o.key]}
                   </button>
                 ))}
               </div>
             </div>
         )}
-        {note && <p className="v2-dv-note">{note}</p>}
       </div>
     </Module>
   );

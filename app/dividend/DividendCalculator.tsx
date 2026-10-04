@@ -14,7 +14,8 @@ import { DEFAULT_SHARES, GOAL_DEFAULT_MAN, ADD_DEFAULT_MAN, AMOUNT_DEFAULT, SCOP
 import type { Scope } from "./shared";
 import { goalBasis, monthlyOf } from "./calc";
 import { SearchBox, QuickChips, MoreRows } from "./Search";
-import { HoldingsTable } from "./Holdings";
+import { HoldingsBar, HoldingsTable } from "./Holdings";
+import { BandSkeleton } from "./BandSkeleton";
 import type { SortKey } from "./Holdings";
 import { MonthFill, upcomingOf } from "./Calendar";
 import { GoalBox } from "./Goal";
@@ -80,6 +81,7 @@ export function DividendCalculator({
   const stocks = useMemo(() => wire.map(inflate), [wire]);
   const byCode = useMemo(() => new Map(stocks.map((s) => [s.code, s])), [stocks]);
   const holdings = useSyncExternalStore(holdingsStore.subscribe, holdingsStore.getSnapshot, holdingsStore.getServerSnapshot);
+  const holdingsLoaded = useSyncExternalStore(holdingsStore.subscribe, holdingsStore.isLoaded, holdingsStore.isLoadedServer);
   const setHoldings = writeHoldings;
   // 머리의 칸은 세후·세전 둘뿐이다(2026-09-13 지적: "일반 유저에겐 세후·세전이 쉽다"). 어느 계좌로 세는지는
   // 세후일 때만 히어로 아래 작은 칸에서 고른다 — 세전이면 계좌가 뜻이 없다.
@@ -210,7 +212,9 @@ export function DividendCalculator({
   //    이제 결과 셋은 종목을 담았을 때만 선다(아래 렌더).
   const bandTotal = active.reduce((s, l) => s + l.netKrw, 0);
   const bandInvest = active.reduce((s, l) => s + (l.investKrw ?? 0), 0);
-  const bandYield = bandInvest > 0 ? (active.filter((l) => l.investKrw != null).reduce((s, l) => s + l.grossKrw, 0) / bandInvest) * 100 : null;
+  // 수익률은 바로 위 큰 숫자와 같은 쪽(세후면 세후) — 세후 합 아래에 세전 수익률이 서서 세 숫자의 셈이 안 맞았다(2026-10-04 점검).
+  const bandYield =
+    bandInvest > 0 ? (active.filter((l) => l.investKrw != null).reduce((s, l) => s + (afterTax ? l.netKrw : l.grossKrw), 0) / bandInvest) * 100 : null;
   const upcoming = upcomingOf(active, fx, taxMode);
 
   const add = (code: string, source: string) => {
@@ -376,6 +380,8 @@ export function DividendCalculator({
       <LoadFailedNote sources={failedSources} />
       <DvCover counts={counts} usdkrw={usdkrw} priceDate={priceDate} usPriceDate={usPriceDate} />
 
+      {/* 저장소를 읽기 전 — 담은 종목이 있는 사람에게만 결과 셋 자리를 잡아 둔다(BandSkeleton 머리말 · v2.css .v2-dv-band-ph). */}
+      {!holdingsLoaded && <BandSkeleton />}
       {/* 둘째 줄 — 결과 셋. 예전엔 한 시트 안에서 검색 · 칩 · 표 아래로 내려가야 달력 · 일정이 보였다. 담은 종목이 있을 때만 선다. */}
       {lines.length > 0 && (
         <div className="v2-dv-band">
@@ -396,7 +402,6 @@ export function DividendCalculator({
             }}
             mixed={mixed}
             taxTip={taxTip}
-            note={heroNote}
           />
           <CalendarModule
             monthly={monthly}
@@ -410,6 +415,9 @@ export function DividendCalculator({
           <UpcomingModule items={upcoming.items} sureKrw={upcoming.sureKrw} expectedKrw={upcoming.expectedKrw} afterTax={afterTax} />
         </div>
       )}
+      {/* 세금 단서(못 담은 종목 · 한도 · 종합과세 문턱) — 둘째 줄 아래 판 폭 한 줄. 첫 칸(판의 25%) 안에 두면 계좌를 바꿀 때마다
+          그 칸이 여섯 줄까지 길어져 달력 · 일정 칸까지 같이 늘었다(2026-10-04 점검). */}
+      {lines.length > 0 && heroNote && <p className="v2-dv-notebar">{heroNote}</p>}
       {/* 달력에서 누른 달 — 그 달에 주는 종목(빈 달 채우기). 둘째 줄 바로 아래 판 폭으로. */}
       {fillMonth != null && <MonthFill month={fillMonth} order={fillOrder} holdings={holdings} onPick={(code) => add(code, "fill_month")} onClose={() => setFillMonth(null)} />}
 
@@ -423,9 +431,15 @@ export function DividendCalculator({
       >
         <header className="v2-mod-head">
           <h2>내 종목</h2>
+          {lines.length > 0 && <HoldingsBar lines={lines} onSort={sortLines} onClear={clearAll} />}
         </header>
         <div className="dv-body">
           <SearchBox stocks={stocks} onPick={(code) => add(code, "search")} />
+          {/* 담은 종목이 있으면 표가 검색 바로 아래 — 칩 세 판(1,100 에서 433px) 아래에 있으면 이미 담은 사람에게 자기 표보다
+              담을 후보가 먼저 보였다(2026-10-04 점검). */}
+          {lines.length > 0 && (
+            <HoldingsTable lines={lines} inputs={inputs} totalInvest={invest} mode={taxMode} onToggle={setLineOn} onMove={moveLine} onAccount={setLineAccount} onSplit={splitLine} onShares={setShares} onCost={setCost} onRemove={remove} />
+          )}
           {/* 세 갈래가 늘 나란히 선다. 갈래마다 이름 · 근거 · 칩 여덟 · '더 보기'. 좁으면 한 갈래씩 쌓인다.
               '더 보기'를 열면 그 갈래의 묶음들이 세 갈래 **아래에 가로로** 펼쳐진다. 폰에서는 CSS order 로 그 갈래 바로 아래에 붙는다. */}
           <div className="dv-groups">
@@ -437,8 +451,9 @@ export function DividendCalculator({
                 </div>
                 <QuickChips codes={chipsBy[o.key]} byCode={byCode} holdings={holdings} onPick={(code) => add(code, `chip_${o.key}`)} />
                 {more[o.key].rows.length > 0 && (
+                  // 열린 동안에도 이름은 그대로 — '접기'로 바꾸면 펼친 판 머리의 '접기'와 둘이 섰다(2026-10-04 점검). 열림은 색으로만.
                   <button type="button" className="dv-more-btn" aria-expanded={moreOpen === o.key} onClick={() => toggleMore(o.key)}>
-                    {moreOpen === o.key ? "접기" : `${o.label} 더 보기`}
+                    {`${o.label} 더 보기`}
                   </button>
                 )}
               </section>
@@ -455,9 +470,6 @@ export function DividendCalculator({
               />
             )}
           </div>
-          {lines.length > 0 && (
-            <HoldingsTable lines={lines} inputs={inputs} totalInvest={invest} mode={taxMode} onClear={clearAll} onToggle={setLineOn} onMove={moveLine} onSort={sortLines} onAccount={setLineAccount} onSplit={splitLine} onShares={setShares} onCost={setCost} onRemove={remove} />
-          )}
         </div>
       </section>
       {clearUsed && <ClearDialog open={clearAsk} onOpenChange={setClearAsk} count={distinct} onConfirm={clearConfirmed} />}

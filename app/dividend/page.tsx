@@ -231,15 +231,10 @@ export default async function DividendPage() {
     ],
     popularEtf,
   );
-  const n = (v: number) => v.toLocaleString("ko-KR");
-  const etfUs = etfs.filter((s) => s.currency === "USD").length;
-  // 담기는 수는 묶음 후보(unusual 을 뺀 것)가 아니라 검색에 걸리는 전부 — 배당이 있는 종목 수.
+  // 담기는 수는 묶음 후보(unusual 을 뺀 것)가 아니라 검색에 걸리는 전부 — 배당이 있는 종목 수(첫 줄 띠).
   const krAll = stocks.filter((s) => s.kind === "stock" && s.currency === "KRW" && s.dps > 0 && !s.name.includes("스팩")).length;
-  const more: MoreLists = {
-    kr: { rows: moreKr, note: `코스피·코스닥에서 배당이 있는 ${n(krAll)}종목이 다 담깁니다.` },
-    us: { rows: moreUs, note: `미국 배당주 ${n(us.length)}종목이 담깁니다.` },
-    etf: { rows: moreEtf, note: `ETF ${n(etfs.length)}개(미국 ${etfUs} · 국내 ${n(etfs.length - etfUs)})가 담깁니다. 국내는 운용사를 가리지 않고 지난 1년 분배가 있는 전부입니다.` },
-  };
+  // 갈래마다 '여기 없는 종목은 검색창에서 · N종목이 담깁니다' 꼬리 문장이 있었다 — 수는 첫 줄 띠와 겹치고 설명 각주라 걷었다(2026-10-04 점검).
+  const more: MoreLists = { kr: { rows: moreKr }, us: { rows: moreUs }, etf: { rows: moreEtf } };
 
   return (
     <DividendCalculator

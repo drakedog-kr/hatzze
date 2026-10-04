@@ -772,7 +772,8 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       title: "꾸준함 우선",
       desc: "오래, 안 줄이고 준 국내·미국 회사",
       // 알약은 카드 한 줄(270px)에 셋까지 — 넷이면 두 줄이 되어 복잡해 보인다(2026-09-16 지적). 중요한 순으로 셋.
-      rules: ["5년 연속 배당", "줄인 해 없음", "배당성향 80% 이하"],
+      // 국내 · 미국을 번갈아 담는다는 걸 알약으로 — 순서가 섞여 보였다(2026-10-04 점검).
+      rules: ["5년 연속 배당", "줄인 해 없음", "국내·미국 하나씩"],
       icon: "verified",
       codes: codes(steady),
       meta: "streak",
@@ -781,7 +782,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "yield",
       title: "지금 배당수익률 우선",
       desc: "지금 가격에 배당이 가장 큰 회사",
-      rules: ["3년 연속 배당", "배당성향 80% 이하", "수익률 순"],
+      rules: ["3년 연속 배당", "배당성향 80% 이하", "국내·미국 하나씩"],
       icon: "trending_up",
       codes: codes(high),
       meta: "yield",
@@ -790,7 +791,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "growth",
       title: "성장 우선",
       desc: "배당을 해마다 늘려 온 회사",
-      rules: ["5년 연속 배당", "5년간 해마다 +10%", "증가율 순"],
+      rules: ["5년 연속 배당", "5년 연평균 +10%", "국내·미국 하나씩"],
       icon: "stairs",
       codes: codes(growth),
       meta: "growth",
@@ -807,7 +808,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
     {
       key: "covered",
       title: "커버드콜 현금흐름",
-      desc: "옵션 프리미엄으로 달마다 높은 분배금을 주는 ETF",
+      desc: "옵션 프리미엄으로 달마다 주는 ETF",
       rules: ["미국·국내 하나씩", "분배율 30% 이하", "운용사당 하나"],
       icon: "toll",
       codes: codes(covered),
@@ -837,7 +838,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "usgrowth",
       title: "미국 배당성장",
       desc: "10년 넘게 늘려 온 회사 가운데 빠르게 늘리는 곳",
-      rules: ["10년 넘게 늘림", "5년간 해마다 +7%", "배당성향 80% 이하"],
+      rules: ["10년 넘게 늘림", "5년 연평균 +7%", "배당성향 80% 이하"],
       icon: "rocket_launch",
       codes: codes(usGrowth),
       meta: "growth",
@@ -873,7 +874,8 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
     {
       key: "account",
       title: "내 계좌 맞춤",
-      desc: "ISA는 국내 기초, 연금저축·IRP는 해외 기초 ETF가 세금에 맞는다",
+      // 명사구로 짧게 — 해라체 문장이 머리 곁글에서 잘렸다(2026-10-04 점검).
+      desc: "고른 계좌 세금에 맞춘 열 종목",
       // 고른 계좌의 규칙만 보인다(rulesPension·rulesIrp) — 셋을 다 적으면 넉 줄이 됐다.
       rules: ["국내 회사 6 + 국내 ETF 4", "분배율 15% 이하", "운용사당 둘"],
       rulesPension: ["해외 기초 ETF 10", "배당·리츠·커버드콜 섞어", "운용사당 둘"],

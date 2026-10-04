@@ -74,6 +74,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import execute_with_retry, get_client, load_all  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
+from common.ttm_count import last_n_year  # noqa: E402
 
 TABLE = "kr_dividend_stock"
 CASH_KINDS = ("현금배당", "동시배당")
@@ -198,6 +199,7 @@ def summarize(code: str, recs: list[dict], today: date, close: float | None) -> 
     next_record: date | None = None
     share_kind = None
     is_reit = False
+    cash: list[tuple[date, date | None, float]] = []
     for r in recs:
         rd = date.fromisoformat(r["record_date"])
         share_kind = share_kind or r.get("share_kind")
@@ -218,12 +220,19 @@ def summarize(code: str, recs: list[dict], today: date, close: float | None) -> 
             last_record = rd
         if pd and (last_pay is None or pd > last_pay):
             last_pay = pd
-        if rd > ttm_from:
-            ttm_dps += amt
-            ttm_count += 1
-            if pd:
-                pay_months.add(pd.month)
-            payments.append({"record": rd.isoformat(), "pay": pd.isoformat() if pd else None, "amount": round(amt, 2)})
+        cash.append((rd, pd, amt))
+
+    # 지난 1년 — 날짜 창이 아니라 **횟수**로(common/ttm_count.py). 9/30 기준일이 지났는데 금액이 아직 없으면 작년 9/30 건이
+    # 창 밖으로 빠져 분기배당이 세 분기만 셌다(2026-10-04 점검, 삼성전자 1,668 → 1,312원). 셀 수 없으면(지급 둘 이하) 날짜 창.
+    picked = last_n_year([(rd, (rd, pd, amt)) for rd, pd, amt in cash], today)
+    if picked is None:
+        picked = [(rd, pd, amt) for rd, pd, amt in cash if rd > ttm_from]
+    for rd, pd, amt in picked:
+        ttm_dps += amt
+        ttm_count += 1
+        if pd:
+            pay_months.add(pd.month)
+        payments.append({"record": rd.isoformat(), "pay": pd.isoformat() if pd else None, "amount": round(amt, 2)})
 
     # 연속 배당 연수 — 가장 최근 끝난 회계연도부터 거슬러 센다.
     streak = 0
@@ -232,13 +241,22 @@ def summarize(code: str, recs: list[dict], today: date, close: float | None) -> 
         streak += 1
         y -= 1
     # 최근 5년(last_year-4 … last_year) 각각을 전년과 견줘 줄인 해를 센다.
+    # 특별배당이 낀 해(그 전 해의 두 배 넘게) — 견주는 기준으로 쓰지 않는다. 삼성전자 2020(2,994원, 특별배당)을 5년 전 기준으로
+    # 쓰니 정기배당이 1,416 → 1,668원으로 늘었는데도 '해마다 −11%'였고, 2021 을 줄인 해로 셌다(2026-10-04 점검).
+    def special(yy: int) -> bool:
+        before = annual.get(yy - 1, 0)
+        return before > 0 and annual.get(yy, 0) > 2 * before
+
     cuts = 0
     for yy in range(last_year - 4, last_year + 1):
-        prev, cur = annual.get(yy - 1, 0), annual.get(yy, 0)
+        ref_year = yy - 2 if special(yy - 1) else yy - 1
+        prev, cur = annual.get(ref_year, 0), annual.get(yy, 0)
         if prev > 0 and cur < prev:
             cuts += 1
-    base, top = annual.get(last_year - 5, 0), annual.get(last_year, 0)
-    growth = ((top / base) ** (1 / 5) - 1) * 100 if base > 0 and top > 0 else None
+    base_year = last_year - 6 if special(last_year - 5) else last_year - 5
+    base, top = annual.get(base_year, 0), annual.get(last_year, 0)
+    span = last_year - base_year
+    growth = ((top / base) ** (1 / span) - 1) * 100 if base > 0 and top > 0 else None
     # 12개월 합이 그 전 회계연도의 두 배를 넘으면 특별·청산배당이 섞인 것으로 본다.
     # 견주는 해가 '가장 최근 끝난 해'가 아니라 **그 전 해**인 까닭: 4월 결산 배당이 크게
     # 뛴 해는 최근 끝난 해 자체가 그 배당을 품고 있어 견줘도 안 걸린다(노바텍 2025).

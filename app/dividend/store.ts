@@ -76,6 +76,9 @@ export const holdingsStore = {
   },
   getSnapshot: () => current,
   getServerSnapshot: () => NO_HOLDINGS,
+  /** 저장값을 읽었나 — 읽기 전엔 결과 셋 자리표시자(BandSkeleton)를 그린다. 서버 · 하이드레이션 땐 늘 거짓. */
+  isLoaded: () => loaded,
+  isLoadedServer: () => false,
 };
 
 export function writeHoldings(next: Holding[] | ((prev: Holding[]) => Holding[])) {
@@ -88,6 +91,9 @@ export function writeHoldings(next: Holding[] | ((prev: Holding[]) => Holding[])
   current = typeof next === "function" ? next(current) : next;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+    // 첫 그림 전 스크립트(app/layout.tsx PREF_SCRIPT)가 다는 표시도 같이 — 다 빼고 다른 화면에 갔다 오면 빈 자리표시자가 섰다.
+    if (current.length) document.documentElement.setAttribute("data-dv-has", "1");
+    else document.documentElement.removeAttribute("data-dv-has");
   } catch {
     /* 저장이 막힌 브라우저에서는 이번 방문 안에서만 산다 */
   }

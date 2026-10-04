@@ -10,7 +10,8 @@ import { STREAK_CAP } from "./shared";
 export function basketMeta(meta: BasketLite["meta"], s: StockLite): string {
   switch (meta) {
     case "growth":
-      return s.growth5 != null ? `연 ${s.growth5.toFixed(0)}% 성장` : "";
+      // 담은 종목 알약과 같은 말('5년 연평균 +N%') — '연 86% 성장'과 두 이름이었다(2026-10-04 점검).
+      return s.growth5 != null ? `5년 연평균 ${s.growth5 >= 0 ? "+" : "-"}${Math.abs(s.growth5).toFixed(0)}%` : "";
     case "streak":
       // 미국은 SEC 로 센 연속 연수가 19~20에서 막힌다 — 해마다 늘린 햇수(stockanalysis)가 있으면 그것.
       // 무엇이 몇 년인지까지 적는다 — 이름 아래 줄로 내리자(2026-10-04) '15년 넘게'만으로는 무엇이 15년인지 안 읽혔다.

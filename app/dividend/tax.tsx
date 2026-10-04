@@ -117,8 +117,9 @@ export const ACCOUNT_SHORT: Record<Account, string> = { general: "일반 계좌"
 export const TAX_SHORT: Record<TaxMode, string> = {
   general: "국내 15.4% · 미국 15%",
   isa: "국내 9.9% · 해외 15%",
-  pension: "ETF·리츠 5.5% · 주식 15.4%",
-  irp: "ETF·리츠 5.5% · 주식 15.4%",
+  // 연금 계좌에 못 담는 미국 종목은 일반 계좌 세율(15%)로 센다(taxRate) — 빠뜨리면 미국 종목 세금이 말풍선에 없다(2026-10-04 점검).
+  pension: "ETF·리츠 5.5% · 국내 주식 15.4% · 미국 15%",
+  irp: "ETF·리츠 5.5% · 국내 주식 15.4% · 미국 15%",
   exempt: "국내 0% · 해외 15%",
   gross: "",
 };

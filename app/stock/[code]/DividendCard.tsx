@@ -27,7 +27,7 @@ export function DividendCard({ s }: { s: DividendStock }) {
   const max = Math.max(...byMonth);
   const facts: string[] = [];
   if (s.payout) facts.push(`${s.payout.year != null ? `${s.payout.year}년 ` : ""}배당성향 ${Math.round(s.payout.pct).toLocaleString("ko-KR")}%`);
-  if (s.growth5 != null && s.streak >= 5 && Math.abs(Math.round(s.growth5)) >= 1) facts.push(`5년간 해마다 ${s.growth5 > 0 ? "+" : "−"}${Math.abs(Math.round(s.growth5))}%`);
+  if (s.growth5 != null && s.streak >= 5 && Math.abs(Math.round(s.growth5)) >= 1) facts.push(`5년 연평균 ${s.growth5 > 0 ? "+" : "-"}${Math.abs(Math.round(s.growth5))}%`);
   if (s.streak >= 3) facts.push(s.streak >= 15 ? "15년 넘게 연속 배당" : `${s.streak}년 연속 배당`);
   if (showsSepTax(s)) facts.push("분리과세 대상");
   const href = `${DIVIDEND_PAGE.href}?add=${encodeURIComponent(s.code)}`;

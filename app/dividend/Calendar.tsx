@@ -6,7 +6,7 @@ import { useMemo } from "react";
 import { Icon } from "../ui";
 import { type StockLite } from "./types";
 import type { Holding } from "./store";
-import { won, wonCal, usd, money } from "./format";
+import { won, wonCal, money } from "./format";
 import { isPensionLike, fitsAccount, taxRate, taxableShare } from "./tax";
 import type { TaxMode } from "./tax";
 import { ROW_CHIPS, UPCOMING_MAX, UPCOMING_DAYS, MONTHS, SCOPES } from "./shared";
@@ -56,7 +56,9 @@ export function MonthCalendar({
               onClick={() => onPick(m)}
               title={v > 0 ? `${m}월에 주는 종목 보기` : `${m}월은 비어 있습니다 · 이 달에 주는 종목 보기`}
             >
-              <span className="dv-cal-bar" style={{ height: max > 0 ? `${Math.max(v > 0 ? 6 : 0, (v / max) * 100)}%` : 0 }} aria-hidden="true" />
+              {/* 키는 비율(--r)만 넘기고 CSS 가 막대 자리(칸 − 글자 두 줄)에 곱한다. 칸 전체의 퍼센트로 주면 글자 몫까지 합쳐 칸을 넘는
+                  막대가 줄어들어(flex-shrink) 큰 달들이 다 같은 키였다 — 폰에선 열한 달이 22px 로 같았다(2026-10-04 점검). */}
+              <span className="dv-cal-bar" style={{ "--r": max > 0 && v > 0 ? Math.max(0.06, v / max) : 0 } as React.CSSProperties} aria-hidden="true" />
               <span className="dv-cal-month">{m}월</span>
               {/* 빈 달은 금액 자리에 + 동그라미 — "여기 눌러 채우라"는 표시(시장 브리핑의 '새로운 지표 제보하기'와 같은 아이콘).
                   같은 아이콘이 여러 칸에 서지만 뜻이 하나(이 달을 채운다)라 한 화면 한 아이콘 규칙의 예외로 둔다. */}
@@ -104,7 +106,9 @@ export function upcomingOf(lines: Line[], fx: number, mode: TaxMode): { items: U
       return sum + perShare * l.shares * (1 - taxRate(s, m) * share);
     }, 0);
     const krw = v * (s.currency === "USD" ? fx : 1);
-    return [s.currency === "USD" ? `${usd(v)} · ${won(krw)}` : won(krw), krw];
+    // 금액 칸은 원화 하나 — 1주 달러 금액은 아랫줄('분배금 1주에 $0.37')이 말한다. '$63.14 · 85,132원'이면 칸이 111px 라
+    // 종목 이름이 두 줄로 꺾여 줄마다 키가 69px 였다(지급 건마다 줄을 세우며 여섯 줄이 되자 둘째 줄 키가 484px, 2026-10-04).
+    return [won(krw), krw];
   };
   for (const ls of groups.values()) {
     const s = ls[0].stock;
@@ -112,7 +116,7 @@ export function upcomingOf(lines: Line[], fx: number, mode: TaxMode): { items: U
     // 공시된 확정값 — 지급일까지 있으면 그날, 지급일이 없으면(국내 결산배당 공시) 기준일 줄에 금액을 적는다.
     const sure = s.nextPay && (s.nextPay[0] ? s.nextPay[0] >= iso : !!s.nextRecord && s.nextRecord >= iso) ? s.nextPay : null;
     // 지난 1년 지급일로 어림한 석 달 안의 건 — 확정 건의 짝은 빠져 있다. 합에는 전부, 표에는 확정 건이 없을 때 첫 건만.
-    const expected = expectedPays(s.pays, iso, horizon, sure && { pay: sure[0], record: s.nextRecord });
+    const expected = expectedPays(s.pays, iso, horizon, sure && { pay: sure[0], record: s.nextRecord }, s.currency === "USD");
     for (const e of expected) expectedKrw += net(ls, e.v)[1];
     if (s.nextRecord && s.nextRecord >= iso) {
       const a = sure && !sure[0] ? net(ls, sure[1]) : null;
@@ -125,30 +129,33 @@ export function upcomingOf(lines: Line[], fx: number, mode: TaxMode): { items: U
     if (sure && sure[0]) {
       const a = net(ls, sure[1]);
       out.push({ key: `${s.code}-p`, when: dateLabel(sure[0]), sortKey: sure[0], name: s.name, what: `${unit} 1주에 ${money(sure[1], s)}`, amount: a[0], amountKrw: a[1], tag: "확정" });
-      continue;
     }
-    if (sure) continue;
-    // 날짜를 모르면 지난 1년 지급일을 올해(지났으면 내년)로 옮겨 가장 가까운 것 하나.
-    const next = expected[0];
-    if (next) {
-      const a = net(ls, next.v);
+    // 지난 1년 지급일을 올해(지났으면 내년)로 옮긴 석 달 안의 건 — **전부** 줄로 선다(월분배의 둘째 · 셋째 달까지, 확정 건의 짝은 빠졌다).
+    // 종목마다 한 건만 세웠더니 머리의 예상 합에 든 JEPI 12/3 건이 줄에 없어 머리 금액을 줄에서 맞춰 볼 수 없었다(2026-10-04 점검).
+    expected.forEach((e, i) => {
+      const a = net(ls, e.v);
       out.push({
-        key: `${s.code}-e`,
-        when: `${dateLabel(next.date)}쯤`,
-        sortKey: next.date,
+        key: `${s.code}-e${i}`,
+        when: `${dateLabel(e.date)}쯤`,
+        sortKey: e.date,
         name: s.name,
         // '지난해 이날'은 무엇이 지난해인지 안 읽혔다(2026-10-04 점검) — 날짜와 금액을 작년 지급에서 옮겼다는 뜻.
-        what: `${unit} 1주에 ${money(next.v, s)} · 작년 지급일 기준`,
+        what: `${unit} 1주에 ${money(e.v, s)} · 작년 지급일 기준`,
         amount: a[0],
         amountKrw: a[1],
         tag: "예상",
       });
-    }
+    });
   }
   out.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-  // 합은 자르기 전 전부(석 달 안). 표에 못 든 줄도, 표엔 한 줄로 선 종목의 뒤 지급(월배당의 둘째·셋째 달)도 합엔 든다.
   const sureKrw = out.filter((i) => i.tag === "확정").reduce((t, i) => t + i.amountKrw, 0);
-  return { items: out.slice(0, UPCOMING_MAX), sureKrw, expectedKrw };
+  if (out.length <= UPCOMING_MAX) return { items: out, sureKrw, expectedKrw };
+  // 넘치면 마지막 줄 하나에 나머지 건수 · 합 — 줄을 다 더하면 머리의 합(확정 + 예상)이 된다.
+  const shown = out.slice(0, UPCOMING_MAX - 1);
+  const rest = out.slice(UPCOMING_MAX - 1);
+  const restKrw = rest.reduce((t, i) => t + i.amountKrw, 0);
+  shown.push({ key: "rest", when: "", sortKey: "", name: `외 ${rest.length}건`, what: "", amount: restKrw > 0 ? won(restKrw) : null, amountKrw: restKrw, tag: null });
+  return { items: shown, sureKrw, expectedKrw };
 }
 
 /** 일정 줄만 — v2 모듈 안에서 쓴다(머리의 합은 모듈 근거 글자가 말한다). */
@@ -160,7 +167,7 @@ export function UpcomingRows({ items }: { items: UpcomingItem[] }) {
           <span className="dv-upcoming-when">{it.when}</span>
           <span className="dv-upcoming-name">{it.name}</span>
           {it.tag && <span className={`dv-upcoming-tag${it.tag === "확정" ? " dv-upcoming-tag-sure" : ""}`}>{it.tag}</span>}
-          <span className="dv-upcoming-what">{it.what}</span>
+          {it.what && <span className="dv-upcoming-what">{it.what}</span>}
           {it.amount && <span className="dv-upcoming-amt">{it.amount}</span>}
         </li>
       ))}
@@ -195,6 +202,7 @@ export function MonthFill({
     <div className="dv-more" role="region" aria-label={`${month}월에 주는 종목`}>
       <div className="dv-more-head">
         <span className="dv-more-title">{month}월에 주는 종목</span>
+        <span className="dv-more-meta">지난 1년 지급일</span>
         <button type="button" className="dv-more-toggle" onClick={onClose}>
           접기
         </button>
@@ -207,9 +215,9 @@ export function MonthFill({
           </div>
         ))
       ) : (
-        <p className="dv-more-foot">{month}월에 주는 종목이 후보에 없습니다. 위 검색창에서 찾아 보세요.</p>
+        // 이 판은 둘째 줄 바로 아래, 검색창보다 위에 선다 — '위 검색창'은 방향이 틀렸고 해요체였다(2026-10-04 점검).
+        <p className="dv-more-foot">{month}월에 주는 종목이 후보에 없습니다.</p>
       )}
-      <p className="dv-more-foot">지난 1년 지급일 기준입니다. 담으면 위 달력이 바로 바뀝니다.</p>
     </div>
   );
 }

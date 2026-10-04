@@ -32,21 +32,35 @@ const dayOfYear = (m: number, d: number) => Math.round((Date.UTC(2001, m - 1, d)
 /**
  * 다가오는 일정의 '예상' 건 — 지난 1년 지급 건([달, 1주 금액, 날])을 올해(지났으면 내년)로 옮긴 날 가운데 오늘(iso)~horizon,
  * 가까운 순. 석 달 안 합은 이 건 **전부**를 더한다 — 월배당은 석 달에 세 번 들어오는데 종목마다 가장 가까운 한 번만 더했더니
- * JEPI 같은 월배당이 석 달 치의 3분의 1로 적혔다. 표에는 (확정 건이 없을 때) 첫 건 하나만 선다.
+ * JEPI 같은 월배당이 석 달 치의 3분의 1로 적혔다. 표에도 전부 선다(줄 합이 머리 합과 맞게, 2026-10-04).
  *
  * 공시된 확정 건(sure)이 있으면 그 건의 짝(지난해의 같은 차례)을 빼야 두 번 안 센다.
  *   지급일이 있으면 — 짝은 지난해 지급일 가운데 해를 떼고 그날에 가장 가까운 것(달로 가르면 9/30 확정과 지난해 10/1 이
  *     다른 건이 된다). 짝이 오늘 앞이라 내년으로 밀려 창 밖이면 뺄 게 없다. 확정 건보다 앞선 예상도 뺀다 — 다음 지급이
  *     확정 건이니 그 앞에 들어올 건 없다.
  *   지급일 없이 기준일만 있으면(국내 결산배당 공시) — 지급은 기준일 뒤라 기준일 뒤 첫 예상이 짝이다.
+ *
+ * latest 면 금액은 지난해 같은 차례가 아니라 **가장 최근 지급 건**의 금액 — 미국 종목은 회차마다 같은 금액을 주다가 올리므로,
+ * 같은 차례 금액이면 그 뒤에 올린 배당이 안 들었다(IBM 12월 예상 $1.68, 최근은 $1.69 · 2026-10-04 점검). 결산 · 중간 금액이
+ * 다른 국내 종목은 같은 차례 금액이 맞아 쓰지 않는다.
  */
 export function expectedPays(
   pays: [number, number, number][],
   iso: string,
   horizon: string,
   sure: { pay: string | null; record: string | null } | null,
+  latest = false,
 ): { date: string; v: number }[] {
   const year = Number(iso.slice(0, 4));
+  // 가장 최근 지급 건 — 해를 뗀 날이 오늘 앞이면 올해, 아니면 지난해에 준 것으로 보고 가장 늦은 날.
+  let lastV: number | null = null;
+  if (latest && pays.length) {
+    const past = pays.map(([m, v, d]) => {
+      const md = `${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      return { date: `${year}-${md}` < iso ? `${year}-${md}` : `${year - 1}-${md}`, v };
+    });
+    lastV = past.reduce((a, b) => (b.date > a.date ? b : a)).v;
+  }
   const all = pays
     .map(([m, v, d], i) => {
       const md = `${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
@@ -64,12 +78,15 @@ export function expectedPays(
     pays.forEach((p, i) => {
       if (twin < 0 || gap(p) < gap(pays[twin])) twin = i;
     });
+    // 짝은 보름 안에 있을 때만 — 지난해 같은 차례가 기록에 없으면(1년 합이 끝점에 걸린 JEPI) 31일 떨어진 다음 달 건이 짝으로 지워져
+    // 석 달에 세 번 받는 월분배가 두 번으로 적혔다(2026-10-04 점검). 15일은 월분배 주기의 절반이다.
+    if (twin >= 0 && gap(pays[twin]) > 15) twin = -1;
   } else if (sure?.record) {
     const record = sure.record;
     twin = all.find((e) => e.date >= record)?.i ?? -1;
   }
   const after = sure?.pay ?? "";
-  return all.filter((e) => e.i !== twin && e.date > after).map(({ date, v }) => ({ date, v }));
+  return all.filter((e) => e.i !== twin && e.date > after).map(({ date, v }) => ({ date, v: lastV ?? v }));
 }
 
 /**

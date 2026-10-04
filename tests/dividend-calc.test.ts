@@ -77,11 +77,23 @@ describe("expectedPays — 다가오는 일정의 '석 달 안 예상' 합에 �
     assert.deepEqual(dates(got), ["2026-12-28"]);
   });
 
+  it("짝은 보름 안에서만 — 지난해 10월 건이 기록에 없는 월분배(JEPI 11건)는 확정 10/5 의 짝을 31일 떨어진 11/5 로 잡지 않는다", () => {
+    const jepi: [number, number, number][] = [[11, 0.38, 5], [12, 0.38, 3], [1, 0.38, 5], [2, 0.38, 4], [3, 0.38, 5], [4, 0.38, 3], [5, 0.38, 5], [6, 0.38, 4], [7, 0.38, 3], [8, 0.38, 5], [9, 0.38, 3]];
+    assert.deepEqual(dates(expectedPays(jepi, iso, horizon, { pay: "2026-10-05", record: null })), ["2026-11-05", "2026-12-03"]);
+  });
+
   it("국내 배당 공시가 기준일만 있고 지급일이 없으면 기준일 뒤 첫 예상이 그 짝이다", () => {
     const quarterly: [number, number, number][] = [[4, 361, 18], [5, 361, 20], [8, 361, 20], [11, 361, 20]];
     assert.deepEqual(dates(expectedPays(quarterly, iso, horizon, { pay: null, record: "2026-09-30" })), []);
     // 공시 전이면 지난해 11/20 을 그대로 예상한다.
     assert.deepEqual(dates(expectedPays(quarterly, iso, horizon, null)), ["2026-11-20"]);
+  });
+
+  it("latest 면 금액은 가장 최근 지급 건 — 그 사이 올린 배당이 든다(IBM 12월 예상 $1.68 → $1.69)", () => {
+    const ibm: [number, number, number][] = [[12, 1.68, 10], [3, 1.68, 10], [6, 1.69, 10], [9, 1.69, 10]];
+    assert.deepEqual(expectedPays(ibm, iso, horizon, null, true), [{ date: "2026-12-10", v: 1.69 }]);
+    // 기본(국내 — 결산 · 중간 금액이 다르다)은 같은 차례 금액 그대로.
+    assert.deepEqual(expectedPays(ibm, iso, horizon, null), [{ date: "2026-12-10", v: 1.68 }]);
   });
 
   it("지난 날은 내년으로 옮기고, 석 달 밖은 빼고, 가까운 순으로 선다", () => {

@@ -19,7 +19,9 @@ function titleOf(b: BasketLite, mode: TaxMode): string {
   if (b.altIrp && mode === "irp") return `${b.title} (IRP)`;
   if (b.altPension && mode === "pension") return `${b.title} (연금저축)`;
   if (b.altPension && mode === "exempt") return `${b.title} (비과세 종합저축)`;
-  if (b.altPension) return `${b.title} (ISA)`;
+  if (b.altPension && mode === "isa") return `${b.title} (ISA)`;
+  // 일반 계좌 · 세전이면 목록은 ISA 것인데 '내 계좌 맞춤 (ISA)'라 적으면 내 계좌가 ISA 로 읽혔다(2026-10-04 점검).
+  if (b.altPension) return "ISA 맞춤";
   return b.title;
 }
 
@@ -39,8 +41,8 @@ function AmountBar({ amount, onChange }: { amount: number; onChange: (v: number)
   };
   return (
     <div className="v2-dv-amt">
-      {/* 주수를 어떻게 정하나는 데이터 툴팁 한 문장(예전엔 시트 바닥 두 문장). */}
-      <label htmlFor="dv-amount-input" className="v2-dv-amt-k hz-tip" data-tip="열 종목에 같은 금액씩 나눠 몇 주인지 셉니다">
+      {/* 주수를 어떻게 정하나는 값이 말한다 — 입력 옆 '종목당 100만원'(예전엔 22자 말풍선, 2026-10-04 점검). */}
+      <label htmlFor="dv-amount-input" className="v2-dv-amt-k">
         투자금
       </label>
       <span className="v2-dv-amt-v">
@@ -61,6 +63,7 @@ function AmountBar({ amount, onChange }: { amount: number; onChange: (v: number)
         />
         만원
         {amount >= 1e8 && <em>{wonShort(amount)}</em>}
+        <em>종목당 {wonShort(Math.round(amount / 10))}</em>
       </span>
       <input
         type="range"
@@ -109,7 +112,8 @@ export function BasketBoard({
         const net = lines.reduce((s, l) => s + l.netKrw, 0);
         const gross = lines.reduce((s, l) => s + l.grossKrw, 0);
         const invest = lines.reduce((s, l) => s + (l.investKrw ?? 0), 0);
-        return { b, lines, net, invest, y: invest > 0 ? (gross / invest) * 100 : null };
+        // 수익률은 표 머리와 같은 쪽(세후면 세후 — 첫 칸 '1년에 받는 배당'과 같은 규칙).
+        return { b, lines, net, invest, y: invest > 0 ? ((mode === "gross" ? gross : net) / invest) * 100 : null };
       }),
     [baskets, amount, mode, byCode, fx],
   );
@@ -125,7 +129,7 @@ export function BasketBoard({
         <AmountBar amount={amount} onChange={onAmount} />
         <div className="v2-dv-bk-th" aria-hidden="true">
           <span>바스켓</span>
-          <span>배당수익률</span>
+          <span>{mode === "gross" ? "배당수익률" : "세후 수익률"}</span>
           <span>1년에 받는 배당</span>
         </div>
         <div className="v2-dv-bk-rows" role="listbox" aria-label="성향별 바스켓">
@@ -151,7 +155,9 @@ export function BasketBoard({
                   >
                     <span className="v2-dv-bk-name">{titleOf(r.b, mode)}</span>
                     <span className="v2-dv-bk-num">{r.y != null ? pct(r.y) : "없음"}</span>
-                    <span className="v2-dv-bk-num is-strong">{r.lines.length ? won(r.net) : "없음"}</span>
+                    {/* 입력한 투자금 기준으로 맞춘 값 — 1주가 비싸 내림으로 잘리면 실제 담긴 돈이 바스켓마다 854만~988만원이라 줄끼리 못 견줬다
+                        (2026-10-04 점검). 실제 값(담긴 돈 · 받는 돈)은 오른쪽 읽기 칸 바닥에 그대로 있다. */}
+                    <span className="v2-dv-bk-num is-strong">{r.lines.length && r.invest > 0 ? won((r.net * amount) / r.invest) : "없음"}</span>
                   </button>
                 );
               })}

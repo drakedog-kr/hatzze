@@ -121,7 +121,7 @@ export function GoalBox({
           <span className="v2-dv-goal-s">{need != null && goal > 0 ? (reached ? "더 필요한 돈 없음" : `지금보다 ${roundMan(remaining)} 더`) : ""}</span>
         </div>
         <div className="v2-dv-goal-cell">
-          <span className="v2-dv-goal-k">목표까지</span>
+          <span className="v2-dv-goal-k">걸리는 기간</span>
           <b className="v2-dv-goal-v">{reached ? "이미 넘음" : months == null ? `${GOAL_MAX_MONTHS / 12}년 넘게` : years}</b>
           <span className="v2-dv-goal-s">
             매달 {manInput(addMan, onAdd, "매달 더 넣는 돈(만원)", 56)}만원씩 더 넣으면

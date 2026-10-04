@@ -99,7 +99,7 @@ export function SearchBox({ stocks, onPick }: { stocks: StockLite[]; onPick: (co
               </div>
             ))
           ) : (
-            <p className="dv-search-none">찾는 것이 없습니다. 코스피·코스닥 주식 전부, 미국 주식 560종목, ETF 980여 개(미국 33 · 국내는 운용사 가리지 않고 지난 1년 분배가 있는 전부)가 담깁니다.</p>
+            <p className="dv-search-none">찾는 종목이 없습니다.</p>
           )}
         </div>
       )}
@@ -195,7 +195,6 @@ export function MoreRows({
           <QuickChips codes={r.codes} byCode={byCode} holdings={holdings} onPick={onPick} />
         </div>
       ))}
-      <p className="dv-more-foot">여기 없는 종목은 위 검색창에서 찾습니다. {lists.note}</p>
     </div>
   );
 }
