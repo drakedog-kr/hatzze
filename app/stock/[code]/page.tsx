@@ -106,7 +106,8 @@ function Trend({ points }: { points: StockTrendPoint[] }) {
           <span key={p.date} className={`hz-tip hz-vline${edge}`} data-tip={`${fmtKoDate(p.date)} · 언급 ${p.mentions}회 · 채널 ${p.channels}곳`}>
             <i
               className={!p.mentions ? "is-none" : p.date >= recentFrom ? "is-recent" : undefined}
-              style={{ height: `${Math.max(p.mentions ? 3 : 1, (p.mentions / max) * 100)}%` }}
+              // 0 인 날은 2px 바닥선(내부자 · 테마 추이와 같은 꼴, 2026-10-05).
+              style={{ height: p.mentions ? `${Math.max(3, (p.mentions / max) * 100)}%` : "2px" }}
             />
           </span>
         );

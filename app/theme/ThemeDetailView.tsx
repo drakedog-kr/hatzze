@@ -75,7 +75,8 @@ function Trend({ points, recent }: { points: ThemeTrendPoint[]; recent: Set<stri
             <i
               className={!p.share ? "is-none" : recent.has(p.date) ? "is-recent" : undefined}
               style={{
-                height: `${Math.max(p.share ? 3 : 1, (p.share / max) * 100)}%`,
+                // 0 인 날은 2px 바닥선(내부자 · 종목 추이와 같은 꼴, 2026-10-05).
+                height: p.share ? `${Math.max(3, (p.share / max) * 100)}%` : "2px",
               }}
             />
           </span>

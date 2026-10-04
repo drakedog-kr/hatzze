@@ -21,7 +21,11 @@ import { CODE_LABEL, Money, fmtDate, moveBadge } from "./parts";
 const ROWS_OPEN = 8;
 const ROWS_STEP = 10;
 
+/** 비중 — 0.01% 아래는 '<0.01%'(전량 정리 다섯 줄이 '0.00%'로 0 처럼 읽혔다, 2026-10-05 점검). */
+const wpct = (w: number) => (w < 0.01 ? "<0.01%" : `${w < 1 ? w.toFixed(2) : w.toFixed(1)}%`);
+
 /** 상세의 줄 목록 + 바닥의 '더 보기'. 모듈 높이가 짝 모듈보다 크면 줄이 고르게 늘어난다(v2.css). */
+
 export function DetailList({ items, name, cols, open = ROWS_OPEN }: { items: React.ReactNode[]; name: string; cols: string; open?: number }) {
   return (
     <ExpandableList
@@ -51,10 +55,11 @@ export function holderLines(rows: StockHolder[], rate: number | null) {
       <Link href={`/insider/investor/${h.cik}`} className="v2-isd-row" data-ga="insider_holder_click">
         <span className="v2-isd-who">
           <b>{h.person}</b>
-          {h.firm && h.firm !== h.person && <span>{h.firm}</span>}
+          {/* 소속이 이름으로 시작하면('국민연금 국민연금공단') 같은 말이 두 번 — 뺀다(2026-10-05 점검). */}
+          {h.firm && !h.firm.startsWith(h.person) && <span>{h.firm}</span>}
         </span>
         <Move move={h.move} change={h.sharesChange} />
-        <span className="v2-isd-num is-sub">비중 {h.weight < 1 ? h.weight.toFixed(2) : h.weight.toFixed(1)}%</span>
+        <span className="v2-isd-num is-sub">비중 {wpct(h.weight)}</span>
         <span className="v2-isd-num">
           <Money usd={h.value} rate={rate} />
         </span>
@@ -83,7 +88,8 @@ export function insiderLines(rows: StockInsider[], rate: number | null) {
           <span className={`v2-isd-mid ${toneCls(tone)}`}>
             {what}
             {t.count > 1 ? ` ${t.count}건` : ""}
-            <em>{fmtDate(t.transactionDate ?? t.filedDate)} 매매</em>
+            {/* 날짜만 — 증여 · 원천징수 줄에도 '매매'가 붙었고 모듈 머리가 '매매일 순'이라 말한다(2026-10-05 점검). */}
+            <em>{fmtDate(t.transactionDate ?? t.filedDate)}</em>
           </span>
           <span className={`v2-isd-num${t.value == null ? " is-sub" : ""}`}>
             {t.value != null ? <Money usd={t.value} rate={rate} /> : t.shares != null ? `${Math.round(t.shares).toLocaleString("ko-KR")}주` : "미상"}
@@ -98,8 +104,28 @@ export function insiderLines(rows: StockInsider[], rate: number | null) {
  * 종목 상세 — 의원 신고(산 것 + 판 것, 매매일 최신 순). 의원 | 매수 · 매도 · 매매일 | 신고 구간.
  * ⚠️ 금액은 늘 구간이고 대부분 같은 구간이라($1K~$15K, 86%) 이 줄에서 갈리는 값은 날짜다(옛 congressRow 주석).
  */
+/** 같은 의원 · 같은 매매일 · 같은 방향 줄은 한 줄로 — 'Cleo Fields 매수 6/26'이 세 줄 되풀이됐다(2026-10-05 점검). 금액 구간은 합. */
+export function groupCongressLines(rows: StockCongress[]): (StockCongress & { n: number })[] {
+  const out: (StockCongress & { n: number })[] = [];
+  const byKey = new Map<string, StockCongress & { n: number }>();
+  for (const c of rows) {
+    const key = `${c.member}|${c.transactionDate}|${c.kind}`;
+    const g = byKey.get(key);
+    if (!g) {
+      const first = { ...c, n: 1 };
+      byKey.set(key, first);
+      out.push(first);
+      continue;
+    }
+    g.n += 1;
+    g.amountLow = g.amountLow != null && c.amountLow != null ? g.amountLow + c.amountLow : null;
+    g.amountHigh = g.amountHigh != null && c.amountHigh != null ? g.amountHigh + c.amountHigh : null;
+  }
+  return out;
+}
+
 export function congressLines(rows: StockCongress[], rate: number | null) {
-  return rows.map((c, i) => {
+  return groupCongressLines(rows).map((c, i) => {
     const buy = c.kind === "P";
     return (
       <li key={`${c.member}-${c.filedDate}-${i}`}>
@@ -109,7 +135,8 @@ export function congressLines(rows: StockCongress[], rate: number | null) {
           </span>
           <span className={`v2-isd-mid ${buy ? "is-up" : c.kind === "S" ? "is-down" : "is-flat"}`}>
             {buy ? "매수" : c.kind === "S" ? "매도" : "교환"}
-            <em>{fmtDate(c.transactionDate)} 매매</em>
+            {c.n > 1 ? ` ${c.n}건` : ""}
+            <em>{fmtDate(c.transactionDate)}</em>
           </span>
           <span className="v2-isd-num is-sub">
             {c.amountLow != null && c.amountHigh != null ? (
@@ -144,7 +171,7 @@ export function holdingLines(rows: ManagerHolding[], rate: number | null) {
       <Link href={`/insider/stock/${encodeURIComponent(h.ticker)}`} className="v2-isd-row" data-ga="insider_holding_click">
         <StockWho ticker={h.ticker} name={h.name} />
         <Move move={h.move} change={h.sharesChange} />
-        <span className="v2-isd-num is-sub">비중 {h.weight < 1 ? h.weight.toFixed(2) : h.weight.toFixed(1)}%</span>
+        <span className="v2-isd-num is-sub">비중 {wpct(h.weight)}</span>
         <span className="v2-isd-num">
           <Money usd={h.value} rate={rate} />
         </span>
@@ -159,7 +186,7 @@ export function exitedLines(rows: { ticker: string; name: string; value: number;
     <li key={e.ticker}>
       <Link href={`/insider/stock/${encodeURIComponent(e.ticker)}`} className="v2-isd-row" data-ga="insider_exited_click">
         <StockWho ticker={e.ticker} name={e.name} />
-        <span className="v2-isd-num is-sub">비중 {e.weight < 1 ? e.weight.toFixed(2) : e.weight.toFixed(1)}%</span>
+        <span className="v2-isd-num is-sub">비중 {wpct(e.weight)}</span>
         <span className="v2-isd-num">
           <Money usd={e.value} rate={rate} />
         </span>

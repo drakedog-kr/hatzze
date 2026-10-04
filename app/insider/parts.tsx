@@ -436,25 +436,44 @@ export function Empty({ children }: { children: React.ReactNode }) {
    메인의 다섯 줄은 '그 표가 고른 까닭' 하나만 남긴 요약이고, 누가 · 어떤 코드로는 여기 줄이 자세히 말한다. */
 
 /**
- * 차트 마커의 축. 배지 필터와 CSS 클래스와 마커 색이 이 표 하나를 공유한다.
+ * 차트 마커의 축. 배지 필터와 CSS 클래스와 마커 모양이 이 표 하나를 공유한다.
  *
- * ## ⭐ 색은 **축**을, 채움은 **방향**을 말한다
+ * ## 내력
  *
  * 처음엔 색을 방향(매수 파랑 / 매도 회색)에 쓰고 축은 크기로 갈랐다. 크기 차이(2.6·3.4·4)는
- * 실제 화면에서 안 읽혔다. 색을 축에 주고 방향을 채움으로 옮기면 둘 다 또렷해진다.
+ * 실제 화면에서 안 읽혔다. 그다음 색을 축(임원 파랑 · 거물 잉크 · 의원 빨강)에 주고 방향을 채움으로 옮겼는데,
+ * 의원이 판 점이 빨강이라 같은 화면 줄 글자의 빨강(매수)과 반대로 읽혔다(2026-10-05 점검).
  *
  * ## ⚠️ 새 색을 만들지 않는다
  *
- * 이 저장소는 **2색 체계**다(파랑·빨강. 전역이라 카더라·MDD 도 같이 움직인다). 세 번째
- * 색조를 들이면 그 체계가 깨진다. 그래서 파랑·잉크·빨강 셋으로 가른다 — 전부 있는
- * 토큰이고 다크에서도 짝이 정의돼 있다.
+ * 이 저장소는 **2색 체계**다(파랑·빨강. 전역이라 카더라·MDD 도 같이 움직인다). 세 번째 색조를 들이지 않고
+ * 갈래는 모양으로 가른다.
  */
+/* ⭐ 2026-10-05 — 색은 **방향**(매수 빨강 채움 · 매도 파랑 고리), 사람 갈래는 **모양**(임원 원 · 거물 네모 · 의원 마름모)으로 바꿨다.
+   색이 갈래였을 땐 의원이 판 점(빨강 고리)이 같은 화면 줄 글자의 빨강(매수)과 반대로 읽혔다. 2색 체계는 그대로다. */
 export const MARK_GROUPS = [
-  { key: "all", label: "전체", color: null },
-  { key: "insider", label: "임원", color: "var(--c-blue)" },
-  { key: "manager", label: "거물", color: "var(--c-ink)" },
-  { key: "congress", label: "의원", color: "var(--c-hot)" },
+  { key: "all", label: "전체", shape: null },
+  { key: "insider", label: "임원", shape: "circle" },
+  { key: "manager", label: "거물", shape: "square" },
+  { key: "congress", label: "의원", shape: "diamond" },
 ] as const;
+
+/** 방향 색 — 매수 빨강 · 매도 파랑(이 화면 줄 글자와 같은 뜻). */
+const SIDE_COLOR = { buy: "var(--c-hot)", sell: "var(--c-blue)" } as const;
+
+/** 갈래 모양 하나 — 가운데(cx, cy) · 반지름 r. 원 · 네모 · 마름모(넓이가 비슷하게 네모는 조금 작게). */
+function MarkShape({ shape, cx, cy, r, ...rest }: { shape: "circle" | "square" | "diamond"; cx: number; cy: number; r: number } & React.SVGProps<SVGElement>) {
+  if (shape === "square") {
+    const h = r * 0.88;
+    return <rect x={cx - h} y={cy - h} width={h * 2} height={h * 2} {...(rest as React.SVGProps<SVGRectElement>)} />;
+  }
+  if (shape === "diamond") {
+    const d = r * 1.22;
+    return <polygon points={`${cx},${cy - d} ${cx + d},${cy} ${cx},${cy + d} ${cx - d},${cy}`} {...(rest as React.SVGProps<SVGPolygonElement>)} />;
+  }
+  return <circle cx={cx} cy={cy} r={r} {...(rest as React.SVGProps<SVGCircleElement>)} />;
+}
+const SHAPE_OF = { insider: "circle", manager: "square", congress: "diamond" } as const;
 
 /**
  * 마커 반지름. **하나뿐이다.**
@@ -465,11 +484,6 @@ export const MARK_GROUPS = [
  */
 const MARK_R = 3.6;
 
-const MARK_COLOR: Record<string, string> = {
-  insider: "var(--c-blue)",
-  manager: "var(--c-ink)",
-  congress: "var(--c-hot)",
-};
 
 export type ChartMark = {
   date: string;
@@ -482,6 +496,16 @@ export type ChartMark = {
   low: number | null;
   high: number | null;
 };
+
+/** 차트가 실제로 그리는 표식 자리 수(같은 봉에 선 것은 한 자리) — 머리의 '매매 시점 N개'가 이 수라야 점을 세어 맞는다(2026-10-05 점검). */
+export function markSpotCount(bars: { date: string }[], marks: { date: string }[]): number {
+  const spots = new Set<number>();
+  for (const m of marks) {
+    const i = bars.findIndex((b) => b.date >= m.date);
+    if (i >= 0) spots.add(i);
+  }
+  return spots.size;
+}
 
 /**
  * 주가 선 + **매매 시점 표시** + 축 + 호버.
@@ -678,11 +702,13 @@ export function PriceChart({
           //    **채움**이 말한다 — 채운 점이 매수, 빈 고리가 매도.
           // ⛔ 반지름을 자리마다 바꾸지 말 것. 겹친 마커를 겹쳐 담으려고 크기를 키웠더니
           //    "동그라미 크기가 왜 다르냐"가 됐다 — 크기는 이 화면에서 아무 뜻도 없다.
-          const color = MARK_COLOR[s.who];
+          // 색은 방향(그날 많은 쪽), 모양은 갈래.
           const buyish = s.buy >= s.sell;
+          const color = buyish ? SIDE_COLOR.buy : SIDE_COLOR.sell;
           return (
-            <circle
+            <MarkShape
               key={`${s.i}-${s.who}`}
+              shape={SHAPE_OF[s.who]}
               className={`hz-mk hz-mk-${s.who}`}
               cx={x(s.i)}
               cy={y(bars[s.i].close)}
@@ -713,7 +739,8 @@ export function PriceChart({
             <div
               key={b.date}
               className={`hz-tip hz-vline${edge}`}
-              data-tip={`${b.date} · $${b.close.toLocaleString("en-US", { maximumFractionDigits: 2 })}${won}`}
+              // 날짜 꼴은 표식 말풍선과 같은 fmtDate · 값은 소수 둘째 자리(2026-10-05 점검).
+              data-tip={`${fmtDate(b.date)} · $${b.close.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${won}`}
               // 선·호버 점을 칸 가운데가 아니라 실제 점 자리(칸 폭의 i/(n−1))에 세운다(app/home/parts.tsx AreaChart 와 같은 셈).
               style={{ flex: 1, position: "relative", ["--hz-x" as string]: `${at2 * 100}%` }}
             >
@@ -761,7 +788,7 @@ export function PriceChart({
               width: `${wPct}%`,
               aspectRatio: "1",
               // 겹쳐 있으면 맨 위 마커의 색으로 불을 켠다.
-              ["--mk" as string]: MARK_COLOR[list[list.length - 1].who],
+              ["--mk" as string]: list[list.length - 1].buy >= list[list.length - 1].sell ? SIDE_COLOR.buy : SIDE_COLOR.sell,
             }}
           />
         );
@@ -822,9 +849,10 @@ export function MarkBadges({ id }: { id: string }) {
     <span className="hz-mkfilter-set">
       {MARK_GROUPS.map((g) => (
         <label key={g.key} htmlFor={`${id}-${g.key}`} data-k={g.key}>
-          {g.color && (
-            <svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true">
-              <circle cx="4" cy="4" r="3.2" fill={g.color} />
+          {/* 칩 점은 갈래 모양(잉크) — 색은 방향이라 갈래 칩엔 안 싣는다. */}
+          {g.shape && (
+            <svg width="9" height="9" viewBox="0 0 9 9" aria-hidden="true">
+              <MarkShape shape={g.shape} cx={4.5} cy={4.5} r={3.2} fill="var(--c-label)" />
             </svg>
           )}
           {g.label}
@@ -1126,7 +1154,8 @@ const CONSENSUS_KO: Record<string, string> = {
  */
 export function ExactMoney({ usd, rate }: { usd: number | null; rate: number | null }) {
   if (usd == null) return <>-</>;
-  const d = `$${usd.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+  // 소수 둘째 자리까지 늘 — '$192 ~ $309.81'처럼 끝의 0 을 지워 자릿수가 들쭉날쭉했다(2026-10-05 점검).
+  const d = `$${usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   if (!rate) return <>{d}</>;
   return (
     <>
@@ -1189,7 +1218,8 @@ export function AnalystActions({ rows, rate }: { rows: AnalystAction[]; rate: nu
             <strong className="hz-cellsub" style={{ ...ROW.lead, fontSize: "var(--fs-13)" }}>
               {r.firm}
             </strong>
-            <SubLine text={`${r.analyst === "Unknown Analyst" ? "이름 없음" : r.analyst} · ${fmtDate(r.date)}`} />
+            {/* 이름을 모르면 날짜만 — '이름 없음'이 찍혔다(2026-10-05 점검). */}
+            <SubLine text={r.analyst === "Unknown Analyst" ? fmtDate(r.date) : `${r.analyst} · ${fmtDate(r.date)}`} />
           </span>
           <span style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6, flexWrap: "wrap" }}>
             {act && (act.tone ? <Pill tone={act.tone}>{act.text}</Pill> : <span style={{ ...ROW.sub }}>{act.text}</span>)}
@@ -1224,7 +1254,7 @@ export function AnalystActions({ rows, rate }: { rows: AnalystAction[]; rate: nu
           64명은 등급을 걸어 둔 사람 수, 이 목록은 그 사이에 움직인 사람이다. */}
       <span style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "0 14px 4px" }}>
         <span style={{ ...ROW.sub }}>최근 의견</span>
-        {span && <span style={{ fontSize: T.small, color: C.muted, fontFamily: MONO }}>{span}</span>}
+        {span && <span style={{ fontSize: "var(--fs-12)", color: C.muted, fontFamily: MONO }}>{span}</span>}
       </span>
       {/* ⭐ 다섯 줄로 열고 눌러서 늘린다. 다 펴면 '접기'가 함께 뜬다(ExpandableList 기본).
           ⚠️⚠️ 바닥 띠는 **`hz-sheet-foot-row`** 를 쓴다. 기본 푸터로 뒀더니 카드 한가운데
@@ -1265,7 +1295,10 @@ export function ConsensusBody({
   const upside = price && c.targetAvg ? ((c.targetAvg - price) / price) * 100 : null;
   // 현재가가 최저~최고 사이 어디인지. 목표가 구간이 없으면 안 그린다.
   const span = c.targetLow != null && c.targetHigh != null && c.targetHigh > c.targetLow;
-  const pos = span && price ? Math.min(100, Math.max(0, ((price - c.targetLow!) / (c.targetHigh! - c.targetLow!)) * 100)) : null;
+  // 구간 밖이면(현재가 < 최저 목표가 · > 최고 목표가) 막대 끝에 붙이지 않고 바깥에 빈 고리로 — 끝에 붙으면 '최저 목표가' 자리를 가리켰다(EVMN, 2026-10-05 점검).
+  const raw = span && price ? ((price - c.targetLow!) / (c.targetHigh! - c.targetLow!)) * 100 : null;
+  const outside = raw == null ? null : raw < 0 ? "low" : raw > 100 ? "high" : null;
+  const pos = raw == null ? null : Math.min(100, Math.max(0, raw));
 
   return (
     // ⚠️ 가로 여백을 여기 두지 말 것. 아래 목록의 '더 보기' 띠가 **카드 폭을 꽉 채워야**
@@ -1330,7 +1363,12 @@ export function ConsensusBody({
                 {/* 채우는 막대가 아니라 **구간 위의 점**이다. 저점부터 채우면 "이만큼 올랐다"로
                     읽히는데, 이 값은 그게 아니라 예측 범위 안 어디에 지금 값이 있느냐다. */}
                 <span className="hz-range" style={{ position: "relative", height: 10 }}>
-                  {pos != null && <span className="hz-range-knob" style={{ left: `${pos}%` }} />}
+                  {pos != null && (
+                    <span
+                      className={`hz-range-knob${outside ? " is-out" : ""}`}
+                      style={{ left: outside === "low" ? "-8px" : outside === "high" ? "calc(100% + 8px)" : `${pos}%` }}
+                    />
+                  )}
                 </span>
                 {/* ⚠️ 숫자만 두면 그게 목표가의 양끝인지 축 눈금인지 안 보인다 — 바로 위가
                     막대라 특히 그렇다. 숫자 아래에 무엇인지 적는다. */}
@@ -1339,20 +1377,21 @@ export function ConsensusBody({
                     <span style={{ ...ROW.sub, fontFamily: MONO, color: C.ink }}>
                       <ExactMoney usd={c.targetLow} rate={rate} />
                     </span>
-                    <span style={{ fontSize: T.small, color: C.muted }}>최저 목표가</span>
+                    <span style={{ fontSize: "var(--fs-12)", color: C.muted }}>최저 목표가</span>
                   </span>
                   {/* 막대 위 점이 무엇인지 — 바로 위 큰 숫자가 '목표가 평균'이라 점도 평균 자리로 읽혔다(2026-10-04 점검). */}
                   {pos != null && (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, alignSelf: "flex-end", fontSize: T.small, color: C.muted }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, alignSelf: "flex-end", fontSize: "var(--fs-12)", color: C.muted }}>
                       <span aria-hidden style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--c-blue)", flexShrink: 0 }} />
-                      현재가
+                      {/* 값을 붙인다 — 구간 밖이면 점만으로는 어디인지 안 읽힌다. */}
+                      현재가 {price != null ? `$${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ""}
                     </span>
                   )}
                   <span style={{ display: "flex", flexDirection: "column", gap: 1, alignItems: "flex-end" }}>
                     <span style={{ ...ROW.sub, fontFamily: MONO, color: C.ink }}>
                       <ExactMoney usd={c.targetHigh} rate={rate} />
                     </span>
-                    <span style={{ fontSize: T.small, color: C.muted }}>최고 목표가</span>
+                    <span style={{ fontSize: "var(--fs-12)", color: C.muted }}>최고 목표가</span>
                   </span>
                 </span>
               </>

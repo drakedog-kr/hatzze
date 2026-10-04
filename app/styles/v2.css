@@ -1687,7 +1687,8 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-tm-trend > span { position: relative; flex: 1; min-width: 0; height: 100%; display: flex; align-items: flex-end; }
 .v2-tm-trend i { display: block; width: 100%; border-radius: 2px; background: color-mix(in srgb, var(--t-down) 35%, transparent); }
 .v2-tm-trend i.is-recent { background: var(--t-down); }
-.v2-tm-trend i.is-none { background: var(--t-bar-off); }
+/* 0 인 날 — 2px 바닥선(언급 없는 종목에 1px 막대 40개가 빈 칸처럼 보였다, 2026-10-05). 바탕보다 한 단 진하게. */
+.v2-tm-trend i.is-none { background: var(--t-ink4); opacity: 0.45; }
 /* 아직 안 끝난 날(오늘) — 옅게. 반나절치라 다른 날과 견줄 막대가 아니다(내부자 종목 상세 mentionPartial). */
 .v2-tm-trend i.is-part { opacity: 0.4; }
 /* 일정을 판 폭으로 쌓을 때(.v2-tm-stack · 1,000 미만 옆 칸) — 두 단을 세로 먼저 채운다(--ev-rows, ThemeDetailView). 줄 키는 제 글만큼.
@@ -2392,13 +2393,24 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 .v2-isd-facts > div + div { border-top: 1px solid var(--t-line); }
 .v2-isd-facts dt { font-size: 12px; font-weight: 500; color: var(--t-ink2); }
 .v2-isd-facts dd { display: flex; flex-direction: column; align-items: flex-end; gap: 0; margin: 0; text-align: right; }
-.v2-isd-facts b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.v2-isd-facts b { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .v2-isd-facts b.is-zero { color: var(--t-ink3); }
 .v2-isd-facts b span { margin-left: 1px; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-isd-facts em { font-style: normal; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
 .v2-isd-tk { color: var(--t-ink2); text-decoration: none; }
 .v2-isd-tk:hover { color: var(--t-ink); text-decoration: underline; }
 .v2-isd-narrow { display: none; }
+/* 종목 상세 '공시에 남은 것' — 두 층(위 이름표 · 값, 아래 곁줄). 값 · 곁줄을 오른쪽 한 칸에 몰았을 땐 이름표 자리가 64px 까지 눌려
+   '월가 거물 보 / 유' · '임원 신 / 고'로 꺾이고 줄 높이가 들쭉날쭉했다(2026-10-05 점검). 투자자 상세(.v2-isd-inv)는 그대로. */
+.v2-tm-band.is-brief .v2-isd-facts > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "k v" "s s"; align-items: baseline; row-gap: 2px; padding-block: 8px; }
+.v2-tm-band.is-brief .v2-isd-facts dd { display: contents; }
+.v2-tm-band.is-brief .v2-isd-facts dt { grid-area: k; white-space: nowrap; }
+.v2-tm-band.is-brief .v2-isd-facts dd b { grid-area: v; }
+.v2-tm-band.is-brief .v2-isd-facts dd em { grid-area: s; text-align: left; word-break: keep-all; }
+/* 투자자 상세 '분기에 한 것' — 줄이 두 층(갈래 · 종목)이라 위아래 여백을 준다(1~2px 로 납작했다). 갈래 이름은 종목 줄보다 한 단 위. */
+.v2-isd-inv .v2-isd-facts > div { padding-block: 8px; }
+.v2-isd-inv .v2-isd-facts dt { font-size: 13px; font-weight: 600; color: var(--t-ink); }
+.v2-isd-inv .v2-isd-facts dt em { display: block; font-size: 12px; font-weight: 500; color: var(--t-ink2); }
 @container kd (max-width: 999px) {
   .v2-isd-wide { display: none; }
   .v2-isd-narrow { display: inline; }
@@ -2516,10 +2528,11 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 }
 a.v2-isd-row:hover { background: var(--t-tint); margin: 0 -14px; padding: 0 14px; }
 .v2-isd-list.is-holder .v2-isd-row,
-.v2-isd-list.is-holding .v2-isd-row { grid-template-columns: minmax(0, 1fr) 88px 56px 84px; }
+.v2-isd-list.is-holding .v2-isd-row { grid-template-columns: minmax(0, 1fr) 88px 72px 84px; }
 .v2-isd-list.is-trade .v2-isd-row { grid-template-columns: minmax(0, 1fr) max-content 84px; }
 .v2-isd-list.is-congress .v2-isd-row { grid-template-columns: minmax(0, 1fr) max-content 120px; }
-.v2-isd-list.is-exited .v2-isd-row { grid-template-columns: minmax(0, 1fr) 56px 84px; }
+/* 비중 칸 72 — 56 이면 '비중 22.0%'(60px) · '비중 <0.01%'(70px)가 넘쳐 줄마다 오른쪽 끝이 어긋났다(2026-10-05 점검). */
+.v2-isd-list.is-exited .v2-isd-row { grid-template-columns: minmax(0, 1fr) 72px 84px; }
 .v2-isd-who { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
 .v2-isd-who > b { flex: none; font-weight: 600; white-space: nowrap; }
 .v2-isd-who > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
@@ -2546,8 +2559,12 @@ a.v2-isd-row:hover { background: var(--t-tint); margin: 0 -14px; padding: 0 14px
 .v2-isd-chartbar { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; padding: 0 14px 8px; }
 .v2-isd-legend { display: inline-flex; align-items: center; gap: 12px; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-isd-legend > span { display: inline-flex; align-items: center; gap: 5px; }
-.v2-isd-legend i { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--t-ink3); }
-.v2-isd-legend i.is-fill { background: var(--t-ink3); }
+.v2-in .hz-mkfilter-set label { font-size: 12px; font-weight: 500; }
+/* 현재가가 목표가 구간 밖이면 막대 바깥에 빈 고리(ConsensusBody outside). */
+.v2-in .hz-range-knob.is-out { background: var(--c-card); box-shadow: inset 0 0 0 2px var(--c-blue); }
+/* 범례 — 색이 방향이다(매수 빨강 채움 · 매도 파랑 고리, 차트 표식과 같은 뜻 · 2026-10-05). */
+.v2-isd-legend i { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--t-down); }
+.v2-isd-legend i.is-fill { border-color: var(--t-up); background: var(--t-up); }
 
 /* 애널리스트 — 옛 시트 속(ConsensusBody)을 그대로 담는다. 시트 머리가 없어진 만큼 위 여백만 맞춘다. */
 .v2-isd-consensus > :not(.v2-mod-head):first-of-type { padding-top: 4px; }
@@ -2563,10 +2580,15 @@ a.v2-isd-row:hover { background: var(--t-tint); margin: 0 -14px; padding: 0 14px
   .v2-isd-list.is-congress .v2-isd-row { grid-template-columns: minmax(0, 1fr) max-content; }
   .v2-isd-list.is-congress .v2-isd-row > :nth-child(3) { grid-column: 1 / -1; text-align: left; padding-bottom: 6px; }
   .v2-isd-chart .v2-mod-head { flex-wrap: wrap; row-gap: 6px; }
-  /* 이름이 길면(아메리칸익스프레스 · 알티미터 캐피털) 말줄임 대신 다음 줄로 — 폰에서 줄 끝이 잘려 무엇인지 안 읽혔다. */
+  .v2-isd-row { padding-block: 4px; }
+  /* 확대 단추는 범례 줄 오른쪽 빈 자리로 — 그림 오른쪽 아래면 52주 저점 근처 가격선을 덮었다(EVMN, 2026-10-05 점검). */
+  .v2-isd-chart .hz-zoom-btn { top: -34px; bottom: auto; }
+}
+/* 이름이 길면(아메리칸익스프레스 · 알티미터 캐피털) 말줄임 대신 다음 줄로 — 폰에서 줄 끝이 잘려 무엇인지 안 읽혔다. 1,100(짝 417px)도
+   소속이 '…'로 잘려 폰과 같이 둔다(2026-10-05 점검). */
+@container kd (max-width: 999px) {
   .v2-isd-who { flex-wrap: wrap; row-gap: 0; }
   .v2-isd-who > span { overflow: visible; white-space: normal; word-break: keep-all; }
-  .v2-isd-row { padding-block: 4px; }
 }
 /* 투자자 상세 옆 칸 — 이번 분기에 한 것(줄 넷)이 남는 높이를 받고, 전량 정리는 제 키대로 아래에 선다. */
 .v2-isd-inv .v2-tm-side > .v2-mod { display: flex; flex-direction: column; }

@@ -107,6 +107,9 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
 
   // 이번 분기에 한 것 — 갈래마다 종목(비중 큰 순). 줄 글자와 같은 잣대(parts.tsx moveKind)라 표의 '유지' 줄은 늘림 · 줄임에 안 든다.
   const byKind = (k: "new" | "add" | "trim") => d.holdings.filter((h) => moveKind(h.move, h.sharesChange) === k).map((h) => h.ticker);
+  // 전량 정리가 둘 이하면 모듈을 안 세운다 — 한두 줄 모듈이 옆 칸 키로 늘어 바닥 100px 가 비었다(버핏 1,100, 2026-10-05 점검).
+  // 그때는 '분기에 한 것'의 전량 정리 줄이 종목을 말한다.
+  const exitedMod = d.exited.length > 2;
   const moves = [
     { label: "새로 담음", list: byKind("new") },
     { label: "늘림", list: byKind("add") },
@@ -148,7 +151,8 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
       <div className="v2-cover">
         <div className="v2-cover-cell v2-sk-id">
           <h1>{d.person}</h1>
-          <span className="v2-cover-k">{d.firm}</span>
+          {/* 소속이 이름으로 시작하면('국민연금 국민연금공단') 같은 말이 두 번 — 뺀다(2026-10-05 점검). */}
+          {d.firm && !d.firm.startsWith(d.person) && <span className="v2-cover-k">{d.firm}</span>}
         </div>
         <div className="v2-cover-cell">
           {/* '운용자산 ?(미국 상장주만 집계)'였다 — 이름표가 글자 그대로 그 값을 말하게(2026-10-04 "헬프 툴팁이 필요하면 심플하지 않다"). */}
@@ -175,12 +179,14 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
             <b>{d.holdings.length}종목</b>
           </span>
           <span className="v2-cover-v">
-            <em>상위 5종목</em>
+            {/* 보유가 다섯 아래면 그 수로 — 4종목인데 '상위 5종목 100%'였다(2026-10-05 점검). */}
+            <em>상위 {Math.min(5, d.holdings.length)}종목</em>
             <b>{top5.toFixed(0)}%</b>
           </span>
           <span className="v2-cover-v">
             {/* 짧게 — 폰에서 값 셋이 한 줄에 들게(2026-10-04 점검). */}
-            <em>카더라</em>
+            {/* '카더라 언급' — 무엇을 센 수인지(보유 중 카더라에서 언급된 종목, 2026-10-05 점검). */}
+            <em>카더라 언급</em>
             <b>{kaderaCount}종목</b>
           </span>
         </div>
@@ -200,7 +206,7 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
       <div className="v2-tm-band is-hot v2-isd-inv">
         <Module
           title="보유 종목"
-          meta={`${d.holdings.length > ROWS_MAX ? `비중 상위 ${ROWS_MAX} / ` : ""}${d.holdings.length}종목 · 비중 순`}
+          meta={`${d.holdings.length > ROWS_MAX ? `상위 ${ROWS_MAX} / ` : ""}${d.holdings.length}종목 · 비중 순`}
           className="v2-isd-mod"
         >
           {d.holdings.length === 0 ? (
@@ -213,7 +219,8 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
           {/* '이번 분기'는 오늘의 분기로 읽혔다 — 13F 분기 이름으로(2026-10-04 점검). */}
           <Module
             title={d.reportDate ? `${Math.ceil(Number(d.reportDate.slice(5, 7)) / 3)}분기에 한 것` : "분기에 한 것"}
-            meta={d.priorDate ? `${quarterLabel(d.reportDate)} · 직전 분기 대비` : undefined}
+            // 분기는 띠(업데이트 칸)와 제목이 말한다 — 머리에 분기가 두 번이었다(2026-10-05 점검).
+            meta={d.priorDate ? "직전 분기 대비" : undefined}
             className="v2-isd-facts-mod"
           >
             {d.priorDate ? (
@@ -221,12 +228,14 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
                 {moves.map((s) => (
                   <div key={s.label}>
                     {/* 갈래 이름 아래 종목 — 표를 다 훑지 않아도 무엇을 바꿨는지 보인다. 종목은 그 종목 화면 링크.
-                        판 1,000 이상은 여덟까지(줄이 92px 로 넉넉하다), 그 밑은 넷까지 · 나머지는 수로(v2.css .v2-isd-wide · .v2-isd-narrow). */}
+                        판 1,000 이상은 여섯까지, 그 밑은 넷까지 · 나머지는 수로(v2.css .v2-isd-wide · .v2-isd-narrow). */}
                     <dt>
                       {s.label}
-                      {s.list.length > 0 && (
+                      {/* 전량 정리는 아래 모듈이 종목을 말하면 이 줄은 수만 — 같은 사실이 한 화면에 두 번 섰다(2026-10-05 점검). */}
+                      {s.list.length > 0 && !(s.label === "전량 정리" && exitedMod) && (
                         <em>
-                          {s.list.slice(0, 8).map((t, i) => (
+                          {/* 넓은 판은 여섯까지 — 여덟이면 '353종 / 목' · 'AMD 외 / 345'로 꺾였다(국민연금 1,440, 2026-10-05 점검). */}
+                          {s.list.slice(0, 6).map((t, i) => (
                             <Fragment key={t}>
                               {i > 0 && <span className={i >= 4 ? "v2-isd-wide" : undefined}> · </span>}
                               <Link href={`/insider/stock/${encodeURIComponent(t)}`} className={`v2-isd-tk${i >= 4 ? " v2-isd-wide" : ""}`} data-ga="insider_investor_move_click">
@@ -235,7 +244,7 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
                             </Fragment>
                           ))}
                           {s.list.length > 4 && <span className="v2-isd-narrow"> 외 {s.list.length - 4}</span>}
-                          {s.list.length > 8 && <span className="v2-isd-wide"> 외 {s.list.length - 8}</span>}
+                          {s.list.length > 6 && <span className="v2-isd-wide"> 외 {s.list.length - 6}</span>}
                         </em>
                       )}
                     </dt>
@@ -252,7 +261,7 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
               <p className="v2-empty">견줄 직전 분기가 아직 없습니다.</p>
             )}
           </Module>
-          {d.exited.length > 0 && (
+          {exitedMod && (
             <Module title="전량 정리한 종목" meta={`${quarterLabel(d.priorDate)} 비중 · 금액`} className="v2-isd-mod">
               <DetailList name="investor_exited" cols="exited" open={5} items={exitedLines(d.exited.slice(0, ROWS_MAX), d.usdKrw)} />
             </Module>
