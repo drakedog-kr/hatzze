@@ -56,6 +56,24 @@ describe("groupEventRows", () => {
     assert.equal(out[0].channels, 3); // a · b + 달 줄의 d
   });
 
+  it("매출 · 신주 표기가 갈려도 한 줄 — 분기 실적과는 다른 줄(2026-10-05 점검)", () => {
+    const out = groupEventRows([
+      row("TSM", "a", "2026-10-08", "day", "9월 매출 실적 공개"),
+      row("TSM", "b", "2026-10-08", "day", "9월 매출 발표"),
+      row("TSM", "c", "2026-10-01", "month", "3분기 실적 발표"),
+      row("207940", "a", "2026-10-06", "day", "신주 배정일"),
+      row("207940", "b", "2026-10-06", "day", "신주 배정 기준일"),
+      row("207940", "c", "2026-10-06", "day", "유상증자 신주 배정 기준일"),
+    ]);
+    const tsm = out.filter((e) => e.code === "TSM");
+    assert.equal(tsm.length, 2);
+    assert.equal(tsm.find((e) => eventKind(e.event) === "매출")?.channels, 2);
+    const sb = out.filter((e) => e.code === "207940");
+    assert.equal(sb.length, 1);
+    assert.equal(sb[0].channels, 3);
+    assert.equal(eventKind("신주 상장"), "상장");
+  });
+
   it("다른 종목 · 다른 기간은 그대로", () => {
     const out = groupEventRows([
       row("000660", "a", "2026-10-27", "day", "실적발표"),

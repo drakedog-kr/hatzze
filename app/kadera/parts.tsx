@@ -124,7 +124,8 @@ export function ThemeVsUsualRows({ themes }: { themes: (ThemeRow & { name: strin
             <span style={{ position: "relative", minWidth: 0, height: 7 }}>
               {/* 트랙·회색 채움·눈금은 잉크를 섞은 타일 전용 색(tx.css --tx-track · --tx-flat · --tx-tick) — --c-track 은 회색 타일 위에서 사라진다. */}
               <span style={{ position: "absolute", inset: 0, borderRadius: 999, background: "var(--tx-track)", overflow: "hidden" }}>
-                {lean && fill && (
+                {/* '평소 수준'은 눈금만 — 차이 길이만큼 회색을 그리면 '더 낙관' 막대보다 긴 회색이 섰다(2026-10-05 점검). 막대가 선 줄 = 다르다고 말한 줄. */}
+                {lean && lean.shift !== "same" && fill && (
                   <span
                     style={{
                       position: "absolute",

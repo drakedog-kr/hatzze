@@ -46,7 +46,8 @@ async function previewChip(): Promise<CoverChip | null> {
   return {
     cap: `${p.usFrom && p.usFrom < p.usSession ? `${md(p.usFrom)}~` : ""}${md(p.usSession)} 미장`,
     name: top.usName,
-    val: `${top.dp > 0 ? "+" : top.dp < 0 ? "-" : ""}${Math.abs(top.dp).toFixed(1)}%`,
+    // 소수 둘째 자리 — 같은 띠 지수(+0.46%) · 미리보기 표(-10.22%)와 자릿수를 맞춘다(2026-10-05 점검).
+    val: `${top.dp > 0 ? "+" : top.dp < 0 ? "-" : ""}${Math.abs(top.dp).toFixed(2)}%`,
     tone: top.dp > 0 ? "up" : top.dp < 0 ? "down" : "flat",
     href: "/preview",
     ga: "kadera_chip_preview",
@@ -62,7 +63,8 @@ async function usSurgingChip(ga = "kadera_chip_us_surging"): Promise<CoverChip |
     name: top.name,
     // '언급' 을 붙인다 — '6.3배'만이면 주가 배수로도 읽혔다(2026-10-04 점검). 첫 언급은 배수 대신 그 말(카더라 표와 같다).
     val: top.isNew ? "첫 언급" : `언급 ${top.multiple >= 10 ? Math.round(top.multiple) : top.multiple.toFixed(1)}배`,
-    tone: "up",
+    // 색을 싣지 않는다 — 빨강 · 파랑은 주가 오르내림 말이라 언급 배수에 칠하면 오른 종목처럼 읽혔다(카더라 표와 같은 규칙, 2026-10-05 점검).
+    tone: "flat",
     href: "/kadera/us#surging",
     ga,
   };
@@ -76,7 +78,7 @@ async function krSurgingChip(ga: string): Promise<CoverChip | null> {
     cap: "국장 급부상",
     name: top.name,
     val: top.isNew || !Number.isFinite(top.ratio) ? "첫 언급" : `언급 ${top.ratio >= 10 ? Math.round(top.ratio) : top.ratio.toFixed(1)}배`,
-    tone: "up",
+    tone: "flat",
     href: "/kadera#surging",
     ga,
   };

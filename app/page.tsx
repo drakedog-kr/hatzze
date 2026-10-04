@@ -125,7 +125,15 @@ export default async function Home() {
      첫 줄 띠(지수 종가 · 링크 칸 · 업데이트) → 둘째 줄 [햇쩨 지수 | 오늘의 브리핑] → 지표 모듈 둘(시장 · 감성).
      페이지 제목 · 구간 제목('01 시장 지표')은 걷고 모듈 머리 띠가 이름을 말한다. 카드 안의 부제 · 바닥 설명 문장은 v2.css .v2-bf 가 숨긴다.
      링크 칸은 홈 '오늘 눈에 띄는 것'의 재료다(급부상 1위 · 테마 유입 1위). ⛔ 밤사이 미장 칸은 안 쓴다 — 2026-10-03 "별로". */
-  const toLink = (c: SpotChip): CoverLink => ({ cap: c.cap, name: c.name, val: c.val.replace("▲", "+"), tone: "up", href: c.href, ga: c.ga });
+  // 언급 배수('언급 5.9배' · '첫 언급')엔 색을 싣지 않는다 — 빨강은 주가가 오른 말로 읽힌다(카더라 띠 · 표와 같은 규칙, 2026-10-05 점검).
+  const toLink = (c: SpotChip): CoverLink => ({
+    cap: c.cap,
+    name: c.name,
+    val: c.val.replace("▲", "+"),
+    tone: c.val.includes("언급") ? "flat" : "up",
+    href: c.href,
+    ga: c.ga,
+  });
   const coverLinks = [spotlight.timed.kadera, ...spotlight.fixed].filter((c): c is SpotChip => c !== null).map(toLink);
   const indexes = isLoadFailed(rawIndexes) ? null : rawIndexes;
   const nMarket = indicators.filter((i) => i.category === "시장").length;

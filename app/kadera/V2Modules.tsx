@@ -178,6 +178,13 @@ export function SentimentModule({
           <span className="v2-reason">{label}</span>
         </span>
         <Spark id="v2-mood-spark" values={vals} base={50} baseLabel="50%" w={300} h={64} tone={tone} dot tips={trend.map((p) => `${shortDate(p.date)} · 낙관 ${p.score}%`)} />
+        {/* 선의 양끝 날짜 — 큰 숫자(최근 N일)와 선(한 달)의 기간이 한눈에 갈리게. 축 글자다(2026-10-05 점검). */}
+        {trend.length >= 2 && (
+          <span className="v2-spark-axis" aria-hidden="true">
+            <span>{shortDate(trend[0].date)}</span>
+            <span>{shortDate(trend[trend.length - 1].date)}</span>
+          </span>
+        )}
         <span className="v2-card-foot">
           <span>
             {/* '30일 · 29일 최고'로 화면마다 날 수가 달랐다(미장 기록이 하루 짧다) — 한 달로 부른다(2026-10-04 점검). */}
@@ -240,14 +247,14 @@ export function ThemeShares({
     <Module
       id="themes"
       title="테마 점유율"
-      // 변화(+20.5%p)가 무엇과 견준 값인지 머리에 — 평소(5일 이상 전 평균, lib/telegram-data.ts THEME_PRIOR_GAP_DAYS)와의 차이다(2026-10-04 점검).
-      meta="최근 3일 · 평소 대비"
+      // 변화(+20.5%p)가 무엇과 견준 값인지는 표 머리 줄 '평소 대비'가 말한다 — 평소 = 5일 이상 전 평균(lib/telegram-data.ts THEME_PRIOR_GAP_DAYS).
+      meta="최근 3일"
       // 테마 전체 보기는 이 머리 오른쪽에 둔다(2026-10-03) — 첫 줄 띠 끝에 있을 땐 띠가 1,280 에서 두 줄로 접혔고, 목록을 보다 넘어가는 자리가 여기다.
       aside={
         hrefOf && (
+          // 화살표 아이콘은 달지 않는다 — 첫 줄 띠 링크 칸 둘의 › 와 한 화면에 셋이 섰다(2026-10-05 점검). 호버 바탕이 링크임을 말한다.
           <Link href={allHref} className="v2-more">
             전체 보기
-            <Icon name="chevron_right" />
           </Link>
         )
       }
@@ -256,6 +263,16 @@ export function ThemeShares({
         <p className="v2-empty">아직 집계된 테마가 없습니다.</p>
       ) : (
         <ol className="v2-tsh">
+          {/* 머리 줄 — 옆 · 아래 표와 같은 꼴(2026-10-05 점검). 막대 칸은 이름이 없다(점유율 숫자의 그림이다). */}
+          <li aria-hidden="true">
+            <span className="v2-tsh-row v2-tsh-th">
+              <span />
+              <span>테마</span>
+              <span />
+              <span>점유율</span>
+              <span>평소 대비</span>
+            </span>
+          </li>
           {rows.map((t, i) => {
             const d = t.shareDelta;
             const lead = t.stocks[0]?.name;
@@ -364,7 +381,6 @@ export function EventsModule({ events, today, failed, limit = 5 }: { events: Upc
 export function KeywordTable({ keywords, split = true }: { keywords: Pick<IssueKeyword, "rank" | "word" | "count" | "trend">[]; split?: boolean }) {
   const rows = keywords.slice(0, 10);
   const top = Math.max(1, ...rows.map((k) => k.count));
-  const total = rows.reduce((a, k) => a + k.count, 0) || 1;
   // 오른쪽 좁은 칸에 설 땐(split=false) 한 단 열 줄이다(page.tsx 셋째 줄).
   const half = split ? Math.ceil(rows.length / 2) : rows.length;
   const cols = [rows.slice(0, half), rows.slice(half)].filter((c) => c.length > 0);
@@ -396,7 +412,6 @@ export function KeywordTable({ keywords, split = true }: { keywords: Pick<IssueK
                       <span className="v2-kw-word">{k.word}</span>
                       <span className="v2-kw-bar" aria-hidden="true">
                         <i style={{ width: `${(k.count / top) * 100}%` }} />
-                        <em>{((k.count / total) * 100).toFixed(1)}%</em>
                       </span>
                       <span className="v2-kw-num">{k.count.toLocaleString("ko-KR")}회</span>
                       <span className={`v2-kw-num v2-kw-delta${dCls}`}>
@@ -447,8 +462,9 @@ export function CoverUsIndexCell({ label, spx }: { label: string; spx: number })
     <div className="v2-cover-cell v2-cover-idx">
       <span className="v2-cover-k">{label}</span>
       <span className="v2-cover-v">
-        <em>S&amp;P500</em>
-        <b className={`v2-cover-chg${spx > 0 ? " is-up" : spx < 0 ? " is-down" : ""}`}>{signPct(spx, 2)}</b>
+        {/* 국장 칸(코스피 · 코스닥)과 같은 꼴 — 이름이 13px 600, 등락이 12px 500. 뒤집혀 있어 '+0.73%'만 굵게 튀었다(2026-10-05 점검). */}
+        <b>S&amp;P500</b>
+        <span className={`v2-cover-chg${spx > 0 ? " is-up" : spx < 0 ? " is-down" : ""}`}>{signPct(spx, 2)}</span>
       </span>
     </div>
   );

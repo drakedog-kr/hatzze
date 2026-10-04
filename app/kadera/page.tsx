@@ -21,7 +21,6 @@ import { assertLoaded, isLoadFailed } from "@/lib/load-state";
 import { KADERA_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { highlightTerms, termsFor, ThemeVsUsualRows } from "./parts";
-import { fmtKoDate } from "@/lib/stock-page";
 import { THEME_NAMES, themeHref } from "@/lib/theme-href";
 import { THEMES } from "@/lib/stock-themes";
 import { THEME_PUBLIC } from "../screen-flags";
@@ -44,8 +43,6 @@ function firstSentence(t: string | null): string | null {
  * 움직인 종목의 시세 2차 조회가 화면에 설 줄을 알아야 해서 그쪽 상수를 그대로 쓴다(lib/kadera-why.ts BOARD_TILES 주석).
  */
 const MAX_ROWS = BOARD_TILES;
-/** 움직인 종목의 위 다섯 줄 — '오른 셋 + 내린 둘'로 짠다(아래 moveRows). */
-const FIRST_ROWS = 5;
 
 
 // 미리보기 이미지는 옆의 opengraph-image.tsx 가 그린다(ownImage). 자세한 건 app/seo.ts 주석 참고.
@@ -193,6 +190,7 @@ export default async function KaderaPage() {
 
   /* ⭐ 표 셋은 **열 줄씩 다 펼친다**(2026-10-03 "숫자가 딱 떨어지면" → "다섯은 너무 적다" → 쪽 넘김 · 표 안 스크롤은 "별로").
      급부상 여섯 · 움직인 아홉은 예전 카드 격자(3×2 · 3×3)를 채우던 수였다. */
+  const moveReason = new Map([...(why?.rows ?? []), ...(why?.down ?? [])].map((r) => [r.code, r.reason] as const));
   const surgeRows: BoardRow[] = surging.map((s) => ({
     code: s.code,
     name: s.name,
@@ -201,26 +199,22 @@ export default async function KaderaPage() {
     change: s.isLive ? s.changeRate : null,
     // '신규'는 신규 상장으로 읽혔다(그날 표엔 진짜 신규 상장 종목도 있었다). 뜻은 '평소 기간엔 언급이 없던 종목'(lib/surging-score.ts baseShare 0).
     // 첫 언급은 배수 대신 그 말을 숫자 칸에 — 꼬리표 '첫 언급'과 '3.4배'가 한 줄에 같이 서면 서로 반대말로 읽혔다(2026-10-04 점검).
-    cells: [s.isNew ? { v: "첫 언급", hot: true, k: "" } : { v: `${s.ratio.toFixed(1)}배`, hot: true }],
-    // 한 줄 요약이 없으면 같은 종목의 흐름 요약 첫 문장을 빌린다 — 두 표에 같이 선 종목이 한쪽만 '정리 중'이었다(2026-10-04 점검).
-    text: surgeLines[s.code] ?? firstSentence(narratives[s.code] ?? null),
+    // 빨강으로 칠하지 않는다 — 이 표는 정의상 모두 증가라 색이 정보를 안 싣고, 내린 종목 줄에 빨강이 서서 오른 종목처럼 보였다(2026-10-05 점검).
+    cells: [s.isNew ? { v: "첫 언급", k: "" } : { v: `${s.ratio.toFixed(1)}배` }],
+    // 한 줄 요약이 없으면 같은 종목의 흐름 요약 첫 문장을, 그것도 없으면 같은 화면 '크게 움직인 종목'의 이유를 빌린다 —
+    // 두 표에 같이 선 종목이 한쪽만 '정리 중'이었다(2026-10-04 · 10-05 점검). 이유는 명사 끝이라 '왜 뜨나' 칸과 말끝이 같다.
+    text: surgeLines[s.code] ?? firstSentence(narratives[s.code] ?? null) ?? moveReason.get(s.code) ?? null,
     pending: "정리 중",
   }));
 
-  /* 오른 것(큰 순) + 크게 내린 것(lib/kadera-why.ts DOWN_MIN, 하루 0~6줄). 부호 색이 둘을 가른다.
-     ⭐ 위 다섯 줄은 '오른 셋 + 내린 둘'이다 — 다섯 줄 판 그대로. 내린 까닭도 독자가 찾는 것이라(급락 이유) 위에 둔다.
-     움직인 폭 순으로 한 줄에 세우면 상한가가 많은 날 내린 줄이 표 밖으로 밀렸다(2026-10-03: 오른 18줄이 모두 14% 넘게 올라 -10.22% 가 19위).
-     그 아래는 남은 오른 것, 그다음 남은 내린 것. */
+  /* 크게 내린 것(큰 순, lib/kadera-why.ts DOWN_MIN · 하루 0~6줄) → 오른 것(큰 순). 부호는 한 번만 바뀐다.
+     ⭐ 내린 줄은 적어도 둘을 넣고 위에 둔다 — 내린 이유도 독자가 찾는 것이라서다(급락 이유). 움직인 폭 순으로 한 줄에 세우면
+     상한가가 많은 날 내린 줄이 표 밖으로 밀렸다(2026-10-03: 오른 18줄이 모두 14% 넘게 올라 -10.22% 가 19위).
+     예전엔 '오른 셋 + 내린 둘 + 남은 오른 것'이라 부호가 두 번 바뀌어 +29.80% 가 -8.32% 아래에 섰다(2026-10-05 점검). 줄에 드는 종목은 같다. */
   const ups = why?.rows ?? [];
   const downs = why?.down ?? [];
-  const downsFirst = Math.min(2, downs.length);
-  const moveRows: BoardRow[] = [
-    ...ups.slice(0, FIRST_ROWS - downsFirst),
-    ...downs.slice(0, downsFirst),
-    ...ups.slice(FIRST_ROWS - downsFirst),
-    ...downs.slice(downsFirst),
-  ]
-    .slice(0, MAX_ROWS)
+  const nDown = Math.min(downs.length, Math.max(2, MAX_ROWS - ups.length));
+  const moveRows: BoardRow[] = [...downs.slice(0, nDown), ...ups.slice(0, MAX_ROWS - nDown)]
     .map((r) => ({
       code: r.code,
       name: r.name,
@@ -269,7 +263,8 @@ export default async function KaderaPage() {
       id: "why",
       // '오늘'이라 적으면 안 된다 — 아침에 보면 어제 장 마감의 일이다. 날은 근거 자리에 적는다.
       title: "크게 움직인 종목",
-      meta: why ? `${fmtKoDate(why.date)} 장 마감` : undefined,
+      // 날짜 꼴은 표 머리('10/2 등락') · 첫 줄 띠와 같은 M/D — 한 모듈에 '10월 2일'과 '10/2'가 같이 섰다(2026-10-05 점검).
+      meta: whyDay ? `${whyDay} 장 마감` : undefined,
       kind: "move",
       heads: ["", "종목", whyDay ? `${whyDay} 등락` : "등락", "움직인 이유"],
       aiText: true,
@@ -338,7 +333,7 @@ export default async function KaderaPage() {
             })()}
           </div>
         </Module>
-        <EventsModule events={events} today={kaderaToday} failed={eventsFailed} limit={9} />
+        <EventsModule events={events} today={kaderaToday} failed={eventsFailed} limit={10} />
       </div>
 
       {/* 셋째 줄 — [급부상 | 테마 점유율] · [크게 움직인 | 이슈 키워드] · [많이 언급(판 폭 전체)]. 자리는 v2.css .v2-grid 의 영역 이름이 정한다.

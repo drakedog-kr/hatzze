@@ -224,6 +224,10 @@
 .v2-band .v2-events { flex: 1; }
 .v2-band .v2-events li { flex: 1; display: flex; }
 .v2-band .v2-ev-row { flex: 1; align-items: center; }
+/* 알약 폭 고정 — 56px 이면 '10/13(화)'(69px)에서 알약이 늘어나 일정 글 시작선이 세 단으로 갈렸다(2026-10-05 점검). */
+.v2-band .v2-daypill { min-width: 70px; }
+/* 일정은 열을 받아 1,000 이상(한 단)은 아홉, 두 단(680~999)은 5+5 로 채운다 — 아홉이면 두 단 오른쪽 아래가 비었다. */
+.v2-band .v2-events li:nth-child(10) { display: none; }
 
 /* ── 셋째 줄 — [급부상 | 테마 점유율] · [크게 움직인 | 이슈 키워드] · [많이 언급(판 폭 전체)] ──
    오늘의 요약은 2026-10-04 둘째 줄 가운데로 올렸다(테마 점유율과 자리 바꿈 — 요약이 더 쓸모 있다는 운영자 판단).
@@ -261,7 +265,7 @@
    대목은 날마다 셋 · 넷이라(넷째는 일정 재료가 있는 날만) 짧은 날 요약 아래가 비었다(미장 2026-10-03 101px).
    대목 사이 가는 선은 걷었다(2026-10-04 운영자 판단) — 대목 사이 여백만으로 갈린다.
    대목 안 글은 span 하나에 담는다 — p 를 flex 로 두면 굵힌 낱말이 따로 놀아 줄글이 깨진다. */
-.v2-band > #brief .v2-brief { flex: 1; display: flex; flex-direction: column; padding-top: 2px; padding-bottom: 4px; font-size: 13px; line-height: 1.85; }
+.v2-band > #brief .v2-brief { flex: 1; display: flex; flex-direction: column; padding: 2px 14px 4px; font-size: 13px; line-height: 1.85; }
 .v2-band > #brief .v2-brief p { flex: 1 0 auto; display: flex; align-items: center; margin: 0; padding: 8px 0; }
 /* 오른쪽 칸(400 · 340)의 이슈 키워드는 한 단 열 줄 — 막대 칸이 들어갈 폭이 없어 폰과 같은 꼴(순위 · 키워드 · 횟수 · 변화).
    한 줄기(1,000 미만)에선 판 폭 전체라 막대를 그대로 둔다. */
@@ -276,9 +280,10 @@
 .v2-brief p { margin: 0 0 10px; }
 .v2-brief p:last-child { margin-bottom: 0; }
 /* ⛔ 두 단으로 나누지 말 것 — 2026-10-02 에 해 봤더니 줄 폭이 반이 되어 줄 수가 두 배라 높이가 그대로였다(322 → 302). 읽기만 어려워진다. */
-/* 굵힌 낱말은 highlightTerms 가 인라인으로 800 · 옛 잉크를 박는다 — 700 · 토큰 잉크로 덮는다. */
-.v2-brief b { color: var(--t-ink) !important; font-weight: 600 !important; }
-.v2-brief .hz-kd-termlink { color: var(--t-ink); font-weight: 600; text-decoration-color: var(--t-ink3); }
+/* 굵힌 낱말은 highlightTerms 가 인라인으로 800 · 옛 잉크를 박는다 — 굵기는 본문과 같게, 한 단 진한 잉크로만 가른다.
+   문장 속 낱말을 600 으로 굵히면 '문장 속 강조는 굵게 하지 않는다'에 걸렸다(2026-10-05 점검). 용어 링크는 점선 밑줄이 더 말한다. */
+.v2-brief b { color: var(--t-ink) !important; font-weight: 500 !important; }
+.v2-brief .hz-kd-termlink { color: var(--t-ink); font-weight: 500; text-decoration-color: var(--t-ink3); }
 .v2-brief .hz-kd-termlink:hover { color: var(--t-down); text-decoration-color: var(--t-down); }
 
 /* ── 신호 표 ── 행마다 가는 선, 머리 줄은 옅은 면 */
@@ -315,7 +320,9 @@ a.v2-tr:hover { background: var(--t-tint); }
 .v2-td-stock { display: flex; align-items: center; gap: 8px; min-width: 0; }
 /* 긴 이름은 두 줄로 감는다 — 말줄임으로 자르면 'LIG디펜스앤에어로스페이스'가 'LIG디펜스앤에어…'로 남았다(2026-10-03, 스무 줄로 늘리자 처음 걸렸다). */
 /* 줄의 주인공(종목 이름)만 600 — 뿌리가 500 이라(2026-10-04) 따로 적는다. */
-.v2-td-name { min-width: 0; font-weight: 600; line-height: 18px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* 감기면 두 줄을 고르게(balance) — 글자 사이에서 끊을 수 있어야(word-break: normal) 고르게 나눈다. 바깥의 keep-all 을 물려받으면
+   '롯데에너지머티리얼' / '즈'처럼 끝 한 글자만 꺾였다(2026-10-05 점검, 폰). */
+.v2-td-name { min-width: 0; font-weight: 600; line-height: 18px; word-break: normal; overflow-wrap: anywhere; text-wrap: balance; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .v2-badge {
   flex-shrink: 0;
   height: 18px;
@@ -341,6 +348,7 @@ a.v2-tr:hover { background: var(--t-tint); }
   line-height: 18px;
   color: var(--t-ink2);
   word-break: keep-all;
+  text-wrap: pretty;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
@@ -406,31 +414,36 @@ a.v2-tr:hover { background: var(--t-tint); }
    막대 색은 MDD 업종 목록과 같은 옅은 파랑 — 오르내림이 아니라 '얼마나 몰렸나'라 빨강 · 파랑 뜻을 싣지 않는 한 색. */
 /* 열 줄이 한 격자를 나눠 쓴다(subgrid) — 이름 칸은 가장 긴 이름만큼(최소 92px) 넓어지고, 모자라면 감긴다. 줄마다 따로 92px 이던 때
    'AI 인프라·클라우드' 줄만 두 줄로 감겨 줄 높이가 어긋났다(2026-10-04 점검). 줄은 남는 키를 고르게 나눈다(1fr). */
+/* 줄 꼴은 옆 · 아래 표와 같다(머리 줄 30 옅은 면 · 줄 40 · 가는 선 · 안쪽 14). 머리 줄 없이 30px 줄이던 때 짝인 급부상 표와
+   줄이 9px 씩 엇갈렸고, 순위 칸이 실폭 8px 라 '10'이 넘치거나 폰에서 '1' / '0' 두 줄로 꺾였다(2026-10-05 점검).
+   첫 칸 34 · 끝 칸 66 은 줄 안쪽 14 를 품은 값이다(subgrid 줄의 안쪽 여백이 첫 · 끝 칸을 먹는다) — 실폭 20(순위) · 52('+12.3%p'). */
 .v2-tsh {
   flex: 1;
   display: grid;
-  grid-template-columns: 14px minmax(92px, max-content) minmax(0, 1fr) 46px 52px;
-  grid-auto-rows: minmax(30px, 1fr);
-  column-gap: 10px;
+  grid-template-columns: 34px minmax(92px, max-content) minmax(0, 1fr) 46px 66px;
+  grid-template-rows: 30px;
+  grid-auto-rows: minmax(40px, 1fr);
+  column-gap: 12px;
   margin: 0;
-  padding: 6px 8px 8px;
+  padding: 0;
   list-style: none;
 }
-.v2-tsh > li { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; }
+.v2-tsh > li { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; border-bottom: 1px solid var(--t-line); }
+.v2-tsh > li:last-child { border-bottom: 0; }
 .v2-tsh-row {
   grid-column: 1 / -1;
   display: grid;
   grid-template-columns: subgrid;
   align-items: center;
-  min-height: 30px;
-  padding: 0 6px;
-  border-radius: 4px;
+  padding: 0 14px;
   color: var(--t-ink);
   text-decoration: none;
   font-variant-numeric: tabular-nums;
 }
 a.v2-tsh-row:hover { background: var(--t-tint); }
-.v2-tsh-rank { font-size: 12px; font-weight: 500; color: var(--t-ink3); text-align: right; }
+.v2-tsh-th { background: var(--t-head); font-size: 12px; font-weight: 500; color: var(--t-ink3); white-space: nowrap; }
+.v2-tsh-th > :nth-child(n + 4) { text-align: right; }
+.v2-tsh-rank { color: var(--t-ink3); text-align: center; white-space: nowrap; }
 .v2-tsh-name { min-width: 0; font-size: 13px; font-weight: 600; line-height: 18px; word-break: keep-all; overflow-wrap: break-word; }
 .v2-tsh-bar { position: relative; height: 8px; border-radius: 4px; background: var(--t-bar-off); }
 .v2-tsh-bar > i { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 4px; background: color-mix(in srgb, var(--t-down) 45%, transparent); }
@@ -446,7 +459,10 @@ a.v2-tsh-row:hover { background: var(--t-tint); }
 .v2-spark svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .v2-spark-line { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
 .v2-spark-base { stroke: var(--t-base); stroke-width: 1; stroke-dasharray: 2 3; }
-.v2-spark-blabel { position: absolute; left: 0; transform: translateY(-100%); padding-bottom: 2px; font-size: var(--fs-11); line-height: 1; color: var(--t-ink3); font-variant-numeric: tabular-nums; pointer-events: none; }
+.v2-spark-blabel { position: absolute; z-index: 1; left: 0; transform: translateY(-100%); padding-bottom: 2px; font-size: var(--fs-11); line-height: 1; color: var(--t-ink3); font-variant-numeric: tabular-nums; pointer-events: none;
+  /* 선이 축 글자를 가로질러 글자가 묻혔다(2026-10-05 점검) — 글자 둘레만 카드색으로 띄운다(선은 그대로 보인다). */
+  text-shadow: 0 0 2px var(--t-card), 0 0 2px var(--t-card), 0 0 3px var(--t-card); }
+.v2-spark-axis { display: flex; justify-content: space-between; font-size: var(--fs-11); line-height: 14px; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
 .v2-spark-dot {
   position: absolute;
   right: -4px;
@@ -541,9 +557,9 @@ a.v2-ev-row:hover { background: var(--t-tint); }
 .v2-kw-rank { text-align: center; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
 .v2-kw-word { min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 언급량 — 막대(끝 = 1위) + 점유율. 막대 폭 %는 이 칸의 첫 단 폭 기준이다. */
-.v2-kw-bar { display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: center; column-gap: 8px; min-width: 0; }
+/* 막대만 — 옆 '%'는 무엇 중 몇 %인지 기준이 화면에 없었고 바로 옆 '102회'와 같은 크기를 두 번 말했다(2026-10-05 점검). */
+.v2-kw-bar { display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; min-width: 0; }
 .v2-kw-bar i { display: block; justify-self: start; height: 6px; border-radius: 3px; background: var(--t-heat); }
-.v2-kw-bar em { font-style: normal; font-size: 12px; font-weight: 500; color: var(--t-ink3); text-align: right; font-variant-numeric: tabular-nums; }
 .v2-kw-num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .v2-kw-delta { font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-kw-delta.is-up { color: var(--t-up); font-weight: 500; }
@@ -557,7 +573,7 @@ a.v2-ev-row:hover { background: var(--t-tint); }
 @container kd (max-width: 1099px) {
   .v2-band { grid-template-columns: calc(25% - 6px) minmax(0, 1fr) 340px; }
   /* 테마 칸이 395 로 좁아진다(1,280) — 테마 이름 칸을 줄인다. 긴 이름은 두 줄로 감긴다(잘리지 않는다). */
-  .v2-tsh { grid-template-columns: 14px minmax(84px, max-content) minmax(0, 1fr) 44px 50px; column-gap: 8px; }
+  .v2-tsh { grid-template-columns: 34px minmax(84px, max-content) minmax(0, 1fr) 44px 66px; column-gap: 10px; }
   .v2-grid { grid-template-columns: minmax(0, 1fr) 340px; }
   .v2-tr,
   .v2-tbl.is-talk .v2-tr { grid-template-columns: 20px 160px minmax(0, 1fr) 72px 64px; }
@@ -568,6 +584,7 @@ a.v2-ev-row:hover { background: var(--t-tint); }
   .v2-band > #events { grid-column: 1 / -1; }
   /* 일정은 판 폭 한 줄이라 두 단으로 — 한 단이면 줄마다 오른쪽 500~680px 가 비었다(2026-10-04 점검, 1,100). 위에서 아래로 채운다. */
   .v2-band > #events .v2-events { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: column; grid-template-rows: repeat(5, auto); column-gap: 12px; }
+  .v2-band .v2-events li:nth-child(10) { display: flex; }
   .v2-kw { grid-template-columns: minmax(0, 1fr); }
   .v2-kw-col + .v2-kw-col { border-left: 0; border-top: 1px solid var(--t-line); }
   .v2-kw-col + .v2-kw-col .v2-kw-th { display: none; }
@@ -593,6 +610,8 @@ a.v2-ev-row:hover { background: var(--t-tint); }
   .v2-cover > .v2-cover-cell:not(.v2-cover-meta):not(:has(> :nth-child(3))) { grid-template-columns: auto; }
   .v2-cover > .v2-cover-cell:not(.v2-cover-meta):has(> :nth-child(4)) { grid-template-columns: repeat(3, auto); }
   .v2-cover > .v2-cover-cell:not(.v2-cover-meta) > .v2-cover-k { grid-column: 1 / -1; line-height: 14px; }
+  /* 지수 칸에 둘(코스피 · 코스닥)이 서는 띠(국장 카더라)는 이 폭에서 업데이트가 둘째 줄로 내려간다 — 폰처럼 왼쪽에서 읽히게(2026-10-05 점검). */
+  .v2-cover:has(> .v2-cover-idx > .v2-cover-v + .v2-cover-v) > .v2-cover-meta { justify-content: flex-start; }
   /* 종목 · 사람 이름 칸은 한 줄 — 자식이 둘(로고 · h1)인 내부자 종목 상세는 한 열 격자가 돼 로고가 위 줄에 혼자 섰다(2026-10-04 점검). */
   .v2-cover > .v2-cover-cell.v2-sk-id { display: flex; align-items: center; column-gap: 8px; }
 }
@@ -625,6 +644,9 @@ a.v2-ev-row:hover { background: var(--t-tint); }
   /* 링크 칸 둘은 반 칸씩 — 머리말을 위 작은 줄로 올려 이름 · 값이 들어가게. */
   .v2-cover-go { flex: 1 1 40%; flex-wrap: wrap; row-gap: 2px; align-content: center; }
   .v2-cover-go > .v2-cover-k { flex: 1 1 100%; }
+  /* 지수 칸이 반 칸(미장 카더라 S&P500)이면 마지막 링크 칸이 혼자 한 줄을 받는다 — 머리말 · 값을 한 줄로 세워 칸 가운데가 비지 않게(2026-10-05 점검). */
+  .v2-cover-idx:not(:has(> .v2-cover-v + .v2-cover-v)) ~ a.v2-cover-go:last-of-type { flex-wrap: nowrap; column-gap: 10px; }
+  .v2-cover-idx:not(:has(> .v2-cover-v + .v2-cover-v)) ~ a.v2-cover-go:last-of-type > .v2-cover-k { flex: none; }
   .v2-th { display: none; }
   .v2-tr,
   .v2-tbl.is-move .v2-tr,

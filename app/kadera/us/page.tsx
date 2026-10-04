@@ -16,7 +16,6 @@ import { US_THEME_NAMES, usThemeHref } from "@/lib/theme-href";
 import { THEME_PUBLIC } from "../../screen-flags";
 import { US_THEME_PAGE } from "../../theme/copy";
 import { todayKst } from "@/lib/kadera-why";
-import { fmtKoDate } from "@/lib/stock-page";
 import { assertLoaded, isLoadFailed } from "@/lib/load-state";
 import { formatKstUpdate } from "@/lib/format";
 import { lastSession, liveChangeHead } from "@/lib/yahoo-quote";
@@ -66,8 +65,6 @@ const THEME_LINK_MAP = new Map(US_THEME_NAMES.map((t) => [t, usThemeHref(t)]));
  * 움직인 종목의 시세 2차 조회가 화면에 설 줄을 알아야 해서 그쪽 상수를 그대로 쓴다(lib/kadera-us-why.ts US_BOARD_TILES).
  */
 const MAX_ROWS = US_BOARD_TILES;
-/** 움직인 종목의 위 다섯 줄 — '오른 셋 + 내린 둘'(국장과 같은 짜임). */
-const FIRST_ROWS = 5;
 
 /** 배수 표기 — 10 이상은 정수(첫 줄 칩 · 검색 · 홈과 같은 표기). */
 const times = (m: number) => `${m >= 10 ? Math.round(m) : m.toFixed(1)}배`;
@@ -123,29 +120,25 @@ export default async function UsKaderaPage() {
   // 흐름 요약은 첫 문장만 줄에 싣는다. 급부상 줄도 한 줄 요약이 없으면 이 첫 문장을 빌린다.
   const narrativeLead = (t: string | null) => (t ? t.split(/(?<=[가-힣]\.)\s+/)[0] : null);
   const narrativeOf = new Map(reports.map((r) => [r.ticker, r.narrative] as const));
+  const moveReason = new Map([...(why?.rows ?? []), ...(why?.down ?? [])].map((r) => [r.ticker, r.reason] as const));
   const surgeRows: BoardRow[] = surging.map((s) => ({
     code: s.ticker,
     name: s.name,
     market: "US",
     change: s.changeRate,
     // 첫 언급은 배수 대신 그 말을 숫자 칸에(국장 page.tsx 와 같은 규칙, 2026-10-04 점검).
-    cells: [s.isNew ? { v: "첫 언급", hot: true, k: "" } : { v: times(s.multiple), hot: true }],
-    // 한 줄 요약이 없으면 같은 종목의 흐름 요약 첫 문장을 빌린다(국장 page.tsx 와 같은 규칙).
-    text: surgeLines[s.ticker] ?? narrativeLead(narrativeOf.get(s.ticker) ?? null),
+    // 빨강으로 칠하지 않는다(국장 page.tsx 와 같은 규칙, 2026-10-05 점검).
+    cells: [s.isNew ? { v: "첫 언급", k: "" } : { v: times(s.multiple) }],
+    // 한 줄 요약이 없으면 흐름 요약 첫 문장을, 그것도 없으면 '크게 움직인 종목'의 이유를 빌린다(국장 page.tsx 와 같은 규칙).
+    text: surgeLines[s.ticker] ?? narrativeLead(narrativeOf.get(s.ticker) ?? null) ?? moveReason.get(s.ticker) ?? null,
     pending: "정리 중",
   }));
 
-  /* 오른 것(큰 순) + 크게 내린 것(lib/kadera-us-why.ts DOWN_MIN). 위 다섯 줄은 '오른 셋 + 내린 둘'(국장 주석). */
+  /* 크게 내린 것(큰 순, lib/kadera-us-why.ts DOWN_MIN) → 오른 것(큰 순). 내린 줄은 적어도 둘 · 부호는 한 번만 바뀐다(국장 주석). */
   const ups = why?.rows ?? [];
   const downs = why?.down ?? [];
-  const downsFirst = Math.min(2, downs.length);
-  const moveRows: BoardRow[] = [
-    ...ups.slice(0, FIRST_ROWS - downsFirst),
-    ...downs.slice(0, downsFirst),
-    ...ups.slice(FIRST_ROWS - downsFirst),
-    ...downs.slice(downsFirst),
-  ]
-    .slice(0, MAX_ROWS)
+  const nDown = Math.min(downs.length, Math.max(2, MAX_ROWS - ups.length));
+  const moveRows: BoardRow[] = [...downs.slice(0, nDown), ...ups.slice(0, MAX_ROWS - nDown)]
     .map((r) => ({ code: r.ticker, name: r.name, market: "US", change: r.changeRate, cells: [], text: r.reason }));
 
   /* 언급 수 순(getUsStockReports 가 이미 그 순서다). 흐름 요약은 첫 문장만 줄에 싣고 전문은 줄 title 로. */
@@ -179,7 +172,8 @@ export default async function UsKaderaPage() {
     {
       id: "why",
       title: "크게 움직인 종목",
-      meta: session ? `${fmtKoDate(session)} 미국장 마감` : undefined,
+      // 날짜 꼴은 표 머리 · 첫 줄 띠와 같은 M/D(국장 page.tsx 와 같은 규칙).
+      meta: sessionDay ? `${sessionDay} 미국장 마감` : undefined,
       kind: "move",
       heads: ["", "종목", sessionDay ? `${sessionDay} 등락` : "등락", "움직인 이유"],
       aiText: true,
@@ -244,7 +238,7 @@ export default async function UsKaderaPage() {
             )}
           </div>
         </Module>
-        <EventsModule events={events} today={usToday} failed={eventsFailed} limit={9} />
+        <EventsModule events={events} today={usToday} failed={eventsFailed} limit={10} />
       </div>
 
       {/* 셋째 줄 — [급부상 | 테마 점유율] · [크게 움직인 | 이슈 키워드] · [많이 언급(판 폭 전체)]. 자리는 v2.css .v2-grid 의 영역 이름이 정한다. */}
