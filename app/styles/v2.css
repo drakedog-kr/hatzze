@@ -75,7 +75,9 @@
    자리표시자와 쪽지 몸은 손가락을 통과시키고(가려진 줄이 그대로 눌린다) 오른쪽 ✕ 만 되받는다. 바탕은 잉크(89%)를 카드색 위에 겹쳐 불투명하게 — 비치면 아래 줄 글자가 섞였다.
    모듈의 overflow:hidden 안이라 판 밖으로는 안 나간다(폭 상한 · 판 폭 − 28). */
 .v2-has-hint { position: relative; }
-.v2-hint-slot { position: absolute; z-index: 4; pointer-events: none; max-width: calc(100% - 28px); }
+/* 층은 본문 안 맨 앞(50) — 시장 브리핑 구간 목록(.hz-dist-pop 40) · 말풍선(.hz-tip::after 30) 뒤에 깔려 쪽지가 팝오버에 가렸다(2026-10-05 지적).
+   본문 묶음(.v2-kd 의 container-type 이 쌓임 맥락을 만든다) 안의 값이라 사이드바 · 메뉴 위로는 안 올라간다. */
+.v2-hint-slot { position: absolute; z-index: 50; pointer-events: none; max-width: calc(100% - 28px); }
 .v2-hint-slot[hidden] { display: none; }
 .v2-hint {
   position: relative;
