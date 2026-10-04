@@ -250,7 +250,8 @@ export function Controls({
               setFocused(true);
             }}
             onBlur={() => setFocused(false)}
-            placeholder={`${selected.name} · 다른 종목 검색`}
+            // 이름을 모르는 코드(없는 종목)면 코드가 이름처럼 박혔다('999999 · 다른 종목 검색', 2026-10-05 점검).
+            placeholder={selected.name === selected.code ? "종목 이름 · 코드 검색" : `${selected.name} · 다른 종목 검색`}
             className="mdd-search-input"
             style={{ flex: 1, alignSelf: "stretch", border: "none", outline: "none", background: "transparent", color: C.ink, minWidth: 0 }}
           />
@@ -396,14 +397,14 @@ export function Results({ data, onPick }: { data: MddResult; onPick: (s: StockOp
         {a.recovery ? (
           <RecoveryModule a={a} />
         ) : a.lastDrop ? (
-          <LastDropModule d={a.lastDrop} />
+          <LastDropModule d={a.lastDrop} asOf={a.asOf} />
         ) : (
           <AbsentSheet title="회복까지" body="지금은 고점 부근이라 회복을 기다릴 하락이 없습니다." />
         )}
 
         {/* 해마다 | 시장 탓 — 위 줄(사례 2 : 회복 1)과 한 격자에 둬 칸 경계도 높이도 같다(2026-10-03 "위와 같은 크기로"). */}
         {data.risk ? (
-          <YearsModule r={data.risk} periodLabel={periodLabel} asOf={a.asOf} />
+          <YearsModule r={data.risk} periodLabel={periodLabel} asOf={a.asOf} firstDate={a.firstDate} />
         ) : (
           <AbsentSheet title="해마다" body="상장한 지 얼마 되지 않아 연도별 성적을 낼 만큼 이력이 쌓이지 않았습니다." className="v2-md-years" />
         )}

@@ -13,7 +13,7 @@ import { StockLogo } from "../StockLogo";
 import {
   fmtPct,
   fmtPrice,
-  fmtDayCount,
+  fmtDur,
   fmtDay,
   fmtYm,
   fmtDot,
@@ -84,7 +84,8 @@ export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel:
       <Module title="지금 낙폭" meta={caution ? `${periodLabel} · ${caution}` : periodLabel} className="v2-md-dd">
         <div className="v2-md-body">
           <span className="v2-card-val is-big">
-            <b className={atHigh ? undefined : "is-down"}>{atHigh ? "신고가 부근" : fmtPct(a.currentDd)}</b>
+            {/* 오늘 종가가 기간 최고가면 '신고가' — '부근'은 −1% 안쪽일 때만(2026-10-05 점검, 심텍). */}
+            <b className={atHigh ? undefined : "is-down"}>{atHigh ? (a.currentDd === 0 ? "신고가" : "신고가 부근") : fmtPct(a.currentDd)}</b>
             {!atHigh && <span className="v2-md-aside">전고점 대비</span>}
           </span>
           {/* 신고가 부근에도 게이지를 둔다 — 핀이 0% 에 서고 '최대' 눈금이 이 기간 가장 깊었던 자리를 말한다. 빼면 칸 가운데가 비었다. */}
@@ -107,7 +108,8 @@ export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel:
               </>
             ) : (
               <>
-                <StatCell label="고점 이후" value={fmtDayCount(sincePeak)} />
+                {/* 사람 단위(5.3년) — '1,927일'은 큰 날수라 안 읽혔고 표의 '3.4년'과 꼴이 갈렸다(2026-10-05 점검). */}
+                <StatCell label="고점 이후" value={fmtDur(sincePeak)} />
                 <StatCell label="저점 대비" value={fmtPct(fromLow)} tone={Math.abs(fromLow) < 0.05 ? undefined : fromLow > 0 ? UP : DOWN} />
               </>
             )}
@@ -405,11 +407,25 @@ export function Underwater({
     yearStep = s;
     if (yearMarks.filter((t) => t.year % s === 0).length <= maxLabels) break;
   }
-  const ticks = yearMarks.filter((t) => t.year % yearStep === 0);
-  // 그리드 라인(0/절반/바닥) 라벨.
-  const rows = [0, floor / 2, floor];
-  // 격자는 넷으로 나눈 다섯 줄(shadcn 차트처럼 옅게 촘촘히), 라벨은 위 셋에만.
-  const gridRows = [0, floor / 4, floor / 2, (floor * 3) / 4, floor];
+  // 2년이 안 되면(1년 조회) 해 경계가 하나뿐이라 '2026' 하나만 섰다(2026-10-05 점검) — 두 달 간격 달 눈금으로(1월은 해).
+  const spanDays = n > 1 ? (Date.parse(series[n - 1].date) - Date.parse(series[0].date)) / 86_400_000 : 0;
+  const ticks: { x: number; key: string; label: string }[] = [];
+  if (spanDays < 730) {
+    for (let i = 1; i < n; i++) {
+      const m = Number(series[i].date.slice(5, 7));
+      if (series[i - 1].date.slice(0, 7) === series[i].date.slice(0, 7) || m % 2 === 0) continue;
+      ticks.push({ x: x(i), key: series[i].date.slice(0, 7), label: m === 1 ? series[i].date.slice(0, 4) : `${m}월` });
+    }
+  } else {
+    for (const t of yearMarks) if (t.year % yearStep === 0) ticks.push({ x: t.x, key: String(t.year), label: String(t.year) });
+  }
+  // 세로축 눈금은 떨어지는 값으로 — 바닥의 절반을 찍으면 '−23% · −45%'처럼 어정쩡했고, −23% 줄이 '지금 −23.9%'의 눈금처럼 읽혔다(2026-10-05 점검).
+  // 간격은 바닥까지 눈금이 둘 이하인 가장 작은 값(45 → 20: 0 · −20 · −40, 66 → 25, 81 → 40). 폰의 낮은 그림에서 글자가 닿지 않게 셋까지.
+  const absFloor = Math.abs(floor);
+  const step = [1, 2, 5, 10, 20, 25, 40, 50].find((s) => Math.floor(absFloor / s) <= 2) ?? 50;
+  const rows = [0, -step, -2 * step].filter((v) => v >= floor);
+  // 격자는 눈금 줄 + 바닥선(글자 없음).
+  const gridRows = rows.includes(floor) ? rows : [...rows, floor];
   // 사례 표에서 고른 구간 — 솎아 낸 점(250개 남짓)이라 날짜로 가장 가까운 점을 찾는다.
   let band: { x0: number; x1: number } | null = null;
   if (focus && n > 1) {
@@ -497,6 +513,10 @@ export function Underwater({
       <svg
       viewBox={`0 ${-VB_PAD} ${W} ${VBH}`}
       width="100%"
+      // 폰에선 그림 키를 늘린다(v2.css .mdd-uw-body .mdd-uw-svg) — 너비에 맞춰 72px 로 눌려 표식이 서로 · 확대 단추와 겹쳤다(2026-10-05 점검).
+      // 선은 non-scaling-stroke, 표식 · 십자선 · 축 글자는 % 자리라 함께 따라간다.
+      preserveAspectRatio="none"
+      className="mdd-uw-svg"
       style={{ overflow: "visible" }}
       role="img"
       aria-label={`고점 대비 낙폭 곡선. 현재 ${fmtPct(series[n - 1].dd)}, 기간 최저 ${fmtPct(mdd)}`}
@@ -579,8 +599,8 @@ export function Underwater({
       <div className="hz-chart-x" aria-hidden>
         {ticks.map((t, i) => (
           // 둘째마다 표시 — 좁은 폭에선 CSS 가 이것들을 숨겨 연도가 겹치지 않는다.
-          <span key={t.year} data-minor={i % 2 === 1 ? "" : undefined} style={{ left: `${(t.x / W) * 100}%` }}>
-            {t.year}
+          <span key={t.key} data-minor={i % 2 === 1 ? "" : undefined} style={{ left: `${(t.x / W) * 100}%` }}>
+            {t.label}
           </span>
         ))}
       </div>
@@ -614,7 +634,7 @@ export function Underwater({
         }
       />
       {/* 본문 여백은 다른 v2 칸과 같은 12 · 14(옛 시트 20 · 22 였다). */}
-      <div style={{ padding: "12px 14px 14px", position: "relative" }}>
+      <div className="mdd-uw-body" style={{ padding: "12px 14px 14px", position: "relative" }}>
       {/* overflow:visible — 최저점 표시가 하필 마지막 지점일 때(지금이 역대 최저인
           종목) 뷰박스 오른쪽 끝에 놓여 기본값(hidden)이면 반지름만큼 잘린다. 뷰박스를
           넓히는 대신 넘침만 허용한다 — 넓히면 아래 크로스헤어 띠(퍼센트로 잡은 위치)가

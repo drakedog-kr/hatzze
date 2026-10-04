@@ -12,7 +12,7 @@ import { CHARACTER_SPLIT_DAYS } from "@/lib/mdd";
 import type { MddAnalysis, RiskProfile as RiskProfileData } from "@/lib/mdd";
 
 import { CoverLinkCell, CoverMeta, Module, type CoverLink } from "../kadera/V2Modules";
-import { benchName, fmtCloseDay, fmtDay, fmtDayCount, fmtDur, fmtPct, fmtPrice, fmtYm, mddSummary, similarDrop } from "./shared";
+import { benchName, fmtCloseDay, fmtDay, fmtDur, fmtPct, fmtPrice, fmtYm, mddSummary, similarDrop } from "./shared";
 import type { PriceLadder } from "@/lib/mdd";
 import type { AttributionData, MddResult, StockOption, ThemeCmp } from "./shared";
 
@@ -41,8 +41,12 @@ export function MddCover({ data, periodLabel }: { data: MddResult; periodLabel: 
     },
   ];
   if (data.theme?.href) links.push({ cap: "테마 리포트", name: data.theme.name, href: data.theme.href, ga: "mdd_cover_theme" });
+  // 지수 칸은 '시장 탓 · 종목 탓' 칸이 없는 종목(신고가 부근 — 그 자리엔 '시장 대비 최근 1년')에만 — 그 칸이 서면 같은 화면에 코스피 낙폭이
+  // 기준이 다른 세 숫자(띠 −23.2% · 시장 탓 −22.7% · 사례 표 −38.3%)로 섰다(2026-10-05 점검).
+  const showIdx = !data.attribution;
   return (
     <div className="v2-cover">
+      {showIdx && (
       <div className="v2-cover-cell v2-cover-idx">
         <span className="v2-cover-k">{periodLabel} 고점 대비</span>
         <span className="v2-cover-v">
@@ -57,11 +61,13 @@ export function MddCover({ data, periodLabel }: { data: MddResult; periodLabel: 
           )}
         </span>
       </div>
+      )}
       {links.map((c) => (
         <CoverLinkCell key={c.ga} c={c} />
       ))}
       {/* 한 줄로(2026-10-03) — 카더라는 칩 둘과 함께라 두 줄로 쌓지만, 여기는 칸이 적어 한 줄에 든다. */}
-      <CoverMeta updated={`${fmtCloseDay(a.asOf)} 종가 기준 · 거래일 ${a.tradingDays.toLocaleString("ko-KR")}일`} />
+      {/* 'N거래일' — 지금 낙폭 칸 '이보다 깊었던 날 682거래일'과 같은 꼴(2026-10-05 점검). */}
+      <CoverMeta updated={`${fmtCloseDay(a.asOf)} 종가 기준 · ${a.tradingDays.toLocaleString("ko-KR")}거래일`} />
     </div>
   );
 }
@@ -123,8 +129,15 @@ export function ThemeModule({ theme, onPick }: { theme: ThemeCmp; onPick: (s: St
     // 위 '시장 탓' 칸의 업종 평균과 숫자가 다른 까닭(그쪽은 이 종목 고점 이후 같은 기간)은 그 칸 머리가 말한다.
     <Module
       title={`${theme.name} 대표 ${theme.peers.length}종목 안에서`}
-      // '평균 고점 대비' — 옆 '시장 탓' 칸의 대표 종목 값(같은 기간 등락)과 다른 평균이라 무엇의 평균인지 적는다(2026-10-04 점검).
-      meta={`${rank ? `깊게 빠진 순 ${rank}위 · ` : ""}평균 고점 대비 ${fmtPct(theme.avgDd)}`}
+      // 짧게 — 폰(머리 175px)에서 '깊게 빠진 순 8위 · 평균 고점 대비 −26.2%'가 말줄임으로 잘려 평균값이 사라졌다(2026-10-05 점검).
+      // '깊게 빠진 순'은 깊은 순으로 늘어선 막대가 말한다. '평균' 앞 점선 표식이 그림 속 세로 점선의 이름이다.
+      meta={
+        <>
+          {rank ? `${rank}위 · ` : ""}
+          <i className="v2-dd-avg-key" aria-hidden="true" />
+          평균 {fmtPct(theme.avgDd)}
+        </>
+      }
       className="v2-md-theme"
     >
       <DdList
@@ -341,7 +354,8 @@ export function CasesTable({
                 {fmtDur(e.troughDays)}
               </span>
               {/* 진행 중이면 저점 이후 며칠째인지 — '진행 중'은 구간 칸이 이미 말한다. */}
-              <span className="is-num" data-k="되찾은">
+              {/* 폰 칸 이름은 '회복' — '되찾은 2개월째'가 71px 칸에서 두 줄로 꺾였다(2026-10-05 점검). */}
+              <span className="is-num" data-k="회복">
                 {/* 진행 중도 같은 단위(1.2년 · 2개월)로 — 날수('687일째')면 같은 칸의 다른 줄과 단위가 달랐다. */}
                 {e.recovered ? fmtDur(e.days - e.troughDays) : <em>{fmtDur(e.days - e.troughDays)}째</em>}
               </span>
@@ -366,7 +380,8 @@ export function RecoveryModule({ a }: { a: MddAnalysis }) {
   // 문턱은 지금 낙폭 그대로(소수 한 자리) — 반올림하면(23.9 → 24) 센 하락과 글자가 조금 어긋난다.
   const depth = `${Math.abs(a.currentDd).toFixed(1)}% 넘게`;
   const ch = a.character;
-  const sincePeak = Math.round((Date.parse(a.asOf) - Date.parse(a.athDate)) / 86_400_000);
+  // 저점 이후 — 위 '보통 ○년'과 같은 기준(저점에서 되찾기까지, lib/mdd.ts recoveryStats). 고점 이후 날수와 견주면 기준이 달랐다(2026-10-05 점검).
+  const sinceLow = Math.round((Date.parse(a.asOf) - Date.parse(a.lowDate)) / 86_400_000);
   const hasRange = r.recoveredCount >= 2 && r.minDays !== null && r.maxDays !== null && r.maxDays > r.minDays;
   const kinds = ch
     ? ([
@@ -390,8 +405,8 @@ export function RecoveryModule({ a }: { a: MddAnalysis }) {
             </>
           ) : (
             <>
-              <b className="is-down">{fmtDayCount(sincePeak)}째</b>
-              <span className="v2-reason">고점 이후</span>
+              <b className="is-down">{fmtDur(sinceLow)}째</b>
+              <span className="v2-reason">저점 이후</span>
             </>
           )}
         </span>
@@ -412,9 +427,7 @@ export function RecoveryModule({ a }: { a: MddAnalysis }) {
         )}
         {kinds.some(([, , k]) => k) && (
           <div className="v2-md-kinds">
-            {/* 머리 줄 — 아래 두 줄이 센 하락. 위 '이만큼 빠졌던 n번'(지금만큼 깊었던 것)과 모집단이 달라(15% 넘게 빠졌다 되찾은 것 전부)
-                3번 + 2번이 4번과 안 맞아 보였다(2026-10-03). */}
-            <span className="v2-md-kinds-cap">15% 넘게 빠졌다 되찾은 {kinds.reduce((s, [, , k]) => s + (k?.count ?? 0), 0)}번</span>
+            {/* 머리 줄은 걷었다 — 아래 두 줄도 위 머리('이만큼 빠졌던 n번 중 m번 되찾음')와 같은 하락을 센다(lib/mdd.ts drawdownCharacter, 2026-10-05). */}
             {kinds.map(([key, label, k]) => (
               <div key={key} className={`v2-md-kind${ch!.currentClass === key ? " is-now" : ""}`}>
                 <span className="v2-md-kind-name">
@@ -479,7 +492,8 @@ export function AttributionModule({
   const bench = benchName(market);
   // 받침에 따라 와 · 과(요약 줄 mddSummary 의 은 · 는과 같은 셈 — S&P500 은 '오백', 코스닥은 받침이 있다).
   const wa = market === "US" || market === "KOSDAQ" ? "과" : "와";
-  const themeLabel = `${themeName ?? "업종"} 대표 종목`;
+  // '○○ 평균' — '인터넷·플랫폼 대표 종목'은 96px 이름 칸에서 모든 폭 두 줄이었다(2026-10-05 점검).
+  const themeLabel = `${themeName ?? "업종"} 평균`;
   const rows: { key: string; label: string; v: number; self?: boolean }[] = [];
   if (attr.market !== null) rows.push({ key: "market", label: bench, v: attr.market });
   if (attr.theme !== null) rows.push({ key: "theme", label: themeLabel, v: attr.theme });
@@ -499,32 +513,43 @@ export function AttributionModule({
         : s0 > m
           ? { word: "덜 빠짐", big: s0 - m, note: `${bench}보다 덜 빠짐` }
           : t !== null && (similarDrop(s0, t) || s0 > t)
-            ? { word: "업종 탓", big: s0 - m, note: `${bench}보다 더 · ${themeLabel}과 비슷하게 빠짐` }
-            : { word: "종목 탓", big: s0 - m, note: t !== null ? `${bench} · ${themeLabel}보다 더 빠짐` : `${bench}보다 더 빠짐` };
+            ? { word: "업종 탓", big: s0 - m, note: `${bench}보다 더 · 업종과 비슷하게 빠짐` }
+            : { word: "종목 탓", big: s0 - m, note: t !== null ? `${bench} · 업종보다 더 빠짐` : `${bench}보다 더 빠짐` };
+  // 부호가 섞이면(시장은 오르고 종목은 빠짐) 막대를 가운데 0 선에서 좌우로 — 같은 방향으로 뻗으면 방향을 색으로만 갈랐다(2026-10-05 점검).
+  const mixed = rows.some((r) => r.v > 0) && rows.some((r) => r.v < 0);
   return (
     <Module title="시장 탓 · 종목 탓" meta={`${since} 고점 이후`} className="v2-md-attr">
       <div className="v2-md-body">
         {verdict && s0 !== 0 && (
           <span className="v2-card-val is-big">
-            {/* 시장과 비슷하면 큰 숫자는 시장의 낙폭, 아니면 시장과의 차이(%p). */}
-            <b>{verdict.word === "시장 탓" ? fmtPct(verdict.big) : `${Math.abs(verdict.big).toFixed(1)}%p`}</b>
+            {/* 큰 숫자는 늘 시장(지수)과의 차이(%p) — '시장 탓'일 때만 시장의 낙폭을 적으면 종목 칸 안이라 이 종목 낙폭으로 읽혔다(2026-10-05 점검). */}
+            <b>{`${Math.abs(s0 - m!).toFixed(1)}%p`}</b>
             <span className="v2-reason">{verdict.word}</span>
             <span className="v2-md-aside">{verdict.note}</span>
           </span>
         )}
-        <ol className="v2-md-attr-rows">
-          {rows.map((r) => (
-            <li key={r.key} className={r.self ? "is-self" : undefined}>
-              <span className="v2-md-attr-name">{r.label}</span>
-              <span className="v2-dd-bar">
-                <i className={r.v >= 0 ? "is-up" : undefined} style={{ ["--w" as string]: `${Math.max(1.5, (Math.abs(r.v) / worst) * 100)}%` }} />
-              </span>
-              <span className={`v2-md-attr-val${r.v > 0 ? " is-up" : ""}`}>{fmtPct(r.v)}</span>
-            </li>
-          ))}
-        </ol>
+        <AttrRows rows={rows} worst={worst} mixed={mixed} />
       </div>
     </Module>
+  );
+}
+
+/**
+ * 이름 · 막대 · 값 줄들(시장 탓 · 시장 대비 칸). 부호가 섞이면(mixed) 막대는 가운데 0 선에서 좌우로 뻗는다 — 길이는 같은 잣대(worst)의 반폭.
+ */
+function AttrRows({ rows, worst, mixed }: { rows: { key: string; label: string; v: number; self?: boolean }[]; worst: number; mixed: boolean }) {
+  return (
+    <ol className={`v2-md-attr-rows${mixed ? " is-mixed" : ""}`}>
+      {rows.map((r) => (
+        <li key={r.key} className={r.self ? "is-self" : undefined}>
+          <span className="v2-md-attr-name">{r.label}</span>
+          <span className="v2-dd-bar">
+            <i className={r.v >= 0 ? "is-up" : undefined} style={{ ["--w" as string]: `${Math.max(1.5, (Math.abs(r.v) / worst) * 100)}%` }} />
+          </span>
+          <span className={`v2-md-attr-val${r.v > 0 ? " is-up" : ""}`}>{fmtPct(r.v)}</span>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -535,7 +560,7 @@ const daysOf = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(
  * 직전 큰 하락 — 고점 부근이라 '회복까지'를 잴 하락이 없을 때 그 자리에 선다. 마지막으로 크게 빠졌다 되찾은 일(lib/mdd.ts lastDrop)의
  * 깊이 · 빠진 기간 · 되찾기까지. 한 줄 문장만 든 빈 판이던 자리다(2026-10-04 점검, 엔비디아).
  */
-export function LastDropModule({ d }: { d: NonNullable<MddAnalysis["lastDrop"]> }) {
+export function LastDropModule({ d, asOf }: { d: NonNullable<MddAnalysis["lastDrop"]>; asOf: string }) {
   const fall = daysOf(d.peakDate, d.troughDate);
   const back = daysOf(d.troughDate, d.recoveryDate);
   return (
@@ -544,7 +569,6 @@ export function LastDropModule({ d }: { d: NonNullable<MddAnalysis["lastDrop"]> 
         <span className="v2-card-val is-big">
           <b className="is-down">{fmtPct(d.depth)}</b>
           <span className="v2-reason">고점 대비</span>
-          <span className="v2-md-aside">되찾기까지 {fmtDur(back)}</span>
         </span>
         <dl className="v2-md-kv">
           <div>
@@ -557,7 +581,8 @@ export function LastDropModule({ d }: { d: NonNullable<MddAnalysis["lastDrop"]> 
           </div>
           <div>
             <dt>고점을 되찾은 날</dt>
-            <dd>{d.recoveryDate.replaceAll("-", ".")}</dd>
+            {/* 지금 낙폭 칸 '되찾은 날'과 같은 꼴('10월 1일') — '2026.10.01'로 두 꼴이 섰다(2026-10-05 점검). */}
+            <dd>{fmtDay(d.recoveryDate, asOf)}</dd>
           </div>
         </dl>
       </div>
@@ -582,17 +607,7 @@ export function YearVsMarketModule({ c, stockName, market }: { c: { stock: numbe
           <span className="v2-reason">{gap >= 0 ? "더 오름" : "덜 오름"}</span>
           <span className="v2-md-aside">{bench}보다</span>
         </span>
-        <ol className="v2-md-attr-rows">
-          {rows.map((r) => (
-            <li key={r.key} className={r.self ? "is-self" : undefined}>
-              <span className="v2-md-attr-name">{r.label}</span>
-              <span className="v2-dd-bar">
-                <i className={r.v >= 0 ? "is-up" : undefined} style={{ ["--w" as string]: `${Math.max(1.5, (Math.abs(r.v) / worst) * 100)}%` }} />
-              </span>
-              <span className={`v2-md-attr-val${r.v > 0 ? " is-up" : ""}`}>{fmtPct(r.v)}</span>
-            </li>
-          ))}
-        </ol>
+        <AttrRows rows={rows} worst={worst} mixed={rows.some((r) => r.v > 0) && rows.some((r) => r.v < 0)} />
       </div>
     </Module>
   );
@@ -608,7 +623,19 @@ export function YearVsMarketModule({ c, stockName, market }: { c: { stock: numbe
  * 평균은 머리 줄에 있다. 차트는 남는 높이를 받는다(옆 '시장 탓' 칸과 키를 맞춘다).
  * 해가 많으면(전체 조회 27년 등) 막대 끝 숫자가 서로 닿아 숨기고(툴팁에 있다) 연도는 하나 걸러 적는다.
  */
-export function YearsModule({ r, periodLabel, asOf }: { r: RiskProfileData; periodLabel: string; /** 마지막 거래일 — 그해 막대는 덜 찬 해라 옅게 · '올해'로. */ asOf: string }) {
+export function YearsModule({
+  r,
+  periodLabel,
+  asOf,
+  firstDate,
+}: {
+  r: RiskProfileData;
+  periodLabel: string;
+  /** 마지막 거래일 — 그해 막대는 덜 찬 해라 옅게 · '올해'로. */
+  asOf: string;
+  /** 자료 첫날 — 1년 조회의 첫 해(작년 끝 몇 달)도 덜 찬 해다. */
+  firstDate: string;
+}) {
   // 2년이 안 되는 조회는 걸친 해를 다 그린다(1년 조회면 작년 끝 몇 달 + 올해) — 하나만 그리면 머리의 1년 수익과 막대가 안 맞았다(2026-10-04 점검).
   const short = r.years < 2;
   const yrs = short ? r.yearly.length : Math.max(1, Math.round(r.years));
@@ -618,6 +645,18 @@ export function YearsModule({ r, periodLabel, asOf }: { r: RiskProfileData; peri
   const maxDown = Math.max(0, ...years.map((y) => -y.ret));
   const span = Math.max(1, maxUp + maxDown);
   const dense = years.length > 14;
+  // 막대가 적으면(3 · 5년 조회) 24px 막대 사이가 200px 넘게 비었다 — 막대를 넓힌다(2026-10-05 점검).
+  const few = years.length <= 6;
+  // 막대가 많으면 끝 숫자를 숨기되 가장 높은 해 · 가장 낮은 해 · 올해는 남긴다 — 다 숨기면 축도 숫자도 없는 그림이었다(2026-10-05 점검).
+  const keepYears = new Set<number>();
+  if (dense && years.length) {
+    keepYears.add(years.reduce((b, y) => (y.ret > b.ret ? y : b)).year);
+    keepYears.add(years.reduce((b, y) => (y.ret < b.ret ? y : b)).year);
+    keepYears.add(Number(asOf.slice(0, 4)));
+  }
+  // 자료가 그 해 1월 초부터가 아니면 첫 해도 덜 찬 해다(1년 조회의 '2025' = 10~12월 석 달, 2026-10-05 점검).
+  const firstYear = Number(firstDate.slice(0, 4));
+  const firstPart = firstDate.slice(5) > "01-10";
   // 폰(10년이면 칸 32px)에선 세 자리 수익("+214%", 11px 37px)이 이웃 숫자와 닿았다(알테오젠 · 테슬라 실측) — 세 자리만 폰에서 한 단
   // 작게(.is-wide) 써서 숫자가 제 칸 폭 안에 들게 한다. 이웃 숫자를 위로 띄우는 길은 짧은 막대 쪽을 띄우면 오히려 붙었다.
   const wide = (v: number) => Math.round(Math.abs(v)) >= 100;
@@ -642,7 +681,7 @@ export function YearsModule({ r, periodLabel, asOf }: { r: RiskProfileData; peri
           </span>
         </span>
         <div
-          className={`v2-yc${dense ? " is-dense" : ""}`}
+          className={`v2-yc${dense ? " is-dense" : ""}${few ? " is-few" : ""}`}
           style={{ ["--n" as string]: years.length, ["--zero" as string]: `${(maxUp / span) * 100}%` }}
           role="img"
           aria-label={`해마다 수익 ${years.map((y) => `${y.year}년 ${fmtPct(y.ret)}`).join(", ")}`}
@@ -652,13 +691,18 @@ export function YearsModule({ r, periodLabel, asOf }: { r: RiskProfileData; peri
             const edge = at < 0.2 ? " hz-tip-start" : at > 0.8 ? " hz-tip-end" : "";
             // 마지막 거래일의 해는 아직 덜 찼다 — 옅게 칠하고 '올해'로, 툴팁에 '○월 ○일까지'(2026-10-04 점검: 아홉 달 성적이 한 해처럼 읽혔다).
             const partYear = y.year === Number(asOf.slice(0, 4));
-            const upTo = partYear ? ` · ${Number(asOf.slice(5, 7))}월 ${Number(asOf.slice(8, 10))}일까지` : "";
+            const headPart = !partYear && firstPart && y.year === firstYear;
+            const upTo = partYear
+              ? ` · ${Number(asOf.slice(5, 7))}월 ${Number(asOf.slice(8, 10))}일까지`
+              : headPart
+                ? ` · ${Number(firstDate.slice(5, 7))}월 ${Number(firstDate.slice(8, 10))}일부터`
+                : "";
             return (
               <div key={y.year} className={`v2-yc-col hz-tip${edge}`} data-tip={`${y.year}년${upTo} · 수익 ${fmtPct(y.ret)} · 그 해 낙폭 ${fmtPct(y.mdd)}`}>
                 <span className="v2-yc-plot">
-                  <i className={`${y.ret >= 0 ? "is-up" : "is-down"}${partYear ? " is-part" : ""}`} style={{ ["--h" as string]: `${(Math.abs(y.ret) / span) * 100}%` }}>
+                  <i className={`${y.ret >= 0 ? "is-up" : "is-down"}${partYear || headPart ? " is-part" : ""}`} style={{ ["--h" as string]: `${(Math.abs(y.ret) / span) * 100}%` }}>
                     {/* 폰은 '+'를 뗀 짧은 꼴(.is-bare) — 10년이면 칸이 32px 라 '+125%+130%'처럼 붙어 읽혔다(2026-10-04 점검). 방향은 막대 색이 말한다. */}
-                    <em className={wide(y.ret) ? "is-wide" : undefined}>
+                    <em className={wide(y.ret) ? "is-wide" : undefined} data-keep={keepYears.has(y.year) ? "" : undefined}>
                       <span className="v2-yc-full">{pctShort(y.ret)}</span>
                       <span className="v2-yc-bare">{y.ret < 0 ? pctShort(y.ret) : `${Math.round(y.ret)}%`}</span>
                     </em>

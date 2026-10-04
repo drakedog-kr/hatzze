@@ -935,7 +935,7 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
   --fs-17: 13px;
 }
 .v2-kd.v2-md .hz-sheet { border-color: var(--t-frame); border-radius: 6px; box-shadow: none; }
-.v2-kd.v2-md .hz-sheet-head { padding: 10px 14px; gap: 8px; align-items: baseline; background: var(--t-card); border-bottom: 1px solid var(--t-line); }
+.v2-kd.v2-md .hz-sheet-head { box-sizing: border-box; min-height: 42px; padding: 10px 14px; gap: 8px; align-items: baseline; background: var(--t-card); border-bottom: 1px solid var(--t-line); }
 .v2-kd.v2-md .hz-sheet-head-ico,
 .v2-kd.v2-md .hz-sheet-head-desc,
 .v2-kd.v2-md .hz-sheet-foot { display: none; }
@@ -965,7 +965,7 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-md-chg.is-down { color: var(--t-down); }
 .v2-md-rows { margin-top: auto; }
 .v2-md-aside { font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
-.v2-card-val.is-big .v2-md-aside b { font-size: 12px; font-weight: 600; line-height: 16px; letter-spacing: 0; }
+.v2-card-val.is-big .v2-md-aside b { font-size: 12px; font-weight: 500; line-height: 16px; letter-spacing: 0; }
 .v2-card-val.is-big .v2-md-aside b.is-up { color: var(--t-up); }
 .v2-card-val.is-big .v2-md-aside b.is-down { color: var(--t-down); }
 .v2-md-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--t-line); }
@@ -974,9 +974,10 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-md .mdd-stat-value { font-size: 13px !important; font-weight: 600 !important; letter-spacing: 0 !important; }
 /* 둘째 줄의 빈 곳 — 셋 중 가장 긴 칸이 키를 정하고, 나머지는 안쪽 줄이 남는 높이를 나눠 받는다.
    종목: 전고점 · 저점 두 줄이 늘어난다. 지금 낙폭: 덩어리 사이가 고르게 벌어진다. */
-.v2-md-rows { flex: 1; display: flex; flex-direction: column; }
+.v2-md-rows { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; }
 /* 전고점 · 저점 줄 — 이름 · 날짜(12/500) · 값(13/700). 줄은 남는 높이를 나눠 받고 가는 선으로 가른다. */
-.v2-md-pr { flex: 1 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 36px; border-top: 1px solid var(--t-line); }
+/* 줄 키 44 고정 · 칸 바닥에 붙는다 — 늘어난 칸 가운데에 뜨면 옆 두 칸 바닥 줄과 26px 어긋났다(2026-10-05 점검). */
+.v2-md-pr { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; border-top: 1px solid var(--t-line); }
 .v2-md-pr-k { min-width: 0; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink2); }
 .v2-md-pr-k > span { margin-left: 4px; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
 .v2-md-pr-v { flex: none; font-size: 13px; font-weight: 600; line-height: 20px; color: var(--t-ink); font-variant-numeric: tabular-nums; }
@@ -990,15 +991,28 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-md-range-lab { display: flex; justify-content: space-between; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
 
 /* 시장 탓 · 종목 탓(V2Sheets.tsx AttributionModule) — 줄마다 이름 · 막대 · 값, 남는 높이를 나눠 받는다(옆 '해마다'와 키가 같다). */
-.v2-md-attr-rows { flex: 1; display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--t-line); }
-.v2-md-attr-rows > li { flex: 1 0 auto; display: grid; grid-template-columns: 96px minmax(0, 1fr) 56px; align-items: center; column-gap: 10px; min-height: 30px; }
+/* 줄은 44 고정(옆 사례 표와 같은 줄 꼴) — 남는 높이는 큰 숫자 덩어리가 받는다. 줄이 둘 · 셋뿐인 칸이 높이를 줄 사이 틈으로 채워
+   두 줄 간격이 114px 였다(2026-10-05 점검). 값 칸 60 · 한 줄 — 56 이면 '+113.8%'가 두 줄로 꺾였다. */
+.v2-md-attr-rows { flex: none; display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--t-line); }
+.v2-md-attr-rows > li { flex: none; display: grid; grid-template-columns: 96px minmax(0, 1fr) 60px; align-items: center; column-gap: 10px; min-height: 44px; }
+.v2-md-attr .v2-md-body > .v2-card-val.is-big,
+.v2-md-lastdrop .v2-md-body > .v2-card-val.is-big,
+.v2-md-rec .v2-md-body > .v2-card-val.is-big { flex: 1; align-items: center; }
 .v2-md-attr-name { min-width: 0; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink2); word-break: keep-all; overflow-wrap: anywhere; }
-.v2-md-attr-val { text-align: right; font-size: 13px; font-weight: 600; line-height: 20px; color: var(--t-ink); font-variant-numeric: tabular-nums; }
+.v2-md-attr-val { text-align: right; white-space: nowrap; font-size: 13px; font-weight: 600; line-height: 20px; color: var(--t-ink); font-variant-numeric: tabular-nums; }
 .v2-md-attr-val.is-up { color: var(--t-up); }
 .v2-md-attr-rows > .is-self .v2-md-attr-name { font-weight: 600; color: var(--t-ink); }
-.v2-md-attr-rows > .is-self .v2-md-attr-val { color: var(--t-down-deep); }
+.v2-md-attr-rows > .is-self .v2-md-attr-val:not(.is-up) { color: var(--t-down-deep); }
 .v2-md-attr-rows > .is-self .v2-dd-bar > i { background: var(--t-down); }
 .v2-md-attr-rows .v2-dd-bar > i.is-up { background: color-mix(in srgb, var(--t-up) 38%, transparent); }
+/* 이 종목 줄이 오른 값이면 진한 빨강 — 위 is-self 규칙(클래스 셋)이 오름색을 이겨 '+23.9%'가 파랑으로 섰다(2026-10-05 점검). */
+.v2-md-attr-rows > .is-self .v2-md-attr-val.is-up { color: var(--t-up); }
+.v2-md-attr-rows > .is-self .v2-dd-bar > i.is-up { background: var(--t-up); }
+[data-theme="dark"] .v2-md-attr-rows > li:not(.is-self) .v2-dd-bar > i.is-up { background: color-mix(in srgb, var(--t-up) 60%, transparent); }
+/* 부호가 섞이면 가운데 0 선에서 좌우로(AttrRows mixed) — 같은 방향으로 뻗으면 방향을 색으로만 갈랐다(2026-10-05 점검). 길이는 반폭 잣대. */
+.v2-md-attr-rows.is-mixed .v2-dd-bar > i { left: 50%; width: calc(var(--w) / 2); border-radius: 0 4px 4px 0; }
+.v2-md-attr-rows.is-mixed .v2-dd-bar > i:not(.is-up) { left: auto; right: 50%; border-radius: 4px 0 0 4px; }
+.v2-md-attr-rows.is-mixed .v2-dd-bar::after { content: ""; position: absolute; top: -3px; bottom: -3px; left: 50%; width: 1px; background: var(--t-ink4); }
 
 
 /* ── v2 MDD 1단계(2026-10-03 판정표) — 새 모듈 ── */
@@ -1045,17 +1059,16 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-yc-bare { display: none; }
 
 /* 회복까지 — 중앙값 · 범위 선 · 빠진 속도별 두 줄(지금 꼬리표). 두 줄이 남는 높이를 받는다. */
-.v2-md-kinds { flex: 1; display: flex; flex-direction: column; margin-top: 4px; border-top: 1px solid var(--t-line); }
-.v2-md-kinds-cap { padding-top: 8px; font-size: 11px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
-.v2-md-kind { flex: 1 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; column-gap: 12px; min-height: 36px; border-bottom: 1px solid var(--t-line); font-variant-numeric: tabular-nums; }
+.v2-md-kinds { flex: none; display: flex; flex-direction: column; margin-top: 4px; border-top: 1px solid var(--t-line); }
+.v2-md-kind { flex: none; min-height: 44px; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; column-gap: 12px; border-bottom: 1px solid var(--t-line); font-variant-numeric: tabular-nums; }
 .v2-md-kind:last-child { border-bottom: 0; }
 .v2-md-kind-name { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; }
 .v2-md-kind-n { font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-md-kind-v { text-align: right; font-weight: 600; }
 .v2-md-kind.is-now .v2-md-kind-v { color: var(--t-up); }
 /* 직전 큰 하락(고점 부근 종목의 회복까지 자리) — 이름 · 값 세 줄. 회복까지 칸의 줄 꼴과 같다. */
-.v2-md-kv { flex: 1; display: flex; flex-direction: column; margin: 4px 0 0; border-top: 1px solid var(--t-line); }
-.v2-md-kv > div { flex: 1 0 auto; display: flex; align-items: center; justify-content: space-between; min-height: 36px; border-bottom: 1px solid var(--t-line); font-variant-numeric: tabular-nums; }
+.v2-md-kv { flex: none; display: flex; flex-direction: column; margin: 4px 0 0; border-top: 1px solid var(--t-line); }
+.v2-md-kv > div { flex: none; display: flex; align-items: center; justify-content: space-between; min-height: 44px; border-bottom: 1px solid var(--t-line); font-variant-numeric: tabular-nums; }
 .v2-md-kv > div:last-child { border-bottom: 0; }
 .v2-md-kv dt { font-weight: 500; }
 .v2-md-kv dd { margin: 0; font-weight: 600; }
@@ -1069,15 +1082,18 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-yc-plot > i { position: absolute; left: 50%; width: min(24px, 56%); height: var(--h); transform: translateX(-50%); }
 .v2-yc-plot > i.is-up { bottom: calc(100% - var(--zero)); border-radius: 2px 2px 0 0; background: var(--t-up); }
 .v2-yc-plot > i.is-down { top: var(--zero); border-radius: 0 0 2px 2px; background: var(--t-down); }
-/* 덜 찬 올해 — 막대만 옅게(글자는 그대로 읽히게). */
-.v2-yc-plot > i.is-part.is-up { background: color-mix(in srgb, var(--t-up) 45%, transparent); }
-.v2-yc-plot > i.is-part.is-down { background: color-mix(in srgb, var(--t-down) 45%, transparent); }
+/* 덜 찬 해(올해 · 1년 조회의 첫 해) — 같은 색 테두리 + 빗금. 옅게 섞던 때 바탕 대비가 2.15 라 3:1 에 못 미쳤고 다크에선 탁한 밤색이었다(2026-10-05 점검). */
+.v2-yc-plot > i.is-part.is-up { background: repeating-linear-gradient(45deg, var(--t-up) 0 2px, transparent 2px 5px); box-shadow: inset 0 0 0 1px var(--t-up); }
+.v2-yc-plot > i.is-part.is-down { background: repeating-linear-gradient(45deg, var(--t-down) 0 2px, transparent 2px 5px); box-shadow: inset 0 0 0 1px var(--t-down); }
+/* 막대가 여섯 이하면 넓게 — 24px 막대 사이가 200px 넘게 비었다(2026-10-05 점검). */
+.v2-yc.is-few .v2-yc-plot > i { width: min(48px, 40%); }
 .v2-yc-plot > i > em { position: absolute; left: 50%; transform: translateX(-50%); font-style: normal; font-size: 12px; font-weight: 500; line-height: 16px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .v2-yc-plot > i.is-up > em { bottom: 100%; margin-bottom: 2px; color: var(--t-up); }
 .v2-yc-plot > i.is-down > em { top: 100%; margin-top: 2px; color: var(--t-down); }
 .v2-yc-yr { flex: none; text-align: center; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
 /* 해가 많으면(전체 조회) 막대 끝 숫자는 숨기고(툴팁에 있다) 연도는 하나 걸러 적는다. */
-.v2-yc.is-dense .v2-yc-plot > i > em { display: none; }
+/* 가장 높은 해 · 가장 낮은 해 · 올해(data-keep)는 남긴다 — 다 숨기면 축도 숫자도 없는 그림이었다(2026-10-05 점검). */
+.v2-yc.is-dense .v2-yc-plot > i > em:not([data-keep]) { display: none; }
 .v2-yc.is-dense .v2-yc-yr[data-minor] { visibility: hidden; }
 .v2-md-years .v2-md-body { gap: 12px; }
 
@@ -1195,6 +1211,8 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-md-pl-tbl tbody td.is-up { font-weight: 600; color: var(--t-up); }
 .v2-md-pl-tbl tbody td.is-down { font-weight: 600; color: var(--t-down); }
 .v2-md-pl-tbl tbody tr + tr > * { border-top: 1px solid var(--t-line); }
+/* 칸 머리 '평균' 앞 점선 표식 — 그림 속 세로 점선(.v2-dd-avg)의 이름이다(2026-10-05 점검). */
+.v2-dd-avg-key { display: inline-block; width: 0; height: 10px; margin-right: 4px; border-left: 1px dashed var(--t-ink3); vertical-align: -1px; }
 .v2-dd-avg {
   position: absolute;
   top: 8px;
@@ -1219,7 +1237,8 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   /* 사례 표 — 두 층(구간 · 깊이 / 시장 · 빠진 · 되찾은 · 유형). 여섯 칸이 한 줄이면 폰 폭(351)에 안 든다. */
   .v2-md-case-th { display: none; }
   .v2-md-case {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    /* 시장 · 회복 칸을 조금 넓게 — 같은 폭(71px)이면 '코스피 −23.2%' · '회복 2개월째'가 두 줄로 꺾여 줄 키가 들쭉날쭉했다(2026-10-05 점검). */
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1.25fr) auto;
     /* ⚠️ 영역 이름에 'span' 을 쓰지 말 것 — 격자 자리 지정의 예약어라 무시되고 칸이 한 칸으로 눌려 글자가 잘렸다. */
     grid-template-areas: "per per per dd" "mk dn up kind";
     row-gap: 2px;
@@ -1241,6 +1260,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   .v2-yc-bare { display: inline; }
   /* 사례 표 아래 층 숫자 앞에 칸 이름(머리 줄이 없다). */
   .v2-md-case > [data-k]::before { content: attr(data-k) " "; font-weight: 500; color: var(--t-ink3); }
+  .v2-md-case > [data-k] { white-space: nowrap; }
 }
 @container kd (max-width: 679px) {
   .v2-md-band { grid-template-columns: minmax(0, 1fr); }
@@ -1250,8 +1270,14 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   /* 기간 단추는 한 줄을 고르게 나눠 갖는다 — 왼쪽 217px 에 붙어 오른쪽 134px 가 비었다(2026-10-04 점검). */
   .mdd-period { flex: 1 1 100%; }
   .mdd-period > button { flex: 1; }
-  /* 확대 단추는 그림 오른쪽 위로 — 오른쪽 아래면 바닥의 사례 번호 표식을 밟았다(2026-10-04 점검). */
-  .v2-md .hz-zoom-btn { top: 6px; bottom: auto; }
+  /* 그림 키 140 — 너비에 맞춰 72px 로 눌리면 표식끼리 겹쳤다(Hero.tsx preserveAspectRatio, 2026-10-05 점검). 최저점 동그라미는 늘어나 타원이 돼 뺀다. */
+  .v2-md .mdd-uw-body .mdd-uw-svg { height: 140px; }
+  .v2-md .mdd-uw-body .mdd-uw-svg circle { display: none; }
+  /* 확대 단추는 그림 밖 — 가로축 글자 아래 줄 오른쪽. 그림 위에 두면 '지금' 글자 · 사례 표식을 덮었다(2026-10-05 점검). */
+  .v2-md .mdd-uw-body { padding-bottom: 46px !important; }
+  .v2-md .hz-zoom-btn { top: auto; bottom: 10px; right: 14px; }
+  /* 띠 지수 칸 — 날짜 조각('8월 13일 고점')은 둘째 줄로(375 에서 4px 넘쳤다). */
+  .v2-md .v2-cover-idx .v2-cover-v { flex-wrap: wrap; }
 }
 
 /* ── v2 배당으로 살기(2026-10-03) — 카더라 · MDD 의 v2 규칙을 옮겼다 ─────────────────────────────

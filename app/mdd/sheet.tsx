@@ -170,8 +170,8 @@ export function ErrorCard({ message, missing = false }: { message: string; missi
   return (
     <Sheet>
       <div style={{ padding: PAD, display: "flex", alignItems: "center", gap: 10, color: C.sub, fontSize: "var(--fs-13)" }}>
-        {/* 없는 코드는 고장이 아니다 — 회색 검색 아이콘. 일시 실패만 빨간 경고. */}
-        <Icon name={missing ? "search" : "error_outline"} style={{ fontSize: "var(--fs-20)", color: missing ? C.sub : C.mania }} />
+        {/* 없는 코드는 고장이 아니라 아이콘 없이 글자만 — 바로 위 검색창 돋보기와 한 본문에 두 번 섰다(2026-10-05 점검). 일시 실패만 빨간 경고. */}
+        {!missing && <Icon name="error_outline" style={{ fontSize: "var(--fs-20)", color: C.mania }} />}
         {message}
       </div>
     </Sheet>

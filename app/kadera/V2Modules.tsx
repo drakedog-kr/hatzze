@@ -35,7 +35,7 @@ export function Module({
    */
   help?: string;
   /** 제목 옆 근거 — 기간 · 표본 · 기준 시각. 인텔리전스 화면은 숫자마다 '어디서 언제'를 단다. */
-  meta?: string;
+  meta?: React.ReactNode;
   aside?: React.ReactNode;
   /** 생성형 AI 가 쓴 문장을 담은 모듈이면 제목 앞에 AI 표시(이용약관 4조의 고지). */
   ai?: boolean;

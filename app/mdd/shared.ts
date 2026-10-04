@@ -135,7 +135,8 @@ export function periodInfo(years: string, firstDate: string, asOf: string): { la
   // '전체'는 자료가 시작한 해로 적는다 — 야후 일봉이 2000년부터라 1975년 상장한 삼성전자도 '상장 이후·약 27년'이라 적혀 사실과 달랐다
   // (2026-10-04 점검). 고른 기간보다 짧은 종목(truncated)은 자료 첫날이 곧 상장 무렵이라 '상장 이후'가 맞다.
   const n = Math.max(1, Math.round(approxYears));
-  const label = years === "all" ? `${firstDate.slice(0, 4)}년 이후·약 ${n}년` : truncated ? `상장 이후·약 ${n}년` : `최근 ${years}년`;
+  // '약 27년'은 뗐다 — '2000년 이후'가 이미 길이를 말한다(2026-10-05 점검, 풀어 쓴 꼴).
+  const label = years === "all" ? `${firstDate.slice(0, 4)}년 이후` : truncated ? `상장 이후·약 ${n}년` : `최근 ${years}년`;
   return { label, truncated, approxYears };
 }
 
@@ -144,7 +145,8 @@ export function periodInfo(years: string, firstDate: string, asOf: string): { la
  * 1년을 골랐을 뿐인 종목에 '표본이 짧다'고 하면 거짓이다. 전체 구간은 합병·감자로 끊긴 가격이 섞인다.
  */
 export function cautionShort(years: string, truncated: boolean, approxYears: number): string | null {
-  if (years === "all") return "합병·감자 구간 섞임";
+  // '전체'의 '합병·감자 구간 섞임'은 걷었다 — 종목과 상관없이 모든 종목(삼성전자까지)에 붙었다(2026-10-05 점검). 실제 가격 끊김을 찾게 되면 그때 단다.
+  if (years === "all") return null;
   if (truncated) return `상장 ${Math.max(1, Math.round(approxYears))}년, 표본 짧음`;
   return null;
 }
@@ -185,13 +187,14 @@ export const fmtPrice = (n: number, market: string | null | undefined) =>
  */
 export const benchName = (market: string | null | undefined) => (market === "US" ? "S&P500" : market === "KOSDAQ" ? "코스닥" : "코스피");
 
+/** 해 단위 숫자 — 소수 한 자리, '.0'은 뗀다('1.0년' → '1년', 2026-10-05 점검). */
+const yrs = (d: number) => (d / 365).toFixed(1).replace(/\.0$/, "");
+
 /**
  * 기간을 사람 단위로 짧게. 카드 안 큰 숫자는 이 형식으로 통일한다(1,733일 → 4.7년).
  * 350일부터 해로 적는다 — 365 를 문턱으로 두면 364일이 '12개월', 365일이 '1.0년'으로 같은 길이가 다르게 적혔다(사례 표 실측).
  */
-export const fmtDur = (d: number) => (d >= 350 ? `${(d / 365).toFixed(1)}년` : d >= 45 ? `${Math.round(d / 30)}개월` : `${Math.round(d)}일`);
-
-export const fmtDayCount = (d: number) => `${Math.round(d).toLocaleString("ko-KR")}일`;
+export const fmtDur = (d: number) => (d >= 350 ? `${yrs(d)}년` : d >= 45 ? `${Math.round(d / 30)}개월` : `${Math.round(d)}일`);
 
 /** 표 · 차트 머리의 연·월. "2017-11-24" → "2017.11".
  *  연도를 두 자리로 줄이면("17.11") 연·월인지 월·일인지 분간이 안 된다. 하이픈("2017-11")은 코드 꼴이라 점으로(2026-10-03). */
@@ -271,7 +274,7 @@ const pp = (n: number) => `${Math.abs(n).toFixed(1)}%p`;
  * 긴 쪽이 1년을 넘고 짧은 쪽도 11개월 가까이면 둘 다 년으로 적고, 같아지면 하나만 적는다.
  */
 function durRange(min: number, max: number): string {
-  const lo = max >= 365 && min >= 330 ? `${(min / 365).toFixed(1)}년` : fmtDur(min);
+  const lo = max >= 365 && min >= 330 ? `${yrs(min)}년` : fmtDur(min);
   const hi = fmtDur(max);
   if (lo === hi) return hi;
   // 단위가 같으면 앞 단위를 뗀다 — "1.6~3.0년", "4~9개월".
@@ -301,6 +304,8 @@ export function mddSummary(d: Pick<MddResult, "analysis" | "attribution" | "them
   const a = d.analysis;
   const atHigh = a.currentDd > -1;
   const span = periodInfo(d.years, a.firstDate, a.asOf).label.replace("·", " ");
+  // '2000년 이후'는 그 자체가 기간이라 '동안'을 안 붙인다('2000년 이후 동안'이 됐다).
+  const during = span.endsWith("이후") ? span : `${span} 동안`;
   const rows: SumRow[] = [];
 
   // 깊이 — 지금보다 깊이 빠져 있던 날이 얼마나 흔했나(옆 칸 '이보다 깊었던 날'을 말로).
@@ -314,12 +319,13 @@ export function mddSummary(d: Pick<MddResult, "analysis" | "attribution" | "them
       a.currentDd === 0 && a.asOf === a.athDate
         ? [`${fmtDay(a.asOf, a.asOf)} 종가가 `, { b: `${span} 최고가` }, "였습니다."]
         : a.deeperThanNowDays === 0
-          ? [`${span} 동안 `, { b: "지금이 가장 깊이" }, " 빠져 있습니다."]
+          ? [`${during} `, { b: "지금이 가장 깊이" }, " 빠져 있습니다."]
         : p < 0.05
-          ? [`${span} 동안 지금보다 깊이 빠져 있던 날은 `, { b: `${a.deeperThanNowDays.toLocaleString("ko-KR")}일` }, "뿐입니다."]
+          ? // 거래일 — 옆 칸 '이보다 깊었던 날 5거래일'과 같은 단위(2026-10-05 점검).
+            [`${during} 지금보다 깊이 빠져 있던 날은 `, { b: `${a.deeperThanNowDays.toLocaleString("ko-KR")}거래일` }, "뿐입니다."]
           : p >= 0.95
-            ? [`${span} 동안 `, { b: "거의 모든 날" }, "이 지금보다 깊이 빠져 있었습니다."]
-            : [`${span} 동안 지금보다 깊이 빠져 있던 날은 `, { b: `열흘에 ${k}일꼴` }, "입니다."],
+            ? [`${during} `, { b: "거의 모든 날" }, "이 지금보다 깊이 빠져 있었습니다."]
+            : [`${during} 지금보다 깊이 빠져 있던 날은 `, { b: `열흘에 ${k}일꼴` }, "입니다."],
   });
 
   if (atHigh) {
@@ -330,7 +336,8 @@ export function mddSummary(d: Pick<MddResult, "analysis" | "attribution" | "them
         key: "worst",
         label: "최대 낙폭",
         parts: worst.recovered
-          ? [`${span} 가장 깊었던 하락은 `, { b: fmtPct(worst.depth) }, "였고, 고점을 되찾기까지 ", { b: fmtDur(worst.days) }, " 걸렸습니다."]
+          ? // 저점에서 되찾기까지 — 사례 표 '되찾은 기간'과 같은 기준(2026-10-05 점검).
+            [`${span} 가장 깊었던 하락은 `, { b: fmtPct(worst.depth) }, "였고, 저점에서 되찾기까지 ", { b: fmtDur(worst.days - worst.troughDays) }, " 걸렸습니다."]
           : [`${span} 가장 깊었던 하락은 `, { b: fmtPct(worst.depth) }, "입니다."],
       });
     }
@@ -344,12 +351,12 @@ export function mddSummary(d: Pick<MddResult, "analysis" | "attribution" | "them
     if (r.unrecoveredCount === 1 && done > 0) {
       tail =
         done === 1
-          ? [" 앞선 1번은 고점을 되찾기까지 ", { b: fmtDur(r.minDays!) }, " 걸렸습니다."]
+          ? [" 앞선 1번은 저점에서 되찾기까지 ", { b: fmtDur(r.minDays!) }, " 걸렸습니다."]
           : done === 2
-            ? [" 앞선 2번은 고점을 되찾기까지 ", { b: durRange(r.minDays!, r.maxDays!) }, " 걸렸습니다."]
-            : [` 앞선 ${done}번은 고점을 되찾기까지 보통 `, { b: fmtDur(r.medianDays!) }, " 걸렸습니다."];
+            ? [" 앞선 2번은 저점에서 되찾기까지 ", { b: durRange(r.minDays!, r.maxDays!) }, " 걸렸습니다."]
+            : [` 앞선 ${done}번은 저점에서 되찾기까지 보통 `, { b: fmtDur(r.medianDays!) }, " 걸렸습니다."];
     }
-    rows.push({ key: "recovery", label: "회복", parts: nth === 1 ? [`${span} 동안 `, ...head] : [...head, ...tail] });
+    rows.push({ key: "recovery", label: "회복", parts: nth === 1 ? [`${during} `, ...head] : [...head, ...tail] });
   }
 
   const attr = d.attribution;

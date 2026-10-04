@@ -87,7 +87,8 @@ export type RecoveryStats = {
   deeperCount: number;
   recoveredCount: number;
   unrecoveredCount: number;
-  /** 회복한 사건들의 달력 일수. 회복 사례가 없으면 null. */
+  /** 회복한 사건들의 **저점에서 고점을 되찾기까지** 달력 일수. 회복 사례가 없으면 null.
+   *  고점부터 잰 일수였을 땐 사례 표의 '되찾은 기간'(저점부터)과 기준이 갈려 '2.2년 보통'이 표 어디에도 없었다(2026-10-05 점검). */
   minDays: number | null;
   medianDays: number | null;
   maxDays: number | null;
@@ -136,7 +137,7 @@ export type MddAnalysis = {
   /**
    * 직전 큰 하락 — 15% 넘게 빠졌다 되찾은 사건 중 마지막 것(고점 · 저점의 날과 종가).
    * 오늘이 신고가인 날 화면이 쓴다: 전고점 · 저점이 둘 다 오늘 종가라 종목 칸에 같은 값이 세 번 섰다(심텍, 2026-10-03).
-   * 깊이 문턱은 급락형 · 완만형 표본과 같다(CHARACTER_MIN_DEPTH) — 하루 −0.3% 같은 잔물결을 '직전 하락'이라 부르지 않는다.
+   * 깊이 문턱은 15%(CHARACTER_MIN_DEPTH) — 하루 −0.3% 같은 잔물결을 '직전 하락'이라 부르지 않는다.
    */
   lastDrop: { peakDate: string; peak: number; troughDate: string; trough: number; depth: number; recoveryDate: string } | null;
   /** 낙폭 구간별 발생 횟수(−20% 이상 하락만). 위 depthHistogram 주석 참고. */
@@ -230,7 +231,7 @@ function recoveryStats(eps: Episode[], currentDd: number): RecoveryStats | null 
     return { similarCount: 0, deeperCount: 0, recoveredCount: 0, unrecoveredCount: 0, minDays: null, medianDays: null, maxDays: null, samples: [] };
   }
   const recovered = similar.filter((e) => e.recovered);
-  const days = recovered.map((e) => e.days);
+  const days = recovered.map((e) => e.days - e.troughDays);
   return {
     similarCount: similar.length,
     // 진행 중 사건의 깊이는 currentDd 와 같은 식·같은 고점으로 나와, 신저점 날에는 두 값이 비트까지 같다.
@@ -258,12 +259,15 @@ function drawdownCharacter(eps: Episode[], currentDd: number, bars: Bar[]): Draw
 
   // 표본이 얇으면 급락/완만 비교는 생략하되(버킷 null), 섹션 자체는 살려 둔다 —
   // 현재 하락의 성격(급락/완만)만이라도 보여주고, 화면이 "기간을 넓히라"고 안내한다.
-  const meaningful = eps.filter((e) => e.recovered && e.depth <= CHARACTER_MIN_DEPTH);
+  // ⭐ 모집단은 회복 통계(recoveryStats)와 같다 — 지금만큼 깊었다 되찾은 하락. 15% 넘게 빠진 것 전부를 세던 때 같은 칸에서
+  //    '4번 중 3번 되찾음'과 '급락 3 · 완만 2'가 맞아 보이지 않았다(2026-10-05 점검). 여기 오는 currentDd 는 CHARACTER_MIN_DD(−8%) 아래라 잔물결은 안 든다.
+  const meaningful = eps.filter((e) => e.recovered && e.depth <= currentDd);
   const enough = meaningful.length >= 3;
 
   const bucket = (fast: boolean) => {
     if (!enough) return null;
-    const days = meaningful.filter((e) => (e.troughDays <= CHARACTER_SPLIT_DAYS) === fast).map((e) => e.days);
+    // 기간은 저점에서 되찾기까지(recoveryStats 와 같은 기준).
+    const days = meaningful.filter((e) => (e.troughDays <= CHARACTER_SPLIT_DAYS) === fast).map((e) => e.days - e.troughDays);
     return days.length ? { count: days.length, medianRecovery: median(days) } : null;
   };
 
