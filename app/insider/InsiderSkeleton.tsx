@@ -22,7 +22,7 @@ function Mod({ h }: { h: number }) {
 }
 
 /**
- * 내부자 화면 셋의 골격. brief 는 본 화면만 — 첫 줄 띠 아래 '오늘의 브리핑'(2026-10-04) 자리를 판 폭 한 장으로 둔다.
+ * 내부자 화면 셋의 골격. brief 는 본 화면만 — 첫 줄 띠 아래 둘째 줄 [매매 방향 | 오늘의 브리핑](2026-10-04) 자리를 둔다.
  * 종목 · 인물 상세는 브리핑이 없어 자기 loading.tsx 가 brief 없이 부른다(없으면 이 파일을 물려받아 없는 판이 섰다 사라진다).
  */
 export function InsiderSkeleton({ brief }: { brief: boolean }) {
@@ -30,8 +30,13 @@ export function InsiderSkeleton({ brief }: { brief: boolean }) {
     // position:relative 는 아래 hz-loading-float 의 기준 상자가 되기 위한 것이다.
     <div className="hz-tx v2-kd v2-in" style={{ position: "relative" }} aria-hidden>
       <div className="v2-cover" style={{ height: 41 }} />
-      {/* 브리핑 판 — 1,440 실물 173(머리 42 + 줄 둘)에 맞춘다. */}
-      {brief && <Mod h={105} />}
+      {/* 둘째 줄 — 매매 방향 | 오늘의 브리핑(.v2-in-band). 키는 1,440 실물에 맞춘다. */}
+      {brief && (
+        <div className="v2-in-band">
+          <Mod h={208} />
+          <Mod h={208} />
+        </div>
+      )}
       {/* 짝 모듈 줄 셋 — 높이는 실물(1,440)에서 잰 값에 가깝게. */}
       {[0, 1, 2].map((i) => (
         <div key={i} className="v2-in-pair">

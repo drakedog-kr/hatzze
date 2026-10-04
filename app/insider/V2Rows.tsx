@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import type { InsiderBriefRow } from "@/lib/insider-brief";
+import type { InsiderBriefRow, InsiderLeanRow } from "@/lib/insider-brief";
 import type { AnalystTop, CongressTicker, InsiderActivity, ManagerMove, ManagerRank } from "@/lib/insider-data";
 
 import { StockLogo } from "../StockLogo";
@@ -152,12 +152,11 @@ export function analystLines(rows: AnalystTop[]) {
 
 /**
  * 오늘의 브리핑 줄 넷(lib/insider-brief.ts) — 이름표 칸 · 문장 칸(.v2-brief3, 시장 브리핑 · MDD 낙폭 요약과 같은 줄 꼴).
- * 판 1,000 이상은 두 단 — 임원 · 의원 / 거물 · 겹친 곳이 아래 짝 모듈(임원 | 의원 · 늘린 | 줄인)과 같은 세로줄에 선다.
- * 종목은 종목 화면 링크, 금액은 통화 스위치를 따른다(Money).
+ * 문장은 종목을 적고 숫자는 옆 '매매 방향'이 맡는다. 종목은 종목 화면 링크.
  */
-export function BriefRows({ rows, rate }: { rows: InsiderBriefRow[]; rate: number | null }) {
+export function BriefRows({ rows }: { rows: InsiderBriefRow[] }) {
   return (
-    <dl className="v2-brief3 v2-in-brief">
+    <dl className="v2-brief3">
       {rows.map((r) => (
         <div key={r.key} className="v2-brief3-row">
           <dt>{r.label}</dt>
@@ -165,8 +164,6 @@ export function BriefRows({ rows, rate }: { rows: InsiderBriefRow[]; rate: numbe
             {r.parts.map((p, i) =>
               typeof p === "string" ? (
                 p
-              ) : "usd" in p ? (
-                <Money key={i} usd={p.usd} rate={rate} />
               ) : (
                 <Link key={i} href={stockHref(p.ticker)} className="v2-in-brief-link" data-ga="insider_brief_click">
                   {p.name}
@@ -177,5 +174,41 @@ export function BriefRows({ rows, rate }: { rows: InsiderBriefRow[]; rate: numbe
         </div>
       ))}
     </dl>
+  );
+}
+
+/**
+ * 매매 방향 — 축마다 산 쪽(빨강) · 판 쪽(파랑)을 한 막대에 가른다(사는 쪽 빨강 · 파는 쪽 파랑, 이 화면의 다른 줄과 같은 뜻).
+ * 막대는 그림일 뿐이라 읽어 주는 기계에선 빼고(aria-hidden) 아래 두 값이 같은 말을 한다. 한쪽이 0 이면 그 토막은 안 그린다.
+ */
+export function LeanRows({ rows, rate }: { rows: InsiderLeanRow[]; rate: number | null }) {
+  const val = (v: number, unit: InsiderLeanRow["unit"]) => (unit === "usd" ? <Money usd={v} rate={rate} /> : `${v.toLocaleString("ko-KR")}${unit}`);
+  return (
+    <div className="v2-in-lean">
+      {rows.map((r) => {
+        const total = r.buy + r.sell;
+        const up = total > 0 ? (r.buy / total) * 100 : 0;
+        return (
+          <div key={r.key} className="v2-in-lean-row">
+            <div className="v2-in-lean-head">
+              <b>{r.label}</b>
+              <span>{r.span}</span>
+            </div>
+            <div className="v2-in-lean-bar" aria-hidden>
+              {r.buy > 0 && <i className="is-up" style={{ flexBasis: `${up}%` }} />}
+              {r.sell > 0 && <i className="is-down" style={{ flexBasis: `${100 - up}%` }} />}
+            </div>
+            <div className="v2-in-lean-legend">
+              <span className="is-up">
+                {r.buyLabel} <b>{val(r.buy, r.unit)}</b>
+              </span>
+              <span className="is-down">
+                {r.sellLabel} <b>{val(r.sell, r.unit)}</b>
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }

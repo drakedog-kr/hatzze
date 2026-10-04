@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { insiderBrief } from "@/lib/insider-brief";
+import { insiderBrief, insiderLean } from "@/lib/insider-brief";
 import { assertLoaded } from "@/lib/load-state";
 import { RANK_MIN_ANALYSTS, getInsiderOverview } from "@/lib/insider-data";
 import Link from "next/link";
@@ -11,7 +11,7 @@ import { CurrencyToggle } from "../AppShell";
 import { CoverMeta, Module } from "../kadera/V2Modules";
 import { INSIDER_LISTS, insiderListHref } from "./lists";
 import { fmtDate, insiderNote } from "./parts";
-import { BriefRows, analystLines, congressLines, execLines, managerLines, moveLines } from "./V2Rows";
+import { BriefRows, LeanRows, analystLines, congressLines, execLines, managerLines, moveLines } from "./V2Rows";
 import { INSIDER_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { Icon } from "../ui";
@@ -65,7 +65,8 @@ export default async function InsiderPage() {
      ⭐ 3차(2026-10-04 운영자 판단): '커뮤니티에서 뜨거운 종목' 걷고 '운용자산이 큰 순'(거물 명단) 되살림.
      ⛔ 옛 히어로 '오늘의 브리핑' 넉 줄(아래 모듈 1등의 되풀이) · 구간 제목 · 시트 부제 · 안내 쪽지(TapHint)는 걷었다.
      ⭐ 짝 순서는 **새로 들어오는 것부터**: 임원 · 의원 신고(매일) → 거물 분기 변화(분기) → 거물 명단 · 증권가.
-     ⭐ 4차(2026-10-04 "브리핑 카드가 있으면"): 첫 줄 띠 아래 '오늘의 브리핑' — 옛 넉 줄과 달리 모듈 1등을 되풀이하지 않고 합계 · 겹친 곳을 적는다(lib/insider-brief.ts). */
+     ⭐ 4차(2026-10-04 "브리핑 카드가 있으면" → 같은 날 "엉성하다"): 둘째 줄 [매매 방향 | 오늘의 브리핑] — 다른 v2 화면처럼 첫 칸은 숫자 카드
+       (카더라 여론 칸과 같은 폭), 브리핑은 종목만. 옛 넉 줄과 달리 모듈 1등을 되풀이하지 않는다(lib/insider-brief.ts). */
   const quarter = insiderNote("adds", ov);
   return (
     // ⭐ 내부자 리포트는 **달러가 기본**이다 — 재료가 전부 미국 공시라 달러가 원본이고, 원화는 크기를 가늠하라고 얹은 것이다.
@@ -102,10 +103,16 @@ export default async function InsiderPage() {
         />
       </div>
 
-      {/* 오늘의 브리핑 — 계산 문장이라 AI 표시가 없다. 판 폭 한 장, 안은 두 단(아래 짝 모듈과 같은 세로줄). */}
-      <Module title="오늘의 브리핑" className="v2-in-briefmod">
-        <BriefRows rows={insiderBrief(ov)} rate={ov.usdKrw} />
-      </Module>
+      {/* 둘째 줄 — 매매 방향(숫자) | 오늘의 브리핑(종목). 계산 문장이라 AI 표시가 없다.
+          ⛔ 브리핑을 판 폭 한 장 · 두 단으로 두고 합계까지 문장에 넣었던 첫 판은 숫자가 글에 묻혀 "엉성하다"였다. */}
+      <div className="v2-in-band">
+        <Module title="매매 방향" className="v2-in-leanmod">
+          <LeanRows rows={insiderLean(ov)} rate={ov.usdKrw} />
+        </Module>
+        <Module title="오늘의 브리핑" className="v2-in-briefmod">
+          <BriefRows rows={insiderBrief(ov)} />
+        </Module>
+      </div>
 
       {/* ① 임원 · 의원 신고 — 매일 들어온다 */}
       <div className="v2-in-pair">

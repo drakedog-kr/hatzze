@@ -1,11 +1,11 @@
 /**
- * lib/insider-brief.ts — 내부자 리포트 '오늘의 브리핑' 줄 넷. 아래 모듈의 1등을 되풀이하지 않고 합계 · 다른 순서의 한 종목 ·
- * 의원과 거물이 함께 산 종목을 적는다. 겹친 곳은 문턱(의원 둘 · 거물 셋)이 없으면 62곳이 나왔다(2026-10-04).
+ * lib/insider-brief.ts — 내부자 리포트 둘째 줄 [매매 방향 | 오늘의 브리핑]. 숫자는 매매 방향(축마다 산 쪽 · 판 쪽 합계),
+ * 브리핑은 아래 모듈과 다른 잣대로 고른 종목을 적는다. 겹친 곳은 문턱(의원 둘 · 거물 셋)이 없으면 62곳이 나왔다(2026-10-04).
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { insiderBrief, type InsiderBriefPart, type InsiderBriefRow } from "../lib/insider-brief.ts";
+import { insiderBrief, insiderLean, type InsiderBriefRow } from "../lib/insider-brief.ts";
 import type { CongressTicker, InsiderActivity, ManagerMove } from "../lib/insider-data.ts";
 
 const exec = (ticker: string, bought: number, disposed: number, name = ticker): InsiderActivity => ({
@@ -58,38 +58,68 @@ const base = {
   scale: { officers: 0, members: 0, managers: 30, windowDays: 90 },
 };
 
-const text = (r: InsiderBriefRow) =>
-  r.parts.map((p) => (typeof p === "string" ? p : "usd" in p ? `$${p.usd}` : `[${p.name}]`)).join("");
+const text = (r: InsiderBriefRow) => r.parts.map((p) => (typeof p === "string" ? p : `[${p.name}]`)).join("");
 const row = (rows: InsiderBriefRow[], key: InsiderBriefRow["key"]) => rows.find((r) => r.key === key)!;
+
+describe("insiderLean — 매매 방향", () => {
+  it("임원은 장내 매수 · 처분 금액, 의원은 건수, 거물은 늘린 쪽 · 줄인 쪽이 더 많은 종목 수", () => {
+    const rows = insiderLean({
+      ...base,
+      buys: [exec("A", 30, 0), exec("B", 0, 500), exec("C", 10, 5)],
+      congressTickers: [congress("X", 2, 3, 1), congress("Y", 1, 0, 4)],
+      managerAdds: [move("M1", 3, 1), move("M2", 2, 2), move("M3", 1, 0)],
+      managerTrims: [move("T1", 4, 0), move("M2", 2, 2)],
+    });
+    assert.deepEqual(
+      rows.map((r) => [r.key, r.span, r.buy, r.sell, r.unit]),
+      [
+        ["exec", "7일", 40, 505, "usd"],
+        ["congress", "90일", 3, 5, "건"],
+        // M2 는 늘린 · 줄인 거물이 같아 어느 쪽에도 안 든다.
+        ["managers", "2026 Q2", 2, 1, "종목"],
+      ],
+    );
+  });
+
+  it("견줄 분기가 없으면 거물 줄을 뺀다", () => {
+    const rows = insiderLean({ ...base, compareQuarters: ["2026-06-30"], managerAdds: [move("A", 3, 0)] });
+    assert.deepEqual(rows.map((r) => r.key), ["exec", "congress"]);
+  });
+});
 
 describe("insiderBrief — 임원", () => {
   it("신고가 없으면 없다고 적는다", () => {
     assert.equal(text(row(insiderBrief(base), "exec")), "최근 7일에는 임원 신고가 없습니다.");
   });
 
-  it("장내 매수가 없으면 처분 합계만", () => {
-    const r = row(insiderBrief({ ...base, buys: [exec("AAA", 0, 100), exec("BBB", 0, 50), exec("CCC", 0, 0)] }), "exec");
-    assert.equal(text(r), "최근 7일 임원 신고가 들어온 3개 종목 가운데 장내 매수는 없고, 처분은 2개 종목 $150입니다.");
+  it("장내 매수가 없으면 없다고", () => {
+    const r = row(insiderBrief({ ...base, buys: [exec("AAA", 0, 100), exec("BBB", 0, 50)] }), "exec");
+    assert.equal(text(r), "최근 7일 신고가 들어온 2개 종목 가운데 장내에서 산 종목은 없습니다.");
   });
 
-  it("장내 매수가 한 종목이면 '가장 크게'라 부르지 않는다", () => {
+  it("한 종목이면 '가장 크게'라 부르지 않는다", () => {
     const r = row(insiderBrief({ ...base, buys: [exec("ORCL", 30, 0, "오라클"), exec("BBB", 0, 50)] }), "exec");
-    assert.equal(text(r), "최근 7일 임원 신고가 들어온 2개 종목 가운데 장내 매수는 1개 종목 $30, 처분은 1개 종목 $50입니다. 장내에서 산 종목은 [오라클] 하나입니다.");
+    assert.equal(text(r), "최근 7일 신고가 들어온 2개 종목 가운데 장내에서 산 종목은 [오라클] 하나입니다.");
   });
 
   it("여럿이면 산 금액이 가장 큰 종목 — 모듈 순서(처분 · 매수 섞인 금액 순)와 다르다", () => {
     const r = row(insiderBrief({ ...base, buys: [exec("BIG", 0, 900), exec("SMALL", 10, 0), exec("MID", 40, 5)] }), "exec");
-    assert.match(text(r), /장내 매수는 2개 종목 \$50, 처분은 2개 종목 \$905입니다\. 가장 크게 산 종목은 \[MID\]입니다\.$/);
+    assert.equal(text(r), "최근 7일 신고가 들어온 3개 종목 가운데 장내에서 산 종목은 2개이고, 가장 크게 산 종목은 [MID]입니다.");
   });
 });
 
 describe("insiderBrief — 의원", () => {
-  it("의원 수 · 종목 수 · 매수 · 매도 건수를 더한다", () => {
+  it("의원 수 · 종목 수, 산 의원이 가장 많은 종목(둘 이상일 때)", () => {
     const r = row(
-      insiderBrief({ ...base, scale: { ...base.scale, members: 43 }, congressTickers: [congress("A", 2, 3, 1), congress("B", 1, 0, 4)] }),
+      insiderBrief({ ...base, scale: { ...base.scale, members: 43 }, congressTickers: [congress("A", 2, 3, 1), congress("B", 3, 3, 9, "비")] }),
       "congress",
     );
-    assert.equal(text(r), "최근 90일 의원 43명이 2개 종목을 신고했습니다. 매수 3건 · 매도 5건입니다.");
+    assert.equal(text(r), "최근 90일 의원 43명이 2개 종목을 신고했습니다. 가장 많은 의원이 산 종목은 [비]입니다.");
+  });
+
+  it("산 의원이 한 명씩이면 '가장 많은'을 안 쓴다", () => {
+    const r = row(insiderBrief({ ...base, scale: { ...base.scale, members: 2 }, congressTickers: [congress("A", 1, 1, 0)] }), "congress");
+    assert.equal(text(r), "최근 90일 의원 2명이 1개 종목을 신고했습니다.");
   });
 });
 
@@ -98,22 +128,21 @@ describe("insiderBrief — 거물", () => {
     assert.equal(text(row(insiderBrief({ ...base, compareQuarters: ["2026-06-30"] }), "managers")), "견줄 직전 분기가 아직 없습니다.");
   });
 
-  it("늘린 쪽 · 줄인 쪽이 더 많은 종목만 세고, 새로 담은 거물이 둘 이상인 종목 가운데 가장 많은 곳", () => {
+  it("새로 담은 · 다 판 거물이 가장 많은 종목 — 같으면 티커 순", () => {
     const r = row(
       insiderBrief({
         ...base,
-        managerAdds: [move("A", 5, 1, 1), move("B", 2, 2, 0), move("C", 3, 0, 3, "씨"), move("D", 4, 0, 3)],
-        managerTrims: [move("E", 2, 0), move("B", 2, 2)],
+        managerAdds: [move("A", 5, 1, 1), move("C", 3, 0, 3, "씨"), move("B", 4, 0, 3)],
+        managerTrims: [move("E", 2, 0, 2), move("F", 9, 0, 1)],
       }),
       "managers",
     );
-    // B 는 늘린 · 줄인 거물이 같아 어느 쪽에도 안 든다. 새로 담은 3곳이 둘(C · D)이면 움직인 거물이 많은 D.
-    assert.equal(text(r), "2026년 2분기에 직전 분기보다 늘린 거물이 더 많은 종목은 3개, 줄인 거물이 더 많은 종목은 1개입니다. 새로 담은 거물이 가장 많은 종목은 [D]입니다.");
+    assert.equal(text(r), "2026년 2분기에 새로 담은 거물이 가장 많은 종목은 [B]입니다. 다 판 거물이 가장 많은 종목은 [E]입니다.");
   });
 
-  it("새로 담은 거물이 한 명뿐이면 그 문장을 안 쓴다", () => {
-    const r = row(insiderBrief({ ...base, managerAdds: [move("A", 5, 0, 1)] }), "managers");
-    assert.doesNotMatch(text(r), /새로 담은/);
+  it("둘 다 한 명뿐이면 없다고", () => {
+    const r = row(insiderBrief({ ...base, managerAdds: [move("A", 5, 0, 1)], managerTrims: [move("B", 2, 0, 1)] }), "managers");
+    assert.equal(text(r), "2026년 2분기에 거물 둘 이상이 새로 담거나 다 판 종목은 없습니다.");
   });
 });
 
@@ -149,11 +178,12 @@ describe("insiderBrief — 문장 꼴", () => {
       buys: [exec("AAPL", 10, 0), exec("NVDA", 20, 0)],
       congressTickers: [congress("MU", 2, 2, 0)],
       managerAdds: [move("MU", 3, 0, 2)],
+      managerTrims: [move("TSM", 3, 0, 2)],
     });
     const JOSA = /^[은는이가을를와과의에로도만]/;
     for (const r of rows) {
-      r.parts.forEach((p: InsiderBriefPart, i) => {
-        if (typeof p === "string" || "usd" in p) return;
+      r.parts.forEach((p, i) => {
+        if (typeof p === "string") return;
         const next = r.parts[i + 1];
         if (typeof next === "string") assert.doesNotMatch(next, JOSA, `${r.key}: [${p.name}]${next}`);
       });
