@@ -52,7 +52,8 @@ function VsAvg({ ratio, knob, showScale = true }: { ratio: number; knob: string;
   // **1배를 축 한가운데에 못박는다.** 예전엔 0~2배를 0~100%로 폈는데(1배가 가운데인 건
   // 같지만) 축이 넓어 1.0배와 1.3배가 15%p 차이로 붙어 보였다. ±0.5배를 양 끝으로 두면
   // 같은 차이가 30%p 로 벌어진다. 검색 지수는 1배 근처에서 노는 값이라 이쪽이 맞다.
-  const pos = Math.max(0, Math.min(100, 50 + (ratio - 1) * 100));
+  // 평소(nearUsual)면 노브를 1배 눈금에 바로 둔다 — 큰 글 · 화살표는 '평소'인데 노브만 8~11px 왼쪽이라 '조금 적음'으로 읽혔다(2026-10-05 점검).
+  const pos = nearUsual(ratio) ? 50 : Math.max(0, Math.min(100, 50 + (ratio - 1) * 100));
   // 채움을 **가운데에서 뻗어 나가게** 한다. 왼쪽 끝에서부터 채우면 1.0배(평소)도 절반이
   // 차 있어 "꽤 많다"로 읽힌다. 가운데 기준이면 평소는 채움이 없고, 채운 길이가 곧
   // '평소에서 얼마나 벗어났나'다 — 두 줄을 위아래로 놓았을 때 방향이 바로 갈린다.
@@ -309,7 +310,6 @@ export function CardSentiment({
   //
   // 건수가 없는 옛 행은 순감성(-100~100) 부호만 쓴다 — 세 칸 막대는 건수가 있어야
   // 그릴 수 있어서, 그 경우엔 반반으로 두고 큰 수치만 순감성으로 적는다.
-  const optimistic = ratio ? ratio.pos >= 50 : raw >= 0;
   // 두 칸(비관 : 낙관)으로 나눈다. **중립은 빼고 판정된 것끼리만** 견준다 —
   // 헤드라인의 "63:37" 이 이미 중립을 뺀 비율이라, 막대에 중립 칸을 넣으면 같은 카드
   // 안에서 두 숫자가 다른 분모를 쓰게 된다(2026-08-03 되돌림).
@@ -368,8 +368,9 @@ export function CardSentiment({
           <div style={{ width: `${posW}%`, borderRadius: "0 99px 99px 0", background: C.mania }} />
         </div>
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ fontSize: "var(--fs-11)", fontWeight: optimistic ? 600 : 700, color: C.cold }}>비관</span>
-          <span style={{ fontSize: "var(--fs-11)", fontWeight: optimistic ? 700 : 600, color: C.mania }}>낙관</span>
+          {/* 축 글자는 다른 카드처럼 500 — 우세 쪽은 큰 숫자 색과 꼬리표가 말한다. */}
+          <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.cold }}>비관</span>
+          <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.mania }}>낙관</span>
         </div>
       </div>
       <Foot text={v.desc} />
@@ -388,7 +389,7 @@ export function CardYoutube({ v }: { v: Pick }) {
   };
   const max = Math.max(v.threshold ?? 0, v.raw ?? 0) || 1;
   const rows = [
-    { label: "평소", value: v.threshold, fill: "var(--c-blue-5)", strong: false },
+    { label: "평소", value: v.threshold, fill: "var(--c-blue-3)", strong: false },
     { label: "오늘", value: v.raw, fill: C.blue, strong: true },
   ];
   return (
@@ -401,7 +402,8 @@ export function CardYoutube({ v }: { v: Pick }) {
           </strong>
           {/* 초보 검색량 카드와 같은 화살표 규칙 — 기준은 1배(평소)다. */}
           {!nearUsual(ratio) && (
-            <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: ratio < 1 ? C.cold : C.hot }}>{ratio > 1 ? "↑" : "↓"}</span>
+            // 위쪽 화살표는 --t-up — 초고온 칸의 옅은 빨강 바탕에서 C.hot 은 4.37:1 이었다(2026-10-05 점검).
+            <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: ratio < 1 ? C.cold : `var(--t-up, ${C.hot})` }}>{ratio > 1 ? "↑" : "↓"}</span>
           )}
           <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>평소 대비</span>
         </div>

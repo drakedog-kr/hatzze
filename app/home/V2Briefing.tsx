@@ -58,7 +58,7 @@ export function IndexModule({
           id="v2-index-spark"
           values={vals}
           base={50}
-          baseLabel="50℃"
+          baseLabel="고온 50℃"
           w={300}
           h={64}
           tone={tone}

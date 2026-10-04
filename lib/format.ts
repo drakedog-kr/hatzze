@@ -149,6 +149,16 @@ export function formatKstUpdateSnapped(isoString: string, scheduledHours: readon
 }
 
 /**
+ * formatKstUpdateSnapped 의 짧은 꼴 — "10/4 오후 6시". 미리보기 해외 값 머리가 살아 있는 값일 땐 "10/4 오후 11:20 시점",
+ * 담아 둔 값일 땐 "10월 4일(일) 오후 6시 시점"으로 같은 자리 꼴이 갈렸다(2026-10-05 점검). 정각 붙이기는 같다.
+ */
+export function formatKstSnappedShort(isoString: string, scheduledHours: readonly number[]): string {
+  const p = kstUpdateParts(new Date(isoString));
+  const scheduled = scheduledHours.find((h) => Math.abs(p.hour - h) <= SCHEDULE_SLACK_HOURS);
+  return `${p.month}/${p.day} ${scheduled !== undefined ? hourLabel(scheduled) : `${hourLabel(p.hour)}경`}`;
+}
+
+/**
  * 툴팁·미니차트 축의 짧은 날짜 표기. "YYYY-MM-DD" 또는 "MM-DD" 를 "M/D" 로 바꾼다.
  * 예: "2026-07-16" → "7/16", "07-16" → "7/16". 툴팁마다 date.slice(5) 를 흩뿌리지
  * 않고 여기 하나로 모아, 표기(하이픈↔슬래시)를 한 곳에서 바꾼다.

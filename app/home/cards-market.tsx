@@ -33,7 +33,8 @@ export function CardBuffett({ v }: { v: Pick }) {
           </div>
           {/* shadcn 막대 꼴(빈칸 위, 데이터 끝만 둥근 10px 막대 · shadcn.css .hz-hbar-*) — MDD 와 같은 방식(2026-09-27). */}
           <div className="hz-hbar-track hz-hbar-md hz-hbar-block">
-            <div className="hz-hbar-fill" style={{ width: `${gdpWidth}%`, background: "var(--c-blue-5)" }} />
+            {/* 비교 막대는 --c-blue-3 — --c-blue-5 는 바탕 막대와 1.15:1 이라 끝이 안 보였다(2026-10-05 점검). */}
+            <div className="hz-hbar-fill" style={{ width: `${gdpWidth}%`, background: "var(--c-blue-3)" }} />
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -154,7 +155,8 @@ export function CardMarketActions({ v }: { v: Pick }) {
   // 쪽이라 상온 파랑, CB 는 둘 다 걸릴 수 있어 중립인 연파랑.
   // 줄 이름은 장치 이름 그대로 — 'CB' 같은 영문 약어는 걷었다(v2, 2026-10-03). 매수 · 매도는 사이드카 방향이다(fetch_market_actions.py).
   const rows = [
-    { label: "매수 사이드카", n: buyN, fill: C.hot, ink: C.hot },
+    // 글자는 건수가 있을 때만 칠한다 — 발동 없음인데 '0건'만 빨갰다(2026-10-05 점검).
+    { label: "매수 사이드카", n: buyN, fill: C.hot, ink: buyN > 0 ? C.hot : C.ink },
     { label: "매도 사이드카", n: sellN, fill: C.neutral, ink: C.ink },
     { label: "서킷브레이커", n: cbN, fill: "var(--c-blue-4)", ink: C.label },
   ];
@@ -228,7 +230,8 @@ export function CardTurnover({ v }: { v: Pick }) {
           {segs.map((s2) =>
             s2.pct <= 0 ? null : (
               <div key={s2.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ width: 8, height: 8, borderRadius: 3, background: s2.fill, flexShrink: 0 }} />
+                {/* 옅은 조각(5~10위 · 그 외)은 점이 바탕에 묻혔다(1.12~1.28:1) — 가는 테두리로 점 자리를 보인다. */}
+                <span style={{ width: 8, height: 8, borderRadius: 3, background: s2.fill, boxShadow: "inset 0 0 0 1px var(--t-frame)", flexShrink: 0 }} />
                 {/* 종목 줄은 종목 화면으로 잇는다(코드가 있는 줄만 — 옛 행엔 코드가 없다). 말줄임을 자르는
                     상자가 링크 자신이라 크기·굵기·clip 을 링크에 준다(.hz-stock-link 주석). */}
                 {s2.code ? (
@@ -275,7 +278,8 @@ export function CardHighGap({ v, tops, failed = false }: { v: Pick; tops: StockH
   const priorHigh = v.details?.prior_high;
   const num = (n: number) => n.toLocaleString("ko-KR", { maximumFractionDigits: 0 });
   // 순위대로 진한 파랑 → 옅은 파랑. 색조가 아니라 명도만 움직여 '서열'로 읽히게 한다.
-  const rankColor = ["var(--c-blue-2)", "var(--c-blue-3)", "var(--c-blue-4)"];
+  // 셋째(--c-blue-4)가 바탕과 1.26:1 이라 통째로 한 단 진하게 옮겼다(2026-10-05 점검).
+  const rankColor = ["var(--c-blue-1)", "var(--c-blue-2)", "var(--c-blue-3)"];
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow
@@ -363,6 +367,9 @@ export function CardSpeed({ v, path = [], failed = false }: { v: Pick; path?: Cl
   const pts = base > 0 ? path.map((x) => ({ key: x.date, value: (x.close / base - 1) * 100 })) : [];
   const hi = pts.length ? Math.max(...pts.map((x) => x.value), 0) : null;
   const lo = pts.length ? Math.min(...pts.map((x) => x.value), 0) : null;
+  const hiLo = [hi !== null && hi >= 0.05 ? `최고 +${hi.toFixed(1)}%` : null, lo !== null && lo <= -0.05 ? `최저 ${lo.toFixed(1)}%` : null]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="trending_up" name={v.name} />
@@ -382,11 +389,8 @@ export function CardSpeed({ v, path = [], failed = false }: { v: Pick; path?: Cl
           />
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>3개월 전부터</span>
-            {hi !== null && lo !== null && (
-              <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>
-                최고 {hi >= 0 ? "+" : ""}{hi.toFixed(1)}% · 최저 {lo.toFixed(1)}%
-              </span>
-            )}
+            {/* 시작점(0%)에 머문 쪽은 적지 않는다 — 석 달 내내 아래였으면 '최고 +0.0%'가 뜻 없이 섰다(2026-10-05 점검). */}
+            {hiLo && <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>{hiLo}</span>}
           </div>
         </div>
       ) : (
@@ -578,7 +582,7 @@ export function CardVolume({ v }: { v: Pick }) {
   // 두 막대는 같은 축 위에 있어야 길이 비교가 뜻을 갖는다 — 큰 쪽을 100%로 둔다.
   const max = Math.max(avg ?? 0, today ?? 0) || 1;
   const rows: { label: string; value: number | null; fill: string; strong: boolean }[] = [
-    { label: "30일 평균", value: avg, fill: "var(--c-blue-5)", strong: false },
+    { label: "30일 평균", value: avg, fill: "var(--c-blue-3)", strong: false },
     { label: "최근 거래일", value: today, fill: C.blue, strong: true },
   ];
   return (
@@ -620,14 +624,14 @@ export function CardFx({ v }: { v: Pick }) {
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="waves" name={v.name} />
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-        <Big disp={`±${v.disp}`} unit={v.unit} color={v.color} size={32} />
-        {typeof close === "number" && (
-          <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
-            {close.toLocaleString("ko-KR", { maximumFractionDigits: 0 })}원
-          </span>
-        )}
-      </div>
+      {/* 환율은 큰 숫자 곁말로 — 알약이면 바로 아래 선이 환율 추이로 읽혔다(선은 변동성이다, 2026-10-05 점검). */}
+      <Big
+        disp={`±${v.disp}`}
+        unit={v.unit}
+        color={v.color}
+        size={32}
+        sub={typeof close === "number" ? `환율 ${close.toLocaleString("ko-KR", { maximumFractionDigits: 0 })}원` : undefined}
+      />
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <AreaChart points={pts} color={v.color} tip={(x) => `${shortDate(x.key)} · ±${x.value.toFixed(2)}%`} />
         {/* 기간은 차트의 캡션이지 큰 수치의 곁말이 아니다 — 차트 밑 오른쪽에 둔다
@@ -661,6 +665,11 @@ export function CardNetBuy({ v }: { v: Pick }) {
   const daily = dt?.daily5 ?? [];
   // 거래일은 주말·휴장을 건너뛰어 화면에서 역산할 수 없다 — 파이프라인이 넣어준 값을 쓴다.
   const dates = dt?.dates5 ?? [];
+  // 막대 아래 값 — 칸이 50px 안팎이라 조 단위 한 자리('-3.3조')로 줄인다. 천억 미만만 억으로.
+  const flowShort = (d: number) => {
+    const a = Math.abs(d);
+    return `${d >= 0 ? "+" : "-"}${a >= 1000 ? `${(a / 10000).toFixed(1)}조` : `${Math.round(a / 10) * 10}억`}`;
+  };
   const ymdShort = (ymd: number) => shortDate(`${String(ymd).slice(0, 4)}-${String(ymd).slice(4, 6)}-${String(ymd).slice(6, 8)}`);
   const maxAbs = Math.max(1, ...daily.map((d) => Math.abs(d)));
   const isBuy = cum >= 0;
@@ -743,6 +752,14 @@ export function CardNetBuy({ v }: { v: Pick }) {
               ))}
             </div>
           )}
+          {/* 그날 값 — 부호가 방향(+ 순매수 · − 순매도). 값이 말풍선에만 있어 막대가 무엇의 크기인지 안 읽혔다(2026-10-05 점검). */}
+          <div style={{ display: "flex", gap: 8 }}>
+            {daily.map((d, i) => (
+              <span key={i} style={{ flex: 1, textAlign: "center", fontFamily: MONO, fontSize: "var(--fs-11)", color: C.sub, whiteSpace: "nowrap" }}>
+                {flowShort(d)}
+              </span>
+            ))}
+          </div>
         </div>
       )}
       <Foot text={v.desc} />

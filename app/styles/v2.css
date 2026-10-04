@@ -137,7 +137,8 @@
   align-items: baseline;
   gap: 8px;
   min-width: 0;
-  padding: 9px 16px;
+  /* 왼쪽 14px — 아래 모듈 글자(테두리 1 + 안쪽 14)와 시작선이 맞는다. 16 이면 띠 글자만 2px 안쪽이었다(2026-10-05 점검). */
+  padding: 9px 14px;
   box-shadow: 1px 0 0 var(--t-line), 0 1px 0 var(--t-line);
 }
 .v2-cover-k {
@@ -608,7 +609,8 @@ a.v2-ev-row:hover { background: var(--t-tint); }
   /* 일정 아홉은 둘째 줄 세 칸의 키를 맞추려는 것이다. 한 줄기인 폰에선 길어지기만 해서 다섯으로. */
   .v2-band .v2-events li:nth-child(n + 6) { display: none; }
   .v2-band > #events .v2-events { display: flex; }
-  .v2-cover-cell { flex: 1 1 40%; padding: 8px 12px; }
+  /* 왼쪽은 데스크톱처럼 14(모듈 글자 시작선), 오른쪽은 10 으로 줄여 글자 폭을 그대로 둔다. */
+  .v2-cover-cell { flex: 1 1 40%; padding: 8px 10px 8px 14px; }
   /* 지수 칸은 한 줄 전체 — 날짜는 위 작은 줄, 코스피 · 코스닥은 아래 나란히. 반 칸에 두면 둘째 지수가 잘렸다(375). */
   .v2-cover-idx { flex: 1 1 100%; display: grid; grid-template-columns: 1fr 1fr; row-gap: 2px; column-gap: 12px; }
   .v2-cover-idx > .v2-cover-k { grid-column: 1 / -1; }
@@ -799,7 +801,11 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 /* 굵은 낱말 · 지표 이름 링크 — renderRichSummary 가 인라인으로 800 · 온도색을 박는다. 굵기만 v2 로 내린다(색은 온도 낱말의 뜻이라 둔다). */
 .v2-brief3 dd b,
 .v2-brief3 dd strong { font-weight: 600 !important; }
-.v2-bf .hz-brief3-link { color: var(--t-ink); font-weight: 600; text-decoration: underline; text-decoration-color: var(--t-ink4); text-underline-offset: 3px; }
+/* 홈 브리핑은 한 줄에 지표 이름 · 온도 낱말이 서너 개 선다 — 굵게 두면 한 줄에 굵은 덩어리가 다섯이었다(2026-10-05 점검).
+   색(온도색 · 잉크)과 링크 밑줄이 갈래를 말하니 굵기는 본문과 같게 둔다. 미리보기 브리핑(줄마다 둘 이하)은 그대로. */
+.v2-bf .v2-brief3 dd b,
+.v2-bf .v2-brief3 dd strong { font-weight: 500 !important; }
+.v2-bf .hz-brief3-link { color: var(--t-ink); font-weight: 500; text-decoration: underline; text-decoration-color: var(--t-ink4); text-underline-offset: 3px; }
 .v2-bf .hz-brief3-link:hover { color: var(--t-down); text-decoration-color: var(--t-down); }
 
 /* 지표 모듈 — 모듈 하나에 셀 격자. 시트의 둥근 판 · 안쪽 링 · 그림자는 걷고 모듈 테두리가 바깥을 맡는다.
@@ -823,6 +829,8 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 /* 칸 머리 — 아이콘 · 부제(설명 문장)를 걷고 이름 한 줄(13/700). 화면에 설명 문장을 두지 않는다(카더라 v2 규칙). */
 .v2-bf .hz-cell-head { height: auto; min-height: 20px; }
 .v2-bf .hz-cell-hot .hz-cell-head { padding-right: 48px; }
+/* 초고온 칸 옅은 빨강 바탕 위 작은 빨간 단위('%')가 4.37:1 이었다 — 같은 빨강 계열의 진한 쪽(--t-up, 4.64:1)으로. */
+.v2-bf .hz-cell-hot .hz-big-unit { color: var(--t-up) !important; }
 .v2-bf .hz-cell-icon,
 .v2-bf .hz-cell-desc,
 .v2-bf .hz-cell-foot { display: none !important; }
@@ -848,7 +856,7 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-bf .hz-cell-graphic { min-height: 0; gap: 12px !important; }
 /* 같은 줄 셀은 키가 같다 — 짧은 셀은 바닥이 비었다(풋/콜 72px · 안전장치 57px). 마지막 그림(막대 · 차트 · 목록)을 셀 바닥에 붙여
    한 줄 넷의 그림 바닥선이 맞게 한다. 이름 · 큰 숫자는 위에, 그림은 아래 — 줄이 표처럼 읽힌다. */
-.v2-bf .hz-cell-graphic > :last-child:not(:first-child) { margin-top: auto; }
+.v2-bf .hz-cell-graphic > :last-child:not(:first-child) { margin-top: auto; margin-bottom: 0; }
 /* 여윳돈 칸의 지표 이름 — 칸이 251px 이 되는 1,280 에서 '오마카세·파인다이닝 웨이팅 검색 지수'가 말줄임으로 잘렸다. 두 줄로 감는다. */
 .v2-bf .hz-subspend-name { white-space: normal !important; overflow: visible !important; word-break: keep-all; line-height: 1.35; }
 /* 지표 제보 칸 — 칸 가운데 링크 한 줄(아이콘 + 이름). 감성 판 끝 칸이다. */
@@ -1771,24 +1779,23 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-pv .v2-brief3 dd b.is-down { color: var(--t-down); }
 .v2-pv-briefp { margin: 0; padding: 12px 14px 14px; font-size: 13px; font-weight: 500; line-height: 22px; color: var(--t-ink2); word-break: keep-all; }
 
-/* 엮인 국장 종목 — 묶음 = [미장 칸 | 국장 줄들]. 머리 줄도 같은 격자라 열이 맞는다.
+/* 함께 움직인 국장 종목 — 묶음 = 미장 머리 줄(옅은 면 한 줄) + 그 아래 국장 줄들. 폰과 같은 얼개다.
+   예전엔 [미장 칸 | 국장 줄들] 두 칸이라 국장 줄이 여럿인 묶음은 왼쪽 300px 칸이 통째로 비었다(테슬라 묶음 317px 중 264px, 2026-10-05 점검).
    ⭐ 선은 **묶음 사이에만** 한 단 진하게(--t-frame) 긋고 묶음 안 국장 줄 사이엔 안 긋는다. 줄마다 같은 가는 선이었을 땐
    묶음 경계와 줄 경계가 똑같아 어디까지가 한 미장 종목의 몫인지 안 보였다(2026-10-03 "엮인 것들끼리의 구분이 잘 안 간다").
    묶음 위아래에 4px 씩 숨을 둬 경계 선이 줄에 붙지 않게 한다. */
 .v2-pv-tbl ol { list-style: none; margin: 0; padding: 0; }
-.v2-pv-grp { display: grid; grid-template-columns: 300px minmax(0, 1fr); border-bottom: 1px solid var(--t-frame); }
+.v2-pv-grp { border-bottom: 1px solid var(--t-frame); }
 .v2-pv-tbl > ol > li:last-child { border-bottom: 0; }
-/* 미장 칸은 두 줄(이름 / 업종 · 등락 / 평소 폭) 36px 을 위아래 8px 로 감싸 국장 쪽(숨 4 + 줄 44 + 숨 4)과 같은 키다 — 국장 줄이 하나인
-   묶음은 키가 꼭 맞고, 여럿인 묶음은 미장 칸이 첫 줄 가운데에 선다. 미장 칸이 국장 줄보다 크면 줄 하나인 묶음 바닥이 빈다(9px 였을 때 16px). */
-.v2-pv-us { display: flex; align-items: flex-start; gap: 8px; min-width: 0; padding: 8px 14px; border-right: 1px solid var(--t-line); }
-.v2-pv-us .hz-stock-logo,
-.v2-pv-us .hz-stock-badge { margin-top: 6px; }
-.v2-pv-usname { flex: 1; display: flex; flex-direction: column; min-width: 0; line-height: 18px; }
+/* 미장 머리 줄 — 한 줄(티커 · 이름 · 업종 … 요일 등락 · 평소 폭). 폰은 두 층으로 접는다(아래 ≤679). */
+.v2-pv-us { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px 14px; border-bottom: 1px solid var(--t-line); background: var(--t-head); }
+.v2-pv-usname { flex: 1; display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 8px; min-width: 0; line-height: 18px; }
+.v2-pv-us > .v2-td-two { flex-direction: row; align-items: baseline; column-gap: 8px; }
 .v2-pv-usname > span { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 6px; min-width: 0; }
 .v2-pv-usname b { font-weight: 600; }
 .v2-pv-usname em { font-style: normal; font-size: 12px; font-weight: 500; color: var(--t-ink3); word-break: keep-all; overflow-wrap: break-word; }
 .v2-pv-usname > span em { color: var(--t-ink2); }
-.v2-pv-when { display: none; }
+.v2-pv-when { font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-pv-kr {
   display: grid;
   grid-template-columns: 180px minmax(0, 1fr) 72px 72px 72px;
@@ -1810,8 +1817,7 @@ a.v2-pv-kr:hover { background: var(--t-tint); }
 .v2-pv-nums { display: contents; }
 .v2-pv-why { min-width: 0; font-size: 12px; font-weight: 500; line-height: 18px; color: var(--t-ink3); overflow-wrap: anywhere; }
 .v2-pv-kr .v2-td-num { font-weight: 500; }
-.v2-pv-head { background: var(--t-head); font-size: 12px; font-weight: 500; color: var(--t-ink3); }
-.v2-pv-head .v2-pv-us { align-items: center; min-height: 30px; padding-top: 0; padding-bottom: 0; }
+.v2-pv-head { border-bottom: 1px solid var(--t-frame); font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-pv-head .v2-pv-kr { min-height: 30px; }
 .v2-pv-head .v2-pv-nums > span { text-align: right; }
 
@@ -1823,7 +1829,6 @@ a.v2-pv-kr:hover { background: var(--t-tint); }
 @container kd (max-width: 999px) {
   .v2-pv-band,
   .v2-pv-band.is-pair { grid-template-columns: 216px minmax(0, 1fr); }
-  .v2-pv-grp { grid-template-columns: 220px minmax(0, 1fr); }
   .v2-pv-kr { grid-template-columns: 148px minmax(0, 1fr) 64px 64px 64px; }
 }
 @container kd (max-width: 679px) {
@@ -1849,13 +1854,15 @@ a.v2-pv-kr:hover { background: var(--t-tint); }
   /* 심볼 링크는 16px 줄이라 손가락에 작다 — 위아래 4px 를 늘리고 같은 만큼 바깥 여백을 빼 자리는 그대로(mobile.css 의 링크들과 같은 수법). */
   .v2-pv-sym { padding-block: 4px; margin-block: -4px; }
   .v2-pv-vol[data-k]::before { content: attr(data-k) " "; }
-  /* 엮인 국장 종목 — 미장 칸이 묶음 머리 줄(옅은 면), 그 아래 국장 줄이 두 층(위 이름 · 관계, 아래 개장 · 장 중 · 종가). */
+  /* 함께 움직인 국장 종목 — 머리 줄 대신 칸마다 이름(개장 · 장 중 · 종가)을 붙인다. 미장 머리 줄은 두 층(이름 / 업종 · 등락 / 평소 폭). */
   .v2-pv-head { display: none; }
-  .v2-pv-grp { display: block; }
-  .v2-pv-us { align-items: center; padding: 8px 14px; border-right: 0; border-bottom: 1px solid var(--t-line); background: var(--t-head); }
-  .v2-pv-us .hz-stock-logo,
-  .v2-pv-us .hz-stock-badge { margin-top: 0; }
-  .v2-pv-when { display: inline; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
+  .v2-pv-usname { flex-direction: column; align-items: stretch; }
+  .v2-pv-us > .v2-td-two { flex-direction: column; align-items: flex-end; }
+  /* 국장 대비 — 머리 줄이 숨어 이름이 사라졌다. '국장 대비'가 없으면 퍼센트가 선물의 하루 등락으로 읽힌다(OvernightModule 주석).
+     data-k 를 쓰면 .v2-td-two[data-k] 규칙(grid-area: krw)에 걸려 칸이 옮겨지므로 ::before 에 바로 적는다. */
+  .v2-pv-perp .v2-pv-diff { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; align-items: baseline; column-gap: 6px; }
+  .v2-pv-perp .v2-pv-diff em { flex-basis: 100%; text-align: right; }
+  .v2-pv-perp .v2-pv-diff::before { content: "국장 대비"; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
   .v2-pv-kr {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas: "stock why" "nums nums";

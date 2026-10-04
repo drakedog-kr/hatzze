@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { getKrIndexClosesSide } from "@/lib/data";
-import { formatKstUpdateSnapped } from "@/lib/format";
+import { formatKstSnappedShort, formatKstUpdateSnapped } from "@/lib/format";
 import { getOvernightLive, type OvernightData, type OvernightRow } from "@/lib/kr-overnight";
 import { getPreview, sessionWord, type PreviewLink, type PreviewMover } from "@/lib/kr-preview";
 import { assertLoaded, isLoadFailed } from "@/lib/load-state";
@@ -250,7 +250,7 @@ function OvernightModule({ overnight }: { overnight: OvernightData & { live: boo
   const at = overnight.capturedAt
     ? overnight.live
       ? `${kstStamp(overnight.capturedAt)} 시점`
-      : `${formatKstUpdateSnapped(overnight.capturedAt, PERP_HOURS).replace(" 기준", "")} 시점`
+      : `${formatKstSnappedShort(overnight.capturedAt, PERP_HOURS)} 시점`
     : null;
   // ⚠️ 환율은 하루에 하나다(수집기가 실행마다 한 번 받아 모든 줄에 같은 값을 넣는다). 줄 순서가 거래대금 순이라
   //    rows[0] 은 날마다 다른 종목이다 — 가장 큰 값을 집어 뜻을 못박는다. 원 단위로 반올림(카드 값이 원 단위다).
@@ -352,6 +352,7 @@ function BriefModule({
   const linkCount = new Map<string, number>();
   for (const m of movers) for (const l of m.links) linkCount.set(l.stock, (linkCount.get(l.stock) ?? 0) + 1);
   const crowded = [...linkCount.entries()].sort((a, b) => b[1] - a[1])[0];
+  const crowdedWith = crowded ? movers.filter((m) => m.links.some((l) => l.stock === crowded[0])).map((m) => m.usName) : [];
 
   return (
     <Module id="brief" title="오늘의 브리핑" className="v2-pv-briefmod">
@@ -381,9 +382,9 @@ function BriefModule({
             <div className="v2-brief3-row">
               <dt>국장</dt>
               <dd>
-                가장 크게 따라갔던 곳은 <b>{strongest.l.stock}</b>입니다. {strongest.m.usName}에 {strongest.l.why + euro(strongest.l.why)} 엮여 있어, 최근 5년 이만큼
-                움직인 날 아침에 평균 <b className={tone(strongest.l.krOpen).trim() || undefined}>{strongest.l.krOpen == null ? "없음" : PCT(strongest.l.krOpen)}</b>에
-                열렸습니다.
+                {/* 관계는 표와 같은 꼬리표로 둔다 — '엮여 있어' 같은 술어는 공급 · 경쟁 관계에 안 맞고 문장만 길었다(2026-10-05 점검). */}
+                가장 크게 따라간 곳은 <b>{strongest.l.stock}</b>({strongest.m.usName} · {strongest.l.why})입니다. 최근 5년 이런 날 평균{" "}
+                <b className={tone(strongest.l.krOpen).trim() || undefined}>{strongest.l.krOpen == null ? "없음" : PCT(strongest.l.krOpen)}</b>에 열렸습니다.
               </dd>
             </div>
           )}
@@ -391,8 +392,10 @@ function BriefModule({
             <div className="v2-brief3-row">
               <dt>겹친 곳</dt>
               <dd>
+                {/* 어느 미장 종목인지 이름으로 — 수만 적으면 표를 뒤져야 했다(2026-10-05 점검). 넷 이상이면 셋 + '등 N곳'. */}
                 <b>{crowded[0]}</b>
-                {josa(crowded[0], "은", "는")} {when} 크게 움직인 미장 종목 {crowded[1]}곳과 한꺼번에 엮입니다.
+                {josa(crowded[0], "은", "는")} {crowdedWith.length > 3 ? `${crowdedWith.slice(0, 3).join(" · ")} 등 ${crowdedWith.length}곳` : crowdedWith.join(" · ")}
+                {crowdedWith.length > 3 ? "과" : josa(crowdedWith[crowdedWith.length - 1], "과", "와")} 함께 움직입니다.
               </dd>
             </div>
           )}
@@ -410,7 +413,8 @@ function zx(z: number): string {
 /* ── 엮인 국장 종목 표 ───────────────────────────────────────────────────── */
 
 /**
- * 미장 종목 한 묶음 = 왼쪽 칸(그 미장 종목) + 오른쪽 국장 줄들(엮인 종목 · 관계 · 개장 · 장 중 · 종가).
+ * 미장 종목 한 묶음 = 머리 줄(그 미장 종목, 옅은 면 한 줄) + 그 아래 국장 줄들(엮인 종목 · 관계 · 개장 · 장 중 · 종가).
+ * 예전엔 [미장 칸 | 국장 줄들] 두 칸이라 국장 줄이 여럿인 묶음은 왼쪽 칸이 통째로 비었다(2026-10-05 점검) — 폰과 같은 얼개로 맞췄다.
  *
  * ⚠️⚠️ 국장 숫자 셋은 **최근 5년, 그 미장 종목이 이만큼(같은 방향) 움직인 날의 평균**이다 — 오늘 일이 아니다.
  *    모듈 머리 근거('최근 5년 이런 날 평균')와 위아래를 가르는 칸 경계가 그 말을 한다(옛 타일은 선과 머리줄로 갈랐다).
@@ -490,7 +494,6 @@ export default async function PreviewPage() {
   const when = usHoliday ? "밤사이" : sessionWord(date, usSession, usFrom);
   const movers = sectors.flatMap((s) => s.movers);
   const wall = [...movers].sort((a, b) => b.z - a.z);
-  const stockCount = new Set(movers.flatMap((m) => m.links.map((l) => l.stock))).size;
   const hasOvernight = overnight.rows.length > 0;
 
   return (
@@ -502,10 +505,9 @@ export default async function PreviewPage() {
           <CoverLinkCell key={c.ga} c={c} />
         ))}
         {/* ⚠️ 다른 화면의 30분 눈금이 아니라 HERO_HOURS 정각에 붙인다(06:31 에 쓰여 늘 '오전 7시'). 손으로 밖에서 돌린 실행만 '오후 3시경'. */}
-        <CoverMeta
-          updated={updatedAt ? formatKstUpdateSnapped(updatedAt, HERO_HOURS, "업데이트") : "업데이트 준비 중"}
-          basis={moverCount ? `미장 ${moverCount}종목 · 국장 ${stockCount}종목` : null}
-        />
+        {/* 근거(미장 N종목 · 국장 N종목)는 걷었다 — 링크 칸 둘 뒤에 붙이면 1,100 · 1,280 · 1,366 에서 업데이트 글자가 혼자 둘째 줄을
+            차지해 띠 절반이 비었다(2026-10-05 점검). 같은 수를 브리핑 첫 줄과 표가 말한다. */}
+        <CoverMeta updated={updatedAt ? formatKstUpdateSnapped(updatedAt, HERO_HOURS, "업데이트") : "업데이트 준비 중"} />
       </div>
 
       {/* 둘째 줄 — 밤사이 뉴욕 | 해외에서 거래 중인 값 | 오늘의 브리핑. 해외 값이 없는 날(수집 실패 · 표 없음)은 그 모듈째 빼고 두 칸.
@@ -521,8 +523,8 @@ export default async function PreviewPage() {
       {wall.length > 0 && (
         <Module id="links" title="함께 움직인 국장 종목" meta="최근 5년 이런 날 평균">
           <div className="v2-pv-tbl">
-            <div className="v2-pv-grp v2-pv-head">
-              <span className="v2-pv-us">{when} 미장</span>
+            {/* 머리 줄은 국장 줄의 칸 이름만 — 미장 종목은 묶음마다 머리 줄(옅은 면)로 선다. */}
+            <div className="v2-pv-head">
               <span className="v2-pv-kr">
                 <span>국장 종목</span>
                 <span>관계</span>
