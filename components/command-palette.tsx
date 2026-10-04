@@ -176,19 +176,24 @@ function PaletteBody({
             ))}
           </CommandGroup>
         )}
-        {index.trend.length > 0 && (
-          <CommandGroup heading={<Heading title="지금 뜨는 종목" unit="평소 대비" />}>
-            {index.trend.map((t) => (
-              <StockRow
-                key={`t:${t.market}:${t.code}`}
-                value={`t:${t.market}:${t.code}`}
-                s={{ market: t.market, code: t.code, name: t.name, alias: null, mentions: null }}
-                note={t.ratio === null ? "신규 등장" : `${t.ratio.toFixed(1)}배`}
-                go={go}
-              />
-            ))}
-          </CommandGroup>
-        )}
+        {/* 국장 · 미장을 묶음 둘로 가른다 — 한 묶음에 이어 붙이면 '6.3 · 5.6 · 5.0 · 10.9배'처럼 순서가 없어 보였다(2026-10-04 점검). */}
+        {(["kr", "us"] as const).map((mk) => {
+          const rows = index.trend.filter((t) => t.market === mk);
+          if (!rows.length) return null;
+          return (
+            <CommandGroup key={`trend-${mk}`} heading={<Heading title={`지금 뜨는 ${marketLabel(mk)} 종목`} unit="평소 대비" />}>
+              {rows.map((t) => (
+                <StockRow
+                  key={`t:${t.market}:${t.code}`}
+                  value={`t:${t.market}:${t.code}`}
+                  s={{ market: t.market, code: t.code, name: t.name, alias: null, mentions: null }}
+                  note={t.ratio === null ? "신규 등장" : `${t.ratio.toFixed(1)}배`}
+                  go={go}
+                />
+              ))}
+            </CommandGroup>
+          );
+        })}
       </>
     );
   } else {

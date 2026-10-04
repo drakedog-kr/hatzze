@@ -539,7 +539,7 @@ export function eventDateLabel(e: { date: string; precision: DatePrecision }): s
   const yearPrefix = y !== thisYear ? `${y}년 ` : "";
   if (e.precision === "day") {
     const wd = WEEKDAY[new Date(`${e.date}T00:00:00Z`).getUTCDay()];
-    return `${yearPrefix}${m}월 ${d}일 (${wd})`;
+    return `${yearPrefix}${m}월 ${d}일(${wd})`;
   }
   if (e.precision === "month") return `${yearPrefix}${m}월 중`;
   if (e.precision === "quarter") return `${yearPrefix}${Math.ceil(m / 3)}분기`;

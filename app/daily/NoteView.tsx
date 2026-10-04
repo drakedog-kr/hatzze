@@ -12,6 +12,7 @@ import {
   type NoteStub,
 } from "@/lib/daily-note";
 import { noteHeadings, parseNoteMarkdown, type NoteBlock, type NoteInline } from "@/lib/daily-note-md";
+import { stockDetailHref } from "@/lib/insider-range";
 import { stockHref } from "@/lib/stock-page";
 
 import { CoverLinkCell, CoverMeta, Module } from "../kadera/V2Modules";
@@ -142,7 +143,8 @@ function NoteTocModule({ blocks }: { blocks: NoteBlock[] }) {
   const items = noteHeadings(blocks).filter((h) => h.level === 3);
   if (!items.length) return null;
   return (
-    <Module title="목차">
+    // 판이 좁아 오른쪽 칸이 글 아래로 내려가면 숨긴다(v2.css .v2-nt-tocmod) — 다 읽은 뒤에 서는 목차는 쓸 데가 없고 언급된 종목을 한 화면 밀었다.
+    <Module title="목차" className="v2-nt-tocmod">
       <nav aria-label="글의 꼭지">
         <ol className="v2-nt-toc">
           {items.map((h) => (
@@ -160,18 +162,24 @@ function NoteTocModule({ blocks }: { blocks: NoteBlock[] }) {
  * 언급된 종목 — 국내는 이름 · 종가 · 등락, 미국은 이름 · 티커. 오른쪽 칸에 한 단으로 선다(좁은 판에선 글 아래 여러 단).
  *
  * ⚠️ 종가는 오늘 글이면 야후 실시간(카더라 카드와 같은 소스), 지난 글이면 `stocks` 표의 **최근** KRX 값이다 —
- *    지난 글을 열어도 오늘 시세가 보인다. 기준일이 다른 줄은 그 줄에 따로 적는다(lib/daily-note getNoteStocks 머리말).
+ *    지난 글을 열어도 오늘 시세가 보인다. 그래서 기준일이 글 날과 다르면 머리에 'n월 n일 종가'를 적고 등락률은 뺀다 —
+ *    다른 날의 하루 등락을 글 옆에 두면 그날 등락으로 읽혔다(2026-10-04 점검, 9월 28일 글 옆 HLB −0.25%).
+ *    기준일이 다른 줄은 그 줄에 따로 적는다(lib/daily-note getNoteStocks 머리말).
+ * ⭐ 미국 종목은 미장 종목 화면(/insider/stock)으로 잇는다 — 국내 줄만 눌리고 미국 줄은 안 눌렸다.
  * ⭐ 등락은 +/− 부호(v2 공통) — ▲▼ 는 걷었다.
  */
-function NoteStocksModule({ stocks }: { stocks: NoteStocks }) {
+function NoteStocksModule({ stocks, noteDate }: { stocks: NoteStocks; noteDate: string }) {
   if (!stocks.kr.length && !stocks.us.length) return null;
   const dates = stocks.kr.map((s) => s.priceDate).filter((d): d is string => Boolean(d));
   const latest = dates.length ? dates.reduce((a, b) => (a > b ? a : b)) : null;
+  const stale = latest !== null && latest !== noteDate;
+  const counts = `국내 ${stocks.kr.length} · 미국 ${stocks.us.length}`;
   return (
-    <Module id="stocks" title="언급된 종목" meta={`국내 ${stocks.kr.length} · 미국 ${stocks.us.length}`}>
+    <Module id="stocks" title="언급된 종목" meta={stale ? `${fmtNoteDay(latest)} 종가 · ${counts}` : counts}>
       <ul className="v2-nt-stocks">
         {stocks.kr.map((s) => {
-          const chg = s.changeRate;
+          // 등락률은 글 날의 값일 때만 — 지난 글 옆 최신 하루 등락은 글과 상관없는 숫자다.
+          const chg = s.priceDate === noteDate ? s.changeRate : null;
           return (
             <li key={s.code}>
               <Link href={stockHref(s.code)} className="v2-nt-stock" data-ga="note_stock_click">
@@ -194,13 +202,13 @@ function NoteStocksModule({ stocks }: { stocks: NoteStocks }) {
         {/* 미국 종목은 종가 원천이 없어 이름 · 티커만. 같은 줄 꼴로 이어 세운다(예전 칩 꼴은 v2 결과 안 맞는다). */}
         {stocks.us.map((u) => (
           <li key={u.ticker}>
-            <span className="v2-nt-stock is-us">
+            <Link href={stockDetailHref(u.ticker)} className="v2-nt-stock is-us" data-ga="note_stock_click">
               <StockLogo code={u.ticker} name={u.name} market="US" size={20} />
               <span className="v2-nt-stock-name">{u.name}</span>
               <span className="v2-nt-stock-px">
                 <em>{u.ticker}</em>
               </span>
-            </span>
+            </Link>
           </li>
         ))}
       </ul>
@@ -258,7 +266,7 @@ export function NoteView({
         <div className="v2-nt-main">{note ? <NoteArticle note={note} blocks={blocks} dated={dated} /> : <NoteEmpty failed={failed} />}</div>
         <aside className="v2-nt-rail" aria-label="글의 곁">
           {note && <NoteTocModule blocks={blocks} />}
-          {note && <NoteStocksModule stocks={stocks} />}
+          {note && <NoteStocksModule stocks={stocks} noteDate={note.date} />}
           {items.length > 0 && <NoteArchiveList items={items} current={note?.date ?? null} />}
         </aside>
       </div>

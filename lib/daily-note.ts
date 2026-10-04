@@ -98,10 +98,10 @@ export function fmtNoteDate(iso: string): string {
   return `${y}년 ${m}월 ${d}일 ${WEEKDAYS[weekdayOf(iso)]}`;
 }
 
-/** 목록용. "9월 5일 (토)" — 해는 목록 머리가 한 번만 말한다. */
+/** 목록용. "9월 5일(토)" — 해는 목록 머리가 한 번만 말한다. 요일은 붙인다(업데이트 시각 · MDD 와 같은 꼴). */
 export function fmtNoteDateShort(iso: string): string {
   const [, m, d] = iso.split("-").map(Number);
-  return `${m}월 ${d}일 (${WEEKDAYS_SHORT[weekdayOf(iso)]})`;
+  return `${m}월 ${d}일(${WEEKDAYS_SHORT[weekdayOf(iso)]})`;
 }
 
 /** "9월 3일" — 시세 기준일 같은 짧은 자리. */

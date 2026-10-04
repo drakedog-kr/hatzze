@@ -203,8 +203,8 @@ export default function PrivacyPage() {
         </P>
         <Ul>
           <li>
-            사용하시는 브라우저의 설정에서 쿠키를 차단하실 수 있습니다. 이 경우 화면 테마·통화·
-            사이드바 선택이 저장되지 않습니다.
+            사용하시는 브라우저의 설정에서 쿠키를 차단하실 수 있습니다. 이 경우 화면
+            테마·통화·사이드바 선택이 저장되지 않습니다.
           </li>
           <li>
             <Ext href="https://tools.google.com/dlpage/gaoptout">Google 애널리틱스 차단 부가기능</Ext>을

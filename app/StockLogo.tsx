@@ -85,9 +85,36 @@ function readBandColor(img: HTMLImageElement): string | null {
 /**
  * 받은 그림이 진짜 로고인가. 라우트는 로고가 없을 때 1×1 투명 그림을 200 으로 준다(app/api/logo 의 reply).
  * 폭 0 은 받다 실패한 것(옛 404 가 브라우저 캐시에 남은 경우 포함), 폭 1 은 '없음' 표시다.
+ *
+ * 보이는 픽셀이 전부 흰색인 로고(어두운 바탕용 로고)도 '없음'으로 친다 — 흰 타일 위에 얹히면 동그라미가 빈칸처럼
+ * 보였다(2026-10-04 점검, HLB제약 047920: 불투명 52% · 어두운 픽셀 0%). 그럴 땐 글자 배지가 낫다.
  */
 function isRealLogo(img: HTMLImageElement): boolean {
-  return img.naturalWidth > 1;
+  return img.naturalWidth > 1 && !isAllLight(img);
+}
+
+/** 불투명 픽셀 가운데 흰색에 가깝지 않은 것(R+G+B < 600)이 2% 도 안 되면 참. 못 읽으면 거짓(로고를 그대로 띄운다). */
+function isAllLight(img: HTMLImageElement): boolean {
+  try {
+    const n = 32;
+    const canvas = document.createElement("canvas");
+    canvas.width = n;
+    canvas.height = n;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return false;
+    ctx.drawImage(img, 0, 0, n, n);
+    const d = ctx.getImageData(0, 0, n, n).data;
+    let opaque = 0;
+    let dark = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 200) continue;
+      opaque += 1;
+      if (d[i] + d[i + 1] + d[i + 2] < 600) dark += 1;
+    }
+    return opaque > 0 && dark / opaque < 0.02;
+  } catch {
+    return false;
+  }
 }
 
 export function StockLogo({

@@ -134,9 +134,9 @@ export function VersionLink() {
       data-tip={show ? TIP_NEW : TIP_PLAIN}
       /* 이름을 글자에서 만들게 두면 툴팁 ::after 의 글까지 딸려 들어와 같은 말이 두 번
          읽힌다. 여기서 못박아 두면 그 셈이 아예 안 일어난다.
-         ⚠️ 눈에 보이는 글자("v.1.12.0")로 시작해야 한다 — 이름이 보이는 글자를 품지
+         ⚠️ 눈에 보이는 글자("v1.12.0")로 시작해야 한다 — 이름이 보이는 글자를 품지
             않으면 음성으로 조작하는 사람이 본 대로 부를 수 없다(WCAG 2.5.3). */
-      aria-label={`v.${APP_VERSION} · ${show ? TIP_NEW : TIP_PLAIN}`}
+      aria-label={`v${APP_VERSION} · ${show ? TIP_NEW : TIP_PLAIN}`}
       onClick={markSeen}
       style={{
         display: "inline-flex",
@@ -152,7 +152,7 @@ export function VersionLink() {
         letterSpacing: "0.02em",
       }}
     >
-      <span className="hz-version-num">v.{APP_VERSION}</span>
+      <span className="hz-version-num">v{APP_VERSION}</span>
       {show && <NewBadge lift={BADGE_LIFT} />}
     </Link>
   );

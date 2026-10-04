@@ -1847,8 +1847,11 @@ function PcHint() {
     pcHintStore.getSnapshot,
     () => false,
   );
+  const pathname = useAppPathname();
+  // 지표 화면용 문장이다 — 글을 읽는 화면(데일리 노트 · 문서)에선 띄우지 않는다(2026-10-04 점검).
+  const reading = pathname.startsWith(NOTE_PAGE.href) || pathname in DOC_PAGES;
 
-  if (!show) return null;
+  if (!show || reading) return null;
 
   const dismiss = () => {
     try {

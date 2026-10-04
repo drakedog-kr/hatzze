@@ -44,7 +44,8 @@ export async function generateStaticParams() {
   return [];
 }
 
-const MISSING: Metadata = { title: "글을 찾을 수 없습니다 | hatzze", robots: { index: false, follow: false } };
+// 제목은 루트 404(app/not-found.tsx)와 같은 말 — 탭은 '글을 찾을 수 없습니다', 화면 h1 은 '찾을 수 없는 주소입니다'로 갈렸다(2026-10-04 점검).
+const MISSING: Metadata = { title: "찾을 수 없는 주소입니다 | hatzze", robots: { index: false, follow: false } };
 
 export async function generateMetadata({ params }: { params: Promise<{ date: string }> }): Promise<Metadata> {
   const { date } = await params;

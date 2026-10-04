@@ -54,15 +54,19 @@ export default function ChangelogPage() {
           사람은 누르는 순간 이미 꺼지지만, 사이드바·검색·주소 직접 입력으로 닿은 사람은
           이 줄이 없으면 다 읽고 나가도 배지가 그대로 켜져 있다. 그리는 것은 없다. */}
       <ChangelogSeen />
-      <DocCover title="업데이트 기록" links={[]}>
-        <DocCell k="지금 판" v={`v${latest.version}`} sub={md(latest.date)} />
-        <DocCell k="지금까지" v={`${RELEASES.length.toLocaleString("ko-KR")}번`} />
+      {/* 달 바로가기 — 9월 한 달이 94줄이라 지난달로 가려면 한참 내려야 했다(2026-10-04 점검). '현재'는 줄 배지와 같은 말. */}
+      <DocCover
+        title="업데이트 기록"
+        links={months.slice(1).map((m) => ({ href: `#m-${m.key}`, label: `${Number(m.key.slice(5))}월` }))}
+      >
+        <DocCell k="현재" v={`v${latest.version}`} sub={md(latest.date)} />
+        <DocCell k="지금까지" v={`${RELEASES.length.toLocaleString("ko-KR")}번 업데이트`} />
         <DocCell k="첫 공개" v={koDate(first.date)} sub={`v${first.version}`} />
       </DocCover>
       {months.map((m) => {
         const [y, mo] = m.key.split("-").map(Number);
         return (
-          <Module key={m.key} id={`m-${m.key}`} title={`${y}년 ${mo}월`} meta={`${m.rows.length}번`} className="v2-cl-mod">
+          <Module key={m.key} id={`m-${m.key}`} title={`${y}년 ${mo}월`} meta={`${m.rows.length}번 업데이트`} className="v2-cl-mod">
             <ol className="v2-cl-list">
               {m.rows.map((rel) => (
                 <li key={rel.version} className="v2-cl-row">
