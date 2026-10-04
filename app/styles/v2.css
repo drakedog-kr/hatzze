@@ -72,35 +72,50 @@
   overflow: hidden;
 }
 /* 처음 온 사람에게 한 번 띄우는 쪽지(app/V2Hint.tsx) — v1 의 내부자 리포트 · 테마 지도 쪽지와 같은 생김새(잉크 바탕 · 카드색 글자).
-   자리표시자는 손가락을 통과시키고 쪽지 단추만 되받는다. 바탕은 잉크(89%)를 카드색 위에 겹쳐 불투명하게 — 비치면 아래 줄 글자가 섞였다.
+   자리표시자와 쪽지 몸은 손가락을 통과시키고(가려진 줄이 그대로 눌린다) 오른쪽 ✕ 만 되받는다. 바탕은 잉크(89%)를 카드색 위에 겹쳐 불투명하게 — 비치면 아래 줄 글자가 섞였다.
    모듈의 overflow:hidden 안이라 판 밖으로는 안 나간다(폭 상한 · 판 폭 − 28). */
 .v2-has-hint { position: relative; }
 .v2-hint-slot { position: absolute; z-index: 4; pointer-events: none; max-width: calc(100% - 28px); }
 .v2-hint-slot[hidden] { display: none; }
 .v2-hint {
-  pointer-events: auto;
   position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
   width: max-content;
-  max-width: min(320px, 100%);
-  margin: 0;
-  padding: 7px 10px 7px 8px;
-  border: 0;
+  max-width: min(340px, 100%);
+  padding: 5px 4px 5px 8px;
   border-radius: 6px;
   background: linear-gradient(var(--t-ink), var(--t-ink)) var(--t-card);
   color: var(--t-card);
-  font: inherit;
   font-size: 12px;
   font-weight: 500;
   line-height: 18px;
-  text-align: left;
   word-break: keep-all;
   box-shadow: 0 4px 16px rgba(15, 23, 42, 0.18);
-  cursor: pointer;
 }
 .v2-hint > :first-child { flex: none; font-size: 16px; }
+/* 닫기 — 24 칸(손가락 자리) · 글자색을 그대로 받아 옅게. 쪽지 몸이 손가락을 통과시키므로 이것만 되받는다. */
+.v2-hint-x {
+  pointer-events: auto;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  opacity: 0.7;
+  cursor: pointer;
+}
+.v2-hint-x:hover,
+.v2-hint-x:focus-visible { opacity: 1; background: color-mix(in srgb, var(--t-card) 16%, transparent); }
+.v2-hint-x > * { font-size: 16px; }
 /* 위 줄(가리키는 것)을 향한 꼭지 — 안에 띄우는 쪽지(차트 위)엔 없다. 위로 뒤집힌 쪽지(.is-above)는 아래를 가리킨다. */
 .v2-hint-slot:not(.is-inside) .v2-hint::before {
   content: "";

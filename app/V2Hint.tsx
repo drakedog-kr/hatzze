@@ -9,12 +9,15 @@ import { Icon } from "./ui";
  * 처음 온 사람에게 "여기를 누르면 무엇이 나온다"고 한 번만 알려 주는 쪽지(v2). 2026-10-05 운영자 판단으로 v1 의 쪽지 셋
  * (내부자 리포트 줄 · 테마 지도 칸)을 되살리고 열 곳을 더했다 — 줄이 링크인데 화살표가 없거나, 말풍선이 눌러야만 열리는 자리다.
  *
- * - 한 번 보면 끝이다. 쪽지를 누르거나 쪽지가 선 판(부모 요소)을 아무 데나 누르면 '봤음'으로 적는다(localStorage `hz-v2hint-<id>`).
+ * - 한 번 보면 끝이다. 오른쪽 ✕ 를 누르거나 쪽지가 선 판(부모 요소)을 아무 데나 누르면 '봤음'으로 적는다(localStorage `hz-v2hint-<id>`).
  *   click 이 아니라 pointerdown 인 이유: 링크를 누르면 그대로 페이지가 떠나서 click 이 안 올 수 있다.
+ * - 쪽지 몸은 손가락을 **통과**시킨다(v1 과 같다) — 쪽지에 가려진 줄 · 칸을 누르면 그대로 그리로 가고, 그 순간 '봤음'이 된다.
+ *   ✕ 만 손가락을 받는다 — 아무것도 안 누르고 끌 수 있어야 한다(2026-10-05 운영자 판단).
  * - 같은 id 는 같은 가르침이다 — 카더라에서 '종목을 누르면 …'을 본 사람에게 미리보기 · 데일리 노트에서 또 띄우지 않는다.
  * - **한 화면에 하나씩.** 화면에 붙은 쪽지 가운데 아직 안 본 것 중 order 가 가장 앞선 것만 뜨고, 그걸 보면 다음이 뜬다
  *   (한 화면에 같은 손가락 아이콘이 둘 서지 않는다). order 는 화면에서 위에 있는 차례로 준다.
- * - 닫기 ✕ 는 두지 않는다 — 쪽지 전체가 닫는 단추다. 맨 위 소식 띠의 ✕ 와 한 화면에 같은 아이콘이 둘 섰다.
+ * - 닫기 ✕ 는 맨 위 소식 띠의 ✕ 와 한 화면에 같이 설 수 있다 — 처음엔 그래서 쪽지 전체를 닫는 단추로 두고 ✕ 를 뺐는데, 쪽지를 누르는
+ *   것이 '그 줄을 누르는 것'으로 읽혀 끄는 길이 안 보였다(2026-10-05 운영자 지시로 ✕ 를 되살림).
  *
  * 자리: `anchor`(부모 안 CSS 선택자)를 주면 그 요소 바로 밑(at="below" · 위를 가리키는 꼭지) 또는 그 안 왼쪽 위(at="inside")에
  * 띄운다 — 좌표는 재서 넣는다(줄 키가 화면 폭마다 달라서). 밑에 두면 판 바닥을 넘는 자리(가리킨 줄이 마지막 줄)면 위로 뒤집는다
@@ -107,10 +110,13 @@ export function V2Hint({ id, text, order = 0, anchor, at = "below", className, s
   return (
     // ⚠️ `hidden` 이지 `return null` 이 아니다(app/hint-store.ts 머리 주석 ①).
     <div ref={ref} data-hint={id} className={`v2-hint-slot${at === "inside" ? " is-inside" : ""}${className ? ` ${className}` : ""}`} style={style} hidden={!show}>
-      <button type="button" className="v2-hint" onClick={() => markSeen(id)} aria-label={`${text}. 안내 닫기`}>
+      <div className="v2-hint" role="note">
         <Icon name="touch_app" />
         <span>{text}</span>
-      </button>
+        <button type="button" className="v2-hint-x" onClick={() => markSeen(id)} aria-label="안내 닫기">
+          <Icon name="close" />
+        </button>
+      </div>
     </div>
   );
 }
