@@ -4,6 +4,7 @@ import type { InsiderBriefRow, InsiderLeanRow } from "@/lib/insider-brief";
 import type { AnalystTop, CongressTicker, InsiderActivity, ManagerMove, ManagerRank } from "@/lib/insider-data";
 
 import { StockLogo } from "../StockLogo";
+import { Icon } from "../ui";
 import { Money } from "./parts";
 
 /**
@@ -193,7 +194,14 @@ export function LeanRows({ rows }: { rows: InsiderLeanRow[] }) {
         return (
           <div key={r.key} className="v2-in-lean-row">
             <div className="v2-in-lean-head">
-              <b>{r.label}</b>
+              <b>
+                {r.label}
+                {r.help && (
+                  <span className="hz-tip v2-mod-help" data-tip={r.help} aria-label={r.help} tabIndex={0}>
+                    <Icon name="help" />
+                  </span>
+                )}
+              </b>
               <span>{r.span}</span>
             </div>
             <div className="v2-in-lean-bar" aria-hidden>

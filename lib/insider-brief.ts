@@ -76,7 +76,9 @@ export function sellSize(rows: InsiderSellRow[]): { under: number; over: number 
 export type InsiderLeanRow = {
   key: "exec" | "congress" | "managers";
   label: string;
-  /** 축의 기간 — '7일' · '90일' · '2026 Q2'. 임원 줄은 무엇을 갈랐는지까지('7일 · 보유 중 판 몫'). */
+  /** 줄 이름 옆 물음표(15자 안) — 임원 줄의 '많이 판' 기준. */
+  help?: string;
+  /** 축의 기간 — '7일' · '90일' · '2026 Q2'. 임원 줄은 무엇에 견줬는지까지('7일 · 가진 주식 대비'). */
   span: string;
   /** dir — 왼쪽 산 쪽(빨강) · 오른쪽 판 쪽(파랑). size — 둘 다 판 쪽이라 왼쪽 연한 파랑 · 오른쪽 진한 파랑. */
   tone: "dir" | "size";
@@ -111,11 +113,13 @@ export function insiderLean(ov: BriefInput): InsiderLeanRow[] {
     {
       key: "exec",
       label: "임원",
-      // ⚠️ 216 칸(판 1,000 미만)에 두 값이 한 줄로 들어야 한다 — '보유 10% 미만 41명'이면 8px 모자랐다. '보유'는 머리로 올린다.
-      span: `${ov.windowDays}일 · 보유 중 판 몫`,
+      // 숫자 기준(10% 미만 · 이상)을 값 이름으로 두면 "한번에 이해하기 힘들다"(2026-10-04) — 값은 말로(조금 판 · 많이 판), 기준은 물음표로.
+      // ⚠️ 216 칸(판 1,000 미만)에 두 값이 한 줄로 들어야 한다 — '보유 10% 미만 41명'이면 8px 모자랐다.
+      help: `${Math.round(SELL_BIG_FRAC * 100)}% 이상 팔면 많이 판`,
+      span: `${ov.windowDays}일 · 가진 주식 대비`,
       tone: "size",
-      leftLabel: `${Math.round(SELL_BIG_FRAC * 100)}% 미만`,
-      rightLabel: `${Math.round(SELL_BIG_FRAC * 100)}% 이상`,
+      leftLabel: "조금 판",
+      rightLabel: "많이 판",
       left: ov.execSellSize.under,
       right: ov.execSellSize.over,
       unit: "명",

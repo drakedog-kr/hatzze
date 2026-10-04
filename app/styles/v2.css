@@ -1898,7 +1898,7 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 .v2-in-lean-row { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--t-line); }
 .v2-in-lean-row:last-child { border-bottom: 0; }
 .v2-in-lean-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 13px; line-height: 18px; }
-.v2-in-lean-head b { font-weight: 600; color: var(--t-ink); }
+.v2-in-lean-head b { display: inline-flex; align-items: center; gap: 2px; font-weight: 600; color: var(--t-ink); }
 .v2-in-lean-head span { font-size: 12px; font-weight: 500; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
 .v2-in-lean-bar { display: flex; gap: 2px; height: 8px; border-radius: 2px; overflow: hidden; background: var(--t-bar-off); }
 .v2-in-lean-bar i { display: block; min-width: 3px; height: 100%; }

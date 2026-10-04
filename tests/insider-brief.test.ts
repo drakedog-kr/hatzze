@@ -117,7 +117,7 @@ describe("insiderLean — 매매 방향", () => {
     assert.deepEqual(
       rows.map((r) => [r.key, r.tone, r.leftLabel, r.left, r.rightLabel, r.right, r.unit]),
       [
-        ["exec", "size", "10% 미만", 41, "10% 이상", 19, "명"],
+        ["exec", "size", "조금 판", 41, "많이 판", 19, "명"],
         ["congress", "dir", "매수", 3, "매도", 5, "건"],
         // M2 는 늘린 · 줄인 거물이 같아 어느 쪽에도 안 든다.
         ["managers", "dir", "늘림", 2, "줄임", 1, "종목"],
