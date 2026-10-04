@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { thinDays, usableDays, withTodayRank } from "../lib/theme-flow.ts";
+import { thinDays, usableDays, weekAgoDates, withTodayRank } from "../lib/theme-flow.ts";
 
 describe("withTodayRank", () => {
   it("마지막 날만 표 순위로 바꾸고 그 전 날은 그대로", () => {
@@ -57,5 +57,21 @@ describe("usableDays", () => {
     ]);
     assert.deepEqual(usableDays(totals, ["09-28", "09-29", "09-30", "10-03", "10-04"]), ["09-28", "09-29", "09-30", "10-03"]);
     assert.deepEqual(usableDays(null, ["a", "b"]), ["a", "b"]);
+  });
+});
+
+describe("weekAgoDates", () => {
+  it("최근 날마다 정확히 1주 앞(같은 요일) — 파이프라인 common/thin_days.py week_ago_dates 와 같은 답", () => {
+    const usable = ["2026-09-25", "2026-09-26", "2026-09-27", "2026-09-29", "2026-10-02", "2026-10-03", "2026-10-04"];
+    assert.deepEqual(weekAgoDates(["2026-10-02", "2026-10-03", "2026-10-04"], usable), ["2026-09-25", "2026-09-26", "2026-09-27"]);
+  });
+
+  it("1주 전 날이 쓸 날에 없으면 뺀다 · 다 없으면 빈 목록", () => {
+    assert.deepEqual(weekAgoDates(["2026-10-02", "2026-10-03", "2026-10-04"], ["2026-09-25", "2026-09-27"]), ["2026-09-25", "2026-09-27"]);
+    assert.deepEqual(weekAgoDates(["2026-10-02"], ["2026-10-01"]), []);
+  });
+
+  it("달 · 해를 넘어도 같다", () => {
+    assert.deepEqual(weekAgoDates(["2027-01-03"], ["2026-12-27"]), ["2026-12-27"]);
   });
 });

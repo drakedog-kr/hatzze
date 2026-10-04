@@ -225,16 +225,22 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
           </span>
         </div>
         <div className="v2-cover-cell">
-          {/* +%p 는 평소(5일 이상 전 평균) 대비 — 머리에 적는다(2026-10-04 점검). */}
-          {/* 견준 기간을 글자로 — 이 화면엔 '평소'가 둘이었다(이 띠는 1~2주 전 평균, 말 많은 종목 태그는 앞 27일). 2026-10-04 점검. */}
-          <span className="v2-cover-k">최근 {KADERA_WINDOW_DAYS}일 점유율 · 1~2주 전 대비</span>
+          {/* 칸 이름엔 점유율의 기간만, 변화(+%p)가 견준 기간은 그 값 바로 앞에 — 칸 이름에 '최근 3일 점유율 · 1~2주 전 대비'로 나란히
+              두었더니 두 기간이 한 덩어리로 읽혔다(2026-10-05 운영자 판단, 카더라 · 테마 판세와 같은 정리). '평소'라 부르지 않는 건
+              말 많은 종목 태그(앞 27일)와 두 뜻이 돼서다(2026-10-04 점검). */}
+          <span className="v2-cover-k">최근 {KADERA_WINDOW_DAYS}일 점유율</span>
           <span className="v2-cover-v">
             {d.loadFailed || d.recentShare == null ? (
               <em>{d.loadFailed ? "집계를 불러오지 못했습니다" : "집계된 날이 없습니다"}</em>
             ) : (
               <>
                 <b>{d.recentShare.toFixed(1)}%</b>
-                {d.shareDelta != null && <span className={`v2-cover-chg${toneCls(d.shareDelta, 1)}`}>{pp(d.shareDelta)}</span>}
+                {d.shareDelta != null && (
+                  <>
+                    <em>1주 전 대비</em>
+                    <span className={`v2-cover-chg${toneCls(d.shareDelta, 1)}`}>{pp(d.shareDelta)}</span>
+                  </>
+                )}
                 {d.recentRank && <em>{d.recentRank}위</em>}
               </>
             )}

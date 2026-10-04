@@ -36,6 +36,24 @@ export function usableDays(dayTotals: Map<string, number> | null, days: string[]
   return days.filter((d) => !thin.has(d));
 }
 
+/** 테마 점유율 변화가 견주는 간격(일) — 화면 글자 '1주 전 대비'. */
+export const THEME_COMPARE_DAYS = 7;
+
+/**
+ * 테마 점유율 변화의 견줄 날 — 최근 창(recent)의 날마다 정확히 1주(THEME_COMPARE_DAYS) 앞, 같은 요일이다. 그 날이 쓸 날(usable,
+ * 얇은 날을 뺀 날짜)에 없으면 뺀다 — 비면 변화를 안 적는다.
+ * 예전엔 '5일 이상 전 평균'(5~14일 전)이라 화면이 '1~2주 전 대비'로 적었는데, 머리 근거로는 기간이 둘이라 헷갈렸고 '1주 전 대비'로
+ * 통일했다(2026-10-05 운영자 판단). 2026-08-01~10-04 65일을 되돌려 보면 변화의 방향은 81%(국장) · 82%(미장)가 같고, 하루 사이 흔들림은
+ * 20% 남짓 커진다(국장 중앙 0.81 → 1.03%p) — 견주는 날이 열흘에서 사흘로 준 값이다.
+ * ⚠️ 파이프라인 짝(common/thin_days.py week_ago_dates)과 같은 규칙이다. 방송 테마 글이 같은 날 같은 테마의 변화를 적는다.
+ */
+export function weekAgoDates(recent: string[], usable: string[]): string[] {
+  const have = new Set(usable);
+  return recent
+    .map((d) => new Date(Date.parse(`${d}T00:00:00Z`) - THEME_COMPARE_DAYS * 86_400_000).toISOString().slice(0, 10))
+    .filter((d) => have.has(d));
+}
+
 /**
  * 하루 앞(쓸 날의 끝에서 둘째 날)에서 끝나는 n 일 평균 점유율 순위 — '5위 밖으로 밀린 테마'를 표 순위(최근 n 일 평균)와 같은 잣대로
  * 견주려고 낸다. 어제 **하루** 순위와 오늘 3일 순위를 견주면 표에서 오르는 중인 테마가 '밀렸다'로 떴다(2026-10-04 점검, 조선).

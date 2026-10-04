@@ -217,7 +217,7 @@ export function stockHref(code: string, market: string | null): string | null {
 
 /**
  * 테마 점유율 — 상위 열 테마의 막대 목록. 줄마다 순위 · 테마 · 점유율 막대 · 점유율 · 변화(2026-10-04).
- * 점유율 = 최근 3일 평균(머리 띠의 '최근 3일'), 변화 = 5일 이상 전 평균과의 차이(lib/telegram-data.ts THEME_PRIOR_GAP_DAYS).
+ * 점유율 = 최근 3일 평균(머리 띠의 '최근 3일'), 변화 = 1주 전 같은 날들의 평균과의 차이(lib/theme-flow.ts weekAgoDates).
  *
  * 2차의 작은 카드 열 장(미니 선 · 이름 · 대장 꼬리표 · 점유율 · 변화)을 되살렸었는데 "열 개라 너무 복잡하고 정보 전달도 잘 안 된다"였다(10-04).
  * 카드마다 다섯 가지가 서서 한 칸에 쉰 개 가까운 글자 · 그림이 섞였고, 두 칸 격자라 몇 위가 어디인지도 안 읽혔다. 그래서 '어느 테마에
@@ -247,7 +247,7 @@ export function ThemeShares({
     <Module
       id="themes"
       title="테마 점유율"
-      // 머리엔 점유율의 기간만. 변화(+20.5%p)가 견준 기간(5~14일 전 평균, lib/telegram-data.ts THEME_PRIOR_GAP_DAYS)은 그 칸 머리가 말한다 —
+      // 머리엔 점유율의 기간만. 변화(+20.5%p)가 견준 기간(1주 전 같은 날들, lib/theme-flow.ts weekAgoDates)은 그 칸 머리가 말한다 —
       // 머리에 '최근 3일 · 1~2주 전 대비'로 나란히 두었더니 두 기간이 한 덩어리로 읽혀 헷갈렸다(2026-10-05 운영자 판단).
       meta="최근 3일"
       // 테마 전체 보기는 이 머리 오른쪽에 둔다(2026-10-03) — 첫 줄 띠 끝에 있을 땐 띠가 1,280 에서 두 줄로 접혔고, 목록을 보다 넘어가는 자리가 여기다.
@@ -271,7 +271,7 @@ export function ThemeShares({
               <span>테마</span>
               <span />
               <span>점유율</span>
-              <span>1~2주 전 대비</span>
+              <span>1주 전 대비</span>
             </span>
           </li>
           {rows.map((t, i) => {

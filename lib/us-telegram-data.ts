@@ -43,7 +43,7 @@ import { changeRateOf, dateInZone, fetchYahooQuote } from "@/lib/yahoo-quote";
 import { yahooSymbol } from "@/lib/yahoo-history";
 import { US_THEMES } from "@/lib/us-stock-themes";
 import { scoreUsSurging } from "@/lib/surging-score";
-import { usableDays } from "@/lib/theme-flow";
+import { usableDays, weekAgoDates } from "@/lib/theme-flow";
 
 /** 급부상 판정에서 '최근'으로 볼 일수. 국내(KADERA_WINDOW_DAYS)와 같게 둔다. */
 export const US_WINDOW_DAYS = 3;
@@ -704,17 +704,14 @@ export type UsTrendingMessage = {
  * 예전엔 기준일 **하루치**를 7일 전 하루와 견줬다. 그러면 주말·수집이 얇은 날에
  * 점유율이 통째로 요동친다 — 국장 쪽 주석이 그래서 창을 며칠씩 묶어 쓴다고 적어 두었다.
  *
- * 최근 3일 평균 vs **5일 이상 이전** 평균. 사이 이틀(3·4일 전)을 비워 두는 이유는
- * 겹침을 막으려는 게 아니라(공백 없이도 안 겹친다) 경계를 갓 넘어온 날을 막으려는
- * 것이다 — 공백이 없으면 기준 창의 가장 최근 날이 '어제까지 최근 창에 있던 날'이라,
- * 최근 3일을 하루 밀린 자기 자신과 견주는 꼴이 된다.
+ * 최근 3일 평균 vs **1주 전 같은 날들**의 평균(화면 글자 '1주 전 대비', lib/theme-flow.ts weekAgoDates).
+ * 예전 '5일 이상 이전 평균'(5~14일 전)에서 바꿨다 — 근거와 되돌려 잰 값은 그쪽 주석에 있다(2026-10-05).
  *
  * ⚠️ 미장 총평 둘째 대목이 적는 점유율은 이 표의 값이다 — 파이썬 사본
  * (generate_us_telegram_narratives.theme_window_shares)이 같은 창·같은 평균으로 낸다.
  */
 const THEME_SERIES_DAYS = 14;
 const THEME_RECENT_DAYS = 3;
-const THEME_PRIOR_GAP_DAYS = 5;
 
 /**
  * 미장 테마 로테이션.
@@ -768,19 +765,9 @@ export async function getUsThemeRotation(limit = 8): Promise<{ date: string | nu
     byTheme.set(r.theme, m);
   }
 
-  const dayMs = 86_400_000;
-  // 앞 창과의 간격은 쓸 날의 마지막 날부터 잰다(국장과 같다). 기준일이 얇아 빠졌으면 하루 앞이 끝이다.
-  const windowEnd = dates[dates.length - 1];
-  const daysBefore = (d: string) =>
-    (new Date(`${windowEnd}T00:00:00Z`).getTime() - new Date(`${d}T00:00:00Z`).getTime()) / dayMs;
-
+  // 최근 창은 쓸 날의 끝 셋(기준일이 얇아 빠졌으면 하루 앞이 끝이다) · 견줄 날은 그 날마다 정확히 7일 앞(국장과 같다).
   const recentDates = dates.slice(-THEME_RECENT_DAYS);
-  // recent 는 **개수**로, prior 는 **날짜 간격**으로 잡는다. 수집이 며칠 끊기면 recent 가
-  // 5일 전보다 더 뒤까지 손을 뻗어 같은 날이 양쪽에 들어가므로 명시적으로 뺀다(국장이
-  // 실제로 겪은 함정 — 카더라 수집은 2026-07-26~28 에 이틀 멈춘 적이 있다).
-  const priorDates = dates.filter(
-    (d) => daysBefore(d) >= THEME_PRIOR_GAP_DAYS && !recentDates.includes(d),
-  );
+  const priorDates = weekAgoDates(recentDates, dates);
 
   const themeNames = [...byTheme.keys()];
   // 그날 안 뜬 테마는 0 으로 치므로 **창 전체 일수**로 나눈다(등장한 날 수가 아니다).

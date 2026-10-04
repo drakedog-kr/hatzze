@@ -169,7 +169,7 @@ async function loadThemes(): Promise<SearchIndex["themes"]> {
     .slice(0, THEME_US_ROWS)
     .map((t) => ({ market: "us" as const, name: t.theme, delta: t.shareDelta! }));
   // 늘어난 폭 순으로 한 목록 — 국장 둘 + 미장 하나를 이어 붙였더니 12.3 · 3.1 · 6.3 처럼 순서가 뒤섞였다(2026-10-05 점검).
-  // 줄마다 국장 · 미장 꼬리가 있어 섞어도 갈린다. 두 시장 다 5일 이상 전 평균과 견준다(THEME_PRIOR_GAP_DAYS).
+  // 줄마다 국장 · 미장 꼬리가 있어 섞어도 갈린다. 두 시장 다 1주 전 같은 날들과 견준다(lib/theme-flow.ts weekAgoDates).
   return [...krRows, ...usRows].sort((a, b) => b.delta - a.delta);
 }
 

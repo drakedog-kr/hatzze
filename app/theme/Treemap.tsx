@@ -67,7 +67,7 @@ export type TreemapTile = {
   sub?: string;
 };
 
-/** 테마 목록의 칸 — 넓이는 점유율, 색은 5일 넘게 이전과 견준 변화(%p). 시장 키로 주소를 가른다(/theme/… · /theme/us/…). */
+/** 테마 목록의 칸 — 넓이는 점유율, 색은 1주 전 같은 날들과 견준 변화(%p, lib/theme-flow.ts weekAgoDates). 시장 키로 주소를 가른다(/theme/… · /theme/us/…). */
 export function themeTiles(themes: ThemeOverview[], market: ThemeMarketKey = "kr"): TreemapTile[] {
   return themes.map((t) => ({
     key: t.theme,
@@ -75,7 +75,7 @@ export function themeTiles(themes: ThemeOverview[], market: ThemeMarketKey = "kr
     value: t.sharePct,
     tone: toneOf(t.shareDelta),
     href: marketThemeHref(market, t.theme),
-    tip: `${t.theme} · 점유율 ${t.sharePct.toFixed(1)}% · ${fmtDelta(t.shareDelta)} · ${t.rank}위`,
+    tip: `${t.theme} · 점유율 ${t.sharePct.toFixed(1)}% · ${t.shareDelta == null ? fmtDelta(null) : `1주 전 대비 ${fmtDelta(t.shareDelta)}`} · ${t.rank}위`,
     valueText: `${t.sharePct.toFixed(1)}%`,
     sub: t.topStocks.length ? t.topStocks.map((x) => x.name).join(" · ") : undefined,
   }));
@@ -184,11 +184,12 @@ export function Treemap({
   );
 }
 
-/** 지도 아래 범례. 색이 무엇을 뜻하는지 글자로 한 번 적는다(색만으로 방향을 말하지 않는다). */
-export function TreemapLegend({ up, flat, down }: { up: string; flat: string; down: string }) {
+/** 지도 아래 범례. 색이 무엇을 뜻하는지 글자로 한 번 적는다(색만으로 방향을 말하지 않는다). basis = 색이 견준 기간(맨 앞 글자). */
+export function TreemapLegend({ up, flat, down, basis }: { up: string; flat: string; down: string; basis?: string }) {
   const sw = (cls: string) => <span className={`hz-tm-sw ${cls}`} aria-hidden="true" />;
   return (
     <div className="hz-tm-legend">
+      {basis && <span className="hz-tm-basis">{basis}</span>}
       <span>{sw("is-up-3")}{sw("is-up-2")}{sw("is-up-1")} {up}</span>
       <span>{sw("is-flat")} {flat}</span>
       <span>{sw("is-down-1")}{sw("is-down-2")}{sw("is-down-3")} {down}</span>

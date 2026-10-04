@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+from datetime import date, timedelta
 from statistics import median
 
 # 하루 총량이 평소(총량이 있는 날의 중앙값)의 이 비율 미만이면 얇은 날이다. lib/theme-flow.ts THIN_DAY_FRAC 와 같은 값.
@@ -32,3 +33,18 @@ def usable_days(day_totals: dict[str, float] | None, days: list[str]) -> list[st
     """얇은 날을 뺀 날짜(받은 차례 그대로)."""
     thin = thin_days(day_totals, days)
     return [d for d in days if d not in thin]
+
+
+# 테마 점유율 변화가 견주는 간격(일) — 화면 글자 '1주 전 대비'. lib/theme-flow.ts THEME_COMPARE_DAYS 와 같은 값.
+THEME_COMPARE_DAYS = 7
+
+
+def week_ago_dates(recent: list[str], usable: list[str]) -> list[str]:
+    """테마 점유율 변화의 견줄 날 — 최근 창의 날마다 정확히 1주 앞(같은 요일). 쓸 날(얇은 날을 뺀 날짜)에 없으면 뺀다.
+
+    **lib/theme-flow.ts weekAgoDates 를 옮긴 것이다.** 사이트 테마 표(국장 · 미장)와 방송 테마 글이 같은 날 같은 테마의
+    변화를 적는다. 예전엔 '5일 이상 전 평균'(5~14일 전)이었다 — 근거와 되돌려 잰 값은 그쪽 주석에 있다(2026-10-05).
+    """
+    have = set(usable)
+    back = ((date.fromisoformat(d) - timedelta(days=THEME_COMPARE_DAYS)).isoformat() for d in recent)
+    return [d for d in back if d in have]

@@ -419,12 +419,12 @@ a.v2-tr:hover { background: var(--t-tint); }
    'AI 인프라·클라우드' 줄만 두 줄로 감겨 줄 높이가 어긋났다(2026-10-04 점검). 줄은 남는 키를 고르게 나눈다(1fr). */
 /* 줄 꼴은 옆 · 아래 표와 같다(머리 줄 30 옅은 면 · 줄 40 · 가는 선 · 안쪽 14). 머리 줄 없이 30px 줄이던 때 짝인 급부상 표와
    줄이 9px 씩 엇갈렸고, 순위 칸이 실폭 8px 라 '10'이 넘치거나 폰에서 '1' / '0' 두 줄로 꺾였다(2026-10-05 점검).
-   첫 칸 34 · 끝 칸 84 는 줄 안쪽 14 를 품은 값이다(subgrid 줄의 안쪽 여백이 첫 · 끝 칸을 먹는다) — 실폭 20(순위) · 70(머리 '1~2주 전 대비').
+   첫 칸 34 · 끝 칸 70 은 줄 안쪽 14 를 품은 값이다(subgrid 줄의 안쪽 여백이 첫 · 끝 칸을 먹는다) — 실폭 20(순위) · 56(머리 '1주 전 대비' 55 · '+12.3%p' 52).
    끝 칸 머리가 견준 기간을 말한다 — 모듈 머리에 '최근 3일 · 1~2주 전 대비'로 나란히 두었더니 헷갈렸다(2026-10-05 운영자 판단). */
 .v2-tsh {
   flex: 1;
   display: grid;
-  grid-template-columns: 34px minmax(92px, max-content) minmax(0, 1fr) 46px 84px;
+  grid-template-columns: 34px minmax(92px, max-content) minmax(0, 1fr) 46px 70px;
   grid-template-rows: 30px;
   grid-auto-rows: minmax(40px, 1fr);
   column-gap: 12px;
@@ -577,7 +577,7 @@ a.v2-ev-row:hover { background: var(--t-tint); }
 @container kd (max-width: 1099px) {
   .v2-band { grid-template-columns: calc(25% - 6px) minmax(0, 1fr) 340px; }
   /* 테마 칸이 395 로 좁아진다(1,280) — 테마 이름 칸을 줄인다. 긴 이름은 두 줄로 감긴다(잘리지 않는다). */
-  .v2-tsh { grid-template-columns: 34px minmax(84px, max-content) minmax(0, 1fr) 44px 84px; column-gap: 10px; }
+  .v2-tsh { grid-template-columns: 34px minmax(84px, max-content) minmax(0, 1fr) 44px 70px; column-gap: 10px; }
   .v2-grid { grid-template-columns: minmax(0, 1fr) 340px; }
   .v2-tr,
   .v2-tbl.is-talk .v2-tr { grid-template-columns: 20px 160px minmax(0, 1fr) 72px 64px; }
@@ -1629,6 +1629,8 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-tm .hz-tm-sw.is-flat { background: var(--t-bar-off); }
 .v2-tm .hz-tm-legend { gap: 6px 16px; padding: 10px 14px 12px; font-size: 11px; font-weight: 500; color: var(--t-ink3); }
 .v2-tm .hz-tm-sw { width: 10px; height: 10px; border-radius: 2px; }
+/* 범례 맨 앞 '1주 전 대비' — 색이 견준 기간. 견본 색이 없는 이름표라 한 단 진하게. */
+.v2-tm .hz-tm-basis { color: var(--t-ink2); }
 
 /* 주인공 표 — 옆 일정 칸 키에 맞춰 줄이 고르게 늘어난다. */
 .v2-tm-hot .v2-tbl,
@@ -1644,6 +1646,11 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-tm-flowtbl .v2-tr { grid-template-columns: 20px 336px minmax(0, 1fr) 88px 120px; min-height: 52px; }
 .v2-tm-flowtbl .v2-th > * { white-space: nowrap; }
 .v2-tm-flowtbl .v2-th { min-height: 44px; }
+/* 점유율 칸 머리 두 줄 — 칸 꼴(점유율 / 그 아래 변화)과 같다. 둘째 줄이 변화가 견준 기간이다(2026-10-05 운영자 판단 '1주 전 대비'). */
+.v2-tm-flowtbl .v2-th > .v2-th-two { display: flex; flex-direction: column; align-items: flex-end; line-height: 16px; }
+.v2-th-two em { font-style: normal; }
+/* 흐름 머리 근거 끝 '· 1주 전 대비'는 폰만 — 넓은 화면은 점유율 칸 머리가 말한다. 폰은 표 머리 줄이 숨는다. */
+.v2-tm-basis { display: none; }
 /* 순위는 테마 이름 줄에 — 이름 · 종목 두 줄 칸이 줄 가운데를 정해 순위가 둘 사이에 떠 보였다(2026-10-05 점검). 테마 칸 위 여백 7 과 같은 줄. */
 .v2-tm-flowtbl .v2-tbody .v2-td-rank { align-self: start; margin-top: 7px; }
 .v2-td-theme2 { display: flex; flex-direction: column; gap: 1px; min-width: 0; padding: 7px 0; }
@@ -1821,6 +1828,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   .v2-tm-map-in,
   .v2-tm-map-legend { display: none; }
   .v2-tm-map-bar { display: block; }
+  .v2-tm-basis { display: inline; }
   /* 테마 흐름 — 위 테마 · 점유율, 가운데 열흘 한 조각, 아래 요즘 도는 얘기. */
   .v2-tm-flowtbl .v2-tr {
     grid-template-columns: 20px minmax(0, 1fr) auto;

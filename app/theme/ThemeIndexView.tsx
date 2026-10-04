@@ -83,7 +83,7 @@ export function ThemeIndexView({
   const flowDates = all[0]?.flowDates ?? [];
 
   /* 첫 줄 띠 — 오늘 무엇이 달라졌나. 칸마다 다른 테마를 세운다(옛 히어로 '같은 테마를 두 번 세우지 않는다'와 같은 규칙).
-     관심 변화 둘(가장 많이 늘어난 · 줄어든, 5일 전 대비) + 상위권의 문 하나(새로 상위에 오른 → 없으면 상위에서 내려간 → 순위가 가장 오른). */
+     관심 변화 둘(가장 많이 늘어난 · 줄어든, 1주 전 대비) + 상위권의 문 하나(새로 상위에 오른 → 없으면 상위에서 내려간 → 순위가 가장 오른). */
   const used = new Set<string>();
   const pick = <T,>(list: T[], nameOf: (x: T) => string) => {
     const x = list.find((y) => !used.has(nameOf(y))) ?? null;
@@ -131,14 +131,16 @@ export function ThemeIndexView({
         {coverLinks.map((c) => (
           <CoverLinkCell key={c.ga} c={c} />
         ))}
-        {/* 근거는 걷었다 — '최근 3일 언급'은 지도 머리, 견준 기간은 흐름 머리가 말한다. 근거를 붙이면 링크 칸 셋 뒤 업데이트가
+        {/* 근거는 걷었다 — '최근 3일 언급'은 지도 머리, 견준 기간('1주 전 대비')은 지도 범례 · 흐름 표 점유율 칸 머리가 말한다. 근거를 붙이면 링크 칸 셋 뒤 업데이트가
             1,280 · 1,366 · 1,440(미장)에서 둘째 줄로 내려가 띠 절반이 비었다(2026-10-05 점검). */}
         <CoverMeta updated={updatedAt ? formatKstUpdate(updatedAt, "업데이트") : "업데이트 준비 중"} />
       </div>
 
-      {/* 둘째 줄 — 점유율 지도. 판 폭 전체에 낮게(3:1) — 칸 크기 = 최근 3일 언급 점유율, 색 = 5일 전 대비 변화. 누르면 그 테마 화면. */}
-      {/* 견준 기간을 글자로 — '평소'는 테마 한 장에서 다른 잣대(말 많은 종목 태그 · 앞 27일)라 두 뜻이 됐다(2026-10-05 점검). */}
-      <Module title="테마 점유율 지도" meta={`최근 ${KADERA_WINDOW_DAYS}일 언급 점유율 · 1~2주 전 대비`} className="v2-tm-map">
+      {/* 둘째 줄 — 점유율 지도. 판 폭 전체에 낮게(3:1) — 칸 크기 = 최근 3일 언급 점유율, 색 = 1주 전 대비 변화. 누르면 그 테마 화면. */}
+      {/* 머리엔 칸 크기의 기간만, 색이 견준 기간은 범례 맨 앞에 — 머리에 '최근 3일 언급 점유율 · 1~2주 전 대비'로 나란히 두었더니
+          두 기간이 한 덩어리로 읽혀 헷갈렸다(2026-10-05 운영자 판단, 카더라 테마 점유율과 같은 정리). '평소'라 부르지 않는 건
+          테마 한 장의 다른 잣대(말 많은 종목 태그 · 앞 27일)와 두 뜻이 돼서다. */}
+      <Module title="테마 점유율 지도" meta={`최근 ${KADERA_WINDOW_DAYS}일 언급 점유율`} className="v2-tm-map">
         {themes === null ? (
           <p className="v2-empty">테마 집계를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오.</p>
         ) : themes.length === 0 ? (
@@ -148,9 +150,9 @@ export function ThemeIndexView({
             <div className="v2-tm-map-in">
               <Treemap tiles={themeTiles(themes, market.key)} ariaLabel="테마별 최근 3일 언급 점유율" aspect={3} />
             </div>
-            {/* 색은 평소(5일 이상 전 평균) 대비 변화 — '변화 ±0.3%p 안'은 무엇과 견준 변화인지 안 읽혔다(2026-10-04 점검). */}
+            {/* 색은 1주 전 대비 변화 — '변화 ±0.3%p 안'은 무엇과 견준 변화인지 안 읽혔다(2026-10-04 점검). */}
             <div className="v2-tm-map-legend">
-              <TreemapLegend up="늘어난 테마" flat="비슷" down="줄어든 테마" />
+              <TreemapLegend basis="1주 전 대비" up="늘어난 테마" flat="비슷" down="줄어든 테마" />
             </div>
             {/* 폰은 지도 대신 막대 하나(앞 다섯 + 나머지) — 3:2 지도에선 26칸 중 이름이 든 칸이 하나뿐이었다(2026-10-04 점검). */}
             <div className="v2-tm-map-bar">
@@ -164,18 +166,24 @@ export function ThemeIndexView({
         )}
       </Module>
 
-      {/* 셋째 줄 — 테마 흐름. 점유율 상위 열 테마 한 줄씩: 순위 · 테마와 말 많은 종목 · 요즘 도는 얘기 첫 문장(✨) · 점유율(5일 전 대비) · 열흘.
+      {/* 셋째 줄 — 테마 흐름. 점유율 상위 열 테마 한 줄씩: 순위 · 테마와 말 많은 종목 · 요즘 도는 얘기 첫 문장(✨) · 점유율(1주 전 대비) · 열흘.
           ⭐ 칸 차례는 이름 → 문장 → 숫자(2026-10-04 "텍스트 배치가 이상하다"). 숫자 칸(오른쪽 정렬)이 문장(왼쪽 정렬) 앞에 서면 '10일 중 3일 상위'와
-          문장 첫 낱말이 12px 사이로 붙어 한 덩어리로 읽혔다. 숫자는 줄 오른쪽 끝에 모으고, 5일 전 대비(+4.0%p)는 테마 이름 옆에서 점유율 아래로 옮겼다 —
+          문장 첫 낱말이 12px 사이로 붙어 한 덩어리로 읽혔다. 숫자는 줄 오른쪽 끝에 모으고, 1주 전 대비(+4.0%p)는 테마 이름 옆에서 점유율 아래로 옮겼다 —
           그 숫자가 꾸미는 값 바로 밑이다. */}
       <Module
         id="flow"
         title="테마 흐름"
         // 요즘 도는 얘기 첫 문장이 AI 글이라 고지는 모듈 머리에 둔다(카더라 네 표와 같은 자리, 2026-10-04 점검).
         ai
-        // 점유율 아래 +%p 는 평소(5일 이상 전 평균) 대비 — 머리에 적는다(2026-10-04 점검).
-        // 날짜 범위는 뺐다 — 열흘 값처럼 읽혔는데 점유율 칸은 최근 3일이고 열흘은 마지막 칸('최근 10일' 머리 · 줄 툴팁)뿐이다(2026-10-04 점검).
-        meta={`점유율 상위 ${FLOW_ROWS} · 1~2주 전 대비`}
+        // 점유율 아래 +%p 가 견준 기간('1주 전 대비')은 점유율 칸 머리 둘째 줄이 말한다 — 칸 꼴(점유율 / 그 아래 변화)과 같은 두 줄이다.
+        // 머리 근거에 두었더니 칸 머리 '최근 3일 점유율'과 기간 둘이 한 모듈에 따로 섰다(2026-10-05 운영자 판단, 카더라와 같은 정리).
+        // 폰은 표 머리 줄이 숨어서 머리 근거 끝에 남긴다(.v2-tm-basis). 날짜 범위는 뺐다 — 열흘 값처럼 읽혔다(2026-10-04 점검).
+        meta={
+          <>
+            점유율 상위 {FLOW_ROWS}
+            <span className="v2-tm-basis"> · 1주 전 대비</span>
+          </>
+        }
       >
         {themes === null || themes.length === 0 ? (
           <p className="v2-empty">{themes === null ? "테마 집계를 지금 불러오지 못했습니다." : "아직 집계된 테마가 없습니다."}</p>
@@ -185,7 +193,10 @@ export function ThemeIndexView({
               <span />
               <span>테마 · 말 많은 종목</span>
               <span>요즘 도는 얘기</span>
-              <span>최근 {KADERA_WINDOW_DAYS}일 점유율</span>
+              <span className="v2-th-two">
+                최근 {KADERA_WINDOW_DAYS}일 점유율
+                <em>1주 전 대비</em>
+              </span>
               <span>최근 {flowDates.length || THEME_FLOW_DAYS}일</span>
             </div>
             <ol className="v2-tbody">
@@ -214,12 +225,12 @@ export function ThemeIndexView({
                         <span className="v2-td-sub">{t.topStocks.length ? t.topStocks.map((x) => x.name).join(" · ") : "최근 언급 없음"}</span>
                       </span>
                       <span className={`v2-td-text${t.briefLine ? "" : " is-pending"}`}>{t.briefLine ?? "-"}</span>
-                      {/* 점유율 · 그 아래 5일 전 대비(움직임이 0.05%p 아래면 안 적는다). */}
+                      {/* 점유율 · 그 아래 1주 전 대비(움직임이 0.05%p 아래면 안 적는다). */}
                       <span className="v2-td-num v2-td-two v2-td-share">
                         {t.sharePct.toFixed(1)}%
                         {d != null && Math.abs(d) >= 0.05 && <em className={d > 0 ? "is-up" : "is-down"}>{pp(d)}</em>}
                       </span>
-                      {/* 열흘 — 지속 · 첫 등장 · 간헐 한 조각. ⛔ 'n일째 오르는 중'은 걷었다 — 바로 옆 '-3.0%p'(1~2주 전 대비)와 잣대가 달라
+                      {/* 열흘 — 지속 · 첫 등장 · 간헐 한 조각. ⛔ 'n일째 오르는 중'은 걷었다 — 바로 옆 '-3.0%p'(1주 전 대비)와 잣대가 달라
                           한 줄에 반대말로 섰다(2026-10-05 점검). 날마다의 방향은 테마 한 장 30일 추이의 몫이다. */}
                       <span className="v2-td-two v2-td-flow2">
                         <span className={`v2-td-flow${cap.on ? " is-on" : ""}`}>{cap.text}</span>
