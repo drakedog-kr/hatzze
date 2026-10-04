@@ -45,7 +45,8 @@ function Row({
           {ticker && <StockLogo code={ticker} name={name} market="US" size={20} />}
           {ticker && <b>{ticker}</b>}
           {showName && <span className={ticker ? "v2-in-name" : "v2-in-name is-lead"}>{name}</span>}
-          {sub && sub !== name && <span className="v2-in-name">{sub}</span>}
+          {/* 운용사가 사람 이름으로 시작하면('국민연금 국민연금공단') 같은 말이 두 번 — 뺀다(2026-10-04 점검). */}
+          {sub && !sub.startsWith(name) && <span className="v2-in-name">{sub}</span>}
         </span>
         <span className="v2-in-aux">{aux}</span>
         <span className="v2-in-val">{value}</span>
@@ -153,7 +154,7 @@ export function analystLines(rows: AnalystTop[]) {
 }
 
 /**
- * 오늘의 브리핑 줄 넷(lib/insider-brief.ts) — 이름표 칸 · 문장 칸(.v2-brief3, 시장 브리핑 · MDD 낙폭 요약과 같은 줄 꼴).
+ * 브리핑 줄 넷(lib/insider-brief.ts) — 이름표 칸 · 문장 칸(.v2-brief3, 시장 브리핑 · MDD 낙폭 요약과 같은 줄 꼴).
  * 문장은 종목을 적고 숫자는 옆 '매매 방향'이 맡는다. 종목은 종목 화면 링크.
  */
 export function BriefRows({ rows }: { rows: InsiderBriefRow[] }) {

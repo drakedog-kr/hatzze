@@ -17,7 +17,7 @@ import type { IconName } from "@/lib/icon-names";
  * 전체보기는 "이 카드의 나머지"다. 제목이나 설명이 갈리면 독자가 다른 자료로 읽는다.
  * 카드의 `noteHelp` 를 여기 `help` 가 그대로 받고, 카드 제목을 `title` 이 받는다.
  */
-export type InsiderListSlug = "exec" | "congress" | "adds" | "trims" | "hot" | "holders" | "managers" | "analyst";
+export type InsiderListSlug = "exec" | "congress" | "adds" | "trims" | "managers" | "analyst";
 
 export type InsiderListSpec = {
   /** 페이지 h1 . 카드 제목과 같다. */
@@ -33,19 +33,26 @@ export type InsiderListSpec = {
   icon: IconName;
 };
 
-export const INSIDER_LIST_SLUGS: InsiderListSlug[] = ["exec", "congress", "adds", "trims", "hot", "holders", "managers", "analyst"];
+export const INSIDER_LIST_SLUGS: InsiderListSlug[] = ["exec", "congress", "adds", "trims", "managers", "analyst"];
+
+/**
+ * 걷은 목록 — 본 화면에서 모듈을 걷은 뒤(2026-10-04 운영자 판단) 닿는 링크 없이 사이트맵에만 남아 있던 두 장('커뮤니티에서 뜨거운 종목'
+ * · '월가 거물이 들고 있는 종목'). 오늘(안 끝난 날) 언급으로 모집단을 정해 8종목뿐이었다. 옛 주소는 본 화면으로 보낸다([kind]/page.tsx).
+ */
+export const RETIRED_INSIDER_LISTS = ["hot", "holders"];
 
 export const INSIDER_LISTS: Record<InsiderListSlug, InsiderListSpec> = {
   exec: {
     title: "임원이 신고한 매매",
     sub: "종목으로 묶어 금액이 큰 순입니다.",
-    note: "옵션 행사 매도 포함",
+    // 카드마다 범위가 달라 카드가 적는다([kind]/page.tsx Card.note) — 산 종목 카드에도 '옵션 행사 매도 포함'이 붙었다(2026-10-04 점검).
+    note: "",
     icon: "account_balance_wallet",
   },
   congress: {
     title: "미 하원의원이 사고판 것",
     sub: "카더라 밖 종목까지 보고, 여러 의원이 건드린 순입니다.",
-    note: "신고 건수",
+    note: "의원 수 순",
     icon: "account_balance",
   },
   adds: {
@@ -60,12 +67,6 @@ export const INSIDER_LISTS: Record<InsiderListSlug, InsiderListSpec> = {
     note: "직전 분기말 대비",
     icon: "trending_down",
   },
-  hot: {
-    title: "커뮤니티에서 뜨거운 종목",
-    sub: "주식 텔레그램에서 가장 많이 회자된 미국 종목입니다.",
-    note: "언급 하루 · 임원 7일",
-    icon: "local_fire_department",
-  },
   managers: {
     // '운용자산이 큰 순'이었다 — 값은 13F 신고 합계(미국 상장주만)라 운용자산이 아니고, 그 단서를 물음표에 숨겨 두었다.
     // 제목이 글자 그대로의 뜻을 말하게 바꿨다(2026-10-04 "헬프 툴팁이 필요하면 심플하지 않다").
@@ -77,18 +78,9 @@ export const INSIDER_LISTS: Record<InsiderListSlug, InsiderListSpec> = {
   analyst: {
     title: "증권가가 긍정적으로 보는 종목",
     sub: "등급을 낸 애널리스트가 10명 이상인 종목만 세웁니다.",
-    // 출처는 투자 유의사항(/disclaimer) 한 곳에만 적는다(2026-10-02 결정).
-    note: "",
+    // 출처는 투자 유의사항(/disclaimer) 한 곳에만 적는다(2026-10-02 결정). 조건은 본 화면 머리와 같게(RANK_MIN_ANALYSTS).
+    note: "애널리스트 10명 이상",
     icon: "reviews",
-  },
-  holders: {
-    title: "월가 거물이 들고 있는 종목",
-    sub: "카더라에 오른 종목을 거물 몇 명이 들고 있는지 봅니다.",
-    note: "분기말 기준",
-    // ⚠️ groups 였다. 같은 화면의 `managers`("운용자산이 큰 순")가 이미 그 그림을 쓰고 있어
-    //    한 화면에 같은 아이콘이 둘이었다. groups 는 사람 명단인 managers 쪽이 갖는 것이 맞다 —
-    //    이 카드의 주어는 사람이 아니라 **종목**이고, 묻는 것은 "그 종목을 들고 있나"다.
-    icon: "inventory_2",
   },
 };
 

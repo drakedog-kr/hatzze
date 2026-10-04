@@ -14,7 +14,6 @@ import { fmtDate, insiderNote } from "./parts";
 import { BriefRows, LeanRows, analystLines, congressLines, execLines, managerLines, moveLines } from "./V2Rows";
 import { INSIDER_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
-import { Icon } from "../ui";
 import { LoadFailedNote } from "../LoadFailedNote";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -37,12 +36,14 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 const BLOCK_ROWS = 5;
 
-/** 모듈 머리 오른쪽 '전체 보기' — 다른 화면(목록)으로 간다. 예전엔 모듈 바닥 띠였다. */
+/**
+ * 모듈 머리 오른쪽 '전체 보기' — 다른 화면(목록)으로 간다. 예전엔 모듈 바닥 띠였다.
+ * 화살표 아이콘은 뺐다 — 모듈 여섯이 같은 아이콘을 들어 한 화면에 여섯 번 섰다(2026-10-04 점검). 글자 링크(.v2-more)로 충분하다.
+ */
 function SeeAll({ href }: { href: string }) {
   return (
     <Link href={href} className="v2-more" data-ga="insider_see_all" data-ga-list={href.split("/").pop()}>
       전체 보기
-      <Icon name="chevron_right" />
     </Link>
   );
 }
@@ -84,7 +85,8 @@ export default async function InsiderPage() {
           ].map(({ k, f }) => (
             <span key={k} className="v2-cover-v">
               <em>{k}</em>
-              <b>{f.count.toLocaleString("ko-KR")}건</b>
+              {/* 신고서 수는 '장' — 아래 매매 방향의 '건'(거래 줄 · 거물×종목)과 다른 것을 센다(2026-10-04 점검). */}
+              <b>{f.count.toLocaleString("ko-KR")}장</b>
               {f.date && <span className="v2-cover-chg">{fmtDate(f.date)}</span>}
             </span>
           ))}
@@ -99,7 +101,8 @@ export default async function InsiderPage() {
         )}
         <CoverMeta
           updated={ov.asOf ? `${koDay(ov.asOf)} 공시까지` : "공시 준비 중"}
-          basis={`최근 ${ov.scale.windowDays}일 임원 ${ov.scale.officers.toLocaleString("ko-KR")}명 · 의원 ${ov.scale.members.toLocaleString("ko-KR")}명`}
+          // 축마다 보는 기간 — '최근 90일 임원 1,243명'을 적었더니 바로 아래 임원 모듈 · 브리핑의 7일과 어긋났다(2026-10-04 점검).
+          basis={`임원 ${ov.windowDays}일 · 의원 ${ov.congressWindowDays}일 · 거물 분기`}
         />
       </div>
 
@@ -109,7 +112,8 @@ export default async function InsiderPage() {
         <Module title="매매 방향" className="v2-in-leanmod">
           <LeanRows rows={insiderLean(ov)} />
         </Module>
-        <Module title="오늘의 브리핑" className="v2-in-briefmod">
+        {/* '오늘의'는 뺐다 — 문장이 7일 · 90일 · 분기라 오늘 일이 아니다(2026-10-04 점검). */}
+        <Module title="브리핑" className="v2-in-briefmod">
           <BriefRows rows={insiderBrief(ov)} />
         </Module>
       </div>

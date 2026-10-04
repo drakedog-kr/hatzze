@@ -17,7 +17,7 @@ import type { InsiderOverview } from "./insider-data";
 
 type BriefInput = Pick<
   InsiderOverview,
-  "windowDays" | "congressWindowDays" | "buys" | "targetMoves" | "congressTickers" | "managerAdds" | "managerTrims" | "compareQuarters" | "scale"
+  "windowDays" | "congressWindowDays" | "buys" | "targetMoves" | "congressTickers" | "managerAdds" | "managerTrims" | "managerMoveTotals" | "compareQuarters" | "scale"
 >;
 
 /* ── 증권가 목표가 ──────────────────────────────────────────────────── */
@@ -52,7 +52,7 @@ export function targetMoves(rows: { action_date: string; target_now: number | nu
 export type InsiderLeanRow = {
   key: "congress" | "managers" | "analyst";
   label: string;
-  /** 줄 머리 오른쪽 — 축의 기간('90일' · '2026 Q2'), 증권가 줄은 무엇을 쟀는지까지('7일 목표가'). */
+  /** 줄 머리 오른쪽 — 축의 기간('90일' · '2026 Q2'), 증권가 줄은 무엇을 쟀는지까지('목표가 · 7일'). */
   span: string;
   /** 왼쪽은 오르는 쪽(산 · 늘린 · 올린, 빨강), 오른쪽은 내리는 쪽(판 · 줄인 · 내린, 파랑). */
   leftLabel: string;
@@ -103,8 +103,9 @@ export function insiderLean(ov: BriefInput): InsiderLeanRow[] {
       span: quarterShort(ov.compareQuarters[1]),
       leftLabel: "늘림",
       rightLabel: "줄임",
-      left: sum(ov.managerAdds.map((m) => m.movers)),
-      right: sum(ov.managerTrims.map((m) => m.movers)),
+      // 전체 건수 — 순증감으로 가른 두 목록의 movers 를 더하면 순으로 반대쪽인 종목의 건이 빠진다(InsiderOverview.managerMoveTotals).
+      left: ov.managerMoveTotals.up,
+      right: ov.managerMoveTotals.down,
       unit: "건",
     });
   }
@@ -112,7 +113,8 @@ export function insiderLean(ov: BriefInput): InsiderLeanRow[] {
   rows.push({
     key: "analyst",
     label: "증권가",
-    span: `${TARGET_DAYS}일 목표가`,
+    // '7일 목표가'는 7일짜리 목표가로도 읽혔다 — 무엇 · 기간 순(2026-10-04 점검).
+    span: `목표가 · ${TARGET_DAYS}일`,
     leftLabel: "올림",
     rightLabel: "내림",
     left: ov.targetMoves.up,
@@ -159,14 +161,17 @@ export function insiderBrief(ov: BriefInput): InsiderBriefRow[] {
   const rows: InsiderBriefRow[] = [];
 
   // 임원 — 장내에서 산 종목. 모듈은 처분 · 매수가 섞인 금액 순이라 큰 처분이 위를 다 차지한다.
+  // 모집단은 전체보기 카드(산 · 처분한 종목)와 같게 금액이 있는 종목만 — 무상 취득 · 옵션 행사 취득만 있는 종목까지 세면
+  // '63개 종목'인데 전체보기엔 1 + 47개뿐이었다(2026-10-04 점검).
+  const traded = ov.buys.filter((b) => b.boughtValue > 0 || b.disposedValue > 0);
   const bought = ov.buys.filter((b) => b.buyCount > 0).sort((a, b) => b.boughtValue - a.boughtValue || a.ticker.localeCompare(b.ticker));
-  const head = `최근 ${ov.windowDays}일 신고가 들어온 ${n(ov.buys.length)}개 종목 가운데 장내에서 산 종목은 `;
+  const head = `최근 ${ov.windowDays}일 임원 매매가 신고된 ${n(traded.length)}개 종목 가운데 장내에서 산 종목은 `;
   rows.push({
     key: "exec",
     label: "임원",
     parts:
-      ov.buys.length === 0
-        ? [`최근 ${ov.windowDays}일에는 임원 신고가 없습니다.`]
+      traded.length === 0
+        ? [`최근 ${ov.windowDays}일에는 임원 매매 신고가 없습니다.`]
         : bought.length === 0
           ? [`${head}없습니다.`]
           : bought.length === 1
@@ -223,7 +228,8 @@ export function insiderBrief(ov: BriefInput): InsiderBriefRow[] {
   } else {
     parts.push(`${who}은 `);
     both.slice(0, OVERLAP_SHOW).forEach((x, i) => parts.push(...(i > 0 ? [" · "] : []), x));
-    parts.push(both.length > OVERLAP_SHOW ? ` 외 ${n(both.length - OVERLAP_SHOW)}곳입니다.` : "입니다.");
+    // 종목은 '종목'으로 센다('외 2곳'이었다, 2026-10-04 점검).
+    parts.push(both.length > OVERLAP_SHOW ? ` 외 ${n(both.length - OVERLAP_SHOW)}종목입니다.` : "입니다.");
   }
   rows.push({ key: "overlap", label: "겹친 곳", parts });
 

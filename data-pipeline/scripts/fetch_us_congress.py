@@ -135,6 +135,22 @@ def parse_pdf(blob: bytes) -> tuple[bool, list[tuple]]:
     return True, TXN_RE.findall(" ".join(text.split()))
 
 
+# 하원 색인의 First 칸에 호칭이 섞이거나 Last 와 겹쳐 'Richard Dean Dr McCormick' · 'John J Mr McGuire' ·
+# 'Scott Scott Franklin'으로 섰다(2026-10-04 점검). 호칭을 걷고 이어진 같은 낱말은 하나로.
+_HONORIFICS = {"dr", "mr", "mrs", "ms", "hon", "honorable"}
+
+
+def member_name(first: str, last: str) -> str:
+    out: list[str] = []
+    for w in f"{first or ''} {last or ''}".split():
+        if w.rstrip(".").lower() in _HONORIFICS:
+            continue
+        if out and out[-1].lower() == w.lower():
+            continue
+        out.append(w)
+    return " ".join(out)
+
+
 def to_iso(mdy: str) -> str | None:
     """`4/15/2026` → `2026-04-15`.
 
@@ -226,7 +242,7 @@ def main() -> None:
         if not hits:
             stats["no_stock"] += 1
             continue
-        member = f"{r['first']} {r['last']}".strip()
+        member = member_name(r["first"], r["last"])
         seq = 0
         for ticker, asset, kind, tdate, ndate, low, high in hits:
             stats["txn"] += 1

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { assertLoaded } from "@/lib/load-state";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 
 import { getInsiderOverview } from "@/lib/insider-data";
 
@@ -12,7 +12,7 @@ import { INSIDER_CARD } from "../../../og-copy";
 import { pageMetadata } from "../../../seo";
 import { ExpandableList } from "../../../kadera/ExpandableList";
 import { LoadFailedNote } from "../../../LoadFailedNote";
-import { INSIDER_LISTS, INSIDER_LIST_MAX, INSIDER_LIST_SLUGS, type InsiderListSlug } from "../../lists";
+import { INSIDER_LISTS, INSIDER_LIST_MAX, INSIDER_LIST_SLUGS, RETIRED_INSIDER_LISTS, type InsiderListSlug } from "../../lists";
 import {
   WIDE_COLS,
   WideHead,
@@ -20,8 +20,6 @@ import {
   wideAnalystRows,
   wideCongressRows,
   wideExecRows,
-  wideHolderRows,
-  wideHotRows,
   wideManagerRows,
   wideMoveRows,
 } from "../../parts";
@@ -80,6 +78,8 @@ export async function generateMetadata({ params }: { params: Promise<{ kind: str
 
 export default async function InsiderListPage({ params }: { params: Promise<{ kind: string }> }) {
   const { kind } = await params;
+  // 걷은 목록의 옛 주소는 본 화면으로(lists.ts RETIRED_INSIDER_LISTS).
+  if (RETIRED_INSIDER_LISTS.includes(kind)) permanentRedirect("/insider");
   const spec = specOf(kind);
   if (!spec) notFound();
 
@@ -108,6 +108,10 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
     /** 열 구성과 머리 이름. 데이터 행과 **같은 문자열**을 써야 칸이 맞는다. */
     cols: string;
     heads: (string | null)[];
+    /** 머리 근거 끝의 셈법 한 마디 — 카드마다 범위가 다르면 카드가 적는다(없으면 spec.note). */
+    note?: string;
+    /** 머리 근거의 개수 단위 — 사람이 주인공인 목록(거물 명단)은 '명'. */
+    unit?: string;
   };
   const cards: Card[] = ((): Card[] => {
     switch (kind as InsiderListSlug) {
@@ -125,13 +129,15 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
             heads: ["종목", "신고", "금액"],
           },
           {
-            title: "임원이 내놓은 종목",
+            // '처분' — 본 화면 값 칸과 같은 말('내놓은'이었다, 2026-10-04 점검). 장내 매도 말고도 옵션 행사 · 증여 · 원천징수가 든다.
+            title: "임원이 처분한 종목",
             icon: "trending_down",
-            desc: "금액이 큰 순입니다. 무엇으로 내놓았는지 옆에 적었습니다.",
+            desc: "금액이 큰 순입니다. 무엇으로 처분했는지 옆에 적었습니다.",
             items: wideExecRows(cut(sold), ov.usdKrw, "sell"),
             total: sold.length,
             cols: WIDE_COLS.exec,
             heads: ["종목", "신고", "금액"],
+            note: "옵션 행사 · 증여 · 원천징수 포함",
           },
         ];
       }
@@ -153,7 +159,7 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
             items: wideCongressRows(cut(bought), "buy"),
             total: bought.length,
             cols: WIDE_COLS.congress,
-            heads: ["종목", "의원", "건수"],
+            heads: ["종목", "의원 · 건수", "의원"],
           },
           {
             title: "의원이 판 종목",
@@ -162,7 +168,7 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
             items: wideCongressRows(cut(sold), "sell"),
             total: sold.length,
             cols: WIDE_COLS.congress,
-            heads: ["종목", "의원", "건수"],
+            heads: ["종목", "의원 · 건수", "의원"],
           },
         ];
       }
@@ -190,18 +196,6 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
             heads: ["종목", "줄인 거물", "인원"],
           },
         ];
-      case "hot":
-        return [
-          {
-            title: spec.title,
-            icon: spec.icon,
-            desc: spec.sub,
-            items: wideHotRows(cut(ov.rows), ov.usdKrw),
-            total: ov.rows.length,
-            cols: WIDE_COLS.hot,
-            heads: ["종목", "커뮤니티", "시세"],
-          },
-        ];
       case "managers":
         return [
           {
@@ -211,7 +205,9 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
             items: wideManagerRows(cut(ov.managerRanks), ov.usdKrw),
             total: ov.managerRanks.length,
             cols: WIDE_COLS.managers,
-            heads: ["거물", "소속", "보유", "운용자산"],
+            // 값은 13F 신고 합계(미국 상장주만)라 '운용자산'이 아니다 — 제목(미국 주식을 많이 든 거물)과 같은 말로(2026-10-04 점검).
+            heads: ["거물", "소속 · 최대 비중", "보유", "미국 주식"],
+            unit: "명",
           },
         ];
       case "analyst":
@@ -223,36 +219,33 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
             items: wideAnalystRows(cut(ov.analystTop)),
             total: ov.analystTop.length,
             cols: WIDE_COLS.analyst,
-            heads: ["종목", "증권가 종합", "적극 매수"],
+            heads: ["종목", "애널리스트", "적극 매수"],
           },
         ];
-      case "holders": {
-        // 메인 화면과 같은 순서. 저기서도 이 세 줄이 그대로다.
-        const rows = [...ov.rows]
-          .filter((r) => r.holders > 0)
-          .sort((a, b) => b.holders - a.holders || b.mentions - a.mentions);
-        return [
-          {
-            title: spec.title,
-            icon: spec.icon,
-            desc: spec.sub,
-            items: wideHolderRows(cut(rows), ov.scale.managers),
-            total: rows.length,
-            cols: WIDE_COLS.holders,
-            heads: ["종목", "든 거물", "보유"],
-          },
-        ];
-      }
     }
   })();
 
   // ⚠️ 여기서 규칙을 다시 쓰지 않는다. 카드와 **같은 함수**를 부른다 — 한때 이 자리에
   //    자기 삼항식이 있었고, 카드만 날짜 기준으로 바뀌면서 넷이 어긋났다(insiderNote 주석).
   const note = insiderNote(kind as InsiderListSlug, ov);
+  const koWd = (iso: string) => `${fmtKoDate(iso)}(${"일월화수목금토"[new Date(`${iso}T00:00:00Z`).getUTCDay()]})`;
+  const coverUpdated = ((): string => {
+    switch (kind as InsiderListSlug) {
+      case "exec":
+        return ov.asOf ? `${koWd(ov.asOf)} 공시까지` : "공시 준비 중";
+      case "congress":
+        return ov.congressAsOf ? `${koWd(ov.congressAsOf)} 신고까지` : "신고 준비 중";
+      case "analyst":
+        return ov.analystAsOf ? `${koWd(ov.analystAsOf)} 받음` : "받은 날 없음";
+      default:
+        // 분기 축(늘린 · 줄인 · 거물 명단) — 13F 분기.
+        return ov.compareQuarters.length === 2 ? `13F ${note} 신고` : "13F 신고";
+    }
+  })();
 
   /** 잘렸으면 **알약이 그 사실을 적는다.** "전체보기"라 해 놓고 조용히 100개만 내면 거짓말이 된다. */
-  const countNote = (total: number, shown: number) =>
-    total > shown ? `${total.toLocaleString("ko-KR")}개 중 ${shown}개` : `${total.toLocaleString("ko-KR")}개`;
+  const countNote = (total: number, shown: number, unit = "개") =>
+    total > shown ? `${total.toLocaleString("ko-KR")}${unit} 중 ${shown}${unit}` : `${total.toLocaleString("ko-KR")}${unit}`;
   /* ⚠️ 잘림은 **알약이 이미 말한다**("1,000개 중 100개"). 툴팁에 같은 말을 한 번 더
      넣었더니 96자가 되어 아무도 안 읽는 길이가 됐다 — 한 자리에서 한 번만 말한다. */
 
@@ -281,7 +274,8 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
             <CurrencyToggle fallback="usd" />
           </div>
         )}
-        <CoverMeta updated={ov.asOf ? `${fmtKoDate(ov.asOf)}(${"일월화수목금토"[new Date(`${ov.asOf}T00:00:00Z`).getUTCDay()]}) 공시까지` : "공시 준비 중"} />
+        {/* 업데이트 자리는 그 목록의 끝점 — 늘 임원 공시 끝점을 적었더니 의원 목록에 날짜가 둘, 13F 목록엔 상관없는 날짜가 섰다(2026-10-04 점검). */}
+        <CoverMeta updated={coverUpdated} />
       </div>
 
       {cards.map((card) => (
@@ -290,7 +284,7 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
           title={card.title}
           // ⚠️ 잘렸으면 머리 근거가 그 사실을 적는다("1,000개 중 100개") — "전체보기"라 해 놓고 조용히 100개만 내면 거짓말이 된다.
           // 셈법 한 마디는 머리 근거 끝에 그대로(물음표 말풍선이던 것, 2026-10-04). 카드 부제(설명 문장)는 걷었다(v2).
-          meta={[countNote(card.total, card.items.length), spec.note].filter(Boolean).join(" · ")}
+          meta={[countNote(card.total, card.items.length, card.unit), card.note ?? spec.note].filter(Boolean).join(" · ")}
           className="v2-in-listmod"
         >
           {card.items.length === 0 ? (

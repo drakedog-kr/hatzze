@@ -11,7 +11,7 @@ import { Fragment } from "react";
 
 import Link from "next/link";
 
-import type { AnalystTop, CongressTicker, InsiderActivity, InsiderOverview, InsiderRow, ManagerMove, ManagerRank } from "@/lib/insider-data";
+import type { AnalystTop, CongressTicker, InsiderActivity, InsiderOverview, ManagerMove, ManagerRank } from "@/lib/insider-data";
 import type { AnalystAction, AnalystConsensus } from "@/lib/insider-detail";
 
 import { ExpandableList } from "../kadera/ExpandableList";
@@ -99,14 +99,12 @@ export function insiderNote(kind: InsiderListSlug, ov: InsiderOverview): string 
       return upTo(ov.asOf, ov.windowDays);
     case "congress":
       return upTo(ov.congressAsOf, ov.congressWindowDays);
-    case "hot":
-      return `${fmtDate(ov.mentionDate)} 하루`;
     case "analyst":
-      return ov.analystAsOf ? `${fmtDate(ov.analystAsOf)} 기준` : "받은 날 기준";
+      // 날짜만 — 띠 열쇠가 이미 '기준'이라 '기준 10/4 기준'으로 두 번 섰다(2026-10-04 점검). 본 화면 머리 근거도 날짜면 읽힌다.
+      return ov.analystAsOf ? `${fmtDate(ov.analystAsOf)} 받음` : "받은 날";
     case "adds":
     case "trims":
     case "managers":
-    case "holders":
       return quarter;
   }
 }
@@ -878,8 +876,6 @@ export const WIDE_COLS = {
   exec: "minmax(220px, 1.2fr) minmax(0, 1.9fr) 128px",
   congress: "minmax(220px, 1.2fr) minmax(0, 1.9fr) 96px",
   move: "minmax(220px, 1.2fr) minmax(0, 1.9fr) 96px",
-  hot: "minmax(220px, 1.2fr) minmax(0, 1.9fr) 128px",
-  holders: "minmax(220px, 1.2fr) minmax(0, 1.9fr) 128px",
   /** 거물 명단. 사람이 주인공이라 첫 칸이 이름, 둘째가 대표 보유, 끝이 금액이다. */
   managers: "minmax(200px, 1.1fr) minmax(0, 1.6fr) 92px 124px",
   /** 증권가 순위. 끝 칸이 "62명 중 49명"이라 다른 표의 금액 칸보다 넓어야 한다. */
@@ -943,9 +939,10 @@ function WideStock({ ticker, name, badge }: { ticker: string; name: string; badg
     <Link
       href={`/insider/stock/${encodeURIComponent(ticker)}`}
       className="hz-cellhead"
-      style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0, textDecoration: "none" }}
+      style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, textDecoration: "none" }}
     >
-      <StockLogo code={ticker} name={name} market="US" size={26} />
+      {/* 본 화면 줄(V2Rows)과 같은 20px — 26px 이던 땐 같은 종목이 두 화면에서 다른 크기로 섰다(2026-10-04 점검). */}
+      <StockLogo code={ticker} name={name} market="US" size={20} />
       <strong style={{ ...ROW.lead, fontFamily: MONO }}>{ticker}</strong>
       {name && name.toUpperCase() !== ticker.toUpperCase() && (
         <span className="hz-cellname" style={{ ...ROW.sub }}>{name}</span>
@@ -968,9 +965,10 @@ export function wideExecRows(rows: InsiderActivity[], rate: number | null, side:
         cells={[
           <WideStock key="s" ticker={b.ticker} name={b.name} />,
           text(
+            // 날짜는 그 방향 신고의 마지막 접수일(InsiderActivity.boughtFiled · disposedFiled).
             `${side === "buy" ? `장내 매수 ${b.buyCount}건` : codeSummary(b.codes)} · ${
               side === "buy" ? b.buyPeople : b.sellPeople
-            }명 · ${fmtDate(b.filedDate)} 접수`,
+            }명 · ${fmtDate((side === "buy" ? b.boughtFiled : b.disposedFiled) ?? b.filedDate)} 접수`,
             "left",
           ),
           num(<Money usd={side === "buy" ? b.boughtValue : b.disposedValue} rate={rate} />),
@@ -998,10 +996,11 @@ export function wideManagerRows(rows: ManagerRank[], rate: number | null) {
           </Link>,
           // ⚠️ 전체보기는 "이 카드의 나머지"다. 칸이 넓으니 소속과 대표 보유를 나눠 적되,
           //    **카드와 같은 사실**을 낸다(카드는 한 줄에 붙여 적는다).
+          // 운용사가 사람 이름으로 시작하면('무바달라 / 무바달라 인베스트먼트') 소속을 뺀다 — 같은 말이 두 번 섰다(2026-10-04 점검).
           text(
-            m.topTicker
-              ? `${m.firm} · 최대 비중 ${m.topName || m.topTicker} ${Math.round(m.topWeight)}%`
-              : m.firm,
+            [m.firm && !m.firm.startsWith(m.person) ? m.firm : null, m.topTicker ? `최대 비중 ${m.topName || m.topTicker} ${Math.round(m.topWeight)}%` : null]
+              .filter(Boolean)
+              .join(" · ") || m.firm,
             "left",
           ),
           num(<>{m.holdings}<span style={{ ...ROW.sub }}>종목</span></>),
@@ -1023,14 +1022,15 @@ export function wideAnalystRows(rows: AnalystTop[]) {
           cells={[
             <WideStock key="s" ticker={a.ticker} name={a.name} />,
             <span key="b" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-              <span className="hz-bar" style={{ flex: 1, height: 7 }}>
+              <span className="hz-bar v2-in-ratio" style={{ flex: 1, height: 7 }}>
                 <span style={{ width: `${Math.max(1.5, Math.min(100, share))}%` }} />
               </span>
+              {/* 본 화면과 같은 꼴 — 'N명 중 적극 매수 M명' · 비율. 등급(매수)을 옆에 두었더니 폰에서 '매수 26명 중 14명'으로 읽혔다(2026-10-04 점검). */}
               <span style={{ ...ROW.sub, whiteSpace: "nowrap", flexShrink: 0 }}>
-                {CONSENSUS_KO[a.consensus ?? ""] ?? a.consensus ?? "-"}
+                {a.analystCount}명 중 적극 매수 {a.strongBuy}명
               </span>
             </span>,
-            num(<>{a.analystCount}명 중 {a.strongBuy}명</>),
+            num(`${Math.round(share)}%`),
           ]}
         />
       </li>
@@ -1047,12 +1047,13 @@ export function wideCongressRows(rows: CongressTicker[], side: "buy" | "sell") {
           cols={WIDE_COLS.congress}
           cells={[
             <WideStock key="s" ticker={c.ticker} name={c.name} badge={c.inKadera ? <KaderaPill /> : undefined} />,
-            // 이름과 마지막 매매일을 한 칸에. 인원은 "외 N명"이 이미 말한다.
+            // 이름 · 건수 · 그 방향의 마지막 거래일을 한 칸에. 값 칸은 정렬 기준인 그 방향 의원 수 — 건수를 두었더니 의원 수 순인데
+            // 값이 9 · 7 · 6 · 4 … 5건으로 들쭉날쭉해 순서가 틀려 보였다(2026-10-04 점검). 날짜는 산 카드엔 마지막 매수일.
             text(
-              `${names[0] ?? "이름 없음"}${names.length > 1 ? ` 외 ${names.length - 1}명` : ""} · ${fmtDate(c.latest)} 매매`,
+              `${names[0] ?? "이름 없음"}${names.length > 1 ? ` 외 ${names.length - 1}명` : ""} · ${side === "buy" ? c.buys : c.sells}건 · ${fmtDate((side === "buy" ? c.buyLatest : c.sellLatest) ?? c.latest)} 매매`,
               "left",
             ),
-            num(side === "buy" ? c.buys : c.sells, "건"),
+            num(names.length, "명"),
           ]}
         />
       </li>
@@ -1067,20 +1068,12 @@ export function wideMoveRows(rows: ManagerMove[], kind: "add" | "trim") {
       <WideRow
         cols={WIDE_COLS.move}
         cells={[
-          <WideStock
-            key="s"
-            ticker={m.ticker}
-            name={m.name}
-            badge={
-              m.mark > 0 ? (
-                // 신규·청산은 배지로 종목 옆에 붙인다. 자기 칸을 주면 대부분 빈 칸이 된다.
-                <Pill tone={kind === "add" ? MOVE_TONE.buy : MOVE_TONE.sell} title={`반대로 움직인 거물 ${m.against}명`}>
-                  {markLabel} {m.mark}
-                </Pill>
-              ) : undefined
-            }
-          />,
-          text(`${m.names.slice(0, 3).join(" · ")}${m.names.length > 3 ? ` 외 ${m.names.length - 3}명` : ""}`, "left"),
+          <WideStock key="s" ticker={m.ticker} name={m.name} />,
+          // 신규 · 청산은 본 화면과 같은 회색 곁글('신규 12명') — 여기만 색 알약('신규 12')이라 다른 자료로 읽혔다(2026-10-04 점검).
+          text(
+            `${m.names.slice(0, 3).join(" · ")}${m.names.length > 3 ? ` 외 ${m.names.length - 3}명` : ""}${m.mark > 0 ? ` · ${markLabel} ${m.mark}명` : ""}`,
+            "left",
+          ),
           num(m.movers, "명"),
         ]}
       />
@@ -1088,40 +1081,6 @@ export function wideMoveRows(rows: ManagerMove[], kind: "add" | "trim") {
   ));
 }
 
-export function wideHotRows(rows: InsiderRow[], rate: number | null) {
-  return rows.map((r) => (
-    <li key={r.ticker}>
-      <WideRow
-        cols={WIDE_COLS.hot}
-        cells={[
-          <WideStock key="s" ticker={r.ticker} name={r.name} />,
-          text(
-            `언급 ${r.mentions}회 · 채널 ${r.channels}곳${r.txns > 0 ? ` · 임원 신고 ${r.txns}건` : ""}`,
-            "left",
-          ),
-          <span key="q" style={{ display: "flex", justifyContent: "flex-end" }}>
-            <Quote price={r.price} change={r.changeRate} rate={rate} />
-          </span>,
-        ]}
-      />
-    </li>
-  ));
-}
-
-export function wideHolderRows(rows: InsiderRow[], managers: number) {
-  return rows.map((r) => (
-    <li key={r.ticker}>
-      <WideRow
-        cols={WIDE_COLS.holders}
-        cells={[
-          <WideStock key="s" ticker={r.ticker} name={r.name} />,
-          text(`${r.holderNames.slice(0, 3).join(" · ")}${r.holders > 3 ? ` 외 ${r.holders - 3}명` : ""}`, "left"),
-          num(r.holders, `/${managers}`),
-        ]}
-      />
-    </li>
-  ));
-}
 
 
 /**

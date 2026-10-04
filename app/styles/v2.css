@@ -2041,11 +2041,13 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
    목록이 열을 정하고 줄은 subgrid 로 따른다. 줄은 모듈 남는 높이를 고르게 나눠 받는다(짝 모듈 키가 같다).
    ⭐ 곁 숫자는 종목 바로 뒤에서 왼쪽 정렬로 선다 — 종목 칸이 남는 폭을 먹고 곁 숫자가 오른쪽 정렬로 값 바로 앞에 붙어 있을 땐
    '임원 5명 $112.8M 처분' · '최대 비중 애플 22% $299.3B'가 한 덩어리로 읽혔다(2026-10-04, 테마 · 카더라 표와 같은 이름 → 곁말 → 값 규칙).
-   종목 칸은 그 모듈에서 가장 긴 이름만큼(max-content), 곁 숫자가 남는 폭, 값은 줄 오른쪽 끝. */
+   종목 칸은 화면 공통 폭(176) — 모듈마다 가장 긴 이름(max-content)을 따랐을 땐 나란한 두 모듈 · 위아래 모듈의 곁 숫자가
+   177 · 183 · 204px 처럼 다른 x 에서 시작했다(2026-10-04 점검, 나란한 모듈은 오와 열을 맞춘다). 더 긴 이름은 칸 안에서 접힌다.
+   곁 숫자가 남는 폭, 값은 줄 오른쪽 끝. */
 .v2-in-rows {
   flex: 1;
   display: grid;
-  grid-template-columns: 20px minmax(0, max-content) minmax(88px, 1fr) auto;
+  grid-template-columns: 20px 176px minmax(88px, 1fr) auto;
   grid-auto-rows: minmax(44px, 1fr);
   list-style: none;
   margin: 0;
@@ -2079,6 +2081,8 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 /* 줄 — 글 시작선 15(모듈 테두리 1 + 14) · 가는 선 · 호버는 옅은 회색(다른 v2 표와 같다). */
 .v2-in .hz-trow { min-height: 52px; padding: 6px 14px; column-gap: 12px; border-bottom-color: var(--t-line); }
 .v2-in .hz-trow:hover { background: var(--t-tint); }
+/* 전체보기 줄은 본 화면 줄과 같은 44 — 52 이던 땐 같은 목록이 두 화면에서 다른 촘촘함이었다(2026-10-04 점검). 접히는 줄은 늘어난다. */
+.v2-in .v2-in-listmod .hz-trow { min-height: 44px; }
 .v2-in .hz-cellbody-wrap { gap: 8px !important; }
 /* ⛔ 이름 · 곁줄을 말줄임으로 자르지 않는다(v2) — 판이 반 폭이라 넘치는 날은 접힌다. */
 .v2-in .hz-cellname,
@@ -2086,6 +2090,8 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 .v2-in .hz-cellhead { flex-wrap: wrap; row-gap: 2px; }
 .v2-in .hz-bar { background: var(--t-bar-off); border-radius: 3px; }
 .v2-in .hz-bar > span { background: var(--t-down); }
+/* 증권가 '적극 매수' 비율 막대 — 남의 등급이라 방향색(파는 쪽 파랑)이 아니라 중립색(2026-10-04 점검). */
+.v2-in .hz-bar.v2-in-ratio > span { background: var(--t-ink3); }
 .v2-in .hz-trow:hover .hz-bar { background: var(--t-bar-off); }
 /* 통화 칸 — 첫 줄 띠 안의 ₩ · $ 스위치. 폰(≤560)은 탑바가 같은 스위치를 들어 여기는 숨는다(AppShell PageTools). */
 /* 머리에 서던 크기(38)면 띠가 58px 로 부풀었다 — 띠 줄 높이(20)에 맞춰 22 로 줄인다. */
@@ -2103,6 +2109,8 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 @container kd (max-width: 679px) {
   /* 머리 근거('10/1까지 90일 · 의원 수 순')가 제목 옆에서 말줄임으로 잘렸다(375) — 다음 줄로 접는다. */
   .v2-in .v2-mod-head { flex-wrap: wrap; row-gap: 0; }
+  /* 첫 줄 [제목 · 전체 보기], 둘째 줄 근거 — 근거가 첫 줄을 다 먹으면 '전체 보기'만 둘째 줄 오른쪽에 혼자 섰다(2026-10-04 점검). */
+  .v2-in .v2-mod-head .v2-mod-meta { order: 3; flex-basis: 100%; white-space: normal; }
   .v2-in-band { grid-template-columns: minmax(0, 1fr); }
   /* 줄 — 폰은 곁 숫자를 이름 아래 둘째 줄로(한 줄에 넷이면 이름이 눌린다). */
   .v2-in-rows { grid-template-columns: 20px minmax(0, 1fr) auto; grid-auto-rows: minmax(52px, auto); }

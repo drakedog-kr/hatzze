@@ -20,6 +20,8 @@ const exec = (ticker: string, bought: number, disposed: number, name = ticker): 
   names: [],
   codes: [],
   filedDate: "2026-10-02",
+  boughtFiled: bought > 0 ? "2026-10-02" : null,
+  disposedFiled: disposed > 0 ? "2026-10-02" : null,
   value: Math.max(bought, disposed),
   direction: bought > disposed ? "buy" : "disposed",
 });
@@ -34,6 +36,8 @@ const congress = (ticker: string, buyers: number, buys: number, sells: number, n
   buyMembers: Array.from({ length: buyers }, (_, i) => `의원${i}`),
   sellMembers: [],
   latest: "2026-09-30",
+  buyLatest: buys > 0 ? "2026-09-30" : null,
+  sellLatest: sells > 0 ? "2026-09-30" : null,
   inKadera: false,
 });
 
@@ -55,6 +59,7 @@ const base = {
   congressTickers: [] as CongressTicker[],
   managerAdds: [] as ManagerMove[],
   managerTrims: [] as ManagerMove[],
+  managerMoveTotals: { up: 0, down: 0 },
   compareQuarters: ["2026-03-31", "2026-06-30"],
   scale: { officers: 0, members: 0, managers: 30, windowDays: 90 },
 };
@@ -83,21 +88,22 @@ describe("targetMoves — 증권가 목표가", () => {
 });
 
 describe("insiderLean — 매매 방향", () => {
-  it("의원 → 거물 → 증권가 — 의원은 매수 · 매도 건수, 거물은 늘린 · 줄인 건수(거물 한 명 · 종목 하나가 한 건), 증권가는 목표가 올림 · 내림", () => {
+  it("의원 → 거물 → 증권가 — 의원은 매수 · 매도 건수, 거물은 늘린 · 줄인 전체 건수(거물 한 명 · 종목 하나가 한 건), 증권가는 목표가 올림 · 내림", () => {
     const rows = insiderLean({
       ...base,
       targetMoves: { up: 66, down: 59, end: "2026-10-03" },
       congressTickers: [congress("X", 2, 3, 1), congress("Y", 1, 0, 4)],
-      managerAdds: [move("M1", 3, 1), move("M2", 2, 2), move("M3", 1, 0)],
-      managerTrims: [move("T1", 4, 0), move("M2", 2, 2)],
+      managerAdds: [move("M1", 3, 1), move("M3", 1, 0)],
+      managerTrims: [move("T1", 4, 0)],
+      // 순증감으로 갈린 목록 밖(늘린 수 = 줄인 수인 M2 · 순으로 반대쪽 종목의 건)까지 든 전체 — 목록의 movers 합(4 · 4)이 아니다.
+      managerMoveTotals: { up: 9, down: 8 },
     });
     assert.deepEqual(
       rows.map((r) => [r.key, r.span, r.leftLabel, r.left, r.rightLabel, r.right, r.unit]),
       [
         ["congress", "90일", "매수", 3, "매도", 5, "건"],
-        // 늘린 거물 3 + 2 + 1 = 6건, 줄인 거물 4 + 2 = 6건 — 종목마다 움직인 거물 수를 더한다.
-        ["managers", "2026 Q2", "늘림", 6, "줄임", 6, "건"],
-        ["analyst", "7일 목표가", "올림", 66, "내림", 59, "건"],
+        ["managers", "2026 Q2", "늘림", 9, "줄임", 8, "건"],
+        ["analyst", "목표가 · 7일", "올림", 66, "내림", 59, "건"],
       ],
     );
   });
@@ -110,22 +116,27 @@ describe("insiderLean — 매매 방향", () => {
 
 describe("insiderBrief — 임원", () => {
   it("신고가 없으면 없다고 적는다", () => {
-    assert.equal(text(row(insiderBrief(base), "exec")), "최근 7일에는 임원 신고가 없습니다.");
+    assert.equal(text(row(insiderBrief(base), "exec")), "최근 7일에는 임원 매매 신고가 없습니다.");
   });
 
   it("장내 매수가 없으면 없다고", () => {
     const r = row(insiderBrief({ ...base, buys: [exec("AAA", 0, 100), exec("BBB", 0, 50)] }), "exec");
-    assert.equal(text(r), "최근 7일 신고가 들어온 2개 종목 가운데 장내에서 산 종목은 없습니다.");
+    assert.equal(text(r), "최근 7일 임원 매매가 신고된 2개 종목 가운데 장내에서 산 종목은 없습니다.");
+  });
+
+  it("금액이 없는 신고(무상 취득 · 옵션 행사 취득만)는 종목 수에 안 든다 — 전체보기 카드와 같은 모집단", () => {
+    const r = row(insiderBrief({ ...base, buys: [exec("AAA", 0, 100), exec("ZERO", 0, 0)] }), "exec");
+    assert.equal(text(r), "최근 7일 임원 매매가 신고된 1개 종목 가운데 장내에서 산 종목은 없습니다.");
   });
 
   it("한 종목이면 '가장 크게'라 부르지 않는다", () => {
     const r = row(insiderBrief({ ...base, buys: [exec("ORCL", 30, 0, "오라클"), exec("BBB", 0, 50)] }), "exec");
-    assert.equal(text(r), "최근 7일 신고가 들어온 2개 종목 가운데 장내에서 산 종목은 [오라클] 하나입니다.");
+    assert.equal(text(r), "최근 7일 임원 매매가 신고된 2개 종목 가운데 장내에서 산 종목은 [오라클] 하나입니다.");
   });
 
   it("여럿이면 산 금액이 가장 큰 종목 — 모듈 순서(처분 · 매수 섞인 금액 순)와 다르다", () => {
     const r = row(insiderBrief({ ...base, buys: [exec("BIG", 0, 900), exec("SMALL", 10, 0), exec("MID", 40, 5)] }), "exec");
-    assert.equal(text(r), "최근 7일 신고가 들어온 3개 종목 가운데 장내에서 산 종목은 2개이고, 가장 크게 산 종목은 [MID]입니다.");
+    assert.equal(text(r), "최근 7일 임원 매매가 신고된 3개 종목 가운데 장내에서 산 종목은 2개이고, 가장 크게 산 종목은 [MID]입니다.");
   });
 });
 
@@ -182,9 +193,9 @@ describe("insiderBrief — 겹친 곳", () => {
     managerAdds: [move("TWO", 3, 0), move("ONE", 9, 0), move("SOLD", 9, 0), move("FOUR", 3, 1), move("LOW", 2, 0), move("X1", 3, 0), move("X2", 3, 0)],
   };
 
-  it("의원 둘 이상이 사고 거물 셋 이상이 늘린 종목 — 사람 수 합이 많은 순, 넷째부터는 '외 N곳'", () => {
+  it("의원 둘 이상이 사고 거물 셋 이상이 늘린 종목 — 사람 수 합이 많은 순, 넷째부터는 '외 N종목'", () => {
     const r = row(insiderBrief(ov), "overlap");
-    assert.equal(text(r), "의원 둘 이상이 사고 거물 셋 이상이 늘린 종목은 [넷] · [TWO] · [X1] 외 1곳입니다.");
+    assert.equal(text(r), "의원 둘 이상이 사고 거물 셋 이상이 늘린 종목은 [넷] · [TWO] · [X1] 외 1종목입니다.");
   });
 
   it("없으면 없다고", () => {
