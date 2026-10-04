@@ -16,7 +16,6 @@ import { PREVIEW_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { PREVIEW_PUBLIC } from "../screen-flags";
 import { StockLogo } from "../StockLogo";
-import { Icon } from "../ui";
 
 /**
  * 국장 미리보기 — 간밤 미장에서 크게 움직인 종목이 오늘 아침 국내 어디와 엮이는지.
@@ -195,7 +194,7 @@ function NightModule({
   // 간밤 S&P 가 든 구간의 과거 코스피. ⚠️ 미장이 쉰 날은 고르지 않는다 — 그날 spx 의 움직임은 전날 개장에서 이미 끝났다.
   const after = spx == null || usHoliday ? null : (KOSPI_AFTER.find(([lo, hi]) => spx >= lo && spx < hi) ?? null);
   return (
-    <Module id="night" title={`${when} 뉴욕`} meta="S&P 500">
+    <Module id="night" title={`${when} 뉴욕`} meta="S&P500">
       <div className="v2-pv-night">
         <div className="v2-pv-big">
           <b className={usHoliday ? undefined : tone(spx).trim() || undefined}>{usHoliday ? "휴장" : spx == null ? "없음" : PCT(spx)}</b>
@@ -220,7 +219,7 @@ function NightModule({
           <p className="v2-pv-night-foot">
             {usHoliday ? (
               <>
-                마지막 거래일{usSession ? ` ${sessionDay(usSession)}` : ""} S&amp;P 500{" "}
+                마지막 거래일{usSession ? ` ${sessionDay(usSession)}` : ""} S&amp;P500{" "}
                 <b className={tone(spx).trim() || undefined}>{spx == null ? "없음" : PCT(spx)}</b>
               </>
             ) : (
@@ -284,8 +283,11 @@ function PerpRow({ r }: { r: OvernightRow }) {
       <span className="v2-td-stock">
         <StockLogo code={r.code} name={r.name} market="KOSPI" size={24} />
         <span className="v2-pv-name">
-          <b>{r.name}</b>
-          {/* 심볼이 곧 출처 링크다. 파랗게 칠하지 않는다 — 누를 수 있다는 것은 화살표와 호버로만. */}
+          {/* 이름은 아래 엮인 국장 종목 표처럼 종목 화면으로 잇는다. */}
+          <Link href={stockHref(r.code)} className="v2-pv-stock" data-ga="cta_click" data-ga-cta="stock" data-ga-surface="preview_perp">
+            {r.name}
+          </Link>
+          {/* 심볼이 곧 출처 링크다. 파랗게 칠하지 않고 화살표도 달지 않는다 — 세 줄마다 같은 아이콘이 섰다(2026-10-04 점검). 호버 밑줄로 알린다. */}
           <a
             className="v2-pv-sym"
             href={`https://app.hyperliquid.xyz/trade/${r.symbol}`}
@@ -295,7 +297,6 @@ function PerpRow({ r }: { r: OvernightRow }) {
             data-ga-symbol={r.symbol}
           >
             {r.symbol.replace(`${HL_DEX}:`, "")}
-            <Icon name="north_east" />
           </a>
         </span>
       </span>
@@ -341,7 +342,12 @@ function BriefModule({
   const biggest = movers.reduce<PreviewMover | null>((a, m) => (!a || Math.abs(m.dp) > Math.abs(a.dp) ? m : a), null);
   const strongest = movers
     .flatMap((m) => m.links.map((l) => ({ m, l })))
-    .reduce<{ m: PreviewMover; l: PreviewLink } | null>((a, x) => (!a || Math.abs(x.l.gap) > Math.abs(a.l.gap) ? x : a), null);
+    // 문장에 적는 값(개장)으로 고른다. 화면에 없는 코스피 대비 초과분(gap)으로 고르면 표에 더 큰 개장 값이 있어
+    // '가장 크게'가 틀려 보였다(2026-10-04 한화솔루션 +1.39% · 표의 SK하이닉스 −1.86%).
+    .reduce<{ m: PreviewMover; l: PreviewLink } | null>(
+      (a, x) => (!a || Math.abs(x.l.krOpen ?? 0) > Math.abs(a.l.krOpen ?? 0) ? x : a),
+      null,
+    );
   const linkCount = new Map<string, number>();
   for (const m of movers) for (const l of m.links) linkCount.set(l.stock, (linkCount.get(l.stock) ?? 0) + 1);
   const crowded = [...linkCount.entries()].sort((a, b) => b[1] - a[1])[0];
@@ -365,8 +371,8 @@ function BriefModule({
             <div className="v2-brief3-row">
               <dt>미장</dt>
               <dd>
-                {when} {moverCount}곳이 평소보다 크게 움직였습니다. 가장 큰 곳은 <b>{biggest.usName}</b>
-                {euro(biggest.usName)} <b className={tone(biggest.dp).trim() || undefined}>{PCT(biggest.dp)}</b>, 평소 하루 폭의 {biggest.z.toFixed(1)}배였습니다.
+                {when} {moverCount}곳이 평소 폭을 넘게 움직였습니다. 가장 큰 곳은 <b>{biggest.usName}</b>
+                {euro(biggest.usName)} <b className={tone(biggest.dp).trim() || undefined}>{PCT(biggest.dp)}</b>, 평소 폭의 {zx(biggest.z)}배였습니다.
               </dd>
             </div>
           )}
@@ -395,6 +401,11 @@ function BriefModule({
   );
 }
 
+/** 평소 폭 배수. 문턱(1.0)을 막 넘은 값이 '1.0배'로 찍히면 평소와 같다는 말로 읽혀, 1.5 밑은 소수 둘째 자리(1.04배)까지 적는다. */
+function zx(z: number): string {
+  return z < 1.5 ? z.toFixed(2) : z.toFixed(1);
+}
+
 /* ── 엮인 국장 종목 표 ───────────────────────────────────────────────────── */
 
 /**
@@ -407,7 +418,7 @@ function BriefModule({
  *    평소와 같다는 말로 읽혀 바꿨다(2026-10-03, 그날 다섯 중 셋이 1.0~1.1배).
  * ⭐ 묶음 순서는 **평소 폭 대비 큰 순**(z) — 등락률로 세우면 늘 변동성 큰 종목만 올라와 "평소와 달랐던 밤" 이 사라진다.
  */
-function MoverGroup({ m, when }: { m: PreviewMover; when: string }) {
+function MoverGroup({ m, when, span }: { m: PreviewMover; when: string; span: number }) {
   return (
     <li className="v2-pv-grp" id={`mv-${m.ticker}`}>
       <div className="v2-pv-us">
@@ -424,7 +435,7 @@ function MoverGroup({ m, when }: { m: PreviewMover; when: string }) {
             <span className="v2-pv-when">{when} </span>
             {PCT(m.dp)}
           </b>
-          <em>평소 폭의 {m.z.toFixed(1)}배</em>
+          <em>평소 폭의 {zx(m.z)}배</em>
         </span>
       </div>
       <ol className="v2-pv-krs">
@@ -439,6 +450,19 @@ function MoverGroup({ m, when }: { m: PreviewMover; when: string }) {
                 </span>
                 {/* 관계는 짧은 꼬리표다 — 쌍마다 다른 개별 관계(사전의 why). */}
                 <span className="v2-pv-why">{l.why}</span>
+                {/* 개장 값의 0 중심 갈림 막대 — 관계 칸 뒤가 줄마다 360px 비던 자리(1440)다. 축은 이 표에서 가장 큰 개장 값. */}
+                <span className="v2-pv-bar" aria-hidden="true">
+                  {l.krOpen != null && l.krOpen !== 0 && (
+                    <i
+                      className={tone(l.krOpen).trim() || undefined}
+                      style={
+                        l.krOpen > 0
+                          ? { left: "50%", width: `${(l.krOpen / span) * 50}%` }
+                          : { right: "50%", width: `${(-l.krOpen / span) * 50}%` }
+                      }
+                    />
+                  )}
+                </span>
                 <span className="v2-pv-nums">
                   {([["개장", l.krOpen], ["장 중", l.krIntra], ["종가", day]] as const).map(([label, v]) => (
                     <span key={label} className={`v2-td-num v2-td-chg${tone(v)}`} data-k={label}>
@@ -477,6 +501,8 @@ export default async function PreviewPage() {
   const when = usHoliday ? "밤사이" : sessionWord(date, usSession, usFrom);
   const movers = sectors.flatMap((s) => s.movers);
   const wall = [...movers].sort((a, b) => b.z - a.z);
+  // 갈림 막대 축 — 표 전체에서 가장 큰 개장 절댓값(10% 여유). 묶음마다 축을 따로 잡으면 막대 길이를 견줄 수 없다.
+  const openSpan = Math.max(0.1, ...wall.flatMap((m) => m.links.map((l) => Math.abs(l.krOpen ?? 0)))) * 1.1;
   const stockCount = new Set(movers.flatMap((m) => m.links.map((l) => l.stock))).size;
   const hasOvernight = overnight.rows.length > 0;
 
@@ -513,6 +539,7 @@ export default async function PreviewPage() {
               <span className="v2-pv-kr">
                 <span>국장 종목</span>
                 <span>관계</span>
+                <span className="v2-pv-bar-h" aria-hidden="true" />
                 <span className="v2-pv-nums">
                   <span>개장</span>
                   <span>장 중</span>
@@ -522,7 +549,7 @@ export default async function PreviewPage() {
             </div>
             <ol>
               {wall.map((m) => (
-                <MoverGroup key={m.ticker} m={m} when={when} />
+                <MoverGroup key={m.ticker} m={m} when={when} span={openSpan} />
               ))}
             </ol>
           </div>

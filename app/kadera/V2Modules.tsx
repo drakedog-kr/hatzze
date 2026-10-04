@@ -80,10 +80,13 @@ export function Spark({
   tone,
   dot,
   tips,
+  baseLabel,
 }: {
   id: string;
   values: number[];
   base?: number;
+  /** 점선 왼끝에 붙일 축 글자('50℃'). 이름 없는 점선은 무엇과 견준 선인지 몰랐다(2026-10-04 점검). */
+  baseLabel?: string;
   w: number;
   h: number;
   tone: Tone;
@@ -115,6 +118,11 @@ export function Spark({
         <path d={area} fill={`url(#${id})`} />
         <path d={line} className="v2-spark-line" vectorEffect="non-scaling-stroke" />
       </svg>
+      {base !== undefined && baseLabel && (
+        <span className="v2-spark-blabel" style={{ top: `${(y(base) / h) * 100}%` }} aria-hidden="true">
+          {baseLabel}
+        </span>
+      )}
       {dot && <span className="v2-spark-dot" style={{ top: `${lastTop}%` }} />}
       {tips && tips.length === values.length && (
         // 칸 n 등분 — i 번째 칸 안에서 점의 자리는 칸 폭의 i/(n-1) 이라 --hz-x 하나로 선과 점이 점 위에 선다.
@@ -169,7 +177,7 @@ export function SentimentModule({
           <b className={`is-${tone}`}>{score}%</b>
           <span className="v2-reason">{label}</span>
         </span>
-        <Spark id="v2-mood-spark" values={vals} base={50} w={300} h={64} tone={tone} dot tips={trend.map((p) => `${shortDate(p.date)} · 낙관 ${p.score}%`)} />
+        <Spark id="v2-mood-spark" values={vals} base={50} baseLabel="50%" w={300} h={64} tone={tone} dot tips={trend.map((p) => `${shortDate(p.date)} · 낙관 ${p.score}%`)} />
         <span className="v2-card-foot">
           <span>
             {/* '30일 · 29일 최고'로 화면마다 날 수가 달랐다(미장 기록이 하루 짧다) — 한 달로 부른다(2026-10-04 점검). */}

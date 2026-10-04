@@ -103,8 +103,10 @@
   --c-band-neutral: #3d9cf5;
   --c-band-hot: #f7bcc2;
   --c-band-mania: #ef8f9a;
-  --c-dist-cold: #dbe9f7;
-  --c-dist-neutral: #3d9cf5;
+  /* 분포는 양 끝(저온 · 초고온)이 진하고 가운데(상온 · 고온)가 옅은 갈림 꼴이다. 저온이 #dbe9f7 이던 때는 막대 트랙과
+     명암비 1.05 라 지표 절반이 든 구간이 빈 막대처럼 보였다(2026-10-04 점검). 값은 파랑 램프(--c-blue-1 · -3)에서 가져왔다. */
+  --c-dist-cold: #1b7fd4;
+  --c-dist-neutral: #7dbcf8;
   --c-dist-hot: #ef8a94;
   --c-dist-mania: #dc4b56;
 
@@ -415,8 +417,8 @@
   --c-band-neutral: #4a92d8;
   --c-band-hot: #8f3d47;
   --c-band-mania: #c9505c;
-  --c-dist-cold: #3a6f9e;
-  --c-dist-neutral: #6bb6f8;
+  --c-dist-cold: #6bb6f8;
+  --c-dist-neutral: #3a6f9e;
   --c-dist-hot: #c9505c;
   --c-dist-mania: #fa616d;
   /* tint 위 잉크는 다크에서 **밝은 쪽**이다(라이트와 방향 반대). */

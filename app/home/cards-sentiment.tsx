@@ -2,7 +2,7 @@
 
 import { formatIndicatorValue, formatSampleCount, sentimentTone, shortDate } from "@/lib/format";
 import { C, MONO, R } from "../ui";
-import { overheatColor, Shell, TitleRow, Big, Foot, HeatFill, AreaChart, SplitStats } from "./parts";
+import { overheatColor, Shell, TitleRow, Big, Foot, HeatFill, HeatScale, HotPill, AreaChart, SplitStats } from "./parts";
 import type { Pick } from "./parts";
 import type { IconName } from "@/lib/icon-names";
 
@@ -186,6 +186,10 @@ export function CardDivergence({ v }: { v: Pick }) {
   );
 }
 
+// '평소 대비 N배'가 평소와 같은가. ±0.05 = 소수 첫째 자리로 1.0 으로 보이는 폭 — 이 안에서는 화살표를 안 그린다.
+// 세 카드(초보 검색 · 유튜브 · 여윳돈)가 이 한 경계를 쓴다. 따로 가르면 0.98 이 '1.0배 ↓'로 떴다(2026-10-04 점검).
+const nearUsual = (x: number) => Math.abs(x - 1) < 0.05;
+
 // 초보검색 / 깃헙 봇 / 베스트셀러 — 모양이 둘로 갈린다.
 //  · details.vs_avg 가 있으면(네이버 검색지수) '평소 대비 N배' 눈금
 //  · 없으면 값 + 초고온 기준선까지의 진행 막대
@@ -193,7 +197,7 @@ export function CardDivergence({ v }: { v: Pick }) {
 // "지금 얼마나 뜨거운가" 하나뿐이라 기준선까지의 거리가 그 답을 그대로 그린다.
 export function CardTrend({ v, icon }: { v: Pick; icon: IconName }) {
   const vsAvg = v.details?.vs_avg ?? null;
-  const arrow = vsAvg === null || vsAvg === 1 ? "" : vsAvg > 1 ? "↑" : "↓";
+  const arrow = vsAvg === null || nearUsual(vsAvg) ? "" : vsAvg > 1 ? "↑" : "↓";
   // 진행 막대는 0 ~ 초고온 진입선을 축으로 쓴다. 카드가 "기준선 N"이라고 적는 그 값이다.
   const hot = v.ind?.latest?.details?.hot_threshold ?? null;
   const pct = hot && v.raw !== null ? Math.max(0, Math.min(100, (v.raw / hot) * 100)) : null;
@@ -220,12 +224,7 @@ export function CardTrend({ v, icon }: { v: Pick; icon: IconName }) {
         <>
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
             <Big disp={v.disp} unit={v.unit} color={v.color} size={32} />
-            {v.hotDisp && (
-              <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub, background: C.chip, borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
-                {/* '초고온 6.00%'는 기준선인데 큰 숫자 옆이라 값처럼 읽혔다(2026-10-04 점검) — 기준이라는 걸 말로. */}
-                {v.dirLabel === "이하" ? `${v.hotDisp} 이하면 초고온` : `${v.hotDisp}부터 초고온`}
-              </span>
-            )}
+            <HotPill v={v} />
           </div>
           {/* 진행 막대에서 차트로 되돌렸다(2026-08-03). 이 둘은 값이 하루하루
               오르내리는 계열이라 "지금 어디"보다 "어떻게 움직여 왔나"가 더 읽을 게 많다.
@@ -320,7 +319,7 @@ export function CardSentiment({
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon={icon} name={v.name} />
       {ratio ? (
-        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
             {/* 순서는 앱 전체에서 '비관 : 낙관'으로 통일한다(카더라 테마 막대도 동일). */}
             {/* 숫자도 막대와 같은 편을 든다 — 비관은 저온색, 낙관은 초고온색.
@@ -401,7 +400,7 @@ export function CardYoutube({ v }: { v: Pick }) {
             {ratio.toFixed(1)}배
           </strong>
           {/* 초보 검색량 카드와 같은 화살표 규칙 — 기준은 1배(평소)다. */}
-          {ratio !== 1 && (
+          {!nearUsual(ratio) && (
             <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: ratio < 1 ? C.cold : C.hot }}>{ratio > 1 ? "↑" : "↓"}</span>
           )}
           <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>평소 대비</span>
@@ -429,12 +428,11 @@ export function CardYoutube({ v }: { v: Pick }) {
 // 여윳돈이 향하는 곳 — 명품·수입차 + 오마카세·파인다이닝. 지표 둘이 한 카드에 들어가는
 // 유일한 카드다. 목업은 세로 구분선으로 반 가르지 않고 **두 줄을 위아래로** 쌓고,
 // 눈금 라벨(적음·평소·많음)은 아래쪽 한 번만 적는다.
-function SubSpend({ v, showScale }: { v: Pick; showScale: boolean }) {
+function SubSpend({ v, label, showScale }: { v: Pick; label: string; showScale: boolean }) {
   const ratio = v.details?.vs_avg ?? null;
   // 화살표와 색이 **같은 경계**를 써야 한다. 예전엔 화살표가 `ratio === 1` 로만 갈려서,
   // 0.98배(화면엔 "1.0배")가 색은 중립인데 화살표만 ↓ 로 떴다 — 한 줄이 두 말을 했다.
-  // ±0.05 = 소수 첫째 자리로 1.0 으로 보이는 폭. 이 안에서는 화살표를 안 그린다.
-  const flat = ratio === null || Math.abs(ratio - 1) < 0.05;
+  const flat = ratio === null || nearUsual(ratio);
   const arrow = flat ? "" : (ratio as number) > 1 ? "↑" : "↓";
   const arrowColor = v.color;
   return (
@@ -442,7 +440,7 @@ function SubSpend({ v, showScale }: { v: Pick; showScale: boolean }) {
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         {/* 줄 앞 아이콘(쇼핑백 · 식기)은 걷었다(v2, 2026-10-03) — 셀 머리 아이콘을 걷은 것과 같은 까닭. 이름이 말한다. */}
         <span className="hz-subspend-name" style={{ flex: 1, fontSize: "var(--fs-12)", fontWeight: 500, color: C.label, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {v.name}
+          {label}
         </span>
         <strong
           style={{
@@ -471,16 +469,22 @@ export function CardSpending({ luxury, dining }: { luxury: Pick; dining: Pick })
   // **평소에서 더 많이 벗어난 쪽**을 세운다 — 그게 이 카드가 하려는 말이다.
   const lr = luxury.details?.vs_avg ?? null;
   const dr = dining.details?.vs_avg ?? null;
+  // 줄 이름과 큰 숫자 곁말이 같은 말이어야 한다 — 곁말은 '외식 검색', 줄은 '오마카세·파인다이닝 웨이팅 검색 지수'라
+  // 같은 값이 두 이름이었다(2026-10-04 점검). 카드 안에서는 짧은 이름 하나로 부른다.
+  const LUX = "명품·수입차 검색";
+  const DINE = "오마카세 검색";
   const lead =
     lr === null && dr === null
       ? null
       : lr === null
-        ? { v: dining, r: dr as number, other: "명품" }
+        ? { v: dining, r: dr as number, name: DINE }
         : dr === null
-          ? { v: luxury, r: lr, other: "외식" }
+          ? { v: luxury, r: lr, name: LUX }
           : Math.abs(dr - 1) >= Math.abs(lr - 1)
-            ? { v: dining, r: dr, other: "명품" }
-            : { v: luxury, r: lr, other: "외식" };
+            ? { v: dining, r: dr, name: DINE }
+            : { v: luxury, r: lr, name: LUX };
+  // 둘 다 평소 폭 안이면 큰 숫자 자리에 '평소 수준' 한 말 — '1.0배'가 세 번 서지 않게.
+  const bothUsual = (lr === null || nearUsual(lr)) && (dr === null || nearUsual(dr));
   // 곁말은 큰 숫자가 둘 중 무엇인지만 말한다. 나머지 한쪽 값('· 명품 0.9배')을 붙였었는데 바로 아래 두 줄이 같은 값을 다시 적어
   // 걷었다(v2, 2026-10-03).
   // 지표 둘이 한 셀이라 스크롤 목적지 id 는 하나만 붙는다(명품). 오마카세로 오는
@@ -490,16 +494,16 @@ export function CardSpending({ luxury, dining }: { luxury: Pick; dining: Pick })
       <TitleRow icon="local_mall" name="여윳돈이 향하는 곳" desc="명품·외식 검색량으로 본 소비 심리" />
       {lead && (
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-          <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: lead.v.color, lineHeight: 1, whiteSpace: "nowrap" }}>
-            {lead.r.toFixed(1)}배
+          <strong style={{ fontFamily: bothUsual ? undefined : MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: lead.v.color, lineHeight: 1, whiteSpace: "nowrap" }}>
+            {bothUsual ? "평소 수준" : `${lead.r.toFixed(1)}배`}
           </strong>
           <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2, whiteSpace: "nowrap" }}>
-            {lead.other === "명품" ? "외식" : "명품"} 검색 · 평소 대비
+            {bothUsual ? "명품 · 오마카세 검색" : `${lead.name} · 평소 대비`}
           </span>
         </div>
       )}
-      <SubSpend v={luxury} showScale={false} />
-      <SubSpend v={dining} showScale />
+      <SubSpend v={luxury} label={LUX} showScale={false} />
+      <SubSpend v={dining} label={DINE} showScale />
       {/* 지표가 둘이지만 설명은 하나로 합쳐 적는다. 두 문장을 이어 붙이면 이 카드만
           설명이 두 줄이 되어 같은 행 카드들과 밑선이 어긋난다. 제목("여윳돈이 향하는 곳")도
           DB 가 아니라 여기서 정하므로, 합친 문장도 같은 자리에 두는 게 맞다. */}
@@ -517,8 +521,10 @@ export function CardSpending({ luxury, dining }: { luxury: Pick; dining: Pick })
 export function CardUpbit({ v }: { v: Pick }) {
   const dt = v.details;
   const heat = v.capped === null ? null : Math.round(v.capped);
-  // 영문 HIGH · MID · LOW 를 우리말로(v2, 2026-10-03). 문턱은 그대로다.
-  const volLabel = (x: number) => (x >= 100 ? "높음" : x >= 60 ? "보통" : "낮음");
+  // 말과 색을 같은 띠로 가른다(25 · 50 · 75). 말은 문턱 100 · 60, 색은 과열도 띠로 따로 갈라 '보통'이 초고온 빨강으로
+  // 칠해졌다(2026-10-04 점검, 진행률 94.5).
+  const volLabel = (x: number) => (x >= 75 ? "매우 높음" : x >= 50 ? "높음" : x >= 25 ? "보통" : "낮음");
+  const kimchiProgress = dt?.kimchi_progress;
   const premium = dt?.kimchi_premium ?? null;
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
@@ -530,12 +536,20 @@ export function CardUpbit({ v }: { v: Pick }) {
         </strong>
         <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>과열도</span>
       </div>
-      <HeatFill pct={heat ?? 0} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <HeatFill pct={heat ?? 0} />
+        <HeatScale />
+      </div>
       {dt && (
         // 회색 타일 둘 → 가는 선으로 나눈 두 칸(v2, 2026-10-03). 거래량 강도의 말은 0~100 진행률에서 나온 것이라 같은 밴드 규칙으로 칠한다.
         <SplitStats
           items={[
-            { label: "김치 프리미엄", value: premium !== null ? `${premium > 0 ? "+" : ""}${premium.toFixed(1)}%` : "-", color: v.color },
+            {
+              label: "김치 프리미엄",
+              value: premium !== null ? `${premium > 0 ? "+" : ""}${premium.toFixed(1)}%` : "-",
+              // 두 칸이 각자 제 진행률로 칠한다 — 카드 전체 색을 빌리면 김프가 상온이어도 빨강이었다.
+              color: kimchiProgress != null ? overheatColor(kimchiProgress) : v.color,
+            },
             { label: "거래량 강도", value: volLabel(dt.volume_progress ?? 0), color: overheatColor(dt.volume_progress ?? 0) },
           ]}
         />
@@ -566,6 +580,19 @@ export function CardBrokerage({ v }: { v: Pick }) {
             <span className="hz-rank-name">{shortName(app.name)}</span>
           </div>
         ))}
+        {/* 큰 숫자는 10개인데 넷만 보이면 나머지가 없는 것처럼 읽힌다 — 급등 종목 카드와 같은 '외 N개'(툴팁에 나머지 순위). */}
+        {charted.length > 4 && (
+          <span
+            className="hz-tip hz-tip-wide hz-tip-lines hz-tip-start"
+            data-tip={charted
+              .slice(4)
+              .map((app) => `${app.rank}위 ${shortName(app.name)}`)
+              .join("\n")}
+            style={{ alignSelf: "flex-start", fontSize: "var(--fs-11)", color: C.sub }}
+          >
+            외 {charted.length - 4}개
+          </span>
+        )}
       </div>
       <Foot text={v.desc} />
     </Shell>

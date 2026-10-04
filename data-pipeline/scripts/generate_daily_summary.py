@@ -68,11 +68,12 @@ def cap_progress(progress: float) -> float:
 
 def stage_for_score(score: float) -> str:
     """종합 점수 → 구간. calculate_score.stage_for_score와 동일(밴드 25/50/75)."""
-    if score < 25:
+    s = js_round(score)  # 화면에 찍히는 정수로 가른다(app/ui.tsx stageForScore). 24.72 는 25℃ · 상온이다.
+    if s < 25:
         return "저온"
-    if score < 50:
+    if s < 50:
         return "상온"
-    if score < 75:
+    if s < 75:
         return "고온"
     return "초고온"
 
@@ -103,7 +104,8 @@ COMMON = """\
 [데이터 읽는 법]
 - 각 지표의 '과열도'(0=저온 ~ 100=초고온)가 그 지표가 얼마나 뜨거운지의 유일한 값입니다.
   높을수록 뜨겁고 낮을수록 식은 것입니다. 방향을 절대 뒤집지 마세요.
-- 헤드라인 '햇쩨 지수'는 ℃로, 개별 지표는 과열도 %로 말합니다.
+- 헤드라인 '햇쩨 지수'는 ℃로, 개별 지표는 '과열도 75'처럼 숫자 앞에 '과열도'를 붙여 말합니다.
+  %를 붙이지 마세요. 비중(%)을 재는 지표가 있어 비중이 75%인 것처럼 읽힙니다.
 
 [강조 형식]
 - **지표 이름만** 별표 두 개로 감싸 굵게 씁니다. 예: **깃헙 거래봇 생성 수**. 숫자·온도·다른 말은 굵게 하지 마세요.
@@ -154,7 +156,7 @@ CHANGE_SYSTEM = COMMON + """
 - 방향은 목록에 적힌 '더 뜨거워짐'·'식음'을 그대로 따르세요. 원래 값이 올랐다·내렸다고 쓰지
   마세요(낮을수록 뜨거운 지표가 있어 거꾸로 읽힙니다).
 - 지표가 무엇을 재는지 풀어 쓰지 마세요(한 줄에 들지 않습니다).
-- **목록에 없는 지표는 쓰지 마세요.** 과열도 %, 몇 배 같은 숫자는 쓰지 마세요.
+- **목록에 없는 지표는 쓰지 마세요.** 과열도, 몇 배 같은 숫자는 쓰지 마세요.
 - 햇쩨 지수와 ℃, 며칠간의 흐름은 쓰지 마세요(앞 줄이 맡습니다)."""
 
 HOT_SYSTEM = COMMON + """
@@ -476,7 +478,8 @@ def yeoron_problems(text: str, tone: str, names: list[str]) -> list[str]:
 # 않게 짓는다(받침을 몰라도 된다). 2026-09-28 Haiku(API 폴백 때 쓰는 모델)가 시장 1등이 쉬는 날 세 번 모두
 # "시장 지표 중 금 대비 코스피 상대강도가 가장 높습니다"라고 써서 넣었다 — 그대로 저장하면 거짓이 나간다.
 def _named(r: dict, with_pct: bool = True) -> str:
-    return f"**{r['name']}**({js_round(r['capped'])}%)" if with_pct else f"**{r['name']}**"
+    # 과열도는 '%' 없이 이름을 붙인다 — '(75%)'는 비중 지표(경제 베스트셀러 비중 6.00%)의 값처럼 읽혔다(2026-10-04 점검).
+    return f"**{r['name']}**(과열도 {js_round(r['capped'])})" if with_pct else f"**{r['name']}**"
 
 
 def hot_fallback(rows: list[dict], hot: dict[str, int]) -> str:
@@ -753,8 +756,8 @@ def build_digest(
     '얼마나 뜨거운지'의 단일 척도다. raw 현재값/기준값을 같이 주면 모델이 '현재<기준=식음'
     처럼 방향을 거꾸로 읽는 일이 생겨(예: 상대강도 지표) 일부러 뺀다.
 
-    헤드라인 '햇쩨 지수'는 온도(℃)로, 개별 지표는 기준선까지의 진행률(과열도 %)로
-    표기해 화면 표기와 맞춘다.
+    헤드라인 '햇쩨 지수'는 온도(℃)로, 개별 지표는 기준선까지의 진행률('과열도 75', % 없이)로
+    적는다. %를 붙이면 비중 지표의 값처럼 읽힌다(2026-10-04).
 
     - [최근 추세]: 3번째 문단(추세)용. 최근 며칠 햇쩨 지수를 (날짜, 점수) 쌍으로,
       오래된→최신 순으로 받아 날짜별 목록으로 적는다(trend_lines 주석 참고).
@@ -790,7 +793,7 @@ def build_digest(
     for r in rows:
         hot_mark = " · 초고온" if r["hot"] else ""
         gate_mark = "" if mentionable(r) else "  ← 이 지표는 문장에 쓰지 마세요"
-        lines.append(f"- {r['name']} ({r['category']}): 과열도 {js_round(r['capped'])}%{hot_mark}{gate_mark}")
+        lines.append(f"- {r['name']} ({r['category']}): 과열도 {js_round(r['capped'])}{hot_mark}{gate_mark}")
         if desc and r["name"] in desc_names and r.get("desc"):
             lines.append(f"    뜻: {r['desc']}")
     return "\n".join(lines)

@@ -434,6 +434,7 @@ a.v2-tsh-row:hover { background: var(--t-tint); }
 .v2-spark svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .v2-spark-line { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
 .v2-spark-base { stroke: var(--t-base); stroke-width: 1; stroke-dasharray: 2 3; }
+.v2-spark-blabel { position: absolute; left: 0; transform: translateY(-100%); padding-bottom: 2px; font-size: var(--fs-11); line-height: 1; color: var(--t-ink3); font-variant-numeric: tabular-nums; pointer-events: none; }
 .v2-spark-dot {
   position: absolute;
   right: -4px;
@@ -592,6 +593,14 @@ a.v2-ev-row:hover { background: var(--t-tint); }
   .v2-cover > .v2-cover-cell:not(.v2-cover-meta):has(> :nth-child(4)) { grid-template-columns: repeat(3, auto); }
   .v2-cover > .v2-cover-cell:not(.v2-cover-meta) > .v2-cover-k { grid-column: 1 / -1; line-height: 14px; }
 }
+/* 링크 칸 화살표는 격자 · 줄바꿈 밖으로 — 칸 안 오른쪽(뒤로 가는 칸은 왼쪽) 세로 가운데에 띄운다. 격자 칸 하나를 차지하면
+   ‹ 가 혼자 한 줄이 돼 칸 키가 58px 로 컸고(680~999), 폰에서 숨기면 링크 칸이 정보 칸처럼 보였다(2026-10-04 점검). */
+@container kd (max-width: 999px) {
+  .v2-cover > .v2-cover-go { position: relative; padding-right: 28px; }
+  .v2-cover > .v2-cover-go.is-back { padding-right: 12px; padding-left: 28px; }
+  .v2-cover > .v2-cover-go > .ms { position: absolute; top: 50%; right: 8px; translate: 0 -50%; margin: 0; }
+  .v2-cover > .v2-cover-go.is-back > .ms { right: auto; left: 8px; }
+}
 @container kd (max-width: 679px) {
   .v2-band { grid-template-columns: minmax(0, 1fr); }
   /* 일정 아홉은 둘째 줄 세 칸의 키를 맞추려는 것이다. 한 줄기인 폰에선 길어지기만 해서 다섯으로. */
@@ -608,7 +617,6 @@ a.v2-ev-row:hover { background: var(--t-tint); }
   /* 링크 칸 둘은 반 칸씩 — 머리말을 위 작은 줄로 올려 이름 · 값이 들어가게. */
   .v2-cover-go { flex: 1 1 40%; flex-wrap: wrap; row-gap: 2px; align-content: center; }
   .v2-cover-go > .v2-cover-k { flex: 1 1 100%; }
-  .v2-cover-go .ms { display: none; }
   .v2-th { display: none; }
   .v2-tr,
   .v2-tbl.is-move .v2-tr,
@@ -865,11 +873,13 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-bf .hz-rank-row:first-child .hz-rank-n { color: var(--t-down-deep); }
 .v2-bf .hz-rank-name { overflow: hidden; font-size: 12px; font-weight: 500; color: var(--t-ink2); text-overflow: ellipsis; white-space: nowrap; }
 
+/* 1,000 미만도 다른 화면처럼 첫 칸 216px + 옆 칸 — 이 화면만 한 줄로 쌓아 햇쩨 지수가 판 폭으로 펴지고 오른쪽이 비었다(2026-10-04 점검). */
 @container kd (max-width: 999px) {
-  .v2-bf-band { grid-template-columns: minmax(0, 1fr); }
+  .v2-bf-band { grid-template-columns: 216px minmax(0, 1fr); }
   .v2-bf .v2-sheet .hz-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @container kd (max-width: 679px) {
+  .v2-bf-band { grid-template-columns: minmax(0, 1fr); }
   .v2-bf .v2-sheet .hz-cards { grid-template-columns: minmax(0, 1fr); }
   .v2-bf .hz-cards > .hz-cell-wide { grid-column: auto; }
   .v2-brief3-row { grid-template-columns: 56px minmax(0, 1fr); padding: 10px 14px; }
@@ -1634,10 +1644,10 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 }
 .v2-pv-th > :nth-child(n + 2) { text-align: right; }
 .v2-pv-name { display: flex; flex-direction: column; min-width: 0; line-height: 18px; }
-.v2-pv-name b { font-weight: 600; overflow-wrap: anywhere; }
-.v2-pv-sym { display: inline-flex; align-items: center; gap: 1px; width: fit-content; font-size: 11px; font-weight: 500; line-height: 16px; color: var(--t-ink3); text-decoration: none; }
-.v2-pv-sym .ms { font-size: 11px; }
-.v2-pv-sym:hover { color: var(--t-down); }
+.v2-pv-stock { width: fit-content; font-weight: 600; color: var(--t-ink); text-decoration: none; overflow-wrap: anywhere; }
+.v2-pv-stock:hover { text-decoration: underline; text-underline-offset: 2px; }
+.v2-pv-sym { display: inline-flex; align-items: center; width: fit-content; font-size: 11px; font-weight: 500; line-height: 16px; color: var(--t-ink3); text-decoration: none; }
+.v2-pv-sym:hover { color: var(--t-down); text-decoration: underline; text-underline-offset: 2px; }
 .v2-pv .v2-td-two b { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .v2-pv .v2-td-two em { white-space: nowrap; font-variant-numeric: tabular-nums; }
 /* 줄의 주인공은 종목 · 해외 값 — 국장 종가 대비는 색으로만 말한다(굵기 500, 2026-10-04). */
@@ -1667,12 +1677,12 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-pv-usname { flex: 1; display: flex; flex-direction: column; min-width: 0; line-height: 18px; }
 .v2-pv-usname > span { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 6px; min-width: 0; }
 .v2-pv-usname b { font-weight: 600; }
-.v2-pv-usname em { font-style: normal; font-size: 12px; font-weight: 500; color: var(--t-ink3); overflow-wrap: anywhere; }
+.v2-pv-usname em { font-style: normal; font-size: 12px; font-weight: 500; color: var(--t-ink3); word-break: keep-all; overflow-wrap: break-word; }
 .v2-pv-usname > span em { color: var(--t-ink2); }
 .v2-pv-when { display: none; }
 .v2-pv-kr {
   display: grid;
-  grid-template-columns: 180px minmax(0, 1fr) 72px 72px 72px;
+  grid-template-columns: 180px 140px minmax(0, 1fr) 72px 72px 72px;
   align-items: center;
   column-gap: 12px;
   min-height: 44px;
@@ -1689,6 +1699,12 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-pv-krs > li > .v2-pv-kr { flex: 1; }
 a.v2-pv-kr:hover { background: var(--t-tint); }
 .v2-pv-nums { display: contents; }
+/* 개장 값 갈림 막대 — 가운데 세로선이 0, 오른쪽이 오름 · 왼쪽이 내림. */
+.v2-pv-bar { position: relative; height: 8px; border-radius: 4px; background: var(--t-bar-off); }
+.v2-pv-bar::before { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; border-left: 1px solid var(--t-line); }
+.v2-pv-bar > i { position: absolute; top: 0; bottom: 0; border-radius: 4px; background: var(--t-ink4); }
+.v2-pv-bar > i.is-up { background: var(--t-up); }
+.v2-pv-bar > i.is-down { background: var(--t-down); }
 .v2-pv-why { min-width: 0; font-size: 12px; font-weight: 500; line-height: 18px; color: var(--t-ink3); overflow-wrap: anywhere; }
 .v2-pv-kr .v2-td-num { font-weight: 500; }
 .v2-pv-head { background: var(--t-head); font-size: 12px; font-weight: 500; color: var(--t-ink3); }
@@ -1706,6 +1722,9 @@ a.v2-pv-kr:hover { background: var(--t-tint); }
   .v2-pv-band.is-pair { grid-template-columns: 216px minmax(0, 1fr); }
   .v2-pv-grp { grid-template-columns: 220px minmax(0, 1fr); }
   .v2-pv-kr { grid-template-columns: 148px minmax(0, 1fr) 64px 64px 64px; }
+  /* 국장 칸이 좁아 갈림 막대는 뺀다 — 관계 칸이 남는 폭을 받는다. */
+  .v2-pv-bar,
+  .v2-pv-bar-h { display: none; }
 }
 @container kd (max-width: 679px) {
   .v2-pv-band,
@@ -1745,7 +1764,10 @@ a.v2-pv-kr:hover { background: var(--t-tint); }
     padding-bottom: 8px;
   }
   .v2-pv-why { grid-area: why; text-align: right; }
-  .v2-pv-nums { grid-area: nums; display: flex; flex-wrap: wrap; column-gap: 16px; padding-left: 28px; }
+  /* 세 칸 폭을 고정한다 — flex 로 흘리면 +/- 글자 폭에 따라 '장 중' · '종가' 시작점이 줄마다 2~5px 흔들렸다. */
+  .v2-pv-nums { grid-area: nums; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 12px; padding-left: 28px; }
+  /* 표 공용 규칙(.v2-td-chg { grid-area: chg })이 세 칸을 한 자리에 겹쳐 놓는다 — 여기선 차례대로 둔다. */
+  .v2-pv-nums > * { grid-area: auto; }
   .v2-pv-nums > [data-k]::before { content: attr(data-k) " "; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 }
 

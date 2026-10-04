@@ -492,7 +492,7 @@ export function HeatFill({ pct, height = 10 }: { pct: number; height?: number })
   );
 }
 
-export function HeatBar({ v, hideThreshold = false }: { v: Pick; hideThreshold?: boolean }) {
+export function HeatBar({ v }: { v: Pick }) {
   if (v.capped === null) return null;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -504,16 +504,40 @@ export function HeatBar({ v, hideThreshold = false }: { v: Pick; hideThreshold?:
         </span>
       </div>
       <HeatFill pct={v.capped} />
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>안심</span>
-        <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>과열 100</span>
-      </div>
-      {v.hotDisp && !hideThreshold && (
-        // 회색 상자였다 — 눈금 아래 글자 한 줄로(v2, 2026-10-03). 양 끝 '안심 · 과열 100' 과 같은 꼴.
-        <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.sub }}>
-          {v.hotDisp} {v.dirLabel}이면 초고온
-        </span>
-      )}
+      <HeatScale />
+    </div>
+  );
+}
+
+/** 과열도 막대 양 끝 글자. 레버리지 · 코인 · 일반 카드가 같은 두 말(안심 · 과열)을 쓴다(2026-10-04 점검 — '과열 100' · 눈금 없음이 섞였다). */
+export function HeatScale() {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between" }}>
+      <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>안심</span>
+      <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>과열</span>
+    </div>
+  );
+}
+
+/**
+ * 초고온 기준 알약 — 큰 숫자 옆에 선다. 막대 밑 글줄('1.83배 이상이면 초고온')과 알약('6.00%부터 초고온')이 화면 안에서
+ * 두 꼴이었다(2026-10-04 점검). '초고온 6.00%'로 적으면 기준선인데 값처럼 읽혀 기준이라는 걸 말로 적는다.
+ */
+export function HotPill({ v }: { v: Pick }) {
+  if (!v.hotDisp) return null;
+  return (
+    <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub, background: C.chip, borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+      {v.dirLabel === "이하" ? `${v.hotDisp} 이하면 초고온` : `${v.hotDisp}부터 초고온`}
+    </span>
+  );
+}
+
+/** 큰 숫자 + 초고온 기준 알약 한 줄. 알약이 없으면 큰 숫자만. */
+export function BigWithHot({ v, size, sub }: { v: Pick; size: number; sub?: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+      <Big disp={v.disp} unit={v.unit} color={v.color} size={size} sub={sub} />
+      <HotPill v={v} />
     </div>
   );
 }
@@ -698,7 +722,7 @@ export function GenericCard({ v, icon }: { v: Pick; icon: IconName }) {
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={210}>
       <TitleRow desc={v.headline} icon={icon} name={v.name} />
-      <Big disp={v.disp} unit={v.unit} color={v.color} size={30} />
+      <BigWithHot v={v} size={30} />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
         <HeatBar v={v} />
       </div>

@@ -213,7 +213,7 @@ def test_hot_fallback_is_true_and_josa_free():
     hot, top = balance_counts(rows)
     s = hot_fallback(rows, hot)
     # 한 곳만 — 식은 시장 지표는 안 적는다(2026-10-04 '뜨거운 곳' 한 줄).
-    assert s == "초고온에 든 지표는 **경제 베스트셀러 비중**(94%) 하나입니다."
+    assert s == "초고온에 든 지표는 **경제 베스트셀러 비중**(과열도 94) 하나입니다."
     assert hot_problems(s, rows, hot, top) == []
     # 초고온 지표가 쉬면 종류와 개수로
     rested = [dict(r, rest=(r["name"] == "경제 베스트셀러 비중")) for r in rows]
@@ -226,7 +226,7 @@ def test_hot_fallback_is_true_and_josa_free():
 def test_hot_fallback_no_hot_names_top_only_when_true():
     rows = [_row("금 대비 코스피 상대강도", "시장", 63), _row("코스피 상승 속도", "시장", 0)]
     hot, top = balance_counts(rows)
-    assert hot_fallback(rows, hot).startswith("초고온에 든 지표는 없고 과열도가 가장 높은 지표는 **금 대비 코스피 상대강도**(63%)입니다.")
+    assert hot_fallback(rows, hot).startswith("초고온에 든 지표는 없고 과열도가 가장 높은 지표는 **금 대비 코스피 상대강도**(과열도 63)입니다.")
     # 1등이 쉬면 '가장'을 안 붙인다
     rows = [_row("옵션 풋/콜 비율", "시장", 64, rest=True)] + rows
     hot, top = balance_counts(rows)
@@ -239,7 +239,7 @@ def test_hot_fallback_names_one_of_many():
     rows = [_row("코인 투자 과열 지수", "감성", 78), _row("경제 베스트셀러 비중", "감성", 76), _row("코스피 상승 속도", "시장", 0)]
     hot, top = balance_counts(rows)
     s = hot_fallback(rows, hot)
-    assert s == "초고온에 든 지표 2개 가운데 하나는 **코인 투자 과열 지수**(78%)입니다."
+    assert s == "초고온에 든 지표 2개 가운데 하나는 **코인 투자 과열 지수**(과열도 78)입니다."
     assert hot_problems(s, rows, hot, top) == []
 
 
