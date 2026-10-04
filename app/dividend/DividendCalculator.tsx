@@ -10,7 +10,7 @@ import { newId, holdingsStore, writeHoldings } from "./store";
 import type { Holding } from "./store";
 import { IRP_RISK_MAX, isSafeAsset, ACCOUNTS, TAX_HELP, taxNote } from "./tax";
 import type { Account, TaxMode } from "./tax";
-import { accountTag, DEFAULT_SHARES, GOAL_DEFAULT_MAN, ADD_DEFAULT_MAN, AMOUNT_DEFAULT, SCOPES, scopeOf, computeLines, basketCodes, nextAccountFor, basketShares } from "./shared";
+import { DEFAULT_SHARES, GOAL_DEFAULT_MAN, ADD_DEFAULT_MAN, AMOUNT_DEFAULT, SCOPES, scopeOf, computeLines, basketCodes, nextAccountFor, basketShares } from "./shared";
 import type { Scope } from "./shared";
 import { goalBasis, monthlyOf } from "./calc";
 import { SearchBox, QuickChips, MoreRows } from "./Search";
@@ -394,7 +394,7 @@ export function DividendCalculator({
               track("dividend_account", { account: a });
               setAccount(a);
             }}
-            tag={mixed ? " (계좌별)" : accountTag(taxMode)}
+            mixed={mixed}
             help={helpText}
             note={heroNote}
           />

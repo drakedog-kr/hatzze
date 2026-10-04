@@ -902,8 +902,9 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-kd.v2-md .hz-seg > button[aria-pressed="true"] { background: var(--t-tint); color: var(--t-ink); box-shadow: none; }
 .v2-kd.v2-md .hz-seg-hover > button[aria-pressed="false"]:hover { color: var(--t-ink); }
 
-/* 둘째 줄 — 종목 | 지금 낙폭 | 낙폭 요약. 키는 셋이 같고(stretch) 바닥 줄(전고점 · 저점 / 통계 셋)은 바닥에 붙는다. */
-.v2-md-band { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.4fr); align-items: stretch; gap: 12px; }
+/* 둘째 줄 — 종목 | 지금 낙폭 | 낙폭 요약. 키는 셋이 같고(stretch) 바닥 줄(전고점 · 저점 / 통계 셋)은 바닥에 붙는다.
+   첫 칸은 카더라 여론 칸 · 시장 브리핑 햇쩨 지수 칸과 같은 폭(판의 25% − 6px, 1,000 미만은 216) — 배당 · 미리보기도 같다(2026-10-04 요청 "통일성"). */
+.v2-md-band { display: grid; grid-template-columns: calc(25% - 6px) minmax(0, 1.2fr) minmax(0, 1.4fr); align-items: stretch; gap: 12px; }
 .v2-md-band > .v2-mod { display: flex; flex-direction: column; }
 .v2-md-body { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 12px 14px 14px; }
 .v2-md-price { display: flex; align-items: center; gap: 10px; }
@@ -1138,7 +1139,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 
 /* 셋이 한 줄인 건 판 1,000 까지 — 1,280(판 1,004)에서 두 칸 + 맥락 한 줄로 접으면 둘째 줄 키가 406 이었다. */
 @container kd (max-width: 999px) {
-  .v2-md-band { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); }
+  .v2-md-band { grid-template-columns: 216px minmax(0, 1fr); }
   .v2-md-band > .v2-md-sum { grid-column: 1 / -1; }
   .v2-md-row.is-21 { grid-template-columns: minmax(0, 1fr); }
   .v2-md-row.is-quad { grid-auto-rows: auto; }
@@ -1195,7 +1196,8 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 
 /* 둘째 줄 — 결과 셋. 키는 셋이 같고(stretch) 짧은 칸은 안쪽 줄이 남는 높이를 나눠 받는다. */
 /* 가운데 달력 칸을 넓게(1.3) — 여섯 칸 금액("100,713원")이 1,280 에서 칸 52px 라 이웃과 닿았다. */
-.v2-dv-band { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr); align-items: stretch; gap: 12px; }
+/* 첫 칸은 카더라 여론 칸과 같은 폭(판의 25% − 6px, 1,000 미만은 216 · .v2-band 와 같다, 2026-10-04). */
+.v2-dv-band { display: grid; grid-template-columns: calc(25% - 6px) minmax(0, 1.3fr) minmax(0, 1fr); align-items: stretch; gap: 12px; }
 .v2-dv-band > .v2-mod { display: flex; flex-direction: column; }
 .v2-dv-help { display: inline-flex; align-self: center; color: var(--t-ink3); cursor: help; }
 .v2-dv-acct { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -1338,7 +1340,9 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-dv-bk-foot b { font-weight: 600; color: var(--t-ink); font-variant-numeric: tabular-nums; }
 
 @container kd (max-width: 999px) {
-  .v2-dv-band { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .v2-dv-band { grid-template-columns: 216px minmax(0, 1fr); }
+  /* 216 칸 머리엔 제목 · 세후 버튼 사이에 7px 만 남는다 — '계좌별' 곁글은 숨긴다(종목 표의 줄마다 계좌가 보인다). */
+  .v2-dv-sum .v2-mod-meta { display: none; }
   .v2-dv-band > .v2-dv-up { grid-column: 1 / -1; }
   .v2-dv-bk { grid-template-columns: minmax(0, 1fr); }
   .v2-dv-goal-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1583,8 +1587,9 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
    표는 미장 종목 한 묶음이 한 줄 — 왼쪽 칸에 미장 종목, 오른쪽에 엮인 국장 줄들. 국장 숫자 셋(개장 · 장 중 · 종가)은 묶음이 달라도 같은 열에 선다. */
 
 /* 둘째 줄 — 셋은 키가 같다(stretch). 짧은 쪽은 줄이 고르게 늘어난다(빈 곳 없음). 해외 값이 없는 날은 두 칸(is-pair). */
-.v2-pv-band { display: grid; grid-template-columns: 260px minmax(0, 1.15fr) minmax(0, 1fr); align-items: stretch; gap: 12px; }
-.v2-pv-band.is-pair { grid-template-columns: 260px minmax(0, 1fr); }
+/* 첫 칸(밤사이 뉴욕)은 카더라 여론 칸과 같은 폭(판의 25% − 6px, 1,000 미만은 216 · .v2-band 와 같다, 2026-10-04). 고정 260 이던 땐 1,440 에서 25px 좁았다. */
+.v2-pv-band { display: grid; grid-template-columns: calc(25% - 6px) minmax(0, 1.15fr) minmax(0, 1fr); align-items: stretch; gap: 12px; }
+.v2-pv-band.is-pair { grid-template-columns: calc(25% - 6px) minmax(0, 1fr); }
 .v2-pv-band > .v2-mod { display: flex; flex-direction: column; }
 .v2-pv b.is-up,
 .v2-pv dd.is-up { color: var(--t-up); }
@@ -1694,10 +1699,12 @@ a.v2-pv-kr:hover { background: var(--t-tint); }
 
 @container kd (max-width: 1099px) {
   /* 해외 값 표가 1/3 폭에 안 든다 — [밤사이 뉴욕 | 해외 값] 아래 브리핑이 판 폭 한 줄. 해외 값이 없는 날은 [뉴욕 | 브리핑] 그대로. */
-  .v2-pv-band { grid-template-columns: 260px minmax(0, 1fr); }
+  .v2-pv-band { grid-template-columns: calc(25% - 6px) minmax(0, 1fr); }
   .v2-pv-band:not(.is-pair) > #brief { grid-column: 1 / -1; }
 }
 @container kd (max-width: 999px) {
+  .v2-pv-band,
+  .v2-pv-band.is-pair { grid-template-columns: 216px minmax(0, 1fr); }
   .v2-pv-grp { grid-template-columns: 220px minmax(0, 1fr); }
   .v2-pv-kr { grid-template-columns: 148px minmax(0, 1fr) 64px 64px 64px; }
 }

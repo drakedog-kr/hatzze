@@ -96,7 +96,7 @@ export function YearlyModule({
   onTax,
   account,
   onAccount,
-  tag,
+  mixed,
   help,
   note,
 }: {
@@ -109,12 +109,14 @@ export function YearlyModule({
   onTax: (v: boolean) => void;
   account: Account;
   onAccount: (a: Account) => void;
-  /** 세후일 때 계좌 꼬리(' (ISA)' · ' (계좌별)'). */
-  tag: string;
+  /** 종목마다 계좌가 다르게 담겼나(세후일 때만 참). */
+  mixed: boolean;
   help: string;
   note: string | null;
 }) {
-  const meta = afterTax ? `세후${tag}` : "세전";
+  // 머리 곁글은 '계좌별'일 때만 — '세후 (ISA)'는 바로 옆 세후 · 세전 버튼과 아래 계좌 버튼이 이미 말한다. 첫 칸이 여론 칸 폭(285 · 245 · 216)으로
+  // 좁아지자 긴 계좌 이름이 말줄임으로 잘렸다(2026-10-04). 1,000 미만(216)은 그마저 안 들어 숨긴다(v2.css .v2-dv-sum).
+  const meta = mixed ? "계좌별" : undefined;
   return (
     <Module title="1년에 받는 배당" meta={meta} aside={<TaxSeg afterTax={afterTax} onChange={onTax} />} className="v2-dv-sum">
       <div className="v2-md-body">
