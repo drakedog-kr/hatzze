@@ -164,7 +164,7 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
      (원전, 2026-10-03 실측 223px) 주인공을 판 폭 전체로 펴고 이 둘을 그 아래 한 줄 짝으로 내린다. */
   const sideMods = (
     <>
-      <Module title="다가오는 일정" meta={`채널이 짚은 날짜 · 앞으로 ${CALENDAR_DAYS / 7}주`} className="v2-tm-events">
+      <Module title="다가오는 일정" meta={`앞으로 ${CALENDAR_DAYS / 7}주`} className="v2-tm-events">
         {events.length === 0 ? (
           <p className="v2-empty">앞으로 {CALENDAR_DAYS / 7}주 안에 짚인 이 테마 종목의 일정이 아직 없습니다.</p>
         ) : (

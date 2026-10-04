@@ -336,8 +336,8 @@ export function mddSummary(d: Pick<MddResult, "analysis" | "attribution" | "them
         key: "worst",
         label: "최대 낙폭",
         parts: worst.recovered
-          ? // 저점에서 되찾기까지 — 사례 표 '되찾은 기간'과 같은 기준(2026-10-05 점검).
-            [`${span} 가장 깊었던 하락은 `, { b: fmtPct(worst.depth) }, "였고, 저점에서 되찾기까지 ", { b: fmtDur(worst.days - worst.troughDays) }, " 걸렸습니다."]
+          ? // 저점에서 회복하기까지 — 사례 표 '회복 기간'과 같은 기준(2026-10-05 점검).
+            [`${span} 가장 깊었던 하락은 `, { b: fmtPct(worst.depth) }, "였고, 저점에서 회복하기까지 ", { b: fmtDur(worst.days - worst.troughDays) }, " 걸렸습니다."]
           : [`${span} 가장 깊었던 하락은 `, { b: fmtPct(worst.depth) }, "입니다."],
       });
     }
@@ -351,10 +351,10 @@ export function mddSummary(d: Pick<MddResult, "analysis" | "attribution" | "them
     if (r.unrecoveredCount === 1 && done > 0) {
       tail =
         done === 1
-          ? [" 앞선 1번은 저점에서 되찾기까지 ", { b: fmtDur(r.minDays!) }, " 걸렸습니다."]
+          ? [" 앞선 1번은 저점에서 회복하기까지 ", { b: fmtDur(r.minDays!) }, " 걸렸습니다."]
           : done === 2
-            ? [" 앞선 2번은 저점에서 되찾기까지 ", { b: durRange(r.minDays!, r.maxDays!) }, " 걸렸습니다."]
-            : [` 앞선 ${done}번은 저점에서 되찾기까지 보통 `, { b: fmtDur(r.medianDays!) }, " 걸렸습니다."];
+            ? [" 앞선 2번은 저점에서 회복하기까지 ", { b: durRange(r.minDays!, r.maxDays!) }, " 걸렸습니다."]
+            : [` 앞선 ${done}번은 저점에서 회복하기까지 보통 `, { b: fmtDur(r.medianDays!) }, " 걸렸습니다."];
     }
     rows.push({ key: "recovery", label: "회복", parts: nth === 1 ? [`${during} `, ...head] : [...head, ...tail] });
   }

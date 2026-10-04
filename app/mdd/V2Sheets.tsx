@@ -318,7 +318,7 @@ export function CasesTable({
           {/* '그동안' — 그 사례의 고점 → 저점 사이 지수 등락이다. '코스피'만이면 지수 자체의 낙폭으로 읽혀 띠의 '코스피 −23.2%'와 겹쳤다. */}
           <span>그동안 {bench}</span>
           <span>빠진 기간</span>
-          <span>되찾은 기간</span>
+          <span>회복 기간</span>
           <span>유형</span>
         </div>
         <ol>
@@ -390,23 +390,22 @@ export function RecoveryModule({ a }: { a: MddAnalysis }) {
       ] as const)
     : [];
   return (
-    // 되찾은 사례가 없으면 이번이 처음이다(진행 중인 하락은 마지막 하나뿐) — '1번 중 0번 되찾음'으로 적혔다(카카오 5년 실측).
-    <Module
-      title="회복까지"
-      meta={r.recoveredCount > 0 ? `${depth} 빠졌던 ${r.similarCount}번 중 ${r.recoveredCount}번 되찾음` : `${depth} 빠진 건 이번이 처음`}
-      className="v2-md-rec"
-    >
+    // 회복한 사례가 없으면 이번이 처음이다(진행 중인 하락은 마지막 하나뿐) — '1번 중 0번 되찾음'으로 적혔다(카카오 5년 실측).
+    // 몇 번 중 몇 번이 회복했는지는 머리 근거가 아니라 큰 숫자 옆에 — 큰 숫자가 그 하락들의 기간이다(2026-10-05 운영자 판단).
+    <Module title="회복까지" className="v2-md-rec">
       <div className="v2-md-body">
         <span className="v2-card-val is-big">
           {r.recoveredCount > 0 ? (
             <>
               <b>{fmtDur(r.medianDays!)}</b>
               <span className="v2-reason">{r.recoveredCount === 1 ? "걸림" : "보통"}</span>
+              <span className="v2-md-aside">{`${depth} 빠졌던 ${r.similarCount}번 중 ${r.recoveredCount}번 회복함`}</span>
             </>
           ) : (
             <>
               <b className="is-down">{fmtDur(sinceLow)}째</b>
               <span className="v2-reason">저점 이후</span>
+              <span className="v2-md-aside">{`${depth} 빠진 건 이번이 처음`}</span>
             </>
           )}
         </span>
@@ -420,14 +419,14 @@ export function RecoveryModule({ a }: { a: MddAnalysis }) {
               .map((e) => (
                 <div key={e.peakDate}>
                   <dt>{fmtPct(e.depth)} 빠졌을 때</dt>
-                  <dd>되찾기까지 {fmtDur(e.days - e.troughDays)}</dd>
+                  <dd>회복까지 {fmtDur(e.days - e.troughDays)}</dd>
                 </div>
               ))}
           </dl>
         )}
         {kinds.some(([, , k]) => k) && (
           <div className="v2-md-kinds">
-            {/* 머리 줄은 걷었다 — 아래 두 줄도 위 머리('이만큼 빠졌던 n번 중 m번 되찾음')와 같은 하락을 센다(lib/mdd.ts drawdownCharacter, 2026-10-05). */}
+            {/* 머리 줄은 걷었다 — 아래 두 줄도 위 큰 숫자 옆('이만큼 빠졌던 n번 중 m번 회복함')과 같은 하락을 센다(lib/mdd.ts drawdownCharacter, 2026-10-05). */}
             {kinds.map(([key, label, k]) => (
               <div key={key} className={`v2-md-kind${ch!.currentClass === key ? " is-now" : ""}`}>
                 <span className="v2-md-kind-name">
@@ -576,12 +575,12 @@ export function LastDropModule({ d, asOf }: { d: NonNullable<MddAnalysis["lastDr
             <dd>{fmtDur(fall)}</dd>
           </div>
           <div>
-            <dt>되찾은 기간</dt>
+            <dt>회복 기간</dt>
             <dd>{fmtDur(back)}</dd>
           </div>
           <div>
-            <dt>고점을 되찾은 날</dt>
-            {/* 지금 낙폭 칸 '되찾은 날'과 같은 꼴('10월 1일') — '2026.10.01'로 두 꼴이 섰다(2026-10-05 점검). */}
+            <dt>고점을 회복한 날</dt>
+            {/* 지금 낙폭 칸 '회복한 날'과 같은 꼴('10월 1일') — '2026.10.01'로 두 꼴이 섰다(2026-10-05 점검). */}
             <dd>{fmtDay(d.recoveryDate, asOf)}</dd>
           </div>
         </dl>

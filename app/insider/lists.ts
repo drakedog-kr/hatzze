@@ -52,7 +52,7 @@ export const INSIDER_LISTS: Record<InsiderListSlug, InsiderListSpec> = {
   congress: {
     title: "미 하원의원이 사고판 것",
     sub: "카더라 밖 종목까지 보고, 여러 의원이 건드린 순입니다.",
-    note: "의원 수 순",
+    note: "",
     icon: "account_balance",
   },
   adds: {

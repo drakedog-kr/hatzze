@@ -247,9 +247,9 @@ export function ThemeShares({
     <Module
       id="themes"
       title="테마 점유율"
-      // 변화(+20.5%p)가 무엇과 견준 값인지 머리에 — 5~14일 전 평균(lib/telegram-data.ts THEME_PRIOR_GAP_DAYS). '평소'라 부르면 테마 한 장의
-      // '평소'(말 많은 종목 태그 · 앞 27일)와 두 뜻이 돼 기간을 글자로 적는다(테마 판세와 같은 말, 2026-10-05 점검).
-      meta="최근 3일 · 1~2주 전 대비"
+      // 머리엔 점유율의 기간만. 변화(+20.5%p)가 견준 기간(5~14일 전 평균, lib/telegram-data.ts THEME_PRIOR_GAP_DAYS)은 그 칸 머리가 말한다 —
+      // 머리에 '최근 3일 · 1~2주 전 대비'로 나란히 두었더니 두 기간이 한 덩어리로 읽혀 헷갈렸다(2026-10-05 운영자 판단).
+      meta="최근 3일"
       // 테마 전체 보기는 이 머리 오른쪽에 둔다(2026-10-03) — 첫 줄 띠 끝에 있을 땐 띠가 1,280 에서 두 줄로 접혔고, 목록을 보다 넘어가는 자리가 여기다.
       aside={
         hrefOf && (
@@ -271,7 +271,7 @@ export function ThemeShares({
               <span>테마</span>
               <span />
               <span>점유율</span>
-              <span>변화</span>
+              <span>1~2주 전 대비</span>
             </span>
           </li>
           {rows.map((t, i) => {
@@ -326,7 +326,7 @@ export function dayPill(date: string, today: string): string {
 /**
  * 다가오는 일정 — 날짜 알약 + 일정. 2차의 일정 카드 꼴을 되살렸다(2026-10-02 요청).
  * 둘째 줄(여론 · 테마 옆) 오른쪽 칸이다 — 가까운 다섯.
- * ⛔ '채널 글에서 뽑은 날짜라 공시와 다를 수 있다' 같은 각주를 달지 않는다(사족) — 머리 띠의 '채널이 짚은 날짜'가 그 말이다.
+ * ⛔ '채널 글에서 뽑은 날짜라 공시와 다를 수 있다' 같은 각주를 달지 않는다(사족). 머리 근거 '채널이 짚은 날짜'도 걷었다(2026-10-05 운영자 판단).
  * 줄은 그 종목 화면으로 간다(표의 줄과 같은 동작) — 국내는 종목 페이지, 미장은 내부자 리포트 종목 화면(stockHref).
  */
 export function EventsModule({ events, today, failed, limit = 5 }: { events: UpcomingEvent[]; today: string; failed: boolean; limit?: number }) {
@@ -335,7 +335,7 @@ export function EventsModule({ events, today, failed, limit = 5 }: { events: Upc
     .sort((a, b) => a.date.localeCompare(b.date) || b.channels - a.channels)
     .slice(0, limit);
   return (
-    <Module id="events" title="다가오는 일정" meta="채널이 짚은 날짜">
+    <Module id="events" title="다가오는 일정">
       {failed ? (
         <p className="v2-empty">일정을 불러오지 못했습니다.</p>
       ) : next.length === 0 ? (

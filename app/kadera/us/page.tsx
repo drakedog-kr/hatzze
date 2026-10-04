@@ -160,7 +160,7 @@ export default async function UsKaderaPage() {
   const sections: BoardSection[] = [
     {
       id: "surging",
-      title: "급부상 종목",
+      title: "언급 급부상 종목",
       meta: `최근 ${US_WINDOW_DAYS}일 · 평소 대비`,
       kind: "surge",
       heads: ["", "종목", liveHead, "언급 증가", "왜 뜨나"],

@@ -104,7 +104,7 @@ export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel:
             {drop ? (
               <>
                 <StatCell label="직전 하락" value={fmtPct(drop.depth)} tone={DOWN} />
-                <StatCell label="되찾은 날" value={fmtDay(drop.recoveryDate, a.asOf)} />
+                <StatCell label="회복한 날" value={fmtDay(drop.recoveryDate, a.asOf)} />
               </>
             ) : (
               <>

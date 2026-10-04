@@ -236,7 +236,7 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
 
   const holdersMod =
     d.holders.length > 0 ? (
-      <Module title="이 종목을 든 월가 거물" meta={`${d.holders.length}/${d.managerCount}명 · ${q ? `${q} 말` : "분기말"} · 금액 순`} className="v2-isd-mod">
+      <Module title="이 종목을 든 월가 거물" meta={`${d.holders.length}/${d.managerCount}명 · ${q ? `${q} 말` : "분기말"}`} className="v2-isd-mod">
         <DetailList name="stock_holders" cols="holder" items={holderLines(d.holders.slice(0, ROWS_MAX), d.usdKrw)} />
       </Module>
     ) : null;
@@ -249,14 +249,14 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
   ) : null;
   const execMod =
     execTrades.length > 0 ? (
-      // 머리는 기간 · 순서만 — 수는 둘째 줄 '공시에 남은 것'이 말한다(네 조각이었다, 2026-10-05 점검).
-      <Module title="임원 신고" meta={[since(d.insiderSince) && `${since(d.insiderSince)} 접수`, "매매일 순"].filter(Boolean).join(" · ")} className="v2-isd-mod">
+      // 머리는 기간만 — 수는 둘째 줄 '공시에 남은 것'이 말한다(네 조각이었다, 2026-10-05 점검). '~ 순' 정렬 표기는 걷었다(운영자 판단).
+      <Module title="임원 신고" meta={since(d.insiderSince) ? `${since(d.insiderSince)} 접수` : undefined} className="v2-isd-mod">
         <DetailList name="stock_insider" cols="trade" items={insiderLines(execTrades.slice(0, ROWS_MAX), d.usdKrw)} />
       </Module>
     ) : null;
   const cgMod =
     cgTrades.length > 0 ? (
-      <Module title="미 하원의원 신고" meta={[since(d.congressSince) && `${since(d.congressSince)} 접수`, "매매일 순"].filter(Boolean).join(" · ")} className="v2-isd-mod">
+      <Module title="미 하원의원 신고" meta={since(d.congressSince) ? `${since(d.congressSince)} 접수` : undefined} className="v2-isd-mod">
         <DetailList name="stock_congress" cols="congress" items={congressLines(cgTrades.slice(0, ROWS_MAX), d.usdKrw)} />
       </Module>
     ) : null;

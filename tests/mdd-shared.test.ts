@@ -97,7 +97,7 @@ describe("mddSummary — 낙폭 요약 줄", () => {
     const rows = mddSummary(base());
     assert.deepEqual(rows.map((r) => r.key), ["depth", "recovery", "market", "theme"]);
     assert.equal(text(rows, "depth"), "최근 10년 동안 지금보다 깊이 빠져 있던 날은 열흘에 3일꼴입니다.");
-    assert.equal(text(rows, "recovery"), "이만큼 빠진 하락은 이번이 4번째입니다. 앞선 3번은 저점에서 되찾기까지 보통 2.2년 걸렸습니다.");
+    assert.equal(text(rows, "recovery"), "이만큼 빠진 하락은 이번이 4번째입니다. 앞선 3번은 저점에서 회복하기까지 보통 2.2년 걸렸습니다.");
     assert.equal(text(rows, "market"), "6월 18일 고점 이후 코스피도 −22.7%로 비슷하게 빠졌습니다.");
     assert.equal(text(rows, "theme"), "같은 기간 반도체 대표 종목은 평균 −9.2%로 이 종목보다 14.7%p 덜 빠졌습니다.");
   });
@@ -111,13 +111,13 @@ describe("mddSummary — 낙폭 요약 줄", () => {
     const first = { similarCount: 1, deeperCount: 0, recoveredCount: 0, unrecoveredCount: 1, minDays: null, medianDays: null, maxDays: null, samples: [] };
     assert.equal(text(mddSummary(base({ analysis: { recovery: first } })), "recovery"), "최근 10년 동안 이만큼 빠진 하락은 이번이 처음입니다.");
     const one = { ...first, similarCount: 2, recoveredCount: 1, minDays: 400, medianDays: 400, maxDays: 400 };
-    assert.match(text(mddSummary(base({ analysis: { recovery: one } })), "recovery")!, /이번이 2번째입니다\. 앞선 1번은 저점에서 되찾기까지 1\.1년 걸렸습니다\.$/);
+    assert.match(text(mddSummary(base({ analysis: { recovery: one } })), "recovery")!, /이번이 2번째입니다\. 앞선 1번은 저점에서 회복하기까지 1\.1년 걸렸습니다\.$/);
     const two = { ...first, similarCount: 3, recoveredCount: 2, minDays: 364, medianDays: 373, maxDays: 381 };
-    assert.match(text(mddSummary(base({ analysis: { recovery: two } })), "recovery")!, /앞선 2번은 저점에서 되찾기까지 1년 걸렸습니다\.$/);
+    assert.match(text(mddSummary(base({ analysis: { recovery: two } })), "recovery")!, /앞선 2번은 저점에서 회복하기까지 1년 걸렸습니다\.$/);
     const both = { ...two, minDays: 583, medianDays: 833, maxDays: 1083 };
     assert.match(text(mddSummary(base({ analysis: { recovery: both } })), "recovery")!, /1\.6~3년 걸렸습니다\.$/);
     const far = { ...two, minDays: 120, medianDays: 310, maxDays: 500 };
-    assert.match(text(mddSummary(base({ analysis: { recovery: far } })), "recovery")!, /앞선 2번은 저점에서 되찾기까지 4개월~1\.4년 걸렸습니다\.$/);
+    assert.match(text(mddSummary(base({ analysis: { recovery: far } })), "recovery")!, /앞선 2번은 저점에서 회복하기까지 4개월~1\.4년 걸렸습니다\.$/);
   });
 
   it("시장이 올랐으면 '빠졌습니다'라고 하지 않는다 — 미장 조사도", () => {
@@ -144,7 +144,7 @@ describe("mddSummary — 낙폭 요약 줄", () => {
     const rows = mddSummary(base({ analysis: { currentDd: -0.8, deeperThanNowDays: 2161, recovery: null }, attribution: null }));
     assert.deepEqual(rows.map((r) => r.key), ["depth", "worst", "theme"]);
     assert.equal(text(rows, "depth"), "최근 10년 동안 지금보다 깊이 빠져 있던 날은 열흘에 9일꼴입니다.");
-    assert.equal(text(rows, "worst"), "최근 10년 가장 깊었던 하락은 −45.2%였고, 저점에서 되찾기까지 1년 걸렸습니다.");
+    assert.equal(text(rows, "worst"), "최근 10년 가장 깊었던 하락은 −45.2%였고, 저점에서 회복하기까지 1년 걸렸습니다.");
     assert.equal(text(rows, "theme"), "반도체 대표 11종목은 평균 고점 대비 −26.2%입니다.");
   });
 

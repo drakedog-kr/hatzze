@@ -120,20 +120,20 @@ export default async function InsiderPage() {
 
       {/* ① 임원 · 의원 신고 — 매일 들어온다 */}
       <div className="v2-in-pair">
-        <Module title="임원이 신고한 매매" meta={`${insiderNote("exec", ov)} · 금액 순`} aside={<SeeAll href="/insider/list/exec" />}>
+        <Module title="임원이 신고한 매매" meta={insiderNote("exec", ov)} aside={<SeeAll href="/insider/list/exec" />}>
           {ov.buys.length === 0 ? <p className="v2-empty">최근에는 없습니다.</p> : <Rows items={execLines(ov.buys.slice(0, BLOCK_ROWS), ov.usdKrw)} />}
         </Module>
-        <Module title="미 하원의원이 사고판 것" meta={`${insiderNote("congress", ov)} · 의원 수 순`} aside={<SeeAll href="/insider/list/congress" />}>
+        <Module title="미 하원의원이 사고판 것" meta={insiderNote("congress", ov)} aside={<SeeAll href="/insider/list/congress" />}>
           {ov.congressTickers.length === 0 ? <p className="v2-empty">최근에는 없습니다.</p> : <Rows items={congressLines(ov.congressTickers.slice(0, BLOCK_ROWS))} />}
         </Module>
       </div>
 
       {/* ② 거물이 분기 사이에 움직인 것 — 같은 계산의 양쪽 끝이라 나란히. 값은 금액이 아니라 사람 수다. */}
       <div className="v2-in-pair">
-        <Module title="월가 거물이 늘린 종목" meta={`${quarter} · 늘린 거물 수 순`} aside={<SeeAll href="/insider/list/adds" />}>
+        <Module title="월가 거물이 늘린 종목" meta={quarter} aside={<SeeAll href="/insider/list/adds" />}>
           {ov.managerAdds.length === 0 ? <p className="v2-empty">견줄 직전 분기가 아직 없습니다.</p> : <Rows items={moveLines(ov.managerAdds.slice(0, BLOCK_ROWS), "add")} />}
         </Module>
-        <Module title="월가 거물이 줄인 종목" meta={`${quarter} · 줄인 거물 수 순`} aside={<SeeAll href="/insider/list/trims" />}>
+        <Module title="월가 거물이 줄인 종목" meta={quarter} aside={<SeeAll href="/insider/list/trims" />}>
           {ov.managerTrims.length === 0 ? <p className="v2-empty">견줄 직전 분기가 아직 없습니다.</p> : <Rows items={moveLines(ov.managerTrims.slice(0, BLOCK_ROWS), "trim")} />}
         </Module>
       </div>

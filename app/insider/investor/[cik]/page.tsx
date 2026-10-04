@@ -206,7 +206,7 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
       <div className="v2-tm-band is-hot v2-isd-inv">
         <Module
           title="보유 종목"
-          meta={`${d.holdings.length > ROWS_MAX ? `상위 ${ROWS_MAX} / ` : ""}${d.holdings.length}종목 · 비중 순`}
+          meta={`${d.holdings.length > ROWS_MAX ? `상위 ${ROWS_MAX} / ` : ""}${d.holdings.length}종목`}
           className="v2-isd-mod"
         >
           {d.holdings.length === 0 ? (

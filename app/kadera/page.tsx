@@ -249,7 +249,7 @@ export default async function KaderaPage() {
   const sections: BoardSection[] = [
     {
       id: "surging",
-      title: "급부상 종목",
+      title: "언급 급부상 종목",
       meta: `최근 ${surgeDays}일 · 평소 대비`,
       kind: "surge",
       // 숫자 칸 이름은 '언급 증가' — '평소 대비'만 두면 바로 옆 '지금 등락'과 붙어 주가 배수로 읽혔다(2026-10-04 점검).

@@ -179,8 +179,9 @@ function NoteStocksModule({ stocks, noteDate }: { stocks: NoteStocks; noteDate: 
     <Module id="stocks" title="언급된 종목" meta={stale ? `${fmtNoteDay(latest)} 종가 · ${counts}` : counts} className="v2-nt-stockmod">
       <ul className="v2-nt-stocks">
         {stocks.kr.map((s) => {
-          // 등락률은 글 날의 값일 때만 — 지난 글 옆 최신 하루 등락은 글과 상관없는 숫자다.
-          const chg = s.priceDate === noteDate ? s.changeRate : null;
+          // 등락률은 늘 보인다 — 글 날의 값일 때만 두었더니 주말 · 연휴 글엔 등락이 통째로 빠졌다(2026-10-05 운영자 판단 "기존처럼 등락 %").
+          // 어느 날 종가 · 등락인지는 모듈 머리('10월 2일 종가')와 줄 끝 날짜가 말한다.
+          const chg = s.changeRate;
           return (
             <li key={s.code}>
               <Link href={stockHref(s.code)} className="v2-nt-stock" data-ga="note_stock_click">

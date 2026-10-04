@@ -188,7 +188,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
   const eventsMod =
     events.length > 0 ? (
       // 채널 글에서 뽑은 앞날의 일정. 카더라 카드와 달리 달 · 분기 · 연 단위도 보여준다 — 한 종목의 자리라 "10월 중" · "2027년"이 글로 서면 된다.
-      <Module title="다가오는 일정" meta={`채널이 짚은 날짜 · ${eventList.total}건`} className="v2-tm-events">
+      <Module title="다가오는 일정" meta={`${eventList.total}건`} className="v2-tm-events">
         <ul className="v2-events">
           {events.map((e) => (
             <li key={`${e.date}-${e.precision}-${e.event}`}>

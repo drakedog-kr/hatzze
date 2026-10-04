@@ -460,31 +460,36 @@ export function CardVkospi({ v }: { v: Pick }) {
 }
 
 export function CardAsia({ v }: { v: Pick }) {
+  // ⭐ 코스피 100 기준 지수 꼴로 되돌렸다(2026-10-05 운영자 판단 "기존 것이 더 쉽게 이해된다"). 10-04 점검에서 나라마다 실제 한 달 등락을
+  //    0 가운데 좌우 막대로 바꿨었는데, 그쪽이 덜 읽혔다. 굵기만 v2 눈금(500 · 600)으로 낮췄다.
   const dt = v.details;
-  // 막대는 나라마다 **실제 한 달 등락**이다. 예전엔 100 + (그 나라 − 코스피)라 '일본 96'처럼 지수를 다시 매긴 값으로
-  // 보여 실제 등락(닛케이 +3.2%)이 안 보였고, '코스피 100 기준' 글줄로 풀어야 했다(2026-10-04 점검).
-  // 0 을 가운데 두고 좌우로 자라게 해 내린 나라(홍콩 −4.9%)도 담는다. 세로 파선은 한국 값 — 그 오른쪽이 코스피보다 앞선 나라다.
+  const k = dt?.kospi ?? 0;
   const bars = dt
     ? [
-        { label: "한국", ret: dt.kospi ?? 0, self: true },
-        { label: "일본", ret: dt.nikkei ?? 0, self: false },
-        { label: "홍콩", ret: dt.hangseng ?? 0, self: false },
-        { label: "대만", ret: dt.taiex ?? 0, self: false },
+        { label: "KOSPI", sub: "한국", index: 100, self: true },
+        { label: "Nikkei", sub: "일본", index: 100 + ((dt.nikkei ?? 0) - k), self: false },
+        { label: "HangSeng", sub: "홍콩", index: 100 + ((dt.hangseng ?? 0) - k), self: false },
+        { label: "Taiex", sub: "대만", index: 100 + ((dt.taiex ?? 0) - k), self: false },
       ]
     : [];
-  // 눈금은 가장 크게 움직인 나라의 절댓값에 8% 여유 — 막대 끝이 칸 끝에 붙으면 축이 닫힌 것처럼 읽힌다.
-  const span = Math.max(0.5, ...bars.map((b) => Math.abs(b.ret))) * 1.08;
-  const at = (n: number) => 50 + (Math.max(-span, Math.min(span, n)) / span) * 50;
-  const kospiAt = bars.length ? at(bars[0].ret) : 50;
-  const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "-" : ""}${Math.abs(n).toFixed(1)}%`;
-  // 라벨·값 칸 폭. 파선 상자가 이 값을 그대로 되읽어야 막대 칸에 정확히 겹친다.
-  const LABEL_W = 28;
-  const VALUE_W = 44;
+  // 눈금 상한. 가장 큰 나라도 막대 끝에 딱 붙지 않게 4% 만큼 여유를 둔다 — 붙으면
+  // "여기가 최대치"로 읽혀서, 실제로는 열려 있는 축이 닫힌 것처럼 보인다.
+  const scaleMax = bars.length ? Math.max(...bars.map((b) => b.index)) * 1.04 : 1;
+  const pct = (n: number) => `${Math.max(0, Math.min(100, (n / scaleMax) * 100))}%`;
+  // 기준선(KOSPI)이 축 위에서 갖는 자리. 파선과 아래 캡션이 같은 값을 읽어야 어긋나지 않는다.
+  const kospiPct = bars.length ? pct(bars[0].index) : "0%";
+  // 라벨·값 칸 폭. 파선을 덮어씌우는 상자가 이 값을 그대로 되읽어야 막대 칸에 정확히
+  // 겹친다(숫자를 두 곳에 적으면 반드시 어긋난다).
+  const LABEL_W = 62;
+  const VALUE_W = 34;
   const ROW_GAP = 9;
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
-      {/* ⚠️ public(지구본) 이었다. 아래 CardNetBuy("고점권 외국인 매도")가 같은 지구본을 쓴다. 이 카드는 네 나라를
-          한 기준선에서 견주는 일을 하므로 그 모양(align_horizontal_left)을 쓴다. */}
+      {/* ⚠️ public(지구본) 이었다. 아래 CardNetBuy("고점권 외국인 매도")가 같은 지구본을
+          쓰고 있어 한 화면에 둘이었다. 지구본은 그쪽이 갖는다 — 저 카드는 **누가** 사고파는지
+          (외국인)를 말하는 자리라 방향에 매이지 않는 그림이 필요하고, 이 카드가 실제로 하는
+          일은 네 나라를 **한 기준선에서 견주는 것**이다. 아이콘이 카드의 모양을 되풀이하는
+          것은 이 화면의 어법이다(쏠림=pie_chart · 증권앱 순위=leaderboard). */}
       <TitleRow desc={v.headline} icon="align_horizontal_left" name={v.name} badge="최근 30일" />
       <Big
         disp={`${v.raw !== null && v.raw > 0 ? "+" : ""}${v.disp}`}
@@ -494,55 +499,93 @@ export function CardAsia({ v }: { v: Pick }) {
         sub="코스피 초과수익률"
       />
       {bars.length > 0 ? (
+        // 세로 막대 넷을 **가로 막대 넷**으로 바꿨다. 세로로 세우면 네 나라의 차이가
+        // 높이차로만 남는데, 100 대 107 처럼 붙은 값들은 그 차이가 몇 px 이라 안 보인다.
+        // 가로로 눕히면 같은 차이가 훨씬 긴 축 위에 놓이고, 무엇보다 **기준선(KOSPI)을
+        // 세로 파선 하나로 그을 수 있어** "우리보다 앞선 나라"가 선 오른쪽으로 갈린다.
         <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 10 }}>
-          {/* 0 선과 한국 파선은 막대 칸에만 건다(좌우를 라벨 · 값 칸 폭만큼 물린 상자). 막대보다 앞 레이어라야
-              코스피를 넘어선 나라의 막대가 파선을 덮지 않는다. */}
+          {/* 파선은 막대 칸에만 걸쳐야 한다 — 라벨·값 칸까지 가로지르면 표를 관통하는
+              줄이 돼서 기준선으로 안 읽힌다. 좌우를 그 두 칸 폭만큼 물린 상자를 깔고
+              그 안에서 %로 세운다. 아래 캡션 줄(12+gap 10)만큼 bottom 도 물린다.
+              ⚠️ zIndex 1 — 이 상자는 DOM 에서 막대보다 **앞**이라, 그냥 두면 뒤에 깔려
+              KOSPI 를 넘어선 나라의 막대가 파선을 덮는다. 기준선은 자기가 가르는 막대
+              위에 보여야 "여기까지가 우리"로 읽히므로 맨 앞 레이어로 올린다. */}
           <span
             aria-hidden
-            style={{ position: "absolute", top: -2, bottom: -2, left: LABEL_W + ROW_GAP, right: VALUE_W + ROW_GAP, pointerEvents: "none", zIndex: 1 }}
+            style={{
+              position: "absolute",
+              top: 0,
+              bottom: 22,
+              left: LABEL_W + ROW_GAP,
+              right: VALUE_W + ROW_GAP,
+              pointerEvents: "none",
+              zIndex: 1,
+            }}
           >
-            <span style={{ position: "absolute", left: "50%", top: 0, bottom: 0, borderLeft: `1px solid ${C.line}` }} />
-            <span style={{ position: "absolute", left: `${kospiAt}%`, top: 0, bottom: 0, borderLeft: `1px dashed var(--c-blue-3)` }} />
+            <span style={{ position: "absolute", left: kospiPct, top: -2, bottom: 0, borderLeft: `1px dashed var(--c-blue-3)` }} />
           </span>
-          {bars.map((b) => {
-            const lo = Math.min(at(0), at(b.ret));
-            const hi = Math.max(at(0), at(b.ret));
-            return (
-              <div key={b.label} style={{ display: "flex", alignItems: "center", gap: ROW_GAP }}>
-                <span style={{ width: LABEL_W, flexShrink: 0, fontSize: "var(--fs-12)", fontWeight: b.self ? 600 : 500, color: b.self ? C.ink : C.sub2, whiteSpace: "nowrap" }}>
+          {bars.map((b) => (
+            <div key={b.label} style={{ display: "flex", alignItems: "center", gap: ROW_GAP }}>
+              <span style={{ width: LABEL_W, flexShrink: 0, display: "flex", flexDirection: "column", gap: 1 }}>
+                <span style={{ fontSize: "var(--fs-11)", fontWeight: b.self ? 600 : 500, color: b.self ? C.ink : C.label, whiteSpace: "nowrap" }}>
                   {b.label}
                 </span>
-                {/* 막대 두께는 카드 안 목록 막대(10px, shadcn.css .hz-hbar-md)와 맞춘다. 기준국만 진한 파랑. */}
-                <div style={{ position: "relative", flex: 1, minWidth: 0, height: 10 }}>
-                  <div style={{ position: "absolute", inset: 0, borderRadius: 4, background: C.track }} />
-                  <div
-                    style={{
-                      position: "absolute",
-                      left: `${lo}%`,
-                      width: `${Math.max(hi - lo, 0.8)}%`,
-                      top: 0,
-                      bottom: 0,
-                      borderRadius: 4,
-                      background: b.self ? "var(--c-blue-1)" : "var(--c-blue-4)",
-                    }}
-                  />
-                </div>
-                <span
+                <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.sub }}>{b.sub}</span>
+              </span>
+              {/* 막대 두께는 카드 안 목록 막대(10px, shadcn.css .hz-hbar-md)와 맞춘다(2026-09-27, 16 → 10). */}
+              <div style={{ position: "relative", flex: 1, minWidth: 0, height: 10 }}>
+                <div style={{ position: "absolute", inset: 0, borderRadius: 4, background: C.track }} />
+                {/* 기준국만 진한 파랑. 넷을 다 같은 색으로 두면 "누가 기준인지"를 라벨
+                    굵기로만 말하게 되는데, 그건 막대를 훑는 눈에 안 걸린다. */}
+                <div
                   style={{
-                    width: VALUE_W,
-                    flexShrink: 0,
-                    textAlign: "right",
-                    fontFamily: MONO,
-                    fontSize: "var(--fs-12)",
-                    fontWeight: b.self ? 600 : 500,
-                    color: b.self ? C.ink : C.label,
+                    position: "absolute",
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: pct(b.index),
+                    borderRadius: 4,
+                    background: b.self ? "var(--c-blue-1)" : "var(--c-blue-4)",
                   }}
-                >
-                  {signed(b.ret)}
-                </span>
+                />
               </div>
-            );
-          })}
+              <span
+                style={{
+                  width: VALUE_W,
+                  flexShrink: 0,
+                  textAlign: "right",
+                  fontFamily: MONO,
+                  fontSize: "var(--fs-12)",
+                  fontWeight: b.self ? 600 : 500,
+                  color: b.self ? C.ink : C.label,
+                }}
+              >
+                {Math.round(b.index)}
+              </span>
+            </div>
+          ))}
+          {/* 파선이 무슨 선인지 적는 줄. 파선과 같은 kospiPct 를 쓰되 오른쪽 기준으로
+              뒤집어 잡는다 — left 로 두면 캡션이 길어질 때 왼쪽으로 자라 선에서 밀린다. */}
+          <div style={{ display: "flex", alignItems: "center", gap: ROW_GAP }}>
+            <span style={{ width: LABEL_W, flexShrink: 0 }} />
+            <div style={{ position: "relative", flex: 1, minWidth: 0, height: 12 }}>
+              <span
+                style={{
+                  position: "absolute",
+                  right: `calc(100% - ${kospiPct})`,
+                  top: 0,
+                  transform: "translateX(50%)",
+                  fontSize: "var(--fs-11)",
+                  fontWeight: 500,
+                  color: "var(--c-cold-ink)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                KOSPI 100 기준
+              </span>
+            </div>
+            <span style={{ width: VALUE_W, flexShrink: 0 }} />
+          </div>
         </div>
       ) : (
         <HeatBar v={v} />
