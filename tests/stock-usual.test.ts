@@ -61,8 +61,8 @@ describe("평소 대비 문구", () => {
     assert.equal(usualDeltaShort(10, 0.111), "10배 넘게");
     assert.equal(usualDeltaText(12, 3), "평소의 4배 언급");
     assert.equal(usualDeltaText(16, 10), "평소 대비 +60% 언급");
-    assert.equal(usualDeltaText(58, 100), "평소 대비 −42% 언급");
-    assert.equal(usualDeltaShort(58, 100), "−42%");
+    assert.equal(usualDeltaText(58, 100), "평소 대비 -42% 언급");
+    assert.equal(usualDeltaShort(58, 100), "-42%");
     assert.equal(usualDeltaText(5, 0), "새로 등장");
     assert.equal(usualDeltaShort(10, 10), "평소만큼");
   });

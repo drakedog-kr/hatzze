@@ -97,6 +97,10 @@ def pick_risers(
     for c, a in agg.items():
         if a["recent"] < RISER_MIN_MENTIONS:
             continue
+        # 횟수가 그대로거나 준 종목은 '급부상'이 아니다 — 몫으로만 고르면 주말이 낀 창에서 19회 → 12회로 준 종목이 1.6배로 섰다
+        # (2026-10-04 점검, 미장 슈퍼마이크로). 화면 오른쪽 칸이 횟수(최근 · 그 전)를 적으니 횟수도 늘어야 한다.
+        if a["recent"] <= a["prior"]:
+            continue
         ratio = None if a["prior"] == 0 else (a["recent"] / total["recent"]) / (a["prior"] / total["prior"])
         if ratio is not None and ratio < RISER_MIN_RATIO:
             continue

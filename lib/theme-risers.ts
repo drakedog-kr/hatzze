@@ -47,6 +47,8 @@ export function parseRisers(rows: RiserRow[], known: (theme: string) => boolean)
     seen.add(r.theme);
     if (!r.riser?.code) continue; // 그 테마의 최신 행에 후보가 없다 — 줄이 없다.
     const s = r.riser;
+    // 횟수가 그대로거나 준 종목은 줄을 세우지 않는다 — 파이프라인 pick_risers 와 같은 거름(2026-10-04 점검). 그 규칙 전에 저장된 행에도 건다.
+    if ((Number(s.prior) || 0) > 0 && (Number(s.recent) || 0) <= (Number(s.prior) || 0)) continue;
     out.push({
       theme: r.theme,
       code: s.code,

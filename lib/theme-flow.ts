@@ -36,3 +36,15 @@ export function usableDays(dayTotals: Map<string, number> | null, days: string[]
   return days.filter((d) => !thin.has(d));
 }
 
+/**
+ * 하루 앞(쓸 날의 끝에서 둘째 날)에서 끝나는 n 일 평균 점유율 순위 — '5위 밖으로 밀린 테마'를 표 순위(최근 n 일 평균)와 같은 잣대로
+ * 견주려고 낸다. 어제 **하루** 순위와 오늘 3일 순위를 견주면 표에서 오르는 중인 테마가 '밀렸다'로 떴다(2026-10-04 점검, 조선).
+ * 그날 집계에 없는 테마는 0 으로 친다(창 전체 일수로 나눈다 — 테마 로테이션과 같다).
+ */
+export function prevWindowRanks(shareOn: Map<string, Map<string, number>>, dates: string[], themes: string[], n: number): Map<string, number> {
+  const win = dates.slice(-(n + 1), -1);
+  if (!win.length) return new Map();
+  const avg = themes.map((t) => [t, win.reduce((a, d) => a + (shareOn.get(d)?.get(t) ?? 0), 0) / win.length] as const);
+  return new Map([...avg].sort((a, b) => b[1] - a[1]).map(([t], i) => [t, i + 1]));
+}
+

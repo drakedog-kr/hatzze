@@ -75,3 +75,18 @@ def test_window_includes_base_date():
     days, recent = window_days("2026-10-01")
     assert days[-1] == "2026-10-01" and "2026-10-01" in recent
     assert days[0] == "2026-09-26" and len(days) == 6 and len(recent) == 3
+
+
+def test_fewer_mentions_is_not_a_riser_even_if_share_grew():
+    # 주말이 낀 최근 사흘 — 몫은 늘었지만 횟수는 줄었다(19회 → 12회, 2026-10-04 미장 슈퍼마이크로). 급부상이 아니다.
+    base = "2026-10-04"  # 일요일 — 최근 10/2~10/4(금·토·일), 앞 9/29~10/1(평일 셋)
+    _, recent = window_days(base)
+
+    def vol(d: date) -> dict:
+        weekend = d.weekday() >= 5
+        if d.isoformat() in recent:
+            return {"A": 4, "BIG": 6 if weekend else 60}
+        return {"A": 6, "BIG": 300}
+
+    got = pick_risers(_rows(base, vol), "stock_code", THEMES_OF, NAMES, recent)
+    assert [r["code"] for r in got] == []

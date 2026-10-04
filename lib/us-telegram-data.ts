@@ -39,7 +39,7 @@ import {
   toPercents,
   windowBefore,
 } from "@/lib/telegram-data";
-import { changeRateOf, fetchYahooQuote } from "@/lib/yahoo-quote";
+import { changeRateOf, dateInZone, fetchYahooQuote } from "@/lib/yahoo-quote";
 import { yahooSymbol } from "@/lib/yahoo-history";
 import { US_THEMES } from "@/lib/us-stock-themes";
 import { scoreUsSurging } from "@/lib/surging-score";
@@ -122,15 +122,17 @@ export type UsSurgingStock = {
  * 캐시 30분: 이 fetch 의 revalidate 가 /kadera/us 와 /insider 사본의 주기를 정한다(가장 짧은
  * fetch 가 라우트 주기 — lib/supabase-server.ts). app/kadera/us/page.tsx 의 1800 과 같은 값.
  */
-export async function usQuotes(tickers: string[]): Promise<Map<string, { price: number; changeRate: number | null }>> {
-  const out = new Map<string, { price: number; changeRate: number | null }>();
+export async function usQuotes(tickers: string[]): Promise<Map<string, { price: number; changeRate: number | null; date?: string | null }>> {
+  // date = 그 시세의 미국 세션 날짜(뉴욕). 테마 띠가 '10월 2일 미국장'처럼 기준일을 적는다(2026-10-04 점검 — 국장 짝은 '10월 2일 종가').
+  const out = new Map<string, { price: number; changeRate: number | null; date?: string | null }>();
   const got = await Promise.all(
     tickers.map(async (t) => {
       const q = await fetchYahooQuote(yahooSymbol(t, "US"), { next: { revalidate: 1800 } });
       return [t, q] as const;
     }),
   );
-  for (const [t, q] of got) if (q) out.set(t, { price: q.price, changeRate: changeRateOf(q) });
+  for (const [t, q] of got)
+    if (q) out.set(t, { price: q.price, changeRate: changeRateOf(q), date: q.marketTime === null ? null : dateInZone(q.marketTime, "America/New_York") });
   return out;
 }
 

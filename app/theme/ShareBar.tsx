@@ -13,7 +13,16 @@ import { C } from "../ui";
 const TOP = 5;
 const RAMP = ["var(--c-blue-1)", "var(--c-blue-2)", "var(--c-blue-3)", "var(--c-blue-4)", "var(--c-blue-5)"];
 
-export function ShareBar({ stocks, ariaLabel }: { stocks: { code: string; name: string; mentions: number }[]; ariaLabel: string }) {
+export function ShareBar({
+  stocks,
+  ariaLabel,
+  unit = "종목",
+}: {
+  stocks: { code: string; name: string; mentions: number }[];
+  ariaLabel: string;
+  /** '나머지 N종목'의 셈 단위. 테마 목록(폰 점유율)은 '테마'. */
+  unit?: string;
+}) {
   const total = stocks.reduce((s, x) => s + x.mentions, 0);
   if (total <= 0) return null;
   const top = [...stocks].sort((a, b) => b.mentions - a.mentions).slice(0, TOP);
@@ -22,7 +31,7 @@ export function ShareBar({ stocks, ariaLabel }: { stocks: { code: string; name: 
   const rest = total - topSum;
   const pct = (n: number) => (n / total) * 100;
   const label = (n: number) => `${Math.round(pct(n))}%`;
-  const segs = [...top.map((s, i) => ({ key: s.code, name: s.name, n: s.mentions, color: RAMP[i] })), ...(rest > 0 ? [{ key: "rest", name: `나머지 ${restCount}종목`, n: rest, color: "var(--c-bar-mute)" }] : [])];
+  const segs = [...top.map((s, i) => ({ key: s.code, name: s.name, n: s.mentions, color: RAMP[i] })), ...(rest > 0 ? [{ key: "rest", name: `나머지 ${restCount}${unit}`, n: rest, color: "var(--c-bar-mute)" }] : [])];
   return (
     <div role="img" aria-label={ariaLabel} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", height: 12, borderRadius: 6, overflow: "hidden", gap: 2 }}>

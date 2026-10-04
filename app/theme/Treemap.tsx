@@ -47,7 +47,8 @@ function toneOf(delta: number | null): string {
 function fmtDelta(delta: number | null): string {
   if (delta == null) return "변화 자료 없음";
   if (Math.abs(delta) < 0.05) return "0.0%p";
-  return `${delta > 0 ? "▲" : "▼"}${Math.abs(delta).toFixed(1)}%p`;
+  // 띠 · 표와 같은 +/- 꼴(▲ · ▼ 를 쓰면 한 화면에 같은 값이 두 꼴이었다, 2026-10-04 점검).
+  return `${delta > 0 ? "+" : "-"}${Math.abs(delta).toFixed(1)}%p`;
 }
 
 /** 지도 한 칸의 재료. 테마(목록)와 종목(테마 화면)이 같은 그림을 쓴다. */
@@ -168,7 +169,8 @@ export function Treemap({
               <span className="hz-tm-in">
                 {/* 가운뎃점 앞에 단어 결합자(U+2060)를 둬 폰에서 줄바꿈할 때 점이 앞 낱말에 붙는다 —
                     안 두면 "전자 / · / 부품" 처럼 점이 혼자 한 줄을 차지한다(2026-09-19 실측). */}
-                <span className="hz-tm-name">{t.label.replace(/·/g, "\u2060·")}</span>
+                {/* 점 앞은 붙이고(\u2060) 점 뒤에 끊을 자리(\u200b)를 둔다 — '전기차·자율주 / 행' 대신 '전기차· / 자율주행'. */}
+                <span className="hz-tm-name">{t.label.replace(/·/g, "\u2060·\u200b")}</span>
                 {size !== "sm" && size !== "tall" && (
                   <span className="hz-tm-val" style={{ fontFamily: MONO }}>
                     {t.valueText}

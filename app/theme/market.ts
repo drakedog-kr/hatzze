@@ -46,7 +46,8 @@ export const US_MARKET: ThemeMarket = {
   themeNames: US_THEME_NAMES,
   themeHref: (t) => marketThemeHref("us", t),
   stockHref: (c) => themeStockHref("us", c),
-  quotesCaption: () => "미국장 최근 시세",
+  // 미국 세션 날짜 — 장중이면 그날 지금 값이라 '종가'라 하지 않는다.
+  quotesCaption: (date) => (date ? `${fmtKoDate(date)} 미국장` : "미국장 최근 시세"),
   reasonRateNote: "채널이 적은 등락률",
   marketWord: "미국",
 };

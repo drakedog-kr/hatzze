@@ -7,8 +7,8 @@ import { THEME_FLOW_DAYS, THEME_FLOW_TOP, type ThemeOverview, type ThemeRiser } 
 
 import { StockLogo } from "../StockLogo";
 import { CoverLinkCell, CoverMeta, Module, type CoverLink } from "../kadera/V2Modules";
-import { AiMark } from "../ui";
 import type { ThemeMarket } from "./market";
+import { ShareBar } from "./ShareBar";
 import { Treemap, TreemapLegend, themeTiles, toneForRatio } from "./Treemap";
 
 /**
@@ -61,12 +61,27 @@ function shareStreak(t: ThemeOverview): { dir: 1 | -1 | 0; days: number } {
   return { dir, days };
 }
 
-/** 태그 글자. 새로 등장이면 그 말을, 아니면 "3일 전 대비 2.1배"(후보는 1.5배 이상뿐이라 '배'가 손해로 읽힐 일이 없다). */
+/**
+ * 태그 글자 — 바로 옆 칸의 **횟수**(최근 · 그 전)와 같은 잣대로 적는다. 몫의 배수(r.ratio, 줄 세우는 잣대)를 적으면 '39회 · 그 전 3회'
+ * 옆에 '31.0배'가 서서 셈이 안 맞았다(2026-10-04 점검). 꼴은 테마 화면 '말 많은 종목'과 같다(3배부터 반올림 · 10배 넘게에서 멈춤).
+ * 줄은 횟수가 는 종목만이라(lib/theme-risers.ts parseRisers) 손해로 읽히는 배수는 안 나온다.
+ */
+function riserMultiple(r: ThemeRiser): number | null {
+  return r.ratio === null || r.prior <= 0 ? null : r.recent / r.prior;
+}
 function riserDelta(r: ThemeRiser): string {
-  return r.ratio === null ? "새로 등장" : `3일 전 대비 ${r.ratio.toFixed(1)}배`;
+  const x = riserMultiple(r);
+  if (x === null) return "새로 등장";
+  if (x >= 10) return "앞 3일의 10배 넘게";
+  if (x >= 3) return `앞 3일의 ${Math.round(x)}배`;
+  return `앞 3일보다 +${Math.round((x - 1) * 100)}%`;
 }
 
-const pp = (v: number) => `${v > 0 ? "+" : v < 0 ? "-" : ""}${Math.abs(v).toFixed(1)}%p`;
+// 부호는 반올림한 값으로 — −0.04 가 '−0.0%p'로 찍혔다(2026-10-04 점검).
+const pp = (v: number) => {
+  const r = Number(v.toFixed(1));
+  return `${r > 0 ? "+" : r < 0 ? "-" : ""}${Math.abs(r).toFixed(1)}%p`;
+};
 
 export function ThemeIndexView({
   market,
@@ -97,17 +112,13 @@ export function ThemeIndexView({
   const gainer = pick(byDelta.filter((t) => (t.shareDelta as number) > 0), (t) => t.theme);
   const loser = pick([...byDelta].reverse().filter((t) => (t.shareDelta as number) < 0), (t) => t.theme);
   const fresh = pick(all.filter((t) => t.label === "new").sort((a, b) => a.rank - b.rank), (t) => t.theme);
-  // 어제는 5위 안이었는데 오늘은 밖인 테마. 오늘은 **표의 순위**(최근 3일 점유율)로 본다 — 오늘 하루 순위로 보면 아침 표본이 적어
-  // 표 3위 테마가 '상위에서 내려간 테마 · 3위'로 떴다(2026-10-04 점검, lib/theme-page.ts withTodayRank).
+  // 어제는 5위 안이었는데 오늘은 밖인 테마. 어제 · 오늘 둘 다 **표의 순위**(최근 3일 점유율)로 본다 — 어제 하루 순위와 견주면
+  // 표에서 오르는 중인 조선이 '밀린 테마'로 떴다(2026-10-04 점검, lib/theme-flow.ts prevWindowRanks).
   const dropped = fresh
     ? null
     : pick(
         all
-          .filter((t) => {
-            const n = t.flow.length;
-            const prev = n >= 2 ? t.flow[n - 2] : null;
-            return prev != null && prev <= THEME_FLOW_TOP && t.rank > THEME_FLOW_TOP;
-          })
+          .filter((t) => t.prevRank3 != null && t.prevRank3 <= THEME_FLOW_TOP && t.rank > THEME_FLOW_TOP)
           .sort((a, b) => a.rank - b.rank),
         (t) => t.theme,
       );
@@ -150,7 +161,17 @@ export function ThemeIndexView({
               <Treemap tiles={themeTiles(themes, market.key)} ariaLabel="테마별 최근 3일 언급 점유율" aspect={3} />
             </div>
             {/* 색은 평소(5일 이상 전 평균) 대비 변화 — '변화 ±0.3%p 안'은 무엇과 견준 변화인지 안 읽혔다(2026-10-04 점검). */}
-            <TreemapLegend up="평소보다 늘어난 테마" flat="평소와 비슷" down="평소보다 줄어든 테마" />
+            <div className="v2-tm-map-legend">
+              <TreemapLegend up="평소보다 늘어난 테마" flat="평소와 비슷" down="평소보다 줄어든 테마" />
+            </div>
+            {/* 폰은 지도 대신 막대 하나(앞 다섯 + 나머지) — 3:2 지도에선 26칸 중 이름이 든 칸이 하나뿐이었다(2026-10-04 점검). */}
+            <div className="v2-tm-map-bar">
+              <ShareBar
+                stocks={themes.map((t) => ({ code: t.theme, name: t.theme, mentions: t.sharePct }))}
+                ariaLabel="테마별 최근 3일 언급 점유율"
+                unit="테마"
+              />
+            </div>
           </>
         )}
       </Module>
@@ -162,8 +183,11 @@ export function ThemeIndexView({
       <Module
         id="flow"
         title="테마 흐름"
+        // 요즘 도는 얘기 첫 문장이 AI 글이라 고지는 모듈 머리에 둔다(카더라 네 표와 같은 자리, 2026-10-04 점검).
+        ai
         // 점유율 아래 +%p 는 평소(5일 이상 전 평균) 대비 — 머리에 적는다(2026-10-04 점검).
-        meta={flowDates.length ? `점유율 상위 ${FLOW_ROWS} · 평소 대비 · ${fmtKoDate(flowDates[0])} ~ ${fmtKoDate(flowDates[flowDates.length - 1])}` : `점유율 상위 ${FLOW_ROWS} · 평소 대비`}
+        // 날짜 범위는 뺐다 — 열흘 값처럼 읽혔는데 점유율 칸은 최근 3일이고 열흘은 마지막 칸('최근 10일' 머리 · 줄 툴팁)뿐이다(2026-10-04 점검).
+        meta={`점유율 상위 ${FLOW_ROWS} · 평소 대비`}
       >
         {themes === null || themes.length === 0 ? (
           <p className="v2-empty">{themes === null ? "테마 집계를 지금 불러오지 못했습니다." : "아직 집계된 테마가 없습니다."}</p>
@@ -172,11 +196,8 @@ export function ThemeIndexView({
             <div className="v2-tr v2-th" aria-hidden="true">
               <span />
               <span>테마 · 말 많은 종목</span>
-              <span>
-                <AiMark size={11} />
-                요즘 도는 얘기
-              </span>
-              <span>점유율</span>
+              <span>요즘 도는 얘기</span>
+              <span>최근 {KADERA_WINDOW_DAYS}일 점유율</span>
               <span>최근 {flowDates.length || THEME_FLOW_DAYS}일</span>
             </div>
             <ol className="v2-tbody">
@@ -190,7 +211,14 @@ export function ThemeIndexView({
                     <Link
                       href={market.themeHref(t.theme)}
                       className="v2-tr"
-                      title={`최근 ${t.flowDates.length}일 순위 ${t.flow.map((r, i) => `${fmtKoDate(t.flowDates[i])} ${r == null ? "집계 없음" : `${r}위`}`).join(" · ")}`}
+                      // 마지막 칸은 칸 글자처럼 표의 순위(최근 3일)다 — 하루 순위를 적으면 칸('n일째 5위 안')과 어긋났다.
+                      title={`최근 ${t.flowDates.length}일 순위 ${t.flow
+                        .map((r, i) =>
+                          i === t.flow.length - 1
+                            ? `${fmtKoDate(t.flowDates[i])}(최근 3일) ${t.rank}위`
+                            : `${fmtKoDate(t.flowDates[i])} ${r == null ? "집계 없음" : `${r}위`}`,
+                        )
+                        .join(" · ")}`}
                       data-ga="theme_flow_click"
                     >
                       <span className="v2-td-rank">{t.rank}</span>
@@ -221,20 +249,18 @@ export function ThemeIndexView({
       {/* 셋째 줄 — 테마별 급부상 종목. 테마마다 3일 전보다 언급(몫)이 가장 많이 는 종목 하나와 채널이 말한 까닭.
           고르는 것도 까닭을 쓰는 것도 파이프라인이고(generate_theme_briefs.py) 화면은 요약 행의 riser 를 읽는다. 카더라의 신호 표와 같은 줄 꼴.
           칸 차례는 테마 흐름과 같이 이름(테마 · 종목) → 문장 → 숫자(언급)다(2026-10-04). */}
-      <Module id="risers" title="테마별 급부상 종목" meta={`최근 ${KADERA_WINDOW_DAYS}일 · 3일 전 대비`}>
+      <Module id="risers" title="테마별 급부상 종목" meta={`최근 ${KADERA_WINDOW_DAYS}일 · 앞 3일 대비`} ai>
         {risers === null ? (
           <p className="v2-empty">테마 요약을 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오.</p>
         ) : risers.length === 0 ? (
-          <p className="v2-empty">3일 전보다 언급이 늘고 채널이 이유를 말한 종목이 없습니다.</p>
+          <p className="v2-empty">앞 3일보다 언급이 늘고 채널이 이유를 말한 종목이 없습니다.</p>
         ) : (
           <div className="v2-tbl v2-tm-risertbl">
             <div className="v2-tr v2-th" aria-hidden="true">
               <span>테마</span>
               <span>종목</span>
-              <span>
-                <AiMark size={11} />
-                요즘 도는 얘기
-              </span>
+              {/* 채널이 그 종목에 대해 말한 이유다 — 바로 위 테마 흐름 표의 '요즘 도는 얘기'(테마 요약 첫 문장)와 다른 글이라 이름을 가른다(상세 화면과 같은 말). */}
+              <span>채널이 말한 이유</span>
               <span>최근 {KADERA_WINDOW_DAYS}일 언급</span>
             </div>
             <ol className="v2-tbody">
@@ -244,11 +270,11 @@ export function ThemeIndexView({
                     <Link href={market.themeHref(r.theme)} className="v2-td-theme" data-ga="theme_riser_theme_click">
                       {r.theme}
                     </Link>
-                    {/* 종목 + 3일 전 대비 태그(테마 화면 '이 테마의 주인공'과 같은 태그 · 같은 색 단계). 색은 배수 그대로. */}
+                    {/* 종목 + 앞 3일 대비 태그(테마 화면 '말 많은 종목'과 같은 태그 · 같은 색 단계). 색은 태그에 적은 횟수 배수 그대로. */}
                     <Link href={market.stockHref(r.code)} className="v2-td-stock" data-ga="theme_riser_stock_click">
                       <StockLogo code={r.code} name={r.name} market={r.market} size={22} />
                       <span className="v2-td-name">{r.name}</span>
-                      <span className={`hz-theme-tag ${toneForRatio(r.ratio, r.recent)}`}>{riserDelta(r)}</span>
+                      <span className={`hz-theme-tag ${toneForRatio(riserMultiple(r), r.recent)}`}>{riserDelta(r)}</span>
                     </Link>
                     <span className="v2-td-text">{r.reason}</span>
                     <span className="v2-td-num v2-td-two">

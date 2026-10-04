@@ -15,7 +15,7 @@ import {
 } from "./telegram-data";
 import { THEMES } from "./stock-themes";
 import { expectedUsualMentions } from "./stock-usual";
-import { thinDays, withTodayRank } from "./theme-flow";
+import { prevWindowRanks, thinDays, usableDays, withTodayRank } from "./theme-flow";
 import { themeDetailWindow } from "./theme-window";
 import { getEventsForCodes, todayKst, type UpcomingEvent } from "./kadera-why";
 import { isLoadFailed } from "./load-state";
@@ -314,9 +314,13 @@ export function buildHotStocks(
     agg.set(r.code, a);
   }
   const latestReasonOf = new Map<string, ThemeReasonRow>();
+  // 이유는 최근 7일 안의 것 — 아래 '등락의 이유'와 같은 기간이다. 최근 사흘로만 붙이면 주말 · 월요일엔 사실상 금요일 하루치라
+  // 열 줄 중 아홉이 비어 큰 빈 칸이 생겼다(2026-10-04 점검, 반도체). 날짜가 줄에 붙으니 오래된 이유도 그렇게 읽힌다.
+  const recentEnd = [...recentSet].sort().at(-1);
+  const reasonFrom = recentEnd ? addDaysISO(recentEnd, -6) : null;
   for (const r of reasons) {
-    // 최근 창 안의 것만, 종목마다 가장 최근 하나(목록이 최신순이라 처음 만난 것이 그것이다).
-    if (recentSet.has(r.date) && !latestReasonOf.has(r.code)) latestReasonOf.set(r.code, r);
+    // 종목마다 가장 최근 하나(목록이 최신순이라 처음 만난 것이 그것이다).
+    if (reasonFrom && recentEnd && r.date >= reasonFrom && r.date <= recentEnd && !latestReasonOf.has(r.code)) latestReasonOf.set(r.code, r);
   }
   return [...agg.entries()]
     // 앞 사흘에만 언급되고 최근 사흘엔 없는 종목은 '말 많은 종목'이 아니다.
@@ -553,8 +557,10 @@ export type ThemeOverview = {
   flow: (number | null)[];
   /** 같은 날들의 점유율(%). 집계가 없는 날은 0. 목록의 작은 막대가 그린다. */
   shareFlow: number[];
-  /** flow 의 날짜(오래된→최신). */
+  /** flow 의 날짜(오래된→최신). 표본이 거의 없는 날은 뺐다(lib/theme-flow.ts usableDays). */
   flowDates: string[];
+  /** 하루 앞에서 끝나는 최근 3일 평균 점유율 순위 — '5위 밖으로 밀린 테마'를 표 순위와 같은 잣대로 견준다(prevWindowRanks). */
+  prevRank3: number | null;
   /** 최신일부터 거슬러 며칠 연속 상위였나. */
   streak: number;
   /** 열흘 중 상위였던 날 수. */
@@ -626,7 +632,7 @@ export async function listThemeOverview(): Promise<ThemeOverview[] | null> {
   // 21일 × 26테마 = 546행이라 1,000행 캡 안이다.
   const { data, error } = await db
     .from("telegram_theme_daily")
-    .select("date,theme,share_pct")
+    .select("date,theme,share_pct,mention_count")
     .lte("date", baseDate)
     .gte("date", addDaysISO(baseDate, -THEME_FLOW_DAYS * 2))
     .order("date", { ascending: false });
@@ -634,8 +640,12 @@ export async function listThemeOverview(): Promise<ThemeOverview[] | null> {
     console.error("[listThemeOverview] 테마 집계를 못 읽었습니다", error);
     return null;
   }
-  const rows = (data ?? []) as { date: string; theme: string; share_pct: number | string }[];
-  const dates = [...new Set(rows.map((r) => r.date))].sort().slice(-THEME_FLOW_DAYS);
+  const rows = (data ?? []) as { date: string; theme: string; share_pct: number | string; mention_count: number | null }[];
+  // 표본이 거의 없는 날(기준일 아침)은 흐름에서 뺀다 — 테마 로테이션 · 테마 상세와 같은 규칙(lib/theme-flow.ts usableDays).
+  // 넣으면 언급 4건인 날 반도체 100% 가 '하루 더 오른 날'로 세어져, 목록과 상세의 'n일째 오르는 중'이 갈렸다(2026-10-04 점검).
+  const dayTotals = new Map<string, number>();
+  for (const r of rows) dayTotals.set(r.date, (dayTotals.get(r.date) ?? 0) + (r.mention_count ?? 0));
+  const dates = usableDays(dayTotals, [...new Set(rows.map((r) => r.date))].sort()).slice(-THEME_FLOW_DAYS);
   const rankOn = new Map<string, Map<string, number>>();
   const shareOn = new Map<string, Map<string, number>>();
   for (const d of dates) {
@@ -659,6 +669,7 @@ export async function listThemeOverview(): Promise<ThemeOverview[] | null> {
     if (!briefOf.has(r.theme) && r.brief?.trim()) briefOf.set(r.theme, r.brief);
   }
 
+  const prevRank3 = prevWindowRanks(shareOn, dates, Object.keys(THEMES), KADERA_WINDOW_DAYS);
   return rotation
     .filter((r) => r.theme in THEMES)
     .map((r) => {
@@ -674,6 +685,7 @@ export async function listThemeOverview(): Promise<ThemeOverview[] | null> {
         flow,
         shareFlow,
         flowDates: dates,
+        prevRank3: prevRank3.get(r.theme) ?? null,
         streak,
         topDays,
         label,

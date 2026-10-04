@@ -51,7 +51,7 @@ from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 from common.broadcast_content import banned_hits  # noqa: E402
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.supabase_client import get_client, load_all, load_all_keyset  # noqa: E402
-from common.text_check import is_clean, problems  # noqa: E402
+from common.text_check import glued_names, is_clean, problems  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 from config.stock_extraction import is_house  # noqa: E402
 from config.stock_themes import THEMES  # noqa: E402
@@ -275,7 +275,9 @@ def riser_pick(candidates: list[str], digest: str) -> str | None:
         return None
     candidates = [t for t in candidates if not any(w in t for w in PRICE_WORDS)] or candidates
     candidates = [t for t in candidates if not window_hits(t)] or candidates
-    clean = [t for t in candidates if is_clean(t, digest)] or candidates
+    clean = [t for t in candidates if is_clean(t, digest)]
+    # 전부 걸렸으면 붙은 이름(text_check.glued_names)이 든 문장만 빼고 쓴다 — 걸린 후보를 그대로 실어 '오삼성전자의 …'가 나갔다(2026-10-04 점검).
+    clean = clean or [t for t in (drop_glued_sentences(t, digest) for t in candidates) if t.strip()] or candidates
     mid = (RISER_LEN_MIN + RISER_LEN_MAX) / 2
     in_goal = [t for t in clean if RISER_LEN_MIN <= len(t) <= RISER_LEN_MAX]
     in_ok = [t for t in clean if RISER_LEN_HARD_MIN <= len(t) <= RISER_LEN_HARD_MAX]
@@ -418,6 +420,17 @@ def build_theme_bundle(
         "message_count": len(keys),
         "stock_count": len(per_stock),
     }
+
+
+def drop_glued_sentences(text: str, digest: str) -> str:
+    """문단은 지키며 붙은 이름이 든 문장만 뺀다."""
+    paras = []
+    for para in text.split("\n\n"):
+        sents = re.split(r"(?<=다\.)\s+", para.strip())
+        kept = [x for x in sents if x and not glued_names(x, digest)]
+        if kept:
+            paras.append(" ".join(kept))
+    return "\n\n".join(paras)
 
 
 def pick_text(candidates: list[str], digest: str) -> str | None:

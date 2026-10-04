@@ -22,7 +22,7 @@ import { BackTrail } from "@/components/back-trail";
  *
  * ## v2(2026-10-03) — 카더라 · MDD · 배당에 쓴 규칙으로
  * 뒤로 가기 줄 → 첫 줄 띠(테마 종목 · 최근 3일 점유율 · 시세 반응 · 기준일) → [요즘 도는 얘기 | 30일 점유율 추이]
- * → [이 테마의 주인공 | 다가오는 일정 · 함께 거론되는 테마] → 등락의 이유(최근 7일).
+ * → [말 많은 종목 | 다가오는 일정 · 함께 거론되는 테마] → 등락의 이유(최근 7일).
  * - 걷은 것: 회색 타일 히어로, 큰 구간 제목 셋(01 · 02 · 03), 시트 머리 아이콘 타일 · 설명 문장, 등락의 이유 '이전 7일' 단추(쪽 넘김),
  *   '채널에서 오간 글' 카드 여섯 장 + 더 보기 — 카더라 v2 에서 화제 글을 걷은 것과 같은 까닭(눌린 비율 2~5%).
  * - 주인공은 1~5 · 6~10 두 단이었는데 한 단 열 줄로(비교 목록은 한 단 세로 목록이 낫다 — MDD 업종 칸 때 정한 것).
@@ -36,7 +36,7 @@ import { BackTrail } from "@/components/back-trail";
  * 테마는 사전이 정적이라 셸의 DEEP_PAGES 가 이름을 안다(AppShell). v2 에선 화면에서만 걷고 h1 은 남는다.
  */
 
-/** '이 테마의 주인공' 줄 수. */
+/** '말 많은 종목' 줄 수. */
 const HOT_ROWS = 10;
 /** 일정 — 날짜가 짚인 것은 앞으로 5주(카더라와 같다), 달 · 분기만 짚인 것은 가까운 것 몇 줄. */
 const CALENDAR_DAYS = 35;
@@ -46,9 +46,17 @@ const REASON_DAYS = 7;
 const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
 const fmtKoWd = (iso: string) => `${fmtKoDate(iso)}(${WEEKDAY[new Date(`${iso}T00:00:00Z`).getUTCDay()]})`;
 
-const signPct = (v: number) => `${v > 0 ? "+" : v < 0 ? "-" : ""}${Math.abs(v).toFixed(2)}%`;
-const pp = (v: number) => `${v > 0 ? "+" : v < 0 ? "-" : ""}${Math.abs(v).toFixed(1)}%p`;
-const toneCls = (v: number | null | undefined) => (v == null || Math.abs(v) < 0.005 ? "" : v > 0 ? " is-up" : " is-down");
+// 부호 · 색은 **반올림한 값**으로 정한다 — −0.001 이 '−0.00%'로, +0.04%p 가 회색이 아닌 빨강 '0.0%p'로 찍혔다(2026-10-04 점검).
+const signed = (v: number, digits: number, unit: string) => {
+  const r = Number(v.toFixed(digits));
+  return `${r > 0 ? "+" : r < 0 ? "-" : ""}${Math.abs(r).toFixed(digits)}${unit}`;
+};
+const signPct = (v: number) => signed(v, 2, "%");
+const pp = (v: number) => signed(v, 1, "%p");
+const toneCls = (v: number | null | undefined, digits = 2) => {
+  const r = v == null ? 0 : Number(v.toFixed(digits));
+  return r > 0 ? " is-up" : r < 0 ? " is-down" : "";
+};
 
 /**
  * 30일 점유율 막대. 최근 사흘(띠의 점유율 칸이 재는 날들)만 진한 파랑, 그 전은 옅은 파랑 — 두 자리가 같은 날을 가리킨다.
@@ -107,7 +115,11 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
   const dayEvents = d.events
     .filter((e) => e.precision === "day" && e.date >= today && e.date <= calendarEnd)
     .sort((a, b) => a.date.localeCompare(b.date) || b.channels - a.channels);
-  const vagueEvents = d.events.filter((e) => e.precision !== "day").slice(0, VAGUE_ROWS);
+  // 달 · 분기 일정도 그 기간이 앞으로 5주 안에 시작하는 것만 — 머리가 '앞으로 5주'인데 12월 · 2027년 일정이 실렸다(2026-10-04 점검).
+  // 반기 · 해 단위('2026년')는 5주 일정이라 부르기 어려워 뺀다.
+  const vagueEvents = d.events.filter((e) => (e.precision === "month" || e.precision === "quarter") && e.date <= calendarEnd).slice(0, VAGUE_ROWS);
+  // 줄 수는 주인공 표 줄 수 + 둘까지 — 오른쪽 칸이 더 길면 주인공 줄이 그 키를 나눠 받아 한 줄이 89~100px 로 늘었다(빅테크 일정 16줄).
+  const hotRows = Math.min(HOT_ROWS, d.hotStocks.length);
   const events: { e: UpcomingEvent; pill: string; today: boolean }[] = [
     ...dayEvents.map((e) => ({
       e,
@@ -115,7 +127,7 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
       today: e.date === today,
     })),
     ...vagueEvents.map((e) => ({ e, pill: eventDateLabel(e), today: false })),
-  ];
+  ].slice(0, Math.max(6, hotRows + 2));
 
   /* 등락의 이유 — 기준일까지의 이레를 날짜로 묶는다(오래된 날이 위 · 달력 순서, 같은 날은 여러 채널이 말한 것이 먼저). */
   const reasonEnd = d.baseDate;
@@ -206,14 +218,15 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
         </div>
         <div className="v2-cover-cell">
           {/* +%p 는 평소(5일 이상 전 평균) 대비 — 머리에 적는다(2026-10-04 점검). */}
-          <span className="v2-cover-k">최근 {KADERA_WINDOW_DAYS}일 점유율 · 평소 대비</span>
+          {/* 견준 기간을 글자로 — 이 화면엔 '평소'가 둘이었다(이 띠는 1~2주 전 평균, 말 많은 종목 태그는 앞 27일). 2026-10-04 점검. */}
+          <span className="v2-cover-k">최근 {KADERA_WINDOW_DAYS}일 점유율 · 1~2주 전 대비</span>
           <span className="v2-cover-v">
             {d.loadFailed || d.recentShare == null ? (
               <em>{d.loadFailed ? "집계를 불러오지 못했습니다" : "집계된 날이 없습니다"}</em>
             ) : (
               <>
                 <b>{d.recentShare.toFixed(1)}%</b>
-                {d.shareDelta != null && <span className={`v2-cover-chg${toneCls(d.shareDelta)}`}>{pp(d.shareDelta)}</span>}
+                {d.shareDelta != null && <span className={`v2-cover-chg${toneCls(d.shareDelta, 1)}`}>{pp(d.shareDelta)}</span>}
                 {d.recentRank && <em>{d.recentRank}위</em>}
               </>
             )}
@@ -295,7 +308,8 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
 
       {/* 셋째 줄 — [이 테마의 주인공 | 다가오는 일정 · 함께 거론되는 테마]. 주인공 열 줄이 키를 정하고 오른쪽 일정 줄이 그 높이를 나눠 받는다. */}
       <div className={`v2-tm-band is-hot${events.length ? "" : " is-solo"}`}>
-        <Module title="이 테마의 주인공" meta={`최근 ${KADERA_WINDOW_DAYS}일 언급 · 평소 대비`} className="v2-tm-hot">
+        {/* 이름은 목록 화면과 같은 '말 많은 종목'(2026-10-04 점검). 채널이 말한 이유 칸이 AI 글이라 고지는 머리에. */}
+        <Module title="말 많은 종목" meta={`최근 ${KADERA_WINDOW_DAYS}일 언급 · 평소 대비`} className="v2-tm-hot" ai={anyReason}>
           {d.loadFailed ? (
             <p className="v2-empty">집계를 지금 불러오지 못했습니다.</p>
           ) : d.hotStocks.length === 0 ? (
@@ -359,7 +373,8 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
       {/* 넷째 줄 — 등락의 이유(기준일까지의 이레). 날짜 머리 하나 아래 그날 종목들 — 줄은 종목 · 까닭(남는 폭) · 종가 · 등락 · 채널 수.
           숫자는 줄 오른쪽 끝에 모은다(2026-10-04) — 등락이 종목과 까닭 사이에 있을 땐 '+3.27%'와 까닭 첫 낱말이 붙어 읽혔다.
           종가는 % 앞에(같은 날 요청). 미장은 그날 종가가 없어(lib/theme-page.ts ThemeReasonRow.close) 그 칸째 걷는다. */}
-      <Module title="등락의 이유" meta={`${fmtKoDate(reasonStart)} ~ ${fmtKoDate(reasonEnd)} · 크게 움직인 날`} className="v2-tm-reasons">
+      {/* '크게 움직인 날'은 뺐다 — 이유 후보엔 많이 언급된 종목도 들어 −0.98% 같은 작은 움직임 줄이 섞인다(2026-10-04 점검). */}
+      <Module title="등락의 이유" meta={`${fmtKoDate(reasonStart)} ~ ${fmtKoDate(reasonEnd)} · 채널이 이유를 단 종목`} className="v2-tm-reasons" ai>
         {reasonDays.length === 0 ? (
           <p className="v2-empty">최근 {REASON_DAYS}일 사이 이 테마 종목에 붙은 이유가 없습니다.</p>
         ) : (

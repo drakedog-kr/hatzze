@@ -76,7 +76,7 @@ export function usualDeltaShort(mentions: number, usual: number): string {
   if (ratio >= 3) return `${Math.round(ratio)}배`;
   const pct = Math.round((ratio - 1) * 100);
   if (pct === 0) return "평소만큼";
-  return `${pct > 0 ? "+" : "−"}${Math.abs(pct)}%`;
+  return `${pct > 0 ? "+" : "-"}${Math.abs(pct)}%`; // 하이픈 — 띠 · 표의 '-0.60%'와 같은 글자(U+2212 를 쓰면 꼴이 갈렸다)
 }
 
 /** 평소와 견준 언급 변화 한 마디 — "평소 대비 +60% 언급" · "평소의 3배 언급" · "새로 등장". 표 태그와 지도 툴팁이 같이 쓴다. */

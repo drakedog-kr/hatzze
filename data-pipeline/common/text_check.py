@@ -340,6 +340,27 @@ def _fixed_slips(text: str) -> list[str]:
     return found
 
 
+# 붙은 이름 — 원문의 긴 낱말(종목 이름 따위) 앞에 한 음절이 붙어 원문에 없는 어절이 된 꼴. 2026-10-04 테마 요약에
+# '오삼성전자의 DDR5 후공정…'('오킨스전자는 삼성전자의…'가 뭉개진 것)이 그대로 실렸다 — 어절 점수 검사([3])는 '오' + 아는 낱말이라
+# 통과시켰다. 흔한 접두(대 · 신 · 전 …)는 뺀다('전반도체' · '신고가'처럼 말이 된다).
+_GLUE_PREFIX_OK = set("대신총전비탈친반초재고저무미불최준차다양")
+_JOSA_TAIL = re.compile(r"(?:에서|으로|의|은|는|이|가|을|를|과|와|도|에|로|만)$")
+
+
+def glued_names(text: str, source: str) -> list[str]:
+    """원문에 없는데, 첫 음절을 떼면 원문에 있는 네 음절 넘는 낱말이 되는 어절."""
+    found: list[str] = []
+    for word in _SPLIT.split(text):
+        if not _HANGUL_WORD.match(word):
+            continue
+        stem = _JOSA_TAIL.sub("", word)
+        if len(stem) < 5 or stem in source or stem[0] in _GLUE_PREFIX_OK:
+            continue
+        if stem[1:] in source:
+            found.append(f"붙은 이름 '{stem}'(원문은 '{stem[1:]}')")
+    return found
+
+
 def problems(text: str, source: str | None = None, *, slips: bool = True) -> list[str]:
     """이 문장의 문제 목록. 비어 있으면 통과다(사람이 읽는 문자열로 돌려준다).
 
@@ -364,6 +385,8 @@ def problems(text: str, source: str | None = None, *, slips: bool = True) -> lis
         found.append(f"한글 사이 라틴({_LATIN_IN_HANGUL.search(text).group()})")
     if _control_chars(text):
         found.append("제어문자")
+    if source:
+        found.extend(glued_names(text, source))
 
     kiwi = _get_kiwi()
     if kiwi is None:

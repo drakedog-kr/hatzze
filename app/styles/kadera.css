@@ -325,14 +325,15 @@
    ② 작은 칸 — 값을 빼고 이름만 한 단 작게, 여백도 좁게
    ③ 세로쓰기 칸 — 높이가 모자라면 뺀다(한 자씩 쌓다 마지막 자가 잘리면 다른 이름으로 읽힌다) */
 .hz-treemap .hz-tm-tile { container-type: size; }
-@container (max-width: 40px) or (max-height: 38px) {
+/* 글자를 빼는 단은 54px — 그보다 좁은 칸은 세 글자 이름('빅테크')도 한 줄에 못 들어 '빅테/크'로 끊겼다(2026-10-04 점검). 툴팁이 말한다. */
+@container (max-width: 54px) or (max-height: 38px) {
   .hz-tm-tile .hz-tm-in { display: none; }
 }
 @container (max-width: 88px) or (max-height: 76px) {
   .hz-tm-tile .hz-tm-val { display: none; }
-  /* 작은 칸에서만 낱말 가운데를 끊는다(keep-all 해제) — 46px 칸에서 "전자·부품"은 한 덩이라 안 끊으면 줄을 통째로
-     넘겨 가로로 잘린다. 끊으면 "전자· / 부품"이 되고, 그래도 넘치면 두 줄 끝에서 말줄임표로 끊긴다. */
-  .hz-tm-tile .hz-tm-name { font-size: var(--fs-11); font-weight: 700; line-height: 1.2; word-break: break-word; overflow-wrap: anywhere; }
+  /* 작은 칸 — 가운뎃점 뒤에서 끊는다(Treemap.tsx 가 점 뒤에 끊을 자리를 넣는다: "전자· / 부품"). 낱말 가운데는 그 낱말이 칸보다
+     넓을 때만 끊는다(break-word). 글자 단위로 끊으면 '반도 / 체 장…'처럼 다른 이름으로 읽혔다(2026-10-04 점검). */
+  .hz-tm-tile .hz-tm-name { font-size: var(--fs-11); font-weight: 700; line-height: 1.2; word-break: keep-all; overflow-wrap: break-word; }
   .hz-tm-tile .hz-tm-in { padding: 5px 6px; }
 }
 @container (max-height: 84px) {
