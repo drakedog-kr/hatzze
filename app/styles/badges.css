@@ -73,7 +73,8 @@
   justify-content: center;
   flex-shrink: 0;
   /* 이니셜은 타일의 42% — 크기를 바꿔도 비율이 유지된다. */
-  font-size: calc(var(--hz-logo, 24px) * 0.42);
+  /* 0.45 — 20px 에서 9px(0.42 면 8.4px 로 머리글자가 안 읽혔다, 2026-10-05 점검). */
+  font-size: calc(var(--hz-logo, 24px) * 0.45);
   font-weight: 700;
   letter-spacing: -0.02em;
   background: hsl(var(--h) 44% 91%);

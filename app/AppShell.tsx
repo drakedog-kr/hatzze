@@ -2252,7 +2252,8 @@ export default function AppShell({
               margin: "0 auto",
               display: "flex",
               flexDirection: "column",
-              gap: 20,
+              // 12 — v2 화면의 띠 · 모듈 사이와 같은 리듬(소식 띠 아래만 20 이라 따로 놀았다, 2026-10-05 점검). 푸터 위 여백은 푸터가 따로 든다.
+              gap: 12,
             }}
           >
             <NewsStrip />

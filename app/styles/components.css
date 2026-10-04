@@ -11,7 +11,8 @@
   gap: 4px;
   padding: 0 4px 0 14px;
   background: var(--c-blue-tint);
-  border-radius: var(--r-card);
+  /* 6 — 바로 밑 v2 띠 · 모듈과 같은 모서리(12 이던 땐 따로 놀았다, 2026-10-05 점검). */
+  border-radius: 6px;
   color: var(--c-cold-ink);
 }
 .hz-news-link {
@@ -23,7 +24,7 @@
   padding: 11px 0;
   color: inherit;
   text-decoration: none;
-  font-size: var(--fs-13-5);
+  font-size: 13px;
   /* 띠 문장은 500, 갈 화면 이름(.hz-news-em)만 600 — 문장 전체가 600 이면 강조가 강조로 안 읽혔다(2026-10-04). */
   font-weight: 500;
   letter-spacing: -0.01em;

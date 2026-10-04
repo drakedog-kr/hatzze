@@ -147,7 +147,8 @@ export function VersionLink() {
         cursor: "pointer",
         fontFamily: MONO,
         fontSize: "var(--fs-11)",
-        fontWeight: 600,
+        // 곁줄 버전은 500 — 굵기 세 단(500 · 600 · 700), 곁줄은 굵게 하지 않는다(2026-10-05 점검).
+        fontWeight: 500,
         lineHeight: 1,
         letterSpacing: "0.02em",
       }}
@@ -256,7 +257,7 @@ export function NewBadge({ lift = 0 }: { lift?: number }) {
         background: "var(--c-new, #cd3945)",
         color: "#fff",
         fontSize: BADGE_FONT,
-        fontWeight: 800,
+        fontWeight: 700,
         /* 자간은 0 이어야 한다. 링크가 0.02em(11px 에서 **0.22px**)을 물려주는데, 자간은
            글자 **뒤**에 붙는다. 한 글자짜리 배지에서는 오른쪽에만 0.22px 이 더 붙어
            라인박스가 그만큼 넓어지고, text-align:center 가 그 상자를 가운데 두므로 N 이

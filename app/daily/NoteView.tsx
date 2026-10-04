@@ -118,18 +118,19 @@ function NoteArticle({ note, blocks, dated }: { note: DailyNote; blocks: NoteBlo
   const Title = dated ? "h1" : "h2";
   return (
     <article className="v2-mod v2-nt-art">
+      {/* 머리 한 줄 — 제목 · 공유. 날짜는 바로 위 첫 줄 띠가 말해 화면에선 걷고 읽는 기계에만 남긴다. 공유는 글 끝 66px 꼬리 줄에
+          혼자 섰던 것을 올렸다(2026-10-05 점검). 공유는 **날짜가 든 주소**로 넘긴다 — `/daily` 를 공유하면 내일 다른 글이 열린다. */}
       <header className="v2-nt-head">
-        <time dateTime={note.date}>{fmtNoteDate(note.date)}</time>
+        <time dateTime={note.date} className="sr-only">
+          {fmtNoteDate(note.date)}
+        </time>
         <Title className="v2-nt-title">{note.title}</Title>
+        <ShareButton path={noteHref(note.date)} title={note.title} />
       </header>
       <div className="hz-note-body v2-nt-body">
         {blocks.map((b, i) => (
           <Block key={i} block={b} />
         ))}
-      </div>
-      {/* 공유는 **날짜가 든 주소**로 넘긴다 — `/daily` 를 공유하면 내일 다른 글이 열린다. */}
-      <div className="v2-nt-foot">
-        <ShareButton path={noteHref(note.date)} title={note.title} />
       </div>
     </article>
   );
@@ -175,7 +176,7 @@ function NoteStocksModule({ stocks, noteDate }: { stocks: NoteStocks; noteDate: 
   const stale = latest !== null && latest !== noteDate;
   const counts = `국내 ${stocks.kr.length} · 미국 ${stocks.us.length}`;
   return (
-    <Module id="stocks" title="언급된 종목" meta={stale ? `${fmtNoteDay(latest)} 종가 · ${counts}` : counts}>
+    <Module id="stocks" title="언급된 종목" meta={stale ? `${fmtNoteDay(latest)} 종가 · ${counts}` : counts} className="v2-nt-stockmod">
       <ul className="v2-nt-stocks">
         {stocks.kr.map((s) => {
           // 등락률은 글 날의 값일 때만 — 지난 글 옆 최신 하루 등락은 글과 상관없는 숫자다.
@@ -204,9 +205,10 @@ function NoteStocksModule({ stocks, noteDate }: { stocks: NoteStocks; noteDate: 
           <li key={u.ticker}>
             <Link href={stockDetailHref(u.ticker)} className="v2-nt-stock is-us" data-ga="note_stock_click">
               <StockLogo code={u.ticker} name={u.name} market="US" size={20} />
-              <span className="v2-nt-stock-name">{u.name}</span>
-              <span className="v2-nt-stock-px">
-                <em>{u.ticker}</em>
+              {/* 티커는 이름 꼬리로 — 값 자리에 서면 머리 '10월 2일 종가'의 값으로 읽혔다(2026-10-05 점검). */}
+              <span className="v2-nt-stock-name">
+                {u.name}
+                {u.name !== u.ticker && <em>{u.ticker}</em>}
               </span>
             </Link>
           </li>

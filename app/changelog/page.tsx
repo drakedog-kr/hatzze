@@ -59,7 +59,8 @@ export default function ChangelogPage() {
         title="업데이트 기록"
         links={months.slice(1).map((m) => ({ href: `#m-${m.key}`, label: `${Number(m.key.slice(5))}월` }))}
       >
-        <DocCell k="현재" v={`v${latest.version}`} sub={md(latest.date)} />
+        {/* 날짜 꼴은 사이트 나머지와 같은 'n월 n일'(2026-10-05 점검). */}
+        <DocCell k="현재" v={`v${latest.version}`} sub={`${Number(latest.date.slice(5, 7))}월 ${Number(latest.date.slice(8, 10))}일`} />
         <DocCell k="지금까지" v={`${RELEASES.length.toLocaleString("ko-KR")}번 업데이트`} />
         <DocCell k="첫 공개" v={koDate(first.date)} sub={`v${first.version}`} />
       </DocCover>

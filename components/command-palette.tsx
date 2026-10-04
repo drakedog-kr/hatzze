@@ -170,7 +170,7 @@ function PaletteBody({
         )}
         {/* 테마가 종목보다 먼저다 — 테마 상세 화면이 종목 화면보다 볼 거리가 많다(2026-09-26). */}
         {themes && index.themes.length > 0 && (
-          <CommandGroup heading={<Heading title="지금 뜨는 테마" unit="점유율 변화" />}>
+          <CommandGroup heading={<Heading title="지금 뜨는 테마" unit="최근 3일 · 1~2주 전 대비" />}>
             {index.themes.map((t) => (
               <ThemeRow key={`tt:${t.market}:${t.name}`} value={`tt:${t.market}:${t.name}`} t={t} note={`+${t.delta.toFixed(1)}%p`} go={go} />
             ))}
