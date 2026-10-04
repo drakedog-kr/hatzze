@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { assertLoaded } from "@/lib/load-state";
 import { notFound } from "next/navigation";
+import Link from "next/link";
+import { Fragment } from "react";
 
 import { getManagerDetail } from "@/lib/insider-detail";
 import { isCik } from "@/lib/insider-13f";
@@ -155,11 +157,15 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
             <b>
               <Money usd={d.aum} rate={d.usdKrw} />
             </b>
+            {/* 무엇과 견준 값인지 글자로 — 말풍선에만 있어 현재가 옆 등락처럼 수익률로 읽혔다(2026-10-04 점검). */}
             {aumChange != null && (
-              <span className={`v2-cover-chg hz-tip${aumChange > 0 ? " is-up" : aumChange < 0 ? " is-down" : ""}`} data-tip="직전 분기 대비">
-                {aumChange > 0 ? "+" : aumChange < 0 ? "-" : ""}
-                {Math.abs(aumChange).toFixed(1)}%
-              </span>
+              <>
+                <span className="v2-cover-k">전 분기보다</span>
+                <span className={`v2-cover-chg${aumChange > 0 ? " is-up" : aumChange < 0 ? " is-down" : ""}`}>
+                  {aumChange > 0 ? "+" : aumChange < 0 ? "-" : ""}
+                  {Math.abs(aumChange).toFixed(1)}%
+                </span>
+              </>
             )}
           </span>
         </div>
@@ -173,7 +179,8 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
             <b>{top5.toFixed(0)}%</b>
           </span>
           <span className="v2-cover-v">
-            <em>카더라에 오른 것</em>
+            {/* 짧게 — 폰에서 값 셋이 한 줄에 들게(2026-10-04 점검). */}
+            <em>카더라</em>
             <b>{kaderaCount}종목</b>
           </span>
         </div>
@@ -203,15 +210,34 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
           )}
         </Module>
         <div className="v2-tm-side">
-          <Module title="이번 분기에 한 것" meta={d.priorDate ? `직전 분기 대비` : undefined} className="v2-isd-facts-mod">
+          {/* '이번 분기'는 오늘의 분기로 읽혔다 — 13F 분기 이름으로(2026-10-04 점검). */}
+          <Module
+            title={d.reportDate ? `${Math.ceil(Number(d.reportDate.slice(5, 7)) / 3)}분기에 한 것` : "분기에 한 것"}
+            meta={d.priorDate ? `${quarterLabel(d.reportDate)} · 직전 분기 대비` : undefined}
+            className="v2-isd-facts-mod"
+          >
             {d.priorDate ? (
               <dl className="v2-isd-facts">
                 {moves.map((s) => (
                   <div key={s.label}>
-                    {/* 갈래 이름 아래 종목 — 표를 다 훑지 않아도 무엇을 바꿨는지 보인다(넷까지 · 나머지는 수로). */}
+                    {/* 갈래 이름 아래 종목 — 표를 다 훑지 않아도 무엇을 바꿨는지 보인다. 종목은 그 종목 화면 링크.
+                        판 1,000 이상은 여덟까지(줄이 92px 로 넉넉하다), 그 밑은 넷까지 · 나머지는 수로(v2.css .v2-isd-wide · .v2-isd-narrow). */}
                     <dt>
                       {s.label}
-                      {s.list.length > 0 && <em>{s.list.slice(0, 4).join(" · ") + (s.list.length > 4 ? ` 외 ${s.list.length - 4}` : "")}</em>}
+                      {s.list.length > 0 && (
+                        <em>
+                          {s.list.slice(0, 8).map((t, i) => (
+                            <Fragment key={t}>
+                              {i > 0 && <span className={i >= 4 ? "v2-isd-wide" : undefined}> · </span>}
+                              <Link href={`/insider/stock/${encodeURIComponent(t)}`} className={`v2-isd-tk${i >= 4 ? " v2-isd-wide" : ""}`} data-ga="insider_investor_move_click">
+                                {t}
+                              </Link>
+                            </Fragment>
+                          ))}
+                          {s.list.length > 4 && <span className="v2-isd-narrow"> 외 {s.list.length - 4}</span>}
+                          {s.list.length > 8 && <span className="v2-isd-wide"> 외 {s.list.length - 8}</span>}
+                        </em>
+                      )}
                     </dt>
                     <dd>
                       <b className={s.list.length ? undefined : "is-zero"}>

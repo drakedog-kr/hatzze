@@ -119,6 +119,8 @@ export type StockInsider = {
   shares: number | null;
   price: number | null;
   value: number | null;
+  /** 매매일(원천의 transaction_date). 줄 날짜 · 정렬은 이것 — 차트 점과 같은 날(2026-10-04 점검). 없으면 접수일. */
+  transactionDate: string | null;
   filedDate: string;
   sourceUrl: string | null;
 };
@@ -198,6 +200,17 @@ export type StockDetail = {
   /** 추이의 끝점 = 언급 표 전체의 가장 최근 날(이 종목의 마지막 언급일이 아니다). */
   mentionDate: string | null;
   holders: StockHolder[];
+  /** 보유 거물의 분기(가장 흔한 report_date) — '2026 Q2 늘림 8명'처럼 분기 이름을 적는다. 없으면 null. */
+  holdersQuarter: string | null;
+  /** 직전 분기에 들었다가 최신 분기에 다 판 거물 수. 차트의 거물 '매도'(줄임 + 정리)와 같은 잣대(2026-10-04 점검). */
+  exitedCount: number;
+  /** 언급 끝점이 오늘(KST, 아직 안 끝난 날)이라 머리 숫자를 전날로 돌렸나 — 막대의 마지막 칸을 옅게 그린다. */
+  mentionPartial: boolean;
+  /** 언급 표 전체의 가장 최근 날 — 이 종목이 언급된 적이 없어도 띠가 '그날 기준'을 적는다('언급 준비 중'이 아니다). */
+  mentionAsOf: string | null;
+  /** 의원 · 임원 표가 덮는 기간의 시작(가장 이른 접수일). 못 읽으면 null. */
+  congressSince: string | null;
+  insiderSince: string | null;
   /** 거물 명단 전체 수. "N/62" 의 분모다. */
   managerCount: number;
   /** 주가 일봉. 못 받으면 빈 배열이고 차트를 안 그린다. */
@@ -293,7 +306,7 @@ const loadStockDetail = cache(async (rawTicker: string, range: string): Promise<
     console.error(`[insider/stock] ${label} 조회 실패`, e);
   };
 
-  const [stockRows, mentionRows, holdingRows, managerRows, congressRows, insiderRows, consensusRows, actionRows, latestMention] =
+  const [stockRows, mentionRows, holdingRows, managerRows, congressRows, insiderRowsAll, consensusRows, actionRows, latestMention, congressStart, insiderStart] =
     await Promise.all([
     db.from("us_stocks").select("ticker,name_ko,name_en").in("ticker", spellings).limit(1),
     fetchAllRows<{ date: string; mention_count: number | null; channel_count: number | null }>(
@@ -330,6 +343,7 @@ const loadStockDetail = cache(async (rawTicker: string, range: string): Promise<
       { onError: failed("의원 신고") },
     ),
     fetchAllRows<{
+      issuer_cik: number | null;
       owner_name: string | null;
       owner_title: string | null;
       transaction_code: string | null;
@@ -344,7 +358,7 @@ const loadStockDetail = cache(async (rawTicker: string, range: string): Promise<
       () =>
         db
           .from("us_insider_txn")
-          .select("accession_no,seq,owner_name,owner_title,transaction_code,acquired_disposed,shares,price,transaction_date,filed_date,source_url")
+          .select("accession_no,seq,issuer_cik,owner_name,owner_title,transaction_code,acquired_disposed,shares,price,transaction_date,filed_date,source_url")
           .in("ticker", spellings)
           .order("accession_no"),
       { onError: failed("임원 신고") },
@@ -375,7 +389,17 @@ const loadStockDetail = cache(async (rawTicker: string, range: string): Promise<
       .limit(30),
     // 언급 추이의 끝점 — 표 전체의 가장 최근 날. 이 종목의 마지막 행이 아니다(mentionTrend 주석).
     db.from("telegram_us_stock_daily").select("date").order("date", { ascending: false }).limit(1),
+    // 의원 · 임원 표가 덮는 기간의 시작(표 전체의 가장 이른 접수일) — 세 축의 기간이 달라 화면이 적는다(2026-10-04 점검).
+    db.from("us_congress_trade").select("filed_date").order("filed_date").limit(1),
+    db.from("us_insider_txn").select("filed_date").order("filed_date").limit(1),
   ]);
+
+  // 임원 행은 그 티커의 **주된 발행사 CIK** 것만 — 심볼 없는 다른 발행사 신고(블랙스톤 계열이 비상장 펀드를 산 것)가 폴더 CIK 의
+  // 티커로 담겨 'BX 임원 장내 매수'로 섰다(2026-10-04 점검). 수집기도 이제 버리지만(fetch_us_insider.parse_filing) 이미 든 행을 막는다.
+  const cikCount = new Map<number, number>();
+  for (const r of insiderRowsAll) if (r.issuer_cik != null) cikCount.set(r.issuer_cik, (cikCount.get(r.issuer_cik) ?? 0) + 1);
+  const mainCik = [...cikCount.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  const insiderRows = mainCik == null ? insiderRowsAll : insiderRowsAll.filter((r) => r.issuer_cik == null || r.issuer_cik === mainCik);
 
   // 한 번에 받는 표 넷은 fetchAllRows 를 안 거쳐 error 를 여기서 본다.
   if (stockRows.error) failed("종목 사전")(stockRows.error);
@@ -405,11 +429,14 @@ const loadStockDetail = cache(async (rawTicker: string, range: string): Promise<
     mentions: m.mention_count ?? 0,
     channels: m.channel_count ?? 0,
   }));
-  const { trend, today, date: mentionDate } = mentionTrend(
-    trendRaw,
-    latestMention.data?.[0]?.date ?? null,
-    MENTION_TREND_DAYS,
-  );
+  const todayIso = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  const latestMentionDate: string | null = latestMention.data?.[0]?.date ?? null;
+  const { trend, today, date: mentionDate, partial: mentionPartial } = mentionTrend(trendRaw, latestMentionDate, MENTION_TREND_DAYS, todayIso);
+  // 언급이 없는 종목의 기준일도 같은 규칙 — 오늘(안 끝난 날)이면 전날(mentionTrend 주석).
+  const mentionAsOf =
+    latestMentionDate && latestMentionDate === todayIso
+      ? new Date(Date.parse(`${latestMentionDate}T00:00:00Z`) - 86400e3).toISOString().slice(0, 10)
+      : latestMentionDate;
 
   // 거물별 최신 분기의 보유만 남기고, 직전 분기와 견줘 움직임을 붙인다.
   const managerOf = new Map(managerRows.map((m) => [m.cik, m]));
@@ -452,6 +479,18 @@ const loadStockDetail = cache(async (rawTicker: string, range: string): Promise<
     });
   }
   holders.sort((a, b) => b.value - a.value);
+  const qCount = new Map<string, number>();
+  for (const h of holders) qCount.set(h.reportDate, (qCount.get(h.reportDate) ?? 0) + 1);
+  const holdersQuarter = [...qCount.entries()].sort((a, b) => b[1] - a[1] || b[0].localeCompare(a[0]))[0]?.[0] ?? null;
+  // 다 판 거물 — 그 운용사가 낸 직전 분기엔 이 종목이 있고 최신 분기엔 없다(stockPosition 은 최신 분기 행이 없으면 null 이라 holders 에 안 든다).
+  let exitedCount = 0;
+  for (const [cik, rows] of byCik) {
+    if (!managerOf.get(cik)) continue;
+    const qs = filed.get(cik) ?? [...new Set(rows.map((r) => r.report_date))].sort();
+    const latestQ = qs[qs.length - 1];
+    const priorQ = qs[qs.length - 2];
+    if (priorQ && !rows.some((r) => r.report_date === latestQ) && rows.some((r) => r.report_date === priorQ)) exitedCount += 1;
+  }
 
   const [quotes, fx, history] = await Promise.all([
     usQuotes([ticker]),
@@ -618,7 +657,13 @@ const loadStockDetail = cache(async (rawTicker: string, range: string): Promise<
     mentionsToday: today?.mentions ?? 0,
     channelsToday: today?.channels ?? 0,
     mentionDate,
+    mentionPartial,
+    mentionAsOf,
+    congressSince: (congressStart.data?.[0]?.filed_date as string | undefined) ?? null,
+    insiderSince: (insiderStart.data?.[0]?.filed_date as string | undefined) ?? null,
     holders,
+    holdersQuarter,
+    exitedCount,
     managerCount: managerRows.length,
     bars,
     week52,
@@ -647,10 +692,11 @@ const loadStockDetail = cache(async (rawTicker: string, range: string): Promise<
         shares: i.shares,
         price: i.price,
         value: i.shares && i.price ? i.shares * i.price : null,
+        transactionDate: i.transaction_date,
         filedDate: i.filed_date,
         sourceUrl: i.source_url,
       }))
-      .sort((a, b) => b.filedDate.localeCompare(a.filedDate) || (b.value ?? 0) - (a.value ?? 0)),
+      .sort((a, b) => (b.transactionDate ?? b.filedDate).localeCompare(a.transactionDate ?? a.filedDate) || (b.value ?? 0) - (a.value ?? 0)),
   };
 });
 

@@ -592,6 +592,8 @@ a.v2-ev-row:hover { background: var(--t-tint); }
   .v2-cover > .v2-cover-cell:not(.v2-cover-meta):not(:has(> :nth-child(3))) { grid-template-columns: auto; }
   .v2-cover > .v2-cover-cell:not(.v2-cover-meta):has(> :nth-child(4)) { grid-template-columns: repeat(3, auto); }
   .v2-cover > .v2-cover-cell:not(.v2-cover-meta) > .v2-cover-k { grid-column: 1 / -1; line-height: 14px; }
+  /* 종목 · 사람 이름 칸은 한 줄 — 자식이 둘(로고 · h1)인 내부자 종목 상세는 한 열 격자가 돼 로고가 위 줄에 혼자 섰다(2026-10-04 점검). */
+  .v2-cover > .v2-cover-cell.v2-sk-id { display: flex; align-items: center; column-gap: 8px; }
 }
 /* 링크 칸 화살표는 격자 · 줄바꿈 밖으로 — 칸 안 오른쪽(뒤로 가는 칸은 왼쪽) 세로 가운데에 띄운다. 격자 칸 하나를 차지하면
    ‹ 가 혼자 한 줄이 돼 칸 키가 58px 로 컸고(680~999), 폰에서 숨기면 링크 칸이 정보 칸처럼 보였다(2026-10-04 점검). */
@@ -1564,6 +1566,8 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-tm-trend i { display: block; width: 100%; border-radius: 2px; background: color-mix(in srgb, var(--t-down) 35%, transparent); }
 .v2-tm-trend i.is-recent { background: var(--t-down); }
 .v2-tm-trend i.is-none { background: var(--t-bar-off); }
+/* 아직 안 끝난 날(오늘) — 옅게. 반나절치라 다른 날과 견줄 막대가 아니다(내부자 종목 상세 mentionPartial). */
+.v2-tm-trend i.is-part { opacity: 0.4; }
 .v2-tm-legend { display: flex; gap: 14px; font-size: 11px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
 .v2-tm-legend > span { display: inline-flex; align-items: center; gap: 5px; }
 .v2-tm-legend i { width: 10px; height: 10px; border-radius: 2px; background: color-mix(in srgb, var(--t-down) 35%, transparent); }
@@ -2197,6 +2201,13 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 .v2-isd-facts b.is-zero { color: var(--t-ink3); }
 .v2-isd-facts b span { margin-left: 1px; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-isd-facts em { font-style: normal; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
+.v2-isd-tk { color: var(--t-ink2); text-decoration: none; }
+.v2-isd-tk:hover { color: var(--t-ink); text-decoration: underline; }
+.v2-isd-narrow { display: none; }
+@container kd (max-width: 999px) {
+  .v2-isd-wide { display: none; }
+  .v2-isd-narrow { display: inline; }
+}
 .v2-sk-id .v2-cover-k .v2-in-help { margin-left: 2px; }
 /* 폰 — 상세 화면의 첫 줄 칸(운용자산 · 현재가 · 52주 위치)은 값이 길어 반 칸에 안 든다(버핏 '운용자산 $299.3B +13.7%'가 12px 넘침).
    테마 한 장과 같이 칸마다 한 줄. */
@@ -2293,7 +2304,8 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 .v2-isd-mod { display: flex; flex-direction: column; }
 /* 줄 목록 — 짝 모듈보다 짧으면 줄이 고르게 늘어난다(카더라 표와 같은 규칙). '더 보기' 줄은 바닥. */
 .v2-isd-list { flex: 1; display: flex; flex-direction: column; margin: 0; padding: 0 14px; list-style: none; }
-.v2-isd-list > li { flex: 1 0 auto; display: flex; }
+/* 줄은 남는 높이를 나눠 받되 한 줄 64 까지 — 줄 셋뿐인 목록이 키 큰 짝에 맞춰 한 줄 207px 까지 늘었다(2026-10-04 점검). 짝은 키가 비슷한 것끼리 고른다(detail.tsx pairUp). */
+.v2-isd-list > li { flex: 1 0 auto; display: flex; max-height: 64px; }
 .v2-isd-list > li + li { border-top: 1px solid var(--t-line); }
 .v2-isd-row {
   flex: 1;
@@ -2348,8 +2360,11 @@ a.v2-isd-row:hover { background: var(--t-tint); margin: 0 -14px; padding: 0 14px
 @container kd (max-width: 679px) {
   .v2-isd-list.is-holder .v2-isd-row,
   .v2-isd-list.is-holding .v2-isd-row { grid-template-columns: minmax(0, 1fr) 72px 76px; }
+  /* 거물 목록(종목 상세)은 움직임을, 보유 목록(투자자 상세)은 비중을 남긴다 — 머리가 '비중 순'인데 비중 칸을 숨겼다(2026-10-04 점검). */
   .v2-isd-list.is-holder .v2-isd-row > :nth-child(3),
-  .v2-isd-list.is-holding .v2-isd-row > :nth-child(3) { display: none; }
+  .v2-isd-list.is-holding .v2-isd-row > :nth-child(2) { display: none; }
+  /* 값 셋짜리 띠 칸(수익률 1개월 · 3개월 · 1년 · 투자자 보유) — 두 열이면 셋째가 혼자 아래 줄로 떨어졌다. */
+  .v2-in .v2-cover-idx:has(> :nth-child(4)) { grid-template-columns: repeat(3, auto); justify-content: space-between; }
   .v2-isd-list.is-congress .v2-isd-row { grid-template-columns: minmax(0, 1fr) max-content; }
   .v2-isd-list.is-congress .v2-isd-row > :nth-child(3) { grid-column: 1 / -1; text-align: left; padding-bottom: 6px; }
   .v2-isd-chart .v2-mod-head { flex-wrap: wrap; row-gap: 6px; }

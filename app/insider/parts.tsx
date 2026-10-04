@@ -49,10 +49,15 @@ export const ROW = {
   sub: { fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 } as const,
 } as const;
 
+/**
+ * 'M/D' — 올해(KST)가 아니면 '25.12.18'처럼 연도 두 자리를 붙인다. 연도 없이 '12/18'이면 지난해 매매가 앞으로 올 날로 읽혔고,
+ * 매매일 순 목록이 '3/23 · 1/30 · 12/24 · 1/14'로 순서가 깨진 것처럼 보였다(2026-10-04 점검).
+ */
 export function fmtDate(iso: string | null): string {
   if (!iso) return "-";
-  const [, m, d] = iso.split("-");
-  return `${Number(m)}/${Number(d)}`;
+  const [y, m, d] = iso.split("-");
+  const thisYear = new Date(Date.now() + 9 * 3600e3).getUTCFullYear();
+  return Number(y) === thisYear ? `${Number(m)}/${Number(d)}` : `${y.slice(2)}.${Number(m)}.${Number(d)}`;
 }
 
 /**
@@ -553,11 +558,13 @@ export function PriceChart({
   const line = bars.map((b, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(b.close).toFixed(1)}`).join(" ");
   const area = `${line} L${W},${H - PAD_B} L${PAD_L},${H - PAD_B} Z`;
 
-  // 가로축 — 달이 바뀌는 지점. 일봉 반년이면 6~7개라 겹치지 않는다.
+  // 가로축 — 달이 바뀌는 지점. 일봉 반년이면 6~7개라 겹치지 않는다. 해가 바뀌는 1월은 '26년'으로 — 2년 차트에 같은 달 이름이
+  // 두 번 나와 어느 해인지 몰랐다(2026-10-04 점검).
   const monthTicks: { x: number; label: string }[] = [];
   for (let i = 1; i < n; i++) {
     if (bars[i].date.slice(5, 7) !== bars[i - 1].date.slice(5, 7)) {
-      monthTicks.push({ x: x(i), label: `${Number(bars[i].date.slice(5, 7))}월` });
+      const mm = Number(bars[i].date.slice(5, 7));
+      monthTicks.push({ x: x(i), label: mm === 1 ? `${bars[i].date.slice(2, 4)}년` : `${mm}월` });
     }
   }
   // 세로축 — 위·가운데·아래 셋. 더 넣으면 반년짜리 작은 차트에서 시끄럽다. 격자는 그 사이까지 다섯 줄로 옅게.
@@ -583,28 +590,31 @@ export function PriceChart({
    *    (반지름을 키워 겹쳐 담아 봤다가 크기가 제각각이 되어 되돌렸다.)
    */
   const WHO_ORDER = ["insider", "congress", "manager"] as const;
+  /** 물량은 방향마다 따로 — 같은 날 산 주식 수와 판 주식 수(의원은 구간)를 더하면 아무 뜻이 없다(2026-10-04 점검). */
+  type Qty = { shares: number | null; low: number | null; high: number | null };
   type Slot = {
     i: number;
     who: ChartMark["who"];
     buy: number;
     sell: number;
     names: string[];
-    shares: number | null;
-    low: number | null;
-    high: number | null;
+    buyQty: Qty;
+    sellQty: Qty;
   };
   const slotOf = new Map<string, Slot>();
   for (const m of marks) {
     const i = nearest(m.date);
     if (i < 0) continue;
     const key = `${i}|${m.who}`;
-    const s = slotOf.get(key) ?? { i, who: m.who, buy: 0, sell: 0, names: [], shares: null, low: null, high: null };
+    const blank = (): Qty => ({ shares: null, low: null, high: null });
+    const s = slotOf.get(key) ?? { i, who: m.who, buy: 0, sell: 0, names: [], buyQty: blank(), sellQty: blank() };
     if (m.side === "buy") s.buy += m.count;
     else s.sell += m.count;
     for (const nm of m.names) if (!s.names.includes(nm)) s.names.push(nm);
-    if (m.shares != null) s.shares = (s.shares ?? 0) + m.shares;
-    if (m.low != null) s.low = (s.low ?? 0) + m.low;
-    if (m.high != null) s.high = (s.high ?? 0) + m.high;
+    const q = m.side === "buy" ? s.buyQty : s.sellQty;
+    if (m.shares != null) q.shares = (q.shares ?? 0) + m.shares;
+    if (m.low != null) q.low = (q.low ?? 0) + m.low;
+    if (m.high != null) q.high = (q.high ?? 0) + m.high;
     slotOf.set(key, s);
   }
   const perIndex = new Map<number, Slot[]>();
@@ -621,20 +631,24 @@ export function PriceChart({
    */
   const tipOf = (s: Slot) => {
     // 거물은 신고 "건"이 아니라 거물 수다 — 한 사람이 한 번 신고한다. '명'으로 센다(본 화면 · 상세와 같은 단위, 2026-10-04).
+    // 거물 축은 13F 두 분기의 차이라 상세 둘째 줄과 같은 말(늘림 · 줄임 · 정리)로 — 매수 · 매도라 부르면 다른 숫자로 읽혔다.
     const unit = s.who === "manager" ? "명" : "건";
-    const acts = [s.buy ? `매수 ${s.buy}${unit}` : "", s.sell ? `매도 ${s.sell}${unit}` : ""].filter(Boolean).join(" · ");
-    const qty =
-      s.shares != null
-        ? `${Math.round(s.shares).toLocaleString("ko-KR")}주`
-        : s.low != null && s.high != null
-          ? `${money(s.low)}~${money(s.high)}`
-          : "";
+    const [buyWord, sellWord] = s.who === "manager" ? ["늘림", "줄임 · 정리"] : ["매수", "매도"];
+    const qtyOf = (q: Qty) =>
+      q.shares != null ? `${Math.round(q.shares).toLocaleString("ko-KR")}주` : q.low != null && q.high != null ? `${money(q.low)}~${money(q.high)}` : "";
+    // 방향마다 '매수 1건 $1K~$15K'처럼 물량을 붙인다.
+    const acts = [
+      s.buy ? [`${buyWord} ${s.buy}${unit}`, qtyOf(s.buyQty)].filter(Boolean).join(" ") : "",
+      s.sell ? [`${sellWord} ${s.sell}${unit}`, qtyOf(s.sellQty)].filter(Boolean).join(" ") : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
     const who = s.names.length
       ? `${s.names.slice(0, 2).join(", ")}${s.names.length > 2 ? ` 외 ${s.names.length - 2}명` : ""}`
       : "";
     // ⚠️ 날짜는 여기서 안 붙인다. 한 자리에 축이 여럿이면 말풍선에 날짜가 두 번 나온다 —
     //    날짜는 손닿는 자리가 **한 번만** 앞에 적는다.
-    return [`${whoLabel[s.who]} ${acts}`, qty, who, s.who === "manager" ? "분기말 기준" : ""]
+    return [`${whoLabel[s.who]} ${acts}`, who, s.who === "manager" ? "분기말 기준" : ""]
       .filter(Boolean)
       .join(" · ");
   };
@@ -1130,7 +1144,7 @@ const CONSENSUS_KO: Record<string, string> = {
  *    "수정하지 않고" 쓰라는 조건이라 목표가를 $304.73 → $305 로 바꾸면 그 조건을
  *    어긴다. 시세를 적는 `Quote` 와 같은 자릿수(소수 둘째까지)로 둔다.
  */
-function ExactMoney({ usd, rate }: { usd: number | null; rate: number | null }) {
+export function ExactMoney({ usd, rate }: { usd: number | null; rate: number | null }) {
   if (usd == null) return <>-</>;
   const d = `$${usd.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
   if (!rate) return <>{d}</>;
@@ -1187,10 +1201,10 @@ export function AnalystActions({ rows, rate }: { rows: AnalystAction[]; rate: nu
     const act = r.action ? ACTION_KO[r.action] : undefined;
     return (
       <li key={`${r.date}-${r.firm}-${r.analyst}-${i}`}>
-        {/* ⚠️ 좌우 22 는 **줄이 들고 있어야 한다.** 목록(listStyle)에 주면 줄이 그만큼
+        {/* ⚠️ 좌우 여백(14)은 **줄이 들고 있어야 한다.** 목록(listStyle)에 주면 줄이 그만큼
             안쪽으로 밀려서, 호버 하이라이트가 카드 끝까지 못 닿고 양옆에 흰 띠가 남는다
             (2026-08-26). 다른 목록은 `.hz-trow` 가 `padding: 9px 22px` 로 이미 이 방식이다. */}
-        <div className="hz-trow hz-actionrow" style={{ padding: "7px 22px" }}>
+        <div className="hz-trow hz-actionrow" style={{ padding: "7px 14px" }}>
           <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
             <strong className="hz-cellsub" style={{ ...ROW.lead, fontSize: "var(--fs-13)" }}>
               {r.firm}
@@ -1228,7 +1242,7 @@ export function AnalystActions({ rows, rate }: { rows: AnalystAction[]; rate: nu
           엔비디아는 사흘, 가장 긴 곳은 176일이다(커버리지가 뜸한 종목).
           그래서 기간을 **재서 적는다.** 그래야 "64명 중 왜 8명뿐이냐"에도 답이 된다 —
           64명은 등급을 걸어 둔 사람 수, 이 목록은 그 사이에 움직인 사람이다. */}
-      <span style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "0 22px 4px" }}>
+      <span style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "0 14px 4px" }}>
         <span style={{ ...ROW.sub }}>최근 의견</span>
         {span && <span style={{ fontSize: T.small, color: C.muted, fontFamily: MONO }}>{span}</span>}
       </span>
@@ -1279,7 +1293,8 @@ export function ConsensusBody({
     <div style={{ display: "flex", flexDirection: "column" }}>
       {/* ⭐ **두 값을 나란히 세운다.** 등급과 목표가는 이 카드가 답하는 질문 둘이라 위아래로
           쌓으면 카드가 길기만 하고 무엇이 요점인지 안 보인다. 좁아지면 저절로 접힌다. */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 16, padding: "14px 22px 16px" }}>
+      {/* 좌우 14 — v2 모듈 안쪽 여백(제목 · 다른 모듈 줄과 한 세로줄). 옛 시트의 22 가 남아 8px 더 깊었다(2026-10-04 점검). */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 16, padding: "14px 14px 16px" }}>
         {total > 0 && (
           <div style={{ flex: "1 1 260px", display: "flex", flexDirection: "column", gap: 9, minWidth: 0 }}>
             <span style={{ ...ROW.sub }}>증권가 종합</span>
@@ -1346,6 +1361,13 @@ export function ConsensusBody({
                     </span>
                     <span style={{ fontSize: T.small, color: C.muted }}>최저 목표가</span>
                   </span>
+                  {/* 막대 위 점이 무엇인지 — 바로 위 큰 숫자가 '목표가 평균'이라 점도 평균 자리로 읽혔다(2026-10-04 점검). */}
+                  {pos != null && (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, alignSelf: "flex-end", fontSize: T.small, color: C.muted }}>
+                      <span aria-hidden style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--c-blue)", flexShrink: 0 }} />
+                      현재가
+                    </span>
+                  )}
                   <span style={{ display: "flex", flexDirection: "column", gap: 1, alignItems: "flex-end" }}>
                     <span style={{ ...ROW.sub, fontFamily: MONO, color: C.ink }}>
                       <ExactMoney usd={c.targetHigh} rate={rate} />

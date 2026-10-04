@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import type { ManagerHolding, StockCongress, StockHolder, StockInsider } from "@/lib/insider-detail";
+import { groupInsiderLines, ownerDisplayName, shortTitle } from "@/lib/insider-person";
 
 import { ExpandableList } from "../kadera/ExpandableList";
 import { StockLogo } from "../StockLogo";
@@ -63,22 +64,26 @@ export function holderLines(rows: StockHolder[], rate: number | null) {
 }
 
 /**
- * 종목 상세 — 임원 신고(산 것 + 손을 떠난 것, 접수 최신 순). 이름 · 직함 | 무엇을 · 언제 | 금액.
+ * 종목 상세 — 임원 신고(산 것 + 손을 떠난 것, 매매일 최신 순). 이름 · 직함 | 무엇을 · 몇 건 · 언제 매매 | 금액.
+ * 같은 사람 · 같은 날 · 같은 종류 줄은 하나로 묶는다(lib/insider-person.ts). 날짜는 매매일 — 차트 점과 같은 날이고 의원 줄처럼 '매매'를 붙인다.
  * ⚠️ 금액이 없는 신고(증여 · 전환은 원천에 단가가 없다)는 주식 수를 세우고 한 단 흐리게 한다(옛 insiderRow 와 같은 규칙).
  */
 export function insiderLines(rows: StockInsider[], rate: number | null) {
-  return rows.map((t, i) => {
+  return groupInsiderLines(rows).map((t, i) => {
     const tone = t.code === "P" ? "up" : t.acquiredDisposed === "D" ? "down" : "flat";
     const what = t.code ? (CODE_LABEL[t.code]?.text ?? t.code) : "종류 미상";
+    const title = shortTitle(t.ownerTitle);
     return (
-      <li key={`${t.ownerName}-${t.filedDate}-${i}`}>
+      <li key={`${t.ownerName}-${t.transactionDate ?? t.filedDate}-${i}`}>
         <div className="v2-isd-row">
           <span className="v2-isd-who">
-            <b>{t.ownerName ?? "이름 없음"}</b>
+            <b>{ownerDisplayName(t.ownerName) ?? "이름 없음"}</b>
+            {title && <span>{title}</span>}
           </span>
           <span className={`v2-isd-mid ${toneCls(tone)}`}>
             {what}
-            <em>{fmtDate(t.filedDate)}</em>
+            {t.count > 1 ? ` ${t.count}건` : ""}
+            <em>{fmtDate(t.transactionDate ?? t.filedDate)} 매매</em>
           </span>
           <span className={`v2-isd-num${t.value == null ? " is-sub" : ""}`}>
             {t.value != null ? <Money usd={t.value} rate={rate} /> : t.shares != null ? `${Math.round(t.shares).toLocaleString("ko-KR")}주` : "미상"}

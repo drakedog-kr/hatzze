@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Fragment } from "react";
 
 import { withObjectParticle } from "@/lib/format";
-import { getStockDetail } from "@/lib/insider-detail";
+import { MENTION_TREND_DAYS, getStockDetail } from "@/lib/insider-detail";
+import { groupInsiderLines } from "@/lib/insider-person";
 import { PRICE_RANGES, type PriceRangeKey, stockDetailHref } from "@/lib/insider-range";
 import { assertLoaded } from "@/lib/load-state";
 
@@ -15,7 +17,7 @@ import { PageJsonLd } from "../../../JsonLd";
 import { INSIDER_CARD } from "../../../og-copy";
 import { pageMetadata } from "../../../seo";
 import { LoadFailedNote } from "../../../LoadFailedNote";
-import { AnalystActions, ConsensusBody, MarkBadges, MarkRadios, Money, PriceChart, fmtDate, moveKind } from "../../parts";
+import { AnalystActions, ConsensusBody, ExactMoney, MarkBadges, MarkRadios, PriceChart, fmtDate, moveKind, quarterLabel } from "../../parts";
 import { DetailList, congressLines, holderLines, insiderLines } from "../../V2DetailRows";
 import { BackTrail } from "@/components/back-trail";
 
@@ -66,10 +68,9 @@ export async function stockDetailMetadata(ticker: string, range: PriceRangeKey):
   const d = await getStockDetail(ticker, range);
   if (!d) return STOCK_NOT_FOUND_META;
   const meta = await pageMetadata({
-    title: `${d.name || d.ticker}(${d.ticker}) 내부자 공시 | hatzze`,
-    description: `${withObjectParticle(d.name || d.ticker)} 월가 거물 ${d.holders.length}명이 보유하고, 미 하원의원 ${
-      new Set(d.congress.map((c) => c.member)).size
-    }명이 신고했습니다. 주식 텔레그램 언급 추이와 함께 봅니다.`,
+    // 이름이 없으면 티커 한 번 — 'MCO(MCO)'로 겹쳤다(2026-10-04 점검).
+    title: `${d.name ? `${d.name}(${d.ticker})` : d.ticker} 내부자 공시 | hatzze`,
+    description: `${withObjectParticle(d.name || d.ticker)} 월가 거물 ${d.holders.length}명이 보유하고, 미 하원의원 ${congressMembers(d.congress)}명이 신고했습니다. 주식 텔레그램 언급 추이와 함께 봅니다.`,
     // 기간 주소도 기본 주소를 가리킨다 — 같은 화면의 차트 창만 다르다.
     path: stockDetailHref(d.ticker),
     // 자기 폴더에 카드가 없어 구역(/insider)의 카드를 쓴다(app/seo.ts 의 imagePath).
@@ -85,13 +86,72 @@ export async function stockDetailMetadata(ticker: string, range: PriceRangeKey):
 }
 
 /**
+ * 의원 수 — 지역구(state_dst)로 센다. 같은 의원이 표기가 갈려('John McGuire' · 'John J Mr McGuire') 두 명으로 셌다(2026-10-04 점검).
+ * 지역구가 없는 행만 이름으로.
+ */
+function congressMembers(rows: { member: string; stateDst: string | null }[]): number {
+  return new Set(rows.map((c) => c.stateDst ?? c.member)).size;
+}
+
+/** 언급이 한 번도 없는 종목의 막대 — 언급 표의 끝날까지 0 으로 채운 날들(빈 문장 대신 같은 꼴로 그린다). */
+function zeroDays(end: string, days: number) {
+  const out: { date: string; mentions: number; channels: number }[] = [];
+  const d = new Date(`${end}T00:00:00Z`);
+  for (let i = days - 1; i >= 0; i--) {
+    const t = new Date(d);
+    t.setUTCDate(t.getUTCDate() - i);
+    out.push({ date: t.toISOString().slice(0, 10), mentions: 0, channels: 0 });
+  }
+  return out;
+}
+
+/** 목록 모듈의 키 어림 — 펴는 줄(8)까지 + 넘치면 '더 보기' 한 줄. */
+const rowsWeight = (n: number) => Math.min(n, 8) + (n > 8 ? 1 : 0);
+
+/** 짝지을 모듈 하나 — w 는 줄 수로 어림한 키(펴는 줄 8 + '더 보기' 1, 애널리스트 칸은 줄 12쯤). */
+type PairMod = { key: string; node: React.ReactNode; w: number };
+
+/**
+ * 모듈을 둘씩 짝짓는다 — 키가 비슷한 것끼리. [거물 | 애널리스트] · [임원 | 의원]으로 못박았을 땐 한쪽이 없으면 남은 것이 판 폭을
+ * 혼자 차지했고(이름과 금액이 1,000px 떨어짐), 줄이 셋뿐인 목록이 키 큰 짝에 맞춰 늘어 한 줄이 200px 가까이 됐다(2026-10-04 점검).
+ * 짝의 순서는 원래 순서(거물 → 애널리스트 → 임원 → 의원)의 앞선 것부터. 홀수면 하나가 판 폭으로 선다.
+ */
+function pairUp(ms: PairMod[]): PairMod[][] {
+  if (ms.length <= 2) return ms.length ? [ms] : [];
+  const cost = (a: PairMod, b: PairMod) => Math.abs(Math.log(a.w / b.w));
+  const idx = (m: PairMod) => ms.indexOf(m);
+  const order = (gs: PairMod[][]) => gs.map((g) => [...g].sort((a, b) => idx(a) - idx(b))).sort((a, b) => idx(a[0]) - idx(b[0]));
+  if (ms.length === 3) {
+    let best: PairMod[][] = [];
+    let bc = Infinity;
+    for (let solo = 0; solo < 3; solo++) {
+      const pair = ms.filter((_, i) => i !== solo);
+      const c = cost(pair[0], pair[1]);
+      if (c < bc) {
+        bc = c;
+        best = [pair, [ms[solo]]];
+      }
+    }
+    return order(best);
+  }
+  const [a, b, c, d] = ms;
+  const options = [
+    [[a, b], [c, d]],
+    [[a, c], [b, d]],
+    [[a, d], [b, c]],
+  ];
+  const best = options.reduce((x, y) => (cost(y[0][0], y[0][1]) + cost(y[1][0], y[1][1]) < cost(x[0][0], x[0][1]) + cost(x[1][0], x[1][1]) ? y : x));
+  return order(best);
+}
+
+/**
  * 언급 추이 막대. **SVG 도 라이브러리도 안 쓴다** — 40개짜리 막대는 div 로 충분하고,
  * 서버 컴포넌트로 남길 수 있어 클라이언트 번들이 안 는다.
  *
  * ⚠️ 빈 날을 0 으로 메워 받는다(`fillDays`). 안 메우면 주말을 건너뛰어 막대 간격이
  *    날짜와 어긋나고, 추이가 실제보다 촘촘해 보인다.
  */
-function Trend({ points }: { points: { date: string; mentions: number; channels: number }[] }) {
+function Trend({ points, partial = false }: { points: { date: string; mentions: number; channels: number }[]; partial?: boolean }) {
   const max = Math.max(1, ...points.map((p) => p.mentions));
   // v2 — 종목 페이지 · 테마 한 장의 추이와 같은 꼴(.v2-tm-trend). 최근 사흘만 진한 파랑.
   const recentFrom = points.length >= 3 ? points[points.length - 3].date : "";
@@ -100,9 +160,14 @@ function Trend({ points }: { points: { date: string; mentions: number; channels:
       {points.map((p, i) => {
         const at = i / Math.max(1, points.length - 1);
         const edge = at > 0.72 ? " hz-tip-end" : at < 0.28 ? " hz-tip-start" : "";
+        // 마지막 칸이 오늘(아직 안 끝난 날)이면 옅게 · 말풍선에 '집계 중'(mentionTrend partial).
+        const part = partial && i === points.length - 1;
         return (
-          <span key={p.date} className={`hz-tip hz-vline${edge}`} data-tip={`${fmtDate(p.date)} · 언급 ${p.mentions}회 · 채널 ${p.channels}곳`}>
-            <i className={!p.mentions ? "is-none" : p.date >= recentFrom ? "is-recent" : undefined} style={{ height: `${Math.max(p.mentions ? 3 : 1, (p.mentions / max) * 100)}%` }} />
+          <span key={p.date} className={`hz-tip hz-vline${edge}`} data-tip={`${fmtDate(p.date)} · 언급 ${p.mentions}회 · 채널 ${p.channels}곳${part ? " · 집계 중" : ""}`}>
+            <i
+              className={[!p.mentions ? "is-none" : p.date >= recentFrom ? "is-recent" : "", part ? "is-part" : ""].filter(Boolean).join(" ") || undefined}
+              style={{ height: `${Math.max(p.mentions ? 3 : 1, (p.mentions / max) * 100)}%` }}
+            />
           </span>
         );
       })}
@@ -123,8 +188,9 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
   assertLoaded("/insider/stock/[ticker]");
   if (!d) notFound();
 
-  const members = new Set(d.congress.map((c) => c.member)).size;
+  const members = congressMembers(d.congress);
   const peak = Math.max(0, ...d.trend.map((p) => p.mentions));
+  const trendPoints = d.trend.length ? d.trend : d.mentionAsOf ? zeroDays(d.mentionAsOf, MENTION_TREND_DAYS) : [];
 
   // ⚠️⚠️ 둘로 가르면 **어느 쪽도 아닌 신고**가 남는다 — 임원은 옵션 행사(M)·무상 취득(A)·
   //      전환(C), 의원은 교환(E). 실측으로 임원 전체의 19% 다. 조용히 빠뜨리면 카드 두
@@ -136,8 +202,11 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
   const execSells = d.insiders.filter((t) => t.acquiredDisposed === "D");
   const cgBuys = d.congress.filter((c) => c.kind === "P");
   const cgSells = d.congress.filter((c) => c.kind === "S");
-  // 한 목록에 섞어 최신 순으로(임원은 접수일, 의원은 매매일 — 옛 카드가 쓰던 순서 그대로).
-  const execTrades = [...execBuys, ...execSells].sort((a, b) => b.filedDate.localeCompare(a.filedDate));
+  // 한 목록에 섞어 매매일 최신 순으로(의원과 같은 잣대 — 차트 점과 같은 날, 2026-10-04 점검). 매매일이 없으면 접수일.
+  const execTrades = [...execBuys, ...execSells].sort((a, b) => (b.transactionDate ?? b.filedDate).localeCompare(a.transactionDate ?? a.filedDate));
+  // 장내 매수도 처분도 아닌 신고(무상 취득 · 옵션 행사 취득 · 전환) — 큰 숫자(임원 신고)와 두 갈래 합을 맞춘다(2026-10-04 점검).
+  const execOther = d.insiders.length - execBuys.length - execSells.length;
+  const since = (iso: string | null) => (iso ? `${fmtDate(iso)} 이후` : "");
   const cgTrades = [...cgBuys, ...cgSells].sort((a, b) => (b.transactionDate ?? b.filedDate).localeCompare(a.transactionDate ?? a.filedDate));
 
   // 거물의 이번 분기 방향. 비교할 직전 분기가 없는 곳은 move 가 null 이라 안 센다.
@@ -145,11 +214,18 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
   const kinds = d.holders.map((h) => moveKind(h.move, h.sharesChange));
   const added = kinds.filter((k) => k === "new" || k === "add").length;
   const trimmed = kinds.filter((k) => k === "trim").length;
-  const quarterMoves = added + trimmed > 0 ? `이번 분기 늘림 ${added}명 · 줄임 ${trimmed}명` : "이번 분기 변화 없음";
+  // '이번 분기'가 아니라 분기 이름(2026 Q2) — 오늘(4분기)과 헷갈렸다. 다 판 거물(정리)도 센다 — 차트의 거물 '줄임 · 정리'와 같은 수(2026-10-04 점검).
+  const q = d.holdersQuarter ? quarterLabel(d.holdersQuarter) : "";
+  const quarterMoves =
+    d.holders.length === 0 && d.exitedCount === 0
+      ? "보유한 거물 없음"
+      : added + trimmed + d.exitedCount > 0
+        ? `${q} ${[`늘림 ${added}명`, `줄임 ${trimmed}명`, d.exitedCount ? `정리 ${d.exitedCount}명` : ""].filter(Boolean).join(" · ")}`.trim()
+        : `${q} 변화 없음`.trim();
 
   const holdersMod =
     d.holders.length > 0 ? (
-      <Module title="이 종목을 든 월가 거물" meta={`${d.holders.length}/${d.managerCount}명 · 분기말 · 금액 순`} className="v2-isd-mod">
+      <Module title="이 종목을 든 월가 거물" meta={`${d.holders.length}/${d.managerCount}명 · ${q ? `${q} 말` : "분기말"} · 금액 순`} className="v2-isd-mod">
         <DetailList name="stock_holders" cols="holder" items={holderLines(d.holders.slice(0, ROWS_MAX), d.usdKrw)} />
       </Module>
     ) : null;
@@ -162,13 +238,13 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
   ) : null;
   const execMod =
     execTrades.length > 0 ? (
-      <Module title="임원 신고" meta={`장내 매수 ${execBuys.length} · 내놓은 것 ${execSells.length}건 · 접수 순`} className="v2-isd-mod">
+      <Module title="임원 신고" meta={[since(d.insiderSince) && `${since(d.insiderSince)} 접수`, `장내 매수 ${execBuys.length} · 처분 ${execSells.length}건 · 매매일 순`].filter(Boolean).join(" · ")} className="v2-isd-mod">
         <DetailList name="stock_insider" cols="trade" items={insiderLines(execTrades.slice(0, ROWS_MAX), d.usdKrw)} />
       </Module>
     ) : null;
   const cgMod =
     cgTrades.length > 0 ? (
-      <Module title="미 하원의원 신고" meta={`매수 ${cgBuys.length} · 매도 ${cgSells.length}건 · 매매일 순`} className="v2-isd-mod">
+      <Module title="미 하원의원 신고" meta={[since(d.congressSince) && `${since(d.congressSince)} 신고`, `매수 ${cgBuys.length} · 매도 ${cgSells.length}건 · 매매일 순`].filter(Boolean).join(" · ")} className="v2-isd-mod">
         <DetailList name="stock_congress" cols="congress" items={congressLines(cgTrades.slice(0, ROWS_MAX), d.usdKrw)} />
       </Module>
     ) : null;
@@ -183,13 +259,14 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
           ⛔ 색인하지 않는 사전 밖 종목에는 안 낸다 — noindex 와 구조화 데이터가 어긋난 신호가 된다. */}
       {d.listed && (
         <PageJsonLd
-          title={d.name}
+          title={d.name || d.ticker}
           description={`${withObjectParticle(d.name || d.ticker)} 월가 거물 보유·임원 신고·미 하원의원 매매와 주식 텔레그램 언급 추이로 봅니다.`}
           path={stockDetailHref(d.ticker)}
           trail={[PARENT]}
         />
       )}
-      <BackTrail parent={{ name: PARENT.name, href: PARENT.path }} current={d.name} />
+      {/* 이름 사전에 없는 종목은 티커 — 빈 이름이면 이동 경로 끝이 빈칸이었다(SMCIP, 2026-10-04 점검). */}
+      <BackTrail parent={{ name: PARENT.name, href: PARENT.path }} current={d.name || d.ticker} />
 
       {/* ── 첫 줄 띠 · 둘째 줄(v2, 2026-10-03) ─────────────────────────────
           옛 히어로 세 칸(종목 정체 · 공시에 남은 것 · 커뮤니티 관심 추이)을 v2 꼴로 옮겼다 — 종목 정체(티커 · 시세 · 52주 위치 · 기간 수익률)는
@@ -209,8 +286,9 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
           <div className="v2-cover-cell">
             <span className="v2-cover-k">현재가</span>
             <span className="v2-cover-v">
+              {/* 시세는 소수 둘째 자리까지(ExactMoney) — 금액 접기(Money)는 $1,000 미만을 정수로 반올림해 $6.92 가 '$7'로 섰다(2026-10-04 점검). */}
               <b>
-                <Money usd={d.price} rate={d.usdKrw} />
+                <ExactMoney usd={d.price} rate={d.usdKrw} />
               </b>
               {d.changeRate != null && (
                 <span className={`v2-cover-chg${d.changeRate > 0 ? " is-up" : d.changeRate < 0 ? " is-down" : ""}`}>
@@ -228,7 +306,7 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
             <span className="v2-cover-v">
               <b>{Math.round(d.week52.position)}%</b>
               <span className="v2-cover-chg">
-                <Money usd={d.week52.low} rate={d.usdKrw} /> ~ <Money usd={d.week52.high} rate={d.usdKrw} />
+                <ExactMoney usd={d.week52.low} rate={d.usdKrw} /> ~ <ExactMoney usd={d.week52.high} rate={d.usdKrw} />
               </span>
             </span>
           </div>
@@ -253,7 +331,8 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
             <CurrencyToggle fallback="usd" />
           </div>
         )}
-        <CoverMeta updated={d.mentionDate ? `${fmtDate(d.mentionDate)} 언급 기준` : "언급 준비 중"} basis={`월가 거물 ${d.managerCount}명 추적`} />
+        {/* 언급이 없는 종목도 언급 표의 끝날로 — '언급 준비 중'은 자료가 준비 중인 것으로 읽혔다(2026-10-04 점검). */}
+        <CoverMeta updated={d.mentionDate ?? d.mentionAsOf ? `${fmtDate(d.mentionDate ?? d.mentionAsOf)} 언급 기준` : "언급 기록 없음"} basis={`월가 거물 ${d.managerCount}명 추적`} />
       </div>
 
       {/* 둘째 줄 — 공시에 남은 것 | 커뮤니티 관심 추이. 둘 다 안이 늘어난다(줄 · 막대). */}
@@ -262,8 +341,15 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
           <dl className="v2-isd-facts">
             {[
               { label: "월가 거물 보유", n: d.holders.length, unit: `/${d.managerCount}명`, sub: quarterMoves },
-              { label: "미 하원의원 신고", n: members, unit: "명", sub: `매수 ${cgBuys.length} · 매도 ${cgSells.length}건` },
-              { label: "임원 신고", n: d.insiders.length, unit: "건", sub: `내놓은 것 ${execSells.length} · 장내에서 산 것 ${execBuys.length}` },
+              // 기간을 적는다 — 세 축의 기간이 달라(거물 분기 · 의원 표 전체 · 임원 표 전체) 본 화면의 90일 숫자와 어긋나 보였다(2026-10-04 점검).
+              { label: "미 하원의원 신고", n: members, unit: "명", sub: [`매수 ${cgBuys.length} · 매도 ${cgSells.length}건`, since(d.congressSince)].filter(Boolean).join(" · ") },
+              // 셋째 갈래(그 밖)를 넣어 합이 큰 숫자와 맞는다 — 낱말 · 순서는 아래 임원 모듈 머리와 같게(장내 매수 · 처분).
+              {
+                label: "임원 신고",
+                n: d.insiders.length,
+                unit: "건",
+                sub: [`장내 매수 ${execBuys.length} · 처분 ${execSells.length}${execOther > 0 ? ` · 그 밖 ${execOther}` : ""}`, since(d.insiderSince)].filter(Boolean).join(" · "),
+              },
             ].map((s) => (
               <div key={s.label}>
                 <dt>{s.label}</dt>
@@ -278,9 +364,20 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
             ))}
           </dl>
         </Module>
-        <Module title="커뮤니티 관심 추이" meta={d.trend.length ? `최근 ${d.trend.length}일` : undefined} className="v2-tm-trendmod">
-          {d.trend.length === 0 ? (
-            <p className="v2-empty">이 종목은 아직 커뮤니티에서 잡힌 적이 없습니다.</p>
+        <Module title="커뮤니티 관심 추이" meta={trendPoints.length ? `최근 ${trendPoints.length}일` : undefined} className="v2-tm-trendmod">
+          {trendPoints.length === 0 ? (
+            <p className="v2-empty">언급 기록을 아직 못 읽었습니다.</p>
+          ) : d.trend.length === 0 ? (
+            // 언급이 한 번도 없는 종목 — 문장 한 줄 아래가 비던 것을 같은 꼴(0 막대 · 숫자 칸)로(2026-10-04 점검).
+            <div className="v2-tm-trendbody">
+              <div className="v2-tm-figs">
+                <span>
+                  <b>0회</b>
+                  <em>최근 {trendPoints.length}일 언급</em>
+                </span>
+              </div>
+              <Trend points={trendPoints} />
+            </div>
           ) : (
             <div className="v2-tm-trendbody">
               <div className="v2-tm-figs">
@@ -297,7 +394,7 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
                   <em>최근 {d.trend.length}일 최다</em>
                 </span>
               </div>
-              <Trend points={d.trend} />
+              <Trend points={d.trend} partial={d.mentionPartial} />
             </div>
           )}
         </Module>
@@ -365,27 +462,31 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
         </Module>
       )}
 
-      {/* ── [이 종목을 든 월가 거물 | 월가 애널리스트의 시선] · [임원 신고 | 의원 신고] ───────────────
+      {/* ── 거물 · 애널리스트 · 임원 · 의원 — 있는 모듈을 키가 비슷한 것끼리 둘씩(pairUp) ───────────────
           v2(2026-10-04) — 구간 제목 · 시트 머리 부제를 걷고 모듈 짝으로. 줄은 한 줄 네 칸(V2DetailRows).
-          ⭐ 빈 모듈은 그리지 않고 짝이 판 폭을 쓴다 — 0건은 둘째 줄 '공시에 남은 것'이 이미 말하고, 빈 모듈을 세우면 옆 짝 높이만큼
-             아래가 빈다(에보뮨: 거물 0 → 576px · 의원 0 → 167px, 2026-10-04 실측). 애널리스트 커버리지가 없을 때도 같다. */}
-      {(holdersMod || consensusMod) && (
-        <div className={`v2-tm-band is-hot${holdersMod && consensusMod ? "" : " is-solo"}`}>
-          {holdersMod}
-          {consensusMod}
+          ⭐ 빈 모듈은 그리지 않는다 — 0건은 둘째 줄 '공시에 남은 것'이 이미 말하고, 빈 모듈을 세우면 옆 짝 높이만큼 아래가 빈다
+             (에보뮨: 거물 0 → 576px · 의원 0 → 167px, 2026-10-04 실측). 애널리스트 커버리지가 없을 때도 같다. */}
+      {pairUp(
+        (
+          [
+            holdersMod ? { key: "holders", node: holdersMod, w: rowsWeight(d.holders.length) } : null,
+            consensusMod ? { key: "consensus", node: consensusMod, w: 12 } : null,
+            execMod ? { key: "exec", node: execMod, w: rowsWeight(groupInsiderLines(execTrades).length) } : null,
+            cgMod ? { key: "congress", node: cgMod, w: rowsWeight(cgTrades.length) } : null,
+          ] as (PairMod | null)[]
+        ).filter((m): m is PairMod => m != null),
+      ).map((g) => (
+        <div key={g.map((m) => m.key).join("-")} className={g.length === 2 ? "v2-tm-band is-pair" : "v2-tm-band is-hot is-solo"}>
+          {g.map((m) => (
+            <Fragment key={m.key}>{m.node}</Fragment>
+          ))}
         </div>
-      )}
+      ))}
 
-      {/* 산 것과 판 것을 한 목록에(최신 순).
+      {/* 임원 목록은 산 것과 판 것을 한 목록에(최신 순).
           ⚠️⚠️ 산 것 · 판 것으로 가르면 **어느 쪽도 아닌 신고**가 남는다(옵션 행사 M · 무상 취득 A · 전환 C, 임원 전체의 19%).
-          예전 반쪽 카드 넷이 그랬듯 여기도 장내 매수(P)와 손을 떠난 것(방향 D)만 담는다 — 머리 띠 수가 그 둘의 합이다.
+          예전 반쪽 카드 넷이 그랬듯 여기도 장내 매수(P)와 손을 떠난 것(방향 D)만 담는다 — 둘째 줄이 그 밖의 수를 따로 적는다.
           대형주는 임원 장내 매수가 거의 없어 옛 '산 것' 카드가 늘 '0건' 빈 카드였다 — 한 목록이면 그 빈 칸이 없다. */}
-      {(execMod || cgMod) && (
-        <div className={`v2-tm-band ${execMod && cgMod ? "is-pair" : "is-hot is-solo"}`}>
-          {execMod}
-          {cgMod}
-        </div>
-      )}
 
       {/* ⛔ 여기 있던 "SEC와 미 하원이 공개한 공시를 그대로 옮긴 것입니다 …" 각주는
           2026-08-23 에 뺐다. 같은 고지("투자 조언이나 매수·매도 추천이 아닙니다. 모든 투자 판단과
