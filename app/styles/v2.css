@@ -1284,7 +1284,9 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
    얼개: 첫 줄 띠(담을 수 있는 종목 · 환율 · 종가 기준일) → 둘째 줄 [1년에 받는 배당 | 달마다 들어오는 돈 | 다가오는 일정](app/dividend/V2Parts.tsx)
    → 내 종목(검색 · 갈래 셋 · 담은 종목 표) → 목표까지 → 성향별 바스켓. 계산 부품(표 · 달력 · 칩 · 검색)은 그대로 쓰고 이 범위에서 덮는다.
    담은 종목이 없으면 둘째 줄 셋은 첫 바스켓을 예시로 그린다(빈 안내문 대신 결과 미리보기). */
-.v2-dv {
+/* 다크에선 hz-tx 다크 규칙([data-theme="dark"] .hz-tx, 특이도 0,2,0)이 투명 타일을 이겨 갈래 판에 회색 면이 깔렸다(2026-10-05 점검) — 같은 특이도로 덮는다. */
+.v2-dv,
+[data-theme="dark"] .hz-tx.v2-dv {
   --tx-r: 6px;
   --tx-r-tile: 4px;
   /* 회색 타일(갈래 판 · 달력 · 일정 바탕)을 걷는다 — v2 는 면이 아니라 가는 선으로 가른다. */
@@ -1297,9 +1299,9 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-kd.v2-dv .hz-sheet-head-title { font-size: 13px; font-weight: 700; line-height: 20px; letter-spacing: 0; }
 
 /* 머리 안 세그먼트(세후 · 세전) — 키 24 + 위아래 −2 로 머리 띠 줄 높이(20)를 안 넘는다(MDD 낙폭 추이 탭과 같다). */
-.v2-kd.v2-dv .v2-dv-seg { height: 24px; margin: -2px 0; padding: 2px; gap: 2px; border: 1px solid var(--t-frame); border-radius: 6px; background: var(--t-card); align-items: stretch; }
-.v2-kd.v2-dv .v2-dv-seg > button { padding: 0 8px; border-radius: 4px; font-size: 12px; font-weight: 600; color: var(--t-ink3); }
-.v2-kd.v2-dv .v2-dv-seg > button[aria-pressed="true"] { background: var(--t-tint); color: var(--t-ink); box-shadow: none; }
+.v2-kd.v2-dv .v2-dv-seg { height: 24px; margin: -3px 0 -1px; padding: 2px; gap: 2px; border: 1px solid var(--t-frame); border-radius: 6px; background: var(--t-card); align-items: stretch; }
+.v2-kd.v2-dv .v2-dv-seg > button { padding: 0 8px; border-radius: 4px; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
+.v2-kd.v2-dv .v2-dv-seg > button[aria-pressed="true"] { background: var(--t-tint); color: var(--t-ink); font-weight: 600; box-shadow: none; }
 
 /* 둘째 줄 — 결과 셋. 키는 셋이 같고(stretch) 짧은 칸은 안쪽 줄이 남는 높이를 나눠 받는다. */
 /* 가운데 달력 칸을 넓게(1.3) — 여섯 칸 금액("100,713원")이 1,280 에서 칸 52px 라 이웃과 닿았다. */
@@ -1366,7 +1368,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-kd.v2-dv .v2-dv-mine { transition: border-color 0.15s ease, box-shadow 0.15s ease; }
 .v2-kd.v2-dv .v2-dv-mine.dv-drop-on { border-color: var(--t-down); box-shadow: 0 0 0 3px var(--t-down-weak); }
 .v2-dv .dv-search-box { border-color: var(--t-frame); border-radius: 6px; }
-.v2-dv .dv-groups { gap: 0; border-top: 1px solid var(--t-line); border-bottom: 1px solid var(--t-line); }
+.v2-dv .dv-groups { gap: 0; border-top: 1px solid var(--t-line); }
 .v2-dv .dv-group { padding: 10px 14px 12px; border-radius: 0; box-shadow: inset -1px 0 0 var(--t-line); }
 .v2-dv .dv-group:first-child { padding-left: 0; }
 .v2-dv .dv-group[data-scope="etf"] { padding-right: 0; box-shadow: none; }
@@ -1410,7 +1412,8 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-dv-goal-cell:last-child { box-shadow: none; }
 .v2-dv-goal-k { font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
 .v2-dv-goal-v { font-size: 20px; font-weight: 700; line-height: 28px; color: var(--t-ink); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
-.v2-dv-goal-s { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
+/* 셋째 줄은 칸 바닥 한 선에(입력 칸 28px 와 같은 키) — 칸마다 16px 계단졌다(2026-10-05 점검). */
+.v2-dv-goal-s { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: auto; min-height: 28px; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
 .v2-dv-goal-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 2px; }
 .v2-dv-goal-presets > button { height: 28px; padding: 0 8px; border: 1px solid var(--t-frame); border-radius: 4px; background: var(--t-card); color: var(--t-ink2); font-family: inherit; font-size: 12px; font-weight: 500; cursor: pointer; }
 .v2-dv-goal-presets > button:hover { background: var(--t-tint); }
@@ -1450,11 +1453,41 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-dv-bk-read .v2-mod-meta { min-width: 0; }
 .v2-dv-bk-rules { display: flex; flex-wrap: wrap; gap: 4px; }
 .v2-dv .dv-tfact { border-radius: 4px; background: var(--t-tint); color: var(--t-ink2); font-size: 11px; }
+/* 주의 알약은 붉은 기 — 위 규칙(0,2,0)이 tx.css 의 .dv-tfact-warn(0,1,0)을 덮어 일반 알약과 같은 회색이었다(2026-10-05 점검). */
+.v2-dv .dv-tfact-warn { background: var(--t-up-weak); color: var(--c-hot-ink); }
+
+/* ── 배당 점검 2(2026-10-05) — 옛 부품(tx.css)을 v2 눈금으로 덮는다 ── */
+/* 검색 판이 모듈 바닥에서 잘려 아래 결과를 못 눌렀다 — 모듈의 overflow:hidden 을 이 모듈만 푼다. 머리 띠 모서리는 따로 둥글린다. */
+.v2-kd.v2-dv .v2-dv-mine { overflow: visible; }
+.v2-kd.v2-dv .v2-dv-mine > .v2-mod-head { border-radius: 6px 6px 0 0; }
+.v2-dv .dv-search-pop { border-radius: 6px; }
+.v2-dv .dv-search-row { font-size: 13px; }
+.v2-dv .dv-search-group-head { font-size: 12px; font-weight: 500; letter-spacing: 0; }
+/* 순서 손잡이 — 옛 시트 여백(26px) 기준 −22px 라 모듈 왼쪽 테두리 밖으로 7px 나갔다. 합은 그대로(−10) 두고 점 두 열이 테두리 안에 들게. */
+.v2-dv .dv-tgrip { width: 10px; margin: 0 -7px 0 -13px; background-size: 5px 7px; background-position: 0 center; }
+/* 크기 · 모서리 · 굵기를 v2 눈금으로 — 한 줄에 굵은 덩어리가 넷(이름 · 계좌 알약 · 주수 · 1년 배당)이었다. 주수 칸은 표의 13px · 500. */
+.v2-dv .dv-tsort { font-size: 12px; }
+.v2-dv .dv-tacct { padding-block: 3px; font-weight: 500; }
+.v2-dv .dv-tacct-own { font-weight: 600; }
+.v2-dv .dv-step,
+.v2-dv .dv-tshares input,
+.v2-dv .dv-remove { border-radius: 4px; }
+.v2-dv .dv-step { font-weight: 500; }
+.v2-dv .dv-tshares input { font-size: 13px; font-weight: 500; }
+.v2-dv .dv-goal-inline { font-weight: 600; }
+/* '평단 넣기'는 첫 줄만 늘 또렷하게 — 칸이 있다는 것을 알린다. 나머지 줄은 올렸을 때만(2026-09-15 결정). */
+@media (hover: hover) {
+  .v2-dv .dv-thead + .dv-trow .dv-tcost-open { opacity: 1; }
+}
+/* 빈 달 — 점선 칸 + '0원'(Calendar.tsx). */
+.v2-dv .dv-cal-cell:not(.dv-cal-on) { outline: 1px dashed var(--t-frame); outline-offset: -1px; }
+.v2-dv .dv-cal-zero { color: var(--t-ink3); }
+.v2-dv-fill .dv-more-row:first-child { border-top: 0; padding-top: 0; }
 .v2-dv-bk-list-st { flex: 1; display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--t-line); }
 .v2-dv-bk-list-st > li { flex: 1 0 auto; display: flex; border-bottom: 1px solid var(--t-line); }
-.v2-dv-bk-st { flex: 1; display: grid; grid-template-columns: 16px 20px minmax(0, 1fr) 40px; align-items: center; column-gap: 8px; min-height: 40px; padding: 0 4px; border: 0; border-radius: 4px; background: none; font-family: inherit; color: inherit; text-align: left; cursor: grab; }
+.v2-dv-bk-st { flex: 1; display: grid; grid-template-columns: 16px 20px minmax(0, 1fr) 40px; align-items: center; column-gap: 8px; min-height: 40px; padding: 0 4px 0 0; border: 0; border-radius: 4px; background: none; font-family: inherit; color: inherit; text-align: left; cursor: grab; }
 .v2-dv-bk-st:hover { background: var(--t-tint); }
-.v2-dv-bk-rank { font-size: 12px; font-weight: 500; color: var(--t-ink3); text-align: right; font-variant-numeric: tabular-nums; }
+.v2-dv-bk-rank { font-size: 12px; font-weight: 500; color: var(--t-ink3); text-align: left; font-variant-numeric: tabular-nums; }
 /* 이름은 두 줄까지 — 이름이 곧 정체라 말줄임이면 무슨 상품인지 모른다('KODEX 미국나스닥100데일리커버드콜OTM', 2026-10-04 점검). */
 .v2-dv-bk-stn { min-width: 0; font-size: 13px; font-weight: 600; color: var(--t-ink); word-break: keep-all; overflow-wrap: break-word; }
 /* 이름 · 고른 까닭 두 줄(이름 위). */
@@ -1474,6 +1507,8 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   .v2-dv-band > .v2-dv-up { grid-column: 1 / -1; }
   /* 바스켓 읽기 칸은 680 까지 표 옆에 — 한 열로 내리면 '올리면 바뀌는' 칸이 12줄 표(719px) 아래, 화면 밖에 섰다(2026-10-04 점검). */
   .v2-dv-bk { grid-template-columns: minmax(0, 1fr) 300px; }
+  /* 300px 읽기 칸에선 단추가 둘째 줄 왼쪽에 혼자 섰다 — 꺾일 때는 줄 폭 전체로. */
+  .v2-dv-bk-foot .v2-dv-cta { flex: 1 1 100%; }
   .v2-dv-goal-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .v2-dv-goal-cell:nth-child(2) { box-shadow: none; }
   .v2-dv-goal-cell:nth-child(-n + 2) { border-bottom: 1px solid var(--t-line); }
@@ -1501,6 +1536,16 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   .v2-dv-bk-row { grid-template-columns: minmax(0, 1fr) 72px 104px; column-gap: 8px; }
   .v2-dv-amt { flex-wrap: wrap; }
   .v2-dv .v2-dv-amt-range { flex: 1 1 100%; }
+  /* 폰 알약 — 옛 폰 규칙(여백 0 · 바탕 없음 · '·' 구분점)과 v2 바탕이 섞여 글자가 상자 왼끝에 붙고 줄 첫머리에 점이 남았다(2026-10-05 점검). */
+  .v2-dv .dv-tfact { padding: 2px 6px; font-size: 11px; }
+  .v2-dv .dv-tfact + .dv-tfact::before { content: none; }
+  /* 폰 검색 줄 — 이름이 세 글자로 잘렸다('TIG…'). 이름은 감기고 값은 아랫줄로. */
+  .v2-dv .dv-search-row { flex-wrap: wrap; row-gap: 2px; }
+  .v2-dv .dv-search-name { white-space: normal; overflow: visible; }
+  .v2-dv .dv-search-meta { flex-basis: 100%; margin-left: 34px; }
+  /* 첫 줄 띠 — 담을 수 있는 종목 셋을 한 줄에, 환율 · 기준일은 반 칸씩(150 → 약 96px). */
+  .v2-dv .v2-cover-idx { grid-template-columns: repeat(3, auto); justify-content: start; column-gap: 16px; }
+  .v2-dv .v2-cover .v2-cover-meta { flex: 1 1 40%; }
 }
 
 

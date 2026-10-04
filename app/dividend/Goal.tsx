@@ -87,7 +87,8 @@ export function GoalBox({
   return (
     <Module
       title="목표까지"
-      meta={`지금 담은 종목 수익률 그대로 · 배당은 다시 담음${skipped > 0 ? ` · 종가 없는 ${skipped}종목 뺌` : ""}`}
+      // 가정은 숫자로 — '지금 담은 종목 수익률 그대로 · 배당은 다시 담음'은 문장이었다(2026-10-05 점검). net 은 세후다(goalBasis).
+      meta={`세후 ${rate > 0 ? `${(rate * 100).toFixed(2)}%` : "수익률 없음"} · 배당 재투자${skipped > 0 ? ` · 종가 없는 ${skipped}종목 뺌` : ""}`}
       className="v2-dv-goal"
     >
       <div className="v2-dv-goal-row">

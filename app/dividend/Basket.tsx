@@ -25,8 +25,9 @@ export function basketMeta(meta: BasketLite["meta"], s: StockLite): string {
     case "septax":
       return `${s.yieldPct != null ? `${pct(s.yieldPct)} · ` : ""}배당성향 ${s.highDiv?.[1] != null ? Math.round(s.highDiv[1]) : "?"}%`;
     case "discount":
-      return s.discount != null ? `${s.yieldPct != null ? `${pct(s.yieldPct)} · ` : ""}보통주보다 ${Math.round(s.discount)}% 아래` : s.yieldPct != null ? pct(s.yieldPct) : "";
+      // '보통주보다 25% 아래'는 무엇이 아래인지 안 읽혔다 — 가격이 싸다는 말(2026-10-05 점검). 맨 퍼센트엔 '수익률'을 붙인다.
+      return s.discount != null ? `${s.yieldPct != null ? `수익률 ${pct(s.yieldPct)} · ` : ""}보통주보다 ${Math.round(s.discount)}% 쌈` : s.yieldPct != null ? `수익률 ${pct(s.yieldPct)}` : "";
     default:
-      return s.yieldPct != null ? pct(s.yieldPct) : "";
+      return s.yieldPct != null ? `수익률 ${pct(s.yieldPct)}` : "";
   }
 }

@@ -125,7 +125,9 @@ export function BasketBoard({
   const meta = (st: Parameters<typeof basketMeta>[1]) => basketMeta(cur.b.meta, st);
   return (
     <div className="v2-dv-bk">
-      <Module title="성향별 바스켓" meta={`1년에 받는 배당${mode === "gross" ? " · 세전" : ` · 세후${accountTag(mode)}`}`} className="v2-dv-bk-list">
+      {/* 근거는 '투자금 기준' — 표는 입력한 투자금으로 환산한 값이라 읽기 칸 바닥(실제로 담기는 금액)과 숫자가 갈렸다(2026-10-05 점검).
+          '1년에 받는 배당'은 바로 아래 열 머리와 같은 말이라 뺐다. */}
+      <Module title="성향별 바스켓" meta={`${wonShort(amount)} 기준${mode === "gross" ? " · 세전" : ` · 세후${accountTag(mode)}`}`} className="v2-dv-bk-list">
         <AmountBar amount={amount} onChange={onAmount} />
         <div className="v2-dv-bk-th" aria-hidden="true">
           <span>바스켓</span>
@@ -217,7 +219,8 @@ export function BasketBoard({
             </ol>
             <div className="v2-dv-bk-foot">
               <span>
-                투자금 <b>{wonShort(Math.round(cur.invest / 1e4) * 1e4)}</b> · 한 달 <b>{won(cur.net / 12)}</b>
+                {/* 표와 같은 단위(1년) — '한 달'이면 표의 1년 값과 견줄 수 없었다(2026-10-05 점검). */}
+                실제 <b>{wonShort(Math.round(cur.invest / 1e4) * 1e4)}</b> · 1년 <b>{won(cur.net)}</b>
               </span>
               <button type="button" className="v2-dv-cta" onClick={() => onApply(cur.b)}>
                 내 종목에 담기

@@ -88,7 +88,7 @@ export function SearchBox({ stocks, onPick }: { stocks: StockLite[]; onPick: (co
                       <button type="button" className="hz-row-link hz-pick dv-search-row" onClick={() => pick(s.code)}>
                         <StockLogo code={s.code} name={s.name} market={s.market} />
                         <span className="dv-search-name">{s.name}</span>
-                        <Badges s={s} />
+                        <Badges s={s} noEtf />
                         <span className="dv-search-meta">
                           {s.dps > 0 ? `1주에 ${money(s.dps, s)}${s.yieldPct != null ? ` · ${pct(s.yieldPct)}` : ""}` : s.currency === "USD" ? "공시에서 배당을 못 읽음" : "최근 1년 배당 없음"}
                         </span>
@@ -148,7 +148,7 @@ export function QuickChips({
           {s.yieldPct != null &&
             (s.yieldPct > HOT_YIELD_PCT ? (
               // 일드맥스류 — 칩에서 제일 큰 숫자라 제일 좋은 걸로 읽힌다(2026-09-15 지적). 흐리게 두고 뜻은 툴팁에.
-              <span className="dv-chip-yield dv-chip-yield-hot hz-tip hz-tip-wide" data-tip="분배금에 원금을 돌려주는 몫이 섞인 초고배당 ETF입니다. 달마다 크게 흔들립니다.">
+              <span className="dv-chip-yield dv-chip-yield-hot hz-tip hz-tip-wide" data-tip="원금 반환 섞인 분배">
                 {pct(s.yieldPct)}
               </span>
             ) : (

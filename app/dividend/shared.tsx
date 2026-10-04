@@ -33,10 +33,8 @@ export const BASKET_ROWS = ["기본", "현금흐름", "미국", "국내"];
 /** 빈 달 채우기의 줄마다 칩 수. '더 보기' 묶음과 같다. */
 export const ROW_CHIPS = 8;
 
-/** 다가오는 일정의 줄 수 상한과, 지난해 지급일로 어림한 것을 얼마나 앞까지 보여 주나(날). */
+/** 다가오는 일정의 줄 수 — 가까운 여섯 건(1년 앞까지 본다, Calendar.tsx upcomingOf). */
 export const UPCOMING_MAX = 6;
-
-export const UPCOMING_DAYS = 92;
 
 /** 목표까지 몇 달인지 셀 때의 상한(달). 넘으면 "이 속도로는 안 닿는다"로 적는다. */
 export const GOAL_MAX_MONTHS = 50 * 12;
@@ -74,9 +72,10 @@ export const STREAK_CAP = 15;
 export type Scope = "kr" | "us" | "etf";
 
 export const SCOPES: { key: Scope; label: string; desc: string }[] = [
-  { key: "kr", label: "국장", desc: "요즘 채널에서 자주 오르내린 배당주" },
-  { key: "us", label: "미장", desc: "요즘 채널에서 자주 오르내린 배당주" },
-  { key: "etf", label: "ETF", desc: "많이 드는 미국 배당·월분배 ETF" },
+  // 짧게 — 국장 · 미장이 같은 긴 문장이었고 ETF 는 'ETF … ETF'였다(2026-10-05 점검).
+  { key: "kr", label: "국장", desc: "채널 언급 순" },
+  { key: "us", label: "미장", desc: "채널 언급 순" },
+  { key: "etf", label: "ETF", desc: "미국 배당·월분배" },
 ];
 
 export const scopeOf = (s: StockLite): Scope => (s.kind === "etf" ? "etf" : s.currency === "USD" ? "us" : "kr");
@@ -84,18 +83,17 @@ export const scopeOf = (s: StockLite): Scope => (s.kind === "etf" ? "etf" : s.cu
 /** 이름 줄의 배지 — 이게 무엇인가만(코스피·코스닥·미국, ETF·국내). 국장·미장·ETF 가 한 표에 섞이므로 **모든 줄에** 붙인다.
     분리과세 같은 세금 성질은 여기 안 두고 아래 알약 줄에(2026-09-17 지적: 이름 줄은 정체만, 성질은 알약 줄에). */
 
-export function Badges({ s }: { s: StockLite }) {
-  const items =
-    s.kind === "etf"
-      ? ["ETF", s.currency === "USD" ? "미국" : "국내"]
-      : [s.market === "KOSDAQ" ? "코스닥" : s.market === "US" ? "미국" : "코스피"];
+export function Badges({ s, noEtf = false }: { s: StockLite; /** 검색 판 — 묶음 머리가 이미 'ETF'라 ETF 배지는 겹말이다. */ noEtf?: boolean }) {
+  const items = (
+    s.kind === "etf" ? ["ETF", s.currency === "USD" ? "미국" : "국내"] : [s.market === "KOSDAQ" ? "코스닥" : s.market === "US" ? "미국" : "코스피"]
+  ).filter((b) => !(noEtf && b === "ETF"));
   return (
     <>
       {items.map((b) => (
         <span
           key={b}
           className={b === "ETF" ? "dv-badge hz-tip hz-tip-wide" : "dv-badge"}
-          data-tip={b === "ETF" ? "ETF가 주는 돈은 분배금이라 부릅니다. 세금은 배당금과 같습니다." : undefined}
+          data-tip={b === "ETF" ? "ETF 배당은 분배금" : undefined}
         >
           {b}
         </span>
@@ -254,7 +252,7 @@ export const RULE_TIPS: Record<string, string> = {
   "분배율 15% 이하": "가격의 15% 넘는 분배 뺌",
   "고배당기업 공시": "거래소 고배당기업 목록",
   "수익률 3%+": "배당수익률 3% 이상",
-  "보통주보다 20%+ 아래": "보통주보다 20% 넘게 쌈",
+  "보통주보다 20%+ 쌈": "우선주 가격 괴리",
   "시총 1,000억+": "시가총액 1,000억원 이상",
   "국내 회사 6 + 국내 ETF 4": "ISA에 맞는 국내 열 종목",
   "해외 기초 ETF 10": "연금저축에 맞는 해외 ETF",

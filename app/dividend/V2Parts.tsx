@@ -11,7 +11,7 @@ import { ACCOUNTS, ACCOUNT_SHORT } from "./tax";
 import type { Account } from "./tax";
 import { MonthCalendar, UpcomingRows, type UpcomingItem } from "./Calendar";
 import { MONTHS } from "./shared";
-import { pct, won, wonShort } from "./format";
+import { pct, won, wonCal, wonShort } from "./format";
 
 const md = (iso: string) => `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}`;
 
@@ -183,7 +183,8 @@ export function CalendarModule({
   onPick: (m: number) => void;
 }) {
   const paid = MONTHS.filter((m) => monthly[m] > 0).length;
-  const meta = [paid ? `1년에 ${paid}달` : "지급 달 모름", "최근 12개월", noCalCount > 0 ? `${noCalCount}종목 제외` : null]
+  // '1년에 12달'은 '1년은 12달'로 읽혔다(2026-10-05 점검) — 빈 달 수로(빈 달 칸의 '0원'과 같은 말).
+  const meta = [paid ? (paid === 12 ? "빈 달 없음" : `빈 달 ${12 - paid}`) : "지급 달 모름", "최근 12개월", noCalCount > 0 ? `${noCalCount}종목 제외` : null]
     .filter(Boolean)
     .join(" · ");
   return (
@@ -196,22 +197,13 @@ export function CalendarModule({
 }
 
 /* ── 다가오는 일정 ────────────────────────────────────────────────── */
-export function UpcomingModule({
-  items,
-  sureKrw,
-  expectedKrw,
-  afterTax,
-}: {
-  items: UpcomingItem[];
-  sureKrw: number;
-  expectedKrw: number;
-  afterTax: boolean;
-}) {
-  const sum = [sureKrw > 0 ? `확정 ${won(sureKrw)}` : null, expectedKrw > 0 ? `예상 ${won(expectedKrw)}` : null].filter(Boolean).join(" · ");
-  const meta = ["석 달 안", sum ? `${afterTax ? "세후" : "세전"} ${sum}` : null].filter(Boolean).join(" · ");
+export function UpcomingModule({ items, sureKrw, expectedKrw }: { items: UpcomingItem[]; sureKrw: number; expectedKrw: number }) {
+  // 짧게 — 폰에서 '석 달 안 · 세후 확정 1,173,566원 · 예상 4,242,…'가 말줄임으로 잘렸다(2026-10-05 점검). 세후 · 세전은 첫 칸 단추가 말한다.
+  const sum = [sureKrw > 0 ? `확정 ${wonCal(sureKrw)}` : null, expectedKrw > 0 ? `예상 ${wonCal(expectedKrw)}` : null].filter(Boolean).join(" · ");
+  const meta = [items.length ? `다음 ${items.length}건` : null, sum || null].filter(Boolean).join(" · ");
   return (
     <Module title="다가오는 일정" meta={meta} className="v2-dv-up">
-      <div className="v2-md-body">{items.length ? <UpcomingRows items={items} /> : <p className="v2-empty">석 달 안에 잡힌 일정이 없습니다.</p>}</div>
+      <div className="v2-md-body">{items.length ? <UpcomingRows items={items} /> : <p className="v2-empty">1년 안에 잡힌 일정이 없습니다.</p>}</div>
     </Module>
   );
 }

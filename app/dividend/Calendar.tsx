@@ -3,16 +3,16 @@
 // 월 배당 달력과 다가오는 일정. DividendCalculator.tsx 에서 그대로 옮겨 왔다(store.ts 머리말 참고).
 
 import { useMemo } from "react";
-import { Icon } from "../ui";
 import { type StockLite } from "./types";
 import type { Holding } from "./store";
 import { won, wonCal, money } from "./format";
 import { isPensionLike, fitsAccount, taxRate, taxableShare } from "./tax";
 import type { TaxMode } from "./tax";
-import { ROW_CHIPS, UPCOMING_MAX, UPCOMING_DAYS, MONTHS, SCOPES } from "./shared";
+import { ROW_CHIPS, UPCOMING_MAX, MONTHS, SCOPES } from "./shared";
 import type { Scope, Line } from "./shared";
 import { expectedPays } from "./calc";
 import { QuickChips } from "./Search";
+import { Module } from "../kadera/V2Modules";
 
 /* ── 달마다 얼마 ─────────────────────────────────────────────────── */
 export function MonthCalendar({
@@ -31,6 +31,8 @@ export function MonthCalendar({
 }) {
   const max = Math.max(...MONTHS.map((m) => monthly[m]));
   const paidMonths = MONTHS.filter((m) => monthly[m] > 0).length;
+  // 판 하나에 단위 하나 — 칸마다 100만 문턱을 따로 재면 '870,676원'이 '108만원'보다 길어 더 커 보였다(2026-10-05 점검).
+  const amt = (v: number) => (max >= 1e8 ? `${(v / 1e8).toFixed(1)}억원` : max >= 1e6 ? `${Math.round(v / 1e4).toLocaleString("ko-KR")}만원` : won(v));
   return (
     <div className="dv-cal">
       {!bare && (
@@ -60,15 +62,9 @@ export function MonthCalendar({
                   막대가 줄어들어(flex-shrink) 큰 달들이 다 같은 키였다 — 폰에선 열한 달이 22px 로 같았다(2026-10-04 점검). */}
               <span className="dv-cal-bar" style={{ "--r": max > 0 && v > 0 ? Math.max(0.06, v / max) : 0 } as React.CSSProperties} aria-hidden="true" />
               <span className="dv-cal-month">{m}월</span>
-              {/* 빈 달은 금액 자리에 + 동그라미 — "여기 눌러 채우라"는 표시(시장 브리핑의 '새로운 지표 제보하기'와 같은 아이콘).
-                  같은 아이콘이 여러 칸에 서지만 뜻이 하나(이 달을 채운다)라 한 화면 한 아이콘 규칙의 예외로 둔다. */}
-              {v > 0 ? (
-                <span className="dv-cal-amt">{wonCal(v)}</span>
-              ) : (
-                <span className="dv-cal-amt dv-cal-add" aria-hidden="true">
-                  <Icon name="add_circle" style={{ fontSize: "var(--fs-18)" }} />
-                </span>
-              )}
+              {/* 빈 달은 '0원' + 점선 칸(v2.css .dv-cal-cell:not(.dv-cal-on)) — 칸마다 + 아이콘을 두면 한 판에 다섯 번 섰다(2026-10-05 점검).
+                  누르면 그 달에 주는 종목 판이 열리는 것은 그대로다. */}
+              <span className={`dv-cal-amt${v > 0 ? "" : " dv-cal-zero"}`}>{v > 0 ? amt(v) : "0원"}</span>
             </button>
           );
         })}
@@ -90,9 +86,10 @@ export function upcomingOf(lines: Line[], fx: number, mode: TaxMode): { items: U
   // 날짜는 KST 로 — toISOString 은 UTC 라 한국 새벽 0~9시엔 어제가 '오늘'이 돼 지난 일정이 다가오는 일정에 남는다.
   const today = new Date(Date.now() + 9 * 3600e3);
   const iso = today.toISOString().slice(0, 10);
-  const horizon = new Date(today.getTime() + UPCOMING_DAYS * 86400e3).toISOString().slice(0, 10);
+  // 석 달이 아니라 '가까운 여섯 건' — 석 달 안이 한 건뿐이면 그 줄이 칸 가운데에 떠 위아래가 90px 씩 비었다(2026-10-05 점검).
+  // 어림은 1년 앞까지 보고, 머리의 합은 줄에 선 건만 더한다(줄을 더하면 머리 합이 된다).
+  const horizon = new Date(today.getTime() + 365 * 86400e3).toISOString().slice(0, 10);
   const out: UpcomingItem[] = [];
-  let expectedKrw = 0;
   const dateLabel = (d: string) => `${Number(d.slice(5, 7))}월 ${Number(d.slice(8, 10))}일`;
   // 같은 종목이 두 줄(ISA·일반 계좌)이면 일정은 하나로 — 세후 금액은 줄마다 세율이 달라 줄별로 떼어 더한다.
   const groups = new Map<string, Line[]>();
@@ -108,7 +105,8 @@ export function upcomingOf(lines: Line[], fx: number, mode: TaxMode): { items: U
     const krw = v * (s.currency === "USD" ? fx : 1);
     // 금액 칸은 원화 하나 — 1주 달러 금액은 아랫줄('분배금 1주에 $0.37')이 말한다. '$63.14 · 85,132원'이면 칸이 111px 라
     // 종목 이름이 두 줄로 꺾여 줄마다 키가 69px 였다(지급 건마다 줄을 세우며 여섯 줄이 되자 둘째 줄 키가 484px, 2026-10-04).
-    return [won(krw), krw];
+    // 100만원부터는 만원 단위(달력 칸과 같은 문턱) — 7자리 금액이면 이름이 두 줄로 꺾였다(2026-10-05 점검).
+    return [wonCal(krw), krw];
   };
   for (const ls of groups.values()) {
     const s = ls[0].stock;
@@ -117,7 +115,6 @@ export function upcomingOf(lines: Line[], fx: number, mode: TaxMode): { items: U
     const sure = s.nextPay && (s.nextPay[0] ? s.nextPay[0] >= iso : !!s.nextRecord && s.nextRecord >= iso) ? s.nextPay : null;
     // 지난 1년 지급일로 어림한 석 달 안의 건 — 확정 건의 짝은 빠져 있다. 합에는 전부, 표에는 확정 건이 없을 때 첫 건만.
     const expected = expectedPays(s.pays, iso, horizon, sure && { pay: sure[0], record: s.nextRecord }, s.currency === "USD");
-    for (const e of expected) expectedKrw += net(ls, e.v)[1];
     if (s.nextRecord && s.nextRecord >= iso) {
       const a = sure && !sure[0] ? net(ls, sure[1]) : null;
       out.push({
@@ -139,8 +136,8 @@ export function upcomingOf(lines: Line[], fx: number, mode: TaxMode): { items: U
         when: `${dateLabel(e.date)}쯤`,
         sortKey: e.date,
         name: s.name,
-        // '지난해 이날'은 무엇이 지난해인지 안 읽혔다(2026-10-04 점검) — 날짜와 금액을 작년 지급에서 옮겼다는 뜻.
-        what: `${unit} 1주에 ${money(e.v, s)} · 작년 지급일 기준`,
+        // '작년 지급일 기준'은 뗐다 — '쯤'과 '예상' 꼬리표가 이미 말해 세 겹이었다(2026-10-05 점검).
+        what: `${unit} 1주에 ${money(e.v, s)}`,
         amount: a[0],
         amountKrw: a[1],
         tag: "예상",
@@ -148,14 +145,9 @@ export function upcomingOf(lines: Line[], fx: number, mode: TaxMode): { items: U
     });
   }
   out.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-  const sureKrw = out.filter((i) => i.tag === "확정").reduce((t, i) => t + i.amountKrw, 0);
-  if (out.length <= UPCOMING_MAX) return { items: out, sureKrw, expectedKrw };
-  // 넘치면 마지막 줄 하나에 나머지 건수 · 합 — 줄을 다 더하면 머리의 합(확정 + 예상)이 된다.
-  const shown = out.slice(0, UPCOMING_MAX - 1);
-  const rest = out.slice(UPCOMING_MAX - 1);
-  const restKrw = rest.reduce((t, i) => t + i.amountKrw, 0);
-  shown.push({ key: "rest", when: "", sortKey: "", name: `외 ${rest.length}건`, what: "", amount: restKrw > 0 ? won(restKrw) : null, amountKrw: restKrw, tag: null });
-  return { items: shown, sureKrw, expectedKrw };
+  const items = out.slice(0, UPCOMING_MAX);
+  const sum = (tag: UpcomingItem["tag"]) => items.filter((i) => i.tag === tag).reduce((t, i) => t + i.amountKrw, 0);
+  return { items, sureKrw: sum("확정"), expectedKrw: sum("예상") };
 }
 
 /** 일정 줄만 — v2 모듈 안에서 쓴다(머리의 합은 모듈 근거 글자가 말한다). */
@@ -198,27 +190,32 @@ export function MonthFill({
     codes: order[o.key].filter((s) => !held.has(s.code) && s.pays.some(([m]) => m === month)).slice(0, ROW_CHIPS).map((s) => s.code),
   })).filter((r) => r.codes.length);
   const byCode = useMemo(() => new Map(Object.values(order).flat().map((s) => [s.code, s])), [order]);
+  // 다른 칸과 같은 v2 모듈(머리 띠 · 제목 h2) — 이 판만 머리 띠가 없고 '접기'가 파란 600 이었다(2026-10-05 점검). '접기'는 '모두 빼기'와 같은 꼴.
   return (
-    <div className="dv-more" role="region" aria-label={`${month}월에 주는 종목`}>
-      <div className="dv-more-head">
-        <span className="dv-more-title">{month}월에 주는 종목</span>
-        <span className="dv-more-meta">지난 1년 지급일</span>
-        <button type="button" className="dv-more-toggle" onClick={onClose}>
+    <Module
+      title={`${month}월에 주는 종목`}
+      meta="지난 1년 지급일"
+      aside={
+        <button type="button" className="dv-table-clear" onClick={onClose}>
           접기
         </button>
+      }
+      className="v2-dv-fill"
+    >
+      <div className="v2-md-body">
+        {rows.length ? (
+          rows.map((r) => (
+            <div key={r.label} className="dv-more-row">
+              <span className="dv-more-label">{r.label}</span>
+              <QuickChips codes={r.codes} byCode={byCode} holdings={holdings} onPick={onPick} />
+            </div>
+          ))
+        ) : (
+          // 이 판은 둘째 줄 바로 아래, 검색창보다 위에 선다 — '위 검색창'은 방향이 틀렸고 해요체였다(2026-10-04 점검).
+          <p className="dv-more-foot">{month}월에 주는 종목이 후보에 없습니다.</p>
+        )}
       </div>
-      {rows.length ? (
-        rows.map((r) => (
-          <div key={r.label} className="dv-more-row">
-            <span className="dv-more-label">{r.label}</span>
-            <QuickChips codes={r.codes} byCode={byCode} holdings={holdings} onPick={onPick} />
-          </div>
-        ))
-      ) : (
-        // 이 판은 둘째 줄 바로 아래, 검색창보다 위에 선다 — '위 검색창'은 방향이 틀렸고 해요체였다(2026-10-04 점검).
-        <p className="dv-more-foot">{month}월에 주는 종목이 후보에 없습니다.</p>
-      )}
-    </div>
+    </Module>
   );
 }
 

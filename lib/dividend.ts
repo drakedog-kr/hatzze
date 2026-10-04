@@ -865,7 +865,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
       key: "preferred",
       title: "우선주",
       desc: "같은 회사 보통주보다 배당수익률이 높은 우선주",
-      rules: ["보통주보다 20%+ 아래", "시총 1,000억+", "수익률 순"],
+      rules: ["보통주보다 20%+ 쌈", "시총 1,000억+", "수익률 순"],
       icon: "star",
       codes: codes(preferred),
       meta: "discount",

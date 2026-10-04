@@ -183,11 +183,10 @@ export function DividendCalculator({
   // 금융소득 종합과세 문턱과 고배당기업(분리과세 대상) 배당의 몫 — **일반 계좌 줄만** 합친다(ISA·연금 계좌 안 소득은 금융소득에
   // 안 합친다). 못 담아 일반 세율로 센 줄(outside)도 실제론 일반 계좌라 넣는다. 세전 합이 문턱 근처인 사람에게만 뜻이 있어 그때만 적는다.
   const generalLines = active.filter((l) => l.account === "general" || l.outside);
-  // 문턱은 과세되는 몫으로 — ETF 과표·감액배당을 뺀 값. 세전 합은 문장에서 그 차이를 밝히는 데 쓴다.
+  // 문턱은 과세되는 몫으로 — ETF 과표·감액배당을 뺀 값. 세전 합은 문턱 조각을 적을지(1,000만원 넘나) 가르는 데 쓴다.
   const sepGross = generalLines.filter((l) => l.stock.highDiv).reduce((s, l) => s + l.taxableKrw, 0);
   const grossAll = generalLines.reduce((s, l) => s + l.grossKrw, 0);
   const taxableAll = generalLines.reduce((s, l) => s + l.taxableKrw, 0);
-  const outsideCount = active.filter((l) => l.outside).length;
   // IRP 위험자산 비율 — IRP 로 세는 줄(outside 아님)의 투자금 가운데 안전자산이 아닌 몫. 30% 를 채우려면 안전자산이
   // x 더 있어야 한다: (safe + x) / (total + x) = 0.3 → x = (0.3·total − safe) / 0.7.
   const irpInfo = (() => {
@@ -200,7 +199,7 @@ export function DividendCalculator({
     return { riskPct, needKrw: Math.max(0, ((1 - IRP_RISK_MAX) * total - safe) / IRP_RISK_MAX) };
   })();
   const exemptInvested = afterTax ? byAccount("exempt").filter((l) => !l.outside).reduce((s, l) => s + (l.investKrw ?? 0), 0) : 0;
-  const heroNote = taxNote(taxMode, grossAll, taxableAll, sepGross, outsideCount, irpInfo, mixed, { invested: exemptInvested });
+  const heroNote = taxNote(taxMode, grossAll, taxableAll, sepGross, irpInfo, mixed, { invested: exemptInvested });
   // 달력에 못 드는 줄 — 지급일 기록(pays)이 없는 것(stockanalysis 에 없는 미국 종목 등). 배당이 있는 줄만 센다.
   const noCalCount = active.filter((l) => l.stock.dps > 0 && !l.stock.pays.length).length;
   // 달력은 지급 달을 아는 줄만. 세후는 줄의 세후 ÷ 세전으로 — 히어로·표와 같은 값(calc.ts 의 monthlyOf).
@@ -412,7 +411,7 @@ export function DividendCalculator({
               if (fillMonth !== m) track("dividend_fill_month", { month: m });
             }}
           />
-          <UpcomingModule items={upcoming.items} sureKrw={upcoming.sureKrw} expectedKrw={upcoming.expectedKrw} afterTax={afterTax} />
+          <UpcomingModule items={upcoming.items} sureKrw={upcoming.sureKrw} expectedKrw={upcoming.expectedKrw} />
         </div>
       )}
       {/* 세금 단서(못 담은 종목 · 한도 · 종합과세 문턱) — 둘째 줄 아래 판 폭 한 줄. 첫 칸(판의 25%) 안에 두면 계좌를 바꿀 때마다

@@ -24,4 +24,5 @@ export const usd = (v: number) => `$${v.toLocaleString("en-US", { minimumFractio
 /** 그 종목의 돈 단위로. 미국은 달러, 국내는 원. */
 export const money = (v: number, s: StockLite) => (s.currency === "USD" ? usd(v) : won(v));
 
-export const pct = (v: number) => `${v.toFixed(2)}%`;
+// 반올림을 먼저 — 저장값 0.475 에 toFixed(2)를 하면 부동소수 탓에 0.47 이라 표(0.48)와 갈렸다(2026-10-05 점검).
+export const pct = (v: number) => `${(Math.round(v * 100 + 1e-9) / 100).toFixed(2)}%`;
