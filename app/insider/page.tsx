@@ -107,7 +107,7 @@ export default async function InsiderPage() {
           ⛔ 브리핑을 판 폭 한 장 · 두 단으로 두고 합계까지 문장에 넣었던 첫 판은 숫자가 글에 묻혀 "엉성하다"였다. */}
       <div className="v2-in-band">
         <Module title="매매 방향" className="v2-in-leanmod">
-          <LeanRows rows={insiderLean(ov)} />
+          <LeanRows rows={insiderLean(ov)} rate={ov.usdKrw} />
         </Module>
         <Module title="오늘의 브리핑" className="v2-in-briefmod">
           <BriefRows rows={insiderBrief(ov)} />

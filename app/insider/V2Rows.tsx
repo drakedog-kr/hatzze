@@ -4,7 +4,6 @@ import type { InsiderBriefRow, InsiderLeanRow } from "@/lib/insider-brief";
 import type { AnalystTop, CongressTicker, InsiderActivity, ManagerMove, ManagerRank } from "@/lib/insider-data";
 
 import { StockLogo } from "../StockLogo";
-import { Icon } from "../ui";
 import { Money } from "./parts";
 
 /**
@@ -180,28 +179,21 @@ export function BriefRows({ rows }: { rows: InsiderBriefRow[] }) {
 
 /**
  * 매매 방향 — 축마다 두 쪽을 한 막대에 가른다. 의원 · 거물은 산 쪽(빨강) · 판 쪽(파랑) — 사는 쪽 빨강 · 파는 쪽 파랑, 이 화면의 다른 줄과 같은 뜻.
- * 임원은 둘 다 판 쪽이라(보유 10% 미만 · 이상) 연한 파랑 · 진한 파랑(tone "size", lib/insider-brief.ts insiderLean).
+ * 임원은 둘 다 판 쪽이라(판 금액 그 전 7일 · 최근 7일) 연한 파랑 · 진한 파랑(tone "sell", lib/insider-brief.ts insiderLean).
  * 막대는 그림일 뿐이라 읽어 주는 기계에선 빼고(aria-hidden) 아래 두 값이 같은 말을 한다. 한쪽이 0 이면 그 토막은 안 그린다.
  */
-export function LeanRows({ rows }: { rows: InsiderLeanRow[] }) {
+export function LeanRows({ rows, rate }: { rows: InsiderLeanRow[]; rate: number | null }) {
   return (
     <div className="v2-in-lean">
       {rows.map((r) => {
         const total = r.left + r.right;
         const lp = total > 0 ? (r.left / total) * 100 : 0;
-        const [lt, rt] = r.tone === "size" ? ["is-soft", "is-down"] : ["is-up", "is-down"];
-        const n = (v: number) => `${v.toLocaleString("ko-KR")}${r.unit}`;
+        const [lt, rt] = r.tone === "sell" ? ["is-soft", "is-down"] : ["is-up", "is-down"];
+        const n = (v: number) => (r.unit === "usd" ? <Money usd={v} rate={rate} /> : `${v.toLocaleString("ko-KR")}${r.unit}`);
         return (
           <div key={r.key} className="v2-in-lean-row">
             <div className="v2-in-lean-head">
-              <b>
-                {r.label}
-                {r.help && (
-                  <span className="hz-tip v2-mod-help" data-tip={r.help} aria-label={r.help} tabIndex={0}>
-                    <Icon name="help" />
-                  </span>
-                )}
-              </b>
+              <b>{r.label}</b>
               <span>{r.span}</span>
             </div>
             <div className="v2-in-lean-bar" aria-hidden>
