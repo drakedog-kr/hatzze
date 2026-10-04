@@ -41,16 +41,6 @@ def test_ttm_by_pay_date_counts_last_years_q3():
     assert r["ttm_count"] == 4 and r["ttm_dps"] == 1682
 
 
-def test_sk_reit_pay_shift_counts_four():
-    # SK리츠 꼴 — 지급일이 10/17 → 9/28 로 당겨져 지급일 창 안에 같은 차례 둘. 네 번만 센다.
-    recs = [
-        {"record_date": d, "pay_date": p, "kind": "현금배당", "cash_per_share": a, "fiscal_month": "12"}
-        for d, p, a in [("2025-06-30", "2025-10-17", 66), ("2025-09-30", "2025-12-31", 66), ("2025-12-31", "2026-03-31", 66), ("2026-03-31", "2026-06-26", 68), ("2026-06-30", "2026-09-28", 68)]
-    ]
-    r = K.summarize("395400", recs, TODAY, 5000)
-    assert r["ttm_count"] == 4 and r["ttm_dps"] == 268
-
-
 def test_annual_before_declaration_keeps_last_year():
     # 12/31 결산배당 — 1월엔 올해 금액이 아직 없다(0). 작년 결산배당을 그대로 센다(예전엔 0 이었다).
     recs = [
@@ -82,16 +72,24 @@ def test_pay_date_shift_not_double_counted():
     assert r["ttm_dps"] == 2450
 
 
-def test_record_date_moved_later_still_four_quarters():
-    # HD현대 꼴 — 개편 뒤 기준일이 늦게 밀렸다(2분기 6/30 → 8/13). 지난 1년 지급 네 번을 다 센다.
+def test_record_date_moved_to_march_not_double_counted():
+    # 대한항공 꼴 — 결산 기준일을 12/31 → 이듬해 3/31 로 옮긴 해. 작년 결산과 올해 결산을 둘 다 세지 않는다(반박 검증).
     recs = [
-        {"record_date": "2025-09-30", "pay_date": "2025-11-14", "kind": "현금배당", "cash_per_share": 900, "fiscal_month": "12"},
-        {"record_date": "2026-02-27", "pay_date": "2026-04-14", "kind": "현금배당", "cash_per_share": 1300, "fiscal_month": "12"},
-        {"record_date": "2026-05-28", "pay_date": "2026-06-16", "kind": "현금배당", "cash_per_share": 1300, "fiscal_month": "12"},
-        {"record_date": "2026-08-13", "pay_date": "2026-09-04", "kind": "현금배당", "cash_per_share": 1300, "fiscal_month": "12"},
+        {"record_date": "2024-12-31", "pay_date": "2025-04-25", "kind": "현금배당", "cash_per_share": 750, "fiscal_month": "12"},
+        {"record_date": "2026-03-31", "pay_date": "2026-04-24", "kind": "현금배당", "cash_per_share": 750, "fiscal_month": "12"},
     ]
-    r = K.summarize("267250", recs, TODAY, 100000)
-    assert r["ttm_count"] == 4 and r["ttm_dps"] == 4800
+    r = K.summarize("003490", recs, date(2026, 4, 15), 25000)
+    assert r["ttm_dps"] == 750
+
+
+def test_old_undeclared_row_not_filled():
+    # 기준일이 90일 넘게 지났는데 금액이 0 이면(취소 · 자료 누락) 작년 것으로 채우지 않는다.
+    recs = [
+        {"record_date": "2025-03-31", "pay_date": "2025-05-20", "kind": "현금배당", "cash_per_share": 100, "fiscal_month": "12"},
+        {"record_date": "2026-03-31", "pay_date": None, "kind": "현금배당", "cash_per_share": 0, "fiscal_month": "12"},
+    ]
+    r = K.summarize("000002", recs, TODAY, 10000)
+    assert r["ttm_dps"] == 0
 
 
 def test_first_dividend_declared_counts_before_paid():

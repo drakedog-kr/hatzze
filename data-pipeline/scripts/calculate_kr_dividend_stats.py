@@ -74,7 +74,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import execute_with_retry, get_client, load_all  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
-from common.ttm_window import ttm_window  # noqa: E402
 
 TABLE = "kr_dividend_stock"
 CASH_KINDS = ("현금배당", "동시배당")
@@ -88,6 +87,7 @@ PAGE = 1000
 
 PAY_LAG_FALLBACK_DAYS = 100  # 지급일이 비었을 때 기준일에 더하는 날수(실측 중앙값 103)
 TWIN_DAYS = 45  # 기준일이 1년에서 이만큼 안쪽으로 떨어져 있으면 같은 차례(분기 간격 91일의 절반)
+UNDECLARED_DAYS = 90  # 기준일이 이만큼 안쪽인 '금액 미정' 행만 1년 전 같은 차례로 채운다(그보다 오래 0 이면 취소 · 자료 누락)
 YEAR_END_PAY_LAST_MONTH = 4  # 12월 결산 회사의 결산 배당은 이 달까지 지급된다(머리말)
 
 
@@ -188,6 +188,7 @@ def notice_bits(code: str, notices: list[dict], payments: list[dict], today: dat
 
 
 def summarize(code: str, recs: list[dict], today: date, close: float | None) -> dict:
+    ttm_from = today - timedelta(days=365)
     last_year = latest_complete_year(today)
     annual: dict[int, float] = defaultdict(float)
     ttm_dps = 0.0
@@ -200,6 +201,7 @@ def summarize(code: str, recs: list[dict], today: date, close: float | None) -> 
     share_kind = None
     is_reit = False
     cash: list[tuple[date, date | None, float]] = []
+    undeclared: list[date] = []
     for r in recs:
         rd = date.fromisoformat(r["record_date"])
         share_kind = share_kind or r.get("share_kind")
@@ -213,6 +215,7 @@ def summarize(code: str, recs: list[dict], today: date, close: float | None) -> 
             continue
         amt = float(r["cash_per_share"] or 0)
         if amt <= 0:
+            undeclared.append(rd)
             continue
         pd = date.fromisoformat(r["pay_date"]) if r.get("pay_date") else None
         annual[fiscal_year(rd, pd, r.get("fiscal_month"))] += amt
@@ -222,23 +225,22 @@ def summarize(code: str, recs: list[dict], today: date, close: float | None) -> 
             last_pay = pd
         cash.append((rd, pd, amt))
 
-    # 지난 1년 — 지급일로 모으고(최근 12개월 지급), 기준일로 '같은 차례'를 가려 한 차례 한 건만 센다.
-    # ① 기준일로만 자르면 9/30 기준일이 지났는데 3분기 금액이 아직 없을 때 작년 9/30 건이 창 밖으로 빠져 분기배당을 세 분기만
-    #    셌고(2026-10-04 점검, 삼성전자 1,668 → 1,312원), 개편 뒤 기준일이 늦게 밀린 회사(HD현대 9/30 → 11월)도 같았다.
-    # ② 지급일로만 자르면 지급일이 해마다 앞당겨지는 회사가 같은 차례를 두 번 셌다(영원무역 작년 9/30 · 올해 9/18 지급,
-    #    SK리츠 5건). 그래서 기준일이 1년(± TWIN_DAYS) 떨어진 두 건이 함께 들면 옛 건을 뺀다.
-    # ③ 확정 공시(기준일은 지났고 지급 전)는 함께 세되 1년 전 같은 차례를 새 금액으로 바꾼다 — 지급일로만 자르면 첫 배당 · 새
-    #    중간배당이 지급될 때까지 0 이었다(효성오앤비 · 한국카본).
-    # 지급일이 없는 건은 그 종목의 평소 '기준일 → 지급일' 간격으로 어림한 날로 판정한다.
-    lags = sorted((pd - rd).days for rd, pd, _ in cash if pd and pd >= rd)
-    lag = lags[len(lags) // 2] if lags else PAY_LAG_FALLBACK_DAYS
-    paid_on = lambda rd, pd: pd or rd + timedelta(days=lag)  # noqa: E731
-    twin = lambda a, b: abs(abs((a - b).days) - 365) <= TWIN_DAYS  # noqa: E731
-    picked = ttm_window([(paid_on(rd, pd), (rd, pd, amt)) for rd, pd, amt in cash], today)
-    for c in sorted(c for c in cash if paid_on(c[0], c[1]) > today):
-        picked = [x for x in picked if not twin(c[0], x[0])] + [c]
+    # 지난 1년 — 기준일로 자른다(예전 그대로). 그리고 기준일은 지났는데 금액이 아직 없는 현금배당 행(금액 미정, 90일 안)이 있으면
+    # 1년 전 같은 차례(기준일 1년 ± TWIN_DAYS, 창 밖) 건으로 채운다 — 9/30 기준일이 지났는데 3분기 금액이 이사회(10월 말) 전이라
+    # 작년 9/30 건이 창 밖으로 빠져 분기배당을 세 분기만 셌다(2026-10-04 점검, 삼성전자 1,668 → 1,312원).
+    # ⛔ 지급일 창 · '같은 차례' 짝짓기로 넓게 고쳤다가 되돌렸다(같은 날 머지 전 반박 검증). 결산 기준일을 12/31 → 3월로 옮긴 해에
+    #    작년 결산과 올해 결산을 둘 다 셌고(대한항공 750 → 1,500원 · 2025-04 하루 175종목), 확정 공시 한 건이 작년 결산과 1분기를
+    #    함께 지웠다(HD현대 · KB금융). 금액 미정 행이 있을 때만 채우면 예전보다 줄어드는 곳이 없다.
+    picked = [(rd, pd, amt) for rd, pd, amt in cash if rd > ttm_from]
+    for ud in undeclared:
+        if (today - ud).days > UNDECLARED_DAYS:
+            continue
+        cands = [c for c in cash if c[0] <= ttm_from and abs((ud - c[0]).days - 365) <= TWIN_DAYS]
+        if cands:
+            best = min(cands, key=lambda c: abs((ud - c[0]).days - 365))
+            if best not in picked:
+                picked.append(best)
     picked.sort(key=lambda t: t[0])
-    picked = [x for i, x in enumerate(picked) if not any(twin(x[0], y[0]) and y[0] > x[0] for y in picked[i + 1 :])]
     for rd, pd, amt in picked:
         ttm_dps += amt
         ttm_count += 1

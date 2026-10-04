@@ -523,7 +523,11 @@ export function CardUpbit({ v }: { v: Pick }) {
   const heat = v.capped === null ? null : Math.round(v.capped);
   // 말과 색을 같은 띠로 가른다(25 · 50 · 75). 말은 문턱 100 · 60, 색은 과열도 띠로 따로 갈라 '보통'이 초고온 빨강으로
   // 칠해졌다(2026-10-04 점검, 진행률 94.5).
-  const volLabel = (x: number) => (x >= 75 ? "매우 높음" : x >= 50 ? "높음" : x >= 25 ? "보통" : "낮음");
+  // 색(overheatColor)과 같은 띠 — 반올림한 값으로 가른다(74.5~75 가 '높음'인데 빨강이던 것, 2026-10-04 머지 전 반박 검증).
+  const volLabel = (x: number) => {
+    const v = Math.round(x);
+    return v >= 75 ? "매우 높음" : v >= 50 ? "높음" : v >= 25 ? "보통" : "낮음";
+  };
   const kimchiProgress = dt?.kimchi_progress;
   const premium = dt?.kimchi_premium ?? null;
   return (

@@ -66,3 +66,11 @@ def test_annual_late_payment_kept():
     # 연 1회 — 작년 지급일(2025-04-18)은 지났고 올해 건(04-22)은 아직. 그 사이 0 이 되지 않는다.
     items = [(date(2024, 4, 19), 1000), (date(2025, 4, 18), 1100)]
     assert ttm_window(items, date(2026, 4, 20)) == [1100]
+
+
+def test_this_years_twin_paid_a_day_earlier_not_double():
+    # 반박 검증 사례 — 올해 지급이 작년보다 하루 이르면 작년 건(오늘 − 379일)과 올해 건(오늘 − 15일)이 함께 들었다.
+    today = date(2026, 10, 20)
+    items = [(date(2025, 10, 6), "y1"), (date(2026, 1, 6), "q"), (date(2026, 4, 6), "q"), (date(2026, 7, 6), "q"), (date(2026, 10, 5), "y2")]
+    got = ttm_window(items, today)
+    assert "y1" not in got and len(got) == 4

@@ -1,8 +1,10 @@
 """지난 1년 배당을 고르는 창 — 365일 날짜 창에 **끝점 여유**를 하나 더한 것.
 
 날짜 창만 쓰면 해마다 같은 날쯤 주는 건이 끝점에 걸려 한 번씩 빠진다 — JEPI(매달 초 지급)는 2025-10-03 지급분이 하루 차이로
-창 밖이고 2026-10-05 건은 아직 지급 전이라 11달만 셌다(2026-10-04 점검). 그래서 창 끝 바로 앞(15일) 건은 **최근 15일 안에
-지급이 없을 때만** 살린다 — 최근에 지급이 있으면 그 건이 1년 전 같은 차례를 이미 대신한 것이라 둘 다 세면 두 번이다.
+창 밖이고 2026-10-05 건은 아직 지급 전이라 11달만 셌다(2026-10-04 점검). 그래서 창 끝 바로 앞(15일) 건은 **그 건의 1년 뒤
+짝이 아직 안 들어왔을 때만** 살린다 — 들어왔으면 그 짝이 이미 창 안에 있어 둘 다 세면 두 번이다.
+
+국장(calculate_kr_dividend_stats)은 이 창을 쓰지 않는다 — 기준일 창에 '금액 미정 행 채우기'만 더했다(그 파일 주석).
 
 ⛔ 한때 '최근 간격으로 센 한 해 횟수만큼 최근 건'(횟수 셈)으로 바꿨다가 되돌렸다(같은 날, 머지 전 점검). 주간 ETF 가 12건으로 잘려
 1년 합이 1/4 이 됐고(ULTY 23.98 → 3.72), 최근 분기배당을 시작한 회사는 옛 연 1회 간격 때문에 한 건만 셌으며(LG 3,100 → 1,000원),
@@ -28,17 +30,19 @@ def ttm_window(items: list[tuple[date, T]], today: date, days: int = DAYS, grace
     """
     start = today - timedelta(days=days)
     inside = [(d, x) for d, x in items if start < d <= today]
-    recent = any(today - timedelta(days=grace) < d <= today for d, _ in items)
     edge: list[tuple[date, T]] = []
-    if not recent:
-        cand = [(d, x) for d, x in items if start - timedelta(days=grace) < d <= start]
-        if cand and inside:
-            edge = cand
-        elif cand:
-            # 1년 안에 다른 지급이 없으면 — 연 1회 지급(바로 앞 지급이 300일 넘게 떨어짐)일 때만 살린다. 국장 결산배당이 작년보다
-            # 며칠 늦게 들어오는 사이 0 이 되지 않게. 분기 · 월 지급인데 1년 안에 없으면 끊은 것이다 — 마지막 건을 살리면 안 된다.
-            first = min(d for d, _ in cand)
-            before = [d for d, _ in items if d < first]
-            if not before or (first - max(before)).days >= ANNUAL_GAP_DAYS:
-                edge = cand
+    for d, x in items:
+        if not (start - timedelta(days=grace) < d <= start):
+            continue
+        # 이 건의 1년 뒤 짝이 이미 들어왔으면(이 건 + 1년 − 여유 뒤에 지급이 있으면) 빼야 두 번이 아니다. 오늘 기준 '최근 15일'로
+        # 보면 올해 지급이 작년보다 하루라도 이르면 작년 건과 올해 건이 함께 들었다(JEPI · SCHD · KO · T, 같은 날 머지 전 반박 검증).
+        if any(d + timedelta(days=days - grace) < e <= today for e, _ in items):
+            continue
+        if not inside:
+            # 1년 안에 다른 지급이 없으면 — 연 1회 지급(바로 앞 지급이 300일 넘게 떨어짐)일 때만 살린다. 분기 · 월 지급인데 1년 안에
+            # 없으면 끊은 것이다 — 마지막 건을 살리면 안 된다.
+            before = [e for e, _ in items if e < d]
+            if before and (d - max(before)).days < ANNUAL_GAP_DAYS:
+                continue
+        edge.append((d, x))
     return [x for _, x in sorted(edge + inside, key=lambda t: t[0])]
