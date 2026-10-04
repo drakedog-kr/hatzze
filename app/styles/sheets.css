@@ -211,6 +211,9 @@
 #hz-mkf-insider:checked ~ .hz-mkfilter-chart .hz-mk:not(.hz-mk-insider) { opacity: 0.12; }
 #hz-mkf-manager:checked ~ .hz-mkfilter-chart .hz-mk:not(.hz-mk-manager) { opacity: 0.12; }
 #hz-mkf-congress:checked ~ .hz-mkfilter-chart .hz-mk:not(.hz-mk-congress) { opacity: 0.12; }
+/* 겹친 표식 — 위에 선 것(is-over, parts.tsx PriceChart)을 흐려 아래 것이 비쳐 보이게. '전체'일 때만 — 한 축을 고르면 다른 축이 흐려져
+   겹침이 사라지므로 고른 축은 진하게 남는다(2026-10-05 운영자 판단). */
+#hz-mkf-all:checked ~ .hz-mkfilter-chart .hz-mk.is-over { opacity: 0.5; }
 
 /* 초점 링 — 라디오를 숨겼으니 라벨이 대신 받는다. 안 그리면 키보드로 어디 있는지 모른다. */
 .hz-mkfilter > input[type="radio"]:focus-visible ~ * .hz-mkfilter-set label { outline: 1px dashed var(--c-blue); }

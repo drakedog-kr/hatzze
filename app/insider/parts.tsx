@@ -623,6 +623,11 @@ export function PriceChart({
   // 축 순서를 못박아 둔다 — 같은 점에 겹치면 늘 같은 것이 위에 온다(그림이 안 흔들린다).
   for (const list of perIndex.values()) list.sort((a, b) => WHO_ORDER.indexOf(a.who) - WHO_ORDER.indexOf(b.who));
   const drawn = [...perIndex.values()].flat();
+  // ⭐ 겹친 표식 — 나중에 그려 위에 선 것(앞)을 흐리게 해 아래 것이 비쳐 보이게 한다(2026-10-05 운영자 판단 "겹쳐 있다는 걸 표현").
+  //    같은 봉의 다른 축(완전히 같은 자리)과 가까운 날끼리 반쯤 겹친 것 둘 다다. 문턱은 두 모양이 맞닿는 거리(반지름 둘 남짓 —
+  //    마름모 · 네모 모서리가 원보다 1.2배 나간다). 흐리는 건 '전체'를 볼 때만(sheets.css) — 한 축만 고르면 나머지가 흐려져 겹침이 없다.
+  const ctr = drawn.map((s) => [x(s.i), y(bars[s.i].close)] as const);
+  const over = drawn.map((_, k) => ctr.slice(0, k).some(([px, py]) => Math.hypot(px - ctr[k][0], py - ctr[k][1]) < MARK_R * 2.2));
 
   /**
    * 호버에 뜰 한 줄 — **누가 · 언제 · 얼마나.**
@@ -696,7 +701,7 @@ export function PriceChart({
           vectorEffect="non-scaling-stroke"
           pointerEvents="none"
         />
-        {drawn.map((s) => {
+        {drawn.map((s, k) => {
           // ⭐ **선 위에 정확히 얹는다.** 예전엔 매수를 7 위로, 매도를 7 아래로 띄웠는데
           //    선이 가파른 자리에서 점이 선과 떨어져 보였다. 방향은 자리가 아니라
           //    **채움**이 말한다 — 채운 점이 매수, 빈 고리가 매도.
@@ -709,7 +714,7 @@ export function PriceChart({
             <MarkShape
               key={`${s.i}-${s.who}`}
               shape={SHAPE_OF[s.who]}
-              className={`hz-mk hz-mk-${s.who}`}
+              className={`hz-mk hz-mk-${s.who}${over[k] ? " is-over" : ""}`}
               cx={x(s.i)}
               cy={y(bars[s.i].close)}
               r={MARK_R}
