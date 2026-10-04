@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { DocCell, DocPage, Ext, InfoBlock, Lead, P, PREV_EFFECTIVE, PRIVACY_EFFECTIVE, Revision, Section, Ul } from "../legal";
+import { B, DocCell, DocPage, Ext, InfoBlock, Lead, P, PREV_EFFECTIVE, PRIVACY_EFFECTIVE, Revision, Section, Ul } from "../legal";
 import { C } from "../ui";
 import { pageMetadata } from "../seo";
 
@@ -46,7 +46,7 @@ export default function PrivacyPage() {
           {/* ⚠️ 예전엔 "입력받는 화면 자체가 없다 · 모두 자동으로 생성되는 정보"라고 적었다. 채널 등록 신청
               (app/brand.ts CHANNEL_FORM)과 지표 제보(app/page.tsx) 구글 폼이 이메일을 필수로 받아 사실과
               달랐다(2026-09-26 폼을 열어 확인). 폼에 칸을 더하면 1항 목록도 같이 고칠 것. */}
-          <b style={{ color: C.ink }}>서비스에는 회원가입 절차가 없습니다.</b> 이용자가 직접 적어 보내시는
+          <B>서비스에는 회원가입 절차가 없습니다.</B> 이용자가 직접 적어 보내시는
           정보는 채널 등록 신청과 지표 제보 때의 이메일 주소와 신청 내용뿐이며, 그 밖의 항목은 모두
           웹사이트를 이용하는 과정에서 자동으로 생성되는 정보입니다.
         </P>
@@ -199,7 +199,7 @@ export default function PrivacyPage() {
           ]}
         />
         <P>
-          <b style={{ color: C.ink }}>거부 방법</b>은 세 가지입니다.
+          <B>거부 방법</B>은 세 가지입니다.
         </P>
         <Ul>
           <li>
@@ -212,9 +212,9 @@ export default function PrivacyPage() {
           </li>
           <li>
             이 사이트에서만 수집을 원하지 않으시면{" "}
-            <b style={{ color: C.ink }}>hatzze.fun/?ga=off</b> 주소로 한 번 접속해 주십시오. 해당 기기에서는
+            <B>hatzze.fun/?ga=off</B> 주소로 한 번 접속해 주십시오. 해당 기기에서는
             이후 수집이 이루어지지 않습니다. 되돌리시려면{" "}
-            <b style={{ color: C.ink }}>hatzze.fun/?ga=on</b> 주소로 접속하시면 됩니다.
+            <B>hatzze.fun/?ga=on</B> 주소로 접속하시면 됩니다.
           </li>
         </Ul>
       </Section>
@@ -257,7 +257,7 @@ export default function PrivacyPage() {
           heading="문의처"
           rows={[
             ["책임자", "hatzze 운영자"],
-            ["이메일", <a key="m" href={`mailto:${CONTACT_EMAIL}`} style={{ color: C.blueInk, textDecoration: "none", fontWeight: 600 }}>{CONTACT_EMAIL}</a>],
+            ["이메일", <a key="m" href={`mailto:${CONTACT_EMAIL}`} style={{ color: C.blueInk, textDecoration: "none", fontWeight: 500 }}>{CONTACT_EMAIL}</a>],
           ]}
         />
         <P>개인정보와 관련한 문의·불만·피해구제에 관한 사항을 접수하시면 지체 없이 답변해 드립니다.</P>

@@ -105,9 +105,9 @@ function VsAvg({ ratio, knob, showScale = true }: { ratio: number; knob: string;
       {showScale && (
         <div style={{ display: "flex", justifyContent: "space-between" }}>
           {/* 눈금 라벨은 --c-sub 이상으로. faint 는 장식용 선에만 쓴다(대비 규칙). */}
-          <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub }}>적음</span>
-          <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, color: C.sub2 }}>평소(1배)</span>
-          <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub }}>많음</span>
+          <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.sub }}>적음</span>
+          <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.sub2 }}>평소(1배)</span>
+          <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.sub }}>많음</span>
         </div>
       )}
     </div>
@@ -162,7 +162,7 @@ export function CardDivergence({ v }: { v: Pick }) {
         <strong style={{ fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
           {leadWho} <span style={{ fontFamily: MONO }}>{Math.round(Math.abs(lead))}%</span>
         </strong>
-        <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>강세</span>
+        <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>강세</span>
       </div>
       {/* 회색 타일 둘 → 가는 선으로 나눈 두 칸(v2, 2026-10-03 · parts.tsx SplitStats). 물음표 아이콘 둘은 점선 밑줄로 —
           한 칸에 같은 아이콘이 둘 섰다. 색은 값이 아니라 **그 값이 뜻하는 과열도**(heat)로 낸다 — 위 주석 참고. */}
@@ -210,8 +210,8 @@ export function CardTrend({ v, icon }: { v: Pick; icon: IconName }) {
                 화살표·막대는 평균 대비 방향(>1 이면 빨강)이라, 1.1배(과열도 저온) 카드가
                 파란 숫자 옆에 빨간 화살표를 달고 있었다 — 한 줄이 두 말을 했다.
                 방향은 이미 화살표 모양과 막대가 뻗는 쪽이 말한다. 색은 온도만 맡는다. */}
-            {arrow && <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: v.color }}>{arrow}</span>}
-            <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>평소 대비</span>
+            {arrow && <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: v.color }}>{arrow}</span>}
+            <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>평소 대비</span>
           </div>
           <VsAvg ratio={vsAvg} knob={v.color} />
         </>
@@ -220,7 +220,7 @@ export function CardTrend({ v, icon }: { v: Pick; icon: IconName }) {
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
             <Big disp={v.disp} unit={v.unit} color={v.color} size={32} />
             {v.hotDisp && (
-              <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: C.sub, background: C.chip, borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+              <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub, background: C.chip, borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
                 초고온 {v.hotDisp}
               </span>
             )}
@@ -328,7 +328,7 @@ export function CardSentiment({
               <span style={{ color: C.sub2 }}>:</span>
               <span style={{ color: C.mania }}>{ratio.pos}</span>
             </strong>
-            <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>{sentimentTone(ratio.pos).label}</span>
+            <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>{sentimentTone(ratio.pos).label}</span>
           </div>
           {/* 표본 크기 알약. 낱말을 줄인 건 말맛이 아니라 **폭** 때문이다 — 이 알약은 왼쪽
               헤드라인(숫자 + 톤 라벨)과 한 줄을 나눠 쓰는데, 넘치면 다음 줄로 내려가면서
@@ -352,7 +352,7 @@ export function CardSentiment({
               자릿수가 늘면 이 여유 7px 이 바로 사라지므로(다섯 자리 248 ✗ · 여섯 자리 255 ✗)
               건수는 formatSampleCount 가 만 단위로 묶는다 — 폭이 자릿수에 안 딸리게 하는 게
               핵심이고, 그 함수 주석에 이 예산의 근거를 적어 뒀다. */}
-          <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: C.sub, background: C.chip, borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+          <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub, background: C.chip, borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
             {ratio.days > 1 ? `${ratio.days}일` : countNoun} {formatSampleCount(ratio.total)}건
           </span>
         </div>
@@ -400,20 +400,20 @@ export function CardYoutube({ v }: { v: Pick }) {
           </strong>
           {/* 초보 검색량 카드와 같은 화살표 규칙 — 기준은 1배(평소)다. */}
           {ratio !== 1 && (
-            <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: ratio < 1 ? C.cold : C.hot }}>{ratio > 1 ? "↑" : "↓"}</span>
+            <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: ratio < 1 ? C.cold : C.hot }}>{ratio > 1 ? "↑" : "↓"}</span>
           )}
-          <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>평소 대비</span>
+          <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>평소 대비</span>
         </div>
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {rows.map((r) => (
           <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ width: 34, flexShrink: 0, fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>{r.label}</span>
+            <span style={{ width: 34, flexShrink: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>{r.label}</span>
             {/* shadcn 막대 꼴(빈칸 위, 데이터 끝만 둥근 10px 막대 · shadcn.css .hz-hbar-*) — MDD 와 같은 방식(2026-09-27). */}
             <div className="hz-hbar-track hz-hbar-md">
               <div className="hz-hbar-fill" style={{ width: `${((r.value ?? 0) / max) * 100}%`, background: r.fill }} />
             </div>
-            <span style={{ width: 78, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: r.strong ? C.ink : C.label }}>
+            <span style={{ width: 78, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: r.strong ? C.ink : C.label }}>
               {r.value != null ? fmt(r.value) : "-"}
             </span>
           </div>
@@ -439,14 +439,14 @@ function SubSpend({ v, showScale }: { v: Pick; showScale: boolean }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         {/* 줄 앞 아이콘(쇼핑백 · 식기)은 걷었다(v2, 2026-10-03) — 셀 머리 아이콘을 걷은 것과 같은 까닭. 이름이 말한다. */}
-        <span className="hz-subspend-name" style={{ flex: 1, fontSize: "var(--fs-12)", fontWeight: 700, color: C.label, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <span className="hz-subspend-name" style={{ flex: 1, fontSize: "var(--fs-12)", fontWeight: 500, color: C.label, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {v.name}
         </span>
         <strong
           style={{
             fontFamily: MONO,
             fontSize: "var(--fs-13)",
-            fontWeight: 700,
+            fontWeight: 600,
             // 막대와 같은 색이어야 한다 — 숫자가 파랑인데 막대가 빨강이면 한 줄이 두 말을 한다.
             // 그 "같은 색"은 **온도**다(2026-08-04). 방향으로 맞췄더니 이번엔 이 줄만
             // 다른 카드와 규칙이 갈렸다.
@@ -491,7 +491,7 @@ export function CardSpending({ luxury, dining }: { luxury: Pick; dining: Pick })
           <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: lead.v.color, lineHeight: 1, whiteSpace: "nowrap" }}>
             {lead.r.toFixed(1)}배
           </strong>
-          <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2, whiteSpace: "nowrap" }}>
             {lead.other === "명품" ? "외식" : "명품"} 검색
           </span>
         </div>
@@ -524,9 +524,9 @@ export function CardUpbit({ v }: { v: Pick }) {
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
         <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
           {heat ?? "-"}
-          <span style={{ fontSize: "var(--fs-13)", fontWeight: 700, color: C.sub }}>/100</span>
+          <span style={{ fontSize: "var(--fs-13)", fontWeight: 500, color: C.sub }}>/100</span>
         </strong>
-        <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>과열도</span>
+        <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>과열도</span>
       </div>
       <HeatFill pct={heat ?? 0} />
       {dt && (

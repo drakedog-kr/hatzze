@@ -32,7 +32,7 @@ function Mail() {
 
 function Inner({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link href={href} style={{ color: C.blueInk, textDecoration: "none", fontWeight: 600 }}>
+    <Link href={href} style={{ color: C.blueInk, textDecoration: "none", fontWeight: 500 }}>
       {children}
     </Link>
   );

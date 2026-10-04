@@ -24,10 +24,10 @@ export function CardBuffett({ v }: { v: Pick }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-            <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>
+            <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>
               나라 경제 (GDP){dt && dt.gdp_year ? ` · ${String(dt.gdp_year).slice(2)}년 ${dt.gdp_q}분기` : ""}
             </span>
-            <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: C.label, whiteSpace: "nowrap" }}>
+            <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: C.label, whiteSpace: "nowrap" }}>
               {dt && dt.gdp ? `약 ${jo(dt.gdp)}조원` : "기준 100"}
             </span>
           </div>
@@ -38,8 +38,8 @@ export function CardBuffett({ v }: { v: Pick }) {
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-            <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>증시 시가총액</span>
-            <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: C.ink, whiteSpace: "nowrap" }}>
+            <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>증시 시가총액</span>
+            <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: C.ink, whiteSpace: "nowrap" }}>
               {dt && dt.market_cap ? `약 ${jo(dt.market_cap)}조원` : `${v.disp}${v.unit}`}
             </span>
           </div>
@@ -90,9 +90,9 @@ export function CardLeverage({ v }: { v: Pick }) {
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
         <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
           {heat ?? "-"}
-          <span style={{ fontSize: "var(--fs-13)", fontWeight: 700, color: C.sub }}>/100</span>
+          <span style={{ fontSize: "var(--fs-13)", fontWeight: 500, color: C.sub }}>/100</span>
         </strong>
-        <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>종합 과열도</span>
+        <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>종합 과열도</span>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <HeatFill pct={heat ?? 0} />
@@ -172,11 +172,11 @@ export function CardMarketActions({ v }: { v: Pick }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {rows.map((r) => (
           <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ width: 76, flexShrink: 0, fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>{r.label}</span>
+            <span style={{ width: 76, flexShrink: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2, whiteSpace: "nowrap" }}>{r.label}</span>
             <div className="hz-hbar-track hz-hbar-md">
               <div className="hz-hbar-fill" style={{ width: `${(r.n / maxN) * 100}%`, background: r.fill }} />
             </div>
-            <span style={{ width: 30, flexShrink: 0, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: r.ink }}>
+            <span style={{ width: 30, flexShrink: 0, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: r.ink }}>
               {r.n}건
             </span>
           </div>
@@ -236,17 +236,17 @@ export function CardTurnover({ v }: { v: Pick }) {
                       data-ga="cta_click"
                       data-ga-cta="stock"
                       data-ga-surface="home_turnover"
-                      style={{ minWidth: 0, fontSize: "var(--fs-12)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                      style={{ minWidth: 0, fontSize: "var(--fs-12)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                     >
                       {s2.label}
                     </Link>
                   </span>
                 ) : (
-                  <span style={{ flex: 1, minWidth: 0, fontSize: "var(--fs-12)", fontWeight: 600, color: C.label, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.label, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {s2.label}
                   </span>
                 )}
-                <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: s2.ink }}>{s2.pct.toFixed(1)}%</span>
+                <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: s2.ink }}>{s2.pct.toFixed(1)}%</span>
               </div>
             ),
           )}
@@ -284,7 +284,7 @@ export function CardHighGap({ v, tops, failed = false }: { v: Pick; tops: StockH
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={`${gap > 0 ? "+" : ""}${v.disp}`} unit={v.unit} color={v.color} size={32} sub={gap > 0 ? "이전 전고점 돌파" : "전고점으로부터"} />
         {typeof priorHigh === "number" && (
-          <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
             전고점 {num(priorHigh)}
           </span>
         )}
@@ -304,7 +304,7 @@ export function CardHighGap({ v, tops, failed = false }: { v: Pick; tops: StockH
             className="hz-tip hz-tip-wide hz-tip-start"
             data-tip={`현재가와 52주 고점 모두 야후 파이낸스 종가 기준입니다${tops[0]?.priceDate ? ` (${tops[0].priceDate} 종가)` : ""}. 막대가 꽉 찰수록 고점에 가깝습니다.`}
             data-ga-tip="high_gap_source"
-            style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.muted }}
+            style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.muted }}
           >
             거래대금 상위 종목의 52주 고점 근접도
           </span>
@@ -316,7 +316,7 @@ export function CardHighGap({ v, tops, failed = false }: { v: Pick; tops: StockH
                 data-ga="cta_click"
                 data-ga-cta="stock"
                 data-ga-surface="home_high_gap"
-                style={{ width: 76, flexShrink: 0, fontSize: "var(--fs-12)", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                style={{ width: 76, flexShrink: 0, fontSize: "var(--fs-12)", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
               >
                 {st.name}
               </Link>
@@ -335,7 +335,7 @@ export function CardHighGap({ v, tops, failed = false }: { v: Pick; tops: StockH
                     없다(같은 값이 52.5 · 64.0 · 48.9 로 갈린다). */}
                 <div className="hz-hbar-fill" style={{ width: `${Math.max(0, Math.min(100, 100 + st.gapPct))}%`, background: rankColor[i] ?? "var(--c-blue-4)" }} />
               </div>
-              <span style={{ width: 50, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: C.ink }}>
+              <span style={{ width: 50, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: C.ink }}>
                 {st.gapPct >= 0 ? "+" : ""}{st.gapPct.toFixed(1)}%
               </span>
             </div>
@@ -434,7 +434,7 @@ export function CardVkospi({ v }: { v: Pick }) {
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         {/* 곁말 '변동성지수'는 걷었다 — 지표 이름 'VKOSPI (변동성지수)'와 같은 말이다(v2, 2026-10-03). */}
         <Big disp={v.disp} color={v.color} size={32} />
-        <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
           {verdict}
         </span>
       </div>
@@ -451,8 +451,8 @@ export function CardVkospi({ v }: { v: Pick }) {
             셀 맨 아래 설명 한 줄이 맡는다. */}
         {/* 가운데 '최근 30일 범위'는 걷었다 — 위 알약('최근 30일 중 낮은 편')이 같은 기간을 말한다. */}
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.muted }}>잔잔 {lo !== null ? Math.round(lo) : "-"}</span>
-          <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.muted }}>출렁 {hi !== null ? Math.round(hi) : "-"}</span>
+          <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.muted }}>잔잔 {lo !== null ? Math.round(lo) : "-"}</span>
+          <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.muted }}>출렁 {hi !== null ? Math.round(hi) : "-"}</span>
         </div>
       </div>
       <Foot text={v.desc} />
@@ -553,7 +553,7 @@ export function CardAsia({ v }: { v: Pick }) {
                   textAlign: "right",
                   fontFamily: MONO,
                   fontSize: "var(--fs-12)",
-                  fontWeight: 700,
+                  fontWeight: 600,
                   color: b.self ? C.ink : C.label,
                 }}
               >
@@ -573,7 +573,7 @@ export function CardAsia({ v }: { v: Pick }) {
                   top: 0,
                   transform: "translateX(50%)",
                   fontSize: "var(--fs-11)",
-                  fontWeight: 700,
+                  fontWeight: 500,
                   color: "var(--c-cold-ink)",
                   whiteSpace: "nowrap",
                 }}
@@ -637,11 +637,11 @@ export function CardVolume({ v }: { v: Pick }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {rows.map((r) => (
           <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ width: 60, flexShrink: 0, fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>{r.label}</span>
+            <span style={{ width: 60, flexShrink: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>{r.label}</span>
             <div className="hz-hbar-track hz-hbar-md">
               <div className="hz-hbar-fill" style={{ width: `${((r.value ?? 0) / max) * 100}%`, background: r.fill }} />
             </div>
-            <span style={{ width: 58, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: r.strong ? C.ink : C.label }}>
+            <span style={{ width: 58, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: r.strong ? C.ink : C.label }}>
               {r.value !== null ? fmt(r.value) : "-"}
             </span>
           </div>
@@ -667,7 +667,7 @@ export function CardFx({ v }: { v: Pick }) {
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={`±${v.disp}`} unit={v.unit} color={v.color} size={32} />
         {typeof close === "number" && (
-          <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+          <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
             {close.toLocaleString("ko-KR", { maximumFractionDigits: 0 })}원
           </span>
         )}
@@ -734,7 +734,7 @@ export function CardNetBuy({ v }: { v: Pick }) {
             style={{
               alignSelf: "flex-start",
               fontSize: "var(--fs-12)",
-              fontWeight: 700,
+              fontWeight: 600,
               padding: "4px 10px",
               borderRadius: R.pill,
               color: atHigh ? "var(--c-hot-ink)" : "var(--c-cold-ink)",
@@ -848,7 +848,7 @@ export function CardLimitUp({ v }: { v: Pick }) {
         ) : (
           rank.map((r, i) => (
             <div key={`${r.n}-${i}`} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, minWidth: 0 }}>
-              <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.label, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.label, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {r.n}
               </span>
               <span
@@ -856,7 +856,7 @@ export function CardLimitUp({ v }: { v: Pick }) {
                   flexShrink: 0,
                   fontFamily: MONO,
                   fontSize: "var(--fs-12)",
-                  fontWeight: 700,
+                  fontWeight: 600,
                   color: "var(--card-accent-ink, var(--c-cold-ink))",
                   background: "var(--card-accent-tint, var(--c-blue-tint))",
                   borderRadius: R.pill,
@@ -913,7 +913,7 @@ export function CardPutCall({ v }: { v: Pick }) {
       <TitleRow desc={v.headline} icon="casino" name={v.name} />
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={ratio.toFixed(2)} color={v.color} size={32} sub="풋/콜" />
-        <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
           {greedy ? "콜 우세" : "풋 우세"}
         </span>
       </div>
@@ -924,8 +924,8 @@ export function CardPutCall({ v }: { v: Pick }) {
           <div className="hz-tip" data-tip={tip("put")} style={{ width: `${100 - callShare}%`, borderRadius: "0 99px 99px 0", background: C.cold }} />
         </div>
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: C.mania }}>콜 {Math.round(callShare)}%</span>
-          <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: C.cold }}>풋 {Math.round(100 - callShare)}%</span>
+          <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.mania }}>콜 {Math.round(callShare)}%</span>
+          <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.cold }}>풋 {Math.round(100 - callShare)}%</span>
         </div>
       </div>
       <Foot text={v.desc} />

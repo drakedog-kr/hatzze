@@ -259,7 +259,7 @@ function HitBadge({ label = "초고온" }: { label?: string }) {
           background: "var(--c-mania-tint)",
           /* tint 위에 C.mania 를 그대로 얹으면 명암비 4.21 이라 배지 글자가 안 읽힌다. */
           color: "var(--c-hot-ink)",
-          fontWeight: 700,
+          fontWeight: 600,
           fontSize: "var(--fs-11)",
           lineHeight: 1.2,
           padding: "5px 10px",
@@ -348,7 +348,7 @@ export function TitleRow({
               className="hz-cell-badge"
               style={{
                 fontSize: "var(--fs-11)",
-                fontWeight: 700,
+                fontWeight: 600,
                 color: C.sub,
                 background: C.chip,
                 padding: "3px 8px",
@@ -405,7 +405,7 @@ export function Big({
       </span>
       {/* 곁말은 목업에서 **강조색이 아니라 회색**이다(12.5 / --c-sub2). 큰 수치와 같은
           색이면 둘이 한 덩어리로 읽혀 어느 쪽이 결론인지 흐려진다. */}
-      {sub && <span className="hz-big-sub" style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>{sub}</span>}
+      {sub && <span className="hz-big-sub" style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2, whiteSpace: "nowrap" }}>{sub}</span>}
     </div>
   );
 }
@@ -497,10 +497,10 @@ export function HeatBar({ v, hideThreshold = false }: { v: Pick; hideThreshold?:
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, color: C.muted }}>과열도</span>
-        <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: v.color }}>
+        <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.muted }}>과열도</span>
+        <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: v.color }}>
           {Math.round(v.capped)}
-          <span style={{ color: C.sub, fontWeight: 600 }}>/100</span>
+          <span style={{ color: C.sub, fontWeight: 500 }}>/100</span>
         </span>
       </div>
       <HeatFill pct={v.capped} />
@@ -571,7 +571,7 @@ export function renderRichSummary(text: string): React.ReactNode {
       const tempColor = STAGE_META[seg]?.color;
       if (tempColor) {
         return (
-          <b key={`${pi}-${si}`} style={{ color: tempColor, fontWeight: 700 }}>
+          <b key={`${pi}-${si}`} style={{ color: tempColor, fontWeight: 600 }}>
             {seg}
           </b>
         );

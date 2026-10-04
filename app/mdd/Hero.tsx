@@ -270,7 +270,7 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
       <div ref={rowRef} style={{ position: "relative", height: 13 }}>
         <span
           ref={startRef}
-          style={{ position: "absolute", left: 0, top: 0, fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub, visibility: fit.showStart ? "visible" : "hidden" }}
+          style={{ position: "absolute", left: 0, top: 0, fontSize: "var(--fs-11)", fontWeight: 500, color: C.sub, visibility: fit.showStart ? "visible" : "hidden" }}
         >
           0%
         </span>
@@ -283,7 +283,7 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
               top: 0,
               transform: "translateX(-50%)",
               fontSize: "var(--fs-11)",
-              fontWeight: 600,
+              fontWeight: 500,
               color: C.sub,
               whiteSpace: "nowrap",
             }}
@@ -294,7 +294,7 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
         )}
         <span
           ref={endRef}
-          style={{ position: "absolute", right: 0, top: 0, fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub, visibility: fit.showEnd ? "visible" : "hidden" }}
+          style={{ position: "absolute", right: 0, top: 0, fontSize: "var(--fs-11)", fontWeight: 500, color: C.sub, visibility: fit.showEnd ? "visible" : "hidden" }}
         >
           −100%
         </span>

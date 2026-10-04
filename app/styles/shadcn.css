@@ -457,9 +457,10 @@ html[data-sidebar="icon"] .hz-sidebar [data-label]:hover::after {
 .hz-chart-y > span,
 .hz-chart-x > span {
   position: absolute;
-  /* 11px · 400 · --c-muted 는 너무 흐렸다(09-27) — shadcn 축 글자 크기(12px)에 굵기 600, 한 단 진한 --c-sub(5.55:1). */
+  /* 11px · 400 · --c-muted 는 너무 흐렸다(09-27) — shadcn 축 글자 크기(12px)에 한 단 진한 --c-sub(5.55:1).
+     굵기는 500 — 600 이던 땐 축 글자가 그림의 값보다 먼저 눈에 걸렸다(2026-10-04). */
   font-size: var(--fs-12);
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1;
   color: var(--c-sub);
   font-variant-numeric: tabular-nums;

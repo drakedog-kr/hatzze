@@ -73,7 +73,7 @@
   background: var(--c-card);
   color: var(--c-sub);
   font-size: var(--fs-11);
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
   transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }

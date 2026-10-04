@@ -96,7 +96,7 @@ function SuggestSection({
     <section>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, padding: "0 10px 6px" }}>
         <h3 style={{ margin: 0, fontSize: "var(--fs-13)", fontWeight: 700, color: C.ink }}>{title}</h3>
-        <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.muted, whiteSpace: "nowrap" }}>{hint}</span>
+        <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.muted, whiteSpace: "nowrap" }}>{hint}</span>
       </div>
       <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
         {items.map((s, i) => (
@@ -137,7 +137,7 @@ function SuggestSection({
                   {marketBadge(s.market)}
                 </span>
               )}
-              <span style={{ marginLeft: "auto", fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub, whiteSpace: "nowrap" }}>{s.note}</span>
+              <span style={{ marginLeft: "auto", fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub, whiteSpace: "nowrap" }}>{s.note}</span>
             </button>
           </li>
         ))}

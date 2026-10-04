@@ -37,14 +37,14 @@ export const T = { big: "var(--fs-22)", lead: "var(--fs-15)", body: "var(--fs-12
  * globals.css 의 '읽히는 잉크 램프'가 못박은 규칙이다 — **정보성 텍스트는 12px 이
  * 바닥이고 10~11px 은 차트 축 눈금뿐**이다. 보조줄을 11 로 쓰던 것이 그 규칙 위반이었다.
  *
- * ⭐ 크기 차이를 **또렷하게** 벌린다(13.5 / 13 / 12). 굵기는 둘(700 / 500)뿐이고,
+ * ⭐ 크기 차이를 **또렷하게** 벌린다(13.5 / 13 / 12). 굵기는 둘(600 / 500)뿐이고(700 은 v2 에서 내렸다, 2026-10-04),
  *   색도 잉크와 sub2 둘뿐이다.
  */
 export const ROW = {
   /** 주인공 — 종목 이름이나 사람 이름. */
-  lead: { fontSize: "var(--fs-13-5)", fontWeight: 700, color: C.ink } as const,
+  lead: { fontSize: "var(--fs-13-5)", fontWeight: 600, color: C.ink } as const,
   /** 값 — 숫자. 주인공과 같은 무게로 두어 눈이 좌우를 함께 짚는다. */
-  value: { fontFamily: MONO, fontSize: "var(--fs-13)", fontWeight: 700, color: C.ink } as const,
+  value: { fontFamily: MONO, fontSize: "var(--fs-13)", fontWeight: 600, color: C.ink } as const,
   /** 보조 — **한 종류뿐이다.** 여기에 또 단을 만들지 말 것. */
   sub: { fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 } as const,
 } as const;
@@ -315,7 +315,7 @@ export function Quote({
         style={{
           fontFamily: MONO,
           fontSize: large ? 22 : 13,
-          fontWeight: large ? 800 : 700,
+          fontWeight: large ? 700 : 600,
           color: C.ink,
           letterSpacing: large ? "-.02em" : undefined,
           whiteSpace: "nowrap",
@@ -335,7 +335,7 @@ export function Quote({
           style={{
             fontFamily: MONO,
             fontSize: large ? 13 : 12,
-            fontWeight: large ? 700 : 600,
+            fontWeight: 600,
             whiteSpace: "nowrap",
             color: change > 0 ? "var(--c-hot-ink)" : change < 0 ? "var(--c-cold-ink)" : C.sub2,
           }}
@@ -916,7 +916,7 @@ const num = (v: React.ReactNode, muted?: string) => (
   <span style={{ ...ROW.value, textAlign: "right", whiteSpace: "nowrap" }}>
     {v}
     {/* 단위는 값보다 한 단 아래. 같은 크기로 두면 "9.4%" 가 두 덩이로 읽힌다. */}
-    {muted && <span style={{ ...ROW.sub, fontWeight: 600 }}>{muted}</span>}
+    {muted && <span style={{ ...ROW.sub }}>{muted}</span>}
   </span>
 );
 /**
@@ -1004,7 +1004,7 @@ export function wideManagerRows(rows: ManagerRank[], rate: number | null) {
               : m.firm,
             "left",
           ),
-          num(<>{m.holdings}<span style={{ ...ROW.sub, fontWeight: 600 }}>종목</span></>),
+          num(<>{m.holdings}<span style={{ ...ROW.sub }}>종목</span></>),
           num(<Money usd={m.aum} rate={rate} />),
         ]}
       />
@@ -1240,7 +1240,7 @@ export function AnalystActions({ rows, rate }: { rows: AnalystAction[]; rate: nu
           </span>
           <span style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6, flexWrap: "wrap" }}>
             {act && (act.tone ? <Pill tone={act.tone}>{act.text}</Pill> : <span style={{ ...ROW.sub }}>{act.text}</span>)}
-            {r.rating && <span style={{ ...ROW.sub, fontWeight: 600, color: C.ink }}>{CONSENSUS_KO[r.rating] ?? r.rating}</span>}
+            {r.rating && <span style={{ ...ROW.sub, color: C.ink }}>{CONSENSUS_KO[r.rating] ?? r.rating}</span>}
           </span>
           <span style={{ ...ROW.value, textAlign: "right", whiteSpace: "nowrap" }}>
             {r.targetNow == null ? (
@@ -1270,7 +1270,7 @@ export function AnalystActions({ rows, rate }: { rows: AnalystAction[]; rate: nu
           그래서 기간을 **재서 적는다.** 그래야 "64명 중 왜 8명뿐이냐"에도 답이 된다 —
           64명은 등급을 걸어 둔 사람 수, 이 목록은 그 사이에 움직인 사람이다. */}
       <span style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "0 22px 4px" }}>
-        <span style={{ ...ROW.sub, fontWeight: 600 }}>최근 의견</span>
+        <span style={{ ...ROW.sub }}>최근 의견</span>
         {span && <span style={{ fontSize: T.small, color: C.muted, fontFamily: MONO }}>{span}</span>}
       </span>
       {/* ⭐ 다섯 줄로 열고 눌러서 늘린다. 다 펴면 '접기'가 함께 뜬다(ExpandableList 기본).
@@ -1323,7 +1323,7 @@ export function ConsensusBody({
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16, padding: "14px 22px 16px" }}>
         {total > 0 && (
           <div style={{ flex: "1 1 260px", display: "flex", flexDirection: "column", gap: 9, minWidth: 0 }}>
-            <span style={{ ...ROW.sub, fontWeight: 600 }}>증권가 종합</span>
+            <span style={{ ...ROW.sub }}>증권가 종합</span>
             <span style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
               <strong style={{ fontSize: "var(--fs-22)", fontWeight: 700, color: C.ink, letterSpacing: "-.02em" }}>
                 {(c.consensus && CONSENSUS_KO[c.consensus]) ?? c.consensus ?? "등급 미상"}
@@ -1346,7 +1346,7 @@ export function ConsensusBody({
               {RATING.filter((r) => counts[r.key] > 0).map((r) => (
                 <span key={r.key} style={{ display: "inline-flex", alignItems: "center", gap: 5, ...ROW.sub }}>
                   <span style={{ width: 8, height: 8, borderRadius: 2, background: r.tone, flexShrink: 0 }} />
-                  {r.label} <strong style={{ fontFamily: MONO, color: C.ink, fontWeight: 700 }}>{counts[r.key]}</strong>
+                  {r.label} <strong style={{ fontFamily: MONO, color: C.ink, fontWeight: 600 }}>{counts[r.key]}</strong>
                 </span>
               ))}
             </span>
@@ -1355,7 +1355,7 @@ export function ConsensusBody({
 
         {c.targetAvg != null && (
           <div style={{ flex: "1 1 260px", display: "flex", flexDirection: "column", gap: 9, minWidth: 0 }}>
-            <span style={{ ...ROW.sub, fontWeight: 600 }}>
+            <span style={{ ...ROW.sub }}>
               1년 목표가 평균{c.targetCount != null ? ` · 애널리스트 ${c.targetCount}명` : ""}
             </span>
             <span style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
@@ -1365,7 +1365,7 @@ export function ConsensusBody({
               {upside != null && (
                 // ⚠️ 색을 주지 않는다. 목표가는 예측이지 약속이 아니라, 화면이 좋고 나쁨을
                 //    말하는 자리가 아니다.
-                <span style={{ ...ROW.sub, fontFamily: MONO, fontWeight: 700 }}>
+                <span style={{ ...ROW.sub, fontFamily: MONO }}>
                   현재가 대비 {upside > 0 ? "+" : "−"}
                   {Math.abs(upside).toFixed(1)}%
                 </span>
@@ -1382,13 +1382,13 @@ export function ConsensusBody({
                     막대라 특히 그렇다. 숫자 아래에 무엇인지 적는다. */}
                 <span style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
                   <span style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                    <span style={{ ...ROW.sub, fontFamily: MONO, color: C.ink, fontWeight: 600 }}>
+                    <span style={{ ...ROW.sub, fontFamily: MONO, color: C.ink }}>
                       <ExactMoney usd={c.targetLow} rate={rate} />
                     </span>
                     <span style={{ fontSize: T.small, color: C.muted }}>최저 목표가</span>
                   </span>
                   <span style={{ display: "flex", flexDirection: "column", gap: 1, alignItems: "flex-end" }}>
-                    <span style={{ ...ROW.sub, fontFamily: MONO, color: C.ink, fontWeight: 600 }}>
+                    <span style={{ ...ROW.sub, fontFamily: MONO, color: C.ink }}>
                       <ExactMoney usd={c.targetHigh} rate={rate} />
                     </span>
                     <span style={{ fontSize: T.small, color: C.muted }}>최고 목표가</span>

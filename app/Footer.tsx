@@ -25,7 +25,7 @@ const CONTACT_EMAIL = "hatzze@proton.me";
 //     같은 결정이다 — 이름은 투자 유의사항의 '데이터 출처'에만 있다.
 //     ⛔ 다시 넣자고 제안하지 말 것. 이 결정은 위험을 듣고 내린 것이다.
 
-const LINK: React.CSSProperties = { fontSize: "var(--fs-12)", fontWeight: 600 };
+const LINK: React.CSSProperties = { fontSize: "var(--fs-12)", fontWeight: 500 };
 
 /**
  * ⭐ 띠의 글자는 전부 **워드마크의 밑선 하나**에 앉는다. 처음엔 줄 상자 가운데에 세웠더니(alignItems center) 12px 글자가

@@ -987,10 +987,10 @@
   border-radius: 8px; cursor: pointer; color: var(--c-ink); font-size: var(--fs-14); text-align: left; font-family: inherit;
 }
 .dv-search-name { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dv-search-meta { margin-left: auto; font-size: var(--fs-12); font-weight: 600; color: var(--c-sub); white-space: nowrap; }
+.dv-search-meta { margin-left: auto; font-size: var(--fs-12); font-weight: 500; color: var(--c-sub); white-space: nowrap; }
 .dv-search-none { margin: 0; padding: 12px 10px; font-size: var(--fs-12-5); line-height: 1.5; color: var(--c-muted); }
 .dv-badge {
-  font-size: var(--fs-11); font-weight: 600; color: var(--c-sub); background: var(--c-chip);
+  font-size: var(--fs-11); font-weight: 500; color: var(--c-sub); background: var(--c-chip);
   padding: 2px 5px; border-radius: 4px; flex-shrink: 0; margin-left: 6px;
 }
 
@@ -1002,7 +1002,7 @@
   max-width: 100%;
   display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px 5px 6px; border-radius: 999px;
   border: 1px solid var(--c-line); background: var(--c-card); color: var(--c-ink);
-  font-size: var(--fs-12-5); font-weight: 600; cursor: grab; font-family: inherit; transition: background 0.12s ease;
+  font-size: var(--fs-12-5); font-weight: 500; cursor: grab; font-family: inherit; transition: background 0.12s ease;
 }
 .dv-chip:hover { background: var(--tx-btn); }
 .dv-chip:active { cursor: grabbing; }
@@ -1051,14 +1051,14 @@
 /* 표 위 한 줄 — 담은 수와 '모두 빼기'. */
 .dv-table-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 0 10px; }
 .dv-table-count { font-size: var(--fs-12); font-weight: 700; color: var(--c-sub); }
-.dv-table-clear { padding: 0; border: none; background: none; color: var(--c-muted); font-size: var(--fs-12); font-weight: 600; cursor: pointer; font-family: inherit; }
+.dv-table-clear { padding: 0; border: none; background: none; color: var(--c-muted); font-size: var(--fs-12); font-weight: 500; cursor: pointer; font-family: inherit; }
 .dv-table-clear:hover { color: var(--c-blue); text-decoration: underline; }
 .dv-table-tools { display: flex; align-items: center; gap: 14px; }
 /* 표 위 '정렬' — 줄의 계좌 알약과 같은 생김새의 메뉴 단추(shadcn DropdownMenu 의 단추). 고르면 순서가 한 번 바뀐다. */
 .dv-tsort {
   appearance: none; -webkit-appearance: none; padding: 2px 16px 2px 8px; border-radius: 4px; border: 1px solid transparent;
   background: var(--c-chip) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 3.5l3 3 3-3' fill='none' stroke='%235e728d' stroke-width='1.5'/></svg>") no-repeat right 4px center;
-  color: var(--c-sub); font-size: var(--fs-11); font-weight: 600; font-family: inherit; cursor: pointer; line-height: 1.4;
+  color: var(--c-sub); font-size: var(--fs-11); font-weight: 500; font-family: inherit; cursor: pointer; line-height: 1.4;
 }
 .dv-tsort:focus-visible { outline: none; border-color: var(--c-blue); box-shadow: 0 0 0 3px var(--c-blue-tint); }
 /* 순서 손잡이 — 줄 맨 왼쪽, 시트 여백(.dv-body 의 26px) 안에 점 여섯(2×3). 이름 칸 폭을 안 먹는다. 끌기는 포인터 이벤트라
@@ -1110,7 +1110,7 @@
 /* 사실 조각 알약 — 배당성향 · 연속 늘림 · 5년 연 +n% · 다음 지급. 뜻은 title 로. */
 .dv-tfacts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .dv-tfact {
-  font-size: var(--fs-11); font-weight: 600; color: var(--c-sub); background: var(--tx-tile); border-radius: 6px; padding: 2px 6px;
+  font-size: var(--fs-11); font-weight: 500; color: var(--c-sub); background: var(--tx-tile); border-radius: 6px; padding: 2px 6px;
   white-space: nowrap; cursor: default;
 }
 /* 주의 알약 — 붉은 기. 온도 빨강(--c-hot)이 아니라 '조심' 표시라 연한 바탕에 진한 글자로만. */
@@ -1127,7 +1127,7 @@
 .dv-tshares .dv-tcost input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .dv-tshares .dv-tcost input:focus { outline: none; border-color: var(--c-blue); box-shadow: 0 0 0 3px var(--c-blue-tint); }
 .dv-tcost-open {
-  justify-self: start; padding: 0; border: none; background: none; color: var(--c-muted); font-size: var(--fs-11); font-weight: 600;
+  justify-self: start; padding: 0; border: none; background: none; color: var(--c-muted); font-size: var(--fs-11); font-weight: 500;
   cursor: pointer; font-family: inherit;
 }
 .dv-tcost-open:hover { color: var(--c-blue); text-decoration: underline; }
@@ -1160,7 +1160,7 @@
 .dv-step:hover { background: var(--tx-btn-hover); }
 .dv-step:disabled { opacity: 0.4; cursor: default; }
 .dv-tnum { text-align: right; font-size: var(--fs-13-5); color: var(--c-label); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.dv-tstrong { font-weight: 700; color: var(--c-ink); }
+.dv-tstrong { font-weight: 600; color: var(--c-ink); }
 /* 미국 줄의 달러 표기 — 원화 아래 작은 글씨. 원화가 주인공이다(국내 줄과 한 열에서 더해지니까). */
 .dv-tsub { display: block; font-size: var(--fs-11); font-weight: 500; color: var(--c-sub); }
 /* 비중 칸 — 숫자 아래 얇은 막대. */
@@ -1177,12 +1177,12 @@
 .dv-upcoming-list { list-style: none; margin: 0; padding: 0; }
 .dv-upcoming-row { display: flex; align-items: baseline; gap: 10px; padding: 6px 0; border-top: 1px solid var(--c-sheet-row); font-size: var(--fs-13); }
 .dv-upcoming-row:first-child { border-top: 0; }
-.dv-upcoming-when { flex: 0 0 84px; white-space: nowrap; font-weight: 700; color: var(--c-ink); font-variant-numeric: tabular-nums; }
+.dv-upcoming-when { flex: 0 0 84px; white-space: nowrap; font-weight: 500; color: var(--c-ink); font-variant-numeric: tabular-nums; }
 .dv-upcoming-name { font-weight: 600; color: var(--c-ink); white-space: nowrap; }
 .dv-upcoming-what { color: var(--c-sub); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dv-upcoming-amt { margin-left: auto; font-weight: 700; color: var(--c-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dv-upcoming-amt { margin-left: auto; font-weight: 600; color: var(--c-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* 확정·예상 — 공시된 값이면 파랗게, 지난해로 어림한 값이면 흐리게. 줄마다 붙지만 두 글자라 무겁지 않다. */
-.dv-upcoming-tag { flex-shrink: 0; padding: 1px 6px; border-radius: 4px; font-size: var(--fs-10-5); font-weight: 700; line-height: 1.5; color: var(--c-sub); background: var(--c-chip); }
+.dv-upcoming-tag { flex-shrink: 0; padding: 1px 6px; border-radius: 4px; font-size: var(--fs-10-5); font-weight: 600; line-height: 1.5; color: var(--c-sub); background: var(--c-chip); }
 .dv-upcoming-tag-sure { color: var(--c-cold-ink); background: var(--c-blue-tint); }
 .dv-goal-inline {
   height: 30px; padding: 0 8px; text-align: right; border-radius: 8px; border: 1px solid var(--c-line); background: var(--c-card);
@@ -1220,7 +1220,7 @@
 .dv-cal-bar { width: 100%; max-width: 28px; margin-top: auto; border-radius: 4px 4px 0 0; background: var(--c-blue); } /* 위(데이터 끝)만 둥글고 바닥은 각지게(shadcn 막대 꼴, 09-27 · 바닥 2 → 0) */
 .dv-cal-cell:not(.dv-cal-on) .dv-cal-bar { height: 3px; background: var(--c-track); }
 .dv-cal-month { font-size: var(--fs-11); color: var(--c-sub); }
-.dv-cal-amt { font-size: var(--fs-11); font-weight: 700; color: var(--c-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dv-cal-amt { font-size: var(--fs-11); font-weight: 500; color: var(--c-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .dv-cal-cell:not(.dv-cal-on) .dv-cal-amt { color: var(--c-hint); font-weight: 400; }
 /* 빈 달의 + 동그라미. 파란색으로 "눌러 채우라"를 말하고, 올리면 진해진다. */
 /* ⚠️ 위 :not(.dv-cal-on) 규칙(특이도 0,3,0)이 회색을 입히므로 같은 특이도로 뒤에서 덮는다. */

@@ -35,7 +35,9 @@
   gap: 12px;
   color: var(--t-ink);
   font-size: 13px;
-  font-weight: 600;
+  /* 기본 굵기는 500 — 600 이던 땐 순위 숫자 · 곁줄 · 설명 줄까지 물려받아 반굵게 서서 강조가 강조로 안 읽혔다(2026-10-04 "과도한 볼드가
+     가독성을 해친다"). 굵기는 제목 · 큰 숫자 · 줄마다 주인공(이름 · 값)에만 적어 준다. */
+  font-weight: 500;
   line-height: 20px;
 }
 [data-theme="dark"] .v2-kd {
@@ -153,7 +155,7 @@
 .v2-cover-v em { font-style: normal; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 /* 시장 맥락 칸 — 'M/D 종가' 다음에 코스피 · 코스닥(이름 · 값 · 등락) */
 .v2-cover-idx { gap: 16px; }
-.v2-cover-chg { font-size: 12px; font-weight: 600; color: var(--t-ink3); }
+.v2-cover-chg { font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-cover-chg.is-up { color: var(--t-up); }
 .v2-cover-chg.is-down { color: var(--t-down); }
 /* 링크 칸 둘 — 이 화면에 없는 것을 싣고 다른 화면으로 보낸다(cover-chips.ts). 띠의 다른 칸과 같은 꼴에 끝에 작은 ›.
@@ -181,7 +183,7 @@
   padding: 2px 4px 2px 8px;
   border-radius: 4px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 20px;
   color: var(--t-ink2);
   text-decoration: none;
@@ -273,8 +275,8 @@
 .v2-brief p:last-child { margin-bottom: 0; }
 /* ⛔ 두 단으로 나누지 말 것 — 2026-10-02 에 해 봤더니 줄 폭이 반이 되어 줄 수가 두 배라 높이가 그대로였다(322 → 302). 읽기만 어려워진다. */
 /* 굵힌 낱말은 highlightTerms 가 인라인으로 800 · 옛 잉크를 박는다 — 700 · 토큰 잉크로 덮는다. */
-.v2-brief b { color: var(--t-ink) !important; font-weight: 700 !important; }
-.v2-brief .hz-kd-termlink { color: var(--t-ink); font-weight: 700; text-decoration-color: var(--t-ink3); }
+.v2-brief b { color: var(--t-ink) !important; font-weight: 600 !important; }
+.v2-brief .hz-kd-termlink { color: var(--t-ink); font-weight: 600; text-decoration-color: var(--t-ink3); }
 .v2-brief .hz-kd-termlink:hover { color: var(--t-down); text-decoration-color: var(--t-down); }
 
 /* ── 신호 표 ── 행마다 가는 선, 머리 줄은 옅은 면 */
@@ -301,7 +303,7 @@ a.v2-tr:hover { background: var(--t-tint); }
   min-height: 30px;
   background: var(--t-head);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--t-ink3);
 }
 /* 머리 줄 — 셋째 칸이 문장(왼쪽 · AI 표시), 넷째부터 숫자(오른쪽). */
@@ -310,7 +312,8 @@ a.v2-tr:hover { background: var(--t-tint); }
 .v2-td-rank { text-align: center; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
 .v2-td-stock { display: flex; align-items: center; gap: 8px; min-width: 0; }
 /* 긴 이름은 두 줄로 감는다 — 말줄임으로 자르면 'LIG디펜스앤에어로스페이스'가 'LIG디펜스앤에어…'로 남았다(2026-10-03, 스무 줄로 늘리자 처음 걸렸다). */
-.v2-td-name { min-width: 0; line-height: 18px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* 줄의 주인공(종목 이름)만 600 — 뿌리가 500 이라(2026-10-04) 따로 적는다. */
+.v2-td-name { min-width: 0; font-weight: 600; line-height: 18px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .v2-badge {
   flex-shrink: 0;
   height: 18px;
@@ -415,12 +418,12 @@ a.v2-tr:hover { background: var(--t-tint); }
   font-variant-numeric: tabular-nums;
 }
 a.v2-tsh-row:hover { background: var(--t-tint); }
-.v2-tsh-rank { font-size: 12px; font-weight: 600; color: var(--t-ink3); text-align: right; }
+.v2-tsh-rank { font-size: 12px; font-weight: 500; color: var(--t-ink3); text-align: right; }
 .v2-tsh-name { min-width: 0; font-size: 13px; font-weight: 600; line-height: 18px; word-break: keep-all; overflow-wrap: anywhere; }
 .v2-tsh-bar { position: relative; height: 8px; border-radius: 4px; background: var(--t-bar-off); }
 .v2-tsh-bar > i { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 4px; background: color-mix(in srgb, var(--t-down) 45%, transparent); }
-.v2-tsh-val { font-size: 13px; font-weight: 700; text-align: right; }
-.v2-tsh-chg { font-size: 12px; font-weight: 600; text-align: right; color: var(--t-ink3); white-space: nowrap; }
+.v2-tsh-val { font-size: 13px; font-weight: 600; text-align: right; }
+.v2-tsh-chg { font-size: 12px; font-weight: 500; text-align: right; color: var(--t-ink3); white-space: nowrap; }
 .v2-tsh-chg.is-up { color: var(--t-up); }
 .v2-tsh-chg.is-down { color: var(--t-down); }
 
@@ -520,18 +523,18 @@ a.v2-ev-row:hover { background: var(--t-tint); }
   border-bottom: 1px solid var(--t-line);
 }
 .v2-kw ol li:last-child { border-bottom: 0; }
-.v2-kw-th { min-height: 30px; background: var(--t-head); font-size: 12px; font-weight: 600; color: var(--t-ink3); }
+.v2-kw-th { min-height: 30px; background: var(--t-head); font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-kw-th > :nth-child(n + 4) { text-align: right; }
 .v2-kw-rank { text-align: center; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
-.v2-kw-word { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2-kw-word { min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 언급량 — 막대(끝 = 1위) + 점유율. 막대 폭 %는 이 칸의 첫 단 폭 기준이다. */
 .v2-kw-bar { display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: center; column-gap: 8px; min-width: 0; }
 .v2-kw-bar i { display: block; justify-self: start; height: 6px; border-radius: 3px; background: var(--t-heat); }
 .v2-kw-bar em { font-style: normal; font-size: 12px; font-weight: 500; color: var(--t-ink3); text-align: right; font-variant-numeric: tabular-nums; }
 .v2-kw-num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .v2-kw-delta { font-size: 12px; font-weight: 500; color: var(--t-ink3); }
-.v2-kw-delta.is-up { color: var(--t-up); font-weight: 600; }
-.v2-kw-delta.is-down { color: var(--t-down); font-weight: 600; }
+.v2-kw-delta.is-up { color: var(--t-up); font-weight: 500; }
+.v2-kw-delta.is-down { color: var(--t-down); font-weight: 500; }
 
 /* ── 폭에 따라 ─────────────────────────────────────────────────────────────
    판 1,100 이상: 둘째 줄 260 | 테마 | 340 · 오른쪽 요약 칸 340.
@@ -738,7 +741,7 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-bf-band > .v2-mod { display: flex; flex-direction: column; }
 .v2-index { position: relative; flex: 1; }
 .v2-index-delta { display: inline-flex; gap: 4px; margin-left: auto; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
-.v2-card-val.is-big .v2-index-delta b { font-size: 12px; font-weight: 700; line-height: 16px; letter-spacing: 0; color: var(--t-ink2); }
+.v2-card-val.is-big .v2-index-delta b { font-size: 12px; font-weight: 600; line-height: 16px; letter-spacing: 0; color: var(--t-ink2); }
 .v2-card-val.is-big .v2-index-delta b.is-up { color: var(--t-up); }
 .v2-card-val.is-big .v2-index-delta b.is-down { color: var(--t-down); }
 /* 구간별 지표 수 — 이름 · 막대(오늘 지표 중 몫) · 개수. 줄에 마우스를 올리면 그 구간의 지표 목록(.hz-dist-pop)이 오른쪽으로 열린다. */
@@ -760,7 +763,7 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-band-name i { width: 7px; height: 7px; border-radius: 50%; }
 .v2-band-bar { height: 6px; border-radius: 3px; background: var(--t-bar-off); overflow: hidden; }
 .v2-band-bar i { display: block; height: 100%; border-radius: 3px; }
-.v2-band-n { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.v2-band-n { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
 .v2-bf .hz-dist-pop { top: 8px; bottom: 8px; border-color: var(--t-frame); border-radius: 6px; }
 
 /* 오늘의 브리핑 — 이름표 칸 · 문장 칸 두 칸 줄, 줄마다 가는 선. 줄은 남는 높이를 고르게 받는다(옆 햇쩨 지수가 키를 정하는 날). */
@@ -775,14 +778,14 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
   border-bottom: 1px solid var(--t-line);
 }
 .v2-brief3-row:last-child { border-bottom: 0; }
-.v2-brief3 dt { font-size: 12px; font-weight: 600; line-height: 22px; color: var(--t-ink3); }
+.v2-brief3 dt { font-size: 12px; font-weight: 500; line-height: 22px; color: var(--t-ink3); }
 .v2-brief3 dt a { color: var(--t-ink2); text-decoration: none; }
 .v2-brief3 dt a:hover { color: var(--t-down); }
 .v2-brief3 dd { margin: 0; font-size: 13px; font-weight: 500; line-height: 22px; color: var(--t-ink2); word-break: keep-all; }
 /* 굵은 낱말 · 지표 이름 링크 — renderRichSummary 가 인라인으로 800 · 온도색을 박는다. 굵기만 v2 로 내린다(색은 온도 낱말의 뜻이라 둔다). */
 .v2-brief3 dd b,
-.v2-brief3 dd strong { font-weight: 700 !important; }
-.v2-bf .hz-brief3-link { color: var(--t-ink); font-weight: 700; text-decoration: underline; text-decoration-color: var(--t-ink4); text-underline-offset: 3px; }
+.v2-brief3 dd strong { font-weight: 600 !important; }
+.v2-bf .hz-brief3-link { color: var(--t-ink); font-weight: 600; text-decoration: underline; text-decoration-color: var(--t-ink4); text-underline-offset: 3px; }
 .v2-bf .hz-brief3-link:hover { color: var(--t-down); text-decoration-color: var(--t-down); }
 
 /* 지표 모듈 — 모듈 하나에 셀 격자. 시트의 둥근 판 · 안쪽 링 · 그림자는 걷고 모듈 테두리가 바깥을 맡는다.
@@ -838,7 +841,7 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-bf .hz-report-cell { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 14px; text-decoration: none; color: var(--t-ink2); }
 .v2-bf .hz-report-cell:hover { background: var(--t-tint); color: var(--t-down); }
 .v2-bf .hz-report-cell .ms { font-size: 18px; }
-.v2-bf .hz-report-cell strong { font-size: 13px; font-weight: 700; }
+.v2-bf .hz-report-cell strong { font-size: 13px; font-weight: 600; }
 
 /* 두 칸 셀 — 판 끝의 자리 채움 칸(준비 중 · 지표 제보)만. 지표 14 · 10장 + 두 칸 = 16 · 12 라 4열 · 2열 어디서든 끝 줄이 꽉 찬다.
    ⛔ 지표 칸은 늘리지 않는다(아시아 · 여윳돈을 늘렸다가 "이상하다"로 되돌림). 한 단(폰)에선 그냥 한 칸. */
@@ -850,7 +853,7 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-bf .hz-split-cell + .hz-split-cell { padding: 10px 0 0 12px; border-left: 1px solid var(--t-line); }
 .v2-bf .hz-split-k { align-self: flex-start; font-size: 12px; font-weight: 500; line-height: 18px; color: var(--t-ink3); }
 .v2-bf .hz-split-k.is-tip { text-decoration: underline dotted var(--t-ink4); text-underline-offset: 3px; cursor: help; }
-.v2-bf .hz-split-v { font-size: 13px; font-weight: 700; line-height: 20px; font-variant-numeric: tabular-nums; color: var(--t-ink); }
+.v2-bf .hz-split-v { font-size: 13px; font-weight: 600; line-height: 20px; font-variant-numeric: tabular-nums; color: var(--t-ink); }
 .v2-bf .hz-split-sub { font-size: 11px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
 
 /* 순위 목록(증권 앱) — 회색 둥근 행 대신 가는 선으로 나눈 줄. 순위는 고정 폭이라 이름 길이와 상관없이 같은 자리에 선다. */
@@ -858,9 +861,9 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-bf .hz-rank-row { display: grid; grid-template-columns: 36px minmax(0, 1fr); align-items: center; column-gap: 8px; min-height: 32px; border-top: 1px solid var(--t-line); }
 .v2-bf .hz-rank-row:last-child { border-bottom: 1px solid var(--t-line); }
 /* 순위 글자는 ink2 — 초고온 셀의 옅은 빨강 바탕 위에서 ink3 은 4.50 경계였다. */
-.v2-bf .hz-rank-n { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--t-ink2); }
+.v2-bf .hz-rank-n { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--t-ink2); }
 .v2-bf .hz-rank-row:first-child .hz-rank-n { color: var(--t-down-deep); }
-.v2-bf .hz-rank-name { overflow: hidden; font-size: 12px; font-weight: 600; color: var(--t-ink2); text-overflow: ellipsis; white-space: nowrap; }
+.v2-bf .hz-rank-name { overflow: hidden; font-size: 12px; font-weight: 500; color: var(--t-ink2); text-overflow: ellipsis; white-space: nowrap; }
 
 @container kd (max-width: 999px) {
   .v2-bf-band { grid-template-columns: minmax(0, 1fr); }
@@ -904,18 +907,18 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-md-band > .v2-mod { display: flex; flex-direction: column; }
 .v2-md-body { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 12px 14px 14px; }
 .v2-md-price { display: flex; align-items: center; gap: 10px; }
-.v2-md-chg { font-size: 12px; font-weight: 600; line-height: 16px; font-variant-numeric: tabular-nums; color: var(--t-ink3); }
+.v2-md-chg { font-size: 12px; font-weight: 500; line-height: 16px; font-variant-numeric: tabular-nums; color: var(--t-ink3); }
 .v2-md-chg.is-up { color: var(--t-up); }
 .v2-md-chg.is-down { color: var(--t-down); }
 .v2-md-rows { margin-top: auto; }
 .v2-md-aside { font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
-.v2-card-val.is-big .v2-md-aside b { font-size: 12px; font-weight: 700; line-height: 16px; letter-spacing: 0; }
+.v2-card-val.is-big .v2-md-aside b { font-size: 12px; font-weight: 600; line-height: 16px; letter-spacing: 0; }
 .v2-card-val.is-big .v2-md-aside b.is-up { color: var(--t-up); }
 .v2-card-val.is-big .v2-md-aside b.is-down { color: var(--t-down); }
 .v2-md-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--t-line); }
 /* 통계 칸 — 라벨 12/500 · 값 13/700(인라인 11/700 대문자 간격 · 15/800 이라 !important). */
 .v2-md .mdd-stat-label { font-size: 12px !important; font-weight: 500 !important; letter-spacing: 0 !important; color: var(--t-ink3) !important; }
-.v2-md .mdd-stat-value { font-size: 13px !important; font-weight: 700 !important; letter-spacing: 0 !important; }
+.v2-md .mdd-stat-value { font-size: 13px !important; font-weight: 600 !important; letter-spacing: 0 !important; }
 /* 둘째 줄의 빈 곳 — 셋 중 가장 긴 칸이 키를 정하고, 나머지는 안쪽 줄이 남는 높이를 나눠 받는다.
    종목: 전고점 · 저점 두 줄이 늘어난다. 지금 낙폭: 덩어리 사이가 고르게 벌어진다. */
 .v2-md-rows { flex: 1; display: flex; flex-direction: column; }
@@ -923,7 +926,7 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-md-pr { flex: 1 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 36px; border-top: 1px solid var(--t-line); }
 .v2-md-pr-k { min-width: 0; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink2); }
 .v2-md-pr-k > span { margin-left: 4px; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
-.v2-md-pr-v { flex: none; font-size: 13px; font-weight: 700; line-height: 20px; color: var(--t-ink); font-variant-numeric: tabular-nums; }
+.v2-md-pr-v { flex: none; font-size: 13px; font-weight: 600; line-height: 20px; color: var(--t-ink); font-variant-numeric: tabular-nums; }
 .v2-md-dd .v2-md-body { justify-content: space-between; }
 /* 통계 칸을 바닥에 붙이던 margin-top:auto 가 남는 높이를 한곳(게이지 아래)에 다 모았다 — 고르게 나누도록 푼다. */
 .v2-md-dd .v2-md-stats { margin-top: 0; }
@@ -937,9 +940,9 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-md-attr-rows { flex: 1; display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--t-line); }
 .v2-md-attr-rows > li { flex: 1 0 auto; display: grid; grid-template-columns: 96px minmax(0, 1fr) 56px; align-items: center; column-gap: 10px; min-height: 30px; }
 .v2-md-attr-name { min-width: 0; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink2); word-break: keep-all; overflow-wrap: anywhere; }
-.v2-md-attr-val { text-align: right; font-size: 13px; font-weight: 700; line-height: 20px; color: var(--t-ink); font-variant-numeric: tabular-nums; }
+.v2-md-attr-val { text-align: right; font-size: 13px; font-weight: 600; line-height: 20px; color: var(--t-ink); font-variant-numeric: tabular-nums; }
 .v2-md-attr-val.is-up { color: var(--t-up); }
-.v2-md-attr-rows > .is-self .v2-md-attr-name { font-weight: 700; color: var(--t-ink); }
+.v2-md-attr-rows > .is-self .v2-md-attr-name { font-weight: 600; color: var(--t-ink); }
 .v2-md-attr-rows > .is-self .v2-md-attr-val { color: var(--t-down-deep); }
 .v2-md-attr-rows > .is-self .v2-dd-bar > i { background: var(--t-down); }
 .v2-md-attr-rows .v2-dd-bar > i.is-up { background: color-mix(in srgb, var(--t-up) 38%, transparent); }
@@ -954,8 +957,9 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-md-row > .v2-mod,
 .v2-md-row > .hz-sheet { display: flex; flex-direction: column; }
 
-/* 낙폭 요약 — 시장 브리핑 '오늘의 브리핑'과 같은 줄 꼴(.v2-brief3). 굵은 말은 한 단 진하게(옆 숫자 칸과 같은 잉크). */
-.v2-md-sum dd b { color: var(--t-ink); }
+/* 낙폭 요약 — 시장 브리핑 '오늘의 브리핑'과 같은 줄 꼴(.v2-brief3). 짚는 말은 한 단 진한 잉크로만 가른다 —
+   계산 문장이라 한 줄에 두세 군데가 짚혀(−23.2% · 13.7%p 덜) 굵게 두면 줄이 얼룩졌다(2026-10-04). */
+.v2-md-sum dd b { font-weight: 500 !important; color: var(--t-ink); }
 /* 글 시작을 다른 칸 제목 선(14)에 맞춘다 — 브리핑 줄 꼴은 16 이다. */
 .v2-md-sum .v2-brief3-row { padding-left: 14px; padding-right: 14px; }
 
@@ -974,13 +978,13 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
   font-variant-numeric: tabular-nums;
 }
 .v2-md-cases li:last-child { border-bottom: 0; }
-.v2-md-case-th { flex: none; min-height: 30px; background: var(--t-head); font-size: 12px; font-weight: 600; color: var(--t-ink3); }
+.v2-md-case-th { flex: none; min-height: 30px; background: var(--t-head); font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-md-case > :nth-child(n + 2):nth-child(-n + 5) { text-align: right; }
 .v2-md-case > :last-child { text-align: right; }
 .v2-md-case.is-now { background: var(--t-tint); }
 .v2-md-case-span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.v2-md-case-span b { font-weight: 700; color: var(--t-down); }
-.v2-md-case .is-num { font-weight: 600; }
+.v2-md-case-span b { font-weight: 600; color: var(--t-down); }
+.v2-md-case .is-num { font-weight: 500; }
 .v2-md-case .is-num.is-up { color: var(--t-up); }
 .v2-md-case .is-num.is-down { color: var(--t-down); }
 .v2-md-case em { font-style: normal; color: var(--t-ink3); }
@@ -991,9 +995,9 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-md-kinds-cap { padding-top: 8px; font-size: 11px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
 .v2-md-kind { flex: 1 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; column-gap: 12px; min-height: 36px; border-bottom: 1px solid var(--t-line); font-variant-numeric: tabular-nums; }
 .v2-md-kind:last-child { border-bottom: 0; }
-.v2-md-kind-name { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.v2-md-kind-name { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; }
 .v2-md-kind-n { font-size: 12px; font-weight: 500; color: var(--t-ink3); }
-.v2-md-kind-v { text-align: right; font-weight: 700; }
+.v2-md-kind-v { text-align: right; font-weight: 600; }
 .v2-md-kind.is-now .v2-md-kind-v { color: var(--t-up); }
 
 /* 해마다 — 막대 차트 하나(V2Sheets.tsx YearsModule). 0 선(--zero)에서 오름은 위(빨강) · 빠짐은 아래(파랑), 막대 끝에 수익.
@@ -1005,7 +1009,7 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-yc-plot > i { position: absolute; left: 50%; width: min(24px, 56%); height: var(--h); transform: translateX(-50%); }
 .v2-yc-plot > i.is-up { bottom: calc(100% - var(--zero)); border-radius: 2px 2px 0 0; background: var(--t-up); }
 .v2-yc-plot > i.is-down { top: var(--zero); border-radius: 0 0 2px 2px; background: var(--t-down); }
-.v2-yc-plot > i > em { position: absolute; left: 50%; transform: translateX(-50%); font-style: normal; font-size: 12px; font-weight: 600; line-height: 16px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.v2-yc-plot > i > em { position: absolute; left: 50%; transform: translateX(-50%); font-style: normal; font-size: 12px; font-weight: 500; line-height: 16px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .v2-yc-plot > i.is-up > em { bottom: 100%; margin-bottom: 2px; color: var(--t-up); }
 .v2-yc-plot > i.is-down > em { top: 100%; margin-top: 2px; color: var(--t-down); }
 .v2-yc-yr { flex: none; text-align: center; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
@@ -1085,10 +1089,10 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-dd-name { min-width: 0; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink2); word-break: keep-all; overflow-wrap: anywhere; }
 .v2-dd-bar { position: relative; height: 8px; border-radius: 4px; background: var(--t-bar-off); }
 .v2-dd-bar > i { position: absolute; top: 0; bottom: 0; left: 0; width: var(--w); border-radius: 4px; background: color-mix(in srgb, var(--t-down) 38%, transparent); }
-.v2-dd-val { text-align: right; font-size: 13px; font-weight: 700; line-height: 20px; color: var(--t-ink); font-variant-numeric: tabular-nums; }
+.v2-dd-val { text-align: right; font-size: 13px; font-weight: 600; line-height: 20px; color: var(--t-ink); font-variant-numeric: tabular-nums; }
 /* 지금 종목 — 바탕은 옅은 회색. 옅은 파랑(--t-down-weak)이면 다크에서 파란 값이 4.49 로 떨어졌다. */
 .v2-dd .is-self .v2-dd-row { background: var(--t-tint); }
-.v2-dd .is-self .v2-dd-name { font-weight: 700; color: var(--t-ink); }
+.v2-dd .is-self .v2-dd-name { font-weight: 600; color: var(--t-ink); }
 .v2-dd .is-self .v2-dd-val { color: var(--t-down-deep); }
 .v2-dd .is-self .v2-dd-bar > i { background: var(--t-down); }
 /* 수익 · 손실 비율(app/mdd/V2Sheets.tsx LadderModule) — 위 도넛 + 숫자 둘, 아래 평균 매수가 표. 수익은 빨강 · 손실은 파랑(국내 관례 · 등락 색과 같은 뜻).
@@ -1106,7 +1110,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-md-pl-legend { display: flex; flex-direction: column; gap: 12px; margin: 0; }
 .v2-md-pl-legend > div { display: flex; flex-direction: column; gap: 0; }
 /* 숫자 색이 곧 도넛의 두 색이라 이름 앞 점은 안 단다(점은 아래 표 줄 이름에만). */
-.v2-md-pl-legend dt { font-size: 13px; font-weight: 600; line-height: 20px; color: var(--t-ink2); }
+.v2-md-pl-legend dt { font-size: 13px; font-weight: 500; line-height: 20px; color: var(--t-ink2); }
 .v2-md-pl-legend dd { margin: 0; font-size: 24px; font-weight: 700; line-height: 30px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .v2-md-pl-legend .is-gain dd { color: var(--t-up); }
 .v2-md-pl-legend .is-loss dd { color: var(--t-down); }
@@ -1115,13 +1119,13 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-md-pl-tbl th,
 .v2-md-pl-tbl td { padding: 0 2px; text-align: right; white-space: nowrap; }
 .v2-md-pl-tbl thead th { height: 28px; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); border-bottom: 1px solid var(--t-line); }
-.v2-md-pl-tbl tbody th { text-align: left; font-size: 13px; font-weight: 600; color: var(--t-ink2); }
+.v2-md-pl-tbl tbody th { text-align: left; font-size: 13px; font-weight: 500; color: var(--t-ink2); }
 .v2-md-pl-tbl tbody th::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; vertical-align: 1px; }
 .v2-md-pl-tbl tbody .is-gain th::before { background: var(--t-up); }
 .v2-md-pl-tbl tbody .is-loss th::before { background: var(--t-down); }
-.v2-md-pl-tbl tbody td { height: 40px; font-size: 13px; font-weight: 600; line-height: 20px; color: var(--t-ink); }
-.v2-md-pl-tbl tbody td.is-up { color: var(--t-up); }
-.v2-md-pl-tbl tbody td.is-down { color: var(--t-down); }
+.v2-md-pl-tbl tbody td { height: 40px; font-size: 13px; font-weight: 500; line-height: 20px; color: var(--t-ink); }
+.v2-md-pl-tbl tbody td.is-up { font-weight: 600; color: var(--t-up); }
+.v2-md-pl-tbl tbody td.is-down { font-weight: 600; color: var(--t-down); }
 .v2-md-pl-tbl tbody tr + tr > * { border-top: 1px solid var(--t-line); }
 .v2-dd-avg {
   position: absolute;
@@ -1200,7 +1204,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-kd.v2-dv .v2-dv-acct .v2-dv-seg > button { height: 22px; }
 .v2-dv-note { margin: 0; font-size: 12px; line-height: 18px; color: var(--t-ink3); word-break: keep-all; }
 /* 예시일 때 단추 하나 — 그대로 담는다. 글자는 카드색(다크에선 어두운 글자)이라 두 테마 모두 진한 파랑 위에서 읽힌다. */
-.v2-dv-cta { height: 36px; padding: 0 14px; border: 0; border-radius: 6px; background: var(--t-down-deep); color: var(--t-card); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.v2-dv-cta { height: 36px; padding: 0 14px; border: 0; border-radius: 6px; background: var(--t-down-deep); color: var(--t-card); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .v2-dv-cta:hover { filter: brightness(1.06); }
 
 /* 달마다 들어오는 돈 — 여섯 칸 두 줄(띠 칸 폭에 열두 칸이면 칸이 30px 라 "100,713원"이 안 든다). 회색 판은 걷는다. */
@@ -1248,26 +1252,26 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-dv .dv-group:first-child { padding-left: 0; }
 .v2-dv .dv-group[data-scope="etf"] { padding-right: 0; box-shadow: none; }
 .v2-dv .dv-group-head { flex-direction: row; align-items: baseline; gap: 8px; margin-bottom: 10px; }
-.v2-dv .dv-group-title { font-size: 13px; font-weight: 700; letter-spacing: 0; }
+.v2-dv .dv-group-title { font-size: 13px; font-weight: 600; letter-spacing: 0; }
 .v2-dv .dv-group-desc { font-size: 12px; color: var(--t-ink3); }
 .v2-dv .dv-chip { padding: 4px 8px 4px 5px; border-color: var(--t-frame); border-radius: 4px; font-size: 12px; }
 .v2-dv .dv-chip:hover { background: var(--t-tint); }
 /* 더 보기 — 꽉 찬 단추 대신 갈래 바닥의 글자 단추(v2 '전체 보기'와 같은 꼴). 연 갈래는 파란 글자. */
-.v2-dv .dv-more-btn { width: auto; align-self: flex-start; margin-top: auto; padding: 2px 0; border: 0; border-radius: 0; background: none; color: var(--t-ink2); font-size: 12px; font-weight: 600; }
+.v2-dv .dv-more-btn { width: auto; align-self: flex-start; margin-top: auto; padding: 2px 0; border: 0; border-radius: 0; background: none; color: var(--t-ink2); font-size: 12px; font-weight: 500; }
 .v2-dv .dv-more-btn::after { content: " ›"; }
 .v2-dv .dv-more-btn:hover { background: none; color: var(--t-ink); }
 .v2-dv .dv-more-btn[aria-expanded="true"] { background: none; color: var(--t-down); }
 .v2-dv .dv-more { padding: 10px 0 12px; border-radius: 0; border-top: 1px solid var(--t-line); }
-.v2-dv .dv-more-title { font-size: 13px; font-weight: 700; letter-spacing: 0; }
-.v2-dv .dv-more-label { font-size: 12px; font-weight: 600; color: var(--t-ink2); }
+.v2-dv .dv-more-title { font-size: 13px; font-weight: 600; letter-spacing: 0; }
+.v2-dv .dv-more-label { font-size: 12px; font-weight: 500; color: var(--t-ink2); }
 .v2-dv .dv-more-row { border-top-color: var(--t-line); }
 /* 달력에서 누른 달 — 둘째 줄 바로 아래 판(v2 모듈과 같은 테두리). */
 .v2-dv > .dv-more { padding: 10px 14px 12px; border: 1px solid var(--t-frame); border-radius: 6px; background: var(--t-card); }
 
 /* 담은 종목 표 — 열 머리 · 숫자 · 알약을 v2 눈금으로(12 · 13 · 11). 열 배치 · 접기 문턱은 tx.css 그대로(폰 세 줄 배치까지). */
-.v2-dv .dv-table-count { font-size: 12px; font-weight: 600; color: var(--t-ink2); }
+.v2-dv .dv-table-count { font-size: 12px; font-weight: 500; color: var(--t-ink2); }
 .v2-dv .dv-table-clear { font-size: 12px; color: var(--t-ink3); }
-.v2-dv .dv-thead { font-size: 12px; font-weight: 600; color: var(--t-ink3); }
+.v2-dv .dv-thead { font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-dv .dv-trow { border-top-color: var(--t-line); }
 .v2-dv .dv-tnum { font-size: 13px; color: var(--t-ink2); }
 .v2-dv .dv-tname-main { font-size: 13px; }
@@ -1281,7 +1285,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-dv-goal-v { font-size: 20px; font-weight: 700; line-height: 28px; color: var(--t-ink); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
 .v2-dv-goal-s { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
 .v2-dv-goal-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 2px; }
-.v2-dv-goal-presets > button { height: 28px; padding: 0 8px; border: 1px solid var(--t-frame); border-radius: 4px; background: var(--t-card); color: var(--t-ink2); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.v2-dv-goal-presets > button { height: 28px; padding: 0 8px; border: 1px solid var(--t-frame); border-radius: 4px; background: var(--t-card); color: var(--t-ink2); font-family: inherit; font-size: 12px; font-weight: 500; cursor: pointer; }
 .v2-dv-goal-presets > button:hover { background: var(--t-tint); }
 .v2-dv-goal-presets > button[aria-pressed="true"] { border-color: var(--t-down); background: var(--t-down-weak); color: var(--t-down-deep); }
 .v2-dv-goal-own { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--t-ink3); }
@@ -1294,26 +1298,26 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-dv-bk > .v2-mod { display: flex; flex-direction: column; min-width: 0; }
 /* 투자금 줄 — 이름 · 만원 입력 · 끌개. */
 .v2-dv-amt { display: flex; align-items: center; gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--t-line); }
-.v2-dv-amt-k { flex: none; font-size: 12px; font-weight: 600; color: var(--t-ink2); cursor: help; }
-.v2-dv-amt-v { flex: none; display: inline-flex; align-items: baseline; gap: 4px; font-size: 13px; font-weight: 600; color: var(--t-ink2); }
-.v2-dv-amt-v input { height: 28px; padding: 0 6px; border: 1px solid var(--t-frame); border-radius: 4px; background: var(--t-card); color: var(--t-ink); font-family: inherit; font-size: 13px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.v2-dv-amt-k { flex: none; font-size: 12px; font-weight: 500; color: var(--t-ink2); cursor: help; }
+.v2-dv-amt-v { flex: none; display: inline-flex; align-items: baseline; gap: 4px; font-size: 13px; font-weight: 500; color: var(--t-ink2); }
+.v2-dv-amt-v input { height: 28px; padding: 0 6px; border: 1px solid var(--t-frame); border-radius: 4px; background: var(--t-card); color: var(--t-ink); font-family: inherit; font-size: 13px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
 .v2-dv-amt-v em { font-style: normal; font-size: 12px; color: var(--t-ink3); }
 .v2-dv .v2-dv-amt-range { flex: 1; min-width: 80px; margin: 0; }
 .v2-dv-bk-th,
 .v2-dv-bk-row { display: grid; grid-template-columns: minmax(0, 1fr) 96px 132px; align-items: center; column-gap: 12px; padding: 0 14px; }
-.v2-dv-bk-th { min-height: 30px; background: var(--t-head); border-bottom: 1px solid var(--t-line); font-size: 12px; font-weight: 600; color: var(--t-ink3); }
+.v2-dv-bk-th { min-height: 30px; background: var(--t-head); border-bottom: 1px solid var(--t-line); font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-dv-bk-th > :nth-child(n + 2) { text-align: right; }
 .v2-dv-bk-rows { flex: 1; display: flex; flex-direction: column; }
 .v2-dv-bk-group { flex: 1 0 auto; display: flex; flex-direction: column; }
-.v2-dv-bk-cap { padding: 8px 14px 2px; font-size: 12px; font-weight: 600; color: var(--t-ink3); }
+.v2-dv-bk-cap { padding: 8px 14px 2px; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-dv-bk-row { flex: 1 0 auto; min-height: 40px; border: 0; border-bottom: 1px solid var(--t-line); background: none; font-family: inherit; color: inherit; text-align: left; cursor: pointer; transition: background-color 0.15s; }
 .v2-dv-bk-group:last-child .v2-dv-bk-row:last-child { border-bottom: 0; }
 .v2-dv-bk-row:hover { background: var(--t-tint); }
 .v2-dv-bk-row.is-on { background: var(--t-down-weak); box-shadow: inset 3px 0 0 var(--t-down); }
 .v2-dv-bk-row:focus-visible { outline: 2px solid var(--t-down); outline-offset: -2px; }
 .v2-dv-bk-name { min-width: 0; font-size: 13px; font-weight: 600; color: var(--t-ink); word-break: keep-all; }
-.v2-dv-bk-num { text-align: right; font-size: 13px; font-weight: 600; color: var(--t-ink2); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.v2-dv-bk-num.is-strong { font-weight: 700; color: var(--t-ink); }
+.v2-dv-bk-num { text-align: right; font-size: 13px; font-weight: 500; color: var(--t-ink2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v2-dv-bk-num.is-strong { font-weight: 600; color: var(--t-ink); }
 /* 읽기 칸 — 규칙 알약 · 열 종목 · 바닥(투자금 · 한 달 · 담기). 종목 줄이 남는 높이를 나눠 받는다(왼쪽 표와 키가 같다). */
 .v2-dv-bk-read .v2-mod-head .v2-dv-help { margin-left: -4px; }
 .v2-dv-bk-read .v2-mod-meta { min-width: 0; }
@@ -1323,15 +1327,15 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-dv-bk-list-st > li { flex: 1 0 auto; display: flex; border-bottom: 1px solid var(--t-line); }
 .v2-dv-bk-st { flex: 1; display: grid; grid-template-columns: 16px 20px minmax(0, 1fr) 40px; align-items: center; column-gap: 8px; min-height: 40px; padding: 0 4px; border: 0; border-radius: 4px; background: none; font-family: inherit; color: inherit; text-align: left; cursor: grab; }
 .v2-dv-bk-st:hover { background: var(--t-tint); }
-.v2-dv-bk-rank { font-size: 12px; font-weight: 600; color: var(--t-ink3); text-align: right; font-variant-numeric: tabular-nums; }
+.v2-dv-bk-rank { font-size: 12px; font-weight: 500; color: var(--t-ink3); text-align: right; font-variant-numeric: tabular-nums; }
 .v2-dv-bk-stn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; color: var(--t-ink); }
 /* 이름 · 고른 까닭 두 줄(이름 위). */
 .v2-dv-bk-stx { display: flex; flex-direction: column; min-width: 0; padding: 4px 0; }
 .v2-dv-bk-stm { font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.v2-dv-bk-sts { font-size: 12px; font-weight: 600; color: var(--t-ink2); text-align: right; font-variant-numeric: tabular-nums; }
+.v2-dv-bk-sts { font-size: 12px; font-weight: 500; color: var(--t-ink2); text-align: right; font-variant-numeric: tabular-nums; }
 .v2-dv-bk-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .v2-dv-bk-foot > span { font-size: 12px; color: var(--t-ink3); }
-.v2-dv-bk-foot b { font-weight: 700; color: var(--t-ink); font-variant-numeric: tabular-nums; }
+.v2-dv-bk-foot b { font-weight: 600; color: var(--t-ink); font-variant-numeric: tabular-nums; }
 
 @container kd (max-width: 999px) {
   .v2-dv-band { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
@@ -1385,13 +1389,13 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-tm-map-in { padding: 12px 14px 0; }
 .v2-tm-map .hz-treemap { aspect-ratio: var(--tm-aspect, 2 / 1); background: var(--t-card); border-radius: 4px; }
 .v2-tm .hz-treemap .hz-tm-tile { border-color: var(--t-card); border-radius: 4px; }
-.v2-tm .hz-tm-name { font-size: 12px; font-weight: 700; }
+.v2-tm .hz-tm-name { font-size: 12px; font-weight: 600; }
 .v2-tm .hz-tm-tile.is-lg .hz-tm-name { font-size: 13px; }
 .v2-tm .hz-tm-tile.is-lg .hz-tm-val { font-size: 12px; }
 .v2-tm .hz-tm-tile.is-sm .hz-tm-name,
 .v2-tm .hz-tm-tile.is-tall .hz-tm-name { font-size: 11px; font-weight: 600; }
-.v2-tm .hz-tm-val { font-size: 11px; font-weight: 600; }
-.v2-tm .hz-tm-delta { font-size: 11px; font-weight: 600; }
+.v2-tm .hz-tm-val { font-size: 11px; font-weight: 500; }
+.v2-tm .hz-tm-delta { font-size: 11px; font-weight: 500; }
 /* 큰 칸의 곁줄 — 그 테마의 말 많은 종목(Treemap.tsx sub). 두 줄까지. */
 .hz-tm-sub {
   margin-top: 6px;
@@ -1424,21 +1428,21 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
    머리 줄 정렬은 신호 표 공통 규칙(셋째 = 문장 왼쪽 · 넷째부터 숫자 오른쪽)을 그대로 쓴다. */
 .v2-tm-flowtbl .v2-tr { grid-template-columns: 20px 240px minmax(0, 1fr) 72px 120px; min-height: 52px; }
 .v2-td-theme2 { display: flex; flex-direction: column; gap: 1px; min-width: 0; padding: 7px 0; }
-.v2-td-theme2 b { font-weight: 700; overflow-wrap: anywhere; }
+.v2-td-theme2 b { font-weight: 600; overflow-wrap: anywhere; }
 .v2-td-share em,
-.v2-td-flow2 em { font-style: normal; font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--t-ink3); }
+.v2-td-flow2 em { font-style: normal; font-size: 12px; font-weight: 500; white-space: nowrap; color: var(--t-ink3); }
 .v2-td-share em.is-up,
 .v2-td-flow2 em.is-up { color: var(--t-up); }
 .v2-td-share em.is-down,
 .v2-td-flow2 em.is-down { color: var(--t-down); }
 .v2-td-sub { font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); word-break: keep-all; }
 .v2-td-flow { text-align: right; white-space: nowrap; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
-.v2-td-flow.is-on { font-weight: 600; color: var(--t-down-deep); }
+.v2-td-flow.is-on { font-weight: 500; color: var(--t-down-deep); }
 
 /* 표 공통 — 두 줄 숫자(위 값 · 아래 곁말), 테마 이름 칸, 태그(평소 대비 · 3일 전 대비) */
 .v2-td-two { display: flex; flex-direction: column; align-items: flex-end; gap: 0; line-height: 18px; }
 .v2-td-two em { font-style: normal; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
-.v2-td-theme { min-width: 0; font-weight: 600; color: var(--t-ink); text-decoration: none; overflow-wrap: anywhere; }
+.v2-td-theme { min-width: 0; font-weight: 500; color: var(--t-ink); text-decoration: none; overflow-wrap: anywhere; }
 .v2-td-theme:hover { text-decoration: underline; text-decoration-color: var(--t-ink4); text-underline-offset: 3px; }
 .v2-tm .hz-theme-tag { flex-shrink: 0; height: 18px; padding: 0 5px; border-radius: 4px; font-size: 11px; font-weight: 600; line-height: 18px; white-space: nowrap; }
 .v2-td-date { margin-left: 6px; font-style: normal; font-size: 11px; color: var(--t-ink3); white-space: nowrap; }
@@ -1456,7 +1460,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-tm-trendbody { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 12px 14px; }
 .v2-tm-figs { display: flex; gap: 28px; }
 .v2-tm-figs > span { display: flex; flex-direction: column; min-width: 0; }
-.v2-tm-figs b { font-size: 13px; font-weight: 700; line-height: 20px; font-variant-numeric: tabular-nums; }
+.v2-tm-figs b { font-size: 13px; font-weight: 600; line-height: 20px; font-variant-numeric: tabular-nums; }
 .v2-tm-figs em { font-style: normal; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); white-space: nowrap; }
 /* 막대는 남는 높이를 받되 하한은 낮게 — 요약 글이 짧은 테마(원전)에서 막대 하한(104)이 키를 정해 글 칸 아래가 87px 비었다. */
 .v2-tm-trend { flex: 1; min-height: 56px; display: flex; align-items: flex-end; gap: 3px; }
@@ -1489,7 +1493,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   border: 1px solid var(--t-frame);
   border-radius: 4px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 24px;
   color: var(--t-ink2);
   text-decoration: none;
@@ -1499,14 +1503,14 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 
 /* 등락의 이유 — 날짜 머리 하나 아래 그날 종목 줄 */
 .v2-tm-dayhead { display: flex; align-items: baseline; gap: 8px; padding: 8px 14px; background: var(--t-head); border-bottom: 1px solid var(--t-line); }
-.v2-tm-dayhead b { font-size: 13px; font-weight: 700; }
+.v2-tm-dayhead b { font-size: 13px; font-weight: 600; }
 .v2-tm-dayhead .v2-badge { align-self: center; }
 .v2-tm-dayhead em { margin-left: auto; font-style: normal; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-tm-reasonrows { list-style: none; margin: 0; padding: 0; }
 /* 종목 · 까닭(남는 폭) · 종가 · 등락 · 채널 수 — 숫자는 줄 오른쪽 끝에. 종가가 없는 미장은 그 칸째 없다(.no-close). */
 .v2-tm-reasonrows .v2-tr { grid-template-columns: 220px minmax(0, 1fr) 84px 64px 76px; }
 .v2-tm-days.no-close .v2-tm-reasonrows .v2-tr { grid-template-columns: 220px minmax(0, 1fr) 72px 76px; }
-.v2-td-px { font-weight: 600; color: var(--t-ink); }
+.v2-td-px { font-weight: 500; color: var(--t-ink); }
 .v2-td-ch { font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-tm-days > section:last-child li:last-child .v2-tr { border-bottom: 0; }
 
@@ -1600,9 +1604,9 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-pv-after-head dd { flex-shrink: 0; font-size: 12px; font-weight: 500; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
 .v2-pv-after-row + .v2-pv-after-row { border-top: 1px solid var(--t-line); }
 .v2-pv-after-row dt { color: var(--t-ink2); }
-.v2-pv-after-row dd { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v2-pv-after-row dd { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .v2-pv-night-foot { margin: auto 0 0; padding: 10px 0 4px; border-top: 1px solid var(--t-line); font-size: 12px; font-weight: 500; line-height: 20px; color: var(--t-ink2); word-break: keep-all; }
-.v2-pv-night-foot b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.v2-pv-night-foot b { font-weight: 600; font-variant-numeric: tabular-nums; }
 
 /* 해외에서 거래 중인 값 — 종목 · 해외 값(아래 견준 국장 종가) · 국장 종가 대비(% · 원) · 24시간 거래대금. 줄은 남는 높이를 고르게 받는다. */
 .v2-pv-perp { flex: 1; display: flex; flex-direction: column; }
@@ -1621,7 +1625,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   background: var(--t-head);
   border-bottom: 1px solid var(--t-line);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--t-ink3);
 }
 .v2-pv-th > :nth-child(n + 2) { text-align: right; }
@@ -1630,11 +1634,13 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-pv-sym { display: inline-flex; align-items: center; gap: 1px; width: fit-content; font-size: 11px; font-weight: 500; line-height: 16px; color: var(--t-ink3); text-decoration: none; }
 .v2-pv-sym .ms { font-size: 11px; }
 .v2-pv-sym:hover { color: var(--t-down); }
-.v2-pv .v2-td-two b { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v2-pv .v2-td-two b { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .v2-pv .v2-td-two em { white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* 줄의 주인공은 종목 · 해외 값 — 국장 종가 대비는 색으로만 말한다(굵기 500, 2026-10-04). */
+.v2-pv .v2-pv-diff b { font-weight: 500; }
 .v2-pv-diff.is-up b { color: var(--t-up); }
 .v2-pv-diff.is-down b { color: var(--t-down); }
-.v2-pv-vol { font-weight: 600; color: var(--t-ink2); }
+.v2-pv-vol { font-weight: 500; color: var(--t-ink2); }
 
 /* 오늘의 브리핑 — 이름표 줄(시장 브리핑의 .v2-brief3). 미장이 쉬었거나 조용한 밤은 문단 하나. */
 .v2-pv .v2-brief3 dd b { color: var(--t-ink); }
@@ -1656,7 +1662,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-pv-us .hz-stock-badge { margin-top: 6px; }
 .v2-pv-usname { flex: 1; display: flex; flex-direction: column; min-width: 0; line-height: 18px; }
 .v2-pv-usname > span { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 6px; min-width: 0; }
-.v2-pv-usname b { font-weight: 700; }
+.v2-pv-usname b { font-weight: 600; }
 .v2-pv-usname em { font-style: normal; font-size: 12px; font-weight: 500; color: var(--t-ink3); overflow-wrap: anywhere; }
 .v2-pv-usname > span em { color: var(--t-ink2); }
 .v2-pv-when { display: none; }
@@ -1680,8 +1686,8 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 a.v2-pv-kr:hover { background: var(--t-tint); }
 .v2-pv-nums { display: contents; }
 .v2-pv-why { min-width: 0; font-size: 12px; font-weight: 500; line-height: 18px; color: var(--t-ink3); overflow-wrap: anywhere; }
-.v2-pv-kr .v2-td-num { font-weight: 700; }
-.v2-pv-head { background: var(--t-head); font-size: 12px; font-weight: 600; color: var(--t-ink3); }
+.v2-pv-kr .v2-td-num { font-weight: 500; }
+.v2-pv-head { background: var(--t-head); font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-pv-head .v2-pv-us { align-items: center; min-height: 30px; padding-top: 0; padding-bottom: 0; }
 .v2-pv-head .v2-pv-kr { min-height: 30px; }
 .v2-pv-head .v2-pv-nums > span { text-align: right; }
@@ -1766,9 +1772,11 @@ a.v2-pv-kr:hover { background: var(--t-tint); }
 .v2-nt .hz-note-table { font-size: 13px; }
 .v2-nt .hz-note-table th,
 .v2-nt .hz-note-table td { border-bottom-color: var(--t-line); }
-.v2-nt .hz-note-table th { font-size: 12px; font-weight: 600; color: var(--t-ink3); background: var(--t-head); }
+.v2-nt .hz-note-table th { font-size: 12px; font-weight: 500; color: var(--t-ink3); background: var(--t-head); }
 .v2-nt .hz-note-table td:first-child { color: var(--t-ink); }
 .v2-nt .hz-note-body > p.hz-note-source { font-size: 12px; color: var(--t-ink3); }
+/* 출처 줄의 링크는 굵지 않게 — 글 끝 회색 한 줄이라 700 이면 본문 소제목보다 먼저 눈에 걸렸다(2026-10-04). */
+.v2-nt .hz-note-body > p.hz-note-source b { font-weight: 500; }
 .v2-nt .hz-note-body > p.hz-note-notice { font-size: 12px; font-weight: 500; color: var(--t-ink3); background: var(--t-tint); border-radius: 4px; }
 /* 공유 — 글 끝 오른쪽. v2 꼬리표 꼴(1px 선 · 모서리 4). */
 .v2-nt-foot { display: flex; justify-content: flex-end; padding: 16px 24px 18px; }
@@ -1795,7 +1803,7 @@ a.v2-pv-kr:hover { background: var(--t-tint); }
   content: counter(toc, decimal-leading-zero);
   flex: none;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--t-ink3);
   font-variant-numeric: tabular-nums;
 }
@@ -1812,8 +1820,8 @@ a.v2-pv-kr:hover { background: var(--t-tint); }
 a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decoration-color: var(--t-ink4); text-underline-offset: 3px; }
 .v2-nt-stock-name { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; line-height: 18px; }
 .v2-nt-stock-px { flex: none; display: inline-flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.v2-nt-stock-px b { font-weight: 700; }
-.v2-nt-stock-px i { font-style: normal; font-size: 12px; font-weight: 600; color: var(--t-ink3); }
+.v2-nt-stock-px b { font-weight: 600; }
+.v2-nt-stock-px i { font-style: normal; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-nt-stock-px i.is-up { color: var(--t-up); }
 .v2-nt-stock-px i.is-down { color: var(--t-down); }
 .v2-nt-stock-px em { font-style: normal; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
@@ -1844,7 +1852,7 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 .v2-nt-archive-list time { flex: none; width: 78px; font-size: 12px; font-weight: 500; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
 .v2-nt-archive-list span { min-width: 0; font-weight: 500; color: var(--t-ink2); overflow-wrap: anywhere; }
 .v2-nt-archive-list li[aria-current="page"] time { font-weight: 600; color: var(--t-down); }
-.v2-nt-archive-list li[aria-current="page"] span { font-weight: 700; color: var(--t-ink); }
+.v2-nt-archive-list li[aria-current="page"] span { font-weight: 600; color: var(--t-ink); }
 
 /* 글이 없을 때 */
 .v2-nt-empty { align-items: center; gap: 8px; padding: 36px 24px; color: var(--t-ink3); text-align: center; }
@@ -1904,11 +1912,11 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 .v2-in-row:hover { background: var(--t-tint); }
 .v2-in-rank { text-align: center; font-size: 12px; font-weight: 500; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
 .v2-in-who { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.v2-in-who b { flex: none; font-weight: 700; }
+.v2-in-who b { flex: none; font-weight: 600; }
 .v2-in-name { min-width: 0; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); overflow-wrap: anywhere; word-break: keep-all; }
 .v2-in-name.is-lead { font-size: 13px; font-weight: 600; color: var(--t-ink); }
 .v2-in-aux { min-width: 0; padding-left: 8px; text-align: left; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); word-break: keep-all; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
-.v2-in-val { text-align: right; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.v2-in-val { text-align: right; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .v2-in-val em { margin-left: 4px; font-style: normal; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-in-val .is-up { color: var(--t-up); }
 .v2-in-val .is-down { color: var(--t-down); }
@@ -1952,10 +1960,10 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 .v2-in > nav { font-size: 13px; }
 .v2-in > nav * { font-size: inherit; }
 .v2-in .hz-thead.hz-wide-head { min-height: 30px; padding: 0 14px; background: var(--t-head); border-bottom: 1px solid var(--t-line); }
-.v2-in .hz-thead > * { font-size: 12px; font-weight: 600; letter-spacing: 0; color: var(--t-ink3); }
+.v2-in .hz-thead > * { font-size: 12px; font-weight: 500; letter-spacing: 0; color: var(--t-ink3); }
 .v2-in .hz-trow.hz-wide { min-height: 52px; }
 .v2-in .hz-sheet-foot-row { min-height: 40px; border-top: 1px solid var(--t-line); }
-.v2-in .hz-more-btn { font-size: 12px !important; font-weight: 600 !important; color: var(--t-ink2); background: transparent; }
+.v2-in .hz-more-btn { font-size: 12px !important; font-weight: 500 !important; color: var(--t-ink2); background: transparent; }
 .v2-in .hz-more-btn:hover { background: var(--t-tint); color: var(--t-ink); }
 .v2-in-help { display: inline-flex; align-items: center; color: var(--t-ink3); cursor: help; }
 .v2-in-help .ms { font-size: 16px; }
@@ -1979,7 +1987,7 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 .v2-sk-id .v2-cover-k { margin-left: 2px; }
 /* 요즘 도는 얘기 — 이름표 칸에 날짜 · 등락이 서서 시장 브리핑보다 넓다. */
 .v2-sk .v2-brief3-row { grid-template-columns: 96px minmax(0, 1fr); }
-.v2-sk .v2-brief3 dt b { font-weight: 700; }
+.v2-sk .v2-brief3 dt b { font-weight: 600; }
 .v2-sk .v2-brief3 dt b.is-up { color: var(--t-up); }
 .v2-sk .v2-brief3 dt b.is-down { color: var(--t-down); }
 .v2-sk-src { font-size: 12px; color: var(--t-ink3); }
@@ -1992,7 +2000,7 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 .v2-sk-mbar i { display: block; width: 100%; max-width: 22px; border-radius: 2px; background: var(--t-down); }
 .v2-sk-mbar i.is-none { background: var(--t-bar-off); }
 .v2-sk-months em { font-style: normal; font-size: 11px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
-.v2-sk-months b { font-size: 11px; font-weight: 600; line-height: 14px; color: var(--t-ink2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v2-sk-months b { font-size: 11px; font-weight: 500; line-height: 14px; color: var(--t-ink2); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .v2-sk-facts { margin: 0; font-size: 12px; font-weight: 500; line-height: 18px; color: var(--t-ink3); word-break: keep-all; }
 /* 추이 · 배당 숫자 칸 — 넷이면 폰 폭(351)을 넘었다. 접어 두 줄로. */
 .v2-sk .v2-tm-figs { flex-wrap: wrap; row-gap: 8px; }
@@ -2008,7 +2016,7 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 .v2-isd-facts > div + div { border-top: 1px solid var(--t-line); }
 .v2-isd-facts dt { font-size: 12px; font-weight: 500; color: var(--t-ink2); }
 .v2-isd-facts dd { display: flex; flex-direction: column; align-items: flex-end; gap: 0; margin: 0; text-align: right; }
-.v2-isd-facts b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.v2-isd-facts b { font-weight: 600; font-variant-numeric: tabular-nums; }
 .v2-isd-facts b.is-zero { color: var(--t-ink3); }
 .v2-isd-facts b span { margin-left: 1px; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-isd-facts em { font-style: normal; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
@@ -2050,24 +2058,24 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 
 /* 쿠키 · 국외 이전 같은 짝 고지 — 카드 속 카드 대신 1px 선 · 머리 줄 면(.v2-dc-info). */
 .v2-dc-info { margin: 0 0 12px; border: 1px solid var(--t-line); border-radius: 4px; overflow: hidden; }
-.v2-dc-info-h { padding: 8px 14px; background: var(--t-head); border-bottom: 1px solid var(--t-line); font-size: 13px; font-weight: 700; line-height: 20px; color: var(--t-ink); }
+.v2-dc-info-h { padding: 8px 14px; background: var(--t-head); border-bottom: 1px solid var(--t-line); font-size: 13px; font-weight: 600; line-height: 20px; color: var(--t-ink); }
 .v2-dc-info dl { margin: 0; padding: 6px 14px 8px; display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 16px; }
 .v2-dc-info dl > div { display: contents; }
-.v2-dc-info dt { padding: 3px 0; font-size: 12px; font-weight: 600; line-height: 22px; color: var(--t-ink3); white-space: nowrap; }
+.v2-dc-info dt { padding: 3px 0; font-size: 12px; font-weight: 500; line-height: 22px; color: var(--t-ink3); white-space: nowrap; }
 .v2-dc-info dd { margin: 0; padding: 3px 0; font-size: 13px; font-weight: 400; line-height: 22px; color: var(--c-sub); overflow-wrap: anywhere; }
 
 /* 목차 — 조항 번호(번호 없는 문서는 차례 번호) · 제목. 누르면 #art-N(번호 있는 조항) · 영문 id 로 뛴다. */
 .v2-dc-toc { list-style: none; margin: 0; padding: 2px 14px; }
 .v2-dc-toc li + li { border-top: 1px solid var(--t-line); }
 .v2-dc-toc a { display: flex; align-items: baseline; gap: 10px; padding: 7px 0; font-size: 13px; font-weight: 500; line-height: 20px; color: var(--t-ink2); text-decoration: none; word-break: keep-all; }
-.v2-dc-toc i { flex: none; width: 16px; font-style: normal; font-size: 12px; font-weight: 600; color: var(--t-ink3); font-variant-numeric: tabular-nums; text-align: right; }
+.v2-dc-toc i { flex: none; width: 16px; font-style: normal; font-size: 12px; font-weight: 500; color: var(--t-ink3); font-variant-numeric: tabular-nums; text-align: right; }
 .v2-dc-toc a:hover { color: var(--t-down); }
 
 /* 데이터 출처(투자 유의사항 오른쪽 칸) — 갈래 · 기관 이름. 갈래 줄마다 가는 선. */
 .v2-dc-src { scroll-margin-top: 16px; }
 .v2-dc-src dl { margin: 0; padding: 2px 14px; }
 .v2-dc-src dl > div { padding: 8px 0; border-bottom: 1px solid var(--t-line); }
-.v2-dc-src dt { font-size: 12px; font-weight: 600; line-height: 18px; color: var(--t-ink3); }
+.v2-dc-src dt { font-size: 12px; font-weight: 500; line-height: 18px; color: var(--t-ink3); }
 .v2-dc-src dd { margin: 2px 0 0; font-size: 13px; font-weight: 500; line-height: 20px; color: var(--t-ink); word-break: keep-all; }
 .v2-dc-src p { margin: 0; padding: 8px 14px 12px; font-size: 12px; font-weight: 500; line-height: 18px; color: var(--t-ink3); }
 
@@ -2088,7 +2096,7 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 .v2-cl-list { list-style: none; margin: 0; padding: 0 14px; }
 .v2-cl-row { display: grid; grid-template-columns: 112px 48px minmax(0, 1fr); column-gap: 12px; align-items: baseline; padding: 8px 0; }
 .v2-cl-row + .v2-cl-row { border-top: 1px solid var(--t-line); }
-.v2-cl-ver { display: inline-flex; align-items: baseline; gap: 6px; font-size: 13px; font-weight: 700; line-height: 20px; color: var(--t-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v2-cl-ver { display: inline-flex; align-items: baseline; gap: 6px; font-size: 13px; font-weight: 600; line-height: 20px; color: var(--t-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .v2-cl-ver .v2-badge { align-self: center; }
 .v2-cl-row time { font-size: 12px; font-weight: 500; line-height: 20px; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
 .v2-cl-row ul { margin: 0; padding-left: 16px; list-style: disc outside; display: flex; flex-direction: column; gap: 2px; font-size: 13px; font-weight: 400; line-height: 20px; color: var(--c-sub); word-break: keep-all; overflow-wrap: anywhere; }
@@ -2127,16 +2135,16 @@ a.v2-isd-row:hover { background: var(--t-tint); margin: 0 -14px; padding: 0 14px
 .v2-isd-list.is-congress .v2-isd-row { grid-template-columns: minmax(0, 1fr) max-content 120px; }
 .v2-isd-list.is-exited .v2-isd-row { grid-template-columns: minmax(0, 1fr) 56px 84px; }
 .v2-isd-who { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
-.v2-isd-who > b { flex: none; font-weight: 700; white-space: nowrap; }
+.v2-isd-who > b { flex: none; font-weight: 600; white-space: nowrap; }
 .v2-isd-who > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-isd-who .hz-logo,
 .v2-isd-who img { align-self: center; flex: none; }
-.v2-isd-mid { display: inline-flex; align-items: baseline; gap: 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.v2-isd-mid { display: inline-flex; align-items: baseline; gap: 6px; font-size: 12px; font-weight: 500; white-space: nowrap; }
 .v2-isd-mid em { font-style: normal; font-weight: 500; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
 .v2-isd-mid.is-up { color: var(--t-up); }
 .v2-isd-mid.is-down { color: var(--t-down); }
 .v2-isd-mid.is-flat { color: var(--t-ink3); }
-.v2-isd-num { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v2-isd-num { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .v2-isd-num.is-sub { font-size: 12px; font-weight: 500; color: var(--t-ink2); }
 
 /* 차트 — 머리 띠 오른쪽 기간 단추(작은 세그먼트) · 차트 위 한 줄(매매자 칩 | 범례). */

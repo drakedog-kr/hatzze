@@ -34,7 +34,7 @@ export function ShareBar({ stocks, ariaLabel }: { stocks: { code: string; name: 
         {segs.map((s) => (
           <span key={s.key} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "var(--fs-12)", color: C.sub, whiteSpace: "nowrap" }}>
             <span aria-hidden style={{ width: 8, height: 8, borderRadius: 2, background: s.color, flex: "none" }} />
-            <span style={{ color: s.key === "rest" ? C.sub : C.ink, fontWeight: s.key === "rest" ? 600 : 700 }}>{s.name}</span>
+            <span style={{ color: s.key === "rest" ? C.sub : C.ink, fontWeight: 500 }}>{s.name}</span>
             <span style={{ fontFamily: "inherit" }}>{label(s.n)}</span>
           </span>
         ))}

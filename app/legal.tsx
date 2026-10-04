@@ -112,9 +112,12 @@ export function P({ children }: { children: React.ReactNode }) {
   return <p style={{ margin: "0 0 12px" }}>{children}</p>;
 }
 
-/** 본문 안에서 한 마디를 잉크색으로 올린다(조항의 핵심어). */
+/**
+ * 본문 안에서 한 마디를 잉크색으로 올린다(조항의 핵심어). 약관의 중요 조항이라 강조는 남기되 굵기는 600 —
+ * 브라우저 기본(bolder → 700)이면 약관 한 장에 스물두 군데가 제목만큼 굵었다(2026-10-04).
+ */
 export function B({ children }: { children: React.ReactNode }) {
-  return <b style={{ color: C.ink }}>{children}</b>;
+  return <b style={{ color: C.ink, fontWeight: 600 }}>{children}</b>;
 }
 
 // Tailwind 프리플라이트가 ul 의 list-style 을 지운다. 여기서 되살리지 않으면 항목이
@@ -156,7 +159,7 @@ export function Ext({ href, children }: { href: string; children: React.ReactNod
     /* ⚠️ C.blue 가 아니라 C.blueInk 다. 원색은 면(막대·알약 바탕)에 쓰는 값이라 흰 바탕
        위 글자로는 3.71 밖에 안 나온다 — 이 저장소가 ui.tsx 주석에 이미 적어 둔 규칙인데
        법률 페이지의 바깥 링크만 원색으로 남아 있었다(2026-08-25 실측). */
-    <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: C.blueInk, textDecoration: "none", fontWeight: 600 }}>
+    <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: C.blueInk, textDecoration: "none", fontWeight: 500 }}>
       {children}
     </a>
   );
