@@ -59,7 +59,7 @@ export type InsiderLeanRow = {
   rightLabel: string;
   left: number;
   right: number;
-  unit: "건" | "종목";
+  unit: "건";
 };
 
 /** 분기 끝날('2026-06-30') → '2026 Q2'(모듈 머리 parts.tsx quarterLabel 과 같은 꼴). */
@@ -68,14 +68,15 @@ const quarterShort = (iso: string) => `${iso.slice(0, 4)} Q${Math.ceil(Number(is
 const quarterKo = (iso: string) => `${iso.slice(0, 4)}년 ${Math.ceil(Number(iso.slice(5, 7)) / 3)}분기`;
 
 const sum = (xs: number[]) => xs.reduce((s, v) => s + v, 0);
-/** 늘린 쪽 · 줄인 쪽이 **더 많은** 종목만 — 늘린 거물과 줄인 거물이 같으면 어느 쪽에도 안 든다. */
+/** 늘린 거물이 줄인 거물보다 **많은** 종목만(브리핑 겹친 곳이 쓴다) — 같으면 안 든다. */
 const netAdds = (ov: BriefInput) => ov.managerAdds.filter((m) => m.movers > m.against);
-const netTrims = (ov: BriefInput) => ov.managerTrims.filter((m) => m.movers > m.against);
-const hasQuarters = (ov: BriefInput) => ov.compareQuarters.length === 2 && (netAdds(ov).length > 0 || netTrims(ov).length > 0);
+const hasQuarters = (ov: BriefInput) => ov.compareQuarters.length === 2 && (ov.managerAdds.length > 0 || ov.managerTrims.length > 0);
 
 /**
- * 줄 셋의 두 쪽 — 의원(매수 · 매도 건수), 거물(늘린 쪽 · 줄인 쪽이 더 많은 종목 수, 13F 금액은 주가에 오염돼 사람 수로 센다 —
- * ManagerMove 주석. 견줄 분기가 없으면 빠진다), 증권가(최근 7일 목표가 올림 · 내림 건수).
+ * 줄 셋의 두 쪽 — 의원(매수 · 매도 건수), 거물(종목을 늘린 · 줄인 건수 — 거물 한 명이 한 종목을 늘리면 한 건. 13F 금액은 주가에
+ * 오염돼 사람 수로 센다 — ManagerMove 주석. 견줄 분기가 없으면 빠진다), 증권가(최근 7일 목표가 올림 · 내림 건수).
+ * ⛔ 거물 줄을 '늘린 거물이 더 많은 종목 수'(618 · 588종목)로 두지 말 것 — 글자로는 '늘린 종목'으로 읽혀 뜻이 어긋났다
+ *    ("한번에 이해되게", 2026-10-04). 건수면 '늘림 N건'이 글자 그대로의 뜻이다.
  *
  * 셋째 줄은 처음에 임원이었다. ⛔ 다시 임원으로 두려면 아래를 먼저 볼 것(2026-10-04 하루에 셋을 걷었다):
  *  - 장내 매수 · 처분 금액 — 매수가 한 주에 한두 종목이라($3.5M · $540.8M) 막대가 늘 파랑 한 토막("매수가 너무 적다").
@@ -102,9 +103,9 @@ export function insiderLean(ov: BriefInput): InsiderLeanRow[] {
       span: quarterShort(ov.compareQuarters[1]),
       leftLabel: "늘림",
       rightLabel: "줄임",
-      left: netAdds(ov).length,
-      right: netTrims(ov).length,
-      unit: "종목",
+      left: sum(ov.managerAdds.map((m) => m.movers)),
+      right: sum(ov.managerTrims.map((m) => m.movers)),
+      unit: "건",
     });
   }
   // 줄 순서는 의원 → 거물 → 증권가(2026-10-04 "의원을 첫째로, 거물을 둘째로, 셋째 칸은 다시 생각"→ 증권가 목표가).
