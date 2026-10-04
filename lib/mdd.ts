@@ -414,7 +414,11 @@ export function analyzeDrawdown(bars: Bar[]): MddAnalysis | null {
      오늘이다. 0일은 '지금이 이 구간에서 가장 깊다'는 뜻이라 화면이 문장을 갈아탄다. */
   const deeperDays = ds.filter((p) => p.dd < last.dd).length;
   const eps = episodes(bars);
-  const topDrawdowns = [...eps].sort((a, b) => a.depth - b.depth).slice(0, 5);
+  // 깊은 순 다섯 — 단, 15% 넘게 빠진 사건은 여덟까지 다 싣는다. 회복까지 칸이 '15% 넘게 빠졌다 되찾은 5번'이라 세는데 표엔 넷만 있어
+  // 확인할 수 없었다(2026-10-04 점검). 여덟이 상한인 까닭은 아래 격자(is-quad) 키다.
+  const byDepth = [...eps].sort((a, b) => a.depth - b.depth);
+  const big15 = byDepth.filter((e) => e.depth <= CHARACTER_MIN_DEPTH).length;
+  const topDrawdowns = byDepth.slice(0, Math.min(8, Math.max(5, big15)));
   const closeOn = new Map(bars.map((b) => [b.date, b.close]));
   const big = [...eps].reverse().find((e) => e.recovered && e.depth <= CHARACTER_MIN_DEPTH);
   const lastDrop = big

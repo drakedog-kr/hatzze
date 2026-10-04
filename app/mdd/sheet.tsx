@@ -60,9 +60,10 @@ export function Foot({ children }: { children: React.ReactNode }) {
  * v2(2026-10-03): 옛 시트(머리 아이콘 타일 + 정보 아이콘 + 두 문장)를 v2 모듈(머리 띠 + 까닭 한 줄)로. 신고가 종목에선
  * '회복까지' · '시장 탓' 두 칸이 나란히 이 꼴이 돼 정보 아이콘이 한 화면에 둘 섰다.
  */
-export function AbsentSheet({ title, body }: { title: string; body: string }) {
+export function AbsentSheet({ title, body, className }: { title: string; body: string; className?: string }) {
   return (
-    <Module title={title}>
+    // className — 대신 서는 칸의 자리 규칙(판 폭 칸 v2-md-cases-mod · v2-md-years)을 그대로 받는다.
+    <Module title={title} className={className}>
       <p className="v2-empty">{body}</p>
     </Module>
   );
@@ -91,7 +92,7 @@ export function StatCell({ label, value, tone }: { label: string; value: string;
  * 오는 중인지"를 가르는 것이었으니, 기다림이 더 긴 이쪽에 없으면 앞뒤가 안 맞는다.
  *
  * 문구는 **무엇이 바뀌어서 다시 뜨느냐로 갈린다**(2026-08-02 결정).
- *  - 첫 진입 · 종목 변경 — "10년치 들춰보는 중". 종목이 바뀌면 그 종목의 시세를 처음부터
+ *  - 첫 진입 · 종목 변경 — "시세 들춰보는 중". 종목이 바뀌면 그 종목의 시세를 처음부터
  *    들춰 오는 것이라 1단계와 같은 일이다. 특히 첫 진입은 1단계 배지 바로 뒤에 이어
  *    붙으므로 **글자 그대로 같아야 한다** — 다르면 1.5초 안에 글자가 갈아끼워져 진행이
  *    아니라 깜빡임으로 읽힌다.
@@ -116,8 +117,9 @@ export function Skeleton({ periodOnly }: { periodOnly: boolean }) {
         <div className="v2-cover" style={{ height: 41 }} />
         {/* v2: 둘째 줄은 모듈 셋(Hero.tsx HeroStrip 과 같은 .v2-md-band). */}
         <div className="v2-md-band">
-          {[0, 1, 2].map((i) => (
-            <section key={i} className="hz-sheet">
+          {/* 결과(HeroStrip)와 같은 자리 클래스 — 없으면 1,000 미만에서 셋째 칸이 첫 칸 밑 216px 에 서서 결과가 오면 판이 튀었다(2026-10-04 점검). */}
+          {(["v2-md-stock", "v2-md-dd", "v2-md-sum"] as const).map((cls) => (
+            <section key={cls} className={`hz-sheet ${cls}`}>
               {body(
                 <>
                   {block(14)}
@@ -146,7 +148,8 @@ export function Skeleton({ periodOnly }: { periodOnly: boolean }) {
       <div className="hz-loading-float" aria-hidden>
         <span className="hz-loading-badge">
           <Spinner />
-          {periodOnly ? "고점부터 되짚는 중" : "10년치 들춰보는 중"}
+          {/* 기간을 적지 않는다 — 주소에 기간(?years=)이 실린 뒤로 1년 · 전체를 골라도 '10년치'라 거짓이었다(2026-10-04 점검). 라우트 자리표시자와 같은 말. */}
+          {periodOnly ? "고점부터 되짚는 중" : "시세 들춰보는 중"}
         </span>
       </div>
 
@@ -163,11 +166,12 @@ export function Skeleton({ periodOnly }: { periodOnly: boolean }) {
   );
 }
 
-export function ErrorCard({ message }: { message: string }) {
+export function ErrorCard({ message, missing = false }: { message: string; missing?: boolean }) {
   return (
     <Sheet>
       <div style={{ padding: PAD, display: "flex", alignItems: "center", gap: 10, color: C.sub, fontSize: "var(--fs-13)" }}>
-        <Icon name="error_outline" style={{ fontSize: "var(--fs-20)", color: C.mania }} />
+        {/* 없는 코드는 고장이 아니다 — 회색 검색 아이콘. 일시 실패만 빨간 경고. */}
+        <Icon name={missing ? "search" : "error_outline"} style={{ fontSize: "var(--fs-20)", color: missing ? C.sub : C.mania }} />
         {message}
       </div>
     </Sheet>

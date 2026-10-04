@@ -48,6 +48,8 @@ export type MddResult = {
   years: string;
   analysis: MddAnalysis;
   attribution: AttributionData | null;
+  /** 고점 부근일 때 최근 1년 등락 — 이 종목 · 기준 지수(%). '시장 탓' 칸 자리에 선다. 고점 부근이 아니거나 지수를 못 받았으면 null. */
+  yearCmp?: { stock: number; market: number } | null;
   theme: ThemeCmp | null;
   risk: RiskProfileData | null;
   partial: MddPartial | null;
@@ -130,7 +132,10 @@ export function periodInfo(years: string, firstDate: string, asOf: string): { la
   const approxYears = (Date.parse(asOf) - Date.parse(firstDate)) / (365 * 86_400_000);
   const requested = years === "all" ? Infinity : Number(years);
   const truncated = years !== "all" && approxYears < requested - 0.5;
-  const label = years === "all" || truncated ? `상장 이후·약 ${Math.max(1, Math.round(approxYears))}년` : `최근 ${years}년`;
+  // '전체'는 자료가 시작한 해로 적는다 — 야후 일봉이 2000년부터라 1975년 상장한 삼성전자도 '상장 이후·약 27년'이라 적혀 사실과 달랐다
+  // (2026-10-04 점검). 고른 기간보다 짧은 종목(truncated)은 자료 첫날이 곧 상장 무렵이라 '상장 이후'가 맞다.
+  const n = Math.max(1, Math.round(approxYears));
+  const label = years === "all" ? `${firstDate.slice(0, 4)}년 이후·약 ${n}년` : truncated ? `상장 이후·약 ${n}년` : `최근 ${years}년`;
   return { label, truncated, approxYears };
 }
 
@@ -250,9 +255,12 @@ export const PAD = "18px 22px";
 export type SumPart = string | { b: string };
 export type SumRow = { key: "depth" | "worst" | "recovery" | "market" | "theme"; label: string; parts: SumPart[] };
 
-/** 이만큼 차이 나면 '비슷하게'가 아니다 — 3%p, 또는 이 종목 낙폭의 15% 중 큰 쪽. */
+/** 이만큼 차이 나면 '비슷하게'가 아니다 — 3%p, 또는 이 종목 낙폭의 15% 중 큰 쪽. '시장 탓 · 종목 탓' 칸(V2Sheets)도 이 잣대로 가른다. */
 const SUM_SIMILAR_PP = 3;
 const SUM_SIMILAR_RATIO = 0.15;
+export function similarDrop(stock: number, other: number): boolean {
+  return Math.abs(stock - other) <= Math.max(SUM_SIMILAR_PP, SUM_SIMILAR_RATIO * Math.abs(stock));
+}
 /** 시장 · 업종 등락이 이 안쪽이면 '거의 그대로'. */
 const SUM_FLAT = 3;
 
@@ -279,7 +287,7 @@ function versus(subject: string, subjectDo: string, avg: string, v: number, stoc
   if (v >= SUM_FLAT) return [`${subject} 오히려 ${avg}`, { b: fmtPct(v) }, " 올랐습니다."];
   if (v > -SUM_FLAT) return [`${subject} ${avg}`, { b: fmtPct(v) }, "로 거의 그대로였습니다."];
   const gap = stock - v;
-  if (Math.abs(gap) <= Math.max(SUM_SIMILAR_PP, SUM_SIMILAR_RATIO * Math.abs(stock))) {
+  if (similarDrop(stock, v)) {
     return [`${subjectDo} ${avg}`, { b: fmtPct(v) }, "로 ", { b: "비슷하게" }, " 빠졌습니다."];
   }
   return [`${subject} ${avg}`, { b: fmtPct(v) }, "로 이 종목보다 ", { b: `${pp(gap)} ${gap < 0 ? "덜" : "더"}` }, " 빠졌습니다."];
@@ -302,8 +310,11 @@ export function mddSummary(d: Pick<MddResult, "analysis" | "attribution" | "them
     key: "depth",
     label: "깊이",
     parts:
-      a.deeperThanNowDays === 0
-        ? [`${span} 동안 `, { b: "지금이 가장 깊이" }, " 빠져 있습니다."]
+      // 오늘 종가가 기간 최고가면 낙폭 잣대의 문장('거의 모든 날이 지금보다 깊이 빠져 있었습니다')은 뜻이 없다(2026-10-04 점검, 심텍).
+      a.currentDd === 0 && a.asOf === a.athDate
+        ? [`${fmtDay(a.asOf, a.asOf)} 종가가 `, { b: `${span} 최고가` }, "였습니다."]
+        : a.deeperThanNowDays === 0
+          ? [`${span} 동안 `, { b: "지금이 가장 깊이" }, " 빠져 있습니다."]
         : p < 0.05
           ? [`${span} 동안 지금보다 깊이 빠져 있던 날은 `, { b: `${a.deeperThanNowDays.toLocaleString("ko-KR")}일` }, "뿐입니다."]
           : p >= 0.95

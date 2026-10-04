@@ -46,6 +46,10 @@ describe("periodInfo · cautionShort", () => {
     assert.equal(cautionShort("10", p.truncated, p.approxYears), "상장 3년, 표본 짧음");
   });
 
+  it("전체 구간은 자료가 시작한 해로 적는다 — 야후가 2000년부터라 '상장 이후'면 1975년 상장 종목에 거짓이다", () => {
+    assert.equal(periodInfo("all", "2000-01-04", "2026-09-30").label, "2000년 이후·약 27년");
+  });
+
   it("전체 구간은 합병·감자 경고", () => {
     const p = periodInfo("all", "2000-01-04", "2026-09-30");
     assert.equal(cautionShort("all", p.truncated, p.approxYears), "합병·감자 구간 섞임");

@@ -94,7 +94,12 @@ export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel:
             {/* '기간 최저점'은 게이지 끝 · 사례 표 첫 줄과 같은 값이라 뺐다(판정표 3) — 그 자리에 저점 대비. */}
             {/* 보조 줄('2,448일 중' · '6월 18일부터' · '7월 30일 저점')은 걷었다 — 띠의 거래일 수 · 옆 종목 칸의 전고점 · 저점 날짜와
                 같은 말이었다(2026-10-03). */}
-            <StatCell label="이보다 깊었던 날" value={deeperLabel(a)} />
+            {/* 신고가 당일엔 '이보다 깊었던 날 2,341일'이 뜻이 없다 — 직전 큰 하락의 고점보다 얼마나 올라섰나로 바꾼다(2026-10-04 점검, 심텍). */}
+            {drop ? (
+              <StatCell label="직전 고점 대비" value={fmtPct((a.price / drop.peak - 1) * 100)} tone={UP} />
+            ) : (
+              <StatCell label="이보다 깊었던 날" value={deeperLabel(a)} />
+            )}
             {drop ? (
               <>
                 <StatCell label="직전 하락" value={fmtPct(drop.depth)} tone={DOWN} />
@@ -138,7 +143,8 @@ function PriceRow({ label, date, value }: { label: string; date: string; value: 
  */
 function deeperLabel(a: MddAnalysis): string {
   if (a.deeperThanNowDays === 0) return "없음";
-  return fmtDayCount(a.deeperThanNowDays);
+  // 거래일이라고 적는다 — 옆 칸 '고점 이후 106일'은 달력 날수라, 같은 'N일'이면 두 칸이 같은 것을 세는 줄 알았다(2026-10-04 점검).
+  return `${Math.round(a.deeperThanNowDays).toLocaleString("ko-KR")}거래일`;
 }
 
 /** 눈금 줄 라벨 배치 결과. left 는 마커 라벨의 중심(px), null 이면 아직 안 쟀다. */
@@ -547,8 +553,9 @@ export function Underwater({
         {/* 표식은 HTML 로 얹는다 — 그림 안 글자는 그림 폭에 따라 커졌다 작아졌다 한다(축 글자를 밖으로 뺀 것과 같은 까닭).
             '지금'은 선 끝 점 + 후광. 예전(09)엔 값이 히어로에 있다고 뺐지만, 번호 표식과 같이 보면 지금이 어느 사례 뒤인지가 보인다. */}
         <div className="mdd-uw-marks">
+          {/* 끝 점이 고점 바로 밑(−2% 안)이면 '지금' 글자를 점 왼쪽에 — 위에 두면 머리 띠 선을 넘었다(2026-10-04 점검, 신고가 심텍). */}
           {!nowOnMark && (
-            <span className="mdd-uw-now" style={at(n - 1)} aria-hidden>
+            <span className={`mdd-uw-now${series[n - 1].dd > -2 ? " is-top" : ""}`} style={at(n - 1)} aria-hidden>
               <em>지금</em>
             </span>
           )}
@@ -556,7 +563,7 @@ export function Underwater({
             <button
               key={m.peak}
               type="button"
-              className={`mdd-uw-num${focusPeak === m.peak ? " is-on" : ""}`}
+              className={`mdd-uw-num${focusPeak === m.peak ? " is-on" : ""}${m.k === n - 1 && series[n - 1].dd > -2 ? " is-top" : ""}`}
               style={at(m.k)}
               aria-label={`${m.no}번 사례 구간을 차트에 표시`}
               aria-pressed={focusPeak === m.peak}

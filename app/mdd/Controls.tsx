@@ -10,7 +10,7 @@ import { MAJOR_NAMES, PERIODS, marketBadge, benchName, fmtDay } from "./shared";
 import type { StockOption, Suggestion, SuggestGroups, MddResult } from "./shared";
 import { periodLabelOf, AbsentSheet } from "./sheet";
 import { HeroStrip, Underwater } from "./Hero";
-import { AttributionModule, CasesTable, LadderModule, MddCover, RecoveryModule, ThemeModule, YearsModule } from "./V2Sheets";
+import { AttributionModule, CasesTable, LadderModule, LastDropModule, MddCover, RecoveryModule, ThemeModule, YearVsMarketModule, YearsModule } from "./V2Sheets";
 
 const MAJOR_RANK = new Map(MAJOR_NAMES.map((n, i) => [n, i]));
 
@@ -118,7 +118,10 @@ function SuggestSection({
                 textAlign: "left",
               }}
             >
-              <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", color: C.muted, width: 12, flexShrink: 0 }}>{i + 1}</span>
+              {/* 순위는 시장마다 따로(국내 1~3 · 미국 1~2) — 이어 매기면 '3 삼성전기 99회 → 4 마이크론 709회'처럼 값과 어긋났다(2026-10-04 점검). */}
+              <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", color: C.muted, width: 12, flexShrink: 0 }}>
+                {items.slice(0, i + 1).filter((x) => (x.market === "US") === (s.market === "US")).length}
+              </span>
               <StockLogo code={s.code} name={s.name} market={s.market} />
               <span style={{ fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {s.name}
@@ -388,19 +391,21 @@ export function Results({ data, onPick }: { data: MddResult; onPick: (s: StockOp
         {a.topDrawdowns.length > 0 ? (
           <CasesTable a={a} periodLabel={periodLabel} market={data.market} focus={focus} onFocus={onFocus} />
         ) : (
-          <AbsentSheet title="역대 하락 사례" body="이 기간엔 순위를 매길 만한 하락이 없었습니다." />
+          <AbsentSheet title="역대 하락 사례" body="이 기간엔 순위를 매길 만한 하락이 없었습니다." className="v2-md-cases-mod" />
         )}
         {a.recovery ? (
           <RecoveryModule a={a} />
+        ) : a.lastDrop ? (
+          <LastDropModule d={a.lastDrop} />
         ) : (
           <AbsentSheet title="회복까지" body="지금은 고점 부근이라 회복을 기다릴 하락이 없습니다." />
         )}
 
         {/* 해마다 | 시장 탓 — 위 줄(사례 2 : 회복 1)과 한 격자에 둬 칸 경계도 높이도 같다(2026-10-03 "위와 같은 크기로"). */}
         {data.risk ? (
-          <YearsModule r={data.risk} periodLabel={periodLabel} />
+          <YearsModule r={data.risk} periodLabel={periodLabel} asOf={a.asOf} />
         ) : (
-          <AbsentSheet title="해마다" body="상장한 지 얼마 되지 않아 연도별 성적을 낼 만큼 이력이 쌓이지 않았습니다." />
+          <AbsentSheet title="해마다" body="상장한 지 얼마 되지 않아 연도별 성적을 낼 만큼 이력이 쌓이지 않았습니다." className="v2-md-years" />
         )}
         {data.attribution ? (
           <AttributionModule
@@ -410,6 +415,8 @@ export function Results({ data, onPick }: { data: MddResult; onPick: (s: StockOp
             market={data.market}
             since={fmtDay(a.athDate, a.asOf)}
           />
+        ) : data.yearCmp ? (
+          <YearVsMarketModule c={data.yearCmp} stockName={data.name} market={data.market} />
         ) : (
           <AbsentSheet
             title="시장 탓 · 종목 탓"

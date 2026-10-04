@@ -67,9 +67,23 @@ export async function GET(request: Request) {
   const bars = await fetchDailyHistory(symbol, years, { volume: true });
   const analysis = bars ? analyzeDrawdown(bars) : null;
   if (!bars || !analysis) {
+    // 표에 없는 코드(잘못 친 · 상장폐지)와 일시 실패를 가른다 — 같은 문구 · 빨간 아이콘이라 없는 코드도 '고장'으로 읽혔다(2026-10-04 점검).
+    let known = true;
+    try {
+      const { data } = await getSupabaseServer()
+        .from(isUs ? "us_stocks" : "stocks")
+        .select(isUs ? "ticker" : "code")
+        .eq(isUs ? "ticker" : "code", code)
+        .maybeSingle();
+      known = !!data;
+    } catch {
+      // 표 조회가 깨졌으면 일시 실패로 둔다.
+    }
     return NextResponse.json(
-      { ok: false, error: "이 종목의 과거 시세를 불러오지 못했습니다." },
-      { status: 502 },
+      known
+        ? { ok: false, error: "이 종목의 과거 시세를 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오." }
+        : { ok: false, missing: true, error: "찾을 수 없는 종목 코드입니다. 위 검색창에서 종목 이름으로 찾아 보십시오." },
+      { status: known ? 502 : 404 },
     );
   }
 
@@ -117,6 +131,17 @@ export async function GET(request: Request) {
         }
       : null;
 
+  // 고점 부근이면 원인을 나눌 하락이 없다 — 대신 최근 1년을 시장과 견준다('시장 탓' 칸 자리). 빈 판이던 자리다(2026-10-04 점검).
+  const yearAgo = new Date(Date.parse(`${analysis.asOf}T00:00:00Z`) - 365 * 86_400_000).toISOString().slice(0, 10);
+  const yearCmp =
+    atHigh && marketBars
+      ? (() => {
+          const stock = returnSince(bars, yearAgo);
+          const mk = returnSince(marketBars, yearAgo);
+          return stock !== null && mk !== null ? { stock, market: mk } : null;
+        })()
+      : null;
+
   /**
    * ## 부분 실패는 짧게 캐시하고 화면에 알린다
    *
@@ -133,7 +158,7 @@ export async function GET(request: Request) {
       : null;
 
   return NextResponse.json(
-    { ok: true, code, name, market, symbol, years: yearsKey, analysis, attribution, theme, risk, partial, bench, benchUnderwater, ladder },
+    { ok: true, code, name, market, symbol, years: yearsKey, analysis, attribution, yearCmp, theme, risk, partial, bench, benchUnderwater, ladder },
     {
       headers: {
         "Cache-Control": partial

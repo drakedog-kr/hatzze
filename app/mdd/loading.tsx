@@ -53,8 +53,9 @@ export default function Loading() {
         {/* 첫 줄 띠(키 41) — 결과의 MddCover 자리. */}
         <div className="v2-cover" style={{ height: 41 }} />
         <div className="v2-md-band">
-          {[0, 1, 2].map((i) => (
-            <section key={i} className="hz-sheet">
+          {/* 결과와 같은 자리 클래스(sheet.tsx Skeleton 과 같다). */}
+          {(["v2-md-stock", "v2-md-dd", "v2-md-sum"] as const).map((cls) => (
+            <section key={cls} className={`hz-sheet ${cls}`}>
               <div style={body}>
                 <Block h={14} />
                 <Block h={38} />
@@ -85,7 +86,7 @@ export default function Loading() {
       <div className="hz-loading-float" aria-hidden>
         <span className="hz-loading-badge">
           <Spinner />
-          10년치 들춰보는 중
+          시세 들춰보는 중
         </span>
       </div>
 

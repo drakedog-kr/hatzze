@@ -27,6 +27,8 @@ export function MddExplorer({
   const [data, setData] = useState<MddResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // 표에 없는 코드(api/mdd missing) — 고장이 아니라 빨간 아이콘을 쓰지 않는다.
+  const [missing, setMissing] = useState(false);
   // 자리표시자 배지 문구를 가르는 값 — 기간만 바꿨나(true), 아니면 첫 진입·종목 변경인가.
   // 이유는 Skeleton 주석에. 조회를 거는 두 입구에서 세워 두고 Skeleton 이 읽는다.
   const [periodOnly, setPeriodOnly] = useState(false);
@@ -73,6 +75,7 @@ export function MddExplorer({
     const run = async () => {
       setLoading(true);
       setError(null);
+      setMissing(false);
       const params = new URLSearchParams({
         code: selected.code,
         market: selected.market ?? "KOSPI",
@@ -84,7 +87,10 @@ export function MddExplorer({
         const json = await res.json();
         if (!active) return;
         if (json.ok) setData(json as MddResult);
-        else setError(json.error ?? "불러오지 못했습니다.");
+        else {
+          setError(json.error ?? "불러오지 못했습니다.");
+          setMissing(json.missing === true);
+        }
       } catch {
         if (active) setError("네트워크 오류로 불러오지 못했습니다.");
       } finally {
@@ -146,7 +152,7 @@ export function MddExplorer({
       />
 
       {loading && <Skeleton periodOnly={periodOnly} />}
-      {!loading && error && <ErrorCard message={error} />}
+      {!loading && error && <ErrorCard message={error} missing={missing} />}
       {!loading && !error && data && <Results data={data} onPick={pickFromResults} />}
     </div>
   );
