@@ -110,8 +110,8 @@ from config.stock_extraction import (  # noqa: E402
     is_house,
 )
 
-# 화면 카드 정원. app/kadera/page.tsx 의 getSurgingStocks(6) 와 같아야 한다.
-CARD_N = 6
+# 화면 정원. app/kadera/page.tsx 의 getSurgingStocks(MAX_ROWS) 와 같아야 한다(v2 표 10줄).
+CARD_N = 10
 # 복붙 지배 문턱 — 창 안 언급의 이 비율 이상이 같은 본문이면 신호.
 DUP_RATIO = 0.8
 # 표본 부족 문턱 — 창 안 언급이 이 수 미만이면 신호.

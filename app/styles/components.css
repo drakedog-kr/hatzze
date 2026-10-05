@@ -88,6 +88,10 @@
   .hz-news-tail-full { display: none; }
   .hz-news-tail-short { display: inline; }
 }
+/* 330px 안팎 폰에서는 설문 문장(밑줄 이름이 끝에 선다)이 두 줄을 넘어 '참여하기'가 잘렸다 — 이 폭에서만 세 줄까지 둔다(2026-10-05 머지 전 점검). */
+@media (max-width: 340px) {
+  .hz-news:not(.hz-news-namefirst) .hz-news-text { -webkit-line-clamp: 3; }
+}
 
 /* 명절 인사 팝업(.hz-greet*)이 여기 있었다. 2026 추석 연휴(09-24~09-27)에 띄우고 연휴가 끝나 걷었다.
    다음 명절에 되살릴 땐 PR #560·#561 의 app/HolidayGreeting.tsx 와 이 자리의 CSS 를 가져와 인사 문구만 바꾼다.

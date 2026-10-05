@@ -77,10 +77,10 @@ from config.stock_extraction import (  # noqa: E402
 )
 from extract_telegram_stocks import JOSA_TAIL_RE, build_pattern, extract, load_dictionary  # noqa: E402
 
-# 화면 정원. app/kadera/page.tsx 의 getSurgingStocks(6)·getTopStocksWithTrend(6),
+# 화면 정원. app/kadera/page.tsx 의 getSurgingStocks(MAX_ROWS)·getTopStocksWithTrend(MAX_ROWS)(v2 표 10줄),
 # lib/kadera-why.ts 의 BOARD_TILES, lib/telegram-data.ts 의 KADERA_WINDOW_DAYS 와 같아야 한다.
-CARD_N = 6
-BOARD_TILES = 9
+CARD_N = 10
+BOARD_TILES = 10
 KADERA_WINDOW_DAYS = 3
 
 # 문맥 발췌 — 매칭 자리 앞뒤 글자 수. 한 줄로 읽히는 길이.

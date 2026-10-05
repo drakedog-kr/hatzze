@@ -1386,7 +1386,7 @@ export function ConsensusBody({
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 5, alignSelf: "flex-end", fontSize: "var(--fs-12)", color: C.muted }}>
                       <span aria-hidden style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--c-blue)", flexShrink: 0 }} />
                       {/* 값을 붙인다 — 구간 밖이면 점만으로는 어디인지 안 읽힌다. */}
-                      현재가 {price != null ? `$${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ""}
+                      현재가 {price != null && <ExactMoney usd={price} rate={rate} />}
                     </span>
                   )}
                   <span style={{ display: "flex", flexDirection: "column", gap: 1, alignItems: "flex-end" }}>

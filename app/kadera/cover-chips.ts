@@ -77,7 +77,7 @@ async function krSurgingChip(ga: string): Promise<CoverChip | null> {
   return {
     cap: "국장 급부상",
     name: top.name,
-    val: top.isNew || !Number.isFinite(top.ratio) ? "첫 언급" : `언급 ${top.ratio >= 10 ? Math.round(top.ratio) : top.ratio.toFixed(1)}배`,
+    val: top.isNew || !Number.isFinite(top.ratio) ? "첫 언급" : `언급 ${top.ratio.toFixed(1)}배`, // 국장 카더라 표와 같은 자릿수
     tone: "flat",
     href: "/kadera#surging",
     ga,
