@@ -71,7 +71,12 @@ function Trend({ points, recent }: { points: ThemeTrendPoint[]; recent: Set<stri
         const at = i / Math.max(1, points.length - 1);
         const edge = at > 0.72 ? " hz-tip-end" : at < 0.28 ? " hz-tip-start" : "";
         return (
-          <span key={p.date} className={`hz-tip hz-vline${edge}`} data-tip={`${fmtKoDate(p.date)} · 점유율 ${p.share.toFixed(1)}%${p.rank ? ` · ${p.rank}위` : ""}`}>
+          <span
+            key={p.date}
+            className={`hz-tip hz-vline${edge}`}
+            // 계산에서 뺀 날(기준일 아침처럼 표본이 거의 없는 날)은 '집계 전' — 0.0% 로 적으면 틀린 값으로 읽혔다(lib/theme-page.ts thin).
+            data-tip={p.thin ? `${fmtKoDate(p.date)} · 집계 전` : `${fmtKoDate(p.date)} · 점유율 ${p.share.toFixed(1)}%${p.rank ? ` · ${p.rank}위` : ""}`}
+          >
             <i
               className={!p.share ? "is-none" : recent.has(p.date) ? "is-recent" : undefined}
               style={{

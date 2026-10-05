@@ -95,6 +95,8 @@ export type ThemeTrendPoint = {
   /** 그날 점유율 순위. 집계가 없는 날은 null. */
   rank: number | null;
   mentions: number;
+  /** 표본이 거의 없어 계산에서 뺀 날(기준일 아침 · lib/theme-flow.ts thinDays). 막대는 바닥선, 말풍선은 '집계 전' — 0.0% 로 적으면 틀린 값으로 읽혔다(2026-10-05 머지 전 점검). */
+  thin?: boolean;
   /** 그날 이 테마 종목에 까닭 한 줄이 붙었나 — 추이 위에 점으로 찍는다. */
   hasReason: boolean;
 };
@@ -302,14 +304,17 @@ export function buildHotStocks(
   share?: { usualDays: string[]; dayTotals: Map<string, number> | null },
 ): ThemeHotStock[] {
   const agg = new Map<string, { m: number; c: number; w: number; u: number }>();
+  const usualSet = new Set(share?.usualDays ?? []);
   for (const r of rows) {
     const a = agg.get(r.code) ?? { m: 0, c: 0, w: 0, u: 0 };
     if (recentSet.has(r.date)) {
       a.m += r.mentions || 0;
       a.c = Math.max(a.c, r.channels || 0);
       a.w += Number(r.weight) || 0;
-    } else {
-      a.u += r.mentions || 0; // 평소(앞 27일) 합. 행이 없는 날은 0회라 날수는 27로 고정해 나눈다.
+    } else if (!share || usualSet.has(r.date)) {
+      // 평소 합 — 평소 날(얇은 날 제외)의 행만. 계산에서 뺀 기준일 아침 행까지 더하면 분모(평소 날수)와 어긋나 '새로 등장'이
+      // '평소의 10배 넘게'로 찍혔다(2026-10-05 머지 전 점검). 행이 없는 날은 0회라 날수는 그대로 나눈다.
+      a.u += r.mentions || 0;
     }
     agg.set(r.code, a);
   }
@@ -480,6 +485,7 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
       rank: r?.rank ?? null,
       mentions: r?.mention_count ?? 0,
       hasReason: reasonDates.has(date),
+      thin: thin.has(date),
     };
   });
 

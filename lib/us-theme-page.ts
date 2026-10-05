@@ -165,7 +165,7 @@ export const getUsThemePage = cache(async (theme: string): Promise<ThemePageData
   const thin = thinDays(dayTotals, trendDays);
   const trend: ThemeTrendPoint[] = trendDays.map((date) => {
     const r = thin.has(date) ? undefined : dailyByDate.get(date);
-    return { date, share: r ? Number(r.share_pct) || 0 : 0, rank: r?.rank ?? null, mentions: r?.mention_count ?? 0, hasReason: reasonDates.has(date) };
+    return { date, share: r ? Number(r.share_pct) || 0 : 0, rank: r?.rank ?? null, mentions: r?.mention_count ?? 0, hasReason: reasonDates.has(date), thin: thin.has(date) };
   });
 
   // '최근 사흘'도 얇은 날을 뺀 끝에서 고른다 — 히어로 점유율(테마 로테이션 · lib/theme-flow.ts usableDays)과 같은 사흘이어야
