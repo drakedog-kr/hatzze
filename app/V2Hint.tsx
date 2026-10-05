@@ -20,6 +20,8 @@ import { Icon } from "./ui";
  * - 같은 id 는 같은 가르침이다 — 카더라에서 '종목을 누르면 …'을 본 사람에게 미리보기 · 데일리 노트에서 또 띄우지 않는다.
  * - **한 화면에 하나씩.** 화면에 붙은 쪽지 가운데 아직 안 본 것 중 order 가 가장 앞선 것만 뜨고, 그걸 보면 다음이 뜬다
  *   (한 화면에 같은 손가락 아이콘이 둘 서지 않는다). order 는 화면에서 위에 있는 차례로 준다.
+ *   예외 `together` — 차례를 안 기다리고 바로 뜨고, 다른 쪽지의 차례에도 끼지 않는다. 카더라(국장 · 미장)의 테마 쪽지와 '많이 언급된
+ *   종목' 쪽지가 그렇다 — 테마 쪽지를 닫아야 종목 쪽지가 떠서, 첫 화면 아래의 종목 쪽지를 아무도 못 봤다(2026-10-05 운영자 지시 "동시에").
  * - 닫기 ✕ 는 맨 위 소식 띠의 ✕ 와 한 화면에 같이 설 수 있다 — 처음엔 그래서 쪽지 전체를 닫는 단추로 두고 ✕ 를 뺐는데, 쪽지를 누르는
  *   것이 '그 줄을 누르는 것'으로 읽혀 끄는 길이 안 보였다(2026-10-05 운영자 지시로 ✕ 를 되살림).
  *
@@ -30,13 +32,14 @@ import { Icon } from "./ui";
  */
 const { storeFor, markSeen } = createHintStore("hz-v2hint-", "hz-v2hint-change");
 
-/** 지금 화면에 붙은 쪽지 — id → 차례 · 붙은 수(같은 id 가 폭에 따라 두 자리에 설 수 있다 · 테마 지도와 흐름 표). */
-const mounted = new Map<string, { order: number; n: number }>();
+/** 지금 화면에 붙은 쪽지 — id → 차례 · 붙은 수(같은 id 가 폭에 따라 두 자리에 설 수 있다 · 테마 지도와 흐름 표) · 차례 밖인가. */
+const mounted = new Map<string, { order: number; n: number; together: boolean }>();
 
 function myTurn(id: string, order: number): boolean {
   if (!mounted.has(id) || !storeFor(id).getSnapshot()) return false;
+  if (mounted.get(id)!.together) return true; // 차례 밖 — 바로 뜬다
   for (const [other, m] of mounted) {
-    if (other === id) continue;
+    if (other === id || m.together) continue; // 차례 밖 쪽지는 줄에 안 선다
     const before = m.order < order || (m.order === order && other < id);
     if (before && storeFor(other).getSnapshot()) return false;
   }
@@ -53,6 +56,8 @@ export type HintSpec = {
   className?: string;
   /** 눌렀을 때 '봤음'이 되는 것(판 안 CSS 선택자) — 쪽지가 가르치는 동작의 대상. 없으면 anchor 에서 자리 표시를 뗀 것. */
   target?: string;
+  /** 차례를 안 기다리고 바로 뜬다(다른 쪽지의 차례에도 안 낀다) — 머리 주석의 예외. */
+  together?: boolean;
 };
 
 /** anchor 의 자리 표시(첫째 · 끝 · n째)를 뗀 선택자 — '첫 줄'을 가리키는 쪽지의 가르침은 '아무 줄이나 누르면'이다. */
@@ -61,7 +66,7 @@ export function targetOf(anchor: string | undefined): string | null {
   return anchor.replace(/:(?:first-child|last-child|first-of-type|last-of-type|nth-child\([^)]*\)|nth-of-type\([^)]*\))/g, "").trim() || null;
 }
 
-export function V2Hint({ id, text, order = 0, anchor, at = "below", className, target, style }: HintSpec & { style?: React.CSSProperties }) {
+export function V2Hint({ id, text, order = 0, anchor, at = "below", className, target, together = false, style }: HintSpec & { style?: React.CSSProperties }) {
   const ref = useRef<HTMLDivElement>(null);
   const store = storeFor(id);
   const show = useSyncExternalStore(store.subscribe, () => myTurn(id, order), () => false);
@@ -69,7 +74,7 @@ export function V2Hint({ id, text, order = 0, anchor, at = "below", className, t
   // 화면에 붙었다고 적는다 — 차례 셈은 붙은 쪽지끼리만 한다. 붙기 전엔 안 띄운다(myTurn 의 mounted.has).
   useEffect(() => {
     const m = mounted.get(id);
-    mounted.set(id, { order: Math.min(order, m?.order ?? order), n: (m?.n ?? 0) + 1 });
+    mounted.set(id, { order: Math.min(order, m?.order ?? order), n: (m?.n ?? 0) + 1, together: together || (m?.together ?? false) });
     window.dispatchEvent(new Event("hz-v2hint-change"));
     return () => {
       const cur = mounted.get(id);
@@ -77,7 +82,7 @@ export function V2Hint({ id, text, order = 0, anchor, at = "below", className, t
       else mounted.set(id, { ...cur, n: cur.n - 1 });
       window.dispatchEvent(new Event("hz-v2hint-change"));
     };
-  }, [id, order]);
+  }, [id, order, together]);
 
   // 가르친 대로 눌러 본 사람도 알아들은 것이다 — 그때도 '봤음'으로 적어야 돌아왔을 때 또 안 뜬다. 판의 다른 자리는 세지 않는다(머리 주석).
   const sel = target ?? targetOf(anchor);

@@ -186,7 +186,7 @@ export default async function UsKaderaPage() {
       title: "많이 언급된 종목",
       meta: `최근 ${US_WINDOW_DAYS}일`,
       // 종목 쪽지는 이 표 첫 줄(가장 많이 언급된 종목) 밑에 — 국장 카더라와 같은 까닭(app/kadera/page.tsx talk 주석).
-      hint: { id: "stock-row-us", order: 2, text: "종목을 누르면 월가 거물·임원 매매까지 함께 나옵니다" },
+      hint: { id: "stock-row-us", order: 2, together: true, text: "종목을 누르면 월가 거물·임원 매매까지 함께 나옵니다" },
       kind: "talk",
       heads: ["", "종목", liveHead, "언급", "흐름 요약"],
       key0: "언급",
