@@ -96,8 +96,10 @@ from generate_telegram_narratives import (  # noqa: E402
     first_sentences,
     has_schedule_block,
     kst_date,
+    narrative_problems,
     newest_first,
     optimism,
+    pick_narrative,
     percent_count,
     schedule_digest,
     schedule_excerpt,
@@ -312,10 +314,14 @@ STOCK_SYSTEM = US_COMMON + f"""
 - **언급 횟수·낙관도 퍼센트를 쓰지 마세요.** 이 문장 아래에 "언급 357회 · 62개 채널"이
   찍히고 위에는 일별 막대가 있습니다. 같은 걸 또 적으면 자리만 차지하고, 무엇보다
   **두 숫자가 어긋나 보일 수 있습니다**(카드와 집계 시점이 다릅니다).
-- **날짜 숫자('9일', '10~11일')도 쓰지 마세요.** 차트에 날짜 축이 이미 있습니다.
-  추이는 모양으로 옮기세요 — "최근 사흘 사이 부쩍 늘었습니다".
-- ⚠️ **화면 차트는 이 digest 보다 긴 기간을 그립니다.** 추이를 말할 땐 "최근 사흘",
-  "요 며칠"처럼 가까운 며칠로 못박으세요.
+- **날짜 숫자('9일', '10~11일')와 언급 추이('언급이 부쩍 줄었습니다', '관심이 늘었습니다')도
+  쓰지 마세요.** 일별 막대가 이미 보여 줍니다. 주말·휴장일엔 모든 종목의 언급이 함께 줄어,
+  추이를 문장으로 적으면 이 종목만 관심이 식은 것처럼 읽힙니다. 기간('최근 3일', '요 며칠')도
+  적지 말고 그 자리를 화제 내용에 쓰세요.
+- **주가 얘기와 증권사가 이 종목을 좋게 본 평가는 옮기지 마세요.** "강세", "저평가", "급등" 같은
+  시세 표현과 매수 의견·추천 종목·비중 확대·목표주가처럼 "이 종목을 사라"로 읽히는 평가는
+  전언("~라는 의견이 돌았습니다")으로 바꿔도 안 됩니다. 그 보고서가 **무엇을 다뤘는지**(업황,
+  실적 전망의 근거)만 적으세요.
 - ⚠️ **그 종목의 이름으로 문장을 시작하지 마세요.** 카드 머리에 이름과 티커가 이미 크게
   적혀 있어 되풀이이고, {LEN_MAX}자에서 그 자리가 아깝습니다. 나쁜 예(주인공이 애플일 때):
   "애플의 핵심 공급업체 TSMC의 매출 증가세가 화제였습니다" → 좋은 예: "핵심 공급업체
@@ -927,12 +933,12 @@ def main() -> None:
             candidates = [ask(STOCK_SYSTEM, digest)]
             for _ in range(MAX_RETRIES):
                 cur = candidates[-1]
-                found = problems(cur, digest)
+                found = narrative_problems(cur, digest)
                 if LEN_MIN <= len(cur) <= LEN_MAX and not found:
                     break
                 if found:
                     print(f"  [{name}] 문장을 버리고 다시 씁니다({' · '.join(found)}): {cur[:40]}…")
-                    fix = f"방금 쓴 문장에 문제가 있습니다({' · '.join(found)}). 같은 뜻으로 다시 써 주세요.\n\n{digest}"
+                    fix = f"방금 쓴 문장에 문제가 있습니다({' · '.join(found)}). 그 대목을 빼고 {LEN_MIN}~{LEN_MAX}자로 다시 써 주세요.\n\n{digest}"
                 else:
                     need = "늘려" if len(cur) < LEN_MIN else "줄여"
                     fix = (
@@ -942,24 +948,10 @@ def main() -> None:
                     )
                 candidates.append(ask(STOCK_SYSTEM, fix))
 
-            clean = [t for t in candidates if is_clean(t, digest)] or candidates
-            mid = (LEN_MIN + LEN_MAX) / 2
-            in_goal = [t for t in clean if LEN_MIN <= len(t) <= LEN_MAX]
-            in_ok = [t for t in clean if LEN_HARD_MIN <= len(t) <= LEN_HARD_MAX]
-            usable = [t for t in clean if t.strip()]
-            if in_goal:
-                text = in_goal[0]
-            elif in_ok:
-                text = min(in_ok, key=lambda t: abs(len(t) - mid))
-            elif usable:
-                # 길이는 '맞으면 좋은 것'이다. 카드에 빈칸이 생기는 게 몇 자 어긋난 것보다
-                # 나쁘다(국내에서 삼성전자 요약이 그렇게 사라진 적이 있다).
-                text = min(usable, key=lambda t: abs(len(t) - mid))
-                lens = ", ".join(str(len(t)) for t in candidates)
-                print(f"  [{name}] 길이({lens}자)가 모두 허용 범위 밖 — "
-                      f"목표에 가장 가까운 {len(text)}자를 저장합니다.")
-            else:
-                print(f"  [{name}] 빈 응답만 받아 저장하지 못했습니다.")
+            # 고르는 규칙은 국내와 같다(generate_telegram_narratives.pick_narrative).
+            text = pick_narrative(candidates, digest, name)
+            if text is None:
+                print(f"  [{name}] 저장할 문장이 없어 건너뜁니다.")
                 continue
 
             db.table("telegram_us_stock_narrative").upsert(
