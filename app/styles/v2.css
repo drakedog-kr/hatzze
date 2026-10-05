@@ -2111,8 +2111,12 @@ a.v2-pv-kr:hover { background: var(--t-tint); }
   .v2-pv-diff { grid-area: diff; }
   .v2-pv-vol { grid-area: vol; font-size: 12px; }
   .v2-pv-perp [data-k]::before { content: attr(data-k); font-size: 12px; font-weight: 500; color: var(--t-ink3); }
-  /* 심볼 링크는 16px 줄이라 손가락에 작다 — 위아래 4px 를 늘리고 같은 만큼 바깥 여백을 빼 자리는 그대로(mobile.css 의 링크들과 같은 수법). */
-  .v2-pv-sym { padding-block: 4px; margin-block: -4px; }
+  /* 줄 전체가 종목 화면 링크 — 이름 링크만 누르는 자리(줄의 5%)라 빗나가면 심볼(바깥 사이트)이 눌렸다(2026-10-05 모바일 점검).
+     심볼은 이름 오른쪽에 두고 위 층에서 따로 눌리게 한다(바깥 여백을 빼 자리 차지는 그대로). */
+  .v2-pv-perp .v2-tr { position: relative; }
+  .v2-pv-stock::after { content: ""; position: absolute; inset: 0; }
+  .v2-pv-name { flex-direction: row; align-items: baseline; gap: 8px; }
+  .v2-pv-sym { position: relative; z-index: 1; padding: 10px 6px; margin: -10px -6px; }
   .v2-pv-vol[data-k]::before { content: attr(data-k) " "; }
   /* 함께 움직인 국장 종목 — 미장 칸이 묶음 머리 줄(옅은 면), 그 아래 국장 줄이 두 층(위 이름 · 관계, 아래 개장 · 장 중 · 종가).
      머리 줄은 숨긴다 — '.v2-pv-grp { display: block }'과 특이도가 같아 뒤 규칙에 덮여 91px 깨진 머리가 섰다(2026-10-05 점검). */
