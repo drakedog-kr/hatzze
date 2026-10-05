@@ -2058,7 +2058,25 @@ function seekAnchor(el: HTMLElement, hash: string, waiting: React.RefObject<(() 
     const a = document.getElementById(id);
     return a && el.contains(a) ? a : null;
   };
-  const toAnchor = (a: HTMLElement) => a.scrollIntoView({ block: "start", behavior: "instant" });
+  // 내린 뒤에도 ANCHOR_WAIT_MS 동안은 다시 잰다 — 스트리밍이 끝나며 앵커 모듈이 **새 요소로 갈아 끼워지고** 위쪽이 자리를 잡아,
+  // 주소창으로 /kadera#surging 을 열면 폰에서 모듈 머리가 탑바 밑 −24 ~ −83px 에 멈췄다(2026-10-05 머지 전 점검). 그동안 짧게
+  // 재어(요소는 매번 id 로 다시 찾는다 · 붙잡아 둔 옛 요소는 문서에서 떨어져 있다) 처음 내린 자리에서 벗어나면 다시 내린다.
+  // 사람이 손대면(waiting 을 거두면) 바로 놓는다.
+  const toAnchor = (a: HTMLElement) => {
+    a.scrollIntoView({ block: "start", behavior: "instant" });
+    const landed = a.getBoundingClientRect().top;
+    const tick = window.setInterval(() => {
+      const cur = find();
+      if (cur && Math.abs(cur.getBoundingClientRect().top - landed) > 2) cur.scrollIntoView({ block: "start", behavior: "instant" });
+    }, 120);
+    const timer = window.setTimeout(() => settle(), ANCHOR_WAIT_MS);
+    const settle = () => {
+      window.clearInterval(tick);
+      window.clearTimeout(timer);
+      if (waiting.current === settle) waiting.current = null;
+    };
+    waiting.current = settle;
+  };
   const now = find();
   if (now) {
     toAnchor(now);
