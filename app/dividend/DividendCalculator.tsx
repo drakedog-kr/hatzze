@@ -93,6 +93,15 @@ export function DividendCalculator({
   const [addMan, setAddMan] = useState(ADD_DEFAULT_MAN);
   // 달력에서 누른 달 — 그 달에 주는 종목을 아래에 세운다(빈 달 채우기).
   const [fillMonth, setFillMonth] = useState<number | null>(null);
+  // 달 칸으로 새 달을 열었을 때만 그 판까지 내려간다 — 폰에선 판이 화면 밖(아래 1,000px 남짓)에 열려 누른 칸 색만 바뀌었다
+  // (2026-10-05 모바일 점검 P1). 넓은 화면은 판이 이미 보여 'nearest' 가 움직이지 않는다. 같은 달을 다시 눌러 닫을 땐 안 움직인다.
+  const fillScroll = useRef(false);
+  useEffect(() => {
+    if (fillMonth == null || !fillScroll.current) return;
+    fillScroll.current = false;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document.querySelector(".v2-dv-fill")?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
+  }, [fillMonth]);
   const [amount, setAmount] = useState(AMOUNT_DEFAULT);
   const chipsBy: Record<Scope, string[]> = { kr: popular, us: popularUs, etf: popularEtf };
   // 빈 달 채우기의 후보 순서 — 칩과 '더 보기' 묶음에 선 것(서버가 고른 순)이 먼저, 그다음은 나머지 전부를
@@ -408,7 +417,10 @@ export function DividendCalculator({
             selected={fillMonth}
             onPick={(m) => {
               setFillMonth((cur) => (cur === m ? null : m));
-              if (fillMonth !== m) track("dividend_fill_month", { month: m });
+              if (fillMonth !== m) {
+                fillScroll.current = true;
+                track("dividend_fill_month", { month: m });
+              }
             }}
           />
           <UpcomingModule items={upcoming.items} sureKrw={upcoming.sureKrw} expectedKrw={upcoming.expectedKrw} />
