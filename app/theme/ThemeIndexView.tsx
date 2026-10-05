@@ -254,7 +254,12 @@ export function ThemeIndexView({
                     >
                       <span className="v2-td-rank">{t.rank}</span>
                       <span className="v2-td-theme2">
-                        <b>{t.theme}</b>
+                        {/* 폰은 열흘 한 조각을 이름 줄 옆에 붙인다(오른쪽 칸은 숨긴다) — 네 층 줄이 한 줄 평균 118px 였다(2026-10-05 모바일 점검).
+                            넓은 화면은 이 조각을 숨기고 오른쪽 칸을 그대로 쓴다. */}
+                        <span className="v2-td-theme2-top">
+                          <b>{t.theme}</b>
+                          <span className={`v2-td-flow v2-td-flowinline${cap.on ? " is-on" : ""}`}>{cap.text}</span>
+                        </span>
                         <span className="v2-td-sub">{t.topStocks.length ? t.topStocks.map((x) => x.name).join(" · ") : "최근 언급 없음"}</span>
                       </span>
                       <span className={`v2-td-text${t.briefLine ? "" : " is-pending"}`}>{t.briefLine ?? "-"}</span>

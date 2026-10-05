@@ -1774,8 +1774,9 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-tm-figs b { font-size: 13px; font-weight: 600; line-height: 20px; font-variant-numeric: tabular-nums; }
 .v2-tm-figs em { font-style: normal; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); white-space: nowrap; }
 /* 막대는 남는 높이를 받되 하한은 낮게 — 요약 글이 짧은 테마(원전)에서 막대 하한(104)이 키를 정해 글 칸 아래가 87px 비었다. */
-.v2-tm-trend { flex: 1; min-height: 56px; display: flex; align-items: flex-end; gap: 3px; }
-.v2-tm-trend > span { position: relative; flex: 1; min-width: 0; height: 100%; display: flex; align-items: flex-end; }
+/* 막대 사이 3px 틈은 칸의 안쪽 여백으로 — gap 이면 틈을 누를 때 아무 막대도 안 잡혔다(2026-10-05 모바일 점검). 보이는 모양은 같다. */
+.v2-tm-trend { flex: 1; min-height: 56px; display: flex; align-items: flex-end; gap: 0; }
+.v2-tm-trend > span { position: relative; flex: 1; min-width: 0; height: 100%; display: flex; align-items: flex-end; padding: 0 1.5px; }
 .v2-tm-trend i { display: block; width: 100%; border-radius: 2px; background: color-mix(in srgb, var(--t-down) 35%, transparent); }
 .v2-tm-trend i.is-recent { background: var(--t-down); }
 /* 0 인 날 — 2px 바닥선(언급 없는 종목에 1px 막대 40개가 빈 칸처럼 보였다, 2026-10-05). 바탕보다 한 단 진하게. */
@@ -2495,7 +2496,8 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 .v2-sk .v2-tm-figs { flex-wrap: wrap; row-gap: 8px; }
 @container kd (max-width: 679px) {
   /* 88 · 한 줄 — 76 이면 '10/1 +10.90%'가 날짜 · 등락 두 줄로 갈렸다(2026-10-05 점검). */
-  .v2-sk .v2-brief3-row { grid-template-columns: 88px minmax(0, 1fr); }
+  /* 날짜는 문장 위 작은 줄로 — 88px 날짜 칸 옆 문장이 236px 로 좁아 네 줄씩 접혔다(2026-10-05 모바일 점검). */
+  .v2-sk .v2-brief3-row { grid-template-columns: minmax(0, 1fr); row-gap: 2px; }
   .v2-sk .v2-brief3 dt { white-space: nowrap; }
   /* 숫자 넷은 2×2 — 넷째만 둘째 줄에 혼자 섰다. 배당 숫자 셋은 그대로. */
   .v2-sk .v2-tm-figs:has(> :nth-child(4)) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -2783,6 +2785,24 @@ a.v2-isd-row:hover { background: var(--t-tint); margin: 0 -14px; padding: 0 14px
   .hz-cell-wide:has(.hz-soon-box) { flex-direction: row !important; align-items: center; justify-content: space-between; }
   .hz-cell-wide:has(.hz-soon-box) > .hz-cell-graphic { flex: none !important; }
   .hz-soon-box { min-height: 0; border: 0 !important; }
+}
+/* 테마 흐름 이름 줄 — 이름 옆 열흘 조각(폰 전용). */
+.v2-td-theme2-top { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; min-width: 0; }
+.v2-td-flowinline { display: none; }
+@container kd (max-width: 679px) {
+  /* 테마 흐름 — 열흘 조각을 이름 옆으로 옮기고 오른쪽 칸 층을 걷는다(네 층 → 세 층). */
+  .v2-td-flowinline { display: inline; text-align: left; }
+  .v2-tm-flowtbl .v2-td-flow2 { display: none; }
+  .v2-tm-flowtbl .v2-tr { grid-template-areas: "rank theme share" ".    text  text"; }
+  /* 테마별 급부상 종목 — 언급 수는 종목의 값이라 종목 줄 오른쪽에. 테마 이름은 누를 자리만 위아래로 넓힌다. */
+  .v2-tm-risertbl .v2-tr { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "theme theme" "stock num" "text text"; }
+  .v2-tm-risertbl .v2-td-theme { justify-self: start; padding: 6px 0; margin: -6px 0 -2px; }
+  /* 30일 막대는 80 — 56 이면 납작해 날마다의 차이가 안 보였다(종목 판 폭 112 와 같은 생각). */
+  .v2-tm-trendmod .v2-tm-trend { min-height: 80px; }
+  /* 등락의 이유 — 오른쪽 숫자 열 끝을 줄마다 맞춘다(종가 끝이 여섯 가지였다). */
+  .v2-tm-reasonrows .v2-td-px { min-width: 76px; text-align: right; }
+  .v2-tm-reasonrows .v2-td-chg { min-width: 58px; text-align: right; }
+  .v2-tm-reasonrows .v2-td-ch { min-width: 52px; text-align: right; }
 }
 @container kd (max-width: 359px) {
   /* 360 미만에서만 표 종목 이름 세 줄. */
