@@ -1688,7 +1688,8 @@ const NEWS_EVENT = "hz-news-change";
    ⛔ 소식을 새로 걸거나 문구를 고칠 때는 app/releases.ts 에 판을 올리지 않는다(2026-10-01 지시 — 업데이트 기록에 안 싣는다). */
 /* tailShort: 폰(≤560)에서 tail 대신 쓰는 짧은 꼬리. 이름이 앞에 서는 소식은 폰에서 한 줄로 잘리므로(components.css 의
    .hz-news-namefirst) 긴 tail 은 문장 중간에서 '…'로 끊긴다. 한 줄(360px 폰에서 글자 칸 238px)에 들어가는 문장을 따로 둔다. */
-type NewsItem = { key: string; from: string; href: string; head?: string; name: string; tail: string; tailShort?: string; aria?: string; icon: IconName; ga: string };
+/* until: 이 시각부터는 안 띄운다(없으면 계속). 마감이 있는 소식(설문 · 행사)이 끝난 뒤에 남지 않게. */
+type NewsItem = { key: string; from: string; until?: string; href: string; head?: string; name: string; tail: string; tailShort?: string; aria?: string; icon: IconName; ga: string };
 
 /* 2026-10-01 · 텔레그램 구독 권유 4판. 테마 리포트 오픈 소식(9/23~)을 내리고 다시 건다.
    ⭐ **문장이 먼저 오고 밑줄 이름이 뒤에 선다**(head → name → tail). 사람들이 가장 궁금해하는 '왜 올랐나'가 주인공이고
@@ -1712,14 +1713,33 @@ const TELEGRAM_NEWS: NewsItem = {
   ga: "news-telegram",
 };
 
-/** 지금 걸 소식. 소식을 바꿀 땐 이 줄과 위 덩이만 갈아 끼운다. */
-const NEWS: NewsItem = TELEGRAM_NEWS;
+/* 2026-10-05 · v2 의견 설문(구글 설문, 1분 · 추첨 10명 커피 기프티콘 · 10월 20일 마감). 텔레그램 4판을 내리고 건다.
+   문구는 운영자가 후보 열 중에 고른 것이다. 상품 수 · 마감일은 문장에 안 넣고(설문 첫 장이 말한다) '1분'과 '커피'만 둔다.
+   ⚠️ 키를 새로 땄다 — 텔레그램 띠를 닫았던 사람에게도 한 번 뜬다. 마감 다음 날 0시(KST)부터는 저절로 텔레그램 4판으로 돌아간다(until ·
+   아래 NEWS). 4판을 이미 닫은 사람에게는 안 뜬다 — 다시 모두에게 띄우려면 그때 4판 키를 새로 딴다.
+   아이콘 campaign 은 본문 어디에도 안 쓰는 그림이라 한 화면 두 번 규칙에 안 걸린다. */
+const SURVEY_NEWS: NewsItem = {
+  key: "hz-news-survey-v2",
+  from: "2026-10-05T00:00:00+09:00",
+  until: "2026-10-21T00:00:00+09:00",
+  href: "https://forms.gle/otD2jw73frGsTBqb9",
+  head: "hatzze가 새로 바뀌었습니다. 1분 의견 설문에 답하시면 추첨으로 커피를 드립니다. ",
+  name: "참여하기",
+  tail: "",
+  aria: "hatzze가 새로 바뀌었습니다. 1분 의견 설문에 답하시면 추첨으로 커피를 드립니다. 참여하기. 의견 설문 열기(새 탭)",
+  icon: "campaign",
+  ga: "news-survey",
+};
 
 // 모듈이 읽힐 때 한 번만 본다(렌더 안에서 Date.now() 를 부르면 React 컴파일러 린트가 막는다).
 // 서버는 어차피 안 그리고(getServerSnapshot 이 false), 클라이언트는 페이지를 열 때마다 새로 읽는다.
 // 개발 서버에서는 시각과 무관하게 띄운다 — 문구·아이콘을 로컬에서 보려면 날짜를 기다릴 수 없다.
 const NEWS_NOW = Date.now();
-const newsLive = (news: NewsItem) => process.env.NODE_ENV !== "production" || NEWS_NOW >= Date.parse(news.from);
+const newsLive = (news: NewsItem) =>
+  process.env.NODE_ENV !== "production" || (NEWS_NOW >= Date.parse(news.from) && (!news.until || NEWS_NOW < Date.parse(news.until)));
+
+/** 지금 걸 소식. 소식을 바꿀 땐 이 줄과 위 덩이만 갈아 끼운다. 설문이 끝나면(until) 텔레그램 4판으로 돌아간다. */
+const NEWS: NewsItem = newsLive(SURVEY_NEWS) ? SURVEY_NEWS : TELEGRAM_NEWS;
 
 /** 소식마다 저장소 하나. 훅에 넘기는 객체가 렌더마다 새것이면 useSyncExternalStore 가 계속 다시 구독한다 — 키로 캐시한다. */
 const newsStores = new Map<string, { subscribe: (cb: () => void) => () => void; getSnapshot: () => boolean }>();
