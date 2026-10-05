@@ -254,7 +254,7 @@ export function ThemeShares({
       title="테마 점유율"
       // 줄이 테마 화면으로 가는 링크다(국장 · 미장 같은 id — 한 번 보면 둘 다 끝). 아래 첫 표 쪽지보다 위라 먼저 뜬다.
       // 첫 li 는 머리 줄이라 둘째 li(첫 테마 줄)를 가리킨다.
-      hint={hrefOf && rows.length ? { id: "kadera-themes", order: 1, anchor: ".v2-tsh > li:nth-child(2)", text: "테마를 누르면 그 테마 종목과 이유가 나옵니다" } : undefined}
+      hint={hrefOf && rows.length ? { id: "kadera-themes", order: 1, anchor: ".v2-tsh > li:nth-child(2)", target: ".v2-tsh > li:not(:first-child)", text: "테마를 누르면 그 테마 종목과 이유가 나옵니다" } : undefined}
       // 머리엔 점유율의 기간만. 변화(+20.5%p)가 견준 기간(1주 전 같은 날들, lib/theme-flow.ts weekAgoDates)은 그 칸 머리가 말한다 —
       // 머리에 '최근 3일 · 1~2주 전 대비'로 나란히 두었더니 두 기간이 한 덩어리로 읽혀 헷갈렸다(2026-10-05 운영자 판단).
       meta="최근 3일"

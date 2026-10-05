@@ -193,6 +193,7 @@ export function Treemap({
           id={hint.id}
           order={hint.order}
           text={hint.text(byKey.get(biggest.key)!.label)}
+          target=".hz-tm-tile"
           style={{ left: `calc(${biggest.x}% + 10px)`, top: `calc(${(biggest.y / H) * 100}% + 56px)` }}
         />
       )}
