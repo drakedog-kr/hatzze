@@ -1829,7 +1829,9 @@ function NewsStrip() {
  * 그래서 데스크톱 방문자는 '봤음' 표시를 남기지 않는다 — 나중에 폰으로 들어오면 그때
  * 제대로 한 번 뜬다.
  */
-const PC_HINT_KEY = "hz-pc-hint-seen";
+// ⚠️ 이름 뒤 '-v2' 는 v2 개편(2026-10-05)에 맞춰 예전에 닫은 사람에게도 한 번 더 띄우려고 붙였다(운영자 판단 "그래도 PC 가 좋긴 하다").
+//    다시 모두에게 띄우고 싶을 때만 꼬리를 바꾼다 — 문구만 고칠 땐 건드리지 말 것.
+const PC_HINT_KEY = "hz-pc-hint-seen-v2";
 const PC_HINT_EVENT = "hz-pc-hint-change";
 
 const pcHintStore = {
