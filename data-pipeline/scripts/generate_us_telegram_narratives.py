@@ -1,7 +1,7 @@
 """미장 집계를 LLM(Claude Haiku)으로 문장화해 미장 카더라 카드에 넣는다.
 
   telegram_us_daily_brief.sentiment_summary : '오늘의 요약' 총평(빈 줄로 이어 붙인다)
-  telegram_us_stock_narrative.narrative     : 주요 종목 리포트의 흐름 요약(종목당 75~80자)
+  telegram_us_stock_narrative.narrative     : 주요 종목 리포트의 흐름 요약(종목당 95~105자 · 국장 LEN_MIN/MAX 그대로)
 
 국내 짝은 `generate_telegram_narratives.py`. **그 파일을 고치지 않는다** — 매일 도는
 검증된 경로이고, 히어로·종목 리포트 문장은 손대지 않기로 정해 둔 자리다.

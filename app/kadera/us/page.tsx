@@ -148,8 +148,8 @@ export default async function UsKaderaPage() {
     market: "US",
     change: r.changeRate,
     cells: [{ v: `${r.recentMentions.toLocaleString("ko-KR")}회` }],
-    text: narrativeLead(r.narrative) ?? surgeLines[r.ticker] ?? null,
-    full: r.narrative,
+    // 전문(100자 안팎)을 싣는다 — 국장 '많이 언급된 종목'과 같다(app/kadera/page.tsx firstSentence 주석).
+    text: r.narrative ?? surgeLines[r.ticker] ?? null,
     pending: "정리 중",
   }));
 
@@ -205,7 +205,7 @@ export default async function UsKaderaPage() {
         ))}
         <CoverMeta
           updated={summary.lastUpdated ? formatKstUpdate(summary.lastUpdated, "업데이트") : "업데이트 준비 중"}
-          basis={sentiment ? `채널 글 ${sentiment.messageCount.toLocaleString("ko-KR")}건 · 최근 ${sentiment.windowDays}일` : null}
+          basis={sentiment ? `채널 글 ${sentiment.messageCount.toLocaleString("ko-KR")}건 분석 · 최근 ${sentiment.windowDays}일` : null}
         />
       </div>
 

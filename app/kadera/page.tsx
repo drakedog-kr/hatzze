@@ -31,8 +31,10 @@ import { loadCoverChips } from "./cover-chips";
 import type { BoardRow, BoardSection } from "./KaderaBoard";
 
 /**
- * 문단의 첫 문장. 표 줄에는 한 문장만 싣고 전문은 줄 title 로 둔다 — 흐름 요약(두세 문장)을 한 줄로 자르면 낱말 한가운데서
+ * 문단의 첫 문장 — 급부상 표가 한 줄 요약이 없을 때 흐름 요약에서 빌리는 몫. 흐름 요약(두세 문장)을 한 줄로 자르면 낱말 한가운데서
  * 끊겼다(2026-10-02, 여섯 줄 모두). ⚠️ 마침표 뒤 공백이 아니라 **한글 뒤 마침표**로 가른다(소수점·도메인 오인, app/insider/parts.tsx).
+ * '많이 언급된 종목'은 첫 문장이 아니라 **전문**(100자 안팎)을 싣는다 — 사람들이 가장 관심 있는 종목들이고 PC 에선 문장 칸이 넓어
+ * 한 문장(22~45자)이면 칸이 비었다(2026-10-05 운영자 판단).
  */
 function firstSentence(t: string | null): string | null {
   return t ? t.split(/(?<=[가-힣]\.)\s+/)[0] : null;
@@ -232,8 +234,7 @@ export default async function KaderaPage() {
     market: r.market,
     change: r.changeRate,
     cells: [{ v: `${r.totalMentions.toLocaleString("ko-KR")}회` }],
-    text: firstSentence(narratives[r.code] ?? null) ?? surgeLines[r.code] ?? null,
-    full: narratives[r.code] ?? null,
+    text: narratives[r.code] ?? surgeLines[r.code] ?? null,
     pending: "정리 중",
   }));
 
@@ -306,7 +307,7 @@ export default async function KaderaPage() {
         ))}
         <CoverMeta
           updated={summary.lastUpdated ? formatKstUpdate(summary.lastUpdated, "업데이트") : "업데이트 준비 중"}
-          basis={sentiment ? `채널 글 ${sentiment.messageCount.toLocaleString("ko-KR")}건 · 최근 ${sentiment.windowDays}일` : null}
+          basis={sentiment ? `채널 글 ${sentiment.messageCount.toLocaleString("ko-KR")}건 분석 · 최근 ${sentiment.windowDays}일` : null}
         />
       </div>
 

@@ -2831,6 +2831,10 @@ a.v2-isd-row:hover { background: var(--t-tint); margin: 0 -14px; padding: 0 14px
   #mood .v2-card-val.is-big > b { font-size: 32px; line-height: 36px; }
   .v2-cover-price .v2-cover-v b { font-size: 22px; line-height: 28px; font-weight: 700; }
 }
+@container kd (max-width: 679px) {
+  /* 많이 언급된 종목 — 흐름 요약 전문(100자 안팎)을 싣는다. 폰 문장 칸(300px 남짓 · 한 줄 22자)에선 다섯 줄. */
+  .v2-tbl.is-talk ol .v2-td-text { -webkit-line-clamp: 5; }
+}
 /* MDD 연도 두 자리 꼴은 판 330 이하(320 폰)에서만 — 375 폰(판 351)은 네 자리가 한 줄에 든다. */
 .v2-yc-y2 { display: none; }
 @container kd (max-width: 679px) {
