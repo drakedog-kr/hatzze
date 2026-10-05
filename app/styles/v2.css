@@ -2804,6 +2804,25 @@ a.v2-isd-row:hover { background: var(--t-tint); margin: 0 -14px; padding: 0 14px
   .v2-tm-reasonrows .v2-td-chg { min-width: 58px; text-align: right; }
   .v2-tm-reasonrows .v2-td-ch { min-width: 52px; text-align: right; }
 }
+@container kd (max-width: 679px) {
+  /* 배당 목표 — 둘째~넷째 칸(지금 한 달 · 필요한 투자금 · 걸리는 기간)은 이름 왼쪽 · 값 오른쪽 한 줄, 곁줄은 이름 아래.
+     네 칸이 위아래로 쌓여 489px 였다(2026-10-05 모바일 점검). 진행 막대는 그 칸 바닥 한 줄. */
+  .v2-dv-goal-cell:not(:first-child) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "k v" "s v";
+    align-items: center;
+    column-gap: 12px;
+    row-gap: 2px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+  .v2-dv-goal-cell:not(:first-child):has(.dv-goal-bar) { grid-template-areas: "k v" "s v" "bar bar"; }
+  .v2-dv-goal-cell:not(:first-child) > .v2-dv-goal-k { grid-area: k; }
+  .v2-dv-goal-cell:not(:first-child) > .v2-dv-goal-v { grid-area: v; text-align: right; }
+  .v2-dv-goal-cell:not(:first-child) > .v2-dv-goal-s { grid-area: s; margin-top: 0; min-height: 0; }
+  .v2-dv-goal-cell:not(:first-child) > :has(.dv-goal-bar) { grid-area: bar; margin-top: 6px; }
+}
 /* MDD 연도 두 자리 꼴은 판 330 이하(320 폰)에서만 — 375 폰(판 351)은 네 자리가 한 줄에 든다. */
 .v2-yc-y2 { display: none; }
 @container kd (max-width: 679px) {

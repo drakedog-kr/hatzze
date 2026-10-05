@@ -1335,7 +1335,9 @@
   .dv-tname-txt { flex: 1 1 auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px 6px; }
   .dv-tname-txt::after { content: ""; flex-basis: 100%; order: 1; }
   .dv-tname-main { display: contents; }
-  .dv-tacct { margin-left: 0; }
+  /* 계좌 선택은 늘 둘째 줄 맨 앞(사실 조각과 같은 order 2 · 앞 DOM) — 이름 길이에 따라 첫 줄 끝 · 둘째 줄을 오가 왼쪽 선이 들쭉날쭉했다
+     (2026-10-05 모바일 점검, 줄마다 left 193 · 198 · 183 · 89). */
+  .dv-tacct { margin-left: 0; order: 2; }
   .dv-tfacts { display: contents; }
   .dv-tfact { order: 2; padding: 0; background: none; font-size: var(--fs-12); font-weight: 500; }
   .dv-tfact + .dv-tfact::before { content: "·"; margin-right: 6px; color: var(--c-hint); }
