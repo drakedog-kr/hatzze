@@ -16,10 +16,12 @@ export function CardComingSoon() {
       {/* v2(2026-10-03): 이름 옆 '준비 중' 꼬리표 · 회색 면 · 모래시계를 걷었다 — 상자 안 글자와 꼬리표가 같은 말을 했다.
           점선 테두리 하나가 '빈자리'를 말한다(지표 제보 칸과 같은 어법). */}
       <TitleRow icon="credit_score" name="신용융자 잔고" desc="빚내서 주식을 산 금액" />
+      {/* 폰 한 줄기에선 점선 상자를 걷고 제목 줄 오른쪽 글자 한 줄로 접는다(v2.css .hz-soon-box · 2026-10-05 모바일 점검 — 156 → 한 줄).
+          그래서 키는 인라인이 아니라 클래스(.hz-soon-box min-height 96)가 쥔다. */}
       <div
+        className="hz-soon-box"
         style={{
           flex: 1,
-          minHeight: 96,
           borderRadius: R.control,
           border: `1px dashed ${C.line}`,
           display: "flex",

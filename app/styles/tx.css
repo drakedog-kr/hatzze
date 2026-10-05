@@ -896,6 +896,11 @@
   .hz-tx .hz-dist-row:hover .hz-dist-pop,
   .hz-tx .hz-dist-row:focus-within .hz-dist-pop { transform: none; }
 }
+/* 폰 — 252px 판이 안에서 굴렀다(저온 12개: 320 높이에 525). 폭은 판 폭, 높이는 화면에 맞춰 안 스크롤을 없앤다.
+   누른 줄 근처에 앵커로 여는 것은 그대로다(2026-10-05 모바일 점검). */
+@media (max-width: 560px) {
+  .hz-tx .hz-dist-pop { width: calc(100vw - 24px); max-height: calc(100dvh - 110px); }
+}
 
 /* ══════════════════════════════════════════════════════════════════════════
    데일리 노트(/daily) — 본문 조판(문단 · 소제목 · 표 · 출처 · 고지)과 공유 단추.

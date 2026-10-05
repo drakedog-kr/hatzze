@@ -2765,6 +2765,21 @@ a.v2-isd-row:hover { background: var(--t-tint); margin: 0 -14px; padding: 0 14px
   .v2-tbl.is-talk .v2-tr { padding-top: 10px; padding-bottom: 10px; }
   .v2-td-text { margin: 0; }
 }
+/* 홈 카드 안 종목 줄(신고가 괴리율 · 거래대금 쏠림도 범례) — 폰에선 줄 전체가 그 종목 링크다. 이름 링크(28 · 이웃과 0~2px)만 누르는
+   자리였다. ::after 의 기준 상자가 줄(position: relative)이라 링크 자신의 말줄임 overflow 에 안 잘린다(2026-10-05 모바일 점검). */
+@container kd (max-width: 679px) {
+  .hz-rowlink { position: relative; min-height: 40px; }
+  .hz-rowlink > a::after,
+  .hz-rowlink > span > a::after { content: ""; position: absolute; inset: 0; }
+}
+/* 홈 '신용융자 잔고' 준비 중 칸 — 넓은 화면은 점선 상자(96)로 두 칸을 채운다. */
+.hz-soon-box { min-height: 96px; }
+@container kd (max-width: 679px) {
+  /* 폰 한 줄기에선 156px 를 점선 빈 상자로 썼다 — 제목 줄과 '데이터 준비 중' 글자 한 줄로 접는다(인라인 flex 방향이라 !important). */
+  .hz-cell-wide:has(.hz-soon-box) { flex-direction: row !important; align-items: center; justify-content: space-between; }
+  .hz-cell-wide:has(.hz-soon-box) > .hz-cell-graphic { flex: none !important; }
+  .hz-soon-box { min-height: 0; border: 0 !important; }
+}
 @container kd (max-width: 359px) {
   /* 360 미만에서만 표 종목 이름 세 줄. */
   .v2-td-name { -webkit-line-clamp: 3; }

@@ -229,7 +229,7 @@ export function CardTurnover({ v }: { v: Pick }) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", columnGap: 12, rowGap: 8 }}>
           {segs.map((s2) =>
             s2.pct <= 0 ? null : (
-              <div key={s2.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div key={s2.key} className="hz-rowlink" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 {/* 옅은 조각(5~10위 · 그 외)은 점이 바탕에 묻혔다(1.12~1.28:1) — 가는 테두리로 점 자리를 보인다. */}
                 <span style={{ width: 8, height: 8, borderRadius: 3, background: s2.fill, boxShadow: "inset 0 0 0 1px var(--t-frame)", flexShrink: 0 }} />
                 {/* 종목 줄은 종목 화면으로 잇는다(코드가 있는 줄만 — 옛 행엔 코드가 없다). 말줄임을 자르는
@@ -310,7 +310,7 @@ export function CardHighGap({ v, tops, failed = false }: { v: Pick; tops: StockH
           {/* 머리는 오른쪽 숫자와 같은 말로 — '근접도'라 적으면 −38.4% 와 반대말이었다. 출처 · 읽는 법 툴팁은 걷었다(출처는 /disclaimer). */}
           <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.muted }}>거래대금 상위 종목 · 52주 고점 대비</span>
           {tops.map((st, i) => (
-            <div key={st.code} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div key={st.code} className="hz-rowlink" style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <Link
                 href={stockHref(st.code)}
                 className="hz-stock-link hz-stock-link-label"
@@ -875,8 +875,9 @@ export function CardLimitUp({ v }: { v: Pick }) {
                   fontFamily: MONO,
                   fontSize: "var(--fs-12)",
                   fontWeight: 600,
-                  color: "var(--card-accent-ink, var(--c-cold-ink))",
-                  background: "var(--card-accent-tint, var(--c-blue-tint))",
+                  // 오른 값은 늘 오름 색 — 카드 온도색(저온 = 파랑)을 따라가면 2색 체계에서 '내림'으로 읽혔다(2026-10-05 모바일 점검).
+                  color: "var(--c-hot-ink)",
+                  background: "var(--c-hot-tint)",
                   borderRadius: R.pill,
                   padding: "3px 9px",
                 }}
