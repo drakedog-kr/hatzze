@@ -107,10 +107,13 @@ export async function GET(request: Request) {
     analysis.topDrawdowns = analysis.topDrawdowns.map((e) => ({ ...e, market: moveBetween(marketBars, e.peakDate, e.troughDate) }));
   }
   const theme = themeFetch.theme;
+  // 지수 고점도 **종목 첫 날부터** 센다 — 종목 낙폭과 같은 출발점에 서야 같은 기간을 견준다. 상장이 짧은 종목 · '전체' 기간에서
+  // 지수만 그 전 고점부터 세어 물속 차트의 시장 선이 −24% 에서 출발했다(LG씨엔에스, 2026-10-05 머지 전 점검).
+  const marketSpan = marketBars && bars.length ? marketBars.filter((b) => b.date >= bars[0].date) : null;
   // 같은 기간 기준 지수의 지금 낙폭 — 첫 줄 띠의 시장 칸('최근 10년 고점 대비 코스피 −23.2%').
-  const bench = marketBars ? drawdownNow(marketBars) : null;
+  const bench = marketSpan?.length ? drawdownNow(marketSpan) : null;
   // 물속 차트의 '시장과 함께' 선 — 종목 물속 점과 같은 날짜로 맞춘 지수 낙폭(250개 남짓).
-  const benchUnderwater = marketBars ? drawdownOnDates(marketBars, analysis.underwater.map((p) => p.date)) : null;
+  const benchUnderwater = marketSpan?.length ? drawdownOnDates(marketSpan, analysis.underwater.map((p) => p.date)) : null;
 
   // 해마다 수익 · 낙폭과 복리 연평균(화면 '해마다' 모듈) — 종목 종가로 요약.
   // ⏳ 옛 화면 받침 — v2 배포 순간 열려 있던 옛 /mdd 탭은 이 API 를 직접 부르고 risk.events.slice · bigDropCount 를 읽는다
