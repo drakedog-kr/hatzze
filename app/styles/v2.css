@@ -1662,6 +1662,11 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
    한때 [지도 | 테마 순위] 짝이었는데 테마 흐름 표를 되살리며 순위 칸을 걷었다(2026-10-03). */
 .v2-tm-map-in { padding: 12px 14px 0; }
 .v2-tm-map-bar { display: none; padding: 12px 14px 14px; }
+/* 폰 막대 밑 '나머지' 알약 줄 — 막대 상자(.v2-tm-map-bar)가 이미 안쪽 14 를 품어 알약 줄 자신의 안쪽은 걷는다. */
+.v2-tm-map-bar .v2-tm-restpills { padding: 12px 0 0; }
+.hz-sharebar-link { text-decoration: none; }
+.hz-sharebar-link:hover { color: var(--t-down) !important; }
+.v2-tm-title-phone { display: none; }
 .v2-tm-map .hz-treemap { aspect-ratio: var(--tm-aspect, 2 / 1); background: var(--t-card); border-radius: 4px; }
 .v2-tm .hz-treemap .hz-tm-tile { border-color: var(--t-card); border-radius: 4px; }
 .v2-tm .hz-tm-name { font-size: 12px; font-weight: 600; }
@@ -1892,6 +1897,8 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   .v2-tm-map-in,
   .v2-tm-map-legend { display: none; }
   .v2-tm-map-bar { display: block; }
+  .v2-tm-title-wide { display: none; }
+  .v2-tm-title-phone { display: inline; }
   .v2-tm-basis { display: inline; }
   /* 테마 흐름 — 위 테마 · 점유율, 가운데 열흘 한 조각, 아래 요즘 도는 얘기. */
   .v2-tm-flowtbl .v2-tr {

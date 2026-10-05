@@ -30,7 +30,7 @@ export function Module({
   children,
 }: {
   id?: string;
-  title: string;
+  title: React.ReactNode;
   /**
    * 제목 바로 뒤 물음표 툴팁(15자 안 한 마디). ⭐ 설명하는 제목에 붙여 둔다 — 머리 띠 오른쪽 끝(aside)에 두면 '전체 보기' 옆에 떨어져
    * 무엇을 설명하는지 안 읽혔고 글자보다 3px 떠 있었다(2026-10-04 지적).

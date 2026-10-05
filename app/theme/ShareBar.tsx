@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { C } from "../ui";
 
 /**
@@ -17,11 +19,17 @@ export function ShareBar({
   stocks,
   ariaLabel,
   unit = "종목",
+  hrefOf,
 }: {
   stocks: { code: string; name: string; mentions: number }[];
   ariaLabel: string;
   /** '나머지 N종목'의 셈 단위. 테마 목록(폰 점유율)은 '테마'. */
   unit?: string;
+  /**
+   * 주면 범례 이름이 그 주소로 가는 링크가 된다(나머지는 빼고). 테마 목록 폰 막대가 쓴다 — 폰은 지도 대신 이 막대라
+   * 범례가 링크가 아니면 흐름 표 밖 테마로 갈 길이 없었다(2026-10-05 모바일 점검 P1).
+   */
+  hrefOf?: (code: string) => string;
 }) {
   const total = stocks.reduce((s, x) => s + x.mentions, 0);
   if (total <= 0) return null;
@@ -49,7 +57,13 @@ export function ShareBar({
         {segs.map((s) => (
           <span key={s.key} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "var(--fs-12)", color: C.sub, whiteSpace: "nowrap" }}>
             <span aria-hidden style={{ width: 8, height: 8, borderRadius: 2, background: s.color, flex: "none" }} />
-            <span style={{ color: s.key === "rest" ? C.sub : C.ink, fontWeight: 500 }}>{s.name}</span>
+            {hrefOf && s.key !== "rest" ? (
+              <Link href={hrefOf(s.key)} className="hz-sharebar-link" style={{ color: C.ink, fontWeight: 500 }}>
+                {s.name}
+              </Link>
+            ) : (
+              <span style={{ color: s.key === "rest" ? C.sub : C.ink, fontWeight: 500 }}>{s.name}</span>
+            )}
             <span style={{ fontFamily: "inherit" }}>{label(s.n)}</span>
           </span>
         ))}

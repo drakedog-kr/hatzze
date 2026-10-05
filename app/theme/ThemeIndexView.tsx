@@ -140,7 +140,17 @@ export function ThemeIndexView({
       {/* 머리엔 칸 크기의 기간만, 색이 견준 기간은 범례 맨 앞에 — 머리에 '최근 3일 언급 점유율 · 1~2주 전 대비'로 나란히 두었더니
           두 기간이 한 덩어리로 읽혀 헷갈렸다(2026-10-05 운영자 판단, 카더라 테마 점유율과 같은 정리). '평소'라 부르지 않는 건
           테마 한 장의 다른 잣대(말 많은 종목 태그 · 앞 27일)와 두 뜻이 돼서다. */}
-      <Module title="테마 점유율 지도" meta={`최근 ${KADERA_WINDOW_DAYS}일 언급 점유율`} className="v2-tm-map">
+      <Module
+        // 폰은 지도 대신 막대라 이름이 '테마 점유율'이다(2026-10-05 모바일 점검) — 내용을 숨기는 게 아니라 이름만 갈아 끼운다(v2.css).
+        title={
+          <>
+            <span className="v2-tm-title-wide">테마 점유율 지도</span>
+            <span className="v2-tm-title-phone">테마 점유율</span>
+          </>
+        }
+        meta={`최근 ${KADERA_WINDOW_DAYS}일 언급 점유율`}
+        className="v2-tm-map"
+      >
         {themes === null ? (
           <p className="v2-empty">테마 집계를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오.</p>
         ) : themes.length === 0 ? (
@@ -160,13 +170,28 @@ export function ThemeIndexView({
             <div className="v2-tm-map-legend">
               <TreemapLegend basis="1주 전 대비" up="늘어난 테마" flat="비슷" down="줄어든 테마" />
             </div>
-            {/* 폰은 지도 대신 막대 하나(앞 다섯 + 나머지) — 3:2 지도에선 26칸 중 이름이 든 칸이 하나뿐이었다(2026-10-04 점검). */}
+            {/* 폰은 지도 대신 막대 하나(앞 다섯 + 나머지) — 3:2 지도에선 26칸 중 이름이 든 칸이 하나뿐이었다(2026-10-04 점검).
+                범례 이름은 그 테마 화면 링크, '나머지'는 아래 알약 줄로 다 편다 — 지도가 없는 폰에서 흐름 표(열 줄) 밖 테마로 갈 길이
+                없었다(2026-10-05 모바일 점검 P1, 국장 16 · 미장 6). 알약 꼴은 테마 화면 '함께 거론되는 테마'와 같다. */}
             <div className="v2-tm-map-bar">
               <ShareBar
                 stocks={themes.map((t) => ({ code: t.theme, name: t.theme, mentions: t.sharePct }))}
                 ariaLabel="테마별 최근 3일 언급 점유율"
                 unit="테마"
+                hrefOf={market.themeHref}
               />
+              {themes.length > 5 && (
+                <div className="v2-tm-pills v2-tm-restpills">
+                  {[...themes]
+                    .sort((a, b) => b.sharePct - a.sharePct)
+                    .slice(5)
+                    .map((t) => (
+                      <Link key={t.theme} href={market.themeHref(t.theme)} className="v2-tm-pill" data-ga="theme_rest_click">
+                        {t.theme}
+                      </Link>
+                    ))}
+                </div>
+              )}
             </div>
           </>
         )}
