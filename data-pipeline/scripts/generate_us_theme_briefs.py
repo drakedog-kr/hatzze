@@ -13,7 +13,7 @@
   사전        config/us_stock_themes.py — 키가 티커라 이름 대조가 없다.
   급부상      common/us_theme_risers.py 가 고르고, digest 는 build_stock_digests(tickers=…)로 만든다.
   도는 얘기   테마 상세 '말 많은 종목' 줄마다 한 줄(talk jsonb · 마이그레이션 092). 줄은 common/theme_hot.py 가 화면과 같은
-              규칙으로 고르고, 쓰는 일(TALK_RULES · write_talk)은 국장 짝 그대로다.
+              규칙으로 고르고, 쓰는 일(TALK_SYSTEM · write_talk)은 국장 짝 그대로다.
 
 실행:
     cd data-pipeline && source .venv/bin/activate
@@ -53,7 +53,7 @@ TABLE = "telegram_us_theme_brief"
 
 US_THEME_SYSTEM = US.US_COMMON + TB.THEME_RULES
 US_RISER_SYSTEM = US.US_COMMON + TB.RISER_RULES
-US_TALK_SYSTEM = US.US_COMMON + TB.TALK_RULES
+US_TALK_SYSTEM = TB.TALK_SYSTEM + TB.TALK_US_EXTRA
 
 
 def build_us_theme_bundle(
@@ -235,7 +235,10 @@ def main() -> None:
         return "".join(b.text for b in resp.content if b.type == "text").strip()
 
     def ask_talk(system: str, user: str) -> str:
-        resp = client.messages.create(model=MODEL, max_tokens=TB.TALK_MAX_TOKENS, system=system, messages=[{"role": "user", "content": user}])
+        resp = client.messages.create(
+            model=MODEL, max_tokens=TB.TALK_MAX_TOKENS, system=system, messages=[{"role": "user", "content": user}],
+            output_config={"format": {"type": "json_schema", "schema": TB.TALK_SCHEMA}},
+        )
         return "".join(b.text for b in resp.content if b.type == "text").strip()
 
     if talk_only:
