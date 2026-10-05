@@ -9,8 +9,10 @@ import { Icon } from "./ui";
  * 처음 온 사람에게 "여기를 누르면 무엇이 나온다"고 한 번만 알려 주는 쪽지(v2). 2026-10-05 운영자 판단으로 v1 의 쪽지 셋
  * (내부자 리포트 줄 · 테마 지도 칸)을 되살리고 열 곳을 더했다 — 줄이 링크인데 화살표가 없거나, 말풍선이 눌러야만 열리는 자리다.
  *
- * - 한 번 보면 끝이다. 오른쪽 ✕ 를 누르거나 쪽지가 선 판(부모 요소)을 아무 데나 누르면 '봤음'으로 적는다(localStorage `hz-v2hint-<id>`).
- *   click 이 아니라 pointerdown 인 이유: 링크를 누르면 그대로 페이지가 떠나서 click 이 안 올 수 있다.
+ * - 한 번 보면 끝이다. 오른쪽 ✕ 를 누르거나, 쪽지가 **떠 있는 동안** 그 판(부모 요소)을 아무 데나 누르면 '봤음'으로 적는다
+ *   (localStorage `hz-v2hint-<id>`). pointerdown 이 아니라 click 이다 — 폰은 손가락 스크롤을 시작해도 pointerdown 이 와서 아무것도
+ *   안 눌렀는데 닫혔고, 아직 차례가 안 와 숨은 쪽지도 판을 건드리면 한 번도 안 보인 채 지워졌다(2026-10-05 머지 전 점검).
+ *   링크를 눌러도 click 은 먼저 온다(이동은 click 의 기본 동작이다).
  * - 쪽지 몸은 손가락을 **통과**시킨다(v1 과 같다) — 쪽지에 가려진 줄 · 칸을 누르면 그대로 그리로 가고, 그 순간 '봤음'이 된다.
  *   ✕ 만 손가락을 받는다 — 아무것도 안 누르고 끌 수 있어야 한다(2026-10-05 운영자 판단).
  * - 같은 id 는 같은 가르침이다 — 카더라에서 '종목을 누르면 …'을 본 사람에게 미리보기 · 데일리 노트에서 또 띄우지 않는다.
@@ -71,12 +73,13 @@ export function V2Hint({ id, text, order = 0, anchor, at = "below", className, s
   useEffect(() => {
     const host = ref.current?.parentElement;
     if (!host) return;
-    const onDown = (e: Event) => {
-      if (ref.current?.contains(e.target as Node)) return; // 쪽지 자신은 아래 onClick 이 처리
+    const onTap = (e: Event) => {
+      if (!ref.current || ref.current.hidden) return; // 아직 차례가 안 와 숨은 쪽지는 기록하지 않는다
+      if (ref.current.contains(e.target as Node)) return; // 쪽지 자신은 아래 onClick 이 처리
       markSeen(id);
     };
-    host.addEventListener("pointerdown", onDown);
-    return () => host.removeEventListener("pointerdown", onDown);
+    host.addEventListener("click", onTap);
+    return () => host.removeEventListener("click", onTap);
   }, [id]);
 
   // 자리 — 상태로 두지 않고 요소에 바로 적는다(effect 안 setState 는 린트가 막는다). 판 크기가 바뀌면 다시 잰다.
