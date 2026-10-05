@@ -23,6 +23,12 @@ import { useEffect } from "react";
  *
  * ⚠️ 호버가 되는 기기에서는 리스너를 아예 안 건다. 마우스로 쓰는 화면에서 클릭마다
  * 클래스가 붙었다 떨어지는 일이 없어야 한다.
+ *
+ * ## 끌어 읽기(2026-10-05 모바일 점검)
+ * 차트의 세로 칸(.hz-vline)은 6~11px 라 원하는 날을 탭으로 집기 어렵다. 칸 위에서 시작한 터치를 **옆으로** 끌면 손가락 아래 칸으로
+ * 말풍선이 따라온다(증권 앱 차트처럼). 세로로 끌면 손대지 않는다 — 칸에 `touch-action: pan-y pinch-zoom`(shadcn.css)을 둬
+ * 세로 이동 · 확대는 브라우저가, 가로 이동만 여기서 받는다. 8px 넘게 · 세로보다 더 옆으로 움직였을 때만 끌기로 본다.
+ * 칸은 x 로만 고른다 — 손가락이 차트 위아래로 벗어나도 같은 날을 가리킨다.
  */
 export function TipTap() {
   useEffect(() => {
@@ -37,7 +43,42 @@ export function TipTap() {
       open = null;
     };
 
+    let drag: { id: number; x: number; y: number; on: boolean; group: Element } | null = null;
+    let draggedAt = 0;
+    const tipAtX = (group: Element, x: number) =>
+      [...group.children].find((c) => {
+        if (!c.classList.contains("hz-vline")) return false;
+        const r = c.getBoundingClientRect();
+        return x >= r.left && x < r.right;
+      }) ?? null;
+    const onDown = (e: PointerEvent) => {
+      if (e.pointerType !== "touch") return;
+      const v = (e.target as Element | null)?.closest?.(".hz-vline");
+      drag = v?.parentElement ? { id: e.pointerId, x: e.clientX, y: e.clientY, on: false, group: v.parentElement } : null;
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      if (!drag.on) {
+        const dx = Math.abs(e.clientX - drag.x);
+        if (dx < 8 || dx < Math.abs(e.clientY - drag.y)) return;
+        drag.on = true;
+      }
+      const t = tipAtX(drag.group, e.clientX);
+      if (t && t !== open) {
+        close();
+        t.classList.add(OPEN);
+        open = t;
+      }
+    };
+    const onUp = (e: PointerEvent) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      // 끌기가 끝난 자리의 말풍선은 열어 둔다 — 뒤따르는 click 이 그걸 '같은 것 다시 누름'으로 닫지 않게 잠깐 막는다.
+      if (drag.on) draggedAt = Date.now();
+      drag = null;
+    };
+
     const onClick = (e: MouseEvent) => {
+      if (Date.now() - draggedAt < 400) return;
       const target = e.target as Element | null;
       // hz-tip-tap 은 제 힘으로 열리므로 뺀다.
       const tip = target?.closest?.("[data-tip]:not(.hz-tip-tap)") ?? null;
@@ -54,6 +95,10 @@ export function TipTap() {
     };
 
     document.addEventListener("click", onClick);
+    document.addEventListener("pointerdown", onDown, { passive: true });
+    document.addEventListener("pointermove", onMove, { passive: true });
+    document.addEventListener("pointerup", onUp, { passive: true });
+    document.addEventListener("pointercancel", onUp, { passive: true });
     // 스크롤하면 닫는다. 툴팁은 제 자리에 absolute 로 붙어 있어서, 열어 둔 채 화면을
     // 밀면 설명만 엉뚱한 자리에 남는다.
     // ⚠️ 스크롤은 window 가 아니라 main.hz-scroll 이 먹는다(이 저장소의 반복된 함정).
@@ -63,6 +108,10 @@ export function TipTap() {
 
     return () => {
       document.removeEventListener("click", onClick);
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      document.removeEventListener("pointercancel", onUp);
       scroller?.removeEventListener("scroll", close);
       window.removeEventListener("scroll", close);
     };

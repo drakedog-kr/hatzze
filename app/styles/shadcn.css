@@ -279,6 +279,8 @@
 
 /* 차트 크로스헤어 툴팁은 shadcn ChartTooltip 꼴 — 흰 카드 · 옅은 테두리 · 큰 그림자 · 숫자 폭 고정.
    도움말 툴팁(진한 알약 = shadcn Tooltip 꼴, 원래 모양 그대로)과 한눈에 갈린다. 일곱 차트가 이 한 규칙을 쓴다. */
+/* 터치로 옆으로 끌면 말풍선이 손가락을 따라간다(app/TipTap.tsx 끌어 읽기) — 세로 이동 · 확대는 브라우저에 남긴다. */
+.hz-vline { touch-action: pan-y pinch-zoom; }
 .hz-vline::after {
   background: var(--popover);
   color: var(--popover-foreground);
