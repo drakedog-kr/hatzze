@@ -19,7 +19,7 @@ import { prevWindowRanks, thinDays, usableDays, withTodayRank } from "./theme-fl
 import { themeDetailWindow } from "./theme-window";
 import { getEventsForCodes, todayKst, type UpcomingEvent } from "./kadera-why";
 import { isLoadFailed } from "./load-state";
-import { parseRisers, type RiserRow, type ThemeRiser } from "./theme-risers";
+import { RISER_FALLBACK_DAYS, risersWithFallback, type RiserRow, type ThemeRiser } from "./theme-risers";
 import { changeRateOf, fetchYahooQuote } from "./yahoo-quote";
 
 /**
@@ -725,22 +725,23 @@ export async function listThemeOverview(): Promise<ThemeOverview[] | null> {
  * 후보가 하나도 없는 테마는 줄이 없다 — 변화가 큰 테마가 여덟이면 여덟 줄만 선다.
  * 기준일분이 없으면 하루 거슬러 간다(LLM_TEXT_CARRY_DAYS) — 요약과 같은 규칙.
  */
-export async function listThemeRisers(): Promise<ThemeRiser[] | null> {
+export async function listThemeRisers(): Promise<{ risers: ThemeRiser[]; asOf: string | null } | null> {
   const db = getSupabaseAdmin();
   const baseDate = await kaderaBaseDate();
   const { data, error } = await db
     .from("telegram_theme_brief")
     .select("theme,date,riser")
-    .gte("date", addDaysISO(baseDate, -LLM_TEXT_CARRY_DAYS))
+    // 그날 줄이 없으면 앞 날로 채운다(risersWithFallback) — 그래서 RISER_FALLBACK_DAYS 만큼 받는다.
+    .gte("date", addDaysISO(baseDate, -RISER_FALLBACK_DAYS))
     .lte("date", baseDate)
     // riser 가 빈 행도 받는다 — 오늘 후보가 없다는 행이 있어야 어제 riser 로 거슬러 가지 않는다(parseRisers).
-    // 26테마 × 이틀이라 200 안이다.
+    // 26테마 × 여드레라 300 안이다.
     .order("date", { ascending: false })
-    .limit(200);
+    .limit(300);
   if (error) {
     // 표에 riser 열이 아직 없으면(마이그레이션 081 전) 42703. 카드는 비고 나머지는 그린다.
     console.error("[listThemeRisers] 테마 요약의 종목 칸을 못 읽었습니다", error);
     return null;
   }
-  return parseRisers((data ?? []) as RiserRow[], (t) => t in THEMES);
+  return risersWithFallback((data ?? []) as RiserRow[], (t) => t in THEMES, addDaysISO(baseDate, -LLM_TEXT_CARRY_DAYS));
 }

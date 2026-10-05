@@ -28,7 +28,7 @@ import { Treemap, TreemapLegend, themeTiles, toneForRatio } from "./Treemap";
  */
 
 /**
- * 열흘 흐름 한 조각 — n일째 5위 안 · 다시 5위 안 · 처음 5위 안 · 열흘 중 n일 5위 안 · 5위 밖. 판정은 lib/theme-page.ts listThemeOverview.
+ * 열흘 흐름 한 조각 — n일째 5위 안 · 다시 5위 안 · 처음 5위 안 · 5위 안 n일 · 5위 밖. 판정은 lib/theme-page.ts listThemeOverview.
  * ⭐ '상위'라 부르지 않고 몇 위인지 적는다 — 표가 '점유율 상위 10'이라 6~10위 줄에 '상위 밖'이 붙어 서로 반대말로 읽혔다(2026-10-04 점검).
  */
 function flowCaption(t: ThemeOverview): { text: string; on: boolean } {
@@ -36,7 +36,8 @@ function flowCaption(t: ThemeOverview): { text: string; on: boolean } {
   // 연속 하루째인데 열흘 안에 5위 안이던 날이 더 있으면 "돌아온" 것이다 — "1일째"는 어색하다.
   if (t.label === "streak") return { text: t.streak === 1 ? `다시 ${top} 안` : `${t.streak}일째 ${top} 안`, on: true };
   if (t.label === "new") return { text: t.streak === 1 ? `처음 ${top} 안` : `2일째 ${top} 안`, on: true };
-  if (t.label === "intermittent") return { text: `10일 중 ${t.topDays}일 ${top} 안`, on: false };
+  // 칸 머리가 '최근 10일'이라 '10일 중'은 뺀다 — '10일 중 4일 5위 안'은 길고 숫자가 셋이라 읽기 불편했다(2026-10-05 운영자 지적).
+  if (t.label === "intermittent") return { text: `${top} 안 ${t.topDays}일`, on: false };
   return { text: `${top} 밖`, on: false };
 }
 
@@ -69,6 +70,7 @@ export function ThemeIndexView({
   market,
   themes,
   risers,
+  risersAsOf = null,
   updatedAt,
 }: {
   market: ThemeMarket;
@@ -76,6 +78,8 @@ export function ThemeIndexView({
   themes: ThemeOverview[] | null;
   /** null = 요약 행을 못 읽었다. 이유 없는 줄은 부르는 쪽이 이미 걸렀다. */
   risers: ThemeRiser[] | null;
+  /** 그날 줄이 없어 앞 날 목록을 채웠으면 그날(YYYY-MM-DD) — 머리에 'n/n 기준'을 적는다(lib/theme-risers.ts risersWithFallback). */
+  risersAsOf?: string | null;
   /** 카더라 화면과 같은 기준 시각(themeUpdatedAt → lastKaderaUpdatedAt). */
   updatedAt: string | null;
 }) {
@@ -285,7 +289,13 @@ export function ThemeIndexView({
       {/* 셋째 줄 — 테마별 급부상 종목. 테마마다 3일 전보다 언급(몫)이 가장 많이 는 종목 하나와 채널이 말한 까닭.
           고르는 것도 까닭을 쓰는 것도 파이프라인이고(generate_theme_briefs.py) 화면은 요약 행의 riser 를 읽는다. 카더라의 신호 표와 같은 줄 꼴.
           칸 차례는 테마 흐름과 같이 이름(테마 · 종목) → 문장 → 숫자(언급)다(2026-10-04). */}
-      <Module id="risers" title="테마별 급부상 종목" meta={`최근 ${KADERA_WINDOW_DAYS}일 · 앞 3일 대비`} ai>
+      <Module
+        id="risers"
+        title="테마별 급부상 종목"
+        // 연휴 끝처럼 그날 줄이 하나도 없으면 줄이 있던 가장 최근 날의 목록이다 — 그날을 앞에 밝힌다.
+        meta={`${risersAsOf ? `${Number(risersAsOf.slice(5, 7))}/${Number(risersAsOf.slice(8, 10))} 기준 · ` : ""}최근 ${KADERA_WINDOW_DAYS}일 · 앞 3일 대비`}
+        ai
+      >
         {risers === null ? (
           <p className="v2-empty">테마 요약을 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오.</p>
         ) : risers.length === 0 ? (

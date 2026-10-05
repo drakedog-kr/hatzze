@@ -107,6 +107,9 @@ export const ACCOUNTS: { key: Account; label: string }[] = [
   { key: "exempt", label: "비과세 종합저축" },
 ];
 
+/** '1년에 받는 배당' 칸의 계좌 단추 — 다섯을 한 줄에 같은 폭으로(셋 · 둘로 나눈 두 줄이 고르지 않았다, 2026-10-05 운영자 지적). 원래 이름은 말풍선. */
+export const ACCOUNT_TINY: Record<Account, string> = { general: "일반", isa: "ISA", pension: "연금", irp: "IRP", exempt: "비과세" };
+
 /** 줄의 계좌 알약(select)은 폭이 좁아 짧은 이름. */
 export const ACCOUNT_SHORT: Record<Account, string> = { general: "일반 계좌", isa: "ISA", pension: "연금저축", irp: "IRP", exempt: "비과세저축" };
 

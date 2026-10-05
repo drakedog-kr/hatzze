@@ -7,7 +7,7 @@
 
 import { CoverMeta, Module } from "../kadera/V2Modules";
 import { fmtCloseDay } from "../mdd/shared";
-import { ACCOUNTS, ACCOUNT_SHORT } from "./tax";
+import { ACCOUNTS, ACCOUNT_TINY } from "./tax";
 import type { Account } from "./tax";
 import { MonthCalendar, UpcomingRows, type UpcomingItem } from "./Calendar";
 import { MONTHS } from "./shared";
@@ -99,6 +99,8 @@ function TaxSeg({ afterTax, onChange, taxTip }: { afterTax: boolean; onChange: (
  */
 export function YearlyModule({
   total,
+  gross,
+  net,
   invest,
   yieldPct,
   onCostNote,
@@ -110,6 +112,9 @@ export function YearlyModule({
   taxTip,
 }: {
   total: number;
+  /** 세전 합 · 고른 계좌로 세금을 뗀 합 — 세전을 보고 있을 때도 둘 다 준다(갈림 막대 '받는 돈 | 세금'). */
+  gross: number;
+  net: number;
   invest: number;
   yieldPct: number | null;
   /** 평단을 넣은 줄이 있으면 투자금 줄 이름에 붙인다. */
@@ -129,9 +134,27 @@ export function YearlyModule({
   return (
     <Module title="1년에 받는 배당" meta={meta} aside={<TaxSeg afterTax={afterTax} onChange={onTax} taxTip={taxTip} />} className="v2-dv-sum">
       <div className="v2-md-body">
-        <span className="v2-card-val is-big">
-          <b>{won(total)}</b>
-        </span>
+        {/* 큰 숫자 + 갈림 막대(받는 돈 | 세금). 옆 칸(달력 · 일정)이 정한 높이에서 큰 숫자 밑이 75px 비어 있었다 — 그 자리에 세금 몫을
+            그린다. 계좌를 바꾸면 막대가 바로 움직여 계좌 단추가 무엇을 바꾸는지도 보인다(2026-10-05 운영자 지적 "투박하다"). */}
+        <div className="v2-dv-sumtop">
+          <span className="v2-card-val is-big">
+            <b>{won(total)}</b>
+          </span>
+          {gross > 0 && (
+            <div className="v2-dv-taxbar">
+              <span className="v2-dv-taxbar-bar" aria-hidden="true">
+                <i style={{ width: `${Math.max(0, Math.min(100, (net / gross) * 100))}%` }} />
+              </span>
+              <span className="v2-dv-taxbar-leg">
+                <span>
+                  <i className="is-tax" aria-hidden="true" />
+                  세금 {won(Math.max(0, gross - net))}
+                </span>
+                <span>{afterTax ? `세전 ${won(gross)}` : `세후 ${won(net)}`}</span>
+              </span>
+            </div>
+          )}
+        </div>
         <div className="v2-md-rows">
           <div className="v2-md-pr">
             <span className="v2-md-pr-k">한 달 평균</span>
@@ -156,10 +179,10 @@ export function YearlyModule({
             <div className="v2-dv-acct">
               <span className="v2-dv-acct-k">계좌</span>
               <div className="hz-seg hz-seg-hover v2-dv-seg" role="group" aria-label="어느 계좌로 세나">
-                {/* 짧은 이름(비과세저축) — 긴 이름이면 다섯 단추 가운데 하나만 둘째 줄에 혼자 섰다(2026-10-04 점검). 줄은 셋 · 둘로 칸을 꽉 채운다(v2.css). */}
+                {/* 다섯을 한 줄에 같은 폭으로 — 셋 · 둘 두 줄은 고르지 않았다(2026-10-05). 이름은 줄이고 원래 이름은 말풍선 · 읽기 이름에. */}
                 {ACCOUNTS.map((o) => (
-                  <button key={o.key} type="button" aria-pressed={account === o.key} onClick={() => onAccount(o.key)}>
-                    {ACCOUNT_SHORT[o.key]}
+                  <button key={o.key} type="button" aria-pressed={account === o.key} onClick={() => onAccount(o.key)} title={o.label} aria-label={o.label}>
+                    {ACCOUNT_TINY[o.key]}
                   </button>
                 ))}
               </div>

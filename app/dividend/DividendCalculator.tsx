@@ -181,6 +181,8 @@ export function DividendCalculator({
   // 환율이 없으면(미국 표가 비었을 때) 미국 종목 자체가 목록에 없다(lib/dividend.ts). 1 은 자리값.
   const fx = usdkrw?.rate ?? 1;
   const lines = useMemo(() => computeLines(holdings, byCode, fx, taxMode, account), [holdings, byCode, fx, taxMode, account]);
+  // 고른 계좌로 세금을 뗀 줄 — 세전을 보고 있을 때도 '1년에 받는 배당' 칸의 갈림 막대(받는 돈 | 세금)가 쓴다.
+  const taxedLines = useMemo(() => (afterTax ? lines : computeLines(holdings, byCode, fx, account, account)), [afterTax, lines, holdings, byCode, fx, account]);
   // 체크를 푼 줄은 표에만 남고 셈에서 빠진다 — 아래 합계·달력·일정·목표·세금 안내는 전부 이 목록으로. 표만 lines 를 본다.
   const active = useMemo(() => lines.filter((l) => !l.off), [lines]);
   // 줄마다 계좌가 다를 수 있다 — 라벨 꼬리·툴팁·주의 문구는 줄의 계좌로 센다.
@@ -395,6 +397,8 @@ export function DividendCalculator({
         <div className="v2-dv-band">
           <YearlyModule
             total={bandTotal}
+            gross={active.reduce((s, l) => s + l.grossKrw, 0)}
+            net={taxedLines.filter((l) => !l.off).reduce((s, l) => s + l.netKrw, 0)}
             invest={bandInvest}
             yieldPct={bandYield}
             onCostNote={lines.some((l) => l.onCost)}

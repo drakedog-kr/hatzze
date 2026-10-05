@@ -10,6 +10,7 @@ import { getUsEventsForTickers } from "./kadera-us-why";
 import { prevWindowRanks, thinDays, usableDays, withTodayRank } from "./theme-flow";
 import { themeDetailWindow } from "./theme-window";
 import { verifiedChangesOnce } from "./quoted-change";
+import { RISER_FALLBACK_DAYS, risersWithFallback } from "./theme-risers";
 import { fetchDailyHistory, yahooSymbol } from "./yahoo-history";
 import {
   THEME_FLOW_DAYS,
@@ -18,7 +19,6 @@ import {
   buildHotStocks,
   flowStats,
   parseBriefRow,
-  parseRisers,
   themeDayTotals,
   themeQuotes,
   type BriefRow,
@@ -282,20 +282,21 @@ export async function listUsThemeOverview(): Promise<ThemeOverview[] | null> {
 }
 
 /** 미장 '테마별 급부상 종목' — 요약 행의 riser(파이프라인 common/us_theme_risers.py 가 고른 것)를 읽어 줄만 세운다. */
-export async function listUsThemeRisers(): Promise<ThemeRiser[] | null> {
+export async function listUsThemeRisers(): Promise<{ risers: ThemeRiser[]; asOf: string | null } | null> {
   const db = getSupabaseAdmin();
   const baseDate = await usKaderaBaseDate();
   const { data, error } = await db
     .from("telegram_us_theme_brief")
     .select("theme,date,riser")
-    .gte("date", addDaysISO(baseDate, -LLM_TEXT_CARRY_DAYS))
+    // 그날 줄이 없으면 앞 날로 채운다(국장 listThemeRisers · risersWithFallback 과 같은 까닭).
+    .gte("date", addDaysISO(baseDate, -RISER_FALLBACK_DAYS))
     .lte("date", baseDate)
-    // riser 가 빈 행도 받는다(국장 listThemeRisers 와 같은 까닭). 16테마 × 이틀.
+    // riser 가 빈 행도 받는다(국장 listThemeRisers 와 같은 까닭). 16테마 × 여드레.
     .order("date", { ascending: false })
-    .limit(200);
+    .limit(300);
   if (error) {
     console.error("[listUsThemeRisers] 테마 요약의 종목 칸을 못 읽었습니다", error);
     return null;
   }
-  return parseRisers((data ?? []) as RiserRow[], (t) => t in US_THEMES);
+  return risersWithFallback((data ?? []) as RiserRow[], (t) => t in US_THEMES, addDaysISO(baseDate, -LLM_TEXT_CARRY_DAYS));
 }

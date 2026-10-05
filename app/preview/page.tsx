@@ -263,7 +263,7 @@ function OvernightModule({ overnight }: { overnight: OvernightData & { live: boo
           <span>해외 값</span>
           {/* '국장 대비'면 국장 종가와 견준 것으로 읽힌다 — '종가'까지 풀어 쓰면 길기만 했다(2026-10-04 지적). */}
           <span>국장 대비</span>
-          <span>24시간 거래</span>
+          <span>24H 거래량</span>
         </div>
         <ol className="v2-tbody">
           {overnight.rows.map((r) => (

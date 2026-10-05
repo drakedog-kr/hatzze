@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { RISER_MAX, parseRisers, type RiserRow } from "../lib/theme-risers.ts";
+import { RISER_MAX, parseRisers, risersWithFallback, type RiserRow } from "../lib/theme-risers.ts";
 
 const riser = (code: string, ratio: number | null, reason: string, recent = 10) => ({
   code,
@@ -69,3 +69,38 @@ describe("parseRisers", () => {
     assert.deepEqual(out.slice(0, 3).map((r) => r.theme), ["B", "C", "A"]);
   });
 });
+
+describe("risersWithFallback — 그날 줄이 없으면 줄이 있던 가장 최근 날", () => {
+  const known = () => true;
+  it("기준일(이어 읽기 포함)에 이유 있는 줄이 있으면 그대로 · asOf 없음", () => {
+    const rows = [row("2026-10-05", "반도체", riser("A", 2, "이유")), row("2026-10-04", "바이오", riser("B", 3, "이유"))];
+    const got = risersWithFallback(rows, known, "2026-10-04");
+    assert.equal(got.asOf, null);
+    assert.deepEqual(got.risers.map((r) => r.code).sort(), ["A", "B"]);
+  });
+  it("연휴 끝처럼 기준일 · 어제 줄이 다 비면 그 앞 가장 최근 날의 목록을 그날과 함께", () => {
+    const rows = [
+      row("2026-10-05", "반도체", null),
+      row("2026-10-04", "반도체", null),
+      row("2026-10-03", "반도체", riser("C", 2, "이유")),
+      row("2026-10-02", "반도체", riser("D", 4, "이유")),
+    ];
+    const got = risersWithFallback(rows, known, "2026-10-04");
+    assert.equal(got.asOf, "2026-10-03");
+    assert.deepEqual(got.risers.map((r) => r.code), ["C"]);
+  });
+  it("이유 없는 줄만 있는 날은 건너뛴다", () => {
+    const rows = [row("2026-10-05", "반도체", null), row("2026-10-03", "반도체", riser("E", 2, "")), row("2026-10-02", "반도체", riser("F", 2, "이유"))];
+    assert.equal(risersWithFallback(rows, known, "2026-10-04").asOf, "2026-10-02");
+  });
+});
+
+describe("risersWithFallback — 어제 목록이 오늘 빈 행에 가려지지 않게", () => {
+  it("오늘 행이 다 비면 어제 목록(asOf 어제)", () => {
+    const rows = [row("2026-10-05", "반도체", null), row("2026-10-04", "반도체", riser("G", 2, "이유"))];
+    const got = risersWithFallback(rows, () => true, "2026-10-04");
+    assert.equal(got.asOf, "2026-10-04");
+    assert.deepEqual(got.risers.map((r) => r.code), ["G"]);
+  });
+});
+
