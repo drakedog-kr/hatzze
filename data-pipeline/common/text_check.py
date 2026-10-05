@@ -356,7 +356,9 @@ def glued_names(text: str, source: str) -> list[str]:
         stem = _JOSA_TAIL.sub("", word)
         if len(stem) < 5 or stem in source or stem[0] in _GLUE_PREFIX_OK:
             continue
-        if stem[1:] in source:
+        # 떼어 낸 낱말이 원문에서 **낱말 머리**로 나와야 한다 — 그냥 부분 문자열로 보면 '늘었습니다'가 원문 '좋았었습니다'의
+        # '었습니다'에 걸리는 식으로 흔한 합쇼체 어미가 모두 오타로 잡혔다(2026-10-05 머지 전 점검, 화면 문장 3%).
+        if re.search(r"(?<![가-힣])" + re.escape(stem[1:]), source):
             found.append(f"붙은 이름 '{stem}'(원문은 '{stem[1:]}')")
     return found
 
