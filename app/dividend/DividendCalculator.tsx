@@ -20,6 +20,7 @@ import type { SortKey } from "./Holdings";
 import { MonthFill, upcomingOf } from "./Calendar";
 import { GoalBox } from "./Goal";
 import { BasketBoard } from "./V2Baskets";
+import { V2Hint } from "../V2Hint";
 import { CalendarModule, DvCover, UpcomingModule, YearlyModule } from "./V2Parts";
 
 // '모두 빼기' 확인 판(Base UI 대화상자, gzip 약 20KB)은 처음 누를 때 받아 온다(ClearDialog.tsx).
@@ -439,12 +440,17 @@ export function DividendCalculator({
 
       <section
         ref={calcRef}
-        className={`v2-mod v2-dv-mine${dragOver ? " dv-drop-on" : ""}`}
+        className={`v2-mod v2-dv-mine v2-has-hint${dragOver ? " dv-drop-on" : ""}`}
         onDragOver={onDragOver}
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
         aria-label="내 종목 계산기"
       >
+        {/* 처음 온 사람(담은 종목 없음)에게 한 번 — 칩을 누르면 담긴다는 것. 칸 안 어디를 눌러도(검색 · 칩) '봤음'이 된다(app/V2Hint.tsx).
+            저장소를 읽기 전엔 띄우지 않는다 — 담은 종목이 있는 사람에게 잠깐 섰다 사라진다. */}
+        {holdingsLoaded && lines.length === 0 && (
+          <V2Hint id="dividend-pick" anchor=".dv-groups .dv-chip" text="종목을 누르면 담기고 배당이 계산됩니다" />
+        )}
         <header className="v2-mod-head">
           <h2>내 종목</h2>
           {lines.length > 0 && <HoldingsBar lines={lines} onSort={sortLines} onClear={clearAll} />}

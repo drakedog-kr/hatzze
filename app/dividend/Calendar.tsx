@@ -13,6 +13,7 @@ import type { Scope, Line } from "./shared";
 import { expectedPays } from "./calc";
 import { QuickChips } from "./Search";
 import { Module } from "../kadera/V2Modules";
+import { Icon } from "../ui";
 
 /* ── 달마다 얼마 ─────────────────────────────────────────────────── */
 export function MonthCalendar({
@@ -65,9 +66,15 @@ export function MonthCalendar({
                   막대가 줄어들어(flex-shrink) 큰 달들이 다 같은 키였다 — 폰에선 열한 달이 22px 로 같았다(2026-10-04 점검). */}
               <span className="dv-cal-bar" style={{ "--r": max > 0 && v > 0 ? Math.max(0.06, v / max) : 0 } as React.CSSProperties} aria-hidden="true" />
               <span className="dv-cal-month">{m}월</span>
-              {/* 빈 달은 '0원' + 점선 칸(v2.css .dv-cal-cell:not(.dv-cal-on)) — 칸마다 + 아이콘을 두면 한 판에 다섯 번 섰다(2026-10-05 점검).
-                  누르면 그 달에 주는 종목 판이 열리는 것은 그대로다. */}
-              <span className={`dv-cal-amt${v > 0 ? "" : " dv-cal-zero"}`}>{v > 0 ? amt(v) : "0원"}</span>
+              {/* 빈 달은 점선 칸 + 동그라미 + — "눌러서 이 달을 채운다"(누르면 그 달에 주는 종목 판). 한때 '0원'으로 바꿨다가(칸마다 같은
+                  아이콘이 다섯 번 선다는 이유) 운영자 지시로 되살렸다(2026-10-05) — 뜻이 하나(이 달을 채운다)라 한 화면 한 아이콘 규칙의 예외다. */}
+              {v > 0 ? (
+                <span className="dv-cal-amt">{amt(v)}</span>
+              ) : (
+                <span className="dv-cal-amt dv-cal-add" aria-hidden="true">
+                  <Icon name="add_circle" style={{ fontSize: 18 }} />
+                </span>
+              )}
             </button>
           );
         })}

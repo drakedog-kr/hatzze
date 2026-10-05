@@ -1578,7 +1578,9 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 }
 /* 빈 달 — 점선 칸 + '0원'(Calendar.tsx). */
 .v2-dv .dv-cal-cell:not(.dv-cal-on) { outline: 1px dashed var(--t-frame); outline-offset: -1px; }
-.v2-dv .dv-cal-zero { color: var(--t-ink3); }
+/* 빈 달의 + 동그라미 — 달력 막대와 같은 파랑, 누를 수 있다는 표시라 호버 · 고른 달에서 진하게. */
+.v2-dv .dv-cal-cell:not(.dv-cal-on) .dv-cal-add { display: inline-flex; height: 18px; margin-top: 0; align-items: center; color: var(--t-down); opacity: 0.7; }
+.v2-dv .dv-cal-cell:hover .dv-cal-add, .v2-dv .dv-cal-cell[aria-pressed="true"] .dv-cal-add { opacity: 1; }
 .v2-dv-fill .dv-more-row:first-child { border-top: 0; padding-top: 0; }
 .v2-dv-bk-list-st { flex: 1; display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--t-line); }
 .v2-dv-bk-list-st > li { flex: 1 0 auto; display: flex; border-bottom: 1px solid var(--t-line); }
