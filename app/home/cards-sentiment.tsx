@@ -2,7 +2,7 @@
 
 import { formatIndicatorValue, formatSampleCount, sentimentTone, shortDate } from "@/lib/format";
 import { C, MONO, R } from "../ui";
-import { overheatColor, Shell, TitleRow, Big, Foot, HeatFill, HeatScale, HotPill, AreaChart, SplitStats } from "./parts";
+import { overheatColor, Shell, TitleRow, Big, Foot, HeatFill, HeatScale, AreaChart, SplitStats } from "./parts";
 import type { Pick } from "./parts";
 import type { IconName } from "@/lib/icon-names";
 
@@ -227,11 +227,10 @@ export function CardTrend({ v, icon }: { v: Pick; icon: IconName }) {
         <>
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
             <Big disp={v.disp} unit={v.unit} color={v.color} size={32} />
-            <HotPill v={v} />
           </div>
           {/* 진행 막대에서 차트로 되돌렸다(2026-08-03). 이 둘은 값이 하루하루
               오르내리는 계열이라 "지금 어디"보다 "어떻게 움직여 왔나"가 더 읽을 게 많다.
-              기준선까지의 거리는 위 칩(초고온 N)이 그대로 말한다. */}
+              (기준선 칩 '초고온 N부터'는 2026-10-05 에 걷었다 — app/home/parts.tsx 주석.) */}
           {chart.length >= 2 ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <AreaChart

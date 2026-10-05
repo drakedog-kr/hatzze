@@ -5,7 +5,7 @@ import type { ClosePoint, StockHighGap } from "@/lib/data";
 import { formatEokMixed, formatIndicatorValue, shortDate } from "@/lib/format";
 import { stockHref } from "@/lib/stock-page";
 import { BLUE_SCALE, C, MONO, R } from "../ui";
-import { sourceDateBadge, Shell, TitleRow, Big, BigWithHot, Foot, HeatKnob, HeatFill, HeatBar, HeatScale, AreaChart, SplitStats } from "./parts";
+import { sourceDateBadge, Shell, TitleRow, Big, Foot, HeatKnob, HeatFill, HeatBar, HeatScale, AreaChart, SplitStats } from "./parts";
 import type { Pick } from "./parts";
 
 export function CardBuffett({ v }: { v: Pick }) {
@@ -603,7 +603,7 @@ export function CardGoldRatio({ v }: { v: Pick }) {
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow icon="balance" name={v.name} desc={v.headline} />
-      <BigWithHot v={v} size={32} sub={note} />
+      <Big disp={v.disp} unit={v.unit} color={v.color} size={32} sub={note} />
       <HeatBar v={v} />
       <Foot text={v.desc} />
     </Shell>

@@ -47,9 +47,6 @@ export type Pick = {
   unit: string;
   /** 진행률 100 지점(매핑 상한). 유튜브 '평소 대비 N배'처럼 이 값이 필요한 카드만 쓴다. */
   thDisp: string | null;
-  /** 카드에 "기준선"으로 적는 값 = 초고온 진입선. 이걸 넘으면 배지가 켜진다. */
-  hotDisp: string | null;
-  dirLabel: string;
   details: Record<string, number> | null;
   history: number[];
   historyPoints: { date: string; value: number }[];
@@ -75,22 +72,12 @@ export function pick(ind: Ind | undefined): Pick {
   const score = ind?.latest?.normalized_score ?? null;
   const capped = score === null ? null : Math.min(Math.max(score, 0), 100);
   const threshold = ind?.latest?.threshold ?? null;
-  // 카드에 "기준선"으로 적는 값은 진행률 100 지점이 아니라 **초고온 진입선**(진행률 75)이다.
-  // 파이프라인이 details.hot_threshold에 넣어준다(calculate_score.raw_at_progress).
-  // 이 값을 넘는 순간 초고온 배지가 켜지므로 표시와 판정이 같은 지점을 가리킨다.
-  //
-  // 없으면 threshold로 폴백하지 **않는다** — 그게 정확히 고치려던 그 문제이기 때문이다.
-  // (threshold는 진행률 100 지점이라, 그걸 기준선이라 적으면 "기준선에 못 미쳤는데
-  //  초고온" 표시가 그대로 남는다.) 새 코드로 파이프라인이 한 번 돌기 전까지는
-  //  기준선 줄을 아예 숨겨서 틀린 숫자를 보여주지 않는다.
-  const hotThreshold = ind?.latest?.details?.hot_threshold ?? null;
   const unit = ind?.unit ?? "";
   const f =
     raw !== null
       ? formatIndicatorValue(raw, unit)
       : { display: "-", displayUnit: unit };
   const tf = threshold !== null ? formatIndicatorValue(threshold, unit) : null;
-  const hf = hotThreshold !== null ? formatIndicatorValue(hotThreshold, unit) : null;
   return {
     ind,
     name: ind?.name ?? "",
@@ -101,8 +88,7 @@ export function pick(ind: Ind | undefined): Pick {
     capped,
     threshold,
     // 초고온 = 진행률 ≥ 75. 모든 지표의 진행률이 '과열도(0~100)'로 통일돼 있어
-    // (youtube는 surge_map으로 평균 대비 급증을 매핑) 예외 없이 동일 기준이고,
-    // 이 지점이 곧 카드에 적히는 기준선(hotDisp)이다.
+    // (youtube는 surge_map으로 평균 대비 급증을 매핑) 예외 없이 동일 기준이다.
     // 반올림한 값으로 — 구간 이름 · 색과 같은 잣대(stageForScore · overheatColor).
     isHit: Math.round(capped ?? 0) >= 75,
     // 고온 이상(진행률 ≥ 50). 카드에 붙는 보조 배지의 색을 가르는 값이다 — 배지가 늘
@@ -116,8 +102,6 @@ export function pick(ind: Ind | undefined): Pick {
     disp: f.display,
     unit: f.displayUnit,
     thDisp: tf ? `${tf.display}${tf.displayUnit}` : null,
-    hotDisp: hf ? `${hf.display}${hf.displayUnit}` : null,
-    dirLabel: ind?.direction === "low" ? "이하" : "이상",
     details: ind?.latest?.details ?? null,
     history: ind?.history ?? [],
     historyPoints: ind?.historyPoints ?? [],
@@ -523,28 +507,9 @@ export function HeatScale() {
   );
 }
 
-/**
- * 초고온 기준 알약 — 큰 숫자 옆에 선다. 막대 밑 글줄('1.83배 이상이면 초고온')과 알약('6.00%부터 초고온')이 화면 안에서
- * 두 꼴이었다(2026-10-04 점검). '초고온 6.00%'로 적으면 기준선인데 값처럼 읽혀 기준이라는 걸 말로 적는다.
- */
-export function HotPill({ v }: { v: Pick }) {
-  if (!v.hotDisp) return null;
-  return (
-    <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub, background: C.chip, borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
-      {v.dirLabel === "이하" ? `${v.hotDisp} 이하면 초고온` : `${v.hotDisp}부터 초고온`}
-    </span>
-  );
-}
-
-/** 큰 숫자 + 초고온 기준 알약 한 줄. 알약이 없으면 큰 숫자만. */
-export function BigWithHot({ v, size, sub }: { v: Pick; size: number; sub?: string }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-      <Big disp={v.disp} unit={v.unit} color={v.color} size={size} sub={sub} />
-      <HotPill v={v} />
-    </div>
-  );
-}
+/* ⛔ 초고온 기준 알약('1.83배부터 초고온' · '6.00%부터 초고온')과 그걸 큰 숫자 옆에 세우던 BigWithHot 은 걷었다(2026-10-05 운영자 판단 —
+   초고온이 언제부터인지 말해 주는 글은 빼고 큰 숫자 · 막대 색이 말하게). 금 대비 코스피 · 경제 베스트셀러 · 깃헙 거래봇 세 카드에만 섰다.
+   파이프라인의 details.hot_threshold 는 그대로 남아 있다(배지 판정은 진행률 75). */
 
 /**
  * 근거 두 칸 — 레버리지 · 코인 · 실물–증시 괴리가 큰 숫자 아래 근거 둘을 나란히 둔다.
@@ -726,7 +691,7 @@ export function GenericCard({ v, icon }: { v: Pick; icon: IconName }) {
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={210}>
       <TitleRow desc={v.headline} icon={icon} name={v.name} />
-      <BigWithHot v={v} size={30} />
+      <Big disp={v.disp} unit={v.unit} color={v.color} size={30} />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
         <HeatBar v={v} />
       </div>
